@@ -17,6 +17,16 @@
 
 阶段匹配子表用来归因；我方dense/dense、sparse/dense、dense/sparse、sparse/sparse四配置由Opus负责。等K不等compute/traffic，报告原生保护集、真实选择数、CPU/GPU驻留与临时缓存；共同预算与质量容差/Pareto互补，均沿既有范围。仅受控消融统一保护集。MInference+Quest等是可选、须真接入验证的组合，不是原论文原生基线，本轮不要求新增。
 
+## 模型兼容门槛：Qwen3不能只换模型名
+
+每个“方法×模型×实现路径”标三态：**官方native**、**已验证faithful port**、**不支持/尚未验证（N/A）**。原生支持也须记录所用依赖/模型版本；质量移植通过不自动代表高效kernel支持。不同checkpoint的分数不拼排行榜。
+
+DeepSeek在S-T023历史Progress中已有Qwen3字段映射计划，新adapter保留q_norm/k_norm、position_embeddings和cache.update，是必要工作，但当前仍有上述dense分支缺失，尚不能标已验证faithful port。官方Quest [注册入口L248–261](https://github.com/mit-han-lab/Quest/blob/01c1623bf9395009520874e989e29f683203b357/evaluation/quest_attention.py#L248)只识别LlamaAttention/MistralAttention；不能以结构相似替代验证。
+
+移植验收须保留Q/K norm、RoPE及position、GQA head映射、scale、mask、cache更新、prefill/decode条件和dense fallback，并对固定官方实现的选择器/页极值/topk/保护集语义核对。全预算退化为dense等价只是必要条件；还需稀疏预算下选择器语义对拍。现有 [CPU测试L74–111](https://github.com/Chosen-David/two-level-attention/blob/b6782d885484f09020b383f94e08db27712b641b/exp/vendor_baselines/quest_vendor/test_qwen3_quest_patch.py#L74)名为mask-selection却只断言有限/非零输出；L114–135测人工score的topk，没有覆盖真实QK到页分数的全链路。本轮未执行测试，不能背书README的“全绿”。
+
+若无法低风险接入，Qwen3表诚实N/A；可提出双方共同官方支持模型上的配对补充，但须沿既有授权/资源范围确认后才实施，不能擅自扩模型或GPU矩阵。HF全QK后mask路径可研究质量，不能借用原论文CUDA/kernel速度冒充该移植的实测效率。
+
 ## 固定源码调用链与待办
 
 实际在隔离目录克隆、静态阅读以下固定SHA；未装依赖、未执行仓库脚本/模型/GPU，未递归取子模块。完整139条证据已保存Library：`libfile_da83e8d565a08191a1ad21d20d0d5d16`。以下链接给出最短复查入口，非全仓审计。
