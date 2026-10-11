@@ -171159,5 +171159,27 @@
   }
  ],
  "finished": "2026-10-11 22:22:39",
- "output_content_sha256": "050ea88965237817d0e825356306dfd8496ab0cef96dc066ef8e2683656af0f9"
+ "output_content_sha256": "1b7a101c3141eac054bec9265587250a1b0b147c30856c88fc92c0d31159bdb9",
+ "correction": {
+  "id": "TL-E126-STAGE-DOUBLECOUNT-001",
+  "applied": "2026-10-12 00:19:57",
+  "description": "S2 父子区间重复求和修复：selector_total_ms_median_est 与 amortization.selector_ms 原把 S2 与其子段 S2_far/S2_near 一并累加（父子关系非互斥阶段）导致 cluster 臂重复计时。修正 = 互斥阶段（EXCLUSIVE_STAGE_KEYS）中位数和/逐步和；S2_far/S2_near 保留为 breakdown。修正值语义 = 互斥阶段和，非 wall time。",
+  "method": {
+   "selector_total_ms_median_est": "stage_ms_samples 白名单互斥阶段中位数和（原始样本逐位不动，fresh 重算）",
+   "amortization.selector_ms": "逐步原值 − (s2_far_ms + s2_near_ms)（逐步全 span 未持久化，子段扣除为唯一可恢复路径，浮点误差 ≤ 1 ulp 级）"
+  },
+  "affected_fields": [
+   "cases[].selector_total_ms_median_est",
+   "cases[].amortization.selector_ms（仅 cluster 臂）"
+  ],
+  "raw_untouched": [
+   "cases[].stage_ms_samples",
+   "cases[].wall_ns_selector_samples",
+   "cases[].s8_ms_samples",
+   "cases[].stage_ms_median",
+   "cases[].amortization.step_S/s2_ms/s2_far_ms/s2_near_ms/s2_cum_ms",
+   "cases[].e2e_128step_wall_ns_timing_off"
+  ],
+  "report": "exp/trace/results/e126_dedup_correction_report.json"
+ }
 }
