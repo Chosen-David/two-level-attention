@@ -17,9 +17,10 @@ agent 库的 [项目文档治理](https://github.com/Chosen-David/agent) 布局�
 | 人类指南（映射） | `/home/wangyuanshuo02/sglang/TASK.md`（用户私人任务设定，AI 只读）与 `/home/wangyuanshuo02/sglang/论文indexer.md`（论文口径权威定义，异议写反馈） |
 | 历史治理区 | `/home/wangyuanshuo02/sglang/agent_doc/`（主项目迁移前的治理存档，内容已迁移到本目录） |
 
-本目录 2026-10-11 建立：task/advice/results 内容自 sglang 主仓
-`agent_doc/` 迁移而来（主项目地位移交），后续由主 AI 在本目录维护，不再
-双清单并行。
+本目录 2026-10-11 建立：task 只迁移**未完成**任务（在飞/暂停）、
+advice 只保留**未过时**建议、results 迁移活跃表现索引（主项目地位移交）；
+已收官任务与过时建议的历史保留在 sglang 主仓 `agent_doc/`（sglang 不
+停止维护，后续仍回来做集成相关工作）。主项目任务链在本目录维护。
 
 ## 目录职责
 
