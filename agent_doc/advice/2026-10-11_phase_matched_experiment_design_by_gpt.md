@@ -117,6 +117,14 @@ Sanity先在近原论文配置核输入、算法语义、预算、指标和重�
 原作者所谓E2E逐项翻译成实际计时边界；Quest/SparQ单token模型时间、ClusterKV含prefill的整段时间与本库请求时间分别标注。
 最少交付：来源/支持表、split与输入hash、冻结配置、实际路由/预算、逐seq预测/分数、完整时间与内存分解、失败和主张证据对照。
 
+### E126 窄更正（固定源 d567c7e；证据候选，非 GPU 重测）
+独审及本轮复核：五臂50格的阶段median与逐样本复算一致，六份JSON与各自sidecar SHA-256一致；这验证了样本/文件一致性，不代表派生总成本或请求E2E已验收。保留原样本；本条不改R53主结果、不新增矩阵/资源，也不删除尚未全验收的advice。
+
+- **去除嵌套阶段双计**：[计时脚本L435–449](https://github.com/Chosen-David/two-level-attention/blob/d567c7e1f91c026ba7ef3e41f5b3399fd3f44107/exp/trace/e126_stage_timing.py#L435-L449)的S2已包含far/near，但[L626–627、635–636](https://github.com/Chosen-David/two-level-attention/blob/d567c7e1f91c026ba7ef3e41f5b3399fd3f44107/exp/trace/e126_stage_timing.py#L626-L636)再次相加。后续须保留原样本，按每步互斥stage求和再汇总，旧双计派生量标失效。64k structured去重后的**阶段median之和**为mavg 5.551584 ms、cclustersim 5.726768 ms，相对差3.16%，不是“<2%”；该量仍不等于每步总和的median或均值成本，不能互换。
+- **限定计时名称**：[L511–518](https://github.com/Chosen-David/two-level-attention/blob/d567c7e1f91c026ba7ef3e41f5b3399fd3f44107/exp/trace/e126_stage_timing.py#L511-L518)仅记录selector host interval，[L605–609](https://github.com/Chosen-David/two-level-attention/blob/d567c7e1f91c026ba7ef3e41f5b3399fd3f44107/exp/trace/e126_stage_timing.py#L605-L609)再加S8 CUDA-event时间；`e2e_128step_wall_ns_timing_off`不是同步的request wall。即使补同步，也仍是单层synthetic微基准，不是完整请求E2E；现仅标混合时钟微基准，不与未配对E127组成提速结论。
+- **按实际配置解释成本**：[ARM_CONFIGS L112–123](https://github.com/Chosen-David/two-level-attention/blob/d567c7e1f91c026ba7ef3e41f5b3399fd3f44107/exp/trace/e126_stage_timing.py#L112-L123)中aavg的(α,β,γ)是(.125,.125,.375)，不是(0,0)；两cluster臂使用sim_greedy，不能把占位的256簇/10轮参数解释为实测kmeans成本。[eager_decoding L39–60](https://github.com/Chosen-David/two-level-attention/blob/d567c7e1f91c026ba7ef3e41f5b3399fd3f44107/sparse_attn/ops/eager_decoding.py#L39-L60)为全长QK→mask/softmax→全长PV，S8不能称只读取K2个KV。
+- **保留证据范围**：冷建、重建峰值及均值成本仍须分别保留；结论仅覆盖structured/singleton两种synthetic分布、B=1、q_len=1、D′ off及登记配置，不能推为普遍分布无关。此处提出汇总修正要求，不冒称已经重生成结果或完成质量—速度配对验收。
+
 ## 6 已收到的只读源码核查附录
 本轮只读clone核查报告已取得：八个仓库位于指定SHA且工作树clean，检查源码调用链；没有install、执行模型或GPU测试，clone完成不等于接入通过。
 - [MoBA wrapper L51–82](https://github.com/MoonshotAI/MoBA/blob/b5d58363311d3ca946f1ec444182727c15e338b5/moba/wrapper.py#L51-L82)：等长Q/K走稀疏路径，否则dense decode；S-T023的“decode慢速稀疏路径”须按实际路由更正。
