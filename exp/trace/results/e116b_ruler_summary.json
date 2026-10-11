@@ -1,0 +1,183 @@
+{
+ "experiment": "E116b RULER 三档全量收口汇总（32K/64K/128K × mavg/aavg(0,0)/fullkv）",
+ "date": "2026-10-11",
+ "model": "Qwen3-8B",
+ "scorer": "score_ruler_formal.py（单格门禁 + producer receipt 消费 + .tli_gen 指针协议）",
+ "cells": {
+  "32K": {
+   "mavg": {
+    "avg": 59.65,
+    "delta_vs_fullkv": 0.27,
+    "per_task": {
+     "niah_single_1": 100.0,
+     "niah_single_2": 100.0,
+     "niah_single_3": 98.0,
+     "niah_multikey_1": 98.0,
+     "niah_multikey_2": 84.0,
+     "niah_multikey_3": 8.0,
+     "niah_multiquery": 24.5,
+     "niah_multivalue": 28.5,
+     "cwe": 71.3,
+     "fwe": 11.67,
+     "vt": 32.2
+    },
+    "formal_record": "exp/trace/results/e116b_ruler32768k_formal_mavg.json (+.md/manifest/receipt 四件套)"
+   },
+   "aavg": {
+    "avg": 57.33,
+    "delta_vs_fullkv": -2.05,
+    "per_task": {
+     "niah_single_1": 93.0,
+     "niah_single_2": 98.0,
+     "niah_single_3": 99.0,
+     "niah_multikey_1": 99.0,
+     "niah_multikey_2": 73.0,
+     "niah_multikey_3": 0.0,
+     "niah_multiquery": 26.25,
+     "niah_multivalue": 25.5,
+     "cwe": 81.9,
+     "fwe": 4.0,
+     "vt": 31.0
+    },
+    "formal_record": "exp/trace/results/e116b_ruler32768k_formal_aavg.json (+.md/manifest/receipt 四件套)"
+   },
+   "fullkv": {
+    "avg": 59.38,
+    "delta_vs_fullkv": 0.0,
+    "per_task": {
+     "niah_single_1": 100.0,
+     "niah_single_2": 100.0,
+     "niah_single_3": 100.0,
+     "niah_multikey_1": 99.0,
+     "niah_multikey_2": 76.0,
+     "niah_multikey_3": 4.0,
+     "niah_multiquery": 24.5,
+     "niah_multivalue": 25.0,
+     "cwe": 83.5,
+     "fwe": 7.0,
+     "vt": 34.2
+    },
+    "formal_record": "exp/trace/results/e116b_ruler32768k_formal_fullkv.json (+.md/manifest/receipt 四件套)"
+   }
+  },
+  "64K": {
+   "mavg": {
+    "avg": 49.94,
+    "delta_vs_fullkv": 1.4,
+    "per_task": {
+     "niah_single_1": 86.0,
+     "niah_single_2": 100.0,
+     "niah_single_3": 100.0,
+     "niah_multikey_1": 100.0,
+     "niah_multikey_2": 60.0,
+     "niah_multikey_3": 0.0,
+     "niah_multiquery": 27.5,
+     "niah_multivalue": 29.5,
+     "cwe": 0.3,
+     "fwe": 14.0,
+     "vt": 32.0
+    },
+    "formal_record": "exp/trace/results/e116b_ruler65536k_formal_mavg.json (+.md/manifest/receipt 四件套)"
+   },
+   "aavg": {
+    "avg": 47.51,
+    "delta_vs_fullkv": -1.03,
+    "per_task": {
+     "niah_single_1": 92.0,
+     "niah_single_2": 99.0,
+     "niah_single_3": 79.0,
+     "niah_multikey_1": 97.0,
+     "niah_multikey_2": 55.0,
+     "niah_multikey_3": 0.0,
+     "niah_multiquery": 25.25,
+     "niah_multivalue": 40.25,
+     "cwe": 0.2,
+     "fwe": 6.33,
+     "vt": 28.6
+    },
+    "formal_record": "exp/trace/results/e116b_ruler65536k_formal_aavg.json (+.md/manifest/receipt 四件套)"
+   },
+   "fullkv": {
+    "avg": 48.54,
+    "delta_vs_fullkv": 0.0,
+    "per_task": {
+     "niah_single_1": 100.0,
+     "niah_single_2": 100.0,
+     "niah_single_3": 100.0,
+     "niah_multikey_1": 100.0,
+     "niah_multikey_2": 50.0,
+     "niah_multikey_3": 0.0,
+     "niah_multiquery": 20.25,
+     "niah_multivalue": 26.25,
+     "cwe": 0.6,
+     "fwe": 4.0,
+     "vt": 32.8
+    },
+    "formal_record": "exp/trace/results/e116b_ruler65536k_formal_fullkv.json (+.md/manifest/receipt 四件套)"
+   }
+  },
+  "128K": {
+   "mavg": {
+    "avg": 47.2,
+    "delta_vs_fullkv": 0.77,
+    "per_task": {
+     "niah_single_1": 100.0,
+     "niah_single_2": 100.0,
+     "niah_single_3": 99.0,
+     "niah_multikey_1": 98.0,
+     "niah_multikey_2": 46.0,
+     "niah_multikey_3": 1.0,
+     "niah_multiquery": 22.5,
+     "niah_multivalue": 2.5,
+     "cwe": 0.5,
+     "fwe": 26.67,
+     "vt": 23.0
+    },
+    "formal_record": "exp/trace/results/e116b_ruler128k_formal_mavg.json (+.md/manifest/receipt 四件套)"
+   },
+   "aavg": {
+    "avg": 42.56,
+    "delta_vs_fullkv": -3.87,
+    "per_task": {
+     "niah_single_1": 100.0,
+     "niah_single_2": 99.0,
+     "niah_single_3": 49.0,
+     "niah_multikey_1": 95.0,
+     "niah_multikey_2": 47.0,
+     "niah_multikey_3": 0.0,
+     "niah_multiquery": 16.25,
+     "niah_multivalue": 14.75,
+     "cwe": 0.3,
+     "fwe": 20.67,
+     "vt": 26.2
+    },
+    "formal_record": "exp/trace/results/e116b_ruler128k_formal_aavg.json (+.md/manifest/receipt 四件套)"
+   },
+   "fullkv": {
+    "avg": 46.43,
+    "delta_vs_fullkv": 0.0,
+    "per_task": {
+     "niah_single_1": 100.0,
+     "niah_single_2": 100.0,
+     "niah_single_3": 100.0,
+     "niah_multikey_1": 99.0,
+     "niah_multikey_2": 57.0,
+     "niah_multikey_3": 1.0,
+     "niah_multiquery": 12.25,
+     "niah_multivalue": 2.5,
+     "cwe": 3.4,
+     "fwe": 13.0,
+     "vt": 22.6
+    },
+    "formal_record": "exp/trace/results/e116b_ruler128k_formal_fullkv.json (+.md/manifest/receipt 四件套)"
+   }
+  }
+ },
+ "verdict": "三档排序一致：mavg(.25,.125,.625) > FullKV > aavg(0,0)——32K 59.65(+0.27)、64K 49.94(+1.40)、128K 47.20(+0.77)；mavg 冠军跨三档稳定，aavg 单池随长度衰减放大（−2.05/−1.02/−3.87）；fullkv 复用值与 E116e/E119 收口逐位交叉验证一致",
+ "caliber": {
+  "mavg/aavg": "E116b 新口径重跑（B10/075 修复后）；128K yarn_factor=4.0（producer receipt 权威）",
+  "fullkv": "复用 E109 dense（method=none 不走 TLI 路径，复用政策 S-T019）；RULER 三档复用值经 E116e/E119 收口逐位交叉验证",
+  "errata": "E119 128K 旧回执 yarn_factor=2.0 为标注错误（实际 4.0），分数不受影响——见 exp/trace/results/ERRATA.md"
+ },
+ "identity_contract": "本汇总为 9 个已关门格的聚合视图；逐格身份/SHA/闭包以各 formal_*.json + manifest + receipt 为准（本文件不替代门禁）"
+}
