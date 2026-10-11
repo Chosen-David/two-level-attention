@@ -1,0 +1,380 @@
+{
+ "meta": {
+  "champion_ref": "mavg(.25,.125,.625) 新口径（E123 锚点，AVG5=47.91）",
+  "fullkv_ref": "FullKV 新口径（E123 锚点，AVG5=48.02）",
+  "scorer_backend": "difflib:stdlib",
+  "bootstrap": {
+   "B": 10000,
+   "seed": 42,
+   "rng": "stdlib random.Random（Mersenne Twister）",
+   "task_order": [
+    "qasper",
+    "hotpotqa",
+    "gov_report",
+    "musique",
+    "repobench"
+   ],
+   "unit": "任务级配对差（arm−mavg 锚点）有放回重采样",
+   "ci": "percentile 95%：sorted means[int(0.025*B)], means[int(0.975*B)-1]"
+  },
+  "arm_configs": {
+   "aavg": "far=avg near=avg (.125,.125,.375) kmeans=false --tli_far_method avg --tli_near_method avg",
+   "cavgsim": "far=minmax near=avg (0,0,0) far_select=sim_greedy kmeans=true tli_sim=0.9（d85af51 修复后新源身份重跑）",
+   "cclustersim": "far=minmax near=avg far_select=sim_greedy near_select=sim_greedy kmeans=true tli_sim=0.9 (.125,.25,.125)",
+   "mminmax": "far=minmax near=minmax (.875,.875,.125) kmeans=false"
+  },
+  "anchor_provenance": {
+   "source": "exp/trace/results/e123_trial_verdict.json",
+   "anchor_scorer_backend": "difflib:stdlib",
+   "anchor_backend_migration": {
+    "source": "exp/trace/results/e123_trial_raw/pred_{mavg,cavg_g,cavg_off,fullkv}/result.json _meta.scorer_backend",
+    "resolved_backend": "difflib:stdlib",
+    "reason": "e123_trial_verdict.json meta 缺 scorer_backend（E123 判决生成早于 085 身份字段协议）；四臂 raw 闭包一致，显式迁移登记，不猜默认值"
+   },
+   "note": "mavg/fullkv 锚点逐任务分数复用 E123（同 difflib 协议同 5 任务集，E123 已过 scorer 身份门禁与 input_manifest 闭包）"
+  },
+  "cavgsim_provenance": "d85af51 修复后新源身份重跑（BeeGFS 直写，旧 buggytail 产出已隔离）；其余三臂旧树 d993d748（C 组 10 配置逐位一致证明与修复树同行为）"
+ },
+ "input_manifest": [
+  {
+   "arm": "aavg",
+   "task": "qasper",
+   "basename": "qasper-tli_64_128_1024_c4_a0.125_b0.125_g0.375_h59af9edb35-1011154302.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "e43bc7de5221c749895a0e232ec8360a7b8c3bb167f9016b1f022c304b4b7279"
+  },
+  {
+   "arm": "aavg",
+   "task": "hotpotqa",
+   "basename": "hotpotqa-tli_64_128_1024_c4_a0.125_b0.125_g0.375_h59af9edb35-1011154302.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "fa5ac1f92c56288e277147f176952527a751983f4f8040368b1fb9b04a40b08f"
+  },
+  {
+   "arm": "aavg",
+   "task": "gov_report",
+   "basename": "gov_report-tli_64_128_1024_c4_a0.125_b0.125_g0.375_h59af9edb35-1011203542.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "7a31a2bb0e4d00bf03027e43c0000e935fff05177977739138fbcae794ad505d"
+  },
+  {
+   "arm": "aavg",
+   "task": "musique",
+   "basename": "musique-tli_64_128_1024_c4_a0.125_b0.125_g0.375_h59af9edb35-1011154302.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "742bd96d8f754f713e566c8cf34e550a34171b3221a33ca6a4b33a5466f64e95"
+  },
+  {
+   "arm": "aavg",
+   "task": "repobench",
+   "basename": "repobench-tli_64_128_1024_c4_a0.125_b0.125_g0.375_h59af9edb35-1011154302.jsonl",
+   "rows": 500,
+   "expect": 500,
+   "sha256": "437945b98a4d1f961ef9bef52001fdc03bfc3951e0c02bf81791d9b79f8fe6f9"
+  },
+  {
+   "arm": "cavgsim",
+   "task": "qasper",
+   "basename": "qasper-tli_64_128_1024_c4_Ba0_b0_g0_h0d7b19f074-1011185054.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "a79a110fdadb3b1e76477b8a130350e0dd742f5634a9d3a80df544a0bb032b85"
+  },
+  {
+   "arm": "cavgsim",
+   "task": "hotpotqa",
+   "basename": "hotpotqa-tli_64_128_1024_c4_Ba0_b0_g0_h0d7b19f074-1011185054.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "9a6b946f4db730d3c94f8bec6b5120395f396122ead7bd5c425a7ce37fd5bc08"
+  },
+  {
+   "arm": "cavgsim",
+   "task": "gov_report",
+   "basename": "gov_report-tli_64_128_1024_c4_Ba0_b0_g0_h0d7b19f074-1011185054.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "9ae54a9e30248a5866a1115706b972c6a255b3c352b88ec15aebcd2f1513f3ed"
+  },
+  {
+   "arm": "cavgsim",
+   "task": "musique",
+   "basename": "musique-tli_64_128_1024_c4_Ba0_b0_g0_h0d7b19f074-1011213402.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "1dbd7969c1462e83caa3c187563f4421a50ad1a731b2df75089c893467cc33cf"
+  },
+  {
+   "arm": "cavgsim",
+   "task": "repobench",
+   "basename": "repobench-tli_64_128_1024_c4_Ba0_b0_g0_h0d7b19f074-1011213402.jsonl",
+   "rows": 500,
+   "expect": 500,
+   "sha256": "5935b57386d9edb36510a7917323602e0f85ad21d467db97d0df3c4134a98267"
+  },
+  {
+   "arm": "cclustersim",
+   "task": "qasper",
+   "basename": "qasper-tli_64_128_1024_c4_Ba0.125_b0.25_g0.125_h66b8285f28-1011154302.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "3d852bb93b7ffbf9855e062001b12b681a12029912f3e5726d4ba86a6c61a04f"
+  },
+  {
+   "arm": "cclustersim",
+   "task": "hotpotqa",
+   "basename": "hotpotqa-tli_64_128_1024_c4_Ba0.125_b0.25_g0.125_h66b8285f28-1011154302.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "eb91c9523764caf307007f397e1522d4cfb3b3f8ad7e2afbcaf9b32cf09ee782"
+  },
+  {
+   "arm": "cclustersim",
+   "task": "gov_report",
+   "basename": "gov_report-tli_64_128_1024_c4_Ba0.125_b0.25_g0.125_h66b8285f28-1011203542.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "6e7134171923de4f33d2d3adb458d0853f5736dd22a7a5c8a12e6abe4e76cc6a"
+  },
+  {
+   "arm": "cclustersim",
+   "task": "musique",
+   "basename": "musique-tli_64_128_1024_c4_Ba0.125_b0.25_g0.125_h66b8285f28-1011154302.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "90c238e0ba744b65cab16af5cde502e0620ea7ba5b10f9624400088c476c015a"
+  },
+  {
+   "arm": "cclustersim",
+   "task": "repobench",
+   "basename": "repobench-tli_64_128_1024_c4_Ba0.125_b0.25_g0.125_h66b8285f28-1011154302.jsonl",
+   "rows": 500,
+   "expect": 500,
+   "sha256": "47d4839015843319360d07108ef969c645bbe0b0ea577fe7545bafd0dad8c776"
+  },
+  {
+   "arm": "mminmax",
+   "task": "qasper",
+   "basename": "qasper-tli_64_128_1024_c4_a0.875_b0.875_g0.125_h4e8d2cb493-1011154302.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "d1cd341cc49681f23d64c05b49b1459a7555c3dfdcb5057baab6087f1b76cf2e"
+  },
+  {
+   "arm": "mminmax",
+   "task": "hotpotqa",
+   "basename": "hotpotqa-tli_64_128_1024_c4_a0.875_b0.875_g0.125_h4e8d2cb493-1011154302.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "fb955d001915537f062894703efdf8773319580fa5d20e743d2ea999bf5c3efa"
+  },
+  {
+   "arm": "mminmax",
+   "task": "gov_report",
+   "basename": "gov_report-tli_64_128_1024_c4_a0.875_b0.875_g0.125_h4e8d2cb493-1011203542.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "c86af2ab74f698bbb6e4311f9632e49905d511e3da8f992beec8a9d3517dddd0"
+  },
+  {
+   "arm": "mminmax",
+   "task": "musique",
+   "basename": "musique-tli_64_128_1024_c4_a0.875_b0.875_g0.125_h4e8d2cb493-1011154302.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "412766338515df75caebec0bbf3b39cff63d4b4ef1a8bf901ddf075a5bb7fcd8"
+  },
+  {
+   "arm": "mminmax",
+   "task": "repobench",
+   "basename": "repobench-tli_64_128_1024_c4_a0.875_b0.875_g0.125_h4e8d2cb493-1011154302.jsonl",
+   "rows": 500,
+   "expect": 500,
+   "sha256": "d3acc51b1d7c4e5255f571f8a9a11618b946716292da94ee44a0d6392740d426"
+  }
+ ],
+ "per_task": {
+  "aavg/qasper": {
+   "arm": 46.8,
+   "mavg": 46.45,
+   "fullkv": 47.47,
+   "delta_vs_mavg": 0.3499999999999943,
+   "delta_vs_fullkv": -0.6700000000000017
+  },
+  "aavg/hotpotqa": {
+   "arm": 60.79,
+   "mavg": 59.42,
+   "fullkv": 59.07,
+   "delta_vs_mavg": 1.3699999999999974,
+   "delta_vs_fullkv": 1.7199999999999989
+  },
+  "aavg/gov_report": {
+   "arm": 33.45,
+   "mavg": 33.6,
+   "fullkv": 33.36,
+   "delta_vs_mavg": -0.14999999999999858,
+   "delta_vs_fullkv": 0.09000000000000341
+  },
+  "aavg/musique": {
+   "arm": 33.8,
+   "mavg": 34.25,
+   "fullkv": 35.44,
+   "delta_vs_mavg": -0.45000000000000284,
+   "delta_vs_fullkv": -1.6400000000000006
+  },
+  "aavg/repobench": {
+   "arm": 65.78,
+   "mavg": 65.83,
+   "fullkv": 64.74,
+   "delta_vs_mavg": -0.04999999999999716,
+   "delta_vs_fullkv": 1.0400000000000063
+  },
+  "cavgsim/qasper": {
+   "arm": 46.56,
+   "mavg": 46.45,
+   "fullkv": 47.47,
+   "delta_vs_mavg": 0.10999999999999943,
+   "delta_vs_fullkv": -0.9099999999999966
+  },
+  "cavgsim/hotpotqa": {
+   "arm": 59.68,
+   "mavg": 59.42,
+   "fullkv": 59.07,
+   "delta_vs_mavg": 0.259999999999998,
+   "delta_vs_fullkv": 0.6099999999999994
+  },
+  "cavgsim/gov_report": {
+   "arm": 33.26,
+   "mavg": 33.6,
+   "fullkv": 33.36,
+   "delta_vs_mavg": -0.3400000000000034,
+   "delta_vs_fullkv": -0.10000000000000142
+  },
+  "cavgsim/musique": {
+   "arm": 33.83,
+   "mavg": 34.25,
+   "fullkv": 35.44,
+   "delta_vs_mavg": -0.4200000000000017,
+   "delta_vs_fullkv": -1.6099999999999994
+  },
+  "cavgsim/repobench": {
+   "arm": 65.33,
+   "mavg": 65.83,
+   "fullkv": 64.74,
+   "delta_vs_mavg": -0.5,
+   "delta_vs_fullkv": 0.5900000000000034
+  },
+  "cclustersim/qasper": {
+   "arm": 47.11,
+   "mavg": 46.45,
+   "fullkv": 47.47,
+   "delta_vs_mavg": 0.6599999999999966,
+   "delta_vs_fullkv": -0.35999999999999943
+  },
+  "cclustersim/hotpotqa": {
+   "arm": 60.98,
+   "mavg": 59.42,
+   "fullkv": 59.07,
+   "delta_vs_mavg": 1.5599999999999952,
+   "delta_vs_fullkv": 1.9099999999999966
+  },
+  "cclustersim/gov_report": {
+   "arm": 33.25,
+   "mavg": 33.6,
+   "fullkv": 33.36,
+   "delta_vs_mavg": -0.3500000000000014,
+   "delta_vs_fullkv": -0.10999999999999943
+  },
+  "cclustersim/musique": {
+   "arm": 34.12,
+   "mavg": 34.25,
+   "fullkv": 35.44,
+   "delta_vs_mavg": -0.13000000000000256,
+   "delta_vs_fullkv": -1.3200000000000003
+  },
+  "cclustersim/repobench": {
+   "arm": 65.79,
+   "mavg": 65.83,
+   "fullkv": 64.74,
+   "delta_vs_mavg": -0.03999999999999204,
+   "delta_vs_fullkv": 1.0500000000000114
+  },
+  "mminmax/qasper": {
+   "arm": 44.39,
+   "mavg": 46.45,
+   "fullkv": 47.47,
+   "delta_vs_mavg": -2.0600000000000023,
+   "delta_vs_fullkv": -3.0799999999999983
+  },
+  "mminmax/hotpotqa": {
+   "arm": 57.96,
+   "mavg": 59.42,
+   "fullkv": 59.07,
+   "delta_vs_mavg": -1.4600000000000009,
+   "delta_vs_fullkv": -1.1099999999999994
+  },
+  "mminmax/gov_report": {
+   "arm": 33.42,
+   "mavg": 33.6,
+   "fullkv": 33.36,
+   "delta_vs_mavg": -0.17999999999999972,
+   "delta_vs_fullkv": 0.060000000000002274
+  },
+  "mminmax/musique": {
+   "arm": 34.52,
+   "mavg": 34.25,
+   "fullkv": 35.44,
+   "delta_vs_mavg": 0.2700000000000031,
+   "delta_vs_fullkv": -0.9199999999999946
+  },
+  "mminmax/repobench": {
+   "arm": 65.25,
+   "mavg": 65.83,
+   "fullkv": 64.74,
+   "delta_vs_mavg": -0.5799999999999983,
+   "delta_vs_fullkv": 0.5100000000000051
+  }
+ },
+ "aavg_avg": 48.12400000000001,
+ "aavg_avg_delta_vs_mavg": 0.21400000000000574,
+ "aavg_ci95": [
+  -0.25,
+  0.8619999999999977
+ ],
+ "aavg_significant_vs_mavg": false,
+ "cavgsim_avg": 47.73199999999999,
+ "cavgsim_avg_delta_vs_mavg": -0.17800000000001148,
+ "cavgsim_ci95": [
+  -0.4360000000000014,
+  0.09399999999999835
+ ],
+ "cavgsim_significant_vs_mavg": false,
+ "cclustersim_avg": 48.25,
+ "cclustersim_avg_delta_vs_mavg": 0.3399999999999963,
+ "cclustersim_ci95": [
+  -0.2,
+  1.019999999999996
+ ],
+ "cclustersim_significant_vs_mavg": false,
+ "mminmax_avg": 47.108,
+ "mminmax_avg_delta_vs_mavg": -0.8020000000000067,
+ "mminmax_ci95": [
+  -1.5640000000000014,
+  -0.0799999999999983
+ ],
+ "mminmax_significant_vs_mavg": true,
+ "mavg_anchor_avg": 47.910000000000004,
+ "fullkv_anchor_avg": 48.016,
+ "candidates_avg5": {
+  "mavg": 47.910000000000004,
+  "aavg": 48.12400000000001,
+  "cavgsim": 47.73199999999999,
+  "cclustersim": 48.25,
+  "mminmax": 47.108
+ },
+ "verdict": "冠军换人：cclustersim AVG5=48.25 > mavg 47.91（配对差 +0.34，CI 含 0，未证明显著优于——按点估计选举，正式主张待全量（E116b 咬合）确认）"
+}
