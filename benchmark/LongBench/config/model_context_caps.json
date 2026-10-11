@@ -1,0 +1,20 @@
+{
+    "DeepSeek-V2-Lite-Chat": {
+        "official_position_capability": {
+            "value": 163840,
+            "evidence": "模型快照 config.json:max_position_embeddings @ deepseek-ai/DeepSeek-V2-Lite-Chat 85864749（rope_scaling: yarn, factor=40, original_max_position_embeddings=4096；TL-DSV2-CONTEXT-CAP-093：031e6b8 提交说明误称该字段为 16384，实为 163840）"
+        },
+        "tokenizer_suggested_max_length": {
+            "value": 16384,
+            "evidence": "模型快照 tokenizer_config.json:model_max_length @ 同快照（官方仓自身的新旧元数据冲突项：16K tokenizer 旧元数据 vs 163840 位置张量配置 vs 模型卡 32K；能力检查不消费此字段，仅在启动门禁打印冲突明细）"
+        },
+        "model_card_declared_context": {
+            "value": 32768,
+            "evidence": "模型快照 README.md 模型下载表：DeepSeek-V2-Lite-Chat (SFT) 16B 2.4B 32k"
+        },
+        "experiment_input_cap": {
+            "value": 31500,
+            "evidence": "benchmark/LongBench/config/model2maxlen.json:DeepSeek-V2-Lite-Chat（LongBench 协议原值 = ffb61457 前值，TL-DSV2-CONTEXT-CAP-093 修复恢复；与 Qwen3 系同口径，模型能力 163840 ≥ 31500 覆盖。注意：eager attention (16 heads × L² × fp32) 在 L=31500 时单层 score 张量 ~59 GiB，显存上限是运行实现的约束而非模型位置能力上限）"
+        }
+    }
+}
