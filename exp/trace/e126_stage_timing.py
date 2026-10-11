@@ -44,6 +44,10 @@ tli_indexer.py 升级（E127 合入）后行号漂移会 fail-closed 而非静�
         按执行顺序持久化，median 由已持久化样本派生）。
   摊销曲线（R2c）：rep0 全 128 步逐步记录 S2/S2_far/S2_near span 与累计值——
         验证块对齐缓存命中（历史 sanity 锚点：不缓存时 61s/step 级反常）。
+  阶段求和口径（TL-E126-STAGE-DOUBLECOUNT-001 修复后）：selector_total_ms_
+        median_est 与 amortization.selector_ms = 互斥阶段和（EXCLUSIVE_STAGE_
+        KEYS 白名单）；S2_far/S2_near 为 S2 的子区间细分，只作 breakdown 不
+        重复计入求和。修正值语义 = 互斥阶段和，非 wall time。
   正确性门（fail-closed）：mask 无全 False 行、attention 输出 finite、每头选中
         token 数在 [sink+swa, K2+sink+swa+块宽余量] 合理区间；任一失败 →
         非零退出 + failure.json，性能 JSON 不发布。
@@ -172,6 +176,29 @@ STAGE_SPANS = [
     ("S6",         ("S6", "S7")),
     ("S7",         ("S7", "CM_out")),
 ]
+
+# ===================================================================== #
+# 互斥阶段白名单（TL-E126-STAGE-DOUBLECOUNT-001 修复）。
+# S2_far/S2_near 是 S2 的**子区间**细分（S2 = 前导段 + S2_far + S2_near，
+# 父子关系非互斥阶段），只作 breakdown 展示；任何「阶段求和」若把父 S2 与
+# 子段一并累加即重复计时。故 selector_total / selector_ms 等求和口径一律
+# 用 EXCLUSIVE_STAGE_KEYS（= 全部 STAGE_SPANS 名去掉子段键）。
+# 语义边界：修正值 = 互斥阶段和（中位数和 / 逐步和），**不是** wall time。
+# ===================================================================== #
+SUB_STAGE_KEYS = frozenset({"S2_far", "S2_near"})
+EXCLUSIVE_STAGE_KEYS = frozenset(name for name, _ in STAGE_SPANS) - SUB_STAGE_KEYS
+
+
+def exclusive_stage_sum(step_spans):
+    """单步 span 字典的互斥阶段求和（排除 S2_far/S2_near 子段；S2 已覆盖其区间）。"""
+    return sum(v for k, v in step_spans.items()
+               if v is not None and k in EXCLUSIVE_STAGE_KEYS)
+
+
+def exclusive_stage_median_sum(stage_raw):
+    """互斥阶段中位数和（selector_total_ms_median_est 口径；非 wall time）。"""
+    return sum(median(v) for k, v in stage_raw.items()
+               if v and k in EXCLUSIVE_STAGE_KEYS)
 
 HELPER_BLOCK = '''
 
@@ -623,8 +650,9 @@ def bench_arm(arm, mod, eager_fn, identity, args, device):
                                     for k, v in stage_raw.items()},
                 "wall_ns_selector_median": median(wall_raw),
                 "s8_ms_median": median(s8_raw),
-                "selector_total_ms_median_est": sum(
-                    median(v) for v in stage_raw.values() if v),
+                # 互斥阶段中位数和（白名单：S2_far/S2_near 子段不计入，
+                # 修复 TL-E126-STAGE-DOUBLECOUNT-001 父子重复求和）
+                "selector_total_ms_median_est": exclusive_stage_median_sum(stage_raw),
                 # ---- 摊销曲线（rep0 全 128 步）----
                 "amortization": {
                     "step_S": [S + i for i in range(N_STEPS)],
@@ -632,8 +660,8 @@ def bench_arm(arm, mod, eager_fn, identity, args, device):
                     "s2_far_ms": [t.get("S2_far") for t in amort],
                     "s2_near_ms": [t.get("S2_near") for t in amort],
                     "s2_cum_ms": list(_cumsum(t.get("S2") for t in amort)),
-                    "selector_ms": [sum(v for v in t.values() if v is not None)
-                                    for t in amort],
+                    # 逐步互斥阶段和（白名单同上；子段重复计数修复）
+                    "selector_ms": [exclusive_stage_sum(t) for t in amort],
                 },
             }
             print(f"[{arm}/{data_kind}/S={S}] selector_med="
@@ -662,7 +690,10 @@ def build_meta(identity, args, arm):
                    "样本按执行顺序持久化不排序不舍入，median 由持久化样本派生）；"
                    "每步选择器 wall = perf_counter_ns 整数纳秒（055 口径）；"
                    "S8 = eager_decoding_attn 独立 event 对；"
-                   "e2e_128step = 计时关 1 rep 粗粒度合并口径（非服务级精度）"),
+                   "e2e_128step = 计时关 1 rep 粗粒度合并口径（非服务级精度）；"
+                   "selector_total/selector_ms = 互斥阶段和（EXCLUSIVE_STAGE_KEYS；"
+                   "S2_far/S2_near 为 S2 子段细分仅作 breakdown 不重复计入，"
+                   "TL-E126-STAGE-DOUBLECOUNT-001 修复口径）"),
         "protocol": {"sizes": list(args.sizes), "steps": N_STEPS, "warm": WARM,
                      "reps": REPS, "data_kinds": list(DATA_KINDS),
                      "kv_dtype": "bfloat16", "B": 1, "q_len": 1,
