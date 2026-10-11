@@ -62,9 +62,23 @@
   sanity核语义/配置/打分/计时，不能强制结果符合论文方向；新Quest patch缺dense分支待修。
   本轮文档纠偏不新增跑批矩阵、不启动GPU。([详情](task_details/S-T023.md))
 
+## 2026-10-11（晚间）
+
+- [x] [S-T025] E126 五臂 TLI 选择器分阶段计时 microbench（成本指纹，
+  **优化前基线**；收官。零改动 AST 插桩（生产文件 md5 冻结锚点全程
+  fail-closed）+ 红绿 python±-O 全绿 + H20 正式计时五臂全落袋。
+  关键发现：S3_fine 细筛分为最大选择器成本项（O(S) 线性 0.23→2.67ms）；
+  cavg 系步均建簇摊销额外成本仅 0.03-0.13ms 但冷建簇超线性（64K 需
+  1.7-1.9s，e2e 不可隐藏）；选择器成本对数据分布不敏感。
+  worktree e126-stage-timing（eb308c7+6325bcf）按隔离纪律未 push，
+  E127 验收合入后同协议复测，前后成对进 E128）
+  ([详情](task_details/S-T025.md))
+
 ## 待办池（未排期，均有用户指令或审计来源）
 
 - [ ] E118：sglang C1/C2/C3 三源码 bug 修复（SG e2e taskmd+CUDA graph
   前置门；C3 修复改行为须换 postfix 重跑；sglang 主仓集成相关，后续回归
   sglang 时处理）
 - [ ] E120：粗筛阶段价值消融 + 单级方案对比（依赖 S-T009 讨论收敛）
+- [ ] E127：TLI 选择器优化（候选方向：S3_fine 细筛分 O(S) 主成本项 +
+  cavg 系 prefill 建簇/decode 复用分相；验收合入后按 S-T025 协议复测）
