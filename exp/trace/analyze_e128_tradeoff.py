@@ -31,17 +31,40 @@ GPT f4139b5 四点窄更正（E128 消费硬约束，逐条落实）：
   ④ S8 = eager_decoding 全长 PV（非只读 K2 个 KV）——S8 语义注释如实。
 
 统计诚实纪律（084 措辞）：质量差 CI 含 0 的臂间写「未证明差异」，
-不写「持平/等价」。E125 全部臂 vs mavg 的 CI 均含 0（mminmax 除外，
-显著更差）；cclustersim +0.34 [-0.20,+1.02] 未证明显著。
+不写「持平/等价」。E125 三候选（aavg/cavgsim/cclustersim）vs mavg 的
+CI 均含 0；mminmax vs mavg 显著更差。臂间配对全枚举（pairwise_ci_all，
+10 对）中另有 aavg 显著优于 cavgsim、cclustersim 显著优于 cavgsim
+（未做多重比较校正）——不得从「vs mavg 含 0」外推「全部臂间含 0」
+（GPT 099 全称命题为假）。
+
+GPT 审计 098/099/100 修复（2026-10-12，TL-E128-PARETO-098 /
+TL-E128-STATEMENT-099 / TL-E128-FAILCLOSED-100）：
+  098 Pareto 摘要与 dominance 表矛盾 → frontier_summary 机器生成；
+     分离 quality_steady_cost_pareto 与 cost_only_total_order_at_horizon
+     （后者纯成本排序陈述，禁用 Pareto 支配术语——新增最小化成本维在
+     数学上不可能创造二维平面不存在的 Pareto 支配，新支配集 ⊆ 旧支配集，
+     性质由 test_e128_fix_098_100.py 单测保证）。
+  099 统计措辞 → significance_note 严格限定为实际计算范围 + 10 对臂间
+     配对 bootstrap CI 全枚举进 JSON（标注未做多重比较校正）+ R1/R6
+     措辞修正（R6 的 E100 含零 CI 不得写「持平」，写「未证明差异」）。
+  100 fail-closed 门禁 → E125 manifest (arm,task) 笛卡尔积唯一集比对 +
+     delta==arm-mavg 逐任务联立 + arm_avg/avg_delta 联立；E126 完整
+     arm 配置绑定（far/near method+select、kmeans、αβγ + 五臂
+     common_config 逐位一致 + tli_sim=0.9）+ stage_ms_median 与
+     stage_ms_samples 精确中位数联立；E127 拒重复 run 键 + 所有消费
+     数值 isfinite>0 门；E100 进 provenance（R6 消费其 delta/CI）。
 
 结论限定口径：structured/singleton 合成数据、B=1、q_len=1、D′ off、
 单层 microbench（E126 计时插桩开 / E127 独立 harness），H20-3e。
 
 python 与 -O 双跑安全（无 assert 门禁，全部 sys.exit fail-closed）。
-v1 by Opus 派遣分析 agent，2026-10-12。
+v1 by Opus 派遣分析 agent，2026-10-12；098/099/100 修复 by Opus-fix
+（worktree e128-fix-098-100），2026-10-12。
 """
 import hashlib
+import itertools
 import json
+import math
 import os
 import random
 import sys
@@ -89,6 +112,33 @@ E127_FIN64 = os.path.join(E127_DIR, "e127_stage_bench_final_64k.json")
 E127_FIN8 = os.path.join(E127_DIR, "e127_stage_bench_final_8k.json")
 E109_PATH = os.path.join(REPO, "exp", "trace", "results",
                         "e109_screen4_selection.json")
+E100_PATH = os.path.join(REPO, "exp", "trace", "results",
+                        "e100_bootstrap_ci.json")
+
+# 100-③：E126 完整 arm 配置权威值——只绑 (α,β,γ) 会放过 far_method 等
+# 方法字段篡改（GPT 反例：mavg far_method 改 NOT_MAVG 仍被消费）。
+# 值来源 = 五臂 e126_stage_timing_*.json meta.arm_config 实测冻结。
+EXPECTED_ARM_CONFIG = {
+    "mavg":        {"far_method": "minmax", "near_method": "avg",
+                    "far_select": "4bit", "near_select": "4bit",
+                    "enable_kmeans": False},
+    "aavg":        {"far_method": "avg", "near_method": "avg",
+                    "far_select": "4bit", "near_select": "4bit",
+                    "enable_kmeans": False},
+    "mminmax":     {"far_method": "minmax", "near_method": "minmax",
+                    "far_select": "4bit", "near_select": "4bit",
+                    "enable_kmeans": False},
+    "cavgsim":     {"far_method": "minmax", "near_method": "avg",
+                    "far_select": "sim_greedy", "near_select": "4bit",
+                    "enable_kmeans": True},
+    "cclustersim": {"far_method": "minmax", "near_method": "avg",
+                     "far_select": "sim_greedy", "near_select": "sim_greedy",
+                     "enable_kmeans": True},
+}
+# sim_greedy 口径共用配置门（common_config 五臂须逐位一致 + 关键值冻结）
+EXPECTED_COMMON_KEYS = {"tli_sim": 0.9, "tli_subspace": "tail",
+                        "tia_level2_cmp_ratio": 4,
+                        "tli_enable_layer_skip": False}
 
 E109_KEYS = {  # E109 旧口径各臂最佳配置（E125 重跑的就是这五个配置）
     "mavg": "E109_mavg_a0.25_b0.125_g0.625",
@@ -166,11 +216,12 @@ def load_e125(prov):
         "sha256": sha256_of(E125_PATH),
         "consumed_fields": [
             "meta.scorer_backend", "meta.bootstrap", "meta.arm_configs",
-            "input_manifest[]（20 格 rows==expect 闭包门禁）",
+            "input_manifest[]（20 格 rows==expect + (arm,task) 笛卡尔积"
+            "唯一集闭包门禁，100-①）",
             "per_task.{arm}/{task}.{arm,mavg,fullkv,delta_vs_mavg,"
-            "delta_vs_fullkv}",
+            "delta_vs_fullkv}（delta==arm−锚 逐任务联立门禁，100-②）",
             "{arm}_avg / {arm}_avg_delta_vs_mavg / {arm}_ci95 / "
-            "{arm}_significant_vs_mavg（重算复核门禁）",
+            "{arm}_significant_vs_mavg（重算复核门禁 + 均值/均值差联立）",
             "mavg_anchor_avg / fullkv_anchor_avg / candidates_avg5 / verdict"],
     }
     if (d.get("meta") or {}).get("scorer_backend") != "difflib:stdlib":
@@ -180,10 +231,22 @@ def load_e125(prov):
         fail(f"E125: bootstrap B/seed 与本脚本协议不一致（{bs['B']}/{bs['seed']}"
              f" vs {B}/{SEED}）——CI 复核无意义，fail closed")
 
-    # input_manifest 闭包：20 格，rows==expect
+    # input_manifest 闭包（100-①：只数长度会放过「复制第 1 项 20 次」式
+    # 篡改——必须显式比对 (arm,task) 笛卡尔积唯一集合）
     man = d.get("input_manifest") or []
     if len(man) != 20:
         fail(f"E125: input_manifest {len(man)} 格 != 20——闭包不完整")
+    got_pairs = [(e["arm"], e["task"]) for e in man]
+    expected_pairs = {(a, t) for a in ARMS if a != "mavg" for t in TASKS}
+    if len(set(got_pairs)) != len(got_pairs):
+        dup = sorted({p for p in got_pairs if got_pairs.count(p) > 1})
+        fail(f"E125: input_manifest 存在重复 (arm,task) 项 {dup}"
+             f"——期望 4 候选臂 × 5 任务笛卡尔积唯一集，fail closed")
+    if set(got_pairs) != expected_pairs:
+        miss = sorted(expected_pairs - set(got_pairs))
+        extra = sorted(set(got_pairs) - expected_pairs)
+        fail(f"E125: manifest (arm,task) 集合 != 4 臂×5 任务笛卡尔积——"
+             f"缺失 {miss} / 多余 {extra}，fail closed")
     for e in man:
         if e["rows"] != e["expect"]:
             fail(f"E125: manifest {e['arm']}/{e['task']} rows={e['rows']} "
@@ -209,10 +272,8 @@ def load_e125(prov):
 
     # 重算复核：AVG5 与 CI95 必须与落盘判决逐位吻合（1e-9）
     quality = {}
+    per_task_scores = {}  # 供 10 对臂间配对全枚举（099-②）
     for a in ARMS:
-        if a == "mavg":
-            scores = [pt[f"mavg-proxy/{t}"]["mavg"] if False else None
-                      for t in TASKS]
         entry = {}
         if a == "mavg":
             # mavg 锚点逐任务分数嵌在四候选臂条目的 "mavg" 字段（E125 判决
@@ -226,6 +287,7 @@ def load_e125(prov):
                     fail(f"E125: mavg 锚点分数四臂交叉核对不一致 task={t} "
                          f"{vals}")
                 mavg_scores.append(vals[0])
+            per_task_scores["mavg"] = mavg_scores
             avg5 = sum(mavg_scores) / 5
             if abs(avg5 - d["mavg_anchor_avg"]) > 1e-9:
                 fail(f"E125: mavg 锚点 AVG5 重算 {avg5} != 落盘 "
@@ -238,7 +300,29 @@ def load_e125(prov):
             avg5 = sum(scores) / 5
             if abs(avg5 - d[f"{a}_avg"]) > 1e-9:
                 fail(f"E125: {a} AVG5 重算 {avg5} != 落盘 {d[f'{a}_avg']}")
-            deltas = [pt[f"{a}/{t}"]["delta_vs_mavg"] for t in TASKS]
+            # 100-② 逐任务联立：预存 delta 必须 == arm−锚 重算（1e-9）。
+            # GPT 反例：aavg/qasper.arm += 5 且同步 aavg_avg += 1 —— 点估计
+            # 变 +1.214 而 CI 仍用预存旧值，质量均值与 CI 来源脱钩即从此漏过。
+            for t in TASKS:
+                e = pt[f"{a}/{t}"]
+                if abs((e["arm"] - e["mavg"]) - e["delta_vs_mavg"]) > 1e-9:
+                    fail(f"E125: {a}/{t} delta_vs_mavg={e['delta_vs_mavg']} "
+                         f"!= arm−mavg 重算 {e['arm'] - e['mavg']}"
+                         f"——质量值与配对差来源脱钩，fail closed")
+                if abs((e["arm"] - e["fullkv"]) - e["delta_vs_fullkv"]) > 1e-9:
+                    fail(f"E125: {a}/{t} delta_vs_fullkv="
+                         f"{e['delta_vs_fullkv']} != arm−fullkv 重算 "
+                         f"{e['arm'] - e['fullkv']}——fail closed")
+            # 100-② 均值差联立：{arm}_avg_delta_vs_mavg == {arm}_avg − 锚
+            if abs((avg5 - d["mavg_anchor_avg"])
+                   - d[f"{a}_avg_delta_vs_mavg"]) > 1e-9:
+                fail(f"E125: {a} avg_delta_vs_mavg="
+                     f"{d[f'{a}_avg_delta_vs_mavg']} != AVG5 重算差 "
+                     f"{avg5 - d['mavg_anchor_avg']}——fail closed")
+            # CI 从 fresh 重算的逐任务差（arm−mavg）复核——与逐任务联立门
+            # 叠加后，点估计与 CI 不可能再各自独立被篡改
+            deltas = [pt[f"{a}/{t}"]["arm"] - pt[f"{a}/{t}"]["mavg"]
+                      for t in TASKS]
             lo, hi = paired_bootstrap(deltas)
             if abs(lo - d[f"{a}_ci95"][0]) > 1e-9 or \
                abs(hi - d[f"{a}_ci95"][1]) > 1e-9:
@@ -250,7 +334,8 @@ def load_e125(prov):
                      f"{d[f'{a}_significant_vs_mavg']}")
             # 补充计算（E128 新增，协议同 E125 B=10000 seed=42，非 E125 产物）：
             # vs fullkv 配对差 CI——供「点估计高于 FullKV」主张的显著性边界核查
-            dfkv = [pt[f"{a}/{t}"]["delta_vs_fullkv"] for t in TASKS]
+            dfkv = [pt[f"{a}/{t}"]["arm"] - pt[f"{a}/{t}"]["fullkv"]
+                    for t in TASKS]
             flo, fhi = paired_bootstrap(dfkv)
             entry = {
                 "avg5": avg5,
@@ -262,10 +347,42 @@ def load_e125(prov):
                 "significant_vs_fullkv": (flo > 0) or (fhi < 0),
                 "per_task_scores": {t: pt[f"{a}/{t}"]["arm"] for t in TASKS},
             }
+            per_task_scores[a] = scores
         quality[a] = entry
     quality["fullkv_anchor_avg"] = d["fullkv_anchor_avg"]
     quality["verdict_e125"] = d["verdict"]
-    return quality
+
+    # ---- 099-②：10 对臂间配对 bootstrap CI 全枚举（C(5,2)=10）----
+    # GPT 反例：只算各候选 vs mavg 的 CI，却写「除 mminmax 外臂间 CI 均含 0」
+    # ——同协议复算 aavg-cavgsim [+0.110,+0.762]、cavgsim-cclustersim
+    # [-0.948,-0.178] 均不含 0，全称命题为假。改为全枚举如实落盘，
+    # 任何臂间措辞从本表生成；未做多重比较校正。
+    pairwise = {"direction": "point_est = 前臂 − 后臂（任务级配对差均值）",
+                "protocol": f"paired bootstrap B={B} seed={SEED}（与 E125 同协议）",
+                "multiple_comparison_correction": "none（10 对全枚举，未做校正）",
+                "pairs": {}}
+    for x, y in itertools.combinations(ARMS, 2):
+        deltas = [sx - sy for sx, sy in zip(per_task_scores[x],
+                                             per_task_scores[y])]
+        point = sum(deltas) / len(deltas)
+        lo, hi = paired_bootstrap(deltas)
+        pairwise["pairs"][f"{x}-{y}"] = {
+            "point_est": r6(point),
+            "ci95": [r6(lo), r6(hi)],
+            "contains_zero": bool(lo <= 0.0 <= hi),
+            "significant_uncorrected": bool(lo > 0 or hi < 0),
+        }
+    # 与已复核的 vs mavg CI 交叉自洽（方向翻转）：mavg-X 的 CI 应为
+    # X 的 vs mavg CI 的镜像（1e-9），不一致说明枚举路径有错
+    for a in ARMS:
+        if a == "mavg":
+            continue
+        p = pairwise["pairs"][f"mavg-{a}"]
+        q = quality[a]["ci95_vs_mavg"]
+        if abs(p["ci95"][0] + q[1]) > 1e-6 or abs(p["ci95"][1] + q[0]) > 1e-6:
+            fail(f"E125: 臂间枚举 mavg-{a} CI {p['ci95']} 与已复核 "
+                 f"{a} vs mavg CI {q} 镜像不一致——枚举路径自错，fail closed")
+    return quality, pairwise
 
 
 # ------------------------------------------------------------------ E126
@@ -273,8 +390,22 @@ def load_e126(prov):
     """五臂修正后计时。只消费 correction 段存在的文件（任务硬约束 4：
     correction 缺失 = 修正前版本，立即 fail-closed 不猜测）。"""
     timing = {}
+    raw = {a: load_json(E126_PATH[a], f"E126-{a}") for a in ARMS}
+    # 100-③ 共用配置门：五臂 common_config 逐位一致（以 mavg 臂为基准）
+    # + sim_greedy 口径关键值冻结（tli_sim=0.9 / tail 子空间 / cmp_ratio=4 /
+    # 层跳过关）。单臂漂移或全臂同漂（协议错位）都会被冻结值门拦截。
+    common_ref = raw["mavg"]["meta"]["common_config"]
     for a in ARMS:
-        d = load_json(E126_PATH[a], f"E126-{a}")
+        cc = raw[a]["meta"]["common_config"]
+        if cc != common_ref:
+            fail(f"E126-{a}: common_config 与 mavg 臂不逐位一致"
+                 f"——五臂共用配置漂移，fail closed")
+        for k, v in EXPECTED_COMMON_KEYS.items():
+            if common_ref.get(k) != v:
+                fail(f"E126-{a}: common_config.{k}={common_ref.get(k)!r} "
+                     f"!= 权威 {v!r}——sim_greedy 口径配置漂移，fail closed")
+    for a in ARMS:
+        d = raw[a]
         corr = d.get("correction")
         if not corr or corr.get("id") != CORR_ID or not corr.get("applied"):
             fail(f"E126-{a}: correction 段缺失或非 {CORR_ID}——修正前版本"
@@ -296,6 +427,12 @@ def load_e126(prov):
         if got_abg != exp:
             fail(f"E126-{a}: arm_config (α,β,γ)={got_abg} != 权威 {exp}"
                  f"——GPT f4139b5 ③ 配置口径冲突")
+        # 100-③ 完整方法配置绑定：只绑 (α,β,γ) 会放过 far_method 等
+        # 方法字段篡改（GPT 反例：mavg far_method 改 NOT_MAVG 仍被消费）
+        for k, v in EXPECTED_ARM_CONFIG[a].items():
+            if ac.get(k) != v:
+                fail(f"E126-{a}: arm_config.{k}={ac.get(k)!r} != 权威 {v!r}"
+                     f"——完整方法配置不符（100-③），fail closed")
         prov[f"e126_timing_{a}"] = {
             "path": os.path.relpath(E126_PATH[a], REPO),
             "sha256": sha256_of(E126_PATH[a]),
@@ -340,6 +477,26 @@ def load_e126(prov):
             missing = [k for k in EXCLUSIVE_STAGE_KEYS if sm.get(k) is None]
             if missing:
                 fail(f"E126-{a}/{data}/S={S}: stage_ms_median 缺阶段 {missing}")
+            # 100-④ 阶段统计联立：stage_ms_median 必须与 stage_ms_samples
+            # 精确中位数一致（GPT 反例：S3_fine 篡改 1000 而 samples/total
+            # 不变，opt_stage_share 输出 599.7 假数字）。样本持久化在案，
+            # 结构允许精确中位数复算而非仅 min/max 边界核查。
+            for k, smp in samples.items():
+                if smp:
+                    if sm.get(k) is None or abs(median(smp) - sm[k]) > 1e-9:
+                        fail(f"E126-{a}/{data}/S={S}: stage_ms_median.{k}="
+                             f"{sm.get(k)} != samples 精确中位数重算 "
+                             f"{None if sm.get(k) is None else median(smp)}"
+                             f"——阶段统计与样本脱钩（100-④），fail closed")
+                else:
+                    if sm.get(k) is not None:
+                        fail(f"E126-{a}/{data}/S={S}: stage_ms_samples.{k} "
+                             f"为空但 stage_ms_median.{k}={sm.get(k)} 非空"
+                             f"——fail closed")
+            empty_exc = [k for k in EXCLUSIVE_STAGE_KEYS if not samples.get(k)]
+            if empty_exc:
+                fail(f"E126-{a}/{data}/S={S}: 互斥阶段样本缺失 {empty_exc}"
+                     f"——fail closed")
             am = c["amortization"]
             if len(am["selector_ms"]) != 128:
                 fail(f"E126-{a}/{data}/S={S}: amortization 曲线长度 "
@@ -421,20 +578,50 @@ def load_e127(prov):
         "bench_config_is_mavg": True,
     }
 
-    def index(d):
+    # 100-⑤ 拒重复 run 键：建字典前显式检查（GPT 反例：baseline 追加重复
+    # run 后字典静默去重仍 8 键通过）。100-⑥ 所有消费数值 isfinite>0 门
+    # （NaN 使 <=0 与偏差比较均为 False 而漏过）。
+    def pos_finite(x, label):
+        if not (isinstance(x, (int, float)) and not isinstance(x, bool)
+                and math.isfinite(x) and x > 0):
+            fail(f"E127: {label}={x!r} 非有限正数——数据损坏，fail closed")
+        return float(x)
+
+    def index(d, label, expect_n=None):
+        keys = [(run["S0"], run["layer_kind"]) for run in d["runs"]]
+        if len(set(keys)) != len(keys):
+            dup = sorted({k for k in keys if keys.count(k) > 1})
+            fail(f"E127-{label}: runs 存在重复键 {dup}——先去重后检查键数"
+                 f"会静默吞掉损坏输入（100-⑤），fail closed")
+        if expect_n is not None and len(keys) != expect_n:
+            fail(f"E127-{label}: run 键数 {len(keys)} != {expect_n}"
+                 f"（{sorted(keys)}）")
         out = {}
         for run in d["runs"]:
             out[(run["S0"], run["layer_kind"])] = run
         return out
 
-    bi, ii = index(base), index(it8)
+    def gate_run_numbers(d, label):
+        for run in d["runs"]:
+            tag = f"{label}/S{run['S0']}/{run['layer_kind']}"
+            pos_finite(run["step_gpu_sum_ms"], f"{tag}.step_gpu_sum_ms")
+            pos_finite(run["step_cpu_wall_ms"], f"{tag}.step_cpu_wall_ms")
+            for st in ("prepare_index", "compute_score", "compute_mask",
+                       "metrics", "eager_decoding"):
+                pos_finite(run[st]["gpu_ms_median"], f"{tag}.{st}.gpu_ms_median")
+
+    for label, d in (("baseline", base), ("iter8", it8),
+                     ("final_64k", f64), ("final_8k", f8)):
+        gate_run_numbers(d, label)
+
+    bi, ii = index(base, "baseline", expect_n=8), index(it8, "iter8", expect_n=8)
     if set(bi) != set(ii) or len(bi) != 8:
         fail(f"E127: baseline/iter8 run 集合不一致或非 8 组（{sorted(bi)}）")
     paired = {}
     for k in sorted(bi):
         b, i = bi[k], ii[k]
-        if b["step_gpu_sum_ms"] <= 0 or i["step_gpu_sum_ms"] <= 0:
-            fail(f"E127: {k} 非正计时——数据损坏")
+        pos_finite(b["step_gpu_sum_ms"], f"baseline/{k}.step_gpu_sum_ms")
+        pos_finite(i["step_gpu_sum_ms"], f"iter8/{k}.step_gpu_sum_ms")
         paired[f"S{k[0]}/{k[1]}"] = {
             "baseline_gpu_ms": r6(b["step_gpu_sum_ms"]),
             "iter8_gpu_ms": r6(i["step_gpu_sum_ms"]),
@@ -452,8 +639,8 @@ def load_e127(prov):
                  "metrics", "eager_decoding")},
         }
     # final 复核对（iter8 定案恢复逐字一致口径，2% 容差）
-    fi64 = index(f64)
-    fi8 = index(f8)
+    fi64 = index(f64, "final_64k")
+    fi8 = index(f8, "final_8k")
     for kind in ("normal", "skip"):
         k64 = (65536, kind)
         k8 = (8192, kind)
@@ -493,28 +680,71 @@ def load_e109(prov):
     return out
 
 
+# ------------------------------------------------------------------ E100
+def load_e100(prov):
+    """100-⑥：E100 进 provenance——R6 消费其 delta 与 CI（旧版只在
+    推荐文字里引用历史判决，provenance 缺该输入版本绑定）。加载时
+    claim 与 main_ci 联立门禁，R6 数字全部机器取值。"""
+    d = load_json(E100_PATH, "E100")
+    claim, mc = d["claim"], d["main_ci_13tasks"]
+    cal = d["calibration_check"]
+    if abs(claim["diff"] - mc["mean"]) > 1e-9:
+        fail(f"E100: claim.diff={claim['diff']} != main_ci.mean={mc['mean']}"
+             f"——判决文件内部不一致，fail closed")
+    if abs(claim["psi_avg"] - claim["fkv_avg"] - claim["diff"]) > 1e-9:
+        fail(f"E100: psi_avg−fkv_avg={claim['psi_avg'] - claim['fkv_avg']}"
+             f" != diff={claim['diff']}——fail closed")
+    if abs(cal["psi_avg_expected"] - claim["psi_avg"]) > 1e-9 or \
+       abs(cal["fkv_avg_expected"] - claim["fkv_avg"]) > 1e-9 or \
+       not cal["passed"]:
+        fail(f"E100: calibration_check 与 claim 不一致（{cal} vs {claim}）"
+             f"——fail closed")
+    if mc["ci95_lo"] > mc["ci95_hi"]:
+        fail("E100: main_ci ci95_lo > ci95_hi——fail closed")
+    if mc["contains_zero"] != (mc["ci95_lo"] <= 0 <= mc["ci95_hi"]):
+        fail(f"E100: contains_zero={mc['contains_zero']} 与 CI "
+             f"[{mc['ci95_lo']},{mc['ci95_hi']}] 矛盾——fail closed")
+    prov["e100_bootstrap_ci"] = {
+        "path": os.path.relpath(E100_PATH, REPO),
+        "sha256": sha256_of(E100_PATH),
+        "consumed_fields": [
+            "claim.{diff,psi_avg,fkv_avg}（R6 的 +0.42 来源）",
+            "main_ci_13tasks.{mean,ci95_lo,ci95_hi,contains_zero}"
+            "（R6 的 CI [-0.18,+1.02] 来源；claim/main_ci 联立门禁）",
+            "verdict（历史判决文本，13 任务 mavg 臂口径）"],
+        "role": "R6 论文主张链引用的历史判决（100-⑥ 修复：进 provenance）",
+    }
+    return {"diff": claim["diff"], "ci95": [mc["ci95_lo"], mc["ci95_hi"]],
+            "contains_zero": bool(mc["contains_zero"]),
+            "verdict": d["verdict"]}
+
+
 # ------------------------------------------------------------------ 分析
-def pareto_analysis(quality, timing):
-    """(AVG5 ↑, 稳态选择器成本 ↓) 点估计支配关系 + 冷建簇第三维。
+def pareto_analysis(quality, timing, pairwise):
+    """098 修复：(AVG5 ↑, 稳态选择器成本 ↓) 二维点估计支配关系。
 
     成本向量 = 10 格（2 data_kind × 5 S）selector_total_ms_median_est。
     支配 = 质量点估计更高 AND 成本向量逐格不高于（至少一格严格更低）。
-    显著性边界如实标注：除 mminmax vs mavg 外全部臂间质量差 CI 含 0，
-    支配关系只是点估计层面的排序主张。
+
+    098 铁律：加入冷建簇最小化维不可能创造二维平面不存在的 Pareto 支配
+    （新支配集 ⊆ 旧支配集——性质测试见 test_e128_fix_098_100.py）。因此：
+      - 本函数只输出二维支配表 quality_steady_cost_pareto；
+      - 总成本（稳态+冷建簇）排序主张全部放 cost_only_total_order()
+        生成，为纯 cost-only 陈述，禁用「Pareto 支配」术语；
+      - frontier_summary 由 dominance 表机器生成，结构上不可能包含
+        表不支持的支配主张（GPT 反例：表全空却断言簇臂被零建簇臂支配）。
+    显著性边界如实标注（099）：vs mavg 三候选 CI 含 0、mminmax 显著更差；
+    臂间配对事实从 pairwise_ci_all 枚举引用，不做全称外推。
     """
     cost = {}
-    cold = {}
     for a in ARMS:
         cells = timing[a]["cells"]
         cost[a] = [cells[f"{dk}/S{s}"]["selector_total_ms_median_est"]
                    for dk in DATA_KINDS for s in SIZES]
-        # 冷成本第三维 = 初建超额 + 128 步窗内重建尖峰超额（簇臂建簇非一次性）
-        cold[a] = [cells[f"{dk}/S{s}"]["initial_build_excess_ms"]
-                   + cells[f"{dk}/S{s}"]["rebuild_excess_ms_in_128steps"]
-                   for dk in DATA_KINDS for s in SIZES]
     dom = {}
     for a in ARMS:
-        dom[a] = {"dominates_point_estimate": [], "dominated_by_point_estimate": []}
+        dom[a] = {"dominates_point_estimate": [],
+                  "dominated_by_point_estimate": []}
     for a in ARMS:
         for b in ARMS:
             if a == b:
@@ -522,33 +752,122 @@ def pareto_analysis(quality, timing):
             q = quality[a]["avg5"] > quality[b]["avg5"]
             c = all(x <= y for x, y in zip(cost[a], cost[b])) and \
                 any(x < y for x, y in zip(cost[a], cost[b]))
-            k = all(x <= y for x, y in zip(cold[a], cold[b])) and \
-                any(x < y for x, y in zip(cold[a], cold[b]))
             if q and c:
                 dom[a]["dominates_point_estimate"].append(
-                    {"arm": b, "with_cold_build_dimension": bool(k)})
+                    {"arm": b, "quality_point_higher": True})
                 dom[b]["dominated_by_point_estimate"].append(
-                    {"arm": a, "with_cold_build_dimension": bool(k)})
-    any_dom = any(dom[a]["dominates_point_estimate"] for a in ARMS)
+                    {"arm": a, "quality_point_higher": True})
+    dom_pairs = sorted((a, x["arm"]) for a in ARMS
+                       for x in dom[a]["dominates_point_estimate"])
+    if dom_pairs:
+        frontier_summary = ("点估计支配对（质量更高且 10 格稳态成本逐格不高于、"
+                            "至少一格更低）：" + "；".join(
+                                f"{a} 支配 {b}" for a, b in dom_pairs) +
+                            "——均为点估计排序主张，不构成统计证明")
+    else:
+        frontier_summary = ("质量-稳态成本二维平面（AVG5↑、10 格 "
+                            "selector_total 互斥阶段中位数和↓）上无任何点估计"
+                            "支配对——五臂构成真实权衡前沿。冷建簇成本维的"
+                            "总成本陈述见 cost_only_total_order_at_horizon"
+                            "（新增最小化维不可能创造此处不存在的 Pareto 支配，"
+                            "新支配集 ⊆ 旧支配集）")
+    # 099：significance_note 严格限定为实际计算范围（vs mavg + 全枚举引用）
+    sig_pairs = sorted(k for k, v in pairwise["pairs"].items()
+                       if not v["contains_zero"])
+    significance_note = (
+        "vs mavg：三候选（aavg/cavgsim/cclustersim）CI 均含 0（未证明差异），"
+        "mminmax 显著更差（[-1.56,-0.08]）。臂间配对全枚举（10 对，未做多重"
+        f"比较校正）中 {len(sig_pairs)} 对 CI 不含 0：{sig_pairs}——支配关系"
+        "是点估计排序主张，不构成统计证明")
     return {
         "cost_unit": "selector_total_ms_median_est（ms，10 格 = "
                      "structured/singleton × S 4K-64K）",
-        "cold_unit": "初建超额 initial_build_excess_ms + 128 步窗内重建尖峰"
-                     "超额 rebuild_excess_ms_in_128steps（簇臂建簇非一次性）",
-        "significance_note": "除 mminmax（vs mavg CI [-1.56,-0.08] 显著更差）"
-                             "外，臂间质量差 bootstrap CI 均含 0——以下支配"
-                             "关系是点估计排序，不构成统计证明",
+        "significance_note": significance_note,
         "dominance": dom,
-        "frontier_summary": (
-            "质量-稳态成本二维平面上无任何严格支配对：每对臂或质量点估计"
-            "交叉或成本向量交叉（mavg vs aavg 在 S=16K 结构化成本交叉；簇"
-            "臂质量点估计更高但成本全面更高；mminmax 成本最低但质量显著更"
-            "差）——五臂构成真实权衡前沿。加入建簇+重建成本维后：cclustersim"
-            "相对 mavg 稳态更贵且建簇不摊销（任何 decode 长度总成本更高的"
-            "点估计支配关系成立）；cavgsim 64K 回本需 26,000+ 步（steady-only"
-            "口径）且重建复发继续侵蚀——簇臂在总成本维被零建簇臂（mavg/"
-            "aavg）点估计支配" if not any_dom else
-            "存在点估计支配对，见 dominance"),
+        "frontier_summary": frontier_summary,
+        "summary_generated_from": "dominance（机器生成，无手写支配主张）",
+    }
+
+
+def cost_only_total_order(timing):
+    """098-②：总成本（稳态 + 冷建簇/重建）排序陈述——纯 cost-only。
+
+    本对象禁用「Pareto 支配」术语：质量维不参与，只陈述「总成本点估计
+    更高 / 不摊销 / 回本步数」这类一维成本排序事实。所有句子从数据
+    机器生成，decode 口径与数据边界显式声明。
+    """
+    zero_build = [a for a in ARMS if not timing[a]["is_cluster_arm"]]
+    stmts = []
+    for c in CLUSTER_ARMS:
+        cc_cells = timing[c]["cells"]
+        for z in zero_build:
+            zc_cells = timing[z]["cells"]
+            keys = [f"{dk}/S{s}" for dk in DATA_KINDS for s in SIZES]
+            hi = sum(1 for k in keys
+                     if cc_cells[k]["selector_total_ms_median_est"]
+                     > zc_cells[k]["selector_total_ms_median_est"])
+            lo = sum(1 for k in keys
+                     if cc_cells[k]["selector_total_ms_median_est"]
+                     < zc_cells[k]["selector_total_ms_median_est"])
+            eq = len(keys) - hi - lo
+            k64 = "structured/S65536"
+            init64 = cc_cells[k64]["initial_build_excess_ms"]
+            spike_n = cc_cells[k64]["rebuild_spike_n_in_128steps"]
+            spike_excess = cc_cells[k64]["rebuild_excess_ms_in_128steps"]
+            rebuild_note = (
+                f"128 步窗内已观测到 {spike_n} 次重建尖峰（超额 "
+                f"{spike_excess:.0f}ms），复发使实际回本步数更长"
+                if spike_n else
+                "128 步窗内未观测到重建尖峰，但重建随 S 跨阈复发的风险"
+                "仍在（簇臂建簇非一次性，cclustersim 已实证复发）")
+            if lo == 0:
+                stmts.append(
+                    f"{c} vs {z}：稳态 10 格中 {hi} 格点估计更高、{eq} 格相等、"
+                    f"无一格更低，且 {c} 冷建簇+重建成本为正（64K structured "
+                    f"初建超额 {init64:.0f}ms/层/序列）——含冷成本后任何 "
+                    f"decode 长度总成本点估计不低于 {z}（steady-only 口径下"
+                    f"无回本点；{c} 的冷建簇不摊销）。纯一维成本排序陈述"
+                    f"（cost-only；质量维与显著性语义见 "
+                    f"quality_steady_cost_pareto）")
+            else:
+                diff = (zc_cells[k64]["selector_total_ms_median_est"]
+                        - cc_cells[k64]["selector_total_ms_median_est"])
+                if diff > 0:
+                    steps_txt = (f"64K structured steady-only 口径：初建超额 "
+                                 f"{init64:.0f}ms ÷ 稳态差 {diff:.4f}ms/步 → "
+                                 f"回本步数 ≈ {init64 / diff:,.0f} 步——decode "
+                                 f"长度短于该步数时总成本点估计更高、更长则"
+                                 f"更低（点估计；{rebuild_note}）")
+                else:
+                    steps_txt = ("64K structured 稳态差 ≤ 0——稳态亦不便宜，"
+                                "任何 decode 长度总成本点估计不低于 "
+                                f"{z}（无回本点）")
+                stmts.append(
+                    f"{c} vs {z}：稳态 10 格中 {lo} 格点估计更低、{hi} 格更高"
+                    f"（其余 {eq} 格相等）——稳态口径 {c} 相对 {z} 更便宜，"
+                    f"但 {c} 冷建簇成本为正（64K structured 初建超额 "
+                    f"{init64:.0f}ms/层/序列）。{steps_txt}。纯一维成本排序"
+                    f"陈述（cost-only）")
+    return {
+        "semantics": "总成本 = 稳态选择器成本（10 格点估计）+ 冷建簇初建超额 "
+                     "+ 128 步窗内重建尖峰超额。一维成本排序陈述（cost-only "
+                     "total order），不含质量维，禁用 Pareto 支配术语——"
+                     "新增最小化成本维在数学上只可能缩小支配集（新 ⊆ 旧，"
+                     "性质测试 test_e128_fix_098_100.py），不可能从二维"
+                     "无支配变出支配",
+        "decode_horizon": "任意 decode 长度（steady-only 口径：稳态差 ≤ 0 则"
+                          "任何长度不摊销）+ 128 步实测窗（rep0 含初建+全部"
+                          "重建尖峰的有效均值见 amortization_horizon_vs_mavg）",
+        "calibers": ["steady_only（假设建簇不再发生——对 cclustersim 已证伪，"
+                     "仅供下界/回本步数参考）",
+                     "含重建复发（rebuild_excess_ms_in_128steps 实测）"],
+        "data_scope": "structured/singleton 合成数据（真实 LongBench 分布"
+                      "未测，structured 为有利下界）；B=1、q_len=1、D′ off、"
+                      "单层 microbench、E126 优化前基线口径、H20-3e",
+        "point_estimate_nature": "成本为中位数点估计，无置信区间；质量维"
+                                 "显著性见 quality_steady_cost_pareto."
+                                 "significance_note",
+        "statements": stmts,
     }
 
 
@@ -603,8 +922,15 @@ def amortization_horizon(timing):
     return out
 
 
-def build_recommendation(quality, timing, e127_paired, headline, e109):
-    """论文主方法推荐（分析支撑，最终裁决权在主 AI Opus）。"""
+def build_recommendation(quality, timing, e127_paired, headline, e109,
+                         pairwise, e100):
+    """论文主方法推荐（分析支撑，最终裁决权在主 AI Opus）。
+
+    099 修复：R1/R6 措辞严格化——R1 分开陈述「三候选 vs mavg 含 0」与
+    「mminmax 显著更差」（旧版同句内部冲突）；臂间配对事实从 pairwise_ci_all
+    机器引用；R6 的 E100 含零 CI 写「未证明差异」（084 纪律：不写「持平」），
+    数字从 e100_bootstrap_ci.json 机器取值并经联立门禁。
+    """
     cc = quality["cclustersim"]
     mm = quality["mminmax"]
     steady64 = {a: timing[a]["cells"]["structured/S65536"]
@@ -617,16 +943,27 @@ def build_recommendation(quality, timing, e127_paired, headline, e109):
     v64i = timing["cavgsim"]["cells"]["singleton/S65536"]
     e2e64 = {a: timing[a]["cells"]["structured/S65536"]
              ["e2e_128step_ms_timing_off_mixed_clock"] for a in ARMS}
+    # 099：臂间配对不含 0 的事实从全枚举机器生成（方向 = 前臂 − 后臂）
+    sig_arm_pair_txt = "; ".join(
+        f"{k} 点估计 {v['point_est']:+.2f} "
+        f"[{v['ci95'][0]:+.2f},{v['ci95'][1]:+.2f}]"
+        for k, v in sorted(pairwise["pairs"].items())
+        if not v["contains_zero"] and not k.startswith("mavg-"))
     reasons = [
         {"id": "R1-quality-unproven",
-         "statement": "无臂被证明优于 mavg：E125 全部四候选 vs mavg 的 "
-                      "bootstrap CI 均含 0（cclustersim +0.34 "
+         "statement": "换锚判据（候选 vs mavg）：三候选未证明差异——"
+                      "cclustersim +0.34 "
                       f"[{cc['ci95_vs_mavg'][0]:+.2f},{cc['ci95_vs_mavg'][1]:+.2f}]、"
-                      "aavg +0.21 [-0.25,+0.86]、cavgsim -0.18 [-0.44,+0.09]）"
-                      "——084 措辞纪律下只能写「未证明差异」，不足以支撑换锚。"
-                      "唯一显著判决是 mminmax 显著更差"
+                      "aavg +0.21 [-0.25,+0.86]、cavgsim -0.18 [-0.44,+0.09] "
+                      "vs mavg 的 bootstrap CI 均含 0，084 措辞纪律下只能写"
+                      "「未证明差异」，不足以支撑换锚。唯一 vs mavg 显著判决"
+                      "是 mminmax 显著更差"
                       f"（{mm['delta_vs_mavg']:+.2f} "
-                      f"[{mm['ci95_vs_mavg'][0]:+.2f},{mm['ci95_vs_mavg'][1]:+.2f}]）。",
+                      f"[{mm['ci95_vs_mavg'][0]:+.2f},{mm['ci95_vs_mavg'][1]:+.2f}]）。"
+                      "臂间配对全枚举（pairwise_ci_all，10 对，未做多重比较"
+                      f"校正）中另有不含 0 的臂间对：{sig_arm_pair_txt}——"
+                      "臂间排序事实如实登记，但换锚判据是候选 vs mavg，"
+                      "臂间配对事实不改变「无候选被证明优于 mavg」。",
          "data_source": "e125_screen_verdict.json（本脚本重算复核通过）",
          "uncertainty": "cclustersim 点估计最高且高于 FullKV 锚点"
                         f"（+{cc['delta_vs_fullkv_point']:.2f}，vs fullkv "
@@ -713,14 +1050,19 @@ def build_recommendation(quality, timing, e127_paired, headline, e109):
          "uncertainty": "两口径任务集/协议不同（repobench-p vs repobench），"
                         "只作符号稳定性参考，不作分数横比"},
         {"id": "R6-paper-story",
-         "statement": "论文主张链已锚定 mavg：E100 13 任务 FullKV 持平"
-                      "（+0.42，CI [-0.18,+1.02] 含 0）+ E127 同预算 kernel "
-                      "加速（mavg 配置实测 5.47×）。换 cclustersim 需重跑"
+         "statement": "论文主张链已锚定 mavg：E100 13 任务 vs FullKV "
+                      f"{'未证明差异' if e100['contains_zero'] else '显著差异'}"
+                      f"（+{e100['diff']:.2f}，CI "
+                      f"[{e100['ci95'][0]:+.2f},{e100['ci95'][1]:+.2f}] "
+                      f"{'含 0；084 措辞纪律：含 0 只能写「未证明差异」' if e100['contains_zero'] else '不含 0'}）"
+                      "+ E127 同预算 kernel 加速（mavg 配置实测 "
+                      f"{headline['gpu_speedup']:.2f}×）。换 cclustersim 需重跑"
                       "全量验证（E116b 式咬合）+ fast-path 臂级基准 + prefill "
                       "suffix 不变性验收，成本大而质量收益未证明。",
-         "data_source": "e100_bootstrap_ci.json 结论（历史判决）+ "
+         "data_source": "e100_bootstrap_ci.json（历史判决，100-⑥：进 "
+                        "provenance，claim/main_ci 联立门禁通过）+ "
                         "E127 配对组实测口径",
-         "uncertainty": "E100 持平口径基于 mavg 臂 13 任务全量；"
+         "uncertainty": "E100 未证明差异口径基于 mavg 臂 13 任务全量；"
                         "cclustersim 无对应全量数据"},
     ]
     rec = {
@@ -736,8 +1078,13 @@ def build_recommendation(quality, timing, e127_paired, headline, e109):
             "aavg": "零建簇成本、稳态与 mavg 同档（10 格内有格交叉），点估计"
                     "+0.21 未证明且跨口径符号翻转（E109 −0.52）——不换锚，"
                     "可作消融臂",
-            "cavgsim": "被 mavg/aavg 点估计支配（质量更低 + 冷建簇 1859ms"
-                       "@64K）；E123 cavg 线已 NO-GO 关闭",
+            "cavgsim": "质量点估计低于 mavg/aavg（vs mavg -0.18 CI 含 0 "
+                       "未证明差异；臂间配对 aavg-cavgsim CI 不含 0）且冷"
+                       f"建簇 {v64s['initial_build_excess_ms']:.0f}ms"
+                       "@64K structured——以上均为点估计排序与配对事实"
+                       "陈述，非 Pareto 支配主张（二维支配表为空，见 "
+                       "quality_steady_cost_pareto）；E123 cavg 线已 NO-GO "
+                       "关闭",
             "mminmax": "唯一显著判决臂（vs mavg CI [-1.56,-0.08]）——剔除",
         },
         "inflight_conflict_note": "E129 子空间消融在飞以 cclustersim 为冠军"
@@ -753,11 +1100,13 @@ def build_recommendation(quality, timing, e127_paired, headline, e109):
 # ------------------------------------------------------------------ main
 def main():
     prov = {}
-    quality = load_e125(prov)
+    quality, pairwise = load_e125(prov)
     timing = load_e126(prov)
     e127_paired, headline, e127_profile = load_e127(prov)
     e109 = load_e109(prov)
-    pareto = pareto_analysis(quality, timing)
+    e100 = load_e100(prov)
+    pareto = pareto_analysis(quality, timing, pairwise)
+    cost_only = cost_only_total_order(timing)
     amort = amortization_horizon(timing)
 
     # E127 覆盖面（静态事实，来源=代码门控条件 + S-T024 报告；如实区分）
@@ -827,9 +1176,11 @@ def main():
     payload = {
         "meta": {
             "probe": "E128 五臂质量×性能综合权衡表（#216）——E125 质量分 × "
-                     "E126 修正后计时 × E127 优化定案",
+                     "E126 修正后计时 × E127 优化定案（098/099/100 修复版）",
             "generated": "2026-10-12",
-            "worktree_branch": "e128-tradeoff",
+            "worktree_branch": os.popen(
+                "git -C " + REPO + " rev-parse --abbrev-ref HEAD"
+            ).read().strip() or "detached-or-non-git",
             "base_commit": os.popen(
                 "git -C " + REPO + " rev-parse --short HEAD").read().strip(),
             "scope_limits": "structured/singleton 合成数据、B=1、q_len=1、"
@@ -850,12 +1201,28 @@ def main():
                                   "gather 选中子集",
             },
             "statistical_discipline": "084 措辞：CI 含 0 写「未证明差异」"
-                                      "不写「持平/等价」；支配关系为点估计"
-                                      "排序主张",
+                                      "不写「持平/等价」；Pareto 支配术语仅"
+                                      "允许出现在 quality_steady_cost_pareto"
+                                      ".dominance 及其机器生成摘要中，"
+                                      "cost_only_total_order_at_horizon 为纯"
+                                      "成本排序陈述禁用支配术语（098）；"
+                                      "臂间配对结论只引用 pairwise_ci_all "
+                                      "全枚举，不做「除 X 外均含 0」式全称"
+                                      "外推（099）；支配/排序关系均为点估计"
+                                      "主张",
+            "multiple_comparison_note": "pairwise_ci_all 为 10 对全枚举，"
+                                         "未做多重比较校正；含 0 的对只写"
+                                         "「未证明差异」（099-②）",
+            "fix_provenance_gpt_audit": "TL-E128-PARETO-098 / "
+                                        "TL-E128-STATEMENT-099 / "
+                                        "TL-E128-FAILCLOSED-100 修复"
+                                        "（2026-10-12），套件 "
+                                        "test_e128_fix_098_100.py",
             "consumed_only_corrected_e126_fields": True,
         },
         "provenance": prov,
         "quality_e125": quality,
+        "pairwise_ci_all": pairwise,
         "steady_selector_cost_e126": {
             a: {"cells": timing[a]["cells"],
                 "is_cluster_arm": timing[a]["is_cluster_arm"],
@@ -893,9 +1260,10 @@ def main():
         "e127_coverage": e127_coverage,
         "e127_applicability_per_arm": e127_applicability,
         "e109_old_caliber_avg5_cross_check": e109,
-        "pareto": pareto,
+        "quality_steady_cost_pareto": pareto,
+        "cost_only_total_order_at_horizon": cost_only,
         "recommendation": build_recommendation(
-            quality, timing, e127_paired, headline, e109),
+            quality, timing, e127_paired, headline, e109, pairwise, e100),
     }
 
     with open(OUT_JSON, "w") as f:
@@ -957,17 +1325,24 @@ def main():
     print(f"launch/step: {e127_profile['one_step_cuda_kernels']['baseline']} → "
           f"{e127_profile['one_step_cuda_kernels']['iter8']}")
     print()
-    print("--- Pareto（点估计；质量差 CI 除 mminmax 外均含 0）---")
+    print("--- 臂间配对 bootstrap CI 全枚举（099；point = 前臂 − 后臂；"
+          "未做多重比较校正）---")
+    for k, v in pairwise["pairs"].items():
+        print(f"{k:<24}{v['point_est']:+.3f}  "
+              f"[{v['ci95'][0]:+.3f},{v['ci95'][1]:+.3f}]  "
+              f"{'含 0（未证明差异）' if v['contains_zero'] else '不含 0'}")
+    print()
+    print("--- Pareto 二维支配表（质量-稳态成本；点估计；机器生成摘要）---")
     for a in ARMS:
         d = pareto["dominance"][a]
         doms = ", ".join(x["arm"] for x in d["dominates_point_estimate"]) or "—"
         dby = ", ".join(x["arm"] for x in d["dominated_by_point_estimate"]) or "—"
         print(f"{a:<12}支配 [{doms}]  被支配 [{dby}]")
-    any_dom = any(pareto["dominance"][a]["dominates_point_estimate"]
-                  for a in ARMS)
-    print("（质量-稳态成本二维平面上无严格支配对：每对臂或质量交叉或成本"
-          "交叉——真实权衡前沿；加建簇+重建成本维后簇臂在任何 decode 长度"
-          "的总成本意义上劣于零建簇臂，见摊销视野）" if not any_dom else "")
+    print(f"（{pareto['frontier_summary']}）")
+    print()
+    print("--- 总成本排序（cost-only；禁用 Pareto 支配术语；098-②）---")
+    for s in cost_only["statements"]:
+        print(f"  - {s}")
     print()
     print("--- 簇臂摊销视野（vs mavg；steady-only / 128 步窗有效均值双口径）---")
     for a in CLUSTER_ARMS:
