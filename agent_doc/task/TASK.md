@@ -56,13 +56,11 @@
   GPT 2bbb9a763 优先级切换；E109 海选 31 臂为旧口径，mavg/fullkv 复用
   E123 新口径数据，4 method 最佳臂 .187 在飞补齐）
   ([详情](task_details/S-T022.md))
-- [ ] [S-T023] 论文对比基线设计 + 开源复现任务链（用户 18:2X/18:5X 指令：
-  **基于创新点设计对比**——T1 必比 Quest/ClusterKV/MoBA（A 轨公平 + B 轨 vendor
-  双证）+ T2 应比 KV 压缩族（KVCache-Factory 统一接入）+ FullKV 锚点；指标=精度主表
-  （LBv1 16/LBv2 503/RULER 32/64/128K）+ 效率副表（microbench/e2e/选择器开销/KV 显存）
-  + 质量-预算 Pareto；模型 Qwen3-8B/32B/DeepSeek-V2-Lite-Chat（MLA）；**sanity 硬门禁：
-  复现数据须符合对方原论文结论**。设计论证见 task_details/S-T023.md §0；阶段 0-5 推进）
-  ([详情](task_details/S-T023.md))
+- [ ] [S-T023] 竞品复现与整请求公平比较：Quest/FASA/SparQ/ClusterKV + MInference，
+  HiP/MoBA条件候选；主表统一整请求质量及实测E2E，各方法保留原生另一阶段。
+  阶段子表仅归因；我方海选/冠军/MLA扩展由Opus独占，DeepSeek仅竞品。
+  sanity核语义/配置/打分/计时，不能强制结果符合论文方向；新Quest patch缺dense分支待修。
+  本轮文档纠偏不新增跑批矩阵、不启动GPU。([详情](task_details/S-T023.md))
 
 ## 待办池（未排期，均有用户指令或审计来源）
 
