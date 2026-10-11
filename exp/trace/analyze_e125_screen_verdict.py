@@ -182,7 +182,41 @@ def load_e123_anchor():
     mavg_avg = sum(mavg.values()) / 5
     fullkv_avg = sum(fullkv.values()) / 5
     e123_backend = (d.get("meta") or {}).get("scorer_backend")
-    return mavg, fullkv, mavg_avg, fullkv_avg, e123_backend
+    migration = None
+    if not e123_backend:
+        # TL-E125-ANCHOR-BACKEND-001 修复（GPT 2026-10-11 审计）：verdict 缺
+        # meta.scorer_backend 时绝不猜默认值——唯一放行路径是显式迁移：
+        # 从 E123 raw（083 manifest 同源闭包目录）逐臂读 _meta.scorer_backend，
+        # 四臂全部存在且一致才登记为锚点 backend；任一缺失/不一致 fail closed。
+        raw_dir = os.path.join(
+            REPO, "exp", "trace", "results", "e123_trial_raw")
+        arms123 = ["mavg", "cavg_g", "cavg_off", "fullkv"]
+        raw_backends = []
+        for arm123 in arms123:
+            rp = os.path.join(raw_dir, f"pred_{arm123}", "result.json")
+            if not os.path.exists(rp):
+                sys.exit(f"[ABORT] E123 锚点缺 meta.scorer_backend 且 raw "
+                         f"result.json 不存在：{rp}——身份不可臆造，fail closed")
+            b123 = (json.load(open(rp)).get("_meta") or {}).get("scorer_backend")
+            if not b123:
+                sys.exit(f"[ABORT] E123 raw pred_{arm123}/result.json 缺 "
+                         f"_meta.scorer_backend——身份不可臆造，fail closed")
+            raw_backends.append(b123)
+        if len(set(raw_backends)) != 1:
+            sys.exit(f"[ABORT] E123 raw 四臂 scorer_backend 不一致 "
+                     f"{dict(zip(arms123, raw_backends))}——来源冲突，fail closed")
+        e123_backend = raw_backends[0]
+        migration = {
+            "source": ("exp/trace/results/e123_trial_raw/pred_{mavg,cavg_g,"
+                       "cavg_off,fullkv}/result.json _meta.scorer_backend"),
+            "resolved_backend": e123_backend,
+            "reason": ("e123_trial_verdict.json meta 缺 scorer_backend（E123 "
+                       "判决生成早于 085 身份字段协议）；四臂 raw 闭包一致，"
+                       "显式迁移登记，不猜默认值"),
+        }
+        print(f"[MIGRATE] E123 锚点 scorer backend 显式迁移：{e123_backend} "
+              f"（来源 {migration['source']}）")
+    return mavg, fullkv, mavg_avg, fullkv_avg, e123_backend, migration
 
 
 def main():
@@ -213,8 +247,11 @@ def main():
     print(f"[SCORER] 四臂实际打分后端一致：{backend_id}")
 
     # 3) E123 锚点（mavg/fullkv 逐任务）+ 后端身份一致性核对
-    mavg, fullkv, mavg_avg, fullkv_avg, e123_backend = load_e123_anchor()
-    if e123_backend and e123_backend != backend_id:
+    mavg, fullkv, mavg_avg, fullkv_avg, e123_backend, migration = (
+        load_e123_anchor())
+    # 001 修复后 e123_backend 保证非 None（缺字段已 fail-closed 或显式迁移），
+    # 无条件严格比较——跨后端比较无意义
+    if e123_backend != backend_id:
         sys.exit(f"[ABORT] 锚点 scorer 后端（E123: {e123_backend}）与本轮 "
                  f"（{backend_id}）不一致——跨后端比较无意义，fail closed")
 
@@ -236,6 +273,8 @@ def main():
             "arm_configs": ARM_CONFIGS,
             "anchor_provenance": {
                 "source": "exp/trace/results/e123_trial_verdict.json",
+                "anchor_scorer_backend": e123_backend,
+                "anchor_backend_migration": migration,
                 "note": "mavg/fullkv 锚点逐任务分数复用 E123（同 difflib "
                         "协议同 5 任务集，E123 已过 scorer 身份门禁与 "
                         "input_manifest 闭包）"},
