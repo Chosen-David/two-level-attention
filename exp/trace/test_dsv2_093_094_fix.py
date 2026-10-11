@@ -272,18 +272,19 @@ def test_093():
     caps = json.load(open(CAPS_FP, encoding="utf-8"))
     entry = caps["DeepSeek-V2-Lite-Chat"]
 
-    # T10 cap 恢复
+    # T10 cap 口径：受限 treatment 落地（16K 运行 cap + 协议值 31500 留注册表）
     prev_val = json.loads(_sh(["git", "show",
                                "ffb61457:benchmark/LongBench/config/"
                                "model2maxlen.json"]))
     old_val = json.loads(_sh(["git", "show",
                               f"{OLD_BASE}:benchmark/LongBench/config/"
                               "model2maxlen.json"]))
-    _check(m2m["DeepSeek-V2-Lite-Chat"] == 31500
+    _check(m2m["DeepSeek-V2-Lite-Chat"] == 16384
            and prev_val["DeepSeek-V2-Lite-Chat"] == 31500
            and old_val["DeepSeek-V2-Lite-Chat"] == 16384,
-           f"T10 model2maxlen 恢复 31500（ffb61457 协议原值 31500，缺陷基线"
-           f"值 16384，修复版 {m2m['DeepSeek-V2-Lite-Chat']}）")
+           f"T10 model2maxlen=16384 受限 treatment（eager OOM 实证下唯一可运"
+           f"行 cap，注册表 protocol 31500 保留；ffb61457 协议值 31500，缺陷基"
+           f"线 16384 但彼时冒称模型能力）")
 
     # T11 注册表 vs 真实快照文件活值对账
     cfg = json.load(open(os.path.join(DSV2_SNAPSHOT, "config.json")))
@@ -302,8 +303,10 @@ def test_093():
            ["value"] == 32768,
            "T11c 注册表 model_card_declared_context == README 模型卡 32k")
     _check(entry["experiment_input_cap"]["value"] == 31500
+           and entry["restricted_context_treatment"]["value"] == 16384
            == m2m["DeepSeek-V2-Lite-Chat"],
-           "T11d 注册表 experiment_input_cap == model2maxlen 活值 == 31500")
+           "T11d 注册表 protocol 31500 + restricted treatment 16384 == "
+           "model2maxlen 活值（受限 treatment 落地一致）")
 
     # T12/T13 门禁放行 + 三方冲突不静默（真实快照活值路径）
     code, out, err, ret = run_gate(

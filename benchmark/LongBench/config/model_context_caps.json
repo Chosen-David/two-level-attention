@@ -14,7 +14,11 @@
         },
         "experiment_input_cap": {
             "value": 31500,
-            "evidence": "benchmark/LongBench/config/model2maxlen.json:DeepSeek-V2-Lite-Chat（LongBench 协议原值 = ffb61457 前值，TL-DSV2-CONTEXT-CAP-093 修复恢复；与 Qwen3 系同口径，模型能力 163840 ≥ 31500 覆盖。注意：eager attention (16 heads × L² × fp32) 在 L=31500 时单层 score 张量 ~59 GiB，显存上限是运行实现的约束而非模型位置能力上限）"
+            "evidence": "LongBench 协议原值（ffb61457 前值）= 论文口径协议锚，模型能力 163840 ≥ 31500 覆盖。TL-DSV2-CONTEXT-CAP-093 修复先恢复此值；随后 2026-10-12 裁决：eager attention (16 heads × L² × fp32) 在 L=31500 时单层 score 张量 ~59 GiB（BF16 ~29.6 GiB + FP32 softmax ~59 GiB），实测 OOM，且官方 modeling_deepseek.py 仅支持 eager/flash_attention_2 而 GPU 池无 flash_attn → 当前可运行实现仅支持 16K。协议值 31500 保留为将来高效 attention 路线（flash_attention_2/分块）的协议锚，不回改"
+        },
+        "restricted_context_treatment": {
+            "value": 16384,
+            "evidence": "2026-10-12 裁决落地（Opus）：运行实现显存约束（eager OOM 实证、.251 H20-3e 140GB 卡上 031e6b8 前实测）下的受限上下文 treatment，= model2maxlen.json:DeepSeek-V2-Lite-Chat 当前值。与 031e6b8 缺陷的本质区别：该提交把 16384 冒称模型位置能力上限（TL-DSV2-CONTEXT-CAP-093），本 treatment 如实声明为运行实现约束，启动门禁打印 [EXPERIMENT-CAP-DIVERGENCE] 对照协议值 31500，结果文件须标注 16K 受限上下文口径，绝不冒称模型能力。DeepSeek 线内所有被比较臂（fullkv 锚点 + 未来 TLI-MLA 臂）统一同 16K treatment（GPT 093 建议修复第 2 条）"
         }
     }
 }
