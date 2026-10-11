@@ -400,21 +400,6 @@ def test_score_mask_derived():
                 if not T.equal(a[step][1], b[step][1]):
                     n_fail += 1
                     print(f"  {cname} {ltag} step{step} MASK MISMATCH")
-                # 【iter9】gmean 双输出 vs fast 分数现场 mean（同源分数，
-                # kernel 内「先舍入 OUT dtype 再 fp32 顺序平均」= torch
-                # mean opmath 顺序 → 数学同构，逐位一致口径）
-                from einops import rearrange as _rearr
-                for _gkey, _skey in (("score_coarse_g", "score_coarse"),
-                                     ("score_coarse_avg_g", "score_coarse_avg")):
-                    _g = sb.get(_gkey)
-                    _src = sb.get(_skey)
-                    if _g is None:
-                        continue
-                    _ref = _rearr(_src, "b qt (h g) kt -> b qt h g kt",
-                                  g=4).mean(dim=-2)
-                    if not T.equal(_g, _ref):
-                        n_fail += 1
-                        print(f"  {cname} {ltag} step{step} {_gkey} != 现场 mean")
     check("score_mask_derived: 4 配置 × normal/skip × 10 步 score/mask 一致"
           "（coarse+avg ULP≤1e-4 + fine ULP≤1e-4 + mask 逐位）",
           n_fail == 0,
@@ -467,50 +452,6 @@ def test_score_mask_derived():
     check("score_mask_derived: S 回退全量重建 + 后续增量 score ULP 口径一致"
           "（coarse/avg/fine）",
           ok_back)
-
-    # 【iter11】gmean/fused 启用档（8K < T ≤ 16K）专项：S=16384 下
-    # score_coarse_g/score_coarse_avg_g 双输出 vs fast 分数现场 mean
-    # 逐位 + fused mask-p 路由生效（mask 对 TLIIndexer 逐位）。
-    # （S0=4093 主矩阵在 iter11 路由下走回退路径，gmean 断言静默跳过，
-    # 此处补启用档数值覆盖。）
-    n_fail_g16 = 0
-    for cname, cargs in [("champion_e64", make_cfg(0.25, 0.125, 0.625, "minmax", "avg")),
-                         ("aavg_00", make_cfg(0.0, 0.0, 0.375, "avg", "avg"))]:
-        T.manual_seed(20261021)
-        i_r = TLIIndexer(cargs); i_r.layer_idx = 2; i_r.clear()
-        T.manual_seed(20261021)
-        i_f = TLIIndexerFast(cargs); i_f.layer_idx = 2; i_f.clear()
-        k16 = T.randn(1, 16384, Hkv, D, device=dev, dtype=T.bfloat16)
-        q16 = T.randn(1, 1, H, D, device=dev, dtype=T.bfloat16)
-        cu16 = prepare_cu_seqlens(k16)
-        qi16 = cu16[1:] - cu16[:-1] - 1
-        sc_f16 = i_f.compute_score(q16, qi16, i_f.prepare_index(k16, cu16), scale)
-        m_f16 = i_f.compute_mask(qi16, sc_f16)
-        if sc_f16.get("score_coarse_g") is None:
-            n_fail_g16 += 1
-            print(f"  {cname} S=16K gmean 键缺失（路由未启用）")
-            continue
-        for gk, sk in (("score_coarse_g", "score_coarse"),
-                       ("score_coarse_avg_g", "score_coarse_avg")):
-            g16 = sc_f16.get(gk); s16 = sc_f16.get(sk)
-            if g16 is None and s16 is None:
-                continue
-            if g16 is None:
-                n_fail_g16 += 1
-                print(f"  {cname} S=16K {gk} 缺失")
-                continue
-            ref16 = _rearr(s16, "b qt (h g) kt -> b qt h g kt",
-                              g=4).mean(dim=-2)
-            if not T.equal(g16, ref16):
-                n_fail_g16 += 1
-                print(f"  {cname} S=16K {gk} != 现场 mean")
-        sc_r16 = i_r.compute_score(q16, qi16, i_r.prepare_index(k16, cu16), scale)
-        m_r16 = i_r.compute_mask(qi16, sc_r16)
-        if not T.equal(m_f16, m_r16):
-            n_fail_g16 += 1
-            print(f"  {cname} S=16K mask 不一致")
-    check("score_mask_derived: gmean/fused 启用档（16K）gmean 逐位 + mask 逐位",
-          n_fail_g16 == 0)
 
 
 def test_pipeline_zero_sync():

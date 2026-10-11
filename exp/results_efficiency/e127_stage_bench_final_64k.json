@@ -1,0 +1,83 @@
+{
+  "config": {
+    "alpha": 0.25,
+    "beta": 0.125,
+    "gamma": 0.625,
+    "K1": 128,
+    "K2": 1024,
+    "bs": 64,
+    "D": 128,
+    "H": 32,
+    "Hkv": 8
+  },
+  "gpu": "NVIDIA H20-3e",
+  "torch": "2.8.0+cu128",
+  "runs": [
+    {
+      "layer_idx": 2,
+      "S0": 65536,
+      "steps": 30,
+      "prepare_index": {
+        "gpu_ms_median": 0.44707199931144714,
+        "gpu_ms_p90": 0.4604800045490265,
+        "cpu_ms_median": 0.9588822722434998
+      },
+      "compute_score": {
+        "gpu_ms_median": 0.34964799880981445,
+        "gpu_ms_p90": 0.36048001050949097,
+        "cpu_ms_median": 0.29934197664260864
+      },
+      "compute_mask": {
+        "gpu_ms_median": 0.47360000014305115,
+        "gpu_ms_p90": 0.48096001148223877,
+        "cpu_ms_median": 0.502370297908783
+      },
+      "metrics": {
+        "gpu_ms_median": 0.06763200089335442,
+        "gpu_ms_p90": 0.07583999633789062,
+        "cpu_ms_median": 0.08682534098625183
+      },
+      "eager_decoding": {
+        "gpu_ms_median": 0.18215999752283096,
+        "gpu_ms_p90": 0.1892160028219223,
+        "cpu_ms_median": 0.17579272389411926
+      },
+      "step_gpu_sum_ms": 1.5201119966804981,
+      "step_cpu_wall_ms": 2.0220614969730377,
+      "layer_kind": "normal"
+    },
+    {
+      "layer_idx": 0,
+      "S0": 65536,
+      "steps": 30,
+      "prepare_index": {
+        "gpu_ms_median": 0.4445919990539551,
+        "gpu_ms_p90": 0.4598720073699951,
+        "cpu_ms_median": 0.9594820439815521
+      },
+      "compute_score": {
+        "gpu_ms_median": 0.34569600224494934,
+        "gpu_ms_p90": 0.3540799915790558,
+        "cpu_ms_median": 0.29775872826576233
+      },
+      "compute_mask": {
+        "gpu_ms_median": 0.35892799496650696,
+        "gpu_ms_p90": 0.36819198727607727,
+        "cpu_ms_median": 0.40616095066070557
+      },
+      "metrics": {
+        "gpu_ms_median": 0.08832000195980072,
+        "gpu_ms_p90": 0.09455999732017517,
+        "cpu_ms_median": 0.08764490485191345
+      },
+      "eager_decoding": {
+        "gpu_ms_median": 0.1865760013461113,
+        "gpu_ms_p90": 0.1921280026435852,
+        "cpu_ms_median": 0.17557665705680847
+      },
+      "step_gpu_sum_ms": 1.4241119995713234,
+      "step_cpu_wall_ms": 1.9233860075473785,
+      "layer_kind": "skip"
+    }
+  ]
+}
