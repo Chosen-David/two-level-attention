@@ -1,0 +1,112 @@
+# two-level-attention 项目任务索引（AI 维护）
+
+这是 two-level-attention 主项目的唯一 AI 任务索引（agent_doc 口径），
+由主 AI 串行维护。
+**优先级从属关系：sglang 主仓根目录 `/home/wangyuanshuo02/sglang/TASK.md`
+（用户私人设定，AI 只读）是指南层，本文件是执行索引层**——每项登记的
+任务须能追溯到用户指令或根 TASK.md 条目；两者冲突时以根 TASK.md 为准。
+
+每项任务的方法、进度、证据、阻塞与下一步写 `task_details/<任务ID>.md`，
+不在此堆日志。日期是任务来源/组织日期，不自动表示完成日期。
+
+本索引自 sglang 主仓 `agent_doc/task/TASK.md` 迁移（2026-10-11 主项目
+移交），任务内容与 S-T 编号原样保留，此后在本目录维护。
+
+## 2026-10-08
+
+- [ ] [S-T001] E109 method×(α,β,γ) 海选-全量两级扫描（进行中：AVG5 6 臂
+  入账，榜首 aavg(.125,.125,.375)=46.43；三机 12 卡满载推进）
+  ([详情](task_details/S-T001.md))
+- [x] [S-T002] GPT 复查 bug1/2/3 核实与修复（全部属实全修复，红-绿双证，
+  sglang 067553e60/3a868d9bf/3b1482744）
+  ([详情](task_details/S-T002.md))
+- [ ] [S-T003] agent 库升级 f299566c + sglang agent_doc 布局建立
+  (本文件即交付物之一；[详情](task_details/S-T003.md))
+
+历史任务（E1-E113 全链）的原始记录位于 `two-level-attention/exp/trace/`
+与 `research/docs/`，不在本索引重建；新任务自此按本格式登记。
+
+## 2026-10-09（补记 S-T004~S-T008，主 AI 维护义务恢复）
+
+- [x] [S-T004] E116a-e 评分完整性门禁五连（LB v1 manifest / RULER
+  fail-closed / 正式入口 / 发布原子性；遗留 E116b 等冠军口径重跑）
+  ([详情](task_details/S-T004.md))
+- [x] [S-T005] E117a W_O 投影逐层潜力重判（NO-GO：中位 gap 8.045%<10%，
+  平坦性第五证；2a852c9a0）
+  ([详情](task_details/S-T005.md))
+- [x] [S-T006] E117b LB v2 解析器官方口径统一 + 503×3 重评（排序反转：
+  FullKV 32.21 > mavg 32.01 > aavg 31.81，原「LB v2 冠军=aavg」撤销）
+  ([详情](task_details/S-T006.md))
+- [ ] [S-T007] E119 四机 RULER 64K/128K 汇总 + 正式入口收口
+  （**64K 三臂已收口**：mavg 49.42 > FullKV 48.54 > aavg 47.51，
+  bb4cb21ac；128K 在飞四机 20 卡满载，全齐后同口径收口）
+  ([详情](task_details/S-T007.md))
+- [x] [S-T008] E116f 正式入口发布事务原子性修复（GPT 审计 038/039，
+  generation+单指针协议，红绿 4/4 + 32K 回归逐位；d659568ab）
+  ([详情](task_details/S-T008.md))
+- [ ] [S-T009] 论文对比口径讨论（dense vs 单级稀疏）+ E120 单级无粗筛
+  方案探索（用户 13:2X 指令；讨论已发起 advice，待 GPT 回复）
+  ([详情](task_details/S-T009.md))
+
+## 2026-10-10
+
+- [x] [S-T011] E117 8 层逐层配置 e2e 小试（**NO-GO**：perlayer 50.27 vs
+  uniform 50.43，配对差 −0.16 CI 含 0，5/13 胜；E85f 教训第三次验证，
+  E117 线负结果关闭，生产保持 uniform 冠军）
+  ([详情](task_details/S-T011.md))
+- [x] [S-T014] E119-066 同字节异配置 provenance 修复（formal 冻结窗口生产者
+  同键 flock + B3/B4 负例 + 锁开销实测；30/30+10/10 python±-O，c943bb028）
+  ([详情](task_details/S-T014.md))
+- [x] [S-T015] E119-066crash/067 崩溃残留指针协议 + SKIP 计数修复（不可变
+  generation+单指针 + B5 崩溃三相位六组合 + PASS/SKIP/FAIL 三分计数；
+  31/31+10/10 python±-O，99838ff3a）
+  ([详情](task_details/S-T015.md))
+- [x] [S-T016] E119-068/069 指针下游消费者修复（E109 SKIP 四态探针 + direct
+  scorer fail loudly 单口径；11/11 新套件+全套零回归，a76fd521f）
+  ([详情](task_details/S-T016.md))
+- [x] [S-T012] E119-059/060/061 GPT 复审三连修复（回执同代绑定 v2 +
+  完整配置 schema/跨格门禁 + correction 机器消费；23/23+10/10 python±-O，
+  654c2f0c8）
+  ([详情](task_details/S-T012.md))
+- [x] [S-T013] E119-062/063/064/065 GPT 二轮复审四连修复（快照竞态三方
+  一致 + 纠偏严格 schema + max_num/config 闭包 + 110 断言显式化 TOR 元
+  测试；28/28+10/10 python±-O，b4a64f2b8）
+  ([详情](task_details/S-T013.md))
+
+## 2026-10-10（晚）
+
+- [x] [S-T017] E121 kimi3 开放 bug 修复批次（R01/B10/B04/B09+F11/F5
+  口径级 + F 系防御 + SG 附加；17/17 python±-O + 全回归零回归，384dabe41）
+  ([详情](task_details/S-T017.md))
+- [x] [S-T018] E122 γ off 自由竞争模式 + E123 cavg 两配置 vs 海选冠军小试
+  （**判决 NO-GO**：cavg_g −0.242 CI 含 0 / cavg_off −2.202 显著更差，
+  维持 mavg 冠军，新口径 5 任务锚点落袋，e123_trial_verdict.json 入库）
+  ([详情](task_details/S-T018.md))
+
+## 2026-10-11（上午）
+
+- [ ] [S-T019] E116b 新口径三件套全量重跑（#167；mavg+aavg 双臂 ×
+  LB v1 16 任务 + LB v2 503 + RULER 32/64/128K；fullkv 复用仅补三缺任务；
+  **四机 20 卡 09:47 全量起跑**；动态主线转向后不停——静态锚点 + fullkv
+  基线 + 动态 vs 静态消融素材）
+  ([详情](task_details/S-T019.md))
+- [x] [S-T020] 多机 GPU 调度经验沉淀进 agent 库（用户 10-11 指令；已收官
+  agent@25e05a6：第 16 角色 gpu-experiment-dispatch skill + 15 真实事故
+  作战手册 + workflow/评测用例全套接线，945 测试无新失败）
+- [~] [S-T021] E124 论文主线转运行时逐序列逐层动态参数（用户 10-11 指令 +
+  GPT Runtime 方案 f304ec979 合流；静态 mavg 留作对照/回退，Observation
+  改每层差距，D' gate 动态版；A0-A7 阶段制）
+  **2026-10-11 15:2X 用户指令：动态线暂停**——E124 全部保留为未验收候选，
+  恢复等用户明确通知；GPT 090/091（seq 身份可移植 + DecisionLog 预检）
+  为恢复前置门。A1 已收官（087/088/089 修复 + v3 sample）。
+  ([详情](task_details/S-T021.md))
+- [ ] [S-T022] E125 静态 method 海选收官 → 冠军选举（用户 15:2X 指令 +
+  GPT 2bbb9a763 优先级切换；E109 海选 31 臂为旧口径，mavg/fullkv 复用
+  E123 新口径数据，4 method 最佳臂 .187 在飞补齐）
+  ([详情](task_details/S-T022.md))
+
+## 待办池（未排期，均有用户指令或审计来源）
+
+- [ ] E118：sglang C1/C2/C3 三源码 bug 修复（SG e2e taskmd+CUDA graph
+  前置门；C3 修复改行为须换 postfix 重跑）
+- [ ] E120：粗筛阶段价值消融 + 单级方案对比（依赖 S-T009 讨论收敛）
