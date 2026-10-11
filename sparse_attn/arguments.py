@@ -20,6 +20,12 @@ def _add_quest_args(parser: argparse.ArgumentParser):
     group = parser.add_argument_group(title='quest')
     group.add_argument('--quest_block_size', type=int, default=64)
     group.add_argument('--quest_topk', type=int, default=16)
+    # B 轨 vendor（官方源码复用，per-head topk 官方粒度）：Quest 官方口径
+    # token_budget=1024（等效 token 预算）、chunk_size=16（chunk 长度）。
+    # 与 A 轨 quest_block_size/topk 的关系：quest_vendor 用这两个参数，
+    # 官方 local_heavy_hitter_mask 内部按 chunk_size 分组选 topk chunk。
+    group.add_argument('--quest_token_budget', type=int, default=1024)
+    group.add_argument('--quest_chunk_size', type=int, default=16)
     return parser
 
 def _parse_gamma(x):
@@ -105,7 +111,7 @@ def _add_tli_args(parser: argparse.ArgumentParser):
 def parse_args():
     parser = argparse.ArgumentParser(description='Sparse Attention Arguments',
                                      allow_abbrev=False)
-    parser.add_argument('--method', type=str, choices=['quest', 'tia', 'twi', 'tli', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'tia', 'twi', 'tli', 'none'])
     parser = _add_quest_args(parser)
     _add_twilight_args(parser)
     parser = _add_tia_args(parser)
@@ -113,7 +119,7 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'tia', 'twi', 'tli', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'tia', 'twi', 'tli', 'none'])
     parser = _add_quest_args(parser)
     parser = _add_twilight_args(parser)
     parser = _add_tia_args(parser)

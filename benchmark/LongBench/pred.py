@@ -346,15 +346,32 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
     model = model.eval()
 
     # 【B3 修复（kimi3 清单 F3，2026-10-08）】patch 计数显式校验：
-    # register_patch 返回成功 patch 的模块数；method≠none 而 0 匹配
-    # （如 GLM-4 等未支持架构）时 fail-closed——防止静默跑 dense 却把
-    # 输出文件打上稀疏方法标签（register_patch 内部同款 raise 为第一道）。
+    # method≠none 而 0 匹配（如 GLM-4 等未支持架构）时 fail-closed——
+    # 防止静默跑 dense 却把输出文件打上稀疏方法标签。
     # 081（TL-E121-OUTPUT-SNAPSHOT-081）：snapshot 透传给每个 attention
     # 层的 TLIIndexer（共享同一冻结对象，不按层重开文件）。
-    n_patched = register_patch(model, args, snapshot)
+    if args.method == "quest_vendor":
+        # B 轨 vendor（官方源码复用）：不走 indexer_type_dict（A 轨
+        # quest_indexer 是语义复现），改为把官方 Quest forward 原样绑定
+        # Qwen3Attention——quest_attention_official.py 与官方仓库逐字节
+        # 一致（md5 78e87fb8...），qwen3_quest_patch.py 只做接口胶水。
+        import sys
+        vendor_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "..", "exp", "vendor_baselines", "quest_vendor",
+        )
+        sys.path.insert(0, vendor_dir)
+        from qwen3_quest_patch import enable_quest
+        n_patched = enable_quest(
+            model,
+            token_budget=getattr(args, "quest_token_budget", 1024),
+            chunk_size=getattr(args, "quest_chunk_size", 16),
+        )
+    else:
+        n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:
         raise RuntimeError(
-            f"method={args.method!r} 但 register_patch 成功挂载 0 个 "
+            f"method={args.method!r} 但成功挂载 0 个 "
             f"attention 模块，模型实际将以 dense 运行——拒绝产出被误标为"
             f"稀疏方法的结果。"
         )

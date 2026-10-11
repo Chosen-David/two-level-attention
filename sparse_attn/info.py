@@ -461,6 +461,10 @@ def get_method_name_with_info(args, snapshot=None):
     # 派生（与 sidecar/receipt 同源）；非 tli 分支不消费 snapshot。
     if args.method == "quest":
         return f"quest_{args.quest_block_size}_{args.quest_topk}"
+    elif args.method == "quest_vendor":
+        # B 轨 vendor（官方源码复用）：Quest 官方口径
+        # token_budget/chunk_size 全参数编码进文件名。
+        return f"quest_vendor_{args.quest_token_budget}_{args.quest_chunk_size}"
     elif args.method == "twi":
         return f"twi_{args.twi_block_size}_{args.twi_level1_topk}_{args.twi_level2_topp}"
     elif args.method == "tia":
