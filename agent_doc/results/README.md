@@ -23,4 +23,5 @@
 | E109 v2 海选 | `/tmp/e109_scan_v2`（三机汇聚，selection.json 增量落袋 `exp/trace/results/e109_screen4_selection.json`） | pending（链在跑） |
 | E109 冠军对拍 | `exp/trace/results/e109_champ_validate.json` | usable-with-scope（v1 污染判决证据） |
 | E125 海选表现 | `results/各个method组合配置冠军的海选表现.md`（本目录，2026-10-11 迁移） | 在飞（S-T022） |
+| 历史基线盘点（Quest/MoBA/SnapKV…+TIA/TWI 身份） | `results/2026-10-11_历史开源基线结果盘点_by_opus.md`（数据源 e71/e89/e104 + 测试链路 + 可信度分级） | usable-with-scope（旧口径，排序先验；KV 压缩四臂最低） |
 | GPT/Kimi3 判决 | sglang 主仓 `research/docs/gpt_kimi3_verdict_20261008.json` | usable-with-scope（修复全闭环） |
