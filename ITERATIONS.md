@@ -17,6 +17,7 @@
 | iter8 | compute_score coarse 段 Triton GQA K 复用（minmax 双点积 + avg 复用 fine kernel） | 1.52 GPU / 2.02 CPU wall | 5.47×GPU / 4.76×wall | 15/15 PASS |
 | iter9 | compute_mask 前段融合（gmean 双输出 + fused mask-p，64K 净回归混合结果） | 1.56 GPU / 2.06 CPU wall（64K 主档 vs iter8 回归 -3%；最优维持 iter8 1.52/2.02） | 5.31×GPU / 4.67×wall | 15/15 PASS |
 | iter10 | iter9 按档路由（T≤32768 启用融合）：16K 兑现 +3.7%，32K/64K 疑环境漂移待对照 | 16K 1.46（1.95×）其余档漂移疑点未定 | 16K 1.95×/1.98× | 15/15 PASS |
+| iter11 | 路由再收紧 8K<T≤16K + A-B 对照定论：方向收益 < 方差，HEAD 回 iter8 | 探索性负结果（+30μs 稳定实测） | — | 16/16 PASS |
 
 ## Iterations
 
@@ -382,4 +383,30 @@
   下一步用 iter8 代码原样复跑对照定论。
 - 门禁：15/15 PASS（python±-O 双跑）；路由冒烟：16K gmean 键在 /
   64K 键无 + 双档 mask 对 TLIIndexer 逐位一致。
+- commit：见 git log
+
+### [iter 11] 路由再收紧（仅 8K < T ≤ 16K 启用）+ A-B 交替对照定论 → HEAD 回 iter8
+- 改动：③④/M-E 路由阈值 16384 → 8192 < T ≤ 16384（同环境对照实测
+  仅 16K 档净赚 -13μs；8K 档 +24~28μs、32K 档 +30μs 回归）；门禁
+  补启用档专项（16K gmean 双输出 vs 现场 mean 逐位 + fused mask 逐位，
+  16 项）。
+- 数字（如实，A-B-A-B 背靠背交替对照排除时间漂移）：64K normal
+  iter11 1.548/1.557 vs iter8 1.527/1.518——**iter11 稳定 +30μs（2%）**；
+  16K 收益翻转（iter10 -13μs → iter11 +29μs）——落在 run-to-run 方差带
+  （±20μs）内不可稳定兑现。
+- 根因分析：iter11 在 64K 已完全回退 gmean/fused（行为 = iter8），残余
+  差异是 host 侧新增判断/构造（⑤ 的 locals()+dict 两步+2×unsqueeze、
+  M-A/M-B/M-E 的路由条件串、③④ 的阈值判断）——launch-gap 主导口径下
+  CPU 排队时间直接转化为 stage 计时，纯 Python 数十行即 ~30μs。
+  **iter9 方向（compute_mask 前段融合）的收益量级（10-20μs）< 本机
+  环境方差（±20μs）且 < host 路由残余开销，不可兑现。**
+- 停止判据（ako4all stall 规则，3 iter 无稳定改善）：iter9 -3%、
+  iter10 未修复、iter11 收益翻转——方向收益被方差淹没；结构性证据
+  （profiler）：mask busy 194μs+gap 290μs、score busy 110μs+gap 260μs，
+  剩余大头是 CPU launch 排队（115 launches/step ≈ 800μs CPU > GPU
+  busy 73%），进一步收益需 L2 topk 段融合/prepare_index 33 launches
+  压缩等大规模重构（新方向，非本线延伸）。
+- 门禁：16/16 PASS（python±-O 双跑）+ 路由边界冒烟 6 档全逐位。
+- 处置：**HEAD 按协议恢复 iter8（最优可信 iter）**，iter9/10/11 作为
+  探索性负结果完整保留在 git 历史（含全部实现与门禁）。
 - commit：见 git log
