@@ -83,9 +83,14 @@ def _sh(cmd):
     return subprocess.check_output(cmd, cwd=REPO, text=True)
 
 
+# 缺陷基线固定锚：修复合入 main 后 "main:" 引用会漂移到新版使红证失效，
+# 故固定用修复前最后代码 commit（7460bfa = 031e6b8 + advice 文档提交）。
+OLD_BASE = "7460bfa"
+
+
 def get_old_pred_source():
-    """main 版 pred.py（缺陷基线；main 仅比 031e6b8 多 advice 文档提交）。"""
-    return _sh(["git", "show", "main:benchmark/LongBench/pred.py"])
+    """缺陷基线版 pred.py（7460bfa，031e6b8 所携缺陷未修）。"""
+    return _sh(["git", "show", f"{OLD_BASE}:benchmark/LongBench/pred.py"])
 
 
 def get_func_source(src, name):
@@ -271,13 +276,13 @@ def test_093():
     prev_val = json.loads(_sh(["git", "show",
                                "ffb61457:benchmark/LongBench/config/"
                                "model2maxlen.json"]))
-    main_val = json.loads(_sh(["git", "show",
-                               "main:benchmark/LongBench/config/"
-                               "model2maxlen.json"]))
+    old_val = json.loads(_sh(["git", "show",
+                              f"{OLD_BASE}:benchmark/LongBench/config/"
+                              "model2maxlen.json"]))
     _check(m2m["DeepSeek-V2-Lite-Chat"] == 31500
            and prev_val["DeepSeek-V2-Lite-Chat"] == 31500
-           and main_val["DeepSeek-V2-Lite-Chat"] == 16384,
-           f"T10 model2maxlen 恢复 31500（ffb61457 协议原值 31500，main 缺陷"
+           and old_val["DeepSeek-V2-Lite-Chat"] == 16384,
+           f"T10 model2maxlen 恢复 31500（ffb61457 协议原值 31500，缺陷基线"
            f"值 16384，修复版 {m2m['DeepSeek-V2-Lite-Chat']}）")
 
     # T11 注册表 vs 真实快照文件活值对账
@@ -410,11 +415,20 @@ def test_093():
     _check("model2maxlen" not in info_src,
            "T21 sparse_attn/info.py 不含 model2maxlen 消费（081 snapshot "
            "闭包与实验 cap 解耦，cap 变更无需改 manifest——如实登记）")
+    # 修复合入后消费点新增白名单：gate（读 model2maxlen 属修复设计）+ 本测试
+    # 文件自身（断言字符串）。不变式=缺陷基线上的既有消费点未被触碰。
+    allowed_consumers = ("pred.py", "pred_kvcf.py",
+                         "context_capability_gate.py", "test_dsv2_093_094_fix.py")
     grep_hits = _sh(["git", "grep", "-l", "model2maxlen", "main", "--",
                      "*.py"]).strip().splitlines()
-    _check(all("pred.py" in h or "pred_kvcf.py" in h for h in grep_hits),
-           f"T21b 全仓 model2maxlen 消费点仅 pred.py（+ exp/trace/pred_kvcf.py"
-           f" 常量副本）：{grep_hits}")
+    _check(all(any(c in h for c in allowed_consumers) for h in grep_hits),
+           f"T21b 全仓 model2maxlen 消费点在白名单内（既有 pred.py/pred_kvcf.py"
+           f" + 修复新增 gate/本测试）：{grep_hits}")
+    old_hits = _sh(["git", "grep", "-l", "model2maxlen", OLD_BASE, "--",
+                    "*.py"]).strip().splitlines()
+    _check(all("pred.py" in h or "pred_kvcf.py" in h for h in old_hits),
+           f"T21c 缺陷基线 {OLD_BASE} 上既有消费点仅 pred.py/pred_kvcf.py"
+           f"（修复未越界扩散）：{old_hits}")
 
 
 def main():
