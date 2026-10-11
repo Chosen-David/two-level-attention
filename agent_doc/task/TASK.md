@@ -54,6 +54,13 @@
   GPT 2bbb9a763 优先级切换；E109 海选 31 臂为旧口径，mavg/fullkv 复用
   E123 新口径数据，4 method 最佳臂 .187 在飞补齐）
   ([详情](task_details/S-T022.md))
+- [ ] [S-T023] DeepSeek 专属开源 baseline 复现（用户 18:2X 指令：最终论文
+  方法与 Quest/MoBA/ClusterKV 对比测全量——LB v1 14 英文+2 代码 / LB v2
+  全部 503 / RULER 32/64/128K；模型矩阵 Qwen3-8B / Qwen3-32B（规模变化）
+  / DeepSeek-V2-Lite-Chat（nope+rope MLA 与跨家族验证）。vendor B 轨 +
+  harness A 轨双轨；third_party 已落库（quest/MoBA/ClusterKV），阶段 0
+  收尾（补子模块/独立 venv）+ 阶段 1 C 轨 sanity 不占 GPU 可先做）
+  ([详情](task_details/S-T023.md))
 
 ## 待办池（未排期，均有用户指令或审计来源）
 
