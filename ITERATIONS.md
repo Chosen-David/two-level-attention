@@ -15,6 +15,7 @@
 | iter6 | score_fine Triton GQA K 复用（_rep 退役） | 2.15 GPU / 2.65 CPU wall（bench 口径持平；GPU busy 实降 0.46ms/层） | 3.86×GPU / 3.63×wall | 15/15 PASS |
 | iter7 | eager gather Triton 融合（~15 op → 2 kernel） | 1.73 GPU / 2.23 CPU wall | 4.79×GPU / 4.31×wall | 15/15 PASS |
 | iter8 | compute_score coarse 段 Triton GQA K 复用（minmax 双点积 + avg 复用 fine kernel） | 1.52 GPU / 2.02 CPU wall | 5.47×GPU / 4.76×wall | 15/15 PASS |
+| iter9 | compute_mask 前段融合（gmean 双输出 + fused mask-p，64K 净回归混合结果） | 1.56 GPU / 2.06 CPU wall（64K 主档 vs iter8 回归 -3%；最优维持 iter8 1.52/2.02） | 5.31×GPU / 4.67×wall | 15/15 PASS |
 
 ## Iterations
 
@@ -309,4 +310,56 @@
 - 门禁：15/15 PASS（python±-O 双跑）；既有回归 env=1 复跑 7 套件
   全绿（near_swa 3/3+4/4、C3 5/5、E122 6/6、E125 尾巴 10/10、
   E125 kmeans 守卫 5/5、E116f 12/12）。
+- commit：见 git log
+
+### [iter 9] compute_mask 前段融合（gmean 双输出前移 + fused masked-softmax-gmean）
+- 改动：sparse_attn/indexer/tli_indexer_fast.py（锚点文件零改动）——两方向：
+  ① coarse/fine kernel gmean 双输出（_SCORE_REPL ③④ 扩 want_g=True：
+  _score_coarse_kernel/_score_fine_kernel 加 OUTG+HAS_G constexpr，s_out
+  先舍入 OUT dtype 再 fp32 顺序累加 /G = torch mean opmath 口径；⑤ 新
+  替换点透传 score_coarse_g/score_coarse_avg_g 键）+ _MASK_REPL M-A/M-B
+  消费点直供（形状守卫，无键/不符回退现场 rearrange+mean）——消
+  compute_mask 内 2 处 rearrange 物化 + 2 MeanOps kernel。
+  ② M-E fused mask-p（_mask_p_stat_kernel grid=(H,NC) 单头单 chunk
+  chunk-local (m_c,l_c) + _mask_p_out_kernel grid=(Hkv,NC) 跨 chunk
+  合并 + 循环 g 头重算，p = Σ_g exp(s−m_g)/l_g /G；swa 区直接置 1.0）
+  替代共享口径六连（repeat+where+softmax+nan_to_num+mean+置位：6 kernel
+  + 3 次全宽 [H,T] 物化 → 2 kernel）。exp 用 libdevice.exp（__nv_expf，
+  与 PyTorch softmax 内部 expf 同实现）；mean 前 bf16 舍入口径对齐。
+  路由条件全 host 已知量（NC≤64 → T≤64K），异常 _triton_ok=False 回退
+  原段 fail-closed。
+- 开发中抓到的两个 bug（如实记录）：
+  ① ⑤ 替换点 _sc_g 只 unsqueeze 一次（3 维），M-A 守卫 dim()==4 恒假
+  → gmean 全程回退现场 mean（mask 门禁照过掩盖了未生效），门禁新增
+  gmean 对拍断言抓出（100% 形状失配）→ 补两次 unsqueeze 到 [1,1,Hkv,kt]。
+  ② M-A/M-B 绑引用（非 clone）：compute_mask 下方对 score_coarse 的
+  原地写（skip_far far 区 -inf / 末块置 +inf 排除）透传进 dict 的
+  score_coarse_g 键——原版 mean 产物是独立新张量，dict 键永不被 mask
+  阶段污染；直供版破坏该契约（最末块全 h_kv +inf，多步/带 mask 运行
+  才显形，单步无 mask 不复现）。修复：消费点 clone（[1,1,Hkv,kt] tiny
+  copy，换掉 rearrange 物化 + MeanOps 仍净赚）。教训：**Python 引用
+  语义下「读侧直供」须审原版写路径的别名结构**。
+- 数字（GPU 空闲态，复测一致）：64K normal 全步 1.516→1.560 GPU /
+  2.02→2.06 wall（**vs iter8 净回归 -3%**；vs baseline 5.31×/4.67×）；
+  分解：compute_score 0.346→0.370（gmean 双输出 +0.024 复测一致）、
+  compute_mask 0.467→0.486（fused 生效但净 +0.019，launches 47→42）。
+  16K normal 1.88×→**1.98×**（mask 0.468→0.423）；32K normal
+  3.09×→3.10×；8K/skip 全档持平。**混合结果：16K 改善 / 64K 主档
+  回归 / 32K/8K 噪声内——最优 iter 维持 iter8（1.52 GPU / 2.02 wall，
+  5.47×）**。
+- 分析（如实）：原型隔离 microbench fused p 0.085→0.066ms（-19μs）未
+  传导到 64K 生产 stage 口径——launch-gap 主导下六连 kernel 本体被
+  队列中其他 kernel 执行时间掩盖（overlap），融合省的是已被掩盖的
+  gap；而 gmean 双输出的 fine/coarse kernel 特化（HAS_G 分支 +
+  OUTG store）开销在 score 阶段显形。iter6「launch gap 转移」教训的
+  反向情形：融合方向在小 S 档（16K）有效（CPU 排队压力下 gap 不被
+  掩盖），大 S 档 kernel 本体占比高时融合收益被特化开销吃掉。
+- 数值口径（门禁实测）：gmean 双输出 4 配置 × normal/skip × 10 步
+  对 fast 分数现场 mean **逐位 0 差异**（0/289408 级）；fused p 原型
+  口径对齐档 0 ULP / padding 档 4/524K≈7.6e-6；mask 全档逐位一致；
+  fine 48/10.5M 保持。S 回退 ULP 口径绿。
+- 门禁：15/15 PASS（python±-O 双跑；新增 gmean 断言进
+  score_mask_derived）；既有回归 env=1 复跑 7 套件全绿（near_swa
+  3/3+4/4、C3 5/5、E122 6/6、E125 尾巴 10/10、E125 kmeans 5/5、
+  E116f 12/12）。
 - commit：见 git log

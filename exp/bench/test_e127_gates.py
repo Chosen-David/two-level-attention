@@ -400,6 +400,21 @@ def test_score_mask_derived():
                 if not T.equal(a[step][1], b[step][1]):
                     n_fail += 1
                     print(f"  {cname} {ltag} step{step} MASK MISMATCH")
+                # 【iter9】gmean 双输出 vs fast 分数现场 mean（同源分数，
+                # kernel 内「先舍入 OUT dtype 再 fp32 顺序平均」= torch
+                # mean opmath 顺序 → 数学同构，逐位一致口径）
+                from einops import rearrange as _rearr
+                for _gkey, _skey in (("score_coarse_g", "score_coarse"),
+                                     ("score_coarse_avg_g", "score_coarse_avg")):
+                    _g = sb.get(_gkey)
+                    _src = sb.get(_skey)
+                    if _g is None:
+                        continue
+                    _ref = _rearr(_src, "b qt (h g) kt -> b qt h g kt",
+                                  g=4).mean(dim=-2)
+                    if not T.equal(_g, _ref):
+                        n_fail += 1
+                        print(f"  {cname} {ltag} step{step} {_gkey} != 现场 mean")
     check("score_mask_derived: 4 配置 × normal/skip × 10 步 score/mask 一致"
           "（coarse+avg ULP≤1e-4 + fine ULP≤1e-4 + mask 逐位）",
           n_fail == 0,

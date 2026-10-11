@@ -68,6 +68,7 @@ from einops import rearrange, repeat, einsum
 
 import triton
 import triton.language as tl
+from triton.language.extra import libdevice   # 【iter9】精确 expf（__nv_expf）
 
 from .tli_indexer import TLIIndexer
 
@@ -208,7 +209,7 @@ class TLIIndexerFast(TLIIndexer):
         return idx
 
     # ------------------------------------------------ 【iter6】Triton score_fine
-    def _fast_score_fine(self, kq, b_q_full, out_dtype):
+    def _fast_score_fine(self, kq, b_q_full, out_dtype, want_g=False):
         """score_fine 的 Triton GQA K 复用 kernel（非投影路径专用）。
 
         数学：score[h, t] = sum_d b_q_full[h, d] * k_qat32[t, h//g, d]，
@@ -234,18 +235,23 @@ class TLIIndexerFast(TLIIndexer):
             H = b_q_full.shape[0]
             g = H // Hkv
             out = torch.empty((H, T), device=kq.device, dtype=out_dtype)
+            if want_g:
+                outg = torch.empty((Hkv, T), device=kq.device, dtype=out_dtype)
+            else:
+                outg = out   # HAS_G=False 占位（编译期裁剪不读）
             grid = (triton.cdiv(T, 64), Hkv)
             _score_fine_kernel[grid](
-                kq, b_q_full, out, T,
+                kq, b_q_full, out, outg, T,
                 kq.stride(0), kq.stride(1), b_q_full.stride(0),
                 out.stride(0), out.stride(1),
-                Hkv=Hkv, G=g, D=D, BT=64, num_warps=4)
-            return out
+                outg.stride(0), outg.stride(1),
+                Hkv=Hkv, G=g, D=D, BT=64, HAS_G=want_g, num_warps=4)
+            return (out, outg) if want_g else out
         except Exception:
             self._triton_ok = False
             raise
 
-    def _fast_score_coarse(self, k_min, k_max, b_q, out_dtype):
+    def _fast_score_coarse(self, k_min, k_max, b_q, out_dtype, want_g=False):
         """【iter8】score_coarse 的 Triton GQA K 复用 kernel（非投影路径专用）。
 
         数学：score_coarse[h, t] = Σ_d min(b_q[h,d],0)·k_min32[t,h//g,d]
@@ -265,15 +271,63 @@ class TLIIndexerFast(TLIIndexer):
             H = b_q.shape[0]
             g = H // Hkv
             out = torch.empty((H, T), device=k_min.device, dtype=out_dtype)
+            if want_g:
+                outg = torch.empty((Hkv, T), device=k_min.device, dtype=out_dtype)
+            else:
+                outg = out   # HAS_G=False 占位（编译期裁剪不读）
             grid = (triton.cdiv(T, 64), Hkv)
             _score_coarse_kernel[grid](
-                k_min, k_max, b_q, out, T,
+                k_min, k_max, b_q, out, outg, T,
                 k_min.stride(0), k_min.stride(1),
                 k_max.stride(0), k_max.stride(1),
                 b_q.stride(0),
                 out.stride(0), out.stride(1),
-                Hkv=Hkv, G=g, D=D, BT=64, num_warps=4)
-            return out
+                outg.stride(0), outg.stride(1),
+                Hkv=Hkv, G=g, D=D, BT=64, HAS_G=want_g, num_warps=4)
+            return (out, outg) if want_g else out
+        except Exception:
+            self._triton_ok = False
+            raise
+
+    def _fast_mask_p(self, topk_mask, score_fine, bs, swa_lo, s_real):
+        """【iter9】fused masked-softmax-gmean：compute_mask 共享口径的
+        repeat + where + softmax + nan_to_num + mean + swa 置位
+        6 op（3 次全宽 [H,T] 中间物化 + 6 launch）→ 2 kernel。
+
+        数学语义（与原段逐位等价的构成）：
+          - softmax(全 T 行、未选位 -inf) ≡ exp(s−m)/l（m/l 为全 T 归约），
+            s = 块级 mask 展开后的 score_fine（连续 bs token 读同一块
+            bool，L1 命中）；libdevice.exp = __nv_expf 与 PyTorch softmax
+            内部 expf 同实现 → 分子逐位同。
+          - l 的 fp32 分块归约顺序差异 → 相对 ~1e-6 量级，几乎全被
+            bf16 舍入吸收（原型实测对齐 S 档 0 ULP / padding 档
+            4/524K ≈ 7.6e-6 比例，下游 topk mask 逐位不变）。
+          - mean(dim=-2) 口径：softmax 输出先舍入 P dtype 再 fp32 顺序
+            累加 /G（= torch mean opmath 顺序累加），原型实测逐位一致。
+          - 全 -inf 行：l=0 → p=0 ≡ softmax NaN → nan_to_num(0)。
+          - swa 强制区 [swa_lo, S_real) 直接写 1.0 ≡ 原版 mean 后置位；
+            padding 区 [S_real, T) score_fine 已 -inf → p=0 同原版。
+
+        fail-closed：异常置 _triton_ok=False 并向上抛（调用方回退原段）。
+        NC ≤ 64（BT=1024 → T ≤ 64K，调用方路由已保证）。
+        """
+        try:
+            blkm = topk_mask[0, 0]                     # [Hkv, kt] bool
+            sf = score_fine[0, 0]                      # [H, T]
+            H, T = sf.shape
+            Hkv = blkm.shape[0]
+            G = H // Hkv
+            NC = triton.cdiv(T, 1024)
+            ms = torch.empty((H, NC), device=sf.device, dtype=torch.float32)
+            ls = torch.empty((H, NC), device=sf.device, dtype=torch.float32)
+            p = torch.empty((Hkv, T), device=sf.device, dtype=sf.dtype)
+            _mask_p_stat_kernel[(H, NC)](
+                sf, blkm, ms, ls, T, sf.stride(0), blkm.stride(0), NC,
+                G=G, BS=bs, BT=1024, num_warps=4)
+            _mask_p_out_kernel[(Hkv, NC)](
+                sf, blkm, ms, ls, p, T, sf.stride(0), blkm.stride(0),
+                p.stride(0), NC, swa_lo, s_real, G=G, BS=bs, BT=1024, num_warps=4)
+            return p[None, None]
         except Exception:
             self._triton_ok = False
             raise
@@ -281,12 +335,17 @@ class TLIIndexerFast(TLIIndexer):
 
 @triton.jit
 def _score_fine_kernel(
-    KQ, Q, OUT,   # KQ [T,Hkv,D] bf16；Q [H,D] fp32；OUT [H,T] out_dtype
+    KQ, Q, OUT, OUTG,   # KQ [T,Hkv,D] bf16；Q [H,D] fp32；OUT [H,T]；OUTG [Hkv,T]
     T, stride_kt, stride_kh, stride_qh, stride_oh, stride_ot,
+    stride_gh, stride_gt,
     Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
+    HAS_G: tl.constexpr,
 ):
     """GQA K 复用 score_fine：每 program 处理 (token 块 × 1 个 kv 头)，
-    K 块 [BT, D] 载入寄存器后循环 g 个 q 头逐头点积，K 读带宽 /g。"""
+    K 块 [BT, D] 载入寄存器后循环 g 个 q 头逐头点积，K 读带宽 /g。
+    【iter9】HAS_G=True 时双输出 OUTG[h_kv,t] = mean_g s_j（s_j 先舍入
+    OUT dtype 再 fp32 顺序累加——与原版「softmax/mean 前先 bf16 舍入」
+    的 torch mean(dim=-2) 顺序累加口径同构，原型实测逐位一致）。"""
     pid_t = tl.program_id(0)
     pid_h = tl.program_id(1)
     offs_t = pid_t * BT + tl.arange(0, BT)
@@ -294,20 +353,27 @@ def _score_fine_kernel(
     mask_t = offs_t < T
     k = tl.load(KQ + offs_t[:, None] * stride_kt + pid_h * stride_kh + offs_d[None, :],
                 mask=mask_t[:, None], other=0.0).to(tl.float32)
+    gm = tl.zeros((BT,), tl.float32)
     for j in tl.static_range(G):
         h = pid_h * G + j
         q = tl.load(Q + h * stride_qh + offs_d)      # [D] fp32（已乘 scale）
         s = tl.sum(k * q[None, :], axis=1)            # [BT] fp32
-        tl.store(OUT + h * stride_oh + offs_t * stride_ot,
-                 s.to(OUT.dtype.element_ty), mask=mask_t)
+        s_out = s.to(OUT.dtype.element_ty)
+        tl.store(OUT + h * stride_oh + offs_t * stride_ot, s_out, mask=mask_t)
+        if HAS_G:
+            gm += s_out.to(tl.float32)
+    if HAS_G:
+        tl.store(OUTG + pid_h * stride_gh + offs_t * stride_gt,
+                 (gm / G).to(OUTG.dtype.element_ty), mask=mask_t)
 
 
 @triton.jit
 def _score_coarse_kernel(
-    KMIN, KMAX, Q, OUT,   # KMIN/KMAX [T,Hkv,D] bf16；Q [H,D] fp32；OUT [H,T]
+    KMIN, KMAX, Q, OUT, OUTG,   # KMIN/KMAX [T,Hkv,D] bf16；Q [H,D]；OUT [H,T]；OUTG [Hkv,T]
     T, stride_kt, stride_kh, stride_kt2, stride_kh2,
-    stride_qh, stride_oh, stride_ot,
+    stride_qh, stride_oh, stride_ot, stride_gh, stride_gt,
     Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
+    HAS_G: tl.constexpr,
 ):
     """【iter8】GQA K 复用 coarse minmax 上界分（min/max 两份 K 独立 stride）：
     s[h,t] = Σ_d min(q,0)·k_min + Σ_d max(q,0)·k_max（负部配 k_min、正部
@@ -324,14 +390,90 @@ def _score_coarse_kernel(
     kmax = tl.load(KMAX + offs_t[:, None] * stride_kt2 + pid_h * stride_kh2
                    + offs_d[None, :],
                    mask=mask_t[:, None], other=0.0).to(tl.float32)
+    gm = tl.zeros((BT,), tl.float32)
     for j in tl.static_range(G):
         h = pid_h * G + j
         q = tl.load(Q + h * stride_qh + offs_d)      # [D] fp32（已缩放）
         q_low = tl.minimum(q, 0.0)                   # clamp(max=0)：负部 → k_min
         q_high = tl.maximum(q, 0.0)                  # clamp(min=0)：正部 → k_max
         s = tl.sum(kmin * q_low[None, :], axis=1) + tl.sum(kmax * q_high[None, :], axis=1)
-        tl.store(OUT + h * stride_oh + offs_t * stride_ot,
-                 s.to(OUT.dtype.element_ty), mask=mask_t)
+        s_out = s.to(OUT.dtype.element_ty)
+        tl.store(OUT + h * stride_oh + offs_t * stride_ot, s_out, mask=mask_t)
+        if HAS_G:   # 【iter9】gmean 双输出（先舍入再 fp32 顺序平均，原型逐位一致）
+            gm += s_out.to(tl.float32)
+    if HAS_G:
+        tl.store(OUTG + pid_h * stride_gh + offs_t * stride_gt,
+                 (gm / G).to(OUTG.dtype.element_ty), mask=mask_t)
+
+
+# ---- 【iter9】fused masked-softmax-gmean（compute_mask 共享口径前段）----
+@triton.jit
+def _mask_p_stat_kernel(
+    SF, BLKM, MS, LS,   # SF [H,T]；BLKM [Hkv,kt] bool；MS/LS [H,NC] fp32
+    T, stride_sf, stride_bm, NC,
+    G: tl.constexpr, BS: tl.constexpr, BT: tl.constexpr,
+):
+    """(h_all, c)：单头单 chunk 的 masked s chunk-local (m_c, l_c)。
+    s = 块级 mask 展开后的 score_fine（块外 -inf）；l_c 以 m_c 归一
+    （flash 式，out kernel 跨 chunk 合并）；全 -inf chunk → (m_c,l_c)
+    = (-inf, 0)（exp(-inf-0)=0 精确）。exp 用 libdevice.exp（__nv_expf，
+    与 PyTorch softmax 内部 expf 同实现）。"""
+    hg = tl.program_id(0)
+    h = hg // G
+    c = tl.program_id(1)
+    offs_t = c * BT + tl.arange(0, BT)
+    tm = offs_t < T
+    # token → 块 bool gather：连续 BS 个 token 读同一字节，L1 完全命中
+    bidx = (offs_t // BS).to(tl.int32)
+    tokm = tl.load(BLKM + h * stride_bm + bidx, mask=tm, other=0).to(tl.int32)
+    sf = tl.load(SF + hg * stride_sf + offs_t, mask=tm, other=0.0).to(tl.float32)
+    s = tl.where((tokm != 0) & tm, sf, float('-inf'))
+    mc = tl.max(s, axis=0)
+    mc_safe = tl.where(mc == float('-inf'), 0.0, mc)
+    lc = tl.sum(libdevice.exp(s - mc_safe), axis=0)
+    tl.store(MS + hg * NC + c, mc)
+    tl.store(LS + hg * NC + c, lc)
+
+
+@triton.jit
+def _mask_p_out_kernel(
+    SF, BLKM, MS, LS, P,   # P [Hkv, T]
+    T, stride_sf, stride_bm, stride_p,
+    NC,
+    SWA_LO, S_REAL,
+    G: tl.constexpr, BS: tl.constexpr, BT: tl.constexpr,
+):
+    """(h_kv, c)：循环 g 个 q 头合并 [nC] chunk 统计 → 全局 (m_g, l_g)
+    （M=max_c m_c；L=Σ_c l_c·exp(m_c−M)），重载 sf 块重算 masked s →
+    p[h,t] = Σ_g exp(s_g−m_g)/l_g / G；swa 强制区直接 1.0。
+    l_g=0（该头全行 -inf）⟹ 本 chunk s 全 -inf ⟹ 分子 exp(-inf)=0 →
+    p=0，等价原版 softmax NaN → nan_to_num(0)（lg 守卫防 0 除）。
+    mean 口径：pj 先舍入 P dtype 再 fp32 累加（= torch mean opmath 顺序）。"""
+    h = tl.program_id(0)
+    c = tl.program_id(1)
+    offs_t = c * BT + tl.arange(0, BT)
+    tm = offs_t < T
+    bidx = (offs_t // BS).to(tl.int32)
+    tokm = tl.load(BLKM + h * stride_bm + bidx, mask=tm, other=0).to(tl.int32)
+    offs_c = tl.arange(0, 64)      # NC ≤ 64（BT=1024 → T ≤ 64K，路由保证）
+    cm = offs_c < NC
+    pacc = tl.zeros((BT,), tl.float32)
+    for j in tl.static_range(G):
+        ms = tl.load(MS + (h * G + j) * NC + offs_c, mask=cm, other=float('-inf'))
+        ls = tl.load(LS + (h * G + j) * NC + offs_c, mask=cm, other=0.0)
+        mg = tl.max(ms, axis=0)
+        mg_safe = tl.where(mg == float('-inf'), 0.0, mg)
+        lg = tl.sum(ls * libdevice.exp(ms - mg_safe), axis=0)
+        sf = tl.load(SF + (h * G + j) * stride_sf + offs_t,
+                     mask=tm, other=0.0).to(tl.float32)
+        s = tl.where((tokm != 0) & tm, sf, float('-inf'))
+        pj = libdevice.exp(s - mg_safe) / tl.where(lg > 0.0, lg, 1.0)
+        pacc += pj.to(P.dtype.element_ty).to(tl.float32)
+    p = pacc / G
+    # swa 强制区 [swa_lo, S_real) 直接 1.0（≡ 原版 mean 后置位）；
+    # padding 区 [S_real, T) 保持 0（score_fine 已被置 -inf → p=0）
+    p = tl.where((offs_t >= SWA_LO) & (offs_t < S_REAL), 1.0, p)
+    tl.store(P + h * stride_p + offs_t, p.to(P.dtype.element_ty), mask=tm)
 
 
 # ======================================================================
@@ -422,11 +564,15 @@ _SCORE_REPL = [
         '            + einsum(b_q.clamp(min=0), b_k_max, "h d, kt h d -> h kt")\n'
         '        )\n'
         '        score_coarse[0] = b_score.to(q_sq.dtype)',
+        "        _sc_g = None\n"
         "        # 【E127 iter8】coarse minmax 段 Triton GQA K 复用（同 iter6\n"
         "        # fine 模式）：免 b_k_min/b_k_max 两次 [kt,H,d'] fp32 repeat\n"
         "        # 物化 + clamp 胶水（~10 launches → 1 kernel）；fp32 累加顺序\n"
         "        # 与 cublas 不同 → bf16 舍入后 ULP 级漂移（实测 ~5e-5 比例\n"
         "        # 差 1 ULP）。投影/异形布局/Triton 异常回退原版表达式。\n"
+        "        # 【iter9】want_g=True 双输出 gmean（组内 mean 前移，与\n"
+        "        # 现场 rearrange+mean 逐位一致，原型实测），供 compute_mask\n"
+        "        # 消费（score_coarse_g 键；无键回退现场 mean）。\n"
         "        if (self._basis is None and k_min.dim() == 3 and k_max.dim() == 3\n"
         "                and (k_min.shape[-1] & (k_min.shape[-1] - 1)) == 0\n"
         "                and k_min.stride(-1) == 1 and k_max.stride(-1) == 1\n"
@@ -435,8 +581,8 @@ _SCORE_REPL = [
         "                and k_min.shape[1] * self.group_size == b_q.shape[0]\n"
         "                and getattr(self, \"_triton_ok\", True)):\n"
         "            try:\n"
-        "                score_coarse[0] = self._fast_score_coarse(\n"
-        "                    k_min, k_max, b_q, q_sq.dtype)\n"
+        "                score_coarse[0], _sc_g = self._fast_score_coarse(\n"
+        "                    k_min, k_max, b_q, q_sq.dtype, want_g=True)\n"
         "            except Exception:\n"
         "                b_k_min = repeat(k_min, \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
         "                b_k_max = repeat(k_max, \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
@@ -462,10 +608,12 @@ _SCORE_REPL = [
         '            b_k_avg = repeat(k_avg, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)\n'
         '            score_coarse_avg = q_sq.new_full(coarse_shape, float("-inf"))\n'
         '            score_coarse_avg[0] = einsum(b_q, b_k_avg, "h d, kt h d -> h kt").to(q_sq.dtype)',
+        "        _sc_avg_g = None\n"
         "        if k_avg is not None:\n"
         "            # 【E127 iter8】avg 段复用 iter6 _score_fine_kernel 同构\n"
         "            # （einsum(b_q, repeat(k_avg)) 数学等价，GQA K 复用免物\n"
         "            # 化）；ULP 口径同 iter6；异形/异常回退原版表达式。\n"
+        "            # 【iter9】want_g=True 双输出 gmean（同 ③）。\n"
         "            if (self._basis is None and k_avg.dim() == 3\n"
         "                    and (k_avg.shape[-1] & (k_avg.shape[-1] - 1)) == 0\n"
         "                    and k_avg.stride(-1) == 1\n"
@@ -475,8 +623,8 @@ _SCORE_REPL = [
         "                    and getattr(self, \"_triton_ok\", True)):\n"
         "                try:\n"
         "                    score_coarse_avg = q_sq.new_full(coarse_shape, float(\"-inf\"))\n"
-        "                    score_coarse_avg[0] = self._fast_score_fine(\n"
-        "                        k_avg, b_q, q_sq.dtype)\n"
+        "                    score_coarse_avg[0], _sc_avg_g = self._fast_score_fine(\n"
+        "                        k_avg, b_q, q_sq.dtype, want_g=True)\n"
         "                except Exception:\n"
         "                    b_k_avg = repeat(k_avg, \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
         "                    score_coarse_avg = q_sq.new_full(coarse_shape, float(\"-inf\"))\n"
@@ -485,6 +633,39 @@ _SCORE_REPL = [
         "                b_k_avg = repeat(k_avg, \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
         "                score_coarse_avg = q_sq.new_full(coarse_shape, float(\"-inf\"))\n"
         "                score_coarse_avg[0] = einsum(b_q, b_k_avg, \"h d, kt h d -> h kt\").to(q_sq.dtype)",
+    ),
+    # ---- 【iter9】⑤：返回 dict 透传 gmean 双输出（compute_mask 消费；
+    # 无键 = 回退/父类捷径/投影路径，消费端 get 返回 None 走现场 mean）。
+    (
+        '        return {\n'
+        '            "score_coarse": score_coarse.unsqueeze(0),\n'
+        '            "score_coarse_avg": None if score_coarse_avg is None else score_coarse_avg.unsqueeze(0),\n'
+        '            "score_moba": None if score_moba is None else score_moba.unsqueeze(0),\n'
+        '            "score_fine": score_fine.unsqueeze(0),\n'
+        '            # 075：真实序列长度随分数透传给 compute_mask（投影路径\n'
+        '            # score_fine 宽 = Tpad ≠ 真实 S；无值时消费端回退宽度口径）\n'
+        '            "valid_length": index_dict.get("valid_length"),\n'
+        '        }',
+        '        _e127_ret = {\n'
+        '            "score_coarse": score_coarse.unsqueeze(0),\n'
+        '            "score_coarse_avg": None if score_coarse_avg is None else score_coarse_avg.unsqueeze(0),\n'
+        '            "score_moba": None if score_moba is None else score_moba.unsqueeze(0),\n'
+        '            "score_fine": score_fine.unsqueeze(0),\n'
+        '            # 075：真实序列长度随分数透传给 compute_mask（投影路径\n'
+        '            # score_fine 宽 = Tpad ≠ 真实 S；无值时消费端回退宽度口径）\n'
+        '            "valid_length": index_dict.get("valid_length"),\n'
+        '        }\n'
+        '        # 【E127 iter9】gmean 前移产物透传（kernel 双输出 [Hkv,kt]，\n'
+        '        # 原型实测与现场 rearrange+mean 逐位一致）；无值不写键 →\n'
+        '        # 消费端回退。两次 unsqueeze 补到 4 维 [1,1,Hkv,kt]（= 原版\n'
+        '        # 消费端 rearrange+mean 输出形状，M-A/M-B 守卫 dim()==4）。\n'
+        '        _sc_g_out = locals().get("_sc_g")\n'
+        '        if _sc_g_out is not None:\n'
+        '            _e127_ret["score_coarse_g"] = _sc_g_out.unsqueeze(0).unsqueeze(0)\n'
+        '        _sc_avg_g_out = locals().get("_sc_avg_g")\n'
+        '        if _sc_avg_g_out is not None:\n'
+        '            _e127_ret["score_coarse_avg_g"] = _sc_avg_g_out.unsqueeze(0).unsqueeze(0)\n'
+        '        return _e127_ret',
     ),
 ]
 
@@ -525,6 +706,150 @@ _MASK_REPL = [
         "                    sc_pool[..., torch.arange(far_lo_blk, far_hi_blk, device=sc_pool.device)] = float(\"-inf\")",
         "                    # 【E127 iter5】同上：连续区间切片赋值零同步等价改写\n"
         "                    sc_pool[..., far_lo_blk:far_hi_blk] = float(\"-inf\")",
+    ),
+    # ---- 【iter9】M-A：score_coarse group-mean 前移消费（kernel 双输出
+    # 直供，原型实测与现场 rearrange+mean 逐位一致；无键/形状不符回退
+    # 原式）。【clone 必要性】compute_mask 下方对 score_coarse 有原地写
+    # （skip_far far 区 -inf / 末块置 +inf 排除）：原版 mean 产物是独立
+    # 新张量，score_dict 键永不被 mask 阶段污染；直供版若绑引用则写
+    # 透传进 dict 的 score_coarse_g 键（破坏「dict = compute_score 输出」
+    # 契约）。此处 clone 恢复原版语义（[1,1,Hkv,kt] tiny copy，换掉
+    # rearrange 物化 + MeanOps kernel 仍净赚）；下方原地写落在副本上，
+    # 与原版「写 mean 产物」逐位等价。
+    (
+        '        if not self.per_q_head:\n'
+        '            score_coarse = rearrange(\n'
+        '                score_coarse, "b qt (h g) kt -> b qt h g kt", g=self.group_size\n'
+        '            ).mean(dim=-2)  # [1,1,Hkv,kt]',
+        "        _sc_g_pre = score_dict.get(\"score_coarse_g\")\n"
+        "        if (not self.per_q_head and _sc_g_pre is not None\n"
+        "                and _sc_g_pre.dim() == 4\n"
+        "                and _sc_g_pre.shape[-1] == score_coarse.shape[-1]\n"
+        "                and _sc_g_pre.shape[-2] * self.group_size == score_coarse.shape[-2]):\n"
+        "            # 【E127 iter9】gmean 前移直供（compute_score kernel 双输出；\n"
+        "            # clone 保「score_dict 键不被 mask 阶段原地写污染」契约）\n"
+        "            score_coarse = _sc_g_pre.clone()\n"
+        "        elif not self.per_q_head:\n"
+        "            score_coarse = rearrange(\n"
+        "                score_coarse, \"b qt (h g) kt -> b qt h g kt\", g=self.group_size\n"
+        "            ).mean(dim=-2)  # [1,1,Hkv,kt]",
+    ),
+    # ---- 【iter9】M-B：score_coarse_avg group-mean 前移消费（同 M-A，
+    # clone 保 dict 键不被 mask 阶段原地写污染；单池分支 L1036 的 clone
+    # 后写不触及本张量）。
+    (
+        '        score_coarse_avg = score_dict.get("score_coarse_avg")\n'
+        '        if score_coarse_avg is not None and not self.per_q_head:\n'
+        '            score_coarse_avg = rearrange(\n'
+        '                score_coarse_avg, "b qt (h g) kt -> b qt h g kt", g=self.group_size\n'
+        '            ).mean(dim=-2)',
+        "        score_coarse_avg = score_dict.get(\"score_coarse_avg\")\n"
+        "        if score_coarse_avg is not None and not self.per_q_head:\n"
+        "            _sc_avg_g_pre = score_dict.get(\"score_coarse_avg_g\")\n"
+        "            if (_sc_avg_g_pre is not None\n"
+        "                    and _sc_avg_g_pre.dim() == 4\n"
+        "                    and _sc_avg_g_pre.shape[-1] == score_coarse_avg.shape[-1]\n"
+        "                    and _sc_avg_g_pre.shape[-2] * self.group_size == score_coarse_avg.shape[-2]):\n"
+        "                # 【E127 iter9】gmean 前移直供（同 M-A，clone 保契约）\n"
+        "                score_coarse_avg = _sc_avg_g_pre.clone()\n"
+        "            else:\n"
+        "                score_coarse_avg = rearrange(\n"
+        "                    score_coarse_avg, \"b qt (h g) kt -> b qt h g kt\", g=self.group_size\n"
+        "                ).mean(dim=-2)",
+    ),
+    # ---- 【iter9】M-E：fused masked-softmax-gmean（共享口径前段 6 op →
+    # 2 kernel；原型逐位一致：libdevice.exp=__nv_expf 与 PyTorch softmax
+    # 内部 expf 同实现 + mean 前 bf16 舍入口径对齐 + l 分块归约差异被
+    # bf16 舍入吸收，下游 topk mask 逐位不变）。路由条件全 host 已知量
+    # （零同步判走）；异常 → 置 _triton_ok=False 回退原段（值同原路径）。
+    (
+        '        if self.per_q_head:\n'
+        '            # E103：mask 已是 per-q-head [1,1,H,kt]，只做块→token 展开（不按 G 扩）\n'
+        '            topk_mask = repeat(\n'
+        '                topk_mask, "b qt h kt -> b qt h (kt bs)", bs=bs\n'
+        '            )\n'
+        '        else:\n'
+        '            topk_mask = repeat(\n'
+        '                topk_mask, "b qt h kt -> b qt (h g) (kt bs)", g=self.group_size, bs=bs\n'
+        '            )\n'
+        '\n'
+        '        if self.enable_async:\n'
+        '            if self.prev_mask is not None:\n'
+        '                topk_mask, self.prev_mask = self.prev_mask, topk_mask\n'
+        '                if topk_mask.shape[-1] < score_fine.shape[-1]:\n'
+        '                    pad_len = score_fine.shape[-1] - topk_mask.shape[-1]\n'
+        '                    topk_mask = F.pad(topk_mask, (0, pad_len), value=True)\n'
+        '            else:\n'
+        '                self.prev_mask = topk_mask\n'
+        '\n'
+        '        topk_mask = topk_mask[..., : score_fine.shape[-1]]\n'
+        '        score_fine = torch.where(topk_mask, score_fine, float("-inf"))\n'
+        '        p = F.softmax(score_fine, dim=-1).nan_to_num(nan=0)\n'
+        '        if not self.per_q_head:\n'
+        '            # E103：共享口径组内 mean；per_q_head 保留 [1,1,H,T] 直接 topk\n'
+        '            p = rearrange(p, "b qt (h g) kt -> b qt h g kt", g=self.group_size).mean(dim=-2)\n'
+        '        # 【075 修复】SWA 强制区按真实 S：p[..., -swa:] 在投影路径落 padded\n'
+        '        # 尾部（消费端裁剪后真实序列尾只保 swa−(Tpad−S) 个 token，S=6145\n'
+        '        # 实测 65/128）。改为 [S_real−swa, S_real)；非投影路径 S_real==宽度\n'
+        '        # → 与旧 p[..., -swa:] 逐位等价（S_real<swa 时两者同为全宽度置位）。\n'
+        '        p[..., max(0, S_real - swa_tok):S_real] = 1.0',
+        "        _e127_p_fused = False\n"
+        "        if (\n"
+        "            not self.per_q_head\n"
+        "            and not self.enable_async\n"
+        "            and getattr(self, \"_triton_ok\", True)\n"
+        "            and topk_mask.dim() == 4 and topk_mask.dtype == torch.bool\n"
+        "            and topk_mask.stride(-1) == 1\n"
+        "            and topk_mask.shape[0] == 1 and topk_mask.shape[1] == 1\n"
+        "            and score_fine.dim() == 4 and score_fine.stride(-1) == 1\n"
+        "            and score_fine.shape[0] == 1 and score_fine.shape[1] == 1\n"
+        "            and topk_mask.shape[-2] * self.group_size == score_fine.shape[-2]\n"
+        "            and topk_mask.shape[-1] * bs >= score_fine.shape[-1]\n"
+        "            and 0 < score_fine.shape[-1] <= 65536\n"
+        "        ):\n"
+        "            # 【E127 iter9】fused masked-softmax-gmean：repeat+where+\n"
+        "            # softmax+nan_to_num+mean+swa 置位 6 op → 2 kernel（原型\n"
+        "            # 逐位一致验证；下游 topk mask 逐位不变）。异常置标志\n"
+        "            # 回退原段（值同原路径）。\n"
+        "            try:\n"
+        "                p = self._fast_mask_p(\n"
+        "                    topk_mask, score_fine, bs,\n"
+        "                    max(0, S_real - swa_tok), S_real)\n"
+        "                _e127_p_fused = True\n"
+        "            except Exception:\n"
+        "                self._triton_ok = False\n"
+        "                _e127_p_fused = False\n"
+        "        if not _e127_p_fused:\n"
+        "            if self.per_q_head:\n"
+        "                # E103：mask 已是 per-q-head [1,1,H,kt]，只做块→token 展开（不按 G 扩）\n"
+        "                topk_mask = repeat(\n"
+        "                    topk_mask, \"b qt h kt -> b qt h (kt bs)\", bs=bs\n"
+        "                )\n"
+        "            else:\n"
+        "                topk_mask = repeat(\n"
+        "                    topk_mask, \"b qt h kt -> b qt (h g) (kt bs)\", g=self.group_size, bs=bs\n"
+        "                )\n"
+        "\n"
+        "            if self.enable_async:\n"
+        "                if self.prev_mask is not None:\n"
+        "                    topk_mask, self.prev_mask = self.prev_mask, topk_mask\n"
+        "                    if topk_mask.shape[-1] < score_fine.shape[-1]:\n"
+        "                        pad_len = score_fine.shape[-1] - topk_mask.shape[-1]\n"
+        "                        topk_mask = F.pad(topk_mask, (0, pad_len), value=True)\n"
+        "                else:\n"
+        "                    self.prev_mask = topk_mask\n"
+        "\n"
+        "            topk_mask = topk_mask[..., : score_fine.shape[-1]]\n"
+        "            score_fine = torch.where(topk_mask, score_fine, float(\"-inf\"))\n"
+        "            p = F.softmax(score_fine, dim=-1).nan_to_num(nan=0)\n"
+        "            if not self.per_q_head:\n"
+        "                # E103：共享口径组内 mean；per_q_head 保留 [1,1,H,T] 直接 topk\n"
+        "                p = rearrange(p, \"b qt (h g) kt -> b qt h g kt\", g=self.group_size).mean(dim=-2)\n"
+        "            # 【075 修复】SWA 强制区按真实 S：p[..., -swa:] 在投影路径落 padded\n"
+        "            # 尾部（消费端裁剪后真实序列尾只保 swa−(Tpad−S) 个 token，S=6145\n"
+        "            # 实测 65/128）。改为 [S_real−swa, S_real)；非投影路径 S_real==宽度\n"
+        "            # → 与旧 p[..., -swa:] 逐位等价（S_real<swa 时两者同为全宽度置位）。\n"
+        "            p[..., max(0, S_real - swa_tok):S_real] = 1.0",
     ),
 ]
 
