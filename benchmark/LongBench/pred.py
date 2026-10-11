@@ -18,6 +18,9 @@ import random
 import argparse
 
 from benchmark.LongBench.lbv2_choice import extract_choice_official
+from benchmark.LongBench.context_capability_gate import (
+    enforce_context_capability_gate,
+)
 from sparse_attn.arguments import add_sparse_attn_args
 from sparse_attn.patches import register_patch
 from sparse_attn.metrics import get_metrics
@@ -179,6 +182,11 @@ def get_pred(
             prompt = tokenizer.decode(
                 tokenized_prompt[:half], skip_special_tokens=True
             ) + tokenizer.decode(tokenized_prompt[-half:], skip_special_tokens=True)
+        # TL-DSV2-DOUBLE-BOS-094（GPT 审计 2026-10-12_0330）：记录本样本是否
+        # 套了 chat template——DeepSeek 模板首部即 {{ bos_token }}，渲染文本
+        # 已以 BOS 开头，后续 tokenizer 编码不得再自动补 BOS（见下方
+        # add_special_tokens=False 分支注释）。
+        chat_template_applied = False
         if dataset not in [
             "trec",
             "triviaqa",
@@ -188,6 +196,7 @@ def get_pred(
             "repobench-p",
         ]:  # chat models are better off without build prompts on these tasks
             prompt = build_chat(tokenizer, prompt, model_name)
+            chat_template_applied = True
 
         # split the prompt and question (simulate decoding in the question stage)
         if dataset in ["qasper", "hotpotqa"]:
@@ -215,8 +224,22 @@ def get_pred(
             # input = prompt.to(device)
             input = prompt.to("cuda")
         else:
-            # input = tokenizer(prompt, truncation=False, return_tensors="pt").to(device)
-            input = tokenizer(prompt, truncation=False, return_tensors="pt").to("cuda")
+            # TL-DSV2-DOUBLE-BOS-094 修复（GPT 审计 2026-10-12_0330，031e6b8）：
+            # DeepSeek chat template 渲染文本首部已是 BOS（模板首部
+            # {{ bos_token }}），tokenizer_config add_bos_token=true 下默认
+            # tokenizer(prompt, ...) 会再自动补一个 → [BOS,BOS,"User:",...]，
+            # 偏离官方单 BOS prompt。对 DeepSeek 模板渲染路径显式
+            # add_special_tokens=False（与官方 apply_chat_template(tokenize=True)
+            # 内部口径一致）；非模板路径（trec 等 5 任务）仍走默认调用保持单
+            # BOS；Qwen3 等其他模型（模板为无 BOS 的 f-string）逐位不变。
+            if chat_template_applied and IS_DSV2:
+                input = tokenizer(
+                    prompt, truncation=False, return_tensors="pt",
+                    add_special_tokens=False,
+                ).to("cuda")
+            else:
+                # input = tokenizer(prompt, truncation=False, return_tensors="pt").to(device)
+                input = tokenizer(prompt, truncation=False, return_tensors="pt").to("cuda")
             q_input = tokenizer(question, truncation=False, return_tensors="pt").to(
                 "cuda"
             )
@@ -484,10 +507,20 @@ if __name__ == "__main__":
         snapshot = resolve_treatment_snapshot(args)
     else:
         snapshot = None
+    # TL-DSV2-CONTEXT-CAP-093 修复（GPT 审计 2026-10-12_0330，031e6b8）：
+    # 加载 tokenizer/model 之前核对实验 cap 与模型上下文能力（注册表 +
+    # 本地快照活值），三方冲突打印明细不静默挑选，cap 超过
+    # min(max_position_embeddings, 模型卡声明) 时 fail-closed。未登记模型
+    # （Qwen3 等既有链）门禁跳过，行为零变化。max_length 读取从
+    # load_model_and_tokenizer 之后提前到此处（同一 dict 查找，仅求值时序
+    # 变化，语义不变）。
+    max_length = model2maxlen[model_name]
+    enforce_context_capability_gate(
+        model_name, model2path, max_length, config_path
+    )
     model, tokenizer = load_model_and_tokenizer(
         model2path, model_name, device, args, snapshot
     )
-    max_length = model2maxlen[model_name]
 
     datasets = [args.task]
     dataset2prompt = json.load(open(f"{config_path}/dataset2prompt.json", "r"))
