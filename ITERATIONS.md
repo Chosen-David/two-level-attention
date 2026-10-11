@@ -232,12 +232,20 @@
   时间被排队延迟主导（prepare_index 8K-64K 全档恒 2.50ms vs iter6 增量
   0.46ms = 明显失真；8K eager 4.96 vs 2.2 = 3.5× 偏差）。干净卡隔离
   microbench（原型，S=16K-131072 × shared/per_qh）：Triton 融合
-  0.10-0.29ms vs torch gather 0.41-0.66ms（2.7-4.6×，launch 数 ~15→2）；
-  污染跑中 16K-64K 段 eager 阶段 0.24-0.26ms（iter6 为 0.60ms）——即使
-  在被抢占的卡上 Triton 路径仍快 ~2.3×，方向与 microbench 一致。**全步
-  定案数字待 GPU 空闲复测**（watcher /tmp/e127_wait_gpu_rerun.sh pid
-  2993511 在飞，自动重跑并覆写 e127_stage_bench_iter7.json，完成后追加
-  复测补记 commit）。
+  0.10-0.29ms vs torch gather 0.41-0.66ms（2.7-4.6×）。
+  **开发中抓到并修复的路由 bug（如实记录）**：初次集成的路由条件要求
+  cu int32，而生产 prepare_cu_seqlens 的 `.cumsum(0)` 把 int32 tensor
+  整数提升为 int64 → 生产/主 bench 全程 Triton 路径未生效（eager 阶段
+  launch 实测 37 = torch gather；污染跑的 eager 0.24-0.26ms 实为 torch
+  gather 数字，此前条目误读为「Triton 快 2.3×」——已更正）。gates 全绿
+  是因测试用手工 int32 cu，掩盖了该 dtype 分歧（教训：**门禁输入形态须
+  含生产构造路径**，已补生产形态 int64 cu 对拍：allclose maxdiff
+  9.77e-04）。修复：helper 内确定性 cast int64→int32（2 元素 tiny
+  kernel，值逐位同）+ 路由放宽接受 int64。修复后 eager 阶段 launch
+  37→**6**（cu cast/full/qs mul/qs to/kernel A/kernel B），单步整步
+  launch 158→~127（干净复测定案）。**全步定案数字待 GPU 空闲复测**
+  （watcher /tmp/e127_wait_gpu_rerun.sh pid 2993511 在飞，自动重跑并
+  覆写 e127_stage_bench_iter7.json，完成后追加复测补记 commit）。
 - 门禁：15/15 PASS——eager 7/7（allclose 全配置 worst 1.95e-03 + B7 小
   序列双路径当场 raise + B7 大序列 gather 尾部 raise + W 超上界/cu 破坏
   尾部 raise + 零 host 同步 40 次调用零异常，python±-O 双跑同绿）；其余

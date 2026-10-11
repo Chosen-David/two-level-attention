@@ -193,6 +193,11 @@ def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
     kernel A TP=1024/num_warps=8；kernel B BW=256/num_warps=4）。
     q [1,H,D]；k/v [T,Hkv,D]；m0 [R,T] bool（token 级，block_size==1 前置
     已保证）。异常向上抛（调用方置标志回退 torch gather）。"""
+    # 生产 cu 恒 int64（prepare_cu_seqlens 的 cumsum 整数提升）；kernel A
+    # 原型验证口径为 int32——此处确定性 cast（2 元素 tiny kernel，长度
+    # < 2^31 无溢出），值逐位同。
+    if cu_seqlens_k.dtype != torch.int32:
+        cu_seqlens_k = cu_seqlens_k.to(torch.int32)
     R = m0.shape[0]
     H = q.shape[-2]
     D = k.shape[-1]
@@ -351,7 +356,9 @@ def _eager_decoding_attn_gather(
     # block_size==1（TLI 生产 mask 即 token 级，kernel A 直接读 m0 免
     # repeat）、布局/dtype 契约满足时，两个 kernel 替代下方 ~15 op 链。
     # 路由条件全部 host 已知量（零同步判走）；W_upper 判定与 torch 路径
-    # 同口径（W*8>T 回退 dense，生产 W≈1344 在 16K+ 档同向）。
+    # 同口径（W*8>T 回退 dense，生产 W≈1344 在 16K+ 档同向）。cu 接受
+    # int32/int64（生产 prepare_cu_seqlens 的 cumsum 整数提升恒为 int64，
+    # helper 内确定性 cast 到 kernel 验证口径 int32）。
     # fail-closed：异常 → 置全局标志 False 并落入下方 torch gather 路径
     # （本次即回退，值同原路径，仅性能回退）。
     T_tok = full_len
@@ -364,7 +371,7 @@ def _eager_decoding_attn_gather(
         and q.shape[0] == 1
         and (k.shape[-1] & (k.shape[-1] - 1)) == 0   # D 须为 2 的幂（tl.arange）
         and m0.stride(-1) == 1 and k.stride(-1) == 1 and v.stride(-1) == 1
-        and cu_seqlens_k.dtype == torch.int32
+        and cu_seqlens_k.dtype in (torch.int32, torch.int64)
     ):
         W_up_tri = min(int(os.environ.get("TLI_E127_W_UPPER", "2048")), T_tok)
         if W_up_tri * 8 <= T_tok:
