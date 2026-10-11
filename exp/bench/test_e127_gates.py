@@ -286,14 +286,173 @@ def test_indexer_inc():
     check("indexer_inc: S 回退全量重建 + 后续增量正确", ok_back)
 
 
+# ---------------------------------------------------------------- iter5 派生
+def test_score_mask_derived():
+    """iter5：compute_score rep 缓存 + compute_mask 同步消除（锚点文本派生）——
+    score_dict 四项输出 + mask 对 TLIIndexer 原类逐位一致（==）。
+
+    覆盖：site1（e64+skip）、site2（单池+skip，minmax/avg 两分数源）、
+    e64 normal 层（rep 缓存主路径）、avg 分数源、多 token 步、S 回退
+    （rep 全量重建）、块边界非对齐起点。
+    """
+    import torch as T
+    from exp.bench.e127_stage_bench import make_args
+    from sparse_attn.indexer.tli_indexer import TLIIndexer
+    from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast
+    from sparse_attn.patches.utils import prepare_cu_seqlens
+
+    dev = T.device('cuda:0')
+    H, Hkv, D = 32, 8, 128
+    scale = D ** -0.5
+
+    # 配置矩阵：champion=e64 mavg（site1） / (0,0) 单池（site2 minmax 源）/
+    # aavg e64（avg 分数源） / aavg(0,0)（site2 avg 源）
+    def make_cfg(alpha, beta, gamma, far, near):
+        a = make_args(alpha, beta, gamma)
+        a.tli_far_method, a.tli_near_method = far, near
+        return a
+
+    configs = [
+        ("champion_e64", make_cfg(0.25, 0.125, 0.625, "minmax", "avg")),
+        ("singlepool_00", make_cfg(0.0, 0.0, 0.625, "minmax", "minmax")),
+        ("aavg_e64", make_cfg(0.125, 0.125, 0.375, "avg", "avg")),
+        ("aavg_00", make_cfg(0.0, 0.0, 0.375, "avg", "avg")),
+    ]
+
+    def run(idx_cls, args, layer_idx, S0, n_steps, seed):
+        T.manual_seed(seed)
+        idx = idx_cls(args)
+        idx.layer_idx = layer_idx
+        idx.clear()
+        k = T.randn(1, S0, Hkv, D, device=dev, dtype=T.bfloat16)
+        outs = []
+        for step in range(n_steps):
+            n_new = 3 if step == 5 else 1
+            if step > 0:
+                k = T.cat([k, T.randn(1, n_new, Hkv, D, device=dev,
+                                      dtype=T.bfloat16)], dim=1)
+            q = T.randn(1, 1, H, D, device=dev, dtype=T.bfloat16)
+            cu = prepare_cu_seqlens(k)
+            q_ids = cu[1:] - cu[:-1] - 1
+            d = idx.prepare_index(k, cu)
+            sc = idx.compute_score(q, q_ids, d, scale)
+            m = idx.compute_mask(q_ids, sc)
+            outs.append((sc, m))
+        return outs
+
+    n_fail = 0
+    for cname, args in configs:
+        for layer_idx, ltag in [(2, "normal"), (0, "skip")]:
+            a = run(TLIIndexer, args, layer_idx, 4093, 10, 20261018)
+            b = run(TLIIndexerFast, args, layer_idx, 4093, 10, 20261018)
+            for step in range(10):
+                sa, sb = a[step][0], b[step][0]
+                for key in ["score_coarse", "score_fine"]:
+                    if sa[key].shape != sb[key].shape or not T.equal(sa[key], sb[key]):
+                        n_fail += 1
+                        print(f"  {cname} {ltag} step{step} {key} MISMATCH")
+                ka, kb = sa.get("score_coarse_avg"), sb.get("score_coarse_avg")
+                if (ka is None) != (kb is None) or (
+                        ka is not None and not T.equal(ka, kb)):
+                    n_fail += 1
+                    print(f"  {cname} {ltag} step{step} score_coarse_avg MISMATCH")
+                if not T.equal(a[step][1], b[step][1]):
+                    n_fail += 1
+                    print(f"  {cname} {ltag} step{step} MASK MISMATCH")
+    check("score_mask_derived: 4 配置 × normal/skip × 10 步 score_dict+mask 逐位一致",
+          n_fail == 0, f"mismatch={n_fail}")
+
+    # S 回退 → rep 全量重建后继续增量正确（score_fine 继续逐位）
+    args = make_cfg(0.25, 0.125, 0.625, "minmax", "avg")
+    ok_back = True
+    T.manual_seed(20261019)
+    i_ref = TLIIndexer(args); i_ref.layer_idx = 2; i_ref.clear()
+    T.manual_seed(20261019)
+    i_fast = TLIIndexerFast(args); i_fast.layer_idx = 2; i_fast.clear()
+    q = T.randn(1, 1, H, D, device=dev, dtype=T.bfloat16)
+
+    def _score_pair(k):
+        cu = prepare_cu_seqlens(k)
+        q_ids = cu[1:] - cu[:-1] - 1
+        sc_r = i_ref.compute_score(q, q_ids, i_ref.prepare_index(k, cu), scale)
+        sc_f = i_fast.compute_score(q, q_ids, i_fast.prepare_index(k, cu), scale)
+        return sc_r, sc_f
+
+    k1 = T.randn(1, 5000, Hkv, D, device=dev, dtype=T.bfloat16)
+    sc_r, sc_f = _score_pair(k1)
+    ok_back = T.equal(sc_r["score_fine"], sc_f["score_fine"])
+    k2 = T.randn(1, 4000, Hkv, D, device=dev, dtype=T.bfloat16)   # S 回退
+    sc_r, sc_f = _score_pair(k2)
+    ok_back = ok_back and T.equal(sc_r["score_fine"], sc_f["score_fine"]) \
+        and i_fast._rep["sync"] == 4000
+    k3 = T.cat([k2, T.randn(1, 1, Hkv, D, device=dev, dtype=T.bfloat16)], dim=1)
+    sc_r, sc_f = _score_pair(k3)
+    ok_back = ok_back and T.equal(sc_r["score_fine"], sc_f["score_fine"])
+    check("score_mask_derived: S 回退 rep 重建 + 后续增量 score_fine 逐位一致", ok_back)
+
+
+def test_pipeline_zero_sync():
+    """iter5：prepare_index → compute_score → compute_mask 全管线零 host 同步
+    （sync_debug_mode=error，20 步 × normal/skip 层；含 rep 扩容步）。"""
+    import torch as T
+    from exp.bench.e127_stage_bench import make_args
+    from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast
+    from sparse_attn.patches.utils import prepare_cu_seqlens
+
+    dev = T.device('cuda:0')
+    H, Hkv, D = 32, 8, 128
+    scale = D ** -0.5
+    no_sync_all = True
+    for layer_idx, ltag in [(2, "normal"), (0, "skip")]:
+        T.manual_seed(20261020)
+        idx = TLIIndexerFast(make_args(0.25, 0.125, 0.625))
+        idx.layer_idx = layer_idx
+        idx.clear()
+        k = T.randn(1, 16384, Hkv, D, device=dev, dtype=T.bfloat16)
+        q = T.randn(1, 1, H, D, device=dev, dtype=T.bfloat16)
+        # 冷启动（full prepare + rep 全量建）在窗口外完成
+        cu = prepare_cu_seqlens(k)
+        d = idx.prepare_index(k, cu)
+        sc = idx.compute_score(q, cu[1:] - cu[:-1] - 1, d, scale)
+        _ = idx.compute_mask(cu[1:] - cu[:-1] - 1, sc)
+        T.cuda.synchronize()
+        T.cuda.set_sync_debug_mode("error")
+        try:
+            for _ in range(20):
+                k = T.cat([k, T.randn(1, 1, Hkv, D, device=dev,
+                                      dtype=T.bfloat16)], dim=1)
+                # cu/q_ids 构造属调用方（attn patch / bench harness）职责：
+                # prepare_cu_seqlens 的 pageable H2D 会触发 debug-mode 标记，
+                # 但非队列排空型同步（µs 级），且为 env 无关共享基础设施
+                # （改动会违反 env=0 零扰动铁律）——不纳入本门禁窗口。
+                T.cuda.set_sync_debug_mode("default")
+                cu = prepare_cu_seqlens(k)
+                q_ids = cu[1:] - cu[:-1] - 1
+                T.cuda.synchronize()
+                T.cuda.set_sync_debug_mode("error")
+                d = idx.prepare_index(k, cu)
+                sc = idx.compute_score(q, q_ids, d, scale)
+                _ = idx.compute_mask(q_ids, sc)
+        except Exception as e:
+            no_sync_all = False
+            print(f"  [{ltag}] 同步异常: {type(e).__name__}: {e}")
+        finally:
+            T.cuda.set_sync_debug_mode("default")
+    check("pipeline_zero_sync: prepare+score+mask 20 步零 host 同步（normal+skip）",
+          no_sync_all)
+
+
 if __name__ == '__main__':
-    selected = sys.argv[1:] or ["metrics", "eager", "indexer"]
+    selected = sys.argv[1:] or ["metrics", "eager", "indexer", "iter5"]
     if "metrics" in selected:
         test_metrics_lazy()
     if "eager" in selected:
         test_eager_gather()
     if "indexer" in selected:
         test_indexer_inc()
+    if "iter5" in selected:
+        test_score_mask_derived()
+        test_pipeline_zero_sync()
     print(f"\n=== {len(PASS)} PASS / {len(FAIL)} FAIL ===")
     for f in FAIL:
         print(f"FAILED: {f}")

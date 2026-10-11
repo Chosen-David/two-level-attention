@@ -11,6 +11,7 @@
 | iter2 | eager_decoding gather（≥16K 稀疏走 gather） | 6.62 GPU / 7.12 CPU wall | 1.25×GPU / 1.35×wall | 3/3 PASS |
 | iter3 | gather 路径零同步化（错误标志 GPU 化 + W 上界化） | 6.25 GPU / 6.75 CPU wall | 1.33×GPU / 1.43×wall | 9/9 PASS |
 | iter4 | prepare_index 增量缓存子类（块统计/quant 逐位一致） | 4.21 GPU / 4.71 CPU wall | 1.97×GPU / 2.04×wall | 12/12 PASS |
+| iter5 | compute_score rep 缓存 + compute_mask 同步消除（锚点文本派生） | 2.13 GPU / 2.63 CPU wall | 3.89×GPU / 3.66×wall | 15/15 PASS |
 
 ## Iterations
 
@@ -123,4 +124,49 @@
   正确。既有回归 env=1 复跑 5 套件全绿（near_swa 3/3、C3 5/5、E122
   6/6、E125 尾巴 10/10、E125 kmeans 5/5）；env=0 套件 iter3 时已全绿
   （patch.py 改动 env=0 零路径差异）。
+- commit：见 git log
+
+### [iter 5] compute_score rep 缓存 + compute_mask 同步消除（锚点方法文本派生）
+- 改动：sparse_attn/indexer/tli_indexer_fast.py（锚点文件依旧零改动）+ 门禁扩充
+  exp/bench/test_e127_gates.py（+3 项至 15 项）。三块：
+  ① compute_score 的 b_k_qat 物化（repeat(k_qat,"t h d -> t (h g) d").to(fp32)
+  每步 [S,H,128]，S=64K 合计 ~1.6GB/步写带宽，profile 实测占该阶段 78%：
+  拷贝/转换 2.23ms vs einsum 本体 0.58ms）→ _fast_b_k_qat 惰性增量缓存
+  （尾段步进写 + 容量翻倍摊销扩容）。逐位等价：repeat/fp32 转换均为逐元素
+  确定性算子，k append-only 前缀 token 的 k_qat 值不变（同 iter4 归纳）→
+  缓存行 ≡ 全量 repeat+转换输出 → einsum 输入逐位同 → score_fine 逐位一致。
+  fail-closed：k_qat 与增量缓存 data_ptr host 判同（零同步）才复用前缀；
+  投影基/moba/外部合成 k_qat/维度不符一律全量重建（值同原版路径）。
+  ② compute_mask 的 skip 层两处 n_valid 统计 .item() host 同步（skip 层
+  compute_mask CPU 3.0ms 停顿主源）数学恒等消除：site1（e64 分支）far
+  区间刚被整段置 -inf → 计数恒 0（host 常量）；site2（单池分支）sc_pool
+  除 far 区外全有限 → 计数 = kt − far 区块数（host 可算）。另消两处
+  far_range tensor 高级索引赋值（index_put_ 触发同步）→ 连续区间切片赋值
+  （数学恒等，区间空时同为空操作）。
+  ③ _qat_indices 缓存（原每步 list→tensor pageable H2D → GPU 端 arange
+  cat 构造零 H2D）+ _prepare_index_inc 的 pad_cu 向量化（原对 GPU 张量
+  逐元素 Python 迭代 = 隐式 .item() 同步）。
+- 实现方式（杜绝手工拷贝 500+ 行方法漂移）：_derive_anchor_method ——
+  inspect.getsource 读锚点方法文本 → 唯一文本替换（count≠1 fail-closed
+  raise 拒载）→ dedent → exec 挂到 TLIIndexerFast。除替换点外与锚点逐字节
+  同；锚点文本变更时拒绝加载（E127 派生契约 fail-closed）。super() 零参
+  在 exec 函数中无 __class__ cell → 显式改写 TLIIndexer.compute_score
+  （Fast 的 MRO 下语义等价）。
+- 数字（S=64K normal 层）：compute_score 3.02→0.99ms（3.05×）；全步
+  GPU sum 4.21→2.13（vs baseline **3.89×**），CPU wall 4.71→2.63
+  （**3.66×**）。64K skip 层 GPU 1.93→1.02（4.16×）、wall 2.16→0.56
+  （3.86×）。32K normal 2.75×GPU/2.62×wall、16K normal 2.62×/2.41×。
+  8K 档复测持平零回归（dense 路由，噪声内）。
+- 如实记录（运行方差，非行为变化）：本 iter 未触碰 eager_decoding 代码，
+  mask 逐位一致门禁证明行为零变化，但 16K/32K/64K normal 层 eager 阶段
+  GPU +0.1~0.3ms（0.25→0.37 量级）。64K 复测（GPU 空闲态）主 run 一致
+  （2.13/2.63），eager 仍 ~0.37ms——判为环境/时钟状态方差（iter4 run 时
+  卡上无并发负载），全步口径不受影响（3.89× 为复测确认值）。
+- 门禁：15/15 PASS——原 12 项保持绿 + 新增 score_mask_derived（4 配置
+  矩阵 champion_e64/singlepool_00/aavg_e64/aavg_00 × normal/skip × 10 步
+  score_dict+mask 对 TLIIndexer 逐位一致（==）+ S 回退 rep 全量重建后续
+  增量正确）+ pipeline_zero_sync（20 步 prepare+score+mask 全管线
+  sync_debug_mode=error 零同步，normal+skip 双层）。既有回归 env=1
+  复跑 7 套件全绿（near_swa 3/3+4/4、C3 5/5、E122 6/6、E125 尾巴 10/10、
+  E125 kmeans 守卫 5/5、E116f 12/12）。
 - commit：见 git log

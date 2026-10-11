@@ -1,44 +1,47 @@
 # -*- coding: utf-8 -*-
-"""【E127 iter4】TLIIndexer 增量缓存子类（decode prepare_index 加速）。
+"""【E127 iter4+iter5】TLIIndexer 增量缓存子类（decode 热路径加速）。
 
 锚点文件 sparse_attn/indexer/tli_indexer.py 零改动（md5 身份不变）；
 本子类经 sparse_attn/patches/patch.py 在 TLI_E127_FAST=1 时替换实例化
 （默认 0 走原类，在飞链零扰动）。
 
-优化目标：原 prepare_index 每次 decode step 对全序列 S 做 O(S) 重算
-（S=64K 每层步 2.89ms：pad_tensor 全量复制 134MB + k[..., indices]
-gather + 全量 quant + zeros_like 134MB + amax/amin/mean 全块归约），
-而 decode 每步只追加 1 个新 token——统计量只有尾块变化。
+iter4：prepare_index 增量缓存
+  原实现每次 decode step 对全序列 S 做 O(S) 重算（S=64K 每层步 2.89ms），
+  而 decode 每步只追加 1 个 token。增量版：k_min/k_max/k_avg 复用块
+  [0, fb) 缓存 + 尾段重算（pad 语义与全量版一致）；k_qat 预分配 buffer
+  步进写。逐位一致为数学保证（块内独立归约 + quant 逐 token 独立）。
 
-逐位一致证明（数学保证，不依赖实测运气）：
-  - k_min/k_max = k_coarse.amax/amin(dim=2)、k_avg = mean(dim=2)：bs 维
-    （块内）独立归约，块间无交叉 → 块 [0, fb) 输入不变时其输出不变；
-    缓存值即原 kernel 的历史输出，与本次全量重算逐位相同（同 kernel、
-    同输入、确定性）。
-  - k_qat = zeros_like(k) + [..., indices] 散布 min_max_per_token_quant：
-    量化沿 dim=-1 逐 token 独立，indices 维外恒 0 → 尾段先 zero_ 再
-    scatter 与全量版 zeros_like+scatter 逐位相同；前缀段保留历史即
-    全量重算值。
-  - 尾块重算用与全量版相同的 pad 语义（块对齐、pad 值 0）→ 尾块统计
-    含 padding 的行为与全量版一致。
+iter5：compute_score 物化缓存 + compute_mask 同步消除
+  - compute_score：b_k_qat = repeat(k_qat, "t h d -> t (h g) d").to(fp32)
+    每步物化 [S,H,128]（S=64K：bf16 repeat 536MB 写 + fp32 转换 1.07GB
+    写/536MB 读），profile 实测占该阶段 78%（拷贝/转换 2.23ms vs einsum
+    本体 0.58ms）。改为惰性增量缓存（_fast_b_k_qat）：尾段步进写 +
+    容量翻倍摊销扩容，einsum 输入形状/布局/值逐位同 → score 逐位一致。
+  - compute_mask：skip 层两处 n_valid 统计的 .item() host 同步（skip
+    层 compute_mask CPU 3.0ms 的停顿主源），数学上恒为 host 可算值：
+    site1（e64 分支）far 区间刚被整段置 -inf → 计数恒 0；site2（单池
+    分支）sc_pool 除 far 区外全有限 → 计数 = kt − far 区块数。
+  - 两个方法均从锚点源码文本派生（_derive_anchor_method）：除上述
+    数学等价替换点外逐字节同锚点，锚点文本变更时 fail-closed 拒绝加载
+    （杜绝手工拷贝 500+ 行方法的漂移风险）。
+  - _prepare_index_inc 的 pad_cu 向量化（原 prepare_pad_mask 对 GPU
+    张量逐元素 Python 迭代 = 隐式 .item() 同步）+ quant indices 缓存
+    （原每步 H2D 构造）。
 
-契约（fail-closed 防御，全部回退全量重算）：
-  - k append-only（HF DynamicCache decode 语义：每步 cat 追加，前缀
-    不可变）。S_now > S_prev 才增量；S_now ≤ S_prev（新请求/异常回退/
-    前缀改写导致的长度回退）→ 全量重建缓存。
-  - clear()（patch 每次 prefill 前调用）使缓存失效 → 新请求首步全量。
-  - 非默认路径（投影基 _basis/_basis_all 非 None、moba gate、D≠128、
-    子空间 key 变化）一律 super() 全量，行为与原类逐位相同。
-  - 残余风险：调用方改写前缀但长度单调增（理论上的契约破坏）无法零
-    成本检测——与 cu=[0,S] 契约同族，文档化；如需强校验可加全前缀
-    逐位比对（成本 ~8µs/层步，见 E127 报告建议）。
+契约（fail-closed，全部回退原路径）：
+  - k append-only（HF DynamicCache decode 语义）。S_now ≤ S_prev →
+    全量重建缓存（含 _rep）。
+  - clear() / _prepare_index_full 使 _inc、_rep 失效 → 新请求首步全量。
+  - _fast_b_k_qat 仅当 index_dict 的 k_qat 与增量缓存同一底层存储
+    （data_ptr host 判同，零同步）才复用前缀；投影基/moba/外部合成
+    k_qat 一律全量重建（值同原版路径，行为逐位不变）。
 """
 
 import torch
-from einops import rearrange
+import torch.nn.functional as F
+from einops import rearrange, repeat, einsum
 
 from .tli_indexer import TLIIndexer
-from .utils import prepare_pad_mask
 
 
 class TLIIndexerFast(TLIIndexer):
@@ -46,6 +49,7 @@ class TLIIndexerFast(TLIIndexer):
     def clear(self):
         super().clear()
         self._inc = None
+        self._rep = None   # 【iter5】b_k_qat 增量缓存随 _inc 一并失效
 
     # ------------------------------------------------------------------ 入口
     def prepare_index(self, k, cu_seqlens_k):
@@ -76,6 +80,8 @@ class TLIIndexerFast(TLIIndexer):
     # ---------------------------------------------------------------- 全量
     def _prepare_index_full(self, k, cu_seqlens_k):
         d = super().prepare_index(k, cu_seqlens_k)
+        # 【iter5】rep 缓存随全量重建失效（内容可能整体不同：新请求/S 回退）
+        self._rep = None
         # 建缓存（k_qat 仅非投影路径可作增量 buffer——投影路径 k_qat 为
         # 全维量化特征，散布语义不同；_basis 非 None 时 can_inc 已挡，
         # 此处再防御一次）
@@ -104,7 +110,13 @@ class TLIIndexerFast(TLIIndexer):
         idx_sub = self._subspace_indices(k.device) if self.enable_subspace else None
 
         # ---- 尾段 [lo, S_now) 重算（pad 语义与全量版一致：块对齐、pad 0）----
-        _, pad_cu_seqlens_k = prepare_pad_mask(bs, cu_seqlens_k)
+        # 【iter5】pad_cu 向量化：原 prepare_pad_mask 对 seqlens 逐元素
+        # Python 迭代（GPU 张量迭代 = 隐式 .item() host 同步，每步一次）；
+        # 整数算术逐位等价：pad = (x+bs-1)//bs*bs，cumsum 前接 0。
+        _seqlens_k = cu_seqlens_k[1:] - cu_seqlens_k[:-1]
+        _pad_seqlens_k = (_seqlens_k + bs - 1) // bs * bs
+        pad_cu_seqlens_k = torch.cat(
+            (_pad_seqlens_k.new_zeros((1,)), _pad_seqlens_k.cumsum(dim=0)))
         tail_k = k[:, lo:S_now]                              # [1, n, Hkv, D]
         # 尾段块数与 pad：与全量版一致 = ceil(S_now/bs)*bs 覆盖下的尾块集
         # （lo 为块边界，前缀块已对齐——尾段 pad 量 = 全量 pad 量）
@@ -121,12 +133,9 @@ class TLIIndexerFast(TLIIndexer):
         if self._need_avg_score():
             k_avg = torch.cat([inc["k_avg"][:, :fb], t_coarse.mean(dim=2)], dim=1)
 
-        # ---- k_qat 增量：预分配 buffer 步进写（尾段 zero_ + scatter，
-        # 与全量版 zeros_like+scatter 逐位同构）----
-        delta = 64 // self.cmp_ratio
-        indices = idx_sub if idx_sub is not None else torch.tensor(
-            list(range(64 - delta, 64)) + list(range(128 - delta, 128))
-        ).to(k.device)
+        # ---- k_qat 增量：预分配 buffer 步进写（尾段 zero_ + scatter， ----
+        # 与全量版 zeros_like+scatter 逐位同构）
+        indices = idx_sub if idx_sub is not None else self._qat_indices(k.device)
         buf, cap = inc["k_qat_buf"], inc["k_qat_cap"]
         if S_now > cap:   # 扩容（翻倍摊销）
             new_cap = max(2 * cap, S_now)
@@ -157,3 +166,163 @@ class TLIIndexerFast(TLIIndexer):
         inc["S"] = S_now
         inc["k_min"], inc["k_max"], inc["k_avg"] = k_min, k_max, k_avg
         return index_dict
+
+    def _qat_indices(self, device):
+        """【iter5】非子空间 quant indices 缓存（原每步 list→tensor 的
+        pageable H2D 构造；cmp_ratio 为实例级常量 → 命中后零构造零拷贝）。
+        GPU 端 arange 构造（纯 kernel 零 H2D，int64 与原 torch.tensor(list)
+        同 dtype，值逐位同）。"""
+        key = (self.cmp_ratio, device)
+        cache = getattr(self, "_qat_idx_cache", None)
+        if cache is not None and cache[0] == key:
+            return cache[1]
+        delta = 64 // self.cmp_ratio
+        idx = torch.cat([torch.arange(64 - delta, 64, device=device),
+                         torch.arange(128 - delta, 128, device=device)])
+        self._qat_idx_cache = (key, idx)
+        return idx
+
+    # ------------------------------------------------ 【iter5】b_k_qat 缓存
+    def _fast_b_k_qat(self, k_qat, H, g):
+        """b_k_qat（k_qat 的 GQA repeat + fp32 转换）惰性增量缓存。
+
+        逐位等价论证：repeat/转换均为逐元素确定性算子，k append-only 前缀
+        token 的 k_qat 值不变（同 iter4 k_qat_buf 归纳）→ 缓存行 ≡ 本次
+        全量 repeat+转换输出；einsum 收到形状/布局/值逐位相同的输入 →
+        score_fine 逐位一致。尾段步进写（~64 token × H × D），容量翻倍
+        摊销扩容（前缀行整体拷贝，值不变）。
+
+        fail-closed：仅当 index_dict 的 k_qat 与增量缓存同一底层存储
+        （data_ptr host 判同，零同步）且 H/Hkv/g/D 匹配才复用；投影基/
+        moba/外部合成 k_qat/维度不符一律全量重建（与原版路径值相同）。
+        """
+        kq = k_qat.squeeze(0)
+        if kq.dim() != 3:
+            # 防御：意外布局回退原版表达式（repeat 语义不变）
+            return repeat(kq, "t h d -> t (h g) d", g=g).to(torch.float32)
+        S, Hkv, D = kq.shape
+        inc = getattr(self, "_inc", None)
+        rep = getattr(self, "_rep", None)
+        ok = (
+            inc is not None
+            and inc.get("k_qat_buf") is not None
+            and kq.data_ptr() == inc["k_qat_buf"].data_ptr()
+            and rep is not None
+            and rep["H"] == H and rep["Hkv"] == Hkv
+            and rep["g"] == g and rep["D"] == D
+            and rep["sync"] <= S
+            and self._basis is None and self._basis_all is None
+            and not self.moba_gate
+        )
+        if not ok:
+            buf = (kq.unsqueeze(2).expand(S, Hkv, g, D)
+                   .reshape(S, H, D).to(torch.float32))
+            self._rep = {"buf": buf, "cap": S, "sync": S,
+                         "H": H, "Hkv": Hkv, "g": g, "D": D}
+            return buf
+        if rep["cap"] < S:
+            # 扩容（翻倍摊销）：前缀行整体拷贝，值逐位不变
+            new_cap = max(2 * rep["cap"], S)
+            new_buf = rep["buf"].new_zeros((new_cap, H, D))
+            new_buf[:rep["sync"]] = rep["buf"][:rep["sync"]]
+            rep["buf"], rep["cap"] = new_buf, new_cap
+        buf = rep["buf"]
+        if rep["sync"] < S:
+            lo = rep["sync"]
+            buf[lo:S] = (kq[lo:S].unsqueeze(2).expand(S - lo, Hkv, g, D)
+                         .reshape(S - lo, H, D))
+            rep["sync"] = S
+        return buf[:S]
+
+
+# ======================================================================
+# 【E127 iter5】锚点方法文本派生：compute_score / compute_mask
+#
+# 方法：inspect 读取锚点源码 → 对数学等价替换点做唯一文本替换 → exec
+# 挂到 TLIIndexerFast。除替换点外与锚点逐字节相同（杜绝 500+ 行方法
+# 手工拷贝的漂移风险）；锚点文本变更（替换点不再唯一匹配）时 fail-closed
+# raise，拒绝在失配锚点上加载派生方法。
+# ======================================================================
+def _derive_anchor_method(name, replacements):
+    import inspect
+    import textwrap
+    # 注意：先在原始缩进（getsource 返回类体缩进文本）上做唯一文本替换，
+    # 再 dedent —— 替换串按锚点文件缩进书写，锚点文本变更即失配 fail-closed。
+    src = inspect.getsource(getattr(TLIIndexer, name))
+    for old, new in replacements:
+        n = src.count(old)
+        if n != 1:
+            raise RuntimeError(
+                f"[TLIIndexerFast] 锚点方法 {name} 的替换点文本不再唯一匹配"
+                f"（锚点 sparse_attn/indexer/tli_indexer.py 已变更？）："
+                f"expected 1 occurrence of {old[:70]!r}..., got {n}。"
+                f"E127 派生方法与锚点的逐位一致契约被破坏，拒绝加载。")
+        src = src.replace(old, new)
+    src = textwrap.dedent(src)
+    ns = {"torch": torch, "F": F, "rearrange": rearrange,
+          "repeat": repeat, "einsum": einsum, "TLIIndexer": TLIIndexer}
+    exec(compile(src, f"<tli_indexer_fast:derived-{name}>", "exec"), ns)
+    return ns[name]
+
+
+# ---- compute_score：两处替换 ----
+# ① 零参 super() 在 exec 派生的独立函数中无 __class__ cell → 显式等价
+#   改写（Fast 的 MRO 下 super().compute_score ≡ TLIIndexer.compute_score）；
+# ② b_k_qat 物化 → _fast_b_k_qat 惰性增量缓存（见方法 docstring）。
+_SCORE_REPL = [
+    (
+        "            d = super().compute_score(q, q_ids, index_dict, softmax_scale)",
+        "            d = TLIIndexer.compute_score(self, q, q_ids, index_dict, softmax_scale)",
+    ),
+    (
+        '        b_k_qat = repeat(k_qat.squeeze(0), "t h d -> t (h g) d", '
+        'g=self.group_size).to(torch.float32)',
+        "        # 【E127 iter5】b_k_qat 惰性增量缓存（逐位等价论证见\n"
+        "        # _fast_b_k_qat docstring）：原版每步物化 [S,H,128] repeat\n"
+        "        # + fp32 转换（S=64K 合计 ~1.6GB/步写带宽，占本阶段 78%）\n"
+        "        b_k_qat = self._fast_b_k_qat(k_qat, H, self.group_size)",
+    ),
+]
+
+# ---- compute_mask：两处 .item() 同步消除（数学恒等替换）----
+# site1（e64 分支 + skip_far）：far 区间 [far_lo_blk, far_hi_blk) 刚在
+#   上方被 far_range 整段置 -inf → (> -inf).sum() 数学恒 0（区间空时
+#   空张量计数亦为 0）→ host 常量 0 逐位等价。
+# site2（单池分支 + skip_far）：sc_pool 除 far 区外全有限（score_coarse/
+#   score_coarse_avg 均在 compute_score 中被全量覆写；父类捷径同构；
+#   far 区 minmax/avg 两口径均已在上方整段置 -inf）→ 有效块数
+#   = kt − far 区块数，host 可算（区间倒挂时两者同为 kt−0）。
+_MASK_REPL = [
+    (
+        "                n_valid_far = int(\n"
+        "                    (score_coarse[..., far_lo_blk:far_hi_blk] > float(\"-inf\")).sum(dim=-1).max().item()\n"
+        "                )",
+        "                # 【E127 iter5】far 区间刚被上方 far_range 整段置 -inf，\n"
+        "                # 计数数学恒 0——host 常量替代 GPU 统计 + .item()\n"
+        "                # host 同步（逐位等价；区间空时原计数亦为 0）\n"
+        "                n_valid_far = 0",
+    ),
+    (
+        "                n_valid = int((sc_pool > float(\"-inf\")).sum(dim=-1).max().item())",
+        "                # 【E127 iter5】sc_pool 除 far 区（minmax/avg 两口径均在\n"
+        "                # 上方整段置 -inf）外全有限（分数矩阵被全量覆写过）→\n"
+        "                # 有效块数 = kt − far 区块数，host 可算免同步（逐位等价）\n"
+        "                n_valid = kt - max(0, far_hi_blk - far_lo_blk)",
+    ),
+    (
+        "            far_range = torch.arange(far_lo_blk, far_hi_blk, device=score_coarse.device)\n"
+        "            score_coarse[..., far_range] = float(\"-inf\")",
+        "            # 【E127 iter5】far_range 恒为连续区间 [far_lo_blk, far_hi_blk)——\n"
+        "            # tensor 高级索引赋值（index_put_）触发 host 同步，连续\n"
+        "            # 区间切片赋值数学恒等（区间空时两者同为空操作）→ 零同步改写\n"
+        "            score_coarse[..., far_lo_blk:far_hi_blk] = float(\"-inf\")",
+    ),
+    (
+        "                    sc_pool[..., torch.arange(far_lo_blk, far_hi_blk, device=sc_pool.device)] = float(\"-inf\")",
+        "                    # 【E127 iter5】同上：连续区间切片赋值零同步等价改写\n"
+        "                    sc_pool[..., far_lo_blk:far_hi_blk] = float(\"-inf\")",
+    ),
+]
+
+TLIIndexerFast.compute_score = _derive_anchor_method("compute_score", _SCORE_REPL)
+TLIIndexerFast.compute_mask = _derive_anchor_method("compute_mask", _MASK_REPL)
