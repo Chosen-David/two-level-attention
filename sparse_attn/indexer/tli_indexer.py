@@ -501,6 +501,22 @@ class TLIIndexer(TIAIndexer):
         Tn = near_hi - far_hi
         if Tn < 256:   # near 区过小（< 4 块）不值得聚类，消费端回退细筛分
             return
+        # 【near kmeans 4 倍样本守卫（DeepSeek 审计 round1 ③，2026-10-11，
+        #   主 AI 派单确认）】far 侧 _build_far_kmeans 有同口径守卫
+        #   （Tfar < far_clusters*4 → 放弃建簇 _km_centroids=None 回退细筛
+        #   分），near 侧 kmeans 分支复用 far_clusters 作簇数（256 簇固定），
+        #   却只有 Tn<256 下限：Tn ∈ [256, far_clusters*4)（far_clusters=256
+        #   时 [256,1024)）时簇数逼近/≥样本数 → kmeans 退化为一簇一样本/
+        #   大量空簇，聚类完全失效且静默继续（LB 短序列 near 区可落入，
+        #   Tn=300 实测每头 256 簇几乎全被单样本占据）。补与 far 侧同口径
+        #   守卫：kmeans 分支样本不足 4 倍簇数时跳过更新，沿用本函数
+        #   Tn<256 的跳过惯例（_km_near_centroids 保持 None，消费端回退
+        #   细筛分——细筛分质量高于簇代表分，语义无损偏保守）。
+        #   sim_greedy 分支不受影响：贪心簇数自适应（Kcap=Tn，活簇随数据
+        #   增长），不存在簇数≥样本数退化，与 far 侧 greedy 无 4 倍守卫
+        #   口径一致。far_clusters=64 时阈值=256 与既有下限重合，行为不变。
+        if self.near_select == "cluster" and Tn < self.far_clusters * 4:
+            return
         idx = (self._sim_dims_indices if self.near_select == "sim_greedy"
                else self._subspace_indices)(k.device)
         x = k[0, far_hi:near_hi].float()[..., idx]   # [Tn, Hkv, dd]
