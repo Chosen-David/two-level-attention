@@ -1,9 +1,9 @@
 {
  "meta": {
-  "probe": "E128 五臂质量×性能综合权衡表（#216）——E125 质量分 × E126 修正后计时 × E127 优化定案",
+  "probe": "E128 五臂质量×性能综合权衡表（#216）——E125 质量分 × E126 修正后计时 × E127 优化定案（098/099/100 修复版）",
   "generated": "2026-10-12",
-  "worktree_branch": "e128-tradeoff",
-  "base_commit": "f2d28f3",
+  "worktree_branch": "e128-fix-098-100",
+  "base_commit": "6e918c5",
   "scope_limits": "structured/singleton 合成数据、B=1、q_len=1、D′ off（E126 layer_skip off / E127 normal 层）、单层 microbench、H20-3e；E126 为优化前基线（计时插桩开），E127 为独立 harness 配对组",
   "gpt_f4139b5_constraints": {
    "1_steady_rel_diff_64k": "cclustersim vs mavg 相对差 3.16%（重算核实，非 <2%）",
@@ -11,7 +11,9 @@
    "3_aavg_config": "(α,β,γ)=(.125,.125,.375)（E125 字串 + E126 数值双门禁通过）",
    "4_s8_semantics": "E126 基线 S8 = eager_decoding 全长 PV（非只读 K2 个 KV）；E127 iter2 后消费端gather 选中子集"
   },
-  "statistical_discipline": "084 措辞：CI 含 0 写「未证明差异」不写「持平/等价」；支配关系为点估计排序主张",
+  "statistical_discipline": "084 措辞：CI 含 0 写「未证明差异」不写「持平/等价」；Pareto 支配术语仅允许出现在 quality_steady_cost_pareto.dominance 及其机器生成摘要中，cost_only_total_order_at_horizon 为纯成本排序陈述禁用支配术语（098）；臂间配对结论只引用 pairwise_ci_all 全枚举，不做「除 X 外均含 0」式全称外推（099）；支配/排序关系均为点估计主张",
+  "multiple_comparison_note": "pairwise_ci_all 为 10 对全枚举，未做多重比较校正；含 0 的对只写「未证明差异」（099-②）",
+  "fix_provenance_gpt_audit": "TL-E128-PARETO-098 / TL-E128-STATEMENT-099 / TL-E128-FAILCLOSED-100 修复（2026-10-12），套件 test_e128_fix_098_100.py",
   "consumed_only_corrected_e126_fields": true
  },
  "provenance": {
@@ -22,9 +24,9 @@
     "meta.scorer_backend",
     "meta.bootstrap",
     "meta.arm_configs",
-    "input_manifest[]（20 格 rows==expect 闭包门禁）",
-    "per_task.{arm}/{task}.{arm,mavg,fullkv,delta_vs_mavg,delta_vs_fullkv}",
-    "{arm}_avg / {arm}_avg_delta_vs_mavg / {arm}_ci95 / {arm}_significant_vs_mavg（重算复核门禁）",
+    "input_manifest[]（20 格 rows==expect + (arm,task) 笛卡尔积唯一集闭包门禁，100-①）",
+    "per_task.{arm}/{task}.{arm,mavg,fullkv,delta_vs_mavg,delta_vs_fullkv}（delta==arm−锚 逐任务联立门禁，100-②）",
+    "{arm}_avg / {arm}_avg_delta_vs_mavg / {arm}_ci95 / {arm}_significant_vs_mavg（重算复核门禁 + 均值/均值差联立）",
     "mavg_anchor_avg / fullkv_anchor_avg / candidates_avg5 / verdict"
    ]
   },
@@ -139,6 +141,16 @@
     "tasks[E109_cavgsim_a0_b0_g0].AVG5（旧口径 B10 前，5 任务含 repobench-p；用途=跨口径符号稳定性论证）",
     "tasks[E109_cclustersim_a0.125_b0.25_g0.125].AVG5（旧口径 B10 前，5 任务含 repobench-p；用途=跨口径符号稳定性论证）"
    ]
+  },
+  "e100_bootstrap_ci": {
+   "path": "exp/trace/results/e100_bootstrap_ci.json",
+   "sha256": "90de60fd50e7134cc7b6d96f2713fbc778a4c7d70d48e1ccb706939ba1b02f03",
+   "consumed_fields": [
+    "claim.{diff,psi_avg,fkv_avg}（R6 的 +0.42 来源）",
+    "main_ci_13tasks.{mean,ci95_lo,ci95_hi,contains_zero}（R6 的 CI [-0.18,+1.02] 来源；claim/main_ci 联立门禁）",
+    "verdict（历史判决文本，13 任务 mavg 臂口径）"
+   ],
+   "role": "R6 论文主张链引用的历史判决（100-⑥ 修复：进 provenance）"
   }
  },
  "quality_e125": {
@@ -242,6 +254,103 @@
   },
   "fullkv_anchor_avg": 48.016,
   "verdict_e125": "冠军换人：cclustersim AVG5=48.25 > mavg 47.91（配对差 +0.34，CI 含 0，未证明显著优于——按点估计选举，正式主张待全量（E116b 咬合）确认）"
+ },
+ "pairwise_ci_all": {
+  "direction": "point_est = 前臂 − 后臂（任务级配对差均值）",
+  "protocol": "paired bootstrap B=10000 seed=42（与 E125 同协议）",
+  "multiple_comparison_correction": "none（10 对全枚举，未做校正）",
+  "pairs": {
+   "mavg-aavg": {
+    "point_est": -0.214,
+    "ci95": [
+     -0.862,
+     0.25
+    ],
+    "contains_zero": true,
+    "significant_uncorrected": false
+   },
+   "mavg-mminmax": {
+    "point_est": 0.802,
+    "ci95": [
+     0.08,
+     1.564
+    ],
+    "contains_zero": false,
+    "significant_uncorrected": true
+   },
+   "mavg-cavgsim": {
+    "point_est": 0.178,
+    "ci95": [
+     -0.094,
+     0.436
+    ],
+    "contains_zero": true,
+    "significant_uncorrected": false
+   },
+   "mavg-cclustersim": {
+    "point_est": -0.34,
+    "ci95": [
+     -1.02,
+     0.2
+    ],
+    "contains_zero": true,
+    "significant_uncorrected": false
+   },
+   "aavg-mminmax": {
+    "point_est": 1.016,
+    "ci95": [
+     -0.17,
+     2.202
+    ],
+    "contains_zero": true,
+    "significant_uncorrected": false
+   },
+   "aavg-cavgsim": {
+    "point_est": 0.392,
+    "ci95": [
+     0.11,
+     0.762
+    ],
+    "contains_zero": false,
+    "significant_uncorrected": true
+   },
+   "aavg-cclustersim": {
+    "point_est": -0.126,
+    "ci95": [
+     -0.29,
+     0.054
+    ],
+    "contains_zero": true,
+    "significant_uncorrected": false
+   },
+   "mminmax-cavgsim": {
+    "point_est": -0.624,
+    "ci95": [
+     -1.614,
+     0.324
+    ],
+    "contains_zero": true,
+    "significant_uncorrected": false
+   },
+   "mminmax-cclustersim": {
+    "point_est": -1.142,
+    "ci95": [
+     -2.404,
+     0.12
+    ],
+    "contains_zero": true,
+    "significant_uncorrected": false
+   },
+   "cavgsim-cclustersim": {
+    "point_est": -0.518,
+    "ci95": [
+     -0.948,
+     -0.178
+    ],
+    "contains_zero": false,
+    "significant_uncorrected": true
+   }
+  }
  },
  "steady_selector_cost_e126": {
   "mavg": {
@@ -3038,10 +3147,9 @@
   "cavgsim": 46.53,
   "cclustersim": 46.46
  },
- "pareto": {
+ "quality_steady_cost_pareto": {
   "cost_unit": "selector_total_ms_median_est（ms，10 格 = structured/singleton × S 4K-64K）",
-  "cold_unit": "初建超额 initial_build_excess_ms + 128 步窗内重建尖峰超额 rebuild_excess_ms_in_128steps（簇臂建簇非一次性）",
-  "significance_note": "除 mminmax（vs mavg CI [-1.56,-0.08] 显著更差）外，臂间质量差 bootstrap CI 均含 0——以下支配关系是点估计排序，不构成统计证明",
+  "significance_note": "vs mavg：三候选（aavg/cavgsim/cclustersim）CI 均含 0（未证明差异），mminmax 显著更差（[-1.56,-0.08]）。臂间配对全枚举（10 对，未做多重比较校正）中 3 对 CI 不含 0：['aavg-cavgsim', 'cavgsim-cclustersim', 'mavg-mminmax']——支配关系是点估计排序主张，不构成统计证明",
   "dominance": {
    "mavg": {
     "dominates_point_estimate": [],
@@ -3064,7 +3172,26 @@
     "dominated_by_point_estimate": []
    }
   },
-  "frontier_summary": "质量-稳态成本二维平面上无任何严格支配对：每对臂或质量点估计交叉或成本向量交叉（mavg vs aavg 在 S=16K 结构化成本交叉；簇臂质量点估计更高但成本全面更高；mminmax 成本最低但质量显著更差）——五臂构成真实权衡前沿。加入建簇+重建成本维后：cclustersim相对 mavg 稳态更贵且建簇不摊销（任何 decode 长度总成本更高的点估计支配关系成立）；cavgsim 64K 回本需 26,000+ 步（steady-only口径）且重建复发继续侵蚀——簇臂在总成本维被零建簇臂（mavg/aavg）点估计支配"
+  "frontier_summary": "质量-稳态成本二维平面（AVG5↑、10 格 selector_total 互斥阶段中位数和↓）上无任何点估计支配对——五臂构成真实权衡前沿。冷建簇成本维的总成本陈述见 cost_only_total_order_at_horizon（新增最小化维不可能创造此处不存在的 Pareto 支配，新支配集 ⊆ 旧支配集）",
+  "summary_generated_from": "dominance（机器生成，无手写支配主张）"
+ },
+ "cost_only_total_order_at_horizon": {
+  "semantics": "总成本 = 稳态选择器成本（10 格点估计）+ 冷建簇初建超额 + 128 步窗内重建尖峰超额。一维成本排序陈述（cost-only total order），不含质量维，禁用 Pareto 支配术语——新增最小化成本维在数学上只可能缩小支配集（新 ⊆ 旧，性质测试 test_e128_fix_098_100.py），不可能从二维无支配变出支配",
+  "decode_horizon": "任意 decode 长度（steady-only 口径：稳态差 ≤ 0 则任何长度不摊销）+ 128 步实测窗（rep0 含初建+全部重建尖峰的有效均值见 amortization_horizon_vs_mavg）",
+  "calibers": [
+   "steady_only（假设建簇不再发生——对 cclustersim 已证伪，仅供下界/回本步数参考）",
+   "含重建复发（rebuild_excess_ms_in_128steps 实测）"
+  ],
+  "data_scope": "structured/singleton 合成数据（真实 LongBench 分布未测，structured 为有利下界）；B=1、q_len=1、D′ off、单层 microbench、E126 优化前基线口径、H20-3e",
+  "point_estimate_nature": "成本为中位数点估计，无置信区间；质量维显著性见 quality_steady_cost_pareto.significance_note",
+  "statements": [
+   "cavgsim vs mavg：稳态 10 格中 10 格点估计更低、0 格更高（其余 0 格相等）——稳态口径 cavgsim 相对 mavg 更便宜，但 cavgsim 冷建簇成本为正（64K structured 初建超额 1859ms/层/序列）。64K structured steady-only 口径：初建超额 1859ms ÷ 稳态差 0.0705ms/步 → 回本步数 ≈ 26,360 步——decode 长度短于该步数时总成本点估计更高、更长则更低（点估计；128 步窗内未观测到重建尖峰，但重建随 S 跨阈复发的风险仍在（簇臂建簇非一次性，cclustersim 已实证复发））。纯一维成本排序陈述（cost-only）",
+   "cavgsim vs aavg：稳态 10 格中 10 格点估计更低、0 格更高（其余 0 格相等）——稳态口径 cavgsim 相对 aavg 更便宜，但 cavgsim 冷建簇成本为正（64K structured 初建超额 1859ms/层/序列）。64K structured steady-only 口径：初建超额 1859ms ÷ 稳态差 0.0549ms/步 → 回本步数 ≈ 33,856 步——decode 长度短于该步数时总成本点估计更高、更长则更低（点估计；128 步窗内未观测到重建尖峰，但重建随 S 跨阈复发的风险仍在（簇臂建簇非一次性，cclustersim 已实证复发））。纯一维成本排序陈述（cost-only）",
+   "cavgsim vs mminmax：稳态 10 格中 10 格点估计更高、0 格相等、无一格更低，且 cavgsim 冷建簇+重建成本为正（64K structured 初建超额 1859ms/层/序列）——含冷成本后任何 decode 长度总成本点估计不低于 mminmax（steady-only 口径下无回本点；cavgsim 的冷建簇不摊销）。纯一维成本排序陈述（cost-only；质量维与显著性语义见 quality_steady_cost_pareto）",
+   "cclustersim vs mavg：稳态 10 格中 10 格点估计更高、0 格相等、无一格更低，且 cclustersim 冷建簇+重建成本为正（64K structured 初建超额 1680ms/层/序列）——含冷成本后任何 decode 长度总成本点估计不低于 mavg（steady-only 口径下无回本点；cclustersim 的冷建簇不摊销）。纯一维成本排序陈述（cost-only；质量维与显著性语义见 quality_steady_cost_pareto）",
+   "cclustersim vs aavg：稳态 10 格中 10 格点估计更高、0 格相等、无一格更低，且 cclustersim 冷建簇+重建成本为正（64K structured 初建超额 1680ms/层/序列）——含冷成本后任何 decode 长度总成本点估计不低于 aavg（steady-only 口径下无回本点；cclustersim 的冷建簇不摊销）。纯一维成本排序陈述（cost-only；质量维与显著性语义见 quality_steady_cost_pareto）",
+   "cclustersim vs mminmax：稳态 10 格中 10 格点估计更高、0 格相等、无一格更低，且 cclustersim 冷建簇+重建成本为正（64K structured 初建超额 1680ms/层/序列）——含冷成本后任何 decode 长度总成本点估计不低于 mminmax（steady-only 口径下无回本点；cclustersim 的冷建簇不摊销）。纯一维成本排序陈述（cost-only；质量维与显著性语义见 quality_steady_cost_pareto）"
+  ]
  },
  "recommendation": {
   "main_method_recommendation": "mavg（维持论文主方法）",
@@ -3072,7 +3199,7 @@
   "reasons": [
    {
     "id": "R1-quality-unproven",
-    "statement": "无臂被证明优于 mavg：E125 全部四候选 vs mavg 的 bootstrap CI 均含 0（cclustersim +0.34 [-0.20,+1.02]、aavg +0.21 [-0.25,+0.86]、cavgsim -0.18 [-0.44,+0.09]）——084 措辞纪律下只能写「未证明差异」，不足以支撑换锚。唯一显著判决是 mminmax 显著更差（-0.80 [-1.56,-0.08]）。",
+    "statement": "换锚判据（候选 vs mavg）：三候选未证明差异——cclustersim +0.34 [-0.20,+1.02]、aavg +0.21 [-0.25,+0.86]、cavgsim -0.18 [-0.44,+0.09] vs mavg 的 bootstrap CI 均含 0，084 措辞纪律下只能写「未证明差异」，不足以支撑换锚。唯一 vs mavg 显著判决是 mminmax 显著更差（-0.80 [-1.56,-0.08]）。臂间配对全枚举（pairwise_ci_all，10 对，未做多重比较校正）中另有不含 0 的臂间对：aavg-cavgsim 点估计 +0.39 [+0.11,+0.76]; cavgsim-cclustersim 点估计 -0.52 [-0.95,-0.18]——臂间排序事实如实登记，但换锚判据是候选 vs mavg，臂间配对事实不改变「无候选被证明优于 mavg」。",
     "data_source": "e125_screen_verdict.json（本脚本重算复核通过）",
     "uncertainty": "cclustersim 点估计最高且高于 FullKV 锚点（+0.23，vs fullkv CI 补算含 0）——若 E116b 全量咬合后 CI 不含 0 可重议"
    },
@@ -3102,15 +3229,15 @@
    },
    {
     "id": "R6-paper-story",
-    "statement": "论文主张链已锚定 mavg：E100 13 任务 FullKV 持平（+0.42，CI [-0.18,+1.02] 含 0）+ E127 同预算 kernel 加速（mavg 配置实测 5.47×）。换 cclustersim 需重跑全量验证（E116b 式咬合）+ fast-path 臂级基准 + prefill suffix 不变性验收，成本大而质量收益未证明。",
-    "data_source": "e100_bootstrap_ci.json 结论（历史判决）+ E127 配对组实测口径",
-    "uncertainty": "E100 持平口径基于 mavg 臂 13 任务全量；cclustersim 无对应全量数据"
+    "statement": "论文主张链已锚定 mavg：E100 13 任务 vs FullKV 未证明差异（+0.42，CI [-0.18,+1.02] 含 0；084 措辞纪律：含 0 只能写「未证明差异」）+ E127 同预算 kernel 加速（mavg 配置实测 5.47×）。换 cclustersim 需重跑全量验证（E116b 式咬合）+ fast-path 臂级基准 + prefill suffix 不变性验收，成本大而质量收益未证明。",
+    "data_source": "e100_bootstrap_ci.json（历史判决，100-⑥：进 provenance，claim/main_ci 联立门禁通过）+ E127 配对组实测口径",
+    "uncertainty": "E100 未证明差异口径基于 mavg 臂 13 任务全量；cclustersim 无对应全量数据"
    }
   ],
   "alternative_disposition": {
    "cclustersim": "进消融/讨论段如实报告：E125 点估计海选冠军（+0.34 vs mavg，未证明显著；点估计亦高于 FullKV +0.23）——但冷建簇超线性 + E127 未覆盖，不适合作主方法",
    "aavg": "零建簇成本、稳态与 mavg 同档（10 格内有格交叉），点估计+0.21 未证明且跨口径符号翻转（E109 −0.52）——不换锚，可作消融臂",
-   "cavgsim": "被 mavg/aavg 点估计支配（质量更低 + 冷建簇 1859ms@64K）；E123 cavg 线已 NO-GO 关闭",
+   "cavgsim": "质量点估计低于 mavg/aavg（vs mavg -0.18 CI 含 0 未证明差异；臂间配对 aavg-cavgsim CI 不含 0）且冷建簇 1859ms@64K structured——以上均为点估计排序与配对事实陈述，非 Pareto 支配主张（二维支配表为空，见 quality_steady_cost_pareto）；E123 cavg 线已 NO-GO 关闭",
    "mminmax": "唯一显著判决臂（vs mavg CI [-1.56,-0.08]）——剔除"
   },
   "inflight_conflict_note": "E129 子空间消融在飞以 cclustersim 为冠军臂——若本推荐被采纳，E129 结果仍有效（臂内子空间相对效应），但「冠军」称谓与论文主方法口径需主 AI 对齐；若 E116b 全量咬合后 cclustersim CI 不含 0，本推荐可重新审议（R1 不确定性边界）"
