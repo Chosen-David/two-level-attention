@@ -109,6 +109,10 @@ def bench_layer(layer_idx, S0, n_steps, warmup, device, alpha, beta, gamma):
             cpu_ms["prepare_index"].append(max(0.0, (time.perf_counter() - t_wall0) * 1e3 - rest))
             for i, s in enumerate(STAGES):
                 gpu_ms[s].append(evs[i].elapsed_time(evs[i + 1]))
+            # 【E127 iter3】零同步路径配套：步末校验 GPU 错误标志
+            # （此时队列已空，读回是纯 D2H ~µs 级，不增加 drain 停顿）
+            from sparse_attn.ops.eager_decoding import eager_decoding_check_errors
+            eager_decoding_check_errors(device)
 
         # 下一步：KV 追加 1 个新 token（模拟 decode；HF DynamicCache 每步 cat）
         new_k = torch.randn(1, 1, Hkv, D, device=device, dtype=torch.bfloat16)

@@ -9,6 +9,7 @@
 | baseline | 现状（无 env 开关） | 8.29 GPU / 9.62 CPU wall | 1.00× | — |
 | iter1 | metrics 惰性化（去 2×.item() 同步/层步） | 8.18 GPU / 8.68 CPU wall | 1.01×GPU / 1.11×wall | 2/2 PASS |
 | iter2 | eager_decoding gather（≥16K 稀疏走 gather） | 6.62 GPU / 7.12 CPU wall | 1.25×GPU / 1.35×wall | 3/3 PASS |
+| iter3 | gather 路径零同步化（错误标志 GPU 化 + W 上界化） | 6.25 GPU / 6.75 CPU wall | 1.33×GPU / 1.43×wall | 9/9 PASS |
 
 ## Iterations
 
@@ -51,4 +52,39 @@
   ~15 个小 op，其余为 launch 开销——后续 Triton 化方向）。
 - 门禁：eager 3/3 PASS——allclose(1e-2) 全配置（S=4097/8192/16384/65523 ×
   shared/per_qh）worst_abs_diff=1.53e-05；B7 全 False 行守卫双口径一致 raise。
+- commit：见 git log
+
+### [iter 3] gather 路径零 host 同步化（错误标志 GPU 化 + W 上界化）
+- 改动：sparse_attn/ops/eager_decoding.py —— 三处同步全消：
+  ① stats 读回（torch.stack([max,min]).cpu() 取 W+B7 检查）→ W 改用
+  host 已知契约上界 TLI_E127_W_UPPER（默认 2048；indexer 契约 K2(1024)+
+  sink(128)+swa(128)+当前块(64)≈1344，50% 安全垫），B7 空行/W 超上界/
+  cu 契约破坏三类违规 GPU 端原地点并全局标志（copy_+maximum，code=1/2/3），
+  生成结束 eager_decoding_check_errors() 一次性读回校验——fail-closed
+  语义守恒（同文案 raise、整次生成作废），仅 raise 时机后移（与 iter1
+  metrics 惰性化同精神）。topk k=2048 时补齐位由既有 valid 掩码处理，
+  数学路径与精确 W 完全一致。
+  ② bos_k/eos_k 的隐式 .item() 切片（b_mask 裁剪 + KV 切段，dense 亦有的
+  存量同步）→ 用 host 元数据判等零同步推导：mask 块宽×bs == k 序列长 →
+  cu 恒 [0,S]（prepare_cu_seqlens 构造保证、B=1 生产路径恒成立）直接算；
+  判等失败（投影 padding）回退 dense（同步次数与 env=0 持平）。
+  ③ 路由 W*8>T 用 W_upper 判定（host 已知量）——生产 W≈1344 与
+  W_upper=2048 在 16K/32K/64K 档路由同向，行为零变化。
+- 开发中修的 bug：k.shape[1] 误用（k 布局 [seq,head,dim]，序列维是
+  shape[0]）——判等恒假致 gather 全程未生效，maxdiff=0.0 暴露。
+- 数字（S=64K normal 层）：eager 阶段 GPU 0.58→0.25ms（真实 GPU 计算
+  浮出，drain 停顿从 stage 归因消失）；全步 GPU sum 6.62→6.25（vs
+  baseline 1.33×），CPU wall 7.12→6.75（1.43×）。全档首测：16K normal
+  1.23×/1.28×、32K normal 1.29×/1.38×、64K skip 1.24×/1.33×、16K/32K
+  skip 1.06×-1.14×；8K 档路由 dense 零回归（2.19 vs 2.15，噪声内）。
+  生产收益大于 bench 所示：bench 每步 cuda event 计时强制同步，跨层
+  流水收益测不出——真实 decode 36 层/token 的每层同步全消后 CPU 可
+  跨层跑在 GPU 前面。
+- 门禁：eager 9/9 PASS——allclose(1e-2) 全配置（4 档 S × shared/per_qh，
+  worst 1.22e-04）+ B7 小序列双路径当场 raise（双口径）+ B7 大序列
+  gather 尾部 raise + W 超上界/cu 破坏尾部 raise + gather 主路径零
+  host 同步（sync_debug_mode=error 下 40 次调用零异常）。metrics 2/2
+  保持绿。既有回归 7 套件 env=0 全绿（near_swa 3/3+4/4、C3 5/5、E122
+  6/6、E125 尾巴 10/10、E125 kmeans 守卫 5/5、E116f 12/12）；env=1
+  子集复跑见 commit 后记录。
 - commit：见 git log
