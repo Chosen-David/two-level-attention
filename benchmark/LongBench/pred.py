@@ -152,6 +152,14 @@ def get_pred(
 ):
     preds = []
 
+    # DeepSeek-V2 兼容修复（S-T023 2026-10-12）：官方 modeling_deepseek.py
+    # 是旧 transformers 时代代码，与 4.56.2 新 DynamicCache（self.layers 结构）
+    # 不兼容，且 DeepseekV2Attention.forward 强制 assert attention_mask is not
+    # None。手动 prefill/decode 循环在 DeepSeek 上会触发 legacy cache 转换陷阱
+    # （见 elif IS_DSV2 分支注释）→ 对 DeepSeek 改走 model.generate 路径。
+    # 对 Qwen3 等模型保持原手动循环协议，结果零变化。
+    IS_DSV2 = "DeepSeek" in model_name
+
     # HACK: sample 10 examples for debugging
     # data = np.random.choice(data, 10)
 
@@ -243,6 +251,28 @@ def get_pred(
                     tokenizer.eos_token_id,
                     tokenizer.encode("\n", add_special_tokens=False)[-1],
                 ],
+            )[0]
+            generated_content = output[full_ids.shape[-1]:].tolist()
+        elif IS_DSV2:
+            # S-T023 DeepSeek fullkv 修复（2026-10-12）：官方 modeling_deepseek.py
+            # 是旧 transformers 时代代码，手动 prefill/decode 循环在 4.56.2 新
+            # DynamicCache（self.layers 结构）下会触发 legacy cache 转换陷阱——
+            # prefill 返回 to_legacy_cache 的 tuple，decode 再 from_legacy_cache
+            # 转回，转换后 get_seq_length 返回 0 → _prepare_4d_causal_attention_mask
+            # 生成 (1,1,1,1) mask，与 attention 层期望 (1,1,1,kv_seq_len) 不符 →
+            # ValueError。改用 model.generate 路径（与 samsum 分支同协议：full_ids
+            # 一次 prefill + 贪心生成），cache_position/cache 全权交给 transformers
+            # 管理，生成语义与手动 argmax 循环严格等价。
+            full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
+            output = model.generate(
+                input_ids=full_ids,
+                attention_mask=torch.ones_like(full_ids),
+                max_new_tokens=max_gen,
+                num_beams=1,
+                do_sample=False,
+                temperature=1.0,
+                pad_token_id=tokenizer.eos_token_id,
+                eos_token_id=tokenizer.eos_token_id,
             )[0]
             generated_content = output[full_ids.shape[-1]:].tolist()
         else:
