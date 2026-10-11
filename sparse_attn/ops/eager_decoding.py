@@ -4,6 +4,16 @@ import torch
 import torch.nn.functional as F
 from einops import rearrange, repeat, einsum
 
+# 【E127 iter7】Triton 可选依赖：eager_decoding 是生产必经模块（env=0 也
+# import），triton 缺失时只禁用 iter7 融合路径、回退 torch gather（值同
+# 原路径），不破坏模块可用性。
+try:
+    import triton
+    import triton.language as tl
+    _HAS_TRITON = True
+except Exception:  # pragma: no cover
+    _HAS_TRITON = False
+
 # ---------------------------------------------------------------------------
 # 【E127 iter3】GPU 端错误标志缓冲：decode 全程零 host 同步的配套机制。
 # 旧口径的两次当场同步（counts 读回取 W + B7 空行检查）每次排空整个
@@ -71,6 +81,139 @@ def _raise_for_code(code: int):
             "B=1 生产路径恒成立），实测不符。本提示在校验点 raise，整次"
             "生成作废；请检查调用方传入的 cu_seqlens_k。"
         )
+
+
+# ---------------------------------------------------------------------------
+# 【E127 iter7】eager gather Triton 融合主路径（原型 exp/bench/
+# _scratch_triton_eager.py 已验证：6 配置 allclose(1e-2) 全绿、
+# 0.10-0.29ms vs torch gather 0.41-0.66ms、flag 语义逐码一致）。
+#
+# 原 torch gather 路径 = repeat + counts + topk(W) + gather×2 + einsum×2 +
+# softmax + where 等 ~15 个小 op（每 op 一次 launch + 中间张量往返 HBM）；
+# 融合为两个 kernel：
+#   kernel A（mask 展开）：token 级 bool mask → 每行紧凑选中索引 IDX [R, W]
+#     + 行计数 COUNT [R]，chunk 循环（TP=1024）+ running cumsum；iter3 的
+#     三类契约校验（B7 空行=1 / W 超上界=2 / cu 破坏=3）原地点并入——
+#     atomic_max 进全局错误标志，语义/文案与 torch 路径逐码一致。
+#   kernel B（gather attention）：program = (行 r × 组内头 j) 展平，单头
+#     标量 online-softmax（m/l 全标量 + acc[D]，规避 Triton 不支持块内
+#     标量索引赋值）；BW=256 块循环 gather K/V，cnt 超上界 clamp 到 W
+#     （与 torch topk 只取 W_upper 同语义，漏选 flag=2 由 kernel A 记录）。
+# 数学语义：softmax(全 S 行、未选位 -inf) ≡ softmax(选中子集)（exp(-inf)=0
+# 精确）；online-softmax 与全长 softmax 仅归约顺序不同 → ULP 级漂移，
+# allclose(1e-2) 门禁。fail-closed：编译/执行异常 → 置 _EAGER_TRITON_OK
+# 下方标志 False，本次即回退 torch gather 路径（值同原路径）。
+# ---------------------------------------------------------------------------
+_EAGER_TRITON_OK = {"ok": True}
+
+if _HAS_TRITON:
+
+    @triton.jit
+    def _eager_expand_kernel(
+        MASK, IDX, COUNT, FLAG, CUK,  # MASK [R, T] bool；IDX [R, W] int32(-1)；COUNT [R]；FLAG 全局；CUK cu[2]
+        T, stride_mr,
+        W: tl.constexpr, TP: tl.constexpr,
+    ):
+        """行 r：token 级 mask → 紧凑选中索引（chunk 循环 + running cumsum）。
+        校验并入：count==0 → flag 1（B7）；槽 ≥ W → flag 2（漏选保护）；
+        cu ≠ [0, T] → flag 3（长度契约）。"""
+        r = tl.program_id(0)
+        cu0 = tl.load(CUK)
+        cu1 = tl.load(CUK + 1)
+        f = tl.where((cu0 == 0) & ((cu1 - cu0) == T), 0, 3)
+        base = tl.zeros((), tl.int32)
+        for c0 in range(0, T, TP):
+            offs = c0 + tl.arange(0, TP)
+            tm = offs < T
+            sel = tl.load(MASK + r * stride_mr + offs, mask=tm, other=0).to(tl.int32)
+            csum = tl.cumsum(sel, axis=0)
+            pos = base + csum - sel                  # exclusive 位置
+            w = (sel != 0) & tm & (pos < W)
+            tl.store(IDX + r * W + tl.where(w, pos, 0), tl.where(w, offs, 0),
+                     mask=w)
+            over = (sel != 0) & tm & (pos >= W)
+            f = tl.maximum(f, tl.where(tl.sum(over, axis=0) > 0, 2, 0))
+            base += tl.sum(sel, axis=0)
+        tl.store(COUNT + r, base)
+        f = tl.maximum(f, tl.where(base == 0, 1, 0))
+        tl.atomic_max(FLAG, f)
+
+    @triton.jit
+    def _eager_attn_kernel(
+        IDX, COUNT, Q, K, V, OUT,
+        stride_kt, stride_kh, stride_qh, stride_oh,
+        G: tl.constexpr, D: tl.constexpr,
+        PER_QH: tl.constexpr, BW: tl.constexpr, W: tl.constexpr,
+    ):
+        """program = (行 r × q 头 j) 展平：单头 online-softmax gather attention。
+        K/V 每 program 重读（G× 读冗余，W×D×2×2B×G ≈ 4MB/行，可接受）——
+        换取全标量 m/l + acc [D]，无 G 维广播/索引。"""
+        pid = tl.program_id(0)
+        j = pid % G
+        r = pid // G
+        cnt = tl.load(COUNT + r)
+        cnt = tl.minimum(cnt, W)   # 超上界时只取前 W（漏选保护 flag=2 由 expand 记录）
+        if PER_QH:
+            kvh = r // G
+            qh = r
+        else:
+            kvh = r
+            qh = r * G + j
+        offs_d = tl.arange(0, D)
+        qv = tl.load(Q + qh * stride_qh + offs_d)          # [D] fp32（已乘 scale）
+        m = float('-inf')
+        l = 0.0
+        acc = tl.zeros((D,), tl.float32)
+        for w0 in range(0, cnt, BW):
+            offs_w = w0 + tl.arange(0, BW)
+            wm = offs_w < cnt
+            tok = tl.load(IDX + r * W + offs_w, mask=wm, other=0)
+            kk = tl.load(K + tok[:, None] * stride_kt + kvh * stride_kh + offs_d[None, :],
+                         mask=wm[:, None], other=0.0).to(tl.float32)
+            vv = tl.load(V + tok[:, None] * stride_kt + kvh * stride_kh + offs_d[None, :],
+                         mask=wm[:, None], other=0.0).to(tl.float32)
+            s = tl.sum(kk * qv[None, :], axis=1)
+            s = tl.where(wm, s, float('-inf'))
+            m_new = tl.maximum(m, tl.max(s, axis=0))
+            m_safe = tl.where(m_new == float('-inf'), 0.0, m_new)
+            m_old = tl.where(m == float('-inf'), 0.0, m)
+            alpha = tl.exp(m_old - m_safe)
+            p = tl.exp(s - m_safe)
+            p = tl.where(wm, p, 0.0)
+            l = l * alpha + tl.sum(p, axis=0)
+            acc = acc * alpha + tl.sum(p[:, None] * vv, axis=0)
+            m = m_new
+        o = acc / tl.where(l == 0.0, 1.0, l)
+        tl.store(OUT + qh * stride_oh + offs_d, o.to(OUT.dtype.element_ty))
+
+
+def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
+                         cu_seqlens_k, softmax_scale):
+    """【E127 iter7】Triton 融合 launch 封装（原型已验证参数：
+    kernel A TP=1024/num_warps=8；kernel B BW=256/num_warps=4）。
+    q [1,H,D]；k/v [T,Hkv,D]；m0 [R,T] bool（token 级，block_size==1 前置
+    已保证）。异常向上抛（调用方置标志回退 torch gather）。"""
+    R = m0.shape[0]
+    H = q.shape[-2]
+    D = k.shape[-1]
+    T = k.shape[0]
+    dev = q.device
+    idx = torch.full((R, W_upper), -1, device=dev, dtype=torch.int32)
+    cnt = torch.empty(R, device=dev, dtype=torch.int32)
+    flag = _err_flag(dev)
+    _eager_expand_kernel[(R,)](
+        m0, idx, cnt, flag, cu_seqlens_k,
+        T, m0.stride(0),
+        W=W_upper, TP=1024, num_warps=8)
+    # q*scale 后转 fp32（与 torch 路径的 b_q 同口径：bf16 乘 scale 舍入
+    # 后升精度——数值与原型逐位同）
+    qs = (q[0] * softmax_scale).to(torch.float32)   # [H, D]
+    o = torch.empty((H, D), device=dev, dtype=q.dtype)
+    _eager_attn_kernel[(R * G,)](
+        idx, cnt, qs, k, v, o,
+        k.stride(0), k.stride(1), qs.stride(0), o.stride(0),
+        G=G, D=D, PER_QH=per_qh, BW=256, W=W_upper, num_warps=4)
+    return o[None, None]
 
 
 def eager_decoding_attn(
@@ -203,6 +346,36 @@ def _eager_decoding_attn_gather(
             mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale)
     m0 = mask[0]
     per_qh = m0.shape[0] != k.shape[-2]
+
+    # 【iter7】Triton 融合主路径：T ≥ 16K（同 torch gather 路由）、
+    # block_size==1（TLI 生产 mask 即 token 级，kernel A 直接读 m0 免
+    # repeat）、布局/dtype 契约满足时，两个 kernel 替代下方 ~15 op 链。
+    # 路由条件全部 host 已知量（零同步判走）；W_upper 判定与 torch 路径
+    # 同口径（W*8>T 回退 dense，生产 W≈1344 在 16K+ 档同向）。
+    # fail-closed：异常 → 置全局标志 False 并落入下方 torch gather 路径
+    # （本次即回退，值同原路径，仅性能回退）。
+    T_tok = full_len
+    if (
+        T_tok >= 16384
+        and block_size == 1
+        and _HAS_TRITON
+        and _EAGER_TRITON_OK["ok"]
+        and m0.dtype == torch.bool
+        and q.shape[0] == 1
+        and (k.shape[-1] & (k.shape[-1] - 1)) == 0   # D 须为 2 的幂（tl.arange）
+        and m0.stride(-1) == 1 and k.stride(-1) == 1 and v.stride(-1) == 1
+        and cu_seqlens_k.dtype == torch.int32
+    ):
+        W_up_tri = min(int(os.environ.get("TLI_E127_W_UPPER", "2048")), T_tok)
+        if W_up_tri * 8 <= T_tok:
+            try:
+                return _eager_gather_triton(
+                    q, k, v, m0, per_qh, G, W_up_tri,
+                    cu_seqlens_k, softmax_scale)
+            except Exception:
+                _EAGER_TRITON_OK["ok"] = False
+    # ---- 以下原 torch gather 路径（回退/契约外布局兜底，值同 iter3）----
+
     # 与 _dense 相同的 b_mask 构造（repeat 到 token 级；无 padding 时不裁剪，
     # 与 [..., :eos_k-bos_k] 在 cu=[0,S] 契约下逐位等价）
     if per_qh:

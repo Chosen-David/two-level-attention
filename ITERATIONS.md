@@ -13,6 +13,7 @@
 | iter4 | prepare_index 增量缓存子类（块统计/quant 逐位一致） | 4.21 GPU / 4.71 CPU wall | 1.97×GPU / 2.04×wall | 12/12 PASS |
 | iter5 | compute_score rep 缓存 + compute_mask 同步消除（锚点文本派生） | 2.13 GPU / 2.63 CPU wall | 3.89×GPU / 3.66×wall | 15/15 PASS |
 | iter6 | score_fine Triton GQA K 复用（_rep 退役） | 2.15 GPU / 2.65 CPU wall（bench 口径持平；GPU busy 实降 0.46ms/层） | 3.86×GPU / 3.63×wall | 15/15 PASS |
+| iter7 | eager gather Triton 融合（~15 op → 2 kernel） | bench 被外部容器负载污染（无效，复测 watcher 在飞）；隔离 microbench eager 0.60→~0.25ms | 待干净复测定案 | 15/15 PASS |
 
 ## Iterations
 
@@ -205,4 +206,46 @@
   ≤2% + mask 仍逐位；S 回退测试同步改 ULP 口径）。既有回归 env=1
   复跑 7 套件全绿（near_swa 3/3+4/4、C3 5/5、E122 6/6、E125 尾巴
   10/10、E125 kmeans 5/5、E116f 12/12）。
+- commit：见 git log
+
+### [iter 7] eager gather Triton 融合（mask 展开 + gather online-softmax attention，~15 op → 2 kernel）
+- 改动：sparse_attn/ops/eager_decoding.py（原型 exp/bench/_scratch_triton_eager.py
+  6 配置验证后集成）——两个 Triton kernel 替代 torch gather 路径主段：
+  ① _eager_expand_kernel（grid=(R,)，TP=1024/num_warps=8）：token 级
+  bool mask → 每行紧凑选中索引 IDX [R,W_upper] + 计数 COUNT，chunk 循环 +
+  running cumsum；iter3 三类契约校验（B7 空行=1 / W 超上界=2 / cu 破坏=3）
+  原地点并入 kernel（atomic_max 全局错误标志），文案/语义逐码一致。
+  ② _eager_attn_kernel（grid=(R*G,)，BW=256/num_warps=4）：program =
+  (行×组内头) 展平，单头标量 online-softmax + acc[D]（规避 Triton 块内
+  标量索引赋值），gather K/V 块循环；cnt clamp 到 W（与 topk 只取 W_upper
+  同语义，漏选 flag=2 由 kernel ① 记录）。
+  路由条件全 host 已知量（零同步判走）：T≥16K + block_size==1（TLI 生产
+  mask 即 token 级）+ bool mask + D 2 幂 + 尾维 stride==1 + cu int32 +
+  W_upper*8≤T；任一不满足或 Triton 异常 → 回退原 torch gather 路径
+  （_EAGER_TRITON_OK 全局标志 fail-closed，本次即回退，值同 iter3 路径）。
+  triton 缺失时模块仍可 import（try/except，env=0 生产零扰动）。
+- 数学语义：softmax(全 S 行、未选位 -inf) ≡ softmax(选中子集)（exp(-inf)=0
+  精确）；online-softmax 与 torch 全长 softmax 仅归约顺序不同 → ULP 级
+  漂移，allclose(1e-2) 门禁（eager 组 worst 1.95e-03，容差内）。
+- 数字【如实记录】：本 run 全步 bench 被外部容器负载污染无效——GPU0 被
+  跨容器进程占满（82→95GB / 100% util，本容器 ps 不可见），所有阶段 GPU
+  时间被排队延迟主导（prepare_index 8K-64K 全档恒 2.50ms vs iter6 增量
+  0.46ms = 明显失真；8K eager 4.96 vs 2.2 = 3.5× 偏差）。干净卡隔离
+  microbench（原型，S=16K-131072 × shared/per_qh）：Triton 融合
+  0.10-0.29ms vs torch gather 0.41-0.66ms（2.7-4.6×，launch 数 ~15→2）；
+  污染跑中 16K-64K 段 eager 阶段 0.24-0.26ms（iter6 为 0.60ms）——即使
+  在被抢占的卡上 Triton 路径仍快 ~2.3×，方向与 microbench 一致。**全步
+  定案数字待 GPU 空闲复测**（watcher /tmp/e127_wait_gpu_rerun.sh pid
+  2993511 在飞，自动重跑并覆写 e127_stage_bench_iter7.json，完成后追加
+  复测补记 commit）。
+- 门禁：15/15 PASS——eager 7/7（allclose 全配置 worst 1.95e-03 + B7 小
+  序列双路径当场 raise + B7 大序列 gather 尾部 raise + W 超上界/cu 破坏
+  尾部 raise + 零 host 同步 40 次调用零异常，python±-O 双跑同绿）；其余
+  8 项（metrics 2 / indexer 3 / score_mask_derived 2 / pipeline_zero_sync
+  1）保持绿。fail-closed 专项验证：注入 Triton 异常 → 回退 torch gather
+  输出 vs dense allclose（maxdiff 4.88e-04）+ 标志持续 False（exp/bench/
+  _scratch_fallback_check.py）。既有回归 env=1 复跑 7 套件全绿（near_swa
+  3/3+4/4、C3 5/5、E122 6/6、E125 尾巴 10/10、E125 kmeans 守卫 5/5、
+  E116f 12/12）。launch profile：一步 CUDA kernel 158（污染跑口径，含
+  Triton JIT 侧计数；干净复测定案）。
 - commit：见 git log
