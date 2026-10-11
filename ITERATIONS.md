@@ -16,6 +16,7 @@
 | iter7 | eager gather Triton 融合（~15 op → 2 kernel） | 1.73 GPU / 2.23 CPU wall | 4.79×GPU / 4.31×wall | 15/15 PASS |
 | iter8 | compute_score coarse 段 Triton GQA K 复用（minmax 双点积 + avg 复用 fine kernel） | 1.52 GPU / 2.02 CPU wall | 5.47×GPU / 4.76×wall | 15/15 PASS |
 | iter9 | compute_mask 前段融合（gmean 双输出 + fused mask-p，64K 净回归混合结果） | 1.56 GPU / 2.06 CPU wall（64K 主档 vs iter8 回归 -3%；最优维持 iter8 1.52/2.02） | 5.31×GPU / 4.67×wall | 15/15 PASS |
+| iter10 | iter9 按档路由（T≤32768 启用融合）：16K 兑现 +3.7%，32K/64K 疑环境漂移待对照 | 16K 1.46（1.95×）其余档漂移疑点未定 | 16K 1.95×/1.98× | 15/15 PASS |
 
 ## Iterations
 
@@ -362,4 +363,23 @@
   score_mask_derived）；既有回归 env=1 复跑 7 套件全绿（near_swa
   3/3+4/4、C3 5/5、E122 6/6、E125 尾巴 10/10、E125 kmeans 5/5、
   E116f 12/12）。
+- commit：见 git log
+
+### [iter 10] iter9 按档路由：gmean 双输出 + fused mask-p 仅 T ≤ 32768 启用
+- 改动：sparse_attn/indexer/tli_indexer_fast.py——③④ want_g 改条件路由
+  （kt*bs ≤ 32768 才双输出 gmean，否则单输出 = iter8 行为；_fast_score_*
+  want_g=False 返回单值，调用处分支解包）+ M-E fused 路由上界 65536 → 32768。
+  M-A/M-B 无需改（键不写 → get None → 回退现场 rearrange+mean）。
+- 依据：iter9 实测收益谱系——16K normal +10%（CPU launch 排队压力下 gap
+  不被掩盖，融合赚）/ 64K 主档 -3%（大 S 档 kernel 本体占比高，特化 +
+  clone + Triton host launch 开销超收益）→ 按档取最优。
+- 数字（如实，含未解疑点）：16K normal 1.511→1.457（vs i8 +3.7%、
+  vs base 1.95×GPU/1.98×wall）兑现路由收益；**但 32K/64K 档回退路径
+  后仍 -1.9~-2.8% vs iter8 定案**（64K 分解 score +17μs / mask +20μs，
+  与 iter9 时 +43μs 几乎相同——回退 gmean/fused 后理论上应消失）。
+  8K 持平（-1%）。**疑似环境/时钟漂移**：iter8 定案 1.516 为数日前
+  GPU 空闲态测量，本晚 iter9/10 两次独立复测 1.556/1.560 一致——
+  下一步用 iter8 代码原样复跑对照定论。
+- 门禁：15/15 PASS（python±-O 双跑）；路由冒烟：16K gmean 键在 /
+  64K 键无 + 双档 mask 对 TLIIndexer 逐位一致。
 - commit：见 git log
