@@ -1,0 +1,35 @@
+{
+ "run_id": "20261011200053-2710072-1007",
+ "status": "failed",
+ "generated": "2026-10-11T20:00:53.436077",
+ "error": "[GATE-FAIL] root=/tmp/e116b_ruler/fullkv_32768 postfix=_1024: manifest 只覆盖 0/11 个任务（缺 ['cwe', 'fwe', 'niah_multikey_1', 'niah_multikey_2', 'niah_multikey_3', 'niah_multiquery', 'niah_multivalue', 'niah_single_1', 'niah_single_2', 'niah_single_3', 'vt']）——fail closed",
+ "argv": [
+  "--root",
+  "/tmp/e116b_ruler/fullkv_32768",
+  "--pred-postfix",
+  "_1024",
+  "--data-root",
+  "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+  "--out",
+  "exp/trace/results/e116b_ruler32768k_formal_fullkv.json",
+  "--manifest-out",
+  "exp/trace/results/e116b_ruler32768k_formal_fullkv.json.manifest.json",
+  "--model-path",
+  "/home/wangyuanshuo02/Qwen3-8B",
+  "--extra-param",
+  "method=none"
+ ],
+ "publish_protocol": "e116i-generation-v3",
+ "publish_committed": false,
+ "gc_pending": [],
+ "retained_backups": [],
+ "rollback": {
+  "attempted": false,
+  "n_restored": 0,
+  "errors": [],
+  "in_publish_lock": false
+ },
+ "note": "本轮失败，未发布任何产物（发布阶段失败时已回滚全部已替换的公开镜像至旧代际）；输出路径下既有产物（如有）属于上一轮成功运行，请以最新 *.receipt.json 为准",
+ "staging_cleaned": true,
+ "generation_cleaned": true
+}
