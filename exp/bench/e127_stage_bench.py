@@ -39,6 +39,12 @@ import torch  # noqa: E402
 from sparse_attn.indexer.tli_indexer import TLIIndexer  # noqa: E402
 from sparse_attn.ops.eager_decoding import eager_decoding_attn  # noqa: E402
 from sparse_attn.patches.utils import prepare_cu_seqlens, prepare_seqlens  # noqa: E402
+# 【E127 iter4】env=1 用增量缓存子类（prepare_index 逐位一致加速，
+# 锚点文件零改动）；默认 0 用原类（与 baseline 完全同路径）。
+if os.environ.get("TLI_E127_FAST", "0") == "1":
+    from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast as _IdxCls
+else:
+    _IdxCls = TLIIndexer
 
 
 def make_args(alpha, beta, gamma):
@@ -62,7 +68,7 @@ STAGES = ["prepare_index", "compute_score", "compute_mask", "metrics", "eager_de
 def bench_layer(layer_idx, S0, n_steps, warmup, device, alpha, beta, gamma):
     """单层 decode 模拟。返回 {stage: {gpu_ms_median, cpu_ms_median}} + 全步统计。"""
     torch.manual_seed(20261011 + layer_idx)
-    idx = TLIIndexer(make_args(alpha, beta, gamma))
+    idx = _IdxCls(make_args(alpha, beta, gamma))
     idx.layer_idx = layer_idx
     idx.clear()
 
@@ -136,7 +142,7 @@ def bench_layer(layer_idx, S0, n_steps, warmup, device, alpha, beta, gamma):
 def profile_launches(layer_idx, S0, device, alpha, beta, gamma, n_steps=5):
     """torch profiler 模式：数每阶段 kernel launch 数（单独 pass，不计入数字表）。"""
     from torch.profiler import profile, ProfilerActivity
-    idx = TLIIndexer(make_args(alpha, beta, gamma))
+    idx = _IdxCls(make_args(alpha, beta, gamma))
     idx.layer_idx = layer_idx
     idx.clear()
     H, Hkv, D = 32, 8, 128

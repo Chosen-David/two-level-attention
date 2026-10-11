@@ -10,6 +10,7 @@
 | iter1 | metrics 惰性化（去 2×.item() 同步/层步） | 8.18 GPU / 8.68 CPU wall | 1.01×GPU / 1.11×wall | 2/2 PASS |
 | iter2 | eager_decoding gather（≥16K 稀疏走 gather） | 6.62 GPU / 7.12 CPU wall | 1.25×GPU / 1.35×wall | 3/3 PASS |
 | iter3 | gather 路径零同步化（错误标志 GPU 化 + W 上界化） | 6.25 GPU / 6.75 CPU wall | 1.33×GPU / 1.43×wall | 9/9 PASS |
+| iter4 | prepare_index 增量缓存子类（块统计/quant 逐位一致） | 4.21 GPU / 4.71 CPU wall | 1.97×GPU / 2.04×wall | 12/12 PASS |
 
 ## Iterations
 
@@ -87,4 +88,39 @@
   保持绿。既有回归 7 套件 env=0 全绿（near_swa 3/3+4/4、C3 5/5、E122
   6/6、E125 尾巴 10/10、E125 kmeans 守卫 5/5、E116f 12/12）；env=1
   子集复跑见 commit 后记录。
+- commit：见 git log
+
+### [iter 4] prepare_index 增量缓存子类（TLIIndexerFast，锚点文件零改动）
+- 改动：新文件 sparse_attn/indexer/tli_indexer_fast.py + patch.py 接线
+  （TLI_E127_FAST=1 时 tli 臂实例化 TLIIndexerFast，snapshot 注入同语义；
+  默认 0 走原类，在飞链零扰动）+ bench 接线。
+- 原理：原 prepare_index 每次 decode step 对全序列 O(S) 重算
+  （S=64K 每层步 2.89ms：pad_tensor 全量 134MB 复制 + gather + 全量
+  quant + zeros_like 134MB + amax/amin/mean 全块归约），但 decode 每步
+  只追加 1 token——只有尾块统计在变。增量版：k_min/k_max/k_avg 复用
+  块 [0, fb) 缓存 + 尾段重算（pad 语义与全量版一致）；k_qat 预分配
+  buffer 步进写（尾段 zero_+scatter，容量翻倍摊销扩容）。
+  **逐位一致为数学保证**：amax/amin/mean(dim=2) 是块内独立归约、
+  quant 逐 token 独立，块间无交叉 → 缓存值（原 kernel 历史输出）≡
+  本次全量重算值。契约 fail-closed：S_now ≤ S_prev（回退/新请求）全量
+  重建；clear() 失效缓存（patch 每次 prefill 前调用）；投影基/moba/
+  子空间 key 变化一律 super() 全量。k append-only 契约（HF
+  DynamicCache）文档化。
+- 数字（S=64K normal 层）：prepare_index 2.89→0.62ms（4.7×）；全步
+  GPU sum 6.25→4.21（vs baseline **1.97×**），CPU wall 6.75→4.71
+  （**2.04×**）。32K normal 1.64×、16K normal 1.28×、64K skip 1.76×。
+  8K 档复测持平零回归（2.16/2.26 vs baseline 2.15/2.25；iter4 run 中
+  8K skip 2.66 为单次环境噪声，复测两次均 2.26）。
+- 已知 trade-off（如实记录）：compute_score 2.80→3.02ms（+0.22）——
+  原版 prepare 每步全量重写 k_qat（134MB）使 compute_score 的 repeat
+  读取命中 L2（temporal locality 红利）；增量版只写尾块，score 的
+  全量读取退回 HBM。净 prepare+score 合计 5.69→3.64ms（-2.05ms），
+  总账大赚；根本解法是消除 compute_score 的 1GB repeat 物化（锚点
+  文件，见报告建议节）。
+- 门禁：12/12 PASS——增量 12 步 decode（块边界 S=4093 起点/多 token
+  +3/跨块大步 +63）normal+skip 层 index_dict+mask 逐位一致（==，
+  非 allclose）+ 64K 大 S 15 步 mask 逐位 + S 回退全量重建/后续增量
+  正确。既有回归 env=1 复跑 5 套件全绿（near_swa 3/3、C3 5/5、E122
+  6/6、E125 尾巴 10/10、E125 kmeans 5/5）；env=0 套件 iter3 时已全绿
+  （patch.py 改动 env=0 零路径差异）。
 - commit：见 git log

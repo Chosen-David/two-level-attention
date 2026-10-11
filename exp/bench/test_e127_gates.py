@@ -197,12 +197,103 @@ def test_eager_gather():
     os.environ.pop("TLI_E127_FAST", None)
 
 
+# ---------------------------------------------------------------- indexer 增量
+def test_indexer_inc():
+    """iter4：TLIIndexerFast 增量 prepare_index —— index_dict/mask 逐位一致。
+
+    逐位一致是数学保证（min/max/mean 块内独立归约 + quant 逐 token 独立，
+    缓存值 = 原 kernel 历史输出 ≡ 全量重算），门禁用多步 decode 实测验证
+    实现正确性：块边界（S=4093 非对齐起点）、多 token 步（+3）、跨块大步
+    （+63）、64K 大 S、S 回退全量重建、clear() 后重建。
+    """
+    import torch as T
+    from exp.bench.e127_stage_bench import make_args
+    from sparse_attn.indexer.tli_indexer import TLIIndexer
+    from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast
+    from sparse_attn.patches.utils import prepare_cu_seqlens
+
+    dev = T.device('cuda:0')
+    H, Hkv, D = 32, 8, 128
+    scale = D ** -0.5
+
+    def run(idx_cls, layer_idx, S0, n_steps, seed):
+        T.manual_seed(seed)
+        idx = idx_cls(make_args(0.25, 0.125, 0.125 + 0.5))
+        idx.layer_idx = layer_idx
+        idx.clear()
+        k = T.randn(1, S0, Hkv, D, device=dev, dtype=T.bfloat16)
+        dicts, masks = [], []
+        for step in range(n_steps):
+            n_new = 3 if step == 5 else (63 if step == 8 else 1)
+            if step > 0:
+                k = T.cat([k, T.randn(1, n_new, Hkv, D, device=dev,
+                                      dtype=T.bfloat16)], dim=1)
+            q = T.randn(1, 1, H, D, device=dev, dtype=T.bfloat16)
+            cu = prepare_cu_seqlens(k)
+            q_ids = cu[1:] - cu[:-1] - 1
+            d = idx.prepare_index(k, cu)
+            sc = idx.compute_score(q, q_ids, d, scale)
+            m = idx.compute_mask(q_ids, sc)
+            dicts.append({kk: (vv.clone() if T.is_tensor(vv) else vv)
+                          for kk, vv in d.items()})
+            masks.append(m)
+        return dicts, masks
+
+    ok = True
+    for layer_idx, tag in [(2, "normal"), (0, "skip")]:
+        da, ma = run(TLIIndexer, layer_idx, 4093, 12, 20261014)
+        db, mb = run(TLIIndexerFast, layer_idx, 4093, 12, 20261014)
+        for step in range(12):
+            for kk in ["k_min", "k_max", "k_qat"]:
+                if not T.equal(da[step][kk], db[step][kk]):
+                    ok = False
+                    print(f"  {tag} step{step} {kk} MISMATCH")
+            ka, kb_ = da[step].get("k_avg"), db[step].get("k_avg")
+            if (ka is None) != (kb_ is None) or (
+                    ka is not None and not T.equal(ka, kb_)):
+                ok = False
+                print(f"  {tag} step{step} k_avg MISMATCH")
+            if not T.equal(ma[step], mb[step]):
+                ok = False
+                print(f"  {tag} step{step} MASK MISMATCH")
+    check("indexer_inc: 12 步 decode（块边界/多 token/大步）index_dict+mask 逐位一致", ok)
+
+    da, ma = run(TLIIndexer, 2, 65536 - 13, 15, 20261016)
+    db, mb = run(TLIIndexerFast, 2, 65536 - 13, 15, 20261016)
+    check("indexer_inc: 64K 大 S 15 步 mask 逐位一致",
+          all(T.equal(x, y) for x, y in zip(ma, mb)))
+
+    # S 回退 → 全量重建（不崩、结果正确）
+    idx = TLIIndexerFast(make_args(0.25, 0.125, 0.625))
+    idx.layer_idx = 2
+    idx.clear()
+    k1 = T.randn(1, 5000, Hkv, D, device=dev, dtype=T.bfloat16)
+    idx.prepare_index(k1, prepare_cu_seqlens(k1))
+    k2 = T.randn(1, 4000, Hkv, D, device=dev, dtype=T.bfloat16)
+    d_back = idx.prepare_index(k2, prepare_cu_seqlens(k2))   # S 回退
+    idx_ref = TLIIndexer(make_args(0.25, 0.125, 0.625))
+    idx_ref.layer_idx = 2
+    idx_ref.clear()
+    d_ref = idx_ref.prepare_index(k2, prepare_cu_seqlens(k2))
+    ok_back = all(T.equal(d_back[kk], d_ref[kk]) for kk in ["k_min", "k_max", "k_qat"])
+    # 回退后继续增量也正确
+    k3 = T.cat([k2, T.randn(1, 1, Hkv, D, device=dev, dtype=T.bfloat16)], dim=1)
+    d3 = idx.prepare_index(k3, prepare_cu_seqlens(k3))
+    idx_ref.clear()
+    d_ref3 = idx_ref.prepare_index(k3, prepare_cu_seqlens(k3))
+    ok_back = ok_back and all(
+        T.equal(d3[kk], d_ref3[kk]) for kk in ["k_min", "k_max", "k_qat"])
+    check("indexer_inc: S 回退全量重建 + 后续增量正确", ok_back)
+
+
 if __name__ == '__main__':
-    selected = sys.argv[1:] or ["metrics", "eager"]
+    selected = sys.argv[1:] or ["metrics", "eager", "indexer"]
     if "metrics" in selected:
         test_metrics_lazy()
     if "eager" in selected:
         test_eager_gather()
+    if "indexer" in selected:
+        test_indexer_inc()
     print(f"\n=== {len(PASS)} PASS / {len(FAIL)} FAIL ===")
     for f in FAIL:
         print(f"FAILED: {f}")
