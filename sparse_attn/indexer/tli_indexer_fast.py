@@ -40,6 +40,19 @@ iter6：score_fine Triton GQA K 复用（compute_score 派生替换点②改写�
     逐位不变（经验验证口径，非数学保证）；attention 输出 allclose(1e-2)
     任务容差内。投影/异形布局/Triton 编译失败 → 回退原版 repeat+einsum。
 
+iter8：coarse 段 Triton GQA K 复用（compute_score 派生替换点③④）
+  - coarse minmax 段：原版每步 repeat(k_min/k_max) 物化 [kt,H,d'] fp32
+    ×2 + clamp(max/min=0) 双 gemv + copy 胶水（iter7 附带发现：该段
+    gemv 本体仅 ~32μs，repeat 物化/胶水 ~120μs 主导，~10 launches）。
+    现 _score_coarse_kernel 单 kernel：每 program 载 k_min/k_max 块
+    [BT,d']，循环 g 个 q 头做 min(q,0)·k_min + max(q,0)·k_max 双点积
+    （GQA 组内 K 寄存器复用），块级 kt=S/64（64K 档仅 1024）。
+  - score_coarse_avg 段：einsum(b_q, repeat(k_avg)) 与 _score_fine_kernel
+    同构 → 复用 iter6 kernel。
+  - 数值：fp32 累加顺序与 cublas 不同 → bf16 舍入后 ULP 漂移（与
+    iter6 fine 同口径）；coarse 分数决定块级 topk → mask 选择为经验
+    验证口径（门禁 4 配置 × normal/skip × 10 步实测）。
+
 契约（fail-closed，全部回退原路径）：
   - k append-only（HF DynamicCache decode 语义）。S_now ≤ S_prev →
     全量重建缓存（含 _rep）。
@@ -232,6 +245,39 @@ class TLIIndexerFast(TLIIndexer):
             self._triton_ok = False
             raise
 
+    def _fast_score_coarse(self, k_min, k_max, b_q, out_dtype):
+        """【iter8】score_coarse 的 Triton GQA K 复用 kernel（非投影路径专用）。
+
+        数学：score_coarse[h, t] = Σ_d min(b_q[h,d],0)·k_min32[t,h//g,d]
+                                   + Σ_d max(b_q[h,d],0)·k_max32[t,h//g,d]，
+        与原版 repeat(k_min/k_max) 后 clamp(max=0)/clamp(min=0) 双 einsum
+        数学等价（minmax 上界分：负部配 k_min、正部配 k_max）；GQA 组内
+        k_min/k_max 块寄存器复用（读带宽 /g），免 [kt,H,d'] fp32 repeat
+        物化 + clamp 胶水（~10 launches → 1 kernel）。
+
+        数值：fp32 累加顺序与 cublas 双 gemv 不同 → bf16 舍入后 ULP 级
+        漂移（实测 ~5e-5 比例元素差 1 ULP，与 iter6 fine 同量级）；
+        mask/topk 选择为经验验证口径（非数学保证）。
+
+        fail-closed：异常置 _triton_ok=False 并回退原版表达式。"""
+        try:
+            T, Hkv, D = k_min.shape
+            H = b_q.shape[0]
+            g = H // Hkv
+            out = torch.empty((H, T), device=k_min.device, dtype=out_dtype)
+            grid = (triton.cdiv(T, 64), Hkv)
+            _score_coarse_kernel[grid](
+                k_min, k_max, b_q, out, T,
+                k_min.stride(0), k_min.stride(1),
+                k_max.stride(0), k_max.stride(1),
+                b_q.stride(0),
+                out.stride(0), out.stride(1),
+                Hkv=Hkv, G=g, D=D, BT=64, num_warps=4)
+            return out
+        except Exception:
+            self._triton_ok = False
+            raise
+
 
 @triton.jit
 def _score_fine_kernel(
@@ -252,6 +298,38 @@ def _score_fine_kernel(
         h = pid_h * G + j
         q = tl.load(Q + h * stride_qh + offs_d)      # [D] fp32（已乘 scale）
         s = tl.sum(k * q[None, :], axis=1)            # [BT] fp32
+        tl.store(OUT + h * stride_oh + offs_t * stride_ot,
+                 s.to(OUT.dtype.element_ty), mask=mask_t)
+
+
+@triton.jit
+def _score_coarse_kernel(
+    KMIN, KMAX, Q, OUT,   # KMIN/KMAX [T,Hkv,D] bf16；Q [H,D] fp32；OUT [H,T]
+    T, stride_kt, stride_kh, stride_kt2, stride_kh2,
+    stride_qh, stride_oh, stride_ot,
+    Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
+):
+    """【iter8】GQA K 复用 coarse minmax 上界分（min/max 两份 K 独立 stride）：
+    s[h,t] = Σ_d min(q,0)·k_min + Σ_d max(q,0)·k_max（负部配 k_min、正部
+    配 k_max，与原版 clamp 双 einsum 数学等价）。K 块 [BT,D] 寄存器复用
+    服务 g 个 q 头（读带宽 /g，免 repeat 物化）。"""
+    pid_t = tl.program_id(0)
+    pid_h = tl.program_id(1)
+    offs_t = pid_t * BT + tl.arange(0, BT)
+    offs_d = tl.arange(0, D)
+    mask_t = offs_t < T
+    kmin = tl.load(KMIN + offs_t[:, None] * stride_kt + pid_h * stride_kh
+                   + offs_d[None, :],
+                   mask=mask_t[:, None], other=0.0).to(tl.float32)   # [BT, D]
+    kmax = tl.load(KMAX + offs_t[:, None] * stride_kt2 + pid_h * stride_kh2
+                   + offs_d[None, :],
+                   mask=mask_t[:, None], other=0.0).to(tl.float32)
+    for j in tl.static_range(G):
+        h = pid_h * G + j
+        q = tl.load(Q + h * stride_qh + offs_d)      # [D] fp32（已缩放）
+        q_low = tl.minimum(q, 0.0)                   # clamp(max=0)：负部 → k_min
+        q_high = tl.maximum(q, 0.0)                  # clamp(min=0)：正部 → k_max
+        s = tl.sum(kmin * q_low[None, :], axis=1) + tl.sum(kmax * q_high[None, :], axis=1)
         tl.store(OUT + h * stride_oh + offs_t * stride_ot,
                  s.to(OUT.dtype.element_ty), mask=mask_t)
 
@@ -286,12 +364,17 @@ def _derive_anchor_method(name, replacements):
     return ns[name]
 
 
-# ---- compute_score：两处替换 ----
+# ---- compute_score：四处替换 ----
 # ① 零参 super() 在 exec 派生的独立函数中无 __class__ cell → 显式等价
 #   改写（Fast 的 MRO 下 super().compute_score ≡ TLIIndexer.compute_score）；
 # ② b_k_qat 物化 + 双分支 einsum（该两分支唯一消费点）→ 非投影
 #   Triton GQA K 复用（_fast_score_fine；数学等价、bf16 舍入后 ULP 级
 #   漂移、mask 门禁实测逐位不变）；投影/异形/编译失败回退原版表达式。
+# ③【iter8】coarse minmax 段（b_k_min/b_k_max repeat 物化 + clamp 双
+#   gemv + 胶水 ~10 launches）→ _fast_score_coarse 单 kernel（负部·k_min
+#   + 正部·k_max 数学等价，GQA 组内 K 复用；ULP 口径同 ②）。
+# ④【iter8】score_coarse_avg 段（repeat(k_avg) + gemv）→ 复用 ② 的
+#   _score_fine_kernel 同构（einsum(b_q, k_avg) 数学等价；ULP 口径同 ②）。
 _SCORE_REPL = [
     (
         "            d = super().compute_score(q, q_ids, index_dict, softmax_scale)",
@@ -325,6 +408,83 @@ _SCORE_REPL = [
         "        else:\n"
         "            b_k_qat = repeat(k_qat.squeeze(0), \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
         "            score_fine[0] = einsum(b_q_full, b_k_qat, \"h d, kt h d -> h kt\").to(q_sq.dtype)",
+    ),
+    # ---- 【iter8】coarse minmax 段 Triton GQA K 复用：b_k_min/b_k_max
+    # 两次 [kt,H,d'] fp32 repeat 物化 + clamp 双 gemv + 胶水（~10
+    # launches）→ 1 kernel。数学等价（负部·k_min + 正部·k_max）；fp32
+    # 累加顺序差异 → bf16 舍入后 ULP 漂移（同 iter6 fine 口径）。
+    # 投影/异形布局/Triton 异常回退原版表达式（fail-closed）。
+    (
+        '        b_k_min = repeat(k_min, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)\n'
+        '        b_k_max = repeat(k_max, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)\n'
+        '        b_score = (\n'
+        '            einsum(b_q.clamp(max=0), b_k_min, "h d, kt h d -> h kt")\n'
+        '            + einsum(b_q.clamp(min=0), b_k_max, "h d, kt h d -> h kt")\n'
+        '        )\n'
+        '        score_coarse[0] = b_score.to(q_sq.dtype)',
+        "        # 【E127 iter8】coarse minmax 段 Triton GQA K 复用（同 iter6\n"
+        "        # fine 模式）：免 b_k_min/b_k_max 两次 [kt,H,d'] fp32 repeat\n"
+        "        # 物化 + clamp 胶水（~10 launches → 1 kernel）；fp32 累加顺序\n"
+        "        # 与 cublas 不同 → bf16 舍入后 ULP 级漂移（实测 ~5e-5 比例\n"
+        "        # 差 1 ULP）。投影/异形布局/Triton 异常回退原版表达式。\n"
+        "        if (self._basis is None and k_min.dim() == 3 and k_max.dim() == 3\n"
+        "                and (k_min.shape[-1] & (k_min.shape[-1] - 1)) == 0\n"
+        "                and k_min.stride(-1) == 1 and k_max.stride(-1) == 1\n"
+        "                and b_q.stride(-1) == 1 and b_q.dtype == torch.float32\n"
+        "                and k_min.shape[-1] == b_q.shape[-1]\n"
+        "                and k_min.shape[1] * self.group_size == b_q.shape[0]\n"
+        "                and getattr(self, \"_triton_ok\", True)):\n"
+        "            try:\n"
+        "                score_coarse[0] = self._fast_score_coarse(\n"
+        "                    k_min, k_max, b_q, q_sq.dtype)\n"
+        "            except Exception:\n"
+        "                b_k_min = repeat(k_min, \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
+        "                b_k_max = repeat(k_max, \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
+        "                b_score = (\n"
+        "                    einsum(b_q.clamp(max=0), b_k_min, \"h d, kt h d -> h kt\")\n"
+        "                    + einsum(b_q.clamp(min=0), b_k_max, \"h d, kt h d -> h kt\")\n"
+        "                )\n"
+        "                score_coarse[0] = b_score.to(q_sq.dtype)\n"
+        "        else:\n"
+        "            b_k_min = repeat(k_min, \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
+        "            b_k_max = repeat(k_max, \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
+        "            b_score = (\n"
+        "                einsum(b_q.clamp(max=0), b_k_min, \"h d, kt h d -> h kt\")\n"
+        "                + einsum(b_q.clamp(min=0), b_k_max, \"h d, kt h d -> h kt\")\n"
+        "            )\n"
+        "            score_coarse[0] = b_score.to(q_sq.dtype)",
+    ),
+    # ---- 【iter8】score_coarse_avg 段：einsum(b_q, repeat(k_avg)) 与
+    # _score_fine_kernel 同构 → 复用 iter6 kernel（GQA K 复用免物化），
+    # ULP 口径同 iter6；回退原版表达式（fail-closed）。
+    (
+        '        if k_avg is not None:\n'
+        '            b_k_avg = repeat(k_avg, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)\n'
+        '            score_coarse_avg = q_sq.new_full(coarse_shape, float("-inf"))\n'
+        '            score_coarse_avg[0] = einsum(b_q, b_k_avg, "h d, kt h d -> h kt").to(q_sq.dtype)',
+        "        if k_avg is not None:\n"
+        "            # 【E127 iter8】avg 段复用 iter6 _score_fine_kernel 同构\n"
+        "            # （einsum(b_q, repeat(k_avg)) 数学等价，GQA K 复用免物\n"
+        "            # 化）；ULP 口径同 iter6；异形/异常回退原版表达式。\n"
+        "            if (self._basis is None and k_avg.dim() == 3\n"
+        "                    and (k_avg.shape[-1] & (k_avg.shape[-1] - 1)) == 0\n"
+        "                    and k_avg.stride(-1) == 1\n"
+        "                    and b_q.dtype == torch.float32\n"
+        "                    and k_avg.shape[-1] == b_q.shape[-1]\n"
+        "                    and k_avg.shape[1] * self.group_size == b_q.shape[0]\n"
+        "                    and getattr(self, \"_triton_ok\", True)):\n"
+        "                try:\n"
+        "                    score_coarse_avg = q_sq.new_full(coarse_shape, float(\"-inf\"))\n"
+        "                    score_coarse_avg[0] = self._fast_score_fine(\n"
+        "                        k_avg, b_q, q_sq.dtype)\n"
+        "                except Exception:\n"
+        "                    b_k_avg = repeat(k_avg, \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
+        "                    score_coarse_avg = q_sq.new_full(coarse_shape, float(\"-inf\"))\n"
+        "                    score_coarse_avg[0] = einsum(b_q, b_k_avg, \"h d, kt h d -> h kt\").to(q_sq.dtype)\n"
+        "            else:\n"
+        "                b_k_avg = repeat(k_avg, \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
+        "                score_coarse_avg = q_sq.new_full(coarse_shape, float(\"-inf\"))\n"
+        "                score_coarse_avg[0] = einsum(b_q, b_k_avg, \"h d, kt h d -> h kt\").to(q_sq.dtype)",
     ),
 ]
 

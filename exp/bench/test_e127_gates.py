@@ -289,7 +289,9 @@ def test_indexer_inc():
 # ---------------------------------------------------------------- iter5 派生
 def test_score_mask_derived():
     """iter5：compute_score rep 缓存 + compute_mask 同步消除（锚点文本派生）——
-    score_dict 四项输出 + mask 对 TLIIndexer 原类逐位一致（==）。
+    score_dict 四项输出 + mask 对 TLIIndexer 原类一致。
+    【iter6】score_fine、【iter8】score_coarse/score_coarse_avg 为 Triton
+    累加顺序差异的 ULP 口径（≤1e-4 比例 + ≤2% 相对）；mask 仍逐位（==）。
 
     覆盖：site1（e64+skip）、site2（单池+skip，minmax/avg 两分数源）、
     e64 normal 层（rep 缓存主路径）、avg 分数源、多 token 步、S 回退
@@ -342,48 +344,68 @@ def test_score_mask_derived():
 
     n_fail = 0
     n_sf_ulp, n_sf_tot, sf_maxrel = 0, 0, 0.0
+    n_sc_ulp, n_sc_tot, sc_maxrel = 0, 0, 0.0
+
+    def _ulp_ok(fa, fb):
+        """【iter6/iter8】Triton 累加顺序不同 → fp32 ULP 漂移，bf16 舍入后
+        个别元素差 1 ULP。口径：差异元素比例 ≤ 1e-4 且相对幅度 ≤ 2%
+        （1 bf16 ULP @小分数值）。返回 (nd, rel, ok)。"""
+        if fa.shape != fb.shape:
+            return -1, float("inf"), False
+        nd = int((fa != fb).sum().item())
+        if nd == 0:
+            return 0, 0.0, True
+        rel = ((fa.float() - fb.float()).abs()
+               / fa.float().abs().clamp(min=1e-3)).max().item()
+        return nd, rel, nd <= fa.numel() * 1e-4 and rel <= 0.02
+
     for cname, args in configs:
         for layer_idx, ltag in [(2, "normal"), (0, "skip")]:
             a = run(TLIIndexer, args, layer_idx, 4093, 10, 20261018)
             b = run(TLIIndexerFast, args, layer_idx, 4093, 10, 20261018)
             for step in range(10):
                 sa, sb = a[step][0], b[step][0]
-                # score_coarse / score_coarse_avg 未改（逐位一致）
-                for key in ["score_coarse"]:
-                    if sa[key].shape != sb[key].shape or not T.equal(sa[key], sb[key]):
-                        n_fail += 1
-                        print(f"  {cname} {ltag} step{step} {key} MISMATCH")
-                # 【iter6】score_fine：Triton 累加顺序不同 → fp32 ULP 漂移，
-                # bf16 舍入后个别元素差 1 ULP。口径：差异元素比例 ≤ 1e-4
-                # 且差异幅度相对 ≤ 2%（1 bf16 ULP @小分数值）。mask 逐位。
+                # 【iter8】score_coarse：coarse minmax 段 Triton 化 → ULP
+                # 口径（同 fine；块级 kt 小实测常见 0 漂移）。mask 逐位。
+                nd, rel, ok = _ulp_ok(sa["score_coarse"], sb["score_coarse"])
+                n_sc_ulp += max(nd, 0); n_sc_tot += sa["score_coarse"].numel()
+                if not ok:
+                    n_fail += 1
+                    print(f"  {cname} {ltag} step{step} score_coarse ULP "
+                          f"超界: nd={nd}/{sa['score_coarse'].numel()} rel={rel:.3e}")
+                # 【iter6】score_fine：ULP 口径（同上）。
                 fa, fb = sa["score_fine"], sb["score_fine"]
-                if fa.shape != fb.shape:
+                nd, rel, ok = _ulp_ok(fa, fb)
+                n_sf_ulp += max(nd, 0); n_sf_tot += fa.numel()
+                if nd:
+                    sf_maxrel = max(sf_maxrel, rel)
+                if not ok:
                     n_fail += 1
-                    print(f"  {cname} {ltag} step{step} score_fine SHAPE")
-                else:
-                    nd = (fa != fb).sum().item()
-                    n_sf_ulp += nd
-                    n_sf_tot += fa.numel()
-                    if nd:
-                        rel = ((fa.float() - fb.float()).abs()
-                               / fa.float().abs().clamp(min=1e-3)).max().item()
-                        sf_maxrel = max(sf_maxrel, rel)
-                        if nd > fa.numel() * 1e-4 or rel > 0.02:
-                            n_fail += 1
-                            print(f"  {cname} {ltag} step{step} score_fine ULP "
-                                  f"超界: nd={nd}/{fa.numel()} rel={rel:.3e}")
+                    print(f"  {cname} {ltag} step{step} score_fine ULP "
+                          f"超界: nd={nd}/{fa.numel()} rel={rel:.3e}")
+                # 【iter8】score_coarse_avg：复用 _score_fine_kernel → ULP 口径
                 ka, kb = sa.get("score_coarse_avg"), sb.get("score_coarse_avg")
-                if (ka is None) != (kb is None) or (
-                        ka is not None and not T.equal(ka, kb)):
+                if (ka is None) != (kb is None):
                     n_fail += 1
-                    print(f"  {cname} {ltag} step{step} score_coarse_avg MISMATCH")
+                    print(f"  {cname} {ltag} step{step} score_coarse_avg PRESENCE")
+                elif ka is not None:
+                    nd, rel, ok = _ulp_ok(ka, kb)
+                    n_sc_ulp += max(nd, 0); n_sc_tot += ka.numel()
+                    if nd:
+                        sc_maxrel = max(sc_maxrel, rel)
+                    if not ok:
+                        n_fail += 1
+                        print(f"  {cname} {ltag} step{step} score_coarse_avg "
+                              f"ULP 超界: nd={nd}/{ka.numel()} rel={rel:.3e}")
                 if not T.equal(a[step][1], b[step][1]):
                     n_fail += 1
                     print(f"  {cname} {ltag} step{step} MASK MISMATCH")
     check("score_mask_derived: 4 配置 × normal/skip × 10 步 score/mask 一致"
-          "（coarse 逐位 + fine ULP≤1e-4 + mask 逐位）",
+          "（coarse+avg ULP≤1e-4 + fine ULP≤1e-4 + mask 逐位）",
           n_fail == 0,
-          f"mismatch={n_fail} fine_ulp={n_sf_ulp}/{n_sf_tot} maxrel={sf_maxrel:.2e}")
+          f"mismatch={n_fail} coarse_ulp={n_sc_ulp}/{n_sc_tot} "
+          f"maxrel={sc_maxrel:.2e} fine_ulp={n_sf_ulp}/{n_sf_tot} "
+          f"maxrel={sf_maxrel:.2e}")
 
     # S 回退 → 全量重建后继续增量正确（score_fine ULP 口径继续一致）
     args = make_cfg(0.25, 0.125, 0.625, "minmax", "avg")
@@ -402,13 +424,21 @@ def test_score_mask_derived():
         return sc_r, sc_f
 
     def _sf_ok(sc_r, sc_f):
-        fa, fb = sc_r["score_fine"], sc_f["score_fine"]
-        if fa.shape != fb.shape:
-            return False
-        nd = (fa != fb).sum().item()
-        rel = ((fa.float() - fb.float()).abs()
-               / fa.float().abs().clamp(min=1e-3)).max().item() if nd else 0.0
-        return nd <= fa.numel() * 1e-4 and rel <= 0.02
+        # 【iter8】coarse/coarse_avg（Triton 化）与 fine 同 ULP 口径
+        for key in ("score_fine", "score_coarse", "score_coarse_avg"):
+            fa, fb = sc_r.get(key), sc_f.get(key)
+            if (fa is None) != (fb is None):
+                return False
+            if fa is None:
+                continue
+            if fa.shape != fb.shape:
+                return False
+            nd = (fa != fb).sum().item()
+            rel = ((fa.float() - fb.float()).abs()
+                   / fa.float().abs().clamp(min=1e-3)).max().item() if nd else 0.0
+            if not (nd <= fa.numel() * 1e-4 and rel <= 0.02):
+                return False
+        return True
 
     k1 = T.randn(1, 5000, Hkv, D, device=dev, dtype=T.bfloat16)
     sc_r, sc_f = _score_pair(k1)
@@ -419,7 +449,8 @@ def test_score_mask_derived():
     k3 = T.cat([k2, T.randn(1, 1, Hkv, D, device=dev, dtype=T.bfloat16)], dim=1)
     sc_r, sc_f = _score_pair(k3)
     ok_back = ok_back and _sf_ok(sc_r, sc_f)
-    check("score_mask_derived: S 回退全量重建 + 后续增量 score_fine ULP 口径一致",
+    check("score_mask_derived: S 回退全量重建 + 后续增量 score ULP 口径一致"
+          "（coarse/avg/fine）",
           ok_back)
 
 

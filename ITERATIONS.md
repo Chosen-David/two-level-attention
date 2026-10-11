@@ -14,6 +14,7 @@
 | iter5 | compute_score rep 缓存 + compute_mask 同步消除（锚点文本派生） | 2.13 GPU / 2.63 CPU wall | 3.89×GPU / 3.66×wall | 15/15 PASS |
 | iter6 | score_fine Triton GQA K 复用（_rep 退役） | 2.15 GPU / 2.65 CPU wall（bench 口径持平；GPU busy 实降 0.46ms/层） | 3.86×GPU / 3.63×wall | 15/15 PASS |
 | iter7 | eager gather Triton 融合（~15 op → 2 kernel） | 1.73 GPU / 2.23 CPU wall | 4.79×GPU / 4.31×wall | 15/15 PASS |
+| iter8 | compute_score coarse 段 Triton GQA K 复用（minmax 双点积 + avg 复用 fine kernel） | 1.52 GPU / 2.02 CPU wall | 5.47×GPU / 4.76×wall | 15/15 PASS |
 
 ## Iterations
 
@@ -270,4 +271,42 @@
   9.77e-04）。既有回归 env=1 复跑 7 套件全绿（near_swa
   3/3+4/4、C3 5/5、E122 6/6、E125 尾巴 10/10、E125 kmeans 守卫 5/5、
   E116f 12/12）。
+- commit：见 git log
+
+### [iter 8] compute_score coarse 段 Triton GQA K 复用（替换点③④：minmax 双点积单 kernel + avg 段复用 fine kernel）
+- 改动：sparse_attn/indexer/tli_indexer_fast.py（锚点文件零改动）——新
+  Triton kernel _score_coarse_kernel（grid=(kt/64, Hkv)，每 program 载
+  k_min/k_max 块 [64,d']（min/max 独立 stride），循环 g=4 个 q 头做
+  min(q,0)·k_min + max(q,0)·k_max 双点积——负部配 k_min、正部配 k_max，
+  与原版 repeat 后 clamp 双 einsum 数学等价）+ _fast_score_coarse 方法；
+  _SCORE_REPL 扩至 4 处替换（③ coarse minmax 段、④ score_coarse_avg 段
+  ——einsum(b_q, repeat(k_avg)) 与 _score_fine_kernel 同构直接复用
+  iter6 kernel）。门禁 test_score_mask_derived 口径更新：coarse/avg
+  从逐位改 ULP（同 fine：比例 ≤1e-4 + 相对 ≤2%），mask 仍逐位。
+- 原理：iter7 附带发现 compute_score 残余 27 launches 中 coarse 段
+  gemv 本体仅 ~32μs，repeat(k_min/k_max/k_avg) 物化 + clamp + copy 胶水
+  ~120μs 主导；且 coarse 维度是块级 kt=S/bs（64K 档仅 1024 行）——
+  计算量极小、launch/物化开销占比更高的典型胶水瓶颈。GQA 组内
+  k_min/k_max 块寄存器复用（读带宽 /g），[kt,H,d'] fp32 repeat 物化
+  ×3（min/max/avg）全消。
+- 数字（GPU 空闲态）：原型 microbench（kt=1024, d'=32）：torch
+  coarse+avg 0.173ms → Triton 0.062ms。stage 64K normal
+  compute_score 0.536→0.346ms（-0.19）；全步 1.73→**1.52 GPU /
+  2.02 wall（vs baseline 5.47× / 4.76×）**。全档改善：16K normal
+  1.88×/1.94×、32K 3.07×/3.01×、64K skip 5.92×/5.06×；**8K 档首次
+  真提升 1.16×/1.15×**（2.01→1.86——8K eager 走 dense 路由但
+  coarse Triton 不受 S 门槛限制，coarse 胶水 8K 亦在消费）。单步
+  CUDA launch 127→**115**（compute_score 27→13）。
+- 数值口径（如实分级）：门禁 4 配置 × normal/skip × 10 步
+  score_coarse/coarse_avg **实测 ULP=0/289408（逐位一致，优于 ULP
+  预期口径——块级 kt 小、fp32 树形归约与 cublas 在该尺度常同舍入）**；
+  fine 48/10.5M 保持；mask 逐位不变；S 回退全量重建 ULP 口径绿。
+  ULP 口径作为保守上界保留（更大 kt/不同配置可能出 1 ULP 漂移，
+  原型隔离实测 D=128 大 kt 时 ~5e-5 比例差 1 ULP）。
+- 下一步输入：compute_mask 现为最大阶段（64K normal 0.467ms、
+  35 launches：4×topk + 3 排序 + 3 MeanOps + softmax 链）→ iter9
+  主攻方向。
+- 门禁：15/15 PASS（python±-O 双跑）；既有回归 env=1 复跑 7 套件
+  全绿（near_swa 3/3+4/4、C3 5/5、E122 6/6、E125 尾巴 10/10、
+  E125 kmeans 守卫 5/5、E116f 12/12）。
 - commit：见 git log
