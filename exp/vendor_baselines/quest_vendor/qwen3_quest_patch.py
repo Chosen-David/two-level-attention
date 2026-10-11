@@ -90,7 +90,16 @@ def enable_quest(model, token_budget: int = 1024, chunk_size: int = 16) -> int:
                 layer_id += 1
                 module.num_heads = module.config.num_attention_heads
                 module.num_key_value_heads = module.config.num_key_value_heads
-                module.hidden_size = module.config.hidden_size
+                # 【32B 适配 bug 修复，2026-10-12】官方 forward 末尾
+                # `attn_output.reshape(bsz, q_len, self.hidden_size)` 要求
+                # hidden_size == num_heads*head_dim（Llama/Mistral 成立）。
+                # Qwen3-32B config: num_heads=64, head_dim=128 → 8192，而
+                # config.hidden_size=5120 不相等 → decode reshape 崩溃
+                # (shape [1,1,5120] invalid for size 8192)。Qwen3-8B 恰好
+                # 4096==4096 未暴露。此处注入 num_heads*head_dim（对
+                # Llama/Mistral/Qwen3-8B 与 config.hidden_size 相同，零影响；
+                # 对 32B 正确）。官方算法文件逐字节不动。
+                module.hidden_size = module.num_heads * module.head_dim
                 # 官方 forward 内部用 self.rotary_emb(value_states, position_ids)
                 # （rotary_emb 实例在 _inject_rotary 阶段统一注入）
                 module.token_budget = token_budget

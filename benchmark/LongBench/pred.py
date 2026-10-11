@@ -46,6 +46,7 @@ def parse_args(args=None):
             'Qwen3-8B',
             'Qwen3-14B',
             'Qwen3-32B',
+            'DeepSeek-V2-Lite-Chat',
         ],
     )
     parser.add_argument(
@@ -110,6 +111,13 @@ def build_chat(tokenizer, prompt, model_name):
     elif "GLM-4" in model_name:
         message = [{"role": "user", "content": prompt},]
         prompt = tokenizer.apply_chat_template(message, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+    elif "DeepSeek-V2" in model_name:
+        # DeepSeek-V2-Lite-Chat（MLA）：LongBench 官方 pred.py 对 DeepSeek
+        # 用 apply_chat_template 原生模板（S-T023 MLA 矩阵 fullkv 锚点）。
+        message = [{"role": "user", "content": prompt}]
+        prompt = tokenizer.apply_chat_template(
+            message, tokenize=False, add_generation_prompt=True
+        )
     return prompt
 
 
