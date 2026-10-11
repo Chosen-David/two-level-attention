@@ -27,6 +27,10 @@ from sparse_attn.metrics import get_metrics
 from sparse_attn.info import get_method_name_with_info, \
     truncate_output_name_keep_hash, get_treatment_manifest_json, \
     gate_output_treatment_identity, resolve_treatment_snapshot
+# 【095 修复（GPT 审计 2026-10-12_0527）】TLI_E127_FAST=1 的 gather 路径把
+# 三类契约违规延迟到 GPU 端错误标志，须由本入口在每样本生成段边界消费
+# ——guard 退出校验 raise 必须先于 record 构造/append 与任何落盘。
+from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 
 def parse_args(args=None):
@@ -254,99 +258,108 @@ def get_pred(
 
         context_length = input.input_ids.shape[-1] + q_input.input_ids.shape[-1]
 
-        if (
-            dataset == "samsum"
-        ):  # prevent illegal output on samsum (model endlessly repeat "\nDialogue"), might be a prompting issue
-            # B03 修复（GPT 审查 2026-10-08）：原版 model.generate(**input) 缺两件事——
-            # ① q_input 切出的 question 没接回，只喂了 prefix；② output 赋值后
-            # generated_content 从未赋值，下方共用 decode 必 UnboundLocalError。
-            # 修法：拼接完整输入（与 else 分支同协议），generate 后取新增 token。
-            full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
-            output = model.generate(
-                input_ids=full_ids,
-                attention_mask=torch.ones_like(full_ids),
-                max_new_tokens=max_gen,
-                num_beams=1,
-                do_sample=False,
-                temperature=1.0,
-                min_length=full_ids.shape[-1] + 1,
-                eos_token_id=[
-                    tokenizer.eos_token_id,
-                    tokenizer.encode("\n", add_special_tokens=False)[-1],
-                ],
-            )[0]
-            generated_content = output[full_ids.shape[-1]:].tolist()
-        elif IS_DSV2:
-            # S-T023 DeepSeek fullkv 修复（2026-10-12）：官方 modeling_deepseek.py
-            # 是旧 transformers 时代代码，手动 prefill/decode 循环在 4.56.2 新
-            # DynamicCache（self.layers 结构）下会触发 legacy cache 转换陷阱——
-            # prefill 返回 to_legacy_cache 的 tuple，decode 再 from_legacy_cache
-            # 转回，转换后 get_seq_length 返回 0 → _prepare_4d_causal_attention_mask
-            # 生成 (1,1,1,1) mask，与 attention 层期望 (1,1,1,kv_seq_len) 不符 →
-            # ValueError。改用 model.generate 路径（与 samsum 分支同协议：full_ids
-            # 一次 prefill + 贪心生成），cache_position/cache 全权交给 transformers
-            # 管理，生成语义与手动 argmax 循环严格等价。
-            full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
-            output = model.generate(
-                input_ids=full_ids,
-                attention_mask=torch.ones_like(full_ids),
-                max_new_tokens=max_gen,
-                num_beams=1,
-                do_sample=False,
-                temperature=1.0,
-                pad_token_id=tokenizer.eos_token_id,
-                eos_token_id=tokenizer.eos_token_id,
-            )[0]
-            generated_content = output[full_ids.shape[-1]:].tolist()
-        else:
-            with torch.no_grad():
-                output = model(
-                    input_ids=input.input_ids,
-                    past_key_values=None,
-                    use_cache=True,
-                )
-                past_key_values = output.past_key_values
-                for input_id in q_input.input_ids[0]:
+        # 【095 修复（GPT 审计 2026-10-12_0527，2026-10-12）】请求级
+        # fail-closed guard：TLI_E127_FAST=1 的 gather 路径把三类契约违规
+        # （空 mask 行 / 选中数超 TLI_E127_W_UPPER / cu_seqlens_k 破坏）
+        # 延迟到 GPU 端错误标志（decode 零同步的配套），由 guard 在本样本
+        # 生成段边界一次校验 raise——必须先于 record 构造/append（get_pred
+        # 内）与任何落盘（out_path 写入在 get_pred 返回后，raise 传播即
+        # 整次任务输出作废）。进入时清旧 flag：上一样本未消费的违规不
+        # 误杀本样本（guard 语义/并发限制见其 docstring）。
+        with eager_decoding_request_guard():
+            if (
+                dataset == "samsum"
+            ):  # prevent illegal output on samsum (model endlessly repeat "\nDialogue"), might be a prompting issue
+                # B03 修复（GPT 审查 2026-10-08）：原版 model.generate(**input) 缺两件事——
+                # ① q_input 切出的 question 没接回，只喂了 prefix；② output 赋值后
+                # generated_content 从未赋值，下方共用 decode 必 UnboundLocalError。
+                # 修法：拼接完整输入（与 else 分支同协议），generate 后取新增 token。
+                full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
+                output = model.generate(
+                    input_ids=full_ids,
+                    attention_mask=torch.ones_like(full_ids),
+                    max_new_tokens=max_gen,
+                    num_beams=1,
+                    do_sample=False,
+                    temperature=1.0,
+                    min_length=full_ids.shape[-1] + 1,
+                    eos_token_id=[
+                        tokenizer.eos_token_id,
+                        tokenizer.encode("\n", add_special_tokens=False)[-1],
+                    ],
+                )[0]
+                generated_content = output[full_ids.shape[-1]:].tolist()
+            elif IS_DSV2:
+                # S-T023 DeepSeek fullkv 修复（2026-10-12）：官方 modeling_deepseek.py
+                # 是旧 transformers 时代代码，手动 prefill/decode 循环在 4.56.2 新
+                # DynamicCache（self.layers 结构）下会触发 legacy cache 转换陷阱——
+                # prefill 返回 to_legacy_cache 的 tuple，decode 再 from_legacy_cache
+                # 转回，转换后 get_seq_length 返回 0 → _prepare_4d_causal_attention_mask
+                # 生成 (1,1,1,1) mask，与 attention 层期望 (1,1,1,kv_seq_len) 不符 →
+                # ValueError。改用 model.generate 路径（与 samsum 分支同协议：full_ids
+                # 一次 prefill + 贪心生成），cache_position/cache 全权交给 transformers
+                # 管理，生成语义与手动 argmax 循环严格等价。
+                full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
+                output = model.generate(
+                    input_ids=full_ids,
+                    attention_mask=torch.ones_like(full_ids),
+                    max_new_tokens=max_gen,
+                    num_beams=1,
+                    do_sample=False,
+                    temperature=1.0,
+                    pad_token_id=tokenizer.eos_token_id,
+                    eos_token_id=tokenizer.eos_token_id,
+                )[0]
+                generated_content = output[full_ids.shape[-1]:].tolist()
+            else:
+                with torch.no_grad():
                     output = model(
-                        input_ids=input_id.unsqueeze(0).unsqueeze(0),
-                        past_key_values=past_key_values,
+                        input_ids=input.input_ids,
+                        past_key_values=None,
                         use_cache=True,
                     )
                     past_key_values = output.past_key_values
-
-                pred_token_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
-                generated_content = [pred_token_idx.item()]
-                # B04 修复（kimi3 清单 2026-10-08）：原循环的 EOS 判停在每个
-                # token push 之后，唯独漏了首 token——首 token 即 EOS 时
-                # 不停，输出 EOS 串尾巴且继续解码。首 token 也须判停。
-                if (
-                    tokenizer.eos_token_id is not None
-                    and pred_token_idx.item() == tokenizer.eos_token_id
-                ):
-                    generated_content = [pred_token_idx.item()]
-                else:
-                    for _ in range(max_gen - 1):
-                        outputs = model(
-                            input_ids=pred_token_idx,
+                    for input_id in q_input.input_ids[0]:
+                        output = model(
+                            input_ids=input_id.unsqueeze(0).unsqueeze(0),
                             past_key_values=past_key_values,
                             use_cache=True,
                         )
+                        past_key_values = output.past_key_values
 
-                        past_key_values = outputs.past_key_values
-                        pred_token_idx = (
-                            outputs.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
-                        )
-                        generated_content += [pred_token_idx.item()]
-                        if pred_token_idx.item() == tokenizer.eos_token_id:
-                            break
+                    pred_token_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
+                    generated_content = [pred_token_idx.item()]
+                    # B04 修复（kimi3 清单 2026-10-08）：原循环的 EOS 判停在每个
+                    # token push 之后，唯独漏了首 token——首 token 即 EOS 时
+                    # 不停，输出 EOS 串尾巴且继续解码。首 token 也须判停。
+                    if (
+                        tokenizer.eos_token_id is not None
+                        and pred_token_idx.item() == tokenizer.eos_token_id
+                    ):
+                        generated_content = [pred_token_idx.item()]
+                    else:
+                        for _ in range(max_gen - 1):
+                            outputs = model(
+                                input_ids=pred_token_idx,
+                                past_key_values=past_key_values,
+                                use_cache=True,
+                            )
 
-            # output = model.generate(
-            #     **input,
-            #     max_new_tokens=max_gen,
-            #     num_beams=1,
-            #     do_sample=False,
-            #     temperature=1.0,
-            # )[0]
+                            past_key_values = outputs.past_key_values
+                            pred_token_idx = (
+                                outputs.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
+                            )
+                            generated_content += [pred_token_idx.item()]
+                            if pred_token_idx.item() == tokenizer.eos_token_id:
+                                break
+
+                # output = model.generate(
+                #     **input,
+                #     max_new_tokens=max_gen,
+                #     num_beams=1,
+                #     do_sample=False,
+                #     temperature=1.0,
+                # )[0]
 
         pred = tokenizer.decode(generated_content, skip_special_tokens=True)
         # pred = tokenizer.decode(output[context_length:], skip_special_tokens=True)

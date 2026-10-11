@@ -1,4 +1,5 @@
 import os
+from contextlib import contextmanager
 
 import torch
 import torch.nn.functional as F
@@ -83,6 +84,46 @@ def _raise_for_code(code: int):
         )
 
 
+@contextmanager
+def eager_decoding_request_guard(device=None):
+    """【E127 095 修复（GPT 审计 2026-10-12_0527，2026-10-12）】请求级
+    fail-closed 生命周期 guard——deferred error flag 的统一消费点。
+
+    缺陷背景：iter3 把三类契约违规（B7 空行=1 / W 超上界=2 / cu 破坏=3）
+    延迟到 GPU 端 _ERR_FLAG 以换取 decode 零 host 同步，设计声明由
+    eager_decoding_check_errors() 在「生成结束」一次读回显式 raise、整次
+    生成作废——但修复前该函数唯一调用者在 exp/bench/{e127_stage_bench,
+    test_e127_gates}，三条生产入口（benchmark/LongBench/pred.py、
+    benchmark/RULER/pred_ruler.py、benchmark/RULER/llm_eval.py）均未消
+    费：TLI_E127_FAST=1 下触发契约违规时，零输出/截断注意力照常完成生成
+    并写盘 JSONL，fail-closed 没落到消费者。
+
+    语义：进入时清空设备错误标志（防跨请求继承旧 flag——上一请求未消费
+    的违规不得误杀/污染下一请求），退出时 check_errors() 一次性校验，
+    有错显式 raise（整次生成作废由调用方传播路径保证：raise 必须先于任
+    何完成外观产物的落盘）。
+
+    生产接线（三条入口均已接入，见各文件「095 修复」注释）：
+      benchmark/LongBench/pred.py    —— 每样本生成段（record append 前）
+      benchmark/RULER/pred_ruler.py  —— 每行生成段（fout.write 前；raise
+        后 gen 目录不 commit、.tli_gen 指针不切，best-file 口径不变）
+      benchmark/RULER/llm_eval.py    —— simple_evaluate 整段（save_results 前）
+
+    【限制（如实登记）】_ERR_FLAG 是设备级全局单例，本 guard 不做同进程
+    并发请求隔离：两个并发请求共享同一 flag，A 的违规会被先退出的 B 的
+    guard 捕获（fail-closed 方向正确，但报错归因到 B 的请求）。当前生
+    产口径为单请求串行 benchmark（B=1、逐样本串行生成），该限制不可
+    达；将来引入同进程并发请求时须改为 per-request flag 槽
+    （如 dict[request_id]）再撤此登记。
+    """
+    for _, _buf in list(_ERR_FLAG.items()):
+        _buf.zero_()
+    try:
+        yield
+    finally:
+        eager_decoding_check_errors(device)
+
+
 # ---------------------------------------------------------------------------
 # 【E127 iter7】eager gather Triton 融合主路径（原型 exp/bench/
 # _scratch_triton_eager.py 已验证：6 配置 allclose(1e-2) 全绿、
@@ -145,20 +186,28 @@ if _HAS_TRITON:
         G: tl.constexpr, D: tl.constexpr,
         PER_QH: tl.constexpr, BW: tl.constexpr, W: tl.constexpr,
     ):
-        """program = (行 r × q 头 j) 展平：单头 online-softmax gather attention。
+        """单头 online-softmax gather attention。
+        共享口径（PER_QH=0）：program = 行 r × 组内头 j 展平（grid=R*G），
+        行 h 的组内 G 个 q-head 广播同一选择。
+        per_qh 口径（PER_QH=1）：【097 修复】grid=(R,)，一 program 一行，
+        pid 即行号 r——修复前固定 grid=(R*G,) 而 PER_QH 分支 j 维完全未
+        用，Qwen3（H=32, G=4）时 128 个 program 对 32 行输出各重复计算/
+        同址非原子 store 竞争写 4 次（同输入派生同值故数值未错，冗余 +
+        写竞争 inconclusive）。
         K/V 每 program 重读（G× 读冗余，W×D×2×2B×G ≈ 4MB/行，可接受）——
         换取全标量 m/l + acc [D]，无 G 维广播/索引。"""
         pid = tl.program_id(0)
-        j = pid % G
-        r = pid // G
-        cnt = tl.load(COUNT + r)
-        cnt = tl.minimum(cnt, W)   # 超上界时只取前 W（漏选保护 flag=2 由 expand 记录）
         if PER_QH:
+            r = pid                # 097：per_qh 一行一 program，j 维不再参与
             kvh = r // G
             qh = r
         else:
+            j = pid % G
+            r = pid // G
             kvh = r
             qh = r * G + j
+        cnt = tl.load(COUNT + r)
+        cnt = tl.minimum(cnt, W)   # 超上界时只取前 W（漏选保护 flag=2 由 expand 记录）
         offs_d = tl.arange(0, D)
         qv = tl.load(Q + qh * stride_qh + offs_d)          # [D] fp32（已乘 scale）
         m = float('-inf')
@@ -185,6 +234,13 @@ if _HAS_TRITON:
             m = m_new
         o = acc / tl.where(l == 0.0, 1.0, l)
         tl.store(OUT + qh * stride_oh + offs_d, o.to(OUT.dtype.element_ty))
+
+
+def _attn_grid_size(R: int, G: int, per_qh: bool) -> int:
+    """【E127 097 修复】kernel B 的 program 数（独立纯函数供门禁直断）：
+    per_qh 口径一行一 program（R 个——修复前误为 R*G，Qwen3 G=4 时
+    128→32）；共享口径行×组内头展平（R*G 个，语义不变）。"""
+    return R if per_qh else R * G
 
 
 def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
@@ -214,7 +270,7 @@ def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
     # 后升精度——数值与原型逐位同）
     qs = (q[0] * softmax_scale).to(torch.float32)   # [H, D]
     o = torch.empty((H, D), device=dev, dtype=q.dtype)
-    _eager_attn_kernel[(R * G,)](
+    _eager_attn_kernel[(_attn_grid_size(R, G, per_qh),)](
         idx, cnt, qs, k, v, o,
         k.stride(0), k.stride(1), qs.stride(0), o.stride(0),
         G=G, D=D, PER_QH=per_qh, BW=256, W=W_upper, num_warps=4)

@@ -10,6 +10,10 @@ from transformers import (
 from sparse_attn.arguments import add_sparse_attn_args
 from sparse_attn.patches import register_patch
 from sparse_attn.metrics import get_metrics
+# 【095 修复（GPT 审计 2026-10-12_0527，2026-10-12）】deferred error flag
+# 的请求级消费点——lm_eval 生成段（simple_evaluate）边界接线，guard 退出
+# 校验 raise 必须先于 save_results 任何结果落盘。
+from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 from sparse_attn.info import (
     get_method_name_with_info,
     resolve_treatment_snapshot,
@@ -107,13 +111,17 @@ def main():
     task_names = lm_eval_utils.pattern_match(args.tasks, task_manager.all_tasks)
 
     print("task_names: {}".format(task_names))
-    result_dict = lm_eval.simple_evaluate(
-        hflm, tasks=task_names, 
-        batch_size=args.lm_eval_batch_size, 
-        max_batch_size=args.lm_eval_batch_size,
-        task_manager=task_manager,
-        confirm_run_unsafe_code=True,
-    )
+    # 【095 修复】TLI_E127_FAST=1 的 gather 路径契约违规延迟到 GPU 端错误
+    # 标志，由 guard 在生成段（simple_evaluate 全程）边界一次校验 raise
+    # ——异常传播后 save_results 不可达，无任何完成外观结果产物落盘。
+    with eager_decoding_request_guard():
+        result_dict = lm_eval.simple_evaluate(
+            hflm, tasks=task_names,
+            batch_size=args.lm_eval_batch_size,
+            max_batch_size=args.lm_eval_batch_size,
+            task_manager=task_manager,
+            confirm_run_unsafe_code=True,
+        )
     result_table = lm_eval_utils.make_table(result_dict)
     
     # 获取稀疏注意力指标

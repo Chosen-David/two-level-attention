@@ -79,6 +79,10 @@ from benchmark.RULER.yarn_receipt import (  # noqa: E402
 from sparse_attn.arguments import add_sparse_attn_args  # noqa: E402
 from sparse_attn.patches import register_patch  # noqa: E402
 from sparse_attn.metrics import get_metrics  # noqa: E402
+# 【095 修复】deferred error flag 的请求级消费点（guard 语义/限制见其
+# docstring）——RULER 生成的逐行生成段接线。
+from sparse_attn.ops.eager_decoding import (  # noqa: E402
+    eager_decoding_request_guard)
 from sparse_attn.info import (  # noqa: E402
     get_method_name_with_info, get_treatment_manifest_json,
     resolve_treatment_snapshot)
@@ -257,24 +261,33 @@ def main():
             input_ids = tokenizer(row["input"], truncation=False,
                                   return_tensors="pt").input_ids.to("cuda")
             context_length = input_ids.shape[-1]
-            with torch.no_grad():
-                output = model(input_ids=input_ids, past_key_values=None,
-                               use_cache=True,
-                               **({"logits_to_keep": 1} if keep_logits else {}))
-                past = output.past_key_values
-                pred_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
-                gen = [pred_idx.item()]
-                for _ in range(MAX_GEN - 1):
-                    # min_length 语义：禁止在 context 结束前停（RULER 官方口径）
-                    if len(gen) < 2 and pred_idx.item() in eos_ids:
-                        pass  # 首位不许停（近似 min_length=context+1）
-                    out = model(input_ids=pred_idx, past_key_values=past,
-                                use_cache=True)
-                    past = out.past_key_values
-                    pred_idx = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
-                    gen.append(pred_idx.item())
-                    if pred_idx.item() in eos_ids and len(gen) > 1:
-                        break
+            # 【095 修复（GPT 审计 2026-10-12_0527，2026-10-12）】请求级
+            # fail-closed guard：TLI_E127_FAST=1 的 gather 路径把三类契约
+            # 违规（空 mask 行/W 超上界/cu 破坏）延迟到 GPU 端错误标志，
+            # 由 guard 在本行生成段边界（写盘前）一次性校验 raise——raise
+            # 传播后 finally 只释放 flock，generation 目录不 commit、
+            # .tli_gen 指针不切（066/crash-recovery 语义天然吸收：旧完整
+            # 代可见，无任何完成外观产物被污染）。进入时清旧 flag 防跨
+            # 行继承（上一行未消费的违规不误杀本行）。
+            with eager_decoding_request_guard():
+                with torch.no_grad():
+                    output = model(input_ids=input_ids, past_key_values=None,
+                                   use_cache=True,
+                                   **({"logits_to_keep": 1} if keep_logits else {}))
+                    past = output.past_key_values
+                    pred_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
+                    gen = [pred_idx.item()]
+                    for _ in range(MAX_GEN - 1):
+                        # min_length 语义：禁止在 context 结束前停（RULER 官方口径）
+                        if len(gen) < 2 and pred_idx.item() in eos_ids:
+                            pass  # 首位不许停（近似 min_length=context+1）
+                        out = model(input_ids=pred_idx, past_key_values=past,
+                                    use_cache=True)
+                        past = out.past_key_values
+                        pred_idx = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
+                        gen.append(pred_idx.item())
+                        if pred_idx.item() in eos_ids and len(gen) > 1:
+                            break
             pred = tokenizer.decode(gen, skip_special_tokens=True)
             metrics = get_metrics()
             budget = metrics.get_select_tokens()
