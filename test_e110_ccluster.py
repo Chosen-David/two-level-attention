@@ -39,7 +39,10 @@ import torch
 torch.set_num_threads(1)
 
 REPO = os.path.dirname(os.path.abspath(__file__))                     # worktree 的 two-level-attention
-MAIN_TREE = "/home/wangyuanshuo02/sglang/two-level-attention"          # 主树（只读！）
+# 主树基线（只读！）：two-level-attention 已从 sglang monorepo 提取为独立仓库
+#（3b66c3c initial snapshot），旧 monorepo 路径 /sglang/two-level-attention 已不存在
+# ——基线改指独立主仓当前检出（main，不含 E125 修复）= 修复前旧代码。
+MAIN_TREE = "/home/wangyuanshuo02/two-level-attention"
 E64A_PATH = os.path.join(MAIN_TREE, "exp", "trace", "analyze_e64a_ab_grid.py")
 
 RESULTS = []   # [(name, ok, detail)]

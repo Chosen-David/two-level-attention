@@ -501,6 +501,22 @@ class TLIIndexer(TIAIndexer):
         Tn = near_hi - far_hi
         if Tn < 256:   # near 区过小（< 4 块）不值得聚类，消费端回退细筛分
             return
+        # 【near kmeans 4 倍样本守卫（DeepSeek 审计 round1 ③，2026-10-11，
+        #   主 AI 派单确认）】far 侧 _build_far_kmeans 有同口径守卫
+        #   （Tfar < far_clusters*4 → 放弃建簇 _km_centroids=None 回退细筛
+        #   分），near 侧 kmeans 分支复用 far_clusters 作簇数（256 簇固定），
+        #   却只有 Tn<256 下限：Tn ∈ [256, far_clusters*4)（far_clusters=256
+        #   时 [256,1024)）时簇数逼近/≥样本数 → kmeans 退化为一簇一样本/
+        #   大量空簇，聚类完全失效且静默继续（LB 短序列 near 区可落入，
+        #   Tn=300 实测每头 256 簇几乎全被单样本占据）。补与 far 侧同口径
+        #   守卫：kmeans 分支样本不足 4 倍簇数时跳过更新，沿用本函数
+        #   Tn<256 的跳过惯例（_km_near_centroids 保持 None，消费端回退
+        #   细筛分——细筛分质量高于簇代表分，语义无损偏保守）。
+        #   sim_greedy 分支不受影响：贪心簇数自适应（Kcap=Tn，活簇随数据
+        #   增长），不存在簇数≥样本数退化，与 far 侧 greedy 无 4 倍守卫
+        #   口径一致。far_clusters=64 时阈值=256 与既有下限重合，行为不变。
+        if self.near_select == "cluster" and Tn < self.far_clusters * 4:
+            return
         idx = (self._sim_dims_indices if self.near_select == "sim_greedy"
                else self._subspace_indices)(k.device)
         x = k[0, far_hi:near_hi].float()[..., idx]   # [Tn, Hkv, dd]
@@ -1136,7 +1152,30 @@ class TLIIndexer(TIAIndexer):
             far_tok_lo = far_lo_blk * bs
             # far 细筛池上界 = far/near 块边界（near_len_dyn 修复后只含 α·mid，
             # 不能再用 kt*bs-near_len_dyn——那会把 near 区吞进 far 池）
-            far_tok_hi = min(near_blks * bs, p.shape[-1])
+            # 【静态簇尾巴覆盖修复（GPT 审计 TL cluster tail coverage，2026-10-11，
+            #   主 AI 核验 confirmed）】触发五元组（α=β=0 + far_select≠4bit +
+            #   enable_kmeans + skip_far=false + 簇缓存已初始化）下，生产者
+            #   _maybe_build_kmeans 的 far 上界按真实 S 块对齐向下（far_hi =
+            #   max(sink+1, (S−swa)//bs)·bs ≤ S−swa），而 near_blks 在消费分支
+            #   （L916-923）从 padding 过界的 kt*bs 推 → far_tok_hi 被撑大
+            #   （最多 bs−1 token）→ 守卫 swa_lo_tok > far_tok_hi 恒 FALSE →
+            #   near 补齐分支被跳过，而簇 topk 候选只到缓存覆盖 far_hi 为止
+            #   → 残留尾巴 [far_hi, S−swa)（宽 = (S−swa) mod bs）结构性不可达。
+            #   S=4097/bs=64/sink=swa=128 实测：far_hi=3968、far_tok_hi=4032、
+            #   swa_lo_tok=3969 → token 3968 无论分数多高不可选。
+            # 修复（单一事实源）：far 池上界不再两侧各算各的公式，直接读生产者
+            #   写进簇缓存条目的 far_hi（_km_far_hi_cached，_build_far_kmeans /
+            #   _update_far_greedy 全路径在建簇时维护 = 缓存真实覆盖右缘），
+            #   簇覆盖 [far_lo, far_hi) 与消费上界严格一致；S%bs==0 时
+            #   far_hi == S−swa == 旧 near_blks·bs → 行为逐位不变。
+            #   far_tok_score is not None 蕴含 far_select∈{cluster,sim_greedy}
+            #   且簇缓存已初始化（触发五元组后两条）+ skip_far=false（本
+            #   use_partition 块已保证）。其余路径（e64 分区 / far_select=4bit /
+            #   无簇分）保持旧口径逐位不变。
+            if self.alpha == 0 and self.beta == 0 and far_tok_score is not None:
+                far_tok_hi = min(self._km_far_hi_cached, p.shape[-1])
+            else:
+                far_tok_hi = min(near_blks * bs, p.shape[-1])
             # 严格口径（2026-09-29 用户最终澄清）：sink/swa 保护 token 必选且
             # 自动从预算排除——mid 预算 K2_mid = K2 − sink_tok − swa_tok；
             # 固定区 token 不进任何 topk 池，最终 mask 直接置位
@@ -1179,8 +1218,26 @@ class TLIIndexer(TIAIndexer):
                     w_far = max(0, min(far_tok_score.shape[-1],
                                        min(far_tok_hi, swa_lo_tok) - far_tok_lo))
                     fs = far_tok_score[..., :w_far]
-                    near_seg = p[..., far_tok_hi:swa_lo_tok] \
-                        if swa_lo_tok > far_tok_hi else p[..., :0]
+                    if self.alpha == 0 and self.beta == 0:
+                        # 【尾巴覆盖修复】(0,0)+非4bit 触发组合：far_tok_hi 已
+                        # 改为生产者簇缓存右缘（上方单一事实源修复）→ near_seg
+                        # 恰为簇缓存结构性覆盖不到的残留尾巴 [far_tok_hi,
+                        # swa_lo_tok)（宽 < bs）。尾巴 token 用原始细筛分参与
+                        # 自由竞争：p 是 softmax 概率（≤1）与无界簇分混池
+                        # （上方量纲风险注），高分尾巴也竞争不过簇分 → 仍不可
+                        # 选。改用 group-sum 细筛分（与 _far_token_score 的
+                        # group-sum 簇分同量纲，ccluster near 池 C3 修复同款
+                        # 口径理由），量纲一致公平竞争。e64 分区臂（α/β>0）的
+                        # near 段保持 p 口径逐位不变。
+                        sf_raw_goff = score_dict["score_fine"][..., : p.shape[-1]].to(torch.float32)
+                        sf_gsum = rearrange(
+                            sf_raw_goff, "b qt (h g) kt -> b qt h g kt",
+                            g=self.group_size).sum(dim=-2)
+                        near_seg = sf_gsum[..., far_tok_hi:swa_lo_tok] \
+                            if swa_lo_tok > far_tok_hi else p[..., :0]
+                    else:
+                        near_seg = p[..., far_tok_hi:swa_lo_tok] \
+                            if swa_lo_tok > far_tok_hi else p[..., :0]
                     cat_sc = torch.cat(
                         [fs.unsqueeze(0).unsqueeze(0), near_seg], dim=-1)
                     k2_free = min(K2_mid, cat_sc.shape[-1])
@@ -1229,8 +1286,19 @@ class TLIIndexer(TIAIndexer):
                         far_budget = max(0, K2_mid - nt_near)
                     elif self.alpha == 0 and self.beta == 0:
                         # TASK.md L231 严格口径：cluster 组合 (0,0) 单池点
-                        # far（簇分）拿全部 mid 预算（near 区已空）
-                        far_budget = K2_mid
+                        # far（簇分）拿全部 mid 预算（near 区已空）。
+                        # 【尾巴覆盖修复】far_tok_hi 已改为生产者簇缓存右缘
+                        # （上方单一事实源修复），守卫 swa_lo_tok > far_tok_hi
+                        # 在有残留尾巴时为 TRUE，但旧口径 far_budget=K2_mid
+                        # 全给簇 topk → k2_near = K2_mid−k2_far = 0，near
+                        # 补齐分支即使进得去也无预算（尾巴只挂名不覆盖）。
+                        # 修复：先从 far 预算扣除尾巴宽度 gap_w = swa_lo_tok −
+                        # far_tok_hi（< bs，簇缓存块对齐的结构性盲区），由
+                        # 下方 near 补齐分支用细筛分给尾巴 token 正常打分
+                        # 参与选择；mid 总预算 K2_mid 逐位不变（预算身份：
+                        # K2 1024 = sink 128 + swa 128 + mid K2_mid 保持）。
+                        # S%bs==0 时 gap_w=0 → far_budget 与旧口径逐位相同。
+                        far_budget = max(0, K2_mid - max(0, swa_lo_tok - far_tok_hi))
                     else:
                         far_budget = self.far_tokens
                     k2_far = min(far_budget, Tfar, K2_mid)
