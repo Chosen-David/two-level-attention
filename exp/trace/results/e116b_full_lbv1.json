@@ -1,0 +1,91 @@
+{
+ "experiment": "E116b_full_suite_piece1_lbv1_16task",
+ "date": "2026-10-11",
+ "model": "Qwen3-8B",
+ "scorer": "difflib:stdlib (eval.py 默认后端，_meta 记录)",
+ "caliber": {
+  "mavg/aavg": "E116b 新口径（B10 near-SWA 左界 + 075 padded-S 修复后，E121 pred.py 修复合入后）.187 G6/G7 链重跑，产物 rsync 拉回 /tmp/e116b_lb1",
+  "fullkv_13task": "复用 E100/E109 期 dense 数据（exp/results_longbench/Qwen3-8B/pred_1024/*-none-*，method=none 不走 TLI 路径，复用政策见 S-T019；生成协议为 E121 R01/B03/B04 修复前）",
+  "fullkv_3task": "trec/samsum/passage_count 三格 .251 2026-10-11 13:2X-13:40 补位新跑（E121 修复后）",
+  "reuse_cross_validation": "fullkv AVG13 difflib=50.1308 与 e109_lbv1_code_rescore.json difflib 逐位一致"
+ },
+ "source_data": "exp/results_longbench/Qwen3-8B/e116b_lb/pred_E116B_{mavg,aavg,fullkv}/（含 .tli_manifest.json 身份侧车与 result.json 打分记录）",
+ "arms": {
+  "FullKV": {
+   "avg16": 48.1138,
+   "per_task": {
+    "2wikimqa": 38.29,
+    "gov_report": 33.17,
+    "hotpotqa": 53.48,
+    "lcc": 67.35,
+    "multi_news": 24.93,
+    "multifieldqa_en": 53.4,
+    "musique": 32.14,
+    "narrativeqa": 25.61,
+    "passage_count": 2.0,
+    "passage_retrieval_en": 100.0,
+    "qasper": 44.17,
+    "qmsum": 23.53,
+    "repobench": 64.92,
+    "samsum": 44.62,
+    "trec": 71.5,
+    "triviaqa": 90.71
+   }
+  },
+  "mavg_a0.25_b0.125_g0.625": {
+   "avg16": 48.8963,
+   "per_task": {
+    "2wikimqa": 40.39,
+    "gov_report": 33.6,
+    "hotpotqa": 59.42,
+    "lcc": 68.53,
+    "multi_news": 24.54,
+    "multifieldqa_en": 53.44,
+    "musique": 34.25,
+    "narrativeqa": 26.84,
+    "passage_count": 0.75,
+    "passage_retrieval_en": 99.0,
+    "qasper": 46.45,
+    "qmsum": 23.92,
+    "repobench": 65.83,
+    "samsum": 44.39,
+    "trec": 71.5,
+    "triviaqa": 89.49
+   },
+   "delta_vs_fullkv": 0.7825
+  },
+  "aavg_a0_b0_g0": {
+   "avg16": 48.5369,
+   "per_task": {
+    "2wikimqa": 41.61,
+    "gov_report": 33.57,
+    "hotpotqa": 59.95,
+    "lcc": 67.96,
+    "multi_news": 24.62,
+    "multifieldqa_en": 53.48,
+    "musique": 32.21,
+    "narrativeqa": 22.75,
+    "passage_count": 0.5,
+    "passage_retrieval_en": 100.0,
+    "qasper": 47.37,
+    "qmsum": 24.44,
+    "repobench": 61.95,
+    "samsum": 44.32,
+    "trec": 72.0,
+    "triviaqa": 89.86
+   },
+   "delta_vs_fullkv": 0.4231
+  }
+ },
+ "lbv2_503": {
+  "FullKV_reused_E109": 32.21,
+  "mavg_new": 32.21,
+  "aavg_new": 31.61,
+  "note": "FullKV 按 method=none 复用政策沿用 E109 lbv2 32.21；E109 旧值 mavg 32.01/aavg 32.60 供对照（e109_full_lbv2.json）"
+ },
+ "verdict": "LB v1 16 任务：mavg 48.90(+0.78) > aavg(0,0) 48.54(+0.43) > FullKV 48.11——mavg 冠军稳定，与 E109 13 任务旧口径（mavg+0.30/aavg-0.10 difflib）方向一致且差值扩大；lbv2：mavg 32.21 = FullKV 32.21 持平 > aavg 31.61",
+ "caveats": [
+  "fullkv 13 复用格为 E121 pred.py 修复（R01 BOS 裁剪/B03 samsum 截断/B04 首 token EOS）前生成协议，mavg/aavg 为修复后——复用政策系用户既定（E116b 静态锚点 + fullkv 复用），此处如实登记口径不对称",
+  "difflib 16 任务均值含 passage_count 低分任务（fullkv 亦仅 2.0），与 E109 13 任务均值不可横比"
+ ]
+}
