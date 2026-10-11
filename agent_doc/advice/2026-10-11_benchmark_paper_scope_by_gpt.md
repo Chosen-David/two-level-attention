@@ -21,13 +21,34 @@
 
 每个“方法×模型×实现路径”标三态：**官方native**、**已验证faithful port**、**不支持/尚未验证（N/A）**。原生支持也须记录所用依赖/模型版本；质量移植通过不自动代表高效kernel支持。不同checkpoint的分数不拼排行榜。
 
-DeepSeek在S-T023历史Progress中已有Qwen3字段映射计划，新adapter保留q_norm/k_norm、position_embeddings和cache.update，是必要工作，但当前仍有上述dense分支缺失，尚不能标已验证faithful port。官方Quest [注册入口L248–261](https://github.com/mit-han-lab/Quest/blob/01c1623bf9395009520874e989e29f683203b357/evaluation/quest_attention.py#L248)只识别LlamaAttention/MistralAttention；不能以结构相似替代验证。
+DeepSeek在S-T023历史Progress中已有Qwen3字段映射计划，新adapter保留q_norm/k_norm、position_embeddings和cache.update，是必要工作，但b6782d8旧版有dense分支缺失；新4b0a25f状态见下方并发更新，仍不能标已验证faithful port。官方Quest [注册入口L248–261](https://github.com/mit-han-lab/Quest/blob/01c1623bf9395009520874e989e29f683203b357/evaluation/quest_attention.py#L248)只识别LlamaAttention/MistralAttention；不能以结构相似替代验证。
 
 移植验收须保留Q/K norm、RoPE及position、GQA head映射、scale、mask、cache更新、prefill/decode条件和dense fallback，并对固定官方实现的选择器/页极值/topk/保护集语义核对。全预算退化为dense等价只是必要条件；还需稀疏预算下选择器语义对拍。现有 [CPU测试L74–111](https://github.com/Chosen-David/two-level-attention/blob/b6782d885484f09020b383f94e08db27712b641b/exp/vendor_baselines/quest_vendor/test_qwen3_quest_patch.py#L74)名为mask-selection却只断言有限/非零输出；L114–135测人工score的topk，没有覆盖真实QK到页分数的全链路。本轮未执行测试，不能背书README的“全绿”。
 
 若无法低风险接入，Qwen3表诚实N/A；可提出双方共同官方支持模型上的配对补充，但须沿既有授权/资源范围确认后才实施，不能擅自扩模型或GPU矩阵。HF全QK后mask路径可研究质量，不能借用原论文CUDA/kernel速度冒充该移植的实测效率。
 
 **是否换主比较模型的决策门槛**：保留现有Qwen3结果，不直接全量重跑。少量接口映射且能忠实保留选择/缓存语义时，先验证低风险port；若多个核心对手都需要大幅改算法、cache或kernel，则优先核实一个真实共同支持checkpoint，提出作为匹配补充或主比较。冻结我方规则和参数，Qwen3保留跨模型验证，不重开海选/大搜索。不能把“支持Llama”当成支持同一Llama版本、RoPE设定或context length；具体checkpoint需逐仓入口、配置、依赖和论文设置的交集证据，目前尚未定案。该决策规则不触发新下载/GPU/全量排期。
+
+支持交集独审合流：**目前没有证据证明六个核心候选存在零改动的共同checkpoint**。保留Qwen3，不立刻全套换Llama，也不强行移植全部对手。逐方法的实际限制如下（沿下节固定SHA）：
+
+| 方法 | 模型支持证据与不能外推的边界 |
+|---|---|
+| Quest | quality只注册Llama/Mistral；optimized使用LlamaConfig、batch=1及旧RoPE/GQA限制。质量port不能代表速度port。|
+| FASA | [requirements L4](https://github.com/wangyifei0047/FASA-ICLR2026/blob/96c00c46db12ccee56104175470aa29579d66c58/requirements.txt#L4)为transformers4.43；[校准注册L261](https://github.com/wangyifei0047/FASA-ICLR2026/blob/96c00c46db12ccee56104175470aa29579d66c58/longbench/identify_important_fre.py#L261)是Qwen2FlashAttention2，不是Qwen3。移植须独立进行该checkpoint的FC校准。|
+| SparQ | [utility.py L189–195](https://github.com/graphcore-research/llm-inference-research/blob/ead9b6a70e3304e4666ae887cd2c6f506525fea2/llminference/utility.py#L189)硬断言transformers4.40.1；quality grouped GQA selection与GPU repeat_interleave后逐head选择不默认同语义，mean-V按模型/版本记录。|
+| ClusterKV | quality覆盖Llama/GLM4；[efficiency MODEL_CFGS L28–38](https://github.com/sjtu-zhao-lab/ClusterKV/blob/c7380819588771e8c5dadacdbd33942d7c53adea/efficiency/bench_textgen.py#L28)实际为Llama-2-7b-chat-hf/Meta-Llama-3-8B-Instruct，不能用论文Fig13的Llama3.1说法背书当前高效代码零改动支持。|
+| MInference | [generic forward L48–96](https://github.com/microsoft/MInference/blob/29ef1974fcb5a1440ccf92d7d7996900230fddcf/minference/modules/forward.py#L48)缺Qwen3的q_norm/k_norm；[model2path L23–42](https://github.com/microsoft/MInference/blob/29ef1974fcb5a1440ccf92d7d7996900230fddcf/minference/configs/model2path.py#L23)有Qwen2/2.5无Qwen3，README“any LLM”不能代替适配验证。|
+| HiP | [5f37a7f文档L855–889](https://github.com/DeepAuto-AI/hip-attention/blob/5f37a7fd77abe4d362cc7b7cd4ea24a3748614c1/docs/USAGE.sglang.md#L855)确有Qwen3-30B-A3B，但设置HIP_DEBUG_FORCE_DENSE_DECODE=1；L1079–1124还有2507/FP8多卡路线。既不能说完全无Qwen3，也不能外推为Qwen3-8B sparse decode已支持。此项为独审及官方文档核查，不冒称本工作区已克隆HiP。|
+
+[官方Qwen3 v4.51.3 L166–256](https://github.com/huggingface/transformers/blob/v4.51.3/src/transformers/models/qwen3/modeling_qwen3.py#L166)使用config head_dim、Q/K RMSNorm后RoPE、外部position_embeddings/cache_position。工程判断：保留原生forward、在合适位置注入selector通常比搬旧Llama forward风险低，仍需验证。门禁包括dense极限下attention/logits/多步cache等价、官方支持模型同QKV下selector对拍，以及Qwen3的prefill/decode/padding/position/GQA覆盖；本轮只提出门禁，不写适配或运行测试。
+
+共同模型候选`Llama-3.1-8B-Instruct`有FASA、ClusterKV quality、MInference及HiP证据，但Quest/ClusterKV高效路径和SparQ仍需预检，**不是已决定的主模型**。论文先例也区分兼容范围：ClusterKV v2 §V-C/Fig13分别画OPT/InfiniGen和Llama/Quest panel；FASA公开Qwen2 adapter是透明适配先例，不是只换模型名即可复现的依据。
+
+本库当前已公开`exp/vendor_baselines/`代码，较早“尚未公开适配层”的快照已经过时；下文b6782d8结论是旧版静态审计，存在代码不代表验收完成。
+
+**提交前并发更新（4b0a25f，含b77d31e）**：新版 [wrapper L40–48](https://github.com/Chosen-David/two-level-attention/blob/4b0a25f7d6a49207e53e39c9374b81a22f665c49/exp/vendor_baselines/quest_vendor/qwen3_quest_patch.py#L40)已补prefill/浅层dense分支，旧版“缺分支”不再是当前缺陷。但decode转交的 [official forward L103–138](https://github.com/Chosen-David/two-level-attention/blob/4b0a25f7d6a49207e53e39c9374b81a22f665c49/exp/vendor_baselines/quest_vendor/quest_attention_official.py#L103)直接投影Q/K并RoPE，未执行Qwen3的q_norm/k_norm；因此原生prefill缓存和decode新K的前处理不一致。逐字节复用旧Llama forward不等于忠实保留Qwen3模型。position/cache适配也仍须上述门禁，当前不能标已验证port。
+
+新 [测试L81–97](https://github.com/Chosen-David/two-level-attention/blob/4b0a25f7d6a49207e53e39c9374b81a22f665c49/exp/vendor_baselines/quest_vendor/test_qwen3_quest_patch.py#L81)用8-token prompt、预算16、3步decode，序列尚未超过预算，却要求与dense输出不同；差异不能证明“稀疏生效”，可能恰是前处理偏差。应验证全预算dense等价及真实删减时selector语义。本轮仅静态核查新提交，未运行测试、未修改他人适配代码；保留该并发提交。
 
 ## 固定源码调用链与待办
 

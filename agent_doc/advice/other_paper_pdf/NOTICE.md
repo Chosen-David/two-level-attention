@@ -60,6 +60,18 @@ License: CC-BY-SA-4.0. Status: download-blocked.
 
 Official arXiv PDF download blocked by environment network proxy (HTTP CONNECT 403); no local PDF acquired, hash/page count unknown. No PDF is included; SHA-256 and locally verified page count are null.
 
+## SparQ — additional PMLR proceedings edition
+
+SparQ Attention: Bandwidth-Efficient LLM Inference
+
+Authors: Luka Ribar, Ivan Chelombiev, Luke Hudlass-Galley, Charlie Blake, Carlo Luschi, Douglas Orr.
+
+Ribar et al. (2024). Proceedings of the 41st International Conference on Machine Learning, PMLR 235:42558–42583. [Original PMLR publication](https://proceedings.mlr.press/v235/ribar24a.html) · [Official PDF](https://raw.githubusercontent.com/mlresearch/v235/main/assets/ribar24a/ribar24a.pdf).
+
+License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), per [PMLR agreement](https://proceedings.mlr.press/pmlr-license-agreement.html), clauses 2–3; attribution and original proceedings citation/link retained. Accessed 2026-10-11.
+
+File: `SparQ-PMLR235-2024.pdf`; 26 PDF pages; 1649074 bytes; SHA-256 `a0e6a2d6e94743d64ab4671f9ca95064ca2d5f87cc67a5d3b09d6a01c8e46267`; unmodified official bytes, independently checked locally. This is NOT arXiv v6 (27 pages, CC BY-SA 4.0). The advice's v6 page/section references remain v6 references and must not be read as PMLR page references.
+
 ## MInference
 
 MInference 1.0: Accelerating Pre-filling for Long-Context LLMs via Dynamic Sparse Attention

@@ -59,7 +59,7 @@
 - [ ] [S-T023] 竞品复现与整请求公平比较：Quest/FASA/SparQ/ClusterKV + MInference，
   HiP/MoBA条件候选；主表统一整请求质量及实测E2E，各方法保留原生另一阶段。
   阶段子表仅归因；我方海选/冠军/MLA扩展由Opus独占，DeepSeek仅竞品。
-  sanity核语义/配置/打分/计时，不能强制结果符合论文方向；新Quest patch缺dense分支待修。
+  sanity核语义/配置/打分/计时，不能强制结果符合论文方向；Quest新版已补dense分支，decode缺Q/K norm及验收问题待修。
   本轮文档纠偏不新增跑批矩阵、不启动GPU。([详情](task_details/S-T023.md))
 
 ## 2026-10-11（晚间）
