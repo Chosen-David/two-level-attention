@@ -5,3 +5,16 @@ hf_models
 offline_data
 lm-evaluation-harness
 __pycache__
+
+# --- bulk data / artifacts (kept out of the standalone repo) ---
+# LongBench raw datasets (444M)
+benchmark/LongBench/data/
+# RULER generated testdata
+benchmark/RULER/testdata/
+# vendored third-party trees
+third_party/
+# experiment artifacts: new files under exp/ are ignored by default;
+# selected result jsons already tracked stay tracked, add more with `git add -f`
+exp/
+# run/lock files
+*.lock
