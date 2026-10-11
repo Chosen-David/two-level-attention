@@ -341,16 +341,37 @@ def test_score_mask_derived():
         return outs
 
     n_fail = 0
+    n_sf_ulp, n_sf_tot, sf_maxrel = 0, 0, 0.0
     for cname, args in configs:
         for layer_idx, ltag in [(2, "normal"), (0, "skip")]:
             a = run(TLIIndexer, args, layer_idx, 4093, 10, 20261018)
             b = run(TLIIndexerFast, args, layer_idx, 4093, 10, 20261018)
             for step in range(10):
                 sa, sb = a[step][0], b[step][0]
-                for key in ["score_coarse", "score_fine"]:
+                # score_coarse / score_coarse_avg 未改（逐位一致）
+                for key in ["score_coarse"]:
                     if sa[key].shape != sb[key].shape or not T.equal(sa[key], sb[key]):
                         n_fail += 1
                         print(f"  {cname} {ltag} step{step} {key} MISMATCH")
+                # 【iter6】score_fine：Triton 累加顺序不同 → fp32 ULP 漂移，
+                # bf16 舍入后个别元素差 1 ULP。口径：差异元素比例 ≤ 1e-4
+                # 且差异幅度相对 ≤ 2%（1 bf16 ULP @小分数值）。mask 逐位。
+                fa, fb = sa["score_fine"], sb["score_fine"]
+                if fa.shape != fb.shape:
+                    n_fail += 1
+                    print(f"  {cname} {ltag} step{step} score_fine SHAPE")
+                else:
+                    nd = (fa != fb).sum().item()
+                    n_sf_ulp += nd
+                    n_sf_tot += fa.numel()
+                    if nd:
+                        rel = ((fa.float() - fb.float()).abs()
+                               / fa.float().abs().clamp(min=1e-3)).max().item()
+                        sf_maxrel = max(sf_maxrel, rel)
+                        if nd > fa.numel() * 1e-4 or rel > 0.02:
+                            n_fail += 1
+                            print(f"  {cname} {ltag} step{step} score_fine ULP "
+                                  f"超界: nd={nd}/{fa.numel()} rel={rel:.3e}")
                 ka, kb = sa.get("score_coarse_avg"), sb.get("score_coarse_avg")
                 if (ka is None) != (kb is None) or (
                         ka is not None and not T.equal(ka, kb)):
@@ -359,10 +380,12 @@ def test_score_mask_derived():
                 if not T.equal(a[step][1], b[step][1]):
                     n_fail += 1
                     print(f"  {cname} {ltag} step{step} MASK MISMATCH")
-    check("score_mask_derived: 4 配置 × normal/skip × 10 步 score_dict+mask 逐位一致",
-          n_fail == 0, f"mismatch={n_fail}")
+    check("score_mask_derived: 4 配置 × normal/skip × 10 步 score/mask 一致"
+          "（coarse 逐位 + fine ULP≤1e-4 + mask 逐位）",
+          n_fail == 0,
+          f"mismatch={n_fail} fine_ulp={n_sf_ulp}/{n_sf_tot} maxrel={sf_maxrel:.2e}")
 
-    # S 回退 → rep 全量重建后继续增量正确（score_fine 继续逐位）
+    # S 回退 → 全量重建后继续增量正确（score_fine ULP 口径继续一致）
     args = make_cfg(0.25, 0.125, 0.625, "minmax", "avg")
     ok_back = True
     T.manual_seed(20261019)
@@ -378,17 +401,26 @@ def test_score_mask_derived():
         sc_f = i_fast.compute_score(q, q_ids, i_fast.prepare_index(k, cu), scale)
         return sc_r, sc_f
 
+    def _sf_ok(sc_r, sc_f):
+        fa, fb = sc_r["score_fine"], sc_f["score_fine"]
+        if fa.shape != fb.shape:
+            return False
+        nd = (fa != fb).sum().item()
+        rel = ((fa.float() - fb.float()).abs()
+               / fa.float().abs().clamp(min=1e-3)).max().item() if nd else 0.0
+        return nd <= fa.numel() * 1e-4 and rel <= 0.02
+
     k1 = T.randn(1, 5000, Hkv, D, device=dev, dtype=T.bfloat16)
     sc_r, sc_f = _score_pair(k1)
-    ok_back = T.equal(sc_r["score_fine"], sc_f["score_fine"])
+    ok_back = _sf_ok(sc_r, sc_f)
     k2 = T.randn(1, 4000, Hkv, D, device=dev, dtype=T.bfloat16)   # S 回退
     sc_r, sc_f = _score_pair(k2)
-    ok_back = ok_back and T.equal(sc_r["score_fine"], sc_f["score_fine"]) \
-        and i_fast._rep["sync"] == 4000
+    ok_back = ok_back and _sf_ok(sc_r, sc_f)
     k3 = T.cat([k2, T.randn(1, 1, Hkv, D, device=dev, dtype=T.bfloat16)], dim=1)
     sc_r, sc_f = _score_pair(k3)
-    ok_back = ok_back and T.equal(sc_r["score_fine"], sc_f["score_fine"])
-    check("score_mask_derived: S 回退 rep 重建 + 后续增量 score_fine 逐位一致", ok_back)
+    ok_back = ok_back and _sf_ok(sc_r, sc_f)
+    check("score_mask_derived: S 回退全量重建 + 后续增量 score_fine ULP 口径一致",
+          ok_back)
 
 
 def test_pipeline_zero_sync():

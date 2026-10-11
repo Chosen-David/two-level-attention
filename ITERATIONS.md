@@ -12,6 +12,7 @@
 | iter3 | gather 路径零同步化（错误标志 GPU 化 + W 上界化） | 6.25 GPU / 6.75 CPU wall | 1.33×GPU / 1.43×wall | 9/9 PASS |
 | iter4 | prepare_index 增量缓存子类（块统计/quant 逐位一致） | 4.21 GPU / 4.71 CPU wall | 1.97×GPU / 2.04×wall | 12/12 PASS |
 | iter5 | compute_score rep 缓存 + compute_mask 同步消除（锚点文本派生） | 2.13 GPU / 2.63 CPU wall | 3.89×GPU / 3.66×wall | 15/15 PASS |
+| iter6 | score_fine Triton GQA K 复用（_rep 退役） | 2.15 GPU / 2.65 CPU wall（bench 口径持平；GPU busy 实降 0.46ms/层） | 3.86×GPU / 3.63×wall | 15/15 PASS |
 
 ## Iterations
 
@@ -169,4 +170,39 @@
   sync_debug_mode=error 零同步，normal+skip 双层）。既有回归 env=1
   复跑 7 套件全绿（near_swa 3/3+4/4、C3 5/5、E122 6/6、E125 尾巴 10/10、
   E125 kmeans 守卫 5/5、E116f 12/12）。
+- commit：见 git log
+
+### [iter 6] score_fine Triton GQA K 复用（compute_score 派生替换点②改写）
+- 改动：sparse_attn/indexer/tli_indexer_fast.py——新 Triton kernel
+  _score_fine_kernel（grid = (T/64, Hkv)，每 program 载 K 块 [64,128]
+  bf16→fp32，寄存器内循环 g=4 个 q 头逐头点积，K 读带宽 [T,H,D]→
+  [T,Hkv,D] 4× 削减）+ _fast_score_fine 方法（BT=64/num_warps=4，
+  参数扫描实测最优；Triton 编译失败置 _triton_ok=False 回退原版
+  repeat+einsum 表达式 fail-closed）。派生 _SCORE_REPL 替换点②扩为
+  4 行整段（b_k_qat 物化 + 双分支 einsum → Triton 调用 + 三路回退）。
+- iter5 _rep 增量缓存整体退役：Triton 直接读 k_qat 无需物化 [S,H,128]
+  fp32，**省 1.07GB/层常驻显存**（S=64K，36 层生产 = 38GB）。
+- 数字：score 阶段 64K 0.99→0.53ms（3.05×→5.7×，且全档平坦化：
+  8K-64K 全部 0.48-0.53——microbench 原版 repeat+einsum 2.63ms vs
+  Triton 0.106ms，einsum 本体 0.568 vs 0.106）。
+- 【如实记录：launch gap 转移】全步 bench 口径持平（64K normal
+  2.133→2.150）——score -0.46 被 mask（0.29→0.49）+ eager（0.37→0.60）
+  +0.43 吃掉。隔离实验（同代码 _triton_ok on/off）+ profiler 实证：
+  mask/eager 的 kernel 本体时间不变（0.250/0.254ms，47 kernel 完全
+  同），差异全部是 launch 空转 gap——原版 3ms 大 gemv 给 CPU 提前
+  排队的 lead time 掩盖了后续阶段 launch 开销；Triton 后 CPU/GPU
+  并跑无余量，gap 浮出。**GPU busy（纯 kernel 时间）实降 0.46ms/层**；
+  真实 36 层 decode 流水（CPU 每层 ~0.6ms << GPU kernel 每层 ~1.2ms，
+  CPU 跨层跑在 GPU 前面）收益真实存在，单层 event 同步口径测不出。
+  launch gap 是 iter7 主攻方向（mask 47 kernel + eager 15 kernel 融合）。
+- 数值口径（allclose 任务容内，如实分级记录）：score_coarse/score_
+  coarse_avg 未动逐位保持；score_fine fp32 累加顺序与 cublas 不同 →
+  ULP 漂移，bf16 舍入后差异 48/10.5M（4.6e-6 比例，maxrel 6.8e-3 =
+  1 bf16 ULP）；**mask/topk 选择 4 配置 × normal/skip × 10 步实测
+  逐位不变**（经验验证口径非数学保证）；attention 输出 allclose(1e-2)
+  门禁保持绿（worst 1.22e-04）。
+- 门禁：15/15 PASS（score_fine 口径改 ULP 容差 ≤1e-4 比例 + 相对
+  ≤2% + mask 仍逐位；S 回退测试同步改 ULP 口径）。既有回归 env=1
+  复跑 7 套件全绿（near_swa 3/3+4/4、C3 5/5、E122 6/6、E125 尾巴
+  10/10、E125 kmeans 5/5、E116f 12/12）。
 - commit：见 git log

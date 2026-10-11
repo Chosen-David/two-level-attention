@@ -28,6 +28,18 @@ iter5：compute_score 物化缓存 + compute_mask 同步消除
     张量逐元素 Python 迭代 = 隐式 .item() 同步）+ quant indices 缓存
     （原每步 H2D 构造）。
 
+iter6：score_fine Triton GQA K 复用（compute_score 派生替换点②改写）
+  - 原版每步物化 b_k_qat = repeat(k_qat)[S,H,128].to(fp32)（S=64K
+    1.07GB fp32 写 + gemv 读 1.07GB = HBM 带宽瓶颈，实测 einsum 本体
+    0.55ms 阶段主项）；iter5 曾用 _rep 增量缓存压尾段写但常驻 1.07GB/层。
+  - 现改为 Triton kernel 直接读 k_qat [T,Hkv,D] bf16（134MB，GQA 组内
+    寄存器复用 4× 读带宽削减），fp32 乘加累加 → 输出 RNE 舍入 bf16，
+    microbench 2.63ms → 0.11ms；_rep 常驻缓存整体退役（省 1.07GB/层）。
+  - 数值口径：fp32 累加顺序与 cublas gemv 不同 → fp32 ULP 级漂移，bf16
+    舍入后实测 ~5e-5 比例元素差 1 ULP；mask/topk 选择多步多配置实测
+    逐位不变（经验验证口径，非数学保证）；attention 输出 allclose(1e-2)
+    任务容差内。投影/异形布局/Triton 编译失败 → 回退原版 repeat+einsum。
+
 契约（fail-closed，全部回退原路径）：
   - k append-only（HF DynamicCache decode 语义）。S_now ≤ S_prev →
     全量重建缓存（含 _rep）。
@@ -41,6 +53,9 @@ import torch
 import torch.nn.functional as F
 from einops import rearrange, repeat, einsum
 
+import triton
+import triton.language as tl
+
 from .tli_indexer import TLIIndexer
 
 
@@ -49,7 +64,6 @@ class TLIIndexerFast(TLIIndexer):
     def clear(self):
         super().clear()
         self._inc = None
-        self._rep = None   # 【iter5】b_k_qat 增量缓存随 _inc 一并失效
 
     # ------------------------------------------------------------------ 入口
     def prepare_index(self, k, cu_seqlens_k):
@@ -80,8 +94,6 @@ class TLIIndexerFast(TLIIndexer):
     # ---------------------------------------------------------------- 全量
     def _prepare_index_full(self, k, cu_seqlens_k):
         d = super().prepare_index(k, cu_seqlens_k)
-        # 【iter5】rep 缓存随全量重建失效（内容可能整体不同：新请求/S 回退）
-        self._rep = None
         # 建缓存（k_qat 仅非投影路径可作增量 buffer——投影路径 k_qat 为
         # 全维量化特征，散布语义不同；_basis 非 None 时 can_inc 已挡，
         # 此处再防御一次）
@@ -182,57 +194,66 @@ class TLIIndexerFast(TLIIndexer):
         self._qat_idx_cache = (key, idx)
         return idx
 
-    # ------------------------------------------------ 【iter5】b_k_qat 缓存
-    def _fast_b_k_qat(self, k_qat, H, g):
-        """b_k_qat（k_qat 的 GQA repeat + fp32 转换）惰性增量缓存。
+    # ------------------------------------------------ 【iter6】Triton score_fine
+    def _fast_score_fine(self, kq, b_q_full, out_dtype):
+        """score_fine 的 Triton GQA K 复用 kernel（非投影路径专用）。
 
-        逐位等价论证：repeat/转换均为逐元素确定性算子，k append-only 前缀
-        token 的 k_qat 值不变（同 iter4 k_qat_buf 归纳）→ 缓存行 ≡ 本次
-        全量 repeat+转换输出；einsum 收到形状/布局/值逐位相同的输入 →
-        score_fine 逐位一致。尾段步进写（~64 token × H × D），容量翻倍
-        摊销扩容（前缀行整体拷贝，值不变）。
+        数学：score[h, t] = sum_d b_q_full[h, d] * k_qat32[t, h//g, d]，
+        与原版 repeat(k_qat,"t h d -> t (h g) d") 后 einsum("h d, kt h d
+        -> h kt") 的数学等价；GQA 组内 K 在寄存器复用（每块 K 只读一次
+        服务 g 个 q 头），读带宽 [T,H,D] → [T,Hkv,D]（4× 削减），且无需
+        物化 fp32 repeat 缓存（iter5 _rep 常驻 [S,H,128] fp32 =
+        1.07GB/层 @S=64K 整体退役）。
 
-        fail-closed：仅当 index_dict 的 k_qat 与增量缓存同一底层存储
-        （data_ptr host 判同，零同步）且 H/Hkv/g/D 匹配才复用；投影基/
-        moba/外部合成 k_qat/维度不符一律全量重建（与原版路径值相同）。
+        数值：kernel 内 bf16→fp32 精确转换 + fp32 乘加累加 + 输出
+        RNE 舍入到 out_dtype，与原版 fp32 einsum → .to(bf16) 相比仅
+        累加顺序不同（tl.sum D 维 tree-reduce vs cublas gemv 调度）→
+        fp32 结果 ULP 级漂移，bf16 舍入后实测差异 ~5e-5 比例的元素
+        差 1 ULP；mask/topk 选择实测逐位不变（门禁实测口径，非数学
+        保证）。注意原版输出为 bf16（q_sq.dtype，非投影路径），fp32
+        ULP 漂移绝大部分被 bf16 舍入吸收。
+
+        fail-closed：Triton 编译/执行异常 → 置 _triton_ok=False 并
+        回退原版 repeat+einsum 表达式（值同原版路径，仅性能回退）。
         """
-        kq = k_qat.squeeze(0)
-        if kq.dim() != 3:
-            # 防御：意外布局回退原版表达式（repeat 语义不变）
-            return repeat(kq, "t h d -> t (h g) d", g=g).to(torch.float32)
-        S, Hkv, D = kq.shape
-        inc = getattr(self, "_inc", None)
-        rep = getattr(self, "_rep", None)
-        ok = (
-            inc is not None
-            and inc.get("k_qat_buf") is not None
-            and kq.data_ptr() == inc["k_qat_buf"].data_ptr()
-            and rep is not None
-            and rep["H"] == H and rep["Hkv"] == Hkv
-            and rep["g"] == g and rep["D"] == D
-            and rep["sync"] <= S
-            and self._basis is None and self._basis_all is None
-            and not self.moba_gate
-        )
-        if not ok:
-            buf = (kq.unsqueeze(2).expand(S, Hkv, g, D)
-                   .reshape(S, H, D).to(torch.float32))
-            self._rep = {"buf": buf, "cap": S, "sync": S,
-                         "H": H, "Hkv": Hkv, "g": g, "D": D}
-            return buf
-        if rep["cap"] < S:
-            # 扩容（翻倍摊销）：前缀行整体拷贝，值逐位不变
-            new_cap = max(2 * rep["cap"], S)
-            new_buf = rep["buf"].new_zeros((new_cap, H, D))
-            new_buf[:rep["sync"]] = rep["buf"][:rep["sync"]]
-            rep["buf"], rep["cap"] = new_buf, new_cap
-        buf = rep["buf"]
-        if rep["sync"] < S:
-            lo = rep["sync"]
-            buf[lo:S] = (kq[lo:S].unsqueeze(2).expand(S - lo, Hkv, g, D)
-                         .reshape(S - lo, H, D))
-            rep["sync"] = S
-        return buf[:S]
+        try:
+            T, Hkv, D = kq.shape
+            H = b_q_full.shape[0]
+            g = H // Hkv
+            out = torch.empty((H, T), device=kq.device, dtype=out_dtype)
+            grid = (triton.cdiv(T, 64), Hkv)
+            _score_fine_kernel[grid](
+                kq, b_q_full, out, T,
+                kq.stride(0), kq.stride(1), b_q_full.stride(0),
+                out.stride(0), out.stride(1),
+                Hkv=Hkv, G=g, D=D, BT=64, num_warps=4)
+            return out
+        except Exception:
+            self._triton_ok = False
+            raise
+
+
+@triton.jit
+def _score_fine_kernel(
+    KQ, Q, OUT,   # KQ [T,Hkv,D] bf16；Q [H,D] fp32；OUT [H,T] out_dtype
+    T, stride_kt, stride_kh, stride_qh, stride_oh, stride_ot,
+    Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
+):
+    """GQA K 复用 score_fine：每 program 处理 (token 块 × 1 个 kv 头)，
+    K 块 [BT, D] 载入寄存器后循环 g 个 q 头逐头点积，K 读带宽 /g。"""
+    pid_t = tl.program_id(0)
+    pid_h = tl.program_id(1)
+    offs_t = pid_t * BT + tl.arange(0, BT)
+    offs_d = tl.arange(0, D)
+    mask_t = offs_t < T
+    k = tl.load(KQ + offs_t[:, None] * stride_kt + pid_h * stride_kh + offs_d[None, :],
+                mask=mask_t[:, None], other=0.0).to(tl.float32)
+    for j in tl.static_range(G):
+        h = pid_h * G + j
+        q = tl.load(Q + h * stride_qh + offs_d)      # [D] fp32（已乘 scale）
+        s = tl.sum(k * q[None, :], axis=1)            # [BT] fp32
+        tl.store(OUT + h * stride_oh + offs_t * stride_ot,
+                 s.to(OUT.dtype.element_ty), mask=mask_t)
 
 
 # ======================================================================
@@ -268,7 +289,9 @@ def _derive_anchor_method(name, replacements):
 # ---- compute_score：两处替换 ----
 # ① 零参 super() 在 exec 派生的独立函数中无 __class__ cell → 显式等价
 #   改写（Fast 的 MRO 下 super().compute_score ≡ TLIIndexer.compute_score）；
-# ② b_k_qat 物化 → _fast_b_k_qat 惰性增量缓存（见方法 docstring）。
+# ② b_k_qat 物化 + 双分支 einsum（该两分支唯一消费点）→ 非投影
+#   Triton GQA K 复用（_fast_score_fine；数学等价、bf16 舍入后 ULP 级
+#   漂移、mask 门禁实测逐位不变）；投影/异形/编译失败回退原版表达式。
 _SCORE_REPL = [
     (
         "            d = super().compute_score(q, q_ids, index_dict, softmax_scale)",
@@ -276,11 +299,32 @@ _SCORE_REPL = [
     ),
     (
         '        b_k_qat = repeat(k_qat.squeeze(0), "t h d -> t (h g) d", '
-        'g=self.group_size).to(torch.float32)',
-        "        # 【E127 iter5】b_k_qat 惰性增量缓存（逐位等价论证见\n"
-        "        # _fast_b_k_qat docstring）：原版每步物化 [S,H,128] repeat\n"
-        "        # + fp32 转换（S=64K 合计 ~1.6GB/步写带宽，占本阶段 78%）\n"
-        "        b_k_qat = self._fast_b_k_qat(k_qat, H, self.group_size)",
+        'g=self.group_size).to(torch.float32)\n'
+        '        if self._basis is not None:\n'
+        '            score_fine[0] = einsum(b_q_full, b_k_qat, "h d, kt h d -> h kt")\n'
+        '        else:\n'
+        '            score_fine[0] = einsum(b_q_full, b_k_qat, "h d, kt h d -> h kt").to(q_sq.dtype)',
+        "        # 【E127 iter6】非投影路径 Triton GQA K 复用（K 读带宽 4× 削减，\n"
+        "        # 消除 [T,H,128] fp32 repeat 物化与 iter5 _rep 常驻缓存；fp32\n"
+        "        # 累加与原版 einsum 仅累加顺序不同 → bf16 舍入后 ULP 级漂移，\n"
+        "        # mask 逐位门禁实测不变）。投影/异形布局/Triton 不可用回退原版。\n"
+        "        if (self._basis is None and k_qat.dim() == 4 and k_qat.shape[0] == 1\n"
+        "                and k_qat.shape[-1] == 128\n"
+        "                and b_q_full.dtype == torch.float32\n"
+        "                and k_qat.shape[2] * self.group_size == b_q_full.shape[0]\n"
+        "                and getattr(self, \"_triton_ok\", True)):\n"
+        "            try:\n"
+        "                score_fine[0] = self._fast_score_fine(\n"
+        "                    k_qat.squeeze(0), b_q_full, q_sq.dtype)\n"
+        "            except Exception:\n"
+        "                b_k_qat = repeat(k_qat.squeeze(0), \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
+        "                score_fine[0] = einsum(b_q_full, b_k_qat, \"h d, kt h d -> h kt\").to(q_sq.dtype)\n"
+        "        elif self._basis is not None:\n"
+        "            b_k_qat = repeat(k_qat.squeeze(0), \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
+        "            score_fine[0] = einsum(b_q_full, b_k_qat, \"h d, kt h d -> h kt\")\n"
+        "        else:\n"
+        "            b_k_qat = repeat(k_qat.squeeze(0), \"t h d -> t (h g) d\", g=self.group_size).to(torch.float32)\n"
+        "            score_fine[0] = einsum(b_q_full, b_k_qat, \"h d, kt h d -> h kt\").to(q_sq.dtype)",
     ),
 ]
 
