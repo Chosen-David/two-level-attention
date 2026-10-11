@@ -13,7 +13,7 @@
 | iter4 | prepare_index 增量缓存子类（块统计/quant 逐位一致） | 4.21 GPU / 4.71 CPU wall | 1.97×GPU / 2.04×wall | 12/12 PASS |
 | iter5 | compute_score rep 缓存 + compute_mask 同步消除（锚点文本派生） | 2.13 GPU / 2.63 CPU wall | 3.89×GPU / 3.66×wall | 15/15 PASS |
 | iter6 | score_fine Triton GQA K 复用（_rep 退役） | 2.15 GPU / 2.65 CPU wall（bench 口径持平；GPU busy 实降 0.46ms/层） | 3.86×GPU / 3.63×wall | 15/15 PASS |
-| iter7 | eager gather Triton 融合（~15 op → 2 kernel） | bench 被外部容器负载污染（无效，复测 watcher 在飞）；隔离 microbench eager 0.60→~0.25ms | 待干净复测定案 | 15/15 PASS |
+| iter7 | eager gather Triton 融合（~15 op → 2 kernel） | 1.73 GPU / 2.23 CPU wall | 4.79×GPU / 4.31×wall | 15/15 PASS |
 
 ## Iterations
 
@@ -242,18 +242,32 @@
   含生产构造路径**，已补生产形态 int64 cu 对拍：allclose maxdiff
   9.77e-04）。修复：helper 内确定性 cast int64→int32（2 元素 tiny
   kernel，值逐位同）+ 路由放宽接受 int64。修复后 eager 阶段 launch
-  37→**6**（cu cast/full/qs mul/qs to/kernel A/kernel B），单步整步
-  launch 158→~127（干净复测定案）。**全步定案数字待 GPU 空闲复测**
-  （watcher /tmp/e127_wait_gpu_rerun.sh pid 2993511 在飞，自动重跑并
-  覆写 e127_stage_bench_iter7.json，完成后追加复测补记 commit）。
+  37→**6**（cu cast/full/qs mul/qs to/kernel A/kernel B）。
+- 数字（GPU 空闲态复测定案，watcher 02:24 自动重跑覆写
+  e127_stage_bench_iter7.json）：S=64K normal 全步 **1.73 GPU / 2.23 wall
+  （vs baseline 4.79× / 4.31×）**；64K skip 5.18×/4.60×、32K normal
+  2.69×/2.69×、16K normal 1.70×/1.75×。eager 阶段 16K-64K 全档
+  0.55-0.60 → **0.186-0.191ms（3.2×）**且全档平坦（gather 本
+  O(R·W·D) 与 S 无关，torch 路径的 launch 空转被 2-kernel 消除后真实
+  kernel 时间浮出）；8K 档 dense 路由零回归（eager 0.516 不变、全步
+  2.01 vs baseline 2.15 噪声内）。单步 CUDA launch 137（baseline）→
+  **127**（eager 段 37→6）。vs iter5 全步口径 2.13→1.73（eager 单点
+  -0.40ms 兑现）。
+- 附带发现（只读分析，iter8 输入）：增量 prepare_index 真实口径 33
+  launches 零 H2D/DtoH——此前探针测得 45+5 memcpy 系固定-S 重复调用
+  误走全量路径的口径错误（与 iter6 profiler 教训同型）；全量版 anchors
+  每步 torch.tensor(list) 构造 indices 的 pageable H2D 仅 prefill/回退
+  触发。剩余 launch 大头：compute_mask 35（4×topk+3 排序+3 MeanOps+
+  softmax 链）、compute_score 27、cu 构造 4（含 prepare_cu_seqlens 的
+  pageable H2D ×1，gates 注释既知）、metrics 7。
 - 门禁：15/15 PASS——eager 7/7（allclose 全配置 worst 1.95e-03 + B7 小
   序列双路径当场 raise + B7 大序列 gather 尾部 raise + W 超上界/cu 破坏
   尾部 raise + 零 host 同步 40 次调用零异常，python±-O 双跑同绿）；其余
   8 项（metrics 2 / indexer 3 / score_mask_derived 2 / pipeline_zero_sync
   1）保持绿。fail-closed 专项验证：注入 Triton 异常 → 回退 torch gather
   输出 vs dense allclose（maxdiff 4.88e-04）+ 标志持续 False（exp/bench/
-  _scratch_fallback_check.py）。既有回归 env=1 复跑 7 套件全绿（near_swa
+  _scratch_fallback_check.py）+ 生产形态 int64 cu 对拍 allclose（maxdiff
+  9.77e-04）。既有回归 env=1 复跑 7 套件全绿（near_swa
   3/3+4/4、C3 5/5、E122 6/6、E125 尾巴 10/10、E125 kmeans 守卫 5/5、
-  E116f 12/12）。launch profile：一步 CUDA kernel 158（污染跑口径，含
-  Triton JIT 侧计数；干净复测定案）。
+  E116f 12/12）。
 - commit：见 git log
