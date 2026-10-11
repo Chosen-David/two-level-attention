@@ -75,6 +75,12 @@ def enforce_context_capability_gate(model_name, model_path, experiment_cap,
     返回 dict（测试可消费）：{capability, max_position_embeddings,
     tokenizer_suggested_max_length, model_card_declared_context,
     experiment_cap}——fail-closed 路径不返回（SystemExit）。
+    096（TL-DSV2-CAP-PROVENANCE-096）追加注册表侧三键
+    {registry_protocol_cap, registry_restricted_context_treatment,
+    registered}：run-cap manifest（benchmark/LongBench/run_cap_manifest.py）
+    消费 protocol cap / restricted treatment 值把 cap 绑进结果产物身份——
+    修复前该返回值被 pred.py 丢弃（096 审计 P1）。未登记/注册表缺失的
+    跳过路径仍返回 None，消费侧按 unregistered 折叠。
     """
     if stream is None:
         stream = sys.stdout
@@ -165,4 +171,11 @@ def enforce_context_capability_gate(model_name, model_path, experiment_cap,
         "tokenizer_suggested_max_length": tok_meta,
         "model_card_declared_context": reg_card,
         "experiment_input_cap": experiment_cap,
+        # 096：注册表侧字段（run-cap manifest 消费——cap 绑进结果产物
+        # 身份；restricted_context_treatment 登记缺省时如实记 null）
+        "registry_protocol_cap": reg_cap,
+        "registry_restricted_context_treatment": (
+            (entry.get("restricted_context_treatment") or {}).get("value")
+        ),
+        "registered": True,
     }

@@ -244,6 +244,18 @@ def test_094():
         "TL-DSV2-DOUBLE-BOS-094", "context_capability_gate",
         "enforce_context_capability_gate", "TL-DSV2-CONTEXT-CAP-093",
         "max_length = model2maxlen",
+        # 096（TL-DSV2-CAP-PROVENANCE-096）修复新增范围：run-cap manifest
+        # 落盘（gate 返回值消费 cap_gate_info / runcap sidecar 两阶段写 /
+        # get_pred 逐样本 run_stats 采集 / 写门上移 method_name 计算块）。
+        # T6 语义 = OLD_BASE→当前 HEAD 每个变更 hunk 都在既定修复范围内；
+        # 096 合入后预期清单相应扩展（Qwen 等其他模型生成路径仍零改动）。
+        "TL-DSV2-CAP-PROVENANCE-096", "runcap", "run_cap",
+        "cap_gate_info", "run_stats", "truncated_flag",
+        # 095（GPT 审计 2026-10-12_0527 同批协同修复，另一 agent 在本仓
+        # 并行接入）：请求级 fail-closed guard（TLI_E127_FAST gather 路径
+        # 三类契约违规的入口闭包）——生成段整体包进 with
+        # eager_decoding_request_guard() 并整体缩进。
+        "095", "eager_decoding_request_guard",
     )
     hunks, cur = [], None
     for l in diff_lines:
@@ -256,13 +268,34 @@ def test_094():
             cur.append(l)
     if cur:
         hunks.append(cur)
+    # 搬迁/缩进伪影豁免（095 guard 整体缩进 + 096 method_name 计算块上移
+    # 都会把既有代码整块 re-indent/搬位，difflib 对齐会把它们切成不含任何
+    # 标记的孤立 hunk）：一个无标记 hunk 若其每一行（去缩进）都在对面
+    # 版本中逐字存在，则属既有代码的纯搬迁/缩进（无新行为），放行；
+    # 任何对面不存在的新行（真正的新行为）仍会被拦。
+    def _norm(line):
+        return line[1:].strip() if line[:1] in ("+", "-") else line.strip()
+    old_lines = {_norm(l) for l in old_src.splitlines()}
+    new_lines = {_norm(l) for l in new_src.splitlines()}
+
+    def _is_relocation(hunk):
+        for line in hunk:
+            n = _norm(line)
+            if not n:
+                continue
+            if line[0] == "-" and n not in new_lines:
+                return False
+            if line[0] == "+" and n not in old_lines:
+                return False
+        return True
     stray = [h for h in hunks
              if not any(any(m in line for m in allowed_markers)
-                        for line in h)]
+                        for line in h)
+             and not _is_relocation(h)]
     _check(not stray,
            f"T6 old→new pred.py 共 {len(hunks)} 个变更 hunk 全部含 DeepSeek "
-           f"093/094 修复预期标记（无越界 hunk：{stray[:1]}）——Qwen 等其他"
-           f"模型路径零改动")
+           f"093/094 修复预期标记或属既有代码纯搬迁/缩进伪影（无越界 "
+           f"hunk：{stray[:1]}）——Qwen 等其他模型路径零改动")
 
 
 # ------------------------------------------------------------ 093 上下文 cap
@@ -418,10 +451,15 @@ def test_093():
     _check("model2maxlen" not in info_src,
            "T21 sparse_attn/info.py 不含 model2maxlen 消费（081 snapshot "
            "闭包与实验 cap 解耦，cap 变更无需改 manifest——如实登记）")
-    # 修复合入后消费点新增白名单：gate（读 model2maxlen 属修复设计）+ 本测试
-    # 文件自身（断言字符串）。不变式=缺陷基线上的既有消费点未被触碰。
+    # 修复合入后消费点新增白名单：gate（093 读 model2maxlen 属修复设计）+
+    # 本测试文件自身（断言字符串）+ 096 run-cap manifest 层
+    # （run_cap_manifest.py 的 effective_cap_source 注记 / backfill 工具 /
+    # 096 门禁测试）。不变式=缺陷基线上的既有消费点未被触碰（T21c），
+    # 且 sparse_attn/info.py（081 treatment snapshot 层）仍不消费。
     allowed_consumers = ("pred.py", "pred_kvcf.py",
-                         "context_capability_gate.py", "test_dsv2_093_094_fix.py")
+                         "context_capability_gate.py", "test_dsv2_093_094_fix.py",
+                         "run_cap_manifest.py", "backfill_run_cap_manifest.py",
+                         "test_e096_cap_provenance.py")
     grep_hits = _sh(["git", "grep", "-l", "model2maxlen", "main", "--",
                      "*.py"]).strip().splitlines()
     _check(all(any(c in h for c in allowed_consumers) for h in grep_hits),

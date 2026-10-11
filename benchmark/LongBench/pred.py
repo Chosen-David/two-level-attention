@@ -21,6 +21,18 @@ from benchmark.LongBench.lbv2_choice import extract_choice_official
 from benchmark.LongBench.context_capability_gate import (
     enforce_context_capability_gate,
 )
+# 096（TL-DSV2-CAP-PROVENANCE-096，GPT 审计 2026-10-12_0527_08819a7）：
+# run 级 cap provenance manifest——全 method（含 none/fullkv）把实验输入
+# cap 绑进结果产物身份，与 081 treatment snapshot 是两个独立层（cap 不进
+# info.py treatment manifest，见 run_cap_manifest.py 模块头注释）。
+from benchmark.LongBench.run_cap_manifest import (
+    build_run_cap_core,
+    compute_result_binding,
+    finalize_run_cap_manifest,
+    gate_run_cap_identity,
+    resolve_producer_identity,
+    write_run_cap_manifest,
+)
 from sparse_attn.arguments import add_sparse_attn_args
 from sparse_attn.patches import register_patch
 from sparse_attn.metrics import get_metrics
@@ -156,6 +168,7 @@ def get_pred(
     device,
     model_name,
     data_fp="",
+    run_stats=None,  # 096：每样本实际输入 token 数 / 截断标记（run-cap manifest）
 ):
     preds = []
 
@@ -181,11 +194,17 @@ def get_pred(
             tokenized_prompt = tokenizer(
                 prompt, truncation=False, return_tensors="pt", add_special_tokens=False
             ).input_ids[0]
+        # 096（TL-DSV2-CAP-PROVENANCE-096）：记录本样本是否发生中部截断
+        # （截断判据 = 模板前 tokenized_prompt 超过本次 max_length）——
+        # run-cap manifest 的 per-sample truncated 标记来源。
         if len(tokenized_prompt) > max_length:
+            truncated_flag = True
             half = int(max_length / 2)
             prompt = tokenizer.decode(
                 tokenized_prompt[:half], skip_special_tokens=True
             ) + tokenizer.decode(tokenized_prompt[-half:], skip_special_tokens=True)
+        else:
+            truncated_flag = False
         # TL-DSV2-DOUBLE-BOS-094（GPT 审计 2026-10-12_0330）：记录本样本是否
         # 套了 chat template——DeepSeek 模板首部即 {{ bos_token }}，渲染文本
         # 已以 BOS 开头，后续 tokenizer 编码不得再自动补 BOS（见下方
@@ -257,6 +276,15 @@ def get_pred(
                 q_input.input_ids = q_input.input_ids[:, 1:]
 
         context_length = input.input_ids.shape[-1] + q_input.input_ids.shape[-1]
+        # 096（TL-DSV2-CAP-PROVENANCE-096）：每样本实际输入 token 数（chat
+        # 模板后、question 拼接后的终值）进 run-cap manifest——修复前每行
+        # JSONL 只记数据集原字段 length，本次 max_length/实际输入/是否截断
+        # 均不落盘（096 审计 P1）。
+        if run_stats is not None:
+            run_stats.setdefault("input_tokens", []).append(
+                int(context_length))
+            run_stats.setdefault("truncated", []).append(
+                bool(truncated_flag))
 
         # 【095 修复（GPT 审计 2026-10-12_0527，2026-10-12）】请求级
         # fail-closed guard：TLI_E127_FAST=1 的 gather 路径把三类契约违规
@@ -528,7 +556,11 @@ if __name__ == "__main__":
     # load_model_and_tokenizer 之后提前到此处（同一 dict 查找，仅求值时序
     # 变化，语义不变）。
     max_length = model2maxlen[model_name]
-    enforce_context_capability_gate(
+    # 096（TL-DSV2-CAP-PROVENANCE-096）：接收并消费 gate 返回值——修复前
+    # 该调用不接收返回值，含 experiment_input_cap / 注册表 protocol cap 的
+    # 字典被丢弃（096 审计 P1 原话）。cap_gate_info 由 run-cap manifest
+    # 消费（cap 绑进结果产物身份），None（未登记模型）按 unregistered 折叠。
+    cap_gate_info = enforce_context_capability_gate(
         model_name, model2path, max_length, config_path
     )
     model, tokenizer = load_model_and_tokenizer(
@@ -607,19 +639,12 @@ if __name__ == "__main__":
                 ensure_ascii=False, sort_keys=True,
             )
             data_fp = _hashlib.sha256(_fp_src.encode("utf-8")).hexdigest()[:12]
-        preds = get_pred(
-            model,
-            tokenizer,
-            data,
-            max_length,
-            max_gen,
-            prompt_format,
-            dataset,
-            device,
-            model_name,
-            data_fp=data_fp,
-        )
 
+        # 096（TL-DSV2-CAP-PROVENANCE-096）：method_name/out_fn/out_path 从
+        # get_pred 之后上移到此处——run-cap 写门的早期 [CAP-CLASH] 检测在
+        # 烧 GPU 之前完成（同 task/method/时间戳不同 cap 直接拒，不必等
+        # 整轮生成跑完才发现口径冲突）。method_name 只依赖 args/snapshot
+        # （与 get_pred 无数据依赖），提前计算逐位不变。
         # 081：method_name 从冻结 snapshot 派生（tli 臂）——生成窗口内
         # 文件被替换时文件名仍等于 runtime/sidecar 的内容身份。
         method_name = get_method_name_with_info(args, snapshot)
@@ -635,14 +660,52 @@ if __name__ == "__main__":
             # 走重建路径时不经过上面的 replace，与未截断路径口径一致）。
             # 081 + kimi3 0316 追加修复 1：上限 245 → 230——out_fn 落盘
             # 要拼 ".jsonl"（6）且写门会创建 sidecar ".tli_manifest.json"
-            # （18），245 下 sidecar 实名 269 > ext4 255 单文件名上限 →
-            # open 抛 OSError 36 裸 traceback（破坏 076 fail-closed 统一
-            # 口径）；230 = 255 − 6 − 18 − 1，与
-            # truncate_output_name_keep_hash 缺省 limit 同源。
+            # （18）+ ".runcap.json"（13，096），245 下 sidecar 实名超
+            # ext4 255 单文件名上限 → open 抛 OSError 36 裸 traceback
+            # （破坏 076 fail-closed 统一口径）；230 = 255 − 6 − 18 − 1，
+            # 与 truncate_output_name_keep_hash 缺省 limit 同源。
             out_fn = truncate_output_name_keep_hash(
                 dataset_prefix, method_name, args.t)
             out_fn = out_fn.replace(" ", "").replace("'", "")
         out_path = f"{dir}/{out_fn}.jsonl"
+
+        # 096：run 级 cap provenance manifest（全 method 含 none/fullkv——
+        # 修复前 fullkv 无任何 provenance 旁挂，16K 与 31.5K 产物可同路径
+        # 互覆或被当同一 treatment，产物自身无法证明处理口径，096 审计 P1）。
+        # 写门 fail-closed：同路径已存在不同 cap 的 manifest → [CAP-CLASH]
+        # 拒绝运行（093 修复链的落盘闭包）。
+        runcap_core = build_run_cap_core(
+            model_name=model_name,
+            model_path=model2path,
+            method=args.method,
+            dataset=dataset,
+            dataset_fingerprint=data_fp,
+            run_timestamp=args.t,
+            effective_cap=max_length,
+            cap_gate_info=cap_gate_info,
+            max_new_tokens=max_gen,
+            producer=resolve_producer_identity(__file__),
+        )
+        runcap_sidecar = gate_run_cap_identity(out_path, runcap_core)
+        # 096：生成期采集每样本实际输入 token 数 / 截断标记（get_pred 内
+        # 逐样本 append，见 run_stats 参数）。
+        run_stats = {}
+        preds = get_pred(
+            model,
+            tokenizer,
+            data,
+            max_length,
+            max_gen,
+            prompt_format,
+            dataset,
+            device,
+            model_name,
+            data_fp=data_fp,
+            run_stats=run_stats,
+        )
+        # 096：method_name/out_fn/out_path 计算块已上移至 get_pred 之前
+        # （run-cap 写门早期 CAP-CLASH 检测，
+        # TL-DSV2-CAP-PROVENANCE-096）。
 
         # 076（TL-E121-OUTPUT-ID）fail-closed 写入门：tli 输出目标已存在
         # 时，须以 sidecar manifest 字节级证明同 treatment 才允许重写
@@ -665,10 +728,31 @@ if __name__ == "__main__":
             with open(sidecar, "w", encoding="utf-8") as f:
                 f.write(manifest_json)
 
+        # 096（TL-DSV2-CAP-PROVENANCE-096）：先落 generating manifest 再写
+        # 数据（076 tli sidecar 同款崩溃语义：数据写之前 manifest 已在盘上，
+        # 中断窗口留 manifest 可证 cap，不留无主数据；status=generating 告知
+        # 消费侧结果 sha 未绑定）。写门 + 两阶段均在 run_cap_manifest.py。
+        write_run_cap_manifest(runcap_sidecar, finalize_run_cap_manifest(
+            runcap_core, status="generating", n_samples=len(preds),
+            input_tokens=run_stats.get("input_tokens"),
+            truncated_flags=run_stats.get("truncated"),
+            result_file=os.path.basename(out_path),
+            result_sha256=None, result_lines=None))
+
         with open(out_path, "w", encoding="utf-8") as f:
             for pred in preds:
                 json.dump(pred, f, ensure_ascii=False)
                 f.write("\n")
+
+        # 096：生成完成后回填结果文件 sha256 + 行数（status generating →
+        # complete；原子替换，读侧永不见半文件）。
+        runcap_sha, runcap_lines = compute_result_binding(out_path)
+        write_run_cap_manifest(runcap_sidecar, finalize_run_cap_manifest(
+            runcap_core, status="complete", n_samples=len(preds),
+            input_tokens=run_stats.get("input_tokens"),
+            truncated_flags=run_stats.get("truncated"),
+            result_file=os.path.basename(out_path),
+            result_sha256=runcap_sha, result_lines=runcap_lines))
 
         budgets = [pred["budget"] for pred in preds if pred["budget"] is not None]
         ave_budget = sum(budgets) / len(budgets) if len(budgets) > 0 else None
