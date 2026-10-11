@@ -346,7 +346,45 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
 
 
+def _patch_deepseek_dynamic_cache_compat():
+    """DeepSeek-V2 trust_remote_code modeling（modeling_deepseek.py）依赖
+    transformers 旧版 DynamicCache API：get_usable_length / seen_tokens /
+    get_max_length。transformers 4.56.2 已移除三者 → monkey-patch 补齐
+    兼容 shim（语义对齐旧版，仅当方法缺失时注入，不影响其他模型）。
+    """
+    from transformers.cache_utils import DynamicCache
+
+    if not hasattr(DynamicCache, "get_usable_length"):
+
+        def _get_usable_length(self, new_seq_length=None, layer_idx=0):
+            # 旧版语义：返回该层已缓存 KV 数量（层未创建返回全局已见数）。
+            return self.get_seq_length(layer_idx)
+
+        DynamicCache.get_usable_length = _get_usable_length
+
+    if not hasattr(DynamicCache, "get_max_length"):
+
+        def _get_max_length(self):
+            # 旧版 DynamicCache 语义：无固定上限 → None（不触发 mask 裁剪）。
+            return None
+
+        DynamicCache.get_max_length = _get_max_length
+
+    if not hasattr(DynamicCache, "seen_tokens"):
+
+        @property
+        def _seen_tokens(self):
+            # 4.56.2 无全局 _seen_tokens 计数；无裁剪连续生成时
+            # layer0 长度 == 全局已见 token 数。
+            return self.get_seq_length(0)
+
+        DynamicCache.seen_tokens = _seen_tokens
+
+
 def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
+    # DeepSeek-V2 trust_remote_code 需要旧版 DynamicCache API 兼容
+    if "DeepSeek-V2" in model_name:
+        _patch_deepseek_dynamic_cache_compat()
     tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
         path, trust_remote_code=True, torch_dtype=torch.bfloat16, device_map="auto"
