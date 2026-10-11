@@ -78,28 +78,58 @@ def test_prefill_dense_consistency():
     print("[PASS] test_prefill_dense_consistency")
 
 
+def test_full_budget_dense_equivalence():
+    """【GPT 审计 2026-10-11 门禁】token_budget 全预算时，quest_vendor 的
+    prefill+decode 输出必须与 dense 完全一致（torch.equal）。
+
+    全保留的实现前提（官方语义）：local_heavy_hitter_mask 的 topk 用
+    k = min(max(3, token_budget // chunk_size), num_chunks)，而 quest forward
+    里 token_budget = min(kv_seq_len, self.token_budget)。当 kv_seq_len 不是
+    chunk_size 整数倍时，kv_seq_len // chunk_size < num_chunks → 最后含新
+    token 的 chunk 会被丢弃 → 稀疏必生效，无法用「全预算」验证 dense 等价。
+    因此本测试用 chunk_size=1（每 token 一个 chunk），使 kv_seq_len // 1 =
+    num_chunks，真正全保留。此时若 K/V 前处理（q_norm/k_norm）缺失，decode
+    新 K 与 prefill 缓存 K 不在同一空间，输出会确定性不一致（暴露 bug）。"""
+    model, _ = make_model()
+    ids = torch.randint(0, 128, (1, 40))
+    pre_native, dec_native = run(model, ids, num_new=5)
+
+    model2, _ = make_model()
+    enable_quest(model2, token_budget=100000, chunk_size=1)  # 全预算（chunk=1 保证全保留）
+    pre_quest, dec_quest = run(model2, ids, num_new=5)
+
+    assert torch.equal(pre_native, pre_quest), "全预算 prefill 输出不一致"
+    for i, (dn, dq) in enumerate(zip(dec_native, dec_quest)):
+        assert torch.equal(dn, dq), (
+            f"全预算 decode step {i} 输出不一致——K/V 前处理（q_norm/k_norm）"
+            f"未对齐（prefill 缓存与 decode 新 K 不在同一空间）"
+        )
+    print("[PASS] test_full_budget_dense_equivalence")
+
+
 def test_decode_sparse_active_and_bounded():
     model, _ = make_model()
-    ids = torch.randint(0, 128, (1, 8))
-    _, dec_native = run(model, ids)
+    # 序列（100）须超 token_budget（16）——短序列 + 大预算时稀疏零删减，
+    # 要求输出不同反而掩盖 norm bug（GPT 审计 2026-10-11 指正）。
+    ids = torch.randint(0, 128, (1, 100))
+    _, dec_native = run(model, ids, num_new=5)
 
     model2, _ = make_model()
     enable_quest(model2, token_budget=16, chunk_size=4)
-    _, dec_quest = run(model2, ids)
+    _, dec_quest = run(model2, ids, num_new=5)
 
     for i, (dn, dq) in enumerate(zip(dec_native, dec_quest)):
         assert torch.isfinite(dq).all(), f"decode step {i} 输出含 NaN/Inf"
         assert torch.isfinite(dn).all(), f"dense step {i} 输出含 NaN/Inf"
-        # 稀疏应改变输出（除浅层 dense 层外，深层稀疏生效）
-        # 至少 logits 不同（不能等于 dense）
-        if i >= 1:  # 第 0 步可能恰好接近，放宽
-            diff = (dq - dn).abs().max().item()
-            assert diff > 0, f"decode step {i} 稀疏与 dense 输出相同（稀疏未生效）"
+        # 序列超预算 → 稀疏生效 → 输出与 dense 不同
+        diff = (dq - dn).abs().max().item()
+        assert diff > 0, f"decode step {i} 稀疏与 dense 输出相同（稀疏未生效）"
     print("[PASS] test_decode_sparse_active_and_bounded")
 
 
 if __name__ == "__main__":
     test_enable_patches_and_fields()
     test_prefill_dense_consistency()
+    test_full_budget_dense_equivalence()
     test_decode_sparse_active_and_bounded()
     print("\n全部通过 ✓")

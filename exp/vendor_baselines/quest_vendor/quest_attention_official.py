@@ -1,8 +1,13 @@
-"""Quest 官方 quest_attention.py 原样复制（B 轨 vendor 源码，未改动）。
+"""Quest 官方 quest_attention.py 复制（B 轨 vendor），选择算法逐字节官方。
 
 来源：third_party/quest/evaluation/quest_attention.py（Quest 官方仓库
-mit-han-lab/Quest，snapshot quest@01c1623b）。本文件与官方逐字节一致
-（md5 78e87fb8cc71ac058c860e2305a7b466），仅在文件头附加本 provenance 说明。
+mit-han-lab/Quest，snapshot quest@01c1623b）。官方原文件与仓库逐字节一致
+（md5 78e87fb8cc71ac058c860e2305a7b466）。本副本唯一改动 = forward 投影后
+按 Qwen3 语义补 q_norm/k_norm 前处理（官方 Llama/Mistral 版无此步骤；
+prefill 走 Qwen3 原生 flash_forward 已 norm，decode 若不 norm 会导致同一
+token 的 K 前处理不一致 → KV 缓存混合污染）。**选择算法（sign 符号匹配 +
+chunk max-pool score + topk chunk + 因果 tril）与官方逐字节一致，未改动。**
+hasattr(self,"q_norm") 检查保证对 Llama/Mistral（无 q_norm）行为不变。
 用法：由 qwen3_quest_patch.py 的适配层 import（forward /
 local_heavy_hitter_mask），绑定到 Qwen3Attention。
 """
@@ -100,21 +105,29 @@ def forward(
             **kwargs,
         )
 
-    query_states = (
-        self.q_proj(hidden_states)
-        .view(bsz, q_len, self.num_heads, self.head_dim)
-        .transpose(1, 2)
+    # 【Qwen3 前处理适配，2026-10-11】官方 Quest forward 为 Llama/Mistral
+    # 编写，无 q_norm/k_norm；Qwen3 eager 在投影后对每个 head_dim 做 RMSNorm
+    # （Qwen3RMSNorm(self.head_dim)，modeling_qwen3.py:183/200-201）。
+    # prefill（Qwen3 原生 flash_forward）缓存的是 norm 后的 K/V，decode 若
+    # 走无 norm 路径 → 同一 token 的 K 前处理不一致 → KV 缓存混合污染。
+    # 此处在投影后、RoPE 前按 Qwen3 语义补 norm；选择算法（sign/chunk
+    # max-pool/topk/tril）逐字节不动。hasattr 检查保证 Llama/Mistral
+    # （无 q_norm）行为不变。
+    query_states = self.q_proj(hidden_states).view(
+        bsz, q_len, self.num_heads, self.head_dim
     )
-    key_states = (
-        self.k_proj(hidden_states)
-        .view(bsz, q_len, self.num_key_value_heads, self.head_dim)
-        .transpose(1, 2)
+    key_states = self.k_proj(hidden_states).view(
+        bsz, q_len, self.num_key_value_heads, self.head_dim
     )
-    value_states = (
-        self.v_proj(hidden_states)
-        .view(bsz, q_len, self.num_key_value_heads, self.head_dim)
-        .transpose(1, 2)
+    value_states = self.v_proj(hidden_states).view(
+        bsz, q_len, self.num_key_value_heads, self.head_dim
     )
+    if hasattr(self, "q_norm") and self.q_norm is not None:
+        query_states = self.q_norm(query_states)  # per-head dim RMSNorm（Qwen3 前处理）
+        key_states = self.k_norm(key_states)
+    query_states = query_states.transpose(1, 2)
+    key_states = key_states.transpose(1, 2)
+    value_states = value_states.transpose(1, 2)
     
     # New cache format
     if isinstance(past_key_value, DynamicCache):
@@ -147,9 +160,13 @@ def forward(
     key_states = repeat_kv(key_states, self.num_key_value_groups)
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
-    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(
-        self.head_dim
-    )
+    # 【Qwen3 数值对齐，2026-10-11】官方用「除以 sqrt(head_dim)」，Qwen3 eager
+    # 用「乘以 head_dim**-0.5」（self.scaling）。数学等价，但 bf16 下除法与
+    # 乘法的逐元素舍入有 ULP 级差异 → 全预算下官方 forward 与 Qwen3 eager 的
+    # attention 权重存在 ~0.0009 输出差（非稀疏路径即可见）。统一为乘法
+    # （与 Qwen3 eager 数值逐位一致）；非 attention 选择算法，scaling 为常数。
+    scaling = getattr(self, "scaling", self.head_dim**-0.5)
+    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) * scaling
 
     sign = (query_states > 0) + (~(query_states > 0)) * -1
     max_key = key_states * sign
