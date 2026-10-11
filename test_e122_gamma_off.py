@@ -88,6 +88,7 @@ def drive_compute_mask(args, fine_1h, kt, far_inject=None):
         idx._km_centroids = far_inject["centroids"]      # [Hkv, K_c, d']
         idx._km_token_assign = far_inject["assign"]      # [Hkv, Tfar]
         idx._km_far_lo = far_inject["far_lo"]
+        idx._km_far_hi_cached = far_inject["far_hi"]     # E125：簇缓存契约字段
         idx._km_dims = far_inject["dims"]
         idx._last_q = far_inject["last_q"]               # [H, D]（已缩放语义）
     T = fine_1h.shape[-1]
@@ -102,10 +103,14 @@ def drive_compute_mask(args, fine_1h, kt, far_inject=None):
     return idx, mask
 
 
-def make_far_inject(Tfar, n_c0, d=4, far_lo=128):
+def make_far_inject(Tfar, n_c0, far_hi, d=4, far_lo=128):
     """合成 far 簇机制：2 簇，c0 分 1.0、c1 分 0.0；前 n_c0 个 token 归 c0。
 
     _last_q = e_0（128 维）→ q·c0 = 1.0、q·c1 = 0.0（两 head 同构）。
+    far_hi：簇缓存真实覆盖右缘（token 坐标）。E125 契约：生产者建簇时把
+    far_hi 写进 _km_far_hi_cached，消费端 (0,0)+cluster 分支直接读它作
+    far_tok_hi（单一事实源）——合成注入必须同步携带该字段才算忠实
+    模拟"簇缓存已初始化"状态。
     """
     centroids = torch.zeros(2, 2, d)
     centroids[:, 0, 0] = 1.0                       # h∈{0,1} 的簇 0 = e_0
@@ -117,6 +122,7 @@ def make_far_inject(Tfar, n_c0, d=4, far_lo=128):
         "centroids": centroids,
         "assign": assign,
         "far_lo": far_lo,
+        "far_hi": far_hi,
         "dims": torch.arange(d),
         "last_q": last_q,
     }
@@ -200,7 +206,7 @@ def t2_cavg_concat_mapping():
         far_lo, far_hi, near_lo, near_hi = 128, 3136, 3136, 3968
         K2_mid = 1792
         Tfar = far_hi - far_lo          # 3008（注入簇分数宽度 = far 区宽）
-        inj = make_far_inject(Tfar, n_c0=1504)
+        inj = make_far_inject(Tfar, n_c0=1504, far_hi=far_hi)
         fine = torch.zeros(T)
         # near 分 5.0+梯度：off 下被选中的 near = p 最高的 288 个（梯度最大端）
         near_pos = torch.arange(near_lo, near_hi)
@@ -265,7 +271,7 @@ def t3_zero_zero_near_empty():
         far_lo, far_hi = 128, 3968
         K2_mid = 1792
         Tfar = far_hi - far_lo          # 3840
-        inj = make_far_inject(Tfar, n_c0=2000)
+        inj = make_far_inject(Tfar, n_c0=2000, far_hi=far_hi)
         fine = torch.zeros(T)
         fine[sink_tok:swa_lo] = 1.0 + 1e-6 * torch.arange(swa_lo - sink_tok)
         cfg = dict(tli_enable_layer_skip=False, tli_far_method="avg",
@@ -313,7 +319,7 @@ def t4_edges():
         #     swa 强制区 token [192,256) 不进竞争不占预算
         S2 = 320
         Tfar = 128                       # 簇覆盖 [128,256)
-        inj = make_far_inject(Tfar, n_c0=64)   # 前 64（[128,192)）簇 0 分 1.0
+        inj = make_far_inject(Tfar, n_c0=64, far_hi=256)   # 前 64（[128,192)）簇 0 分 1.0
         fine2 = torch.zeros(S2)
         cfg_b = dict(tli_enable_layer_skip=False, tli_far_method="minmax",
                      tli_near_method="avg", tli_alpha=0.25, tli_beta=0.125,
