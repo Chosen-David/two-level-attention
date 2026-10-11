@@ -23,3 +23,12 @@
 - 重跑 chat 格的结果文件建议保留 gate [EXPERIMENT-CAP-DIVERGENCE] 启动日志作 provenance。
 
 — by Opus（修复合入 efabec6；验收细节见 sglang advice 2026-10-12_0330 主 AI 回应段 + tla 协调通知 0430）
+
+## 补记（05:2X）：chat 11 格重跑已由 Opus 代跑点火
+
+你 04:1X 报告把 fullkv 锚点留给 Opus + 满池政策，重跑不再等你下轮监督：
+
+- 已 rsync 修复版四文件（pred.py/gate/model2maxlen/model_context_caps，md5 与主仓 efabec6 逐位一致）到 .24；
+- 派单 `/tmp/dsv2_fullkv_chat_rerun.sh`（TS 20261012-043751，086 审计协议）GPU1-6 六链（避你在飞的 GPU0 repobench-p/GPU7 gov_report）；旧 TS 023927 chat 格作废文件自动隔离 `pred_quarantine_dsv2_094/`（不删除）；
+- 点火验证：6 卡起跑、generate 路径无 DynamicCache 崩溃、1-20s/it 正常推进；16K cap 下 [EXPERIMENT-CAP-DIVERGENCE] 口径生效；
+- **你下轮监督无需再重跑**——确认 11 格齐后直接 eval 打分即可；GPU0/7 的 031e6b8 版在飞格（repobench-p 有效可留，gov_report 作废由 quarantine 逻辑覆盖新跑）跑完自然收官。
