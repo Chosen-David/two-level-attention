@@ -100,7 +100,7 @@ def torch_avg(k_avg, b_q, out_dtype):
 
 
 # 复用已集成的 _score_fine_kernel（iter6，验证同构性）
-from sparse_attn.indexer.tli_indexer_fast import _score_fine_kernel
+from sparse_attn.indexer.tli_indexer import _score_fine_kernel  # inplace 合并后 kernel 在基类
 
 H, Hkv, G = 32, 8, 4
 print(f"{'config':<28}{'ULP比例':>10}{'maxrel':>10}{'maxabs':>10}{'tri ms':>9}{'torch ms':>10}")

@@ -12,11 +12,11 @@ from .llama3_attn_patch import llama3_attn_forward
 from ..indexer import indexer_type_dict
 from ..indexer.tli_indexer import TLIIndexer
 
-# 【E127 iter4】TLI_E127_FAST=1 时 tli 臂实例化换增量缓存子类
-# TLIIndexerFast（prepare_index 逐位一致加速；锚点文件零改动，md5 不变）。
-# 默认 0 走原类——在飞链零扰动。子类继承 __init__，snapshot 注入语义相同。
-if os.environ.get("TLI_E127_FAST", "0") == "1":
-    from ..indexer.tli_indexer_fast import TLIIndexerFast
+# 【E127 inplace 合并（用户 2026-10-12 指令）】TLIIndexerFast 子类退役：
+# 增量缓存 + Triton fast path 语义已全部并入 TLIIndexer 基类
+# （tli_indexer.py），env 实例化切换门随之退役——tli 臂恒实例化基类，
+# fast path 由基类内部守卫（GPU/Triton 可用性/布局）自动生效，
+# 异常 fail-closed 回退原版表达式。tli_indexer_fast.py 已删除。
 
 def register_patch(model: nn.Module, args, snapshot=None) -> int:
     """注册稀疏 attention patch，返回成功 patch 的模块数。
@@ -41,10 +41,6 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
     IndexerType = indexer_type_dict.get(args.method, None)
     if args.method != 'none' and IndexerType is None:
         raise ValueError(f"not support {args.method}")
-    # 【E127 iter4】env=1 时 tli 臂换增量缓存子类（snapshot 注入同语义）
-    if (IndexerType is TLIIndexer
-            and os.environ.get("TLI_E127_FAST", "0") == "1"):
-        IndexerType = TLIIndexerFast
     # 082（TL-E121-LLM-EVAL-SNAPSHOT-082）：tli 臂不带 snapshot 走
     # register_patch 是 081 快照契约的旁路（legacy 路径仅测试/兼容
     # 保留）——loudly 警告，防新增入口无意绕过快照。生产入口
@@ -59,8 +55,7 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
         for name, module in model.named_modules():
             if isinstance(module, Qwen3Attention):
                 module.indexer = IndexerType(args, snapshot=snapshot) \
-                    if (snapshot is not None
-                        and IndexerType in (TLIIndexer, TLIIndexerFast)) \
+                    if (snapshot is not None and IndexerType is TLIIndexer) \
                     else IndexerType(args)
                 if hasattr(module, "layer_idx"):
                     module.indexer.layer_idx = module.layer_idx  # TLI D' 层掩码用
@@ -70,8 +65,7 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
                     print(f"register qwen3 attn: [{name}]")
             elif isinstance(module, LlamaAttention):
                 module.indexer = IndexerType(args, snapshot=snapshot) \
-                    if (snapshot is not None
-                        and IndexerType in (TLIIndexer, TLIIndexerFast)) \
+                    if (snapshot is not None and IndexerType is TLIIndexer) \
                     else IndexerType(args)
                 if hasattr(module, "layer_idx"):
                     module.indexer.layer_idx = module.layer_idx

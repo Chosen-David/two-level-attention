@@ -39,12 +39,10 @@ import torch  # noqa: E402
 from sparse_attn.indexer.tli_indexer import TLIIndexer  # noqa: E402
 from sparse_attn.ops.eager_decoding import eager_decoding_attn  # noqa: E402
 from sparse_attn.patches.utils import prepare_cu_seqlens, prepare_seqlens  # noqa: E402
-# 【E127 iter4】env=1 用增量缓存子类（prepare_index 逐位一致加速，
-# 锚点文件零改动）；默认 0 用原类（与 baseline 完全同路径）。
-if os.environ.get("TLI_E127_FAST", "0") == "1":
-    from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast as _IdxCls
-else:
-    _IdxCls = TLIIndexer
+# 【E127 inplace 合并（2026-10-12）】TLIIndexerFast 子类退役，增量缓存 +
+# Triton fast path 已并入 TLIIndexer 基类并默认生效——_IdxCls 恒为基类。
+# TLI_E127_FAST=0 显式回退合并前口径（紧急逃生口，归档复现用）。
+_IdxCls = TLIIndexer
 
 
 def make_args(alpha, beta, gamma):

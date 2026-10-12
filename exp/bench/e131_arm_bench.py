@@ -63,12 +63,10 @@ from sparse_attn.indexer.tli_indexer import TLIIndexer  # noqa: E402
 from sparse_attn.ops.eager_decoding import (  # noqa: E402
     eager_decoding_attn, eager_decoding_check_errors)
 from sparse_attn.patches.utils import prepare_cu_seqlens, prepare_seqlens  # noqa: E402
-# E127 fast path 子类：env=1 用增量缓存子类（与生产 patch 同一开关；
-# 本 harness 启动即断言 env=1，防误跑优化前口径）。
-if os.environ.get("TLI_E127_FAST", "0") == "1":
-    from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast as _IdxCls
-else:
-    _IdxCls = TLIIndexer
+# 【E127 inplace 合并（2026-10-12）】TLIIndexerFast 子类退役，增量缓存 +
+# Triton fast path 已并入 TLIIndexer 基类默认生效——_IdxCls 恒为基类；
+# 启动断言 TLI_E127_FAST≠0，防显式回退合并前口径冒充 fast path 数字。
+_IdxCls = TLIIndexer
 
 STAGES = ["prepare_index", "compute_score", "compute_mask", "metrics", "eager_decoding"]
 
@@ -311,9 +309,10 @@ def main():
     p.add_argument('--json', type=str, required=True)
     args = p.parse_args()
 
-    if os.environ.get("TLI_E127_FAST", "0") != "1":
-        print("[GATE-FAIL] E131 须 TLI_E127_FAST=1（fast path 口径），"
-              "当前环境未设置——拒绝跑优化前口径冒充 fast path 数字",
+    if os.environ.get("TLI_E127_FAST", "1") == "0":
+        print("[GATE-FAIL] E131 须 fast path 口径（默认生效；合并后基类内置），"
+              "但 TLI_E127_FAST=0 显式回退了合并前口径——拒绝跑优化前口径"
+              "冒充 fast path 数字",
               flush=True)
         raise SystemExit(2)
     assert torch.cuda.is_available()
@@ -322,7 +321,6 @@ def main():
     torch.set_grad_enabled(False)
 
     tli_path = os.path.join(REPO, "sparse_attn", "indexer", "tli_indexer.py")
-    fast_path = os.path.join(REPO, "sparse_attn", "indexer", "tli_indexer_fast.py")
     greedy_path = os.path.join(REPO, "sparse_attn", "indexer", "greedy_triton.py")
     harness_path = os.path.abspath(__file__)
     meta = {
@@ -351,7 +349,9 @@ def main():
         "identity": {"root": REPO, "git": git_identity(REPO),
                      "tli_indexer": {"md5": file_md5(tli_path),
                                      "sha256": file_sha256(tli_path)},
-                     "tli_indexer_fast": {"sha256": file_sha256(fast_path)},
+                     "note_e127_inplace_merge": (
+                         "2026-10-12 inplace 合并后 fast path 内置于基类；"
+                         "tli_indexer_fast.py 已按用户指令退役"),
                      "greedy_triton": {"sha256": file_sha256(greedy_path)},
                      "harness_sha256": file_sha256(harness_path)},
         "gpu": torch.cuda.get_device_name(0),

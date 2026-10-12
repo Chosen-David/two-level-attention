@@ -199,26 +199,28 @@ def test_eager_gather():
 
 # ---------------------------------------------------------------- indexer 增量
 def test_indexer_inc():
-    """iter4：TLIIndexerFast 增量 prepare_index —— index_dict/mask 逐位一致。
+    """iter4（inplace 合并后改写）：基类内置增量 prepare_index —— 增量 vs
+    每步全量重建（clear() 强制 _inc=None）index_dict/mask 逐位一致。
 
     逐位一致是数学保证（min/max/mean 块内独立归约 + quant 逐 token 独立，
     缓存值 = 原 kernel 历史输出 ≡ 全量重算），门禁用多步 decode 实测验证
     实现正确性：块边界（S=4093 非对齐起点）、多 token 步（+3）、跨块大步
     （+63）、64K 大 S、S 回退全量重建、clear() 后重建。
+    【2026-10-12 inplace 合并】TLIIndexerFast 并入基类：原「Fast vs 基类」
+    对拍改写为「同基类：增量缓存路径 vs 每步 clear() 全量重建」自身对拍。
     """
     import torch as T
     from exp.bench.e127_stage_bench import make_args
     from sparse_attn.indexer.tli_indexer import TLIIndexer
-    from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast
     from sparse_attn.patches.utils import prepare_cu_seqlens
 
     dev = T.device('cuda:0')
     H, Hkv, D = 32, 8, 128
     scale = D ** -0.5
 
-    def run(idx_cls, layer_idx, S0, n_steps, seed):
+    def run(step_full, layer_idx, S0, n_steps, seed):
         T.manual_seed(seed)
-        idx = idx_cls(make_args(0.25, 0.125, 0.125 + 0.5))
+        idx = TLIIndexer(make_args(0.25, 0.125, 0.125 + 0.5))
         idx.layer_idx = layer_idx
         idx.clear()
         k = T.randn(1, S0, Hkv, D, device=dev, dtype=T.bfloat16)
@@ -231,6 +233,8 @@ def test_indexer_inc():
             q = T.randn(1, 1, H, D, device=dev, dtype=T.bfloat16)
             cu = prepare_cu_seqlens(k)
             q_ids = cu[1:] - cu[:-1] - 1
+            if step_full:
+                idx.clear()     # _inc=None → 本步强制全量重建
             d = idx.prepare_index(k, cu)
             sc = idx.compute_score(q, q_ids, d, scale)
             m = idx.compute_mask(q_ids, sc)
@@ -241,8 +245,8 @@ def test_indexer_inc():
 
     ok = True
     for layer_idx, tag in [(2, "normal"), (0, "skip")]:
-        da, ma = run(TLIIndexer, layer_idx, 4093, 12, 20261014)
-        db, mb = run(TLIIndexerFast, layer_idx, 4093, 12, 20261014)
+        da, ma = run(False, layer_idx, 4093, 12, 20261014)
+        db, mb = run(True, layer_idx, 4093, 12, 20261014)
         for step in range(12):
             for kk in ["k_min", "k_max", "k_qat"]:
                 if not T.equal(da[step][kk], db[step][kk]):
@@ -256,15 +260,16 @@ def test_indexer_inc():
             if not T.equal(ma[step], mb[step]):
                 ok = False
                 print(f"  {tag} step{step} MASK MISMATCH")
-    check("indexer_inc: 12 步 decode（块边界/多 token/大步）index_dict+mask 逐位一致", ok)
+    check("indexer_inc: 12 步 decode（块边界/多 token/大步）增量 vs 全量重建"
+          " index_dict+mask 逐位一致", ok)
 
-    da, ma = run(TLIIndexer, 2, 65536 - 13, 15, 20261016)
-    db, mb = run(TLIIndexerFast, 2, 65536 - 13, 15, 20261016)
-    check("indexer_inc: 64K 大 S 15 步 mask 逐位一致",
+    da, ma = run(False, 2, 65536 - 13, 15, 20261016)
+    db, mb = run(True, 2, 65536 - 13, 15, 20261016)
+    check("indexer_inc: 64K 大 S 15 步增量 vs 全量重建 mask 逐位一致",
           all(T.equal(x, y) for x, y in zip(ma, mb)))
 
     # S 回退 → 全量重建（不崩、结果正确）
-    idx = TLIIndexerFast(make_args(0.25, 0.125, 0.625))
+    idx = TLIIndexer(make_args(0.25, 0.125, 0.625))
     idx.layer_idx = 2
     idx.clear()
     k1 = T.randn(1, 5000, Hkv, D, device=dev, dtype=T.bfloat16)
@@ -288,19 +293,21 @@ def test_indexer_inc():
 
 # ---------------------------------------------------------------- iter5 派生
 def test_score_mask_derived():
-    """iter5：compute_score rep 缓存 + compute_mask 同步消除（锚点文本派生）——
-    score_dict 四项输出 + mask 对 TLIIndexer 原类一致。
+    """iter5（inplace 合并后改写）：Triton fast path vs 强制回退
+    （_triton_ok=False → 原版 repeat+einsum 表达式）——score ULP 口径 +
+    mask 逐位（==）。
     【iter6】score_fine、【iter8】score_coarse/score_coarse_avg 为 Triton
     累加顺序差异的 ULP 口径（≤1e-4 比例 + ≤2% 相对）；mask 仍逐位（==）。
+    【2026-10-12 inplace 合并】TLIIndexerFast 退役：原「Fast vs 基类」对拍
+    改写为「同基类：Triton fast path vs _triton_ok=False 强制回退」对拍
+    （skip 层 e64 走 dgate_short 分支，两臂同路径，trivially 一致属预期）。
 
     覆盖：site1（e64+skip）、site2（单池+skip，minmax/avg 两分数源）、
-    e64 normal 层（rep 缓存主路径）、avg 分数源、多 token 步、S 回退
-    （rep 全量重建）、块边界非对齐起点。
+    e64 normal 层、avg 分数源、多 token 步、S 回退、块边界非对齐起点。
     """
     import torch as T
     from exp.bench.e127_stage_bench import make_args
     from sparse_attn.indexer.tli_indexer import TLIIndexer
-    from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast
     from sparse_attn.patches.utils import prepare_cu_seqlens
 
     dev = T.device('cuda:0')
@@ -321,11 +328,13 @@ def test_score_mask_derived():
         ("aavg_00", make_cfg(0.0, 0.0, 0.375, "avg", "avg")),
     ]
 
-    def run(idx_cls, args, layer_idx, S0, n_steps, seed):
+    def run(triton_on, args, layer_idx, S0, n_steps, seed):
         T.manual_seed(seed)
-        idx = idx_cls(args)
+        idx = TLIIndexer(args)
         idx.layer_idx = layer_idx
         idx.clear()
+        if not triton_on:
+            idx._triton_ok = False   # 强制回退原版 repeat+einsum 表达式
         k = T.randn(1, S0, Hkv, D, device=dev, dtype=T.bfloat16)
         outs = []
         for step in range(n_steps):
@@ -361,8 +370,8 @@ def test_score_mask_derived():
 
     for cname, args in configs:
         for layer_idx, ltag in [(2, "normal"), (0, "skip")]:
-            a = run(TLIIndexer, args, layer_idx, 4093, 10, 20261018)
-            b = run(TLIIndexerFast, args, layer_idx, 4093, 10, 20261018)
+            a = run(False, args, layer_idx, 4093, 10, 20261018)
+            b = run(True, args, layer_idx, 4093, 10, 20261018)
             for step in range(10):
                 sa, sb = a[step][0], b[step][0]
                 # 【iter8】score_coarse：coarse minmax 段 Triton 化 → ULP
@@ -412,8 +421,9 @@ def test_score_mask_derived():
     ok_back = True
     T.manual_seed(20261019)
     i_ref = TLIIndexer(args); i_ref.layer_idx = 2; i_ref.clear()
+    i_ref._triton_ok = False
     T.manual_seed(20261019)
-    i_fast = TLIIndexerFast(args); i_fast.layer_idx = 2; i_fast.clear()
+    i_fast = TLIIndexer(args); i_fast.layer_idx = 2; i_fast.clear()
     q = T.randn(1, 1, H, D, device=dev, dtype=T.bfloat16)
 
     def _score_pair(k):
@@ -459,7 +469,7 @@ def test_pipeline_zero_sync():
     （sync_debug_mode=error，20 步 × normal/skip 层；含 rep 扩容步）。"""
     import torch as T
     from exp.bench.e127_stage_bench import make_args
-    from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast
+    from sparse_attn.indexer.tli_indexer import TLIIndexer
     from sparse_attn.patches.utils import prepare_cu_seqlens
 
     dev = T.device('cuda:0')
@@ -468,7 +478,7 @@ def test_pipeline_zero_sync():
     no_sync_all = True
     for layer_idx, ltag in [(2, "normal"), (0, "skip")]:
         T.manual_seed(20261020)
-        idx = TLIIndexerFast(make_args(0.25, 0.125, 0.625))
+        idx = TLIIndexer(make_args(0.25, 0.125, 0.625))
         idx.layer_idx = layer_idx
         idx.clear()
         k = T.randn(1, 16384, Hkv, D, device=dev, dtype=T.bfloat16)

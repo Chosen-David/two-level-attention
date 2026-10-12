@@ -359,7 +359,9 @@ def eager_decoding_attn(
     拒绝——修复前三例非法输入静默越界读/未初始化输出）。
     """
     _validate_gqa_shape(q, k, v, mask, block_size)
-    if os.environ.get("TLI_E127_FAST", "0") == "1":
+    # 【E127 inplace 合并（2026-10-12）】gather 路径并为默认——env 门反转，
+    # TLI_E127_FAST=0 显式回退 dense 路径（紧急逃生口，归档复现用）。
+    if os.environ.get("TLI_E127_FAST", "1") != "0":
         return _eager_decoding_attn_gather(
             q, k, v, mask, block_size, cu_seqlens_k, softmax_scale)
     return _eager_decoding_attn_dense(
