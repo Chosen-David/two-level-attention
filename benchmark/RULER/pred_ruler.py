@@ -206,6 +206,27 @@ def main():
             token_budget=getattr(args, "quest_token_budget", 1024),
             chunk_size=getattr(args, "quest_chunk_size", 16),
         )
+    elif args.method == "minference_vendor":
+        # MInference（NeurIPS 2024 sparse prefill）B 轨官方源码复用——与
+        # LongBench pred.py 同口径：qwen3_minference_patch.py 轻量胶水只
+        # 替换 Qwen3Attention.forward（prefill sparse / decode dense），
+        # pattern 为 36 层×32 头 best_pattern_qwen3_8b.json（在线搜索产物）。
+        vendor_dir = os.path.join(
+            REPO, "exp", "vendor_baselines", "minference_vendor")
+        if vendor_dir not in sys.path:
+            sys.path.insert(0, vendor_dir)
+        from qwen3_minference_patch import enable_minference  # noqa: E402
+        cfg_path = getattr(args, "minference_config_path", None)
+        if not cfg_path or not os.path.isfile(cfg_path):
+            raise RuntimeError(
+                "method=minference_vendor 需要 --minference_config_path "
+                "指向 pattern json（如 best_pattern_qwen3_8b.json）")
+        n_patched = enable_minference(
+            model,
+            is_search=False,
+            config_path=cfg_path,
+            starting_layer=getattr(args, "minference_starting_layer", -1),
+        )
     else:
         n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:
