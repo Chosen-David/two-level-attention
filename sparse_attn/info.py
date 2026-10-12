@@ -84,6 +84,7 @@ _TREATMENT_FIELD_DEFAULTS = {
     "tia_level2_cmp_ratio": 2,      # argparse 缺省（可读段直接属性访问，兜底不可达）
     "tli_enable_subspace": True,
     "tli_subspace": "full",
+    "tli_l2_subspace": "same",      # E134 子空间矩阵第三臂 sub+full（L2 全维量化）
     "tli_alpha": 0.0,
     "tli_beta": 0.0,
     "tli_gamma": 1.0,               # γ 兜底 1.0（B09 既有约定保持；off=None 走 JSON null）

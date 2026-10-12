@@ -92,6 +92,12 @@ class TLIIndexer(TIAIndexer):
             self.enable_subspace = False      # 全维（用户默认）
         elif self.subspace in ("rope", "nope"):
             self.enable_subspace = True       # 显式子空间段
+        # ---- E134：L2 细筛子空间独立开关（子空间矩阵第三臂 sub+full）----
+        #   same = L2 与 L1 同一子空间（现状，E85f 口径：粗筛+细筛同特征）
+        #   full = L2 细筛 k_qat 全 128 维量化（L1 仍由 tli_subspace 决定）
+        self.l2_subspace = getattr(args, "tli_l2_subspace", "same")
+        assert self.l2_subspace in ("same", "full"), \
+            f"tli_l2_subspace 非法取值: {self.l2_subspace}"
         # ---- B：远端 kmeans（far_select='cluster' 时才构建，默认 4bit 分区）----
         self.enable_kmeans = getattr(args, "tli_enable_kmeans", True)
         self.far_select = getattr(args, "tli_far_select", "4bit")
@@ -386,6 +392,8 @@ class TLIIndexer(TIAIndexer):
 
         # ---- k_qat 增量：预分配 buffer 步进写（尾段 zero_ + scatter， ----
         # 与全量版 zeros_like+scatter 逐位同构）
+        # E134：l2_subspace=full 时尾段全维量化直写（buffer [cap,Hkv,128]
+        # 整段赋值，与全量版全维量化逐位同构）。
         indices = idx_sub if idx_sub is not None else self._qat_indices(k.device)
         buf, cap = inc["k_qat_buf"], inc["k_qat_cap"]
         if S_now > cap:   # 扩容（翻倍摊销）
@@ -394,9 +402,13 @@ class TLIIndexer(TIAIndexer):
             new_buf[:S_prev] = buf[:S_prev]
             inc["k_qat_buf"], inc["k_qat_cap"] = new_buf, new_cap
             buf = new_buf
-        buf[lo:S_now].zero_()
-        buf[lo:S_now, :, indices] = self.min_max_per_token_quant(
-            k[0, lo:S_now, :, indices])
+        if self.l2_subspace == "full":
+            buf[lo:S_now] = self.min_max_per_token_quant(
+                k[0, lo:S_now])                             # 全 128 维量化
+        else:
+            buf[lo:S_now].zero_()
+            buf[lo:S_now, :, indices] = self.min_max_per_token_quant(
+                k[0, lo:S_now, :, indices])
         k_qat = buf[:S_now].unsqueeze(0)                     # [1, S, Hkv, D] 视图
 
         index_dict = {
@@ -500,12 +512,17 @@ class TLIIndexer(TIAIndexer):
         # E85f 口径修正：L2 细筛 k_qat 与 L1 粗筛用同一子空间（idx_sub）——
         # E85e 重放口径是粗筛+细筛同特征；tail 臂 idx_sub 与旧硬编码 tail32
         # 逐位相同（cmp_ratio=2），仅 rope/nope 探索臂与静态 pair 臂行为改变
-        delta = 64 // self.cmp_ratio
-        indices = idx_sub if idx_sub is not None else torch.tensor(
-            list(range(64 - delta, 64)) + list(range(128 - delta, 128))
-        ).to(k.device)
-        k_qat = torch.zeros_like(k)
-        k_qat[..., indices] = self.min_max_per_token_quant(k[..., indices])
+        # E134：--tli_l2_subspace full = L2 细筛全 128 维量化（L1 仍由 idx_sub
+        # 决定）——子空间矩阵第三臂 sub+full 的消费端，score_fine 宽度 = 全维。
+        if self.l2_subspace == "full":
+            k_qat = self.min_max_per_token_quant(k)   # [1, S, Hkv, 128] 全维量化
+        else:
+            delta = 64 // self.cmp_ratio
+            indices = idx_sub if idx_sub is not None else torch.tensor(
+                list(range(64 - delta, 64)) + list(range(128 - delta, 128))
+            ).to(k.device)
+            k_qat = torch.zeros_like(k)
+            k_qat[..., indices] = self.min_max_per_token_quant(k[..., indices])
         index_dict = {
             "k_min": k_min,
             "k_max": k_max,

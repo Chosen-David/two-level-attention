@@ -84,6 +84,11 @@ def _add_tli_args(parser: argparse.ArgumentParser):
     group.add_argument('--tli_subspace', type=str, default='full',
                        choices=['full', 'rope', 'nope', 'tail', 'random', 'highfreq'],
                        help='子空间选择: full=全128维(默认) / rope=前64旋转维 / nope=后64非旋转维 / tail=旧口径低频尾维32(E71/B7/C0复现)')
+    group.add_argument('--tli_l2_subspace', type=str, default='same',
+                       choices=['same', 'full'],
+                       help='L2 细筛子空间选择（E134 子空间矩阵第三臂 sub+full）: '
+                            'same=与 L1 粗筛同一子空间(默认,现状) / full=L2 细筛 k_qat 全 128 维量化'
+                            '（仅 L1 用子空间而 L2 用全维的组合）')
     group.add_argument('--tli_proj_basis', type=str, default=None,
                        help='sup_wsvd 投影基 .pt（裸 tensor [n_layers,Hkv,128,r]）')
     # ---- E85f：per-layer 静态 pair 选取（E85e 重放 0.849 vs tail32 0.811 的 e2e 判决）----
