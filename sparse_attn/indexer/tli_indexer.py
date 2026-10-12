@@ -712,7 +712,29 @@ class TLIIndexer(TIAIndexer):
         硬约束；现有 sim_dims 口径全为 2 的幂，此为防御性回退）。
         两条路径语义逐位一致（exp/trace/test_e113_greedy_triton.py 对拍 +
         test_e113b_kernel_integration.py 开关双跑对拍）。
+
+        【E131-S2（原 fast.py override 并入）】默认先走 v2 SPLIT 协作 kernel
+        （greedy_triton.greedy_pass_triton_v2：grid=(H,SPLIT) 同头多 program
+        均分活簇扫描 + 两阶段软件 barrier，n_regs 死锁防御钳制 SPLIT）。E131
+        阶段 1 实测 v1 grid=(H,) 仅 H=8 program、78 SM 闲置 90%——v2 far
+        冷建 8077→958ms（8.4×），大 k_live 续跑 9.5×（H20 randn 最坏口径）。
+        对拍 exp/bench/e131s2_v2_validate.py V1-V5 全过（assign/k_live 逐位
+        + 状态 allclose）。开关 TLI_E131_GREEDY_V2=0 回退 v1；v2 编译/执行
+        异常 fail-closed 回退本调度器（值同锚点路径，仅性能回退）。
         """
+        if (os.environ.get("TLI_E131_GREEDY_V2", "1") not in ("0", "false", "False")
+                and x.is_cuda
+                and x.dim() == 3
+                and x.shape[-1] > 0
+                and (x.shape[-1] & (x.shape[-1] - 1)) == 0):
+            try:
+                from .greedy_triton import greedy_pass_triton_v2
+                # 复用锚点的 chunk=16384 分段驱动（跨 launch 串行，语义 =
+                # 全量重放，E113 T3 口径；fn 形参即逐段实现）
+                return TLIIndexer._greedy_cluster_pass_triton(
+                    x, sim, sums, cnt, sq, k_live, greedy_pass_triton_v2)
+            except Exception:
+                pass   # fail-closed：v2 不可用 → v1/Python 锚点调度器（值同）
         if (os.environ.get("SGLANG_TLI_GREEDY_KERNEL", "1") not in ("0", "false", "False")
                 and x.is_cuda):
             fn = _load_greedy_triton()
@@ -1148,6 +1170,47 @@ class TLIIndexer(TIAIndexer):
             self._triton_ok = False
             raise
 
+    def _fast_tok_score(self, q, idx_sub, centroids, assign, agg):
+        """【E131-S2（原 fast.py override 并入）】簇分数段 q_g+einsum+gather
+        三件套的 Triton 全融合。
+
+        数学：q_g[h,d'] = AGG_{j<G} q[h·G+j, idx_sub[d']]（AGG=sum 远端 /
+        mean 近端，与原版 reshape(...).sum(1)/mean(1) 数学等价）；
+        tok_score[h,t] = Σ_d q_g[h,d]·centroids[h, assign[h,t], d]，与
+        原版 q 胶水 + einsum("hd,hkd->hk") + gather(1, assign) 数学等价。
+        一次 launch 完成（原版 3 个小 launch 的胶水序列两处各付一遍）。
+        E131-S2 实测（H20 S=64K cclustersim 稳态）：far 侧 0.135→~0.05ms。
+
+        数值口径（同 E127 iter6/8）：q_g 组内累加与 dot 的 fp32 累加顺序
+        均与 torch/cublas 不同 → fp32 ULP 级漂移（tok_score 无 bf16 舍入
+        吸收，直接进 topk 竞争）→ 并列边界可能翻转，mask 选择为经验
+        验证口径（门禁实测 + top-k 重叠率 ≥99.9% 报告精确值；E131-S2
+        实测 16 步 mask 逐位 0 差异 + e2e 24 步 12585120/12585120）。
+
+        fail-closed：Triton 编译/执行异常 → 调用点回退原版表达式（值同
+        原版路径，仅性能回退）。"""
+        try:
+            Hkv, Kc, dd = centroids.shape
+            T = assign.shape[1]
+            H = q.shape[0]
+            G = H // Hkv
+            out = torch.empty((Hkv, T), device=centroids.device, dtype=torch.float32)
+            grid = (triton.cdiv(T, 128), Hkv)
+            # AGG 除数：sum → 1.0；mean → 1/G（G 为 2 的幂 → 精确二进制
+            # 除法，与 torch mean 的 /G 逐位同）
+            agg_div = 1.0 if agg == "sum" else 1.0 / G
+            _tok_score_kernel[grid](
+                q, idx_sub, centroids, assign, out, T, agg_div,
+                q.stride(0),
+                centroids.stride(0), centroids.stride(1),
+                assign.stride(0), assign.stride(1),
+                out.stride(0), out.stride(1),
+                Hkv=Hkv, G=G, DD=dd, BT=128, num_warps=4)
+            return out
+        except Exception:
+            self._triton_ok = False
+            raise
+
     def _far_token_score(self, q):
         """B：远端 token 的簇分数（E4/E7 语义：按中心分数 token 级展开）。
 
@@ -1155,15 +1218,40 @@ class TLIIndexer(TIAIndexer):
         E110：q 取维改用建簇时记录的 _km_dims（sim_greedy 的 sim_dims 可异于
         _subspace_indices——打分/建簇维度必须同源；kmeans 路径 _km_dims 即
         _subspace_indices 的返回值，行为不变）。
+
+        【E131-S2（原 fast.py override 并入）】默认先走 Triton 全融合
+        （_fast_tok_score，开关 TLI_E131_TOKSCORE_TRITON，fail-closed
+        回退原版表达式）；far 侧 0.107→0.057ms（1.89×）。
         """
         if self._km_centroids is None:
             return None
         idx_sub = self._km_dims if self._km_dims is not None \
             else self._subspace_indices(q.device)
-        q_sub = q[:, idx_sub].float()                       # [H, d']
         H = q.shape[0]
         Hkv = self._km_centroids.shape[0]
         G = H // Hkv
+        if (_HAS_TRITON
+                and os.environ.get("TLI_E131_TOKSCORE_TRITON", "1")
+                not in ("0", "false", "False")
+                and getattr(self, "_triton_ok", True)
+                and q.is_cuda and q.dtype == torch.float32
+                and self._km_centroids.is_cuda
+                and self._km_token_assign.is_cuda
+                and idx_sub is not None and idx_sub.is_cuda
+                and self._km_centroids.dim() == 3
+                and self._km_centroids.shape[-1] > 0
+                and (self._km_centroids.shape[-1]
+                     & (self._km_centroids.shape[-1] - 1)) == 0
+                and self._km_centroids.stride(-1) == 1
+                and self._km_token_assign.dim() == 2
+                and (G & (G - 1)) == 0):
+            try:
+                return self._fast_tok_score(
+                    q, idx_sub, self._km_centroids, self._km_token_assign,
+                    agg="sum")
+            except Exception:
+                pass   # fail-closed：下方原版表达式（值同原版路径）
+        q_sub = q[:, idx_sub].float()                       # [H, d']
         q_g = q_sub.reshape(Hkv, G, -1).sum(1)              # [Hkv, d']（group 求和，与 L1 量纲一致）
         cscore = torch.einsum("hd,hkd->hk", q_g, self._km_centroids)  # [Hkv, K_c]
         tok_score = cscore.gather(1, self._km_token_assign)  # [Hkv, Tfar]
@@ -1176,13 +1264,38 @@ class TLIIndexer(TIAIndexer):
         与 far 侧的唯一差别：group 聚合用 mean——far 侧单独 topk 用 sum 无所谓
         量纲，near 侧簇分数要与「未覆盖段的细筛回退分 sf_g（group-mean 原始
         点积分）」在同一 topk 内竞争，sum 会放大 G 倍导致簇段霸榜，必须 mean。
+
+        【E131-S2（原 fast.py override 并入）】Triton 全融合同构（AGG=mean
+        对齐 sf_g 量纲）；near 侧 0.062→0.047ms（1.32×）。
         """
         if self._km_near_centroids is None:
             return None
-        q_sub = q[:, self._km_near_dims].float()            # [H, dd]
+        idx_sub = self._km_near_dims
         H = q.shape[0]
         Hkv = self._km_near_centroids.shape[0]
         G = H // Hkv
+        if (_HAS_TRITON
+                and os.environ.get("TLI_E131_TOKSCORE_TRITON", "1")
+                not in ("0", "false", "False")
+                and getattr(self, "_triton_ok", True)
+                and q.is_cuda and q.dtype == torch.float32
+                and self._km_near_centroids.is_cuda
+                and self._km_near_assign.is_cuda
+                and idx_sub is not None and idx_sub.is_cuda
+                and self._km_near_centroids.dim() == 3
+                and self._km_near_centroids.shape[-1] > 0
+                and (self._km_near_centroids.shape[-1]
+                     & (self._km_near_centroids.shape[-1] - 1)) == 0
+                and self._km_near_centroids.stride(-1) == 1
+                and self._km_near_assign.dim() == 2
+                and (G & (G - 1)) == 0):
+            try:
+                return self._fast_tok_score(
+                    q, idx_sub, self._km_near_centroids, self._km_near_assign,
+                    agg="mean")
+            except Exception:
+                pass
+        q_sub = q[:, idx_sub].float()            # [H, dd]
         q_g = q_sub.reshape(Hkv, G, -1).mean(1)             # [Hkv, dd]（group 均值，对齐 sf_g 量纲）
         cscore = torch.einsum("hd,hkd->hk", q_g, self._km_near_centroids)  # [Hkv, K_c]
         return cscore.gather(1, self._km_near_assign)       # [Hkv, Tn]
@@ -1894,3 +2007,37 @@ if _HAS_TRITON:
             s = tl.sum(kmin * q_low[None, :], axis=1) + tl.sum(kmax * q_high[None, :], axis=1)
             tl.store(OUT + h * stride_oh + offs_t * stride_ot,
                      s.to(OUT.dtype.element_ty), mask=mask_t)
+
+    @triton.jit
+    def _tok_score_kernel(
+        Q, IDXSUB, CENT, ASSIGN, OUT,
+        # Q [H,D] fp32（已乘 scale）；IDXSUB [DD] int64；CENT [Hkv,Kc,DD] fp32；
+        # ASSIGN [Hkv,T] int64；OUT [Hkv,T] fp32
+        T, AGG_DIV,
+        stride_qh, stride_cenh, stride_cenk, stride_ah, stride_at,
+        stride_oh, stride_ot,
+        Hkv: tl.constexpr, G: tl.constexpr, DD: tl.constexpr, BT: tl.constexpr,
+    ):
+        """【E131-S2（原 fast.py 并入）】tok_score 全融合：q_g =
+        AGG_{j<G} q[h·G+j, idx_sub]（sum 或 mean=AGG_DIV·sum）→
+        tok_score[h,t] = Σ_d q_g[h,d]·cent[h,a[h,t],d]。fp32 累加顺序
+        ULP 口径见 _fast_tok_score。"""
+        pid_t = tl.program_id(0)
+        h = tl.program_id(1)
+        offs_t = pid_t * BT + tl.arange(0, BT)
+        mask_t = offs_t < T
+        # ---- q_g：组内 G 行 q 取 idx_sub 维聚合（sum / mean=AGG_DIV·sum）----
+        offs_d = tl.arange(0, DD)
+        offs_j = tl.arange(0, G)
+        sub = tl.load(IDXSUB + offs_d)                       # [DD]
+        q_rows = tl.load(Q + (h * G + offs_j)[:, None] * stride_qh
+                        + sub[None, :])                      # [G, DD] fp32
+        qg = tl.sum(q_rows, axis=0) * AGG_DIV                # [DD]
+        # ---- gather-dot：簇号值域 [0,Kc) < 2^31 → int32 索引（int64 地址
+        # 计算慢，randn 单例口径实测 0.079→0.036ms）----
+        a = tl.load(ASSIGN + h * stride_ah + offs_t * stride_at,
+                    mask=mask_t, other=0).to(tl.int32)
+        c = tl.load(CENT + h * stride_cenh + a[:, None] * stride_cenk
+                    + offs_d[None, :], mask=mask_t[:, None], other=0.0)
+        s = tl.sum(c * qg[None, :], axis=1)
+        tl.store(OUT + h * stride_oh + offs_t * stride_ot, s, mask=mask_t)

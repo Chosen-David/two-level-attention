@@ -16,7 +16,8 @@ sys.path.insert(0, os.path.join(REPO, "exp", "bench"))
 
 import torch  # noqa: E402
 from e131_arm_bench import make_args  # noqa: E402
-from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast  # noqa: E402
+# 【E131-S2 移植（2026-10-12）】inplace 合并后 fast.py 已退役，基类默认即 fast path。
+from sparse_attn.indexer.tli_indexer import TLIIndexer  # noqa: E402
 from sparse_attn.patches.utils import prepare_cu_seqlens, prepare_seqlens  # noqa: E402
 
 
@@ -28,7 +29,7 @@ def main():
     args = p.parse_args()
 
     torch.manual_seed(20261011 + 2)
-    idx = TLIIndexerFast(make_args(args.arm))
+    idx = TLIIndexer(make_args(args.arm))
     idx.layer_idx = 2
     idx.clear()
     dev = 'cuda:0'
