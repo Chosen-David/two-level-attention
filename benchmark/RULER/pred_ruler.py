@@ -189,7 +189,30 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path, config=config, trust_remote_code=True,
         torch_dtype=torch.bfloat16, device_map="auto").eval()
-    register_patch(model, args, snapshot)
+    # ---- Quest vendor（B 轨官方源码复用，主表口径）----
+    # 不走 register_patch 的 indexer_type_dict（A 轨 quest_indexer 是语义
+    # 复现），改为绑定官方 Quest forward 到 Qwen3Attention——与 LongBench
+    # pred.py 同口径：quest_attention_official.py 与官方仓库逐字节一致，
+    # qwen3_quest_patch.py 仅接口胶水。RULER 长上下文预算独立设定（默认
+    # 1024，派单时按 Quest 论文口径显式传 --quest_token_budget）。
+    if args.method == "quest_vendor":
+        vendor_dir = os.path.join(
+            REPO, "exp", "vendor_baselines", "quest_vendor")
+        if vendor_dir not in sys.path:
+            sys.path.insert(0, vendor_dir)
+        from qwen3_quest_patch import enable_quest  # noqa: E402
+        n_patched = enable_quest(
+            model,
+            token_budget=getattr(args, "quest_token_budget", 1024),
+            chunk_size=getattr(args, "quest_chunk_size", 16),
+        )
+    else:
+        n_patched = register_patch(model, args, snapshot)
+    if args.method != "none" and n_patched == 0:
+        raise RuntimeError(
+            f"method={args.method!r} 但成功挂载 0 个 attention 模块，模型"
+            f"实际将以 dense 运行——拒绝产出被误标为稀疏方法的结果。"
+        )
 
     # 超原生档位启用 logits_to_keep=1：prefill 只回传末 token logits
     # （131072×151936 bf16 全序列 logits ≈ 39.8GB 纯浪费；等价性由审计
