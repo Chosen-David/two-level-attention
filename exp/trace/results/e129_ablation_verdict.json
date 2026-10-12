@@ -385,5 +385,28 @@
   }
  ],
  "summary": "c1_gate: AVG5=43.78 vs C0 48.25，Δ=-4.47，95% CI [-9.00,-1.17]，显著（CI 不含 0）；c2_tail: AVG5=48.25 vs C0 48.25，Δ=+0.00，95% CI [+0.00,+0.00]，未证明显著（CI 含 0）；c3_both: AVG5=43.98 vs C0 48.25，Δ=-4.27，95% CI [-8.94,-0.93]，显著（CI 不含 0）；gate_effect_c1_minus_c0: mean=-4.470，95% CI [-8.998,-1.166]，显著；tail_effect_c2_minus_c0: mean=+0.000，95% CI [+0.000,+0.000]，未证明显著；interaction_c3_minus_c1_minus_c2_plus_c0: mean=+0.204，95% CI [+0.034,+0.462]，显著；c2_tail 与 C0 五任务输出逐位一致（sha256 相同）——tail 效应=0 是逐位 no-op 而非统计不可分辨；交互项数值上=gate 条件下的 tail 效应（C3−C1）",
- "verdict_note": "判决结论措辞（GO/NO-GO、是否采纳 gate/tail 进主线）留主会话裁决——本 JSON 只登记点估计与 CI 如实数据。"
+ "verdict_note": "判决结论措辞（GO/NO-GO、是否采纳 gate/tail 进主线）留主会话裁决——本 JSON 只登记点估计与 CI 如实数据。",
+ "final_ruling": {
+  "ruling": "NO-GO（gate 两臂均不采纳进主线）；tail32 无操作（不采纳也无损失）",
+  "decided_by": "Opus（主会话终裁，2026-10-12；自主决策授权 10-11）",
+  "decisions": [
+   {
+    "arm": "D' gate（C1 / C3）",
+    "decision": "NO-GO——不采纳进论文主方法与生产配置。",
+    "evidence": "gate 主效应 -4.47 [-9.00,-1.17] 显著负（逐任务全负，qasper -12.76 最重）；C3 both -4.27 [-8.94,-0.93] 同显著负；交互 +0.204 [+0.03,+0.46] 语义=gate 条件下 tail 效应，量级远不足以抵消 gate 损失。",
+    "consequence": "静态层 aware far 跳过作为质量维度方向关闭。E127 timing 的 gate 省算收益仅当质量可接受才有意义——本判决下不单独主张。论文可如实记录为 negative result（消融表引用本 verdict）。"
+   },
+   {
+    "arm": "paired tail32 子空间（C2）",
+    "decision": "逐位 no-op——对冠军 base 不采纳（无增益），也无质量风险（无损失）。",
+    "evidence": "C2≡C0 五任务 sha256 逐位相同；根因=cclustersim 双池最终选择全由簇分+全维细筛分驱动，不消费 L1 块池分数（tail32 只影响 L1 分数维数）。",
+    "consequence": "子空间消融问题关闭：tail32 在冠军臂上是自由变量，不进主线叙事。"
+   }
+  ],
+  "caveat_code_version": "本判决 15 格 e2e 生成于 E111 dgate_short 省算 + skip 层 e64 分区保留 patch 合入前的代码口径（旧版 skip 层落 legacy topk：swa 以 p=1.0 占 K2 预算、near 细筛实际 0 选中、far p=0 填充进 mask；patch 后 skip+e64 走分区 far 池置空 + near 拿满 K2_mid 预算）。若未来重开 gate 方向，须按新代码口径重验（旧标不覆盖，新标换源码/运行身份）。方向性结论（丢弃 far 区上下文 → 质量损失）由 far 全 -inf 结构语义保证，预期重验仍负；但量级可能变化。",
+  "followups": [
+   "E129 旧 D' 消融标（本 verdict）在论文中引用时须带 caveat_code_version 口径标注",
+   "GPU 分阶段计时 gate 开/关对比（GPT 0739 验收第 3 条）仍待做——但 NO-GO 后该项降级为归档口径说明，非生产决策依据"
+  ]
+ }
 }
