@@ -261,20 +261,24 @@ def _validate_gqa_shape(q, k, v, mask, block_size):
     """101 host 边界门（纯 host 检查，零 GPU 同步、零分配）。
 
     入参为 eager_decoding_attn 的原始入参形状：q [..,H,D] / k,v [..,T,Hkv,D]
-    / mask [..,R,blocks]。拒绝四类非法输入（ValueError，文案带完整参数）：
+    / mask [..,R,blocks]。拒绝五类非法输入（ValueError，文案带完整参数）：
       ① Hkv<=0 或 H<=0（零头数——空 KV 头维会让一切行映射失去意义）；
       ② H % Hkv != 0（GQA 契约外，G=H//Hkv 截断——审计 H=10,Hkv=3 两例）；
       ③ K/V 头数不一致（共享口径行号直接当 head 索引，错位读）；
-      ④ mask 行数 R ∉ {Hkv, H}（R=9 @ H=32,Hkv=8 误判 per_qh 例）。
+      ④ mask 行数 R ∉ {Hkv, H}（R=9 @ H=32,Hkv=8 误判 per_qh 例）；
+      ⑤【116】V 与 K 不一致——token 长度/head_dim/device/dtype/stride
+        任一不同（kernel 以 K 的 token 索引与 K 的 stride 同时寻址 V，
+        审计例 v[1,1,8,128] vs k[1,16384,8,128] 修复前返回 true）。
     block_size 同时做正整数检查（mask 块宽 × block_size 的长度推导前提）。
     """
     def _fail(msg):
         raise ValueError(
-            f"eager_decoding_attn: 非法 GQA/shape 输入（101 fail-closed，"
-            f"host 侧 launch 前拒绝）——{msg}。契约：H%Hkv==0、K/V 头数"
-            f"一致、mask 行数 R∈{{Hkv,H}}（R==Hkv=共享选择，R==H=per-q-"
-            f"head 选择）、block_size≥1。请检查调用方传入的 q/k/v/mask "
-            f"形状。"
+            f"eager_decoding_attn: 非法 GQA/shape 输入（101 fail-closed；"
+            f"116 V 校验 fail-closed，host 侧 launch 前拒绝）——{msg}。"
+            f"契约：H%Hkv==0、K/V 头数一致、V 与 K token 长度/head_dim/"
+            f"device/dtype/stride 一致（116）、mask 行数 R∈{{Hkv,H}}"
+            f"（R==Hkv=共享选择，R==H=per-q-head 选择）、block_size≥1。"
+            f"请检查调用方传入的 q/k/v/mask 形状。"
         )
     H = q.shape[-2]
     Hkv = k.shape[-2]
@@ -285,6 +289,38 @@ def _validate_gqa_shape(q, k, v, mask, block_size):
               f"映射 kvh=r//G 将越界）")
     if k.shape[-2] != v.shape[-2]:
         _fail(f"K/V 头数不一致 k_hkv={k.shape[-2]} v_hkv={v.shape[-2]}")
+    # ------------------------------------------------------------------
+    # 【116 修复（GPT 审计 2026-10-12_0933 TL-E127-KV-SHAPE-STRIDE-116，
+    # P1）】V 与 K 的 token 长度/head_dim/device/dtype/布局一致性门。
+    #
+    # 缺陷背景：_eager_attn_kernel 以 K 的 token 索引 tok 和 wrapper 只传
+    # 的 k.stride(0)/k.stride(1)（stride_kt/stride_kh）**同时寻址 K 与
+    # V**——V 的 token 长度/stride 从未传入或核对。审计红证：
+    # q[1,1,32,128] / k[1,16384,8,128] / v[1,1,8,128] / mask[1,8,16384]
+    # 修复前门返回 true，任何 tok>=1 都超出 V 的 token 范围（越界读/
+    # 静默错值）；即使 token 长度一致，V stride 与 K 不同也必错址。正常
+    # Qwen 连续同形 K/V 不触发；本门是面向未来 kernel 接入/异常调用/
+    # 异布局 V 的内存安全 fail-closed（launch 前拒绝）。GPU 后果未实测
+    # （审计环境无 GPU），host 门纯 Python 可测。
+    # ------------------------------------------------------------------
+    if v.dim() != k.dim():
+        _fail(f"V 维数 {v.dim()} != K 维数 {k.dim()}（116——V 须为 "
+              f"[.., T, Hkv, D] 同构）")
+    if v.shape[-3] != k.shape[-3]:
+        _fail(f"V token 长度 {v.shape[-3]} != K token 长度 {k.shape[-3]}"
+              f"（116——kernel 以 K 的 token 索引寻址 V，短 V 越界读、"
+              f"长 V 静默截断）")
+    if v.shape[-1] != k.shape[-1]:
+        _fail(f"V head_dim {v.shape[-1]} != K head_dim {k.shape[-1]}"
+              f"（116——错位读）")
+    if v.device != k.device or v.dtype != k.dtype:
+        _fail(f"V device/dtype 与 K 不一致（116）：v={v.device}/"
+              f"{v.dtype} vs k={k.device}/{k.dtype}")
+    for _ax, _nm in ((-3, "token"), (-2, "head"), (-1, "elem")):
+        if v.stride(_ax) != k.stride(_ax):
+            _fail(f"V stride[{_ax}]={v.stride(_ax)} != K stride"
+                  f"[{_ax}]={k.stride(_ax)}（116——{_nm} 轴：kernel 以 "
+                  f"K 的 stride 寻址 V，非同布局 V 必错址）")
     if int(block_size) != block_size or int(block_size) < 1:
         _fail(f"block_size={block_size} 非正整数")
     if mask.dim() < 2:

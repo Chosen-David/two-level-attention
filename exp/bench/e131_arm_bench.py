@@ -139,6 +139,27 @@ def make_args(arm):
     return argparse.Namespace(**cfg)
 
 
+def arm_config_for_meta(arm):
+    """【123 修复（GPT 审计 2026-10-12_0933 TL-E131-CONFIG-IDENTITY-123，
+    P2）】meta.config 的 arm 段——mavg_e127 臂记录实际 effective args。
+
+    缺陷背景：修复前 mavg_e127 臂无条件写 ARM_CONFIGS.get(args.arm,
+    {note 占位})——meta 声称的配置与实际运行配置（make_args 的 cmp_ratio=2
+    / subspace='full' / enable_layer_skip=True，与 E126 冻结 COMMON_ARGS 的
+    cmp_ratio=4 / subspace='tail' / layer_skip=False 三键不同）不符，机器
+    校准锚点的配置身份不可复核。冻结五臂仍逐字段记 ARM_CONFIGS（E126
+    派单口径，不变）。
+    """
+    if arm in ARM_CONFIGS:
+        return dict(ARM_CONFIGS[arm])
+    return {
+        "effective_args": vars(make_args(arm)),
+        "note": "mavg_e127 E127 锚点配置（make_args 实际 effective args，"
+                "非 COMMON_ARGS：cmp_ratio=2 / subspace=full / "
+                "layer_skip=True）",
+    }
+
+
 # ---------------------------------------------------------------- 工具（E126 精简版）
 def file_sha256(path):
     h = hashlib.sha256()
@@ -328,8 +349,9 @@ def main():
                   "（阶段 1：开箱即用口径，供阶段 2 专项优化定位瓶颈段）"),
         "arm": args.arm,
         "config": {"common": COMMON_ARGS,
-                   "arm": ARM_CONFIGS.get(args.arm, {"note": "mavg_e127 E127 锚点配置"
-                                                     "（e127_stage_bench.py make_args 原样克隆）"}),
+                   # 123：mavg_e127 臂记录实际 effective args（make_args
+                   # Namespace），冻结五臂仍逐字段记 ARM_CONFIGS。
+                   "arm": arm_config_for_meta(args.arm),
                    "is_e126_frozen_arm": args.arm in ARM_CONFIGS},
         "protocol": {"stages": STAGES, "kv_dtype": "bfloat16", "B": 1, "q_len": 1,
                      "H": 32, "Hkv": 8, "D": 128, "bs": 64, "K1": 128, "K2": 1024,
