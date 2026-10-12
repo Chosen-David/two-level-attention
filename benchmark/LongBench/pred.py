@@ -597,14 +597,14 @@ if __name__ == "__main__":
     dataset2prompt = json.load(open(f"{config_path}/dataset2prompt.json", "r"))
     dataset2maxlen = json.load(open(f"{config_path}/dataset2maxlen.json", "r"))
 
+    # 并发派单修复（2026-10-13）：多卡同时启动写同一 output-dir 时，多个进程
+    # 同过 `not os.path.exists` 检查后都执行 makedirs → 竞态 FileExistsError。
+    # 改为 exist_ok=True 幂等创建。
     if args.e:
         dir = f"{args.output_dir}/pred_e{args.pred_postfix}"
-        if not os.path.exists(dir):
-            os.makedirs(dir)
     else:
         dir = f"{args.output_dir}/pred{args.pred_postfix}"
-        if not os.path.exists(dir):
-            os.makedirs(dir)
+    os.makedirs(dir, exist_ok=True)
 
     local_data_set = args.dataset_path
     has_local_data_set = os.path.exists(local_data_set)
