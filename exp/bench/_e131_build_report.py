@@ -1,19 +1,101 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""E131 阶段 1 报告构建脚本（一次性工具）：汇总六臂 JSON → e131_phase1_report.json。"""
+"""E131 阶段 1 报告构建脚本（一次性工具）：汇总六臂 JSON → e131_phase1_report.json。
+
+【E132b TL-E131-AGG-FAILOPEN-119 修复】聚合前 fail-closed 校验：
+唯一 run / arm 匹配预期 / S0·steps·warmup·layer 协议一致 / gate 全过 /
+数值 finite / sidecar sha256 匹配 / triton_ok·inc_cache_built 全真。
+任一失败 → stderr 报原因 + 退出非零，拒绝发布（此前错 arm/S0=8192/
+NaN/翻 gate/缺 sidecar 均可被静默汇总成「64K 五臂报告」）。"""
 import hashlib
 import json
+import math
+import os
+import sys
 import time
 
 STAGES = ["prepare_index", "compute_score", "compute_mask", "metrics", "eager_decoding"]
 
+# 【119】E131 阶段 1 正式协议（.251 GPU1 独占采集）：S0=64K、steps=30
+# （cavgsim 80 步补充文件例外）、warmup=8、layer=2——聚合产物自称
+# 「64K 五臂报告」，输入任何一项偏离协议即身份不明，拒绝汇总。
+_EXPECT = {"S0": 65536, "warmup": 8, "layer": 2}
+_EXPECT_STEPS = {"mavg": 30, "aavg": 30, "mminmax": 30, "cavgsim": 30,
+                 "cclustersim": 30, "mavg_e127": 30, "cavgsim_steps80": 80}
 
-def load(arm):
-    return json.load(open(f'e131_arm_bench_{arm}.json'))
+
+def _fail(msg):
+    print(f"[E131-agg FAILOPEN-119] 拒绝发布: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def _finit(v, where):
+    if isinstance(v, bool) or not isinstance(v, (int, float)) \
+            or not math.isfinite(v):
+        _fail(f"{where} = {v!r} 非有限数值")
 
 
 def sha(p):
     return hashlib.sha256(open(p, 'rb').read()).hexdigest()
+
+
+def load(arm):
+    """【119】校验后加载：sidecar sha256 → 唯一 run → arm/协议/gate/finite。
+    arm 亦可为 'cavgsim_steps80'（补充文件，steps 预期 80，arm 名 cavgsim）。"""
+    expect_arm = arm[:-len("_steps80")] if arm.endswith("_steps80") else arm
+    path = f'e131_arm_bench_{arm}.json'
+    if not os.path.exists(path):
+        _fail(f"输入缺失: {path}")
+    # sidecar sha256 匹配（首 token，兼容 bare-hash 与 sha256sum 双格式）
+    sc_path = path + '.sha256'
+    if not os.path.exists(sc_path):
+        _fail(f"sidecar 缺失: {sc_path}")
+    sc_want = open(sc_path).read().split()[0].strip()
+    sc_got = sha(path)
+    if sc_want != sc_got:
+        _fail(f"sidecar sha256 不匹配: {path}（want={sc_want} got={sc_got}）")
+    d = json.load(open(path))
+    runs = d.get('runs') or []
+    if len(runs) != 1:
+        _fail(f"{path}: runs={len(runs)} ≠ 1（唯一 run 校验）")
+    r = runs[0]
+    if d.get('meta', {}).get('arm') != expect_arm or r.get('arm') != expect_arm:
+        _fail(f"{path}: arm 身份不匹配（meta={d.get('meta', {}).get('arm')!r} "
+              f"run={r.get('arm')!r} 预期={expect_arm!r}）")
+    for k in ("S0", "warmup", "layer"):
+        if r.get(k) != _EXPECT[k]:
+            _fail(f"{path}: run.{k}={r.get(k)!r} ≠ 协议预期 {_EXPECT[k]}")
+    if r.get('steps') != _EXPECT_STEPS[arm]:
+        _fail(f"{path}: run.steps={r.get('steps')!r} ≠ 预期 {_EXPECT_STEPS[arm]}")
+    proto = d.get('meta', {}).get('protocol') or {}
+    if proto.get('warmup') is not None and proto['warmup'] != r['warmup']:
+        _fail(f"{path}: meta.protocol.warmup={proto['warmup']} 与 run.warmup={r['warmup']} 自相矛盾")
+    if proto.get('steps') is not None and proto['steps'] != r['steps']:
+        _fail(f"{path}: meta.protocol.steps={proto['steps']} 与 run.steps={r['steps']} 自相矛盾")
+    # gate 全过（末步弱门禁是既有口径——此处只拒绝「明确翻红」的输入）
+    g = r.get('gate') or {}
+    if g.get('min_row_any') is not True or g.get('out_finite') is not True:
+        _fail(f"{path}: gate 未全过（min_row_any={g.get('min_row_any')} "
+              f"out_finite={g.get('out_finite')}）")
+    if not (g.get('sel_tokens_min', 0) > 0):
+        _fail(f"{path}: gate.sel_tokens_min={g.get('sel_tokens_min')} 非正")
+    if r.get('last_out_finite_recheck') is not True:
+        _fail(f"{path}: last_out_finite_recheck={r.get('last_out_finite_recheck')}")
+    if r.get('triton_ok') is not True or r.get('inc_cache_built') is not True:
+        _fail(f"{path}: triton_ok={r.get('triton_ok')} "
+              f"inc_cache_built={r.get('inc_cache_built')}（fast path 覆盖断言）")
+    # 数值 finite：稳态聚合字段 + 全步原始样本
+    _finit(r['step_gpu_sum_ms'], f"{path}:run.step_gpu_sum_ms")
+    _finit(r['step_cpu_wall_ms'], f"{path}:run.step_cpu_wall_ms")
+    _finit(r['first_step']['prepare_index']['gpu_ms'],
+           f"{path}:run.first_step.prepare_index.gpu_ms")
+    for s in STAGES:
+        _finit(r['stages'][s]['gpu_ms_median'], f"{path}:stages.{s}.gpu_ms_median")
+        _finit(r['stages'][s]['gpu_ms_p90'], f"{path}:stages.{s}.gpu_ms_p90")
+    for st_name, arr in (r.get('per_step_gpu_ms') or {}).items():
+        for i, v in enumerate(arr):
+            _finit(v, f"{path}:per_step_gpu_ms.{st_name}[{i}]")
+    return d
 
 
 arms = ['mavg', 'aavg', 'mminmax', 'cavgsim', 'cclustersim']
@@ -31,8 +113,8 @@ for a in arms + ['mavg_e127']:
         'triton_ok': r['triton_ok'], 'inc_cache_built': r['inc_cache_built'],
     }
 
-# cavgsim 80 步补充（far 增量续跑 spike 实测）
-d80 = json.load(open('e131_arm_bench_cavgsim_steps80.json'))
+# cavgsim 80 步补充（far 增量续跑 spike 实测）——【119】同样走校验加载
+d80 = load('cavgsim_steps80')
 r80 = d80['runs'][0]
 prep80 = r80['per_step_gpu_ms']['prepare_index']
 cav_far_spike = max((x, i) for i, x in enumerate(prep80) if i > 1)
