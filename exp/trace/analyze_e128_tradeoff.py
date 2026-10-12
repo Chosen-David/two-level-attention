@@ -54,12 +54,35 @@ TL-E128-STATEMENT-099 / TL-E128-FAILCLOSED-100）：
      stage_ms_samples 精确中位数联立；E127 拒重复 run 键 + 所有消费
      数值 isfinite>0 门；E100 进 provenance（R6 消费其 delta/CI）。
 
+GPT 审计 107-110 修复（2026-10-12，advice 2026-10-12_0739_3d5b1b9）：
+  107（P2）验收套件浮点逐位比较跨环境不稳 → 修复落在
+     test_e128_fix_098_100.py（容差比较器，本脚本数值语义零改动——
+     CPython 3.12 起 sum() 对 float 改用 Neumaier 补偿求和，与旧版
+     朴素求和在末位 ulp（~1e-14 相对量级）上不同，异环境再生 JSON 与
+     提交 JSON 逐位比较必红，主数值不受影响）。
+  108（P2）E127 baseline/iter8 配对未绑定完整配置 → config 全键
+     canonical hash（K1/K2/bs/D/H/Hkv/αβγ + gpu + torch + 逐 run
+     {S0,layer_kind,steps,layer_idx}）四份归档联立比对，任一字段
+     不一致 fail-closed；hash 写入每组配对与 provenance。
+  109（P2）NaN/±Inf 穿透 E125/E126/E100 消费路径 → 入口对每份输入
+     整树递归 isfinite 校验（带字段路径 fail-closed）+ 最终
+     json.dump(allow_nan=False)；NaN 使所有 >/</== 比较与
+     「CI 含 0」判定均静默通过（abs(NaN)>tol 为 False、
+     lo<=0<=hi 为 False 即「不含 0」），必须在入口拦截。
+  110（P2）机器表已更新但叙事硬编码 → significance_note、R1、R5、
+     R6、alternative_disposition 及 R2/R3/R4 中全部具体数值/显著性
+     集合改为从 quality_e125 / pairwise_ci_all / steady_selector_
+     cost_e126 / e100 / e109 结构化字段 f-string 生成（模板集中
+     定义，零手写数字、零固定显著性集合）；GPT 反例（aavg 五任务
+     协同 +1）下文字必须与结构化对象同步翻转。
+
 结论限定口径：structured/singleton 合成数据、B=1、q_len=1、D′ off、
 单层 microbench（E126 计时插桩开 / E127 独立 harness），H20-3e。
 
 python 与 -O 双跑安全（无 assert 门禁，全部 sys.exit fail-closed）。
 v1 by Opus 派遣分析 agent，2026-10-12；098/099/100 修复 by Opus-fix
-（worktree e128-fix-098-100），2026-10-12。
+（worktree e128-fix-098-100）；107-110 修复 by Agent E
+（worktree e128-fix-107-110），2026-10-12。
 """
 import hashlib
 import itertools
@@ -150,6 +173,10 @@ E109_KEYS = {  # E109 旧口径各臂最佳配置（E125 重跑的就是这五�
 
 CORR_ID = "TL-E126-STAGE-DOUBLECOUNT-001"
 TLI_INDEXER_MD5 = "bf5e26c4d6123875b2786b9ed886da5f"
+# 108：E127 配对配置绑定的必需键（config 为全键哈希，此列表只作
+# 「归档格式漂移」缺键哨兵——K1/K2/bs/D/H/Hkv 是速度比的几何/预算语义字段）
+E127_REQUIRED_CONFIG_KEYS = ["alpha", "beta", "gamma", "K1", "K2", "bs",
+                             "D", "H", "Hkv"]
 
 # E126 互斥阶段白名单（与 e126_stage_timing.py EXCLUSIVE_STAGE_KEYS 同源：
 # 全部 STAGE_SPANS 名去掉子段 S2_far/S2_near）
@@ -192,6 +219,28 @@ def load_json(path, label):
     return json.load(open(path))
 
 
+def assert_finite(obj, label, path="root"):
+    """109：入口对每份输入整树递归 isfinite 校验（带字段路径）。
+
+    NaN/±Inf 使所有 >/</== 偏差比较静默通过（abs(NaN)>tol 为 False），
+    还会令「CI 含 0」判定翻转为「不含 0」（lo<=0<=hi 对 NaN 恒 False）
+    ——GPT 三反例（E126 median=NaN / E100 协同 NaN 产「+nan 显著」/
+    E125 协同 NaN 计入「不含 0」对）均由此穿透。int 无限值问题
+    （任意精度），只查 float；bool 是 int 子类天然有限。
+    json.load 默认解析 NaN/Infinity/-Infinity 字面量，故必须在此拦截。
+    """
+    if isinstance(obj, float):
+        if not math.isfinite(obj):
+            fail(f"{label}: 非有限值 {path}={obj!r}——NaN/±Inf 使一切偏差"
+                 f"比较与含 0 判定静默通过，入口 fail closed（109）")
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            assert_finite(v, label, f"{path}.{k}")
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            assert_finite(v, label, f"{path}[{i}]")
+
+
 def paired_bootstrap(deltas, B=B, seed=SEED):
     """与 analyze_e125_screen_verdict.py 同协议（fresh seed / 任务级重采样）。"""
     rng = random.Random(seed)
@@ -211,6 +260,7 @@ def r6(x):
 # ------------------------------------------------------------------ E125
 def load_e125(prov):
     d = load_json(E125_PATH, "E125")
+    assert_finite(d, "E125")  # 109：质量输入整树 isfinite
     prov["e125_screen_verdict"] = {
         "path": os.path.relpath(E125_PATH, REPO),
         "sha256": sha256_of(E125_PATH),
@@ -391,6 +441,8 @@ def load_e126(prov):
     correction 缺失 = 修正前版本，立即 fail-closed 不猜测）。"""
     timing = {}
     raw = {a: load_json(E126_PATH[a], f"E126-{a}") for a in ARMS}
+    for a in ARMS:
+        assert_finite(raw[a], f"E126-{a}")  # 109：计时输入整树 isfinite
     # 100-③ 共用配置门：五臂 common_config 逐位一致（以 mavg 臂为基准）
     # + sim_greedy 口径关键值冻结（tli_sim=0.9 / tail 子空间 / cmp_ratio=4 /
     # 层跳过关）。单臂漂移或全臂同漂（协议错位）都会被冻结值门拦截。
@@ -561,22 +613,39 @@ def load_e127(prov):
                  f"——配对组非 mavg 配置，覆盖面推断口径冲突")
         if d["gpu"] != "NVIDIA H20-3e":
             fail(f"E127-{label}: gpu != NVIDIA H20-3e——跨机混比无意义")
-    prov["e127_stage_bench"] = {
-        "baseline": {"path": os.path.relpath(E127_BASE, REPO),
-                     "sha256": sha256_of(E127_BASE)},
-        "iter8": {"path": os.path.relpath(E127_ITER8, REPO),
-                  "sha256": sha256_of(E127_ITER8)},
-        "final_64k": {"path": os.path.relpath(E127_FIN64, REPO),
-                      "sha256": sha256_of(E127_FIN64)},
-        "final_8k": {"path": os.path.relpath(E127_FIN8, REPO),
-                     "sha256": sha256_of(E127_FIN8)},
-        "consumed_fields": ["config(α,β,γ)/gpu", "runs[].step_gpu_sum_ms",
-                             "runs[].step_cpu_wall_ms",
-                             "runs[].{prepare_index,compute_score,"
-                             "compute_mask,metrics,eager_decoding}"
-                             ".gpu_ms_median", "profile.one_step_cuda_kernels"],
-        "bench_config_is_mavg": True,
-    }
+
+    # ---- 108：E127 配对完整配置绑定（GPT 反例：iter8 改 K2=2048/D=64/
+    # bs=1/torch=fake，保留 α/β/γ、GPU 与 run 键，旧门仍发布 5.47×/4.76×
+    # 为「同预算」速度比）。绑定面 = config 全键（K1/K2/bs/D/H/Hkv/αβγ
+    # 及未来 harness 新增键——全键哈希结构性覆盖）+ gpu + torch + 逐 run
+    # {S0,layer_kind,steps,layer_idx}；canonical sha256 写入每组配对与
+    # provenance，baseline/iter8 任一字段不一致 → fail-closed。
+    # 归档未记录 dtype/CUDA/Triton 版本/TLI_E127_FAST 等 kernel 开关/
+    # 输入生成参数——如实声明（provenance.config_binding），不作未记录
+    # 字段的同配置事实断言；未来记录即自动进全键哈希参与绑定。
+    def e127_canonical(d, label):
+        cfg = d["config"]
+        missing = [k for k in E127_REQUIRED_CONFIG_KEYS if k not in cfg]
+        if missing:
+            fail(f"E127-{label}: config 缺必需键 {missing}——归档格式漂移，"
+                 f"配置绑定无从成立（108），fail closed")
+        for k in ("gpu", "torch"):
+            if k not in d:
+                fail(f"E127-{label}: 缺 {k} 字段——配置绑定不完整（108），"
+                     f"fail closed")
+        ident = sorted((r["S0"], r["layer_kind"], r["steps"], r["layer_idx"])
+                       for r in d["runs"])
+        return {"config": cfg, "gpu": d["gpu"], "torch": d["torch"],
+                "runs_identity": ident}
+
+    canon = {}
+    for label, d in (("baseline", base), ("iter8", it8),
+                     ("final_64k", f64), ("final_8k", f8)):
+        c = e127_canonical(d, label)
+        blob = json.dumps(c, ensure_ascii=False, sort_keys=True)
+        c["sha256"] = hashlib.sha256(
+            blob.encode("utf-8")).hexdigest()
+        canon[label] = c
 
     # 100-⑤ 拒重复 run 键：建字典前显式检查（GPT 反例：baseline 追加重复
     # run 后字典静默去重仍 8 键通过）。100-⑥ 所有消费数值 isfinite>0 门
@@ -617,12 +686,78 @@ def load_e127(prov):
     bi, ii = index(base, "baseline", expect_n=8), index(it8, "iter8", expect_n=8)
     if set(bi) != set(ii) or len(bi) != 8:
         fail(f"E127: baseline/iter8 run 集合不一致或非 8 组（{sorted(bi)}）")
+
+    # ---- 108 绑定比较后置：结构损坏门（100-⑤ 重复键 / 100-⑥ 非
+    # 有限正数）先行拦截，跨文件身份绑定其次——重复 run 是结构损坏
+    # 不是配置漂移，缺陷类别不得误报（T5 红绿回归）。
+    if canon["baseline"]["sha256"] != canon["iter8"]["sha256"]:
+        det = []
+        for k in ("config", "gpu", "torch", "runs_identity"):
+            b, i = canon["baseline"][k], canon["iter8"][k]
+            if b == i:
+                continue
+            if k == "config":
+                det += [f"config.{ck}: baseline={b.get(ck)!r} iter8={i.get(ck)!r}"
+                        for ck in sorted(set(b) | set(i))
+                        if b.get(ck) != i.get(ck)]
+            else:
+                det.append(f"{k}: baseline={b!r} iter8={i!r}")
+        fail(f"E127: baseline/iter8 配置绑定不一致（108）——{'; '.join(det)}"
+             f"——异配置计时不得发布为同预算配对速度比，fail closed")
+    for fl in ("final_64k", "final_8k"):
+        for k in ("config", "gpu", "torch"):
+            if canon[fl][k] != canon["baseline"][k]:
+                fail(f"E127-{fl}: {k} 与配对组不一致（108）——复核文件配置"
+                     f"漂移，fail closed")
+    cfg_hash = canon["baseline"]["sha256"]
+    prov["e127_stage_bench"] = {
+        "baseline": {"path": os.path.relpath(E127_BASE, REPO),
+                     "sha256": sha256_of(E127_BASE)},
+        "iter8": {"path": os.path.relpath(E127_ITER8, REPO),
+                  "sha256": sha256_of(E127_ITER8)},
+        "final_64k": {"path": os.path.relpath(E127_FIN64, REPO),
+                      "sha256": sha256_of(E127_FIN64)},
+        "final_8k": {"path": os.path.relpath(E127_FIN8, REPO),
+                     "sha256": sha256_of(E127_FIN8)},
+        "consumed_fields": ["config(α,β,γ)/gpu + 108 全键配置绑定",
+                            "runs[].step_gpu_sum_ms",
+                             "runs[].step_cpu_wall_ms",
+                             "runs[].{prepare_index,compute_score,"
+                             "compute_mask,metrics,eager_decoding}"
+                             ".gpu_ms_median", "profile.one_step_cuda_kernels"],
+        "bench_config_is_mavg": True,
+        "config_binding": {  # 108：配对组配置身份（canonical hash 进每组配对）
+            "sha256": cfg_hash,
+            "canonical": {"config": canon["baseline"]["config"],
+                          "gpu": canon["baseline"]["gpu"],
+                          "torch": canon["baseline"]["torch"],
+                          "runs_identity": canon["baseline"]["runs_identity"]},
+            "bound_fields": ["config 全键（K1/K2/bs/D/H/Hkv/αβγ "
+                             "及未来 harness 新增键——全键哈希结构性覆盖）",
+                             "gpu", "torch",
+                             "runs[].{S0,layer_kind,steps,layer_idx}"],
+            "unrecorded_fields_declaration":
+                "归档 JSON 未记录 dtype/CUDA/Triton 版本/TLI_E127_FAST 等 "
+                "kernel 开关/输入生成参数——108 如实声明：不作未记录字段的"
+                "同配置事实断言；config 为全键 canonical hash，harness 未来"
+                "记录这些字段即自动纳入绑定。当前四份归档 config/gpu/torch "
+                "逐位一致、baseline/iter8 runs_identity 逐位一致，同 harness "
+                "产出链为间接约束",
+            "baseline_sha256": canon["baseline"]["sha256"],
+            "iter8_sha256": canon["iter8"]["sha256"],
+            "final_64k_config_equal": canon["final_64k"]["config"] ==
+                                      canon["baseline"]["config"],
+            "final_8k_config_equal": canon["final_8k"]["config"] ==
+                                     canon["baseline"]["config"],
+        },
+    }
     paired = {}
     for k in sorted(bi):
         b, i = bi[k], ii[k]
         pos_finite(b["step_gpu_sum_ms"], f"baseline/{k}.step_gpu_sum_ms")
         pos_finite(i["step_gpu_sum_ms"], f"iter8/{k}.step_gpu_sum_ms")
         paired[f"S{k[0]}/{k[1]}"] = {
+            "config_binding_sha256": cfg_hash,  # 108：配对组配置身份
             "baseline_gpu_ms": r6(b["step_gpu_sum_ms"]),
             "iter8_gpu_ms": r6(i["step_gpu_sum_ms"]),
             "gpu_speedup": r6(b["step_gpu_sum_ms"] / i["step_gpu_sum_ms"]),
@@ -665,6 +800,7 @@ def load_e127(prov):
 # ------------------------------------------------------------------ E109
 def load_e109(prov):
     d = load_json(E109_PATH, "E109")
+    assert_finite(d, "E109")  # 109：跨口径对照输入整树 isfinite
     prov["e109_screen4_selection"] = {
         "path": os.path.relpath(E109_PATH, REPO),
         "sha256": sha256_of(E109_PATH),
@@ -686,6 +822,7 @@ def load_e100(prov):
     推荐文字里引用历史判决，provenance 缺该输入版本绑定）。加载时
     claim 与 main_ci 联立门禁，R6 数字全部机器取值。"""
     d = load_json(E100_PATH, "E100")
+    assert_finite(d, "E100")  # 109：bootstrap CI 输入整树 isfinite
     claim, mc = d["claim"], d["main_ci_13tasks"]
     cal = d["calibration_check"]
     if abs(claim["diff"] - mc["mean"]) > 1e-9:
@@ -716,7 +853,196 @@ def load_e100(prov):
     }
     return {"diff": claim["diff"], "ci95": [mc["ci95_lo"], mc["ci95_hi"]],
             "contains_zero": bool(mc["contains_zero"]),
+            "n_tasks": len(d["task_table"]),  # 110：R6「13 任务」机器取值
             "verdict": d["verdict"]}
+
+
+# ------------------------------------------------------- 叙事模板（110）
+# GPT 反例（TL-E128-NARRATIVE-DERIVATION-110）：aavg 五任务协同 +1（内部
+# 自洽、全部联立门通过——合法数据变化）后，机器表（quality_e125/
+# pairwise_ci_all）已翻转，significance_note 仍写「三候选均含 0」、R1 仍
+# 写「aavg +0.21 [-0.25,+0.86]」——文字与结构化对象矛盾。修复：全部含
+# 具体数值/显著性集合的叙事文本由以下模板从结构化字段 f-string 生成，
+# 零手写数字、零固定显著性集合；含 0 臂集/显著臂集/显著臂间对集每次运行
+# 现算，候选计数以中文数词机器生成（当前数据下保持「三候选」量词措辞）。
+def fmt_d2(x):
+    return f"{x:+.2f}"
+
+
+def fmt_ci2(lo, hi):
+    return f"[{lo:+.2f},{hi:+.2f}]"
+
+
+CNT_CN = {0: "零", 1: "一", 2: "两", 3: "三", 4: "四", 5: "五", 6: "六"}
+
+
+def partition_vs_mavg(quality):
+    """非锚臂按 vs mavg 显著性三分（从未证明/显著更好/显著更差）。
+
+    依据 = quality[a].significant_vs_mavg（重算复核门禁后的结构化字段）
+    + delta_vs_mavg 符号。集合每次现算，不保留固定成员。"""
+    unproven, better, worse = [], [], []
+    for a in sorted(ARMS):
+        if a == "mavg":
+            continue
+        qa = quality[a]
+        if not qa["significant_vs_mavg"]:
+            unproven.append(a)
+        elif qa["delta_vs_mavg"] > 0:
+            better.append(a)
+        else:
+            worse.append(a)
+    return unproven, better, worse
+
+
+def arm_triple(a, quality):
+    qa = quality[a]
+    return f"{a} {fmt_d2(qa['delta_vs_mavg'])} {fmt_ci2(*qa['ci95_vs_mavg'])}"
+
+
+def make_significance_note(quality, pairwise):
+    """099+110：显著性说明——vs mavg 三分集合 + 臂间全枚举不含 0 对集，
+    全部从 quality/pairwise 现算生成。"""
+    unproven, better, worse = partition_vs_mavg(quality)
+    seg = []
+    if unproven:
+        seg.append(f"{CNT_CN[len(unproven)]}候选（{'/'.join(unproven)}）"
+                   f"CI 均含 0（未证明差异）")
+    for a in better:
+        seg.append(f"{a} 显著更好（{arm_triple(a, quality)}）")
+    for a in worse:
+        seg.append(f"{a} 显著更差（{fmt_ci2(*quality[a]['ci95_vs_mavg'])}）")
+    sig_pairs = sorted(k for k, v in pairwise["pairs"].items()
+                       if not v["contains_zero"])
+    n_pairs = len(pairwise["pairs"])
+    return ("vs mavg：" + "，".join(seg)
+            + f"。臂间配对全枚举（{n_pairs} 对，未做多重比较校正）中 "
+            f"{len(sig_pairs)} 对 CI 不含 0：{sig_pairs}"
+            "——支配关系是点估计排序主张，不构成统计证明")
+
+
+def make_r1_statement(quality, pairwise):
+    """099+110：R1 换锚判据——未证明/显著更好/显著更差三段全部机器生成；
+    「唯一 vs mavg 显著判决」与「无候选被证明优于 mavg」均为条件措辞，
+    合法数据变化（如某候选 CI 翻出 0）下自动翻转。"""
+    unproven, better, worse = partition_vs_mavg(quality)
+    by_delta = sorted(unproven, key=lambda a: -quality[a]["delta_vs_mavg"])
+    n_pairs = len(pairwise["pairs"])
+    parts = ["换锚判据（候选 vs mavg）："]
+    if by_delta:
+        parts.append(f"{CNT_CN[len(by_delta)]}候选未证明差异——"
+                     + "、".join(arm_triple(a, quality) for a in by_delta)
+                     + " vs mavg 的 bootstrap CI 均含 0，084 措辞纪律下只能写"
+                     "「未证明差异」"
+                     + ("，不足以支撑换锚。" if not better else "。"))
+    if better:
+        parts.append("被证明优于 mavg 的候选："
+                     + "、".join(arm_triple(a, quality) for a in better)
+                     + "——vs mavg bootstrap CI 不含 0（未做多重比较校正，"
+                     "需谨慎解读；显著性层面对换锚判据构成支持，最终裁决"
+                     "权在主 AI）")
+    sig_total = len(better) + len(worse)
+    if sig_total == 1 and worse:
+        a = worse[0]
+        parts.append(f"唯一 vs mavg 显著判决是 {a} 显著更差"
+                     f"（{fmt_d2(quality[a]['delta_vs_mavg'])} "
+                     f"{fmt_ci2(*quality[a]['ci95_vs_mavg'])}）。")
+    elif sig_total:
+        det = [f"{a} 显著更好（{arm_triple(a, quality)}）" for a in better] \
+            + [f"{a} 显著更差（{arm_triple(a, quality)}）" for a in worse]
+        parts.append(f"vs mavg 显著判决共 {sig_total} 臂：{'；'.join(det)}。")
+    sig_arm_pair_txt = "; ".join(
+        f"{k} 点估计 {fmt_d2(v['point_est'])} {fmt_ci2(*v['ci95'])}"
+        for k, v in sorted(pairwise["pairs"].items())
+        if not v["contains_zero"] and not k.startswith("mavg-"))
+    if sig_arm_pair_txt:
+        parts.append(
+            f"臂间配对全枚举（pairwise_ci_all，{n_pairs} 对，未做多重比较"
+            f"校正）中另有不含 0 的臂间对：{sig_arm_pair_txt}——臂间排序"
+            "事实如实登记，但换锚判据是候选 vs mavg，"
+            + ("臂间配对事实不改变「无候选被证明优于 mavg」。"
+               if not better else
+               "被证明优于 mavg 的候选见上（换锚判据以候选 vs mavg 表为准）。"))
+    return "".join(parts)
+
+
+def make_r5_statement(quality, e109):
+    """110：R5 跨口径符号稳定性——E109/E125 数值全部机器取值，
+    「反超/未反超」随 delta 符号条件生成。"""
+    cc = quality["cclustersim"]
+    d109_cc = e109["mavg"] - e109["cclustersim"]
+    flip = (f"cclustersim {fmt_d2(cc['delta_vs_mavg'])} 反超"
+            if cc["delta_vs_mavg"] > 0 else
+            f"cclustersim {fmt_d2(cc['delta_vs_mavg'])} 未反超")
+    return (f"跨口径符号稳定性：E109 旧口径 mavg 最佳 {e109['mavg']:.2f}，"
+            f"cclustersim {e109['cclustersim']:.2f}（−{d109_cc:.2f} 居后）、"
+            f"aavg {e109['aavg']:.2f}；E125 新口径符号翻转（{flip}）"
+            f"——n={len(TASKS)} 任务噪声主导，不足以在两口径间换锚；"
+            "mavg 两口径均居首/前列，稳健性最好。")
+
+
+def make_r6_statement(e100, headline):
+    """099+110：R6 论文主张链——E100 差值/CI/含 0 措辞 + 任务数 +
+    E127 加速比全部机器取值（13 任务 = e100_bootstrap_ci task_table 实长）。"""
+    cz = bool(e100["contains_zero"])
+    word = "未证明差异" if cz else "显著差异"
+    ci_note = ("含 0；084 措辞纪律：含 0 只能写「未证明差异」" if cz
+               else "不含 0")
+    return (f"论文主张链已锚定 mavg：E100 {e100['n_tasks']} 任务 vs FullKV "
+            f"{word}（{fmt_d2(e100['diff'])}，CI "
+            f"{fmt_ci2(e100['ci95'][0], e100['ci95'][1])} {ci_note}）"
+            f"+ E127 同预算 kernel 加速（mavg 配置实测 "
+            f"{headline['gpu_speedup']:.2f}×）。换 cclustersim 需重跑全量验证"
+            "（E116b 式咬合）+ fast-path 臂级基准 + prefill suffix 不变性验收，"
+            "成本大而质量收益未证明。")
+
+
+def make_dispositions(quality, e109, timing, dom_pairs, pairwise):
+    """110：alternative_disposition 全部数值/显著性/支配表状态机器生成。"""
+    disp = {}
+    cc, aa, cv, mm = (quality["cclustersim"], quality["aavg"],
+                      quality["cavgsim"], quality["mminmax"])
+    v64s = timing["cavgsim"]["cells"]["structured/S65536"]
+    dom_note = ("二维支配表为空" if not dom_pairs else
+                f"二维支配表含 {len(dom_pairs)} 支配对"
+                + "、".join(f"{a} 支配 {b}" for a, b in dom_pairs))
+    disp["cclustersim"] = (
+        "进消融/讨论段如实报告：E125 点估计海选冠军"
+        f"（{fmt_d2(cc['delta_vs_mavg'])} vs mavg，"
+        f"{'已证明显著' if cc['significant_vs_mavg'] else '未证明显著'}；"
+        "点估计亦"
+        f"{'高于' if cc['delta_vs_fullkv_point'] > 0 else '不高于'} FullKV "
+        f"{fmt_d2(cc['delta_vs_fullkv_point'])}）——但冷建簇超线性 + E127 "
+        "未覆盖，不适合作主方法")
+    d109_aa = e109["mavg"] - e109["aavg"]
+    e109_aa_txt = (f"跨口径符号翻转（E109 −{d109_aa:.2f}）"
+                   if d109_aa > 0 else
+                   f"跨口径符号一致（E109 +{-d109_aa:.2f}）")
+    disp["aavg"] = (
+        "零建簇成本、稳态与 mavg 同档（10 格内有格交叉），点估计"
+        f"{fmt_d2(aa['delta_vs_mavg'])} "
+        f"{'未证明' if not aa['significant_vs_mavg'] else '已证明优于 mavg'}"
+        f"且{e109_aa_txt}——不换锚，可作消融臂")
+    lower_than = [x for x in ("mavg", "aavg")
+                  if cv["avg5"] < quality[x]["avg5"]]
+    sig_pairs_cv = sorted(k for k, v in pairwise["pairs"].items()
+                          if not v["contains_zero"]
+                          and "cavgsim" in k.split("-"))
+    disp["cavgsim"] = (
+        f"质量点估计低于 {'/'.join(lower_than) if lower_than else '上述臂'}"
+        f"（vs mavg {fmt_d2(cv['delta_vs_mavg'])} CI "
+        f"{'含 0 未证明差异' if not cv['significant_vs_mavg'] else '不含 0 显著'}"
+        f"；臂间配对 {'、'.join(sig_pairs_cv)} CI 不含 0）且冷建簇 "
+        f"{v64s['initial_build_excess_ms']:.0f}ms@64K structured——以上均为"
+        "点估计排序与配对事实陈述，非 Pareto 支配主张"
+        f"（{dom_note}，见 quality_steady_cost_pareto）；E123 cavg 线已 NO-GO "
+        "关闭")
+    sig_total = sum(1 for a in ARMS if a != "mavg"
+                    and quality[a]["significant_vs_mavg"])
+    disp["mminmax"] = (
+        f"{'唯一' if sig_total == 1 else '之一'}显著判决臂（vs mavg CI "
+        f"{fmt_ci2(*mm['ci95_vs_mavg'])}）——剔除")
+    return disp
 
 
 # ------------------------------------------------------------------ 分析
@@ -771,18 +1097,12 @@ def pareto_analysis(quality, timing, pairwise):
                             "总成本陈述见 cost_only_total_order_at_horizon"
                             "（新增最小化维不可能创造此处不存在的 Pareto 支配，"
                             "新支配集 ⊆ 旧支配集）")
-    # 099：significance_note 严格限定为实际计算范围（vs mavg + 全枚举引用）
-    sig_pairs = sorted(k for k, v in pairwise["pairs"].items()
-                       if not v["contains_zero"])
-    significance_note = (
-        "vs mavg：三候选（aavg/cavgsim/cclustersim）CI 均含 0（未证明差异），"
-        "mminmax 显著更差（[-1.56,-0.08]）。臂间配对全枚举（10 对，未做多重"
-        f"比较校正）中 {len(sig_pairs)} 对 CI 不含 0：{sig_pairs}——支配关系"
-        "是点估计排序主张，不构成统计证明")
+    # 099+110：significance_note 由模板从 quality/pairwise 结构化字段生成
+    # （含 0 臂集 / 显著臂集 / 不含 0 臂间对集每次现算，无手写数字）
     return {
         "cost_unit": "selector_total_ms_median_est（ms，10 格 = "
                      "structured/singleton × S 4K-64K）",
-        "significance_note": significance_note,
+        "significance_note": make_significance_note(quality, pairwise),
         "dominance": dom,
         "frontier_summary": frontier_summary,
         "summary_generated_from": "dominance（机器生成，无手写支配主张）",
@@ -923,16 +1243,18 @@ def amortization_horizon(timing):
 
 
 def build_recommendation(quality, timing, e127_paired, headline, e109,
-                         pairwise, e100):
+                         pairwise, e100, pareto):
     """论文主方法推荐（分析支撑，最终裁决权在主 AI Opus）。
 
     099 修复：R1/R6 措辞严格化——R1 分开陈述「三候选 vs mavg 含 0」与
     「mminmax 显著更差」（旧版同句内部冲突）；臂间配对事实从 pairwise_ci_all
     机器引用；R6 的 E100 含零 CI 写「未证明差异」（084 纪律：不写「持平」），
     数字从 e100_bootstrap_ci.json 机器取值并经联立门禁。
+    110 修复：R1/R5/R6/dispositions 由模板函数生成；R2/R3/R4 中全部具体
+    数值改为从 timing/headline 现算 f-string——零手写数字、零固定显著性
+    集合（GPT aavg+1 协同反例下文字必须与结构化对象同步翻转）。
     """
     cc = quality["cclustersim"]
-    mm = quality["mminmax"]
     steady64 = {a: timing[a]["cells"]["structured/S65536"]
                 ["selector_total_ms_median_est"] for a in ARMS}
     rel = steady64["cclustersim"] / steady64["mavg"] - 1.0
@@ -943,31 +1265,43 @@ def build_recommendation(quality, timing, e127_paired, headline, e109,
     v64i = timing["cavgsim"]["cells"]["singleton/S65536"]
     e2e64 = {a: timing[a]["cells"]["structured/S65536"]
              ["e2e_128step_ms_timing_off_mixed_clock"] for a in ARMS}
-    # 099：臂间配对不含 0 的事实从全枚举机器生成（方向 = 前臂 − 后臂）
-    sig_arm_pair_txt = "; ".join(
-        f"{k} 点估计 {v['point_est']:+.2f} "
-        f"[{v['ci95'][0]:+.2f},{v['ci95'][1]:+.2f}]"
-        for k, v in sorted(pairwise["pairs"].items())
-        if not v["contains_zero"] and not k.startswith("mavg-"))
+    # ---- 110：R2/R3 数据派生量（全部从 timing cells 现算）----
+    cost_keys = [f"{dk}/S{s}" for dk in DATA_KINDS for s in SIZES]
+    n_cc_below_mavg = sum(
+        1 for k in cost_keys
+        if timing["cclustersim"]["cells"][k]
+        ["selector_total_ms_median_est"]
+        < timing["mavg"]["cells"][k]["selector_total_ms_median_est"])
+    below_txt = ("无一格" if n_cc_below_mavg == 0
+                 else f"{n_cc_below_mavg} 格")
+    max_steady_diff = max(
+        abs(steady64[a] - steady64["mavg"]) for a in ARMS if a != "mavg")
+    c40 = c64["structured/S4096"]["initial_build_excess_ms"]
+    c16 = c64["structured/S16384"]["initial_build_excess_ms"]
+    mx_noncluster = max(
+        abs(timing[a]["cells"][k]["initial_build_excess_ms"])
+        for a in ARMS if not timing[a]["is_cluster_arm"]
+        for k in cost_keys)
+    r_cc_singleton = (c64i["initial_build_excess_ms"]
+                      / c64s["initial_build_excess_ms"])
+    r_cv_singleton = (v64i["initial_build_excess_ms"]
+                      / v64s["initial_build_excess_ms"])
+    steady_diff_cv = steady64["mavg"] - steady64["cavgsim"]
+    steps_cv = (v64s["initial_build_excess_ms"] / steady_diff_cv
+                if steady_diff_cv > 0 else None)
+    rb_steps = [0] + list(c64s["rebuild_steps"])
+    rb_gaps = [b - a for a, b in zip(rb_steps, rb_steps[1:])]
+    dom_pairs = sorted(
+        (a, x["arm"]) for a in ARMS
+        for x in pareto["dominance"][a]["dominates_point_estimate"])
     reasons = [
         {"id": "R1-quality-unproven",
-         "statement": "换锚判据（候选 vs mavg）：三候选未证明差异——"
-                      "cclustersim +0.34 "
-                      f"[{cc['ci95_vs_mavg'][0]:+.2f},{cc['ci95_vs_mavg'][1]:+.2f}]、"
-                      "aavg +0.21 [-0.25,+0.86]、cavgsim -0.18 [-0.44,+0.09] "
-                      "vs mavg 的 bootstrap CI 均含 0，084 措辞纪律下只能写"
-                      "「未证明差异」，不足以支撑换锚。唯一 vs mavg 显著判决"
-                      "是 mminmax 显著更差"
-                      f"（{mm['delta_vs_mavg']:+.2f} "
-                      f"[{mm['ci95_vs_mavg'][0]:+.2f},{mm['ci95_vs_mavg'][1]:+.2f}]）。"
-                      "臂间配对全枚举（pairwise_ci_all，10 对，未做多重比较"
-                      f"校正）中另有不含 0 的臂间对：{sig_arm_pair_txt}——"
-                      "臂间排序事实如实登记，但换锚判据是候选 vs mavg，"
-                      "臂间配对事实不改变「无候选被证明优于 mavg」。",
+         "statement": make_r1_statement(quality, pairwise),
          "data_source": "e125_screen_verdict.json（本脚本重算复核通过）",
          "uncertainty": "cclustersim 点估计最高且高于 FullKV 锚点"
                         f"（+{cc['delta_vs_fullkv_point']:.2f}，vs fullkv "
-                        "CI 补算含 0）——若 E116b 全量咬合后 CI 不含 0 可重议"},
+                        f"CI 补算{'含 0' if not cc['significant_vs_fullkv'] else '不含 0'}）"
+                        "——若 E116b 全量咬合后 CI 不含 0 可重议"},
         {"id": "R2-steady-cost",
          "statement": f"稳态选择器成本（修正后互斥阶段中位数和，64K "
                       f"structured）：mavg {steady64['mavg']:.4f}ms、"
@@ -976,16 +1310,21 @@ def build_recommendation(quality, timing, e127_paired, headline, e109,
                       f"{steady64['mminmax']:.4f}、cclustersim "
                       f"{steady64['cclustersim']:.4f}——cclustersim vs mavg "
                       f"相对差 {rel * 100:+.2f}%（GPT f4139b5 ①：3.16% 口径，"
-                      "不得写 <2%），且 10 格成本向量无一格低于 mavg。",
+                      f"不得写 <2%），且 10 格成本向量{below_txt}"
+                      "低于 mavg。",
          "data_source": "e126_stage_timing_*.json 修正后字段",
          "uncertainty": "单层 microbench（计时插桩开），launch-gap 口径下"
-                        "主机侧差异可能低估；量级本身很小（<0.2ms/步）"},
+                        "主机侧差异可能低估；量级本身很小（五臂 64K "
+                        f"structured 稳态点估计差绝对值 "
+                        f"<{max_steady_diff:.2f}ms/步）"},
         {"id": "R3-cold-build",
          "statement": f"cclustersim 初建簇首步超额 {c64s['initial_build_excess_ms']:.0f}ms"
                       f"/层/序列 @64K structured（cavgsim "
                       f"{v64s['initial_build_excess_ms']:.0f}ms；非簇臂首步"
-                      "超额 ~0.06ms 量级），随 S 超线性（cclustersim "
-                      "structured：4K 10.6ms → 16K 120.8 → 64K 1679.7）。"
+                      f"超额 ~{mx_noncluster:.2f}ms 量级），随 S 超线性"
+                      f"（cclustersim structured：4K {c40:.1f}ms → "
+                      f"16K {c16:.1f} → "
+                      f"64K {c64s['initial_build_excess_ms']:.1f}）。"
                       "三条 E128 新增事实使成本面进一步恶化："
                       f"(a) 建簇非一次性——64K 128 步窗内观测到 "
                       f"{c64s['rebuild_spike_n_in_128steps']} 次重建尖峰"
@@ -994,7 +1333,8 @@ def build_recommendation(quality, timing, e127_paired, headline, e109,
                       f"(b) 建簇成本强数据依赖——singleton 64K 初建 "
                       f"{c64i['initial_build_excess_ms']:.0f}ms（cavgsim "
                       f"{v64i['initial_build_excess_ms']:.0f}ms），为 "
-                      "structured 的 4.7×/5.7×——structured 是有利下界，"
+                      f"structured 的 {r_cc_singleton:.1f}×/"
+                      f"{r_cv_singleton:.1f}×——structured 是有利下界，"
                       "真实数据建簇成本落在两者之间且未知；"
                       "(c) E126 内部可比的 128 步 e2e 窗（混合时钟微基准，"
                       f"GPT ②）：cclustersim {e2e64['cclustersim']:.0f}ms "
@@ -1004,13 +1344,16 @@ def build_recommendation(quality, timing, e127_paired, headline, e109,
                       "——与摊销曲线自洽（初建+重建+稳态差+S8 分解吻合）。"
                       "cclustersim 稳态亦更贵（R2），故建簇成本在任何 decode "
                       "长度下都不摊销；cavgsim 稳态略便宜但 64K 回本步数 "
-                      "26,000+ 步（steady-only 口径，重建复发再侵蚀）。",
+                      + (f"≈{steps_cv:,.0f} 步" if steps_cv is not None
+                         else "不存在（稳态差不支持回本）")
+                      + "（steady-only 口径，重建复发再侵蚀）。",
          "data_source": "e126 amortization rep0 首 128 步摊销曲线（重建尖峰"
                         "判据 = 超稳态中位数 2×）+ e2e_128step_wall_ns_"
                         "timing_off（仅 E126 内部可比，禁止与 E127 配对组"
                         "提速混算）",
          "uncertainty": "建簇为每序列每层发生（服务冷启动税）；重建尖峰"
-                        "cadence（~30-70 步/次@64K）与单次量级随 S 与数据"
+                        f"cadence（实测间隔 {min(rb_gaps)}-{max(rb_gaps)}"
+                        " 步/次@64K）与单次量级随 S 与数据"
                         "分布变化，128 步窗只是采样；singleton/structured "
                         "为合成数据两界，真实 LongBench 分布未测"},
         {"id": "R4-e127-convergence",
@@ -1026,11 +1369,15 @@ def build_recommendation(quality, timing, e127_paired, headline, e109,
                       f"{headline['wall_speedup']:.2f}×）。簇臂的 S2 冷建簇"
                       "（fast 路径原样调用 _maybe_build_kmeans）与 S4 簇内 "
                       "greedy 打分、compute_mask 核心（S5-S7，iter9-11 负结果）"
-                      "未被优化——共享路径 5.47× 压缩后，臂间残余差异与冷建簇"
+                      f"未被优化——共享路径 {headline['gpu_speedup']:.2f}× "
+                      "压缩后，臂间残余差异与冷建簇"
                       "在优化后系统里的相对占比上升，簇臂的相对成本位置不改善"
-                      "反而恶化。切换主方法将使 5.47×/4.76× 主张从实测降级为"
+                      "反而恶化。切换主方法将使 "
+                      f"{headline['gpu_speedup']:.2f}×/"
+                      f"{headline['wall_speedup']:.2f}× 主张从实测降级为"
                       "外推。",
-         "data_source": "e127_stage_bench_baseline/iter8.json（config=mavg）+ "
+         "data_source": "e127_stage_bench_baseline/iter8.json（config=mavg，"
+                        "108：全键配置绑定 hash 校验通过）+ "
                         "S-T024 §2/§4/§6.1 + tli_indexer_fast.py 门控条件"
                         "（行为门禁含 E125 尾巴 10/10 与 kmeans 守卫 5/5 "
                         "env=1 全绿——簇臂行为已验，性能未测）",
@@ -1038,31 +1385,18 @@ def build_recommendation(quality, timing, e127_paired, headline, e109,
                         "逐位同路径，E126 佐证）；E127 单层 event 同步口径是"
                         "保守下界（S-T024 §6.4：36 层流水收益测不出）"},
         {"id": "R5-cross-caliber-stability",
-         "statement": f"跨口径符号稳定性：E109 旧口径 mavg 最佳 "
-                      f"{e109['mavg']:.2f}，cclustersim {e109['cclustersim']:.2f}"
-                      f"（−{e109['mavg'] - e109['cclustersim']:.2f} 居后）、"
-                      f"aavg {e109['aavg']:.2f}；E125 新口径符号翻转"
-                      "（cclustersim +0.34 反超）——n=5 任务噪声主导，"
-                      "不足以在两口径间换锚；mavg 两口径均居首/前列，"
-                      "稳健性最好。",
+         "statement": make_r5_statement(quality, e109),
          "data_source": "e109_screen4_selection.json（旧口径 B10 前）vs "
                         "e125_screen_verdict.json（新口径 E121 修复后）",
          "uncertainty": "两口径任务集/协议不同（repobench-p vs repobench），"
                         "只作符号稳定性参考，不作分数横比"},
         {"id": "R6-paper-story",
-         "statement": "论文主张链已锚定 mavg：E100 13 任务 vs FullKV "
-                      f"{'未证明差异' if e100['contains_zero'] else '显著差异'}"
-                      f"（+{e100['diff']:.2f}，CI "
-                      f"[{e100['ci95'][0]:+.2f},{e100['ci95'][1]:+.2f}] "
-                      f"{'含 0；084 措辞纪律：含 0 只能写「未证明差异」' if e100['contains_zero'] else '不含 0'}）"
-                      "+ E127 同预算 kernel 加速（mavg 配置实测 "
-                      f"{headline['gpu_speedup']:.2f}×）。换 cclustersim 需重跑"
-                      "全量验证（E116b 式咬合）+ fast-path 臂级基准 + prefill "
-                      "suffix 不变性验收，成本大而质量收益未证明。",
+         "statement": make_r6_statement(e100, headline),
          "data_source": "e100_bootstrap_ci.json（历史判决，100-⑥：进 "
-                        "provenance，claim/main_ci 联立门禁通过）+ "
-                        "E127 配对组实测口径",
-         "uncertainty": "E100 未证明差异口径基于 mavg 臂 13 任务全量；"
+                        "provenance，claim/main_ci 联立门禁通过；109：入口"
+                        "整树 isfinite）+ E127 配对组实测口径",
+         "uncertainty": f"E100 {'未证明差异' if e100['contains_zero'] else '显著差异'}"
+                        f"口径基于 mavg 臂 {e100['n_tasks']} 任务全量；"
                         "cclustersim 无对应全量数据"},
     ]
     rec = {
@@ -1070,23 +1404,8 @@ def build_recommendation(quality, timing, e127_paired, headline, e109,
         "decision_authority": "主 AI Opus（10-11 授权自主决策权）；本推荐为"
                               "分析支撑，供裁决",
         "reasons": reasons,
-        "alternative_disposition": {
-            "cclustersim": "进消融/讨论段如实报告：E125 点估计海选冠军"
-                           "（+0.34 vs mavg，未证明显著；点估计亦高于 "
-                           "FullKV +0.23）——但冷建簇超线性 + E127 未覆盖，"
-                           "不适合作主方法",
-            "aavg": "零建簇成本、稳态与 mavg 同档（10 格内有格交叉），点估计"
-                    "+0.21 未证明且跨口径符号翻转（E109 −0.52）——不换锚，"
-                    "可作消融臂",
-            "cavgsim": "质量点估计低于 mavg/aavg（vs mavg -0.18 CI 含 0 "
-                       "未证明差异；臂间配对 aavg-cavgsim CI 不含 0）且冷"
-                       f"建簇 {v64s['initial_build_excess_ms']:.0f}ms"
-                       "@64K structured——以上均为点估计排序与配对事实"
-                       "陈述，非 Pareto 支配主张（二维支配表为空，见 "
-                       "quality_steady_cost_pareto）；E123 cavg 线已 NO-GO "
-                       "关闭",
-            "mminmax": "唯一显著判决臂（vs mavg CI [-1.56,-0.08]）——剔除",
-        },
+        "alternative_disposition": make_dispositions(
+            quality, e109, timing, dom_pairs, pairwise),
         "inflight_conflict_note": "E129 子空间消融在飞以 cclustersim 为冠军"
                                   "臂——若本推荐被采纳，E129 结果仍有效"
                                   "（臂内子空间相对效应），但「冠军」称谓与"
@@ -1176,7 +1495,8 @@ def main():
     payload = {
         "meta": {
             "probe": "E128 五臂质量×性能综合权衡表（#216）——E125 质量分 × "
-                     "E126 修正后计时 × E127 优化定案（098/099/100 修复版）",
+                     "E126 修正后计时 × E127 优化定案（098/099/100 + "
+                     "107/108/109/110 修复版）",
             "generated": "2026-10-12",
             "worktree_branch": os.popen(
                 "git -C " + REPO + " rev-parse --abbrev-ref HEAD"
@@ -1216,8 +1536,19 @@ def main():
             "fix_provenance_gpt_audit": "TL-E128-PARETO-098 / "
                                         "TL-E128-STATEMENT-099 / "
                                         "TL-E128-FAILCLOSED-100 修复"
-                                        "（2026-10-12），套件 "
-                                        "test_e128_fix_098_100.py",
+                                        "（2026-10-12）+ TL-E128-"
+                                        "REGEN-BITWISE-107 / TL-E128-"
+                                        "E127-IDENTITY-108 / TL-E128-"
+                                        "NONFINITE-CLOSURE-109 / TL-E128-"
+                                        "NARRATIVE-DERIVATION-110 修复"
+                                        "（2026-10-12，advice 0739_3d5b1b9），"
+                                        "套件 test_e128_fix_098_100.py",
+            "narrative_generation": "110：significance_note/R1/R5/R6/"
+                                    "dispositions 及 R2/R3/R4 全部数值均由"
+                                    "模板从结构化字段 f-string 生成（零手写"
+                                    "数字、零固定显著性集合），文字与"
+                                    "quality_e125/pairwise_ci_all 等结构化"
+                                    "对象一致（性质测试见套件）",
             "consumed_only_corrected_e126_fields": True,
         },
         "provenance": prov,
@@ -1263,11 +1594,14 @@ def main():
         "quality_steady_cost_pareto": pareto,
         "cost_only_total_order_at_horizon": cost_only,
         "recommendation": build_recommendation(
-            quality, timing, e127_paired, headline, e109, pairwise, e100),
+            quality, timing, e127_paired, headline, e109, pairwise, e100,
+            pareto),
     }
 
+    # 109：allow_nan=False——任一 NaN/±Inf 漏过入口门（不应发生）时
+    # 序列化即 ValueError 崩溃（fail-closed），绝不落盘污染 JSON
     with open(OUT_JSON, "w") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=1)
+        json.dump(payload, f, ensure_ascii=False, indent=1, allow_nan=False)
 
     # ---------------- 终端表 ----------------
     print("=" * 78)

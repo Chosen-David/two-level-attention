@@ -1,9 +1,9 @@
 {
  "meta": {
-  "probe": "E128 五臂质量×性能综合权衡表（#216）——E125 质量分 × E126 修正后计时 × E127 优化定案（098/099/100 修复版）",
+  "probe": "E128 五臂质量×性能综合权衡表（#216）——E125 质量分 × E126 修正后计时 × E127 优化定案（098/099/100 + 107/108/109/110 修复版）",
   "generated": "2026-10-12",
-  "worktree_branch": "main",
-  "base_commit": "49bfaa5",
+  "worktree_branch": "e128-fix-107-110",
+  "base_commit": "61b8c2c",
   "scope_limits": "structured/singleton 合成数据、B=1、q_len=1、D′ off（E126 layer_skip off / E127 normal 层）、单层 microbench、H20-3e；E126 为优化前基线（计时插桩开），E127 为独立 harness 配对组",
   "gpt_f4139b5_constraints": {
    "1_steady_rel_diff_64k": "cclustersim vs mavg 相对差 3.16%（重算核实，非 <2%）",
@@ -13,7 +13,8 @@
   },
   "statistical_discipline": "084 措辞：CI 含 0 写「未证明差异」不写「持平/等价」；Pareto 支配术语仅允许出现在 quality_steady_cost_pareto.dominance 及其机器生成摘要中，cost_only_total_order_at_horizon 为纯成本排序陈述禁用支配术语（098）；臂间配对结论只引用 pairwise_ci_all 全枚举，不做「除 X 外均含 0」式全称外推（099）；支配/排序关系均为点估计主张",
   "multiple_comparison_note": "pairwise_ci_all 为 10 对全枚举，未做多重比较校正；含 0 的对只写「未证明差异」（099-②）",
-  "fix_provenance_gpt_audit": "TL-E128-PARETO-098 / TL-E128-STATEMENT-099 / TL-E128-FAILCLOSED-100 修复（2026-10-12），套件 test_e128_fix_098_100.py",
+  "fix_provenance_gpt_audit": "TL-E128-PARETO-098 / TL-E128-STATEMENT-099 / TL-E128-FAILCLOSED-100 修复（2026-10-12）+ TL-E128-REGEN-BITWISE-107 / TL-E128-E127-IDENTITY-108 / TL-E128-NONFINITE-CLOSURE-109 / TL-E128-NARRATIVE-DERIVATION-110 修复（2026-10-12，advice 0739_3d5b1b9），套件 test_e128_fix_098_100.py",
+  "narrative_generation": "110：significance_note/R1/R5/R6/dispositions 及 R2/R3/R4 全部数值均由模板从结构化字段 f-string 生成（零手写数字、零固定显著性集合），文字与quality_e125/pairwise_ci_all 等结构化对象一致（性质测试见套件）",
   "consumed_only_corrected_e126_fields": true
  },
  "provenance": {
@@ -123,13 +124,92 @@
     "sha256": "a92d49fb162825006ad6708e1ab171b74a4e24eef162cf9c37c46e120311e914"
    },
    "consumed_fields": [
-    "config(α,β,γ)/gpu",
+    "config(α,β,γ)/gpu + 108 全键配置绑定",
     "runs[].step_gpu_sum_ms",
     "runs[].step_cpu_wall_ms",
     "runs[].{prepare_index,compute_score,compute_mask,metrics,eager_decoding}.gpu_ms_median",
     "profile.one_step_cuda_kernels"
    ],
-   "bench_config_is_mavg": true
+   "bench_config_is_mavg": true,
+   "config_binding": {
+    "sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
+    "canonical": {
+     "config": {
+      "alpha": 0.25,
+      "beta": 0.125,
+      "gamma": 0.625,
+      "K1": 128,
+      "K2": 1024,
+      "bs": 64,
+      "D": 128,
+      "H": 32,
+      "Hkv": 8
+     },
+     "gpu": "NVIDIA H20-3e",
+     "torch": "2.8.0+cu128",
+     "runs_identity": [
+      [
+       8192,
+       "normal",
+       30,
+       2
+      ],
+      [
+       8192,
+       "skip",
+       30,
+       0
+      ],
+      [
+       16384,
+       "normal",
+       30,
+       2
+      ],
+      [
+       16384,
+       "skip",
+       30,
+       0
+      ],
+      [
+       32768,
+       "normal",
+       30,
+       2
+      ],
+      [
+       32768,
+       "skip",
+       30,
+       0
+      ],
+      [
+       65536,
+       "normal",
+       30,
+       2
+      ],
+      [
+       65536,
+       "skip",
+       30,
+       0
+      ]
+     ]
+    },
+    "bound_fields": [
+     "config 全键（K1/K2/bs/D/H/Hkv/αβγ 及未来 harness 新增键——全键哈希结构性覆盖）",
+     "gpu",
+     "torch",
+     "runs[].{S0,layer_kind,steps,layer_idx}"
+    ],
+    "unrecorded_fields_declaration": "归档 JSON 未记录 dtype/CUDA/Triton 版本/TLI_E127_FAST 等 kernel 开关/输入生成参数——108 如实声明：不作未记录字段的同配置事实断言；config 为全键 canonical hash，harness 未来记录这些字段即自动纳入绑定。当前四份归档 config/gpu/torch 逐位一致、baseline/iter8 runs_identity 逐位一致，同 harness 产出链为间接约束",
+    "baseline_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
+    "iter8_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
+    "final_64k_config_equal": true,
+    "final_8k_config_equal": true
+   }
   },
   "e109_screen4_selection": {
    "path": "exp/trace/results/e109_screen4_selection.json",
@@ -2774,6 +2854,7 @@
  },
  "e127_paired_baseline_vs_iter8": {
   "S8192/normal": {
+   "config_binding_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
    "baseline_gpu_ms": 2.15168,
    "iter8_gpu_ms": 1.856544,
    "gpu_speedup": 1.158971,
@@ -2796,6 +2877,7 @@
    }
   },
   "S8192/skip": {
+   "config_binding_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
    "baseline_gpu_ms": 2.25376,
    "iter8_gpu_ms": 1.676176,
    "gpu_speedup": 1.344584,
@@ -2818,6 +2900,7 @@
    }
   },
   "S16384/normal": {
+   "config_binding_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
    "baseline_gpu_ms": 2.84384,
    "iter8_gpu_ms": 1.51128,
    "gpu_speedup": 1.881743,
@@ -2840,6 +2923,7 @@
    }
   },
   "S16384/skip": {
+   "config_binding_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
    "baseline_gpu_ms": 3.004208,
    "iter8_gpu_ms": 1.368928,
    "gpu_speedup": 2.19457,
@@ -2862,6 +2946,7 @@
    }
   },
   "S32768/normal": {
+   "config_binding_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
    "baseline_gpu_ms": 4.635808,
    "iter8_gpu_ms": 1.512304,
    "gpu_speedup": 3.065394,
@@ -2884,6 +2969,7 @@
    }
   },
   "S32768/skip": {
+   "config_binding_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
    "baseline_gpu_ms": 4.850064,
    "iter8_gpu_ms": 1.42664,
    "gpu_speedup": 3.399641,
@@ -2906,6 +2992,7 @@
    }
   },
   "S65536/normal": {
+   "config_binding_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
    "baseline_gpu_ms": 8.286928,
    "iter8_gpu_ms": 1.51552,
    "gpu_speedup": 5.468043,
@@ -2928,6 +3015,7 @@
    }
   },
   "S65536/skip": {
+   "config_binding_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
    "baseline_gpu_ms": 8.43888,
    "iter8_gpu_ms": 1.425824,
    "gpu_speedup": 5.918599,
@@ -2951,6 +3039,7 @@
   }
  },
  "e127_headline_64k_normal": {
+  "config_binding_sha256": "b198ac1f2fbc257f211b48fb9e636e83697afb9c92f7f92c56683e5699d6d90f",
   "baseline_gpu_ms": 8.286928,
   "iter8_gpu_ms": 1.51552,
   "gpu_speedup": 5.468043,
@@ -3207,18 +3296,18 @@
     "id": "R2-steady-cost",
     "statement": "稳态选择器成本（修正后互斥阶段中位数和，64K structured）：mavg 5.5516ms、aavg 5.5360、cavgsim 5.4811、mminmax 5.3710、cclustersim 5.7268——cclustersim vs mavg 相对差 +3.16%（GPT f4139b5 ①：3.16% 口径，不得写 <2%），且 10 格成本向量无一格低于 mavg。",
     "data_source": "e126_stage_timing_*.json 修正后字段",
-    "uncertainty": "单层 microbench（计时插桩开），launch-gap 口径下主机侧差异可能低估；量级本身很小（<0.2ms/步）"
+    "uncertainty": "单层 microbench（计时插桩开），launch-gap 口径下主机侧差异可能低估；量级本身很小（五臂 64K structured 稳态点估计差绝对值 <0.18ms/步）"
    },
    {
     "id": "R3-cold-build",
-    "statement": "cclustersim 初建簇首步超额 1680ms/层/序列 @64K structured（cavgsim 1859ms；非簇臂首步超额 ~0.06ms 量级），随 S 超线性（cclustersim structured：4K 10.6ms → 16K 120.8 → 64K 1679.7）。三条 E128 新增事实使成本面进一步恶化：(a) 建簇非一次性——64K 128 步窗内观测到 3 次重建尖峰（~111ms/次，步 [36, 64, 109]，随 S 跨阈复发）；(b) 建簇成本强数据依赖——singleton 64K 初建 7916ms（cavgsim 10610ms），为 structured 的 4.7×/5.7×——structured 是有利下界，真实数据建簇成本落在两者之间且未知；(c) E126 内部可比的 128 步 e2e 窗（混合时钟微基准，GPT ②）：cclustersim 3001ms vs mavg 986ms（structured）/singleton 9370ms（mavg 985）——与摊销曲线自洽（初建+重建+稳态差+S8 分解吻合）。cclustersim 稳态亦更贵（R2），故建簇成本在任何 decode 长度下都不摊销；cavgsim 稳态略便宜但 64K 回本步数 26,000+ 步（steady-only 口径，重建复发再侵蚀）。",
+    "statement": "cclustersim 初建簇首步超额 1680ms/层/序列 @64K structured（cavgsim 1859ms；非簇臂首步超额 ~0.07ms 量级），随 S 超线性（cclustersim structured：4K 10.5ms → 16K 120.8 → 64K 1679.8）。三条 E128 新增事实使成本面进一步恶化：(a) 建簇非一次性——64K 128 步窗内观测到 3 次重建尖峰（~111ms/次，步 [36, 64, 109]，随 S 跨阈复发）；(b) 建簇成本强数据依赖——singleton 64K 初建 7916ms（cavgsim 10610ms），为 structured 的 4.7×/5.7×——structured 是有利下界，真实数据建簇成本落在两者之间且未知；(c) E126 内部可比的 128 步 e2e 窗（混合时钟微基准，GPT ②）：cclustersim 3001ms vs mavg 986ms（structured）/singleton 9370ms（mavg 985）——与摊销曲线自洽（初建+重建+稳态差+S8 分解吻合）。cclustersim 稳态亦更贵（R2），故建簇成本在任何 decode 长度下都不摊销；cavgsim 稳态略便宜但 64K 回本步数 ≈26,360 步（steady-only 口径，重建复发再侵蚀）。",
     "data_source": "e126 amortization rep0 首 128 步摊销曲线（重建尖峰判据 = 超稳态中位数 2×）+ e2e_128step_wall_ns_timing_off（仅 E126 内部可比，禁止与 E127 配对组提速混算）",
-    "uncertainty": "建簇为每序列每层发生（服务冷启动税）；重建尖峰cadence（~30-70 步/次@64K）与单次量级随 S 与数据分布变化，128 步窗只是采样；singleton/structured 为合成数据两界，真实 LongBench 分布未测"
+    "uncertainty": "建簇为每序列每层发生（服务冷启动税）；重建尖峰cadence（实测间隔 28-45 步/次@64K）与单次量级随 S 与数据分布变化，128 步窗只是采样；singleton/structured 为合成数据两界，真实 LongBench 分布未测"
    },
    {
     "id": "R4-e127-convergence",
     "statement": "E127 优化对象是共享热路径（S0/S1 增量缓存、S3 compute_score Triton、S8 eager gather、metrics 惰性化），激活门与 method 臂无关，结构上五臂共享；但实测只在 mavg 配置下进行（64K normal GPU 8.29→1.52ms 5.47× / wall 9.62→2.02ms 4.76×）。簇臂的 S2 冷建簇（fast 路径原样调用 _maybe_build_kmeans）与 S4 簇内 greedy 打分、compute_mask 核心（S5-S7，iter9-11 负结果）未被优化——共享路径 5.47× 压缩后，臂间残余差异与冷建簇在优化后系统里的相对占比上升，簇臂的相对成本位置不改善反而恶化。切换主方法将使 5.47×/4.76× 主张从实测降级为外推。",
-    "data_source": "e127_stage_bench_baseline/iter8.json（config=mavg）+ S-T024 §2/§4/§6.1 + tli_indexer_fast.py 门控条件（行为门禁含 E125 尾巴 10/10 与 kmeans 守卫 5/5 env=1 全绿——簇臂行为已验，性能未测）",
+    "data_source": "e127_stage_bench_baseline/iter8.json（config=mavg，108：全键配置绑定 hash 校验通过）+ S-T024 §2/§4/§6.1 + tli_indexer_fast.py 门控条件（行为门禁含 E125 尾巴 10/10 与 kmeans 守卫 5/5 env=1 全绿——簇臂行为已验，性能未测）",
     "uncertainty": "五臂 fast 路径收益为结构外推（S0/S1/S3/S8 阶段五臂逐位同路径，E126 佐证）；E127 单层 event 同步口径是保守下界（S-T024 §6.4：36 层流水收益测不出）"
    },
    {
@@ -3230,14 +3319,14 @@
    {
     "id": "R6-paper-story",
     "statement": "论文主张链已锚定 mavg：E100 13 任务 vs FullKV 未证明差异（+0.42，CI [-0.18,+1.02] 含 0；084 措辞纪律：含 0 只能写「未证明差异」）+ E127 同预算 kernel 加速（mavg 配置实测 5.47×）。换 cclustersim 需重跑全量验证（E116b 式咬合）+ fast-path 臂级基准 + prefill suffix 不变性验收，成本大而质量收益未证明。",
-    "data_source": "e100_bootstrap_ci.json（历史判决，100-⑥：进 provenance，claim/main_ci 联立门禁通过）+ E127 配对组实测口径",
+    "data_source": "e100_bootstrap_ci.json（历史判决，100-⑥：进 provenance，claim/main_ci 联立门禁通过；109：入口整树 isfinite）+ E127 配对组实测口径",
     "uncertainty": "E100 未证明差异口径基于 mavg 臂 13 任务全量；cclustersim 无对应全量数据"
    }
   ],
   "alternative_disposition": {
    "cclustersim": "进消融/讨论段如实报告：E125 点估计海选冠军（+0.34 vs mavg，未证明显著；点估计亦高于 FullKV +0.23）——但冷建簇超线性 + E127 未覆盖，不适合作主方法",
    "aavg": "零建簇成本、稳态与 mavg 同档（10 格内有格交叉），点估计+0.21 未证明且跨口径符号翻转（E109 −0.52）——不换锚，可作消融臂",
-   "cavgsim": "质量点估计低于 mavg/aavg（vs mavg -0.18 CI 含 0 未证明差异；臂间配对 aavg-cavgsim CI 不含 0）且冷建簇 1859ms@64K structured——以上均为点估计排序与配对事实陈述，非 Pareto 支配主张（二维支配表为空，见 quality_steady_cost_pareto）；E123 cavg 线已 NO-GO 关闭",
+   "cavgsim": "质量点估计低于 mavg/aavg（vs mavg -0.18 CI 含 0 未证明差异；臂间配对 aavg-cavgsim、cavgsim-cclustersim CI 不含 0）且冷建簇 1859ms@64K structured——以上均为点估计排序与配对事实陈述，非 Pareto 支配主张（二维支配表为空，见 quality_steady_cost_pareto）；E123 cavg 线已 NO-GO 关闭",
    "mminmax": "唯一显著判决臂（vs mavg CI [-1.56,-0.08]）——剔除"
   },
   "inflight_conflict_note": "E129 子空间消融在飞以 cclustersim 为冠军臂——若本推荐被采纳，E129 结果仍有效（臂内子空间相对效应），但「冠军」称谓与论文主方法口径需主 AI 对齐；若 E116b 全量咬合后 cclustersim CI 不含 0，本推荐可重新审议（R1 不确定性边界）"
