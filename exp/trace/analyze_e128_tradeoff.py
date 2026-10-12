@@ -1378,8 +1378,9 @@ def build_recommendation(quality, timing, e127_paired, headline, e109,
                       "外推。",
          "data_source": "e127_stage_bench_baseline/iter8.json（config=mavg，"
                         "108：全键配置绑定 hash 校验通过）+ "
-                        "S-T024 §2/§4/§6.1 + tli_indexer_fast.py 门控条件"
-                        "（行为门禁含 E125 尾巴 10/10 与 kmeans 守卫 5/5 "
+                        "S-T024 §2/§4/§6.1 + tli_indexer.py fast path 门控条件"
+                        "（inplace 合并前为 tli_indexer_fast.py；行为门禁含 "
+                        "E125 尾巴 10/10 与 kmeans 守卫 5/5 "
                         "env=1 全绿——簇臂行为已验，性能未测）",
          "uncertainty": "五臂 fast 路径收益为结构外推（S0/S1/S3/S8 阶段五臂"
                         "逐位同路径，E126 佐证）；E127 单层 event 同步口径是"
@@ -1428,14 +1429,25 @@ def main():
     cost_only = cost_only_total_order(timing)
     amort = amortization_horizon(timing)
 
-    # E127 覆盖面（静态事实，来源=代码门控条件 + S-T024 报告；如实区分）
-    fast_file = os.path.join(REPO, "sparse_attn", "indexer",
-                             "tli_indexer_fast.py")
-    if not os.path.exists(fast_file):
-        fail("sparse_attn/indexer/tli_indexer_fast.py 不存在——E127 交付物"
+    # E127 覆盖面（静态事实，来源=代码门控条件 + S-T024 报告；如实区分）。
+    # 【inplace 合并（用户 2026-10-12 指令）】tli_indexer_fast.py 退役，E127
+    # 交付物（增量缓存 + Triton GQA K 复用）已并入 TLIIndexer 基类——
+    # 存在性锚点由子类文件改为基类内实现标记。
+    tli_file = os.path.join(REPO, "sparse_attn", "indexer", "tli_indexer.py")
+    if not os.path.exists(tli_file):
+        fail("sparse_attn/indexer/tli_indexer.py 不存在——E127 交付物"
              "缺失，覆盖面事实无从锚定")
+    with open(tli_file, encoding="utf-8") as _f:
+        _tli_src = _f.read()
+    if ("_prepare_index_inc" not in _tli_src
+            or "_score_fine_kernel" not in _tli_src
+            or "_fast_score_fine" not in _tli_src):
+        fail("TLIIndexer 基类缺少 E127 fast path 实现标记"
+             "（_prepare_index_inc/_score_fine_kernel/_fast_score_fine）"
+             "——inplace 合并交付物缺失")
     e127_coverage = {
-        "activation": "TLI_E127_FAST=1 时 patch.py 替换实例化为 TLIIndexerFast；"
+        "activation": "【inplace 合并后】fast path 内置 TLIIndexer 基类默认"
+                      "生效（TLI_E127_FAST=0 显式回退合并前口径）；"
                       "激活门（_basis None、非 moba、D=128、sub_key 稳定、"
                       "k_avg 按需缓存、triton_ok）与 method 臂无关",
         "optimized_shared_stages_all_arms": {
@@ -1448,7 +1460,8 @@ def main():
         },
         "not_optimized": {
             "S2_kmeans_build": "fast 路径原样调用 _maybe_build_kmeans"
-                               "（tli_indexer_fast.py L186-188）——簇臂冷建簇"
+                               "（inplace 合并后位于 tli_indexer.py "
+                               "_prepare_index_inc）——簇臂冷建簇"
                                "成本 E127 后原样保留",
             "S4_in_cluster_greedy": "sim_greedy 臂簇内分数调用区未 Triton 化"
                                     "（cclustersim far+near 双侧、cavgsim "
@@ -1465,8 +1478,9 @@ def main():
                                 "——其余臂 fast 收益为结构外推",
         "sources": ["agent_doc/task/task_details/S-T024.md §1/§2/§4/§6（主仓"
                     "untracked，只读参考）",
-                    "sparse_attn/indexer/tli_indexer_fast.py（sha256="
-                    + sha256_of(fast_file)[:16] + "…）",
+                    "sparse_attn/indexer/tli_indexer.py（inplace 合并后含 E127 "
+                    "fast path；sha256="
+                    + sha256_of(tli_file)[:16] + "…）",
                     "exp/trace/e126_stage_timing.py stage_boundaries"],
     }
     e127_applicability = {}

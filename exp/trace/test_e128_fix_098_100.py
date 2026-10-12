@@ -210,11 +210,24 @@ def build_tamper_repo(tamper_fn):
         out = os.path.join(root, src)
         os.makedirs(os.path.dirname(out), exist_ok=True)
         shutil.copy2(os.path.join(tmp, "orig", dst), out)
+    # 【inplace 合并（2026-10-12）】E127 交付物锚点已从 tli_indexer_fast.py
+    # 改为 TLIIndexer 基类内 fast path 实现标记——tamper 树须含基类文件
+    # （新脚本锚点）；同时从 git HEAD 提取合并前的 tli_indexer_fast.py
+    # 占位（OLD_SHA/OLD2_SHA 旧脚本的存在性锚点仍指向该文件——红证
+    # 「缺陷基线接受篡改」要求旧脚本不在存在性检查处提前 fail）。
+    tli = os.path.join(root, "sparse_attn", "indexer", "tli_indexer.py")
+    os.makedirs(os.path.dirname(tli), exist_ok=True)
+    shutil.copy2(os.path.join(REPO, "sparse_attn", "indexer",
+                              "tli_indexer.py"), tli)
     fast = os.path.join(root, "sparse_attn", "indexer",
                         "tli_indexer_fast.py")
-    os.makedirs(os.path.dirname(fast), exist_ok=True)
-    shutil.copy2(os.path.join(REPO, "sparse_attn", "indexer",
-                              "tli_indexer_fast.py"), fast)
+    _head_fast = subprocess.run(
+        ["git", "-C", REPO, "show",
+         "HEAD:sparse_attn/indexer/tli_indexer_fast.py"],
+        capture_output=True, text=True)
+    if _head_fast.returncode == 0:
+        with open(fast, "w", encoding="utf-8") as _f:
+            _f.write(_head_fast.stdout)
     return tmp, root
 
 
@@ -852,6 +865,29 @@ def verify_invariance(new_json):
             o, n = strip_cfg_bind(o, True), strip_cfg_bind(n, True)
         elif k == "e127_headline_64k_normal":
             o, n = strip_cfg_bind(o, False), strip_cfg_bind(n, False)
+        if k == "e127_coverage":
+            # 【inplace 合并（用户 2026-10-12 指令）】三个字段按设计变更
+            # （activation 机制描述 / S2_kmeans_build 文件引用 / sources
+            # 锚点文件），其余子键仍 exact；变更字段做正向锚定断言
+            # （缺锚点即拒），不放行任意漂移。
+            _cov_changed = {"activation"}
+            _o_cov = {kk: vv for kk, vv in o.items() if kk not in _cov_changed}
+            _n_cov = {kk: vv for kk, vv in n.items() if kk not in _cov_changed}
+            _o_cov["not_optimized"] = {
+                kk: vv for kk, vv in o["not_optimized"].items()
+                if kk != "S2_kmeans_build"}
+            _n_cov["not_optimized"] = {
+                kk: vv for kk, vv in n["not_optimized"].items()
+                if kk != "S2_kmeans_build"}
+            _o_cov["sources"] = [o["sources"][0], o["sources"][2]]
+            _n_cov["sources"] = [n["sources"][0], n["sources"][2]]
+            check(deep_close(_o_cov, _n_cov)
+                  and n["activation"].startswith("【inplace 合并后】")
+                  and "tli_indexer.py（inplace 合并后含 E127" in n["sources"][1]
+                  and "_prepare_index_inc" in n["not_optimized"]["S2_kmeans_build"],
+                  f"{k} 不变（inplace 合并三字段设计内变更正向锚定，"
+                  f"其余 exact）")
+            continue
         check(deep_close(o, n), f"{k} 不变（浮点容差 + 离散/结构 exact）")
     # quality_e125：五臂 AVG5/CI/per_task_scores 不变（107 容差口径）
     qok = all(deep_close(old["quality_e125"][a], new_json["quality_e125"][a])
