@@ -1,0 +1,123 @@
+{
+  "meta": {
+    "scorer": "benchmark.LongBench.eval（difflib:stdlib），.187 链分与本机 91f5b00 复算逐格一致",
+    "runcap": "双臂 pred 无 096 sidecar，--legacy-no-runcap 显式降级，cap 身份未知；同派单脚本同 argv 仅 γ 异",
+    "bootstrap": "n=5 任务级有放回重采样 ×10000，仅描述性（126 纪律），不作显著性主张",
+    "anchor": "e123_trial_verdict.json per_task mavg（AVG5 47.91，不重跑）"
+  },
+  "input_manifest": {
+    "goff/qasper": {
+      "file": "qasper-tli_64_128_1024_c4_Ba0.125_b0.25_goff_h3fe1c89fcb-1012105348.jsonl",
+      "rows": 200,
+      "sha256": "7bc1a677b19fc50652805dcf2b3e858cc9f4ae9c0ed56ad7280993a1a454bb9e"
+    },
+    "goff/hotpotqa": {
+      "file": "hotpotqa-tli_64_128_1024_c4_Ba0.125_b0.25_goff_h3fe1c89fcb-1012105348.jsonl",
+      "rows": 200,
+      "sha256": "4ef374f2bd907a7a0081b881f8a39090c8a0547f70bfd337f48d01cc46954396"
+    },
+    "goff/gov_report": {
+      "file": "gov_report-tli_64_128_1024_c4_Ba0.125_b0.25_goff_h3fe1c89fcb-1012105348.jsonl",
+      "rows": 200,
+      "sha256": "21dcf00a01bfb0d7032d88213e54fd7fc8df9242bc40778fbc880f9db428e03c"
+    },
+    "goff/musique": {
+      "file": "musique-tli_64_128_1024_c4_Ba0.125_b0.25_goff_h3fe1c89fcb-1012105348.jsonl",
+      "rows": 200,
+      "sha256": "b4bf7492ff757999d20e6b0144d7b763f487e5b1fe74412dc370bbea9a827702"
+    },
+    "goff/repobench": {
+      "file": "repobench-tli_64_128_1024_c4_Ba0.125_b0.25_goff_h3fe1c89fcb-1012105348.jsonl",
+      "rows": 500,
+      "sha256": "7358d12bf738e0b2a83df20ee2665bae88ebeb2698f39716c24bade80c4b6362"
+    },
+    "g075/qasper": {
+      "file": "qasper-tli_64_128_1024_c4_Ba0.125_b0.25_g0.75_hdfb4e5c8ee-1012105348.jsonl",
+      "rows": 200,
+      "sha256": "6b44a94fa98baf38ad4fbbf653b47177140c48a7d2b8be5e42977fd8b9e3d421"
+    },
+    "g075/hotpotqa": {
+      "file": "hotpotqa-tli_64_128_1024_c4_Ba0.125_b0.25_g0.75_hdfb4e5c8ee-1012105348.jsonl",
+      "rows": 200,
+      "sha256": "904fff02d5dd425026102ee3628694b137394e36fcfb8c54e81bc64813dad4b6"
+    },
+    "g075/gov_report": {
+      "file": "gov_report-tli_64_128_1024_c4_Ba0.125_b0.25_g0.75_hdfb4e5c8ee-1012105348.jsonl",
+      "rows": 200,
+      "sha256": "1b98c2558e9b72b8143f26a31d7c1b9a3315866db0ec62aac3c406082833fb36"
+    },
+    "g075/musique": {
+      "file": "musique-tli_64_128_1024_c4_Ba0.125_b0.25_g0.75_hdfb4e5c8ee-1012105348.jsonl",
+      "rows": 200,
+      "sha256": "7a684f7143cd0de4e3d32b02be5d216d0937d54b99dda7a371095cdd72f430f2"
+    },
+    "g075/repobench": {
+      "file": "repobench-tli_64_128_1024_c4_Ba0.125_b0.25_g0.75_hdfb4e5c8ee-1012105348.jsonl",
+      "rows": 500,
+      "sha256": "3a8bf41d1a51bc29bf2bd17cd1504f586464458f54cfec8606358a7cada1146e"
+    }
+  },
+  "per_task": {
+    "goff": {
+      "qasper": 46.92,
+      "hotpotqa": 57.11,
+      "gov_report": 32.67,
+      "musique": 29.25,
+      "repobench": 62.69
+    },
+    "g075": {
+      "qasper": 19.23,
+      "hotpotqa": 40.87,
+      "gov_report": 25.92,
+      "musique": 18.03,
+      "repobench": 60.72
+    }
+  },
+  "anchor_per_task": {
+    "qasper": 46.45,
+    "hotpotqa": 59.42,
+    "gov_report": 33.6,
+    "musique": 34.25,
+    "repobench": 65.83
+  },
+  "avg5": {
+    "goff": 45.728,
+    "g075": 32.954
+  },
+  "anchor_avg5": 47.91,
+  "delta_vs_anchor": {
+    "goff": {
+      "avg5": -2.182,
+      "per_task": {
+        "qasper": 0.47,
+        "hotpotqa": -2.31,
+        "gov_report": -0.93,
+        "musique": -5.0,
+        "repobench": -3.14
+      },
+      "task_bootstrap_descriptive": [
+        -3.814,
+        -0.6420000000000016
+      ]
+    },
+    "g075": {
+      "avg5": -14.956,
+      "per_task": {
+        "qasper": -27.22,
+        "hotpotqa": -18.55,
+        "gov_report": -7.68,
+        "musique": -16.22,
+        "repobench": -5.11
+      },
+      "task_bootstrap_descriptive": [
+        -21.578000000000003,
+        -8.36
+      ]
+    }
+  },
+  "verdict": [
+    "E130 候选（mavg α.125 β.25 γ-off）e2e AVG5 45.73 vs 锚点 mavg 47.91：Δ -2.18，点估计全面低于锚点（仅 qasper +0.47 一项为正）——候选否决，冠军 mavg(.25,.125,.625) 维持。",
+    "同位 γ=0.75 对照臂 AVG5 32.95（Δ -14.96）崩塌级劣化，逐任务全负（qasper 19.23 vs 锚点 46.45 近随机）——partitioned (α,β)=(.125,.25) 配置对 γ 极度敏感，该象限整体不稳健。",
+    "mass↔e2e 反转如实报备：mass 网格 goff +0.031、g075 仅 -0.0004，e2e 实测两者相差 12.8 分——GPT 审计 TL-E130-L1-BOUNDARY-117（分析器分界页两池重复消费，支持集不等价生产）在本反转中得到e2e 侧印证；E130 mass 网格排名不作为任何后续决策依据。"
+  ]
+}
