@@ -79,7 +79,7 @@ def main():
                 {
                     "id": "③",
                     "name": "簇分数 gather-dot Triton 全融合（E127 GQA K 复用同款）",
-                    "file": "sparse_attn/indexer/tli_indexer_fast.py",
+                    "file": "sparse_attn/indexer/tli_indexer.py（E127 inplace 合并后；原 tli_indexer_fast.py）",
                     "switch": "TLI_E131_TOKSCORE_TRITON（默认 1；0 回退锚点原版）",
                     "detail": "einsum+gather+q_g 胶水三件套 → 单 kernel（int32 索引 + qg 组内聚合融合）",
                     "effect": "far_token_score 0.107→0.057ms（1.89×）；near_token_score 0.062→0.047ms（1.32×）",

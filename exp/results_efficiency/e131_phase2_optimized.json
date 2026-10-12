@@ -74,6 +74,23 @@
     "aavg_SUM": 1.615
    },
    "conclusion": "三次采样 mavg 1.6125/1.6359/1.6179、aavg 1.6038/1.6391/1.6150，复测均落在 pre/post 之间，噪声带 ±0.02ms，无代码级回归"
+  },
+  "port_note": {
+   "date": "2026-10-12",
+   "event": "E127 inplace 合并（d3f1aca）删除 tli_indexer_fast.py，E131-S2 三组件迁移至 tli_indexer.py 基类",
+   "post_port_md5": {
+    "tli_indexer.py": "83b5004fe227638a37f100c59af62c94",
+    "greedy_triton.py": "b8669bb6ca58976248bc0e2434f9a1ad"
+   },
+   "post_port_revalidation": {
+    "greedy_v2": "V1-V5 全 PASS（far 冷建 962.9ms / near 47.7ms / 续跑 115.3ms 与移植前一致）",
+    "mask_bitexact": "12585120/12585120 = 100.0000%（两臂各 24 步）",
+    "e2e_SUM": {
+     "cclustersim": 1.8193,
+     "cavgsim": 1.5105
+    },
+    "gate": "全绿"
+   }
   }
  },
  "results": {
