@@ -18,12 +18,32 @@ import random
 import argparse
 
 from benchmark.LongBench.lbv2_choice import extract_choice_official
+from benchmark.LongBench.context_capability_gate import (
+    enforce_context_capability_gate,
+)
+# 096（TL-DSV2-CAP-PROVENANCE-096，GPT 审计 2026-10-12_0527_08819a7）：
+# run 级 cap provenance manifest——全 method（含 none/fullkv）把实验输入
+# cap 绑进结果产物身份，与 081 treatment snapshot 是两个独立层（cap 不进
+# info.py treatment manifest，见 run_cap_manifest.py 模块头注释）。
+from benchmark.LongBench.run_cap_manifest import (
+    build_run_cap_core,
+    compute_result_binding,
+    finalize_run_cap_manifest,
+    gate_run_cap_identity,
+    resolve_producer_identity,
+    runcap_gate_lock,   # 103（TL-E096-CAP-GATE-TOCTOU-103）：gate→发布锁
+    write_run_cap_manifest,
+)
 from sparse_attn.arguments import add_sparse_attn_args
 from sparse_attn.patches import register_patch
 from sparse_attn.metrics import get_metrics
 from sparse_attn.info import get_method_name_with_info, \
     truncate_output_name_keep_hash, get_treatment_manifest_json, \
     gate_output_treatment_identity, resolve_treatment_snapshot
+# 【095 修复（GPT 审计 2026-10-12_0527）】TLI_E127_FAST=1 的 gather 路径把
+# 三类契约违规延迟到 GPU 端错误标志，须由本入口在每样本生成段边界消费
+# ——guard 退出校验 raise 必须先于 record 构造/append 与任何落盘。
+from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 
 def parse_args(args=None):
@@ -46,6 +66,7 @@ def parse_args(args=None):
             'Qwen3-8B',
             'Qwen3-14B',
             'Qwen3-32B',
+            'DeepSeek-V2-Lite-Chat',
         ],
     )
     parser.add_argument(
@@ -110,6 +131,13 @@ def build_chat(tokenizer, prompt, model_name):
     elif "GLM-4" in model_name:
         message = [{"role": "user", "content": prompt},]
         prompt = tokenizer.apply_chat_template(message, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+    elif "DeepSeek-V2" in model_name:
+        # DeepSeek-V2-Lite-Chat（MLA）：LongBench 官方 pred.py 对 DeepSeek
+        # 用 apply_chat_template 原生模板（S-T023 MLA 矩阵 fullkv 锚点）。
+        message = [{"role": "user", "content": prompt}]
+        prompt = tokenizer.apply_chat_template(
+            message, tokenize=False, add_generation_prompt=True
+        )
     return prompt
 
 
@@ -141,8 +169,17 @@ def get_pred(
     device,
     model_name,
     data_fp="",
+    run_stats=None,  # 096：每样本实际输入 token 数 / 截断标记（run-cap manifest）
 ):
     preds = []
+
+    # DeepSeek-V2 兼容修复（S-T023 2026-10-12）：官方 modeling_deepseek.py
+    # 是旧 transformers 时代代码，与 4.56.2 新 DynamicCache（self.layers 结构）
+    # 不兼容，且 DeepseekV2Attention.forward 强制 assert attention_mask is not
+    # None。手动 prefill/decode 循环在 DeepSeek 上会触发 legacy cache 转换陷阱
+    # （见 elif IS_DSV2 分支注释）→ 对 DeepSeek 改走 model.generate 路径。
+    # 对 Qwen3 等模型保持原手动循环协议，结果零变化。
+    IS_DSV2 = "DeepSeek" in model_name
 
     # HACK: sample 10 examples for debugging
     # data = np.random.choice(data, 10)
@@ -158,11 +195,22 @@ def get_pred(
             tokenized_prompt = tokenizer(
                 prompt, truncation=False, return_tensors="pt", add_special_tokens=False
             ).input_ids[0]
+        # 096（TL-DSV2-CAP-PROVENANCE-096）：记录本样本是否发生中部截断
+        # （截断判据 = 模板前 tokenized_prompt 超过本次 max_length）——
+        # run-cap manifest 的 per-sample truncated 标记来源。
         if len(tokenized_prompt) > max_length:
+            truncated_flag = True
             half = int(max_length / 2)
             prompt = tokenizer.decode(
                 tokenized_prompt[:half], skip_special_tokens=True
             ) + tokenizer.decode(tokenized_prompt[-half:], skip_special_tokens=True)
+        else:
+            truncated_flag = False
+        # TL-DSV2-DOUBLE-BOS-094（GPT 审计 2026-10-12_0330）：记录本样本是否
+        # 套了 chat template——DeepSeek 模板首部即 {{ bos_token }}，渲染文本
+        # 已以 BOS 开头，后续 tokenizer 编码不得再自动补 BOS（见下方
+        # add_special_tokens=False 分支注释）。
+        chat_template_applied = False
         if dataset not in [
             "trec",
             "triviaqa",
@@ -172,6 +220,7 @@ def get_pred(
             "repobench-p",
         ]:  # chat models are better off without build prompts on these tasks
             prompt = build_chat(tokenizer, prompt, model_name)
+            chat_template_applied = True
 
         # split the prompt and question (simulate decoding in the question stage)
         if dataset in ["qasper", "hotpotqa"]:
@@ -199,8 +248,22 @@ def get_pred(
             # input = prompt.to(device)
             input = prompt.to("cuda")
         else:
-            # input = tokenizer(prompt, truncation=False, return_tensors="pt").to(device)
-            input = tokenizer(prompt, truncation=False, return_tensors="pt").to("cuda")
+            # TL-DSV2-DOUBLE-BOS-094 修复（GPT 审计 2026-10-12_0330，031e6b8）：
+            # DeepSeek chat template 渲染文本首部已是 BOS（模板首部
+            # {{ bos_token }}），tokenizer_config add_bos_token=true 下默认
+            # tokenizer(prompt, ...) 会再自动补一个 → [BOS,BOS,"User:",...]，
+            # 偏离官方单 BOS prompt。对 DeepSeek 模板渲染路径显式
+            # add_special_tokens=False（与官方 apply_chat_template(tokenize=True)
+            # 内部口径一致）；非模板路径（trec 等 5 任务）仍走默认调用保持单
+            # BOS；Qwen3 等其他模型（模板为无 BOS 的 f-string）逐位不变。
+            if chat_template_applied and IS_DSV2:
+                input = tokenizer(
+                    prompt, truncation=False, return_tensors="pt",
+                    add_special_tokens=False,
+                ).to("cuda")
+            else:
+                # input = tokenizer(prompt, truncation=False, return_tensors="pt").to(device)
+                input = tokenizer(prompt, truncation=False, return_tensors="pt").to("cuda")
             q_input = tokenizer(question, truncation=False, return_tensors="pt").to(
                 "cuda"
             )
@@ -214,78 +277,118 @@ def get_pred(
                 q_input.input_ids = q_input.input_ids[:, 1:]
 
         context_length = input.input_ids.shape[-1] + q_input.input_ids.shape[-1]
+        # 096（TL-DSV2-CAP-PROVENANCE-096）：每样本实际输入 token 数（chat
+        # 模板后、question 拼接后的终值）进 run-cap manifest——修复前每行
+        # JSONL 只记数据集原字段 length，本次 max_length/实际输入/是否截断
+        # 均不落盘（096 审计 P1）。
+        if run_stats is not None:
+            run_stats.setdefault("input_tokens", []).append(
+                int(context_length))
+            run_stats.setdefault("truncated", []).append(
+                bool(truncated_flag))
 
-        if (
-            dataset == "samsum"
-        ):  # prevent illegal output on samsum (model endlessly repeat "\nDialogue"), might be a prompting issue
-            # B03 修复（GPT 审查 2026-10-08）：原版 model.generate(**input) 缺两件事——
-            # ① q_input 切出的 question 没接回，只喂了 prefix；② output 赋值后
-            # generated_content 从未赋值，下方共用 decode 必 UnboundLocalError。
-            # 修法：拼接完整输入（与 else 分支同协议），generate 后取新增 token。
-            full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
-            output = model.generate(
-                input_ids=full_ids,
-                attention_mask=torch.ones_like(full_ids),
-                max_new_tokens=max_gen,
-                num_beams=1,
-                do_sample=False,
-                temperature=1.0,
-                min_length=full_ids.shape[-1] + 1,
-                eos_token_id=[
-                    tokenizer.eos_token_id,
-                    tokenizer.encode("\n", add_special_tokens=False)[-1],
-                ],
-            )[0]
-            generated_content = output[full_ids.shape[-1]:].tolist()
-        else:
-            with torch.no_grad():
-                output = model(
-                    input_ids=input.input_ids,
-                    past_key_values=None,
-                    use_cache=True,
-                )
-                past_key_values = output.past_key_values
-                for input_id in q_input.input_ids[0]:
+        # 【095 修复（GPT 审计 2026-10-12_0527，2026-10-12）】请求级
+        # fail-closed guard：TLI_E127_FAST=1 的 gather 路径把三类契约违规
+        # （空 mask 行 / 选中数超 TLI_E127_W_UPPER / cu_seqlens_k 破坏）
+        # 延迟到 GPU 端错误标志（decode 零同步的配套），由 guard 在本样本
+        # 生成段边界一次校验 raise——必须先于 record 构造/append（get_pred
+        # 内）与任何落盘（out_path 写入在 get_pred 返回后，raise 传播即
+        # 整次任务输出作废）。进入时清旧 flag：上一样本未消费的违规不
+        # 误杀本样本（guard 语义/并发限制见其 docstring）。
+        with eager_decoding_request_guard():
+            if (
+                dataset == "samsum"
+            ):  # prevent illegal output on samsum (model endlessly repeat "\nDialogue"), might be a prompting issue
+                # B03 修复（GPT 审查 2026-10-08）：原版 model.generate(**input) 缺两件事——
+                # ① q_input 切出的 question 没接回，只喂了 prefix；② output 赋值后
+                # generated_content 从未赋值，下方共用 decode 必 UnboundLocalError。
+                # 修法：拼接完整输入（与 else 分支同协议），generate 后取新增 token。
+                full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
+                output = model.generate(
+                    input_ids=full_ids,
+                    attention_mask=torch.ones_like(full_ids),
+                    max_new_tokens=max_gen,
+                    num_beams=1,
+                    do_sample=False,
+                    temperature=1.0,
+                    min_length=full_ids.shape[-1] + 1,
+                    eos_token_id=[
+                        tokenizer.eos_token_id,
+                        tokenizer.encode("\n", add_special_tokens=False)[-1],
+                    ],
+                )[0]
+                generated_content = output[full_ids.shape[-1]:].tolist()
+            elif IS_DSV2:
+                # S-T023 DeepSeek fullkv 修复（2026-10-12）：官方 modeling_deepseek.py
+                # 是旧 transformers 时代代码，手动 prefill/decode 循环在 4.56.2 新
+                # DynamicCache（self.layers 结构）下会触发 legacy cache 转换陷阱——
+                # prefill 返回 to_legacy_cache 的 tuple，decode 再 from_legacy_cache
+                # 转回，转换后 get_seq_length 返回 0 → _prepare_4d_causal_attention_mask
+                # 生成 (1,1,1,1) mask，与 attention 层期望 (1,1,1,kv_seq_len) 不符 →
+                # ValueError。改用 model.generate 路径（与 samsum 分支同协议：full_ids
+                # 一次 prefill + 贪心生成），cache_position/cache 全权交给 transformers
+                # 管理，生成语义与手动 argmax 循环严格等价。
+                full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
+                output = model.generate(
+                    input_ids=full_ids,
+                    attention_mask=torch.ones_like(full_ids),
+                    max_new_tokens=max_gen,
+                    num_beams=1,
+                    do_sample=False,
+                    temperature=1.0,
+                    pad_token_id=tokenizer.eos_token_id,
+                    eos_token_id=tokenizer.eos_token_id,
+                )[0]
+                generated_content = output[full_ids.shape[-1]:].tolist()
+            else:
+                with torch.no_grad():
                     output = model(
-                        input_ids=input_id.unsqueeze(0).unsqueeze(0),
-                        past_key_values=past_key_values,
+                        input_ids=input.input_ids,
+                        past_key_values=None,
                         use_cache=True,
                     )
                     past_key_values = output.past_key_values
-
-                pred_token_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
-                generated_content = [pred_token_idx.item()]
-                # B04 修复（kimi3 清单 2026-10-08）：原循环的 EOS 判停在每个
-                # token push 之后，唯独漏了首 token——首 token 即 EOS 时
-                # 不停，输出 EOS 串尾巴且继续解码。首 token 也须判停。
-                if (
-                    tokenizer.eos_token_id is not None
-                    and pred_token_idx.item() == tokenizer.eos_token_id
-                ):
-                    generated_content = [pred_token_idx.item()]
-                else:
-                    for _ in range(max_gen - 1):
-                        outputs = model(
-                            input_ids=pred_token_idx,
+                    for input_id in q_input.input_ids[0]:
+                        output = model(
+                            input_ids=input_id.unsqueeze(0).unsqueeze(0),
                             past_key_values=past_key_values,
                             use_cache=True,
                         )
+                        past_key_values = output.past_key_values
 
-                        past_key_values = outputs.past_key_values
-                        pred_token_idx = (
-                            outputs.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
-                        )
-                        generated_content += [pred_token_idx.item()]
-                        if pred_token_idx.item() == tokenizer.eos_token_id:
-                            break
+                    pred_token_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
+                    generated_content = [pred_token_idx.item()]
+                    # B04 修复（kimi3 清单 2026-10-08）：原循环的 EOS 判停在每个
+                    # token push 之后，唯独漏了首 token——首 token 即 EOS 时
+                    # 不停，输出 EOS 串尾巴且继续解码。首 token 也须判停。
+                    if (
+                        tokenizer.eos_token_id is not None
+                        and pred_token_idx.item() == tokenizer.eos_token_id
+                    ):
+                        generated_content = [pred_token_idx.item()]
+                    else:
+                        for _ in range(max_gen - 1):
+                            outputs = model(
+                                input_ids=pred_token_idx,
+                                past_key_values=past_key_values,
+                                use_cache=True,
+                            )
 
-            # output = model.generate(
-            #     **input,
-            #     max_new_tokens=max_gen,
-            #     num_beams=1,
-            #     do_sample=False,
-            #     temperature=1.0,
-            # )[0]
+                            past_key_values = outputs.past_key_values
+                            pred_token_idx = (
+                                outputs.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
+                            )
+                            generated_content += [pred_token_idx.item()]
+                            if pred_token_idx.item() == tokenizer.eos_token_id:
+                                break
+
+                # output = model.generate(
+                #     **input,
+                #     max_new_tokens=max_gen,
+                #     num_beams=1,
+                #     do_sample=False,
+                #     temperature=1.0,
+                # )[0]
 
         pred = tokenizer.decode(generated_content, skip_special_tokens=True)
         # pred = tokenizer.decode(output[context_length:], skip_special_tokens=True)
@@ -338,7 +441,45 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
 
 
+def _patch_deepseek_dynamic_cache_compat():
+    """DeepSeek-V2 trust_remote_code modeling（modeling_deepseek.py）依赖
+    transformers 旧版 DynamicCache API：get_usable_length / seen_tokens /
+    get_max_length。transformers 4.56.2 已移除三者 → monkey-patch 补齐
+    兼容 shim（语义对齐旧版，仅当方法缺失时注入，不影响其他模型）。
+    """
+    from transformers.cache_utils import DynamicCache
+
+    if not hasattr(DynamicCache, "get_usable_length"):
+
+        def _get_usable_length(self, new_seq_length=None, layer_idx=0):
+            # 旧版语义：返回该层已缓存 KV 数量（层未创建返回全局已见数）。
+            return self.get_seq_length(layer_idx)
+
+        DynamicCache.get_usable_length = _get_usable_length
+
+    if not hasattr(DynamicCache, "get_max_length"):
+
+        def _get_max_length(self):
+            # 旧版 DynamicCache 语义：无固定上限 → None（不触发 mask 裁剪）。
+            return None
+
+        DynamicCache.get_max_length = _get_max_length
+
+    if not hasattr(DynamicCache, "seen_tokens"):
+
+        @property
+        def _seen_tokens(self):
+            # 4.56.2 无全局 _seen_tokens 计数；无裁剪连续生成时
+            # layer0 长度 == 全局已见 token 数。
+            return self.get_seq_length(0)
+
+        DynamicCache.seen_tokens = _seen_tokens
+
+
 def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
+    # DeepSeek-V2 trust_remote_code 需要旧版 DynamicCache API 兼容
+    if "DeepSeek-V2" in model_name:
+        _patch_deepseek_dynamic_cache_compat()
     tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
         path, trust_remote_code=True, torch_dtype=torch.bfloat16, device_map="auto"
@@ -408,10 +549,24 @@ if __name__ == "__main__":
         snapshot = resolve_treatment_snapshot(args)
     else:
         snapshot = None
+    # TL-DSV2-CONTEXT-CAP-093 修复（GPT 审计 2026-10-12_0330，031e6b8）：
+    # 加载 tokenizer/model 之前核对实验 cap 与模型上下文能力（注册表 +
+    # 本地快照活值），三方冲突打印明细不静默挑选，cap 超过
+    # min(max_position_embeddings, 模型卡声明) 时 fail-closed。未登记模型
+    # （Qwen3 等既有链）门禁跳过，行为零变化。max_length 读取从
+    # load_model_and_tokenizer 之后提前到此处（同一 dict 查找，仅求值时序
+    # 变化，语义不变）。
+    max_length = model2maxlen[model_name]
+    # 096（TL-DSV2-CAP-PROVENANCE-096）：接收并消费 gate 返回值——修复前
+    # 该调用不接收返回值，含 experiment_input_cap / 注册表 protocol cap 的
+    # 字典被丢弃（096 审计 P1 原话）。cap_gate_info 由 run-cap manifest
+    # 消费（cap 绑进结果产物身份），None（未登记模型）按 unregistered 折叠。
+    cap_gate_info = enforce_context_capability_gate(
+        model_name, model2path, max_length, config_path
+    )
     model, tokenizer = load_model_and_tokenizer(
         model2path, model_name, device, args, snapshot
     )
-    max_length = model2maxlen[model_name]
 
     datasets = [args.task]
     dataset2prompt = json.load(open(f"{config_path}/dataset2prompt.json", "r"))
@@ -485,19 +640,12 @@ if __name__ == "__main__":
                 ensure_ascii=False, sort_keys=True,
             )
             data_fp = _hashlib.sha256(_fp_src.encode("utf-8")).hexdigest()[:12]
-        preds = get_pred(
-            model,
-            tokenizer,
-            data,
-            max_length,
-            max_gen,
-            prompt_format,
-            dataset,
-            device,
-            model_name,
-            data_fp=data_fp,
-        )
 
+        # 096（TL-DSV2-CAP-PROVENANCE-096）：method_name/out_fn/out_path 从
+        # get_pred 之后上移到此处——run-cap 写门的早期 [CAP-CLASH] 检测在
+        # 烧 GPU 之前完成（同 task/method/时间戳不同 cap 直接拒，不必等
+        # 整轮生成跑完才发现口径冲突）。method_name 只依赖 args/snapshot
+        # （与 get_pred 无数据依赖），提前计算逐位不变。
         # 081：method_name 从冻结 snapshot 派生（tli 臂）——生成窗口内
         # 文件被替换时文件名仍等于 runtime/sidecar 的内容身份。
         method_name = get_method_name_with_info(args, snapshot)
@@ -513,40 +661,115 @@ if __name__ == "__main__":
             # 走重建路径时不经过上面的 replace，与未截断路径口径一致）。
             # 081 + kimi3 0316 追加修复 1：上限 245 → 230——out_fn 落盘
             # 要拼 ".jsonl"（6）且写门会创建 sidecar ".tli_manifest.json"
-            # （18），245 下 sidecar 实名 269 > ext4 255 单文件名上限 →
-            # open 抛 OSError 36 裸 traceback（破坏 076 fail-closed 统一
-            # 口径）；230 = 255 − 6 − 18 − 1，与
-            # truncate_output_name_keep_hash 缺省 limit 同源。
+            # （18）+ ".runcap.json"（13，096），245 下 sidecar 实名超
+            # ext4 255 单文件名上限 → open 抛 OSError 36 裸 traceback
+            # （破坏 076 fail-closed 统一口径）；230 = 255 − 6 − 18 − 1，
+            # 与 truncate_output_name_keep_hash 缺省 limit 同源。
             out_fn = truncate_output_name_keep_hash(
                 dataset_prefix, method_name, args.t)
             out_fn = out_fn.replace(" ", "").replace("'", "")
         out_path = f"{dir}/{out_fn}.jsonl"
 
-        # 076（TL-E121-OUTPUT-ID）fail-closed 写入门：tli 输出目标已存在
-        # 时，须以 sidecar manifest 字节级证明同 treatment 才允许重写
-        # （同配置重跑幂等 = SKIP 语义；异配置/无记录 → 拒绝运行，不覆
-        # 盖）。先写 sidecar 再写数据：中断只留孤儿 sidecar，下次目标
-        # 不存在 → 门自然放行。非 tli 方法可读段已编码其全部旋钮
-        # （quest/twia/tia/none），维持旧覆盖语义（076 审计范围 = tli
-        # treatment 矩阵）。
-        # 079（TL-E121-OUTPUT-ID-079）：本门消费的 manifest 已升级为
-        # resolved manifest（tia_enable_async_topk 生效值 + tli_proj_basis/
-        # tli_layer_skip_path 的 realpath+内容 sha256+shape/n_skip，文件
-        # 缺失/损坏 fail closed）——「同路径、内容已变」不再同 manifest，
-        # 写门必拒；与 method hash/RULER receipt 共用 info.py 单一事实源。
-        # 081：manifest 从冻结 snapshot 派生（与 472 行 method_name、
-        # runtime 各层消费的 skip/basis 同一对象）——删除生成后重读
-        # 路径的调用，生成窗口内的文件替换不再产生 name/sidecar 混装。
-        if args.method == "tli":
-            manifest_json = get_treatment_manifest_json(args, snapshot)
-            sidecar = gate_output_treatment_identity(out_path, manifest_json)
-            with open(sidecar, "w", encoding="utf-8") as f:
-                f.write(manifest_json)
+        # 096：run 级 cap provenance manifest（全 method 含 none/fullkv——
+        # 修复前 fullkv 无任何 provenance 旁挂，16K 与 31.5K 产物可同路径
+        # 互覆或被当同一 treatment，产物自身无法证明处理口径，096 审计 P1）。
+        # 写门 fail-closed：同路径已存在不同 cap 的 manifest → [CAP-CLASH]
+        # 拒绝运行（093 修复链的落盘闭包）。
+        runcap_core = build_run_cap_core(
+            model_name=model_name,
+            model_path=model2path,
+            method=args.method,
+            dataset=dataset,
+            dataset_fingerprint=data_fp,
+            run_timestamp=args.t,
+            effective_cap=max_length,
+            cap_gate_info=cap_gate_info,
+            max_new_tokens=max_gen,
+            producer=resolve_producer_identity(__file__),
+        )
+        # 103（TL-E096-CAP-GATE-TOCTOU-103，GPT 审计 2026-10-12_0739）：
+        # gate 与发布间的跨进程独占锁（fcntl.flock，锁文件 = 输出目录下
+        # .runcap_gate.lock）——修复前两进程可在 sidecar 尚不存在时同时
+        # 过 gate，随后交错覆盖数据与 manifest（TOCTOU）。锁持有窗口 =
+        # gate → generating manifest → 数据写 → complete manifest（下方
+        # 整块）；gate 在锁内重新执行即 double-check（后到者锁内重读身份，
+        # 先到者已写出的 manifest 触发 [CAP-CLASH] 或同 cap 幂等放行）。
+        # try/finally 语义与 095 guard 的 raise 传播兼容（异常必释放）。
+        with runcap_gate_lock(out_path):
+            # 105（run_cap backfill 绑定，GPT TL-E096-BACKFILL-BINDING-105）：
+            # 本 run 的 stdout 身份绑定行——backfill 工具按
+            # [CONTEXT-CAP-GATE] model= 行分块后，块内以本行绑定
+            # task/时间戳/输出 basename（修复前日志与产物无任何可绑定
+            # 线索，跨 run 日志可把 partial 产物洗白成另一模型的 complete）。
+            print(f"[CONTEXT-CAP-GATE] run-bind task={dataset} t={args.t} "
+                  f"output={os.path.basename(out_path)}", flush=True)
+            runcap_sidecar = gate_run_cap_identity(out_path, runcap_core)
+            # 096：生成期采集每样本实际输入 token 数 / 截断标记（get_pred 内
+            # 逐样本 append，见 run_stats 参数）。
+            run_stats = {}
+            preds = get_pred(
+                model,
+                tokenizer,
+                data,
+                max_length,
+                max_gen,
+                prompt_format,
+                dataset,
+                device,
+                model_name,
+                data_fp=data_fp,
+                run_stats=run_stats,
+            )
+            # 096：method_name/out_fn/out_path 计算块已上移至 get_pred 之前
+            # （run-cap 写门早期 CAP-CLASH 检测，
+            # TL-DSV2-CAP-PROVENANCE-096）。
 
-        with open(out_path, "w", encoding="utf-8") as f:
-            for pred in preds:
-                json.dump(pred, f, ensure_ascii=False)
-                f.write("\n")
+            # 076（TL-E121-OUTPUT-ID）fail-closed 写入门：tli 输出目标已存在
+            # 时，须以 sidecar manifest 字节级证明同 treatment 才允许重写
+            # （同配置重跑幂等 = SKIP 语义；异配置/无记录 → 拒绝运行，不覆
+            # 盖）。先写 sidecar 再写数据：中断只留孤儿 sidecar，下次目标
+            # 不存在 → 门自然放行。非 tli 方法可读段已编码其全部旋钮
+            # （quest/twia/tia/none），维持旧覆盖语义（076 审计范围 = tli
+            # treatment 矩阵）。
+            # 079（TL-E121-OUTPUT-ID-079）：本门消费的 manifest 已升级为
+            # resolved manifest（tia_enable_async_topk 生效值 + tli_proj_basis/
+            # tli_layer_skip_path 的 realpath+内容 sha256+shape/n_skip，文件
+            # 缺失/损坏 fail closed）——「同路径、内容已变」不再同 manifest，
+            # 写门必拒；与 method hash/RULER receipt 共用 info.py 单一事实源。
+            # 081：manifest 从冻结 snapshot 派生（与 472 行 method_name、
+            # runtime 各层消费的 skip/basis 同一对象）——删除生成后重读
+            # 路径的调用，生成窗口内的文件替换不再产生 name/sidecar 混装。
+            if args.method == "tli":
+                manifest_json = get_treatment_manifest_json(args, snapshot)
+                sidecar = gate_output_treatment_identity(out_path, manifest_json)
+                with open(sidecar, "w", encoding="utf-8") as f:
+                    f.write(manifest_json)
+
+            # 096（TL-DSV2-CAP-PROVENANCE-096）：先落 generating manifest 再写
+            # 数据（076 tli sidecar 同款崩溃语义：数据写之前 manifest 已在盘上，
+            # 中断窗口留 manifest 可证 cap，不留无主数据；status=generating 告知
+            # 消费侧结果 sha 未绑定）。写门 + 两阶段均在 run_cap_manifest.py。
+            write_run_cap_manifest(runcap_sidecar, finalize_run_cap_manifest(
+                runcap_core, status="generating", n_samples=len(preds),
+                input_tokens=run_stats.get("input_tokens"),
+                truncated_flags=run_stats.get("truncated"),
+                result_file=os.path.basename(out_path),
+                result_sha256=None, result_lines=None))
+
+            with open(out_path, "w", encoding="utf-8") as f:
+                for pred in preds:
+                    json.dump(pred, f, ensure_ascii=False)
+                    f.write("\n")
+
+            # 096：生成完成后回填结果文件 sha256 + 行数（status generating →
+            # complete；原子替换，读侧永不见半文件）。
+            runcap_sha, runcap_lines = compute_result_binding(out_path)
+            write_run_cap_manifest(runcap_sidecar, finalize_run_cap_manifest(
+                runcap_core, status="complete", n_samples=len(preds),
+                input_tokens=run_stats.get("input_tokens"),
+                truncated_flags=run_stats.get("truncated"),
+                result_file=os.path.basename(out_path),
+                result_sha256=runcap_sha, result_lines=runcap_lines))
 
         budgets = [pred["budget"] for pred in preds if pred["budget"] is not None]
         ave_budget = sum(budgets) / len(budgets) if len(budgets) > 0 else None

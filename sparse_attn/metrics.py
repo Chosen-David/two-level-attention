@@ -1,3 +1,5 @@
+import os
+
 import torch
 from einops import rearrange, einsum
 
@@ -10,17 +12,48 @@ class Metrics:
         self.k_min = []
         self.k_delta_max = []
         self.k_delta_mean = []
-    
+
     def clear(self):
         self.select_tokens.clear()
         self.k_delta_max.clear()
         self.k_delta_mean.clear()
-    
-    def add_select_result(self, 
-        q_ids: torch.Tensor, 
-        mask: torch.Tensor, 
+
+    def _add_select_result_lazy(self,
+        q_ids: torch.Tensor,
+        mask: torch.Tensor,
         block_size: int,
     ):
+        """【E127 iter1】惰性路径：消除每层每 decode step 的 2 次 .item()
+        host 同步（q_ids[i].item() + b_mask.sum().item()——36 层模型每 token
+        72 次同步，是 decode 流水线的最大 CPU 停顿源之一）。
+
+        数值契约（逐位一致，门禁 test_e127_metrics_lazy.py）：
+          - 旧路径：cond = (q_ids[i].item()+1 >= threshold)；cond 真时记录
+            Python float = int(b_mask[i].sum().item()) * block_size / H。
+          - 惰性路径：GPU 端存 0-dim int64 张量 s = where(cond, sum, -1)；
+            读取端 get_select_tokens 一次性逐条 .item()（读取时刻同步一次，
+            生产路径只在生成结束后读一次），过滤 -1 哨兵后在 Python float64
+            里做与旧路径完全相同的 s*bs/H 逐条算术——整数精确、除法同序，
+            均值逐位等于旧路径（旧路径 sum(list)/len 的加法序也按记录序）。
+        mask 的 H（q-head 数）每条记录可能不同（per_q_head 臂 [H,tk] vs
+        共享 [Hkv,tk]），故 bs/H 随条目一起存。
+        """
+        mask = mask.squeeze(0)  # [tq, h, tk]
+        for i in range(q_ids.shape[0]):
+            cond = (q_ids[i] + 1) >= self.threshold          # GPU bool，无同步
+            s = mask[i].sum()                                # GPU int64
+            self.select_tokens.append((torch.where(cond, s, s.new_full((), -1)),
+                                       block_size, mask[i].shape[0]))
+
+    def add_select_result(self,
+        q_ids: torch.Tensor,
+        mask: torch.Tensor,
+        block_size: int,
+    ):
+        # E127 iter1：env 开 = 惰性路径（数值逐位一致）；默认关 = 原路径
+        # 逐位不变（在飞链零扰动铁律）。
+        if os.environ.get("TLI_E127_FAST", "0") == "1":
+            return self._add_select_result_lazy(q_ids, mask, block_size)
         mask = mask.squeeze(0) # [tq, h, tk]
         for i in range(q_ids.shape[0]):
             num_tokens = q_ids[i].item() + 1
@@ -28,10 +61,24 @@ class Metrics:
                 b_mask = mask[i] # [h, tk]
                 num_select_tokens = b_mask.sum().item() * block_size / b_mask.shape[0]
                 self.select_tokens.append(num_select_tokens)
-    
+
     def get_select_tokens(self):
         if len(self.select_tokens) > 0:
-            result = sum(self.select_tokens) / len(self.select_tokens)
+            # E127 iter1：惰性条目 = (tensor, bs, H) 三元组；旧条目 = float。
+            # 两者按记录序做完全相同的 Python float64 算术 → 均值逐位一致。
+            total = 0.0
+            cnt = 0
+            for e in self.select_tokens:
+                if isinstance(e, tuple):
+                    s, bs, h = e
+                    s = int(s.item())          # 读取端唯一同步点（逐条）
+                    if s < 0:                  # -1 哨兵 = 记录时阈值不满足
+                        continue
+                    total += s * bs / h
+                else:
+                    total += e
+                cnt += 1
+            result = total / cnt if cnt > 0 else None
         else:
             result = None
         return result

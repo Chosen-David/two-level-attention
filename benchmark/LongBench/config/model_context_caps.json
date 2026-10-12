@@ -1,0 +1,24 @@
+{
+    "DeepSeek-V2-Lite-Chat": {
+        "official_position_capability": {
+            "value": 163840,
+            "evidence": "模型快照 config.json:max_position_embeddings @ deepseek-ai/DeepSeek-V2-Lite-Chat 85864749（rope_scaling: yarn, factor=40, original_max_position_embeddings=4096；TL-DSV2-CONTEXT-CAP-093：031e6b8 提交说明误称该字段为 16384，实为 163840）"
+        },
+        "tokenizer_suggested_max_length": {
+            "value": 16384,
+            "evidence": "模型快照 tokenizer_config.json:model_max_length @ 同快照（官方仓自身的新旧元数据冲突项：16K tokenizer 旧元数据 vs 163840 位置张量配置 vs 模型卡 32K；能力检查不消费此字段，仅在启动门禁打印冲突明细）"
+        },
+        "model_card_declared_context": {
+            "value": 32768,
+            "evidence": "模型快照 README.md 模型下载表：DeepSeek-V2-Lite-Chat (SFT) 16B 2.4B 32k"
+        },
+        "experiment_input_cap": {
+            "value": 31500,
+            "evidence": "LongBench 协议原值（ffb61457 前值）= 论文口径协议锚，模型能力 163840 ≥ 31500 覆盖。TL-DSV2-CONTEXT-CAP-093 修复先恢复此值；随后 2026-10-12 裁决：eager attention (16 heads × L² × fp32) 在 L=31500 时单层 score 张量 ~59 GiB（BF16 ~29.6 GiB + FP32 softmax ~59 GiB），实测 OOM，且官方 modeling_deepseek.py 仅支持 eager/flash_attention_2 而 GPU 池无 flash_attn → 当前可运行实现仅支持 16K。协议值 31500 保留为将来高效 attention 路线（flash_attention_2/分块）的协议锚，不回改"
+        },
+        "restricted_context_treatment": {
+            "value": 16384,
+            "evidence": "2026-10-12 裁决落地（Opus）：运行实现显存约束（eager OOM 实证、.251 H20-3e 140GB 卡上 031e6b8 前实测）下的受限上下文 treatment，= model2maxlen.json:DeepSeek-V2-Lite-Chat 当前值。与 031e6b8 缺陷的本质区别：该提交把 16384 冒称模型位置能力上限（TL-DSV2-CONTEXT-CAP-093），本 treatment 如实声明为运行实现约束，启动门禁打印 [EXPERIMENT-CAP-DIVERGENCE] 对照协议值 31500，结果文件须标注 16K 受限上下文口径，绝不冒称模型能力。DeepSeek 线内所有被比较臂（fullkv 锚点 + 未来 TLI-MLA 臂）统一同 16K treatment（GPT 093 建议修复第 2 条）"
+        }
+    }
+}
