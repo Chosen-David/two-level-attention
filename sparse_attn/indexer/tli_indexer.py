@@ -276,23 +276,34 @@ class TLIIndexer(TIAIndexer):
         # E85f：静态 pair 已定（prefill q 统计）→ 用 per-layer 完整旋转对替换 tail32
         if self.static_pair and self._pair_idx is not None:
             return self._pair_idx.to(device)
+        # 【E133b 原生化】实例级缓存：本函数在 tail 模式下每 decode step 被
+        # prepare_index/compute_score 各调一次，原每次 CPU list 构造 +
+        # pageable H2D（~20-40µs/步 × 2-3 次）——是 tail 臂实测 +5.7% 稳态
+        # 回归的主因。子空间配置是实例常量 → 按 device 缓存零构造零拷贝。
+        # clear() 不失效（与 _qat_idx_cache 同口径：配置级常量非请求态）。
+        cache = getattr(self, "_idx_sub_cache", None)
+        if cache is not None and cache[0] == device:
+            return cache[1]
         if self.subspace == "rope":
-            return torch.arange(0, 64, device=device)
-        if self.subspace == "nope":
-            return torch.arange(64, 128, device=device)
-        # E90 消融臂（对齐 E3 mass 口径）：random=固定 seed 随机 32 维 /
-        # highfreq=头 16+头 16（RoPE 旋转对前元素，最高频对）
-        if self.subspace == "random":
+            out = torch.arange(0, 64, device=device)
+        elif self.subspace == "nope":
+            out = torch.arange(64, 128, device=device)
+        elif self.subspace == "random":
+            # E90 消融臂（对齐 E3 mass 口径）：固定 seed 随机 32 维
             g = torch.Generator().manual_seed(20261002)
-            return torch.randperm(128, generator=g)[:32].sort().values.to(device)
-        if self.subspace == "highfreq":
+            out = torch.randperm(128, generator=g)[:32].sort().values.to(device)
+        elif self.subspace == "highfreq":
+            # E90 消融臂：头 16+头 16（RoPE 旋转对前元素，最高频对）
             delta = 64 // self.cmp_ratio
-            return torch.tensor(
+            out = torch.tensor(
                 list(range(0, delta)) + list(range(64, 64 + delta)), device=device)
-        delta = 64 // self.cmp_ratio
-        return torch.tensor(
-            list(range(64 - delta, 64)) + list(range(128 - delta, 128)), device=device
-        )
+        else:
+            delta = 64 // self.cmp_ratio
+            out = torch.tensor(
+                list(range(64 - delta, 64)) + list(range(128 - delta, 128)),
+                device=device)
+        self._idx_sub_cache = (device, out)
+        return out
 
     def prepare_index(self, k, cu_seqlens_k):
         """【E127 inplace 合并（用户 2026-10-12 指令）】decode 热路径增量缓存
@@ -384,8 +395,8 @@ class TLIIndexer(TIAIndexer):
         if self._need_avg_score():
             k_avg = torch.cat([inc["k_avg"][:, :fb], t_coarse.mean(dim=2)], dim=1)
 
-        # ---- k_qat 增量：预分配 buffer 步进写（尾段 zero_ + scatter， ----
-        # 与全量版 zeros_like+scatter 逐位同构）
+        # ---- k_qat 增量：预分配 buffer 步进写（E133b 原生 [cap,Hkv,delta]
+        # 紧凑布局直写——量化覆盖全部 delta 维，与全量版紧凑 k_qat 同构）
         indices = idx_sub if idx_sub is not None else self._qat_indices(k.device)
         buf, cap = inc["k_qat_buf"], inc["k_qat_cap"]
         if S_now > cap:   # 扩容（翻倍摊销）
@@ -394,10 +405,9 @@ class TLIIndexer(TIAIndexer):
             new_buf[:S_prev] = buf[:S_prev]
             inc["k_qat_buf"], inc["k_qat_cap"] = new_buf, new_cap
             buf = new_buf
-        buf[lo:S_now].zero_()
-        buf[lo:S_now, :, indices] = self.min_max_per_token_quant(
+        buf[lo:S_now] = self.min_max_per_token_quant(
             k[0, lo:S_now, :, indices])
-        k_qat = buf[:S_now].unsqueeze(0)                     # [1, S, Hkv, D] 视图
+        k_qat = buf[:S_now].unsqueeze(0)                     # [1, S, Hkv, delta] 视图
 
         index_dict = {
             "k_min": k_min,
@@ -500,12 +510,14 @@ class TLIIndexer(TIAIndexer):
         # E85f 口径修正：L2 细筛 k_qat 与 L1 粗筛用同一子空间（idx_sub）——
         # E85e 重放口径是粗筛+细筛同特征；tail 臂 idx_sub 与旧硬编码 tail32
         # 逐位相同（cmp_ratio=2），仅 rope/nope 探索臂与静态 pair 臂行为改变
-        delta = 64 // self.cmp_ratio
-        indices = idx_sub if idx_sub is not None else torch.tensor(
-            list(range(64 - delta, 64)) + list(range(128 - delta, 128))
-        ).to(k.device)
-        k_qat = torch.zeros_like(k)
-        k_qat[..., indices] = self.min_max_per_token_quant(k[..., indices])
+        # 【E133b 原生化】k_qat 直接产出 [1,S,Hkv,delta] 紧凑布局（原为
+        # zeros_like(k) 128 维零填充 dense + 尾段 scatter——96 个零维参与
+        # fine 打分读带宽 4× 浪费；零维乘积恒为 0，紧凑布局数学等价，仅
+        # fp32 累加顺序变化 → bf16 舍入后 ULP 级漂移，E127 iter6 同口径）。
+        # full 模式 L2 同样用 tail-delta 尾段（cmp_ratio 口径，idx_sub=None
+        # 时 _qat_indices 缓存路径），full 锚点 fine 段同样受益。
+        indices = idx_sub if idx_sub is not None else self._qat_indices(k.device)
+        k_qat = self.min_max_per_token_quant(k[..., indices])
         index_dict = {
             "k_min": k_min,
             "k_max": k_max,
@@ -1054,7 +1066,12 @@ class TLIIndexer(TIAIndexer):
         if self._basis is not None:
             b_q_full = b_q
         else:
-            b_q_full = (q_sq[0] * softmax_scale).to(torch.float32)
+            # 【E133b 原生】k_qat 紧凑 [.,.,delta] → q 同步 gather 到量化维
+            # （被丢弃维乘积恒为 0，数学等价；fp32 累加顺序变化 → bf16 舍入
+            # 后 ULP 级漂移，E127 iter6 同口径）。indices 规则与 prepare 端
+            # k_qat 量化完全同源（idx_sub 优先，full 落 _qat_indices）。
+            _qi = idx_sub if idx_sub is not None else self._qat_indices(q_sq.device)
+            b_q_full = (q_sq[0] * softmax_scale).to(torch.float32)[..., _qi]
         if dgate_short:
             # E111 省算：far 段 token [sink_tok, near_blks·bs) 的细筛分
             # 保持 -inf（skip 层 far 池置空后不可达）。分段对保留段逐位
@@ -1072,9 +1089,11 @@ class TLIIndexer(TIAIndexer):
                 score_fine[0, :, _fth:] = sf_tail.to(q_sq.dtype)
         elif (_HAS_TRITON and self._basis is None and k_qat.dim() == 4
                 and k_qat.is_cuda
-                and k_qat.shape[0] == 1 and k_qat.shape[-1] == 128
+                and k_qat.shape[0] == 1
+                and (k_qat.shape[-1] & (k_qat.shape[-1] - 1)) == 0
                 and k_qat.stride(-1) == 1 and b_q_full.stride(-1) == 1
                 and b_q_full.dtype == torch.float32
+                and k_qat.shape[-1] == b_q_full.shape[-1]
                 and k_qat.shape[2] * self.group_size == b_q_full.shape[0]
                 and self._triton_ok):
             # 【E127 iter6】非投影路径 Triton GQA K 复用（K 读带宽 4× 削减，
