@@ -673,8 +673,9 @@ def _validate_common_schema(receipt, pred_path):
     正 int 且等于 native_mpe、beta_fast=32、beta_slow=1——与
     resolve_yarn_config 产出的 Qwen3 官方配方逐位一致）、
     yarn_factor_source 枚举且与开关自洽、generation_params 必需键
-    （seed 正 int、max_gen 正 int、max_num 非负 int、method/t/
-    pred_postfix 非空 str）、producer_script 路径+SHA 格式。
+    （seed 正 int、max_gen 正 int、max_num 非负 int、method/t 非空
+    str、pred_postfix 为 str 可空——空 postfix = 产物落 pred/ 目录
+    是 pred_ruler.py 合法默认路径）、producer_script 路径+SHA 格式。
     允许额外键（前向兼容），但必需键缺一/类型错 → 拒收。"""
     base = os.path.basename(pred_path)
     required = ("receipt_version", "audit_ref", "produced_at",
@@ -734,7 +735,9 @@ def _validate_common_schema(receipt, pred_path):
         return (f"{pred_path}: yarn_enabled=False 但 source={src!r}——"
                 f"自相矛盾，fail closed（060）")
     # generation_params 必需键（seed 正 int / max_gen 正 int / max_num
-    # 非负 int / method、t、pred_postfix 非空 str）
+    # 非负 int / method、t 非空 str / pred_postfix 为 str 可空——
+    # 空 postfix = 产物落 pred/ 目录是 pred_ruler.py 的合法默认路径，
+    # score_ruler_formal 目录定位 f"pred{postfix}" 同语义支持）
     gp = receipt["generation_params"]
     if not isinstance(gp, dict):
         return f"{pred_path}: generation_params 非对象——fail closed（060）"
@@ -743,7 +746,7 @@ def _validate_common_schema(receipt, pred_path):
         "max_num": lambda v: isinstance(v, int) and not isinstance(v, bool)
                              and v >= 0,
         "method": lambda v: isinstance(v, str) and bool(v),
-        "pred_postfix": lambda v: isinstance(v, str) and bool(v),
+        "pred_postfix": lambda v: isinstance(v, str),
         "t": lambda v: isinstance(v, str) and bool(v),
     }
     for k, chk in gp_req.items():

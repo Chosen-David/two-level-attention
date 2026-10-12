@@ -1,0 +1,793 @@
+{
+ "run_id": "20261012122943-3514082-6288",
+ "status": "success",
+ "generated": "2026-10-12T12:29:43.794931",
+ "publish_protocol": "e116i-generation-v3",
+ "formal": {
+  "script": "benchmark/RULER/score_ruler_formal.py",
+  "sha256": "ae99067f36347307507ac6c2a9e4a7fa5bec77b35b3063273e10c54ab68f459c"
+ },
+ "scorer": {
+  "script": "benchmark/RULER/score_ruler.py",
+  "sha256": "e5139e2dd914d92e87e036cdff3635a5136e10f79ae3efe0a3d13cd702c7319b"
+ },
+ "inputs": {
+  "root": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16",
+  "pred_postfix": "",
+  "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+  "expect_tasks": 11,
+  "min_samples": 100,
+  "run_identity": {
+   "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+   "model_path": null,
+   "yarn": false,
+   "yarn_factor": null,
+   "yarn_factor_provenance": "producer_receipt",
+   "yarn_factor_operator_declared": null,
+   "producer_evidence": {
+    "status": "present",
+    "protocol": "producer-yarn-config-v2",
+    "same_generation_bound": true,
+    "config_consistency_enforced": true,
+    "model_config_closure": true,
+    "generation_binding_modes": [
+     "pointer-v1"
+    ],
+    "cells_with_receipt": 11,
+    "cells_total": 11,
+    "yarn_enabled": false,
+    "effective_yarn_factor": null,
+    "receipts": {
+     "L32768/quest_vendor_1024_16/cwe": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20431-2824/cwe-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "023ee2ab927e8eb88b5cf31541f773128bd9f1eb41c6c83739802a9eee685652"
+     },
+     "L32768/quest_vendor_1024_16/fwe": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20432-2824/fwe-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "5ea3e90a42904f9e986708fa450b5f6d8fa8ddbcb1d1bc622c996c42eb9fbad0"
+     },
+     "L32768/quest_vendor_1024_16/niah_multikey_1": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284116-2824/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "935aef2471a279fcfe254d9535aa1eabd9f5b196eb730f9b623f431add7d8e33"
+     },
+     "L32768/quest_vendor_1024_16/niah_multikey_2": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284117-2824/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "982f372d9ad8e69eb2e2ff37b88b50c2972850819987ff1ce2ee628e614be516"
+     },
+     "L32768/quest_vendor_1024_16/niah_multikey_3": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284118-2824/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "05899f23c955f617298561af4350aba99f8cd13d2b3486221ff0ac869cf69124"
+     },
+     "L32768/quest_vendor_1024_16/niah_multiquery": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20429-2824/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "bbc14f5ac625a637a90a4a2deeb68af89c0be1834b3a6b9dfb4718e5569a2183"
+     },
+     "L32768/quest_vendor_1024_16/niah_multivalue": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20430-2824/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "a07fa631c1159b900e948701e5a8248c5547bdda215e73a8f2ea5ea552b62fc4"
+     },
+     "L32768/quest_vendor_1024_16/niah_single_1": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284113-2824/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "bae37c1f304f7428bd93854413aeed2fd630462e76ddbce44ad203c9d258c50a"
+     },
+     "L32768/quest_vendor_1024_16/niah_single_2": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284114-2824/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "2c0ff8a81eceae7147b205ecd476ac22784bcb4d0179dfe4eae4006bc93f5af2"
+     },
+     "L32768/quest_vendor_1024_16/niah_single_3": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284115-2824/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "f48fdb614c5dcd1dba49b6d1254a579354b05c8013b3f20ed87709d8655e4cc4"
+     },
+     "L32768/quest_vendor_1024_16/vt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20433-2824/vt-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "2ab20dfbca97a0f57437ac389ceff64cf9f1c5337d57fa4ccd7c5b136d8f324e"
+     }
+    }
+   },
+   "extra_params": {},
+   "formal_script_sha256": "ae99067f36347307507ac6c2a9e4a7fa5bec77b35b3063273e10c54ab68f459c",
+   "scorer_sha256": "e5139e2dd914d92e87e036cdff3635a5136e10f79ae3efe0a3d13cd702c7319b",
+   "note": "model_path 为操作者声明值；yarn_factor 按 yarn_factor_provenance 区分：producer_receipt=生成进程旁挂 v2 回执证实的实际生效值（回执与best-file 经 prediction SHA/行数逐位同代绑定，059），producer_receipt_v1_partial=v1 回执只证 factor 口径不证回执与预测同代（059 降级标注），operator_declared=legacy 产物无生产者证据时的操作者事后声明（实际生效值未闭合，不冒充）；legacy 数据无法从文件恢复完整输入身份（identity_mode=legacy-partial），native 数据由 pred_ruler.py 落盘"
+  }
+ },
+ "outputs": {
+  "json": "/tmp/ruler_formal_quest32.json",
+  "md": "/tmp/ruler_formal_quest32.md",
+  "manifest": "/tmp/ruler_formal_quest32.json.manifest.json",
+  "derived_dir": "/tmp/ruler_formal_quest32.json.run-20261012122943-3514082-6288",
+  "generation_files": {
+   "json": "result.json",
+   "md": "result.md",
+   "manifest": "manifest.json",
+   "receipt": "receipt.json"
+  }
+ },
+ "manifest_sha256": "79220febfa57f95a8a0f20d6058c6bb93927d297c7975fe1ea161196d4335840",
+ "result_sha256": "ef5a87313667ff004492d73ad955c6b1a5e749571ef4c3e7e228699f4376ff07",
+ "source_data_sha256": {
+  "32768/niah_single_1": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_single_1.jsonl",
+   "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db"
+  },
+  "32768/niah_single_2": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_single_2.jsonl",
+   "sha256": "26af960be2fdcf7c7907b7fd2a17c6bb44958381e90ccc50ad297770b51eaf79"
+  },
+  "32768/niah_single_3": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_single_3.jsonl",
+   "sha256": "1e383c1b27269f8796650d37012b212c1d51124b3388bc8fce56c809698b7bc8"
+  },
+  "32768/niah_multikey_1": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_1.jsonl",
+   "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23"
+  },
+  "32768/niah_multikey_2": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_2.jsonl",
+   "sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8"
+  },
+  "32768/niah_multikey_3": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_3.jsonl",
+   "sha256": "d13f08fb05ac73aa062377c764c602d762d6b9d1e22092ec1e522596bfbb0a76"
+  },
+  "32768/niah_multiquery": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multiquery.jsonl",
+   "sha256": "273bb35ea339defdee27055947a7ea78512877c0e1648c701225ef49fcc8e91c"
+  },
+  "32768/niah_multivalue": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multivalue.jsonl",
+   "sha256": "1da24401a722c00618e4d4d1b72583620a331d0a4c7b6df384dad3974b0bd234"
+  },
+  "32768/cwe": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/cwe.jsonl",
+   "sha256": "07fcda888ce6d9f834639abafa23c8fd726a352227432a26175bc3c3ff2e0051"
+  },
+  "32768/fwe": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/fwe.jsonl",
+   "sha256": "23a8073809df38f32194cf5cfec6a311a286f4776af6771a3912b33010a65206"
+  },
+  "32768/vt": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/vt.jsonl",
+   "sha256": "f34626c7908480ea16c6e7c77decd51326e202014570b107156730ea6e69f4b7"
+  }
+ },
+ "cells": {
+  "L32768/quest_vendor_1024_16": {
+   "length_dir": 32768,
+   "identity_mode": "native",
+   "tasks": {
+    "niah_single_1": {
+     "n": 100,
+     "best_file": "niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284113-2824/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "4de80b316fc00c1026ca976c3732ada19add887169e9f31f5307a7f1210046b7",
+     "derived_sha256": "4de80b316fc00c1026ca976c3732ada19add887169e9f31f5307a7f1210046b7",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284113-2824/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "bae37c1f304f7428bd93854413aeed2fd630462e76ddbce44ad203c9d258c50a",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284113-2824",
+       "gen_pred_sha256": "4de80b316fc00c1026ca976c3732ada19add887169e9f31f5307a7f1210046b7",
+       "gen_rcp_sha256": "bae37c1f304f7428bd93854413aeed2fd630462e76ddbce44ad203c9d258c50a"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_single_1",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110042-2284113-2824",
+       "prediction_basename": "niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "4de80b316fc00c1026ca976c3732ada19add887169e9f31f5307a7f1210046b7",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "4de80b316fc00c1026ca976c3732ada19add887169e9f31f5307a7f1210046b7",
+       "source_sha256_at_freeze": "4de80b316fc00c1026ca976c3732ada19add887169e9f31f5307a7f1210046b7"
+      },
+      "source_sha256": "4de80b316fc00c1026ca976c3732ada19add887169e9f31f5307a7f1210046b7",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 2,
+      "acquire_wait_seconds": 0.000112
+     }
+    },
+    "niah_single_2": {
+     "n": 100,
+     "best_file": "niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284114-2824/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "cc21bebbe51f5032deccddd1c3b3f1c6909f53588428087e94470c689c79c298",
+     "derived_sha256": "cc21bebbe51f5032deccddd1c3b3f1c6909f53588428087e94470c689c79c298",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284114-2824/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "2c0ff8a81eceae7147b205ecd476ac22784bcb4d0179dfe4eae4006bc93f5af2",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284114-2824",
+       "gen_pred_sha256": "cc21bebbe51f5032deccddd1c3b3f1c6909f53588428087e94470c689c79c298",
+       "gen_rcp_sha256": "2c0ff8a81eceae7147b205ecd476ac22784bcb4d0179dfe4eae4006bc93f5af2"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_single_2",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110042-2284114-2824",
+       "prediction_basename": "niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "cc21bebbe51f5032deccddd1c3b3f1c6909f53588428087e94470c689c79c298",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "cc21bebbe51f5032deccddd1c3b3f1c6909f53588428087e94470c689c79c298",
+       "source_sha256_at_freeze": "cc21bebbe51f5032deccddd1c3b3f1c6909f53588428087e94470c689c79c298"
+      },
+      "source_sha256": "cc21bebbe51f5032deccddd1c3b3f1c6909f53588428087e94470c689c79c298",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6.7e-05
+     }
+    },
+    "niah_single_3": {
+     "n": 100,
+     "best_file": "niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284115-2824/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "3e6c104e34051612e96b333c2d3fe2fac2bf977a3f3dc2951b657634a4547298",
+     "derived_sha256": "3e6c104e34051612e96b333c2d3fe2fac2bf977a3f3dc2951b657634a4547298",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284115-2824/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "f48fdb614c5dcd1dba49b6d1254a579354b05c8013b3f20ed87709d8655e4cc4",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284115-2824",
+       "gen_pred_sha256": "3e6c104e34051612e96b333c2d3fe2fac2bf977a3f3dc2951b657634a4547298",
+       "gen_rcp_sha256": "f48fdb614c5dcd1dba49b6d1254a579354b05c8013b3f20ed87709d8655e4cc4"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_single_3",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110042-2284115-2824",
+       "prediction_basename": "niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "3e6c104e34051612e96b333c2d3fe2fac2bf977a3f3dc2951b657634a4547298",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "3e6c104e34051612e96b333c2d3fe2fac2bf977a3f3dc2951b657634a4547298",
+       "source_sha256_at_freeze": "3e6c104e34051612e96b333c2d3fe2fac2bf977a3f3dc2951b657634a4547298"
+      },
+      "source_sha256": "3e6c104e34051612e96b333c2d3fe2fac2bf977a3f3dc2951b657634a4547298",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6.1e-05
+     }
+    },
+    "niah_multikey_1": {
+     "n": 100,
+     "best_file": "niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284116-2824/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "b35728b270ebbe0c06e53ef7a528c709233af55af815338ddf8947ac9bd8582e",
+     "derived_sha256": "b35728b270ebbe0c06e53ef7a528c709233af55af815338ddf8947ac9bd8582e",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284116-2824/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "935aef2471a279fcfe254d9535aa1eabd9f5b196eb730f9b623f431add7d8e33",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284116-2824",
+       "gen_pred_sha256": "b35728b270ebbe0c06e53ef7a528c709233af55af815338ddf8947ac9bd8582e",
+       "gen_rcp_sha256": "935aef2471a279fcfe254d9535aa1eabd9f5b196eb730f9b623f431add7d8e33"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_multikey_1",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110042-2284116-2824",
+       "prediction_basename": "niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "b35728b270ebbe0c06e53ef7a528c709233af55af815338ddf8947ac9bd8582e",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "b35728b270ebbe0c06e53ef7a528c709233af55af815338ddf8947ac9bd8582e",
+       "source_sha256_at_freeze": "b35728b270ebbe0c06e53ef7a528c709233af55af815338ddf8947ac9bd8582e"
+      },
+      "source_sha256": "b35728b270ebbe0c06e53ef7a528c709233af55af815338ddf8947ac9bd8582e",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6.3e-05
+     }
+    },
+    "niah_multikey_2": {
+     "n": 100,
+     "best_file": "niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284117-2824/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "e34c02fb02839b4cc2191f2fdb0b096eeda425ec47116ddfdbbb92aa4723021d",
+     "derived_sha256": "e34c02fb02839b4cc2191f2fdb0b096eeda425ec47116ddfdbbb92aa4723021d",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284117-2824/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "982f372d9ad8e69eb2e2ff37b88b50c2972850819987ff1ce2ee628e614be516",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284117-2824",
+       "gen_pred_sha256": "e34c02fb02839b4cc2191f2fdb0b096eeda425ec47116ddfdbbb92aa4723021d",
+       "gen_rcp_sha256": "982f372d9ad8e69eb2e2ff37b88b50c2972850819987ff1ce2ee628e614be516"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_multikey_2",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110042-2284117-2824",
+       "prediction_basename": "niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "e34c02fb02839b4cc2191f2fdb0b096eeda425ec47116ddfdbbb92aa4723021d",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "e34c02fb02839b4cc2191f2fdb0b096eeda425ec47116ddfdbbb92aa4723021d",
+       "source_sha256_at_freeze": "e34c02fb02839b4cc2191f2fdb0b096eeda425ec47116ddfdbbb92aa4723021d"
+      },
+      "source_sha256": "e34c02fb02839b4cc2191f2fdb0b096eeda425ec47116ddfdbbb92aa4723021d",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 7e-05
+     }
+    },
+    "niah_multikey_3": {
+     "n": 100,
+     "best_file": "niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284118-2824/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "b2732cf7f044f3559ff4c71fddb24b3bfeb509ab0def78fc4321c650088186c9",
+     "derived_sha256": "b2732cf7f044f3559ff4c71fddb24b3bfeb509ab0def78fc4321c650088186c9",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284118-2824/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "05899f23c955f617298561af4350aba99f8cd13d2b3486221ff0ac869cf69124",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110042-2284118-2824",
+       "gen_pred_sha256": "b2732cf7f044f3559ff4c71fddb24b3bfeb509ab0def78fc4321c650088186c9",
+       "gen_rcp_sha256": "05899f23c955f617298561af4350aba99f8cd13d2b3486221ff0ac869cf69124"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_multikey_3",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110042-2284118-2824",
+       "prediction_basename": "niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "b2732cf7f044f3559ff4c71fddb24b3bfeb509ab0def78fc4321c650088186c9",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "b2732cf7f044f3559ff4c71fddb24b3bfeb509ab0def78fc4321c650088186c9",
+       "source_sha256_at_freeze": "b2732cf7f044f3559ff4c71fddb24b3bfeb509ab0def78fc4321c650088186c9"
+      },
+      "source_sha256": "b2732cf7f044f3559ff4c71fddb24b3bfeb509ab0def78fc4321c650088186c9",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6.3e-05
+     }
+    },
+    "niah_multiquery": {
+     "n": 100,
+     "best_file": "niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20429-2824/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "3586d7697e6a56f837b2dafa845c12c60ba2fddf46d289ffc7dcd8bf171dc6b2",
+     "derived_sha256": "3586d7697e6a56f837b2dafa845c12c60ba2fddf46d289ffc7dcd8bf171dc6b2",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20429-2824/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "bbc14f5ac625a637a90a4a2deeb68af89c0be1834b3a6b9dfb4718e5569a2183",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20429-2824",
+       "gen_pred_sha256": "3586d7697e6a56f837b2dafa845c12c60ba2fddf46d289ffc7dcd8bf171dc6b2",
+       "gen_rcp_sha256": "bbc14f5ac625a637a90a4a2deeb68af89c0be1834b3a6b9dfb4718e5569a2183"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_multiquery",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110254-20429-2824",
+       "prediction_basename": "niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "3586d7697e6a56f837b2dafa845c12c60ba2fddf46d289ffc7dcd8bf171dc6b2",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "3586d7697e6a56f837b2dafa845c12c60ba2fddf46d289ffc7dcd8bf171dc6b2",
+       "source_sha256_at_freeze": "3586d7697e6a56f837b2dafa845c12c60ba2fddf46d289ffc7dcd8bf171dc6b2"
+      },
+      "source_sha256": "3586d7697e6a56f837b2dafa845c12c60ba2fddf46d289ffc7dcd8bf171dc6b2",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6.2e-05
+     }
+    },
+    "niah_multivalue": {
+     "n": 100,
+     "best_file": "niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20430-2824/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "4006c4bf47158d9967633058686c707b5852a7fc4c27ef1d0c11f9cbc6548649",
+     "derived_sha256": "4006c4bf47158d9967633058686c707b5852a7fc4c27ef1d0c11f9cbc6548649",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20430-2824/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "a07fa631c1159b900e948701e5a8248c5547bdda215e73a8f2ea5ea552b62fc4",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20430-2824",
+       "gen_pred_sha256": "4006c4bf47158d9967633058686c707b5852a7fc4c27ef1d0c11f9cbc6548649",
+       "gen_rcp_sha256": "a07fa631c1159b900e948701e5a8248c5547bdda215e73a8f2ea5ea552b62fc4"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_multivalue",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110254-20430-2824",
+       "prediction_basename": "niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "4006c4bf47158d9967633058686c707b5852a7fc4c27ef1d0c11f9cbc6548649",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "4006c4bf47158d9967633058686c707b5852a7fc4c27ef1d0c11f9cbc6548649",
+       "source_sha256_at_freeze": "4006c4bf47158d9967633058686c707b5852a7fc4c27ef1d0c11f9cbc6548649"
+      },
+      "source_sha256": "4006c4bf47158d9967633058686c707b5852a7fc4c27ef1d0c11f9cbc6548649",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6.2e-05
+     }
+    },
+    "cwe": {
+     "n": 100,
+     "best_file": "cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20431-2824/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "b5f974363883222ce4f02c6a5152f7390152c344f4056dc604772f4206e1b484",
+     "derived_sha256": "b5f974363883222ce4f02c6a5152f7390152c344f4056dc604772f4206e1b484",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20431-2824/cwe-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "023ee2ab927e8eb88b5cf31541f773128bd9f1eb41c6c83739802a9eee685652",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20431-2824",
+       "gen_pred_sha256": "b5f974363883222ce4f02c6a5152f7390152c344f4056dc604772f4206e1b484",
+       "gen_rcp_sha256": "023ee2ab927e8eb88b5cf31541f773128bd9f1eb41c6c83739802a9eee685652"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "cwe",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110254-20431-2824",
+       "prediction_basename": "cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "b5f974363883222ce4f02c6a5152f7390152c344f4056dc604772f4206e1b484",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "b5f974363883222ce4f02c6a5152f7390152c344f4056dc604772f4206e1b484",
+       "source_sha256_at_freeze": "b5f974363883222ce4f02c6a5152f7390152c344f4056dc604772f4206e1b484"
+      },
+      "source_sha256": "b5f974363883222ce4f02c6a5152f7390152c344f4056dc604772f4206e1b484",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 5.9e-05
+     }
+    },
+    "fwe": {
+     "n": 100,
+     "best_file": "fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20432-2824/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "a63ceff797ab44a0d3e361f1b8222c4d9db4858dfd9608a5cc75b5ef42a8096c",
+     "derived_sha256": "a63ceff797ab44a0d3e361f1b8222c4d9db4858dfd9608a5cc75b5ef42a8096c",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20432-2824/fwe-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "5ea3e90a42904f9e986708fa450b5f6d8fa8ddbcb1d1bc622c996c42eb9fbad0",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20432-2824",
+       "gen_pred_sha256": "a63ceff797ab44a0d3e361f1b8222c4d9db4858dfd9608a5cc75b5ef42a8096c",
+       "gen_rcp_sha256": "5ea3e90a42904f9e986708fa450b5f6d8fa8ddbcb1d1bc622c996c42eb9fbad0"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "fwe",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110254-20432-2824",
+       "prediction_basename": "fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "a63ceff797ab44a0d3e361f1b8222c4d9db4858dfd9608a5cc75b5ef42a8096c",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "a63ceff797ab44a0d3e361f1b8222c4d9db4858dfd9608a5cc75b5ef42a8096c",
+       "source_sha256_at_freeze": "a63ceff797ab44a0d3e361f1b8222c4d9db4858dfd9608a5cc75b5ef42a8096c"
+      },
+      "source_sha256": "a63ceff797ab44a0d3e361f1b8222c4d9db4858dfd9608a5cc75b5ef42a8096c",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 5.9e-05
+     }
+    },
+    "vt": {
+     "n": 100,
+     "best_file": "vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20433-2824/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "fe503b7f39033a09f5756a6bd25b93cf57feb5c2e69175eed67312376176dcfa",
+     "derived_sha256": "fe503b7f39033a09f5756a6bd25b93cf57feb5c2e69175eed67312376176dcfa",
+     "producer_yarn_receipt": {
+      "path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20433-2824/vt-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "2ab20dfbca97a0f57437ac389ceff64cf9f1c5337d57fa4ccd7c5b136d8f324e",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/home/wangyuanshuo02/two-level-attention/exp/results_ruler/Qwen3-8B/quest_vendor_1024_16/L32768/pred/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012110254-20433-2824",
+       "gen_pred_sha256": "fe503b7f39033a09f5756a6bd25b93cf57feb5c2e69175eed67312376176dcfa",
+       "gen_rcp_sha256": "2ab20dfbca97a0f57437ac389ceff64cf9f1c5337d57fa4ccd7c5b136d8f324e"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "vt",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012110254-20433-2824",
+       "prediction_basename": "vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "fe503b7f39033a09f5756a6bd25b93cf57feb5c2e69175eed67312376176dcfa",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "fe503b7f39033a09f5756a6bd25b93cf57feb5c2e69175eed67312376176dcfa",
+       "source_sha256_at_freeze": "fe503b7f39033a09f5756a6bd25b93cf57feb5c2e69175eed67312376176dcfa"
+      },
+      "source_sha256": "fe503b7f39033a09f5756a6bd25b93cf57feb5c2e69175eed67312376176dcfa",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "081f632a164b5c1df11bc1912dbd88c333328f1bef0349fb489df5901d37fde8",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6e-05
+     }
+    }
+   }
+  }
+ },
+ "avg": {
+  "L32768/quest_vendor_1024_16": 42.85
+ },
+ "legacy_stamp": {
+  "n_stamped": 0,
+  "invariant_fields": [
+   "pred",
+   "answers",
+   "length",
+   "budget"
+  ],
+  "invariant_asserted": true,
+  "note": "补刻只发生在 staging 派生副本；源文件 SHA256 记录于 cells[].tasks[].source_sha256，全程只读"
+ },
+ "gen_md_sha256": "f6359e7123241deb5bd2807bd45a4175109f1c2e2bc7b14d6b7b27194196d063",
+ "gen_receipt_sha256": "fcb5cf1d59d07ec56472b3f787e22a79381f949ebdf1dd92379d2dc3274e2a32"
+}
