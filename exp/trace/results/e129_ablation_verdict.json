@@ -1,0 +1,389 @@
+{
+ "meta": {
+  "experiment": "E129 冠军配置子空间消融 + 静态 D' gate（2×2 增量格，#217）",
+  "design": "C0=cclustersim 冠军 base（E125 复用不重跑）；C1=+D' gate；C2=+paired tail32 子空间；C3=交互。3 增量臂 × 5 任务 = 15 新格。",
+  "scorer_backend": "difflib:stdlib",
+  "bootstrap": {
+   "B": 10000,
+   "seed": 42,
+   "rng": "stdlib random.Random（Mersenne Twister）",
+   "task_order": [
+    "qasper",
+    "hotpotqa",
+    "gov_report",
+    "musique",
+    "repobench"
+   ],
+   "unit": "任务级配对差有放回重采样（vs C0 锚点；主效应/交互按对应差分向量）",
+   "ci": "percentile 95%：sorted means[int(0.025*B)], means[int(0.975*B)-1]"
+  },
+  "arm_configs": {
+   "c0_base": "cclustersim 冠军 base（E125）：far=minmax near=avg far_select=sim_greedy near_select=sim_greedy kmeans=true tli_sim=0.9 (.125,.25,.125) tli_alpha 0.125 tli_beta 0.25 tli_gamma 0.125 --tia_level1_topk 128 --tia_level2_topk 1024 --tia_level2_cmp_ratio 4 --tli_enable_layer_skip false --tli_subspace 默认（非 tail）",
+   "c1_gate": "C0 + D' gate：--tli_enable_layer_skip true",
+   "c2_tail": "C0 + paired tail32 子空间：--tli_subspace tail（cmp_ratio=4 → [48..63]∪[112..127] 32 维）",
+   "c3_both": "C1 + C2 交互：--tli_enable_layer_skip true --tli_subspace tail"
+  },
+  "c0_anchor_provenance": {
+   "source": "exp/trace/results/e125_screen_verdict.json per_task cclustersim/{task}（E125 判决同源，AVG5=48.25 点估计，已过 scorer 身份门禁与 E123/E128 链核对）",
+   "anchor_scorer_backend": "difflib:stdlib",
+   "c0_per_task": {
+    "qasper": 47.11,
+    "hotpotqa": 60.98,
+    "gov_report": 33.25,
+    "musique": 34.12,
+    "repobench": 65.79
+   },
+   "c0_avg5": 48.25
+  },
+  "harvest_provenance": {
+   "protocol": "镜像优先：.187 慢方停车，.251 镜像补齐 7 格（c1_gate/gov_report、c2_tail/{hotpotqa,musique,qasper}、c3_both/{hotpotqa,musique,qasper}），rsync 经本机中转推 .187 合并打分。同模型同数据同代码，推理确定性下机器差异对分数无影响，来源逐格登记。",
+   "raw_locations": {
+    ".187": "~/tmp_e129_ablation/pred_{c1_gate,c2_tail,c3_both}/",
+    ".251": "~/tmp_e129_ablation/（镜像 7 格原始文件本体不回传，sha256 见 input_manifest）"
+   },
+   "machine_note": ".187 打分时卡 0/2/5/6/7 被 E130 e2e 占用——打分为 CPU 活未占卡，未触碰任何 GPU 进程"
+  }
+ },
+ "input_manifest": [
+  {
+   "arm": "c1_gate",
+   "task": "qasper",
+   "basename": "qasper-tli_64_128_1024_c4_BDa0.125_b0.25_g0.125_h6b22f4abd5-1012003216.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "da324bec9b14593af8d2a92881cf69bf12557601494efa9dbca5cd64f75a1d7a",
+   "source_machine": ".187",
+   "remote_path": "/home/wangyuanshuo02/tmp_e129_ablation/pred_c1_gate/qasper-tli_64_128_1024_c4_BDa0.125_b0.25_g0.125_h6b22f4abd5-1012003216.jsonl"
+  },
+  {
+   "arm": "c1_gate",
+   "task": "hotpotqa",
+   "basename": "hotpotqa-tli_64_128_1024_c4_BDa0.125_b0.25_g0.125_h6b22f4abd5-1012003216.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "c33f8aeb7bfa37b8cbda3ebc68227b3f2edf16af87a4ca95dd413fe83a0b404b",
+   "source_machine": ".187",
+   "remote_path": "/home/wangyuanshuo02/tmp_e129_ablation/pred_c1_gate/hotpotqa-tli_64_128_1024_c4_BDa0.125_b0.25_g0.125_h6b22f4abd5-1012003216.jsonl"
+  },
+  {
+   "arm": "c1_gate",
+   "task": "gov_report",
+   "basename": "gov_report-tli_64_128_1024_c4_BDa0.125_b0.25_g0.125_h6b22f4abd5-1012024800.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "56e600cf3ebab351c7feb6ec58b5e5581be60ce2faa62390e03dc3f9c1cfdf12",
+   "source_machine": ".251(镜像)",
+   "remote_path": ".251(镜像):/home/wangyuanshuo02/tmp_e129_ablation/pred_c1_gate/gov_report-tli_64_128_1024_c4_BDa0.125_b0.25_g0.125_h6b22f4abd5-1012024800.jsonl"
+  },
+  {
+   "arm": "c1_gate",
+   "task": "musique",
+   "basename": "musique-tli_64_128_1024_c4_BDa0.125_b0.25_g0.125_h6b22f4abd5-1012003216.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "8cb1b546329d447e15d453eeb332c523bb4d008496bd55576e5fd084f3875b8d",
+   "source_machine": ".187",
+   "remote_path": "/home/wangyuanshuo02/tmp_e129_ablation/pred_c1_gate/musique-tli_64_128_1024_c4_BDa0.125_b0.25_g0.125_h6b22f4abd5-1012003216.jsonl"
+  },
+  {
+   "arm": "c1_gate",
+   "task": "repobench",
+   "basename": "repobench-tli_64_128_1024_c4_BDa0.125_b0.25_g0.125_h6b22f4abd5-1012003216.jsonl",
+   "rows": 500,
+   "expect": 500,
+   "sha256": "8daef9fc8998e9a3772ea78a77f82831b13e1caca09ce036003cd281896b2e6b",
+   "source_machine": ".187",
+   "remote_path": "/home/wangyuanshuo02/tmp_e129_ablation/pred_c1_gate/repobench-tli_64_128_1024_c4_BDa0.125_b0.25_g0.125_h6b22f4abd5-1012003216.jsonl"
+  },
+  {
+   "arm": "c2_tail",
+   "task": "qasper",
+   "basename": "qasper-tli_64_128_1024_c4_ABa0.125_b0.25_g0.125_h7db045da00-1012024000.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "3d852bb93b7ffbf9855e062001b12b681a12029912f3e5726d4ba86a6c61a04f",
+   "source_machine": ".251(镜像)",
+   "remote_path": ".251(镜像):/home/wangyuanshuo02/tmp_e129_ablation/pred_c2_tail/qasper-tli_64_128_1024_c4_ABa0.125_b0.25_g0.125_h7db045da00-1012024000.jsonl"
+  },
+  {
+   "arm": "c2_tail",
+   "task": "hotpotqa",
+   "basename": "hotpotqa-tli_64_128_1024_c4_ABa0.125_b0.25_g0.125_h7db045da00-1012003705.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "eb91c9523764caf307007f397e1522d4cfb3b3f8ad7e2afbcaf9b32cf09ee782",
+   "source_machine": ".251(镜像)",
+   "remote_path": ".251(镜像):/home/wangyuanshuo02/tmp_e129_ablation/pred_c2_tail/hotpotqa-tli_64_128_1024_c4_ABa0.125_b0.25_g0.125_h7db045da00-1012003705.jsonl"
+  },
+  {
+   "arm": "c2_tail",
+   "task": "gov_report",
+   "basename": "gov_report-tli_64_128_1024_c4_ABa0.125_b0.25_g0.125_h7db045da00-1012003216.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "6e7134171923de4f33d2d3adb458d0853f5736dd22a7a5c8a12e6abe4e76cc6a",
+   "source_machine": ".187",
+   "remote_path": "/home/wangyuanshuo02/tmp_e129_ablation/pred_c2_tail/gov_report-tli_64_128_1024_c4_ABa0.125_b0.25_g0.125_h7db045da00-1012003216.jsonl"
+  },
+  {
+   "arm": "c2_tail",
+   "task": "musique",
+   "basename": "musique-tli_64_128_1024_c4_ABa0.125_b0.25_g0.125_h7db045da00-1012003705.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "90c238e0ba744b65cab16af5cde502e0620ea7ba5b10f9624400088c476c015a",
+   "source_machine": ".251(镜像)",
+   "remote_path": ".251(镜像):/home/wangyuanshuo02/tmp_e129_ablation/pred_c2_tail/musique-tli_64_128_1024_c4_ABa0.125_b0.25_g0.125_h7db045da00-1012003705.jsonl"
+  },
+  {
+   "arm": "c2_tail",
+   "task": "repobench",
+   "basename": "repobench-tli_64_128_1024_c4_ABa0.125_b0.25_g0.125_h7db045da00-1012003216.jsonl",
+   "rows": 500,
+   "expect": 500,
+   "sha256": "47d4839015843319360d07108ef969c645bbe0b0ea577fe7545bafd0dad8c776",
+   "source_machine": ".187",
+   "remote_path": "/home/wangyuanshuo02/tmp_e129_ablation/pred_c2_tail/repobench-tli_64_128_1024_c4_ABa0.125_b0.25_g0.125_h7db045da00-1012003216.jsonl"
+  },
+  {
+   "arm": "c3_both",
+   "task": "qasper",
+   "basename": "qasper-tli_64_128_1024_c4_ABDa0.125_b0.25_g0.125_h096c175c7b-1012003705.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "da324bec9b14593af8d2a92881cf69bf12557601494efa9dbca5cd64f75a1d7a",
+   "source_machine": ".251(镜像)",
+   "remote_path": ".251(镜像):/home/wangyuanshuo02/tmp_e129_ablation/pred_c3_both/qasper-tli_64_128_1024_c4_ABDa0.125_b0.25_g0.125_h096c175c7b-1012003705.jsonl"
+  },
+  {
+   "arm": "c3_both",
+   "task": "hotpotqa",
+   "basename": "hotpotqa-tli_64_128_1024_c4_ABDa0.125_b0.25_g0.125_h096c175c7b-1012003705.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "3644d33aefe42ff7b18df026bae5772a318c8a243eaafaa41ad2bd7acdb44e8e",
+   "source_machine": ".251(镜像)",
+   "remote_path": ".251(镜像):/home/wangyuanshuo02/tmp_e129_ablation/pred_c3_both/hotpotqa-tli_64_128_1024_c4_ABDa0.125_b0.25_g0.125_h096c175c7b-1012003705.jsonl"
+  },
+  {
+   "arm": "c3_both",
+   "task": "gov_report",
+   "basename": "gov_report-tli_64_128_1024_c4_ABDa0.125_b0.25_g0.125_h096c175c7b-1012003216.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "34775af072eb172c9d576680c09854d2f7121f060c318301c48b7256e4577af1",
+   "source_machine": ".187",
+   "remote_path": "/home/wangyuanshuo02/tmp_e129_ablation/pred_c3_both/gov_report-tli_64_128_1024_c4_ABDa0.125_b0.25_g0.125_h096c175c7b-1012003216.jsonl"
+  },
+  {
+   "arm": "c3_both",
+   "task": "musique",
+   "basename": "musique-tli_64_128_1024_c4_ABDa0.125_b0.25_g0.125_h096c175c7b-1012003705.jsonl",
+   "rows": 200,
+   "expect": 200,
+   "sha256": "b0789a1a1b531fbe557d01a35433f51add2231c923f54b0cbf231f291c4625ae",
+   "source_machine": ".251(镜像)",
+   "remote_path": ".251(镜像):/home/wangyuanshuo02/tmp_e129_ablation/pred_c3_both/musique-tli_64_128_1024_c4_ABDa0.125_b0.25_g0.125_h096c175c7b-1012003705.jsonl"
+  },
+  {
+   "arm": "c3_both",
+   "task": "repobench",
+   "basename": "repobench-tli_64_128_1024_c4_ABDa0.125_b0.25_g0.125_h096c175c7b-1012003216.jsonl",
+   "rows": 500,
+   "expect": 500,
+   "sha256": "0e0e1db7232ee5237aa734a267e8e48c55a8c6fee7a511d38113f5e4f6a1a288",
+   "source_machine": ".187",
+   "remote_path": "/home/wangyuanshuo02/tmp_e129_ablation/pred_c3_both/repobench-tli_64_128_1024_c4_ABDa0.125_b0.25_g0.125_h096c175c7b-1012003216.jsonl"
+  }
+ ],
+ "per_task": {
+  "c1_gate/qasper": {
+   "arm": 34.35,
+   "c0": 47.11,
+   "delta_vs_c0": -12.759999999999998
+  },
+  "c1_gate/hotpotqa": {
+   "arm": 55.17,
+   "c0": 60.98,
+   "delta_vs_c0": -5.809999999999995
+  },
+  "c1_gate/gov_report": {
+   "arm": 32.1,
+   "c0": 33.25,
+   "delta_vs_c0": -1.1499999999999986
+  },
+  "c1_gate/musique": {
+   "arm": 32.39,
+   "c0": 34.12,
+   "delta_vs_c0": -1.7299999999999969
+  },
+  "c1_gate/repobench": {
+   "arm": 64.89,
+   "c0": 65.79,
+   "delta_vs_c0": -0.9000000000000057
+  },
+  "c2_tail/qasper": {
+   "arm": 47.11,
+   "c0": 47.11,
+   "delta_vs_c0": 0.0
+  },
+  "c2_tail/hotpotqa": {
+   "arm": 60.98,
+   "c0": 60.98,
+   "delta_vs_c0": 0.0
+  },
+  "c2_tail/gov_report": {
+   "arm": 33.25,
+   "c0": 33.25,
+   "delta_vs_c0": 0.0
+  },
+  "c2_tail/musique": {
+   "arm": 34.12,
+   "c0": 34.12,
+   "delta_vs_c0": 0.0
+  },
+  "c2_tail/repobench": {
+   "arm": 65.79,
+   "c0": 65.79,
+   "delta_vs_c0": 0.0
+  },
+  "c3_both/qasper": {
+   "arm": 34.35,
+   "c0": 47.11,
+   "delta_vs_c0": -12.759999999999998
+  },
+  "c3_both/hotpotqa": {
+   "arm": 55.3,
+   "c0": 60.98,
+   "delta_vs_c0": -5.68
+  },
+  "c3_both/gov_report": {
+   "arm": 32.12,
+   "c0": 33.25,
+   "delta_vs_c0": -1.1300000000000026
+  },
+  "c3_both/musique": {
+   "arm": 33.1,
+   "c0": 34.12,
+   "delta_vs_c0": -1.019999999999996
+  },
+  "c3_both/repobench": {
+   "arm": 65.05,
+   "c0": 65.79,
+   "delta_vs_c0": -0.7400000000000091
+  }
+ },
+ "avg5": {
+  "c0_base": 48.25,
+  "c1_gate": 43.779999999999994,
+  "c2_tail": 48.25,
+  "c3_both": 43.984
+ },
+ "effects": {
+  "c1_gate": {
+   "avg5": 43.779999999999994,
+   "delta_avg5_vs_c0": -4.470000000000006,
+   "ci95_vs_c0": [
+    -8.998,
+    -1.166000000000001
+   ],
+   "significant_vs_c0": true
+  },
+  "c2_tail": {
+   "avg5": 48.25,
+   "delta_avg5_vs_c0": 0.0,
+   "ci95_vs_c0": [
+    0.0,
+    0.0
+   ],
+   "significant_vs_c0": false
+  },
+  "c3_both": {
+   "avg5": 43.984,
+   "delta_avg5_vs_c0": -4.265999999999998,
+   "ci95_vs_c0": [
+    -8.940000000000001,
+    -0.9300000000000026
+   ],
+   "significant_vs_c0": true
+  },
+  "gate_effect_c1_minus_c0": {
+   "mean": -4.469999999999999,
+   "ci95": [
+    -8.998,
+    -1.166000000000001
+   ],
+   "significant": true
+  },
+  "tail_effect_c2_minus_c0": {
+   "mean": 0.0,
+   "ci95": [
+    0.0,
+    0.0
+   ],
+   "significant": false
+  },
+  "interaction_c3_minus_c1_minus_c2_plus_c0": {
+   "mean": 0.2039999999999978,
+   "ci95": [
+    0.0339999999999975,
+    0.461999999999999
+   ],
+   "significant": true
+  },
+  "gate_main_effect_factorial_avg": {
+   "mean": -4.367999999999999,
+   "ci95": [
+    -8.969,
+    -1.0590000000000017
+   ],
+   "significant": true
+  },
+  "tail_main_effect_factorial_avg": {
+   "mean": 0.10200000000000102,
+   "ci95": [
+    0.0170000000000023,
+    0.23100000000000023
+   ],
+   "significant": true
+  }
+ },
+ "mechanism_analysis": {
+  "c2_bit_identical_to_c0": {
+   "per_task": {
+    "qasper": true,
+    "hotpotqa": true,
+    "gov_report": true,
+    "musique": true,
+    "repobench": true
+   },
+   "all_5_tasks": true,
+   "evidence": "本轮 c2_tail sha256 与 E125 input_manifest cclustersim sha256 逐任务对比；跨天（10-11 vs 10-12）跨机（.187/.251）逐位一致同时证明推理确定性",
+   "implication": "tail32 子空间在冠军 base（无 gate）下是 no-op：ΔAVG5=0 非统计不可分辨，而是输出逐位相同——tail 维度对 base 配置零信息量"
+  },
+  "code_evidence": {
+   "c2_noop_root_cause": [
+    "sparse_attn/indexer/tli_indexer.py _sim_dims_indices docstring：sim_greedy 簇分维度 '_subspace_indices 全分支——注意 full 落到 tail 分支'（full 与 tail 的簇/建簇维度同源同值）",
+    "非 skip 层 cclustersim 双池最终选择：far=topk(far_tok_score) 簇分、near=簇分（覆盖段）+细筛原始分 sf_g（未覆盖段，score_fine 全维与 idx_sub 无关），注释明示『都不过 L1 块池门控』→ L1 minmax 块分（唯一消费 idx_sub 的分数）不进最终选择 → full≡tail"
+   ],
+   "c3_vs_c1_root_cause": [
+    "skip 层（gate=true 时 D' 掩码命中层）use_partition=False → 簇分不可用 → 落 legacy 全序列 topk（L1382+），topk_mask 来自 L1 score_coarse（消费 idx_sub：full=128 维 vs tail=32 维）→ subspace flag 只在 skip 层生效 → C3≠C1（4/5 任务；qasper 上skip 层两口径块选择恰好未翻转任何最终输出，C3≡C1）"
+   ]
+  },
+  "interaction_semantics": "C2≡C0（逐位）使交互项 C3−C1−C2+C0 数值上退化为 C3−C1，即『gate 条件下的 tail 效应』——它度量的不是两增量独立性的经典交互，而是 tail 维度在 skip 层 legacy 路径上的边际效应（+0.20/任务，量级远小于 gate 主损失 −4.47）",
+  "gate_harm_context": "D' gate 损失远端上下文（skip 层 far 区全 -inf）且该层落 legacy topk 路径（swa 占 K2 预算等残余口径差，B1 修复段记录）——−4.47 显著负符合机制预期；gate 省算收益属 E127 timing 口径，本判决仅质量维度"
+ },
+ "identical_output_pairs": [
+  {
+   "task": "qasper",
+   "arms": [
+    "c1_gate",
+    "c3_both"
+   ],
+   "sha256": "da324bec9b14593af8d2a92881cf69bf12557601494efa9dbca5cd64f75a1d7a",
+   "note": "c1_gate 与 c3_both 在 qasper 输出逐位一致——另一维度对该格输出零影响"
+  }
+ ],
+ "summary": "c1_gate: AVG5=43.78 vs C0 48.25，Δ=-4.47，95% CI [-9.00,-1.17]，显著（CI 不含 0）；c2_tail: AVG5=48.25 vs C0 48.25，Δ=+0.00，95% CI [+0.00,+0.00]，未证明显著（CI 含 0）；c3_both: AVG5=43.98 vs C0 48.25，Δ=-4.27，95% CI [-8.94,-0.93]，显著（CI 不含 0）；gate_effect_c1_minus_c0: mean=-4.470，95% CI [-8.998,-1.166]，显著；tail_effect_c2_minus_c0: mean=+0.000，95% CI [+0.000,+0.000]，未证明显著；interaction_c3_minus_c1_minus_c2_plus_c0: mean=+0.204，95% CI [+0.034,+0.462]，显著；c2_tail 与 C0 五任务输出逐位一致（sha256 相同）——tail 效应=0 是逐位 no-op 而非统计不可分辨；交互项数值上=gate 条件下的 tail 效应（C3−C1）",
+ "verdict_note": "判决结论措辞（GO/NO-GO、是否采纳 gate/tail 进主线）留主会话裁决——本 JSON 只登记点估计与 CI 如实数据。"
+}
