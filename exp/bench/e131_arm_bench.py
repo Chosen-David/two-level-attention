@@ -106,11 +106,23 @@ ARM_CONFIGS = {
                         enable_kmeans=True, alpha=0.125, beta=0.25, gamma=0.125),
 }
 
-ARMS = list(ARM_CONFIGS) + ["mavg_e127"]
+ARMS = list(ARM_CONFIGS) + ["mavg_e127", "mavg_e2e", "mavg_tail"]
 
 
 def make_args(arm):
-    """五臂参数化 make_args（E126 冻结配置）；mavg_e127 = E127 锚点原样克隆。"""
+    """五臂参数化 make_args（E126 冻结配置）；mavg_e127 = E127 锚点原样克隆；
+    mavg_e2e = e2e 锚点口径（cmp_ratio=4：L2 细筛 32 维，与 E123/E125
+    e2e 同配置）；mavg_tail = E133 子空间臂（mavg_e2e + tail32，
+    单键差 L1 粗筛 128→32 维）。"""
+    if arm == "mavg_e2e":
+        ns = make_args("mavg_e127")
+        ns.tia_level2_cmp_ratio = 4
+        return ns
+    if arm == "mavg_tail":
+        ns = make_args("mavg_e127")
+        ns.tli_subspace = "tail"
+        ns.tia_level2_cmp_ratio = 4
+        return ns
     if arm == "mavg_e127":
         # E127 harness make_args(0.25, 0.125, 0.625) 原样克隆（机器校准锚点；
         # cmp_ratio=2 / subspace='full' / layer_skip=True / kmeans=True 但
@@ -152,6 +164,18 @@ def arm_config_for_meta(arm):
     """
     if arm in ARM_CONFIGS:
         return dict(ARM_CONFIGS[arm])
+    if arm == "mavg_e2e":
+        return {
+            "effective_args": vars(make_args(arm)),
+            "note": "E133 e2e 锚点口径：mavg_e127 + cmp_ratio=4"
+                    "（L2 细筛 32 维，与 E123/E125 e2e 生产配置同口径）",
+        }
+    if arm == "mavg_tail":
+        return {
+            "effective_args": vars(make_args(arm)),
+            "note": "E133 子空间臂：mavg_e127 锚点 + subspace=tail + "
+                    "cmp_ratio=4（E129 C2 同款 tail32 口径，仅此两键异）",
+        }
     return {
         "effective_args": vars(make_args(arm)),
         "note": "mavg_e127 E127 锚点配置（make_args 实际 effective args，"
