@@ -1,0 +1,60 @@
+{
+ "exp": "E133 mavg+tail32 子空间采纳 e2e 判决",
+ "date": "2026-10-13",
+ "protocol": {
+  "arm": "E123 mavg 锚点 flags + --tli_subspace tail（单键差 = L1 粗筛 128→32 维；cmp_ratio=4 与锚点一致）",
+  "anchor": "E123 mavg AVG5 47.91（e123_trial_verdict.json per_task，不重跑）",
+  "scoring": "双源打分核验一致：本机 91f5b00 eval.py（difflib:stdlib）== .251 复算（本机 LongBench 包同步至 /tmp/e133_eval_pkg），五格逐分一致；strict runcap 5/5，cap_comparability_key 6688f41924 单一，无 legacy 混挂",
+  "hosts": "本机 GPU0 repobench / GPU1 gov_report+qasper；.251 GPU0 hotpotqa / GPU1 musique；产物 rsync 双向合并后本机+.251 各自全量复算",
+  "stats": "task-bootstrap 10000 次 seed 20261013，仅描述性（126 措辞纪律，不写显著）"
+ },
+ "per_task": {
+  "gov_report": {
+   "anchor": 33.6,
+   "tail32": 33.67,
+   "delta": 0.07000000000000028
+  },
+  "hotpotqa": {
+   "anchor": 59.42,
+   "tail32": 59.2,
+   "delta": -0.21999999999999886
+  },
+  "musique": {
+   "anchor": 34.25,
+   "tail32": 33.88,
+   "delta": -0.36999999999999744
+  },
+  "qasper": {
+   "anchor": 46.45,
+   "tail32": 45.95,
+   "delta": -0.5
+  },
+  "repobench": {
+   "anchor": 65.83,
+   "tail32": 65.24,
+   "delta": -0.5900000000000034
+  }
+ },
+ "avg": {
+  "anchor": 47.91,
+  "tail32": 47.59,
+  "delta": -0.32
+ },
+ "bootstrap_ci95": [
+  -0.51,
+  -0.104
+ ],
+ "mask_context": "mask 逐位对拍 98.34%（24/24 步有差异 ~1.66%/步，单键差 L1 128→32）——e2e 确认该差异噪声级",
+ "perf_merged": {
+  "note": "用户指令参考口径「+5.7% 劣化」已被 E133b 同机对照更正：~+6.7% 为 .187/本机环境差，原生实现后 tail 相对旧适配层 -3.4%~-4.9%",
+  "native_vs_base_tail": "-3.4%~-4.9%（交叉复跑一致）",
+  "native_tail_vs_native_full": "+2.5%（coarse kernel D=32 特化劣化，E133c #228 待收割）",
+  "verdict_json": "e133b_native_bench_verdict.json"
+ },
+ "verdict": "质量掉分：AVG5 47.59 vs 锚点 47.91（Δ-0.32），task-bootstrap 95% CI [-0.510, -0.104] 不含 0，4/5 任务一致负向（gov_report +0.07 除外）——与 mask 对拍 98.34%（~1.66%/步差异）自洽，L1 粗筛维度 128→32 带来真实但微小的质量代价，未达噪声带持平标准（E123 判据：CI 含 0）。裁决：①tail32 子空间不采纳进主方法/生产冠军（维持 full），进论文消融——质量-成本权衡数据点：质量 -0.32 e2e 分 + L1 粗筛 4× 理论省算（性能未兑现前不构成 Pareto 支配）；②E133b 原生紧凑量化布局（k_qat 紧凑直出 + idx_sub 实例缓存，781c96e）保留主线——对 full 生产配置无伤且尾臂实测 -3.4%~-4.9%；③E133c coarse kernel D=32 调优（#228）降级为消融附录级（tail 不进生产，调优收益不再直接服务主线）；④论文贡献叙事锚定：mask 98.34% → e2e -0.32 的层级传导证据链（块级选择对粗筛维度收缩敏感但幅度小）",
+ "quality_gate_detail": {
+  "判据": "E123 噪声带口径 = task-bootstrap 95% CI 含 0",
+  "E123 对照": "fullkv +0.106 CI[-0.624,0.848] 不显著 / cavg_g -0.242 CI[-0.89,0.458] 不显著 / cavg_off -2.202 显著",
+  "E133_tail32": "-0.32 CI 不含 0 → 掉分（幅度与 E125 冠军差 +0.34 同量级，但方向为负且一致）"
+ }
+}
