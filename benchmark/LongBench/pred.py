@@ -508,6 +508,31 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
             token_budget=getattr(args, "quest_token_budget", 1024),
             chunk_size=getattr(args, "quest_chunk_size", 16),
         )
+    elif args.method == "minference_vendor":
+        # B 轨 vendor（官方源码复用）：MInference（微软 NeurIPS 2024）动态稀疏
+        # prefill + decode dense。qwen3_minference_patch.py 只做接口胶水（显式
+        # q_len>1 判 prefill sparse / decode dense），核心算法 vertical+slash
+        # topk 索引与 sparse attention 逐字节来自官方 minference_forward.py。
+        # config_path 由 is_search 在线搜出后复用（pred 正式跑 is_search=False）。
+        import sys
+        vendor_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "..", "exp", "vendor_baselines", "minference_vendor",
+        )
+        sys.path.insert(0, vendor_dir)
+        from qwen3_minference_patch import enable_minference
+        cfg_path = getattr(args, "minference_config_path", None)
+        if not cfg_path:
+            raise RuntimeError(
+                "method=minference_vendor 必须传 --minference_config_path "
+                "（is_search 在线搜出的 best_pattern JSON）"
+            )
+        n_patched = enable_minference(
+            model,
+            is_search=False,
+            config_path=cfg_path,
+            starting_layer=getattr(args, "minference_starting_layer", -1),
+        )
     else:
         n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:

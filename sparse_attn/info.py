@@ -466,6 +466,14 @@ def get_method_name_with_info(args, snapshot=None):
         # B 轨 vendor（官方源码复用）：Quest 官方口径
         # token_budget/chunk_size 全参数编码进文件名。
         return f"quest_vendor_{args.quest_token_budget}_{args.quest_chunk_size}"
+    elif args.method == "minference_vendor":
+        # B 轨 vendor（官方源码复用）：MInference prefill 动态稀疏 + decode dense。
+        # pattern 文件（config_path）不同 = treatment 不同（不同模型/搜索口径），
+        # 取 basename 编码进文件名；starting_layer 之前浅层 dense。
+        pattern_tag = os.path.basename(
+            getattr(args, "minference_config_path", "pattern")
+        ).replace(".json", "")
+        return f"minference_vendor_{pattern_tag}_{getattr(args, 'minference_starting_layer', -1)}"
     elif args.method == "twi":
         return f"twi_{args.twi_block_size}_{args.twi_level1_topk}_{args.twi_level2_topp}"
     elif args.method == "tia":

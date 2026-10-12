@@ -28,6 +28,15 @@ def _add_quest_args(parser: argparse.ArgumentParser):
     group.add_argument('--quest_chunk_size', type=int, default=16)
     return parser
 
+def _add_minference_args(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title='minference')
+    # MInference vendor（官方源码复用）：prefill 动态稀疏（vertical+slash）+ decode dense。
+    # config_path = best_pattern JSON（is_search 在线搜出后复用）；starting_layer 之前
+    # 的浅层 dense（官方默认 -1 = 全层 sparse）。
+    group.add_argument('--minference_config_path', type=str, default=None)
+    group.add_argument('--minference_starting_layer', type=int, default=-1)
+    return parser
+
 def _parse_gamma(x):
     """E122：γ 支持 'off'（大小写不敏感）→ None = 自由竞争模式。
 
@@ -124,8 +133,9 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'tia', 'twi', 'tli', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'tia', 'twi', 'tli', 'none'])
     parser = _add_quest_args(parser)
+    parser = _add_minference_args(parser)
     parser = _add_twilight_args(parser)
     parser = _add_tia_args(parser)
     parser = _add_tli_args(parser)
