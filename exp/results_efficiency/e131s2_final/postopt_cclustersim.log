@@ -1,0 +1,14 @@
+
+=== arm=cclustersim S0=65536 layer=2 (TLIIndexerFast, triton_ok=True, inc_cache=True) ===
+stage            GPU ms(med) GPU ms(p90) GPU ms(max) CPU ms(med)
+prepare_index         0.4961      0.5217     71.8836      1.0004
+compute_score         0.3969      0.4051      0.4282      0.3508
+compute_mask          0.6331      0.6532      0.6673      0.6790
+metrics               0.0922      0.0952      0.0999      0.0914
+eager_decoding        0.1874      0.1937      0.3159      0.1829
+SUM(GPU med)          1.8056
+step CPU wall         2.3023
+first step wall      1498.8（冷建簇/全量缓存构建）
+gate: {"min_row_any": true, "out_finite": true, "sel_tokens_min": 1024.0, "sel_tokens_max": 1024.0, "sel_tokens_mean": 1024.0, "mask_shape": [1, 1, 8, 65581]}
+
+JSON → exp/results_efficiency/e131s2_final/e131s2_postopt_cclustersim.json

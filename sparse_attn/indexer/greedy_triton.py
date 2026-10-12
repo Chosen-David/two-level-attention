@@ -183,4 +183,282 @@ def greedy_build_triton(x, sim, chunk=16384, BT=512, num_warps=4):
     return sums, cnt, sq, k_live, assign
 
 
-__all__ = ["greedy_pass_triton", "greedy_build_triton", "_greedy_pass_kernel"]
+# ====================================================================== #
+# 【E131-S2】SPLIT 协作版贪心 kernel（v2）：同头多 program 并行扫 K 维。
+#
+# == 动机（E131 阶段 1 瓶颈实测）==
+# v1（grid=(H,) 单 program 一头）在 randn 最坏口径下冷建 S=64K 实测
+# 8077ms / 57088 token = 141μs/token（cavgsim/cclustersim 冷建 8-11s 主项；
+# near 重建 spike 137ms/8192 token 同源）。根因不是 launch（E113b 已消灭
+# Python 循环），而是：
+#   a) grid 仅 H=8 个 program，H20 78 个 SM 闲置 90%；
+#   b) randn 最坏数据 sim=0.9 下簇永不归并 → k_live 涨满 T，每 token 的
+#      活簇扫描 O(k_live·dd) → 全程 O(T²) 扫描，总流量 ~1.6TB / 8.4s ≈
+#      190GB/s（HBM 4TB/s 的 5%）——单 program 串行 tile 循环是瓶颈，
+#      带宽远未饱和，纯并行度问题。
+# BT/num_warps 调参实测仅 1.2×（131→111μs/token），证实须增 program 数。
+#
+# == 协议（per-token 两阶段 + 两个软件 barrier）==
+# grid=(H, SPLIT)：同头 SPLIT 个 program 协作。每 token i：
+#   phase1：program p 扫本头活簇区间 [p·kl/SPLIT, (p+1)·kl/SPLIT)（KLIVE
+#           大时均分扫描量），局部 best (cos,k,dot) 写 scratch[h,p]；
+#   barrier1（原子计数 + spin，release-acquire）：scratch 写全局可见；
+#   phase2：每 program 独立读 scratch 全 SPLIT 行做全局归约（p 升序严格 >
+#           比较 = 簇索引升序 first-occurrence，与 v1 跨 tile 语义一致）
+#           → upd/dst 决策；p==0 单写者更新 sums/cnt/sq/assign（避免
+#           多 program 同地址 read-modify-write 竞态），其余 program 仅
+#           本地推进 k_live（决策幂等，各 program 独立算出同值）；
+#   barrier2：p==0 的状态更新对下一 token phase1 可见。
+# counter 单调递增无重置（target=(2i+1/2)·SPLIT），无 ABA。
+#
+# == 逐位一致性论证（对拍口径同 test_e113_greedy_triton.py）==
+#   dot/cos 的归约沿 dd 维逐行进行（tl.sum(axis=1)），与 tile 边界/program
+#   切分完全无关 → 行级数值与 v1 逐位同；跨行 max/argmax 的比较序 =
+#   簇索引升序严格 >（program p 升序 × 区间内 tile 升序），与 v1 跨 tile
+#   严格 > 序完全一致 → argmax/dot_a/gather 序列逐位同。sq 更新用扫描
+#   时 best_dot（更新前口径），同 v1。故 (sums,cnt,sq,k_live,assign)
+#   与 v1 数学逐位一致（对拍单测验证）。
+#
+# == 死锁防御 ==
+# grid block 数 H·SPLIT ≤ SM 数时保守安全（每 block 仅 4 warps + 少量
+# scratch 寄存器，每 SM 至少驻留 1 block → 全 grid 必然并发驻留，spin
+# barrier 不会等未调度的 program）。wrapper 按 device SM 数自动钳制
+# SPLIT，env 可覆盖（TLI_E131_GREEDY_SPLIT）。
+# ====================================================================== #
+
+@triton.jit
+def _greedy_pass_kernel_v2(
+    x_ptr,          # [T, H, DD] fp32 连续
+    sums_ptr,       # [H, K, DD] fp32 连续
+    cnt_ptr,        # [H, K] fp32 连续
+    sq_ptr,         # [H, K] fp32 连续
+    klive_ptr,      # [H] int64：入=初始活簇数，出=终态活簇数
+    assign_ptr,     # [H, T] int64 出口
+    scos_ptr,       # [H, SPLIT] fp32：phase1 局部 best cos scratch
+    sk_ptr,         # [H, SPLIT] int32：局部 best 簇号
+    sdot_ptr,       # [H, SPLIT] fp32：局部 best dot
+    bar_ptr,        # [H] int32：barrier 计数（单调递增，无重置）
+    H: tl.constexpr, DD: tl.constexpr, BT: tl.constexpr, SPLIT: tl.constexpr,
+    K, T, SIM,
+    EPS: tl.constexpr,
+):
+    h = tl.program_id(0)
+    p = tl.program_id(1)
+    k_live = tl.load(klive_ptr + h).to(tl.int32)
+    offs_d = tl.arange(0, DD)
+    for i in range(T):
+        x = tl.load(x_ptr + (i * H + h) * DD + offs_d).to(tl.float32)
+        xn = tl.sqrt(tl.sum(x * x))
+        # ---- phase1：本 p 扫活簇区间 [p·kl/SPLIT, (p+1)·kl/SPLIT) ----
+        # 整数除法均分（差 ≤1 行），与 v1 的行级数值无关（dot 归约沿 dd 维）
+        lo_k = p * k_live // SPLIT
+        hi_k = (p + 1) * k_live // SPLIT
+        best_cos = float("-inf")
+        best_k = tl.zeros((), dtype=tl.int32)
+        best_dot = tl.zeros((), dtype=tl.float32)
+        for k0 in range(lo_k, hi_k, BT):
+            offs_k = k0 + tl.arange(0, BT)
+            m = offs_k < hi_k
+            sums_t = tl.load(
+                sums_ptr + (h * K + offs_k[:, None]) * DD + offs_d[None, :],
+                mask=m[:, None], other=0.0,
+            )
+            dot_t = tl.sum(sums_t * x[None, :], axis=1)
+            sq_t = tl.load(sq_ptr + h * K + offs_k, mask=m, other=0.0)
+            norm_t = tl.sqrt(tl.maximum(sq_t, 0.0))
+            cos_t = dot_t / (norm_t * xn + EPS)
+            cos_t = tl.where(m, cos_t, float("-inf"))
+            am = tl.argmax(cos_t, axis=0)          # tile 内 first-occurrence
+            tmax = tl.max(cos_t, axis=0)
+            lane = tl.arange(0, BT)
+            dot_am = tl.sum(tl.where(lane == am, dot_t, 0.0))
+            take = tmax > best_cos                 # 严格 >：早 tile 赢并列
+            best_cos = tl.where(take, tmax, best_cos)
+            best_k = tl.where(take, (k0 + am).to(tl.int32), best_k)
+            best_dot = tl.where(take, dot_am, best_dot)
+        tl.store(scos_ptr + h * SPLIT + p, best_cos)
+        tl.store(sk_ptr + h * SPLIT + p, best_k)
+        tl.store(sdot_ptr + h * SPLIT + p, best_dot)
+        # ---- barrier1：scratch 全局可见（release-acquire 对同地址原子）----
+        target1 = (2 * i + 1) * SPLIT
+        tl.atomic_add(bar_ptr + h, 1, sem="acq_rel", scope="gpu")
+        v = tl.atomic_add(bar_ptr + h, 0, sem="acquire", scope="gpu")
+        while v < target1:
+            v = tl.atomic_add(bar_ptr + h, 0, sem="acquire", scope="gpu")
+        # ---- phase2：全局归约（p 升序严格 > = 簇索引升序 first-occurrence）----
+        g_cos = float("-inf")
+        g_k = tl.zeros((), dtype=tl.int32)
+        g_dot = tl.zeros((), dtype=tl.float32)
+        for q in range(SPLIT):                     # constexpr 展开小循环
+            c = tl.load(scos_ptr + h * SPLIT + q)
+            take = c > g_cos
+            g_cos = tl.where(take, c, g_cos)
+            g_k = tl.where(take, tl.load(sk_ptr + h * SPLIT + q), g_k)
+            g_dot = tl.where(take, tl.load(sdot_ptr + h * SPLIT + q), g_dot)
+        upd = g_cos >= SIM
+        dst = tl.where(upd, g_k, k_live)
+        if p == 0:                                 # 单写者：无 RMW 竞态
+            row = tl.load(sums_ptr + (h * K + dst) * DD + offs_d)
+            tl.store(sums_ptr + (h * K + dst) * DD + offs_d,
+                     tl.where(upd, row + x, x))
+            c_old = tl.load(cnt_ptr + h * K + dst)
+            tl.store(cnt_ptr + h * K + dst, tl.where(upd, c_old + 1.0, 1.0))
+            s_old = tl.load(sq_ptr + h * K + dst)
+            # 归并：sq += 2·(sums_a·x) + ||x||^2（g_dot 为扫描时口径，更新前）
+            tl.store(sq_ptr + h * K + dst,
+                     tl.where(upd, s_old + 2.0 * g_dot + xn * xn, xn * xn))
+            tl.store(assign_ptr + h * T + i, dst.to(tl.int64))
+        k_live = tl.where(upd, k_live, k_live + 1)  # 各 program 幂等同值
+        # ---- barrier2：p==0 的状态更新对下一 token phase1 可见 ----
+        target2 = (2 * i + 2) * SPLIT
+        tl.atomic_add(bar_ptr + h, 1, sem="acq_rel", scope="gpu")
+        v = tl.atomic_add(bar_ptr + h, 0, sem="acquire", scope="gpu")
+        while v < target2:
+            v = tl.atomic_add(bar_ptr + h, 0, sem="acquire", scope="gpu")
+    if p == 0:
+        tl.store(klive_ptr + h, k_live.to(tl.int64))
+
+
+def _v2_split_bound(H, device):
+    """SPLIT 默认值（env 覆盖优先；0=禁用 v2 回退 v1）。
+
+    实测拐点（H20 78SM，T=14272 randn 最坏）：SPLIT 9→7.97μs/tok、
+    16→6.94、24→6.62（拐点）、32→6.81（phase2/barrier 税反超）→ 默认
+    min(24, 4·SM//H)。死锁安全由 _v2_residency_clamp 二次钳制（按编译
+    后实测寄存器数），本函数只定「想要多少」。"""
+    import os as _os
+    env = _os.environ.get("TLI_E131_GREEDY_SPLIT", "")
+    if env:
+        return max(0, int(env))
+    try:
+        nsm = torch.cuda.get_device_properties(device).multi_processor_count
+    except Exception:
+        return 0
+    return min(24, max(1, nsm * 4 // max(1, H)))
+
+
+# 寄存器探测缓存：key=(device_idx, H, dd, BT, num_warps, SPLIT) → n_regs。
+# 探测用 warmup 只编译不 launch（grid 无须全驻留，无死锁面）。
+_V2_NREGS_CACHE = {}
+
+
+def _v2_residency_clamp(SPLIT, H, dd, BT, num_warps, device, probe_tensors):
+    """死锁防御（实证必要）：BT=512/nw=4 组合实测 n_regs 上升 → 3
+    blocks/SM → SPLIT=32（256 blocks > 78×3=234 容量）grid 无法全驻留
+    → spin barrier 死锁（E131-S2 扫描实证挂死）。修法：warmup 编译
+    探测真实 n_regs → 驻留上界 SM·min(blocks_reg, blocks_thread,
+    blocks_limit) // H 钳制 SPLIT。探测一次缓存（n_regs 对 SPLIT 不敏
+    感，phase2 小展开差异不改变寄存器峰值）。探测异常 → 返回 1（禁用
+    v2 回退 v1，fail-closed）。"""
+    try:
+        dev = torch.device(device) if isinstance(device, str) else device
+        dev_idx = dev.index if dev.index is not None else torch.cuda.current_device()
+        prop = torch.cuda.get_device_properties(dev_idx)
+        nsm = prop.multi_processor_count
+        threads = num_warps * 32
+        key = (dev_idx, H, dd, BT, num_warps, SPLIT)
+        n_regs = _V2_NREGS_CACHE.get(key)
+        if n_regs is None:
+            # warmup 只编译不 launch（无死锁面）；CompiledKernel 的
+            # n_regs 惰性填充在 _init_handles（装载 cubin 句柄），
+            # 手动触发后即可读
+            x_t = probe_tensors
+            ck = _greedy_pass_kernel_v2.warmup(
+                *x_t[:10], K=x_t[10], T=x_t[11], SIM=x_t[12],
+                H=H, DD=dd, BT=BT, SPLIT=SPLIT, EPS=1e-9,
+                num_warps=num_warps, grid=(H, SPLIT))
+            try:
+                ck._init_handles()
+                n_regs = int(getattr(ck, "n_regs", 0) or 0)
+                if n_regs <= 0:
+                    raise RuntimeError(f"n_regs 探测失败: {n_regs}")
+                n_regs = max(n_regs, 32)
+            except Exception:
+                # fail-closed：探测失败 → 返回 1（禁用 v2 回退 v1），
+                # 不能假设小寄存器（方向反了会放行死锁 grid）
+                return 1
+            _V2_NREGS_CACHE[key] = n_regs
+        regs_per_sm = getattr(prop, "regs_per_multiprocessor", 65536)
+        blocks_reg = max(1, regs_per_sm // (threads * n_regs))
+        blocks_thr = max(1, prop.max_threads_per_multi_processor // threads)
+        blocks_hw = max(1, getattr(prop, "max_blocks_per_multi_processor", 32))
+        bps = min(blocks_reg, blocks_thr, blocks_hw)
+        return min(SPLIT, max(1, nsm * bps // max(1, H)))
+    except Exception:
+        return 1
+
+
+def greedy_pass_triton_v2(x, sim, sums, cnt, sq, k_live, BT=256, num_warps=4):
+    """与 greedy_pass_triton 同签名同语义的 SPLIT 协作版（逐位一致，
+    对拍见 exp/trace/test_e113_greedy_triton.py 同口径）。
+
+    仅并行化不同（同头 SPLIT 个 program 均分活簇扫描），语义/数值/扩容
+    判据与 v1 完全一致；SPLIT 由 _v2_split_bound 按 SM 数钳制，SPLIT<2
+    时由调度器回退 v1（单 program 并行无收益只加 barrier 税）。
+    BT 默认 256 ≠ v1 的 512：SPLIT 均分后每 program 扫描区间小，实测
+    （H20 SPLIT=24，randn 最坏）256 比 512 快 ~6%（6.62 vs 7.07μs/
+    token）；BT 只影响 tile 边界不影响行级数值 → 改 BT 逐位不变。
+    回退 v1 时显式用 v1 默认 BT=512：E131-S2 实证大 k_live 续跑
+    （T=64 @k_live≈57K randn singleton）下 BT=256 比 512 慢 2.83×
+    （61.6 vs 21.8ms）——每 tile 固定开销（sq 加载/argmax/lane 归约）
+    在 57K 行 / 224 tiles 时主导，E113 的「6% 差」结论只在 struct
+    K≈2K 小簇口径成立，大簇态必须用大 BT。"""
+    T, H, dd = x.shape
+    assert x.is_cuda, "Triton 路径需要 CUDA"
+    SPLIT = _v2_split_bound(H, x.device)
+    if SPLIT < 2 or T < 256:
+        # 小 T / SPLIT 不可用 → v1 路径（barrier 税不划算；语义同；
+        # BT 用 v1 默认 512，见 docstring 大簇态实证）
+        return greedy_pass_triton(x, sim, sums, cnt, sq, k_live,
+                                  BT=512, num_warps=num_warps)
+    x = x.float().contiguous()
+    need = int(k_live.max().item()) + T
+    K = sums.shape[1]
+    if need > K:  # 扩容（新簇上界 = T，与参考实现同判据）
+        pad = need - K
+        sums = F.pad(sums, (0, 0, 0, pad))
+        cnt = F.pad(cnt, (0, pad))
+        sq = F.pad(sq, (0, pad))
+        K = sums.shape[1]
+    sums = sums.contiguous()
+    cnt = cnt.contiguous()
+    sq = sq.contiguous()
+    kl = k_live.to(torch.int64).contiguous().clone()
+    assign = torch.empty(H, T, dtype=torch.int64, device=x.device)
+    # phase1 scratch + barrier counter（每次调用新分配：T≤16K/段 → 计数
+    # ≤ 2·T·SPLIT < 2^31 无溢出；单调递增无需重置，kernel 返回即废弃）
+    # ---- BT 自适应（E131-S2 实证）：每 program 扫描行数 k_live/SPLIT ≥
+    # 1024 时 per-tile 固定开销（sq 加载/argmax/lane 归约）占比上升，
+    # BT=512 比 256 快 14%（续跑 8192@k_live=28K：116.9 vs 135.1ms）；
+    # 冷建/小簇（k_live 起步≈0）保持 256（V6 实测 256 比 512 快 6%）。
+    # BT 只影响 tile 边界不影响行级数值（dot 归约沿 dd 维）→ 逐位不变。
+    if max(int(k_live.max().item()), 1) // SPLIT >= 1024:
+        BT = max(BT, 512)
+    BT = min(BT, triton.next_power_of_2(max(K, 16)))
+    scos = torch.empty(H, SPLIT, dtype=torch.float32, device=x.device)
+    sk = torch.empty(H, SPLIT, dtype=torch.int32, device=x.device)
+    sdot = torch.empty(H, SPLIT, dtype=torch.float32, device=x.device)
+    bar = torch.zeros(H, dtype=torch.int32, device=x.device)
+    # ---- 死锁防御：按编译后实测 n_regs 钳制 SPLIT（见函数 docstring
+    # 与 _v2_residency_clamp；warmup 只编译不 launch，无死锁面）----
+    SPLIT = _v2_residency_clamp(
+        SPLIT, H, dd, BT, num_warps, x.device,
+        (x, sums, cnt, sq, kl, assign, scos, sk, sdot, bar, K, T, float(sim)))
+    if SPLIT < 2:
+        # clamp 失败回退 v1（BT 同上：v1 默认 512）
+        return greedy_pass_triton(x, sim, sums, cnt, sq, k_live,
+                                  BT=512, num_warps=num_warps)
+    scos = torch.empty(H, SPLIT, dtype=torch.float32, device=x.device)
+    sk = torch.empty(H, SPLIT, dtype=torch.int32, device=x.device)
+    sdot = torch.empty(H, SPLIT, dtype=torch.float32, device=x.device)
+    bar = torch.zeros(H, dtype=torch.int32, device=x.device)
+    _greedy_pass_kernel_v2[(H, SPLIT)](
+        x, sums, cnt, sq, kl, assign, scos, sk, sdot, bar,
+        H=H, DD=dd, BT=BT, SPLIT=SPLIT, K=K, T=T, SIM=float(sim), EPS=1e-9,
+        num_warps=num_warps,
+    )
+    return sums, cnt, sq, kl, assign
+
+
+__all__ = ["greedy_pass_triton", "greedy_build_triton", "_greedy_pass_kernel",
+           "greedy_pass_triton_v2", "_greedy_pass_kernel_v2"]

@@ -1,0 +1,477 @@
+{
+ "meta": {
+  "experiment": "E131-S2 阶段 2：greedy cluster Triton v2（SPLIT 协作）+ 簇分数 Triton 全融合，五臂 64K 稳态延迟终表",
+  "protocol": {
+   "S": 65536,
+   "B": 1,
+   "q_len": 1,
+   "H": 32,
+   "Hkv": 8,
+   "D": 128,
+   "bs": 64,
+   "K1": 128,
+   "K2": 1024,
+   "layer": 2,
+   "kv_dtype": "bfloat16",
+   "warmup": 8,
+   "steps": {
+    "cclustersim": 38,
+    "cavgsim": 80,
+    "默认": 30
+   },
+   "timing": "cuda Event GPU 时间线 median（稳态，steps>=warmup）；spike 单列 + /64 步摊销；冷建首步单列",
+   "gpu": "2×H20-3e（终表数据 GPU1 独占采集；开发验证 GPU0）",
+   "data": "torch.randn 合成 KV/Q（E127 harness 同口径，singleton 型最坏贪心簇量）",
+   "baseline_env": "TLI_E131_GREEDY_V2=0 + TLI_E131_TOKSCORE_TRITON=0（全关）",
+   "optimized_env": "默认全开（v2 SPLIT 协作 kernel + tok_score Triton 融合）"
+  },
+  "optimizations": [
+   {
+    "id": "①",
+    "name": "greedy cluster pass Triton v2（SPLIT 协作 kernel）",
+    "file": "sparse_attn/indexer/greedy_triton.py",
+    "switch": "TLI_E131_GREEDY_V2（默认 1；0 回退）",
+    "detail": "grid=(H,SPLIT) 同头多 program 均分活簇扫描 + 两阶段软件 barrier；warmup 编译探测 n_regs 死锁防御钳制；小 T<256/探测失败回退 v1",
+    "effect": "far 冷建 8.0→0.96s（8.4×）；near 冷建 137.7→47.6ms；大 k_live 续跑 1080→113ms（9.5×）"
+   },
+   {
+    "id": "③",
+    "name": "簇分数 gather-dot Triton 全融合（E127 GQA K 复用同款）",
+    "file": "sparse_attn/indexer/tli_indexer_fast.py",
+    "switch": "TLI_E131_TOKSCORE_TRITON（默认 1；0 回退锚点原版）",
+    "detail": "einsum+gather+q_g 胶水三件套 → 单 kernel（int32 索引 + qg 组内聚合融合）",
+    "effect": "far_token_score 0.107→0.057ms（1.89×）；near_token_score 0.062→0.047ms（1.32×）"
+   },
+   {
+    "id": "bugfix",
+    "name": "v2 回退路径 BT 修复 + v2 内部 BT 自适应",
+    "file": "sparse_attn/indexer/greedy_triton.py",
+    "detail": "回退 v1 时 BT 256→512（大 k_live 下 tile 固定开销主导，T=64@57K 实测 2.83× 回归修复）；v2 内部每 program 行数≥1024 时 BT=512（续跑 135→117ms）",
+    "effect": "cavgsim far 续跑 spike 73.7→28.3ms（修复 e2e 净回归）"
+   },
+   {
+    "id": "②",
+    "name": "near 侧增量化（复用未失效簇）",
+    "status": "评估后不做",
+    "detail": "锚点语义：near 均值簇心无法精确撤销左缘前移成员（tli_indexer.py L489 注释），增量需改簇心语义破坏逐位一致性；v2 已把 near 重建 spike 156.7→72.3ms（-54%），摊销 0.57ms/步，增量化的边际收益不抵语义风险，如实列为未实施"
+   }
+  ],
+  "correctness": {
+   "greedy_v2": "exp/bench/e131s2_v2_validate.py V1-V5 全 PASS（冷启动 vs Python 参考 / 24 组多 seed 逐位 100% / v2 vs v1 逐位 / 增量续跑==全量重放 / randn 最坏 k_live≈28K 续跑逐位）",
+   "tok_score": "16 步稳态 mask 逐位 0 差异（8390592 位）",
+   "e2e_mask_bitexact": "cclustersim/cavgsim 各 24 步（覆盖 far 块边界续跑 + near 重建）优化前后 mask 逐位一致率 12585120/12585120 = 100.0000%（top-k 重叠率门 ≥99.9% 满分）",
+   "gate": "min_row_any / out_finite / sel_tokens=1024 恒定 全绿（逐臂 JSON gate 字段）"
+  },
+  "md5": {
+   "tli_indexer.py（锚点，未动）": "bf5e26c4d6123875b2786b9ed886da5f",
+   "tli_indexer_fast.py": "467fd087b24156765c19dafac3281215 → de9786c9d2f221e14d3c4aa988f95b54",
+   "greedy_triton.py": "ee14a7882d580db640b544d55876981a → b8669bb6ca58976248bc0e2434f9a1ad"
+  },
+  "noise_band": {
+   "note": "mavg/aavg/mminmax/mavg_e127 代码路径未变（4bit select 不触发 greedy/簇分数），Δ 为运行间漂移",
+   "rerun_gpu1": {
+    "mavg_SUM": 1.6179,
+    "aavg_SUM": 1.615
+   },
+   "conclusion": "三次采样 mavg 1.6125/1.6359/1.6179、aavg 1.6038/1.6391/1.6150，复测均落在 pre/post 之间，噪声带 ±0.02ms，无代码级回归"
+  }
+ },
+ "results": {
+  "mavg": {
+   "pre": {
+    "stages": {
+     "prepare_index": 0.48238401114940643,
+     "compute_score": 0.39392000436782837,
+     "compute_mask": 0.4750080108642578,
+     "metrics": 0.07204800099134445,
+     "eager_decoding": 0.18910399824380875
+    },
+    "spike": {
+     "prepare_index_max": 0.49503999948501587,
+     "step": 29,
+     "amortized": 0.007734999991953373
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65573
+     ]
+    },
+    "first_step_prepare_gpu_ms": 128.31861877441406,
+    "first_step_total_gpu_ms": 596.1713008880615,
+    "SUM": 1.6124640256166458,
+    "wall_cpu_ms": null
+   },
+   "post": {
+    "stages": {
+     "prepare_index": 0.49272000789642334,
+     "compute_score": 0.3972800076007843,
+     "compute_mask": 0.4835679978132248,
+     "metrics": 0.07340800017118454,
+     "eager_decoding": 0.18891199678182602
+    },
+    "spike": {
+     "prepare_index_max": 0.5480639934539795,
+     "step": 12,
+     "amortized": 0.00856349989771843
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65573
+     ]
+    },
+    "first_step_prepare_gpu_ms": 140.57061767578125,
+    "first_step_total_gpu_ms": 605.2136116027832,
+    "SUM": 1.635888010263443,
+    "wall_cpu_ms": null
+   },
+   "delta_SUM": 0.02342398464679718,
+   "speedup_SUM": 0.9856811808022085
+  },
+  "aavg": {
+   "pre": {
+    "stages": {
+     "prepare_index": 0.48044800758361816,
+     "compute_score": 0.3929760009050369,
+     "compute_mask": 0.45372799038887024,
+     "metrics": 0.08851199969649315,
+     "eager_decoding": 0.18809600174427032
+    },
+    "spike": {
+     "prepare_index_max": 0.5043200254440308,
+     "step": 8,
+     "amortized": 0.00788000039756298
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65573
+     ]
+    },
+    "first_step_prepare_gpu_ms": 129.85098266601562,
+    "first_step_total_gpu_ms": 589.1999702453613,
+    "SUM": 1.6037600003182888,
+    "wall_cpu_ms": null
+   },
+   "post": {
+    "stages": {
+     "prepare_index": 0.4928159862756729,
+     "compute_score": 0.39929600059986115,
+     "compute_mask": 0.4649440050125122,
+     "metrics": 0.0907519981265068,
+     "eager_decoding": 0.19129599630832672
+    },
+    "spike": {
+     "prepare_index_max": 0.5205439925193787,
+     "step": 30,
+     "amortized": 0.008133499883115292
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65573
+     ]
+    },
+    "first_step_prepare_gpu_ms": 148.5478973388672,
+    "first_step_total_gpu_ms": 610.6983003616333,
+    "SUM": 1.6391039863228798,
+    "wall_cpu_ms": null
+   },
+   "delta_SUM": 0.03534398600459099,
+   "speedup_SUM": 0.9784370080852035
+  },
+  "mminmax": {
+   "pre": {
+    "stages": {
+     "prepare_index": 0.46007999777793884,
+     "compute_score": 0.33955200016498566,
+     "compute_mask": 0.4203999936580658,
+     "metrics": 0.08955200016498566,
+     "eager_decoding": 0.18833599984645844
+    },
+    "spike": {
+     "prepare_index_max": 0.47628799080848694,
+     "step": 10,
+     "amortized": 0.007441999856382608
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65573
+     ]
+    },
+    "first_step_prepare_gpu_ms": 153.51840209960938,
+    "first_step_total_gpu_ms": 668.5547652244568,
+    "SUM": 1.4979199916124344,
+    "wall_cpu_ms": null
+   },
+   "post": {
+    "stages": {
+     "prepare_index": 0.4556480050086975,
+     "compute_score": 0.33633600175380707,
+     "compute_mask": 0.4203999936580658,
+     "metrics": 0.08934400230646133,
+     "eager_decoding": 0.18756800144910812
+    },
+    "spike": {
+     "prepare_index_max": 0.4889279901981354,
+     "step": 8,
+     "amortized": 0.007639499846845865
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65573
+     ]
+    },
+    "first_step_prepare_gpu_ms": 141.71849060058594,
+    "first_step_total_gpu_ms": 608.7672591209412,
+    "SUM": 1.4892960041761398,
+    "wall_cpu_ms": null
+   },
+   "delta_SUM": -0.008623987436294556,
+   "speedup_SUM": 1.0057906469983886
+  },
+  "cavgsim": {
+   "pre": {
+    "stages": {
+     "prepare_index": 0.47860799729824066,
+     "compute_score": 0.34825599193573,
+     "compute_mask": 0.5122400224208832,
+     "metrics": 0.0931360013782978,
+     "eager_decoding": 0.19835200160741806
+    },
+    "spike": {
+     "prepare_index_max": 25.334400177001953,
+     "step": 64,
+     "amortized": 0.3958500027656555
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65623
+     ]
+    },
+    "first_step_prepare_gpu_ms": 11128.17578125,
+    "first_step_total_gpu_ms": 11298.668073177338,
+    "SUM": 1.6305920146405697,
+    "wall_cpu_ms": null
+   },
+   "post": {
+    "stages": {
+     "prepare_index": 0.467616006731987,
+     "compute_score": 0.3372480124235153,
+     "compute_mask": 0.4373439997434616,
+     "metrics": 0.09073599800467491,
+     "eager_decoding": 0.18569600582122803
+    },
+    "spike": {
+     "prepare_index_max": 28.683935165405273,
+     "step": 64,
+     "amortized": 0.4481864869594574
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65623
+     ]
+    },
+    "first_step_prepare_gpu_ms": 1654.495849609375,
+    "first_step_total_gpu_ms": 1754.8898315429688,
+    "SUM": 1.5186400227248669,
+    "wall_cpu_ms": null
+   },
+   "delta_SUM": -0.11195199191570282,
+   "speedup_SUM": 1.0737185838911512
+  },
+  "cclustersim": {
+   "pre": {
+    "stages": {
+     "prepare_index": 0.49929599463939667,
+     "compute_score": 0.40403199195861816,
+     "compute_mask": 0.7204479873180389,
+     "metrics": 0.09430400282144547,
+     "eager_decoding": 0.20227200537919998
+    },
+    "spike": {
+     "prepare_index_max": 156.6498565673828,
+     "step": 36,
+     "amortized": 2.4476540088653564
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65581
+     ]
+    },
+    "first_step_prepare_gpu_ms": 8389.154296875,
+    "first_step_total_gpu_ms": 8639.559061050415,
+    "SUM": 1.9203519821166992,
+    "wall_cpu_ms": null
+   },
+   "post": {
+    "stages": {
+     "prepare_index": 0.49612800776958466,
+     "compute_score": 0.39686399698257446,
+     "compute_mask": 0.6330879926681519,
+     "metrics": 0.09216000139713287,
+     "eager_decoding": 0.1873920038342476
+    },
+    "spike": {
+     "prepare_index_max": 71.88361358642578,
+     "step": 36,
+     "amortized": 1.1231814622879028
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65581
+     ]
+    },
+    "first_step_prepare_gpu_ms": 1400.409912109375,
+    "first_step_total_gpu_ms": 1498.6491112709045,
+    "SUM": 1.8056320026516914,
+    "wall_cpu_ms": null
+   },
+   "delta_SUM": -0.11471997946500778,
+   "speedup_SUM": 1.0635345293484684
+  },
+  "mavg_e127": {
+   "pre": {
+    "stages": {
+     "prepare_index": 0.4487840086221695,
+     "compute_score": 0.35260799527168274,
+     "compute_mask": 0.4710880070924759,
+     "metrics": 0.0721759982407093,
+     "eager_decoding": 0.18851200491189957
+    },
+    "spike": {
+     "prepare_index_max": 0.46195200085639954,
+     "step": 33,
+     "amortized": 0.007218000013381243
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65573
+     ]
+    },
+    "first_step_prepare_gpu_ms": 128.2548828125,
+    "first_step_total_gpu_ms": 911.0209732055664,
+    "SUM": 1.533168014138937,
+    "wall_cpu_ms": null
+   },
+   "post": {
+    "stages": {
+     "prepare_index": 0.44256000220775604,
+     "compute_score": 0.3473919928073883,
+     "compute_mask": 0.46719999611377716,
+     "metrics": 0.07158400118350983,
+     "eager_decoding": 0.1881759986281395
+    },
+    "spike": {
+     "prepare_index_max": 0.46832001209259033,
+     "step": 8,
+     "amortized": 0.007317500188946724
+    },
+    "gate": {
+     "min_row_any": true,
+     "out_finite": true,
+     "sel_tokens_min": 1024.0,
+     "sel_tokens_max": 1024.0,
+     "sel_tokens_mean": 1024.0,
+     "mask_shape": [
+      1,
+      1,
+      8,
+      65573
+     ]
+    },
+    "first_step_prepare_gpu_ms": 135.39862060546875,
+    "first_step_total_gpu_ms": 595.9535636901855,
+    "SUM": 1.5169119909405708,
+    "wall_cpu_ms": null
+   },
+   "delta_SUM": -0.016256023198366165,
+   "speedup_SUM": 1.0107165236318598
+  }
+ }
+}
