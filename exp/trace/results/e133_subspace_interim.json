@@ -1,0 +1,40 @@
+{
+  "experiment": "E133 mavg+tail32 子空间采纳（用户 16:5X 指令）",
+  "status": "interim（e2e 5 任务在跑，本文件记录 mask 对拍 + 性能三臂）",
+  "date": "2026-10-12",
+  "caliber_correction": {
+    "finding": "cmp_ratio 与 subspace 语义独立（E133 v1 口径勘误）",
+    "detail": "subspace 只控制 L1 粗筛维度（full=128/tail=32，_prepare_index_base k_for_coarse gather）；cmp_ratio 控制 L2 细筛 k_qat 量化宽度（64//r 尾段索引，full 模式同样生效，_prepare_index_base L500-507 fallback——k_qat 为 zeros_like(k) 128 维 dense、尾段量化其余零）",
+    "implication": "E127/E131 性能口径（cmp_ratio=2，L2-64 维）与 E123/E125 e2e 口径（cmp_ratio=4，L2-32 维）从来不同——性能表 1.52ms 是 L2-64 维成本，e2e 生产配置为 L2-32 维",
+    "v1_void": "v1 对拍 A 臂 mavg_e127（cmp2+full，L2-64 维）与 e2e 锚点（cmp4+full，L2-32 维）不同，98.14% 混入 L2 宽度差，作废"
+  },
+  "mask_bitexact": {
+    "v2_design": "A = e2e 锚点口径（cmp4+full）；B = +tail32（单键差 = L1 粗筛 128→32 维）；24 步 decode，S0=65536，seed 777001/20261012",
+    "result": "12375736/12585120 = 98.3363% 逐位一致，24/24 步均存在差异（8106-9506 位/步，~1.66%/步）",
+    "verdict": "tail32 在 mavg 主方法上真实改变 L1 块分数与 α/β/γ 分区预算——与 E129 C2 cclustersim 逐位 no-op（选择不消费 L1 分数）相反。mask 级零损失证明不成立，须 e2e 5 任务质量验证",
+    "v1_for_reference": "98.1398%（作废，双键差）"
+  },
+  "perf_3arm": {
+    "protocol": "e131_arm_bench --S 65536 --steps 30 --warmup 8，本机 H20 GPU 独占窗口，TLI_E127_FAST=1",
+    "steady_gpu_ms": {
+      "mavg_e127_cmp2_full": {"sum": 1.5313, "prepare_index": 0.4457, "compute_score": 0.3503, "compute_mask": 0.4703, "metrics": 0.0695, "eager_decoding": 0.1955},
+      "mavg_e2e_cmp4_full_anchor": {"sum": 1.5444, "prepare_index": 0.4487, "compute_score": 0.3496, "compute_mask": 0.4783, "metrics": 0.0718, "eager_decoding": 0.1960},
+      "mavg_tail_cmp4_tail": {"sum": 1.6329, "prepare_index": 0.4842, "compute_score": 0.3976, "compute_mask": 0.4813, "metrics": 0.0734, "eager_decoding": 0.1964}
+    },
+    "first_step_gpu_ms": {"cmp2_full": 918.7, "cmp4_full": 689.1, "cmp4_tail": 610.7},
+    "findings": [
+      "cmp_ratio 2→4（L2 细筛 64→32 维）稳态无差（1.5313 vs 1.5444，+0.9% 噪声带内）——L2 量化宽度非稳态成本项",
+      "tail32（L1 粗筛 128→32 维）稳态 +5.7%（1.5444→1.6329）：compute_score +13.7%/prepare_index +8.0%——pad_k[..., idx_sub] gather 物化 + coarse kernel D=32 特化劣化抵消带宽收益（k_qat 为零填充 dense，fine 段无节省）",
+      "tail32 首步冷建 -11.4%（689.1→610.7）——k_min/k_max/quant 均只算 32 维",
+      "结论：当前实现下 tail32 无稳态性能增益（净 -5.7%）；要兑现子空间理论收益（L1 粗筛 4× 省算）需 kernel 适配工程（coarse kernel D=32 特化调优 / k_qat 真子空间物化）"
+    ],
+    "correctness_check": "fine 段非 dgate_short 分支 b_q_full = q_sq[0]*scale 为全 128 维（子空间零填充语义，无越界）；coarse Triton 门禁含 k_min.shape[-1]==b_q.shape[-1] 维度匹配；bitexact B 臂 gate 全过（sel_tokens=1024 finite）"
+  },
+  "e2e_inflight": {
+    "design": "T = mavg e2e 锚点 flags + --tli_subspace tail（单键增量，cmp_ratio=4 COMMON 与锚点一致）；锚点 = E123 mavg AVG5 47.91 不重跑",
+    "tasks": "qasper/hotpotqa/gov_report 200 + repobench-p 500 + musique 200",
+    "hosts": "本机 GPU0 repobench / GPU1 gov_report+qasper；.251 GPU0 hotpotqa / GPU1 musique（.251 树 bee/main@60027fb，pred.py md5 74f7b993 与本机一致；tli_indexer.py 83b5004f vs 本机 d110575c——132b stride 门禁修复不改数值）",
+    "launched": "2026-10-12 17:52-17:54",
+    "judge_protocol": "E123 判决克隆：双源打分核验 + 126 描述性措辞纪律（五任务 task-bootstrap 仅描述性）"
+  }
+}
