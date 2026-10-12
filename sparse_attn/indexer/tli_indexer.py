@@ -1023,7 +1023,7 @@ class TLIIndexer(TIAIndexer):
             elif (_HAS_TRITON and self._basis is None and k_avg.dim() == 3
                     and k_avg.is_cuda
                     and (k_avg.shape[-1] & (k_avg.shape[-1] - 1)) == 0
-                    and k_avg.stride(-1) == 1
+                    and k_avg.stride(-1) == 1 and b_q.stride(-1) == 1
                     and b_q.dtype == torch.float32
                     and k_avg.shape[-1] == b_q.shape[-1]
                     and k_avg.shape[1] * self.group_size == b_q.shape[0]
@@ -1031,6 +1031,9 @@ class TLIIndexer(TIAIndexer):
                 # 【E127 iter8】avg 段复用 iter6 _score_fine_kernel 同构
                 # （einsum(b_q, repeat(k_avg)) 数学等价，GQA K 复用免物
                 # 化）；ULP 口径同 iter6；异形/异常回退原版表达式。
+                # 【E132b TL-E127-FEATURE-STRIDE-129】补 b_q 末维 stride
+                # 检查（kernel 以 base+offs_d 硬编码末维 stride=1 访问 Q；
+                # coarse 门禁同款检查已有 k 侧，此处补齐 q 侧）。
                 try:
                     score_coarse_avg[0] = self._fast_score_fine(
                         k_avg, b_q, q_sq.dtype)
@@ -1070,6 +1073,7 @@ class TLIIndexer(TIAIndexer):
         elif (_HAS_TRITON and self._basis is None and k_qat.dim() == 4
                 and k_qat.is_cuda
                 and k_qat.shape[0] == 1 and k_qat.shape[-1] == 128
+                and k_qat.stride(-1) == 1 and b_q_full.stride(-1) == 1
                 and b_q_full.dtype == torch.float32
                 and k_qat.shape[2] * self.group_size == b_q_full.shape[0]
                 and self._triton_ok):
@@ -1077,6 +1081,12 @@ class TLIIndexer(TIAIndexer):
             # 免 [T,H,128] fp32 repeat 物化；fp32 累加与原版 einsum 仅累加
             # 顺序不同 → bf16 舍入后 ULP 级漂移，mask 门禁实测逐位不变）。
             # 投影/异形布局/Triton 异常回退原版 repeat+einsum。
+            # 【E132b TL-E127-FEATURE-STRIDE-129】补 k_qat/b_q_full 末维
+            # stride 检查：_score_fine_kernel 以 base+offs_d 硬编码末维
+            # stride=1 访问特征，合法非连续布局（如 permute/转置 dense 视
+            # 图）会静默读错物理地址——与 coarse 门禁（k_min/k_max/b_q 三
+            # 检查）对齐；非连续输入回退原版 einsum 表达式（fail-closed，
+            # 值同）。
             try:
                 score_fine[0] = self._fast_score_fine(
                     k_qat.squeeze(0), b_q_full, q_sq.dtype)

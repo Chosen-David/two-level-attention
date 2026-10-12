@@ -50,6 +50,8 @@ tli_indexer.py）是逐 token 的 Python 循环：每步 bmm/argmax/gather/index
 
 from __future__ import annotations
 
+import time as _time
+
 import torch
 import torch.nn.functional as F
 import triton
@@ -224,6 +226,14 @@ def greedy_build_triton(x, sim, chunk=16384, BT=512, num_warps=4):
 # scratch 寄存器，每 SM 至少驻留 1 block → 全 grid 必然并发驻留，spin
 # barrier 不会等未调度的 program）。wrapper 按 device SM 数自动钳制
 # SPLIT，env 可覆盖（TLI_E131_GREEDY_SPLIT）。
+#
+# == 【E132b TL-E131S2-BARRIER-RESIDENCY-130】limitation（如实声明）==
+# 跨架构 residency 未证明，H20 实证通过（e131s2_v2_validate V1-V5 全
+# PASS + e2e mask 逐位 12585120/12585120；本机 2×H20-3e）。_v2_
+# residency_clamp 的寄存器计数法不构成跨架构无死锁证明（未覆盖编译后
+# shared memory 占用与寄存器分配粒度，见其 docstring）；未知架构/
+# 新编译器版本上首次运行前应先小规模探测。带外 watchdog 钩子见
+# greedy_pass_triton_v2 wrapper（TLI_E131_V2_TIMEOUT_MS）。
 # ====================================================================== #
 
 @triton.jit
@@ -349,7 +359,20 @@ def _v2_residency_clamp(SPLIT, H, dd, BT, num_warps, device, probe_tensors):
     探测真实 n_regs → 驻留上界 SM·min(blocks_reg, blocks_thread,
     blocks_limit) // H 钳制 SPLIT。探测一次缓存（n_regs 对 SPLIT 不敏
     感，phase2 小展开差异不改变寄存器峰值）。探测异常 → 返回 1（禁用
-    v2 回退 v1，fail-closed）。"""
+    v2 回退 v1，fail-closed）。
+
+    【E132b TL-E131S2-BARRIER-RESIDENCY-130 limitation（如实声明）】
+    本 clamp 是寄存器计数启发式，【不是】跨架构无死锁证明：
+      - 未纳入编译后 shared memory 占用（本 kernel 静态 smem 少，但
+        跨 Triton 版本/新特化不保证；smem 超限会把 blocks/SM 压到
+        估算值之下 → 高估驻留数 → barrier 永久自旋）；
+      - 未纳入寄存器分配粒度（n_regs 按 warp 均匀分配假设；NVIDIA
+        最佳实践明确要求用 occupancy API 而非简单寄存器计数）；
+      - 探测的 SPLIT 特化与实际 launch 的 SPLIT 特化可能不同（返回
+        更小 SPLIT 时靠「n_regs 对 SPLIT 不敏感」的经验假设）。
+    跨架构 residency 未证明；H20-3e 实证通过（V1-V5 + e2e mask 逐位）。
+    未知架构/新编译器首次运行应先小规模探测（探测失败已 fail-closed
+    回退 v1）。带外 watchdog：TLI_E131_V2_TIMEOUT_MS（见 wrapper）。"""
     try:
         dev = torch.device(device) if isinstance(device, str) else device
         dev_idx = dev.index if dev.index is not None else torch.cuda.current_device()
@@ -402,7 +425,18 @@ def greedy_pass_triton_v2(x, sim, sums, cnt, sq, k_live, BT=256, num_warps=4):
     （T=64 @k_live≈57K randn singleton）下 BT=256 比 512 慢 2.83×
     （61.6 vs 21.8ms）——每 tile 固定开销（sq 加载/argmax/lane 归约）
     在 57K 行 / 224 tiles 时主导，E113 的「6% 差」结论只在 struct
-    K≈2K 小簇口径成立，大簇态必须用大 BT。"""
+    K≈2K 小簇口径成立，大簇态必须用大 BT。
+
+    【E132b TL-E131S2-BARRIER-RESIDENCY-130】跨架构 residency 未证明
+    （H20 实证通过；_v2_residency_clamp 寄存器计数法的 limitation 见
+    其 docstring）。带外 watchdog 钩子：launch 前 wrapper 只记录 host
+    时间戳 + 超时阈值（TLI_E131_V2_TIMEOUT_MS，默认 120000ms，≤0 禁
+    用）——【不】在 launch 后加 synchronize 计时（会破坏异步语义：
+    decode step 内 kernel 本就异步排队，强同步会把流水线串行化，且
+    他进程占卡时 sync 等待会被误报成 kernel 超时）。超时检查由带外
+    消费：调用方在【自有】自然同步点（k_live.max().item() / evs
+    synchronize() / 结果消费）之后调用 v2_watchdog_overdue() 查询
+    （advisory：未同步前 elapsed 含排队时间，不得据此判定死锁）。"""
     T, H, dd = x.shape
     assert x.is_cuda, "Triton 路径需要 CUDA"
     SPLIT = _v2_split_bound(H, x.device)
@@ -452,6 +486,12 @@ def greedy_pass_triton_v2(x, sim, sums, cnt, sq, k_live, BT=256, num_warps=4):
     sk = torch.empty(H, SPLIT, dtype=torch.int32, device=x.device)
     sdot = torch.empty(H, SPLIT, dtype=torch.float32, device=x.device)
     bar = torch.zeros(H, dtype=torch.int32, device=x.device)
+    # ---- 【E132b TL-E131S2-BARRIER-RESIDENCY-130】带外 watchdog：launch
+    # 前记录 host 时间戳 + 超时阈值（不 synchronize、不计时 launch——
+    # 破坏异步语义）。barrier 死锁的带外检测由调用方在自有同步点后调
+    # v2_watchdog_overdue() 完成（advisory，见其 docstring）。----
+    global _V2_LAUNCH_TS
+    _V2_LAUNCH_TS = (_time.monotonic(), _v2_timeout_s())
     _greedy_pass_kernel_v2[(H, SPLIT)](
         x, sums, cnt, sq, kl, assign, scos, sk, sdot, bar,
         H=H, DD=dd, BT=BT, SPLIT=SPLIT, K=K, T=T, SIM=float(sim), EPS=1e-9,
@@ -460,5 +500,50 @@ def greedy_pass_triton_v2(x, sim, sums, cnt, sq, k_live, BT=256, num_warps=4):
     return sums, cnt, sq, kl, assign
 
 
+# ---- 【E132b TL-E131S2-BARRIER-RESIDENCY-130】带外 watchdog 钩子框架 ----
+# v2 kernel 的跨 program 自旋 barrier 在 residency 高估时会永久自旋
+# （见 _v2_residency_clamp limitation）。带外 watchdog 只做两件事：
+#   1) wrapper launch 前记录 (host 时间戳, 超时秒)——零 GPU 开销、不改
+#      变异步语义；
+#   2) 调用方在【自有】自然同步点之后调 v2_watchdog_overdue() 查询是否
+#      超时（elapsed 含 kernel 执行 + 排队时间；同步点之后仍超时才有
+#      死锁嫌疑——advisory 判定，非精确 kernel 计时）。
+# 在 wrapper 内 launch 后加 torch.cuda.synchronize + 计时会破坏异步
+# 语义（串行化 decode 流水线 + 他进程占卡时排队等待会被误报），故
+# 不做——死锁检测完全走带外（本框架）+ residency clamp（预防侧）。
+_V2_LAUNCH_TS = None   # (launch_host_ts, timeout_s)：最近一次 v2 launch
+
+
+def _v2_timeout_s():
+    """TLI_E131_V2_TIMEOUT_MS（毫秒，默认 120000）→ 秒；≤0 / 非法值 = 0
+    （禁用带外检查）。"""
+    import os as _os
+    env = _os.environ.get("TLI_E131_V2_TIMEOUT_MS", "")
+    try:
+        ms = float(env) if env else 120000.0
+    except ValueError:
+        ms = 120000.0
+    return max(0.0, ms / 1000.0)
+
+
+def v2_watchdog_overdue():
+    """带外 advisory 检查：返回 (overdue: bool, elapsed_s: float|None)。
+
+    调用方必须已越过【自有】同步点（wrapper 之后的 k_live.max().item()
+    / evs.synchronize() / 结果消费等）再判定 overdue=True——否则 kernel
+    可能只是仍在队列中未执行，elapsed 含排队时间会误报。overdue=True
+    的处置建议：进程级带外手段（独立线程 + cuda launch abort /
+    torch.cuda._sleep 探针 / 直接重启该请求），不要在当前流上加同步。
+    无 launch 记录或超时禁用 → (False, None)。"""
+    if _V2_LAUNCH_TS is None:
+        return False, None
+    ts, timeout_s = _V2_LAUNCH_TS
+    if timeout_s <= 0.0:
+        return False, None
+    elapsed = _time.monotonic() - ts
+    return elapsed > timeout_s, elapsed
+
+
 __all__ = ["greedy_pass_triton", "greedy_build_triton", "_greedy_pass_kernel",
-           "greedy_pass_triton_v2", "_greedy_pass_kernel_v2"]
+           "greedy_pass_triton_v2", "_greedy_pass_kernel_v2",
+           "_v2_timeout_s", "v2_watchdog_overdue"]
