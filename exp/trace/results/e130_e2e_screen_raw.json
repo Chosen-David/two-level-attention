@@ -1,0 +1,81 @@
+{
+ "meta": {
+  "experiment": "E130 e2e 阶段：mavg γ=off 候选配置 5 任务 e2e 海选（mass+e2e 双数据铁律的 e2e 半场）",
+  "mass_ref": "exp/trace/results/e130_mavg_gamma_off.json (commit 153b388)：off 分区最优 (α=0.125, β=0.25) mass 0.8826 vs 冠军 (.25,.125,.625) 0.8515（Δ+0.031）；同位 γ=0.75 档 mass 差仅 +0.0004",
+  "verdict_scope": "只跑数据 + 初步打分，最终判决由主会话做",
+  "code_identity": "a096d2b（E125 同源树，E125 锚点 47.91/48.25 出处；.187 ~/two-level-attention_git，运行中途树被推进到 b086e01 → 剩余格改自 a096d2b worktree /tmp/wt_e130_a096d2b 启动，代码身份与首波 5 格逐位一致）",
+  "machine": ".187 (10.238.9.187, H20×8)，GPU 0/2/5/6/7（卡 1/3/4 他人任务未触碰）",
+  "tstamp_unified": "1012105348（10 格同一值）",
+  "scorer_backend": "difflib:stdlib（与 E125 同口径；eval 从 a096d2b worktree 跑，scorer 冒烟用 E125 aavg 数据逐位复现 46.8/60.79/33.45/33.8/65.78 验证过）",
+  "eval_cmd": "python3 -m benchmark.LongBench.eval --output-path <dir> --expect-count 200（模块方式，打分纪律）",
+  "row_gate": "qasper/hotpotqa/gov_report/musique=200，repobench-p=500，10/10 格全过（best-file 唯一候选，无 AMBIGUOUS）",
+  "cli": "--model Qwen3-8B --model_path ~/Qwen3-8B --e 0 --method tli --tia_level1_topk 128 --tia_level2_topk 1024 --tia_level2_cmp_ratio 4 --tli_far_method minmax --tli_near_method avg --tli_far_select sim_greedy --tli_near_select sim_greedy --tli_enable_kmeans true --tli_sim 0.9 --tli_enable_layer_skip false --tli_alpha 0.125 --tli_beta 0.25 --tli_gamma {off|0.75}（其余与 E125 mavg 臂 CLI 同口径）"
+ },
+ "arm_configs": {
+  "goff": "主候选：α=0.125 β=0.25 γ=off（L2 单池自由竞争，旁路 near/far 配额切分）",
+  "g075": "同位对照：α=0.125 β=0.25 γ=0.75（L2 配额切分：nt_near=min(nb_near·bs·γ,K2)，far=max(64,K2−nt_near)）"
+ },
+ "per_task": {
+  "goff/qasper": {"score": 46.92, "rows": 200, "delta_vs_mavg_anchor": 0.47},
+  "goff/hotpotqa": {"score": 57.11, "rows": 200, "delta_vs_mavg_anchor": -2.31},
+  "goff/gov_report": {"score": 32.67, "rows": 200, "delta_vs_mavg_anchor": -0.93},
+  "goff/musique": {"score": 29.25, "rows": 200, "delta_vs_mavg_anchor": -5.0},
+  "goff/repobench": {"score": 62.69, "rows": 500, "delta_vs_mavg_anchor": -3.14},
+  "g075/qasper": {"score": 19.23, "rows": 200, "delta_vs_mavg_anchor": -27.22},
+  "g075/hotpotqa": {"score": 40.87, "rows": 200, "delta_vs_mavg_anchor": -18.55},
+  "g075/gov_report": {"score": 25.92, "rows": 200, "delta_vs_mavg_anchor": -7.68},
+  "g075/musique": {"score": 18.03, "rows": 200, "delta_vs_mavg_anchor": -16.22},
+  "g075/repobench": {"score": 60.72, "rows": 500, "delta_vs_mavg_anchor": -5.11}
+ },
+ "avg5": {
+  "goff": 45.728,
+  "g075": 32.954
+ },
+ "anchors": {
+  "mavg_e125": {
+   "avg5": 47.91,
+   "per_task": {"qasper": 46.45, "hotpotqa": 59.42, "gov_report": 33.60, "musique": 34.25, "repobench": 65.83},
+   "config": "mavg (.25,.125,.625) 冠军锚点",
+   "source": "exp/trace/results/e125_screen_verdict.json（复用，不重算）"
+  },
+  "cclustersim_e125": {
+   "avg5": 48.25,
+   "per_task": {"qasper": 47.11, "hotpotqa": 60.98, "gov_report": 33.25, "musique": 34.12, "repobench": 65.79},
+   "config": "cclustersim (.125,.25,.125)——同 (α,β)=(.125,.25) 的 γ=0.125 参照，goff 归因的更干净对照",
+   "source": "exp/trace/results/e125_screen_verdict.json"
+  },
+  "fullkv_e125": {"avg5": 48.02, "source": "E123 锚点（经 e125_screen_verdict.json）"}
+ },
+ "goff_vs_g075": {
+  "avg5_delta": -12.774,
+  "note": "γ=0.75 同位对照在生产 K2=1024 下崩坏：β=0.25 → nb_near=16 页，nt_near=16·64·0.75=768，far 配额 = max(64, 1024−768) = 256 token 要覆盖 87.5% 的 mid 区——far 区饥饿导致模型大面积 unanswerable/答非所问（qasper 19.23、musique 18.03）。mass 网格 B_TOK=2048 口径下该臂 far=1280 未暴露此效应（且约束 B：β·BP·BS=1024 < γ·B_TOK=1536 在 E98 口径本应被过滤）。归因结论须谨慎：g075 不是合格的健康对照，(α,β) 贡献的干净参照应看 cclustersim (.125,.25,.125) AVG5=48.25 vs goff 45.73（off 模式本身在该 (α,β) 下 −2.52）"
+ },
+ "row_check": {
+  "goff": {
+   "rows": {"qasper": 200, "hotpotqa": 200, "gov_report": 200, "musique": 200, "repobench": 500},
+   "sha256": {
+    "qasper": "7bc1a677b19fc50652805dcf2b3e858cc9f4ae9c0ed56ad7280993a1a454bb9e",
+    "hotpotqa": "4ef374f2bd907a7a0081b881f8a39090c8a0547f70bfd337f48d01cc46954396",
+    "gov_report": "21dcf00a01bfb0d7032d88213e54fd7fc8df9242bc40778fbc880f9db428e03c",
+    "musique": "b4bf7492ff757999d20e6b0144d7b763f487e5b1fe74412dc370bbea9a827702",
+    "repobench": "7358d12bf738e0b2a83df20ee2665bae88ebeb2698f39716c24bade80c4b6362"
+   }
+  },
+  "g075": {
+   "rows": {"qasper": 200, "hotpotqa": 200, "gov_report": 200, "musique": 200, "repobench": 500},
+   "sha256": {
+    "qasper": "6b44a94fa98baf38ad4fbbf653b47177140c48a7d2b8be5e42977fd8b9e3d421",
+    "hotpotqa": "904fff02d5dd425026102ee3628694b137394e36fcfb8c54e81bc64813dad4b6",
+    "gov_report": "1b98c2558e9b72b8143f26a31d7c1b9a3315866db0ec62aac3c406082833fb36",
+    "musique": "7a684f7143cd0de4e3d32b02be5d216d0937d54b99dda7a371095cdd72f430f2",
+    "repobench": "3a8bf41d1a51bc29bf2bd17cd1504f586464458f54cfec8606358a7cada1146e"
+   }
+  }
+ },
+ "incidents": [
+  "11:00-11:45 co-tenant（其他容器租户，6×~49GB）短暂占用我方 5 卡导致 3 倍减速，撤离后速率恢复；质量数据不受混卡影响（无计时主张）",
+  "11:38 共享树 ~/two-level-attention_git 被推进到 b086e01（E127 iter4 + E129 merge 窗口），新代码 patch.py:63 存在 TLIIndexerFast 条件 import 缺陷（TLI_E127_FAST 未设 + snapshot 非 None → NameError），首波链后续格两连炸；剩余 5 格全部改自 a096d2b worktree 启动（与首波/E125 代码身份一致），10/10 全部落袋。该缺陷影响 b086e01 起所有生产 tli e2e 启动，须主线修复（一行：env 未设时给 TLIIndexerFast 赋 TLIIndexer 别名或把元组求值放进 env 守卫）"
+ ],
+ "raw_data_location": ".187:~/tmp_e130_offscreen/pred_{goff,g075}/（含 .tli_manifest.json sidecar；不 rsync 回本机，主会话收割时处理）",
+ "preliminary_read": "goff AVG5 45.73 < mavg 锚点 47.91（−2.18）：mass +0.031 的优势在 e2e 反转为 −2.18，musique（−5.0）/repobench（−3.1）/hotpotqa（−2.3）拖累最大；γ=off 候选按 e2e 口径不支持换冠军——最终判决由主会话做"
+}
