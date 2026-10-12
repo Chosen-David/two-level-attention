@@ -1,0 +1,14 @@
+
+=== arm=aavg S0=65536 layer=2 (TLIIndexerFast, triton_ok=True, inc_cache=True) ===
+stage            GPU ms(med) GPU ms(p90) GPU ms(max) CPU ms(med)
+prepare_index         0.4804      0.4923      0.5043      0.9848
+compute_score         0.3930      0.4037      0.4148      0.3458
+compute_mask          0.4537      0.4754      0.4879      0.5008
+metrics               0.0885      0.0913      0.0929      0.0876
+eager_decoding        0.1881      0.2031      0.2944      0.1822
+SUM(GPU med)          1.6038
+step CPU wall         2.1122
+first step wall       589.4（冷建簇/全量缓存构建）
+gate: {"min_row_any": true, "out_finite": true, "sel_tokens_min": 1024.0, "sel_tokens_max": 1024.0, "sel_tokens_mean": 1024.0, "mask_shape": [1, 1, 8, 65573]}
+
+JSON → exp/results_efficiency/e131s2_final/e131s2_preopt_aavg.json

@@ -1,0 +1,14 @@
+
+=== arm=mminmax S0=65536 layer=2 (TLIIndexerFast, triton_ok=True, inc_cache=True) ===
+stage            GPU ms(med) GPU ms(p90) GPU ms(max) CPU ms(med)
+prepare_index         0.4601      0.4702      0.4763      0.9615
+compute_score         0.3396      0.3448      0.3522      0.2920
+compute_mask          0.4204      0.4328      0.4433      0.4685
+metrics               0.0896      0.0957      0.0969      0.0886
+eager_decoding        0.1883      0.1970      0.2133      0.1852
+SUM(GPU med)          1.4979
+step CPU wall         1.9995
+first step wall       668.7（冷建簇/全量缓存构建）
+gate: {"min_row_any": true, "out_finite": true, "sel_tokens_min": 1024.0, "sel_tokens_max": 1024.0, "sel_tokens_mean": 1024.0, "mask_shape": [1, 1, 8, 65573]}
+
+JSON → exp/results_efficiency/e131s2_final/e131s2_preopt_mminmax.json

@@ -1,0 +1,14 @@
+
+=== arm=mavg_e127 S0=65536 layer=2 (TLIIndexerFast, triton_ok=True, inc_cache=True) ===
+stage            GPU ms(med) GPU ms(p90) GPU ms(max) CPU ms(med)
+prepare_index         0.4426      0.4602      0.4683      0.9482
+compute_score         0.3474      0.3544      0.3639      0.2977
+compute_mask          0.4672      0.4790      0.4948      0.5025
+metrics               0.0716      0.0802      0.0901      0.0885
+eager_decoding        0.1882      0.1934      0.2075      0.1825
+SUM(GPU med)          1.5169
+step CPU wall         2.0192
+first step wall       596.1（冷建簇/全量缓存构建）
+gate: {"min_row_any": true, "out_finite": true, "sel_tokens_min": 1024.0, "sel_tokens_max": 1024.0, "sel_tokens_mean": 1024.0, "mask_shape": [1, 1, 8, 65573]}
+
+JSON → exp/results_efficiency/e131s2_final/e131s2_postopt_mavg_e127.json
