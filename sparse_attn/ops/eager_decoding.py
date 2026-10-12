@@ -243,6 +243,60 @@ def _attn_grid_size(R: int, G: int, per_qh: bool) -> int:
     return R if per_qh else R * G
 
 
+# ---------------------------------------------------------------------------
+# 【101 修复（GPT 审计 2026-10-12_0739 TL-E127-GQA-SHAPE-101，P2）】host 侧
+# GQA/shape 边界门——在任何分配/launch 之前拒绝非法输入。
+#
+# 缺陷背景：gather 路径用 G=H//Hkv 且仅以 mask 行数是否等于 Hkv 推断
+# per-q-head，没有校验 Hkv>0、H%Hkv==0、K/V 头数一致或 R∈{Hkv,H}。审计
+# 三例（无 GPU sanitize 下纯 Triton 推演 + 本机 GPU 实测复现）：
+#   H=10,Hkv=3,R=10：per_qh 分支 kvh=r//G=3 ≥ Hkv=3 → 越界读 K/V
+#     （连续布局下读进下一 token 的 head 0——不崩溃、静默错值，最危险）；
+#   H=10,Hkv=3,R=3：共享 grid=R*G=9 而 H=10 → qh=9 从未写入（uninitialized）；
+#   H=32,Hkv=8,R=9：被误判 per_qh（R≠Hkv），grid=9 → 23 个输出头未初始化。
+# 正常 Qwen3 配置 H=32,Hkv=8 合法不触发；历史 E127 归档零污染——本门是
+# 面向未来 kernel 接入/非法调用的内存安全 fail-closed（launch 前拒绝）。
+# ---------------------------------------------------------------------------
+def _validate_gqa_shape(q, k, v, mask, block_size):
+    """101 host 边界门（纯 host 检查，零 GPU 同步、零分配）。
+
+    入参为 eager_decoding_attn 的原始入参形状：q [..,H,D] / k,v [..,T,Hkv,D]
+    / mask [..,R,blocks]。拒绝四类非法输入（ValueError，文案带完整参数）：
+      ① Hkv<=0 或 H<=0（零头数——空 KV 头维会让一切行映射失去意义）；
+      ② H % Hkv != 0（GQA 契约外，G=H//Hkv 截断——审计 H=10,Hkv=3 两例）；
+      ③ K/V 头数不一致（共享口径行号直接当 head 索引，错位读）；
+      ④ mask 行数 R ∉ {Hkv, H}（R=9 @ H=32,Hkv=8 误判 per_qh 例）。
+    block_size 同时做正整数检查（mask 块宽 × block_size 的长度推导前提）。
+    """
+    def _fail(msg):
+        raise ValueError(
+            f"eager_decoding_attn: 非法 GQA/shape 输入（101 fail-closed，"
+            f"host 侧 launch 前拒绝）——{msg}。契约：H%Hkv==0、K/V 头数"
+            f"一致、mask 行数 R∈{{Hkv,H}}（R==Hkv=共享选择，R==H=per-q-"
+            f"head 选择）、block_size≥1。请检查调用方传入的 q/k/v/mask "
+            f"形状。"
+        )
+    H = q.shape[-2]
+    Hkv = k.shape[-2]
+    if H <= 0 or Hkv <= 0:
+        _fail(f"零/负头数 H={H} Hkv={Hkv}")
+    if H % Hkv != 0:
+        _fail(f"H={H} 不能被 Hkv={Hkv} 整除（G={H // Hkv} 截断，per_qh 行"
+              f"映射 kvh=r//G 将越界）")
+    if k.shape[-2] != v.shape[-2]:
+        _fail(f"K/V 头数不一致 k_hkv={k.shape[-2]} v_hkv={v.shape[-2]}")
+    if int(block_size) != block_size or int(block_size) < 1:
+        _fail(f"block_size={block_size} 非正整数")
+    if mask.dim() < 2:
+        _fail(f"mask 维度 {mask.dim()} < 2（须为 [..,R,blocks]）")
+    R = mask.shape[-2]
+    if R != Hkv and R != H:
+        _fail(f"mask 行数 R={R} ∉ {{Hkv={Hkv}, H={H}}}（既非共享选择也非"
+              f"per-q-head 选择——H=32,Hkv=8,R=9 类输入会被误判 per_qh，"
+              f"grid 只写 R 行、其余输出头 uninitialized）")
+    return True
+
+
 def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
                          cu_seqlens_k, softmax_scale):
     """【E127 iter7】Triton 融合 launch 封装（原型已验证参数：
@@ -300,7 +354,11 @@ def eager_decoding_attn(
     上界 K2+sink+swa+bs≈1344，默认 2048）+ B7/W 校验 GPU 端并入全局错误
     标志（不再当场 raise）——生成结束由 eager_decoding_check_errors()
     一次性校验（fail-closed 语义保持，raise 时机后移）。
+    【101】入口先过 _validate_gqa_shape host 边界门（Hkv<=0 / H%Hkv!=0 /
+    K,V 头数不等 / mask 行数 R∉{Hkv,H} 一律 launch/分配前 ValueError
+    拒绝——修复前三例非法输入静默越界读/未初始化输出）。
     """
+    _validate_gqa_shape(q, k, v, mask, block_size)
     if os.environ.get("TLI_E127_FAST", "0") == "1":
         return _eager_decoding_attn_gather(
             q, k, v, mask, block_size, cu_seqlens_k, softmax_scale)
@@ -317,6 +375,8 @@ def _eager_decoding_attn_dense(
     cu_seqlens_k: torch.Tensor,
     softmax_scale: float = None,
 ):
+    # 101：直呼本函数同样受 host 边界门保护（公共入口之外的第二防线）
+    _validate_gqa_shape(q, k, v, mask, block_size)
     if softmax_scale is None:
         softmax_scale = k.shape[-1] ** -0.5
     q, k, v, mask = (x.squeeze(0) for x in (q, k, v, mask))
@@ -329,7 +389,10 @@ def _eager_decoding_attn_dense(
     # per_q_head 口径：mask [H, tk]（q-head 级），按 G 拆回 [Hkv, G, tk*bs]
     # 逐元素对应——每个 q-head 用自己的选择，不做组内广播。
     m0 = mask[0]
-    per_qh = m0.shape[0] != k.shape[-2]
+    # 101：per_qh 判定显式化——validator 已保证 R∈{Hkv,H}，故「R==H 且
+    # 非 MHA（H≠Hkv）才 per-q-head」与旧推断「R != Hkv」在全部合法输入上
+    # 布尔等价（含 G=1 时 R==H==Hkv 走共享的历史语义），合法路径逐位不变。
+    per_qh = m0.shape[0] == q.shape[-2] and q.shape[-2] != k.shape[-2]
     # B05 修复（GPT 审查 2026-10-08）：原版 [:, :eos_k-bos_k] 切的是 dim1
     # （per_qh 的 G 轴 / shared 的 Hkv 轴）而非最后一维 token 轴——无 padding
     # 时恰好是 no-op 故长期未暴露；投影路径 Tpad>T 时会广播失败或掩码不裁。
@@ -385,7 +448,11 @@ def _eager_decoding_attn_gather(
     【iter3】零同步：topk 用 host 已知上界 W_upper（≥ 每行真实选中数 →
     全部命中 + 补齐位 valid 掩掉）；B7 空行 / W 超上界契约违规 GPU 端并
     入 _err_flag，生成结束 eager_decoding_check_errors() 校验 raise。
+    【101】直呼本函数同样受 _validate_gqa_shape host 边界门保护（公共入口
+    之外的第二防线——Triton kernel 无 kvh<Hkv 边界检查，非法 shape 的
+    越界读必须在此前拦下）。
     """
+    _validate_gqa_shape(q, k, v, mask, block_size)
     if softmax_scale is None:
         softmax_scale = k.shape[-1] ** -0.5
     q, k, v, mask = (x.squeeze(0) for x in (q, k, v, mask))
@@ -406,7 +473,9 @@ def _eager_decoding_attn_gather(
             q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),
             mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale)
     m0 = mask[0]
-    per_qh = m0.shape[0] != k.shape[-2]
+    # 101：per_qh 判定显式化（与 _dense 同口径——validator 保证 R∈{Hkv,H}
+    # 下与旧推断「R != Hkv」布尔等价，合法路径逐位不变）。
+    per_qh = m0.shape[0] == q.shape[-2] and q.shape[-2] != k.shape[-2]
 
     # 【iter7】Triton 融合主路径：T ≥ 16K（同 torch gather 路由）、
     # block_size==1（TLI 生产 mask 即 token 级，kernel A 直接读 m0 免

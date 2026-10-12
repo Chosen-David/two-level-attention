@@ -31,6 +31,7 @@ from benchmark.LongBench.run_cap_manifest import (
     finalize_run_cap_manifest,
     gate_run_cap_identity,
     resolve_producer_identity,
+    runcap_gate_lock,   # 103（TL-E096-CAP-GATE-TOCTOU-103）：gate→发布锁
     write_run_cap_manifest,
 )
 from sparse_attn.arguments import add_sparse_attn_args
@@ -686,73 +687,89 @@ if __name__ == "__main__":
             max_new_tokens=max_gen,
             producer=resolve_producer_identity(__file__),
         )
-        runcap_sidecar = gate_run_cap_identity(out_path, runcap_core)
-        # 096：生成期采集每样本实际输入 token 数 / 截断标记（get_pred 内
-        # 逐样本 append，见 run_stats 参数）。
-        run_stats = {}
-        preds = get_pred(
-            model,
-            tokenizer,
-            data,
-            max_length,
-            max_gen,
-            prompt_format,
-            dataset,
-            device,
-            model_name,
-            data_fp=data_fp,
-            run_stats=run_stats,
-        )
-        # 096：method_name/out_fn/out_path 计算块已上移至 get_pred 之前
-        # （run-cap 写门早期 CAP-CLASH 检测，
-        # TL-DSV2-CAP-PROVENANCE-096）。
+        # 103（TL-E096-CAP-GATE-TOCTOU-103，GPT 审计 2026-10-12_0739）：
+        # gate 与发布间的跨进程独占锁（fcntl.flock，锁文件 = 输出目录下
+        # .runcap_gate.lock）——修复前两进程可在 sidecar 尚不存在时同时
+        # 过 gate，随后交错覆盖数据与 manifest（TOCTOU）。锁持有窗口 =
+        # gate → generating manifest → 数据写 → complete manifest（下方
+        # 整块）；gate 在锁内重新执行即 double-check（后到者锁内重读身份，
+        # 先到者已写出的 manifest 触发 [CAP-CLASH] 或同 cap 幂等放行）。
+        # try/finally 语义与 095 guard 的 raise 传播兼容（异常必释放）。
+        with runcap_gate_lock(out_path):
+            # 105（run_cap backfill 绑定，GPT TL-E096-BACKFILL-BINDING-105）：
+            # 本 run 的 stdout 身份绑定行——backfill 工具按
+            # [CONTEXT-CAP-GATE] model= 行分块后，块内以本行绑定
+            # task/时间戳/输出 basename（修复前日志与产物无任何可绑定
+            # 线索，跨 run 日志可把 partial 产物洗白成另一模型的 complete）。
+            print(f"[CONTEXT-CAP-GATE] run-bind task={dataset} t={args.t} "
+                  f"output={os.path.basename(out_path)}", flush=True)
+            runcap_sidecar = gate_run_cap_identity(out_path, runcap_core)
+            # 096：生成期采集每样本实际输入 token 数 / 截断标记（get_pred 内
+            # 逐样本 append，见 run_stats 参数）。
+            run_stats = {}
+            preds = get_pred(
+                model,
+                tokenizer,
+                data,
+                max_length,
+                max_gen,
+                prompt_format,
+                dataset,
+                device,
+                model_name,
+                data_fp=data_fp,
+                run_stats=run_stats,
+            )
+            # 096：method_name/out_fn/out_path 计算块已上移至 get_pred 之前
+            # （run-cap 写门早期 CAP-CLASH 检测，
+            # TL-DSV2-CAP-PROVENANCE-096）。
 
-        # 076（TL-E121-OUTPUT-ID）fail-closed 写入门：tli 输出目标已存在
-        # 时，须以 sidecar manifest 字节级证明同 treatment 才允许重写
-        # （同配置重跑幂等 = SKIP 语义；异配置/无记录 → 拒绝运行，不覆
-        # 盖）。先写 sidecar 再写数据：中断只留孤儿 sidecar，下次目标
-        # 不存在 → 门自然放行。非 tli 方法可读段已编码其全部旋钮
-        # （quest/twia/tia/none），维持旧覆盖语义（076 审计范围 = tli
-        # treatment 矩阵）。
-        # 079（TL-E121-OUTPUT-ID-079）：本门消费的 manifest 已升级为
-        # resolved manifest（tia_enable_async_topk 生效值 + tli_proj_basis/
-        # tli_layer_skip_path 的 realpath+内容 sha256+shape/n_skip，文件
-        # 缺失/损坏 fail closed）——「同路径、内容已变」不再同 manifest，
-        # 写门必拒；与 method hash/RULER receipt 共用 info.py 单一事实源。
-        # 081：manifest 从冻结 snapshot 派生（与 472 行 method_name、
-        # runtime 各层消费的 skip/basis 同一对象）——删除生成后重读
-        # 路径的调用，生成窗口内的文件替换不再产生 name/sidecar 混装。
-        if args.method == "tli":
-            manifest_json = get_treatment_manifest_json(args, snapshot)
-            sidecar = gate_output_treatment_identity(out_path, manifest_json)
-            with open(sidecar, "w", encoding="utf-8") as f:
-                f.write(manifest_json)
+            # 076（TL-E121-OUTPUT-ID）fail-closed 写入门：tli 输出目标已存在
+            # 时，须以 sidecar manifest 字节级证明同 treatment 才允许重写
+            # （同配置重跑幂等 = SKIP 语义；异配置/无记录 → 拒绝运行，不覆
+            # 盖）。先写 sidecar 再写数据：中断只留孤儿 sidecar，下次目标
+            # 不存在 → 门自然放行。非 tli 方法可读段已编码其全部旋钮
+            # （quest/twia/tia/none），维持旧覆盖语义（076 审计范围 = tli
+            # treatment 矩阵）。
+            # 079（TL-E121-OUTPUT-ID-079）：本门消费的 manifest 已升级为
+            # resolved manifest（tia_enable_async_topk 生效值 + tli_proj_basis/
+            # tli_layer_skip_path 的 realpath+内容 sha256+shape/n_skip，文件
+            # 缺失/损坏 fail closed）——「同路径、内容已变」不再同 manifest，
+            # 写门必拒；与 method hash/RULER receipt 共用 info.py 单一事实源。
+            # 081：manifest 从冻结 snapshot 派生（与 472 行 method_name、
+            # runtime 各层消费的 skip/basis 同一对象）——删除生成后重读
+            # 路径的调用，生成窗口内的文件替换不再产生 name/sidecar 混装。
+            if args.method == "tli":
+                manifest_json = get_treatment_manifest_json(args, snapshot)
+                sidecar = gate_output_treatment_identity(out_path, manifest_json)
+                with open(sidecar, "w", encoding="utf-8") as f:
+                    f.write(manifest_json)
 
-        # 096（TL-DSV2-CAP-PROVENANCE-096）：先落 generating manifest 再写
-        # 数据（076 tli sidecar 同款崩溃语义：数据写之前 manifest 已在盘上，
-        # 中断窗口留 manifest 可证 cap，不留无主数据；status=generating 告知
-        # 消费侧结果 sha 未绑定）。写门 + 两阶段均在 run_cap_manifest.py。
-        write_run_cap_manifest(runcap_sidecar, finalize_run_cap_manifest(
-            runcap_core, status="generating", n_samples=len(preds),
-            input_tokens=run_stats.get("input_tokens"),
-            truncated_flags=run_stats.get("truncated"),
-            result_file=os.path.basename(out_path),
-            result_sha256=None, result_lines=None))
+            # 096（TL-DSV2-CAP-PROVENANCE-096）：先落 generating manifest 再写
+            # 数据（076 tli sidecar 同款崩溃语义：数据写之前 manifest 已在盘上，
+            # 中断窗口留 manifest 可证 cap，不留无主数据；status=generating 告知
+            # 消费侧结果 sha 未绑定）。写门 + 两阶段均在 run_cap_manifest.py。
+            write_run_cap_manifest(runcap_sidecar, finalize_run_cap_manifest(
+                runcap_core, status="generating", n_samples=len(preds),
+                input_tokens=run_stats.get("input_tokens"),
+                truncated_flags=run_stats.get("truncated"),
+                result_file=os.path.basename(out_path),
+                result_sha256=None, result_lines=None))
 
-        with open(out_path, "w", encoding="utf-8") as f:
-            for pred in preds:
-                json.dump(pred, f, ensure_ascii=False)
-                f.write("\n")
+            with open(out_path, "w", encoding="utf-8") as f:
+                for pred in preds:
+                    json.dump(pred, f, ensure_ascii=False)
+                    f.write("\n")
 
-        # 096：生成完成后回填结果文件 sha256 + 行数（status generating →
-        # complete；原子替换，读侧永不见半文件）。
-        runcap_sha, runcap_lines = compute_result_binding(out_path)
-        write_run_cap_manifest(runcap_sidecar, finalize_run_cap_manifest(
-            runcap_core, status="complete", n_samples=len(preds),
-            input_tokens=run_stats.get("input_tokens"),
-            truncated_flags=run_stats.get("truncated"),
-            result_file=os.path.basename(out_path),
-            result_sha256=runcap_sha, result_lines=runcap_lines))
+            # 096：生成完成后回填结果文件 sha256 + 行数（status generating →
+            # complete；原子替换，读侧永不见半文件）。
+            runcap_sha, runcap_lines = compute_result_binding(out_path)
+            write_run_cap_manifest(runcap_sidecar, finalize_run_cap_manifest(
+                runcap_core, status="complete", n_samples=len(preds),
+                input_tokens=run_stats.get("input_tokens"),
+                truncated_flags=run_stats.get("truncated"),
+                result_file=os.path.basename(out_path),
+                result_sha256=runcap_sha, result_lines=runcap_lines))
 
         budgets = [pred["budget"] for pred in preds if pred["budget"] is not None]
         ave_budget = sum(budgets) / len(budgets) if len(budgets) > 0 else None

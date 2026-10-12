@@ -54,10 +54,12 @@ run：treatment sidecar 逐位相同，runcap sidecar 身份不同）。
   provenance_incomplete      —— 连 stdout 日志都缺/解析不出 cap 的产物，
                                是否入论文表由主 AI 裁决（如实降格，不冒称）。
 
-只依赖标准库（json/os/sys/hashlib/subprocess/datetime），测试与 backfill
-工具可在无 torch/GPU 环境使用。
+只依赖标准库（json/os/sys/hashlib/subprocess/datetime/fcntl/contextlib），
+测试与 backfill 工具可在无 torch/GPU 环境使用。
 """
+import contextlib
 import datetime
+import fcntl
 import hashlib
 import json
 import os
@@ -70,6 +72,8 @@ import sys
 # 本后缀更短不超 ext4 255 单文件名上限。
 RUN_CAP_SIDECAR_SUFFIX = ".runcap.json"
 RUN_CAP_SCHEMA = "run-cap-manifest-v1"
+# 103（TL-E096-CAP-GATE-TOCTOU-103）gate 写门锁文件名（输出目录级）。
+RUN_CAP_LOCK_FILENAME = ".runcap_gate.lock"
 RUN_CAP_PROVENANCES = ("inline", "backfilled-from-stdout",
                        "provenance_incomplete")
 
@@ -441,6 +445,42 @@ def gate_run_cap_identity(out_path, core_or_identity):
               f"exp/trace/backfill_run_cap_manifest.py 补制",
               file=sys.stderr)
     return sidecar
+
+
+@contextlib.contextmanager
+def runcap_gate_lock(out_path):
+    """【103 修复（GPT 审计 2026-10-12_0739 TL-E096-CAP-GATE-TOCTOU-103，
+    P1）】gate 与发布之间的跨进程独占锁——消灭 TOCTOU 交错窗口。
+
+    缺陷背景：两个进程可在 sidecar 尚不存在时同时通过
+    gate_run_cap_identity()（gate 读与 manifest 写之间无锁），随后各自
+    长时间生成、交错覆盖数据与 manifest——受控交错可得到「数据来自 B、
+    complete manifest 来自 A」的错配产物，而 read_run_cap_manifest 只做
+    schema 检查仍会放行（单文件 os.replace 不提供跨产物事务）。
+
+    语义：锁文件 = 输出目录下 .runcap_gate.lock（目录级——同目录串行
+    化；生产调度本就是串行 bash 链，锁粒度不构成瓶颈）。持有窗口 =
+    调用方 with 块全程（gate → generating manifest → 数据写 → complete
+    manifest）。锁内由调用方重新执行 gate_run_cap_identity 即
+    double-check（锁外先过的门不算数——后到者在锁内重读身份，先到者已
+    写出的 manifest 会被 CAP-CLASH 拒绝，或同 cap 幂等放行）。
+
+    死锁纪律：try/finally 保证异常路径必释放（095 guard 在生成段 raise
+    传播时锁不滞留）；锁文件只创建**不删除**（POSIX 锁绑定 inode，删了
+    再建会让并发方锁到不同 inode 上、互斥失效）。
+    """
+    lock_dir = os.path.dirname(os.path.abspath(out_path))
+    os.makedirs(lock_dir, exist_ok=True)
+    lock_path = os.path.join(lock_dir, RUN_CAP_LOCK_FILENAME)
+    lock_file = open(lock_path, "a")   # 只创建不删除（见 docstring）
+    try:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield lock_path
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    finally:
+        lock_file.close()
 
 
 def compute_result_binding(out_path):

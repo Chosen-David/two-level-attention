@@ -499,12 +499,16 @@ def test_green_backfill():
     print("== 096 绿证：backfill 双 provenance 口径 ==")
     with tempfile.TemporaryDirectory() as td:
         result = os.path.join(td, "hotpotqa-none-1012024000.jsonl")
+        # 105 对齐：_id 须内嵌「本文件重算指纹」（answers+length canonical
+        # JSON sha256[:12] = f72cfba32341）——伪造指纹 abc123def456 在 105⑤
+        # 下会被 [GATE-FAIL] 拒绝（partial 冒充全集反例）。fixture 更新为
+        # 自洽的合法全集产物，G7a-G7h 语义不变。
         rows = [{"pred": "a", "answers": ["x"], "all_classes": None,
                  "length": 1000, "budget": None, "score_sum": None,
-                 "_id": "hotpotqa:abc123def456:0"},
+                 "_id": "hotpotqa:f72cfba32341:0"},
                 {"pred": "b", "answers": ["y"], "all_classes": None,
                  "length": 2000, "budget": None, "score_sum": None,
-                 "_id": "hotpotqa:abc123def456:1"}]
+                 "_id": "hotpotqa:f72cfba32341:1"}]
         with open(result, "w", encoding="utf-8") as f:
             for r in rows:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
