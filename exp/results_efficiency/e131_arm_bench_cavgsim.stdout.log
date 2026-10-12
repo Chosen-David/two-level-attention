@@ -1,0 +1,14 @@
+
+=== arm=cavgsim S0=65536 layer=2 (TLIIndexerFast, triton_ok=True, inc_cache=True) ===
+stage            GPU ms(med) GPU ms(p90) GPU ms(max) CPU ms(med)
+prepare_index         0.4974      0.5071      0.5138      0.9939
+compute_score         0.3790      0.3911      0.4755      0.3357
+compute_mask          0.5404      0.5492      0.5744      0.5831
+metrics               0.1008      0.1072      0.1096      0.0990
+eager_decoding        0.2248      0.2308      0.2348      0.2242
+SUM(GPU med)          1.7423
+step CPU wall         2.2387
+first step wall     11356.9（冷建簇/全量缓存构建）
+gate: {"min_row_any": true, "out_finite": true, "sel_tokens_min": 1024.0, "sel_tokens_max": 1024.0, "sel_tokens_mean": 1024.0, "mask_shape": [1, 1, 8, 65573]}
+
+JSON → exp/results_efficiency/e131_arm_bench_cavgsim.json

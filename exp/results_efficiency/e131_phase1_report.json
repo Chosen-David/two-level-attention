@@ -1,0 +1,480 @@
+{
+ "meta": {
+  "probe": "E131 阶段 1：E125 五臂 E127 fast path（TLI_E127_FAST=1）S=64K decode 分阶段延迟（开箱即用口径）",
+  "user_directive": "后续你这些子冠军补充 64K 上他们各自极致优化完后的时间延迟精度数据（2026-10-12）——本阶段先测 fast path 开箱即用，识别未覆盖瓶颈段，供阶段 2 专项优化",
+  "generated": "2026-10-12 10:59:55",
+  "measurement_environ": {
+   "host": ".251 (10.238.139.251) GPU1（CUDA_VISIBLE_DEVICES=1，独占锁卡，与 GPU0 E129 任务物理隔离）",
+   "gpu": "NVIDIA H20-3e",
+   "torch": "2.8.0+cu128",
+   "triton": "3.4.0",
+   "env": "TLI_E127_FAST=1（harness 启动断言）",
+   "git_sha": "387b7242e8bcccbc071fab3ccea9174372fbe08a（.251 worktree ~/two-level-attention_e131，detached @ bee/main；主树 a096d2b 有 E129 在飞未提交改动，未触碰）",
+   "tli_indexer_md5": "bf5e26c4d6123875b2786b9ed886da5f（E127 锚点零改动）",
+   "harness": "exp/bench/e131_arm_bench.py（五臂配置逐字段克隆 e126_stage_timing.py + mavg_e127 锚点臂克隆 e127_stage_bench.py make_args）"
+  },
+  "caliber_notes": [
+   "全部数字 = TLI_E127_FAST=1 优化后口径（E126 优化前基线数字不得与本表混用；E126 对比仅在 stage_baseline_e126_ref 字段作跨口径参考，其阶段口径为 AST 插桩 span、数据为 structured+singleton 双臂，与本表五阶段 event 口径 + randn 数据不同）",
+   "每臂单进程串行独占 GPU1；S0=65536 起 decode 模拟每步 +1 token，steps=30 recorded / warmup=8，median 为稳态口径（E127 定案同款）",
+   "合成数据 = torch.randn KV/Q（E127 harness 同口径，singleton 型 = 贪心簇量最坏情况；cluster 臂冷建/重建代价在真实数据下更低，见 cluster_arm_amortization 推算）",
+   "selector_total = 五阶段 GPU median 和 − eager_decoding（互斥阶段和；与 E126 selector（S0..S7）同语义）",
+   "性能点估计如实报：aavg 与 mavg 稳态 SUM 点估计差 0.0007ms（0.04%），按纪律不写「持平/相当」，如实列差值"
+  ]
+ },
+ "identity": {
+  "result_files": {
+   "e131_arm_bench_mavg.json": "8a70fa1541f3fafaa7fe6b476715e96cc9ac7238654723209480635fd724a25e",
+   "e131_arm_bench_aavg.json": "1d451614f42cf384a8945acd1440deb46e71caabd3fc52ce3dd4f0dfa26f9f89",
+   "e131_arm_bench_mminmax.json": "791efeee05e18e07dd3672f9c12fd333f4be543b7e69154654e0478607abd42b",
+   "e131_arm_bench_cavgsim.json": "13f394eef048f4214744c7efe44bddb6e603adeb74033fbf1582ccd24f33b62d",
+   "e131_arm_bench_cclustersim.json": "384c38e755718dfca734cc33a1cb4c835ce9e18df122bfdf0bac904f98c5010f",
+   "e131_arm_bench_mavg_e127.json": "d72403b16043e88ff62182f4f29da419d522b1788c02a0ededb8e757d924e8b6"
+  },
+  "e131_arm_bench_cavgsim_steps80.json": "ba8e7b164f57c55086b84fc5ea27c25338ed56eb737edade752c82a26476e79d"
+ },
+ "steady_state_64k_gpu_ms": {
+  "mavg": {
+   "stages": {
+    "prepare_index": 0.5169599950313568,
+    "compute_score": 0.4482720047235489,
+    "compute_mask": 0.5219039916992188,
+    "metrics": 0.09185600280761719,
+    "eager_decoding": 0.22281599789857864
+   },
+   "stages_p90": {
+    "prepare_index": 0.5254719853401184,
+    "compute_score": 0.46028798818588257,
+    "compute_mask": 0.533407986164093,
+    "metrics": 0.10099200159311295,
+    "eager_decoding": 0.23241600394248962
+   },
+   "sum_gpu_ms": 1.8018079921603203,
+   "selector_total_ms": 1.5789919942617416,
+   "cpu_wall_ms": 2.29528546333313,
+   "first_step_prepare_ms": 204.02706909179688,
+   "gate": {
+    "min_row_any": true,
+    "out_finite": true,
+    "sel_tokens_min": 1024.0,
+    "sel_tokens_max": 1024.0,
+    "sel_tokens_mean": 1024.0,
+    "mask_shape": [
+     1,
+     1,
+     8,
+     65573
+    ]
+   },
+   "triton_ok": true,
+   "inc_cache_built": true
+  },
+  "aavg": {
+   "stages": {
+    "prepare_index": 0.5188800096511841,
+    "compute_score": 0.44939200580120087,
+    "compute_mask": 0.5148800015449524,
+    "metrics": 0.10027199983596802,
+    "eager_decoding": 0.217631995677948
+   },
+   "stages_p90": {
+    "prepare_index": 0.5307199954986572,
+    "compute_score": 0.469215989112854,
+    "compute_mask": 0.5296000242233276,
+    "metrics": 0.10860799998044968,
+    "eager_decoding": 0.22969600558280945
+   },
+   "sum_gpu_ms": 1.8010560125112534,
+   "selector_total_ms": 1.5834240168333054,
+   "cpu_wall_ms": 2.3006536066532135,
+   "first_step_prepare_ms": 142.74639892578125,
+   "gate": {
+    "min_row_any": true,
+    "out_finite": true,
+    "sel_tokens_min": 1024.0,
+    "sel_tokens_max": 1024.0,
+    "sel_tokens_mean": 1024.0,
+    "mask_shape": [
+     1,
+     1,
+     8,
+     65573
+    ]
+   },
+   "triton_ok": true,
+   "inc_cache_built": true
+  },
+  "mminmax": {
+   "stages": {
+    "prepare_index": 0.48609599471092224,
+    "compute_score": 0.37804798781871796,
+    "compute_mask": 0.4636799991130829,
+    "metrics": 0.09828800335526466,
+    "eager_decoding": 0.22057600319385529
+   },
+   "stages_p90": {
+    "prepare_index": 0.49375998973846436,
+    "compute_score": 0.3851200044155121,
+    "compute_mask": 0.47440001368522644,
+    "metrics": 0.10473600029945374,
+    "eager_decoding": 0.22748799622058868
+   },
+   "sum_gpu_ms": 1.646687988191843,
+   "selector_total_ms": 1.4261119849979877,
+   "cpu_wall_ms": 2.1393708884716034,
+   "first_step_prepare_ms": 128.3353271484375,
+   "gate": {
+    "min_row_any": true,
+    "out_finite": true,
+    "sel_tokens_min": 1024.0,
+    "sel_tokens_max": 1024.0,
+    "sel_tokens_mean": 1024.0,
+    "mask_shape": [
+     1,
+     1,
+     8,
+     65573
+    ]
+   },
+   "triton_ok": true,
+   "inc_cache_built": true
+  },
+  "cavgsim": {
+   "stages": {
+    "prepare_index": 0.4973919987678528,
+    "compute_score": 0.3789920061826706,
+    "compute_mask": 0.5403999984264374,
+    "metrics": 0.10076799988746643,
+    "eager_decoding": 0.2247840017080307
+   },
+   "stages_p90": {
+    "prepare_index": 0.5071039795875549,
+    "compute_score": 0.3911359906196594,
+    "compute_mask": 0.5492159724235535,
+    "metrics": 0.10716799646615982,
+    "eager_decoding": 0.23084799945354462
+   },
+   "sum_gpu_ms": 1.7423360049724579,
+   "selector_total_ms": 1.5175520032644272,
+   "cpu_wall_ms": 2.2386759519577026,
+   "first_step_prepare_ms": 11179.9853515625,
+   "gate": {
+    "min_row_any": true,
+    "out_finite": true,
+    "sel_tokens_min": 1024.0,
+    "sel_tokens_max": 1024.0,
+    "sel_tokens_mean": 1024.0,
+    "mask_shape": [
+     1,
+     1,
+     8,
+     65573
+    ]
+   },
+   "triton_ok": true,
+   "inc_cache_built": true
+  },
+  "cclustersim": {
+   "stages": {
+    "prepare_index": 0.5286400020122528,
+    "compute_score": 0.45505599677562714,
+    "compute_mask": 0.7789120078086853,
+    "metrics": 0.10631999745965004,
+    "eager_decoding": 0.23403199762105942
+   },
+   "stages_p90": {
+    "prepare_index": 0.5517439842224121,
+    "compute_score": 0.46649599075317383,
+    "compute_mask": 0.7956799864768982,
+    "metrics": 0.11164800077676773,
+    "eager_decoding": 0.2439039945602417
+   },
+   "sum_gpu_ms": 2.1029600016772747,
+   "selector_total_ms": 1.8689280040562153,
+   "cpu_wall_ms": 2.600163221359253,
+   "first_step_prepare_ms": 8387.1318359375,
+   "gate": {
+    "min_row_any": true,
+    "out_finite": true,
+    "sel_tokens_min": 1024.0,
+    "sel_tokens_max": 1024.0,
+    "sel_tokens_mean": 1024.0,
+    "mask_shape": [
+     1,
+     1,
+     8,
+     65573
+    ]
+   },
+   "triton_ok": true,
+   "inc_cache_built": true
+  },
+  "mavg_e127": {
+   "stages": {
+    "prepare_index": 0.47391998767852783,
+    "compute_score": 0.3988479971885681,
+    "compute_mask": 0.5127200186252594,
+    "metrics": 0.08734400197863579,
+    "eager_decoding": 0.215999998152256
+   },
+   "stages_p90": {
+    "prepare_index": 0.4832319915294647,
+    "compute_score": 0.413536012172699,
+    "compute_mask": 0.5375040173530579,
+    "metrics": 0.09382399916648865,
+    "eager_decoding": 0.2210880070924759
+   },
+   "sum_gpu_ms": 1.6888320036232471,
+   "selector_total_ms": 1.4728320054709911,
+   "cpu_wall_ms": 2.1904483437538147,
+   "first_step_prepare_ms": 132.80026245117188,
+   "gate": {
+    "min_row_any": true,
+    "out_finite": true,
+    "sel_tokens_min": 1024.0,
+    "sel_tokens_max": 1024.0,
+    "sel_tokens_mean": 1024.0,
+    "mask_shape": [
+     1,
+     1,
+     8,
+     65573
+    ]
+   },
+   "triton_ok": true,
+   "inc_cache_built": true
+  }
+ },
+ "five_arm_table": {
+  "note": "五臂 = E125 冻结配置（E126 COMMON_ARGS+ARM_CONFIGS 逐字段克隆）；单位 ms/层/decode-step（GPU median，S=64K）",
+  "rows": [
+   {
+    "arm": "mavg",
+    "prepare_index": 0.517,
+    "compute_score": 0.4483,
+    "compute_mask": 0.5219,
+    "metrics": 0.0919,
+    "eager_decoding": 0.2228,
+    "sum_gpu_ms": 1.8018,
+    "selector_total_ms": 1.579,
+    "cpu_wall_ms": 2.2953,
+    "first_step_prepare_ms": 204.0
+   },
+   {
+    "arm": "aavg",
+    "prepare_index": 0.5189,
+    "compute_score": 0.4494,
+    "compute_mask": 0.5149,
+    "metrics": 0.1003,
+    "eager_decoding": 0.2176,
+    "sum_gpu_ms": 1.8011,
+    "selector_total_ms": 1.5834,
+    "cpu_wall_ms": 2.3007,
+    "first_step_prepare_ms": 142.7
+   },
+   {
+    "arm": "mminmax",
+    "prepare_index": 0.4861,
+    "compute_score": 0.378,
+    "compute_mask": 0.4637,
+    "metrics": 0.0983,
+    "eager_decoding": 0.2206,
+    "sum_gpu_ms": 1.6467,
+    "selector_total_ms": 1.4261,
+    "cpu_wall_ms": 2.1394,
+    "first_step_prepare_ms": 128.3
+   },
+   {
+    "arm": "cavgsim",
+    "prepare_index": 0.4974,
+    "compute_score": 0.379,
+    "compute_mask": 0.5404,
+    "metrics": 0.1008,
+    "eager_decoding": 0.2248,
+    "sum_gpu_ms": 1.7423,
+    "selector_total_ms": 1.5176,
+    "cpu_wall_ms": 2.2387,
+    "first_step_prepare_ms": 11180.0
+   },
+   {
+    "arm": "cclustersim",
+    "prepare_index": 0.5286,
+    "compute_score": 0.4551,
+    "compute_mask": 0.7789,
+    "metrics": 0.1063,
+    "eager_decoding": 0.234,
+    "sum_gpu_ms": 2.103,
+    "selector_total_ms": 1.8689,
+    "cpu_wall_ms": 2.6002,
+    "first_step_prepare_ms": 8387.1
+   }
+  ]
+ },
+ "machine_calibration": {
+  "purpose": "E127 定案 1.52ms 产自本机 H20；.251 同配置（mavg_e127 锚点臂 = e127_stage_bench.py make_args 原样克隆）复测分离「机器漂移」与「配置差」",
+  "e127_definitive_local_h20_gpu_ms": 1.5201119966804981,
+  "mavg_e127_on_251_gpu_ms": 1.6888320036232471,
+  "calibration_ratio_251_over_local": 1.1109918264648833,
+  "calibration_pct": "+11.1%（.251 比本机慢）",
+  "per_stage_ratio": {
+   "prepare_index": 1.06,
+   "compute_score": 1.1409,
+   "compute_mask": 1.0826,
+   "metrics": 1.2921,
+   "eager_decoding": 1.1855
+  },
+  "config_delta_same_machine": {
+   "note": "同机（.251）内 mavg(E126 冻结配置) vs mavg_e127(E127 harness 配置) 的配置差（cmp_ratio 4 vs 2 / subspace tail vs full / layer_skip off vs on）",
+   "mavg_e126_config_gpu_ms": 1.8018079921603203,
+   "mavg_e127_config_gpu_ms": 1.6888320036232471,
+   "delta_pct": "+6.7%"
+  }
+ },
+ "cluster_arm_amortization": {
+  "note": "簇臂冷建簇在首步（E126 同款口径分开报告）；块边界前移触发 far 增量续跑/near 全量重建（每 ~64 decode 步一次），全步原始样本已持久化，spike 为实测值",
+  "cavgsim": {
+   "first_step_cold_build_ms": 11179.9853515625,
+   "far_incremental_spike_ms": {
+    "value": 25.36,
+    "at_step": 64,
+    "source": "e131_arm_bench_cavgsim_steps80.json（80 步窗口捕获 step64 far 边界）"
+   },
+   "amortized_far_rebuild_ms_per_step": 0.3963,
+   "no_near_rebuild": "near_select=4bit → 无 near 侧聚类"
+  },
+  "cclustersim": {
+   "first_step_cold_build_ms": 8387.1318359375,
+   "near_full_rebuild_plus_far_incremental_spike_ms": {
+    "value": 156.71,
+    "at_step": 36,
+    "source": "e131_arm_bench_cclustersim.json 38 步窗口（step36 = far_hi 块边界 → far 续跑 64 tok + near 全量贪心重建 ~8.2K tok）"
+   },
+   "amortized_rebuild_ms_per_step_randn_worst": 2.4486,
+   "structured_data_estimate": "按 E126 冷建比例 structured/singleton ≈ 1679.7/7915.9 ≈ 0.212 → 重建估 ~33ms/64 步 ≈ 0.52ms/步（推算值非实测；randn 最坏 2.45ms/步为实测）"
+  },
+  "cold_build_root_cause": "_greedy_cluster_pass 为 Python 逐 token 循环（for i in range(T)：每 token ~7 次 kernel launch：bmm/argmax/gather/3×index_add_），65280 token 冷建 ≈ 45 万次 launch（launch-bound 非 FLOP-bound）——E127 fast path 未覆盖（预期内，如实记录）"
+ },
+ "bottleneck_vs_mavg": {
+  "note": "同机同卡同口径直接可比（无需校准）；Δ = 该臂 − mavg 稳态 SUM",
+  "rows": [
+   {
+    "arm": "mavg",
+    "delta_sum_gpu_ms": 0.0,
+    "delta_pct": "+0.00%",
+    "stage_deltas": {
+     "prepare_index": 0.0,
+     "compute_score": 0.0,
+     "compute_mask": 0.0,
+     "metrics": 0.0,
+     "eager_decoding": 0.0
+    }
+   },
+   {
+    "arm": "aavg",
+    "delta_sum_gpu_ms": -0.0008,
+    "delta_pct": "-0.04%",
+    "stage_deltas": {
+     "prepare_index": 0.0019,
+     "compute_score": 0.0011,
+     "compute_mask": -0.007,
+     "metrics": 0.0084,
+     "eager_decoding": -0.0052
+    }
+   },
+   {
+    "arm": "mminmax",
+    "delta_sum_gpu_ms": -0.1551,
+    "delta_pct": "-8.61%",
+    "stage_deltas": {
+     "prepare_index": -0.0309,
+     "compute_score": -0.0702,
+     "compute_mask": -0.0582,
+     "metrics": 0.0064,
+     "eager_decoding": -0.0022
+    }
+   },
+   {
+    "arm": "cavgsim",
+    "delta_sum_gpu_ms": -0.0595,
+    "delta_pct": "-3.30%",
+    "stage_deltas": {
+     "prepare_index": -0.0196,
+     "compute_score": -0.0693,
+     "compute_mask": 0.0185,
+     "metrics": 0.0089,
+     "eager_decoding": 0.002
+    }
+   },
+   {
+    "arm": "cclustersim",
+    "delta_sum_gpu_ms": 0.3012,
+    "delta_pct": "+16.71%",
+    "stage_deltas": {
+     "prepare_index": 0.0117,
+     "compute_score": 0.0068,
+     "compute_mask": 0.257,
+     "metrics": 0.0145,
+     "eager_decoding": 0.0112
+    }
+   }
+  ]
+ },
+ "fastpath_coverage": {
+  "prepare_index_inc_cache": "六臂全覆盖（inc_cache_built=True；稳态 0.48-0.53ms vs E126 优化前 S0+S1≈2.19ms）",
+  "compute_score_triton": "六臂全覆盖（triton_ok=True；fine GQA K 复用 + coarse minmax/avg，0.38-0.46ms vs E126 S3 三段和≈3.05ms）",
+  "compute_mask": "E127 优化点（skip 层 .item() 消除/far 切片零同步）在 normal 层基准不受益；cluster 臂簇分数段（_far_token_score/_near_token_score einsum+gather）完全未覆盖 → cclustersim mask 段 +0.257ms 主项",
+  "metrics_lazy": "六臂全覆盖（GPU 0.09-0.11ms；baseline CPU 3.7ms/步停顿已消）",
+  "eager_gather": "六臂全覆盖（0.22-0.23ms vs E126 优化前 S8≈3.05ms）",
+  "kmeans_greedy_build": "未覆盖（预期内）：冷建 8.4-11.2s + 重建 spike 见 cluster_arm_amortization"
+ },
+ "stage_baseline_e126_ref": {
+  "note": "跨口径参考（E126 优化前基线 exp/trace/results/e126_stage_timing_*.json S=64K structured：阶段=AST span；勿与本表精确对比）",
+  "selector_stage_sum_ms": {
+   "mavg": 5.55,
+   "aavg": 5.54,
+   "mminmax": 5.37,
+   "cavgsim": 5.48,
+   "cclustersim": 5.73
+  },
+  "s8_eager_ms": 3.05
+ },
+ "phase2_recommendations": [
+  {
+   "arm": "cclustersim（E125 冠军臂）",
+   "priority": 1,
+   "target": "near 侧全量重建（实测 156.71ms/64 步 ≈ 2.45ms/步摊销 @randn 最坏；structured 推算 ~0.52ms/步）+ near 簇分数段（mask 段 +0.257ms vs mavg）",
+   "actions": [
+    "① _greedy_cluster_pass CUDA graph 化或 Triton 化：当前逐 token Python 循环 launch-bound（~7 launch/token），graph replay 估 3-10× 削减；冷建 8.4s / 重建 156.7ms 同源受益",
+    "② near 侧改增量：右缘新增段贪心续跑语义已被 far 侧证明逐位一致（_update_far_greedy 增量=全量重放）；左缘撤销不可精确 → 混合策略（定期全量 + 间隙细筛分回退，生产代码已有回退语义）拉长重建周期",
+    "③ _near_token_score/_far_token_score 的 einsum+gather 套用 E127 iter8 同款 GQA K 复用 Triton kernel（[Hkv,K_c,dd] 小 GEMV），预期 mask 段 −0.15~0.20ms"
+   ],
+   "expected_gain": "摊销口径（randn 最坏）4.55→~2.1ms/步；稳态口径 2.10→~1.9ms/步"
+  },
+  {
+   "arm": "cavgsim",
+   "priority": 2,
+   "target": "冷建 11.18s（请求级首 token 延迟）+ far 增量续跑 25.36ms/64 步 ≈ 0.40ms/步摊销",
+   "actions": [
+    "同① greedy pass 加速（同源）；稳态 SUM 已比 mavg 低 0.060ms（(0,0) 单池简化路径），mask 段无需专项"
+   ],
+   "expected_gain": "冷建 11.2s→~1-3s；摊销 +0.40→~+0.1ms/步"
+  },
+  {
+   "arm": "aavg / mavg",
+   "priority": 3,
+   "target": "稳态 1.80ms（两臂点估计差 0.0007ms=0.04%）；score 段 0.45ms 为最大段",
+   "actions": [
+    "E127 iter9 fused mask 前段在 64K 已实测净回归（-3%）、仅 16K +3.7%——不推荐重试同方向；64K 档维持 iter8 结论"
+   ],
+   "expected_gain": "有限；两臂吃 E127 既有优化已接近饱和"
+  },
+  {
+   "arm": "mminmax",
+   "priority": 4,
+   "target": "稳态 1.65ms（五臂最快；无 k_avg 物化天然占优）",
+   "actions": [
+    "无簇开销无 avg 物化，阶段 1 无专项需求"
+   ],
+   "expected_gain": "—"
+  }
+ ]
+}
