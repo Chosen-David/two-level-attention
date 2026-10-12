@@ -54,7 +54,7 @@ DeepSeek在S-T023历史Progress中已有Qwen3字段映射计划，新adapter保�
 
 此前b6782d8/4b0a25f段落保留为历史审计，不作为当前未修清单：[当前norm/scaling L125–169](https://github.com/Chosen-David/two-level-attention/blob/c9429711e5a5833377a9d784551599cfab1f44c8/exp/vendor_baselines/quest_vendor/quest_attention_official.py#L125-L169)、wrapper的prefill/前两层dense均已修复，32B的info.py quest_vendor分支及DSV2 BOS/16K修复也不重复报未修。
 
-[0330作者报告](20261012-0330_S-T023_round_report_by_deepseek.md)的Quest8B 41.35、Full49.39及16个任务delta，其delta均值复算为−8.0325，与报告−8.03吻合；[0410回复](20261012-0410_S-T023_round_report_by_deepseek.md)补充qasper/trec预算观察。原预测/result/manifest未公开供本轮独核，分母、样本配对及scorer尚未验收，不能据此关闭“faithful port主表验收”。保留负结果为作者观察；两任务预算分数单调不证明无bug，也不足把全部掉分归因于Qwen3稀疏敏感度。新批Full49.39不能与旧R53 Full48.11375拼接。
+[0330作者报告](archive/20261012-0330_S-T023_round_report_by_deepseek.md)的Quest8B 41.35、Full49.39及16个任务delta，其delta均值复算为−8.0325，与报告−8.03吻合；[0410回复](archive/20261012-0410_S-T023_round_report_by_deepseek.md)补充qasper/trec预算观察。原预测/result/manifest未公开供本轮独核，分母、样本配对及scorer尚未验收，不能据此关闭“faithful port主表验收”。保留负结果为作者观察；两任务预算分数单调不证明无bug，也不足把全部掉分归因于Qwen3稀疏敏感度。新批Full49.39不能与旧R53 Full48.11375拼接。
 
 尤其[当前L231](https://github.com/Chosen-David/two-level-attention/blob/c9429711e5a5833377a9d784551599cfab1f44c8/exp/vendor_baselines/quest_vendor/quest_attention_official.py#L231)先取B′=min(B,L)，[L68–69](https://github.com/Chosen-David/two-level-attention/blob/c9429711e5a5833377a9d784551599cfab1f44c8/exp/vendor_baselines/quest_vendor/quest_attention_official.py#L68-L69)再按floor(B′/16)选页（含最少3页条件）。当L≥49且不是16整倍数时，即使B≥L也只选floor(L/16)页而非ceil(L/16)页，未达到全支持；遗漏页由score决定，不一定是尾页。因此该预算本身不是dense等价control。保留官方舍入并报告实际支持数，另以受控全支持路径核数值与多步cache等价，再将chunk16稀疏选择与official同输入对拍；不能把官方页舍入自动当成适配bug，也不强制结果符号。本条不扩模型/预算网格或新资源，整请求质量和实测E2E要求不变；未独验的重派完成状态不作验收依据。
 
