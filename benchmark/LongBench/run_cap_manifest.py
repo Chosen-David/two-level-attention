@@ -72,8 +72,12 @@ import sys
 # 本后缀更短不超 ext4 255 单文件名上限。
 RUN_CAP_SIDECAR_SUFFIX = ".runcap.json"
 RUN_CAP_SCHEMA = "run-cap-manifest-v1"
-# 103（TL-E096-CAP-GATE-TOCTOU-103）gate 写门锁文件名（输出目录级）。
-RUN_CAP_LOCK_FILENAME = ".runcap_gate.lock"
+# 103（TL-E096-CAP-GATE-TOCTOU-103）gate 写门锁后缀（**结果文件级**，
+# 2026-10-12 粒度修正：首版为目录级，其「生产调度本就是串行 bash 链」
+# 前提被生产打破——同目录多任务并发是常态派单形态，目录级锁令后到
+# 者持整卡已加载显存空等数小时。GPT 103 威胁模型是「同一输出路径」
+# 交错，锁挂结果文件粒度即闭合 TOCTOU，同目录不同结果文件不互斥）。
+RUN_CAP_LOCK_SUFFIX = ".runcap_gate.lock"
 RUN_CAP_PROVENANCES = ("inline", "backfilled-from-stdout",
                        "provenance_incomplete")
 
@@ -458,20 +462,25 @@ def runcap_gate_lock(out_path):
     complete manifest 来自 A」的错配产物，而 read_run_cap_manifest 只做
     schema 检查仍会放行（单文件 os.replace 不提供跨产物事务）。
 
-    语义：锁文件 = 输出目录下 .runcap_gate.lock（目录级——同目录串行
-    化；生产调度本就是串行 bash 链，锁粒度不构成瓶颈）。持有窗口 =
-    调用方 with 块全程（gate → generating manifest → 数据写 → complete
-    manifest）。锁内由调用方重新执行 gate_run_cap_identity 即
-    double-check（锁外先过的门不算数——后到者在锁内重读身份，先到者已
-    写出的 manifest 会被 CAP-CLASH 拒绝，或同 cap 幂等放行）。
+    语义：锁文件 = out_path + ".runcap_gate.lock"（**结果文件级**——
+    同一 out_path 串行化；同目录不同结果文件不互斥。2026-10-12 粒度
+    修正：首版目录级锁的「生产调度本就是串行 bash 链」前提被生产打
+    破——本机 fullkv 双任务同目录并发时后到者持 62GB 已加载显存空等
+    锁数小时；GPT 103 威胁模型是同一输出路径交错，不同结果文件无共
+    享写目标，目录级属过度串行）。持有窗口 = 调用方 with 块全程
+    （gate → generating manifest → 数据写 → complete manifest）。锁内
+    由调用方重新执行 gate_run_cap_identity 即 double-check（锁外先过
+    的门不算数——后到者在锁内重读身份，先到者已写出的 manifest 会被
+    CAP-CLASH 拒绝，或同 cap 幂等放行）。
 
     死锁纪律：try/finally 保证异常路径必释放（095 guard 在生成段 raise
     传播时锁不滞留）；锁文件只创建**不删除**（POSIX 锁绑定 inode，删了
     再建会让并发方锁到不同 inode 上、互斥失效）。
     """
-    lock_dir = os.path.dirname(os.path.abspath(out_path))
+    out_path = os.path.abspath(out_path)
+    lock_dir = os.path.dirname(out_path)
     os.makedirs(lock_dir, exist_ok=True)
-    lock_path = os.path.join(lock_dir, RUN_CAP_LOCK_FILENAME)
+    lock_path = out_path + RUN_CAP_LOCK_SUFFIX
     lock_file = open(lock_path, "a")   # 只创建不删除（见 docstring）
     try:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)

@@ -576,6 +576,7 @@ with rcm.runcap_gate_lock(p):
 
 
 def test_103_gate_lock():
+    from benchmark.LongBench import run_cap_manifest as rcm
     with tempfile.TemporaryDirectory() as td:
         p = os.path.join(td, "hotpotqa-none-1012024000.jsonl")
 
@@ -610,13 +611,29 @@ def test_103_gate_lock():
               and "CAP-CLASH" in pb.stdout,
               f"held={held2} " + pb.stdout + pb.stderr)
 
-        # ---- 绿：锁文件只创建不删除（POSIX inode 语义）----
-        check("103 绿 锁文件 .runcap_gate.lock 存留（只创建不删除——删除"
-              "会让并发方锁到不同 inode、互斥失效）",
-              os.path.isfile(os.path.join(td, r".runcap_gate.lock")))
+        # ---- 绿：锁文件只创建不删除（POSIX inode 语义，结果文件级路径）----
+        check("103 绿 锁文件 <out_path>.runcap_gate.lock 存留（只创建不删除"
+              "——删除会让并发方锁到不同 inode、互斥失效；结果文件级路径）",
+              os.path.isfile(p + rcm.RUN_CAP_LOCK_SUFFIX))
+
+        # ---- 绿：粒度修正——同目录不同结果文件不互斥（生产回归反证：
+        # 本机 fullkv 双任务同目录并发，目录级锁令后到者持 62GB 显存
+        # 空等；GPT 103 威胁模型是同一 out_path，文件级锁即闭合 TOCTOU）----
+        pa = subprocess.Popen(
+            [sys.executable, "-c", script_a, p],
+            stdout=subprocess.PIPE, text=True)
+        held3 = pa.stdout.readline().strip() == "HELD"   # A 持 p 的锁 3s
+        p_other = os.path.join(td, "qasper-none-1012024001.jsonl")
+        t0 = time.time()
+        with rcm.runcap_gate_lock(p_other):   # 同目录异结果文件：立即入锁
+            enter_wait = time.time() - t0
+        pa.terminate(); pa.wait()
+        check("103 绿 锁粒度（结果文件级）：A 持 hotpotqa 锁时 qasper 同目"
+              "录立即入锁（<1s）——同目录多任务并发不被目录级锁误串行",
+              held3 and enter_wait < 1.0,
+              f"held={held3} enter_wait={enter_wait:.2f}s")
 
         # ---- 绿：异常路径必释放（try/finally）----
-        from benchmark.LongBench import run_cap_manifest as rcm
         released = True
         try:
             with rcm.runcap_gate_lock(p):
