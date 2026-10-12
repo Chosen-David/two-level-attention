@@ -1,0 +1,868 @@
+{
+ "run_id": "20261012141457-3596592-3099",
+ "status": "success",
+ "generated": "2026-10-12T14:14:57.363699",
+ "publish_protocol": "e116i-generation-v3",
+ "formal": {
+  "script": "benchmark/RULER/score_ruler_formal.py",
+  "sha256": "ae99067f36347307507ac6c2a9e4a7fa5bec77b35b3063273e10c54ab68f459c"
+ },
+ "scorer": {
+  "script": "benchmark/RULER/score_ruler.py",
+  "sha256": "e5139e2dd914d92e87e036cdff3635a5136e10f79ae3efe0a3d13cd702c7319b"
+ },
+ "inputs": {
+  "root": "/tmp/e119_64k_quest",
+  "pred_postfix": "",
+  "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+  "expect_tasks": 11,
+  "min_samples": 100,
+  "run_identity": {
+   "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+   "model_path": null,
+   "yarn": true,
+   "yarn_factor": 2.0,
+   "yarn_factor_provenance": "producer_receipt",
+   "yarn_factor_operator_declared": 2.0,
+   "producer_evidence": {
+    "status": "present",
+    "protocol": "producer-yarn-config-v2",
+    "same_generation_bound": true,
+    "config_consistency_enforced": true,
+    "model_config_closure": true,
+    "generation_binding_modes": [
+     "pointer-v1"
+    ],
+    "cells_with_receipt": 11,
+    "cells_total": 11,
+    "yarn_enabled": true,
+    "effective_yarn_factor": 2.0,
+    "receipts": {
+     "L65536/quest_vendor_1024_16/cwe": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97388-2824/cwe-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "1fb199461b4559f6312c7ecd5cc3f0c242360e107a3f26d46330ee529f1d14e8"
+     },
+     "L65536/quest_vendor_1024_16/fwe": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97387-2824/fwe-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "473bfc18544e3ea8bbaf74b7c2ddd2582f57c65f6075c9fb49a08f478c05eb37"
+     },
+     "L65536/quest_vendor_1024_16/niah_multikey_1": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97385-2824/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "58640397f860e00f10755cbfabfebd85d89f7c0d3ebbee9b68833f4836079eb4"
+     },
+     "L65536/quest_vendor_1024_16/niah_multikey_2": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97384-2824/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "c92d094ec7731be0569bb8bd5dd07cfde8e14ec240ce3b46efb2e9fb8c4e50a8"
+     },
+     "L65536/quest_vendor_1024_16/niah_multikey_3": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97383-2824/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "af140da6bbc4dca3981895a7b9ecbc210038ed84fe9965cdc455a0466012460d"
+     },
+     "L65536/quest_vendor_1024_16/niah_multiquery": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111755-2293110-2824/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "49837938b5804bc4475fad1a0851cfd6dbf0e6a570ceb569374cb26b1be29a6f"
+     },
+     "L65536/quest_vendor_1024_16/niah_multivalue": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97386-2824/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "26815cde7b97d5c1917a61a9875db3ca56ff31567914fb1abc60d462ca95c3ef"
+     },
+     "L65536/quest_vendor_1024_16/niah_single_1": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111326-29181-2824/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "51b4caace2bdc5ba228ee799afff1967dcdabd9a27dcd3ca23cb0aaa1dca2d12"
+     },
+     "L65536/quest_vendor_1024_16/niah_single_2": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111326-29182-2824/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "722cb3dcf3334aa514abcebb4a55c5e4511b77f4db3a612feaa27edb6d6fec53"
+     },
+     "L65536/quest_vendor_1024_16/niah_single_3": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124857-97382-2824/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "958a48f90f368505ad60a3bb906249b76ec9763c979086b48b489946b793c6fc"
+     },
+     "L65536/quest_vendor_1024_16/vt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97389-2824/vt-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "8aef598cfd39a204a705c219a4d5086a06894dd19c8c309a44f25ae361d39fd0"
+     }
+    }
+   },
+   "extra_params": {},
+   "formal_script_sha256": "ae99067f36347307507ac6c2a9e4a7fa5bec77b35b3063273e10c54ab68f459c",
+   "scorer_sha256": "e5139e2dd914d92e87e036cdff3635a5136e10f79ae3efe0a3d13cd702c7319b",
+   "note": "model_path 为操作者声明值；yarn_factor 按 yarn_factor_provenance 区分：producer_receipt=生成进程旁挂 v2 回执证实的实际生效值（回执与best-file 经 prediction SHA/行数逐位同代绑定，059），producer_receipt_v1_partial=v1 回执只证 factor 口径不证回执与预测同代（059 降级标注），operator_declared=legacy 产物无生产者证据时的操作者事后声明（实际生效值未闭合，不冒充）；legacy 数据无法从文件恢复完整输入身份（identity_mode=legacy-partial），native 数据由 pred_ruler.py 落盘"
+  }
+ },
+ "outputs": {
+  "json": "/home/wangyuanshuo02/two-level-attention/exp/trace/results/e119_ruler64k_formal_quest_vendor.json",
+  "md": "/home/wangyuanshuo02/two-level-attention/exp/trace/results/e119_ruler64k_formal_quest_vendor.md",
+  "manifest": "/home/wangyuanshuo02/two-level-attention/exp/trace/results/e119_ruler64k_formal_quest_vendor.json.manifest.json",
+  "derived_dir": "/home/wangyuanshuo02/two-level-attention/exp/trace/results/e119_ruler64k_formal_quest_vendor.json.run-20261012141457-3596592-3099",
+  "generation_files": {
+   "json": "result.json",
+   "md": "result.md",
+   "manifest": "manifest.json",
+   "receipt": "receipt.json"
+  }
+ },
+ "manifest_sha256": "6e972d4bd936e30c85d369f60b3092b9eade077c385dda12b45e99306e45cb38",
+ "result_sha256": "b3b47564b69efe2aa8c8876ce5fe6f307c882de9c4200b0f88ce2e3473a504b5",
+ "source_data_sha256": {
+  "65536/niah_single_1": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_single_1.jsonl",
+   "sha256": "32e9693f3748a920b60ecd0afefe0f9118cd71aee468a341c3ada311a1d65d2e"
+  },
+  "65536/niah_single_2": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_single_2.jsonl",
+   "sha256": "2b363ff8d86c3aebfef215fd296f624df161bd8732e388396117d6ff55f5eea5"
+  },
+  "65536/niah_single_3": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_single_3.jsonl",
+   "sha256": "2fd5f2f8afa4f2662d07d8608c738c2125f219885c17e71982ddaac7106c3409"
+  },
+  "65536/niah_multikey_1": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+   "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f"
+  },
+  "65536/niah_multikey_2": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_2.jsonl",
+   "sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063"
+  },
+  "65536/niah_multikey_3": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_3.jsonl",
+   "sha256": "e7ce6cfe3daad3d844aeee8f817779ee4d2fe05db3709a1bbe59b30073913f41"
+  },
+  "65536/niah_multiquery": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multiquery.jsonl",
+   "sha256": "1b0df370747ced4757798cc547a2d8758208828bfa8f56ba0b704c24ac27684c"
+  },
+  "65536/niah_multivalue": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multivalue.jsonl",
+   "sha256": "435e74fd6182a3d7b6c3ff6ce277490970cfec0952f8afe6c93598758bb45008"
+  },
+  "65536/cwe": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/cwe.jsonl",
+   "sha256": "3275a5fa86e71c90d294c5725b0adc3901ec33b5c393b6ae92c1752df4da984c"
+  },
+  "65536/fwe": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/fwe.jsonl",
+   "sha256": "d4258b15ffb8ff7c33976695094355629592e915f65ab7cac6e2028dd1f22107"
+  },
+  "65536/vt": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/vt.jsonl",
+   "sha256": "a98f271a6869b7d0e7ebf9d9a7bd74575c41966721f817ed16ab129e82c5271c"
+  }
+ },
+ "cells": {
+  "L65536/quest_vendor_1024_16": {
+   "length_dir": 65536,
+   "identity_mode": "native",
+   "tasks": {
+    "niah_single_1": {
+     "n": 100,
+     "best_file": "niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111326-29181-2824/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "46cd226a71641454ef6b89ef0ffc1bfff23c5bc4ef025e9a87af23cc2a7ae7c0",
+     "derived_sha256": "46cd226a71641454ef6b89ef0ffc1bfff23c5bc4ef025e9a87af23cc2a7ae7c0",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111326-29181-2824/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "51b4caace2bdc5ba228ee799afff1967dcdabd9a27dcd3ca23cb0aaa1dca2d12",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111326-29181-2824",
+       "gen_pred_sha256": "46cd226a71641454ef6b89ef0ffc1bfff23c5bc4ef025e9a87af23cc2a7ae7c0",
+       "gen_rcp_sha256": "51b4caace2bdc5ba228ee799afff1967dcdabd9a27dcd3ca23cb0aaa1dca2d12"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "niah_single_1",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012111326-29181-2824",
+       "prediction_basename": "niah_single_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "46cd226a71641454ef6b89ef0ffc1bfff23c5bc4ef025e9a87af23cc2a7ae7c0",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "46cd226a71641454ef6b89ef0ffc1bfff23c5bc4ef025e9a87af23cc2a7ae7c0",
+       "source_sha256_at_freeze": "46cd226a71641454ef6b89ef0ffc1bfff23c5bc4ef025e9a87af23cc2a7ae7c0"
+      },
+      "source_sha256": "46cd226a71641454ef6b89ef0ffc1bfff23c5bc4ef025e9a87af23cc2a7ae7c0",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 8.4e-05
+     }
+    },
+    "niah_single_2": {
+     "n": 100,
+     "best_file": "niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111326-29182-2824/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "948cbb6e02c17fa4eaa782792093e2f96dd08b92d63429448cb4344a70605a47",
+     "derived_sha256": "948cbb6e02c17fa4eaa782792093e2f96dd08b92d63429448cb4344a70605a47",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111326-29182-2824/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "722cb3dcf3334aa514abcebb4a55c5e4511b77f4db3a612feaa27edb6d6fec53",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111326-29182-2824",
+       "gen_pred_sha256": "948cbb6e02c17fa4eaa782792093e2f96dd08b92d63429448cb4344a70605a47",
+       "gen_rcp_sha256": "722cb3dcf3334aa514abcebb4a55c5e4511b77f4db3a612feaa27edb6d6fec53"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "niah_single_2",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012111326-29182-2824",
+       "prediction_basename": "niah_single_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "948cbb6e02c17fa4eaa782792093e2f96dd08b92d63429448cb4344a70605a47",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "948cbb6e02c17fa4eaa782792093e2f96dd08b92d63429448cb4344a70605a47",
+       "source_sha256_at_freeze": "948cbb6e02c17fa4eaa782792093e2f96dd08b92d63429448cb4344a70605a47"
+      },
+      "source_sha256": "948cbb6e02c17fa4eaa782792093e2f96dd08b92d63429448cb4344a70605a47",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 8.1e-05
+     }
+    },
+    "niah_single_3": {
+     "n": 100,
+     "best_file": "niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124857-97382-2824/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "dd9d1ab9a9a78ac39a5129d5dd347b00f8c1be27fee52f89ec1368b5ec97030a",
+     "derived_sha256": "dd9d1ab9a9a78ac39a5129d5dd347b00f8c1be27fee52f89ec1368b5ec97030a",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124857-97382-2824/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "958a48f90f368505ad60a3bb906249b76ec9763c979086b48b489946b793c6fc",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124857-97382-2824",
+       "gen_pred_sha256": "dd9d1ab9a9a78ac39a5129d5dd347b00f8c1be27fee52f89ec1368b5ec97030a",
+       "gen_rcp_sha256": "958a48f90f368505ad60a3bb906249b76ec9763c979086b48b489946b793c6fc"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "niah_single_3",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012124857-97382-2824",
+       "prediction_basename": "niah_single_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "dd9d1ab9a9a78ac39a5129d5dd347b00f8c1be27fee52f89ec1368b5ec97030a",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "dd9d1ab9a9a78ac39a5129d5dd347b00f8c1be27fee52f89ec1368b5ec97030a",
+       "source_sha256_at_freeze": "dd9d1ab9a9a78ac39a5129d5dd347b00f8c1be27fee52f89ec1368b5ec97030a"
+      },
+      "source_sha256": "dd9d1ab9a9a78ac39a5129d5dd347b00f8c1be27fee52f89ec1368b5ec97030a",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 7.4e-05
+     }
+    },
+    "niah_multikey_1": {
+     "n": 100,
+     "best_file": "niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97385-2824/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "6f059ed47bb930b9e737df110f24ae4871efb5feabf4a9fee1b4a31fdd63119a",
+     "derived_sha256": "6f059ed47bb930b9e737df110f24ae4871efb5feabf4a9fee1b4a31fdd63119a",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97385-2824/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "58640397f860e00f10755cbfabfebd85d89f7c0d3ebbee9b68833f4836079eb4",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97385-2824",
+       "gen_pred_sha256": "6f059ed47bb930b9e737df110f24ae4871efb5feabf4a9fee1b4a31fdd63119a",
+       "gen_rcp_sha256": "58640397f860e00f10755cbfabfebd85d89f7c0d3ebbee9b68833f4836079eb4"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "niah_multikey_1",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012124858-97385-2824",
+       "prediction_basename": "niah_multikey_1-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "6f059ed47bb930b9e737df110f24ae4871efb5feabf4a9fee1b4a31fdd63119a",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "6f059ed47bb930b9e737df110f24ae4871efb5feabf4a9fee1b4a31fdd63119a",
+       "source_sha256_at_freeze": "6f059ed47bb930b9e737df110f24ae4871efb5feabf4a9fee1b4a31fdd63119a"
+      },
+      "source_sha256": "6f059ed47bb930b9e737df110f24ae4871efb5feabf4a9fee1b4a31fdd63119a",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 7.2e-05
+     }
+    },
+    "niah_multikey_2": {
+     "n": 100,
+     "best_file": "niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97384-2824/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "914452e3cdd91f0241d03eb2064e8a5bdbe6b8c1ab0ecb761b8b8ce6dc5924c7",
+     "derived_sha256": "914452e3cdd91f0241d03eb2064e8a5bdbe6b8c1ab0ecb761b8b8ce6dc5924c7",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97384-2824/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "c92d094ec7731be0569bb8bd5dd07cfde8e14ec240ce3b46efb2e9fb8c4e50a8",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97384-2824",
+       "gen_pred_sha256": "914452e3cdd91f0241d03eb2064e8a5bdbe6b8c1ab0ecb761b8b8ce6dc5924c7",
+       "gen_rcp_sha256": "c92d094ec7731be0569bb8bd5dd07cfde8e14ec240ce3b46efb2e9fb8c4e50a8"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "niah_multikey_2",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012124858-97384-2824",
+       "prediction_basename": "niah_multikey_2-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "914452e3cdd91f0241d03eb2064e8a5bdbe6b8c1ab0ecb761b8b8ce6dc5924c7",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "914452e3cdd91f0241d03eb2064e8a5bdbe6b8c1ab0ecb761b8b8ce6dc5924c7",
+       "source_sha256_at_freeze": "914452e3cdd91f0241d03eb2064e8a5bdbe6b8c1ab0ecb761b8b8ce6dc5924c7"
+      },
+      "source_sha256": "914452e3cdd91f0241d03eb2064e8a5bdbe6b8c1ab0ecb761b8b8ce6dc5924c7",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 7.5e-05
+     }
+    },
+    "niah_multikey_3": {
+     "n": 100,
+     "best_file": "niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97383-2824/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "5751d2d6005ac501ccf8210f6b72cbeaac713eb3652a7851b6b8c1c93ac0331d",
+     "derived_sha256": "5751d2d6005ac501ccf8210f6b72cbeaac713eb3652a7851b6b8c1c93ac0331d",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97383-2824/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "af140da6bbc4dca3981895a7b9ecbc210038ed84fe9965cdc455a0466012460d",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97383-2824",
+       "gen_pred_sha256": "5751d2d6005ac501ccf8210f6b72cbeaac713eb3652a7851b6b8c1c93ac0331d",
+       "gen_rcp_sha256": "af140da6bbc4dca3981895a7b9ecbc210038ed84fe9965cdc455a0466012460d"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "niah_multikey_3",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012124858-97383-2824",
+       "prediction_basename": "niah_multikey_3-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "5751d2d6005ac501ccf8210f6b72cbeaac713eb3652a7851b6b8c1c93ac0331d",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "5751d2d6005ac501ccf8210f6b72cbeaac713eb3652a7851b6b8c1c93ac0331d",
+       "source_sha256_at_freeze": "5751d2d6005ac501ccf8210f6b72cbeaac713eb3652a7851b6b8c1c93ac0331d"
+      },
+      "source_sha256": "5751d2d6005ac501ccf8210f6b72cbeaac713eb3652a7851b6b8c1c93ac0331d",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 7e-05
+     }
+    },
+    "niah_multiquery": {
+     "n": 100,
+     "best_file": "niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111755-2293110-2824/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "b10e8c8f8a0a188293581bb675f6d387012bc5e71826680912fef94eb449134c",
+     "derived_sha256": "b10e8c8f8a0a188293581bb675f6d387012bc5e71826680912fef94eb449134c",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111755-2293110-2824/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "49837938b5804bc4475fad1a0851cfd6dbf0e6a570ceb569374cb26b1be29a6f",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012111755-2293110-2824",
+       "gen_pred_sha256": "b10e8c8f8a0a188293581bb675f6d387012bc5e71826680912fef94eb449134c",
+       "gen_rcp_sha256": "49837938b5804bc4475fad1a0851cfd6dbf0e6a570ceb569374cb26b1be29a6f"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "niah_multiquery",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012111755-2293110-2824",
+       "prediction_basename": "niah_multiquery-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "b10e8c8f8a0a188293581bb675f6d387012bc5e71826680912fef94eb449134c",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "b10e8c8f8a0a188293581bb675f6d387012bc5e71826680912fef94eb449134c",
+       "source_sha256_at_freeze": "b10e8c8f8a0a188293581bb675f6d387012bc5e71826680912fef94eb449134c"
+      },
+      "source_sha256": "b10e8c8f8a0a188293581bb675f6d387012bc5e71826680912fef94eb449134c",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 7.2e-05
+     }
+    },
+    "niah_multivalue": {
+     "n": 100,
+     "best_file": "niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97386-2824/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "01c3809fe792ee9bf4b92958302ea188c784164a300d867093c3e8b7ac9a3845",
+     "derived_sha256": "01c3809fe792ee9bf4b92958302ea188c784164a300d867093c3e8b7ac9a3845",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97386-2824/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "26815cde7b97d5c1917a61a9875db3ca56ff31567914fb1abc60d462ca95c3ef",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97386-2824",
+       "gen_pred_sha256": "01c3809fe792ee9bf4b92958302ea188c784164a300d867093c3e8b7ac9a3845",
+       "gen_rcp_sha256": "26815cde7b97d5c1917a61a9875db3ca56ff31567914fb1abc60d462ca95c3ef"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "niah_multivalue",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012124858-97386-2824",
+       "prediction_basename": "niah_multivalue-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "01c3809fe792ee9bf4b92958302ea188c784164a300d867093c3e8b7ac9a3845",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "01c3809fe792ee9bf4b92958302ea188c784164a300d867093c3e8b7ac9a3845",
+       "source_sha256_at_freeze": "01c3809fe792ee9bf4b92958302ea188c784164a300d867093c3e8b7ac9a3845"
+      },
+      "source_sha256": "01c3809fe792ee9bf4b92958302ea188c784164a300d867093c3e8b7ac9a3845",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 7.1e-05
+     }
+    },
+    "cwe": {
+     "n": 100,
+     "best_file": "cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97388-2824/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "a796f6b99a9238972a8977241c43fcf820fcc60f8c1d0cd7ffd8b5f5f57e12b2",
+     "derived_sha256": "a796f6b99a9238972a8977241c43fcf820fcc60f8c1d0cd7ffd8b5f5f57e12b2",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97388-2824/cwe-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "1fb199461b4559f6312c7ecd5cc3f0c242360e107a3f26d46330ee529f1d14e8",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97388-2824",
+       "gen_pred_sha256": "a796f6b99a9238972a8977241c43fcf820fcc60f8c1d0cd7ffd8b5f5f57e12b2",
+       "gen_rcp_sha256": "1fb199461b4559f6312c7ecd5cc3f0c242360e107a3f26d46330ee529f1d14e8"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "cwe",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012124858-97388-2824",
+       "prediction_basename": "cwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "a796f6b99a9238972a8977241c43fcf820fcc60f8c1d0cd7ffd8b5f5f57e12b2",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "a796f6b99a9238972a8977241c43fcf820fcc60f8c1d0cd7ffd8b5f5f57e12b2",
+       "source_sha256_at_freeze": "a796f6b99a9238972a8977241c43fcf820fcc60f8c1d0cd7ffd8b5f5f57e12b2"
+      },
+      "source_sha256": "a796f6b99a9238972a8977241c43fcf820fcc60f8c1d0cd7ffd8b5f5f57e12b2",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6.6e-05
+     }
+    },
+    "fwe": {
+     "n": 100,
+     "best_file": "fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97387-2824/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "6c6d6abe1147018b94154b48ae7b4f9aaf69f154dd6a37516173c8afdb05598b",
+     "derived_sha256": "6c6d6abe1147018b94154b48ae7b4f9aaf69f154dd6a37516173c8afdb05598b",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97387-2824/fwe-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "473bfc18544e3ea8bbaf74b7c2ddd2582f57c65f6075c9fb49a08f478c05eb37",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97387-2824",
+       "gen_pred_sha256": "6c6d6abe1147018b94154b48ae7b4f9aaf69f154dd6a37516173c8afdb05598b",
+       "gen_rcp_sha256": "473bfc18544e3ea8bbaf74b7c2ddd2582f57c65f6075c9fb49a08f478c05eb37"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "fwe",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012124858-97387-2824",
+       "prediction_basename": "fwe-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "6c6d6abe1147018b94154b48ae7b4f9aaf69f154dd6a37516173c8afdb05598b",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "6c6d6abe1147018b94154b48ae7b4f9aaf69f154dd6a37516173c8afdb05598b",
+       "source_sha256_at_freeze": "6c6d6abe1147018b94154b48ae7b4f9aaf69f154dd6a37516173c8afdb05598b"
+      },
+      "source_sha256": "6c6d6abe1147018b94154b48ae7b4f9aaf69f154dd6a37516173c8afdb05598b",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 7.5e-05
+     }
+    },
+    "vt": {
+     "n": 100,
+     "best_file": "vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_path": "/tmp/e119_64k_quest/L65536/pred/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97389-2824/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "source_final_path": "/tmp/e119_64k_quest/L65536/pred/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "66b213aff61bd36fd7f43dc90760a80d826e1f590bcdc4b8278257fc45608951",
+     "derived_sha256": "66b213aff61bd36fd7f43dc90760a80d826e1f590bcdc4b8278257fc45608951",
+     "producer_yarn_receipt": {
+      "path": "/tmp/e119_64k_quest/L65536/pred/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97389-2824/vt-quest_vendor_1024_16-ruler_quest_20261012-yarn_receipt.json",
+      "sha256": "8aef598cfd39a204a705c219a4d5086a06894dd19c8c309a44f25ae361d39fd0",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/e119_64k_quest/L65536/pred/vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl.tli_gen",
+       "gen_dir_name": "vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl.gen-20261012124858-97389-2824",
+       "gen_pred_sha256": "66b213aff61bd36fd7f43dc90760a80d826e1f590bcdc4b8278257fc45608951",
+       "gen_rcp_sha256": "8aef598cfd39a204a705c219a4d5086a06894dd19c8c309a44f25ae361d39fd0"
+      },
+      "yarn_enabled": true,
+      "effective_yarn_factor": 2.0,
+      "yarn_factor_source": "auto",
+      "context_length": 65536,
+      "task": "vt",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261012124858-97389-2824",
+       "prediction_basename": "vt-quest_vendor_1024_16-ruler_quest_20261012.jsonl",
+       "prediction_sha256": "66b213aff61bd36fd7f43dc90760a80d826e1f590bcdc4b8278257fc45608951",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "66b213aff61bd36fd7f43dc90760a80d826e1f590bcdc4b8278257fc45608951",
+       "source_sha256_at_freeze": "66b213aff61bd36fd7f43dc90760a80d826e1f590bcdc4b8278257fc45608951"
+      },
+      "source_sha256": "66b213aff61bd36fd7f43dc90760a80d826e1f590bcdc4b8278257fc45608951",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": {
+        "rope_type": "yarn",
+        "type": "yarn",
+        "factor": 2.0,
+        "original_max_position_embeddings": 40960,
+        "beta_fast": 32,
+        "beta_slow": 1
+       },
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 500,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "5305fd19c0fa58487d0edfbf6adb9ad97faf3405ad03f4d8ef46ffe80c38f2b3"
+       },
+       "effective_config_sha256": "b53c9b99a956db53ff32839e6aeddc63b5e904192a3f4a4af9e6f19694b37bce",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6.8e-05
+     }
+    }
+   }
+  }
+ },
+ "avg": {
+  "L65536/quest_vendor_1024_16": 26.25
+ },
+ "legacy_stamp": {
+  "n_stamped": 0,
+  "invariant_fields": [
+   "pred",
+   "answers",
+   "length",
+   "budget"
+  ],
+  "invariant_asserted": true,
+  "note": "补刻只发生在 staging 派生副本；源文件 SHA256 记录于 cells[].tasks[].source_sha256，全程只读"
+ }
+}
