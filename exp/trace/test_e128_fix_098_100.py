@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""E128 修复 098/099/100 红绿套件（worktree e128-fix-098-100，2026-10-12）。
+"""E128 修复 098/099/100/107/108/109/110 红绿套件（worktree e128-fix-107-110，
+2026-10-12）。
 
-覆盖 GPT 审计三项（sglang agent_doc/advice/2026-10-12_0527_twolevel_bug_
-audit_08819a7.md，主 AI 逐条 confirmed）：
+覆盖 GPT 审计两轮（098/099/100：sglang agent_doc/advice/2026-10-12_0527_
+twolevel_bug_audit_08819a7.md；107/108/109/110：2026-10-12_0739_twolevel_
+bug_audit_3d5b1b9.md，主 AI 逐条 confirmed）：
 
   098（P1）Pareto 摘要与 dominance 表矛盾
     - 绿证：frontier_summary 由 dominance 机器生成；表空时摘要不得包含
@@ -24,6 +26,51 @@ audit_08819a7.md，主 AI 逐条 confirmed）：
     - 红证锚点纪律：缺陷基线用固定 SHA 提取（OLD_SHA git show），
       不引用可变分支名；修复前脚本对同一篡改输入 rc==0（GPT 六反例
       逐条复现），修复后脚本 rc!=0 且 [ABORT] 文案命中。
+
+  107（P2）套件浮点逐位比较跨环境不稳定（GPT AMD EPYC 74 PASS/1 FAIL）
+    - 缺陷机制：CPython 3.12+ sum() 改用 Neumaier 补偿求和，同一聚合
+      算法在不同 CPU/编译环境下浮点末位漂移 ~1e-14（实测 48.12400000
+      000001 vs 48.124），重算 vs 提交 JSON 的 dict 逐位比较在本环境
+      生成侧全绿、异环境重算侧必红。
+    - 修复：重算与提交 JSON 比较中，bool/int/str/None/键集/列表长度
+      保持 exact，双方均为 float 的值用明确容差（FLOAT_ABS_TOL=1e-9
+      或 FLOAT_REL_TOL=1e-12，常量注释理由）。
+    - 红绿：±5e-14 合成漂移必须通过容差门且逐位比较必须判红（缺陷
+      机制复现）；±1e-6 必须被容差门拒绝（门不空转）；字符串/bool/
+      键集/列表长度篡改必须仍被拒绝（容差不吞结构差异）。
+    - 红证锚点：OLD2_SHA（本套件修复前 HEAD）原比较为逐位 ==，
+      源码级锚点断言 + 机制级判红双重复现。
+
+  108（P2）E127 baseline/iter8 配对未绑定完整配置
+    - 红绿（T7）：iter8 改 K2=2048/D=64/bs=1/torch=fake 保留 α/β/γ/
+      GPU/run 键——OLD2_SHA 旧脚本 rc==0 仍发布 5.47× 为「同预算」
+      速度比（GPT 反例逐条复现），新脚本 ABORT 且逐字段差异进文案。
+    - 绿证：真实四份归档过全键绑定；config canonical sha256 进每组
+      配对（e127_paired_* 与 headline 的 config_binding_sha256）+
+      provenance.config_binding（canonical/bound_fields/未记录字段
+      如实声明——dtype/CUDA/Triton/kernel 开关归档未记录，不作未
+      记录字段的同配置事实断言）。
+
+  109（P2）NaN/Inf 穿透 E125/E126/E100 消费路径
+    - 红绿（T8/T9/T10）：三路独立 NaN 篡改——E126 selector_total_ms_
+      median_est=NaN / E100 claim+main_ci+calibration 联立 NaN /
+      E125 aavg 五任务 arm/delta/AVG/CI 协同 NaN——OLD2_SHA 旧脚本
+      全部 rc==0（NaN 使 abs()>tol 与含 0 判定静默通过、json.dump
+      默认放行），新脚本入口整树 isfinite fail-closed。
+    - 绿证：最终 json.dump(allow_nan=False)（NaN 漏网到输出层时
+      序列化即崩）；真实输入全树无 NaN（绿证基线隐式覆盖）。
+
+  110（P2）机器表更新但叙事硬编码
+    - 性质测试：构造内部自洽且通过全部联立门的合法输入（aavg 五任务
+      各 +1，同步 delta/AVG/CI/significant），文字与结构化对象必须
+      同步翻转——significance_note「三候选」→「两候选 + aavg 显著
+      更好」、R1 出现「被证明优于 mavg 的候选：aavg +1.21
+      [+0.75,+1.86]」（全部从结构化字段格式化生成并与之一致）。
+    - 红证：同一输入在 OLD2_SHA 旧脚本 rc==0，但其自身结构化对象
+      （quality_e125.aavg.significant_vs_mavg=True、pairwise
+      mavg-aavg CI 不含 0）与手写叙事（「三候选 CI 均含 0」、
+      R1「aavg +0.21 [-0.25,+0.86]」）直接矛盾——GPT 110 反例
+      机器复现。
 
 运行：python3 exp/trace/test_e128_fix_098_100.py
   （可用环境变量 E128_TEST_REPO_ROOT 覆盖被测仓根；三跑 + python -O
@@ -49,6 +96,19 @@ B, SEED = 10000, 42
 # 不得改用 main: 等可变分支名，修复合入后红证基线随之失效是预期行为，
 # 锚点本体永久有效）
 OLD_SHA = "6e918c53d6353b5d7c289c5a712b2bb296cb6f45"
+# 107-110 缺陷基线（本套件修复前 HEAD，固定 SHA 锚点同上纪律）：0739
+# 审计四项缺口都在「已含 098/099/100 修复」的版本上发现——109 的 NaN
+# 穿透与 108 的配置漂移放行、110 的手写叙事矛盾都必须对该版本复现
+# 红证（对更早的 6e918c5 复现语义不同：彼时连 E100 联立门都不存在）。
+OLD2_SHA = "ce6cde0b95d6ef2bee3b08647cf1e48f03bd1b93"
+# 107 浮点容差常量：CPython 3.12+ sum() 改用 Neumaier 补偿求和，同
+# 算法跨 CPU/编译环境浮点末位可漂移 ~1e-14（GPT AMD EPYC 实测
+# 48.12400000000001 vs 48.124）。abs 1e-9 吸收求和/排序级联误差，且
+# 比任何真实数据差异（篡改门禁 T 系最小步长 0.1 分数单位）小 8 个量
+# 级；rel 1e-12 覆盖大数值相对误差。bool/int/str/None/键集/列表长度
+# 不进容差、保持 exact（deep_close 只对双方均为 float 的值启用容差）。
+FLOAT_ABS_TOL = 1e-9
+FLOAT_REL_TOL = 1e-12
 
 RESULTS = []
 
@@ -76,6 +136,51 @@ def git_show_old(path):
         sys.exit(f"[ABORT] 无法提取修复前锚点 {OLD_SHA}:{path}"
                  f"——锚点 commit 必须存在于被测仓历史\n{p.stderr}")
     return p.stdout
+
+
+def git_show_at(sha, path):
+    p = subprocess.run(["git", "-C", REPO, "show", f"{sha}:{path}"],
+                       capture_output=True, text=True)
+    if p.returncode != 0:
+        sys.exit(f"[ABORT] 无法提取锚点 {sha}:{path}"
+                 f"——锚点 commit 必须存在于被测仓历史\n{p.stderr}")
+    return p.stdout
+
+
+# ------------------------------------------------- 107 容差比较器
+def deep_close(x, y):
+    """重算 vs 提交 JSON 的递归比较（107）。
+
+    双方均为 float 的值用明确容差（abs 1e-9 或 rel 1e-12）；bool/int/
+    str/None 与结构（键集、列表长度、类型）一律 exact——身份/离散字段
+    不得被容差吞掉。"""
+    if isinstance(x, bool) or isinstance(y, bool):
+        return x is y
+    if isinstance(x, float) and isinstance(y, float):
+        return (abs(x - y) <= FLOAT_ABS_TOL
+                or abs(x - y) <= FLOAT_REL_TOL * max(abs(x), abs(y)))
+    if isinstance(x, dict) and isinstance(y, dict):
+        return set(x) == set(y) and all(deep_close(x[k], y[k]) for k in x)
+    if isinstance(x, list) and isinstance(y, list):
+        return (len(x) == len(y)
+                and all(deep_close(a, b) for a, b in zip(x, y)))
+    return x == y
+
+
+def drift_floats(obj, delta, parity=0):
+    """递归复制 obj，给所有 float 加 ±|delta|（按路径奇偶交替正负——
+    模拟 Neumaier 求和的跨环境末位漂移，非单调平移）。"""
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, float):
+        return obj + delta * (1.0 if parity % 2 == 0 else -1.0)
+    if isinstance(obj, dict):
+        return {k: drift_floats(v, delta, parity + i)
+                for i, (k, v) in enumerate(obj.items())}
+    if isinstance(obj, list):
+        return [drift_floats(v, delta, parity + i)
+                for i, v in enumerate(obj)]
+    return obj
 
 
 # ---------------------------------------------------------------- 篡改工厂
@@ -178,31 +283,126 @@ def tamper_e127_nan(orig_dir):
         json.dump(d, open(p, "w"), ensure_ascii=False, indent=1)
 
 
+def tamper_e127_iter8_config(orig_dir):
+    """⑦ E127 iter8 配置漂移（108 GPT 反例）：K2=2048/D=64/bs=1/
+    torch=fake，保留 α/β/γ/GPU/run 键——旧门只绑 αβγ+GPU，异配置
+    计时仍发布为「同预算」配对速度比。"""
+    p = os.path.join(orig_dir, "e127_iter8.json")
+    d = json.load(open(p))
+    d["config"]["K2"] = 2048
+    d["config"]["D"] = 64
+    d["config"]["bs"] = 1
+    d["torch"] = "0.0-fake"
+    json.dump(d, open(p, "w"), ensure_ascii=False, indent=1)
+
+
+def tamper_e126_selector_nan(orig_dir):
+    """⑧ E126 selector_total_ms_median_est=NaN（109 GPT 反例之一）：
+    NaN 使稳态比较/支配判定静默通过，旧脚本无 isfinite 门。"""
+    p = os.path.join(orig_dir, "e126_mavg.json")
+    d = json.load(open(p))
+    d["cases"][0]["selector_total_ms_median_est"] = float("nan")
+    json.dump(d, open(p, "w"), ensure_ascii=False, indent=1)
+
+
+def tamper_e100_coordinated_nan(orig_dir):
+    """⑨ E100 claim/main_ci/calibration 联立 NaN（109 GPT 反例之二）：
+    abs(NaN−NaN)>tol 恒 False，旧联立门全放行且输出「+nan CI 不含 0
+    显著差异」。"""
+    p = os.path.join(orig_dir, "e100.json")
+    d = json.load(open(p))
+    nan = float("nan")
+    d["claim"] = {"psi_avg": nan, "fkv_avg": nan, "diff": nan}
+    d["main_ci_13tasks"] = {"mean": nan, "ci95_lo": nan, "ci95_hi": nan,
+                            "contains_zero": False}
+    d["calibration_check"] = {"psi_avg_expected": nan,
+                              "fkv_avg_expected": nan, "passed": True}
+    json.dump(d, open(p, "w"), ensure_ascii=False, indent=1)
+
+
+def tamper_e125_coordinated_nan(orig_dir):
+    """⑩ E125 aavg 五任务 arm/delta/AVG/CI 协同 NaN（109 GPT 反例之
+    三）：全部联立门对 NaN 恒 False 放行，pairwise 把 NaN 对计入
+    「不含 0」。mavg/fullkv 锚点字段不动（四臂交叉核对门需锚点一致）。"""
+    p = os.path.join(orig_dir, "e125.json")
+    d = json.load(open(p))
+    nan = float("nan")
+    for t in TASKS:
+        e = d["per_task"][f"aavg/{t}"]
+        e["arm"] = nan
+        e["delta_vs_mavg"] = nan
+        e["delta_vs_fullkv"] = nan
+    d["aavg_avg"] = nan
+    d["aavg_avg_delta_vs_mavg"] = nan
+    d["aavg_ci95"] = [nan, nan]
+    d["aavg_significant_vs_mavg"] = False
+    json.dump(d, open(p, "w"), ensure_ascii=False, indent=1)
+
+
+def tamper_e125_aavg_plus1(orig_dir):
+    """⑪ 110 性质测试：aavg 五任务各 +1 且全字段协同自洽（delta 重算、
+    AVG/均值差 +1、CI 用同协议 paired_bootstrap 重算、significant 重算
+    True、candidates_avg5 同步）——通过全部联立门的合法数据变化。
+    文字与结构化对象必须一起翻转（旧脚本文字硬编码即矛盾）。"""
+    p = os.path.join(orig_dir, "e125.json")
+    d = json.load(open(p))
+    for t in TASKS:
+        e = d["per_task"][f"aavg/{t}"]
+        e["arm"] = e["arm"] + 1.0
+        e["delta_vs_mavg"] = e["arm"] - e["mavg"]
+        e["delta_vs_fullkv"] = e["arm"] - e["fullkv"]
+    deltas = [d["per_task"][f"aavg/{t}"]["delta_vs_mavg"] for t in TASKS]
+    lo, hi = paired_bootstrap(deltas)
+    d["aavg_avg"] = d["aavg_avg"] + 1.0
+    d["aavg_avg_delta_vs_mavg"] = d["aavg_avg_delta_vs_mavg"] + 1.0
+    d["aavg_ci95"] = [lo, hi]
+    d["aavg_significant_vs_mavg"] = bool(lo > 0 or hi < 0)
+    if isinstance(d.get("candidates_avg5"), dict) \
+            and isinstance(d["candidates_avg5"].get("aavg"), (int, float)):
+        d["candidates_avg5"]["aavg"] = d["candidates_avg5"]["aavg"] + 1.0
+    json.dump(d, open(p, "w"), ensure_ascii=False, indent=1)
+
+
+# 第四元素 = 红证锚点："old"（6e918c5，098/099/100 缺陷基线）或
+# "prev"（ce6cde0，107-110 缺陷基线——109/108 反例是对「已含 098/099/
+# 100 修复」版本复现的，对 6e918c5 红证语义不同）。
 TAMPERS = [
-    ("T1-manifest-dup-100①", tamper_manifest_dup, ["重复 (arm,task)",
-                                                    "笛卡尔积"]),
+    ("T1-manifest-dup-100①", tamper_manifest_dup,
+     ["重复 (arm,task)", "笛卡尔积"], "old"),
     ("T2-quality-ci-decouple-100②", tamper_quality_ci_decouple,
-     ["delta_vs_mavg", "来源脱钩"]),
+     ["delta_vs_mavg", "来源脱钩"], "old"),
     ("T3-e126-far-method-100③", tamper_e126_far_method,
-     ["完整方法配置不符"]),
+     ["完整方法配置不符"], "old"),
     ("T4-e126-stage-median-100④", tamper_e126_stage_median,
-     ["精确中位数", "脱钩"]),
-    ("T5-e127-dup-run-100⑤", tamper_e127_dup_run, ["重复键"]),
-    ("T6-e127-nan-100⑥", tamper_e127_nan, ["非有限正数"]),
+     ["精确中位数", "脱钩"], "old"),
+    ("T5-e127-dup-run-100⑤", tamper_e127_dup_run, ["重复键"], "old"),
+    ("T6-e127-nan-100⑥", tamper_e127_nan, ["非有限正数"], "old"),
+    ("T7-e127-iter8-config-108", tamper_e127_iter8_config,
+     ["配置绑定不一致", "108"], "prev"),
+    ("T8-e126-selector-nan-109", tamper_e126_selector_nan,
+     ["非有限值", "109"], "prev"),
+    ("T9-e100-coordinated-nan-109", tamper_e100_coordinated_nan,
+     ["非有限值", "109"], "prev"),
+    ("T10-e125-coordinated-nan-109", tamper_e125_coordinated_nan,
+     ["非有限值", "109"], "prev"),
 ]
 
 
-def run_tamper_cases(old_script_path):
+def run_tamper_cases(old_script_path, prev_script_path):
     print("=" * 78)
-    print("A. 六组篡改负例（红绿双向：旧脚本 rc==0 复现缺陷 / 新脚本 ABORT）")
+    print("A. 十组篡改负例（红绿双向：缺陷基线脚本 rc==0 复现 / 新脚本 ABORT）")
     print("=" * 78)
-    for label, fn, expect_words in TAMPERS:
+    for label, fn, expect_words, anchor in TAMPERS:
         tmp, root = build_tamper_repo(fn)
         try:
-            # 红证：修复前脚本（OLD_SHA 固定锚点）接受同一篡改输入
-            rc_old, _, _ = run_script_with(root, old_script_path,
+            # 红证：缺陷基线脚本（固定 SHA 锚点）接受同一篡改输入。
+            # T1-T6 基线=6e918c5（098/099/100 前）；T7-T10 基线=ce6cde0
+            #（107-110 前，即 098/099/100 修复后——108/109 缺口在该版本
+            # 上被 GPT 审计发现，红证必须对同一版本复现）。
+            base = old_script_path if anchor == "old" else prev_script_path
+            rc_old, _, _ = run_script_with(root, base,
                                            os.path.join(tmp, "old_out.json"))
-            check(rc_old == 0, f"{label} 红证（旧脚本接受篡改，rc==0）",
+            check(rc_old == 0, f"{label} 红证（缺陷基线接受篡改，rc==0）",
                   f"rc={rc_old}")
             # 绿证：修复后脚本拒绝
             rc_new, _, err_new = run_script(root, os.path.join(tmp,
@@ -451,10 +651,180 @@ def verify_e100_prov(new_json):
           "R6 数字与 e100 main_ci_13tasks 一致（+0.42 [-0.18,+1.02]）")
 
 
+# ------------------------------------------------- 108 配置绑定绿证
+def verify_config_binding(new_json):
+    print("=" * 78)
+    print("E2. 108 绿证：E127 全键配置绑定 hash 进每组配对 + provenance")
+    print("=" * 78)
+    prov = new_json["provenance"]["e127_stage_bench"]["config_binding"]
+    h = prov.get("sha256", "")
+    check(len(h) == 64 and all(c in "0123456789abcdef" for c in h),
+          "config canonical sha256 为 64 位 hex", h)
+    paired = new_json["e127_paired_baseline_vs_iter8"]
+    check(all(paired[k].get("config_binding_sha256") == h
+              for k in paired),
+          "8 组配对条目各携带 config_binding_sha256 且与 provenance 一致")
+    check(new_json["e127_headline_64k_normal"].get("config_binding_sha256")
+          == h, "headline 条目携带同一 config_binding_sha256")
+    canon = prov["canonical"]
+    check(canon["config"] == {"alpha": 0.25, "beta": 0.125, "gamma": 0.625,
+                              "K1": 128, "K2": 1024, "bs": 64, "D": 128,
+                              "H": 32, "Hkv": 8}
+          and canon["gpu"] == "NVIDIA H20-3e"
+          and canon["torch"] == "2.8.0+cu128",
+          "canonical 与四份真实归档一致（K1/K2/bs/D/H/Hkv/αβγ/gpu/torch）",
+          json.dumps(canon, ensure_ascii=False)[:200])
+    check(len(canon["runs_identity"]) == 8,
+          "runs_identity 为 8 组 (S0,layer_kind,steps,layer_idx)")
+    check(prov.get("baseline_sha256") == h and prov.get("iter8_sha256") == h,
+          "baseline/iter8 canonical hash 一致（绑定通过的落盘形式）")
+    check("unrecorded_fields_declaration" in prov
+          and "dtype" in prov["unrecorded_fields_declaration"],
+          "未记录字段（dtype/CUDA/Triton/kernel 开关）如实声明、不作未"
+          "记录字段的同配置事实断言")
+
+
+# ------------------------------------------------- 107 浮点容差
+def verify_float_tolerance(new_json):
+    print("=" * 78)
+    print("F0. 107 浮点字段容差比较（红绿 + 判别力）")
+    print("=" * 78)
+    # 源码级红锚点：OLD2_SHA 套件的重算比较是逐位 dict ==
+    prev_suite_src = git_show_at(
+        OLD2_SHA, "exp/trace/test_e128_fix_098_100.py")
+    check('old["quality_e125"][a] == new_json["quality_e125"][a]'
+          in prev_suite_src,
+          "红锚点源码复现：OLD2_SHA 套件 quality_e125 为逐位 == 比较")
+    orig = new_json["quality_e125"]
+    drift14 = drift_floats(orig, 5e-14)
+    check(drift14 != orig,
+          "机制红证：±5e-14 漂移下逐位 dict 比较判红（GPT EPYC 环境 "
+          "74 PASS/1 FAIL 的失败机制——本环境生成侧逐位一致，漂移由"
+          "合成注入模拟跨环境 Neumaier 求和差异）")
+    check(deep_close(orig, drift14),
+          "绿证：±5e-14 漂移通过容差门（FLOAT_ABS_TOL=1e-9）")
+    drift14b = drift_floats(orig, 1e-13)
+    check(deep_close(orig, drift14b),
+          "绿证：±1e-13 漂移（GPT 实测漂移量级上界）亦通过容差门")
+    drift6 = drift_floats(orig, 1e-6)
+    check(not deep_close(orig, drift6),
+          "红证：±1e-6 浮点差必须被容差门拒绝（门不空转——1e-6 已是"
+          "AVG5 第 6 位有效数字，非环境漂移量级）")
+    # 判别力：容差不得吞掉离散/身份/结构差异
+    tampered = json.loads(json.dumps(orig))
+    tampered["aavg"]["avg5"] = 49.124
+    check(not deep_close(orig, tampered),
+          "判别力：浮点真差异（+1 分）仍拒绝")
+    tampered = json.loads(json.dumps(orig))
+    tampered["aavg"]["significant_vs_mavg"] = \
+        not tampered["aavg"]["significant_vs_mavg"]
+    check(not deep_close(orig, tampered),
+          "判别力：bool 显著性翻转仍拒绝（exact）")
+    tampered = json.loads(json.dumps(orig))
+    tampered["verdict_e125"] = "TAMPERED"
+    check(not deep_close(orig, tampered),
+          "判别力：字符串/判决字段篡改仍拒绝（exact）")
+    tampered = json.loads(json.dumps(orig))
+    tampered["aavg"]["ci95_vs_mavg"] = tampered["aavg"]["ci95_vs_mavg"][:-1]
+    check(not deep_close(orig, tampered),
+          "判别力：列表长度变化仍拒绝（exact）")
+    tampered = json.loads(json.dumps(orig))
+    tampered["aavg"]["NEW_KEY"] = 1.0
+    check(not deep_close(orig, tampered),
+          "判别力：键集新增仍拒绝（exact）")
+    # 逐位漂移例（GPT 审计原文形态）：48.124 vs 48.12400000000001
+    check(deep_close(48.124, 48.12400000000001)
+          and 48.124 != 48.12400000000001,
+          "GPT 审计实例：48.124 vs 48.12400000000001——逐位红、容差绿")
+
+
+# ------------------------------------------------- 110 叙事一致性
+def verify_narrative_consistency(prev_script_path):
+    print("=" * 78)
+    print("H. 110 性质测试：aavg+1 协同合法输入——文字与结构化同步翻转")
+    print("=" * 78)
+    tmp, root = build_tamper_repo(tamper_e125_aavg_plus1)
+    try:
+        out_new = os.path.join(tmp, "new.json")
+        rc_new, _, err_new = run_script(root, out_new)
+        check(rc_new == 0,
+              "aavg+1 自洽输入过新脚本全部联立门（合法数据变化 rc==0）",
+              f"rc={rc_new} stderr={err_new[:300]}")
+        out_prev = os.path.join(tmp, "prev.json")
+        rc_prev, _, _ = run_script_with(root, prev_script_path, out_prev)
+        check(rc_prev == 0, "红证：同一输入 OLD2_SHA 旧脚本亦 rc==0"
+                            "（110 缺陷是文字硬编码非门禁拦截）",
+              f"rc={rc_prev}")
+        if rc_new != 0 or rc_prev != 0:
+            return
+        nw = json.load(open(out_new))
+        pv = json.load(open(out_prev))
+        # ---- 结构化对象翻转（两版本都重算，应一致）
+        qa_n = nw["quality_e125"]["aavg"]
+        exp_delta = 1.214
+        check(abs(qa_n["delta_vs_mavg"] - exp_delta) < 1e-9
+              and qa_n["significant_vs_mavg"] is True
+              and abs(qa_n["ci95_vs_mavg"][0] - 0.75) < 1e-9
+              and abs(qa_n["ci95_vs_mavg"][1] - 1.862) < 1e-9,
+              "结构化：aavg Δ=+1.214 CI=[+0.75,+1.862] 显著翻转"
+              "（GPT 110 反例机器结果逐位复现）",
+              json.dumps(qa_n, ensure_ascii=False)[:200])
+        pw_n = nw["pairwise_ci_all"]["pairs"]["mavg-aavg"]
+        check(abs(pw_n["point_est"] + exp_delta) < 1e-6
+              and pw_n["contains_zero"] is False,
+              "结构化：pairwise mavg-aavg CI 不含 0（aavg 显著更优）",
+              json.dumps(pw_n))
+        # ---- 新脚本文字与结构化一致（110 修复核心断言）
+        sn = nw["quality_steady_cost_pareto"]["significance_note"]
+        r1 = [r for r in nw["recommendation"]["reasons"]
+              if r["id"] == "R1-quality-unproven"][0]["statement"]
+        triple = (f"aavg {qa_n['delta_vs_mavg']:+.2f} "
+                  f"[{qa_n['ci95_vs_mavg'][0]:+.2f},"
+                  f"{qa_n['ci95_vs_mavg'][1]:+.2f}]")
+        check("三候选" not in sn and "两候选" in sn
+              and f"aavg 显著更好（{triple}）" in sn,
+              "significance_note 随结构化翻转：「三候选」→「两候选 + "
+              "aavg 显著更好」，数字由结构化字段格式化生成",
+              sn[:200])
+        check(f"被证明优于 mavg 的候选：{triple}" in r1
+              and "+0.21" not in r1,
+              "R1 出现「被证明优于 mavg 的候选：aavg +1.21 [+0.75,+1.86]」"
+              "，旧硬编码数字不复存在", r1[:250])
+        disp_a = nw["recommendation"]["alternative_disposition"]["aavg"]
+        check("已证明优于 mavg" in disp_a and "+1.21" in disp_a,
+              "aavg 处置随结构化翻转（已证明优于 mavg）", disp_a[:200])
+        r5 = [r for r in nw["recommendation"]["reasons"]
+              if r["id"] == "R5-cross-caliber-stability"][0]["statement"]
+        qc = nw["quality_e125"]["cclustersim"]
+        check(f"cclustersim {qc['delta_vs_mavg']:+.2f} 反超" in r5,
+              "R5 反超措辞与 cclustersim 结构化 delta 条件生成"
+              "（+0.34>0 → 反超；本臂未受 aavg 篡改影响）", r5[:150])
+        # ---- 红证：旧脚本文字硬编码与自身结构化矛盾
+        sn_p = pv["quality_steady_cost_pareto"]["significance_note"]
+        r1_p = [r for r in pv["recommendation"]["reasons"]
+                if r["id"] == "R1-quality-unproven"][0]["statement"]
+        qa_p = pv["quality_e125"]["aavg"]
+        check("三候选（aavg/cavgsim/cclustersim）" in sn_p
+              and "aavg +0.21" in r1_p,
+              "红证机制复现：旧 significance_note 仍写「三候选（aavg/…）"
+              "CI 均含 0」、R1 仍写 aavg +0.21（GPT 110 原文形态）",
+              sn_p[:200])
+        check(qa_p["significant_vs_mavg"] is True,
+              "红证矛盾实体：旧脚本自身结构化对象 aavg.significant=True"
+              "（重算路径无硬编码），与手写叙事直接冲突")
+        pw_p = pv["pairwise_ci_all"]["pairs"]["mavg-aavg"]
+        check(pw_p["contains_zero"] is False,
+              "红证矛盾实体：旧 pairwise mavg-aavg CI 不含 0，叙事却称"
+              "「aavg CI 均含 0」——机器表与手写文字脱钩（110 缺陷本质）")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ------------------------------------------------- 主数值不变 diff
 def verify_invariance(new_json):
     print("=" * 78)
-    print("F. 主数值不变：与修复前 JSON（固定锚点 SHA）逐字段 diff")
+    print("F. 主数值不变：与修复前 JSON（固定锚点 SHA）字段级 diff（107："
+          "浮点容差 + 离散 exact）")
     print("=" * 78)
     old = json.loads(git_show_old("exp/trace/results/e128_tradeoff.json"))
     same_keys = ["steady_selector_cost_e126", "cold_build_e126",
@@ -464,17 +834,45 @@ def verify_invariance(new_json):
                  "e127_profile", "e127_coverage",
                  "e127_applicability_per_arm",
                  "e109_old_caliber_avg5_cross_check"]
+
+    def strip_cfg_bind(obj, per_entry):
+        """剥离 108 允许新增的 config_binding_sha256 子键后再比较
+        （per_entry=True：配对对象每个 run 条目一层；False：headline
+        顶层一层）——允许集外任何键集/数值变化仍被 deep_close 拒绝。"""
+        if per_entry:
+            return {k: {kk: vv for kk, vv in v.items()
+                        if kk != "config_binding_sha256"}
+                    for k, v in obj.items()}
+        return {k: v for k, v in obj.items()
+                if k != "config_binding_sha256"}
+
     for k in same_keys:
-        check(old[k] == new_json[k], f"{k} 逐位不变")
-    # quality_e125：五臂 AVG5/CI/per_task_scores 逐位不变
-    qok = all(old["quality_e125"][a] == new_json["quality_e125"][a]
+        o, n = old[k], new_json[k]
+        if k == "e127_paired_baseline_vs_iter8":
+            o, n = strip_cfg_bind(o, True), strip_cfg_bind(n, True)
+        elif k == "e127_headline_64k_normal":
+            o, n = strip_cfg_bind(o, False), strip_cfg_bind(n, False)
+        check(deep_close(o, n), f"{k} 不变（浮点容差 + 离散/结构 exact）")
+    # quality_e125：五臂 AVG5/CI/per_task_scores 不变（107 容差口径）
+    qok = all(deep_close(old["quality_e125"][a], new_json["quality_e125"][a])
               for a in ARMS)
-    check(qok, "quality_e125 五臂条目（AVG5/CI/Δ/逐任务分）逐位不变")
-    check(old["quality_e125"]["fullkv_anchor_avg"] ==
-          new_json["quality_e125"]["fullkv_anchor_avg"] and
-          old["quality_e125"]["verdict_e125"] ==
+    check(qok, "quality_e125 五臂条目（AVG5/CI/Δ/逐任务分）不变"
+              "（float 容差、离散/结构 exact）")
+    check(deep_close(old["quality_e125"]["fullkv_anchor_avg"],
+                    new_json["quality_e125"]["fullkv_anchor_avg"])
+          and old["quality_e125"]["verdict_e125"] ==
           new_json["quality_e125"]["verdict_e125"],
-          "quality_e125 锚点字段逐位不变")
+          "quality_e125 锚点字段不变（verdict 字符串 exact）")
+    # pairwise / cost_only / 分离对象：099/098 修复新增，与提交 JSON 逐位一致
+    cur = json.load(open(os.path.join(
+        REPO, "exp/trace/results/e128_tradeoff.json")))
+    check(deep_close(cur["pairwise_ci_all"], new_json["pairwise_ci_all"])
+          and deep_close(cur["quality_steady_cost_pareto"],
+                         new_json["quality_steady_cost_pareto"])
+          and deep_close(cur["cost_only_total_order_at_horizon"],
+                         new_json["cost_only_total_order_at_horizon"]),
+          "pairwise_ci_all / quality_steady_cost_pareto / cost_only 三对象"
+          "与提交 JSON 一致")
     # 顶层键变化恰好 = 允许集
     old_top = set(old)
     new_top = set(new_json)
@@ -485,19 +883,23 @@ def verify_invariance(new_json):
                                 "cost_only_total_order_at_horizon"},
           "新增顶层键恰为 pairwise_ci_all + 两个分离对象",
           str(new_top - old_top))
-    # meta 变化恰好 = 允许集（环境字段 + 措辞 + 新增注记）
+    # meta 变化恰好 = 允许集（环境字段 + 措辞 + 新增注记 + 110 叙事生成声明）
     meta_diff = {k for k in set(old["meta"]) | set(new_json["meta"])
                  if old["meta"].get(k) != new_json["meta"].get(k)}
     allowed_meta = {"probe", "statistical_discipline", "base_commit",
                     "worktree_branch", "multiple_comparison_note",
-                    "fix_provenance_gpt_audit"}
+                    "fix_provenance_gpt_audit", "narrative_generation"}
     check(meta_diff <= allowed_meta,
-          "meta 变化 ⊆ 允许集（环境/措辞/新增注记）", str(meta_diff))
-    # provenance 变化恰好 = 允许集（E100 新增 + E125 consumed_fields 措辞）
+          "meta 变化 ⊆ 允许集（环境/措辞/新增注记/叙事生成声明）",
+          str(meta_diff))
+    # provenance 变化恰好 = 允许集（E100 新增 + E125 consumed_fields 措辞
+    # + 108 e127 config_binding）
     prov_diff = {k for k in set(old["provenance"]) | set(new_json["provenance"])
                  if old["provenance"].get(k) != new_json["provenance"].get(k)}
-    check(prov_diff == {"e100_bootstrap_ci", "e125_screen_verdict"},
-          "provenance 变化恰为 E100 新增 + E125 consumed_fields 措辞",
+    check(prov_diff == {"e100_bootstrap_ci", "e125_screen_verdict",
+                        "e127_stage_bench"},
+          "provenance 变化恰为 E100 新增 + E125 consumed_fields 措辞 + "
+          "E127 config_binding（108）",
           str(prov_diff))
 
 
@@ -506,10 +908,14 @@ def main():
     if not os.path.exists(SCRIPT):
         sys.exit(f"[ABORT] 被测脚本不存在 {SCRIPT}")
     tmpdir = tempfile.mkdtemp(prefix="e128_suite_")
-    # 修复前脚本固定锚点提取
+    # 修复前脚本固定锚点提取（098/099/100 基线=OLD_SHA；107-110 缺陷
+    # 基线=OLD2_SHA——T7-T10 红证与 110 性质测试的旧脚本）
     old_script = os.path.join(tmpdir, "analyze_e128_tradeoff_old.py")
     with open(old_script, "w") as f:
         f.write(git_show_old("exp/trace/analyze_e128_tradeoff.py"))
+    prev_script = os.path.join(tmpdir, "analyze_e128_tradeoff_prev.py")
+    with open(prev_script, "w") as f:
+        f.write(git_show_at(OLD2_SHA, "exp/trace/analyze_e128_tradeoff.py"))
 
     # ---- 绿证：真实仓跑通（python 与 -O 各一），产物用于后续断言
     print("=" * 78)
@@ -526,12 +932,15 @@ def main():
         return
     new_json = json.load(open(out1))
 
-    run_tamper_cases(old_script)
+    run_tamper_cases(old_script, prev_script)
     property_subset_test()
     verify_pairwise(new_json)
     verify_wording(new_json)
     verify_e100_prov(new_json)
+    verify_config_binding(new_json)
+    verify_float_tolerance(new_json)
     verify_invariance(new_json)
+    verify_narrative_consistency(prev_script)
 
     # ---- 确定性：三跑逐位一致（python）+ -O 与 python 产物主数值一致
     print("=" * 78)
