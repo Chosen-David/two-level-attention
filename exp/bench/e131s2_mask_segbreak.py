@@ -26,7 +26,8 @@ import torch.nn.functional as F  # noqa: E402
 from einops import rearrange  # noqa: E402
 
 from e131_arm_bench import make_args  # noqa: E402
-from sparse_attn.indexer.tli_indexer_fast import TLIIndexerFast  # noqa: E402
+# 【E127 inplace 合并（2026-10-12）】TLIIndexerFast 子类退役，语义并入基类
+from sparse_attn.indexer.tli_indexer import TLIIndexer as TLIIndexerFast  # noqa: E402
 from sparse_attn.patches.utils import prepare_cu_seqlens, prepare_seqlens  # noqa: E402
 
 

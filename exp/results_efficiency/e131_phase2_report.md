@@ -59,3 +59,13 @@
 2. E113 的「BT=256 vs 512 仅差 6%」结论只在 struct K≈2K 小簇口径成立，大簇态（k_live≥28K）必须大 BT——已写入 wrapper 注释。
 3. cavgsim 优化后 spike 28.3 vs 优化前 25.3：残余 +3.0ms 为 v2 wrapper 额外 CPU 开销（k_live.max().item() 同步 + 探测缓存查询，CPU +2.9ms/步实测）+ GPU0/GPU1 跨卡波动，稳态 SUM 无影响，如实记录。
 4. mavg/aavg 不专项优化臂的 Δ+0.02~0.035：第三次复测（mavg 1.6179 / aavg 1.6150）落在两组之间，确认为运行间噪声（代码路径未变，见第二节噪声带说明），不构成回归。
+
+## 六、E127 inplace 合并移植后记（2026-10-12）
+
+E131-S2 开发期间主仓发生 E127 inplace 重构（d3f1aca：TLIIndexerFast 语义并入基类、fast 文件删除，用户指令）。E131-S2 三组件已随 merge 迁移至新结构并全量复验：
+
+- v2 调度分支 → `tli_indexer.py` 基类 `_greedy_cluster_pass`（开关 TLI_E131_GREEDY_V2 不变，fail-closed 回退 v1）；
+- tok_score 全融合 → 基类 `_far/_near_token_score` + 模块级 `_tok_score_kernel`（开关 TLI_E131_TOKSCORE_TRITON 不变）；
+- `greedy_triton.py` v2 kernel 本体不变（md5 b8669bb6ca58976248bc0e2434f9a1ad）。
+
+移植后复验（GPU0，与第二节 GPU1 终表数字对照）：对拍套件 V1-V5 全 PASS（far 冷建 962.9ms / near 47.7ms / 续跑 115.3ms 与移植前一致）；e2e mask 逐位 12585120/12585120 = 100.0000%（两臂各 24 步）；cclustersim SUM 1.8193（终表 1.8056，Δ+0.014 噪声带内）、cavgsim SUM 1.5105（终表 1.5186）；gate 全绿。移植后基类 md5 83b5004fe227638a37f100c59af62c94（注：E127 inplace 合并后 tli_indexer.py md5 不再是 E126 期冻结值 bf5e26c4…，锚点语义由 d3f1aca 的 113 项回归套件背书）。
