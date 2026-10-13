@@ -89,6 +89,9 @@ from sparse_attn.info import (  # noqa: E402
 # 142（TL-FASA-CALIBRATION-IDENTITY）：FASA agreement 源/目标身份的
 # 唯一 staging 口径（与 LongBench 入口、treatment 名三方同源）。
 from sparse_attn.info import stage_fasa_agreement  # noqa: E402
+# 149（TL-MINFERENCE-PATTERN-IDENTITY）：MInference pattern 内容身份
+# 的入口冻结（与 LongBench 入口、treatment 名三方同源）。
+from sparse_attn.info import freeze_minference_pattern_sha8  # noqa: E402
 
 RULER_TASKS = [
     "niah_single_1", "niah_single_2", "niah_single_3",
@@ -224,6 +227,11 @@ def main():
             raise RuntimeError(
                 "method=minference_vendor 需要 --minference_config_path "
                 "指向 pattern json（如 best_pattern_qwen3_8b.json）")
+        # 149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）：入口
+        # 加载期单次冻结 pattern 内容身份（与 adapter 读 config_path JSON
+        # 同一窗口）——treatment 名尾段 _cfg<sha8> 消费冻结值，name 与
+        # runtime 共用同一批 bytes（142 同款单次冻结）。
+        freeze_minference_pattern_sha8(args)
         n_patched = enable_minference(
             model,
             is_search=False,

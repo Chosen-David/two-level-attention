@@ -631,6 +631,49 @@ def stage_fasa_agreement(args, repo_root=None):
     return dst_agr
 
 
+def freeze_minference_pattern_sha8(args):
+    """149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）：
+    入口加载期单次冻结 pattern JSON 内容 SHA256 前 8 位（142 同款
+    单次冻结）——挂 args._minference_pattern_sha8，命名侧优先消费
+    冻结值，与 adapter（qwen3_minference_patch enable_minference 读
+    config_path JSON）同一读点窗口。缺 config_path / 不可读一律
+    fail-closed SystemExit：pattern 内容是 treatment 身份的一部分，
+    MInference 无 config 直跑路径不存在（两入口在 enable 前同样
+    拒绝 None config）。"""
+    cfg_path = getattr(args, "minference_config_path", None)
+    if not cfg_path:
+        raise SystemExit(
+            "[GATE-FAIL] 149: method=minference_vendor 必须传 "
+            "--minference_config_path（is_search 在线搜出的 best_pattern "
+            "JSON）——pattern 内容决定逐层逐头 sparse prefill，是 treatment "
+            "身份的一部分，无 config 直跑路径不存在，fail closed")
+    try:
+        with open(cfg_path, "rb") as f:
+            raw = f.read()
+    except OSError as e:
+        raise SystemExit(
+            f"[GATE-FAIL] 149: MInference pattern JSON 不可读（{cfg_path} → "
+            f"{type(e).__name__}: {e}）——treatment 名必须绑定实际 pattern "
+            f"内容，fail closed")
+    sha8 = hashlib.sha256(raw).hexdigest()[:8]
+    setattr(args, "_minference_pattern_sha8", sha8)
+    return sha8
+
+
+def _minference_cfg_sha8(args):
+    """149：minference_vendor 名字 pattern 内容身份段的唯一来源。
+
+    优先消费入口冻结值（freeze_minference_pattern_sha8，模型加载前
+    单次读源——name 与 adapter 实际加载的 pattern 同一批 bytes）；
+    未经入口冻结的路径（如直接调命名函数的回归测试）现场读源
+    fail closed——降级路径内容身份仍正确，仅读点晚于 runtime（读点
+    替换窗口由入口冻结闭合，本函数不为此重复设防）。"""
+    sha8 = getattr(args, "_minference_pattern_sha8", None)
+    if isinstance(sha8, str) and sha8:
+        return sha8
+    return freeze_minference_pattern_sha8(args)
+
+
 def get_method_name_with_info(args, snapshot=None):
     # 081：snapshot 提供时 tli 名的 _h<hash10> 段从冻结 manifest_json
     # 派生（与 sidecar/receipt 同源）；非 tli 分支不消费 snapshot。
@@ -644,10 +687,19 @@ def get_method_name_with_info(args, snapshot=None):
         # B 轨 vendor（官方源码复用）：MInference prefill 动态稀疏 + decode dense。
         # pattern 文件（config_path）不同 = treatment 不同（不同模型/搜索口径），
         # 取 basename 编码进文件名；starting_layer 之前浅层 dense。
+        # 149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）：只编码
+        # basename 时两份不同内容、同 basename 的 pattern 共享同一 method
+        # name（且非 tli 路径 treatment sidecar 不写，无第二道门）。修复 =
+        # 追加 pattern JSON 内容 SHA256 前 8 位尾段 `_cfg<sha8>`（内容身份，
+        # 与路径无关），追加段不改既有语义字段（既有文件名不追溯改动）。
+        # 内容 sha 优先消费入口加载期冻结值（freeze_minference_pattern_
+        # sha8，142 同款单次冻结）；未经冻结的路径现场读源 fail closed。
+        cfg_sha8 = _minference_cfg_sha8(args)
         pattern_tag = os.path.basename(
             getattr(args, "minference_config_path", "pattern")
         ).replace(".json", "")
-        return f"minference_vendor_{pattern_tag}_{getattr(args, 'minference_starting_layer', -1)}"
+        return (f"minference_vendor_{pattern_tag}_"
+                f"{getattr(args, 'minference_starting_layer', -1)}_cfg{cfg_sha8}")
     elif args.method == "fasa_vendor":
         # B 轨 vendor（官方源码复用）：FASA decode 频域剪枝。校准数据集 +
         # budget/threshold_ratio/min_k/max_k/mode 全参数编码进文件名——

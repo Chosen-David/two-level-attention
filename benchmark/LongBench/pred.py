@@ -43,6 +43,9 @@ from sparse_attn.info import get_method_name_with_info, \
 # 142（TL-FASA-CALIBRATION-IDENTITY）：FASA agreement 源/目标身份的
 # 唯一 staging 口径（与 RULER 入口、treatment 名三方同源）。
 from sparse_attn.info import stage_fasa_agreement
+# 149（TL-MINFERENCE-PATTERN-IDENTITY）：MInference pattern 内容身份
+# 的入口冻结（与 RULER 入口、treatment 名三方同源）。
+from sparse_attn.info import freeze_minference_pattern_sha8
 # 【095 修复（GPT 审计 2026-10-12_0527）】TLI_E127_FAST=1 的 gather 路径把
 # 三类契约违规延迟到 GPU 端错误标志，须由本入口在每样本生成段边界消费
 # ——guard 退出校验 raise 必须先于 record 构造/append 与任何落盘。
@@ -530,6 +533,11 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
                 "method=minference_vendor 必须传 --minference_config_path "
                 "（is_search 在线搜出的 best_pattern JSON）"
             )
+        # 149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）：入口
+        # 加载期单次冻结 pattern 内容身份（与 adapter 读 config_path JSON
+        # 同一窗口）——treatment 名尾段 _cfg<sha8> 消费冻结值，name 与
+        # runtime 共用同一批 bytes（142 同款单次冻结）。
+        freeze_minference_pattern_sha8(args)
         n_patched = enable_minference(
             model,
             is_search=False,
