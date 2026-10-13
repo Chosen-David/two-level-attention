@@ -87,3 +87,29 @@
 尚有 faithful port/身份/整请求 E2E/严格 prefill 等未关闭门禁；E134 待扩大
 质量确认与 prefill 省算兑现；E119 是撤回 round18 误判的当前权威作者记录。
 不根据论文趋势关闭验收，不修改人工指南、方法默认值、分数或任务完成状态。
+
+
+## 2026-10-13 第二次清理判定（核查 main `b787a372`）
+
+以下两份 YaRN 重判已完整收录于 [S-T023 Progress 与 §10](../task/task_details/S-T023.md)
+及 [E119 判决 JSON](../../exp/trace/results/e119_128k_yarn_factor_reverdict.json)，
+移入 `archive/`，逐字保留。归档表示重复建议已整合，不重新验收实验或改变作者判决。
+
+| 归档记录 | 依据与保留边界 |
+| --- | --- |
+| [Opus 11:57 E119 重判](archive/2026-10-13_1157_E119_128k_yarn_factor_reverdict_by_opus.md) | round18 撤回、三臂锚点恢复及 mavg/aavg 重跑取消已有 S-T023 §10 和判决 JSON；源码 `benchmark/RULER/run_ruler_e109.sh`、`pred_ruler.py` 与 `yarn_receipt.py` 支持 auto factor/声明边界。未重跑逐位对拍，不把当前脚本推断当成全部旧 producer 回执。 |
+| [DeepSeek 12:10 重判复核](archive/2026-10-13_1210_yarn_factor_round18_verdict_revisit_by_deepseek.md) | fullkv 重评分、Opus 交叉判决、minf 分任务观察及 open_question_minf 已入 S-T023 12:1X/13:3X。旧安装与派单快照不再作为当前进度；稀疏聚焦是待验证解释，不能据分数方向关闭 faithful port。 |
+
+当前四份活跃建议继续保留：
+
+- 两份 10-11 GPT 建议：整请求质量/实测 E2E、faithful port、原始身份与严格
+  prefill 等门禁未全部关闭；Quest Q/K norm 在当前源码已修，任务索引相应纠正，
+  不再将该局部缺陷列为待修。
+- E134 子空间判决：紧凑实现和更新表已存在，更广任务/128K 质量确认与
+  prefill 省算兑现仍待证，不以局部实现完成归档整份建议。
+- E137 gate 组合建议：当前 `_resolve_skip` 仍会按非 null 静态集合重写
+  `skip_far`，静态默认开、动态默认关；布局修复已有，但 gate 组合及实际运行
+  flags/有效 mask 绑定、修复后标定与开销证据未关闭，继续活跃。
+
+归档路径在任务详情同步更新，历史 Progress 原意保留；未修改人工指南、
+代码、实验分数或任务完成状态。本次仅静态核查与文档验证，未运行 GPU。
