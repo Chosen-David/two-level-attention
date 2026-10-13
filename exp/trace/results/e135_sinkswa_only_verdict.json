@@ -1,0 +1,55 @@
+{
+ "exp": "E135a sinkswa_only 归因臂 e2e 判决（mask=sink[0,128)∪尾128 恒 256 tok/head，L1/L2 分数旁路）",
+ "date": "2026-10-13",
+ "protocol": {
+  "arm": "E123 mavg 锚点 flags + --tli_sinkswa_only（单键增量，treatment hash 移位一轮）",
+  "anchor": "E123 mavg AVG5 47.91（e123_trial_verdict.json per_task，不重跑）",
+  "scoring": "本机 eval.py（python3 -m benchmark.LongBench.eval，difflib:stdlib）五格统一打分；strict runcap 5/5，cap_comparability_key 6688f41924 与锚点同源单一，无 legacy 混挂",
+  "hosts": ".187 GPU3 qasper / GPU4 gov_report / GPU5 repobench-p；.251 GPU0 hotpotqa / GPU1 musique；rsync 收割回本机后单次统一打分",
+  "row_gate": "best-file 行数门 repobench-p=500 其余 200（086 SKIP 前缀协议）；expect-count 200 eval 门全过",
+  "stats": "task-bootstrap 10000 次 seed 20261013，描述性（126 纪律）"
+ },
+ "per_task": {
+  "gov_report": {
+   "anchor": 33.6,
+   "sinkswa_only": 22.42,
+   "delta": -11.18
+  },
+  "hotpotqa": {
+   "anchor": 59.42,
+   "sinkswa_only": 29.92,
+   "delta": -29.5
+  },
+  "musique": {
+   "anchor": 34.25,
+   "sinkswa_only": 12.47,
+   "delta": -21.78
+  },
+  "qasper": {
+   "anchor": 46.45,
+   "sinkswa_only": 11.45,
+   "delta": -35.0
+  },
+  "repobench": {
+   "anchor": 65.83,
+   "sinkswa_only": 54.2,
+   "delta": -11.629999999999995
+  }
+ },
+ "avg": {
+  "anchor": 47.91,
+  "sinkswa_only": 26.09,
+  "delta": -21.82
+ },
+ "bootstrap_ci95": [
+  -30.156,
+  -13.48
+ ],
+ "mass_merged": {
+  "indexer_gain_mass": 0.217437,
+  "grid_json": "e135_sinkswa_grid.json",
+  "note": "mass 面 champion−sinkswa_only=+0.2174 与 e2e 面 AVG Δ-21.82 同向；5/5 任务 e2e 全负（-11.18~-35.00），归因完全单向"
+ },
+ "bitexact": "默认参数（sink=128/swa=128/sinkswa_only=False）跨树逐位 100%（3 anchor 臂 × 12,585,120 位）+ 结构断言全过（sinkswa 臂每步 ≡ sink∪尾128 恰 256 tok/head）——E135 参数化改造零扰动",
+ "verdict": "归因判决成立且完全单向：纯 sink∪swa（256 tok 固定窗）AVG5 26.09 vs 锚点 47.91（Δ-21.82，task-bootstrap CI 不含 0），5/5 任务全负（-11.18~-35.00）——mid 区两级索引选择在全部任务类型上有正贡献（最低 gov_report/repobench ~-11.2/-11.6，最高 qasper -35.0），E135b mass 面 indexer_gain +0.2174 与 e2e 面 Δ-21.82 同向闭合。归因链：mass 面 +0.2174 覆盖率差 → e2e 面 -21.82 分（锚点−归因臂）。与 E135b 敏感性结论（champion 对 (sink,swa) 网格极差仅 2.1pp、增益主体在 mid 选择质量而非固定区宽度）合并构成论文消融叙事：两级索引的增益不可由固定窗替代。主消融表更新：sinkswa_only 26.09 行纳入（归因基线，非竞争臂）。"
+}
