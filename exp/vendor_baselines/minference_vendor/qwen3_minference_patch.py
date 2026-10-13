@@ -208,12 +208,21 @@ def enable_minference(
     is_search: bool = False,
     config_path: str = None,
     starting_layer: int = -1,
+    frozen_pattern: object = None,
 ) -> int:
     """把 model 内全部 Qwen3Attention 绑定 MInference 官方 prefill forward。
 
     - is_search=True：在线搜 Qwen3 自己的 pattern 写 config_path（需要先跑一次长
       prefill，官方 minference_prefill_forward 逐层逐 head search_pattern）。
     - is_search=False：从 config_path 读 best_pattern 正式跑 sparse。
+      149 并发残余修复（C+ 批）：优先消费入口冻结对象 frozen_pattern
+      （sparse_attn/info.py freeze_minference_pattern_sha8 挂
+      args._minference_pattern_frozen 的 .pattern，即 freeze 时刻
+      json.loads 的结果）——不再 open 可变 config_path（旧实现 freeze
+      只存 hash、adapter 二次 open：窗口内源被替换则 name 绑 A、
+      runtime 读 B，与 142 同构）。frozen_pattern 缺省 None 的降级
+      路径（直接调本函数、未经入口 freeze）现场读 config_path 并
+      显式 fail-closed（不用 assert——python -O 会剥除）。
     - starting_layer：之前浅层走 dense（官方默认 -1 = 全层 sparse）。
     返回 patch 层数。
     """
@@ -250,16 +259,27 @@ def enable_minference(
             "config_path": config_path,
         }
     else:
-        assert config_path and os.path.isfile(config_path), (
-            f"is_search=False 需要现有 best_pattern 文件: {config_path}"
-        )
-        with open(config_path, "r") as f:
-            attn_config = {
-                "is_search": False,
-                "starting_layer": starting_layer,
-                "config_path": config_path,
-                "best_pattern": json.load(f),
-            }
+        if frozen_pattern is not None:
+            # 149 并发残余修复：消费入口冻结对象（freeze 时刻已单次读源
+            # 并 json.loads），本路径绝不 open 可变 config_path——name 与
+            # runtime 共用同一冻结内容。
+            best_pattern = frozen_pattern
+        else:
+            # 降级路径（未经入口 freeze 直接调 adapter）：现场读 fail
+            # closed。显式 raise 而非 assert（python -O 剥 assert）。
+            if not config_path or not os.path.isfile(config_path):
+                raise SystemExit(
+                    f"[GATE-FAIL] 149: is_search=False 需要现有 best_pattern"
+                    f"文件: {config_path}——经入口 freeze（--minference_"
+                    f"config_path）或提供可读文件，fail closed")
+            with open(config_path, "r") as f:
+                best_pattern = json.load(f)
+        attn_config = {
+            "is_search": False,
+            "starting_layer": starting_layer,
+            "config_path": config_path,
+            "best_pattern": best_pattern,
+        }
 
     _patch_recursive(model)
     for name, module in model.named_modules():

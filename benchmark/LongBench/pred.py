@@ -533,16 +533,21 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
                 "method=minference_vendor 必须传 --minference_config_path "
                 "（is_search 在线搜出的 best_pattern JSON）"
             )
-        # 149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）：入口
-        # 加载期单次冻结 pattern 内容身份（与 adapter 读 config_path JSON
-        # 同一窗口）——treatment 名尾段 _cfg<sha8> 消费冻结值，name 与
-        # runtime 共用同一批 bytes（142 同款单次冻结）。
+        # 149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd + C+ 批
+        # 并发残余）：入口加载期单次冻结 pattern 完整内容身份快照（sha8
+        # + raw bytes + 解析后 JSON）——treatment 名尾段 _cfg<sha8> 消费
+        # 冻结值；adapter（enable_minference）同样消费冻结对象构建
+        # best_pattern，不再二次 open 可变 config_path（旧实现窗口内
+        # 源被替换则 name 绑 A、runtime 读 B，与 142 同构）。
         freeze_minference_pattern_sha8(args)
+        frozen_snap = getattr(args, "_minference_pattern_frozen", None)
         n_patched = enable_minference(
             model,
             is_search=False,
             config_path=cfg_path,
             starting_layer=getattr(args, "minference_starting_layer", -1),
+            frozen_pattern=(frozen_snap.pattern
+                            if frozen_snap is not None else None),
         )
     elif args.method == "fasa_vendor":
         # B 轨 vendor（官方源码复用）：FASA（ICLR 2026 frequency-aware

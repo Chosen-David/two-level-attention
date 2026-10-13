@@ -712,9 +712,22 @@ def freeze_minference_pattern_sha8(args):
             f"[GATE-FAIL] 149: MInference pattern JSON 不可读（{cfg_path} → "
             f"{type(e).__name__}: {e}）——treatment 名必须绑定实际 pattern "
             f"内容，fail closed")
-    sha8 = hashlib.sha256(raw).hexdigest()[:8]
-    setattr(args, "_minference_pattern_sha8", sha8)
-    return sha8
+    # 149 并发残余：畸形 JSON 在 freeze 期即报错（fail closed 提前到
+    # 入口）——不再留给 adapter 二次 open 时才炸
+    try:
+        parsed = json.loads(raw)
+    except (ValueError, UnicodeDecodeError) as e:
+        raise SystemExit(
+            f"[GATE-FAIL] 149: MInference pattern JSON 畸形（{cfg_path} → "
+            f"{type(e).__name__}: {e}）——treatment 名必须绑定可被 adapter "
+            f"实际消费的 pattern 内容，fail closed")
+    full_sha = hashlib.sha256(raw).hexdigest()
+    snap = MinferencePatternSnapshot(
+        config_path=cfg_path, sha256=full_sha, sha8=full_sha[:8],
+        raw=raw, pattern=parsed)
+    setattr(args, "_minference_pattern_frozen", snap)
+    setattr(args, "_minference_pattern_sha8", snap.sha8)
+    return snap.sha8
 
 
 def _minference_cfg_sha8(args):
@@ -725,6 +738,9 @@ def _minference_cfg_sha8(args):
     未经入口冻结的路径（如直接调命名函数的回归测试）现场读源
     fail closed——降级路径内容身份仍正确，仅读点晚于 runtime（读点
     替换窗口由入口冻结闭合，本函数不为此重复设防）。"""
+    frozen = getattr(args, "_minference_pattern_frozen", None)
+    if frozen is not None:
+        return frozen.sha8
     sha8 = getattr(args, "_minference_pattern_sha8", None)
     if isinstance(sha8, str) and sha8:
         return sha8
