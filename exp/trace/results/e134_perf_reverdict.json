@@ -1,0 +1,41 @@
+{
+ "experiment": "E134 性能重判：真 32 维实现（E133b 紧凑布局 + E133c 省算兑现，merge 2c393c5）后三臂性能矩阵",
+ "date": "2026-10-13",
+ "trigger": "用户指令：E134 原性能表（①1.5284/②1.5773/③1.5342）基于假 32 维旧代码（zeros_like 零填充 128 宽 dense + b_q 全维 + 路由==128），性能浪费未兑现，要求 fix 后重给数据",
+ "code_identity": {
+  "old": "c400956 = E134 原判决树（DeepSeek l2_subspace 开关 + 假 32 维旧实现）",
+  "new": "2c393c5 = main merge e111-dgate-short(6fd956e) + l2_subspace 开关移植进紧凑布局（l2=full 时 buf 全宽直写 + b_q_full 全维）",
+  "bitexact": "三臂（full/tail/l2full）× 24 步 × 12,585,120 位新旧实现逐位对拍 100% PASS——质量判决不变，纯性能重跑；E127 门禁新树 15 PASS"
+ },
+ "protocol": "e131_arm_bench --S 65536 --steps 60 --warmup 40，TLI_E127_FAST=1，稳态=后 20 步 GPU 中位；host 2xh20-reg0519（2×H20-3e 独占）；R1: GPU0=old/GPU1=new，R2 交叉；E134 原数字 1.5284/1.5773/1.5342 为另一环境口径，跨环境绝对值不可比，本判决全部取同机两轮中位",
+ "steady_gpu_ms": {
+  "full+sub": {
+   "old_r1": 1.5435,
+   "old_r2": 1.5654,
+   "old_med": 1.5545,
+   "new_r1": 1.3635,
+   "new_r2": 1.337,
+   "new_med": 1.3502,
+   "delta_pct": -13.1
+  },
+  "sub+sub": {
+   "old_r1": 1.7364,
+   "old_r2": 1.6566,
+   "old_med": 1.6965,
+   "new_r1": 1.3872,
+   "new_r2": 1.3324,
+   "new_med": 1.3598,
+   "delta_pct": -19.8
+  },
+  "sub+full": {
+   "old_r1": 1.5714,
+   "old_r2": 1.629,
+   "old_med": 1.6002,
+   "new_r1": 1.4794,
+   "new_r2": 1.4473,
+   "new_med": 1.4634,
+   "delta_pct": -8.5
+  }
+ },
+ "verdict": "真 32 维实现后三臂全部大幅提速：full+sub -13.1% / sub+sub -19.8% / sub+full -8.5%（两轮交叉一致）。【原判决『L1 子空间无速度收益』反转】旧代码 sub+sub 比冠军慢 +9.1%（1.6965 vs 1.5545，假 32 维零填充+launch 开销吃掉省算）；新代码 sub+sub 1.3598 vs full+sub 1.3502 （+0.7% 噪声带内持平反超）——tail32 省 4× 粗筛算力已兑现为时间。sub+full 1.4634 仍最慢（L2 全 128 维量化/打分成本实打实，紧凑化无法救）——结合质量判决（sub+sub Δ-0.32 显著掉点 / sub+full 与冠军持平）：E134 终判维持 full+sub 冠军（质量最优且性能第一档），但『子空间无性能收益』表述必须撤回——那是旧实现的工程债，不是方法属性；性能维度 sub+sub 现与冠军持平，质量是唯一取舍维度。"
+}

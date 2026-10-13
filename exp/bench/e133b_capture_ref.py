@@ -19,10 +19,13 @@ from sparse_attn.patches.utils import prepare_cu_seqlens, prepare_seqlens  # noq
 
 
 def arm_args(arm):
-    """cmp4 基座（e2e 锚点口径）；arm ∈ full / tail。"""
+    """cmp4 基座（e2e 锚点口径）；arm ∈ full / tail / l2full。"""
     ns = make_args("mavg_e2e")
     if arm == "tail":
         ns.tli_subspace = "tail"
+    elif arm == "l2full":
+        ns.tli_subspace = "tail"
+        ns.tli_l2_subspace = "full"
     return ns
 
 

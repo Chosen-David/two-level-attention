@@ -106,7 +106,7 @@ ARM_CONFIGS = {
                         enable_kmeans=True, alpha=0.125, beta=0.25, gamma=0.125),
 }
 
-ARMS = list(ARM_CONFIGS) + ["mavg_e127", "mavg_e2e", "mavg_tail"]
+ARMS = list(ARM_CONFIGS) + ["mavg_e127", "mavg_e2e", "mavg_tail", "mavg_l2full"]
 
 
 def make_args(arm):
@@ -122,6 +122,12 @@ def make_args(arm):
         ns = make_args("mavg_e127")
         ns.tli_subspace = "tail"
         ns.tia_level2_cmp_ratio = 4
+        return ns
+    if arm == "mavg_l2full":
+        ns = make_args("mavg_e127")
+        ns.tli_subspace = "tail"
+        ns.tia_level2_cmp_ratio = 4
+        ns.tli_l2_subspace = "full"
         return ns
     if arm == "mavg_e127":
         # E127 harness make_args(0.25, 0.125, 0.625) 原样克隆（机器校准锚点；
@@ -139,7 +145,7 @@ def make_args(arm):
             tli_sigma_select='none', tli_moba=False, tli_sigma=8.0,
             tli_per_q_head=False, tli_enable_layer_skip=True, tli_layer_skip_path=None,
             tli_alpha=0.25, tli_beta=0.125, tli_gamma=0.625, tli_subspace='full',
-            tli_proj_basis=None, tli_static_pair=False)
+            tli_l2_subspace='same', tli_proj_basis=None, tli_static_pair=False)
     cfg = dict(COMMON_ARGS)
     ac = ARM_CONFIGS[arm]
     cfg.update(dict(
@@ -175,6 +181,12 @@ def arm_config_for_meta(arm):
             "effective_args": vars(make_args(arm)),
             "note": "E133 子空间臂：mavg_e127 锚点 + subspace=tail + "
                     "cmp_ratio=4（E129 C2 同款 tail32 口径，仅此两键异）",
+        }
+    if arm == "mavg_l2full":
+        return {
+            "effective_args": vars(make_args(arm)),
+            "note": "E134 ③ sub+full 臂：mavg_tail + l2_subspace=full"
+                    "（L1 tail32 粗筛 + L2 全 128 维量化细筛）",
         }
     return {
         "effective_args": vars(make_args(arm)),
