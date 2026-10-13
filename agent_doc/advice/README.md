@@ -62,3 +62,28 @@
 但 faithful port、原始身份/评分、整请求 E2E、严格 prefill 前缀语义等门禁
 尚未全部闭合；阶段设计还包含 E130/E131 配置及产物绑定待核事项。
 未修改人工指南、实现、实验分数或任务完成状态。
+
+
+## 2026-10-13 清理判定（核查 main `cac0238`）
+
+核对活跃 advice、S-T023、MInference/Quest 适配层、LB/RULER 入口、YaRN
+声明边界及 E119 重判 JSON。以下九份监督快照归档，原文 SHA-256 逐份一致；
+未完成事项与撤回判定整合到 [S-T023 §10](../task/task_details/S-T023.md)。
+归档不等于独立实验验收。本次未运行 GPU 或复测远端依赖/网络。
+
+| 归档记录 | 判定依据及保留边界 |
+| --- | --- |
+| [0125 报告](archive/2026-10-13_0125_twolevel_gpu_supervisor_round11_by_deepseek.md) | GPU round11：旧全空/收官快照被后续 MInference 接入取代；ClusterKV 更正与阻塞链补入 S-T023 §10，未判依赖已解。 |
+| [0208 报告](archive/2026-10-13_0208_twolevel_baseline_task_supervisor_round13_by_deepseek.md) | baseline round13：vendor 通道已有源码，接入及下一步已进入 S-T023；Qwen3 pattern 仍须独验，不沿用旧层/头数猜测。 |
+| [0505 报告](archive/2026-10-13_0505_twolevel_baseline_task_supervisor_round14_by_deepseek.md) | baseline round14：Qwen3 胶水、搜索与两任务作者 sanity 已入 S-T023；后续全量记录取代派单建议，faithful port 门禁未关闭。 |
+| [0520 报告](archive/2026-10-13_0520_twolevel_baseline_task_supervisor_round15_by_deepseek.md) | baseline round15：makedirs 幂等修复在源码存在；任务名/跨机检查要点保留，全量在飞快照已被后续汇总取代。 |
+| [0550 报告](archive/2026-10-13_0550_twolevel_gpu_supervisor_round12_by_deepseek.md) | GPU round12：RULER MInference 分支在源码存在，漂移事件已入 S-T023；32K 待补 vt/旧进度由 round16 作者汇总取代。 |
+| [0700 报告](archive/2026-10-13_0700_twolevel_baseline_task_supervisor_round16_by_deepseek.md) | baseline round16：LBv1/LBv2/32K 作者分数及 64K 派单已入 S-T023，64K 在飞快照被 round13/18 取代；非独立主表验收。 |
+| [0725 报告](archive/2026-10-13_0725_twolevel_gpu_supervisor_round13_by_deepseek.md) | GPU round13：64K 50.29 与 128K 派单摘要补入 S-T023 §10；08:00 ETA 与 GPU 快照失效，32B 待办保留。 |
+| [0740 报告](archive/2026-10-13_0740_twolevel_baseline_task_supervisor_round17_by_deepseek.md) | baseline round17：在飞/ETA 被后续汇总取代，32B 前置、Quest 代表任务和 ClusterKV 阻塞继续留在 S-T023。 |
+| [0840 报告](archive/2026-10-13_0840_twolevel_baseline_task_supervisor_round18_by_deepseek.md) | baseline round18：三臂作废及 mavg/aavg 重跑被 Opus 11:57 判决明确撤回；S-T023 §10 标注撤回，保留原文供追溯，不再作为执行指令。 |
+
+继续保留两份 10-11 GPT 建议、E134 子空间判决与 E119 11:57 重判：前两份
+尚有 faithful port/身份/整请求 E2E/严格 prefill 等未关闭门禁；E134 待扩大
+质量确认与 prefill 省算兑现；E119 是撤回 round18 误判的当前权威作者记录。
+不根据论文趋势关闭验收，不修改人工指南、方法默认值、分数或任务完成状态。
