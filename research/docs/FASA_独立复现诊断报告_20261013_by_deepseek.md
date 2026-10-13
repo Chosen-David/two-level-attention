@@ -86,3 +86,22 @@ RULER 崩盘（24.00）形成反差。原因（校准维度不同）：
 - FASA 官方仓库：third_party/FASA-ICLR2026（vendor 移植 fasa_vendor/）
 - 我方适配：exp/vendor_baselines/fasa_vendor/
 - RULER 32K 数据：exp/trace/results/fasa_32k.json（.187）
+
+## 7. 发布闭包修订记录（2026-10-14，GPT 审计 TL-FASA-RESULT-PUBLISH-151）
+
+GPT 审计（2026-10-13_2341，冻结 SHA 8b56bbd）指出：本报告 §6 声称的产物
+（fasa_lb_16.json / fasa_32k.json / 逐样本 pred）当时只存在于工作机本地，
+未被 git 跟踪（exp/ 默认 .gitignore）——「已落盘/入库」声明对干净检出不成立，
+数值本身未被判定错误（表内均值算术自洽）。
+
+修订（主 AI，2026-10-14）：
+- LB16 逐样本产物全量入库：exp/results_longbench_fasa/（16 任务 pred jsonl
+  + qasper 双时间戳复现 TS 150819/153038 + 全套 runcap sidecar + result.json
+  + 4096_qasper 单调性消融）；汇总 exp/trace/results/fasa_lb_16.json。
+- RULER 32K 六任务逐样本 pred 自 .187 rsync 回收入库
+  （exp/trace/results/e119_ruler32768_formal_fasa_vendor/，sha256 与
+  fasa_32k.json sources 6/6 对齐）；fasa_32k.json 一并入库。
+- RULER 32K 六任务口径注明：AVG 24.00 为 6 个 niah 任务均值
+  （single_1 0.0 / single_2 78.0 / single_3 4.0 / multikey_1 53.0 /
+  multikey_2 9.0 / multikey_3 0.0，n=100/格），非全 13 任务 RULER 档。
+- 本节修订后，§6 的「入库」声明对 main 干净检出成立。
