@@ -1,0 +1,26 @@
+{
+ "experiment": "E119 128K yarn factor 重判：round18「三臂 128K 作废」撤回，锚点恢复有效，mavg/aavg 128K 重跑取消",
+ "date": "2026-10-13",
+ "author": "Opus（GPU 监督器 13:2X 改制后收割轮）",
+ "trigger": "round18（2026-10-13 08:40）依据 manifest yarn_factor=2.0 判定 fullkv/mavg/aavg 128K（20261010 产出）PE 溢出精度受损而作废，并派 fullkv 重跑 + 登记 mavg/aavg 重跑。本轮 fullkv 重跑完成后逐位对拍发现新旧产物完全一致，深查后判定作废误判。",
+ "evidence_chain": {
+  "1_bitexact_fullkv": "fullkv 128K 新跑（20261013，producer_receipt 验证 effective_yarn_factor=4.0，rope_scaling={yarn,4.0,original 40960}）与旧产物（e119 run 20261010001142，Oct-9/10 产出）逐位对拍：4 任务（niah_multivalue/niah_single_1/fwe/cwe）× 100 行 × 0 差异。若旧产物 effective=2.0（81920<131072 PE 溢出），free-form 生成不可能逐位一致 → 旧产物 effective=4.0。",
+  "2_dispatch_script": "benchmark/RULER/run_ruler_e109.sh（e119 批 canonical 派单脚本）：128K 档只传 `--yarn`（无显式 factor）→ resolve_yarn_config auto 表 YARN_FACTOR_AUTO={65536:2.0, 131072:4.0} → 131072 档 effective 恒为 4.0。mavg/aavg/fullkv 三臂共用同一脚本，仅 TLI_ARGS 不同。",
+  "3_operator_declared_vs_effective": "旧 manifest 的 2.0 是 score_ruler_formal 打分时 operator 传入的声明值（run_identity note: 'model_path/yarn 等为操作者声明值'），非 producer 侧；057 correction sidecar（2026-10-10T04:08 生成）早已标注 yarn_factor_status=operator_declared_not_effective / producer_native_evidence=missing。round18 把打分侧声明值误读为生产侧实际配置。",
+  "4_independent_e116b_batch": "e116b 批（2026-10-11，声明 factor 4.0，near/SWA 边界修复后新口径独立生成）：fullkv 46.43（与 e119 完全同值）/ aavg 42.56（同值）/ mavg 47.2 vs e119 47.49（Δ0.29，E116b 行为修复所致的生成差异，两批均为 4.0）——独立批次交叉印证 4.0 下分数量级一致。",
+  "5_main_table_footnote": "exp/results_ruler/main_table_quest_vs_tli_draft.md 脚注 4 早已写明『64K/128K 有 yarn（factor 2.0/4.0），打分已按 receipt 校验』——主表口径本就正确，round18 的作废与主表自相矛盾未被发现。",
+  "6_fullkv_rescoring_unchanged": "DeepSeek 11:45 重打分（run 20261013114511，--yarn-factor 4.0，yarn_factor_provenance=producer_receipt）：per-task 与旧打分逐值相同（single_1/2/3=100、multikey_1=99、multikey_2=57、multikey_3=1、multiquery=12.25、multivalue=2.5、cwe=3.4、fwe=13.0、vt=22.6）→ AVG 46.43 不变。"
+ },
+ "verdict": {
+  "anchors_restored": "128K 三臂锚点恢复有效：mavg 47.49 / aavg 42.56 / fullkv 46.43（e119 批，effective 4.0 实证）。主表 §3 128K 行本就引用这些数字，无需改动。",
+  "rerun_cancelled": "mavg/aavg 128K 重跑取消（原登记转 Opus）：与 fullkv 同一脚本同一派单模式，effective=4.0 已被 fullkv 逐位一致直接证明；重跑 22 格（11 任务×2 臂）只会复现同分，省约 3 机 11 卡 × 2h+。",
+  "fullkv_rerun_value": "fullkv 11 格重跑非白跑：产出 receipt 验证的正式发布（46.43，producer_receipt provenance），永久修复了打分侧元数据缺口（operator 声明 → producer 原生证据）。",
+  "round18_lesson_correction": "round18 的教训修正：真实缺陷是『scorer-side operator 声明 ≠ producer effective』（057 机制早已标注），不是『producer 用错 factor』。凡 identity_mode=legacy-partial 的 manifest，其 yarn_factor 字段只代表打分时声明，不可反推生产配置；判定生产配置须用 producer 侧证据（057 receipt 或 auto 档位表推演）。",
+  "open_question_minf": "minf 128K 49.53 > fullkv 46.43 的 sparse>dense 现象与 factor 无关（两个 4.0 验证批均如此），属对手 baseline 领域待解释现象，归 DeepSeek 范围，不影响 TLI 锚点。"
+ },
+ "artifacts": {
+  "fullkv_new_scoring": "exp/trace/results/e119_ruler128k_formal_fullkv.json（run 20261013114511）+ manifest/receipt",
+  "bitexact_probe": "本判决生成时逐位对拍：old=e119_ruler128k_formal_fullkv.json.run-20261010001142/pred_root/L131072/pred_1024 vs new=e119_ruler128k_formal_fullkv/L131072/pred（4 任务×100 行×0 diff）",
+  "yarn_correction_sidecars": "e119_ruler128k_formal_{fullkv,mavg,aavg}.json.manifest.yarn_correction.json（057 标注 operator_declared_not_effective）"
+ }
+}
