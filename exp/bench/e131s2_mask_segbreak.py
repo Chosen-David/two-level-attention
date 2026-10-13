@@ -26,8 +26,8 @@ import torch.nn.functional as F  # noqa: E402
 from einops import rearrange  # noqa: E402
 
 from e131_arm_bench import make_args  # noqa: E402
-# 【E127 inplace 合并（2026-10-12）】TLIIndexerFast 子类退役，语义并入基类
-from sparse_attn.indexer.tli_indexer import TLIIndexer as TLIIndexerFast  # noqa: E402
+# 【E131-S2 移植（2026-10-12）】inplace 合并后 fast.py 已退役，基类默认即 fast path。
+from sparse_attn.indexer.tli_indexer import TLIIndexer  # noqa: E402
 from sparse_attn.patches.utils import prepare_cu_seqlens, prepare_seqlens  # noqa: E402
 
 
@@ -50,7 +50,7 @@ def main():
     args = p.parse_args()
 
     torch.manual_seed(20261011 + 2)
-    idx = TLIIndexerFast(make_args(args.arm))
+    idx = TLIIndexer(make_args(args.arm))
     idx.layer_idx = 2
     idx.clear()
     dev = 'cuda:0'

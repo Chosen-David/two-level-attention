@@ -221,6 +221,50 @@ def cap_identity_hash(**kwargs):
                           ).hexdigest()[:10]
 
 
+# ---------------------------------------------------------------------------
+# 【112 修复（GPT 审计 2026-10-12_0933 TL-E096-CAP-UNIFORMITY-112，P1
+# 可用性阻断）】独立的 cap-comparability key——跨任务 cap 等价判断的正确
+# 口径。
+#
+# 缺陷背景：cap_identity_payload 刻意包含 dataset/时间戳/max_new_tokens 等
+# run 字段（写门「同一路径是否同一口径」需要它们），但 eval.py 的多任务
+# 聚合单一性检查却错用了这个完整 run identity——不同数据集、同
+# effective_cap=16384 的正常多任务聚合必然 hash 不同、被误判「混 cap」
+# 拒绝（审计实测：strict 正常目录无法生成 result.json，可用性阻断）。
+#
+# 语义分工（两层身份，不得混用）：
+#   - cap-comparability key（本函数）：只含可跨任务统一的 cap 语义字段
+#     （effective/protocol/treatment 级）——多任务聚合「同口径」判断用它；
+#   - cap_identity hash（完整 run identity）：含 dataset/时间戳等 run 字段
+#     ——仅用于同一路径的防覆盖写门（gate_run_cap_identity），不参与跨
+#     任务 cap 等价判断。
+# ---------------------------------------------------------------------------
+def cap_comparability_payload(effective_cap, protocol_cap,
+                              cap_treatment_type, cap_treatment_divergence):
+    """cap-comparability key 的输入子集（112）——刻意排除 dataset/
+    fingerprint/method/时间戳/max_new_tokens 等因任务而异的 run 字段。"""
+    return {
+        "schema": RUN_CAP_SCHEMA,
+        "effective_cap": effective_cap,
+        "protocol_cap": protocol_cap,
+        "cap_treatment_type": cap_treatment_type,
+        "cap_treatment_divergence": cap_treatment_divergence,
+    }
+
+
+def cap_comparability_key(effective_cap, protocol_cap,
+                          cap_treatment_type, cap_treatment_divergence):
+    """跨任务 cap 等价 key（112）——排序键 JSON→sha256 前 10 hex，与
+    cap_identity hash 同构造纪律。聚合侧比对用它；异 key = 异 cap 语义，
+    不得进同一张 result.json 被当同一口径均值。"""
+    payload = cap_comparability_payload(
+        effective_cap=effective_cap, protocol_cap=protocol_cap,
+        cap_treatment_type=cap_treatment_type,
+        cap_treatment_divergence=cap_treatment_divergence)
+    return hashlib.sha256(_canonical(payload).encode("utf-8")
+                          ).hexdigest()[:10]
+
+
 def build_run_cap_core(model_name, model_path, method, dataset,
                        dataset_fingerprint, run_timestamp, effective_cap,
                        cap_gate_info, max_new_tokens, producer,
@@ -352,6 +396,48 @@ def validate_run_cap_manifest(manifest):
     ci = manifest["cap_identity"]
     if not isinstance(ci, dict) or not ci.get("hash"):
         _fail("cap_identity 须为含 hash 的对象（cap 进输出身份）")
+    # 【115 修复（GPT 审计 2026-10-12_0933 TL-E096-CAP-SCHEMA-INTEGRITY-
+    # 115，P1）】schema 门此前只查 identity hash 非空——不重算 payload
+    # hash、不核对 payload↔外层字段闭包。审计红证：合法 manifest 仅改外
+    # 层 effective_cap 16384→31500 / result_file→other.jsonl（保留原
+    # payload/hash），validate 仍返回成功——误拷、手改或错误 backfill 的
+    # sidecar 可带错 cap 身份静默进入结果元数据。现做两层核对：
+    #   ① 重算 canonical payload hash == cap_identity.hash（payload 单侧
+    #      篡改拦截）；
+    #   ② payload 覆盖的每个字段与外层逐字段相等（外层单侧篡改拦截——
+    #      payload↔外层闭包）。result_file↔结果 basename 的核对在消费
+    #      侧（eval.validate_runcap_sidecar——validate 层不知 jsonl 路径）。
+    payload = ci.get("payload")
+    if not isinstance(payload, dict):
+        _fail("cap_identity.payload 缺失/非对象——identity hash 不可复核")
+    recomputed = hashlib.sha256(
+        _canonical(payload).encode("utf-8")).hexdigest()[:10]
+    if recomputed != ci["hash"]:
+        _fail(f"cap_identity.hash={ci['hash']!r} != payload 重算 "
+              f"{recomputed!r}——payload 与 hash 不自洽（payload 被篡改/"
+              f"损坏，115 fail-closed）")
+    _closure = {
+        "schema": manifest["schema"],
+        "model_name": manifest["model_name"],
+        "dataset": manifest["dataset"],
+        "dataset_fingerprint": manifest["dataset_fingerprint"],
+        "method": manifest["method"],
+        "run_timestamp": manifest["run_timestamp"],
+        "effective_cap": manifest["effective_cap"],
+        "protocol_cap": manifest["protocol_cap"],
+        "max_new_tokens": manifest["max_new_tokens"],
+    }
+    for _pk, _outer in _closure.items():
+        if payload.get(_pk) != _outer:
+            _fail(f"cap_identity.payload.{_pk}={payload.get(_pk)!r} != "
+                  f"外层 {_pk}={_outer!r}——payload 与外层字段不自洽"
+                  f"（外层被篡改/错配，115 fail-closed）")
+    if payload.get("cap_treatment_type") != \
+            manifest["cap_treatment"].get("type"):
+        _fail(f"payload.cap_treatment_type="
+              f"{payload.get('cap_treatment_type')!r} != 外层 "
+              f"cap_treatment.type="
+              f"{manifest['cap_treatment'].get('type')!r}（115 fail-closed）")
     prov = manifest["provenance"]
     if manifest["effective_cap"] is None and prov != "provenance_incomplete":
         _fail("effective_cap=null 仅允许 provenance_incomplete")

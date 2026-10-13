@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """E131-S2 终表生成：从 e131s2_final/ 的 pre/post JSON 生成
-e131_phase2_optimized.json + e131_phase2_report.md。"""
+e131_phase2_optimized.json + e131_phase2_report.md。
+
+【E132b TL-E131S2-REPORT-REPRO-131 修复】
+  - 输入/输出路径全部 repo 相对（--repo 默认仓根派生），拒绝隐式个人
+    绝对路径——重放不再依赖 /home/... 硬编码；
+  - 源码身份（md5/sha256）从实际文件字节计算（meta.source_identity），
+    不硬编码旧 hash、不引用已删除的 tli_indexer_fast.py；
+  - noise_band / port_note 等人工补充 meta 字段：输出 JSON 已存在时
+    透传既有值（生成器不闭包产生这些字段，重跑不得静默丢弃）。
+"""
+import argparse
+import hashlib
 import json
 import statistics
-
-BASE = "/home/wangyuanshuo02/two-level-attention-e131s2/exp/results_efficiency"
-OUT_JSON = f"{BASE}/e131_phase2_optimized.json"
-OUT_MD = f"{BASE}/e131_phase2_report.md"
+import sys
+from pathlib import Path
 
 STAGES = ("prepare_index", "compute_score", "compute_mask", "metrics", "eager_decoding")
 ARMS = ("mavg", "aavg", "mminmax", "cavgsim", "cclustersim")
@@ -17,6 +26,12 @@ STEPMAP = {"cclustersim": 38, "cavgsim": 80}
 # spike 摊销周期（步）：cavgsim far 续跑每 64 步（far_hi 块对齐前移 bs=64）；
 # cclustersim near 重建 key=(far_hi,near_hi)，far_hi 每 64 步前移 → 周期 64
 SPIKE_PERIOD = 64
+
+# 源码身份文件清单（E131-S2 涉改的两个 kernel 文件；fast.py 已删除不再引用）
+_IDENTITY_FILES = (
+    "sparse_attn/indexer/tli_indexer.py",
+    "sparse_attn/indexer/greedy_triton.py",
+)
 
 
 def summarize(path):
@@ -42,11 +57,41 @@ def summarize(path):
     return out
 
 
+def source_identity(repo):
+    """【131 修复】源码身份从实际文件字节计算（md5+sha256 双口径），
+    不硬编码——文件改动后身份自动跟随，杜绝过期 hash。"""
+    ident = {}
+    for rel in _IDENTITY_FILES:
+        p = Path(repo) / rel
+        if not p.is_file():
+            sys.exit(f"[E131s2-gen] 源码身份文件缺失: {p}")
+        b = p.read_bytes()
+        ident[rel] = {
+            "md5": hashlib.md5(b).hexdigest(),
+            "sha256": hashlib.sha256(b).hexdigest(),
+        }
+    return ident
+
+
 def main():
+    ap = argparse.ArgumentParser(description="E131-S2 终表生成（repo 相对，可重放）")
+    ap.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[2],
+                    help="仓库根（默认：本文件所在仓根派生）")
+    ap.add_argument("--out-json", type=Path, default=None,
+                    help="输出 JSON（默认 <repo>/exp/results_efficiency/e131_phase2_optimized.json）")
+    ap.add_argument("--out-md", type=Path, default=None,
+                    help="输出 Markdown（默认 <repo>/exp/results_efficiency/e131_phase2_report.md）")
+    args = ap.parse_args()
+
+    repo = args.repo.resolve()
+    base = repo / "exp" / "results_efficiency"
+    out_json = args.out_json if args.out_json else base / "e131_phase2_optimized.json"
+    out_md = args.out_md if args.out_md else base / "e131_phase2_report.md"
+
     res = {}
     for arm in ARMS + tuple(EXTRA.keys()):
-        pre = summarize(f"{BASE}/e131s2_final/e131s2_preopt_{arm}.json")
-        post = summarize(f"{BASE}/e131s2_final/e131s2_postopt_{arm}.json")
+        pre = summarize(base / "e131s2_final" / f"e131s2_preopt_{arm}.json")
+        post = summarize(base / "e131s2_final" / f"e131s2_postopt_{arm}.json")
         res[arm] = {"pre": pre, "post": post,
                     "delta_SUM": post["SUM"] - pre["SUM"],
                     "speedup_SUM": pre["SUM"] / post["SUM"] if post["SUM"] else None}
@@ -79,7 +124,7 @@ def main():
                 {
                     "id": "③",
                     "name": "簇分数 gather-dot Triton 全融合（E127 GQA K 复用同款）",
-                    "file": "sparse_attn/indexer/tli_indexer.py（E127 inplace 合并后；原 tli_indexer_fast.py）",
+                    "file": "sparse_attn/indexer/tli_indexer.py（E127 inplace 合并后）",
                     "switch": "TLI_E131_TOKSCORE_TRITON（默认 1；0 回退锚点原版）",
                     "detail": "einsum+gather+q_g 胶水三件套 → 单 kernel（int32 索引 + qg 组内聚合融合）",
                     "effect": "far_token_score 0.107→0.057ms（1.89×）；near_token_score 0.062→0.047ms（1.32×）",
@@ -107,17 +152,29 @@ def main():
                 "e2e_mask_bitexact": "cclustersim/cavgsim 各 24 步（覆盖 far 块边界续跑 + near 重建）优化前后 mask 逐位一致率 12585120/12585120 = 100.0000%（top-k 重叠率门 ≥99.9% 满分）",
                 "gate": "min_row_any / out_finite / sel_tokens=1024 恒定 全绿（逐臂 JSON gate 字段）",
             },
-            "md5": {
-                "tli_indexer.py（锚点，未动）": "bf5e26c4d6123875b2786b9ed886da5f",
-                "tli_indexer_fast.py": "467fd087b24156765c19dafac3281215 → de9786c9d2f221e14d3c4aa988f95b54",
-                "greedy_triton.py": "ee14a7882d580db640b544d55876981a → b8669bb6ca58976248bc0e2434f9a1ad",
-            },
+            # 【131 修复】源码身份实算（替换原硬编码 md5 字典——旧字典含
+            # 已删除 tli_indexer_fast.py 的过期 hash，正式产物 provenance
+            # 不闭环即此项审计根因）
+            "source_identity": source_identity(repo),
         },
         "results": res,
     }
-    with open(OUT_JSON, "w") as f:
+
+    # 【131 修复】meta 透传：noise_band / port_note 为生成后人工补充的
+    # provenance 字段（重跑不可闭包重建）——输出 JSON 已存在则原样保留，
+    # 防止重放静默丢弃补充说明。
+    if Path(out_json).exists():
+        try:
+            old_meta = json.loads(Path(out_json).read_text()).get("meta", {})
+        except Exception:
+            old_meta = {}
+        for key in ("noise_band", "port_note"):
+            if key in old_meta and key not in doc["meta"]:
+                doc["meta"][key] = old_meta[key]
+
+    with open(out_json, "w") as f:
         json.dump(doc, f, ensure_ascii=False, indent=1)
-    print(f"JSON → {OUT_JSON}")
+    print(f"JSON → {out_json}")
 
     # ---- Markdown 报告 ----
     L = []
@@ -126,7 +183,7 @@ def main():
     L.append("| # | 优化 | 文件 | 开关 | 效果 |")
     L.append("|---|------|------|------|------|")
     L.append("| ① | greedy pass Triton v2（SPLIT 协作 kernel，同头多 program 均分扫描+软件 barrier，n_regs 死锁防御） | greedy_triton.py | TLI_E131_GREEDY_V2 | far 冷建 8.0s→0.96s（8.4×），大 k_live 续跑 9.5× |")
-    L.append("| ③ | 簇分数 gather-dot Triton 全融合（E127 GQA K 复用同款：einsum+gather+q_g→单 kernel） | tli_indexer_fast.py | TLI_E131_TOKSCORE_TRITON | far 0.107→0.057ms（1.89×），near 0.062→0.047ms（1.32×） |")
+    L.append("| ③ | 簇分数 gather-dot Triton 全融合（E127 GQA K 复用同款：einsum+gather+q_g→单 kernel） | tli_indexer.py | TLI_E131_TOKSCORE_TRITON | far 0.107→0.057ms（1.89×），near 0.062→0.047ms（1.32×） |")
     L.append("| fix | v2 回退路径 BT 256→512 + v2 内部 BT 自适应（大 k_live tile 开销主导） | greedy_triton.py | — | 修复 cavgsim far 续跑 spike 净回归 73.7→28.3ms |")
     L.append("| ② | near 增量化 | — | 评估后不做 | 均值簇心无法精确撤销左缘成员（锚点语义），v2 已兑现 spike -54%，摊销 0.57ms/步 |")
     L.append("")
@@ -169,16 +226,19 @@ def main():
     L.append("- tok_score 融合：16 步稳态 mask 逐位 0 差异（8390592 位）。")
     L.append("- e2e mask 逐位终验：cclustersim / cavgsim 各 24 步（覆盖 far 块边界续跑 + near 重建），优化前后 mask 逐位一致率 12585120/12585120 = **100.0000%**（top-k 重叠率门 ≥99.9% 满分，超门）。")
     L.append("- 逐臂 bench 末步 gate：min_row_any=true / out_finite=true / sel_tokens=1024 恒定，全绿。")
-    L.append("- 锚点 tli_indexer.py md5 未变（bf5e26c4d6123875b2786b9ed886da5f）。")
+    L.append(f"- 源码身份（生成时从文件字节实算）：tli_indexer.py md5="
+             f"{doc['meta']['source_identity']['sparse_attn/indexer/tli_indexer.py']['md5']}；"
+             f"greedy_triton.py md5="
+             f"{doc['meta']['source_identity']['sparse_attn/indexer/greedy_triton.py']['md5']}。")
     L.append("")
     L.append("## 五、如实的回归与修复记录\n")
     L.append("1. v2 首版回退路径把 v1 默认 BT=512 误设为 256：大 k_live 续跑（T=64@k_live≈57K）每 tile 固定开销主导，实测 2.83× 净回归（cavgsim e2e far 续跑 spike 25.3→73.7ms）。已修复（回退显式 BT=512 + v2 内部行数≥1024 自适应 BT=512），修复后 spike 28.3ms，回到优化前水平。")
     L.append("2. E113 的「BT=256 vs 512 仅差 6%」结论只在 struct K≈2K 小簇口径成立，大簇态（k_live≥28K）必须大 BT——已写入 wrapper 注释。")
     L.append("3. cavgsim 优化后 spike 28.3 vs 优化前 25.3：残余 +3.0ms 为 v2 wrapper 额外 CPU 开销（k_live.max().item() 同步 + 探测缓存查询，CPU +2.9ms/步实测）+ GPU0/GPU1 跨卡波动，稳态 SUM 无影响，如实记录。")
     L.append("")
-    with open(OUT_MD, "w") as f:
+    with open(out_md, "w") as f:
         f.write("\n".join(L))
-    print(f"MD → {OUT_MD}")
+    print(f"MD → {out_md}")
 
 
 if __name__ == "__main__":

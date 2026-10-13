@@ -1,0 +1,33 @@
+{
+  "experiment": "E133b 子空间原生实现（粗筛+细筛全 32 维，不留 full 热路径）性能 bench 判决",
+  "date": "2026-10-12",
+  "code_identity": {
+    "native": "781c96e（e111-dgate-short，tli_indexer.py E133b 四项改造）",
+    "base": "373bfe7 = 781c96e^（tli_indexer.py md5 d110575c，改造前主线指纹）"
+  },
+  "environment": {
+    "host": ".187 (10.238.9.187) GPU4/5/6 独占锁卡，H20-3e，同机同库同负载窗口对照",
+    "caveat": ".187 整体比本机 H20 慢 ~10%（改造前代码 1.6905 vs 本机 1.5313）——跨机绝对值不可比，结论全部取同机对照",
+    "confounder": "GPU0-3 被 DeepSeek RULER 批占满（勿动），冷卡降频 345MHz 需 warmup 40 步（v1 warmup 8 不足已被 v2 排除）"
+  },
+  "protocol": "e131_arm_bench --S 65536 --steps 60 --warmup 40，TLI_E127_FAST=1，稳态取后 20 步中位数；交叉复跑（同刻 GPU4 native vs GPU5 base）验证可复现性",
+  "steady_gpu_ms": {
+    "mavg_e127_cmp2_full": {"base": 1.6905, "native": 1.6942, "delta_pct": "+0.2"},
+    "mavg_e2e_cmp4_full": {"base": 1.6797, "native": 1.6884, "delta_pct": "+0.5"},
+    "mavg_tail_cmp4_tail": {"base": 1.7923, "native": 1.7305, "delta_pct": "-3.4", "cross_check_base": 1.8052, "cross_check_native": 1.7167, "cross_delta_pct": "-4.9"}
+  },
+  "per_stage_tail_arm": {
+    "base": {"prepare_index": 0.5138, "compute_score": 0.4446, "compute_mask": 0.5176, "metrics": 0.0887, "eager_decoding": 0.2275},
+    "native": {"prepare_index": 0.4739, "compute_score": 0.3794, "compute_mask": 0.5583, "metrics": 0.0903, "eager_decoding": 0.2286},
+    "real_gains": "compute_score -14.7%（idx_sub 实例缓存消除每步 2-3 次 pageable H2D ~35µs + k_qat 紧凑 fine 读带宽 4×↓）；prepare_index -7.8%（k_qat 紧凑 [S,Hkv,delta] 直出 + 增量 buf 直写）",
+    "mask_segment_attribution": "compute_mask 段 +8% 为分阶段 cudaEvent 异步队列记账挪移——独立微基准（固定 score_dict 反复单测 250 次，/tmp/e133b_mask_micro.py）显示 mask 函数本身仅 +2.6%（0.3948 vs 0.4051ms 中位），且单测 0.40ms << bench 段 0.52ms 证明段间存在 ~0.12ms 队列借贷；总时间（硬口径）native 稳定更小"
+  },
+  "verdict": {
+    "native_vs_base": "原生实现 tail 臂稳态 -3.4%~-4.9%（交叉复跑两轮一致），full 两臂无伤（+0.2%/+0.5% 噪声带内）——原生改造真实兑现子空间带宽收益",
+    "tail_vs_full_remaining_gap": "native tail 1.7305/1.7167 vs native e2e 1.6884 仍慢 +2.5~4%——tail 臂唯一应显著快于 full 的 coarse 段（读 32 维 vs 128 维 k_min/k_max）被 coarse Triton kernel D=32 特化劣化（带宽受限→发射/延迟受限）吃掉；兑现 L1 粗筛 4× 省算需第三项改造：coarse kernel D=32 tile/vector 调优",
+    "earlier_plus_5pct_correction": "改造前报告的 tail +5.7% 劣化中：~+6.7% 是 .187/本机环境差 + gather 适配层开销；原生实现后收窄至 -3.4%（即原生改造回收 ~8 个百分点）",
+    "paper_claim_grounded": "原生实现贡献数据：cmp4+tail 原生稳态 1.7305ms（.187 口径），相对同库同机改造前 tail 1.7923 -3.4%；较 full 锚点尚余 +2.5% 差距待 coarse kernel D=32 调优收割"
+  },
+  "bitexact": "native vs 改造前零填充 dense 逐位对拍 12,585,120 位 × 2 臂（full/tail）× 24 步 = 100%（e133_mavg_tail_mask_bitexact.py v2 + e133b_capture_ref.py 参考）",
+  "files": ["e133b_mavg_e127_native_perf_v2.json", "e133b_mavg_e2e_native_perf_v2.json", "e133b_mavg_tail_native_perf_v2.json", "e133b_base_mavg_e127.json", "e133b_base_mavg_e2e.json", "e133b_base_mavg_tail.json", "e133b_x_native_tail.json", "e133b_x_base_tail.json"]
+}

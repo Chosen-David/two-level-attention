@@ -203,6 +203,10 @@ class TLIIndexer(TIAIndexer):
         # quant indices 缓存。_inc=None 表示无缓存（首步全量建）。
         self._inc = None
         self._triton_ok = True
+        # 【E133c-A4/A5】尾段统计/量化融合 kernel 健康门（异常置 False 后
+        # 本实例永久回退 PyTorch 原版路径，fail-closed，与 _triton_ok 同口径）
+        self._stat_ok = True
+        self._quant_ok = True
         self._qat_idx_cache = None
         # ---- E64 框架参数化：α/β/γ 分区 + sup_wsvd 投影基（B 配置帕累托点）----
         self.alpha = getattr(args, "tli_alpha", 0.0)
@@ -282,23 +286,34 @@ class TLIIndexer(TIAIndexer):
         # E85f：静态 pair 已定（prefill q 统计）→ 用 per-layer 完整旋转对替换 tail32
         if self.static_pair and self._pair_idx is not None:
             return self._pair_idx.to(device)
+        # 【E133b 原生化】实例级缓存：本函数在 tail 模式下每 decode step 被
+        # prepare_index/compute_score 各调一次，原每次 CPU list 构造 +
+        # pageable H2D（~20-40µs/步 × 2-3 次）——是 tail 臂实测 +5.7% 稳态
+        # 回归的主因。子空间配置是实例常量 → 按 device 缓存零构造零拷贝。
+        # clear() 不失效（与 _qat_idx_cache 同口径：配置级常量非请求态）。
+        cache = getattr(self, "_idx_sub_cache", None)
+        if cache is not None and cache[0] == device:
+            return cache[1]
         if self.subspace == "rope":
-            return torch.arange(0, 64, device=device)
-        if self.subspace == "nope":
-            return torch.arange(64, 128, device=device)
-        # E90 消融臂（对齐 E3 mass 口径）：random=固定 seed 随机 32 维 /
-        # highfreq=头 16+头 16（RoPE 旋转对前元素，最高频对）
-        if self.subspace == "random":
+            out = torch.arange(0, 64, device=device)
+        elif self.subspace == "nope":
+            out = torch.arange(64, 128, device=device)
+        elif self.subspace == "random":
+            # E90 消融臂（对齐 E3 mass 口径）：固定 seed 随机 32 维
             g = torch.Generator().manual_seed(20261002)
-            return torch.randperm(128, generator=g)[:32].sort().values.to(device)
-        if self.subspace == "highfreq":
+            out = torch.randperm(128, generator=g)[:32].sort().values.to(device)
+        elif self.subspace == "highfreq":
+            # E90 消融臂：头 16+头 16（RoPE 旋转对前元素，最高频对）
             delta = 64 // self.cmp_ratio
-            return torch.tensor(
+            out = torch.tensor(
                 list(range(0, delta)) + list(range(64, 64 + delta)), device=device)
-        delta = 64 // self.cmp_ratio
-        return torch.tensor(
-            list(range(64 - delta, 64)) + list(range(128 - delta, 128)), device=device
-        )
+        else:
+            delta = 64 // self.cmp_ratio
+            out = torch.tensor(
+                list(range(64 - delta, 64)) + list(range(128 - delta, 128)),
+                device=device)
+        self._idx_sub_cache = (device, out)
+        return out
 
     def prepare_index(self, k, cu_seqlens_k):
         """【E127 inplace 合并（用户 2026-10-12 指令）】decode 热路径增量缓存
@@ -344,11 +359,25 @@ class TLIIndexer(TIAIndexer):
         if self._basis is None and not self.moba_gate and k.shape[-1] == 128:
             k_qat_buf = d["k_qat"].squeeze(0).clone() if d["k_qat"].dim() == 4 \
                 else None
+        # 【E133c-A1】k_min/k_max/k_avg 预分配块统计 buffer（与 k_qat_buf
+        # 同模式）：inc 路径尾段直写 [fb, T_blk)，消除每步 3 次 cat 的
+        # 全量 [1,T,Hkv,d'] 重分配 + 前缀复制。cat 产物 ≡ buffer 直写
+        # （前缀值归纳不变、尾段同源重算）→ 逐位一致。k_qat_buf None ⇒
+        # inc 路径不可达（prepare_index 前置门），统计 buffer 同门创建。
+        k_min_buf = k_max_buf = k_avg_buf = None
+        if k_qat_buf is not None:
+            k_min_buf = d["k_min"].clone()
+            k_max_buf = d["k_max"].clone()
+            k_avg_buf = d["k_avg"].clone() if d.get("k_avg") is not None else None
         self._inc = {
             "S": k.shape[1],
             "k_min": d["k_min"],
             "k_max": d["k_max"],
             "k_avg": d.get("k_avg"),
+            "k_min_buf": k_min_buf,
+            "k_max_buf": k_max_buf,
+            "k_avg_buf": k_avg_buf,
+            "stat_blk_cap": k_min_buf.shape[1] if k_min_buf is not None else 0,
             "k_qat_buf": k_qat_buf,
             "k_qat_cap": k.shape[1] if k_qat_buf is not None else 0,
             "sub_key": self._sub_key(),
@@ -374,26 +403,88 @@ class TLIIndexer(TIAIndexer):
         _pad_seqlens_k = (_seqlens_k + bs - 1) // bs * bs
         pad_cu_seqlens_k = torch.cat(
             (_pad_seqlens_k.new_zeros((1,)), _pad_seqlens_k.cumsum(dim=0)))
-        tail_k = k[:, lo:S_now]                              # [1, n, Hkv, D]
+        # ---- 【E133c-A1/A4】尾段块统计：预分配 buffer 直写 + 融合 kernel ----
         # 尾段块数与 pad：与全量版一致 = ceil(S_now/bs)*bs 覆盖下的尾块集
         # （lo 为块边界，前缀块已对齐——尾段 pad 量 = 全量 pad 量）
         pad_total = (bs - S_now % bs) % bs
-        tail_pad = tail_k.new_zeros((1, S_now - lo + pad_total) + tail_k.shape[2:])
-        tail_pad[:, : S_now - lo] = tail_k
-        t_coarse = rearrange(
-            tail_pad[..., idx_sub] if idx_sub is not None else tail_pad,
-            "b (t bs) h d -> b t bs h d", bs=bs,
-        )
-        k_min = torch.cat([inc["k_min"][:, :fb], t_coarse.amin(dim=2)], dim=1)
-        k_max = torch.cat([inc["k_max"][:, :fb], t_coarse.amax(dim=2)], dim=1)
-        k_avg = None
-        if self._need_avg_score():
-            k_avg = torch.cat([inc["k_avg"][:, :fb], t_coarse.mean(dim=2)], dim=1)
+        n_tok = S_now - lo                              # 尾段实际 token 数
+        n_blk = (n_tok + pad_total) // bs                # 尾段块数（含 pad 块）
+        T_blk = fb + n_blk
+        need_avg = self._need_avg_score()
+        k_min_buf, k_max_buf, k_avg_buf = (
+            inc["k_min_buf"], inc["k_max_buf"], inc["k_avg_buf"])
+        if k_min_buf is not None and T_blk > inc["stat_blk_cap"]:
+            # 扩容（翻倍摊销；只搬前缀 [0, fb)——尾段本步全量重写）
+            new_cap = max(2 * inc["stat_blk_cap"], T_blk)
+            _nb = k_min_buf.new_zeros((1, new_cap) + k_min_buf.shape[2:])
+            _nb[:, :fb] = k_min_buf[:, :fb]
+            k_min_buf = _nb
+            _nb = k_max_buf.new_zeros((1, new_cap) + k_max_buf.shape[2:])
+            _nb[:, :fb] = k_max_buf[:, :fb]
+            k_max_buf = _nb
+            if k_avg_buf is not None:
+                _nb = k_avg_buf.new_zeros((1, new_cap) + k_avg_buf.shape[2:])
+                _nb[:, :fb] = k_avg_buf[:, :fb]
+                k_avg_buf = _nb
+            inc["stat_blk_cap"] = new_cap
+        stat_fused = False
+        if (k_min_buf is not None and _HAS_TRITON and self._triton_ok
+                and self._stat_ok and k.dim() == 4 and k.shape[0] == 1
+                and k.is_cuda and k.stride(-1) == 1
+                and (bs & (bs - 1)) == 0
+                and (idx_sub is None or (idx_sub.numel() & (idx_sub.numel() - 1)) == 0)):
+            # 【E133c-A4】尾段统计融合：tail_pad 构造（new_zeros+copy）+
+            # gather 物化 + amin/amax/mean + 3 次直写 ≈ 9 launch → 1
+            # kernel（pad 语义用 mask other=0 复现）。数值实证（50 轮
+            # 随机数据全过）：mean 升序 fp32 顺序累加 /64 → RNE bf16 与
+            # PyTorch 逐位一致；min/max 为选择运算无舍入。异常由 wrapper
+            # 置 _stat_ok=False 后回退下方 PyTorch 路径（fail-closed）。
+            try:
+                self._fast_stat_tail(k, idx_sub, lo, n_tok, n_blk, fb,
+                                     k_min_buf, k_max_buf,
+                                     k_avg_buf if need_avg else None)
+                stat_fused = True
+            except Exception:
+                pass
+        if stat_fused:
+            k_min = k_min_buf[:, :T_blk]
+            k_max = k_max_buf[:, :T_blk]
+            k_avg = k_avg_buf[:, :T_blk] if need_avg else None
+        elif k_min_buf is not None:
+            # 【E133c-A1】buffer 直写版（原 cat → 直写 [fb, T_blk)，消除
+            # 3 次全量 [1,T,Hkv,d'] 重分配+前缀复制；值逐位同 cat 产物）
+            tail_k = k[:, lo:S_now]                      # [1, n, Hkv, D]
+            tail_pad = tail_k.new_zeros((1, n_tok + pad_total) + tail_k.shape[2:])
+            tail_pad[:, :n_tok] = tail_k
+            t_coarse = rearrange(
+                tail_pad[..., idx_sub] if idx_sub is not None else tail_pad,
+                "b (t bs) h d -> b t bs h d", bs=bs,
+            )
+            k_min_buf[:, fb:T_blk] = t_coarse.amin(dim=2)
+            k_max_buf[:, fb:T_blk] = t_coarse.amax(dim=2)
+            if need_avg:
+                k_avg_buf[:, fb:T_blk] = t_coarse.mean(dim=2)
+            k_min = k_min_buf[:, :T_blk]
+            k_max = k_max_buf[:, :T_blk]
+            k_avg = k_avg_buf[:, :T_blk] if need_avg else None
+        else:
+            # 防御保底（k_qat_buf None ⇒ inc 路径不可达，理论不触发）：原 cat 语义
+            tail_k = k[:, lo:S_now]                      # [1, n, Hkv, D]
+            tail_pad = tail_k.new_zeros((1, n_tok + pad_total) + tail_k.shape[2:])
+            tail_pad[:, :n_tok] = tail_k
+            t_coarse = rearrange(
+                tail_pad[..., idx_sub] if idx_sub is not None else tail_pad,
+                "b (t bs) h d -> b t bs h d", bs=bs,
+            )
+            k_min = torch.cat([inc["k_min"][:, :fb], t_coarse.amin(dim=2)], dim=1)
+            k_max = torch.cat([inc["k_max"][:, :fb], t_coarse.amax(dim=2)], dim=1)
+            k_avg = None
+            if need_avg:
+                k_avg = torch.cat([inc["k_avg"][:, :fb], t_coarse.mean(dim=2)], dim=1)
 
-        # ---- k_qat 增量：预分配 buffer 步进写（尾段 zero_ + scatter， ----
-        # 与全量版 zeros_like+scatter 逐位同构）
-        # E134：l2_subspace=full 时尾段全维量化直写（buffer [cap,Hkv,128]
-        # 整段赋值，与全量版全维量化逐位同构）。
+        # ---- k_qat 增量：预分配 buffer 步进写（E133b 原生 [cap,Hkv,delta]
+        # 紧凑布局直写——量化覆盖全部 delta 维，与全量版紧凑 k_qat 同构；
+        # E134 l2_subspace=full 时 buffer [cap,Hkv,128] 全维量化整段直写）----
         indices = idx_sub if idx_sub is not None else self._qat_indices(k.device)
         buf, cap = inc["k_qat_buf"], inc["k_qat_cap"]
         if S_now > cap:   # 扩容（翻倍摊销）
@@ -404,12 +495,28 @@ class TLIIndexer(TIAIndexer):
             buf = new_buf
         if self.l2_subspace == "full":
             buf[lo:S_now] = self.min_max_per_token_quant(
-                k[0, lo:S_now])                             # 全 128 维量化
+                k[0, lo:S_now])                             # 全 128 维量化直写
         else:
-            buf[lo:S_now].zero_()
-            buf[lo:S_now, :, indices] = self.min_max_per_token_quant(
-                k[0, lo:S_now, :, indices])
-        k_qat = buf[:S_now].unsqueeze(0)                     # [1, S, Hkv, D] 视图
+            # 【E133c-A5】量化链融合：gather 物化 + minmax 4bit 量化（~10 个
+            # elementwise/reduction 小 launch）+ buf 直写 ≈ 12 launch → 1
+            # kernel 直写 buf[lo:S_now]。逐算子仿真（每算子 fp32 计算 + RNE
+            # bf16，PyTorch CUDA opmath=fp32 口径实测逐位一致）；torch.round
+            # 的 round-half-to-even 用 libdevice.rint 复现。异常由 wrapper 置
+            # _quant_ok=False 后回退原版（fail-closed）。
+            quant_fused = False
+            if (_HAS_TRITON and self._triton_ok and self._quant_ok
+                    and k.dim() == 4 and k.shape[0] == 1 and k.is_cuda
+                    and k.stride(-1) == 1 and indices.dtype == torch.int64
+                    and (indices.numel() & (indices.numel() - 1)) == 0):
+                try:
+                    self._fast_qat_tail(k, indices, lo, n_tok, buf)
+                    quant_fused = True
+                except Exception:
+                    pass
+            if not quant_fused:
+                buf[lo:S_now] = self.min_max_per_token_quant(
+                    k[0, lo:S_now, :, indices])
+        k_qat = buf[:S_now].unsqueeze(0)                     # [1, S, Hkv, delta] 视图（l2=full 时 128 宽）
 
         index_dict = {
             "k_min": k_min,
@@ -425,9 +532,11 @@ class TLIIndexer(TIAIndexer):
                 and (self.far_select != "4bit" or self.near_select != "4bit")):
             self._maybe_build_kmeans(k, index_dict)
 
-        # 缓存滚动（cat 产物作为新缓存；k_qat buffer 原地复用）
+        # 缓存滚动（视图归位；统计/k_qat buffer 原地复用——扩容时归位新 buf）
         inc["S"] = S_now
         inc["k_min"], inc["k_max"], inc["k_avg"] = k_min, k_max, k_avg
+        inc["k_min_buf"], inc["k_max_buf"], inc["k_avg_buf"] = (
+            k_min_buf, k_max_buf, k_avg_buf)
         return index_dict
 
     def _qat_indices(self, device):
@@ -512,17 +621,20 @@ class TLIIndexer(TIAIndexer):
         # E85f 口径修正：L2 细筛 k_qat 与 L1 粗筛用同一子空间（idx_sub）——
         # E85e 重放口径是粗筛+细筛同特征；tail 臂 idx_sub 与旧硬编码 tail32
         # 逐位相同（cmp_ratio=2），仅 rope/nope 探索臂与静态 pair 臂行为改变
-        # E134：--tli_l2_subspace full = L2 细筛全 128 维量化（L1 仍由 idx_sub
-        # 决定）——子空间矩阵第三臂 sub+full 的消费端，score_fine 宽度 = 全维。
+        # 【E133b 原生化】k_qat 直接产出 [1,S,Hkv,delta] 紧凑布局（原为
+        # zeros_like(k) 128 维零填充 dense + 尾段 scatter——96 个零维参与
+        # fine 打分读带宽 4× 浪费；零维乘积恒为 0，紧凑布局数学等价，仅
+        # fp32 累加顺序变化 → bf16 舍入后 ULP 级漂移，E127 iter6 同口径）。
+        # full 模式 L2 同样用 tail-delta 尾段（cmp_ratio 口径，idx_sub=None
+        # 时 _qat_indices 缓存路径），full 锚点 fine 段同样受益。
+        # 【E134】l2_subspace=full 时 L2 细筛全 128 维量化（L1 仍由 idx_sub
+        # 决定）——sub+full 臂消费端，score_fine 宽度 = 全维（128 宽 dense，
+        # 无紧凑化问题）。
         if self.l2_subspace == "full":
             k_qat = self.min_max_per_token_quant(k)   # [1, S, Hkv, 128] 全维量化
         else:
-            delta = 64 // self.cmp_ratio
-            indices = idx_sub if idx_sub is not None else torch.tensor(
-                list(range(64 - delta, 64)) + list(range(128 - delta, 128))
-            ).to(k.device)
-            k_qat = torch.zeros_like(k)
-            k_qat[..., indices] = self.min_max_per_token_quant(k[..., indices])
+            indices = idx_sub if idx_sub is not None else self._qat_indices(k.device)
+            k_qat = self.min_max_per_token_quant(k[..., indices])
         index_dict = {
             "k_min": k_min,
             "k_max": k_max,
@@ -729,25 +841,34 @@ class TLIIndexer(TIAIndexer):
         硬约束；现有 sim_dims 口径全为 2 的幂，此为防御性回退）。
         两条路径语义逐位一致（exp/trace/test_e113_greedy_triton.py 对拍 +
         test_e113b_kernel_integration.py 开关双跑对拍）。
-        【E131-S2】开关 TLI_E131_GREEDY_V2（默认 1）：fn 换 SPLIT 协作 v2
-        kernel（greedy_triton.greedy_pass_triton_v2，grid=(H,SPLIT) 同头多
-        program 均分活簇扫描 + 两阶段软件 barrier；小 T/探测失败 wrapper
-        内部回退 v1）。与 v1/Python 逐位一致（exp/bench/e131s2_v2_validate.py
-        V1-V5 全 PASS）。E131 实测（H20 randn 最坏）：far 冷建 8077→958ms
-        （8.4×）、大 k_live 续跑 9.5×；v2 不可用 fail-closed 保持 v1。
+
+        【E131-S2（原 fast.py override 并入）】默认先走 v2 SPLIT 协作 kernel
+        （greedy_triton.greedy_pass_triton_v2：grid=(H,SPLIT) 同头多 program
+        均分活簇扫描 + 两阶段软件 barrier，n_regs 死锁防御钳制 SPLIT）。E131
+        阶段 1 实测 v1 grid=(H,) 仅 H=8 program、78 SM 闲置 90%——v2 far
+        冷建 8077→958ms（8.4×），大 k_live 续跑 9.5×（H20 randn 最坏口径）。
+        对拍 exp/bench/e131s2_v2_validate.py V1-V5 全过（assign/k_live 逐位
+        + 状态 allclose）。开关 TLI_E131_GREEDY_V2=0 回退 v1；v2 编译/执行
+        异常 fail-closed 回退本调度器（值同锚点路径，仅性能回退）。
         """
+        if (os.environ.get("TLI_E131_GREEDY_V2", "1") not in ("0", "false", "False")
+                and x.is_cuda
+                and x.dim() == 3
+                and x.shape[-1] > 0
+                and (x.shape[-1] & (x.shape[-1] - 1)) == 0):
+            try:
+                from .greedy_triton import greedy_pass_triton_v2
+                # 复用锚点的 chunk=16384 分段驱动（跨 launch 串行，语义 =
+                # 全量重放，E113 T3 口径；fn 形参即逐段实现）
+                return TLIIndexer._greedy_cluster_pass_triton(
+                    x, sim, sums, cnt, sq, k_live, greedy_pass_triton_v2)
+            except Exception:
+                pass   # fail-closed：v2 不可用 → v1/Python 锚点调度器（值同）
         if (os.environ.get("SGLANG_TLI_GREEDY_KERNEL", "1") not in ("0", "false", "False")
                 and x.is_cuda):
             fn = _load_greedy_triton()
             T, H, dd = x.shape
             if fn is not None and T > 0 and dd > 0 and (dd & (dd - 1)) == 0:
-                if (os.environ.get("TLI_E131_GREEDY_V2", "1")
-                        not in ("0", "false", "False")):
-                    try:
-                        from .greedy_triton import greedy_pass_triton_v2
-                        fn = greedy_pass_triton_v2
-                    except Exception:
-                        pass   # fail-closed：保持 v1
                 return TLIIndexer._greedy_cluster_pass_triton(x, sim, sums, cnt, sq,
                                                               k_live, fn)
         return TLIIndexer._greedy_cluster_pass_python(x, sim, sums, cnt, sq, k_live)
@@ -876,7 +997,14 @@ class TLIIndexer(TIAIndexer):
         # 11.31×）导致簇段霸榜挤出回退段；far 侧纯簇分 topk 乘正 scale 不变
         # 排序 → far 行为逐位不变（核验报告 research/docs/gpt_audit_verdict_
         # 20261008_round2.md C3 节）。
-        if q.shape[0] == 1 and q.shape[1] == 1:
+        # 【E133c-A3】_last_q 仅被簇分数分支消费（compute_mask far/near
+        # far_select/near_select ∈ {cluster, sim_greedy} 两处 getattr）；
+        # mavg 等臂每步 2 个 launch 白付 → 按消费方条件化（未命中时保持
+        # 旧值 None 语义，消费端 getattr 回退口径不变）。
+        if q.shape[0] == 1 and q.shape[1] == 1 and (
+            self.far_select in ("cluster", "sim_greedy")
+            or self.near_select in ("cluster", "sim_greedy")
+        ):
             self._last_q = (
                 q.squeeze(0).squeeze(0) * softmax_scale
             ).to(torch.float32)  # [H, D]（已缩放）
@@ -891,6 +1019,19 @@ class TLIIndexer(TIAIndexer):
         # 非 skip / 非 e64 组合的捷径行为逐位不变。
         if not self.enable_subspace and not self._need_avg_score() \
                 and not (self.skip_far and self.alpha > 0 and self.beta > 0):
+            # 【E133b 适配修复】E133b 后 k_qat 为紧凑布局 [1,cap,Hkv,64//r]，
+            # 父类 TIA compute_score 捷径按全维 dense 消费 → einsum 形状崩
+            # （基线 cccf756 同炸，E133b 既有缺陷非 E133c 引入）。喂父类前
+            # 临时展开零填充 dense 副本——零列贡献精确 +0.0，分数逐位不变；
+            # 浅拷贝 dict 不污染调用方。
+            _kq = index_dict.get("k_qat")
+            if _kq is not None and _kq.dim() == 4 and _kq.shape[-1] != q.shape[-1]:
+                _ind = self._qat_indices(_kq.device)
+                _dense = _kq.new_zeros(_kq.shape[0], _kq.shape[1],
+                                       _kq.shape[2], q.shape[-1])
+                _dense[..., _ind] = _kq
+                index_dict = dict(index_dict)
+                index_dict["k_qat"] = _dense
             d = super().compute_score(q, q_ids, index_dict, softmax_scale)
             # 075：父类捷径同样携带真实长度（该路径无投影，valid_length ==
             # score_fine 宽度，行为不变；保持 score_dict 接口统一）
@@ -1031,7 +1172,7 @@ class TLIIndexer(TIAIndexer):
             elif (_HAS_TRITON and self._basis is None and k_avg.dim() == 3
                     and k_avg.is_cuda
                     and (k_avg.shape[-1] & (k_avg.shape[-1] - 1)) == 0
-                    and k_avg.stride(-1) == 1
+                    and k_avg.stride(-1) == 1 and b_q.stride(-1) == 1
                     and b_q.dtype == torch.float32
                     and k_avg.shape[-1] == b_q.shape[-1]
                     and k_avg.shape[1] * self.group_size == b_q.shape[0]
@@ -1039,6 +1180,9 @@ class TLIIndexer(TIAIndexer):
                 # 【E127 iter8】avg 段复用 iter6 _score_fine_kernel 同构
                 # （einsum(b_q, repeat(k_avg)) 数学等价，GQA K 复用免物
                 # 化）；ULP 口径同 iter6；异形/异常回退原版表达式。
+                # 【E132b TL-E127-FEATURE-STRIDE-129】补 b_q 末维 stride
+                # 检查（kernel 以 base+offs_d 硬编码末维 stride=1 访问 Q；
+                # coarse 门禁同款检查已有 k 侧，此处补齐 q 侧）。
                 try:
                     score_coarse_avg[0] = self._fast_score_fine(
                         k_avg, b_q, q_sq.dtype)
@@ -1059,7 +1203,22 @@ class TLIIndexer(TIAIndexer):
         if self._basis is not None:
             b_q_full = b_q
         else:
-            b_q_full = (q_sq[0] * softmax_scale).to(torch.float32)
+            # 【E133b 原生】k_qat 紧凑 [.,.,delta] → q 同步 gather 到量化维
+            # （被丢弃维乘积恒为 0，数学等价；fp32 累加顺序变化 → bf16 舍入
+            # 后 ULP 级漂移，E127 iter6 同口径）。indices 规则与 prepare 端
+            # k_qat 量化完全同源（idx_sub 优先，full 落 _qat_indices）。
+            # 【E133c-A2】tail 模式 _qi == idx_sub → b_q_full ≡ b_q（原
+            # mul+to+gather 3 launch 纯冗余，复用 L931 产物）；full 模式
+            # 共享 q_full 仅 gather 一次（省 mul+to 2 launch）。值逐位同
+            # 原表达式（q_full 与重算的 (q_sq[0]*scale).to(f32) 确定性同值）。
+            # 【E134】l2_subspace=full 时 k_qat 为 128 宽全维 → q 直接用
+            # 全维 q_full（量化覆盖全部维度，无 gather 必要）。
+            if self.l2_subspace == "full":
+                b_q_full = q_full
+            elif idx_sub is not None:
+                b_q_full = b_q
+            else:
+                b_q_full = q_full[..., self._qat_indices(q_sq.device)]
         if dgate_short:
             # E111 省算：far 段 token [sink_tok, near_blks·bs) 的细筛分
             # 保持 -inf（skip 层 far 池置空后不可达）。分段对保留段逐位
@@ -1077,14 +1236,23 @@ class TLIIndexer(TIAIndexer):
                 score_fine[0, :, _fth:] = sf_tail.to(q_sq.dtype)
         elif (_HAS_TRITON and self._basis is None and k_qat.dim() == 4
                 and k_qat.is_cuda
-                and k_qat.shape[0] == 1 and k_qat.shape[-1] == 128
+                and k_qat.shape[0] == 1
+                and (k_qat.shape[-1] & (k_qat.shape[-1] - 1)) == 0
+                and k_qat.stride(-1) == 1 and b_q_full.stride(-1) == 1
                 and b_q_full.dtype == torch.float32
+                and k_qat.shape[-1] == b_q_full.shape[-1]
                 and k_qat.shape[2] * self.group_size == b_q_full.shape[0]
                 and self._triton_ok):
             # 【E127 iter6】非投影路径 Triton GQA K 复用（K 读带宽 4× 削减，
             # 免 [T,H,128] fp32 repeat 物化；fp32 累加与原版 einsum 仅累加
             # 顺序不同 → bf16 舍入后 ULP 级漂移，mask 门禁实测逐位不变）。
             # 投影/异形布局/Triton 异常回退原版 repeat+einsum。
+            # 【E132b TL-E127-FEATURE-STRIDE-129】补 k_qat/b_q_full 末维
+            # stride 检查：_score_fine_kernel 以 base+offs_d 硬编码末维
+            # stride=1 访问特征，合法非连续布局（如 permute/转置 dense 视
+            # 图）会静默读错物理地址——与 coarse 门禁（k_min/k_max/b_q 三
+            # 检查）对齐；非连续输入回退原版 einsum 表达式（fail-closed，
+            # 值同）。
             try:
                 score_fine[0] = self._fast_score_fine(
                     k_qat.squeeze(0), b_q_full, q_sq.dtype)
@@ -1109,6 +1277,15 @@ class TLIIndexer(TIAIndexer):
 
     # ------------------------------------------------ 【E127 iter6/8】Triton
     # fast path（原 TLIIndexerFast._fast_score_fine/_fast_score_coarse 并入）
+    # 【E133c-A6】打分 kernel tile 参数按 D 查表：D=128 维持 (64,4) 原值
+    # 保证 full 臂零回归；D=32 由 exp/bench/e133c_tile_scan.py 实测扫描定参
+    # （2xh20-reg0519 H20，真实 mavg+tail32 链路捕获输入，cudaEvent 稳态中位
+    # warmup50+rep200）：coarse 最优 (128,8)=0.0374ms vs (64,4)=0.0378（-1%）；
+    # fine 最优 (16,1)=0.0394 vs (64,4)=0.0412（-4.4%，D=32 下 warps>1 会把
+    # 32 维 tile 切碎致劣化）。D 缺省回退 (64,4)。扫描数据 tile_scan.json。
+    _TILE_FINE = {32: (16, 1), 64: (64, 4), 128: (64, 4)}
+    _TILE_COARSE = {32: (128, 8), 64: (64, 4), 128: (64, 4)}
+
     def _fast_score_fine(self, kq, b_q_full, out_dtype):
         """score_fine 的 Triton GQA K 复用 kernel（非投影路径专用）。
 
@@ -1134,12 +1311,13 @@ class TLIIndexer(TIAIndexer):
             H = b_q_full.shape[0]
             g = H // Hkv
             out = torch.empty((H, T), device=kq.device, dtype=out_dtype)
-            grid = (triton.cdiv(T, 64), Hkv)
+            bt, nw = self._TILE_FINE.get(D, (64, 4))
+            grid = (triton.cdiv(T, bt), Hkv)
             _score_fine_kernel[grid](
                 kq, b_q_full, out, T,
                 kq.stride(0), kq.stride(1), b_q_full.stride(0),
                 out.stride(0), out.stride(1),
-                Hkv=Hkv, G=g, D=D, BT=64, num_warps=4)
+                Hkv=Hkv, G=g, D=D, BT=bt, num_warps=nw)
             return out
         except Exception:
             self._triton_ok = False
@@ -1165,38 +1343,96 @@ class TLIIndexer(TIAIndexer):
             H = b_q.shape[0]
             g = H // Hkv
             out = torch.empty((H, T), device=k_min.device, dtype=out_dtype)
-            grid = (triton.cdiv(T, 64), Hkv)
+            bt, nw = self._TILE_COARSE.get(D, (64, 4))
+            grid = (triton.cdiv(T, bt), Hkv)
             _score_coarse_kernel[grid](
                 k_min, k_max, b_q, out, T,
                 k_min.stride(0), k_min.stride(1),
                 k_max.stride(0), k_max.stride(1),
                 b_q.stride(0),
                 out.stride(0), out.stride(1),
-                Hkv=Hkv, G=g, D=D, BT=64, num_warps=4)
+                Hkv=Hkv, G=g, D=D, BT=bt, num_warps=nw)
             return out
         except Exception:
             self._triton_ok = False
             raise
 
+    def _fast_stat_tail(self, k, idx_sub, lo, n_tok, n_blk, fb,
+                        k_min_buf, k_max_buf, k_avg_buf):
+        """【E133c-A4】尾段块统计融合 wrapper（1 launch 替代 tail_pad 构造
+        + gather + amin/amax/mean + 3 直写 ≈ 9 launch）。
+
+        数学：对尾段每块（BS token × 1 kv 头）按升序逐行 fp32 顺序累加
+        min/max/sum；mean = sum/BS（BS=64 精确除）。pad 行 mask other=0
+        复现全量版 tail_pad 零填充语义。数值实证（50 轮随机 bf16 全过，
+        /tmp/e133c_numeric_probe.py 口径）：mean 升序 fp32 顺序累加 → RNE
+        bf16 与 PyTorch mean(dim) 逐位一致；min/max 为选择运算无舍入。
+
+        fail-closed：异常置 _stat_ok=False（本实例永久回退 PyTorch 路径）
+        并 raise（调用点 except 走 buffer 直写/cat 回退，值同原版）。"""
+        try:
+            Hkv = k.shape[2]
+            if idx_sub is not None:
+                DD, sub_t = idx_sub.numel(), idx_sub
+            else:
+                # full 模式：全维直读（HAS_SUB=False，IDXSUB 占位不读）
+                DD, sub_t = k.shape[3], k_min_buf
+            _coarse_stat_kernel[(n_blk, Hkv)](
+                k, sub_t, k_min_buf, k_max_buf,
+                k_avg_buf if k_avg_buf is not None else k_min_buf,
+                n_tok, lo, fb,
+                k.stride(1), k.stride(2),
+                k_min_buf.stride(1), k_min_buf.stride(2),
+                Hkv=Hkv, DD=DD, BS=self.args.tia_block_size,
+                HAS_SUB=idx_sub is not None,
+                HAS_AVG=k_avg_buf is not None,
+                num_warps=max(1, DD // 32))
+        except Exception:
+            self._stat_ok = False
+            raise
+
+    def _fast_qat_tail(self, k, indices, lo, n_tok, buf):
+        """【E133c-A5】量化链融合 wrapper（1 launch 替代 gather 物化 +
+        minmax 4bit 量化 ~10 个小 launch + buf 直写 ≈ 12 launch）。
+
+        数学：与 TIAIndexer.min_max_per_token_quant 逐位一致——逐算子
+        仿真（每算子 fp32 计算 + 输出 RNE bf16，PyTorch CUDA elementwise
+        opmath=fp32 口径）；torch.round 的 round-half-to-even 用
+        libdevice.rint（fp32 RN 模式默认 half-to-even）复现。实证 50 轮
+        随机 bf16 全过（/tmp/e133c_numeric_probe.py）。
+
+        fail-closed：异常置 _quant_ok=False 并 raise（调用点 except 回退
+        PyTorch 原版量化，值同）。"""
+        try:
+            Hkv, DD = buf.shape[1], indices.numel()
+            BT = 64
+            _qat_quant_kernel[(triton.cdiv(n_tok, BT), Hkv)](
+                k, indices, buf, n_tok, lo,
+                k.stride(1), k.stride(2), buf.stride(0), buf.stride(1),
+                Hkv=Hkv, DD=DD, BT=BT, num_warps=max(1, DD // 32))
+        except Exception:
+            self._quant_ok = False
+            raise
+
     def _fast_tok_score(self, q, idx_sub, centroids, assign, agg):
-        """【E131-S2】簇分数段 q_g+einsum+gather 三件套的 Triton 全融合。
+        """【E131-S2（原 fast.py override 并入）】簇分数段 q_g+einsum+gather
+        三件套的 Triton 全融合。
 
         数学：q_g[h,d'] = AGG_{j<G} q[h·G+j, idx_sub[d']]（AGG=sum 远端 /
         mean 近端，与原版 reshape(...).sum(1)/mean(1) 数学等价）；
         tok_score[h,t] = Σ_d q_g[h,d]·centroids[h, assign[h,t], d]，与
         原版 q 胶水 + einsum("hd,hkd->hk") + gather(1, assign) 数学等价。
         一次 launch 完成（原版 3 个小 launch 的胶水序列两处各付一遍）。
-        E131-S2 实测（H20 S=64K cclustersim 稳态）：far 侧 0.107→0.057ms
-        （1.89×）/ near 侧 0.062→0.047ms（1.32×）。
+        E131-S2 实测（H20 S=64K cclustersim 稳态）：far 侧 0.135→~0.05ms。
 
         数值口径（同 E127 iter6/8）：q_g 组内累加与 dot 的 fp32 累加顺序
         均与 torch/cublas 不同 → fp32 ULP 级漂移（tok_score 无 bf16 舍入
         吸收，直接进 topk 竞争）→ 并列边界可能翻转，mask 选择为经验
-        验证口径（门禁实测 + top-k 重叠率 ≥99.9% 报告精确值，E131-S2
-        实测 16 步 mask 逐位 0 差异 + e2e 24 步 12585120 位 100% 一致）。
+        验证口径（门禁实测 + top-k 重叠率 ≥99.9% 报告精确值；E131-S2
+        实测 16 步 mask 逐位 0 差异 + e2e 24 步 12585120/12585120）。
 
-        fail-closed：Triton 编译/执行异常 → 置 _triton_ok=False 并由
-        调用点回退原版表达式（值同原版路径，仅性能回退）。"""
+        fail-closed：Triton 编译/执行异常 → 调用点回退原版表达式（值同
+        原版路径，仅性能回退）。"""
         try:
             Hkv, Kc, dd = centroids.shape
             T = assign.shape[1]
@@ -1226,8 +1462,10 @@ class TLIIndexer(TIAIndexer):
         E110：q 取维改用建簇时记录的 _km_dims（sim_greedy 的 sim_dims 可异于
         _subspace_indices——打分/建簇维度必须同源；kmeans 路径 _km_dims 即
         _subspace_indices 的返回值，行为不变）。
-        【E131-S2】Triton 全融合分支（开关 TLI_E131_TOKSCORE_TRITON，默认 1；
-        0 或异形布局/编译异常回退本原版表达式，值逐位同原版路径）。
+
+        【E131-S2（原 fast.py override 并入）】默认先走 Triton 全融合
+        （_fast_tok_score，开关 TLI_E131_TOKSCORE_TRITON，fail-closed
+        回退原版表达式）；far 侧 0.107→0.057ms（1.89×）。
         """
         if self._km_centroids is None:
             return None
@@ -1236,9 +1474,9 @@ class TLIIndexer(TIAIndexer):
         H = q.shape[0]
         Hkv = self._km_centroids.shape[0]
         G = H // Hkv
-        if (os.environ.get("TLI_E131_TOKSCORE_TRITON", "1")
+        if (_HAS_TRITON
+                and os.environ.get("TLI_E131_TOKSCORE_TRITON", "1")
                 not in ("0", "false", "False")
-                and _HAS_TRITON
                 and getattr(self, "_triton_ok", True)
                 and q.is_cuda and q.dtype == torch.float32
                 and self._km_centroids.is_cuda
@@ -1256,7 +1494,7 @@ class TLIIndexer(TIAIndexer):
                     q, idx_sub, self._km_centroids, self._km_token_assign,
                     agg="sum")
             except Exception:
-                pass   # fail-closed：下方原版表达式（值同锚点路径）
+                pass   # fail-closed：下方原版表达式（值同原版路径）
         q_sub = q[:, idx_sub].float()                       # [H, d']
         q_g = q_sub.reshape(Hkv, G, -1).sum(1)              # [Hkv, d']（group 求和，与 L1 量纲一致）
         cscore = torch.einsum("hd,hkd->hk", q_g, self._km_centroids)  # [Hkv, K_c]
@@ -1270,8 +1508,9 @@ class TLIIndexer(TIAIndexer):
         与 far 侧的唯一差别：group 聚合用 mean——far 侧单独 topk 用 sum 无所谓
         量纲，near 侧簇分数要与「未覆盖段的细筛回退分 sf_g（group-mean 原始
         点积分）」在同一 topk 内竞争，sum 会放大 G 倍导致簇段霸榜，必须 mean。
-        【E131-S2】Triton 全融合分支（同 far 侧口径，AGG=mean；开关
-        TLI_E131_TOKSCORE_TRITON 默认 1，异形/异常回退原版表达式）。
+
+        【E131-S2（原 fast.py override 并入）】Triton 全融合同构（AGG=mean
+        对齐 sf_g 量纲）；near 侧 0.062→0.047ms（1.32×）。
         """
         if self._km_near_centroids is None:
             return None
@@ -1279,9 +1518,9 @@ class TLIIndexer(TIAIndexer):
         H = q.shape[0]
         Hkv = self._km_near_centroids.shape[0]
         G = H // Hkv
-        if (os.environ.get("TLI_E131_TOKSCORE_TRITON", "1")
+        if (_HAS_TRITON
+                and os.environ.get("TLI_E131_TOKSCORE_TRITON", "1")
                 not in ("0", "false", "False")
-                and _HAS_TRITON
                 and getattr(self, "_triton_ok", True)
                 and q.is_cuda and q.dtype == torch.float32
                 and self._km_near_centroids.is_cuda
@@ -1959,6 +2198,9 @@ class TLIIndexer(TIAIndexer):
 # 并入；_HAS_TRITON=False 时整体不定义，调用点守卫短路走原版表达式）。
 # ======================================================================
 if _HAS_TRITON:
+    # 【E133c-A5】libdevice.rint：fp32 round-half-to-even（torch.round 的
+    # nearbyint 口径），量化融合 kernel 逐位仿真用
+    from triton.language.extra import libdevice  # noqa: E402
 
     @triton.jit
     def _score_fine_kernel(
@@ -2013,12 +2255,6 @@ if _HAS_TRITON:
             tl.store(OUT + h * stride_oh + offs_t * stride_ot,
                      s.to(OUT.dtype.element_ty), mask=mask_t)
 
-    # 【E131-S2】簇分数 gather-dot 全融合 kernel（q_g 胶水 + einsum +
-    # gather 三件套 → 单 launch；E127 GQA K 复用同款设计）。数学 =
-    # _far/_near_token_score 原版表达式（AGG=sum 远端 / mean=AGG_DIV·sum
-    # 近端，G 为 2 的幂 → 1/G 精确二进制除法）；fp32 累加顺序与 cublas
-    # 不同 → ULP 级漂移口径同 iter6/8（mask 门禁实测，E131-S2 实测
-    # 16 步逐位 0 差异 + e2e 24 步 12585120 位逐位一致）。
     @triton.jit
     def _tok_score_kernel(
         Q, IDXSUB, CENT, ASSIGN, OUT,
@@ -2029,6 +2265,10 @@ if _HAS_TRITON:
         stride_oh, stride_ot,
         Hkv: tl.constexpr, G: tl.constexpr, DD: tl.constexpr, BT: tl.constexpr,
     ):
+        """【E131-S2（原 fast.py 并入）】tok_score 全融合：q_g =
+        AGG_{j<G} q[h·G+j, idx_sub]（sum 或 mean=AGG_DIV·sum）→
+        tok_score[h,t] = Σ_d q_g[h,d]·cent[h,a[h,t],d]。fp32 累加顺序
+        ULP 口径见 _fast_tok_score。"""
         pid_t = tl.program_id(0)
         h = tl.program_id(1)
         offs_t = pid_t * BT + tl.arange(0, BT)
@@ -2048,3 +2288,94 @@ if _HAS_TRITON:
                     + offs_d[None, :], mask=mask_t[:, None], other=0.0)
         s = tl.sum(c * qg[None, :], axis=1)
         tl.store(OUT + h * stride_oh + offs_t * stride_ot, s, mask=mask_t)
+
+    @triton.jit
+    def _bf16_rne(x):
+        """fp32 → RNE 舍入 bf16 → 回 fp32（PyTorch CUDA bf16 算子输出的
+        opmath=fp32 逐算子口径，E133c-A5 量化仿真用）。"""
+        return x.to(tl.bfloat16).to(tl.float32)
+
+    @triton.jit
+    def _coarse_stat_kernel(
+        K, IDXSUB, OMIN, OMAX, OAVG,
+        # K [S,Hkv,D] bf16（k[0] 视图）；OMIN/OMAX/OAVG [1,cap,Hkv,DD] bf16；
+        # IDXSUB [DD] int64（HAS_SUB=False 时占位不读）
+        n_tok, lo, fb,
+        stride_kt, stride_kh, stride_ot, stride_oh,
+        Hkv: tl.constexpr, DD: tl.constexpr, BS: tl.constexpr,
+        HAS_SUB: tl.constexpr, HAS_AVG: tl.constexpr,
+    ):
+        """【E133c-A4】尾段块统计融合：每 program 处理 1 个（尾块 × kv 头），
+        按升序 i=0..BS-1 逐行 fp32 顺序累加 min/max/sum（与 PyTorch
+        mean(dim) 实测同序，/tmp/e133c_numeric_probe.py 50 轮全过）；
+        pad 行 mask other=0 复现全量版 tail_pad 零填充语义。"""
+        pid_b = tl.program_id(0)
+        h = tl.program_id(1)
+        offs_d = tl.arange(0, DD)
+        if HAS_SUB:
+            sub = tl.load(IDXSUB + offs_d)                    # [DD] int64
+        mn = tl.full((DD,), float("inf"), tl.float32)
+        mx = tl.full((DD,), float("-inf"), tl.float32)
+        s = tl.zeros((DD,), tl.float32)
+        for i in tl.static_range(BS):
+            msk = (offs_d >= 0) & ((pid_b * BS + i) < n_tok)  # 向量 mask
+            if HAS_SUB:
+                x = tl.load(K + (lo + pid_b * BS + i) * stride_kt
+                            + h * stride_kh + sub,
+                            mask=msk, other=0.0
+                            ).to(tl.float32)                  # [DD]
+            else:
+                x = tl.load(K + (lo + pid_b * BS + i) * stride_kt
+                            + h * stride_kh + offs_d,
+                            mask=msk, other=0.0).to(tl.float32)
+            mn = tl.minimum(mn, x)
+            mx = tl.maximum(mx, x)
+            s = s + x
+        tl.store(OMIN + (fb + pid_b) * stride_ot + h * stride_oh + offs_d,
+                 mn.to(OMIN.dtype.element_ty))
+        tl.store(OMAX + (fb + pid_b) * stride_ot + h * stride_oh + offs_d,
+                 mx.to(OMAX.dtype.element_ty))
+        if HAS_AVG:
+            tl.store(OAVG + (fb + pid_b) * stride_ot + h * stride_oh
+                     + offs_d,
+                     (s * (1.0 / BS)).to(OAVG.dtype.element_ty))
+
+    @triton.jit
+    def _qat_quant_kernel(
+        K, IDXSUB, OUT,
+        # K [S,Hkv,D] bf16（k[0] 视图）；IDXSUB [DD] int64；OUT=buf
+        # [cap,Hkv,DD] bf16；直写 OUT[lo:lo+n_tok)
+        n_tok, lo,
+        stride_kt, stride_kh, stride_ot, stride_oh,
+        Hkv: tl.constexpr, DD: tl.constexpr, BT: tl.constexpr,
+    ):
+        """【E133c-A5】minmax 4bit 量化融合：每 program 处理（token 块 ×
+        1 kv 头），读 K 子空间维 → 逐 token min/max → 量化逐算子 bf16-RNE
+        仿真（PyTorch CUDA opmath=fp32 口径逐位一致）→ 直写 buf 尾段。
+        round-half-to-even = libdevice.rint（fp32 RN 默认模式）。"""
+        pid_t = tl.program_id(0)
+        h = tl.program_id(1)
+        offs_t = pid_t * BT + tl.arange(0, BT)
+        mask_t = offs_t < n_tok
+        offs_d = tl.arange(0, DD)
+        sub = tl.load(IDXSUB + offs_d)                       # [DD] int64
+        x = tl.load(K + (lo + offs_t)[:, None] * stride_kt + h * stride_kh
+                    + sub[None, :],
+                    mask=mask_t[:, None], other=0.0).to(tl.float32)  # [BT,DD]
+        mx = tl.max(x, axis=1)                               # [BT] 选择精确
+        mn = tl.min(x, axis=1)
+        # scales = (mx - mn).clamp(1e-9) / 15 —— 逐算子 bf16-RNE
+        t1 = _bf16_rne(mx - mn)
+        t2 = _bf16_rne(tl.maximum(t1, 1e-9))
+        scales = _bf16_rne(t2 / 15.0)
+        zeros = -mn                                           # bf16 取负精确
+        # out = clamp(round((x+zeros)/scales), 0, 15)*scales - zeros
+        u = _bf16_rne(x + zeros[:, None])
+        v = _bf16_rne(u / scales[:, None])
+        w = libdevice.rint(v)                                 # RNE-to-even
+        w = tl.minimum(tl.maximum(w, 0.0), 15.0)
+        p = _bf16_rne(w * scales[:, None])
+        out = _bf16_rne(p - zeros[:, None])
+        tl.store(OUT + (lo + offs_t)[:, None] * stride_ot + h * stride_oh
+                 + offs_d[None, :], out.to(tl.bfloat16),
+                 mask=mask_t[:, None])

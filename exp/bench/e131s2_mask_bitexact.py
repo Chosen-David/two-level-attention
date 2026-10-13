@@ -10,15 +10,15 @@ top-k 重叠率 = 一致位比例。
 import os
 import sys
 
-REPO = os.path.dirname(os.path.abspath(__file__)) if False else \
-    "/home/wangyuanshuo02/two-level-attention-e131s2"
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, "exp", "bench"))
 
 import torch  # noqa: E402
 from e131_arm_bench import make_args  # noqa: E402
-# 【E127 inplace 合并（2026-10-12）】TLIIndexerFast 子类退役，语义并入基类
-from sparse_attn.indexer.tli_indexer import TLIIndexer as TLIIndexerFast  # noqa: E402
+# 【E131-S2 移植（2026-10-12）】inplace 合并后 fast.py 已退役，基类默认即
+# fast path（TLI_E127_FAST env 反转：默认开，=0 归档逃生口）。
+from sparse_attn.indexer.tli_indexer import TLIIndexer  # noqa: E402
 from sparse_attn.patches.utils import prepare_cu_seqlens, prepare_seqlens  # noqa: E402
 
 
@@ -26,7 +26,7 @@ def run_arm(arm, steps=24):
     """跑 N 步，返回每步 mask 的 clone 列表（GPU 张量转 CPU）。"""
     os.environ["TLI_E127_FAST"] = "1"
     torch.manual_seed(20261012)
-    idx = TLIIndexerFast(make_args(arm))
+    idx = TLIIndexer(make_args(arm))
     idx.layer_idx = 2
     idx.clear()
     dev = "cuda:0"

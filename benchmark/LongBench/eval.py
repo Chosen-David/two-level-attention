@@ -28,6 +28,8 @@ from .metrics import (
 from .run_cap_manifest import (
     RUN_CAP_SIDECAR_SUFFIX,
     read_run_cap_manifest,
+    runcap_gate_lock,
+    cap_comparability_key,
 )
 
 
@@ -46,8 +48,9 @@ def _runcap_file_lines(path):
         return sum(1 for _ in f)
 
 
-def validate_runcap_sidecar(jsonl_path, legacy_allowed):
-    """102：打分前对单个 *.jsonl 强制校验 run-cap sidecar。
+def validate_runcap_sidecar(jsonl_path, legacy_allowed,
+                            actual_sha=None, actual_lines=None):
+    """102/111/115：打分前对单个 *.jsonl 强制校验 run-cap sidecar。
 
     返回 cap 身份 dict（strict 通过）或 None（legacy 降级放行）；
     违规一律 SystemExit（[RUNCAP-FAIL]/[CAP-SCHEMA-FAIL]），调用方不写
@@ -58,11 +61,19 @@ def validate_runcap_sidecar(jsonl_path, legacy_allowed):
          存量打分路径不炸死，但 cap 身份未知如实记 null）。
       ② schema：read_run_cap_manifest（损坏/缺键 [CAP-SCHEMA-FAIL]）。
       ③ status：必须 complete（generating = 生成中断/未回填，拒绝）。
-      ④ 绑定：结果文件字节 sha256 重算 == manifest.result_sha256
-         （schema 通过 ≠ 绑定通过——TOCTOU/篡改在此拦截）；行数 ==
-         manifest.n_samples（且 manifest.result_lines 非 null 时须一致）。
-      ⑤ cap 身份提取（effective/protocol/identity hash/provenance）供
-         聚合 uniformity 检查与 result.json _meta 落盘。
+      ④ result_file 闭包（115）：manifest.result_file 必须就是当前
+         JSONL 的 basename——误拷/错配 backfill 的 sidecar（cap 身份属
+         于另一结果文件）拒绝。
+      ⑤ 绑定：结果文件字节 sha256 == manifest.result_sha256（schema 通过
+         ≠ 绑定通过——篡改在此拦截）；行数 == manifest.n_samples（且
+         manifest.result_lines 非 null 时须一致）。
+      ⑥ cap 身份提取（effective/protocol/identity hash/comparability
+         key/provenance）供聚合 uniformity 检查与 result.json _meta 落盘。
+    【111】actual_sha/actual_lines：调用方在同一 runcap_gate_lock 锁窗口
+    内从**同一字节快照**预计算的 sha256/行数——评分、SHA、行数和
+    provenance 必须绑定同一不可变快照（修复前 eval 先 parse A、后重开同
+    路径校验重跑后的 B：分数来自 A、元数据 SHA 来自 B 的 TOCTOU）。缺省
+    时本函数自行重读（向后兼容，仅供非 TOCTOU 敏感调用方）。
     """
     sidecar = jsonl_path + RUN_CAP_SIDECAR_SUFFIX
     if not os.path.lexists(sidecar):
@@ -85,14 +96,25 @@ def validate_runcap_sidecar(jsonl_path, legacy_allowed):
             f"status={manifest['status']!r} 非 complete（generating = 生"
             f"成中断/complete 回填未发生）——半残产物拒绝打分，不写 "
             f"result.json")
-    actual_sha = _runcap_file_sha256(jsonl_path)
+    # ④【115】sidecar 的 result_file 必须就是当前 JSONL 的 basename
+    #（validate 层不知 jsonl 路径，此闭包只能在消费侧核对）。
+    if manifest.get("result_file") != os.path.basename(jsonl_path):
+        raise SystemExit(
+            f"[RUNCAP-FAIL] 115: {jsonl_path} 的 run-cap manifest "
+            f"result_file={manifest.get('result_file')!r} != 当前结果文件"
+            f" basename {os.path.basename(jsonl_path)!r}——sidecar 误拷/"
+            f"错配 backfill（cap 身份属于另一结果文件），拒绝打分，不写 "
+            f"result.json")
+    if actual_sha is None:
+        actual_sha = _runcap_file_sha256(jsonl_path)
     if manifest["result_sha256"] is None or actual_sha != manifest["result_sha256"]:
         raise SystemExit(
             f"[RUNCAP-FAIL] 102: {jsonl_path} 结果文件 sha256 与 manifest "
             f"绑定不符——manifest={str(manifest['result_sha256'])[:16]}… "
             f"实际={actual_sha[:16]}…（篡改/TOCTOU 交错/写错文件），拒绝"
             f"打分，不写 result.json")
-    actual_lines = _runcap_file_lines(jsonl_path)
+    if actual_lines is None:
+        actual_lines = _runcap_file_lines(jsonl_path)
     if actual_lines != manifest["n_samples"] or (
             manifest["result_lines"] is not None
             and actual_lines != manifest["result_lines"]):
@@ -101,10 +123,19 @@ def validate_runcap_sidecar(jsonl_path, legacy_allowed):
             f"实际 {actual_lines} 行 vs n_samples={manifest['n_samples']}"
             f" / result_lines={manifest['result_lines']}（部分写入/混行），"
             f"拒绝打分，不写 result.json")
+    ct = manifest["cap_treatment"] \
+        if isinstance(manifest["cap_treatment"], dict) else {}
     return {
         "cap_effective": manifest["effective_cap"],
         "cap_protocol": manifest["protocol_cap"],
         "cap_identity_hash": manifest["cap_identity"]["hash"],
+        # 【112】跨任务 cap 等价 key（只含 cap 语义字段）——聚合单一性
+        # 检查用它；完整 identity hash 仅供单文件防覆盖口径记录。
+        "cap_comparability_key": cap_comparability_key(
+            effective_cap=manifest["effective_cap"],
+            protocol_cap=manifest["protocol_cap"],
+            cap_treatment_type=ct.get("type"),
+            cap_treatment_divergence=ct.get("divergence")),
         "provenance": manifest["provenance"],
         "result_sha256": actual_sha,
         "sidecar": os.path.basename(sidecar),
@@ -258,8 +289,23 @@ if __name__ == "__main__":
         predictions, answers, lengths, budgets = [], [], [], []
         ids = []
         dataset = filename.split("-")[0]
-        with open(f"{path}/{filename}", "r", encoding="utf-8") as f:
-            for line in f:
+        jsonl_full = f"{path}/{filename}"
+        # ----【111 修复（GPT 审计 2026-10-12_0933 TL-E096-CAP-CONSUMER-
+        #      TOCTOU-111，P1）】consumer 侧与 producer 同一把结果文件级
+        # 锁（runcap_gate_lock，7367367 同 key：out_path+".runcap_gate.
+        # lock"）——修复前 eval 先把 JSONL A parse 进内存、随后 validate
+        # 才重开同路径算 SHA/行数：producer（pred.py open(out_path,"w")
+        # 覆盖写）可交错完成 B+sidecar B，得到「分数来自 A、SHA/元数据来
+        # 自 B」。现在读字节→parse→SHA→行数→sidecar 校验→评分输入在
+        # 同一锁窗口一次完成（同一不可变字节快照），锁外只做 scorer。
+        with runcap_gate_lock(jsonl_full):
+            with open(jsonl_full, "rb") as f:
+                raw = f.read()
+            actual_sha = hashlib.sha256(raw).hexdigest()
+            # 行数口径 = producer compute_result_binding 的二进制按行迭代
+            actual_lines = raw.count(b"\n") + (
+                1 if raw and not raw.endswith(b"\n") else 0)
+            for line in raw.decode("utf-8").splitlines():
                 data = json.loads(line)
                 predictions.append(data["pred"])
                 answers.append(data["answers"])
@@ -270,60 +316,64 @@ if __name__ == "__main__":
                     lengths.append(data["length"])
                 if "budget" in data:
                     budgets.append(data["budget"])
-        # ---- 门禁 1：行数下限（--expect-count）----
-        if args.expect_count > 0 and len(predictions) < args.expect_count:
-            raise SystemExit(
-                f"[GATE-FAIL] {filename}: {len(predictions)} 行 < expect-count "
-                f"{args.expect_count}——fail closed，不写 result.json"
-            )
-        # ---- 门禁 2：_id 无重复（新数据全带 _id；旧 v1 文件无 _id 时跳过）----
-        if ids:
-            if len(ids) != len(set(ids)):
-                dup = sorted({i for i in ids if ids.count(i) > 1})[:5]
+            # ---- 门禁 1：行数下限（--expect-count）----
+            if args.expect_count > 0 and len(predictions) < args.expect_count:
                 raise SystemExit(
-                    f"[GATE-FAIL] {filename}: 检测到重复 _id（示例 {dup}）——"
-                    f"fail closed，不写 result.json"
+                    f"[GATE-FAIL] {filename}: {len(predictions)} 行 < expect-count "
+                    f"{args.expect_count}——fail closed，不写 result.json"
                 )
-            if len(ids) != len(predictions):
-                raise SystemExit(
-                    f"[GATE-FAIL] {filename}: 部分 行缺失 _id（{len(ids)}/"
-                    f"{len(predictions)}）——fail closed，不写 result.json"
-                )
-        # ---- 门禁 3：manifest 集合闭包 + answers hash 一致 ----
-        if manifest is not None:
-            m_task = manifest.get(dataset)
-            if m_task is None:
-                print(f"[GATE-WARN] {filename}: 任务 {dataset} 不在 manifest——跳过该文件")
-                continue
-            exp_ids = set(m_task["ids"])
-            got_ids = set(ids) if ids else None
-            if got_ids is None:
-                raise SystemExit(
-                    f"[GATE-FAIL] {filename}: 预测缺 _id 字段，无法对 manifest 校验——"
-                    f"fail closed，不写 result.json"
-                )
-            if got_ids != exp_ids:
-                missing = sorted(exp_ids - got_ids)[:5]
-                extra = sorted(got_ids - exp_ids)[:5]
-                raise SystemExit(
-                    f"[GATE-FAIL] {filename}: _id 集合与 manifest 不等"
-                    f"（缺 {len(exp_ids-got_ids)} 例 {missing}；多 "
-                    f"{len(got_ids-exp_ids)} 例 {extra}）——fail closed，不写 result.json"
-                )
-            exp_sha = m_task.get("answers_sha", {})
-            for i, a in zip(ids, answers):
-                if i in exp_sha and _answers_sha(a) != exp_sha[i]:
+            # ---- 门禁 2：_id 无重复（新数据全带 _id；旧 v1 文件无 _id 时跳过）----
+            if ids:
+                if len(ids) != len(set(ids)):
+                    dup = sorted({i for i in ids if ids.count(i) > 1})[:5]
                     raise SystemExit(
-                        f"[GATE-FAIL] {filename}: _id={i} 的 answers hash 与 manifest "
-                        f"不一致（答案错配/混行）——fail closed，不写 result.json"
+                        f"[GATE-FAIL] {filename}: 检测到重复 _id（示例 {dup}）——"
+                        f"fail closed，不写 result.json"
                     )
-        # ---- 门禁 4（102）：run-cap sidecar 强制消费（任何打分之前）----
-        # manifest 集合门跳过的文件（不在 manifest）不进打分集合，也不做
-        # runcap 校验；进入打分集合的文件必须有合格 sidecar（或显式 legacy
-        # 降级）。schema/status/sha/行数全链 fail-closed，见
-        # validate_runcap_sidecar docstring。
-        runcap_metas[filename] = validate_runcap_sidecar(
-            f"{path}/{filename}", legacy_allowed)
+                if len(ids) != len(predictions):
+                    raise SystemExit(
+                        f"[GATE-FAIL] {filename}: 部分 行缺失 _id（{len(ids)}/"
+                        f"{len(predictions)}）——fail closed，不写 result.json"
+                    )
+            # ---- 门禁 3：manifest 集合闭包 + answers hash 一致 ----
+            if manifest is not None:
+                m_task = manifest.get(dataset)
+                if m_task is None:
+                    print(f"[GATE-WARN] {filename}: 任务 {dataset} 不在 manifest——跳过该文件")
+                    continue
+                exp_ids = set(m_task["ids"])
+                got_ids = set(ids) if ids else None
+                if got_ids is None:
+                    raise SystemExit(
+                        f"[GATE-FAIL] {filename}: 预测缺 _id 字段，无法对 manifest 校验——"
+                        f"fail closed，不写 result.json"
+                    )
+                if got_ids != exp_ids:
+                    missing = sorted(exp_ids - got_ids)[:5]
+                    extra = sorted(got_ids - exp_ids)[:5]
+                    raise SystemExit(
+                        f"[GATE-FAIL] {filename}: _id 集合与 manifest 不等"
+                        f"（缺 {len(exp_ids-got_ids)} 例 {missing}；多 "
+                        f"{len(got_ids-exp_ids)} 例 {extra}）——fail closed，不写 result.json"
+                    )
+                exp_sha = m_task.get("answers_sha", {})
+                for i, a in zip(ids, answers):
+                    if i in exp_sha and _answers_sha(a) != exp_sha[i]:
+                        raise SystemExit(
+                            f"[GATE-FAIL] {filename}: _id={i} 的 answers hash 与 manifest "
+                            f"不一致（答案错配/混行）——fail closed，不写 result.json"
+                        )
+            # ---- 门禁 4（102/111/115）：run-cap sidecar 强制消费（任何
+            #      打分之前）——manifest 集合门跳过的文件（不在 manifest）
+            #      不进打分集合，也不做 runcap 校验；进入打分集合的文件必须
+            #      有合格 sidecar（或显式 legacy 降级）。schema/status/
+            #      result_file 闭包/sha/行数全链 fail-closed，且 sha/行数
+            #      用同一锁窗口快照值（111），见 validate_runcap_sidecar
+            #      docstring。
+            runcap_metas[filename] = validate_runcap_sidecar(
+                jsonl_full, legacy_allowed,
+                actual_sha=actual_sha, actual_lines=actual_lines)
+        # 锁外 scorer（评分输入已从快照字节物化为 Python 对象）
         if args.e:
             score = scorer_e(dataset, predictions, answers, lengths, all_classes)
         else:
@@ -335,29 +385,64 @@ if __name__ == "__main__":
         out_path = f"{dir}/result.json"
     else:
         out_path = f"{dir}/result.json"
-    # 102：聚合集合 cap identity 单一性——同一 result.json 聚合的所有
-    # strict 文件必须同 cap identity（16K treatment 与 31.5K 协议口径的
+    # 102/112/113：聚合集合 cap 单一性——同一 result.json 聚合的所有
+    # strict 文件必须同 cap 语义（16K treatment 与 31.5K 协议口径的
     # 分数不得混进同一张表被当同一口径均值）。异 cap 混挂目录拒绝打分
     # （fail-closed），需要分组时按 cap 分目录分别打分（既有派单口径）。
     strict_metas = [m for m in runcap_metas.values() if m is not None]
-    cap_hashes = sorted({m["cap_identity_hash"] for m in strict_metas})
-    if len(cap_hashes) > 1:
+    legacy_count = len(runcap_metas) - len(strict_metas)
+    # ----【113 修复（GPT 审计 2026-10-12_0933 TL-E096-CAP-LEGACY-MIX-113，
+    #      P2）】strict 与 legacy 混合表 fail-closed 拒绝发布——修复前
+    #      显式 legacy 模式允许「有 sidecar + 无 sidecar」混合同表发布，
+    #      且把 strict 子集的 cap 标到整张表（_meta 同时
+    #      strict_validated=1 + legacy_no_sidecar=1 + 非空 cap——legacy 格
+    #      的 cap 身份未知却被标上 strict 的 cap 标签，同一张表两种
+    #      provenance 口径）。全 legacy 表仅在显式模式（--legacy-no-
+    #      runcap / --no-require-runcap）下放行且 cap 字段全 null（下方
+    #      _meta 如实记），或先补齐 sidecar 再聚合。
+    if strict_metas and legacy_count:
         raise SystemExit(
-            f"[RUNCAP-FAIL] 102: 聚合目录混挂 {len(cap_hashes)} 个不同 "
-            f"cap identity（{cap_hashes}）——异 cap 产物不得混入同一聚合"
-            f"（16K 受限 treatment 与 31.5K 协议口径必须分目录分别打分），"
-            f"拒绝写 result.json，fail loudly")
+            f"[RUNCAP-FAIL] 113: 聚合目录混入 {len(strict_metas)} 个 "
+            f"strict（sidecar 验证）+ {legacy_count} 个 legacy（无 "
+            f"sidecar，cap 身份未知）产物——同一 result.json 不得混合两种"
+            f"provenance 口径（legacy 格不得被标上 strict 的 cap 标签）。"
+            f"请拆分目录分别打分，或先用 backfill 工具为 legacy 产物补制"
+            f"sidecar 再聚合，拒绝写 result.json，fail loudly")
+    # ----【112 修复（GPT 审计 2026-10-12_0933 TL-E096-CAP-UNIFORMITY-112，
+    #      P1 可用性阻断）】跨任务 cap 单一性改用独立的 cap-comparability
+    #      key（只含可跨任务统一的 cap 语义：effective/protocol/
+    #      treatment 级）——修复前用完整 run identity hash（含 dataset/
+    #      时间戳等 run 字段）做跨任务等价判断，不同数据集同 cap 的正常
+    #      多任务聚合必被误拒（审计实测 strict 正常目录无法生成
+    #      result.json）。完整 run identity 仍保留在 _meta（逐文件防
+    #      覆盖口径记录），不参与跨任务等价判断。
+    cap_keys = sorted({m["cap_comparability_key"] for m in strict_metas})
+    if len(cap_keys) > 1:
+        raise SystemExit(
+            f"[RUNCAP-FAIL] 112: 聚合目录混挂 {len(cap_keys)} 个不同 "
+            f"cap identity（cap-comparability key {cap_keys}——跨任务只"
+            f"统一 cap 语义 effective/protocol/treatment，异 cap 产物不得"
+            f"混入同一聚合被当同一口径均值，16K 受限 treatment 与 31.5K "
+            f"协议口径必须分目录分别打分），拒绝写 result.json，"
+            f"fail loudly")
+    cap_hashes = sorted({m["cap_identity_hash"] for m in strict_metas})
     # E116a：scorer 后端身份随 result.json 落盘（跨环境复现性锚点）
-    # 102：cap 身份（effective/protocol/identity hash/provenance）随
-    # result.json _meta 落盘——分数与打分时验证过的 cap 口径绑定，跨目录
-    # 聚合时可比对 cap identity 拒混挂。legacy 格（无 sidecar）如实记
-    # null + 计数，不冒称。
+    # 102/112：cap 身份（effective/protocol/comparability key/identity
+    # hash/provenance）随 result.json _meta 落盘——分数与打分时验证过的
+    # cap 口径绑定，跨目录聚合时可比对 cap key 拒混挂。legacy 格（无
+    # sidecar）如实记 null + 计数，不冒称。
     runcap_meta = {
         "strict_validated": len(strict_metas),
-        "legacy_no_sidecar": len(runcap_metas) - len(strict_metas),
+        "legacy_no_sidecar": legacy_count,
         "cap_effective": strict_metas[0]["cap_effective"] if strict_metas else None,
         "cap_protocol": strict_metas[0]["cap_protocol"] if strict_metas else None,
-        "cap_identity_hash": cap_hashes[0] if cap_hashes else None,
+        # 【112】跨任务可比 key（本表全部 strict 文件同 key）
+        "cap_comparability_key": cap_keys[0] if cap_keys else None,
+        # 完整 run identity：单 strict 文件时保留（防覆盖口径锚点）；
+        # 多 strict 文件（异 dataset 同 cap，112 放行）时逐文件不同，
+        # 不冒称单一——完整列表见 cap_identity_hashes。
+        "cap_identity_hash": cap_hashes[0] if len(cap_hashes) == 1 else None,
+        "cap_identity_hashes": cap_hashes,
         "provenance": sorted({m["provenance"] for m in strict_metas})
         if strict_metas else None,
     }

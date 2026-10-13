@@ -1,0 +1,111 @@
+{
+ "experiment": "E133c mavg 子空间省算兑现优化（A1 buffer 直写 + A2/A3 launch 消除 + A4/A5 融合 kernel + A6 tile 调参）性能 bench 判决",
+ "date": "2026-10-13",
+ "code_identity": {
+  "native": "cccf756 工作树 + E133c 改动（tli_indexer.py +310/-22：A1-A6 + 父类捷径零填充 dense 适配修复）",
+  "base": "cccf756 = E133b 合流后主线（tli_indexer.py md5 ff41d5d7，E133c 改动前指纹）",
+  "files": "exp/bench/e133c_tile_scan.py + e133b_capture_ref.py（REPO 自适应）"
+ },
+ "environment": {
+  "host": "2xh20-reg0519 (10.245.58.57) 2×H20-3e 双卡独占（GPU0/GPU1 各只跑一个 bench 进程）",
+  "stack": "torch 2.8.0+cu128 / triton 3.4.0（与本机一致）；base=git archive cccf756 / native=tar 同步工作树，同机同库同负载窗口",
+  "caveat": "该机 H20 与本机同型号；E127 定案 1.52ms 在本机口径，跨机绝对值仍不混用，结论全部取同机对照"
+ },
+ "protocol": "e131_arm_bench --S 65536 --steps 60 --warmup 40，TLI_E127_FAST=1，稳态=后 20 步中位；三臂（mavg_e127 cmp2+full / mavg_e2e cmp4+full 生产口径 / mavg_tail cmp4+tail 判据臂）；两轮：R1 GPU0=base/GPU1=native，R2 交叉 GPU0=native/GPU1=base",
+ "steady_gpu_ms": {
+  "mavg_e127": {
+   "base_r1": 1.5285,
+   "base_r2": 1.572,
+   "base_med": 1.5503,
+   "native_r1": 1.3521,
+   "native_r2": 1.3477,
+   "native_med": 1.3499,
+   "delta_pct": -12.9
+  },
+  "mavg_e2e": {
+   "base_r1": 1.5313,
+   "base_r2": 1.5767,
+   "base_med": 1.554,
+   "native_r1": 1.3911,
+   "native_r2": 1.3352,
+   "native_med": 1.3632,
+   "delta_pct": -12.3
+  },
+  "mavg_tail": {
+   "base_r1": 1.5723,
+   "base_r2": 1.5979,
+   "base_med": 1.5851,
+   "native_r1": 1.3663,
+   "native_r2": 1.3408,
+   "native_med": 1.3536,
+   "delta_pct": -14.6
+  }
+ },
+ "steady_wall_ms": {
+  "mavg_e127": {
+   "base_med": 2.0477,
+   "native_med": 1.8468,
+   "delta_pct": -9.8
+  },
+  "mavg_e2e": {
+   "base_med": 2.0503,
+   "native_med": 1.8599,
+   "delta_pct": -9.3
+  },
+  "mavg_tail": {
+   "base_med": 2.0814,
+   "native_med": 1.8508,
+   "delta_pct": -11.1
+  }
+ },
+ "per_stage_tail_arm": {
+  "base": {
+   "prepare_index": 0.44676800072193146,
+   "compute_score": 0.33052800595760345,
+   "compute_mask": 0.5223039984703064,
+   "metrics": 0.07251200079917908,
+   "eager_decoding": 0.19604799896478653
+  },
+  "native": {
+   "prepare_index": 0.28462399542331696,
+   "compute_score": 0.2834559977054596,
+   "compute_mask": 0.523279994726181,
+   "metrics": 0.07385599985718727,
+   "eager_decoding": 0.19486399739980698
+  }
+ },
+ "bitexact": "逐位对拍两臂（full/tail）× 24 步 × 12,585,120 位 = 100% PASS（tile 回填+捷径修复后重抓重拍，/tmp/e133c_bitexact_cmp.py）；E127 门禁 15 PASS/0 FAIL；096 44/44；E128 93/104（11 FAIL 全部为既有基线锚点漂移 T1-T10+110，15d0339 对照已确认非本轮引入）",
+ "numeric_probes": "①mean(dim) ≡ 升序 fp32 累加→RNE、②quant 链 ≡ 逐算子 fp32+RNE bf16 仿真——50 轮随机实证成立（/tmp/e133c_numeric_probe.py），A4/A5 融合 kernel 逐位等价依据",
+ "regression_fix": "E133b 既有缺陷（基线 cccf756 同炸非本轮引入）：父类 TIA compute_score 捷径未适配 E133b 紧凑 k_qat → einsum 形状崩（cmp2+full E127 门禁路径）。修复：捷径分支喂父类前零填充 dense 副本（零列贡献精确 +0.0 逐位不变）。门禁 15 PASS 确认。",
+ "tile_scan": {
+  "host": "2xh20-reg0519 GPU0 独占，真实 mavg+tail32 链路捕获输入，cudaEvent 稳态中位 warmup50+rep200",
+  "best": {
+   "coarse": {
+    "BT128_W8": 0.03741
+   },
+   "avg(fine-kernel)": {
+    "BT16_W1": 0.03504
+   },
+   "fine": {
+    "BT16_W1": 0.03936
+   }
+  },
+  "baseline_64_4": {
+   "coarse": 0.03779,
+   "avg": 0.03514,
+   "fine": 0.04115
+  },
+  "adopted": {
+   "_TILE_FINE[32]": [
+    16,
+    1
+   ],
+   "_TILE_COARSE[32]": [
+    128,
+    8
+   ],
+   "D=128 保持 (64,4)": "full 臂零回归锚"
+  }
+ },
+ "verdict": "全部三臂大幅正收益：mavg_e127 -12.9% / mavg_e2e -12.3% / mavg_tail -14.6%（两轮交叉复跑一致，稳态 GPU 中位口径）——A1（k_min/k_max/k_avg buffer 直写消 3 cat）+A2/A3（-5 launch/步/层）为共同路径，full 两臂同享；A4/A5（尾段统计/量化融合 kernel 7~12 launch→1）+A6 tile 调参为 tail 专属叠加。判据【tail ≤ full 锚点】达成：native tail 1.3536 vs native full(e2e) 1.3632——tail 臂首次持平/反超 full（R1 tail 1.3601<full 1.3891、R2 1.3353 vs 1.3295 +0.4% 噪声带内），E133c 后 tail32 子空间省算全部兑现为时间。裁决：①E133c 全部改动合入主线；②tail32 仍维持消融口径（质量 Δ-0.32 噪声级背书、性能已反平 full，生产冠军是否切换 full→tail 待用户/论文叙事定夺——两臂已无性能差异，切换收益归零，维持 full 生产口径最稳）；③剩余瓶颈已转移：launch-gap 主导（用户判断印证——A6 tile 微调收益仅 -1%~-4.4% 证明 kernel 本体非大头），通向 <1ms 需 decode 整步 CUDA Graph capture（E133d/E134 试点，用户已指令）。"
+}
