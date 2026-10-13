@@ -4,7 +4,6 @@ import io
 import json
 import os
 import re
-import shutil
 
 import torch
 
@@ -478,6 +477,31 @@ def truncate_output_name_keep_hash(dataset_prefix, method_name, t,
 # 不同校准内容（源被替换/重标定）会静默复用同一份 stale 目标并共享
 # 同一 treatment 身份。以下三个函数是 FASA agreement 身份的唯一解析
 # 口径（LongBench/RULER 两入口与 treatment 名三方同源）：
+#
+# ---- 142 reopen（GPT 审计 8b56bbd，2026-10-13 2341）----
+# B 批修复后仍存在「同一次运行内两次独立读源」窗口：stage 先把源 A 复制
+# 到运行时目标（runtime 在模型加载阶段即冻结为目标副本 A），输出名却在
+# 模型加载后经 _fasa_agreement_sha8 重新打开可变源求 SHA——窗口内源被
+# 替换为 B 时同一次运行形成 runtime=A、name=B 错绑。修复：stage 时
+# 一次性读取源 bytes 构造不可变 FasaAgreementSnapshot（完整 sha256 +
+# 8 位段 + raw bytes），挂 args._fasa_staged_snapshot；runtime records
+# 与输出名共用同一 snapshot（物化目标从快照 bytes 原子写出——临时文件 +
+# os.replace；命名侧消费冻结 sha8，不再重新打开源）。
+
+@dataclasses.dataclass(frozen=True)
+class FasaAgreementSnapshot:
+    """142 reopen：stage 时刻单次读源冻结的 agreement 内容身份快照。
+
+    一次运行内 runtime（fasa_utils 读仓库根目标副本，目标由本快照
+    raw bytes 物化而来）与 treatment 名（_agr<sha8> 段）共用同一对象
+    ——stage 之后源文件再被替换也不影响本次运行的身份（name 恒等于
+    runtime 实际消费的内容）。frozen dataclass：属性不可再赋值。"""
+    src_path: str    # stage 时解析出的源绝对路径（身份/报错口径）
+    dst_path: str    # 仓库根物化目标绝对路径
+    sha256: str      # 源 bytes 完整 SHA256（stale 目标比对用同一值）
+    sha8: str        # 前 8 hex（treatment 名 _agr<sha8> 尾段）
+    raw: bytes       # stage 时刻的源 bytes（目标物化与身份共用同一批）
+
 
 def resolve_fasa_agreement_path(args, repo_root=None):
     """142：--fasa_agreement_dir 接线——FASA agreement 源文件路径唯一口径。
@@ -502,31 +526,43 @@ def resolve_fasa_agreement_path(args, repo_root=None):
 
 
 def _fasa_agreement_sha8(args):
-    """142：agreement 源文件内容 SHA256 前 8 位（内容身份，与
-    checkout/路径无关）——进 fasa_vendor treatment 名尾段；文件缺失/
-    不可读 fail closed（名字必须绑定实际校准内容，拒绝无产物空跑）。"""
-    path = resolve_fasa_agreement_path(args)
-    try:
-        with open(path, "rb") as f:
-            raw = f.read()
-    except OSError as e:
+    """142 reopen：消费 stage 冻结快照的 sha8——不再重新打开可变源。
+
+    旧实现（B 批）在模型加载后二次读源求 SHA：runtime 已在模型加载阶段
+    冻结为目标副本 A，窗口内源被替换为 B 时同一次运行 runtime=A、
+    name=B 错绑（GPT 审计 A/B 复现）。现命名侧只消费
+    args._fasa_staged_snapshot（stage_fasa_agreement 挂载）——name 恒
+    等于 runtime 实际消费的内容。无快照（未经 stage 的路径，如直接调
+    命名函数的单元测试）一律 fail-closed SystemExit：不存在「绕开
+    staging 单独算名」的合法路径（回退读源即 142 reopen 的错绑窗口
+    本身）。"""
+    snap = getattr(args, "_fasa_staged_snapshot", None)
+    if snap is None:
         raise SystemExit(
-            f"[GATE-FAIL] 142: FASA agreement 源文件不可读（{path} → "
-            f"{type(e).__name__}: {e}）——treatment 名必须绑定实际校准"
-            f"内容（先跑 qwen3_identify_fre.py + convert_agreement.py），"
-            f"fail closed")
-    return hashlib.sha256(raw).hexdigest()[:8]
+            "[GATE-FAIL] 142: fasa_vendor 命名缺少冻结快照——必须先经 "
+            "stage_fasa_agreement（LongBench/RULER 两入口在模型加载前"
+            "调用，快照随 args 冻结 runtime/名字共用的同一批源 bytes）。"
+            "未经 staging 的直接命名不再回退读源（旧回退即 142 reopen "
+            "的 A/B 错绑窗口），fail closed")
+    return snap.sha8
 
 
 def stage_fasa_agreement(args, repo_root=None):
-    """142：把 agreement 源物化为仓库根工作副本并返回目标绝对路径。
+    """142 + 142 reopen：单次读源冻结快照 + 原子物化，返回目标绝对路径。
 
     官方 constructe_adaptive_selection 硬编码相对路径
     dimension_rankings/（与 CWD 无关地拼接 <model>/<dataset>），故源
     （vendor 目录或 --fasa_agreement_dir 自定义位置）须先物化到仓库根
-    dimension_rankings/。修复前「目标已存在时不比较」→ stale 目标静默
-    复用；现目标已存在时做源/目标字节 SHA256 全量对比，不一致
-    SystemExit fail closed（中文提示 stale 目标，须先清理或重新标定）。"""
+    dimension_rankings/。行为（B 批语义全部保持）：
+      - 目标已存在时源/目标字节 SHA256 全量对比，不一致 SystemExit
+        fail closed（stale 目标；比对两侧 = 冻结快照 bytes vs 目标
+        实读 bytes）；
+      - 目标不存在时物化（142 reopen：改临时文件 + os.replace 原子写，
+        内容 = 冻结快照 bytes——不再 shutil.copy2 二次读源）；
+      - 142 reopen：每次调用单次读源 bytes 构造 FasaAgreementSnapshot
+        挂 args._fasa_staged_snapshot——runtime records 与输出名共用
+        同一快照（stale 拒绝时不更新快照，args 保持上一次成功 stage
+        的身份）。"""
     if repo_root is None:
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     src_agr = resolve_fasa_agreement_path(args, repo_root)
@@ -538,24 +574,104 @@ def stage_fasa_agreement(args, repo_root=None):
             f"[GATE-FAIL] 142: FASA 校准产物缺失: {src_agr}"
             f"（--fasa_agreement_dir 解析所得；先跑 qwen3_identify_fre.py"
             f" + convert_agreement.py），fail closed")
-    if os.path.isfile(dst_agr):
+    # 142 reopen：单次读源——stale 比对 / 目标物化 / 名字身份全部消费
+    # 同一批 bytes（快照），stage 之后源再变不影响本次运行身份。
+    try:
         with open(src_agr, "rb") as f:
-            src_sha = hashlib.sha256(f.read()).hexdigest()
-        with open(dst_agr, "rb") as f:
-            dst_sha = hashlib.sha256(f.read()).hexdigest()
-        if src_sha != dst_sha:
+            raw = f.read()
+    except OSError as e:
+        raise SystemExit(
+            f"[GATE-FAIL] 142: FASA agreement 源文件不可读（{src_agr} → "
+            f"{type(e).__name__}: {e}）——treatment 名必须绑定实际校准"
+            f"内容（先跑 qwen3_identify_fre.py + convert_agreement.py），"
+            f"fail closed")
+    full_sha = hashlib.sha256(raw).hexdigest()
+    snap = FasaAgreementSnapshot(
+        src_path=src_agr, dst_path=dst_agr,
+        sha256=full_sha, sha8=full_sha[:8], raw=raw)
+    if os.path.isfile(dst_agr):
+        try:
+            with open(dst_agr, "rb") as f:
+                dst_sha = hashlib.sha256(f.read()).hexdigest()
+        except OSError as e:
+            raise SystemExit(
+                f"[GATE-FAIL] 142: FASA agreement 目标读取失败（{dst_agr}"
+                f" → {type(e).__name__}: {e}）——无法证明目标与源内容一致，"
+                f"拒绝运行，fail closed")
+        if dst_sha != snap.sha256:
             raise SystemExit(
                 f"[GATE-FAIL] 142: FASA agreement 目标与源内容不一致"
-                f"（stale 目标）：\n  源   {src_agr}\n  sha256 {src_sha}\n"
+                f"（stale 目标）：\n  源   {src_agr}\n  sha256 {snap.sha256}\n"
                 f"  目标 {dst_agr}\n  sha256 {dst_sha}\n"
                 f"目标 dimension_rankings/ 下是旧校准内容却被静默复用，"
                 f"不同校准内容不得共享同一 treatment 身份——请先删除/更名"
                 f" stale 目标（或把 --fasa_agreement_dir 指向与目标一致的"
                 f" 源），fail closed")
-        return dst_agr
-    os.makedirs(os.path.dirname(dst_agr), exist_ok=True)
-    shutil.copy2(src_agr, dst_agr)
+    else:
+        os.makedirs(os.path.dirname(dst_agr), exist_ok=True)
+        # 142 reopen：原子物化——临时文件 + os.replace（copy2 无锁非
+        # 原子，窗口内半写目标可能被 runtime 读到）。内容 = 冻结快照
+        # bytes（绝不二次读源——快照与物化目标逐字节一致）。
+        tmp_agr = f"{dst_agr}.tmp.{os.getpid()}"
+        try:
+            with open(tmp_agr, "wb") as f:
+                f.write(snap.raw)
+            os.replace(tmp_agr, dst_agr)
+        except BaseException:
+            # 物化失败清理半写临时文件，不留会被误当目标的残骸
+            try:
+                if os.path.lexists(tmp_agr):
+                    os.remove(tmp_agr)
+            except OSError:
+                pass
+            raise
+    # 142 reopen：冻结快照挂 args——命名（get_method_name_with_info 的
+    # fasa 分支经 _fasa_agreement_sha8）与 runtime 共用同一内容身份。
+    setattr(args, "_fasa_staged_snapshot", snap)
     return dst_agr
+
+
+def freeze_minference_pattern_sha8(args):
+    """149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）：
+    入口加载期单次冻结 pattern JSON 内容 SHA256 前 8 位（142 同款
+    单次冻结）——挂 args._minference_pattern_sha8，命名侧优先消费
+    冻结值，与 adapter（qwen3_minference_patch enable_minference 读
+    config_path JSON）同一读点窗口。缺 config_path / 不可读一律
+    fail-closed SystemExit：pattern 内容是 treatment 身份的一部分，
+    MInference 无 config 直跑路径不存在（两入口在 enable 前同样
+    拒绝 None config）。"""
+    cfg_path = getattr(args, "minference_config_path", None)
+    if not cfg_path:
+        raise SystemExit(
+            "[GATE-FAIL] 149: method=minference_vendor 必须传 "
+            "--minference_config_path（is_search 在线搜出的 best_pattern "
+            "JSON）——pattern 内容决定逐层逐头 sparse prefill，是 treatment "
+            "身份的一部分，无 config 直跑路径不存在，fail closed")
+    try:
+        with open(cfg_path, "rb") as f:
+            raw = f.read()
+    except OSError as e:
+        raise SystemExit(
+            f"[GATE-FAIL] 149: MInference pattern JSON 不可读（{cfg_path} → "
+            f"{type(e).__name__}: {e}）——treatment 名必须绑定实际 pattern "
+            f"内容，fail closed")
+    sha8 = hashlib.sha256(raw).hexdigest()[:8]
+    setattr(args, "_minference_pattern_sha8", sha8)
+    return sha8
+
+
+def _minference_cfg_sha8(args):
+    """149：minference_vendor 名字 pattern 内容身份段的唯一来源。
+
+    优先消费入口冻结值（freeze_minference_pattern_sha8，模型加载前
+    单次读源——name 与 adapter 实际加载的 pattern 同一批 bytes）；
+    未经入口冻结的路径（如直接调命名函数的回归测试）现场读源
+    fail closed——降级路径内容身份仍正确，仅读点晚于 runtime（读点
+    替换窗口由入口冻结闭合，本函数不为此重复设防）。"""
+    sha8 = getattr(args, "_minference_pattern_sha8", None)
+    if isinstance(sha8, str) and sha8:
+        return sha8
+    return freeze_minference_pattern_sha8(args)
 
 
 def get_method_name_with_info(args, snapshot=None):
@@ -571,10 +687,19 @@ def get_method_name_with_info(args, snapshot=None):
         # B 轨 vendor（官方源码复用）：MInference prefill 动态稀疏 + decode dense。
         # pattern 文件（config_path）不同 = treatment 不同（不同模型/搜索口径），
         # 取 basename 编码进文件名；starting_layer 之前浅层 dense。
+        # 149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）：只编码
+        # basename 时两份不同内容、同 basename 的 pattern 共享同一 method
+        # name（且非 tli 路径 treatment sidecar 不写，无第二道门）。修复 =
+        # 追加 pattern JSON 内容 SHA256 前 8 位尾段 `_cfg<sha8>`（内容身份，
+        # 与路径无关），追加段不改既有语义字段（既有文件名不追溯改动）。
+        # 内容 sha 优先消费入口加载期冻结值（freeze_minference_pattern_
+        # sha8，142 同款单次冻结）；未经冻结的路径现场读源 fail closed。
+        cfg_sha8 = _minference_cfg_sha8(args)
         pattern_tag = os.path.basename(
             getattr(args, "minference_config_path", "pattern")
         ).replace(".json", "")
-        return f"minference_vendor_{pattern_tag}_{getattr(args, 'minference_starting_layer', -1)}"
+        return (f"minference_vendor_{pattern_tag}_"
+                f"{getattr(args, 'minference_starting_layer', -1)}_cfg{cfg_sha8}")
     elif args.method == "fasa_vendor":
         # B 轨 vendor（官方源码复用）：FASA decode 频域剪枝。校准数据集 +
         # budget/threshold_ratio/min_k/max_k/mode 全参数编码进文件名——

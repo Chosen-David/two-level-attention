@@ -202,9 +202,16 @@ class TLIIndexer(TIAIndexer):
                 raise ValueError("--tli_sinkswa_only 与 --tli_per_q_head 互斥（归因臂用共享 kv-head mask）")
         if self.near_select != "4bit":
             # E110：near 侧簇分路径与 σ/MoBA 均绕过/改写两级选择语义，显式互斥
-            assert self.sigma_select == "none", \
-                "--tli_near_select 与 --tli_sigma_select 互斥（σ 路径绕过两级选择）"
-            assert not self.moba_gate, "--tli_near_select 与 --tli_moba 互斥"
+            # 150（TL-TLI-OPTIMIZED-CONFIG-GATE，GPT 审计 8b56bbd）：组合
+            # 契约门从 assert 改显式 raise（A2/E135 同款）——assert 在
+            # python -O 下被剥除，CLI 可解析的未定义组合（单 flag 值全部
+            # 合法、仅组合无定义）会进入 Hq/Hkv 不兼容路径。
+            if self.sigma_select != "none":
+                raise ValueError(
+                    "--tli_near_select 与 --tli_sigma_select 互斥"
+                    "（σ 路径绕过两级选择）")
+            if self.moba_gate:
+                raise ValueError("--tli_near_select 与 --tli_moba 互斥")
         # ---- E103：kv-head 共享消融（审稿 MAJOR）----
         #   论文 §2.2 口径：L1/L2 分数先在 GQA 组内 mean 聚合到 kv-head 级再 topk
         #   （32 q-head → 8 kv-head，索引量省 4 倍）。本开关打开时旁路全部聚合点，
@@ -212,15 +219,26 @@ class TLIIndexer(TIAIndexer):
         #   mask 从 [1,1,Hkv,T] 变 [1,1,H,T]（消费端 eager_decoding 按组拆回）。
         #   互斥守卫：cluster/moba/σ 路径的簇分数与 gate 均为 kv-head 级语义，
         #   与 per-q-head 组合无定义，显式禁止（E103 臂不经过这些路径）。
+        #   150（TL-TLI-OPTIMIZED-CONFIG-GATE，GPT 审计 8b56bbd）：组合契约
+        #   门从 assert 改显式 raise（-O 剥除问题与 A2/E135 同源）。
         self.per_q_head = getattr(args, "tli_per_q_head", False)
         if self.per_q_head:
-            assert not self.moba_gate, "--tli_per_q_head 与 --tli_moba 互斥（gate 是 kv-head 级语义）"
-            assert self.far_select == "4bit", \
-                "--tli_per_q_head 与 --tli_far_select cluster/sim_greedy 互斥（簇分数是 kv-head 级语义）"
-            assert self.near_select == "4bit", \
-                "--tli_per_q_head 与 --tli_near_select cluster/sim_greedy 互斥（簇分数是 kv-head 级语义）"
-            assert self.sigma_select == "none", \
-                "--tli_per_q_head 与 --tli_sigma_select 互斥（E103 臂不经过 σ 路径）"
+            if self.moba_gate:
+                raise ValueError(
+                    "--tli_per_q_head 与 --tli_moba 互斥"
+                    "（gate 是 kv-head 级语义）")
+            if self.far_select != "4bit":
+                raise ValueError(
+                    "--tli_per_q_head 与 --tli_far_select cluster/sim_greedy "
+                    "互斥（簇分数是 kv-head 级语义）")
+            if self.near_select != "4bit":
+                raise ValueError(
+                    "--tli_per_q_head 与 --tli_near_select cluster/sim_greedy "
+                    "互斥（簇分数是 kv-head 级语义）")
+            if self.sigma_select != "none":
+                raise ValueError(
+                    "--tli_per_q_head 与 --tli_sigma_select 互斥"
+                    "（E103 臂不经过 σ 路径）")
         # ---- D'：静态层掩码 ----
         self.enable_layer_skip = getattr(args, "tli_enable_layer_skip", True)
         # A6（TL-E137-PREFILL-GATE-145）：静态 D'（层掩码）× 动态 D'
