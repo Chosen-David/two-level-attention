@@ -13,7 +13,8 @@ class TIAIndexer(Indexer):
     def __init__(self, args) -> None:
         super().__init__(args)
         self.group_size = None
-        self.sliding_window_size = 128
+        # E135：swa 正交强制区参数化（--tli_swa_size，默认 128 = 历史硬编码值）
+        self.sliding_window_size = getattr(args, "tli_swa_size", 128)
         self.cmp_ratio = args.tia_level2_cmp_ratio
         self.enable_async = args.tia_enable_async_topk
         self.prev_mask = None

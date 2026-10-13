@@ -127,7 +127,25 @@ class TLIIndexer(TIAIndexer):
         self.sigma_select = getattr(args, "tli_sigma_select", "none")
         self.moba_gate = getattr(args, "tli_moba", False)
         self.sigma = getattr(args, "tli_sigma", 8.0)
-        self.sink_blocks = 2                                      # sink = 前 2 块（128 tok）
+        self.sink_blocks = 2                                      # sink = 前 2 块（128 tok）——E135 起仅作历史锚，池左界/强制区宽统一由 sink_tokens 推导
+        # ---- E135：sink/swa 正交强制区参数化 + sinkswa_only 归因臂（用户 2026-10-13 批准）----
+        #   sink_tokens/swa 默认 128/128 与历史硬编码（sink_blocks=2×64 / sliding_
+        #   window=128）逐位一致；非默认值只改变正交强制区宽度与池左界
+        #   （floor(sink_tokens/bs) 块对齐——子块 sink 时 sink 所在块参与
+        #   L1/L2 池竞争，mask 并集语义无 token 结构性丢失）。
+        self.sink_tokens = int(getattr(args, "tli_sink_tokens", 128))
+        assert self.sink_tokens >= 0, "tli_sink_tokens 必须 >= 0"
+        assert self.sliding_window_size >= 1, "tli_swa_size 必须 >= 1"
+        #   E135a 归因臂：mask 只含 sink 头 + swa 尾（mid 全丢），两级索引
+        #   分数照算但绝不进 mask——与 σ/MoBA/per-q-head 组合无定义，fail loudly。
+        self.sinkswa_only = bool(getattr(args, "tli_sinkswa_only", False))
+        if self.sinkswa_only:
+            assert self.sigma_select == "none", \
+                "--tli_sinkswa_only 与 --tli_sigma_select 互斥（归因臂不做 σ 选择）"
+            assert not self.moba_gate, \
+                "--tli_sinkswa_only 与 --tli_moba 互斥（归因臂不做块 gate）"
+            assert not getattr(args, "tli_per_q_head", False), \
+                "--tli_sinkswa_only 与 --tli_per_q_head 互斥（归因臂用共享 kv-head mask）"
         if self.near_select != "4bit":
             # E110：near 侧簇分路径与 σ/MoBA 均绕过/改写两级选择语义，显式互斥
             assert self.sigma_select == "none", \
@@ -254,6 +272,18 @@ class TLIIndexer(TIAIndexer):
                     "静态 pair 是 tail32 的同宽度替换，非独立子空间段"
                 )
             self.enable_subspace = True
+
+    # ---------------- E135：sink/swa 参数化的单一事实源 ---------------- #
+
+    @property
+    def _sink_pool_lo_blk(self):
+        """E135：L1/L2/簇池左界（块对齐）——floor(sink_tokens/bs)。
+
+        默认 sink_tokens=128 → 128//64 = 2 ≡ 历史 sink_blocks，全部派生值
+        逐位不变。子块 sink（如 16 tok < bs）时左界为 0——sink 所在块参与
+        池竞争，与强制区并集，无 token 结构性丢失（ceil 口径会在
+        [sink_tokens, ceil·bs) 产生既不强制也不可选的死区，弃用）。"""
+        return max(0, self.sink_tokens // self.args.tia_block_size)
 
     # ---------------- E85f：prefill q 统计 → per-layer 静态 pair ---------------- #
 
@@ -655,8 +685,8 @@ class TLIIndexer(TIAIndexer):
 
     def _maybe_build_kmeans(self, k, index_dict):
         S = k.shape[1]
-        # far_lo 对齐 sink 边界（sink_blocks×block_size），与 compute_mask 的远端块区间一致
-        far_lo = self.sink_blocks * self.args.tia_block_size
+        # far_lo 对齐 sink 池左界（E135：floor(sink_tokens/bs) 块对齐，默认 2 块逐位不变）
+        far_lo = self._sink_pool_lo_blk * self.args.tia_block_size
         # 修复（2026-09-29 E72 预检）：far_hi 判据块对齐——decode 时 S 每步 +1，
         # 若用 token 级 far_hi = S - near_len 则每步每层重建 kmeans（实测 61s/step）。
         # far 区真正参与选择的是 [far_lo, near_blks) 块区间（compute_mask 口径），
@@ -671,7 +701,7 @@ class TLIIndexer(TIAIndexer):
         # 保持簇覆盖范围与消费端 far_tok_hi = near_blks·bs 一致；(0,0)/老逻辑
         # 分支保持旧式（S − near_len_dyn）逐位不变。
         if self.alpha > 0 and self.beta > 0:
-            sink_tok = self.sink_blocks * bs
+            sink_tok = self.sink_tokens          # E135：强制区宽单一事实源
             mid_len = max(0, S - sink_tok - swa_tok)
             near_len_dyn = max(bs, int(self.alpha * mid_len))
             near_base = S - swa_tok
@@ -683,7 +713,8 @@ class TLIIndexer(TIAIndexer):
         else:
             near_len_dyn = self.near_len
             near_base = S
-        far_hi_blk = max(self.sink_blocks + 1, (near_base - near_len_dyn) // bs)
+        # E135：sink 池左界块数 +1 保底（默认 floor(128/64)+1 = 3 ≡ 历史 sink_blocks+1）
+        far_hi_blk = max(self._sink_pool_lo_blk + 1, (near_base - near_len_dyn) // bs)
         far_hi = far_hi_blk * bs
         # ---- E110：far/near 两侧各自独立构建 ----
         #   far=cluster（cavg 原路径，原样保留）/ far=sim_greedy（增量贪心，见下）
@@ -1085,19 +1116,19 @@ class TLIIndexer(TIAIndexer):
             _vl = index_dict.get("valid_length")
             if _vl is not None:
                 _bs = self.args.tia_block_size
-                _sink_tok = self.sink_blocks * _bs
+                _sink_tok = self.sink_tokens          # E135：强制区宽单一事实源
                 _swa_tok = self.sliding_window_size
                 _mid_len = max(0, int(_vl) - _sink_tok - _swa_tok)
                 _near_len_dyn = max(_bs, int(self.alpha * _mid_len))
-                _near_blks = max(self.sink_blocks,
+                _near_blks = max(self._sink_pool_lo_blk,
                                  ((int(_vl) - _swa_tok) - _near_len_dyn) // _bs)
-                if self.sink_blocks < _near_blks:
+                if self._sink_pool_lo_blk < _near_blks:
                     dgate_short = True
                     dgate_near_blks = _near_blks
         if dgate_short:
             b_k_min = repeat(k_min, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
             b_k_max = repeat(k_max, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
-            _sb = self.sink_blocks
+            _sb = self._sink_pool_lo_blk             # E135：池左界块数单一事实源
             _qc0 = b_q.clamp(max=0)
             _qc1 = b_q.clamp(min=0)
             sc_head = (
@@ -1560,7 +1591,7 @@ class TLIIndexer(TIAIndexer):
         sf = score_dict["score_fine"]
         K2 = min(sf.shape[-1], self.args.tia_level2_topk)
         nb_sel = max(1, K2 // bs)
-        sink_tok = self.sink_blocks * bs
+        sink_tok = self.sink_tokens              # E135：强制区宽单一事实源
         swa_tok = self.sliding_window_size
         # 未来块屏蔽（因果）：gate 只对已见块打分，此处全为历史块，无需额外 mask
         i_blk = torch.topk(sm, min(nb_sel, sm.shape[-1]), dim=-1).indices  # [1,1,Hkv,nb]
@@ -1605,6 +1636,22 @@ class TLIIndexer(TIAIndexer):
             # 原地写 score_dict：p（softmax 源）、σ 分支与 ccluster 分支的
             # sf_raw 均从 score_dict["score_fine"] 现读 → 同一份屏蔽全生效
             score_dict["score_fine"][..., S_real:] = float("-inf")
+        # ---- E135a：sinkswa_only 归因臂（用户 2026-10-13 批准）----
+        # mask 只含正交强制区（sink 头 sink_tokens + swa 尾 swa_tok），
+        # mid 全丢、L1/L2 两级索引分数全旁路（prepare_index/compute_score
+        # 照算——本臂测质量归因不测速度，分数不进任何 mask 路径即语义等价
+        # 于「纯 sink+swa」基线）。D' 层同样只给强制区（归因臂逐层统一，
+        # far 池被旁路本身无意义）。075：[S_real, S_width) padding 段保持
+        # False；形状与共享口径最终 mask 一致（[b,qt,Hkv,T]，消费端
+        # eager_decoding 按 GQA 组展开同款）。
+        if self.sinkswa_only:
+            shape = list(score_fine.shape)          # [b, qt, H, T]
+            shape[2] = shape[2] // self.group_size   # → Hkv（互斥守卫保证非 per_q_head）
+            m = torch.zeros(shape, dtype=torch.bool,
+                            device=score_fine.device)
+            m[..., :min(self.sink_tokens, S_real)] = True
+            m[..., max(0, S_real - self.sliding_window_size):S_real] = True
+            return m
         # ---- E103：kv-head 共享消融----
         # 共享口径（默认）：组内 mean 聚合到 kv-head 级 [1,1,Hkv,kt]；
         # per_q_head：旁路聚合，保留 per-q-head 分数 [1,1,H,kt] 直接进 topk
@@ -1648,7 +1695,7 @@ class TLIIndexer(TIAIndexer):
         # F5 修复行为逐位不变。
         # S_real 已在函数顶部解析（valid_length 优先，回退 score_fine 宽度）
         if e64_partition:
-            sink_tok = self.sink_blocks * bs
+            sink_tok = self.sink_tokens          # E135：强制区宽单一事实源
             mid_len = max(0, S_real - sink_tok - swa_tok)
             near_len_dyn = max(bs, int(self.alpha * mid_len))  # near 只算 mid 部分（不含 swa）
             near_base = S_real - swa_tok   # near 右界 = swa 起点（B10；真实 S 口径 F5）
@@ -1659,8 +1706,10 @@ class TLIIndexer(TIAIndexer):
         else:
             near_len_dyn = self.near_len
             near_base = kt * bs
-        near_blks = max(self.sink_blocks, (near_base - near_len_dyn) // bs)
-        far_lo_blk, far_hi_blk = self.sink_blocks, near_blks  # 远端块区间（含 far_hi 前一块）
+        # E135：池左界 = floor(sink_tokens/bs)（默认 2 ≡ sink_blocks，逐位不变）；
+        # near_blks 保底同步用池左界（子块 sink 时 near 池可含 sink 所在块）
+        near_blks = max(self._sink_pool_lo_blk, (near_base - near_len_dyn) // bs)
+        far_lo_blk, far_hi_blk = self._sink_pool_lo_blk, near_blks  # 远端块区间（含 far_hi 前一块）
         # near 池上界 = swa 起点（swa 块完全排除出双池，纯靠 mask 强制）
         swa_lo_blk = max(near_blks, kt - max(1, swa_tok // bs))
 
@@ -1852,7 +1901,7 @@ class TLIIndexer(TIAIndexer):
             K2_sig = min(p.shape[-1], self.args.tia_level2_topk)
             far_tok_lo = far_lo_blk * bs
             far_tok_hi = min(near_blks * bs, p.shape[-1])
-            sink_tok = far_tok_lo
+            sink_tok = self.sink_tokens   # E135：σ 锚 = 强制区宽（默认 == far_tok_lo 逐位不变）
             # 075：swa 起点按真实 S（p 宽度在投影路径是 Tpad）
             swa_lo_tok = max(0, S_real - self.sliding_window_size)
             sf_raw = score_dict["score_fine"][..., : p.shape[-1]].to(torch.float32)
@@ -1924,7 +1973,12 @@ class TLIIndexer(TIAIndexer):
             # 自动从预算排除——mid 预算 K2_mid = K2 − sink_tok − swa_tok；
             # 固定区 token 不进任何 topk 池，最终 mask 直接置位
             # （如 K2=2048、sink=128、swa=128 → mid_token = 1792 全给创新管线）
-            sink_tok = far_tok_lo
+            sink_tok = self.sink_tokens   # E135：强制区宽 = token 级（子块 sink 时
+            # far_tok_lo=floor(sink/bs)·bs < sink_tokens，绑池左界会让头
+            # sink<bs 段强制区丢失——sink=16 实测 head64=0 即此 bug）。
+            # mid topk 域仍从 far_tok_lo 起（floor 口径：sink 所在块参与
+            # 竞争），[0, sink_tokens) 可能被 topk 重复选中，仅浪费名额
+            # 不破坏并集语义。
             # 075：swa 起点/强制区宽度按真实 S——投影路径 p 宽 = Tpad，
             # 旧口径 swa 强制区落 padded 尾且 K2_mid 把 padding 段当 swa 扣除
             swa_lo_tok = max(0, S_real - self.sliding_window_size)
@@ -2148,7 +2202,7 @@ class TLIIndexer(TIAIndexer):
         # （(0,0) 单池 / enable_kmeans-only，无生产配置），B1 sink 强制
         # 保留为该域防线。
         if self.skip_far:
-            sink_tok = min(self.sink_blocks * bs, topk_mask.shape[-1])
+            sink_tok = min(self.sink_tokens, topk_mask.shape[-1])  # E135：强制区宽单一事实源
             topk_mask[..., :sink_tok] = True
         return topk_mask
 

@@ -37,6 +37,22 @@ def _add_minference_args(parser: argparse.ArgumentParser):
     group.add_argument('--minference_starting_layer', type=int, default=-1)
     return parser
 
+def _add_fasa_args(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title='fasa')
+    # FASA vendor（官方源码复用）：decode 时按频率分组 agreement（Phase 1 校准产物
+    # dimension_rankings/<model>/<dataset>_agreement.pkl）选 head_dim 子维度，再
+    # core_module_with_padding_old 剪枝到 budget 个 token。budget 默认 1024 与
+    # quest/minf 主表预算口径对齐（FASA 论文默认 256 可显式覆盖做消融）。
+    group.add_argument('--fasa_budget', type=int, default=1024)
+    group.add_argument('--fasa_dataset', type=str, default='qasper',
+                       help='Phase 1 校准数据集名（agreement.pkl 的 dataset 段）')
+    group.add_argument('--fasa_threshold_ratio', type=float, default=0.8)
+    group.add_argument('--fasa_min_k', type=int, default=16)
+    group.add_argument('--fasa_max_k', type=int, default=16)
+    group.add_argument('--fasa_mode', type=str, default='topk', choices=['topk', 'dynamic'])
+    group.add_argument('--fasa_agreement_dir', type=str, default='dimension_rankings')
+    return parser
+
 def _parse_gamma(x):
     """E122：γ 支持 'off'（大小写不敏感）→ None = 自由竞争模式。
 
@@ -120,6 +136,20 @@ def _add_tli_args(parser: argparse.ArgumentParser):
                        default=False,
                        help='E103 消融：旁路 GQA 组内 mean 聚合，per-q-head 独立选择'
                             '（mask [H,T]，索引量 ×G；关闭 = 论文 §2.2 kv-head 共享口径）')
+    # ---- E135：sink/swa 正交强制区参数化（敏感性扫参）+ 归因臂（用户 2026-10-13 批准）----
+    #   历史口径：sink = 前 2 块（tli_indexer sink_blocks=2 ×64=128 tok，硬编码）、
+    #   swa = 尾 128 tok（tia_indexer sliding_window_size=128，硬编码）——两者均为
+    #   无实验依据的工程约定（文献惯例 + 块对齐）。默认 128/128 与历史行为逐位一致。
+    group.add_argument('--tli_sink_tokens', type=int, default=128,
+                       help='sink 正交强制区宽度（token 级，默认 128 = 历史 sink_blocks×64）。'
+                            'L1/L2 池左界按 floor(sink_tokens/block_size) 块对齐'
+                            '（子块 sink 时 sink 所在块参与池竞争，强制区并集语义）')
+    group.add_argument('--tli_swa_size', type=int, default=128,
+                       help='swa 正交强制区宽度（token 级，默认 128 = 历史 sliding_window_size）')
+    group.add_argument('--tli_sinkswa_only', action='store_true', default=False,
+                       help='E135a 归因臂：mask 只含正交强制区（sink 头 + swa 尾），mid 全丢，'
+                            'L1/L2 两级索引分数全旁路（分数照算但绝不进 mask）——'
+                            '回答「功劳归 sink/swa 还是归 indexer」的消融对照')
     return parser
 
 def parse_args():
@@ -133,9 +163,10 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'tia', 'twi', 'tli', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'tia', 'twi', 'tli', 'none'])
     parser = _add_quest_args(parser)
     parser = _add_minference_args(parser)
+    parser = _add_fasa_args(parser)
     parser = _add_twilight_args(parser)
     parser = _add_tia_args(parser)
     parser = _add_tli_args(parser)

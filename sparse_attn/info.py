@@ -115,6 +115,14 @@ _TREATMENT_FIELD_DEFAULTS = {
     "tli_proj_basis": None,
     "tli_static_pair": False,
     "tli_layer_skip_path": None,
+    # E135：sink/swa 正交强制区参数化 + sinkswa_only 归因臂——改变算法
+    # 行为（强制区宽/池左界/mask 全旁路），必须进 treatment 身份。默认
+    # 128/128/False 与历史硬编码行为逐位一致（同 E134 加 tli_l2_subspace
+    # 先例，manifest 扩字段使全部 treatment hash 移位一轮；既有锚点文件
+    # 名不重算不受影响）。
+    "tli_sink_tokens": 128,
+    "tli_swa_size": 128,
+    "tli_sinkswa_only": False,
 }
 
 # 079②：文件型配置字段集合（值非 None → 内容身份解析，见上）
@@ -474,6 +482,17 @@ def get_method_name_with_info(args, snapshot=None):
             getattr(args, "minference_config_path", "pattern")
         ).replace(".json", "")
         return f"minference_vendor_{pattern_tag}_{getattr(args, 'minference_starting_layer', -1)}"
+    elif args.method == "fasa_vendor":
+        # B 轨 vendor（官方源码复用）：FASA decode 频域剪枝。校准数据集 +
+        # budget/threshold_ratio/min_k/max_k/mode 全参数编码进文件名——
+        # 不同校准产物/预算 = 不同 treatment，防同名互覆（与 minference
+        # config_path 编码同哲学）。fasa_mode 默认 topk（官方 static 口径，
+        # dynamic 消融单独编码）。
+        fasa_dataset = getattr(args, "fasa_dataset", "qasper")
+        return (f"fasa_vendor_{fasa_dataset}_b{getattr(args, 'fasa_budget', 1024)}"
+                f"_t{getattr(args, 'fasa_threshold_ratio', 0.8):g}"
+                f"_k{getattr(args, 'fasa_min_k', 16)}-{getattr(args, 'fasa_max_k', 16)}"
+                f"_{getattr(args, 'fasa_mode', 'topk')}")
     elif args.method == "twi":
         return f"twi_{args.twi_block_size}_{args.twi_level1_topk}_{args.twi_level2_topp}"
     elif args.method == "tia":
@@ -507,6 +526,16 @@ def get_method_name_with_info(args, snapshot=None):
         # 否则 P-off/P-on 同路径 w 模式互相覆盖（GPT 审计 B09 族新实例）。默认不传
         # flag 时后缀为空 → 在跑链文件名逐位不变。
         p = "_P" if getattr(args, "tli_sparse_prefill", False) else ""
+        # 【E135】sink/swa 非默认值/归因臂标记进可读名——默认（128/128/关）
+        # 不加任何后缀，锚点文件名逐位不变；身份单射由 manifest/hash 恒承载。
+        sk = getattr(args, "tli_sink_tokens", 128)
+        sw = getattr(args, "tli_swa_size", 128)
+        sso = getattr(args, "tli_sinkswa_only", False)
+        e135 = ""
+        if sso:
+            e135 += "_sinkswaonly"
+        if sk != 128 or sw != 128:
+            e135 += f"_sk{sk:g}_sw{sw:g}"
         # E122 合并说明：γ=off 自由竞争经 g_str="off" 渲染进文件名
         # （a…_b…_goff），与 γ 数值臂天然区分，无需独立 _goff 后缀；
         # 默认缺省 γ 按 1.0 处理（getattr 兜底，只有显式 off 才是 None）。
@@ -519,7 +548,7 @@ def get_method_name_with_info(args, snapshot=None):
         # 文件被替换时文件名与 runtime/sidecar 仍同源。
         return (f"tli_{args.tia_block_size}_{args.tia_level1_topk}_"
                 f"{args.tia_level2_topk}_c{args.tia_level2_cmp_ratio}_"
-                f"{ab}a{alpha:g}_b{beta:g}_g{g_str}{p}"
+                f"{ab}a{alpha:g}_b{beta:g}_g{g_str}{p}{e135}"
                 f"_h{_treatment_hash(args, snapshot)}")
     elif args.method == "none":
         return "none"
