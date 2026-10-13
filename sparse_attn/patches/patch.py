@@ -50,6 +50,21 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
               "各层将按旧路径重开 D′ 掩码/投影基文件（081 快照契约旁路，"
               "仅测试/兼容路径合法），生产入口须先 "
               "resolve_treatment_snapshot(args) 并透传")
+    # A5（TL-E137-LLAMA-NOOP-146）：fail-closed 注册预扫。LlamaAttention
+    # 与 Qwen3Attention 注入相同的 TLI/E137 参数，但 llama3_attn_forward
+    # 从不调用 calibrate_dyn_dgate——--tli_dyn_dgate 在 Llama 上是静默
+    # no-op 且结果仍带稀疏方法标签（实验结论污染）。检测到 Llama 目标类
+    # 且声明动态 gate 时显式拒绝（在任何 indexer 构造/patch 动作前）。
+    if getattr(args, "tli_dyn_dgate", False) and any(
+        isinstance(m, LlamaAttention) for _, m in model.named_modules()
+    ):
+        raise RuntimeError(
+            "Llama patch 未实现 E137 动态标定，拒绝静默 no-op——如需 Llama "
+            "动态 gate 请先实现 llama3_attn_patch 的 calibrate 调用"
+            "（当前 llama3_attn_forward 不调用 calibrate_dyn_dgate，"
+            "--tli_dyn_dgate 在 Llama 上不会生效，继续运行会产出带动态 "
+            "gate 标签的 dense 语义结果）"
+        )
     n_patched = 0
     if IndexerType is not None:
         for name, module in model.named_modules():
