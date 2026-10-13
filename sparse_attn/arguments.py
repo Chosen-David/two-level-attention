@@ -1,4 +1,5 @@
 import argparse
+import math
 
 def _add_tia_args(parser: argparse.ArgumentParser):
     group = parser.add_argument_group(title='Twi-Index Sparse Attention')
@@ -63,6 +64,40 @@ def _parse_gamma(x):
     if str(x).strip().lower() == "off":
         return None
     return float(x)
+
+
+def _parse_dgate_rows(x):
+    """A4（TL-E137-PARAM-VALIDATION-147）：--tli_dyn_dgate_rows 边界校验。
+
+    标定用 prefill q 尾行数，必须 >= 1；非法值抛 ArgumentTypeError
+    （argparse 转 exit 2，与 tli_indexer 构造函数双处校验同口径——
+    构造层兜底 getattr 兜底路径）。"""
+    try:
+        v = int(x)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            f"--tli_dyn_dgate_rows 必须是整数（标定用 prefill q 尾行数），收到 {x!r}")
+    if v < 1:
+        raise argparse.ArgumentTypeError(
+            f"--tli_dyn_dgate_rows 必须 >= 1（标定用 prefill q 尾行数），收到 {x!r}")
+    return v
+
+
+def _parse_dgate_eps(x):
+    """A4（TL-E137-PARAM-VALIDATION-147）：--tli_dyn_dgate_eps 边界校验。
+
+    far 区概率质量损失上界阈值，必须为有限值且 0<=eps<=1
+    （NaN/inf/越界一律拒绝——NaN 比较恒 False 会静默禁用 gate）。"""
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            f"--tli_dyn_dgate_eps 必须是数值（far 区概率质量阈值），收到 {x!r}")
+    if not math.isfinite(v) or not (0.0 <= v <= 1.0):
+        raise argparse.ArgumentTypeError(
+            f"--tli_dyn_dgate_eps 必须为有限值且 0<=eps<=1"
+            f"（far 区概率质量损失上界阈值），收到 {x!r}")
+    return v
 
 
 def _add_tli_args(parser: argparse.ArgumentParser):
@@ -158,12 +193,13 @@ def _add_tli_args(parser: argparse.ArgumentParser):
                        help='E137 动态 D\' gate：prefill 期逐层标定 far 区概率质量 '
                             '（q 尾行全维 softmax，与 dense prefill 同源），r_l < eps 的层 '
                             'decode 期跳过 far（E111 dgate_short 省算链全复用）')
-    group.add_argument('--tli_dyn_dgate_eps', type=float, default=0.05,
+    group.add_argument('--tli_dyn_dgate_eps', type=_parse_dgate_eps, default=0.05,
                        help='动态 D\' gate 阈值（被跳层 far 平均概率质量损失上界，'
-                            'head-mean 口径；E137 全量标定 τ=0.05 割 ~4% 层 / 0.10 割 ~18% 层，'
+                            'head-mean 口径；必须有限且 0<=eps<=1，'
+                            'E137 全量标定 τ=0.05 割 ~4% 层 / 0.10 割 ~18% 层，'
                             '质量-速度旋钮，e2e 双臂判决）')
-    group.add_argument('--tli_dyn_dgate_rows', type=int, default=256,
-                       help='标定用 prefill q 尾行数（与 observe_prefill_q E85f 同口径）')
+    group.add_argument('--tli_dyn_dgate_rows', type=_parse_dgate_rows, default=256,
+                       help='标定用 prefill q 尾行数（与 observe_prefill_q E85f 同口径，必须 >= 1）')
     return parser
 
 def parse_args():

@@ -14,6 +14,7 @@
 继承 TIAIndexer，复用其 L2（4bit 部分维 token 精筛 + 滑窗强制）语义。
 """
 import json
+import math
 import os
 
 import torch
@@ -134,8 +135,28 @@ class TLIIndexer(TIAIndexer):
         #   （floor(sink_tokens/bs) 块对齐——子块 sink 时 sink 所在块参与
         #   L1/L2 池竞争，mask 并集语义无 token 结构性丢失）。
         self.sink_tokens = int(getattr(args, "tli_sink_tokens", 128))
-        assert self.sink_tokens >= 0, "tli_sink_tokens 必须 >= 0"
-        assert self.sliding_window_size >= 1, "tli_swa_size 必须 >= 1"
+        # A2（TL-E135-OPTIMIZED-GATE-144）：边界守卫从 assert 改显式 raise——
+        # assert 在 python -O 下被剥除，参数门禁必须不随解释器优化等级漂移。
+        if self.sink_tokens < 0:
+            raise ValueError("tli_sink_tokens 必须 >= 0")
+        if self.sliding_window_size < 1:
+            raise ValueError("tli_swa_size 必须 >= 1")
+        # A3（TL-E135-PROTECTED-BUDGET-143）：「保护区不占预算」契约的
+        # fail-closed 块对齐校验。非块对齐 sink_tokens 时 sink 所在块重入
+        # K2 top-k 重复耗 K2_mid 名额（sink 头既走强制区又参与池竞争）；
+        # 非对齐 swa_size 让边界块 mid token 结构性不可选。历史默认
+        # 128/128 及 64 倍数集合不受影响；E135b 网格 sink=16 为 trace
+        # 参考语义，生产不支持非对齐。
+        _bs = self.args.tia_block_size
+        if self.sink_tokens % _bs != 0 or self.sliding_window_size % _bs != 0:
+            raise ValueError(
+                f"tli_sink_tokens={self.sink_tokens} / tli_swa_size="
+                f"{self.sliding_window_size} 必须是 tia_block_size={_bs} 的"
+                "整数倍（保护区不占预算契约：非对齐 sink 所在块会重入 K2 "
+                "top-k 重复耗 K2_mid 名额，非对齐 swa 让边界块 mid token "
+                "结构性不可选）。历史默认 128/128 及 64 倍数集合不受影响；"
+                "E135b 网格 sink=16 为 trace 参考语义，生产不支持非对齐"
+            )
         #   E135a 归因臂：mask 只含 sink 头 + swa 尾（mid 全丢），两级索引
         #   分数照算但绝不进 mask——与 σ/MoBA/per-q-head 组合无定义，fail loudly。
         self.sinkswa_only = bool(getattr(args, "tli_sinkswa_only", False))
@@ -146,15 +167,39 @@ class TLIIndexer(TIAIndexer):
         self.dyn_dgate = bool(getattr(args, "tli_dyn_dgate", False))
         self.dyn_dgate_eps = float(getattr(args, "tli_dyn_dgate_eps", 0.05))
         self.dyn_dgate_rows = int(getattr(args, "tli_dyn_dgate_rows", 256))
+        # A4（TL-E137-PARAM-VALIDATION-147）：rows/eps 边界双处校验之一
+        # （另一处在 arguments.py 的 type 校验函数）。此处覆盖 getattr
+        # 兜底路径（非 CLI 入口直接传 namespace 同样拒绝），保证任何
+        # tensor/GPU 分配前 fail-closed。eps 是 far 区概率质量损失上界
+        # 阈值，必须有限且 ∈[0,1]；rows 是标定用 prefill 尾行数，>=1。
+        if not math.isfinite(self.dyn_dgate_eps) \
+                or not (0.0 <= self.dyn_dgate_eps <= 1.0):
+            raise ValueError(
+                f"tli_dyn_dgate_eps={self.dyn_dgate_eps!r} 非法：必须为有限值"
+                "且 0<=eps<=1（far 区概率质量损失上界阈值）")
+        if self.dyn_dgate_rows < 1:
+            raise ValueError(
+                f"tli_dyn_dgate_rows={self.dyn_dgate_rows} 非法：必须 >= 1"
+                "（标定用 prefill q 尾行数）")
+        # A6（TL-E137-PREFILL-GATE-145）：decode-frozen 生命周期分离状态。
+        # prefill 期 calibrate_dyn_dgate 只写 _dyn_skip_pending（标定决策
+        # 挂起）；decode 首步由 freeze_dyn_dgate 一次性冻结进 skip_far。
+        # 此前 calibrate 直接写 skip_far，TLI_SPARSE_PREFILL=1 时稀疏
+        # prefill chunk 的 prepare_mask 会消费完整 prompt 标定的决策——
+        # 完整 prompt 的未来后缀影响较早 chunk 路由，非因果。
+        self._dyn_skip_pending = False
+        self._dyn_frozen = False
         if self.dyn_dgate and self.sinkswa_only:
             raise AssertionError("--tli_dyn_dgate 与 --tli_sinkswa_only 互斥（归因臂测的是 indexer 全旁路）")
         if self.sinkswa_only:
-            assert self.sigma_select == "none", \
-                "--tli_sinkswa_only 与 --tli_sigma_select 互斥（归因臂不做 σ 选择）"
-            assert not self.moba_gate, \
-                "--tli_sinkswa_only 与 --tli_moba 互斥（归因臂不做块 gate）"
-            assert not getattr(args, "tli_per_q_head", False), \
-                "--tli_sinkswa_only 与 --tli_per_q_head 互斥（归因臂用共享 kv-head mask）"
+            # A2（TL-E135-OPTIMIZED-GATE-144）：E135a 归因臂的互斥守卫同批
+            # 从 assert 改显式 raise（-O 剥除问题与 sink/swa 边界同源）。
+            if self.sigma_select != "none":
+                raise ValueError("--tli_sinkswa_only 与 --tli_sigma_select 互斥（归因臂不做 σ 选择）")
+            if self.moba_gate:
+                raise ValueError("--tli_sinkswa_only 与 --tli_moba 互斥（归因臂不做块 gate）")
+            if getattr(args, "tli_per_q_head", False):
+                raise ValueError("--tli_sinkswa_only 与 --tli_per_q_head 互斥（归因臂用共享 kv-head mask）")
         if self.near_select != "4bit":
             # E110：near 侧簇分路径与 σ/MoBA 均绕过/改写两级选择语义，显式互斥
             assert self.sigma_select == "none", \
@@ -178,6 +223,17 @@ class TLIIndexer(TIAIndexer):
                 "--tli_per_q_head 与 --tli_sigma_select 互斥（E103 臂不经过 σ 路径）"
         # ---- D'：静态层掩码 ----
         self.enable_layer_skip = getattr(args, "tli_enable_layer_skip", True)
+        # A6（TL-E137-PREFILL-GATE-145）：静态 D'（层掩码）× 动态 D'
+        # （E137 标定）组合语义未定义 fail-closed——_resolve_skip 每步用
+        # 静态 _skip_ids 覆盖 skip_far，会把 decode 首步冻结的动态决策
+        # 静默冲掉。当前生产全用 --tli_enable_layer_skip false 显式关
+        # 静态，无既有数据受影响。
+        if self.dyn_dgate and self.enable_layer_skip:
+            raise ValueError(
+                "--tli_dyn_dgate 与 --tli_enable_layer_skip true 互斥："
+                "静态层掩码与 E137 动态标定组合语义未定义（_resolve_skip "
+                "会用静态 _skip_ids 覆盖动态冻结的 skip_far），生产动态 "
+                "gate 臂请显式传 --tli_enable_layer_skip false")
         self.skip_far = False
         self._skip_ids: set[int] | None = None
         if snapshot is not None:
@@ -250,6 +306,18 @@ class TLIIndexer(TIAIndexer):
                     f"tli_proj_basis 定义在 tail-32 子空间上，与 tli_subspace={self.subspace} "
                     "不兼容（投影基的输入是 32 维特征）；请用 --tli_subspace tail"
                 )
+            # A1（TL-E134-PROJ-L2FULL-137）：投影 L1 + 全维 L2 组合未实现，
+            # fail-closed。投影路径下 L2 细筛仍以 rank-r 投影特征执行
+            # （k_qat 由投影后特征量化），与 --tli_l2_subspace full 声明的
+            # 「L2 全 128 维量化」不符——此前静默接受 = CLI 声明与实际
+            # 执行行为背离，构造期拒绝。
+            if self.l2_subspace == "full":
+                raise ValueError(
+                    "--tli_proj_basis 与 --tli_l2_subspace full 组合未实现："
+                    "投影路径的 L2 细筛以 rank-r 投影特征执行，非 CLI 声明的"
+                    "全 128 维量化，拒绝构造（需「投影 L1 + 全维 L2」时请先"
+                    "实现该组合再放开）"
+                )
             if snapshot is not None:
                 # 081：注入已解析的投影基（resolve 阶段单次 open，SHA 与
                 # tensor 同一批 bytes）——零文件 IO；快照缺基即与 args
@@ -291,7 +359,9 @@ class TLIIndexer(TIAIndexer):
         默认 sink_tokens=128 → 128//64 = 2 ≡ 历史 sink_blocks，全部派生值
         逐位不变。子块 sink（如 16 tok < bs）时左界为 0——sink 所在块参与
         池竞争，与强制区并集，无 token 结构性丢失（ceil 口径会在
-        [sink_tokens, ceil·bs) 产生既不强制也不可选的死区，弃用）。"""
+        [sink_tokens, ceil·bs) 产生既不强制也不可选的死区，弃用）。
+        【A3（TL-E135-PROTECTED-BUDGET-143）后构造期已对非块对齐值
+        fail-closed，子块 sink 分支实际不可达，floor 推导语义保留。】"""
         return max(0, self.sink_tokens // self.args.tia_block_size)
 
     # ---------------- E85f：prefill q 统计 → per-layer 静态 pair ---------------- #
@@ -369,10 +439,31 @@ class TLIIndexer(TIAIndexer):
         p = torch.softmax(s, dim=-1)
         r_l = float(p[..., far_lo:far_hi].sum(-1).mean())
         del s, p
-        if r_l < self.dyn_dgate_eps:
-            self.skip_far = True
+        # A6（TL-E137-PREFILL-GATE-145）：只写 pending，不直接落 skip_far。
+        # 决策由 decode 首步 freeze_dyn_dgate 冻结生效——prefill 期
+        # skip_far 恒 False：dense prefill（默认路径）不消费 skip_far，
+        # 行为逐位不变；TLI_SPARSE_PREFILL=1 时稀疏 prefill chunk 不再
+        # 消费「完整 prompt 标定」的决策（未来后缀影响较早 chunk 路由的
+        # 非因果缺陷修复）。对现产线（decode 才消费）等价。
+        self._dyn_skip_pending = bool(r_l < self.dyn_dgate_eps)
         if os.environ.get("TLI_DEBUG") and self.layer_idx is not None:
             print(f"[E137] L{self.layer_idx} r_l={r_l:.6f} eps={self.dyn_dgate_eps} "
+                  f"pending_skip_far={self._dyn_skip_pending}", flush=True)
+
+    def freeze_dyn_dgate(self):
+        """A6（TL-E137-PREFILL-GATE-145）：decode 首步一次性冻结标定决策。
+
+        qwen3_attn_patch decode 分支（prepare_mask 前）调用：首次 decode 步
+        把 prefill 期挂起的 _dyn_skip_pending 写入 skip_far 并置 _dyn_frozen
+        哨兵（后续 decode 步幂等 no-op）。clear() 复位 pending/frozen 两状态
+        （新请求 prefill 重新标定）。非 dyn_dgate 实例恒 no-op。
+        """
+        if self._dyn_frozen or not self.dyn_dgate:
+            return
+        self.skip_far = bool(self._dyn_skip_pending)
+        self._dyn_frozen = True
+        if os.environ.get("TLI_DEBUG") and self.layer_idx is not None:
+            print(f"[E137] L{self.layer_idx} decode 首步冻结 "
                   f"skip_far={self.skip_far}", flush=True)
 
 
@@ -2303,10 +2394,13 @@ class TLIIndexer(TIAIndexer):
         # observe_prefill_q 用本请求的 q 统计重选 pair（否则残留上一请求）
         self._pair_idx = None
         # E137：动态 D' 标定跨请求重置——clear() 在每次 prefill 前调用，
-        # 本请求 prefill 期末由 calibrate_dyn_dgate 用新 q/k 重新标定
-        # （静态 _skip_ids 路径不受影响：_resolve_skip 每步重算覆盖）
+        # 本请求 prefill 期末由 calibrate_dyn_dgate 用新 q/k 重新标定。
+        # A6：pending/frozen 两状态同步复位（skip_far / _dyn_skip_pending /
+        # _dyn_frozen 三态全清），新请求 decode 首步重新冻结。
         if self.dyn_dgate:
             self.skip_far = False
+            self._dyn_skip_pending = False
+            self._dyn_frozen = False
         # 【C3 修复 2026-10-08】_last_q 同样跨请求必须重置——否则任何
         # 「prefill 期调用 compute_mask 且簇已构建」的路径（TLI_DEBUG 重放类）
         # 会用上一请求 decode 的 stale q 打 near 簇分

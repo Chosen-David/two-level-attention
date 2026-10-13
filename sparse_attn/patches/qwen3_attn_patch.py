@@ -128,6 +128,13 @@ def qwen3_attn_forward(
                 f"mask，按 2D 假设处理不正确），拒绝执行。"
             )
         indexer: Indexer = self.indexer
+        # A6（TL-E137-PREFILL-GATE-145）：decode 首步冻结 E137 动态标定决策。
+        # prefill 期 calibrate_dyn_dgate 只写 _dyn_skip_pending（决策挂起），
+        # 此处一次性落 skip_far（_dyn_frozen 哨兵防重复，clear() 复位两状态）
+        # ——修复「完整 prompt 标定结果被稀疏 prefill chunk 消费」的非因果
+        # 缺陷；dense prefill（默认路径）逐位不变。非 dyn_dgate 实例 no-op。
+        if hasattr(indexer, "freeze_dyn_dgate"):
+            indexer.freeze_dyn_dgate()
         query_states, key_states, value_states = (x.transpose(1, 2) for x in (query_states, key_states, value_states))
         if attention_mask is not None:
             cu_seqlens_k = prepare_cu_seqlens_from_mask(attention_mask)
