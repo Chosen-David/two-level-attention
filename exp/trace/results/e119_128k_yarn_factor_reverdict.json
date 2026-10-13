@@ -22,5 +22,11 @@
   "fullkv_new_scoring": "exp/trace/results/e119_ruler128k_formal_fullkv.json（run 20261013114511）+ manifest/receipt",
   "bitexact_probe": "本判决生成时逐位对拍：old=e119_ruler128k_formal_fullkv.json.run-20261010001142/pred_root/L131072/pred_1024 vs new=e119_ruler128k_formal_fullkv/L131072/pred（4 任务×100 行×0 diff）",
   "yarn_correction_sidecars": "e119_ruler128k_formal_{fullkv,mavg,aavg}.json.manifest.yarn_correction.json（057 标注 operator_declared_not_effective）"
+ },
+ "evidence_tier_revision": {
+  "revised_by": "Opus 2026-10-13（GPT TL-E119-LEGACY-FACTOR-139 采纳）",
+  "fullkv": "receipt-bound confirmed（v2 producer receipt，run 20261013114511，11/11 derived_sha256 与新代 source_sha256 相等）",
+  "mavg_aavg": "provisional / effective_yarn_factor=unclosed——legacy-partial manifest 无 producer receipt，4.0 为运行侧高可信推断（057 sidecar operator_declared_not_effective + 派单脚本 auto 表 131072:4.0 + e116b 同代同值佐证），非 producer-bound 闭包；correction 侧明确 effective_yarn_factor=null / effective_factor_closed=false。主表不得称 receipt-verified。",
+  "rerun_decision": "22 格重跑取消的决策保留，但表述修正：非「只会复现同分」，而是显式接受残余 provenance 风险（同派单协议佐证 vs 重跑成本的权衡）；若论文终稿要求闭包 4.0 身份，按 v2 协议重跑并留 receipt。"
  }
 }
