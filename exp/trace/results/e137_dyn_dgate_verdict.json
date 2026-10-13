@@ -1,0 +1,96 @@
+{
+ "exp": "E137 D' gate prefill 动态标定 e2e 判决（r_l < eps 层 decode 期 skip far，双臂）",
+ "date": "2026-10-13",
+ "protocol": {
+  "arms": "mavg 冠军 flags（.25/.125/.625, cmp4, L1 128/L2 1024）+ --tli_dyn_dgate + eps ∈ {0.05, 0.10}；--tli_enable_layer_skip false 显式关静态",
+  "anchor": "E123 mavg AVG5 47.91（e123_trial_verdict.json per_task，不重跑）",
+  "scoring": "本机 eval.py（python3 -m benchmark.LongBench.eval，difflib:stdlib）双臂目录统一打分；行数门 repobench-p=500 其余 200（086 SKIP 前缀协议）；runcap strict 核验",
+  "hosts": ".187 GPU0-7（GPU0=gov_report@0.05 冒烟续用）+ .251 GPU0-1（musique 双臂）；rsync 收割回本机单次统一打分",
+  "calibration": "per-q-head softmax、prefill 尾 256 行、生产 far 区 [sink, sink+(1-α)·mid)；标定-跳层漂移 Jaccard 0.333(0.05)/0.634(0.10)，跳层 decode 端真实 far 质量上界0.168/0.280（e137_calib_256_selfcheck.json）",
+  "stats": "task-bootstrap 10000 次 seed 20261013，描述性（126 纪律）"
+ },
+ "per_task": {
+  "dg5": {
+   "gov_report": {
+    "anchor": 33.6,
+    "arm": 33.45,
+    "delta": -0.15
+   },
+   "hotpotqa": {
+    "anchor": 59.42,
+    "arm": 58.37,
+    "delta": -1.05
+   },
+   "musique": {
+    "anchor": 34.25,
+    "arm": 35.05,
+    "delta": 0.8
+   },
+   "qasper": {
+    "anchor": 46.45,
+    "arm": 46.75,
+    "delta": 0.3
+   },
+   "repobench": {
+    "anchor": 65.83,
+    "arm": 65.76,
+    "delta": -0.07
+   }
+  },
+  "dg1": {
+   "gov_report": {
+    "anchor": 33.6,
+    "arm": 33.11,
+    "delta": -0.49
+   },
+   "hotpotqa": {
+    "anchor": 59.42,
+    "arm": 58.16,
+    "delta": -1.26
+   },
+   "musique": {
+    "anchor": 34.25,
+    "arm": 33.74,
+    "delta": -0.51
+   },
+   "qasper": {
+    "anchor": 46.45,
+    "arm": 46.95,
+    "delta": 0.5
+   },
+   "repobench": {
+    "anchor": 65.83,
+    "arm": 66.5,
+    "delta": 0.67
+   }
+  }
+ },
+ "avg": {
+  "dg5": {
+   "anchor": 47.91,
+   "arm": 47.88,
+   "delta": -0.03
+  },
+  "dg1": {
+   "anchor": 47.91,
+   "arm": 47.69,
+   "delta": -0.22
+  }
+ },
+ "bootstrap_ci95": {
+  "dg5": [
+   -0.584,
+   0.452
+  ],
+  "dg1": [
+   -0.806,
+   0.4
+  ]
+ },
+ "activation_evidence": {
+  "eps0.05": "冒烟 21/46 样本触发（层集 {L7,L8,L10,L11,L35}，L10 主导 16 样本 r_l 0.042-0.048）——激活臂非 no-op，e2e Δ 是真实 skip 信号",
+  "eps0.10": "TRACE 自校验 τ=0.10 割 115/576 层（20%），漂移层集更大"
+ },
+ "verdict": "eps=0.05 臂 AVG5 Δ-0.03（CI [-0.584,+0.452] 含 0，3/5 任务负向）；eps=0.10 臂 AVG5 Δ-0.22（CI [-0.806,+0.400] 含 0，3/5 任务负向）。",
+ "decision": "【mass ≠ e2e 铁律，e2e 实测裁决】D' gate 救援成立：eps=0.05 臂 AVG5 47.88（Δ-0.03，CI 含 0，效应量 -0.06%）与锚点统计不可分——保守默认 eps=0.05 维持，作为生产可选项落袋（跳 ~5% 层 far，省算链复用 E111 dgate_short）；eps=0.10 臂 AVG5 47.69（Δ-0.22，CI 含 0）同样未超噪声带，激进档（跳 ~20% 层）亦可用但保守档优先。与 E129 静态口径 e2e -4.47 惨败对照，动态 per-prompt 标定（prefill 尾 256 行 per-q-head + 生产 far 区）是 D' gate 可用性的决定性修正；E6 静态口径 13/36 层可跳系 sum-over-G 聚合 artifact（e137_calib_alignment 判决），本实验闭环该证据链。注意事项：激活证据 eps0.05=21/46 样本（非 no-op）；质量上界审计跳层 decode 端真实 far 质量 max 0.168（e137_calib_256_selfcheck.json）——有界非零，LB 5 任务实测无感。后续 E127 门禁重跑欠账另补；128K/LB v2 全集复验为转正候选路径。"
+}
