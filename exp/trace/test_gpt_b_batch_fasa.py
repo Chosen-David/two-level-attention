@@ -40,7 +40,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(
 sys.path.insert(0, REPO)
 
 from sparse_attn.info import (  # noqa: E402
-    _fasa_agreement_sha8, get_method_name_with_info,
+    get_method_name_with_info,
     resolve_fasa_agreement_path, stage_fasa_agreement,
 )
 
@@ -213,18 +213,49 @@ def test_b2_calibration_identity():
         _check(old_name_a == "fasa_vendor_qasper_b1024_t0.8_k16-16_topk",
                "红B: 旧名字只编码参数段——不同校准内容同名（审计缺陷）")
 
-        # --- 绿B：新名字尾段 _agr<sha8> 绑定内容——内容不同名必不同 ---
-        #     （reset src 回内容 A：名字计算消费当前源文件内容）
+        # --- 142 reopen（GPT 审计 8b56bbd）：B 批修复后命名侧仍在模型
+        #     加载后重新打开可变源 → runtime=A、name=B 错绑。现名字只消费
+        #     stage 冻结快照（_fasa_staged_snapshot），不再读源。 ---
+        # 未经 stage 的直接命名必须 fail-closed（无冻结快照无合法路径）
+        args_nofreeze = _fa_args(agr_dir)
+        try:
+            get_method_name_with_info(args_nofreeze)
+            raise AssertionError("142: 无冻结快照时命名未 fail-closed")
+        except SystemExit as e:
+            _check("142" in str(e) and "冻结快照" in str(e),
+                   f"142: 无快照命名报错应带编号与中文提示: {e}")
+
+        # 绿B（冻结语义）：reset src 回内容 A 后 stage → 冻结快照 A →
+        # 名字 = A 的 sha8；此后源替换为 B，名字仍 = A（runtime=A、name=A，
+        # 不再错绑），runtime 目标副本 bytes 仍逐字节 == A
         with open(src, "wb") as f:
             f.write(content_a)
+        _check(stage_fasa_agreement(args, fake_repo) == dst,
+               "142: 源/目标一致时应放行")
         name_a = get_method_name_with_info(args)
         _check(name_a.endswith(f"_agr{sha8_a}"),
                f"142: 名字应附加 _agr<sha8>: {name_a}")
         with open(src, "wb") as f:
-            f.write(src_now)
+            f.write(src_now)   # stage 后（模型加载后、命名前）源被替换为 B
+        _check(get_method_name_with_info(args) == name_a,
+               ("142 reopen: stage 后源被替换，名字必须仍绑定冻结内容 A"
+                "（旧实现此处翻转为 B 的 sha8 = A/B 错绑）"))
+        with open(dst, "rb") as f:
+            _check(f.read() == content_a,
+                   "142 reopen: runtime 目标副本 bytes 应仍逐字节等于 A")
+
+        # 不同校准内容必须得到不同 treatment 名：换全新 repo_root 重新
+        # stage B（旧 repo 的目标与 B 不一致会 stale 拒绝，fail-closed
+        # 语义已在上文覆盖）→ 快照翻转为 B → 名字翻转为 B 的 sha8
+        fake_repo_b = os.path.join(td, "fake_repo_b")
+        os.makedirs(fake_repo_b, exist_ok=True)
+        _check(stage_fasa_agreement(args, fake_repo_b) ==
+               os.path.join(fake_repo_b, "dimension_rankings", "Qwen3-8B",
+                            "qasper_agreement.pkl"),
+               "142: 新 repo_root staging 目标路径不符")
         name_b = get_method_name_with_info(args)
         _check(name_b.endswith(f"_agr{sha8_b}"),
-               f"142: 名字应附加 _agr<sha8>: {name_b}")
+               f"142: 重新 stage 后名字应绑定新内容: {name_b}")
         _check(name_a != name_b,
                "142: 不同校准内容必须得到不同 treatment 名")
         # 同内容重算稳定（内容身份，路径无关）
@@ -234,13 +265,9 @@ def test_b2_calibration_identity():
         _check(name_a.startswith("fasa_vendor_qasper_b1024_t0.8_k16-16_topk"),
                f"142: 既有参数段不得被改动: {name_a}")
 
-        # --- 源缺失 fail-closed（名字与 staging 双口径） ---
+        # --- 源缺失 fail-closed（staging 侧；命名侧 fail-closed =
+        #     无冻结快照拒绝，上文已覆盖——名字不再读源） ---
         os.remove(src)
-        try:
-            _fasa_agreement_sha8(args)
-            raise AssertionError("142: 源缺失时名字计算未 fail-closed")
-        except SystemExit as e:
-            _check("142" in str(e), f"142: 报错应带编号: {e}")
         try:
             stage_fasa_agreement(args, fake_repo)
             raise AssertionError("142: 源缺失时 staging 未 fail-closed")
@@ -250,7 +277,8 @@ def test_b2_calibration_identity():
     print("B2 PASS  --fasa_agreement_dir 接线（绝对路径自定义源/默认向后"
           "兼容）；目标已存在时源/目标 SHA256 对比，stale 目标 SystemExit "
           "fail-closed（红A 复刻旧逻辑实证静默复用）；treatment 名附加 "
-          "_agr<sha8> 内容身份（红B 旧名不同内容同名混淆已闭合）")
+          "_agr<sha8> 内容身份且消费 stage 冻结快照（142 reopen：stage 后"
+          "源被替换名字仍绑定 runtime 同一份内容；无快照命名 fail-closed）")
 
 
 def main():
