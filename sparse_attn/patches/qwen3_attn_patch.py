@@ -68,6 +68,11 @@ def qwen3_attn_forward(
         # pair 选取（decode 侧 _subspace_indices 消费；非静态 pair 模式为 no-op）
         if hasattr(indexer, "observe_prefill_q"):
             indexer.observe_prefill_q(query_states)
+        # E137：动态 D' gate prefill 期标定（dense prefill 逐层一次）——
+        # 尾行 far 概率质量 r_l < eps 的层 decode 期跳过 far（E60 已验证
+        # prefill↔decode 层间 far mass corr 0.966~0.991）。默认关零扰动。
+        if hasattr(indexer, "calibrate_dyn_dgate"):
+            indexer.calibrate_dyn_dgate(query_states, key_states)
         # 稀疏 prefill（用户 2026-10-08 指令，TLI_SPARSE_PREFILL=1 门控）：
         # 默认未设置时走原 dense 分支逐位不变（E109 在跑链零扰动铁律）。
         # chunk 共享选择语义（MoBA 口径）见 ops/eager_prefill.py 模块注释。

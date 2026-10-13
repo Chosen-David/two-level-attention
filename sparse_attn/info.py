@@ -123,6 +123,10 @@ _TREATMENT_FIELD_DEFAULTS = {
     "tli_sink_tokens": 128,
     "tli_swa_size": 128,
     "tli_sinkswa_only": False,
+    # E137：D' gate 动态标定（默认关零扰动；eps/rows 非默认值才进可读名）
+    "tli_dyn_dgate": False,
+    "tli_dyn_dgate_eps": 0.05,
+    "tli_dyn_dgate_rows": 256,
 }
 
 # 079②：文件型配置字段集合（值非 None → 内容身份解析，见上）
@@ -536,6 +540,16 @@ def get_method_name_with_info(args, snapshot=None):
             e135 += "_sinkswaonly"
         if sk != 128 or sw != 128:
             e135 += f"_sk{sk:g}_sw{sw:g}"
+        # E137：动态 D' gate 标记（默认关不加后缀；eps/rows 非默认时渲染）
+        ddg = getattr(args, "tli_dyn_dgate", False)
+        if ddg:
+            e135 += "_dyndgate"
+            dep = getattr(args, "tli_dyn_dgate_eps", 0.05)
+            drw = getattr(args, "tli_dyn_dgate_rows", 256)
+            if dep != 0.02:
+                e135 += f"_eps{dep:g}"
+            if drw != 256:
+                e135 += f"_r{drw:g}"
         # E122 合并说明：γ=off 自由竞争经 g_str="off" 渲染进文件名
         # （a…_b…_goff），与 γ 数值臂天然区分，无需独立 _goff 后缀；
         # 默认缺省 γ 按 1.0 处理（getattr 兜底，只有显式 off 才是 None）。

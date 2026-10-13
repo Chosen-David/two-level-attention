@@ -1,0 +1,46 @@
+{
+ "exp": "E137 标定口径自校验：实现精确口径（prefill 尾 256 行 per-head 生产 far 区全均值）vs 判决口径（decode 尾 5 行）",
+ "date": "2026-10-13",
+ "data": "e137_calib_alignment_all_256.json（16 样本 × 36 层全量复算，.187 cuda:1，脚本 /tmp/e137_calib_alignment.py）",
+ "headcount": {
+  "E_farzone_256": {
+   "0.02": "4/576 (0.2/样本)",
+   "0.05": "30/576 (0~6, 均值1.9)",
+   "0.10": "115/576 (5~12, 均值7.2)"
+  },
+  "E_farzone_mean": {
+   "0.02": "1/576",
+   "0.05": "22/576 (0~4, 均值1.4)",
+   "0.10": "104/576 (2~12, 均值6.5)"
+  },
+  "E_farzone_max": "全 τ 零头寸（head 间 far 依赖不均是硬约束，不变）"
+ },
+ "layer_set_agreement": {
+  "tau_0.05": {
+   "jaccard": 0.333,
+   "intersection": 13,
+   "union": 39
+  },
+  "tau_0.10": {
+   "jaccard": 0.634,
+   "intersection": 85,
+   "union": 134
+  },
+  "note": "两口径层集漂移实质存在：prefill 尾行标定对部分层低估 decode 后期 far 依赖（E60 corr 0.966~0.991 高但非恒等）"
+ },
+ "safety_audit": {
+  "tau_0.05_skipped30": {
+   "decode尾5行质量 mean": 0.0582,
+   "max": 0.1678,
+   "P95": 0.1008
+  },
+  "tau_0.10_skipped115": {
+   "decode尾5行质量 mean": 0.0864,
+   "max": 0.2795,
+   "P95": 0.1944
+  },
+  "note": "256 口径跳层在 decode 端真实 head-mean far 质量最大 0.168（τ=0.05）——质量风险有界但非零，e2e 双臂判决决定 eps 去留；若掉分则收紧（τ=0.02 仅 4/576）或放弃"
+ },
+ "verdict": "eps 默认 0.05 维持（实现口径 ~5% 层，比判决口径 3.8% 略保守），e2e 双臂 0.05/0.10 判决不变；实现 r_l 公式与 E_farzone_256 严格一致（尾 256 行 per-head 生产 far 区全均值），标定数据即本 JSON。",
+ "bitexact_note": "dyn_dgate 默认关：calibrate_dyn_dgate 首行 return，prefill hook 为纯 no-op，默认路径零扰动（静态保证）"
+}

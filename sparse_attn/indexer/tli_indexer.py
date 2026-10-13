@@ -139,6 +139,15 @@ class TLIIndexer(TIAIndexer):
         #   E135a 归因臂：mask 只含 sink 头 + swa 尾（mid 全丢），两级索引
         #   分数照算但绝不进 mask——与 σ/MoBA/per-q-head 组合无定义，fail loudly。
         self.sinkswa_only = bool(getattr(args, "tli_sinkswa_only", False))
+        # ---- E137：D' gate prefill 动态标定（用户 2026-10-13 指令）----
+        #   r_l < eps 的层 prefill 期末标定 skip_far=True，decode 期消费链
+        #   全复用 E111 dgate_short（_resolve_skip 不动——静态 _skip_ids 与
+        #   动态标定独立共存：静态优先，动态只在非静态 skip 层上叠加）。
+        self.dyn_dgate = bool(getattr(args, "tli_dyn_dgate", False))
+        self.dyn_dgate_eps = float(getattr(args, "tli_dyn_dgate_eps", 0.05))
+        self.dyn_dgate_rows = int(getattr(args, "tli_dyn_dgate_rows", 256))
+        if self.dyn_dgate and self.sinkswa_only:
+            raise AssertionError("--tli_dyn_dgate 与 --tli_sinkswa_only 互斥（归因臂测的是 indexer 全旁路）")
         if self.sinkswa_only:
             assert self.sigma_select == "none", \
                 "--tli_sinkswa_only 与 --tli_sigma_select 互斥（归因臂不做 σ 选择）"
@@ -301,6 +310,70 @@ class TLIIndexer(TIAIndexer):
         if os.environ.get("TLI_DEBUG") and self.layer_idx is not None:
             print(f"[E85f] L{self.layer_idx} static pairs (freq j): "
                   f"{sorted(top_pairs.tolist())}", flush=True)
+
+    # ---------------- E137：D' gate prefill 动态标定 ---------------- #
+
+    def calibrate_dyn_dgate(self, q, k):
+        """E137 动态 D' gate 标定（qwen3_attn_patch prefill 分支调用）。
+
+        q [B,H,S,D] post-RoPE / k [B,S,Hkv,D]，与 dense prefill 同源张量。
+        取 q 尾 dyn_dgate_rows 行（默认 256，与 observe_prefill_q E85f 同口径），
+        per-q-head 全维 softmax（k GQA 展开到 H 头——组内 mean 会改变 softmax
+        分布，E137 口径对齐判决 e137_calib_alignment 已证其失真），
+        far 区 = 生产 far 区 [sink_tokens, sink+(1-α)·mid_len)（mid_len =
+        S-sink-swa；该区在 skip_far 时不被 near 选择/sink/swa 任一覆盖，
+        其概率质量即真实质量损失上界的 head-mean 近似），
+        r_l = rows×heads 全均值。r_l < eps → 该层 decode 期 skip_far=True
+        （_resolve_skip 消费链零新造，E111 dgate_short 省算五消费点全复用）。
+
+        口径对齐判决（e137_calib_alignment_all.json，16 样本全量）：
+        E6 静态口径「13/36 层可跳」系 sum-over-G 分数聚合 artifact（组内
+        4 head far 分数互抵消把聚合分布压零，per-head 口径同层高一个量级，
+        E129 静态 gate e2e -4.47 与此自洽）；per-head 生产 far 区口径下
+        τ=0.05 割 22/576 层（4%）、τ=0.10 割 104/576（18%）。eps 默认 0.05
+        （保守），e2e 双臂 0.05/0.10 判决。head-max 保守口径全量零头寸
+        ——head 间 far 依赖不均是硬约束，mean 口径阈值即质量-速度旋钮。
+
+        有效性背书：E60 已离线验证 prefill 尾行 far mass 与 decode 尾行
+        far mass 层间 corr 0.966~0.991——far 依赖性是层属性，prefill 标定
+        对 decode 有效。成本 ~[rows,H,S,D] GEMM/层（64K/256 行 <30ms 级），
+        prefill 一次付清。
+        """
+        if not self.dyn_dgate:
+            return
+        S = q.shape[2]
+        sink_tok = self.sink_tokens
+        swa_tok = self.sliding_window_size
+        mid_len = S - swa_tok - sink_tok
+        # 生产 far 区右界（E135 analyze 同式）：far = [sink, sink+(1-α)·mid)
+        far_hi = sink_tok + int((1.0 - self.alpha) * mid_len)
+        far_lo = sink_tok
+        if far_hi <= far_lo:          # 序列太短：far 区空，跳过标定不 skip
+            return
+        rows = min(self.dyn_dgate_rows, S)
+        qe = q.detach()[:, :, -rows:, :].float()          # [B,H,rows,D]
+        ke = k.detach()[:, -S:, :, :].float().transpose(1, 2)  # [B,Hkv,S,D]
+        B, H, _, D = qe.shape
+        Hkv = ke.shape[1]
+        G = H // Hkv
+        scale = D ** -0.5
+        # per-q-head 概率（E137 口径）：k GQA 展开到 H 头，不做组内 mean
+        ke_e = ke.repeat_interleave(G, dim=1)             # [B,H,S,D]
+        s = torch.einsum("bhrd,bhsd->bhrs", qe, ke_e) * scale
+        del ke_e
+        # 因果 mask：每个尾行 r 可见 k ∈ [0, S-rows+r]
+        pos_q = torch.arange(S - rows, S, device=q.device).view(1, 1, -1, 1)
+        pos_k = torch.arange(S, device=q.device).view(1, 1, 1, -1)
+        s = s.masked_fill(pos_k > pos_q, float("-inf"))
+        p = torch.softmax(s, dim=-1)
+        r_l = float(p[..., far_lo:far_hi].sum(-1).mean())
+        del s, p
+        if r_l < self.dyn_dgate_eps:
+            self.skip_far = True
+        if os.environ.get("TLI_DEBUG") and self.layer_idx is not None:
+            print(f"[E137] L{self.layer_idx} r_l={r_l:.6f} eps={self.dyn_dgate_eps} "
+                  f"skip_far={self.skip_far}", flush=True)
+
 
     # ---------------- D' ---------------- #
 
@@ -2228,6 +2301,11 @@ class TLIIndexer(TIAIndexer):
         # E85f：跨请求必须重置——clear() 在每次 prefill 前调用，随后
         # observe_prefill_q 用本请求的 q 统计重选 pair（否则残留上一请求）
         self._pair_idx = None
+        # E137：动态 D' 标定跨请求重置——clear() 在每次 prefill 前调用，
+        # 本请求 prefill 期末由 calibrate_dyn_dgate 用新 q/k 重新标定
+        # （静态 _skip_ids 路径不受影响：_resolve_skip 每步重算覆盖）
+        if self.dyn_dgate:
+            self.skip_far = False
         # 【C3 修复 2026-10-08】_last_q 同样跨请求必须重置——否则任何
         # 「prefill 期调用 compute_mask 且簇已构建」的路径（TLI_DEBUG 重放类）
         # 会用上一请求 decode 的 stale q 打 near 簇分

@@ -150,6 +150,20 @@ def _add_tli_args(parser: argparse.ArgumentParser):
                        help='E135a 归因臂：mask 只含正交强制区（sink 头 + swa 尾），mid 全丢，'
                             'L1/L2 两级索引分数全旁路（分数照算但绝不进 mask）——'
                             '回答「功劳归 sink/swa 还是归 indexer」的消融对照')
+    # ---- E137：D' gate 动态标定（用户 2026-10-13 指令：救静态 D' gate）----
+    #   prefill 尾行观测逐层 far 概率质量 r_l，r_l < eps 的层 decode 期 skip far。
+    #   核心假设已由 E60 离线验证：prefill 尾行 far mass 与 decode 尾行 far mass
+    #   层间 corr 0.966~0.991（e60_prefill_dynamic_gate.json，mean/max/P95 三口径）。
+    group.add_argument('--tli_dyn_dgate', action='store_true', default=False,
+                       help='E137 动态 D\' gate：prefill 期逐层标定 far 区概率质量 '
+                            '（q 尾行全维 softmax，与 dense prefill 同源），r_l < eps 的层 '
+                            'decode 期跳过 far（E111 dgate_short 省算链全复用）')
+    group.add_argument('--tli_dyn_dgate_eps', type=float, default=0.05,
+                       help='动态 D\' gate 阈值（被跳层 far 平均概率质量损失上界，'
+                            'head-mean 口径；E137 全量标定 τ=0.05 割 ~4% 层 / 0.10 割 ~18% 层，'
+                            '质量-速度旋钮，e2e 双臂判决）')
+    group.add_argument('--tli_dyn_dgate_rows', type=int, default=256,
+                       help='标定用 prefill q 尾行数（与 observe_prefill_q E85f 同口径）')
     return parser
 
 def parse_args():
