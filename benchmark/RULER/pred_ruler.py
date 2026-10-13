@@ -53,7 +53,6 @@ import hashlib
 import json
 import os
 import random
-import shutil
 import sys
 from datetime import datetime
 
@@ -87,6 +86,9 @@ from sparse_attn.ops.eager_decoding import (  # noqa: E402
 from sparse_attn.info import (  # noqa: E402
     get_method_name_with_info, get_treatment_manifest_json,
     resolve_treatment_snapshot)
+# 142（TL-FASA-CALIBRATION-IDENTITY）：FASA agreement 源/目标身份的
+# 唯一 staging 口径（与 LongBench 入口、treatment 名三方同源）。
+from sparse_attn.info import stage_fasa_agreement  # noqa: E402
 
 RULER_TASKS = [
     "niah_single_1", "niah_single_2", "niah_single_3",
@@ -242,23 +244,21 @@ def main():
             sys.path.insert(0, vendor_dir)
         from qwen3_fasa_patch import enable_fasa  # noqa: E402
         fasa_dataset = getattr(args, "fasa_dataset", "qasper")
-        src_agr = os.path.join(vendor_dir, "dimension_rankings",
-                               args.model, f"{fasa_dataset}_agreement.pkl")
-        dst_agr = os.path.join(REPO, "dimension_rankings", args.model,
-                               f"{fasa_dataset}_agreement.pkl")
-        if not os.path.isfile(src_agr):
-            raise RuntimeError(
-                f"FASA Phase 1 校准产物缺失：{src_agr}（先跑 "
-                f"qwen3_identify_fre.py + convert_agreement.py）")
-        if not os.path.isfile(dst_agr):
-            os.makedirs(os.path.dirname(dst_agr), exist_ok=True)
-            shutil.copy2(src_agr, dst_agr)
+        # 142（TL-FASA-CALIBRATION-IDENTITY，GPT 审计 B 批）：--fasa_
+        # agreement_dir 此前注册后从未被消费（源/目标硬编码 vendor 内
+        # dimension_rankings/ + 仓库根），且「目标已存在时不比较」→
+        # 不同校准内容静默共享同一 treatment 身份。现统一走
+        # sparse_attn/info.py 的 142 三函数（与 LongBench 入口、
+        # treatment 名三方同源）：agreement 源目录 = --fasa_agreement_dir
+        # （默认 'dimension_rankings' 相对 vendor 目录解析，向后兼容）；
+        # 目标已存在时源/目标 SHA256 对比，stale 目标 fail-closed。
+        dst_agr = stage_fasa_agreement(args, REPO)
         cwd_bak = os.getcwd()
         os.chdir(REPO)
         try:
             n_patched = enable_fasa(
                 model,
-                agreement_dir=os.path.join(REPO, "dimension_rankings"),
+                agreement_dir=os.path.dirname(dst_agr),
                 model_name=args.model,
                 dataset_name=fasa_dataset,
                 budget=getattr(args, "fasa_budget", 1024),
