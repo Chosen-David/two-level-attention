@@ -53,6 +53,7 @@ import hashlib
 import json
 import os
 import random
+import shutil
 import sys
 from datetime import datetime
 
@@ -227,6 +228,47 @@ def main():
             config_path=cfg_path,
             starting_layer=getattr(args, "minference_starting_layer", -1),
         )
+    elif args.method == "fasa_vendor":
+        # FASA（ICLR 2026 frequency-aware sparse attention）B 轨官方源码
+        # 复用——qwen3_fasa_patch.py 仅接口胶水，fasa_utils.py 与官方
+        # utils.py 逐字节一致（constructe_adaptive_selection /
+        # core_module_with_padding_old）。官方解码剪枝相对路径依赖
+        # dimension_rankings/<model>/<dataset>_agreement.pkl 且 CWD 无关
+        # （constructe_adaptive_selection 硬编码相对路径），故把 Phase 1
+        # 校准产物从 vendor 目录拷贝到 REPO 根，并临时切 CWD 保证解析。
+        vendor_dir = os.path.join(
+            REPO, "exp", "vendor_baselines", "fasa_vendor")
+        if vendor_dir not in sys.path:
+            sys.path.insert(0, vendor_dir)
+        from qwen3_fasa_patch import enable_fasa  # noqa: E402
+        fasa_dataset = getattr(args, "fasa_dataset", "qasper")
+        src_agr = os.path.join(vendor_dir, "dimension_rankings",
+                               args.model, f"{fasa_dataset}_agreement.pkl")
+        dst_agr = os.path.join(REPO, "dimension_rankings", args.model,
+                               f"{fasa_dataset}_agreement.pkl")
+        if not os.path.isfile(src_agr):
+            raise RuntimeError(
+                f"FASA Phase 1 校准产物缺失：{src_agr}（先跑 "
+                f"qwen3_identify_fre.py + convert_agreement.py）")
+        if not os.path.isfile(dst_agr):
+            os.makedirs(os.path.dirname(dst_agr), exist_ok=True)
+            shutil.copy2(src_agr, dst_agr)
+        cwd_bak = os.getcwd()
+        os.chdir(REPO)
+        try:
+            n_patched = enable_fasa(
+                model,
+                agreement_dir=os.path.join(REPO, "dimension_rankings"),
+                model_name=args.model,
+                dataset_name=fasa_dataset,
+                budget=getattr(args, "fasa_budget", 1024),
+                threshold_ratio=getattr(args, "fasa_threshold_ratio", 0.8),
+                min_k=getattr(args, "fasa_min_k", 16),
+                max_k=getattr(args, "fasa_max_k", 16),
+                mode=getattr(args, "fasa_mode", "topk"),
+            )
+        finally:
+            os.chdir(cwd_bak)
     else:
         n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:
