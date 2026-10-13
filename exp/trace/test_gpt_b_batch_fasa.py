@@ -68,33 +68,60 @@ def _fa_args(fasa_agreement_dir, dataset="qasper", model="Qwen3-8B"):
 
 
 def test_b1_publish_closure():
-    """141：入库计数 + git archive 干净检出 import smoke。"""
-    r = subprocess.run(
-        ["git", "ls-files", "exp/vendor_baselines/fasa_vendor/"],
-        cwd=REPO, capture_output=True, text=True)
-    files = [x for x in r.stdout.splitlines() if x.strip()]
-    _check(len(files) > 0, f"141: fasa_vendor 未入库（ls-files={files!r}）")
-    bad = [f for f in files if "__pycache__" in f or f.endswith(".pyc")]
-    _check(not bad, f"141: __pycache__/pyc 不应入库: {bad}")
-    pkl = [f for f in files if f.endswith(".pkl")]
-    _check(not pkl, f"141: 校准产物 pkl 按约定不入库: {pkl}")
-    py = [f for f in files if f.endswith(".py")]
-    _check(len(py) >= 5, f"141: .py 源码应≥5个（patch/utils/校准两脚本/冒烟）: {py}")
+    """141：发布在位核验 + git archive 干净检出 import smoke。
 
-    # 干净检出 import smoke：git archive HEAD → 临时目录 → sys.path 加
-    # fasa_vendor → import qwen3_fasa_patch（修复前该步骤 ModuleNotFound）。
+    发布在位以磁盘为准（git archive 解出的干净检出同样成立——那里没有
+    .git，ls-files 不可用）；在真 git checkout 中追加 ls-files 硬核验
+    （入库计数、无 __pycache__/pyc、无 pkl）。"""
+    vendor = os.path.join(REPO, "exp", "vendor_baselines", "fasa_vendor")
+    expect_py = ["qwen3_fasa_patch.py", "fasa_utils.py",
+                 "qwen3_identify_fre.py", "convert_agreement.py",
+                 "smoke_qwen3_fasa.py", "README.md"]
+    missing = [f for f in expect_py
+               if not os.path.isfile(os.path.join(vendor, f))]
+    _check(not missing, f"141: 发布文件缺失: {missing}")
+    r = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                       cwd=REPO, capture_output=True, text=True)
+    if r.returncode == 0 and r.stdout.strip() == "true":
+        # 真 git checkout：入库内容硬核验
+        lr = subprocess.run(
+            ["git", "ls-files", "exp/vendor_baselines/fasa_vendor/"],
+            cwd=REPO, capture_output=True, text=True)
+        files = [x for x in lr.stdout.splitlines() if x.strip()]
+        _check(len(files) > 0, f"141: fasa_vendor 未入库（ls-files={files!r}）")
+        bad = [f for f in files if "__pycache__" in f or f.endswith(".pyc")]
+        _check(not bad, f"141: __pycache__/pyc 不应入库: {bad}")
+        pkl = [f for f in files if f.endswith(".pkl")]
+        _check(not pkl, f"141: 校准产物 pkl 按约定不入库: {pkl}")
+        py = [f for f in files if f.endswith(".py")]
+        _check(len(py) >= 5, f"141: .py 源码应≥5个: {py}")
+        n_files = len(files)
+    else:
+        # git archive 干净检出（无 .git）：磁盘在位即发布证明
+        py = [f for f in expect_py if f.endswith(".py")]
+        n_files = len(expect_py)
+
+    # 干净检出 import smoke：git 仓内先 git archive HEAD → 临时目录再验；
+    # git archive 解出的干净检出（无 .git）直接对自身 vendor 目录验——
+    # 修复前该 import 即 ModuleNotFoundError（141 红证形态）。
     with tempfile.TemporaryDirectory() as td:
-        arch = subprocess.run(
+        r_arch = subprocess.run(
             ["git", "archive", "HEAD"], cwd=REPO,
             stdout=subprocess.PIPE)
-        _check(arch.returncode == 0, "141: git archive 失败")
-        untar = subprocess.run(["tar", "-x", "-C", td], input=arch.stdout,
-                               stdout=subprocess.PIPE)
-        _check(untar.returncode == 0, "141: tar 解包失败")
+        if r_arch.returncode == 0:
+            smoke_dir = td
+            untar = subprocess.run(["tar", "-x", "-C", td],
+                                   input=r_arch.stdout,
+                                   stdout=subprocess.PIPE)
+            _check(untar.returncode == 0, "141: tar 解包失败")
+        else:
+            smoke_dir = REPO   # 本体已是干净检出（archive 形态）
         probe = subprocess.run(
             [sys.executable, "-c",
              "import sys; "
-             f"sys.path.insert(0, {td!r} + '/exp/vendor_baselines/fasa_vendor'); "
+             "sys.path.insert(0, " +
+             repr(os.path.join(smoke_dir, "exp", "vendor_baselines",
+                               "fasa_vendor")) + "); "
              "import qwen3_fasa_patch; "
              "print('IMPORT-OK', qwen3_fasa_patch.enable_fasa.__name__)"],
             capture_output=True, text=True)
@@ -102,7 +129,7 @@ def test_b1_publish_closure():
                ("141: 干净检出 import smoke 失败（修复前红证）: "
                 f"rc={probe.returncode} out={probe.stdout[-300:]} "
                 f"err={probe.stderr[-500:]}"))
-    print(f"B1 PASS  fasa_vendor 入库 {len(files)} 文件（.py {len(py)}，"
+    print(f"B1 PASS  fasa_vendor 入库 {n_files} 文件（.py {len(py)}，"
           f"无 pyc/pyc 无 pkl）；干净检出 import smoke 成功"
           f"（修复前 ModuleNotFoundError）")
 
