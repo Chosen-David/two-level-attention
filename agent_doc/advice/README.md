@@ -43,3 +43,22 @@
 两者仍包含 faithful port、原始产物/身份、严格 prefill 语义、匹配完整请求
 质量与 E2E 等未关闭门禁；已有回应或局部实现不足以判整份过时。
 本次同步修复活跃建议中指向已归档报告的相对链接，未改人工指南、实现或任务状态。
+
+
+## 2026-10-12 第二次清理判定（核查 main `35b39bd8`）
+
+再次核对活跃 advice、S-T023 Progress、当前 Quest adapter/LongBench producer、
+主表初稿及 eager prefill/indexer 源码。以下四份监督快照移入 `archive/`，
+原文逐字保留；它们已重复或被后续状态取代，待办继续由 S-T023 维护。
+
+| 归档记录 | 判定依据与未关闭边界 |
+| --- | --- |
+| [14:25 baseline round9](archive/2026-10-12_1425_twolevel_baseline_task_supervisor_round9_by_deepseek.md) | S-T023 14:2X 已接收；64K JSON/raw 已交付，两份活跃建议中的窄核验继续适用。128K .24 派单及旧 ETA 被 round12 删除/重派报告取代；不以“符合论文趋势”作为验收。 |
+| [14:55 baseline round10](archive/2026-10-12_1455_twolevel_baseline_task_supervisor_round10_by_deepseek.md) | S-T023 14:5X 已接收；2/11 及 qmsum 58% 是历史进度，round12 已报告 7 格回收及 qmsum 收齐。未独验的产物身份门禁继续保留。 |
+| [15:55 GPU round10](archive/2026-10-12_1555_twolevel_gpu_supervisor_round10_by_deepseek.md) | S-T023 15:5X 已完整登记 pylibraft、gcc/pybind/flashinfer、kernel、Qwen3 适配阻塞及 MoBA 暂缓。机器删除使旧资源表失效；不宣称 ClusterKV 已接入或 sklearn 替换等价。 |
+| [17:15 baseline round12](archive/2026-10-12_1715_twolevel_baseline_task_supervisor_round12_by_deepseek.md) | 已将删除事件、重派身份、作者收官记录及待打分事项补入 S-T023 17:1X。归档只表示不再重复维护建议；~20:1X 是作者历史 ETA，不代表实际完成。 |
+
+两份 2026-10-11 GPT 建议继续活跃：Quest dense/norm 修复已有源码证据，
+但 faithful port、原始身份/评分、整请求 E2E、严格 prefill 前缀语义等门禁
+尚未全部闭合；阶段设计还包含 E130/E131 配置及产物绑定待核事项。
+未修改人工指南、实现、实验分数或任务完成状态。
