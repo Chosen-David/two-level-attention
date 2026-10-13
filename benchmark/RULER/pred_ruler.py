@@ -227,25 +227,34 @@ def main():
             raise RuntimeError(
                 "method=minference_vendor 需要 --minference_config_path "
                 "指向 pattern json（如 best_pattern_qwen3_8b.json）")
-        # 149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）：入口
-        # 加载期单次冻结 pattern 内容身份（与 adapter 读 config_path JSON
-        # 同一窗口）——treatment 名尾段 _cfg<sha8> 消费冻结值，name 与
-        # runtime 共用同一批 bytes（142 同款单次冻结）。
+        # 149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd + C+ 批
+        # 并发残余）：入口加载期单次冻结 pattern 完整内容身份快照（sha8
+        # + raw bytes + 解析后 JSON）——treatment 名尾段 _cfg<sha8> 消费
+        # 冻结值；adapter（enable_minference）同样消费冻结对象构建
+        # best_pattern，不再二次 open 可变 config_path（旧实现窗口内
+        # 源被替换则 name 绑 A、runtime 读 B，与 142 同构）。
         freeze_minference_pattern_sha8(args)
+        frozen_snap = getattr(args, "_minference_pattern_frozen", None)
         n_patched = enable_minference(
             model,
             is_search=False,
             config_path=cfg_path,
             starting_layer=getattr(args, "minference_starting_layer", -1),
+            frozen_pattern=(frozen_snap.pattern
+                            if frozen_snap is not None else None),
         )
     elif args.method == "fasa_vendor":
         # FASA（ICLR 2026 frequency-aware sparse attention）B 轨官方源码
         # 复用——qwen3_fasa_patch.py 仅接口胶水，fasa_utils.py 与官方
         # utils.py 逐字节一致（constructe_adaptive_selection /
         # core_module_with_padding_old）。官方解码剪枝相对路径依赖
-        # dimension_rankings/<model>/<dataset>_agreement.pkl 且 CWD 无关
-        # （constructe_adaptive_selection 硬编码相对路径），故把 Phase 1
-        # 校准产物从 vendor 目录拷贝到 REPO 根，并临时切 CWD 保证解析。
+        # dimension_rankings/<model>/<dataset>_agreement.pkl（相对 CWD
+        # 解析）——C+ 批 142 并发残余修复后，stage 物化目标是内容寻址
+        # 进程私有目录 dimension_rankings_staged/<sha8>/（共享固定路径
+        # 下并发首 stage 不同内容会后者覆盖前者、先到进程的官方 loader
+        # 读到后者内容），adapter（enable_fasa）调官方函数前把 CWD 切
+        # 到 staged 根（try/finally 恢复），官方相对路径即解析到内容
+        # 寻址副本；旧 REPO 根 dimension_rankings/ 不再被读写。
         vendor_dir = os.path.join(
             REPO, "exp", "vendor_baselines", "fasa_vendor")
         if vendor_dir not in sys.path:
@@ -259,24 +268,20 @@ def main():
         # sparse_attn/info.py 的 142 三函数（与 LongBench 入口、
         # treatment 名三方同源）：agreement 源目录 = --fasa_agreement_dir
         # （默认 'dimension_rankings' 相对 vendor 目录解析，向后兼容）；
-        # 目标已存在时源/目标 SHA256 对比，stale 目标 fail-closed。
-        dst_agr = stage_fasa_agreement(args, REPO)
-        cwd_bak = os.getcwd()
-        os.chdir(REPO)
-        try:
-            n_patched = enable_fasa(
-                model,
-                agreement_dir=os.path.dirname(dst_agr),
-                model_name=args.model,
-                dataset_name=fasa_dataset,
-                budget=getattr(args, "fasa_budget", 1024),
-                threshold_ratio=getattr(args, "fasa_threshold_ratio", 0.8),
-                min_k=getattr(args, "fasa_min_k", 16),
-                max_k=getattr(args, "fasa_max_k", 16),
-                mode=getattr(args, "fasa_mode", "topk"),
-            )
-        finally:
-            os.chdir(cwd_bak)
+        # 内容寻址私有目标已存在时源/目标 SHA256 对比（被篡改/损坏的
+        # stale 目标）fail-closed。
+        staged_root = stage_fasa_agreement(args, REPO)
+        n_patched = enable_fasa(
+            model,
+            agreement_dir=staged_root,
+            model_name=args.model,
+            dataset_name=fasa_dataset,
+            budget=getattr(args, "fasa_budget", 1024),
+            threshold_ratio=getattr(args, "fasa_threshold_ratio", 0.8),
+            min_k=getattr(args, "fasa_min_k", 16),
+            max_k=getattr(args, "fasa_max_k", 16),
+            mode=getattr(args, "fasa_mode", "topk"),
+        )
     else:
         n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:
