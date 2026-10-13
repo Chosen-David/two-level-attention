@@ -132,8 +132,13 @@
                         model_config_closure=false 降级标注，有值 →
                         bound/true（不虚报不漏报）。
   061 纠偏消费：
-    R1 三份真实 128K manifest → effective=null + not_effective +
-                        target/correction 双 SHA 绑定（不脑补 2.0/4.0）；
+    R1 双形态（138 重发布归档后）：mavg/aavg 真实 128K manifest →
+                        effective=null + not_effective + target/correction
+                        双 SHA 绑定（不脑补 2.0/4.0）；fullkv manifest 已
+                        被 e116i-generation-v3 合法重发布（run
+                        20261013114511，producer_receipt/4.0）——旧 057
+                        纠偏按 138 归档（固定别名旁移，内容不动）→ 透传
+                        producer_receipt/4.0；
     R2 无旁挂透传       → manifest 原值 + manifest_declared_no_provenance；
     R3 target hash 失配 → SystemExit fail-closed；
     R4 128K analyzer 接线：三臂全纠偏 → 汇总通过 +
@@ -1473,11 +1478,20 @@ def test_S4_config_closure_negatives(base):
 # ================================================================ 061
 
 def test_R1_real_128k_corrections():
-    """R1：三份真实 128K manifest 旁挂纠偏 → 解析入口返回
-    effective=null + operator_declared_not_effective + 双 SHA 绑定
-    （不得是 2.0，不脑补 4.0）。"""
+    """R1（061 纠偏消费；138 重发布归档后双形态）：
+    - mavg/aavg：旁挂纠偏 → 解析入口返回 effective=null +
+      operator_declared_not_effective + target/correction 双 SHA 绑定
+      （不得是 2.0，不脑补 4.0）——原有断言逐位保持。
+    - fullkv：manifest 已被 e116i-generation-v3 合法重发布（run
+      20261013114511，run_identity.yarn_factor=4.0 / provenance=
+      producer_receipt）。旧 057 纠偏绑定的 target_manifest_sha256=
+      0b7f9a70... 指向旧 manifest，resolver 按 061 纪律 fail-closed 拒收
+      ——按 GPT 审计 TL-E119-SIDECAR-REBASE-138 方案「不改绑」：过期
+      sidecar 从固定别名旁移到版本化归档路径（内容字节不动），
+      固定别名不复存在 → 透传 manifest 原值（producer_receipt/4.0，
+      生产者证据闭包，不脑补）。同时核验归档文件在位、别名已空。"""
     results = os.path.join(REPO, "exp", "trace", "results")
-    for arm in ("mavg", "fullkv", "aavg"):
+    for arm in ("mavg", "aavg"):
         mp = os.path.join(results,
                           f"e119_ruler128k_formal_{arm}.json.manifest.json")
         res = resolve_manifest_yarn_identity(mp)
@@ -1490,9 +1504,34 @@ def test_R1_real_128k_corrections():
             c["correction_version"] == "yarn-identity-057-v1" and \
             c["target_manifest_sha256"] == _sha(mp) and \
             c["correction_sha256"] == _sha(c["correction_path"]), (arm, c))
-    print("R1 PASS  三份真实 128K manifest → effective=null + "
-          "operator_declared_not_effective + target/correction 双 SHA "
-          "绑定（旧 2.0 不再当 effective，不脑补 4.0）")
+    # fullkv：138 重发布后透传（producer_receipt / 4.0）
+    mp_fullkv = os.path.join(results,
+                             "e119_ruler128k_formal_fullkv.json"
+                             ".manifest.json")
+    res = resolve_manifest_yarn_identity(mp_fullkv)
+    _check(res["correction"] is None,
+           ("138: fullkv 固定别名应无旁挂纠偏（已归档）", res))
+    _check(res["effective_yarn_factor"] == 4.0,
+           ("138: fullkv 透传 manifest 原值应为 4.0（重发布 producer "
+            "receipt）", res))
+    _check(res["yarn_factor_provenance"] == "producer_receipt",
+           ("138: fullkv provenance 应为 producer_receipt", res))
+    _check(res["manifest_run_identity_yarn_factor"] == 4.0, res)
+    # 归档文件在位（版本化路径）且内容与归档时逐字节一致（绑定旧
+    # manifest SHA 0b7f9a70... 的历史事实原样保留，不改绑不删证据）
+    arch = os.path.join(results,
+                        "e119_yarn_correction_archive_20261010_fullkv.json")
+    _check(os.path.isfile(arch) and not os.path.isfile(
+        manifest_correction_path_for(mp_fullkv)),
+        ("138: 归档文件应在位且固定别名应为空", arch))
+    doc = json.load(open(arch))
+    _check(doc["target_manifest_sha256"].startswith("0b7f9a70"),
+           ("138: 归档 sidecar 应保留旧 manifest 绑定（历史证据不改写）",
+            doc.get("target_manifest_sha256")))
+    print("R1 PASS  mavg/aavg 旁挂纠偏 → effective=null + not_effective + "
+          "双 SHA 绑定（旧 2.0 不再当 effective，不脑补 4.0）；fullkv "
+          "138 重发布归档后透传 → producer_receipt/4.0（归档在位、别名"
+          "已空、旧绑定 SHA 原样保留）")
 
 
 def test_R2_passthrough_no_correction(base):

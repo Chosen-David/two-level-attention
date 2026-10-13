@@ -2,7 +2,6 @@
 
 import os
 import re
-import shutil
 from datasets import load_dataset
 import torch
 import json
@@ -41,6 +40,9 @@ from sparse_attn.metrics import get_metrics
 from sparse_attn.info import get_method_name_with_info, \
     truncate_output_name_keep_hash, get_treatment_manifest_json, \
     gate_output_treatment_identity, resolve_treatment_snapshot
+# 142（TL-FASA-CALIBRATION-IDENTITY）：FASA agreement 源/目标身份的
+# 唯一 staging 口径（与 RULER 入口、treatment 名三方同源）。
+from sparse_attn.info import stage_fasa_agreement
 # 【095 修复（GPT 审计 2026-10-12_0527）】TLI_E127_FAST=1 的 gather 路径把
 # 三类契约违规延迟到 GPU 端错误标志，须由本入口在每样本生成段边界消费
 # ——guard 退出校验 raise 必须先于 record 构造/append 与任何落盘。
@@ -548,25 +550,20 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
         sys.path.insert(0, vendor_dir)
         from qwen3_fasa_patch import enable_fasa
         fasa_dataset = getattr(args, "fasa_dataset", "qasper")
-        src_agr = os.path.join(
-            vendor_dir, "dimension_rankings", args.model,
-            f"{fasa_dataset}_agreement.pkl")
-        dst_agr = os.path.join(
-            repo, "dimension_rankings", args.model,
-            f"{fasa_dataset}_agreement.pkl")
-        if not os.path.isfile(src_agr):
-            raise RuntimeError(
-                f"method=fasa_vendor 校准产物缺失: {src_agr}"
-                f"（先跑 qwen3_identify_fre.py + convert_agreement.py）")
-        if not os.path.isfile(dst_agr):
-            os.makedirs(os.path.dirname(dst_agr), exist_ok=True)
-            shutil.copy2(src_agr, dst_agr)
+        # 142（TL-FASA-CALIBRATION-IDENTITY，GPT 审计 B 批）：此前
+        # --fasa_agreement_dir 注册后从未被消费、源/目标硬编码且「目标
+        # 已存在时不比较」→ 不同校准内容静默共享同一 treatment 身份。
+        # 现统一走 sparse_attn/info.py 的 142 三函数（两入口与 treatment
+        # 名三方同源）：agreement 源目录 = --fasa_agreement_dir（默认
+        # 'dimension_rankings' 相对 vendor 目录解析，向后兼容）；目标
+        # 已存在时源/目标 SHA256 对比，stale 目标 fail-closed。
+        dst_agr = stage_fasa_agreement(args, repo)
         cwd_bak = os.getcwd()
         os.chdir(repo)  # constructe_adaptive_selection 硬编码相对路径 dimension_rankings/
         try:
             n_patched = enable_fasa(
                 model,
-                agreement_dir=os.path.join(repo, "dimension_rankings"),
+                agreement_dir=os.path.dirname(dst_agr),
                 model_name=args.model, dataset_name=fasa_dataset,
                 budget=getattr(args, "fasa_budget", 1024),
                 threshold_ratio=getattr(args, "fasa_threshold_ratio", 0.8),

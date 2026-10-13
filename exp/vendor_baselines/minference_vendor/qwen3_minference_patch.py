@@ -23,6 +23,11 @@
 口径（对齐 MInference 论文）：prefill 动态稀疏 + decode dense KV；starting_layer 之前
 的浅层 dense。is_search=True 时在线搜 Qwen3-8B 自己的 pattern（32 层×40 头）写 JSON，
 is_search=False 时读 best_pattern 正式跑 sparse。
+
+135/136（GPT 审计 B 批 fail-closed）：官方 kernel 按无 padding + Q_len==K_len
+方阵 + 单段全量 prefill 协议假设——wrapper 在进入稀疏 prefill 分支前显式拒绝
+非平凡 padding mask（TL-MINF-PADMASK-135）与 chunked prefill with prefix cache
+（TL-MINF-CHUNKCACHE-136），不触碰官方 kernel 本体（宁拒绝不静默错输出）。
 """
 import json
 import os
@@ -33,6 +38,79 @@ from transformers.models.llama.modeling_llama import repeat_kv
 from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention, apply_rotary_pos_emb
 
 from minference.modules.minference_forward import minference_prefill_forward
+
+
+# ---- 135/136（TL-MINF-PADMASK-135 / TL-MINF-CHUNKCACHE-136，GPT 审计
+# B 批）：vendor 适配层 fail-closed 守卫 ----
+# 审计复现的两个静默错误输出路径（官方 kernel 均按「无 padding + Q_len==K_len
+# 方阵 + 单段全量 prefill」协议假设，不校验也不报错）：
+#   135：attention_mask（padding）进 prefill_kwargs 后稀疏层
+#        （vertical_and_slash / block_sparse）与浅层 flash_attn_func 均不
+#        消费 → padding 改变有效 token 输出（被 pad 行错读全 KV）；
+#   136：仅按 q_len==1 分 decode，q_len>1 且 cache 已有 token（chunked
+#        prefill with prefix cache）仍走稀疏 prefill，方阵协议错位。
+# 本层只加显式拒绝（raise），不触碰官方 kernel 本体——静默错误输出比
+# 硬失败更危险，宁拒绝不虚标。
+
+def _has_nontrivial_padding(attention_mask):
+    """135：检测 4D/2D attention mask 中超出固有因果结构的被屏蔽位置。
+
+    4D mask（transformers 4.56 create_causal_mask 产物，[B, 1, q, kv]）
+    自带因果上三角屏蔽，不能简单 `not mask.all()`（纯因果 eager prefill
+    会误杀）。无 padding 的全量 prefill（q==kv）中最后一个 query 行全
+    位置可见——只要最后一行存在被屏蔽位置即 padding（右 padding 屏蔽
+    尾部列 / 左 padding 屏蔽前缀列，末行必见；左 padding 下前缀列对
+    所有行均屏蔽）。mask 语义：float 加性（0=可见，非 0=屏蔽）或
+    bool（True=可见，transformers 新 masking 标准 / torch SDPA 语义）。
+    2D mask（[B, kv_len]，1/True=可见）罕见路径下按整张判定。
+    """
+    if attention_mask is None:
+        return False
+    m = attention_mask
+    if not torch.is_tensor(m):
+        return True  # 非张量 mask（罕见/未预期协议）——一律视为非平凡
+    if m.dtype == torch.bool:
+        masked = ~m          # 新 masking 标准 / SDPA：True=可见
+    elif m.is_floating_point():
+        masked = (m != 0)    # float 加性：0=可见，非 0（dtype min）=屏蔽
+    else:
+        masked = (m == 0)    # 老式 int 0/1 掩码（2D）：1=可见，0=屏蔽
+    if m.ndim == 4:
+        return bool(masked[:, :, -1, :].any().item())
+    if m.ndim == 2:
+        return bool(masked.any().item())
+    # 3D/5D 等未预期形态——同样视为非平凡，交给调用方 raise
+    return True
+
+
+def _prefill_guard_violation(q_len, past_key_values, attention_mask):
+    """135/136 单一守卫入口：返回 None=放行，或 (审计编号, 中文报错)。
+
+    136 检测点刻意在 past_key_values.update() 之前调用（此时
+    get_seq_length() 是更新前的长度，等价于「进本层前 cache 已有
+    token」——HF cache update 发生在 attention 内部，若更新后再判
+    get_seq_length()>0 则对首段全量 prefill 也恒真，会误杀）。
+    """
+    # 136：chunked prefill with prefix cache——更新前 cache 已有 token
+    # 且本次仍输入 q_len>1 → 下游 kernel 按 Q_len==K_len 方阵协议错位。
+    if q_len > 1 and past_key_values is not None \
+            and past_key_values.get_seq_length() > 0:
+        return ("TL-MINF-CHUNKCACHE-136",
+                f"q_len={q_len} > 1 且 past_key_values 更新前已缓存 "
+                f"{past_key_values.get_seq_length()} 个 token——chunked "
+                f"prefill with prefix cache 不被 MInference vendor kernel "
+                f"的 Q_len==K_len 方阵协议支持（稀疏层 vertical+slash 按方阵"
+                f"取对角线，错位即静默错误输出），fail-closed 拒绝。请关闭 "
+                f"prefix cache 或整段一次性 prefill。")
+    # 135：非平凡 padding mask——稀疏层与浅层 flash 均不消费 mask。
+    if q_len > 1 and _has_nontrivial_padding(attention_mask):
+        return ("TL-MINF-PADMASK-135",
+                "attention_mask 含超出固有因果结构的被屏蔽位置（padding）"
+                "——非平凡 padding mask 不被 MInference 稀疏 prefill 支持"
+                "（sparse kernel 与浅层 flash_attn_func 均不消费 mask，被 "
+                "pad 行会错读全部 KV token 静默产出错误输出），fail-closed "
+                "拒绝。请逐样本单条输入（无 padding）运行。")
+    return None
 
 
 def _qwen3_minference_wrapper(
@@ -62,6 +140,14 @@ def _qwen3_minference_wrapper(
             cache_position,
             **kwargs,
         )
+
+    # ---- 135/136 fail-closed 守卫（详见 _prefill_guard_violation）----
+    # 位置在 decode 分支之后、cache update 之前：136 须用更新前
+    # seq_length 判定，135 在进入稀疏 prefill 分支前拒绝 padding。
+    violation = _prefill_guard_violation(q_len, past_key_values, attention_mask)
+    if violation is not None:
+        raise RuntimeError(
+            f"[MINFERENCE-VENDOR-FAIL-CLOSED {violation[0]}] {violation[1]}")
 
     # ---- prefill：MInference 官方 sparse（复用 Qwen3 原生 qkv + QK-Norm + rope）----
     bsz, _, _ = hidden_states.size()

@@ -4,6 +4,7 @@ import io
 import json
 import os
 import re
+import shutil
 
 import torch
 
@@ -469,6 +470,94 @@ def truncate_output_name_keep_hash(dataset_prefix, method_name, t,
     return f"{dataset_prefix}-{readable[:max(room, 0)]}...{hash_seg}-{t}"
 
 
+# ---- 142（TL-FASA-CALIBRATION-IDENTITY-142，GPT 审计 B 批）----
+# 修复前缺陷：--fasa_agreement_dir 在 sparse_attn/arguments.py 注册后
+# 从未被任何入口消费（全仓仅定义一处），pred.py / pred_ruler.py 的
+# fasa_vendor 分支硬编码 vendor 内 dimension_rankings/ 为源、仓库根
+# dimension_rankings/ 为目标，且「目标已存在时不比较源/目标」——
+# 不同校准内容（源被替换/重标定）会静默复用同一份 stale 目标并共享
+# 同一 treatment 身份。以下三个函数是 FASA agreement 身份的唯一解析
+# 口径（LongBench/RULER 两入口与 treatment 名三方同源）：
+
+def resolve_fasa_agreement_path(args, repo_root=None):
+    """142：--fasa_agreement_dir 接线——FASA agreement 源文件路径唯一口径。
+
+    - 绝对路径：直接作为 agreement 源目录（自定义校准产物位置）；
+    - 相对路径：相对 fasa_vendor 目录解析——默认值 'dimension_rankings'
+      即原硬编码源 exp/vendor_baselines/fasa_vendor/dimension_rankings/，
+      默认行为逐位向后兼容。
+    返回 <源目录>/<model>/<dataset>_agreement.pkl（不校验存在性——
+    存在性与 SHA 对比由 stage_fasa_agreement / 名字消费方按各自时序
+    fail closed，本函数只负责路径身份单一事实源）。"""
+    if repo_root is None:
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    vendor_dir = os.path.join(
+        repo_root, "exp", "vendor_baselines", "fasa_vendor")
+    agr_dir = getattr(args, "fasa_agreement_dir", None) or "dimension_rankings"
+    src_root = agr_dir if os.path.isabs(agr_dir) \
+        else os.path.join(vendor_dir, agr_dir)
+    fasa_dataset = getattr(args, "fasa_dataset", "qasper")
+    return os.path.join(src_root, args.model,
+                        f"{fasa_dataset}_agreement.pkl")
+
+
+def _fasa_agreement_sha8(args):
+    """142：agreement 源文件内容 SHA256 前 8 位（内容身份，与
+    checkout/路径无关）——进 fasa_vendor treatment 名尾段；文件缺失/
+    不可读 fail closed（名字必须绑定实际校准内容，拒绝无产物空跑）。"""
+    path = resolve_fasa_agreement_path(args)
+    try:
+        with open(path, "rb") as f:
+            raw = f.read()
+    except OSError as e:
+        raise SystemExit(
+            f"[GATE-FAIL] 142: FASA agreement 源文件不可读（{path} → "
+            f"{type(e).__name__}: {e}）——treatment 名必须绑定实际校准"
+            f"内容（先跑 qwen3_identify_fre.py + convert_agreement.py），"
+            f"fail closed")
+    return hashlib.sha256(raw).hexdigest()[:8]
+
+
+def stage_fasa_agreement(args, repo_root=None):
+    """142：把 agreement 源物化为仓库根工作副本并返回目标绝对路径。
+
+    官方 constructe_adaptive_selection 硬编码相对路径
+    dimension_rankings/（与 CWD 无关地拼接 <model>/<dataset>），故源
+    （vendor 目录或 --fasa_agreement_dir 自定义位置）须先物化到仓库根
+    dimension_rankings/。修复前「目标已存在时不比较」→ stale 目标静默
+    复用；现目标已存在时做源/目标字节 SHA256 全量对比，不一致
+    SystemExit fail closed（中文提示 stale 目标，须先清理或重新标定）。"""
+    if repo_root is None:
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src_agr = resolve_fasa_agreement_path(args, repo_root)
+    fasa_dataset = getattr(args, "fasa_dataset", "qasper")
+    dst_agr = os.path.join(repo_root, "dimension_rankings", args.model,
+                           f"{fasa_dataset}_agreement.pkl")
+    if not os.path.isfile(src_agr):
+        raise SystemExit(
+            f"[GATE-FAIL] 142: FASA 校准产物缺失: {src_agr}"
+            f"（--fasa_agreement_dir 解析所得；先跑 qwen3_identify_fre.py"
+            f" + convert_agreement.py），fail closed")
+    if os.path.isfile(dst_agr):
+        with open(src_agr, "rb") as f:
+            src_sha = hashlib.sha256(f.read()).hexdigest()
+        with open(dst_agr, "rb") as f:
+            dst_sha = hashlib.sha256(f.read()).hexdigest()
+        if src_sha != dst_sha:
+            raise SystemExit(
+                f"[GATE-FAIL] 142: FASA agreement 目标与源内容不一致"
+                f"（stale 目标）：\n  源   {src_agr}\n  sha256 {src_sha}\n"
+                f"  目标 {dst_agr}\n  sha256 {dst_sha}\n"
+                f"目标 dimension_rankings/ 下是旧校准内容却被静默复用，"
+                f"不同校准内容不得共享同一 treatment 身份——请先删除/更名"
+                f" stale 目标（或把 --fasa_agreement_dir 指向与目标一致的"
+                f" 源），fail closed")
+        return dst_agr
+    os.makedirs(os.path.dirname(dst_agr), exist_ok=True)
+    shutil.copy2(src_agr, dst_agr)
+    return dst_agr
+
+
 def get_method_name_with_info(args, snapshot=None):
     # 081：snapshot 提供时 tli 名的 _h<hash10> 段从冻结 manifest_json
     # 派生（与 sidecar/receipt 同源）；非 tli 分支不消费 snapshot。
@@ -492,11 +581,18 @@ def get_method_name_with_info(args, snapshot=None):
         # 不同校准产物/预算 = 不同 treatment，防同名互覆（与 minference
         # config_path 编码同哲学）。fasa_mode 默认 topk（官方 static 口径，
         # dynamic 消融单独编码）。
+        # 142（TL-FASA-CALIBRATION-IDENTITY，GPT 审计 B 批）：参数段只
+        # 编码「读了哪份校准配置」，不绑定「agreement 文件实际内容」——
+        # 不同校准内容（同 dataset 名下重新标定/换模型重标定）共享同一
+        # treatment 身份。修复=追加 agreement 源文件内容 SHA256 前 8 位
+        # 尾段 `_agr<sha8>`（内容身份，与 checkout/路径无关），追加段
+        # 不改既有语义字段（既有文件名不追溯改动）。
         fasa_dataset = getattr(args, "fasa_dataset", "qasper")
         return (f"fasa_vendor_{fasa_dataset}_b{getattr(args, 'fasa_budget', 1024)}"
                 f"_t{getattr(args, 'fasa_threshold_ratio', 0.8):g}"
                 f"_k{getattr(args, 'fasa_min_k', 16)}-{getattr(args, 'fasa_max_k', 16)}"
-                f"_{getattr(args, 'fasa_mode', 'topk')}")
+                f"_{getattr(args, 'fasa_mode', 'topk')}"
+                f"_agr{_fasa_agreement_sha8(args)}")
     elif args.method == "twi":
         return f"twi_{args.twi_block_size}_{args.twi_level1_topk}_{args.twi_level2_topp}"
     elif args.method == "tia":
