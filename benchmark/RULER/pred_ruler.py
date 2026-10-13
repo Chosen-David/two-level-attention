@@ -259,24 +259,20 @@ def main():
         # sparse_attn/info.py 的 142 三函数（与 LongBench 入口、
         # treatment 名三方同源）：agreement 源目录 = --fasa_agreement_dir
         # （默认 'dimension_rankings' 相对 vendor 目录解析，向后兼容）；
-        # 目标已存在时源/目标 SHA256 对比，stale 目标 fail-closed。
-        dst_agr = stage_fasa_agreement(args, REPO)
-        cwd_bak = os.getcwd()
-        os.chdir(REPO)
-        try:
-            n_patched = enable_fasa(
-                model,
-                agreement_dir=os.path.dirname(dst_agr),
-                model_name=args.model,
-                dataset_name=fasa_dataset,
-                budget=getattr(args, "fasa_budget", 1024),
-                threshold_ratio=getattr(args, "fasa_threshold_ratio", 0.8),
-                min_k=getattr(args, "fasa_min_k", 16),
-                max_k=getattr(args, "fasa_max_k", 16),
-                mode=getattr(args, "fasa_mode", "topk"),
-            )
-        finally:
-            os.chdir(cwd_bak)
+        # 内容寻址私有目标已存在时源/目标 SHA256 对比（被篡改/损坏的
+        # stale 目标）fail-closed。
+        staged_root = stage_fasa_agreement(args, REPO)
+        n_patched = enable_fasa(
+            model,
+            agreement_dir=staged_root,
+            model_name=args.model,
+            dataset_name=fasa_dataset,
+            budget=getattr(args, "fasa_budget", 1024),
+            threshold_ratio=getattr(args, "fasa_threshold_ratio", 0.8),
+            min_k=getattr(args, "fasa_min_k", 16),
+            max_k=getattr(args, "fasa_max_k", 16),
+            mode=getattr(args, "fasa_mode", "topk"),
+        )
     else:
         n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:

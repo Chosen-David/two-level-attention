@@ -558,28 +558,25 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
         sys.path.insert(0, vendor_dir)
         from qwen3_fasa_patch import enable_fasa
         fasa_dataset = getattr(args, "fasa_dataset", "qasper")
-        # 142（TL-FASA-CALIBRATION-IDENTITY，GPT 审计 B 批）：此前
-        # --fasa_agreement_dir 注册后从未被消费、源/目标硬编码且「目标
-        # 已存在时不比较」→ 不同校准内容静默共享同一 treatment 身份。
-        # 现统一走 sparse_attn/info.py 的 142 三函数（两入口与 treatment
-        # 名三方同源）：agreement 源目录 = --fasa_agreement_dir（默认
-        # 'dimension_rankings' 相对 vendor 目录解析，向后兼容）；目标
-        # 已存在时源/目标 SHA256 对比，stale 目标 fail-closed。
-        dst_agr = stage_fasa_agreement(args, repo)
-        cwd_bak = os.getcwd()
-        os.chdir(repo)  # constructe_adaptive_selection 硬编码相对路径 dimension_rankings/
-        try:
-            n_patched = enable_fasa(
-                model,
-                agreement_dir=os.path.dirname(dst_agr),
-                model_name=args.model, dataset_name=fasa_dataset,
-                budget=getattr(args, "fasa_budget", 1024),
-                threshold_ratio=getattr(args, "fasa_threshold_ratio", 0.8),
-                min_k=getattr(args, "fasa_min_k", 16),
-                max_k=getattr(args, "fasa_max_k", 16),
-                mode=getattr(args, "fasa_mode", "topk"))
-        finally:
-            os.chdir(cwd_bak)
+        # 142（TL-FASA-CALIBRATION-IDENTITY，GPT 审计 B 批 + C+ 批并发
+        # 残余）：--fasa_agreement_dir 接线经 sparse_attn/info.py 的 142
+        # 三函数（两入口与 treatment 名三方同源）；物化目标是内容寻址
+        # 进程私有目录 dimension_rankings_staged/<sha8>/（共享固定路径
+        # 下并发首 stage 不同内容会后者覆盖前者、先到进程的官方 loader
+        # 读到后者内容——错绑）。stage 返回 staged 根，adapter（enable_
+        # fasa）调官方 constructe_adaptive_selection 前把 CWD 切到该
+        # 根（try/finally 恢复），官方相对路径 dimension_rankings/ 即解
+        # 析到内容寻址副本；旧仓库根 dimension_rankings/ 不再被读写。
+        staged_root = stage_fasa_agreement(args, repo)
+        n_patched = enable_fasa(
+            model,
+            agreement_dir=staged_root,
+            model_name=args.model, dataset_name=fasa_dataset,
+            budget=getattr(args, "fasa_budget", 1024),
+            threshold_ratio=getattr(args, "fasa_threshold_ratio", 0.8),
+            min_k=getattr(args, "fasa_min_k", 16),
+            max_k=getattr(args, "fasa_max_k", 16),
+            mode=getattr(args, "fasa_mode", "topk"))
     else:
         n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:

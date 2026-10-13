@@ -15,6 +15,7 @@
   - 剪枝口径：layer_idx>0（前 1 层 dense，对齐官方 qwen_df.py 的
     `query_states.shape[2] == 1 and self.layer_idx > 0`）。
 """
+import os
 import types
 from typing import Tuple
 
@@ -97,12 +98,30 @@ def enable_fasa(
     max_k: int = 16,
     mode: str = "topk",
 ) -> int:
-    """把 model 内全部 Qwen3Attention 绑定 FASA 剪枝 forward。返回 patch 层数。"""
-    records = constructe_adaptive_selection(
-        model_name, budget, threshold_ratio, min_k, max_k,
-        dataset_name=dataset_name,
-        mode=mode,
-    )
+    """把 model 内全部 Qwen3Attention 绑定 FASA 剪枝 forward。返回 patch 层数。
+
+    agreement_dir = 内容寻址 staged 根（sparse_attn/info.py 的
+    stage_fasa_agreement 返回值，其下有 dimension_rankings/<model>/
+    <dataset>_agreement.pkl）。官方 constructe_adaptive_selection 硬编码
+    相对路径 dimension_rankings/（相对 CWD），故此处把 CWD 切到
+    agreement_dir 后再调官方函数（try/finally 恢复，不污染进程后续
+    相对路径操作）——官方相对路径即解析到内容寻址副本。
+
+    142 并发残余修复（C+ 批）：不同校准内容 stage 到不同
+    dimension_rankings_staged/<sha8>/ 目录，跨进程「A 先 replace、B 后
+    replace 覆盖、A 的官方 loader 读到 B」结构性不可能；旧仓库根
+    dimension_rankings/ 共享固定路径不再被本路径读到（历史产物原地
+    保留，与本函数无关）。"""
+    cwd_bak = os.getcwd()
+    os.chdir(agreement_dir)
+    try:
+        records = constructe_adaptive_selection(
+            model_name, budget, threshold_ratio, min_k, max_k,
+            dataset_name=dataset_name,
+            mode=mode,
+        )
+    finally:
+        os.chdir(cwd_bak)
     n_patched = 0
     layer_id = 0
 

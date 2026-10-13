@@ -487,20 +487,37 @@ def truncate_output_name_keep_hash(dataset_prefix, method_name, t,
 # 8 位段 + raw bytes），挂 args._fasa_staged_snapshot；runtime records
 # 与输出名共用同一 snapshot（物化目标从快照 bytes 原子写出——临时文件 +
 # os.replace；命名侧消费冻结 sha8，不再重新打开源）。
+#
+# ---- 142 并发残余（GPT advice C+ 批，2026-10-14）----
+# C 批修复后单次运行内三方同源，但物化目标仍是仓库根共享固定路径
+# dimension_rankings/<model>/<dataset>_agreement.pkl——两个不同内容的
+# 源并发首次 stage 同一共享目标时，双方都通过 isfile 不存在检查
+# （stale 拒绝分支不触发），A 先 os.replace、B 后 os.replace 覆盖 A →
+# A 进程 name/snapshot 绑 A、官方 loader 却读到 B（原子替换 ≠ 内容归属
+# 锁定；GPT 双进程 CPU 复现 + 主 AI 复跑红证确认）。修复（GPT 建议
+# 「内容寻址/进程私有不可变文件」口径）：物化目标改为内容寻址进程
+# 私有目录 dimension_rankings_staged/<sha8>/dimension_rankings/<model>/...
+# ——同内容双进程写同一路径但内容逐字节相同、os.replace 幂等无害；
+# 不同内容天然隔离到不同 sha8 目录，跨进程错绑结构性不可能。官方
+# loader 的 CWD 由 adapter（qwen3_fasa_patch.enable_fasa）切到私有
+# staged 根（见该函数），旧仓库根 dimension_rankings/ 共享固定路径
+# 不再被写入也不再被读到（历史产物原地保留，不删不动不读）。
 
 @dataclasses.dataclass(frozen=True)
 class FasaAgreementSnapshot:
     """142 reopen：stage 时刻单次读源冻结的 agreement 内容身份快照。
 
-    一次运行内 runtime（fasa_utils 读仓库根目标副本，目标由本快照
-    raw bytes 物化而来）与 treatment 名（_agr<sha8> 段）共用同一对象
-    ——stage 之后源文件再被替换也不影响本次运行的身份（name 恒等于
-    runtime 实际消费的内容）。frozen dataclass：属性不可再赋值。"""
+    一次运行内 runtime（fasa_utils 经 adapter chdir 读内容寻址目标
+    副本，目标由本快照 raw bytes 物化而来）与 treatment 名（_agr<sha8>
+    段）共用同一对象——stage 之后源文件再被替换也不影响本次运行的
+    身份（name 恒等于 runtime 实际消费的内容）。frozen dataclass：
+    属性不可再赋值。"""
     src_path: str    # stage 时解析出的源绝对路径（身份/报错口径）
-    dst_path: str    # 仓库根物化目标绝对路径
+    dst_path: str    # 内容寻址物化目标绝对路径（staged_root 下）
     sha256: str      # 源 bytes 完整 SHA256（stale 目标比对用同一值）
-    sha8: str        # 前 8 hex（treatment 名 _agr<sha8> 尾段）
+    sha8: str        # 前 8 hex（treatment 名 _agr<sha8> 尾段 + 目录段）
     raw: bytes       # stage 时刻的源 bytes（目标物化与身份共用同一批）
+    staged_root: str = ""   # 内容寻址 staged 根（adapter chdir 目标）
 
 
 def resolve_fasa_agreement_path(args, repo_root=None):
@@ -548,27 +565,36 @@ def _fasa_agreement_sha8(args):
 
 
 def stage_fasa_agreement(args, repo_root=None):
-    """142 + 142 reopen：单次读源冻结快照 + 原子物化，返回目标绝对路径。
+    """142 + 142 reopen + 142 并发残余：单次读源冻结快照 + 内容寻址
+    原子物化，返回 staged 根绝对路径（adapter chdir 目标）。
 
     官方 constructe_adaptive_selection 硬编码相对路径
-    dimension_rankings/（与 CWD 无关地拼接 <model>/<dataset>），故源
-    （vendor 目录或 --fasa_agreement_dir 自定义位置）须先物化到仓库根
-    dimension_rankings/。行为（B 批语义全部保持）：
-      - 目标已存在时源/目标字节 SHA256 全量对比，不一致 SystemExit
-        fail closed（stale 目标；比对两侧 = 冻结快照 bytes vs 目标
-        实读 bytes）；
-      - 目标不存在时物化（142 reopen：改临时文件 + os.replace 原子写，
-        内容 = 冻结快照 bytes——不再 shutil.copy2 二次读源）；
-      - 142 reopen：每次调用单次读源 bytes 构造 FasaAgreementSnapshot
-        挂 args._fasa_staged_snapshot——runtime records 与输出名共用
-        同一快照（stale 拒绝时不更新快照，args 保持上一次成功 stage
-        的身份）。"""
+    dimension_rankings/（相对 CWD 拼接 <model>/<dataset>），故源
+    （vendor 目录或 --fasa_agreement_dir 自定义位置）须先物化。C+ 批
+    起物化目标是内容寻址进程私有目录：
+      <repo_root>/dimension_rankings_staged/<sha8>/dimension_rankings/
+        <model>/<dataset>_agreement.pkl
+    （142 并发残余修复：旧共享固定路径 <repo_root>/dimension_rankings/
+    下，两进程并发首次 stage 不同内容时后者覆盖前者、前者的官方
+    loader 读到后者的内容——原子替换 ≠ 内容归属锁定。内容寻址下
+    同内容双进程写同一路径且内容逐字节相同、os.replace 幂等无害，
+    不同内容天然隔离，错绑结构性不可能。）行为：
+      - 私有目标已存在时源/目标字节 SHA256 全量对比，不一致
+        SystemExit fail closed（内容寻址目录被篡改/损坏的 stale
+        目标；比对两侧 = 冻结快照 bytes vs 目标实读 bytes）；
+      - 私有目标不存在时物化（临时文件 + os.replace 原子写，内容 =
+        冻结快照 bytes——绝不二次读源）；
+      - 每次调用单次读源 bytes 构造 FasaAgreementSnapshot 挂
+        args._fasa_staged_snapshot——runtime records 与输出名共用
+        同一快照（stale 拒绝时不更新快照，args 保持上一次成功
+        stage 的身份）；
+      - 旧仓库根 dimension_rankings/（共享固定路径）：不删不动不读
+        （历史产物原地保留）——官方 loader 的 CWD 由 adapter 切到
+        返回的 staged 根，旧路径不再可达。"""
     if repo_root is None:
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     src_agr = resolve_fasa_agreement_path(args, repo_root)
     fasa_dataset = getattr(args, "fasa_dataset", "qasper")
-    dst_agr = os.path.join(repo_root, "dimension_rankings", args.model,
-                           f"{fasa_dataset}_agreement.pkl")
     if not os.path.isfile(src_agr):
         raise SystemExit(
             f"[GATE-FAIL] 142: FASA 校准产物缺失: {src_agr}"
@@ -586,9 +612,15 @@ def stage_fasa_agreement(args, repo_root=None):
             f"内容（先跑 qwen3_identify_fre.py + convert_agreement.py），"
             f"fail closed")
     full_sha = hashlib.sha256(raw).hexdigest()
+    # 142 并发残余：物化目标 = 内容寻址进程私有目录（sha8 做目录段）
+    staged_root = os.path.join(repo_root, "dimension_rankings_staged",
+                               full_sha[:8])
+    dst_agr = os.path.join(staged_root, "dimension_rankings", args.model,
+                           f"{fasa_dataset}_agreement.pkl")
     snap = FasaAgreementSnapshot(
         src_path=src_agr, dst_path=dst_agr,
-        sha256=full_sha, sha8=full_sha[:8], raw=raw)
+        sha256=full_sha, sha8=full_sha[:8], raw=raw,
+        staged_root=staged_root)
     if os.path.isfile(dst_agr):
         try:
             with open(dst_agr, "rb") as f:
@@ -601,17 +633,20 @@ def stage_fasa_agreement(args, repo_root=None):
         if dst_sha != snap.sha256:
             raise SystemExit(
                 f"[GATE-FAIL] 142: FASA agreement 目标与源内容不一致"
-                f"（stale 目标）：\n  源   {src_agr}\n  sha256 {snap.sha256}\n"
+                f"（stale 目标，内容寻址目录被篡改/损坏）：\n"
+                f"  源   {src_agr}\n  sha256 {snap.sha256}\n"
                 f"  目标 {dst_agr}\n  sha256 {dst_sha}\n"
-                f"目标 dimension_rankings/ 下是旧校准内容却被静默复用，"
-                f"不同校准内容不得共享同一 treatment 身份——请先删除/更名"
-                f" stale 目标（或把 --fasa_agreement_dir 指向与目标一致的"
-                f" 源），fail closed")
+                f"dimension_rankings_staged/<sha8>/ 下应与内容逐字节对应，"
+                f"被静默复用的目标与源不符——请删除该 stale 目标后重跑，"
+                f"fail closed")
     else:
         os.makedirs(os.path.dirname(dst_agr), exist_ok=True)
         # 142 reopen：原子物化——临时文件 + os.replace（copy2 无锁非
         # 原子，窗口内半写目标可能被 runtime 读到）。内容 = 冻结快照
         # bytes（绝不二次读源——快照与物化目标逐字节一致）。
+        # 142 并发残余：同内容双进程并发写同一路径——tmp 名含 PID
+        # 互不覆盖、os.replace 幂等（双方内容逐字节相同）；A 后到
+        # isfile=True 时走上方 SHA 全量比对，同内容幂等通过。
         tmp_agr = f"{dst_agr}.tmp.{os.getpid()}"
         try:
             with open(tmp_agr, "wb") as f:
@@ -628,18 +663,40 @@ def stage_fasa_agreement(args, repo_root=None):
     # 142 reopen：冻结快照挂 args——命名（get_method_name_with_info 的
     # fasa 分支经 _fasa_agreement_sha8）与 runtime 共用同一内容身份。
     setattr(args, "_fasa_staged_snapshot", snap)
-    return dst_agr
+    return staged_root
+
+
+@dataclasses.dataclass(frozen=True)
+class MinferencePatternSnapshot:
+    """149 + 149 并发残余（C+ 批）：pattern JSON 内容身份冻结快照。
+
+    入口加载期单次读源构造：完整 sha256 + 8 位段 + raw bytes +
+    解析后的 JSON 对象。命名（_cfg<sha8> 段）与 adapter
+    （enable_minference 构建 best_pattern）共用同一冻结对象——
+    freeze 之后源 config_path 再被替换/删除都不影响本次运行的
+    身份与 runtime 实际消费的 pattern（name 恒等于 runtime 内容）。
+    frozen dataclass：属性不可再赋值。"""
+    config_path: str  # freeze 时解析出的 pattern JSON 路径（报错口径）
+    sha256: str       # pattern bytes 完整 SHA256（名字 _cfg<sha8> 段同源）
+    sha8: str         # 前 8 hex（treatment 名 _cfg<sha8> 尾段）
+    raw: bytes        # freeze 时刻的源 bytes（身份与内容共用同一批）
+    pattern: object = None  # json.loads(raw)（adapter 直接消费，不再 open）
 
 
 def freeze_minference_pattern_sha8(args):
-    """149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）：
-    入口加载期单次冻结 pattern JSON 内容 SHA256 前 8 位（142 同款
-    单次冻结）——挂 args._minference_pattern_sha8，命名侧优先消费
-    冻结值，与 adapter（qwen3_minference_patch enable_minference 读
-    config_path JSON）同一读点窗口。缺 config_path / 不可读一律
-    fail-closed SystemExit：pattern 内容是 treatment 身份的一部分，
-    MInference 无 config 直跑路径不存在（两入口在 enable 前同样
-    拒绝 None config）。"""
+    """149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）+ 149
+    并发残余（C+ 批）：入口加载期单次读源冻结完整 pattern 身份快照。
+
+    挂 args._minference_pattern_frozen（MinferencePatternSnapshot：sha8
+    + raw bytes + 解析后的 JSON 对象）——命名侧与 adapter
+    （qwen3_minference_patch enable_minference 构建 best_pattern）共用
+    同一冻结对象，adapter 不再二次 open 可变 config_path（旧实现
+    freeze 只存 hash、adapter 重新 open 载入 JSON——窗口内源被替换则
+    name 绑 A、runtime 读 B，与 142 同构）。缺 config_path / 不可读 /
+    畸形 JSON 一律 fail-closed SystemExit（畸形 JSON 的报错从
+    adapter 读点提前到入口 freeze 点）：pattern 内容是 treatment
+    身份的一部分，MInference 无 config 直跑路径不存在。返回 sha8
+    （签名不变，既有消费方兼容）。"""
     cfg_path = getattr(args, "minference_config_path", None)
     if not cfg_path:
         raise SystemExit(
