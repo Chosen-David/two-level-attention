@@ -38,6 +38,7 @@
 """
 import argparse
 import hashlib
+import json
 import os
 import sys
 import tempfile
@@ -108,7 +109,25 @@ def test_142_reopen_frozen_snapshot():
         os.makedirs(fake_repo, exist_ok=True)
 
         # --- stage：单次读源冻结快照 + 原子物化 ---
-        dst = stage_fasa_agreement(args, fake_repo)
+        # C+ 批（142 并发残余）：stage 返回内容寻址 staged 根，
+        # 物化目标在其下 dimension_rankings/<model>/<dataset>_agreement.pkl
+        staged_root = stage_fasa_agreement(args, fake_repo)
+        snap0 = getattr(args, "_fasa_staged_snapshot")
+        dst = snap0.dst_path
+        _check(staged_root == os.path.join(fake_repo,
+                                           "dimension_rankings_staged", sha8_a),
+               f"142 并发残余: staged 根应为内容寻址目录（尾段=源 A 的"
+               f" sha8）: {staged_root}")
+        _check(snap0.staged_root == staged_root,
+               "142 并发残余: 快照应记录 staged 根（adapter chdir 目标）")
+        _check(dst == os.path.join(staged_root, "dimension_rankings",
+                                   "Qwen3-8B", "qasper_agreement.pkl"),
+               f"142 并发残余: 物化目标应在 staged 根下: {dst}")
+        # 绝不写旧共享固定路径（并发错绑窗口本体）
+        _check(not os.path.exists(os.path.join(fake_repo,
+                                               "dimension_rankings")),
+               "142 并发残余: stage 不得写仓库根共享固定路径 "
+               "dimension_rankings/（跨进程错绑窗口本体）")
         with open(dst, "rb") as f:
             dst_bytes = f.read()
         _check(dst_bytes == content_a,
@@ -171,14 +190,33 @@ def test_142_reopen_frozen_snapshot():
         # --- 换内容须重新 stage：新 repo_root stage B → 快照/名字翻转 ---
         fake_repo_b = os.path.join(td, "fake_repo_b")
         os.makedirs(fake_repo_b, exist_ok=True)
-        stage_fasa_agreement(args, fake_repo_b)
+        staged_root_b = stage_fasa_agreement(args, fake_repo_b)
         name_b = get_method_name_with_info(args)
         _check(name_b.endswith(f"_agr{sha8_b}") and name_b != name_a,
                f"142: 重新 stage B 后名字应绑定 B: {name_b}")
+        # 142 并发残余：不同内容天然隔离到不同 sha8 目录，互不覆盖
+        # （旧共享固定路径下 A 先 replace、B 后 replace 覆盖即错绑窗口）
+        _check(staged_root_b == os.path.join(
+                   fake_repo_b, "dimension_rankings_staged", sha8_b),
+               f"142 并发残余: B 的 staged 根尾段应为 B 的 sha8: "
+               f"{staged_root_b}")
+        _check(os.path.basename(staged_root_b) !=
+               os.path.basename(staged_root),
+               "142 并发残余: A/B staged 根必须内容寻址隔离（sha8 目录段）")
+        with open(getattr(args, "_fasa_staged_snapshot").dst_path, "rb") as f:
+            _check(f.read() == content_b,
+                   "142 并发残余: B stage 后 B 的物化目标内容应为 B")
+        with open(dst, "rb") as f:
+            _check(f.read() == content_a,
+                   "142 并发残余: B stage 后 A 的物化目标必须原样保留"
+                   "（内容寻址隔离，不得被 B 覆盖）")
 
     print("142 reopen PASS  stage 单次读源冻结 FasaAgreementSnapshot（frozen）"
           "挂 args；A/B 替换复现下 runtime/快照/名字三方恒等于 A；无快照命名 "
-          "fail-closed；物化原子（临时文件 + os.replace，无残留）")
+          "fail-closed；物化原子（临时文件 + os.replace，无残留）；"
+          "C+ 批并发残余：物化目标 = dimension_rankings_staged/<sha8>/ 内容"
+          "寻址目录（不写仓库根共享固定路径，A/B 不同内容隔离互不覆盖，"
+          "staged 根随快照返回供 adapter chdir）")
 
 
 # ==================================================================== 149
@@ -230,10 +268,34 @@ def test_149_pattern_content_identity():
         _check(freeze_minference_pattern_sha8 is not None,
                "149: freeze_minference_pattern_sha8 不存在（修复未实施）")
         if freeze_minference_pattern_sha8 is not None:
+            import dataclasses
             args_frozen = _mi_args(cfg_a)   # freeze 与命名同一 args 对象
             frozen = freeze_minference_pattern_sha8(args_frozen)
             _check(frozen == sha8_a,
                    f"149: 入口冻结返回值应为内容 sha8: {frozen}")
+            # C+ 批（149 并发残余）：freeze 升级为完整冻结对象——sha8 +
+            # raw bytes + 解析后 JSON（adapter 消费冻结对象，不再二次
+            # open 可变 config_path）
+            frozen_snap = getattr(args_frozen,
+                                  "_minference_pattern_frozen", None)
+            _check(frozen_snap is not None,
+                   "149 并发残余: freeze 应挂完整冻结对象"
+                   "（_minference_pattern_frozen）——只存 hash 则 adapter "
+                   "被迫二次 open 可变源（name 绑 A、runtime 读 B）")
+            if frozen_snap is not None:
+                _check(frozen_snap.raw == content_a and
+                       frozen_snap.sha8 == sha8_a and
+                       frozen_snap.config_path == cfg_a,
+                       "149 并发残余: 冻结对象 bytes/sha8/路径与源不符")
+                _check(frozen_snap.pattern == json.loads(content_a),
+                       "149 并发残余: 冻结对象应含解析后的 JSON（adapter "
+                       "直接消费）")
+                try:
+                    frozen_snap.sha8 = "00000000"
+                    raise AssertionError(
+                        "149 并发残余: 冻结对象属性可被改写（应 frozen）")
+                except dataclasses.FrozenInstanceError:
+                    pass
             # 冻结后再换源（adapter 读点之后的替换窗口）→ 名字仍 = A
             with open(cfg_a, "wb") as f:
                 f.write(content_b)
@@ -241,6 +303,11 @@ def test_149_pattern_content_identity():
             _check(name_frozen.endswith(f"_cfg{sha8_a}"),
                    ("149: 入口冻结后源被替换，名字必须仍绑定冻结内容 A"
                     f"（现翻转为 B）: {name_frozen}"))
+            if frozen_snap is not None:
+                _check(frozen_snap.raw == content_a and
+                       frozen_snap.pattern == json.loads(content_a),
+                       "149 并发残余: 源替换后冻结对象内容必须原样（内存"
+                       "冻结，adapter 消费的就是这批内容）")
 
         # --- fail-closed：config_path None（无 config 直跑路径不存在）---
         try:
@@ -256,11 +323,25 @@ def test_149_pattern_content_identity():
             raise AssertionError("149: pattern 不可读时命名未 fail-closed")
         except SystemExit as e:
             _check("149" in str(e), f"149: 不可读报错应带编号: {e}")
+        # --- fail-closed（C+ 批）：畸形 JSON 在 freeze 期即报错
+        #     （提前到入口；留给 adapter 二次 open 才炸即红证形态）---
+        bad = os.path.join(td, "bad_pattern.json")
+        with open(bad, "wb") as f:
+            f.write(b'{"pattern": NOT-VALID-JSON')
+        try:
+            freeze_minference_pattern_sha8(_mi_args(bad))
+            raise AssertionError("149 并发残余: 畸形 JSON 未在 freeze 期"
+                                 " fail-closed")
+        except SystemExit as e:
+            _check("149" in str(e) and "畸形" in str(e),
+                   f"149 并发残余: 畸形 JSON 报错应带编号与中文提示: {e}")
 
     print("149 PASS  minference_vendor 名追加 _cfg<sha8> pattern 内容身份"
           "（同 basename 不同内容名不同/同内容不同路径段相同）；入口冻结"
           " freeze_minference_pattern_sha8 单次读源（源替换后名字不变）；"
-          "config None / 不可读 fail-closed")
+          "config None / 不可读 fail-closed；C+ 批并发残余：freeze 升级为"
+          "完整冻结对象（sha8 + raw + 解析后 JSON，adapter 消费冻结对象"
+          "不再二次 open 可变源），畸形 JSON 在 freeze 期即 fail-closed")
 
 
 # ==================================================================== 150
