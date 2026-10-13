@@ -83,21 +83,33 @@ def _has_nontrivial_padding(attention_mask):
     return True
 
 
-def _prefill_guard_violation(q_len, past_key_values, attention_mask):
+def _prefill_guard_violation(q_len, past_key_values, attention_mask,
+                             layer_idx=0):
     """135/136 单一守卫入口：返回 None=放行，或 (审计编号, 中文报错)。
 
     136 检测点刻意在 past_key_values.update() 之前调用（此时
     get_seq_length() 是更新前的长度，等价于「进本层前 cache 已有
     token」——HF cache update 发生在 attention 内部，若更新后再判
     get_seq_length()>0 则对首段全量 prefill 也恒真，会误杀）。
+
+    layer_idx（GPT advice 2026-10-13_1446 跨层误杀修复）：判定与报错
+    读数都必须用「本层」的 get_seq_length(layer_idx)——transformers
+    4.56 Cache API 无参调用 get_seq_length() 默认 layer_idx=0，而
+    Qwen3 逐层解码循环共享同一个 DynamicCache：首段完整 prefill 时
+    layer0 守卫放行、其 attention 内部 update() 写入后，layer>=1 再
+    进守卫时无参调用会读到 layer0 的非零长度 → 首次 prefill 的
+    layer>=1 全部被跨层误杀。报错消息中的长度读数同用本层值。
     """
-    # 136：chunked prefill with prefix cache——更新前 cache 已有 token
-    # 且本次仍输入 q_len>1 → 下游 kernel 按 Q_len==K_len 方阵协议错位。
+    # 136：chunked prefill with prefix cache——本层更新前 cache 已有
+    # token 且本次仍输入 q_len>1 → 下游 kernel 按 Q_len==K_len 方阵协议
+    # 错位。（按本层 layer_idx 读更新前长度，共享 cache 下其他层已写入
+    # 不构成对本层的 chunked 判定依据。）
     if q_len > 1 and past_key_values is not None \
-            and past_key_values.get_seq_length() > 0:
+            and past_key_values.get_seq_length(layer_idx) > 0:
+        cached = past_key_values.get_seq_length(layer_idx)
         return ("TL-MINF-CHUNKCACHE-136",
-                f"q_len={q_len} > 1 且 past_key_values 更新前已缓存 "
-                f"{past_key_values.get_seq_length()} 个 token——chunked "
+                f"q_len={q_len} > 1 且 past_key_values 第 {layer_idx} 层"
+                f"更新前已缓存 {cached} 个 token——chunked "
                 f"prefill with prefix cache 不被 MInference vendor kernel "
                 f"的 Q_len==K_len 方阵协议支持（稀疏层 vertical+slash 按方阵"
                 f"取对角线，错位即静默错误输出），fail-closed 拒绝。请关闭 "
@@ -142,9 +154,11 @@ def _qwen3_minference_wrapper(
         )
 
     # ---- 135/136 fail-closed 守卫（详见 _prefill_guard_violation）----
-    # 位置在 decode 分支之后、cache update 之前：136 须用更新前
-    # seq_length 判定，135 在进入稀疏 prefill 分支前拒绝 padding。
-    violation = _prefill_guard_violation(q_len, past_key_values, attention_mask)
+    # 位置在 decode 分支之后、cache update 之前：136 须用「本层」更新前
+    # seq_length 判定（layer_idx=self.layer_idx，跨层误杀修复），135 在
+    # 进入稀疏 prefill 分支前拒绝 padding。
+    violation = _prefill_guard_violation(
+        q_len, past_key_values, attention_mask, layer_idx=self.layer_idx)
     if violation is not None:
         raise RuntimeError(
             f"[MINFERENCE-VENDOR-FAIL-CLOSED {violation[0]}] {violation[1]}")

@@ -20,6 +20,16 @@ TL-MINF-CHUNKCACHE-136（B4）
       RuntimeError（检测点在 cache update 之前，get_seq_length() 为更新前
       长度）；首段全量 prefill（cache=0）与 decode（q_len=1）不误杀。
 
+TL-MINF-CHUNKCACHE-136 跨层误杀（C 批追加，GPT advice 2026-10-13_1446）
+  缺陷：guard 无参调用 get_seq_length()（transformers 4.56 默认
+      layer_idx=0）——Qwen3 逐层循环共享同一 DynamicCache，首次完整
+      prefill 时 layer0 放行并写入后 layer1 进守卫读到 layer0 的非零
+      长度 → layer>=1 全误杀（B4 原验收 FakeCache 忽略层号为盲点）。
+  绿：guard 增参 layer_idx（wrapper 传 self.layer_idx），136 判定与
+      报错读数均读本层 get_seq_length(layer_idx) 更新前长度；共享 cache
+      首次 prefill layer0→layer1 均放行、本层 prefix chunked prefill
+      照旧拒收、decode 直通不变。
+
 运行要求：本机树存在 minference_vendor 工作目录（minference 官方包为
 vendored 依赖）；缺包时 SKIP（不 FAIL）。
 
@@ -75,17 +85,26 @@ def _pad(causal, tail=3):
 
 
 class _FakeCache:
-    """get_seq_length/update 语义对齐 HF DynamicCache（无参调用返回当前
-    已缓存长度；update 返回展开后的 k/v——首段全量 prefill 会真正走到）。
-    136 守卫须在 update 之前判定（更新后 get_seq_length 恒>0 会误杀）。"""
+    """get_seq_length/update 语义对齐 HF DynamicCache（GPT advice
+    2026-10-13_1446 跨层误杀修复后）：**按层存储**——get_seq_length
+    (layer_idx) 只读本层长度（无参调用默认 layer_idx=0，同 HF 4.56
+    Cache API）；update() 真正把本层新 token append 进本层计数
+    （HF 逐层循环共享同一 cache：layer0 prefill 写入后 layer1 更新前
+    本层仍为 0）。构造参数 n = 所有层的初始缓存长度（prefix cache
+    全层就绪形态；n=0 即首段完整 prefill 起点）。"""
 
-    def __init__(self, n):
-        self.n = n
+    def __init__(self, n=0):
+        self._base = n
+        self.per_layer = {}
 
     def get_seq_length(self, layer_idx=0):
-        return self.n
+        # 本层未写过 → 构造基值；写过 → update 追加后的本层真实长度
+        return self.per_layer.get(layer_idx, self._base)
 
     def update(self, key_states, value_states, layer_idx, cache_kwargs=None):
+        # key_states [bsz, heads, q_len, head_dim]（wrapper 已 transpose）
+        self.per_layer[layer_idx] = (self.get_seq_length(layer_idx) +
+                                     key_states.shape[2])
         return key_states, value_states
 
 
@@ -115,11 +134,13 @@ def _call_wrapper(self, hidden_states, attention_mask=None,
             return ("raise", str(e)), captured
 
 
-def _fake_self(q_len, kv_len):
-    """构造能走完稀疏 prefill 分支的最小 Qwen3Attention 替身（CPU）。"""
+def _fake_self(q_len, kv_len, layer_idx=1):
+    """构造能走完稀疏 prefill 分支的最小 Qwen3Attention 替身（CPU）。
+    layer_idx 可参数化（跨层三态测试需构造 layer0/layer1/layer2 替身
+    共享同一 cache，模拟 Qwen3 逐层解码循环）。"""
     bsz, heads, head_dim = 1, 2, 8
     s = types.SimpleNamespace()
-    s.layer_idx = 1
+    s.layer_idx = layer_idx
     s.head_dim = head_dim
     s.config = types.SimpleNamespace(num_hidden_layers=4)
     s._minference_attn_config = {"is_search": False, "starting_layer": -1,
@@ -243,9 +264,79 @@ def test_136_chunkcache():
           "RuntimeError + 首段 prefill/decode 不误杀）")
 
 
+def test_136_crosslayer_shared_cache():
+    """136 跨层误杀回归（GPT advice 2026-10-13_1446，C 批追加项）。
+
+    缺陷：guard 无参调用 past_key_values.get_seq_length()——transformers
+    4.56 Cache API 默认 layer_idx=0。Qwen3 逐层循环共享同一 DynamicCache：
+    首次完整 prefill 时 layer0 检查放行、其 attention 内部 update() 写入
+    后，layer1 进守卫读到 layer0 的非零长度 → 误抛 TL-MINF-CHUNKCACHE-136
+    （layer>=1 全误杀）。B4 原验收的 FakeCache 忽略层号 + update 不改状态，
+    测试盲点。
+
+    三态验证（wrapper 级，FakeCache 按 HF 语义按层存储 + 真 update）：
+      ① 共享 cache 首次 prefill：layer0 放行并写入后，layer1 进守卫
+         （q_len>1）→ 必须放行（红证点：基线上无参 get_seq_length 默认
+         读 layer0 而误拒）；
+      ② 当前层已有 prefix（chunked prefill with prefix cache）且 q_len>1
+         → 在 update 之前拒绝（既有 fail-closed 语义保留，报错读数 =
+         本层更新前长度）；
+      ③ 单 token decode 直通不变。
+    """
+    q_len = 5
+    hs = torch.zeros(1, q_len, 8)
+
+    # ---- ① 共享 cache 首次完整 prefill：layer0 → layer1 都必须放行 ----
+    cache = _FakeCache(0)          # 首段全量 prefill 起点：全层皆空
+    s0 = _fake_self(q_len, q_len, layer_idx=0)
+    s1 = _fake_self(q_len, q_len, layer_idx=1)
+    (st0, m0), _ = _call_wrapper(s0, hs, attention_mask=None,
+                                 past_key_values=cache)
+    _check(st0 == "ok",
+           f"136 跨层①: layer0 首段 prefill 应放行: {st0} {m0}")
+    _check(cache.get_seq_length(0) == q_len,
+           "136 跨层①: layer0 update 应真正写入本层（HF 逐层共享 cache）")
+    _check(cache.get_seq_length(1) == 0,
+           "136 跨层①: layer1 更新前本层应为 0（其他层已写入不构成本层"
+           " chunked 判定依据）")
+    # 红证点：基线 guard 无参 get_seq_length()（默认 layer_idx=0）读到
+    # layer0 已写入的 5 → layer1 首次 prefill 被跨层误拒。
+    (st1, m1), _ = _call_wrapper(s1, hs, attention_mask=None,
+                                 past_key_values=cache)
+    _check(st1 == "ok",
+           ("136 跨层①红证点: 共享 cache 下 layer1 首段 prefill 被误拒"
+            f"（无参 get_seq_length 默认 layer_idx=0，读到 layer0 已写入"
+            f"长度）——guard 须按本层 layer_idx 读更新前长度: {st1} {m1}"))
+    _check(cache.get_seq_length(1) == q_len,
+           "136 跨层①: layer1 放行后 update 应写入本层")
+
+    # ---- ② 当前层已有 prefix 且 q_len>1 → update 前拒绝（同层读数）----
+    hs_chunk = torch.zeros(1, 3, 8)   # 新 chunk q_len=3（layer1 已缓存 5）
+    (st2, m2), _ = _call_wrapper(s1, hs_chunk, attention_mask=None,
+                                 past_key_values=cache)
+    _check(st2 == "raise" and "TL-MINF-CHUNKCACHE-136" in m2 and "方阵" in m2,
+           f"136 跨层②: 本层已有 prefix 的 chunked prefill 应显式拒收: "
+           f"{st2} {m2}")
+    _check("第 1 层" in m2 and "5 个 token" in m2,
+           f"136 跨层②: 报错读数须为本层（layer1）更新前长度 5: {m2}")
+    _check(cache.get_seq_length(1) == q_len,
+           "136 跨层②: 拒绝须发生在 update 之前（本层长度不得被改写）")
+
+    # ---- ③ 单 token decode 直通不变（q_len=1 不触守卫）----
+    (st3, _), _ = _call_wrapper(s1, torch.zeros(1, 1, 8), attention_mask=None,
+                                past_key_values=cache)
+    _check(st3 == "ok", "136 跨层③: decode 单 token 不得误杀")
+    print("B4+ PASS  136 跨层误杀回归（advice 2026-10-13_1446）：共享 "
+          "cache 首次 prefill layer0→layer1 均放行（红证点：基线无参 "
+          "get_seq_length 默认 layer_idx=0 跨层误拒）；本层 prefix "
+          "chunked prefill 在 update 前拒收且读数=本层更新前长度；decode "
+          "单 token 直通不变")
+
+
 def main():
     test_135_padmask()
     test_136_chunkcache()
+    test_136_crosslayer_shared_cache()
     print("\nGPT-B-BATCH-MINFERENCE(135/136) RESULT: ALL PASS")
     return 0
 
