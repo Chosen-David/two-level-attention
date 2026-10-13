@@ -316,7 +316,8 @@ class TLIIndexer(TIAIndexer):
     def calibrate_dyn_dgate(self, q, k):
         """E137 动态 D' gate 标定（qwen3_attn_patch prefill 分支调用）。
 
-        q [B,H,S,D] post-RoPE / k [B,S,Hkv,D]，与 dense prefill 同源张量。
+        q [B,H,S,D] post-RoPE / k [B,Hkv,S,D]（均 patch 侧 transpose 后布局，
+        E137 冒烟实证：误按 [B,S,Hkv,D] 多转置一次 → Hkv 读成 D → G=0 崩）。
         取 q 尾 dyn_dgate_rows 行（默认 256，与 observe_prefill_q E85f 同口径），
         per-q-head 全维 softmax（k GQA 展开到 H 头——组内 mean 会改变 softmax
         分布，E137 口径对齐判决 e137_calib_alignment 已证其失真），
@@ -352,7 +353,7 @@ class TLIIndexer(TIAIndexer):
             return
         rows = min(self.dyn_dgate_rows, S)
         qe = q.detach()[:, :, -rows:, :].float()          # [B,H,rows,D]
-        ke = k.detach()[:, -S:, :, :].float().transpose(1, 2)  # [B,Hkv,S,D]
+        ke = k.detach()[:, :, -S:, :].float()            # [B,Hkv,S,D]（已是 patch 转置后布局）
         B, H, _, D = qe.shape
         Hkv = ke.shape[1]
         G = H // Hkv
