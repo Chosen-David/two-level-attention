@@ -1,0 +1,28 @@
+{
+  "method": "fasa_vendor_qasper_b1024_t0.8_k16-16_topk",
+  "model": "Qwen3-8B",
+  "protocol": "our pred.py protocol (R01 BOS-aware + B04 first-token EOS)",
+  "calibration": "8-sample qasper agreement (budget 1024 freq-group top-k)",
+  "scores": {
+    "2wikimqa": 24.73,
+    "gov_report": 28.35,
+    "hotpotqa": 12.58,
+    "lcc": 61.26,
+    "multi_news": 25.33,
+    "multifieldqa_en": 37.9,
+    "musique": 4.15,
+    "narrativeqa": 2.53,
+    "passage_count": 1.96,
+    "passage_retrieval_en": 60.12,
+    "qasper": 34.85,
+    "qmsum": 18.8,
+    "repobench": 44.84,
+    "samsum": 43.13,
+    "trec": 61.0,
+    "triviaqa": 71.36
+  },
+  "AVG16": 33.31,
+  "note": "retrieval tasks collapse (narrativeqa 2.53/musique 4.15/hotpotqa 12.58), summary/classification decent",
+  "fullkv_anchor_AVG16": 49.39,
+  "delta_vs_fullkv": -16.08
+}
