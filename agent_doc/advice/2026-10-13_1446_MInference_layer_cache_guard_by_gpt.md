@@ -1,0 +1,9 @@
+# MInference 首次 prefill 的跨层缓存误拒
+
+@DeepSeek（S-T023 baseline）。静态核查 main `846d939e2dbc5d1ccb900d95c620a7761390b57d` 与 Transformers 4.56.2；未运行仓库测试、模型或GPU。当前53份advice Markdown未见本项；135/136原修复意图保留，本建议仅针对新增guard的层索引。
+
+**条件与调用链**：首次完整prefill、`q_len>1`、多个attention层共用同一HF DynamicCache时，[guard L86–104](https://github.com/Chosen-David/two-level-attention/blob/846d939e2dbc5d1ccb900d95c620a7761390b57d/exp/vendor_baselines/minference_vendor/qwen3_minference_patch.py#L86-L104)无参调用 `get_seq_length()`；[wrapper L144–166](https://github.com/Chosen-David/two-level-attention/blob/846d939e2dbc5d1ccb900d95c620a7761390b57d/exp/vendor_baselines/minference_vendor/qwen3_minference_patch.py#L144-L166)先检查、后按 `self.layer_idx` 更新。官方 [Cache API L850–854](https://github.com/huggingface/transformers/blob/v4.56.2/src/transformers/cache_utils.py#L850-L854)无参默认 `layer_idx=0`，而 [Qwen3逐层循环 L409–418](https://github.com/huggingface/transformers/blob/v4.56.2/src/transformers/models/qwen3/modeling_qwen3.py#L409-L418)向各层传入同一cache。因此layer0检查为空并更新后，layer1虽尚未缓存，guard却读取layer0的非零长度，抛出 `TL-MINF-CHUNKCACHE-136`。把检查放在“本层update前”不足以避免这次误拒；这是上述接口条件下的源码推导，非已执行模型复现。
+
+**现有测试盲点**：[FakeCache L77–89](https://github.com/Chosen-David/two-level-attention/blob/846d939e2dbc5d1ccb900d95c620a7761390b57d/exp/trace/test_gpt_b_batch_minference.py#L77-L89)的 `get_seq_length(layer_idx=0)` 忽略层号，`update()`仅返回输入、不改变缓存状态；[首段放行检查 L231–235](https://github.com/Chosen-David/two-level-attention/blob/846d939e2dbc5d1ccb900d95c620a7761390b57d/exp/trace/test_gpt_b_batch_minference.py#L231-L235)仅调用一次空缓存，不能覆盖layer0更新→layer1检查。已有PASS不能关闭这个跨层条件。
+
+**建议与最小验收（待执行方处理）**：guard显式接收并读取当前 `self.layer_idx` 的更新前长度，报错也读取同层；保留真正prefix-cache、多token输入的拒绝及单token原生decode分支。CPU最小状态验证应使用按层存储且update真正追加的共享cache：先完成layer0首次prefill，再进入layer1，两层均放行；已有prefix的当前层且 `q_len>1` 必须在update前拒绝；单tokendecode仍直通。由执行方核对实现并验证，不以本建议代替测试回执。本轮未取得真实job的生成SHA/flags/cache类型/运行日志，不能断言既有分数污染或任何作业已停止；不请求GPU重跑，不新增评测矩阵，也不关闭S-T023其余验收。
