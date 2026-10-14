@@ -1,0 +1,26 @@
+{
+  "exp": "E139 纲领②③ wall 曲线补测（#251）：批量版 K2 上探 + L 可扩展性，.187 双卡交叉 + 本机 GPU0",
+  "date": "2026-10-14",
+  "protocol": "协议克隆 e139_k2_prefill_wall_bench：fresh indexer 每 iter、7 iter 中位、warmup 2、单流（PREFETCH=0）、锁卡计时；树 fc84edf（batch_select 已落地）；.187 GPU4/5 双卡交叉，本机 GPU0 锁卡",
+  "results": {
+    "lsweep_g187_gpu45": {
+      "L8192": {"dense": 6.8, "per_group": 175.3, "batch": 96.5, "batch_vs_pergrp": 1.82, "batch_vs_dense": 0.07},
+      "L16384": {"dense": 25.8, "per_group": 411.9, "batch": 240.8, "batch_vs_pergrp": 1.71, "batch_vs_dense": 0.11},
+      "L32768": {"dense": 100.3, "per_group": 977.1, "batch": 592.9, "batch_vs_pergrp": 1.65, "batch_vs_dense": 0.17},
+      "L65536": {"dense": 395.1, "per_group": 2294.4, "batch": 1492.0, "batch_vs_pergrp": 1.54, "batch_vs_dense": 0.26},
+      "cross_gpu_consistency": "GPU4 vs GPU5 全档差 ≤0.2%（592.9 vs 593.9 等）"
+    },
+    "k2_upscan_local_gpu0_L32K_batch": {
+      "k1024": 572.9, "k1536": 751.6, "k2048": 825.8, "dense": 101.1,
+      "k2_sensitivity_1024_to_2048": 1.44,
+      "note": "逐组版同扫为 981→1206（1.23x）——批量版 K2 敏感度更高（批量化省 per-call 开销后，列宽 × 直接打在 attention/gather 段）"
+    },
+    "machine_anchor": "逐组 32K 本机 932.7 vs .187 977.1（+4.5%）；批量 575.1 vs 592.9（+3.1%）——同向一致，机器间口径可比"
+  },
+  "reading": {
+    "lsweep": "批量选择收益随 L 递减（1.82x→1.54x）：选择链（已批量化）随 L 次线性，attention 段（einsum+gather，纲领④目标）随 L 超线性——64K 时批量版 1492ms 中 attention 段估 ~1140ms（选择链 32K 实测 179ms 按次线性外推 ~350ms），是纲领④融合 kernel 的主战场与上限空间",
+    "k2": "K2=2048（质量 -0.7/-2.2 档）批量版 wall 826ms vs dense 101ms（0.12x）——质量-预算上探的 wall 代价 1.44x，进三轴 trade-off 表；K2 wall 曲线与质量曲线（56.04→57.90→58.76）合并为预算-质量-性能三轴完整数据"
+  },
+  "next": "纲领④融合 attention kernel 收官后同协议复扫 L/K2 曲线（预期 attention 段大幅收缩），统一并入 #249 三件套判决 JSON",
+  "scripts": ["exp/bench/e139_gang23_wall_lsweep.py", "exp/bench/e139_gang23_wall_k2scan.py", "exp/trace/results/e139_lsweep_g{4,5}.log", "exp/trace/results/e139_gang23_wall_k2scan.log"]
+}
