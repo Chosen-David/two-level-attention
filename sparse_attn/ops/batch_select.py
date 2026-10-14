@@ -59,8 +59,54 @@ skip_far / D≠128 / 非 CUDA 等）返回 None，调用方回退逐组路径—
 注意：本路径不调 metrics.add_select_result（逐组版每组一条 GPU 侧记录），
 批量版跳过——metrics 仅诊断用途，不影响选择/输出正确性。
 """
+import os
+
 import torch
 import torch.nn.functional as F
+
+# 【E139 #253】选择链 CUDA Graph 缓存：key=(L, N, kf, kn, group_ends 指纹,
+# indexer 身份)。同一 prompt 内 36 层几何/host 值全同（层间仅 k 统计与 q
+# 变化）→ capture 一次、逐层 copy_ 注入 + replay。长度分桶上限防私池膨胀。
+_GRAPH_CACHE = {}
+_GRAPH_CACHE_MAX = 8
+
+
+def _graph_cached_run(key, body_fn, inputs):
+    """capture-or-replay：首次 clone 静态缓冲 → side stream warmup 3 →
+    capture（warmup/capture 期间 body 真实执行，首层输出即 capture 结果）；
+    后续 copy_ 注入新层输入 → replay。返回静态输出缓冲（下一次调用 replay
+    前被覆盖——调用方须在同 stream 顺序消费完毕，eager_prefill 现口径满足）。
+    逐位一致性机制：replay 重放与 eager 完全相同的 kernel 序列 + 相同地址
+    + 相同归约树（e139_l2_graph_poc 双重硬门 0/1008 diff 实证）。"""
+    ent = _GRAPH_CACHE.get(key)
+    if ent is None:
+        if len(_GRAPH_CACHE) >= _GRAPH_CACHE_MAX:
+            _GRAPH_CACHE.clear()      # LRU 简化版：超限全清（重新 capture）
+        statics = {n: (t.clone() if t is not None else None)
+                   for n, t in inputs.items()}
+        s = torch.cuda.Stream()
+        s.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(s):
+            for _ in range(3):
+                body_fn(**statics)
+        torch.cuda.current_stream().wait_stream(s)
+        g = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(g):
+            out = body_fn(**statics)
+        # capture 只 record 不执行——replay 一次产出首层真实结果
+        g.replay()
+        # ent 必须持有 body_fn 闭包：闭包捕获的几何张量（m_far/m_near/
+        # near_blks/...）是 graph kernel 固化指针的数据源——失去引用会被
+        # allocator 回收复用，replay 将读到被覆盖的垃圾（实测 810/1008 diff）
+        ent = (g, statics, out, body_fn)
+        _GRAPH_CACHE[key] = ent
+        return out
+    g, statics, out, _ = ent
+    for n, t in inputs.items():
+        if t is not None:
+            statics[n].copy_(t)
+    g.replay()
+    return out
 
 
 def _gate_ok(indexer, q, k):
@@ -227,13 +273,42 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
     # kernel launch 在 host 侧排队，无逐行同步）。
     # fail-closed：kernel 异常（含 _triton_ok 置 False 的实例级回退）→
     # return None 走逐组参考路径。
-    sc_far_q = torch.full((N, H, Tb), float("-inf"),
-                          dtype=qdtype, device=dev)        # [N,H,Tb] per-q-head
-    sc_near_q = torch.full((N, H, Tb), float("-inf"),
-                           dtype=qdtype, device=dev)
-    try:
-        nb_l = near_blks.tolist()
-        sl_l = swa_lo_blk.tolist()
+    # ---- 【E139 #253】层间不变量外提（graph capture 硬约束：capture 区内
+    # 禁 D2H 同步——tolist()/item() 全部外提；几何/预算 host 值只依赖
+    # g1/池边界/indexer 常量，同一 prompt 内 36 层全同 → capture 一次固化） ----
+    nb_l = near_blks.tolist()
+    sl_l = swa_lo_blk.tolist()
+    # ④ L2 预算向量化（compute_mask L2126-2359 逐字段；纯 GPU 张量算术，
+    # 层间不变——闭包捕获地址供 eager，graph capture 固化 kernel 参数）
+    K2arg = int(indexer.args.tia_level2_topk)
+    K2 = torch.minimum(g1, torch.full_like(g1, K2arg))      # min(p 宽=g1_j, K2)
+    far_tok_lo = far_lo * bs
+    far_tok_hi = torch.minimum(near_blks * bs, g1)          # min(near_blks*bs, p 宽)
+    # K2_mid = K2 − sink − (S_real − swa_lo)（保护区不占预算）
+    K2_mid = (K2 - sink_tok - torch.minimum(g1, torch.full_like(g1, swa_tok))
+              ).clamp(min=0)
+    # nt_near = min(int(nb_near·bs·γ), K2_mid)（e64 分支 L2300；int 为 Python
+    # 标量算术与参考逐位同值，K2_mid 逐行 min）
+    nt_near = torch.minimum(
+        torch.full_like(K2_mid, int(nb_near * bs * float(indexer.gamma))), K2_mid)
+    far_budget = (K2_mid - nt_near).clamp(min=0)
+    far_width = (far_tok_hi - far_tok_lo).clamp(min=0)
+    k2_far = torch.minimum(torch.minimum(far_budget, far_width), K2_mid)
+    k2_near = (K2_mid - k2_far).clamp(min=0)
+    # near 池内截断饥饿语义（L2349 min(k2_near, 池宽)）在 ⑤ 逐行调用处以
+    # min(k2_near_l[j], near_p.shape[-1]) 落地（池宽 = swa_lo_tok−far_tok_hi）
+    far_lo_tok = far_lo * bs
+    h_idx_col = torch.arange(Hkv, device=dev).view(Hkv, 1)  # 广播 gather 列
+    k2_far_l = k2_far.tolist()
+    k2_near_l = k2_near.tolist()
+
+    # ---- ③④⑤ 选择体（输入 k_min/k_max/k_avg/k_qat/b_q 逐层变化；其余
+    # 闭包捕获层间不变量）——eager 与 CUDA Graph capture 共用同一 body ----
+    def _body(k_min, k_max, k_avg, k_qat, b_q):
+        sc_far_q = torch.full((N, H, Tb), float("-inf"),
+                              dtype=qdtype, device=dev)    # [N,H,Tb] per-q-head
+        sc_near_q = torch.full((N, H, Tb), float("-inf"),
+                               dtype=qdtype, device=dev)
         for j in range(N):
             bq = b_q[j].reshape(H, -1)                     # [H, d'] fp32 连续
             # far 段 [far_lo, nb_j)：far_method 对应分
@@ -256,88 +331,62 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
                     out = indexer._fast_score_fine(
                         k_avg[r0:r1], bq, qdtype)
                 sc_near_q[j, :, r0:r1] = out                # [H, W]
-    except Exception:
-        return None                    # Triton 编译/执行异常：fail-closed 回退
-    # GQA 组内 mean over g（批量一次；cast 序同上——数值树与逐组版同序）
-    sc_far = sc_far_q.view(N, Hkv, G, Tb).mean(dim=2)      # [N,Hkv,Tb]
-    sc_near = sc_near_q.view(N, Hkv, G, Tb).mean(dim=2)
+        # GQA 组内 mean over g（批量一次；cast 序同上——数值树与逐组版同序）
+        sc_far = sc_far_q.view(N, Hkv, G, Tb).mean(dim=2)      # [N,Hkv,Tb]
+        sc_near = sc_near_q.view(N, Hkv, G, Tb).mean(dim=2)
 
-    # 段外补 -inf 后按池掩码收口（行级段切片 ⊆ 池段；池掩码兜底因果与
-    # 段边界外的残留值——与全宽版 where 同一选择集）。
-    # 注：逐组版 compute_mask L1937「当前块置 inf」不复刻——kt-1 恒不在
-    # 任何池内（sl ≤ kt-2 → kt-1 ∉ [nb, sl)；nb ≤ kt-3 → kt-1 ∉ far 段），
-    # 两版该块均被池掩码 -inf，选择集逐位相同。
-    sc_far = sc_far.masked_fill(~m_far, float("-inf"))     # [N,Hkv,Tb]
-    sc_near = sc_near.masked_fill(~m_near, float("-inf"))
-    # 统一 k=nb_far/nb_near topk + -inf 无效过滤 ≡ 逐组版 min(k, 池宽)：
-    # 池宽不足的行 topk 补位是 -inf → 过滤后恰为全部有效块（同一选择集）
-    tv_f = torch.topk(sc_far, kf, dim=-1) if kf > 0 else None
-    tv_n = torch.topk(sc_near, kn, dim=-1) if kn > 0 else None
-    if tv_f is not None:
-        i_f, v_f = tv_f.indices, tv_f.values                # [N,Hkv,nb_far]
-        valid_f = v_f > float("-inf")
-    else:
-        i_f = torch.zeros(N, Hkv, 0, dtype=torch.long, device=dev)
-        valid_f = i_f.bool()
-    if tv_n is not None:
-        i_n, v_n = tv_n.indices, tv_n.values                # [N,Hkv,nb_near]
-        valid_n = v_n > float("-inf")
-    else:
-        i_n = torch.zeros(N, Hkv, 0, dtype=torch.long, device=dev)
-        valid_n = i_n.bool()
-    # 候选块布局：[far 槽(nf) | near 槽(nn)]——far/near 池块区间不相交，
-    # topk 索引无重复 → token 无重复
-    cand_blk = torch.cat([i_f, i_n], dim=-1)                # [N,Hkv,C_blk]
-    cand_valid_blk = torch.cat([valid_f, valid_n], dim=-1)
-    n_far = int(i_f.shape[-1])
-    C_blk = int(cand_blk.shape[-1])
-    C = C_blk * bs                                          # 8192（生产口径）
-    cand_tok = (cand_blk * bs)[..., None] + torch.arange(bs, device=dev)
-    cand_tok = cand_tok.reshape(N, Hkv, C)                  # [N,Hkv,C]
-    cand_valid = cand_valid_blk[..., None].expand(N, Hkv, C_blk, bs) \
-        .reshape(N, Hkv, C)
+        # 段外补 -inf 后按池掩码收口（行级段切片 ⊆ 池段；池掩码兜底因果与
+        # 段边界外的残留值——与全宽版 where 同一选择集）。
+        # 注：逐组版 compute_mask L1937「当前块置 inf」不复刻——kt-1 恒不在
+        # 任何池内（sl ≤ kt-2 → kt-1 ∉ [nb, sl)；nb ≤ kt-3 → kt-1 ∉ far 段），
+        # 两版该块均被池掩码 -inf，选择集逐位相同。
+        sc_far = sc_far.masked_fill(~m_far, float("-inf"))     # [N,Hkv,Tb]
+        sc_near = sc_near.masked_fill(~m_near, float("-inf"))
+        # 统一 k=nb_far/nb_near topk + -inf 无效过滤 ≡ 逐组版 min(k, 池宽)：
+        # 池宽不足的行 topk 补位是 -inf → 过滤后恰为全部有效块（同一选择集）
+        tv_f = torch.topk(sc_far, kf, dim=-1) if kf > 0 else None
+        tv_n = torch.topk(sc_near, kn, dim=-1) if kn > 0 else None
+        if tv_f is not None:
+            i_f, v_f = tv_f.indices, tv_f.values                # [N,Hkv,nb_far]
+            valid_f = v_f > float("-inf")
+        else:
+            i_f = torch.zeros(N, Hkv, 0, dtype=torch.long, device=dev)
+            valid_f = i_f.bool()
+        if tv_n is not None:
+            i_n, v_n = tv_n.indices, tv_n.values                # [N,Hkv,nb_near]
+            valid_n = v_n > float("-inf")
+        else:
+            i_n = torch.zeros(N, Hkv, 0, dtype=torch.long, device=dev)
+            valid_n = i_n.bool()
+        # 候选块布局：[far 槽(nf) | near 槽(nn)]——far/near 池块区间不相交，
+        # topk 索引无重复 → token 无重复
+        cand_blk = torch.cat([i_f, i_n], dim=-1)                # [N,Hkv,C_blk]
+        cand_valid_blk = torch.cat([valid_f, valid_n], dim=-1)
+        n_far = int(i_f.shape[-1])
+        C_blk = int(cand_blk.shape[-1])
+        C = C_blk * bs                                          # 8192（生产口径）
+        cand_tok = (cand_blk * bs)[..., None] + torch.arange(bs, device=dev)
+        cand_tok = cand_tok.reshape(N, Hkv, C)                  # [N,Hkv,C]
+        cand_valid = cand_valid_blk[..., None].expand(N, Hkv, C_blk, bs) \
+            .reshape(N, Hkv, C)
 
-    # ---- ④ L2 预算向量化（compute_mask L2126-2359 逐字段） ----
-    K2arg = int(indexer.args.tia_level2_topk)
-    K2 = torch.minimum(g1, torch.full_like(g1, K2arg))      # min(p 宽=g1_j, K2)
-    far_tok_lo = far_lo * bs
-    far_tok_hi = torch.minimum(near_blks * bs, g1)          # min(near_blks*bs, p 宽)
-    # K2_mid = K2 − sink − (S_real − swa_lo)（保护区不占预算）
-    K2_mid = (K2 - sink_tok - torch.minimum(g1, torch.full_like(g1, swa_tok))
-              ).clamp(min=0)
-    # nt_near = min(int(nb_near·bs·γ), K2_mid)（e64 分支 L2300；int 为 Python
-    # 标量算术与参考逐位同值，K2_mid 逐行 min）
-    nt_near = torch.minimum(
-        torch.full_like(K2_mid, int(nb_near * bs * float(indexer.gamma))), K2_mid)
-    far_budget = (K2_mid - nt_near).clamp(min=0)
-    far_width = (far_tok_hi - far_tok_lo).clamp(min=0)
-    k2_far = torch.minimum(torch.minimum(far_budget, far_width), K2_mid)
-    k2_near = (K2_mid - k2_far).clamp(min=0)
-    # near 池内截断饥饿语义（L2349 min(k2_near, 池宽)）在 ⑤ 逐行调用处以
-    # min(k2_near_l[j], near_p.shape[-1]) 落地（池宽 = swa_lo_tok−far_tok_hi）
-
-    # ---- ⑤ L2：候选内 gather 打分（纲领③）+ softmax/双池 topk 全宽逐位复刻 ----
-    # 打分仍只在候选列（纲领③省算主体：k_qat 候选 gather + 逐行调与参考链
-    # 同一 Triton fine kernel——compute_score L1459-1471 _fast_score_fine，
-    # kernel per-tile 独立 → 候选列分数与参考全前缀输出的对应 token 逐位
-    # 一致；einsum/cublas 版累加顺序差是 L2 topk 边界翻转源，实测 ~0.45%
-    # 选择差，不用）。
-    # softmax/GQA mean/L2 双池 topk 则按行以与逐组参考完全相同的形状·数值
-    # ·内存布局逐算子复刻：[1,1,H,g1] 的 where(topk_mask, sf, -inf) 等价
-    # 张量（全宽 -inf + 候选 scatter）→ F.softmax → nan_to_num →
-    # view(1,1,Hkv,G,·).mean(-2) → far/near 位置切片 topk → scatter →
-    # sink/swa 强制。理由：候选列 softmax 的归约树宽度差（g1 vs C）与
-    # topk 池序差（位置序 vs L1 topk rank 序）是仅剩的 ULP 翻转源——
-    # 候选列版 mask 一致率 0.9990（过 mask 门）但 0.1% 翻转使输出级
-    # allclose(1e-2) 不可达（实测 maxdiff 1.8e-1）；同形同值复刻后全部
-    # 算子确定性 → mask 逐位一致。softmax/mean/topk 是逐元素/归约廉价
-    # 算子（O(H·g1) ≪ 打分 O(H·C·δ)），复刻成本远小于打分省算收益。
-    h_idx_col = torch.arange(Hkv, device=dev).view(Hkv, 1)  # 广播 gather 列
-    far_lo_tok = far_lo * bs
-    k2_far_l = k2_far.tolist()
-    k2_near_l = k2_near.tolist()
-    out_masks = []
-    try:
+        # ---- ⑤ L2：候选内 gather 打分（纲领③）+ softmax/双池 topk 全宽逐位复刻 ----
+        # 打分仍只在候选列（纲领③省算主体：k_qat 候选 gather + 逐行调与参考链
+        # 同一 Triton fine kernel——compute_score L1459-1471 _fast_score_fine，
+        # kernel per-tile 独立 → 候选列分数与参考全前缀输出的对应 token 逐位
+        # 一致；einsum/cublas 版累加顺序差是 L2 topk 边界翻转源，实测 ~0.45%
+        # 选择差，不用）。
+        # softmax/GQA mean/L2 双池 topk 则按行以与逐组参考完全相同的形状·数值
+        # ·内存布局逐算子复刻：[1,1,H,g1] 的 where(topk_mask, sf, -inf) 等价
+        # 张量（全宽 -inf + 候选 scatter）→ F.softmax → nan_to_num →
+        # view(1,1,Hkv,G,·).mean(-2) → far/near 位置切片 topk → scatter →
+        # sink/swa 强制。理由：候选列 softmax 的归约树宽度差（g1 vs C）与
+        # topk 池序差（位置序 vs L1 topk rank 序）是仅剩的 ULP 翻转源——
+        # 候选列版 mask 一致率 0.9990（过 mask 门）但 0.1% 翻转使输出级
+        # allclose(1e-2) 不可达（实测 maxdiff 1.8e-1）；同形同值复刻后全部
+        # 算子确定性 → mask 逐位一致。softmax/mean/topk 是逐元素/归约廉价
+        # 算子（O(H·g1) ≪ 打分 O(H·C·δ)），复刻成本远小于打分省算收益。
+        out_masks = []
         for j in range(N):
             g1_j = int(group_ends[j])
             ct_j = cand_tok[j]                              # [Hkv, C]
@@ -387,6 +436,27 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
             m[..., :sink_tok] = True
             m[..., swa_lo_tok_j:g1_j] = True
             out_masks.append(m[0, 0])
+        return out_masks
+
+    # ---- 双路径：CUDA Graph（env TLI_PREFILL_SELECT_GRAPH 默认 0 fail-closed）
+    # capture/replay 任何异常 → 清缓存回退 eager；eager body 异常 → return None
+    # 走逐组参考路径（与原版语义一致）。graph 输出为静态缓冲——下一次调用
+    # replay 前被覆盖，调用方（eager_prefill）同 stream 顺序消费满足生命周期。
+    if os.environ.get("TLI_PREFILL_SELECT_GRAPH", "0") == "1":
+        # key = 几何 + 配置指纹（不含 indexer 实例 id——e2e 每层独立
+        # indexer 实例，跨层共享同一 graph：statics 注入层间数据，闭包持
+        # 首层几何（层间不变）与首层 indexer（仅 capture 期发起 kernel，
+        # 参数固化为 statics 指针，replay 不再访问实例）
+        key = (L, N, kf, kn, K2arg, tuple(group_ends),
+               far_use_mm, near_use_mm)
+        try:
+            return _graph_cached_run(
+                key, _body,
+                dict(k_min=k_min, k_max=k_max, k_avg=k_avg,
+                     k_qat=k_qat, b_q=b_q))
+        except Exception:
+            _GRAPH_CACHE.pop(key, None)
+    try:
+        return _body(k_min, k_max, k_avg, k_qat, b_q)
     except Exception:
-        return None          # Triton 编译/执行异常等：fail-closed 回退
-    return out_masks
+        return None
