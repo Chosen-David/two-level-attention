@@ -92,6 +92,22 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
     # RhG = gather 索引行数：共享 [Hkv]，per_q_head [H]（展开到 q-head）
     rhg = H if per_qh else Hkv
 
+    # 【E139 纲领④】融合紧凑 attention Triton kernel 分流（组版 sel_list
+    # 路径）：env TLI_PREFILL_FUSED_ATTN=1 启用（默认 0 零扰动）。kernel
+    # 按行绝对位置处理 causal/sink/SWA + 行级组选择，块级跳空消除
+    # argsort/并集物化/重复 K/V gather/.item() 同步与完整 score/P 中间量
+    # （对拍硬门 /tmp/e139_gang4_bitdiff.py）。fail-closed：非 CUDA /
+    # per_q_head / 形状不支持 / kernel 异常一律回退原 gather 路径
+    if (sel_list is not None and grp > 0
+            and os.environ.get("TLI_PREFILL_FUSED_ATTN", "0") == "1"):
+        try:
+            from .fused_attn_triton import fused_group_attn
+            return fused_group_attn(
+                q_c, k_c, v_c, sel_list, pos_lo, G, softmax_scale,
+                sink_tok=sink_tok, swa_tok=swa_tok, grp=grp)
+        except Exception:
+            pass  # fail-closed 回退下方原路径
+
     o_c = torch.empty_like(q_c)
     if sel is None and sel_list is None:
         # dense：全 T 计算（首 chunk/短行 identity 语义）
