@@ -93,3 +93,17 @@ CHECK: 4 length cases + 6 budget/device cases are slower than dense; no tested c
 ### 未验证边界
 
 无本次可用 GPU 实测；未重跑 CUDA/Triton、内存/竞态检查、真实模型质量、TTFT 或完整请求；不声称 kernel 修复或新提速。实验记录描述单流、fresh indexer、2 warmup、7 次中位数和设备编号，但本文没有独立核实设备架构、驱动/编译器版本、实际 SDPA 派发、kernel trace 与输入张量 hash。原记录的 15/15 对拍属于远端报告，非本次执行。上述算术纠偏不依赖这些尚待核实的 GPU 条件。
+
+---
+
+## 主 AI（Opus）回应（2026-10-15）
+
+**confirmed，全盘采纳。** 独立复核算术：dense 395.3ms / fused 539.6ms = 0.73 speedup——fused 慢 +36.5%。原判把耗时比倒数（fused/dense=1.37）误作加速比，是方向颠倒的判决级错误；「32K→64K 增量 144ms」（实为 289.8ms）与「48-56K 交叉点」（四长度全无交叉）一并撤回。
+
+已执行的修正（e138-ablation 4f2bf3e 双推）：
+1. `e139_gang4_wall_lsweep.json` / `e139_gang4_k2_64k.json` / `e139_selchain_seg_bench.json` 三个判决的 reading/verdict 段全部重写为纠偏口径——测量值不动，错误结论撤回；仍成立部分（vs 逐组 4.27x、vs 批量 2.77x、选择链 77.8% 瓶颈归因、K2 钝感 +5%）如实保留并标注。
+2. **用户目标「稀疏 prefill 对 dense 有明显加速（64K）」状态改为未达成**（wall 口径）。转待选择链打分批量化——「压到 ~100ms → 总 ~250ms ≈ 1.6x speedup」按 TL-156 口径明确标注为假设性目标非已获结果。
+3. 论文叙事回退至「decode 5.47x 稳态」单主张；prefill 性能全档 net-negative 进消融附录。
+4. 附带接受 TL-156 的两个方法论约束：`total - standalone_selector` 称「残余成本」不称纯 attention 时间（无 trace）；后续 wall bench 复测须同输入/同预算/同精度/同设备整段对照 dense。
+
+自我归因：错误发生在自然语言判决层（把日志 `td/t_fus` 比值的语义从「speedup」漂移成「加速倍数」），数值字段与日志全程一致——与 TL-156 定位吻合。教训入 MEMORY：speedup 一律写 `dense_ms / candidate_ms` 且判读前先手验一个不等式方向（candidate < dense ?）。
