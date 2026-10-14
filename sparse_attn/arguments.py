@@ -38,6 +38,21 @@ def _add_minference_args(parser: argparse.ArgumentParser):
     group.add_argument('--minference_starting_layer', type=int, default=-1)
     return parser
 
+def _add_sparq_args(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title='sparq')
+    # SparQ vendor（官方源码复用）：decode 时 |Q| 的 r 个最大坐标近似注意力
+    # 分数 → top-k（k 个 token）→ 全维 QK 精确注意力 + V_mean lerp 插值。
+    # 主表口径（用户 2026-10-14 拍板）：k 固定 1024（token budget 与
+    # quest/fasa 对齐）；r = max(1, round(head_dim / (context_length/(2*k))))
+    # 随序列长度变化（Qwen3-8B head_dim=128 → 32K: r=8；128K: r=2）。
+    group.add_argument('--sparq_k', type=int, default=1024,
+                       help='SparQ top-k token 预算（主表口径固定 1024）')
+    group.add_argument('--sparq_context_length', type=int, default=None,
+                       help='SparQ r 反推用的 context_length（默认 None = 跟随任务'
+                            ' --context_length，即 r 随序列长度自适应）')
+    return parser
+
+
 def _add_fasa_args(parser: argparse.ArgumentParser):
     group = parser.add_argument_group(title='fasa')
     # FASA vendor（官方源码复用）：decode 时按频率分组 agreement（Phase 1 校准产物
@@ -213,10 +228,11 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'tia', 'twi', 'tli', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'tia', 'twi', 'tli', 'none'])
     parser = _add_quest_args(parser)
     parser = _add_minference_args(parser)
     parser = _add_fasa_args(parser)
+    parser = _add_sparq_args(parser)
     parser = _add_twilight_args(parser)
     parser = _add_tia_args(parser)
     parser = _add_tli_args(parser)

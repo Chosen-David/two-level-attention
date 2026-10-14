@@ -282,6 +282,33 @@ def main():
             max_k=getattr(args, "fasa_max_k", 16),
             mode=getattr(args, "fasa_mode", "topk"),
         )
+    elif args.method == "sparq_vendor":
+        # SparQ（bandwidth-efficient sparse attention）B 轨官方源码复用——
+        # qwen3_sparq_patch.py 仅接口胶水（GQA repeat_kv 展开 + V_mean
+        # dtype/device 迁移 + DynamicCache 4.56 全量 slice 适配），核心
+        # sparq_attn 来自 sparq_attention_official.py（与 graphcore
+        # sparq-gpt-fast 的 sparq.py 逐字节一致，md5=522a085c）。
+        # 主表口径（用户 2026-10-14 拍板）：k 固定 1024；r 随序列长度
+        # 由 ratio=context_length/(2*k) 反推，context_length 默认跟随任务
+        # --context_length（128K RULER → r=2），可用 --sparq_context_length
+        # 显式覆盖。
+        vendor_dir = os.path.join(
+            REPO, "exp", "vendor_baselines", "sparq_vendor")
+        if vendor_dir not in sys.path:
+            sys.path.insert(0, vendor_dir)
+        from qwen3_sparq_patch import enable_sparq  # noqa: E402
+        # --sparq_context_length 注册默认 None：getattr 返回 None 而非默认值，
+        # 须显式回退到任务 --context_length（RULER 各 L 档位）。生效 ctx 存
+        # _sparq_ctx_effective 供 treatment 名编码（r 随序列长度变，不同
+        # ctx = 不同 treatment，防 32K/64K/128K 同名互覆）。
+        _sparq_cl = getattr(args, "sparq_context_length", None)
+        _sparq_ctx = (_sparq_cl if _sparq_cl else args.context_length)
+        setattr(args, "_sparq_ctx_effective", _sparq_ctx)
+        n_patched = enable_sparq(
+            model,
+            k=getattr(args, "sparq_k", 1024),
+            context_length=_sparq_ctx,
+        )
     else:
         n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:

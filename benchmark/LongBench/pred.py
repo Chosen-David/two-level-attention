@@ -582,6 +582,47 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
             min_k=getattr(args, "fasa_min_k", 16),
             max_k=getattr(args, "fasa_max_k", 16),
             mode=getattr(args, "fasa_mode", "topk"))
+    elif args.method == "sparq_vendor":
+        # B 轨 vendor（官方源码复用）：SparQ（graphcore bandwidth-efficient
+        # sparse attention）纯 PyTorch 无 CUDA kernel 无离线校准。qwen3_
+        # sparq_patch.py 只做接口胶水（GQA repeat_kv 展开 + V_mean dtype/
+        # device 迁移 + DynamicCache 4.56 全量 slice 适配），核心 sparq_attn
+        # 来自 sparq_attention_official.py（与官方 sparq.py 逐字节一致，
+        # md5=522a085c）。主表口径（用户 2026-10-14 拍板）：k 固定 1024；
+        # r 随序列长度由 ratio=context_length/(2*k) 反推。LongBench 任务
+        # 序列长度 0.5k~32k，context_length 默认取模型 cap（31500）。
+        import sys
+        repo = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", ".."
+        )
+        vendor_dir = os.path.join(repo, "exp", "vendor_baselines", "sparq_vendor")
+        sys.path.insert(0, vendor_dir)
+        from qwen3_sparq_patch import enable_sparq
+        # --sparq_context_length 默认 None → 回退到 LongBench 协议 cap
+        # （model2maxlen.json，Qwen3-8B=31500）：ratio=31500/(2*1024)=15.4
+        # → r=round(128/15.4)=8，与用户拍板口径（S=32768→r=8）一致。
+        # 不用 model.config.max_position_embeddings（Qwen3-8B=40960 → r=6，
+        # 偏离口径，高估序列上界）。生效 ctx 存 _sparq_ctx_effective 供
+        # treatment 名编码——r 随序列长度变，不同 ctx = 不同 treatment，
+        # 防跨档位同名互覆。
+        _sparq_cl = getattr(args, "sparq_context_length", None)
+        if _sparq_cl is None:
+            try:
+                import json as _json
+                _cap_file = os.path.join(
+                    getattr(args, "config_path", ""), "model2maxlen.json")
+                with open(_cap_file) as _f:
+                    _sparq_ctx = int(_json.load(_f)[args.model])
+            except (OSError, KeyError, TypeError, ValueError):
+                _sparq_ctx = 32768  # 兜底：用户口径 S=32768 → r=8
+        else:
+            _sparq_ctx = _sparq_cl
+        setattr(args, "_sparq_ctx_effective", _sparq_ctx)
+        n_patched = enable_sparq(
+            model,
+            k=getattr(args, "sparq_k", 1024),
+            context_length=_sparq_ctx,
+        )
     else:
         n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:

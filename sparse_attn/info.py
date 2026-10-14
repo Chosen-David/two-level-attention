@@ -791,6 +791,21 @@ def get_method_name_with_info(args, snapshot=None):
                 f"_k{getattr(args, 'fasa_min_k', 16)}-{getattr(args, 'fasa_max_k', 16)}"
                 f"_{getattr(args, 'fasa_mode', 'topk')}"
                 f"_agr{_fasa_agreement_sha8(args)}")
+    elif args.method == "sparq_vendor":
+        # B 轨 vendor（官方源码复用）：SparQ decode top-k + V_mean 插值。
+        # 主表口径（用户 2026-10-14 拍板）：k 固定 1024；r 由
+        # context_length 反推（r=round(head_dim/(ctx/(2k)))）——ctx 不同 =
+        # 不同 treatment，必须编码进文件名（LongBench 默认模型 cap 31500
+        # vs RULER 32K/64K/128K 各 L 档位），防跨序列长度同名互覆。
+        # ctx 优先消费入口冻结的 _sparq_ctx_effective（pred 两入口在
+        # enable_sparq 前 setattr，与 runtime 实际生效值同源）。
+        _ctx = getattr(args, "_sparq_ctx_effective", None)
+        if _ctx is None:
+            _ctx = getattr(args, "sparq_context_length", None)
+        if _ctx is None:
+            _ctx = getattr(args, "context_length", 31500)
+        return (f"sparq_vendor_k{getattr(args, 'sparq_k', 1024)}"
+                f"_cl{_ctx:g}")
     elif args.method == "twi":
         return f"twi_{args.twi_block_size}_{args.twi_level1_topk}_{args.twi_level2_topp}"
     elif args.method == "tia":

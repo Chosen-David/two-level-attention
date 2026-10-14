@@ -1,0 +1,7 @@
+按照顶会可视化审美做出如下图
+
+我们的论文observation需要加上swa和sink的观察吗？可以参考clusterKV这篇论文思考我们应该如何做。但是你这里可以画一个分割线，也即过了这个分割先后面可能选择的重要token数降低这样的数据 -> 引出我们的near far的贡献
+
+此外near+far的atten mass也可以采集放上去->引出我们的gate的贡献，也即部分far区域可以跳过（记得选某些层那种near区域聚集但是far区域很稀疏的atten mass极低的）我们论文里面可以表述只占比多少atten mass这种
+
+低频子空间如何引出observation?可以参考FASA或者相关论文呢
