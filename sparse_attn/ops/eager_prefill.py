@@ -25,6 +25,7 @@ chunk 末行的 sink/SWA，块内早行自己的 128-token 局部窗口不保证
 已知成本（E107a 诊断）：每 chunk 的 prepare_mask 走 prepare_index 全量
 重建 O(S²/chunk)——质量路径可接受；sglang serving 路径已有 F1-F3 增量化。
 """
+import operator
 import os
 
 import torch
@@ -125,24 +126,47 @@ def sparse_prefill_attn(
     注意：不改 tli_indexer.py 的单行 query 断言（保护在跑语义）——本函数
     每 chunk 只喂末行单行 q（reshape 成 [1,1,H,D]）。
     """
-    L, H, D = q.shape[1], q.shape[2], q.shape[3]
-    S = k.shape[1]
-    assert q.shape[0] == 1 and k.shape[0] == 1, "质量路径假设 B=1"
-    assert L == S, "质量路径假设 prefill 时 q/k 等长（无 prefix 续写）"
+    # Metadata-only guards: do not use assert, which disappears with python -O.
+    # The row implementation consumes batch 0 only and allocates an output with
+    # q's shape, so accepting other batches could return unwritten elements.
+    if any(t.ndim != 4 for t in (q, k, v)):
+        raise ValueError("prefill q/k/v must be rank-4 [B, S, H, D] tensors")
+    if any(t.shape[0] != 1 for t in (q, k, v)):
+        raise ValueError("prefill supports B=1 only")
+    if k.shape != v.shape:
+        raise ValueError("prefill k/v shapes must match")
+    L, H, D = q.shape[1:]
+    S, Hkv = k.shape[1:3]
+    if L != S:
+        raise ValueError("prefill requires equal q/k lengths (no cached prefix)")
+    if D < 1 or D != k.shape[-1]:
+        raise ValueError("prefill q/k/v head dimensions must match and be positive")
+    if H < 1 or Hkv < 1 or H % Hkv != 0:
+        raise ValueError("prefill requires positive heads and H divisible by Hkv")
     if softmax_scale is None:
         softmax_scale = D ** -0.5
     if chunk_size is None:
         chunk_size = int(
             os.environ.get("TLI_SPARSE_PREFILL_CHUNK", SPARSE_PREFILL_CHUNK)
         )
+    if isinstance(chunk_size, bool):
+        raise ValueError("prefill chunk_size must be a positive integer")
+    try:
+        chunk_size = operator.index(chunk_size)
+    except TypeError as exc:
+        raise ValueError("prefill chunk_size must be a positive integer") from exc
+    if chunk_size <= 0:
+        raise ValueError("prefill chunk_size must be a positive integer")
     if dense_below is None:
         dense_below = getattr(indexer.args, "tia_level2_topk", 1024)
 
-    G = H // k.shape[2]
+    G = H // Hkv
     # 行级保护带尺寸（与 indexer mask 强制区同源；getattr 兜底对齐默认配置）
     swa_tok = int(getattr(indexer, "sliding_window_size", 128))
-    _bs = int(getattr(indexer.args, "tia_block_size", 64))
-    sink_tok = int(getattr(indexer, "sink_blocks", 2)) * _bs
+    # E135 makes sink_tokens authoritative; sink_blocks is historical metadata.
+    # Reconstructing it from page size silently adds unselected tokens when the
+    # configured sink is shorter (including sink=0).
+    sink_tok = int(getattr(indexer, "sink_tokens", 128))
     o = torch.empty_like(q)
     for c0 in range(0, L, chunk_size):
         c1 = min(c0 + chunk_size, L)
