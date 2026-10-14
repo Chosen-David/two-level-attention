@@ -1,0 +1,30 @@
+{
+  "exp": "E139 #253 Step2 判决：L2 双池 topk 候选列化（env TLI_PREFILL_L2_TOPK_CAND）——64K 对 dense 1.64x 净加速（wall 口径）",
+  "date": "2026-10-15",
+  "protocol": {
+    "env": "本机 GPU0 独占；树 /tmp/wt_e138_ablation（e138-ablation 工作树）；L∈{8K,16K,32K,64K} grp64 K2=1024 生产口径；7-iter 中位 warmup2；单流 PREFETCH=0；BATCH+FUSED+GRAPH 全开",
+    "design": "⑤ 段 ④ 步替换：p 全宽 softmax/mean 不变（值 gather 零 ULP）→ 候选列 [N,Hkv,C] 批量 topk（2 个大 kernel 替代 2N 次全宽 O(W) topk）→ 池掩码 where 合成 → k>cnt 行零补位仿真（_zero_pad_pool 分支免化·graph capture 安全）",
+    "feasibility": "e139_step2_topk_cand_feasibility.json：① tie 位置序等价 0/320 全格 ② k>cnt 零补位序等价 0/320 全格（探针初版 320/320 不匹配系探针自身 k2 计算负数切片 bug，修正后全过）"
+  },
+  "results": {
+    "hard_gate_mask_bitdiff": "e139_step2_cand_bitdiff.py：G3 CAND=0 同输入两次 diff=0（默认路径零扰动）；G1 CAND=1 vs CAND=0 diff_rows=0/1008 diff_tokens=0（K2=1024 生产档 + K2=8192 补位应力档双档）；G2 GRAPH=1 capture 层 + 2 个换 seed/fresh_idx replay 层 diff=0/1008（双档）",
+    "hard_gate_e2e_output": "e139_step2_cand_e2e_bitdiff.py：L∈{8192,32768,65536} × {Step2 eager vs Step1 eager / capture vs Step2 eager / 跨实例 replay vs Step2 eager} maxdiff=0.000e+00 全格 + nan=0——mask 逐位一致经同一 attention 链 → 输出逐位一致",
+    "regression": "E127 门禁 15/0 + e138b prefill bitdiff 17/17 + e138 grp bitdiff 5/5 (allclose 口径) + test_sparse_prefill_impl 7/7 全绿",
+    "selection_chain_wall": "K2=1024 graph 口径（e139_step2_cand_bitdiff 内嵌四格）：eager 旧 388.1 / eager Step2 305.3 / graph 旧 207.8 / graph Step2 120.7ms——选择链 graph 2.07x→**1.72x 追加**（topk 段 111.5ms 投影 ~20ms 兑现为 87.1ms 差值，含 gather/where/scatter 新增成本）",
+    "wall_lsweep": {
+      "L_8192": "dense 6.8 / Step1 graph 26.1 / Step2 graph 21.5ms（vs dense 0.31x）",
+      "L_16384": "dense 25.9 / Step1 graph 61.4 / Step2 graph 48.4ms（vs dense 0.53x）",
+      "L_32768": "dense 101.0 / Step1 graph 144.1 / Step2 graph 107.6ms（vs dense 0.94x）",
+      "L_65536": "dense 398.1 / Step1 graph 328.9 / **Step2 graph 242.2ms（vs dense 1.64x 净加速；手验 242.2<398.1 ✓）**",
+      "reading": "64K 净加速 1.22x（Step1）→ **1.64x（Step2）**；交叉点从 ~45-50K 下移至 ~33K；32K 档 0.94x 接近持平；短档仍净负（选择链固定开销占比高）。投影 ~235ms 实测 242.2ms 偏差 ~3%"
+    }
+  },
+  "implementation_notes": {
+    "v1_regression_lesson": "逐行 [Hkv,C] 微网格 topk × 2N 次 = launch/延迟受限，比 O(W) 全宽 topk 更慢（eager 392→533ms 回归）——v2 全批量化（池掩码/topk/rank 过滤跨行批量，2 个大 [N,Hkv,C] topk kernel）后才兑现",
+    "scatter_false_erase_bug": "v2 初版 K2=8192 档 890/1008 diff：m.scatter_(src=ok_mask) 会把 False 写进真实池位置（near 池的 -inf 槽指向 far 池候选位，覆写 far 已写的 True）——修复 = 批量重定向 torch.where(ok, sel, 0)（token 0 ∈ sink 区幂等 True），与既有 ② 段 idx_w 模式同构",
+    "l1_garbage_slot": "L1 topk 的 -inf 补位块号可 ≥ g1_j 越界——cat 前 where(valid, idx, 0) 净化（块 0 ∈ sink 区非候选，行为中性）",
+    "graph_key": "use_cand_topk 进 graph cache key（env 指纹防缓存混用）"
+  },
+  "verdict": "Step2 验收全过并落袋：硬门（mask 逐位 0/N + e2e 输出 maxdiff=0.0 三长度 + 回归全绿）+ 性能兑现（64K 1.64x vs dense，选择链 graph 207.8→120.7ms）。env TLI_PREFILL_L2_TOPK_CAND 默认 0 fail-closed。#253 剩余杠杆：Step3 fine tile 已判『收益不足不实施』（e139_step3_tile_scan_verdict，全档 -1.8%）",
+  "scripts": ["exp/bench/e139_step2_cand_bitdiff.py", "exp/bench/e139_step2_cand_e2e_bitdiff.py", "exp/bench/e139_step2_wall_lsweep.py"]
+}

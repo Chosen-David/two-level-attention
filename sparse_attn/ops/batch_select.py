@@ -50,6 +50,18 @@ allclose 且 maxdiff=0.000e+00，因果探针非跨界 chunk 零 diff + 同输�
      （sink 区 [0,sink) 恒非候选，-inf 幂等写入无覆盖）。历史教训：
      trash 列全宽 scatter 版的 False 直写会覆盖先前段已写的 True 选中
      （near 池补位块号落 far 段，组 0 far L2 选中被全部抹 False）。
+  ⑦ 【#253 Step2】L2 双池 topk 候选列化（env TLI_PREFILL_L2_TOPK_CAND
+     默认 0 fail-closed）：p 全宽计算（②③ 段）不变，④ 步 topk 从池位置
+     切片 O(W) radix select 换成候选列 topk O(C)。p 值 gather 自同一全宽
+     p 张量（零 ULP——区别于已证伪的候选列 softmax 归约树差 0.1% 翻转）。
+     等价性实证 e139_step2_topk_cand_feasibility（0/320 全格）：
+     (a) 候选按位置序（cand_blk sort）后 CUDA radix topk 相等值取低
+     index ≡ 全宽位置序 tie 序；(b) k > cnt（池内候选数，仅大 K2/窄池
+     档出现）时全宽零补位 = 池内非候选块 token 位置序前 (k-cnt) 个——
+     _zero_pad_pool 补位仿真。cnt 只依赖池几何（sc -inf 模式头不变，
+     与数据无关）→ nbad 是 host 常量分支，CUDA Graph capture 安全。
+     已知残余边界：候选 p 值 bf16 下溢恰为 0.0 时与补位零的位置序混合
+     （生产 score 范围内概率极低，bitdiff 硬门把关）。
 
 fail-closed：任何配置不匹配（非 4bit 选择 / 非 e64 分区 / per_q_head /
 σ / MoBA / sinkswa_only / async / 投影基 / l2=full / 非 tail 子空间 /
@@ -107,6 +119,30 @@ def _graph_cached_run(key, body_fn, inputs):
             statics[n].copy_(t)
     g.replay()
     return out
+
+
+def _zero_pad_pool(m, blk_idx, blk_valid, lo_blk, n_pool, nbad, dev):
+    """【#253 Step2】k > cnt 零补位仿真（分支免化·graph capture 安全）。
+
+    全宽 topk 在 k 超过池内候选数 cnt 时，零值（非候选）位置按位置序
+    升序补位。候选是 64-token 整块 → 非候选池位置 = 非 L1 选中块的
+    token，位置序 = 块序 × 块内偏移：非选中块排他 cumsum×64 + offset
+    < nbad 即入选（固定形状，无数据相关分支）。nbad = k - cnt 是 host
+    常量（cnt = min(k1 池预算, 池块数)×64 只依赖池几何）。无效槽
+    （L1 topk -inf 垃圾块号，可能越界）统一散到 dummy 列 n_pool 防止
+    scatter 越界/与真实选中块碰撞。
+    """
+    h = blk_idx.shape[0]
+    selb = torch.zeros((h, n_pool + 1), dtype=torch.bool, device=dev)
+    safe = torch.where(blk_valid, blk_idx - lo_blk,
+                       torch.full_like(blk_idx, n_pool))
+    selb.scatter_(1, safe, blk_valid)
+    nonsel = ~selb[:, :n_pool]                              # [h, n_pool]
+    csum = torch.cumsum(nonsel.to(torch.int32), dim=-1)
+    base = (csum - nonsel.to(torch.int32)) * 64             # 排他块序 ×64
+    off = torch.arange(64, device=dev)
+    cond = nonsel[..., None] & (base[..., None] + off < nbad)
+    m[:, lo_blk * 64:(lo_blk + n_pool) * 64] |= cond.reshape(h, -1)
 
 
 def _gate_ok(indexer, q, k):
@@ -301,6 +337,31 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
     h_idx_col = torch.arange(Hkv, device=dev).view(Hkv, 1)  # 广播 gather 列
     k2_far_l = k2_far.tolist()
     k2_near_l = k2_near.tolist()
+    # 【#253 Step2】L2 双池 topk 候选列化（默认 0 fail-closed；graph key
+    # 含该 env 指纹——env 翻转不混用缓存）。逐行小 kernel 版实测倒挂
+    # （[Hkv,C] 微 grid × 2N 次 topk 的 launch/延迟 > topk 节省）→ v2
+    # 批量化：池掩码/topk/rank 过滤全部跨行批量（层内 2 次大 topk），
+    # 逐行仅剩 pc gather + mask scatter 两个不可批量 kernel。
+    use_cand_topk = os.environ.get("TLI_PREFILL_L2_TOPK_CAND", "0") == "1"
+    if use_cand_topk:
+        # 层不变 device/host 值（graph capture 外一次性外提——k_max 的
+        # .max() 是 D2H 同步，禁入 capture 区）
+        swa_lo_all = (g1 - swa_tok).clamp(min=0)              # [N]
+        k_near_all = torch.minimum(
+            k2_near, (swa_lo_all - far_tok_hi).clamp(min=0))  # [N]
+        k_max_f = int(k2_far.max())
+        k_max_n = int(k_near_all.max())
+        keep_f = (torch.arange(k_max_f, device=dev)[None, :]
+                  < k2_far[:, None]) if k_max_f > 0 else None
+        keep_n = (torch.arange(k_max_n, device=dev)[None, :]
+                  < k_near_all[:, None]) if k_max_n > 0 else None
+        k_near_l = k_near_all.tolist()
+        # nbad = k − cnt（cnt = min(池预算, 池块数)×64 只依赖池几何——
+        # L1 sc 的 -inf 模式头不变，与数据无关）→ host 常量，capture 安全
+        nbad_f_l = [int(k2_far_l[j]) - min(kf, int(nb_l[j]) - far_lo) * 64
+                    for j in range(N)]
+        nbad_n_l = [k_near_l[j] - min(kn, int(sl_l[j]) - int(nb_l[j])) * 64
+                    for j in range(N)]
 
     # ---- ③④⑤ 选择体（输入 k_min/k_max/k_avg/k_qat/b_q 逐层变化；其余
     # 闭包捕获层间不变量）——eager 与 CUDA Graph capture 共用同一 body ----
@@ -360,8 +421,21 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
             valid_n = i_n.bool()
         # 候选块布局：[far 槽(nf) | near 槽(nn)]——far/near 池块区间不相交，
         # topk 索引无重复 → token 无重复
+        if use_cand_topk:
+            # L1 垃圾槽（-inf 补位块号，可 ≥ g1_j 越界）清零到块 0：块 0
+            # ∈ sink 区恒非候选 → cand_tok 全程 < g1_j（gather/scatter 免
+            # 越界防护），行为中性（② 段 idx_w 本就重定向无效槽到 0）
+            i_f = torch.where(valid_f, i_f, torch.zeros_like(i_f))
+            i_n = torch.where(valid_n, i_n, torch.zeros_like(i_n))
         cand_blk = torch.cat([i_f, i_n], dim=-1)                # [N,Hkv,C_blk]
         cand_valid_blk = torch.cat([valid_f, valid_n], dim=-1)
+        if use_cand_topk:
+            # Step2 tie 序等价性前提：cat 后块内序是 L1 topk rank 序——
+            # sort 成全局 token 位置升序（CUDA radix topk 相等值取低
+            # index，候选须位置序才与全宽位置序 tie 序一致）。valid 随
+            # perm 同步重排；①②③ 段 gather/scatter 与序无关 → 数值不变。
+            cand_blk, _perm = torch.sort(cand_blk, dim=-1)
+            cand_valid_blk = torch.gather(cand_valid_blk, -1, _perm)
         n_far = int(i_f.shape[-1])
         C_blk = int(cand_blk.shape[-1])
         C = C_blk * bs                                          # 8192（生产口径）
@@ -386,6 +460,14 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
         # allclose(1e-2) 不可达（实测 maxdiff 1.8e-1）；同形同值复刻后全部
         # 算子确定性 → mask 逐位一致。softmax/mean/topk 是逐元素/归约廉价
         # 算子（O(H·g1) ≪ 打分 O(H·C·δ)），复刻成本远小于打分省算收益。
+        if use_cand_topk:
+            # 池掩码批量化 [N,Hkv,C]（层内 6 kernel 替代逐行 6N）：
+            # far [far_lo_tok, far_tok_hi) / near [far_tok_hi, swa_lo_all)
+            in_far_b = (cand_tok >= far_lo_tok) & (
+                cand_tok < far_tok_hi.view(N, 1, 1))
+            in_near_b = (cand_tok >= far_tok_hi.view(N, 1, 1)) & (
+                cand_tok < swa_lo_all.view(N, 1, 1))
+            pc_all = torch.empty((N, Hkv, C), dtype=qdtype, device=dev)
         out_masks = []
         for j in range(N):
             g1_j = int(group_ends[j])
@@ -412,30 +494,86 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
             p = p.view(1, 1, Hkv, G, g1_j).mean(dim=-2)     # [1,1,Hkv,g1]
             # 参考 L2051 的 swa 区 p=1.0 赋值不复刻：双池切片
             # [far_lo,far_hi)/[far_hi,swa_lo) 均不含 [swa_lo,g1)，值不受影响
+            if use_cand_topk:
+                # ④'-pre：候选列 p 值 gather 进批量缓冲（零 ULP——纯
+                # gather 无算术；垃圾槽已清零 → 恒 < g1_j 无越界）
+                torch.gather(p[0, 0], 1, ct_j, out=pc_all[j])
+                continue
             # ④ L2 双池位置切片 topk（预算 host 标量逐行；参考 L2262-2354
             # 同款 guard/k/偏移——far 空 guard L2254-2255、near 倒挂 L2350）
+            # ——默认路径零扰动原样保留
             far_hi_tok = min(int(nb_l[j]) * bs, g1_j)
             swa_lo_tok_j = max(0, g1_j - swa_tok)
             if far_hi_tok > far_lo_tok:
-                i_f = torch.topk(
+                i_f2 = torch.topk(
                     p[..., far_lo_tok:far_hi_tok], k2_far_l[j],
                     dim=-1).indices + far_lo_tok
             else:
-                i_f = p.new_zeros((1, 1, Hkv, 0), dtype=torch.long)
+                i_f2 = p.new_zeros((1, 1, Hkv, 0), dtype=torch.long)
             if swa_lo_tok_j > far_hi_tok:
                 near_p = p[..., far_hi_tok:swa_lo_tok_j]
-                i_n = torch.topk(
+                i_n2 = torch.topk(
                     near_p, min(k2_near_l[j], int(near_p.shape[-1])),
                     dim=-1).indices + far_hi_tok
             else:
-                i_n = i_f[..., :0]
+                i_n2 = i_f2[..., :0]
             # ⑤ mask：scatter + sink/swa 正交强制区（参考 L2352-2358 同款）
             m = torch.zeros((1, 1, Hkv, g1_j), dtype=torch.bool, device=dev)
-            m.scatter_(-1, i_f, True)
-            m.scatter_(-1, i_n, True)
+            m.scatter_(-1, i_f2, True)
+            m.scatter_(-1, i_n2, True)
             m[..., :sink_tok] = True
             m[..., swa_lo_tok_j:g1_j] = True
             out_masks.append(m[0, 0])
+        if use_cand_topk:
+            # ④' 【#253 Step2 v2】L2 双池 topk 候选列化（跨行批量）：O(C)
+            # topk 两池各一次全批量 kernel（[N·Hkv, C] 满占用，替代 2N 次
+            # [Hkv, W/C] 微 grid topk——v1 逐行版实测倒挂的根因）。等价性：
+            #   ① p 值 gather 自同一全宽 p 张量（零 ULP）+ 候选位置序
+            #     （cand_blk sort）→ tie 序 ≡ 全宽位置序（radix topk
+            #     相等值取低 index）；
+            #   ② k 逐行差异（k2_far_l[k]）用 rank < k_j 掩码分支免化
+            #     （keep_f/keep_n 层不变批量掩码），k > cnt 行的 -inf 槽
+            #     过滤 + _zero_pad_pool 池内非候选块位置序补位仿真。
+            # scatter src 用 ok 掩码张量（True/False 槽）——False 槽位置
+            # 与 True 槽/他池/强制区互斥，写 False 等价不写。
+            # 【关键】ok=False 槽（rank 溢出 + -inf 补位）批量重定向到
+            # token 0（sink 区恒 True，幂等）：-inf 槽指向池外候选位置，
+            # near/far 双 scatter 有序执行时后者会把前者已写的 True 抹
+            # False（K2=8192 补位档实测 890/1008 崩）——与 ② 段 idx_w 同
+            # 一防护，批量 where 层内 1 kernel。
+            k_f_t = min(k_max_f, C)
+            if k_f_t > 0:
+                pc_f = torch.where(in_far_b, pc_all, float("-inf"))
+                tv_f = torch.topk(pc_f, k_f_t, dim=-1)     # [N,Hkv,k_f_t]
+                sel_f = cand_tok.gather(-1, tv_f.indices)
+                ok_f = (tv_f.values > float("-inf")) & keep_f[:, None, :k_f_t]
+                sel_f = torch.where(ok_f, sel_f, 0)
+            k_n_t = min(k_max_n, C)
+            if k_n_t > 0:
+                pc_n = torch.where(in_near_b, pc_all, float("-inf"))
+                tv_n = torch.topk(pc_n, k_n_t, dim=-1)
+                sel_n = cand_tok.gather(-1, tv_n.indices)
+                ok_n = (tv_n.values > float("-inf")) & keep_n[:, None, :k_n_t]
+                sel_n = torch.where(ok_n, sel_n, 0)
+            # ⑤ 逐行 mask scatter（m 宽度逐行不同，不可批量）+ 补位 +
+            # sink/swa 强制
+            for j in range(N):
+                g1_j = int(group_ends[j])
+                swa_lo_tok_j = max(0, g1_j - swa_tok)
+                m = torch.zeros((1, 1, Hkv, g1_j), dtype=torch.bool, device=dev)
+                if k_f_t > 0:
+                    m[0, 0].scatter_(-1, sel_f[j], True)
+                if nbad_f_l[j] > 0:
+                    _zero_pad_pool(m[0, 0], i_f[j], valid_f[j], far_lo,
+                                   int(nb_l[j]) - far_lo, nbad_f_l[j], dev)
+                if k_n_t > 0:
+                    m[0, 0].scatter_(-1, sel_n[j], True)
+                if nbad_n_l[j] > 0:
+                    _zero_pad_pool(m[0, 0], i_n[j], valid_n[j], int(nb_l[j]),
+                                   int(sl_l[j]) - int(nb_l[j]), nbad_n_l[j], dev)
+                m[..., :sink_tok] = True
+                m[..., swa_lo_tok_j:g1_j] = True
+                out_masks.append(m[0, 0])
         return out_masks
 
     # ---- 双路径：CUDA Graph（env TLI_PREFILL_SELECT_GRAPH 默认 0 fail-closed）
@@ -448,7 +586,7 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
         # 首层几何（层间不变）与首层 indexer（仅 capture 期发起 kernel，
         # 参数固化为 statics 指针，replay 不再访问实例）
         key = (L, N, kf, kn, K2arg, tuple(group_ends),
-               far_use_mm, near_use_mm)
+               far_use_mm, near_use_mm, use_cand_topk)
         try:
             return _graph_cached_run(
                 key, _body,
