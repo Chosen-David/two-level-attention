@@ -60,7 +60,7 @@ def _row_block_size(rhg, w_sel_max, swa_tok, sink_tok=0, budget=_ROW_BLOCK_MAX_E
 
 
 def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
-                     sink_tok=0, swa_tok=0):
+                     sink_tok=0, swa_tok=0, w_sel_cap=0):
     """单个 chunk 的行级 attention（高性能 gather 紧凑版）。
 
     q_c: [1, len, H, D]；k_c/v_c: [1, T, Hkv, D]；sel: [Hkv, T]（kv-head
@@ -105,8 +105,14 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
 
     # ---- 稀疏：行块级 gather 紧凑计算 ----
     sel_e = sel if not per_qh else sel.reshape(-1, T)      # [RhG, T]
-    # 共享选择满额上界（chunk 内恒定，供 R 估算）
-    w_sel_max = int(sel_e[:, : T].sum(dim=-1).max().item())
+    # 共享选择满额上界：w_sel_cap（调用方按 indexer 配置算的理论满额，
+    # K2 mid + sink + 末行 swa + 块对齐松弛）；w_sel_cap=0 时回退 GPU
+    # 实测（.item() 同步，仅独立调用形态兜底）。上界宽松无害——W 用
+    # 上界多出的 pad 列由 valid mask 屏蔽（exp=0 不进 softmax 分母）
+    if w_sel_cap > 0:
+        w_sel_max = int(w_sel_cap)
+    else:
+        w_sel_max = int(sel_e[:, : T].sum(dim=-1).max().item())
     R = _row_block_size(rhg, w_sel_max, swa_tok, sink_tok)
     for r0 in range(0, len_r, R):
         r1 = min(r0 + R, len_r)
@@ -125,10 +131,13 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
             # no-op，跳过省一次 kernel 发射
             vis[:, p_first : p_max + 1] = True
         # compact：选中前置（stable 保持升序——softmax 非零项顺序与
-        # 原 mask 版一致，reduce 分组漂移最小化）
+        # 原 mask 版一致，reduce 分组漂移最小化）。W 用静态上界替代
+        # counts.max().item()（每行块一次 host-GPU 同步——上界差量由
+        # valid mask 屏蔽，数值不变；行块形状恒定对 allocator 友好）
         order = torch.argsort(~vis, dim=-1, stable=True)
         counts = vis.sum(dim=-1)                           # [RhG]
-        W = int(counts.max().item())
+        W = min(w_sel_max + sink_tok + (r1 - r0) + max(swa_tok, 1),
+                p_max + 1)
         idx = order[:, :W]                                 # [RhG, W] 升序位置
         pos_w = idx
         in_sel = torch.gather(sel_e[:, : p_max + 1], 1, idx)
@@ -237,6 +246,13 @@ def sparse_prefill_attn(
     swa_tok = int(getattr(indexer, "sliding_window_size", 128))
     _bs = int(getattr(indexer.args, "tia_block_size", 64))
     sink_tok = int(getattr(indexer, "sink_blocks", 2)) * _bs
+    # 共享选择满额理论上界（host 静态算，零 GPU 同步）：mid topk（K2，
+    # 块对齐 +1 块松弛）+ sink 强制 + 末行 swa 强制 + 1 块对齐余量。
+    # W 用该上界多出的 pad 列由 valid mask 屏蔽，数值不变
+    w_sel_cap = (
+        int(getattr(indexer.args, "tia_level2_topk", 1024)) + _bs
+        + sink_tok + swa_tok + _bs
+    )
     o = torch.empty_like(q)
     for c0 in range(0, L, chunk_size):
         c1 = min(c0 + chunk_size, L)
@@ -260,9 +276,11 @@ def sparse_prefill_attn(
             )
             m0 = mask[0, 0]        # [h, T_pad]（h=Hkv 共享 或 H per_q_head）
             sel = m0[..., :c1]     # 截到真实 token 数（pad 块尾巴去除）
-            # 稀疏 chunk：行级保护带生效（TL-PREFILL-SWA-002）
+            # 稀疏 chunk：行级保护带生效（TL-PREFILL-SWA-002）+ 满额
+            # 上界传参（消 w_sel_max/W 两处 .item() host-GPU 同步）
             prot_args = dict(sink_tok=sink_tok, swa_tok=swa_tok)
         o[:, c0:c1] = _chunk_rows_attn(
-            q[:, c0:c1], k_c, v_c, sel, c0, G, softmax_scale, **prot_args
+            q[:, c0:c1], k_c, v_c, sel, c0, G, softmax_scale,
+            w_sel_cap=(0 if sel is None else w_sel_cap), **prot_args
         )
     return o
