@@ -33,6 +33,14 @@
       "fused_K2_2048": 365.7,
       "speedup_2048": 1.09
     },
+    "wall_L_curve_graph": {
+      "protocol": "e139_gang4_wall_lsweep_graph.py，.187 GPU4/5 双卡交叉 ±0.3%，7-iter 中位，日志 e139_lsweep_graph_g{4,5}.log",
+      "L8192": {"dense": 6.8, "fused_no_graph": 54.3, "fused_graph": 26.1, "chain_speedup": 2.08, "vs_dense": 0.26},
+      "L16384": {"dense": 25.8, "fused_no_graph": 117.2, "fused_graph": 61.4, "chain_speedup": 1.91, "vs_dense": 0.42},
+      "L32768": {"dense": 100.7, "fused_no_graph": 250.8, "fused_graph": 143.5, "chain_speedup": 1.75, "vs_dense": 0.70},
+      "L65536": {"dense": 395.3, "fused_no_graph": 543.0, "fused_graph": 327.8, "chain_speedup": 1.66, "vs_dense": 1.21},
+      "crossover_reading": "graph 收益随 L 单调放大（链内 2.08x→1.66x 说明短 L dispatch 占比更高收益更大，但绝对墙仍被固定开销主导）；对 dense 交叉点在 32K-64K 之间（插值 ~45-50K）——TL-156 纠偏时撤回的『交叉点』图化后真实存在；8K-32K 档仍净负，dense 仍是短 prefill 最优"
+    },
     "regression": {
       "e127_gates": "15 PASS / 0 FAIL",
       "e138b_prefill_bitdiff": "17/17 PASS",
@@ -47,7 +55,7 @@
     "k2_curve_post_graph": "K2 敏感度 1024→2048 = +11.7%（327.4→365.7）vs 融合态无图版 +5%——图化后选择链地板压低，attention 段列宽增量占比上升；K2=1024 甜点不变",
     "production_constraints": "形状静态：graph key 含 L/group_ends/config 指纹 → 生产 prefill 按长度分桶 capture 缓存（_GRAPH_CACHE_MAX=8 超限全清）；静态注入 copy_（k_min/k_max/k_avg/k_qat/b_q）<1ms；graph 输出为静态缓冲，同 stream 顺序消费满足生命周期"
   },
-  "verdict": "#253 Step1 验收通过：① mask 级硬门 0/1008（capture+3 replay 层，跨 indexer 实例）② e2e 输出级三档长度逐位一致 maxdiff=0.0 ③ 回归全绿（E127 15 + e138b 17 + grp 5 + impl 7）④ 选择链 wall 2.07x（430.5→207.6ms）⑤ 64K 生产链 327.4ms vs dense 398.3 = 1.22x 净加速——用户目标『稀疏 prefill 对 dense 有明显加速（64K）』wall 口径达成。Step2 topk 候选列化（111.5→~20ms → ~1.8x）与 Step3 A 段 fine kernel tile 是下一杠杆",
+  "verdict": "#253 Step1 验收通过：① mask 级硬门 0/1008（capture+3 replay 层，跨 indexer 实例）② e2e 输出级三档长度逐位一致 maxdiff=0.0 ③ 回归全绿（E127 15 + e138b 17 + grp 5 + impl 7）④ 选择链 wall 2.07x（430.5→207.6ms）⑤ 64K 生产链 327.4ms vs dense 398.3 = 1.22x 净加速——用户目标『稀疏 prefill 对 dense 有明显加速（64K）』wall 口径达成。L 全档补测（双卡交叉）：8K 0.26x / 16K 0.42x / 32K 0.70x / 64K 1.21x——对 dense 交叉点 ~45-50K（图化后真实存在），短档仍净负。Step2 topk 候选列化（111.5→~20ms → ~1.8x）与 Step3 A 段 fine kernel tile 是下一杠杆",
   "next": "Step2 topk 候选列化（tie 位置序 + 零补位边界仿真逐位对拍驱动）；Step3 A 段 fine kernel tile (16,1)→(64,4)（E133c A6 先例低风险）；L 曲线全档（8K-64K）graph 化收益统一补测进 wall_lsweep 判决",
   "scripts": ["exp/bench/e139_bs_graph_bitdiff.py", "exp/bench/e139_bs_graph_e2e_bitdiff.py", "exp/bench/e139_gang4_wall_k2_64k.py（既有）"]
 }
