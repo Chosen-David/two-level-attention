@@ -89,6 +89,12 @@ _TREATMENT_FIELD_DEFAULTS = {
     "tli_beta": 0.0,
     "tli_gamma": 1.0,               # γ 兜底 1.0（B09 既有约定保持；off=None 走 JSON null）
     "tli_sparse_prefill": False,
+    # 【E138 消融①】decode dense 回退开关入 manifest（TL-PREFILL-
+    # PROVENANCE-001 同族：开关改变输出必须进身份，否则 P on+DD on 与
+    # P on 两臂 manifest 逐字节相同）。默认 False；manifest 扩字段使全部
+    # treatment hash 移位一轮（E135 加 sink/swa 先例，既有锚点文件名
+    # 不重算不受影响）。
+    "tli_decode_dense": False,
     # 081 + kimi3 0316 追加修复 2：B/D 开关入 manifest（见文件头注释——
     # 截断可吃掉可读段 B/D 位，身份必须由 manifest/hash 承载）
     "tli_enable_kmeans": True,
@@ -824,6 +830,11 @@ def get_method_name_with_info(args, snapshot=None):
         # 否则 P-off/P-on 同路径 w 模式互相覆盖（GPT 审计 B09 族新实例）。默认不传
         # flag 时后缀为空 → 在跑链文件名逐位不变。
         p = "_P" if getattr(args, "tli_sparse_prefill", False) else ""
+        # 【E138 消融①】decode dense 回退标记进可读名——P on + DD on
+        # （prefill-only 稀疏臂）与 P on（双稀疏臂）文件名必须可分（同
+        # TL-PREFILL-PROVENANCE-001 族：开关不进名则同路径 w 模式互覆）。
+        # 默认关不加后缀，在跑链文件名逐位不变。
+        pdd = "_DD" if getattr(args, "tli_decode_dense", False) else ""
         # 【E135】sink/swa 非默认值/归因臂标记进可读名——默认（128/128/关）
         # 不加任何后缀，锚点文件名逐位不变；身份单射由 manifest/hash 恒承载。
         sk = getattr(args, "tli_sink_tokens", 128)
@@ -856,7 +867,7 @@ def get_method_name_with_info(args, snapshot=None):
         # 文件被替换时文件名与 runtime/sidecar 仍同源。
         return (f"tli_{args.tia_block_size}_{args.tia_level1_topk}_"
                 f"{args.tia_level2_topk}_c{args.tia_level2_cmp_ratio}_"
-                f"{ab}a{alpha:g}_b{beta:g}_g{g_str}{p}{e135}"
+                f"{ab}a{alpha:g}_b{beta:g}_g{g_str}{p}{pdd}{e135}"
                 f"_h{_treatment_hash(args, snapshot)}")
     elif args.method == "none":
         return "none"
