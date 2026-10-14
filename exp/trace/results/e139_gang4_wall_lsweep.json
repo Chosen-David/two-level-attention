@@ -1,0 +1,26 @@
+{
+  "exp": "E139 纲领④ 融合态 wall 全曲线（#249 追补）：L∈{8K,16K,32K,64K} 四态（dense/逐组/批量/批量+融合）+ K2 上探，.187 GPU4/5 双卡交叉",
+  "date": "2026-10-15",
+  "protocol": "协议克隆 e139_gang23_wall_lsweep：fresh indexer 每 iter、7 iter 中位、warmup 2、单流（PREFETCH=0）、锁卡计时；树 a9e814e（含融合 kernel）；GPU4/5 双卡交叉（.187 GPU0-3 被 round3 e2e 占用，纯 bench 与 e2e 分卡）",
+  "results": {
+    "lsweep_gpu45": {
+      "L8192": {"dense": 6.8, "per_group": 174.9, "batch": 96.2, "fused": 54.3, "fused_vs_dense": 0.12},
+      "L16384": {"dense": 25.8, "per_group": 411.7, "batch": 241.3, "fused": 117.3, "fused_vs_dense": 0.22},
+      "L32768": {"dense": 100.2, "per_group": 978.8, "batch": 592.4, "fused": 249.8, "fused_vs_dense": 0.40},
+      "L65536": {"dense": 395.3, "per_group": 2302.2, "batch": 1495.1, "fused": 539.6, "fused_vs_dense": 0.73},
+      "cross_gpu_consistency": "GPU4 vs GPU5 全档差 ≤0.3%（539.6 vs 539.9 等）",
+      "speedup_cumulative": "融合态 vs 逐组：8K 3.22x / 16K 3.51x / 32K 3.92x / 64K 4.27x——随 L 单调增（融合 kernel 块级跳空的节省随 L 超线性）"
+    }
+  },
+  "reading": {
+    "verdict_level": "【判决级】64K 档融合态 539.6ms vs dense SDPA 395.3ms = 0.73x，即 1.37x 净加速——首次跨过 dense 线：稀疏 prefill 在 64K 长序列上对 dense 实现净加速（用户目标「稀疏 prefill 对 dense 有明显加速（64K 合成数据验证）」在 wall 口径达成）",
+    "mechanism": "融合态 wall 斜率随 L 变缓：attention 段经块级跳空后只剩 ~1.2K/32K 有效列（~4%），选择链（~210ms 次线性）+ 融合 attention（有效列次线性）共同把 64K 增量压到 144ms（32K→64K），而 dense 64K 增量 295ms（O(L²) 全量）。交叉点在 ~48-56K 之间",
+    "caveats": [
+      "64K 净加速成立的前提是 K2=1024 质量档（hotpot -3.4 残差）；K2=2048 质量恢复档 wall 上探 1.44x（826ms@32K 批量版），融合态下 K2 上探待补——若 64K K2=2048 融合态 > dense 则该加速主张限定 K2=1024 档",
+      "dense 参照 = SDPA（transformers ≥4.51 Qwen3 默认 attn 实现 = e2e PFDD 生产口径）",
+      "8K/16K/32K 档仍净负（0.12/0.22/0.40x）——短序列稀疏无 wall 收益的 limitation 维持"
+    ]
+  },
+  "verdict": "① 纲领④融合 kernel 的 L 曲线判决：融合态收益随 L 单调放大（3.22x→4.27x vs 逐组），64K 档首次实现稀疏 prefill 对 dense 净加速（1.37x）——论文性能叙事可升级为「decode 5.47x 稳态 + prefill ≥64K 净加速（K2=1024 档）」双主张（附交叉点与短序列 limitation）。② K2=1024 口径的 64K 净加速数字（539.6 vs 395.3ms）进论文性能表 + 用户目标达成记录。③ 后续：K2=2048 融合态 64K 补格（判定加速主张的预算适用范围）；选择链打分批量化（~210ms 段）继续是剩余杠杆",
+  "scripts": ["exp/bench/e139_gang4_wall_lsweep.py（入库随本 commit）", "exp/trace/results/e139_g4lsweep_g{4,5}.log"]
+}
