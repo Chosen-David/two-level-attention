@@ -48,11 +48,12 @@ SPARSE_PREFILL_CHUNK = 2048
 _ROW_BLOCK_MAX_ELEM = 1 << 27
 
 
-def _row_block_size(rhg, w_sel_max, swa_tok, budget=_ROW_BLOCK_MAX_ELEM):
+def _row_block_size(rhg, w_sel_max, swa_tok, sink_tok=0, budget=_ROW_BLOCK_MAX_ELEM):
     """行子块尺寸 R：score 峰值 [R, RhG, W] 元素预算，其中
-    W ≈ w_sel_max + R + swa_tok + sink（保护带并集宽含 R 行自身窗口）。
-    解 R² + (w_sel_max + swa_tok)·R − budget/RhG ≤ 0 的正根。"""
-    b = w_sel_max + swa_tok + 1
+    W ≈ w_sel_max + R + swa_tok + sink_tok（保护带并集宽含 R 行自身
+    窗口，另加 sink 强制区）。解
+    R² + (w_sel_max + swa_tok + sink_tok)·R − budget/RhG ≤ 0 的正根。"""
+    b = w_sel_max + swa_tok + sink_tok + 1
     c = budget // max(rhg, 1)
     r = int(0.5 * (-b + (b * b + 4 * c) ** 0.5))
     return max(1, r)
@@ -83,18 +84,20 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
         # dense：全 T 计算（首 chunk/短行 identity 语义）
         R = _row_block_size(H, T, 0)
         kcol = torch.arange(T, device=device)
+        b_k = k_c[0].to(torch.float32)  # 行块外一次物化（块间重复 cast 浪费）
         for r0 in range(0, len_r, R):
             r1 = min(r0 + R, len_r)
             b_q = rearrange(
                 q_c[0, r0:r1] * softmax_scale, "r (h g) d -> r h g d", g=G
             ).to(torch.float32)
-            b_k = k_c[0].to(torch.float32)
             b_s = einsum(b_q, b_k, "r h g d, t h d -> r h g t")
             causal = (
                 torch.arange(pos_lo + r0, pos_lo + r1, device=device)[:, None]
                 >= kcol[None, :]
             )
-            b_s = torch.where(causal[:, None, None, :], b_s, float("-inf"))
+            # masked_fill_ 与原 torch.where 逐位相同（b_s 来自 einsum 为新鲜
+            # 张量，原地安全），省一份 score 峰值分配
+            b_s = b_s.masked_fill_(~causal[:, None, None, :], float("-inf"))
             b_p = F.softmax(b_s, dim=-1).to(q_c.dtype)
             b_o = einsum(b_p, v_c[0], "r h g t, t h d -> r h g d")
             o_c[0, r0:r1] = rearrange(b_o, "r h g d -> r (h g) d").to(q_c.dtype)
@@ -104,22 +107,23 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
     sel_e = sel if not per_qh else sel.reshape(-1, T)      # [RhG, T]
     # 共享选择满额上界（chunk 内恒定，供 R 估算）
     w_sel_max = int(sel_e[:, : T].sum(dim=-1).max().item())
-    for r0 in range(0, len_r, _row_block_size(rhg, w_sel_max, swa_tok)):
-        r1 = min(r0 + _row_block_size(rhg, w_sel_max, swa_tok), len_r)
+    R = _row_block_size(rhg, w_sel_max, swa_tok, sink_tok)
+    for r0 in range(0, len_r, R):
+        r1 = min(r0 + R, len_r)
         p_first = pos_lo + r0
         p_max = pos_lo + r1 - 1
         # 行块可见并集：sel ∩ [0, p_max] ∪ sink ∪ 保护带并集
-        # [max(0, p_first-swa_tok+1), p_max]（行间窗口连续；含行块对角线
-        # 区间 [p_first, p_max] ⊆ 保护带——空行兜底可精确 OR 对角线）
+        # [max(0, p_first-swa_tok+1), p_max]（行间窗口连续拼接成一条带）
         vis = sel_e[:, : p_max + 1].clone()
         vis[:, : min(sink_tok, p_max + 1)] = True
         prot_lo = max(0, p_first - swa_tok + 1)
         if swa_tok > 0:
             vis[:, prot_lo:] = True
-        # 行块对角线段并集进 vis：保证空行兜底的对角线位置 ∈ idx
-        # （swa≥1 时对角线段 ⊆ 保护带并集，此行 no-op；swa=0 非生产
-        # 直接调用形态下兜底仍可精确成立）
-        vis[:, max(0, p_first) : p_max + 1] = True
+        else:
+            # swa=0 时对角线段须显式并集进 vis（保证空行兜底的
+            # 对角线位置 ∈ idx）；swa>0 时对角线段 ⊆ 保护带并集为
+            # no-op，跳过省一次 kernel 发射
+            vis[:, p_first : p_max + 1] = True
         # compact：选中前置（stable 保持升序——softmax 非零项顺序与
         # 原 mask 版一致，reduce 分组漂移最小化）
         order = torch.argsort(~vis, dim=-1, stable=True)
@@ -131,37 +135,38 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
         valid = (
             torch.arange(W, device=device)[None, :] < counts[:, None]
         )                                                  # [RhG, W] pad 列
-        # gather K/V（[T, Hkv, D] → per-gather-row [RhG, W, D]）
+        # gather K/V：只读 W 列。per_qh 不做 K/V 按 GQA 展开的整体物化
+        # （原 advanced indexing `k[:, kv_of, :]` 会复制全 K 的 4× 展开体，
+        # T=32K 时 ~268MB/chunk），直接在 [Hkv,·,T,D] 扩展视图上按组 gather
+        b_q = rearrange(
+            q_c[0, r0:r1] * softmax_scale, "r (h g) d -> r h g d", g=G
+        ).to(torch.float32)                                # [R, Hkv, G, D]
         if per_qh:
-            kv_of = torch.arange(H, device=device) // G     # q-head → kv-head
-            k_h = k_c[0][:, kv_of, :].permute(1, 0, 2)      # [H, T, D]
-            v_h = v_c[0][:, kv_of, :].permute(1, 0, 2)
-            kg = torch.gather(k_h, 1, idx.unsqueeze(-1).expand(-1, -1, D))
-            vg = torch.gather(v_h, 1, idx.unsqueeze(-1).expand(-1, -1, D))
+            k_hv = k_c[0].permute(1, 0, 2)                 # [Hkv, T, D] 视图
+            v_hv = v_c[0].permute(1, 0, 2)
+            # q-head 行序 (h g)：h = hkv*G + g 连续 → idx 直接 reshape 分组
+            g_idx = idx.reshape(Hkv, G, W).unsqueeze(-1).expand(
+                Hkv, G, W, D
+            )                                              # [Hkv, G, W, D]
+            kg = torch.gather(
+                k_hv.unsqueeze(1).expand(Hkv, G, T, D), 2, g_idx
+            )                                              # [Hkv, G, W, D]
+            vg = torch.gather(
+                v_hv.unsqueeze(1).expand(Hkv, G, T, D), 2, g_idx
+            )
         else:
-            k_h = k_c[0].permute(1, 0, 2)                   # [Hkv, T, D]
+            k_h = k_c[0].permute(1, 0, 2)                  # [Hkv, T, D]
             v_h = v_c[0].permute(1, 0, 2)
             kg = torch.gather(k_h, 1, idx.unsqueeze(-1).expand(-1, -1, D))
             vg = torch.gather(v_h, 1, idx.unsqueeze(-1).expand(-1, -1, D))
         # score：fp32 只算 W 列
-        b_k = kg.to(torch.float32)                         # [RhG, W, D]
+        b_k = kg.to(torch.float32)
         if per_qh:
-            b_q = rearrange(
-                q_c[0, r0:r1] * softmax_scale, "r (h g) d -> r h g d", g=G
-            ).to(torch.float32)                            # [R, Hkv, G, D]
-            # einops einsum 不支持复合下标，手动 reshape 到 [Hkv, G, W, D]
-            b_s = einsum(b_q, b_k.reshape(Hkv, G, -1, D),
-                         "r h g d, h g w d -> r h g w")
+            b_s = einsum(b_q, b_k, "r h g d, h g w d -> r h g w")
         else:
-            b_q = rearrange(
-                q_c[0, r0:r1] * softmax_scale, "r (h g) d -> r h g d", g=G
-            ).to(torch.float32)                            # [R, Hkv, G, D]
             b_s = einsum(b_q, b_k, "r h g d, h w d -> r h g w")
         # 行级可见 mask（W 宽小 mask）：行 p_r 可见 = pos ≤ p_r 且
-        #   (in_sel | pos < sink_tok | pos ≥ p_r-swa_tok+1)，pad 列恒 False。
-        #   空行对角线兜底（防御：选择∩因果全空行——sink 强制 + pos≥K2
-        #   下不应触发；对角线段已并入 vis，兜底位置 ∈ idx 恒可精确 OR；
-        #   非空行不 OR 对角线，与原 mask 版逐行可见集严格一致）
+        #   (in_sel | pos < sink_tok | pos ≥ p_r-swa_tok+1)，pad 列恒 False
         p_r = torch.arange(pos_lo + r0, pos_lo + r1, device=device)
         pos_ok = pos_w[None, :, :] <= p_r[:, None, None]    # [R, RhG, W]
         row_ok = (
@@ -172,25 +177,28 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
             & valid[None, :, :]
         )
         diag = (pos_w[None, :, :] == p_r[:, None, None]) & valid[None, :, :]
+        # 空行对角线兜底（防御：选择∩因果全空行——sink 强制 + pos≥K2
+        # 下不应触发；对角线段已并入 vis，兜底位置 ∈ idx 恒可精确 OR；
+        # 非空行不 OR 对角线，与原 mask 版逐行可见集严格一致）。
+        # 向量化无分支：消除 bool(any) 的行块内 host-GPU 同步
         empty = ~row_ok.any(dim=-1)                         # [R, RhG]
-        if bool(empty.any()):
-            row_ok[empty] |= diag[empty]
+        row_ok = row_ok | (diag & empty[..., None])
         # b_s 是 [R, Hkv, G, W]：per_qh 时 RhG=H 需展开回 h/g 两维
         if per_qh:
             m_fill = row_ok.view(r1 - r0, Hkv, G, W)
         else:
             m_fill = row_ok[:, :, None, :]
-        b_s = b_s.masked_fill(~m_fill, float("-inf"))
-        b_p = F.softmax(b_s, dim=-1).to(q_c.dtype)          # [R, RhG(分组), W]
+        # masked_fill_ 原地（b_s 来自 einsum 为新鲜张量），省一份
+        # [R, RhG, W] fp32 峰值分配
+        b_s = b_s.masked_fill_(~m_fill, float("-inf"))
+        b_p = F.softmax(b_s, dim=-1).to(q_c.dtype)          # [R, Hkv, G, W]
         # 输出：vg 转模型 dtype 后 einsum（与 v 相乘口径同原版）
         vg_d = vg.to(q_c.dtype)
         if per_qh:
-            b_o = einsum(b_p, vg_d.reshape(Hkv, G, -1, D),
-                         "r h g w, h g w d -> r h g d")
-            o_c[0, r0:r1] = rearrange(b_o, "r h g d -> r (h g) d").to(q_c.dtype)
+            b_o = einsum(b_p, vg_d, "r h g w, h g w d -> r h g d")
         else:
             b_o = einsum(b_p, vg_d, "r h g w, h w d -> r h g d")
-            o_c[0, r0:r1] = rearrange(b_o, "r h g d -> r (h g) d").to(q_c.dtype)
+        o_c[0, r0:r1] = rearrange(b_o, "r h g d -> r (h g) d").to(q_c.dtype)
     return o_c
 
 
