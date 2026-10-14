@@ -1,0 +1,28 @@
+{
+  "exp": "E139 #253 Step3 探索判决：A 段 fine kernel D=32 tile 对选择链形状的适配扫描（graph 稳态口径）",
+  "date": "2026-10-15",
+  "protocol": {
+    "env": ".187 GPU4 独占；树 19a813e（~/tmp_e138_abl_tree_187）；L=65536 grp64 K2=1024 生产口径；eager + GRAPH=1 稳态（每 tile 清 _GRAPH_CACHE 重 capture）双口径；7-iter 中位",
+    "design": "monkey-patch TLIIndexer._TILE_FINE[32] ∈ {(16,1)基线,(32,1),(32,2),(64,1),(64,2),(64,4),(128,1),(128,2),(128,4),(256,2),(256,4),(256,8)}；BT 只影响 T 维 grid 分块不改 per-output D 维归约树 → 数值上逐位安全",
+    "motivation": "PoC e139_l2_graph_poc_verdict 的 a_tile_lever 杠杆：A 段 32.2ms（隔离计时）用 decode 调参 tile (16,1)，投影 tile 改 (64,4)/(128,4) → ~10ms"
+  },
+  "results": {
+    "eager_wall_all_tiles": "425.7-431.6ms 噪声带内全平（±1.5%）——eager 路径 dispatch-bound，A 段 GPU 差异被调度噪声淹没（与 Step1 判决自洽）",
+    "graph_wall": {
+      "tile_16_1_baseline": 207.7,
+      "tile_32_1": 205.8, "tile_32_2": 204.8,
+      "tile_64_1": 205.3, "tile_64_2": 204.3, "tile_64_4": 204.6,
+      "tile_128_1": 205.8, "tile_128_2": 204.9, "tile_128_4": 204.0,
+      "tile_256_2": 206.0, "tile_256_4": 204.8, "tile_256_8": 204.7,
+      "best": "(128,4) 204.0ms = -1.8% vs 基线"
+    },
+    "bitexact": "全部 12 tile 档 mask diff_rows=0/1008（BT 不改 D 维归约树实证）"
+  },
+  "reading": {
+    "poc_projection_falsified": "PoC『A 段 tile (16,1)→(64,4) 32.2→~10ms』全链口径证伪：全链仅 -1.8%（3.7ms）。隔离计时高估了 A 段在全链占比——graph 化后全链 204-208ms 中 A 段（fine kernel GPU 工作）实际远小于 32.2ms，或与其他段重叠掩盖",
+    "true_bottleneck_confirmed": "graph 化后选择链残余的真瓶颈仍是 PoC 判决的双池 topk 111.5ms（O(N·W) radix select 真实 GPU 工作）——#253 Step2 topk 候选列化是唯一剩余大杠杆（204→~110ms 级 → 64K 总 wall ~230ms ≈ 1.7x）",
+    "tile_table_untouched": "_TILE_FINE[32]=(16,1) 维持不动：1.8% 收益不值得动生产 tile 表（牵连 decode 路径 E133c A6 定参），风险收益比不合算"
+  },
+  "verdict": "Step3 判『收益不足，不实施』：fine tile 全档 mask 逐位一致（数值安全实证），但 graph 稳态全链收益仅 -1.8%（207.7→204.0ms），PoC 投影证伪。#253 剩余唯一大杠杆 = Step2 topk 候选列化",
+  "scripts": ["exp/bench/e139_step3_fine_tile_scan.py"]
+}
