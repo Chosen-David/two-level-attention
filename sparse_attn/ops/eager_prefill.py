@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""稀疏 prefill（质量路径，TLI_SPARSE_PREFILL=1 门控）。
+"""稀疏 prefill（质量路径，TLI_SPARSE_PREFILL=1 门控）——gather 紧凑高性能版。
 
-用户 2026-10-08 指令：e2e 的 prefill 和 decode 都应上 indexer，对齐
-MoBA/NSA/DSA 论文的 chunked sparse prefill 口径。
+用户 2026-10-14 指令：全部 fix 成高性能版本，低效率版本不要留——原
+einsum 全 T 算 score + torch.where(m, -inf) 的 mask 方法实现已删除
+（全序列 K/V 读带宽 + 全序列 QK 计算，32K 序列下稀疏选择零节省，
+还倒贴 mask 构造开销）。
 
 chunk 共享选择语义（MoBA 口径，MoBA 论文 §3.2 TopK Gating）：
   prefill 的 L 行 query 按 CHUNK=2048 行切块；对每个 chunk 取末行 q 调
@@ -22,8 +24,17 @@ chunk 末行的 sink/SWA，块内早行自己的 128-token 局部窗口不保证
 ∩ 因果），保护 token 不占 mid top-k 预算（对齐 decode 侧 sink/swa 强制
 区在 K2_mid 之外的契约）。
 
-已知成本（E107a 诊断）：每 chunk 的 prepare_mask 走 prepare_index 全量
-重建 O(S²/chunk)——质量路径可接受；sglang serving 路径已有 F1-F3 增量化。
+【E138b gather 化（2026-10-14 用户指令）】高性能实现：
+  行块内各行可见集的并集 = (共享 sel ∩ [0, p_max]) ∪ sink [0, sink_tok)
+  ∪ 保护带并集 [max(0, p_first-swa_tok+1), p_max]（行间自身窗口连续
+  拼接成一条带）。并集 stable argsort 选中前置 compact 成 per-head 索引
+  [RhG, W]（W ≈ K2 + R + swa + sink），score einsum 与 K/V 读带宽只对
+  W 列计算——T=32K、W≈1.2K 时 ~25× 计算与带宽节省。行级因果/自身
+  保护带在 W 宽上做小 mask（被 mask 列 exp=0 不进 softmax 分母，与原
+  mask 版同可见集 softmax 数学等价；compact 用 stable 升序保持非零项
+  reduce 顺序，仅树形归约分组 ULP 级漂移，对拍 allclose 验证）。
+  索引重建：chunk 间 append-only 走 E127 增量缓存（_prepare_index_inc
+  命中条件 S_now > inc["S"]），无 O(S²) 重建。
 """
 import os
 
@@ -37,18 +48,25 @@ SPARSE_PREFILL_CHUNK = 2048
 _ROW_BLOCK_MAX_ELEM = 1 << 27
 
 
+def _row_block_size(rhg, w_sel_max, swa_tok, budget=_ROW_BLOCK_MAX_ELEM):
+    """行子块尺寸 R：score 峰值 [R, RhG, W] 元素预算，其中
+    W ≈ w_sel_max + R + swa_tok + sink（保护带并集宽含 R 行自身窗口）。
+    解 R² + (w_sel_max + swa_tok)·R − budget/RhG ≤ 0 的正根。"""
+    b = w_sel_max + swa_tok + 1
+    c = budget // max(rhg, 1)
+    r = int(0.5 * (-b + (b * b + 4 * c) ** 0.5))
+    return max(1, r)
+
+
 def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
                      sink_tok=0, swa_tok=0):
-    """单个 chunk 的行级 attention（dense 与稀疏共用，dense 时 sel=None）。
+    """单个 chunk 的行级 attention（高性能 gather 紧凑版）。
 
     q_c: [1, len, H, D]；k_c/v_c: [1, T, Hkv, D]；sel: [Hkv, T]（kv-head
     共享）或 [H, T]（E103 per_q_head）的 token 级 bool 选择，None=dense。
-    行 r 的绝对位置 = pos_lo + r，可见 keys [0, pos_lo + r] ∩ sel。
-
-    TL-PREFILL-SWA-002：sink_tok/swa_tok > 0 时（稀疏 chunk），每行额外
-    OR 自身保护带：sink 列 [0, min(sink_tok, p+1)) ∪ 自身窗口
-    [max(0, p-swa_tok+1), p]（再 ∩ 因果）。dense（sel=None）保护带 ⊆ 因果
-    恒为 no-op，路径不变。
+    行 r 的绝对位置 = pos_lo + r，可见 keys = sel ∪ 自身保护带
+    （sink [0, sink_tok) ∪ [p-swa_tok+1, p]）∩ 因果 [0, p]。
+    dense（sel=None）保持全 T einsum（首 chunk identity 选择无浪费）。
 
     数值口径对齐 decode 侧 eager_decoding_attn：score 在 fp32 计算
     （q*scale → fp32、k → fp32），softmax fp32 后转回模型 dtype 与 v 相乘。
@@ -56,55 +74,123 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
     len_r, H, D = q_c.shape[1], q_c.shape[2], q_c.shape[3]
     T, Hkv = k_c.shape[1], k_c.shape[2]
     device = q_c.device
+    per_qh = sel is not None and sel.shape[0] == H
+    # RhG = gather 索引行数：共享 [Hkv]，per_q_head [H]（展开到 q-head）
+    rhg = H if per_qh else Hkv
 
-    # 选择集展开到 [Hkv, G, T] 形状（与 b_s 的 head 布局对齐）
-    if sel is None:
-        sel_e = None
-    elif sel.shape[0] == Hkv:
-        sel_e = sel[:, None, :]          # [Hkv, 1, T] 广播到组内 G 个 q-head
-    else:
-        # E103 per_q_head：[H, T] → [Hkv, G, T]（q-head 布局 (h g) 与 b_s 一致）
-        sel_e = sel.reshape(Hkv, G, T)
-
-    # 行子块：控制 fp32 score 张量 [R, Hkv, G, T] 峰值内存
-    R = max(1, _ROW_BLOCK_MAX_ELEM // (H * max(T, 1)))
     o_c = torch.empty_like(q_c)
-    kcol = torch.arange(T, device=device)
-    for r0 in range(0, len_r, R):
-        r1 = min(r0 + R, len_r)
-        b_q = rearrange(
-            q_c[0, r0:r1] * softmax_scale, "r (h g) d -> r h g d", g=G
-        ).to(torch.float32)
-        b_k = k_c[0].to(torch.float32)
-        b_s = einsum(b_q, b_k, "r h g d, t h d -> r h g t")
-        # 因果下三角：行 r（绝对位置 pos_lo+r0+i）只可见 t <= 该位置
-        causal = (
-            torch.arange(pos_lo + r0, pos_lo + r1, device=device)[:, None]
-            >= kcol[None, :]
-        )  # [r, T]
-        if sel_e is None:
-            m = causal[:, None, None, :]
+    if sel is None:
+        # dense：全 T 计算（首 chunk/短行 identity 语义）
+        R = _row_block_size(H, T, 0)
+        kcol = torch.arange(T, device=device)
+        for r0 in range(0, len_r, R):
+            r1 = min(r0 + R, len_r)
+            b_q = rearrange(
+                q_c[0, r0:r1] * softmax_scale, "r (h g) d -> r h g d", g=G
+            ).to(torch.float32)
+            b_k = k_c[0].to(torch.float32)
+            b_s = einsum(b_q, b_k, "r h g d, t h d -> r h g t")
+            causal = (
+                torch.arange(pos_lo + r0, pos_lo + r1, device=device)[:, None]
+                >= kcol[None, :]
+            )
+            b_s = torch.where(causal[:, None, None, :], b_s, float("-inf"))
+            b_p = F.softmax(b_s, dim=-1).to(q_c.dtype)
+            b_o = einsum(b_p, v_c[0], "r h g t, t h d -> r h g d")
+            o_c[0, r0:r1] = rearrange(b_o, "r h g d -> r (h g) d").to(q_c.dtype)
+        return o_c
+
+    # ---- 稀疏：行块级 gather 紧凑计算 ----
+    sel_e = sel if not per_qh else sel.reshape(-1, T)      # [RhG, T]
+    # 共享选择满额上界（chunk 内恒定，供 R 估算）
+    w_sel_max = int(sel_e[:, : T].sum(dim=-1).max().item())
+    for r0 in range(0, len_r, _row_block_size(rhg, w_sel_max, swa_tok)):
+        r1 = min(r0 + _row_block_size(rhg, w_sel_max, swa_tok), len_r)
+        p_first = pos_lo + r0
+        p_max = pos_lo + r1 - 1
+        # 行块可见并集：sel ∩ [0, p_max] ∪ sink ∪ 保护带并集
+        # [max(0, p_first-swa_tok+1), p_max]（行间窗口连续；含行块对角线
+        # 区间 [p_first, p_max] ⊆ 保护带——空行兜底可精确 OR 对角线）
+        vis = sel_e[:, : p_max + 1].clone()
+        vis[:, : min(sink_tok, p_max + 1)] = True
+        prot_lo = max(0, p_first - swa_tok + 1)
+        if swa_tok > 0:
+            vis[:, prot_lo:] = True
+        # 行块对角线段并集进 vis：保证空行兜底的对角线位置 ∈ idx
+        # （swa≥1 时对角线段 ⊆ 保护带并集，此行 no-op；swa=0 非生产
+        # 直接调用形态下兜底仍可精确成立）
+        vis[:, max(0, p_first) : p_max + 1] = True
+        # compact：选中前置（stable 保持升序——softmax 非零项顺序与
+        # 原 mask 版一致，reduce 分组漂移最小化）
+        order = torch.argsort(~vis, dim=-1, stable=True)
+        counts = vis.sum(dim=-1)                           # [RhG]
+        W = int(counts.max().item())
+        idx = order[:, :W]                                 # [RhG, W] 升序位置
+        pos_w = idx
+        in_sel = torch.gather(sel_e[:, : p_max + 1], 1, idx)
+        valid = (
+            torch.arange(W, device=device)[None, :] < counts[:, None]
+        )                                                  # [RhG, W] pad 列
+        # gather K/V（[T, Hkv, D] → per-gather-row [RhG, W, D]）
+        if per_qh:
+            kv_of = torch.arange(H, device=device) // G     # q-head → kv-head
+            k_h = k_c[0][:, kv_of, :].permute(1, 0, 2)      # [H, T, D]
+            v_h = v_c[0][:, kv_of, :].permute(1, 0, 2)
+            kg = torch.gather(k_h, 1, idx.unsqueeze(-1).expand(-1, -1, D))
+            vg = torch.gather(v_h, 1, idx.unsqueeze(-1).expand(-1, -1, D))
         else:
-            m = sel_e[None, :, :, :] & causal[:, None, None, :]
-            # TL-PREFILL-SWA-002：行级保护带（自身 sink + 自身 swa 窗口），
-            # ∩ 因果后 OR 进共享选择——块内早行的局部窗口不再依赖末行选集
-            if sink_tok > 0 or swa_tok > 0:
-                pos_r = torch.arange(pos_lo + r0, pos_lo + r1, device=device)
-                prot = (kcol[None, :] < sink_tok) | (
-                    kcol[None, :] >= (pos_r - swa_tok + 1)[:, None]
-                )
-                m = m | (prot & causal)[:, None, None, :]
-        # 防御：选择 ∩ 因果全空的行兜底对角线（sink 强制 + pos>=2048 下
-        # 不应触发；防御性保 softmax 无 NaN）
-        if not bool(m.any(dim=-1).all()):
-            diag = torch.arange(pos_lo + r0, pos_lo + r1, device=device)[
-                :, None
-            ] == kcol[None, :]
-            m = m | diag[:, None, None, :]
-        b_s = torch.where(m, b_s, float("-inf"))
-        b_p = F.softmax(b_s, dim=-1).to(q_c.dtype)
-        b_o = einsum(b_p, v_c[0], "r h g t, t h d -> r h g d")
-        o_c[0, r0:r1] = rearrange(b_o, "r h g d -> r (h g) d").to(q_c.dtype)
+            k_h = k_c[0].permute(1, 0, 2)                   # [Hkv, T, D]
+            v_h = v_c[0].permute(1, 0, 2)
+            kg = torch.gather(k_h, 1, idx.unsqueeze(-1).expand(-1, -1, D))
+            vg = torch.gather(v_h, 1, idx.unsqueeze(-1).expand(-1, -1, D))
+        # score：fp32 只算 W 列
+        b_k = kg.to(torch.float32)                         # [RhG, W, D]
+        if per_qh:
+            b_q = rearrange(
+                q_c[0, r0:r1] * softmax_scale, "r (h g) d -> r h g d", g=G
+            ).to(torch.float32)                            # [R, Hkv, G, D]
+            # einops einsum 不支持复合下标，手动 reshape 到 [Hkv, G, W, D]
+            b_s = einsum(b_q, b_k.reshape(Hkv, G, -1, D),
+                         "r h g d, h g w d -> r h g w")
+        else:
+            b_q = rearrange(
+                q_c[0, r0:r1] * softmax_scale, "r (h g) d -> r h g d", g=G
+            ).to(torch.float32)                            # [R, Hkv, G, D]
+            b_s = einsum(b_q, b_k, "r h g d, h w d -> r h g w")
+        # 行级可见 mask（W 宽小 mask）：行 p_r 可见 = pos ≤ p_r 且
+        #   (in_sel | pos < sink_tok | pos ≥ p_r-swa_tok+1)，pad 列恒 False。
+        #   空行对角线兜底（防御：选择∩因果全空行——sink 强制 + pos≥K2
+        #   下不应触发；对角线段已并入 vis，兜底位置 ∈ idx 恒可精确 OR；
+        #   非空行不 OR 对角线，与原 mask 版逐行可见集严格一致）
+        p_r = torch.arange(pos_lo + r0, pos_lo + r1, device=device)
+        pos_ok = pos_w[None, :, :] <= p_r[:, None, None]    # [R, RhG, W]
+        row_ok = (
+            pos_ok
+            & (in_sel[None, :, :]
+               | (pos_w[None, :, :] < sink_tok)
+               | (pos_w[None, :, :] >= (p_r[:, None, None] - swa_tok + 1)))
+            & valid[None, :, :]
+        )
+        diag = (pos_w[None, :, :] == p_r[:, None, None]) & valid[None, :, :]
+        empty = ~row_ok.any(dim=-1)                         # [R, RhG]
+        if bool(empty.any()):
+            row_ok[empty] |= diag[empty]
+        # b_s 是 [R, Hkv, G, W]：per_qh 时 RhG=H 需展开回 h/g 两维
+        if per_qh:
+            m_fill = row_ok.view(r1 - r0, Hkv, G, W)
+        else:
+            m_fill = row_ok[:, :, None, :]
+        b_s = b_s.masked_fill(~m_fill, float("-inf"))
+        b_p = F.softmax(b_s, dim=-1).to(q_c.dtype)          # [R, RhG(分组), W]
+        # 输出：vg 转模型 dtype 后 einsum（与 v 相乘口径同原版）
+        vg_d = vg.to(q_c.dtype)
+        if per_qh:
+            b_o = einsum(b_p, vg_d.reshape(Hkv, G, -1, D),
+                         "r h g w, h g w d -> r h g d")
+            o_c[0, r0:r1] = rearrange(b_o, "r h g d -> r (h g) d").to(q_c.dtype)
+        else:
+            b_o = einsum(b_p, vg_d, "r h g w, h w d -> r h g d")
+            o_c[0, r0:r1] = rearrange(b_o, "r h g d -> r (h g) d").to(q_c.dtype)
     return o_c
 
 
