@@ -1,0 +1,170 @@
+\documentclass[conference,9pt,letterpaper]{IEEEtran}
+\usepackage{amsmath,amssymb,graphicx,booktabs,array,fontspec,unicode-math}
+\setmainfont{NotoSerifCJK-Regular.ttc}[FontIndex=2,BoldFont=NotoSerifCJK-Bold.ttc,BoldFeatures={FontIndex=2}]
+\setsansfont{NotoSansCJK-Regular.ttc}[FontIndex=2,BoldFont=NotoSansCJK-Bold.ttc,BoldFeatures={FontIndex=2}]
+\setmathfont{Latin Modern Math}
+\XeTeXlinebreaklocale "zh"
+\XeTeXlinebreakskip=0pt plus 1pt
+\usepackage[hidelinks]{hyperref}
+\hypersetup{pdftitle={基于低频RoPE子空间的近远分区稀疏注意力},pdfauthor={},pdfcreator={LaTeX}}
+\graphicspath{{../figures/}}
+\newcommand{\Top}{\operatorname{TopK}}
+\renewcommand{\abstractname}{摘要}
+\renewcommand{\figurename}{图}
+\renewcommand{\tablename}{表}
+\title{基于低频RoPE子空间的近远分区稀疏注意力}
+\author{\IEEEauthorblockN{匿名作者}}
+\begin{document}
+\maketitle
+\begin{abstract}
+稀疏注意力的页筛选可能在精筛之前丢弃有用的远端词元，因此评分表示是候选选择的重要设计要素。本文研究一种近远分区级联，其页筛选与词元精筛共享32个低频RoPE坐标，组成16个完整旋转对。独立的区域页配额为近端和远端历史保留候选入口，最终注意力使用选中词元的原始全维键和值。在Qwen3-8B的五项LongBench任务上，sub/sub平均得分为47.588，名义full/sub与sub/full配置分别为47.910和47.666。由于配置绑定不完整，这些差值仅支持描述性比较。独立合成实验中，sub/sub相对full/sub所报的选择器时延没有下降。这些结果表明，紧凑评分需要与选择质量、包含准备的成本共同评估，尚未建立联合质量--时延优势。
+\end{abstract}
+\begin{IEEEkeywords}稀疏注意力，共享表示，区域检索，长上下文推理\end{IEEEkeywords}
+
+\section{引言}
+长上下文稀疏注意力需要保留有用历史，同时使词元选择成本低于其省去的注意力计算成本。对两级选择器而言，这一目标涉及两项决策。页粗筛决定哪些词元能够进入精筛：被排除的页无法在下一阶段恢复。评分表示决定每次比较的算术量，而表示准备、排序与访存也共同构成时延。因此，本文将评分维度和候选分配作为两项不同的设计选择来研究。
+
+本文研究用于近远分区级联的共享低频表示。每层、每KV头的页筛选和词元精筛采用同一组完整RoPE坐标对。级联为近期未保护历史与其余历史分别分配页配额，使远端词元即使在近区主导页选择时仍能进入精筛。最终注意力在所选词元集合上使用原始全维Q/K/V。共享评分视图减少设计中的表示重复，区域配额控制候选入口；二者本身均不保证时延下降或任务质量不变。
+
+本文将紧凑评分与区域候选分配作为不同设计选择来研究。名义sub/sub、full/sub与sub/full配置的五任务初步均值分别为47.588、47.910和47.666，其配置记录不足以将差值受控归因于L1或L2维度。因此，表示的双因素研究需要与区域分配、完整系统性能分别评估。图\ref{fig:pending-observation}给出距离条件注意力与完整坐标对检索的诊断视角，相应测量仍待完成。
+
+\begin{figure}[b]\centering
+\fbox{\begin{minipage}[c][0.63in][c]{0.93\columnwidth}\centering\small
+\textbf{(a) 距离相关的注意力分布}\\[3pt]
+\textbf{待结果}\\
+横轴：query--key距离（tokens）\\
+纵轴：full-reference每token概率质量
+\end{minipage}}\\[4pt]
+\fbox{\begin{minipage}[c][0.70in][c]{0.93\columnwidth}\centering\small
+\textbf{(b) 完整配对坐标的检索保真}\\[3pt]
+\textbf{待结果}\\
+横轴：低频／高频／成对随机（均32维）\\
+纵轴：保留的full-reference注意力概率质量\\
+成对随机：待实现验收
+\end{minipage}}
+\caption{检索需求与坐标选择的诊断视角（待实验结果）。距离箱的概率质量按有效词元数归一，保护词元单列；频段比较采用相同Q/K、候选范围与预算。}
+\label{fig:pending-observation}\end{figure}
+
+\section{相关工作}
+Quest、SparQ与HISA等查询感知检索方法通过近似选择缩小注意力集合~\cite{quest,sparq,hisa}。AsyncTLS结合了KV组共享的页／词元选集、逐查询头概率的组内平均，以及最终全维注意力~\cite{asynctls}。本文沿用这种级联结构，研究不同的表示与分配选择：两级筛选采用共同的低频RoPE坐标对，并为近区和远区分别保留页配额。AsyncTLS则采用全维页评分、校准的精筛通道和异步执行。这些差异使表示选择与具体执行调度的收益成为可区分的问题。
+
+KV压缩与放置方法关注互补的存储容量和数据移动约束~\cite{shadowkv,million,clusterkv}。本文保留原始键和值，改变的是词元选择。因此，紧凑评分表示不会相应缩减原始KV缓存容量。
+
+\section{共享子空间内的近远筛选}
+选择器首先构造共享低频评分视图，再将未受保护的历史划分为近区和远区。每个区域依次进行页粗筛和词元精筛，所得索引用于聚集原始全维键和值并计算注意力（图\ref{fig:architecture}）。这种分工允许改变评分表示，同时在所选词元上保留原始全维操作数进行注意力计算。
+\subsection{共享低频坐标}
+本文评估的Qwen3-8B表示从128维RoPE后Q/K中选择
+$J=\{48,\ldots,63,112,\ldots,127\}$，即16个完整低频旋转对。较慢的位置相位变化为考察这组紧凑评分坐标提供了动机，但不保证更高的检索保真度，后者仍取决于查询与键的内容。它不是连续最后32维，也不是学习投影；Q/K评分张量实际紧凑为32维。令$E_J$为坐标嵌入，则$z_q=E_J^\top q$、$z_i=E_J^\top k_i$。每层、每KV头为两区域和两阶段准备同一键视图，查询头各自保留评分分布（图\ref{fig:architecture}及补充图S1）。最终注意力及后续查询仍可访问原始全维KV，因此本设计不节省原KV缓存容量。
+
+\begin{figure*}[t]\centering
+\includegraphics[width=\textwidth]{ppt_overview_zh.pdf}
+\caption{共享子空间近远筛选。两级筛选采用同一组RoPE坐标对，选中IDs读取原始Q/K/V用于最终注意力。可选的prefill门控省略远区筛选，并将空余词元配额分配给已保留的近区页。普通精筛实现先计算完整历史分数，再施加页掩码。}
+\label{fig:architecture}\end{figure*}
+
+
+
+固定的词元无关坐标映射与行选择算子$R$满足$R(KE_J)=(RK)E_J$。因此，同一紧凑键视图可以服务于两个区域，而无需改变坐标选择操作。页摘要与量化--反量化的词元键仍是不同的派生表示。词元追加、区域边界变化与坐标映射更新，均要求维护相应表示及逻辑ID。这些维护和原始KV聚集成本共同决定表示复用能否缩短执行路径。
+
+\subsection{区域页配额与词元配额}
+在decode位置$t$保护前缀和近期窗口：
+\begin{align}
+\mathcal P_t&=\{i:0\le i\le t,\ i<s\ \text{或}\ i>t-w\},\\
+\mathcal M_t&=\{0,\ldots,t\}\setminus\mathcal P_t.
+\end{align}
+保护重叠仅计一次。near是未保护middle历史的后缀，far为其余部分；near与受保护SWA不同。near边界由未保护历史的比例$\alpha$结合最小页与页对齐规则确定；middle长度为$\max(0,S-|\mathcal P_t|)$。默认参数见实验设置。
+
+near采用平均键页评分，far在共享空间采用符号感知极值。对非空区域页$b$定义$m_{b,j}=\min_{i\in b}z_{i,j}$与$M_{b,j}=\max_{i\in b}z_{i,j}$，Quest极值构造~\cite{quest}给出
+\begin{equation}
+U_b(z_q)=\sum_j(z_{q,j}^{+}M_{b,j}+z_{q,j}^{-}m_{b,j}),
+\end{equation}
+其中$z^+=\max(z,0)$、$z^-=\min(z,0)$。它仅上界未量化共享空间点积，不自动上界原维logits或另行量化的评分。不同维极值可能来自不同词元，有限页筛选仍会漏掉重要词元；平均键评分也不继承该上界。
+
+
+
+$K_1=128$、$\beta=.125$分配near16页与far112页。区域保留提供候选入口，却不保证质量：远端页会占用本可分给近端的容量。L1丢弃某页后，后续词元配额不能恢复其词元；因此区域L1与先全局筛页再分区属于不同策略。
+
+对KV头$h$，$\mathcal A_{R,h}$包含区域$R$获选页中的有效词元。在支持的预算范围$K\geq|\mathcal P_t|$内，middle配额为$K_{\mathrm{mid}}=K-|\mathcal P_t|$。在源码推导的历史长度充足示例中，每头总配额$K=1024$扣除不重叠保护后，middle剩768（补充图S2）。正常候选充足路径下，$\gamma=.625$作用于near页容量，产生$16\cdot64\cdot.625=640$个near与128个far词元。短历史或候选不足会降低实际占用。保护与IDs仅合并一次，padding排除，重复ID不额外消耗预算。
+
+\subsection{GQA聚合与原维注意力}
+32查询头／8KV头对应每组4个查询。L1对组内查询的页分数取平均再做区域TopK。普通L2对每个查询计算全历史低维分数，施加共享L1掩码，并在KV组内对各查询独立归一化后的概率取平均。这种概率聚合不同于先平均logits再做softmax。因此，共享坐标仍保留查询各自的分布；而全历史评分意味着，缩小页候选集本身并不会减少L2点积工作量。
+
+组内唯一选集$\mathcal S_{t,h}$包含保护与区域胜出IDs，受总配额约束。组内各查询$g$使用相同IDs，但独立重算原维注意力：
+\begin{equation}
+o_{h,g}=\sum_{i\in\mathcal S_{t,h}}\frac{e^{q_{h,g}^{\top}k_{i,h}/\sqrt d}}{\sum_{j\in\mathcal S_{t,h}}e^{q_{h,g}^{\top}k_{j,h}/\sqrt d}}v_{i,h}.
+\end{equation}
+先合并IDs再softmax，避免直接相加各区域独立归一化输出~\cite{salo}。保留词元使用原KV logit，但缩减分母仍会改变注意力输出。共享IDs提供相同的聚集集合；实际KV流量取决于内核的加载与复用行为。实际16级表示是浮点量化反量化，不是打包四位存储或INT4算术。
+
+\subsection{基于prefill观测的远区门控}
+即使某层很少关注远区，逐步decode仍需承担远区筛选工作。D$'$检验能否通过prefill观测识别可省略far选择的层。对每个输入的每一层，若prefill观测的平均远区注意力概率质量低于$\epsilon$，则判定为OFF并在后续decode中复用，否则保留far选择。该功能默认不启用，此时仍执行普通近远筛选。在支持的路径上，OFF跳过far两级评分与选取，并将可用L2余量回填合法near词元，near页预算保持不变。
+
+本文实现了单序列门控扩展，其观测边界与状态转换见补充注S5。阈值约束的是prefill统计量，而非后续注意力误差。因此，门控是一种近似策略，其质量和总成本影响需要与默认非门控方法分别评估。
+
+\section{实验设置}
+Sub/sub采用Qwen3-8B与表\ref{tab:settings}中的设置。保存的manifest明确dense prefill与共享KV头选集；记录的生产源码给出128词元前缀、近期窗口及32维表示。这些属于源码推断设置，并非逐步运行核验。选择器在浮点张量中使用16级量化--反量化数值，其执行区别于packed INT4算术。其他结果族及未明确设置列于补充注S7。
+\begin{table}[t]\centering\small
+\caption{Sub/sub设置：M为保存的manifest，C为记录源码推断。$K$包含去重保护词元。}\label{tab:settings}
+\begin{tabular}{ll}\hline
+参数 & 设置／证据 \\\hline
+最终词元上限$K$ & 1024（M）\\
+页长；L1页上限$K_1$ & 64；128（M）\\
+$\alpha,\beta,\gamma$ & .25、.125、.625（M）\\
+L1/L2评分坐标 & 32/32（C）\\
+前缀／近期保护 & 128/128（C）\\
+Prefill；decode层 & dense（M）；全层稀疏（C）\\
+L2评分范围 & 完整历史评分后mask（C）\\\hline
+\end{tabular}\end{table}
+
+\textbf{表示与质量。}稠密FullKV保留完整注意力范围，作为质量参照；full/full则保留稀疏选择，在两级使用全维评分。受控L1/L2双因素比较需要四种模式，并固定评分规则、保护集与模型设置，下文描述性得分尚未完成该比较。稀疏基线的公平性以最终去重词元配额$K$（含保护）对齐，并采用相同模型、输入、解码阶段和dense层策略。内部候选页配额属于方法参数，无须在不同方法间相同，但其评分和访存成本必须计入。匹配比较须分别报告实际词元数、页取整以及逐Q头／共享KV头选集差异（补充注S7）。
+
+\textbf{对照设计。}表示复用与区域分配对应不同控制。固定IDs回放保持选中词元和注意力计算不变，仅改变表示构造；等预算的区域／全局比较则在全历史统一页scorer下改变页分配。若仅区域臂使用near平均／far极值评分，分配效应会与评分效应混杂。对于可选门控，far-on、off-refill和off-no-refill分别区分省略远区计算与改变近区选集的作用。这些控制区分方法中不同机制的作用。
+
+\textbf{成本与不确定性。}完整请求时间包含表示准备、维护、标定、选择、KV聚集、注意力和同步，重叠工作只计一次。TTFT表示首个词元的返回时间，TPOT为后续词元返回间隔的均值。质量与时延的联合比较要求相同模型、输入、生成设置和评分方式。任务分数差的不确定性还需考虑同一源文档内多个问题的依赖关系；非劣检验需要在查看确认结果前指定可接受退化界限。本文分别报告表示分数与选择器局部计时，不据此估计联合的端到端质量--时延前沿。实验配置与复现细节见补充注S6。
+
+\begin{figure}[t]\centering
+\fbox{\begin{minipage}[c][0.65in][c]{0.93\columnwidth}\centering\small
+\textbf{(a) 完整请求成本}\\[3pt]
+\textbf{待匹配测量}\\
+横轴：实际输入长度（tokens）\\
+纵轴：请求wall时间（ms），包含准备
+\end{minipage}}\\[4pt]
+\fbox{\begin{minipage}[c][0.70in][c]{0.93\columnwidth}\centering\small
+\textbf{(b) 解码成本}\\[3pt]
+\textbf{待匹配测量}\\
+横轴：实际输入长度（tokens）\\
+纵轴：每输出词元时间（ms）\\
+相同模型、输入、输出长度与词元预算
+\end{minipage}}
+\caption{完整请求与解码成本（待实验结果）。两面板均采用与质量比较相同的工作负载。请求时间包含准备成本；每词元时间为首输出之后返回间隔的均值。}
+\label{fig:pending-evaluation}\end{figure}
+
+\section{初步结果}
+\textbf{配置得分比较。}在HotpotQA、Qasper、MuSiQue、GovReport和RepoBench-P五项任务~\cite{longbench}上，平均得分为47.588（sub/sub）、47.910（名义full/sub）与47.666（名义sub/full）。后两者相对sub/sub分别高0.322与0.078分，sub/full比full/sub低0.244分。Full/sub记录缺少配置旁车文件，sub/full标记也未绑定到实现所声明L2模式的生产代码树，因此这些差值不能单独归因于任一级维度的恢复。本文保留这些描述性得分，不将其视为已完成的三臂因果消融（补充注S4、S7）。这些配置均不等于稠密FullKV。
+
+图\ref{fig:fullkv-quality}中的sub/sub--FullKV差值尚无经核验匹配条件下的测量。因此，三臂均值不能建立dense注意力质量保持结论。任务级bootstrap汇总描述的是这五项任务间的变化，不构成文档配对的非劣检验。
+
+\begin{figure}[t]\centering
+\fbox{\begin{minipage}[c][1.08in][c]{0.93\columnwidth}\centering\small
+\textbf{双32近远筛选方法（sub/sub）}\\[4pt]
+\textbf{相对FullKV的匹配比较待测}\\[5pt]
+参考：相同输入下的dense FullKV\\
+$\Delta Q=Q_{\mathrm{sub/sub}}-Q_{\mathrm{FullKV}}$（分）\\
+逐任务及总体配对不确定性：待计算
+\end{minipage}}
+\caption{Sub/sub相对dense FullKV的质量（待匹配实验结果）。目标量为相同输入上的任务分数差及文档配对不确定性。Full/full是稀疏选择中的表示控制，并非dense参照。}
+\label{fig:fullkv-quality}\end{figure}
+
+\textbf{选择器局部成本。}独立合成实验采用单层、batch1、单query、64K长度QKV，两轮稳态汇总为：full/sub 1.3502毫秒，sub/sub 1.3598毫秒，sub/full 1.4634毫秒。在此设置下，共享子空间选择器的所报时间未低于full/sub。这一排序不能定位瓶颈阶段，且尚未解决的采样协议差异使小幅计时差异无法得到可靠解释（补充注S6）。这些算子计时未与LongBench质量实验配对，也未测量完整请求成本。
+
+\textbf{保护与prefill门控的局限。}保护only配置得分26.09，对照参考为47.91，同时使用的词元数由1024变为256，因此该差值混合了检索策略与预算效应。Prefill统计量也不能约束后续远区需求：一条prefill远区概率质量低于.05的记录，在decode阶段达到.1678。相对复用的47.910参考值，门控阈值.05和.10对应的均值分别下降.034和.218分，每臂五项任务均有三项下降，其中HotpotQA分别下降1.05和1.26分。较大的逐任务损失表明，小幅均值变化可能掩盖任务敏感性。这些门控汇总未明确完整的评分配置，因此其结果不能归属于门控双32方法（补充注S6）。
+
+\textbf{适用范围。}上述结果描述了所研究Qwen3配置的得分和prefill门控局限，尚未建立相对dense FullKV的非劣性、区域页配额的独立收益或完整请求成本下降。现有128K RULER记录~\cite{ruler}缺少身份明确的可比稀疏臂，因此不纳入定量比较。结论限于已报告的配置和工作负载。
+
+\section{结论}
+本文研究了近远页筛选与词元精筛共享的低频RoPE表示。Sub/sub的五任务均值为47.588，名义full/sub与sub/full分别为47.910和47.666；配置绑定不完整使这些差值无法归因于某一级选择器。独立合成计时实验未报告sub/sub的时延优势。具有竞争力的质量--成本折中因此需要在匹配的最终词元预算下，以包含准备的请求测量建立，并在评估前规定可接受的质量退化。
+
+\section*{Content Generated by AI}
+通过Codex使用的OpenAI语言模型参与全文起草和修订、中英文翻译、图与LaTeX代码生成，并辅助来源核对及算术复算。界面未提供可核实的底层模型版本标识。
+% DAC 2027 requires a separate references-only page.
+\clearpage
+\input{references_zh.tex}
+\end{document}
