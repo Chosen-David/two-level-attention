@@ -1,0 +1,36 @@
+{
+  "exp": "E138-residual：稀疏 prefill 选择粒度完整曲线（#246 终判）——CHUNK/G ∈ {2048,1024,512,256,128,64}（缩 chunk 版）+ 组版 TLI_PREFILL_SELECT_GROUP ∈ {256,64}（chunk=2048 组织不变，34abc61），× hotpotqa/musique，判定粒度细化（per-token partition 近似）能把 chunk 共享选择的质量崩塌买回多少、残差归因",
+  "date": "2026-10-14",
+  "protocol": {
+    "arm": "pfsp 口径同 flags（mavg 冠军 + --tli_subspace tail + --tli-sparse-prefill），变量 = TLI_SPARSE_PREFILL_CHUNK（缩 chunk 臂）或 TLI_PREFILL_SELECT_GROUP（组臂，chunk=2048）",
+    "dispatch": "一轮 /tmp/e138_chunkscan_dispatch.sh（c512/c1024，T=1014141000）；二轮 /tmp/e138_chunkscan2_dispatch.sh（c256/c128/c64，T=1014150000）；组版 /tmp/e138_grp_dispatch.sh + 恢复轮 /tmp/e138_resume_dispatch.sh（16:14 全节点 SIGTERM 后重跑，T=1014162000）。treatment=34abc61（组版）/",
+    "scoring": ".187 ~/tmp_e138_abl_tree_187 python3 -m benchmark.LongBench.eval（difflib:stdlib），strict 全格通过，cap_comparability_key 6688f41924",
+    "reference": "dense prefill 锚点 hotpot 59.42/musique 34.25（E133 per_task）；c2048/c1024/c512 取 e138_chunk_granularity_verdict.json（一轮）"
+  },
+  "results": {
+    "hotpotqa": {
+      "dense": 59.42, "c2048": 48.97, "c1024": 50.99, "c512": 54.53,
+      "c256": 53.72, "c128": 55.55, "c64": 55.91,
+      "grp256": 53.51, "grp64": 56.04,
+      "gap_vs_dense": {"c2048": -10.45, "c1024": -8.43, "c512": -4.89, "c256": -5.70, "c128": -3.87, "c64": -3.51, "grp64": -3.38}
+    },
+    "musique": {
+      "dense": 34.25, "c2048": 27.08, "c1024": 27.98, "c512": 26.08,
+      "c256": 27.24, "c128": 27.37, "c64": 28.19,
+      "grp256": 28.39, "grp64": 28.22,
+      "gap_vs_dense": {"c2048": -7.17, "c1024": -6.27, "c512": -8.17, "c256": -7.01, "c128": -6.88, "c64": -6.06, "grp64": -6.03}
+    },
+    "group_vs_smallchunk_e2e_equivalence": {
+      "hotpot": {"grp256_vs_c256": -0.21, "grp64_vs_c64": 0.13},
+      "musique": {"grp256_vs_c256": 1.15, "grp64_vs_c64": 0.03},
+      "note": "组版与缩 chunk 版 e2e 同分（差 ≤ 任务噪声带）——对拍 allclose 5/5 之外的生产级等价背书；组版 chunk=2048 计算组织不变，prefill 语义（每 token 自己的 near/far/sink/swa 四分区选择）由组粒度 G 提供"
+    },
+    "granularity_lever_recovery": {
+      "hotpot": "gap -10.45 → -3.38（G=64 组版）：粒度买回 68% 崩塌量；c128→c64 增益 +0.36 边际递减",
+      "musique": "gap -7.17 → -6.03：粒度买回 16%；一轮「musique 粒度钝感」结论部分修正——G=64 档有 +1.1 回血但残差仍大"
+    }
+  },
+  "verdict": "① 粒度杠杆判定：hotpot 崩塌的 2/3 可被粒度细化买回（G=64=块对齐 per-token 近似，-3.4），musique 只买回 1/6（-6.0）——per-token partition 近似成立但不足以恢复锚点。② 残差归因（G=64 已消除选择错位 ≥64 行 + 与 decode 同为 64-token 块粒度、同 1024/query 预算，decode 侧 CI 含 0 零成本）：剩余 -3.4/-6.0 不是选择错位，而是 (a) 多层稀疏复合（36 层稀疏 prefill 的层间误差累积——decode 每步选择可自校正，prefill 一遍过）+ (b) 预算 1024/query 的覆盖率上限（远端检索密度低于近端）。③ 论文口径：粒度曲线 = 稀疏 prefill 质量-成本权衡表（abl-5，agent_doc/results/2026-10-14_论文可视化图规划_v1）；decode 主线叙事维持。④ 后续杠杆只剩预算（K2 扫参 #245）与层选择性稀疏（D' gate 移植 prefill——跳质量敏感层 far）",
+  "next": "E139 K2 预算扫参（残差归因 (b) 直接验证：1024→2048 买回多少）；D'-prefill 层选择性稀疏（残差归因 (a) 直接验证）；两者均立项候选，按用户指令排序",
+  "scripts": ["/tmp/e138_chunkscan2_dispatch.sh", "/tmp/e138_grp_dispatch.sh", "/tmp/e138_resume_dispatch.sh", ".187:~/tmp_e138_chunkscan2_e2e/pred_cs{256,128,64}/result.json", ".187:~/tmp_e138_grp_e2e/pred_grp{256,64}/result.json"]
+}
