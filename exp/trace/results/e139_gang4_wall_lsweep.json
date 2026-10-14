@@ -13,14 +13,14 @@
     }
   },
   "reading": {
-    "verdict_level": "【判决级】64K 档融合态 539.6ms vs dense SDPA 395.3ms = 0.73x，即 1.37x 净加速——首次跨过 dense 线：稀疏 prefill 在 64K 长序列上对 dense 实现净加速（用户目标「稀疏 prefill 对 dense 有明显加速（64K 合成数据验证）」在 wall 口径达成）",
-    "mechanism": "融合态 wall 斜率随 L 变缓：attention 段经块级跳空后只剩 ~1.2K/32K 有效列（~4%），选择链（~210ms 次线性）+ 融合 attention（有效列次线性）共同把 64K 增量压到 144ms（32K→64K），而 dense 64K 增量 295ms（O(L²) 全量）。交叉点在 ~48-56K 之间",
+    "verdict_level": "【2026-10-15 方向纠偏（GPT TL-156 confirmed，92bdbf0）】原判「64K 融合态 1.37x 净加速」系方向颠倒错误：脚本输出 td/t_fus=0.73 是 speedup（<1 = 更慢），539.6ms > 395.3ms——融合态 @64K 仍比 dense 慢 +36.5%（latency_multiplier 1.365）。用户目标「稀疏 prefill 对 dense 有明显加速（64K）」在 wall 口径【未达成】。原「32K→64K 增量 144ms」亦有算术错（实为 539.6-249.8=289.8ms，与 dense 增量 295.1ms 近相等）；四个测试长度（8K/16K/32K/64K）均无交叉，「48-56K 交叉点」不受数据支持",
+    "mechanism": "仍成立的部分：融合态 vs 逐组 4.27x / vs 批量 2.77x @64K（相对旧稀疏实现的显著改善）；分项口径（e139_selchain_seg_bench）显示选择链 421ms 占 77.8% 而 attention 段仅 ~120ms——稀疏 attention 段本身已达次线性，瓶颈在选择链。若选择链批量化压到 ~100ms，总 wall ~250ms < dense 395.3ms，净加速才成立（此为假设性目标非已获结果）",
     "caveats": [
-      "64K 净加速成立的前提是 K2=1024 质量档（hotpot -3.4 残差）；K2=2048 质量恢复档 wall 上探 1.44x（826ms@32K 批量版），融合态下 K2 上探待补——若 64K K2=2048 融合态 > dense 则该加速主张限定 K2=1024 档",
+      "speedup = dense_ms / candidate_ms，>1 才是更快；本表 64K speedup = 0.73x（更慢 +36.5%）",
       "dense 参照 = SDPA（transformers ≥4.51 Qwen3 默认 attn 实现 = e2e PFDD 生产口径）",
-      "8K/16K/32K 档仍净负（0.12/0.22/0.40x）——短序列稀疏无 wall 收益的 limitation 维持"
+      "8K/16K/32K 档 speedup 0.12/0.22/0.40x——全长度档慢于 dense，无已测交叉点"
     ]
   },
-  "verdict": "① 纲领④融合 kernel 的 L 曲线判决：融合态收益随 L 单调放大（3.22x→4.27x vs 逐组），64K 档首次实现稀疏 prefill 对 dense 净加速（1.37x）——论文性能叙事可升级为「decode 5.47x 稳态 + prefill ≥64K 净加速（K2=1024 档）」双主张（附交叉点与短序列 limitation）。② K2=1024 口径的 64K 净加速数字（539.6 vs 395.3ms）进论文性能表 + 用户目标达成记录。③ 后续：K2=2048 融合态 64K 补格（判定加速主张的预算适用范围）；选择链打分批量化（~210ms 段）继续是剩余杠杆",
+  "verdict": "【已纠偏】① 纲领④融合 kernel 的 L 曲线收益真实（vs 逐组 3.22x→4.27x 随 L 单调、vs 批量 2.77x @64K），但截至本判决稀疏 prefill 对 dense 无任何已测长度/预算档实现净加速——64K 慢 +36.5%。② 论文性能叙事维持「decode 5.47x 稳态」单主张，prefill 性能进消融附录（相对稀疏实现链 4.27x + 对 dense 全档 net-negative + 选择链为剩余瓶颈）。③ 用户 64K 目标未达成，转待选择链打分批量化（收益上界：选择链 ~100ms 档则总 wall ~250ms ≈ 1.6x speedup vs dense——须实测验证）",
   "scripts": ["exp/bench/e139_gang4_wall_lsweep.py（入库随本 commit）", "exp/trace/results/e139_g4lsweep_g{4,5}.log"]
 }
