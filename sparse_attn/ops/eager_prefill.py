@@ -393,6 +393,40 @@ def sparse_prefill_attn(
         m0 = mask[0, 0]        # [h, T_pad]（h=Hkv 共享 或 H per_q_head）
         return m0[..., :c1]    # 截到真实 token 数（pad 块尾巴去除）
 
+    # 【E139 纲领②③】组选择批量化（sparse_attn/ops/batch_select.py）：整层
+    # 一次统计 + 批量两级选择，替代 ~496 次逐组三段式（主因 ~20k launch/层）。
+    # env TLI_PREFILL_BATCH_SELECT 默认 0（默认行为零扰动）；批量版内部
+    # fail-closed 配置门（非 mavg_tail 生产口径返回 None 回退逐组）。组末行
+    # 非 bs 倍数的组（L%bs!=0 或 chunk 起点 unaligned 的尾组）走逐组回退——
+    # 前缀非块对齐时全前缀批量统计与逐组 pad 统计（pad 0 参与块 min/max/mean）
+    # 语义不同，不并入批量
+    batch_sels = None
+    if grp > 0 and os.environ.get("TLI_PREFILL_BATCH_SELECT", "0") == "1":
+        from .batch_select import batched_group_sels
+        pairs = []
+        for (bc0, bc1) in bounds:
+            if bc0 >= dense_below:
+                for bg0 in range(bc0, bc1, grp):
+                    pairs.append((bg0, min(bg0 + grp, bc1)))
+        aligned = [(bg0, bg1v) for (bg0, bg1v) in pairs if bg1v % _bs == 0]
+        sel_aligned = batched_group_sels(
+            indexer, q, k, softmax_scale,
+            [bg1v for (_, bg1v) in aligned], dense_below,
+        ) if aligned else []
+        if sel_aligned is not None:
+            sel_unaligned = {
+                bg1v: _prepare_sel(bg0, bg1v)
+                for (bg0, bg1v) in pairs if bg1v % _bs != 0
+            }
+            it_a = iter(sel_aligned)
+            batch_sels = []
+            for (_, bg1v) in pairs:
+                if bg1v in sel_unaligned:
+                    batch_sels.append(sel_unaligned[bg1v])
+                else:
+                    batch_sels.append(next(it_a))
+    _pair_cur = 0
+
     pending = None  # (c0, sel, event)
     for i, (c0, c1) in enumerate(bounds):
         if c0 < dense_below:
@@ -414,13 +448,20 @@ def sparse_prefill_attn(
             else:
                 sel = _prepare_sel(c0, c1)
             if grp > 0:
-                # 组选择：chunk 内每 grp 行一组，组末行独立选择（chunk 首
-                # 行起对齐划分；组选择序 = 位置序——inc 缓存 append-only
-                # 语义与缩 chunk 版一致）。组版不走预取（use_pf 已门控关）
-                sel_list = [
-                    _prepare_sel(g0, min(g0 + grp, c1))
-                    for g0 in range(c0, c1, grp)
-                ]
+                if batch_sels is not None:
+                    # 批量版：消费预计算的整层组选择列表（顺序与 bounds
+                    # 组划分一致；dense 段跳过不计游标）
+                    n_g_c = (c1 - c0 + grp - 1) // grp
+                    sel_list = batch_sels[_pair_cur: _pair_cur + n_g_c]
+                    _pair_cur += n_g_c
+                else:
+                    # 组选择：chunk 内每 grp 行一组，组末行独立选择（chunk 首
+                    # 行起对齐划分；组选择序 = 位置序——inc 缓存 append-only
+                    # 语义与缩 chunk 版一致）。组版不走预取（use_pf 已门控关）
+                    sel_list = [
+                        _prepare_sel(g0, min(g0 + grp, c1))
+                        for g0 in range(c0, c1, grp)
+                    ]
                 sel = None
             else:
                 sel_list = None

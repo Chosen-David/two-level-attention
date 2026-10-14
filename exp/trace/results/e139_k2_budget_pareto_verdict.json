@@ -9,14 +9,19 @@
   },
   "results": {
     "armA_prefill_upscan": {
-      "hotpotqa": {"k1024": 56.04, "k2048": 58.76, "dense_anchor": 59.42, "gap_k2048": -0.66},
-      "musique": {"k1024": 28.22, "k2048": 32.03, "dense_anchor": 34.25, "gap_k2048": -2.22},
-      "budget": {"k2048": 2043.2}
+      "hotpotqa": {"k1024": 56.04, "k1536_r2": 57.90, "k2048": 58.76, "dense_anchor": 59.42, "gap_k2048": -0.66},
+      "musique": {"k1024": 28.22, "k1536_r2": 31.75, "k2048": 32.03, "dense_anchor": 34.25, "gap_k2048": -2.22},
+      "budget": {"k1536_r2": 1530.2, "k2048": 2043.2}
     },
     "armB_decode_downscan": {
-      "hotpotqa": {"k1024_anchor": 59.20, "k768": 46.86, "k512": 45.96, "k384": 44.91},
-      "musique": {"k1024_anchor": 33.88, "k768": 21.17, "k512": 22.28, "k384": 22.13},
-      "budget": {"k768": 768.0, "k512": 512.0, "k384": 384.0}
+      "hotpotqa": {"k1024_anchor": 59.20, "k768": 46.86, "k512": 45.96, "k384": 44.91, "k256_r2": 29.92},
+      "musique": {"k1024_anchor": 33.88, "k768": 21.17, "k512": 22.28, "k384": 22.13, "k256_r2": 12.47},
+      "budget": {"k768": 768.0, "k512": 512.0, "k384": 384.0, "k256_r2": 256.0}
+    },
+    "round2": {
+      "dispatch": "/tmp/e139r2_k2scan_dispatch.sh（.187:~/e139r2_k2scan_dispatch.sh），T=1014190000，19:11 点火 20:18 收官 rc=0，treatment=e25a617（注意：旧 dense 口径——dense_below=K2，纲领①后已固定 1024，判决解读须注明）",
+      "cells": {"pf_g64_k1536": "hotpot 57.90 / musique 31.75（budget 1530.2/1532.1）", "dd_k256": "hotpot 29.92 / musique 12.47（budget 256.0）双跑复证一致"},
+      "strict": "全格 2/2，cap key 6688f41924，difflib:stdlib"
     }
   },
   "reading": {
@@ -24,6 +29,7 @@
     "armB": "decode 侧预算悬崖陡峭：1024→768 单步掉 -12.3/-12.7，768→384 近平台（-2.0/-1.0）——TLI 的 mid 区选择在预算 <768 时 near 区被挤压（K2 缩小时 α·mid near 预算同步缩小，E130 g075 崩塌同构机制）。Pareto 判定：TLI 无法在 512-768 token/query 预算下维持质量——与 Quest（~1-2% 上下文 page 级）对标处于劣势区间，TLI 的可比区间是 ~1024/query 全预算（sink128+swa128+mid768）。论文口径：不做「更少召回」贡献主张，转为「固定 1024/query 定额下的质量持平 + 5.47x decode 加速」叙事；K2 下探曲线进消融证明预算-质量悬崖（1024 是甜点）"
   },
   "verdict": "① Arm A 判决：稀疏 prefill 残差主因 = 预算上限（归因 (b)），多层复合成分 (a) 在 hotpot 上 -0.7 噪声带级；K2=2048 下 grp64 稀疏 prefill 质量几乎恢复锚点（-0.7/-2.2）——prefill 稀疏作为高预算可选项成立（预算-性能-质量三轴权衡进论文 trade-off 表）。② Arm B 判决：decode 预算悬崖在 1024→768（-12 分级）；1024/query 是 TLI 质量甜点，对标竞品的召回口径叙述修正为定额 1024 而非更少召回。③ 后续：E139 round2（256 档 + K2=1536 中间档 + g075 同构 near 挤压归因确认）排队；D'-prefill 层选择性稀疏（归因 (a) 的 musk 剩余成分）维持立项候选",
-  "next": "round2 候选：dd_k256 ×2 + pf_g64_k1536 ×2（A 曲线中间点：56.04→58.76 之间插值判定线形）；性能面：K2=2048 prefill wall bench（列宽 ×2 的性能代价量化）",
-  "scripts": ["/tmp/e139_k2scan_dispatch.sh", ".187:~/tmp_e139_k2scan_e2e/pred_{pf_g64_k2048,dd_k768,dd_k512,dd_k384}/result.json"]
+  "round2_verdict": "④ round2 落袋收官（#247）：A 曲线中间点 k1536 = 57.90/31.75——hotpot 56.04→57.90→58.76 与 musique 28.22→31.75→32.03 均近单调且边际递减（hotpot +1.86/+0.86、musique +3.53/+0.28），K2 上探曲线线形判定成立、2048 附近趋饱和；dd_k256=29.92/12.47 双跑复证第二悬崖（384→256 掉 -15/-9.7）——mid 区预算 768→576→384 递减下 near 区（α·mid）同步塌缩至 ~96 token，与 E130 g075 near 挤压机制同构归因确认。⑤ round2 格为旧 dense 口径（dense_below=K2，纲领① d0e87d7 前树 e25a617）——若后续在固定 dense 前缀口径下复扫 K2，1536/2048 档 dense 段将从 1536/2048 缩回 1024，预期分数有轻度口径差，对比时须分列",
+  "next": "prefill 性能面转入纲领②③④（批量选择 + 融合 kernel，#249）；K2 上探饱和点已到（2048 档边际 +0.86/-0.28），不再上探 4096；g075 同构 near 挤压归因已由 k256 证实",
+  "scripts": ["/tmp/e139_k2scan_dispatch.sh", ".187:~/tmp_e139_k2scan_e2e/pred_{pf_g64_k2048,dd_k768,dd_k512,dd_k384}/result.json", ".187:~/tmp_e139_k2scan_e2e/pred_{pf_g64_k1536,dd_k256}/result.json", ".187:~/e139r2_k2scan_dispatch.sh"]
 }
