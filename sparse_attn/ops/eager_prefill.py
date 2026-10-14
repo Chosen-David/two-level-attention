@@ -254,33 +254,81 @@ def sparse_prefill_attn(
         + sink_tok + swa_tok + _bs
     )
     o = torch.empty_like(q)
-    for c0 in range(0, L, chunk_size):
-        c1 = min(c0 + chunk_size, L)
-        # 因果可见前缀切片：中间 chunk 的末行不可见 [c1, L) 的未来 token，
-        # 切片保证选择严格因果（末行视角 mask 的 swa 强制区同样是块末
-        # 视角最近 128）
-        k_c = k[:, :c1]
-        v_c = v[:, :c1]
+    # 【E138c chunk 级双流预取（2026-10-14 用户「全面性能优化」指令）】
+    # chunk c+1 的选择（prepare_mask 只依赖 K/V 前缀与末行 q，不依赖
+    # chunk c 的 attention 输出——prefill 开始时全序列 K/V 已物化）在
+    # side stream 上计算，与主 stream 的 chunk c attention 重叠，隐藏
+    # 选择时间（选择链 mavg 生产口径无 host 同步，全部 launch 异步）。
+    # 数值不变性：选择 kernel 输入相同 + side stream FIFO 保 indexer
+    # prepare 调用序（E127 inc 缓存 append-only 语义不破——所有 prep
+    # 调用串行在单一 side stream 上）+ 主 stream 经 event 依赖后才消费
+    # sel + sel 跨流 record_stream 标记（caching allocator 在主 stream
+    # kernel 完成前不得重用其存储）。层间安全：每层入口 side.wait_stream
+    # (主 stream) 使本层 prep 排在上一层的 observe/calibrate 之后；尾
+    # chunk 消费点 ev.wait() 保证层返回时 side 无在飞工作。
+    # 逃生口 TLI_PREFILL_PREFETCH=0（默认开）。
+    bounds = [(c0, min(c0 + chunk_size, L)) for c0 in range(0, L, chunk_size)]
+    n_sparse = sum(1 for c0, _ in bounds if c0 >= dense_below)
+    # 门槛 n_sparse >= 4（.251 H20 长度扫描实测：n_sparse=2 净负 0.74x——
+    # 流交错/SM 争用开销 > 重叠收益；=3 持平 1.02x；>=5 稳定 +5~9%，
+    # =15 时 1.07x。短序列走逐 chunk 串行路径零扰动）
+    use_pf = (
+        n_sparse >= 4
+        and q.is_cuda
+        and os.environ.get("TLI_PREFILL_PREFETCH", "1") == "1"
+    )
+    side = None
+    if use_pf:
+        side = torch.cuda.Stream()
+        side.wait_stream(torch.cuda.current_stream())
+
+    def _prepare_sel(c0, c1):
+        """末行 q 单行选择（indexer 单行 query 设计，规避多行 assert）。
+        因果可见前缀切片：末行不可见 [c1, L) 的未来 token，切片保证选择
+        严格因果（末行视角 mask 的 swa 强制区同样是块末视角最近 128）。"""
+        last_q = q[:, c1 - 1 : c1]  # [1, 1, H, D]
+        cu = torch.tensor([0, c1], dtype=torch.int32, device=k.device)
+        q_ids = cu[1:] - 1  # 末行位置（= prepare_seqlens(cu) - 1 口径）
+        mask, _bs = indexer.prepare_mask(
+            last_q, q_ids, k[:, :c1], cu, softmax_scale
+        )
+        m0 = mask[0, 0]        # [h, T_pad]（h=Hkv 共享 或 H per_q_head）
+        return m0[..., :c1]    # 截到真实 token 数（pad 块尾巴去除）
+
+    pending = None  # (c0, sel, event)
+    for i, (c0, c1) in enumerate(bounds):
         if c0 < dense_below:
             # 首 chunk / 短行：dense（identity 选择，对齐 B02/S1 短行语义；
             # 保护带 ⊆ 因果恒 no-op，不传保持 dense 路径逐位不变）
             sel = None
             prot_args = dict(sink_tok=0, swa_tok=0)
         else:
-            # 末行 q 单行调用（indexer 单行 query 设计，规避多行 assert）
-            last_q = q[:, c1 - 1 : c1]  # [1, 1, H, D]
-            cu = torch.tensor([0, c1], dtype=torch.int32, device=k.device)
-            q_ids = cu[1:] - 1  # 末行位置（= prepare_seqlens(cu) - 1 口径）
-            mask, _bs = indexer.prepare_mask(
-                last_q, q_ids, k_c, cu, softmax_scale
-            )
-            m0 = mask[0, 0]        # [h, T_pad]（h=Hkv 共享 或 H per_q_head）
-            sel = m0[..., :c1]     # 截到真实 token 数（pad 块尾巴去除）
+            if pending is not None and pending[0] == c0:
+                # 消费预取：主 stream 等 side 完成后读 sel；record_stream
+                # 防 allocator 跨流重用竞争
+                _, sel, ev = pending
+                ev.wait()
+                sel.record_stream(torch.cuda.current_stream())
+                pending = None
+            else:
+                sel = _prepare_sel(c0, c1)
             # 稀疏 chunk：行级保护带生效（TL-PREFILL-SWA-002）+ 满额
             # 上界传参（消 w_sel_max/W 两处 .item() host-GPU 同步）
             prot_args = dict(sink_tok=sink_tok, swa_tok=swa_tok)
+            # 发起下一个稀疏 chunk 的选择预取（side stream FIFO：prep
+            # 调用保持 chunk 顺序）
+            if use_pf and pending is None:
+                for j in range(i + 1, len(bounds)):
+                    nc0, nc1 = bounds[j]
+                    if nc0 >= dense_below:
+                        with torch.cuda.stream(side):
+                            sel_next = _prepare_sel(nc0, nc1)
+                            ev_next = torch.cuda.Event()
+                            ev_next.record(side)
+                        pending = (nc0, sel_next, ev_next)
+                        break
         o[:, c0:c1] = _chunk_rows_attn(
-            q[:, c0:c1], k_c, v_c, sel, c0, G, softmax_scale,
+            q[:, c0:c1], k[:, :c1], v[:, :c1], sel, c0, G, softmax_scale,
             w_sel_cap=(0 if sel is None else w_sel_cap), **prot_args
         )
     return o
