@@ -300,7 +300,12 @@ def sparse_prefill_attn(
             os.environ.get("TLI_SPARSE_PREFILL_CHUNK", SPARSE_PREFILL_CHUNK)
         )
     if dense_below is None:
-        dense_below = getattr(indexer.args, "tia_level2_topk", 1024)
+        # 【E139 纲领①固定 dense 前缀】dense 段宽与 K2 解耦——此前
+        # dense_below = tia_level2_topk 使 K2 扫参同时改变 dense 段宽
+        # （K2=256 时 dense 256、K2=2048 时 dense 2048），实验口径污染。
+        # 默认固定 1024（生产 K2 默认档，默认配置下与旧行为逐位一致）；
+        # env TLI_PREFILL_DENSE_BELOW 覆盖（>L 时全 dense）
+        dense_below = int(os.environ.get("TLI_PREFILL_DENSE_BELOW", "1024"))
     # 【E138-residual 组选择】chunk（计算组织，2048 不变）与选择粒度解耦：
     # TLI_PREFILL_SELECT_GROUP=G>0 时 chunk 内每 G 行一组，组末行按自身
     # 前缀做完整两级选择（near 池 L1-avg + far 池 L1-minmax + L2 4bit），
@@ -313,7 +318,10 @@ def sparse_prefill_attn(
     # 行级保护带尺寸（与 indexer mask 强制区同源；getattr 兜底对齐默认配置）
     swa_tok = int(getattr(indexer, "sliding_window_size", 128))
     _bs = int(getattr(indexer.args, "tia_block_size", 64))
-    sink_tok = int(getattr(indexer, "sink_blocks", 2)) * _bs
+    # 【E139 纲领①sink 统一】读 indexer E135 权威参数 sink_tokens（单一
+    # 事实源），替换历史锚 sink_blocks×bs 读法——非默认 sink（如 192）
+    # 时 prefill 此前会用错 128。默认 128 ≡ 旧 2×64 逐位一致
+    sink_tok = int(getattr(indexer, "sink_tokens", 128))
     # 共享选择满额理论上界（host 静态算，零 GPU 同步）：mid topk（K2，
     # 块对齐 +1 块松弛）+ sink 强制 + 末行 swa 强制 + 1 块对齐余量。
     # W 用该上界多出的 pad 列由 valid mask 屏蔽，数值不变
@@ -334,7 +342,8 @@ def sparse_prefill_attn(
     # kernel 完成前不得重用其存储）。层间安全：每层入口 side.wait_stream
     # (主 stream) 使本层 prep 排在上一层的 observe/calibrate 之后；尾
     # chunk 消费点 ev.wait() 保证层返回时 side 无在飞工作。
-    # 逃生口 TLI_PREFILL_PREFETCH=0（默认开）。
+    # 【E139 纲领①】默认关（单流隔离跨流缓存问题），显式
+    # TLI_PREFILL_PREFETCH=1 重新启用。
     bounds = [(c0, min(c0 + chunk_size, L)) for c0 in range(0, L, chunk_size)]
     if grp > 0:
         # 组版 dense 段按行对齐缩 chunk 语义：[0, dense_below) 独立成
@@ -361,7 +370,10 @@ def sparse_prefill_attn(
         n_sparse >= 4
         and q.is_cuda
         and grp == 0
-        and os.environ.get("TLI_PREFILL_PREFETCH", "1") == "1"
+        # 【E139 纲领①单流隔离】默认改 0（原默认 1）——grp0 双流预取
+        # 的跨流缓存问题先隔离：查清前 prefill 默认单流逐 chunk 串行
+        # （数值路径零变化，仅时序），需要预取时显式 TLI_PREFILL_PREFETCH=1
+        and os.environ.get("TLI_PREFILL_PREFETCH", "0") == "1"
     )
     side = None
     if use_pf:
