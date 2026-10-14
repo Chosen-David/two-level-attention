@@ -17,7 +17,8 @@
       "L_32768": "dense 101.0 / Step1 graph 144.1 / Step2 graph 107.6ms（vs dense 0.94x）",
       "L_65536": "dense 398.1 / Step1 graph 328.9 / **Step2 graph 242.2ms（vs dense 1.64x 净加速；手验 242.2<398.1 ✓）**",
       "reading": "64K 净加速 1.22x（Step1）→ **1.64x（Step2）**；交叉点从 ~45-50K 下移至 ~33K；32K 档 0.94x 接近持平；短档仍净负（选择链固定开销占比高）。投影 ~235ms 实测 242.2ms 偏差 ~3%"
-    }
+    },
+    "cross_machine_verification": ".187 GPU4 独立复验（树 1c8c6b8 archive 递送，md5 与本地逐字节一致）：硬门 0/1008 双 K2 档全过；选择链 graph Step2 121.1ms（本地 120.7，±0.3%）；wall L 曲线逐档 ±1%——64K dense 395.3 / Step2 graph 241.4ms = 1.64x（手验 241.4<395.3 ✓）——单机侥幸排除"
   },
   "implementation_notes": {
     "v1_regression_lesson": "逐行 [Hkv,C] 微网格 topk × 2N 次 = launch/延迟受限，比 O(W) 全宽 topk 更慢（eager 392→533ms 回归）——v2 全批量化（池掩码/topk/rank 过滤跨行批量，2 个大 [N,Hkv,C] topk kernel）后才兑现",
