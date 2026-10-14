@@ -141,8 +141,10 @@ def sparse_prefill_attn(
     G = H // k.shape[2]
     # 行级保护带尺寸（与 indexer mask 强制区同源；getattr 兜底对齐默认配置）
     swa_tok = int(getattr(indexer, "sliding_window_size", 128))
-    _bs = int(getattr(indexer.args, "tia_block_size", 64))
-    sink_tok = int(getattr(indexer, "sink_blocks", 2)) * _bs
+    # E135 makes sink_tokens authoritative; sink_blocks is historical metadata.
+    # Reconstructing it from page size silently adds unselected tokens when the
+    # configured sink is shorter (including sink=0).
+    sink_tok = int(getattr(indexer, "sink_tokens", 128))
     o = torch.empty_like(q)
     for c0 in range(0, L, chunk_size):
         c1 = min(c0 + chunk_size, L)
