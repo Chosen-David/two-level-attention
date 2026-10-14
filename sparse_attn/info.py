@@ -502,6 +502,17 @@ def truncate_output_name_keep_hash(dataset_prefix, method_name, t,
 # loader 的 CWD 由 adapter（qwen3_fasa_patch.enable_fasa）切到私有
 # staged 根（见该函数），旧仓库根 dimension_rankings/ 共享固定路径
 # 不再被写入也不再被读到（历史产物原地保留，不删不动不读）。
+#
+# ---- 142 sha8 前缀碰撞条件残余（GPT 审计 P2，2026-10-14）----
+# C+ 批的 <sha8> 目录段仍有条件残余：两个不同内容若 sha256 前 8 hex
+# 碰撞且并发首次 stage，双方都过 isfile 不存在检查（不同内容、不同
+# full sha，stale 拒绝分支不触发），A 先 os.replace 后被 B 覆盖 → A
+# 的快照 dst_path 指向 B 的内容（原子替换 ≠ 内容归属锁定在碰撞档
+# 复活）。修复：目录段升级为完整 SHA256
+# dimension_rankings_staged/<full_sha256>/（sha8 只作 treatment 名
+# 显示标识）；os.replace 后写后复核（读回 dst 与快照 raw 逐字节比对
+# 不一致即 SystemExit fail-closed）；旧 sha8 段 staged 残骸与旧仓库
+# 根 dimension_rankings/ 一样不删不动不读。
 
 @dataclasses.dataclass(frozen=True)
 class FasaAgreementSnapshot:
@@ -515,7 +526,8 @@ class FasaAgreementSnapshot:
     src_path: str    # stage 时解析出的源绝对路径（身份/报错口径）
     dst_path: str    # 内容寻址物化目标绝对路径（staged_root 下）
     sha256: str      # 源 bytes 完整 SHA256（stale 目标比对用同一值）
-    sha8: str        # 前 8 hex（treatment 名 _agr<sha8> 尾段 + 目录段）
+    sha8: str        # 前 8 hex（treatment 名 _agr<sha8> 尾段，仅显示标识——
+                     # 目录段用完整 sha256，见 stage_fasa_agreement）
     raw: bytes       # stage 时刻的源 bytes（目标物化与身份共用同一批）
     staged_root: str = ""   # 内容寻址 staged 根（adapter chdir 目标）
 
@@ -571,26 +583,35 @@ def stage_fasa_agreement(args, repo_root=None):
     官方 constructe_adaptive_selection 硬编码相对路径
     dimension_rankings/（相对 CWD 拼接 <model>/<dataset>），故源
     （vendor 目录或 --fasa_agreement_dir 自定义位置）须先物化。C+ 批
-    起物化目标是内容寻址进程私有目录：
-      <repo_root>/dimension_rankings_staged/<sha8>/dimension_rankings/
-        <model>/<dataset>_agreement.pkl
+    起物化目标是内容寻址进程私有目录，sha8 前缀碰撞条件残余修复
+    （TL-FASA-CALIBRATION-IDENTITY-142 P2）起目录段升级为完整
+    SHA256：
+      <repo_root>/dimension_rankings_staged/<full_sha256>/
+        dimension_rankings/<model>/<dataset>_agreement.pkl
     （142 并发残余修复：旧共享固定路径 <repo_root>/dimension_rankings/
     下，两进程并发首次 stage 不同内容时后者覆盖前者、前者的官方
     loader 读到后者的内容——原子替换 ≠ 内容归属锁定。内容寻址下
     同内容双进程写同一路径且内容逐字节相同、os.replace 幂等无害，
-    不同内容天然隔离，错绑结构性不可能。）行为：
+    不同内容天然隔离，错绑结构性不可能。目录段用完整 SHA256 而
+    非 sha8 前缀：sha256 前 8 hex 碰撞时两个不同内容共享同一目录，
+    并发首次 stage 双方都过 isfile 检查、后写覆盖先写——sha8 只作
+    treatment 名的显示标识，不承担文件隔离保证。）行为：
       - 私有目标已存在时源/目标字节 SHA256 全量对比，不一致
         SystemExit fail closed（内容寻址目录被篡改/损坏的 stale
         目标；比对两侧 = 冻结快照 bytes vs 目标实读 bytes）；
       - 私有目标不存在时物化（临时文件 + os.replace 原子写，内容 =
-        冻结快照 bytes——绝不二次读源）；
+        冻结快照 bytes——绝不二次读源），写后复核：读回目标与快照
+        raw 逐字节比对，不一致 SystemExit fail closed（防任何残余
+        覆盖——目录段换名窗口 / 外部并发写 / 磁盘损坏均在射程内）；
       - 每次调用单次读源 bytes 构造 FasaAgreementSnapshot 挂
         args._fasa_staged_snapshot——runtime records 与输出名共用
         同一快照（stale 拒绝时不更新快照，args 保持上一次成功
         stage 的身份）；
-      - 旧仓库根 dimension_rankings/（共享固定路径）：不删不动不读
-        （历史产物原地保留）——官方 loader 的 CWD 由 adapter 切到
-        返回的 staged 根，旧路径不再可达。"""
+      - 旧仓库根 dimension_rankings/（共享固定路径）与旧 sha8 段
+        staged 残骸（dimension_rankings_staged/<sha8>/）：不删不动
+        不读（历史产物原地保留，新代码只认 <full_sha256>/ 段）——
+        官方 loader 的 CWD 由 adapter 切到返回的 staged 根，旧路径
+        不再可达。"""
     if repo_root is None:
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     src_agr = resolve_fasa_agreement_path(args, repo_root)
@@ -612,9 +633,14 @@ def stage_fasa_agreement(args, repo_root=None):
             f"内容（先跑 qwen3_identify_fre.py + convert_agreement.py），"
             f"fail closed")
     full_sha = hashlib.sha256(raw).hexdigest()
-    # 142 并发残余：物化目标 = 内容寻址进程私有目录（sha8 做目录段）
+    # 142 sha8 前缀碰撞条件残余修复：物化目标 = 内容寻址进程私有目录，
+    # 目录段用完整 SHA256（非 sha8 前缀）——两个不同内容若 sha256 前
+    # 8 hex 碰撞且并发首次 stage，sha8 段方案下双方都过 isfile 检查、
+    # 后写覆盖先写；full_sha 段下不同内容目录必然不同，天然隔离。
+    # sha8 只作 treatment 名显示标识（_fasa_agreement_sha8），不承担
+    # 文件隔离保证。
     staged_root = os.path.join(repo_root, "dimension_rankings_staged",
-                               full_sha[:8])
+                               full_sha)
     dst_agr = os.path.join(staged_root, "dimension_rankings", args.model,
                            f"{fasa_dataset}_agreement.pkl")
     snap = FasaAgreementSnapshot(
@@ -636,9 +662,9 @@ def stage_fasa_agreement(args, repo_root=None):
                 f"（stale 目标，内容寻址目录被篡改/损坏）：\n"
                 f"  源   {src_agr}\n  sha256 {snap.sha256}\n"
                 f"  目标 {dst_agr}\n  sha256 {dst_sha}\n"
-                f"dimension_rankings_staged/<sha8>/ 下应与内容逐字节对应，"
-                f"被静默复用的目标与源不符——请删除该 stale 目标后重跑，"
-                f"fail closed")
+                f"dimension_rankings_staged/<full_sha256>/ 下应与内容逐字节"
+                f"对应，被静默复用的目标与源不符——请删除该 stale 目标后"
+                f"重跑，fail closed")
     else:
         os.makedirs(os.path.dirname(dst_agr), exist_ok=True)
         # 142 reopen：原子物化——临时文件 + os.replace（copy2 无锁非
@@ -652,6 +678,29 @@ def stage_fasa_agreement(args, repo_root=None):
             with open(tmp_agr, "wb") as f:
                 f.write(snap.raw)
             os.replace(tmp_agr, dst_agr)
+            # 142 sha8 前缀碰撞残余：写后复核——os.replace 落盘后读回
+            # 目标与冻结快照 raw 逐字节比对，不一致即 fail closed。
+            # full_sha 目录段下正常时序不可能不一致；此复核防御任何
+            # 残余覆盖路径（未来目录段再变更 / 外部进程同路径写 /
+            # 文件系统损坏），保证「stage 成功返回 ⇒ 目标内容恒等于
+            # 本次快照」这一 runtime 身份不变式。
+            try:
+                with open(dst_agr, "rb") as f:
+                    written_back = f.read()
+            except OSError as e:
+                raise SystemExit(
+                    f"[GATE-FAIL] 142: FASA agreement 写后复核读取失败"
+                    f"（{dst_agr} → {type(e).__name__}: {e}）——无法证明"
+                    f"物化目标与快照一致，fail closed")
+            if written_back != snap.raw:
+                raise SystemExit(
+                    f"[GATE-FAIL] 142: FASA agreement 写后复核不一致"
+                    f"（物化目标在落盘后被覆盖/损坏）：\n"
+                    f"  目标 {dst_agr}\n  快照 sha256 {snap.sha256}\n"
+                    f"  写后实读 sha256 "
+                    f"{hashlib.sha256(written_back).hexdigest()}\n"
+                    f"stage 成功返回 ⇒ 目标内容必须恒等于本次快照，"
+                    f"fail closed")
         except BaseException:
             # 物化失败清理半写临时文件，不留会被误当目标的残骸
             try:

@@ -13,11 +13,16 @@
           name/snapshot 绑 A、官方 loader 却读到 B（原子替换 ≠ 内容
           归属锁定；/tmp/repro_fasa_142.py 双进程调度复现）。
     绿：  物化目标 = 内容寻址进程私有目录
-          dimension_rankings_staged/<sha8>/dimension_rankings/<model>/...
+          dimension_rankings_staged/<full_sha256>/dimension_rankings/
+          <model>/...
           ——双进程并发 stage 不同内容各自三方同源（name/snapshot/
           runtime_file 一致，旧共享路径下即错绑形态）；同内容并发
           幂等无害；旧仓库根 dimension_rankings/ 不删不动不读；
           私有目标被篡改仍 fail-closed（强度不降）。
+          （P2 追修：目录段由 sha8 前缀升级为完整 SHA256——sha8 前 8
+          hex 碰撞时两个不同内容共享同一目录、并发首次 stage 后写
+          覆盖先写；sha8 只作 treatment 名显示标识。旧 sha8 段 staged
+          残骸不删不动不读。）
   149 同构残余（TL-MINFERENCE-PATTERN-IDENTITY，GPT advice C+ 批）
     缺陷：freeze 只把 sha8 挂 args，adapter（enable_minference）在
           enable 时重新 open config_path 载入 JSON——窗口内源被替换
@@ -27,6 +32,15 @@
           best_pattern（源文件删除后 enable 仍成功 = 证明不再 open）；
           降级路径 config 缺失显式 SystemExit（-O 下同型）；畸形
           JSON 在 freeze 期 fail-closed（C 批套件覆盖）。
+  152 SKIP 汇总（TL-CPLUS-SKIP-SUCCESS-152，P2）
+    缺陷：test_149_adapter_frozen_consumption 依赖导入失败时 print
+          SKIP + return（无状态返回），main() 无条件打印
+          RESULT: ALL PASS 且 return 0——required adapter 未执行也
+          宣称全项通过。
+    绿：  各测试函数显式返回 "PASS"/"SKIP"；main 汇总——全 PASS 才
+          ALL PASS rc=0；有 SKIP 打 RESULT: PARTIAL (SKIP: <项>)
+          rc=3。测试内 _check 失败保持 SystemExit [TEST-FAIL]
+          （异常即 FAIL，rc=1 由解释器/SystemExit 消息字符串透传）。
 
 用法（本仓根，普通与 -O 双跑，两者结果一致才算绿）：
   PYTHONPATH=<repo> python3 exp/trace/test_gpt_cplus_batch.py
@@ -35,7 +49,8 @@
 不依赖 GPU（142 用 AST 提取官方 load_pickle 规避 fasa_utils 模块级
 .to("cuda")；149 adapter 测试用 Qwen3Attention.__new__ 空壳 + 冻结
 对象，不触 CUDA kernel）。149 adapter 段需 vendored minference 可导入
-（缺编译产物 .so 时如实 SKIP，同 B 批套件纪律）。
+（缺编译产物 .so 时如实 SKIP，同 B 批套件纪律——但 152 起 SKIP 必须
+以 PARTIAL rc=3 汇总，不得宣称 ALL PASS）。
 """
 import ast
 import hashlib
@@ -219,15 +234,16 @@ def test_142_concurrent_content_addressed():
                           pickle.loads(content_a), "142A")
         _assert_three_way(row_by_role["B"], hashes["B"],
                           pickle.loads(content_b), "142B")
-        # 内容寻址隔离：A/B staged 根不同（sha8 目录段），互不覆盖
+        # 内容寻址隔离：A/B staged 根不同（full_sha256 目录段），互不覆盖
         _check(row_by_role["A"]["staged_root"] !=
                row_by_role["B"]["staged_root"],
-               "142: 不同内容必须隔离到不同 sha8 staged 目录")
+               "142: 不同内容必须隔离到不同 full_sha256 staged 目录")
         _check(os.path.basename(row_by_role["A"]["staged_root"]) ==
-               hashes["A"][:8] and
+               hashes["A"] and
                os.path.basename(row_by_role["B"]["staged_root"]) ==
-               hashes["B"][:8],
-               "142: staged 根尾段必须等于各自内容 sha8")
+               hashes["B"],
+               "142: staged 根尾段必须等于各自内容完整 sha256"
+               f"（P2 追修：sha8 前缀碰撞残余——目录段不得用 sha8）")
         # 旧仓库根共享固定路径绝不存在（不再被写）
         _check(not os.path.exists(os.path.join(str(repo),
                                                "dimension_rankings")),
@@ -235,8 +251,9 @@ def test_142_concurrent_content_addressed():
                "路径即错绑窗口关闭）")
     print("142 并发不同内容 PASS  双进程并发 stage 不同内容 → 各自"
           "name/快照/runtime 文件/官方 loader 读回 四方同源；staged 根按"
-          "sha8 隔离互不覆盖；仓库根共享固定路径不被写（错绑窗口结构性"
-          "关闭）")
+          "完整 sha256 隔离互不覆盖（sha8 只作名字显示标识）；仓库根共享"
+          "固定路径不被写（错绑窗口结构性关闭）")
+    return "PASS"
 
 
 def test_142_concurrent_same_content():
@@ -259,6 +276,7 @@ def test_142_concurrent_same_content():
                "142 同内容: 物化目标应同路径")
     print("142 并发同内容 PASS  双进程并发 stage 同一内容 → 同一路径"
           "幂等（os.replace 逐字节相同无害），双方三方同源")
+    return "PASS"
 
 
 def test_142_legacy_shared_path_untouched():
@@ -290,8 +308,10 @@ def test_142_legacy_shared_path_untouched():
                                             "dimension_rankings") + os.sep),
                f"142: 物化目标应位于 staged 根下 dimension_rankings/ 内: {dst}")
     print("142 旧共享路径 PASS  仓库根 dimension_rankings/ 历史产物不删"
-          "不动不读；新 stage 物化到 dimension_rankings_staged/<sha8>/ 私有"
-          "目录（官方 loader 的 CWD 由 adapter 切走，旧路径不再可达）")
+          "不动不读；新 stage 物化到 dimension_rankings_staged/<full_sha256>/"
+          " 私有目录（官方 loader 的 CWD 由 adapter 切走，旧路径不再"
+          "可达；旧 sha8 段残骸同样不删不动不读）")
+    return "PASS"
 
 
 def test_142_stale_private_target():
@@ -319,6 +339,7 @@ def test_142_stale_private_target():
                    f"142: 篡改目标报错应带编号: {e}")
     print("142 stale 强度 PASS  私有目标被篡改仍 SystemExit fail-closed"
           "（SHA 全量比对语义在新路径下保持）")
+    return "PASS"
 
 
 # ================================================================ 149 同构残余
@@ -335,8 +356,11 @@ def test_149_adapter_frozen_consumption():
         from qwen3_minference_patch import enable_minference
         from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention
     except Exception as e:  # noqa: BLE001——缺 vendored 依赖时如实 SKIP
+        # 152：SKIP 必须显式返回状态给 main 汇总——旧版 print 后裸
+        # return，main 无条件 ALL PASS rc=0，required adapter 未执行
+        # 也宣称全项通过。SKIP ≠ PASS，汇总层打 PARTIAL rc=3。
         print(f"[CPLUS-149] SKIP: minference_vendor 依赖不可导入（{e}）")
-        return
+        return "SKIP"
 
     with tempfile.TemporaryDirectory() as td:
         cfg = os.path.join(td, "best_pattern.json")
@@ -392,14 +416,33 @@ def test_149_adapter_frozen_consumption():
           "解析后 JSON）；源文件删除后 enable_minference 仍成功且 runtime "
           "best_pattern = 冻结内容（不再二次 open 可变 config_path）；降级"
           "路径 config 缺失显式 SystemExit（-O 下同型）")
+    return "PASS"
 
 
 def main():
-    test_142_concurrent_content_addressed()
-    test_142_concurrent_same_content()
-    test_142_legacy_shared_path_untouched()
-    test_142_stale_private_target()
-    test_149_adapter_frozen_consumption()
+    # 152（TL-CPLUS-SKIP-SUCCESS-152）：汇总必须区分 PASS/SKIP——
+    # required adapter（149）未执行时不得宣称全项通过。各测试显式返回
+    # "PASS"/"SKIP"；_check 失败仍走 SystemExit [TEST-FAIL]（异常即
+    # FAIL，不进入汇总层）。全 PASS 才 ALL PASS rc=0；有 SKIP 打
+    # PARTIAL + SKIP 项列表、rc=3。
+    tests = [
+        ("142_concurrent_content_addressed",
+         test_142_concurrent_content_addressed),
+        ("142_concurrent_same_content",
+         test_142_concurrent_same_content),
+        ("142_legacy_shared_path_untouched",
+         test_142_legacy_shared_path_untouched),
+        ("142_stale_private_target",
+         test_142_stale_private_target),
+        ("149_adapter_frozen_consumption",
+         test_149_adapter_frozen_consumption),
+    ]
+    statuses = {name: fn() for name, fn in tests}
+    skips = [name for name, st in statuses.items() if st == "SKIP"]
+    if skips:
+        print(f"\nGPT-CPLUS-BATCH(142-concurrent/149-adapter) "
+              f"RESULT: PARTIAL (SKIP: {', '.join(skips)})")
+        return 3
     print("\nGPT-CPLUS-BATCH(142-concurrent/149-adapter) RESULT: ALL PASS")
     return 0
 

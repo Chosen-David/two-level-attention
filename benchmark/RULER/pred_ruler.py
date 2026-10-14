@@ -249,10 +249,12 @@ def main():
         # utils.py 逐字节一致（constructe_adaptive_selection /
         # core_module_with_padding_old）。官方解码剪枝相对路径依赖
         # dimension_rankings/<model>/<dataset>_agreement.pkl（相对 CWD
-        # 解析）——C+ 批 142 并发残余修复后，stage 物化目标是内容寻址
-        # 进程私有目录 dimension_rankings_staged/<sha8>/（共享固定路径
-        # 下并发首 stage 不同内容会后者覆盖前者、先到进程的官方 loader
-        # 读到后者内容），adapter（enable_fasa）调官方函数前把 CWD 切
+        # 解析）——C+ 批 142 并发残余 + sha8 前缀碰撞残余（P2）修复后，
+        # stage 物化目标是内容寻址进程私有目录
+        # dimension_rankings_staged/<full_sha256>/（共享固定路径下并发
+        # 首 stage 不同内容会后者覆盖前者、先到进程的官方 loader 读到
+        # 后者内容；sha8 前缀碰撞档同构，故目录段用完整 SHA256，sha8
+        # 只作名字显示标识），adapter（enable_fasa）调官方函数前把 CWD 切
         # 到 staged 根（try/finally 恢复），官方相对路径即解析到内容
         # 寻址副本；旧 REPO 根 dimension_rankings/ 不再被读写。
         vendor_dir = os.path.join(

@@ -564,11 +564,13 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
         from qwen3_fasa_patch import enable_fasa
         fasa_dataset = getattr(args, "fasa_dataset", "qasper")
         # 142（TL-FASA-CALIBRATION-IDENTITY，GPT 审计 B 批 + C+ 批并发
-        # 残余）：--fasa_agreement_dir 接线经 sparse_attn/info.py 的 142
-        # 三函数（两入口与 treatment 名三方同源）；物化目标是内容寻址
-        # 进程私有目录 dimension_rankings_staged/<sha8>/（共享固定路径
-        # 下并发首 stage 不同内容会后者覆盖前者、先到进程的官方 loader
-        # 读到后者内容——错绑）。stage 返回 staged 根，adapter（enable_
+        # 残余 + sha8 前缀碰撞残余 P2）：--fasa_agreement_dir 接线经
+        # sparse_attn/info.py 的 142 三函数（两入口与 treatment 名三方
+        # 同源）；物化目标是内容寻址进程私有目录
+        # dimension_rankings_staged/<full_sha256>/（共享固定路径下并发
+        # 首 stage 不同内容会后者覆盖前者、先到进程的官方 loader 读到
+        # 后者内容——错绑；sha8 前缀碰撞档同构，故目录段用完整 SHA256，
+        # sha8 只作名字显示标识）。stage 返回 staged 根，adapter（enable_
         # fasa）调官方 constructe_adaptive_selection 前把 CWD 切到该
         # 根（try/finally 恢复），官方相对路径 dimension_rankings/ 即解
         # 析到内容寻址副本；旧仓库根 dimension_rankings/ 不再被读写。
