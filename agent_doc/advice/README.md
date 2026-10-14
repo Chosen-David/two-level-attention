@@ -123,7 +123,7 @@
 | --- | --- |
 | 归档 [E134 子空间判决](archive/2026-10-13_0050_E134_subspace_matrix_verdict_by_deepseek.md) | 当前源码有紧凑量化与全维L2分支，性能重判JSON和主表已有数据；历史判决转入 [S-T022](../task/task_details/S-T022.md)，原文逐字保留。更广任务/128K质量确认、prefill省算、运行与评分身份继续开放；竞品及集成待办沿S-T023/原任务维护。归档不表示所有实验验收通过。 |
 | 保留 [E137 gate组合](2026-10-13_1040_E137_gate_composition_scope_by_gpt.md) | 静态/动态互斥、pending→freeze与clear复位已有源码，旧覆盖缺陷已修。[新动态质量判决](../../exp/trace/results/e137_dyn_dgate_verdict.json)报告双臂AVG5及显式关闭静态gate；这是作者结果，不能替代实际运行SHA/flags/有效mask、跨请求真实入口与标定/请求E2E成本证据。旧README关于覆盖未修的说明仅为当时快照；不重复催派。 |
-| 保留 [MInference跨层缓存guard](2026-10-13_1446_MInference_layer_cache_guard_by_gpt.md) | 当前guard仍无参读取get_seq_length()，未消费当前层layer_idx；建议的按层共享cache最小验证仍待执行方处理。 |
+| 保留 [MInference跨层缓存guard](archive/2026-10-13_1446_MInference_layer_cache_guard_by_gpt.md) | 当前guard仍无参读取get_seq_length()，未消费当前层layer_idx；建议的按层共享cache最小验证仍待执行方处理。 |
 | 保留两份10-11 GPT建议 | faithful port、原始产物/身份、严格prefill与完整请求质量—实测E2E等门禁仍未全部闭合，局部修复或分数方向不能关闭整份建议。 |
 
 提交前已快进同步 `5334aef` 的FASA产物发布增量；新增原始产物不自动关闭
@@ -131,3 +131,22 @@
 
 本次未改人工指南、代码、实验分数或任务完成状态；仅归集已有判决、
 保存未关闭项并验证原文SHA-256及本次新增/变更的相对引用。
+
+
+## 2026-10-14 MInference 局部修复清理（核查 main `404feb17`）
+
+前述“guard仍无参读取”是旧快照，当前已修；以下两份建议逐字归档，
+未关闭事项转入 [S-T023 §11](../task/task_details/S-T023.md)。
+
+| 归档记录 | 当前源码依据与验收边界 |
+| --- | --- |
+| [跨层缓存 guard](archive/2026-10-13_1446_MInference_layer_cache_guard_by_gpt.md) | guard 的判定/报错均读取当前 layer_idx，wrapper 显式传 self.layer_idx；B批已新增共享缓存跨层回归。标准库抽取实际 guard、使用按层缓存验证两层首次 prefill 放行、本层 prefix 多token拒绝、单token guard放行。未执行真实 wrapper/模型，真实入口与作业身份验收仍开放。 |
+| [pattern 运行时绑定](archive/2026-10-13_2042_MInference_pattern_runtime_binding_by_gpt.md) | freeze 保存 raw/SHA/解析对象，LB/RULER 把 snap.pattern 传给 adapter；源码冻结消费分支不重开源文件。标准库抽取实际 freeze/enable，使用 FakeAttention 核验替换A→B及删除源后模块 best_pattern 仍为A。作者 C+ 回应已收录，但不追溯证明旧作业身份。 |
+
+上述抽取检查普通/`-O`均通过，仅验证函数级状态与对象绑定。完整仓库
+C+套件在 import sparse_attn.info 时因缺 torch 失败，未进入测试；不能将
+抽取检查称为完整回归、真实 HF cache 或 GPU 验收。
+
+继续保留两份10-11建议与E137建议：faithful port、原始产物/评分身份、
+严格prefill、完整请求质量/E2E及动态gate真实入口/标定成本未全部闭合。
+未修改人工指南、代码、分数或任务完成状态。
