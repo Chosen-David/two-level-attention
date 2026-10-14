@@ -60,7 +60,8 @@ def _row_block_size(rhg, w_sel_max, swa_tok, sink_tok=0, budget=_ROW_BLOCK_MAX_E
 
 
 def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
-                     sink_tok=0, swa_tok=0, w_sel_cap=0):
+                     sink_tok=0, swa_tok=0, w_sel_cap=0, sel_list=None,
+                     grp=0):
     """单个 chunk 的行级 attention（高性能 gather 紧凑版）。
 
     q_c: [1, len, H, D]；k_c/v_c: [1, T, Hkv, D]；sel: [Hkv, T]（kv-head
@@ -69,6 +70,16 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
     （sink [0, sink_tok) ∪ [p-swa_tok+1, p]）∩ 因果 [0, p]。
     dense（sel=None）保持全 T einsum（首 chunk identity 选择无浪费）。
 
+    【E138-residual 组选择（用户口径「每个 token 有自己的 near/far/sink/
+    swa」）】sel_list 非空时（chunk=2048 计算组织不变 + 组粒度 grp 选择）：
+    sel_list[j] 为 chunk 内第 j 组（grp 行）末行按自身前缀做的完整两级
+    选择；行 r 可见 keys = sel_list[r//grp] ∪ 自身保护带 ∩ 因果——组内
+    partition 错位 ≤ grp-1（grp=64=tia_block_size 即块对齐 per-token 语义）。
+    compact 并集 = ∪_j sel_list[j] ∩ [0, p_max] ∪ sink ∪ 保护带并集，
+    行级 mask 的 in_sel 按行自己组的选择取值——数学上与「每 grp 行独立
+    chunk」严格等价（idx 升序 + 行级 -inf 屏蔽并集差量，softmax 非零项
+    顺序与独立版一致）。与缩 chunk 版可逐位对拍。
+
     数值口径对齐 decode 侧 eager_decoding_attn：score 在 fp32 计算
     （q*scale → fp32、k → fp32），softmax fp32 后转回模型 dtype 与 v 相乘。
     """
@@ -76,11 +87,13 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
     T, Hkv = k_c.shape[1], k_c.shape[2]
     device = q_c.device
     per_qh = sel is not None and sel.shape[0] == H
+    if sel_list is not None:
+        per_qh = sel_list[0].shape[0] == H
     # RhG = gather 索引行数：共享 [Hkv]，per_q_head [H]（展开到 q-head）
     rhg = H if per_qh else Hkv
 
     o_c = torch.empty_like(q_c)
-    if sel is None:
+    if sel is None and sel_list is None:
         # dense：全 T 计算（首 chunk/短行 identity 语义）
         R = _row_block_size(H, T, 0)
         kcol = torch.arange(T, device=device)
@@ -104,7 +117,27 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
         return o_c
 
     # ---- 稀疏：行块级 gather 紧凑计算 ----
-    sel_e = sel if not per_qh else sel.reshape(-1, T)      # [RhG, T]
+    if sel_list is not None:
+        # 组选择版：sel_list[j] = 第 j 组末行的选择 [h, g1_j]（宽度 = 组
+        # 末行前缀长，各不相同）。统一右 pad 到 T：pad 列（位置 ≥ g1_j，
+        # > 该组末行）恒 False——组版行级 mask 用各自组选择，位置 ≥ 组末
+        # 的列对组内早行本是未来 token（pos_ok 截断）+ pad 列恒 False，
+        # 双重不可见，语义严格因果
+        sels = []
+        for s in sel_list:
+            s = s[..., : T]
+            if s.shape[-1] < T:
+                pad = torch.zeros(
+                    (*s.shape[:-1], T - s.shape[-1]),
+                    dtype=torch.bool, device=s.device)
+                s = torch.cat([s, pad], dim=-1)
+            sels.append(s)
+        per_qh = sels[0].shape[0] == H
+        sels = [s.reshape(-1, T) if per_qh else s for s in sels]
+        sel_stack = torch.stack(sels)                      # [n_g, RhG, T]
+        sel_e = sel_stack.any(dim=0)                       # 并集（vis 用）
+    else:
+        sel_e = sel if not per_qh else sel.reshape(-1, T)  # [RhG, T]
     # 共享选择满额上界：w_sel_cap（调用方按 indexer 配置算的理论满额，
     # K2 mid + sink + 末行 swa + 块对齐松弛）；w_sel_cap=0 时回退 GPU
     # 实测（.item() 同步，仅独立调用形态兜底）。上界宽松无害——W 用
@@ -113,7 +146,13 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
         w_sel_max = int(w_sel_cap)
     else:
         w_sel_max = int(sel_e[:, : T].sum(dim=-1).max().item())
-    R = _row_block_size(rhg, w_sel_max, swa_tok, sink_tok)
+    if sel_list is not None:
+        # 组版行块对齐 grp 倍数（组边界与行块边界对齐——组内行不跨界，
+        # gid 映射恒局部）；预算按并集上界放（W 实测修正见下）
+        R = _row_block_size(rhg, w_sel_max, swa_tok, sink_tok)
+        R = max(grp, (R // grp) * grp)
+    else:
+        R = _row_block_size(rhg, w_sel_max, swa_tok, sink_tok)
     for r0 in range(0, len_r, R):
         r1 = min(r0 + R, len_r)
         p_first = pos_lo + r0
@@ -136,11 +175,32 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
         # valid mask 屏蔽，数值不变；行块形状恒定对 allocator 友好）
         order = torch.argsort(~vis, dim=-1, stable=True)
         counts = vis.sum(dim=-1)                           # [RhG]
-        W = min(w_sel_max + sink_tok + (r1 - r0) + max(swa_tok, 1),
-                p_max + 1)
+        if sel_list is not None:
+            # 组版 W 实测（并集宽度 ~n_g·w_sel 只在组间选择高度不相关时
+            # 才成立——实测是性能可行性的直接量尺；单次 host 同步，正确
+            # 优先，静态化留性能轮）。数值与独立版等价不受 W 影响（差量
+            # pad 列由 valid 屏蔽）
+            W = min(int(counts.max().item()), p_max + 1)
+        else:
+            W = min(w_sel_max + sink_tok + (r1 - r0) + max(swa_tok, 1),
+                    p_max + 1)
         idx = order[:, :W]                                 # [RhG, W] 升序位置
         pos_w = idx
-        in_sel = torch.gather(sel_e[:, : p_max + 1], 1, idx)
+        if sel_list is not None:
+            # in_sel 按行自己组的选择（组内 partition 语义核心）：行 r 的
+            # in_sel[r, h, w] = sel_stack[j(r)][h, idx[h, w]]。行块与组均
+            # grp 对齐（r0 恒 grp 倍数）→ 组内行连续、组号局部
+            n_g_blk = (r1 - r0 + grp - 1) // grp
+            j0 = r0 // grp
+            in_sel = torch.empty(
+                (r1 - r0, rhg, W), dtype=torch.bool, device=device)
+            for j in range(n_g_blk):
+                rs = j * grp
+                re = min(rs + grp, r1 - r0)
+                sel_j = sel_stack[j0 + j][:, : p_max + 1]
+                in_sel[rs:re] = torch.gather(sel_j, 1, idx)
+        else:
+            in_sel = torch.gather(sel_e[:, : p_max + 1], 1, idx)
         valid = (
             torch.arange(W, device=device)[None, :] < counts[:, None]
         )                                                  # [RhG, W] pad 列
@@ -178,9 +238,10 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
         #   (in_sel | pos < sink_tok | pos ≥ p_r-swa_tok+1)，pad 列恒 False
         p_r = torch.arange(pos_lo + r0, pos_lo + r1, device=device)
         pos_ok = pos_w[None, :, :] <= p_r[:, None, None]    # [R, RhG, W]
+        in_sel_b = in_sel if sel_list is not None else in_sel[None, :, :]
         row_ok = (
             pos_ok
-            & (in_sel[None, :, :]
+            & (in_sel_b
                | (pos_w[None, :, :] < sink_tok)
                | (pos_w[None, :, :] >= (p_r[:, None, None] - swa_tok + 1)))
             & valid[None, :, :]
@@ -240,6 +301,13 @@ def sparse_prefill_attn(
         )
     if dense_below is None:
         dense_below = getattr(indexer.args, "tia_level2_topk", 1024)
+    # 【E138-residual 组选择】chunk（计算组织，2048 不变）与选择粒度解耦：
+    # TLI_PREFILL_SELECT_GROUP=G>0 时 chunk 内每 G 行一组，组末行按自身
+    # 前缀做完整两级选择（near 池 L1-avg + far 池 L1-minmax + L2 4bit），
+    # 行级 mask 用行自己组的选择——「每个 token 有自己的 near/far/sink/
+    # swa」的 scalable 落地（G=64=tia_block_size 即块对齐 per-token 语义）。
+    # 0 = 默认旧行为（末行选择整 chunk 共享）逐位不变
+    grp = int(os.environ.get("TLI_PREFILL_SELECT_GROUP", "0"))
 
     G = H // k.shape[2]
     # 行级保护带尺寸（与 indexer mask 强制区同源；getattr 兜底对齐默认配置）
@@ -268,6 +336,23 @@ def sparse_prefill_attn(
     # chunk 消费点 ev.wait() 保证层返回时 side 无在飞工作。
     # 逃生口 TLI_PREFILL_PREFETCH=0（默认开）。
     bounds = [(c0, min(c0 + chunk_size, L)) for c0 in range(0, L, chunk_size)]
+    if grp > 0:
+        # 组版 dense 段按行对齐缩 chunk 语义：[0, dense_below) 独立成
+        # dense 段（否则首 chunk 整块 dense，dense 段宽 = chunk_size 与
+        # 缩 chunk 版的 dense_below 不一致——对拍 FAIL 根因）。段边界
+        # 并入 bounds；稀疏段组划分从段首（=dense_below，K2 块对齐）
+        # 起对齐
+        if 0 < dense_below < L:
+            # 首 chunk (0, chunk_size) 横跨 dense 边界时其中 [dense_below,
+            # chunk_size) 是稀疏半段——`if c0 >= dense_below` 过滤会把该
+            # 半段整块丢弃（行永不计算，empty_like 未初始化内存，对拍
+            # diff 行恰为 [dense_below, chunk_size) 的直接根因）。改为从
+            # dense_below 重建稀疏段（段首 K2 块对齐，组划分与缩 chunk
+            # 版行边界一致）
+            bounds = [(0, dense_below)] + [
+                (c0, min(c0 + chunk_size, L))
+                for c0 in range(dense_below, L, chunk_size)
+            ]
     n_sparse = sum(1 for c0, _ in bounds if c0 >= dense_below)
     # 门槛 n_sparse >= 4（.251 H20 长度扫描实测：n_sparse=2 净负 0.74x——
     # 流交错/SM 争用开销 > 重叠收益；=3 持平 1.02x；>=5 稳定 +5~9%，
@@ -275,6 +360,7 @@ def sparse_prefill_attn(
     use_pf = (
         n_sparse >= 4
         and q.is_cuda
+        and grp == 0
         and os.environ.get("TLI_PREFILL_PREFETCH", "1") == "1"
     )
     side = None
@@ -301,6 +387,7 @@ def sparse_prefill_attn(
             # 首 chunk / 短行：dense（identity 选择，对齐 B02/S1 短行语义；
             # 保护带 ⊆ 因果恒 no-op，不传保持 dense 路径逐位不变）
             sel = None
+            sel_list = None
             prot_args = dict(sink_tok=0, swa_tok=0)
         else:
             if pending is not None and pending[0] == c0:
@@ -310,8 +397,21 @@ def sparse_prefill_attn(
                 ev.wait()
                 sel.record_stream(torch.cuda.current_stream())
                 pending = None
+            elif grp > 0:
+                sel = None   # 组版不做 chunk 级选择（组选择在下方）
             else:
                 sel = _prepare_sel(c0, c1)
+            if grp > 0:
+                # 组选择：chunk 内每 grp 行一组，组末行独立选择（chunk 首
+                # 行起对齐划分；组选择序 = 位置序——inc 缓存 append-only
+                # 语义与缩 chunk 版一致）。组版不走预取（use_pf 已门控关）
+                sel_list = [
+                    _prepare_sel(g0, min(g0 + grp, c1))
+                    for g0 in range(c0, c1, grp)
+                ]
+                sel = None
+            else:
+                sel_list = None
             # 稀疏 chunk：行级保护带生效（TL-PREFILL-SWA-002）+ 满额
             # 上界传参（消 w_sel_max/W 两处 .item() host-GPU 同步）
             prot_args = dict(sink_tok=sink_tok, swa_tok=swa_tok)
@@ -329,6 +429,7 @@ def sparse_prefill_attn(
                         break
         o[:, c0:c1] = _chunk_rows_attn(
             q[:, c0:c1], k[:, :c1], v[:, :c1], sel, c0, G, softmax_scale,
-            w_sel_cap=(0 if sel is None else w_sel_cap), **prot_args
+            w_sel_cap=(0 if sel is None else w_sel_cap),
+            sel_list=sel_list, grp=grp, **prot_args
         )
     return o
