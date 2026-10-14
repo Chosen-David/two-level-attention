@@ -102,6 +102,26 @@ def qwen3_attn_forward(
                 **kwargs,
             )
     else:
+        # E138 消融①（prefill-only 稀疏，2026-10-14 用户指令）：TLI_DECODE_DENSE=1
+        # 时 decode 显式回退 dense 原生前向——patch 保持挂载（prefill 稀疏
+        # 选择消费 indexer），decode 不做稀疏选择。用于分离「prefill 稀疏
+        # 的 KV 污染」与「decode 稀疏选择」两因素的贡献。默认不设 = 0 =
+        # 现状稀疏 decode 逐位不变（B2 守卫/所有下游路径零扰动）。
+        if os.environ.get("TLI_DECODE_DENSE", "0") == "1":
+            attn_output, attn_weights = attention_interface(
+                self,
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                dropout=0.0 if not self.training else self.attention_dropout,
+                scaling=self.scaling,
+                sliding_window=self.sliding_window,  # diff with Llama
+                **kwargs,
+            )
+            attn_output = attn_output.reshape(*input_shape, -1).contiguous()
+            attn_output = self.o_proj(attn_output)
+            return attn_output, attn_weights
         # 【B2 修复（kimi3 清单 F2，2026-10-08）】decode 分支入口硬守卫
         # （audit 建议口径）：use_cache=False / chunked prefill（q_len>1）/
         # batch>1 / 4D float mask 一律显式拒绝，替代静默零输出与形状崩溃。

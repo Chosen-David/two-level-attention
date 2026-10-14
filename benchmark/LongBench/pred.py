@@ -101,6 +101,14 @@ def parse_args(args=None):
         '--tli-sparse-prefill', action='store_true',
         help='prefill 也走 indexer 稀疏选择（chunk 共享选择，MoBA 口径）',
     )
+    # E138 消融①（prefill-only 稀疏）：decode 显式回退 dense——分离 prefill
+    # 稀疏 KV 污染与 decode 稀疏选择两因素（对照 --tli-sparse-prefill 单开
+    # = 消融② prefill+decode 双稀疏）。
+    parser.add_argument(
+        '--tli-decode-dense', action='store_true',
+        help='decode 回退 dense 原生前向（须与 --tli-sparse-prefill 同用；'
+             'E138 消融① prefill-only 稀疏臂）',
+    )
 
     add_sparse_attn_args(parser)
 
@@ -601,6 +609,16 @@ if __name__ == "__main__":
     # （qwen3_attn_patch 逐 forward 读取；默认不设 = dense 逐位不变）
     if args.tli_sparse_prefill:
         os.environ["TLI_SPARSE_PREFILL"] = "1"
+    # E138 消融①：TLI_DECODE_DENSE=1（qwen3_attn_patch decode 分支逐
+    # forward 读 env）。单独开（无稀疏 prefill）无意义且与产出标注冲突，
+    # 拒绝产出被误标的结果。
+    if args.tli_decode_dense:
+        if not args.tli_sparse_prefill:
+            raise SystemExit(
+                "[GATE-FAIL] E138: --tli-decode-dense 须与 --tli-sparse-prefill "
+                "同用（prefill-only 稀疏消融臂）；单独开 = 全 dense，"
+                "method=tli 标注失真，fail closed")
+        os.environ["TLI_DECODE_DENSE"] = "1"
 
     config_path = args.config_path
     model2maxlen = json.load(open(f"{config_path}/model2maxlen.json", "r"))
