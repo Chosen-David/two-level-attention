@@ -237,21 +237,23 @@ def scorer_e(dataset, predictions, answers, lengths, all_classes):
     return scores
 
 
+def sample_score(dataset, prediction, ground_truths, all_classes):
+    """Official unrounded per-example score, shared by aggregate and paired reports."""
+    score = 0.0
+    if dataset in ["trec", "triviaqa", "samsum", "lsht"]:
+        prediction = prediction.lstrip("\n").split("\n")[0]
+    for ground_truth in ground_truths:
+        score = max(score, dataset2metric[dataset](
+            prediction, ground_truth, all_classes=all_classes))
+    return score
+
+
 def scorer(dataset, predictions, answers, all_classes):
     total_score = 0.0
     for prediction, ground_truths in zip(predictions, answers):
-        score = 0.0
-        if dataset in ["trec", "triviaqa", "samsum", "lsht"]:
-            prediction = prediction.lstrip("\n").split("\n")[0]
-        for ground_truth in ground_truths:
-            score = max(
-                score,
-                dataset2metric[dataset](
-                    prediction, ground_truth, all_classes=all_classes
-                ),
-            )
-        total_score += score
+        total_score += sample_score(dataset, prediction, ground_truths, all_classes)
     return round(100 * total_score / len(predictions), 2)
+
 
 
 if __name__ == "__main__":
