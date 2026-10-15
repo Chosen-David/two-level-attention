@@ -106,13 +106,9 @@ m1 = [pt[t]["sinkswa_only"] for t in tasks]
 k1_dec = [16, 64, 128, 256]
 dec_hot = [e140b["results"]["dk1_16"]["hotpotqa"], e140b["results"]["dk1_64"]["hotpotqa"],
            e140b["results"]["anchor_k128"]["hotpotqa"], e140b["results"]["dk1_256"]["hotpotqa"]]
-_dec_mus_raw = [e140b["results"]["dk1_16"]["musique"], e140b["results"]["dk1_64"]["musique"],
-                e140b["results"]["anchor_k128"]["musique"], e140b["results"]["dk1_256"]["musique"]]
-k1_mus, dec_mus = [], []
-for k, v in zip(k1_dec, _dec_mus_raw):
-    if v is not None:
-        k1_mus.append(k)
-        dec_mus.append(v)
+dec_mus = [e140b["results"]["dk1_16"]["musique"], e140b["results"]["dk1_64"]["musique"],
+           e140b["results"]["anchor_k128"]["musique"], e140b["results"]["dk1_256"]["musique"]]
+k1_mus = k1_dec
 k1_pf = [128, 256, 512]
 pf_hot_k1 = [e140a["results"]["anchor_grp64_k128"]["hotpotqa"],
              e140a["results"]["pfk1_256"]["hotpotqa"], e140a["results"]["pfk1_512"]["hotpotqa"]]

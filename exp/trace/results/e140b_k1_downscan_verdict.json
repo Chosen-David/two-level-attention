@@ -15,7 +15,7 @@
     "anchor_k128": {"hotpotqa": 59.20, "musique": 33.88},
     "dk1_16": {"hotpotqa": 55.43, "musique": 26.09},
     "dk1_64": {"hotpotqa": 60.83, "musique": 33.85},
-    "dk1_256": {"hotpotqa": 45.27, "musique": null, "status_pending": "musique 在飞（GPU1）"}
+    "dk1_256": {"hotpotqa": 45.27, "musique": 21.57}
   },
   "far_token_budget_at_K2_1024": {
     "formula": "far_budget = 768 - min(round(K1*0.125)*64*0.625, 768)",
@@ -26,5 +26,6 @@
     "pareto_point": "K1=64：60.83/33.85 vs 锚 59.20/33.88——质量更高且粗筛页数减半（性能更优），Quest 口径总召回不变 1024",
     "quest_caliber": "全部 K1 档总召回恒为 1024（sink128+swa128+mid768），与 Quest 口径一致——K1 只改 mid 内部 far/near 配比，无召回放大"
   },
-  "harvest_log": "tmp_e140b_k1down_e2e result.json ×2 目录（eval .187 树内）"
+  "harvest_log": "tmp_e140b_k1down_e2e result.json ×2 目录（eval .187 树内）",
+  "final_note": "dk1_256 musique = 21.57（-12.31 vs 锚）——右臂双任务闭环，倒 U 全谱落袋：16→55.4/26.1，64→60.8/33.9，128→59.2/33.9，256→45.3/21.6"
 }
