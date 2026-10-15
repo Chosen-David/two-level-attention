@@ -173,3 +173,8 @@ extracted by AST, substituting loader dependencies, a fake tokenizer/model/clock
 and guard. They verify routing, hashes, EOS/max-budget behavior, publication order,
 clock/counter negatives and hook cleanup. The plan test executes the entrypoint AST;
 it does not certify the full installed CLI/dependency stack.
+
+Publication-time main update `6a8da9d4ef790fa00fe8922cd7e9eab06e356d9f` is also
+integrated. Active E139 scripts use main's shape/device/equality gates before
+timing, together with this branch's actual Graph-route/replay counters. CPU
+process-control stubs validate failure exits; they are not GPU measurements.

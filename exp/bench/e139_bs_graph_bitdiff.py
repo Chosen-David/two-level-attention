@@ -16,7 +16,8 @@ sys.path.insert(0, os.path.join(TREE, "exp", "bench"))
 import torch  # noqa: E402
 from e131_arm_bench import make_args  # noqa: E402
 from sparse_attn.indexer.tli_indexer import TLIIndexer  # noqa: E402
-from e139_graph_checks import require_masks, require_graph
+from e139_graph_checks import require_graph
+from e139_validation_gates import require_equal_masks
 from sparse_attn.ops.batch_select import _GRAPH_CACHE, _GRAPH_STATS
 from sparse_attn.ops.batch_select import _gate_ok  # noqa: E402
 
@@ -89,7 +90,7 @@ print(f"N={N}", flush=True)
 idx = fresh_idx()
 q, k, v = make_qkv(999)
 if not _gate_ok(idx, q, k):
-    raise RuntimeError("unsupported selector configuration")
+    raise SystemExit("validation failed: selector is not eligible")
 _GRAPH_CACHE.clear()
 SS = D ** -0.5
 
@@ -99,7 +100,7 @@ from sparse_attn.ops.batch_select import batched_group_sels  # noqa: E402
 os.environ.pop("TLI_PREFILL_SELECT_GRAPH", None)
 m_a1 = batched_group_sels(idx, q, k, SS, group_ends, dense_below)
 m_a2 = batched_group_sels(idx, q, k, SS, group_ends, dense_below)
-require_masks(m_a1, m_a2, N)
+require_equal_masks("[G2] eager repeat", m_a1, m_a2, group_ends)
 d0 = sum(1 for a, b in zip(m_a1, m_a2) if not torch.equal(a, b))
 print(f"[G2] eager 同输入两次 diff_rows = {d0}/{N}", flush=True)
 
@@ -109,7 +110,7 @@ os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
 before = dict(_GRAPH_STATS)
 m_g0 = batched_group_sels(idx, q, k, SS, group_ends, dense_below)
 require_graph(before, _GRAPH_STATS, "capture")
-require_masks(m_g0, m_a1, N)
+require_equal_masks("[G1] capture", m_a1, m_g0, group_ends)
 d_cap = sum(1 for a, b in zip(m_g0, m_a1) if not torch.equal(a, b))
 print(f"[G1] capture 层 graph vs eager diff_rows = {d_cap}/{N}", flush=True)
 
@@ -120,13 +121,13 @@ for layer in range(1, 4):
     # eager 先算（独立内存）
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
     m_e = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, dense_below)
-    require_masks(m_e, m_e, N)
+    require_equal_masks("[G1] eager input", m_e, m_e, group_ends)
     # graph replay（copy_ 注入 + replay）
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
     before = dict(_GRAPH_STATS)
     m_r = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, dense_below)
     require_graph(before, _GRAPH_STATS, "replay")
-    require_masks(m_r, m_e, N)
+    require_equal_masks("[G1] replay", m_e, m_r, group_ends)
     d = sum(1 for a, b in zip(m_e, m_r) if not torch.equal(a, b))
     print(f"[G1] 层 {layer}（seed {seed}，新 idx 实例）replay vs eager "
           f"diff_rows = {d}/{N}", flush=True)
