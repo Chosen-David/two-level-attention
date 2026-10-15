@@ -22,9 +22,11 @@ attn 模块属性含 mscale²）。参考概率 = 逐 head softmax(full 192d sco
 
 输出：exp/trace/results/e141_mla_nope_trace.json。
 """
+import hashlib
 import json
 import os
 import statistics as st
+import sys
 
 import torch
 
@@ -46,11 +48,6 @@ MODEL = os.environ.get("MLA_MODEL", os.path.expanduser(
     "~/models/huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat"))
 
 
-def rotate_half(x):
-    x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2:]
-    return torch.cat((-x2, x1), dim=-1)
-
-
 def load_model():
     from transformers import AutoModelForCausalLM, AutoTokenizer
     tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
@@ -70,24 +67,32 @@ def get_mla_qk(model, input_ids):
     T = input_ids.shape[1]
     qn, qr, kn, kr, scales = {}, {}, {}, {}, {}
     for L in LAYERS:
-        hs = out.hidden_states[L]                       # (1,T,2048) bf16
+        # 【E141 修正 2026-10-15，TL-E141-QK-RECONSTRUCTION 审计缺陷①】
+        # hidden_states[L] 是层边界记录 = 该层 input_layernorm 的输入——
+        # 须先过该层 RMSNorm 再投影，否则 q/k 输入非 attention 真值。
+        hs = model.model.layers[L].input_layernorm(out.hidden_states[L])
         attn = model.model.layers[L].self_attn
         # ---- q：nope 128 | rope 64（q_lora_rank=None → q_proj 直连）----
         q = attn.q_proj(hs).view(1, T, H, NOPE_D + ROPE_D)
         q_nope = q[..., :NOPE_D][0]                     # (T,H,128)
-        q_pe = q[..., NOPE_D:][0]                       # (T,H,64)
         # ---- kv：latent c_kv 512 + 共享 rope 64；kv_b_proj 上投影 → per-head nope ----
         ckv_kpe = attn.kv_a_proj_with_mqa(hs)
         c_kv, k_pe = ckv_kpe[..., :512], ckv_kpe[..., 512:]  # (1,T,512)/(1,T,64)
         kv = attn.kv_b_proj(attn.kv_a_layernorm(c_kv))
         kv = kv.view(1, T, H, NOPE_D + 128)
         k_nope = kv[..., :NOPE_D][0]                    # (T,H,128)
-        # ---- yarn RoPE（走模型自带模块，cos/sin 与生产逐位一致）----
+        # 【E141 修正 2026-10-15，审计缺陷②】yarn RoPE 改走同源
+        # apply_rotary_pos_emb（含 view(d//2,2).transpose 通道重排 +
+        # position_ids 索引），不再手工 cos/sin + rotate_half——原实现
+        # 漏 interleaved 布局前置重排，跨位置 QK 点积错误。
+        rope_fn = sys.modules[type(attn).__module__].apply_rotary_pos_emb
+        pos_ids = torch.arange(T, device=hs.device).unsqueeze(0)  # (1,T) 同产线口径
         cos, sin = attn.rotary_emb(k_pe, seq_len=T)     # (T,64) bf16
-        cos, sin = cos.unsqueeze(1), sin.unsqueeze(1)   # (T,1,64) 广播 head
-        k_pe = k_pe[0].unsqueeze(1)                     # (T,1,64) MQA 共享
-        q_pe_r = q_pe * cos + rotate_half(q_pe) * sin
-        k_pe_r = k_pe * cos + rotate_half(k_pe) * sin
+        q4 = q[..., NOPE_D:].transpose(1, 2)            # (1,H,T,64)
+        k4 = k_pe.unsqueeze(1)                          # (1,1,T,64) MQA 共享
+        q4r, k4r = rope_fn(q4, k4, cos, sin, pos_ids, unsqueeze_dim=1)
+        q_pe_r = q4r[0].transpose(0, 1)                 # (T,H,64)
+        k_pe_r = k4r[0, 0].unsqueeze(1)                 # (T,1,64) MQA 共享
         qn[L], qr[L] = q_nope.float(), q_pe_r.float()
         kn[L], kr[L] = k_nope.float(), k_pe_r.float()
         scales[L] = float(attn.softmax_scale)           # 192^-0.5 * mscale²
@@ -243,6 +248,11 @@ def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     meta = {
         "model": MODEL, "arch": "MLA (DeepSeek-V2-Lite)", "tasks": TASKS,
+        "modeling_sha256": hashlib.sha256(
+            open(os.path.join(MODEL, "modeling_deepseek.py"), "rb").read()
+        ).hexdigest(),
+        "qk_reconstruction": "fixed 2026-10-15 (input_layernorm + same-source "
+                             "apply_rotary_pos_emb; TL-E141-QK-RECONSTRUCTION)",
         "n_sample": N_SAMPLE, "layers": LAYERS, "maxlen": MAXLEN,
         "dims": {"nope": NOPE_D, "rope": ROPE_D, "kv_lora_rank": 512},
         "alpha": ALPHA, "bs": BS, "K1": K1, "K2_mid": K2MID,

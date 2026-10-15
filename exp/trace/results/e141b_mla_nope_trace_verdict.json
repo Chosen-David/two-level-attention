@@ -1,0 +1,36 @@
+{
+ "experiment": "E141b MLA 子空间 trace 重跑（Q/K 重建修复后）——TL-E141-QK-RECONSTRUCTION 审计落地",
+ "date": "2026-10-15",
+ "supersedes": "exp/trace/results/e141_mla_nope_trace_verdict.json（oracle 无效：探针漏 input_layernorm + rope 通道重排，GPT 审计 13be23c confirmed，Opus 本地诊断器复现 parity=false）",
+ "user_directive": "GQA 子空间结论扩展到 MLA（nope-only / nope 压缩 / rope 对照），丰富论文架构适用性叙事",
+ "fix": {
+  "probe": "agent_doc/guide/paper_figs/trace/e141_mla_nope_probe.py 两处修复：① hs 先过 model.model.layers[L].input_layernorm 再投影；② rope 改走同源 sys.modules[type(attn).__module__].apply_rotary_pos_emb（含 view(d//2,2).transpose 通道重排 + position_ids (1,T)）",
+  "validation": "hook 真实 forward 的 apply_rotary_pos_emb 捕获 post-rope q/k vs 修复后重建：q_pe_r/k_pe_r 逐位一致（max|Δ|=0，bf16 同路径）——两处缺陷任一未修都会破坏该对拍",
+  "modeling_sha256": "5128aab02d0dc38d5146de4ba72fda7999b39d4197de5e917b0de32578a99ed4（部署 vendored 源，rotary 结构与官方 85864749 同构）"
+ },
+ "model": {
+  "path": "~/models/huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat",
+  "arch": "MLA: nope 128 + rope 64 = q_head 192；kv_lora_rank 512；16 head；27 层 MoE；yarn rope factor 40",
+  "caliber": "同 E141（逐 head softmax(192d) → 16 head 均值概率；head 均值分单索引；L1 页 avg top-128 → L2 token top-768；ref = P TopK-768）",
+  "data": "hotpotqa/musique 各 2 样本 16K 截断，layers {4,8,12,16,20}，16 query/样本，全部 16/16 query 可测（无 softmax 下溢跳过）"
+ },
+ "results": {
+  "arms_retained_mass_mean_4sample": {
+   "L4": "full192 .815 / nope128 .477 / rope64 .769（Δfull-rope .046）",
+   "L8": "full192 .860 / nope128 .513 / rope64 .838（Δ .022）",
+   "L12": "full192 .915 / nope128 .826 / rope64 .756（Δ .159——rope 在此层反而最弱，nope 最强）",
+   "L16": "full192 .899 / nope128 .723 / rope64 .814（Δ .085）",
+   "L20": "full192 .844 / nope128 .581 / rope64 .775（Δ .069）"
+  },
+  "rope64_page_recall": ".955-.964 全层（L1 粗筛召回优异——质量损失集中在 L2 token 排序）",
+  "mass_structure": "sink 25-67% / swa 23-58% / mid 10-26%（mid 内 far 9-23% ≫ near 1-4%）——修正后 swa 占比大幅上升、sink 主导减弱，与原『sink 78-93%』结论不可比（原 oracle 无效）",
+  "nope_compression": "nope 随机子空间 {96,64,32} ≈ nope128 全维（±0.03 内）+ 方差 top/bottom 无分化——nope 维度冗余结论保持，但其前提（nope 选择信号弱）在 L12 例外"
+ },
+ "verdict": {
+  "nope_only_hypothesis": "驳回（修正后数据同样支持）：nope128 在 4/5 层远弱于 full（L4 .477 vs .815 最差）——GQA tail 子空间结论不能按 nope-only 形式迁移",
+  "rope_only_finding": "原『rope-only 与 full192 持平（≤.02）』系无效 oracle 产物，撤销：修正后 rope64 是最佳单分量（4/5 层）但仍低于 full192（Δ 均值 .022-.159，最差 L12 .159，且 L12 nope>rope 反转）——『3x 降维 + MQA 单索引』降为 trace 级『rope 主导但非充分』叙事，e2e 质量判决待 E142a LongBench cells",
+  "layer_selective": "原『L12/16/24 mid 精确 0 → 天然层跳过』撤销：修正后全部层 16/16 query mid 质量可测且非零（原下溢是错误 oracle 的产物）",
+  "mechanism": "修正后 MLA 选择信号在 rope 与 nope 间分层混合（浅层偏 rope、L12 偏 nope），单一子空间均非充分；质量结构 sink/swa 双高——与 GQA tail 单一甜点的机制图景不同，MLA 的架构适用性叙事需按此重写"
+ },
+ "next": "E142a e2e cells（hotpotqa/musique，fullkv vs mla_rope sparse）是 rope-only 索引的最终质量判据（mass≠e2e 铁律）；论文 MLA 段以 E141b+E142a 双数据重写"
+}
