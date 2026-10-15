@@ -14,10 +14,23 @@ from unittest.mock import patch
 import weakref
 
 import torch
+from torch.utils._python_dispatch import TorchDispatchMode
 
 
 ROOT = Path(__file__).resolve().parents[3]
 VENDOR = ROOT / 'exp/vendor_baselines/sparq_vendor'
+
+
+class NoHostScalar(TorchDispatchMode):
+    """Reject real scalar reads without changing Tensor method identities.
+
+    CPU eager guard only: this is not proof of CUDA graph behavior, compiled
+    kernel dispatch or measured device synchronization cost.
+    """
+    def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+        if func is torch.ops.aten._local_scalar_dense.default:
+            raise AssertionError('host scalar extraction')
+        return func(*args, **(kwargs or {}))
 
 
 @contextmanager
@@ -145,21 +158,47 @@ class SparQRequestLifecycle(unittest.TestCase):
     def test_continuation_uses_running_update_without_tensor_item(self):
         attn, cache = Attention(), Cache()
         self.call(attn, self.values(5, 2), cache)
-        # Only the wrapper's scalar decision is forbidden; upstream arithmetic
-        # stays real. CPU proof of no Tensor.item(), not a CUDA timing result.
-        # This host-decision test executes the original softmax arithmetic,
-        # without its optional compiler wrapper. Dynamo itself may inspect the
-        # mocked Tensor.item or call it while constructing fake scalar tensors;
-        # those compiler actions are outside the adapter's host-decision scope.
-        # Keep the item trap active across ALL adapter/upstream arithmetic.
-        softmax = CORE._scaled_softmax
-        eager_softmax = getattr(softmax, '_torchdynamo_orig_callable', softmax)
-        with patch.object(CORE, '_scaled_softmax', eager_softmax), patch.object(
-                torch.Tensor, 'item', side_effect=AssertionError('host scalar extraction')):
+        # Intercept actual reads, not Tensor.item's descriptor: changing that
+        # global identity also breaks Dynamo's inspection of unrelated code.
+        with NoHostScalar():
             self.call(attn, self.values(1, 3), cache)
             with patch.object(attn.sparq_vmean, 'init', side_effect=AssertionError('unexpected full rebuild')):
                 self.call(attn, self.values(1, 4), cache)
         self.assert_mean(attn, cache)
+
+    def test_scalar_guard_with_cpu_compiler_boundary(self):
+        # Exercise the reported compiler/fixture interaction on CPU without
+        # requiring CUDA or changing the vendored official implementation.
+        def scaled_softmax(x, divscale, dim):
+            return torch.softmax(x / divscale, dim=dim)
+        compiled = torch.compile(scaled_softmax, backend='eager')
+        with patch.object(CORE, '_scaled_softmax', compiled):
+            self.test_continuation_uses_running_update_without_tensor_item()
+
+    def test_scalar_guard_detects_reads_and_restores_on_failure(self):
+        scalar = torch.tensor(2.)
+        original_item = torch.Tensor.item
+        for read in (lambda: scalar.item(), lambda: torch.Tensor.item(scalar),
+                     lambda: int(scalar), lambda: float(scalar), lambda: bool(scalar)):
+            with self.subTest(read=read):
+                with self.assertRaisesRegex(AssertionError, 'host scalar extraction'):
+                    with NoHostScalar():
+                        self.assertIs(torch.Tensor.item, original_item)
+                        read()
+                self.assertIs(torch.Tensor.item, original_item)
+                self.assertEqual(scalar.item(), 2.)
+
+    def test_scalar_guard_catches_injected_running_mean_read(self):
+        attn, cache = Attention(), Cache()
+        self.call(attn, self.values(5, 2), cache)
+        original_init = attn.sparq_vmean.init
+        def init_and_read(values):
+            original_init(values)
+            attn.sparq_vmean.n.item()
+        with patch.object(attn.sparq_vmean, 'init', side_effect=init_and_read):
+            with self.assertRaisesRegex(AssertionError, 'host scalar extraction'):
+                with NoHostScalar():
+                    self.call(attn, self.values(1, 3), cache)
 
     def test_no_cache_calls_rebuild_independent_values(self):
         attn = Attention()
