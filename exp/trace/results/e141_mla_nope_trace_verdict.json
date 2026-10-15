@@ -1,0 +1,33 @@
+{
+  "experiment": "E141 MLA 架构子空间 trace probe（DeepSeek-V2-Lite-Chat）——nope-only 假说检验 + rope-only 意外发现",
+  "date": "2026-10-15",
+  "user_directive": "GQA 子空间结论扩展到 MLA：nope 维度独立使用（192→128 节约）+ nope 维度压缩探索，丰富论文架构适用性叙事",
+  "model": {
+    "path": "~/models/huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat",
+    "arch": "MLA: nope 128 + rope 64 = q_head 192；kv_lora_rank 512（latent）；16 head；27 层 MoE；yarn rope factor 40",
+    "caliber": "手动复刻 MLA 注意力前向（q_proj/kv_a_proj_with_mqa/kv_b_proj+kv_a_layernorm，yarn cos/sin 走模型自带 rotary_emb，softmax_scale 读 attn 模块含 mscale²）；参考 P = 逐 head softmax(192d) → 16 head 均值（O1 组均值口径换 head 均值）；选择 = head 均值分单索引；L1 页 avg top-128 → L2 token top-768；ref = P TopK-768",
+    "data": "hotpotqa/musique 各 2 样本，16K 截断，layers {4,8,12,16,20,24}，16 query/样本"
+  },
+  "results": {
+    "mass_structure": {
+      "sink_dominant": "总概率 78-93% 集中于 sink[0,128)；swa 仅 0.3-0.9%；mid（near+far）合计 5-21%",
+      "mid_internal": "mid 内 far(5-15%) > near(2-7%) 约 2-3 倍——far 仍是 mid 质量主体（与 Qwen3 O1 far 占 83% 同向但 MLA 总 mid 占比小得多）",
+      "sink_only_layers": "L12/L16/L24 全部 query mid 质量精确为 0（逐 head softmax fp32 下溢）——注意力完全 sink 集中，mid 选择对这些层零影响（天然层跳过）"
+    },
+    "arms_retained_mass_mean": {
+      "L4": "full192 .919-.936 / nope128 .865-.871 / rope64 .893-.938",
+      "L8": "full192 .920-.929 / nope128 .670-.746 / rope64 .908-.922",
+      "L20": "full192 .781-.999 / nope128 .009-.229 / rope64 .781-.999",
+      "nope_compression": "nope 随机子空间 {96,64,32} ≈ nope128 全维（±0.02 内），方差 top/bottom 64 无分化——nope 内维度对选择高度冗余，但其选择信号本身弱"
+    },
+    "verdict": {
+      "nope_only_hypothesis": "被驳回：nope-only 128d 在深层选择力崩塌（L20 .009-.229 vs full .78-.999）——GQA tail 子空间结论不能按『nope-only』形式迁移到 MLA",
+      "rope_only_finding": "意外收获（更强主张）：rope-only 64d 在全部可用层与 full 192d 选择持平（差 ≤.02，L20 双任务 .781/.781、.999/.999）——维度节约 192→64 = 3 倍，且 rope key 是 MQA 共享（16 head 单索引），索引成本再除以 head 数",
+      "mechanism": "MLA 注意力质量 sink 主导（78-93%）+ mid 池小且由 rope 位置相位信号近优排序；nope/latent 部分主要承载 value 语义（对 V 贡献）而非 top-768 选择排序——选择子空间与内容子空间在 MLA 上解耦",
+      "layer_selective": "L12/16/24 mid 质量为 0 → sink+swa 即足，无需 mid 选择——MLA 上层选择性稀疏是自然结构（零成本层跳过）",
+      "scope_limit": "trace 口径非 e2e；2 任务×2 样本×{4,8,20} 可用层；DeepSeek-V2-Lite 特异（massive-activation sink 是 DeepSeek 系特征）；per-head 选择 vs head 均值单索引未分离；e2e MLA 管线落地是后续任务（#142 12 单元）"
+    }
+  },
+  "paper_narrative": "架构适用性一节的 MLA 数据点：子空间选取律跨架构反转——GQA（Qwen3）低频 tail 32d 是甜点；MLA（DeepSeek）rope-only 64d 是甜点（3x 降维 + MQA 单索引），nope-only 反而失效。共同抽象：选择子空间应取『编码注意力排序信号』的维度而非『编码内容』的维度；两架构中该信号分别位于低频 rope 分量与 rope 分量本身",
+  "files": "agent_doc/guide/paper_figs/trace/e141_mla_nope_probe.py / exp/trace/results/e141_mla_nope_trace.json"
+}

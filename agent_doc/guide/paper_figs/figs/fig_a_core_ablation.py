@@ -14,7 +14,7 @@
   + Quest 口径竖线（总召回 1024）。
 面板 (D) A5 middle 归因 per-task：FullKV vs sink+SWA-only（E135a）。
 面板 (E) E140b K1 倒 U：decode K1∈{16,64,128,256}（左臂=L1 far 粗筛覆盖
-  不足，右臂=far 配额归零 K1≥154 阴影区）+ prefill K1∈{128,256,512}
+  不足，右臂=far 配额归零 K1≥156 阴影区）+ prefill K1∈{128,256,512}
   （K1 全局共享 decode+prefill 双路径同塌）。
 面板 (F) E140 机制：far token 配额曲线 far_budget=K2_mid−min(K1·β·bs·γ,
   K2_mid)——K2=1024/896/768 三档，far=0 阈值精确导出 K2 悬崖位置。
@@ -114,7 +114,13 @@ pf_hot_k1 = [e140a["results"]["anchor_grp64_k128"]["hotpotqa"],
              e140a["results"]["pfk1_256"]["hotpotqa"], e140a["results"]["pfk1_512"]["hotpotqa"]]
 pf_mus_k1 = [e140a["results"]["anchor_grp64_k128"]["musique"],
              e140a["results"]["pfk1_256"]["musique"], e140a["results"]["pfk1_512"]["musique"]]
-FAR_ZERO_K1 = 153.6   # K2_mid/(beta*bs*gamma) = 768/5
+FAR_ZERO_K1 = 156   # 离散精确阈值（GPT 勘误采纳；连续交点 153.6 见注释）
+# 离散精确阈值（GPT TL-E140-QUOTA-ROUNDING 勘误采纳）：round() 使首次 far=0
+# 的整数 K1 为 156/124/101（K1=155 时 far=8 未归零）——图注/竖线用离散值
+def far_zero_k1(k2, beta=0.125, bs=64, gamma=0.625, sink=128, swa=128):
+    mid = max(0, k2 - sink - swa)
+    return next(k for k in range(1, 1025)
+                if max(0, mid - min(max(1, int(round(k * beta))) * bs * gamma, mid)) == 0)
 
 # (F) far 配额曲线（机制）
 def far_budget(k1, k2, beta=0.125, bs=64, gamma=0.625, sink=128, swa=128):
@@ -211,7 +217,7 @@ ax_e.plot(k1_pf, pf_hot_k1, "--^", color=C_HL, label="prefill hotpotqa (grp64)",
 ax_e.plot(k1_pf, pf_mus_k1, "--v", color="#9B59B6", label="prefill musique (grp64)",
           markersize=13, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
 ax_e.axvline(FAR_ZERO_K1, color=C_HL, lw=LINE_WIDTHS["reference"], linestyle="--")
-ax_e.text(FAR_ZERO_K1 + 18, 27, "far budget = 0\n(K1 $\\geq$ 154)",
+ax_e.text(FAR_ZERO_K1 + 18, 27, "far budget = 0\n(K1 $\\geq$ 156)",
           fontsize=FONT_SIZES["annotation"] - 3, color=C_HL)
 ax_e.text(20, 47.5, "left arm:\nL1 far coverage\ninsufficient", fontsize=FONT_SIZES["annotation"] - 3,
           color=C_NEU)
@@ -230,9 +236,9 @@ ax_e.set_ylim(8, 68)
 
 # ---- 面板 (F) far 配额机制 ----
 k1_grid = [16, 32, 64, 96, 128, 160, 192, 256, 384, 512]
-for k2, c, mk, lab in [(1024, C_MAIN, "o", "K2=1024 (far>0 iff K1<154)"),
-                        (896, C_SEC, "s", "K2=896  (far>0 iff K1<128)"),
-                        (768, C_HL, "^", "K2=768  (far>0 iff K1<100)")]:
+for k2, c, mk, lab in [(1024, C_MAIN, "o", "K2=1024 (far>0 iff K1<156)"),
+                        (896, C_SEC, "s", "K2=896  (far>0 iff K1<124)"),
+                        (768, C_HL, "^", "K2=768  (far>0 iff K1<101)")]:
     fb = [far_budget(k, k2) for k in k1_grid]
     ax_f.plot(k1_grid, fb, "-" + mk, color=c, label=lab,
               markersize=11, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
@@ -291,7 +297,7 @@ for k, v in zip(k1_pf, pf_mus_k1):
 for k2 in (768, 896, 1024):
     for k in k1_grid:
         rows.append(f"A\tf\tK2={k2}@K1={k}\tfar_token_budget\ttokens\t{far_budget(k, k2)}\t\t\te140_far_quota_mechanism")
-rows.append(f"A\te\tthreshold\tfar_zero_K1\tK1\t{FAR_ZERO_K1}\t\t\te140_far_quota_mechanism")
+rows.append(f"A\te\tthreshold\tfar_zero_K1_discrete\tK1\t{FAR_ZERO_K1}\t\t\te140_far_quota_mechanism")
 with open(os.path.join(OUT, "A_core_ablation_figure_data.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 print("exported A_core_ablation_figure_data.tsv")
