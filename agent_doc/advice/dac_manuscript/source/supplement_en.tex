@@ -1,0 +1,67 @@
+\documentclass[10pt,letterpaper]{article}
+\usepackage[margin=.7in]{geometry}
+\usepackage{graphicx,amsmath,fontspec,unicode-math}
+\setmainfont{NimbusRoman-Regular.otf}[BoldFont=NimbusRoman-Bold.otf,ItalicFont=NimbusRoman-Italic.otf,BoldItalicFont=NimbusRoman-BoldItalic.otf]
+\setsansfont{NimbusSans-Regular.otf}
+\setmathfont{Latin Modern Math}
+\usepackage[hidelinks]{hyperref}
+\hypersetup{pdfauthor={},pdftitle={Supplementary mechanism diagrams}}
+\graphicspath{{../figures/}}
+\pagestyle{plain}
+\begin{document}
+\section*{Supplementary mechanism diagrams S1: Subspace selection}
+Detailed views of subspace selection, regional allocation, and the gate lifecycle under the assumptions stated in the main text.\par\medskip
+\noindent\includegraphics[width=\textwidth]{ppt_subspace_en.pdf}
+\par\medskip\noindent Subspace selection. The same 16 complete RoPE pairs feed L1 and L2 in both regions. The implementation stores floating-point quantize--dequantize values, not packed INT4. Selected IDs retrieve original 128-dimensional KV.
+\clearpage
+\section*{Supplementary mechanism diagrams S2: Regional page and token allocation}
+\noindent\includegraphics[width=\textwidth]{ppt_near_far_en.pdf}
+\par\medskip\noindent Regional selection and protected-token accounting. Under sufficient eligible capacity, $K_1=128$ gives 16 near and 112 far pages; the total 1024-token cap includes 256 protected tokens and 640/128 near/far tokens. The diagram's blocks are schematic. Per-query-head normalization precedes KV-group averaging.
+\clearpage
+\section*{Supplementary mechanism diagrams S3: Prefill-to-decode gate lifecycle}
+\noindent\includegraphics[width=\textwidth]{ppt_gate_en.pdf}
+\par\medskip\noindent Gate lifecycle and supported short circuit. Prefill stores a decision; the first decode-path call freezes it. In the fixed numeric-quota path with valid length and nonempty far history, OFF skips far L1/L2 dot products and far selection. Only unused L2 quota refills eligible near tokens; the near L1 cap stays 16 pages. Global preparation and S-wide buffers/softmax remain. The gate is disabled by default and has no matched quality--cost validation for the dual-32 candidate.
+\clearpage
+\section*{Supplementary Figure S4: Descriptive configuration comparison}
+\noindent\includegraphics[width=.72\textwidth]{e134_quality_current.pdf}
+\par\medskip\noindent The five-task means are 47.910 (nominal full/sub), 47.588 (sub/sub) and 47.666 (nominal sub/full). The differences of 0.322 and 0.078 points from sub/sub are descriptive. Full/sub lacks configuration sidecars; sub/full's L2-mode flag is not bound to a producer tree implementing that mode. These labels therefore do not establish controlled stage interventions or a completed three-arm ablation. Supplementary Note S7 gives the configuration evidence. None is dense FullKV, and no document-paired non-inferiority or matched quality--cost conclusion follows.
+\clearpage
+\section*{Supplementary Note S5: Gate observation and execution scope}
+
+When the optional gate feature is disabled, ordinary far selection remains active; OFF denotes a calibrated per-layer skip decision only when the feature is enabled. The optional D$'$ extension observes a layer's prefill queries, stores a pending far-skip decision, freezes it at the first decode-path call, and reuses it until a new input clears the state (Supplementary Fig.~S3). That call can still consume question tokens, so it need not see the complete question. Calibration uses at most the final 256 available query rows, full-dimensional scores and per-query-head softmax; its averaged far-attention mass is compared strictly with the threshold. The threshold controls a prefill observation; it does not bound far-attention mass or task error during later decoding.
+
+
+
+In the supported numeric-quota path (batch one, valid length and nonempty far history), OFF skips far L1/L2 dot products and selection. Unused L2 quota refills eligible near candidates without enlarging near's L1 page budget. Far-on, off-refill and off-no-refill are distinct interventions: removing far can change per-query softmax denominators and the aggregated near ranking. Consequently refill is not an isolated saving with an invariant near set. Preparation, quantization, repeat-to-float and S-wide buffers/softmax remain in the cost. Dynamic and static skip configurations are rejected together; Llama dynamic registration is rejected. Batched state isolation, lifecycle execution and shift-triggered fallback remain to be validated. The separate runtime $\alpha,\beta,\gamma$ allocator stays paused.
+
+
+The main-text gate is a candidate extension to the dual-32 method. The archived gate task summaries do not identify generation source SHA, complete subspace flags or paired predictions, so they cannot validate this configuration. These implementation details qualify the mechanism rather than provide measured speed or quality gains.
+
+\clearpage
+\section*{Supplementary Note S6: Scope of the archived diagnostics}
+The following records retain the numerical detail behind the main-text limitations. They are author-archived diagnostics, not new experiments or matched validation of the dual-32 method.
+
+\textbf{Local selector timing and aggregation.} The archived performance record reports two GPU-crossed rounds for the new implementation. The per-round values are 1.3635/1.337 ms (full/sub), 1.3872/1.3324 ms (sub/sub), and 1.4794/1.4473 ms (sub/full). Its reported two-round medians are 1.3502, 1.3598 and 1.4634 ms, respectively. Taking the usual midpoint median of each pair locally gives 1.35025, 1.35980 and 1.46335 ms, which explains the earlier extra decimal places; this arithmetic is not a new timing measurement. The record does not supply per-stage medians or raw sequences and therefore does not establish the earlier description as a sum of five stage medians. The synthetic single-layer, batch-one, single-query 64K scope is distinct from complete layer or request execution and is not paired with the quality runs. The record describes 60 steps, 40 warmups and 20 steady samples, whereas the previously inspected harness implies 100 total and 60 steady samples. This discrepancy remains unresolved. The reported sub/sub time exceeds full/sub; neither statistical significance nor complete-system speedup is established.
+
+\textbf{Regional and gate diagnostics.} A historical protection-only comparison scores 26.09 versus 47.91 with middle-history retrieval, but also reduces the token budget from 1024 to 256; it cannot isolate regional allocation. Gate calibration contains 16 input labels and 36 layers each. Selecting input--layer records whose saved far-mass field is $<0.05$ gives 30 prefill and 22 decode records, with 13 in common. The prefill-selected records have mean decode far-attention mass 0.0582 and maximum 0.1678. These stored statistics expose cross-phase changes, not task-quality preservation or request-time savings. A subsequent author report gives five-task means 47.876 ($\epsilon=.05$) and 47.692 ($.10$), against a reused 47.910 anchor: changes of $-0.034$ and $-0.218$ points. Each arm declines on three tasks, with HotpotQA changes $-1.05/-1.26$. Reported five-task bootstrap intervals $[-.584,.452]/[-.806,.400]$ are descriptive, not equivalence evidence. The available run records do not establish a matched comparison for the dual-32 configuration (Supplementary Note~S5). Matched three-policy quality and complete cost remain unverified.
+
+\textbf{Current coverage and missing controls.} Matched dense FullKV quality, the sparse full/full selector control, and preparation-inclusive request comparisons remain missing; historical full-L1/tail-32 runs cannot fill them. At 128K, RULER (main-text Ref.~[10]) sparse-arm identities remain unresolved despite a new FullKV receipt, precluding cross-arm ranking. The historical static-layer policy did not meet its improvement threshold. That negative result and the mixed-policy gate diagnostics constrain interpretation but do not directly test this candidate. Their scores and provenance remain in the evidence register. These Qwen3 diagnostics establish no cross-family or production benefit.
+
+
+\clearpage
+\section*{Supplementary Note S7: Budgets and configuration identity}
+\textbf{Fair comparison.} The sparse-comparator budget is the final unique attention support $K$, including protected tokens. L1 candidate pages are an internal design choice, not a quantity that must match a competitor. Their construction, scoring, ranking and memory traffic remain part of cost. Model, input IDs, generation limits, prefill/decode treatment, dense-layer policy and task scorer must be matched. Native and controlled-adapter results must be distinguished. Actual token counts after page rounding and selection granularity must accompany nominal $K$.
+
+\textbf{Sub/sub LongBench settings.} The five saved manifests specify page size 64, L1 cap 128 pages, final cap 1024 tokens, compression ratio 4, tail coordinates, $\alpha=.25$, $\beta=.125$, $\gamma=.625$, near-average/far-minmax page scoring and 4-bit quantize--dequantize values. They specify shared KV-head selection, dense prefill and disabled static layer skip. All five run receipts identify producer \texttt{35b39bd8\allowbreak{}e43cf478\allowbreak{}bb4f0ab6\allowbreak{}4a8457f0\allowbreak{}8d87c864}. That recorded tree gives 32 scoring coordinates, prefix protection $2\times64=128$, recent protection 128, and sparse decode on all Qwen3 attention layers. These code-derived fields do not certify an unrecorded modified worktree or an execution trace. The normal long-history allocation is 16/112 near/far pages and 640/128 middle tokens, plus 256 protected tokens. The 8192 candidate slots do not imply 8192 final attention tokens, nor bound L2 scoring: ordinary L2 scores the full history before masking. Realized per-step counts were not recorded.
+
+The saved input cap is 31500 for these runs. Task sample counts and maximum generated tokens are: Qasper 200/128; HotpotQA 200/32; MuSiQue 200/32; GovReport 200/512; RepoBench-P 500/64. The cap is not an observed input length. The complete model/tokenizer revision, runtime precision, hardware identity and scorer revision are not established by these configuration sidecars; they must be bound for a matched comparison. Document-cluster identity, a matched dense run and a predeclared task-quality tolerance are still required for non-inferiority testing.
+
+\textbf{Nominal full/sub.} Five legacy prediction files have no manifest or run receipt. Filename/verdict records identify page 64, L1 cap 128, final cap 1024, compression ratio 4 and the same nominal $\alpha,\beta,\gamma$. Effective input cap, full producer identity, protection, phase and complete scorer settings are not verified. Current defaults cannot fill these gaps.
+
+\textbf{Nominal sub/full.} Five manifests contain the same listed budget settings and an explicit full L2 flag. Four receipts omit the producer commit. The MuSiQue receipt identifies \texttt{60027fba\allowbreak{}3672f337\allowbreak{}44917c4f\allowbreak{}59960d0f\allowbreak{}131f8ab0}, but that tree does not implement the recorded L2-mode field. The code actually executed is therefore not established by that commit. The nominal label and score are retained; full-dimensional L2 execution is not certified.
+
+\textbf{Quest comparator.} The official evaluation uses dense multi-token prefill, sparse token-by-token processing, dense first two layers, and page selection per query head. Its 1024-token budget with chunk size 16 differs internally from 128 pages of size 64 in our selector. A controlled comparison aligns final unique $K$ and phase/layer policy, while reporting the page quotas and head-sharing distinction separately. A paper's native configuration and a controlled adapter must not be pooled into one result. No matched Quest or FullKV quality--request-cost result is claimed here.
+
+\textbf{Other result families.} The synthetic 64K selector timings are single-layer, batch-one, single-query summaries with an unresolved sampling protocol (S6); they are not bound to the LongBench requests. Gate summaries identify thresholds but not complete producer/subspace settings. Protection-only uses 256 tokens versus its reference's 1024. Missing identity, unknown gate/refill settings, and unmeasured complete costs remain unknown rather than being inferred from current defaults.
+
+\end{document}
