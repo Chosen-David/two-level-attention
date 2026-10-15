@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""A 系列核心消融图（figure_id=A2/A3/A4/A5 合并四面板，P0 主文）。
+"""A 系列核心消融图（figure_id=A2/A3/A4/A5 合并六面板 2x3，P0 主文）。
 
 面板 (A) 质量代价 forest（AVG5 配对差值 + bootstrap CI95，正负例均保留）：
   - tail32 子空间（E133）Δ-0.32 CI[-0.51,-0.104]——A2 质量侧
@@ -10,8 +10,14 @@
 面板 (B) A2 成本侧：表示三臂稳态 GPU ms（E134 同机两轮交叉中位）
   ——sub+sub ≈ full+sub（+0.7% 换 4x 粗筛省算），sub+full 最慢。
 面板 (C) A3 预算：K2 上/下探双臂（E139 pareto）——decode 下探悬崖
-  （hotpot 59.2→29.92, musique 33.88→12.47）+ prefill 上探恢复曲线。
+  （hotpot 59.2→29.92, musique 33.88→12.47）+ prefill 上探恢复曲线
+  + Quest 口径竖线（总召回 1024）。
 面板 (D) A5 middle 归因 per-task：FullKV vs sink+SWA-only（E135a）。
+面板 (E) E140b K1 倒 U：decode K1∈{16,64,128,256}（左臂=L1 far 粗筛覆盖
+  不足，右臂=far 配额归零 K1≥154 阴影区）+ prefill K1∈{128,256,512}
+  （K1 全局共享 decode+prefill 双路径同塌）。
+面板 (F) E140 机制：far token 配额曲线 far_budget=K2_mid−min(K1·β·bs·γ,
+  K2_mid)——K2=1024/896/768 三档，far=0 阈值精确导出 K2 悬崖位置。
 
 数据全部程序化读取自判决 JSON；输出 PDF+PNG+SVG + figure_data.tsv。
 """
@@ -50,6 +56,8 @@ e137 = json.load(open(R + "e137_dyn_dgate_verdict.json"))
 e135 = json.load(open(R + "e135_sinkswa_only_verdict.json"))
 e134 = json.load(open(R + "e134_perf_reverdict.json"))
 e139 = json.load(open(WT + "/exp/trace/results/e139_k2_budget_pareto_verdict.json"))
+e140b = json.load(open(R + "e140b_k1_downscan_verdict.json"))
+e140a = json.load(open(R + "e140a_prefill_k1up_verdict.json"))
 
 # (A) forest
 forest = [  # (label, delta, ci_lo, ci_hi, color)
@@ -94,11 +102,34 @@ tasks = ["qasper", "hotpotqa", "musique", "gov_report", "repobench"]
 m0 = [pt[t]["anchor"] for t in tasks]
 m1 = [pt[t]["sinkswa_only"] for t in tasks]
 
-# ---------------- 画布 2x2 ----------------
-fig, axes = plt.subplots(2, 2, figsize=(20, 16), gridspec_kw={"wspace": 0.30, "hspace": 0.34})
-fig.subplots_adjust(left=0.19, right=0.97, top=0.95, bottom=0.075)
-ax_a, ax_b = axes[0]
-ax_c, ax_d = axes[1]
+# (E) K1 倒 U（E140b decode + E140a prefill）
+k1_dec = [16, 64, 128, 256]
+dec_hot = [e140b["results"]["dk1_16"]["hotpotqa"], e140b["results"]["dk1_64"]["hotpotqa"],
+           e140b["results"]["anchor_k128"]["hotpotqa"], e140b["results"]["dk1_256"]["hotpotqa"]]
+_dec_mus_raw = [e140b["results"]["dk1_16"]["musique"], e140b["results"]["dk1_64"]["musique"],
+                e140b["results"]["anchor_k128"]["musique"], e140b["results"]["dk1_256"]["musique"]]
+k1_mus, dec_mus = [], []
+for k, v in zip(k1_dec, _dec_mus_raw):
+    if v is not None:
+        k1_mus.append(k)
+        dec_mus.append(v)
+k1_pf = [128, 256, 512]
+pf_hot_k1 = [e140a["results"]["anchor_grp64_k128"]["hotpotqa"],
+             e140a["results"]["pfk1_256"]["hotpotqa"], e140a["results"]["pfk1_512"]["hotpotqa"]]
+pf_mus_k1 = [e140a["results"]["anchor_grp64_k128"]["musique"],
+             e140a["results"]["pfk1_256"]["musique"], e140a["results"]["pfk1_512"]["musique"]]
+FAR_ZERO_K1 = 153.6   # K2_mid/(beta*bs*gamma) = 768/5
+
+# (F) far 配额曲线（机制）
+def far_budget(k1, k2, beta=0.125, bs=64, gamma=0.625, sink=128, swa=128):
+    k2m = k2 - sink - swa
+    return max(0, k2m - min(round(k1 * beta) * bs * gamma, k2m))
+
+# ---------------- 画布 2x3 ----------------
+fig, axes = plt.subplots(2, 3, figsize=(30, 16), gridspec_kw={"wspace": 0.30, "hspace": 0.34})
+fig.subplots_adjust(left=0.13, right=0.97, top=0.95, bottom=0.075)
+ax_a, ax_b, ax_c = axes[0]
+ax_d, ax_e, ax_f = axes[1]
 
 # ---- 面板 (A) forest ----
 ys = np.arange(len(forest))[::-1]
@@ -142,6 +173,9 @@ ax_c.text(1015, anchor_hot + 0.6, "dense hotpot 59.4", fontsize=FONT_SIZES["anno
           color=C_NEU, ha="right")
 ax_c.text(1015, anchor_mus + 0.6, "dense musique 34.3", fontsize=FONT_SIZES["annotation"] - 3,
           color=C_NEU, ha="right")
+ax_c.axvline(1024, color=C_HL, lw=LINE_WIDTHS["reference"], linestyle="--")
+ax_c.text(1040, 62, "Quest-caliber\ntotal recall", fontsize=FONT_SIZES["annotation"] - 3,
+          color=C_HL)
 ax_c.set_xscale("log")
 ax_c.set_xticks([256, 384, 512, 768, 1024, 1536, 2048])
 ax_c.set_xticklabels(["256", "384", "512", "768", "1024", "1536", "2048"])
@@ -169,6 +203,54 @@ for xi, d0, d1 in zip(xd, m0, m1):
     ax_d.text(xi, d1 + 1.2, f"-{d0 - d1:.0f}", ha="center",
               fontsize=FONT_SIZES["annotation"] - 3, color=C_HL)
 ax_d.set_ylim(0, 72)
+
+# ---- 面板 (E) K1 倒 U ----
+ax_e.axvspan(FAR_ZERO_K1, 600, color=C_NEU, alpha=0.18)
+ax_e.plot(k1_dec, dec_hot, "-o", color=C_MAIN, label="decode hotpotqa",
+          markersize=13, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
+ax_e.plot(k1_mus, dec_mus, "-s", color=C_SEC, label="decode musique",
+          markersize=12, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
+ax_e.plot(k1_pf, pf_hot_k1, "--^", color=C_HL, label="prefill hotpotqa (grp64)",
+          markersize=13, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
+ax_e.plot(k1_pf, pf_mus_k1, "--v", color="#9B59B6", label="prefill musique (grp64)",
+          markersize=13, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
+ax_e.axvline(FAR_ZERO_K1, color=C_HL, lw=LINE_WIDTHS["reference"], linestyle="--")
+ax_e.text(FAR_ZERO_K1 + 18, 27, "far budget = 0\n(K1 $\\geq$ 154)",
+          fontsize=FONT_SIZES["annotation"] - 3, color=C_HL)
+ax_e.text(20, 47.5, "left arm:\nL1 far coverage\ninsufficient", fontsize=FONT_SIZES["annotation"] - 3,
+          color=C_NEU)
+for k, v in zip(k1_dec, [688, 448, 128, 0]):
+    ax_e.text(k, 11.5, f"far {v}", ha="center",
+              fontsize=FONT_SIZES["annotation"] - 4, color=C_NEU)
+ax_e.set_xscale("log")
+ax_e.set_xticks([16, 64, 128, 256, 512])
+ax_e.set_xticklabels(["16", "64", "128", "256", "512"])
+ax_e.set_xlim(12, 600)
+ax_e.set_xlabel("K1 pages (L1 coarse top-k)")
+ax_e.set_ylabel("task score")
+ax_e.set_title("E  K1 sweep: inverted-U, far quota collapse", loc="left", pad=10)
+ax_e.legend(loc="upper right", fontsize=FONT_SIZES["legend"] - 3)
+ax_e.set_ylim(8, 68)
+
+# ---- 面板 (F) far 配额机制 ----
+k1_grid = [16, 32, 64, 96, 128, 160, 192, 256, 384, 512]
+for k2, c, mk, lab in [(1024, C_MAIN, "o", "K2=1024 (far>0 iff K1<154)"),
+                        (896, C_SEC, "s", "K2=896  (far>0 iff K1<128)"),
+                        (768, C_HL, "^", "K2=768  (far>0 iff K1<100)")]:
+    fb = [far_budget(k, k2) for k in k1_grid]
+    ax_f.plot(k1_grid, fb, "-" + mk, color=c, label=lab,
+              markersize=11, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
+ax_f.axhline(0, color="black", lw=LINE_WIDTHS["reference"], linestyle="--")
+ax_f.text(300, 60, "far=0 zone:\nmulti-hop retrieval\nstarved", fontsize=FONT_SIZES["annotation"] - 3,
+          color=C_HL, ha="center")
+ax_f.set_xscale("log")
+ax_f.set_xticks([16, 64, 128, 256, 512])
+ax_f.set_xticklabels(["16", "64", "128", "256", "512"])
+ax_f.set_xlabel("K1 pages")
+ax_f.set_ylabel("far token budget (K2_mid - near quota)")
+ax_f.set_title("F  far quota mechanism: $K2_{mid} - \\min(K1\\beta\\,bs\\,\\gamma,\\ K2_{mid})$", loc="left", pad=10)
+ax_f.legend(loc="upper right", fontsize=FONT_SIZES["legend"] - 3)
+ax_f.set_ylim(-30, 760)
 
 # ---------------- lint + 导出 ----------------
 report = lint_figure(fig)
@@ -202,6 +284,18 @@ for k, hh, mm in zip(pf_k, pf_hot, pf_mus):
 for t, d0, d1 in zip(tasks, m0, m1):
     rows.append(f"A\td\t{t}\tfullkv\tscore\t{d0:.2f}\t\t\te135_sinkswa_only")
     rows.append(f"A\td\t{t}\tsinkswa_only\tscore\t{d1:.2f}\t\t\te135_sinkswa_only")
+for k, v in zip(k1_dec, dec_hot):
+    rows.append(f"A\te\tdecode@K1={k}\thotpotqa\tscore\t{v:.2f}\t\t\te140b_k1_downscan")
+for k, v in zip(k1_mus, dec_mus):
+    rows.append(f"A\te\tdecode@K1={k}\tmusique\tscore\t{v:.2f}\t\t\te140b_k1_downscan")
+for k, v in zip(k1_pf, pf_hot_k1):
+    rows.append(f"A\te\tprefill@K1={k}\thotpotqa\tscore\t{v:.2f}\t\t\te140a_prefill_k1up")
+for k, v in zip(k1_pf, pf_mus_k1):
+    rows.append(f"A\te\tprefill@K1={k}\tmusique\tscore\t{v:.2f}\t\t\te140a_prefill_k1up")
+for k2 in (768, 896, 1024):
+    for k in k1_grid:
+        rows.append(f"A\tf\tK2={k2}@K1={k}\tfar_token_budget\ttokens\t{far_budget(k, k2)}\t\t\te140_far_quota_mechanism")
+rows.append(f"A\te\tthreshold\tfar_zero_K1\tK1\t{FAR_ZERO_K1}\t\t\te140_far_quota_mechanism")
 with open(os.path.join(OUT, "A_core_ablation_figure_data.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 print("exported A_core_ablation_figure_data.tsv")

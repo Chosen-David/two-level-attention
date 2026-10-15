@@ -1,0 +1,30 @@
+{
+  "experiment": "E140b decode K1 下探 + 补格上探——K1 倒 U 曲线（配对 E140a prefill 上探）",
+  "date": "2026-10-15",
+  "tree": "tmp_e140_tree_187 (1c8c6b8 archive)",
+  "run_timestamp": "1015200001",
+  "protocol": {
+    "model": "Qwen3-8B",
+    "method": "tli decode",
+    "anchor": "K1=128 K2=1024 cmp4 α=.25 β=.125 γ=.625 tail",
+    "k1_sweep": [16, 64, 128, 256],
+    "tasks": ["hotpotqa", "musique"],
+    "n_samples": 200
+  },
+  "results": {
+    "anchor_k128": {"hotpotqa": 59.20, "musique": 33.88},
+    "dk1_16": {"hotpotqa": 55.43, "musique": 26.09},
+    "dk1_64": {"hotpotqa": 60.83, "musique": 33.85},
+    "dk1_256": {"hotpotqa": 45.27, "musique": null, "status_pending": "musique 在飞（GPU1）"}
+  },
+  "far_token_budget_at_K2_1024": {
+    "formula": "far_budget = 768 - min(round(K1*0.125)*64*0.625, 768)",
+    "K1=16": 688, "K1=64": 448, "K1=128": 128, "K1=256": 0
+  },
+  "verdict": {
+    "inverted_U": "左臂（16→64）= L1 far 粗筛覆盖不足；右臂（128→256）= far 配额归零（K1≥154，见 e140_far_quota_mechanism_verdict.json）；顶点 K1=64",
+    "pareto_point": "K1=64：60.83/33.85 vs 锚 59.20/33.88——质量更高且粗筛页数减半（性能更优），Quest 口径总召回不变 1024",
+    "quest_caliber": "全部 K1 档总召回恒为 1024（sink128+swa128+mid768），与 Quest 口径一致——K1 只改 mid 内部 far/near 配比，无召回放大"
+  },
+  "harvest_log": "tmp_e140b_k1down_e2e result.json ×2 目录（eval .187 树内）"
+}
