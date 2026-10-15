@@ -122,3 +122,54 @@ boundaries, freezes runtime counters before outside-wall observation, and valida
 actual routes, support and lifecycle. It rejects T0 (host wall is not device kernel
 time), counter resets/disappearance, fallback and inconsistent receipts. It is a
 host adapter building block, not a completed model-level benchmark or GPU runner.
+
+## LongBench Qwen manual-path integration
+
+`collect_timing_call` remains a generic helper. The actual integration now lives
+in `benchmark/LongBench/pred.py`: its existing greedy loop uses `_manual_generate`,
+and optional `QwenRequestCapture` surrounds the same request guard. The default is
+`--paper-capture off`; prediction output has no new receipt in this mode.
+
+```sh
+# On a host with the normal LongBench dependencies; exits before seeding/model load:
+python benchmark/LongBench/pred.py --task hotpotqa --paper-capture plan
+# To an otherwise reviewed Qwen3 manual-path benchmark command, append:
+# --paper-capture timing
+```
+
+No benchmark execution is initiated by this change. Timing mode rejects samsum's
+`generate`, DeepSeek/other models and unknown attention forwards. CLI rejection
+of unsupported model/task happens before model loading. The Python `get_pred`
+entry also rejects unsupported paths. There is no blanket `model.generate` hook.
+
+A successful prediction record includes `paper_request_capture`:
+
+- Actual concatenated material/question token IDs are SHA-256-bound after existing
+  truncation, templating and question BOS handling. Encoding is int64 little-endian;
+  counts, actual greedy/EOS budget and producer-file hashes accompany it.
+- Real calls are labeled material, token-wise question and generated decode. Every
+  call must observe every installed layer once, using native Qwen forward hooks or
+  successful branch markers in the existing TLI Qwen patch. Question tokens thus
+  record decode routes, rather than being mislabeled as material prefill.
+- TTFT starts before guard entry and ends at first generated-token completion.
+  Decode-after-first wall ends after the last generated token; TPOT divides by
+  actual `n-1`, and is null for one output. Request wall ends after guard exit and
+  completion synchronization. Guard/model/sync/clock/counter/hook failures return
+  no successful receipt. Guard validation precedes prediction record construction.
+- Tokenization, input hashing and hook installation are outside request wall.
+  Lightweight route-hook and completion-sync overhead is included. Internal compile,
+  plan, capture, prepare, metadata update, injected copy and replay times are null,
+  not fabricated zeros. Native internal kernel selection is not separately observed.
+
+These are `longbench-qwen-request-v1` **candidate telemetry** records, deliberately
+not the frozen paper-run timing schema and not eligible for scientific acceptance.
+Support inspection is disabled during timing. A separate independently validated
+support pass remains necessary; a caller's unit list does not prove full coverage.
+Real model/HF version parity, complete support hooks and internal lifecycle
+instrumentation remain unverified. No GPU benchmark was run.
+
+CPU tests execute the actual `_manual_generate` and `get_pred` function bodies
+extracted by AST, substituting loader dependencies, a fake tokenizer/model/clock
+and guard. They verify routing, hashes, EOS/max-budget behavior, publication order,
+clock/counter negatives and hook cleanup. The plan test executes the entrypoint AST;
+it does not certify the full installed CLI/dependency stack.

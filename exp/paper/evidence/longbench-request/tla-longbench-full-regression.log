@@ -1,0 +1,71 @@
+test_actual_callsite_geometry_and_cross_layer_reuse (test_e139_graph_contract.Contracts.test_actual_callsite_geometry_and_cross_layer_reuse) ... ok
+test_hard_gates_subprocess_exit (test_e139_graph_contract.Contracts.test_hard_gates_subprocess_exit) ... EXIT optimized=False expected=0 actual=0 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.ones(2,dtype=torch.bool)], 1)
+EXIT optimized=False expected=0 actual=0 case=require_outputs(torch.ones(2), torch.ones(2))
+EXIT optimized=False expected=1 actual=1 case=require_masks(None, [], 1)
+EXIT optimized=False expected=1 actual=1 case=require_masks([], [], 1)
+EXIT optimized=False expected=1 actual=1 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.zeros(2,dtype=torch.bool)], 1)
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.ones(2), torch.zeros(2))
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.tensor([float('nan')]), torch.ones(1))
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.tensor([float('inf')]), torch.tensor([float('inf')]))
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.ones(2), torch.ones(1))
+EXIT optimized=False expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=1,replay=1),'replay')
+EXIT optimized=False expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=0,replay=0),'replay')
+EXIT optimized=True expected=0 actual=0 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.ones(2,dtype=torch.bool)], 1)
+EXIT optimized=True expected=0 actual=0 case=require_outputs(torch.ones(2), torch.ones(2))
+EXIT optimized=True expected=1 actual=1 case=require_masks(None, [], 1)
+EXIT optimized=True expected=1 actual=1 case=require_masks([], [], 1)
+EXIT optimized=True expected=1 actual=1 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.zeros(2,dtype=torch.bool)], 1)
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.ones(2), torch.zeros(2))
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.tensor([float('nan')]), torch.ones(1))
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.tensor([float('inf')]), torch.tensor([float('inf')]))
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.ones(2), torch.ones(1))
+EXIT optimized=True expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=1,replay=1),'replay')
+EXIT optimized=True expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=0,replay=0),'replay')
+ok
+test_real_hit_checks_before_copy_or_replay (test_e139_graph_contract.Contracts.test_real_hit_checks_before_copy_or_replay) ... ok
+test_scalar_signature_boundaries (test_e139_graph_contract.Contracts.test_scalar_signature_boundaries) ... ok
+test_schema_and_backend_signature (test_e139_graph_contract.Contracts.test_schema_and_backend_signature) ... ok
+test_values_and_noncontiguous_copy (test_e139_graph_contract.Contracts.test_values_and_noncontiguous_copy) ... ok
+test_actual_selector_boundaries_and_switch (test_e139_shared_gqa_indices.SharedIndices.test_actual_selector_boundaries_and_switch) ... ok
+test_candidate_invariant_oracle_negative_controls (test_e139_shared_gqa_indices.SharedIndices.test_candidate_invariant_oracle_negative_controls) ... ok
+test_cpu_allocation_proxy (test_e139_shared_gqa_indices.SharedIndices.test_cpu_allocation_proxy) ... USDT:2026-10-15 03:05:34 5273:5273 SyncActivityProfilerHandler.cpp:39] profiler_start
+USDT:2026-10-15 03:05:34 5273:5273 SyncActivityProfilerHandler.cpp:46] profiler_stop
+USDT:2026-10-15 03:05:34 5273:5273 SyncActivityProfilerHandler.cpp:39] profiler_start
+USDT:2026-10-15 03:05:34 5273:5273 SyncActivityProfilerHandler.cpp:46] profiler_stop
+CPU_ALLOCATION_PROXY {"Hkv": 2, "G": 4, "C": 128, "width": 512, "baseline_positive_self_cpu_bytes": 29700, "shared_positive_self_cpu_bytes": 6156, "full_history_softmax_unchanged": true, "cuda_measured": false}
+ok
+test_gqa_normalization_negative_control (test_e139_shared_gqa_indices.SharedIndices.test_gqa_normalization_negative_control) ... ok
+test_graph_key_binds_switch (test_e139_shared_gqa_indices.SharedIndices.test_graph_key_binds_switch) ... ok
+test_noncontiguous_layout_and_schema_rejections (test_e139_shared_gqa_indices.SharedIndices.test_noncontiguous_layout_and_schema_rejections) ... ok
+test_scatter_softmax_gqa_and_ties (test_e139_shared_gqa_indices.SharedIndices.test_scatter_softmax_gqa_and_ties) ... ok
+test_actual_hook_receives_layer_normalized_projections_and_rope (test_e140_observation.Observation.test_actual_hook_receives_layer_normalized_projections_and_rope) ... ok
+test_cli_dry_run_does_not_load_model (test_e140_observation.Observation.test_cli_dry_run_does_not_load_model) ... ok
+test_near_is_right_and_swa_exact (test_e140_observation.Observation.test_near_is_right_and_swa_exact) ... ok
+test_negative_probabilities_geometry (test_e140_observation.Observation.test_negative_probabilities_geometry) ... ok
+test_o3_partial_page_and_explicit_denominators (test_e140_observation.Observation.test_o3_partial_page_and_explicit_denominators) ... ok
+test_query_schedule_no_duplicate_weighting (test_e140_observation.Observation.test_query_schedule_no_duplicate_weighting) ... ok
+test_short_overlap_and_nonaligned_conservation (test_e140_observation.Observation.test_short_overlap_and_nonaligned_conservation) ... ok
+test_duplicate_and_missing_layer_events_fail (test_longbench_request_capture.Capture.test_duplicate_and_missing_layer_events_fail) ... ok
+test_exact_boundary_question_routing_and_token_identity (test_longbench_request_capture.Capture.test_exact_boundary_question_routing_and_token_identity) ... ok
+test_first_eos_and_single_token_have_no_tpot (test_longbench_request_capture.Capture.test_first_eos_and_single_token_have_no_tpot) ... ok
+test_get_pred_guard_failure_cannot_append_record (test_longbench_request_capture.Capture.test_get_pred_guard_failure_cannot_append_record) ... ok
+test_get_pred_real_record_path_opt_in_and_default_disabled (test_longbench_request_capture.Capture.test_get_pred_real_record_path_opt_in_and_default_disabled) ... ok
+test_guard_failure_and_model_failure_never_publish (test_longbench_request_capture.Capture.test_guard_failure_and_model_failure_never_publish) ... ok
+test_native_hook_and_cleanup (test_longbench_request_capture.Capture.test_native_hook_and_cleanup) ... ok
+test_new_request_counter_reset_or_missing_field_fails (test_longbench_request_capture.Capture.test_new_request_counter_reset_or_missing_field_fails) ... ok
+test_nonfinite_reverse_and_zero_clock_rejected (test_longbench_request_capture.Capture.test_nonfinite_reverse_and_zero_clock_rejected) ... ok
+test_plan_branch_precedes_seed_or_model_load (test_longbench_request_capture.Capture.test_plan_branch_precedes_seed_or_model_load) ... ok
+test_unsupported_generate_and_incomplete_hooks (test_longbench_request_capture.Capture.test_unsupported_generate_and_incomplete_hooks) ... ok
+test_candidate_preserves_main_guards_and_schema (test_paper_runtime.Runtime.test_candidate_preserves_main_guards_and_schema) ... ok
+test_default_reference_and_candidate_dense (test_paper_runtime.Runtime.test_default_reference_and_candidate_dense) ... ok
+test_grouped_candidate_matches_actual_row_oracle (test_paper_runtime.Runtime.test_grouped_candidate_matches_actual_row_oracle) ... ok
+test_receipt_reads_runtime_without_compat_import (test_paper_runtime.Runtime.test_receipt_reads_runtime_without_compat_import) ... ok
+test_unknown_runtime_rejected (test_paper_runtime.Runtime.test_unknown_runtime_rejected) ... ok
+test_packing_and_attention (test_prefill_blocklist.GPUChecks.test_packing_and_attention) ... skipped 'requires CUDA and Triton; CPU is not kernel validation'
+test_sorted_group_superset_retains_exact_tile_sequence (test_prefill_blocklist.Geometry.test_sorted_group_superset_retains_exact_tile_sequence) ... ok
+
+----------------------------------------------------------------------
+Ran 38 tests in 36.144s
+
+OK (skipped=1)
+{"schema": "longbench-paper-capture-plan-v1", "gpu_started": false, "supported": "Qwen3 manual greedy path only", "unsupported": ["samsum generate", "DeepSeek generate", "unknown attention forwards"], "support_observation": "separate pass required; not implemented by timing hooks", "execution": "disabled"}
