@@ -47,6 +47,9 @@ def _qwen3_quest_wrapper(
             **kwargs,
         )
 
+    from sparse_attn.baseline_runtime import require_unmasked_decode
+    require_unmasked_decode(hidden_states, attention_mask, past_key_values, cache_position)
+
     # decode 单 token：官方 Quest 稀疏路径
     if cache_position is not None:
         position_ids = cache_position.unsqueeze(0)  # (1, q_len)，官方 forward 期望 (bsz, q_len)
@@ -78,6 +81,8 @@ def _qwen3_quest_wrapper(
 
 def enable_quest(model, token_budget: int = 1024, chunk_size: int = 16) -> int:
     """把 model 内全部 Qwen3Attention 绑定官方 Quest forward。返回 patch 层数。"""
+    if type(token_budget) is not int or type(chunk_size) is not int or token_budget <= 0 or chunk_size <= 0:
+        raise ValueError('Quest budget/chunk_size must be positive integers')
     n_patched = 0
     layer_id = 0
 

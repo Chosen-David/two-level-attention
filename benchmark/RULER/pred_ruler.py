@@ -76,6 +76,7 @@ from benchmark.RULER.yarn_receipt import (  # noqa: E402
     commit_yarn_generation, generation_pointer_path, release_output_lock,
     resolve_yarn_config, stage_yarn_generation, stage_yarn_receipt,
 )
+from sparse_attn.baseline_runtime import baseline_request, load_ffd, baseline_preflight
 from sparse_attn.arguments import add_sparse_attn_args  # noqa: E402
 from sparse_attn.patches import register_patch  # noqa: E402
 from sparse_attn.metrics import get_metrics  # noqa: E402
@@ -143,6 +144,7 @@ def seed_everything(seed=SEED):   # 057：默认值单源化（receipt 身份字
 
 def main():
     args = parse_args()
+    baseline_preflight(args)
     seed_everything()
 
     # ---- YaRN 校验与配置（E109 三件套 #3 + 057 effective 单点解析）----
@@ -192,16 +194,23 @@ def main():
                                         trust_remote_code=True)
     if use_yarn:
         config.rope_scaling = rope_scaling
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_path, config=config, trust_remote_code=True,
-        torch_dtype=torch.bfloat16, device_map="auto").eval()
+    if args.method == 'ffd_vendor':
+        if use_yarn:
+            raise ValueError('FFD Llama cannot use Qwen3-specific YaRN defaults')
+        model = load_ffd(args.model_path, args, config=config)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_path, config=config, trust_remote_code=True,
+            torch_dtype=torch.bfloat16, device_map="auto").eval()
     # ---- Quest vendor（B 轨官方源码复用，主表口径）----
     # 不走 register_patch 的 indexer_type_dict（A 轨 quest_indexer 是语义
     # 复现），改为绑定官方 Quest forward 到 Qwen3Attention——与 LongBench
     # pred.py 同口径：quest_attention_official.py 与官方仓库逐字节一致，
     # qwen3_quest_patch.py 仅接口胶水。RULER 长上下文预算独立设定（默认
     # 1024，派单时按 Quest 论文口径显式传 --quest_token_budget）。
-    if args.method == "quest_vendor":
+    if args.method == "ffd_vendor":
+        n_patched = model.config.num_hidden_layers
+    elif args.method == "quest_vendor":
         vendor_dir = os.path.join(
             REPO, "exp", "vendor_baselines", "quest_vendor")
         if vendor_dir not in sys.path:
@@ -397,7 +406,7 @@ def main():
             # .tli_gen 指针不切（066/crash-recovery 语义天然吸收：旧完整
             # 代可见，无任何完成外观产物被污染）。进入时清旧 flag 防跨
             # 行继承（上一行未消费的违规不误杀本行）。
-            with eager_decoding_request_guard():
+            with baseline_request(model) as baseline_receipt, eager_decoding_request_guard():
                 with torch.no_grad():
                     output = model(input_ids=input_ids, past_key_values=None,
                                    use_cache=True,
@@ -418,13 +427,14 @@ def main():
                             break
             pred = tokenizer.decode(gen, skip_special_tokens=True)
             metrics = get_metrics()
-            budget = metrics.get_select_tokens()
+            budget = None if baseline_receipt else metrics.get_select_tokens()
             metrics.clear()
             # E116c（GPT 0826 审计 TL-RULER-SAMPLE-GATE-026）：样本身份绑定源行
             # index（RULER 源 jsonl 自带 0..99 int，比 LB v1 的 data_fp 指纹更直接）
             # + answers canonical SHA256 前 16 位（与 LongBench manifest 口径一致），
             # 评分端据此做 fail-closed 集合闭包校验；其余字段与行为零改动。
             fout.write(json.dumps({
+                **({"baseline_receipt": baseline_receipt} if baseline_receipt else {}),
                 "pred": pred, "answers": row["outputs"],
                 "length": row["length"], "budget": budget,
                 "_id": f"{args.task}:{row['index']}",

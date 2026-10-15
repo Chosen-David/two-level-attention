@@ -34,6 +34,7 @@ from benchmark.LongBench.run_cap_manifest import (
     runcap_gate_lock,   # 103（TL-E096-CAP-GATE-TOCTOU-103）：gate→发布锁
     write_run_cap_manifest,
 )
+from sparse_attn.baseline_runtime import baseline_request, load_ffd, baseline_preflight
 from sparse_attn.arguments import add_sparse_attn_args
 from sparse_attn.patches import register_patch
 from sparse_attn.metrics import get_metrics
@@ -227,6 +228,7 @@ def get_pred(
     run_stats=None,  # 096：每样本实际输入 token 数 / 截断标记（run-cap manifest）
     paper_capture_mode="off",
 ):
+    from sparse_attn.baseline_runtime import baseline_request
     preds = []
 
     # DeepSeek-V2 兼容修复（S-T023 2026-10-12）：官方 modeling_deepseek.py
@@ -353,7 +355,7 @@ def get_pred(
         # 误杀本样本（guard 语义/并发限制见其 docstring）。
         capture_context,capture = _paper_capture_request(
             paper_capture_mode,model,input.input_ids,q_input.input_ids,dataset,model_name)
-        with capture_context, eager_decoding_request_guard():
+        with baseline_request(model) as baseline_receipt, capture_context, eager_decoding_request_guard():
             if (
                 dataset == "samsum"
             ):  # prevent illegal output on samsum (model endlessly repeat "\nDialogue"), might be a prompting issue
@@ -417,7 +419,7 @@ def get_pred(
         # avg_B0 = budget_info.get_total_avg_budget_B0()
 
         metrics = get_metrics()
-        budget = metrics.get_select_tokens()
+        budget = None if baseline_receipt else metrics.get_select_tokens()
         metrics.clear()
 
         record = {
@@ -430,6 +432,8 @@ def get_pred(
             # "B0": avg_B0,
             # "B1": avg_budget,
         }
+        if baseline_receipt:
+            record['baseline_receipt'] = baseline_receipt
         if capture is not None:
             if capture.receipt is None:raise ValueError('request capture incomplete')
             record['paper_request_capture']=capture.receipt
@@ -492,6 +496,11 @@ def _patch_deepseek_dynamic_cache_compat():
 
 
 def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
+    baseline_preflight(args)
+    if args.method == 'ffd_vendor':
+        model = load_ffd(path, args)
+        tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True, trust_remote_code=False)
+        return model, tokenizer
     # DeepSeek-V2 trust_remote_code 需要旧版 DynamicCache API 兼容
     if "DeepSeek-V2" in model_name:
         _patch_deepseek_dynamic_cache_compat()
