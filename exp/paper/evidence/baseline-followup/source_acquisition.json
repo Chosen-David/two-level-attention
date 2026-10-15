@@ -1,0 +1,117 @@
+{
+  "date": "2026-10-15",
+  "gpu_started": false,
+  "build_started": false,
+  "sources": [
+    {
+      "name": "ClusterKV",
+      "path": "/tmp/tla-clusterkv-official",
+      "url": "https://github.com/sjtu-zhao-lab/ClusterKV",
+      "commit": "c7380819588771e8c5dadacdbd33942d7c53adea",
+      "license_path": null,
+      "license_sha256": null,
+      "redistributed": false,
+      "executed": false,
+      "submodules": [
+        {
+          "commit": "9f49803b1db0a40ea0019ad98b8bb5d4f1593c77",
+          "path": "3rdparty/flashinfer",
+          "checked_out_matches_gitlink": true
+        },
+        {
+          "commit": "40412d85124f7c6f3d88454583c4633e5e10fc8c",
+          "path": "3rdparty/flashinfer/3rdparty/googletest",
+          "checked_out_matches_gitlink": true
+        },
+        {
+          "commit": "f57aa9c993f4392a76650bc54513f571cd1128c9",
+          "path": "3rdparty/flashinfer/3rdparty/nvbench",
+          "checked_out_matches_gitlink": true
+        },
+        {
+          "commit": "768cebe17e65c2a0a64ed067510729efc3c7ff6c",
+          "path": "3rdparty/pybind",
+          "checked_out_matches_gitlink": true
+        },
+        {
+          "commit": "1e4961e2354afba116e3479c5ec9041937b9922e",
+          "path": "3rdparty/raft",
+          "checked_out_matches_gitlink": true
+        }
+      ],
+      "source_files": {
+        "pyproject.toml": "69efcad9876194a3f2abd6d91679b4f7cc326392d4fcbc81f5d0dd733e41a3b4",
+        ".gitmodules": "0b27c298d37194367dd211c01c79ce1a96cfcf930761ed2581894b113e6d53c4",
+        "kernel/CMakeLists.txt": "4a5519fa32a91d990ae1acee0c1227de900e0f068f5fd283360523c9a858eb24",
+        "kernel/cmake/fetch_rapids.cmake": "7ff5442e154d01c583a4e998c405c5bfc84045bfba63d69249cd36a76ec55eea",
+        "kernel/cmake/get_raft.cmake": "62df7ddd79d50a7d27f09529b992aea7825b6a55302d6f594ffc673ed9d7822c",
+        "accuracy/cluster_attention.py": "f18df2cb1e4469887d4f143cd941bb4d28786df2827d2d68b60f4fcc6014922d"
+      }
+    },
+    {
+      "name": "HiP",
+      "path": "/tmp/tla-hip-official",
+      "url": "https://github.com/DeepAuto-AI/hip-attention",
+      "commit": "5f37a7fd77abe4d362cc7b7cd4ea24a3748614c1",
+      "license_path": "LICENSE.md",
+      "license_sha256": "58060c2b8a8c8134cb0e8d03dd26691f3e0b401e68ca19b9a0630e3a5b08ac1e",
+      "redistributed": false,
+      "executed": false
+    },
+    {
+      "name": "MoBA",
+      "path": "/tmp/tla-moba-official",
+      "url": "https://github.com/MoonshotAI/MoBA",
+      "commit": "b5d58363311d3ca946f1ec444182727c15e338b5",
+      "license_path": "LICENSE",
+      "license_sha256": "f0c89806155f93f4ea5cb9e81ef70aad1a7729240132df9706db9584024547db",
+      "redistributed": false,
+      "executed": false
+    },
+    {
+      "name": "HISA_author_entry",
+      "path": "/tmp/tla-hisa-official",
+      "url": "https://github.com/MuLabPKU/TransArch",
+      "commit": "dc9f3a3b7938bd26e165b0c99e3b6ea627d1ecfc",
+      "license_path": null,
+      "license_sha256": null,
+      "redistributed": false,
+      "executed": false
+    },
+    {
+      "name": "HISA_TileLang",
+      "path": "/tmp/tla-hisa-tilelang",
+      "url": "https://github.com/tile-ai/tilelang",
+      "commit": "7940102813c08c1a589e1b4c57d7010d9aa68982",
+      "license_path": "LICENSE",
+      "license_sha256": "f70e5cdc24c3797af741930440086f9a0ad36930b05a3dfc25b420936dc2cfa1",
+      "redistributed": false,
+      "executed": false,
+      "source_files": {
+        "examples/dsa_hisa/tilelang_utils.py": "c7dd2114367e6d660d93eb93576f161a4c7954b912601dc27131f1c5c374b27e",
+        "examples/dsa_hisa/pool_mqa_fp8.py": "3eb1aaa58cdad57039ab424b3aa236d3790f33669fa6487afba0dc081ca2aa0e",
+        "examples/dsa_hisa/hisa.py": "8bdbcd5c75bdf08d07b6a48cd6957489d1c030c37aaacb543c95ff17bb1ce0f5",
+        "examples/dsa_hisa/fp8_block_mean_pooling.py": "104cbf5fa1dd042b67567fde6ddd159cb4d532e595adcdf1ef5602bedb366c6c",
+        "examples/dsa_hisa/clean_and_maintain_logits.py": "b8c99f67e4b187ad21afb2b3a11cd557ae27a772f536767f07349d5792fdf52c",
+        "examples/dsa_hisa/block_sparse_mqa_fp8.py": "de96bcdb35dfc68b34da4ce5e8cf9fd468bc674d64985a56af079f94bf70bfd3",
+        "examples/dsa_hisa/README.md": "cde6161e51e3a4af4db5929d31b73b72d36817942bef19a8b9c225574b1f5894"
+      }
+    },
+    {
+      "name": "RAFT_24.10",
+      "path": "/tmp/tla-raft-2410",
+      "url": "https://github.com/rapidsai/raft",
+      "commit": "397042a0af9cb819a098ce60259a55e0a4509956",
+      "license_path": "LICENSE",
+      "license_sha256": "756005f963846334943e8bfc08ef98cd254257d8467ac7a7ffd42a1be262f442",
+      "redistributed": false,
+      "executed": false
+    }
+  ],
+  "wheel_checks": {
+    "pypi_nvidia": "HTTPS tunnel 403 Forbidden; no wheel retrieved",
+    "pypi_org": "simple index read succeeded; no 24.10 wheel links found"
+  },
+  "hisa_paper": "https://arxiv.org/html/2603.28458v4",
+  "hisa_author_entry": "HISA_COLM_2026/README.md"
+}

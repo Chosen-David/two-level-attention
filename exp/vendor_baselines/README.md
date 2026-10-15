@@ -19,7 +19,7 @@ No new scorer or result conversion is used.
 | MInference vendor | existing Qwen3 sparse prefill/native dense decode | exact pattern coverage/invalid starting layer rejection; official core byte match | compiled deps/GPU and model quality not tested here |
 | FFD vendor | **new native Llama loader**, official model and Q2+FP8 cache, top-delta sparse decode | cache injection/route/invalid-input gates using CPU doubles, NOT actual FFD kernel | official model/kernel not executed; CUDA/Triton dependencies required; Qwen3/MLA explicitly unsupported |
 | ClusterKV | no local faithful runtime adapter | source/task inventory only | official efficiency dependencies, model/offload lifecycle absent; blocked, not substituted with ccluster |
-| HISA | no guessed implementation | identity remains unresolved | exact paper/authors/official source required |
+| HISA | official TransArch/TileLang source fetched | identity resolved: Xu et al., arXiv2603.28458v4 | DSA/Sparse-MLA indexer; no current Qwen3/HF integration |
 | HiP / MoBA | conditional candidates retained | no new integration | supported model/training conditions unaccepted; `tli_moba` is not official MoBA |
 
 ## FFD identity and routing
@@ -96,3 +96,10 @@ missing head patterns instead of allowing upstream default pattern substitution.
 
 Tests: `tests/test_baseline_integration.py`, normal and `-O`; logs and retained
 first-failure regression evidence in `exp/paper/evidence/baseline-integration/`.
+
+## Source/cache follow-up
+
+See [FOLLOWUP_20261015.md](FOLLOWUP_20261015.md) for the subsequent FFD
+cache ownership/layer-state repair, actual official source/submodule downloads,
+resolved HISA identity, and exact remaining ClusterKV/HiP/MoBA boundaries.
+Earlier first-integration test evidence is historical, not the latest source hash.

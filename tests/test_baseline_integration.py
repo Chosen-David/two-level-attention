@@ -20,7 +20,10 @@ from qwen3_sparq_patch import enable_sparq
 
 
 class FakeCache:
-    def __init__(self, **kw): self.length = 0
+    def __init__(self, **kw):
+        self.length = 0
+        self.layers = []
+        self.__dict__.update(kw)
     def get_seq_length(self): return self.length
 
 
@@ -30,11 +33,17 @@ class FakeFFD(torch.nn.Module):
         self.config = types.SimpleNamespace(num_hidden_layers=2, attn_settings=dict(settings, debug_stats=stats))
         self.stats = stats
         self.wrong_route = False
+        self.fail_after_update = False
     def forward(self, input_ids, past_key_values=None, **kw):
         if input_ids.shape[1] > 1: key = 'prefill_calls'
         else: key = 'flash_path_decode_calls' if self.wrong_route else 'sparse_path_calls'
         self.stats[key] = self.stats.get(key, 0) + 2
+        if not past_key_values.layers:
+            kw = {k:getattr(past_key_values,k) for k in ('BS','k_bits','use_fp8_residual','max_seq_len')}
+            past_key_values.layers = [FakeCache(**kw) for _ in range(2)]
+        for layer in past_key_values.layers:layer.length += input_ids.shape[1]
         past_key_values.length += input_ids.shape[1]
+        if self.fail_after_update:raise RuntimeError('injected model failure')
         return types.SimpleNamespace(past_key_values=past_key_values)
 
 
@@ -72,6 +81,62 @@ class BaselineTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             with baseline_request(model):
                 model(input_ids=torch.ones(1,1,dtype=torch.long),past_key_values=out.past_key_values)
+    def test_ffd_external_empty_and_mismatched_caches_rejected(self):
+        for length in (1,127,128):
+            model=self.ffd()
+            external=FakeCache(BS=128,k_bits=2,use_fp8_residual=True,max_seq_len=131200)
+            with self.assertRaisesRegex(ValueError, 'external caches'):
+                model(input_ids=torch.ones(1,length,dtype=torch.long),past_key_values=external)
+            self.assertEqual(model.stats,{})
+        # Ownership is per-loader, not merely the same class/configuration.
+        first=self.ffd();cache=first(input_ids=torch.ones(1,128)).past_key_values
+        with self.assertRaisesRegex(ValueError, 'external caches'):
+            self.ffd()(input_ids=torch.ones(1,1),past_key_values=cache)
+
+    def test_ffd_owned_cache_configuration_and_empty_reset(self):
+        changes={'BS':256,'k_bits':4,'use_fp8_residual':False,'max_seq_len':256}
+        for field,bad in changes.items():
+            for layer in (False,True):
+                model=self.ffd();cache=model(input_ids=torch.ones(1,128)).past_key_values
+                component=cache
+                if layer:
+                    component=cache.layers[1]
+                setattr(component,field,bad)
+                before=dict(model.stats)
+                with self.assertRaisesRegex(ValueError,'configuration'):
+                    model(input_ids=torch.ones(1,1),past_key_values=cache)
+                self.assertEqual(model.stats,before)
+        model=self.ffd();cache=model(input_ids=torch.ones(1,128)).past_key_values
+        cache.length=0
+        with self.assertRaisesRegex(ValueError,'empty cache'):
+            model(input_ids=torch.ones(1,1),past_key_values=cache)
+        with self.assertRaisesRegex(ValueError,'lengths'):
+            model(input_ids=torch.ones(1,128),past_key_values=cache)
+        fresh=model(input_ids=torch.ones(1,128)).past_key_values
+        model(input_ids=torch.ones(1,1),past_key_values=fresh)
+
+    def test_ffd_layer_replacement_lengths_and_failed_cache(self):
+        for mutation in ('replace','append','length'):
+            model=self.ffd();cache=model(input_ids=torch.ones(1,128)).past_key_values
+            if mutation=='replace':cache.layers[1]=copy.copy(cache.layers[1])
+            elif mutation=='append':cache.layers.append(copy.copy(cache.layers[0]))
+            else:cache.layers[1].length-=1
+            with self.assertRaisesRegex(ValueError,'layer'):
+                model(input_ids=torch.ones(1,1),past_key_values=cache)
+        model=self.ffd();cache=model(input_ids=torch.ones(1,128)).past_key_values
+        model.wrong_route=True
+        with self.assertRaises(RuntimeError):model(input_ids=torch.ones(1,1),past_key_values=cache)
+        model.wrong_route=False
+        with self.assertRaisesRegex(ValueError,'failed call'):
+            model(input_ids=torch.ones(1,1),past_key_values=cache)
+        model=self.ffd();cache=model(input_ids=torch.ones(1,128)).past_key_values
+        model.fail_after_update=True
+        with self.assertRaisesRegex(RuntimeError,'injected model failure'):
+            model(input_ids=torch.ones(1,1),past_key_values=cache)
+        model.fail_after_update=False
+        with self.assertRaisesRegex(ValueError,'failed call'):
+            model(input_ids=torch.ones(1,1),past_key_values=cache)
+
     def test_clock_and_ruler_limits(self):
         for times in ([0,0],[2,1],[0,float('inf')],[float('nan'),2],[0,1e308]):
             model=self.ffd()

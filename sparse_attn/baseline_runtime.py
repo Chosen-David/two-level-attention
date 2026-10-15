@@ -6,6 +6,7 @@ import json
 import math
 import sys
 import time
+import weakref
 
 ROOT = Path(__file__).resolve().parents[1]
 FFD_SHA = 'ca09458ab1536328e5f46502b27891412733cd6d'
@@ -125,6 +126,9 @@ def install_ffd_guard(model, cache_type, stats, settings, capacity):
     """Supply the real cache and check the route of each successful model call."""
     layers = model.config.num_hidden_layers
     pending = {}
+    owned_caches = weakref.WeakKeyDictionary()
+    cache_config = dict(BS=settings['BS'], k_bits=settings['k_bits'],
+                        use_fp8_residual=settings['use_fp8_residual'], max_seq_len=capacity)
     def before(module, positional, kw):
         ids = kw.get('input_ids')
         if positional or ids is None or ids.ndim != 2 or ids.shape[0] != 1 or ids.shape[1] < 1:
@@ -135,10 +139,27 @@ def install_ffd_guard(model, cache_type, stats, settings, capacity):
         if cache is None or (not isinstance(cache, cache_type) and hasattr(cache, 'get_seq_length') and cache.get_seq_length() == 0):
             if ids.shape[1] < settings['BS']:
                 raise ValueError('FFD integration requires initial prefill >= BS=128')
-            cache = cache_type(BS=128, use_fp8_residual=True, k_bits=2, max_seq_len=capacity)
+            cache = cache_type(**cache_config)
+            owned_caches[cache] = dict(valid=True, length=0, layers=())
             kw['past_key_values'] = cache
-        if not isinstance(cache, cache_type):
-            raise ValueError('FFD requires pinned QuantizedKVCache; dense cache rejected')
+        if not isinstance(cache, cache_type) or cache not in owned_caches:
+            raise ValueError('FFD accepts only caches created by this loader; external caches rejected')
+        state = owned_caches[cache]
+        if not state['valid']:
+            raise ValueError('FFD cache from an incomplete/failed call cannot be reused')
+        current_layers = tuple(getattr(cache, 'layers', []))
+        if len(current_layers) != len(state['layers']) or any(a is not b for a, b in zip(current_layers, state['layers'])):
+            raise ValueError('FFD cache layer identity/count changed')
+        for component in [cache, *current_layers]:
+            if any(type(getattr(component, k, None)) is not type(v) or getattr(component, k) != v
+                   for k, v in cache_config.items()):
+                raise ValueError('FFD cache configuration differs from frozen settings')
+        if getattr(cache, 'offloading', False):
+            raise ValueError('FFD offloading cache is not supported')
+        if cache.get_seq_length() == 0 and ids.shape[1] < settings['BS']:
+            raise ValueError('FFD empty cache requires initial prefill >= BS=128')
+        if cache.get_seq_length() != state['length'] or any(x.get_seq_length() != state['length'] for x in current_layers):
+            raise ValueError('FFD cache layer lengths changed or diverged')
         if cache.get_seq_length() > 0 and ids.shape[1] > 1:
             raise ValueError('FFD chunked continuation unsupported; use initial prefill then single tokens')
         if cache.get_seq_length() + ids.shape[1] > capacity:
@@ -148,7 +169,8 @@ def install_ffd_guard(model, cache_type, stats, settings, capacity):
             raise ValueError('FFD candidate only supports unpadded full prompts')
         if set(module.config.attn_settings) != set(settings) | {'debug_stats'} or any(module.config.attn_settings.get(k) != v for k, v in settings.items()):
             raise ValueError('FFD runtime settings changed after identity freeze')
-        pending.update(before=dict(stats), q_len=ids.shape[1])
+        pending.update(before=dict(stats), q_len=ids.shape[1], cache=cache, state=state)
+        state['valid'] = False
         return positional, kw
     def after(module, positional, kw, output):
         old = pending['before']
@@ -157,6 +179,18 @@ def install_ffd_guard(model, cache_type, stats, settings, capacity):
             raise RuntimeError('FFD actual route mismatch; refusing mislabeled dense output')
         if stats.get('flash_path_decode_calls', 0) != old.get('flash_path_decode_calls', 0):
             raise RuntimeError('FFD unexpected dense decode')
+        cache, state = pending['cache'], pending['state']
+        expected_length = state['length'] + pending['q_len']
+        if getattr(output, 'past_key_values', None) is not cache:
+            raise RuntimeError('FFD output cache replaced')
+        actual_layers = tuple(cache.layers)
+        if state['layers'] and (len(actual_layers) != len(state['layers']) or any(a is not b for a, b in zip(actual_layers, state['layers']))):
+            raise RuntimeError('FFD cache layers replaced during forward')
+        if len(actual_layers) != layers or any(x.get_seq_length() != expected_length for x in actual_layers):
+            raise RuntimeError('FFD incomplete cache layer update')
+        if cache.get_seq_length() != expected_length:
+            raise RuntimeError('FFD cache length update mismatch')
+        state.update(valid=True, length=expected_length, layers=actual_layers)
     model.register_forward_pre_hook(before, with_kwargs=True)
     model.register_forward_hook(after, with_kwargs=True)
     model._baseline_stats = stats
@@ -205,9 +239,9 @@ def plan():
         'quest_vendor':'Qwen3 quality adapter; full QK mask, not efficient sparse-read kernel',
         'fasa_vendor':'Qwen3 calibration-dependent adapter; GPU/quality unverified in this change',
         'minference_vendor':'Qwen3 sparse-prefill/dense-decode adapter; frozen pattern required',
-        'ClusterKV':'blocked: no local official efficiency dependencies/model adapter',
-        'HISA':'blocked: exact identity not established; no guessed implementation',
-        'HiP/MoBA':'conditional candidates; no unconditional model support',
+        'ClusterKV':'official source/gitlinks fetched; project license unresolved; CUDA build/wheel/model adapter blocked',
+        'HISA':'Xu et al., arXiv2603.28458v4; official TileLang prefill indexer fetched; no Qwen3/HF integration',
+        'HiP/MoBA':'fixed sources fetched; HiP Qwen3 documented SGLang dense-decode route; MoBA native dense decode, continued-training condition',
     })
 
 if __name__ == '__main__':
