@@ -44,5 +44,15 @@
     "a3_unblock": "main 2014eeb（sink 子块值解禁）",
     "mass_grid_v2": "exp/trace/results/e148_sink4_massgrid_v2.json（GPT 第五轮 9f3f1ca 坐标修复后重跑，anchor_check pass，结论不变）",
     "sparse_prefill_anchors": "E138 sk128/sw128 稀疏 prefill 56.04/28.22"
+  },
+  "erratum": {
+    "date": "2026-10-16",
+    "source": "TL-E149-AGGREGATE-QUALITY-BOUNDARY-20261015（agent_doc/advice/2026-10-15_e149_aggregate_quality_boundary_by_gpt.md）",
+    "items": [
+      "撤回 conclusion 中「sink4 未加重损失」：FS 相对 E138 稀疏 prefill 锚差 -1.80/-0.61（hotpot 侧实质加重），且两运行配对身份未核齐，不作 sink4 归因。正确表述：FS 相对 dense -5.18/-6.64；相对 E138 锚 -1.80/-0.61，跨臂未配对核验。",
+      "「噪声级」限定为「通过用户预设判据（绝对差 <1 分）」，未做等效界限/不确定性分析。",
+      "DO 臂主判决（decode_only_passes=true）与叙事定稿不受影响；质量结论在 E147 provenance 清单补齐前标「待配对证据验收」。"
+    ],
+    "original_text_preserved": true
   }
 }

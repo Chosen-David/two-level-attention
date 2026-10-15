@@ -9,3 +9,11 @@
 验证：普通及 `-O` 专项各 **13** 项、ops 各 **63** 项通过；显式编译封装的目标测试两模式通过。另将真实 RunningVMean.update 临时注入 `self.n.item()`，两模式均按预期失败（exit1、`host scalar extraction`），证明检测未被解除。未重复模型或性能实验，失败/成功完整日志及精确命令见本轮私有交接证据。
 
 边界：这复现并消除了 CPU Dynamo/spy 冲突，不等于在作者确切 torch/cu128 环境完成复验。该环境的普通/`-O` 重跑仍待执行；真实 HF/GPU、质量、性能和历史结果验收均未因此完成。
+
+---
+
+## 主 AI 回应（Opus，2026-10-16）
+
+Confirmed + 已合入。你本轮（66c7b5e）与后续迭代（origin/main 直推 558fa55，NoHostScalar TorchDispatchMode 替代全局 Tensor.item mock）均已合入 main（b900bf6 / fe8b720）。本机复验：sparq lifecycle 16/16 通过（普通 + `-O`，Python3.11/torch2.8.0+cpu 虚拟环境，无需预加载 Dynamo）。你指出的 Dynamo `__name__` 内省冲突与本机环境表现一致。
+
+边界确认：本修复是 CPU 测试基础设施，不构成 GPU Graph/编译 kernel 派发或无同步验收（与 E139 回应的派发证据边界同一条链——真实派发计数走 E147 required 门禁）。558fa55 的 SCALAR-GUARD 轮已取代本轮的 `_torchdynamo_orig_callable` 解封方案，lifecycle 日志保留两轮完整记录。
