@@ -15,7 +15,7 @@
 \begin{document}
 \maketitle
 \begin{abstract}
-Page screening in sparse attention can discard useful distant tokens before refinement, making its scoring representation a critical part of candidate selection. We study a near--far cascade whose page screening and token refinement share 32 low-frequency RoPE coordinates, arranged as 16 complete rotation pairs. Separate regional page quotas retain candidate access to near and far history, while final attention uses the selected original-dimensional keys and values. On five LongBench tasks with Qwen3-8B, sub/sub scores 47.588 on average; the nominal full/sub and sub/full configurations score 47.910 and 47.666. Incomplete configuration binding limits these differences to descriptive comparisons. A separate synthetic study reports no selector-latency reduction for sub/sub relative to full/sub. The results motivate evaluating compact scoring jointly with selection quality and preparation-inclusive cost, without establishing a joint quality--latency advantage.
+Page screening in sparse attention can discard useful distant tokens before refinement, making its scoring representation a critical part of candidate selection. We study a near--far cascade whose page screening and token refinement share 32 low-frequency RoPE coordinates, arranged as 16 complete rotation pairs. Separate regional page quotas retain candidate access to near and far history, while final attention uses the selected original-dimensional keys and values. On five LongBench tasks with Qwen3-8B, page/token scoring at 32/32 dimensions (sub/sub) averages 47.588; nominal 128/32 (full/sub) and nominal 32/128 (sub/full) configurations score 47.910 and 47.666. Incomplete configuration binding limits these differences to descriptive comparisons. A separate synthetic study reports no selector-latency reduction for sub/sub relative to full/sub. The results motivate evaluating compact scoring jointly with selection quality and preparation-inclusive cost, without establishing a joint quality--latency advantage.
 \end{abstract}
 \begin{IEEEkeywords}
 sparse attention, shared representation, regional retrieval, long-context inference
@@ -26,7 +26,7 @@ Long-context sparse attention must retain useful history while keeping token sel
 
 We investigate a shared low-frequency representation for a near--far selection cascade. Each layer and KV head uses one set of complete RoPE coordinate pairs for page screening and token refinement. The cascade assigns separate page quotas to recent unprotected history and the remaining history, allowing distant candidates to enter refinement even when the near region dominates page selection. Original-dimensional Q/K/V determine attention over the resulting token set. Sharing the scoring view reduces representational duplication in the design; regional quotas control candidate access. Neither mechanism alone guarantees lower latency or unchanged task quality.
 
-We examine compact scoring and regional candidate allocation as distinct design choices. The preliminary five-task means for the nominal sub/sub, full/sub and sub/full configurations are 47.588, 47.910 and 47.666. Their configuration records do not support a controlled attribution of the differences to L1 or L2 width. This motivates a factorial representation study separate from regional allocation and complete-system performance. Distance-conditioned attention and paired-coordinate retrieval provide the diagnostic views in Fig.~\ref{fig:pending-observation}; the corresponding measurements remain pending.
+The design raises three questions: whether compact coordinates retain useful candidates, whether regional quotas improve retrieval at a fixed final token budget, and whether attention savings exceed representation preparation and selection costs. Figure~\ref{fig:pending-observation} separates retrieval demand from scoring fidelity: distance-conditioned attention describes where full-reference mass lies, while equal-width paired-coordinate comparisons measure the mass retained by selected tokens. These diagnostics remain pending; the available task scores and local timings neither isolate stage-specific effects nor establish a joint quality--latency advantage.
 
 \begin{figure}[b]\centering
 \fbox{\begin{minipage}[c][0.63in][c]{0.93\columnwidth}\centering\small
@@ -58,7 +58,7 @@ $J=\{48,\ldots,63,112,\ldots,127\}$ from each 128-dimensional query and key. The
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\textwidth]{ppt_overview_en.pdf}
-\caption{Shared-subspace near--far selection. Both stages use the same RoPE coordinate pairs; selected IDs retrieve original Q/K/V for final attention. The optional prefill-informed gate suppresses far selection and reallocates unused token quota within the retained near pages. The ordinary refinement implementation computes full-history scores before applying the page mask.}
+\caption{Shared-subspace near--far selection. Both stages use the same RoPE coordinate pairs; selected IDs gather original-dimensional K/V, while each query uses its original-dimensional Q for final attention. The optional prefill-informed gate suppresses far selection and reallocates unused token quota within the retained near pages. The ordinary refinement implementation computes full-history scores before applying the page mask.}
 \label{fig:architecture}\end{figure*}
 
 
@@ -140,7 +140,7 @@ Same model, inputs, output length and token budget
 \label{fig:pending-evaluation}\end{figure}
 
 \section{Preliminary Results}
-\textbf{Reported configuration scores.} Across HotpotQA, Qasper, MuSiQue, GovReport and RepoBench-P~\cite{longbench}, the mean scores are 47.588 (sub/sub), 47.910 (nominal full/sub) and 47.666 (nominal sub/full). Relative to sub/sub, the latter means differ by 0.322 and 0.078 points; sub/full is 0.244 points below full/sub. The full/sub records lack configuration sidecars, and the sub/full flag is not bound to a producer tree that implements the claimed L2 mode. These differences therefore do not isolate the effect of restoring either stage's dimensions. The scores are retained as descriptive results, rather than a completed three-arm causal ablation (Supplementary Notes~S4 and S7). None is dense FullKV.
+\textbf{Reported configuration scores.} Across HotpotQA, Qasper, MuSiQue, GovReport and RepoBench-P~\cite{longbench}, the mean scores are 47.588 (sub/sub), 47.910 (nominal full/sub) and 47.666 (nominal sub/full). Relative to sub/sub, the latter means differ by 0.322 and 0.078 points; sub/full is 0.244 points below full/sub. The nominal full/sub and sub/full runs are not verified as controlled changes to page- or token-scoring dimensionality. Their score differences are therefore descriptive and do not isolate either stage's effect (Supplementary Notes~S4 and S7). None is dense FullKV.
 
 The sub/sub--FullKV contrast in Fig.~\ref{fig:fullkv-quality} remains unmeasured under verified matching conditions. The three-arm means therefore cannot establish preservation of dense-attention quality. Task-level bootstrap summaries describe variation across these five tasks, rather than a document-paired non-inferiority test.
 
