@@ -12,7 +12,7 @@
   },
   "mechanism": {
     "formula": "far_budget(K1, K2) = K2_mid - min(round(K1*beta)*bs*gamma, K2_mid),  K2_mid = K2 - sink - swa",
-    "far_zero_threshold_K1": "K1 >= K2_mid/(beta*bs*gamma) = 768/5 = 153.6（生产默认 α.25/β.125/γ.625/bs64/K2=1024）",
+    "far_zero_threshold_K1": "连续交点 153.6（K2_mid/(beta*bs*gamma)=768/5）；离散精确阈值 K1>=156（GPT TL-E140-QUOTA-ROUNDING 勘误采纳：K1=155 时 round(19.375)=19→far=8 未归零，K1=156 时 round(19.5)=20→far=0；K2=896/768 档对应 124/101，前一档 far=40/32）",
     "far_zero_threshold_K2": "K2_mid <= nt_near 即 K2 <= 896（nb_near=16 → nt_near=640）——精确导出 E139 悬崖位置 K2∈(896,1024)",
     "quota_table_K2_1024": {
       "K1=16": "nb_near=2, nt_near=80, far=688（far 粗筛覆盖不足→左臂掉）",
@@ -23,11 +23,11 @@
     }
   },
   "unified_explanations": {
-    "decode_K1_inverted_U": "左臂 = L1 far 粗筛覆盖不足（K1=16）；右臂 = far 配额归零（K1>=154）；顶点 K1=64（far=448）",
+    "decode_K1_inverted_U": "左臂 = L1 far 粗筛覆盖不足（K1=16）；右臂 = far 配额归零（离散阈值 K1>=156）；顶点 K1=64（far=448）",
     "E139_K2_cliff": "K2=768/896 → K2_mid=512/640 <= nt_near=640 → far=0；K2=1024 → far=128>0。悬崖位置由公式精确导出，非经验观察",
     "gamma75_no_recovery": "γ 是 near 配额放大系数（nt_near ∝ γ）——γ 上调使 far 更早归零，方向与『far 倾斜』相反。dd_g75k768=46.86 与 γ=.625 同分完全自洽",
     "beta25_no_recovery": "β 上调放大 nb_near 同样挤 far（dk1_64b25 60.0 < dk1_64 60.83）",
-    "mass_probe_not_collapsing": "e140_l1_dilution_probe 是单池口径（对应 α=0/β=0 legacy 分支 L1998-2021），结构上不存在 nt_near/far_budget 配额——对 L2 配额变量失明。K1=448 时 retained_mass .835/.805（exact/q4）证明 L1 页级覆盖与 4bit 质量本身不塌，q4 常数罚 ~0.03 无交互项",
+    "mass_probe_not_collapsing": "e140_l1_dilution_probe 是单池口径（对应 α=0/β=0 legacy 分支 L1998-2021），结构上不存在 nt_near/far_budget 配额——对 L2 配额变量失明。K1=448 时 retained_mass .835/.805（exact/q4）为代理算子观测。勘误（GPT TL-E140-MASS-ORACLE 采纳）：exact 臂以跨 head sum-logit 选择、逐 head softmax 均值 P 评估，二者不同构——嵌套候选扩张对该 P 不保证单调（CPU 反例：扩张后 retained 1→0.88）。该探针不构成严格单调 oracle，『排除稀释机制』的强表述降级为『代理口径下未见稀释信号』；far 归零判决的支撑是代码级配额证据 + γ/β/总量再分配 e2e 实验组",
     "E140a_prefill_collapse": "k256/k512 的 e2e 崩 = prefill 批量路径同公式 far 归零 + decode 侧 K1 全局共享同崩（双路径叠加）。『L1 旁路量化稀释』单因归因作废——稀释常数罚 ~3% mass 远小于 -14 e2e"
   },
   "practical_finding": {
@@ -42,5 +42,6 @@
     "e140_l1_dilution_probe.json（mass 级单池探针，K1∈{16,64,128,224,448} × exact/q4）",
     "E139 e139_k2_budget_pareto_verdict.json（K2 下探悬崖）"
   ],
-  "probe_verdict": "稀释假说 REJECTED（单池 mass 无交互项）；far 配额归零 CONFIRMED（代码行号 + 六组实验交叉自洽）"
+  "probe_verdict": "稀释假说在代理口径下未见支持（单池 mass 无交互项；探针 sum-logit 选择 vs mean-prob 评估非严格 oracle，见 mass_probe_not_collapsing 勘误）；far 配额归零 CONFIRMED（代码行号 + 六组实验交叉自洽）",
+  "erratum": "2026-10-15 GPT audit f0b0308 两项采纳：①far=0 阈值由连续交点 153.6 勘误为离散精确 156/124/101（K2=1024/896/768）；②mass 探针 exact 臂非单调 oracle，稀释排除强表述降级。另 e140e_f_sinkswa_cliff_verdict.json 的『K2=896 总召回 1152』系双计 sink+swa（K2 已含保护区），实际总召回 896<1024，该臂不作为『召回超 Quest 仍塌』反证"
 }

@@ -257,7 +257,7 @@ def _attn_grid_size(R: int, G: int, per_qh: bool) -> int:
 # 正常 Qwen3 配置 H=32,Hkv=8 合法不触发；历史 E127 归档零污染——本门是
 # 面向未来 kernel 接入/非法调用的内存安全 fail-closed（launch 前拒绝）。
 # ---------------------------------------------------------------------------
-def _validate_gqa_shape(q, k, v, mask, block_size):
+def _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero=False):
     """101 host 边界门（纯 host 检查，零 GPU 同步、零分配）。
 
     入参为 eager_decoding_attn 的原始入参形状：q [..,H,D] / k,v [..,T,Hkv,D]
@@ -270,6 +270,12 @@ def _validate_gqa_shape(q, k, v, mask, block_size):
         任一不同（kernel 以 K 的 token 索引与 K 的 stride 同时寻址 V，
         审计例 v[1,1,8,128] vs k[1,16384,8,128] 修复前返回 true）。
     block_size 同时做正整数检查（mask 块宽 × block_size 的长度推导前提）。
+
+    【E142a】allow_kv_hetero=True（DeepSeek MLA 路径）：qk_head_dim(192) ≠
+    v_head_dim(128) 是 MLA 标准形态——⑤的 head_dim/stride 一致性改为
+    「V 自身末维连续 + token 长度/头数/device/dtype 与 K 一致」。该口径
+    下不兼容的 K/V 由显式布局门排除 Triton，消费走 torch gather/dense
+    路径（einsum 对 q·k 与 p·v 维度独立，天然异维）。
     """
     def _fail(msg):
         raise ValueError(
@@ -310,17 +316,26 @@ def _validate_gqa_shape(q, k, v, mask, block_size):
         _fail(f"V token 长度 {v.shape[-3]} != K token 长度 {k.shape[-3]}"
               f"（116——kernel 以 K 的 token 索引寻址 V，短 V 越界读、"
               f"长 V 静默截断）")
-    if v.shape[-1] != k.shape[-1]:
-        _fail(f"V head_dim {v.shape[-1]} != K head_dim {k.shape[-1]}"
-              f"（116——错位读）")
     if v.device != k.device or v.dtype != k.dtype:
         _fail(f"V device/dtype 与 K 不一致（116）：v={v.device}/"
               f"{v.dtype} vs k={k.device}/{k.dtype}")
-    for _ax, _nm in ((-3, "token"), (-2, "head"), (-1, "elem")):
-        if v.stride(_ax) != k.stride(_ax):
-            _fail(f"V stride[{_ax}]={v.stride(_ax)} != K stride"
-                  f"[{_ax}]={k.stride(_ax)}（116——{_nm} 轴：kernel 以 "
-                  f"K 的 stride 寻址 V，非同布局 V 必错址）")
+    if allow_kv_hetero:
+        # 【E142a】MLA 异维口径：qk 192d / v 128d。Triton kernel 以 K 的
+        # stride 同时寻址 V 的假设失效——该口径下消费端只允许 torch
+        # gather/dense 路径（einsum 独立维度）。门收窄为：V 自身末维连续
+        # （gather 以 V 自己的 stride 寻址）+ 头数一致（上方 ③ 已查）。
+        if v.stride(-1) != 1:
+            _fail(f"V stride[-1]={v.stride(-1)} != 1（E142a MLA 异维口径："
+                  f"torch gather 路径按 V 自身 stride 寻址，末维须连续）")
+    else:
+        if v.shape[-1] != k.shape[-1]:
+            _fail(f"V head_dim {v.shape[-1]} != K head_dim {k.shape[-1]}"
+                  f"（116——错位读）")
+        for _ax, _nm in ((-3, "token"), (-2, "head"), (-1, "elem")):
+            if v.stride(_ax) != k.stride(_ax):
+                _fail(f"V stride[{_ax}]={v.stride(_ax)} != K stride"
+                      f"[{_ax}]={k.stride(_ax)}（116——{_nm} 轴：kernel 以 "
+                      f"K 的 stride 寻址 V，非同布局 V 必错址）")
     if int(block_size) != block_size or int(block_size) < 1:
         _fail(f"block_size={block_size} 非正整数")
     if mask.dim() < 2:
@@ -333,12 +348,24 @@ def _validate_gqa_shape(q, k, v, mask, block_size):
     return True
 
 
+def _triton_kv_layout_compatible(k, v):
+    """The fused kernel shares K's width and strides when addressing V.
+
+    Host metadata only: heterogeneous torch support must not relax this ABI.
+    Equal noncontiguous layouts are safe too; base storage offsets may differ.
+    """
+    return (k.shape == v.shape
+            and all(k.stride(ax) == v.stride(ax) for ax in (-3, -2, -1)))
+
+
 def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
                          cu_seqlens_k, softmax_scale):
     """【E127 iter7】Triton 融合 launch 封装（原型已验证参数：
     kernel A TP=1024/num_warps=8；kernel B BW=256/num_warps=4）。
     q [1,H,D]；k/v [T,Hkv,D]；m0 [R,T] bool（token 级，block_size==1 前置
     已保证）。异常向上抛（调用方置标志回退 torch gather）。"""
+    if not _triton_kv_layout_compatible(k, v):
+        raise ValueError("Triton eager attention requires matching K/V shapes and strides")
     # 生产 cu 恒 int64（prepare_cu_seqlens 的 cumsum 整数提升）；kernel A
     # 原型验证口径为 int32——此处确定性 cast（2 元素 tiny kernel，长度
     # < 2^31 无溢出），值逐位同。
@@ -375,6 +402,7 @@ def eager_decoding_attn(
     block_size: int,
     cu_seqlens_k: torch.Tensor,
     softmax_scale: float = None,
+    allow_kv_hetero: bool = False,
 ):
     """【E127 iter2+3】稀疏 attention 消费端入口（原实现原样保留为 _dense 版）。
 
@@ -393,15 +421,20 @@ def eager_decoding_attn(
     【101】入口先过 _validate_gqa_shape host 边界门（Hkv<=0 / H%Hkv!=0 /
     K,V 头数不等 / mask 行数 R∉{Hkv,H} 一律 launch/分配前 ValueError
     拒绝——修复前三例非法输入静默越界读/未初始化输出）。
+    【E142a】allow_kv_hetero=True：DeepSeek MLA（qk 192d / v 128d）异维
+    口径——validator 的 V/K head_dim+stride 一致门收窄为 V 自身连续，
+    不兼容的 K/V 由显式布局门排除 Triton，消费走 torch gather/dense。
     """
-    _validate_gqa_shape(q, k, v, mask, block_size)
+    _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero)
     # 【E127 inplace 合并（2026-10-12）】gather 路径并为默认——env 门反转，
     # TLI_E127_FAST=0 显式回退 dense 路径（紧急逃生口，归档复现用）。
     if os.environ.get("TLI_E127_FAST", "1") != "0":
         return _eager_decoding_attn_gather(
-            q, k, v, mask, block_size, cu_seqlens_k, softmax_scale)
+            q, k, v, mask, block_size, cu_seqlens_k, softmax_scale,
+            allow_kv_hetero=allow_kv_hetero)
     return _eager_decoding_attn_dense(
-        q, k, v, mask, block_size, cu_seqlens_k, softmax_scale)
+        q, k, v, mask, block_size, cu_seqlens_k, softmax_scale,
+        allow_kv_hetero=allow_kv_hetero)
 
 
 def _eager_decoding_attn_dense(
@@ -412,9 +445,10 @@ def _eager_decoding_attn_dense(
     block_size: int,
     cu_seqlens_k: torch.Tensor,
     softmax_scale: float = None,
+    allow_kv_hetero: bool = False,
 ):
     # 101：直呼本函数同样受 host 边界门保护（公共入口之外的第二防线）
-    _validate_gqa_shape(q, k, v, mask, block_size)
+    _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero)
     if softmax_scale is None:
         softmax_scale = k.shape[-1] ** -0.5
     q, k, v, mask = (x.squeeze(0) for x in (q, k, v, mask))
@@ -477,6 +511,7 @@ def _eager_decoding_attn_gather(
     block_size: int,
     cu_seqlens_k: torch.Tensor,
     softmax_scale: float = None,
+    allow_kv_hetero: bool = False,
 ):
     """E127 gather 路径（数学语义 = _dense，仅归约顺序不同）。
 
@@ -489,8 +524,11 @@ def _eager_decoding_attn_gather(
     【101】直呼本函数同样受 _validate_gqa_shape host 边界门保护（公共入口
     之外的第二防线——Triton kernel 无 kvh<Hkv 边界检查，非法 shape 的
     越界读必须在此前拦下）。
+    【E142a】allow_kv_hetero=True：MLA qk 192d/v 128d——Triton 融合路径
+    显式检查 K/V shape/stride 后才允许共享寻址的 Triton 路径，不能
+    只依赖 192 不是 2 的幂。torch gather 段以 V 自身末维展开（idx_v）。
     """
-    _validate_gqa_shape(q, k, v, mask, block_size)
+    _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero)
     if softmax_scale is None:
         softmax_scale = k.shape[-1] ** -0.5
     q, k, v, mask = (x.squeeze(0) for x in (q, k, v, mask))
@@ -509,7 +547,8 @@ def _eager_decoding_attn_gather(
     if full_len != k.shape[0]:
         return _eager_decoding_attn_dense(
             q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),
-            mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale)
+            mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale,
+            allow_kv_hetero=allow_kv_hetero)
     m0 = mask[0]
     # 101：per_qh 判定显式化（与 _dense 同口径——validator 保证 R∈{Hkv,H}
     # 下与旧推断「R != Hkv」布尔等价，合法路径逐位不变）。
@@ -533,6 +572,7 @@ def _eager_decoding_attn_gather(
         and m0.dtype == torch.bool
         and q.shape[0] == 1
         and (k.shape[-1] & (k.shape[-1] - 1)) == 0   # D 须为 2 的幂（tl.arange）
+        and _triton_kv_layout_compatible(k, v)
         and m0.stride(-1) == 1 and k.stride(-1) == 1 and v.stride(-1) == 1
         and cu_seqlens_k.dtype in (torch.int32, torch.int64)
     ):
@@ -571,7 +611,8 @@ def _eager_decoding_attn_gather(
     if T < 16384:
         return _eager_decoding_attn_dense(
             q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),
-            mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale)
+            mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale,
+            allow_kv_hetero=allow_kv_hetero)
     counts = bm2.sum(dim=-1)                            # [R]（GPU int64，无同步）
 
     # 【iter3】零同步化：W 用 host 已知的契约上界（indexer 契约：每行选中
@@ -586,7 +627,8 @@ def _eager_decoding_attn_gather(
     if W_upper * 8 > T:
         return _eager_decoding_attn_dense(
             q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),
-            mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale)
+            mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale,
+            allow_kv_hetero=allow_kv_hetero)
 
     # 【iter3】GPU 端契约校验（无同步，替代原 stats 读回 + 当场 raise）：
     #   counts.min()==0   → B7 全 False 行（code=1，文案与 _dense 一致）
@@ -615,9 +657,16 @@ def _eager_decoding_attn_gather(
     kv_t = k.permute(1, 0, 2)                            # [Hkv, T, D]
     vv_t = v.permute(1, 0, 2)
     if head_of_row is None:
+        # 【E142a】MLA 异维：k 末维与 v 末维独立展开（gather index 的
+        # expand 宽度必须与被 gather 张量自身末维一致——同维时 idx_v≡idx3
+        # 单次 expand，异维时两次 expand，值不变）
         idx3 = idx.unsqueeze(-1).expand(*idx.shape, kv_t.shape[-1])
-        gk = torch.gather(kv_t, 1, idx3)                 # [Hkv, W, D]
-        gv = torch.gather(vv_t, 1, idx3)
+        gk = torch.gather(kv_t, 1, idx3)                 # [Hkv, W, D_k]
+        if vv_t.shape[-1] == kv_t.shape[-1]:
+            gv = torch.gather(vv_t, 1, idx3)
+        else:
+            idx_v = idx.unsqueeze(-1).expand(*idx.shape, vv_t.shape[-1])
+            gv = torch.gather(vv_t, 1, idx_v)            # [Hkv, W, D_v]
     else:
         h_idx = head_of_row.unsqueeze(-1).expand_as(idx)  # [R, W]
         gk = kv_t[h_idx, idx, :]                         # [R, W, D] 高级索引 gather

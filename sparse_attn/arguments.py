@@ -53,6 +53,23 @@ def _add_sparq_args(parser: argparse.ArgumentParser):
     return parser
 
 
+def _add_moba_args(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title='moba')
+    # MoBA vendor（官方源码复用）：prefill 块级 gate 稀疏（chunk-mean key gate →
+    # per-query top-k 选块）+ decode dense。主表预算口径对齐 K2=1024 token/query：
+    # topk 默认 None → enable_moba 内 topk = max(2, ceil(budget/chunk))。官方默认
+    # chunk=4096 → topk=2 → 预算 8192（官方 efficient 内部 topk-1，topk=1 退化为
+    # dense）；严格对齐 1024 须改 chunk（如 256→topk=4），论文标注 budget-normalized
+    # 消融。
+    group.add_argument('--moba_chunk_size', type=int, default=4096,
+                       help='MoBA chunk 大小（官方默认 4096，方法定义参数）')
+    group.add_argument('--moba_topk', type=int, default=None,
+                       help='MoBA top-k 块数（None = 按 budget 换算；显式传覆盖）')
+    group.add_argument('--moba_budget', type=int, default=1024,
+                       help='MoBA token 预算口径（默认 1024 与 Quest/SparQ/FASA 对齐）')
+    return parser
+
+
 def _add_fasa_args(parser: argparse.ArgumentParser):
     group = parser.add_argument_group(title='fasa')
     # FASA vendor（官方源码复用）：decode 时按频率分组 agreement（Phase 1 校准产物
@@ -157,8 +174,9 @@ def _add_tli_args(parser: argparse.ArgumentParser):
                        help='near 细筛 token 折扣（E64 gamma）；off=自由竞争'
                             '（E122：取消 near/far L2 配额分割，mid 单池 topk 竞争）')
     group.add_argument('--tli_subspace', type=str, default='full',
-                       choices=['full', 'rope', 'nope', 'tail', 'random', 'highfreq'],
-                       help='子空间选择: full=全128维(默认) / rope=前64旋转维 / nope=后64非旋转维 / tail=旧口径低频尾维32(E71/B7/C0复现)')
+                       choices=['full', 'rope', 'nope', 'tail', 'random', 'highfreq', 'mla_rope'],
+                       help='子空间选择: full=全128维(默认) / rope=前64旋转维 / nope=后64非旋转维 / tail=旧口径低频尾维32(E71/B7/C0复现) / '
+                            'mla_rope=DeepSeek MLA 192维布局尾段rope 64维(E142a，E141判决:rope-only与full192持平)')
     group.add_argument('--tli_l2_subspace', type=str, default='same',
                        choices=['same', 'full'],
                        help='L2 细筛子空间选择（E134 子空间矩阵第三臂 sub+full）: '
@@ -228,7 +246,7 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'tia', 'twi', 'tli', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'moba_vendor', 'tia', 'twi', 'tli', 'none'])
     parser = _add_quest_args(parser)
     parser = _add_minference_args(parser)
     parser = _add_fasa_args(parser)
@@ -236,6 +254,7 @@ def add_sparse_attn_args(parser: argparse.ArgumentParser):
     parser.add_argument('--baseline-execute', action='store_true', help='explicitly enable new FFD/SparQ candidate execution; plan: python -m sparse_attn.baseline_runtime')
     parser.add_argument('--ffd_delta', type=float, default=5.0, help='FFD upstream log2 threshold, variable budget')
     parser.add_argument('--ffd_cache_length', type=int, default=131200)
+    parser = _add_moba_args(parser)
     parser = _add_twilight_args(parser)
     parser = _add_tia_args(parser)
     parser = _add_tli_args(parser)

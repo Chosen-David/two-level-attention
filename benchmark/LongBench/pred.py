@@ -643,6 +643,30 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
             k=getattr(args, "sparq_k", 1024),
             context_length=_sparq_ctx,
         )
+    elif args.method == "moba_vendor":
+        # MoBA（Mixture of Block Attention）B 轨官方源码复用——官方语义：
+        # prefill 块级 gate 稀疏（chunk-mean key gate → per-query top-k 选块，
+        # 尾 chunk 总是选）+ decode dense（官方 wrapper.py:54-82）。qwen3_
+        # moba_patch.py 仅接口胶水（GQA 展开 + 形状搬运），核心
+        # moba_attn_varlen 来自 moba_attention_official.py（=
+        # third_party/MoBA/moba/moba_efficient.py 逐字节一致，md5=da636efc）。
+        # 主表预算口径对齐 K2=1024：topk 默认 None → 换算
+        # max(2, ceil(budget/chunk))。官方默认 chunk=4096 → topk=2 → 预算 8192
+        # （块粒度下限，官方 efficient 内部 topk-1，topk=1 退化为 dense）；
+        # 严格 1024 须改 chunk（如 256→topk=4），论文标注 budget-normalized 消融。
+        import sys
+        repo = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", ".."
+        )
+        vendor_dir = os.path.join(repo, "exp", "vendor_baselines", "moba_vendor")
+        sys.path.insert(0, vendor_dir)
+        from qwen3_moba_patch import enable_moba
+        n_patched = enable_moba(
+            model,
+            chunk_size=getattr(args, "moba_chunk_size", 4096),
+            topk=getattr(args, "moba_topk", None),
+            budget=getattr(args, "moba_budget", 1024),
+        )
     else:
         n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:

@@ -86,12 +86,15 @@ class TLIIndexer(TIAIndexer):
         #   full = 全 128 维（默认）；rope = 前 64 旋转维；nope = 后 64 非旋转维；
         #   tail = 旧口径低频尾维 32（E71/B7/C0 主表口径，向后兼容保留）
         self.subspace = getattr(args, "tli_subspace", "full")
-        assert self.subspace in ("full", "rope", "nope", "tail", "random", "highfreq"), \
+        # 【E142a】mla_rope：DeepSeek-V2 MLA 布局（nope 128 + rope 64 = 192，
+        # rope 在尾段、MQA 共享）。E141 trace 判决：rope-only 64d 选择与
+        # full 192d 持平（≤.02）——GQA tail 子空间结论的跨架构对应臂。
+        assert self.subspace in ("full", "rope", "nope", "tail", "random", "highfreq", "mla_rope"), \
             f"tli_subspace 非法取值: {self.subspace}"
         self.enable_subspace = getattr(args, "tli_enable_subspace", True)
         if self.subspace == "full":
             self.enable_subspace = False      # 全维（用户默认）
-        elif self.subspace in ("rope", "nope"):
+        elif self.subspace in ("rope", "nope", "mla_rope"):
             self.enable_subspace = True       # 显式子空间段
         # ---- E134：L2 细筛子空间独立开关（子空间矩阵第三臂 sub+full）----
         #   same = L2 与 L1 同一子空间（现状，E85f 口径：粗筛+细筛同特征）
@@ -511,6 +514,10 @@ class TLIIndexer(TIAIndexer):
             out = torch.arange(0, 64, device=device)
         elif self.subspace == "nope":
             out = torch.arange(64, 128, device=device)
+        elif self.subspace == "mla_rope":
+            # 【E142a】DeepSeek-V2 MLA：k = [nope 128 | rope 64] 192 维，
+            # rope 分量在尾段（与 Qwen3 rotate_half 两半布局不同）
+            out = torch.arange(128, 192, device=device)
         elif self.subspace == "random":
             # E90 消融臂（对齐 E3 mass 口径）：固定 seed 随机 32 维
             g = torch.Generator().manual_seed(20261002)
@@ -830,7 +837,12 @@ class TLIIndexer(TIAIndexer):
             k_avg_full = kc_full.mean(dim=2)
         cu_seqlens_k_coarse = pad_cu_seqlens_k // self.args.tia_block_size
 
-        assert k.shape[-1] == 128
+        # 【E142a】维度门：Qwen3 GQA 128 维 / DeepSeek MLA mla_rope 臂 192 维
+        # （nope 128 + rope 64；选择子空间 mla_rope 只取尾 64 维）。
+        # 其他模式（full/tail/rope/nope/random/highfreq）保持 128 硬门不变。
+        assert k.shape[-1] == (192 if self.subspace == "mla_rope" else 128), \
+            f"tli_subspace={self.subspace} 需要的 k 末维 = " \
+            f"{192 if self.subspace == 'mla_rope' else 128}，实际 {k.shape[-1]}"
         # E85f 口径修正：L2 细筛 k_qat 与 L1 粗筛用同一子空间（idx_sub）——
         # E85e 重放口径是粗筛+细筛同特征；tail 臂 idx_sub 与旧硬编码 tail32
         # 逐位相同（cmp_ratio=2），仅 rope/nope 探索臂与静态 pair 臂行为改变
