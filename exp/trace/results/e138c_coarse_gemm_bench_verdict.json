@@ -1,0 +1,43 @@
+{
+  "exp": "E138c 粗筛阶段 GEMM 化判定 microbench（用户 2026-10-14 指令：粗筛可否做成 GEMM + 能提性能的都应用上）",
+  "date": "2026-10-14",
+  "machine": ".251 GPU0 (2x H20-3e, torch 2.8.0+cu128, triton 3.4.0), 独占空卡",
+  "shape": "T=32768, Hkv=8, H=32 (G=4), D in {128, 32}, bf16 K / fp32 Q",
+  "scripts": ["/tmp/e138c_coarse_gemm_bench.py", "/tmp/e138c_coarse_tile_scan.py"],
+  "math_facts": {
+    "coarse_score": "s[h,t] = sum_d min(q,0)*k_min[t,d] + sum_d max(q,0)*k_max[t,d] —— 数学上已是 per-head 双 GEMV",
+    "arithmetic_intensity": "4*G = 16 FLOP/byte per (hkv,t) 原始, 摊销 G 复用后 ~4 FLOP/byte, 远低于 H20 平衡点"
+  },
+  "results": {
+    "ref_d2d_copy": "2213 GB/s (1GiB, 读写合计)",
+    "D128": {
+      "A_current_BT64_w4": {"us": 120.4, "GBps": 1149, "pct_of_copy": 52},
+      "A_tile_scan": "BT in {64,128,256,512} x warps {2,4,8}: 现产 (64,4) 即最优，其余全劣化（(64,8)=121.0, (128,4)=137.8, (512,8)=270.7）——D=128 tile 无零数值变化的提升空间",
+      "B_bf16_mma_BT64_w4": {"us": 96.2, "GBps": 1439, "pct_of_copy": 65, "speedup_vs_A": "1.25x", "maxdiff_vs_A": 0.204},
+      "B2_tf32_mma_BT64_w4": {"us": 102.5, "GBps": 1350, "speedup_vs_A": "1.17x", "maxdiff_vs_A": 0.052},
+      "C_cublas_bmm_fp32": {"us": 635.3, "GBps": 218, "verdict": "5.3x 劣化（strided fp32 bmm 路径低效），实证排除 cublas 路线，iter8 选 Triton 正确"}
+    },
+    "D32": {
+      "all_variants": "A/B/B2 全部挤在 56-65us / ~640 GB/s (29% copy) 平台，MMA 零差异",
+      "root_cause": "D=32 时每 (t,h) 访问段 64B < 128B cache line，DRAM/L2 粒度 8 分之 1 利用——访问模式墙非算力墙",
+      "note": "tail32 非生产口径（E133 判决 full 维持），不立项"
+    }
+  },
+  "verdict": {
+    "decision": "粗筛 GEMM/tensor-core 化不采纳，现产 kernel 维持",
+    "reasons": [
+      "单 kernel MMA 收益 -15%~-20%（真实但有限）；破逐位对拍门（bf16 q cast / tf32）需消融级 e2e 重验，收益不成比例",
+      "decode 稳态 launch-bound（E127 §6: 115 launches/step CPU 排队 ~800us > GPU busy 73%），kernel 内 20% 收益被 launch 队列稀释，decode 主战场是 CUDA Graph（#236）",
+      "粗筛占全步成本 ~8-15%（E126 分段），MMA 折算全步仅省 ~2-3%",
+      "prefill 侧 prepare_mask 每 chunk 一次单行 GEMV，粗筛占比更小",
+      "A 的 D=128 tile 扫描证明现产 (64,4) 即最优——零数值变化的调优空间不存在"
+    ],
+    "candidate_backlog": [
+      "prefill chunk 末行批量打分：所有 chunk 末行 q 一次 batched 调用（选择仅依赖 K 前缀，prefill 开始即可全量算），省每层 16 次 prepare_mask 固定 launch 开销——改动大（indexer 单行断言 + 因果切片重构），收益不确切，挂账候选"
+    ]
+  },
+  "provenance": {
+    "base": "e138-ablation 5da98b8 粗筛 kernel 口径（与主线 tli_indexer.py 同源 _score_coarse_kernel）",
+    "caveat": "microbench 独立复刻 kernel，非生产调用链内计时；绝对值受 .251 机器特性影响（跨机不可比，E133b 教训），相对对比同卡同条件有效"
+  }
+}

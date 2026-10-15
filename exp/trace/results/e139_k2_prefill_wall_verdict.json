@@ -1,0 +1,24 @@
+{
+  "exp": "E139-性能面：grp64 稀疏 prefill wall 的 K2 扫参 + dense SDPA 锚点修正——「prefill wall 3.82x」叙事分母口径纠正",
+  "date": "2026-10-14",
+  "machine": ".187 GPU4/GPU5（H20，torch 2.8.0+cu128），双卡交叉逐值一致（±1%）；树 tmp_e138_abl_tree_187（e25a617，代码与 round1 e2e 同源）",
+  "protocol": {
+    "bench": "/tmp/e139_k2_prefill_wall_bench.py（.187:~/e139_k2_prefill_wall_bench.py）：e138bc 口径克隆（每 iter fresh TLIIndexer(mavg_tail) 模拟层间重建，warmup 2 + 9 iters 中位），env = TLI_PREFILL_SELECT_GROUP=64 + TLI_SPARSE_PREFILL_CHUNK=2048 + TLI_PREFILL_PREFETCH=1（生产口径）",
+    "dense_anchor": "torch SDPA flash（is_causal + enable_gqa）——transformers ≥4.51 对 Qwen3 的默认 attn 实现（pred.py from_pretrained 未显式传 attn_implementation），即 e2e PFDD 臂 prefill dense 生产口径的公平锚点",
+    "machine_anchoring": "chunk-shared 对照（GROUP=0，~/e139_chunkshared_wall.py GPU4）@32K = 168.6ms 与 e138bc .251 逐值一致——两机 H20 同型号同 torch，跨机可比性锚定"
+  },
+  "results_ms_median_gpu45": {
+    "L8192": {"dense": 6.8, "k512": 166.2, "k768": 162.8, "k1024": 175.3, "k1536": 175.8, "k2048": 166.9},
+    "L16384": {"dense": 25.8, "k512": 363.1, "k768": 365.6, "k1024": 411.7, "k1536": 455.3, "k2048": 454.7},
+    "L32768": {"dense": 100.6, "k512": 823.3, "k768": 863.0, "k1024": 981.3, "k1536": 1150.1, "k2048": 1205.7},
+    "chunkshared_k1024_control": {"L8192": 41.0, "L16384": 82.7, "L32768": 168.6}
+  },
+  "reading": {
+    "verdict_correction": "【判决级修正】e138bc 的「prefill wall 3.82x」分母是旧 mask 实现（644ms，einsum 全 T + where，本身比 dense SDPA 慢 6.4x）——3.82x 是稀疏路径内部 mask→gather+预取的实现优化比，不是 vs dense 的加速比。vs dense SDPA（e2e 生产 dense 口径）稀疏 prefill 全线净负：chunk-shared（质量崩塌档）0.60x、grp64 k1024（质量 -3.4 档）0.10x、grp64 k2048（质量 -0.7 档）0.08x——「prefill 稀疏换 wall 收益」主张在所有质量档均不成立",
+    "granularity_cost": "同 K2=1024 下 grp64 981ms vs chunk-shared 168.6ms（5.8x）——粒度买回质量的性能代价主因是选择链 ×32（每 chunk 32 组各做完整两级选择 vs 1 次共享选择）+ W 并集变宽（~3-11K vs ~1.2K 列），与 e138_grp_wdiag.py 诊断（组版 1040 vs 缩 chunk 956ms）自洽",
+    "k2_sensitivity": "K2 512→2048 wall +46%（823→1206ms @32K）：W 并集重叠压缩下列宽敏感度中等；8K/16K 档近饱和（K2 不敏感，预算超 far 池）",
+    "e139_armA_rebalance": "E139 Arm A「prefill 稀疏故事复活」仅在质量轴成立（K2=2048 距锚点 -0.66/-2.22）；性能轴判决反转——稀疏 prefill 是纯质量-预算分析对象（消融/trade-off 表），无 wall 收益主张。论文叙事定型：decode 主线（质量持平 + 5.47x 稳态）+ prefill dense 生产口径；稀疏 prefill 进 limitation/analysis 段（粒度-预算-质量三轴，性能列如实标净负）"
+  },
+  "verdict": "① 性能判决：vs dense SDPA 锚点，稀疏 prefill 在全部质量档（chunk-shared 0.60x / grp64 0.10x / grp64+K2048 0.08x）净负——「prefill wall 3.82x 收益」系分母口径错误（实现优化比被误读为 vs dense 加速比），论文 eval-2 prefill panel 与 abl-5 三轴表须按本判决修正。② E138b/c 工程价值重定位：mask→gather+预取 3.82x 仍真实（稀疏路径自身 644→168.6ms），但它是「稀疏 prefill 的实现优化」，服务于稀疏路径消融的可信度而非加速主张。③ 叙事定型：TLI 的性能故事完全落在 decode（5.47x 稳态 + CI 含 0 三重质量判决），prefill 稀疏为质量-粒度-预算分析对象；后续若救 prefill 性能须先攻选择链批量化（组选择 512 次→批量打分，挂账候选）",
+  "scripts": ["/tmp/e139_k2_prefill_wall_bench.py", ".187:~/e139_wall_gpu4.log", ".187:~/e139_wall_gpu5.log", ".187:~/e139_chunkshared_wall.py", ".187:~/e139_cs_wall_gpu4.log"]
+}

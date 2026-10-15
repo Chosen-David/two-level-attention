@@ -1,0 +1,15 @@
+{
+  "exp": "E139 纲领④ 融合态 K2 上探 @64K：判定「64K 对 dense 净加速」主张的预算适用范围",
+  "date": "2026-10-15",
+  "protocol": ".187 GPU6/7 双卡交叉（round3 e2e GPU0-3 + L 曲线 GPU4/5 均不占卡）；树 a9e814e；7-iter 中位 fresh indexer 单流锁卡",
+  "results": {
+    "dense_sdpa": {"gpu6": 394.8, "gpu7": 398.2},
+    "fused_k1024": {"gpu6": 541.3, "gpu7": 545.7, "vs_dense": 0.73},
+    "fused_k1536": {"gpu6": 567.1, "gpu7": 573.9, "vs_dense": 0.70},
+    "fused_k2048": {"gpu6": 569.3, "gpu7": 575.5, "vs_dense": 0.69},
+    "cross_gpu_consistency": "±0.8% 内一致"
+  },
+  "reading": "【2026-10-15 方向纠偏（GPT TL-156 confirmed，92bdbf0）】原判「全预算档净加速 1.37-1.45x」系方向颠倒：vs_dense 0.69-0.73 是 speedup = dense/fused（<1 = 更慢），融合态全 K2 档 @64K 均【慢于】dense +37%~+45%（541-576ms vs 395-398ms）。仍成立的发现：K2 敏感度在融合态 @64K 极钝——1024→2048 仅 +5%（541→569ms，vs 批量版 @32K +44%）——融合 kernel 块级跳空把列宽增量吃掉（W 并集重叠压缩 + 跳空使有效列增长远小于 K2 线性），本身是融合 kernel 设计收益证明",
+  "verdict": "【已纠偏】① 「K2=2048 质量恢复+净加速双达标」表述不成立——64K 全预算档对 dense net-negative（慢 37-45%）。② 融合态 K2 钝感（+5% vs 批量版 +44%）仍成立（融合 kernel 设计收益）。③ 三轴 trade-off 表口径：对 dense 的列全部为「更慢」，speedup = dense/fused ∈ [0.69, 0.73]；32K K2 上探用批量版数据（826ms@2048）须注明实现代差（融合态是终态实现）。质量侧 K2=2048 固定 dense 口径残差 hotpot -1.15/musique -3.66（round3 修正后）",
+  "scripts": ["exp/bench/e139_gang4_wall_k2_64k.py", "exp/trace/results/e139_g4k2_64k_g{6,7}.log"]
+}

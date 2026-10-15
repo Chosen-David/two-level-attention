@@ -1,0 +1,30 @@
+{
+  "exp": "E138 消融③：decode-only D' gate @ sub/sub e2e 判决（动态 per-prompt 标定跳 far 层，eps ∈ {0.05, 0.10}）",
+  "date": "2026-10-14",
+  "protocol": {
+    "arm": "mavg 冠军 flags + --tli_subspace tail + --tli_dyn_dgate --tli_dyn_dgate_eps（派单 /tmp/e138_sub_dg_dispatch.sh，T=1014093000）",
+    "anchor": "E133 sub/sub 无 gate AVG5 47.59（e133_subspace_verdict.json per_task，不重跑）；对照 fullKV 47.91（E123）",
+    "hosts": ".187 GPU0-7（gov/hotpot/qasper/repobench ×2 eps）+ .251 GPU0-1（musique ×2 eps，经本机中转至 .187 打分）",
+    "scoring": ".187 ~/two-level-attention_git eval.py（difflib:stdlib，md5 与 .251 producer 树完全一致 1bb58cdcbecc）；strict runcap 5/5，cap_comparability_key 6688f41924 单一无 legacy 混挂",
+    "stats": "task-bootstrap 10000 次 seed 20261013，描述性口径（126 措辞纪律）"
+  },
+  "per_task_delta": {
+    "dg5_eps0.05": {"gov_report": -0.07, "hotpotqa": -0.26, "musique": 0.30, "qasper": 0.33, "repobench": -0.12},
+    "dg1_eps0.10": {"gov_report": -0.45, "hotpotqa": -2.02, "musique": 0.20, "qasper": 0.45, "repobench": 0.67}
+  },
+  "avg": {
+    "anchor_sub_sub": 47.59,
+    "dg5_eps0.05": 47.62,
+    "dg1_eps0.10": 47.36
+  },
+  "bootstrap_ci95": {
+    "dg5_eps0.05": {"delta": 0.036, "ci": [-0.204, 0.318], "contains_zero": true},
+    "dg1_eps0.10": {"delta": -0.230, "ci": [-1.526, 0.576], "contains_zero": true}
+  },
+  "cross_reference": {
+    "e137_full_baseline": "dg5 47.88 (Δ-0.03 vs 47.91) / dg1 47.69 (Δ-0.22)——E138 ③ 在 sub/sub 基线上复现同构形态：保守档噪声级持平，激进档小幅负未超带",
+    "conclusion": "D' gate 质量成本在 full 与 sub/sub 两种子空间配置下均为噪声级（CI 均含 0）——E137 判决口径在 sub/sub 基线上独立复证"
+  },
+  "verdict": "③ 判决：保守默认 eps=0.05 维持（Δ+0.04 噪声级，sub/sub 基线复证 E137 结论）；D' gate 作为生产可选项落袋，不强制启用；激进 eps=0.10 不进生产（hotpotqa -2.02 单任务拖累，CI 宽但点估计负）。三消融 ①② 待收割后出 E138 总判决",
+  "residual": "E127 门禁重跑欠账（GPU 空闲后补）；128K/LB v2 复验仍为 D' gate 转正候选路径"
+}

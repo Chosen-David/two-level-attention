@@ -1,0 +1,20 @@
+{
+  "exp": "E138b/c prefill wall 性能量化收官：mask 版（91ed0c8^，einsum 全 T + where(-inf)）vs gather 串行（5da98b8）vs gather+双流预取（cc93913）",
+  "date": "2026-10-14",
+  "machine": ".251 GPU0/GPU1（2x H20-3e，torch 2.8.0+cu128，triton 3.4.0），双卡各跑全臂交叉，两卡逐值一致（644.3 vs 645.1ms 级）",
+  "protocol": "诊断级 wall：sparse_prefill_attn 整函数计时（含 indexer 选择链，每 iter fresh TLIIndexer('mavg') 模拟 e2e 层间全量重建），mavg 生产口径；7 iter 中位数；.251 树 /tmp/wt_e138c_tree 指纹 cc93913 与主仓逐位一致（902fcaf8）",
+  "results_ms_median": {
+    "L4096": {"mask": 15.5, "serial": 16.9, "prefetch": 16.9, "serial_vs_mask": "0.92x"},
+    "L8192": {"mask": 52.0, "serial": 40.8, "prefetch": 40.8, "serial_vs_mask": "1.28x", "prefetch_vs_mask": "1.28x"},
+    "L16384": {"mask": 176.3, "serial": 88.3, "prefetch": 84.6, "serial_vs_mask": "2.00x", "prefetch_vs_mask": "2.08x"},
+    "L32768": {"mask": 644.3, "serial": 183.3, "prefetch": 168.6, "serial_vs_mask": "3.51x", "prefetch_vs_mask": "3.82x"}
+  },
+  "reading": {
+    "gather_main_win": "E138b gather 化是主导项：L=32K prefill wall 3.51×（K/V 读带宽与 QK 计算只对 W≈1.2K 列，T=32K 全序列 einsum 的 25× 理论省算在 wall 上兑现为 3.5×——选择链与 gather 索引构造占剩余成本）",
+    "prefetch_addon": "E138c 预取在串行 gather 之上 +8~9%（183.3→168.6ms，与 e138c_prefetch_bench_verdict.json 长度扫描 1.10x 自洽）",
+    "short_seq_cost": "L=4096 有 -8% 净负（单稀疏 chunk，compact 机制固定开销 > 节省）——e2e 中 4K 级 prefill 占比小且 decode 主导，如实记录不修（阈值化收益不成比例）",
+    "quality_gate": "数值逐位不变已由 e138b 14/14 + e138c 4/4 bitwise 对拍背书，性能表不需要独立质量门"
+  },
+  "verdict": "「全面性能优化」指令在 prefill 侧的完整量化：32K 序列 prefill wall mask→gather+预取 3.82×。与 e2e 无冲突（数值逐位不变）；进论文性能表 prefill 段",
+  "scripts": ["/tmp/e138c_prefill_wall_bench.py", ".251:/tmp/wall_g0.log", ".251:/tmp/wall_g1.log"]
+}

@@ -1,0 +1,32 @@
+{
+  "exp": "E139-p2/#249：纲领②③④ prefill 性能三件套收官——批量选择（②③）+ 融合紧凑 attention kernel（④），对拍硬门 + wall 判决",
+  "date": "2026-10-15",
+  "protocol": {
+    "code": "e138-ablation 分支：fc84edf（纲领②③ batch_select）+ fused_attn_triton.py（纲领④，本 commit）；env TLI_PREFILL_BATCH_SELECT / TLI_PREFILL_FUSED_ATTN 默认双 0（生产零扰动，显式开）",
+    "bitdiff": "/tmp/e139_gang4_bitdiff.py——G1 输出级（L∈{8192,32768} grp64 K2=1024 bf16/fp16 allclose + maxdiff ≤1 bf16 ULP）；G2 行级有效列集合恒等（原实现 row_ok vs kernel 谓词 dense mask differ=0，三形态：块对齐/随机非对齐/全空 sel + 谓词 oracle 朴素 attention 对拍消循环论证盲区）；G3 因果探针（篡改后半 K/V @16384 组边界对齐 + @16416 组内错位，前段逐位一致 diff 行数=0）；G4 回归（impl 7/7 + e138b 17/17 + e138grp 5/5）；fail-closed（per_q_head/CPU 回退原路径）",
+    "wall": "本机 GPU1 锁卡，7-iter 中位 fresh indexer；agent 跑 + 主 AI 独立复跑双轮"
+  },
+  "results": {
+    "bitdiff": "15/15 PASS 双轮（agent a063ae90 + 主 AI 独立复跑同判）：G1 maxdiff 3.9e-3 = 1 bf16 ULP（fp16 4.9e-4）；G2 集合恒等 differ=0 cells 全形态 + oracle 对拍 PASS；G3 因果零泄漏双档（组边界对齐+组内错位）；G4 回归 29/29 零扰动",
+    "wall_L32K_grp64_K2_1024": {
+      "per_group_orig_attn": 933.4, "batch_orig_attn": 574.2, "batch_fused": 231.9, "dense_sdpa": 100.1,
+      "speedup_vs_per_group": 4.03, "speedup_vs_batch": 2.48, "vs_dense": 0.43,
+      "independent_rerun": "agent 232.5ms vs 主 AI 231.9ms（±0.3%）；批量基线 574-576 与纲领②③记录 575.1 一致、dense 100.1-100.2 与 100.9 一致——锚点对齐"
+    },
+    "tile_scan": "BRG∈{32,64,128}×BK∈{64,128}×warps∈{4,8}×stages∈{2,3} 共 11 组全 PASS，最优 (BRG=64,BK=64,w=4,st=2)=234.4ms 写死",
+    "kernel_design": [
+      "token 直取不走并集 argsort：行谓词 j<=p AND (sel[j(r)//grp][h,j] OR j<sink OR j>=p-swa+1)，列按 K 原始位置序天然因果——消全 T argsort/并集物化/W 宽 .item() host 同步",
+      "flash 在线 softmax：GQA 折叠行 tile（BRG=BR×G=64）× K tile tl.dot bf16 输入 fp32 累加——不物化完整 score/P",
+      "块级跳空（主加速源）：64-token 块位图 any 聚合，无 sel 且不交 sink/保护带窗口的 K tile 整块跳过",
+      "空行兜底 l_i==0→v[p]，与原版 diag OR 单列语义精确等价；K/V 原地读消大搬运"
+    ]
+  },
+  "reading": {
+    "cumulative": "稀疏 prefill wall 链条完整：逐组 933 → 批量选择 574（纲领②③ 1.62x）→ +融合 attention 232（纲领④ 2.48x）——累计 4.03x；纲领④点名四浪费（跨组并集 argsort/重复搬运/.item()/完整 score 物化）全部消除",
+    "vs_dense": "0.43x 仍净负但量级已从 9.3x 压到 2.3x 慢——剩余瓶颈在选择链（批量版 ~210ms：batch_select ③ 段逐行 Triton 打分循环 + softmax/topk 复刻），非 attention 段；与论文叙事（稀疏 prefill=质量-粒度-预算分析对象，性能故事落 decode 5.47x）不冲突，wall 曲线进性能消融附录",
+    "numerical": "G1-G3 三层门均过：输出 1 ULP 级、行级有效列集合逐位恒等（语义同构的强判据——列集合同则 attention 只差归约树 ULP）、因果零泄漏双档对齐/错位"
+  },
+  "verdict": "① 纲领④判决：融合 kernel 采纳（默认 env 关零扰动，显式 TLI_PREFILL_FUSED_ATTN=1 启用）——15/15 对拍双轮 + wall 2.48x vs 批量基线（574→232ms），目标 ≤300ms 达成。② 用户四点纲领①②③④全部收官。③ 后续杠杆：batch_select ③ 段打分批量化（逐行循环→整层一次）；选择链若压到 ~100ms 量级则组合态逼近 dense 2x 慢以内。④ 挂账：b7bdcdb/e87ba71（main 输入守卫+142/152 修复）未移植进 e138-ablation，merge 时统一处理",
+  "next": "e138-ablation → main merge 待纲领链全部收官后统一处理；wall 曲线（b0f40cc）+ 本判决进 #249 三件套收官",
+  "scripts": ["/tmp/wt_e138_ablation/sparse_attn/ops/fused_attn_triton.py", "/tmp/e139_gang4_bitdiff.py", "/tmp/e139_gang4_tilescan.py", "/tmp/e139_gang4_quickbench.py", "/tmp/e139_gang4_smoke.py"]
+}

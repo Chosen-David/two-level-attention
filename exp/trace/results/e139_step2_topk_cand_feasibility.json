@@ -1,0 +1,24 @@
+{
+  "exp": "E139 #253 Step2 可行性判决：L2 双池 topk 候选列化——tie 序/零补位序等价性双探针实证（预实施设计）",
+  "date": "2026-10-15",
+  "protocol": {
+    "probe": "exp/bench/e139_step2_tie_probe.py（本机 GPU0，纯 torch 受控实验，softmax 型非负 bf16 值 + 受控 tie 密度 tie_lv∈{64,8,2}）× 形状 W∈{4096,32768,65536} × C∈{1024,8192} × rows=64 × reps=5 = 每格 320 行",
+    "background": "PoC 判决（e139_l2_graph_poc_verdict）：graph 化后 L2 残余 192.2ms 最大单点 = 双池位置切片 topk 111.5ms（O(N·W) radix select 真实 GPU 工作，图化不可消）——Step2 是 #253 剩余唯一大杠杆"
+  },
+  "results": {
+    "invariant_tie_order": "① 位置排序候选 topk vs 全宽 topk 选择集合恒等：0/320 全格（tie 密度从稀疏到 bf16 量化密集 tie 全过）——CUDA radix topk 对相等值按低 index 优先，候选按位置排序后 tie 序与全宽位置序一致（PoC 挂账『待实证』落定）",
+    "invariant_zero_padding": "② k > 候选数时全宽 topk 零补位 = 池内非候选位置升序：补位仿真『全体候选 ∪ complement[:k-cnt]』集合恒等 0/320 全格（k2=C+pad 档，pad∈{128,512,1024}）",
+    "probe_bug_note": "探针初版 ② 档 320/320 全不匹配系探针自身 bug（k2=min(k+C//2,W) 算出 k2<C，comp[:负数] 取几乎全补位集）——单行手查定位后修正重跑全过；另合成负值候选会引入生产不存在的『负值排零后』伪不匹配，已改 softmax 型非负值",
+    "value_equivalence": "值等价零 ULP：候选列 p 值 = gather 自同一全宽 p 张量（无任何算术变化）——区别于此前证伪的候选列 softmax（归约树宽度差 0.1% ULP 翻转），Option A 不改 softmax/mean（B 前半 47.2ms 保留不动）"
+  },
+  "design": {
+    "option_A": "⑤ 段 ④ 步替换：p 全宽计算不变 → 每行 gather 候选列 p 值 [Hkv,C]（ct_j 须先按位置排序——现序为 L1 topk rank 序）→ 池掩码（far [far_lo,far_hi) / near [far_hi,swa_lo)，边界层不变 host 值）where(out-of-pool, -inf) → topk over C 列 → 映射回 token 位置；k > cnt 行（早行窄池）补位仿真",
+    "graph_safety_constraint": "【关键】k vs cnt 分支是数据相关（cnt 依赖 cand_valid 数据）——不能像现 ⑤ 段的层不变 host 分支那样进 capture。须分支免化（branch-free 固定形状）：topk(cand_masked, k) 的 -inf 无效槽 + complement 位置 cumsum-rank scatter 固定形状填充，where 合成；cnt 用 device 张量（无 host 同步）。或者（更简）Step2 只走 eager 路径 + graph key 加 env 指纹使 GRAPH=1 时 Step2 优雅回退旧 topk 路径——两段分步落袋",
+    "production_edge_analysis": "k ≤ C 恒成立（K2=1024 ≪ C=8192）；k > cnt 仅早行窄池出现（L1 far topk kf 块 × 64 ≥ k2_far 档时 cnt ≥ k）——补位仿真分支是边界正确性要求，触发频率低",
+    "p_zero_edge": "候选 p 值 bf16 下溢到 0.0（score < -87 档）会与补位零按位置序混合——生产 score 范围内概率极低，bitdiff 硬门实测把关，如实测出现可加 where(cand_p==0) 行级回退旧路径"
+  },
+  "projected_gain": "B 后半 topk/mask 111.5ms → 候选列 topk O(C=8192) + gather ~15-25ms → 选择链 207.6→~115ms → 64K 总 wall 327.4→~235ms ≈ 1.7x vs dense 398.3（须实测）",
+  "verdict": "Step2 可行性成立：①② 等价性探针全过 + 值 gather 零 ULP + 边界分析完备。实施排序：先 eager 路径 + bitdiff 硬门（mask 0/N + e2e maxdiff=0 + 回归套件），graph 兼容分支免化设计其后（或 GRAPH=1 暂回退旧 topk——图化收益 2.07x 中 topk 段 O(W) 部分本就不可消，回退损失可控）",
+  "next": "实施 env TLI_PREFILL_L2_TOPK_CAND（默认 0 fail-closed）进 batch_select.py ⑤ 段；验收硬门克隆 e139_bs_graph_bitdiff 口径；wall 实测 64K",
+  "scripts": ["exp/bench/e139_step2_tie_probe.py"]
+}
