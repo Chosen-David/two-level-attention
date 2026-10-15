@@ -1,78 +1,163 @@
-"""Qwen3 adapter of pinned gpt-fast SparQ, per query-head selection + mean-V.
+"""SparQ 官方源码的 Qwen3 适配层（B 轨 vendor，复用官方算法不改）。
 
-Full KV remains resident; mean-V is recomputed (cost included), not an optimized
-running cache. This is a model adapter candidate, not upstream Qwen3 support.
+本文件只做「接口胶水 + 形状展开」，核心选择算法完全来自官方
+sparq_attention_official.py（与 Graphcore sparq-gpt-fast 仓库的 sparq.py
+逐字节一致，md5=522a085c...）：
+  - `sparq_attn`：Stage1 用 |Q| 的 r 个最大坐标近似注意力分数 →
+    top-k（k 个 token）→ Stage2 全维 QK 精确注意力 + V_mean lerp 插值。
+  - RunningVMean：decode 时对 V 维护 running mean，用于 Stage3 插值
+    （SparQ 论文核心：top-k 覆盖不到的 token 用 V 均值近似）。
+
+与官方 gpt-fast 的差异（Qwen3 / transformers 4.56）：
+  * 官方模型自管 DoubleKVCache/SingleKVCache + input_pos；Qwen3 用
+    transformers DynamicCache，KV 存 kv_heads 粒度（GQA 不展开）。
+  * 官方 `_generate` 里 V_mean 是 kv_heads 粒度，sparq_attn 的 lerp 期望
+    与 y_ 同 H 粒度 —— 官方只在无 GQA 模型（Llama-2-7B）验证过；GQA
+    模型 V_mean 直接传会 shape 不匹配。适配层在调官方 sparq_attn 前把
+    V_mean repeat_kv 展开到 H（组内 G 头共享同一均值，语义不变）。
+  * RunningVMean.init 官方接收展开后 V，shape 与 kv_heads 粒度 buffer
+    不匹配 —— 适配层传 kv 粒度全量 V（mean(-2) 后形状恰好匹配）。
+
+主表口径（用户 2026-10-14 拍板）：**k 固定 1024**（token budget 与
+Quest/FASA 同口径）。r 由官方公式反推：
+  ratio = context_length / (2*k)；r = round(head_dim / ratio)
+Qwen3-8B head_dim=128 → 32K: r=8；128K: r=2（官方语义随序列变）。
 """
 import types
+from typing import Tuple
+
 import torch
-from sparse_attn.baseline_runtime import verified_vendor
+
+from transformers.models.qwen3.modeling_qwen3 import (
+    Qwen3Attention, apply_rotary_pos_emb, repeat_kv,
+)
+
+from sparq_attention_official import (
+    SparQArgs, RunningVMean, sparq_attn,
+)
 
 
-def enable_sparq(model, k=1024, context_length=32768):
-    if type(k) is not int or k <= 0 or type(context_length) is not int or context_length <= 0:
-        raise ValueError('SparQ k/context_length must be positive integers')
-    root = verified_vendor('sparq_vendor')
-    import sys
-    from pathlib import Path
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))
-    from sparq import sparq_attn, SparQArgs
-    for name in ('sparq', 'kv_cache'):
-        if Path(sys.modules[name].__file__).resolve().parent != root.resolve():
-            raise RuntimeError(f'SparQ import collision: {name}')
-    from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention, apply_rotary_pos_emb, repeat_kv
-    layers = [m for m in model.modules() if isinstance(m, Qwen3Attention)]
-    if not layers or len(layers) != model.config.num_hidden_layers:
-        raise ValueError('SparQ adapter supports complete Qwen3 attention models only')
-    if any(hasattr(m, '_sparq_native_forward') for m in layers):
-        raise ValueError('SparQ already installed')
-    stats = {}
-    config = SparQArgs(running_V_mean=False)
-    def bump(key):
-        stats[key] = stats.get(key, 0) + 1
-    def forward(self, hidden_states, position_embeddings, attention_mask=None,
-                past_key_values=None, cache_position=None, **kwargs):
-        b, s, _ = hidden_states.shape
-        if b != 1 or s < 1:
-            raise ValueError('SparQ candidate supports batch=1 only')
-        if s > 1:
-            out = self._sparq_native_forward(hidden_states, position_embeddings,
-                attention_mask=attention_mask, past_key_values=past_key_values,
-                cache_position=cache_position, **kwargs)
-            bump('native_prefill_calls')
-            return out
-        from sparse_attn.baseline_runtime import require_unmasked_decode
-        require_unmasked_decode(hidden_states, attention_mask, past_key_values, cache_position)
-        if kwargs.get('use_cache', True) is not True:
-            raise ValueError('SparQ decode requires use_cache=True')
-        q = self.q_norm(self.q_proj(hidden_states).view(b, s, -1, self.head_dim)).transpose(1, 2)
-        key = self.k_norm(self.k_proj(hidden_states).view(b, s, -1, self.head_dim)).transpose(1, 2)
-        value = self.v_proj(hidden_states).view(b, s, -1, self.head_dim).transpose(1, 2)
-        cos, sin = position_embeddings
-        q, key = apply_rotary_pos_emb(q, key, cos, sin)
-        key, value = past_key_values.update(key, value, self.layer_idx,
-                      {'cos': cos, 'sin': sin, 'cache_position': cache_position})
-        length = past_key_values.get_seq_length(self.layer_idx)
-        if key.shape[-2] != length:
-            raise ValueError('SparQ candidate requires non-padded dynamic cache')
-        key, value = repeat_kv(key, self.num_key_value_groups), repeat_kv(value, self.num_key_value_groups)
-        r = max(1, min(self.head_dim, round(self.head_dim / (context_length / (2 * k)))))
-        mask = torch.ones((1, 1, 1, length), dtype=torch.bool, device=q.device)
-        mean = value.mean(-2, dtype=torch.float32, keepdim=True).to(value.dtype)
-        out = sparq_attn(q, key, key, value, mean, mask, r, min(k, length), config)
-        out = self.o_proj(out.transpose(1, 2).reshape(b, s, -1).contiguous())
-        bump('sparq_decode_calls')
-        return out, None
-    for layer in layers:
-        layer._sparq_native_forward = layer.forward
-        layer.forward = types.MethodType(forward, layer)
-    model._baseline_stats = stats
-    import hashlib
-    model._baseline_identity = dict(method='sparq_vendor',
-        adapter_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-        upstream='f2eeb9d10e79d3ffecc48015e55157bab0f6e269', k=k,
-        context_length=context_length, r_by_head_dim={str(m.head_dim):max(1,min(m.head_dim,round(m.head_dim/(context_length/(2*k))))) for m in layers},
-        selection='per-query-head; mean-V compensation enabled; full resident KV',
-        comparison='Qwen3 adapter, not group-shared native quality library; union K unobserved',
-        gpu_quality_validated=False)
-    return len(layers)
+def _qwen3_sparq_wrapper(
+    self,
+    hidden_states: torch.Tensor,
+    position_embeddings: Tuple[torch.Tensor, torch.Tensor],
+    attention_mask=None,
+    past_key_values=None,
+    cache_position=None,
+    **kwargs,
+) -> Tuple[torch.Tensor, None]:
+    """Qwen3Attention forward：prefill 走原生；decode 走官方 SparQ 稀疏路径。"""
+    q_len = hidden_states.shape[1]
+
+    if q_len > 1:
+        # prefill：原生 dense（与 fullkv 锚点一致；官方 SparQ prefill 也是 SDPA dense）
+        return self.flash_forward(
+            hidden_states, position_embeddings, attention_mask,
+            past_key_values, cache_position, **kwargs,
+        )
+
+    input_shape = hidden_states.shape[:-1]
+    hidden_shape = (*input_shape, -1, self.head_dim)
+
+    # 投影 + Qwen3 per-head RMSNorm + rotary（与原生 prefill 一致）
+    query_states = self.q_norm(
+        self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+    key_states = self.k_norm(
+        self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+    value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
+
+    cos, sin = position_embeddings
+    query_states, key_states = apply_rotary_pos_emb(
+        query_states, key_states, cos, sin)
+
+    if past_key_values is not None:
+        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+        # 4.56 DynamicCache.update 返回全量 KV slice；RunningVMean.update 期望
+        # 单 token 的 v，故须在 update 缓存前捕获本步新 token（decode q_len==1
+        # 时为 [B, kv_heads, 1, D]）
+        new_v = value_states
+        key_states, value_states = past_key_values.update(
+            key_states, value_states, self.layer_idx, cache_kwargs)
+
+    # ---- 官方 SparQ 稀疏路径（仅 decode，q_len==1）----
+    # DynamicCache.update 返回全量 KV slice（[B, kv_heads, S, D]，GQA 未展开）
+    full_k, full_v = key_states, value_states
+    kv_len = full_k.shape[-2]
+
+    # V_mean：首 decode 用含新 token 的全量 V init（等价官方 prefill init +
+    # decode1 update，因 (S*mean_prev+v1)/(S+1) 恰为含 v1 的全量均值）；
+    # 后续 update 本步新 token。kv 粒度维护，sparq_attn 前展开到 H。
+    if self.sparq_vmean.n.item() == 0:
+        self.sparq_vmean.init(full_v)          # [B, kv_heads, S, D]
+    else:
+        self.sparq_vmean.update(new_v)          # [B, kv_heads, 1, D]
+
+    K = repeat_kv(full_k, self.num_key_value_groups)          # [B, H, S, D]
+    V = repeat_kv(full_v, self.num_key_value_groups)          # [B, H, S, D]
+    # 官方 RunningVMean buffer 是 fp32（register_buffer 默认）；官方 update()
+    # 返回前 .to(v.dtype) 转回模型 dtype。此处直接读 buffer 须手动转，否则
+    # torch.lerp(input=fp32, end=bf16) dtype 不匹配崩溃。
+    V_mean = repeat_kv(
+        self.sparq_vmean.V_mean.to(query_states.dtype),
+        self.num_key_value_groups)
+
+    # decode 单 token：全历史可见
+    mask = torch.ones(1, 1, 1, kv_len, dtype=torch.bool,
+                      device=query_states.device)
+
+    attn_weights = sparq_attn(
+        query_states,            # [B, H, 1, D]
+        K, K,                    # K1 == K2 == K（官方 DoubleKVCache 双存 K/K^T，数值相同）
+        V,
+        V_mean,                  # [B, H, 1, D]
+        mask,
+        self.sparq_r,
+        self.sparq_k,
+        self.sparq_config,
+    )
+    attn_output = attn_weights.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(*input_shape, -1)
+    attn_output = self.o_proj(attn_output)
+    return attn_output, None
+
+
+def enable_sparq(
+    model,
+    k: int = 1024,
+    context_length: int = 32768,
+) -> int:
+    """把 model 内全部 Qwen3Attention 绑定官方 SparQ 稀疏 forward。返回 patch 层数。
+
+    r/k 主表口径：k 固定（默认 1024）；r = round(head_dim/ratio)，
+    ratio = context_length/(2*k)（官方 get_r_k_for_compression_ratio 反推）。
+    """
+    n_patched = 0
+    layer_id = 0
+    _ratio = context_length / (2 * k)
+
+    def _patch_recursive(container):
+        nonlocal n_patched, layer_id
+        for name, module in list(container._modules.items()):
+            if isinstance(module, Qwen3Attention):
+                module.layer_id = layer_id
+                layer_id += 1
+                module.sparq_r = max(1, round(module.head_dim / _ratio))
+                module.sparq_k = k
+                module.sparq_config = SparQArgs()
+                module.sparq_vmean = RunningVMean(
+                    max_batch_size=1,
+                    n_local_heads=module.config.num_key_value_heads,
+                    head_dim=module.head_dim,
+                )
+                # RunningVMean 的 V_mean/n buffer 默认建在 CPU（torch.full/tensor
+                # 默认 CPU），须随模型移到 CUDA，否则 sparq_attn 内 lerp 时报
+                # "Expected all tensors on same device, cuda:0 vs cpu"。
+                module.sparq_vmean.to(module.q_proj.weight.device)
+                module.flash_forward = module.forward
+                module.forward = types.MethodType(_qwen3_sparq_wrapper, module)
+                n_patched += 1
+            elif len(list(module._modules.items())) > 0:
+                _patch_recursive(module)
+
+    _patch_recursive(model)
+    return n_patched

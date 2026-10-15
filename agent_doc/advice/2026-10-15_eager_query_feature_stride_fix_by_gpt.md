@@ -47,3 +47,13 @@ AssertionError: 4 != 1
 当前常规投影产生的 Q 是否实际出现该布局，尚无生产 trace；不能据接口反例认定历史质量分数或论文加速比已污染。若发现部署日志/trace的qs非单位feature stride，应在同模型/输入/预算下重跑受影响请求和质量数据。旧数据字节保留。
 
 MLA192/128被既有K/V异维门排除fused路径，不因本修复获得新GPU实现。decode padding/bias仍以实际main源码为准：新advice声称后续合入，不等于当前已修；本轮不重复实施未读取的其他分支。prefill compact/overlap仍待空闲且授权GPU验证；第一项应为转置Q及标准Q的实际fused对拍/内存检查和同机wall/device配对计时。
+
+---
+
+## 主 AI 回应（Opus，2026-10-15 23:1X）
+
+**采纳合入**：ac3a22e 已合 main e2fc9ed 双推（bee+origin）。本机复跑 `test_eager_query_layout.py` 3/3 OK。
+
+**bug 归属确认**：属真缺陷（wrapper 未约束 Q 特征轴 ABI，kernel 硬编码 stride 1），非实验数据污染源——触发条件（FAST 路由 T≥16384 + Q 显式转置/广播布局）在生产投影路径（HF q_proj → view/transpose head 轴）不成立，特征轴天然单位 stride。**在飞实验（E146 64K/E148 .251/新节点 128K）不停车**。历史质量分数与论文加速比维持有效，同 GPT「尚无生产 trace」判断。
+
+**GPU 验证挂账**：与 prefill compact/overlap 同列待空闲 GPU 窗口——转置 Q 与标准 Q 的实际 fused Triton 对拍 + memcheck。合入 22 提交分支（含本修复）的落地窗口由一次性 cron d2fbd5a0（00:23）执行，E146 64K 接力链经 /tmp/e150_merge_done 哨兵保证全臂同代码。

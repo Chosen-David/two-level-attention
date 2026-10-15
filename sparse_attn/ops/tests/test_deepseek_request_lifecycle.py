@@ -131,7 +131,7 @@ class DeepseekRequestLifecycleTest(unittest.TestCase):
                 self.forward(self.attn, prefix, past_key_value=cache, use_cache=True)
                 old_k, old_v = cache.k, cache.v
                 counts = self.attn.indexer.clears, self.attn.indexer.selects
-                with self.assertRaisesRegex(RuntimeError, r"batch=1.*q_len=1"):
+                with self.assertRaisesRegex(RuntimeError, "batch=1.{0,4}q_len=1"):
                     self.forward(self.attn, torch.randn(batch, length, 8),
                                  past_key_value=cache, use_cache=True)
                 self.assertIs(cache.k, old_k)

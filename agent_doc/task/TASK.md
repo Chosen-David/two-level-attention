@@ -76,6 +76,8 @@
 
 ## 待办池（未排期，均有用户指令或审计来源）
 
+- [x] [TL-MLA-MASK-20261015] MLA decode非恒等mask在cache更新前拒绝；50项普通/-O CPU回归与24合法路径逐位对照。显式CUDA mask新增归约/同步，性能及真实模型尚未验证。([详情](task_details/TL-MLA-MASK-20261015.md))
+
 - [x] [TL-DECODE-INPUT-20261015] decode公共消费端形状与Q/K宽度守卫，CPU回归41项与48合法路径逐位对照；GPU未验，不代表padding支持。([详情](task_details/TL-DECODE-INPUT-20261015.md))
 
 - [x] [TL-Q-STRIDE-20261015] fused wrapper按需整理Q特征布局，44项CPU回归及独立ABI矩阵通过；GPU/性能尚未验证。([详情](task_details/TL-Q-STRIDE-20261015.md))

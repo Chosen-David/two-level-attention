@@ -23,8 +23,10 @@
 decode 期 attention_mask 契约：DSV2 走 model.generate，HF 传 4D float
 causal mask（[1,1,1,S]，B=1 无 padding 下全 0 可加）。稀疏路径在选中
 token 子集上做 causal-free softmax（选中的全是 ≤ 当前位置的 token——
-sink/swa/near/far 分区几何保证），仅在 cache 更新前验证 mask 为 None 或同设备、准确形状的全零浮点张量后
-忽略。B>1 / padding / 非恒等 mask 显式拒绝。该值检查可能产生设备同步。
+sink/swa/near/far 分区几何保证），仅在 cache 更新前验证该 mask 全零后
+忽略。decode B>1、非标准 mask 布局、padding/非零 bias/非有限值显式
+拒绝。None 不增加值检查；显式 CUDA mask 的值检查需要归约和设备同步，
+不支持 graph capture，也不表示实现了 padding 语义。
 """
 
 import sys
@@ -84,38 +86,6 @@ def deepseek_v2_attn_forward(
             "the hidden_states device; 2D padding/bool masks are unsupported"
         )
 
-    # Establish the supported decode contract before projection or cache.update.
-    # A fresh cache, including a one-token prompt, remains the dense prefill path.
-    if past_key_value is None:
-        raise RuntimeError("E142a sparse attention requires a KV cache (use_cache=True)")
-    if self.layer_idx is None:
-        raise ValueError("E142a cache requires layer_idx")
-    prefix_len = past_key_value.get_usable_length(q_len, self.layer_idx)
-    if q_len == 0 or prefix_len > 0:
-        if bsz != 1 or q_len != 1 or not use_cache:
-            raise RuntimeError(
-                f"E142a decode requires batch=1, q_len=1, use_cache=True; "
-                f"got batch={bsz}, q_len={q_len}, use_cache={use_cache}"
-            )
-        if attention_mask is not None:
-            expected = (1, 1, 1, prefix_len + q_len)
-            if (not isinstance(attention_mask, torch.Tensor)
-                    or attention_mask.layout != torch.strided
-                    or not attention_mask.is_floating_point()
-                    or tuple(attention_mask.shape) != expected
-                    or attention_mask.device != hidden_states.device):
-                raise ValueError(
-                    f"E142a decode attention_mask must be a floating additive "
-                    f"tensor of shape {expected} on the input device, or None"
-                )
-            # Exact zero rejects padding, bias, NaN and infinities. This value
-            # check synchronizes a CUDA tensor; no graph/performance claim.
-            if not bool(torch.all(attention_mask == 0)):
-                raise ValueError(
-                    "E142a decode attention_mask must be all zero; padding "
-                    "and nonidentity additive masks are unsupported"
-                )
-
     # ---- MLA 投影复刻（vendored modeling_deepseek eager forward 同构）----
     if self.q_lora_rank is None:
         q = self.q_proj(hidden_states)
@@ -164,6 +134,18 @@ def deepseek_v2_attn_forward(
             f"E142a attention_mask shape must be {(bsz, 1, q_len, kv_seq_len)}, "
             f"got {tuple(attention_mask.shape)}"
         )
+    if kv_seq_len != q_len and attention_mask is not None:
+        # Only an identity additive mask may be dropped by sparse decode.
+        # Check the original dtype (no cast/tolerance: tiny biases still count),
+        # before RoPE/cache.update/indexer state changes. Fresh dense prefill
+        # continues to consume arbitrary supported additive masks below.
+        # A CUDA mask requires O(S) work and host synchronization here; None
+        # avoids that cost. Do not memoize by pointer: callers can mutate masks.
+        if not bool(torch.all(attention_mask == 0)):
+            raise ValueError(
+                "E142a decode attention_mask must be all zero; padding, "
+                "nonidentity bias and nonfinite values are unsupported"
+            )
     cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
     apply_rotary_pos_emb = _module_apply_rope(self)
     q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids)
@@ -218,7 +200,21 @@ def deepseek_v2_attn_forward(
         attn_output = self.o_proj(attn_output)
         return attn_output, (attn_weights if output_attentions else None), past_key_value
 
-    # The identity decode mask was validated before any cache mutation.
+    # decode 稀疏分支入口硬守卫（B2 口径）
+    if past_key_value is None:
+        raise RuntimeError(
+            "E142a TLI 稀疏 patch 需要 KV cache（use_cache=True）；当前 "
+            "past_key_value=None（训练/PPL/logprob 形态不支持稀疏索引"
+            "路径），拒绝执行。"
+        )
+    if bsz != 1 or q_len != 1:
+        raise RuntimeError(
+            f"E142a TLI 稀疏 decode 路径仅支持 batch=1 且 q_len=1 的逐 "
+            f"token 解码；当前 batch={bsz}、q_len={q_len}（chunked "
+            f"prefill / batch>1 未实现），拒绝执行。"
+        )
+    # Identity mask checked before cache.update. Padding/bias are rejected,
+    # not silently removed from the selected set or its softmax denominator.
 
     indexer: Indexer = self.indexer
     if hasattr(indexer, "freeze_dyn_dgate"):
