@@ -24,6 +24,7 @@ Quest/FASA 同口径）。r 由官方公式反推：
 Qwen3-8B head_dim=128 → 32K: r=8；128K: r=2（官方语义随序列变）。
 """
 import types
+import weakref
 from typing import Tuple
 
 import torch
@@ -50,6 +51,11 @@ def _qwen3_sparq_wrapper(
     q_len = hidden_states.shape[1]
 
     if q_len > 1:
+        # Native prefill may replace/refill the same cache object, even with a
+        # length that aliases the previous decode. Invalidate before delegation
+        # so a failed prefill cannot leave an apparently reusable running mean.
+        self._sparq_mean_cache = None
+        self._sparq_mean_length = None
         # prefill：原生 dense（与 fullkv 锚点一致；官方 SparQ prefill 也是 SDPA dense）
         return self.flash_forward(
             hidden_states, position_embeddings, attention_mask,
@@ -70,12 +76,12 @@ def _qwen3_sparq_wrapper(
     query_states, key_states = apply_rotary_pos_emb(
         query_states, key_states, cos, sin)
 
+    new_v = value_states
     if past_key_values is not None:
         cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
         # 4.56 DynamicCache.update 返回全量 KV slice；RunningVMean.update 期望
         # 单 token 的 v，故须在 update 缓存前捕获本步新 token（decode q_len==1
         # 时为 [B, kv_heads, 1, D]）
-        new_v = value_states
         key_states, value_states = past_key_values.update(
             key_states, value_states, self.layer_idx, cache_kwargs)
 
@@ -87,10 +93,21 @@ def _qwen3_sparq_wrapper(
     # V_mean：首 decode 用含新 token 的全量 V init（等价官方 prefill init +
     # decode1 update，因 (S*mean_prev+v1)/(S+1) 恰为含 v1 的全量均值）；
     # 后续 update 本步新 token。kv 粒度维护，sparq_attn 前展开到 H。
-    if self.sparq_vmean.n.item() == 0:
-        self.sparq_vmean.init(full_v)          # [B, kv_heads, S, D]
-    else:
+    mean_cache = getattr(self, '_sparq_mean_cache', None)
+    if (past_key_values is not None and mean_cache is not None
+            and mean_cache() is past_key_values
+            and getattr(self, '_sparq_mean_length', None) == kv_len - 1):
         self.sparq_vmean.update(new_v)          # [B, kv_heads, 1, D]
+    else:
+        self.sparq_vmean.init(full_v)          # [B, kv_heads, S, D]
+    # Host metadata avoids n.item() (a CUDA synchronization). A weak reference
+    # must not keep a finished request's potentially large cache alive. Unknown
+    # or non-weak-referenceable cache implementations conservatively rebuild.
+    try:
+        self._sparq_mean_cache = weakref.ref(past_key_values)
+    except TypeError:
+        self._sparq_mean_cache = None
+    self._sparq_mean_length = kv_len
 
     K = repeat_kv(full_k, self.num_key_value_groups)          # [B, H, S, D]
     V = repeat_kv(full_v, self.num_key_value_groups)          # [B, H, S, D]

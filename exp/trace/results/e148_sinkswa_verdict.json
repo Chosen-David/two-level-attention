@@ -1,0 +1,49 @@
+{
+  "experiment": "E148",
+  "title": "sink/swa 保护带几何 × 稀疏 prefill 质量（AVG5）",
+  "date": "2026-10-16",
+  "user_directive": "sink=4/swa=124 救 prefill 精度假说的块对齐最近邻验证：B 臂 sink64/swa64（保护带总量同 128，far 预算 768→896）vs A 臂 sink128/swa128 锚",
+  "caliber": {
+    "model": "Qwen3-8B",
+    "tree": ".251 worktree ~/tmp_e148_tree (main 324c210)",
+    "config": "tli mavg alpha=0.25 beta=0.125 gamma=0.625 K1=128 K2=1024 block=64 tail cmp_ratio=4 kmeans/layer_skip off, 稀疏 prefill (TLI_SPARSE_PREFILL_CHUNK=2048, PREFILL_SELECT_GROUP=64, --tli-sparse-prefill)",
+    "T_STAMP": 1015160000,
+    "output_root": ".251 ~/tmp_e148_sinkswa_e2e"
+  },
+  "arms": {
+    "B_sk64sw64": {
+      "hotpotqa": 52.82,
+      "musique": 27.96,
+      "gov_report": 32.95,
+      "qasper": 45.98,
+      "repobench_p": 59.67,
+      "AVG5": 43.88
+    },
+    "A_sk128sw128": {
+      "hotpotqa": 56.04,
+      "musique": 28.22,
+      "gov_report": 32.74,
+      "qasper": 45.54,
+      "repobench_p": 60.71,
+      "AVG5": 44.65,
+      "note_hotpot_musique": "复用 E138 sk128/sw128 稀疏 prefill；gov/qasper/repobench 本轮新出"
+    }
+  },
+  "anchors": {
+    "prefill_dense_mavg": {"AVG5": 47.91, "caliber": "E140h 口径 a.25/b.125/.625 K1=128"},
+    "per_task_dense": {"hotpotqa": 59.42, "musique": 34.25}
+  },
+  "verdict": {
+    "far_budget_starvation_hypothesis": "REJECTED——缩保护带释放 far 预算（K2_mid 768→896）未收窄与 dense 锚差距，反而 -0.77（43.88 vs 44.65）",
+    "b_vs_a": -0.77,
+    "b_vs_dense": -4.03,
+    "a_vs_dense": -3.26,
+    "conclusion": "稀疏 prefill 精度瓶颈不在保护带几何/far 预算饥饿。per-task 看 gov/qasper B 微优（+0.21/+0.44），hotpot -3.22——保护带缩减的收益/损失任务相关且净负。与 E149-FS（全稀疏掉 5-6 分）互相印证：prefill 维持 dense 的叙事定稿不受威胁。",
+    "second_round_sink0_swa128": "不触发——判据要求 AVG5 差距收窄 ≥1 分，实测 -0.77 反向"
+  },
+  "cross_references": {
+    "e149": "e149_sink4_verdict.json（decode-only sink4/swa128 近无损，prefill dense 定稿）",
+    "e148b_mass": "e148_sink4_massgrid_v2.json（mass 面 sink 几何不敏感，champion Δ-0.0030）",
+    "e138": "稀疏 prefill sk128/sw128 锚 hotpot 56.04 / musique 28.22"
+  }
+}
