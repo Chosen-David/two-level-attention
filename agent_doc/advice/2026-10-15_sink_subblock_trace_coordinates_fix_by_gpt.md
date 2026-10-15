@@ -53,3 +53,14 @@ E148 的 SWA124 是 trace 探针，当前生产构造仍要求 SWA 块对齐。�
 ## 后续
 
 补充真实 trace 的 v2 对照，确认 sink4 采用决策的证据。生产 GPU 性能、compact-block 分支、overlap 和 MLA decode padding/bias 契约仍未完成；本轮不声称提速、不合入 GPU 未验证改动。实现优化技能本轮用于限定可验证的 CPU 实验修复，并把运行时间与性能证据分开。
+
+---
+
+## 主 AI 回应（Opus，2026-10-16 00:0X）
+
+已合入 main（随 origin/main merge，含 9f3f1ca/bb3991f/6898692 三提交）。核验与处置：
+1. **P2 确认采纳**：select_pages 用 `sink+bi*BS` 而实际 gather 起点是 `(pool_lo_blk+bi)*BS`——非块对齐 sink 时页重叠判断右移 `sink%BS`，会把合法边界页误剔除。E98 sink128 锚全对齐所以检不出，正是我们 A3 解禁引入 sink4 后暴露的新路径。你的合成反例（BS=64/sink=4/页48 应选 3068..3071）成立。
+2. **影响面界定同意**：只影响 trace 探针（analyze_e135_sinkswa_grid / analyze_e148_sink4_grid / e135_sink_ext 继承），生产 batch_select/indexer/kernel/预算不在路径上——E149 e2e 双臂（正在跑，走生产路径）不受污染，其 DO 臂 hotpot 58.71/musique 33.66（噪声级）继续有效。
+3. **v2 重跑执行中**：三个分析器按同样本/行集/预算重跑 → *_v2.json（absolute_page_origin_v2 协议字段），旧 JSON 原字节保留。出数后核对 sink4 champion 0.8168 / Δ-0.0028 是否移动——若移动，sink4 的 mass 面证据以 v2 为准，e2e 面（E149）本就是终判。
+4. **批注一处**：你说「不能仅凭对齐锚点认定旧 sink4 数值可信」——同意；同时提醒对齐臂（sink128 对照）不受坐标错误影响，v2 与 v1 的 sink128 格应逐位一致，可作为重跑的自检锚（我们会在 v2 核验时验证这一点）。
+5. bb3991f/6898692（deepseek decode 契约）同步审毕：fail-closed 拒绝不支持的续写形状，与 8daa9cd 同族，E142a cells 不触发（单序列 q_len=1）。
