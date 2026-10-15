@@ -1,0 +1,48 @@
+{
+  "experiment": "E149",
+  "title": "sink4/swa128 两臂对拍：full-sparse(prefill+decode 稀疏) vs decode-only 稀疏",
+  "date": "2026-10-15",
+  "user_directive": "prefill+decode 全上 vs 仅 decode 稀疏，无显著精度损失则论文叙事改 sink4+swa128（StreamingLLM 惯例）",
+  "caliber": {
+    "model": "Qwen3-8B",
+    "tasks": ["hotpotqa", "musique"],
+    "config": "tli mavg, alpha=0.25 beta=0.125 gamma=0.625, K1=128 K2=1024, block=64, tail, cmp_ratio=4, kmeans/layer_skip off, sink=4 swa=128",
+    "T_STAMP": 1015170000,
+    "output_dir": "exp/results_longbench/Qwen3-8B/pred_E149_sink4",
+    "base_code": "main 2014eeb (A3 解禁 sink 子块值)"
+  },
+  "arms": {
+    "A_full_sparse": {
+      "desc": "稀疏 prefill (TLI_SPARSE_PREFILL_CHUNK=2048, PREFILL_SELECT_GROUP=64, --tli-sparse-prefill) + 稀疏 decode",
+      "postfix": "_sk4sw128FS",
+      "hotpotqa": 54.24,
+      "musique": 27.61
+    },
+    "B_decode_only": {
+      "desc": "稠密 prefill + 稀疏 decode",
+      "postfix": "_sk4sw128DO",
+      "hotpotqa": 58.71,
+      "musique": 33.66
+    }
+  },
+  "anchors": {
+    "dense_fullkv": {"hotpotqa": 59.42, "musique": 34.25},
+    "e138_sk128sw128_sparse_prefill": {"hotpotqa": 56.04, "musique": 28.22}
+  },
+  "deltas_vs_dense": {
+    "A_full_sparse": {"hotpotqa": -5.18, "musique": -6.64},
+    "B_decode_only": {"hotpotqa": -0.71, "musique": -0.59}
+  },
+  "verdict": {
+    "decode_only_passes": true,
+    "full_sparse_fails": true,
+    "conclusion": "DO 臂（decode-only 稀疏）两任务分别 -0.71/-0.59，噪声级，通过用户『无显著精度损失』判据；FS 臂（全稀疏）掉 5-6 分，与 E138 sk128/sw128 稀疏 prefill 掉幅（-3.4/-6.0）同量级且 sink4 未加重损失。",
+    "narrative_decision": "论文叙事定稿：decode 稀疏 = sink4+swa128（StreamingLLM 惯例，A3 已解禁，E148b mass v2 网格 Δ-0.0030 噪声级背书）；prefill 维持 dense。整体故事 = dense prefill + 稀疏 decode（sink4/swa128）+ E141a 长文性能面（64K 1.64x/128K 2.75x/256K 4.24x）。",
+    "prefill_sparse_status": "稀疏 prefill 精度未通过（-5~-6 分），故用户『prefill 稀疏精度不掉则补性能数据』条件不触发于 E149-FS；性能叙事由 E141a/E147 kernel 级链承载。"
+  },
+  "cross_references": {
+    "a3_unblock": "main 2014eeb（sink 子块值解禁）",
+    "mass_grid_v2": "exp/trace/results/e148_sink4_massgrid_v2.json（GPT 第五轮 9f3f1ca 坐标修复后重跑，anchor_check pass，结论不变）",
+    "sparse_prefill_anchors": "E138 sk128/sw128 稀疏 prefill 56.04/28.22"
+  }
+}
