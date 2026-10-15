@@ -4,6 +4,7 @@ Execute the actual wrapper and upstream SparQ/RunningVMean on CPU. Qwen's
 projection, rotary, native prefill and DynamicCache are small test doubles;
 these tests do not validate pretrained HF, CUDA or benchmark speed.
 """
+from contextlib import contextmanager
 import importlib.util
 from pathlib import Path
 import sys
@@ -19,13 +20,31 @@ ROOT = Path(__file__).resolve().parents[3]
 VENDOR = ROOT / 'exp/vendor_baselines/sparq_vendor'
 
 
+@contextmanager
+def module_overrides(replacements):
+    # Restore only our aliases. patch.dict(sys.modules) restores the *whole*
+    # mapping, unloading lazy imports while leaving their C++ registrations live
+    # (the upstream @torch.compile decorator imports Dynamo even on CPU).
+    missing = object()
+    previous = {name: sys.modules.get(name, missing) for name in replacements}
+    sys.modules.update(replacements)
+    try:
+        yield
+    finally:
+        for name, value in previous.items():
+            if value is missing:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = value
+
+
 def load_core():
     spec = importlib.util.spec_from_file_location('sparq_lifecycle_core', VENDOR / 'sparq_attention_official.py')
     core = importlib.util.module_from_spec(spec)
     cache_spec = importlib.util.spec_from_file_location('kv_cache', VENDOR / 'kv_cache.py')
     cache = importlib.util.module_from_spec(cache_spec)
     cache_spec.loader.exec_module(cache)
-    with patch.dict(sys.modules, {'kv_cache': cache, spec.name: core}):
+    with module_overrides({'kv_cache': cache, spec.name: core}):
         spec.loader.exec_module(core)
     return core
 
@@ -45,7 +64,7 @@ def load_wrapper():
     native.repeat_kv = repeat_kv
     spec = importlib.util.spec_from_file_location('sparq_lifecycle_adapter', source)
     adapter = importlib.util.module_from_spec(spec)
-    with patch.dict(sys.modules, {native.__name__: native, 'sparq_attention_official': CORE}):
+    with module_overrides({native.__name__: native, 'sparq_attention_official': CORE}):
         spec.loader.exec_module(adapter)
     return adapter._qwen3_sparq_wrapper
 
@@ -232,6 +251,27 @@ class SparQRequestLifecycle(unittest.TestCase):
         self.call(attn, self.values(1, 11), old)
         self.call(attn, self.values(1, -3), new)
         self.assert_mean(attn, new)
+
+    def test_module_overrides_restore_aliases_but_keep_lazy_imports(self):
+        existing = '_sparq_fixture_existing'
+        added = '_sparq_fixture_added'
+        lazy = '_sparq_fixture_lazy'
+        original = object()
+        sys.modules[existing] = original
+        try:
+            with self.assertRaisesRegex(RuntimeError, 'fixture failed'):
+                with module_overrides({existing: object(), added: object()}):
+                    sys.modules[lazy] = object()  # Simulates a new framework import.
+                    raise RuntimeError('fixture failed')
+            self.assertIs(sys.modules[existing], original)
+            self.assertNotIn(added, sys.modules)
+            self.assertIn(lazy, sys.modules)
+            # The real lazy-import consumer must also remain usable after
+            # loading the official core and adapter, without runner preloading.
+            self.assertEqual(torch.manual_seed(142).initial_seed(), 142)
+        finally:
+            for name in (existing, added, lazy):
+                sys.modules.pop(name, None)
 
 
 if __name__ == '__main__':

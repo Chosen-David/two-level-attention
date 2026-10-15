@@ -25,3 +25,11 @@
   SparQ跑批影响核验未完成，无速度/精度提升数字。
 - 下一步：有授权空闲GPU及真实Qwen后做双请求smoke，再以新postfix重跑相关
   SparQ质量/整请求成本；不修改旧数据或占用未知训练作业。
+
+- 发布闭环：适配层修复已在 `44a98682538209e3fcd44cd12b703012f277b58b`
+  发布 main，fetch 回读 tree 及全部5文件字节一致；此前“待回读”为当时快照。
+- 后续 TL-SPARQ-TEST-IMPORT-20261016：定位并修复本 fixture 全量恢复
+  sys.modules 导致的惰性导入/重复注册问题，生产 adapter 不变。普通 discover
+  修前62项18错误；修后63项普通/-O均无需预加载通过。仅改精确 alias 恢复。
+  [证据与限制](../../advice/2026-10-16_sparq_test_import_isolation_by_gpt.md)。
+  GPU/真实模型与历史质量待办不因此完成。
