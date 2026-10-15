@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
-"""O 系列观察图（figure_id=O1/O3，P0 主文）。
+"""Historical observation renderer; archived results are not corrected evidence.
 
-面板 (a) O1 距离密度：Qwen3-8B 真实 LongBench 样本（hotpotqa/musique 各 2，16K 截断）
-mid 非保护区 64-token 距离箱 density（mass/token，log 距离网格质量加权聚合）。
-near 区密度 ~3.3e-4 缓慢衰减，远端长尾 ~3e-5 且 d>9K 回升——远端检索热点存在，
-far 区 token 数 ~10x near → far 占 mid 质量 83%（两级选择 far 分区动机）。
-面板 (b) O1 四区质量占比：sink .21 / swa .22 / near .10 / far .48（组均值），
-far 组内最差头 0.65——最差头远端依赖更强（逐头方差不均，双池防挤出依据）。
-面板 (c) O3 频段对照三臂：tail32（低频尾 pairs）vs high32（高频头）vs
-random32（unpaired 诊断臂 seed20261002），同规则两层选择（L1 页级 avg top-128 →
-L2 候选页 token top-768）vs full-ref TopK-768：tail32 retained_mass .79 vs
-random .47 vs high .26——低频尾子空间保留 79% 概率质量，判决性频段证据。
-
-数据全部程序化读取自 e140_o_trace.json；输出 PDF+PNG+SVG + figure_data.tsv。
+See ../observation/E140_VALIDITY.md. Existing JSON/figures remain unchanged.
+This renderer cannot consume v2 records or repair old near/far/QK boundaries.
 """
+import os
+if os.environ.get("E140_ALLOW_HISTORICAL_DIAGNOSTIC") != "1":
+    raise SystemExit("Historical observation invalid for paper conclusions; see E140_VALIDITY.md. No files written.")
+
 import json
 import math
 import os

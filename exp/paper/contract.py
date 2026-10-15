@@ -83,6 +83,18 @@ def protocol_errors(p):
         document_splits[doc]=split
         h=row.get('input_ids_sha256'); check(hash_value(h), 'input hash')
         check(h not in hashes or hashes[h]==doc, 'same input relabeled as independent documents'); hashes[h]=doc
+    coverage=p.get('support_units')
+    check(isinstance(coverage,dict) and set(coverage)==seen, 'planned support sample coverage')
+    if isinstance(coverage,dict):
+        for arms in coverage.values():
+            check(isinstance(arms,dict) and set(arms)=={'dense','method'}, 'planned support arm coverage')
+            if not isinstance(arms,dict): continue
+            for units in arms.values():
+                check(isinstance(units,dict) and bool(units), 'planned support units')
+                if not isinstance(units,dict): continue
+                for unit,geom in units.items():
+                    fields={'query_position','length','sink','swa'}
+                    check(isinstance(unit,str) and known(unit) and isinstance(geom,dict) and set(geom)==fields and all(type(v) is int and v>=0 for v in geom.values()) and geom['query_position']<geom['length'], 'planned support geometry')
     for k in ('context_limit','repeats','warmup'):
         check(type(p.get(k)) is int and p[k] >= (0 if k=='warmup' else 1), 'int:'+k)
     check(p.get('timing_level') in TIMING, 'timing_level')
@@ -133,7 +145,10 @@ def validate_timing(row, p, protocol_sha):
     need(type(row.get('order')) is int and row['order']==expected_order.index(row['arm']), 'pair order mismatch')
     support=row.get('support')
     need(isinstance(support,dict) and bool(support), 'missing actual unique support receipt')
+    planned=p['support_units'][row['sample_id']][row['arm']]
+    need(set(support)==set(planned),'actual support coverage differs from frozen units')
     for unit,value in support.items():
+        need(all(value.get(k)==v for k,v in planned[unit].items()), 'actual support geometry differs from frozen unit')
         need(known(unit) and isinstance(value,dict), 'support unit')
         from sparse_attn.ops.selection_contract import support_receipt, require_support
         geometry = ('query_position','length','sink','swa','k_cap')

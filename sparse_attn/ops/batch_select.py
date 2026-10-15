@@ -131,6 +131,7 @@ def _graph_cached_run(key, body_fn, inputs):
     逐位一致性机制：replay 重放与 eager 完全相同的 kernel 序列 + 相同地址
     + 相同归约树（e139_l2_graph_poc 双重硬门 0/1008 diff 实证）。"""
     schema = _input_schema(inputs)
+    key = (key, schema)  # qualify even direct callers; incompatible schema recaptures
     ent = _GRAPH_CACHE.get(key)
     if ent is None:
         if len(_GRAPH_CACHE) >= _GRAPH_CACHE_MAX:
@@ -156,15 +157,19 @@ def _graph_cached_run(key, body_fn, inputs):
         _GRAPH_CACHE[key] = ent
         return out
     g, statics, out, _, expected, static_schema = ent
-    # Check every field before any copy_: copy_ otherwise broadcasts and casts.
-    # clone may normalize source strides, hence separate source/static schemas.
-    if schema != expected or _input_schema(statics) != static_schema:
-        raise ValueError("CUDA Graph input schema mismatch")
-    for n, t in inputs.items():
-        if t is not None:
-            statics[n].copy_(t)
-    g.replay()
-    _GRAPH_STATS["replay"] += 1
+    try:
+        # Check every field before any copy_: copy_ otherwise broadcasts and casts.
+        # clone may normalize source strides, hence separate source/static schemas.
+        if schema != expected or _input_schema(statics) != static_schema:
+            raise ValueError("CUDA Graph input schema mismatch")
+        for n, t in inputs.items():
+            if t is not None:
+                statics[n].copy_(t)
+        g.replay()
+        _GRAPH_STATS["replay"] += 1
+    except Exception:
+        _GRAPH_CACHE.pop(key, None)
+        raise
     return out
 
 
@@ -693,8 +698,7 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
                 return _graph_cached_run(key, _body, inputs)
         except Exception:
             _GRAPH_STATS["fallback"] += 1
-            if key is not None:
-                _GRAPH_CACHE.pop(key, None)
+            # Schema-qualified replay eviction happens inside _graph_cached_run.
     try:
         return _body(k_min, k_max, k_avg, k_qat, b_q)
     except Exception:

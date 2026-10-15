@@ -100,3 +100,25 @@ is reclassified as validation of this branch.
 
 The requested guide sentence is provided separately in `guide_append.txt`;
 `guide_append.json` gives byte-preserving manual instructions. GUIDE is unchanged.
+
+## Observation and collection repair (2026-10-15 v2)
+
+Main `9449c8e9d827f4c079f9ecff5ce2cb8243273d58` is integrated. Direct Graph-cache
+callers now also qualify their keys by input schema; failed replays evict only that
+qualified entry. The stricter backend/geometry/stride checks are preserved.
+
+See `agent_doc/guide/paper_figs/observation/E140_VALIDITY.md` for the immutable
+historical evidence and unexecuted minimal recollection command. The corrected
+collector defaults to plan-only. It uses actual normalized projections and actual
+RoPE inputs, right-side near, exact SWA, partial pages and explicit metric names;
+no historical result was relabeled as corrected data.
+
+Frozen timing protocols now require `support_units[sample_id][arm][unit]`, each
+containing query_position/length/sink/swa. Actual receipt units and geometry must
+match exactly. This prevents partial declared coverage from silently passing; the
+completeness of the frozen list itself still needs independent host validation.
+`collect_timing_call` measures the real supplied callback between synchronization
+boundaries, freezes runtime counters before outside-wall observation, and validates
+actual routes, support and lifecycle. It rejects T0 (host wall is not device kernel
+time), counter resets/disappearance, fallback and inconsistent receipts. It is a
+host adapter building block, not a completed model-level benchmark or GPU runner.

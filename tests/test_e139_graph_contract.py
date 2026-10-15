@@ -117,7 +117,7 @@ class Contracts(unittest.TestCase):
         g = Graph()
         static = {'x': a.contiguous()}
         ent = (g, static, 'output', None, bs._input_schema({'x': a}), bs._input_schema(static))
-        with patch.dict(bs._GRAPH_CACHE, {'test': ent}, clear=True):
+        with patch.dict(bs._GRAPH_CACHE, {('test', ent[4]): ent}, clear=True):
             bs._graph_cached_run('test', None, {'x': a + 10})
             self.assertTrue(torch.equal(static['x'], a + 10))
             bs._graph_cached_run('test', None, {'x': b})
@@ -136,7 +136,7 @@ class Contracts(unittest.TestCase):
         g = Graph(); static = {'x': torch.zeros(2, 3), 'avg': None}
         source = {'x': torch.ones(2, 3), 'avg': None}
         ent = (g, static, 'output', None, bs._input_schema(source), bs._input_schema(static))
-        with patch.dict(bs._GRAPH_CACHE, {'test': ent}, clear=True):
+        with patch.dict(bs._GRAPH_CACHE, {('test', ent[4]): ent}, clear=True):
             self.assertEqual(bs._graph_cached_run('test', None, source), 'output')
             self.assertEqual(g.calls, 1)
             for bad in ({'x': torch.ones(1, 3), 'avg': None},
@@ -148,7 +148,9 @@ class Contracts(unittest.TestCase):
                         {'x': torch.ones(3, 2).t(), 'avg': None},
                         {'x': torch.ones(2, 3)},
                         {'x': torch.ones(2, 3), 'avg': torch.ones(1)}):
-                with self.assertRaises(ValueError): bs._graph_cached_run('test', None, bad)
+                # Deliberately corrupt the qualified entry to exercise hit guards.
+                with patch.dict(bs._GRAPH_CACHE, {('test',bs._input_schema(bad)):ent},clear=True):
+                    with self.assertRaises(ValueError): bs._graph_cached_run('test', None, bad)
             self.assertEqual(g.calls, 1)
             self.assertTrue(torch.equal(static['x'], source['x']))
 

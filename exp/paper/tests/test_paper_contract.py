@@ -21,6 +21,7 @@ def protocol():
     overrides={a:{k:identity[k] for k in ('backend_id','selection_semantics','config_sha256','phase_route_by_layer','first_dense_layers')} for a in ('dense','method')}
     return dict(schema='paper-run-v1',status='frozen',identity=identity,arm_overrides=overrides,
         samples=[dict(sample_id='s',document_id='d',input_ids_sha256='d'*64,split='confirmation')],
+        support_units={'s':{a:{'query0:head0':dict(query_position=63,length=64,sink=2,swa=0)} for a in ('dense','method')}},
         context_limit=128,repeats=1,warmup=0,timing_level='T3',cache_state='request-cold',
         order_policy='AB/BA',run_mode='natural',timer_boundary='model-entry-to-last-output-complete',sync_policy='before-after',arms=['dense','method'])
 
@@ -78,6 +79,31 @@ class Contract(unittest.TestCase):
         a['support']['query0:head0']=support_receipt(list(range(32)),query_position=32,length=64,sink=2,swa=0,k_cap=64)
         b['support']['query0:head0']=support_receipt(list(range(32)),query_position=33,length=64,sink=2,swa=0,k_cap=64)
         with self.assertRaises(ValueError):summarize([a,b],p,'e'*64)
+    def test_timing_collector_and_exact_coverage(self):
+        from exp.paper.receipt import collect_timing_call
+        p=protocol();r=row(p,'dense');events=[]
+        actual=collect_timing_call(p,'e'*64,r,lambda:events.append('call'),lambda:events.append('sync'),lambda result:r)
+        self.assertEqual(events,['sync','call','sync']);self.assertGreater(actual['request_wall_ms'],0)
+        q=copy.deepcopy(r);q['support']['extra']=q['support']['query0:head0']
+        with self.assertRaises(ValueError):validate_timing(q,p,'e'*64)
+        with self.assertRaises(RuntimeError):collect_timing_call(p,'e'*64,r,lambda:(_ for _ in ()).throw(RuntimeError('failure')),lambda:None,lambda result:r)
+    def test_collector_rejects_kernel_label_and_excludes_observer_counters(self):
+        from exp.paper.receipt import collect_timing_call
+        p=protocol();r=row(p,'dense');p['timing_level']='T0'
+        with self.assertRaises(ValueError):collect_timing_call(p,'e'*64,r,lambda:None,lambda:None,lambda _:r)
+        p['timing_level']='T3'
+        with patch('exp.paper.receipt.runtime_counters',side_effect=[{'runtime':{'fallback':0}},{'runtime':{'fallback':0}}]) as counters:
+            def observe(result):
+                self.assertEqual(counters.call_count,2)
+                return r
+            actual=collect_timing_call(p,'e'*64,r,lambda:None,lambda:None,observe)
+        self.assertEqual(actual['fallback_count'],0)
+    def test_collector_counter_reset_or_disappearance_rejected(self):
+        from exp.paper.receipt import collect_timing_call
+        p=protocol();r=row(p,'dense')
+        for before,after in [({'r':{'a_fallback':1,'b_fallback':0}},{'r':{'a_fallback':0,'b_fallback':1}}),({'r':{'calls':1}},{}),({'r':{'calls':1}},{'r':{}})]:
+            with patch('exp.paper.receipt.runtime_counters',side_effect=[before,after]),self.assertRaises(ValueError):
+                collect_timing_call(p,'e'*64,r,lambda:None,lambda:None,lambda _:r)
     def test_support_union_and_invalid_indices(self):
         r=support_receipt([0,1,2],query_position=2,length=3,sink=2,swa=2,k_cap=1)
         self.assertEqual(r['protected_real'],3);require_support(r)
