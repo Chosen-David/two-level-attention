@@ -147,7 +147,15 @@ class SparQRequestLifecycle(unittest.TestCase):
         self.call(attn, self.values(5, 2), cache)
         # Only the wrapper's scalar decision is forbidden; upstream arithmetic
         # stays real. CPU proof of no Tensor.item(), not a CUDA timing result.
-        with patch.object(torch.Tensor, 'item', side_effect=AssertionError('host scalar extraction')):
+        # This host-decision test executes the original softmax arithmetic,
+        # without its optional compiler wrapper. Dynamo itself may inspect the
+        # mocked Tensor.item or call it while constructing fake scalar tensors;
+        # those compiler actions are outside the adapter's host-decision scope.
+        # Keep the item trap active across ALL adapter/upstream arithmetic.
+        softmax = CORE._scaled_softmax
+        eager_softmax = getattr(softmax, '_torchdynamo_orig_callable', softmax)
+        with patch.object(CORE, '_scaled_softmax', eager_softmax), patch.object(
+                torch.Tensor, 'item', side_effect=AssertionError('host scalar extraction')):
             self.call(attn, self.values(1, 3), cache)
             with patch.object(attn.sparq_vmean, 'init', side_effect=AssertionError('unexpected full rebuild')):
                 self.call(attn, self.values(1, 4), cache)

@@ -33,3 +33,10 @@
   修前62项18错误；修后63项普通/-O均无需预加载通过。仅改精确 alias 恢复。
   [证据与限制](../../advice/2026-10-16_sparq_test_import_isolation_by_gpt.md)。
   GPU/真实模型与历史质量待办不因此完成。
+
+- 后续 `TL-SPARQ-ITEM-TEST-COMPAT-20261016`：CPU Dynamo 封装真实复现
+  `Tensor.item` mock 元数据及 fake scalar 追踪冲突；只在该 host-decision
+  测试解开 softmax 编译装饰，真实算术与全局 item 拒绝仍在。专项13/ops63
+  普通及 `-O` 通过，注入实际 update `.item()` 两模式仍失败。目标 cu128
+  未本地复验；本轮仅发既有 dev，用户审核 main，未改生产代码。
+  [证据与限制](../../advice/2026-10-16_sparq_tensor_item_fixture_compat_by_gpt.md)。
