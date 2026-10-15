@@ -84,17 +84,6 @@ License: arXiv nonexclusive-distrib. Status: link-only.
 
 arXiv nonexclusive distribution license does not itself grant this repository redistribution; NeurIPS edition redistribution not verified. No PDF is included; SHA-256 and locally verified page count are null.
 
-## MoBA
-
-MoBA: Mixture of Block Attention for Long-Context LLMs
-
-Authors: Enzhe Lu, Zhejun Jiang, Jingyuan Liu, Yulun Du, Tao Jiang, Chao Hong, Shaowei Liu, Weiran He, Enming Yuan, Yuzhi Wang, Zhiqi Huang, Huan Yuan, Suting Xu, Xinran Xu, Guokun Lai, Yanru Chen, Huabin Zheng, Junjie Yan, Jianlin Su, Yuxin Wu, Neo Y. Zhang, Zhilin Yang, Xinyu Zhou, Mingxing Zhang, Jiezhong Qiu.
-
-Version: 2502.13189v1; accessed 2026-10-11. [Source](https://arxiv.org/abs/2502.13189v1) · [PDF](https://arxiv.org/pdf/2502.13189v1) · [License evidence](https://arxiv.org/abs/2502.13189v1).
-
-License: CC-BY-NC-ND-4.0. Status: link-only.
-
-NC-ND terms; future repository use is unspecified, conservatively link-only, not a claim that this project is commercial. No PDF is included; SHA-256 and locally verified page count are null.
 
 ## HiP
 
@@ -107,3 +96,57 @@ Version: ICLR2025; accessed 2026-10-11. [Source](https://arxiv.org/abs/2406.0982
 License: proceedings redistribution unverified; arXiv v3 CC-BY-NC-SA-4.0. Status: link-only.
 
 ICLR proceedings redistribution license not verified; arXiv v3 has NC-SA restrictions. Keep editions distinct and link-only. No PDF is included; SHA-256 and locally verified page count are null.
+
+## 2026-10-15 reference additions and refreshed MoBA status
+
+The entries below supersede the previous MoBA link-only decision: the user authorized noncommercial reference archiving of its unmodified original PDF under its separate license. Acquisition is still blocked, so no new PDF bytes are included. Metadata and license links were checked on the fixed-version official arXiv pages.
+
+### MoBA
+
+MoBA: Mixture of Block Attention for Long-Context LLMs
+
+Authors: Enzhe Lu, Zhejun Jiang, Jingyuan Liu, Yulun Du, Tao Jiang, Chao Hong, Shaowei Liu, Weiran He, Enming Yuan, Yuzhi Wang, Zhiqi Huang, Huan Yuan, Suting Xu, Xinran Xu, Guokun Lai, Yanru Chen, Huabin Zheng, Junjie Yan, Jianlin Su, Yuxin Wu, Neo Y. Zhang, Zhilin Yang, Xinyu Zhou, Mingxing Zhang, Jiezhong Qiu.
+
+Version: 2502.13189v1; accessed 2026-10-15. [Source](https://arxiv.org/abs/2502.13189v1) · [Official PDF](https://arxiv.org/pdf/2502.13189v1) · [License evidence](https://arxiv.org/abs/2502.13189v1) · [License terms](https://creativecommons.org/licenses/by-nc-nd/4.0/).
+
+License: CC-BY-NC-ND-4.0. Status: download-blocked. User authorized noncommercial reference inclusion of unmodified original PDF under its separate CC BY-NC-ND 4.0 license. Library bundle download failed; official PDF download denied by environment proxy (HTTP CONNECT 403). No local bytes or SHA256 verified.
+
+Local filename, SHA-256, byte size and page count: unknown/null; no PDF included in this update. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
+
+Authorized intended use: noncommercial reference only, unmodified original PDF with attribution and separate CC BY-NC-ND 4.0 license; no adapted-paper redistribution or commercial-use grant.
+
+### StreamingLLM
+
+Efficient Streaming Language Models with Attention Sinks
+
+Authors: Guangxuan Xiao, Yuandong Tian, Beidi Chen, Song Han, Mike Lewis.
+
+Version: 2309.17453v4; accessed 2026-10-15. [Source](https://arxiv.org/abs/2309.17453v4) · [Official PDF](https://arxiv.org/pdf/2309.17453v4) · [License evidence](https://arxiv.org/abs/2309.17453v4) · [License terms](https://creativecommons.org/licenses/by/4.0/).
+
+License: CC-BY-4.0. Status: download-blocked. Library bundle download failed; official PDF download denied by environment proxy (HTTP CONNECT 403). No local PDF bytes, SHA256 or page count verified.
+
+Local filename, SHA-256, byte size and page count: unknown/null; no PDF included in this update. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
+
+### HISA
+
+HISA: Efficient Hierarchical Indexing for Fine-Grained Sparse Attention
+
+Authors: Yufei Xu, Fanxu Meng, Fan Jiang, Yuxuan Wang, Ruijie Zhou, Zhaohui Wang, Jiexi Wu, Zhixin Pan, Xiaojuan Tang, Wenjie Pei, Tongxuan Liu, Di Yin, Xing Sun, Muhan Zhang.
+
+Version: 2603.28458v4; accessed 2026-10-15. [Source](https://arxiv.org/abs/2603.28458v4) · [Official PDF](https://arxiv.org/pdf/2603.28458v4) · [License evidence](https://arxiv.org/abs/2603.28458v4) · [License terms](https://creativecommons.org/licenses/by/4.0/).
+
+License: CC-BY-4.0. Status: download-blocked. Library bundle download failed; official PDF download denied by environment proxy (HTTP CONNECT 403). No local PDF bytes, SHA256 or page count verified.
+
+Local filename, SHA-256, byte size and page count: unknown/null; no PDF included in this update. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
+
+### H2O
+
+H2O: Heavy-Hitter Oracle for Efficient Generative Inference of Large Language Models
+
+Authors: Zhenyu Zhang, Ying Sheng, Tianyi Zhou, Tianlong Chen, Lianmin Zheng, Ruisi Cai, Zhao Song, Yuandong Tian, Christopher Ré, Clark Barrett, Zhangyang Wang, Beidi Chen.
+
+Version: 2306.14048v3; accessed 2026-10-15. [Source](https://arxiv.org/abs/2306.14048v3) · [Official PDF](https://arxiv.org/pdf/2306.14048v3) · [License evidence](https://arxiv.org/abs/2306.14048v3) · [License terms](https://arxiv.org/licenses/nonexclusive-distrib/1.0/).
+
+License: arXiv nonexclusive-distrib. Status: link-only. Repository redistribution rights not verified; official link only, no PDF copied.
+
+Local filename, SHA-256, byte size and page count: unknown/null; no PDF included in this update. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
