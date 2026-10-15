@@ -76,8 +76,8 @@ import os
 import torch
 import torch.nn.functional as F
 
-# 【E139 #253】选择链 CUDA Graph 缓存：key=(L, N, kf, kn, group_ends 指纹,
-# indexer 身份)。同一 prompt 内 36 层几何/host 值全同（层间仅 k 统计与 q
+# 【E139 #253】选择链 CUDA Graph 缓存：key=调用几何/配置 + 输入 schema，
+# 不含 indexer 实例身份。同一 prompt 内 36 层几何/host 值全同（层间仅 k 统计与 q
 # 变化）→ capture 一次、逐层 copy_ 注入 + replay。长度分桶上限防私池膨胀。
 _GRAPH_CACHE = {}
 _GRAPH_CACHE_MAX = 8
@@ -90,6 +90,14 @@ def _graph_cached_run(key, body_fn, inputs):
     前被覆盖——调用方须在同 stream 顺序消费完毕，eager_prefill 现口径满足）。
     逐位一致性机制：replay 重放与 eager 完全相同的 kernel 序列 + 相同地址
     + 相同归约树（e139_l2_graph_poc 双重硬门 0/1008 diff 实证）。"""
+    # copy_ accepts broadcasting and implicit casts: success does not establish
+    # graph compatibility. Bind metadata before lookup, without device reads.
+    # Tensor identity/strides are intentionally excluded: copy_ materializes
+    # equal-shaped values into the capture's existing static storage.
+    schema = tuple((name, None if t is None else
+                    (tuple(t.shape), t.dtype, t.device, t.layout))
+                   for name, t in sorted(inputs.items()))
+    key = (key, schema)
     ent = _GRAPH_CACHE.get(key)
     if ent is None:
         if len(_GRAPH_CACHE) >= _GRAPH_CACHE_MAX:
@@ -114,10 +122,15 @@ def _graph_cached_run(key, body_fn, inputs):
         _GRAPH_CACHE[key] = ent
         return out
     g, statics, out, _ = ent
-    for n, t in inputs.items():
-        if t is not None:
-            statics[n].copy_(t)
-    g.replay()
+    try:
+        for n, t in inputs.items():
+            if t is not None:
+                statics[n].copy_(t)
+        g.replay()
+    except Exception:
+        # Evict the schema-qualified entry, not just the caller's geometry key.
+        _GRAPH_CACHE.pop(key, None)
+        raise
     return out
 
 
@@ -602,20 +615,22 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
                    int(idx_sub.shape[-1]))
         _dt_fp = tuple((t.dtype if t is not None else None)
                        for t in (k_min, k_max, k_avg, k_qat, b_q))
+        # b_q is always float32; qdtype still controls captured score storage
+        # and rounding, so its identity cannot be inferred from input dtypes.
         key = (L, N, kf, kn, K2arg, tuple(group_ends),
                far_use_mm, near_use_mm, use_cand_topk,
                tuple(nb_l), tuple(sl_l), tuple(k2_far_l), tuple(k2_near_l),
                sink_tok, swa_tok, bs, sink_lo,
                float(indexer.alpha), float(indexer.beta),
                float(indexer.gamma), k1,
-               _sub_fp, _dt_fp, str(dev))
+               _sub_fp, _dt_fp, str(dev), qdtype)
         try:
             return _graph_cached_run(
                 key, _body,
                 dict(k_min=k_min, k_max=k_max, k_avg=k_avg,
                      k_qat=k_qat, b_q=b_q))
         except Exception:
-            _GRAPH_CACHE.pop(key, None)
+            pass  # _graph_cached_run evicts failed replay entries before raising.
     try:
         return _body(k_min, k_max, k_avg, k_qat, b_q)
     except Exception:
