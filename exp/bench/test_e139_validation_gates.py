@@ -60,12 +60,18 @@ def probe(script, fault, fault_call):
     module("sparse_attn.ops")
     bs = module("sparse_attn.ops.batch_select")
     bs._GRAPH_CACHE = {}
+    bs._GRAPH_STATS = dict(capture=0,replay=0,fallback=0)
     bs._gate_ok = lambda *args: fault != "ineligible"
     calls = 0
 
     def select(idx, q, k, scale, ends, dense, *, require_graph=False):
         nonlocal calls
         calls += 1
+        # CPU process-control stub, not a GPU capture/replay proof.
+        if os.environ.get('TLI_PREFILL_SELECT_GRAPH')=='1':
+            event='replay' if bs._GRAPH_CACHE else 'capture'
+            bs._GRAPH_STATS[event]+=1
+            bs._GRAPH_CACHE['stub']=True
         rows = [Tensor((8, end)) for end in ends]
         graph_failed = ((fault == "graph_failure" and calls == fault_call)
                         or (fault == "graph_timing" and timing_started

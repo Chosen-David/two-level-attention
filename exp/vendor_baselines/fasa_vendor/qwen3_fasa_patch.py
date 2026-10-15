@@ -58,6 +58,8 @@ def _qwen3_fasa_forward(
             past_key_values, cache_position, **kwargs,
         )
 
+    from sparse_attn.baseline_runtime import require_unmasked_decode
+    require_unmasked_decode(hidden_states, attention_mask, past_key_values, cache_position)
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
 

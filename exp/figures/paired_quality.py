@@ -98,6 +98,7 @@ def analyze(p, base):
     identity = p['arms']['dense']['identity']
     need(identity['scorer_sha256'] == scorer_hash and identity['scorer_backend'] == SCORER_BACKEND_ID, 'scorer identity mismatch')
     audit, groups, sources = {}, {}, {}
+    absolute = {}
     document_tasks = {}
     for task, spec in sorted(p['tasks'].items()):
         label(task, 'task')
@@ -153,7 +154,10 @@ def analyze(p, base):
             if a_status != 'ok' or b_status != 'ok':
                 excluded.append(dict(sample_id=sid,dense_status=b_status,sub_sub_status=a_status)); continue
             need(a['answers']==b['answers'] and a['all_classes']==b['all_classes'], 'reference mismatch')
-            delta=100*(sample_score(task,a['pred'],a['answers'],a['all_classes'])-sample_score(task,b['pred'],b['answers'],b['all_classes']))
+            method_score=100*sample_score(task,a['pred'],a['answers'],a['all_classes'])
+            dense_score=100*sample_score(task,b['pred'],b['answers'],b['all_classes'])
+            absolute.setdefault(task, []).append((dense_score, method_score))
+            delta=method_score-dense_score
             pairs.setdefault(item['document_id'],[]).append(delta)
         groups[task]=pairs
         audit[task]=dict(n_planned=len(planned),n_valid=sum(map(len,pairs.values())),n_excluded=len(excluded),excluded=excluded)
@@ -161,6 +165,8 @@ def analyze(p, base):
     reports,overall=paired_stats(groups,p['bootstrap_draws'],p['seed']) if complete else ({},None)
     for task, report in reports.items():
         delta = (p.get('noninferiority_delta_pp') or {}).get(task)
+        report['dense_score_pp'] = float(np.mean([r[0] for r in absolute[task]]))
+        report['sub_sub_score_pp'] = float(np.mean([r[1] for r in absolute[task]]))
         report['delta_pp'] = delta
         report['lower_bound_above_minus_delta'] = None if delta is None else report['ci_low'] > -delta
     return dict(status='diagnostic-pending-independent-identity-review' if complete else 'blocked-missing-failed-or-insufficient-documents',
@@ -192,8 +198,10 @@ def main():
             import matplotlib.pyplot as plt
             fig,ax=plt.subplots(figsize=(8,max(3,len(rows)*.35)))
             for i,r in enumerate(rows):
+                delta = result['tasks'][r['panel_id']]['delta_pp']
+                if delta is not None: ax.plot(-delta,i,'|',color='darkred',markersize=12)
                 ax.plot([r['ci_low'],r['ci_high']],[i,i],color='steelblue');ax.plot(r['estimate'],i,'o',color='steelblue')
-            ax.set_yticks(range(len(rows)),[r['panel_id'] for r in rows]);ax.axvline(0,color='gray',ls='--');ax.set_xlabel('sub/sub − dense FullKV (percentage points)');ax.set_title('Diagnostic only · identity review pending');fig.tight_layout();fig.savefig(a.out/'paired_quality.svg');plt.close(fig)
+            ax.set_yticks(range(len(rows)),[r['panel_id'] for r in rows]);ax.axvline(0,color='gray',ls='--');ax.set_xlabel('sub/sub − dense FullKV (percentage points)');ax.set_title('Diagnostic only · identity review pending');fig.tight_layout();fig.savefig(a.out/'paired_quality.svg');fig.savefig(a.out/'paired_quality.pdf');plt.close(fig)
     publish_directory(a.out, final_out)
     print(result['status'])
 

@@ -1,0 +1,20 @@
+Environment: /workspace/twolevel-cpu-env/bin/python, CPU-only torch; OMP_NUM_THREADS=1.
+Collector tests additionally HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1.
+Log trailing whitespace normalized; failure bodies retained.
+
+mask-before.log (before patch):
+python -m unittest sparse_attn.ops.tests.test_deepseek_decode_mask.DecodeMaskTest -q
+
+ops-{normal,optimized}.log (after patch; optimized adds -O):
+python -m unittest discover -s sparse_attn/ops/tests -q
+
+affected-{normal,optimized}.log (optimized adds -O):
+python -m pytest tests/test_qwen_archive_audit.py tests/test_e140_observation.py tests/test_e140_hf_cpu.py tests/test_e141_collector.py tests/test_baseline_integration.py tests/test_longbench_request_capture.py -q
+
+collector-normal.log (expanded attempt, missing E141 external fixture):
+python -m pytest tests/test_qwen_archive_audit.py tests/test_e140_observation.py tests/test_e140_hf_cpu.py tests/test_e141_collector.py tests/test_e141_verifier_finite.py -q
+collector-optimized.log uses -O and additionally tests/test_baseline_integration.py.
+
+archive-local.json:
+python exp/paper/audit_qwen_archive.py
+Expected/observed exit=2, all 12 files missing. No tensor or model loading occurred.

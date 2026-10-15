@@ -285,11 +285,14 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'moba_vendor', 'tia', 'twi', 'tli', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'moba_vendor', 'tia', 'twi', 'tli', 'none'])
     parser = _add_quest_args(parser)
     parser = _add_minference_args(parser)
     parser = _add_fasa_args(parser)
     parser = _add_sparq_args(parser)
+    parser.add_argument('--baseline-execute', action='store_true', help='explicitly enable new FFD/SparQ candidate execution; plan: python -m sparse_attn.baseline_runtime')
+    parser.add_argument('--ffd_delta', type=float, default=5.0, help='FFD upstream log2 threshold, variable budget')
+    parser.add_argument('--ffd_cache_length', type=int, default=131200)
     parser = _add_moba_args(parser)
     parser = _add_clusterkv_args(parser)
     parser = _add_twilight_args(parser)

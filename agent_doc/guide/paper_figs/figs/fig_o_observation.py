@@ -22,7 +22,17 @@ SparQ「方案对照同图竞技」三家的观察图范式），四个面板一
 
 数据全部程序化读取自 repo 内 e140_o_trace.json + e140_o4_select_trace.json；
 输出 PDF+PNG+SVG + figure_data.tsv。
+
+【有效性警示（GPT TL-E140-VALIDITY 审计确认，主 AI 复核 defect5 属实）】
+上述 JSON 由旧采集器产出（漏 input_layernorm + near 取左半 + SWA 129 位 +
+far_worst_head 语义 + O3 尾页丢弃），不是修复后的论文证据，见
+../observation/E140_VALIDITY.md。重采（E140v2）落地前本图仅供历史诊断，
+渲染需 E140_ALLOW_HISTORICAL_DIAGNOSTIC=1 显式放行。
 """
+import os
+if os.environ.get("E140_ALLOW_HISTORICAL_DIAGNOSTIC") != "1":
+    raise SystemExit("Historical observation invalid for paper conclusions; see E140_VALIDITY.md. No files written.")
+
 import json
 import math
 import os

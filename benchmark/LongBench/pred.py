@@ -34,6 +34,7 @@ from benchmark.LongBench.run_cap_manifest import (
     runcap_gate_lock,   # 103（TL-E096-CAP-GATE-TOCTOU-103）：gate→发布锁
     write_run_cap_manifest,
 )
+from sparse_attn.baseline_runtime import baseline_request, load_ffd, baseline_preflight
 from sparse_attn.arguments import add_sparse_attn_args
 from sparse_attn.patches import register_patch
 from sparse_attn.metrics import get_metrics
@@ -110,6 +111,8 @@ def parse_args(args=None):
              'E138 消融① prefill-only 稀疏臂）',
     )
 
+    parser.add_argument('--paper-capture',choices=('off','plan','timing'),default='off',
+                        help='candidate Qwen manual-path telemetry; plan exits before model load')
     add_sparse_attn_args(parser)
 
     return parser.parse_args(args)
@@ -172,6 +175,45 @@ def extract_choice_letter(text):
     return extract_choice_official(text)
 
 
+def _manual_generate(model, material_ids, question_ids, max_gen, eos_token_id, capture=None):
+    """Existing LongBench greedy loop, instrumented only when capture is enabled."""
+    if type(max_gen) is not int or max_gen<1:raise ValueError('max_gen must be positive')
+    if capture is not None:
+        capture.generation_policy=dict(max_new_tokens=max_gen,eos_token_id=eos_token_id,decoding='greedy')
+    def invoke(phase,**kwargs):
+        return model(**kwargs) if capture is None else capture.call(phase,model,**kwargs)
+    with torch.no_grad():
+        output=invoke('material',input_ids=material_ids,past_key_values=None,use_cache=True)
+        cache=output.past_key_values
+        for token in question_ids[0]:
+            output=invoke('question',input_ids=token.unsqueeze(0).unsqueeze(0),past_key_values=cache,use_cache=True)
+            cache=output.past_key_values
+        token=output.logits[:,-1,:].argmax(dim=-1).unsqueeze(1)
+        generated=[token.item()]
+        if capture is not None:capture.token_ready(generated[-1])
+        if eos_token_id is None or generated[-1]!=eos_token_id:
+            for _ in range(max_gen-1):
+                output=invoke('decode',input_ids=token,past_key_values=cache,use_cache=True)
+                cache=output.past_key_values
+                token=output.logits[:,-1,:].argmax(dim=-1).unsqueeze(1)
+                generated.append(token.item())
+                if capture is not None:capture.token_ready(generated[-1])
+                if generated[-1]==eos_token_id:break
+        if capture is not None:capture.generation_complete()
+        return generated
+
+
+def _paper_capture_request(mode,model,material,question,dataset,model_name):
+    from contextlib import nullcontext
+    if mode=='off':return nullcontext(),None
+    if mode!='timing':raise ValueError('plan is entrypoint-only; no request executed')
+    if dataset=='samsum' or 'qwen3' not in model_name.lower():
+        raise ValueError('paper capture unsupported for generate/other-model paths')
+    from exp.paper.receipt import QwenRequestCapture
+    capture=QwenRequestCapture(model,material,question)
+    return capture,capture
+
+
 def get_pred(
     model,
     tokenizer,
@@ -184,7 +226,9 @@ def get_pred(
     model_name,
     data_fp="",
     run_stats=None,  # 096：每样本实际输入 token 数 / 截断标记（run-cap manifest）
+    paper_capture_mode="off",
 ):
+    from sparse_attn.baseline_runtime import baseline_request
     preds = []
 
     # DeepSeek-V2 兼容修复（S-T023 2026-10-12）：官方 modeling_deepseek.py
@@ -309,7 +353,9 @@ def get_pred(
         # 内）与任何落盘（out_path 写入在 get_pred 返回后，raise 传播即
         # 整次任务输出作废）。进入时清旧 flag：上一样本未消费的违规不
         # 误杀本样本（guard 语义/并发限制见其 docstring）。
-        with eager_decoding_request_guard():
+        capture_context,capture = _paper_capture_request(
+            paper_capture_mode,model,input.input_ids,q_input.input_ids,dataset,model_name)
+        with baseline_request(model) as baseline_receipt, capture_context, eager_decoding_request_guard():
             if (
                 dataset == "samsum"
             ):  # prevent illegal output on samsum (model endlessly repeat "\nDialogue"), might be a prompting issue
@@ -355,54 +401,8 @@ def get_pred(
                 )[0]
                 generated_content = output[full_ids.shape[-1]:].tolist()
             else:
-                with torch.no_grad():
-                    output = model(
-                        input_ids=input.input_ids,
-                        past_key_values=None,
-                        use_cache=True,
-                    )
-                    past_key_values = output.past_key_values
-                    for input_id in q_input.input_ids[0]:
-                        output = model(
-                            input_ids=input_id.unsqueeze(0).unsqueeze(0),
-                            past_key_values=past_key_values,
-                            use_cache=True,
-                        )
-                        past_key_values = output.past_key_values
-
-                    pred_token_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
-                    generated_content = [pred_token_idx.item()]
-                    # B04 修复（kimi3 清单 2026-10-08）：原循环的 EOS 判停在每个
-                    # token push 之后，唯独漏了首 token——首 token 即 EOS 时
-                    # 不停，输出 EOS 串尾巴且继续解码。首 token 也须判停。
-                    if (
-                        tokenizer.eos_token_id is not None
-                        and pred_token_idx.item() == tokenizer.eos_token_id
-                    ):
-                        generated_content = [pred_token_idx.item()]
-                    else:
-                        for _ in range(max_gen - 1):
-                            outputs = model(
-                                input_ids=pred_token_idx,
-                                past_key_values=past_key_values,
-                                use_cache=True,
-                            )
-
-                            past_key_values = outputs.past_key_values
-                            pred_token_idx = (
-                                outputs.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
-                            )
-                            generated_content += [pred_token_idx.item()]
-                            if pred_token_idx.item() == tokenizer.eos_token_id:
-                                break
-
-                # output = model.generate(
-                #     **input,
-                #     max_new_tokens=max_gen,
-                #     num_beams=1,
-                #     do_sample=False,
-                #     temperature=1.0,
-                # )[0]
+                generated_content = _manual_generate(
+                    model,input.input_ids,q_input.input_ids,max_gen,tokenizer.eos_token_id,capture)
 
         pred = tokenizer.decode(generated_content, skip_special_tokens=True)
         # pred = tokenizer.decode(output[context_length:], skip_special_tokens=True)
@@ -419,7 +419,7 @@ def get_pred(
         # avg_B0 = budget_info.get_total_avg_budget_B0()
 
         metrics = get_metrics()
-        budget = metrics.get_select_tokens()
+        budget = None if baseline_receipt else metrics.get_select_tokens()
         metrics.clear()
 
         record = {
@@ -432,6 +432,11 @@ def get_pred(
             # "B0": avg_B0,
             # "B1": avg_budget,
         }
+        if baseline_receipt:
+            record['baseline_receipt'] = baseline_receipt
+        if capture is not None:
+            if capture.receipt is None:raise ValueError('request capture incomplete')
+            record['paper_request_capture']=capture.receipt
         if dataset == "lbv2":
             # LongBench-v2：额外落盘解析字母与样本 _id（打分口径 accuracy = pred_choice == answer）
             record["pred_choice"] = extract_choice_letter(pred)
@@ -491,6 +496,11 @@ def _patch_deepseek_dynamic_cache_compat():
 
 
 def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
+    baseline_preflight(args)
+    if args.method == 'ffd_vendor':
+        model = load_ffd(path, args)
+        tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True, trust_remote_code=False)
+        return model, tokenizer
     # DeepSeek-V2 trust_remote_code 需要旧版 DynamicCache API 兼容
     if "DeepSeek-V2" in model_name:
         _patch_deepseek_dynamic_cache_compat()
@@ -703,8 +713,15 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
 
 
 if __name__ == "__main__":
-    seed_everything(42)
     args = parse_args()
+    if args.paper_capture=='plan':
+        print(json.dumps({'schema':'longbench-paper-capture-plan-v1','gpu_started':False,
+            'supported':'Qwen3 manual greedy path only','unsupported':['samsum generate','DeepSeek generate','unknown attention forwards'],
+            'support_observation':'separate pass required; not implemented by timing hooks','execution':'disabled'}))
+        raise SystemExit(0)
+    if args.paper_capture=='timing' and (not args.model or 'qwen3' not in args.model.lower() or args.task=='samsum'):
+        raise ValueError('paper timing supports only Qwen3 manual path; rejected before model loading')
+    seed_everything(42)
     # 稀疏 prefill 门控：在模型加载/patch 挂载前设置环境变量
     # （qwen3_attn_patch 逐 forward 读取；默认不设 = dense 逐位不变）
     if args.tli_sparse_prefill:
@@ -911,6 +928,7 @@ if __name__ == "__main__":
                 model_name,
                 data_fp=data_fp,
                 run_stats=run_stats,
+                paper_capture_mode=args.paper_capture,
             )
             # 096：method_name/out_fn/out_path 计算块已上移至 get_pred 之前
             # （run-cap 写门早期 CAP-CLASH 检测，

@@ -226,6 +226,8 @@ def enable_minference(
     - starting_layer：之前浅层走 dense（官方默认 -1 = 全层 sparse）。
     返回 patch 层数。
     """
+    if type(starting_layer) is not int or not -1 <= starting_layer < model.config.num_hidden_layers:
+        raise ValueError('MInference starting_layer disables sparse prefill')
     n_patched = 0
     layer_id = 0
 
@@ -274,6 +276,9 @@ def enable_minference(
                     f"config_path）或提供可读文件，fail closed")
             with open(config_path, "r") as f:
                 best_pattern = json.load(f)
+        from sparse_attn.baseline_runtime import validate_minference_pattern
+        validate_minference_pattern(best_pattern, model.config.num_hidden_layers,
+                                    model.config.num_attention_heads, starting_layer)
         attn_config = {
             "is_search": False,
             "starting_layer": starting_layer,

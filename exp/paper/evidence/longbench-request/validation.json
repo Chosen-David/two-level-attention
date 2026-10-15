@@ -1,0 +1,33 @@
+{
+  "schema": "longbench-request-cpu-validation-v1",
+  "base_commit": "a38620cae34c4ca7ac58c85f27ce9764fbe3b01e",
+  "main": "9449c8e9d827f4c079f9ecff5ce2cb8243273d58",
+  "independent_review": "passed after timestamp finite/overflow checks and native/counter/guard negative tests",
+  "tests": {
+    "capture_normal": 11,
+    "capture_optimized": 11,
+    "paper_independent_normal": 12,
+    "paper_independent_optimized": 12,
+    "full_runtime_normal": 38,
+    "cuda_skipped": 1
+  },
+  "files_sha256": {
+    "benchmark/LongBench/pred.py": "f5b7d9e3f273af5844da7209cb09ec1360113755f1bf3f85bb004d813f6b0ec5",
+    "sparse_attn/patches/qwen3_attn_patch.py": "b985d46020b440366f789b0d3a65e332c0feafbc4202ee6ad5ef64bf084260f4",
+    "exp/paper/receipt.py": "d8da614deeb1ce9949f16dfd183b8a79c99ecb19e5b133878b2a0a146d8f97cd",
+    "tests/test_longbench_request_capture.py": "8c717bdc4e0584edc0c4090de1d9329cd60f3230602f7d34a9d79d8d75637d16"
+  },
+  "evidence_scope": "production get_pred/manual generation function AST plus CPU doubles; no full CLI dependency stack or real model",
+  "gpu_executed": false,
+  "complete_support_observed": false,
+  "internal_lifecycle_observed": false,
+  "receipt_status": "candidate telemetry; scientific acceptance false",
+  "default_mode": "off",
+  "explicit_plan": "exits before seed/model load",
+  "service_recovery_claim": false,
+  "publication_main_integrated": "6a8da9d4ef790fa00fe8922cd7e9eab06e356d9f",
+  "concurrent_main_gate_tests": "two unittest methods exercise positive/negative script subprocesses in normal and optimized mode",
+  "concurrent_main_gate_independent_review": "passed; 70 CPU subprocess cases per normal/optimized suite",
+  "later_observed_main": "28c221faca507298abedaef9b17ac21e40c58193",
+  "later_main_overlap": "none; new probe/verdict/data files left on main"
+}

@@ -1,0 +1,116 @@
+.......................F..                                   [100%]
+=================================== FAILURES ===================================
+_____________ FiniteGate.test_finite_native_surrogate_still_passes _____________
+
+self = <test_e141_verifier_finite.FiniteGate testMethod=test_finite_native_surrogate_still_passes>
+
+    def test_finite_native_surrogate_still_passes(self):
+        result=self.run_case('finite')
+>       self.assertEqual(result.returncode,0,result.stdout)
+E       AssertionError: 1 != 0 : Traceback (most recent call last):
+E         File "<string>", line 36, in <module>
+E         File "/workspace/two-level-attention/exp/trace/verify_e141_native_forward.py", line 36, in main
+E           actual_hash=hashlib.sha256(args.upstream_source.read_bytes()).hexdigest()
+E                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E         File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1019, in read_bytes
+E           with self.open(mode='rb') as f:
+E                ^^^^^^^^^^^^^^^^^^^^
+E         File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open
+E           return io.open(self, mode, buffering, encoding, errors, newline)
+E                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py'
+
+tests/test_e141_verifier_finite.py:61: AssertionError
+___ FiniteGate.test_nonfinite_got_and_ref_exit_one (side='got', value='nan') ___
+
+self = <test_e141_verifier_finite.FiniteGate testMethod=test_nonfinite_got_and_ref_exit_one>
+
+    def test_nonfinite_got_and_ref_exit_one(self):
+        for side in ('got','ref'):
+            for value in ('nan','inf','-inf'):
+                with self.subTest(side=side,value=value):
+                    result=self.run_case(side,value)
+                    self.assertEqual(result.returncode,1,result.stdout)
+>                   self.assertIn('ValueError: nonfinite got/ref probabilities',result.stdout)
+E                   AssertionError: 'ValueError: nonfinite got/ref probabilities' not found in 'Traceback (most recent call last):\n  File "<string>", line 36, in <module>\n  File "/workspace/two-level-attention/exp/trace/verify_e141_native_forward.py", line 36, in main\n    actual_hash=hashlib.sha256(args.upstream_source.read_bytes()).hexdigest()\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1019, in read_bytes\n    with self.open(mode=\'rb\') as f:\n         ^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: \'/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py\'\n'
+
+tests/test_e141_verifier_finite.py:69: AssertionError
+___ FiniteGate.test_nonfinite_got_and_ref_exit_one (side='got', value='inf') ___
+
+self = <test_e141_verifier_finite.FiniteGate testMethod=test_nonfinite_got_and_ref_exit_one>
+
+    def test_nonfinite_got_and_ref_exit_one(self):
+        for side in ('got','ref'):
+            for value in ('nan','inf','-inf'):
+                with self.subTest(side=side,value=value):
+                    result=self.run_case(side,value)
+                    self.assertEqual(result.returncode,1,result.stdout)
+>                   self.assertIn('ValueError: nonfinite got/ref probabilities',result.stdout)
+E                   AssertionError: 'ValueError: nonfinite got/ref probabilities' not found in 'Traceback (most recent call last):\n  File "<string>", line 36, in <module>\n  File "/workspace/two-level-attention/exp/trace/verify_e141_native_forward.py", line 36, in main\n    actual_hash=hashlib.sha256(args.upstream_source.read_bytes()).hexdigest()\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1019, in read_bytes\n    with self.open(mode=\'rb\') as f:\n         ^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: \'/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py\'\n'
+
+tests/test_e141_verifier_finite.py:69: AssertionError
+__ FiniteGate.test_nonfinite_got_and_ref_exit_one (side='got', value='-inf') ___
+
+self = <test_e141_verifier_finite.FiniteGate testMethod=test_nonfinite_got_and_ref_exit_one>
+
+    def test_nonfinite_got_and_ref_exit_one(self):
+        for side in ('got','ref'):
+            for value in ('nan','inf','-inf'):
+                with self.subTest(side=side,value=value):
+                    result=self.run_case(side,value)
+                    self.assertEqual(result.returncode,1,result.stdout)
+>                   self.assertIn('ValueError: nonfinite got/ref probabilities',result.stdout)
+E                   AssertionError: 'ValueError: nonfinite got/ref probabilities' not found in 'Traceback (most recent call last):\n  File "<string>", line 36, in <module>\n  File "/workspace/two-level-attention/exp/trace/verify_e141_native_forward.py", line 36, in main\n    actual_hash=hashlib.sha256(args.upstream_source.read_bytes()).hexdigest()\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1019, in read_bytes\n    with self.open(mode=\'rb\') as f:\n         ^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: \'/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py\'\n'
+
+tests/test_e141_verifier_finite.py:69: AssertionError
+___ FiniteGate.test_nonfinite_got_and_ref_exit_one (side='ref', value='nan') ___
+
+self = <test_e141_verifier_finite.FiniteGate testMethod=test_nonfinite_got_and_ref_exit_one>
+
+    def test_nonfinite_got_and_ref_exit_one(self):
+        for side in ('got','ref'):
+            for value in ('nan','inf','-inf'):
+                with self.subTest(side=side,value=value):
+                    result=self.run_case(side,value)
+                    self.assertEqual(result.returncode,1,result.stdout)
+>                   self.assertIn('ValueError: nonfinite got/ref probabilities',result.stdout)
+E                   AssertionError: 'ValueError: nonfinite got/ref probabilities' not found in 'Traceback (most recent call last):\n  File "<string>", line 36, in <module>\n  File "/workspace/two-level-attention/exp/trace/verify_e141_native_forward.py", line 36, in main\n    actual_hash=hashlib.sha256(args.upstream_source.read_bytes()).hexdigest()\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1019, in read_bytes\n    with self.open(mode=\'rb\') as f:\n         ^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: \'/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py\'\n'
+
+tests/test_e141_verifier_finite.py:69: AssertionError
+___ FiniteGate.test_nonfinite_got_and_ref_exit_one (side='ref', value='inf') ___
+
+self = <test_e141_verifier_finite.FiniteGate testMethod=test_nonfinite_got_and_ref_exit_one>
+
+    def test_nonfinite_got_and_ref_exit_one(self):
+        for side in ('got','ref'):
+            for value in ('nan','inf','-inf'):
+                with self.subTest(side=side,value=value):
+                    result=self.run_case(side,value)
+                    self.assertEqual(result.returncode,1,result.stdout)
+>                   self.assertIn('ValueError: nonfinite got/ref probabilities',result.stdout)
+E                   AssertionError: 'ValueError: nonfinite got/ref probabilities' not found in 'Traceback (most recent call last):\n  File "<string>", line 36, in <module>\n  File "/workspace/two-level-attention/exp/trace/verify_e141_native_forward.py", line 36, in main\n    actual_hash=hashlib.sha256(args.upstream_source.read_bytes()).hexdigest()\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1019, in read_bytes\n    with self.open(mode=\'rb\') as f:\n         ^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: \'/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py\'\n'
+
+tests/test_e141_verifier_finite.py:69: AssertionError
+__ FiniteGate.test_nonfinite_got_and_ref_exit_one (side='ref', value='-inf') ___
+
+self = <test_e141_verifier_finite.FiniteGate testMethod=test_nonfinite_got_and_ref_exit_one>
+
+    def test_nonfinite_got_and_ref_exit_one(self):
+        for side in ('got','ref'):
+            for value in ('nan','inf','-inf'):
+                with self.subTest(side=side,value=value):
+                    result=self.run_case(side,value)
+                    self.assertEqual(result.returncode,1,result.stdout)
+>                   self.assertIn('ValueError: nonfinite got/ref probabilities',result.stdout)
+E                   AssertionError: 'ValueError: nonfinite got/ref probabilities' not found in 'Traceback (most recent call last):\n  File "<string>", line 36, in <module>\n  File "/workspace/two-level-attention/exp/trace/verify_e141_native_forward.py", line 36, in main\n    actual_hash=hashlib.sha256(args.upstream_source.read_bytes()).hexdigest()\n                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1019, in read_bytes\n    with self.open(mode=\'rb\') as f:\n         ^^^^^^^^^^^^^^^^^^^^\n  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: \'/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py\'\n'
+
+tests/test_e141_verifier_finite.py:69: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_e141_verifier_finite.py::FiniteGate::test_finite_native_surrogate_still_passes
+SUBFAILED(side='got', value='nan') tests/test_e141_verifier_finite.py::FiniteGate::test_nonfinite_got_and_ref_exit_one
+SUBFAILED(side='got', value='inf') tests/test_e141_verifier_finite.py::FiniteGate::test_nonfinite_got_and_ref_exit_one
+SUBFAILED(side='got', value='-inf') tests/test_e141_verifier_finite.py::FiniteGate::test_nonfinite_got_and_ref_exit_one
+SUBFAILED(side='ref', value='nan') tests/test_e141_verifier_finite.py::FiniteGate::test_nonfinite_got_and_ref_exit_one
+SUBFAILED(side='ref', value='inf') tests/test_e141_verifier_finite.py::FiniteGate::test_nonfinite_got_and_ref_exit_one
+SUBFAILED(side='ref', value='-inf') tests/test_e141_verifier_finite.py::FiniteGate::test_nonfinite_got_and_ref_exit_one
+7 failed, 25 passed, 6 subtests passed in 15.84s

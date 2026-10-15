@@ -91,13 +91,16 @@ class GraphCacheSchemaTest(unittest.TestCase):
                               _subspace_indices=lambda dev: torch.arange(32, device=dev))
         k = torch.zeros(1, 256, 2, 128, dtype=torch.bfloat16)
         coarse = k[..., :32].reshape(1, 4, 64, 2, 32).mean(2)
+        idx._fast_score_coarse = lambda: None
+        idx._fast_score_fine = lambda: None
+        idx._TILE_COARSE = {}; idx._TILE_FINE = {}; idx._triton_ok = True
         idx.prepare_index = lambda *a: dict(k_min=coarse, k_max=coarse,
                                             k_avg=coarse, k_qat=k[..., :32])
         keys = []
         def capture_key(key, body, inputs):
             keys.append(key)
             return []
-        with patch.object(bs, '_gate_ok', return_value=True), patch.object(
+        with patch.object(bs.torch.cuda, 'current_stream', return_value=SimpleNamespace(cuda_stream=0)), patch.object(bs.torch.cuda, 'device', return_value=nullcontext()), patch.object(bs, '_gate_ok', return_value=True), patch.object(
             bs, '_graph_cached_run', side_effect=capture_key
         ), patch.dict('os.environ', {'TLI_PREFILL_SELECT_GRAPH': '1',
                                     'TLI_PREFILL_L2_TOPK_CAND': '0'}):

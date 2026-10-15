@@ -1,0 +1,485 @@
+[
+  {
+    "name": "normal-collector-tests",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e141*.py",
+      "-v"
+    ],
+    "returncode": 0,
+    "expected": 0
+  },
+  {
+    "name": "normal-e140-accounting-tests",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140_observation.py",
+      "-v"
+    ],
+    "returncode": 0,
+    "expected": 0
+  },
+  {
+    "name": "normal-reused-reconstruction",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "exp/trace/verify_e141_qk_reconstruction.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py"
+    ],
+    "returncode": 0,
+    "expected": 0,
+    "result": {
+      "torch": "2.14.1+cpu",
+      "device": "cpu",
+      "dtype": "float32",
+      "shape": {
+        "batch": 1,
+        "tokens": 5,
+        "hidden": 8,
+        "heads": 2,
+        "nope": 128,
+        "rope": 64
+      },
+      "probe_sha256": "60625ae7fe69dcdda248eef3bfce5b9a6d858d43d04d675c38d914f9fe259304",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "fixture_sha256": "ea873ffc4ee5544e014d9fc54ee311b6d95fbe9badc4ba3e597bee9caf383ffb",
+      "errors": {
+        "norm_q_nope_max_abs": 0.0,
+        "rope_only_q_max_abs": 0.0,
+        "rope_only_k_max_abs": 0.0,
+        "rope_only_probability_max_abs": 0.0
+      },
+      "parity": true
+    }
+  },
+  {
+    "name": "normal-native-fixed",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "exp/trace/verify_e141_native_forward.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+      "--require-sha256",
+      "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "--probe-source",
+      "agent_doc/guide/paper_figs/trace/e141_mla_nope_probe.py"
+    ],
+    "returncode": 0,
+    "expected": 0,
+    "result": {
+      "scope": "random weights; actual eager Attention.forward; CPU fp32, not full checkpoint",
+      "torch": "2.14.1+cpu",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "probe_sha256": "60625ae7fe69dcdda248eef3bfce5b9a6d858d43d04d675c38d914f9fe259304",
+      "fixture_sha256": "fe113a1e80f931487ec7fff1a2211e7a47d392840b0536dcb341801771dbaad8",
+      "hidden_noncontiguous": true,
+      "errors": {
+        "q": 0.0,
+        "k": 0.0,
+        "logits": 0.0,
+        "probabilities": 5.960464477539063e-08
+      },
+      "parity": true,
+      "gpu_used": false
+    }
+  },
+  {
+    "name": "normal-native-historical",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "exp/trace/verify_e141_native_forward.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+      "--require-sha256",
+      "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "--probe-source",
+      "/tmp/e141-negative-b2qa7f1m/historical_probe.py"
+    ],
+    "returncode": 1,
+    "expected": 1,
+    "result": {
+      "scope": "random weights; actual eager Attention.forward; CPU fp32, not full checkpoint",
+      "torch": "2.14.1+cpu",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "probe_sha256": "b7565a5acbb3af0701f339ea93870b7cff95379572764e0f80ac3908380e9930",
+      "fixture_sha256": "fe113a1e80f931487ec7fff1a2211e7a47d392840b0536dcb341801771dbaad8",
+      "hidden_noncontiguous": true,
+      "errors": {
+        "q": 15.37513542175293,
+        "k": 14.696139335632324,
+        "logits": 23.463672637939453,
+        "probabilities": 0.8616850972175598
+      },
+      "parity": false,
+      "gpu_used": false
+    }
+  },
+  {
+    "name": "normal-native-missing-norm",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "exp/trace/verify_e141_native_forward.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+      "--require-sha256",
+      "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "--probe-source",
+      "/tmp/e141-negative-b2qa7f1m/missing_norm.py"
+    ],
+    "returncode": 1,
+    "expected": 1,
+    "result": {
+      "scope": "random weights; actual eager Attention.forward; CPU fp32, not full checkpoint",
+      "torch": "2.14.1+cpu",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "probe_sha256": "70f1b569a920f2dfc27c50ed37bacfa766c43688792d8e4e05bed201a52f2124",
+      "fixture_sha256": "fe113a1e80f931487ec7fff1a2211e7a47d392840b0536dcb341801771dbaad8",
+      "hidden_noncontiguous": true,
+      "errors": {
+        "q": 14.199652671813965,
+        "k": 12.35675048828125,
+        "logits": 27.691431045532227,
+        "probabilities": 0.5829382538795471
+      },
+      "parity": false,
+      "gpu_used": false
+    }
+  },
+  {
+    "name": "normal-native-missing-layout",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "exp/trace/verify_e141_native_forward.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+      "--require-sha256",
+      "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "--probe-source",
+      "/tmp/e141-negative-b2qa7f1m/missing_layout.py"
+    ],
+    "returncode": 1,
+    "expected": 1,
+    "result": {
+      "scope": "random weights; actual eager Attention.forward; CPU fp32, not full checkpoint",
+      "torch": "2.14.1+cpu",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "probe_sha256": "c1c9993b2b0ffab55457d5987527706313aefc661f01d005900ceb943a05f592",
+      "fixture_sha256": "fe113a1e80f931487ec7fff1a2211e7a47d392840b0536dcb341801771dbaad8",
+      "hidden_noncontiguous": true,
+      "errors": {
+        "q": 2.9117915630340576,
+        "k": 2.8385772705078125,
+        "logits": 0.6038392186164856,
+        "probabilities": 0.03137564659118652
+      },
+      "parity": false,
+      "gpu_used": false
+    }
+  },
+  {
+    "name": "normal-historical-reconstruction",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "exp/trace/verify_e141_qk_reconstruction.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+      "--probe-source",
+      "/tmp/e141-negative-b2qa7f1m/historical_probe.py"
+    ],
+    "returncode": 1,
+    "expected": 1,
+    "result": {
+      "torch": "2.14.1+cpu",
+      "device": "cpu",
+      "dtype": "float32",
+      "shape": {
+        "batch": 1,
+        "tokens": 5,
+        "hidden": 8,
+        "heads": 2,
+        "nope": 128,
+        "rope": 64
+      },
+      "probe_sha256": "b7565a5acbb3af0701f339ea93870b7cff95379572764e0f80ac3908380e9930",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "fixture_sha256": "ea873ffc4ee5544e014d9fc54ee311b6d95fbe9badc4ba3e597bee9caf383ffb",
+      "errors": {
+        "norm_q_nope_max_abs": 15.283309936523438,
+        "rope_only_q_max_abs": 2.6790432929992676,
+        "rope_only_k_max_abs": 2.23616886138916,
+        "rope_only_probability_max_abs": 0.03163066506385803
+      },
+      "parity": false
+    }
+  },
+  {
+    "name": "normal-default-identity-rejection",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "exp/trace/verify_e141_native_forward.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py"
+    ],
+    "returncode": 1,
+    "expected": 1
+  },
+  {
+    "name": "optimized-collector-tests",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-O",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e141*.py",
+      "-v"
+    ],
+    "returncode": 0,
+    "expected": 0
+  },
+  {
+    "name": "optimized-e140-accounting-tests",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-O",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140_observation.py",
+      "-v"
+    ],
+    "returncode": 0,
+    "expected": 0
+  },
+  {
+    "name": "optimized-reused-reconstruction",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-O",
+      "exp/trace/verify_e141_qk_reconstruction.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py"
+    ],
+    "returncode": 0,
+    "expected": 0,
+    "result": {
+      "torch": "2.14.1+cpu",
+      "device": "cpu",
+      "dtype": "float32",
+      "shape": {
+        "batch": 1,
+        "tokens": 5,
+        "hidden": 8,
+        "heads": 2,
+        "nope": 128,
+        "rope": 64
+      },
+      "probe_sha256": "60625ae7fe69dcdda248eef3bfce5b9a6d858d43d04d675c38d914f9fe259304",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "fixture_sha256": "ea873ffc4ee5544e014d9fc54ee311b6d95fbe9badc4ba3e597bee9caf383ffb",
+      "errors": {
+        "norm_q_nope_max_abs": 0.0,
+        "rope_only_q_max_abs": 0.0,
+        "rope_only_k_max_abs": 0.0,
+        "rope_only_probability_max_abs": 0.0
+      },
+      "parity": true
+    }
+  },
+  {
+    "name": "optimized-native-fixed",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-O",
+      "exp/trace/verify_e141_native_forward.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+      "--require-sha256",
+      "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "--probe-source",
+      "agent_doc/guide/paper_figs/trace/e141_mla_nope_probe.py"
+    ],
+    "returncode": 0,
+    "expected": 0,
+    "result": {
+      "scope": "random weights; actual eager Attention.forward; CPU fp32, not full checkpoint",
+      "torch": "2.14.1+cpu",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "probe_sha256": "60625ae7fe69dcdda248eef3bfce5b9a6d858d43d04d675c38d914f9fe259304",
+      "fixture_sha256": "fe113a1e80f931487ec7fff1a2211e7a47d392840b0536dcb341801771dbaad8",
+      "hidden_noncontiguous": true,
+      "errors": {
+        "q": 0.0,
+        "k": 0.0,
+        "logits": 0.0,
+        "probabilities": 5.960464477539063e-08
+      },
+      "parity": true,
+      "gpu_used": false
+    }
+  },
+  {
+    "name": "optimized-native-historical",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-O",
+      "exp/trace/verify_e141_native_forward.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+      "--require-sha256",
+      "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "--probe-source",
+      "/tmp/e141-negative-b2qa7f1m/historical_probe.py"
+    ],
+    "returncode": 1,
+    "expected": 1,
+    "result": {
+      "scope": "random weights; actual eager Attention.forward; CPU fp32, not full checkpoint",
+      "torch": "2.14.1+cpu",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "probe_sha256": "b7565a5acbb3af0701f339ea93870b7cff95379572764e0f80ac3908380e9930",
+      "fixture_sha256": "fe113a1e80f931487ec7fff1a2211e7a47d392840b0536dcb341801771dbaad8",
+      "hidden_noncontiguous": true,
+      "errors": {
+        "q": 15.37513542175293,
+        "k": 14.696139335632324,
+        "logits": 23.463672637939453,
+        "probabilities": 0.8616850972175598
+      },
+      "parity": false,
+      "gpu_used": false
+    }
+  },
+  {
+    "name": "optimized-native-missing-norm",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-O",
+      "exp/trace/verify_e141_native_forward.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+      "--require-sha256",
+      "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "--probe-source",
+      "/tmp/e141-negative-b2qa7f1m/missing_norm.py"
+    ],
+    "returncode": 1,
+    "expected": 1,
+    "result": {
+      "scope": "random weights; actual eager Attention.forward; CPU fp32, not full checkpoint",
+      "torch": "2.14.1+cpu",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "probe_sha256": "70f1b569a920f2dfc27c50ed37bacfa766c43688792d8e4e05bed201a52f2124",
+      "fixture_sha256": "fe113a1e80f931487ec7fff1a2211e7a47d392840b0536dcb341801771dbaad8",
+      "hidden_noncontiguous": true,
+      "errors": {
+        "q": 14.199652671813965,
+        "k": 12.35675048828125,
+        "logits": 27.691431045532227,
+        "probabilities": 0.5829382538795471
+      },
+      "parity": false,
+      "gpu_used": false
+    }
+  },
+  {
+    "name": "optimized-native-missing-layout",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-O",
+      "exp/trace/verify_e141_native_forward.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+      "--require-sha256",
+      "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "--probe-source",
+      "/tmp/e141-negative-b2qa7f1m/missing_layout.py"
+    ],
+    "returncode": 1,
+    "expected": 1,
+    "result": {
+      "scope": "random weights; actual eager Attention.forward; CPU fp32, not full checkpoint",
+      "torch": "2.14.1+cpu",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "probe_sha256": "c1c9993b2b0ffab55457d5987527706313aefc661f01d005900ceb943a05f592",
+      "fixture_sha256": "fe113a1e80f931487ec7fff1a2211e7a47d392840b0536dcb341801771dbaad8",
+      "hidden_noncontiguous": true,
+      "errors": {
+        "q": 2.9117915630340576,
+        "k": 2.8385772705078125,
+        "logits": 0.6038392186164856,
+        "probabilities": 0.03137564659118652
+      },
+      "parity": false,
+      "gpu_used": false
+    }
+  },
+  {
+    "name": "optimized-historical-reconstruction",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-O",
+      "exp/trace/verify_e141_qk_reconstruction.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+      "--probe-source",
+      "/tmp/e141-negative-b2qa7f1m/historical_probe.py"
+    ],
+    "returncode": 1,
+    "expected": 1,
+    "result": {
+      "torch": "2.14.1+cpu",
+      "device": "cpu",
+      "dtype": "float32",
+      "shape": {
+        "batch": 1,
+        "tokens": 5,
+        "hidden": 8,
+        "heads": 2,
+        "nope": 128,
+        "rope": 64
+      },
+      "probe_sha256": "b7565a5acbb3af0701f339ea93870b7cff95379572764e0f80ac3908380e9930",
+      "upstream_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+      "fixture_sha256": "ea873ffc4ee5544e014d9fc54ee311b6d95fbe9badc4ba3e597bee9caf383ffb",
+      "errors": {
+        "norm_q_nope_max_abs": 15.283309936523438,
+        "rope_only_q_max_abs": 2.6790432929992676,
+        "rope_only_k_max_abs": 2.23616886138916,
+        "rope_only_probability_max_abs": 0.03163066506385803
+      },
+      "parity": false
+    }
+  },
+  {
+    "name": "optimized-default-identity-rejection",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-O",
+      "exp/trace/verify_e141_native_forward.py",
+      "--upstream-source",
+      "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py"
+    ],
+    "returncode": 1,
+    "expected": 1
+  }
+]

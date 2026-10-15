@@ -805,6 +805,11 @@ def _minference_cfg_sha8(args):
 def get_method_name_with_info(args, snapshot=None):
     # 081：snapshot 提供时 tli 名的 _h<hash10> 段从冻结 manifest_json
     # 派生（与 sidecar/receipt 同源）；非 tli 分支不消费 snapshot。
+    if args.method == "ffd_vendor":
+        from sparse_attn.baseline_runtime import ffd_identity
+        identity = ffd_identity(args)
+        digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:16]
+        return f"ffd_vendor_native_{digest}"
     if args.method == "quest":
         return f"quest_{args.quest_block_size}_{args.quest_topk}"
     elif args.method == "quest_vendor":
@@ -859,8 +864,11 @@ def get_method_name_with_info(args, snapshot=None):
             _ctx = getattr(args, "sparq_context_length", None)
         if _ctx is None:
             _ctx = getattr(args, "context_length", 31500)
+        from pathlib import Path
+        adapter = Path(__file__).resolve().parents[1] / 'exp/vendor_baselines/sparq_vendor/qwen3_sparq_patch.py'
+        source_hash = hashlib.sha256(adapter.read_bytes()).hexdigest()[:16]
         return (f"sparq_vendor_k{getattr(args, 'sparq_k', 1024)}"
-                f"_cl{_ctx:g}")
+                f"_cl{_ctx:g}_src{source_hash}")
     elif args.method == "moba_vendor":
         # B 轨 vendor（官方源码复用）：MoBA prefill 块级 gate 稀疏 + decode
         # dense。chunk/topk/budget 决定每 query 有效预算，必须进 treatment 名

@@ -6,7 +6,7 @@
 causal、sink、SWA；普通 varlen FlashAttention 不能直接替换这套不规则掩码」。
 
 设计（对齐 eager_prefill._chunk_rows_attn 组版语义，L62-271）：
-  1. **token 列表直取，不走并集 argsort**：每行（绝对位置 p = pos_lo + r）
+  1. **原位置块访问，不走并集 argsort**：每行（绝对位置 p = pos_lo + r）
      的有效列谓词 = (j <= p) AND (j < sink_tok OR j >= p-swa_tok+1 OR
      sel[j(r)//grp][h, j])——列遍历按 K 原始位置序天然因果，无需
      argsort/compact/并集物化（原实现对全 T 列 argsort，L=32K 每行块一次）。
@@ -31,7 +31,13 @@ causal、sink、SWA；普通 varlen FlashAttention 不能直接替换这套不�
 
 fail-closed：仅组版（sel_list 非 None）+ kv 共享（非 per_q_head）+ CUDA
 + G 为 2 的幂（tl.arange 约束）启用；异常由调用方捕获回退原 gather 路径。
+
+实验选项 TLI_PREFILL_BLOCK_LIST=1：GPU 前缀和生成每组有序活跃块索引，
+避免每个 query tile 重扫全前缀。默认关闭；尚需目标 GPU 对拍与含打包计时。
+它只减少块判定循环，不消除活跃块内部未选中 token 的点积。
 """
+import os
+
 import torch
 import triton
 import triton.language as tl
@@ -41,11 +47,39 @@ _BLK = 64
 
 
 @triton.jit
+def _pack_group_blocks(SELBLK, BLOCK_IDS, BLOCK_COUNTS,
+                       Tb, len_r, pos_lo, grp, Hkv, swa_tok, sink_tok,
+                       BLK: tl.constexpr, WIDTH: tl.constexpr):
+    """Sorted, race-free compaction; one program per selection group/KV head.
+
+    Include every block the old traversal might execute for any row tile in
+    this group. The consumer retains the exact old per-tile need predicate.
+    No host counts, atomics, sorting or cross-stream scratch lifetime.
+    """
+    group_head = tl.program_id(0)
+    group = group_head // Hkv
+    block = tl.arange(0, WIDTH)
+    selected = tl.load(SELBLK + group_head * Tb + block, block < Tb, other=0)
+    first = pos_lo + group * grp
+    last = pos_lo + tl.minimum((group + 1) * grp, len_r) - 1
+    start = block * BLK
+    sink_hit = (start < sink_tok) & (start <= last)
+    # Deliberately identical interval inequalities to the legacy need test,
+    # including swa_tok=0: do not alter which all-masked blocks it executes.
+    win_hit = (start <= last) & (start + BLK > first - swa_tok + 1)
+    active = (block < Tb) & ((selected != 0) | sink_hit | win_hit)
+    rank = tl.cumsum(active.to(tl.int32), axis=0) - 1
+    tl.store(BLOCK_IDS + group_head * Tb + rank, block, mask=active)
+    tl.store(BLOCK_COUNTS + group_head, tl.sum(active.to(tl.int32), axis=0))
+
+
+@triton.jit
 def _fused_sparse_prefill_attn(
-    Q, K, V, SEL, SELBLK, O,
+    Q, K, V, SEL, SELBLK, BLOCK_IDS, BLOCK_COUNTS, O,
     len_r, T, pos_lo, grp, n_g, sink_tok, swa_tok, scale,
     H, Hkv, G, Tb, Tp,
     BRG: tl.constexpr, BK: tl.constexpr, BLK: tl.constexpr, D: tl.constexpr,
+    USE_BLOCK_LIST: tl.constexpr,
 ):
     """单 chunk 组选择融合 attention。
 
@@ -88,7 +122,18 @@ def _fused_sparse_prefill_attn(
 
     NB: tl.constexpr = BK // BLK        # 每 K tile 覆盖的位图块数
     b = tl.arange(0, NB)
-    for kb in range(0, T, BK):
+    if USE_BLOCK_LIST:
+        # Wrapper requires grp % BR == 0, so a query tile never crosses a
+        # selection group. IDs are ascending, retaining the old softmax order.
+        group_head = (rt * BR // grp) * Hkv + h
+        n_blocks = tl.load(BLOCK_COUNTS + group_head)
+    else:
+        n_blocks = tl.cdiv(T, BK)
+    for block_iter in range(0, n_blocks):
+        if USE_BLOCK_LIST:
+            kb = tl.load(BLOCK_IDS + group_head * Tb + block_iter) * BLK
+        else:
+            kb = block_iter * BK
         # ---- 块级跳空判定（保守正确，见模块 docstring §3）----
         bm_ptrs = SELBLK + j[:, None] * (Hkv * Tb) + h * Tb \
             + (kb // BLK + b)[None, :]
@@ -160,17 +205,31 @@ _NUM_WARPS = 4
 _NUM_STAGES = 2
 
 
+FUSED_LAUNCH_COUNTS = dict(bitmap=0, compact=0)
+
 def fused_group_attn(q_c, k_c, v_c, sel_list, pos_lo, G, softmax_scale,
-                     sink_tok=0, swa_tok=0, grp=0):
+                     sink_tok=0, swa_tok=0, grp=0, use_block_list=None):
     """组选择融合 attention wrapper（_chunk_rows_attn 组版分流入口）。
 
     返回 o_c [1, len_r, H, D]；不支持组合 raise（调用方 fail-closed 回退）。
     sel_list[j]: [Hkv, g1_j] bool（组末行前缀选择，g1_j ≤ T；与批量版
     batched_group_sels 输出同格式）。
     """
+    if any(t.ndim != 4 or t.shape[0] != 1 for t in (q_c,k_c,v_c)):
+        raise ValueError("fused attention requires rank4 B1")
+    if (k_c.shape != v_c.shape or q_c.shape[-1] != k_c.shape[-1]
+            or q_c.dtype not in (torch.float16,torch.bfloat16)
+            or any(t.dtype != q_c.dtype or t.device != q_c.device for t in (k_c,v_c))):
+        raise ValueError("unsupported fused dtype/device/shape")
+    if any(s.ndim != 2 or s.dtype != torch.bool or s.device != q_c.device
+           or s.shape[0] != k_c.shape[2] or s.shape[1] > k_c.shape[1]
+           for s in sel_list):
+        raise ValueError("unsupported fused selection schema")
     len_r, H, D = q_c.shape[1], q_c.shape[2], q_c.shape[3]
     T, Hkv = k_c.shape[1], k_c.shape[2]
     n_g = len(sel_list)
+    if len_r < 1 or T < 1 or n_g < 1:
+        raise ValueError("fused_group_attn requires nonempty rows, keys and selections")
     if not (q_c.is_cuda and k_c.is_cuda and v_c.is_cuda):
         raise ValueError("fused_group_attn 仅支持 CUDA")
     if sel_list[0].shape[0] != Hkv:
@@ -209,14 +268,32 @@ def fused_group_attn(q_c, k_c, v_c, sel_list, pos_lo, G, softmax_scale,
     # 的逐列 sel 读取精确处理——any 聚合只用于跳空，不参与正确性判定
     sel_blk = sel_stack.view(n_g, Hkv, Tb, _BLK).any(dim=-1).contiguous()
 
+    if use_block_list is None:
+        use_block_list = os.environ.get("TLI_PREFILL_BLOCK_LIST", "0") == "1"
+    BR = _BRG // G
+    block_ids = block_counts = sel_blk  # Unused pointer arguments in baseline.
+    if use_block_list:
+        if _BK != _BLK or grp % BR != 0 or Tb > 4096:
+            raise ValueError("block-list path requires BK=BLK, grp divisible by BR and <=4096 blocks")
+        if n_g != (len_r + grp - 1) // grp:
+            raise ValueError("block-list path requires one selection mask per group")
+        block_ids = torch.empty((n_g, Hkv, Tb), dtype=torch.int32, device=dev)
+        block_counts = torch.empty((n_g, Hkv), dtype=torch.int32, device=dev)
+        _pack_group_blocks[(n_g * Hkv,)](
+            sel_blk, block_ids, block_counts, Tb, len_r, pos_lo, grp, Hkv,
+            swa_tok, sink_tok, BLK=_BLK, WIDTH=triton.next_power_of_2(Tb),
+        )
+
     o_c = torch.empty_like(q_c)
     BR = _BRG // G
     grid = ((len_r + BR - 1) // BR, Hkv)
     _fused_sparse_prefill_attn[grid](
-        q_c, k_c, v_c, sel_stack, sel_blk, o_c,
+        q_c, k_c, v_c, sel_stack, sel_blk, block_ids, block_counts, o_c,
         len_r, T, pos_lo, grp, n_g, sink_tok, swa_tok, softmax_scale,
         H, Hkv, G, Tb, Tp,
         BRG=_BRG, BK=_BK, BLK=_BLK, D=D,
+        USE_BLOCK_LIST=use_block_list,
         num_warps=_NUM_WARPS, num_stages=_NUM_STAGES,
     )
+    FUSED_LAUNCH_COUNTS["compact" if use_block_list else "bitmap"] += 1
     return o_c

@@ -64,11 +64,6 @@ def main():
                            kv_b_proj=torch.nn.Linear(512, 2 * 256, bias=False),
                            rotary_emb=lambda value, seq_len: (cos[:seq_len], sin[:seq_len]),
                            softmax_scale=192 ** -.5)
-    # The fixed probe resolves rotary through its attention class's module.
-    # Provide a fixture-local module table backed by the trusted upstream
-    # definition; do not monkeypatch Python's global `types` module (the
-    # SimpleNamespace fixture's real module). The old probe keeps its own
-    # rotate_half, so the diagnostic must still fail on the historical bug.
     probe["sys"] = SimpleNamespace(modules={type(attn).__module__: SimpleNamespace(
         apply_rotary_pos_emb=upstream["apply_rotary_pos_emb"])})
     fixture = hashlib.sha256()

@@ -1,5 +1,6 @@
 """CPU host-route tests, not CUDA capture or GPU performance validation."""
 import os
+from contextlib import nullcontext
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -10,11 +11,19 @@ from sparse_attn.ops import batch_select as bs
 
 class RequiredGraphDispatchTest(unittest.TestCase):
     def setUp(self):
+        # Dev additionally binds graph identity to device/stream. Stub only the
+        # CUDA context metadata; these remain CPU host-route tests, not capture.
+        stream = patch.object(torch.cuda, 'current_stream',
+                              return_value=SimpleNamespace(cuda_stream=7))
+        device = patch.object(torch.cuda, 'device', return_value=nullcontext())
+        stream.start(); device.start()
+        self.addCleanup(stream.stop); self.addCleanup(device.stop)
         args = SimpleNamespace(tia_block_size=64, tia_level1_topk=4,
                                tia_level2_topk=128, tia_subspace='tail',
                                tia_l2_subspace='same')
         self.idx = SimpleNamespace(
             args=args, sink_tokens=64, sliding_window_size=64,
+            _TILE_COARSE={}, _TILE_FINE={}, _triton_ok=True,
             _sink_pool_lo_blk=1, alpha=.25, beta=.25, gamma=.5,
             far_method='minmax', near_method='avg',
             _subspace_indices=lambda dev: torch.arange(32, device=dev))
@@ -23,7 +32,7 @@ class RequiredGraphDispatchTest(unittest.TestCase):
         coarse = self.k[..., :32].reshape(1, 4, 64, 2, 32).mean(2)
         self.idx.prepare_index = lambda *a: dict(
             k_min=coarse, k_max=coarse, k_avg=coarse, k_qat=self.k[..., :32])
-        # Only kernel scoring is substituted; real CPU mask/glue code executes.
+        # Scoring and CUDA context metadata are substituted; real CPU glue executes.
         def score(keys, query, dtype):
             return torch.zeros(query.shape[0], keys.shape[0], dtype=dtype)
         self.idx._fast_score_fine = score

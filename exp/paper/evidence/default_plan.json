@@ -1,0 +1,112 @@
+{
+  "schema": "paper-plan-v1",
+  "execution": "disabled-no-host-snapshot",
+  "gpu_started": false,
+  "protocol_status": "blocked",
+  "blockers": [
+    "status:UNFROZEN",
+    "identity.model_revision",
+    "identity.tokenizer_revision",
+    "identity.dataset_revision",
+    "identity.scorer_sha256",
+    "identity.template",
+    "identity.thinking",
+    "identity.bos_eos",
+    "identity.rope",
+    "identity.dtype",
+    "identity.generation",
+    "identity.phase_route_by_layer",
+    "identity.first_dense_layers",
+    "identity.batch",
+    "identity.chunk",
+    "identity.max_new_tokens",
+    "identity.config_sha256",
+    "identity.producer_commit",
+    "identity.backend_id",
+    "identity.selection_semantics",
+    "identity.comparison_track",
+    "string identity:model_revision",
+    "string identity:tokenizer_revision",
+    "string identity:dataset_revision",
+    "string identity:template",
+    "string identity:rope",
+    "string identity:dtype",
+    "string identity:generation",
+    "string identity:backend_id",
+    "dense layer list",
+    "dense layer list",
+    "dense layer list",
+    "comparison_track",
+    "identity hash:scorer_sha256",
+    "identity hash:config_sha256",
+    "producer_commit",
+    "phase_route_by_layer",
+    "positive int:batch",
+    "positive int:chunk",
+    "positive int:max_new_tokens",
+    "arm identity:dense",
+    "arm config hash:dense",
+    "arm backend:dense",
+    "arm semantics:dense",
+    "arm routes:dense",
+    "arm identity:method",
+    "arm config hash:method",
+    "arm backend:method",
+    "arm semantics:method",
+    "arm routes:method",
+    "samples",
+    "int:context_limit",
+    "int:repeats",
+    "int:warmup",
+    "cache_state",
+    "order_policy",
+    "timing boundary/sync"
+  ],
+  "figures": {
+    "Fig1": {
+      "stable_ids": [
+        "O1",
+        "O3"
+      ],
+      "entry": "exp/figures/o3_retrieval.py",
+      "needs": [
+        "trace identities",
+        "RoPE receipt",
+        "frozen protection/distance bins"
+      ]
+    },
+    "Fig2": {
+      "stable_ids": [
+        "architecture"
+      ],
+      "entry": "architecture.mmd",
+      "needs": []
+    },
+    "Fig3": {
+      "stable_ids": [
+        "E2"
+      ],
+      "entry": "timing",
+      "needs": [
+        "direct T3 raw repetitions",
+        "paired quality identity",
+        "independent acceptance"
+      ]
+    },
+    "Fig4": {
+      "stable_ids": [
+        "E1",
+        "E3"
+      ],
+      "entry": "exp/figures/paired_quality.py",
+      "needs": [
+        "FullKV/SS sample/document/input identity",
+        "inline run caps",
+        "scorer binding"
+      ]
+    }
+  },
+  "launch_commands": [],
+  "dynamic_research": "paused",
+  "performance_claim": null
+}

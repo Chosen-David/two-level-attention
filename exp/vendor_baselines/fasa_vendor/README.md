@@ -59,3 +59,12 @@ agreement 内容 SHA256 前 8 位（TL-FASA-CALIBRATION-IDENTITY-142，
 PYTHONPATH=/tmp/clean_repo/exp/vendor_baselines/fasa_vendor \
     python3 -c "import qwen3_fasa_patch; print('ok')"
 ```
+
+## 2026-10-15 source verification
+
+The historical missing-SHA statement above is superseded for `fasa_utils.py`
+only: it matches official `96c00c46db12ccee56104175470aa29579d66c58`
+`monkey_patch/frequency/utils.py` byte-for-byte. See SOURCE_CHECK.json and the
+original Apache-2.0 LICENSE. This does not retroactively identify the provenance
+of every adapter file. New decode guards reject nontrivial masks and missing
+positions; no GPU/calibration run was performed.

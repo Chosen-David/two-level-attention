@@ -1,0 +1,25 @@
+test_ffd_external_empty_and_mismatched_caches_rejected (cachetests.BaselineTests.test_ffd_external_empty_and_mismatched_caches_rejected) ... FAIL
+test_ffd_owned_cache_configuration_and_empty_reset (cachetests.BaselineTests.test_ffd_owned_cache_configuration_and_empty_reset) ... FAIL
+
+======================================================================
+FAIL: test_ffd_external_empty_and_mismatched_caches_rejected (cachetests.BaselineTests.test_ffd_external_empty_and_mismatched_caches_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/tla-paper-runtime/tests/test_baseline_integration.py", line 88, in test_ffd_external_empty_and_mismatched_caches_rejected
+    with self.assertRaisesRegex(ValueError, 'external caches'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_ffd_owned_cache_configuration_and_empty_reset (cachetests.BaselineTests.test_ffd_owned_cache_configuration_and_empty_reset)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/tla-paper-runtime/tests/test_baseline_integration.py", line 106, in test_ffd_owned_cache_configuration_and_empty_reset
+    with self.assertRaisesRegex(ValueError,'configuration'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.003s
+
+FAILED (failures=2)

@@ -1,0 +1,32 @@
+.EXIT optimized=False expected=0 actual=0 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.ones(2,dtype=torch.bool)], 1)
+EXIT optimized=False expected=0 actual=0 case=require_outputs(torch.ones(2), torch.ones(2))
+EXIT optimized=False expected=1 actual=1 case=require_masks(None, [], 1)
+EXIT optimized=False expected=1 actual=1 case=require_masks([], [], 1)
+EXIT optimized=False expected=1 actual=1 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.zeros(2,dtype=torch.bool)], 1)
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.ones(2), torch.zeros(2))
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.tensor([float('nan')]), torch.ones(1))
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.tensor([float('inf')]), torch.tensor([float('inf')]))
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.ones(2), torch.ones(1))
+EXIT optimized=False expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=1,replay=1),'replay')
+EXIT optimized=False expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=0,replay=0),'replay')
+EXIT optimized=True expected=0 actual=0 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.ones(2,dtype=torch.bool)], 1)
+EXIT optimized=True expected=0 actual=0 case=require_outputs(torch.ones(2), torch.ones(2))
+EXIT optimized=True expected=1 actual=1 case=require_masks(None, [], 1)
+EXIT optimized=True expected=1 actual=1 case=require_masks([], [], 1)
+EXIT optimized=True expected=1 actual=1 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.zeros(2,dtype=torch.bool)], 1)
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.ones(2), torch.zeros(2))
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.tensor([float('nan')]), torch.ones(1))
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.tensor([float('inf')]), torch.tensor([float('inf')]))
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.ones(2), torch.ones(1))
+EXIT optimized=True expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=1,replay=1),'replay')
+EXIT optimized=True expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=0,replay=0),'replay')
+.......USDT:2026-10-15 01:35:37 3454:3454 SyncActivityProfilerHandler.cpp:39] profiler_start
+USDT:2026-10-15 01:35:37 3454:3454 SyncActivityProfilerHandler.cpp:46] profiler_stop
+USDT:2026-10-15 01:35:37 3454:3454 SyncActivityProfilerHandler.cpp:39] profiler_start
+USDT:2026-10-15 01:35:37 3454:3454 SyncActivityProfilerHandler.cpp:46] profiler_stop
+CPU_ALLOCATION_PROXY {"Hkv": 2, "G": 4, "C": 128, "width": 512, "baseline_positive_self_cpu_bytes": 29700, "shared_positive_self_cpu_bytes": 6156, "full_history_softmax_unchanged": true, "cuda_measured": false}
+.........s.
+----------------------------------------------------------------------
+Ran 19 tests in 40.073s
+
+OK (skipped=1)

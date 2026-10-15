@@ -1,0 +1,78 @@
+{
+  "base_commit": "12ffa8e5e01bcebff6c8886b9b55031d0f8456a6",
+  "runs": [
+    {
+      "mode": "normal",
+      "suite": "e141",
+      "returncode": 0,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_e141*.py",
+        "-v"
+      ]
+    },
+    {
+      "mode": "normal",
+      "suite": "e140-accounting",
+      "returncode": 0,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_e140_observation.py",
+        "-v"
+      ]
+    },
+    {
+      "mode": "optimized",
+      "suite": "e141",
+      "returncode": 0,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-O",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_e141*.py",
+        "-v"
+      ]
+    },
+    {
+      "mode": "optimized",
+      "suite": "e140-accounting",
+      "returncode": 0,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-O",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_e140_observation.py",
+        "-v"
+      ]
+    }
+  ],
+  "source_scope": "040246 alternative source; random CPU fp32 ordinary RoPE, not official/pretrained validation",
+  "changed_file_sha256": {
+    "exp/trace/verify_e141_native_forward.py": "dc50560cedce6fdc9649323a679664c6132cc690363dc7d82bd83bb8600a578e",
+    "agent_doc/guide/paper_figs/trace/e141_mla_nope_probe.py": "a4238dd152ff319a42a58cd9b51ffd30044026aa8ec5030f4a6703a37ca934d7",
+    "tests/test_e141_verifier_finite.py": "a29f3686718abb3bbacaa22d1d51c5856b83ec9b92d532d2341399b04939ccec",
+    "tests/test_e141_collector.py": "3592e539d02fa02c0d43449bde5f91f3488abdc8cc298ec348d48d66dce4372c"
+  }
+}

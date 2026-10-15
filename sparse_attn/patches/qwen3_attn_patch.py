@@ -1,4 +1,5 @@
 import os
+import sys
 
 import torch
 from transformers.cache_utils import Cache
@@ -19,6 +20,11 @@ from .utils import (
     prepare_cu_seqlens_from_mask, 
     unpad_tensor
 )
+
+
+def _paper_route(layer,route):
+    observer=sys.modules.get('exp.paper.receipt')
+    if observer is not None:observer.record_qwen_route(layer,route)
 
 
 def qwen3_attn_forward(
@@ -88,6 +94,7 @@ def qwen3_attn_forward(
             attn_output = sparse_prefill_attn(
                 indexer, q_t, k_t, v_t, softmax_scale=self.scaling
             )
+            _paper_route(self.layer_idx,"sparse-prefill:"+os.environ.get("TLI_PREFILL_RUNTIME","reference"))
             attn_weights = None
         else:
             attn_output, attn_weights = attention_interface(
@@ -101,6 +108,7 @@ def qwen3_attn_forward(
                 sliding_window=self.sliding_window,  # diff with Llama
                 **kwargs,
             )
+            _paper_route(self.layer_idx,"dense-prefill")
     else:
         # E138 消融①（prefill-only 稀疏，2026-10-14 用户指令）：TLI_DECODE_DENSE=1
         # 时 decode 显式回退 dense 原生前向——patch 保持挂载（prefill 稀疏
@@ -121,6 +129,7 @@ def qwen3_attn_forward(
             )
             attn_output = attn_output.reshape(*input_shape, -1).contiguous()
             attn_output = self.o_proj(attn_output)
+            _paper_route(self.layer_idx,"dense-decode")
             return attn_output, attn_weights
         # 【B2 修复（kimi3 清单 F2，2026-10-08）】decode 分支入口硬守卫
         # （audit 建议口径）：use_cache=False / chunked prefill（q_len>1）/
@@ -178,6 +187,7 @@ def qwen3_attn_forward(
             cu_seqlens_k,
             softmax_scale=self.scaling,
         )
+        _paper_route(self.layer_idx,"sparse-decode")
         attn_weights = None
 
     attn_output = attn_output.reshape(*input_shape, -1).contiguous()

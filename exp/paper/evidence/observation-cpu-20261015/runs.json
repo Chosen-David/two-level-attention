@@ -1,0 +1,33 @@
+[
+  {
+    "mode": "normal",
+    "returncode": 0,
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140*.py",
+      "-v"
+    ]
+  },
+  {
+    "mode": "optimized",
+    "returncode": 0,
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+      "-O",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140*.py",
+      "-v"
+    ]
+  }
+]

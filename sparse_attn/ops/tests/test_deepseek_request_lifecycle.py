@@ -197,16 +197,24 @@ class DeepseekRequestLifecycleTest(unittest.TestCase):
     def test_invalid_additive_mask_rejected_before_cache_update(self):
         bad_masks = [torch.ones(1, 3), torch.ones(1, 1, 3, 3, dtype=torch.bool),
                      torch.zeros(1, 1, 3, 2), torch.zeros(1, 2, 3, 3),
-                     torch.empty(1, 1, 3, 3, device='meta')]
-        for mask in bad_masks:
-            with self.subTest(shape=mask.shape, dtype=mask.dtype):
+                     torch.empty(1, 1, 3, 3, device='meta'),
+                     [0, 0, 0], {'mask': 0},
+                     torch.zeros(1, 1, 3, 3).to_sparse()]
+        for case, mask in enumerate(bad_masks):
+            with self.subTest(case=case):
                 cache = CacheDouble()
+                before = (self.attn.indexer.clears, self.attn.indexer.selects,
+                          self.attn.indexer.request_state)
                 with self.assertRaisesRegex(ValueError, 'attention_mask'):
                     self.forward(self.attn, torch.randn(1, 3, 8),
                                  attention_mask=mask,
                                  position_ids=torch.arange(3)[None],
                                  past_key_value=cache, use_cache=True)
                 self.assertEqual(cache.get_seq_length(0), 0)
+                self.assertIsNone(cache.k)
+                self.assertIsNone(cache.v)
+                self.assertEqual((self.attn.indexer.clears, self.attn.indexer.selects,
+                                  self.attn.indexer.request_state), before)
 
     def test_invalid_decode_mask_leaves_existing_prefix_unchanged(self):
         for mask in (torch.zeros(1, 4), torch.zeros(1, 1, 1, 3),

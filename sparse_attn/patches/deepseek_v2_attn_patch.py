@@ -23,10 +23,8 @@
 decode 期 attention_mask 契约：DSV2 走 model.generate，HF 传 4D float
 causal mask（[1,1,1,S]，B=1 无 padding 下全 0 可加）。稀疏路径在选中
 token 子集上做 causal-free softmax（选中的全是 ≤ 当前位置的 token——
-sink/swa/near/far 分区几何保证），忽略该 mask（与 qwen3 mask=None 分支
-同构）。decode B>1 与非标准 mask 布局显式拒绝。注意：标准 4D
-mask 内的 padding/非零 bias 尚未验证或消费，decode 仍仅支持无 padding
-全零 additive mask；不得把形状检查当作 padding 值检查。
+sink/swa/near/far 分区几何保证），仅在 cache 更新前验证 mask 为 None 或同设备、准确形状的全零浮点张量后
+忽略。B>1 / padding / 非恒等 mask 显式拒绝。该值检查可能产生设备同步。
 """
 
 import sys
@@ -76,13 +74,47 @@ def deepseek_v2_attn_forward(
         # otherwise mutate a cache object which the caller may retry with.
         raise RuntimeError("E142a 不支持空输入（q_len=0），拒绝更新 KV cache。")
     if attention_mask is not None and (
-        attention_mask.ndim != 4 or not attention_mask.is_floating_point()
+        not isinstance(attention_mask, torch.Tensor)
+        or attention_mask.layout != torch.strided
+        or attention_mask.ndim != 4 or not attention_mask.is_floating_point()
         or attention_mask.device != hidden_states.device
     ):
         raise ValueError(
-            "E142a attention_mask must be a 4D floating additive mask on "
+            "E142a attention_mask must be a strided 4D floating additive tensor on "
             "the hidden_states device; 2D padding/bool masks are unsupported"
         )
+
+    # Establish the supported decode contract before projection or cache.update.
+    # A fresh cache, including a one-token prompt, remains the dense prefill path.
+    if past_key_value is None:
+        raise RuntimeError("E142a sparse attention requires a KV cache (use_cache=True)")
+    if self.layer_idx is None:
+        raise ValueError("E142a cache requires layer_idx")
+    prefix_len = past_key_value.get_usable_length(q_len, self.layer_idx)
+    if q_len == 0 or prefix_len > 0:
+        if bsz != 1 or q_len != 1 or not use_cache:
+            raise RuntimeError(
+                f"E142a decode requires batch=1, q_len=1, use_cache=True; "
+                f"got batch={bsz}, q_len={q_len}, use_cache={use_cache}"
+            )
+        if attention_mask is not None:
+            expected = (1, 1, 1, prefix_len + q_len)
+            if (not isinstance(attention_mask, torch.Tensor)
+                    or attention_mask.layout != torch.strided
+                    or not attention_mask.is_floating_point()
+                    or tuple(attention_mask.shape) != expected
+                    or attention_mask.device != hidden_states.device):
+                raise ValueError(
+                    f"E142a decode attention_mask must be a floating additive "
+                    f"tensor of shape {expected} on the input device, or None"
+                )
+            # Exact zero rejects padding, bias, NaN and infinities. This value
+            # check synchronizes a CUDA tensor; no graph/performance claim.
+            if not bool(torch.all(attention_mask == 0)):
+                raise ValueError(
+                    "E142a decode attention_mask must be all zero; padding "
+                    "and nonidentity additive masks are unsupported"
+                )
 
     # ---- MLA 投影复刻（vendored modeling_deepseek eager forward 同构）----
     if self.q_lora_rank is None:
@@ -186,22 +218,7 @@ def deepseek_v2_attn_forward(
         attn_output = self.o_proj(attn_output)
         return attn_output, (attn_weights if output_attentions else None), past_key_value
 
-    # decode 稀疏分支入口硬守卫（B2 口径）
-    if past_key_value is None:
-        raise RuntimeError(
-            "E142a TLI 稀疏 patch 需要 KV cache（use_cache=True）；当前 "
-            "past_key_value=None（训练/PPL/logprob 形态不支持稀疏索引"
-            "路径），拒绝执行。"
-        )
-    if bsz != 1 or q_len != 1:
-        raise RuntimeError(
-            f"E142a TLI 稀疏 decode 路径仅支持 batch=1 且 q_len=1 的逐 "
-            f"token 解码；当前 batch={bsz}、q_len={q_len}（chunked "
-            f"prefill / batch>1 未实现），拒绝执行。"
-        )
-    # attention_mask：model.generate 传 4D float causal（B=1 无 padding
-    # 下全 0 可加）——稀疏选择分区几何保证只选中 ≤ 当前位置的 token，
-    # 只有全零 mask 才是恒等；4D padding/bias 值仍为未支持契约（见文首）。
+    # The identity decode mask was validated before any cache mutation.
 
     indexer: Indexer = self.indexer
     if hasattr(indexer, "freeze_dyn_dgate"):

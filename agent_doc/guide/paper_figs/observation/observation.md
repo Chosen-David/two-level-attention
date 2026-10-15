@@ -1,3 +1,5 @@
+> 历史 E140 图和区域/最差头/retained-mass 结论受已核采集缺陷影响，不能直接用于主文；见 [E140_VALIDITY.md](E140_VALIDITY.md)。原数据保持不变。
+
 # 论文 Observation 与动机图执行对照
 
 本文件回答三个动机问题：

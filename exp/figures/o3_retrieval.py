@@ -70,7 +70,7 @@ def topk(scores, budget):
     return np.argsort(-scores, axis=-1, kind='stable')[:, :min(budget, scores.shape[-1])]
 
 
-def measure(q, k, budget, coord):
+def measure(q, k, budget, coord, protected=None):
     ref_heads, ref = probabilities(q, k)
     _, approx = probabilities(q, k, coord)
     selected, oracle = topk(approx, budget), topk(ref, budget)
@@ -83,6 +83,12 @@ def measure(q, k, budget, coord):
                      'jaccard': overlap / (len(ids) + len(target) - overlap),
                      'retained_mass': float(ref[group, ids].sum()),
                      'worst_q_head_mass': float(ref_heads[group][:, ids].sum(axis=-1).min())})
+    if protected is not None:
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from exp.paper.observations import mass_partition
+        for group, row in enumerate(rows):
+            row.update(mass_partition(ref[group], row['selected_ids'], protected))
     return rows
 
 
@@ -208,6 +214,7 @@ def run(protocol, output, plot=False):
     require(not output.exists(), 'output exists; use a fresh run directory')
     require(digest(protocol.parent / p['rope_receipt_path']) == p['rope_receipt_sha256'], 'RoPE receipt hash mismatch')
     rows = []
+    o1_rows = []
     sources = []
     arms = [('tail', None), ('high', None)] + [('paired_random', s) for s in p['pair_seeds']]
     for t in p['traces']:
@@ -225,9 +232,21 @@ def run(protocol, output, plot=False):
             q = data['q'][qi].astype(np.float32)
             k = data['k'][:position + 1].astype(np.float32)
             require(np.isfinite(q).all() and np.isfinite(k).all(), 'nonfinite after float32 conversion')
+            protection = None
+            if 'protection' in p:
+                import sys
+                sys.path.insert(0, str(repo))
+                from exp.paper.observations import protected_ids, o1_mass
+                protection = protected_ids(position, p['protection']['sink'], p['protection']['swa'])
+                if 'distance_bin_edges' in p:
+                    _, reference = probabilities(q,k)
+                    near_start = t['near_start_by_query'][str(qi)]
+                    for head, probability in enumerate(reference):
+                        for item in o1_mass(probability,position,near_start,protection,p['distance_bin_edges']):
+                            o1_rows.append(dict(item,sample_id=t['sample_id'],document_id=t['document_id'],layer=t['layer'],query_position=position,kv_head=head))
             for kind, seed in arms:
                 pairs, coord = coordinates(kind, seed)
-                for r in measure(q, k, p['budget'], coord):
+                for r in measure(q, k, p['budget'], coord, protection):
                     rows.append(dict(r, arm_id=kind if seed is None else f'{kind}_{seed}',
                         sample_id=t['sample_id'], document_id=t['document_id'], layer=t['layer'],
                         query_position=position, query_phase='prefill', pair_ids=pairs.tolist(),
@@ -237,11 +256,15 @@ def run(protocol, output, plot=False):
     destination = output
     destination.parent.mkdir(parents=True, exist_ok=True)
     output = Path(tempfile.mkdtemp(prefix='.o3-pending-', dir=destination.parent))
+    (output / 'o1_mass.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in o1_rows))
     (output / 'selection_metrics.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
     public_protocol = {key: p[key] for key in ('run_id', 'model_revision', 'dataset_revision',
         'producer_commit', 'split', 'rope_receipt_sha256', 'rope_layout', 'data_kind',
         'query_phase', 'support', 'quantization', 'budget', 'bootstrap_repeats',
         'bootstrap_seed', 'pair_seeds')}
+    public_protocol['protection'] = p.get('protection')
+    public_protocol['distance_bin_edges'] = p.get('distance_bin_edges')
+    public_protocol['o1_status'] = 'diagnostic' if o1_rows else 'missing-frozen-bins-or-boundaries'
     public_protocol['traces'] = [{key: trace[key] for key in ('sha256', 'sample_id',
         'document_id', 'input_ids_sha256', 'layer', 'query_indices')} for trace in p['traces']]
     (output / 'protocol_summary.json').write_text(json.dumps(public_protocol, indent=2))

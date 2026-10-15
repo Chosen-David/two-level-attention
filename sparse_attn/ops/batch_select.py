@@ -76,11 +76,51 @@ import os
 import torch
 import torch.nn.functional as F
 
-# 【E139 #253】选择链 CUDA Graph 缓存：key=调用几何/配置 + 输入 schema，
-# 不含 indexer 实例身份。同一 prompt 内 36 层几何/host 值全同（层间仅 k 统计与 q
-# 变化）→ capture 一次、逐层 copy_ 注入 + replay。长度分桶上限防私池膨胀。
+# Process-local cache; shared across equivalent layer instances on one CUDA stream.
+# Callers must consume outputs on that stream before the next replay.
 _GRAPH_CACHE = {}
 _GRAPH_CACHE_MAX = 8
+_GRAPH_STATS = dict(capture=0, replay=0, fallback=0)
+
+
+def _input_schema(inputs):
+    """Metadata only: never copy/convert or synchronize tensor values."""
+    if any(type(name) is not str or
+           (t is not None and (not isinstance(t, torch.Tensor)
+                              or t.layout != torch.strided))
+           for name, t in inputs.items()):
+        raise ValueError("Graph inputs must be named strided tensors or None")
+    return tuple((name, None if t is None else
+                  (tuple(t.shape), tuple(t.stride()), t.dtype, t.device,
+                   t.layout, t.requires_grad))
+                 for name, t in sorted(inputs.items()))
+
+
+def _backend_signature(indexer):
+    # Unbound methods preserve cross-layer reuse without binding instance IDs.
+    # Instance-specific callables stay distinct. Tile settings affect reduction
+    # kernels; a disabled Triton backend must not replay an earlier graph.
+    def implementation(name):
+        fn = getattr(indexer, name)
+        return getattr(fn, "__func__", fn)
+    return (type(indexer), implementation("_fast_score_coarse"),
+            implementation("_fast_score_fine"),
+            tuple(sorted(indexer._TILE_COARSE.items())),
+            tuple(sorted(indexer._TILE_FINE.items())), indexer._triton_ok)
+
+
+def _graph_signature(indexer, inputs, *, geometry, modes, output_dtype,
+                     stream):
+    # Geometry is already rounded integer host data at the callsite. Reject
+    # bool/float/NaN rather than allowing Python's True == 1 == 1.0 key alias.
+    def integer_geometry(value):
+        return (type(value) is int or
+                (type(value) is tuple and all(integer_geometry(v) for v in value)))
+    if not integer_geometry(geometry) or type(modes) is not tuple or any(
+            type(mode) is not bool for mode in modes):
+        raise ValueError("Graph signature requires integer geometry and bool modes")
+    return ("batch-select-v2", geometry, modes, output_dtype,
+            _backend_signature(indexer), _input_schema(inputs), stream)
 
 
 def _graph_cached_run(key, body_fn, inputs):
@@ -90,14 +130,8 @@ def _graph_cached_run(key, body_fn, inputs):
     前被覆盖——调用方须在同 stream 顺序消费完毕，eager_prefill 现口径满足）。
     逐位一致性机制：replay 重放与 eager 完全相同的 kernel 序列 + 相同地址
     + 相同归约树（e139_l2_graph_poc 双重硬门 0/1008 diff 实证）。"""
-    # copy_ accepts broadcasting and implicit casts: success does not establish
-    # graph compatibility. Bind metadata before lookup, without device reads.
-    # Tensor identity/strides are intentionally excluded: copy_ materializes
-    # equal-shaped values into the capture's existing static storage.
-    schema = tuple((name, None if t is None else
-                    (tuple(t.shape), t.dtype, t.device, t.layout))
-                   for name, t in sorted(inputs.items()))
-    key = (key, schema)
+    schema = _input_schema(inputs)
+    key = (key, schema)  # qualify even direct callers; incompatible schema recaptures
     ent = _GRAPH_CACHE.get(key)
     if ent is None:
         if len(_GRAPH_CACHE) >= _GRAPH_CACHE_MAX:
@@ -118,20 +152,64 @@ def _graph_cached_run(key, body_fn, inputs):
         # ent 必须持有 body_fn 闭包：闭包捕获的几何张量（m_far/m_near/
         # near_blks/...）是 graph kernel 固化指针的数据源——失去引用会被
         # allocator 回收复用，replay 将读到被覆盖的垃圾（实测 810/1008 diff）
-        ent = (g, statics, out, body_fn)
+        ent = (g, statics, out, body_fn, schema, _input_schema(statics))
+        _GRAPH_STATS["capture"] += 1
         _GRAPH_CACHE[key] = ent
         return out
-    g, statics, out, _ = ent
+    g, statics, out, _, expected, static_schema = ent
     try:
+        # Check every field before any copy_: copy_ otherwise broadcasts and casts.
+        # clone may normalize source strides, hence separate source/static schemas.
+        if schema != expected or _input_schema(statics) != static_schema:
+            raise ValueError("CUDA Graph input schema mismatch")
         for n, t in inputs.items():
             if t is not None:
                 statics[n].copy_(t)
         g.replay()
+        _GRAPH_STATS["replay"] += 1
     except Exception:
-        # Evict the schema-qualified entry, not just the caller's geometry key.
         _GRAPH_CACHE.pop(key, None)
         raise
     return out
+
+
+def _scatter_candidate_scores(buf, scores, tokens, valid, shared_indices=False):
+    """Scatter unchanged per-query-head scores into full-history storage.
+
+    Internal contract: tokens/valid originate from disjoint near/far topk pools;
+    valid candidates are unique and exclude token zero on the shared path.
+    Invalid slots all write -inf to protected token zero, so collisions there
+    are idempotent. No softmax, arithmetic reduction or topk order changes.
+    """
+    if (buf.ndim != 4 or tuple(buf.shape[:2]) != (1, 1)
+            or tokens.ndim != 2 or valid.shape != tokens.shape
+            or tokens.dtype != torch.long or valid.dtype != torch.bool
+            or scores.ndim != 2 or scores.shape[0] != buf.shape[2]
+            or scores.shape[1] != tokens.shape[1] or tokens.shape[0] == 0
+            or scores.shape[0] % tokens.shape[0] != 0
+            or scores.dtype != buf.dtype
+            or any(t.device != buf.device for t in (scores, tokens, valid))):
+        raise ValueError("candidate scatter schema mismatch")
+    Hkv, C = tokens.shape
+    H = scores.shape[0]
+    G = H // Hkv
+    if shared_indices:
+        # Index/valid metadata are shared across GQA heads. expand is a view;
+        # scatter reads its zero-stride G axis without materializing [H,C].
+        idx_w = torch.where(valid, tokens, 0)              # [Hkv,C]
+        src_w = torch.where(valid[:, None, :],
+                            scores.reshape(Hkv, G, C),
+                            scores.new_full((), float("-inf")))
+        buf.view(Hkv, G, -1).scatter_(
+            2, idx_w[:, None, :].expand(Hkv, G, C), src_w)
+    else:
+        # Original baseline; retained for opt-out and unsupported geometry.
+        valid4 = valid.view(Hkv, 1, C).expand(Hkv, G, C).reshape(H, C)
+        idx4 = tokens.view(Hkv, 1, C).expand(Hkv, G, C).reshape(H, C)
+        idx_w = torch.where(valid4, idx4, torch.zeros_like(idx4))
+        src_w = torch.where(valid4, scores,
+                            scores.new_full((), float("-inf")))
+        buf[0, 0].scatter_(1, idx_w, src_w)
 
 
 def _zero_pad_pool(m, blk_idx, blk_valid, lo_blk, n_pool, nbad, dev):
@@ -165,7 +243,8 @@ def _gate_ok(indexer, q, k):
     bs = int(a.tia_block_size)
     try:
         if not (
-            indexer.far_select == "4bit" and indexer.near_select == "4bit"
+            getattr(indexer, "_triton_ok", False)
+            and indexer.far_select == "4bit" and indexer.near_select == "4bit"
             # e64 分区几何（α>0 且 β>0）——L1/L2 双池公式的前提
             and indexer.alpha > 0 and indexer.beta > 0
             and indexer.gamma is not None
@@ -370,6 +449,11 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below,
     # 批量化：池掩码/topk/rank 过滤全部跨行批量（层内 2 次大 topk），
     # 逐行仅剩 pc gather + mask scatter 两个不可批量 kernel。
     use_cand_topk = os.environ.get("TLI_PREFILL_L2_TOPK_CAND", "0") == "1"
+    # Opt-in allocation reduction only. A protected dummy token and GQA
+    # replication are required; unsupported geometry retains the baseline.
+    use_shared_indices = (
+        os.environ.get("TLI_PREFILL_SHARED_GQA_INDICES", "0") == "1"
+        and sink_tok >= bs and far_lo >= 1 and Hkv > 1 and G > 1)
     if use_cand_topk:
         # 层不变 device/host 值（graph capture 外一次性外提——k_max 的
         # .max() 是 D2H 同步，禁入 capture 区）
@@ -508,14 +592,10 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below,
             # ② where(topk_mask, sf, -inf) 等价张量：无效槽指向 token 0
             # （sink 区 [0,sink) 恒非候选 → -inf 幂等写入无覆盖问题；垃圾
             # 块号不得散写 [0,g1)——可能命中有效候选位）
-            valid4 = valid_j.view(Hkv, 1, C).expand(Hkv, G, C).reshape(H, C)
-            idx4 = ct_j.view(Hkv, 1, C).expand(Hkv, G, C).reshape(H, C)
-            idx_w = torch.where(valid4, idx4, torch.zeros_like(idx4))
-            src_w = torch.where(
-                valid4, sf_c, sf_c.new_full((), float("-inf")))
             buf = torch.full((1, 1, H, g1_j), float("-inf"),
                              dtype=qdtype, device=dev)
-            buf[0, 0].scatter_(1, idx_w, src_w)
+            _scatter_candidate_scores(buf, sf_c, ct_j, valid_j,
+                                      shared_indices=use_shared_indices)
             # ③ softmax → nan_to_num → GQA mean（与参考 L2043-2046 同形同值）
             p = F.softmax(buf, dim=-1).nan_to_num(nan=0)    # [1,1,H,g1]
             p = p.view(1, 1, Hkv, G, g1_j).mean(dim=-2)     # [1,1,Hkv,g1]
@@ -611,42 +691,30 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below,
         # key = 几何 + 配置指纹（不含 indexer 实例 id——e2e 每层独立
         # indexer 实例，跨层共享同一 graph：statics 注入层间数据，闭包持
         # 首层几何（层间不变）与首层 indexer（仅 capture 期发起 kernel，
-        # 参数固化为 statics 指针，replay 不再访问实例）。
-        # 【TL-E139-GRAPH-CACHE-20261015 修复】_body 闭包固化的几何不止
-        # shape 级——α/β/γ/sink/SWA/k1/subspace 改变 nb_l/sl_l/k2_*_l 与
-        # 保护带而不改输入 shape → 旧键命中即 replay 陈旧几何（GPT CPU
-        # 复现 36/256 mask 位差）。修复 = 键直接绑定 capture 实际固化的
-        # host 几何真值 + 保护区/配置标量 + 子空间/dtype 指纹：
-        #   nb_l/sl_l          ← near/swa 池块边界（α/sink_lo/group_ends 的
-        #                          函数——真值绑定，配置组合完备性无须论证）
-        #   k2_far_l/k2_near_l ← L2 双池预算（β/γ/k1/K2 的函数）
-        #   sink/swa/bs/sink_lo← mask 强制保护区宽度（_body 直读）
-        #   α/β/γ/k1           ← 原始配置兜底（防几何碰撞同值不同源）
-        #   subspace/dtype/dev ← idx_sub 身份 + statics copy_ 可隐式转换
-        #                          不报错，键级拒绝混用（GPT 修复方案 1+2）
-        _sub_fp = (getattr(indexer.args, "tia_subspace", None),
-                   getattr(indexer.args, "tia_l2_subspace", None),
-                   int(idx_sub.shape[-1]))
-        _dt_fp = tuple((t.dtype if t is not None else None)
-                       for t in (k_min, k_max, k_avg, k_qat, b_q))
-        # b_q is always float32; qdtype still controls captured score storage
-        # and rounding, so its identity cannot be inferred from input dtypes.
-        key = (L, N, kf, kn, K2arg, tuple(group_ends),
-               far_use_mm, near_use_mm, use_cand_topk,
-               tuple(nb_l), tuple(sl_l), tuple(k2_far_l), tuple(k2_near_l),
-               sink_tok, swa_tok, bs, sink_lo,
-               float(indexer.alpha), float(indexer.beta),
-               float(indexer.gamma), k1,
-               _sub_fp, _dt_fp, str(dev), qdtype)
+        # 参数固化为 statics 指针，replay 不再访问实例）
+        key = None
         try:
-            return _graph_cached_run(
-                key, _body,
-                dict(k_min=k_min, k_max=k_max, k_avg=k_avg,
-                     k_qat=k_qat, b_q=b_q))
+            inputs = dict(k_min=k_min, k_max=k_max, k_avg=k_avg,
+                          k_qat=k_qat, b_q=b_q)
+            # Bind all captured geometry/host budgets, including rounded pool
+            # edges. No new D2H synchronization: these lists already exist.
+            key = _graph_signature(
+                indexer, inputs,
+                geometry=(L, N, H, Hkv, G, Tb, bs, sink_tok, swa_tok,
+                          far_lo, kf, kn, K2arg, tuple(group_ends),
+                          tuple(nb_l), tuple(sl_l), tuple(k2_far_l),
+                          tuple(k2_near_l)),
+                modes=(far_use_mm, near_use_mm, use_cand_topk,
+                       use_shared_indices),
+                output_dtype=qdtype,
+                stream=(dev, torch.cuda.current_stream(dev).cuda_stream))
+            with torch.cuda.device(dev):
+                return _graph_cached_run(key, _body, inputs)
         except Exception:
+            _GRAPH_STATS["fallback"] += 1
+            # Schema-qualified replay eviction happens inside _graph_cached_run.
             if require_graph:
-                raise  # A fallback cannot establish graph correctness/performance.
-            pass  # _graph_cached_run evicts failed replay entries before raising.
+                raise  # Never certify an eager fallback as Graph execution.
     try:
         return _body(k_min, k_max, k_avg, k_qat, b_q)
     except Exception:

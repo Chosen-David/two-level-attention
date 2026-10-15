@@ -9,8 +9,6 @@ import os
 import sys
 import time
 
-from e139_validation_gates import require_equal_masks
-
 TREE = os.environ.get("E139_TREE",
                       os.path.expanduser("~/tmp_e138_abl_tree_187"))
 sys.path.insert(0, TREE)
@@ -18,6 +16,9 @@ sys.path.insert(0, os.path.join(TREE, "exp", "bench"))
 import torch  # noqa: E402
 from e131_arm_bench import make_args  # noqa: E402
 from sparse_attn.indexer.tli_indexer import TLIIndexer  # noqa: E402
+from e139_graph_checks import require_graph
+from e139_validation_gates import require_equal_masks
+from sparse_attn.ops.batch_select import _GRAPH_CACHE, _GRAPH_STATS
 from sparse_attn.ops.batch_select import _gate_ok  # noqa: E402
 
 DEV = "cuda:0"
@@ -43,14 +44,19 @@ def fresh_idx(K2=1024):
 
 
 def bench(fn, iters=7):
+    def checked():
+        out = fn()
+        if out is None or len(out) != N:
+            raise RuntimeError("timed selector fell back or returned incomplete masks")
+        return out
     for _ in range(2):
-        fn()
+        checked()
     torch.cuda.synchronize()
     ts = []
     for _ in range(iters):
         torch.cuda.synchronize()
         t0 = time.perf_counter()
-        fn()
+        checked()
         torch.cuda.synchronize()
         ts.append(time.perf_counter() - t0)
     ts.sort()
@@ -85,6 +91,7 @@ idx = fresh_idx()
 q, k, v = make_qkv(999)
 if not _gate_ok(idx, q, k):
     raise SystemExit("validation failed: selector is not eligible")
+_GRAPH_CACHE.clear()
 SS = D ** -0.5
 
 from sparse_attn.ops.batch_select import batched_group_sels  # noqa: E402
@@ -93,13 +100,19 @@ from sparse_attn.ops.batch_select import batched_group_sels  # noqa: E402
 os.environ.pop("TLI_PREFILL_SELECT_GRAPH", None)
 m_a1 = batched_group_sels(idx, q, k, SS, group_ends, dense_below)
 m_a2 = batched_group_sels(idx, q, k, SS, group_ends, dense_below)
-require_equal_masks("[G2] eager 同输入两次", m_a1, m_a2, group_ends)
+require_equal_masks("[G2] eager repeat", m_a1, m_a2, group_ends)
+d0 = sum(1 for a, b in zip(m_a1, m_a2) if not torch.equal(a, b))
+print(f"[G2] eager 同输入两次 diff_rows = {d0}/{N}", flush=True)
 
 # ---- 硬门 1：graph 路径多层注入 vs eager 逐位 ----
 os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
 # 层 0（capture 层）：graph 首调 = capture 执行结果
+before = dict(_GRAPH_STATS)
 m_g0 = batched_group_sels(idx, q, k, SS, group_ends, dense_below, require_graph=True)
-require_equal_masks("[G1] capture 层 graph vs eager", m_a1, m_g0, group_ends)
+require_graph(before, _GRAPH_STATS, "capture")
+require_equal_masks("[G1] capture", m_a1, m_g0, group_ends)
+d_cap = sum(1 for a, b in zip(m_g0, m_a1) if not torch.equal(a, b))
+print(f"[G1] capture 层 graph vs eager diff_rows = {d_cap}/{N}", flush=True)
 
 for layer in range(1, 4):
     seed = 1000 + layer
@@ -108,20 +121,29 @@ for layer in range(1, 4):
     # eager 先算（独立内存）
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
     m_e = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, dense_below)
+    require_equal_masks("[G1] eager input", m_e, m_e, group_ends)
     # graph replay（copy_ 注入 + replay）
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
+    before = dict(_GRAPH_STATS)
     m_r = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, dense_below, require_graph=True)
-    require_equal_masks(
-        f"[G1] 层 {layer}（seed {seed}，新 idx 实例）replay vs eager",
-        m_e, m_r, group_ends)
+    require_graph(before, _GRAPH_STATS, "replay")
+    require_equal_masks("[G1] replay", m_e, m_r, group_ends)
+    d = sum(1 for a, b in zip(m_e, m_r) if not torch.equal(a, b))
+    print(f"[G1] 层 {layer}（seed {seed}，新 idx 实例）replay vs eager "
+          f"diff_rows = {d}/{N}", flush=True)
 
 # ---- 性能：选择链 wall（稳态 replay，不含首层 capture）----
 os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
 t_eager = bench(lambda: batched_group_sels(
     idx, q, k, SS, group_ends, dense_below))
 os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
+before = dict(_GRAPH_STATS)
 t_graph = bench(lambda: batched_group_sels(
     idx, q, k, SS, group_ends, dense_below, require_graph=True))
+require_graph(before, _GRAPH_STATS, "replay")
+if (_GRAPH_STATS["replay"] - before["replay"] != 9
+        or _GRAPH_STATS["capture"] != before["capture"]):
+    raise RuntimeError("timed Graph benchmark requires nine warm-cache replays")
 print(f"选择链 wall: eager = {t_eager*1e3:7.1f}ms / graph = {t_graph*1e3:7.1f}ms"
       f"（speedup = {t_eager/t_graph:.2f}x）", flush=True)
 print("=== DONE ===", flush=True)

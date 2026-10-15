@@ -44,6 +44,7 @@ import torch.nn.functional as F
 from einops import rearrange, einsum
 
 # MoBA 口径的 chunk 行数（gate 粒度）
+RUNTIME_COUNTS = dict(calls=0, fused=0, fused_fallback=0, batch_select=0, batch_fallback=0)
 SPARSE_PREFILL_CHUNK = 2048
 # 行子块 fp32 score 峰值元素数预算（128M 元素 ≈ 512MB fp32）
 _ROW_BLOCK_MAX_ELEM = 1 << 27
@@ -75,7 +76,7 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
     swa」）】sel_list 非空时（chunk=2048 计算组织不变 + 组粒度 grp 选择）：
     sel_list[j] 为 chunk 内第 j 组（grp 行）末行按自身前缀做的完整两级
     选择；行 r 可见 keys = sel_list[r//grp] ∪ 自身保护带 ∩ 因果——组内
-    partition 错位 ≤ grp-1（grp=64=tia_block_size 即块对齐 per-token 语义）。
+    partition 错位 ≤ grp-1（grp=64=tia_block_size 块对齐的 group-end-Q 共享选择（不保证 prefix-invariant））。
     compact 并集 = ∪_j sel_list[j] ∩ [0, p_max] ∪ sink ∪ 保护带并集，
     行级 mask 的 in_sel 按行自己组的选择取值——数学上与「每 grp 行独立
     chunk」严格等价（idx 升序 + 行级 -inf 屏蔽并集差量，softmax 非零项
@@ -103,10 +104,13 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
             and os.environ.get("TLI_PREFILL_FUSED_ATTN", "0") == "1"):
         try:
             from .fused_attn_triton import fused_group_attn
-            return fused_group_attn(
+            result = fused_group_attn(
                 q_c, k_c, v_c, sel_list, pos_lo, G, softmax_scale,
                 sink_tok=sink_tok, swa_tok=swa_tok, grp=grp)
+            RUNTIME_COUNTS["fused"] += 1
+            return result
         except Exception:
+            RUNTIME_COUNTS["fused_fallback"] += 1
             pass  # fail-closed 回退下方原路径
 
     o_c = torch.empty_like(q_c)
@@ -306,6 +310,14 @@ def sparse_prefill_attn(
     注意：不改 tli_indexer.py 的单行 query 断言（保护在跑语义）——本函数
     每 chunk 只喂末行单行 q（reshape 成 [1,1,H,D]）。
     """
+    runtime = os.environ.get("TLI_PREFILL_RUNTIME", "reference")
+    if runtime not in ("reference", "candidate"):
+        raise ValueError("TLI_PREFILL_RUNTIME must be reference or candidate")
+    if runtime == "reference":
+        from .reference_prefill import sparse_prefill_attn as reference
+        return reference(indexer,q,k,v,softmax_scale=softmax_scale,
+                         chunk_size=chunk_size,dense_below=dense_below)
+    RUNTIME_COUNTS["calls"] += 1
     # Metadata-only guards: do not use assert, which disappears with python -O.
     # The row implementation consumes batch 0 only and allocates an output with
     # q's shape, so accepting other batches could return unwritten elements.
@@ -323,6 +335,8 @@ def sparse_prefill_attn(
         raise ValueError("prefill q/k/v head dimensions must match and be positive")
     if H < 1 or Hkv < 1 or H % Hkv != 0:
         raise ValueError("prefill requires positive heads and H divisible by Hkv")
+    if q.device != k.device or q.device != v.device or q.dtype != k.dtype or q.dtype != v.dtype:
+        raise ValueError("prefill q/k/v dtype and device must match")
     if softmax_scale is None:
         softmax_scale = D ** -0.5
     if chunk_size is None:
@@ -348,18 +362,23 @@ def sparse_prefill_attn(
     # TLI_PREFILL_SELECT_GROUP=G>0 时 chunk 内每 G 行一组，组末行按自身
     # 前缀做完整两级选择（near 池 L1-avg + far 池 L1-minmax + L2 4bit），
     # 行级 mask 用行自己组的选择——「每个 token 有自己的 near/far/sink/
-    # swa」的 scalable 落地（G=64=tia_block_size 即块对齐 per-token 语义）。
+    # swa」的 scalable 落地（G=64=tia_block_size 为块对齐组末Q共享选择，不是per-token/prefix-invariant语义）。
     # 0 = 默认旧行为（末行选择整 chunk 共享）逐位不变
     grp = int(os.environ.get("TLI_PREFILL_SELECT_GROUP", "0"))
+    if grp < 0 or (grp and chunk_size % grp):
+        raise ValueError("candidate selection group must divide chunk size")
+    if dense_below < 0:
+        raise ValueError("dense_below must be nonnegative")
+    if os.environ.get("TLI_PREFILL_PREFETCH", "0") != "0":
+        raise ValueError("paper candidate supports single-stream prefill only")
 
     G = H // Hkv
     # 行级保护带尺寸（与 indexer mask 强制区同源；getattr 兜底对齐默认配置）
     swa_tok = int(getattr(indexer, "sliding_window_size", 128))
     _bs = int(getattr(indexer.args, "tia_block_size", 64))
     # 【E139 纲领①sink 统一】读 indexer E135 权威参数 sink_tokens（单一
-    # 事实源，main 2433b52 与分支 d0e87d7 同一修复逐行等价），替换历史锚
-    # sink_blocks×bs 读法——非默认 sink（如 192）时 prefill 此前会用错
-    # 128。默认 128 ≡ 旧 2×64 逐位一致
+    # 事实源），替换历史锚 sink_blocks×bs 读法——非默认 sink（如 192）
+    # 时 prefill 此前会用错 128。默认 128 ≡ 旧 2×64 逐位一致
     sink_tok = int(getattr(indexer, "sink_tokens", 128))
     # 共享选择满额理论上界（host 静态算，零 GPU 同步）：mid topk（K2，
     # 块对齐 +1 块松弛）+ sink 强制 + 末行 swa 强制 + 1 块对齐余量。
@@ -452,6 +471,8 @@ def sparse_prefill_attn(
             indexer, q, k, softmax_scale,
             [bg1v for (_, bg1v) in aligned], dense_below,
         ) if aligned else []
+        if aligned:
+            RUNTIME_COUNTS["batch_select" if sel_aligned is not None else "batch_fallback"] += 1
         if sel_aligned is not None:
             sel_unaligned = {
                 bg1v: _prepare_sel(bg0, bg1v)
