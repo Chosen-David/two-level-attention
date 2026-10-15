@@ -1,0 +1,30 @@
+{
+  "official_required_sha256": "7d8e5221095286eea991137760893fd7ba52727c0b4ebf48ec09e8bc56b45b9c",
+  "official_source_status": "download blocked by HTTP403; not validated in this environment",
+  "tested_source": "/tmp/tla-hisa-official/TransMLA_NeurIPS_2025/models/deepseek_v2_lite/modeling_deepseek.py",
+  "tested_source_sha256": "040246d626f2bb94075177c9cc17999fc1641a96bdb4eaa45a9efd3cce4df0aa",
+  "tested_source_origin": "HISA repository dc9f3a3b7938bd26e165b0c99e3b6ea627d1ecfc / TransMLA_NeurIPS_2025; not the pinned official file",
+  "collector_sha256": "60625ae7fe69dcdda248eef3bfce5b9a6d858d43d04d675c38d914f9fe259304",
+  "historical_artifacts": [
+    {
+      "path": "exp/trace/results/e141_mla_nope_trace.json",
+      "source_commit": "13be23cb1da409a4a63c0d009af34c8fbf167f95",
+      "blob": "93d0f2345bddc3a496b3fff0166c00344c3e32cf",
+      "sha256": "8969c881ffeacb5c87fad7b3997e928df7524bb5d77520a8744216839a2ad9e6",
+      "copied_or_modified": false
+    },
+    {
+      "path": "exp/trace/results/e141_mla_nope_trace_verdict.json",
+      "source_commit": "13be23cb1da409a4a63c0d009af34c8fbf167f95",
+      "blob": "3315f4992ae18954a7884e14223dfed25fcb46ae",
+      "sha256": "1fc346bfd2404d590ba9e3d8bd1844a3da7fcb2c647f4d565cbcd85b1955ad16",
+      "copied_or_modified": false
+    }
+  ],
+  "restriction": "random CPU fp32 attention only, ordinary RoPE; not YaRN/bf16/pretrained/GPU",
+  "validation_file_sha256": {
+    "exp/trace/verify_e141_qk_reconstruction.py": "b3313a385ac9f341ebeed825e0521bb593b17519102a27e3207aa3c0de3d8753",
+    "exp/trace/verify_e141_native_forward.py": "75df626629b3e94abea02aa28b67e5fbdbc4254fe84e234b2757845da6df655d",
+    "tests/test_e141_collector.py": "6491e3220d977ab80b9d4134f6f3d803377d9aea12a85caa2fb3e29f3a2f9dac"
+  }
+}
