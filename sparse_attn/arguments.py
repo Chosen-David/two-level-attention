@@ -86,6 +86,45 @@ def _add_fasa_args(parser: argparse.ArgumentParser):
     group.add_argument('--fasa_agreement_dir', type=str, default='dimension_rankings')
     return parser
 
+
+def _add_clusterkv_args(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title='clusterkv')
+    # ClusterKV vendor（官方源码复用，KMeans 聚类稀疏）：prefill dense；decode
+    # 后期对 prefill key pylibraft KMeans 建簇（build_cluster）→ query×centroids
+    # 最近邻选簇到 token_budget−sink → sel_key_indices → +sink 偏移 → gather +
+    # 精确 matmul 细筛（cluster_attn_out）。官方 token_budget 是「选择预算」
+    # （sink 额外，kv_cache_size = sink + token_budget + window），与 TLI K2=1024
+    # 已含 sink+swa 强制区的口径不同——严格对齐总 attend=1024 须换算
+    # token_budget（如 768 + sink16 + window240），接入验收时按每 Q-head 实际
+    # unique token 数核对（evaluation.md 口径）。默认沿用官方默认参数
+    # （token_budget=1024, sink=16, nlist=400, fit_iter=20, head_sel=truc）。
+    group.add_argument('--clusterkv_token_budget', type=int, default=1024,
+                       help='ClusterKV 选择预算（官方默认 1024，sink 额外；与 TLI '
+                            'K2=1024 口径不同需换算核对）')
+    group.add_argument('--clusterkv_sink', type=int, default=16,
+                       help='ClusterKV sink 区大小（官方默认 16，强制保留前缀 token）')
+    group.add_argument('--clusterkv_window', type=int, default=320,
+                       help='ClusterKV window 区大小（官方 efficiency 路径默认 320，'
+                            'accuracy 路径由 prompt 后最近区隐含；仅统计/换算用）')
+    group.add_argument('--clusterkv_nlist', type=int, default=400,
+                       help='KMeans 簇数（官方默认 400）')
+    group.add_argument('--clusterkv_fit_iter', type=int, default=20,
+                       help='KMeans max_iter（官方默认 20）')
+    group.add_argument('--clusterkv_head_sel', type=str, default='truc',
+                       choices=['truc', 'pad'],
+                       help='per-head 选择预算截断策略（官方默认 truc）')
+    group.add_argument('--clusterkv_balance', action='store_true',
+                       help='Balanced KMeans（ivf_flat，官方默认 False）')
+    group.add_argument('--clusterkv_dist_t', type=str, default='cosine',
+                       choices=['cosine', 'inner_product', 'l2', 'l1', 'euclidean',
+                                'chebyshev', 'canberra'],
+                       help='KMeans 距离度量（官方默认 cosine）')
+    group.add_argument('--clusterkv_gqa_policy', type=str, default=None,
+                       choices=['qavg'], help='GQA 聚合策略（官方默认 None = repeat）')
+    group.add_argument('--clusterkv_topk_stat', action='store_true',
+                       help='官方 top-k 命中率统计（默认关闭）')
+    return parser
+
 def _parse_gamma(x):
     """E122：γ 支持 'off'（大小写不敏感）→ None = 自由竞争模式。
 
@@ -252,6 +291,7 @@ def add_sparse_attn_args(parser: argparse.ArgumentParser):
     parser = _add_fasa_args(parser)
     parser = _add_sparq_args(parser)
     parser = _add_moba_args(parser)
+    parser = _add_clusterkv_args(parser)
     parser = _add_twilight_args(parser)
     parser = _add_tia_args(parser)
     parser = _add_tli_args(parser)

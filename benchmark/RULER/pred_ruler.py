@@ -333,6 +333,40 @@ def main():
             topk=getattr(args, "moba_topk", None),
             budget=getattr(args, "moba_budget", 1024),
         )
+    elif args.method == "clusterkv_vendor":
+        # ClusterKV（KMeans 聚类稀疏）B 轨官方源码复用——官方语义：
+        # prefill dense（官方 flash_forward 分支）；decode 后期对 prefill key
+        # pylibraft KMeans 建簇（build_cluster）→ query×centroids 最近邻选簇到
+        # token_budget−sink → sel_key_indices → +sink 偏移 → gather + 精确
+        # matmul 细筛（cluster_attn_out，官方算法逐字节一致）。
+        # qwen3_clusterkv_patch.py 仅接口胶水（Qwen3 q/k RMSNorm、GQA 展开、
+        # cache 更新）；官方 cluster_attention.py 从
+        # third_party/ClusterKV/accuracy 直接 import（md5 冻结）。官方
+        # `_clusterkv_knl.search_indices` 编译内核在本机不可用（网络阻塞），
+        # 由 vendor 包 clusterkv/_clusterkv_knl.py 纯 torch 等价实现替代
+        # （语义与官方 KMeansSearchIndicesKernel 一致），官方文件零改动。
+        # 预算口径：官方 token_budget 是「选择预算」（sink 额外），与 TLI
+        # K2=1024 已含 sink+swa 的口径不同，接入验收时按 unique token 数核对。
+        vendor_dir = os.path.join(
+            REPO, "exp", "vendor_baselines", "clusterkv_vendor")
+        if vendor_dir not in sys.path:
+            sys.path.insert(0, vendor_dir)
+        ckv_root = os.path.join(REPO, "third_party", "ClusterKV")
+        if ckv_root not in sys.path:
+            sys.path.insert(0, ckv_root)
+        from qwen3_clusterkv_patch import enable_clusterkv  # noqa: E402
+        n_patched = enable_clusterkv(
+            model,
+            token_budget=getattr(args, "clusterkv_token_budget", 1024),
+            sink=getattr(args, "clusterkv_sink", 16),
+            nlist=getattr(args, "clusterkv_nlist", 400),
+            fit_iter=getattr(args, "clusterkv_fit_iter", 20),
+            head_sel=getattr(args, "clusterkv_head_sel", "truc"),
+            balance=getattr(args, "clusterkv_balance", False),
+            dist_t=getattr(args, "clusterkv_dist_t", "cosine"),
+            gqa_policy=getattr(args, "clusterkv_gqa_policy", None),
+            topk_stat=getattr(args, "clusterkv_topk_stat", False),
+        )
     else:
         n_patched = register_patch(model, args, snapshot)
     if args.method != "none" and n_patched == 0:
