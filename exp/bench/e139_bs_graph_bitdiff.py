@@ -108,7 +108,7 @@ print(f"[G2] eager 同输入两次 diff_rows = {d0}/{N}", flush=True)
 os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
 # 层 0（capture 层）：graph 首调 = capture 执行结果
 before = dict(_GRAPH_STATS)
-m_g0 = batched_group_sels(idx, q, k, SS, group_ends, dense_below)
+m_g0 = batched_group_sels(idx, q, k, SS, group_ends, dense_below, require_graph=True)
 require_graph(before, _GRAPH_STATS, "capture")
 require_equal_masks("[G1] capture", m_a1, m_g0, group_ends)
 d_cap = sum(1 for a, b in zip(m_g0, m_a1) if not torch.equal(a, b))
@@ -125,7 +125,7 @@ for layer in range(1, 4):
     # graph replay（copy_ 注入 + replay）
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
     before = dict(_GRAPH_STATS)
-    m_r = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, dense_below)
+    m_r = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, dense_below, require_graph=True)
     require_graph(before, _GRAPH_STATS, "replay")
     require_equal_masks("[G1] replay", m_e, m_r, group_ends)
     d = sum(1 for a, b in zip(m_e, m_r) if not torch.equal(a, b))
@@ -139,7 +139,7 @@ t_eager = bench(lambda: batched_group_sels(
 os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
 before = dict(_GRAPH_STATS)
 t_graph = bench(lambda: batched_group_sels(
-    idx, q, k, SS, group_ends, dense_below))
+    idx, q, k, SS, group_ends, dense_below, require_graph=True))
 require_graph(before, _GRAPH_STATS, "replay")
 if (_GRAPH_STATS["replay"] - before["replay"] != 9
         or _GRAPH_STATS["capture"] != before["capture"]):

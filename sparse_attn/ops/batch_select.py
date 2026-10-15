@@ -275,7 +275,14 @@ def _gate_ok(indexer, q, k):
     return True
 
 
-def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
+def _unsupported_selection(require_graph):
+    if require_graph:
+        raise RuntimeError("required graph execution unavailable: unsupported selector input/configuration")
+    return None
+
+
+def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below,
+                       *, require_graph=False):
     """整层一次批量组选择。
 
     参数：
@@ -285,27 +292,34 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
       group_ends: 该层全部稀疏组的组末行位置 g1_j（严格递增 int 列表，
         均须为 bs 倍数——未对齐组由调用方先行剔除走逐组回退）
       dense_below: dense 前缀宽（须 bs 倍数；仅作门禁校验）
+      require_graph: 验收/测速专用；必须 GRAPH=1 且成功执行 graph，
+        不允许静默 eager/None/空组回退。默认 False 保留生产容错行为。
     返回：
       list[[Hkv, g1_j] bool]（顺序与 group_ends 一致；与逐组版
       _prepare_sel 的 m0[..., :c1] 同形）；配置不匹配返回 None（fail-closed）。
     """
+    if require_graph and os.environ.get("TLI_PREFILL_SELECT_GRAPH", "0") != "1":
+        raise ValueError("require_graph=True needs TLI_PREFILL_SELECT_GRAPH=1")
+
     bs = int(indexer.args.tia_block_size)
     if not _gate_ok(indexer, q, k):
-        return None
+        return _unsupported_selection(require_graph)
     if len(group_ends) == 0:
+        if require_graph:
+            return _unsupported_selection(require_graph)
         return []
     if any(int(g) % bs != 0 for g in group_ends):
-        return None          # 未对齐组：批量全前缀统计与逐组 pad 统计语义不同
+        return _unsupported_selection(require_graph)  # 未对齐组与逐组 pad 统计语义不同
     if int(dense_below) % bs != 0:
-        return None
+        return _unsupported_selection(require_graph)
     L = int(k.shape[1])
     if L != int(q.shape[1]):
-        return None
+        return _unsupported_selection(require_graph)
     N = len(group_ends)
     H, Hkv = int(q.shape[2]), int(k.shape[2])
     G = H // Hkv
     if H % Hkv != 0 or G < 1:
-        return None
+        return _unsupported_selection(require_graph)
     if softmax_scale is None:
         softmax_scale = float(q.shape[3]) ** -0.5
     dev = q.device
@@ -317,7 +331,7 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
     if getattr(indexer, "_skip_ids", None) is not None:
         indexer._resolve_skip()
         if indexer.skip_far:
-            return None
+            return _unsupported_selection(require_graph)
 
     # ---- ① 每层一次全前缀统计（纲领②：共享 K 索引） ----
     # 组末行 g1 均为 bs 倍数 → 行前缀 = 整块前缀（无部分块），全前缀统计的
@@ -357,7 +371,7 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
     kf = min(nb_far, Tb)
     kn = min(nb_near, Tb)
     if kf < 0 or kn < 0:
-        return None
+        return _unsupported_selection(require_graph)
     # 块级因果（硬门）：块 b 可见于行 j ⟺ b < g1_j//bs（整块 ⊆ 前缀）
     blk_causal = blk[None, None, :] < kt.view(N, 1, 1)      # [N,1,Tb]
     m_far = (blk_causal
@@ -699,6 +713,8 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
         except Exception:
             _GRAPH_STATS["fallback"] += 1
             # Schema-qualified replay eviction happens inside _graph_cached_run.
+            if require_graph:
+                raise  # Never certify an eager fallback as Graph execution.
     try:
         return _body(k_min, k_max, k_avg, k_qat, b_q)
     except Exception:
