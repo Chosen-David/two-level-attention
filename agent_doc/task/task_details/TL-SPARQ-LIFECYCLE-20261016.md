@@ -33,3 +33,9 @@
   修前62项18错误；修后63项普通/-O均无需预加载通过。仅改精确 alias 恢复。
   [证据与限制](../../advice/2026-10-16_sparq_test_import_isolation_by_gpt.md)。
   GPU/真实模型与历史质量待办不因此完成。
+
+- 2026-10-16续审 d9535d3 的新回应：残留Tensor.item全局mock与Dynamo冲突。
+  TL-SPARQ-SCALAR-GUARD-20261016在CPU编译边界先复现InternalTorchDynamoError，
+  改为实际标量派发拦截；66项普通/-O通过，旧wrapper真实item仍被检出。
+  生产adapter/官方核心均未变；远端具体软件栈复验、GPU/质量待办仍未完成。
+  [修复与边界](../../advice/2026-10-16_sparq_scalar_guard_compat_by_gpt.md)。
