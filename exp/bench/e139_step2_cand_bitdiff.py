@@ -14,6 +14,8 @@ import os
 import sys
 import time
 
+from e139_validation_gates import require_equal_masks
+
 TREE = os.environ.get("E139_TREE",
                       os.path.expanduser("~/tmp_e138_abl_tree_187"))
 sys.path.insert(0, TREE)
@@ -85,52 +87,39 @@ os.environ.pop("TLI_PREFILL_L2_TOPK_CAND", None)
 from sparse_attn.ops.batch_select import batched_group_sels  # noqa: E402
 import sparse_attn.ops.batch_select as _bs  # noqa: E402
 
-fail = 0
 # K2=1024 生产口径（nbad=0 常规路径）；K2=8192 补位应力档
 # （K2_mid=7872 > kf·64=7168 → 宽 far 池行 nbad=k-cnt>0，触发
 # _zero_pad_pool 补位仿真分支——K2≤2048 时 K2_mid<7168 恒不触发）
-for K2 in (1024, 8192):
+def validate(K2):
     print(f"---- K2 = {K2} ----", flush=True)
     group_ends = group_ends_for(L)
-    N = len(group_ends)
     idx = fresh_idx(K2)
     q, k, _ = make_qkv(999)
-    assert _gate_ok(idx, q, k)
+    if not _gate_ok(idx, q, k):
+        raise SystemExit(f"validation failed: K2={K2} selector is not eligible")
     SS = D ** -0.5
 
     # ---- 硬门 3：默认路径零扰动 ----
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
     m_a1 = batched_group_sels(idx, q, k, SS, group_ends, 1024)
     m_a2 = batched_group_sels(idx, q, k, SS, group_ends, 1024)
-    assert m_a1 is not None and m_a2 is not None
-    d0 = sum(1 for a, b in zip(m_a1, m_a2) if not torch.equal(a, b))
-    print(f"[G3] CAND=0 eager 同输入两次 diff_rows = {d0}/{N}", flush=True)
-    fail += d0
+    require_equal_masks(f"[G3 K2={K2}] CAND=0 eager 同输入两次",
+                        m_a1, m_a2, group_ends)
 
     # ---- 硬门 1：Step2 vs 旧路径（eager 双臂）----
     os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "1"
     m_s2 = batched_group_sels(idx, q, k, SS, group_ends, 1024)
     os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "0"
-    assert m_s2 is not None
-    # m_a1 即 CAND=0 结果（同输入同 idx）
-    d1 = sum(1 for a, b in zip(m_a1, m_s2) if not torch.equal(a, b))
-    d1_tok = 0
-    for a, b in zip(m_a1, m_s2):
-        d1_tok += int((a != b).sum())
-    print(f"[G1] CAND=1 vs CAND=0 diff_rows = {d1}/{N} "
-          f"diff_tokens = {d1_tok}", flush=True)
-    fail += d1
+    require_equal_masks(f"[G1 K2={K2}] CAND=1 vs CAND=0",
+                        m_a1, m_s2, group_ends)
 
     # ---- 硬门 2：Step2 + graph capture/replay vs Step2 eager ----
     os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "1"
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
     _bs._GRAPH_CACHE.clear()        # 排除 Step1 缓存（key 已含 CAND 指纹，防御性）
     m_g0 = batched_group_sels(idx, q, k, SS, group_ends, 1024)
-    assert m_g0 is not None
-    d_cap = sum(1 for a, b in zip(m_g0, m_s2) if not torch.equal(a, b))
-    print(f"[G2] CAND=1 capture 层 graph vs eager diff_rows = {d_cap}/{N}",
-          flush=True)
-    fail += d_cap
+    require_equal_masks(f"[G2 K2={K2}] CAND=1 capture 层 graph vs eager",
+                        m_s2, m_g0, group_ends)
     for layer in range(1, 3):
         seed = 2000 + layer
         q_l, k_l, _ = make_qkv(seed)
@@ -139,39 +128,46 @@ for K2 in (1024, 8192):
         m_e = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, 1024)
         os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
         m_r = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, 1024)
-        assert m_e is not None and m_r is not None
-        d = sum(1 for a, b in zip(m_e, m_r) if not torch.equal(a, b))
-        print(f"[G2] 层 {layer}（seed {seed}）replay vs eager "
-              f"diff_rows = {d}/{N}", flush=True)
-        fail += d
+        require_equal_masks(f"[G2 K2={K2}] 层 {layer}（seed {seed}）replay vs eager",
+                            m_e, m_r, group_ends)
     _bs._GRAPH_CACHE.clear()
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
 
-    # ---- 性能：选择链 wall 四格（仅 K2=1024 生产口径）----
-    if K2 == 1024:
-        os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "0"
-        t_e0 = bench(lambda: batched_group_sels(
-            idx, q, k, SS, group_ends, 1024))
-        os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "1"
-        t_e1 = bench(lambda: batched_group_sels(
-            idx, q, k, SS, group_ends, 1024))
-        os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
-        _bs._GRAPH_CACHE.clear()
-        batched_group_sels(idx, q, k, SS, group_ends, 1024)   # capture
-        t_g1 = bench(lambda: batched_group_sels(
-            idx, q, k, SS, group_ends, 1024))
-        _bs._GRAPH_CACHE.clear()
-        os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "0"
-        batched_group_sels(idx, q, k, SS, group_ends, 1024)
-        t_g0 = bench(lambda: batched_group_sels(
-            idx, q, k, SS, group_ends, 1024))
-        _bs._GRAPH_CACHE.clear()
-        os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
-        print(f"选择链 wall: eager 旧 = {t_e0*1e3:7.1f}ms / "
-              f"eager Step2 = {t_e1*1e3:7.1f}ms / "
-              f"graph 旧 = {t_g0*1e3:7.1f}ms / "
-              f"graph Step2 = {t_g1*1e3:7.1f}ms", flush=True)
     os.environ.pop("TLI_PREFILL_L2_TOPK_CAND", None)
 
-print(f"=== TOTAL FAIL = {fail} ===", flush=True)
+
+# Complete BOTH budget gates before any performance measurement. Function scope
+# releases validation tensors before creating the production benchmark inputs.
+for K2 in (1024, 8192):
+    validate(K2)
+print("=== TOTAL FAIL = 0 ===", flush=True)
+
+# ---- 性能：选择链 wall 四格（K2=1024 生产口径）----
+idx = fresh_idx(1024)
+q, k, _ = make_qkv(999)
+group_ends = group_ends_for(L)
+SS = D ** -0.5
+os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "0"
+t_e0 = bench(lambda: batched_group_sels(
+    idx, q, k, SS, group_ends, 1024))
+os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "1"
+t_e1 = bench(lambda: batched_group_sels(
+    idx, q, k, SS, group_ends, 1024))
+os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
+_bs._GRAPH_CACHE.clear()
+batched_group_sels(idx, q, k, SS, group_ends, 1024)   # capture
+t_g1 = bench(lambda: batched_group_sels(
+    idx, q, k, SS, group_ends, 1024))
+_bs._GRAPH_CACHE.clear()
+os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "0"
+batched_group_sels(idx, q, k, SS, group_ends, 1024)
+t_g0 = bench(lambda: batched_group_sels(
+    idx, q, k, SS, group_ends, 1024))
+_bs._GRAPH_CACHE.clear()
+os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
+print(f"选择链 wall: eager 旧 = {t_e0*1e3:7.1f}ms / "
+      f"eager Step2 = {t_e1*1e3:7.1f}ms / "
+      f"graph 旧 = {t_g0*1e3:7.1f}ms / "
+      f"graph Step2 = {t_g1*1e3:7.1f}ms", flush=True)
+os.environ.pop("TLI_PREFILL_L2_TOPK_CAND", None)
 print("=== DONE ===", flush=True)
