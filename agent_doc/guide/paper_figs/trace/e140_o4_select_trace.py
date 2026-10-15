@@ -59,7 +59,7 @@ import torch.nn.functional as F
 DEV = os.environ.get("E140_DEVICE", "cuda:0")
 TASKS = ["hotpotqa", "musique"]
 N_SAMPLE = 2
-LAYERS = [8, 24]
+LAYERS = [int(x) for x in os.environ.get("E140_LAYERS", "8,24").split(",")]
 MAXLEN = 16384
 N_QUERY = 16
 ALPHA, BETA, GAMMA, BS = 0.25, 0.125, 0.625, 64
