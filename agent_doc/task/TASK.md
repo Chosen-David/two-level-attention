@@ -98,3 +98,6 @@
 
 - [ ] [GPT-PAPER-20261015] 论文运行时、数据门禁与图表薄入口；CPU 回归及独立审查，GPU 实测和科学验收未完成。仅发布独立开发分支。
   ([详情](task_details/GPT-PAPER-20261015.md))
+
+- [x] [TL-E140-O4-PARTIAL-PAGE-20261015] O4 有效末页修复及面板(d)历史诊断隔离；CPU验收，未重采。
+  ([详情](task_details/TL-E140-O4-PARTIAL-PAGE-20261015.md))

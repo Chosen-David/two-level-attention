@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""E140e O4 选择行为 trace 采集 v2（figure_id=O4，补充 O1 的 oracle 视角）。
+"""E140e O4 选择行为 trace 采集 v3（figure_id=O4，补充 O1 的 oracle 视角）。
+
+v3: valid-partial-pages-v1；有效末页统计与候选裁界，近远配额不 refill。
 
 【v2 修复（TL-E140-VALIDITY 采信清单）】旧版 get_qk 从 hidden_states[L] 手工
 q/k_proj+手写 RoPE 重建 Q/K——漏 input_layernorm（Qwen3 v4.51.3 契约违反）。
@@ -71,7 +73,7 @@ SUB32 = list(range(48, 64)) + list(range(112, 128))
 DATA = os.environ.get("LB_DATA", os.path.expanduser(
     "~/datasets/LongBench/data"))
 OUT = os.environ.get("E140_OUT", os.path.expanduser(
-    "~/two-level-attention/exp/trace/results/e140_o4_select_trace_v2.json"))
+    "~/two-level-attention/exp/trace/results/e140_o4_select_trace_v3.json"))
 MODEL = os.environ.get("QWEN_MODEL", os.path.expanduser("~/Qwen3-8B"))
 
 
@@ -162,11 +164,26 @@ def zone_geometry(q_pos):
     S_real = q_pos + 1
     mid_len = max(0, S_real - SINK - SWA)
     near_len = max(BS, int(ALPHA * mid_len))
-    near_base = S_real - SWA                       # near 右界 = swa 起点
+    near_base = max(SINK, S_real - SWA)                       # near 右界 = swa 起点
     near_lo_pg = max(SINK // BS, (near_base - near_len) // BS)
     near_lo = near_lo_pg * BS                      # 页对齐（floor，保守多含）
     return dict(S_real=S_real, mid_lo=SINK, mid_hi=near_base,
                 near_lo=near_lo, near_base=near_base, near_len=near_len)
+
+
+def valid_page_stats(kg):
+    """Page reductions over valid tokens only, including a short final page."""
+    n = kg.shape[0]
+    if n == 0:
+        empty = kg.new_empty((0, kg.shape[1]))
+        return empty, empty, empty
+    pages = (n + BS - 1) // BS
+    padded = F.pad(kg, (0, 0, 0, pages * BS - n)).view(pages, BS, -1)
+    valid = (torch.arange(pages * BS, device=kg.device) < n).view(pages, BS, 1)
+    avg = padded.sum(1) / valid.sum(1)
+    maximum = padded.masked_fill(~valid, -torch.inf).amax(1)
+    minimum = padded.masked_fill(~valid, torch.inf).amin(1)
+    return avg, maximum, minimum
 
 
 def tli_select(q_row, k_all, geo, K1, idx):
@@ -178,26 +195,33 @@ def tli_select(q_row, k_all, geo, K1, idx):
     mid_lo, mid_hi = geo["mid_lo"], geo["mid_hi"]
     near_lo = geo["near_lo"]
     n_mid = mid_hi - mid_lo
-    n_pg = n_mid // BS                                # mid 内完整页数（尾巴页含入最后一页）
+    if K1 < 0 or K2_MID < 0:
+        raise ValueError("budgets must be nonnegative")
+    if not (0 <= mid_lo <= near_lo <= mid_hi <= T):
+        raise ValueError("invalid selection zone")
+    if near_lo not in (mid_lo, mid_hi) and (near_lo - mid_lo) % BS:
+        raise ValueError("internal near boundary must be page aligned")
+    n_pg = (n_mid + BS - 1) // BS  # include every valid final-page token
+    device = q_row.device
     qs = q_row.view(8, 4, 128)[..., idx]              # (8,4,32)
     ks = k_all[:, :, idx]                             # (T',8,32)
     scale = 128 ** -0.5
     tok_score = torch.einsum("ghd,tgd->ght", qs, ks) * scale   # (8,4,T') 细筛分
     k_mid = ks[mid_lo:mid_hi]                         # (n_mid,8,32)
 
-    sel = torch.zeros(8, n_mid, dtype=torch.bool, device=DEV)
+    sel = torch.zeros(8, n_mid, dtype=torch.bool, device=device)
+    if n_mid == 0 or K1 == 0 or K2_MID == 0:
+        return sel
     nb_near = max(1, round(K1 * BETA))
     nb_far = max(0, K1 - nb_near)
     nt_near = min(round(nb_near * BS * GAMMA), K2_MID)
     far_budget = max(0, K2_MID - nt_near)             # E140 配额公式
-    near_pg_lo = (near_lo - mid_lo) // BS             # mid 内页坐标
+    near_pg_lo = (near_lo - mid_lo + BS - 1) // BS             # mid 内页坐标
     far_pg_hi = near_pg_lo
     for g in range(8):
         # ---- L1 页分（生产分型：near=avg / far=minmax 上界）----
         kg = k_mid[:, g, :]                           # (n_mid,32)
-        pg_avg = kg[: n_pg * BS].view(n_pg, BS, -1).mean(dim=1)     # 页均值 k
-        pg_max = kg[: n_pg * BS].view(n_pg, BS, -1).amax(dim=1)
-        pg_min = kg[: n_pg * BS].view(n_pg, BS, -1).amin(dim=1)
+        pg_avg, pg_max, pg_min = valid_page_stats(kg)
         qm = qs[g].mean(dim=0)                        # 组均值 q (32,)
         near_sc = pg_avg @ qm                         # avg 页分
         far_sc = (torch.where(qm >= 0, qm * pg_max, qm * pg_min)
@@ -205,13 +229,16 @@ def tli_select(q_row, k_all, geo, K1, idx):
         n_near_pool = n_pg - near_pg_lo
         k_n = min(nb_near, max(n_near_pool, 0))
         i_near = near_sc[near_pg_lo:].topk(k_n).indices + near_pg_lo \
-            if k_n > 0 else torch.empty(0, dtype=torch.long, device=DEV)
+            if k_n > 0 else torch.empty(0, dtype=torch.long, device=device)
         k_f = min(nb_far, max(far_pg_hi, 0))
         i_far = far_sc[:far_pg_hi].topk(k_f).indices \
-            if k_f > 0 else torch.empty(0, dtype=torch.long, device=DEV)
+            if k_f > 0 else torch.empty(0, dtype=torch.long, device=device)
         cand_pg = torch.cat([i_far, i_near]).unique()
         cand_tok = (cand_pg[:, None] * BS +
-                    torch.arange(BS, device=DEV)[None]).reshape(-1)  # mid 内坐标
+                    torch.arange(BS, device=device)[None]).reshape(-1)  # mid 内坐标
+        cand_tok = cand_tok[cand_tok < n_mid]
+        if cand_tok.numel() == 0:
+            continue
         # ---- L2：候选内逐 head softmax → 组均值 p → 分区配额 topk ----
         s_c = tok_score[g][:, mid_lo:mid_hi][:, cand_tok]            # (4, n_cand)
         p = torch.softmax(s_c, dim=-1).mean(dim=0)                   # (n_cand,)
@@ -275,7 +302,7 @@ def main():
         raise ValueError("explicit model/tokenizer/dataset identity declarations required")
     torch.cuda.set_device(DEV)
     idx = torch.tensor(SUB32, device=DEV)
-    print(f"=== E140e O4 select-behavior trace v2 GPU {DEV} ===", flush=True)
+    print(f"=== E140e O4 select-behavior trace v3 GPU {DEV} ===", flush=True)
     tok, model, theta = load_model()
     results = []
     for task in TASKS:
@@ -328,7 +355,7 @@ def main():
     Path(OUT).parent.mkdir(parents=True, exist_ok=True)
     import transformers, inspect
     model_source = Path(inspect.getfile(type(model.model.layers[0].self_attn)))
-    meta = {"schema": "e140-o4-select-v2",
+    meta = {"schema": "e140-o4-select-v3", "page_statistics": "valid-partial-pages-v1",
             "status": "diagnostic-unverified-identity",
             "qk_capture": "actual q_norm/k_norm outputs + actual attention position_embeddings",
             "transformers_version": transformers.__version__,

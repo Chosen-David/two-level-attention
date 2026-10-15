@@ -105,3 +105,16 @@ decay); (b) far holds ~49% of nonprotected mid mass, not 83%. The paper O
 section and `figs/fig_o_observation.py` must be rewritten against the v2 JSONs
 before any figure is used as paper evidence; the historical-render gate remains
 in force for the old JSONs.
+
+## O4 v2 部分末页缺陷（TL-E140-O4-PARTIAL-PAGE-20261015，当前约束）
+
+此条覆盖上文对 O4 v2 解禁的判断，仅限 O4 与组合图面板(d)，不扩散到 O1。
+`e140_o4_select_trace_v2.json` 的128条query全部有不满64的末页：30272个有效
+ group-token 中，两TLI臂均选择0，oracle选择21785。原始JSON字节不变；缺陷不能
+通过重标记修正。当前SVG/PNG/PDF仅添加面板(d)历史诊断警示，图内原数值未改，
+不适合作为已验证论文证据。默认绘图恢复fail-closed，显式诊断opt-in仍显示警示。
+
+修复后的collector使用有效页统计与候选裁界，维持原near/far配额、不refill；
+未来输出v3并记录页协议。CPU测试不替代重采。未批准自动重采或扩大矩阵。
+O3现有0.8412/0.5060/0.2408是相对reference-mid-TopK质量比例，不是full-attention mass。
+旧、新底图与注释后资产身份分开保存在`e140_validity.json`，此前身份归入prior_asset_sets。

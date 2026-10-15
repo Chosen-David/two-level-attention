@@ -33,6 +33,10 @@ import math
 import os
 import sys
 
+if os.environ.get('E140_ALLOW_HISTORICAL_DIAGNOSTIC') != '1':
+    raise SystemExit('O4 v2 omits partial final pages: panel (d) is historical only. '
+                     'O1 is unaffected. No files written. Explicit diagnostic opt-in required.')
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402

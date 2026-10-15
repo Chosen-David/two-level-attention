@@ -13,9 +13,9 @@ from pathlib import Path
 import subprocess
 import xml.etree.ElementTree as ET
 
-WARNING = 'HISTORICAL DIAGNOSTIC - NOT VALIDATED PAPER EVIDENCE'
-DETAIL = 'Old collector defects remain. Annotation only; no corrected data or new experiment.'
-REFERENCE = 'TL-E140-ASSET-PROVENANCE-20261015 | See E140_VALIDITY.md'
+WARNING = 'PANEL (d) O4: HISTORICAL DIAGNOSTIC - NOT VALIDATED PAPER EVIDENCE'
+DETAIL = 'O4 v2 omitted partial final pages. O1 unaffected. Annotation only; no new experiment.'
+REFERENCE = 'TL-E140-O4-PARTIAL-PAGE-20261015 | See E140_VALIDITY.md'
 FIGDIR = Path('agent_doc/guide/paper_figs/figs')
 MANIFEST = Path('agent_doc/guide/paper_figs/observation/e140_validity.json')
 EXTENSIONS = ('svg', 'png', 'pdf')
