@@ -274,8 +274,8 @@ def _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero=False):
     【E142a】allow_kv_hetero=True（DeepSeek MLA 路径）：qk_head_dim(192) ≠
     v_head_dim(128) 是 MLA 标准形态——⑤的 head_dim/stride 一致性改为
     「V 自身末维连续 + token 长度/头数/device/dtype 与 K 一致」。该口径
-    下 Triton 路径自然失活（D=192 非 2 的幂被路由门拒），消费走 torch
-    gather/dense 路径（einsum 对 q·k 与 p·v 维度独立，天然异维）。
+    下不兼容的 K/V 由显式布局门排除 Triton，消费走 torch gather/dense
+    路径（einsum 对 q·k 与 p·v 维度独立，天然异维）。
     """
     def _fail(msg):
         raise ValueError(
@@ -348,12 +348,24 @@ def _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero=False):
     return True
 
 
+def _triton_kv_layout_compatible(k, v):
+    """The fused kernel shares K's width and strides when addressing V.
+
+    Host metadata only: heterogeneous torch support must not relax this ABI.
+    Equal noncontiguous layouts are safe too; base storage offsets may differ.
+    """
+    return (k.shape == v.shape
+            and all(k.stride(ax) == v.stride(ax) for ax in (-3, -2, -1)))
+
+
 def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
                          cu_seqlens_k, softmax_scale):
     """【E127 iter7】Triton 融合 launch 封装（原型已验证参数：
     kernel A TP=1024/num_warps=8；kernel B BW=256/num_warps=4）。
     q [1,H,D]；k/v [T,Hkv,D]；m0 [R,T] bool（token 级，block_size==1 前置
     已保证）。异常向上抛（调用方置标志回退 torch gather）。"""
+    if not _triton_kv_layout_compatible(k, v):
+        raise ValueError("Triton eager attention requires matching K/V shapes and strides")
     # 生产 cu 恒 int64（prepare_cu_seqlens 的 cumsum 整数提升）；kernel A
     # 原型验证口径为 int32——此处确定性 cast（2 元素 tiny kernel，长度
     # < 2^31 无溢出），值逐位同。
@@ -411,7 +423,7 @@ def eager_decoding_attn(
     拒绝——修复前三例非法输入静默越界读/未初始化输出）。
     【E142a】allow_kv_hetero=True：DeepSeek MLA（qk 192d / v 128d）异维
     口径——validator 的 V/K head_dim+stride 一致门收窄为 V 自身连续，
-    Triton 路径由 D 非 2 幂自然失活，消费走 torch gather/dense。
+    不兼容的 K/V 由显式布局门排除 Triton，消费走 torch gather/dense。
     """
     _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero)
     # 【E127 inplace 合并（2026-10-12）】gather 路径并为默认——env 门反转，
@@ -513,8 +525,8 @@ def _eager_decoding_attn_gather(
     之外的第二防线——Triton kernel 无 kvh<Hkv 边界检查，非法 shape 的
     越界读必须在此前拦下）。
     【E142a】allow_kv_hetero=True：MLA qk 192d/v 128d——Triton 融合路径
-    由「D 须为 2 的幂」路由门对 192 自然失活（本函数内零额外改动），
-    torch gather 段以 V 自身末维独立展开（idx_v）。
+    显式检查 K/V shape/stride 后才允许共享寻址的 Triton 路径，不能
+    只依赖 192 不是 2 的幂。torch gather 段以 V 自身末维展开（idx_v）。
     """
     _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero)
     if softmax_scale is None:
@@ -560,6 +572,7 @@ def _eager_decoding_attn_gather(
         and m0.dtype == torch.bool
         and q.shape[0] == 1
         and (k.shape[-1] & (k.shape[-1] - 1)) == 0   # D 须为 2 的幂（tl.arange）
+        and _triton_kv_layout_compatible(k, v)
         and m0.stride(-1) == 1 and k.stride(-1) == 1 and v.stride(-1) == 1
         and cu_seqlens_k.dtype in (torch.int32, torch.int64)
     ):
