@@ -1,18 +1,27 @@
 # -*- coding: utf-8 -*-
-"""O 系列观察图（figure_id=O1/O3，P0 主文）。
+"""O 系列观察图（figure_id=O1/O3/O4，P0 主文动机图）。
 
-面板 (a) O1 距离密度：Qwen3-8B 真实 LongBench 样本（hotpotqa/musique 各 2，16K 截断）
-mid 非保护区 64-token 距离箱 density（mass/token，log 距离网格质量加权聚合）。
-near 区密度 ~3.3e-4 缓慢衰减，远端长尾 ~3e-5 且 d>9K 回升——远端检索热点存在，
-far 区 token 数 ~10x near → far 占 mid 质量 83%（两级选择 far 分区动机）。
-面板 (b) O1 四区质量占比：sink .21 / swa .22 / near .10 / far .48（组均值），
-far 组内最差头 0.65——最差头远端依赖更强（逐头方差不均，双池防挤出依据）。
-面板 (c) O3 频段对照三臂：tail32（低频尾 pairs）vs high32（高频头）vs
-random32（unpaired 诊断臂 seed20261002），同规则两层选择（L1 页级 avg top-128 →
-L2 候选页 token top-768）vs full-ref TopK-768：tail32 retained_mass .79 vs
-random .47 vs high .26——低频尾子空间保留 79% 概率质量，判决性频段证据。
+设计叙事（参照 StreamingLLM「竖虚线临界点标注」、Quest「图内文字直接给结论」、
+SparQ「方案对照同图竞技」三家的观察图范式），四个面板一条链：
+  (a) 质量在哪  —— O1 距离密度：mid 区密度随距离衰减，但 d>9K 远端长尾回升
+      （检索热点在 near 之外）→ 分区动机：near/far 统计性质相反。
+  (b) 质量有多少 —— O1 四区占比：far 独占 mid 质量 83%，且 GQA 组内最差头
+      0.65 远超组均值 0.48 → 独立 far 预算防挤出动机。
+  (c) 用什么维度看 —— O3 子空间对照：同 32/128 维预算，tail32 保留 79%
+      full-ref 质量 vs random 47% vs high 26% → 位置先验（低频完整 RoPE 对）
+      而非「任意 32 维」。
+  (d) 选择器选对了没 —— O4 选择行为闭环：生产口径两级选择器选中 token 的
+      距离分布贴合 oracle 的远端回升；K1=128 时 far 配额被配额公式压到 128
+      断供，K1=64 恢复 432，overlap 0.47→0.53。
 
-数据全部程序化读取自 e140_o_trace.json；输出 PDF+PNG+SVG + figure_data.tsv。
+可视化手法：
+  - near/far 分区底色在 (a)(d) 两面板复用（视觉连续性，读者一眼认出同一边界）；
+  - near/far 边界用竖虚线 + 标签（StreamingLLM 临界点标注法）；
+  - 每面板结论用白底框注写在图内（Quest 图内结论法），避开刻度与曲线；
+  - (c) 只画预登记主指标 retained_mass（guide O3：二选一，recall 进 tsv/附录）。
+
+数据全部程序化读取自 repo 内 e140_o_trace.json + e140_o4_select_trace.json；
+输出 PDF+PNG+SVG + figure_data.tsv。
 """
 import json
 import math
@@ -26,12 +35,14 @@ import numpy as np  # noqa: E402
 
 SKILL = "/home/wangyuanshuo02/.claude/skills/publication-figures/scripts"
 sys.path.insert(0, SKILL)
-from style_config import apply_style, FONT_SIZES, LINE_WIDTHS  # noqa: E402
+from style_config import apply_style  # noqa: E402
 from figure_lint import lint_figure  # noqa: E402
 
 REPO = "/home/wangyuanshuo02/two-level-attention"
-WT = "/tmp/wt_e138_ablation"
-SRC = os.path.join(WT, "exp/trace/results/e140_o_trace.json")
+SRC = os.path.join(REPO, "exp/trace/results/e140_o_trace.json")
+if not os.path.exists(SRC):  # 兼容旧临时路径
+    SRC = "/tmp/wt_e138_ablation/exp/trace/results/e140_o_trace.json"
+SRC4 = os.path.join(REPO, "exp/trace/results/e140_o4_select_trace.json")
 OUT = os.path.join(REPO, "agent_doc", "guide", "paper_figs", "figs")
 os.makedirs(OUT, exist_ok=True)
 
@@ -42,6 +53,14 @@ C_SEC = pal["secondary"]
 C_TER = pal["tertiary"]
 C_HL = pal["highlight"]
 C_NEU = pal["neutral"]
+
+# 本图为 1x4 宽版多面板，style_config 的 PPT 级字号过大，按面板宽度收敛
+T = 15      # 面板标题
+L = 13      # 轴标签
+TK = 11.5   # 刻度
+AN = 10.5   # 图内注释
+LG = 10.5   # 图例
+LW = 2.4    # 数据线宽
 
 d = json.load(open(SRC))
 cells = d["cells"]
@@ -76,86 +95,181 @@ zones = ["sink", "swa", "near", "far"]
 zmean = [np.mean([o1["mass_" + z] for c in cells for o1 in c["o1"]]) for z in zones]
 fw = float(np.mean([o1["far_worst_head"] for c in cells for o1 in c["o1"]]))
 
-# ---------------- (c) O3 三臂 ----------------
+# ---------------- (c) O3 三臂（主指标 retained_mass） ----------------
 arms = ["tail32", "random32", "high32"]
-mets = ["page_recall", "overlap_recall", "retained_mass"]
-arm_val = {}
-for a in arms:
-    arm_val[a] = [np.mean([c["o3"][a][mm]["mean"] for c in cells]) for mm in mets]
+arm_lab = {"tail32": "tail32\n(low-freq)",
+           "random32": "random32\n(unpaired)",
+           "high32": "high32\n(high-freq)"}
+arm_rm = {a: float(np.mean([c["o3"][a]["retained_mass"]["mean"] for c in cells]))
+          for a in arms}
+# 次级指标进 tsv
+mets_all = ["page_recall", "overlap_recall", "retained_mass"]
+arm_val = {a: [float(np.mean([c["o3"][a][mm]["mean"] for c in cells]))
+               for mm in mets_all] for a in arms}
 
-# ---------------- 画布 1x3 ----------------
-fig, (ax_a, ax_b, ax_c) = plt.subplots(1, 3, figsize=(21, 9),
-                                       gridspec_kw={"wspace": 0.46,
-                                                    "width_ratios": [1.1, 0.85, 1.1]})
+# ---------------- (d) O4 选择行为 ----------------
+d4 = json.load(open(SRC4))
+cells4 = d4["cells"]
+ARM4 = [("oracle", "oracle top-768 (full 128d)", C_NEU, "--"),
+        ("tli_k128", "TLI selector, K1=128 (prod.)", C_MAIN, "-"),
+        ("tli_k64", "TLI selector, K1=64", C_HL, "-")]
+edges4 = np.logspace(math.log10(300), math.log10(17000), 25)
+
+
+def bucket_rate(cells, arm):
+    """log 距离网格上的选中率 = Σ n_sel / Σ n_tok（跨 task/sample/layer/query）。"""
+    sel_sum = np.zeros(len(edges4) - 1)
+    tok_sum = np.zeros(len(edges4) - 1)
+    for c in cells:
+        for b in c["o4"]["arms"][arm]["bins"]:
+            dcen = math.sqrt(b["d_lo"] * b["d_hi"])
+            i = np.searchsorted(edges4, dcen) - 1
+            if 0 <= i < len(sel_sum):
+                sel_sum[i] += b["n_sel"]
+                tok_sum[i] += b["n_tok"]
+    cx4 = np.sqrt(edges4[:-1] * edges4[1:])
+    rate = np.where(tok_sum > 0, sel_sum / np.maximum(tok_sum, 1), np.nan)
+    return cx4, rate
+
+
+bnd4 = float(np.median([c["o4"]["q_pos"] - c["o4"]["near_lo"] for c in cells4]))
+# far 区选中 token 数：trace 按 8 个 kv-head 聚合存储，/8 得每 kv-head 均值
+far_avg = {a: float(np.mean([c["o4"]["arms"][a]["far_sel"]
+                             for c in cells4])) / 8 for a, *_ in ARM4}
+ovl_avg = {a: float(np.mean([c["o4"]["arms"][a]["overlap_recall"]
+                             for c in cells4])) for a, *_ in ARM4}
+
+# ---------------- 画布 1x4 ----------------
+fig, (ax_a, ax_b, ax_c, ax_d) = plt.subplots(
+    1, 4, figsize=(21.5, 5.2),
+    gridspec_kw={"wspace": 0.36, "width_ratios": [1.12, 0.82, 0.80, 1.12]})
+
+XLO, XHI = 270, 21000
+
+
+def shade_zones(ax, bnd):
+    ax.axvspan(XLO, bnd, color=C_MAIN, alpha=0.07, lw=0)
+    ax.axvspan(bnd, XHI, color=C_HL, alpha=0.08, lw=0)
+    ax.axvline(bnd, color=C_HL, lw=2.0, linestyle="--")
+
+
+def note(ax, x, y, text, ha="left", va="top", color="black", size=AN):
+    ax.text(x, y, text, transform=ax.transAxes, ha=ha, va=va,
+            fontsize=size, color=color,
+            bbox=dict(boxstyle="round,pad=0.32", facecolor="white",
+                      edgecolor="0.78", alpha=0.92))
+
 
 # ---- (a) 距离密度 ----
-ax_a.plot(cx, dens, "-o", color=C_MAIN, markersize=10,
-          markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"],
-          lw=LINE_WIDTHS["data"], label="mid density (mass/token)")
-ax_a.axvline(near_len_med, color=C_HL, lw=LINE_WIDTHS["reference"], linestyle="--")
-ax_a.text(near_len_med * 1.12, dens.max() * 0.75,
-          "near/far boundary\n(" + r"$\alpha$=.25, median " + f"{near_len_med:.0f})",
-          fontsize=FONT_SIZES["annotation"] - 3, color=C_HL)
+shade_zones(ax_a, near_len_med)
+ax_a.plot(cx, dens, "-o", color=C_MAIN, markersize=5.5,
+          markeredgecolor="white", markeredgewidth=1.2, lw=LW, zorder=5)
+ax_a.text(near_len_med * 0.90, 3.5e-4, f"boundary (median {near_len_med:.0f})",
+          fontsize=AN - 1.5, color=C_HL, va="center", ha="right",
+          rotation=90)
 ax_a.set_xscale("log")
 ax_a.set_yscale("log")
-ax_a.set_xlim(270, 21000)
+ax_a.set_xlim(XLO, XHI)
 ax_a.set_xticks([300, 1000, 3000, 10000])
-ax_a.set_ylim(1e-5, 1e-3)
+ax_a.set_ylim(1e-5, 1.3e-3)
 ax_a.set_yticks([1e-5, 1e-4, 1e-3])
-ax_a.set_xlabel("distance d = q_pos - k_pos (tokens)")
-ax_a.set_ylabel("attention density (prob mass per token)")
-ax_a.set_title("Attention mass vs distance (mid zone)", loc="left", pad=10)
-ax_a.legend(loc="upper right", fontsize=FONT_SIZES["legend"] - 2)
-ax_a.text(0.02, 0.02, "far tail rebounds at d>9K:\nretrieval hotspots beyond near",
-          transform=ax_a.transAxes, fontsize=FONT_SIZES["annotation"] - 3,
-          color=C_HL, va="bottom", style="italic")
+ax_a.set_xlabel("distance d = q_pos − k_pos (tokens)", fontsize=L)
+ax_a.set_ylabel("attention density\n(mass per token)", fontsize=L)
+ax_a.set_title("(a) Density steps by distance", loc="left", pad=10,
+               fontsize=T, fontweight="bold")
+ax_a.tick_params(labelsize=TK)
+ax_a.text(0.28, 0.965, "near", transform=ax_a.transAxes, ha="center",
+          fontsize=AN, color=C_MAIN, fontweight="bold")
+ax_a.text(0.74, 0.965, "far", transform=ax_a.transAxes, ha="center",
+          fontsize=AN, color=C_HL, fontweight="bold")
+note(ax_a, 0.04, 0.44, "near: dense →\nblock-avg suffices",
+     color=C_MAIN, size=AN - 1)
+note(ax_a, 0.04, 0.03, "far: sparse, tail rebounds at d>9K\n"
+     "→ no-miss bound + token fine-select", color=C_HL, size=AN - 1,
+     va="bottom")
 
-# ---- (b) 四区质量 ----
-xb = np.arange(4)
-ax_b.bar(xb, zmean, width=0.6, color=[C_NEU, C_TER, C_SEC, C_MAIN],
-         edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
-ax_b.plot([3], [fw], marker="^", color=C_HL, markersize=18,
-          markeredgecolor="black", markeredgewidth=LINE_WIDTHS["marker_edge"] * 0.6,
-          linestyle="none", label="far, worst head")
-for xi, v in zip(xb, zmean):
-    ax_b.text(xi, v + 0.015, f"{v:.2f}", ha="center",
-              fontsize=FONT_SIZES["annotation"] - 2)
-ax_b.set_xticks(xb)
-ax_b.set_xticklabels(["sink", "swa", "near", "far"])
-ax_b.set_ylabel("mean prob mass (group mean)")
-ax_b.set_title("Where the mass lives (4 zones)", loc="left", pad=10)
-ax_b.legend(loc="upper left", fontsize=FONT_SIZES["legend"] - 2)
-ax_b.text(0.98, 0.04, "far = 83% of mid mass", transform=ax_b.transAxes,
-          fontsize=FONT_SIZES["annotation"], color=C_HL, ha="right")
-ax_b.set_ylim(0, 0.85)
+# ---- (b) 四区质量：100% 堆叠横条 + 最差头标记 ----
+zcol = {"sink": C_NEU, "swa": C_TER, "near": C_SEC, "far": C_MAIN}
+left = 0.0
+for z, v in zip(zones, zmean):
+    ax_b.barh([0], [v], left=left, height=0.7, color=zcol[z],
+              edgecolor="black", linewidth=1.2)
+    if v >= 0.15:
+        ax_b.text(left + v / 2, 0, f"{z}\n{v:.2f}", ha="center", va="center",
+                  fontsize=AN, color="white" if z == "far" else "black")
+    left += v
+# near 段太窄，向下引线标注（底部空间空闲）
+near_c = zmean[0] + zmean[1] + zmean[2] / 2
+ax_b.annotate(f"near {zmean[2]:.2f}", xy=(near_c, -0.36),
+              xytext=(0.56, -0.62), fontsize=AN - 1, ha="left", va="center",
+              arrowprops=dict(arrowstyle="-", color="0.4", lw=1.0))
+# far 最差头标记（文字直接放标记左侧，避免箭头横穿）
+ax_b.plot([fw], [0.68], marker="v", color=C_HL, markersize=11,
+          markeredgecolor="black", markeredgewidth=1.2, zorder=6)
+ax_b.text(fw - 0.03, 0.68, f"far, worst kv-head: {fw:.2f}", fontsize=AN - 1,
+          color=C_HL, ha="right", va="center")
+ax_b.text(0.02, 0.97, "far = 83% of mid-zone mass\n→ dedicated far budget",
+          transform=ax_b.transAxes, fontsize=AN - 1, color=C_HL,
+          ha="left", va="top",
+          bbox=dict(boxstyle="round,pad=0.32", facecolor="white",
+                    edgecolor="0.78", alpha=0.92))
+ax_b.set_xlim(0, 1.0)
+ax_b.set_ylim(-0.75, 1.35)
+ax_b.set_yticks([])
+ax_b.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
+ax_b.set_xlabel("share of total mass", fontsize=L)
+ax_b.set_title("(b) Mass by zone", loc="left", pad=10, fontsize=T,
+               fontweight="bold")
+ax_b.tick_params(labelsize=TK)
+ax_b.spines[["left", "right", "top"]].set_visible(False)
 
-# ---- (c) O3 三臂 ----
-xc = np.arange(3)
-wc = 0.26
+# ---- (c) O3 三臂（主指标 retained mass） ----
 colors3 = [C_MAIN, C_NEU, C_SEC]
-for i, (a, c) in enumerate(zip(arms, colors3)):
-    ax_c.bar(xc + (i - 1) * wc, arm_val[a], width=wc, color=c,
-             edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6,
-             label=a)
-    for j, (xi, v) in enumerate(zip(xc + (i - 1) * wc, arm_val[a])):
-        if j == 0:  # page recall 三臂 0.87-0.94 挤叠，数值进 tsv 不上图
-            continue
-        ax_c.text(xi, v + 0.015, f"{v:.2f}", ha="center",
-                  fontsize=FONT_SIZES["annotation"] - 4)
-ax_c.set_xticks(xc)
-ax_c.set_xticklabels(["page\nrecall", "overlap\nrecall", "retained\nmass"])
-ax_c.tick_params(axis="x", labelsize=FONT_SIZES["tick_label"] - 2)
-ax_c.set_ylabel("score vs full-ref TopK-768")
-ax_c.set_title("Subspace frequency arms (32 of 128 dims)", loc="left", pad=10)
-ax_c.legend(loc="upper center", fontsize=FONT_SIZES["legend"] - 2)
-ax_c.text(0.98, 0.04, "tail32 keeps 79% of mass;\nhigh32 only 26%", transform=ax_c.transAxes,
-          fontsize=FONT_SIZES["annotation"], color=C_HL, ha="right")
-ax_c.set_ylim(0, 1.12)
+for i, (a, col) in enumerate(zip(arms, colors3)):
+    ax_c.bar([i], [arm_rm[a]], width=0.58, color=col, edgecolor="black",
+             linewidth=1.2)
+    ax_c.text(i, arm_rm[a] + 0.025, f"{arm_rm[a]:.2f}", ha="center",
+              fontsize=AN, fontweight="bold")
+ax_c.set_xticks(np.arange(3))
+ax_c.set_xticklabels([arm_lab[a] for a in arms], fontsize=TK - 1)
+ax_c.set_ylabel("retained full-ref mass", fontsize=L)
+ax_c.set_ylim(0, 1.0)
+ax_c.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+ax_c.set_title("(c) Which 32 of 128 dims", loc="left", pad=10, fontsize=T,
+               fontweight="bold")
+ax_c.tick_params(labelsize=TK)
+note(ax_c, 0.96, 0.96, "position priors (paired\nlow-freq RoPE dims),\n"
+     "not “any 32 dims”", ha="right", va="top", color=C_HL, size=AN - 1)
 
-# 面板字母（嵌入标题左侧空位由 loc="left" 保证不撞）
-for ax, letter in ((ax_a, "A"), (ax_b, "B"), (ax_c, "C")):
-    ax.text(0.01, 1.05, letter, transform=ax.transAxes,
-            fontsize=FONT_SIZES["panel_letter"], fontweight="bold", va="bottom")
+# ---- (d) O4 选择行为 ----
+shade_zones(ax_d, bnd4)
+for a, lab, col, ls in ARM4:
+    cx4, rate = bucket_rate(cells4, a)
+    ax_d.plot(cx4, rate, ls, color=col, lw=LW, label=lab, zorder=5)
+ax_d.set_xscale("log")
+ax_d.set_yscale("log")
+ax_d.set_xlim(XLO, XHI)
+ax_d.set_ylim(3e-3, 1.1)
+ax_d.set_yticks([1e-2, 1e-1, 1])
+ax_d.set_xticks([300, 1000, 3000, 10000])
+ax_d.set_xlabel("distance d = q_pos − k_pos (tokens)", fontsize=L)
+ax_d.set_ylabel("selection rate\n(share of bucket)", fontsize=L)
+ax_d.set_title("(d) Selected tokens by distance", loc="left", pad=10,
+               fontsize=T, fontweight="bold")
+ax_d.tick_params(labelsize=TK)
+ax_d.legend(loc="lower left", fontsize=LG - 1, framealpha=0.92)
+note(ax_d, 0.96, 0.92,
+     f"far sel per query: oracle {far_avg['oracle']:.0f}\n"
+     f"K1=128: {far_avg['tli_k128']:.0f} (far starved)\n"
+     f"K1=64: {far_avg['tli_k64']:.0f}; overlap "
+     f"{ovl_avg['tli_k128']:.2f}→{ovl_avg['tli_k64']:.2f}",
+     ha="right", va="top", color=C_HL, size=AN - 1)
+ax_d.text(0.24, 0.965, "near", transform=ax_d.transAxes, ha="center",
+          fontsize=AN, color=C_MAIN, fontweight="bold")
+ax_d.text(0.60, 0.965, "far", transform=ax_d.transAxes, ha="center",
+          fontsize=AN, color=C_HL, fontweight="bold")
+
+fig.subplots_adjust(left=0.055, right=0.995, top=0.88, bottom=0.17)
 
 # ---------------- lint + 导出 ----------------
 report = lint_figure(fig)
@@ -175,7 +289,7 @@ export(fig, "O_observation")
 
 # ---------------- figure_data.tsv ----------------
 rows = ["figure_id\tpanel_id\tarm_id\tmetric_id\tunit\testimate\tsource_run_id\tsource_field"]
-src = "e140_o_trace.json"
+src = os.path.basename(SRC)
 for x, y in zip(cx, dens):
     rows.append(f"O\ta\tmid_distance\tdensity\tmass/token\t{y:.4e}\t{src}\tbins(log-grid)")
 for z, v in zip(zones, zmean):
@@ -183,8 +297,18 @@ for z, v in zip(zones, zmean):
 rows.append(f"O\tb\tfar_worst_head\tmean_mass\tfrac\t{fw:.4f}\t{src}\tfar_worst_head")
 rows.append(f"O\tb\tnear_len_median\tboundary\ttokens\t{near_len_med:.0f}\t{src}\tnear_len")
 for a in arms:
-    for mm, v in zip(mets, arm_val[a]):
+    for mm, v in zip(mets_all, arm_val[a]):
         rows.append(f"O\tc\t{a}\t{mm}\tfrac\t{v:.4f}\t{src}\to3.{a}.{mm}.mean")
+for a, *_ in ARM4:
+    rows.append(f"O\td\t{a}\tfar_sel_per_query\ttokens\t{far_avg[a]:.2f}\t"
+                f"e140_o4_select_trace.json\to4.arms.{a}.far_sel")
+    rows.append(f"O\td\t{a}\toverlap_recall\tfrac\t{ovl_avg[a]:.4f}\t"
+                f"e140_o4_select_trace.json\to4.arms.{a}.overlap_recall")
+    cx4, rate = bucket_rate(cells4, a)
+    for x, y in zip(cx4, rate):
+        if not np.isnan(y):
+            rows.append(f"O\td\t{a}\tsel_rate\tfrac\t{y:.4e}\t"
+                        f"e140_o4_select_trace.json\to4_bins(log-grid)")
 with open(os.path.join(OUT, "O_observation_figure_data.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 print("exported O_observation_figure_data.tsv")

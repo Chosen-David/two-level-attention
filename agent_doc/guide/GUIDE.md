@@ -31,6 +31,12 @@ Host wys2-8xh20 （不可用，被删除了已经）
   Port 8416
 
 
+Host wys-4xh20
+  HostName 10.238.122.187
+  User wangyuanshuo02
+  Port 8416
+
+
 Host 2xh20-8100
   HostName 10.238.139.251
   User wangyuanshuo02
@@ -105,8 +111,8 @@ RULER 64k/128k 超出 Qwen3-8B 原生 40960 上下文的风险 - 参考Prism使�
 测全量
 1. LongBench v1的14个英文任务+2个代码任务（如果主张中英文通用需要补齐全部任务），
 2. LongBench v2的全部503题
-3. RULER 32k 64k 128k的上下文
-最终论文模型：Qwen3-8B, Qwen3-32B（验证规模变化）和LLama（跨家族验证）， 
+3. RULER 32k 64k 128k的上下文，
+最终论文模型：Qwen3-8B, Qwen3-32B（验证规模变化）和LLama-3.1-8B-Instruct（跨家族验证）， 
 扩展模型实验 DeepSeek-V2-Lite-Chat(则是验证扩展到nope+rope的MLA，以及跨家族验证)
 
 
