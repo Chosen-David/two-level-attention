@@ -1,13 +1,11 @@
 """【E142a】DeepSeek-V2 MLA 稀疏 attention patch（HF 路径 e2e 最小落地）。
 
-背景（E141 trace 判决 e141_mla_nope_trace_verdict.json）：
-  - nope-only 128d 在深层选择力崩塌（L20 .009-.229）——GQA tail 子空间
-    结论不能按 nope-only 形式迁移；
-  - rope-only 64d 与 full 192d 在全部可用层持平（≤.02）——选择子空间
-    甜点 = MLA 布局尾段 rope 64 维（--tli_subspace mla_rope），且 k_pe 是
-    MQA 共享 → 天然单索引（16 head 同选，indexer H=Hkv=16、G=1）；
-  - MLA 质量 sink 主导（78-93%），L12/16/24 mid 质量精确为 0（天然层跳过
-    ——E137 dyn gate 在 MLA 上的后续课题，本 patch 不启用）。
+背景：原 E141 oracle 已撤回，当前参见 e141b_mla_nope_trace_verdict.json。
+  - 修正后的 trace 不支持 rope-only 与 full192 等价，也不支持天然层跳过；
+    --tli_subspace mla_rope 的质量必须以真实 e2e 验证为准。
+  - k_pe 是 MQA 共享，但 query 各 head 不同，不能推出各 head 同选。
+    本 patch 的 indexer H=Hkv=16、G=1，不实现共享单索引。
+  - 本 patch 不启用 MLA 动态 gate，不依据旧 trace 自动改变选择契约。
 
 设计（镜像 qwen3_attn_patch 骨架 + vendored modeling_deepseek eager 投影
 复刻，逐位同源）：
@@ -124,7 +122,9 @@ def deepseek_v2_attn_forward(
     # ---- prefill/decode 分支（B2 守卫口径，镜像 qwen3_attn_patch）----
     if (past_key_value is not None
             and past_key_value.get_seq_length(self.layer_idx) == q_len
-            and q_len > 1):
+            and q_len > 0):
+        # 新请求可以只有一个 token（例如 BOS-only）。按 cache 是否包含
+        # 旧前缀判断阶段，不能用 q_len > 1，否则漏 clear() 并误入 decode。
         # prefill：dense eager 原版复刻（4D float mask 相加语义保持）。
         # observe_prefill_q / calibrate_dyn_dgate 不调用——两者均为 Qwen3
         # 128 维 rotate_half 布局口径（E85f/E137），MLA 静态 pair 与动态

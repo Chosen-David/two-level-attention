@@ -14,11 +14,11 @@ from types import SimpleNamespace
 import torch
 
 
-def definitions(path, names, namespace):
+def definitions(path, names, namespace, optional=()):
     source = path.read_bytes()
     tree = ast.parse(source, filename=str(path))
-    nodes = [n for n in tree.body if getattr(n, "name", None) in names]
-    if {n.name for n in nodes} != set(names):
+    nodes = [n for n in tree.body if getattr(n, "name", None) in set(names) | set(optional)]
+    if not set(names).issubset({n.name for n in nodes}):
         raise ValueError(f"missing definitions in {path}")
     exec(compile(ast.Module(body=nodes, type_ignores=[]), str(path), "exec"), namespace)
     return hashlib.sha256(source).hexdigest()
@@ -48,7 +48,8 @@ def main():
                                {"DeepseekV2RMSNorm", "rotate_half", "apply_rotary_pos_emb"}, upstream)
     probe = {"torch": torch, "DEV": "cpu", "LAYERS": [0], "NOPE_D": 128, "ROPE_D": 64}
     probe_hash = definitions(args.probe_source,
-                            {"get_mla_qk", "rotate_half", "head_mean_probs"}, probe)
+                            {"get_mla_qk", "head_mean_probs"}, probe,
+                            optional={"rotate_half"})
     norm_type = upstream["DeepseekV2RMSNorm"]
     hidden = torch.randn(1, 5, 8) * torch.tensor([1., 3., 10., 2., 7.]).view(1, 5, 1)
     norm = norm_type(8)
@@ -63,6 +64,13 @@ def main():
                            kv_b_proj=torch.nn.Linear(512, 2 * 256, bias=False),
                            rotary_emb=lambda value, seq_len: (cos[:seq_len], sin[:seq_len]),
                            softmax_scale=192 ** -.5)
+    # The fixed probe resolves rotary through its attention class's module.
+    # Provide a fixture-local module table backed by the trusted upstream
+    # definition; do not monkeypatch Python's global `types` module (the
+    # SimpleNamespace fixture's real module). The old probe keeps its own
+    # rotate_half, so the diagnostic must still fail on the historical bug.
+    probe["sys"] = SimpleNamespace(modules={type(attn).__module__: SimpleNamespace(
+        apply_rotary_pos_emb=upstream["apply_rotary_pos_emb"])})
     fixture = hashlib.sha256()
     for tensor in (hidden, norm.weight, attn.q_proj.weight, attn.kv_a_proj_with_mqa.weight,
                    attn.kv_a_layernorm.weight, attn.kv_b_proj.weight, cos, sin):
