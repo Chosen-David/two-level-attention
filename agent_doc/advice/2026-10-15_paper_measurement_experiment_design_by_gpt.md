@@ -1,6 +1,6 @@
 # 有限增量实验设计候选：按论文主张闭合证据
 
-日期：2026-10-15。状态：**已完成独立设计审查；实验尚未执行或验收。本文件是实验设计候选，不是实验结果、派单或运行授权。**
+日期：2026-10-15。状态：**已完成独立设计审查；实验尚未执行或验收。本文件是实验设计候选，不是实验结果、派单或运行授权。**本次仅按论文展示规则修订，不增加实验或新数据；“最终版本”仍须独立通过对应GPU、质量与成本验收。
 
 ## 0. 本次优化的实质
 
@@ -20,7 +20,7 @@
 
 - Fig.1=O1/O3观察；Fig.2=架构；Fig.3=E2请求成本；Fig.4=E1/E3主质量。regional/global 从旧 Fig.3(b) 移至 SFig.2。guide中“当前稿/PPT尚未同步”是其历史状态提示，不作为当前成稿事实；最终应以发布稿/PPT实际面板核对。
 - main 普通 L2 全S评分后mask；实验 `e1edf9c316fc4190dd0c29bc5d47477136f8bdab` 已有候选 L2/candidate-topk；`93e4a364ea3be4897a076ef62feddb60145eccef` 已有活跃块遍历。最新状态须绑定实际执行 SHA，不把 main 的限制泛化到所有分支。
-- 较旧 A6/E2 的“E139原件未取到”已被本地 Step2 harness+verdict 部分补齐：能画作者局部摘要；逐重复 raw 和请求计时仍没有，不能因旧文字忽略新证据，也不能过度升级。
+- 较旧 A6/E2 的“E139原件未取到”已被本地 Step2 harness+verdict 部分补齐：可作内部作者局部摘要诊断，不安排研发阶段曲线进入主图；逐重复 raw 和请求计时仍没有，不能因旧文字忽略新证据，也不能过度升级。
 
 | 已有建议/规约 | 已覆盖内容 | 本轮处理与真正增量 |
 |---|---|---|
@@ -98,7 +98,9 @@ python exp/figures/figure_data_contract.py --bindings "$O3_NEW_OUT/figure_bindin
 
 关键区分：共享坐标不等物理cache复用；32维浮点QDQ不等packed INT4；算法箭头不等main已候选内省算。现有candidate分支可在实现脚注注明SHA与未验边界。完成标准为源码语义、可编辑源、PDF/SVG、双栏字号/灰度检查，不是新增质量或速度证据。P1，无模型运行依赖。
 
-## 6. Fig.3：四层账单与完整请求 E2/A6
+## 6. Fig.3：最终版本对外性能与完整请求 E2/A6
+
+**主性能图的比较臂冻结为：最终优化版本、适用的成熟dense backend、已验收的其他方法。**“最终”须绑定具体实现SHA、有效配置、正确性与质量验收，不能将尚未验收的候选提前标为最终。本图不展示Step1/Step2等研发阶段曲线，也不以开发迭代倍数作为主贡献。T0–T3是验收账单，不要求四层或全部调试结果都进入主图；模块分解仅服务于解释最终版本的真实成本。
 
 ### 6.1 四层一一对应，不做跨层倍率嫁接
 
@@ -121,7 +123,7 @@ python exp/figures/figure_data_contract.py --bindings "$O3_NEW_OUT/figure_bindin
 
 ### 6.2 可复用与最小缺格
 
-已有D-A6图保留8/16/32/64K全部：Step2对dense约0.32/0.54/0.94/1.64×（由四舍五入ms算；作者verdict前两档0.31/0.53×）。harness固定随机BF16 QKV，B1/Hq32/Hkv8/D128，K2=1024，warmup2、timed7中位、`perf_counter`前后CUDA同步，fresh indexer每iter，但capture在warmup完成；chunk2048、select_group64、prefetch0等以原脚本为准。此为局部prefill链路作者摘要，缺逐repeat raw，**没有模型tokenizer/样本任务质量，不进Fig.3请求主面板或质量Pareto**。
+已有D-A6研发诊断内部保留8/16/32/64K全部，不要求进入论文或重新测量：Step2对dense约0.32/0.54/0.94/1.64×（由四舍五入ms算；作者verdict前两档0.31/0.53×）。harness固定随机BF16 QKV，B1/Hq32/Hkv8/D128，K2=1024，warmup2、timed7中位、`perf_counter`前后CUDA同步，fresh indexer每iter，但capture在warmup完成；chunk2048、select_group64、prefetch0等以原脚本为准。此为局部prefill链路作者摘要，缺逐repeat raw，**没有模型tokenizer/样本任务质量，不进Fig.3请求主面板或质量Pareto**。
 
 请求先核现有实际route（当前公开入口[`pred.py L229–253`](https://github.com/Chosen-David/two-level-attention/blob/b4406658aa0e028879cd7ba34c75747a5d67c6e4/benchmark/LongBench/pred.py#L229-L253)拆分question，[`L349–388`](https://github.com/Chosen-David/two-level-attention/blob/b4406658aa0e028879cd7ba34c75747a5d67c6e4/benchmark/LongBench/pred.py#L349-L388)先material forward再逐question token、再生成；具体attention路由仍须结合patch和flags；旧SS来源另见[`35b39bd8 pred.py L225–245`](https://github.com/Chosen-David/two-level-attention/blob/35b39bd8e43cf478bb4f0ab64a8457f08d87c864/benchmark/LongBench/pred.py#L225-L245)，q_pos取任务锚点与尾100字符边界的较大者，不能笼统称整个question。当前源码不替代旧run回执）：LongBench入口可能为material dense预填充、question suffix进入稀疏路径，再自然decode；不得把整个prompt自动标为dense-P。将既有原生material/question/decode路由另列，与受控整prompt dense-P/dense-D及整prompt dense-P/sparse-D分开。旧混合prompt质量不能绑定到整prompt-dense成本。受控两臂只在沿既定范围、路由与对应质量已核后比较，先从已登记请求长度选一个代表格核路由；具体长度/输出量必须由已冻结协议确定，不新选64K只因局部好看。原范围后续只补缺失长度，已完成且身份合格的不重跑。稀疏prefill另需真实route、suffix不变性或明确whole-prompt近似协议，未验不加入严格在线前缀结论。
 
@@ -131,9 +133,9 @@ python exp/figures/figure_data_contract.py --bindings "$O3_NEW_OUT/figure_bindin
 
 Graph修复候选已有CPU交付：以e1edf9c为基线，补丁SHA-256为`02b9349be026bef99fedb312f55c03c725152a768d40497d5422545b7119786a`；签名/schema/fail-closed的6个测试方法和22个子进程场景，经作者与独审的普通/-O四轮检查通过。此处只承接该CPU交付状态，不重复执行、不称CUDA/真实selector/生命周期或性能通过；真实capture依赖及GPU行为仍须对应验收。无GPU验收不得叫Graph已正确。随后在另获授权范围内，同QKV/同candidate集合/同L1mask/softmax支持/保护/tie/GQA/dtype，核最终IDs、finite输出和既定数值容差。覆盖边界/短序列/部分页/候选不足/NaN、alpha/gamma/保护变化导致几何变化；fallback计数必须为预期，不能将fallback成功当Graph成功。
 
-全S、已有candidate-L2/candidate-topk、compact活跃块分别命名，先“同输出实现”比较再接动态selector。生产near avg/far minmax语义保持；若提两独立kernel/分区CTA/融合等新优化，先由正确分支的profiler定位瓶颈，再限选一个最小候选，不能默认全做新矩阵。当前仅列研究候选，未授权实施。
+全S、已有candidate-L2/candidate-topk、compact活跃块在内部实现账本分别命名；只有某个明确科学因果主张需要时，才以最终版本为锚点安排必要的同输出模块消融，不强求复现历史Step1/Step2阶段。生产near avg/far minmax语义保持；若提两独立kernel/分区CTA/融合等新优化，先由正确分支的profiler定位瓶颈，再限选一个最小候选，不能默认全做新矩阵。当前仅列研究候选，未授权实施。
 
-**成功/失败。**先正确性通过，再同质量达到δ、请求改善达到预登记η才称真实收益；kernel快而pipeline/request慢分别报告，不撤负例。报告paired请求比值CI、median/尾部（具体分位预冻结）、actual output长度和显存账单。Fig.3收益主张依赖同身份质量与所用路径自身正确性门禁；Graph门禁只阻塞Graph路径，已正确的非Graph路径可独立推进。优先P0；若只有T0/T1，主图保留待测，局部图放附录。
+**成功/失败。**先正确性通过，再同质量达到δ、请求改善达到预登记η才称真实收益；kernel快而pipeline/request慢分别报告，不撤负例。报告paired请求比值CI、median/尾部（具体分位预冻结）、actual output长度和显存账单。Fig.3收益主张依赖同身份质量与所用路径自身正确性门禁；Graph门禁只阻塞Graph路径，已正确的非Graph路径可独立推进。优先P0；若只有T0/T1，完整请求主图保留待测；局部结果默认留内部诊断，只有回答明确科学问题的必要模块消融才考虑附录，不为保存开发过程曲线而强制出图。最终版本在各既定测试长度的正负结果均如实展示。
 
 ## 7. Fig.4：sub/sub对DenseFullKV主质量
 
@@ -162,7 +164,7 @@ Graph修复候选已有CPU交付：以e1edf9c为基线，补丁SHA-256为`02b934
 | SFig.2b / A5 | 复用M2=本法与M0=dense；M1=256保护-only保留诊断；仅缺M3等总K朴素middle时列缺格 | 保护相同，总unique K1024；M3在看确认结果前选定规则及候选来源，不后挑弱者；长序列middle768，短序列按实际去重余量。保存实际IDs/quality/request成本 | M2仅胜M1不能证明内容选择；M3同质更快保留反例。旧E135的2048 trace与256-only不可补M3。生产臂/汇总仍缺，P0 |
 | SFig.3 / A1+A2b+A5敏感性 | 复用E125/E128搜索；tail16/32/64既定轴、SS32复用；固定32频段；保护已登记网格 | 不做频段×宽度×模型笛卡尔积。paired-random生产臂缺则BLOCKED，旧unpaired random32不能替代；seed/坐标事前固定 | 仅说明有限候选；不在确认集重新挑冠军/保护。e125/e128/e85d/e135脚本原协议和硬编码先审。P1，主结果以后 |
 | SFig.4 / O2+A4+A6 | 复用E137/E129及阶段四臂原件；G0/on、G1/off-refill、G2/off-no-refill仅有真实实现/轨迹者展示 | 保存calibration/selection far IDs、pending/freeze/clear、真实first decode token、每seq/layer/head漂移、阈值/rows、校准同步成本及实际预算；G2少token非sameK。prompt-only trace不能补decode漂移 | 静态cclustersim不替mavg prefill标定；标定低mass非安全证明；动态新研究暂停，未验G2不排队。已有gate仅限测过范围。P2条件性 |
-| 工程附录 / A6 | D-A6-Step2全长负例、Graph候选修复测试、compact已有报告 | 同输出门禁→T0/T1→模型/请求；记录capture/replay/fallback、cache几何/schema、内存与流支持域 | CPU逻辑候选不等CUDA/数值/生命周期通过；仅改善旧慢实现不称vs高效dense胜出。依赖独审与另行授权 |
+| 条件性工程消融 / A6 | 开发阶段与Graph/compact历史诊断内部保留；仅复用能回答明确因果问题的同输出模块证据 | 以最终版本为锚点，冻结其余条件，只改变目标模块；记录capture/replay/fallback、cache几何/schema、内存与流支持域，不强求历史阶段对照 | 非主性能图必选臂；没有独立科学问题则不安排。CPU逻辑候选不等CUDA/性能通过，改善旧慢实现不称vs成熟dense胜出 |
 
 ## 9. 最小优先清单：实际操作、交付、停止点
 
@@ -196,7 +198,7 @@ Graph修复候选已有CPU交付：以e1edf9c为基线，补丁SHA-256为`02b934
 
 | 细节/出处 | 采用、调整或不适用 | 本项目具体落地及验收 |
 |---|---|---|
-| Quest §4.3.1图8/9、§4.3.2图10（PDF物理页7–8）把kernel/attention/模型decode分开 | **采用并扩充边界** | Fig.3执行T0–T3四账单；只有T3可称request收益。图10排sampling不可沿用为我们的完整请求定义；sampling开销存字段，TPOT分母写清 |
+| Quest §4.3.1图8/9、§4.3.2图10（PDF物理页7–8）把kernel/attention/模型decode分开 | **采用并扩充边界** | Fig.3仅比较最终优化版本、成熟dense与已验其他方法；T0–T3为验收账单，不是必须展示的四组研发曲线。只有T3可称request收益。图10排sampling不可沿用为我们的完整请求定义；sampling开销存字段，TPOT分母写清 |
 | Quest Q1 L19–36模型FP16本地路径，无revision；T1 L36/50 tokenizer无revision；W1合成输入无模型 | **调整** | 本法与baseline都锁checkpoint/tokenizer hash及revision；合成kernel运行模型字段记N/A而非伪填Qwen3，正式质量运行缺revision=identity_missing |
 | Quest Q1 L81/90随机embeddings；Twilight W1随机Q/KV/labels/score与独立后级输入 | **仅作局部诊断** | 复用Step2随机QKV的T1证据，不进入E1/请求质量；同输出控制用真实同一QKV/IDs并传递上游输出，不能分别随机后级再相加当pipeline |
 | TokenSelect 图7 chunk512、KV128K/512K/1M；T2 chunk8192与论文不同 | **不适用其规模；采用配置显式绑定** | 本项目沿已登记长度，不补1M/batch新轴；Step2 chunk2048只作该harness身份，不移植到正式请求默认。producer实际chunk必须回执 |
@@ -228,6 +230,8 @@ Graph修复候选已有CPU交付：以e1edf9c为基线，补丁SHA-256为`02b934
 
 TPOT候选定义为首输出之后的decode wall除以`actual_generated_tokens−1`，需以实际程序第一/第二token事件核实，不能凭公式把prompt最后logits算成decode。自然输出长度不同则同时报告真实请求成本与既定固定工作量诊断，不按长度比线性“校正”成未测速度。
 
+“sub/sub或gate在长context更有优势”仅为待证假设；gate仍须独立质量与完整请求成本证据，不能因预期优势进入主性能图。长context仅在既定模型/RoPE、数据与显存支持及已有授权成立时补真实缺格，fixed-K与fixed-ratio分开解释，不自动扩大矩阵。
+
 请求速度比固定为同一pair的`dense_wall / method_wall`，统计时保持同输入配对和运行块结构，不能把所有replay当独立请求。δ/η究竟用百分点、绝对ms或相对改善需先在协议明确；η尚未冻结时不宣布“达到实际价值”。选择分解profile若影响wall，独立保存，不用instrumented wall替代主计时却不披露。
 
 ## 12. 首批复用账本：已经定位的原件，而非从零再盘点
@@ -241,7 +245,7 @@ TPOT候选定义为首输出之后的decode wall除以`actual_generated_tokens�
 | SS主臂历史五任务 | `exp/trace/results/e134_l1sub/pred_mavg_l1sub/`；如`qasper-tli_64_128_1024_c4_Aa0.25_b0.125_g0.625_h0a1708cf4e-1012180214.jsonl` blob `96710ee2701412caeb5e66c0a2842c03358caffe`，同名`.runcap.json` blob `6f54671a1f5ca262f6dc8f33c1fd56d9f9f08b03`、`.tli_manifest.json` blob `cd5bdef9fdd938b4e9dd981e94c33cbaed856c85`；五任务均有对应旁车 | identity_missing至独验完成；不因有旁车自动可与旧FullKV配对。该目录未发现result.json，不再猜文件存在 | 先读这组旁车逐项对齐producer/cap/scorer/实际路由，再核其余任务document/input。47.588仅历史描述，旧E133的task-bootstrap不替document配对统计 |
 | SF历史五任务 | `exp/trace/results/e134_l2full/pred_mavg_l2full/`；如`qasper-tli_64_128_1024_c4_Aa0.25_b0.125_g0.625_h2d1dc6ec58-1012195423.jsonl` blob `57494d0b1fbf4ddcfb5c3535e77b3aa8c5482696`，同名runcap blob `16e558df6ec5eef9272f0f9864f0d5e1b0e1b0dd`、tli_manifest blob `6e310e18478e2bb421a6c264ef24faef47c4b715` | identity_missing；L2full模式与实际生成代码绑定未闭合，不预判semantic_failed | 比较manifest实际producer/dirty文件与L2full实现，核QDQ形状/坐标及phase；闭合前47.666不得作2×2因果点 |
 | FF稀疏臂 | 当前给定产物中未定位合格原件；不等于断言全仓/宿主绝对不存在 | absent_in_reviewed_artifacts；四格逐一判断，FF不是唯一可能需补的格 | 仅查既有任务索引/producer产物清单是否有FF，不全面重搜/重跑；确无且必要才登记缺格 |
-| Step2工程诊断 | 实验SHA `e1edf9c316fc4190dd0c29bc5d47477136f8bdab`：`exp/trace/results/e139_step2_cand_verdict.json` blob `1ecb5851eb9c1de087ca2a0ba34982b2dd034556`；`exp/bench/e139_step2_wall_lsweep.py`；原件清单保留两者SHA-256 | reusable_descriptive：8–64K作者摘要/harness可复用；逐repeat raw、真实模型请求、质量绑定缺；不是absent整条结果 | 先查已有原始timing日志回执（不重复测速）；找不到则继续只画摘要且无CI，不升级Fig.3/请求Pareto |
+| Step2工程诊断 | 实验SHA `e1edf9c316fc4190dd0c29bc5d47477136f8bdab`：`exp/trace/results/e139_step2_cand_verdict.json` blob `1ecb5851eb9c1de087ca2a0ba34982b2dd034556`；`exp/bench/e139_step2_wall_lsweep.py`；原件清单保留两者SHA-256 | reusable_descriptive：8–64K作者摘要/harness可复用；逐repeat raw、真实模型请求、质量绑定缺；不是absent整条结果 | 先查已有原始timing日志回执（不重复测速）；找不到则仅保留内部摘要且无CI，不安排研发阶段论文曲线、不升级Fig.3/请求Pareto |
 
 ### 12.1 请求统计的具体预登记条款
 
@@ -352,6 +356,7 @@ TPOT候选定义为首输出之后的decode wall除以`actual_generated_tokens�
 5. 仅从已有登记请求协议选代表格，冻结完整timing字段、AB/BA顺序、输出工作量、重复/统计；完整请求采集入口未验收，先补入口候选而不是伪造一键运行命令。
 6. 仅补A2四格中真正不可复用格，以及必要的纯配额/等K朴素middle控制。跨方法允许不同K1；配额因果控制固定统一scorer、K1/page/L2/表示/保护。
 7. 用既有trace离线作O3；当前仅全causal质量诊断，进入Fig.1还缺保护质量拆分。O1新口径离线汇总缺；Fig.2只绑可编辑源，不新采GPU。
-8. 保留8–32K负收益与64K局部摘要。Gate现有测量限原范围；新增动态α/β/γ、D′、新baseline、大规模网格继续不排队。
+8. 历史8–32K负收益与64K局部摘要保留内部诊断；主性能图只呈最终版本、成熟dense及已验其他方法的匹配结果，最终版本负例同样保留。Gate现有测量限原范围；新增动态α/β/γ、D′、新baseline、大规模网格继续不排队。
 
 执行入口与冻结条件见本文第4—9节，原件账本见第12节；文献固定版本/源码行号见附后的《论文测量口径逐字段对照》。未知值保持NR/UNFROZEN，不补默认。
+
