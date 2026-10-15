@@ -157,6 +157,14 @@ def sparse_prefill_attn(
         raise ValueError("prefill chunk_size must be a positive integer") from exc
     if chunk_size <= 0:
         raise ValueError("prefill chunk_size must be a positive integer")
+    if q.device != k.device or q.device != v.device or q.dtype != k.dtype or q.dtype != v.dtype:
+        raise ValueError("prefill q/k/v dtype and device must match")
+    runtime = os.environ.get("TLI_PREFILL_RUNTIME", "reference")
+    if runtime not in ("reference", "candidate"):
+        raise ValueError("unknown TLI_PREFILL_RUNTIME")
+    if runtime == "candidate":
+        from .candidate_prefill import sparse_prefill_attn as candidate
+        return candidate(indexer, q, k, v, softmax_scale, chunk_size, dense_below)
     if dense_below is None:
         dense_below = getattr(indexer.args, "tia_level2_topk", 1024)
 

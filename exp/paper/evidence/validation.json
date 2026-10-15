@@ -1,0 +1,54 @@
+{
+  "schema": "paper-cpu-validation-v1",
+  "independent_review": "passed; initial signature/typing/route/support blockers fixed",
+  "tests": {
+    "runtime_full_before_additional_row_oracle": {
+      "tests": 18,
+      "cuda_skipped": 1,
+      "normal_exit": 0,
+      "optimized_exit": 0
+    },
+    "runtime_routing_final": {
+      "tests": 4,
+      "normal_exit": 0,
+      "optimized_exit": 0
+    },
+    "paper_contract_final": {
+      "tests": 9,
+      "normal_exit": 0,
+      "optimized_exit": 0
+    },
+    "figures": {
+      "tests": 36,
+      "normal_exit": 0,
+      "optimized_exit": 0
+    },
+    "existing_ops": {
+      "tests": 9,
+      "normal_exit": 0,
+      "optimized_exit": 0
+    }
+  },
+  "graph_subprocesses_per_mode": {
+    "cases": 22,
+    "expected_exit_0": 4,
+    "expected_exit_1": 18
+  },
+  "cli_smoke": [
+    "default UNFROZEN plan; no GPU commands",
+    "four-family inventory with hashes only",
+    "architecture SVG/PDF/Mermaid"
+  ],
+  "secret_scan": {
+    "credential_pattern_matches": 0,
+    "guide_candidate_matches": 0,
+    "guide_staged": false
+  },
+  "ci": "no repository .github workflows at reviewed base; remote run status checked separately",
+  "gpu_validation": "not run",
+  "limitations": [
+    "coverage of host support units is declared, not proven complete",
+    "no model-level timing collector integration or GPU measurement",
+    "main advanced concurrently; future main integration must reconcile overlapping runtime modules"
+  ]
+}

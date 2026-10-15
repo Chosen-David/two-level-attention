@@ -1,0 +1,12 @@
+flowchart LR
+    QKV[Original full-dimensional Q/K/V] --> Shared[Shared low-dimensional coordinates per layer/KV head]
+    Shared --> Near[Near: average L1 page scoring]
+    Shared --> Far[Far: minmax L1 page scoring]
+    Near --> NL2[Near L2 token selection]
+    Far --> FL2[Far L2 token selection]
+    FL2 -. existing D-prime far-only bypass .-> Merge
+    NL2 --> Merge[Union / dedup / causal protection]
+    FL2 --> Merge
+    Protection[Independent sink / SWA] --> Merge
+    Merge --> Attn[Attention in original full dimension]
+    QKV --> Attn
