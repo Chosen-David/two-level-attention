@@ -10,7 +10,7 @@
 设计（镜像 qwen3_attn_patch 骨架 + vendored modeling_deepseek eager 投影
 复刻，逐位同源）：
   - prefill（q_len == cache 长度，即首步完整 prompt）→ dense eager 原版
-    复刻（4D float mask 相加语义保持）+ indexer.clear()；
+    复刻（4D float mask 相加语义保持；None 时补因果屏蔽）+ indexer.clear()；
   - decode（B=1、q_len=1、use_cache=True）→ 稀疏两级选择
     （prepare_mask）+ eager_decoding_attn(allow_kv_hetero=True)；
   - MLA 异维契约：k [1,S,H,192]（nope 128+rope 64）/ v [1,S,H,128]——
@@ -69,6 +69,16 @@ def deepseek_v2_attn_forward(
     **kwargs,
 ):
     bsz, q_len, _ = hidden_states.size()
+    if attention_mask is not None and (
+        not isinstance(attention_mask, torch.Tensor)
+        or attention_mask.layout != torch.strided
+        or attention_mask.ndim != 4 or not attention_mask.is_floating_point()
+        or attention_mask.device != hidden_states.device
+    ):
+        raise ValueError(
+            "E142a attention_mask must be a strided 4D floating additive tensor on "
+            "the hidden_states device; 2D padding/bool masks are unsupported"
+        )
 
     # Establish the supported decode contract before projection or cache.update.
     # A fresh cache, including a one-token prompt, remains the dense prefill path.
@@ -134,6 +144,12 @@ def deepseek_v2_attn_forward(
                 f"语义需要层索引，拒绝执行"
             )
         kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    if (attention_mask is not None
+            and tuple(attention_mask.shape) != (bsz, 1, q_len, kv_seq_len)):
+        raise ValueError(
+            f"E142a attention_mask shape must be {(bsz, 1, q_len, kv_seq_len)}, "
+            f"got {tuple(attention_mask.shape)}"
+        )
     cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
     apply_rotary_pos_emb = _module_apply_rope(self)
     q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids)
@@ -169,6 +185,14 @@ def deepseek_v2_attn_forward(
         )
         if attention_mask is not None:
             attn_weights = attn_weights + attention_mask
+        elif q_len > 1:
+            # Some model backends omit the explicit causal mask. After replacing
+            # their forward with eager attention, causality is our responsibility.
+            # This branch is a fresh prompt (K length == Q length), not decode.
+            future = torch.ones((q_len, q_len), dtype=torch.bool,
+                                device=query_states.device).triu_(diagonal=1)
+            attn_weights.masked_fill_(future, float('-inf'))
+            del future  # Do not keep the temporary mask live through softmax/PV.
         attn_weights = F.softmax(
             attn_weights, dim=-1, dtype=torch.float32
         ).to(query_states.dtype)

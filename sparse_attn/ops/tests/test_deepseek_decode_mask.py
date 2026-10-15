@@ -34,7 +34,8 @@ class DecodeMaskTest(unittest.TestCase):
                  torch.zeros(1, 1, 1, 5), torch.zeros(1, 2, 1, 4),
                  torch.zeros(1, 1, 1, 4, dtype=torch.bool),
                  torch.zeros(1, 1, 1, 4, dtype=torch.int64), [0, 0, 0, 0],
-                 torch.zeros(1, 1, 1, 4, device="meta")]
+                 torch.zeros(1, 1, 1, 4, device="meta"),
+                 torch.zeros(1, 1, 1, 4).to_sparse()]
         for value in (-float("inf"), float("inf"), float("nan"), -1e9, 0.1, -1e-30):
             mask = torch.zeros(1, 1, 1, 4)
             mask[..., 0] = value
