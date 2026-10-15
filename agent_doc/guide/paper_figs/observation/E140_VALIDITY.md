@@ -1,9 +1,19 @@
 # E140 historical observation limits and minimal recollection
 
 The original JSON (`e670af6eda21d988d4eedcf458064bb72982bf33`, first commit
-`096414368d2f7c102cb526a62c222e181b97620c`) and existing O_observation figures
-are preserved byte-for-byte. `e140_validity.json` records their hashes. They are
-historical diagnostics, not repaired or accepted paper evidence.
+`096414368d2f7c102cb526a62c222e181b97620c`) remains unchanged. The v2 manifest
+retains every legacy v1 artifact hash and pins that historical snapshot to this
+commit. It separately records the later unannotated figure snapshot and current
+SVG/PNG/PDF with a visible historical-diagnostic banner. Original bytes remain
+recoverable from the recorded Git commits; annotation changes presentation only.
+Neither the old nor annotated figures are repaired or accepted paper evidence.
+
+`TL-E140-ASSET-PROVENANCE-20261015`: run
+`python -m exp.paper.e140_asset_provenance` to verify current assets and unchanged
+inputs against the manifest. Renderer default rejection remains mandatory;
+explicit diagnostic rendering keeps a visible warning. Re-rendering changes
+artifact identity and requires a reviewed manifest update, never promotion to
+valid paper evidence by replacing hashes alone.
 
 Confirmed collector defects:
 

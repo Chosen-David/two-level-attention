@@ -281,6 +281,13 @@ ax_d.text(0.60, 0.965, "far", transform=ax_d.transAxes, ha="center",
 
 fig.subplots_adjust(left=0.055, right=0.995, top=0.88, bottom=0.17)
 
+# Explicit diagnostic opt-in does not make old collector data paper evidence.
+# bbox_inches="tight" includes this banner outside the existing plot bounds.
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+from exp.paper.e140_asset_provenance import add_render_warning
+add_render_warning(fig)
+
 # ---------------- lint + 导出 ----------------
 report = lint_figure(fig)
 print(f"[lint] overlaps={len(report.get('overlaps', []))} clipped={len(report.get('clipped', []))}")

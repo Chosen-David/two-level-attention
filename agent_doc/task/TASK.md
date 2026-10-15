@@ -93,5 +93,8 @@
 
 ## 2026-10-15（GPT 论文工程分支）
 
+- [x] [TL-E140-ASSET-PROVENANCE-20261015] E140 历史图可见诊断警告及旧/新身份分离；CPU 正负回归，不代表科学有效性恢复。
+  ([详情](task_details/TL-E140-ASSET-PROVENANCE-20261015.md))
+
 - [ ] [GPT-PAPER-20261015] 论文运行时、数据门禁与图表薄入口；CPU 回归及独立审查，GPU 实测和科学验收未完成。仅发布独立开发分支。
   ([详情](task_details/GPT-PAPER-20261015.md))
