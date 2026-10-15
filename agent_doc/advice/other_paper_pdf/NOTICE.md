@@ -99,7 +99,7 @@ ICLR proceedings redistribution license not verified; arXiv v3 has NC-SA restric
 
 ## 2026-10-15 reference additions and refreshed MoBA status
 
-The entries below supersede the previous MoBA link-only decision: the user authorized noncommercial reference archiving of its unmodified original PDF under its separate license. Acquisition is still blocked, so no new PDF bytes are included. Metadata and license links were checked on the fixed-version official arXiv pages.
+The entries below supersede the previous MoBA link-only decision: the user authorized noncommercial reference archiving of its unmodified original PDF under its separate license. Acquisition was initially blocked; the three originals were subsequently received through authorized Git transport and verified locally, as recorded below. Metadata and license links were checked on the fixed-version official arXiv pages.
 
 ### MoBA
 
@@ -109,11 +109,13 @@ Authors: Enzhe Lu, Zhejun Jiang, Jingyuan Liu, Yulun Du, Tao Jiang, Chao Hong, S
 
 Version: 2502.13189v1; accessed 2026-10-15. [Source](https://arxiv.org/abs/2502.13189v1) · [Official PDF](https://arxiv.org/pdf/2502.13189v1) · [License evidence](https://arxiv.org/abs/2502.13189v1) · [License terms](https://creativecommons.org/licenses/by-nc-nd/4.0/).
 
-License: CC-BY-NC-ND-4.0. Status: download-blocked. User authorized noncommercial reference inclusion of unmodified original PDF under its separate CC BY-NC-ND 4.0 license. Library bundle download failed; official PDF download denied by environment proxy (HTTP CONNECT 403). No local bytes or SHA256 verified.
+License: CC-BY-NC-ND-4.0. Status: included. Unmodified original PDF received via authorized Git transport; local SHA256, Git blob, page count and first-page version/authors verified.
 
-Local filename, SHA-256, byte size and page count: unknown/null; no PDF included in this update. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
+File: `MoBA-2502.13189v1.pdf`; 15 PDF pages; 1573753 bytes; SHA-256 `9ea3247701683eff6d901052367a6d6ebcffcb5a78bed239923d9e696bc9d121`; Git blob `0b8070b702bcd802d33615defe20604c82bfddfd`. Unmodified original bytes. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
 
 Authorized intended use: noncommercial reference only, unmodified original PDF with attribution and separate CC BY-NC-ND 4.0 license; no adapted-paper redistribution or commercial-use grant.
+
+Acquisition history (2026-10-15): Library bundle transfer failed and official PDF download was denied by the environment proxy (HTTP CONNECT 403). No denied download was retried. Subsequently obtained via normal fetch of authorized transport commit `db95867ec902c142ea8d6d79667fd2094ceb6585`; transport commit and fragments are not merged into this branch.
 
 ### StreamingLLM
 
@@ -123,9 +125,11 @@ Authors: Guangxuan Xiao, Yuandong Tian, Beidi Chen, Song Han, Mike Lewis.
 
 Version: 2309.17453v4; accessed 2026-10-15. [Source](https://arxiv.org/abs/2309.17453v4) · [Official PDF](https://arxiv.org/pdf/2309.17453v4) · [License evidence](https://arxiv.org/abs/2309.17453v4) · [License terms](https://creativecommons.org/licenses/by/4.0/).
 
-License: CC-BY-4.0. Status: download-blocked. Library bundle download failed; official PDF download denied by environment proxy (HTTP CONNECT 403). No local PDF bytes, SHA256 or page count verified.
+License: CC-BY-4.0. Status: included. Unmodified original PDF received via authorized Git transport; local SHA256, Git blob, page count and first-page version/authors verified.
 
-Local filename, SHA-256, byte size and page count: unknown/null; no PDF included in this update. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
+File: `StreamingLLM-2309.17453v4.pdf`; 21 PDF pages; 16952848 bytes; SHA-256 `e8a7de67c7c57642648362651b4cf64fd852467e18865a298916a36098314819`; Git blob `e209dfe7ca1c34b9d35383918eb5c9919d112642`. Unmodified original bytes. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
+
+Acquisition history (2026-10-15): Library bundle transfer failed and official PDF download was denied by the environment proxy (HTTP CONNECT 403). No denied download was retried. Subsequently obtained via normal fetch of authorized transport commit `db95867ec902c142ea8d6d79667fd2094ceb6585`; transport commit and fragments are not merged into this branch.
 
 ### HISA
 
@@ -135,9 +139,11 @@ Authors: Yufei Xu, Fanxu Meng, Fan Jiang, Yuxuan Wang, Ruijie Zhou, Zhaohui Wang
 
 Version: 2603.28458v4; accessed 2026-10-15. [Source](https://arxiv.org/abs/2603.28458v4) · [Official PDF](https://arxiv.org/pdf/2603.28458v4) · [License evidence](https://arxiv.org/abs/2603.28458v4) · [License terms](https://creativecommons.org/licenses/by/4.0/).
 
-License: CC-BY-4.0. Status: download-blocked. Library bundle download failed; official PDF download denied by environment proxy (HTTP CONNECT 403). No local PDF bytes, SHA256 or page count verified.
+License: CC-BY-4.0. Status: included. Unmodified original PDF received via authorized Git transport; local SHA256, Git blob, page count and first-page version/authors verified.
 
-Local filename, SHA-256, byte size and page count: unknown/null; no PDF included in this update. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
+File: `HISA-2603.28458v4.pdf`; 18 PDF pages; 624872 bytes; SHA-256 `bb6c13f56075a0bbeac8a77d90ce46f70096bac7ce5e0be1e11e1a6d4fec28d4`; Git blob `7e4a7f7c4d4499c791add8a5694c4eb5159053e4`. Unmodified original bytes. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
+
+Acquisition history (2026-10-15): Library bundle transfer failed and official PDF download was denied by the environment proxy (HTTP CONNECT 403). No denied download was retried. Subsequently obtained via normal fetch of authorized transport commit `db95867ec902c142ea8d6d79667fd2094ceb6585`; transport commit and fragments are not merged into this branch.
 
 ### H2O
 
