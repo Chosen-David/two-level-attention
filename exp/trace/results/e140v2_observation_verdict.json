@@ -1,0 +1,44 @@
+{
+  "experiment": "E140v2",
+  "title": "O 观察图 trace 重采（修复采集器 5 缺陷后）——论文 O 段叙事逐面板重验",
+  "date": "2026-10-16",
+  "user_directive": "任务 #271：E140_VALIDITY 危机（旧采集器漏 input_layernorm 等 5 缺陷）→ 修复版采集器重采 + O 段重验",
+  "caliber": {
+    "model": "Qwen3-8B (local, config sha f7c4eadfbbf52247)",
+    "host": "wys-4xh20 (10.238.122.187) GPU1/GPU3, transformers 4.56.2",
+    "collectors": "agent_doc/guide/paper_figs/trace/e140_o_trace.py (GPT 修复版 v2, commit 2e3e88a) + e140_o4_select_trace.py v2 (本次重写: get_qk 换 hook 实际 q_norm/k_norm+实际 position_embeddings, 加 revision 门禁/--execute/x 防覆写)",
+    "data": "LongBench hotpotqa/musique 各 2 条, 16K 截断, 层 {8,24}, 16 query/样本, sink128/swa128, α=0.25, K1=128, K2_mid=768",
+    "outputs": "exp/trace/results/e140_o_trace_v2.json (o3_raw 剥离 sidecar, sha 862ce75bf905813a) + e140_o4_select_trace_v2.json; npz Q/K 快照留节点私有",
+    "qk_capture": "hook 实际 q_norm/k_norm 输出 + 前向实际 position_embeddings（非手工重建）"
+  },
+  "panel_verdicts": {
+    "a_density": {
+      "old_claim": "mid 区密度随距离衰减但 d>9K 远端长尾回升（检索热点在 near 之外）",
+      "v2_finding": "单调衰减，无 d>9K 回升——hotpot 1.2e-4→1.5e-5 单调降；musique 末档 1.6e-5 仅持平（3-9K 档 1.7e-5）。旧「回升」是缺陷伪象",
+      "verdict": "REWRITTEN——面板叙事改为「far 稀疏 + 单调衰减 → 无漏检界（no-miss bound）+ token 级细筛的动机仍成立」，删除回升句"
+    },
+    "b_zone_mass": {
+      "old_claim": "far 独占 mid 质量 83%；far 最差头 0.65 远超组均值 0.48 → 独立 far 预算防挤出",
+      "v2_finding": "far 占非保护 mid 质量 49%（far .1452 vs near .1515，两任务一致 0.49）；保护带联合 70%（sink .41+swa .29）。far_max_kv_group_mass 均值 .27（L24 .35）≈ far 组均值的 1.8-2.4×——组间异质性存在但幅度缩水",
+      "verdict": "REWRITTEN——「far 独占 83%」作废；新动机链 = far 与 near 质量相当（~49%）且集中于少数 token（密度 1-2 个数量级低于 near），预算切分把 far 挤到断供（见 d）才是硬证据"
+    },
+    "c_subspace": {
+      "old_claim": "tail32 保留 79% full-ref 质量 vs random 47% vs high 26% → 位置先验（低频完整 RoPE 对）",
+      "v2_finding": "tail32 0.8412 / random32 0.5060 / high32 0.2408（L8 0.81/L24 0.87 分层稳定）",
+      "verdict": "SURVIVES（更强）——排序与幅度均复现，面板数字更新即可"
+    },
+    "d_selection": {
+      "old_claim": "两级选择器选中分布贴合 oracle；K1=128 far 配额压到 128 断供，K1=64 恢复 432，overlap 0.47→0.53",
+      "v2_finding": "oracle far_sel/q=305.5、tli_k128 far=128.0（配额精确压制）、tli_k64 far=432.0；overlap 0.518→0.554；retained_mass 0.781/0.736。oracle 选中率在 d>6K 回升（0.021→0.029，密度降但预算集中）——「oracle 检索热点在远端」在选择率口径下仍成立",
+      "verdict": "SURVIVES——far 断供/恢复机制链完整复现，数字更新（305/128/432, 0.52→0.55）"
+    }
+  },
+  "new_observation": "层异质性显著：L8 sink 占 49.5%（far 仅 5.8%），L24 sink 32.2%/far 23.3%（far/(far+near)=54%）——浅层偏局部、深层远程质量上升，可作为面板 (b) 的新叙事素材",
+  "paper_impact": "O 段重写范围：面板 (a)(b) 叙事句重写 + 全部数字更新；(c)(d) 数字更新。动机链总结构不变（分区 + 位置先验 + far 预算防断供），但「far 质量独占」与「远端回升」两个具体主张删除。fig_o_observation.py 须改读 v2 JSON 后解除 E140_ALLOW_HISTORICAL_DIAGNOSTIC 历史门控",
+  "status": "数据落袋 + 判决出；图重渲染与论文 O 段改写挂后续（本判决为依据）",
+  "cross_references": {
+    "validity_audit": "agent_doc/guide/paper_figs/observation/E140_VALIDITY.md（GPT TL-E140-VALIDITY 五缺陷清单）",
+    "o_collector_cpu_parity": "exp/paper/evidence/observation-cpu-20261015/（HF 原生对拍 max|Δ|=1.19e-7）",
+    "old_invalid": "e140_o_trace.json / e140_o4_select_trace.json（字节保留，历史诊断专用）"
+  }
+}

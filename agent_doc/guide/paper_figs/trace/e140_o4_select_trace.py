@@ -1,5 +1,13 @@
 # -*- coding: utf-8 -*-
-"""E140e O4 选择行为 trace 采集（figure_id=O4，补充 O1 的 oracle 视角）。
+"""E140e O4 选择行为 trace 采集 v2（figure_id=O4，补充 O1 的 oracle 视角）。
+
+【v2 修复（TL-E140-VALIDITY 采信清单）】旧版 get_qk 从 hidden_states[L] 手工
+q/k_proj+手写 RoPE 重建 Q/K——漏 input_layernorm（Qwen3 v4.51.3 契约违反）。
+v2 与 e140_o_trace.py v2 同口径：hook 实际 q_norm/k_norm 输出 + 实际前向
+position_embeddings，异常 API fail closed；模型/分词器/数据 revision 声明
+门禁 + --execute 显式执行 + 输出 x 模式防覆写（旧 JSON 字节保留，见
+../observation/E140_VALIDITY.md）。区域几何（near=SWA 左侧右对齐段、SWA
+[q+1-128,q+1) 128 位）与配额公式复刻逻辑自旧版保持不变。
 
 O1 回答「质量在哪里」（dense mass 分布 = 理想选择的先验）；本 trace 回答
 「选择器实际选了哪里」——同一批 Qwen3-8B 真实 LongBench 样本（hotpotqa/
@@ -37,13 +45,16 @@ cells 保留 task/sample/layer/query 粒度可回查。sink/swa 强制区三臂�
 
 输出：exp/trace/results/e140_o4_select_trace.json
 """
+import argparse
+import hashlib
 import json
 import os
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
 
-DEV = "cuda:1" if torch.cuda.device_count() > 1 else "cuda:0"
+DEV = os.environ.get("E140_DEVICE", "cuda:0")
 TASKS = ["hotpotqa", "musique"]
 N_SAMPLE = 2
 LAYERS = [8, 24]
@@ -60,7 +71,7 @@ SUB32 = list(range(48, 64)) + list(range(112, 128))
 DATA = os.environ.get("LB_DATA", os.path.expanduser(
     "~/datasets/LongBench/data"))
 OUT = os.environ.get("E140_OUT", os.path.expanduser(
-    "~/two-level-attention/exp/trace/results/e140_o4_select_trace.json"))
+    "~/two-level-attention/exp/trace/results/e140_o4_select_trace_v2.json"))
 MODEL = os.environ.get("QWEN_MODEL", os.path.expanduser("~/Qwen3-8B"))
 
 
@@ -71,40 +82,71 @@ def rotate_half(x):
 
 def load_model():
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    tok = AutoTokenizer.from_pretrained(MODEL)
+    tok = AutoTokenizer.from_pretrained(MODEL, revision=os.environ["E140_TOKENIZER_REVISION"], local_files_only=True)
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL, torch_dtype=torch.bfloat16, device_map=DEV)
+        MODEL, revision=os.environ["E140_MODEL_REVISION"], local_files_only=True,
+        torch_dtype=torch.bfloat16, device_map=DEV)
     model.eval()
-    assert getattr(model.config, "rope_scaling", None) is None, \
-        "rope_scaling 存在——手写 RoPE 需适配，fail loudly"
+    if getattr(model.config, "model_type", None) != "qwen3":
+        raise ValueError("collector requires the verified Qwen3 attention contract")
     return tok, model, float(model.config.rope_theta)
 
 
 def get_qk(model, theta, input_ids):
-    """一次前向拿 hidden_states，目标层手动 q/k_proj + q/k_norm + RoPE
-    （与 e140_o_trace.py 逐位同流程）。"""
-    with torch.no_grad():
-        out = model(input_ids=input_ids.to(DEV), output_hidden_states=True,
-                    use_cache=False)
-    qs, ks = {}, {}
-    inv_freq = 1.0 / (theta ** (torch.arange(0, 64, device=DEV,
-                                             dtype=torch.float32) / 64))
-    pos = torch.arange(input_ids.shape[1], device=DEV, dtype=torch.float32)
-    emb = torch.cat((torch.outer(pos, inv_freq),) * 2, dim=-1)
-    cos = emb.cos().to(torch.bfloat16)
-    sin = emb.sin().to(torch.bfloat16)
-    for L in LAYERS:
-        hs = out.hidden_states[L]
-        attn = model.model.layers[L].self_attn
-        q = attn.q_norm(attn.q_proj(hs).view(1, -1, 32, 128))
-        k = attn.k_norm(attn.k_proj(hs).view(1, -1, 8, 128))
-        qs[L] = (q * cos[None, :, None] +
-                 rotate_half(q) * sin[None, :, None])[0].float()   # (T,32,128)
-        ks[L] = (k * cos[None, :, None] +
-                 rotate_half(k) * sin[None, :, None])[0].float()   # (T,8,128)
-    del out
-    torch.cuda.empty_cache()
-    return qs, ks
+    """Capture actual normalized projections and supplied RoPE during forward.
+
+    与 e140_o_trace.py v2 逐位同实现：hook q_norm/k_norm 输出（已含
+    input_layernorm 后的 q_proj/k_proj 链）与前向实际 position_embeddings；
+    不再从 hidden_states 重建（旧版缺陷①）。异常 API fail closed。
+    """
+    if (not isinstance(input_ids, torch.Tensor) or input_ids.ndim != 2
+            or input_ids.shape[0] != 1 or input_ids.shape[1] == 0
+            or input_ids.dtype not in (torch.int32, torch.int64)):
+        raise ValueError("collector requires one nonempty integer input sequence")
+    if model.training:
+        raise ValueError("collector requires model.eval()")
+    layers = tuple(LAYERS)
+    if (not layers or any(type(i) is not int or i < 0 or i >= len(model.model.layers) for i in layers)
+            or len(set(layers)) != len(layers)):
+        raise ValueError("collector requires unique valid layer indices")
+    qs, ks, rope, handles = {}, {}, {}, []
+    def projection(target, layer):
+        def hook(module, args, output):
+            if layer in target or not isinstance(output, torch.Tensor) or output.ndim != 4 or output.shape[:2] != input_ids.shape:
+                raise ValueError("unexpected/repeated Qwen3 normalized projection")
+            target[layer] = output.detach().clone()
+        return hook
+    def position_hook(layer):
+        def hook(module, args, kwargs):
+            value = kwargs.get('position_embeddings')
+            if layer in rope or not isinstance(value, (tuple,list)) or len(value)!=2 or not all(isinstance(v,torch.Tensor) for v in value):
+                raise ValueError("actual position_embeddings unavailable")
+            rope[layer] = tuple(v.detach().clone() for v in value)
+        return hook
+    try:
+        for layer in layers:
+            attn = model.model.layers[layer].self_attn
+            handles.append(attn.q_norm.register_forward_hook(projection(qs,layer)))
+            handles.append(attn.k_norm.register_forward_hook(projection(ks,layer)))
+            handles.append(attn.register_forward_pre_hook(position_hook(layer),with_kwargs=True))
+        with torch.no_grad():
+            model(input_ids=input_ids.to(DEV), use_cache=False)
+        for layer in layers:
+            if layer not in qs or layer not in ks or layer not in rope:
+                raise ValueError("actual Q/K/RoPE hook coverage incomplete")
+            q,k=qs[layer],ks[layer];cos,sin=rope[layer]
+            if q.shape[-1]!=128 or k.shape[-1]!=128 or cos.shape!=(1,input_ids.shape[1],128) or sin.shape!=cos.shape:
+                raise ValueError("unsupported Qwen3 projection/RoPE shape")
+            if (not k.shape[2] or not q.shape[2] or q.shape[2] % k.shape[2]
+                    or any(not v.is_floating_point() or v.device != q.device or v.dtype != q.dtype
+                           or not torch.isfinite(v).all() for v in (q,k,cos,sin))):
+                raise ValueError("invalid Qwen3 projection/RoPE values or GQA geometry")
+            cos,sin=cos.unsqueeze(2),sin.unsqueeze(2)
+            qs[layer]=(q*cos+rotate_half(q)*sin)[0].float()   # (T,32,128)
+            ks[layer]=(k*cos+rotate_half(k)*sin)[0].float()   # (T,8,128)
+        return qs,ks
+    finally:
+        for handle in handles: handle.remove()
 
 
 def group_mean_probs(q_row, k_all, scale):
@@ -208,10 +250,32 @@ def bin_counts(sel, q_pos, mid_lo, mid_hi):
     return counts
 
 
+def query_schedule(length):
+    if type(length) is not int or length <= SINK + SWA + 320:
+        raise ValueError("sample too short for frozen query schedule")
+    positions = torch.linspace(SINK + SWA + 256, length - 64, N_QUERY).long().tolist()
+    if len(set(positions)) != N_QUERY:
+        raise ValueError("query schedule requires distinct positions")
+    return positions
+
+
 def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--execute', action='store_true')
+    args = ap.parse_args()
+    if not args.execute:
+        print(json.dumps(dict(status='plan-only', gpu_started=False,
+                              requires=['explicit --execute', 'model/data identity',
+                                        'fresh E140_OUT'],
+                              historical_results='not repaired by relabeling')))
+        return
+    if Path(OUT).exists():
+        raise ValueError("output exists; historical observations cannot be overwritten")
+    if not all(os.environ.get(k) for k in ('E140_MODEL_REVISION', 'E140_TOKENIZER_REVISION', 'E140_DATASET_REVISION')):
+        raise ValueError("explicit model/tokenizer/dataset identity declarations required")
     torch.cuda.set_device(DEV)
     idx = torch.tensor(SUB32, device=DEV)
-    print(f"=== E140e O4 select-behavior trace GPU {DEV} ===", flush=True)
+    print(f"=== E140e O4 select-behavior trace v2 GPU {DEV} ===", flush=True)
     tok, model, theta = load_model()
     results = []
     for task in TASKS:
@@ -224,7 +288,7 @@ def main():
             T = ids.shape[1]
             print(f"[{task} s{si}] T={T}", flush=True)
             qs, ks = get_qk(model, theta, ids)
-            qpos = torch.linspace(SINK + SWA + 256, T - 64, N_QUERY).long().tolist()
+            qpos = query_schedule(T)
             for L in LAYERS:
                 qL, kL = qs[L], ks[L]
                 scale = 128 ** -0.5
@@ -254,12 +318,26 @@ def main():
                             "overlap_recall": ov, "retained_mass": rm,
                             "bins": bin_counts(s, qp, mid_lo, mid_hi)}
                     results.append({"task": task, "sample": si, "layer": L,
-                                    "T": int(T), "o4": rec})
+                                    "T": int(T),
+                                    "input_ids_sha256": hashlib.sha256(
+                                        ids.numpy().astype('<i8').tobytes()).hexdigest(),
+                                    "o4": rec})
                 print(f"  layer {L}: {len(qpos)} queries done", flush=True)
             del qs, ks
             torch.cuda.empty_cache()
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    meta = {"model": MODEL, "tasks": TASKS, "n_sample": N_SAMPLE,
+    Path(OUT).parent.mkdir(parents=True, exist_ok=True)
+    import transformers, inspect
+    model_source = Path(inspect.getfile(type(model.model.layers[0].self_attn)))
+    meta = {"schema": "e140-o4-select-v2",
+            "status": "diagnostic-unverified-identity",
+            "qk_capture": "actual q_norm/k_norm outputs + actual attention position_embeddings",
+            "transformers_version": transformers.__version__,
+            "model_source_sha256": hashlib.sha256(model_source.read_bytes()).hexdigest(),
+            "declared_revisions": {k: os.environ[k] for k in
+                                   ('E140_MODEL_REVISION', 'E140_TOKENIZER_REVISION',
+                                    'E140_DATASET_REVISION')},
+            "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "model": MODEL, "tasks": TASKS, "n_sample": N_SAMPLE,
             "layers": LAYERS, "maxlen": MAXLEN, "n_query": N_QUERY,
             "alpha": ALPHA, "beta": BETA, "gamma": GAMMA, "bs": BS,
             "k2_mid": K2_MID, "sink": SINK, "swa": SWA,
@@ -271,7 +349,7 @@ def main():
                              "far_budget=K2_mid-nt_near (E140 mechanism)",
             "note": "selection BEHAVIOR trace (where tokens land); "
                     "complements O1 mass trace (where mass lives)"}
-    with open(OUT, "w") as f:
+    with open(OUT, "x") as f:
         json.dump({"meta": meta, "cells": results}, f, ensure_ascii=False, indent=1)
     print(f"=== saved {OUT} ===", flush=True)
 
