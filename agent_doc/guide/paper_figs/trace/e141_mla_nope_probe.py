@@ -183,6 +183,11 @@ def probe_cell(q_row, k_nope_pre, k_pe_pre, scale, sub_spaces):
     P = head_mean_probs(q_row, k_nope_pre, k_pe_pre, scale)
     # Reuse E140's disjoint token accounting and right-near partition.
     o1 = e140.o1_trace(P.unsqueeze(0), T-1)
+    # P is already averaged over MLA heads: the singleton is not a KV group
+    # and its far mass cannot describe the worst individual attention head.
+    o1['schema'] = 'e141-o1-head-mean-v2'
+    o1['aggregate_far_mass'] = o1.pop('far_max_kv_group_mass')
+    o1['aggregation'] = 'mean of per-head probabilities; not worst-head mass'
     r = o1['region_bounds']
     mid_lo, mid_hi = r['mid_lo'], r['mid_hi']
     n_mid = mid_hi-mid_lo

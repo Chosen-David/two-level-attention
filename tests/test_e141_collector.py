@@ -22,6 +22,9 @@ class Collector(unittest.TestCase):
             q,k,r=self.inputs(t)
             c=p.probe_cell(q,k,r,192**-.5,{'full192':('full',None)})
             o=c['o1'];b=o['region_bounds']
+            self.assertEqual(o['schema'],'e141-o1-head-mean-v2')
+            self.assertNotIn('far_max_kv_group_mass',o)
+            self.assertEqual(o['aggregate_far_mass'],o['mass_far'])
             self.assertAlmostEqual(o['mass_protected_union']+o['mass_near']+o['mass_far'],1,places=5)
             self.assertEqual(b['swa_lo'],max(0,t-128))
             self.assertEqual(c['mid_count'],max(0,t-256))

@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional, Tuple
@@ -14,6 +15,16 @@ import warnings
 from unittest.mock import patch
 import torch
 from verify_e141_qk_reconstruction import definitions
+
+
+def finite_probability_error(got, ref):
+    """Fail before max aggregation can hide NaN; finite inputs may overflow too."""
+    if not torch.isfinite(got).all() or not torch.isfinite(ref).all():
+        raise ValueError('nonfinite got/ref probabilities')
+    row_error = float((got-ref).abs().max())
+    if not math.isfinite(row_error):
+        raise ValueError('nonfinite probability row error')
+    return row_error
 
 
 def main():
@@ -70,10 +81,11 @@ def main():
         for i in range(17):
             got=probe['head_mean_probs'](dict(nope=qn[0][i],rope=qr[0][i]),kn[0][:i+1],kr[0][:i+1],scales[0])
             ref=captured['probs'][0,:,i,:i+1].mean(0)
-            errors['probabilities']=max(errors['probabilities'],float((got-ref).abs().max()))
+            row_error=finite_probability_error(got,ref)
+            errors['probabilities']=max(errors['probabilities'],row_error)
     fixture=hashlib.sha256()
     for value in (hidden,norm.weight,*attn.state_dict().values()):fixture.update(value.detach().contiguous().numpy().tobytes())
-    passed=all(x<=1e-6 for x in errors.values())
+    passed=all(math.isfinite(x) and x<=1e-6 for x in errors.values())
     print(json.dumps(dict(scope='random weights; actual eager Attention.forward; CPU fp32, not full checkpoint',
         torch=torch.__version__,upstream_sha256=official_hash,probe_sha256=probe_hash,
         fixture_sha256=fixture.hexdigest(),hidden_noncontiguous=not hidden.is_contiguous(),
