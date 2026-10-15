@@ -286,6 +286,20 @@ def _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero=False):
             f"（R==Hkv=共享选择，R==H=per-q-head 选择）、block_size≥1。"
             f"请检查调用方传入的 q/k/v/mask 形状。"
         )
+    # The dense/gather implementations squeeze batch and read only q[0],
+    # mask[0]. Reject unsupported leading dimensions before allocation or
+    # launch; otherwise extra query rows can silently remain zero. The fused
+    # kernel also uses K's width when loading Q, so unequal Q/K widths are
+    # unsafe even when heterogeneous V widths (MLA) are explicitly supported.
+    if (q.dim() != 4 or k.dim() != 4 or v.dim() != 4 or mask.dim() != 4
+            or tuple(q.shape[:2]) != (1, 1)
+            or k.shape[0] != 1 or v.shape[0] != 1
+            or tuple(mask.shape[:2]) != (1, 1)):
+        _fail('single-query decode requires Q=[1,1,H,D], K/V=[1,T,Hkv,D], '
+              'mask=[1,1,R,blocks]')
+    if q.shape[-1] <= 0 or q.shape[-1] != k.shape[-1]:
+        _fail(f'Q/K head_dim must match and be positive: '
+              f'q={q.shape[-1]}, k={k.shape[-1]}')
     H = q.shape[-2]
     Hkv = k.shape[-2]
     if H <= 0 or Hkv <= 0:
@@ -386,6 +400,11 @@ def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
     # q*scale 后转 fp32（与 torch 路径的 b_q 同口径：bf16 乘 scale 舍入
     # 后升精度——数值与原型逐位同）
     qs = (q[0] * softmax_scale).to(torch.float32)   # [H, D]
+    # Pointwise scaling/to() can preserve a transposed dense layout. The
+    # kernel takes the head stride but addresses features as +offs_d, so its
+    # Q operand must have unit feature stride. Standard queries need no copy.
+    if qs.stride(-1) != 1:
+        qs = qs.contiguous()
     o = torch.empty((H, D), device=dev, dtype=q.dtype)
     _eager_attn_kernel[(_attn_grid_size(R, G, per_qh),)](
         idx, cnt, qs, k, v, o,
@@ -409,13 +428,13 @@ def eager_decoding_attn(
     TLI_E127_FAST=1 时走 gather 路径：原实现对全序列 S 个 token 全量计算
     fp32 分数再 mask（稀疏性在消费端被完全丢弃——S=64K 时 k.to(float32)
     物化 + 全长 einsum + 全长 softmax ≈ 2.2ms/层步）；gather 路径只取
-    每行 mask 选中的 token（~K2+sink+swa ≈ 1280）做 attention，带宽
+    每行 mask 选中的 token（~K2=1024，含 sink128+swa128 强制区）做 attention，带宽
     从 O(S·Hkv·D) 降到 O(R·W·D)。数学语义不变：softmax(全 S 行、未选
     位 -inf) ≡ softmax(选中子集)（exp(-inf)=0 精确），数值上仅归约顺序
     不同（输出 ULP 级漂移，allclose(1e-2) 门禁）。
 
     【iter3】gather 路径零 host 同步：W 上界化（TLI_E127_W_UPPER，契约
-    上界 K2+sink+swa+bs≈1344，默认 2048）+ B7/W 校验 GPU 端并入全局错误
+    上界 K2（含 sink/swa 强制区）≈1024，默认 2048）+ B7/W 校验 GPU 端并入全局错误
     标志（不再当场 raise）——生成结束由 eager_decoding_check_errors()
     一次性校验（fail-closed 语义保持，raise 时机后移）。
     【101】入口先过 _validate_gqa_shape host 边界门（Hkv<=0 / H%Hkv!=0 /
@@ -616,12 +635,13 @@ def _eager_decoding_attn_gather(
     counts = bm2.sum(dim=-1)                            # [R]（GPU int64，无同步）
 
     # 【iter3】零同步化：W 用 host 已知的契约上界（indexer 契约：每行选中
-    # ≈ K2(1024)+sink(128)+swa(128)+当前块(64) ≈ 1344 token，上界取 2048
-    # 留 50% 安全垫，env TLI_E127_W_UPPER 可调）。topk k=W_upper 时真实
+    # = K2 ≈ 1024 token，含 sink128+swa128 强制区；预算从 K2 内扣除，
+    # 不额外叠加），上界取 2048 留安全垫，env TLI_E127_W_UPPER 可调。
+    # topk k=W_upper 时真实
     # counts ≤ W_upper 的行全部命中 + 补齐位由 valid 掩掉（与原精确 W 路径
     # 同一掩码机制）；某行 counts > W_upper 时漏选保护 fail-closed（下方
     # code=2 记入 GPU 标志，生成结束校验 raise）。
-    # 路由等价性：原逻辑用真实 W 判 W*8>T，生产 mask W≈1344 与 W_upper=2048
+    # 路由等价性：原逻辑用真实 W 判 W*8>T，生产 mask W≈1024 与 W_upper=2048
     # 在 16K/32K/64K 档同向（都走 gather），行为零变化。
     W_upper = min(int(os.environ.get("TLI_E127_W_UPPER", "2048")), T)
     if W_upper * 8 > T:

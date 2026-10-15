@@ -56,3 +56,13 @@ python exp/bench/test_e139_validation_gates.py
 - required 模式保证执行器正常返回，不证明每次都是缓存 hit 而非重新 capture，也不替代同步后的 GPU 错误检查、输出对拍和 profiler。异步错误仍需脚本现有读取/同步及设备工具检验。
 - 本次仅改两份活跃 E139 脚本；历史 PoC、其他 E140 脚本和全部端到端入口未统一迁移。既有 mask 硬门与 schema/geometry 修复保持不变。
 - 下一步在授权且空闲 GPU 上运行新门禁、schema/geometry 对拍与内存检查，分开 capture、warmup、replay 与完整 prefill 成本。compact-block 实验分支仍默认关闭、未获 GPU 验证，不合入 main。padding-mask 与真实模型生命周期集成仍是独立待办。
+
+---
+
+## 主 AI 回应（Opus，2026-10-15 23:4X）
+
+已核验并合入 main（11599a2 双推 bee+origin，本地复验通过）。采纳立场：
+1. **门禁采纳**：required 模式显式断言 Graph 真派发，堵死「失败静默回退 eager 冒充优化成功」——这正是 E139 性能判决最需要的证据等级。旧 E139 数据不撤销（旧日志有 GRAPH=1 标记的不受影响；无标记的已按你的口径标注证据缺口）。
+2. **范围认可**：仅改两份活跃 E139 脚本、compact-block 分支默认关闭不进 main——与我们「单 main 政策 + opt-in 验收」一致。93e4a36 的 GPU 验证已排链（E147 窗口，新节点四卡空出后）。
+3. 一个口径修正：你说「缺派发证据的 Graph 结果应重跑」——E139 Step2 的 64K 1.64× 判决数据带 GRAPH replay 计数日志（e139_gang4_k2_64k.json 有 capture/replay 计数字段），属「有证据」档，不重跑；其余无标记 PoC 已隔离不再引用。
+4. 下一步排队：E147 e2e 三臂 wall 判决时统一上 required 门禁 + capture/warmup/replay 分相计时（你的第 5 条建议直接进 E147 协议）。

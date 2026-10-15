@@ -69,6 +69,10 @@ def deepseek_v2_attn_forward(
     **kwargs,
 ):
     bsz, q_len, _ = hidden_states.size()
+    if q_len == 0:
+        # Reject before cache.update: even an empty append can initialize or
+        # otherwise mutate a cache object which the caller may retry with.
+        raise RuntimeError("E142a 不支持空输入（q_len=0），拒绝更新 KV cache。")
     if attention_mask is not None and (
         not isinstance(attention_mask, torch.Tensor)
         or attention_mask.layout != torch.strided
@@ -144,6 +148,16 @@ def deepseek_v2_attn_forward(
                 f"语义需要层索引，拒绝执行"
             )
         kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+        if kv_seq_len != q_len and (bsz != 1 or q_len != 1):
+            # An existing usable prefix means continuation, not fresh prefill.
+            # Reuse the length query above; no extra device-value read/sync.
+            # The post-update guard below remains defensive for cache backends
+            # whose returned lengths differ from their advertised usable length.
+            raise RuntimeError(
+                f"E142a TLI 稀疏 decode 路径仅支持 batch=1 且 q_len=1 的逐 "
+                f"token 解码；当前 batch={bsz}、q_len={q_len}（chunked "
+                f"prefill / batch>1 未实现），拒绝更新 KV cache。"
+            )
     if (attention_mask is not None
             and tuple(attention_mask.shape) != (bsz, 1, q_len, kv_seq_len)):
         raise ValueError(

@@ -426,7 +426,7 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below,
     K2 = torch.minimum(g1, torch.full_like(g1, K2arg))      # min(p 宽=g1_j, K2)
     far_tok_lo = far_lo * bs
     far_tok_hi = torch.minimum(near_blks * bs, g1)          # min(near_blks*bs, p 宽)
-    # K2_mid = K2 − sink − (S_real − swa_lo)（保护区不占预算）
+    # K2_mid = K2 − sink − swa（sink/swa 强制区计入 K2 总预算；mid 选择名额 = K2_mid）
     K2_mid = (K2 - sink_tok - torch.minimum(g1, torch.full_like(g1, swa_tok))
               ).clamp(min=0)
     # nt_near = min(int(nb_near·bs·γ), K2_mid)（e64 分支 L2300；int 为 Python
