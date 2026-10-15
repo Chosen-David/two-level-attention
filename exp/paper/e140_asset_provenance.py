@@ -13,19 +13,21 @@ from pathlib import Path
 import subprocess
 import xml.etree.ElementTree as ET
 
-WARNING = 'HISTORICAL DIAGNOSTIC - NOT VALIDATED PAPER EVIDENCE'
-DETAIL = 'Old collector defects remain. Annotation only; no corrected data or new experiment.'
-REFERENCE = 'TL-E140-ASSET-PROVENANCE-20261015 | See E140_VALIDITY.md'
+WARNING = 'PANEL (d) O4: HISTORICAL DIAGNOSTIC - NOT VALIDATED PAPER EVIDENCE'
+DETAIL = 'O4 v2 omitted partial final pages. O1 unaffected. Annotation only; no new experiment.'
+REFERENCE = 'TL-E140-O4-PARTIAL-PAGE-20261015 | See E140_VALIDITY.md'
 FIGDIR = Path('agent_doc/guide/paper_figs/figs')
 MANIFEST = Path('agent_doc/guide/paper_figs/observation/e140_validity.json')
 EXTENSIONS = ('svg', 'png', 'pdf')
 STATUS = 'historical-diagnostic-not-corrected'
-# v3: the E140v2 recollection (2026-10-16) re-rendered the figures from
-# fixed collectors. Current assets are new renders, not promoted old data;
-# the legacy annotation lineage stays pinned in the manifest.
-V3_SCHEMA = 'e140-validity-v3-recollection'
-V3_STATUS = 'v2-recollection-current'
-V3_ASSET_STATUS = 'v2-recollection-render'
+SCHEMA = 'e140-historical-validity-v2'
+# Post-recollection, post-quarantine contract (2026-10-16): the combined
+# figure carries panel (d) from the O4 v2 collector (partial final-page
+# omission), so the whole current asset set stays historical-diagnostic.
+# Panels (a)(b)(c) read e140_o_trace_v2.json, whose bytes are pinned in
+# unchanged_inputs. Every earlier asset generation is preserved in
+# prior_asset_sets; merge-time input reconciliation lives in
+# legacy_inputs_review.
 
 
 def add_render_warning(fig):
@@ -100,22 +102,26 @@ def annotate(data, extension):
 
 def verify(root):
     manifest = json.loads((root / MANIFEST).read_text())
-    if manifest.get('status') != V3_STATUS or manifest.get('schema') != V3_SCHEMA:
+    if manifest.get('status') != STATUS or manifest.get('schema') != SCHEMA:
         raise ValueError('historical validity status/schema changed')
     assets = manifest['current_assets']
     expected = {str(FIGDIR / f'O_observation.{ext}') for ext in EXTENSIONS}
     if {a['path'] for a in assets} != expected or len(assets) != 3:
         raise ValueError('current asset set incomplete')
     for entry in assets:
-        if entry.get('status') != V3_ASSET_STATUS:
-            raise ValueError('current asset status changed: ' + entry['path'])
         if sha((root / entry['path']).read_bytes()) != entry['sha256']:
             raise ValueError('asset/input identity mismatch: ' + entry['path'])
-    for entry in manifest['v2_recollection']['sources']:
+    reviewed = {e['path'] for e in manifest.get('legacy_inputs_review', {}).values()
+                if isinstance(e, dict)} if manifest.get('legacy_inputs_review') else set()
+    for entry in manifest['unchanged_inputs']:
+        if entry.get('status') == 'missing':
+            if (root / entry['path']).exists() and entry['path'] not in reviewed:
+                raise ValueError('previously missing input requires identity review: '+entry['path'])
+            continue
         if sha((root / entry['path']).read_bytes()) != entry['sha256']:
-            raise ValueError('v2 source identity mismatch: ' + entry['path'])
-    if not manifest.get('historical_annotated_assets'):
-        raise ValueError('legacy annotation lineage missing from manifest')
+            raise ValueError('asset/input identity mismatch: ' + entry['path'])
+    if not manifest.get('prior_asset_sets'):
+        raise ValueError('prior asset generations missing from manifest')
     return manifest
 
 

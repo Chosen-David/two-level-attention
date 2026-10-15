@@ -33,6 +33,10 @@ import math
 import os
 import sys
 
+if os.environ.get('E140_ALLOW_HISTORICAL_DIAGNOSTIC') != '1':
+    raise SystemExit('O4 v2 omits partial final pages: panel (d) is historical only. '
+                     'O1 is unaffected. No files written. Explicit diagnostic opt-in required.')
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -280,6 +284,13 @@ ax_d.text(0.72, 0.965, "far", transform=ax_d.transAxes, ha="center",
           fontsize=AN, color=C_HL, fontweight="bold")
 
 fig.subplots_adjust(left=0.055, right=0.995, top=0.88, bottom=0.17)
+
+# Explicit diagnostic opt-in does not make old collector data paper evidence.
+# bbox_inches="tight" includes this banner outside the existing plot bounds.
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+from exp.paper.e140_asset_provenance import add_render_warning
+add_render_warning(fig)
 
 # ---------------- lint + 导出 ----------------
 report = lint_figure(fig)

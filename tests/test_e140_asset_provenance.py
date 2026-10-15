@@ -16,7 +16,6 @@ from exp.paper import e140_asset_provenance as asset
 
 ROOT = Path(__file__).resolve().parents[1]
 RENDERER = ROOT / asset.FIGDIR / 'fig_o_observation.py'
-ANNOTATED_COMMIT = '21b595d'
 
 
 class AssetProvenance(unittest.TestCase):
@@ -33,60 +32,44 @@ class AssetProvenance(unittest.TestCase):
         for entry in manifest['unannotated_current_snapshot']:
             data = subprocess.check_output(['git','show',entry['git_commit']+':'+entry['path']],cwd=ROOT)
             self.assertEqual(asset.sha(data),entry['sha256'])
-        for entry in manifest['historical_annotated_assets']:
-            data = subprocess.check_output(['git','show',entry['git_commit']+':'+entry['path']],cwd=ROOT)
-            self.assertEqual(asset.sha(data),entry['sha256'])
+        for prior in manifest['prior_asset_sets']:
+            for entry in prior['current_assets']:
+                self.assertIn(entry['status'], ('historical-diagnostic-not-corrected',))
         self.assertTrue(any(x['status']=='missing' for x in manifest['unchanged_inputs']))
 
-    def test_annotated_legacy_assets_preserve_plot_and_expose_warning(self):
-        manifest = asset.verify(ROOT)
-        # The annotated historical figures no longer sit at the live paths
-        # (replaced by the E140v2 recollection render); verify their pinned
-        # git blobs instead of the working tree. before = unannotated
-        # snapshot, after = annotated snapshot.
-        annotated = {e['path']: e for e in manifest['historical_annotated_assets']}
-        for entry in manifest['unannotated_current_snapshot']:
-            before = subprocess.check_output(['git','show',entry['git_commit']+':'+entry['path']],cwd=ROOT)
-            after = subprocess.check_output(['git','show',annotated[entry['path']]['git_commit']+':'+entry['path']],cwd=ROOT)
-            ext = Path(entry['path']).suffix
-            if ext == '.png':
-                old = Image.open(BytesIO(before)).convert('RGBA')
-                new = Image.open(BytesIO(after)).convert('RGBA')
-                band = new.height-old.height
-                self.assertGreater(band,0)
-                self.assertEqual(new.width,old.width)
-                self.assertEqual(old.tobytes(),new.crop((0,band,new.width,new.height)).tobytes())
-                self.assertGreater(len(new.crop((0,0,new.width,band)).getcolors(100000)),2)
-            elif ext == '.svg':
-                new = ET.fromstring(after)
-                self.assertIn(asset.WARNING, ''.join(new.itertext()))
-            else:
-                new = fitz.open(stream=after,filetype='pdf')
-                self.assertIn(asset.WARNING,new[0].get_text())
-                new.close()
-
-    def test_current_assets_are_v2_renders_without_historical_banner(self):
-        # Current assets render the E140v2 recollection (fixed collectors);
-        # the historical-diagnostic banner must not mislabel valid v2 evidence.
+    def test_current_assets_carry_panel_d_warning(self):
+        # Current combined figure includes panel (d) from the O4 v2 collector
+        # (partial final-page omission) -> whole asset set historical-diagnostic.
         manifest = asset.verify(ROOT)
         for entry in manifest['current_assets']:
-            self.assertEqual(entry['status'], asset.V3_ASSET_STATUS)
+            self.assertEqual(entry['status'], asset.STATUS)
             data = (ROOT/entry['path']).read_bytes()
             ext = Path(entry['path']).suffix
             if ext == '.svg':
-                self.assertNotIn(asset.WARNING, ''.join(ET.fromstring(data).itertext()))
+                self.assertIn(asset.WARNING, ''.join(ET.fromstring(data).itertext()))
             elif ext == '.pdf':
                 doc = fitz.open(stream=data,filetype='pdf')
-                self.assertNotIn(asset.WARNING, doc[0].get_text())
+                self.assertIn(asset.WARNING, doc[0].get_text())
                 doc.close()
-        for entry in manifest['v2_recollection']['sources']:
-            self.assertTrue((ROOT/entry['path']).is_file())
+            else:
+                img = Image.open(BytesIO(data)).convert('RGBA')
+                self.assertGreater(img.height, 0)
+
+    def test_v2_source_bytes_pinned(self):
+        # Panels (a)(b)(c) read e140_o_trace_v2.json; its bytes stay pinned so
+        # the quarantined combined figure remains traceable to its sources.
+        manifest = asset.verify(ROOT)
+        by_path = {e['path']: e for e in manifest['unchanged_inputs'] if e.get('status') != 'missing'}
+        for p in ('exp/trace/results/e140_o_trace_v2.json',
+                  'exp/trace/results/e140_o4_select_trace_v2.json'):
+            self.assertIn(p, by_path)
+            self.assertEqual(asset.sha((ROOT/p).read_bytes()), by_path[p]['sha256'])
 
     def test_tampered_asset_or_promoted_status_fails(self):
         manifest = asset.verify(ROOT)
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
-            checked = manifest['current_assets']+manifest['v2_recollection']['sources']
+            checked = [i for i in manifest['current_assets']+manifest['unchanged_inputs'] if i.get('status')!='missing']
             for item in checked:
                 target=root/item['path'];target.parent.mkdir(parents=True,exist_ok=True)
                 shutil.copyfile(ROOT/item['path'],target)
@@ -99,14 +82,16 @@ class AssetProvenance(unittest.TestCase):
             manifest['status']='paper-ready';target.write_text(json.dumps(manifest))
             with self.assertRaisesRegex(ValueError,'status/schema'):asset.verify(root)
 
-    def test_renderer_uses_v2_sources_without_banner_call(self):
-        # The renderer reads the E140v2 recollection fail-closed and must not
-        # stamp the historical-diagnostic banner on valid v2 evidence.
-        text = RENDERER.read_text()
-        self.assertIn('e140_o_trace_v2.json', text)
-        self.assertIn('e140_o4_select_trace_v2.json', text)
-        self.assertIn('missing E140v2 recollection', text)
-        self.assertNotIn('add_render_warning', text)
+    def test_default_renderer_fails_closed(self):
+        # Default render refuses: panel (d) is historical-only until the O4 v3
+        # recollection; explicit diagnostic opt-in keeps the visible warning.
+        before={str(p):asset.sha(p.read_bytes()) for p in (ROOT/asset.FIGDIR).glob('O_observation*')}
+        env=dict(os.environ);env.pop('E140_ALLOW_HISTORICAL_DIAGNOSTIC',None)
+        flag=['-O'] if sys.flags.optimize else []
+        result=subprocess.run([sys.executable,*flag,str(RENDERER)],env=env,capture_output=True,text=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('panel (d) is historical only',result.stderr)
+        self.assertEqual(before,{str(p):asset.sha(p.read_bytes()) for p in (ROOT/asset.FIGDIR).glob('O_observation*')})
 
     def test_opt_in_warning_helper_exports_visible_text(self):
         import matplotlib
@@ -114,6 +99,7 @@ class AssetProvenance(unittest.TestCase):
         import matplotlib.pyplot as plt
         fig,ax=plt.subplots(figsize=(12,3));ax.plot([0,1],[0,1])
         asset.add_render_warning(fig)
+        self.assertIn('add_render_warning(fig)',RENDERER.read_text())
         output=BytesIO();fig.savefig(output,format='pdf',bbox_inches='tight')
         doc=fitz.open(stream=output.getvalue(),filetype='pdf')
         self.assertIn(asset.WARNING,doc[0].get_text())
