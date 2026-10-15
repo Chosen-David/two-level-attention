@@ -12,7 +12,7 @@ sliding_window_size=128）均为无实验依据的工程约定（文献惯例 + 
 本分析器在 E98/E130 mass 协议（真实全维 softmax 行级覆盖率）上扫描
 (sink, swa) 网格下 mavg 冠军 (α,β,γ)=(0.25,0.125,0.625) 的覆盖率：
 
-  ① champion 网格臂：sink ∈ {16,64,128} × swa ∈ {128,256,512}
+  ① champion 网格臂：sink ∈ {4,16,64,128} × swa ∈ {124,128}
   ② sinkswa_only 归因臂（E135a mass 面）：cand = sink_c | swa_c——纯固定区
      覆盖率，与冠军臂覆盖率之差即两级索引在 mass 口径下的增量上限
   ③ 锚点复现自校验：(SINK,SWA)=(128,1024) 臂必须逐值复现
@@ -25,8 +25,11 @@ mid_len ≥ 4096（跨臂同一行集，保证可比）。子块 sink（16<bs）
 E135 实现同源：页池左界 = floor(sink/bs) 块（16→0 块，sink 所在块参与
 L1 池竞争），强制区宽 = sink token 级。
 
-用法：E135_DEVICE=cuda:0 python3 analyze_e135_sinkswa_grid.py [--smoke]
-输出：exp/trace/results/e135_sinkswa_grid.json
+本扫描仍是 E98 mass 协议，不是生产选择器对拍；生产 SWA 仍须块对齐，
+swa124 仅为 trace 探针。v2 修正子块 sink 页重叠判断，不改变预算或 L2 规则。
+
+用法：E135_DEVICE=cuda:0 python3 analyze_e148_sink4_grid.py [--smoke]
+输出：exp/trace/results/e148_sink4_massgrid_v2.json（绝对页坐标修正，不覆盖旧结果）
 """
 import argparse
 import json
@@ -36,7 +39,7 @@ import sys
 import torch
 
 TRACE = "/tmp/trace/qwen3-8b"
-OUT = "/home/wangyuanshuo02/two-level-attention/exp/trace/results/e148_sink4_massgrid.json"
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", "e148_sink4_massgrid_v2.json")
 E98_JSON = "/home/wangyuanshuo02/two-level-attention/exp/trace/results/e98_abg_full_grid.json"
 BS = 64
 D2I = list(range(48, 64)) + list(range(112, 128))
@@ -111,9 +114,12 @@ def eval_layer(lf, device):
                 sc = sc_blk_av if use_avg else sc_blk
                 bi = torch.arange(sc.shape[1], device=device)
                 # 页绝对 token 区间 [pool_lo_blk·BS + bi·BS, +BS) ↔ mid 相对
+                # Scores are sliced at floor(sink / BS), not at sink tokens.
+                # Use the same absolute origin as the token gather below.
+                page_start = (pool_lo_blk + bi) * BS
                 s1 = sc.masked_fill(
-                    ~(((bi * BS + sink) < sink + hi_off) &
-                      ((bi * BS + BS - 1 + sink) >= sink + lo_off)).view(1, -1),
+                    ~((page_start < sink + hi_off) &
+                      (page_start + BS > sink + lo_off)).view(1, -1),
                     float("-inf"))
                 ib = torch.topk(s1, min(n_pages, s1.shape[-1]), dim=-1).indices
                 tok = (ib.unsqueeze(-1) * BS +
@@ -226,6 +232,8 @@ def main():
             }
     base = grid["sk128_sw128"]
     out = {
+        "page_coordinate_protocol": "absolute_page_origin_v2",
+        "geometry_note": "non-block-aligned sink arms require a new trace run; historical JSON unchanged",
         "experiment": "E148b sink4/swa124 细网格 mass 探针（E135 协议克隆，行过滤同 (16,512) 最坏点保证跨实验可比）",
         "protocol": f"TRACE={TRACE} 16 样本, B_TOK={B_TOK} BP={BP} BS={BS} TAIL_N={TAIL_N}, "
                     "真实全维 softmax 行级覆盖率; 行过滤按网格最坏点 (sk16,sw512) mid_len≥4096 统一; "

@@ -122,6 +122,42 @@ class DeepseekRequestLifecycleTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "q_len=0"):
             self.call(torch.empty(1, 0, 8), CacheDouble())
 
+    def test_rejected_continuation_does_not_append_to_cache(self):
+        for batch, length in ((1, 2), (2, 1)):
+            with self.subTest(batch=batch, length=length):
+                self.setUp()
+                cache = CacheDouble()
+                prefix = torch.randn(batch, 3, 8)
+                self.forward(self.attn, prefix, past_key_value=cache, use_cache=True)
+                old_k, old_v = cache.k, cache.v
+                counts = self.attn.indexer.clears, self.attn.indexer.selects
+                with self.assertRaisesRegex(RuntimeError, "仅支持 batch=1 且 q_len=1"):
+                    self.forward(self.attn, torch.randn(batch, length, 8),
+                                 past_key_value=cache, use_cache=True)
+                self.assertIs(cache.k, old_k)
+                self.assertIs(cache.v, old_v)
+                self.assertEqual(cache.get_seq_length(0), 3)
+                self.assertEqual((self.attn.indexer.clears, self.attn.indexer.selects), counts)
+
+    def test_empty_prompt_rejection_does_not_initialize_cache(self):
+        cache = CacheDouble()
+        with self.assertRaisesRegex(RuntimeError, "q_len=0"):
+            self.call(torch.empty(1, 0, 8), cache)
+        self.assertIsNone(cache.k)
+        self.assertIsNone(cache.v)
+        self.assertEqual(self.attn.indexer.clears, 0)
+
+    def test_retry_after_rejected_chunk_matches_untouched_cache(self):
+        prefix, rejected, token = torch.randn(1, 3, 8), torch.randn(1, 2, 8), torch.randn(1, 1, 8)
+        actual_cache, expected_cache = CacheDouble(), CacheDouble()
+        self.call(prefix, actual_cache)
+        self.call(prefix, expected_cache)
+        with self.assertRaises(RuntimeError):
+            self.call(rejected, actual_cache)
+        actual, _, _ = self.call(token, actual_cache, output_attentions=False)
+        expected, _, _ = self.call(token, expected_cache, output_attentions=False)
+        torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+
     def test_reused_attention_resets_for_single_token_new_request(self):
         first = CacheDouble()
         self.call(torch.randn(1, 3, 8), first)

@@ -21,7 +21,7 @@ E135 实现同源：页池左界 = floor(sink/bs) 块（16→0 块，sink 所在
 L1 池竞争），强制区宽 = sink token 级。
 
 用法：E135_DEVICE=cuda:0 python3 analyze_e135_sinkswa_grid.py [--smoke]
-输出：exp/trace/results/e135_sinkswa_grid.json
+输出：exp/trace/results/e135_sinkswa_grid_v2.json（绝对页坐标修正，不覆盖旧结果）
 """
 import argparse
 import json
@@ -31,7 +31,7 @@ import sys
 import torch
 
 TRACE = "/tmp/trace/qwen3-8b"
-OUT = "/home/wangyuanshuo02/two-level-attention/exp/trace/results/e135_sinkswa_grid.json"
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", "e135_sinkswa_grid_v2.json")
 E98_JSON = "/home/wangyuanshuo02/two-level-attention/exp/trace/results/e98_abg_full_grid.json"
 BS = 64
 D2I = list(range(48, 64)) + list(range(112, 128))
@@ -106,9 +106,12 @@ def eval_layer(lf, device):
                 sc = sc_blk_av if use_avg else sc_blk
                 bi = torch.arange(sc.shape[1], device=device)
                 # 页绝对 token 区间 [pool_lo_blk·BS + bi·BS, +BS) ↔ mid 相对
+                # Scores are sliced at floor(sink / BS), not at sink tokens.
+                # Use the same absolute origin as the token gather below.
+                page_start = (pool_lo_blk + bi) * BS
                 s1 = sc.masked_fill(
-                    ~(((bi * BS + sink) < sink + hi_off) &
-                      ((bi * BS + BS - 1 + sink) >= sink + lo_off)).view(1, -1),
+                    ~((page_start < sink + hi_off) &
+                      (page_start + BS > sink + lo_off)).view(1, -1),
                     float("-inf"))
                 ib = torch.topk(s1, min(n_pages, s1.shape[-1]), dim=-1).indices
                 tok = (ib.unsqueeze(-1) * BS +
@@ -221,6 +224,8 @@ def main():
             }
     base = grid["sk128_sw128"]
     out = {
+        "page_coordinate_protocol": "absolute_page_origin_v2",
+        "geometry_note": "non-block-aligned sink arms require a new trace run; historical JSON unchanged",
         "experiment": "E135 sink/swa 敏感性 mass 扫参 + sinkswa_only 归因（E98/E130 同协议）",
         "protocol": f"TRACE={TRACE} 16 样本, B_TOK={B_TOK} BP={BP} BS={BS} TAIL_N={TAIL_N}, "
                     "真实全维 softmax 行级覆盖率; 行过滤按网格最坏点 (sk16,sw512) mid_len≥4096 统一; "

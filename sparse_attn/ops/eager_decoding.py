@@ -286,6 +286,20 @@ def _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero=False):
             f"（R==Hkv=共享选择，R==H=per-q-head 选择）、block_size≥1。"
             f"请检查调用方传入的 q/k/v/mask 形状。"
         )
+    # The dense/gather implementations squeeze batch and read only q[0],
+    # mask[0]. Reject unsupported leading dimensions before allocation or
+    # launch; otherwise extra query rows can silently remain zero. The fused
+    # kernel also uses K's width when loading Q, so unequal Q/K widths are
+    # unsafe even when heterogeneous V widths (MLA) are explicitly supported.
+    if (q.dim() != 4 or k.dim() != 4 or v.dim() != 4 or mask.dim() != 4
+            or tuple(q.shape[:2]) != (1, 1)
+            or k.shape[0] != 1 or v.shape[0] != 1
+            or tuple(mask.shape[:2]) != (1, 1)):
+        _fail('single-query decode requires Q=[1,1,H,D], K/V=[1,T,Hkv,D], '
+              'mask=[1,1,R,blocks]')
+    if q.shape[-1] <= 0 or q.shape[-1] != k.shape[-1]:
+        _fail(f'Q/K head_dim must match and be positive: '
+              f'q={q.shape[-1]}, k={k.shape[-1]}')
     H = q.shape[-2]
     Hkv = k.shape[-2]
     if H <= 0 or Hkv <= 0:
