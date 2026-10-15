@@ -23,10 +23,10 @@
 decode 期 attention_mask 契约：DSV2 走 model.generate，HF 传 4D float
 causal mask（[1,1,1,S]，B=1 无 padding 下全 0 可加）。稀疏路径在选中
 token 子集上做 causal-free softmax（选中的全是 ≤ 当前位置的 token——
-sink/swa/near/far 分区几何保证），忽略该 mask（与 qwen3 mask=None 分支
-同构）。decode B>1 与非标准 mask 布局显式拒绝。注意：标准 4D
-mask 内的 padding/非零 bias 尚未验证或消费，decode 仍仅支持无 padding
-全零 additive mask；不得把形状检查当作 padding 值检查。
+sink/swa/near/far 分区几何保证），仅在 cache 更新前验证该 mask 全零后
+忽略。decode B>1、非标准 mask 布局、padding/非零 bias/非有限值显式
+拒绝。None 不增加值检查；显式 CUDA mask 的值检查需要归约和设备同步，
+不支持 graph capture，也不表示实现了 padding 语义。
 """
 
 import sys
@@ -76,11 +76,13 @@ def deepseek_v2_attn_forward(
         # otherwise mutate a cache object which the caller may retry with.
         raise RuntimeError("E142a 不支持空输入（q_len=0），拒绝更新 KV cache。")
     if attention_mask is not None and (
-        attention_mask.ndim != 4 or not attention_mask.is_floating_point()
+        not isinstance(attention_mask, torch.Tensor)
+        or attention_mask.layout != torch.strided
+        or attention_mask.ndim != 4 or not attention_mask.is_floating_point()
         or attention_mask.device != hidden_states.device
     ):
         raise ValueError(
-            "E142a attention_mask must be a 4D floating additive mask on "
+            "E142a attention_mask must be a strided 4D floating additive tensor on "
             "the hidden_states device; 2D padding/bool masks are unsupported"
         )
 
@@ -132,6 +134,18 @@ def deepseek_v2_attn_forward(
             f"E142a attention_mask shape must be {(bsz, 1, q_len, kv_seq_len)}, "
             f"got {tuple(attention_mask.shape)}"
         )
+    if kv_seq_len != q_len and attention_mask is not None:
+        # Only an identity additive mask may be dropped by sparse decode.
+        # Check the original dtype (no cast/tolerance: tiny biases still count),
+        # before RoPE/cache.update/indexer state changes. Fresh dense prefill
+        # continues to consume arbitrary supported additive masks below.
+        # A CUDA mask requires O(S) work and host synchronization here; None
+        # avoids that cost. Do not memoize by pointer: callers can mutate masks.
+        if not bool(torch.all(attention_mask == 0)):
+            raise ValueError(
+                "E142a decode attention_mask must be all zero; padding, "
+                "nonidentity bias and nonfinite values are unsupported"
+            )
     cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
     apply_rotary_pos_emb = _module_apply_rope(self)
     q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids)
@@ -199,9 +213,8 @@ def deepseek_v2_attn_forward(
             f"token 解码；当前 batch={bsz}、q_len={q_len}（chunked "
             f"prefill / batch>1 未实现），拒绝执行。"
         )
-    # attention_mask：model.generate 传 4D float causal（B=1 无 padding
-    # 下全 0 可加）——稀疏选择分区几何保证只选中 ≤ 当前位置的 token，
-    # 只有全零 mask 才是恒等；4D padding/bias 值仍为未支持契约（见文首）。
+    # Identity mask checked before cache.update. Padding/bias are rejected,
+    # not silently removed from the selected set or its softmax denominator.
 
     indexer: Indexer = self.indexer
     if hasattr(indexer, "freeze_dyn_dgate"):
