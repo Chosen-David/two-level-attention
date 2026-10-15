@@ -9,6 +9,8 @@ import os
 import sys
 import time
 
+from e139_validation_gates import require_equal_masks
+
 TREE = os.environ.get("E139_TREE",
                       os.path.expanduser("~/tmp_e138_abl_tree_187"))
 sys.path.insert(0, TREE)
@@ -81,7 +83,8 @@ print(f"N={N}", flush=True)
 
 idx = fresh_idx()
 q, k, v = make_qkv(999)
-assert _gate_ok(idx, q, k)
+if not _gate_ok(idx, q, k):
+    raise SystemExit("validation failed: selector is not eligible")
 SS = D ** -0.5
 
 from sparse_attn.ops.batch_select import batched_group_sels  # noqa: E402
@@ -90,17 +93,13 @@ from sparse_attn.ops.batch_select import batched_group_sels  # noqa: E402
 os.environ.pop("TLI_PREFILL_SELECT_GRAPH", None)
 m_a1 = batched_group_sels(idx, q, k, SS, group_ends, dense_below)
 m_a2 = batched_group_sels(idx, q, k, SS, group_ends, dense_below)
-assert m_a1 is not None and m_a2 is not None
-d0 = sum(1 for a, b in zip(m_a1, m_a2) if not torch.equal(a, b))
-print(f"[G2] eager 同输入两次 diff_rows = {d0}/{N}", flush=True)
+require_equal_masks("[G2] eager 同输入两次", m_a1, m_a2, group_ends)
 
 # ---- 硬门 1：graph 路径多层注入 vs eager 逐位 ----
 os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
 # 层 0（capture 层）：graph 首调 = capture 执行结果
 m_g0 = batched_group_sels(idx, q, k, SS, group_ends, dense_below)
-assert m_g0 is not None
-d_cap = sum(1 for a, b in zip(m_g0, m_a1) if not torch.equal(a, b))
-print(f"[G1] capture 层 graph vs eager diff_rows = {d_cap}/{N}", flush=True)
+require_equal_masks("[G1] capture 层 graph vs eager", m_a1, m_g0, group_ends)
 
 for layer in range(1, 4):
     seed = 1000 + layer
@@ -109,14 +108,12 @@ for layer in range(1, 4):
     # eager 先算（独立内存）
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
     m_e = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, dense_below)
-    assert m_e is not None
     # graph replay（copy_ 注入 + replay）
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
     m_r = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, dense_below)
-    assert m_r is not None
-    d = sum(1 for a, b in zip(m_e, m_r) if not torch.equal(a, b))
-    print(f"[G1] 层 {layer}（seed {seed}，新 idx 实例）replay vs eager "
-          f"diff_rows = {d}/{N}", flush=True)
+    require_equal_masks(
+        f"[G1] 层 {layer}（seed {seed}，新 idx 实例）replay vs eager",
+        m_e, m_r, group_ends)
 
 # ---- 性能：选择链 wall（稳态 replay，不含首层 capture）----
 os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
