@@ -1,9 +1,19 @@
 # E140 historical observation limits and minimal recollection
 
 The original JSON (`e670af6eda21d988d4eedcf458064bb72982bf33`, first commit
-`096414368d2f7c102cb526a62c222e181b97620c`) and existing O_observation figures
-are preserved byte-for-byte. `e140_validity.json` records their hashes. They are
-historical diagnostics, not repaired or accepted paper evidence.
+`096414368d2f7c102cb526a62c222e181b97620c`) remains unchanged. The v2 manifest
+retains every legacy v1 artifact hash and pins that historical snapshot to this
+commit. It separately records the later unannotated figure snapshot and current
+SVG/PNG/PDF with a visible historical-diagnostic banner. Original bytes remain
+recoverable from the recorded Git commits; annotation changes presentation only.
+Neither the old nor annotated figures are repaired or accepted paper evidence.
+
+`TL-E140-ASSET-PROVENANCE-20261015`: run
+`python -m exp.paper.e140_asset_provenance` to verify current assets and unchanged
+inputs against the manifest. Renderer default rejection remains mandatory;
+explicit diagnostic rendering keeps a visible warning. Re-rendering changes
+artifact identity and requires a reviewed manifest update, never promotion to
+valid paper evidence by replacing hashes alone.
 
 Confirmed collector defects:
 
@@ -95,3 +105,17 @@ decay); (b) far holds ~49% of nonprotected mid mass, not 83%. The paper O
 section and `figs/fig_o_observation.py` must be rewritten against the v2 JSONs
 before any figure is used as paper evidence; the historical-render gate remains
 in force for the old JSONs.
+
+### Merge follow-up: manifest v3 reviewed update (2026-10-16)
+
+The annotation manifest (authored 2026-10-15 before the recollection) pinned
+the annotated historical figures at the live `O_observation.*` paths. Merging
+that state with the completed E140v2 recollection required the reviewed
+manifest update this repository's own rule prescribes for re-renders: current
+assets are now the v2-recollection renders (commit a8d9735, sources hashed in
+`v2_recollection`), the annotated historical figures are pinned by git blob in
+`historical_annotated_assets` (21b595d), and every legacy lineage section is
+preserved verbatim. `fig_o_observation.py` renders v2 data fail-closed and no
+longer calls `add_render_warning`; that banner remains valid for the legacy
+assets only. No legacy bytes were modified. Run
+`python -m exp.paper.e140_asset_provenance` to verify.
