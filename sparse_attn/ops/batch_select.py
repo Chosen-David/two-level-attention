@@ -584,9 +584,31 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below):
         # key = 几何 + 配置指纹（不含 indexer 实例 id——e2e 每层独立
         # indexer 实例，跨层共享同一 graph：statics 注入层间数据，闭包持
         # 首层几何（层间不变）与首层 indexer（仅 capture 期发起 kernel，
-        # 参数固化为 statics 指针，replay 不再访问实例）
+        # 参数固化为 statics 指针，replay 不再访问实例）。
+        # 【TL-E139-GRAPH-CACHE-20261015 修复】_body 闭包固化的几何不止
+        # shape 级——α/β/γ/sink/SWA/k1/subspace 改变 nb_l/sl_l/k2_*_l 与
+        # 保护带而不改输入 shape → 旧键命中即 replay 陈旧几何（GPT CPU
+        # 复现 36/256 mask 位差）。修复 = 键直接绑定 capture 实际固化的
+        # host 几何真值 + 保护区/配置标量 + 子空间/dtype 指纹：
+        #   nb_l/sl_l          ← near/swa 池块边界（α/sink_lo/group_ends 的
+        #                          函数——真值绑定，配置组合完备性无须论证）
+        #   k2_far_l/k2_near_l ← L2 双池预算（β/γ/k1/K2 的函数）
+        #   sink/swa/bs/sink_lo← mask 强制保护区宽度（_body 直读）
+        #   α/β/γ/k1           ← 原始配置兜底（防几何碰撞同值不同源）
+        #   subspace/dtype/dev ← idx_sub 身份 + statics copy_ 可隐式转换
+        #                          不报错，键级拒绝混用（GPT 修复方案 1+2）
+        _sub_fp = (getattr(indexer.args, "tia_subspace", None),
+                   getattr(indexer.args, "tia_l2_subspace", None),
+                   int(idx_sub.shape[-1]))
+        _dt_fp = tuple((t.dtype if t is not None else None)
+                       for t in (k_min, k_max, k_avg, k_qat, b_q))
         key = (L, N, kf, kn, K2arg, tuple(group_ends),
-               far_use_mm, near_use_mm, use_cand_topk)
+               far_use_mm, near_use_mm, use_cand_topk,
+               tuple(nb_l), tuple(sl_l), tuple(k2_far_l), tuple(k2_near_l),
+               sink_tok, swa_tok, bs, sink_lo,
+               float(indexer.alpha), float(indexer.beta),
+               float(indexer.gamma), k1,
+               _sub_fp, _dt_fp, str(dev))
         try:
             return _graph_cached_run(
                 key, _body,
