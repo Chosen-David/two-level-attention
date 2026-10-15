@@ -132,6 +132,82 @@ class DeepseekRequestLifecycleTest(unittest.TestCase):
         self.assertEqual(self.attn.indexer.selects, 1)
         self.assertIsNone(self.attn.indexer.request_state)
 
+    def test_maskless_prefill_matches_explicit_causal_mask(self):
+        for length in (1, 3, 5):
+            with self.subTest(length=length):
+                hidden = torch.randn(1, length, 8)
+                expected, weights, _ = self.call(hidden, CacheDouble())
+                actual, actual_weights, _ = self.forward(
+                    self.attn, hidden, attention_mask=None,
+                    position_ids=torch.arange(length)[None],
+                    past_key_value=CacheDouble(), use_cache=True,
+                    output_attentions=True)
+                torch.testing.assert_close(actual, expected)
+                torch.testing.assert_close(actual_weights, weights)
+
+    def test_maskless_prefill_cannot_read_replaced_suffix(self):
+        hidden = torch.randn(1, 5, 8)
+        changed = hidden.clone()
+        changed[:, 2:] = 20 * torch.randn_like(changed[:, 2:])
+        outputs = []
+        for x in (hidden, changed):
+            out, _, _ = self.forward(
+                self.attn, x, attention_mask=None,
+                position_ids=torch.arange(5)[None],
+                past_key_value=CacheDouble(), use_cache=True)
+            outputs.append(out[:, :2])
+        torch.testing.assert_close(*outputs)
+
+    def test_invalid_additive_mask_rejected_before_cache_update(self):
+        bad_masks = [torch.ones(1, 3), torch.ones(1, 1, 3, 3, dtype=torch.bool),
+                     torch.zeros(1, 1, 3, 2), torch.zeros(1, 2, 3, 3),
+                     torch.empty(1, 1, 3, 3, device='meta')]
+        for mask in bad_masks:
+            with self.subTest(shape=mask.shape, dtype=mask.dtype):
+                cache = CacheDouble()
+                with self.assertRaisesRegex(ValueError, 'attention_mask'):
+                    self.forward(self.attn, torch.randn(1, 3, 8),
+                                 attention_mask=mask,
+                                 position_ids=torch.arange(3)[None],
+                                 past_key_value=cache, use_cache=True)
+                self.assertEqual(cache.get_seq_length(0), 0)
+
+    def test_invalid_decode_mask_leaves_existing_prefix_unchanged(self):
+        for mask in (torch.zeros(1, 4), torch.zeros(1, 1, 1, 3),
+                     torch.ones(1, 1, 1, 4, dtype=torch.bool)):
+            with self.subTest(shape=mask.shape, dtype=mask.dtype):
+                cache = CacheDouble()
+                self.call(torch.randn(1, 3, 8), cache)
+                prefix = cache.k
+                selects = self.attn.indexer.selects
+                with self.assertRaisesRegex(ValueError, 'attention_mask'):
+                    self.forward(self.attn, torch.randn(1, 1, 8),
+                                 attention_mask=mask, position_ids=torch.tensor([[3]]),
+                                 past_key_value=cache, use_cache=True)
+                self.assertIs(cache.k, prefix)
+                self.assertEqual(cache.get_seq_length(0), 3)
+                self.assertEqual(self.attn.indexer.selects, selects)
+
+    def test_maskless_prefill_batched_strided_and_bfloat16(self):
+        for dtype in (torch.float32, torch.bfloat16):
+            with self.subTest(dtype=dtype):
+                self.setUp()
+                for value in vars(self.attn).values():
+                    if isinstance(value, torch.nn.Module):
+                        value.to(dtype=dtype)
+                hidden = torch.randn(2, 5, 16, dtype=dtype)[..., ::2]
+                self.assertFalse(hidden.is_contiguous())
+                mask = torch.zeros(2, 1, 5, 5, dtype=dtype).masked_fill(
+                    torch.ones(5, 5, dtype=torch.bool).triu(1), float('-inf'))
+                outputs = []
+                for m in (mask, None):
+                    out, _, _ = self.forward(
+                        self.attn, hidden, attention_mask=m,
+                        position_ids=torch.arange(5)[None].expand(2, -1),
+                        past_key_value=CacheDouble(), use_cache=True)
+                    outputs.append(out)
+                torch.testing.assert_close(*outputs)
+
 
 if __name__ == "__main__":
     unittest.main()

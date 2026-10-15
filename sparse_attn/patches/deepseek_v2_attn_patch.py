@@ -10,7 +10,7 @@
 设计（镜像 qwen3_attn_patch 骨架 + vendored modeling_deepseek eager 投影
 复刻，逐位同源）：
   - prefill（q_len == cache 长度，即首步完整 prompt）→ dense eager 原版
-    复刻（4D float mask 相加语义保持）+ indexer.clear()；
+    复刻（4D float mask 相加语义保持；None 时补因果屏蔽）+ indexer.clear()；
   - decode（B=1、q_len=1、use_cache=True）→ 稀疏两级选择
     （prepare_mask）+ eager_decoding_attn(allow_kv_hetero=True)；
   - MLA 异维契约：k [1,S,H,192]（nope 128+rope 64）/ v [1,S,H,128]——
@@ -24,7 +24,9 @@ decode 期 attention_mask 契约：DSV2 走 model.generate，HF 传 4D float
 causal mask（[1,1,1,S]，B=1 无 padding 下全 0 可加）。稀疏路径在选中
 token 子集上做 causal-free softmax（选中的全是 ≤ 当前位置的 token——
 sink/swa/near/far 分区几何保证），忽略该 mask（与 qwen3 mask=None 分支
-同构）。B>1 / padding 形态显式拒绝（B2 守卫口径）。
+同构）。decode B>1 与非标准 mask 布局显式拒绝。注意：标准 4D
+mask 内的 padding/非零 bias 尚未验证或消费，decode 仍仅支持无 padding
+全零 additive mask；不得把形状检查当作 padding 值检查。
 """
 
 import sys
@@ -69,6 +71,14 @@ def deepseek_v2_attn_forward(
     **kwargs,
 ):
     bsz, q_len, _ = hidden_states.size()
+    if attention_mask is not None and (
+        attention_mask.ndim != 4 or not attention_mask.is_floating_point()
+        or attention_mask.device != hidden_states.device
+    ):
+        raise ValueError(
+            "E142a attention_mask must be a 4D floating additive mask on "
+            "the hidden_states device; 2D padding/bool masks are unsupported"
+        )
 
     # ---- MLA 投影复刻（vendored modeling_deepseek eager forward 同构）----
     if self.q_lora_rank is None:
@@ -102,6 +112,12 @@ def deepseek_v2_attn_forward(
                 f"语义需要层索引，拒绝执行"
             )
         kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    if (attention_mask is not None
+            and tuple(attention_mask.shape) != (bsz, 1, q_len, kv_seq_len)):
+        raise ValueError(
+            f"E142a attention_mask shape must be {(bsz, 1, q_len, kv_seq_len)}, "
+            f"got {tuple(attention_mask.shape)}"
+        )
     cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
     apply_rotary_pos_emb = _module_apply_rope(self)
     q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids)
@@ -137,6 +153,14 @@ def deepseek_v2_attn_forward(
         )
         if attention_mask is not None:
             attn_weights = attn_weights + attention_mask
+        elif q_len > 1:
+            # Some model backends omit the explicit causal mask. After replacing
+            # their forward with eager attention, causality is our responsibility.
+            # This branch is a fresh prompt (K length == Q length), not decode.
+            future = torch.ones((q_len, q_len), dtype=torch.bool,
+                                device=query_states.device).triu_(diagonal=1)
+            attn_weights.masked_fill_(future, float('-inf'))
+            del future  # Do not keep the temporary mask live through softmax/PV.
         attn_weights = F.softmax(
             attn_weights, dim=-1, dtype=torch.float32
         ).to(query_states.dtype)
@@ -163,7 +187,7 @@ def deepseek_v2_attn_forward(
         )
     # attention_mask：model.generate 传 4D float causal（B=1 无 padding
     # 下全 0 可加）——稀疏选择分区几何保证只选中 ≤ 当前位置的 token，
-    # 该 mask 在稀疏路径为恒等，忽略（模块 docstring 契约）。
+    # 只有全零 mask 才是恒等；4D padding/bias 值仍为未支持契约（见文首）。
 
     indexer: Indexer = self.indexer
     if hasattr(indexer, "freeze_dyn_dgate"):
