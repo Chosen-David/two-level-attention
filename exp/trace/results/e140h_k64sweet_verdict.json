@@ -1,0 +1,20 @@
+{
+ "experiment": "E140h：K1=64 甜点 AVG5 组装——E140b hotpot/musique + E140h gov/qasper/repobench 五任务均值 vs mavg 锚",
+ "date": "2026-10-15",
+ "treatment": "tli_64_64_1024_c4_Aa0.25_b0.125_g0.625（tli_subspace=tail，treatment hash hf9cec4bd8d 全五格一致）",
+ "model": "Qwen3-8B bf16，.187 三卡池 + 本机",
+ "caliber": "AVG5 = mean{hotpotqa, musique, gov_report, qasper, repobench}（E123/E125 口径）；锚 = mavg(.25,.125,.625) K1=128 生产工作点 47.91",
+ "cells": {
+  "hotpotqa": "60.83（e140b；锚 59.42）",
+  "musique": "33.85（e140b；锚 34.25）",
+  "gov_report": "33.45（e140h；锚 33.60）",
+  "qasper": "46.92（e140h；锚 46.45）",
+  "repobench": "65.45（e140h；锚 65.83）"
+ },
+ "verdict": {
+  "avg5": "K1=64 = 48.10 vs 锚 47.91（+0.19）",
+  "decision": "K1=64 升论文推荐 L1 工作点：质量 AVG5 持平偏正（+0.19）且 L1 粗筛页数减半（K1 128→64），Pareto 改进。E140b 倒 U 机制（far_budget 公式导出，K1=64 far=448 vs K1=128 far=128）背书该甜点",
+  "redundant_rerun": ".187 musique 重跑（h17e0d6abd6）已终止——e140b dk1_64 同 hash 格已存在，无需重测"
+ },
+ "files": "exp/results_longbench/Qwen3-8B/pred_k64sweet/（gov/qasper/repobench + result.json）；hotpot/musique 见 e140b 判决引用"
+}

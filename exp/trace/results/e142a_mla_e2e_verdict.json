@@ -1,0 +1,21 @@
+{
+ "experiment": "E142a MLA e2e cells——DeepSeek-V2-Lite-Chat fullkv 锚 vs tli mla_rope 稀疏臂（LongBench hotpotqa/musique，200 样本/格）",
+ "date": "2026-10-15",
+ "pipeline": "commit 02423d1：sparse_attn/patches/deepseek_v2_attn_patch.py（attention forward 覆写 + sys.modules 同源 apply_rotary_pos_emb）——结构上免疫 TL-E141-QK-RECONSTRUCTION 两项审计缺陷（输入已过 input_layernorm；rope 走模型自带通道重排）",
+ "treatment_hash": "h3497550862（tli_subspace=mla_rope，manifest 见 pred/*.tli_manifest.json）",
+ "config": "K1=64 / K2=1024 / bs 64 / mavg(.25,.125,.625) / far=minmax / near=avg / kmeans off / layer_skip off / tia_level2_cmp_ratio 4（E129 坑显式传）",
+ "model": "DeepSeek-V2-Lite-Chat bf16（nope128+rope64=192，kv_lora_rank 512，16 head，27 层 MoE，yarn40）",
+ "context": "cap_effective 16384（eager attention L² 显存实现约束；协议锚 31500 保留，cap_comparability_key 7923154369）——受限上下文 treatment，非模型能力上限（163840）",
+ "results": {
+  "hotpotqa": "fullkv 23.91 / sparse mla_rope 23.11（Δ -0.80，保留率 96.7%）",
+  "musique": "fullkv 11.48 / sparse mla_rope 10.77（Δ -0.71，保留率 93.8%）",
+  "index_economy": "选择器只用 rope64 分量（192→64 = 3x 索引维度缩减）+ k_pe MQA 共享（16 head 单索引）——E141b trace 中 rope64 是 MLA 最佳单子空间"
+ },
+ "verdict": {
+  "e2e_quality": "rope-only 索引在 MLA 上 e2e 可用：两任务保留率 96.7%/93.8%（K2=1024 预算）——配合 E141b trace（rope64 retained mass 4/5 层最佳单分量但 Δfull .022-.159），最终叙事定为『MLA 上 rope 分量主导选择信号但非充分：3x 索引降维 + MQA 单索引，质量代价 3-6%』",
+  "narrative_boundary": "E141b 旧『rope-only ≡ full192（≤.02）』已撤销（oracle 无效）；e2e 判据以本表为准——不可再表述为『持平』，只能表述为『小代价降维』",
+  "smoke": "16K needle（16137 tok 实测）双臂均答出 ALPHA-7741-CUB；短 prompt fullkv vs sparse 8/8 token 逐位一致（02423d1 提交前门禁）",
+  "cross_arch": "GQA tail 子空间（E133 系列）与 MLA rope 分量共同指向『选择子空间取编码注意力排序信号的维度』——但 MLA 无 GQA 式单一甜点（L12 nope>rope 反转），架构适用性叙事按 E141b 机制段分写"
+ },
+ "next": "论文 MLA 段以 E141b（trace 机制）+ E142a（e2e 质量）双数据重写（#143）；性能口径（MLA e2e 时延/吞吐）未测，本表仅质量判决"
+}
