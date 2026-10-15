@@ -861,6 +861,18 @@ def get_method_name_with_info(args, snapshot=None):
             _ctx = getattr(args, "context_length", 31500)
         return (f"sparq_vendor_k{getattr(args, 'sparq_k', 1024)}"
                 f"_cl{_ctx:g}")
+    elif args.method == "moba_vendor":
+        # B 轨 vendor（官方源码复用）：MoBA prefill 块级 gate 稀疏 + decode
+        # dense。chunk/topk/budget 决定每 query 有效预算，必须进 treatment 名
+        # （防不同预算口径同名互覆）。topk 默认 None → 换算
+        # max(2, ceil(budget/chunk))，与 enable_moba 同源（同一换算，名称绑定
+        # 实际生效 topk，防名/行为失配）。
+        _moba_chunk = getattr(args, "moba_chunk_size", 4096)
+        _moba_topk = getattr(args, "moba_topk", None)
+        if _moba_topk is None:
+            _moba_budget = getattr(args, "moba_budget", 1024)
+            _moba_topk = max(2, -(-_moba_budget // _moba_chunk))
+        return f"moba_vendor_c{_moba_chunk}_k{_moba_topk}"
     elif args.method == "twi":
         return f"twi_{args.twi_block_size}_{args.twi_level1_topk}_{args.twi_level2_topp}"
     elif args.method == "tia":

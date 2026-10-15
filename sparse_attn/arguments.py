@@ -53,6 +53,23 @@ def _add_sparq_args(parser: argparse.ArgumentParser):
     return parser
 
 
+def _add_moba_args(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title='moba')
+    # MoBA vendor（官方源码复用）：prefill 块级 gate 稀疏（chunk-mean key gate →
+    # per-query top-k 选块）+ decode dense。主表预算口径对齐 K2=1024 token/query：
+    # topk 默认 None → enable_moba 内 topk = max(2, ceil(budget/chunk))。官方默认
+    # chunk=4096 → topk=2 → 预算 8192（官方 efficient 内部 topk-1，topk=1 退化为
+    # dense）；严格对齐 1024 须改 chunk（如 256→topk=4），论文标注 budget-normalized
+    # 消融。
+    group.add_argument('--moba_chunk_size', type=int, default=4096,
+                       help='MoBA chunk 大小（官方默认 4096，方法定义参数）')
+    group.add_argument('--moba_topk', type=int, default=None,
+                       help='MoBA top-k 块数（None = 按 budget 换算；显式传覆盖）')
+    group.add_argument('--moba_budget', type=int, default=1024,
+                       help='MoBA token 预算口径（默认 1024 与 Quest/SparQ/FASA 对齐）')
+    return parser
+
+
 def _add_fasa_args(parser: argparse.ArgumentParser):
     group = parser.add_argument_group(title='fasa')
     # FASA vendor（官方源码复用）：decode 时按频率分组 agreement（Phase 1 校准产物
@@ -229,11 +246,12 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'tia', 'twi', 'tli', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'moba_vendor', 'tia', 'twi', 'tli', 'none'])
     parser = _add_quest_args(parser)
     parser = _add_minference_args(parser)
     parser = _add_fasa_args(parser)
     parser = _add_sparq_args(parser)
+    parser = _add_moba_args(parser)
     parser = _add_twilight_args(parser)
     parser = _add_tia_args(parser)
     parser = _add_tli_args(parser)
