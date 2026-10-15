@@ -9,6 +9,7 @@ from transformers.models.llama.modeling_llama import LlamaAttention
 
 from .qwen3_attn_patch import qwen3_attn_forward
 from .llama3_attn_patch import llama3_attn_forward
+from .deepseek_v2_attn_patch import deepseek_v2_attn_forward
 from ..indexer import indexer_type_dict
 from ..indexer.tli_indexer import TLIIndexer
 
@@ -17,6 +18,18 @@ from ..indexer.tli_indexer import TLIIndexer
 # （tli_indexer.py），env 实例化切换门随之退役——tli 臂恒实例化基类，
 # fast path 由基类内部守卫（GPU/Triton 可用性/布局）自动生效，
 # 异常 fail-closed 回退原版表达式。tli_indexer_fast.py 已删除。
+
+
+def _is_deepseek_attn(module) -> bool:
+    """【E142a】MLA 结构门：类名前缀 DeepseekV2* + MLA 投影属性存在
+    （kv_a_proj_with_mqa / q_head_dim / qk_rope_head_dim）。防非 attention
+    的 DeepseekV2 前缀类（MoE/decoder 层等）误挂 patch。"""
+    return (
+        hasattr(module, "kv_a_proj_with_mqa")
+        and hasattr(module, "q_head_dim")
+        and hasattr(module, "qk_rope_head_dim")
+        and hasattr(module, "rotary_emb")
+    )
 
 def register_patch(model: nn.Module, args, snapshot=None) -> int:
     """注册稀疏 attention patch，返回成功 patch 的模块数。
@@ -65,6 +78,18 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
             "--tli_dyn_dgate 在 Llama 上不会生效，继续运行会产出带动态 "
             "gate 标签的 dense 语义结果）"
         )
+    # 【E142a】同口径 MLA 预扫：deepseek_v2_attn_forward 不调用
+    # calibrate_dyn_dgate（E137 标定是 Qwen3 128 维 rotate_half 布局口径，
+    # MLA 重校准是后续课题）——声明动态 gate + DeepSeek 目标类时显式拒绝。
+    if getattr(args, "tli_dyn_dgate", False) and any(
+        type(m).__name__.startswith("DeepseekV2") and _is_deepseek_attn(m)
+        for _, m in model.named_modules()
+    ):
+        raise RuntimeError(
+            "DeepSeek MLA patch 未实现 E137 动态标定（128 维口径不可直接 "
+            "迁移，MLA 重校准是后续课题），拒绝静默 no-op——如需 MLA 动态 "
+            "gate 请先实现 calibrate 的 MLA 版本"
+        )
     n_patched = 0
     if IndexerType is not None:
         for name, module in model.named_modules():
@@ -78,6 +103,20 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
                 n_patched += 1
                 if hasattr(module, "layer_idx") and module.layer_idx == 0:
                     print(f"register qwen3 attn: [{name}]")
+            elif type(module).__name__.startswith("DeepseekV2") and _is_deepseek_attn(module):
+                # 【E142a】DeepSeek-V2 MLA（trust_remote_code 动态类，类名
+                # 匹配——DeepseekV2Attention / FlashAttention2 / SdpaAttention
+                # 三子类同投影布局，forward 均被覆写）。MLA 语义门：
+                # kv_a_proj_with_mqa + q_head_dim(192) 存在性即 MLA 结构。
+                module.indexer = IndexerType(args, snapshot=snapshot) \
+                    if (snapshot is not None and IndexerType is TLIIndexer) \
+                    else IndexerType(args)
+                if hasattr(module, "layer_idx"):
+                    module.indexer.layer_idx = module.layer_idx
+                module.forward = MethodType(deepseek_v2_attn_forward, module)
+                n_patched += 1
+                if hasattr(module, "layer_idx") and module.layer_idx == 0:
+                    print(f"register deepseek_v2 attn (MLA): [{name}]")
             elif isinstance(module, LlamaAttention):
                 module.indexer = IndexerType(args, snapshot=snapshot) \
                     if (snapshot is not None and IndexerType is TLIIndexer) \

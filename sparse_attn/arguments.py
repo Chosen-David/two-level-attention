@@ -157,8 +157,9 @@ def _add_tli_args(parser: argparse.ArgumentParser):
                        help='near 细筛 token 折扣（E64 gamma）；off=自由竞争'
                             '（E122：取消 near/far L2 配额分割，mid 单池 topk 竞争）')
     group.add_argument('--tli_subspace', type=str, default='full',
-                       choices=['full', 'rope', 'nope', 'tail', 'random', 'highfreq'],
-                       help='子空间选择: full=全128维(默认) / rope=前64旋转维 / nope=后64非旋转维 / tail=旧口径低频尾维32(E71/B7/C0复现)')
+                       choices=['full', 'rope', 'nope', 'tail', 'random', 'highfreq', 'mla_rope'],
+                       help='子空间选择: full=全128维(默认) / rope=前64旋转维 / nope=后64非旋转维 / tail=旧口径低频尾维32(E71/B7/C0复现) / '
+                            'mla_rope=DeepSeek MLA 192维布局尾段rope 64维(E142a，E141判决:rope-only与full192持平)')
     group.add_argument('--tli_l2_subspace', type=str, default='same',
                        choices=['same', 'full'],
                        help='L2 细筛子空间选择（E134 子空间矩阵第三臂 sub+full）: '

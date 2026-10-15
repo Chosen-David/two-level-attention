@@ -876,7 +876,7 @@ def get_method_name_with_info(args, snapshot=None):
         eff_subspace = getattr(args, "tli_enable_subspace", True)
         if subspace == "full":
             eff_subspace = False          # 与 TLIIndexer.__init__ 同源
-        elif subspace in ("rope", "nope"):
+        elif subspace in ("rope", "nope", "mla_rope"):
             eff_subspace = True
         ab = ("A" if eff_subspace else "") + ("B" if args.tli_enable_kmeans else "") + ("D" if args.tli_enable_layer_skip else "")
         # 【B09 修复（kimi3 清单 2026-10-08）】α/β/γ 是 treatment 的一部分，
