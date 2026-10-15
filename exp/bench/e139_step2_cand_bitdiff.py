@@ -117,7 +117,7 @@ def validate(K2):
     os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "1"
     os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
     _bs._GRAPH_CACHE.clear()        # 排除 Step1 缓存（key 已含 CAND 指纹，防御性）
-    m_g0 = batched_group_sels(idx, q, k, SS, group_ends, 1024)
+    m_g0 = batched_group_sels(idx, q, k, SS, group_ends, 1024, require_graph=True)
     require_equal_masks(f"[G2 K2={K2}] CAND=1 capture 层 graph vs eager",
                         m_s2, m_g0, group_ends)
     for layer in range(1, 3):
@@ -127,7 +127,7 @@ def validate(K2):
         os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
         m_e = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, 1024)
         os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
-        m_r = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, 1024)
+        m_r = batched_group_sels(idx_l, q_l, k_l, SS, group_ends, 1024, require_graph=True)
         require_equal_masks(f"[G2 K2={K2}] 层 {layer}（seed {seed}）replay vs eager",
                             m_e, m_r, group_ends)
     _bs._GRAPH_CACHE.clear()
@@ -155,14 +155,14 @@ t_e1 = bench(lambda: batched_group_sels(
     idx, q, k, SS, group_ends, 1024))
 os.environ["TLI_PREFILL_SELECT_GRAPH"] = "1"
 _bs._GRAPH_CACHE.clear()
-batched_group_sels(idx, q, k, SS, group_ends, 1024)   # capture
+batched_group_sels(idx, q, k, SS, group_ends, 1024, require_graph=True)   # capture
 t_g1 = bench(lambda: batched_group_sels(
-    idx, q, k, SS, group_ends, 1024))
+    idx, q, k, SS, group_ends, 1024, require_graph=True))
 _bs._GRAPH_CACHE.clear()
 os.environ["TLI_PREFILL_L2_TOPK_CAND"] = "0"
-batched_group_sels(idx, q, k, SS, group_ends, 1024)
+batched_group_sels(idx, q, k, SS, group_ends, 1024, require_graph=True)
 t_g0 = bench(lambda: batched_group_sels(
-    idx, q, k, SS, group_ends, 1024))
+    idx, q, k, SS, group_ends, 1024, require_graph=True))
 _bs._GRAPH_CACHE.clear()
 os.environ["TLI_PREFILL_SELECT_GRAPH"] = "0"
 print(f"选择链 wall: eager 旧 = {t_e0*1e3:7.1f}ms / "

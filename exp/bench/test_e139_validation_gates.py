@@ -36,7 +36,12 @@ def probe(script, fault, fault_call):
     torch.Generator = lambda **kw: types.SimpleNamespace(manual_seed=lambda seed: seed)
     torch.randn = lambda *shape, **kw: Tensor(shape, kw["dtype"])
     torch.equal = lambda a, b: a.shape == b.shape and a.value == b.value
-    torch.cuda = types.SimpleNamespace(synchronize=lambda: print("BENCH_ENTERED"))
+    timing_started = False
+    def synchronize():
+        nonlocal timing_started
+        timing_started = True
+        print("BENCH_ENTERED")
+    torch.cuda = types.SimpleNamespace(synchronize=synchronize)
     sys.modules["torch"] = torch
 
     def module(name):
@@ -58,10 +63,17 @@ def probe(script, fault, fault_call):
     bs._gate_ok = lambda *args: fault != "ineligible"
     calls = 0
 
-    def select(idx, q, k, scale, ends, dense):
+    def select(idx, q, k, scale, ends, dense, *, require_graph=False):
         nonlocal calls
         calls += 1
         rows = [Tensor((8, end)) for end in ends]
+        graph_failed = ((fault == "graph_failure" and calls == fault_call)
+                        or (fault == "graph_timing" and timing_started
+                            and os.environ.get("TLI_PREFILL_SELECT_GRAPH") == "1"))
+        if graph_failed:
+            if require_graph:
+                raise RuntimeError("validation failed: graph execution failed")
+            return rows  # production's silent eager fallback: same mask bits
         if calls == fault_call:
             if fault == "none":
                 return None
@@ -126,6 +138,20 @@ class ValidationGateTests(unittest.TestCase):
                     self.assertIn("BENCH_ENTERED", result.stdout)
                     self.assertIn("选择链 wall:", result.stdout)
                     self.assertIn("=== DONE ===", result.stdout)
+
+    def test_graph_fallback_never_produces_performance_summary(self):
+        for optimized in (False, True):
+            for script in SCRIPTS:
+                calls = (3, 5) if script == SCRIPTS[0] else (4, 6)
+                for fault, call in [("graph_failure", c) for c in calls] + [("graph_timing", 0)]:
+                    with self.subTest(script=script, fault=fault, call=call, optimized=optimized):
+                        result = self.run_probe(script, fault, call, optimized)
+                        self.assertNotEqual(result.returncode, 0, result.stdout)
+                        self.assertIn("graph execution failed", result.stderr)
+                        if fault == "graph_failure":
+                            self.assertNotIn("BENCH_ENTERED", result.stdout)
+                        self.assertNotIn("选择链 wall:", result.stdout)
+                        self.assertNotIn("=== DONE ===", result.stdout)
 
 
 if __name__ == "__main__":
