@@ -61,3 +61,17 @@ queries, with actual per-query/group rows and raw sampled Q/full K plus hashes.
 Revision strings are declarations; local model/data provenance is still unverified.
 CPU hook fixtures verify plumbing only. No GPU, model loading or recollection was
 executed in this repair, and no service recovery is claimed.
+
+### Follow-up: offline HF CPU parity (2026-10-15)
+
+A subsequent check instantiated a real HF Qwen3 class with random weights on CPU
+fp32 (transformers 4.57.3, torch 2.14.1+cpu), without downloading pretrained
+weights. Native post-RoPE Q/K matched exactly; causal KV-group probabilities had
+maximum absolute error 1.1920928955078125e-7. Thirteen affected tests passed both
+normally and under `-O`; an injected RoPE error failed with exit 1 in both modes.
+The small O3 fixture covers full selection/partial pages, not budget-constrained
+ranking. This does not validate pretrained identity, bf16/GPU, old observations,
+or scientific claims. Historical artifacts and their validity status remain
+unchanged. Details and remaining conditions:
+`agent_doc/advice/2026-10-15_e140_collector_cpu_validation_by_gpt.md`;
+evidence: `exp/paper/evidence/observation-cpu-20261015/`.

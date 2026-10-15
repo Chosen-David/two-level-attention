@@ -1,0 +1,20 @@
+test_native_post_rope_and_causal_group_probabilities (test_e140_hf_cpu.HFObservation.test_native_post_rope_and_causal_group_probabilities) ... FAIL
+
+======================================================================
+FAIL: test_native_post_rope_and_causal_group_probabilities (test_e140_hf_cpu.HFObservation.test_native_post_rope_and_causal_group_probabilities)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/tla-paper-runtime/tests/test_e140_hf_cpu.py", line 77, in test_native_post_rope_and_causal_group_probabilities
+    torch.testing.assert_close(q[layer], native[layer][0], atol=0, rtol=0)
+  File "/tmp/tla-cpu-deps/torch/testing/_comparison.py", line 1689, in assert_close
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not equal!
+
+Mismatched elements: 327680 / 328192 (99.8%)
+Greatest absolute difference: 4.093029975891113 at index (363, 0, 37)
+Greatest relative difference: 53692.3125 at index (608, 3, 102)
+
+----------------------------------------------------------------------
+Ran 1 test in 0.097s
+
+FAILED (failures=1)

@@ -3,6 +3,8 @@ import importlib.util
 from pathlib import Path
 import subprocess
 import sys
+import os
+import tempfile
 import unittest
 from unittest.mock import patch
 import torch
@@ -58,7 +60,7 @@ class Observation(unittest.TestCase):
         class Model(torch.nn.Module):
             def __init__(self):super().__init__();self.model=Inner()
             def forward(self,input_ids,use_cache):return self.model.layers[0](input_ids.unsqueeze(-1).expand(-1,-1,128).float())
-        model=Model();ids=torch.tensor([[1,2]])
+        model=Model().eval();ids=torch.tensor([[1,2]])
         with patch.object(trace,'LAYERS',[0]),patch.object(trace,'DEV','cpu'):
             q,k=trace.get_qk(model,10000,ids)
         expected=trace.rotate_half(ids.unsqueeze(-1).expand(-1,-1,128).float()*3)[0].unsqueeze(1)
@@ -72,5 +74,13 @@ class Observation(unittest.TestCase):
     def test_cli_dry_run_does_not_load_model(self):
         result=subprocess.run([sys.executable,str(SCRIPT)],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr);self.assertIn('"gpu_started": false',result.stdout)
+    def test_identity_and_existing_output_reject_before_device_or_model(self):
+        with tempfile.TemporaryDirectory() as folder:
+            out=Path(folder)/'observation.json'
+            with patch.object(trace,'OUT',str(out)),patch.object(sys,'argv',['trace','--execute']),patch.dict(os.environ,{},clear=True),patch.object(trace.torch.cuda,'set_device',side_effect=AssertionError('no device access')),patch.object(trace,'load_model',side_effect=AssertionError('no model access')):
+                with self.assertRaisesRegex(ValueError,'identity declarations'):trace.main()
+                out.write_text('historical result')
+                with self.assertRaisesRegex(ValueError,'output exists'):trace.main()
+                self.assertEqual(out.read_text(),'historical result')
 
 if __name__=='__main__':unittest.main()

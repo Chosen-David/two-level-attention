@@ -11,6 +11,7 @@ import os
 import sys
 import argparse
 import hashlib
+import math
 from pathlib import Path
 
 import torch
@@ -67,34 +68,48 @@ def get_qk(model, theta, input_ids):
     hidden_states and therefore do not omit that normalization. Unexpected APIs
     fail closed. This is not a GPU parity certificate for an untested HF version.
     """
+    if (not isinstance(input_ids, torch.Tensor) or input_ids.ndim != 2
+            or input_ids.shape[0] != 1 or input_ids.shape[1] == 0
+            or input_ids.dtype not in (torch.int32, torch.int64)):
+        raise ValueError("collector requires one nonempty integer input sequence")
+    if model.training:
+        raise ValueError("collector requires model.eval()")
+    layers = tuple(LAYERS)
+    if (not layers or any(type(i) is not int or i < 0 or i >= len(model.model.layers) for i in layers)
+            or len(set(layers)) != len(layers)):
+        raise ValueError("collector requires unique valid layer indices")
     qs, ks, rope, handles = {}, {}, {}, []
     def projection(target, layer):
         def hook(module, args, output):
-            if layer in target or output.ndim != 4 or output.shape[0] != 1:
+            if layer in target or not isinstance(output, torch.Tensor) or output.ndim != 4 or output.shape[:2] != input_ids.shape:
                 raise ValueError("unexpected/repeated Qwen3 normalized projection")
-            target[layer] = output.detach()
+            target[layer] = output.detach().clone()
         return hook
     def position_hook(layer):
         def hook(module, args, kwargs):
             value = kwargs.get('position_embeddings')
-            if not isinstance(value, (tuple,list)) or len(value)!=2:
+            if layer in rope or not isinstance(value, (tuple,list)) or len(value)!=2 or not all(isinstance(v,torch.Tensor) for v in value):
                 raise ValueError("actual position_embeddings unavailable")
-            rope[layer] = value
+            rope[layer] = tuple(v.detach().clone() for v in value)
         return hook
     try:
-        for layer in LAYERS:
+        for layer in layers:
             attn = model.model.layers[layer].self_attn
-            handles.extend([attn.q_norm.register_forward_hook(projection(qs,layer)),
-                            attn.k_norm.register_forward_hook(projection(ks,layer)),
-                            attn.register_forward_pre_hook(position_hook(layer),with_kwargs=True)])
+            handles.append(attn.q_norm.register_forward_hook(projection(qs,layer)))
+            handles.append(attn.k_norm.register_forward_hook(projection(ks,layer)))
+            handles.append(attn.register_forward_pre_hook(position_hook(layer),with_kwargs=True))
         with torch.no_grad():
             model(input_ids=input_ids.to(DEV), use_cache=False)
-        for layer in LAYERS:
+        for layer in layers:
             if layer not in qs or layer not in ks or layer not in rope:
                 raise ValueError("actual Q/K/RoPE hook coverage incomplete")
             q,k=qs[layer],ks[layer];cos,sin=rope[layer]
             if q.shape[-1]!=128 or k.shape[-1]!=128 or cos.shape!=(1,input_ids.shape[1],128) or sin.shape!=cos.shape:
                 raise ValueError("unsupported Qwen3 projection/RoPE shape")
+            if (not k.shape[2] or not q.shape[2] or q.shape[2] % k.shape[2]
+                    or any(not v.is_floating_point() or v.device != q.device or v.dtype != q.dtype
+                           or not torch.isfinite(v).all() for v in (q,k,cos,sin))):
+                raise ValueError("invalid Qwen3 projection/RoPE values or GQA geometry")
             cos,sin=cos.unsqueeze(2),sin.unsqueeze(2)
             qs[layer]=(q*cos+rotate_half(q)*sin)[0].float()
             ks[layer]=(k*cos+rotate_half(k)*sin)[0].float()
@@ -106,14 +121,18 @@ def get_qk(model, theta, input_ids):
 def group_mean_probs(q_row, k_all, scale):
     """q_row (32,128) k_all (T,8,128) → 组内逐 head softmax 概率均值 (8,T)。
     scale = 1/sqrt(128)（原始全维口径）。GQA：32 Q-head 按 8 组 × 4 映射。"""
-    if q_row.ndim!=2 or k_all.ndim!=3 or q_row.shape[-1]!=k_all.shape[-1] or not k_all.shape[0]:
+    if type(scale) not in (int,float) or not math.isfinite(scale) or scale<=0:
+        raise ValueError("scale must be finite and positive")
+    if q_row.ndim!=2 or k_all.ndim!=3 or not q_row.shape[-1] or q_row.shape[-1]!=k_all.shape[-1] or not k_all.shape[0]:
         raise ValueError("invalid Q/K schema")
+    if not q_row.is_floating_point() or not k_all.is_floating_point() or q_row.dtype!=k_all.dtype or q_row.device!=k_all.device:
+        raise ValueError("Q/K must have matching floating dtype and device")
     Hkv = k_all.shape[1]
     Hq = q_row.shape[0]
     if Hkv<1 or Hq<1 or Hq%Hkv or not torch.isfinite(q_row).all() or not torch.isfinite(k_all).all():
         raise ValueError("invalid GQA heads or nonfinite Q/K")
     g = Hq // Hkv
-    q_g = q_row.view(Hkv, g, -1)                        # (8,4,128)
+    q_g = q_row.reshape(Hkv, g, -1)                     # (8,4,128)
     scores = torch.einsum("ghd,tgd->ght", q_g, k_all) * scale  # (8,4,T)
     probs = torch.softmax(scores, dim=-1)               # 逐 head softmax
     return probs.mean(dim=1)                            # 组内均值 (8,T)
@@ -167,12 +186,18 @@ def o3_trace(q_row, k_all, scale, sub_idx):
     Metrics name their denominator explicitly. Observations are query × KV group,
     never independent documents. This does not reproduce production L1/L2.
     """
+    P = group_mean_probs(q_row, k_all, scale)
+    if q_row.shape[-1] != 128 or scale != 128 ** -0.5:
+        raise ValueError("O3 requires frozen 128-dimensional reference scale")
     T = k_all.shape[0]
     g = torch.Generator().manual_seed(20261002)
     if sub_idx is None:
         sub_idx = torch.randperm(128, generator=g)[:32].sort().values.tolist()
+    if (not isinstance(sub_idx,(list,tuple)) or not sub_idx
+            or any(type(i) is not int or not 0<=i<128 for i in sub_idx)
+            or len(set(sub_idx))!=len(sub_idx)):
+        raise ValueError("subspace requires unique integer coordinates in [0,128)")
     idx = torch.tensor(sub_idx, device=q_row.device)
-    P = group_mean_probs(q_row, k_all, scale)        # (8,T')
     r=regions(T-1)
     mid_lo,mid_hi=r["mid_lo"],r["mid_hi"]
     n_mid = mid_hi - mid_lo
