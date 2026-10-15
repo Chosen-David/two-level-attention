@@ -1,38 +1,33 @@
 # -*- coding: utf-8 -*-
-"""O 系列观察图（figure_id=O1/O3/O4，P0 主文动机图）。
+"""O 系列观察图（figure_id=O1/O3/O4，P0 主文动机图）—— E140v2 重采数据版。
 
 设计叙事（参照 StreamingLLM「竖虚线临界点标注」、Quest「图内文字直接给结论」、
 SparQ「方案对照同图竞技」三家的观察图范式），四个面板一条链：
-  (a) 质量在哪  —— O1 距离密度：mid 区密度随距离衰减，但 d>9K 远端长尾回升
-      （检索热点在 near 之外）→ 分区动机：near/far 统计性质相反。
-  (b) 质量有多少 —— O1 四区占比：far 独占 mid 质量 83%，且 GQA 组内最差头
-      0.65 远超组均值 0.48 → 独立 far 预算防挤出动机。
-  (c) 用什么维度看 —— O3 子空间对照：同 32/128 维预算，tail32 保留 79%
-      full-ref 质量 vs random 47% vs high 26% → 位置先验（低频完整 RoPE 对）
-      而非「任意 32 维」。
-  (d) 选择器选对了没 —— O4 选择行为闭环：生产口径两级选择器选中 token 的
-      距离分布贴合 oracle 的远端回升；K1=128 时 far 配额被配额公式压到 128
-      断供，K1=64 恢复 432，overlap 0.47→0.53。
+  (a) 质量在哪  —— O1v2 距离密度：mid 区密度随距离单调衰减（两任务一致），
+      far 区密度比 near 低 1-2 个数量级但质量相当 → 分区动机：near 稠密
+      块均值可代，far 稀疏须 token 级细筛 + 无漏检界。
+  (b) 质量有多少 —— O1v2 四区占比：far 占非保护 mid 质量 ~49%（与 near 相当
+      而非独占），且 far 最重 KV 组 ~组均值 2 倍（质量集中于少数组）→ 独立
+      far 预算防挤出的证据改由 (d) 的配额断供链承载。
+  (c) 用什么维度看 —— O3v2 子空间对照：同 32/128 维预算，tail32 保留 ~84%
+      reference-topK 质量 vs random ~51% vs high ~24% → 位置先验（低频完整
+      RoPE 对）而非「任意 32 维」。
+  (d) 选择器选对了没 —— O4v2 选择行为闭环：oracle 远端选中率回升（密度降
+      但远端检索集中）；K1=128 时 far 配额被配额公式压到 128（oracle 需 ~306）
+      断供，K1=64 恢复 432，overlap ~0.52→0.55。
 
 可视化手法：
   - near/far 分区底色在 (a)(d) 两面板复用（视觉连续性，读者一眼认出同一边界）；
   - near/far 边界用竖虚线 + 标签（StreamingLLM 临界点标注法）；
   - 每面板结论用白底框注写在图内（Quest 图内结论法），避开刻度与曲线；
-  - (c) 只画预登记主指标 retained_mass（guide O3：二选一，recall 进 tsv/附录）。
+  - (c) 只画预登记主指标 selected_mass_over_reference_topk_mass（guide O3：
+    二选一，recall 进 tsv/附录）。
 
-数据全部程序化读取自 repo 内 e140_o_trace.json + e140_o4_select_trace.json；
+数据全部程序化读取自 repo 内 e140_o_trace_v2.json + e140_o4_select_trace_v2.json
+（E140v2 修复采集器重采：hook 实际 q_norm/k_norm + 实际 position_embeddings；
+判决见 e140v2_observation_verdict.json；旧 JSON 仅历史诊断，字节保留）。
 输出 PDF+PNG+SVG + figure_data.tsv。
-
-【有效性警示（GPT TL-E140-VALIDITY 审计确认，主 AI 复核 defect5 属实）】
-上述 JSON 由旧采集器产出（漏 input_layernorm + near 取左半 + SWA 129 位 +
-far_worst_head 语义 + O3 尾页丢弃），不是修复后的论文证据，见
-../observation/E140_VALIDITY.md。重采（E140v2）落地前本图仅供历史诊断，
-渲染需 E140_ALLOW_HISTORICAL_DIAGNOSTIC=1 显式放行。
 """
-import os
-if os.environ.get("E140_ALLOW_HISTORICAL_DIAGNOSTIC") != "1":
-    raise SystemExit("Historical observation invalid for paper conclusions; see E140_VALIDITY.md. No files written.")
-
 import json
 import math
 import os
@@ -49,10 +44,11 @@ from style_config import apply_style  # noqa: E402
 from figure_lint import lint_figure  # noqa: E402
 
 REPO = "/home/wangyuanshuo02/two-level-attention"
-SRC = os.path.join(REPO, "exp/trace/results/e140_o_trace.json")
-if not os.path.exists(SRC):  # 兼容旧临时路径
-    SRC = "/tmp/wt_e138_ablation/exp/trace/results/e140_o_trace.json"
-SRC4 = os.path.join(REPO, "exp/trace/results/e140_o4_select_trace.json")
+SRC = os.path.join(REPO, "exp/trace/results/e140_o_trace_v2.json")
+SRC4 = os.path.join(REPO, "exp/trace/results/e140_o4_select_trace_v2.json")
+for _p in (SRC, SRC4):
+    if not os.path.exists(_p):
+        raise SystemExit(f"missing E140v2 recollection: {_p}; see E140_VALIDITY.md")
 OUT = os.path.join(REPO, "agent_doc", "guide", "paper_figs", "figs")
 os.makedirs(OUT, exist_ok=True)
 
@@ -100,20 +96,24 @@ cx = np.array(cx)
 nl = [o1["near_len"] for c in cells for o1 in c["o1"]]
 near_len_med = float(np.median(nl))
 
-# ---------------- (b) 四区质量 + far worst head ----------------
+# ---------------- (b) 四区质量 + far 最重 KV 组 ----------------
+ZKEY = {"sink": "mass_sink", "swa": "mass_swa_excluding_sink",
+        "near": "mass_near", "far": "mass_far"}
 zones = ["sink", "swa", "near", "far"]
-zmean = [np.mean([o1["mass_" + z] for c in cells for o1 in c["o1"]]) for z in zones]
-fw = float(np.mean([o1["far_worst_head"] for c in cells for o1 in c["o1"]]))
+zmean = [np.mean([o1[ZKEY[z]] for c in cells for o1 in c["o1"]]) for z in zones]
+fw = float(np.mean([o1["far_max_kv_group_mass"] for c in cells for o1 in c["o1"]]))
+far_mean = float(np.mean([o1["mass_far"] for c in cells for o1 in c["o1"]]))
 
-# ---------------- (c) O3 三臂（主指标 retained_mass） ----------------
+# ---------------- (c) O3 三臂（主指标 selected_mass_over_reference_topk_mass） ----------------
 arms = ["tail32", "random32", "high32"]
 arm_lab = {"tail32": "tail32\n(low-freq)",
            "random32": "random32\n(unpaired)",
            "high32": "high32\n(high-freq)"}
-arm_rm = {a: float(np.mean([c["o3"][a]["retained_mass"]["mean"] for c in cells]))
+arm_rm = {a: float(np.mean([c["o3"][a]["selected_mass_over_reference_topk_mass"]["mean"] for c in cells]))
           for a in arms}
 # 次级指标进 tsv
-mets_all = ["page_recall", "overlap_recall", "retained_mass"]
+mets_all = ["reference_token_page_coverage", "reference_token_overlap_recall",
+            "selected_mass_over_reference_topk_mass", "selected_full_attention_mass"]
 arm_val = {a: [float(np.mean([c["o3"][a][mm]["mean"] for c in cells]))
                for mm in mets_all] for a in arms}
 
@@ -181,11 +181,14 @@ ax_a.set_xscale("log")
 ax_a.set_yscale("log")
 ax_a.set_xlim(XLO, XHI)
 ax_a.set_xticks([300, 1000, 3000, 10000])
-ax_a.set_ylim(1e-5, 1.3e-3)
-ax_a.set_yticks([1e-5, 1e-4, 1e-3])
+_dlo = 10 ** math.floor(math.log10(max(dens.min(), 1e-12)))
+_dhi = 10 ** math.ceil(math.log10(dens.max()))
+ax_a.set_ylim(_dlo / 3, _dhi * 1.5)
+ax_a.set_yticks([_dlo, _dhi])
+ax_a.yaxis.set_major_formatter(matplotlib.ticker.LogFormatterSciNotation())
 ax_a.set_xlabel("distance d = q_pos − k_pos (tokens)", fontsize=L)
 ax_a.set_ylabel("attention density\n(mass per token)", fontsize=L)
-ax_a.set_title("(a) Density steps by distance", loc="left", pad=10,
+ax_a.set_title("(a) Density decays monotonically", loc="left", pad=10,
                fontsize=T, fontweight="bold")
 ax_a.tick_params(labelsize=TK)
 ax_a.text(0.28, 0.965, "near", transform=ax_a.transAxes, ha="center",
@@ -194,8 +197,8 @@ ax_a.text(0.74, 0.965, "far", transform=ax_a.transAxes, ha="center",
           fontsize=AN, color=C_HL, fontweight="bold")
 note(ax_a, 0.04, 0.44, "near: dense →\nblock-avg suffices",
      color=C_MAIN, size=AN - 1)
-note(ax_a, 0.04, 0.03, "far: sparse, tail rebounds at d>9K\n"
-     "→ no-miss bound + token fine-select", color=C_HL, size=AN - 1,
+note(ax_a, 0.04, 0.03, "far: sparse (1-2 orders lower density),\n"
+     "mass rivals near → no-miss bound\n+ token fine-select", color=C_HL, size=AN - 1,
      va="bottom")
 
 # ---- (b) 四区质量：100% 堆叠横条 + 最差头标记 ----
@@ -204,21 +207,18 @@ left = 0.0
 for z, v in zip(zones, zmean):
     ax_b.barh([0], [v], left=left, height=0.7, color=zcol[z],
               edgecolor="black", linewidth=1.2)
-    if v >= 0.15:
+    if v >= 0.12:
         ax_b.text(left + v / 2, 0, f"{z}\n{v:.2f}", ha="center", va="center",
                   fontsize=AN, color="white" if z == "far" else "black")
     left += v
-# near 段太窄，向下引线标注（底部空间空闲）
-near_c = zmean[0] + zmean[1] + zmean[2] / 2
-ax_b.annotate(f"near {zmean[2]:.2f}", xy=(near_c, -0.36),
-              xytext=(0.56, -0.62), fontsize=AN - 1, ha="left", va="center",
-              arrowprops=dict(arrowstyle="-", color="0.4", lw=1.0))
-# far 最差头标记（文字直接放标记左侧，避免箭头横穿）
+# far 最重 KV 组标记（文字直接放标记左侧，避免箭头横穿）
 ax_b.plot([fw], [0.68], marker="v", color=C_HL, markersize=11,
           markeredgecolor="black", markeredgewidth=1.2, zorder=6)
-ax_b.text(fw - 0.03, 0.68, f"far, worst kv-head: {fw:.2f}", fontsize=AN - 1,
-          color=C_HL, ha="right", va="center")
-ax_b.text(0.02, 0.97, "far = 83% of mid-zone mass\n→ dedicated far budget",
+ax_b.text(fw - 0.03, 0.68,
+          f"far, heaviest kv-group: {fw:.2f} ({fw / far_mean:.1f}× group mean)",
+          fontsize=AN - 1, color=C_HL, ha="right", va="center")
+ax_b.text(0.02, 0.97, "far ≈ half of nonprotected mass,\n"
+          "concentrated in few groups\n→ dedicated far budget",
           transform=ax_b.transAxes, fontsize=AN - 1, color=C_HL,
           ha="left", va="top",
           bbox=dict(boxstyle="round,pad=0.32", facecolor="white",
@@ -242,7 +242,7 @@ for i, (a, col) in enumerate(zip(arms, colors3)):
               fontsize=AN, fontweight="bold")
 ax_c.set_xticks(np.arange(3))
 ax_c.set_xticklabels([arm_lab[a] for a in arms], fontsize=TK - 1)
-ax_c.set_ylabel("retained full-ref mass", fontsize=L)
+ax_c.set_ylabel("selected mass /\nreference topK mass", fontsize=L)
 ax_c.set_ylim(0, 1.0)
 ax_c.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
 ax_c.set_title("(c) Which 32 of 128 dims", loc="left", pad=10, fontsize=T,
@@ -276,7 +276,7 @@ note(ax_d, 0.96, 0.92,
      ha="right", va="top", color=C_HL, size=AN - 1)
 ax_d.text(0.24, 0.965, "near", transform=ax_d.transAxes, ha="center",
           fontsize=AN, color=C_MAIN, fontweight="bold")
-ax_d.text(0.60, 0.965, "far", transform=ax_d.transAxes, ha="center",
+ax_d.text(0.72, 0.965, "far", transform=ax_d.transAxes, ha="center",
           fontsize=AN, color=C_HL, fontweight="bold")
 
 fig.subplots_adjust(left=0.055, right=0.995, top=0.88, bottom=0.17)
@@ -303,8 +303,8 @@ src = os.path.basename(SRC)
 for x, y in zip(cx, dens):
     rows.append(f"O\ta\tmid_distance\tdensity\tmass/token\t{y:.4e}\t{src}\tbins(log-grid)")
 for z, v in zip(zones, zmean):
-    rows.append(f"O\tb\t{z}\tmean_mass\tfrac\t{v:.4f}\t{src}\tmass_{z}")
-rows.append(f"O\tb\tfar_worst_head\tmean_mass\tfrac\t{fw:.4f}\t{src}\tfar_worst_head")
+    rows.append(f"O\tb\t{z}\tmean_mass\tfrac\t{v:.4f}\t{src}\t{ZKEY[z]}")
+rows.append(f"O\tb\tfar_max_kv_group_mass\tmean_mass\tfrac\t{fw:.4f}\t{src}\tfar_max_kv_group_mass")
 rows.append(f"O\tb\tnear_len_median\tboundary\ttokens\t{near_len_med:.0f}\t{src}\tnear_len")
 for a in arms:
     for mm, v in zip(mets_all, arm_val[a]):
