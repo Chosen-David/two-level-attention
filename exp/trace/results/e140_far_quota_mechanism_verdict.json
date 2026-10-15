@@ -1,0 +1,46 @@
+{
+  "experiment": "E140 机制大终判：far token 配额归零公式（L2 γ 配额耦合）——统一解释 K1 倒 U / K2 悬崖 / γ/β 解耦无效 / mass 探针不塌",
+  "date": "2026-10-15",
+  "code_evidence": {
+    "tree": "main ceb8fa8（sparse_attn/indexer/tli_indexer.py）",
+    "L1_budget": "L1947-1950: nb_near = max(1, round(K1*beta)); nb_far = K1 - nb_near",
+    "L1_clamp": "L1963/L1973: topk min(nb, pool_width) 钳位——超池静默全准入，无 -inf/NaN/越界（decode 无病态值）",
+    "L2_quota": "L2300-2305: nt_near = min(nb_near*bs*gamma, K2_mid); far_budget = max(0, K2_mid - nt_near); k2_far = min(far_budget, ...); k2_near = K2_mid - k2_far",
+    "mask": "L2352-2358: k2_far=0 → i_f 空 → scatter 空操作 → 最终 mask = sink+swa+near，far 零入选（预算饥饿非数值病态）",
+    "prefill_same_formula": "batch_select.py L326-333 逐字段复刻同公式（prefill 批量路径同崩）",
+    "K1_global": "tia_level1_topk 全局单参数，decode（tli_indexer）/prefill（eager_prefill/batch_select）同改无隔离"
+  },
+  "mechanism": {
+    "formula": "far_budget(K1, K2) = K2_mid - min(round(K1*beta)*bs*gamma, K2_mid),  K2_mid = K2 - sink - swa",
+    "far_zero_threshold_K1": "K1 >= K2_mid/(beta*bs*gamma) = 768/5 = 153.6（生产默认 α.25/β.125/γ.625/bs64/K2=1024）",
+    "far_zero_threshold_K2": "K2_mid <= nt_near 即 K2 <= 896（nb_near=16 → nt_near=640）——精确导出 E139 悬崖位置 K2∈(896,1024)",
+    "quota_table_K2_1024": {
+      "K1=16": "nb_near=2, nt_near=80, far=688（far 粗筛覆盖不足→左臂掉）",
+      "K1=64": "nb_near=8, nt_near=320, far=448（甜点：far 最大且粗筛覆盖足）",
+      "K1=128": "nb_near=16, nt_near=640, far=128（生产默认，far 次优）",
+      "K1=256": "nb_near=32, nt_near=1280→钳768, far=0（断供崩塌）",
+      "K1=512": "nb_near=64, nt_near=2560→钳768, far=0"
+    }
+  },
+  "unified_explanations": {
+    "decode_K1_inverted_U": "左臂 = L1 far 粗筛覆盖不足（K1=16）；右臂 = far 配额归零（K1>=154）；顶点 K1=64（far=448）",
+    "E139_K2_cliff": "K2=768/896 → K2_mid=512/640 <= nt_near=640 → far=0；K2=1024 → far=128>0。悬崖位置由公式精确导出，非经验观察",
+    "gamma75_no_recovery": "γ 是 near 配额放大系数（nt_near ∝ γ）——γ 上调使 far 更早归零，方向与『far 倾斜』相反。dd_g75k768=46.86 与 γ=.625 同分完全自洽",
+    "beta25_no_recovery": "β 上调放大 nb_near 同样挤 far（dk1_64b25 60.0 < dk1_64 60.83）",
+    "mass_probe_not_collapsing": "e140_l1_dilution_probe 是单池口径（对应 α=0/β=0 legacy 分支 L1998-2021），结构上不存在 nt_near/far_budget 配额——对 L2 配额变量失明。K1=448 时 retained_mass .835/.805（exact/q4）证明 L1 页级覆盖与 4bit 质量本身不塌，q4 常数罚 ~0.03 无交互项",
+    "E140a_prefill_collapse": "k256/k512 的 e2e 崩 = prefill 批量路径同公式 far 归零 + decode 侧 K1 全局共享同崩（双路径叠加）。『L1 旁路量化稀释』单因归因作废——稀释常数罚 ~3% mass 远小于 -14 e2e"
+  },
+  "practical_finding": {
+    "pareto_point": "K1=64 是 Pareto 改进：60.83/33.85 > 锚点 59.20/33.88，同时粗筛页数减半（性能更优）",
+    "production_default_suboptimal": "生产默认 K1=128 的 far 配额仅 128/768 token；O1 观测 far 占 mid mass 83% 由极少数高密度页承载，far 448（K1=64）显著更优",
+    "design_lesson": "far/near 配比由 (K1,β,γ,K2) 四参数耦合公式隐式决定——参数间的预算耦合是隐式失败模式，上探任一参数都可能把 far 挤到 0；显式预算接口（far_budget 直配）是防回归设计"
+  },
+  "data_sources": [
+    "e140b decode K1 扫参 e2e（dk1_16/64/128/256 = 55.43/60.83/59.20/45.27 hotpot）",
+    "e140a prefill K1 上探 e2e（k256/k512 = 42.52/41.83 hotpot）",
+    "e140f 悬崖判别（dd_g75k768=46.86 / dd_k896=46.35 hotpot）",
+    "e140_l1_dilution_probe.json（mass 级单池探针，K1∈{16,64,128,224,448} × exact/q4）",
+    "E139 e139_k2_budget_pareto_verdict.json（K2 下探悬崖）"
+  ],
+  "probe_verdict": "稀释假说 REJECTED（单池 mass 无交互项）；far 配额归零 CONFIRMED（代码行号 + 六组实验交叉自洽）"
+}

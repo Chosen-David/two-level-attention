@@ -178,3 +178,16 @@ Publication-time main update `6a8da9d4ef790fa00fe8922cd7e9eab06e356d9f` is also
 integrated. Active E139 scripts use main's shape/device/equality gates before
 timing, together with this branch's actual Graph-route/replay counters. CPU
 process-control stubs validate failure exits; they are not GPU measurements.
+
+## Paper scope decision and final synchronization
+
+Per the user's latest decision, the E140g exact/q4 quantization probe is not
+adopted for this paper iteration. No extra implementation, recollection or figure
+expansion will be added for it. Existing scripts/data remain recoverable; remote
+jobs are untouched, and quantization is not globally disabled. Main a28f052's
+archive/figure updates are preserved unchanged, not newly validated paper evidence.
+
+The paper priority remains shared subspace, near/far separation, far gating,
+quality at the same final unique K, and complete cost. The Qwen timing integration
+remains candidate telemetry: support coverage, internal lifecycle and real HF/GPU
+validation are still incomplete. This scope decision does not upgrade old results.

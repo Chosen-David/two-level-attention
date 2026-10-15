@@ -1,0 +1,40 @@
+{
+  "experiment": "E140a prefill K1 上探（#255）——终判：假说被驳，崩塌=L1 稀释非覆盖不足",
+  "date": "2026-10-15",
+  "tree": "tmp_e140_tree_187 (1c8c6b8 archive)",
+  "run_timestamp": "1015200000",
+  "protocol": {
+    "model": "Qwen3-8B",
+    "method": "tli prefill sparse (grp64 chunk-shared selection)",
+    "anchor": "grp64 K1=128 K2=1024 cmp4 α=.25 β=.125 γ=.625 tail",
+    "arms": {
+      "pfk1_256": "K1=256 (nb_far=224 块 > 16K 样本 far 池 ~172 块 → L1 部分旁路)",
+      "pfk1_512": "K1=512 (nb_far=448 块 ≫ 池 → L1 完全旁路)"
+    },
+    "tasks": ["hotpotqa", "musique"],
+    "n_samples": 200
+  },
+  "results": {
+    "anchor_grp64_k128": {"hotpotqa": 56.04, "musique": 28.22},
+    "pfk1_256": {"hotpotqa": 42.52, "musique": 19.19},
+    "pfk1_512": {"hotpotqa": 41.83, "musique": 18.71}
+  },
+  "deltas_vs_anchor": {
+    "pfk1_256": {"hotpotqa": -13.52, "musique": -9.03},
+    "pfk1_512": {"hotpotqa": -14.21, "musique": -9.51}
+  },
+  "verdict": {
+    "hypothesis_L1_coverage_insufficiency": "REJECTED",
+    "superseded_mechanism_note": "初判『L1 旁路量化稀释』已被 e140_far_quota_mechanism_verdict.json 终判取代——mass 探针（e140_l1_dilution_probe，K1=448 retained_mass .835/.805 exact/q4，无交互项）驳回稀释故事；真机制 = L2 γ 配额耦合 far 归零（batch_select.py L326-333 与 tli_indexer.py L2300-2301 同公式）：K1>=256 → nb_near=K1·β·bs·γ ≥ K2_mid → far token 预算精确归零",
+    "mechanism": "far_budget = K2_mid - min(round(K1*beta)*bs*gamma, K2_mid)；K1=256/512 时 far=0，prefill 批量路径 far 断供 + decode 侧 K1 全局共享同崩（双路径叠加，tia_level1_topk 无 prefill/decode 隔离开关）",
+    "evidence": [
+      "K1 256 与 512 同位塌（42.52/19.19 vs 41.83/18.71，差 <0.7 噪声带）——两臂 far 预算均为 0，公式精确预言同塌",
+      "mass 级配对探针无交互项（q4 常数罚 ~0.03 mass）——选择质量本身不塌，塌在 L2 配额",
+      "decode K1=256 独立复现同量级崩（45.27，far 同归零）——同公式双侧证据",
+      "jsonl 预测文本流畅但事实错误（质量崩塌非管线破损）"
+    ],
+    "implication": "prefill 残差归因维持 E138 终判 (a) 多层稀疏复合 + (b) 预算覆盖率上限；K1 不可上探（>=154 far 归零）；甜点 K1=64（far=448，decode 60.83 > 锚 59.20）",
+    "prefill_narrative": "论文 prefill 叙事维持 E139 口径：质量-粒度-预算分析对象，不做性能加速主张"
+  },
+  "harvest_log": "e140a_k1up_e2e result.json（eval via python3 -m benchmark.LongBench.eval，.187 树内）"
+}
