@@ -1,0 +1,9 @@
+CPU interpreter: /workspace/twolevel-cpu-env/bin/python; OMP_NUM_THREADS=1.
+normal-final.log (optimized-final.log adds -O):
+python -m pytest tests/test_qwen_fig1.py tests/test_qwen_archive_audit.py tests/test_e139_graph_contract.py sparse_attn/ops/tests/test_graph_required_dispatch.py exp/bench/test_e139_validation_gates.py exp/paper/tests/test_paper_contract.py -q
+ops-normal.log (ops-optimized.log adds -O):
+python -m pytest sparse_attn/ops/tests tests/test_e139_shared_gqa_indices.py -q
+local-archive-status.json: python exp/paper/qwen_fig1.py --analyze --out FRESH_PATH
+Observed exit 2. No actual trace/model read, only the checksum index and missing-file checks.
+Log trailing whitespace normalized. CPU synthetic tests only; no GPU or weights.
+Initial merged-main fixture errors (missing stream then backend/tile metadata) were repaired only in test doubles and rerun; production gates unchanged.

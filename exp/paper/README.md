@@ -46,7 +46,8 @@ They do not silently change a selector's budget policy.
   validators define the public schema. Native per-arm configurations can differ;
   controlled comparisons constrain the declared factor and actual per-unit K.
 - `workflow.py observations|quality|timing|architecture`: delegates to existing
-  CPU analysis and produces immutable diagnostics. Fig1 maps O1/O3, Fig2 the
+  CPU analysis and produces immutable diagnostics. The legacy observations action
+  remains an O3 diagnostic; main Fig1 now maps to `qwen_fig1.py` below. Fig2 maps the
   architecture, Fig3 E2 actual costs, Fig4 E1/E3 paired quality. Historical Step
   curves are development-only. O3 optionally exports protected/nonprotected mass
   and O1 distance bins in raw JSONL; the existing O3 figure still plots total
@@ -191,3 +192,30 @@ The paper priority remains shared subspace, near/far separation, far gating,
 quality at the same final unique K, and complete cost. The Qwen timing integration
 remains candidate telemetry: support coverage, internal lifecycle and real HF/GPU
 validation are still incomplete. This scope decision does not upgrade old results.
+
+## Qwen-only Fig1 distance and concentration (CPU candidate)
+
+`python exp/paper/qwen_fig1.py --out /FRESH/status.json` audits the existing fixed
+archive. Add `--root /EXISTING/qwen3-8b --analyze` for CPU diagnostics only after
+all 12 fixed files pass the recorded checksum/schema checks. This never loads a
+model, collects traces, downloads weights, plots data or adds experiment arms.
+Missing inputs exit 2; checksum/schema failure exits 3. Existing output paths
+are rejected. Provenance is still unresolved even after byte/schema success:
+**paper_ready=false in every mode**, not a final paper acceptance interface.
+
+Only hotpotqa/musique 0/1, layers 8/24 and the original 16 midpoint anchors are
+consumed. These are prefill queries, not decode. Raw 128-D FP32 per-Q-head causal
+softmax precedes KV-group averaging. Both levels remain separate. Sink/SWA each
+128 are deduplicated; near uses the repaired E140 alpha=.25 floor-aligned bounds.
+Distances use [64b,64(b+1)) intersected with the nonprotected region, and density
+is mass / effective token count. Near/far concentration is the minimum token or
+fixed absolute-page fraction reaching 90% of that region's mass, with partial
+pages retained. Empty/zero-mass regions are undefined, never false zeros.
+
+Output rows bind sequence/layer/query/head/group and trace SHA256. Distance
+summaries keep sequence/layer/head separate and show contributing query counts
+and positions; means use only queries with that distance, not zero imputation.
+No population inference, bootstrap CI or selector/task-quality claim is made.
+No V exists in this archive: output-vector error is not measured. O3 random-arm
+comparisons and MLA remain outside this entry. Repaired collectors are reused;
+historical E140 and fig1_motivation aggregates are not consumed.

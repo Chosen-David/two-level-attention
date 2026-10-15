@@ -10,7 +10,7 @@ sys.path.insert(0,str(ROOT))
 sys.path.insert(0,str(ROOT / "exp" / "figures"))
 from exp.paper.contract import protocol_errors, summarize, digest
 
-FIGURES={'Fig1':{'stable_ids':['O1','O3'],'entry':'exp/figures/o3_retrieval.py','needs':['trace identities','RoPE receipt','frozen protection/distance bins']},
+FIGURES={'Fig1':{'stable_ids':['O1','near_far_concentration'],'entry':'exp/paper/qwen_fig1.py','needs':['fixed Qwen archive bytes','checkpoint/input/HF provenance','document overlap audit']},
          'Fig2':{'stable_ids':['architecture'],'entry':'architecture.mmd','needs':[]},
          'Fig3':{'stable_ids':['E2'],'entry':'timing','needs':['direct T3 raw repetitions','paired quality identity','independent acceptance']},
          'Fig4':{'stable_ids':['E1','E3'],'entry':'exp/figures/paired_quality.py','needs':['FullKV/SS sample/document/input identity','inline run caps','scorer binding']}}

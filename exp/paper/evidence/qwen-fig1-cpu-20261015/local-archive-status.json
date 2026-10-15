@@ -1,0 +1,104 @@
+{
+  "schema": "qwen-fig1-diagnostic-v1",
+  "paper_ready": false,
+  "status": "blocked",
+  "phase": "prefill-sampled-anchors",
+  "archive_audit": {
+    "cohort": "qwen3-8b-archive-hotpotqa-musique-0-1-layers8-24",
+    "phase": "prefill-sampled-anchors",
+    "root": "/home/agent/.archive/trace-dumps/qwen3-8b",
+    "index_sha256": "02f6f6432ce18f84906a590242f1fb4291e0eb1d582d6d0ba16ad81136877fbc",
+    "files": [
+      {
+        "relative_path": "lb_hotpotqa_0/meta.json",
+        "expected_md5": "1f8b68eab3de4f1d5b3e213d3f0dc59b",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_hotpotqa_0/layer08.pt",
+        "expected_md5": "d6aaefaad3f4ac962d548664c46d07be",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_hotpotqa_0/layer24.pt",
+        "expected_md5": "11b77c9e7e04e64b64caed80747b9f75",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_hotpotqa_1/meta.json",
+        "expected_md5": "8e04a9425aab35349b10a0ccc592ccc9",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_hotpotqa_1/layer08.pt",
+        "expected_md5": "359c295a5d10e61d1c38c6aa8ecd2933",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_hotpotqa_1/layer24.pt",
+        "expected_md5": "f7255c550734cd47fbf60d2dea94971f",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_musique_0/meta.json",
+        "expected_md5": "54c655f2db68bd42cfa23c84137d9131",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_musique_0/layer08.pt",
+        "expected_md5": "a47f7905b98ccc006ffb52b92e727da9",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_musique_0/layer24.pt",
+        "expected_md5": "901731909b48c78b5813d75c19d631f0",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_musique_1/meta.json",
+        "expected_md5": "c86f82af51674896dd1c7bf54d7010a2",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_musique_1/layer08.pt",
+        "expected_md5": "c521f5e1e615b819b2e37ef36d8c869e",
+        "status": "missing"
+      },
+      {
+        "relative_path": "lb_musique_1/layer24.pt",
+        "expected_md5": "338a118144226a1909a91df2280741b5",
+        "status": "missing"
+      }
+    ],
+    "provenance_status": "unresolved",
+    "paper_ready": false,
+    "missing_provenance": [
+      "checkpoint/config",
+      "tokenizer",
+      "dataset rows/document overlap",
+      "exact input IDs/template",
+      "installed HF SDPA implementation/scaling"
+    ],
+    "exit_code": 2
+  },
+  "protocol": {
+    "sink": 128,
+    "swa": 128,
+    "page_size": 64,
+    "distance_bin_width": 64,
+    "alpha": 0.25,
+    "concentration_target": 0.9,
+    "scale": 0.08838834764831845,
+    "probability": "per-Q-head FP32 causal softmax, then KV-group mean",
+    "independent_unit": "source-sequence; document overlap unresolved",
+    "source_sequences": 4,
+    "layers": [
+      8,
+      24
+    ],
+    "anchors_per_sequence": 16
+  },
+  "scientific_claim": null,
+  "rows": [],
+  "distance_summary": []
+}
