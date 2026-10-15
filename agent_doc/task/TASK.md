@@ -78,6 +78,8 @@
 
 - [x] [TL-DECODE-INPUT-20261015] decode公共消费端形状与Q/K宽度守卫，CPU回归41项与48合法路径逐位对照；GPU未验，不代表padding支持。([详情](task_details/TL-DECODE-INPUT-20261015.md))
 
+- [x] [TL-Q-STRIDE-20261015] fused wrapper按需整理Q特征布局，44项CPU回归及独立ABI矩阵通过；GPU/性能尚未验证。([详情](task_details/TL-Q-STRIDE-20261015.md))
+
 - [ ] E118：sglang C1/C2/C3 三源码 bug 修复（SG e2e taskmd+CUDA graph
   前置门；C3 修复改行为须换 postfix 重跑；sglang 主仓集成相关，后续回归
   sglang 时处理）
