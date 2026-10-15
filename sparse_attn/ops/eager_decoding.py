@@ -409,13 +409,13 @@ def eager_decoding_attn(
     TLI_E127_FAST=1 时走 gather 路径：原实现对全序列 S 个 token 全量计算
     fp32 分数再 mask（稀疏性在消费端被完全丢弃——S=64K 时 k.to(float32)
     物化 + 全长 einsum + 全长 softmax ≈ 2.2ms/层步）；gather 路径只取
-    每行 mask 选中的 token（~K2+sink+swa ≈ 1280）做 attention，带宽
+    每行 mask 选中的 token（~K2=1024，含 sink128+swa128 强制区）做 attention，带宽
     从 O(S·Hkv·D) 降到 O(R·W·D)。数学语义不变：softmax(全 S 行、未选
     位 -inf) ≡ softmax(选中子集)（exp(-inf)=0 精确），数值上仅归约顺序
     不同（输出 ULP 级漂移，allclose(1e-2) 门禁）。
 
     【iter3】gather 路径零 host 同步：W 上界化（TLI_E127_W_UPPER，契约
-    上界 K2+sink+swa+bs≈1344，默认 2048）+ B7/W 校验 GPU 端并入全局错误
+    上界 K2（含 sink/swa 强制区）≈1024，默认 2048）+ B7/W 校验 GPU 端并入全局错误
     标志（不再当场 raise）——生成结束由 eager_decoding_check_errors()
     一次性校验（fail-closed 语义保持，raise 时机后移）。
     【101】入口先过 _validate_gqa_shape host 边界门（Hkv<=0 / H%Hkv!=0 /
@@ -616,12 +616,13 @@ def _eager_decoding_attn_gather(
     counts = bm2.sum(dim=-1)                            # [R]（GPU int64，无同步）
 
     # 【iter3】零同步化：W 用 host 已知的契约上界（indexer 契约：每行选中
-    # ≈ K2(1024)+sink(128)+swa(128)+当前块(64) ≈ 1344 token，上界取 2048
-    # 留 50% 安全垫，env TLI_E127_W_UPPER 可调）。topk k=W_upper 时真实
+    # = K2 ≈ 1024 token，含 sink128+swa128 强制区；预算从 K2 内扣除，
+    # 不额外叠加），上界取 2048 留安全垫，env TLI_E127_W_UPPER 可调。
+    # topk k=W_upper 时真实
     # counts ≤ W_upper 的行全部命中 + 补齐位由 valid 掩掉（与原精确 W 路径
     # 同一掩码机制）；某行 counts > W_upper 时漏选保护 fail-closed（下方
     # code=2 记入 GPU 标志，生成结束校验 raise）。
-    # 路由等价性：原逻辑用真实 W 判 W*8>T，生产 mask W≈1344 与 W_upper=2048
+    # 路由等价性：原逻辑用真实 W 判 W*8>T，生产 mask W≈1024 与 W_upper=2048
     # 在 16K/32K/64K 档同向（都走 gather），行为零变化。
     W_upper = min(int(os.environ.get("TLI_E127_W_UPPER", "2048")), T)
     if W_upper * 8 > T:

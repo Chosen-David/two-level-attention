@@ -144,21 +144,21 @@ class TLIIndexer(TIAIndexer):
             raise ValueError("tli_sink_tokens 必须 >= 0")
         if self.sliding_window_size < 1:
             raise ValueError("tli_swa_size 必须 >= 1")
-        # A3（TL-E135-PROTECTED-BUDGET-143）：「保护区不占预算」契约的
-        # fail-closed 块对齐校验。非块对齐 sink_tokens 时 sink 所在块重入
-        # K2 top-k 重复耗 K2_mid 名额（sink 头既走强制区又参与池竞争）；
-        # 非对齐 swa_size 让边界块 mid token 结构性不可选。历史默认
-        # 128/128 及 64 倍数集合不受影响；E135b 网格 sink=16 为 trace
-        # 参考语义，生产不支持非对齐。
+        # A3（TL-E135-PROTECTED-BUDGET-143）：「保护区计入 K2 总预算」契约的
+        # fail-closed 校验。swa 必须块对齐：非对齐 swa 让边界块 mid token
+        # 结构性不可选。sink 自 E143 起允许子块（用户 2026-10-15 批准，
+        # 对齐 StreamingLLM sink=4 文献惯例）：池左界 floor(sink/bs)，sink
+        # 所在块参与池竞争（无死区）；代价是 sink 所在块被池选中时
+        # [pool_lo_blk·bs, sink) 段与强制区重叠，K2_mid 最多虚耗
+        # sink%bs ≤ 63 tok 名额（unique 保留数 ≤ K2，保守方向，论文披露）。
+        # E135 扩展网格（e135_sink_ext.json）：sink 128→4 trace mass 仅
+        # -0.0021，拐点在 4（StreamingLLM "4 suffices" 在 Qwen3-8B 复现）。
         _bs = self.args.tia_block_size
-        if self.sink_tokens % _bs != 0 or self.sliding_window_size % _bs != 0:
+        if self.sliding_window_size % _bs != 0:
             raise ValueError(
-                f"tli_sink_tokens={self.sink_tokens} / tli_swa_size="
-                f"{self.sliding_window_size} 必须是 tia_block_size={_bs} 的"
-                "整数倍（保护区不占预算契约：非对齐 sink 所在块会重入 K2 "
-                "top-k 重复耗 K2_mid 名额，非对齐 swa 让边界块 mid token "
-                "结构性不可选）。历史默认 128/128 及 64 倍数集合不受影响；"
-                "E135b 网格 sink=16 为 trace 参考语义，生产不支持非对齐"
+                f"tli_swa_size={self.sliding_window_size} 必须是 "
+                f"tia_block_size={_bs} 的整数倍（非对齐 swa 让边界块 mid "
+                "token 结构性不可选）。sink 自 E143 起允许子块值（如 4）"
             )
         #   E135a 归因臂：mask 只含 sink 头 + swa 尾（mid 全丢），两级索引
         #   分数照算但绝不进 mask——与 σ/MoBA/per-q-head 组合无定义，fail loudly。
@@ -378,11 +378,10 @@ class TLIIndexer(TIAIndexer):
         """E135：L1/L2/簇池左界（块对齐）——floor(sink_tokens/bs)。
 
         默认 sink_tokens=128 → 128//64 = 2 ≡ 历史 sink_blocks，全部派生值
-        逐位不变。子块 sink（如 16 tok < bs）时左界为 0——sink 所在块参与
-        池竞争，与强制区并集，无 token 结构性丢失（ceil 口径会在
-        [sink_tokens, ceil·bs) 产生既不强制也不可选的死区，弃用）。
-        【A3（TL-E135-PROTECTED-BUDGET-143）后构造期已对非块对齐值
-        fail-closed，子块 sink 分支实际不可达，floor 推导语义保留。】"""
+        逐位不变。子块 sink（如 4 tok < bs，E143 起生产允许）时左界为
+        0——sink 所在块参与池竞争，与强制区并集，无 token 结构性丢失
+        （ceil 口径会在 [sink_tokens, ceil·bs) 产生既不强制也不可选的
+        死区，弃用）。"""
         return max(0, self.sink_tokens // self.args.tia_block_size)
 
     # ---------------- E85f：prefill q 统计 → per-layer 静态 pair ---------------- #
@@ -902,7 +901,7 @@ class TLIIndexer(TIAIndexer):
             near_base = S - swa_tok
         elif self.far_select != "4bit" and self.alpha == 0 and self.beta == 0:
             # TASK.md L231 严格口径：cluster 组合 (0,0) 单池点 = 纯 cluster 全 mid
-            # （near 区空；swa 仍正交强制不占预算）
+            # （near 区空；swa 仍正交强制，计入 K2 预算）
             near_len_dyn = swa_tok
             near_base = S
         else:
@@ -1926,7 +1925,7 @@ class TLIIndexer(TIAIndexer):
         # 分区路径：e64 分区几何（α>0 且 β>0）下 skip 层走「分区路径仅 far
         # 池置空」——far 粗筛/细筛结构性不选（compute_score 已省算），
         # far 池 k2_far=0 → near 池在 [far_tok_hi, swa_lo_tok) 拿满 K2_mid
-        # 预算，sink/swa 强制不占预算（下方 L1368-1371 口径）。修掉 B1 修复
+        # 预算，sink/swa 强制计入 K2 总预算（不占 K2_mid 选择名额，下方 L1368-1371 口径）。修掉 B1 修复
         # 时登记的残余口径差（旧版 skip 层 swa 以 p=1.0 占 K2 预算、near
         # 细筛实际 0 选中、far p=0 填充进 mask）。非分区组合（(0,0) 单池 /
         # enable_kmeans-only）skip 层仍落 legacy 尾部 topk（B1 sink 强制
@@ -2123,7 +2122,7 @@ class TLIIndexer(TIAIndexer):
                 k2_near = min(K2_sig, near_p.shape[-1])
                 i_n = torch.topk(near_p, k2_near, dim=-1).indices + far_tok_hi
                 m.scatter_(-1, i_n, True)
-            # 正交强制区直接置位（必选不占预算）：sink 头部 + swa 尾部
+            # 正交强制区直接置位（必选，计入 K2 预算）：sink 头部 + swa 尾部
             # 075：swa 尾部 = 真实 S 尾（非 padded 尾）；padding 段保持 False
             m[..., :sink_tok] = True
             m[..., swa_lo_tok:S_real] = True
@@ -2181,7 +2180,7 @@ class TLIIndexer(TIAIndexer):
             # ---- E122：γ=off 自由竞争（用户 2026-10-10 指令，cavg 探索臂）----
             # 取消 near/far 配额分割：全部 mid 候选在统一预算 K2_mid 内单池
             # topk 竞争。语义边界（全部保持不变）：
-            #   * sink/swa 保护带：正交强制区必选不占预算（下方直接置位）；
+            #   * sink/swa 保护带：正交强制区必选，计入 K2 预算（下方直接置位）；
             #   * L1 的 β near 块预算：γ 只作用于 L2 配额，L1 双池照旧；
             #   * far 池空 guard（C-1）/near 区宽截断：单池天然覆盖
             #     （far 段宽 w_far = max(0, min(Tfar, 区宽))，near 段 = 区切片）；
@@ -2207,7 +2206,7 @@ class TLIIndexer(TIAIndexer):
                     # 一块）的 token 由 near 段细筛分代表（质量 ≥ 簇代表分），
                     # 不重复占 K2_mid 预算。
                     # 短序列退化（far_tok_hi > swa_lo_tok，near 区倒挂）时 far 段
-                    # 上界收到 swa_lo_tok：swa 强制区 token 不进竞争不占预算
+                    # 上界收到 swa_lo_tok：swa 强制区 token 不进竞争，计入 K2 预算
                     w_far = max(0, min(far_tok_score.shape[-1],
                                        min(far_tok_hi, swa_lo_tok) - far_tok_lo))
                     fs = far_tok_score[..., :w_far]
@@ -2250,7 +2249,7 @@ class TLIIndexer(TIAIndexer):
                         + far_tok_lo
                 m_off = torch.zeros_like(p, dtype=torch.bool)
                 m_off.scatter_(-1, i_tok, True)
-                # 正交强制区直接置位（必选不占预算）：sink 头部 + swa 尾部
+                # 正交强制区直接置位（必选，计入 K2 预算）：sink 头部 + swa 尾部
                 # 075：swa 尾部 = 真实 S 尾；padding 段保持 False
                 m_off[..., :sink_tok] = True
                 m_off[..., swa_lo_tok:S_real] = True
@@ -2364,7 +2363,7 @@ class TLIIndexer(TIAIndexer):
             topk_mask = torch.zeros_like(p, dtype=torch.bool)
             topk_mask.scatter_(-1, i_f, True)
             topk_mask.scatter_(-1, i_n, True)
-            # 正交强制区直接置位（必选不占预算）：sink 头部 + swa 尾部
+            # 正交强制区直接置位（必选，计入 K2 预算）：sink 头部 + swa 尾部
             # 075：swa 尾部 = 真实 S 尾；padding 段保持 False
             topk_mask[..., :sink_tok] = True
             topk_mask[..., swa_lo_tok:S_real] = True
