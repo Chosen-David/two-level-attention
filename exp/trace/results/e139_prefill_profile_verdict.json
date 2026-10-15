@@ -1,0 +1,23 @@
+{
+  "exp": "E139-性能探索：稀疏 prefill 瓶颈 kernel 级 profile（大 GEMM 批量化立项前探针，用户指令「一次选择 + 大 GEMM 性能提升探索」）",
+  "date": "2026-10-14",
+  "machine": ".187 GPU4（H20 独占，torch 2.8.0+cu128），torch.profiler key_averages，3-iter 均值，@L=32K K2=1024，树 tmp_e138_abl_tree_187（e25a617）",
+  "protocol": "两臂：grp64（G=64 组选择，wall 981ms）与 chunk-shared（GROUP=0 一次选择，wall 168.6ms）；双流预取开（device busy 总和 > wall 属正常——side stream 并行）。粗分类关键词映射 select/attn/other",
+  "results_device_busy_ms_per_iter": {
+    "grp64": {"total": 1030.5, "wall_ref": 981, "other_copy_mask_elementwise": 509.3, "attn_bmm_gemm_softmax": 358.2, "select_topk_quant": 163.1},
+    "chunk_shared": {"total": 343.0, "wall_ref": 168.6, "other_copy_mask_elementwise": 195.2, "attn_bmm_gemm_softmax": 138.7, "select_topk_quant": 9.0}
+  },
+  "top_kernels": {
+    "grp64": ["aten::bmm 115.3ms/58c", "aten::copy_ 107.1ms/6826c(~2275/iter)", "sm80_xmma_gemm_f32 86.2ms/27c", "aten::_softmax 65.8ms/525c", "aten::topk 49.7ms/1984c", "aten::masked_fill_ 44.9ms/29c", "sbtopk::gatherTopK 33.7ms/1893c"],
+    "chunk_shared": ["aten::bmm 46.5ms/34c", "aten::copy_ 41.4ms/397c(~132/iter)", "sm80_xmma_gemm_f32 39.5ms/17c", "aten::_softmax 26.4ms/32c", "cunn_SoftMaxForwardReg 25.7ms/15c", "aten::masked_fill_ 20.8ms/17c"]
+  },
+  "reading": {
+    "attribution_correction": "【修正此前推断】「选择链打分类 kernel 是大头」不成立：grp64 打分类（topk/sbtopk/量化）仅 163ms（16%），chunk-shared 仅 9ms（2.6%）。真正大头是 other 类搬运 kernel 风暴——copy_ 每迭代 ~2275 次调用（107ms）、masked_fill_/direct_copy_elementwise/bitwise_and 合计 ~509ms（49%）——这是逐组 Python 循环的组级 tensor 组装/复制/掩码成本，不是算法打分成本",
+    "attn_cost": "grp64 attention 本体 358ms（W 并集 ~6K 列 bmm+softmax）；chunk-shared 138.7ms（W ~1.2K 列）——与 dense flash 全 32K 列 100ms 对照，紧凑注意力实现（物化 [T,W] score + softmax + gather）单位列效率远低于 flash（IO-aware 不物化 score）",
+    "gemm_ceiling": "大 GEMM 批量化（打分 [512,T/64] 一批算）只覆盖 select 类 163ms；若只做打分批量化 grp64 → ~870ms 仍净负。批量化的正确范围 = 消灭逐组循环全部小 kernel（统计+打分+topk+量化+组装一条龙 batch 化，other 509→~30 + select 163→~20）→ grp64 ~400ms 仍慢于 dense",
+    "one_shot_ceiling": "chunk-shared（一次选择）+ 全批量化：select 9ms 已近零，压 other 195→~20ms 后 device busy ~170ms（wall 双流下或 ~100ms）——天花板 ≈ 追平 dense，做不出明显加速；瓶颈转到 attention 段 138.7ms ≈ dense 100ms",
+    "flash_gap": "W=1.2K 列（3.7% 列宽）的紧凑 attention 要 139ms 而 dense flash 全列 100ms——score 物化 + 非 flash kernel 的实现差距是 prefill 性能的最后一堵墙。若换 varlen flash（cu_seqlens 组块），1.2K/32K 列理论 ~20-30ms → chunk-shared 全链或达 50-80ms = 1.5-2x vs dense——这是 prefill 加速的真正路线（批量选择 + flash varlen），但质量是 chunk-shared 崩塌档（-10.5/-7.2）"
+  },
+  "verdict": "① 瓶颈归因修正：稀疏 prefill 慢的主因 = 逐组循环的小搬运 kernel 风暴（other 49-57%）+ 紧凑注意力非 flash 实现（attn 35-40%），打分类仅 16%/2.6%——「大 GEMM 化打分」单独做收益不足 15%。② 用户「一次选择 + 大 GEMM」路线判定：一次选择（chunk-shared）打分成本已近零（9ms），批量化须覆盖组级组装搬运才有意义，全部做完天花板 ≈ 持平 dense；要做出 1.5-2x 加速须叠 flash varlen 重写 attention 段（消 score 物化），且质量固定在崩塌档（E138①② CI 不含 0 判决）。③ 粒度路线（grp64）性能天花板 ~400ms 仍净负——质量-性能在同一旋钮两端的判决再获 profile 级证据。④ 后续方向排序：prefill 性能故事按「一次选择 + 全批量化 + flash varlen」立项候选（需三件套都做），质量档 -10.5 需用户接受或配 D'-prefill/预算补偿验证；decode 主线叙事不变",
+  "scripts": ["/tmp/e139_prefill_profile.py", ".187:~/e139_profile_gpu4.log"]
+}

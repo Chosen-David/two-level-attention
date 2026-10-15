@@ -44,11 +44,16 @@
     "guide_candidate_matches": 0,
     "guide_staged": false
   },
-  "ci": "no repository .github workflows at reviewed base; remote run status checked separately",
+  "ci": "initial publication workflow_runs=[]; final commit checked after push",
   "gpu_validation": "not run",
   "limitations": [
     "coverage of host support units is declared, not proven complete",
-    "no model-level timing collector integration or GPU measurement",
-    "main advanced concurrently; future main integration must reconcile overlapping runtime modules"
-  ]
+    "no model-level timing collector integration or GPU measurement"
+  ],
+  "integration": {
+    "main": "ceb8fa8cdef24941ca09085be4b19b6f70c06b88",
+    "status": "merged candidate chain without duplicate implementation",
+    "additional_regression": "runtime 19 tests (one CUDA skip), routing final 5 tests; ops9 paper9 figures36",
+    "independent_review": "passed normal and optimized: runtime19 CUDA1skip, ops9, paper9, final routing5"
+  }
 }

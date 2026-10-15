@@ -27,6 +27,7 @@ def fresh():
 
 
 def run(idx, q, k, v, graph):
+    os.environ["TLI_PREFILL_RUNTIME"] = "candidate"
     os.environ["TLI_SPARSE_PREFILL_CHUNK"] = "2048"
     os.environ["TLI_PREFILL_SELECT_GROUP"] = "64"
     os.environ["TLI_PREFILL_BATCH_SELECT"] = "1"

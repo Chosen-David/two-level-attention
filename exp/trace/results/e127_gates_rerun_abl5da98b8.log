@@ -1,0 +1,19 @@
+/home/wangyuanshuo02/.local/lib/python3.9/site-packages/torch/cuda/__init__.py:1193: UserWarning: Synchronization debug mode is a prototype feature and does not yet detect all synchronizing operations (Triggered internally at /pytorch/torch/csrc/cuda/Module.cpp:976.)
+  torch._C._cuda_set_sync_debug_mode(debug_mode)
+[PASS] metrics_lazy: get_select_tokens 逐位一致 old=21887.578125 lazy=21887.578125
+[PASS] metrics_lazy: add_select_result 零 host 同步 
+[PASS] eager_gather: allclose(1e-2) 全配置对拍 worst_abs_diff=1.95e-03
+[PASS] eager_gather: B7 全 False 行守卫(shared) 小序列双路径当场 raise 
+[PASS] eager_gather: B7 全 False 行守卫(per_qh) 小序列双路径当场 raise 
+[PASS] eager_gather: B7 大序列 gather 尾部 raise（零同步语义） 
+[PASS] eager_gather: W 超上界 fail-closed 尾部 raise 
+[PASS] eager_gather: cu 契约破坏 fail-closed 尾部 raise 
+[PASS] eager_gather: gather 主路径零 host 同步（40 次调用） 
+[PASS] indexer_inc: 12 步 decode（块边界/多 token/大步）增量 vs 全量重建 index_dict+mask 逐位一致 
+[PASS] indexer_inc: 64K 大 S 15 步增量 vs 全量重建 mask 逐位一致 
+[PASS] indexer_inc: S 回退全量重建 + 后续增量正确 
+[PASS] score_mask_derived: 4 配置 × normal/skip × 10 步 score/mask 一致（coarse+avg ULP≤1e-4 + fine ULP≤1e-4 + mask 逐位） mismatch=0 coarse_ulp=0/289408 maxrel=0.00e+00 fine_ulp=36/10492160 maxrel=6.02e-03
+[PASS] score_mask_derived: S 回退全量重建 + 后续增量 score ULP 口径一致（coarse/avg/fine） 
+[PASS] pipeline_zero_sync: prepare+score+mask 20 步零 host 同步（normal+skip） 
+
+=== 15 PASS / 0 FAIL ===

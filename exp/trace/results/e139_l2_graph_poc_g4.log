@@ -1,0 +1,18 @@
+=== E139 L2 CUDA-Graph PoC L=65536 GPU4 ===
+N=1008
+eager L2 整循环 =   314.0ms
+capture OK
+bitexact same-input replay vs eager: diff_rows = 0/1008
+bitexact new-input replay vs eager: diff_rows = 0/1008
+graph replay L2 整循环 =   192.3ms （speedup vs eager = 1.63x）
+inject+replay =   192.8ms（含 74MB copy_ 注入）
+graph L2-A 打分段 replay =    32.2ms（eager 对照 63.2ms）
+graph L2-B 复刻选择段 replay =   158.7ms
+A+B graph 合计 =   191.0ms（vs 整链 graph 192.3ms）
+B graph bitexact: diff_rows = 0/1008
+graph B 前半（softmax/mean，无 topk）=    47.2ms
+graph B 后半（topk+mask）估计 =   111.5ms
+graph L1 循环 replay =    11.5ms（eager 对照 108.8ms）
+L1 graph bitexact: True
+整链 GPU 地板估计：prep 2.0 + L1 11.5 + L2 192.3 = 205.8ms（eager 423.3ms）
+=== DONE ===

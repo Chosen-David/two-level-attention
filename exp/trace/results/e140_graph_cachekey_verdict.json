@@ -1,0 +1,45 @@
+{
+  "experiment": "E140-GRAPH-CACHEKEY",
+  "defect_id": "TL-E139-GRAPH-CACHE-20261015",
+  "date": "2026-10-15",
+  "operator": "Opus",
+  "source_advice": "agent_doc/advice/2026-10-15_e139_graph_cache_key_by_gpt.md（GPT 报告 SHA 30edd7c08cf6d199fa8f01a3bc1a7230a62bc453）",
+  "treatment_commit": "e138-ablation 本提交（batch_select.py md5 0f35a7aa47735ad20aa86e9c64e2ec55，本机 worktree 与 .187 树逐字节一致）",
+  "defect_summary": "batch_select graph 缓存键只含 (L,N,kf,kn,K2arg,group_ends,far_use_mm,near_use_mm,use_cand_topk)——同进程 GRAPH=1 下 α/β/γ/sink/SWA/k1/subspace 变化不改输入 shape → 旧键命中 → replay 陈旧几何。GPT CPU 模拟复现 α .25→.5 命中旧图 36/256 mask 位差。",
+  "fix": {
+    "approach": "键绑定 capture 实际固化的 host 几何真值 + 配置指纹（不新增 .item() 同步，全部复用 _body 已在 host 持有的列表）",
+    "key_fields": [
+      "L, N, kf, kn, K2arg, tuple(group_ends), far_use_mm, near_use_mm, use_cand_topk（原键保留）",
+      "tuple(nb_l), tuple(sl_l), tuple(k2_far_l), tuple(k2_near_l)（capture 固化的几何真值）",
+      "sink_tok, swa_tok, bs, sink_lo（保护区标量）",
+      "alpha, beta, gamma, k1（浮点/整型配置）",
+      "subspace 指纹（tia_subspace, tia_l2_subspace, idx_sub 宽度）",
+      "dtype 指纹（k_min/k_max/k_avg/k_qat/b_q 各自 dtype 或 None）",
+      "str(dev)"
+    ],
+    "reuse_preserved": "几何相同的跨层新实例仍共享（键不含 id(indexer)）——按 GPT 修复方案 1 执行，不退回实例 ID"
+  },
+  "verification": {
+    "gate_script": "exp/bench/e140_graph_cachekey_bitdiff.py（fail-closed sys.exit(1)）",
+    "log": "exp/trace/results/e140_graph_cachekey_bitdiff.log",
+    "env": "10.238.9.187 GPU1, torch 2.8.0+cu128, H20-3e, L=16384, N=240（DeepSeek 共驻，正确性测试非计时）",
+    "groups": {
+      "capture_A": {"graph_vs_eager_diff": 0},
+      "G1_alpha_0.50": {"graphB_vs_eagerB_diff": 0, "B_vs_A_diff": 240, "note": "几何确实变化"},
+      "G2_gamma_0.375": {"graphB_vs_eagerB_diff": 0, "B_vs_A_diff": 240},
+      "G3_sinkswa_192": {"graphB_vs_eagerB_diff": 0, "B_vs_A_diff": 240},
+      "G4_k1_256": {"graphB_vs_eagerB_diff": 0, "B_vs_A_diff": 240, "note": "args 级 k1 走 args 读取路径"},
+      "G5_reuse_ABA": {"replay_vs_eagerA_diff": 0, "cache_entries": 5, "expected_entries": 5}
+    },
+    "existing_regressions_rerun": {
+      "e139_bs_graph_bitdiff": "0/1008 PASS",
+      "e139_step2_cand_bitdiff": "0/1008 PASS（FAIL=0）"
+    },
+    "verdict": "PASS——四个配置切换方向 graph==eager 逐位 0 差、跨层复用未被误伤（条目数核算 5/5）、既有硬门回归全绿"
+  },
+  "scope_boundaries": [
+    "本测试覆盖单 stream 使用；多 stream 共享静态输出的并发协议未实现未测试（GPT 方案 3 保持为支持边界，GRAPH 默认 0 fail-closed）",
+    "dtype/device 变化走键指纹区分，命中时 copy_ 隐式转换风险已由键隔离；独立 dtype 切换专项未另测（G1-G4 已含几何全维度）",
+    "cache 容量溢出（>8 条目）重新 capture 路径未在本测试范围，e139 既有容量逻辑未改动"
+  ]
+}

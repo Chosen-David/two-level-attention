@@ -1,0 +1,40 @@
+{
+  "exp": "E139 #253 PoC：选择链 L2 循环子段分账 + CUDA Graph capture——批量化主攻方向判决（预实施设计文档）",
+  "date": "2026-10-15",
+  "protocol": {
+    "env": ".187 GPU4 空闲独占（8 卡全空核验后锁卡）；树 a9e814e（~/tmp_e138_abl_tree_187）；7-iter 中位、warmup 2-3、fresh indexer、单流（PREFETCH=0）；L=65536 grp64 K2=1024 生产口径（chunk=2048/dense_below=1024）",
+    "subseg": "exp/bench/e139_l2_subseg.py——原样复刻 batch_select.py ⑤ L2 循环拆 A（gather+fine kernel 打分）/ B（where/scatter/softmax/mean/topk/mask 复刻选择）两段分别计时；拆分自检 diff_rows=0/1008（拆分不改变数值树）",
+    "graph_poc": "exp/bench/e139_l2_graph_poc.py——L2 循环参数化（输入显式 tensor 参数）→ CUDA Graph capture（warmup 3 side stream）→ replay 计时；双重逐位硬门：同输入 replay vs eager、换输入 copy_ 注入 replay vs eager（第二组数据走完整管线不同 seed 生成，保候选<g1_j 因果不变量）",
+    "anchor": "eager L2 整循环 315.5ms 与 e139_selchain_inner_seg.py 312.5ms 一致（±1%）；A/B 分段合计 190.9ms 与整链 graph 192.2ms 吻合"
+  },
+  "results": {
+    "l2_subseg": {
+      "L65536": {"l2_total": 310.9, "A_scoring": 63.2, "B_selection": 216.5},
+      "L32768": {"l2_total": 143.6, "A_scoring": 31.1, "B_selection": 98.4},
+      "scaling": "A 2.03x / B 2.20x（L×2，N×2）——B 若为全宽 softmax O(Σg1)≈O(L²) 工作主导应 ~4x，实测近线性于行数 → B 是 CPU dispatch/launch-bound（每行 ~15 算子 × ~15μs Python+调度 ≈ 0.215ms/行；GPU 真实访存仅 ~7MB/行 μs 级）"
+    },
+    "graph_replay": {
+      "L2_whole": {"eager": 315.5, "graph": 192.2, "speedup": 1.64, "bitexact_same_input": "0/1008 diff", "bitexact_new_input_inject": "0/1008 diff"},
+      "L2_phaseA_scoring": {"eager": 63.2, "graph": 32.2},
+      "L2_phaseB_selection": {"graph": 158.7, "bitexact": "0/1008 diff"},
+      "B_split": {"front_softmax_mean": 47.2, "back_topk_mask": 111.5},
+      "L1_loop": {"eager": 108.8, "graph": 11.5, "speedup": 9.5, "bitexact": true},
+      "inject_cost": "copy_ 注入 74MB（k_qat+cand_tok+cand_valid+b_q 静态缓冲）+ replay = 192.8ms——注入开销 <1ms"
+    },
+    "gpu_floor_accounting": {
+      "select_chain": {"eager": 423.3, "gpu_floor": "prep 2.0 + L1 11.5 + L2 192.2 ≈ 205.7ms"},
+      "wall_projection_64k": "541.3 - 423.3 + 205.7 ≈ 324ms vs dense 395.3 → speedup ≈ 1.22x（投影值，须集成实测）",
+      "l2_remaining_structure": "A 打分 32.2（fine kernel tile (16,1) 对 [H,C] 形状低效）+ B 前半 softmax/mean 47.2（全宽小 batch kernel 低占用，理论带宽 ~3.3ms）+ B 后半 topk/mask 111.5（双池位置切片 topk，~55μs/次 × 2016 次，O(N·W) radix select 真实 GPU 工作——非 launch 开销）"
+    }
+  },
+  "reading": {
+    "direction_reversal": "【主攻方向二次修正】inner_seg 判「L2 循环批量化主攻」方向正确但机制判错：312.5ms 的 70%（B 段 216.5ms）不是 GPU 计算而是 CPU dispatch 开销（增长律 2.2x 线性证伪 O(L²) softmax 主导假说）——正确武器是 CUDA Graph 不是数值树批量化。graph replay 重放完全相同 kernel 序列+相同地址+相同归约树 → 天然逐位一致（双硬门 0/1008 实证），绕开了候选列版 0.1% ULP 翻转难题",
+    "graph_win_map": "L1 9.5x（108.8→11.5ms，几乎纯 dispatch）/ L2 1.64x（315.5→192.2ms，dispatch 约占四成）/ 选择链整体 2.06x（423.3→205.7ms GPU 地板）",
+    "topk_is_new_bottleneck": "graph 化后 L2 残余 192.2ms 的最大单点 = 双池位置切片 topk 111.5ms（58%）——这是 torch.topk radix select 的 O(N·W) 真实 GPU 工作（非 launch 开销，批量化/图化均不可消）。候选列 topk 可把宽度 W≈30K 压到 C=8192，但须解决两个数值等价问题：①tie 顺序——候选按位置排序后 tie 序与全宽 index 序一致（待实证）；②k>#非零候选 时零值补位序——全宽版按位置序选零，候选列版无零需补位仿真（早行小 far 宽边界档）。这是下一杠杆，风险中等",
+    "b_front_bandwidth_gap": "B 前半 47.2ms vs 理论带宽 ~3.3ms 差 14x——softmax 在 [1,1,32,g1] 上一行一块的低占用形态；可走 batch/融合但 softmax 归约树数值等价须逐位对拍背书，暂列二级杠杆",
+    "a_tile_lever": "A 段 32.2ms 的 fine kernel 用 D=32 tile (16,1)（E133c A6 调参为 decode 形状调的），对 L2 的 [H,C]=[32,8192] 输出形状 4096 个单 warp 小 block 低效——tile 改 (64,4)/(128,4) 若 per-output D 归约不变则逐位一致（E133c A6 先例），预期 32.2→~10ms，须对拍实证"
+  },
+  "verdict": "① #253 主攻判决改道：L2 循环「批量化」= CUDA Graph capture L1+L2 循环（PoC 双重逐位一致 0/1008 + L1 9.5x/L2 1.64x 实证），不是数值树批量化（B 段 70% 是 dispatch 开销非 GPU 工作，增长律证伪 O(L²) 假说）。② 投影（须集成实测）：选择链 423.3→~206ms → 64K 总 wall 541.3→~324ms vs dense 395.3 = 1.22x——【首次存在可测净加速路径】（TL-156 口径：speedup=dense/candidate>1）。③ 后续杠杆排序：topk 候选列化（111.5→~20ms，1.22x→~1.8x，数值等价设计风险中等）> A 段 fine kernel tile（32.2→~10ms，低风险）> B 前半融合（47.2→~5ms，归约树对拍风险）。④ 实施约束：graph capture 要求形状静态（L/配置固定——生产 prefill 每 prompt 长度不同 → 按长度分桶 capture 或 capture-per-shape 缓存；静态输入注入 copy_ 74MB <1ms 可忽略）；eager 路径保留为 fallback（capture 失败 fail-closed 回退，对齐 batch_select 既有纪律）。⑤ 集成验收硬门：e139_gang23_bitdiff 口径 mask 逐位一致 + e139_selchain_seg_bench wall 锚点对齐 + 64K 融合态总 wall 实测（投影 324ms 的证实/证伪）",
+  "next": "实施分两步落袋：Step1 graph capture L1+L2+中间 topk（候选构造）进 batch_select.py（env TLI_PREFILL_SELECT_GRAPH 默认 0 fail-closed）+ 逐位对拍 + wall 实测（预期 ~324ms/1.22x）；Step2 topk 候选列化（tie 位置序 + 零补位边界仿真）逐位对拍驱动。L 曲线全档（8K-64K）graph 化收益待 Step1 后统一补测",
+  "scripts": ["exp/bench/e139_l2_subseg.py（.187:/tmp 同名）", "exp/bench/e139_l2_graph_poc.py（.187:/tmp 同名）", "exp/trace/results/e139_l2_graph_poc_g4.log"]
+}

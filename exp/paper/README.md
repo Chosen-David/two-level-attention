@@ -84,14 +84,19 @@ means only that the requested metadata/diagram was exported. Timing diagnostics
 never claim quality-matched scientific acceptance. Existing output directories
 are not overwritten.
 
-## Concurrent main update
+## Integrated main update
 
-During final verification, main advanced from the recorded baseline to
-`ceb8fa8cdef24941ca09085be4b19b6f70c06b88`, incorporating e138. This branch
-retains the reviewed baseline and explicit reference/candidate comparison. It
-does not revert, merge or overwrite that main update. A future main integration
-must reconcile overlapping eager_prefill, batch_select and fused modules; do not
-blindly cherry-pick the whole branch. The source manifest records both heads.
+Main `ceb8fa8cdef24941ca09085be4b19b6f70c06b88` is merged into this branch.
+Its gather/Graph/candidate-topk/E140 chain is retained in `eager_prefill.py` with
+our incremental guards/counters and explicit runtime routing. The original
+full-width reference is retained in `reference_prefill.py`; `candidate_prefill.py`
+is only a compatibility import, not a second implementation. Other incoming
+main files are preserved. Shared-GQA and compact traversal remain opt-in.
+
+E140 tie-probe v2's reported ALL PASS excludes the all-zero boundary. That
+boundary had mismatches in every reported case; this branch does not claim
+full-domain candidate/full-width equivalence. No existing historical GPU result
+is reclassified as validation of this branch.
 
 The requested guide sentence is provided separately in `guide_append.txt`;
 `guide_append.json` gives byte-preserving manual instructions. GUIDE is unchanged.

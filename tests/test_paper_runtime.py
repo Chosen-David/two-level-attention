@@ -36,6 +36,13 @@ class Runtime(unittest.TestCase):
                 receipt=row_support_receipt(shared,query_position=4+r,length=9,sink=sink,swa=swa,k_cap=9)
                 expected=sum(receipt['support_ids'])/receipt['k_real']
                 torch.testing.assert_close(actual[0,r],torch.full_like(actual[0,r],expected))
+    def test_receipt_reads_runtime_without_compat_import(self):
+        import sys
+        from sparse_attn.ops import eager_prefill
+        from exp.paper.receipt import runtime_counters
+        with patch.dict(sys.modules,{'sparse_attn.ops.candidate_prefill':None}):
+            counts=runtime_counters()
+        self.assertEqual(counts['candidate_prefill'],eager_prefill.RUNTIME_COUNTS)
     def test_unknown_runtime_rejected(self):
         idx=SimpleNamespace(args=SimpleNamespace(tia_level2_topk=128))
         q=torch.zeros(1,4,2,8);k=torch.zeros(1,4,1,8)

@@ -1,0 +1,10 @@
+=== E140 graph-cachekey 修复验收 L=16384 GPU1 ===
+N=240
+[capture] A graph vs A eager diff = 0/240
+[G1 alpha] graph-B vs eager-B diff = 0/240；B vs A diff = 240/240（>0 预期）；cache entries = 2
+[G2 gamma] graph-B vs eager-B diff = 0/240；B vs A diff = 240/240（>0 预期）；cache entries = 3
+[G3 sinkswa] graph-B vs eager-B diff = 0/240；B vs A diff = 240/240（>0 预期）；cache entries = 4
+[G4 k1=256] graph-B vs eager-B diff = 0/240；B vs A diff = 240/240（>0 预期）；cache entries = 5
+[G5 reuse] A→B→A replay vs eager-A diff = 0/240
+[G5] cache entries = 5（预期 5）
+=== ALL PASS ===

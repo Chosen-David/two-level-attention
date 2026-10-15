@@ -95,7 +95,7 @@ class PrefillProtectionTest(unittest.TestCase):
             return torch.zeros_like(q_c)
 
         with patch.dict('os.environ', {}, clear=True), patch(
-            'sparse_attn.ops.eager_prefill._chunk_rows_attn', side_effect=capture
+            'sparse_attn.ops.reference_prefill._chunk_rows_attn', side_effect=capture
         ):
             sparse_prefill_attn(indexer, q, k, k)
         self.assertEqual(seen, [(0, 2048, 0, 0), (2048, 3, 0, 64)])

@@ -1,0 +1,33 @@
+{
+  "exp": "E138 ①② 稀疏 prefill 实现代码审查（用户指令「仔细看看代码实现上有 bug 吗」）——对拍盲区专项：mask/gather 同分只能排除 attention 计算层，两实现共同上游（选择链调用方式）单独逐行审查",
+  "date": "2026-10-14",
+  "scope": [
+    "sparse_attn/ops/eager_prefill.py（gather 紧凑版全文逐行）",
+    "sparse_attn/patches/qwen3_attn_patch.py prefill 分支（门控/生命周期）",
+    "sparse_attn/indexer/base.py prepare_mask + tli_indexer.py compute_mask/compute_score（q_ids/cu/S_real 消费链）"
+  ],
+  "audit_findings": {
+    "no_bug_confirmed": [
+      "因果切片：_prepare_sel 喂 k[:, :c1] + q_ids=[c1-1]，末行因果可见严格前缀，compute_mask S_real=c1 全部按 chunk 末真实长度计算（075 valid_length 链生效）",
+      "行级可见集：vis = sel∩[0,p_max] ∪ sink ∪ 保护带并集 [max(0,p_first-swa+1), p_max]——行间窗口连续拼接正确；行级 mask pos_ok & (in_sel | sink | 自身窗口) 与原 mask 版逐行可见集严格一致（对拍 14/14 + mask/gather 同分 49.38/27.19 vs 48.97/27.08 双重背书）",
+      "W 静态上界：w_sel_cap=K2+bs+sink+swa+bs=1408 覆盖满额（实测 sel ~1024 token），上界差量由 valid mask 屏蔽 exp=0 不进 softmax 分母；counts<W 截断不可达（并集 ≤ w_sel_max+sink+R+swa-1 < W）",
+      "空行兜底：对角线段 swa=0 时显式并入 vis / swa>0 时 ⊆ 保护带并集，空行对角线 ∈ idx 恒可精确 OR；向量化无分支消除 host 同步",
+      "增量缓存大步 append：chunk 间 S 以 2048 步进，_prepare_index_inc 尾段重算 [fb, S_now) 与 decode 步进同一代码路径，对拍 L=32768 16-chunk case 覆盖",
+      "双流预取：side FIFO 保 prepare 调用序（inc 缓存 append-only 不破）+ ev.wait 消费 + record_stream 防跨流重用 + 层间 wait_stream 保 calibrate/observe 写序",
+      "patch 层：indexer.clear() 在分支入口（层间状态隔离）；TLI_SPARSE_PREFILL 门控默认 0 走 dense 原生 attention_interface 逐位不变；B=1+mask=None 守卫",
+      "observe_prefill_q/calibrate_dyn_dgate 与稀疏路径正交（mavg 臂均为 no-op/未启用）"
+    ],
+    "mechanism_dissection": {
+      "finding": "无实现 bug，但审查解剖出质量崩塌的机制细节（共享选择语义的内生成本，此前判决未展开）：块内早行的近端覆盖塌缩",
+      "detail": "decode/dense 锚点：每行有自己的 near 区（near_L=α·mid，8K 序列 ≈1.9K token 宽，位于 [p-swa-near_L, p-swa)）+ far topk + sink + swa。稀疏 prefill 块内早行 r：近端只剩自身保护带 128 token——末行 near 区 [c1-swa-near_L, c1-swa) 对距末行 > near_L 的早行被因果全截（R=2048 时 S=8K 级序列约半数行失去 near 覆盖）；远端靠共享 sel∩[0,r]",
+      "consistency_with_score_drop": "gov_report -1（摘要语义局部，近端 128+末行 near 尾部覆盖足够）vs hotpotqa/musique -7~-11（多跳逐行精确检索）与近端塌缩假说方向一致"
+    }
+  },
+  "implication_for_fix_paths": {
+    "granularity_scan_prediction": "CHUNK 512/1024 在跑（#246）：早行距末行缩短 → 末行 near 因果可见比例上升，预计显著回血但不完全（早行 near 仍非自身视角）",
+    "secondary_fix_candidate": "若粒度细化不足：行级保护带从 swa(128) 扩到 near_L（『行级近端保护』）——比 per-row 全选择便宜得多（每行 block 对齐近端并入 vis，选择仍共享），是中间档修复路径",
+    "per_row_full_selection": "最后手段：每行（或每 64-token 行块）独立选择，选择成本 ×R/CHUNK，与 prefill wall 收益权衡"
+  },
+  "verdict": "实现无 bug——三层证据链闭合：合成对拍 14/14、mask/gather 双实现同分同崩、逐行审查选择链上游全部正确。崩塌定案维持：chunk 共享选择语义固有成本，具体机制=块内早行近端覆盖塌缩（128 保护带 vs 锚点 near_L 宽近端）",
+  "reviewer": "Opus 主会话逐行审查（e138-ablation @ 8062159）"
+}

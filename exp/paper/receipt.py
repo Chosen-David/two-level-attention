@@ -21,11 +21,11 @@ def synchronized_wall(sync):
 def runtime_counters():
     import sys
     result={}
-    for name,field in [('sparse_attn.ops.candidate_prefill','RUNTIME_COUNTS'),
+    for name,field in [('sparse_attn.ops.eager_prefill','RUNTIME_COUNTS'),
                        ('sparse_attn.ops.batch_select','_GRAPH_STATS'),
                        ('sparse_attn.ops.fused_attn_triton','FUSED_LAUNCH_COUNTS')]:
         module=sys.modules.get(name)
-        if module is not None: result[name.rsplit('.',1)[-1]]=dict(getattr(module,field))
+        if module is not None: result['candidate_prefill' if name.endswith('.eager_prefill') else name.rsplit('.',1)[-1]]=dict(getattr(module,field))
     return result
 
 

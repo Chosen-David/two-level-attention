@@ -1,0 +1,22 @@
+{
+  "exp": "E138-residual：稀疏 prefill chunk 粒度细化扫参（#246）——CHUNK∈{512,1024} × hotpotqa/musique，判定粒度细化能否修复 chunk 共享选择质量崩塌",
+  "date": "2026-10-14",
+  "protocol": {
+    "arm": "pfsp 口径同 flags（mavg 冠军 + --tli_subspace tail + --tli-sparse-prefill），唯一变量 env TLI_SPARSE_PREFILL_CHUNK（eager_prefill.py L238 参数化，默认 2048 行为逐位不变）",
+    "dispatch": "/tmp/e138_chunkscan_dispatch.sh，T=1014141000，.187 GPU0-3（14:0X 点火 14:28 收官，treatment=5da98b8 archive 树）",
+    "scoring": ".187 ~/two-level-attention_git eval.py（difflib:stdlib），strict 4/4，cap_comparability_key 6688f41924",
+    "reference": "pfsp2048 hotpot 48.97/musique 27.08（e138_abl_sub_e2e_verdict.json）；dense prefill 锚点 hotpot 59.42/musique 34.25（E133 per_task）"
+  },
+  "results": {
+    "hotpotqa": {"dense": 59.42, "chunk2048": 48.97, "chunk1024": 50.99, "chunk512": 54.53, "delta_512_vs_2048": 5.56, "delta_512_vs_dense": -4.89},
+    "musique": {"dense": 34.25, "chunk2048": 27.08, "chunk1024": 27.98, "chunk512": 26.08, "delta_512_vs_2048": -1.00, "delta_512_vs_dense": -8.17}
+  },
+  "reading": {
+    "hotpotqa": "单调显著回血（2048→512 +5.6 分）——粒度是 hotpot 崩塌的显著因子，与代码审查判决（e138_sparse_prefill_code_review.json）的近端塌缩机制自洽：早行距末行从 2048 压到 512，末行 near 区因果可见比例上升。但 512 仍差锚点 4.9 分——早行 near 区约 near_L−CHUNK≈1.4K token 落在末行 far 区（靠 topk 运气）+ far 选择本身仍是末行视角，粒度单独不可恢复到锚点",
+    "musique": "非单调（1024 +0.9 → 512 −1.0，均在任务噪声带内）；两档均差锚点 ~8 分——粒度不是 musique 崩塌的主导因子。musique 多跳远端检索对 far 选择的行间错位（早行需要的远端证据 ≠ 末行 topk 选择）敏感，粒度细化只修 near 不修 far 行间错位",
+    "mechanism_check": "两任务形态差异与近端/远端检索结构一致：hotpot（证据段落较近端偏多）粒度敏感，musique（多跳证据分散远端）粒度钝感——支持「near 塌缩 + far 行间错位」双因素归因"
+  },
+  "verdict": "粒度细化判定：部分修复但不可单独恢复锚点——① chunk 共享选择的质量成本含两个正交成分（near 近端塌缩可被粒度细化部分回收；far 行间错位不可）。修复路径判决：第二档「行级近端保护带扩到 near_L」（保护带并集宽 ~near_L+CHUNK，选择仍共享，W 增 ~1.9K）为 near 成分的精确闭合候选；far 成分需要 per-row（或 per-64 行）选择，成本 ×CHUNK/行块——两档可分步立项，均须 hotpot+musique 双任务验证",
+  "next": "行级近端保护实现（保护带 swa_tok → swa_tok+near_L_dyn，仅稀疏 chunk 路径）→ 对拍 + hotpot/musique 复验；若 hotpot 回血至 −1 内且 musique 仍差 → far 行间错位立项 per-row 选择消融",
+  "scripts": ["/tmp/e138_chunkscan_dispatch.sh", ".187:~/tmp_e138_chunkscan_e2e/pred_cs{512,1024}/result.json"]
+}

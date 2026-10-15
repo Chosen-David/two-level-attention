@@ -1,0 +1,33 @@
+{
+  "experiment": "E140-STEP2-TIE-PROBE-V2",
+  "defect_id": "TL-E139-TOPK-PROBE-IDENTITY-20261015",
+  "date": "2026-10-15",
+  "operator": "Opus",
+  "source_advice": "agent_doc/advice/2026-10-15_e139_topk_probe_identity_by_gpt.md（GPT 报告初版探针负数切片 bug）",
+  "defect_summary": "初版 e140_step2_tie_probe.py 两处缺陷：① k2 = min(k + C//2, W) 在内置形状下恒 k2 < C → [: k2-C] 负切片取到尾部补位（应为前 k2-C 个位置序）；② randn 负值 + 二进制幂缩放不构成受控 tie 密度。初版 PASS 结论无效。",
+  "fix": {
+    "script": "exp/bench/e140_step2_tie_probe_v2.py",
+    "changes": [
+      "pad 独立参数：k2 = C + pad，显式断言 0 < C < C+pad <= W",
+      "候选值严格正值：randint(1, tie_levels+1) 整数级数，tie 密度 = 1/tie_levels 受控",
+      "新增零值档（候选 p 恰 0，bf16 下溢仿真）——已知边界预期 mismatch 如实报告不判失败（候选零与补位零位置序混合，生产由 bitdiff 硬门把关）",
+      "fail-closed：tie/补位两档任一 mismatch 非零 → sys.exit(1)"
+    ]
+  },
+  "verification": {
+    "log": "exp/trace/results/e140_step2_tie_probe_v2.log",
+    "env": "10.238.9.187 GPU1, torch 2.8.0+cu128, H20-3e",
+    "configs": "W ∈ {4096,32768,65536} × tie_levels ∈ {2,8,64}，rows=64 reps=5，每组 320 行",
+    "results": {
+      "tie_mismatch": "0/2880（全 9 组配置）",
+      "pad_mismatch": "0/2880（全 9 组配置）",
+      "zero_value_boundary": "2880/2880 mismatch——已声明边界：候选零与非候选零位置序混合，集合差为预期行为，不判失败；生产等价性由 e139_step2_cand_bitdiff（mask 0/1008）硬门把关"
+    },
+    "verdict": "PASS——修正后探针在受控 tie 密度与真实补位几何下，候选列 topk 与全宽 topk 集合等价（tie 档 + 补位档双零不匹配）"
+  },
+  "scope_boundaries": [
+    "torch.topk 并列序非 API 契约（pytorch 2.8 文档明示）——本探针结论限定当前派生/版本/shape，不外推为 API 保证",
+    "零值档为已知边界如实报告；生产该档由 bitdiff 硬门把关，_zero_pad_pool docstring 已声明",
+    "本探针是独立小实验，不改动生产 batch_select.py 任何代码路径"
+  ]
+}

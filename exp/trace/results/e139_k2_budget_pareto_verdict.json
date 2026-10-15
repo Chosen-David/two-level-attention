@@ -1,0 +1,47 @@
+{
+  "exp": "E139：召回预算 K2 扫参双方向（#245）——A 上探（预算归因验证：grp64 稀疏 prefill + K2=2048）× B 下探（decode 稀疏 + K2∈{768,512,384}，prefill dense 生产口径），× hotpotqa/musique",
+  "date": "2026-10-14",
+  "protocol": {
+    "arm": "A = grp64 稀疏 prefill（TLI_PREFILL_SELECT_GROUP=64 + --tli-sparse-prefill）+ K2=2048；B = decode 稀疏 + K2∈{768,512,384}（prefill dense）；其余 flags 全同 mavg 冠军（--tli_subspace tail + cmp4）",
+    "dispatch": "/tmp/e139_k2scan_dispatch.sh，T=1014180000，.187 8 卡全独占（19:0X 点火 20:2X 收官），treatment=e25a617",
+    "scoring": ".187 ~/tmp_e138_abl_tree_187 python3 -m benchmark.LongBench.eval（difflib:stdlib），strict 全格通过，cap_comparability_key 6688f41924；budget 字段 = runcap 实测每 query 平均召回 token 数",
+    "reference": "grp64@K2=1024 hotpot 56.04/musique 28.22（e138_chunk_granularity_full_curve.json）；decode 锚点 E133 sub/sub hotpot 59.20/musique 33.88（K2=1024）"
+  },
+  "results": {
+    "armA_prefill_upscan": {
+      "hotpotqa": {"k1024": 56.04, "k1536_r2": 57.90, "k2048": 58.76, "dense_anchor": 59.42, "gap_k2048": -0.66},
+      "musique": {"k1024": 28.22, "k1536_r2": 31.75, "k2048": 32.03, "dense_anchor": 34.25, "gap_k2048": -2.22},
+      "budget": {"k1536_r2": 1530.2, "k2048": 2043.2}
+    },
+    "armB_decode_downscan": {
+      "hotpotqa": {"k1024_anchor": 59.20, "k768": 46.86, "k512": 45.96, "k384": 44.91, "k256_r2": 29.92},
+      "musique": {"k1024_anchor": 33.88, "k768": 21.17, "k512": 22.28, "k384": 22.13, "k256_r2": 12.47},
+      "budget": {"k768": 768.0, "k512": 512.0, "k384": 384.0, "k256_r2": 256.0}
+    },
+    "round2": {
+      "dispatch": "/tmp/e139r2_k2scan_dispatch.sh（.187:~/e139r2_k2scan_dispatch.sh），T=1014190000，19:11 点火 20:18 收官 rc=0，treatment=e25a617（注意：旧 dense 口径——dense_below=K2，纲领①后已固定 1024，判决解读须注明）",
+      "cells": {"pf_g64_k1536": "hotpot 57.90 / musique 31.75（budget 1530.2/1532.1）", "dd_k256": "hotpot 29.92 / musique 12.47（budget 256.0）双跑复证一致"},
+      "strict": "全格 2/2，cap key 6688f41924，difflib:stdlib"
+    },
+    "round3_fixed_dense": {
+      "dispatch": "/tmp/e139r3_k2scan_dispatch.sh（.187:~/e139r3_k2scan_dispatch.sh），T=1014200000，.187 GPU0-3（DeepSeek 共驻，质量格安全计时口径作废），treatment=fc84edf（纲领① dense_below 固定 1024 后树；round3 进程加载 fc84edf 模块，a9e814e 增量 env 门控默认关 e2e 零差）",
+      "cells": {"pf_g64_k1536": "hotpot 57.84 / musique 32.36（budget 1530.2/1532.1）", "pf_g64_k2048": "hotpot 58.27 / musique 30.59（budget 2042.2/2044.1）"},
+      "curves_new_caliber": {
+        "hotpotqa": {"k1024": 56.04, "k1536": 57.84, "k2048": 58.27, "dense_anchor": 59.42, "gap_k2048": -1.15},
+        "musique": {"k1024": 28.22, "k1536": 32.36, "k2048": 30.59, "dense_anchor": 34.25, "gap_k2048": -3.66}
+      },
+      "vs_round2_old_caliber": "k1536 Δ=-0.06/+0.61（噪声带内）；k2048 Δ=-0.49/-1.44——旧口径 k2048 的「质量恢复」部分由 dense 段随 K2 变宽（2048）买入",
+      "musique_k2048_recheck": "已报告的样本配对估计 k1536−k2048 = +1.77 分（正差 = k1536 更高），95% CI [-0.82, +4.50]——【2026-10-15 措辞修正（GPT 配对区间 advice f1f1ed6）】区间含 0 只支持差异方向不确定：不能确定回撤仅为噪声，也不能确认单调或等价，不得从跨零推噪声/等价。182/200 样本持平、差分样本 k1536 11 vs k2048 7（两个 ±100 极端样本主导）系描述性统计非判决依据。区间原件与抽样单位待独立核验（脚本 /tmp/e139_musique_paired_boot.py sha256 f7273d2f，.187:/tmp 同名可复算；scorer = eval.py scorer/difflib:stdlib；seed 20261015，N=20000，重采样单位 = jsonl 行样本；jsonl 无 document_id 字段，文档簇级配对不可算，保留未核查；无事前容差登记，不做非劣/等价主张）",
+      "strict": "全格 2/2，cap key 6688f41924，difflib:stdlib，800 行 jsonl + runcap/manifest sidecar 完整"
+    }
+  },
+  "reading": {
+    "armA": "预算归因验证成立：K2 1024→2048 把 grp64 稀疏 prefill 残差从 -3.4/-6.0 缩到 -0.7/-2.2——粒度链终判的残差归因 (b) 预算覆盖率上限被直接证实为 hotpot 主导成分（(a) 多层复合仅剩 -0.7 噪声带级）；musique 残差仍 -2.2（多跳远端检索对预算+多层复合均敏感）。【历史口径标注（GPT 配对区间 advice 第 4 项）】原文「prefill wall 3.82x 性能收益」系 10-14 已纠偏的旧口径——3.82x 是稀疏路径内部实现优化比（mask→gather→预取），不是 vs dense 加速比；且本段 -0.7/-2.2 质量数字系 round2 旧 dense 口径（dense_below=K2），与 round3 固定 dense 口径（-1.15/-3.66）及 TL-156 纠偏后 64K wall 不可拼为同一收益点。当前有效口径见 round3_fixed_dense 与 e139_gang4_k2_64k.json 纠偏版",
+    "armB": "decode 侧预算悬崖陡峭：1024→768 单步掉 -12.3/-12.7，768→384 近平台（-2.0/-1.0）——TLI 的 mid 区选择在预算 <768 时 near 区被挤压（K2 缩小时 α·mid near 预算同步缩小，E130 g075 崩塌同构机制）。Pareto 判定：TLI 无法在 512-768 token/query 预算下维持质量——与 Quest（~1-2% 上下文 page 级）对标处于劣势区间，TLI 的可比区间是 ~1024/query 全预算（sink128+swa128+mid768）。论文口径：不做「更少召回」贡献主张，转为「固定 1024/query 定额下的质量持平 + 5.47x decode 加速」叙事；K2 下探曲线进消融证明预算-质量悬崖（1024 是甜点）"
+  },
+  "verdict": "① Arm A 判决：稀疏 prefill 残差主因 = 预算上限（归因 (b)），多层复合成分 (a) 在 hotpot 上 -0.7 噪声带级；K2=2048 下 grp64 稀疏 prefill 质量几乎恢复锚点（-0.7/-2.2）——prefill 稀疏作为高预算可选项成立（预算-性能-质量三轴权衡进论文 trade-off 表）。② Arm B 判决：decode 预算悬崖在 1024→768（-12 分级）；1024/query 是 TLI 质量甜点，对标竞品的召回口径叙述修正为定额 1024 而非更少召回。③ 后续：E139 round2（256 档 + K2=1536 中间档 + g075 同构 near 挤压归因确认）排队；D'-prefill 层选择性稀疏（归因 (a) 的 musk 剩余成分）维持立项候选",
+  "round2_verdict": "④ round2 落袋收官（#247）：A 曲线中间点 k1536 = 57.90/31.75——hotpot 56.04→57.90→58.76 与 musique 28.22→31.75→32.03 均近单调且边际递减（hotpot +1.86/+0.86、musique +3.53/+0.28），K2 上探曲线线形判定成立、2048 附近趋饱和；dd_k256=29.92/12.47 双跑复证第二悬崖（384→256 掉 -15/-9.7）——mid 区预算 768→576→384 递减下 near 区（α·mid）同步塌缩至 ~96 token，与 E130 g075 near 挤压机制同构归因确认。⑤ round2 格为旧 dense 口径（dense_below=K2，纲领① d0e87d7 前树 e25a617）——若后续在固定 dense 前缀口径下复扫 K2，1536/2048 档 dense 段将从 1536/2048 缩回 1024，预期分数有轻度口径差，对比时须分列",
+  "round3_verdict": "⑥ round3 固定 dense 口径判决（#252）：hotpot A 曲线新口径 56.04→57.84→58.27 仍近单调边际递减，k2048 残差 -1.15（旧口径 -0.66 的一半「恢复」是 dense 段变宽买来的）；musique 28.22→32.36→30.59 的 k2048 回撤——配对区间估计 +1.77 [-0.82, +4.50] 方向不确定（不能据跨零裁定为噪声或单调，见 musique_k2048_recheck 修正措辞）——k2048 残差 -3.66（旧口径 -2.22，同样部分由 dense 段变宽买入）。**论文「K2=2048 质量恢复+净加速双达标」表述须按固定 dense 口径修正为 hotpot -1.15 / musique -3.66**（【TL-156 纠偏后】64K 净加速性能主张本身不存在——融合态全档慢于 dense +37~45%，见 e139_gang4_k2_64k.json 纠偏版）",
+  "next": "prefill 性能面转入纲领②③④（批量选择 + 融合 kernel，#249 已收官）；K2 上探饱和点已到，不再上探 4096；g075 同构 near 挤压归因已由 k256 证实；下一杠杆 = batch_select ③ 段逐行打分批量化（选择链 421ms @64K 占 77.8%，e139_selchain_seg_bench.json）",
+  "scripts": ["/tmp/e139_k2scan_dispatch.sh", ".187:~/tmp_e139_k2scan_e2e/pred_{pf_g64_k2048,dd_k768,dd_k512,dd_k384}/result.json", ".187:~/tmp_e139_k2scan_e2e/pred_{pf_g64_k1536,dd_k256}/result.json", ".187:~/e139r2_k2scan_dispatch.sh"]
+}

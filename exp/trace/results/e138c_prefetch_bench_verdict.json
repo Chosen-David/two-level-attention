@@ -1,0 +1,29 @@
+{
+  "exp": "E138c chunk 级双流预取（「全面性能优化」指令余项，overlap 分析确认的 CPU-GPU 重叠机会）",
+  "date": "2026-10-14",
+  "machine": ".251 GPU0 (2x H20-3e, torch 2.8.0+cu128, triton 3.4.0), 独占空卡",
+  "change": "sparse_attn/ops/eager_prefill.py sparse_prefill_attn：chunk c+1 的选择（prepare_mask 只依赖 K/V 前缀与末行 q，不依赖 chunk c 的 attention 输出）在 side stream 上计算，与主 stream 的 chunk c attention 重叠",
+  "correctness": {
+    "bitwise_pairs": "双流预取版 vs 单流版（5da98b8）逐位对拍（bf16 → int16 视图）",
+    "cases": ["L=32768 (16 chunk, 15 稀疏)", "L=10240 (n_sparse=4 恰过门槛)", "L=5000 (n_sparse=2 门槛下串行)", "L=2100 (1 稀疏)"],
+    "result": "4/4 bitwise PASS",
+    "mechanism": "选择 kernel 输入相同 + side stream FIFO 保 indexer prepare 调用序（E127 inc 缓存 append-only）+ 主 stream event 依赖消费 + sel record_stream 防 allocator 跨流重用；层间 side.wait_stream(main) 保证 observe/calibrate 写序"
+  },
+  "performance": {
+    "wall_timing_diagnostic": "诊断级（真 indexer mavg 口径，每 iter fresh 实例模拟层间全量重建）",
+    "length_scan": {
+      "L5000_nsp2": "0.74x 净负（门槛前实测——流交错/SM 争用 > 重叠收益）",
+      "L8192_nsp3": "1.02x",
+      "L12288_nsp5": "1.05x",
+      "L16384_nsp7": "1.07x",
+      "L24576_nsp11": "1.09x",
+      "L32768_nsp15": "1.10x (183.5→167.4ms)"
+    },
+    "gate": "n_sparse >= 4 才启用（短序列走逐 chunk 串行零扰动，L=5000 复测 1.00x）；逃生口 TLI_PREFILL_PREFETCH=0"
+  },
+  "verdict": "采纳进 e138-ablation 分支；prefill wall -8~10%（长序列），数值逐位不变（在飞 E138 格 treatment=5da98b8 不受影响，096 provenance 铁律）",
+  "residual": {
+    "per_chunk_hosts": "每 chunk 一次 pageable H2D（cu tensor）+ 首稀疏 chunk 串行选择——进一步收益需 chunk 末行批量打分（挂账候选，见 e138c_coarse_gemm_bench_verdict.json）",
+    "attention_内部": "_chunk_rows_attn 行块内 gather→score→mask→softmax→输出链的 Triton 融合（flash-attention 风格单 kernel）建议消融判决后立项"
+  }
+}

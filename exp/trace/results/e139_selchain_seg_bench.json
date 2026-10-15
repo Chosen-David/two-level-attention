@@ -1,0 +1,20 @@
+{
+  "exp": "E139 选择链分项计时基线 @64K：融合态 wall 拆分（选择链 batched_group_sels vs attention 段差值口径），为 batch_select ③ 段打分批量化定标",
+  "date": "2026-10-15",
+  "protocol": ".187 GPU4 锁卡（空闲独占）；树 a9e814e（融合态终态实现）；7-iter 中位 fresh indexer 单流（PREFETCH=0）；选择链单独计时复刻 eager_prefill 组划分（dense_below=1024 / chunk=2048 / grp=64 / 1008 组全对齐）；脚本 /tmp/e139_selchain_seg_bench.py",
+  "results": {
+    "L65536": {
+      "K2_1024": {"total": 541.3, "select_chain": 421.4, "select_pct": 77.8, "attn_diff": 119.9},
+      "K2_2048": {"total": 569.6, "select_chain": 423.1, "select_pct": 74.3, "attn_diff": 146.5},
+      "anchor_check": "总 wall 541.3/569.6 与 e139_gang4_k2_64k.json（gpu6 541.3/569.3）逐值一致——同实现锚点对齐"
+    }
+  },
+  "reading": "【杠杆翻转 + 2026-10-15 方向纠偏（GPT TL-156 confirmed）】纲领④融合 kernel 收官后 @64K 瓶颈结构：attention 段（块级跳空后有效列 ~4%）仅 120-147ms，选择链 421ms 占 77.8% 成唯一大头。选择链 32K→64K 近线性（~210→421ms），斜率未压下来；K2 1024→2048 选择链仅 +1.7ms（421.4→423.1），attention 段 +26.6ms 承担全部 K2 增量。【纠偏】原判「当前 1.37x 净加速、若压到 100ms 则 1.6x」基线方向颠倒——当前 @64K 总 541ms vs dense 395ms 是【慢 +37%】（speedup 0.73）；「选择链压到 ~100ms → 总 ~250ms < dense 395ms ≈ 1.6x speedup」是净加速的【假设性目标】，非已获结果。另按 TL-156：total - standalone_selector 是残余成本估计（含 attention/胶水/打包），无 trace 不称纯 attention 时间",
+  "verdict": "【已纠偏】① 瓶颈归因仍成立：@64K 剩余天花板在选择链（421ms/77.8%）不在 attention 段（~120ms 残余口径）——attention 段已达次线性（K2 增量 +27ms/档）。② 选择链近线性增长（210→421ms）是 prefill 对 dense 翻盘的唯一已识别杠杆：批量化若压到 ~100ms，总 wall ~250ms vs dense 395ms 才首次实现净加速（~1.6x）——须实测验证。③ 对 dense 当前全档 net-negative（64K 慢 +37~45%），论文 prefill 性能进消融附录",
+  "scripts": ["/tmp/e139_selchain_seg_bench.py（送 .187 /tmp 同名）", "/tmp/e139_selchain_inner_seg.py（三段分项，.187 /tmp 同名）"],
+  "inner_seg_2026_10_15": {
+    "protocol": ".187 GPU4 锁卡，7-iter 中位 fresh indexer，原样复刻 batch_select.py ②③ 段代码逐段计时（.187:/tmp/e139_selchain_inner_seg.py）",
+    "results": {"prepare_index": {"ms": 2.0, "pct": 0.5}, "L1_score_loop": {"ms": 108.8, "pct": 25.7}, "L2_loop": {"ms": 312.5, "pct": 73.8}, "sum": "423.3ms 与整链 421.4ms 锚定吻合（差值 = 胶水/池几何/L1 topk）"},
+    "reading": "【主攻方向修正】选择链 421ms 的大头在 ⑤ L2 逐行循环（312.5ms/73.8%）不在 ③ L1 打分循环（108.8ms）——L2 循环每行 ~10+ launch（gather k_qat 候选 → fine kernel → 全宽 scatter buf → 全宽 softmax → GQA mean → 双池 topk → scatter mask）× N=1008 行 ≈ 10k+ launches，且全宽 softmax buf [1,1,H,g1_j] 逐行分配。批量化收益上界重排：L2 循环消除（若压到 ~30ms 量级）→ 选择链 ~130ms → 64K 总 ~250ms ≈ 1.6x speedup vs dense（假设性目标，须实测）。L1 打分循环（108.8ms）为次级杠杆"
+  }
+}

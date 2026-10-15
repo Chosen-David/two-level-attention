@@ -1,0 +1,26 @@
+{
+  "exp": "E139 纲领④ 融合态 wall 全曲线（#249 追补）：L∈{8K,16K,32K,64K} 四态（dense/逐组/批量/批量+融合）+ K2 上探，.187 GPU4/5 双卡交叉",
+  "date": "2026-10-15",
+  "protocol": "协议克隆 e139_gang23_wall_lsweep：fresh indexer 每 iter、7 iter 中位、warmup 2、单流（PREFETCH=0）、锁卡计时；树 a9e814e（含融合 kernel）；GPU4/5 双卡交叉（.187 GPU0-3 被 round3 e2e 占用，纯 bench 与 e2e 分卡）",
+  "results": {
+    "lsweep_gpu45": {
+      "L8192": {"dense": 6.8, "per_group": 174.9, "batch": 96.2, "fused": 54.3, "fused_vs_dense": 0.12},
+      "L16384": {"dense": 25.8, "per_group": 411.7, "batch": 241.3, "fused": 117.3, "fused_vs_dense": 0.22},
+      "L32768": {"dense": 100.2, "per_group": 978.8, "batch": 592.4, "fused": 249.8, "fused_vs_dense": 0.40},
+      "L65536": {"dense": 395.3, "per_group": 2302.2, "batch": 1495.1, "fused": 539.6, "fused_vs_dense": 0.73},
+      "cross_gpu_consistency": "GPU4 vs GPU5 全档差 ≤0.3%（539.6 vs 539.9 等）",
+      "speedup_cumulative": "融合态 vs 逐组：8K 3.22x / 16K 3.51x / 32K 3.92x / 64K 4.27x——随 L 单调增（融合 kernel 块级跳空的节省随 L 超线性）"
+    }
+  },
+  "reading": {
+    "verdict_level": "【2026-10-15 方向纠偏（GPT TL-156 confirmed，92bdbf0）】原判「64K 融合态 1.37x 净加速」系方向颠倒错误：脚本输出 td/t_fus=0.73 是 speedup（<1 = 更慢），539.6ms > 395.3ms——融合态 @64K 仍比 dense 慢 +36.5%（latency_multiplier 1.365）。用户目标「稀疏 prefill 对 dense 有明显加速（64K）」在 wall 口径【未达成】。原「32K→64K 增量 144ms」亦有算术错（实为 539.6-249.8=289.8ms，与 dense 增量 295.1ms 近相等）；四个测试长度（8K/16K/32K/64K）均无交叉，「48-56K 交叉点」不受数据支持",
+    "mechanism": "仍成立的部分：融合态 vs 逐组 4.27x / vs 批量 2.77x @64K（相对旧稀疏实现的显著改善）；分项口径（e139_selchain_seg_bench）显示选择链 421ms 占 77.8% 而 attention 段仅 ~120ms——稀疏 attention 段本身已达次线性，瓶颈在选择链。若选择链批量化压到 ~100ms，总 wall ~250ms < dense 395.3ms，净加速才成立（此为假设性目标非已获结果）",
+    "caveats": [
+      "speedup = dense_ms / candidate_ms，>1 才是更快；本表 64K speedup = 0.73x（更慢 +36.5%）",
+      "dense 参照 = SDPA（transformers ≥4.51 Qwen3 默认 attn 实现 = e2e PFDD 生产口径）",
+      "8K/16K/32K 档 speedup 0.12/0.22/0.40x——全长度档慢于 dense，无已测交叉点"
+    ]
+  },
+  "verdict": "【已纠偏】① 纲领④融合 kernel 的 L 曲线收益真实（vs 逐组 3.22x→4.27x 随 L 单调、vs 批量 2.77x @64K），但截至本判决稀疏 prefill 对 dense 无任何已测长度/预算档实现净加速——64K 慢 +36.5%。② 论文性能叙事维持「decode 5.47x 稳态」单主张，prefill 性能进消融附录（相对稀疏实现链 4.27x + 对 dense 全档 net-negative + 选择链为剩余瓶颈）。③ 用户 64K 目标未达成，转待选择链打分批量化（收益上界：选择链 ~100ms 档则总 wall ~250ms ≈ 1.6x speedup vs dense——须实测验证）",
+  "scripts": ["exp/bench/e139_gang4_wall_lsweep.py（入库随本 commit）", "exp/trace/results/e139_g4lsweep_g{4,5}.log"]
+}

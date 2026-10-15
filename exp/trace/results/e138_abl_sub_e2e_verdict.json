@@ -1,0 +1,39 @@
+{
+  "exp": "E138 消融①②：稀疏 prefill e2e 判决——① PFDD（prefill 稀疏 + decode dense）② PFSP（双稀疏），统一 sub/sub + mavg 冠军基准",
+  "date": "2026-10-14",
+  "protocol": {
+    "arm": "mavg 冠军 flags + --tli_subspace tail + ① --tli-sparse-prefill --tli-decode-dense / ② --tli-sparse-prefill（派单 /tmp/e138_abl_dispatch_g234567.sh，T=1014094000）",
+    "anchor": "E133 sub/sub AVG5 47.59（e133_subspace_verdict.json per_task，不重跑）；对标 fullKV 47.91（E123）",
+    "hosts": ".187 GPU2-7（①② 8 格）+ .251 musique ×2（经本机中转至 .187 打分）",
+    "treatment": "①② = 5da98b8（gather 版稀疏 prefill，cc93913 预取为值等价后续不重铺）；033D gate 对照见 e138_dgate_sub_e2e_verdict.json",
+    "scoring": ".187 ~/two-level-attention_git eval.py（difflib:stdlib）；① strict 5/5 ② strict 5/5，cap_comparability_key 6688f41924 单一无 legacy 混挂",
+    "stats": "task-bootstrap 10000 次 seed 20261014，描述性口径（126 措辞纪律）"
+  },
+  "per_task_delta": {
+    "pfdd_prefill_sparse": {"gov_report": -1.21, "hotpotqa": -11.12, "musique": -6.16, "qasper": -2.79, "repobench": -9.15},
+    "pfsp_dual_sparse": {"gov_report": -0.97, "hotpotqa": -10.45, "musique": -7.17, "qasper": -2.03, "repobench": -5.48}
+  },
+  "avg": {
+    "anchor_sub_sub": 47.59,
+    "pfdd_prefill_sparse": 41.82,
+    "pfsp_dual_sparse": 42.69
+  },
+  "bootstrap_ci95": {
+    "pfdd": {"delta": -6.086, "ci": [-9.340, -2.832], "contains_zero": false},
+    "pfsp": {"delta": -5.220, "ci": [-8.144, -2.296], "contains_zero": false}
+  },
+  "mask_reference_cross_validation": {
+    "design": "mask 版稀疏 prefill（35c79b7 = 91ed0c8^，CLI/身份修复全同、仅 prefill 实现 einsum 全 T + where(-inf)）同 flags 对照 hotpotqa/musique（/tmp/e138_maskref_dispatch.sh，T=1014123000）",
+    "result": {"hotpotqa": {"mask": 49.38, "gather": 48.97, "diff": 0.41}, "musique": {"mask": 27.19, "gather": 27.08, "diff": 0.11}},
+    "reading": "双实现同分（差 ≤0.41）且同崩——崩塌是 chunk 共享选择语义的固有成本，非 gather 版实现缺陷。prefill wall 3.82x 的性能收益（e138bc_prefill_wall_bench_verdict.json）与质量成本来自同一机制的两面"
+  },
+  "failure_mode": "输出流畅但事实性答错（musique 多跳答非所问、23/200 近空）——检索失败形态非实现破损",
+  "attribution": {
+    "prefill_sparse_cost": "①② 与锚点唯一差异 = --tli-sparse-prefill（历史全部 e2e 锚点 prefill 均 dense，flag 为 store_true 默认 False——git 查证 pred.py 1faeeff L95）。这是 chunk 共享选择（CHUNK=2048，末行 q 代言整块）的首次 e2e 质量验证，2048 粒度信息丢失为崩塌根因",
+    "decode_sparse_marginal": "② - ① = +0.87（① decode dense 反而略低）——decode 稀疏非崩源，方向上与 ③ D' gate（decode-only 改动，Δ+0.03 噪声级）自洽：TLI 质量崩塌全部来自 prefill 侧 chunk 粒度",
+    "cross_impl": "mask vs gather ≤0.41 分——实现无关性背书"
+  },
+  "verdict": "①② 判决：chunk 共享选择（2048 粒度）稀疏 prefill e2e 质量成本 Δ≈-5~-6 分（CI 均不含 0），①② 双臂与 mask 版双实现交叉验证三重背书——语义固有成本，非实现缺陷。prefill 稀疏口径需结构性重设计（chunk 粒度细化或 per-row 选择）方可进生产；论文 chunked sparse prefill 对标叙事（MoBA 口径）受重大影响须如实修订。E138 三消融收官：① -5.77 崩塌 ② -4.90 崩塌 ③ D' gate 零成本落袋（生产可选项）",
+  "residual": "2048 粒度细化（512/1024 扫参）与 per-row 选择为候选修复路径；性能面 prefill wall 3.82x 收益的适用前提=质量面修复，两者须联合评估后立项",
+  "scripts": ["/tmp/e138_abl_dispatch_g234567.sh", "/tmp/e138_maskref_dispatch.sh", ".187:~/tmp_e138_abl_e2e/pred_abl_pfdd/pred_abl_pfdd/result.json", ".187:~/tmp_e138_abl_e2e/pred_abl_pfsp/pred_abl_pfsp/result.json", ".187:~/tmp_e138_maskref_e2e"]
+}
