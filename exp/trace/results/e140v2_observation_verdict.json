@@ -40,5 +40,18 @@
     "validity_audit": "agent_doc/guide/paper_figs/observation/E140_VALIDITY.md（GPT TL-E140-VALIDITY 五缺陷清单）",
     "o_collector_cpu_parity": "exp/paper/evidence/observation-cpu-20261015/（HF 原生对拍 max|Δ|=1.19e-7）",
     "old_invalid": "e140_o_trace.json / e140_o4_select_trace.json（字节保留，历史诊断专用）"
+  },
+  "erratum": {
+    "date": "2026-10-16",
+    "source": "TL-E140-O4-PARTIAL-PAGE-20261015（agent_doc/advice/2026-10-15_e140_o4_partial_page_by_gpt.md，合并 main d822345）",
+    "defect": "O4 v2 collector 的 n_pg = n_mid // BS 丢弃 mid 区不完整末页（v2 重写时自旧版保留的逻辑）：128 条 query 全部有不满 64 的末页，30272 个有效 group-token 中两 TLI 臂均选 0、oracle 选 21785。",
+    "impact": [
+      "panel (d) 的 v2 口径数字（far_sel oracle 305.5/128/432，overlap 0.518→0.554，retained_mass 0.781/0.736）降级为「partial-page 缺陷口径，待 v3 重采」；(d) SURVIVES 判决改为 PENDING-V3。",
+      "panel (a)(b)(c) 不受影响（数据源 e140_o_trace_v2.json，无页概念）；(c) SURVIVES 与 (a)(b) REWRITTEN 判决维持。",
+      "组合图 O_observation.* 整体降历史诊断（(d) 与其余面板同图），渲染器默认 fail-closed；v3 采集器已修（valid_page_stats + 候选裁界，tests/test_e140_o4_partial_page.py 7/7）但未执行重采（无 GPU 授权）。"
+    ],
+    "mechanism_note": "far 配额断供机制链的证据结构不变但证据来源降级：K1=128 时 far 配额被压到 128 是配额公式的算术性质（tli_indexer L2300-2305，代码闭合，不受 trace 缺陷影响）；K1=64 甜点有 e2e 独立证据（E140h AVG5 48.10 vs 锚 47.91）。(d) 面板的 trace 数字待 v3 重采后再引用。",
+    "paper_impact_update": "论文正文 §2 Observations 不受新增影响（数字来自 10-trace 口径，无 (d) 面板数字）；图集 O 图在 v3 重采前整体历史诊断。",
+    "original_text_preserved": true
   }
 }
