@@ -400,6 +400,11 @@ def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
     # q*scale 后转 fp32（与 torch 路径的 b_q 同口径：bf16 乘 scale 舍入
     # 后升精度——数值与原型逐位同）
     qs = (q[0] * softmax_scale).to(torch.float32)   # [H, D]
+    # Pointwise scaling/to() can preserve a transposed dense layout. The
+    # kernel takes the head stride but addresses features as +offs_d, so its
+    # Q operand must have unit feature stride. Standard queries need no copy.
+    if qs.stride(-1) != 1:
+        qs = qs.contiguous()
     o = torch.empty((H, D), device=dev, dtype=q.dtype)
     _eager_attn_kernel[(_attn_grid_size(R, G, per_qh),)](
         idx, cnt, qs, k, v, o,
