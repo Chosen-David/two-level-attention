@@ -85,3 +85,23 @@ or scientific claims. Historical artifacts and their validity status remain
 unchanged. Details and remaining conditions:
 `agent_doc/advice/2026-10-15_e140_collector_cpu_validation_by_gpt.md`;
 evidence: `exp/paper/evidence/observation-cpu-20261015/`.
+
+### Follow-up: E140v2 recollection executed (2026-10-16, wys-4xh20 GPU1/GPU3)
+
+Both collectors ran with `--execute` on the 4xH20 node (transformers 4.56.2,
+bf16, declared local revisions with sha256 prefixes; see
+`exp/trace/results/e140v2_observation_verdict.json` meta). Outputs:
+`exp/trace/results/e140_o_trace_v2.json` (o3_raw stripped to a sidecar recorded
+by sha256; npz Q/K snapshots kept private on the node per the snapshot rule) and
+`exp/trace/results/e140_o4_select_trace_v2.json`. The O4 collector was rewritten
+to the v2 contract (hooked q_norm/k_norm outputs + actual position_embeddings,
+revision gating, `--execute`, `x`-mode output) before execution.
+
+Panel-level re-verification (see verdict JSON for full numbers): (c) tail32 >
+random32 > high32 survives with stronger margins (0.84/0.51/0.24); (d) far
+starvation and K1=64 recovery survives (oracle 305.5 vs 128 vs 432 per query,
+overlap 0.518→0.554); (a) the d>9K density rebound does not reproduce (monotone
+decay); (b) far holds ~49% of nonprotected mid mass, not 83%. The paper O
+section and `figs/fig_o_observation.py` must be rewritten against the v2 JSONs
+before any figure is used as paper evidence; the historical-render gate remains
+in force for the old JSONs.

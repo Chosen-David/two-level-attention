@@ -1,0 +1,48 @@
+{
+  "experiment": "E146",
+  "title": "RULER 128K FullKV 锚 + TLI 主臂补齐（新节点 wys-4xh20，22 格全量）",
+  "date": "2026-10-16",
+  "user_directive": "#266：RULER 32/64/128K 全测，主方法定位 decode-only 在长文体现加速",
+  "caliber": {
+    "model": "Qwen3-8B",
+    "host": "wys-4xh20 (10.238.122.187) 4xH20, GPU0/1=none 臂 GPU2/3=tli 臂",
+    "config": "pred_ruler.py --t e146 --max-num 100 --yarn（factor 4.0 自动档），tli 臂 mavg a.125/b.375/g.625 tail minmax/avg K1=128 K2=1024 c4 kmeans/layer_skip off",
+    "tree": "main 324c210 clone（bee 共享盘）",
+    "scoring": "score_ruler_formal.py（string_match_all，manifest 身份闭包 + 原子发布），11 任务×2 臂各 n=100",
+    "formal_outputs": "exp/results_ruler/Qwen3-8B/e146_r128k_formal.json (+md/manifest/receipt，节点侧留档)"
+  },
+  "arms": {
+    "none_fullkv": {
+      "niah_single_1": 100.0, "niah_single_2": 100.0, "niah_single_3": 100.0,
+      "niah_multikey_1": 99.0, "niah_multikey_2": 57.0, "niah_multikey_3": 1.0,
+      "niah_multiquery": 12.25, "niah_multivalue": 2.5,
+      "cwe": 3.4, "fwe": 13.0, "vt": 22.6,
+      "AVG": 46.43
+    },
+    "tli_main_arm": {
+      "niah_single_1": 39.0, "niah_single_2": 44.0, "niah_single_3": 34.0,
+      "niah_multikey_1": 58.0, "niah_multikey_2": 19.0, "niah_multikey_3": 0.0,
+      "niah_multiquery": 10.75, "niah_multivalue": 1.0,
+      "cwe": 0.2, "fwe": 31.0, "vt": 26.8,
+      "AVG": 23.98
+    }
+  },
+  "anchors": {
+    "fullkv_32k_E104B": 88.71,
+    "tli_32k_E104B_mainarm": 85.83,
+    "note": "32K→128K 两臂同塌：FullKV 88.71→46.43，主臂 85.83→23.98——yarn×4 位置外推 + 128K 任务难度本身贡献大部分塌幅，不能全部归因稀疏"
+  },
+  "verdict": {
+    "tli_vs_fullkv_128k": -22.45,
+    "retention_vs_fullkv": 0.517,
+    "conclusion": "128K 档 TLI 主臂保持率 51.7%，质量面未通过『长文近无损』。但两个关键口径事实限定判读：①FullKV 锚自身 32K→128K 塌 42.3 分（yarn 4.0 外推伤害主导，模型有效上下文不足 128K），该档位比较是『两个都已塌的臂的相对差』而非健康基线；②主臂口径 a.125/b.375/g.625 是 LongBench 形态最优，RULER 合成 needle 形态最优臂是 β=0.25/γ=0.125（32K 同表重扫 -2.10，112 任务形态差已知）——口径差解释不了 -22 的量级。",
+    "per_task_reading": "niah single 1-3 掉 56-66 分（最重的质量损失：needle-in-haystack 检索在高外推距离被稀疏预算漏检）；multikey_1 -41；cwe -3.2 塌到 0.2；反超项 fwe +18 / vt +4.2（词表/追踪类对稀疏不敏感甚至受益）。与 E140v2 (d) far 断供证据链一致：128K 下候选池 16×于 32K 而 K2=1024 固定，far 覆盖率结构性下降。",
+    "narrative_impact": "『decode-only 长文加速』叙事的 128K 质量面须如实降级：64K 前提质量判决待本机链（E146 64K 在飞），128K 若引用须配保持率 51.7% + FullKV 同塌 46.4 的口径说明。性能面（E141a/E147 kernel 链 64K 1.64×/128K 2.75×/256K 4.24×）不受本判决影响，但『加速×质量』联合主张在 128K 不能写近无损。"
+  },
+  "in_flight": "本机 64K 双臂链（PID 1949827）进行中，判据待其出数后并入本判决系列",
+  "cross_references": {
+    "e104b_32k": "RULER 32K 五臂（FullKV 88.71 / TIA 88.35 / mavg 最优 87.93）",
+    "e140v2_far_starvation": "e140v2_observation_verdict.json（far 断供 128 vs oracle 305，预算公式证据）",
+    "e150": "attention-kernel-only 性能面板（#270）——性能叙事承载者"
+  }
+}

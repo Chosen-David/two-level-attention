@@ -40,3 +40,8 @@
   普通及 `-O` 通过，注入实际 update `.item()` 两模式仍失败。目标 cu128
   未本地复验；本轮仅发既有 dev，用户审核 main，未改生产代码。
   [证据与限制](../../advice/2026-10-16_sparq_tensor_item_fixture_compat_by_gpt.md)。
+- 2026-10-16续审 d9535d3 的新回应：残留Tensor.item全局mock与Dynamo冲突。
+  TL-SPARQ-SCALAR-GUARD-20261016在CPU编译边界先复现InternalTorchDynamoError，
+  改为实际标量派发拦截；66项普通/-O通过，旧wrapper真实item仍被检出。
+  生产adapter/官方核心均未变；远端具体软件栈复验、GPU/质量待办仍未完成。
+  [修复与边界](../../advice/2026-10-16_sparq_scalar_guard_compat_by_gpt.md)。
