@@ -14,6 +14,19 @@
   消 72-cat/步）。如实呈现 e2e 现状：TPOT tli/dense = 3.4×/2.5×/1.8× @32/64/128K，
   kernel 级加速不 translate（launch-bound 归因链在判决 JSON）；负收益不裁（spec）。
 
+kernel 设计创新点（decode-only 转向后 E2 的设计贡献叙事，全部以同机对照数字入图）：
+  (i) E127 融合两级选择 kernel 链（粗筛上界 + 精筛融合 decode kernel）——5.47× GPU
+      稳态 @64K（面板 a 数据条）；
+  (ii) E133c launch/融合优化套件——A1 统计 buffer 直写消 3 cat、A4/A5 尾段统计与
+      4bit 量化融合 kernel（7-12 launch→1）、A6 D=32 tile 特化——稳态 GPU −12.3%
+      （同机 A/B，两轮交叉一致；tail 臂 −14.6% 反平 full）；tail-32 子空间粗筛省算
+      4×、mask 逐位一致（注记入面板 a）；
+  (iii) E139 Step2 prefill 候选列化 + 选择链 CUDA graph capture——64K 1.64× vs dense
+      （面板 b Step2 曲线）；
+  (iv) E134-pre StaticCache 集成——消 HF DynamicCache 72 cat 拷贝/步共付开销，
+      TPOT 87.9→82.0ms @32K（面板 c StaticCache 工作点）。
+  e2e 缺口诚实归因：launch-bound（host 侧主导），E134 整步 graph capture 为下一杠杆。
+
 数据全部从判决 JSON 程序化读取，无手工键入；输出 PDF+PNG+SVG + figure_data.tsv。
 """
 import json
@@ -64,6 +77,10 @@ for L in Ls:
 
 e152v2 = json.load(open(os.path.join(REPO, "exp/trace/results/e152v2_e2e_latency_verdict.json")))
 rm = e152v2["results_median"]
+# E133c 同机 A/B 稳态百分比（跨机绝对值不与 E127 混用，只取同机对照 delta）
+e133c = json.load(open(os.path.join(REPO, "exp/trace/results/e133c_subspace_speedup_verdict.json")))
+e133c_e2e_pct = e133c["steady_gpu_ms"]["mavg_e2e"]["delta_pct"]   # 生产口径 -12.3%
+e133c_tail_pct = e133c["steady_gpu_ms"]["mavg_tail"]["delta_pct"]  # tail 臂 -14.6%
 
 # ---------------- 画布 ----------------
 fig, (ax_a, ax_b, ax_c) = plt.subplots(1, 3, figsize=(27, 9),
@@ -82,7 +99,7 @@ ax_a.set_yticks([1e-2, 1e-1, 1, 10])
 ax_a.set_xticks(list(x))
 ax_a.set_xticklabels(stage_labels)
 ax_a.set_ylabel("per-step GPU time (ms, log scale)")
-ax_a.set_title("Decode stage decomposition @64K", pad=14)
+ax_a.set_title("Decode steady state: 5.47x @64K", pad=14)
 ax_a.legend(loc="upper left")
 # 仅 total 条标注数值（分项数值进 tsv，避免 log 轴低矮条标签互叠）
 ax_a.text(5 - w / 2, h["baseline_gpu_ms"] * 1.15, f"{h['baseline_gpu_ms']:.2f}",
@@ -91,7 +108,12 @@ ax_a.text(5 + w / 2, h["iter8_gpu_ms"] * 1.15, f"{h['iter8_gpu_ms']:.2f}",
           ha="center", fontsize=FONT_SIZES["annotation"] - 2)
 ax_a.text(5, 3, "5.47x GPU\n4.76x wall", ha="center",
           fontsize=FONT_SIZES["annotation"], color=C_HL, fontweight="bold")
-ax_a.text(0.02, 0.02, "single-layer synthetic steady state,\nnot full-request E2E",
+# 底注：口径 caveat + E133c kernel 创新点合并单元素（同机 A/B 百分比注记，
+# 跨机绝对值不与 E127 混）
+ax_a.text(0.02, 0.02,
+          f"single-layer synthetic steady state, not e2e;\n"
+          f"E133c fused kernels + buffers: {e133c_e2e_pct:.1f}% steady GPU\n"
+          f"(same-machine A/B); tail-32: 4x less coarse compute",
           transform=ax_a.transAxes, fontsize=FONT_SIZES["annotation"] - 4,
           style="italic", color=pal["neutral"], va="bottom")
 
@@ -111,7 +133,7 @@ ax_b.set_xticks(Lk)
 ax_b.set_xticklabels([f"{l}K" for l in Lk])
 ax_b.set_xlabel("input length L (tokens)")
 ax_b.set_ylabel("prefill attention wall (ms, log scale)")
-ax_b.set_title("Prefill: wall vs input length (K2=1024)", pad=14)
+ax_b.set_title("Prefill wall: Step2 graph + columnization", pad=14)
 ax_b.legend(loc="upper left")
 # 数值标注（64K dense 标签移到标记左侧，避让 upper-left legend 右缘）
 for i, (lk, d, s2) in enumerate(zip(Lk, dense_ms, step2_ms)):
@@ -125,7 +147,7 @@ for i, (lk, d, s2) in enumerate(zip(Lk, dense_ms, step2_ms)):
                       ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_DENSE)
     ax_b.annotate(f"{s2:.0f}", (lk, s2), textcoords="offset points", xytext=(0, -18),
                   ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_STEP2)
-ax_b.text(64, 55, "1.64x vs dense", ha="right",
+ax_b.text(64, 55, "1.64x vs dense\n(selection chain CUDA-graph-captured)", ha="right",
           fontsize=FONT_SIZES["annotation"], color=C_HL, fontweight="bold")
 ax_b.text(0.02, 0.02, "single-layer synthetic prefill;\nshort lengths remain net-negative",
           transform=ax_b.transAxes, fontsize=FONT_SIZES["annotation"] - 4,
@@ -160,7 +182,7 @@ for lk, d, t in zip(Lk_c, dense_tp, tli_tp):
                   ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_TLI)
 ax_c.annotate(f"{tli_st[0]:.0f}", (32, tli_st[0]), textcoords="offset points",
               xytext=(14, 6), ha="left", fontsize=FONT_SIZES["annotation"] - 3, color=C_HL)
-ax_c.text(0.98, 0.42, "kernel-level speedups do not translate:\nper-step host/launch chain dominates\n(72-cat + indexer Python; E133c already shipped)",
+ax_c.text(0.98, 0.42, "kernel-level gains (A) do not reach e2e:\nhost/launch chain dominates — 72 KV-cache\ncat-copies/step + Python indexer;\nStaticCache closes part (87.9 -> 82.0 ms)",
           transform=ax_c.transAxes, fontsize=FONT_SIZES["annotation"] - 3,
           style="italic", color=pal["neutral"], ha="right")
 ax_c.text(0.02, 0.02, "v2 continuous-wall protocol, ABBA x3,\nmax_gen=128, greedy; per-step sync diagnostic mode",
@@ -208,6 +230,9 @@ for L, d, t in zip((32768, 65536, 131072), dense_tp, tli_tp):
     rows.append(f"E2\tc@L{L}\tdense_dynamic\ttpot_ms\tms\t{d:.1f}\t{src152}\tL{L}.dense_dynamic.tpot_ms")
     rows.append(f"E2\tc@L{L}\ttli_dynamic\ttpot_ms\tms\t{t:.1f}\t{src152}\tL{L}.tli_dynamic.tpot_ms")
 rows.append(f"E2\tc@L32768\ttli_static\ttpot_ms\tms\t{tli_st[0]:.1f}\t{src152}\tL32768.tli_static.tpot_ms")
+src133c = "e133c_subspace_speedup_verdict.json:steady_gpu_ms"
+rows.append(f"E2\ta\ttli_e133c_delta\tsteady_gpu_delta_pct\tpct\t{e133c_e2e_pct:.1f}\t{src133c}\tmavg_e2e.delta_pct")
+rows.append(f"E2\ta\ttli_e133c_delta_tail\tsteady_gpu_delta_pct\tpct\t{e133c_tail_pct:.1f}\t{src133c}\tmavg_tail.delta_pct")
 with open(os.path.join(OUT, "E2_latency_figure_data.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 print("exported E2_latency_figure_data.tsv")
