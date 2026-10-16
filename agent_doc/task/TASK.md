@@ -108,3 +108,7 @@
 
 - [x] [TL-E140-O4-PARTIAL-PAGE-20261015] O4 有效末页修复及面板(d)历史诊断隔离；CPU验收，未重采。
   ([详情](task_details/TL-E140-O4-PARTIAL-PAGE-20261015.md))
+
+## 2026-10-16（论文论证修订）
+
+- [x] [TL-PAPER-SCHOLARLY-20261016] 实际论文技能与两篇DAC获奖全文学习；双语逐段论证/PPT修订、独立科学与全页读者复核，保留数据及负结果，零新实验。([详情](task_details/TL-PAPER-SCHOLARLY-20261016.md))
