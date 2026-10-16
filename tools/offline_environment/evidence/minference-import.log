@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/workspace/two-level-attention/exp/vendor_baselines/minference_vendor/minference/__init__.py", line 8, in <module>
+    from .models_patch import MInference
+  File "/workspace/two-level-attention/exp/vendor_baselines/minference_vendor/minference/models_patch.py", line 8, in <module>
+    from .patch import minference_patch, minference_patch_vllm, new_patch, patch_hf
+  File "/workspace/two-level-attention/exp/vendor_baselines/minference_vendor/minference/patch.py", line 25, in <module>
+    from .modules.forward import attn_forward, decoding_forwards, prefill_forwards
+  File "/workspace/two-level-attention/exp/vendor_baselines/minference_vendor/minference/modules/forward.py", line 13, in <module>
+    from ..modules.minference_forward import minference_prefill_forward
+  File "/workspace/two-level-attention/exp/vendor_baselines/minference_vendor/minference/modules/minference_forward.py", line 27, in <module>
+    from ..ops.pit_sparse_flash_attention_v2 import vertical_slash_sparse_attention
+  File "/workspace/two-level-attention/exp/vendor_baselines/minference_vendor/minference/ops/pit_sparse_flash_attention_v2.py", line 10, in <module>
+    from ..cuda import convert_vertical_slash_indexes
+ModuleNotFoundError: No module named 'minference.cuda'

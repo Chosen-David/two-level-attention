@@ -174,7 +174,7 @@ if LANG=='zh':
   ax.set_yticks(ax.get_yticks(), [translations.get(t.get_text(), t.get_text()) for t in ax.get_yticklabels()])
   ax.set_xlim(xlim);ax.set_ylim(ylim)
  for t in fig.findobj(Text):
-  t.set_text(translations.get(t.get_text(),t.get_text()));t.set_fontproperties(FontProperties(fname='/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',size=t.get_fontsize()))
+  t.set_text(translations.get(t.get_text(),t.get_text()));t.set_fontproperties(FontProperties(fname=os.environ.get("PAPER_CJK_FONT", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),size=t.get_fontsize()))
 stem='o_observation'+('_zh' if LANG=='zh' else '')
 fig.savefig(OUT/(stem+'.svg'),bbox_inches='tight');fig.savefig(OUT/(stem+'.png'),dpi=220,bbox_inches='tight')
 svg=OUT/(stem+'.svg');svg.write_text('\n'.join(line.rstrip() for line in svg.read_text().splitlines())+'\n')

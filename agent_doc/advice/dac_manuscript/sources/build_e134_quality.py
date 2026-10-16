@@ -5,8 +5,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
-font_manager.fontManager.addfont("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
-cjk=font_manager.FontProperties(fname="/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc").get_name()
+font_manager.fontManager.addfont(os.environ.get("PAPER_CJK_FONT", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"))
+cjk=font_manager.FontProperties(fname=os.environ.get("PAPER_CJK_FONT", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")).get_name()
 p=Path(__file__).resolve().parents[1]/'figures'
 for lang in ['en','zh']:
  plt.rcParams.update({'font.family':'DejaVu Sans' if lang=='en' else cjk,'font.size':10,'pdf.fonttype':42,'svg.fonttype':'path'})

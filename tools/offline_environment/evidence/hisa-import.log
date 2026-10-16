@@ -1,0 +1,10 @@
+Loading tilelang libs from dev root: /workspace/two-level-attention/third_party/offline-sources/HISA_TileLang/build
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/workspace/two-level-attention/third_party/offline-sources/HISA_TileLang/tilelang/__init__.py", line 100, in <module>
+    from .env import env as env  # noqa: F401
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/two-level-attention/third_party/offline-sources/HISA_TileLang/tilelang/env.py", line 69, in <module>
+    assert TL_LIBS and all(os.path.exists(i) for i in TL_LIBS), f"tilelang lib root do not exists: {TL_LIBS}"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: tilelang lib root do not exists: ['/workspace/two-level-attention/third_party/offline-sources/HISA_TileLang/build/lib', '/workspace/two-level-attention/third_party/offline-sources/HISA_TileLang/build/tvm']

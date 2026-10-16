@@ -26,7 +26,7 @@ def save(fig,name):
    ax.set_yticks(ax.get_yticks(),[TRANSLATE.get(t.get_text(),t.get_text()) for t in ax.get_yticklabels()])
    ax.set_xlim(xlim);ax.set_ylim(ylim)
   for t in fig.findobj(Text):
-   t.set_text(TRANSLATE.get(t.get_text(),t.get_text()));t.set_fontproperties(FontProperties(fname='/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',size=t.get_fontsize()))
+   t.set_text(TRANSLATE.get(t.get_text(),t.get_text()));t.set_fontproperties(FontProperties(fname=os.environ.get("PAPER_CJK_FONT", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),size=t.get_fontsize()))
  for ext in ['svg','png']:fig.savefig(OUT/(name+'.'+ext),dpi=220)
  subprocess.run(['inkscape',str(OUT/(name+'.svg')),'--export-type=pdf','--export-filename='+str(OUT/(name+'.pdf'))],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
  plt.close(fig)

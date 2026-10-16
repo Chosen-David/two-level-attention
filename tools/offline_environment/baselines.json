@@ -1,0 +1,507 @@
+{
+  "date": "2026-10-16",
+  "scope": "S-T023 current named methods plus existing FFD/HISA registrations; DSA/SeerAttention/LazyLLM/MagicPIG historical mentions deferred without new arms",
+  "base_main": "88dcb39e3fd2e6d85126bd0610d36d0043783e9c",
+  "target_host_probe": "not supplied; packaging host is not target host",
+  "sources": [
+    {
+      "name": "ClusterKV",
+      "repository": "https://github.com/sjtu-zhao-lab/ClusterKV",
+      "requested_object": "c7380819588771e8c5dadacdbd33942d7c53adea",
+      "requested_object_type": "commit",
+      "commit": "c7380819588771e8c5dadacdbd33942d7c53adea",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/ClusterKV",
+      "license": "UNKNOWN: no root project license at fixed commit",
+      "license_files": [],
+      "source_metadata_hashes": {
+        "pyproject.toml": "69efcad9876194a3f2abd6d91679b4f7cc326392d4fcbc81f5d0dd733e41a3b4",
+        ".gitmodules": "0b27c298d37194367dd211c01c79ce1a96cfcf930761ed2581894b113e6d53c4"
+      },
+      "submodules": [
+        " 9f49803b1db0a40ea0019ad98b8bb5d4f1593c77 3rdparty/flashinfer (9f49803)",
+        " 40412d85124f7c6f3d88454583c4633e5e10fc8c 3rdparty/flashinfer/3rdparty/googletest (40412d8)",
+        " f57aa9c993f4392a76650bc54513f571cd1128c9 3rdparty/flashinfer/3rdparty/nvbench (f57aa9c)",
+        " 768cebe17e65c2a0a64ed067510729efc3c7ff6c 3rdparty/pybind (768cebe)",
+        " 1e4961e2354afba116e3479c5ec9041937b9922e 3rdparty/raft (1e4961e)"
+      ],
+      "model_stage_interface": "official accuracy/efficiency model/offload lifecycle; dense prefill then clustered decode; no faithful local HF adapter",
+      "official_dependencies": {
+        "python": "3.10.15 historically recorded; upstream >=3.10",
+        "torch": "2.5.0",
+        "transformers": "4.45.2",
+        "cuda": "cu11 pylibraft binding; actual target torch CUDA compatibility unverified",
+        "pylibraft-cu11": "24.10.0",
+        "flashinfer-python": "0.2.5",
+        "flash-attn": "2.6.3",
+        "cpp_raft": "24.02 gitlink; NOT interchangeable with pylibraft24.10"
+      },
+      "venv_created": true,
+      "venv_scope": "empty scaffold, dependencies not installed",
+      "cpu_import": {},
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    },
+    {
+      "name": "HiP",
+      "repository": "https://github.com/DeepAuto-AI/hip-attention",
+      "requested_object": "5f37a7fd77abe4d362cc7b7cd4ea24a3748614c1",
+      "requested_object_type": "commit",
+      "commit": "5f37a7fd77abe4d362cc7b7cd4ea24a3748614c1",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/HiP",
+      "license": "FSL-1.1-MIT (conditional; not currently unconditional MIT)",
+      "license_files": [
+        {
+          "path": "LICENSE.md",
+          "sha256": "58060c2b8a8c8134cb0e8d03dd26691f3e0b401e68ca19b9a0630e3a5b08ac1e"
+        }
+      ],
+      "source_metadata_hashes": {
+        "LICENSE.md": "58060c2b8a8c8134cb0e8d03dd26691f3e0b401e68ca19b9a0630e3a5b08ac1e",
+        "pyproject.toml": "f15d3c68f331922bffd472013c3816e82ea6b4ae8bc4a87dd9bdcd4aa56a13ff"
+      },
+      "submodules": [],
+      "model_stage_interface": "direct Llama/Qwen2 files; Qwen3 SGLang route forces dense decode, no verified HF Qwen3-8B route",
+      "official_dependencies": {
+        "python": ">=3.10,<3.13",
+        "torch": "unbounded",
+        "triton": "unbounded",
+        "cuda": "CUDA12 cupy-cuda12x; TileLang, bitsandbytes; host compatibility unresolved"
+      },
+      "venv_created": true,
+      "venv_scope": "empty scaffold, dependencies not installed",
+      "cpu_import": {
+        "name": "hip",
+        "returncode": 1,
+        "import": false,
+        "real_model": false,
+        "gpu_performance": false,
+        "last_error": [
+          "ModuleNotFoundError: No module named 'torch'"
+        ]
+      },
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    },
+    {
+      "name": "MoBA",
+      "repository": "https://github.com/MoonshotAI/MoBA",
+      "requested_object": "b5d58363311d3ca946f1ec444182727c15e338b5",
+      "requested_object_type": "commit",
+      "commit": "b5d58363311d3ca946f1ec444182727c15e338b5",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/MoBA",
+      "license": "MIT",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "f0c89806155f93f4ea5cb9e81ef70aad1a7729240132df9706db9584024547db"
+        }
+      ],
+      "source_metadata_hashes": {
+        "LICENSE": "f0c89806155f93f4ea5cb9e81ef70aad1a7729240132df9706db9584024547db",
+        "requirements.txt": "c87bae0868b70cd51a981ab62526df6b1bc59abbed31efcf89fb9c9c45a9761c",
+        "pyproject.toml": "705c27b722a189a8567c3176f2c51fb2a700bbf6fb3b346b7e63fdb7f8b69d05"
+      },
+      "submodules": [],
+      "model_stage_interface": "Qlen=KVlen sparse prefill/training; otherwise native dense flash decode; continued training condition",
+      "official_dependencies": {
+        "python": ">=3.10",
+        "torch": ">=2.1.0",
+        "transformers": ">=4.48.3",
+        "flash-attn": "2.6.3",
+        "cuda": "FlashAttention build/toolchain required"
+      },
+      "venv_created": true,
+      "venv_scope": "CPU dependency candidate, NOT official CUDA environment",
+      "cpu_import": {
+        "name": "moba",
+        "returncode": 1,
+        "import": false,
+        "real_model": false,
+        "gpu_performance": false,
+        "last_error": [
+          "ModuleNotFoundError: No module named 'flash_attn'"
+        ]
+      },
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    },
+    {
+      "name": "HISA_author_entry",
+      "repository": "https://github.com/MuLabPKU/TransArch",
+      "requested_object": "dc9f3a3b7938bd26e165b0c99e3b6ea627d1ecfc",
+      "requested_object_type": "commit",
+      "commit": "dc9f3a3b7938bd26e165b0c99e3b6ea627d1ecfc",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/HISA_author_entry",
+      "license": "UNKNOWN: no root license",
+      "license_files": [],
+      "source_metadata_hashes": {},
+      "submodules": [],
+      "model_stage_interface": "author identity for HISA arXiv2603.28458v4; DSA/Sparse-MLA indexer (DeepSeek-V3.2/GLM-5), not DeepSeek-V2-Lite/Qwen3 adapter",
+      "official_dependencies": {
+        "cuda": "author end-to-end CUDA13 / SGLang0.5.11 / TileLang0.1.9; excluded"
+      },
+      "venv_created": true,
+      "venv_scope": "empty scaffold, dependencies not installed",
+      "cpu_import": {
+        "name": "hisa",
+        "returncode": 1,
+        "import": false,
+        "real_model": false,
+        "gpu_performance": false,
+        "last_error": [
+          "AssertionError: tilelang lib root do not exists: ['/workspace/two-level-attention/third_party/offline-sources/HISA_TileLang/build/lib', '/workspace/two-level-attention/third_party/offline-sources/HISA_TileLang/build/tvm']"
+        ]
+      },
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    },
+    {
+      "name": "HISA_TileLang",
+      "repository": "https://github.com/tile-ai/tilelang",
+      "requested_object": "7940102813c08c1a589e1b4c57d7010d9aa68982",
+      "requested_object_type": "commit",
+      "commit": "7940102813c08c1a589e1b4c57d7010d9aa68982",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/HISA_TileLang",
+      "license": "MIT, preserve historical collaboration notice",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "f70e5cdc24c3797af741930440086f9a0ad36930b05a3dfc25b420936dc2cfa1"
+        }
+      ],
+      "source_metadata_hashes": {
+        "LICENSE": "f70e5cdc24c3797af741930440086f9a0ad36930b05a3dfc25b420936dc2cfa1",
+        "requirements-lint.txt": "f997468c2e80e780ea59aab0981d233a7c53fc6b26097cff5430f082480fa4c1",
+        "requirements-dev.txt": "98c1499cc6be6cdf3b7e197a55d7be6ed01482c6c56534c2dc65d802016277d9",
+        "requirements-test-rocm.txt": "13a30db971b329110253f26af3206a8797d2b71fd8bf95289832ce1f69279a0d",
+        "requirements.txt": "fff760a6aba24781d2bc6304439edfae8673f2c9b4ec314f7bbe82ff40fe9411",
+        "requirements-test.txt": "beddc80173da7cac3e96ae8dc93ad7ff05c7eae0e92d23bbdff64041adc739fe",
+        "requirements-test-cuda.txt": "3bcb094f01f3440e59e48997307a0dffadf38e2badedcb8971fe957bb43a2bf0",
+        "requirements-test-metal.txt": "6b22ed84f1e5e9751380a4aebddde6265809e1fb0d212d694b860a2bdc8baeb6",
+        "pyproject.toml": "34670e619c7879875dcc70c8416c9e3e7262715a2c4d6827a2e664790fd7106a",
+        ".gitmodules": "97d32757db7b557e3130d1f308031ddbb8d47fbabd130d16088d98c811310086"
+      },
+      "submodules": [
+        " b2dd65dc864e09688245b316ac46c4a6cd07e15c 3rdparty/cutlass (b2dd65d)",
+        " 4211874e9e4b8770fd20ad0d98ab80afd1df5028 3rdparty/tvm (4211874)",
+        " b590a6bfe034ea3a418b7b523e3490956bcb367a 3rdparty/tvm/3rdparty/OpenCL-Headers (b590a6b)",
+        " b2dd65dc864e09688245b316ac46c4a6cd07e15c 3rdparty/tvm/3rdparty/cutlass (b2dd65d)",
+        " 72b9883c986a2ff427ca61ac0b14ad59be1dc862 3rdparty/tvm/3rdparty/cutlass_fpA_intB_gemm (72b9883)",
+        " cc85b64cf676c45f98a17e3a47c0aafcf817f088 3rdparty/tvm/3rdparty/cutlass_fpA_intB_gemm/cutlass (cc85b64)",
+        " 07ba35bae96900e51b4d63ef3487ba24850da870 3rdparty/tvm/3rdparty/libflash_attn (07ba35b)",
+        " e0aaa3c3b38db9a89c31f04fef91e92123ad5e2e 3rdparty/tvm/3rdparty/libflash_attn/cutlass (e0aaa3c)",
+        " 3c35034fd1026011736e19a4e0e1ed0f22058c42 3rdparty/tvm/3rdparty/tvm-ffi (3c35034)",
+        " 84d107bf416c6bab9ae68ad285876600d230490d 3rdparty/tvm/3rdparty/tvm-ffi/3rdparty/dlpack (84d107b)",
+        " 793921876c981ce49759114d7bb89bb89b2d3a2d 3rdparty/tvm/3rdparty/tvm-ffi/3rdparty/libbacktrace (7939218)"
+      ],
+      "model_stage_interface": "prefill indexer tensors Q/K/head weights -> token indices for Sparse MLA; author end-to-end SGLang route excluded",
+      "official_dependencies": {
+        "python": ">=3.10",
+        "torch": "unbounded",
+        "cuda": "author end-to-end CUDA13 + TileLang0.1.9; source kernel build not performed"
+      },
+      "venv_created": true,
+      "venv_scope": "empty scaffold, dependencies not installed",
+      "cpu_import": {
+        "name": "hisa",
+        "returncode": 1,
+        "import": false,
+        "real_model": false,
+        "gpu_performance": false,
+        "last_error": [
+          "AssertionError: tilelang lib root do not exists: ['/workspace/two-level-attention/third_party/offline-sources/HISA_TileLang/build/lib', '/workspace/two-level-attention/third_party/offline-sources/HISA_TileLang/build/tvm']"
+        ]
+      },
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    },
+    {
+      "name": "RAFT_24.10",
+      "repository": "https://github.com/rapidsai/raft",
+      "requested_object": "397042a0af9cb819a098ce60259a55e0a4509956",
+      "requested_object_type": "commit",
+      "commit": "397042a0af9cb819a098ce60259a55e0a4509956",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/RAFT_24.10",
+      "license": "Apache-2.0",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "756005f963846334943e8bfc08ef98cd254257d8467ac7a7ffd42a1be262f442"
+        }
+      ],
+      "source_metadata_hashes": {
+        "LICENSE": "756005f963846334943e8bfc08ef98cd254257d8467ac7a7ffd42a1be262f442",
+        "pyproject.toml": "00a48926353d268f68a5442b32e8eac2b644c23be2ee5d6084a0a65143e7d3fd"
+      },
+      "submodules": [],
+      "model_stage_interface": "ClusterKV accuracy dependency API evidence only; distinct from C++ RAFT 24.02 gitlink",
+      "official_dependencies": {
+        "python": "pylibraft source rmm==24.10.*",
+        "cuda": "CUDA-dependent; matching wheel unavailable"
+      },
+      "venv_created": false,
+      "venv_scope": "source API inspection only; no environment requested for this supporting dependency",
+      "cpu_import": {},
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    },
+    {
+      "name": "FFD",
+      "repository": "https://github.com/qluoluo/faster-flash-decoding",
+      "requested_object": "ca09458ab1536328e5f46502b27891412733cd6d",
+      "requested_object_type": "commit",
+      "commit": "ca09458ab1536328e5f46502b27891412733cd6d",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/FFD",
+      "license": "Apache-2.0",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "fb471733addf2da285fab9c29ae59cdce145431b0dd013c4db208e4b11e07e0d"
+        }
+      ],
+      "source_metadata_hashes": {
+        "LICENSE": "fb471733addf2da285fab9c29ae59cdce145431b0dd013c4db208e4b11e07e0d",
+        "requirements.txt": "3146f1e2923294cbfe4b9162982c94333f91547a44473442564048dffe5af46a",
+        "pyproject.toml": "39a52737c3ad8c9f2926ecd3963a3c10c33095807a3d70e31ed31fafcdab68df"
+      },
+      "submodules": [],
+      "model_stage_interface": "Llama native dense prefill, Q2/FP8 top-delta sparse decode; Qwen3/MLA unsupported; GQA requires flash-attn; B1 initial >=128 tokens",
+      "official_dependencies": {
+        "python": ">=3.10",
+        "torch": "2.8.0+cu128",
+        "cuda": "12.8",
+        "transformers": "4.57.3",
+        "triton": "3.4.0",
+        "flash_attn": "2.8.3 optional upstream, needed for local GQA route",
+        "numpy": "1.26.4 (official requirements)"
+      },
+      "venv_created": true,
+      "venv_scope": "CPU dependency candidate, NOT official CUDA environment",
+      "cpu_import": {
+        "import": true,
+        "evidence": "evidence/ffd-import.log"
+      },
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    },
+    {
+      "name": "Quest",
+      "repository": "https://github.com/mit-han-lab/Quest",
+      "requested_object": "01c1623bf9395009520874e989e29f683203b357",
+      "requested_object_type": "commit",
+      "commit": "01c1623bf9395009520874e989e29f683203b357",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/Quest",
+      "license": "MIT",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "480a5f7ac02bb268cbc83cbfdaf6d459144d66cfc68262fb969da8113067d955"
+        }
+      ],
+      "source_metadata_hashes": {
+        "LICENSE": "480a5f7ac02bb268cbc83cbfdaf6d459144d66cfc68262fb969da8113067d955",
+        "pyproject.toml": "79417c3b8f71334b0f80bebb99d6a8419f10888adcd2b2a0483c97add9db1404",
+        ".gitmodules": "d50061d0f7b159834570bb0eb5aa16a01cf137f5c0b8557f62f9406a36b45b33"
+      },
+      "submodules": [
+        " 9f49803b1db0a40ea0019ad98b8bb5d4f1593c77 kernels/3rdparty/flashinfer (9f49803)",
+        " 40412d85124f7c6f3d88454583c4633e5e10fc8c kernels/3rdparty/flashinfer/3rdparty/googletest (40412d8)",
+        " f57aa9c993f4392a76650bc54513f571cd1128c9 kernels/3rdparty/flashinfer/3rdparty/nvbench (f57aa9c)",
+        " 6a5938233b6519ba99ddb7c7314d45d3fa877969 kernels/3rdparty/googletest (6a59382)",
+        " d8dced8a64d9ce305add92fa6d274fd49b569b7e kernels/3rdparty/nvbench (d8dced8)",
+        " 768cebe17e65c2a0a64ed067510729efc3c7ff6c kernels/3rdparty/pybind (768cebe)",
+        " 1e4961e2354afba116e3479c5ec9041937b9922e kernels/3rdparty/raft (1e4961e)"
+      ],
+      "model_stage_interface": "upstream Llama/Mistral; local Qwen3 quality-mask adapter dense prefill/first layers, sparse decode; not efficient sparse-read kernel",
+      "official_dependencies": {
+        "python": "not constrained in pyproject",
+        "torch": "2.5.0",
+        "transformers": "4.45.2 upstream; local Qwen3 requires newer HF",
+        "cuda": "kernel toolchain not installed or tested"
+      },
+      "venv_created": true,
+      "venv_scope": "CPU dependency candidate, NOT official CUDA environment",
+      "cpu_import": {
+        "name": "quest",
+        "returncode": 0,
+        "import": true,
+        "real_model": false,
+        "gpu_performance": false,
+        "last_error": []
+      },
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    },
+    {
+      "name": "FASA",
+      "repository": "https://github.com/wangyifei0047/FASA-ICLR2026",
+      "requested_object": "96c00c46db12ccee56104175470aa29579d66c58",
+      "requested_object_type": "commit",
+      "commit": "96c00c46db12ccee56104175470aa29579d66c58",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/FASA",
+      "license": "Apache-2.0",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "1ac51f2e6ab5961c87397376c7e7baa3a5d392aa85c7f22e00f6bad01ae9cd10"
+        }
+      ],
+      "source_metadata_hashes": {
+        "LICENSE": "1ac51f2e6ab5961c87397376c7e7baa3a5d392aa85c7f22e00f6bad01ae9cd10",
+        "requirements.txt": "37e099e182d43cdc4e69bbe3269f6574e143cc06cec7af6b52ca966a38354bc3"
+      },
+      "submodules": [],
+      "model_stage_interface": "upstream Llama/Mistral/Qwen2; local Qwen3 adapter requires calibration; native dense prefill+sparse decode",
+      "official_dependencies": {
+        "python": "not pinned",
+        "torch": "2.5.1",
+        "transformers": "4.43 upstream; local Qwen3 port differs",
+        "flash-attn": ">=2.7.4",
+        "cuda": "required even at official fasa_utils import"
+      },
+      "venv_created": true,
+      "venv_scope": "CPU dependency candidate, NOT official CUDA environment",
+      "cpu_import": {
+        "name": "fasa",
+        "returncode": 1,
+        "import": false,
+        "real_model": false,
+        "gpu_performance": false,
+        "last_error": [
+          "AssertionError: Torch not compiled with CUDA enabled"
+        ]
+      },
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    },
+    {
+      "name": "MInference",
+      "repository": "https://github.com/microsoft/MInference",
+      "requested_object": "d542c489a173795f5781409cb0307f4bef0f2b73",
+      "requested_object_type": "tag",
+      "commit": "d76b76e89cb59817c89e1777c4c51b1c7f233335",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/MInference",
+      "license": "MIT",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ],
+      "source_metadata_hashes": {
+        "LICENSE": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+        "setup.py": "b2c62f641644a3bf38a696e34151cc949b532f1304d187351db1b7f67c0ba5be"
+      },
+      "submodules": [],
+      "model_stage_interface": "sparse prefill + dense decode; local Qwen3 adapter needs exact pattern",
+      "official_dependencies": {
+        "python": "not pinned",
+        "torch": "unbounded upstream",
+        "transformers": ">=4.37.0",
+        "triton": "unbounded upstream",
+        "cuda": "compiled minference.cuda required"
+      },
+      "venv_created": true,
+      "venv_scope": "CPU dependency candidate, NOT official CUDA environment",
+      "cpu_import": {
+        "name": "minference",
+        "returncode": 1,
+        "import": false,
+        "real_model": false,
+        "gpu_performance": false,
+        "last_error": [
+          "ModuleNotFoundError: No module named 'minference.cuda'"
+        ]
+      },
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    },
+    {
+      "name": "SparQ",
+      "repository": "https://github.com/graphcore-research/sparq-gpt-fast",
+      "requested_object": "f2eeb9d10e79d3ffecc48015e55157bab0f6e269",
+      "requested_object_type": "commit",
+      "commit": "f2eeb9d10e79d3ffecc48015e55157bab0f6e269",
+      "source_present": true,
+      "local_cache": "third_party/offline-sources/SparQ",
+      "license": "BSD-3-Clause",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "dc2fcddedde170f348996b8f2a13058a48e0e6cd8cc1dd9a39e6a3f11afffec8"
+        }
+      ],
+      "source_metadata_hashes": {
+        "LICENSE": "dc2fcddedde170f348996b8f2a13058a48e0e6cd8cc1dd9a39e6a3f11afffec8",
+        "requirements.txt": "558e2ae348e8c9bb1b6e3b3343d1c4d0cf5c2e68d03b2c86331d2ea8e3d1aa0f",
+        "setup.py": "7823e6b1dd1601c0a56dfbc597afa39c09c5b9bc5f9c3d38d89e28973fea2fb8"
+      },
+      "submodules": [],
+      "model_stage_interface": "official gpt-fast Llama core; local Qwen3 adapters; native dense prefill+sparse decode; calibration-free",
+      "official_dependencies": {
+        "python": "not pinned",
+        "torch": ">=2.4",
+        "cuda": "official gpt-fast CUDA, local CPU core import only",
+        "transformers": "not upstream gpt-fast requirement; local HF adapter separate"
+      },
+      "venv_created": true,
+      "venv_scope": "CPU dependency candidate, NOT official CUDA environment",
+      "cpu_import": {
+        "name": "sparq",
+        "returncode": 0,
+        "import": true,
+        "real_model": false,
+        "gpu_performance": false,
+        "last_error": []
+      },
+      "real_checkpoint_execution": false,
+      "gpu_execution": false,
+      "gpu_performance": false,
+      "all_gitlinks_materialized": true
+    }
+  ],
+  "transported_source_archives": [
+    {
+      "file": "offline/sources/HISA-kernels-7940102.tar.gz",
+      "sha256": "87fbe278129624842fb11dfaf408b290f9315ffe4f9e45b6575ea87859998b0d",
+      "bytes": 16301,
+      "scope": "HISA examples/dsa_hisa + LICENSE only, not TileLang runtime/submodules"
+    },
+    {
+      "file": "offline/sources/MoBA-b5d5836.tar.gz",
+      "sha256": "b47ef9949666ca479d5d1b3fc0143fcba0a8d8cdbc214140a0be2d1b4d1701bd",
+      "bytes": 2313447,
+      "scope": "full pinned MoBA source"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/workspace/two-level-attention/exp/vendor_baselines/fasa_vendor/qwen3_fasa_patch.py", line 29, in <module>
+    from fasa_utils import constructe_adaptive_selection, core_module_with_padding_old
+  File "/workspace/two-level-attention/exp/vendor_baselines/fasa_vendor/fasa_utils.py", line 13, in <module>
+    top_indices = torch.tensor(0).unsqueeze(0).unsqueeze(0).unsqueeze(0).expand(1, -1, -1, 128).to("cuda")
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/two-level-attention/.venv-fasa-cpu/lib/python3.12/site-packages/torch/cuda/__init__.py", line 403, in _lazy_init
+    raise AssertionError("Torch not compiled with CUDA enabled")
+AssertionError: Torch not compiled with CUDA enabled
