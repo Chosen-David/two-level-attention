@@ -35,8 +35,8 @@
     },
     {
       "path": "sources/update_evidence_slides.py",
-      "bytes": 3727,
-      "sha256": "2023ddc0eba56e52dcf4616e4d4326231f8ef98debd4364f019c0c76c2eff750"
+      "bytes": 3829,
+      "sha256": "f04a21917533c71e61f7c151746e3346712c243c9413e2714de3feab4cefbd06"
     },
     {
       "path": "sources/prepare_plot_inputs.py",
@@ -190,23 +190,23 @@
     "scientific_privacy": {
       "reviewer": "independent_review",
       "decision": "approve-with-scope",
-      "checks": "Far-quota qualification independently checked against ordinary no-override formula: nominal far-token quota0, L1far pages80. Reported configuration inference distinct from verified execution or causal attribution; unchanged data and AmgR paragraph."
+      "checks": "SingleTPOTparagraph andPPT12 reviewed; all six medians unchanged; sparse-to-dense ratios3.38/2.46/1.78 are ratios of reported medians, scoped to three reported lengths. Raw repeats, runtime identity and matched quality remain unverified."
     },
     "reader_visual": {
       "reviewer": "reader_visual_review",
       "decision": "approve",
-      "checks": "All26 pages in color/grayscale andPPT14 checked; EnglishFigure4 clipping repaired and re-reviewed. No remaining required visual fixes.",
+      "checks": "All26 pages color/grayscale andPPT12 reviewed; onlyslide12 changes in17-page text/pixel comparison. Existing figures unchanged.",
       "reviewed_sha256": {
-        "output/paper_en.pdf": "86f069bef8ecd8cc6f1e825faf7faca9b50c56bf3650f8376280fb71dedeb4cf",
-        "output/paper_zh.pdf": "33206447f670e08bd1b43388e139af259fd719ef5e96d7c025d9edde3af374ff",
-        "output/supplement_en.pdf": "a06a6350d4ee32549a8f76e766048ba66bd2cc4e4b902f1fdebd82db805a77d2",
-        "output/supplement_zh.pdf": "9445d3de5f847095713f0ca1b6619a1678e9e93e5adb03d9885795caf462107a",
-        "presentation/TwoLevel_UserEdited_20261014.pdf": "804a9d784f62c0537c148ba59b823a6f1c10f2abc5eb2bceb3c538160ac4015f",
-        "presentation/TwoLevel_UserEdited_20261014.pptx": "2cc9ae0b87621e514b83c47e8df7b500882f9a6589804c767444d2152605c6ea"
+        "output/paper_en.pdf": "448640372cb354940a4d4db943072e10cec1c8bd6900ef156b4a4abd4deb648e",
+        "output/paper_zh.pdf": "38e6951237b78c648f855fd42f6e6abb7773cbde0f720d314ea2d34a406a2b41",
+        "output/supplement_en.pdf": "fb2713fbf14587295f655672568754105b6b399e8af8338b0b225c992838f748",
+        "output/supplement_zh.pdf": "3228b31a3888e79295b038d9a1d099f86c4102ec905fb3d2a8defe06e71e23b1",
+        "presentation/TwoLevel_UserEdited_20261014.pdf": "f4c23aebf95f36dba3e2ab9b7d9d641411c86e261cc705f824fec478daba3461",
+        "presentation/TwoLevel_UserEdited_20261014.pptx": "74ab183b9ef1b1dccf7e82c17fb6894d11d4769062916600a8d6a363109ad430"
       }
     },
     "clean_rebuild": {
-      "command": "bash source/rebuild_current.sh",
+      "command": "bash source/build.sh paper_en paper_zh supplement_en supplement_zh",
       "exit_code": 0,
       "fresh_directory": true,
       "page_counts": [
@@ -217,7 +217,8 @@
       ],
       "all26_pages_text_and_72dpi_pixels_equal": true,
       "remaining_warnings": "Existing TeX font substitution and English supplement2.71738pt overfull hbox; visually reviewed.",
-      "grayscale_pixels_equal": true
+      "grayscale_pixels_equal": true,
+      "scope": "Fresh curated directory; compile exact existing figure dependencies without running figure generators."
     }
   },
   "privacy_transformation": "Original repository files remain unchanged. Minimal derived inputs have separate hashes and explicit source hashes/paths; no hostname, network address or private home/scratch path is carried into these inputs.",
@@ -453,6 +454,145 @@
           "pages": 7,
           "text_color_grayscale_equal": true
         }
+      }
+    }
+  },
+  "tpot_paragraph_revision_20261016": {
+    "baseline_commit": "7cb0d54bd74d6624eae1ec15e0342c7acb138852",
+    "workflow_commit": "a73bf13424bdd789284eeac6d5664bea5d104574",
+    "source_paragraph": {
+      "paper": "AmgR: Algebraic Multigrid Accelerated on ReRAM",
+      "venue": "DAC2023",
+      "doi": "10.1109/DAC56929.2023.10247881",
+      "url": "https://www.ssslab.cn/assets/papers/2023-Fan-AmgR.pdf",
+      "location": "Physical page5, IV.B Performance Results, opening paragraph, three sentences; IV.A setup and following six-matrix comparison read as context.",
+      "sentence_functions": [
+        "S1 names the normalization baseline.",
+        "S2 points to the figure and specifies the workload/platform comparison scope.",
+        "S3 reports the aggregate relative outcome against the named comparators."
+      ],
+      "adaptation": "Define same-length dense reference, report sparse-to-dense ratios, then distinguish relative ratios from absolute TPOT and state evidence limits. No AmgR result or causal explanation transferred, no method citation added.",
+      "reading_count": "Paragraph-level deep reuse of previously read paper; no new full-paper reading."
+    },
+    "paragraphs": {
+      "en": {
+        "original": "\\textbf{Model-level decode diagnostic.} Figure~\\ref{fig:pending-evaluation} reports TPOT for the archived sparse configuration of 87.9, 97.6 and 119.9 ms at 32K, 64K and 128K, versus dense values of 26.0, 39.7 and 67.3 ms. All three reported sparse times are higher. The synchronized diagnostic excludes tokenization, input transfer and text output; its aggregates do not identify a causal bottleneck. Raw repetition records remain outside the inspected snapshot, and these timings are not bound to the quality runs or the selected 4/128 candidate.",
+        "candidate": "\\textbf{Model-level decode diagnostic.} Using dense attention at each input length as the reference, Figure~\\ref{fig:pending-evaluation} compares author-reported dynamic-cache TPOT for the archived sparse configuration. At 32K, 64K and 128K, sparse medians are 87.9, 97.6 and 119.9 ms, versus 26.0, 39.7 and 67.3 ms for dense attention: ratios of 3.38, 2.46 and 1.78. The ratio narrows with length, although sparse absolute latency rises and remains higher at every length. This synchronized diagnostic excludes tokenization, input transfer and text output. Aggregate medians cannot identify a causal bottleneck; raw repetition records and verified runtime routes are unavailable, and the timings are not paired with quality runs or the selected 4/128 candidate.",
+        "revised": "\\textbf{Model-level decode diagnostic.} Using dense attention at each input length as the reference, Figure~\\ref{fig:pending-evaluation} compares author-reported dynamic-cache TPOT for the archived sparse configuration. At 32K, 64K and 128K, sparse medians are 87.9, 97.6 and 119.9 ms, versus 26.0, 39.7 and 67.3 ms for dense attention: sparse-to-dense ratios of reported medians of 3.38, 2.46 and 1.78. Across these three reported lengths, the ratio decreases while sparse TPOT rises and remains above dense TPOT. This synchronized diagnostic excludes tokenization, input transfer and text output; it is not complete-request latency. These aggregate medians do not identify a causal bottleneck; raw repetitions have not been recovered in the inspected snapshot and runtime routes remain unverified. The timings are not linked to matched quality runs or verified as measurements of the selected 4/128 candidate."
+      },
+      "zh": {
+        "original": "\\textbf{模型级解码诊断。}图\\ref{fig:pending-evaluation}报告历史稀疏配置在32K、64K、128K的TPOT为87.9、97.6、119.9毫秒，稠密对应值为26.0、39.7、67.3毫秒，三档稀疏计时均更高。该同步诊断不含分词、输入传输及文本输出，汇总数据不能定位因果瓶颈。逐次重复原件不在已检查快照中，这些计时也未绑定质量运行或当前4/128候选。",
+        "candidate": "\\textbf{模型级解码诊断。}图\\ref{fig:pending-evaluation}以各输入长度的稠密注意力为参照，比较作者报告的历史稀疏配置动态缓存TPOT。32K、64K、128K下，稀疏中位数为87.9、97.6、119.9毫秒，稠密为26.0、39.7、67.3毫秒，稀疏／稠密比值依次为3.38、2.46、1.78。比值随长度缩小，但稀疏绝对时延仍在上升，且在每档均高于稠密。这项同步诊断不含分词、输入传输及文本输出。汇总中位数不能识别因果瓶颈；原始重复记录和已核执行路径缺失，这些计时也未与质量运行或当前4/128候选配对。",
+        "revised": "\\textbf{模型级解码诊断。}图\\ref{fig:pending-evaluation}以各输入长度的稠密注意力为参照，比较作者报告的历史稀疏配置动态缓存TPOT。32K、64K、128K下，稀疏中位数为87.9、97.6、119.9毫秒，稠密为26.0、39.7、67.3毫秒，报告中位数的稀疏／稠密比值依次为3.38、2.46、1.78。在这三个报告长度上，比值减小，但稀疏TPOT仍上升且始终高于稠密TPOT。这项同步诊断不含分词、输入传输及文本输出，并非完整请求时延。汇总中位数不能识别因果瓶颈；原始重复记录未在所检查快照中恢复，执行路径仍未核验。这些计时未关联匹配的质量运行，也未核实为当前4/128候选的测量。"
+      }
+    },
+    "derived_ratios_of_reported_medians": {
+      "L32768": 3.380769230769231,
+      "L65536": 2.458438287153652,
+      "L131072": 1.7815750371471026
+    },
+    "rounding": "Two decimal places; not medians of paired-run ratios; no confidence intervals inferred.",
+    "sentence_rationale": [
+      "Name dense denominator at each length and archived dynamic-cache scope.",
+      "Retain all six medians and expose the ratio direction and summary statistic.",
+      "Limit the decreasing ratios to these three reported lengths; preserve increasing sparseTPOT.",
+      "State synchronized diagnostic boundaries and distinguish complete-request time.",
+      "Retain missing raw repetitions in inspected snapshot and unverified execution paths.",
+      "Separate matched quality linkage and selected4/128 measurement identity."
+    ],
+    "evidence": [
+      {
+        "path": "exp/trace/results/e152v2_e2e_latency_verdict.json",
+        "sha256": "cbae41ef66aeab661ccf64b5548cc683cd596f7dedb1948df556e6e3c250bbc3"
+      },
+      {
+        "path": "agent_doc/advice/dac_manuscript/sources/data/decode_tpot_plot_input.json",
+        "sha256": "7601816598ae1c96d315706b2098e8dac318cb2ecf0c4233460853cad0d78ca9"
+      },
+      {
+        "path": "exp/bench/e152_e2e_latency.py",
+        "sha256": "f1d1f966284c6574a86bbb5baf0aa1b1e8c74bbb714df2d93f071f7117a89571"
+      }
+    ],
+    "producer_limit": "Current measurement source computes after-first decode wall divided by subsequent interval count; code inspection does not verify the archived runtime route or bind current producer to old measurements.",
+    "review_cycle": {
+      "scientific_initial": "Clarify ratios of medians, three-length scope and TPOT versus request latency.",
+      "reader_initial": "Specify sparse-to-dense direction, inspected-snapshot absence rather than absolute unavailable, and distinguish candidate identity from pairing.",
+      "author_revision": "All applied in bilingual paragraph andPPT12.",
+      "scientific_final": "approve-with-scope",
+      "reader_visual_final": "approve:26 pages color/grayscale andPPT12; independent pixel comparison confirms onlyslide12 changed."
+    },
+    "new_results_disposition": {
+      "E151c": "Only author aggregate verdict available at1d599ec; no raw predictions recovered. No new paper claim, causal conclusion or dynamic-research restart.",
+      "E146b_E145b": "No matching result filenames found underexp at baselinecommit.",
+      "existing_results": "All archived figures, negative cases, far-token quota qualifier and prior AmgR mechanism paragraph preserved."
+    },
+    "DAC2027_template_check": {
+      "official_page": "https://dac.com/2027/program/research-manuscript-submissions",
+      "observed": "Official page links IEEE Templates;6 content pages plus1references, double-column9or10pt.",
+      "template_link": "https://www.ieee.org/conferences/publishing/templates",
+      "status": "Browser fetch denied byrobots.txt; no official template package obtained or applied."
+    },
+    "observation_reuse_clarification": {
+      "original_figure": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
+      "original_script": "agent_doc/guide/paper_figs/figs/fig_o_observation.py",
+      "data": "exp/trace/results/e140_o_trace_v2.json",
+      "data_sha256": "f0db60364a0e516b5ad28affeb895dadb2b50e0eecd583ee21b0a993b5029b2b",
+      "current_input": "sources/data/observation_plot_input.json",
+      "transformation": "Exact O1 bins and region totals retained in a privacy-minimal derived file; no new model run or tensor acquisition.",
+      "semantic_repairs_already_published": [
+        "Validate disjoint complete causal bins and exact effective token counts.",
+        "Whole-bin selection skips bins that cannot fit remaining2048-token budget; describe as feasible diagnostic, not token-TopK oracle or upper bound.",
+        "Use one global selected set with separate regional denominators."
+      ],
+      "visual_adaptation_already_published": "Remote4panel observation figure not embedded directly: current mainFig1 retainsO1 density/retention;O3 appears as supplemental diagnostic; bilingual labels and single-column layout differ.",
+      "this_round": "All tracked figure files byte-identical to baseline. A previously launched full clean reproduction finished in a temporary directory before stop inspection; following user steering, no further figure renderer was launched. Final acceptance rebuild compiles documents from the exact bundled existing figures only.",
+      "future_preference": "Reuse qualified remote figures directly when suitable; no new Observation collection or plotting chain.",
+      "original_figure_sha256": "e2890fe13f151635dfa67638e721505c4201892986964d834bd64652481a44a9",
+      "original_script_sha256": "517947e9adb13fc3781713a884ec6c36cca2d4e3c9b6b7d2a926aa2f5b23a997",
+      "parent_independent_audit": {
+        "source": "Parent-thread read-only audit supplied during this iteration; no separate rerun by manuscript writer.",
+        "same_source": "E140v2 JSON sha256f0db60364a0e516b5ad28affeb895dadb2b50e0eecd583ee21b0a993b5029b2b,blob39fd06ae3df41898ea33758a316adc096e18cf9a",
+        "remote_whole_bin_overbudget_observations": 97,
+        "total_observations": 128,
+        "maximum_selected_tokens": 2110,
+        "remote_far_near_rates": [
+          0.6904386,
+          0.9329769
+        ],
+        "current_far_near_rates": [
+          0.6759161,
+          0.9314943
+        ],
+        "remote_hardcoded_caption": "musique sample1 layer24 q14212",
+        "remote_actual_selection_and_TSV": "musique sample1 layer8 q13158",
+        "current_precise_boundary_selection": "musique sample1 layer24 q9996",
+        "explanation": "Same validE140v2 source, different selection arithmetic/identity presentation. Do not attribute the difference to obsoleteE140 collector defects."
+      },
+      "minimal_unification_plan": [
+        "Use the existing remote observation script as the layout source and the already-reviewed whole-bin arithmetic as the sole computation implementation; do not add a collector.",
+        "Replace the select-until-full loop with skip-if-bin-does-not-fit logic and derive sample/layer/query labels from the actual selected record; use exact region boundaries for the representative rule.",
+        "Keep one parameterized renderer for bilingual and publication-size variants; export the frozen data and computation dependency into the curated package rather than maintaining another algorithm copy.",
+        "Because the remote plotting script is currently in human-only agent_doc/guide, leave it untouched in this round. A follow-up should place the maintained executable in the ordinary code tree and propose the human-owned guide entrypoint update.",
+        "Validate the existing128observations: no selected budget above2048, exact source identity/labels, the parent-audited regional rates and complete partial-bin handling; compare rendered output before replacing qualified figures."
+      ]
+    },
+    "clean_document_rebuild": {
+      "paper_en.pdf": {
+        "pages": 6,
+        "text_color_grayscale_equal": true
+      },
+      "paper_zh.pdf": {
+        "pages": 5,
+        "text_color_grayscale_equal": true
+      },
+      "supplement_en.pdf": {
+        "pages": 8,
+        "text_color_grayscale_equal": true
+      },
+      "supplement_zh.pdf": {
+        "pages": 7,
+        "text_color_grayscale_equal": true
       }
     }
   }
