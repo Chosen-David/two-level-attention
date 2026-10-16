@@ -1,6 +1,7 @@
 from pptx import Presentation
 from pptx.util import Inches,Pt
 from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pathlib import Path
 R=Path(__file__).resolve().parents[1];p=R/'presentation/TwoLevel_UserEdited_20261014.pptx';r=Presentation(p)
 def text(sl,x,y,w,h,value,size=22):
@@ -12,7 +13,7 @@ for num,keep,title in [(3,[0,1,90],'四项观察：区域选集、紧凑坐标�
  sl=r.slides[num-1];orig=list(sl.shapes)
  for shape in orig:
   is_footer=shape.has_text_frame and shape.text.strip()==str(num) and shape.top>Inches(8.5)
-  if shape.top>=Inches(1.9) and not is_footer:shape._element.getparent().remove(shape._element)
+  if (shape.top>=Inches(1.9) and not is_footer) or (num==3 and shape.shape_type==MSO_SHAPE_TYPE.PICTURE):shape._element.getparent().remove(shape._element)
  for shape in sl.shapes:
   if shape.has_text_frame and Inches(.7)<shape.top<Inches(1.8):shape.text=title
  if num==3:

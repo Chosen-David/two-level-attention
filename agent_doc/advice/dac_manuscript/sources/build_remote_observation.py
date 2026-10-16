@@ -80,7 +80,9 @@ for i in range(len(mass_a)):
 for i in missed:
     rgb[i] = mcolors.to_rgb(C_MISS)
 for j in range(len(bin_lo)):
-    ax_a.add_patch(plt.Rectangle((edges[j],0),edges[j+1]-edges[j],1,facecolor=rgb[j],edgecolor='none'))
+    ax_a.add_patch(plt.Rectangle((edges[j],0),edges[j+1]-edges[j],1,
+        facecolor=rgb[j], edgecolor='black' if j in missed else 'none',
+        linewidth=0.45 if j in missed else 0, hatch='////' if j in missed else None))
 for i in recov:
     ax_a.text(pos_c[i], 0.5, "✓", ha="center", va="center",
               fontsize=TK - 2, color="white", fontweight="bold")
@@ -103,7 +105,7 @@ ax_a.plot([pos_c[i_sp]], [3.10], marker="v", color=C_MISS, markersize=8,
 # 图例替代原说明框（用户 2026-10-16：图内不堆文字，数字解释并入 caption）
 leg_a = [Patch(fc="#e9e9e9", ec="0.6", label="page not selected"),
          Patch(fc=C_MAIN, label="selected by avg pool"),
-         Patch(fc=C_MISS,
+         Patch(fc=C_MISS, ec='black', linewidth=0.45, hatch='////',
                label="mass-ranked page missed by avg\n(✓ = also selected by minmax)")]
 ax_a.legend(handles=leg_a, loc="upper left", bbox_to_anchor=(0.005, 1.005),
             fontsize=9.5, framealpha=0.92, handlelength=1.4,

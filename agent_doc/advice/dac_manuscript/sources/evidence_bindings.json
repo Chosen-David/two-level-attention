@@ -921,5 +921,27 @@
       "review": "Independent numerical and scientific reviews passed; author implemented reader corrections; final bilingualPDF/PPT actual-page visual review passed.",
       "ci": "No tracked .github/workflows; hosted check API inaccessible403; local checks only."
     }
+  },
+  "observation_grayscale_revision_20261016": {
+    "baseline_commit": "5ce8589ad9bb76ce1bb36560d7cc9f5d8bea3942",
+    "scope": "Panel(a) missed cells and legend only: blackedge0.45 plus diagonalhatch////; unchanged colors/data/layout. Bilingual caption adds hatch indication. Slide3 removes two covered images and keeps one current image; updater prevents accumulation.",
+    "summary_sha256": "336903328b6054d9531765c44d18e40949761b78355891d166961bf306dfb68f",
+    "changed_pages": {
+      "paper_en": [
+        2
+      ],
+      "paper_zh": [
+        2
+      ],
+      "presentation": [
+        3
+      ],
+      "supplement_en": [],
+      "supplement_zh": []
+    },
+    "scientific_review": "Independent reviewer confirmed data and selection logic unchanged and slide3 image count1.",
+    "runtime_tests": false,
+    "visual_review": "Independent reader inspected both languages andPPT in color/grayscale: missed vs selected distinguishable; ticks readable; no overlap/crop.",
+    "clean_rebuild": "45pages text/RGB/grayscale exact; regenerated bilingual Observation PDFs and summary exact; slide3 retains one image after repeat generation."
   }
 }
