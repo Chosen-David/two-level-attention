@@ -41,4 +41,28 @@ label.text_frame.paragraphs[0].text='远区注意力\v权重总和'
 for para in label.text_frame.paragraphs:
  for run in para.runs:
   run.font.size=Pt(10); run.font.name='Noto Sans CJK SC'; run.font.color.rgb=RGBColor.from_string('7B6598')
+
+# Full-manuscript narrative revision: preserve17slides and existing diagrams.
+updates = {
+ (2,1): '固定词元预算下：候选访问与选择成本',
+ (2,3): '有用词元所在页一旦被排除，精筛无法恢复；检索本身也有成本。',
+ (2,5): '共享32坐标映射与区域页配额协同选择，\n最终在选集上使用原128维 Q / K / V。',
+ (2,6): '证据与范围',
+ (2,7): '历史128/128配置五任务均值47.588；不是当前紧凑4/128候选的匹配质量—成本验证。',
+ (5,1): '两项核心机制，一个可选扩展',
+ (5,5): '共享坐标映射，不要求共享物理缓冲区',
+ (11,1): 'Q1：现有得分能否验证紧凑评分？',
+ (13,1): '区域访问与门控：证据支持到哪里？',
+ (17,1): '候选访问与选择成本仍需匹配验证',
+ (17,12): '表示与分配机制已具体化\n当前4/128候选仍缺匹配质量—成本验证',
+ (17,13): '门控默认关闭；历史任务存在损失\n预填充统计不保证解码需求',
+}
+for (num, idx), value in updates.items():
+ tf=r.slides[num-1].shapes[idx].text_frame
+ runs=[run for para in tf.paragraphs for run in para.runs]
+ if runs:
+  runs[0].text=value
+  for run in runs[1:]: run.text=''
+ else: tf.paragraphs[0].text=value
+
 r.save(p)
