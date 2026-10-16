@@ -45,6 +45,9 @@ for para in label.text_frame.paragraphs:
 
 # Full-manuscript narrative revision: preserve17slides and existing diagrams.
 updates = {
+ (7,2): '16完整旋转对，两级共用；L2用浮点16级量化–反量化，最终为原维注意力',
+ (8,2): '4/128候选充足示例；摘要按完整物理页计算，远区可重复选中至多4个前缀词元',
+ (8,158): '近区L2∩P=∅；|Pₜ|=132示例',
  (2,1): '固定词元预算下：候选访问与选择成本',
  (2,3): '均值可能稀释少数高分词元，极值上界可能宽松；\n全局TopK不提供区域容量保证。',
  (2,5): '共享32坐标映射与区域页配额协同选择，\n最终在选集上使用原128维 Q / K / V。',

@@ -22,3 +22,5 @@ Replot only the adopted Observation: `python3 sources/build_remote_observation.p
 Panel(a) marks missed pages with diagonal hatching and black edges as well as red fill, so the selected/missed distinction survives grayscale. The matching slide contains one current image; the updater removes prior image objects before replacement.
 
 Panel(a) now shows raw page attention sums above three symmetric saved-set rows: mass-rank reference, avg and minmax. Both scorers share missed-reference and selected-outside-reference encodings; there is no one-way rescue interpretation. The reference is neither exact tokenTopK/DSA nor a proven optimum. Original inputs and all b/c/d statistics are unchanged.
+
+Method presents the shared-coordinate scoring motive before regional allocation, defines the extrema bound in its unquantized subspace, and specifies the ordinary integer boundary and full physical-page summary rules in S7. Per-query softmax precedes GQA probability averaging; ordinary L2 still scores full history. Gate/refill is optional and disabled by default. This wording revision adds no measurements or quality guarantee.
