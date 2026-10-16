@@ -18,7 +18,7 @@ for num,keep,title in [(3,[0,1,90],'四项观察：区域选集、紧凑坐标�
   if shape.has_text_frame and Inches(.7)<shape.top<Inches(1.8):shape.text=title
  if num==3:
   sl.shapes.add_picture(str(R/'figures/o_observation_zh.png'),Inches(2.9),Inches(1.85),height=Inches(6.55))
-  text(sl,.9,8.47,14.9,.70,'(a) 页权重排序≠词元TopK；实际1989/1989/2048词元，集合差异不代表质量优劣；\v(b) 43/128条下降；(c) 随机未配对；(d) 历史代理，不是当前门控或解码保证。',16)
+  text(sl,.9,8.47,14.9,.70,'(a) 页权重排序≠词元TopK；实际1989/1989/2048词元；表示与池化混杂，均值／极值都漏选参考页；\v(b) 43/128条下降；(c) 随机未配对；(d) 历史代理，不是当前门控或解码保证。',16)
  elif num==12:
   sl.shapes.add_picture(str(R/'figures/decode_tpot_current_zh.png'),Inches(.8),Inches(2.2),width=Inches(8))
   text(sl,9.2,2.2,6.6,6.2,'作者报告中位数 · 非完整请求E2E\nQwen3-8B，固定128输出词元\n127个首输出后间隔，逐步同步\n历史稀疏配置 α=.125 / β=.375 / γ=.625\n不同于当前4/128候选；运行路径未独立核验\n32K/64K/128K报告中位数之比（稀疏／稠密）：3.38 / 2.46 / 1.78\n三档比值减小，但稀疏TPOT仍上升且高于稠密；汇总不能定位因果瓶颈。',23)
@@ -46,7 +46,7 @@ for para in label.text_frame.paragraphs:
 # Full-manuscript narrative revision: preserve17slides and existing diagrams.
 updates = {
  (2,1): '固定词元预算下：候选访问与选择成本',
- (2,3): '页筛控制哪些词元获得正的精筛概率；检索本身也有成本。',
+ (2,3): '均值可能稀释少数高分词元，极值上界可能宽松；\n全局TopK不提供区域容量保证。',
  (2,5): '共享32坐标映射与区域页配额协同选择，\n最终在选集上使用原128维 Q / K / V。',
  (2,6): '观察与边界',
  (2,7): '区域预留改变远区覆盖，43/128条观测下降；历史稀疏解码更慢，当前4/128尚缺匹配质量—成本结果。',
