@@ -30,18 +30,8 @@ def save(fig,name):
  for ext in ['svg','png']:fig.savefig(OUT/(name+'.'+ext),dpi=220)
  subprocess.run(['inkscape',str(OUT/(name+'.svg')),'--export-type=pdf','--export-filename='+str(OUT/(name+'.pdf'))],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
  plt.close(fig)
-fig,axs=plt.subplots(2,1,figsize=(3.35,2.75),layout='constrained')
-a=axs[0]
-for region,color in [('near','#007C91'),('far','#C25E24')]:
- bs=[b for b in r['bins'] if b['region']==region]
- for i,b in enumerate(bs):
-  lo=o['q_pos']-b['end']+1;hi=o['q_pos']-b['start']+1
-  a.plot([lo,hi],[b['mass']/b['n_tok']]*2,color=color,lw=.8,label=region if i==0 else None)
-a.set_yscale('log');a.set_xlabel('Query–key distance (tokens)');a.set_ylabel('Mass / valid token');a.set_title('(a) Dense-reference distance density',loc='left');a.legend(frameon=False,ncol=2,loc='upper right')
-a=axs[1];a.barh(['Far','Near'],[far,near],color=['#C25E24','#007C91'],height=.5)
-a.set_xlim(0,1.15);a.set_xticks([0,.5,1]);a.set_xlabel('Regional attention retention');a.set_title('(b) Feasible whole-bin diagnostic',loc='left')
-for i,v in enumerate([far,near]):a.text(v+.02,i,f'{v:.4f}',va='center',fontsize=8)
-save(fig,'observation_current')
+# Figure1 uses the remote four-panel design, maintained in a single renderer.
+subprocess.run([__import__('sys').executable,str(ROOT/'sources/build_remote_observation.py')],check=True)
 x=json.loads((DATA/'decode_tpot_plot_input.json').read_text())['results_median']
 fig,a=plt.subplots(figsize=(3.35,2.15),layout='constrained')
 for arm,label,color,marker in [('dense_dynamic','Dense','#65737D','o'),('tli_dynamic','Archived sparse configuration','#007C91','^')]:
