@@ -1,0 +1,78 @@
+{
+  "experiment": "E145c 中文 8 任务 sink4/swa128 重验",
+  "date": "2026-10-17",
+  "model": "Qwen3-8B",
+  "caliber": "decode-only mavg α0.25/β0.125/γ0.625 tail subspace, far=minmax near=avg, K1=128 K2=1024 cmp4, kmeans off, layer_skip off, sink4/swa128, T=1016180000",
+  "machine": "10.238.9.187 (tmp_e146b_tree_187 worktree, GPU3/4)",
+  "eval_backend": "jieba+rouge (setuptools<81 fix at /tmp/jieba_fix)",
+  "anchor_source": "E145 v1 none arm (dense, caliber-neutral, pred_E145_completion/pred/result.json)",
+  "per_task": {
+    "dureader": {
+      "sink4_beta0.125": 28.28,
+      "none_dense_anchor": 26.83,
+      "e145v1_crash_sink128_beta0.375": 28.02,
+      "delta_vs_anchor": 1.45,
+      "delta_vs_crash": 0.26
+    },
+    "lsht": {
+      "sink4_beta0.125": 47.0,
+      "none_dense_anchor": 47.5,
+      "e145v1_crash_sink128_beta0.375": 23.5,
+      "delta_vs_anchor": -0.5,
+      "delta_vs_crash": 23.5
+    },
+    "multifieldqa_zh": {
+      "sink4_beta0.125": 62.88,
+      "none_dense_anchor": 63.28,
+      "e145v1_crash_sink128_beta0.375": 25.86,
+      "delta_vs_anchor": -0.4,
+      "delta_vs_crash": 37.02
+    },
+    "passage_count": {
+      "sink4_beta0.125": 0.75,
+      "none_dense_anchor": 2.0,
+      "e145v1_crash_sink128_beta0.375": 0.5,
+      "delta_vs_anchor": -1.25,
+      "delta_vs_crash": 0.25
+    },
+    "passage_retrieval_zh": {
+      "sink4_beta0.125": 98.0,
+      "none_dense_anchor": 98.0,
+      "e145v1_crash_sink128_beta0.375": 22.0,
+      "delta_vs_anchor": 0.0,
+      "delta_vs_crash": 76.0
+    },
+    "samsum": {
+      "sink4_beta0.125": 44.65,
+      "none_dense_anchor": 44.62,
+      "e145v1_crash_sink128_beta0.375": 42.19,
+      "delta_vs_anchor": 0.03,
+      "delta_vs_crash": 2.46
+    },
+    "trec": {
+      "sink4_beta0.125": 72.5,
+      "none_dense_anchor": 71.5,
+      "e145v1_crash_sink128_beta0.375": 47.5,
+      "delta_vs_anchor": 1.0,
+      "delta_vs_crash": 25.0
+    },
+    "vcsum": {
+      "sink4_beta0.125": 13.97,
+      "none_dense_anchor": 14.29,
+      "e145v1_crash_sink128_beta0.375": 12.23,
+      "delta_vs_anchor": -0.32,
+      "delta_vs_crash": 1.74
+    }
+  },
+  "avg8": {
+    "sink4_beta0.125": 46.004,
+    "none_dense_anchor": 46.003,
+    "e145v1_crash": 25.225
+  },
+  "verdict": "RECOVERED — 中英通用主张成立：8 任务均值 46.004 vs 稠密锚 46.003（Δ+0.001 噪声级），全部任务 |Δ|≤1.45；pr_zh 98→98 完整恢复（sink128+β0.375 崩溃到 22）。E145 中文大掉分确证为 β0.375 far=0 配置效应，非中文任务形态问题。21 任务（13 EN + 8 中英混合）口径待 e145c-en 英文双臂出数后闭合。",
+  "caveats": [
+    "均值差 +0.001 但单任务偏离至 ±1.45（dureader +1.45 / passage_count -1.25），非逐任务配对非劣",
+    "E145b sink128 β0.125 中文臂已自然死亡未完成，无同机 sink128 干净中文参照，本判决对照为稠密锚",
+    "跨机（.187 产/本机锚）打分 backend 不同需披露：锚为本机 eval，本轮为 .187 eval"
+  ]
+}
