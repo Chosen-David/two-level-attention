@@ -1,0 +1,43 @@
+{
+ "experiment": "E146",
+ "title": "RULER 64K 判决 + TLI 臂 far_budget=0 配置退化 erratum（128K 判读同步修正）",
+ "date": "2026-10-16",
+ "user_directive": "#266：RULER 32/64/128K 全测，decode-only 长文加速叙事质量面",
+ "formal_64k": {
+  "scoring": "score_ruler_formal.py（string_match_all，manifest 身份闭包 + 原子发布），isolated root /tmp/e146_64k_root（仅 L65536），n=100×11 任务×2 臂，incomplete_cells=[]",
+  "output": "exp/trace/results/e146_ruler64k_formal.json (+manifest/md)",
+  "none_fullkv": {"niah_single_1": 100.0, "niah_single_2": 100.0, "niah_single_3": 100.0, "niah_multikey_1": 100.0, "niah_multikey_2": 50.0, "niah_multikey_3": 0.0, "niah_multiquery": 20.25, "niah_multivalue": 26.25, "cwe": 0.6, "fwe": 4.0, "vt": 32.8, "AVG": 48.54},
+  "tli_beta0375": {"niah_single_1": 19.0, "niah_single_2": 24.0, "niah_single_3": 15.0, "niah_multikey_1": 26.0, "niah_multikey_2": 11.0, "niah_multikey_3": 0.0, "niah_multiquery": 2.75, "niah_multivalue": 1.25, "cwe": 0.2, "fwe": 9.0, "vt": 0.0, "AVG": 9.84},
+  "fullkv_anchor_reproduction": "64K 48.54 / 128K 46.43 与 E119 FullKV 完全一致（greedy + seed 42 确定性复现）——锚身份稳定可复用"
+ },
+ "erratum_far_zero": {
+  "finding": "E146 TLI 臂（E104MAIN 口径 α0.125/β0.375/γ0.625）far 预算公式直接归零，臂为退化配置，其 64K 9.84 / 128K 23.98 不是方法判决",
+  "formula": "far_budget = max(0, K2_mid − min(round(K1·β)·bs·γ, K2_mid))，K2_mid = 1024−128−128 = 768（E140 机制律已代码闭合，tli_indexer compute_mask e64 分支）",
+  "beta_0375": "round(128×0.375)×64×0.625 = 48×64×0.625 = 1920 > 768 → far_budget = 0（far 区完全断供，attention 仅见 sink128+swa128+near768）",
+  "beta_0125": "round(128×0.125)×64×0.625 = 16×64×0.625 = 640 ≤ 768 → far_budget = 128（E0 主臂口径，E140 锚）",
+  "config_identity": "yarn receipt（producer-yarn-config-v2）：tli_alpha 0.125 / tli_beta 0.375 / tli_gamma 0.625，K1=128 K2=1024 c4 tail minmax/avg sink128 sw128，tli_sparse_prefill=false（decode-only），yarn factor 2.0 auto",
+  "l_dependent_evidence": {
+   "far0_beta0375": {"32K_E104B": 85.83, "64K_E146": 9.84, "128K_E146": 23.98},
+   "far128_beta0125_E119_legacy": {"64K": 49.42, "128K": 47.49},
+   "fullkv": {"32K": 88.71, "64K": 48.54, "128K": 46.43},
+   "reading": "far=0 在 32K 仅 -2.9（near 640+保护 256 可覆盖 32K needle），64K -38.7 / 128K -22.5 致命——L 越大 far 检索越不可替代的 e2e 直接证据，与 E140v2 (d) far 断供 trace 诊断（oracle 305 vs 128）互证。E119 β0.125 far=128 档 64K +0.9 / 128K +1.1 持平，说明方法在正确配置下未塌。"
+  },
+  "e119_legacy_caveat": "E119 mavg manifest identity_mode=legacy-partial（10-09 产，无 producer 回执闭包），只作方向性证据，不进主表——正式判决需 E146b 同版本重跑"
+ },
+ "impact_on_128k_verdict": {
+  "ref": "exp/trace/results/e146_ruler128k_verdict.json",
+  "correction": "原判读『保持率 51.7%，niah 掉 56-66 分主因 yarn 外推 × 稀疏预算漏检 + 候选池 16×』须修正：TLI 臂 far_budget=0 是第一主因（公式级断供，先于 yarn/候选池效应）。『128K 质量面降级』结论维持但归因改写；E146b 128K 主臂出数前，128K 质量面暂以 E119 legacy 方向性持平为工作假设",
+  "unchanged": "FullKV 锚 46.43 及其自身 32K→128K 塌 42.3 分（yarn×4 外推主导）判读不变；性能面（E141a/E147）不受影响"
+ },
+ "disposition": {
+  "e146b": "重派论文 E0 主臂 α0.25/β0.125/γ0.625（其余与 E146 逐字段一致，decode-only）：64K → wys-4xh20 GPU0/2（11 任务），128K → .187 空卡（DeepSeek WIP 保护下独立 worktree）。出数后 formal 打分 + E146 系列终判",
+  "orig_data": "E146 β0.375 臂数据保留作 far=0 消融格（负面对照有价值：far 断供 L 依赖证据链），不删除"
+ },
+ "in_flight": "E151c oracle 逐层配额（wys-4xh20 GPU1/3，12:34 起）；E145 eval 后台",
+ "cross_references": {
+  "e140_far_quota_mechanism": "e140_far_quota_mechanism_verdict.json（公式代码闭合）",
+  "e140v2_observation": "e140v2_observation_verdict.json (d) far 断供",
+  "e119_ruler64k_mavg": "e119_ruler64k_formal_mavg.json（legacy-partial 身份）",
+  "e151b": "E151b 真剂量臂（LongBench far 总量非 prefill 瓶颈——任务形态差异：RULER niah 对 far 断供极敏感，LongBench 语义冗余高）"
+ }
+}
