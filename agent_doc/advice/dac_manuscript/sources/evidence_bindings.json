@@ -25,8 +25,8 @@
     },
     {
       "path": "sources/build_evidence_figures.py",
-      "bytes": 6137,
-      "sha256": "5b53ae03a55a3de50b33cf88b9f9fa130e48da15ea74a9d91bf3952c93b5edae"
+      "bytes": 6454,
+      "sha256": "ee060055b1238a2befd6f403c4c8aa22cc269075e78e8cf417557c1ba736efa9"
     },
     {
       "path": "sources/observation_bins.py",
@@ -35,8 +35,8 @@
     },
     {
       "path": "sources/update_evidence_slides.py",
-      "bytes": 3692,
-      "sha256": "6cb920d6f2afafd8fb3feffb82172f9ce73160b73bb9a7ecb57672d343ad39b8"
+      "bytes": 3727,
+      "sha256": "2023ddc0eba56e52dcf4616e4d4326231f8ef98debd4364f019c0c76c2eff750"
     },
     {
       "path": "sources/prepare_plot_inputs.py",
@@ -190,19 +190,19 @@
     "scientific_privacy": {
       "reviewer": "independent_review",
       "decision": "approve-with-scope",
-      "checks": "Single-paragraph claims reviewed against current implementation. Author revised algebraic reuse overclaim and final-mask indexing ambiguity; final bilingual mechanism and evidence boundaries approved. No new experiment or E151c result inferred."
+      "checks": "Far-quota qualification independently checked against ordinary no-override formula: nominal far-token quota0, L1far pages80. Reported configuration inference distinct from verified execution or causal attribution; unchanged data and AmgR paragraph."
     },
     "reader_visual": {
       "reviewer": "reader_visual_review",
       "decision": "approve",
-      "checks": "All26 pages checked in color and grayscale after one-paragraph revision; formulas, glyphs, arrows, captions and pagination show no new blocking issue. Existing English supplement2.71738pt overflow does not obscure content. Unchanged PPT retains reviewed identity.",
+      "checks": "All26 pages in color/grayscale andPPT14 checked; EnglishFigure4 clipping repaired and re-reviewed. No remaining required visual fixes.",
       "reviewed_sha256": {
-        "output/paper_en.pdf": "e672532c2136d5f9657448c4eeef415126bbe07ec8cf5e3262a4f02a7d69473a",
-        "output/paper_zh.pdf": "a08a42f987ca74611ee391e8e16a558fe4c8d9a2943d7b8bfbd1d17c556eabed",
-        "output/supplement_en.pdf": "52e8647cc39b5728e830ff22a09a7a66065adbec8e200db08981c0b81e0e7a5c",
-        "output/supplement_zh.pdf": "61641a0d687a53ca74d6523318a65b21875b1806c0289ba2d43de902d5464db4",
-        "presentation/TwoLevel_UserEdited_20261014.pdf": "90c2e000ceea57746e8c6bd390b0e81b1300637e3a6193b7c6ee0ff3c78e497c",
-        "presentation/TwoLevel_UserEdited_20261014.pptx": "95d43b25e8ad32b066d8782eb5cfe1bbc5ae0bda9163de204e19d3afe4d57c8f"
+        "output/paper_en.pdf": "86f069bef8ecd8cc6f1e825faf7faca9b50c56bf3650f8376280fb71dedeb4cf",
+        "output/paper_zh.pdf": "33206447f670e08bd1b43388e139af259fd719ef5e96d7c025d9edde3af374ff",
+        "output/supplement_en.pdf": "a06a6350d4ee32549a8f76e766048ba66bd2cc4e4b902f1fdebd82db805a77d2",
+        "output/supplement_zh.pdf": "9445d3de5f847095713f0ca1b6619a1678e9e93e5adb03d9885795caf462107a",
+        "presentation/TwoLevel_UserEdited_20261014.pdf": "804a9d784f62c0537c148ba59b823a6f1c10f2abc5eb2bceb3c538160ac4015f",
+        "presentation/TwoLevel_UserEdited_20261014.pptx": "2cc9ae0b87621e514b83c47e8df7b500882f9a6589804c767444d2152605c6ea"
       }
     },
     "clean_rebuild": {
@@ -377,6 +377,83 @@
       "path": "agent_doc/guide/paper_figs/README.md",
       "sha256": "2850af7f6156a28fe7491a837f190195b1616085086d9bb1c89828cc762515d7",
       "applied": "Fig2: shared coordinates, derived representations, original Q/K/V bypass; no claim of candidate-only ordinary L2, packedINT4 or speedup. Existing user-authorized manuscript settings preserved."
+    }
+  },
+  "far_quota_qualification_20261016": {
+    "baseline_commit": "533fa9f98ec2423e8dd784e3b0b60b51cb68c19a",
+    "new_source_commit": "b68c67fabcb00f875d48cdce59a5cffe3bd70ac4",
+    "source_identities": [
+      {
+        "path": "exp/trace/results/e146_ruler64k_verdict.json",
+        "sha256": "03e52ad78ad26fa8284fc979f6d732be216275a4f0bfa5460f5e4003c3d7a84f",
+        "bytes": 4498
+      },
+      {
+        "path": "exp/trace/results/e146_ruler64k_formal.json.manifest.json",
+        "sha256": "337453721893fd8722c87feeb0ebdd2e5abb7d17593e8bc71450c9a446a6128c",
+        "bytes": 166929
+      },
+      {
+        "path": "sparse_attn/indexer/tli_indexer.py",
+        "sha256": "96f049831b88f4657758eb0c8fa67dd33a4086be9a8121357cd478e8ee4568e7",
+        "bytes": 164629
+      }
+    ],
+    "scope": "Add material configuration qualifier to historical128K scores, preserving46.43/23.98 and the AmgR paragraph. No64K comparison or new measurements.",
+    "derivation": {
+      "reported_settings": {
+        "K1": 128,
+        "K2": 1024,
+        "beta": 0.375,
+        "gamma": 0.625,
+        "page_size": 64,
+        "sink": 128,
+        "recent": 128
+      },
+      "near_L1_pages": 48,
+      "far_L1_pages": 80,
+      "middle_token_budget": 768,
+      "uncapped_near_token_allocation": 1920,
+      "nominal_far_token_quota": 0,
+      "path": "Ordinary fixed-quota path without a quota override.",
+      "code_locations": "tli_indexer.py:1973-1976,2194,2329-2337",
+      "epistemic_status": "Inference from inspected code and reported configuration; executed path and complete run treatment identity not independently verified. No sole-cause attribution."
+    },
+    "manifest_limits": "64K aggregate scores and manifest are not raw predictions. Receipt summaries lack tli_alpha, tli_beta and sink configuration; hashes alone do not close full run identity.",
+    "review_cycle": {
+      "first_science": "Qualify zero as token quota because L1 far pages remain80; state ordinary path without override.",
+      "first_reader": "Bind plot annotation to sparse arm and separate five-task means from128K narrative.",
+      "author_revision": "Applied token qualifier, sparse-arm label, no-override condition and separate evidence-domain transition.",
+      "science_final": "approve-with-scope: token quota distinct from L1 page quota; ordinary no-override path; inferred configuration not verified execution or sole cause.",
+      "visual_revision": "EnglishFigure4 title and axis label initially clipped; split sparse-arm tick label and shorten x-axis label, then re-render and recompile English manuscript.",
+      "reader_visual_final": "approve:26 document pages in color/grayscale andPPT14, after EnglishFigure4 clipping repair."
+    },
+    "preserved": "All four plotting data JSON inputs and AmgR Method III.A paragraph remain byte-identical to baseline.",
+    "verification": {
+      "archived_plotting_JSON_unchanged": true,
+      "AmgR_bilingual_paragraph_unchanged": true,
+      "PPT_changed_pages": [
+        14
+      ],
+      "PPT_other16_pages_text_and_pixels_equal": true,
+      "clean_rebuild": {
+        "paper_en.pdf": {
+          "pages": 6,
+          "text_color_grayscale_equal": true
+        },
+        "paper_zh.pdf": {
+          "pages": 5,
+          "text_color_grayscale_equal": true
+        },
+        "supplement_en.pdf": {
+          "pages": 8,
+          "text_color_grayscale_equal": true
+        },
+        "supplement_zh.pdf": {
+          "pages": 7,
+          "text_color_grayscale_equal": true
+        }
+      }
     }
   }
 }

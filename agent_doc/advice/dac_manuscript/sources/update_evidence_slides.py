@@ -23,7 +23,7 @@ for num,keep,title in [(3,[0,1,90],'稠密参考：距离密度与整箱捕获�
   text(sl,9.2,2.2,6.6,6.2,'作者报告中位数 · 非完整请求E2E\nQwen3-8B，固定128输出词元\n127个首输出后间隔，逐步同步\n历史稀疏配置 α=.125 / β=.375 / γ=.625\n不同于当前4/128候选；运行路径未独立核验\n三档稀疏计时均高于稠密；汇总不能定位因果瓶颈。',23)
  else:
   sl.shapes.add_picture(str(R/'figures/ruler128k_current_zh.png'),Inches(.8),Inches(2.3),width=Inches(8))
-  text(sl,9.2,2.2,6.6,6.2,'历史稀疏配置 · 作者报告得分\n11任务 × 每任务每臂100例\n差值−22.45分，宏平均分比51.6%\n历史稀疏配置 α=.125 / β=.375 / γ=.625\n原始预测与评分身份未独立验证\n不是样本配对推断；当前4/128工作点质量仍未验证。',23)
+  text(sl,9.2,2.2,6.6,6.2,'历史128K得分：46.43 / 23.98\n11任务；每任务每臂100例\n报告 β=.375，K1=128，保护128/128\n中间预算768；页长64，γ=.625\n按已检公式：名义远区词元配额=0\n代码／配置推论；实际执行未核验\n不能据此认定得分差的唯一原因；不验证当前4/128候选。',23)
 # Terminology and attribution only; retain the existing17-slide structure.
 for slide in r.slides:
  for shape in slide.shapes:
