@@ -61,7 +61,9 @@ C_TER = pal["tertiary"]
 C_HL = pal["highlight"]
 C_NEU = pal["neutral"]
 
-# 本图为 1x4 宽版多面板，style_config 的 PPT 级字号过大，按面板宽度收敛
+# 本图为 1x4 宽版多面板，style_config 的 PPT 级字号过大，按面板宽度收敛。
+# figsize 9.5in 对 IEEE 双栏 \textwidth≈7.16in 的缩放比 ≈0.75，
+# 有效字号 ≈ title 11.3 / label 9.8 / tick 8.6 / annotation 7.9pt
 T = 15      # 面板标题
 L = 13      # 轴标签
 TK = 11.5   # 刻度
@@ -230,10 +232,12 @@ lay_med = np.median(M, axis=0)
 n_light = int((lay_med < 0.01).sum())
 skip_rng = [v["n_skippable"] for v in d6["per_prompt"].values()]
 
-# ================= 画布 1x4 =================
-fig, (ax_a, ax_b, ax_c, ax_d) = plt.subplots(
-    1, 4, figsize=(23, 5.6),
-    gridspec_kw={"wspace": 0.44, "width_ratios": [1.55, 1.0, 0.72, 1.1]})
+# ================= 画布 2x2（IEEE 双栏 \textwidth≈7.16in，缩放比 ≈0.75，
+# 有效字号 ≈ title 11 / label 9.8 / tick 8.6 / annotation 7.9pt） =================
+fig, ((ax_a, ax_b), (ax_c, ax_d)) = plt.subplots(
+    2, 2, figsize=(9.5, 6.9),
+    gridspec_kw={"wspace": 0.48, "hspace": 0.52,
+                 "width_ratios": [1.2, 1.0]})
 
 
 def note(ax, x, y, text, ha="left", va="top", color="black", size=AN):
@@ -258,13 +262,16 @@ ax_a.imshow(sel_mask.astype(float)[None, :], aspect="auto", cmap=cmap_sel,
 ax_a.axvspan(0, rb["sink_hi"], color=C_NEU, alpha=0.35, lw=0)
 ax_a.axvspan(rb["swa_lo"], q_a + 1, color=C_NEU, alpha=0.35, lw=0)
 # near/far 区域标注
-ax_a.text((rb["sink_hi"] + rb["near_lo"]) / 2, 2.08,
+_tagbox = dict(boxstyle="round,pad=0.2", facecolor="white",
+               edgecolor="none", alpha=0.85)
+ax_a.text((rb["sink_hi"] + rb["near_lo"]) / 2, 1.78,
           f"far ({far_tok_frac:.0%} of mid tokens)", ha="center",
-          fontsize=AN, color=C_HL, fontweight="bold")
-ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 2.08, "near", ha="center",
-          fontsize=AN, color=C_MAIN, fontweight="bold")
+          fontsize=AN, color=C_HL, fontweight="bold", bbox=_tagbox)
+ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 1.78, "near", ha="center",
+          fontsize=AN, color=C_MAIN, fontweight="bold", bbox=_tagbox)
 ax_a.axvline(rb["near_lo"], color=C_HL, lw=1.6, linestyle="--")
 ax_a.set_xlim(0, q_a + 1)
+ax_a.set_xticks(range(0, 15000, 3000))
 ax_a.set_ylim(0, 3.4)
 ax_a.set_yticks([0.5, 1.5])
 ax_a.set_yticklabels(["single-pool\ntop-2048", "attn mass"], fontsize=TK - 1.5)
@@ -273,16 +280,17 @@ ax_a.set_title("(a) Mass is position-segmented", loc="left", pad=10,
                fontsize=T, fontweight="bold")
 ax_a.tick_params(labelsize=TK)
 note(ax_a, 0.015, 0.98,
-     f"repr query: musique s1, layer 24, q@14212 — near := nearest 25% of mid\n"
-     f"gray: sink/swa 128 tok auto-included (mass {o_a['mass_sink']:.2f}/"
-     f"{o_a['mass_swa_excluding_sink']:.2f}); far ≈ 50% of mid mass over "
-     f"{far_tok_frac:.0%} of mid tokens\nas sparse spikes (top-5% bins ≈ "
-     f"{conc_mean:.0%} of far mass); single pool captures near {ncap_a:.2f} / "
-     f"far {fcap_a:.2f}\n→ near: block-avg · far: no-miss bound + fine select",
-     color="black", size=AN - 1.5)
+     "repr: musique s1, L24, q@14212; near := nearest 25% mid\n"
+     f"gray: sink/swa 128 tok auto-included "
+     f"({o_a['mass_sink']:.2f}/{o_a['mass_swa_excluding_sink']:.2f})\n"
+     f"far ≈ 50% mid mass over {far_tok_frac:.0%} mid tokens,\n"
+     f"sparse spikes (top-5% bins ≈ {conc_mean:.0%} far mass);\n"
+     f"single pool near/far: {ncap_a:.2f} / {fcap_a:.2f}\n"
+     "→ near: block-avg · far: no-miss bound + select",
+     color="black", size=AN - 2.5)
 sm = plt.cm.ScalarMappable(cmap=cmap_mass, norm=norm_mass)
-cb = fig.colorbar(sm, ax=ax_a, fraction=0.025, pad=0.012)
-cb.set_label("bin mass (log)", fontsize=AN - 1.5)
+cb = fig.colorbar(sm, ax=ax_a, fraction=0.04, pad=0.015)
+cb.set_label("mass (log)", fontsize=AN - 1.5)
 cb.ax.tick_params(labelsize=TK - 3)
 
 # ---- (b) 单池 far 捕获率散点 ----
@@ -292,14 +300,13 @@ for task, col, mk in (("hotpotqa", C_MAIN, "o"), ("musique", C_HL, "^")):
                  marker=mk, alpha=0.65, linewidth=1.1)
     ax_b.scatter(sh[idx], fc[idx], s=26, color=col, marker=mk, alpha=0.75,
                  edgecolor="white", linewidth=0.5, label=f"{task} ({idx.sum()} queries)")
-ax_b.axhline(nc_mean, color=C_NEU, lw=2.0, linestyle="--")
-ax_b.text(0.30, nc_mean - 0.03, f"near capture, same pool: {nc_mean:.2f}",
-          ha="center", va="top", fontsize=AN - 1.5, color=C_NEU)
+ax_b.axhline(nc_mean, color=C_NEU, lw=2.0, linestyle="--",
+             label=f"near capture, same pool: {nc_mean:.2f}")
 ax_b.axvspan(-0.03, 0.4, color=C_HL, alpha=0.08, lw=0)
 ax_b.text(0.19, 0.72, f"diffuse far:\ncapture {fc_diffuse:.2f}", ha="center",
           va="center", fontsize=AN - 1.5, color=C_HL)
 ax_b.set_xlabel("far share of mid mass", fontsize=L)
-ax_b.set_ylabel("far mass capture,\noracle top-2048 (mid budget)", fontsize=L - 1)
+ax_b.set_ylabel("far mass capture\n(oracle top-2048)", fontsize=L - 1)
 ax_b.set_xlim(-0.03, 1.0)
 ax_b.set_ylim(0, 1.05)
 ax_b.set_title("(b) Single pool under-serves far", loc="left", pad=10,
@@ -307,11 +314,10 @@ ax_b.set_title("(b) Single pool under-serves far", loc="left", pad=10,
 ax_b.tick_params(labelsize=TK)
 ax_b.legend(loc="lower right", fontsize=LG - 2, framealpha=0.92)
 note(ax_b, 0.97, 0.97,
-     f"open = far guaranteed {FAR_QUOTA}/{BUDGET_TOK} tokens:\n"
-     f"worst-case capture {fc_min:.2f}→{qc_min:.2f}, "
-     f"p10 {fc_p10:.2f}→{qc_p10:.2f}\n"
-     f"→ guaranteed far quota (anti-eviction)",
-     ha="right", va="top", color=C_HL, size=AN - 1.5)
+     f"open: far quota {FAR_QUOTA}/{BUDGET_TOK}\n"
+     f"worst {fc_min:.2f}→{qc_min:.2f}, p10 {fc_p10:.2f}→{qc_p10:.2f}\n"
+     "→ anti-eviction quota",
+     ha="right", va="top", color=C_HL, size=AN - 2.5)
 
 # ---- (c) O3 三臂 ----
 colors3 = [C_MAIN, C_NEU, C_SEC]
@@ -337,21 +343,21 @@ im = ax_d.imshow(M, aspect="auto", cmap=cmap_mass, norm=norm6,
                  interpolation="nearest")
 ax_d.set_xticks([0, 8, 16, 24, 32])
 ax_d.set_yticks(range(len(ROW_ORDER)))
-ax_d.set_yticklabels([ROW_LAB[k] for k in ROW_ORDER], fontsize=TK - 3.5)
+ax_d.set_yticklabels([ROW_LAB[k] for k in ROW_ORDER], fontsize=TK - 5)
 ax_d.set_xlabel("layer", fontsize=L)
 ax_d.set_title("(d) Far mass by layer (16 seqs)", loc="left", pad=10,
                fontsize=T, fontweight="bold")
-ax_d.tick_params(labelsize=TK)
+ax_d.tick_params(axis="x", labelsize=TK)
 note(ax_d, 0.97, 0.03,
      f"{n_light}/36 layers: median far mass <0.01;\n"
      f"per seq {min(skip_rng)}–{max(skip_rng)} far-light layers\n"
      "→ per-layer far gate (D′)",
      ha="right", va="bottom", color=C_HL, size=AN - 1.5)
-cb6 = fig.colorbar(im, ax=ax_d, fraction=0.025, pad=0.012)
-cb6.set_label("far mass (log)", fontsize=AN - 1.5)
+cb6 = fig.colorbar(im, ax=ax_d, fraction=0.04, pad=0.015)
+cb6.set_label("far mass (log)", fontsize=AN - 2)
 cb6.ax.tick_params(labelsize=TK - 3)
 
-fig.subplots_adjust(left=0.05, right=0.965, top=0.87, bottom=0.16)
+fig.subplots_adjust(left=0.10, right=0.93, top=0.94, bottom=0.09)
 
 # ---------------- lint + 导出 ----------------
 report = lint_figure(fig)
