@@ -22,10 +22,10 @@ if [ -d /usr/share/texlive/texmf-dist ]; then
     (cd ../texmf-var && xetex -ini -etex -interaction=nonstopmode -jobname=xelatex xelatex.ini > init-xelatex.log 2>&1)
   fi
 fi
-papers=(paper_en paper_zh supplement_en supplement_zh)
+papers=(paper_en paper_zh evidence_register)
 if (( $# > 0 )); then papers=("$@"); fi
 for paper in "${papers[@]}"; do
-  case "$paper" in paper_en|paper_zh|supplement_en|supplement_zh) ;; *) echo "Expected paper_en, paper_zh or evidence_register" >&2; exit 2;; esac
+  case "$paper" in paper_en|paper_zh|evidence_register|supplement_en|supplement_zh) ;; *) echo "Expected paper_en, paper_zh or evidence_register" >&2; exit 2;; esac
   xelatex -interaction=nonstopmode -halt-on-error -output-directory=../output "$paper.tex" > "../qa/${paper}-compile.log" 2>&1
   xelatex -interaction=nonstopmode -halt-on-error -output-directory=../output "$paper.tex" >> "../qa/${paper}-compile.log" 2>&1
 done
