@@ -122,7 +122,7 @@ def timed_request(model, input_ids, max_gen, dev):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--method", choices=("none", "tli"), required=True)
+    # --method 由 add_sparse_attn_args 提供（含 tli/none），此处不重复定义
     parser.add_argument("-L", "--context-length", type=int, required=True)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--warmup", type=int, default=1)
