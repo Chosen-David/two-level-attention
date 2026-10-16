@@ -1,4 +1,5 @@
 """Adapt the remote abcd renderer, blob d98ee75..., without recollection.
+Retains v2 negative-gap shading from remote blob42b5258.
 Same2x2design: saved example / regional capture / coordinate bars / historical matrix.
 Only statistical labels, exact boundaries, budget admission and readable fonts change.
 """
@@ -25,7 +26,7 @@ is_far=np.array([lo+n<=rb['near_lo'] for lo,n in zip(bin_lo,ntok_a)])
 sel_o=set(pg['sel_oracle']);sel_avg=set(pg['sel_avg']);sel_mm=set(pg['sel_minmax']);sel_mask=np.array([i in sel_o for i in range(len(bin_lo))])
 missed=sorted(sel_o-sel_avg);recov=sorted(set(missed)&sel_mm);spike=qa_q['detail']['spike'];spike_top1=max(spike['token_mass'])/sum(spike['token_mass']);far_tok_frac=ntok_a[is_far].sum()/ntok_a.sum()
 actual_budget={a:sum(pg['n_tok'][i] for i in pg['sel_'+a]) for a in ['oracle','avg','minmax']}
-if actual_budget!={'oracle':2053,'avg':2053,'minmax':2048}:raise ValueError('Saved example budget changed')
+if actual_budget!={'oracle':1989,'avg':1989,'minmax':2048}:raise ValueError('Saved example budget changed')
 # Whole-bin admission with deterministic position ties; no fractional-bin mass assumptions.
 def select(bs,budget):
  selected=[];used=0
@@ -133,6 +134,7 @@ ax_b.plot(rk, qc_s, color=C_HL, lw=LW, linestyle="--",
           label=f"far/near 1024/1024 ({qc_mean:.2f})")
 ax_b.fill_between(rk, fc_s, qc_s, where=qc_s > fc_s,
                   color=C_HL, alpha=0.15, lw=0)
+ax_b.fill_between(rk, fc_s, qc_s, where=qc_s < fc_s, color=C_MISS, alpha=0.12, lw=0)
 ax_b.axhline(nc_mean, color=C_NEU, lw=1.8, linestyle=":",
              label=f"global near: {nc_mean:.2f}")
 ax_b.set_xlabel("128 observations, sorted by global far capture", fontsize=L)
@@ -190,6 +192,7 @@ if LANG=='zh':
   t.set_text(translations.get(t.get_text(),t.get_text()));t.set_fontproperties(FontProperties(fname='/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',size=t.get_fontsize()))
 stem='o_observation'+('_zh' if LANG=='zh' else '')
 fig.savefig(OUT/(stem+'.svg'),bbox_inches='tight');fig.savefig(OUT/(stem+'.png'),dpi=220,bbox_inches='tight')
+svg=OUT/(stem+'.svg');svg.write_text('\n'.join(line.rstrip() for line in svg.read_text().splitlines())+'\n')
 subprocess.run(['inkscape',str(OUT/(stem+'.svg')),'--export-type=pdf','--export-filename='+str(OUT/(stem+'.pdf'))],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
 plt.close(fig)
 summary={'representative':'musique:s1:L24:q14212','a_actual_tokens':actual_budget,'a_selected_page_counts':{a:len(pg['sel_'+a]) for a in ['oracle','avg','minmax']},'a_mass_rank_missed_by_avg':len(missed),'a_missed_also_selected_by_minmax':len(recov),'a_spike_top1_share':spike_top1,'b_global_far_mean':fc_mean,'b_global_near_mean':nc_mean,'b_partition_far_mean':qc_mean,'b_partition_worse_count':int((qc<fc).sum()),'b_far_share_median':float(np.median(sh)),'b_global_far_min':float(fc.min()),'b_partition_far_min':float(qc.min()),'b_global_far_p10':float(np.percentile(fc,10)),'b_partition_far_p10':float(np.percentile(qc,10)),'b_independent_sequences':4,'b_correlated_observations':len(rows),'c_reference_ratios':arm_rm,'d_low_proxy_layer_medians':n_light,'d_per_sequence_low_counts':dict(zip(ROW_ORDER,skip_rng)),'rows':rows}

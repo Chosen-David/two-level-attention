@@ -17,7 +17,7 @@ for num,keep,title in [(3,[0,1,90],'四项观察：区域选集、紧凑坐标�
   if shape.has_text_frame and Inches(.7)<shape.top<Inches(1.8):shape.text=title
  if num==3:
   sl.shapes.add_picture(str(R/'figures/o_observation_zh.png'),Inches(2.9),Inches(1.85),height=Inches(6.55))
-  text(sl,.9,8.47,14.9,.55,'(a) 实际2053/2053/2048词元；(b) 43/128条下降；(c) 随机未配对；(d) 历史代理，不是当前门控或解码保证。',16)
+  text(sl,.9,8.47,14.9,.55,'(a) 实际1989/1989/2048词元；(b) 43/128条下降；(c) 随机未配对；(d) 历史代理，不是当前门控或解码保证。',16)
  elif num==12:
   sl.shapes.add_picture(str(R/'figures/decode_tpot_current_zh.png'),Inches(.8),Inches(2.2),width=Inches(8))
   text(sl,9.2,2.2,6.6,6.2,'作者报告中位数 · 非完整请求E2E\nQwen3-8B，固定128输出词元\n127个首输出后间隔，逐步同步\n历史稀疏配置 α=.125 / β=.375 / γ=.625\n不同于当前4/128候选；运行路径未独立核验\n32K/64K/128K报告中位数之比（稀疏／稠密）：3.38 / 2.46 / 1.78\n三档比值减小，但稀疏TPOT仍上升且高于稠密；汇总不能定位因果瓶颈。',23)

@@ -18,7 +18,7 @@ y={'provenance':{**ref,'transformation':'Retain O1 bins/region totals and O3 cel
 (OUT/'observation_plot_input.json').write_text(json.dumps(y,indent=2)+'\n')
 
 # The adopted remote four-panel design adds a fixed saved example and historical matrix.
-EXPECTED_SHA256.update({'exp/trace/results/e140b_pooling_anatomy.json':'3327e95d044087d5efb8315a9cf9b33e778e6a4fa028861dddedc2179324f6a7', 'exp/trace/results/e6b_far_profiles.json':'436ec37473042e59453fad194f8547d3975ff030749f8fc0289cb4cd95456bf4'})
+EXPECTED_SHA256.update({'exp/trace/results/e140b_pooling_anatomy.json':'9ba426e66b56786adc375f11b82fa4bb86fe8be257fbf1f23a249f58feeea0ca', 'exp/trace/results/e6b_far_profiles.json':'436ec37473042e59453fad194f8547d3975ff030749f8fc0289cb4cd95456bf4'})
 probe,pr=source('exp/trace/results/e140b_pooling_anatomy.json')
 profiles,fr=source('exp/trace/results/e6b_far_profiles.json')
 q=next(q for c in probe['cells'] if (c['task'],c['sample'],c['layer'])==('musique',1,24) for q in c['queries'] if q['q_pos']==14212)

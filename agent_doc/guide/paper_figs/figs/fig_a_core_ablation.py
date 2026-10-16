@@ -18,6 +18,13 @@
   （K1 全局共享 decode+prefill 双路径同塌）。
 面板 (F) E140 机制：far token 配额曲线 far_budget=K2_mid−min(K1·β·bs·γ,
   K2_mid)——K2=1024/896/768 三档，far=0 阈值精确导出 K2 悬崖位置。
+面板 (G) 两级 vs 单池（用户指令：消融补单池方法对比）：五基准口径
+  Δvs dense 配对条形（e109_full_lbv1 / e109_full_lbv2_v2 / e116b_ruler_summary，
+  全部 β0.125 干净口径）。mavg（两级+分区）稳定优于 aavg(0,0) 单池臂
+  （LB v1 +0.40 / LB v2 +0.20 / RULER 32K +2.32 / 64K +2.43 / 128K +4.64，
+  差距随 L 放大）。口径限定（GPT 澄清采纳）：aavg(0,0) = 单池+有 L1
+  两级结构（α=β=0 关分区不关粗筛）——本面板隔离的是 near/far 分区价值；
+  真无 L1 单级对照 = E120 B2（未实现，不在本图）。
 
 数据全部程序化读取自判决 JSON；输出 PDF+PNG+SVG + figure_data.tsv。
 """
@@ -58,6 +65,22 @@ e134 = json.load(open(R + "e134_perf_reverdict.json"))
 e139 = json.load(open(WT + "/exp/trace/results/e139_k2_budget_pareto_verdict.json"))
 e140b = json.load(open(R + "e140b_k1_downscan_verdict.json"))
 e140a = json.load(open(R + "e140a_prefill_k1up_verdict.json"))
+
+# (G) 两级 vs 单池：五基准 Δvs dense（β0.125 干净口径）
+e109v1 = json.load(open(R + "e109_full_lbv1.json"))
+e109v2 = json.load(open(R + "e109_full_lbv2_v2.json"))
+e116b = json.load(open(R + "e116b_ruler_summary.json"))
+sp_bench = ["LB v1\n(13 tasks)", "LB v2\n(503)", "RULER\n32K", "RULER\n64K", "RULER\n128K"]
+sp_two = [e109v1["mavg(.25,.125,.625)"]["avg"] - e109v1["FullKV"]["avg"],
+          e109v2["arms"]["mavg"]["official_score"] - e109v2["arms"]["FullKV"]["official_score"],
+          e116b["cells"]["32K"]["mavg"]["delta_vs_fullkv"],
+          e116b["cells"]["64K"]["mavg"]["delta_vs_fullkv"],
+          e116b["cells"]["128K"]["mavg"]["delta_vs_fullkv"]]
+sp_one = [e109v1["aavg(0,0)"]["avg"] - e109v1["FullKV"]["avg"],
+          e109v2["arms"]["aavg"]["official_score"] - e109v2["arms"]["FullKV"]["official_score"],
+          e116b["cells"]["32K"]["aavg"]["delta_vs_fullkv"],
+          e116b["cells"]["64K"]["aavg"]["delta_vs_fullkv"],
+          e116b["cells"]["128K"]["aavg"]["delta_vs_fullkv"]]
 
 # (A) forest
 forest = [  # (label, delta, ci_lo, ci_hi, color)
@@ -127,11 +150,12 @@ def far_budget(k1, k2, beta=0.125, bs=64, gamma=0.625, sink=128, swa=128):
     k2m = k2 - sink - swa
     return max(0, k2m - min(round(k1 * beta) * bs * gamma, k2m))
 
-# ---------------- 画布 2x3 ----------------
-fig, axes = plt.subplots(2, 3, figsize=(30, 16), gridspec_kw={"wspace": 0.30, "hspace": 0.34})
-fig.subplots_adjust(left=0.13, right=0.97, top=0.95, bottom=0.075)
-ax_a, ax_b, ax_c = axes[0]
-ax_d, ax_e, ax_f = axes[1]
+# ---------------- 画布 2x4 ----------------
+fig, axes = plt.subplots(2, 4, figsize=(40, 16), gridspec_kw={"wspace": 0.28, "hspace": 0.34})
+fig.subplots_adjust(left=0.10, right=0.97, top=0.95, bottom=0.075)
+ax_a, ax_b, ax_c, ax_g = axes[0]
+ax_d, ax_e, ax_f = axes[1][:3]
+fig.delaxes(axes[1][3])   # 2x4 网格第 8 槽删除（G 在上排右）
 
 # ---- 面板 (A) forest ----
 ys = np.arange(len(forest))[::-1]
@@ -186,6 +210,30 @@ ax_c.set_ylabel("task score")
 ax_c.set_title("C  K2 budget: decode cliff vs prefill recovery", loc="left", pad=10)
 ax_c.legend(loc="lower left", fontsize=FONT_SIZES["legend"] - 2)
 ax_c.set_ylim(5, 70)
+
+# ---- 面板 (G) 两级 vs 单池 ----
+xg = np.arange(len(sp_bench))
+wg = 0.38
+ax_g.axhline(0, color=C_NEU, lw=LINE_WIDTHS["reference"], linestyle=":")
+ax_g.bar(xg - wg / 2, sp_two, width=wg, color=C_MAIN, label="two-level + near/far (mavg)",
+         edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
+ax_g.bar(xg + wg / 2, sp_one, width=wg, color=C_NEU, label="single pool (aavg $\\alpha$=$\\beta$=0)",
+         edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
+# 数值只标 mavg 臂（aavg 值进 tsv），128K 追加 gap 注记——短臂双标签互叠
+for xi, t in zip(xg, sp_two):
+    ax_g.text(xi, t + (0.15 if t >= 0 else -0.35), f"+{t:.2f}" if t >= 0 else f"{t:.2f}",
+              ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_MAIN)
+ax_g.text(4, 2.05, f"gap +{sp_two[4] - sp_one[4]:.2f}", ha="center",
+          fontsize=FONT_SIZES["annotation"] - 2, color=C_HL, fontweight="bold")
+ax_g.set_xticks(xg)
+ax_g.set_xticklabels(sp_bench)
+ax_g.set_ylabel("score delta vs dense FullKV (points)")
+ax_g.set_title("G  Two-level beats single pool; gap grows with L", loc="left", pad=10)
+ax_g.legend(loc="lower left", fontsize=FONT_SIZES["legend"] - 2)
+ax_g.text(0.02, 0.96, "single-pool arm retains L1 coarse\n(partition ablation, GPT-clarified);\nno-L1 single-level = separate study",
+          transform=ax_g.transAxes, fontsize=FONT_SIZES["annotation"] - 4,
+          style="italic", color=pal["neutral"], ha="left", va="top")
+ax_g.set_ylim(-4.8, 2.6)
 
 # ---- 面板 (D) middle 归因 ----
 xd = np.arange(len(tasks))
@@ -298,6 +346,9 @@ for k2 in (768, 896, 1024):
     for k in k1_grid:
         rows.append(f"A\tf\tK2={k2}@K1={k}\tfar_token_budget\ttokens\t{far_budget(k, k2)}\t\t\te140_far_quota_mechanism")
 rows.append(f"A\te\tthreshold\tfar_zero_K1_discrete\tK1\t{FAR_ZERO_K1}\t\t\te140_far_quota_mechanism")
+for bench, t, o in zip(["lbv1", "lbv2", "ruler32k", "ruler64k", "ruler128k"], sp_two, sp_one):
+    rows.append(f"A\tg\t{bench}\ttwo_level_delta_vs_dense\tpoints\t{t:.2f}\t\t\te109_full_lbv1/e109_full_lbv2_v2/e116b_ruler_summary")
+    rows.append(f"A\tg\t{bench}\tsingle_pool_delta_vs_dense\tpoints\t{o:.2f}\t\t\te109_full_lbv1/e109_full_lbv2_v2/e116b_ruler_summary")
 with open(os.path.join(OUT, "A_core_ablation_figure_data.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 print("exported A_core_ablation_figure_data.tsv")

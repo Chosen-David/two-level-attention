@@ -45,13 +45,13 @@
     },
     {
       "path": "sources/data/remote_observation_input.json",
-      "bytes": 49039,
-      "sha256": "b997e48f8b2c0e311564a5cccc919e06783455b17e84f940afd39a0e6805d39b"
+      "bytes": 49013,
+      "sha256": "b54b84f07b59a406c5023a13b54ce7ece37ed343693886b5ef3bed41a4503858"
     },
     {
       "path": "sources/data/remote_observation_summary.json",
       "bytes": 157599,
-      "sha256": "9e7989c2143aa226d5c4357afa7f663b2d9f6d1c88359d22367c618c85e09bdc"
+      "sha256": "336903328b6054d9531765c44d18e40949761b78355891d166961bf306dfb68f"
     }
   ],
   "repository_source_identities": [
@@ -863,7 +863,7 @@
     "renderer_origin_blob": "d98ee75c360da946a9eec890b5f70a4251262d09",
     "design": "Retain remote2x2: three-strip saved selection, sorted paired regional capture, coordinate bars,16x36heatmap. No replacement design.",
     "changes": {
-      "a": "Saved sets retained,2053/2053/2048; exact partial-bin widths; spike99.8433%; no matched-budget optimality claim.",
+      "a": "Latest remote v2 saved sets adopted: samecap2048, actual1989/1989/2048. Only mass/avg selected sets differ from v1; measured page arrays/detail unchanged. No optimality claim.",
       "b": "Exact absolute region membership, pre-admission whole-bin cap2048; far/near1024/1024 independently, no refill;43 negative paired changes.",
       "c": "Original eight-cell ratios and unpaired random limitation.",
       "d": "Same16x36matrix:24/36 layer medians<.01 and12–32 per sequence; last sampled query, sum-group-logits then softmax, old far[64,t−2048), not current gate."
@@ -873,13 +873,13 @@
         "old_paragraph": "Figure~\\ref{fig:pending-observation} motivates treating regional access separately from scoring width. Following ClusterKV's token/page perspective~\\cite{clusterkv}, it contrasts distance-dependent attention density with near/far retention under one feasible global whole-bin selection. The regional retention differs across these Qwen3-8B observations, motivating a test of reserved regional capacity. This diagnostic neither evaluates our production selector nor proves that regional quotas improve task quality. Likewise, slower phase variation motivates the low-frequency coordinate choice, but its retrieval value depends on content and must be tested rather than assumed.",
         "new_paragraph": "Figure~\\ref{fig:observation} connects these design choices to four Qwen3-8B diagnostics, retaining the token/page perspective of ClusterKV~\\cite{clusterkv}. In the fixed example, mass-ranked, mean-score and extrema-score selection retain different pages (a), motivating a comparison of regional scorers rather than proving a pooling-only effect. Under feasible whole-bin budgets, reserving regional capacity changes distant-history access (b): mean far retention rises from .6759 to .7207, but falls on 43 of 128 correlated observations. Regional allocation is thus a trade-off, not a per-query improvement guarantee. The coordinate diagnostic (c) motivates compact scoring, without isolating frequency from RoPE-pair structure. Historical layer profiles (d) motivate examining selective far computation, but their single-query proxy is not the current gate statistic and provides no decode guarantee. These observations define hypotheses for the cascade; they do not establish production-selector fidelity or task-quality gains.",
         "old_figure": "\\begin{figure}[t]\\centering\n\\includegraphics[width=\\columnwidth]{observation_current.pdf}\n\\caption{Archived Qwen3-8B diagnostics, with 128/128 protection. (a) Valid-token-normalized attention mass for one MuSiQue query (sample 1, layer 24, position 9996). (b) Four source sequences contribute 128 correlated query/layer observations. Within each observation, near/far attention retention is selected regional weight divided by total regional weight, using the same global whole-bin selection capped at 2048 middle tokens. Selection acts on probabilities averaged across query heads and eight KV groups (S6). This is not the method's $K=1024$ policy, an oracle or exact concentration.}\n\\label{fig:pending-observation}\\end{figure}",
-        "new_figure": "\\begin{figure*}[t]\\centering\n\\includegraphics[width=\\textwidth]{o_observation.pdf}\n\\caption{Four motivating diagnostics; Qwen3-8B, 128/128 prefix/recent protection in (a)--(c). (a) Saved page selections for MuSiQue sample~1, layer~24, query~14212. Mass-ranked, mean-score and extrema-score sets use 2053/2053/2048 tokens: an illustrative comparison, not a budget-matched oracle. Red marks mass-ranked pages missed by mean scoring; ticks mark those also selected by extrema scoring. (b) Four sequences contribute 128 correlated observations, ordered by global far retention. A global whole-bin cap of 2048 is compared with separate far/near caps of 1024/1024, without refill. Retention divides selected regional mass by full regional mass; the dotted line is global near retention. (c) Selected mass relative to full-dimensional reference mid-TopK mass; random32 does not preserve RoPE pairs. (d) The same 16-by-36 historical single-query proxy matrix gives 24/36 layer medians below .01 and 12--32 low-proxy layers per sequence. Its aggregation differs from the current gate (S6). These are diagnostic selections and profiles, not task-quality or decode-safety results.}\n\\label{fig:observation}\\end{figure*}"
+        "new_figure": "\\begin{figure*}[t]\\centering\n\\includegraphics[width=\\textwidth]{o_observation.pdf}\n\\caption{Four motivating diagnostics; Qwen3-8B, 128/128 prefix/recent protection in (a)--(c). (a) Saved page selections for MuSiQue sample~1, layer~24, query~14212. With cap 2048, mass-ranked, mean-score and extrema-score sets use 1989/1989/2048 tokens: an illustrative comparison, not a budget-matched oracle. Red marks mass-ranked pages missed by mean scoring; ticks mark those also selected by extrema scoring. (b) Four sequences contribute 128 correlated observations, ordered by global far retention. A global whole-bin cap of 2048 is compared with separate far/near caps of 1024/1024, without refill; red shading marks lower capture. Retention divides selected regional mass by full regional mass; the dotted line is global near retention. (c) Selected mass relative to full-dimensional reference mid-TopK mass; random32 does not preserve RoPE pairs. (d) The same 16-by-36 historical single-query proxy matrix gives 24/36 layer medians below .01 and 12--32 low-proxy layers per sequence. It uses the last sampled query, group-logit summation before softmax and far interval $[64,t-2048)$ (S6), unlike the current gate. These are diagnostic selections and profiles, not task-quality or decode-safety results.}\n\\label{fig:observation}\\end{figure*}"
       },
       "zh": {
         "old_paragraph": "图\\ref{fig:pending-observation}为将区域访问与评分宽度分别考察提供动机。借鉴ClusterKV的词元／页视角~\\cite{clusterkv}，图中对照距离相关的注意力密度与同一可行全局整箱选择下的近远区域保留率。Qwen3-8B观测中的区域保留率不同，促使我们检验预留区域容量的作用。这项诊断既未评估实际选择器，也不证明区域配额提高任务质量。同样，较慢的相位变化为低频坐标选择提供动机，但其检索价值取决于内容，必须通过实验检验。",
         "new_paragraph": "图\\ref{fig:observation}沿用ClusterKV的词元／页视角~\\cite{clusterkv}，以四项Qwen3-8B诊断连接设计选择。固定示例中，质量排序、均值评分与极值评分保留的页不同(a)，为比较区域评分器提供动机，但不能证明纯粹的池化效应。在可行整箱预算下，预留区域容量改变远端历史的访问机会(b)：远区平均保留率从.6759升至.7207，但128条相关观测中有43条下降。因此，区域分配是一项取舍，并非逐查询改善保证。坐标诊断(c)为紧凑评分提供动机，却未将频率与RoPE配对结构分离。历史逐层统计(d)促使我们考察选择性远区计算，但其中单查询代理并非当前门控统计，也不保证解码需求。这些观察为级联提出可检验假设，尚不证明生产选择器保真或任务质量收益。",
         "old_figure": "\\begin{figure}[t]\\centering\n\\includegraphics[width=\\columnwidth]{observation_current_zh.pdf}\n\\caption{Qwen3-8B归档诊断，保护为128/128。(a) 一个MuSiQue查询（样本1、层24、位置9996）的每个有效词元的平均注意力权重。(b) 四条源序列贡献128条相关查询／层观测。近区／远区注意力保留率，均为同一全局整箱选集在该区域的选中权重和除以区域总权重（每条观测中间词元上限2048）。选择作用于查询头及八个KV组平均后的概率（补充注S6）。这不是方法的$K=1024$策略、最优参照或精确集中度。}\n\\label{fig:pending-observation}\\end{figure}",
-        "new_figure": "\\begin{figure*}[t]\\centering\n\\includegraphics[width=\\textwidth]{o_observation_zh.pdf}\n\\caption{四项设计动机诊断，模型为Qwen3-8B；(a)--(c)前缀／近期保护各128。(a) MuSiQue样本1、层24、查询14212的保存页选集；质量排序、均值评分与极值评分分别使用2053/2053/2048词元，仅作示例，不是预算匹配的最优参照。红色表示质量排序选中而均值漏选的页，勾号表示极值评分也选中。(b) 四序列贡献128条相关观测，按全局远区保留率排序；比较2048全局整箱上限与远／近各1024的独立上限，不回填。保留率为区域选中质量除以区域总质量，点线为全局选择的近区均值。(c) 选中质量相对全维参考mid-TopK质量；随机32不保留RoPE配对。(d) 同一16×36历史单查询代理矩阵中，24/36层的中位值低于.01，每序列有12--32个低代理值层；聚合不同于当前门控（S6）。这些选择和统计不构成任务质量或解码安全结果。}\n\\label{fig:observation}\\end{figure*}"
+        "new_figure": "\\begin{figure*}[t]\\centering\n\\includegraphics[width=\\textwidth]{o_observation_zh.pdf}\n\\caption{四项设计动机诊断，模型为Qwen3-8B；(a)--(c)前缀／近期保护各128。(a) MuSiQue样本1、层24、查询14212的保存页选集；在2048上限下，质量排序、均值评分与极值评分分别使用1989/1989/2048词元，仅作示例，不是预算匹配的最优参照。红色表示质量排序选中而均值漏选的页，勾号表示极值评分也选中。(b) 四序列贡献128条相关观测，按全局远区保留率排序；比较2048全局整箱上限与远／近各1024的独立上限，不回填；红色填充为保留率下降。保留率为区域选中质量除以区域总质量，点线为全局选择的近区均值。(c) 选中质量相对全维参考mid-TopK质量；随机32不保留RoPE配对。(d) 同一16×36历史单查询代理矩阵中，24/36层的中位值低于.01，每序列有12--32个低代理值层；使用最后采样查询、组内logits先求和后softmax及旧远区$[64,t-2048)$，不同于当前门控（S6）。这些选择和统计不构成任务质量或解码安全结果。}\n\\label{fig:observation}\\end{figure*}"
       }
     },
     "writing_reference": {
@@ -899,6 +899,27 @@
     "review": "Independent numerical recomputation matched128 selected-support sets; saved example and16x36matrix match frozen originals. Reader review prompted actual local revisions. Final visual/clean rebuild receipt recorded below.",
     "no_new_measurement": true,
     "human_guide_modified": false,
-    "layout_revision": "Shortened repeated English discussion/conclusion without dropping limits; AI disclosure now on final content page. Chinese final content columns balanced. EN/ZH5content+1reference pages each; supplements8/8; presentation17."
+    "layout_revision": "Shortened repeated English discussion/conclusion without dropping limits; AI disclosure now on final content page. Chinese final content columns balanced. EN/ZH5content+1reference pages each; supplements8/8; presentation17.",
+    "concurrent_integration": {
+      "remote_head": "81d7356630a9a6a2ed87395504f8a8543fd8d014",
+      "remote_renderer_blob": "42b52581c8f4023c8237133994cd90ee2130b21b",
+      "probe_v2_sha256": "9ba426e66b56786adc375f11b82fa4bb86fe8be257fbf1f23a249f58feeea0ca",
+      "preserved": "All remote guide/results/advice and unrelated evaluation/ablation commits retained. Adopt v2 saved a selections and red negative shading; preserve bilingual wording/reader fixes and precise historicaldscope. No local collection.",
+      "caption_resolution": "Replace oracle/no-miss/floor interpretation with bounded diagnostic language; minimum/p10 statistics remain in bundled summary, no per-query guarantee.",
+      "supersedes_a_budget": "Initial local2053/2053/2048 draft was replaced before publication; actualv2counts1989/1989/2048."
+    },
+    "clean_rebuild": {
+      "result": "45pages identical in extracted text, RGB and grayscale pixels from fresh curated source copy; both Observation PDFs also regenerated with equal pixels and per-query JSON bytes",
+      "pages": {
+        "paper_en": 6,
+        "paper_zh": 6,
+        "supplement_en": 8,
+        "supplement_zh": 8,
+        "presentation": 17
+      },
+      "input_derivation": "3 inputs reproduce byte-for-byte from frozen source hashes",
+      "review": "Independent numerical and scientific reviews passed; author implemented reader corrections; final bilingualPDF/PPT actual-page visual review passed.",
+      "ci": "No tracked .github/workflows; hosted check API inaccessible403; local checks only."
+    }
   }
 }

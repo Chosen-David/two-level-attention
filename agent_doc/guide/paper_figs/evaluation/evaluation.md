@@ -76,6 +76,12 @@
 - **ClusterKV（vendor 已接入，派单中 pending）**：RULER 32K/64K/128K + LongBench 16 待补；预算对齐 token_budget=1024/sink=16（总 attend≈1025，构成=仅 sink 强制区，披露与 TLI sink+swa 差异）。
 - SparQ/MInference/FASA 数据已登记（RULER 32K 60.45/49.94/24.00；LBv1 48.66/47.71/33.31），按 evaluation.md E3「额外 baseline 不堆数量」策略作附录候选，不强制入主图。
 
+**decode-only 转向数据口径（2026-10-16 用户指令，E146b/E145b 在飞）：**
+- 论文叙事定稿为 **decode-only 稀疏（prefill 维持 dense）**——prefill 稀疏精度五面闭合驳回（E148 几何 + E149 e2e + E148b mass + E151b 剂量 + E151c oracle）。E1 主质量表的 TLI 臂一律按 decode-only 口径声明，prefill dense 差异在表注披露。
+- **β 口径披露（far=0 erratum 后强制）**：历史主表臂存在两代口径——E98BEST LBv1 13 任务与 E104 RULER 32K 主臂为 α0.125/β0.375（far_budget 公式级归零，退化配置）；e109 LBv1 重评 / E117b LBv2 / e116b RULER 三档 / E119 / E146b 重派为 α0.25/β0.125（far=128 论文 E0 口径）。E1 图与主表**只能使用 β0.125 干净口径数字**；若某格只有 β0.375 存量（如 E98BEST per-task），须显式标注 legacy-far0 不与新口径混表。RULER 32K/64K/128K 主臂以 E146b formal 打分（在飞）为准，替换图内 E146 far=0 旧值（23.98@128K）。
+- **E145b 中文重验在飞**：E145 TLI 臂同为 β0.375（far=0，pr_zh -76 崩溃同模式），「中英通用」主张待 β0.125 重验数据（pred_E145b_zh）落地后判；中文 8 任务若恢复则 E1 数据范围扩 21 任务口径，若仍崩则边界如实写。
+- **E146b-32K 已落地（2026-10-16 15:40，`e146b_r32k_formal.json` 四件套）**：β0.125 主臂 **57.63**（producer receipt 11/11 闭合，yarn=False native 证实）。对照 FullKV 59.38（-1.75）/ E104 β0.375 far=0 58.63 / e116b 同配置先验 59.65。**同配置复制差 -2.02 集中在 cwe(-12.5)/niah_multikey_2(-12)**：RULER 32K 宏平均跨机复制噪声约 2 分（cwe 跨同配置臂摆动 58.8-83.5）；FullKV greedy 跨机确定复现而 TLI 臂 top-k tie 跨机分歧——主表引用任一 32K 值时必须披露复制噪声，e116b「+0.27 超 FullKV」不可单独作主张。64K/128K 打分监督已挂（17:53 / 次晨 08:37）。
+
 **支持或否定：**可支持声明范围内的质量—成本取舍；不能证明全局最优或跨模型普适。若有任务超过 `δ`，保留并说明适用边界，不能只展示总体平均。
 
 **产物绑定：**`figure_id=E1`，质量表的每格绑定 `run_id + scorer_hash + sample_set_hash`；复用格同样记录原始 run_id。
