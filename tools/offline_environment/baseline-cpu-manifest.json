@@ -1,6 +1,6 @@
 {
   "target": "CPU validation only: CPython 3.12 Linux x86_64 glibc >= 2.28, torch 2.8.0+cpu, NOT CUDA-ready",
-  "source": "official package indexes; license texts retained inside wheels",
+  "source": "Official package indexes; embedded license files plus pinned upstream supplementary notices; not an exhaustive binary/transitive-license audit",
   "files": [
     {
       "filename": "accelerate-1.12.0-py3-none-any.whl",
@@ -421,5 +421,50 @@
     }
   ],
   "total_bytes": 393257872,
-  "requirements_sha256": "e533e236f619cc9e1fe33debbefcb051d4758f09a32218e6d55ac259ee3edbea"
+  "requirements_sha256": "e533e236f619cc9e1fe33debbefcb051d4758f09a32218e6d55ac259ee3edbea",
+  "supplementary_licenses": [
+    {
+      "path": "licenses/sentencepiece/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "upstream_commit": "31646a467d2051eb904e0b45de3a73e91fe1c1e3",
+      "source": "https://github.com/google/sentencepiece/blob/31646a467d2051eb904e0b45de3a73e91fe1c1e3/LICENSE"
+    },
+    {
+      "path": "licenses/sentencepiece/third_party/esaxx/LICENSE",
+      "sha256": "7c28553d1d3312d65fe309f76a22ebaf33a3d76c8c1e3b98a88ee4654ecb53db",
+      "upstream_commit": "31646a467d2051eb904e0b45de3a73e91fe1c1e3",
+      "source": "https://github.com/google/sentencepiece/blob/31646a467d2051eb904e0b45de3a73e91fe1c1e3/third_party/esaxx/LICENSE"
+    },
+    {
+      "path": "licenses/sentencepiece/third_party/protobuf-lite/LICENSE",
+      "sha256": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+      "upstream_commit": "31646a467d2051eb904e0b45de3a73e91fe1c1e3",
+      "source": "https://github.com/google/sentencepiece/blob/31646a467d2051eb904e0b45de3a73e91fe1c1e3/third_party/protobuf-lite/LICENSE"
+    },
+    {
+      "path": "licenses/sentencepiece/third_party/absl/LICENSE",
+      "sha256": "d3e2f59e1d71176dfdb555ece6a41f7a5aa0f52ff21211010ace314f57695f6b",
+      "upstream_commit": "31646a467d2051eb904e0b45de3a73e91fe1c1e3",
+      "source": "https://github.com/google/sentencepiece/blob/31646a467d2051eb904e0b45de3a73e91fe1c1e3/third_party/absl/LICENSE"
+    },
+    {
+      "path": "licenses/sentencepiece/third_party/darts_clone/LICENSE",
+      "sha256": "155f59997298ee336602c49f9c1110f268ac394ca2197eb02647a3555935ad52",
+      "upstream_commit": "31646a467d2051eb904e0b45de3a73e91fe1c1e3",
+      "source": "https://github.com/google/sentencepiece/blob/31646a467d2051eb904e0b45de3a73e91fe1c1e3/third_party/darts_clone/LICENSE"
+    },
+    {
+      "path": "licenses/tokenizers/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "upstream_commit": "f383101a26663708484cac0727792aad74f78234",
+      "source": "https://github.com/huggingface/tokenizers/blob/f383101a26663708484cac0727792aad74f78234/LICENSE"
+    },
+    {
+      "path": "licenses/tokenizers/tokenizers/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "upstream_commit": "f383101a26663708484cac0727792aad74f78234",
+      "source": "https://github.com/huggingface/tokenizers/blob/f383101a26663708484cac0727792aad74f78234/tokenizers/LICENSE"
+    }
+  ],
+  "license_audit_limit": "sentencepiece 0.2.1 and tokenizers 0.22.2 wheels omit embedded LICENSE/NOTICE. Supplied version-matched upstream license texts and sentencepiece vendored component licenses without modifying wheels. No upstream file named NOTICE found. Rust dependency and other binary/transitive notice coverage remains unverified; do not claim full redistribution compliance."
 }

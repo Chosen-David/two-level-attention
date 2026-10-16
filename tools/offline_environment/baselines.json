@@ -42,7 +42,17 @@
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "method": "clusterkv_vendor",
+        "loader_branch_present": true,
+        "standard_cli_choice": false,
+        "vendor_directory": "exp/vendor_baselines/clusterkv_vendor",
+        "vendor_directory_exists": false,
+        "checkpoint_execution": false,
+        "gpu_execution": false,
+        "blocker": "Registered loader points to missing adapter directory; downloaded upstream source does not supply this integration"
+      }
     },
     {
       "name": "HiP",
@@ -86,7 +96,11 @@
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "loader_branch_present": false,
+        "scope": "source inventory/supporting dependency only; no experiment arm added"
+      }
     },
     {
       "name": "MoBA",
@@ -132,7 +146,17 @@
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "method": "moba_vendor",
+        "loader_branch_present": true,
+        "standard_cli_choice": true,
+        "vendor_directory": "exp/vendor_baselines/moba_vendor",
+        "vendor_directory_exists": false,
+        "checkpoint_execution": false,
+        "gpu_execution": false,
+        "blocker": "Registered loader points to missing adapter directory; downloaded upstream source does not supply this integration"
+      }
     },
     {
       "name": "HISA_author_entry",
@@ -165,7 +189,11 @@
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "loader_branch_present": false,
+        "scope": "source inventory/supporting dependency only; no experiment arm added"
+      }
     },
     {
       "name": "HISA_TileLang",
@@ -228,7 +256,11 @@
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "loader_branch_present": false,
+        "scope": "source inventory/supporting dependency only; no experiment arm added"
+      }
     },
     {
       "name": "RAFT_24.10",
@@ -261,7 +293,11 @@
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "loader_branch_present": false,
+        "scope": "source inventory/supporting dependency only; no experiment arm added"
+      }
     },
     {
       "name": "FFD",
@@ -298,12 +334,22 @@
       "venv_scope": "CPU dependency candidate, NOT official CUDA environment",
       "cpu_import": {
         "import": true,
-        "evidence": "evidence/ffd-import.log"
+        "evidence": "evidence/ffd-import.log",
+        "resolved_module_evidence": "evidence/continuation/module-resolution.json"
       },
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "method": "ffd_vendor",
+        "loader_branch_present": true,
+        "standard_cli_choice": true,
+        "vendor_directory": "exp/vendor_baselines/ffd_vendor",
+        "vendor_directory_exists": true,
+        "checkpoint_execution": false,
+        "gpu_execution": false
+      }
     },
     {
       "name": "Quest",
@@ -349,12 +395,22 @@
         "import": true,
         "real_model": false,
         "gpu_performance": false,
-        "last_error": []
+        "last_error": [],
+        "resolved_module_evidence": "evidence/continuation/module-resolution.json"
       },
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "method": "quest_vendor",
+        "loader_branch_present": true,
+        "standard_cli_choice": true,
+        "vendor_directory": "exp/vendor_baselines/quest_vendor",
+        "vendor_directory_exists": true,
+        "checkpoint_execution": false,
+        "gpu_execution": false
+      }
     },
     {
       "name": "FASA",
@@ -399,7 +455,16 @@
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "method": "fasa_vendor",
+        "loader_branch_present": true,
+        "standard_cli_choice": true,
+        "vendor_directory": "exp/vendor_baselines/fasa_vendor",
+        "vendor_directory_exists": true,
+        "checkpoint_execution": false,
+        "gpu_execution": false
+      }
     },
     {
       "name": "MInference",
@@ -444,7 +509,17 @@
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "method": "minference_vendor",
+        "loader_branch_present": true,
+        "standard_cli_choice": true,
+        "vendor_directory": "exp/vendor_baselines/minference_vendor",
+        "vendor_directory_exists": true,
+        "checkpoint_execution": false,
+        "gpu_execution": false,
+        "blocker": "minference.cuda compiled extension absent; adapter import and native execution incomplete"
+      }
     },
     {
       "name": "SparQ",
@@ -482,12 +557,24 @@
         "import": true,
         "real_model": false,
         "gpu_performance": false,
-        "last_error": []
+        "last_error": [],
+        "resolved_module_evidence": "evidence/continuation/module-resolution.json"
       },
       "real_checkpoint_execution": false,
       "gpu_execution": false,
       "gpu_performance": false,
-      "all_gitlinks_materialized": true
+      "all_gitlinks_materialized": true,
+      "benchmark_entrypoint": {
+        "method": "sparq_vendor",
+        "loader_branch_present": true,
+        "standard_cli_choice": true,
+        "vendor_directory": "exp/vendor_baselines/sparq_vendor",
+        "vendor_directory_exists": true,
+        "checkpoint_execution": false,
+        "gpu_execution": false,
+        "cpu_tiny_random_model_test": true,
+        "receipt_contract": "B-track running mean repaired; no checkpoint or benchmark dataset run"
+      }
     }
   ],
   "transported_source_archives": [

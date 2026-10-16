@@ -102,12 +102,12 @@ validation of this environment.
 | Method | Source | Environment / CPU import | Still missing |
 |---|---|---|---|
 | FFD | existing Apache-2.0 vendor + full pinned source | independent CPU env, official `ffd_core` import passes | native cu128/FlashAttention GQA route, weights, actual kernel/model run |
-| ClusterKV | full pinned source and recursive gitlinks | Python 3.10.15 **scaffold only** | pylibraft-cu11 24.10 wheel (NVIDIA index 403), CUDA/build, faithful local adapter, project redistribution license |
+| ClusterKV | full pinned source and recursive gitlinks | Python 3.10.15 **scaffold only** | pylibraft-cu11 24.10 wheel (NVIDIA index 403), CUDA/build, missing registered clusterkv_vendor adapter directory (also absent CLI choice), project redistribution license |
 | Quest | existing Qwen3 quality port + full upstream/gitlinks | independent CPU env, Qwen3 adapter import passes | official efficient CUDA kernel; native upstream HF4.45.2 differs from this CPU port environment |
 | FASA | existing port + full upstream | independent CPU dependencies installed; import fails on official import-time CUDA allocation | CUDA, calibration; native upstream torch2.5.1/HF4.43 differs from CPU port candidate |
-| SparQ | existing vendor/core + full upstream | independent CPU env, core import passes | real model/GPU route; current integration tests expose old/new adapter contract mismatch |
+| SparQ | existing vendor/core + full upstream | independent CPU env, core import passes | checkpoint/GPU route; B-track receipt contract now passes tiny random HF CPU tests |
 | MInference | existing vendor + full upstream | independent CPU deps; import fails at `minference.cuda` | compiled CUDA extension and pattern/real model verification |
-| MoBA | full MIT source, also transported archive | independent CPU deps; import fails at `flash_attn` | flash-attn2.6.3 and continued-training/model conditions |
+| MoBA | full MIT source, also transported archive | independent CPU deps; import fails at `flash_attn` | missing registered moba_vendor adapter directory, flash-attn2.6.3 and continued-training/model conditions |
 | HiP | fixed source, FSL-1.1-MIT | separate **scaffold only**, import lacks torch | method-specific CUDA12 stack; no verified current HF Qwen3-8B route; not newly redistributed |
 | HISA | fixed author entry + TileLang full gitlinks, MIT kernel subset transported | separate **scaffold only**, source import lacks built TileLang libraries | compiled runtime; DSA/Sparse-MLA interface not current Qwen3/DeepSeek-V2-Lite; SGLang route excluded |
 
@@ -141,11 +141,52 @@ python3.12 tools/offline_environment/bootstrap_baseline_cpu.py \
   acceptance or visual review. No rebuilt deliverables were committed.
 - 9 offline-safety tests pass normally and under `-O`; tests declare their target
   platform and reject tampering, traversal, musl, incompatible ABI and overwrite.
-- Existing `tests/test_baseline_integration.py`: **12 pass / 3 SparQ failures**,
+- Initial run of `tests/test_baseline_integration.py`: **12 pass / 3 SparQ failures**,
   both normal and `-O`. Unchanged main source/test expectations differ in
-  `enable_sparq` return value and `_baseline_stats`; retained logs, no algorithm fix.
+  receipt routes and `_baseline_stats` (not return value); historical logs retained.
+  Follow-up fixes the actual B-track receipt contract without changing numeric code;
+  see `evidence/continuation/` for current passing regressions.
 - Independent read-only review checked wheel hashes, pip check, shell syntax,
   and isolation/platform guards. It did not certify target-host installation.
 - `governance.json` preserves guide/task input hashes without copying credentials
   or rewriting human guides. Remote highest-priority mapped files were unavailable;
   current explicit environment-only authorization governs this bounded work.
+
+## Continuation: delivery and SparQ receipts
+
+The system tar **does not include CPython 3.12**. Supply an independently verified
+compatible Python with venv/ensurepip before either Python bootstrap; the system
+tar is not a self-contained host environment.
+
+CPU tar v2 retains all 35 wheel bytes and adds pinned SentencePiece 0.2.1 and
+Tokenizers 0.22.2 upstream license texts (including SentencePiece bundled component
+licenses). `baseline-cpu-manifest.json` records source commits and sidecar hashes;
+the bootstrap verifies them. This is not an exhaustive binary/transitive-license
+audit: Rust dependency notices and wider binary notice coverage remain unverified.
+No blanket redistribution-compliance claim is made.
+
+The authorized Library batch was attempted with complete files. The helper failed
+at hosted-app tool discovery (`tools/list request failed: network`), before any
+successful file receipt; no Library ID/link is available. Do not report these tars
+as transported. GitHub Release credentials are also unavailable. Files are retained
+in `/workspace/offline-artifacts/` for resumption; no fragmentation or new credentials.
+
+SparQ LongBench and RULER still import `qwen3_sparq_patch`, not the parallel
+recomputed-mean adapter. The numeric wrapper's AST is unchanged; a separate outer
+wrapper enforces the supported interface and records successful routes. CPU tests
+compare two requests against the original numeric wrapper with bitwise-equal logits,
+check no-decode receipt rejection, exact route counts, rejected calls, duplicate
+installation, import collision and both benchmark import paths. AST loader checks
+are not execution of the full benchmark runners. Nonempty CUDA mask validation can
+synchronize each layer; GPU performance impact is unmeasured. No scores changed.
+
+`evidence/continuation/module-resolution.json` records actual FFD/Quest/SparQ vendor
+module paths and hashes in separate CPU environments. Import success is distinct
+from benchmark integration, official native environment, checkpoint inference and
+GPU performance. Missing MoBA/ClusterKV adapter directories and MInference's compiled
+extension remain explicit blockers in `baselines.json`.
+
+Current related integration/ops regression: **85 passed, 169 subtests** in both
+normal and `-O`; original 15 integration tests are all passing. Nine offline
+safety tests also pass. The first broader collection lacked einops; installing
+the existing locked CPU bundle locally resolved it, without a network download.

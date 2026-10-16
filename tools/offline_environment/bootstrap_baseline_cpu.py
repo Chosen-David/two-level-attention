@@ -14,6 +14,12 @@ def main():
     expected=Path(__file__).with_name('baseline-cpu-manifest.json').read_bytes()
     if (a.bundle/'manifest.json').read_bytes()!=expected:raise SystemExit('Bundle manifest differs from repository lock')
     verify(a.bundle)
+    for item in json.loads(expected)['supplementary_licenses']:
+        relative=Path(item['path'])
+        if relative.is_absolute() or '..' in relative.parts:raise SystemExit('Unsafe license path')
+        path=a.bundle/relative
+        if any(p.is_symlink() for p in [path,*path.parents]) or not path.is_file():raise SystemExit('Missing or linked license file')
+        if hashlib.sha256(path.read_bytes()).hexdigest()!=item['sha256']:raise SystemExit('License hash mismatch')
     if platform.system()!='Linux' or platform.machine()!='x86_64' or platform.python_implementation()!='CPython' or sys.version_info[:2]!=(3,12):
         raise SystemExit('CPU bundle requires CPython3.12 Linux x86_64')
     libc,version=platform.libc_ver()

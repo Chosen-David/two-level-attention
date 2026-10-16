@@ -39,7 +39,7 @@ Python wheel、系统包、CUDA 依赖分别处理，哈希锁与离线重建才
   flash-attn；HiP/HISA 是未装依赖 scaffold，不能称完成。ClusterKV 创建了真实
   Python3.10.15 scaffold，NVIDIA pylibraft24.10 wheel 索引403仍阻塞。
 - 9 项离线安全回归 normal/-O 通过。原 baseline 集成测试 12通过/3个 SparQ 失败，
-  normal/-O 一致；本轮未改该实现与测试，保留返回值/统计字段不匹配证据，不伪报全绿。
+  normal/-O 一致；本轮未改该实现与测试，保留receipt/统计字段不匹配证据（返回值并无失败），不伪报全绿。
 - 独立只读审查核对 wheel 哈希、pip check、shell语法及安装门禁；修正其指出的
   fresh-clone 测试副作用和来源推断表述，记录真实独审范围。
 
@@ -59,3 +59,19 @@ Python wheel、系统包、CUDA 依赖分别处理，哈希锁与离线重建才
 5. 当前工程包是可续工成果；原S-T023复现科学验收不标完成。
 
 入口与完整边界：`tools/offline_environment/README.md`。
+
+## 续工：SparQ 契约与运输复核
+
+- 原三项失败在同一 main/B轨代码上复现；仅修实际B轨入口守卫、成功计数和identity，
+  数值wrapper AST完全相同，官方核心/预算/评分不改。两benchmark入口AST确认仍B轨。
+- 原15项集成测试恢复通过；加入多请求逐位相等、失败不计数、导入碰撞和重复安装检查。
+  相关集成+ops完整回归 normal/-O 均85通过、169 subtests；9项离线安全测试通过。
+  独立只读审查单独复跑原15项 normal/-O；未将其当GPU或checkpoint验证。
+- 新CUDA mask检查可能引入同步；GPU性能影响未测，不沿用历史性能结论。
+- FFD/Quest/SparQ实际导入路径与sha已记录。MoBA/ClusterKV缺登记adapter目录、
+  ClusterKV缺CLI choice、MInference缺minference.cuda，清单保持缺失，不新增实验臂。
+- CPU v2包新增固定上游版本许可证旁文件，全部wheel字节哈希不变；许可缺失/篡改拒绝
+  已测。仍未完成二进制传递依赖许可审计。Debian包不含CPython3.12，须宿主预装。
+- 两完整包Library helper在tools/list阶段网络失败，无成功file ID；未重试创建、未拆分。
+  仍只在/workspace/offline-artifacts保存，large-artifacts.json登记新hash；不得称已交付。
+- 本次仅推原工程分支，不发布main、不改正文/PPT/图/数据。

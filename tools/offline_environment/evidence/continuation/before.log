@@ -1,0 +1,85 @@
+............FFF                                                          [100%]
+=================================== FAILURES ===================================
+_________ BaselineTests.test_sparq_full_budget_dense_parity_and_routes _________
+
+self = <test_baseline_integration.BaselineTests testMethod=test_sparq_full_budget_dense_parity_and_routes>
+
+    def test_sparq_full_budget_dense_parity_and_routes(self):
+        native=self.tiny(); model=copy.deepcopy(native)
+        self.assertEqual(enable_sparq(model,k=1024,context_length=32768),2)
+        ids=torch.tensor([[1,2,3,4,5]])
+        with torch.no_grad(),baseline_request(model) as receipt:
+            a=native(input_ids=ids,use_cache=True); b=model(input_ids=ids,use_cache=True)
+            torch.testing.assert_close(a.logits,b.logits)
+            for token in (6,7):
+                ids=torch.tensor([[token]])
+                a=native(input_ids=ids,past_key_values=a.past_key_values,use_cache=True)
+                b=model(input_ids=ids,past_key_values=b.past_key_values,use_cache=True)
+                torch.testing.assert_close(a.logits,b.logits,rtol=1e-5,atol=1e-6)
+>       self.assertEqual(receipt['routes'],{'native_prefill_calls':2,'sparq_decode_calls':4})
+                         ^^^^^^^^^^^^^^^^^
+E       KeyError: 'routes'
+
+tests/test_baseline_integration.py:178: KeyError
+________________ BaselineTests.test_sparq_no_sparse_is_rejected ________________
+
+self = <test_baseline_integration.BaselineTests testMethod=test_sparq_no_sparse_is_rejected>
+
+    def test_sparq_no_sparse_is_rejected(self):
+        model=self.tiny();enable_sparq(model)
+>       with self.assertRaises(RuntimeError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: RuntimeError not raised
+
+tests/test_baseline_integration.py:198: AssertionError
+_________ BaselineTests.test_sparq_sparse_nontrivial_and_error_inputs __________
+
+self = <test_baseline_integration.BaselineTests testMethod=test_sparq_sparse_nontrivial_and_error_inputs>
+
+    def test_sparq_sparse_nontrivial_and_error_inputs(self):
+        model=self.tiny();enable_sparq(model,k=2,context_length=16)
+        with torch.no_grad():
+            b=model(input_ids=torch.tensor([[1,2,3,4,5]]),use_cache=True)
+            b=model(input_ids=torch.tensor([[6]]),past_key_values=b.past_key_values,use_cache=True)
+            self.assertTrue(torch.isfinite(b.logits).all())
+>       self.assertEqual(model._baseline_stats['sparq_decode_calls'],2)
+                         ^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_baseline_integration.py:208:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = Qwen3ForCausalLM(
+  (model): Qwen3Model(
+    (embed_tokens): Embedding(32, 32)
+    (layers): ModuleList(
+      (0-1): ...=1e-06)
+    (rotary_emb): Qwen3RotaryEmbedding()
+  )
+  (lm_head): Linear(in_features=32, out_features=32, bias=False)
+)
+name = '_baseline_stats'
+
+    def __getattr__(self, name: str) -> Union[Tensor, "Module"]:
+        if "_parameters" in self.__dict__:
+            _parameters = self.__dict__["_parameters"]
+            if name in _parameters:
+                return _parameters[name]
+        if "_buffers" in self.__dict__:
+            _buffers = self.__dict__["_buffers"]
+            if name in _buffers:
+                return _buffers[name]
+        if "_modules" in self.__dict__:
+            modules = self.__dict__["_modules"]
+            if name in modules:
+                return modules[name]
+>       raise AttributeError(
+            f"'{type(self).__name__}' object has no attribute '{name}'"
+        )
+E       AttributeError: 'Qwen3ForCausalLM' object has no attribute '_baseline_stats'
+
+.venv-ffd-cpu/lib/python3.12/site-packages/torch/nn/modules/module.py:1962: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_baseline_integration.py::BaselineTests::test_sparq_full_budget_dense_parity_and_routes
+FAILED tests/test_baseline_integration.py::BaselineTests::test_sparq_no_sparse_is_rejected
+FAILED tests/test_baseline_integration.py::BaselineTests::test_sparq_sparse_nontrivial_and_error_inputs
+3 failed, 12 passed in 2.99s

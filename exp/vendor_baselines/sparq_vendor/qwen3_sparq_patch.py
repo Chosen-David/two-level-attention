@@ -138,6 +138,26 @@ def _qwen3_sparq_wrapper(
     return attn_output, None
 
 
+
+def _recorded_sparq_forward(self, hidden_states, position_embeddings,
+                            attention_mask=None, past_key_values=None,
+                            cache_position=None, **kwargs):
+    """Validate the supported interface before mutation; count successful calls."""
+    if hidden_states.ndim != 3 or hidden_states.shape[0] != 1 or hidden_states.shape[1] < 1:
+        raise ValueError('SparQ candidate supports batch=1, positive sequence length only')
+    decode = hidden_states.shape[1] == 1
+    if decode:
+        from sparse_attn.baseline_runtime import require_unmasked_decode
+        require_unmasked_decode(hidden_states, attention_mask, past_key_values, cache_position)
+        if kwargs.get('use_cache', True) is not True:
+            raise ValueError('SparQ decode requires use_cache=True')
+    out = _qwen3_sparq_wrapper(self, hidden_states, position_embeddings,
+                              attention_mask, past_key_values, cache_position, **kwargs)
+    key = 'sparq_decode_calls' if decode else 'native_prefill_calls'
+    self._sparq_stats[key] = self._sparq_stats.get(key, 0) + 1
+    return out
+
+
 def enable_sparq(
     model,
     k: int = 1024,
@@ -148,6 +168,23 @@ def enable_sparq(
     r/k 主表口径：k 固定（默认 1024）；r = round(head_dim/ratio)，
     ratio = context_length/(2*k)（官方 get_r_k_for_compression_ratio 反推）。
     """
+    if type(k) is not int or k <= 0 or type(context_length) is not int or context_length <= 0:
+        raise ValueError('SparQ k/context_length must be positive integers')
+    import hashlib
+    import sys
+    from pathlib import Path
+    from sparse_attn.baseline_runtime import verified_vendor
+    root = verified_vendor('sparq_vendor').resolve()
+    core = Path(sys.modules[sparq_attn.__module__].__file__).resolve()
+    expected = hashlib.sha256((root / 'sparq.py').read_bytes()).hexdigest()
+    if core != root / 'sparq_attention_official.py' or hashlib.sha256(core.read_bytes()).hexdigest() != expected:
+        raise RuntimeError('SparQ official core import collision or integrity failure')
+    layers = [m for m in model.modules() if isinstance(m, Qwen3Attention)]
+    if not layers or len(layers) != getattr(model.config, 'num_hidden_layers', None):
+        raise ValueError('SparQ adapter supports complete Qwen3 attention models only')
+    if hasattr(model, '_baseline_identity') or any(hasattr(m, 'sparq_config') or hasattr(m, '_sparq_native_forward') for m in layers):
+        raise ValueError('SparQ already installed or another baseline owns the model')
+    stats = {}
     n_patched = 0
     layer_id = 0
     _ratio = context_length / (2 * k)
@@ -171,10 +208,20 @@ def enable_sparq(
                 # "Expected all tensors on same device, cuda:0 vs cpu"。
                 module.sparq_vmean.to(module.q_proj.weight.device)
                 module.flash_forward = module.forward
-                module.forward = types.MethodType(_qwen3_sparq_wrapper, module)
+                module._sparq_stats = stats
+                module.forward = types.MethodType(_recorded_sparq_forward, module)
                 n_patched += 1
             elif len(list(module._modules.items())) > 0:
                 _patch_recursive(module)
 
     _patch_recursive(model)
+    model._baseline_stats = stats
+    model._baseline_identity = dict(
+        method='sparq_vendor', adapter_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        upstream='f2eeb9d10e79d3ffecc48015e55157bab0f6e269', core_sha256=expected,
+        k=k, context_length=context_length,
+        r_by_head_dim={str(m.head_dim): m.sparq_r for m in layers},
+        selection='per-query-head; running mean-V compensation; full resident KV',
+        comparison='B-track Qwen3 adapter; actual union K unobserved',
+        gpu_quality_validated=False)
     return n_patched
