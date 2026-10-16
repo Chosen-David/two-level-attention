@@ -1,0 +1,36 @@
+{
+ "experiment": "E151c",
+ "title": "oracle 逐层 far 配额终审——自适应参数选择器终局驳回",
+ "date": "2026-10-16",
+ "user_directive": "用户 AskUserQuestion 选定：oracle 逐层配额终审——prefill 稀疏 + far_quota 按层查表 oracle 需求（36 层，min 233/mean 320/max 397）覆盖固定公式，hotpot+musique，判据 dense-1.0（≥58.4/≥33.2）= 自适应参数复活；否则终局驳回关闭自适应问题",
+ "design": {
+  "mechanism": "env TLI_E151C_ORACLE_QUOTA → 36 元 JSON 数组（e151c_oracle_quota.json，源自 e151_layer_demand_v1_compact.json oracle far_sel）；compute_mask 两处 e64_partition 分支 far_budget 按层覆盖 min(quota[layer_idx], K2_mid)；eager_prefill._prepare_sel 以 _e151c_on 实例门禁 try/finally 包裹（decode 路径不受影响，prefill-only 终审）",
+  "engagement_proof": "派单前对拍冒烟：同 α0.25/β0.125/γ0.625 K1=128 K2=1024 配置下 far/head OFF=128 ON=328（=quota[L] 逐位匹配），K2_mid 预算恒等 8192/head 不变（只变 far/near 构成）",
+  "arms": "oracleFS：α0.25/β0.125/γ0.625 + oracle 逐层配额覆盖 + 稀疏 prefill（grp64 chunk2048），sink128/swa128/K1=128/K2=1024/c4/tail/minmax/avg",
+  "host": "wys-4xh20 GPU1/GPU3，main 358f8e5，T=1016181200，n=200/任务，pred_oracleFS",
+  "confound_disclosure": "far 配额灌入挤压 near（K2_mid=768 固定：far≈320 → near≈448 vs 固定臂 near 640）——本格同时是 far 上探+near 挤压联合格，与 E151b K1=64/96 剂量面（far 448/256）方向一致构成剂量曲面"
+ },
+ "results": {
+  "hotpotqa": {"oracle_fs": 49.38, "criterion": 58.4, "pass": false},
+  "musique": {"oracle_fs": 27.19, "criterion": 33.2, "pass": false}
+ },
+ "ladder": {
+  "dense": [59.42, 34.25],
+  "e138_fixed_far128": [56.04, 28.22],
+  "e151b_k64_far448": [54.36, 29.68],
+  "e151b_k96_far256": [51.86, 27.84],
+  "e151c_oracle_far320mean": [49.38, 27.19],
+  "reading": "far 供给从固定 128 → 真剂量 448/256 → oracle 逐层最优需求 320（mean），全剂量面无恢复且非单调甚至反向（oracle 臂比固定臂低 6.66/1.03）。far 配额供给不是 prefill 精度瓶颈；增量 far 同时挤 near 造成联合伤害，与 E151b 归因（L1 粗筛 miss 主导）一致"
+ },
+ "verdict": {
+  "decision": "REJECTED（终局）——oracle 逐层 far 配额未达判据，自适应参数选择器（prefill 逐层 far 重配路线）问题关闭",
+  "narrative": "prefill 维持 dense 五面闭合终审：E148 几何面 + E149 e2e 面 + E148b mass 面 + E151b 剂量面 + E151c oracle 面。论文 decode-only 叙事定稿不受影响；E147/E150 挂账不解锁",
+  "scope": "驳回范围=『以 far 配额供给侧提升 prefill 稀疏精度』整条路线（静态网格/逐层动态/oracle 上界三案全灭）；不含 far 选择质量（L2 评分本身）路径——后者由 O4 v3/索引器质量链另行承载"
+ },
+ "in_flight": "E146b 64K/128K 主臂重派（far=0 erratum 后）+ E145b 中文 β0.125 重验（同 erratum 线）",
+ "artifacts": {
+  "predictions": "wys-4xh20:~/two-level-attention/exp/results_longbench/Qwen3-8B/pred_E151_kquota/pred_oracleFS/pred/（200 行/任务，runcap strict_validated=2）",
+  "quota_table": "exp/trace/results/e151c_oracle_quota.json（36 元，commit 805026a）",
+  "code": "tli_indexer.py E151c override（805026a）+ eager_prefill.py _e151c_on 门禁"
+ }
+}
