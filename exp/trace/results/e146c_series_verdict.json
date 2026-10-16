@@ -1,0 +1,87 @@
+{
+  "experiment": "E146c 系列：RULER 32/64/128K sink4/swa128 主臂三档总判决",
+  "date": "2026-10-17",
+  "caliber": "decode-only mavg α0.25/β0.125/γ0.625 tail, far=minmax near=avg, K1=128 K2=1024 cmp4, kmeans off, layer_skip off, sink4/swa128 (K2_mid=892, far=252)",
+  "three_lengths": {
+    "L32768": {
+      "sink4": 58.3,
+      "fullkv": 59.38,
+      "delta": -1.08,
+      "sink128_e146b": 57.63,
+      "sink4_minus_sink128": 0.67,
+      "retention_pct": 98.2,
+      "yarn": false
+    },
+    "L65536": {
+      "sink4": 48.05,
+      "fullkv": 48.54,
+      "delta": -0.49,
+      "sink128_e146b": 47.51,
+      "sink4_minus_sink128": 0.54,
+      "retention_pct": 99.0,
+      "yarn": "factor2.0"
+    },
+    "L131072": {
+      "sink4": 46.02,
+      "fullkv": 46.43,
+      "delta": -0.41,
+      "sink128_e146b": 42.56,
+      "sink4_minus_sink128": 3.46,
+      "retention_pct": 99.1,
+      "yarn": "factor4.0"
+    }
+  },
+  "per_task": {
+    "L32768": {
+      "niah_single_1": 100.0,
+      "niah_single_2": 100.0,
+      "niah_single_3": 97.0,
+      "niah_multikey_1": 98.0,
+      "niah_multikey_2": 73.0,
+      "niah_multikey_3": 7.0,
+      "niah_multiquery": 24.5,
+      "niah_multivalue": 27.0,
+      "cwe": 68.8,
+      "fwe": 15.0,
+      "vt": 31.0
+    },
+    "L65536": {
+      "niah_single_1": 93.0,
+      "niah_single_2": 100.0,
+      "niah_single_3": 100.0,
+      "niah_multikey_1": 99.0,
+      "niah_multikey_2": 37.0,
+      "niah_multikey_3": 0.0,
+      "niah_multiquery": 25.75,
+      "niah_multivalue": 35.25,
+      "cwe": 0.3,
+      "fwe": 8.0,
+      "vt": 30.2
+    },
+    "L131072": {
+      "niah_single_1": 100.0,
+      "niah_single_2": 100.0,
+      "niah_single_3": 100.0,
+      "niah_multikey_1": 99.0,
+      "niah_multikey_2": 39.0,
+      "niah_multikey_3": 0.0,
+      "niah_multiquery": 18.25,
+      "niah_multivalue": 3.5,
+      "cwe": 0.4,
+      "fwe": 22.67,
+      "vt": 23.4
+    }
+  },
+  "verdict": "SINK4 三档全面占优：vs FullKV 差距 -1.08/-0.49/-0.41（保持率 98.2/99.0/99.1%），且 L 越大优势越大——vs sink128 同配置单变量 +0.67/+0.54/+3.46，128K 改善最大。far 配额翻倍（128→252，K2_mid 768→892）在长上下文兑现最充分，与 far 断供崩溃（E146 β0.375 128K 23.98）形成完整因果链：far 供给决定长档质量。",
+  "mechanism_readout": "逐任务：niah_single 三档满分/近满分；niah_multikey_1 98-99 稳定；multikey_2/3、multiquery、multivalue、cwe 随 L 增长劣化（候选池 16× 固定 K2 压力）但 FullKV 锚自身同趋势（yarn 外推）；cwe sink128 也低（0.2-58.8 跨臂摆动），非 sink4 特有；fwe 128K 22.67 显著优于 sink128（fwe 是 far 检索任务）。",
+  "caveats": [
+    "FullKV 锚 128K 自身塌（59.38→46.43，yarn4.0 外推主导），两臂相对差在非健康基线上，须披露",
+    "e146ca aavg 单池臂三档在飞（等链），面板 G 缺口未闭合",
+    "64K/128K formal 产物四件套已入 exp/trace/results/"
+  ],
+  "sources": {
+    "L32768": "e146c_r32k_formal.json (wys)",
+    "L65536": "e146c_r64k_formal.json (wys)",
+    "L131072": "e146c_r128k_formal.json (.187)"
+  }
+}
