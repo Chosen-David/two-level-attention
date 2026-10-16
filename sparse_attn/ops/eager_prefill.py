@@ -445,9 +445,20 @@ def sparse_prefill_attn(
         last_q = q[:, c1 - 1 : c1]  # [1, 1, H, D]
         cu = torch.tensor([0, c1], dtype=torch.int32, device=k.device)
         q_ids = cu[1:] - 1  # 末行位置（= prepare_seqlens(cu) - 1 口径）
-        mask, _bs = indexer.prepare_mask(
-            last_q, q_ids, k[:, :c1], cu, softmax_scale
-        )
+        # 【E151c oracle 逐层 far 配额】prefill 稀疏选择段置生效旗标（try/
+        # finally 清零防异常泄漏到后续 decode 选择）。env TLI_E151C_ORACLE_QUOTA
+        # 未设时 _e151c_quota=None，旗标无消费者，行为逐位不变。批量
+        # batch_select 路径不支持该臂（E151c 派单不开 TLI_PREFILL_BATCH_SELECT）。
+        _e151c = getattr(indexer, "_e151c_quota", None) is not None
+        if _e151c:
+            indexer._e151c_on = True
+        try:
+            mask, _bs = indexer.prepare_mask(
+                last_q, q_ids, k[:, :c1], cu, softmax_scale
+            )
+        finally:
+            if _e151c:
+                indexer._e151c_on = False
         m0 = mask[0, 0]        # [h, T_pad]（h=Hkv 共享 或 H per_q_head）
         return m0[..., :c1]    # 截到真实 token 数（pad 块尾巴去除）
 

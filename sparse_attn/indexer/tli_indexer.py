@@ -109,6 +109,21 @@ class TLIIndexer(TIAIndexer):
         self.far_niter = getattr(args, "tli_far_niter", 10)
         self.far_blocks = getattr(args, "tli_far_blocks", 16)   # 远端块预算 K1_far
         self.far_tokens = getattr(args, "tli_far_tokens", 512)  # 远端 token 预算 K2_far
+        # 【E151c oracle 逐层 far 配额终审臂】env TLI_E151C_ORACLE_QUOTA 指向
+        # 36 元 JSON 数组（e151_layer_demand_v1_compact.json oracle far_sel，
+        # min 233/mean 320/max 397，36/36 层超 K1=128 平铺供给 128）时，
+        # compute_mask e64 分支的 far_budget 按层查表覆盖为 oracle 需求，
+        # near 池自动吃 K2_mid 剩余（768−≈320≈448，与 oracle near 需求 416
+        # 同量级）。生效范围仅 prefill 稀疏选择段——eager_prefill 在调用
+        # prepare_mask 前后置/清 _e151c_on 旗标；decode 路径旗标恒 False
+        # 不受扰（与 E138 锚单变量对拍）。未设 env 时 _e151c_quota=None，
+        # 全部路径逐位不变（compute_mask 短路在 None 上）。
+        self._e151c_quota = None
+        self._e151c_on = False
+        _e151c_path = os.environ.get("TLI_E151C_ORACLE_QUOTA")
+        if _e151c_path:
+            with open(_e151c_path) as _f:
+                self._e151c_quota = [int(round(float(x))) for x in json.load(_f)]
         self.near_len = 2048                                      # 近端窗（D'/B 共用）
         # ---- E64j method 组合参数化（用户命名: mminmax/cavg/aavg 等）----
         self.far_method = getattr(args, "tli_far_method", "minmax")
@@ -2282,6 +2297,9 @@ class TLIIndexer(TIAIndexer):
                         nt_near = min(int(nb_near * bs * self.gamma), K2_mid)
                         # TASK.md L172 严格口径（与 E109a-γ 同步）：无 64 保底
                         far_budget = max(0, K2_mid - nt_near)
+                        if self._e151c_quota is not None and self._e151c_on:
+                            # E151c oracle 逐层配额终审：far 覆盖为该层 oracle 需求
+                            far_budget = min(self._e151c_quota[self.layer_idx or 0], K2_mid)
                     elif self.alpha == 0 and self.beta == 0:
                         # TASK.md L231 严格口径：cluster 组合 (0,0) 单池点
                         # far（簇分）拿全部 mid 预算（near 区已空）。
@@ -2310,6 +2328,9 @@ class TLIIndexer(TIAIndexer):
                     if e64_partition:
                         nt_near = min(int(nb_near * bs * self.gamma), K2_mid)
                         far_budget = max(0, K2_mid - nt_near)
+                        if self._e151c_quota is not None and self._e151c_on:
+                            # E151c oracle 逐层配额终审（minmax/avg 臂实际走本分支）
+                            far_budget = min(self._e151c_quota[self.layer_idx or 0], K2_mid)
                     else:
                         far_budget = self.far_tokens
                     # 默认：远端与近端同用 4bit 精筛分数，仅在独立池内 topk
