@@ -132,3 +132,17 @@ assets only. No legacy bytes were modified. Run
 未来输出v3并记录页协议。CPU测试不替代重采。未批准自动重采或扩大矩阵。
 O3现有0.8412/0.5060/0.2408是相对reference-mid-TopK质量比例，不是full-attention mass。
 旧、新底图与注释后资产身份分开保存在`e140_validity.json`，此前身份归入prior_asset_sets。
+
+## Manifest v3: observation redesign retires the O4 banner (2026-10-16)
+
+The O-figure was redesigned to one panel per innovation: (a) partition token
+strip (representative query, o1 bins), (b) far-quota scatter (128-query
+oracle single-pool capture), (c) subspace arms (o3, unchanged), (d) per-layer
+far-gate heatmap. Panels (a)(b)(c) read `e140_o_trace_v2.json`; panel (d) now
+reads `e6b_far_profiles.json` / `e6_layer_skip.json` instead of O4. Since no
+panel consumes O4 v2, the partial-page defect no longer reaches the figure and
+the historical-diagnostic banner is retired. The bannered asset set is archived
+in `prior_asset_sets`; manifest schema is `e140-historical-validity-v3`, status
+`redesigned-v2-inputs-current`. Run `python -m exp.paper.e140_asset_provenance`
+to verify. No legacy bytes were modified; the O4 v2 defect record above remains
+in force for any future O4-based panel.

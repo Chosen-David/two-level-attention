@@ -1,6 +1,6 @@
 {
-  "schema": "e140-historical-validity-v2",
-  "status": "historical-diagnostic-not-corrected",
+  "schema": "e140-historical-validity-v3",
+  "status": "redesigned-v2-inputs-current",
   "source_json_blob": "e670af6eda21d988d4eedcf458064bb72982bf33",
   "first_source_commit": "096414368d2f7c102cb526a62c222e181b97620c",
   "artifacts": [
@@ -32,50 +32,23 @@
   "gpu_executed": false,
   "artifacts_scope": "Legacy v1 snapshot, NOT current paths; bytes recoverable at legacy_snapshot_commit.",
   "legacy_snapshot_commit": "096414368d2f7c102cb526a62c222e181b97620c",
-  "unannotated_current_snapshot": [
-    {
-      "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
-      "sha256": "a48fb7e63ef068df2b1fe3070c66878dd6600a1f9e569ec97aeb2fddcae1a1a7",
-      "git_commit": "558fa5586ae6acffa9c634dfa9ec5af37815b619",
-      "git_blob": "4933f2737d6de74f5f9d2dff793755697f339cb8"
-    },
-    {
-      "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
-      "sha256": "8ef1c2a21ae2684261aa57adf71305e83bcb1fe298ed2f3fa8f55dc73832d369",
-      "git_commit": "558fa5586ae6acffa9c634dfa9ec5af37815b619",
-      "git_blob": "8897b4510fdbeb81044103a055b763a455243bf4"
-    },
-    {
-      "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
-      "sha256": "ddacf871ab411830465d50a865b8dadd5948c4df50ef7c8b1a97fe8e6ff0f857",
-      "git_commit": "558fa5586ae6acffa9c634dfa9ec5af37815b619",
-      "git_blob": "5319365a019fd4b93faeeec2e2c54a66355c9513"
-    }
-  ],
   "current_assets": [
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
-      "sha256": "9a6d649251b627ae254ceb46e83934068c0fe359e963beec37cf2d9e4a916106",
-      "status": "historical-diagnostic-not-corrected"
+      "sha256": "512d0e63827f48df4173ee625ed957883d733bf7f3ecd4921ca5c216c7f89f51",
+      "status": "redesigned-v2-inputs-current"
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
-      "sha256": "b1fd73788a0ad9c4c650108bea9ae8149c6557dbebc65784bf895745a35522b3",
-      "status": "historical-diagnostic-not-corrected"
+      "sha256": "61e13ea9c8a9fec702808bb8e9a1faaef563b92ed757b966036a5c2cd826bc82",
+      "status": "redesigned-v2-inputs-current"
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
-      "sha256": "2bc918dafb4fbc93a21fd1f7435eb6a9cd004e0621f75b5e60e213de08227579",
-      "status": "historical-diagnostic-not-corrected"
+      "sha256": "21b4061b4c5017d8b6456e1be31b3495e69710bf1073e78e2e50c0a87678f0bb",
+      "status": "redesigned-v2-inputs-current"
     }
   ],
-  "annotation": {
-    "warning": "PANEL (d) O4: HISTORICAL DIAGNOSTIC - NOT VALIDATED PAPER EVIDENCE",
-    "detail": "O4 v2 omitted partial final pages. O1 unaffected. Annotation only; no new experiment.",
-    "reference": "TL-E140-O4-PARTIAL-PAGE-20261015 | See E140_VALIDITY.md",
-    "scope": "O4 panel (d) only; O1 unaffected",
-    "operation": "Outside-bounds annotation only; preserve original plot"
-  },
   "unchanged_inputs": [
     {
       "path": "exp/trace/results/e140_o_trace.json",
@@ -99,11 +72,21 @@
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation_figure_data.tsv",
-      "sha256": "bf04bb99b40d6965ce67c3d9ee024d6ba5afdfb14ec9679dbabfcfc7a7d52342",
+      "sha256": "454584ec730008f0d3ca70c4103c9a8f7ee7ac884bc351d746d114f58a49caf1",
+      "status": "present-unchanged"
+    },
+    {
+      "path": "exp/trace/results/e6b_far_profiles.json",
+      "sha256": "436ec37473042e59453fad194f8547d3975ff030749f8fc0289cb4cd95456bf4",
+      "status": "present-unchanged"
+    },
+    {
+      "path": "exp/trace/results/e6_layer_skip.json",
+      "sha256": "0b5630022acf0a2c9e60dbf201eb79630593882bf483f5fc591ffbdd57c2a42b",
       "status": "present-unchanged"
     }
   ],
-  "source_provenance": "O4 v2 raw and panel (d) historical/ineligible due to partial-page omission. O1 unchanged; no recollection.",
+  "source_provenance": "Current figure: e140_o_trace_v2.json (O1/O3) + e6b_far_profiles.json + e6_layer_skip.json (panel d). O4 v2 excluded (partial-page defect). Legacy v1/v2 JSON bytes pinned below for historical diagnosis only.",
   "prior_asset_sets": [
     {
       "annotation": {
@@ -166,6 +149,80 @@
           "status": "present-unchanged"
         }
       ]
+    },
+    {
+      "annotation": {
+        "warning": "PANEL (d) O4: HISTORICAL DIAGNOSTIC - NOT VALIDATED PAPER EVIDENCE",
+        "detail": "O4 v2 omitted partial final pages. O1 unaffected. Annotation only; no new experiment.",
+        "reference": "TL-E140-O4-PARTIAL-PAGE-20261015 | See E140_VALIDITY.md",
+        "scope": "O4 panel (d) only; O1 unaffected",
+        "operation": "Outside-bounds annotation only; preserve original plot"
+      },
+      "current_assets": [
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
+          "sha256": "9a6d649251b627ae254ceb46e83934068c0fe359e963beec37cf2d9e4a916106",
+          "status": "historical-diagnostic-not-corrected"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
+          "sha256": "b1fd73788a0ad9c4c650108bea9ae8149c6557dbebc65784bf895745a35522b3",
+          "status": "historical-diagnostic-not-corrected"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
+          "sha256": "2bc918dafb4fbc93a21fd1f7435eb6a9cd004e0621f75b5e60e213de08227579",
+          "status": "historical-diagnostic-not-corrected"
+        }
+      ],
+      "unannotated_current_snapshot": [
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
+          "sha256": "a48fb7e63ef068df2b1fe3070c66878dd6600a1f9e569ec97aeb2fddcae1a1a7",
+          "git_commit": "558fa5586ae6acffa9c634dfa9ec5af37815b619",
+          "git_blob": "4933f2737d6de74f5f9d2dff793755697f339cb8"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
+          "sha256": "8ef1c2a21ae2684261aa57adf71305e83bcb1fe298ed2f3fa8f55dc73832d369",
+          "git_commit": "558fa5586ae6acffa9c634dfa9ec5af37815b619",
+          "git_blob": "8897b4510fdbeb81044103a055b763a455243bf4"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
+          "sha256": "ddacf871ab411830465d50a865b8dadd5948c4df50ef7c8b1a97fe8e6ff0f857",
+          "git_commit": "558fa5586ae6acffa9c634dfa9ec5af37815b619",
+          "git_blob": "5319365a019fd4b93faeeec2e2c54a66355c9513"
+        }
+      ],
+      "unchanged_inputs": [
+        {
+          "path": "exp/trace/results/e140_o_trace.json",
+          "sha256": "3a7a41e720fe9bbe5586d08c9468985a21d05e0cd656d4fb6f7e650ba6b8df1e",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "exp/trace/results/e140_o4_select_trace.json",
+          "sha256": null,
+          "status": "missing"
+        },
+        {
+          "path": "exp/trace/results/e140_o_trace_v2.json",
+          "sha256": "f0db60364a0e516b5ad28affeb895dadb2b50e0eecd583ee21b0a993b5029b2b",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "exp/trace/results/e140_o4_select_trace_v2.json",
+          "sha256": "4a9970ecfd802e0b295f0627bac2ee306402b684a1abdec9c37678e1e1ab97e9",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation_figure_data.tsv",
+          "sha256": "bf04bb99b40d6965ce67c3d9ee024d6ba5afdfb14ec9679dbabfcfc7a7d52342",
+          "status": "present-unchanged"
+        }
+      ],
+      "retired_reason": "2026-10-16 observation redesign: one panel per innovation (partition strip / far-quota scatter / subspace arms / per-layer gate). New figure reads e140_o_trace_v2.json + e6b_far_profiles.json + e6_layer_skip.json only; the O4 v2 partial-page defect no longer reaches any panel, so the historical-diagnostic banner is retired with this asset set."
     }
   ],
   "legacy_inputs_review": {
@@ -181,5 +238,16 @@
       "sha256": "bf04bb99b40d6965ce67c3d9ee024d6ba5afdfb14ec9679dbabfcfc7a7d52342",
       "verdict": "regenerated by the v2-recollection re-render (a8d9735); the 1b3011... bytes remain recoverable at legacy_snapshot_commit"
     }
+  },
+  "redesign": {
+    "date": "2026-10-16",
+    "renderer": "agent_doc/guide/paper_figs/figs/fig_o_observation.py",
+    "panels": {
+      "a": "partition (token strip, repr query, e140_o_trace_v2 o1 bins)",
+      "b": "far quota (128-query single-pool capture scatter, o1 bins)",
+      "c": "subspace (o3 tail32/random32/high32 arms, v2 metric)",
+      "d": "per-layer far gate (e6b heatmap + e6 layer-skip stats)"
+    },
+    "note": "No panel reads O4 v2. No historical-diagnostic banner. Legacy byte lineages preserved in prior_asset_sets / legacy_snapshot_commit."
   }
 }

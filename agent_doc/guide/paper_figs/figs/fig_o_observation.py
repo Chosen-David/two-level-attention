@@ -1,45 +1,41 @@
 # -*- coding: utf-8 -*-
-"""O 系列观察图（figure_id=O1/O3/O4，P0 主文动机图）—— E140v2 重采数据版。
+"""O 系列观察图（figure_id=O1/O3 + E6 gate，P0 主文动机图）—— E140v2 数据版。
 
-设计叙事（参照 StreamingLLM「竖虚线临界点标注」、Quest「图内文字直接给结论」、
-SparQ「方案对照同图竞技」三家的观察图范式），四个面板一条链：
-  (a) 质量在哪  —— O1v2 距离密度：mid 区密度随距离单调衰减（两任务一致），
-      far 区密度比 near 低 1-2 个数量级但质量相当 → 分区动机：near 稠密
-      块均值可代，far 稀疏须 token 级细筛 + 无漏检界。
-  (b) 质量有多少 —— O1v2 四区占比：far 占非保护 mid 质量 ~49%（与 near 相当
-      而非独占），且 far 最重 KV 组 ~组均值 2 倍（质量集中于少数组）→ 独立
-      far 预算防挤出的证据改由 (d) 的配额断供链承载。
-  (c) 用什么维度看 —— O3v2 子空间对照：同 32/128 维预算，tail32 保留 ~84%
-      reference-topK 质量 vs random ~51% vs high ~24% → 位置先验（低频完整
-      RoPE 对）而非「任意 32 维」。
-  (d) 选择器选对了没 —— O4v2 选择行为闭环：oracle 远端选中率回升（密度降
-      但远端检索集中）；K1=128 时 far 配额被配额公式压到 128（oracle 需 ~306）
-      断供，K1=64 恢复 432，overlap ~0.52→0.55。
+设计原则：一个面板对应一个创新点的 observation（2026-10-16 用户指示迭代），
+叙事链 = 分区 → far 配额 → 子空间 → 逐层 gate：
 
-可视化手法：
-  - near/far 分区底色在 (a)(d) 两面板复用（视觉连续性，读者一眼认出同一边界）；
-  - near/far 边界用竖虚线 + 标签（StreamingLLM 临界点标注法）；
-  - 每面板结论用白底框注写在图内（Quest 图内结论法），避开刻度与曲线；
-  - (c) 只画预登记主指标 selected_mass_over_reference_topk_mass（guide O3：
-    二选一，recall 进 tsv/附录）。
+  (a) 分区创新点（ClusterKV 式 token strip，真实数据）：一条 14K 真实 query
+      （musique s1 layer24 q=14212，按「far 份额最接近 128 query 中位数 0.50」
+      的预登记规则选出，非 cherry-pick）的逐 64-token bin 质量条带 + 其下方的
+      「单池 top-2048（按实测 bin 质量排序 = 任意打分单池的上界）」选中条带。
+      sink/swa 高密度保送、near 均匀中密度、far 占 76% mid token 只有稀疏尖峰
+      （最高 bin = 均值 45 倍）→ near/far 统计性质相反 → 分区异构 method。
+  (b) far 配额创新点：128 条 query 的散点——即使完美的质量单池（上界），
+      far 质量捕获率均值 0.69 vs near 0.93（79% 的 query 上 near>far）；
+      far 弥散时（share≤0.4）捕获率仅 0.41 → far 必须有保底配额（防挤出）。
+      与 E88「总质量 mono≈part」不矛盾：本面板度量的是区域公平性而非总质量，
+      分区的 e2e 增益来自让渡+保底（正文口径）。
+  (c) 子空间创新点（不变）：同 32/128 维预算 tail32 0.84 vs random32 0.51
+      vs high32 0.24（v2 主指标 selected_mass_over_reference_topk_mass）。
+  (d) D' gate 创新点：E6 逐层 far mass 热图（16 样本 × 36 层，log 色标）——
+      24/36 层中位数 <0.01；逐 prompt 有 12–32 层 far 极轻 → 逐层 far gate。
 
-数据全部程序化读取自 repo 内 e140_o_trace_v2.json + e140_o4_select_trace_v2.json
-（E140v2 修复采集器重采：hook 实际 q_norm/k_norm + 实际 position_embeddings；
-判决见 e140v2_observation_verdict.json；旧 JSON 仅历史诊断，字节保留）。
-输出 PDF+PNG+SVG + figure_data.tsv。
+数据源（全部为有效输入，不再使用 O4 v2——其部分末页缺陷见 E140_VALIDITY.md，
+本图不含 O4 面板，因此无需历史诊断警示）：
+  e140_o_trace_v2.json（O1/O3，采集器已修复：实际 q_norm/k_norm + 实际 RoPE）
+  e6b_far_profiles.json / e6_layer_skip.json（E6 逐层 far profile，gate 标定同源）
+
+输出 PDF+PNG+SVG + figure_data.tsv（含 (b) 全部 128 个散点、(d) 全矩阵）。
 """
 import json
 import math
 import os
 import sys
 
-if os.environ.get('E140_ALLOW_HISTORICAL_DIAGNOSTIC') != '1':
-    raise SystemExit('O4 v2 omits partial final pages: panel (d) is historical only. '
-                     'O1 is unaffected. No files written. Explicit diagnostic opt-in required.')
-
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.colors as mcolors  # noqa: E402
 import numpy as np  # noqa: E402
 
 SKILL = "/home/wangyuanshuo02/.claude/skills/publication-figures/scripts"
@@ -49,10 +45,11 @@ from figure_lint import lint_figure  # noqa: E402
 
 REPO = "/home/wangyuanshuo02/two-level-attention"
 SRC = os.path.join(REPO, "exp/trace/results/e140_o_trace_v2.json")
-SRC4 = os.path.join(REPO, "exp/trace/results/e140_o4_select_trace_v2.json")
-for _p in (SRC, SRC4):
+SRC6B = os.path.join(REPO, "exp/trace/results/e6b_far_profiles.json")
+SRC6 = os.path.join(REPO, "exp/trace/results/e6_layer_skip.json")
+for _p in (SRC, SRC6B, SRC6):
     if not os.path.exists(_p):
-        raise SystemExit(f"missing E140v2 recollection: {_p}; see E140_VALIDITY.md")
+        raise SystemExit(f"missing input: {_p}")
 OUT = os.path.join(REPO, "agent_doc", "guide", "paper_figs", "figs")
 os.makedirs(OUT, exist_ok=True)
 
@@ -75,96 +72,143 @@ LW = 2.4    # 数据线宽
 d = json.load(open(SRC))
 cells = d["cells"]
 
-# ---------------- (a) 距离密度聚合 ----------------
-pairs = []
+# ================= (a) 代表 query 的 token strip =================
+# 预登记选择规则：q_pos > 9000 的 query 中 far 份额最接近全体中位数者
+BUDGET_TOK = 2048  # 单池预算（mid token）
+
+
+def far_share(o):
+    nl = o["near_len"]
+    fm = sum(b["mass"] for b in o["bins"] if b["d_lo"] >= nl)
+    mm = sum(b["mass"] for b in o["bins"])
+    return fm / mm if mm > 0 else 0.0
+
+
+shares_all = [far_share(o) for c in cells for o in c["o1"]]
+share_med = float(np.median(shares_all))
+best = None
 for c in cells:
-    for o1 in c["o1"]:
-        for b in o1["bins"]:
-            pairs.append((b["d_lo"], b["d_hi"], b["mass"], b["n_tok"]))
-d_lo = np.array([p[0] for p in pairs])
-d_hi = np.array([p[1] for p in pairs])
-m = np.array([p[2] for p in pairs])
-n_tok = np.array([p[3] for p in pairs])
-dc = (d_lo + d_hi) / 2
-edges = np.logspace(math.log10(300), math.log10(17000), 25)
-dens, cx = [], []
-for i in range(len(edges) - 1):
-    sel = (dc >= edges[i]) & (dc < edges[i + 1])
-    if sel.sum() == 0:
-        continue
-    dens.append(m[sel].sum() / n_tok[sel].sum())
-    cx.append(math.sqrt(edges[i] * edges[i + 1]))
-dens = np.array(dens)
-cx = np.array(cx)
+    for o in c["o1"]:
+        if o["q_pos"] > 9000:
+            sc = abs(far_share(o) - share_med)
+            if best is None or sc < best[0]:
+                best = (sc, c, o)
+_, c_a, o_a = best
+rb = o_a["region_bounds"]
+bins_a = o_a["bins"]
+nl_a = o_a["near_len"]
+q_a = o_a["q_pos"]
 
-nl = [o1["near_len"] for c in cells for o1 in c["o1"]]
-near_len_med = float(np.median(nl))
+# bin 的绝对位置边缘（d = q_pos − pos）仅供核对；bins 间有重叠/间隙，
+# 非连续覆盖，故绘制用 bin 中心等宽近似而非 pcolormesh 精确边缘
+mass_a = np.array([b["mass"] for b in bins_a])
+ntok_a = np.array([b["n_tok"] for b in bins_a])
+# bins 按 d_lo 降序存储 → 绝对位置升序排列
+order = np.argsort([q_a - b["d_hi"] for b in bins_a])
+mass_a = mass_a[order]
+ntok_a = ntok_a[order]
 
-# ---------------- (b) 四区质量 + far 最重 KV 组 ----------------
-ZKEY = {"sink": "mass_sink", "swa": "mass_swa_excluding_sink",
-        "near": "mass_near", "far": "mass_far"}
-zones = ["sink", "swa", "near", "far"]
-zmean = [np.mean([o1[ZKEY[z]] for c in cells for o1 in c["o1"]]) for z in zones]
-fw = float(np.mean([o1["far_max_kv_group_mass"] for c in cells for o1 in c["o1"]]))
-far_mean = float(np.mean([o1["mass_far"] for c in cells for o1 in c["o1"]]))
+# 单池 top-2048（按实测 bin 质量排序 = 任意打分单池的质量捕获上界）
+rank_idx = np.argsort(-mass_a)
+acc = 0
+sel_mask = np.zeros(len(mass_a), bool)
+for i in rank_idx:
+    if acc >= BUDGET_TOK:
+        break
+    sel_mask[i] = True
+    acc += ntok_a[i]
+pos_c = np.array([(q_a - b["d_hi"] + q_a - b["d_lo"]) / 2 for b in bins_a])[order]
+is_far = pos_c < rb["near_lo"]  # mid_lo=sink_hi，far = [sink_hi, near_lo)
+fm_a = mass_a[is_far].sum()
+nm_a = mass_a[~is_far].sum()
+fcap_a = mass_a[is_far & sel_mask].sum() / fm_a
+ncap_a = mass_a[~is_far & sel_mask].sum() / nm_a
+far_tok_frac = ntok_a[is_far].sum() / ntok_a.sum()
 
-# ---------------- (c) O3 三臂（主指标 selected_mass_over_reference_topk_mass） ----------------
+# 跨 query 集中度：far 前 5% bin 携带的 far 质量比
+conc = []
+for c in cells:
+    for o in c["o1"]:
+        nl = o["near_len"]
+        fms = sorted((b["mass"] for b in o["bins"] if b["d_lo"] >= nl),
+                     reverse=True)
+        if fms and sum(fms) > 0:
+            k = max(1, int(0.05 * len(fms)))
+            conc.append(sum(fms[:k]) / sum(fms))
+conc_mean = float(np.mean(conc))
+
+# ================= (b) 单池 far 捕获率散点（128 queries） =================
+scat = []  # (task, far_share, far_capture, near_capture)
+for c in cells:
+    for o in c["o1"]:
+        nl = o["near_len"]
+        bins = o["bins"]
+        fm = sum(b["mass"] for b in bins if b["d_lo"] >= nl)
+        nm = sum(b["mass"] for b in bins if b["d_hi"] <= nl)
+        mm = sum(b["mass"] for b in bins)
+        if fm <= 0 or mm <= 0:
+            continue
+        ranked = sorted(bins, key=lambda b: -b["mass"])
+        acc = 0
+        fcap = ncap = 0.0
+        for b in ranked:
+            if acc >= BUDGET_TOK:
+                break
+            acc += b["n_tok"]
+            if b["d_lo"] >= nl:
+                fcap += b["mass"]
+            elif b["d_hi"] <= nl:
+                ncap += b["mass"]
+        scat.append((c["task"], fm / mm, fcap / fm, ncap / nm if nm > 0 else np.nan))
+scat = np.array([(s, f, n) for _, s, f, n in scat])
+tasks = [t for t, *_ in [(c["task"],) for c in cells for o in c["o1"]
+                         if sum(b["mass"] for b in o["bins"] if b["d_lo"] >= o["near_len"]) > 0
+                         and sum(b["mass"] for b in o["bins"]) > 0]]
+sh, fc, nc = scat[:, 0], scat[:, 1], scat[:, 2]
+nc_mean = float(np.nanmean(nc))
+fc_mean = float(np.mean(fc))
+fc_diffuse = float(np.mean(fc[sh <= 0.4]))
+fc_heavy = float(np.mean(fc[sh > 0.6]))
+n_under = float(np.mean(nc > fc))
+
+# ================= (c) O3 三臂（主指标 selected/reference topK mass） =================
 arms = ["tail32", "random32", "high32"]
 arm_lab = {"tail32": "tail32\n(low-freq)",
            "random32": "random32\n(unpaired)",
            "high32": "high32\n(high-freq)"}
-arm_rm = {a: float(np.mean([c["o3"][a]["selected_mass_over_reference_topk_mass"]["mean"] for c in cells]))
-          for a in arms}
-# 次级指标进 tsv
+arm_rm = {a: float(np.mean([c["o3"][a]["selected_mass_over_reference_topk_mass"]["mean"]
+                            for c in cells])) for a in arms}
 mets_all = ["reference_token_page_coverage", "reference_token_overlap_recall",
             "selected_mass_over_reference_topk_mass", "selected_full_attention_mass"]
 arm_val = {a: [float(np.mean([c["o3"][a][mm]["mean"] for c in cells]))
                for mm in mets_all] for a in arms}
 
-# ---------------- (d) O4 选择行为 ----------------
-d4 = json.load(open(SRC4))
-cells4 = d4["cells"]
-ARM4 = [("oracle", "oracle top-768 (full 128d)", C_NEU, "--"),
-        ("tli_k128", "TLI selector, K1=128 (prod.)", C_MAIN, "-"),
-        ("tli_k64", "TLI selector, K1=64", C_HL, "-")]
-edges4 = np.logspace(math.log10(300), math.log10(17000), 25)
+# ================= (d) E6 逐层 far mass 热图 =================
+d6b = json.load(open(SRC6B))
+d6 = json.load(open(SRC6))
+ROW_ORDER = ["lb_gov_report_0", "lb_gov_report_1", "lb_hotpotqa_0",
+             "lb_hotpotqa_1", "lb_multifieldqa_en_0", "lb_multifieldqa_en_1",
+             "lb_musique_0", "lb_musique_1", "lb_narrativeqa_0",
+             "lb_narrativeqa_1", "lb_passage_retrieval_en_0",
+             "lb_passage_retrieval_en_1", "lb_qasper_0", "lb_qasper_1",
+             "natural32k", "needle32k"]
+ROW_LAB = {"lb_gov_report_0": "gov_0", "lb_gov_report_1": "gov_1",
+           "lb_hotpotqa_0": "hot_0", "lb_hotpotqa_1": "hot_1",
+           "lb_multifieldqa_en_0": "mfld_0", "lb_multifieldqa_en_1": "mfld_1",
+           "lb_musique_0": "mus_0", "lb_musique_1": "mus_1",
+           "lb_narrativeqa_0": "nar_0", "lb_narrativeqa_1": "nar_1",
+           "lb_passage_retrieval_en_0": "pr_0", "lb_passage_retrieval_en_1": "pr_1",
+           "lb_qasper_0": "qas_0", "lb_qasper_1": "qas_1",
+           "natural32k": "natural", "needle32k": "needle"}
+M = np.array([d6b[k] for k in ROW_ORDER])  # 16 x 36
+lay_med = np.median(M, axis=0)
+n_light = int((lay_med < 0.01).sum())
+skip_rng = [v["n_skippable"] for v in d6["per_prompt"].values()]
 
-
-def bucket_rate(cells, arm):
-    """log 距离网格上的选中率 = Σ n_sel / Σ n_tok（跨 task/sample/layer/query）。"""
-    sel_sum = np.zeros(len(edges4) - 1)
-    tok_sum = np.zeros(len(edges4) - 1)
-    for c in cells:
-        for b in c["o4"]["arms"][arm]["bins"]:
-            dcen = math.sqrt(b["d_lo"] * b["d_hi"])
-            i = np.searchsorted(edges4, dcen) - 1
-            if 0 <= i < len(sel_sum):
-                sel_sum[i] += b["n_sel"]
-                tok_sum[i] += b["n_tok"]
-    cx4 = np.sqrt(edges4[:-1] * edges4[1:])
-    rate = np.where(tok_sum > 0, sel_sum / np.maximum(tok_sum, 1), np.nan)
-    return cx4, rate
-
-
-bnd4 = float(np.median([c["o4"]["q_pos"] - c["o4"]["near_lo"] for c in cells4]))
-# far 区选中 token 数：trace 按 8 个 kv-head 聚合存储，/8 得每 kv-head 均值
-far_avg = {a: float(np.mean([c["o4"]["arms"][a]["far_sel"]
-                             for c in cells4])) / 8 for a, *_ in ARM4}
-ovl_avg = {a: float(np.mean([c["o4"]["arms"][a]["overlap_recall"]
-                             for c in cells4])) for a, *_ in ARM4}
-
-# ---------------- 画布 1x4 ----------------
+# ================= 画布 1x4 =================
 fig, (ax_a, ax_b, ax_c, ax_d) = plt.subplots(
-    1, 4, figsize=(21.5, 5.2),
-    gridspec_kw={"wspace": 0.36, "width_ratios": [1.12, 0.82, 0.80, 1.12]})
-
-XLO, XHI = 270, 21000
-
-
-def shade_zones(ax, bnd):
-    ax.axvspan(XLO, bnd, color=C_MAIN, alpha=0.07, lw=0)
-    ax.axvspan(bnd, XHI, color=C_HL, alpha=0.08, lw=0)
-    ax.axvline(bnd, color=C_HL, lw=2.0, linestyle="--")
+    1, 4, figsize=(23, 5.6),
+    gridspec_kw={"wspace": 0.44, "width_ratios": [1.55, 1.0, 0.72, 1.1]})
 
 
 def note(ax, x, y, text, ha="left", va="top", color="black", size=AN):
@@ -174,70 +218,73 @@ def note(ax, x, y, text, ha="left", va="top", color="black", size=AN):
                       edgecolor="0.78", alpha=0.92))
 
 
-# ---- (a) 距离密度 ----
-shade_zones(ax_a, near_len_med)
-ax_a.plot(cx, dens, "-o", color=C_MAIN, markersize=5.5,
-          markeredgecolor="white", markeredgewidth=1.2, lw=LW, zorder=5)
-ax_a.text(near_len_med * 0.90, 3.5e-4, f"boundary (median {near_len_med:.0f})",
-          fontsize=AN - 1.5, color=C_HL, va="center", ha="right",
-          rotation=90)
-ax_a.set_xscale("log")
-ax_a.set_yscale("log")
-ax_a.set_xlim(XLO, XHI)
-ax_a.set_xticks([300, 1000, 3000, 10000])
-_dlo = 10 ** math.floor(math.log10(max(dens.min(), 1e-12)))
-_dhi = 10 ** math.ceil(math.log10(dens.max()))
-ax_a.set_ylim(_dlo / 3, _dhi * 1.5)
-ax_a.set_yticks([_dlo, _dhi])
-ax_a.yaxis.set_major_formatter(matplotlib.ticker.LogFormatterSciNotation())
-ax_a.set_xlabel("distance d = q_pos − k_pos (tokens)", fontsize=L)
-ax_a.set_ylabel("attention density\n(mass per token)", fontsize=L)
-ax_a.set_title("(a) Density decays monotonically", loc="left", pad=10,
+# ---- (a) token strip ----
+cmap_mass = mcolors.LinearSegmentedColormap.from_list("mass", ["#ffffff", C_MAIN])
+norm_mass = mcolors.LogNorm(vmin=2e-4, vmax=2e-2)
+X0, X1 = float(min(pos_c)), float(max(pos_c))
+# 上行：逐 bin 质量（log 色标）；下行：单池 top-2048 选择（bin 等宽近似）
+ax_a.imshow(mass_a[None, :], aspect="auto", cmap=cmap_mass, norm=norm_mass,
+            extent=[X0, X1, 1.0, 2.0], interpolation="nearest")
+cmap_sel = mcolors.ListedColormap(["#e9e9e9", C_HL])
+ax_a.imshow(sel_mask.astype(float)[None, :], aspect="auto", cmap=cmap_sel,
+            vmin=0, vmax=1, extent=[X0, X1, 0.0, 1.0],
+            interpolation="nearest")
+# sink / swa 保护区（不在 mid bins 内；区域太窄无法内嵌文字，见说明框）
+ax_a.axvspan(0, rb["sink_hi"], color=C_NEU, alpha=0.35, lw=0)
+ax_a.axvspan(rb["swa_lo"], q_a + 1, color=C_NEU, alpha=0.35, lw=0)
+# near/far 区域标注
+ax_a.text((rb["sink_hi"] + rb["near_lo"]) / 2, 2.08,
+          f"far ({far_tok_frac:.0%} of mid tokens)", ha="center",
+          fontsize=AN, color=C_HL, fontweight="bold")
+ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 2.08, "near", ha="center",
+          fontsize=AN, color=C_MAIN, fontweight="bold")
+ax_a.axvline(rb["near_lo"], color=C_HL, lw=1.6, linestyle="--")
+ax_a.set_xlim(0, q_a + 1)
+ax_a.set_ylim(0, 3.4)
+ax_a.set_yticks([0.5, 1.5])
+ax_a.set_yticklabels(["single-pool\ntop-2048", "attn mass"], fontsize=TK - 1.5)
+ax_a.set_xlabel("key position (tokens); query at right end", fontsize=L)
+ax_a.set_title("(a) Mass is position-segmented", loc="left", pad=10,
                fontsize=T, fontweight="bold")
 ax_a.tick_params(labelsize=TK)
-ax_a.text(0.28, 0.965, "near", transform=ax_a.transAxes, ha="center",
-          fontsize=AN, color=C_MAIN, fontweight="bold")
-ax_a.text(0.74, 0.965, "far", transform=ax_a.transAxes, ha="center",
-          fontsize=AN, color=C_HL, fontweight="bold")
-note(ax_a, 0.04, 0.44, "near: dense →\nblock-avg suffices",
-     color=C_MAIN, size=AN - 1)
-note(ax_a, 0.04, 0.03, "far: sparse (1-2 orders lower density),\n"
-     "mass rivals near → no-miss bound\n+ token fine-select", color=C_HL, size=AN - 1,
-     va="bottom")
+note(ax_a, 0.015, 0.98,
+     f"gray: sink ({o_a['mass_sink']:.2f}) / swa "
+     f"({o_a['mass_swa_excluding_sink']:.2f}) mass auto-included; "
+     f"far ≈ 50% of mid mass\nover {far_tok_frac:.0%} of mid tokens, as sparse spikes "
+     f"(top-5% bins ≈ {conc_mean:.0%} of far mass);\nsingle pool captures near "
+     f"{ncap_a:.2f} / far {fcap_a:.2f} of mass — smaller spikes missed\n"
+     "→ near: block-avg · far: no-miss bound + fine select",
+     color="black", size=AN - 1.5)
+sm = plt.cm.ScalarMappable(cmap=cmap_mass, norm=norm_mass)
+cb = fig.colorbar(sm, ax=ax_a, fraction=0.025, pad=0.012)
+cb.set_label("bin mass (log)", fontsize=AN - 1.5)
+cb.ax.tick_params(labelsize=TK - 3)
 
-# ---- (b) 四区质量：100% 堆叠横条 + 最差头标记 ----
-zcol = {"sink": C_NEU, "swa": C_TER, "near": C_SEC, "far": C_MAIN}
-left = 0.0
-for z, v in zip(zones, zmean):
-    ax_b.barh([0], [v], left=left, height=0.7, color=zcol[z],
-              edgecolor="black", linewidth=1.2)
-    if v >= 0.12:
-        ax_b.text(left + v / 2, 0, f"{z}\n{v:.2f}", ha="center", va="center",
-                  fontsize=AN, color="white" if z == "far" else "black")
-    left += v
-# far 最重 KV 组标记（文字直接放标记左侧，避免箭头横穿）
-ax_b.plot([fw], [0.68], marker="v", color=C_HL, markersize=11,
-          markeredgecolor="black", markeredgewidth=1.2, zorder=6)
-ax_b.text(fw - 0.03, 0.68,
-          f"far, heaviest kv-group: {fw:.2f} ({fw / far_mean:.1f}× group mean)",
-          fontsize=AN - 1, color=C_HL, ha="right", va="center")
-ax_b.text(0.02, 0.97, "far ≈ half of nonprotected mass,\n"
-          "concentrated in few groups\n→ dedicated far budget",
-          transform=ax_b.transAxes, fontsize=AN - 1, color=C_HL,
-          ha="left", va="top",
-          bbox=dict(boxstyle="round,pad=0.32", facecolor="white",
-                    edgecolor="0.78", alpha=0.92))
-ax_b.set_xlim(0, 1.0)
-ax_b.set_ylim(-0.75, 1.35)
-ax_b.set_yticks([])
-ax_b.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
-ax_b.set_xlabel("share of total mass", fontsize=L)
-ax_b.set_title("(b) Mass by zone", loc="left", pad=10, fontsize=T,
-               fontweight="bold")
+# ---- (b) 单池 far 捕获率散点 ----
+for task, col, mk in (("hotpotqa", C_MAIN, "o"), ("musique", C_HL, "^")):
+    idx = np.array([t == task for t in tasks])
+    ax_b.scatter(sh[idx], fc[idx], s=26, color=col, marker=mk, alpha=0.75,
+                 edgecolor="white", linewidth=0.5, label=f"{task} ({idx.sum()} queries)")
+ax_b.axhline(nc_mean, color=C_NEU, lw=2.0, linestyle="--")
+ax_b.text(0.30, nc_mean - 0.03, f"near capture, same pool: {nc_mean:.2f}",
+          ha="center", va="top", fontsize=AN - 1.5, color=C_NEU)
+ax_b.axvspan(-0.03, 0.4, color=C_HL, alpha=0.08, lw=0)
+ax_b.text(0.19, 0.72, f"diffuse far:\ncapture {fc_diffuse:.2f}", ha="center",
+          va="center", fontsize=AN - 1.5, color=C_HL)
+ax_b.set_xlabel("far share of mid mass", fontsize=L)
+ax_b.set_ylabel("far mass capture,\noracle single-pool top-2048", fontsize=L - 1)
+ax_b.set_xlim(-0.03, 1.0)
+ax_b.set_ylim(0, 1.05)
+ax_b.set_title("(b) Single pool under-serves far", loc="left", pad=10,
+               fontsize=T, fontweight="bold")
 ax_b.tick_params(labelsize=TK)
-ax_b.spines[["left", "right", "top"]].set_visible(False)
+ax_b.legend(loc="lower right", fontsize=LG - 2, framealpha=0.92)
+note(ax_b, 0.97, 0.97,
+     f"far capture {fc_mean:.2f} ≪ near {nc_mean:.2f}\n"
+     f"({n_under:.0%} of queries) → guaranteed\nfar quota (anti-eviction)",
+     ha="right", va="top", color=C_HL, size=AN - 1)
 
-# ---- (c) O3 三臂（主指标 retained mass） ----
+# ---- (c) O3 三臂 ----
 colors3 = [C_MAIN, C_NEU, C_SEC]
 for i, (a, col) in enumerate(zip(arms, colors3)):
     ax_c.bar([i], [arm_rm[a]], width=0.58, color=col, edgecolor="black",
@@ -255,42 +302,27 @@ ax_c.tick_params(labelsize=TK)
 note(ax_c, 0.96, 0.96, "position priors (paired\nlow-freq RoPE dims),\n"
      "not “any 32 dims”", ha="right", va="top", color=C_HL, size=AN - 1)
 
-# ---- (d) O4 选择行为 ----
-shade_zones(ax_d, bnd4)
-for a, lab, col, ls in ARM4:
-    cx4, rate = bucket_rate(cells4, a)
-    ax_d.plot(cx4, rate, ls, color=col, lw=LW, label=lab, zorder=5)
-ax_d.set_xscale("log")
-ax_d.set_yscale("log")
-ax_d.set_xlim(XLO, XHI)
-ax_d.set_ylim(3e-3, 1.1)
-ax_d.set_yticks([1e-2, 1e-1, 1])
-ax_d.set_xticks([300, 1000, 3000, 10000])
-ax_d.set_xlabel("distance d = q_pos − k_pos (tokens)", fontsize=L)
-ax_d.set_ylabel("selection rate\n(share of bucket)", fontsize=L)
-ax_d.set_title("(d) Selected tokens by distance", loc="left", pad=10,
+# ---- (d) E6 逐层 far mass 热图 ----
+norm6 = mcolors.LogNorm(vmin=1e-7, vmax=1.0)
+im = ax_d.imshow(M, aspect="auto", cmap=cmap_mass, norm=norm6,
+                 interpolation="nearest")
+ax_d.set_xticks([0, 8, 16, 24, 32])
+ax_d.set_yticks(range(len(ROW_ORDER)))
+ax_d.set_yticklabels([ROW_LAB[k] for k in ROW_ORDER], fontsize=TK - 3.5)
+ax_d.set_xlabel("layer", fontsize=L)
+ax_d.set_title("(d) Far mass by layer (16 seqs)", loc="left", pad=10,
                fontsize=T, fontweight="bold")
 ax_d.tick_params(labelsize=TK)
-ax_d.legend(loc="lower left", fontsize=LG - 1, framealpha=0.92)
-note(ax_d, 0.96, 0.92,
-     f"far sel per query: oracle {far_avg['oracle']:.0f}\n"
-     f"K1=128: {far_avg['tli_k128']:.0f} (far starved)\n"
-     f"K1=64: {far_avg['tli_k64']:.0f}; overlap "
-     f"{ovl_avg['tli_k128']:.2f}→{ovl_avg['tli_k64']:.2f}",
-     ha="right", va="top", color=C_HL, size=AN - 1)
-ax_d.text(0.24, 0.965, "near", transform=ax_d.transAxes, ha="center",
-          fontsize=AN, color=C_MAIN, fontweight="bold")
-ax_d.text(0.72, 0.965, "far", transform=ax_d.transAxes, ha="center",
-          fontsize=AN, color=C_HL, fontweight="bold")
+note(ax_d, 0.97, 0.03,
+     f"{n_light}/36 layers: median far mass <0.01;\n"
+     f"per seq {min(skip_rng)}–{max(skip_rng)} far-light layers\n"
+     "→ per-layer far gate (D′)",
+     ha="right", va="bottom", color=C_HL, size=AN - 1.5)
+cb6 = fig.colorbar(im, ax=ax_d, fraction=0.025, pad=0.012)
+cb6.set_label("far mass (log)", fontsize=AN - 1.5)
+cb6.ax.tick_params(labelsize=TK - 3)
 
-fig.subplots_adjust(left=0.055, right=0.995, top=0.88, bottom=0.17)
-
-# Explicit diagnostic opt-in does not make old collector data paper evidence.
-# bbox_inches="tight" includes this banner outside the existing plot bounds.
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
-from exp.paper.e140_asset_provenance import add_render_warning
-add_render_warning(fig)
+fig.subplots_adjust(left=0.05, right=0.965, top=0.87, bottom=0.16)
 
 # ---------------- lint + 导出 ----------------
 report = lint_figure(fig)
@@ -311,25 +343,27 @@ export(fig, "O_observation")
 # ---------------- figure_data.tsv ----------------
 rows = ["figure_id\tpanel_id\tarm_id\tmetric_id\tunit\testimate\tsource_run_id\tsource_field"]
 src = os.path.basename(SRC)
-for x, y in zip(cx, dens):
-    rows.append(f"O\ta\tmid_distance\tdensity\tmass/token\t{y:.4e}\t{src}\tbins(log-grid)")
-for z, v in zip(zones, zmean):
-    rows.append(f"O\tb\t{z}\tmean_mass\tfrac\t{v:.4f}\t{src}\t{ZKEY[z]}")
-rows.append(f"O\tb\tfar_max_kv_group_mass\tmean_mass\tfrac\t{fw:.4f}\t{src}\tfar_max_kv_group_mass")
-rows.append(f"O\tb\tnear_len_median\tboundary\ttokens\t{near_len_med:.0f}\t{src}\tnear_len")
+rows.append(f"O\ta\trepr_query\tidentity\t-\t{c_a['task']}:s{c_a['sample']}:L{c_a['layer']}:q{q_a}\t{src}\tfar_share closest to median among q_pos>9000")
+rows.append(f"O\ta\trepr_query\tfar_tok_frac\tfrac\t{far_tok_frac:.4f}\t{src}\tbins")
+rows.append(f"O\ta\trepr_query\tsingle_pool_near_capture\tfrac\t{ncap_a:.4f}\t{src}\tbin mass-rank top-{BUDGET_TOK}")
+rows.append(f"O\ta\trepr_query\tsingle_pool_far_capture\tfrac\t{fcap_a:.4f}\t{src}\tbin mass-rank top-{BUDGET_TOK}")
+rows.append(f"O\ta\tall_queries\tfar_top5pct_bin_concentration\tfrac\t{conc_mean:.4f}\t{src}\tbins")
+for x, msv, s in zip(pos_c, mass_a, sel_mask):
+    rows.append(f"O\ta\trepr_strip\tbin_mass\tfrac\t{msv:.4e}\t{src}\tpos={x:.0f},sel={int(s)}")
+for (tk, s, f, n) in [(t, a, b, cc) for (t, a, b, cc) in
+                      zip(tasks, sh, fc, nc)]:
+    rows.append(f"O\tb\t{tk}\tshare_far_capture\tfrac\t{s:.4f},{f:.4f},{n:.4f}\t{src}\tbin mass-rank top-{BUDGET_TOK}")
+rows.append(f"O\tb\tall\tfar_capture_mean\tfrac\t{fc_mean:.4f}\t{src}\t-")
+rows.append(f"O\tb\tall\tnear_capture_mean\tfrac\t{nc_mean:.4f}\t{src}\t-")
+rows.append(f"O\tb\tdiffuse(share<=0.4)\tfar_capture\tfrac\t{fc_diffuse:.4f}\t{src}\t-")
 for a in arms:
     for mm, v in zip(mets_all, arm_val[a]):
         rows.append(f"O\tc\t{a}\t{mm}\tfrac\t{v:.4f}\t{src}\to3.{a}.{mm}.mean")
-for a, *_ in ARM4:
-    rows.append(f"O\td\t{a}\tfar_sel_per_query\ttokens\t{far_avg[a]:.2f}\t"
-                f"e140_o4_select_trace.json\to4.arms.{a}.far_sel")
-    rows.append(f"O\td\t{a}\toverlap_recall\tfrac\t{ovl_avg[a]:.4f}\t"
-                f"e140_o4_select_trace.json\to4.arms.{a}.overlap_recall")
-    cx4, rate = bucket_rate(cells4, a)
-    for x, y in zip(cx4, rate):
-        if not np.isnan(y):
-            rows.append(f"O\td\t{a}\tsel_rate\tfrac\t{y:.4e}\t"
-                        f"e140_o4_select_trace.json\to4_bins(log-grid)")
+for k, row in zip(ROW_ORDER, M):
+    for li, v in enumerate(row):
+        rows.append(f"O\td\t{k}\tfar_mass\tfrac\t{v:.4e}\te6b_far_profiles.json\tlayer={li}")
+rows.append(f"O\td\tall\tlayers_median_lt_0.01\tcount\t{n_light}\te6b_far_profiles.json\t-")
+rows.append(f"O\td\tall\tskippable_layers_per_prompt\trange\t{min(skip_rng)}-{max(skip_rng)}\te6_layer_skip.json\t-")
 with open(os.path.join(OUT, "O_observation_figure_data.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 print("exported O_observation_figure_data.tsv")

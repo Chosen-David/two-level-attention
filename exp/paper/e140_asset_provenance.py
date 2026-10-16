@@ -19,8 +19,8 @@ REFERENCE = 'TL-E140-O4-PARTIAL-PAGE-20261015 | See E140_VALIDITY.md'
 FIGDIR = Path('agent_doc/guide/paper_figs/figs')
 MANIFEST = Path('agent_doc/guide/paper_figs/observation/e140_validity.json')
 EXTENSIONS = ('svg', 'png', 'pdf')
-STATUS = 'historical-diagnostic-not-corrected'
-SCHEMA = 'e140-historical-validity-v2'
+STATUS = 'redesigned-v2-inputs-current'
+SCHEMA = 'e140-historical-validity-v3'
 # Post-recollection, post-quarantine contract (2026-10-16): the combined
 # figure carries panel (d) from the O4 v2 collector (partial final-page
 # omission), so the whole current asset set stays historical-diagnostic.
@@ -28,6 +28,10 @@ SCHEMA = 'e140-historical-validity-v2'
 # unchanged_inputs. Every earlier asset generation is preserved in
 # prior_asset_sets; merge-time input reconciliation lives in
 # legacy_inputs_review.
+# v3 (2026-10-16, observation redesign): the figure was redesigned to one
+# panel per innovation and NO panel reads O4 v2 anymore (panel (d) now uses
+# e6b_far_profiles.json / e6_layer_skip.json). The O4-banner asset set is
+# archived in prior_asset_sets; current assets carry no warning banner.
 
 
 def add_render_warning(fig):
@@ -127,7 +131,7 @@ def verify(root):
 
 def apply(root, source_commit):
     old = json.loads((root / MANIFEST).read_text())
-    if old.get('schema') != 'e140-historical-validity-v1' or old.get('status') != STATUS:
+    if old.get('schema') != 'e140-historical-validity-v1' or old.get('status') != 'historical-diagnostic-not-corrected':
         raise ValueError('requires original v1 manifest; refusing repeat annotation')
     commit = subprocess.check_output(['git','rev-parse', source_commit+'^{commit}'], cwd=root, text=True).strip()
     outputs, previous = {}, []
