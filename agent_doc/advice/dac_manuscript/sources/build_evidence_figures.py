@@ -16,7 +16,7 @@ rows=[(c,o,diagnose(o)) for c in d['cells'] for o in c['o1']]
 median=statistics.median(r['far_share'] for c,o,r in rows)
 c,o,r=min((x for x in rows if x[1]['q_pos']>9000),key=lambda x:abs(x[2]['far_share']-median))
 far=statistics.mean(x[2]['far_capture'] for x in rows);near=statistics.mean(x[2]['near_capture'] for x in rows)
-TRANSLATE={'near':'近区','far':'远区','Far':'远区','Near':'近区','Query–key distance (tokens)':'查询—键距离（词元）','Mass / valid token':'注意力概率质量\n／有效词元','(a) Dense-reference distance density':'(a) 稠密参考距离密度','Selected mass / regional mass':'选中概率质量／区域概率质量','(b) Feasible whole-bin diagnostic':'(b) 可行整箱选择诊断','Dense':'稠密','Archived sparse configuration':'历史稀疏配置','Input length (tokens)':'输入长度（词元）','Diagnostic TPOT (ms)':'诊断TPOT（毫秒）','Macro-average task score (128K)':'宏平均任务分（128K）','Tail32':'低频32','Random32 (unpaired)':'随机32（未配对）','High32':'高频32','Selected / reference-mid-TopK mass':'选中／参考mid-TopK质量'}
+TRANSLATE={'near':'近区','far':'远区','Far':'远区','Near':'近区','Query–key distance (tokens)':'查询—键距离（词元）','Mass / valid token':'平均注意力权重\n（每有效词元）','(a) Dense-reference distance density':'(a) 稠密参考距离密度','Regional attention retention':'区域注意力保留率','(b) Feasible whole-bin diagnostic':'(b) 可行整箱选择诊断','Dense':'稠密','Archived sparse configuration':'历史稀疏配置','Input length (tokens)':'输入长度（词元）','Diagnostic TPOT (ms)':'诊断TPOT（毫秒）','Macro-average task score (128K)':'宏平均任务分（128K）','Tail32':'低频32','Random32 (unpaired)':'随机32（未配对）','High32':'高频32','Selected / reference-mid-TopK mass':'选中／参考mid-TopK权重和'}
 def save(fig,name):
  if LANG=='zh':
   name += '_zh'
@@ -39,7 +39,7 @@ for region,color in [('near','#007C91'),('far','#C25E24')]:
   a.plot([lo,hi],[b['mass']/b['n_tok']]*2,color=color,lw=.8,label=region if i==0 else None)
 a.set_yscale('log');a.set_xlabel('Query–key distance (tokens)');a.set_ylabel('Mass / valid token');a.set_title('(a) Dense-reference distance density',loc='left');a.legend(frameon=False,ncol=2,loc='upper right')
 a=axs[1];a.barh(['Far','Near'],[far,near],color=['#C25E24','#007C91'],height=.5)
-a.set_xlim(0,1.15);a.set_xticks([0,.5,1]);a.set_xlabel('Selected mass / regional mass');a.set_title('(b) Feasible whole-bin diagnostic',loc='left')
+a.set_xlim(0,1.15);a.set_xticks([0,.5,1]);a.set_xlabel('Regional attention retention');a.set_title('(b) Feasible whole-bin diagnostic',loc='left')
 for i,v in enumerate([far,near]):a.text(v+.02,i,f'{v:.4f}',va='center',fontsize=8)
 save(fig,'observation_current')
 x=json.loads((DATA/'decode_tpot_plot_input.json').read_text())['results_median']

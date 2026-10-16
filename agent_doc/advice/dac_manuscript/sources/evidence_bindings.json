@@ -25,8 +25,8 @@
     },
     {
       "path": "sources/build_evidence_figures.py",
-      "bytes": 6145,
-      "sha256": "4068359c521b68b0679110e86886a3c77dfc03bcdc524a23f763c19caaf86957"
+      "bytes": 6137,
+      "sha256": "5b53ae03a55a3de50b33cf88b9f9fa130e48da15ea74a9d91bf3952c93b5edae"
     },
     {
       "path": "sources/observation_bins.py",
@@ -35,8 +35,8 @@
     },
     {
       "path": "sources/update_evidence_slides.py",
-      "bytes": 2523,
-      "sha256": "3809e712568d62833d09f4fec0d209f7b92f7fb50ade9820a570b7b93ef24ef7"
+      "bytes": 3692,
+      "sha256": "6cb920d6f2afafd8fb3feffb82172f9ce73160b73bb9a7ecb57672d343ad39b8"
     },
     {
       "path": "sources/prepare_plot_inputs.py",
@@ -190,19 +190,19 @@
     "scientific_privacy": {
       "reviewer": "independent_review",
       "decision": "approve-with-scope",
-      "checks": "All derived O1/O3 fields and six TPOT values equal original records; original hashes verified; same global selection and separate region denominators; no specified private host/address/home/scratch identifiers in bundled inputs. No GPU/runtime validation."
+      "checks": "Final bilingual terminology and attribution reviewed; all four archived data JSON files byte-identical to baseline. No experiment-validity upgrade; mapping is parent-provided historical reading, not a new reading."
     },
     "reader_visual": {
       "reviewer": "reader_visual_review",
       "decision": "approve",
-      "checks": "All26 document pages and slides3/12/14 of17; MuPDF/Poppler glyphs, long legends and two-line probability-mass axis checked after revision. Main captions use scholarly configuration labels, no internal experiment IDs.",
+      "checks": "All26 document pages and changed slides3/4/9 reviewed. Fig1, Gate and O3 definitions distinguish denominators; final slide9 two-line label stays within node without obscuring arrow. No remaining required visual fixes.",
       "reviewed_sha256": {
-        "output/paper_en.pdf": "f153b79c015053c50909bb57a24485dca7ac34389159c0f084f06431e7fd2612",
-        "output/paper_zh.pdf": "085a5247be95d24bc9a8f76a5bdbb8ec4981e9e8896a1e0a7d1b65a130d4ec0a",
-        "output/supplement_en.pdf": "fcd844e45dd55d75e453f0878ff650e69bc4757d64c5bc3d149daf63e66b1109",
-        "output/supplement_zh.pdf": "e71f1981875380b179e8c889895309b29b4035745e80202f39ed77d650493b49",
-        "presentation/TwoLevel_UserEdited_20261014.pdf": "bb3216da3640002a23941138d94048ef058b9757c637a099116b2ada6a6039be",
-        "presentation/TwoLevel_UserEdited_20261014.pptx": "d070063cf1d90b6444ae6f64014e29202efc2d956f24efc7532f45780a904311"
+        "output/paper_en.pdf": "aec9515cebf9e42177dbae7141822dd26e155ea3103532f4c66c1e65e77addcd",
+        "output/paper_zh.pdf": "2e1858fe6a949de80ea2fe9fb42aa3c20c9b699aa336bbd65e2814f7b2ea32f5",
+        "output/supplement_en.pdf": "e3ffbcd3471eb400e275b80ff8c08b6d74d58ab6adb81abb40f85710fab1f1d7",
+        "output/supplement_zh.pdf": "847aac95600d43dfc25a97380677022adbce61239a3aef23d62b603acc57bd45",
+        "presentation/TwoLevel_UserEdited_20261014.pdf": "90c2e000ceea57746e8c6bd390b0e81b1300637e3a6193b7c6ee0ff3c78e497c",
+        "presentation/TwoLevel_UserEdited_20261014.pptx": "95d43b25e8ad32b066d8782eb5cfe1bbc5ae0bda9163de204e19d3afe4d57c8f"
       }
     },
     "clean_rebuild": {
@@ -219,5 +219,29 @@
       "remaining_warnings": "Existing TeX font substitution and English supplement2.71738pt overfull hbox; visually reviewed."
     }
   },
-  "privacy_transformation": "Original repository files remain unchanged. Minimal derived inputs have separate hashes and explicit source hashes/paths; no hostname, network address or private home/scratch path is carried into these inputs."
+  "privacy_transformation": "Original repository files remain unchanged. Minimal derived inputs have separate hashes and explicit source hashes/paths; no hostname, network address or private home/scratch path is carried into these inputs.",
+  "terminology_revision": {
+    "baseline_commit": "48e616e28323af484085a4265e81e14e7ebcb11e",
+    "scope": "Terminology, concise attribution and layout only; four archived data JSON files unchanged.",
+    "rhetorical_mapping": {
+      "source": "Parent-provided historical reading mapping; reused, not newly read in this revision.",
+      "AQFP": {
+        "doi": "10.1145/3649329.3658467",
+        "page": 1,
+        "role": "Locate existing objectives briefly, then state unresolved objective."
+      },
+      "MASC": {
+        "doi": "10.1145/3649329.3657393",
+        "page": 2,
+        "role": "Classify prior work, then locate the present design."
+      },
+      "application": "Query-aware selection category; one AsyncTLS page-to-token precedent sentence; shared scoring view and regional quota question. Neither mapping paper is added as a method citation."
+    },
+    "definitions": {
+      "Fig1a": "Bin attention-weight sum divided by exact valid-token count.",
+      "Fig1b": "Selected regional weight sum divided by full regional weight sum, from the same global whole-bin selection capped at2048 middle tokens.",
+      "Gate": "Far-region attention-weight sum, subsequently averaged across disclosed query/head axes; not retention.",
+      "O3": "Selected attention-weight sum divided by full-dimensional reference mid-TopK weight sum; not regional retention."
+    }
+  }
 }

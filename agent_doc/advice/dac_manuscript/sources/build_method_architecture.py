@@ -92,7 +92,7 @@ for lang in ['en','zh']:
   s.r(0,y-6,252,35,'pale' if row%2==0 else 'white',None,3)
   s.t(3,y+12,label,size=10,bold=True)
   s.grid(31,y,4,8,'purple',cw=3,ch=3,gap=1)
-  s.t(31,y+26,'far mass ≥ ε' if on else 'far mass < ε','远区概率质量 ≥ ε' if on else '远区概率质量 < ε',size=7.5,c='muted')
+  s.t(31,y+26,'far weight sum ≥ ε' if on else 'far weight sum < ε','远区注意力权重总和 ≥ ε' if on else '远区注意力权重总和 < ε',size=6.2,c='muted')
   s.line([(67,y+8),(100,y+8)],'gate',True)
   s.r(103,y-1,28,19,'gl','gate',3);s.t(117,y+12,'ON' if on else 'OFF',size=8,c='gate',bold=True,anchor='middle')
   s.line([(132,y+8),(146,y+8)],'gate',True)
