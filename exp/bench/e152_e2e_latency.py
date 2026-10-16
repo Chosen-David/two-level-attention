@@ -86,21 +86,36 @@ def sha(b):
     return hashlib.sha256(b).hexdigest()
 
 
-def timed_request(model, input_ids, max_gen, dev):
+def timed_request(model, input_ids, max_gen, dev, static_cache_len=None):
     """连续模型入口→末 token 完成 wall；不含分词、输入 H2D 或清理。
 
     保留逐步同步诊断，不能把本采集器当成低扰动 serving benchmark。
     prefill_ms/decode_ms 是局部分段读数，不用于合成 request_wall_ms。
+    static_cache_len 非 None 时每请求新建 StaticCache（E134-pre 臂：
+    消 HF DynamicCache 每层每步 2 次 cat 全量拷贝 = 72 cat/步），
+    max_cache_len = L + max_gen + 8。
     """
     if type(max_gen) is not int or max_gen < 1:
         raise ValueError("max_gen must be a positive integer")
     torch.cuda.reset_peak_memory_stats()
     base_mem = torch.cuda.memory_allocated()
     input_ids = torch.tensor([input_ids], dtype=torch.long, device=dev)
+    cache = None
+    if static_cache_len is not None:
+        from transformers import StaticCache
+        cache = StaticCache(config=model.config, max_batch_size=1,
+                            max_cache_len=static_cache_len, device=dev,
+                            dtype=torch.bfloat16)
     with torch.no_grad():
         torch.cuda.synchronize()
         t0 = time.perf_counter()
-        out = model(input_ids=input_ids, use_cache=True)
+        # dynamic（cache=None）首步省略 past_key_values kwarg 保持 v2 协议
+        # 调用签名不变（test_e152_request_timing 断言）；static 臂显式传入
+        if cache is None:
+            out = model(input_ids=input_ids, use_cache=True)
+        else:
+            out = model(input_ids=input_ids, past_key_values=cache,
+                        use_cache=True)
         cache = out.past_key_values
         torch.cuda.synchronize()
         prefill_ms = (time.perf_counter() - t0) * 1e3
@@ -165,6 +180,9 @@ def main():
                         default=os.path.expanduser("~/Qwen3-8B"))
     parser.add_argument("--out", type=str, required=True)
     parser.add_argument("--label", type=str, default="")
+    parser.add_argument("--static-cache", action="store_true",
+                        help="E134-pre 臂：StaticCache 替代 DynamicCache"
+                             "（消每层每步 2 次 cat 全量拷贝）")
     add_sparse_attn_args(parser)
     args = parser.parse_args()
 
@@ -204,8 +222,13 @@ def main():
                                      cwd=REPO, text=True).strip()
 
     runs = []
+    # 容量按实际 prompt 长度算（build_prompt_tokens 有 ~57 token 模板开销，
+    # 用 L 近似会 index_copy_ 越界 device-side assert——冒烟实测教训）
+    static_cache_len = (len(ids) + args.max_gen + 8
+                        if args.static_cache else None)
     for r in range(args.warmup + args.repeats):
-        rec = timed_request(model, ids, args.max_gen, dev)
+        rec = timed_request(model, ids, args.max_gen, dev,
+                            static_cache_len=static_cache_len)
         rec.update({
             "run": r, "phase": "warmup" if r < args.warmup else "measured",
             "method": args.method, "L": args.context_length,
@@ -253,6 +276,7 @@ def main():
             "input_ids_sha256_16": sha(torch.tensor([ids]).numpy()
                                        .tobytes())[:16],
             "kv_theory_gib": round(kv_gib, 2),
+            "cache_impl": "StaticCache" if args.static_cache else "DynamicCache",
             "label": args.label,
         },
         "runs": runs,

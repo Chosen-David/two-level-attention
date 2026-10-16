@@ -1,0 +1,36 @@
+{
+  "experiment": "E134-pre",
+  "title": "StaticCache 消 72-cat/步 共付开销——HF 缓存层适配（E134 CUDA graph 前置）",
+  "date": "2026-10-16",
+  "user_directive": "e2e 打不过就继续优化性能（decode-only 主线）；E152v2 揭示 TPOT 缺口在 HF/launch 侧",
+  "caliber": {
+    "model": "Qwen3-8B (bf16, sdpa)",
+    "host": "wys-4xh20 (10.238.122.187) GPU0",
+    "collector": "exp/bench/e152_e2e_latency.py v2（GPT 97228a1 口径）+ --static-cache 臂；worktree ~/tmp_e152v2",
+    "protocol": "L=32768 needle prompt（e152 确定性构造），max_gen=128 greedy，per-step sync 诊断口径",
+    "arms": "method {none,tli} × cache {dynamic,static}；tli = 主臂 a.125/b.375/g.625 tail"
+  },
+  "root_cause_chain": {
+    "72_cat": "transformers 4.56.2 DynamicLayer.update 每层每步 2 次 torch.cat 全量拷贝（72 cat/步，profiler 360 calls/5 步核验）；32K 每 ~4.8GB/步，两臂共付",
+    "static_mask_pathology": "HF 为 StaticCache 物化 4D bool 容量尺寸 causal mask 且 is_compileable=True 强制不跳过（masking_utils L894）→ SDPA 显式 mask 分支：repeat_kv 放大 KV 4× + 脱离 flash 落 mem-efficient cutlassF（decode 2.23ms/层、prefill 373ms/层）",
+    "validation_bug_erratum": "旁路首版判据 X.tril().all() 恒 False（tril 清零上三角，.all() 必见 False）——mask 本身始终纯因果（(~X)&X.tril() 计数=0 核验）。正确判据 torch.equal(X, X.tril())。该 bug 使旁路三小时未生效、误导出 stride/contiguous 假说（contiguous 保留为防御性，~7ms 一次性）"
+  },
+  "results_32k": {
+    "dense_dynamic":  {"prefill_ms": 7900, "tpot_ms": 26.0, "note": "vanilla HF 基线（36 层全 flash 105.7ms/层 prefill）"},
+    "tli_dynamic":    {"prefill_ms": 7900, "tpot_ms": 87.9, "note": "E152v2 已录锚"},
+    "dense_static":   {"prefill_ms": 17800, "tpot_ms": 126.8, "note": "HF mask 病理（80.3ms/步 mem-efficient + 35.6ms/步 mask 拷贝链，profiler 归因闭合）；非公平基线，弃用——dense 臂维持 dynamic"},
+    "tli_static":     {"prefill_ms": 7960, "tpot_ms": 82.0, "note": "本实验产出：旁路生效后 prefill 与 dynamic 持平、TPOT -5.9ms（72-cat 消除净得）"}
+  },
+  "quality_gate": {
+    "smoke": "4 臂冒烟（L=2048, max_gen=16, greedy）：tli×{dynamic,static} 生成 token 序列逐位一致（两次独立复跑）；patch 前 B2 守卫拒绝 4D mask 的缺陷已由 layer0 验证旁路解除",
+    "regression": "test_e152_request_timing 8/8（修首步 kwarg 协议）+ test_e139_graph_contract 6/6；dynamic 路径零扰动（全部新分支被 get_max_cache_shape() is not None 门控）"
+  },
+  "verdict": "PASSED（tli 侧）：StaticCache 适配把 72-cat 共付开销从 tli 臂移除（TPOT 87.9→82.0ms @32K），静态臂 prefill/decode 双面不再劣于 dynamic（mask 旁路修复后 7.96s vs 7.9s）。dense+static 是 HF 自身病理不可用作基线，论文 dense 基线维持 DynamicCache 口径。TPOT 总缺口（82 vs 26ms）仍在索引器 Python/launch 侧——本实验是 E134 decode 整步 CUDA graph capture（#236）的形状前置（静态形状 = 可 capture 的必要条件），下一杠杆即 graph。",
+  "paper_impact": "E2 e2e 时延面板补 tli+static 臂数据点（『含静态缓存系统工程』工作点），叙事口径：kernel 级加速（E127/E133c）+ 系统层消除（E134-pre cat/mask）+ graph 待续（E134）；不做『超过 dense』主张（当前 82 vs 26ms 如实报告，归因链完整）。",
+  "cross_references": {
+    "e152v2": "exp/bench/e152_e2e_latency.py（--static-cache 臂）；节点 ~/e152v2_out/{e152v2_L32768*.json, e134pre_*.json}",
+    "e133c": "6fd956e（A1-A6 launch/cat 消除，本 82ms 为其后读数）",
+    "e134_next": "#236 decode 整步 CUDA graph capture 试点"
+  },
+  "status": "DONE 2026-10-16"
+}

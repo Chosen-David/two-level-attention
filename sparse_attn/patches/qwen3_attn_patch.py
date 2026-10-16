@@ -46,10 +46,41 @@ def qwen3_attn_forward(
     cos, sin = position_embeddings
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
+    cur_len = 0
     if past_key_values is not None:
         # sin and cos are specific to RoPE models; cache_position needed for the static cache
         cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
         key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
+        # 【E134-pre】StaticCache 支持（opt-in）：update 返回全容量缓冲
+        # （index_copy_ 就地写、零拷贝 append），下游统一切到当前序列长。
+        # 判别用 get_max_cache_shape()（静态缓存返回 int，DynamicCache 返回
+        # None），避免版本敏感的 isinstance。长度提示只在 layer 0 每步刷新
+        # 一次（cache_position[-1]+1，一次 .item 同步；StaticLayer.
+        # get_seq_length 是 GPU any() 归约，逐层调用会引入 36 次隐式同步）。
+        # DynamicCache 路径（get_max_cache_shape() is None）零扰动。
+        if past_key_values.get_max_cache_shape() is not None:
+            if (self.layer_idx == 0
+                    or getattr(past_key_values, "_tli_seq_len", None) is None):
+                if cache_position is not None:
+                    past_key_values._tli_seq_len = int(cache_position[-1]) + 1
+                else:
+                    past_key_values._tli_seq_len = past_key_values.get_seq_length(self.layer_idx)
+            _S = past_key_values._tli_seq_len
+            key_states = key_states[:, :, :_S, :]
+            value_states = value_states[:, :, :_S, :]
+            # 【E134-pre】prefill（q_len>1）期 contiguous 一次拷贝（每层
+            # ~69MB×2，~7ms 总量）：切片是静态缓冲的 strided view
+            # （head stride=cap·D≠S·D），pre 走 flash+enable_gqa 时 strided
+            # 布局属后端接受性灰区，规整化一次买确定性（真慢源是 mask 旁
+            # 路，见下方 _tli_pmask_ok 注释）。decode（q_len=1）不走 SDPA
+            # （eager_decoding_attn 自家 Triton kernel 吃 strided），
+            # 不拷贝零扰动。
+            if input_shape[1] > 1 and not key_states.is_contiguous():
+                key_states = key_states.contiguous()
+                value_states = value_states.contiguous()
+            cur_len = _S
+        else:
+            cur_len = past_key_values.get_seq_length(self.layer_idx)
 
     attention_interface: Callable = eager_attention_forward
     if self.config._attn_implementation != "eager":
@@ -67,9 +98,43 @@ def qwen3_attn_forward(
     # decode 分支入口见下方显式 raise（E109 生产路径 B=1、逐 token、
     # mask=None、use_cache=True 逐位不变）。
     if (past_key_values is not None
-            and past_key_values.get_seq_length(self.layer_idx) == input_shape[1]):
+            and cur_len == input_shape[1]):
         indexer: Indexer = self.indexer
         indexer.clear()
+        # 【E134-pre】prefill 期静态缓存 4D 容量 mask 旁路（profiler 归因
+        # 2026-10-16：显式 mask 使 SDPA 脱离 flash/is_causal 快路径落
+        # mem-efficient 慢路径 2.23ms/层 + 35.6ms/步 mask 拷贝链，L=32K
+        # prefill +10s）。本分支 q_len==S==K/V 长度（分支条件本身），
+        # 验证 [:S,:S] 下三角全真/上三角全假 + [S:] 全假后置 None，
+        # SDPA 走 is_causal=True flash 路径，因果语义逐位等价。仅 bool
+        # mask（4D float additive 不旁路，fail-closed 回原路径）；
+        # sliding_window 激活时不旁路（SWA 语义编码在 mask 里）。
+        # layer 0 一次验证（S² 元素归约 + 一次同步），DynamicCache 零扰动。
+        if os.environ.get("TLI_E134_DEBUG") and self.layer_idx == 0 and attention_mask is not None:
+            print(f"[E134dbg] L{self.layer_idx} mask dim={attention_mask.dim()} "
+                  f"dtype={attention_mask.dtype} shape={tuple(attention_mask.shape)} "
+                  f"sw={self.sliding_window} _S={_S}", flush=True)
+        if (attention_mask is not None and attention_mask.dim() == 4
+                and attention_mask.dtype == torch.bool
+                and self.sliding_window is None
+                and past_key_values.get_max_cache_shape() is not None):
+            if (self.layer_idx == 0
+                    or getattr(past_key_values, "_tli_pmask_ok", None) is None):
+                _m = attention_mask
+                _ok_shape = (_m.shape[0] == 1 and _m.shape[1] == 1
+                             and _m.shape[2] == _S and _m.shape[-1] >= _S)
+                # 注意：X.tril().all() 恒 False（tril 清零上三角），
+                # 因果性判据必须是 torch.equal(X, X.tril())
+                _lo = _m[..., :_S, :_S]
+                _ok = bool(_ok_shape
+                           and torch.equal(_lo, _lo.tril())
+                           and int(_m[..., _S:].sum()) == 0)
+                past_key_values._tli_pmask_ok = _ok
+                if os.environ.get("TLI_E134_DEBUG"):
+                    print(f"[E134dbg] L{self.layer_idx} prefill mask _ok={_ok} "
+                          f"(shape_ok={_ok_shape})", flush=True)
+            if past_key_values._tli_pmask_ok:
+                attention_mask = None
         # E85f：prefill 走 dense，但旁路采集 post-RoPE q 统计供 per-layer 静态
         # pair 选取（decode 侧 _subspace_indices 消费；非静态 pair 模式为 no-op）
         if hasattr(indexer, "observe_prefill_q"):
@@ -147,6 +212,25 @@ def qwen3_attn_forward(
                 f"（chunked prefill / batch>1 会静默只算首 token 或形状"
                 f"崩溃），拒绝执行。"
             )
+        # 【E134-pre】StaticCache decode：HF 为静态缓存生成 4D bool 容量尺寸
+        # causal mask（掩盖未写区）。K/V 上方已切到当前序列长 S=cur_len，
+        # q_len=1 因果约束空转（单 query 只看 ≤ 自身位置的全部有效缓存）。
+        # layer 0 逐步验证「[:S] 全真、[S:] 全假」（一次 GPU 归约 + 同步），
+        # 其余层复用判据；验证不过不吞掉，仍走下方原 B2 拒绝路径。
+        # DynamicCache（mask=None）路径零扰动。
+        if (attention_mask is not None and attention_mask.dim() == 4
+                and past_key_values.get_max_cache_shape() is not None
+                and input_shape[0] == 1 and input_shape[1] == 1):
+            if (self.layer_idx == 0
+                    or getattr(past_key_values, "_tli_mask_ok", None) is None):
+                _m, _S = attention_mask, past_key_values._tli_seq_len
+                _ok_shape = (_m.shape[0] == 1 and _m.shape[2] == 1
+                             and _m.shape[-1] >= _S)
+                _ok = bool(_ok_shape and _m[..., :_S].all()
+                           and int(_m[..., _S:].sum()) == 0)
+                past_key_values._tli_mask_ok = _ok
+            if past_key_values._tli_mask_ok:
+                attention_mask = None
         if attention_mask is not None and (
             attention_mask.dim() != 2 or attention_mask.dtype != torch.bool
         ):
