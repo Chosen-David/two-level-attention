@@ -150,7 +150,7 @@
       },
       "author_request": {
         "prepared_date": "2026-10-16",
-        "status": "not_sent_requires_user_authorization",
+        "status": "cancelled_by_user_do_not_send",
         "recipient_name": "Yao-Wen Chang",
         "recipient_email": "ywchang@ntu.edu.tw",
         "contact_source": "https://cc.ee.ntu.edu.tw/~ywchang/",
@@ -229,7 +229,7 @@
       },
       "author_request": {
         "prepared_date": "2026-10-16",
-        "status": "not_sent_requires_user_authorization",
+        "status": "cancelled_by_user_do_not_send",
         "recipient_name": "Li-Shiuan Peh",
         "recipient_email": "peh@nus.edu.sg",
         "contact_source": "https://www.comp.nus.edu.sg/~peh/",
@@ -308,7 +308,7 @@
       },
       "author_request": {
         "prepared_date": "2026-10-16",
-        "status": "not_sent_requires_user_authorization",
+        "status": "cancelled_by_user_do_not_send",
         "recipient_name": "Jungwook Choi",
         "recipient_email": "choij@hanyang.ac.kr",
         "contact_source": "https://jchoi-hyu.github.io/",
@@ -378,7 +378,7 @@
       },
       "author_request": {
         "prepared_date": "2026-10-16",
-        "status": "not_sent_requires_user_authorization",
+        "status": "cancelled_by_user_do_not_send",
         "recipient_name": "Stephan Held",
         "recipient_email": "held@dm.uni-bonn.de",
         "contact_source": "https://www.or.uni-bonn.de/~held/",
@@ -549,7 +549,7 @@
       },
       "author_request": {
         "prepared_date": "2026-10-16",
-        "status": "not_sent_requires_user_authorization",
+        "status": "cancelled_by_user_do_not_send",
         "recipient_name": "Lucas Deutschmann",
         "recipient_email": "lucas.deutschmann@rptu.de",
         "contact_source": "https://eit.rptu.de/fgs/eis/people/deutschmann",
@@ -748,7 +748,7 @@
       },
       "author_request": {
         "prepared_date": "2026-10-16",
-        "status": "not_sent_requires_user_authorization",
+        "status": "cancelled_by_user_do_not_send",
         "recipient_name": "Yi-Chen Lu",
         "recipient_email": "yclueecs@gmail.com",
         "contact_source": "https://yichen-lu.github.io/",
@@ -864,5 +864,278 @@
       }
     ],
     "next_step": "Six author request texts prepared in AUTHOR_REQUESTS.md; no messages sent. Public source or authorized shareable manuscript is still needed."
+  },
+  "additional_search_round_5": {
+    "date": "2026-10-16",
+    "round": 5,
+    "user_instruction": "Do not send email; search arXiv.",
+    "new_award_pdfs": 0,
+    "result": "No exact original or confirmed same-paper preprint identified for the six missing papers.",
+    "limitations": "Not proof of absence. Author homonyms and stemming produced unrelated matches. Two broad INSTA searches exceeded the 200-entry limit; refined author/title/DOI queries and arXiv-domain web searches were also used.",
+    "queries": [
+      {
+        "label": "legalization_authors",
+        "query": "(au:\"Chen_Jianli\" OR au:\"Zhu_Ziran\" OR au:\"Zhu_Wenxing\" OR au:\"Chang_Yao_Wen\") AND (all:legalization OR all:placement OR all:\"cell-height\")",
+        "url": "https://export.arxiv.org/api/query?search_query=%28au%3A%22Chen_Jianli%22+OR+au%3A%22Zhu_Ziran%22+OR+au%3A%22Zhu_Wenxing%22+OR+au%3A%22Chang_Yao_Wen%22%29+AND+%28all%3Alegalization+OR+all%3Aplacement+OR+all%3A%22cell-height%22%29&start=0&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "network_author",
+        "query": "au:\"Daya_Bhavya\" OR (au:Peh AND au:Chandrakasan)",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3A%22Daya_Bhavya%22+OR+%28au%3APeh+AND+au%3AChandrakasan%29&start=0&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "compensated_coauthors",
+        "query": "(au:Jain AND au:Venkataramani) OR (au:Choi AND au:Srinivasan AND au:Chang)",
+        "url": "https://export.arxiv.org/api/query?search_query=%28au%3AJain+AND+au%3AVenkataramani%29+OR+%28au%3AChoi+AND+au%3ASrinivasan+AND+au%3AChang%29&start=0&max_results=200",
+        "status": 200,
+        "total": 11,
+        "returned_entries": 11,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "steiner_authors",
+        "query": "au:\"Rockel_Benjamin\" OR (au:\"Held_Stephan\" AND (all:delay OR all:arborescence))",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3A%22Rockel_Benjamin%22+OR+%28au%3A%22Held_Stephan%22+AND+%28all%3Adelay+OR+all%3Aarborescence%29%29&start=0&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "root_of_trust_authors",
+        "query": "au:\"Deutschmann_Lucas\" OR (au:Fadiheh AND (all:oblivious OR all:\"root-of-trust\"))",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3A%22Deutschmann_Lucas%22+OR+%28au%3AFadiheh+AND+%28all%3Aoblivious+OR+all%3A%22root-of-trust%22%29%29&start=0&max_results=200",
+        "status": 200,
+        "total": 4,
+        "returned_entries": 4,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "insta_coauthors",
+        "query": "(au:Lu AND au:Guo AND au:Ren) OR (au:Kunal AND all:timing)",
+        "url": "https://export.arxiv.org/api/query?search_query=%28au%3ALu+AND+au%3AGuo+AND+au%3ARen%29+OR+%28au%3AKunal+AND+all%3Atiming%29&start=0&max_results=200",
+        "status": 200,
+        "total": 932,
+        "returned_entries": 200,
+        "truncated_by_limit": true
+      },
+      {
+        "label": "legalization_doi",
+        "query": "doi:10.1145/3061639.3062330",
+        "url": "https://export.arxiv.org/api/query?search_query=doi%3A10.1145%2F3061639.3062330&start=0&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "network_doi",
+        "query": "doi:10.1145/3061639.3062278",
+        "url": "https://export.arxiv.org/api/query?search_query=doi%3A10.1145%2F3061639.3062278&start=0&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "compensated_doi",
+        "query": "doi:10.1145/3195970.3196012 OR doi:10.1109/DAC.2018.8465893",
+        "url": "https://export.arxiv.org/api/query?search_query=doi%3A10.1145%2F3195970.3196012+OR+doi%3A10.1109%2FDAC.2018.8465893&start=0&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "steiner_doi",
+        "query": "doi:10.1145/3195970.3196048 OR doi:10.1109/DAC.2018.8465902",
+        "url": "https://export.arxiv.org/api/query?search_query=doi%3A10.1145%2F3195970.3196048+OR+doi%3A10.1109%2FDAC.2018.8465902&start=0&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "root_of_trust_doi",
+        "query": "doi:10.1145/3489517.3530981",
+        "url": "https://export.arxiv.org/api/query?search_query=doi%3A10.1145%2F3489517.3530981&start=0&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "insta_doi",
+        "query": "doi:10.1109/DAC63849.2025.11132858",
+        "url": "https://export.arxiv.org/api/query?search_query=doi%3A10.1109%2FDAC63849.2025.11132858&start=0&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "legalization_refined",
+        "query": "au:Zhu AND (ti:legalization OR ti:\"mixed-cell-height\")",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3AZhu+AND+%28ti%3Alegalization+OR+ti%3A%22mixed-cell-height%22%29&max_results=200",
+        "status": 200,
+        "total": 19,
+        "returned_entries": 19,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "network_refined",
+        "query": "au:Daya AND (all:chip OR all:snoopy OR all:coherent)",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3ADaya+AND+%28all%3Achip+OR+all%3Asnoopy+OR+all%3Acoherent%29&max_results=200",
+        "status": 200,
+        "total": 3,
+        "returned_entries": 3,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "compensated_refined",
+        "query": "au:Venkataramani AND (all:quantization OR all:precision OR all:compensated)",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3AVenkataramani+AND+%28all%3Aquantization+OR+all%3Aprecision+OR+all%3Acompensated%29&max_results=200",
+        "status": 200,
+        "total": 13,
+        "returned_entries": 13,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "steiner_refined",
+        "query": "au:Held AND (ti:Steiner OR ti:arborescences)",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3AHeld+AND+%28ti%3ASteiner+OR+ti%3Aarborescences%29&max_results=200",
+        "status": 200,
+        "total": 4,
+        "returned_entries": 4,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "steiner_rockel",
+        "query": "au:Rockel AND (all:arborescence OR all:delay OR all:Steiner)",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3ARockel+AND+%28all%3Aarborescence+OR+all%3Adelay+OR+all%3ASteiner%29&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "insta_refined",
+        "query": "au:Ren AND (ti:timing OR ti:INSTA)",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3ARen+AND+%28ti%3Atiming+OR+ti%3AINSTA%29&max_results=200",
+        "status": 200,
+        "total": 443,
+        "returned_entries": 200,
+        "truncated_by_limit": true
+      },
+      {
+        "label": "insta_kunal",
+        "query": "au:\"Kishor Kunal\" AND (all:timing OR all:statistical)",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3A%22Kishor+Kunal%22+AND+%28all%3Atiming+OR+all%3Astatistical%29&max_results=200",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "legalization_title",
+        "query": "ti:\"mixed-cell-height\"",
+        "url": "https://export.arxiv.org/api/query?search_query=ti%3A%22mixed-cell-height%22&max_results=200",
+        "status": 200,
+        "total": 1,
+        "returned_entries": 1,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "compensated_title",
+        "query": "ti:compensated AND (ti:DNN OR ti:neural)",
+        "url": "https://export.arxiv.org/api/query?search_query=ti%3Acompensated+AND+%28ti%3ADNN+OR+ti%3Aneural%29&max_results=200",
+        "status": 200,
+        "total": 57,
+        "returned_entries": 57,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "root_author",
+        "query": "au:Deutschmann AND au:Kunz",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3ADeutschmann+AND+au%3AKunz&max_results=200",
+        "status": 200,
+        "total": 4,
+        "returned_entries": 4,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "insta_exact_refinement_1",
+        "query": "au:Ren AND ti:\"static timing\"",
+        "url": "https://export.arxiv.org/api/query?search_query=au%3ARen+AND+ti%3A%22static+timing%22&max_results=100",
+        "status": 200,
+        "total": 0,
+        "returned_entries": 0,
+        "truncated_by_limit": false
+      },
+      {
+        "label": "insta_exact_refinement_2",
+        "query": "ti:INSTA AND all:statistical",
+        "url": "https://export.arxiv.org/api/query?search_query=ti%3AINSTA+AND+all%3Astatistical&max_results=100",
+        "status": 200,
+        "total": 1,
+        "returned_entries": 1,
+        "truncated_by_limit": false
+      }
+    ],
+    "candidate_checks": [
+      {
+        "url": "https://arxiv.org/abs/2204.07439v3",
+        "result": "INSTA-BNN is a binary neural network paper with different authors; not the static timing analysis engine INSTA."
+      },
+      {
+        "url": "https://arxiv.org/pdf/2308.07757v1",
+        "result": "Downloaded and parsed all 14 pages. First version is already the later Scalable Formal Verification manuscript, not the DAC 2022 paper; reference [17] explicitly cites the original DOI 10.1145/3489517.3530981. Existing v2 remains separately recorded as related reading."
+      },
+      {
+        "url": "https://arxiv.org/abs/1805.06085",
+        "result": "PACT: author overlap but a different paper and method, not Compensated-DNN."
+      },
+      {
+        "url": "https://arxiv.org/abs/1807.06964",
+        "result": "Bridging the Accuracy Gap for 2-bit QNN: different author list and PACT/SAWB methods; no evidence it is Compensated-DNN under another title."
+      },
+      {
+        "url": "https://arxiv.org/html/2011.13000v3",
+        "result": "Ax-BxP cites Compensated-DNN as reference [31]; not the target original."
+      },
+      {
+        "url": "https://arxiv.org/html/1911.10741v1",
+        "result": "Shenjing cites the target DAC 2017 on-chip network paper as reference [17]; not the target original."
+      },
+      {
+        "url": "https://arxiv.org/html/2101.08561v1",
+        "result": "A Fast Optimal Double Row Legalization Algorithm cites the target DAC 2017 legalization paper; not the target original."
+      },
+      {
+        "url": "https://arxiv.org/abs/2512.04527",
+        "result": "FLEX is a different 2025 FPGA-CPU legalization paper with different authors."
+      },
+      {
+        "url": "https://arxiv.org/abs/2404.10638",
+        "result": "Single-author capacitated tree-cover 3-approximation, SWAT 2024; not the two-author DAC 2018 exact delay-bounded Steiner paper."
+      },
+      {
+        "url": "https://arxiv.org/html/2603.28381v1",
+        "result": "Warp-STAR cites and compares with INSTA; different authors and DAC 2026 paper, not the DAC 2025 original."
+      }
+    ]
+  },
+  "outreach_policy": {
+    "date": "2026-10-16",
+    "send_email": false,
+    "reason": "User explicitly declined email outreach and requested arXiv search."
   }
 }
