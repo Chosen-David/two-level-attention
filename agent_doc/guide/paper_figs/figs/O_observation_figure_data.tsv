@@ -7,8 +7,14 @@ O	a	repr_query	single_pool_near_capture	frac	0.8695	e140_o_trace_v2.json	bin mas
 O	a	repr_query	single_pool_far_capture	frac	0.7358	e140_o_trace_v2.json	bin mass-rank top-2048, accept-if-fits
 O	a	repr_query	oracle_strip_tokens	count	1989	e140_o_trace_v2.json	budget 2048, accept-if-fits (GPT-review fix)
 O	a	repr_query	avg_pool_miss_pages	count	13/32	e140b_pooling_anatomy.json	single pool 2048 tok, 32-dim tail subspace avg page score
-O	a	repr_query	avg_pool_miss_mass_frac	frac	0.5965	e140b_pooling_anatomy.json	missed oracle mass / oracle mass
+O	a	repr_query	avg_pool_miss_mass_frac	frac	0.5965	e140b_pooling_anatomy.json	missed mass-rank-ref mass / ref mass
 O	a	repr_query	minmax_recover_pages	count	6 (far 3/4)	e140b_pooling_anatomy.json	Quest bound, mean over 32 Q-heads
+O	a	repr_query	minmax_recover_mass_frac	frac	0.4937	e140b_pooling_anatomy.json	recovered pages' mass / ref mass
+O	a	repr_query	minmax_miss_pages	count	17/32	e140b_pooling_anatomy.json	symmetric: minmax misses MORE pages than avg
+O	a	repr_query	minmax_miss_mass_frac	frac	0.2646	e140b_pooling_anatomy.json	but LESS ref mass than avg (0.5965): page-count vs mass criteria differ
+O	a	repr_query	avg_extra_pages	count	13	e140b_pooling_anatomy.json	selected outside mass-rank reference
+O	a	repr_query	minmax_extra_pages	count	17	e140b_pooling_anatomy.json	selected outside mass-rank reference
+O	a	all_queries	miss_mass_frac_avg_vs_minmax	frac	0.2543,0.1208	e140b_pooling_anatomy.json	mean over 128 queries; minmax misses less ref mass
 O	a	repr_query	spike_page_top1_token_share	frac	0.9984	e140b_pooling_anatomy.json	page@7936
 O	a	all_queries	far_top5pct_bin_concentration	frac	0.4507	e140_o_trace_v2.json	bins
 O	a	repr_strip	bin_mass	frac	1.4173e-04	e140_o_trace_v2.json	pos=160,sel=0

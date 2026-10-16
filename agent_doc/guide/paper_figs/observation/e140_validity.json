@@ -35,17 +35,17 @@
   "current_assets": [
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
-      "sha256": "a6c7997ffbbdac45253beea72974acb4aeeeb02414003b24fa113685869ae192",
+      "sha256": "2417a5c3769856dcea49b40fedab0a252f187b9f7402da476612dcbdba49735c",
       "status": "redesigned-v2-inputs-current"
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
-      "sha256": "809ef3bdb04028cb0488d388039426e969e3d6d33f9569ae451448ff2972f546",
+      "sha256": "0072a0999ff972cf41610ed9e2828816bc5fe210f4cd046051eaf04811da386a",
       "status": "redesigned-v2-inputs-current"
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
-      "sha256": "5399c6b2c897a43bf6b4a46930f1831249da5333f3108b008ff112f49e73658e",
+      "sha256": "6001d258c03eef49cd24f372690a306f54c0e0d405883fb273466f6750dc46e7",
       "status": "redesigned-v2-inputs-current"
     }
   ],
@@ -72,7 +72,7 @@
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation_figure_data.tsv",
-      "sha256": "d8ff3739805f9d4e56e1dbcc5ce575f1d2adf14553b8501ecccfb9c3f60b4e6d",
+      "sha256": "2439de56402f7a53bf090d744ec8d67a001338e1184234b0f4cc04b7265349cc",
       "status": "regenerated-current"
     },
     {
@@ -248,12 +248,12 @@
     "date": "2026-10-16",
     "renderer": "agent_doc/guide/paper_figs/figs/fig_o_observation.py",
     "panels": {
-      "a": "partition + heterogeneous scorers (token strip, repr query musique s1 L24 q=14212; 3 bands: attn mass / oracle single pool / avg-pool 32-dim single pool with minmax recovery marks; o1 bins + e140b_pooling_anatomy.json)",
+      "a": "partition + heterogeneous scorers (per-page strip, repr query musique s1 L24 q=14212; 4 bands: attn mass / mass-rank top-2048 reference / avg-pool 32-dim / minmax Quest-bound, symmetric four-state encoding: in-ref-selected / ref-missed /// / extra .. / not selected; o1 bins + e140b_pooling_anatomy.json)",
       "b": "far quota (128-query sorted capture curves: single pool vs far-quota 1024/2048 arm, o1 bins; anti-eviction floor)",
       "c": "subspace (o3 tail32/random32/high32 arms, v2 metric)",
       "d": "per-layer far gate (e6b heatmap, single source; per-prompt light-layer counts recomputed from the same 16x36 matrix)"
     },
-    "note": "No panel reads O4 v2. No historical-diagnostic banner. Panel (a) adds the E140b pooling anatomy probe (same collector math imported from e140_o_trace.py; page boundaries asserted equal to o1 bins). Repr query pinned to musique s1 L24 q=14212 as a fixed disclosed example (not rule-derived): far share 0.494 = 55th percentile of 128 queries (median 0.456); clearest avg-dilution anatomy among comparably representative candidates (spike page@7936: one token = 99.8% page mass). Legacy byte lineages preserved in prior_asset_sets / legacy_snapshot_commit. 2026-10-16 restyle: in-figure note boxes removed per user direction; all panel numbers moved to the manuscript caption; panel (a) keeps only band labels, region tags, a compact selection legend and the spike-page marker (▼ page@7936); panel (b) keeps legend + unpaired arm-minima annotation only. 2026-10-16 GPT-review statistical fixes (e5f5b7e): (1) accept-if-fits budget in all selection loops (old accept-then-check overflowed to 2110 tokens on up to 97/128 queries; all arms now <=2048/1024, verified from stored selections); (2) region attribution by absolute bin endpoints vs region_bounds.near_lo (old d_lo>=near_len misattributed 65/128 near tokens per query as far; far-share median 0.49550018 -> 0.45642671, matching GPT recompute exactly); (3) panel (b) arm minima disclosed as unpaired (single-pool 0.00 has three tied queries; quota-arm min 0.2667 from hotpotqa:s1:L8:q14212) and per-query diffs keep negatives (43/128; negative gaps filled in warning color); (4) repr-point disclosure unified as fixed example (stale closest-median rule wording removed from docstring/TSV); (5) panel (d) single-sourced to the 16-profile heatmap (e6_layer_skip.json 10-prompt summary withdrawn; per-row <0.01 recounts cross-check GPT's values: hotpotqa_0=22, pr_1=30, natural=15, needle=21).",
+    "note": "No panel reads O4 v2. No historical-diagnostic banner. Panel (a) adds the E140b pooling anatomy probe (same collector math imported from e140_o_trace.py; page boundaries asserted equal to o1 bins). Repr query pinned to musique s1 L24 q=14212 as a fixed disclosed example (not rule-derived): far share 0.494 = 55th percentile of 128 queries (median 0.456); clearest avg-dilution anatomy among comparably representative candidates (spike page@7936: one token = 99.8% page mass). Legacy byte lineages preserved in prior_asset_sets / legacy_snapshot_commit. 2026-10-16 restyle: in-figure note boxes removed per user direction; all panel numbers moved to the manuscript caption; panel (a) keeps only band labels, region tags, a compact selection legend and the spike-page marker (▼ page@7936); panel (b) keeps legend + unpaired arm-minima annotation only. 2026-10-16 GPT-review statistical fixes (e5f5b7e): (1) accept-if-fits budget in all selection loops (old accept-then-check overflowed to 2110 tokens on up to 97/128 queries; all arms now <=2048/1024, verified from stored selections); (2) region attribution by absolute bin endpoints vs region_bounds.near_lo (old d_lo>=near_len misattributed 65/128 near tokens per query as far; far-share median 0.49550018 -> 0.45642671, matching GPT recompute exactly); (3) panel (b) arm minima disclosed as unpaired (single-pool 0.00 has three tied queries; quota-arm min 0.2667 from hotpotqa:s1:L8:q14212) and per-query diffs keep negatives (43/128; negative gaps filled in warning color); (4) repr-point disclosure unified as fixed example (stale closest-median rule wording removed from docstring/TSV); (5) panel (d) single-sourced to the 16-profile heatmap (e6_layer_skip.json 10-prompt summary withdrawn; per-row <0.01 recounts cross-check GPT's values: hotpotqa_0=22, pr_1=30, natural=15, needle=21). 2026-10-16 third-round source-side iteration (user: 'continue iterating your own figure line; manuscript side belongs to GPT'): panel (a) redesigned to four symmetric bands with per-page Rectangle patches and four-state color/hatch encoding, absorbing the four-strip symmetry from GPT's manuscript-side 7d8c397 and grayscale hatching from d1d0d6e; new symmetric set-difference stats recorded in TSV (avg misses 13/32 ref pages = 59.65% ref mass with 13 extras; minmax misses 17/32 = 26.46% mass with 17 extras; minmax rescues 6 avg-missed pages carrying 49.37% ref mass; 128-query mean missed mass avg 25.43% vs minmax 12.08%); page-count and mass criteria stated separately; reference band relabeled 'mass ref' (mass-rank top-2048, not an oracle/exact token TopK/DSA).",
     "layout": "2x2, figsize 9.5x6.9in for IEEE double-column textwidth (effective tick ~8.6pt)"
   }
 }

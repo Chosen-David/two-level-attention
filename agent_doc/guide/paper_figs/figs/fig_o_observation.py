@@ -4,15 +4,18 @@
 设计原则：一个面板对应一个创新点的 observation（2026-10-16 用户指示迭代），
 叙事链 = 分区+异构打分 → far 配额 → 子空间 → 逐层 gate：
 
-  (a) 分区+异构打分创新点（token strip，真实数据，三条带）：一条 14K 真实 query
+  (a) 分区+异构打分创新点（token strip，真实数据，四条带）：一条 14K 真实 query
       （musique s1 layer24 q=14212，固定示例披露：far 份额 0.494 = 128 query
       第 55 百分位，非规则产出；同等代表性候选中稀释机理最清晰）的逐
-      64-token bin 质量条带（顶）+ oracle 质量单池 top-2048 选择
-      （中）+ 共享 32 维子空间 avg 页分单池选择（底：红 = oracle 选中但 avg
-      稀释漏掉的页，✓ = minmax 无漏上界救回）。far 稀疏尖峰页被 avg 稀释
-      误筛 → near 用 block-avg、far 用 minmax 上界的异构打分动机。数据源
-      追加 e140b_pooling_anatomy.json（同口径 import 复用 v2 采集器，页边界
-      与 bin 逐一对齐断言）。
+      64-token bin 质量条带（顶，非选集）+ mass-rank 整页参考 / avg / minmax
+      三个选择带，对称四态编码（蓝=参考内选中、红斜线=参考漏页、橙点=参考外
+      入选、灰=未选；斜线/点纹保证灰度可辨）。avg 漏 13 页/59.7% 参考质量；
+      minmax 页数上漏更多（17 页）但质量漏损仅 26.5%——救回的 6 页携带
+      49.4% 参考质量（尖峰页），即页数与质量两个口径须分开陈述（与手稿侧
+      GPT abcd 版「集合差异不构成质量排序」互证）。far 稀疏尖峰页被 avg
+      稀释误筛 → near 用 block-avg、far 用 minmax 上界的异构打分动机。
+      数据源追加 e140b_pooling_anatomy.json（同口径 import 复用 v2 采集器，
+      页边界与 bin 逐一对齐断言）。
   (b) far 配额创新点（排序捕获率曲线）：128 条 query 按单池 far 捕获率升序，
       配额臂（far 区 oracle top-1024/2048）同序绘制；正间隙填色 = 配额获益，
       负间隙（43/128 条配额更低）同样填色披露。两臂最小值不配对（单池 0.00
@@ -23,6 +26,16 @@
   (d) D' gate 创新点：E6 逐层 far mass 热图（16 样本 × 36 层，log 色标，
       单一来源 e6b_far_profiles.json）——24/36 层逐样本中位 <0.01；同一
       热图逐 prompt 计数有 12–32 层 <0.01 → 逐层 far gate。
+
+2026-10-16 第三轮迭代（用户指示「继续迭代你的」源图线，手稿侧归 GPT）：
+  6) panel (a) 从三条带（质量/oracle/avg+✓）改为四条带对称呈现——顶带逐页
+     质量（非选集）+ mass-rank 整页参考 / avg / minmax 三个选择带，吸收手稿侧
+     GPT 7d8c397 的对称设计回源图；「oracle」更名「mass-rank 参考」（整页质量
+     排序只是比较参考，非 token 级上界——GPT caption 同口径）；
+  7) 灰度可辨编码（吸收 GPT d1d0d6e）：参考漏页红底+斜线、参考外入选橙底+
+     点纹、黑边，去 ✓ 文字标记，四态无需颜色即可区分；
+  8) 新增对称差集统计：minmax 页数漏更多（17>13）但质量漏损更低
+     （26.5%<59.7%；128q 均值 12.1% vs 25.4%）——页数与质量口径分离。
 
 2026-10-16 GPT 统计审查（e5f5b7e）修正并入：
   1) 预算：所有选择循环改为接纳前检查 acc+n_tok<=预算，放不下跳过
@@ -55,7 +68,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import matplotlib.colors as mcolors  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
-from matplotlib.patches import Patch  # noqa: E402
+from matplotlib.patches import Patch, Rectangle  # noqa: E402
 
 SKILL = "/home/wangyuanshuo02/.claude/skills/publication-figures/scripts"
 sys.path.insert(0, SKILL)
@@ -176,12 +189,34 @@ sel_avg = set(pg["sel_avg"])
 sel_mm = set(pg["sel_minmax"])
 if sel_o != set(np.where(sel_mask)[0].tolist()):
     raise SystemExit("probe oracle selection differs from figure strip")
-missed = sorted(sel_o - sel_avg)          # oracle 选中但 avg 漏掉的页
+missed = sorted(sel_o - sel_avg)          # 参考选中但 avg 漏掉的页
 recov = sorted(set(missed) & sel_mm)      # 其中被 minmax 上界救回的页
 far_set = set(np.where(is_far)[0].tolist())
 n_miss_far = len(set(missed) & far_set)
 n_rec_far = len(set(recov) & far_set)
 miss_frac = qa_q["miss_mass_frac"]
+# 对称差集与质量口径（2026-10-16 第三轮：页数与质量分开陈述）
+pg_mass = pg["mass"]
+o_mass = sum(pg_mass[i] for i in sel_o)
+mm_missed = sorted(sel_o - sel_mm)                    # minmax 仍漏的参考页
+avg_extra = sorted(sel_avg - sel_o)                   # avg 参考外入选
+mm_extra = sorted(sel_mm - sel_o)                     # minmax 参考外入选
+mm_miss_frac = sum(pg_mass[i] for i in mm_missed) / o_mass
+recov_mass_frac = sum(pg_mass[i] for i in recov) / o_mass
+# 128q 汇总：avg vs minmax 的参考质量漏损率
+ams_all, mms_all = [], []
+for _c in db["cells"]:
+    for _q in _c["queries"]:
+        _p = _q["pages"]
+        _so, _sa, _sm = (set(_p["sel_oracle"]), set(_p["sel_avg"]),
+                         set(_p["sel_minmax"]))
+        _om = sum(_p["mass"][i] for i in _so)
+        if _om <= 0:
+            continue
+        ams_all.append(sum(_p["mass"][i] for i in _so - _sa) / _om)
+        mms_all.append(sum(_p["mass"][i] for i in _so - _sm) / _om)
+ams_mean = float(np.mean(ams_all))
+mms_mean = float(np.mean(mms_all))
 spike = qa_q["detail"].get("spike")
 if spike is None:
     raise SystemExit("repr query lacks spike-page detail")
@@ -310,61 +345,77 @@ fig, ((ax_a, ax_b), (ax_c, ax_d)) = plt.subplots(
                  "width_ratios": [1.2, 1.0]})
 
 
-# ---- (a) token strip：质量 / oracle 单池 / avg 单池 三条带 ----
+# ---- (a) token strip：质量带 + 三个选择带（对称四态编码，灰度可辨） ----
 cmap_mass = mcolors.LinearSegmentedColormap.from_list("mass", ["#ffffff", C_MAIN])
 norm_mass = mcolors.LogNorm(vmin=2e-4, vmax=2e-2)
 X0, X1 = float(min(pos_c)), float(max(pos_c))
-# 顶带：逐 bin 质量（log 色标）；中带：oracle 单池 top-2048（真实质量排序上界）；
-# 底带：avg 单池（共享 32 维子空间页均分）——红 = oracle 选中但 avg 稀释漏掉的页，
-# ✓ = 其中被 minmax 无漏上界救回的页（bin 等宽近似）
-ax_a.imshow(mass_a[None, :], aspect="auto", cmap=cmap_mass, norm=norm_mass,
-            extent=[X0, X1, 2.0, 3.0], interpolation="nearest")
-cmap_sel = mcolors.ListedColormap(["#e9e9e9", C_HL])
-ax_a.imshow(sel_mask.astype(float)[None, :], aspect="auto", cmap=cmap_sel,
-            vmin=0, vmax=1, extent=[X0, X1, 1.0, 2.0],
-            interpolation="nearest")
+n_pg = len(mass_a)
+w_pg = (X1 - X0) / n_pg  # bin 等宽近似（bins 非连续覆盖，见上文注释）
 C_MISS = "#d62728"
-rgb = np.tile(np.array(mcolors.to_rgb("#e9e9e9")), (len(mass_a), 1))
-for i in range(len(mass_a)):
-    if i in sel_avg:
-        rgb[i] = mcolors.to_rgb(C_MAIN)
-for i in missed:
-    rgb[i] = mcolors.to_rgb(C_MISS)
-ax_a.imshow(rgb[None, :, :], aspect="auto", extent=[X0, X1, 0.0, 1.0],
-            interpolation="nearest")
-for i in recov:
-    ax_a.text(pos_c[i], 0.5, "✓", ha="center", va="center",
-              fontsize=TK - 2, color="white", fontweight="bold")
-# sink / swa 保护区（不在 mid bins 内；区域太窄无法内嵌文字，见说明框）
+C_EXTRA = "#e08214"
+# 顶带：逐 bin 质量（log 色标，是统计量不是选集）
+ax_a.imshow(mass_a[None, :], aspect="auto", cmap=cmap_mass, norm=norm_mass,
+            extent=[X0, X1, 3.0, 4.0], interpolation="nearest")
+# 三个选择带：mass-rank 整页参考 / avg / minmax。每页四态：
+# 蓝 = 参考内选中，红+斜线 = 参考漏页，橙+点纹 = 参考外入选，灰 = 未选。
+# （吸收手稿侧 GPT 7d8c397/d1d0d6e 的对称与灰度设计回源图）
+for sel, y0 in ((sel_o, 2.0), (sel_avg, 1.0), (sel_mm, 0.0)):
+    for i in range(n_pg):
+        in_ref, in_x = i in sel_o, i in sel
+        if in_ref and in_x:
+            fc_i, ht_i = C_MAIN, None
+        elif in_ref:
+            fc_i, ht_i = C_MISS, "///"
+        elif in_x:
+            fc_i, ht_i = C_EXTRA, ".."
+        else:
+            fc_i, ht_i = "#e9e9e9", None
+        ax_a.add_patch(Rectangle(
+            (X0 + i * w_pg, y0), w_pg, 1.0, facecolor=fc_i, hatch=ht_i,
+            edgecolor="black" if ht_i else "none",
+            lw=0.5 if ht_i else 0.0, zorder=3))
+# sink / swa 保护区（不在 mid bins 内；区域太窄无法内嵌文字）
 ax_a.axvspan(0, rb["sink_hi"], color=C_NEU, alpha=0.35, lw=0)
 ax_a.axvspan(rb["swa_lo"], q_a + 1, color=C_NEU, alpha=0.35, lw=0)
 # near/far 区域标注（置于顶带中部）
 _tagbox = dict(boxstyle="round,pad=0.2", facecolor="white",
                edgecolor="none", alpha=0.85)
-ax_a.text((rb["sink_hi"] + rb["near_lo"]) / 2, 2.5,
-          f"far ({far_tok_frac:.0%} of mid tokens)", ha="center",
-          fontsize=AN, color=C_HL, fontweight="bold", bbox=_tagbox)
-ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 2.5, "near", ha="center",
+# near/far 区域标注（顶带中部；far 标签置于图例右缘与尖峰页之间的空窗，
+# 双行压缩宽度——lint 实测图例 x∈[264,5146]、尖峰页 7936）
+ax_a.text(6850, 3.5, f"far ({far_tok_frac:.0%})", ha="center",
+          va="center", fontsize=AN - 2, color=C_HL, fontweight="bold",
+          bbox=_tagbox)
+ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 3.5, "near", ha="center",
           fontsize=AN, color=C_MAIN, fontweight="bold", bbox=_tagbox)
 ax_a.axvline(rb["near_lo"], color=C_HL, lw=1.6, linestyle="--")
-# 尖峰页标记（▼，页 @spike.pos_lo：单 token 占页质量 100%，被 avg 稀释落选，
+# 尖峰页标记（▼，页 @spike.pos_lo：单 token 占页质量 99.8%，被 avg 稀释落选，
 # minmax 救回；说明在 caption）
 i_sp = bin_lo.index(spike["pos_lo"])
-ax_a.plot([pos_c[i_sp]], [3.10], marker="v", color=C_MISS, markersize=8,
+ax_a.plot([pos_c[i_sp]], [4.12], marker="v", color=C_MISS, markersize=8,
           clip_on=False, zorder=6)
-# 图例替代原说明框（用户 2026-10-16：图内不堆文字，数字解释并入 caption）
-leg_a = [Patch(fc="#e9e9e9", ec="0.6", label="page not selected"),
-         Patch(fc=C_MAIN, label="selected by avg pool"),
-         Patch(fc=C_MISS,
-               label="oracle page missed by avg\n(✓ = minmax rescue)")]
+# 紧凑图例（用户 2026-10-16：图内不堆文字，数字解释并入 caption）
+leg_a = [Patch(fc=C_MAIN, label="in ref, selected"),
+         Patch(fc=C_MISS, hatch="///", ec="black", lw=0.5,
+               label="ref page missed"),
+         Patch(fc=C_EXTRA, hatch="..", ec="black", lw=0.5,
+               label="selected outside ref"),
+         Patch(fc="#e9e9e9", ec="0.6", label="not selected")]
 ax_a.legend(handles=leg_a, loc="upper left", bbox_to_anchor=(0.005, 1.005),
-            fontsize=LG - 2.5, framealpha=0.92, handlelength=1.4,
-            borderpad=0.45, labelspacing=0.4)
+            fontsize=LG - 4, framealpha=0.92, handlelength=1.2,
+            borderpad=0.35, labelspacing=0.28)
+if os.environ.get("O_DEBUG_BB"):  # 量 legend/tag 数据坐标盒（布局调试用）
+    fig.canvas.draw()
+    _r = fig.canvas.get_renderer()
+    _inv = ax_a.transData.inverted()
+    for _art in ax_a.get_legend(), ax_a.texts[-2], ax_a.texts[-1]:
+        _bb = _art.get_window_extent(_r).transformed(_inv)
+        print(f"[bb] {str(_art)[:40]} x:[{_bb.x0:.0f},{_bb.x1:.0f}] "
+              f"y:[{_bb.y0:.2f},{_bb.y1:.2f}]")
 ax_a.set_xlim(0, q_a + 1)
 ax_a.set_xticks(range(0, 15000, 3000))
 ax_a.set_ylim(0, 4.0)
-ax_a.set_yticks([0.5, 1.5, 2.5])
-ax_a.set_yticklabels(["avg pool", "oracle pool", "attn mass"],
+ax_a.set_yticks([0.5, 1.5, 2.5, 3.5])
+ax_a.set_yticklabels(["minmax", "avg", "mass ref", "attn mass"],
                      fontsize=TK - 1.5)
 ax_a.set_xlabel("key position (tokens); query at right end", fontsize=L)
 ax_a.set_title("(a) Avg pool misses sparse far spikes",
@@ -468,8 +519,14 @@ rows.append(f"O\ta\trepr_query\tsingle_pool_far_capture\tfrac\t{fcap_a:.4f}\t{sr
 rows.append(f"O\ta\trepr_query\toracle_strip_tokens\tcount\t{oracle_tok_a}\t{src}\tbudget {BUDGET_TOK}, accept-if-fits (GPT-review fix)")
 srcb = os.path.basename(SRCB)
 rows.append(f"O\ta\trepr_query\tavg_pool_miss_pages\tcount\t{len(missed)}/{len(sel_o)}\t{srcb}\tsingle pool {BUDGET_TOK} tok, 32-dim tail subspace avg page score")
-rows.append(f"O\ta\trepr_query\tavg_pool_miss_mass_frac\tfrac\t{miss_frac:.4f}\t{srcb}\tmissed oracle mass / oracle mass")
+rows.append(f"O\ta\trepr_query\tavg_pool_miss_mass_frac\tfrac\t{miss_frac:.4f}\t{srcb}\tmissed mass-rank-ref mass / ref mass")
 rows.append(f"O\ta\trepr_query\tminmax_recover_pages\tcount\t{len(recov)} (far {n_rec_far}/{n_miss_far})\t{srcb}\tQuest bound, mean over 32 Q-heads")
+rows.append(f"O\ta\trepr_query\tminmax_recover_mass_frac\tfrac\t{recov_mass_frac:.4f}\t{srcb}\trecovered pages' mass / ref mass")
+rows.append(f"O\ta\trepr_query\tminmax_miss_pages\tcount\t{len(mm_missed)}/{len(sel_o)}\t{srcb}\tsymmetric: minmax misses MORE pages than avg")
+rows.append(f"O\ta\trepr_query\tminmax_miss_mass_frac\tfrac\t{mm_miss_frac:.4f}\t{srcb}\tbut LESS ref mass than avg ({miss_frac:.4f}): page-count vs mass criteria differ")
+rows.append(f"O\ta\trepr_query\tavg_extra_pages\tcount\t{len(avg_extra)}\t{srcb}\tselected outside mass-rank reference")
+rows.append(f"O\ta\trepr_query\tminmax_extra_pages\tcount\t{len(mm_extra)}\t{srcb}\tselected outside mass-rank reference")
+rows.append(f"O\ta\tall_queries\tmiss_mass_frac_avg_vs_minmax\tfrac\t{ams_mean:.4f},{mms_mean:.4f}\t{srcb}\tmean over 128 queries; minmax misses less ref mass")
 if spike:
     rows.append(f"O\ta\trepr_query\tspike_page_top1_token_share\tfrac\t{spike_top1:.4f}\t{srcb}\tpage@{spike['pos_lo']}")
 rows.append(f"O\ta\tall_queries\tfar_top5pct_bin_concentration\tfrac\t{conc_mean:.4f}\t{src}\tbins")

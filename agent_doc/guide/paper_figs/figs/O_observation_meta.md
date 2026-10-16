@@ -18,8 +18,8 @@ python3 agent_doc/guide/paper_figs/figs/fig_o_observation.py
 
 **2026-10-16 版式约束（用户指示）**：图内不堆说明文字（note box 已全部移除），
 面板数字与结论并入手稿 caption。图内仅保留：坐标轴/刻度、面板 (a) 的带名 ytick、
-far/near 区域标签、紧凑选择图例（灰=未选 / 蓝=avg 选中 / 红=oracle 选中但 avg 漏，
-✓=minmax 救回）与尖峰页 ▼ 标记（page@7936）；面板 (b) 仅图例 +
+far/near 区域标签、紧凑四态图例（蓝=in ref 且选中 / 红///=ref 漏页 / 橙..=ref 外
+入选 / 灰=未选）与尖峰页 ▼ 标记（page@7936）；面板 (b) 仅图例 +
 「arm minima 0.00→0.27 (unpaired)」标注（GPT 审查点 3：两臂最小值不配对，
 不再画单 query 配对箭头；负间隙 43/128 以警示色填色披露）。
 
@@ -66,22 +66,29 @@ floor 页对齐）；q=14212 时 near_len=3525，far 占 mid token 的 74.7%。
 
 ### (a) Avg pool misses sparse far spikes — 分区 + 异构打分器动机
 
-三条带（x = key 绝对位置，query 在最右端）：
+四条带（x = key 绝对位置，query 在最右端），逐 64-token 页宽矩形，对称四态编码
+（蓝=in ref 且该臂选中 / 红///=ref 页该臂漏掉 / 橙..=ref 外入选 / 灰=未选）：
 
-1. **attn mass**：逐 64-token bin 的真实注意力质量（log 色标，vmin 2e-4 / vmax 2e-2）；
-2. **oracle pool**：按真实 bin 质量排序的单池 top-2048 token（任何打分单池的上界）；
-3. **avg pool**：共享 32 维 tail 子空间（[48,64)∪[112,128)）token 分的页均值单池
-   top-2048；**红 = oracle 选中但 avg 漏掉的页，✓ = 其中被 Quest minmax 上界救回**。
+1. **attn mass**：逐 bin 的真实注意力质量（log 色标，vmin 2e-4 / vmax 2e-2），非选集；
+2. **mass ref**：按真实 bin 质量排序的单池 top-2048 token 参考集（32 页，**不是
+   oracle、不是精确 token TopK、不是 DSA**，只是比较基准）；
+3. **avg**：共享 32 维 tail 子空间（[48,64)∪[112,128)）token 分的页均值单池 top-2048；
+4. **minmax**：同子空间 Quest 符号感知极值单池 top-2048。
 
-关键数字（repr query，预算修正后）：oracle 单池 32 页 / 1989 token；avg 漏
-13/32 oracle 页（漏掉质量占 oracle 质量 60%）；minmax 救回 6 页（其中 far 3/4）；
-尖峰页 page@7936 单 token 占页质量 99.8% → avg 页均分被 63 个邻居稀释而落选，
+关键数字（repr query，预算修正后，对称差集口径）：mass ref 32 页 / 1989 token；
+avg 漏 13/32 ref 页（漏质量 59.65%）、ref 外多选 13 页；minmax 漏 17/32 ref 页
+（漏质量 26.46%）、多选 17 页——**页数准则与质量准则必须分开陈述**：minmax 漏页
+更多但漏质量更少。avg 漏掉的 ref 页中 minmax 救回 6 页（载 ref 质量 49.37%，
+其中 far 3/4）；avg∩ref=19 页 vs minmax∩ref=15 页。
+尖峰页 page@7936 单 token 占页质量 99.84% → avg 页均分被 63 个邻居稀释而落选，
 minmax 上界 ≥ 该 token 分而保留。
-128 query 汇总：avg 平均漏 7.88/~29.5 oracle 页（漏质量均值 25.4%）。
+128 query 汇总：avg 平均漏质量 25.43% vs minmax 12.08%（页数 avg 平均漏
+7.88/~29.5 ref 页）。
 → 结论：near 均匀用 block-avg；far 稀疏尖峰用 minmax 无漏上界 + 精筛。
 
 诊断口径披露：token 分为 32 Q-head 均值（生产按 KV 组内 4 head 逐头选页）；
-漏筛同时含 32 维表示误差与 pooling 稀释，二者未在图内分离。
+漏筛同时含 32 维表示误差与 pooling 稀释，二者未在图内分离；
+参考集是质量排序单池上界，集合差异不能判定打分器质量优劣。
 
 ### (b) Quota floors far capture — far 保底配额（β）动机
 
@@ -111,8 +118,9 @@ high32（高频）0.24。主指标 = 选中质量 / 参考 top-K 质量（非全
 ## 诚实约束（任何改写不得违反）
 
 1. 4 个源序列；128 条 query 是重复观测，非独立样本。
-2. (a) oracle/avg/minmax 条带是诊断性模拟（oracle = 质量排序上界；avg/minmax =
-   32 维共享子空间诊断打分器），非生产 near-avg/far-minmax 逐 KV 头实现。
+2. (a) mass ref/avg/minmax 条带是诊断性模拟（mass ref = 质量排序单池参考，非最优
+   oracle；avg/minmax = 32 维共享子空间诊断打分器），非生产 near-avg/far-minmax 逐
+   KV 头实现；集合差异是候选访问差异，不能判定打分器质量优劣。
 3. 质量捕获 ≠ 任务精度；e2e 证据属于评估章节（β 让渡消融）。
 4. (d) 是 prefill 统计；门控有效性不得由本图断言。
 5. (b) 配额臂是 1024/2048 示意性划分，非调参结果。
