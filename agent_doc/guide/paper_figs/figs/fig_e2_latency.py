@@ -9,6 +9,10 @@
   .187 GPU4 独立复验 ±1%）。dense SDPA vs 融合态 graph（Step1）vs Step2 候选列化。
   口径：合成单层 prefill attention + 选择链，K2=1024，BATCH+FUSED+GRAPH 全开；
   L∈{8K,16K,32K,64K}，短档净负、~33K 交叉、64K 1.64x 均如实保留（spec：负收益不裁）。
+面板 (c)：完整请求 decode TPOT vs L（e152v2_e2e_latency_verdict.json，v2 连续 wall
+  口径 ABBA×3 中位）。dense vs TLI（dynamic）vs TLI+StaticCache（E134-pre 系统层
+  消 72-cat/步）。如实呈现 e2e 现状：TPOT tli/dense = 3.4×/2.5×/1.8× @32/64/128K，
+  kernel 级加速不 translate（launch-bound 归因链在判决 JSON）；负收益不裁（spec）。
 
 数据全部从判决 JSON 程序化读取，无手工键入；输出 PDF+PNG+SVG + figure_data.tsv。
 """
@@ -46,7 +50,7 @@ h = e128["e127_headline_64k_normal"]
 stages = ["prepare_index", "compute_score", "compute_mask", "metrics", "eager_decoding"]
 base_ms = [h["stage_gpu_baseline"][s] for s in stages] + [h["baseline_gpu_ms"]]
 tli_ms = [h["stage_gpu_iter8"][s] for s in stages] + [h["iter8_gpu_ms"]]
-stage_labels = ["prepare", "scoring", "mask", "metrics", "attn", "total"]
+stage_labels = ["prep", "score", "mask", "metric", "attn", "total"]
 
 e139 = json.load(open(os.path.join(WT, "exp/trace/results/e139_step2_cand_verdict.json")))
 wl = e139["results"]["wall_lsweep"]
@@ -58,9 +62,12 @@ for L in Ls:
     step1_ms.append(float(s.split("Step1 graph ")[1].split(" /")[0]))
     step2_ms.append(float(s.split("Step2 graph ")[1].split("ms")[0]))
 
+e152v2 = json.load(open(os.path.join(REPO, "exp/trace/results/e152v2_e2e_latency_verdict.json")))
+rm = e152v2["results_median"]
+
 # ---------------- 画布 ----------------
-fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(20, 9),
-                                 gridspec_kw={"wspace": 0.30})
+fig, (ax_a, ax_b, ax_c) = plt.subplots(1, 3, figsize=(27, 9),
+                                       gridspec_kw={"wspace": 0.32})
 
 # ---- 面板 (a)：decode 阶段分解（并列条形）----
 x = range(len(stage_labels))
@@ -82,7 +89,7 @@ ax_a.text(5 - w / 2, h["baseline_gpu_ms"] * 1.15, f"{h['baseline_gpu_ms']:.2f}",
           ha="center", fontsize=FONT_SIZES["annotation"] - 2)
 ax_a.text(5 + w / 2, h["iter8_gpu_ms"] * 1.15, f"{h['iter8_gpu_ms']:.2f}",
           ha="center", fontsize=FONT_SIZES["annotation"] - 2)
-ax_a.text(5, 30, "5.47x GPU / 4.76x wall", ha="center",
+ax_a.text(5, 3, "5.47x GPU\n4.76x wall", ha="center",
           fontsize=FONT_SIZES["annotation"], color=C_HL, fontweight="bold")
 ax_a.text(0.02, 0.02, "single-layer synthetic steady state,\nnot full-request E2E",
           transform=ax_a.transAxes, fontsize=FONT_SIZES["annotation"] - 4,
@@ -106,10 +113,16 @@ ax_b.set_xlabel("input length L (tokens)")
 ax_b.set_ylabel("prefill attention wall (ms, log scale)")
 ax_b.set_title("Prefill: wall vs input length (K2=1024)", pad=14)
 ax_b.legend(loc="upper left")
-# 数值标注
-for lk, d, s2 in zip(Lk, dense_ms, step2_ms):
-    ax_b.annotate(f"{d:.0f}", (lk, d), textcoords="offset points", xytext=(0, 10),
-                  ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_DENSE)
+# 数值标注（64K dense 标签移到标记左侧，避让 upper-left legend 右缘）
+for i, (lk, d, s2) in enumerate(zip(Lk, dense_ms, step2_ms)):
+    if i == len(Lk) - 1:
+        # 64K dense 标签移到标记下方，避让 upper-left legend（右缘至 x≈1647）
+        ax_b.annotate(f"{d:.0f}", (lk, d), textcoords="offset points",
+                      xytext=(0, -26), ha="center",
+                      fontsize=FONT_SIZES["annotation"] - 3, color=C_DENSE)
+    else:
+        ax_b.annotate(f"{d:.0f}", (lk, d), textcoords="offset points", xytext=(0, 10),
+                      ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_DENSE)
     ax_b.annotate(f"{s2:.0f}", (lk, s2), textcoords="offset points", xytext=(0, -18),
                   ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_STEP2)
 ax_b.text(64, 55, "1.64x vs dense", ha="right",
@@ -118,9 +131,45 @@ ax_b.text(0.02, 0.02, "single-layer synthetic prefill;\nshort lengths remain net
           transform=ax_b.transAxes, fontsize=FONT_SIZES["annotation"] - 4,
           style="italic", color=pal["neutral"], va="bottom")
 
+# ---- 面板 (c)：完整请求 TPOT vs L（E152v2 v2 连续 wall 口径）----
+Lk_c = [32, 64, 128]
+dense_tp = [rm[f"L{L}"]["dense_dynamic"]["tpot_ms"] for L in (32768, 65536, 131072)]
+tli_tp = [rm[f"L{L}"]["tli_dynamic"]["tpot_ms"] for L in (32768, 65536, 131072)]
+tli_st = [rm["L32768"]["tli_static"]["tpot_ms"]]  # 仅 32K 已采（E134-pre）
+ax_c.plot(Lk_c, dense_tp, "-o", color=C_DENSE, label="dense (FullKV, HF pipeline)",
+          markersize=14, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
+ax_c.plot(Lk_c, tli_tp, "-^", color=C_TLI, label="TLI (dynamic cache)",
+          markersize=14, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
+ax_c.plot([32], tli_st, "D", color=C_HL, markersize=12,
+          markeredgecolor="black", markeredgewidth=LINE_WIDTHS["marker_edge"] * 0.6,
+          label="TLI + StaticCache (E134-pre)")
+ax_c.set_xscale("log", base=2)
+ax_c.set_yscale("log")
+ax_c.set_xticks(Lk_c)
+ax_c.set_xticklabels([f"{l}K" for l in Lk_c])
+ax_c.set_yticks([20, 30, 50, 100, 150])
+ax_c.get_yaxis().set_minor_formatter(matplotlib.ticker.NullFormatter())
+ax_c.set_xlabel("input length L (tokens)")
+ax_c.set_ylabel("decode TPOT (ms/token, log scale)")
+ax_c.set_title("Full-request decode: 36 layers, HF pipeline", pad=14)
+ax_c.legend(loc="upper left", fontsize=FONT_SIZES["annotation"] - 2)
+for lk, d, t in zip(Lk_c, dense_tp, tli_tp):
+    ax_c.annotate(f"{d:.0f}", (lk, d), textcoords="offset points", xytext=(0, 10),
+                  ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_DENSE)
+    ax_c.annotate(f"{t:.0f}", (lk, t), textcoords="offset points", xytext=(0, -18),
+                  ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_TLI)
+ax_c.annotate(f"{tli_st[0]:.0f}", (32, tli_st[0]), textcoords="offset points",
+              xytext=(14, 6), ha="left", fontsize=FONT_SIZES["annotation"] - 3, color=C_HL)
+ax_c.text(0.98, 0.42, "kernel-level speedups do not translate:\nper-step host/launch chain dominates\n(72-cat + indexer Python; E133c already shipped)",
+          transform=ax_c.transAxes, fontsize=FONT_SIZES["annotation"] - 3,
+          style="italic", color=pal["neutral"], ha="right")
+ax_c.text(0.02, 0.02, "v2 continuous-wall protocol, ABBA x3,\nmax_gen=128, greedy; per-step sync diagnostic mode",
+          transform=ax_c.transAxes, fontsize=FONT_SIZES["annotation"] - 4,
+          style="italic", color=pal["neutral"], va="bottom")
+
 # 面板字母
-for ax, letter in ((ax_a, "A"), (ax_b, "B")):
-    ax.text(0.01, 1.05, letter, transform=ax.transAxes,
+for ax, letter in ((ax_a, "A"), (ax_b, "B"), (ax_c, "C")):
+    ax.text(0.01, 1.07, letter, transform=ax.transAxes,
             fontsize=FONT_SIZES["panel_letter"], fontweight="bold", va="bottom")
 
 # ---------------- lint（导出前机械检查）----------------
@@ -154,6 +203,11 @@ for L, d, s1, s2 in zip(Ls, dense_ms, step1_ms, step2_ms):
     rows.append(f"E2\tb@L{L}\tdense\twall_ms\tms\t{d:.1f}\t{src139}\tL_{L}")
     rows.append(f"E2\tb@L{L}\tstep1_graph\twall_ms\tms\t{s1:.1f}\t{src139}\tL_{L}")
     rows.append(f"E2\tb@L{L}\tstep2_graph\twall_ms\tms\t{s2:.1f}\t{src139}\tL_{L}")
+src152 = "e152v2_e2e_latency_verdict.json:results_median"
+for L, d, t in zip((32768, 65536, 131072), dense_tp, tli_tp):
+    rows.append(f"E2\tc@L{L}\tdense_dynamic\ttpot_ms\tms\t{d:.1f}\t{src152}\tL{L}.dense_dynamic.tpot_ms")
+    rows.append(f"E2\tc@L{L}\ttli_dynamic\ttpot_ms\tms\t{t:.1f}\t{src152}\tL{L}.tli_dynamic.tpot_ms")
+rows.append(f"E2\tc@L32768\ttli_static\ttpot_ms\tms\t{tli_st[0]:.1f}\t{src152}\tL32768.tli_static.tpot_ms")
 with open(os.path.join(OUT, "E2_latency_figure_data.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 print("exported E2_latency_figure_data.tsv")

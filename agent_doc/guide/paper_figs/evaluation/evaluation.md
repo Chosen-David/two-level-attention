@@ -71,6 +71,11 @@
 
 **表与面板：**主文质量表按任务组列总体与关键退化，附录给完整逐任务表；不要只画均值柱状图。模型规模/家族用独立列或小面板，显式写 supported、pending、unsupported，不用零分填缺失。
 
+**baseline 接入状态（DeepSeek 轨，2026-10-16）：**
+- **Quest（已验收，已入 E1 图 panel b）**：Qwen3-8B LBv1 41.35 / LBv2 30.22 / RULER 128K 19.33（另 32K 42.85、64K 26.25）；逐任务 13/16 任务见 `exp/results_longbench_vendor/Qwen3-8B/quest_vendor_1024_16/pred/result.json`（缺 gov_report/qmsum/repobench，标记子集口径）。
+- **ClusterKV（vendor 已接入，派单中 pending）**：RULER 32K/64K/128K + LongBench 16 待补；预算对齐 token_budget=1024/sink=16（总 attend≈1025，构成=仅 sink 强制区，披露与 TLI sink+swa 差异）。
+- SparQ/MInference/FASA 数据已登记（RULER 32K 60.45/49.94/24.00；LBv1 48.66/47.71/33.31），按 evaluation.md E3「额外 baseline 不堆数量」策略作附录候选，不强制入主图。
+
 **支持或否定：**可支持声明范围内的质量—成本取舍；不能证明全局最优或跨模型普适。若有任务超过 `δ`，保留并说明适用边界，不能只展示总体平均。
 
 **产物绑定：**`figure_id=E1`，质量表的每格绑定 `run_id + scorer_hash + sample_set_hash`；复用格同样记录原始 run_id。
@@ -94,7 +99,7 @@
 
 **主图安排：**(a) x=实际输入长度，y=请求 wall 或 TPOT，独立面板不混单位；(b) 一个代表长度的绝对成本分解，明确重叠项不可相加；(c) 若已有完整配对点，x=请求时间，y=质量，点标实际预算。prefill 正负收益均保留，不能只画加速的长度。
 
-**当前证据限制：**E127/E134 历史单层合成稳态不能直接当36层 TPOT 或请求 E2E。`1945403` 图规划已把3.82×改为旧 sparse-mask 到 gather/prefetch 的实现比，而非相对 dense；本轮未取得其所引 E139 wall 原始 JSON/完整计时链，故不以规划里的新绝对值出实测图。当前 main 的 `eager_prefill` 是全 QK/PV 后 mask 的质量参考；分支中未来优化必须以它自己的运行 SHA/路由验收，不能借到 main。
+**当前证据限制：**E127/E134 历史单层合成稳态不能直接当36层 TPOT 或请求 E2E——该缺口已由 **E152v2（2026-10-16，v2 连续 wall 口径 ABBA×3，`e152v2_e2e_latency_verdict.json`）闭合**：完整 36 层 Qwen3-8B 请求 decode TPOT，dense vs TLI（dynamic）vs TLI+StaticCache（E134-pre 系统层消 72-cat/步），L=32/64/128K 全档。如实结论：TPOT tli/dense = 3.4×/2.5×/1.8×，kernel 级加速（E127 5.47× GPU / E133c -12~-15%）不 translate 到请求级，净缺口在 HF Python/launch 链（72-cat + 索引器 per-step Python），归因链见判决 JSON attribution 段；E134-pre 静态缓存臂 -5.9ms（87.9→82.0 @32K）。E2 图 (c) 面板即此数据；不做「超过 dense」主张，负结果按 spec 保留。v1（分段和 wall）数据作废不混用。旧段保留备考：`1945403` 图规划已把3.82×改为旧 sparse-mask 到 gather/prefetch 的实现比，而非相对 dense；当前 main 的 `eager_prefill` 是全 QK/PV 后 mask 的质量参考；分支中未来优化必须以它自己的运行 SHA/路由验收，不能借到 main。
 
 **停止条件：**完整请求未改善则只报告局部 selector 收益；标定、传输、索引维护抵消收益时保留净负结果。内核快但请求慢，不提升为 serving 加速。
 
@@ -107,11 +112,11 @@
 | 方法 | 必要性与阶段 | 进入主表前的条件 |
 |---|---|---|
 | FullKV 与高效 dense backend | 必选锚点，dense-P/dense-D | FullKV 是算法语义，FA/SDPA 是实现；写清实际后端，质量与速度均使用正确且适用的基线 |
-| Quest | 必选最近邻：minmax 页筛选，原生 dense-P/sparse-D | 固定官方版及 Qwen3/GQA 适配；页预算、前两层/dense 路由、Q/K norm、原始产物与运行身份通过，不把质量 mask 路径当速度内核 |
+| Quest | 必选最近邻：minmax 页筛选，原生 dense-P/sparse-D | 固定官方版及 Qwen3/GQA 适配；页预算、前两层/dense 路由、Q/K norm、原始产物与运行身份通过，不把质量 mask 路径当速度内核。**已通过验收并接入 E1（DeepSeek 轨 2026-10-13）：Qwen3-8B LBv1 41.35 / LBv2 30.22 / RULER 42.85(32K)/26.25(64K)/19.33(128K)**，见 `exp/results_ruler/main_table_quest_vs_tli_draft.md` |
 | SparQ 或 FASA-C | 至少一个通过验收的低维评分近邻；支持子空间贡献比较 | 固定频维/预算策略、GQA语义、补偿项、原生phase。SparQ新增 vendor 入口不等于完整验收；按已登记 k=1024及r随实际ctx映射核有效r/配置身份。FASA-C不能替换成固定低频tail后仍称原法 |
 | FFD | 保留原要求，条件主基线：阈值筛选与量化内核系统 | 固定论文/代码、Qwen3适配与原生量化策略；δ对应可变实际预算。核自然logit与代码log2阈值约定；首末参考块不是强制sink/SWA保护。未验前只列待接入 |
 | HISA | 保留原要求，待唯一身份核验 | 先填准确题名、作者、固定论文版、官方仓库及阶段；不能根据缩写猜成HiP或其他方法 |
-| ClusterKV | 条件系统基线/相关工作：聚类检索与KV放置 | 保留建簇、重聚类、CPU offload和传输成本；官方accuracy/efficiency路径不能拼接成同一质量—成本点；缺依赖/适配时标pending |
+| ClusterKV | 条件系统基线/相关工作：聚类检索与KV放置 | 保留建簇、重聚类、CPU offload和传输成本；官方accuracy/efficiency路径不能拼接成同一质量—成本点；缺依赖/适配时标pending。**vendor 已接入（2026-10-16 #16 completed，官方 accuracy 选择器 md5 冻结 + 纯 torch search_indices 等价实现），预算换算公式已核（总 attend=token_budget+最近区），正式派单中** |
 
 官方来源入口：[Quest](https://github.com/mit-han-lab/Quest/tree/01c1623bf9395009520874e989e29f683203b357)、[SparQ](https://github.com/graphcore-research/llm-inference-research)、[FASA](https://github.com/wangyifei0047/FASA-ICLR2026/tree/96c00c46db12ccee56104175470aa29579d66c58)、[FFD](https://github.com/qluoluo/faster-flash-decoding/tree/ca09458ab1536328e5f46502b27891412733cd6d)、[ClusterKV](https://github.com/sjtu-zhao-lab/ClusterKV/tree/c7380819588771e8c5dadacdbd33942d7c53adea)。这是来源入口或已核源码快照，不是本库适配验收；SparQ 的实际 vendor 上游路径/版本必须另随运行冻结。HISA 身份未核，暂不填猜测链接。
 

@@ -1,0 +1,37 @@
+{
+  "experiment": "E152v2",
+  "title": "decode-only 请求时延 e2e 重跑（v2 连续 wall 口径）+ launch-bound 归因",
+  "date": "2026-10-16",
+  "caliber": {
+    "model": "Qwen3-8B bf16 sdpa, greedy, max_gen=128",
+    "host": "wys-4xh20 (10.238.122.187) GPU0/2，transformers 4.56.2 / torch 2.8.0",
+    "collector": "exp/bench/e152_e2e_latency.py（97228a1 v2 协议：连续模型入口→末 token wall、TTFT、per-step sync 诊断口径、ABBA×3 交错）",
+    "input": "e152 确定性 needle prompt（固定 seed，两臂逐位相同）",
+    "tli_config": "主臂 a.125/b.375/g.625 tail，K1=128 K2=1024（E133c 6fd956e 后代码）",
+    "data": "节点 ~/e152v2_out/{e152v2_L32768,e152v2_L65536,e152v2_L131072,e152v2_L32768_static,e134pre_tli_static32k_v2}.json（本 JSON 为图中位数汇总源）"
+  },
+  "results_median": {
+    "L32768": {
+      "dense_dynamic":  {"tpot_ms": 26.0, "prefill_ms": 7905},
+      "tli_dynamic":    {"tpot_ms": 87.9, "prefill_ms": 7897},
+      "tli_static":     {"tpot_ms": 82.0, "prefill_ms": 7959, "note": "E134-pre be28179：mask 旁路修复后 prefill 与 dynamic 持平"}
+    },
+    "L65536": {
+      "dense_dynamic":  {"tpot_ms": 39.7, "prefill_ms": 23078},
+      "tli_dynamic":    {"tpot_ms": 97.6, "prefill_ms": 23064}
+    },
+    "L131072": {
+      "dense_dynamic":  {"tpot_ms": 67.3, "prefill_ms": 75477},
+      "tli_dynamic":    {"tpot_ms": 119.9, "prefill_ms": 75458}
+    }
+  },
+  "attribution": {
+    "dense_self": "dense TPOT 随 L 增长（26.0→39.7→67.3ms）本身即 HF Python/launch + 72-cat/步共付开销主导（8B bs=1）；两臂 prefill 完全同速（同 flash 路径）",
+    "tli_gap": "TLI 净增 ~58ms/步（L 弱相关）= 索引器 per-step Python/launch 链；E133c kernel 级优化已收官，e2e 缺口不在 kernel",
+    "systems_layer": "E134-pre 静态缓存适配 -5.9ms（87.9→82.0 @32K）；下一杠杆 E134 decode 整步 CUDA graph（#236，静态形状前置已就绪）",
+    "ratios": "TPOT tli/dense = 3.4× / 2.5× / 1.8× @ 32/64/128K——L 增大 dense 自身开销增长更快，相对劣势收窄但 128K 仍 1.8×"
+  },
+  "verdict": "e2e 时延现状如实报告：kernel 级加速（E127 5.47× GPU / E133c -12~-15%）不 translate 到请求级——胜负在系统层（HF 缓存/mask/launch 链）。E2 图 (c) 面板用本 JSON；不做『超过 dense』主张，归因链完整呈现（论文口径见 e134pre_static_cache_verdict.json paper_impact）。",
+  "v1_erratum": "v1（分段和 wall）数据作废不混用（GPT 97228a1 判定）",
+  "status": "DONE 2026-10-16（32K/64K/128K ABBA×3 齐满格）"
+}

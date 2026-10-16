@@ -52,6 +52,15 @@ t32_ci = e133["bootstrap_ci95"]
 
 rm = json.load(open(R + "e116b_ruler128k_formal_mavg.json"))
 rf = json.load(open(R + "e116b_ruler128k_formal_fullkv.json"))
+rq = json.load(open(R + "e119_ruler128k_formal_quest_vendor.json"))
+# E152 前置审核（2026-10-16）：e116b 的 TLI 128K 臂是无效格——niah_single
+# 100/100/99 与 FullKV 逐位同形（稀疏路径未生效/口径错配），且与 E146 正式
+# 判决（receipt 闭包 + score_ruler_formal manifest 身份）23.98 冲突。
+# RULER 128K 三臂统一改读 E146 正式口径（FullKV 逐任务与 e116b 一致，
+# scorer 等价性已核）。
+e146 = json.load(open(R + "e146_ruler128k_verdict.json"))
+ruler_mavg = e146["arms"]["tli_main_arm"]["AVG"]
+ruler_fullkv = e146["arms"]["none_fullkv"]["AVG"]
 
 
 def ruler_avg(d):
@@ -60,11 +69,17 @@ def ruler_avg(d):
     return sum(v) / len(v)
 
 
-ruler_mavg, ruler_fullkv = ruler_avg(rm), ruler_avg(rf)
+ruler_quest = ruler_avg(rq)
 
 suites = ["LB v1\n(16 tasks)", "LB v2\n(503 tasks)", "RULER\n(128K)"]
 fullkv_scores = [fk["avg16"], lb["lbv2_503"]["FullKV_reused_E109"], ruler_fullkv]
 tli_scores = [mv["avg16"], lb["lbv2_503"]["mavg_new"], ruler_mavg]
+# Quest vendor 已验收聚合（deepseek 轨接入；LBv1/LBv2 来源：
+# exp/results_ruler/main_table_quest_vs_tli_draft.md §1/§2，Quest 官方
+# accuracy/vendor 路径 Qwen3-8B；RULER 128K 为 e119_ruler128k_formal_
+# quest_vendor.json 程序化读取）。主方法 TLI 臂不动，只追加 baseline 臂。
+quest_scores = [41.35, 30.22, ruler_quest]
+QUEST_SRC = "main_table_quest_vs_tli_draft.md §1/§2 + e119_ruler128k_formal_quest_vendor.json"
 
 # ---------------- 画布 1x2 ----------------
 fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(20, 9),
@@ -95,31 +110,39 @@ ax_a.text(0.98, 0.03, "avg16: 48.11 (FullKV) vs 48.90 (TLI)", transform=ax_a.tra
 
 # ---- (b) 套件级总分 ----
 xb = np.arange(3)
-w = 0.38
-ax_b.bar(xb - w / 2, fullkv_scores, width=w, color=C_NEU, label="dense FullKV",
+w = 0.26
+ax_b.bar(xb - w, fullkv_scores, width=w, color=C_NEU, label="dense FullKV",
          edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
-ax_b.bar(xb + w / 2, tli_scores, width=w, color=C_MAIN, label="TLI (mavg, K2=1024)",
+ax_b.bar(xb, quest_scores, width=w, color=C_SEC, label="Quest vendor (K=1024)",
          edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
-for xi, v in zip(xb - w / 2, fullkv_scores):
+ax_b.bar(xb + w, tli_scores, width=w, color=C_MAIN, label="TLI (mavg, K2=1024)",
+         edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
+for xi, v in zip(xb - w, fullkv_scores):
     ax_b.text(xi, v + 0.8, f"{v:.2f}", ha="center", fontsize=FONT_SIZES["annotation"] - 3)
-for xi, v in zip(xb + w / 2, tli_scores):
+for xi, v in zip(xb, quest_scores):
+    ax_b.text(xi, v + 0.8, f"{v:.2f}", ha="center", fontsize=FONT_SIZES["annotation"] - 3)
+for xi, v in zip(xb + w, tli_scores):
     ax_b.text(xi, v + 0.8, f"{v:.2f}", ha="center", fontsize=FONT_SIZES["annotation"] - 3)
 ax_b.set_xticks(xb)
 ax_b.set_xticklabels(suites)
 ax_b.set_ylabel("task score")
 ax_b.set_title("Suite-level totals", loc="left", pad=10)
-ax_b.legend(loc="upper right", fontsize=FONT_SIZES["legend"] - 2)
+ax_b.legend(ncol=2, loc="upper center", bbox_to_anchor=(0.5, 1.12),
+            fontsize=FONT_SIZES["legend"] - 3)
 ax_b.set_ylim(0, 62)
-ax_b.text(0.02, 0.02, "tail32 representation (AVG5): "
+ax_b.text(0.02, 0.02, "tail32 AVG5: "
           + f"{t32:.2f}, Δ{e133['avg']['delta']:+.2f} CI[{t32_ci[0]:.2f},{t32_ci[1]:.2f}]"
-          + "\nLB v1 FullKV 13-task reused pre-E121 (caliber caveat)",
+          + "\nLB v1 FullKV 13-task reused pre-E121"
+          + "\nRULER 128K: both arms collapse vs 32K (yarn 4.0 extrapolation),"
+          + "\nTLI retention 51.7% — long-context quality boundary (E146 formal)"
+          + "\nQuest LBv1/LBv2 from main_table draft; ClusterKV pending",
           transform=ax_b.transAxes, fontsize=FONT_SIZES["annotation"] - 5,
           color=pal["neutral"], va="bottom", style="italic")
 
-# 面板字母
+# 面板字母（轴内左上角，与轴外顶部 legend 不冲突）
 for ax, letter in ((ax_a, "A"), (ax_b, "B")):
-    ax.text(0.01, 1.05, letter, transform=ax.transAxes,
-            fontsize=FONT_SIZES["panel_letter"], fontweight="bold", va="bottom")
+    ax.text(0.012, 0.985, letter, transform=ax.transAxes,
+            fontsize=FONT_SIZES["panel_letter"], fontweight="bold", va="top")
 
 # ---------------- lint + 导出 ----------------
 report = lint_figure(fig)
@@ -144,9 +167,17 @@ for t in tasks:
     rows.append(f"E1\ta\t{t}\tpaired_delta\tpoints\t{delta[t]:+.2f}\t\t\t{src116}:arms.*.per_task.{t}")
     rows.append(f"E1\ta\t{t}\tfullkv\tscore\t{fk['per_task'][t]:.2f}\t\t\t{src116}")
     rows.append(f"E1\ta\t{t}\ttli_mavg\tscore\t{mv['per_task'][t]:.2f}\t\t\t{src116}")
-for s, fv, tv in zip(("lbv1_16", "lbv2_503", "ruler_128k"), fullkv_scores, tli_scores):
-    rows.append(f"E1\tb\t{s}\tfullkv\tscore\t{fv:.2f}\t\t\t{src116}/e116b_ruler128k")
-    rows.append(f"E1\tb\t{s}\ttli_mavg\tscore\t{tv:.2f}\t\t\t{src116}/e116b_ruler128k")
+for s, fv, tv, qv in zip(("lbv1_16", "lbv2_503", "ruler_128k"),
+                         fullkv_scores, tli_scores, quest_scores):
+    src_r = "e146_ruler128k_verdict.json (E146 formal)" if s == "ruler_128k" \
+        else f"{src116}/e116b_ruler128k"
+    rows.append(f"E1\tb\t{s}\tfullkv\tscore\t{fv:.2f}\t\t\t{src_r}")
+    rows.append(f"E1\tb\t{s}\ttli_mavg\tscore\t{tv:.2f}\t\t\t{src_r}")
+    rows.append(f"E1\tb\t{s}\tquest\tscore\t{qv:.2f}\t\t\t{QUEST_SRC}")
+    rows.append(f"E1\tb\t{s}\tclusterkv\tscore\t\t\t\tpending")
+rows.append("E1\b_note\te116b_tli_128k_invalid\tnote\t-\t"
+            "niah_single 100/100/99 = FullKV-shaped, sparse path not effective; "
+            "superseded by E146 formal 23.98")
 rows.append(f"E1\tb\ttail32_avg5\tscore\t{t32:.2f}\t{t32_ci[0]:.2f}\t{t32_ci[1]:.2f}\t"
             "e133_subspace_verdict.json")
 with open(os.path.join(OUT, "E1_quality_figure_data.tsv"), "w") as f:
