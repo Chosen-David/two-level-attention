@@ -138,7 +138,27 @@ for c in cells:
 conc_mean = float(np.mean(conc))
 
 # ================= (b) 单池 far 捕获率散点（128 queries） =================
-scat = []  # (task, far_share, far_capture, near_capture)
+FAR_QUOTA = 1024  # 保底配额臂：far 区内 oracle top-1024（总预算 2048 的 50%）
+
+
+def far_cap_quota(o):
+    nl = o["near_len"]
+    fbins = sorted((b for b in o["bins"] if b["d_lo"] >= nl),
+                   key=lambda b: -b["mass"])
+    fm = sum(b["mass"] for b in fbins)
+    if fm <= 0:
+        return np.nan
+    acc = 0
+    fc = 0.0
+    for b in fbins:
+        if acc >= FAR_QUOTA:
+            break
+        acc += b["n_tok"]
+        fc += b["mass"]
+    return fc / fm
+
+
+scat = []  # (task, far_share, far_capture, near_capture, far_capture_quota)
 for c in cells:
     for o in c["o1"]:
         nl = o["near_len"]
@@ -159,17 +179,22 @@ for c in cells:
                 fcap += b["mass"]
             elif b["d_hi"] <= nl:
                 ncap += b["mass"]
-        scat.append((c["task"], fm / mm, fcap / fm, ncap / nm if nm > 0 else np.nan))
-scat = np.array([(s, f, n) for _, s, f, n in scat])
+        scat.append((c["task"], fm / mm, fcap / fm,
+                     ncap / nm if nm > 0 else np.nan, far_cap_quota(o)))
+scat = np.array([(s, f, n, q) for _, s, f, n, q in scat])
 tasks = [t for t, *_ in [(c["task"],) for c in cells for o in c["o1"]
                          if sum(b["mass"] for b in o["bins"] if b["d_lo"] >= o["near_len"]) > 0
                          and sum(b["mass"] for b in o["bins"]) > 0]]
-sh, fc, nc = scat[:, 0], scat[:, 1], scat[:, 2]
+sh, fc, nc, qc = scat[:, 0], scat[:, 1], scat[:, 2], scat[:, 3]
 nc_mean = float(np.nanmean(nc))
 fc_mean = float(np.mean(fc))
 fc_diffuse = float(np.mean(fc[sh <= 0.4]))
 fc_heavy = float(np.mean(fc[sh > 0.6]))
 n_under = float(np.mean(nc > fc))
+qc_mean = float(np.mean(qc))
+qc_diffuse = float(np.mean(qc[sh <= 0.4]))
+fc_p10, qc_p10 = float(np.percentile(fc, 10)), float(np.percentile(qc, 10))
+fc_min, qc_min = float(fc.min()), float(qc.min())
 
 # ================= (c) O3 三臂（主指标 selected/reference topK mass） =================
 arms = ["tail32", "random32", "high32"]
@@ -248,12 +273,12 @@ ax_a.set_title("(a) Mass is position-segmented", loc="left", pad=10,
                fontsize=T, fontweight="bold")
 ax_a.tick_params(labelsize=TK)
 note(ax_a, 0.015, 0.98,
-     f"gray: sink ({o_a['mass_sink']:.2f}) / swa "
-     f"({o_a['mass_swa_excluding_sink']:.2f}) mass auto-included; "
-     f"far ≈ 50% of mid mass\nover {far_tok_frac:.0%} of mid tokens, as sparse spikes "
-     f"(top-5% bins ≈ {conc_mean:.0%} of far mass);\nsingle pool captures near "
-     f"{ncap_a:.2f} / far {fcap_a:.2f} of mass — smaller spikes missed\n"
-     "→ near: block-avg · far: no-miss bound + fine select",
+     f"repr query: musique s1, layer 24, q@14212 — near := nearest 25% of mid\n"
+     f"gray: sink/swa 128 tok auto-included (mass {o_a['mass_sink']:.2f}/"
+     f"{o_a['mass_swa_excluding_sink']:.2f}); far ≈ 50% of mid mass over "
+     f"{far_tok_frac:.0%} of mid tokens\nas sparse spikes (top-5% bins ≈ "
+     f"{conc_mean:.0%} of far mass); single pool captures near {ncap_a:.2f} / "
+     f"far {fcap_a:.2f}\n→ near: block-avg · far: no-miss bound + fine select",
      color="black", size=AN - 1.5)
 sm = plt.cm.ScalarMappable(cmap=cmap_mass, norm=norm_mass)
 cb = fig.colorbar(sm, ax=ax_a, fraction=0.025, pad=0.012)
@@ -263,6 +288,8 @@ cb.ax.tick_params(labelsize=TK - 3)
 # ---- (b) 单池 far 捕获率散点 ----
 for task, col, mk in (("hotpotqa", C_MAIN, "o"), ("musique", C_HL, "^")):
     idx = np.array([t == task for t in tasks])
+    ax_b.scatter(sh[idx], qc[idx], s=30, facecolors="none", edgecolors=col,
+                 marker=mk, alpha=0.65, linewidth=1.1)
     ax_b.scatter(sh[idx], fc[idx], s=26, color=col, marker=mk, alpha=0.75,
                  edgecolor="white", linewidth=0.5, label=f"{task} ({idx.sum()} queries)")
 ax_b.axhline(nc_mean, color=C_NEU, lw=2.0, linestyle="--")
@@ -272,7 +299,7 @@ ax_b.axvspan(-0.03, 0.4, color=C_HL, alpha=0.08, lw=0)
 ax_b.text(0.19, 0.72, f"diffuse far:\ncapture {fc_diffuse:.2f}", ha="center",
           va="center", fontsize=AN - 1.5, color=C_HL)
 ax_b.set_xlabel("far share of mid mass", fontsize=L)
-ax_b.set_ylabel("far mass capture,\noracle single-pool top-2048", fontsize=L - 1)
+ax_b.set_ylabel("far mass capture,\noracle top-2048 (mid budget)", fontsize=L - 1)
 ax_b.set_xlim(-0.03, 1.0)
 ax_b.set_ylim(0, 1.05)
 ax_b.set_title("(b) Single pool under-serves far", loc="left", pad=10,
@@ -280,9 +307,11 @@ ax_b.set_title("(b) Single pool under-serves far", loc="left", pad=10,
 ax_b.tick_params(labelsize=TK)
 ax_b.legend(loc="lower right", fontsize=LG - 2, framealpha=0.92)
 note(ax_b, 0.97, 0.97,
-     f"far capture {fc_mean:.2f} ≪ near {nc_mean:.2f}\n"
-     f"({n_under:.0%} of queries) → guaranteed\nfar quota (anti-eviction)",
-     ha="right", va="top", color=C_HL, size=AN - 1)
+     f"open = far guaranteed {FAR_QUOTA}/{BUDGET_TOK} tokens:\n"
+     f"worst-case capture {fc_min:.2f}→{qc_min:.2f}, "
+     f"p10 {fc_p10:.2f}→{qc_p10:.2f}\n"
+     f"→ guaranteed far quota (anti-eviction)",
+     ha="right", va="top", color=C_HL, size=AN - 1.5)
 
 # ---- (c) O3 三臂 ----
 colors3 = [C_MAIN, C_NEU, C_SEC]
@@ -350,12 +379,16 @@ rows.append(f"O\ta\trepr_query\tsingle_pool_far_capture\tfrac\t{fcap_a:.4f}\t{sr
 rows.append(f"O\ta\tall_queries\tfar_top5pct_bin_concentration\tfrac\t{conc_mean:.4f}\t{src}\tbins")
 for x, msv, s in zip(pos_c, mass_a, sel_mask):
     rows.append(f"O\ta\trepr_strip\tbin_mass\tfrac\t{msv:.4e}\t{src}\tpos={x:.0f},sel={int(s)}")
-for (tk, s, f, n) in [(t, a, b, cc) for (t, a, b, cc) in
-                      zip(tasks, sh, fc, nc)]:
-    rows.append(f"O\tb\t{tk}\tshare_far_capture\tfrac\t{s:.4f},{f:.4f},{n:.4f}\t{src}\tbin mass-rank top-{BUDGET_TOK}")
+for (tk, s, f, n, q) in [(t, a, b, cc, dd) for (t, a, b, cc, dd) in
+                         zip(tasks, sh, fc, nc, qc)]:
+    rows.append(f"O\tb\t{tk}\tshare_far_capture\tfrac\t{s:.4f},{f:.4f},{n:.4f},{q:.4f}\t{src}\tbin mass-rank top-{BUDGET_TOK} (+far quota {FAR_QUOTA})")
 rows.append(f"O\tb\tall\tfar_capture_mean\tfrac\t{fc_mean:.4f}\t{src}\t-")
 rows.append(f"O\tb\tall\tnear_capture_mean\tfrac\t{nc_mean:.4f}\t{src}\t-")
 rows.append(f"O\tb\tdiffuse(share<=0.4)\tfar_capture\tfrac\t{fc_diffuse:.4f}\t{src}\t-")
+rows.append(f"O\tb\tquota{FAR_QUOTA}\tfar_capture_mean\tfrac\t{qc_mean:.4f}\t{src}\tfar-region top-{FAR_QUOTA}")
+rows.append(f"O\tb\tquota{FAR_QUOTA}\tfar_capture_diffuse\tfrac\t{qc_diffuse:.4f}\t{src}\tfar-region top-{FAR_QUOTA}")
+rows.append(f"O\tb\tall\tfar_capture_p10_single_vs_quota\tfrac\t{fc_p10:.4f},{qc_p10:.4f}\t{src}\t-")
+rows.append(f"O\tb\tall\tfar_capture_min_single_vs_quota\tfrac\t{fc_min:.4f},{qc_min:.4f}\t{src}\t-")
 for a in arms:
     for mm, v in zip(mets_all, arm_val[a]):
         rows.append(f"O\tc\t{a}\t{mm}\tfrac\t{v:.4f}\t{src}\to3.{a}.{mm}.mean")
