@@ -57,7 +57,7 @@ $J=\{48,\ldots,63,112,\ldots,127\}$ from each 128-dimensional query and key. The
 
 
 
-For key matrix $\mathbf K$ and row selector $R$, a fixed token-independent map satisfies $R(\mathbf K E_J)=(R\mathbf K)E_J$: both regions can reuse its coordinates. Page summaries and quantize--dequantize token keys remain distinct derived views. Appends, region boundaries and coordinate-map changes require maintenance of those views and logical token indices. This maintenance and backend-dependent KV access determine whether reuse reduces execution time.
+Both stages use the same fixed coordinate map $E_J$. For key matrix $\mathbf K$ and regional row selector $R$, $R(\mathbf K E_J)=(R\mathbf K)E_J$: regional selection preserves the scoring coordinates. L1 derives page summaries and L2 derives quantize--dequantize token keys from those coordinates, with no requirement to share a physical buffer. The final token mask addresses original full-width keys and values. Appended keys, moving regional boundaries and coordinate-map changes require consistent derived views, logical token indices and region assignments; the identity itself does not prescribe incremental maintenance. Net latency depends on preparing and maintaining these views, selection and backend KV access, and has not been shown to decrease.
 
 \begin{figure}[!ht]\centering
 \renewcommand{\thefigure}{2a}

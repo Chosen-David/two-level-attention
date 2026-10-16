@@ -190,17 +190,17 @@
     "scientific_privacy": {
       "reviewer": "independent_review",
       "decision": "approve-with-scope",
-      "checks": "Final bilingual terminology and attribution reviewed; all four archived data JSON files byte-identical to baseline. No experiment-validity upgrade; mapping is parent-provided historical reading, not a new reading."
+      "checks": "Single-paragraph claims reviewed against current implementation. Author revised algebraic reuse overclaim and final-mask indexing ambiguity; final bilingual mechanism and evidence boundaries approved. No new experiment or E151c result inferred."
     },
     "reader_visual": {
       "reviewer": "reader_visual_review",
       "decision": "approve",
-      "checks": "All26 document pages and changed slides3/4/9 reviewed. Fig1, Gate and O3 definitions distinguish denominators; final slide9 two-line label stays within node without obscuring arrow. No remaining required visual fixes.",
+      "checks": "All26 pages checked in color and grayscale after one-paragraph revision; formulas, glyphs, arrows, captions and pagination show no new blocking issue. Existing English supplement2.71738pt overflow does not obscure content. Unchanged PPT retains reviewed identity.",
       "reviewed_sha256": {
-        "output/paper_en.pdf": "aec9515cebf9e42177dbae7141822dd26e155ea3103532f4c66c1e65e77addcd",
-        "output/paper_zh.pdf": "2e1858fe6a949de80ea2fe9fb42aa3c20c9b699aa336bbd65e2814f7b2ea32f5",
-        "output/supplement_en.pdf": "e3ffbcd3471eb400e275b80ff8c08b6d74d58ab6adb81abb40f85710fab1f1d7",
-        "output/supplement_zh.pdf": "847aac95600d43dfc25a97380677022adbce61239a3aef23d62b603acc57bd45",
+        "output/paper_en.pdf": "e672532c2136d5f9657448c4eeef415126bbe07ec8cf5e3262a4f02a7d69473a",
+        "output/paper_zh.pdf": "a08a42f987ca74611ee391e8e16a558fe4c8d9a2943d7b8bfbd1d17c556eabed",
+        "output/supplement_en.pdf": "52e8647cc39b5728e830ff22a09a7a66065adbec8e200db08981c0b81e0e7a5c",
+        "output/supplement_zh.pdf": "61641a0d687a53ca74d6523318a65b21875b1806c0289ba2d43de902d5464db4",
         "presentation/TwoLevel_UserEdited_20261014.pdf": "90c2e000ceea57746e8c6bd390b0e81b1300637e3a6193b7c6ee0ff3c78e497c",
         "presentation/TwoLevel_UserEdited_20261014.pptx": "95d43b25e8ad32b066d8782eb5cfe1bbc5ae0bda9163de204e19d3afe4d57c8f"
       }
@@ -216,7 +216,8 @@
         7
       ],
       "all26_pages_text_and_72dpi_pixels_equal": true,
-      "remaining_warnings": "Existing TeX font substitution and English supplement2.71738pt overfull hbox; visually reviewed."
+      "remaining_warnings": "Existing TeX font substitution and English supplement2.71738pt overfull hbox; visually reviewed.",
+      "grayscale_pixels_equal": true
     }
   },
   "privacy_transformation": "Original repository files remain unchanged. Minimal derived inputs have separate hashes and explicit source hashes/paths; no hostname, network address or private home/scratch path is carried into these inputs.",
@@ -242,6 +243,140 @@
       "Fig1b": "Selected regional weight sum divided by full regional weight sum, from the same global whole-bin selection capped at2048 middle tokens.",
       "Gate": "Far-region attention-weight sum, subsequently averaged across disclosed query/head axes; not retention.",
       "O3": "Selected attention-weight sum divided by full-dimensional reference mid-TopK weight sum; not regional retention."
+    }
+  },
+  "paragraph_revision_20261016": {
+    "task": "One-paper, one-paragraph revision of Method III.A shared-view/maintenance paragraph; no new experiment or full-paper reading count.",
+    "baseline_commit": "358f8e5963b9b3cd1e4c52e94bca72666f74ce7d",
+    "workflow_commit": "a73bf13424bdd789284eeac6d5664bea5d104574",
+    "source": {
+      "title": "AmgR: Algebraic Multigrid Accelerated on ReRAM",
+      "doi": "10.1109/DAC56929.2023.10247881",
+      "url": "https://www.ssslab.cn/assets/papers/2023-Fan-AmgR.pdf",
+      "location": "Physical page4, section III.B, right column, third paragraph; preceding two paragraphs and following III.C read for context.",
+      "access": "Author PDF paragraph and context read through browser PDF extraction. Local download returned403; no new byte-hash verification.",
+      "parent_verified_pdf_sha256": "d4d3221345ff12b2f2c81db14716cba645d7511ab98bfe8770e02c86e0b23d67",
+      "new_full_read_count": 0,
+      "sentence_functions": [
+        "1 motivates mapping through differing operator-use frequencies.",
+        "2 identifies four resident matrices and their hardware placement.",
+        "3 adds compressed or fixed operands to reduce overhead.",
+        "4 explains initial derived operators and when inputs become resident.",
+        "5 explains the next derived operators and their placement.",
+        "6 names the remaining setup transfer and its derived result.",
+        "7 contrasts solve-stage vector movement with resident matrices.",
+        "8 traces the first dependent vector operations.",
+        "9 traces the next dependent vector operations.",
+        "10 completes the vector-update chain.",
+        "11 links numbered kernels and arrows to the data movement diagram.",
+        "12 states the claimed movement/write reduction."
+      ],
+      "adaptation": "Use object-to-derived-view-to-operation/cost ordering only. No ReRAM placement or measured AmgR benefit is transferred to this method, no sentence copied, and no method citation added."
+    },
+    "paragraphs": {
+      "original": {
+        "en": "For key matrix $\\mathbf K$ and row selector $R$, a fixed token-independent map satisfies $R(\\mathbf K E_J)=(R\\mathbf K)E_J$: both regions can reuse its coordinates. Page summaries and quantize--dequantize token keys remain distinct derived views. Appends, region boundaries and coordinate-map changes require maintenance of those views and logical token indices. This maintenance and backend-dependent KV access determine whether reuse reduces execution time.",
+        "zh": "对键矩阵$\\mathbf K$和行选择算子$R$，固定的词元无关映射满足$R(\\mathbf K E_J)=(R\\mathbf K)E_J$，因此两个区域可以复用坐标。页摘要与量化--反量化词元键仍是不同的派生视图。词元追加、区域边界及坐标映射变化需要维护这些视图与逻辑索引；上述维护开销和依赖后端的KV访问决定复用能否减少执行时间。"
+      },
+      "candidate": {
+        "en": "The two stages share the coordinate map $E_J$. For key matrix $\\mathbf K$ and any regional row selector $R$, $R(\\mathbf K E_J)=(R\\mathbf K)E_J$, so choosing a region does not change its scoring coordinates. L1 forms page summaries from these coordinates, while L2 forms quantize--dequantize token keys; the stages therefore consume distinct derived views. Their logical token indices address the original full-width keys and values, whose cache capacity is unchanged. As decoding appends keys and moves regional boundaries, these views, indices and region assignments must remain consistent; a change of coordinate map also requires corresponding view updates. The identity establishes coordinate reuse, without specifying a shared physical buffer or an incremental maintenance scheme. Whether it reduces execution time depends on view preparation and maintenance, selection and backend KV access; a net latency reduction has not been established.",
+        "zh": "两级共享的对象是坐标映射$E_J$。对键矩阵$\\mathbf K$和任一区域行选择算子$R$，$R(\\mathbf K E_J)=(R\\mathbf K)E_J$，因此选择区域不会改变其评分坐标。L1基于这些坐标生成页摘要，L2则生成量化--反量化词元键，两级因而使用不同的派生视图。其逻辑词元索引指向原始全维键和值，原KV缓存容量保持不变。解码追加键并移动区域边界时，这些视图、索引及区域归属须保持一致；坐标映射变化也需要相应更新视图。上述恒等式确立的是坐标复用，并未规定共享物理缓冲区或增量维护方案。复用能否降低执行时间仍取决于视图准备与维护、选择及后端KV访问，净时延下降尚未确立。"
+      },
+      "revised": {
+        "en": "Both stages use the same fixed coordinate map $E_J$. For key matrix $\\mathbf K$ and regional row selector $R$, $R(\\mathbf K E_J)=(R\\mathbf K)E_J$: regional selection preserves the scoring coordinates. L1 derives page summaries and L2 derives quantize--dequantize token keys from those coordinates, with no requirement to share a physical buffer. The final token mask addresses original full-width keys and values. Appended keys, moving regional boundaries and coordinate-map changes require consistent derived views, logical token indices and region assignments; the identity itself does not prescribe incremental maintenance. Net latency depends on preparing and maintaining these views, selection and backend KV access, and has not been shown to decrease.",
+        "zh": "两级使用同一固定坐标映射$E_J$。对键矩阵$\\mathbf K$和区域行选择算子$R$，$R(\\mathbf K E_J)=(R\\mathbf K)E_J$：区域选择保持评分坐标一致。L1从这些坐标派生页摘要，L2派生量化--反量化词元键，两者无须共享物理缓冲区。最终词元掩码指向原始全维键和值。追加键、移动区域边界及改变坐标映射时，派生视图、逻辑词元索引和区域归属须保持一致；该恒等式本身并未规定增量维护方式。净时延取决于这些视图的准备与维护、选择及后端KV访问，尚未证实有所下降。"
+      }
+    },
+    "revised_sentence_reasons": [
+      {
+        "sentence": 1,
+        "reason": "Name the shared object explicitly as fixed coordinate map, not a physical tensor."
+      },
+      {
+        "sentence": 2,
+        "reason": "Preserve the row/coordinate selection identity with its actual scope: scoring-coordinate consistency."
+      },
+      {
+        "sentence": 3,
+        "reason": "Connect each stage to its distinct derived representation; no common-buffer implication.",
+        "evidence_ref": 0
+      },
+      {
+        "sentence": 4,
+        "reason": "Separate final token-mask addressing from L1 page indices and preserve full-width original KV.",
+        "evidence_ref": 3
+      },
+      {
+        "sentence": 5,
+        "reason": "Explain append, boundary and map-change consistency as obligations; the algebra does not prescribe incremental implementation.",
+        "evidence_refs": [
+          1,
+          2
+        ]
+      },
+      {
+        "sentence": 6,
+        "reason": "Connect the mechanism to preparation, maintenance, selection and backend access costs while retaining unproven net-latency boundary."
+      }
+    ],
+    "code_evidence": [
+      {
+        "path": "sparse_attn/indexer/tli_indexer.py",
+        "lines": "513-549;791-891",
+        "sha256": "96f049831b88f4657758eb0c8fa67dd33a4086be9a8121357cd478e8ee4568e7",
+        "claim": "Fixed coordinate indices, separate coarse page reductions and token quantize--dequantize keys."
+      },
+      {
+        "path": "sparse_attn/indexer/tli_indexer.py",
+        "lines": "552-619;621-779",
+        "sha256": "96f049831b88f4657758eb0c8fa67dd33a4086be9a8121357cd478e8ee4568e7",
+        "claim": "Conditional incremental preparation and full fallback maintain distinct buffers; existence is not matched latency evidence."
+      },
+      {
+        "path": "sparse_attn/indexer/tli_indexer.py",
+        "lines": "1835-1930;2061-2069",
+        "sha256": "96f049831b88f4657758eb0c8fa67dd33a4086be9a8121357cd478e8ee4568e7",
+        "claim": "Valid logical length, regional boundaries and page mask expansion to token support."
+      },
+      {
+        "path": "sparse_attn/ops/eager_decoding.py",
+        "lines": "416-520;525-706",
+        "sha256": "4a3fa812d28636f398221c6b3e0c11a99bac1a8b3266b1c2fba38e31a2dcdbb1",
+        "claim": "Original K/V consumption and backend-dependent dense/gather paths."
+      }
+    ],
+    "review_cycle": {
+      "science_first": "Revise: identity establishes coordinate reuse overstates algebra; final logical token indices ambiguous.",
+      "reader_first": "Revise: v1 repeats defenses and prior capacity statement; shorten mechanism-to-cost chain.",
+      "author_revision": "Changed algebra claim to coordinate consistency, named final token mask, compressed107-word paragraph; retained explicit user-required buffer/incremental/net-latency boundaries.",
+      "science_final": "approve-with-scope",
+      "reader_text_final": "approve",
+      "missing_matched_evidence": "Reuse-versus-rebuild comparison must hold inputs, map, summaries/quantization, final mask and attention fixed; include initialization, maintenance and backend access.",
+      "reader_visual_final": "approve;26 pages color and grayscale"
+    },
+    "scope_exclusions": "No E151c result inferred from oracle quota input; no runtime edits, GPU, new measurements or new paper citation. Figures/PPT remain unchanged because their derived-view and original-KV bypass semantics are consistent.",
+    "clean_rebuild": {
+      "paper_en.pdf": {
+        "pages": 6,
+        "text_color_gray_pixels_equal": true
+      },
+      "paper_zh.pdf": {
+        "pages": 5,
+        "text_color_gray_pixels_equal": true
+      },
+      "supplement_en.pdf": {
+        "pages": 8,
+        "text_color_gray_pixels_equal": true
+      },
+      "supplement_zh.pdf": {
+        "pages": 7,
+        "text_color_gray_pixels_equal": true
+      }
+    },
+    "guide_mapping": {
+      "path": "agent_doc/guide/paper_figs/README.md",
+      "sha256": "2850af7f6156a28fe7491a837f190195b1616085086d9bb1c89828cc762515d7",
+      "applied": "Fig2: shared coordinates, derived representations, original Q/K/V bypass; no claim of candidate-only ordinary L2, packedINT4 or speedup. Existing user-authorized manuscript settings preserved."
     }
   }
 }
