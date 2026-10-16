@@ -1,9 +1,9 @@
 # DAC Best Paper 论文集（2017–2026）
 
 按用户 2026-10-16 指令创建，供 DAC 论文学习与写作参考。近十年按 2017–2026 十届计算。
-本目录仅收录 DAC Research Best Paper 正式获奖论文，不混入 Best Paper Nominee、Most Influential Paper、在 DAC 颁发的期刊奖或 ASP-DAC 论文。
+主索引仅收录 DAC Research Best Paper 正式获奖论文，不混入 Best Paper Nominee、Most Influential Paper、在 DAC 颁发的期刊奖或 ASP-DAC 论文。另在 `related/` 保存明确标注关系的后续研究，作为补充阅读，不计入获奖原文完成数。
 
-**获奖名单已核实 13 篇；已下载 7 篇有效 PDF，另有 6 篇尚未取得全文。PDF 收集尚未完成。**
+**获奖名单已核实 13 篇；已下载 7 篇有效 PDF，另有 6 篇尚未取得全文。PDF 收集尚未完成。另有 1 篇后续研究 PDF。**
 2017、2018、2023 年各有两篇，其余年份各一篇。
 
 ## 年份索引
@@ -64,6 +64,23 @@
 
 逐篇新入口及实测结果已补入 [papers.json](papers.json) 的 `follow_up_search` 和 `download_attempts`。
 后续仍需可用公开副本、用户提供的 PDF，或能正常访问全文的出版商/机构会话。
+
+## 2026-10-16 第三轮：arXiv 与作者关键词补查
+
+本轮新增 **1 篇补充阅读 PDF**；获奖原文仍为 **7/13 篇，缺 6 篇**。
+
+- 对六篇分别检索完整标题、作者与关键词，并请求 arXiv API；尚未确认六篇原文或同一论文的预印本。查询和返回数量记录在 `papers.json` 的 `arxiv_search`。宽泛作者搜索存在同名、词干匹配及结果数限制，不将未命中解释为没有公开版本。
+- 2022 年论文找到同作者后续期刊研究。作者的 [UPEC-DIT 仓库](https://github.com/RPTU-EIS/UPEC-DIT)明确说明后续论文修订了 DAC 2022 方法，提高可扩展性并阐述完备性；正文第 IV 节及参考文献 [17] 也确认关系。
+- Bonn 机构技术报告目录列有 2018 年论文（报告号 181161），但该条目没有全文链接；Daya 的 MIT 简历未列 2017 年论文。UPEC 项目主页的 DAC 2022 条目仍链接 ACM。
+- INSTA 新检索命中 Scribd 上的同题材料，但尚未获得可核验的原始 PDF；不以网页文字重制 PDF。其他引用这些论文的 arXiv 文献不作为原文收录。
+
+### 补充阅读：2022 年获奖研究的后续期刊论文
+
+| 文件 | 来源与版本 | 与获奖原文的关系 |
+| --- | --- | --- |
+| [A Scalable Formal Verification Methodology for Data-Oblivious Hardware · 14 页](related/2024_Data_Oblivious_Hardware_followup_arxiv2308.07757v2.pdf) | [arXiv:2308.07757v2](https://arxiv.org/abs/2308.07757v2)，2024-03-11；[TCAD DOI](https://doi.org/10.1109/TCAD.2024.3374249) | 同作者后续期刊研究；不是 DAC 2022 获奖原文，不计入 7/13 |
+
+补充 PDF 按下载原始字节保存，已核验标题、作者、14 页及全文可解析；来源与 SHA-256 写入 `papers.json` 和 `SHA256SUMS`。arXiv 标示许可证为 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)。
 
 ## 核查说明
 

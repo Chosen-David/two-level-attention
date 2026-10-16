@@ -42,3 +42,12 @@ SHA256SUMS 和 README 计数。所有 13 篇全文实际入库后才关闭本任
 NTU 公开书目只链接 IEEE，Bonn 条目只链接 ACM，RPTU 条目未附全文；
 INSTA 合作者主页未附 PDF，第一作者链接 IEEE，归档查询无快照，官网 PDF 重试超时。
 新检查结果写入 DAC_best_paper/README.md 和 papers.json；现有七个 PDF 字节未修改。
+
+## 2026-10-16 第三轮：arXiv 与作者关键词
+
+用户要求尝试标题、作者加关键词和预印本渠道后继续推送。六篇分别执行 arXiv API
+及网页检索；未获得可确认的获奖原文。下载并核验同作者后续期刊论文
+A Scalable Formal Verification Methodology for Data-Oblivious Hardware
+（arXiv:2308.07757v2，14 页），存入 DAC_best_paper/related/，并记录
+作者仓库对其与 DAC 2022 原文关系的说明。原文仍为 7/13，缺 6 篇；
+补充阅读 1 篇单独计数，任务保持未完成。来源、版本、校验和及索引已同步。

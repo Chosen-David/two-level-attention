@@ -76,7 +76,7 @@
 
 ## 待办池（未排期，均有用户指令或审计来源）
 
-- [ ] [TL-DAC-BEST-PAPERS-20261016] DAC 2017–2026 Best Paper PDF 收集：13 篇获奖名单已核实，7 篇有效 PDF 已入 advice/DAC_best_paper，6 篇因全文入口受阻/失效待补；2026-10-16 第二轮补查未新增 PDF，逐篇新入口及结果已记录；附来源、版本、页数与 SHA-256。
+- [ ] [TL-DAC-BEST-PAPERS-20261016] DAC 2017–2026 Best Paper PDF 收集：13 篇获奖名单已核实，7 篇有效 PDF 已入 advice/DAC_best_paper，6 篇因全文入口受阻/失效待补；2026-10-16 第三轮 arXiv/作者关键词补查新增 1 篇明确标注的后续期刊 PDF（不计入 7/13），原文仍缺 6 篇；附来源、版本、页数与 SHA-256。
   ([详情](task_details/TL-DAC-BEST-PAPERS-20261016.md))
 
 - [x] [TL-E152-STORE-20261016] E152 同路径合作写者锁与原子JSON发布；修前丢记录/中断损坏复现，16项普通/-O通过。LongBench因缺Torch未执行，非GPU提速。([详情](task_details/TL-E152-STORE-20261016.md))
