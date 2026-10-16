@@ -35,17 +35,17 @@
   "current_assets": [
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
-      "sha256": "097cec9ea67a25f87ee66ec3b9cab97b03f933d401f3f4bddc0f183b19b03c0d",
+      "sha256": "6b89ac73828be63eaaa6c7664ad89cac007c3c044cf080bf135e40694ad07e1d",
       "status": "redesigned-v2-inputs-current"
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
-      "sha256": "be8ff6b5b4ada80bde99444eaac5d8f3dcba847096ce946c7ca0debf7653dad9",
+      "sha256": "2d06e909c01c4fe8b87c502bba32f5ef71dfff64d7edf60b00b0d8b0df295045",
       "status": "redesigned-v2-inputs-current"
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
-      "sha256": "e2890fe13f151635dfa67638e721505c4201892986964d834bd64652481a44a9",
+      "sha256": "8a15c828ad18746a2b2c3bb403477dd6cfe1274be50b7c08ab5f43e9407c0f4f",
       "status": "redesigned-v2-inputs-current"
     }
   ],
@@ -72,8 +72,8 @@
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation_figure_data.tsv",
-      "sha256": "8490491a8c93bb60e2dc8ca54f3690678c9f98e8c5fd5bbbdfd057377ba80327",
-      "status": "present-unchanged"
+      "sha256": "b548af27d7ad2fd01b0aa94fcb0bad64c15d135f1d6fd1054c0bec7a6f4c8569",
+      "status": "regenerated-current"
     },
     {
       "path": "exp/trace/results/e6b_far_profiles.json",
@@ -83,6 +83,11 @@
     {
       "path": "exp/trace/results/e6_layer_skip.json",
       "sha256": "0b5630022acf0a2c9e60dbf201eb79630593882bf483f5fc591ffbdd57c2a42b",
+      "status": "present-unchanged"
+    },
+    {
+      "path": "exp/trace/results/e140b_pooling_anatomy.json",
+      "sha256": "3327e95d044087d5efb8315a9cf9b33e778e6a4fa028861dddedc2179324f6a7",
       "status": "present-unchanged"
     }
   ],
@@ -243,12 +248,12 @@
     "date": "2026-10-16",
     "renderer": "agent_doc/guide/paper_figs/figs/fig_o_observation.py",
     "panels": {
-      "a": "partition (token strip, repr query, e140_o_trace_v2 o1 bins)",
-      "b": "far quota (128-query single-pool capture scatter, o1 bins)",
+      "a": "partition + heterogeneous scorers (token strip, repr query musique s1 L24 q=14212; 3 bands: attn mass / oracle single pool / avg-pool 32-dim single pool with minmax recovery marks; o1 bins + e140b_pooling_anatomy.json)",
+      "b": "far quota (128-query sorted capture curves: single pool vs far-quota 1024/2048 arm, o1 bins; anti-eviction floor)",
       "c": "subspace (o3 tail32/random32/high32 arms, v2 metric)",
       "d": "per-layer far gate (e6b heatmap + e6 layer-skip stats)"
     },
-    "note": "No panel reads O4 v2. No historical-diagnostic banner. Legacy byte lineages preserved in prior_asset_sets / legacy_snapshot_commit.",
+    "note": "No panel reads O4 v2. No historical-diagnostic banner. Panel (a) adds the E140b pooling anatomy probe (same collector math imported from e140_o_trace.py; page boundaries asserted equal to o1 bins). Repr query pinned to musique s1 L24 q=14212: far share 0.498 ~= 128-query median 0.496; disclosed as chosen among median-representative candidates for clearest avg-dilution anatomy (spike page@7936: one token = 100% page mass). Legacy byte lineages preserved in prior_asset_sets / legacy_snapshot_commit. 2026-10-16 restyle: in-figure note boxes removed per user direction; all panel numbers moved to the manuscript caption; panel (a) keeps only band labels, region tags, a compact selection legend and the spike-page marker (▼ page@7936); panel (b) keeps legend + worst-case annotation only.",
     "layout": "2x2, figsize 9.5x6.9in for IEEE double-column textwidth (effective tick ~8.6pt)"
   }
 }
