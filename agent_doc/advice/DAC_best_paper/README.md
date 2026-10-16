@@ -52,6 +52,19 @@
 | 2022 | Data_Oblivious_Root_of_Trust | 出版商下载返回 HTTP 403/418；未找到可用的作者公开全文 | [PDF 入口](https://dl.acm.org/doi/pdf/10.1145/3489517.3530981) |
 | 2025 | INSTA | 实验室链接返回 132 字节 Git LFS 指针；公开代码库未附 PDF | [PDF 入口](https://research.nvidia.com/labs/electronic-design-automation/papers/yichen_INSTA_dac25.pdf) |
 
+## 2026-10-16 第二轮补查
+
+本轮新增 PDF **0 篇**；总计仍为 **7/13 篇**，缺失 6 篇，任务保持未完成。
+
+- 核查 NTU EDA 实验室公开书目、NUS/MIT 实验室目录、IBM Research、Bonn 作者主页、RPTU 作者主页，以及 INSTA 两位作者的主页。
+- 6 篇均尝试 IEEE 官方 `stampPDF/getPDF.jsp` 全文入口，实际均返回 HTTP 418；没有把这些响应保存为 PDF。
+- OpenAlex 的相关 ACM/IEEE 记录未提供 PDF 地址；Semantic Scholar 的 Compensated-DNN 和 2022 Root-of-Trust 条目没有开放全文 URL。
+- INSTA 作者主页指向 IEEE；合作者主页未附 PDF。Internet Archive 可用性查询返回空快照，公开代码库 issue/PR 中未找到补充全文。NVIDIA PDF 本轮重试超时；上一轮已记录其返回 Git LFS 指针。
+- GitHub 全文关键词检索得到的主要是书目、摘要和同一 NVIDIA 链接，未获得可核验的 PDF。检索不到不等于论文不存在公开副本。
+
+逐篇新入口及实测结果已补入 [papers.json](papers.json) 的 `follow_up_search` 和 `download_attempts`。
+后续仍需可用公开副本、用户提供的 PDF，或能正常访问全文的出版商/机构会话。
+
 ## 核查说明
 
 - 2023 年 Gamora 与 RL-CCD 均获奖：[ACM SIGDA 2023 年 8 月公告，第 5 页](https://www.sigda.org/wp-content/uploads/2023/08/August-2023-SigDA-E-News.pdf#page=5)明确列出两篇。部分会议网页抓取结果只显示其中一篇，因此以该同期公告及 CEDA 名单交叉确认。

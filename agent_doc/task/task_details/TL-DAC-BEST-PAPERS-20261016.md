@@ -33,3 +33,12 @@ DAC_best_paper，收集近十年 DAC Best Paper PDF，并直接推送 main。
 补齐时检查论文身份、原始版本、全部页可解析、SHA-256，并同步 papers.json、
 SHA256SUMS 和 README 计数。所有 13 篇全文实际入库后才关闭本任务。
 本次发布为已取得材料与完整索引的部分交付，不表示已全部下载。
+
+## 2026-10-16 用户要求继续查找：第二轮结果
+
+完成六篇的作者/机构目录、公开 GitHub 书目/代码库、OpenAlex、Semantic Scholar
+及 INSTA Internet Archive 快照补查，并实际请求六个 IEEE 全文入口，均为 HTTP 418。
+本轮未新增有效 PDF，仍为 7/13；维持未完成状态。
+NTU 公开书目只链接 IEEE，Bonn 条目只链接 ACM，RPTU 条目未附全文；
+INSTA 合作者主页未附 PDF，第一作者链接 IEEE，归档查询无快照，官网 PDF 重试超时。
+新检查结果写入 DAC_best_paper/README.md 和 papers.json；现有七个 PDF 字节未修改。
