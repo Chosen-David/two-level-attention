@@ -29,9 +29,14 @@
     "arms": "K1=64 (GPU1) / K1=96 (GPU3)，FS 全稀疏（--tli-sparse-prefill grp64），hotpot/musique，T=1016180000，输出节点 exp/results_longbench/Qwen3-8B/pred_E151_kquota",
     "anchors": "dense hotpot 59.42 / musique 34.25；E138 sk128/sw128 FS K1=128 = 56.04 / 28.22",
     "criteria": "恢复到 dense -1.0 内 → prefill 稀疏复活（E147/E150 e2e 性能链解锁，prefill dense 叙事重写）；部分恢复 → 如实报告剂量-响应曲线；无恢复 → far 总量不是瓶颈，粗筛 miss 主导，prefill dense 叙事终审维持",
-    "status": "IN-FLIGHT（2026-10-16 08:04 起，节点 GPU1/GPU3）"
+    "results": {
+      "k64_fs": {"hotpotqa": 54.36, "musique": 29.68},
+      "k96_fs": {"hotpotqa": 51.86, "musique": 27.84}
+    },
+    "verdict": "NO RECOVERY——真剂量臂（far 128→448/288，保护带 sink128/swa128 不动）终审。K1=64 far 剂量 3.5× 后 hotpot 54.36 反低于 E138 K1=128 锚 56.04（-1.68），musique 29.68 仅 +1.46（vs dense 仍 -4.57）；K1=96 双任务全面劣于 K1=128。剂量-响应非单调上升 → far 总量不是 prefill 瓶颈，L1 粗筛 miss 主导（E151 phase1 oracle 需求口径的『far 饿 2.5×』不构成质量因果）。prefill 维持 dense 叙事终审闭合（E148 几何面 + E149 e2e 面 + E148b mass 面 + 本剂量面四面闭合）。E148 erratum 的『剂量不足』质疑已由本真剂量臂回应：足剂量同样无效。",
+    "status": "DONE（2026-10-16 09:2X 出数打分，n=200/格满格，runcap strict 校验通过）"
   },
-  "paper_impact": "暂无——phase2 出数前不改任何叙事。若 K1=64 复活 prefill 稀疏，E148/E149『prefill 维持 dense』判决需 erratum，E147/E150 挂账解锁",
+  "paper_impact": "decode-only 叙事终审定案（用户预设路线）：prefill dense + decode 稀疏（E149 DO sink4/swa128 噪声级 -0.71/-0.59）。E147 prefill e2e 性能链与 E150 FS prefill 面板维持挂账不解锁；论文不再主张 prefill 稀疏加速。decode 侧 K1 工作点维持 E140h 推荐（K1=64 AVG5 48.10）——注意本判决只否决 prefill FS 的 K1 剂量救法，不影响 decode 甜点。",
   "cross_references": {
     "e140v2_trace": "exp/trace/results/e140_o4_select_trace_v2.json（L8/L24 两层，oracle far 305.5 与本 36 层均值 320 口径一致）",
     "e140h_k64": "decode 侧 K1=64 e2e 甜点背书",
