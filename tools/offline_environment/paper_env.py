@@ -58,7 +58,9 @@ def install(destination):
         raise SystemExit('Destination must be a NEW .venv-* directory directly under the repository; existing environments are never overwritten.')
     venv.EnvBuilder(with_pip=True).create(destination)
     py = destination / 'bin/python'
-    env = dict(os.environ, PIP_CONFIG_FILE=os.devnull, PIP_NO_INDEX='1', PIP_DISABLE_PIP_VERSION_CHECK='1')
+    env = dict(os.environ, PIP_CONFIG_FILE=os.devnull, PIP_NO_INDEX='1', PIP_DISABLE_PIP_VERSION_CHECK='1',
+               XDG_CACHE_HOME=str(destination/'.cache'), MPLCONFIGDIR=str(destination/'.cache/matplotlib'))
+    (destination/'.cache/matplotlib').mkdir(parents=True, exist_ok=True)
     subprocess.run([str(py), '-m', 'pip', '--isolated', 'install', '--no-index', '--no-cache-dir',
                     '--only-binary=:all:', '--require-hashes', '--find-links', str(BUNDLE / 'wheelhouse'),
                     '-r', str(BUNDLE / 'requirements.lock')], check=True, env=env)

@@ -1,6 +1,8 @@
 # Paper and registered-baseline offline preparation
 
 Task `TL-OFFLINE-ENV-20261016`, based on main `88dcb39e3fd2e6d85126bd0610d36d0043783e9c`.
+Integrated newer main `08ccb54627e7c456fb020d75a68a3ca040f46d2d` before publication;
+repeated the full isolated rebuild against its updated introductions.
 No model weights, GPU jobs, CUDA builds, paid APIs, Claude or SGLang were used.
 Paper/PPT/figure/data outputs in the repository are unchanged. Build validation
 used a separate copy, not the introduction writer's working tree.

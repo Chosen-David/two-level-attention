@@ -43,6 +43,11 @@ Python wheel、系统包、CUDA 依赖分别处理，哈希锁与离线重建才
 - 独立只读审查核对 wheel 哈希、pip check、shell语法及安装门禁；修正其指出的
   fresh-clone 测试副作用和来源推断表述，记录真实独审范围。
 
+- 提交前fetch并merge引言线程新main `08ccb546…`，保留全部对方变更；针对新输入
+  在另一隔离副本重复完整重建，证据见 `paper-build-current.json`。
+- 两份 requirements.lock 被根目录旧 `*.lock` 规则忽略的问题已用精确例外修正，
+  发布前从干净 checkout 验证实际交付文件，不能仅测工作树。
+
 ## 阻塞与下一步
 
 1. 返回目标宿主 probe 后才能选择/重制 ABI 与系统包；当前无目标宿主安装证据。
