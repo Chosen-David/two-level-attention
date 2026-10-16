@@ -1,11 +1,17 @@
-# 论文 / baseline 离线环境执行说明（GPT，2026-10-16）
+# 论文 / baseline 离线环境执行说明（GPT，2026-10-16 更新）
 
-工程成果已非force推到 [`gpt_dev/paper-offline-environment-20261016`](https://github.com/Chosen-David/two-level-attention/tree/gpt_dev/paper-offline-environment-20261016)，提交 `54e343aa896c8fee3ecaad29e3b4a8e8b16e5803`，已回读。已整合引言更新 `08ccb546…`；**工程分支未合main**，本文件单独发布main。
+工程成果位于 [`gpt_dev/paper-offline-environment-20261016`](https://github.com/Chosen-David/two-level-attention/tree/gpt_dev/paper-offline-environment-20261016)，最新提交 [`344e089546ac6891aba8a0a502a7a7264398e1d4`](https://github.com/Chosen-David/two-level-attention/commit/344e089546ac6891aba8a0a502a7a7264398e1d4)，远端已读回。**工程分支未合 main**；本文件单独更新 main，未修改论文正文/PPT/图/数据。
 
-- [完整入口/限制](https://github.com/Chosen-David/two-level-attention/blob/54e343aa896c8fee3ecaad29e3b4a8e8b16e5803/tools/offline_environment/README.md)：15个论文wheel随Git交付，离线新建`.venv-paper`、pip check、合成PDF/PPTX读写通过。仅CPython3.12/Linux x86_64/glibc≥2.28；宿主尚未probe，保存环境不冒充宿主。
-- 构建入口实际为`agent_doc/advice/dac_manuscript/source/{build.sh,rebuild_current.sh}`，已支持Python/TeX/字体配置并修复不存在的默认目标。最新双语正文/补充材料在独立副本编译6/6/8/8页，未改/发布正文、PPT、图或数据生成物。
-- [逐方法清单](https://github.com/Chosen-David/two-level-attention/blob/54e343aa896c8fee3ecaad29e3b4a8e8b16e5803/tools/offline_environment/baselines.json)：复用现有vendor；ClusterKV/Quest/TileLang递归gitlinks已取得。FFD/Quest/SparQ CPU导入通过；FASA缺CUDA、MInference缺编译扩展、MoBA缺flash-attn。ClusterKV真实Python3.10.15与HiP/HISA仅scaffold，**不是完整环境**。ClusterKV未知许可不vendor；无权重/GPU/付费/Claude/SGLang。
-- 9项离线安全回归normal/-O通过，含断网后源码续取/不覆盖改动。原baseline集成回归**12通过/3个SparQ接口失败**，未改算法掩盖。独立只读审查已做。GitHub返回该提交statuses空、PR触发workflow_runs空；仓库无workflow文件，**不是CI通过证明**。
-- 大包尚未运输：Debian13 amd64系统包闭包286个、完整tar **300,800,000 B**；baseline CPU完整tar **393,318,400 B**。版本/哈希已锁、前者逐包与已认证APT索引核对，后者已离线重建；没有系统包安装/目标宿主验收。保存端在`/workspace/offline-artifacts/`，文件名与SHA256见[运输清单](https://github.com/Chosen-David/two-level-attention/blob/54e343aa896c8fee3ecaad29e3b4a8e8b16e5803/tools/offline_environment/large-artifacts.json)。不拆分绕Git限制；Release上传通道未建立，不能称全部离线交付完成。
+- [入口与限制](https://github.com/Chosen-David/two-level-attention/blob/344e089546ac6891aba8a0a502a7a7264398e1d4/tools/offline_environment/README.md)：15 个论文 wheel 已随 Git 交付，离线新建 `.venv-paper`、pip check、合成 PDF/PPTX 读写通过。真实入口为 `agent_doc/advice/dac_manuscript/source/{build.sh,rebuild_current.sh}`；独立副本双语正文/补充材料编译 6/6/8/8 页，仅证明构建通过。
+- SparQ 原三项失败已在工程分支修复：实际 B 轨入口补请求 identity、成功计数和输入校验，数值 wrapper AST 未变，未切换到平行 GPT adapter。CPU 随机微型 HF 模型双请求 logits 与原 wrapper 逐位一致；相关集成/ops 回归 normal 与 `-O` 均 **85 passed、169 subtests**，另 9 项离线安全回归通过。独审单独复跑原 15 项 normal/`-O` 和新增 4 项，无阻塞项。CUDA mask 校验可能同步，GPU 性能影响未测。
+- [逐方法状态](https://github.com/Chosen-David/two-level-attention/blob/344e089546ac6891aba8a0a502a7a7264398e1d4/tools/offline_environment/baselines.json)：FFD/Quest/SparQ 的实际 vendor 导入路径与哈希已记录。MoBA、ClusterKV 的登记 loader 指向缺失 adapter 目录；ClusterKV 还缺标准 CLI choice。MInference 缺 `minference.cuda`，FASA 缺 CUDA；ClusterKV/HiP/HISA 仍有 scaffold/原生依赖缺项。官方源码存在不等于 benchmark 集成闭环。未运行 checkpoint、GPU、付费 API、Claude 或 SGLang。
+- **完整大包仍未交付**：本次核对文件及 Library 精确/简化名称，未检索到对应条目，且本地无保存凭据；重试官方上传流程再次在应用工具发现阶段报网络错误（`tools/list request failed: network`），无成功 file ID，无法进行远端哈希读回。没有申请/提取 GitHub 凭据，没有拆分二进制进 Git。完整文件保留于 `/workspace/offline-artifacts/`，重试记录为该目录下 `DELIVERY-RETRY-20261016.json`。
 
-宿主先建隔离worktree再运行`python3 tools/offline_environment/paper_env.py probe`。平台匹配时用`python3.12 tools/offline_environment/paper_env.py install`，再显式设置`PAPER_PYTHON="$PWD/.venv-paper/bin/python"`运行真实入口。系统包/原生CUDA环境待宿主probe与完整大包运输；不要直接搬运venv，也不要把requirements清单当就绪。
+| 完整文件 | 字节数 | SHA256 |
+|---|---:|---|
+| `tla-system-debian13-amd64.tar` | 300800000 | `8480f03e75ed0d96420a96fd357d70a03aac0f613e373b2172e5dbf11957493d` |
+| `tla-baseline-cpu-cp312-linux-x86_64-v2.tar` | 393431040 | `d7a6ca54aeb40821537f76b1cc5c563b2e24e4f825f7d11f24b3fab41e8ddabe` |
+
+CPU v2 增补固定版本 SentencePiece/Tokenizers 许可证旁文件，所有 wheel 字节保持不变；完整二进制传递依赖许可审计尚未完成。系统 tar 为 286 个 Debian 13 amd64 包的下载闭包，**不含 CPython 3.12**；未在目标宿主安装。Python bundle 仅支持 CPython 3.12/Linux x86_64/glibc≥2.28，宿主须已有 venv/ensurepip。目标 OS/Python/ABI 尚未 probe，不把保存环境当宿主，不直接搬运 venv，不把 requirements 当离线就绪。
+
+宿主匹配性以 `python3 tools/offline_environment/paper_env.py probe` 返回值为准；平台匹配后才使用现有 bootstrap。工程提交 GitHub statuses 与可见 PR-triggered workflow runs 均为空，**不是 CI 通过证明**。后续只需解决整包运输、宿主验收及已登记原生缺项；本文不新增实验或重复催跑。
