@@ -51,3 +51,11 @@ A Scalable Formal Verification Methodology for Data-Oblivious Hardware
 （arXiv:2308.07757v2，14 页），存入 DAC_best_paper/related/，并记录
 作者仓库对其与 DAC 2022 原文关系的说明。原文仍为 7/13，缺 6 篇；
 补充阅读 1 篇单独计数，任务保持未完成。来源、版本、校验和及索引已同步。
+
+## 2026-10-16 第四轮：继续寻找全文
+
+补查 NTU 存储库、CEDA 目录 PDF、Crossref、Consensus、GitHub 精确 DOI 和作者主页。
+CEDA 文件是目录，不是论文；新入口未获得六篇中的任何原文。ACM 浏览器遇反复安全验证，
+已报告并停止尝试；INSTA 官网页面再次返回 132 字节 Git LFS 指针。
+整理 AUTHOR_REQUESTS.md，逐篇列出公开作者联系方式、来源及完整索取邮件；均未发送，
+需要用户明确授权后才能对外联系。当前仍为 7/13 原文及 1 篇后续研究；任务不关闭。

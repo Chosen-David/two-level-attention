@@ -82,6 +82,17 @@
 
 补充 PDF 按下载原始字节保存，已核验标题、作者、14 页及全文可解析；来源与 SHA-256 写入 `papers.json` 和 `SHA256SUMS`。arXiv 标示许可证为 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)。
 
+## 2026-10-16 第四轮：机构存储库、书目接口与作者联系准备
+
+本轮新增获奖原文 **0 篇**；仍为 **7/13 篇，缺 6 篇**。继续保留 1 篇独立标注的后续研究。
+
+- CEDA 名为 `dac2017-proceedings.pdf` 的文件实际只有 16 页目录；NTU 机构存储库的目标条目只提供书目信息，均未作为原文收录。
+- 五个缺失 ACM DOI 的 Crossref 记录仍指向出版商；Consensus 的 Compensated-DNN 条目只有摘要与书目信息。GitHub 精确 DOI/标题补查未取得新的可核验 PDF。
+- ACM 浏览器访问反复显示安全验证，已报告并停止该站点尝试。NVIDIA 的 INSTA 链接再次实测为 HTTP 200、132 字节 Git LFS 指针，目标 PDF 应为 1,451,676 字节。
+- 已核对六篇作者的公开联系方式并准备 [六封全文索取邮件](AUTHOR_REQUESTS.md)，请求可分享的作者稿或可用公开链接，同时询问是否可以收录到本仓库。**尚未发送**，对外发信需要用户明确授权。
+
+此次推送只更新检索记录与下一步可审阅材料，不表示六篇 PDF 已补齐。逐项记录见 `papers.json` 的 `additional_search_round_4`。
+
 ## 核查说明
 
 - 2023 年 Gamora 与 RL-CCD 均获奖：[ACM SIGDA 2023 年 8 月公告，第 5 页](https://www.sigda.org/wp-content/uploads/2023/08/August-2023-SigDA-E-News.pdf#page=5)明确列出两篇。部分会议网页抓取结果只显示其中一篇，因此以该同期公告及 CEDA 名单交叉确认。
