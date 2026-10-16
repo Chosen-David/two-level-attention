@@ -76,6 +76,9 @@
 
 ## 待办池（未排期，均有用户指令或审计来源）
 
+- [ ] [TL-DAC-BEST-PAPERS-20261016] DAC 2017–2026 Best Paper PDF 收集：13 篇获奖名单已核实，7 篇有效 PDF 已入 advice/DAC_best_paper，6 篇因全文入口受阻/失效待补；附来源、版本、页数与 SHA-256。
+  ([详情](task_details/TL-DAC-BEST-PAPERS-20261016.md))
+
 - [x] [TL-E152-STORE-20261016] E152 同路径合作写者锁与原子JSON发布；修前丢记录/中断损坏复现，16项普通/-O通过。LongBench因缺Torch未执行，非GPU提速。([详情](task_details/TL-E152-STORE-20261016.md))
 
 - [x] [TL-E152-TIMING-20261016] E152 连续请求 wall/TTFT、单 token TPOT及 -O 协议门禁修复；专项8项和捕获11项普通/-O通过。GPU路由/低扰动E2仍待验，非提速结果。([详情](task_details/TL-E152-TIMING-20261016.md))
