@@ -1,0 +1,33 @@
+[
+  {
+    "command": [
+      "python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140_asset_provenance.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "postmerge-assets-normal.log"
+  },
+  {
+    "command": [
+      "python",
+      "-O",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140_asset_provenance.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "postmerge-assets-optimized.log"
+  }
+]

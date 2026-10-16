@@ -1,0 +1,12 @@
+{
+  "scope": "CPU plotting arithmetic and diagnostic provenance only; not scientific data acceptance or gate safety",
+  "task": "TL-OBS-PLOT-CORRECTNESS-20261016",
+  "baseline": "47e4ab2f004d1eabce85c63849a2651123f6f45c",
+  "governance": "06ed701",
+  "decision": "EXECUTE: explicit user authorization for bounded plot/label/provenance fixes",
+  "prior_result_search": {"query": "rg E140|e140|E6|bin agent_doc/results", "hit": "20261014-figure-data-candidate/gap_inventory.md", "decision": "reuse raw data identities and limitations only; prior tests do not cover redesigned arithmetic"},
+  "dag": ["repair -> CPU checks -> independent review -> diagnostic render -> image inspection -> remote readback"],
+  "criteria": ["budget never exceeded; actual selected token count exported", "absolute disjoint contiguous bin bounds match source regions; reject boundary straddling", "zero/empty regions remain undefined; paired finite denominator explicit", "no token interpolation, oracle/upper-bound or gate-safety claim", "raw hashes unchanged; old assets recoverable at baseline", "normal and optimized tests record actual subprocess exit codes", "independent reviewer checks code/results and render"],
+  "stop_at": "2026-10-16T00:55:00Z",
+  "limits": "No GPU, collection, paid work, dynamic algorithms, manuscript, human GUIDE, Claude or SGLang changes. No installed supervisor claimed. User owns main merge."
+}

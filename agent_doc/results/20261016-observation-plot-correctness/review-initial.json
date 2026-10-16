@@ -1,0 +1,38 @@
+{
+  "verdict": "helper approved for diagnostic rendering; final labels/assets pending",
+  "scope": "independent CPU review, not scientific acceptance",
+  "checks": [
+    "absolute half-open bin endpoints and complete disjoint region coverage validated",
+    "near-straddling bins refused; no within-bin interpolation",
+    "whole-bin mass-order skip-nonfit selection never exceeds budget",
+    "finite per-region and paired denominators explicit",
+    "existing 128-row source passes integrity checks",
+    "O3 8-cell values independently checked finite/nonnegative; original reference-mid-TopK ratios retained",
+    "E6 blocked card matches audited sum-logit producer; no heatmap/skip counts",
+    "warning helper now states whole-bin diagnostic and E6 blocked"
+  ],
+  "tests": [
+    {
+      "mode": "normal",
+      "tests": 6,
+      "status": "passed",
+      "log": "agent_doc/results/20261016-observation-plot-correctness/review-bins-normal.log",
+      "sha256": "c12abb957788e842f87142f815213f78a6f57b24be35c4a42b175e42410f4eb8"
+    },
+    {
+      "mode": "optimized",
+      "tests": 6,
+      "status": "passed",
+      "log": "agent_doc/results/20261016-observation-plot-correctness/review-bins-optimized.log",
+      "sha256": "c12abb957788e842f87142f815213f78a6f57b24be35c4a42b175e42410f4eb8"
+    }
+  ],
+  "requested_final_adjustments": [
+    "label task/sample identities source sequences, not verified documents; document overlap unresolved",
+    "validate O3 finite/nonnegative values before rendering rather than only JSON write rejection"
+  ],
+  "limits": [
+    "current review precedes final exported assets and manifest",
+    "no model/GPU/recollection or inference of gate safety"
+  ]
+}

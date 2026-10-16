@@ -1,0 +1,64 @@
+[
+  {
+    "command": [
+      "python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_observation_bins.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "final-bins-normal.log"
+  },
+  {
+    "command": [
+      "python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140_asset_provenance.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "final-assets-normal.log"
+  },
+  {
+    "command": [
+      "python",
+      "-O",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_observation_bins.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "final-bins-optimized.log"
+  },
+  {
+    "command": [
+      "python",
+      "-O",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140_asset_provenance.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "final-assets-optimized.log"
+  }
+]

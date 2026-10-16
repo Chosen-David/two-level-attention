@@ -1,0 +1,101 @@
+[
+  {
+    "name": "bins-normal",
+    "command": [
+      "python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_observation_bins.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "regression-bins-normal.log"
+  },
+  {
+    "name": "assets-normal",
+    "command": [
+      "python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140_asset_provenance.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "regression-assets-normal.log"
+  },
+  {
+    "name": "collector-normal",
+    "command": [
+      "/workspace/twolevel-cpu-env/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140_o*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "regression-collector-normal.log"
+  },
+  {
+    "name": "bins-optimized",
+    "command": [
+      "python",
+      "-O",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_observation_bins.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "regression-bins-optimized.log"
+  },
+  {
+    "name": "assets-optimized",
+    "command": [
+      "python",
+      "-O",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140_asset_provenance.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "regression-assets-optimized.log"
+  },
+  {
+    "name": "collector-optimized",
+    "command": [
+      "/workspace/twolevel-cpu-env/bin/python",
+      "-O",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_e140_o*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "log": "regression-collector-optimized.log"
+  }
+]

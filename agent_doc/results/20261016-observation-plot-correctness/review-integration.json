@@ -1,0 +1,51 @@
+{
+  "verdict": "PASS: bounded conflict resolution preserves reviewed diagnostic correction",
+  "checks_exit_code": 0,
+  "merge": "9b582aa",
+  "prior_reviewed": "beeb446",
+  "concurrent_main": "9e03100",
+  "manifest_changed_keys": [
+    "historical_snapshots",
+    "prior_asset_sets"
+  ],
+  "historical_identity": "new snapshot Git blobs and SHA256 verified; old lists retained as prefixes",
+  "reviewed_output_identity": "current assets, derived outputs, renderer sources unchanged and hashes match",
+  "E152": "byte-identical to concurrent main; not executed or scientifically reviewed",
+  "helper_packaging": "observation_bins.py now tracked",
+  "postmerge_runs": [
+    {
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_e140_asset_provenance.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log": "postmerge-assets-normal.log",
+      "sha256": "da8a681388dc1e3a175d0dba2d36b14a25f5a42173f4c850eb7c601ed4a9a2d6"
+    },
+    {
+      "command": [
+        "python",
+        "-O",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_e140_asset_provenance.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log": "postmerge-assets-optimized.log",
+      "sha256": "f1eed8d624b54a03866218180ae58ed87438d02cf3fa3af4c78cddf1d03f6431"
+    }
+  ],
+  "scope": "user-authorized plotting/labels/provenance correction; no collector or GPU work, no scientific acceptance"
+}
