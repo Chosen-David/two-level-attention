@@ -18,10 +18,10 @@ for num,keep,title in [(3,[0,1,90],'四项观察：区域选集、紧凑坐标�
   if shape.has_text_frame and Inches(.7)<shape.top<Inches(1.8):shape.text=title
  if num==3:
   sl.shapes.add_picture(str(R/'figures/o_observation_zh.png'),Inches(2.9),Inches(1.85),height=Inches(6.55))
-  text(sl,.9,8.47,14.9,.70,'(a) 页权重排序≠词元TopK；实际1989/1989/2048词元；表示与池化混杂，均值／极值都漏选参考页；\v(b) 43/128条下降；(c) 随机未配对；(d) 历史代理，不是当前门控或解码保证。',16)
+  text(sl,.9,8.47,14.9,.70,'(a) 页权重排序≠词元TopK；实际1989/1989/2048词元；均值／极值同32维，参考为全维；不能证明区域分工；\v(b) 43/128条下降；(c) 随机未配对；(d) 历史代理，不是当前门控或解码保证。',16)
  elif num==12:
   sl.shapes.add_picture(str(R/'figures/decode_tpot_current_zh.png'),Inches(.8),Inches(2.2),width=Inches(8))
-  text(sl,9.2,2.2,6.6,6.2,'作者报告中位数 · 非完整请求E2E\nQwen3-8B，固定128输出词元\n127个首输出后间隔，逐步同步\n历史稀疏配置 α=.125 / β=.375 / γ=.625\n不同于当前4/128候选；运行路径未独立核验\n32K/64K/128K报告中位数之比（稀疏／稠密）：3.38 / 2.46 / 1.78\n三档比值减小，但稀疏TPOT仍上升且高于稠密；汇总不能定位因果瓶颈。',23)
+  text(sl,9.2,2.2,6.6,6.2,'作者报告中位数 · 非完整请求E2E\nQwen3-8B，固定128输出词元\n127个首输出后间隔，逐步同步\n历史稀疏配置 α=.125 / β=.375 / γ=.625\n不同于当前4/128候选；\v运行路径未独立核验\n32K/64K/128K稀疏／稠密中位数比：\v3.38 / 2.46 / 1.78\n三档比值减小，但稀疏TPOT仍上升且高于稠密；汇总不能定位因果瓶颈。',23)
  else:
   sl.shapes.add_picture(str(R/'figures/ruler128k_current_zh.png'),Inches(.8),Inches(2.3),width=Inches(8))
   text(sl,9.2,2.2,6.6,6.2,'历史128K得分：46.43 / 23.98\n11任务；每任务每臂100例\n报告 β=.375，K1=128，保护128/128\n中间预算768；页长64，γ=.625\n按已检公式：名义远区词元配额=0\n代码／配置推论；实际执行未核验\n不能据此认定得分差的唯一原因；不验证当前4/128候选。',23)
@@ -31,25 +31,26 @@ for slide in r.slides:
   if not shape.has_text_frame:continue
   for para in shape.text_frame.paragraphs:
    for run in para.runs:
-    run.text=run.text.replace('远区概率质量','远区注意力权重总和').replace('远区 概率求和 → 均值','远区注意力权重求和 → 均值').replace('组共享的两级候选选择','页到词元的级联稀疏选择').replace('全维页评分、校准精筛通道与异步执行','相关工作的级联选择先例')
+    run.text=run.text.replace('远区概率质量','远区注意力权重总和').replace('远区 概率求和 → 均值','标定区注意力求和 → 均值').replace('组共享的两级候选选择','页到词元的级联稀疏选择').replace('全维页评分、校准精筛通道与异步执行','相关工作的级联选择先例')
 # Keep the statistic label within its existing gate node.
 label=r.slides[8].shapes[84]
 label.left=Inches(3.88); label.top=Inches(5.06)
 label.width=Inches(1.04); label.height=Inches(.35)
 label.text_frame.margin_left=0; label.text_frame.margin_right=0
 label.text_frame.margin_top=0; label.text_frame.margin_bottom=0
-label.text_frame.paragraphs[0].text='远区注意力\v权重总和'
+label.text_frame.paragraphs[0].text='远区注意力\v代理统计'
 for para in label.text_frame.paragraphs:
  for run in para.runs:
   run.font.size=Pt(10); run.font.name='Noto Sans CJK SC'; run.font.color.rgb=RGBColor.from_string('7B6598')
 
 # Full-manuscript narrative revision: preserve17slides and existing diagrams.
 updates = {
+ (9,2): '门控默认关闭；标定区域与跳过页边界不同，统计量是代理（补充S5）',
  (7,2): '16完整旋转对，两级共用；L2用浮点16级量化–反量化，最终为原维注意力',
  (8,2): '4/128候选充足示例；摘要按完整物理页计算，远区可重复选中至多4个前缀词元',
  (8,158): '近区L2∩P=∅；|Pₜ|=132示例',
  (2,1): '固定词元预算下：候选访问与选择成本',
- (2,3): '均值可能稀释少数高分词元，极值上界可能宽松；\n全局TopK不提供区域容量保证。',
+ (2,3): '均值与极值刻画不同评分目标，页注意力和另作参照。\n全局TopK不提供区域容量保证。',
  (2,5): '共享32坐标映射与区域页配额协同选择，\n最终在选集上使用原128维 Q / K / V。',
  (2,6): '观察与边界',
  (2,7): '区域预留改变远区覆盖，43/128条观测下降；历史稀疏解码更慢，当前4/128尚缺匹配质量—成本结果。',
