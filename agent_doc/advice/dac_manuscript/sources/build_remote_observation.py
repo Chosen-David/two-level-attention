@@ -63,61 +63,44 @@ fig, ((ax_a, ax_b), (ax_c, ax_d)) = plt.subplots(
                  "width_ratios": [1.2, 1.0]})
 
 
-# ---- (a) token strip：质量 / oracle 单池 / avg 单池 三条带 ----
+# ---- (a) raw page mass and symmetric saved-set comparison ----
 cmap_mass = mcolors.LinearSegmentedColormap.from_list("mass", ["#ffffff", C_MAIN])
 norm_mass = mcolors.LogNorm(vmin=2e-4, vmax=2e-2)
-X0, X1 = float(min(pos_c)), float(max(pos_c))
-# Saved mass-ranked and mean-score selections; unequal actual budgets are disclosed.
 edges=np.r_[bin_lo,bin_lo[-1]+int(ntok_a[-1])]
-ax_a.pcolormesh(edges,[2,3],mass_a[None,:],cmap=cmap_mass,norm=norm_mass,shading='flat')
-cmap_sel = mcolors.ListedColormap(["#e9e9e9", C_HL])
-ax_a.pcolormesh(edges,[1,2],sel_mask[None,:].astype(float),cmap=cmap_sel,vmin=0,vmax=1,shading='flat')
+ax_a.pcolormesh(edges,[3,3.8],mass_a[None,:],cmap=cmap_mass,norm=norm_mass,shading='flat')
 C_MISS = "#d62728"
-rgb = np.tile(np.array(mcolors.to_rgb("#e9e9e9")), (len(mass_a), 1))
-for i in range(len(mass_a)):
-    if i in sel_avg:
-        rgb[i] = mcolors.to_rgb(C_MAIN)
-for i in missed:
-    rgb[i] = mcolors.to_rgb(C_MISS)
-for j in range(len(bin_lo)):
-    ax_a.add_patch(plt.Rectangle((edges[j],0),edges[j+1]-edges[j],1,
-        facecolor=rgb[j], edgecolor='black' if j in missed else 'none',
-        linewidth=0.45 if j in missed else 0, hatch='////' if j in missed else None))
-for i in recov:
-    ax_a.text(pos_c[i], 0.5, "✓", ha="center", va="center",
-              fontsize=TK - 2, color="white", fontweight="bold")
-# sink / swa 保护区（不在 mid bins 内；区域太窄无法内嵌文字，见说明框）
+# Identical classification for each scorer: intersection, reference-only, scorer-only.
+# Background means neither selected. Reference is a saved whole-page mass ranking,
+# not exact token TopK, a combinatorial optimum, or DSA.
+for y,chosen in [(2,sel_o),(1,sel_avg),(0,sel_mm)]:
+    for j in range(len(bin_lo)):
+        color="#e9e9e9";hatch=None;edge='none';width=0
+        if j in chosen and j in sel_o:color=C_MAIN
+        elif j in sel_o:color=C_MISS;hatch='////';edge='black';width=.45
+        elif j in chosen:color=C_HL;hatch='..';edge='black';width=.45
+        ax_a.add_patch(plt.Rectangle((edges[j],y),edges[j+1]-edges[j],.8,
+            facecolor=color,edgecolor=edge,linewidth=width,hatch=hatch))
 ax_a.axvspan(0, rb["sink_hi"], color=C_NEU, alpha=0.35, lw=0)
 ax_a.axvspan(rb["swa_lo"], q_a + 1, color=C_NEU, alpha=0.35, lw=0)
-# near/far 区域标注（置于顶带中部）
-_tagbox = dict(boxstyle="round,pad=0.2", facecolor="white",
-               edgecolor="none", alpha=0.85)
-ax_a.text((rb["sink_hi"] + rb["near_lo"]) / 2, 2.5,
-          f"far ({far_tok_frac:.0%} of mid tokens)", ha="center",
-          fontsize=AN, color=C_HL, fontweight="bold", bbox=_tagbox)
-ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 2.5, "near", ha="center",
-          fontsize=AN, color=C_MAIN, fontweight="bold", bbox=_tagbox)
-ax_a.axvline(rb["near_lo"], color=C_HL, lw=1.6, linestyle="--")
-# Fixed-example spike marker; top token share is computed, not assumed to be100%.
-i_sp = bin_lo.index(spike["pos_lo"])
-ax_a.plot([pos_c[i_sp]], [3.10], marker="v", color=C_MISS, markersize=8,
-          clip_on=False, zorder=6)
-# 图例替代原说明框（用户 2026-10-16：图内不堆文字，数字解释并入 caption）
-leg_a = [Patch(fc="#e9e9e9", ec="0.6", label="page not selected"),
-         Patch(fc=C_MAIN, label="selected by avg pool"),
-         Patch(fc=C_MISS, ec='black', linewidth=0.45, hatch='////',
-               label="mass-ranked page missed by avg\n(✓ = also selected by minmax)")]
-ax_a.legend(handles=leg_a, loc="upper left", bbox_to_anchor=(0.005, 1.005),
-            fontsize=9.5, framealpha=0.92, handlelength=1.4,
-            borderpad=0.45, labelspacing=0.4)
-ax_a.set_xlim(0, q_a + 1)
-ax_a.set_xticks(range(0, 15000, 3000))
-ax_a.set_ylim(0, 5.2)
-ax_a.set_yticks([0.5, 1.5, 2.5])
-ax_a.set_yticklabels(["avg pool", "mass rank", "attn mass"],
-                     fontsize=TK - 1.5)
+_tagbox = dict(boxstyle="round,pad=0.2", facecolor="white",edgecolor="none",alpha=0.85)
+ax_a.text((rb["sink_hi"] + rb["near_lo"]) / 2, 3.4,
+          f"far ({far_tok_frac:.0%} of mid tokens)",ha="center",fontsize=AN,
+          color=C_HL,fontweight="bold",bbox=_tagbox)
+ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2,3.4,"near",ha="center",
+          fontsize=AN,color=C_MAIN,fontweight="bold",bbox=_tagbox)
+ax_a.axvline(rb["near_lo"],color=C_HL,lw=1.6,linestyle="--")
+i_sp=bin_lo.index(spike["pos_lo"])
+ax_a.plot([pos_c[i_sp]],[3.95],marker="v",color=C_MISS,markersize=8,clip_on=False,zorder=6)
+leg_a=[Patch(fc=C_MAIN,label="selected in reference"),
+       Patch(fc=C_MISS,ec='black',linewidth=.45,hatch='////',label="reference page missed"),
+       Patch(fc=C_HL,ec='black',linewidth=.45,hatch='..',label="selected outside reference")]
+ax_a.legend(handles=leg_a,loc="upper left",bbox_to_anchor=(.005,1.005),
+            fontsize=9.5,framealpha=.92,handlelength=1.4,borderpad=.45,labelspacing=.4)
+ax_a.set_xlim(0,q_a+1);ax_a.set_xticks(range(0,15000,3000));ax_a.set_ylim(0,6.1)
+ax_a.set_yticks([.4,1.4,2.4,3.4])
+ax_a.set_yticklabels(["minmax","avg pool","mass rank","page mass"],fontsize=TK-1.5)
 ax_a.set_xlabel("key position (tokens); query at right end", fontsize=L)
-ax_a.set_title("(a) Example page selections",
+ax_a.set_title("(a) Symmetric page selections",
                loc="left", pad=10, fontsize=T, fontweight="bold")
 ax_a.tick_params(axis="x", labelsize=TK)
 sm = plt.cm.ScalarMappable(cmap=cmap_mass, norm=norm_mass)
@@ -184,7 +167,7 @@ fig.subplots_adjust(left=0.10, right=0.93, top=0.94, bottom=0.09)
 
 # Bilingual labels only; preserve the remote abcd layout and encodings.
 if LANG=='zh':
- translations={'(a) Example page selections':'(a) 页选集示例','(b) Regional budget changes capture':'(b) 区域预算改变保留率','(c) Which 32 of 128 dims':'(c) 128维中选择32维','(d) Historical far proxy (16 seqs)':'(d) 历史远区代理（16序列）','page not selected':'未选中页','selected by avg pool':'均值评分选中','mass-ranked page missed by avg\n(✓ = also selected by minmax)':'质量排序选中、均值漏选\n（✓：极值评分也选中）','avg pool':'均值评分','mass rank':'质量排序','attn mass':'注意力权重和','key position (tokens); query at right end':'键位置（词元）；查询在右端','mass (log)':'权重和（对数）','128 observations, sorted by global far capture':'128条观测，按单池远区保留率排序','far mass capture\n(whole-bin selection)':'远区注意力保留率','selected mass /\nreference mid-TopK mass':'选中／参考mid-TopK\n注意力权重和','layer':'层','far proxy (log)':'远区代理（对数）','near':'近区','tail32\n(low-freq)':'尾部32\n（低频）','random32\n(unpaired)':'随机32\n（未配对）','high32\n(high-freq)':'高频32\n（高频）',f'far ({far_tok_frac:.0%} of mid tokens)':f'远区（中间词元的{far_tok_frac:.0%}）',f'single pool (mean {fc_mean:.2f})':f'单池（均值{fc_mean:.2f}）',f'far/near 1024/1024 ({qc_mean:.2f})':f'远/近1024/1024（{qc_mean:.2f}）',f'global near: {nc_mean:.2f}':f'单池近区：{nc_mean:.2f}'}
+ translations={'selected in reference':'选中参考页','reference page missed':'参考页漏选','selected outside reference':'选中参考外页','page mass':'页权重和','minmax':'极值评分','(a) Symmetric page selections':'(a) 对称页选集比较','(b) Regional budget changes capture':'(b) 区域预算改变保留率','(c) Which 32 of 128 dims':'(c) 128维中选择32维','(d) Historical far proxy (16 seqs)':'(d) 历史远区代理（16序列）','page not selected':'未选中页','selected by avg pool':'均值评分选中','mass-ranked page missed by avg\n(✓ = also selected by minmax)':'质量排序选中、均值漏选\n（✓：极值评分也选中）','avg pool':'均值评分','mass rank':'质量排序','attn mass':'注意力权重和','key position (tokens); query at right end':'键位置（词元）；查询在右端','mass (log)':'权重和（对数）','128 observations, sorted by global far capture':'128条观测，按单池远区保留率排序','far mass capture\n(whole-bin selection)':'远区注意力保留率','selected mass /\nreference mid-TopK mass':'选中／参考mid-TopK\n注意力权重和','layer':'层','far proxy (log)':'远区代理（对数）','near':'近区','tail32\n(low-freq)':'尾部32\n（低频）','random32\n(unpaired)':'随机32\n（未配对）','high32\n(high-freq)':'高频32\n（高频）',f'far ({far_tok_frac:.0%} of mid tokens)':f'远区（中间词元的{far_tok_frac:.0%}）',f'single pool (mean {fc_mean:.2f})':f'单池（均值{fc_mean:.2f}）',f'far/near 1024/1024 ({qc_mean:.2f})':f'远/近1024/1024（{qc_mean:.2f}）',f'global near: {nc_mean:.2f}':f'单池近区：{nc_mean:.2f}'}
  for ax in fig.axes:
   xlim,ylim=ax.get_xlim(),ax.get_ylim()
   ax.set_xticks(ax.get_xticks(), [translations.get(t.get_text(), t.get_text()) for t in ax.get_xticklabels()])
@@ -197,6 +180,6 @@ fig.savefig(OUT/(stem+'.svg'),bbox_inches='tight');fig.savefig(OUT/(stem+'.png')
 svg=OUT/(stem+'.svg');svg.write_text('\n'.join(line.rstrip() for line in svg.read_text().splitlines())+'\n')
 subprocess.run(['inkscape',str(OUT/(stem+'.svg')),'--export-type=pdf','--export-filename='+str(OUT/(stem+'.pdf'))],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
 plt.close(fig)
-summary={'representative':'musique:s1:L24:q14212','a_actual_tokens':actual_budget,'a_selected_page_counts':{a:len(pg['sel_'+a]) for a in ['oracle','avg','minmax']},'a_mass_rank_missed_by_avg':len(missed),'a_missed_also_selected_by_minmax':len(recov),'a_spike_top1_share':spike_top1,'b_global_far_mean':fc_mean,'b_global_near_mean':nc_mean,'b_partition_far_mean':qc_mean,'b_partition_worse_count':int((qc<fc).sum()),'b_far_share_median':float(np.median(sh)),'b_global_far_min':float(fc.min()),'b_partition_far_min':float(qc.min()),'b_global_far_p10':float(np.percentile(fc,10)),'b_partition_far_p10':float(np.percentile(qc,10)),'b_independent_sequences':4,'b_correlated_observations':len(rows),'c_reference_ratios':arm_rm,'d_low_proxy_layer_medians':n_light,'d_per_sequence_low_counts':dict(zip(ROW_ORDER,skip_rng)),'rows':rows}
+summary={'representative':'musique:s1:L24:q14212','a_actual_tokens':actual_budget,'a_selected_page_counts':{a:len(pg['sel_'+a]) for a in ['oracle','avg','minmax']},'a_mass_rank_missed_by_avg':len(missed),'a_missed_also_selected_by_minmax':len(recov),'a_spike_top1_share':spike_top1,'a_symmetric_sets':{'page_count':len(bin_lo),'reference_missed_by_avg':len(sel_o-sel_avg),'reference_missed_by_minmax':len(sel_o-sel_mm),'reference_missed_by_both':len(sel_o-sel_avg-sel_mm),'avg_missed_minmax_selected':len((sel_o-sel_avg)&sel_mm),'minmax_missed_avg_selected':len((sel_o-sel_mm)&sel_avg),'avg_selected_outside_reference':len(sel_avg-sel_o),'minmax_selected_outside_reference':len(sel_mm-sel_o)},'b_global_far_mean':fc_mean,'b_global_near_mean':nc_mean,'b_partition_far_mean':qc_mean,'b_partition_worse_count':int((qc<fc).sum()),'b_far_share_median':float(np.median(sh)),'b_global_far_min':float(fc.min()),'b_partition_far_min':float(qc.min()),'b_global_far_p10':float(np.percentile(fc,10)),'b_partition_far_p10':float(np.percentile(qc,10)),'b_independent_sequences':4,'b_correlated_observations':len(rows),'c_reference_ratios':arm_rm,'d_low_proxy_layer_medians':n_light,'d_per_sequence_low_counts':dict(zip(ROW_ORDER,skip_rng)),'rows':rows}
 (DATA/'remote_observation_summary.json').write_text(json.dumps(summary,indent=2)+'\n')
 print(json.dumps({k:v for k,v in summary.items() if k!='rows'},indent=2))

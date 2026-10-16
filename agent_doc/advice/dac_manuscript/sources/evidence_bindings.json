@@ -50,8 +50,8 @@
     },
     {
       "path": "sources/data/remote_observation_summary.json",
-      "bytes": 157599,
-      "sha256": "336903328b6054d9531765c44d18e40949761b78355891d166961bf306dfb68f"
+      "bytes": 157920,
+      "sha256": "9bcff065f66fdd2401b1db7669f7633c83b5ea52ab12cbe0d2eb6c5570897641"
     }
   ],
   "repository_source_identities": [
@@ -943,5 +943,41 @@
     "runtime_tests": false,
     "visual_review": "Independent reader inspected both languages andPPT in color/grayscale: missed vs selected distinguishable; ticks readable; no overlap/crop.",
     "clean_rebuild": "45pages text/RGB/grayscale exact; regenerated bilingual Observation PDFs and summary exact; slide3 retains one image after repeat generation."
+  },
+  "observation_symmetric_revision_20261016": {
+    "baseline": "d1d0d6e1be6588afc2f5127f64cea368821a981a",
+    "remote_checked": "e1402dd",
+    "user_request": "Show both avg and minmax symmetrically against saved whole-page mass-rank reference; raw page mass above is not a selection.",
+    "visual_change": "Only(a): raw mass plus reference/avg/minmax rows; identical blue intersection, red-slash reference-only, orange-dot scorer-only encoding. Remove one-way checkmark/rescue narrative. Retain abcd design and bcd statistics.",
+    "counts": {
+      "page_count": 219,
+      "reference_missed_by_avg": 13,
+      "reference_missed_by_minmax": 17,
+      "reference_missed_by_both": 7,
+      "avg_missed_minmax_selected": 6,
+      "minmax_missed_avg_selected": 10,
+      "avg_selected_outside_reference": 13,
+      "minmax_selected_outside_reference": 17
+    },
+    "actual_tokens": {
+      "oracle": 1989,
+      "avg": 1989,
+      "minmax": 2048
+    },
+    "statistics": "No input or existing derived value changed; only symmetric set counts added. Page misses are not task-quality losses and cannot rank methods. Whole-page mass rank is not optimal oracle, exact tokenTopK orDSA.",
+    "review": "Independent set arithmetic and source/scientific review passed; reader checked bilingual paper/PPT color+gray and requested clearer PPT reference wording; author applied it.",
+    "no_new_model_runs": true,
+    "final_validation": {
+      "clean_rebuild": "45pages text/RGB/grayscale exact; bilingualFigure1 PDFs and summary regenerated identically",
+      "visual": "Independent reader approved actual bilingual paper andPPT color/grayscale; author revisedPPT wording and passed final one-line check",
+      "bounded_change": "All preexisting summary fields unchanged;PPT onlyslide3 pixels changed;17slides and oneimage onslide3",
+      "pages": {
+        "paper_en": 6,
+        "paper_zh": 6,
+        "supplement_en": 8,
+        "supplement_zh": 8,
+        "presentation": 17
+      }
+    }
   }
 }

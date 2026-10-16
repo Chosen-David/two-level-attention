@@ -20,3 +20,5 @@ The full-text revision organizes the manuscript around candidate access and sele
 Replot only the adopted Observation: `python3 sources/build_remote_observation.py` and `DAC_FIG_LANG=zh python3 sources/build_remote_observation.py`. Panels(c)(d) retain archived evidence; random32 is unpaired and the historical16×36proxy is not the current gate. No raw Q/K files or GPU run are required for these descriptive plots. The frozen source transformation is reproducible with `sources/prepare_plot_inputs.py`.
 
 Panel(a) marks missed pages with diagonal hatching and black edges as well as red fill, so the selected/missed distinction survives grayscale. The matching slide contains one current image; the updater removes prior image objects before replacement.
+
+Panel(a) now shows raw page attention sums above three symmetric saved-set rows: mass-rank reference, avg and minmax. Both scorers share missed-reference and selected-outside-reference encodings; there is no one-way rescue interpretation. The reference is neither exact tokenTopK/DSA nor a proven optimum. Original inputs and all b/c/d statistics are unchanged.
