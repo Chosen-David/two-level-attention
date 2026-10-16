@@ -101,3 +101,6 @@
 
 - [x] [TL-E140-O4-PARTIAL-PAGE-20261015] O4 有效末页修复及面板(d)历史诊断隔离；CPU验收，未重采。
   ([详情](task_details/TL-E140-O4-PARTIAL-PAGE-20261015.md))
+
+- [ ] [TL-OBS-PLOT-CORRECTNESS-20261016] 有界修复整箱预算、真实区域、有限配对分母和E6证据标注；CPU独审后仅推原dev。
+  ([详情](task_details/TL-OBS-PLOT-CORRECTNESS-20261016.md))

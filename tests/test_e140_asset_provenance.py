@@ -21,25 +21,18 @@ RENDERER = ROOT / asset.FIGDIR / 'fig_o_observation.py'
 class AssetProvenance(unittest.TestCase):
     def test_manifest_preserves_legacy_hashes_and_exact_git_sources(self):
         manifest = asset.verify(ROOT)
-        # v1 manifest did not exist in the original figure commit. Its frozen
-        # bytes are instead retained at the pre-annotation snapshot below.
-        before = manifest['unannotated_current_snapshot'][0]['git_commit']
-        old = json.loads(subprocess.check_output(['git','show',before+':'+str(asset.MANIFEST)],cwd=ROOT))
-        self.assertEqual(old['artifacts'], manifest['artifacts'])
         for entry in manifest['artifacts']:
             data = subprocess.check_output(['git','show',manifest['legacy_snapshot_commit']+':'+entry['path']],cwd=ROOT)
             self.assertEqual(asset.sha(data),entry['sha256'])
-        for entry in manifest['unannotated_current_snapshot']:
-            data = subprocess.check_output(['git','show',entry['git_commit']+':'+entry['path']],cwd=ROOT)
-            self.assertEqual(asset.sha(data),entry['sha256'])
-        for prior in manifest['prior_asset_sets']:
-            for entry in prior['current_assets']:
-                self.assertIn(entry['status'], ('historical-diagnostic-not-corrected',))
+        for snapshot in manifest['historical_snapshots']:
+            for entry in snapshot['files']:
+                data = subprocess.check_output(['git','show',snapshot['git_commit']+':'+entry['path']],cwd=ROOT)
+                self.assertEqual(asset.sha(data),entry['sha256'])
+        self.assertTrue(manifest['prior_asset_sets'])
         self.assertTrue(any(x['status']=='missing' for x in manifest['unchanged_inputs']))
 
-    def test_current_assets_carry_panel_d_warning(self):
-        # Current combined figure includes panel (d) from the O4 v2 collector
-        # (partial final-page omission) -> whole asset set historical-diagnostic.
+    def test_current_assets_carry_diagnostic_warning(self):
+        # Feasible whole-bin diagnostic, blocked E6 panel; no scientific promotion.
         manifest = asset.verify(ROOT)
         for entry in manifest['current_assets']:
             self.assertEqual(entry['status'], asset.STATUS)
@@ -69,13 +62,13 @@ class AssetProvenance(unittest.TestCase):
         manifest = asset.verify(ROOT)
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
-            checked = [i for i in manifest['current_assets']+manifest['unchanged_inputs'] if i.get('status')!='missing']
+            checked = [i for i in manifest['current_assets']+manifest['unchanged_inputs']+manifest['derived_outputs']+manifest['renderer_sources'] if i.get('status')!='missing']
             for item in checked:
                 target=root/item['path'];target.parent.mkdir(parents=True,exist_ok=True)
                 shutil.copyfile(ROOT/item['path'],target)
             target=root/asset.MANIFEST;target.parent.mkdir(parents=True,exist_ok=True)
             target.write_text(json.dumps(manifest));asset.verify(root)
-            for item in manifest['current_assets']:
+            for item in manifest['current_assets']+manifest['derived_outputs']+manifest['renderer_sources']:
                 path=root/item['path'];original=path.read_bytes();path.write_bytes(original+b'changed')
                 with self.assertRaisesRegex(ValueError,'identity mismatch'):asset.verify(root)
                 path.write_bytes(original)
@@ -83,14 +76,13 @@ class AssetProvenance(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'status/schema'):asset.verify(root)
 
     def test_default_renderer_fails_closed(self):
-        # Default render refuses: panel (d) is historical-only until the O4 v3
-        # recollection; explicit diagnostic opt-in keeps the visible warning.
+        # Explicit diagnostic opt-in is required; default never publishes.
         before={str(p):asset.sha(p.read_bytes()) for p in (ROOT/asset.FIGDIR).glob('O_observation*')}
         env=dict(os.environ);env.pop('E140_ALLOW_HISTORICAL_DIAGNOSTIC',None)
         flag=['-O'] if sys.flags.optimize else []
         result=subprocess.run([sys.executable,*flag,str(RENDERER)],env=env,capture_output=True,text=True)
         self.assertNotEqual(result.returncode,0)
-        self.assertIn('panel (d) is historical only',result.stderr)
+        self.assertIn('No files written',result.stderr)
         self.assertEqual(before,{str(p):asset.sha(p.read_bytes()) for p in (ROOT/asset.FIGDIR).glob('O_observation*')})
 
     def test_opt_in_warning_helper_exports_visible_text(self):

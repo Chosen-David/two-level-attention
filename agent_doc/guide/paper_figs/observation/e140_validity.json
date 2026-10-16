@@ -1,6 +1,6 @@
 {
-  "schema": "e140-historical-validity-v3",
-  "status": "redesigned-v2-inputs-current",
+  "schema": "e140-historical-validity-v4",
+  "status": "whole-bin-diagnostic-gate-blocked",
   "source_json_blob": "e670af6eda21d988d4eedcf458064bb72982bf33",
   "first_source_commit": "096414368d2f7c102cb526a62c222e181b97620c",
   "artifacts": [
@@ -26,8 +26,8 @@
     }
   ],
   "raw_archive_search": "tracked .pt/.npz/.npy and accessible repository files; no matching e140 Q/K or per-token probabilities found; not a remote-host absence claim",
-  "reconstruction": "blocked; aggregated bins/SWA cannot exactly recover cut boundaries or folded token; no interpolation or relabeling applied",
-  "independent_sequences": 4,
+  "reconstruction": "Exact token TopK unavailable from aggregate bins. Current diagnostic selects only whole bins; no interpolation.",
+  "independent_sequences": null,
   "query_group_observations_are_independent": false,
   "gpu_executed": false,
   "artifacts_scope": "Legacy v1 snapshot, NOT current paths; bytes recoverable at legacy_snapshot_commit.",
@@ -35,18 +35,18 @@
   "current_assets": [
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
-      "sha256": "512d0e63827f48df4173ee625ed957883d733bf7f3ecd4921ca5c216c7f89f51",
-      "status": "redesigned-v2-inputs-current"
+      "sha256": "822b96874da180c6c57aa744ffa6107adb74e394375444fba82c3c3160751202",
+      "status": "whole-bin-diagnostic-gate-blocked"
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
-      "sha256": "61e13ea9c8a9fec702808bb8e9a1faaef563b92ed757b966036a5c2cd826bc82",
-      "status": "redesigned-v2-inputs-current"
+      "sha256": "e02ed47bdfe17cebe6efcb847ff4d9550ddb80601d7e6d747bf798d7960860a7",
+      "status": "whole-bin-diagnostic-gate-blocked"
     },
     {
       "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
-      "sha256": "21b4061b4c5017d8b6456e1be31b3495e69710bf1073e78e2e50c0a87678f0bb",
-      "status": "redesigned-v2-inputs-current"
+      "sha256": "68bdb81329a6a353c3a5fd9c0ec238aadeef0028a4138b5c59647d74d6b73a00",
+      "status": "whole-bin-diagnostic-gate-blocked"
     }
   ],
   "unchanged_inputs": [
@@ -71,11 +71,6 @@
       "status": "present-unchanged"
     },
     {
-      "path": "agent_doc/guide/paper_figs/figs/O_observation_figure_data.tsv",
-      "sha256": "454584ec730008f0d3ca70c4103c9a8f7ee7ac884bc351d746d114f58a49caf1",
-      "status": "present-unchanged"
-    },
-    {
       "path": "exp/trace/results/e6b_far_profiles.json",
       "sha256": "436ec37473042e59453fad194f8547d3975ff030749f8fc0289cb4cd95456bf4",
       "status": "present-unchanged"
@@ -86,7 +81,7 @@
       "status": "present-unchanged"
     }
   ],
-  "source_provenance": "Current figure: e140_o_trace_v2.json (O1/O3) + e6b_far_profiles.json + e6_layer_skip.json (panel d). O4 v2 excluded (partial-page defect). Legacy v1/v2 JSON bytes pinned below for historical diagnosis only.",
+  "source_provenance": "Existing O1/O3 aggregates only. Whole-bin heuristic is budget-feasible, not token TopK or a bound. E6 blocked. CPU validation does not accept scientific data.",
   "prior_asset_sets": [
     {
       "annotation": {
@@ -223,6 +218,75 @@
         }
       ],
       "retired_reason": "2026-10-16 observation redesign: one panel per innovation (partition strip / far-quota scatter / subspace arms / per-layer gate). New figure reads e140_o_trace_v2.json + e6b_far_profiles.json + e6_layer_skip.json only; the O4 v2 partial-page defect no longer reaches any panel, so the historical-diagnostic banner is retired with this asset set."
+    },
+    {
+      "git_commit": "47e4ab2f004d1eabce85c63849a2651123f6f45c",
+      "current_assets": [
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
+          "sha256": "512d0e63827f48df4173ee625ed957883d733bf7f3ecd4921ca5c216c7f89f51",
+          "status": "redesigned-v2-inputs-current"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
+          "sha256": "61e13ea9c8a9fec702808bb8e9a1faaef563b92ed757b966036a5c2cd826bc82",
+          "status": "redesigned-v2-inputs-current"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
+          "sha256": "21b4061b4c5017d8b6456e1be31b3495e69710bf1073e78e2e50c0a87678f0bb",
+          "status": "redesigned-v2-inputs-current"
+        }
+      ],
+      "unchanged_inputs": [
+        {
+          "path": "exp/trace/results/e140_o_trace.json",
+          "sha256": "3a7a41e720fe9bbe5586d08c9468985a21d05e0cd656d4fb6f7e650ba6b8df1e",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "exp/trace/results/e140_o4_select_trace.json",
+          "sha256": null,
+          "status": "missing"
+        },
+        {
+          "path": "exp/trace/results/e140_o_trace_v2.json",
+          "sha256": "f0db60364a0e516b5ad28affeb895dadb2b50e0eecd583ee21b0a993b5029b2b",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "exp/trace/results/e140_o4_select_trace_v2.json",
+          "sha256": "4a9970ecfd802e0b295f0627bac2ee306402b684a1abdec9c37678e1e1ab97e9",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation_figure_data.tsv",
+          "sha256": "454584ec730008f0d3ca70c4103c9a8f7ee7ac884bc351d746d114f58a49caf1",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "exp/trace/results/e6b_far_profiles.json",
+          "sha256": "436ec37473042e59453fad194f8547d3975ff030749f8fc0289cb4cd95456bf4",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "exp/trace/results/e6_layer_skip.json",
+          "sha256": "0b5630022acf0a2c9e60dbf201eb79630593882bf483f5fc591ffbdd57c2a42b",
+          "status": "present-unchanged"
+        }
+      ],
+      "redesign": {
+        "date": "2026-10-16",
+        "renderer": "agent_doc/guide/paper_figs/figs/fig_o_observation.py",
+        "panels": {
+          "a": "partition (token strip, repr query, e140_o_trace_v2 o1 bins)",
+          "b": "far quota (128-query single-pool capture scatter, o1 bins)",
+          "c": "subspace (o3 tail32/random32/high32 arms, v2 metric)",
+          "d": "per-layer far gate (e6b heatmap + e6 layer-skip stats)"
+        },
+        "note": "No panel reads O4 v2. No historical-diagnostic banner. Legacy byte lineages preserved in prior_asset_sets / legacy_snapshot_commit."
+      },
+      "retired_reason": "Whole-bin budget overshoot and unsupported oracle/gate claims; raw preserved."
     }
   ],
   "legacy_inputs_review": {
@@ -240,14 +304,84 @@
     }
   },
   "redesign": {
-    "date": "2026-10-16",
-    "renderer": "agent_doc/guide/paper_figs/figs/fig_o_observation.py",
-    "panels": {
-      "a": "partition (token strip, repr query, e140_o_trace_v2 o1 bins)",
-      "b": "far quota (128-query single-pool capture scatter, o1 bins)",
-      "c": "subspace (o3 tail32/random32/high32 arms, v2 metric)",
-      "d": "per-layer far gate (e6b heatmap + e6 layer-skip stats)"
+    "protocol": "feasible-whole-bin-mass-rank-v1",
+    "token_budget_cap": 2048,
+    "raw_source": "exp/trace/results/e140_o_trace_v2.json",
+    "e6": "blocked; no profile or skip data consumed",
+    "o4": "not used; prior partial-page quarantine retained",
+    "scientific_acceptance": false
+  },
+  "historical_snapshots": [
+    {
+      "git_commit": "47e4ab2f004d1eabce85c63849a2651123f6f45c",
+      "files": [
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
+          "sha256": "61e13ea9c8a9fec702808bb8e9a1faaef563b92ed757b966036a5c2cd826bc82",
+          "git_blob": "565d825497738947c6c16f3f6dd9f847ba2c3903"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
+          "sha256": "21b4061b4c5017d8b6456e1be31b3495e69710bf1073e78e2e50c0a87678f0bb",
+          "git_blob": "3d0b17f90ba340130dbd0a768b3d31bd63ab936a"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
+          "sha256": "512d0e63827f48df4173ee625ed957883d733bf7f3ecd4921ca5c216c7f89f51",
+          "git_blob": "8d52d9e08f0422f95d0e1aea14af392d92751564"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation_figure_data.tsv",
+          "sha256": "454584ec730008f0d3ca70c4103c9a8f7ee7ac884bc351d746d114f58a49caf1",
+          "git_blob": "da310120d0a150ba4fcfac339e1c446220a057a7"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/fig_o_observation.py",
+          "sha256": "bd9869a6cdb311fc1c3e5034fc80a7046cdd64d0cb5c734134a1aafbb80664a0",
+          "git_blob": "edf7d272d8539358852ea413448a96e2a0f3447c"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/observation/e140_validity.json",
+          "sha256": "e6b0038b7352124e8b958f7595e0284ff3fb64967933b66830e94becf72f547f",
+          "git_blob": "19496101772a079be0627e8daff069b17ff83955"
+        }
+      ]
+    }
+  ],
+  "derived_outputs": [
+    {
+      "path": "agent_doc/guide/paper_figs/figs/O_observation_figure_data.tsv",
+      "sha256": "d7911cd2b700a0fdc46e4e4335911ab01cd79ccea8e1a3a41d0ee37b0aaa6076"
     },
-    "note": "No panel reads O4 v2. No historical-diagnostic banner. Legacy byte lineages preserved in prior_asset_sets / legacy_snapshot_commit."
-  }
+    {
+      "path": "agent_doc/guide/paper_figs/figs/O_observation_diagnostic.json",
+      "sha256": "3696c9153ab8a831066b53c801b4d75d959c6ae7bb5f5b67eda40ea6652f6642"
+    }
+  ],
+  "renderer_sources": [
+    {
+      "path": "agent_doc/guide/paper_figs/figs/fig_o_observation.py",
+      "sha256": "9993bb97a31347a18572377aec1ef6403a6fc99fd521759af79855d61216f26b"
+    },
+    {
+      "path": "exp/paper/observation_bins.py",
+      "sha256": "8fbc22029c16329881f013a73f8ba1b2318de091899e382220dbcc9c70133de1"
+    },
+    {
+      "path": "exp/paper/e140_asset_provenance.py",
+      "sha256": "073d84609c480a653bd7e55fd75eccbff6837ad23a1ac7f3ab1c30f62c275994"
+    }
+  ],
+  "annotation": {
+    "warning": "DIAGNOSTIC ONLY - NOT VALIDATED PAPER EVIDENCE",
+    "detail": "Whole-bin heuristic, not token TopK or an upper bound. E6 gate evidence blocked.",
+    "reference": "TL-OBS-PLOT-CORRECTNESS-20261016 | Existing aggregates; no new collection"
+  },
+  "historical_context": {
+    "raw_archive_search": "tracked .pt/.npz/.npy and accessible repository files; no matching e140 Q/K or per-token probabilities found; not a remote-host absence claim",
+    "reconstruction": "blocked; aggregated bins/SWA cannot exactly recover cut boundaries or folded token; no interpolation or relabeling applied",
+    "independent_sequences": 4
+  },
+  "source_sequences": 4,
+  "sequence_overlap_status": "unresolved; task/sample identities are not proof of independent documents"
 }
