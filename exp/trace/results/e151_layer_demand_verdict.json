@@ -1,0 +1,40 @@
+{
+  "experiment": "E151",
+  "title": "prefill far 配额假说三路判决：逐层重配 vs 静态网格 vs K1 剂量臂",
+  "date": "2026-10-16",
+  "user_directive": "prefill 掉点能否救回：静态 α/β/γ 网格扫描 or 逐层动态判定（用户两案）",
+  "caliber": {
+    "model": "Qwen3-8B (local, config sha f7c4eadfbbf52247，与 E140v2 同 revision 声明)",
+    "host": "wys-4xh20 (10.238.122.187) GPU1",
+    "collector": "agent_doc/guide/paper_figs/trace/e140_o4_select_trace.py（v3 修 partial-page 版 + E140_LAYERS env 覆盖，commit 3721fa2；默认 8,24 行为不变）",
+    "data": "LongBench hotpotqa/musique 各 2 条, 16K 截断, 36 层全扫, 16 query/样本, sink128/swa128, α=0.25, K1=128, K2_mid=768",
+    "outputs": "exp/trace/results/e151_layer_demand_v1_compact.json（bins 剥离；全量 85MB JSON 留节点 ~/e151_out 私有，快照规则同 E140v2 npz）"
+  },
+  "phase1_verdict": {
+    "per_layer_reallocation": {
+      "hypothesis": "far 配额失配集中在深层 → 逐层 far 预算重配（浅层让配额深层加）可零算力救质量",
+      "finding": "驳回。36/36 层 oracle far 需求全部超 128 平铺供给：min 233 (L10) / mean 320 / max 397 (L33)，浅/中/深 = 306/325/328 无梯度。总量守恒重配仅能把最深层抬到 ~159 vs 需求 397——层间无可收割失配。E140v2 观察到的层异质性（L8 far 质量 5.8% vs L24 23.3%）是质量分数异质，不构成 token 数需求的层间梯度。",
+      "verdict": "REJECTED——逐层动态判定（用户案二）在本假说形态下无 headroom；E141b 已撤销「二值层跳过」，本诊断撤销「逐层配额重配」"
+    },
+    "e148_far_starvation_erratum": {
+      "finding": "E148 判决「far 预算饥饿假说驳回」系剂量不足 + 混杂：E148 sk64sw64 只把 far 抬到 ~256（< 需求 320）且同时砍了保护带（sink/swa 128→64）。真剂量臂（far ≥ 320 且保护带不动）从未跑过。",
+      "verdict": "E148 的 far 饥饿驳回降级为「剂量不足口径」；机制链（far 配额公式 K1=128 → far=128）本身代码闭合不受影响"
+    },
+    "actionable_cell": {
+      "finding": "oracle near/far 分割 = 416 near / 320 far（近 1:0.77）；K1=128 给 640/128（far 饿 2.5×，全层均匀），K1=64 给 320/448，K1=96 给 480/288。decode 侧 K1=64 甜点已有 e2e 背书（E140h AVG5 48.10 ≥ 锚 47.91）。",
+      "verdict": "静态网格收敛到有据两格：prefill FS @ K1∈{64,96}，sink128/swa128 不动（只动 K1，与 E138 锚 56.04/28.22 单变量对拍）"
+    }
+  },
+  "phase2_e2e": {
+    "arms": "K1=64 (GPU1) / K1=96 (GPU3)，FS 全稀疏（--tli-sparse-prefill grp64），hotpot/musique，T=1016180000，输出节点 exp/results_longbench/Qwen3-8B/pred_E151_kquota",
+    "anchors": "dense hotpot 59.42 / musique 34.25；E138 sk128/sw128 FS K1=128 = 56.04 / 28.22",
+    "criteria": "恢复到 dense -1.0 内 → prefill 稀疏复活（E147/E150 e2e 性能链解锁，prefill dense 叙事重写）；部分恢复 → 如实报告剂量-响应曲线；无恢复 → far 总量不是瓶颈，粗筛 miss 主导，prefill dense 叙事终审维持",
+    "status": "IN-FLIGHT（2026-10-16 08:04 起，节点 GPU1/GPU3）"
+  },
+  "paper_impact": "暂无——phase2 出数前不改任何叙事。若 K1=64 复活 prefill 稀疏，E148/E149『prefill 维持 dense』判决需 erratum，E147/E150 挂账解锁",
+  "cross_references": {
+    "e140v2_trace": "exp/trace/results/e140_o4_select_trace_v2.json（L8/L24 两层，oracle far 305.5 与本 36 层均值 320 口径一致）",
+    "e140h_k64": "decode 侧 K1=64 e2e 甜点背书",
+    "e148_verdict": "exp/trace/results/e148_sinkswa_verdict.json（far 饥饿驳回判决，见 erratum 字段）"
+  }
+}
