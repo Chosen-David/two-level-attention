@@ -1,0 +1,138 @@
+{
+  "issue_id": "TL-E152-STORE-20261016",
+  "baseline_sha": "be2817946e678ef1464eab1d03d1142218e82602",
+  "kind": "CPU local POSIX writer correctness; NOT GPU performance",
+  "environment": {
+    "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "framework": "not used by E152 tests; current interpreter has no torch",
+    "gpu_arch_driver_cuda_compiler": "not exercised",
+    "kernel_config": "no kernel change or execution"
+  },
+  "source_sha256": {
+    "exp/bench/e152_e2e_latency.py": "f1d1f966284c6574a86bbb5baf0aa1b1e8c74bbb714df2d93f071f7117a89571",
+    "tests/test_e152_result_store.py": "d6ecff63853a3f82acce4288ef2cfe0e7752c0317617dab1425057133c89d8ac"
+  },
+  "fixture_sha256": "5425eeb7a85365318f354bf6a52c0226137f80538c5853e84cad5ad1160d930b",
+  "baseline": {
+    "tests": 8,
+    "failures": 5,
+    "errors": 1,
+    "raw_short_log": "test_corrupt_or_nonarray_input_not_overwritten (baseline_probe.ResultStore.test_corrupt_or_nonarray_input_not_overwritten) ... ERROR\ntest_fsync_failure_preserves_previous_complete_file (baseline_probe.ResultStore.test_fsync_failure_preserves_previous_complete_file) ... FAIL\ntest_interrupted_writer_preserves_previous_complete_file (baseline_probe.ResultStore.test_interrupted_writer_preserves_previous_complete_file) ... FAIL\ntest_new_file_and_existing_mode (baseline_probe.ResultStore.test_new_file_and_existing_mode) ... ok\ntest_overlapping_processes_cannot_lose_a_record (baseline_probe.ResultStore.test_overlapping_processes_cannot_lose_a_record) ... FAIL\ntest_replace_failure_preserves_previous_complete_file (baseline_probe.ResultStore.test_replace_failure_preserves_previous_complete_file) ... FAIL\ntest_serial_append_preserves_history_and_unicode (baseline_probe.ResultStore.test_serial_append_preserves_history_and_unicode) ... ok\ntest_serialization_failure_preserves_bytes_and_removes_temp (baseline_probe.ResultStore.test_serialization_failure_preserves_bytes_and_removes_temp) ... FAIL\n\n======================================================================\nERROR: test_corrupt_or_nonarray_input_not_overwritten (baseline_probe.ResultStore.test_corrupt_or_nonarray_input_not_overwritten)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/twolevel-audit-20261016-0453/tests/test_e152_result_store.py\", line 148, in test_corrupt_or_nonarray_input_not_overwritten\n    self.append(self.path, {\"writer\": \"new\"})\n  File \"/tmp/tmp6vgwf588/e152_before.py\", line 289, in _append_record\n    existing.append(record)\n    ^^^^^^^^^^^^^^^\nAttributeError: 'dict' object has no attribute 'append'\n\n======================================================================\nFAIL: test_fsync_failure_preserves_previous_complete_file (baseline_probe.ResultStore.test_fsync_failure_preserves_previous_complete_file)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/twolevel-audit-20261016-0453/tests/test_e152_result_store.py\", line 139, in test_fsync_failure_preserves_previous_complete_file\n    with self.assertRaisesRegex(OSError, \"sync failed\"):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: OSError not raised\n\n======================================================================\nFAIL: test_interrupted_writer_preserves_previous_complete_file (baseline_probe.ResultStore.test_interrupted_writer_preserves_previous_complete_file)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/twolevel-audit-20261016-0453/tests/test_e152_result_store.py\", line 111, in test_interrupted_writer_preserves_previous_complete_file\n    self.assertEqual(self.path.read_bytes(), self.before)\nAssertionError: b'[{\"incomplete\":' != b'[{\"schema\":\"e152-e2e-latency-v1\",\"runs\":[]}]\\n'\n\n======================================================================\nFAIL: test_overlapping_processes_cannot_lose_a_record (baseline_probe.ResultStore.test_overlapping_processes_cannot_lose_a_record)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/twolevel-audit-20261016-0453/tests/test_e152_result_store.py\", line 97, in test_overlapping_processes_cannot_lose_a_record\n    self.assertEqual([r.get(\"writer\") for r in rows], [None, \"A\", \"B\"])\nAssertionError: Lists differ: [None, 'B'] != [None, 'A', 'B']\n\nFirst differing element 1:\n'B'\n'A'\n\nSecond list contains 1 additional elements.\nFirst extra element 2:\n'B'\n\n- [None, 'B']\n+ [None, 'A', 'B']\n?        +++++\n\n\n======================================================================\nFAIL: test_replace_failure_preserves_previous_complete_file (baseline_probe.ResultStore.test_replace_failure_preserves_previous_complete_file)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/twolevel-audit-20261016-0453/tests/test_e152_result_store.py\", line 132, in test_replace_failure_preserves_previous_complete_file\n    with self.assertRaisesRegex(OSError, \"replace failed\"):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: OSError not raised\n\n======================================================================\nFAIL: test_serialization_failure_preserves_bytes_and_removes_temp (baseline_probe.ResultStore.test_serialization_failure_preserves_bytes_and_removes_temp)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/tmp/twolevel-audit-20261016-0453/tests/test_e152_result_store.py\", line 127, in test_serialization_failure_preserves_bytes_and_removes_temp\n    self.assertEqual(self.path.read_bytes(), self.before)\nAssertionError: b'partial' != b'[{\"schema\":\"e152-e2e-latency-v1\",\"runs\":[]}]\\n'\n\n----------------------------------------------------------------------\nRan 8 tests in 0.044s\n\nFAILED (failures=5, errors=1)\n",
+    "method": "Execute AST-extracted actual main tail of freshly imported HEAD; loader/model excluded"
+  },
+  "candidate_validation": [
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-W",
+        "error::ResourceWarning",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_e152*.py",
+        "-v"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "test_bad_generation_count_rejected_before_device_work (test_e152_request_timing.RequestTiming.test_bad_generation_count_rejected_before_device_work) ... ok\ntest_cli_rejects_wrong_protocol_before_loader_even_under_O (test_e152_request_timing.RequestTiming.test_cli_rejects_wrong_protocol_before_loader_even_under_O) ... ok\ntest_continuous_wall_includes_first_output_and_step_gaps (test_e152_request_timing.RequestTiming.test_continuous_wall_includes_first_output_and_step_gaps) ... ok\ntest_fixed_generation_count_and_timestamp_identity (test_e152_request_timing.RequestTiming.test_fixed_generation_count_and_timestamp_identity) ... ok\ntest_main_serializes_v2_and_preserves_old_records_single_token (test_e152_request_timing.RequestTiming.test_main_serializes_v2_and_preserves_old_records_single_token) ... ok\ntest_missing_method_is_not_silently_dense (test_e152_request_timing.RequestTiming.test_missing_method_is_not_silently_dense) ... ok\ntest_model_failure_does_not_return_a_record (test_e152_request_timing.RequestTiming.test_model_failure_does_not_return_a_record) ... ok\ntest_single_token_has_ttft_but_no_tpot (test_e152_request_timing.RequestTiming.test_single_token_has_ttft_but_no_tpot) ... ok\ntest_corrupt_or_nonarray_input_not_overwritten (test_e152_result_store.ResultStore.test_corrupt_or_nonarray_input_not_overwritten) ... ok\ntest_fsync_failure_preserves_previous_complete_file (test_e152_result_store.ResultStore.test_fsync_failure_preserves_previous_complete_file) ... ok\ntest_interrupted_writer_preserves_previous_complete_file (test_e152_result_store.ResultStore.test_interrupted_writer_preserves_previous_complete_file) ... ok\ntest_new_file_and_existing_mode (test_e152_result_store.ResultStore.test_new_file_and_existing_mode) ... ok\ntest_overlapping_processes_cannot_lose_a_record (test_e152_result_store.ResultStore.test_overlapping_processes_cannot_lose_a_record) ... ok\ntest_replace_failure_preserves_previous_complete_file (test_e152_result_store.ResultStore.test_replace_failure_preserves_previous_complete_file) ... ok\ntest_serial_append_preserves_history_and_unicode (test_e152_result_store.ResultStore.test_serial_append_preserves_history_and_unicode) ... ok\ntest_serialization_failure_preserves_bytes_and_removes_temp (test_e152_result_store.ResultStore.test_serialization_failure_preserves_bytes_and_removes_temp) ... ok\n\n----------------------------------------------------------------------\nRan 16 tests in 0.296s\n\nOK\n"
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-W",
+        "error::ResourceWarning",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_longbench_request_capture.py",
+        "-v"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "test_longbench_request_capture (unittest.loader._FailedTest.test_longbench_request_capture) ... ERROR\n\n======================================================================\nERROR: test_longbench_request_capture (unittest.loader._FailedTest.test_longbench_request_capture)\n----------------------------------------------------------------------\nImportError: Failed to import test module: test_longbench_request_capture\nTraceback (most recent call last):\n  File \"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py\", line 396, in _find_test_path\n    module = self._get_module_from_name(name)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py\", line 339, in _get_module_from_name\n    __import__(name)\n  File \"/tmp/twolevel-audit-20261016-0453/tests/test_longbench_request_capture.py\", line 12, in <module>\n    import torch\nModuleNotFoundError: No module named 'torch'\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)\n",
+      "acceptance": "blocked-before-test-execution: torch missing"
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-O",
+        "-W",
+        "error::ResourceWarning",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_e152*.py",
+        "-v"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "test_bad_generation_count_rejected_before_device_work (test_e152_request_timing.RequestTiming.test_bad_generation_count_rejected_before_device_work) ... ok\ntest_cli_rejects_wrong_protocol_before_loader_even_under_O (test_e152_request_timing.RequestTiming.test_cli_rejects_wrong_protocol_before_loader_even_under_O) ... ok\ntest_continuous_wall_includes_first_output_and_step_gaps (test_e152_request_timing.RequestTiming.test_continuous_wall_includes_first_output_and_step_gaps) ... ok\ntest_fixed_generation_count_and_timestamp_identity (test_e152_request_timing.RequestTiming.test_fixed_generation_count_and_timestamp_identity) ... ok\ntest_main_serializes_v2_and_preserves_old_records_single_token (test_e152_request_timing.RequestTiming.test_main_serializes_v2_and_preserves_old_records_single_token) ... ok\ntest_missing_method_is_not_silently_dense (test_e152_request_timing.RequestTiming.test_missing_method_is_not_silently_dense) ... ok\ntest_model_failure_does_not_return_a_record (test_e152_request_timing.RequestTiming.test_model_failure_does_not_return_a_record) ... ok\ntest_single_token_has_ttft_but_no_tpot (test_e152_request_timing.RequestTiming.test_single_token_has_ttft_but_no_tpot) ... ok\ntest_corrupt_or_nonarray_input_not_overwritten (test_e152_result_store.ResultStore.test_corrupt_or_nonarray_input_not_overwritten) ... ok\ntest_fsync_failure_preserves_previous_complete_file (test_e152_result_store.ResultStore.test_fsync_failure_preserves_previous_complete_file) ... ok\ntest_interrupted_writer_preserves_previous_complete_file (test_e152_result_store.ResultStore.test_interrupted_writer_preserves_previous_complete_file) ... ok\ntest_new_file_and_existing_mode (test_e152_result_store.ResultStore.test_new_file_and_existing_mode) ... ok\ntest_overlapping_processes_cannot_lose_a_record (test_e152_result_store.ResultStore.test_overlapping_processes_cannot_lose_a_record) ... ok\ntest_replace_failure_preserves_previous_complete_file (test_e152_result_store.ResultStore.test_replace_failure_preserves_previous_complete_file) ... ok\ntest_serial_append_preserves_history_and_unicode (test_e152_result_store.ResultStore.test_serial_append_preserves_history_and_unicode) ... ok\ntest_serialization_failure_preserves_bytes_and_removes_temp (test_e152_result_store.ResultStore.test_serialization_failure_preserves_bytes_and_removes_temp) ... ok\n\n----------------------------------------------------------------------\nRan 16 tests in 0.294s\n\nOK\n"
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-O",
+        "-W",
+        "error::ResourceWarning",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_longbench_request_capture.py",
+        "-v"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "test_longbench_request_capture (unittest.loader._FailedTest.test_longbench_request_capture) ... ERROR\n\n======================================================================\nERROR: test_longbench_request_capture (unittest.loader._FailedTest.test_longbench_request_capture)\n----------------------------------------------------------------------\nImportError: Failed to import test module: test_longbench_request_capture\nTraceback (most recent call last):\n  File \"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py\", line 396, in _find_test_path\n    module = self._get_module_from_name(name)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py\", line 339, in _get_module_from_name\n    __import__(name)\n  File \"/tmp/twolevel-audit-20261016-0453/tests/test_longbench_request_capture.py\", line 12, in <module>\n    import torch\nModuleNotFoundError: No module named 'torch'\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)\n",
+      "acceptance": "blocked-before-test-execution: torch missing"
+    }
+  ],
+  "scope": [
+    "same resolved output path",
+    "cooperating local POSIX writers",
+    "process interruption before rename",
+    "serialization/fsync/replace failures before publication",
+    "JSON array validation",
+    "history and mode preservation"
+  ],
+  "not_validated": [
+    "power loss durability",
+    "distributed or noncooperating writers",
+    "uncertain post-rename retries/deduplication",
+    "GPU/model/quality/performance",
+    "LongBench request capture rerun: current interpreter missing torch",
+    "hardlink aliases, owner/ACL/xattr preservation",
+    "real StaticCache/model/GPU route introduced upstream"
+  ],
+  "status": "E152 CPU correctness usable within local cooperative POSIX scope; publication separately verified",
+  "new_test_count": 8,
+  "existing_e152_test_count": 8,
+  "static_checks": [
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "exp/bench/e152_e2e_latency.py",
+        "tests/test_e152_result_store.py"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

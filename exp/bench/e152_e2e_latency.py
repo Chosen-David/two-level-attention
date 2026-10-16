@@ -23,6 +23,7 @@
   - tli 臂 patch 计数 fail-closed（0 挂载即 SystemExit，同 pred.py B3）。
 
 每进程跑一臂×一 L×(warmup+repeats)，JSON 追加写 out；编排器负责交错。
+本地 POSIX 同路径写者持久 sidecar 锁串行追加，临时文件完成后原子替换。
 v2 保留逐步同步诊断，连续 wall 包含同步扰动，不是自然 serving 时延。
 v1 的分段和不能无损换算为 v2 request wall/TTFT，旧记录须保留并重采。
 """
@@ -169,6 +170,49 @@ def _validate_protocol(args):
         raise ValueError("E152 是 decode-only 口径：TLI_SPARSE_PREFILL 必须为 0")
 
 
+def _append_record(path, record):
+    """Cooperative local-POSIX writers; readers see a complete old or new JSON.
+
+    Keep the sidecar inode: unlinking it after unlock would let waiting and new
+    writers lock different inodes. This is not distributed locking or idempotent
+    retry after an uncertain publication; no power-loss guarantee is claimed.
+    """
+    import fcntl
+    import stat
+    import tempfile
+
+    path = os.path.realpath(os.fspath(path))
+    with open(path + ".lock", "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        existing = []
+        mode = None
+        if os.path.exists(path):
+            with open(path) as stream:
+                existing = json.load(stream)
+            mode = stat.S_IMODE(os.stat(path).st_mode)
+        if not isinstance(existing, list):
+            raise ValueError("E152 output must be a JSON array; refusing overwrite")
+        existing.append(record)
+        fd, temporary = tempfile.mkstemp(
+            prefix="." + os.path.basename(path) + ".", suffix=".tmp",
+            dir=os.path.dirname(path))
+        try:
+            with os.fdopen(fd, "w") as stream:
+                if mode is not None:
+                    os.fchmod(stream.fileno(), mode)
+                json.dump(existing, stream, indent=1)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            # Ordinary errors clean up; a killed process may leave a private
+            # orphan .tmp, which is never selected as the published output.
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     # --method 由 add_sparse_attn_args 提供（含 tli/none），此处不重复定义
@@ -281,14 +325,7 @@ def main():
         },
         "runs": runs,
     }
-    # 追加写（编排器交错多进程）
-    existing = []
-    if os.path.exists(args.out):
-        with open(args.out) as f:
-            existing = json.load(f)
-    existing.append(record)
-    with open(args.out, "w") as f:
-        json.dump(existing, f, indent=1)
+    _append_record(args.out, record)
     print(f"[E152] appended to {args.out}")
 
 
