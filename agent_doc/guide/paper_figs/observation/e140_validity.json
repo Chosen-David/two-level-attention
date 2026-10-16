@@ -287,6 +287,75 @@
         "note": "No panel reads O4 v2. No historical-diagnostic banner. Legacy byte lineages preserved in prior_asset_sets / legacy_snapshot_commit."
       },
       "retired_reason": "Whole-bin budget overshoot and unsupported oracle/gate claims; raw preserved."
+    },
+    {
+      "git_commit": "9e0310077902038f6886f531900900efffe5db23",
+      "current_assets": [
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
+          "sha256": "8442387348e431a4a0fe3d4b3869005c824570214c1764e4e93af13811f69242",
+          "status": "redesigned-v2-inputs-current"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
+          "sha256": "7a34d9a22586d7fa5226ccd9f4019b47f3ece897e30a0fae73b1f3c6ddc29d62",
+          "status": "redesigned-v2-inputs-current"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
+          "sha256": "e5c5b4192b32a284f79d0e9f8ca7717adb0bbb0193c6f8d5454da1c695f2e8c4",
+          "status": "redesigned-v2-inputs-current"
+        }
+      ],
+      "unchanged_inputs": [
+        {
+          "path": "exp/trace/results/e140_o_trace.json",
+          "sha256": "3a7a41e720fe9bbe5586d08c9468985a21d05e0cd656d4fb6f7e650ba6b8df1e",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "exp/trace/results/e140_o4_select_trace.json",
+          "sha256": null,
+          "status": "missing"
+        },
+        {
+          "path": "exp/trace/results/e140_o_trace_v2.json",
+          "sha256": "f0db60364a0e516b5ad28affeb895dadb2b50e0eecd583ee21b0a993b5029b2b",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "exp/trace/results/e140_o4_select_trace_v2.json",
+          "sha256": "4a9970ecfd802e0b295f0627bac2ee306402b684a1abdec9c37678e1e1ab97e9",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation_figure_data.tsv",
+          "sha256": "8490491a8c93bb60e2dc8ca54f3690678c9f98e8c5fd5bbbdfd057377ba80327",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "exp/trace/results/e6b_far_profiles.json",
+          "sha256": "436ec37473042e59453fad194f8547d3975ff030749f8fc0289cb4cd95456bf4",
+          "status": "present-unchanged"
+        },
+        {
+          "path": "exp/trace/results/e6_layer_skip.json",
+          "sha256": "0b5630022acf0a2c9e60dbf201eb79630593882bf483f5fc591ffbdd57c2a42b",
+          "status": "present-unchanged"
+        }
+      ],
+      "redesign": {
+        "date": "2026-10-16",
+        "renderer": "agent_doc/guide/paper_figs/figs/fig_o_observation.py",
+        "panels": {
+          "a": "partition (token strip, repr query, e140_o_trace_v2 o1 bins)",
+          "b": "far quota (128-query single-pool capture scatter, o1 bins)",
+          "c": "subspace (o3 tail32/random32/high32 arms, v2 metric)",
+          "d": "per-layer far gate (e6b heatmap + e6 layer-skip stats)"
+        },
+        "note": "No panel reads O4 v2. No historical-diagnostic banner. Legacy byte lineages preserved in prior_asset_sets / legacy_snapshot_commit."
+      },
+      "retired_reason": "Concurrent 2f1ba4d quota overlay shares invalid region and budget/oracle claims; preserved historically, not admitted into diagnostic."
     }
   ],
   "legacy_inputs_review": {
@@ -344,6 +413,41 @@
           "path": "agent_doc/guide/paper_figs/observation/e140_validity.json",
           "sha256": "e6b0038b7352124e8b958f7595e0284ff3fb64967933b66830e94becf72f547f",
           "git_blob": "19496101772a079be0627e8daff069b17ff83955"
+        }
+      ]
+    },
+    {
+      "git_commit": "9e0310077902038f6886f531900900efffe5db23",
+      "files": [
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.png",
+          "sha256": "7a34d9a22586d7fa5226ccd9f4019b47f3ece897e30a0fae73b1f3c6ddc29d62",
+          "git_blob": "d1d70474bded7903c6960b078c1838ba3c23397e"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.svg",
+          "sha256": "8442387348e431a4a0fe3d4b3869005c824570214c1764e4e93af13811f69242",
+          "git_blob": "83ba5415f99f49aad82170398bb5613dd922fd08"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation.pdf",
+          "sha256": "e5c5b4192b32a284f79d0e9f8ca7717adb0bbb0193c6f8d5454da1c695f2e8c4",
+          "git_blob": "a1a90a02b9162066ba2f3676024a2cdec8910b4e"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/O_observation_figure_data.tsv",
+          "sha256": "8490491a8c93bb60e2dc8ca54f3690678c9f98e8c5fd5bbbdfd057377ba80327",
+          "git_blob": "9ab2a81036b492bb43c459a88fcb73428d6a28fc"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/figs/fig_o_observation.py",
+          "sha256": "382f6fe6c0cd23d46601b4d8f98fc920ef2567e3d0989183f5718e98ce755684",
+          "git_blob": "5d43bbb26648294340adaa1de12053030d7fe639"
+        },
+        {
+          "path": "agent_doc/guide/paper_figs/observation/e140_validity.json",
+          "sha256": "3315b8066a645441ae36036487fdf791c3fa1bc26d71a90749922f9ebb0daadc",
+          "git_blob": "62e6bec23e99db07323315159de33a061e44c477"
         }
       ]
     }
