@@ -1,0 +1,142 @@
+{
+  "issue_id": "TL-E152-TIMING-20261016",
+  "baseline_sha": "9e0310077902038f6886f531900900efffe5db23",
+  "kind": "deterministic CPU clock doubles; NOT performance measurement",
+  "input_i64le_sha256": "9357e9bb2a76ed5872f09c0e11cb677a0af2b01af70950c388dcac6e10563592",
+  "source_sha256": {
+    "exp/bench/e152_e2e_latency.py": "8a577da3828bff019c358e89808de3eff6c85b60ac610fe8d07da0b32dfe9569",
+    "tests/test_e152_request_timing.py": "665ce24ee7ee8930d6c4e007a5b76c02dfe67a6166f290971db0a5f48d0746d8"
+  },
+  "environment": {
+    "python": "3.12.14",
+    "machine": "x86_64",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "test_dependency": "torch 2.8.0+cpu for existing LongBench tests; E152 tests use doubles",
+    "gpu_arch_driver_compiler": "not validated; no executable CUDA environment"
+  },
+  "clock_rules_ms": {
+    "synchronize": 1,
+    "forward": 10,
+    "argmax": 7,
+    "unsqueeze": 2
+  },
+  "runs": {
+    "baseline": {
+      "record": {
+        "prefill_ms": 11,
+        "decode_ms": 20.000000000000004,
+        "tpot_ms": 20.000000000000004,
+        "request_wall_ms": 31.000000000000004,
+        "peak_mem_delta_gib": 1,
+        "n_input_tokens": 3,
+        "n_generated": 2
+      },
+      "clock_elapsed_including_initial_sync_ms": 43,
+      "single_token_error": "ZeroDivisionError"
+    },
+    "candidate": {
+      "record": {
+        "prefill_ms": 11,
+        "decode_ms": 19.999999999999996,
+        "ttft_ms": 20.999999999999996,
+        "decode_after_first_wall_ms": 20.999999999999996,
+        "tpot_ms": 20.999999999999996,
+        "request_wall_ms": 41.99999999999999,
+        "request_start_timestamp": 0.001,
+        "first_output_timestamp": 0.022,
+        "last_output_timestamp": 0.043,
+        "per_token_wall_ms": [
+          20.999999999999996
+        ],
+        "peak_mem_delta_gib": 1,
+        "n_input_tokens": 3,
+        "n_generated": 2
+      },
+      "clock_elapsed_including_initial_sync_ms": 43,
+      "single_token_error": null
+    }
+  },
+  "validation": [
+    {
+      "command": [
+        "python",
+        "-W",
+        "error::ResourceWarning",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_e152_request_timing.py",
+        "-v"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "test_bad_generation_count_rejected_before_device_work (test_e152_request_timing.RequestTiming.test_bad_generation_count_rejected_before_device_work) ... ok\ntest_cli_rejects_wrong_protocol_before_loader_even_under_O (test_e152_request_timing.RequestTiming.test_cli_rejects_wrong_protocol_before_loader_even_under_O) ... ok\ntest_continuous_wall_includes_first_output_and_step_gaps (test_e152_request_timing.RequestTiming.test_continuous_wall_includes_first_output_and_step_gaps) ... ok\ntest_fixed_generation_count_and_timestamp_identity (test_e152_request_timing.RequestTiming.test_fixed_generation_count_and_timestamp_identity) ... ok\ntest_main_serializes_v2_and_preserves_old_records_single_token (test_e152_request_timing.RequestTiming.test_main_serializes_v2_and_preserves_old_records_single_token) ... ok\ntest_missing_method_is_not_silently_dense (test_e152_request_timing.RequestTiming.test_missing_method_is_not_silently_dense) ... ok\ntest_model_failure_does_not_return_a_record (test_e152_request_timing.RequestTiming.test_model_failure_does_not_return_a_record) ... ok\ntest_single_token_has_ttft_but_no_tpot (test_e152_request_timing.RequestTiming.test_single_token_has_ttft_but_no_tpot) ... ok\n\n----------------------------------------------------------------------\nRan 8 tests in 0.037s\n\nOK\n"
+    },
+    {
+      "command": [
+        "python",
+        "-W",
+        "error::ResourceWarning",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_longbench_request_capture.py",
+        "-v"
+      ],
+      "returncode": 0,
+      "stdout": "{\"schema\": \"longbench-paper-capture-plan-v1\", \"gpu_started\": false, \"supported\": \"Qwen3 manual greedy path only\", \"unsupported\": [\"samsum generate\", \"DeepSeek generate\", \"unknown attention forwards\"], \"support_observation\": \"separate pass required; not implemented by timing hooks\", \"execution\": \"disabled\"}\n",
+      "stderr": "test_duplicate_and_missing_layer_events_fail (test_longbench_request_capture.Capture.test_duplicate_and_missing_layer_events_fail) ... ok\ntest_exact_boundary_question_routing_and_token_identity (test_longbench_request_capture.Capture.test_exact_boundary_question_routing_and_token_identity) ... ok\ntest_first_eos_and_single_token_have_no_tpot (test_longbench_request_capture.Capture.test_first_eos_and_single_token_have_no_tpot) ... ok\ntest_get_pred_guard_failure_cannot_append_record (test_longbench_request_capture.Capture.test_get_pred_guard_failure_cannot_append_record) ... ok\ntest_get_pred_real_record_path_opt_in_and_default_disabled (test_longbench_request_capture.Capture.test_get_pred_real_record_path_opt_in_and_default_disabled) ... ok\ntest_guard_failure_and_model_failure_never_publish (test_longbench_request_capture.Capture.test_guard_failure_and_model_failure_never_publish) ... ok\ntest_native_hook_and_cleanup (test_longbench_request_capture.Capture.test_native_hook_and_cleanup) ... ok\ntest_new_request_counter_reset_or_missing_field_fails (test_longbench_request_capture.Capture.test_new_request_counter_reset_or_missing_field_fails) ... ok\ntest_nonfinite_reverse_and_zero_clock_rejected (test_longbench_request_capture.Capture.test_nonfinite_reverse_and_zero_clock_rejected) ... ok\ntest_plan_branch_precedes_seed_or_model_load (test_longbench_request_capture.Capture.test_plan_branch_precedes_seed_or_model_load) ... ok\ntest_unsupported_generate_and_incomplete_hooks (test_longbench_request_capture.Capture.test_unsupported_generate_and_incomplete_hooks) ... ok\n\n----------------------------------------------------------------------\nRan 11 tests in 0.011s\n\nOK\n"
+    },
+    {
+      "command": [
+        "python",
+        "-O",
+        "-W",
+        "error::ResourceWarning",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_e152_request_timing.py",
+        "-v"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "test_bad_generation_count_rejected_before_device_work (test_e152_request_timing.RequestTiming.test_bad_generation_count_rejected_before_device_work) ... ok\ntest_cli_rejects_wrong_protocol_before_loader_even_under_O (test_e152_request_timing.RequestTiming.test_cli_rejects_wrong_protocol_before_loader_even_under_O) ... ok\ntest_continuous_wall_includes_first_output_and_step_gaps (test_e152_request_timing.RequestTiming.test_continuous_wall_includes_first_output_and_step_gaps) ... ok\ntest_fixed_generation_count_and_timestamp_identity (test_e152_request_timing.RequestTiming.test_fixed_generation_count_and_timestamp_identity) ... ok\ntest_main_serializes_v2_and_preserves_old_records_single_token (test_e152_request_timing.RequestTiming.test_main_serializes_v2_and_preserves_old_records_single_token) ... ok\ntest_missing_method_is_not_silently_dense (test_e152_request_timing.RequestTiming.test_missing_method_is_not_silently_dense) ... ok\ntest_model_failure_does_not_return_a_record (test_e152_request_timing.RequestTiming.test_model_failure_does_not_return_a_record) ... ok\ntest_single_token_has_ttft_but_no_tpot (test_e152_request_timing.RequestTiming.test_single_token_has_ttft_but_no_tpot) ... ok\n\n----------------------------------------------------------------------\nRan 8 tests in 0.037s\n\nOK\n"
+    },
+    {
+      "command": [
+        "python",
+        "-O",
+        "-W",
+        "error::ResourceWarning",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_longbench_request_capture.py",
+        "-v"
+      ],
+      "returncode": 0,
+      "stdout": "{\"schema\": \"longbench-paper-capture-plan-v1\", \"gpu_started\": false, \"supported\": \"Qwen3 manual greedy path only\", \"unsupported\": [\"samsum generate\", \"DeepSeek generate\", \"unknown attention forwards\"], \"support_observation\": \"separate pass required; not implemented by timing hooks\", \"execution\": \"disabled\"}\n",
+      "stderr": "test_duplicate_and_missing_layer_events_fail (test_longbench_request_capture.Capture.test_duplicate_and_missing_layer_events_fail) ... ok\ntest_exact_boundary_question_routing_and_token_identity (test_longbench_request_capture.Capture.test_exact_boundary_question_routing_and_token_identity) ... ok\ntest_first_eos_and_single_token_have_no_tpot (test_longbench_request_capture.Capture.test_first_eos_and_single_token_have_no_tpot) ... ok\ntest_get_pred_guard_failure_cannot_append_record (test_longbench_request_capture.Capture.test_get_pred_guard_failure_cannot_append_record) ... ok\ntest_get_pred_real_record_path_opt_in_and_default_disabled (test_longbench_request_capture.Capture.test_get_pred_real_record_path_opt_in_and_default_disabled) ... ok\ntest_guard_failure_and_model_failure_never_publish (test_longbench_request_capture.Capture.test_guard_failure_and_model_failure_never_publish) ... ok\ntest_native_hook_and_cleanup (test_longbench_request_capture.Capture.test_native_hook_and_cleanup) ... ok\ntest_new_request_counter_reset_or_missing_field_fails (test_longbench_request_capture.Capture.test_new_request_counter_reset_or_missing_field_fails) ... ok\ntest_nonfinite_reverse_and_zero_clock_rejected (test_longbench_request_capture.Capture.test_nonfinite_reverse_and_zero_clock_rejected) ... ok\ntest_plan_branch_precedes_seed_or_model_load (test_longbench_request_capture.Capture.test_plan_branch_precedes_seed_or_model_load) ... ok\ntest_unsupported_generate_and_incomplete_hooks (test_longbench_request_capture.Capture.test_unsupported_generate_and_incomplete_hooks) ... ok\n\n----------------------------------------------------------------------\nRan 11 tests in 0.013s\n\nOK\n"
+    }
+  ],
+  "not_validated": [
+    "GPU correctness and latency",
+    "real HF model and backend dispatch",
+    "quality",
+    "actual peak memory",
+    "concurrent JSON writers"
+  ]
+}

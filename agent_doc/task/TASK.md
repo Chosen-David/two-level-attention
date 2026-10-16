@@ -76,6 +76,8 @@
 
 ## 待办池（未排期，均有用户指令或审计来源）
 
+- [x] [TL-E152-TIMING-20261016] E152 连续请求 wall/TTFT、单 token TPOT及 -O 协议门禁修复；专项8项和捕获11项普通/-O通过。GPU路由/低扰动E2仍待验，非提速结果。([详情](task_details/TL-E152-TIMING-20261016.md))
+
 - [x] [TL-SPARQ-LIFECYCLE-20261016] B轨SparQ跨请求V_mean owner/length修复；专项12项、ops62项普通/-O及36场景144次decode逐位对照通过。GPU/真实模型及历史影响重测待办。([详情](task_details/TL-SPARQ-LIFECYCLE-20261016.md))
 
 - [x] [TL-MLA-MASK-20261015] MLA decode非恒等mask在cache更新前拒绝；50项普通/-O CPU回归与24合法路径逐位对照。显式CUDA mask新增归约/同步，性能及真实模型尚未验证。([详情](task_details/TL-MLA-MASK-20261015.md))

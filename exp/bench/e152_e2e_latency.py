@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""E152：decode-only e2e 请求时延采集器（figure_id=E2 主数据，evaluation.md 最小阶段设计）。
+"""E152：decode-only 请求时延诊断采集器（E2 候选，尚需 GPU/低扰动验收）。
 
 问题：dense-P/dense-D vs dense-P/sparse-D（TLI decode 稀疏）在完整 36 层请求上
 是否真正缩短请求——TTFT / TPOT / request wall / KV 内存。补 E127/E128 单层合成
@@ -9,7 +9,7 @@
   - 请求边界 host wall（入口到最后一个输出完成并同步）；阶段分解 CUDA sync 边界；
   - TTFT = prompt 前向（material+question）wall + 首 token 处理；
     两臂 prefill 均走原生 SDPA dense（qwen3_attn_patch L100 attention_interface，
-    TLI_SPARSE_PREFILL=0）——TTFT 公平对拍；
+    TLI_SPARSE_PREFILL=0）；实际派发尚未由本脚本核验；
   - TPOT = 首 token 后 decode wall / 其余实际生成 token 数；固定输出长度
     max_gen=128 无 early-stop（等工作量诊断口径，eval.md 允许；自然生成长度
     另由质量链承载）；
@@ -23,6 +23,8 @@
   - tli 臂 patch 计数 fail-closed（0 挂载即 SystemExit，同 pred.py B3）。
 
 每进程跑一臂×一 L×(warmup+repeats)，JSON 追加写 out；编排器负责交错。
+v2 保留逐步同步诊断，连续 wall 包含同步扰动，不是自然 serving 时延。
+v1 的分段和不能无损换算为 v2 request wall/TTFT，旧记录须保留并重采。
 """
 import argparse
 import gc
@@ -85,7 +87,13 @@ def sha(b):
 
 
 def timed_request(model, input_ids, max_gen, dev):
-    """一次完整请求计时：prefill wall / 逐 decode step wall / 峰值显存。"""
+    """连续模型入口→末 token 完成 wall；不含分词、输入 H2D 或清理。
+
+    保留逐步同步诊断，不能把本采集器当成低扰动 serving benchmark。
+    prefill_ms/decode_ms 是局部分段读数，不用于合成 request_wall_ms。
+    """
+    if type(max_gen) is not int or max_gen < 1:
+        raise ValueError("max_gen must be a positive integer")
     torch.cuda.reset_peak_memory_stats()
     base_mem = torch.cuda.memory_allocated()
     input_ids = torch.tensor([input_ids], dtype=torch.long, device=dev)
@@ -97,7 +105,11 @@ def timed_request(model, input_ids, max_gen, dev):
         torch.cuda.synchronize()
         prefill_ms = (time.perf_counter() - t0) * 1e3
         token = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
+        torch.cuda.synchronize()
+        first_output = time.perf_counter()
+        last_output = first_output
         step_ms = []
+        per_token_wall_ms = []
         for _ in range(max_gen - 1):
             torch.cuda.synchronize()
             t1 = time.perf_counter()
@@ -105,19 +117,41 @@ def timed_request(model, input_ids, max_gen, dev):
             cache = out.past_key_values
             token = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
             torch.cuda.synchronize()
-            step_ms.append((time.perf_counter() - t1) * 1e3)
-    torch.cuda.synchronize()
-    wall_ms = prefill_ms + sum(step_ms)
+            completed = time.perf_counter()
+            step_ms.append((completed - t1) * 1e3)
+            per_token_wall_ms.append((completed - last_output) * 1e3)
+            last_output = completed
+    wall_ms = (last_output - t0) * 1e3
+    decode_wall_ms = (last_output - first_output) * 1e3
     peak_delta_gib = (torch.cuda.max_memory_allocated() - base_mem) / 2**30
     return {
         "prefill_ms": prefill_ms,
         "decode_ms": sum(step_ms),
-        "tpot_ms": sum(step_ms) / len(step_ms),
+        "ttft_ms": (first_output - t0) * 1e3,
+        "decode_after_first_wall_ms": decode_wall_ms,
+        "tpot_ms": decode_wall_ms / len(step_ms) if step_ms else None,
         "request_wall_ms": wall_ms,
+        "request_start_timestamp": t0,
+        "first_output_timestamp": first_output,
+        "last_output_timestamp": last_output,
+        "per_token_wall_ms": per_token_wall_ms,
         "peak_mem_delta_gib": peak_delta_gib,
         "n_input_tokens": int(input_ids.shape[1]),
         "n_generated": max_gen,
     }
+
+
+def _validate_protocol(args):
+    """Reject mislabeled/empty E152 runs before loading a model, also under -O."""
+    if args.method not in ("none", "tli"):
+        raise ValueError("E152 requires --method none or tli")
+    for name, minimum in (("context_length", 1), ("max_gen", 1),
+                          ("repeats", 1), ("warmup", 0)):
+        value = getattr(args, name)
+        if type(value) is not int or value < minimum:
+            raise ValueError(f"{name} must be an integer >= {minimum}")
+    if args.method == "tli" and os.environ.get("TLI_SPARSE_PREFILL", "0") != "0":
+        raise ValueError("E152 是 decode-only 口径：TLI_SPARSE_PREFILL 必须为 0")
 
 
 def main():
@@ -134,9 +168,10 @@ def main():
     add_sparse_attn_args(parser)
     args = parser.parse_args()
 
-    if args.method == "tli":
-        assert not os.environ.get("TLI_SPARSE_PREFILL", "0") == "1", \
-            "E152 是 decode-only 口径：TLI_SPARSE_PREFILL 必须为 0"
+    try:
+        _validate_protocol(args)
+    except ValueError as exc:
+        parser.error(str(exc))
     os.environ.setdefault("TLI_SPARSE_PREFILL", "0")
 
     from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
@@ -177,9 +212,11 @@ def main():
             "yarn_factor": factor,
         })
         runs.append(rec)
+        tpot = "N/A" if rec["tpot_ms"] is None else f"{rec['tpot_ms']:.2f}ms"
         print(f"[E152] method={args.method} L={args.context_length} "
               f"run={r} prefill={rec['prefill_ms']:.1f}ms "
-              f"tpot={rec['tpot_ms']:.2f}ms wall={rec['request_wall_ms']:.1f}ms "
+              f"ttft={rec['ttft_ms']:.1f}ms tpot={tpot} "
+              f"wall={rec['request_wall_ms']:.1f}ms "
               f"peakΔ={rec['peak_mem_delta_gib']:.2f}GiB", flush=True)
         gc.collect()
         torch.cuda.empty_cache()
@@ -191,7 +228,7 @@ def main():
     kv_gib = 2 * args.context_length * layers * kvh * hd * 2 / 2**30
 
     record = {
-        "schema": "e152-e2e-latency-v1",
+        "schema": "e152-e2e-latency-v2",
         "caliber": {
             "commit": commit,
             "model": args.model_path,
@@ -199,9 +236,20 @@ def main():
             "torch": torch.__version__,
             "max_gen": args.max_gen,
             "early_stop": False,
+            "timer_api": "time.perf_counter (timestamps in seconds)",
+            "wall_boundary": "after input H2D+sync, before prompt forward -> last token argmax+sync",
+            "tokenization_included": False,
+            "input_h2d_included": False,
+            "sampling_included": "greedy argmax, no text decode/transport",
+            "instrumentation_mode": "per-step-device-synchronized",
+            "sync_policy": "device sync before request, after prefill, after first argmax, before/after each decode step",
+            "diagnostic_fields": ["prefill_ms", "decode_ms"],
+            "backend_verified": False,
             "prefill_backend": "native SDPA dense (both arms)",
-            "decode_backend": ("TLI sparse (K1=128 K2=1024 grp64 tail c4)"
+            "decode_backend": ("TLI sparse (configured treatment; route unverified)"
                                if args.method == "tli" else "native dense"),
+            "treatment_manifest": (json.loads(snapshot.manifest_json)
+                                   if snapshot is not None else None),
             "input_ids_sha256_16": sha(torch.tensor([ids]).numpy()
                                        .tobytes())[:16],
             "kv_theory_gib": round(kv_gib, 2),
@@ -212,7 +260,8 @@ def main():
     # 追加写（编排器交错多进程）
     existing = []
     if os.path.exists(args.out):
-        existing = json.load(open(args.out))
+        with open(args.out) as f:
+            existing = json.load(f)
     existing.append(record)
     with open(args.out, "w") as f:
         json.dump(existing, f, indent=1)
