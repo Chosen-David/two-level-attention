@@ -13,8 +13,9 @@ minmax 无漏上界保留之」的机理。v2 JSON 只有 64-token bin 聚合质
     （诊断简化：生产 L1 按 KV 组内 4 Q-head 均值、逐 KV 头选页；此处全局单一
     选择面，与图 (a) 的 GQA 组均质量口径一致）
   - 页 = o1 的 64-token bin（mid 内，[128, mid_hi)，末页可能不足 64）
-  - 单池预算 = 2048 token（与图 (a) oracle 单池条带相同）：按页分排序、
-    逐页累积 n_tok 至预算，与 fig_o_observation.py 的累积逻辑相同
+  - 单池预算 = 2048 token（与图 (a) oracle 单池条带相同）：按页分降序，
+    接纳前检查 acc + n_tok <= 预算，放不下则跳过该页继续（GPT 2026-10-16
+    审查修正：旧版先接纳后检查，128 条中至多 97 条超额、最大 2110 token）
   - 三臂：oracle（真实页质量和）、avg（页内 token 分均值）、
     minmax（Quest 上界 U_b = Σ_j z_q+·M_j + z_q-·m_j，逐 Q-head 计算后取 32 head 均值）
 
@@ -81,12 +82,16 @@ def minmax_bounds(q_row, k_all, pages):
 
 
 def select_pages(order_vals, ntoks, budget=BUDGET_TOK):
-    """按分值降序逐页累积至 token 预算（与 fig_o_observation.py 同逻辑）。"""
+    """按分值降序逐页累积；接纳前检查 acc+n_tok<=budget，放不下则跳过该页。
+
+    （与 fig_o_observation.py 同逻辑；GPT 审查修正：旧版先接纳后 break，
+    末页不足 64 token 时超额至 2110。跳过而非 break：后续更小的页仍可填。）
+    """
     sel = set()
     acc = 0
     for i in sorted(range(len(order_vals)), key=lambda i: -order_vals[i]):
-        if acc >= budget:
-            break
+        if acc + ntoks[i] > budget:
+            continue
         sel.add(i)
         acc += ntoks[i]
     return sel
@@ -94,7 +99,12 @@ def select_pages(order_vals, ntoks, budget=BUDGET_TOK):
 
 def main():
     if Path(OUT).exists():
-        raise SystemExit(f"output exists (x-mode): {OUT}")
+        if "--overwrite" in sys.argv:
+            # 预算修正重跑：旧 JSON（GPT 冻结哈希 3327e9…）被本版取代，
+            # 取代记录见 observation/e140_validity.json 与审查回复
+            Path(OUT).unlink()
+        else:
+            raise SystemExit(f"output exists (x-mode): {OUT}")
     torch.cuda.set_device(e.DEV)
     tok, model, _ = e.load_model()
     cells_out = []
@@ -188,15 +198,17 @@ def main():
             del qs, ks
             torch.cuda.empty_cache()
     meta = dict(
-        schema="e140b-pooling-anatomy-v1",
+        schema="e140b-pooling-anatomy-v2",
         status="diagnostic-mechanism-illustration",
         parent_trace="e140_o_trace_v2.json（同口径 import 复用）",
         budget_tok=BUDGET_TOK, subspace="tail32", scale=SCALE,
         score_rule="32 Q-head mean of z_q·z_k (own-group K), x 128^-0.5; "
                    "diagnostic single selection plane (production selects per KV head)",
         minmax_rule="Quest bound per Q-head, mean over 32 heads",
-        selection_rule="pages ranked by score, accumulated n_tok to budget "
-                       "(same as fig_o_observation.py oracle strip)",
+        selection_rule="pages ranked by score, accepted only if acc + n_tok "
+                       "<= budget else skipped (v2: GPT-review budget fix; "
+                       "v1 accepted-then-checked and could exceed budget)",
+        supersedes="v1 sha256 3327e95d044087d5efb8315a9cf9b33e778e6a4fa028861dddedc2179324f6a7",
         declared_revisions=_v2["meta"]["declared_revisions"],
         script_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         transformers=_v2["meta"]["transformers_version"],

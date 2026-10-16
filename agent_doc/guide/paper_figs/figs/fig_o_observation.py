@@ -5,26 +5,42 @@
 叙事链 = 分区+异构打分 → far 配额 → 子空间 → 逐层 gate：
 
   (a) 分区+异构打分创新点（token strip，真实数据，三条带）：一条 14K 真实 query
-      （musique s1 layer24 q=14212，预登记规则：q>9K 中 far 份额最接近 128 query
-      中位数者）的逐 64-token bin 质量条带（顶）+ oracle 质量单池 top-2048 选择
+      （musique s1 layer24 q=14212，固定示例披露：far 份额 0.494 = 128 query
+      第 55 百分位，非规则产出；同等代表性候选中稀释机理最清晰）的逐
+      64-token bin 质量条带（顶）+ oracle 质量单池 top-2048 选择
       （中）+ 共享 32 维子空间 avg 页分单池选择（底：红 = oracle 选中但 avg
-      稀释漏掉的页，✓ = minmax 无漏上界救回）。far 稀疏尖峰页（如 page@7936
-      单 token 占页质量 100%）被 avg 稀释误筛 → near 用 block-avg、far 用
-      minmax 上界的异构打分动机。数据源追加 e140b_pooling_anatomy.json
-      （同口径 import 复用 v2 采集器，页边界与 bin 逐一对齐断言）。
+      稀释漏掉的页，✓ = minmax 无漏上界救回）。far 稀疏尖峰页被 avg 稀释
+      误筛 → near 用 block-avg、far 用 minmax 上界的异构打分动机。数据源
+      追加 e140b_pooling_anatomy.json（同口径 import 复用 v2 采集器，页边界
+      与 bin 逐一对齐断言）。
   (b) far 配额创新点（排序捕获率曲线）：128 条 query 按单池 far 捕获率升序，
-      配额臂（far 区 oracle top-1024/2048）同序绘制，竖直间隙 = 逐 query 保底
-      收益——最差 0.00→0.26、p10 0.20→0.34、弥散 0.41→0.52；配额是防挤出
-      下限保底，非均值增益。
+      配额臂（far 区 oracle top-1024/2048）同序绘制；正间隙填色 = 配额获益，
+      负间隙（43/128 条配额更低）同样填色披露。两臂最小值不配对（单池 0.00
+      有三条并列 query，配额臂 0.27 来自另一条）——配额是防挤出下限保底，
+      非均值增益。
   (c) 子空间创新点（不变）：同 32/128 维预算 tail32 0.84 vs random32 0.51
       vs high32 0.24（v2 主指标 selected_mass_over_reference_topk_mass）。
-  (d) D' gate 创新点：E6 逐层 far mass 热图（16 样本 × 36 层，log 色标）——
-      24/36 层中位数 <0.01；逐 prompt 有 12–32 层 far 极轻 → 逐层 far gate。
+  (d) D' gate 创新点：E6 逐层 far mass 热图（16 样本 × 36 层，log 色标，
+      单一来源 e6b_far_profiles.json）——24/36 层逐样本中位 <0.01；同一
+      热图逐 prompt 计数有 12–32 层 <0.01 → 逐层 far gate。
+
+2026-10-16 GPT 统计审查（e5f5b7e）修正并入：
+  1) 预算：所有选择循环改为接纳前检查 acc+n_tok<=预算，放不下跳过
+     （旧版先接纳后检查，全局/oracle/avg 至多 97/128 条超额、最大 2110 token）；
+  2) 区域归属：bin 绝对区间 [q-d_hi, q-d_lo+1) 对照 region_bounds.near_lo
+     （旧规则 d_lo>=near_len 把 65/128 个近区 token 误计入 far；far 份额
+     中位数 0.49550018 → 0.45642671）；本批 bin 均不跨界，fail-closed 断言；
+  3) panel (b) 两臂最小值分离披露 + 逐 query 差值保留负号；
+  4) 代表点披露统一为固定示例（撤销 docstring/TSV 残留的 closest-median 规则
+     说法——该旧规则实际产出 L8 q13158，与固定点不符）；
+  5) panel (d) 撤销 e6_layer_skip.json（仅 10 prompt 的异源摘要），skip 范围
+     改从同一张 16×36 热图逐行计数（交叉验证 hotpotqa_0=22 等与 GPT 一致）。
 
 数据源（全部为有效输入，不再使用 O4 v2——其部分末页缺陷见 E140_VALIDITY.md，
 本图不含 O4 面板，因此无需历史诊断警示）：
   e140_o_trace_v2.json（O1/O3，采集器已修复：实际 q_norm/k_norm + 实际 RoPE）
-  e6b_far_profiles.json / e6_layer_skip.json（E6 逐层 far profile，gate 标定同源）
+  e140b_pooling_anatomy.json（E140b 页级 pooling 解剖，v2 预算修正版）
+  e6b_far_profiles.json（E6 逐层 far profile，gate 标定同源；panel d 单一来源）
 
 输出 PDF+PNG+SVG + figure_data.tsv（含 (b) 全部 128 个散点、(d) 全矩阵）。
 """
@@ -50,8 +66,7 @@ REPO = "/home/wangyuanshuo02/two-level-attention"
 SRC = os.path.join(REPO, "exp/trace/results/e140_o_trace_v2.json")
 SRCB = os.path.join(REPO, "exp/trace/results/e140b_pooling_anatomy.json")
 SRC6B = os.path.join(REPO, "exp/trace/results/e6b_far_profiles.json")
-SRC6 = os.path.join(REPO, "exp/trace/results/e6_layer_skip.json")
-for _p in (SRC, SRCB, SRC6B, SRC6):
+for _p in (SRC, SRCB, SRC6B):
     if not os.path.exists(_p):
         raise SystemExit(f"missing input: {_p}")
 OUT = os.path.join(REPO, "agent_doc", "guide", "paper_figs", "figs")
@@ -80,23 +95,39 @@ cells = d["cells"]
 db = json.load(open(SRCB))
 
 # ================= (a) 代表 query 的 token strip =================
-# repr query 固定为 musique s1 L24 q=14212（披露：far 份额 0.498 ≈ 128 query
-# 中位数 0.496，区域质量分段有代表性；同满足该代表标准的候选中，该 query 的
-# avg 稀释机理最清晰——尖峰页单 token 占页质量 100%。身份与手稿 caption 一致）
+# repr query 固定为 musique s1 L24 q=14212（披露：固定示例，非规则产出——
+# far 份额 0.494 = 128 query 第 55 百分位、中位 0.456，区域质量分段有代表性；
+# 同等代表性候选中其 avg 稀释机理最清晰。身份与手稿 caption 一致）
 BUDGET_TOK = 2048  # 单池预算（mid token）
 
 
+def bin_region(o, b):
+    """bin 绝对区间 [q-d_hi, q-d_lo+1) 对照 region_bounds.near_lo 归属近远。
+
+    GPT 2026-10-16 审查修正：旧规则 d_lo>=near_len 比较的是「距离」与「近区
+    长度」两个不同量纲，在全部 128 行把 65 或 128 个近区 token 误计入 far
+    （far 份额中位 0.4955→0.4564）。本批 bin 均不跨近远边界，fail-closed。
+    """
+    q, nl = o["q_pos"], o["region_bounds"]["near_lo"]
+    lo, hi = q - b["d_hi"], q - b["d_lo"] + 1
+    assert not (lo < nl < hi), \
+        f"bin straddles near boundary: q={q} ({lo},{hi}) near_lo={nl}"
+    return "far" if hi <= nl else "near"
+
+
 def far_share(o):
-    nl = o["near_len"]
-    fm = sum(b["mass"] for b in o["bins"] if b["d_lo"] >= nl)
+    fm = sum(b["mass"] for b in o["bins"] if bin_region(o, b) == "far")
     mm = sum(b["mass"] for b in o["bins"])
     return fm / mm if mm > 0 else 0.0
 
 
 share_med = float(np.median([far_share(o) for c in cells for o in c["o1"]]))
+share_all = np.array([far_share(o) for c in cells for o in c["o1"]])
 c_a = next(c for c in cells if c["task"] == "musique" and c["sample"] == 1
            and c["layer"] == 24)
 o_a = next(o for o in c_a["o1"] if o["q_pos"] == 14212)
+share_a = far_share(o_a)
+share_pct = float((share_all < share_a).mean() * 100)
 rb = o_a["region_bounds"]
 bins_a = o_a["bins"]
 nl_a = o_a["near_len"]
@@ -111,17 +142,20 @@ order = np.argsort([q_a - b["d_hi"] for b in bins_a])
 mass_a = mass_a[order]
 ntok_a = ntok_a[order]
 
-# 单池 top-2048（按实测 bin 质量排序 = 任意打分单池的质量捕获上界）
+# 单池 top-2048（按实测 bin 质量排序 = 任意打分单池的质量捕获上界；
+# 接纳前检查 acc+n_tok<=预算，放不下则跳过——GPT 审查修正：旧版先接纳后
+# break，末页不足 64 token 时全局/oracle 至多 97/128 条超额、最大 2110）
 rank_idx = np.argsort(-mass_a)
 acc = 0
 sel_mask = np.zeros(len(mass_a), bool)
 for i in rank_idx:
-    if acc >= BUDGET_TOK:
-        break
+    if acc + ntok_a[i] > BUDGET_TOK:
+        continue
     sel_mask[i] = True
     acc += ntok_a[i]
+oracle_tok_a = int(acc)  # (b) 循环会复用 acc 变量名，此处留存
 pos_c = np.array([(q_a - b["d_hi"] + q_a - b["d_lo"]) / 2 for b in bins_a])[order]
-is_far = pos_c < rb["near_lo"]  # mid_lo=sink_hi，far = [sink_hi, near_lo)
+is_far = np.array([bin_region(o_a, b) == "far" for b in bins_a])[order]
 fm_a = mass_a[is_far].sum()
 nm_a = mass_a[~is_far].sum()
 fcap_a = mass_a[is_far & sel_mask].sum() / fm_a
@@ -154,13 +188,12 @@ if spike is None:
 tm = spike["token_mass"]
 spike_top1 = max(tm) / sum(tm)
 
-# 跨 query 集中度：far 前 5% bin 携带的 far 质量比
+# 跨 query 集中度：far 前 5% bin 携带的 far 质量比（修正后区域归属）
 conc = []
 for c in cells:
     for o in c["o1"]:
-        nl = o["near_len"]
-        fms = sorted((b["mass"] for b in o["bins"] if b["d_lo"] >= nl),
-                     reverse=True)
+        fms = sorted((b["mass"] for b in o["bins"]
+                      if bin_region(o, b) == "far"), reverse=True)
         if fms and sum(fms) > 0:
             k = max(1, int(0.05 * len(fms)))
             conc.append(sum(fms[:k]) / sum(fms))
@@ -171,8 +204,7 @@ FAR_QUOTA = 1024  # 保底配额臂：far 区内 oracle top-1024（总预算 204
 
 
 def far_cap_quota(o):
-    nl = o["near_len"]
-    fbins = sorted((b for b in o["bins"] if b["d_lo"] >= nl),
+    fbins = sorted((b for b in o["bins"] if bin_region(o, b) == "far"),
                    key=lambda b: -b["mass"])
     fm = sum(b["mass"] for b in fbins)
     if fm <= 0:
@@ -180,50 +212,58 @@ def far_cap_quota(o):
     acc = 0
     fc = 0.0
     for b in fbins:
-        if acc >= FAR_QUOTA:
-            break
+        if acc + b["n_tok"] > FAR_QUOTA:  # 接纳前检查（GPT 审查修正）
+            continue
         acc += b["n_tok"]
         fc += b["mass"]
     return fc / fm
 
 
-scat = []  # (task, far_share, far_capture, near_capture, far_capture_quota)
+# (identity, task, far_share, far_capture, near_capture, far_capture_quota)
+scat = []
 for c in cells:
     for o in c["o1"]:
-        nl = o["near_len"]
         bins = o["bins"]
-        fm = sum(b["mass"] for b in bins if b["d_lo"] >= nl)
-        nm = sum(b["mass"] for b in bins if b["d_hi"] <= nl)
-        mm = sum(b["mass"] for b in bins)
+        regs = [bin_region(o, b) for b in bins]
+        fm = sum(b["mass"] for b, r in zip(bins, regs) if r == "far")
+        nm = sum(b["mass"] for b, r in zip(bins, regs) if r == "near")
+        mm = fm + nm
         if fm <= 0 or mm <= 0:
             continue
-        ranked = sorted(bins, key=lambda b: -b["mass"])
+        ranked = sorted(zip(bins, regs), key=lambda br: -br[0]["mass"])
         acc = 0
         fcap = ncap = 0.0
-        for b in ranked:
-            if acc >= BUDGET_TOK:
-                break
+        for b, r in ranked:
+            if acc + b["n_tok"] > BUDGET_TOK:  # 接纳前检查，放不下跳过
+                continue
             acc += b["n_tok"]
-            if b["d_lo"] >= nl:
+            if r == "far":
                 fcap += b["mass"]
-            elif b["d_hi"] <= nl:
+            else:
                 ncap += b["mass"]
-        scat.append((c["task"], fm / mm, fcap / fm,
+        scat.append((f"{c['task']}:s{c['sample']}:L{c['layer']}:q{o['q_pos']}",
+                     c["task"], fm / mm, fcap / fm,
                      ncap / nm if nm > 0 else np.nan, far_cap_quota(o)))
-scat = np.array([(s, f, n, q) for _, s, f, n, q in scat])
-tasks = [t for t, *_ in [(c["task"],) for c in cells for o in c["o1"]
-                         if sum(b["mass"] for b in o["bins"] if b["d_lo"] >= o["near_len"]) > 0
-                         and sum(b["mass"] for b in o["bins"]) > 0]]
+ids_b = [s[0] for s in scat]
+tasks = [s[1] for s in scat]
+scat = np.array([s[2:] for s in scat])
 sh, fc, nc, qc = scat[:, 0], scat[:, 1], scat[:, 2], scat[:, 3]
 nc_mean = float(np.nanmean(nc))
 fc_mean = float(np.mean(fc))
 fc_diffuse = float(np.mean(fc[sh <= 0.4]))
-fc_heavy = float(np.mean(fc[sh > 0.6]))
-n_under = float(np.mean(nc > fc))
 qc_mean = float(np.mean(qc))
 qc_diffuse = float(np.mean(qc[sh <= 0.4]))
 fc_p10, qc_p10 = float(np.percentile(fc, 10)), float(np.percentile(qc, 10))
-fc_min, qc_min = float(fc.min()), float(qc.min())
+# GPT 审查点 3：两臂最小值不配对——分别定位身份，逐 query 差值保留负号
+diff_b = qc - fc
+n_neg = int((diff_b < 0).sum())
+fc_min = float(fc.min())
+fc_min_ids = [ids_b[i] for i in np.where(fc == fc_min)[0]]
+qc_at_fcmin = [float(qc[i]) for i in np.where(fc == fc_min)[0]]
+qc_min = float(qc.min())
+i_qcmin = int(np.argmin(qc))
+qc_min_id = ids_b[i_qcmin]
+fc_at_qcmin = float(fc[i_qcmin])
 
 # ================= (c) O3 三臂（主指标 selected/reference topK mass） =================
 arms = ["tail32", "random32", "high32"]
@@ -238,8 +278,9 @@ arm_val = {a: [float(np.mean([c["o3"][a][mm]["mean"] for c in cells]))
                for mm in mets_all] for a in arms}
 
 # ================= (d) E6 逐层 far mass 热图 =================
+# GPT 审查点 5：撤销 e6_layer_skip.json（仅 10 prompt 的异源摘要），
+# 逐 prompt 计数改从同一张 16×36 热图按 <0.01 重数（单一来源）。
 d6b = json.load(open(SRC6B))
-d6 = json.load(open(SRC6))
 ROW_ORDER = ["lb_gov_report_0", "lb_gov_report_1", "lb_hotpotqa_0",
              "lb_hotpotqa_1", "lb_multifieldqa_en_0", "lb_multifieldqa_en_1",
              "lb_musique_0", "lb_musique_1", "lb_narrativeqa_0",
@@ -257,7 +298,7 @@ ROW_LAB = {"lb_gov_report_0": "gov_0", "lb_gov_report_1": "gov_1",
 M = np.array([d6b[k] for k in ROW_ORDER])  # 16 x 36
 lay_med = np.median(M, axis=0)
 n_light = int((lay_med < 0.01).sum())
-skip_rng = [v["n_skippable"] for v in d6["per_prompt"].values()]
+skip_rng = (M < 0.01).sum(axis=1)  # 逐 prompt <0.01 层数（同源重算）
 
 # ================= 画布 2x2（IEEE 双栏 \textwidth≈7.16in，缩放比 ≈0.75，
 # 有效字号 ≈ title 11 / label 9.8 / tick 8.6pt） =================
@@ -335,8 +376,10 @@ cb.set_label("mass (log)", fontsize=AN - 1.5)
 cb.ax.tick_params(labelsize=TK - 3)
 
 # ---- (b) 排序捕获率曲线：全局单池 vs far 保底配额 ----
-# 设计：128 条 query 按单池 far 捕获率升序排列，配额臂按同一 query 顺序绘制，
-# 两线间竖直间隙 = 该 query 的保底收益；填充间隙直观呈现「尾部保底」。
+# 设计：128 条 query 按单池 far 捕获率升序排列，配额臂按同一 query 顺序绘制。
+# GPT 审查点 3：两臂最小值不配对（单池 0.00 有并列 query，配额臂最小值来自
+# 另一条 query），图内不再画「单 query 配对提升」箭头；正间隙填主色、负间隙
+# （配额更低的 query）填警示色分别披露，最小值数值以 arm minima 口径标注。
 order_b = np.argsort(fc)
 rk = np.arange(1, len(fc) + 1)
 fc_s, qc_s = fc[order_b], qc[order_b]
@@ -346,14 +389,12 @@ ax_b.plot(rk, qc_s, color=C_HL, lw=LW, linestyle="--",
           label=f"+ far quota {FAR_QUOTA}/{BUDGET_TOK} ({qc_mean:.2f})")
 ax_b.fill_between(rk, fc_s, qc_s, where=qc_s > fc_s,
                   color=C_HL, alpha=0.15, lw=0)
+ax_b.fill_between(rk, fc_s, qc_s, where=qc_s < fc_s,
+                  color=C_MISS, alpha=0.12, lw=0)
 ax_b.axhline(nc_mean, color=C_NEU, lw=1.8, linestyle=":",
              label=f"near capture: {nc_mean:.2f}")
-# 最差情况保底箭头（最左端 = 单池捕获最低的 query）
-i0 = int(np.argmin(fc_s))
-ax_b.annotate("", xy=(rk[i0], qc_s[i0]), xytext=(rk[i0], fc_s[i0]),
-              arrowprops=dict(arrowstyle="->", color=C_HL, lw=1.8))
-ax_b.text(rk[i0] + 4, 0.055,
-          f"worst {fc_min:.2f}→{qc_min:.2f}",
+# 两臂各自最小值（不配对；身份与负差计数见 caption）
+ax_b.text(4, 0.06, f"arm minima {fc_min:.2f}→{qc_min:.2f} (unpaired)",
           fontsize=AN - 1.5, color=C_HL, va="center",
           bbox=dict(boxstyle="round,pad=0.2", facecolor="white",
                     edgecolor="none", alpha=0.85))
@@ -418,10 +459,13 @@ export(fig, "O_observation")
 # ---------------- figure_data.tsv ----------------
 rows = ["figure_id\tpanel_id\tarm_id\tmetric_id\tunit\testimate\tsource_run_id\tsource_field"]
 src = os.path.basename(SRC)
-rows.append(f"O\ta\trepr_query\tidentity\t-\t{c_a['task']}:s{c_a['sample']}:L{c_a['layer']}:q{q_a}\t{src}\tfar_share closest to median among q_pos>9000")
+rows.append(f"O\ta\trepr_query\tidentity\t-\t{c_a['task']}:s{c_a['sample']}:L{c_a['layer']}:q{q_a}\t{src}\tfixed illustrative example (not rule-derived): far share {share_a:.4f} = pct{share_pct:.0f} of 128 queries, median {share_med:.4f}; clearest dilution anatomy among comparably representative candidates")
+rows.append(f"O\ta\trepr_query\tfar_share\tfrac\t{share_a:.4f}\t{src}\tbins, absolute-position region attribution")
+rows.append(f"O\ta\tall_queries\tfar_share_median\tfrac\t{share_med:.4f}\t{src}\tbins, absolute-position region attribution")
 rows.append(f"O\ta\trepr_query\tfar_tok_frac\tfrac\t{far_tok_frac:.4f}\t{src}\tbins")
-rows.append(f"O\ta\trepr_query\tsingle_pool_near_capture\tfrac\t{ncap_a:.4f}\t{src}\tbin mass-rank top-{BUDGET_TOK}")
-rows.append(f"O\ta\trepr_query\tsingle_pool_far_capture\tfrac\t{fcap_a:.4f}\t{src}\tbin mass-rank top-{BUDGET_TOK}")
+rows.append(f"O\ta\trepr_query\tsingle_pool_near_capture\tfrac\t{ncap_a:.4f}\t{src}\tbin mass-rank top-{BUDGET_TOK}, accept-if-fits")
+rows.append(f"O\ta\trepr_query\tsingle_pool_far_capture\tfrac\t{fcap_a:.4f}\t{src}\tbin mass-rank top-{BUDGET_TOK}, accept-if-fits")
+rows.append(f"O\ta\trepr_query\toracle_strip_tokens\tcount\t{oracle_tok_a}\t{src}\tbudget {BUDGET_TOK}, accept-if-fits (GPT-review fix)")
 srcb = os.path.basename(SRCB)
 rows.append(f"O\ta\trepr_query\tavg_pool_miss_pages\tcount\t{len(missed)}/{len(sel_o)}\t{srcb}\tsingle pool {BUDGET_TOK} tok, 32-dim tail subspace avg page score")
 rows.append(f"O\ta\trepr_query\tavg_pool_miss_mass_frac\tfrac\t{miss_frac:.4f}\t{srcb}\tmissed oracle mass / oracle mass")
@@ -440,7 +484,8 @@ rows.append(f"O\tb\tdiffuse(share<=0.4)\tfar_capture\tfrac\t{fc_diffuse:.4f}\t{s
 rows.append(f"O\tb\tquota{FAR_QUOTA}\tfar_capture_mean\tfrac\t{qc_mean:.4f}\t{src}\tfar-region top-{FAR_QUOTA}")
 rows.append(f"O\tb\tquota{FAR_QUOTA}\tfar_capture_diffuse\tfrac\t{qc_diffuse:.4f}\t{src}\tfar-region top-{FAR_QUOTA}")
 rows.append(f"O\tb\tall\tfar_capture_p10_single_vs_quota\tfrac\t{fc_p10:.4f},{qc_p10:.4f}\t{src}\t-")
-rows.append(f"O\tb\tall\tfar_capture_min_single_vs_quota\tfrac\t{fc_min:.4f},{qc_min:.4f}\t{src}\t-")
+rows.append(f"O\tb\tall\tfar_capture_arm_minima_unpaired\tfrac\t{fc_min:.4f},{qc_min:.4f}\t{src}\tsingle-pool min queries: {';'.join(fc_min_ids)} (quota there: {','.join(f'{v:.4f}' for v in qc_at_fcmin)}); quota-arm min query: {qc_min_id} (single {fc_at_qcmin:.4f})")
+rows.append(f"O\tb\tall\tper_query_diff_negative\tcount\t{n_neg}/{len(fc)}\t{src}\tquota minus single, negatives kept (GPT-review fix)")
 for a in arms:
     for mm, v in zip(mets_all, arm_val[a]):
         rows.append(f"O\tc\t{a}\t{mm}\tfrac\t{v:.4f}\t{src}\to3.{a}.{mm}.mean")
@@ -448,7 +493,7 @@ for k, row in zip(ROW_ORDER, M):
     for li, v in enumerate(row):
         rows.append(f"O\td\t{k}\tfar_mass\tfrac\t{v:.4e}\te6b_far_profiles.json\tlayer={li}")
 rows.append(f"O\td\tall\tlayers_median_lt_0.01\tcount\t{n_light}\te6b_far_profiles.json\t-")
-rows.append(f"O\td\tall\tskippable_layers_per_prompt\trange\t{min(skip_rng)}-{max(skip_rng)}\te6_layer_skip.json\t-")
+rows.append(f"O\td\tall\tlayers_lt_0.01_per_prompt\trange\t{int(skip_rng.min())}-{int(skip_rng.max())}\te6b_far_profiles.json\trecomputed per-row from the same 16x36 heatmap (single source; GPT-review fix: e6_layer_skip.json 10-prompt summary withdrawn)")
 with open(os.path.join(OUT, "O_observation_figure_data.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 print("exported O_observation_figure_data.tsv")
