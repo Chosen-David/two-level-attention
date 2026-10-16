@@ -19,14 +19,27 @@ def fetch(row,recursive=False):
         raise ValueError('unsafe source cache path')
     if not row['repository'].startswith('https://github.com/'):
         raise ValueError('only registered official GitHub HTTPS sources supported')
+    marker=path/'.git/tla-offline-source.json'
+    identity={'repository':row['repository'],'requested_object':row['requested_object'],'commit':row['commit']}
+    needs_fetch=False
     if path.exists():
         if not (path/'.git').is_dir():raise ValueError('existing cache is not a standalone checkout')
         if git(path,'status','--porcelain'):raise ValueError('existing source has changes; refusing to overwrite')
-        head=git(path,'rev-parse','HEAD')
-        if head!=row['commit']:raise ValueError('existing source is at another revision; preserve it and inspect manually')
+        try:
+            head=git(path,'rev-parse','--verify','HEAD')
+        except subprocess.CalledProcessError:
+            # Only resume an unborn checkout that this tool created for this pin.
+            if not marker.is_file() or json.loads(marker.read_text())!=identity:
+                raise ValueError('unborn cache has no matching acquisition receipt; inspect manually')
+            needs_fetch=True
+        else:
+            if head!=row['commit']:raise ValueError('existing source is at another revision; preserve it and inspect manually')
     else:
         path.mkdir(parents=True)
         git(path,'init')
+        marker.write_text(json.dumps(identity,sort_keys=True)+'\n')
+        needs_fetch=True
+    if needs_fetch:
         git(path,'fetch','--depth=1',row['repository']+'.git',row['requested_object'])
         git(path,'checkout','--detach','FETCH_HEAD')
     if git(path,'rev-parse','HEAD') != row['commit']:raise ValueError('pinned commit mismatch')

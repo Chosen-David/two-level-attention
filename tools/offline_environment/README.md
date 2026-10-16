@@ -139,7 +139,7 @@ python3.12 tools/offline_environment/bootstrap_baseline_cpu.py \
 - Four real documents rebuilt in an isolated copy: 6/6/8/8 pages; alternate
   TeX/font root lookup also compiled. This is build verification, not scientific
   acceptance or visual review. No rebuilt deliverables were committed.
-- 8 offline-safety tests pass normally and under `-O`; tests declare their target
+- 9 offline-safety tests pass normally and under `-O`; tests declare their target
   platform and reject tampering, traversal, musl, incompatible ABI and overwrite.
 - Existing `tests/test_baseline_integration.py`: **12 pass / 3 SparQ failures**,
   both normal and `-O`. Unchanged main source/test expectations differ in

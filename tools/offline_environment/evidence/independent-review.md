@@ -28,3 +28,11 @@ Acceptance scope: paper Python bundle on its declared platform; not complete
 system/native baseline/target-host offline readiness. New locked Debian helper
 and baseline replay added after the review are owner-tested, not independently
 certified by that original review.
+
+Incremental read-only review covered the new locked Debian downloader, baseline
+bootstrap, fetcher, cache paths and exact lock ignore exceptions. Reviewer found
+that an interrupted initial source fetch left an unborn checkout that could not
+resume. Fixed with a `.git` acquisition receipt bound to URL/object/commit;
+only a matching clean unborn cache can retry. An actual local Git fixture proves
+interruption -> retry -> pinned checkout and preserves/rejects dirty work. No
+network needed for this regression. Nine total tests now run normal and `-O`.

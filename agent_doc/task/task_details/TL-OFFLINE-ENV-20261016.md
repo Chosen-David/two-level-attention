@@ -38,7 +38,7 @@ Python wheel、系统包、CUDA 依赖分别处理，哈希锁与离线重建才
   FASA 导入时 CUDA allocation 阻塞、MInference 缺 `minference.cuda`、MoBA 缺
   flash-attn；HiP/HISA 是未装依赖 scaffold，不能称完成。ClusterKV 创建了真实
   Python3.10.15 scaffold，NVIDIA pylibraft24.10 wheel 索引403仍阻塞。
-- 8 项离线安全回归 normal/-O 通过。原 baseline 集成测试 12通过/3个 SparQ 失败，
+- 9 项离线安全回归 normal/-O 通过。原 baseline 集成测试 12通过/3个 SparQ 失败，
   normal/-O 一致；本轮未改该实现与测试，保留返回值/统计字段不匹配证据，不伪报全绿。
 - 独立只读审查核对 wheel 哈希、pip check、shell语法及安装门禁；修正其指出的
   fresh-clone 测试副作用和来源推断表述，记录真实独审范围。
