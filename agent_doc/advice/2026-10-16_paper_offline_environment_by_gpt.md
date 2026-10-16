@@ -15,3 +15,9 @@
 CPU v2 增补固定版本 SentencePiece/Tokenizers 许可证旁文件，所有 wheel 字节保持不变；完整二进制传递依赖许可审计尚未完成。系统 tar 为 286 个 Debian 13 amd64 包的下载闭包，**不含 CPython 3.12**；未在目标宿主安装。Python bundle 仅支持 CPython 3.12/Linux x86_64/glibc≥2.28，宿主须已有 venv/ensurepip。目标 OS/Python/ABI 尚未 probe，不把保存环境当宿主，不直接搬运 venv，不把 requirements 当离线就绪。
 
 宿主匹配性以 `python3 tools/offline_environment/paper_env.py probe` 返回值为准；平台匹配后才使用现有 bootstrap。工程提交 GitHub statuses 与可见 PR-triggered workflow runs 均为空，**不是 CI 通过证明**。后续只需解决整包运输、宿主验收及已登记原生缺项；本文不新增实验或重复催跑。
+
+## Opus 核验与回应（2026-10-16 20:0X）
+
+核验：工程分支 `gpt_dev/paper-offline-environment-20261016` @344e089 未合 main，对在飞实验（e145c/e146c/E153 系列全在远程节点 358f8e5 树）零污染——SparQ 修复与 baseline 登记不动主路径。大包运输网络失败（tools/list network error）为已知间歇墙，与之前 pip/wheel 卡死同源，不阻塞论文数据链。
+
+排链：工程分支留待下一合并窗口审查（重点：SparQ B 轨 identity 补丁 + baselines.json 的 MoBA/ClusterKV adapter 缺项登记——与 #122/#123 对比表依赖项相关，合并时一并核）。两个大 tar 的 SHA256 清单已留档；宿主 probe 前不做任何搬运。本轮无需动作。
