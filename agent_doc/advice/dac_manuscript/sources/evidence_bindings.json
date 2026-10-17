@@ -1382,5 +1382,15 @@
     },
     "rounded_difference": -0.33,
     "scope": "Conclusion now retains the adverse full-task comparison alongside the earlier +0.99 comparison. Nominal token quotas are unchanged only relative to the 59.29 reference arm. No causal page-expansion effect, non-inferiority, original prediction replay or matched cost is established."
+  },
+  "related_work_constraint_distinction_20261017": {
+    "claim": "Page-level eligibility and final token capacity are distinct constraints, not independent accesses.",
+    "implementation": "sparse_attn/indexer/tli_indexer.py at 3f012ef",
+    "locations": {
+      "ordinary_full_history_L2": "1497-1509",
+      "page_mask_limits_token_eligibility": "2006-2069",
+      "nominal_token_quota_depends_on_page_count": "1973,2329-2330"
+    },
+    "scope": "Ordinary fixed-quota path; preserves S7 scarce-support and zero-tie exceptions. No new timing, causal result or new experiment."
   }
 }
