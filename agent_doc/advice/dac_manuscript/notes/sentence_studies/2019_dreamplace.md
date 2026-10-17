@@ -95,3 +95,34 @@
 - paper_en.tex Related Work P1：AsyncTLS 功劳句后插入 "However, these selectors rank candidates in a single pool, without guaranteed minimum capacity for either region."（Token-Picker P3 缺口句式；后句 "We study these existing components with ... independent near--far page quotas" 自然承接为解法）。
 - paper_zh.tex 直译同步（「然而，这些选择器在单一池中排序候选，不为任一区域保证最低容量。」）。
 - 附带：本轮开始前按用户指令完成**远端对齐**——远端 471a83b（Metrics 段 retention 分母拆分 (b)/(c) 两图定义）裁决采纳，本地第 3-6 轮修改提交后 merge，PDF 冲突以重编译解决，合并后五处标记句全部存活。
+
+---
+
+## §3 The DREAMPlace Algorithms（第 9 轮，2026-10-17）
+
+### §3 开篇（~9 句）：流程总览 + 设计决策数字 + 范围声明
+句链：图句（"Our overall placement flow is given in Figure 2(b)"）→ **差异披露句**（"It is slightly different from the typical one that starts from bound-to-bound initial placement"——诚实声明与惯例的差异）→ **观察+双数字**（"We observe that starting from a random initial placement also achieves the same quality (<0.04% difference) with significantly less runtime (21.1% in Figure 3)"——设计决策绑定量化双口径）→ 实现细节句（高斯噪声、0.1% 尺度）→ kernel 循环定义句 → legalization/detailed placement 各一句 → **范围声明句**（"The rest of this section will focus on GPU acceleration to the ePlace/RePlAce algorithm"——限定本节范围）。
+
+**启示**：设计决策（随机初始化 vs 惯例 bound-to-bound）**当场带数字论证**（<0.04% 质量差 + 21.1% 省时），不是留到实验节。范围声明句限定节内焦点。
+
+### §3.1 Wirelength Forward and Backward（数学+实现小节范式）
+句链：**As 依托句**（"As RePlAce adopts WA wirelength, we use WA as an example"——依托前作选择示例）→ **扩展声明句**（"Similar insights also apply to other wirelength costs like LSE, which is also implemented"——示例的通用性）→ **For brevity 限定句**（只讨论 x 方向）→ **实现披露句**（"The real implementation will separate the computation for x and y into different GPU streams as they are independent"——For brevity 省略的部分在真实实现里的状况）→ **数值陷阱句**（"Direct implementation of WA wirelength ... may result in numerical overflow, so we convert ..."——朴素实现的坑 + 等价变换解法，"which is an equivalent transformation" 显式声明等价性）→ 公式 (4) → **朴素方案否定句**（"A naive parallelization scheme is to allocate one thread per net. This scheme ... only demonstrated limited speedup because ..."——naive 方案 + 引文 + 因为从句：线程数上限 + 负载不均双原因）→ **Noting 归并句**（"Noting that |P| is much larger than |E|, we consider pin-level parallelization"——由规模事实推出设计）→ 依赖图句 + 四步编号列举 → 算法图句 → 三个实现披露句（inline 为了简短 / ± 计算实际分流 / 六个 kernel 与原子操作类型）→ **与前作分歧行动句**（"Although [15] suggests to use sparse matrix-vector multiplication ..., we find that the atomic addition is faster, as matrix-vector multiplication is a more general task. A detailed comparison will be made in the experimental results."——Although 前作建议 + 我们的实测发现 + as 归因 + 前向引用实验节）。
+
+**启示**（与我们 §III 最相关的三点）：
+1. **数值陷阱句式**：朴素实现 → 坑 → 等价变换 → "which is an equivalent transformation" 显式声明。我们的对应物：量化-反量化披露（"16 levels, not packed four-bit storage or INT4"），是类型披露非陷阱披露，不需要加。
+2. **Although 前作建议分歧句**：这是我们 Related Work "credit-then-gap" 的实现级版本——第 7 轮已加 P1 层面的 However 缺口句。我们的原子级对应物是 L2 满历史评分 vs Token-Picker 按需访问的分歧（已在 Related Work P2 "our coordinate-based scorer instead retains full-dimensional KV" 表达），达标。
+3. **规模归并句**（"Noting that |P|≫|E|, we consider..."）：由不变量事实推出设计决策。我们的对应物：Quest 极值构造段 "Each signed coordinate contribution is bounded by its chosen extremum, so..."（性质→保证），结构等价，达标。
+
+### §3.2 Density + §3.2.1 DCT/IDCT
+- "Backward and forward of density cost is another bulk computation."（**another 承接句**——小节间并列衔接）。
+- 四步列举 + "Steps 2 and 3 are the bulk computation parts, since DCT/IDCT is required"（哪步是热点 + since 归因）。
+- 3.2.1 起："The electric potential and field computation in Equation (3) requires fast DCT/IDCT kernels for efficient calculation."（公式→实现需求，呼应 §2.3 铺垫句闭环）。
+
+### 对照我们 §III 的差距结论
+1. **小节间并列衔接句**（"another bulk computation"式）：我们 §III-C→§III-D（GQA→gate）之间无衔接句，gate 小节直接开场。加一句低成本高收益。
+2. 设计决策数字当场论证：诚实边界下我们的设计决策无新数字可绑，不改。
+3. 数值陷阱句、Although 分歧句、规模归并句：已有对等物或已达标（见上）。
+
+### 本轮修改（第 9 轮）
+- paper_en.tex §III-D gate 小节开头：加承接句 "GQA selection leaves a second opportunity: layers whose far region contributes little during prefill."
+- paper_zh.tex 直译同步。

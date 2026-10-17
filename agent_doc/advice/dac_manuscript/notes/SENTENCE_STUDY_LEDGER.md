@@ -20,7 +20,7 @@
 | 顺序 | 论文 | 章节拆解进度 | 手稿对应段落已修 |
 |---|---|---|---|
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
-| 2 | 2019_DREAMPlace.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3、§4 | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ |
+| 2 | 2019_DREAMPlace.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ |
 | 3 | 2020_AdaptivFloat.pdf | 未开始 | — |
 | 4 | 2021_Gemmini.pdf | 未开始 | — |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
@@ -28,6 +28,14 @@
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 9 轮（2026-10-17 12:4x，DREAMPlace §3 The DREAMPlace Algorithms）
+- 远端检查：无新提交。
+- 拆解笔记：`notes/sentence_studies/2019_dreamplace.md` §3 部分（开篇：差异披露句+设计决策双数字当场论证（<0.04% 质量差+21.1% 省时）+范围声明句；§3.1：As 依托句+For brevity 限定句+**数值陷阱句**（naive overflow→等价变换→"which is an equivalent transformation"）+朴素方案否定句（双原因）+**Noting 规模归并句**（|P|≫|E|→pin-level）+**Although 前作建议分歧句**（[15] 建议 SpMV 但 atomic add 实测更快+as 归因+前向引用）；§3.2：**another 承接句**+四步列举+热点步 since 归因）。
+- 对照结论：数值陷阱句（我们的量化披露是类型披露非陷阱披露，不适用）、Although 分歧句（Related Work P2 "instead retains full-dimensional KV" 已对等）、规模归并句（eq:bound 性质→保证句已对等）。**唯一实缺 = 小节间并列衔接句**——§III-C→§III-D 无衔接，gate 小节冷启动开场。
+- paper_en.tex §III-D 开头：加承接句 "Beyond scoring and budgeting, layer variation offers a second savings opportunity."（DREAMPlace "another bulk computation" 式；呼应 Intro P4 "historical layer variation in panel (d) motivates this extension"）。
+- paper_zh.tex 直译同步（「在评分与预算之外，层间差异提供第二类节省机会。」）。
+- 编译验证：双语通过，0 未定义引用。
 
 ### 第 8 轮（2026-10-17 10:3x，用户指令：文法机械审计 + 图美化）
 - **文法审计**（gate_mechanical 式，165 句全文扫描）：>40 词句仅 1 处（摘要尾句 44 词）——拆分为动作先行句 "Establishing a beneficial operating point therefore requires evaluating the compact 4/128-protection implementation with matched quality and preparation-inclusive cost."（en/zh 同步）。hedging 命中（may/rather）与被动命中 14 处逐条目检均为合法用法（许可义 may、对比义 rather than、状态性系表 is disabled by default 等），不虚改。
