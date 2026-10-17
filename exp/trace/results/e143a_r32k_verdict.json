@@ -1,0 +1,48 @@
+{
+  "id": "e143a_r32k_verdict",
+  "date": "2026-10-17",
+  "title": "E143a：Qwen3-32B RULER 32K 双臂收官——GQA 主链跨规模 e2e 证明",
+  "config": {
+    "tli": "两级区域配额 K1=128 K2=1024 α0.25/β0.125/γ0.625 tail minmax/avg c4 sink4/swa128, T=e143a（与 8B e146c 主口径完全同参）",
+    "fullkv": "--method none dense 锚, T=e143a",
+    "model": "Qwen3-32B（17 shards，wys/.187 尺寸指纹 md5 一致）",
+    "machine": "TLI 任务1-6=wys GPU1、任务7-11=.187 GPU2；FullKV=.187 GPU1——跨机跨臂；同 cap_identity_hash he50e5a3a76（TLI 11 格一致）"
+  },
+  "results": {
+    "tli_avg": 50.6427,
+    "fullkv_avg": 52.2182,
+    "diff": -1.5755,
+    "retention": "TLI/FullKV = 96.98%",
+    "per_task": {
+      "niah_single_1": {"tli": 86.0, "fullkv": 93.0, "diff": -7.0},
+      "niah_single_2": {"tli": 99.0, "fullkv": 100.0, "diff": -1.0},
+      "niah_single_3": {"tli": 93.0, "fullkv": 97.0, "diff": -4.0},
+      "niah_multikey_1": {"tli": 77.0, "fullkv": 77.0, "diff": 0.0},
+      "niah_multikey_2": {"tli": 57.0, "fullkv": 46.0, "diff": 11.0},
+      "niah_multikey_3": {"tli": 1.0, "fullkv": 1.0, "diff": 0.0},
+      "niah_multiquery": {"tli": 0.0, "fullkv": 0.0, "diff": 0.0},
+      "niah_multivalue": {"tli": 0.0, "fullkv": 0.0, "diff": 0.0},
+      "cwe": {"tli": 36.2, "fullkv": 45.0, "diff": -8.8},
+      "fwe": {"tli": 11.67, "fullkv": 19.0, "diff": -7.33},
+      "vt": {"tli": 96.2, "fullkv": 96.4, "diff": -0.2}
+    }
+  },
+  "judgment": [
+    "GQA 主链跨规模成立：32B TLI 50.64 vs FullKV 52.22（-1.58，保持率 97.0%）——与 8B（58.30 vs 59.38，-1.08）同量级掉点，规模放大后主口径无崩溃",
+    "关键判别：mq/mv 双零与 mk3 1.0 在 FullKV 锚同样出现——32B 模型自身在这些任务上已退化（对齐 8B FullKV mq 24.5/mv 27.0 的坍缩趋势），不是 TLI 掉点；TLI 侧无新增损失",
+    "真实掉点集中在 far 敏感任务：cwe -8.8、fwe -7.33、single_1 -7——与 8B 的 cwe -14.7/mk2 -3.0 同型（far 词元供给 252 限制），但 cwe 幅度在 32B 收窄（-8.8 vs -14.7）",
+    "mk2 反超 +11（57 vs 46）——8B 侧 mk2 -3.0，32B 侧稀疏两级反而优于 dense；规模效应非单调，如实保留",
+    "8B→32B 规模链：8B -1.08 / 32B -1.58；跨模型族链（Qwen3 GQA 8B/32B + Llama rotate_half 86.19 vs 85.40 + DeepSeek MLA）主链扩展证据齐"
+  ],
+  "next": "cwe/fwe/single_1 掉点与 8B 同因（far 供给），E147 改进臂结论（E147e K1=256/β.03125 方向）在 32B 的迁移验证为后续可选臂，不阻塞主表",
+  "sources": {
+    "e143a_r32k_tli_formal.json": "851fa3b 入仓",
+    "e143a_r32k_fullkv_formal.json": "本轮收官"
+  },
+  "caveats": [
+    "跨机配对：TLI 任务 1-6 在 wys、7-11 与 FullKV 在 .187——同模型 md5 与同 cap_identity_hash 已核，但 cwe 类任务跨机摆动 58.8-83.5 caveat 保留（FullKV cwe 45 vs TLI 36.2 的差部分在摆动带内）",
+    "32B FullKV mq/mv/mk3 低分属模型-任务交互（prompt 模板/对齐未针对 32B 调优），两臂同条件故配对内部有效",
+    "LB EN 32B（GPU0）149/200@27.5s/it 在飞，~23:10 完后另行收官"
+  ],
+  "generated_at": "2026-10-17T21:5X"
+}
