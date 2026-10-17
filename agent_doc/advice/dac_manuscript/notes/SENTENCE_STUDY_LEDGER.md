@@ -22,12 +22,21 @@
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
-| 4 | 2021_Gemmini.pdf | 未开始 | — |
+| 4 | 2021_Gemmini.pdf | Abstract ✓ Intro ✓；待：§2 背景动机 | Intro-P5 Q1/Q2/Q3 前向指针 ✓ |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 17 轮（2026-10-18，Gemmini Abstract + Introduction —— 第 4 篇开始）
+- 远端检查：无新提交；工作区干净（结论节 β 比较版已由 6490873/ba930db 等提交纳入，无需裁决——内容与第 16 轮已采纳的 242c821/e4c74f7 同源）。
+- 拆解笔记：新建 `notes/sentence_studies/2021_gemmini.md`（Abstract 6 句表：**评价方法论缺口句**（"evaluated in isolation"——stakes=评价能力而非性能）/**This 后果句**（makes it difficult to appreciate）/To-address 登场句/能力枚举句（每项 that-clause 回扣缺口）/流片+头牌句（up-to 上界限定+点名基线）/开源披露句；Intro P1：However 双重目标句（嵌套关系从句 X 难造）/demand 归因句带引用簇/**While 让步缺口句**（一句内先功劳后范围限定）/**双 little-support 平行缺口句带 making 后果分词**；P2：登场句与摘要同构/**Unlike 对比句**（also 而非 only）/双工艺流片句/**诚实头牌句**（comparable 同级 claim+匹配条件限定语）/愿景句/**Specifically 案例预告句**；贡献 bullet：动词开头+**每条 Section 前向指针**+贡献 2 内嵌 verdict）。
+- 对照结论：评价缺口链（摘要 "neither isolate nor establish" + Metrics 段）、While 让步句（Intro P1 but 句）、Unlike 定位（Related Work instead 句）、诚实头牌（Q2 0.09 分句+条件披露）、贡献内嵌 verdict（Intro P5 两 verdict 句）均有对等物；流片证据/愿景句/案例预告/设计空间跨度句诚实边界不适用。**唯一实缺 = Intro P5 评估预告句无 Q1/Q2/Q3 前向指针**（Q 标签只在评估节小节标题出现，Intro↔评估节导航断裂；Gemmini per-bullet Section 指针模式）。
+- paper_en.tex Intro P5：`The evaluation examines task quality, regional coverage and execution cost.` → `The evaluation examines task quality (Q1), regional coverage (Q2) and execution cost (Q3).`
+- paper_zh.tex 直译同步（「评估考察任务质量（Q1）、区域覆盖（Q2）与执行成本（Q3）。」）。
+- 版式核对：en 6 / zh 6 页保持，0 未定义引用。
+- 待后续轮次：Gemmini §2 背景动机（Table I 生成器对比矩阵/77% CPU 时间动机数字句/Motivated-by 观察回收句/In-contrast 编号枚举）、§3 生成器、§4 评估、§5 案例研究。
 
 ### 第 16 轮（2026-10-18，AdaptivFloat §6 Hardware Evaluation + §7 Conclusion —— 第 3 篇拆解完毕）
 - **远端裁决**（fetch 发现 242c821/e4c74f7，本地已同步）：(1) 242c821 把 8B β 分配比较（β.125→.0625，AVG 58.30→59.29，页/词元配额 16/112→8/120、640/252→320/572 同报）整合进 Q2——**采纳**，完整披露「比较不能隔离页与词元分配作用」+ 非劣性边界；(2) e4c74f7 摘要重写为三实测数字证据版（58.30/59.29 + 50.64/52.22）——**采纳**，Token-Picker 头牌数字句范式的诚实镜像。
