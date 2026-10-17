@@ -1,0 +1,37 @@
+{
+  "experiment": "e145d",
+  "title": "LBv2 (503 MCQ, official-strict parser, 31.5K truncation) sink4 two-level mavg vs single-pool aavg vs FullKV",
+  "date": "2026-10-17",
+  "caliber": "sink4/swa128, alpha .25, beta .125, gamma .625, K1=128, K2=1024, tail minmax/avg, decode-only sparse, dense prefill",
+  "arms": {
+    "fullkv_anchor": {
+      "score": 32.21,
+      "source": "e109_full_lbv2_v2.json (official-strict-v1 parser, dense sink-neutral, reused)"
+    },
+    "mavg_two_level_sink4": {
+      "score": 32.41,
+      "delta_vs_fullkv": 0.2,
+      "machine": "wys-4xh20",
+      "eval": "wys eval result.json, scorer_backend difflib:stdlib",
+      "output": "wys:~/tmp_e145d_lbv2/pred_E145d_lbv2_mavg/pred/",
+      "budget_avg_tokens": 1021.88
+    },
+    "aavg_single_pool_sink4": {
+      "score": 29.82,
+      "delta_vs_fullkv": -2.39,
+      "machine": ".187",
+      "eval": ".187 tmp_e146b_tree_187 eval result.json, scorer_backend difflib:stdlib",
+      "output": ".187:~/tmp_e146b_tree_187/exp/results_longbench/Qwen3-8B/pred_E145d_lbv2_aavg/pred/",
+      "budget_avg_tokens": 1024.0
+    }
+  },
+  "findings": [
+    "mavg two-level sink4 32.41 exceeds FullKV anchor 32.21 (+0.20): noise-level, no drop on LBv2.",
+    "aavg(0,0) single-pool sink4 29.82 drops -2.39 vs FullKV: two-level beats single-pool by +2.59 on LBv2.",
+    "Both arms share cap_effective=31500, cap_identity_hash b0f05862bc, official-strict parser: caliber-paired with e109 anchor.",
+    "Cross-machine caveat: mavg on wys, aavg on .187; single MCQ aggregate, no per-task granularity in LBv2.",
+    "Reversal note vs E109 old caliber (sink128 beta .375): aavg 32.60 > mavg 32.01 then; under sink4 beta .125 the ordering flips to mavg > aavg. Attributable to config change, not machine, but no paired single-variable arm exists."
+  ],
+  "gate": "user 32K noise-level criterion is for RULER 32K; LBv2 aggregate shows noise-level delta for the main arm, table entry complete.",
+  "status": "closed for full-table assembly"
+}
