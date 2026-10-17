@@ -1,0 +1,30 @@
+{
+  "mode": "offline check/plan",
+  "source_verified": true,
+  "jssa_commit": "34ce5abd82453b16ca6d5f16a1a8ae50fac5b920",
+  "vllm_commit": "39910f2b25aacc09f5e7f166cdf0030b19f8b9e8",
+  "host": {
+    "python": "3.12.14",
+    "platform": "Linux",
+    "machine": "x86_64",
+    "packages": {
+      "torch": null,
+      "transformers": null,
+      "vllm": null,
+      "triton": null
+    }
+  },
+  "required_python": "3.12",
+  "python_matches": true,
+  "gpu_initialized": false,
+  "installation_started": false,
+  "execution_ready": false,
+  "dependency_lock_complete": false,
+  "blockers": [
+    "Resolve and hash target CUDA wheel and complete transitive environment lock on authorized host",
+    "Verify driver/CUDA variant and Triton compiler compatibility",
+    "Require frozen basis provenance with checkpoint/tokenizer/data/producer and identical effective calibration/serving RoPE; upstream basis M alone is insufficient",
+    "HF flash-attn default calibration dependency/version/build unresolved; SDPA would be an explicit alternative",
+    "No GPU numerical or benchmark acceptance; no project runtime adapter"
+  ]
+}

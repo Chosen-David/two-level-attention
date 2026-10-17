@@ -103,3 +103,7 @@ See [FOLLOWUP_20261015.md](FOLLOWUP_20261015.md) for the subsequent FFD
 cache ownership/layer-state repair, actual official source/submodule downloads,
 resolved HISA identity, and exact remaining ClusterKV/HiP/MoBA boundaries.
 Earlier first-integration test evidence is historical, not the latest source hash.
+
+## JSSA source/environment archive (2026-10-17)
+
+[jssa_vendor](jssa_vendor/README.md) preserves official commit34ce5abd with licenses, source hashes and offline environment checks/recipe. No project benchmark adapter, GPU test or complete dependency lock is claimed. User authorized packaging only; unresolved wheel/flash-attn and calibration-serving RoPE provenance block execution.

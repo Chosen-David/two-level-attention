@@ -119,3 +119,5 @@
 ## 2026-10-17
 
 - [ ] [TL-ASYNC-FFD-20261017] AsyncTLS/FFD sources and paper-derived lagged/offload candidate; real calibration/GPU scientific acceptance remain blocked. ([详情](task_details/TL-ASYNC-FFD-20261017.md))
+
+- [ ] [TL-JSSA-PACKAGE-20261017] Archive official JSSA sources and safe environment recipe; original PDF bytes and resolved runtime environment remain blocked. ([详情](task_details/TL-JSSA-PACKAGE-20261017.md))
