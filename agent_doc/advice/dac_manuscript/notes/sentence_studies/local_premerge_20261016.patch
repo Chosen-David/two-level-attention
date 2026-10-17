@@ -1,0 +1,86 @@
+diff --git a/agent_doc/advice/dac_manuscript/source/paper_en.tex b/agent_doc/advice/dac_manuscript/source/paper_en.tex
+index cdfed15..97ba514 100644
+--- a/agent_doc/advice/dac_manuscript/source/paper_en.tex
++++ b/agent_doc/advice/dac_manuscript/source/paper_en.tex
+@@ -19,14 +19,14 @@
+ \begin{document}
+ \maketitle
+ \begin{abstract}
+-Sparse attention must decide which history remains accessible before evaluating attention on a bounded token set. We study the trade-off between candidate access and selection cost at a fixed final token budget. Our near--far cascade combines two mechanisms: a shared 32-coordinate RoPE scoring map for page screening and token refinement, and separate regional page quotas. Final attention uses original-dimensional queries, keys and values. On five Qwen3-8B LongBench tasks, an archived 128/128-protection configuration scores 47.588, compared with 47.910 and 47.666 for nominal full-dimensional page- and token-scoring variants. These descriptive comparisons do not isolate scoring dimensionality or validate the current compact 4/128-protection candidate. In a separate synthetic study, the shared-subspace selector has no lower reported time than the nominal full-dimensional page-scoring variant; historical synchronized TPOT is also higher than dense attention. We therefore present a design and preliminary evaluation, not an established quality--latency improvement. The evidence identifies what a matched evaluation must resolve: whether regional access and compact scoring retain useful tokens at a preparation-inclusive cost below the attention work they remove.
++Decoding attention over a long-context KV cache grows with history, and sparse attention must score and rank that history to select the bounded set it ultimately attends. Selection must therefore remain cheap, or its cost consumes the attention work it removes. Although query-aware selectors reduce the attended set, they score candidates in the full coordinate width and rank pages in a single pool, so near-history dominance can displace distant evidence. Our near--far cascade addresses both points with two mechanisms: a shared 32-coordinate low-frequency RoPE map scores pages and tokens, and separate regional page quotas reserve far capacity; final attention recomputes from original-dimensional queries, keys and values. On five Qwen3-8B LongBench tasks, an archived 128/128-protection shared-subspace configuration scores 47.588, against 47.910 and 47.666 for nominal full-dimensional page- and token-scoring variants, a descriptive spread within 0.33 points. Neither the comparison nor the timing evidence establishes an advantage: the compact 4/128 candidate lacks matched validation, the shared-subspace selector reports no lower synthetic time than full-dimensional page scoring, and historical synchronized sparse TPOT exceeds dense. We therefore present a design and preliminary evaluation, and state what a matched evaluation must resolve: whether regional access and compact scoring retain useful tokens at a preparation-inclusive cost below the attention work they remove.
+ \end{abstract}
+ \begin{IEEEkeywords}
+ sparse attention, shared representation, regional retrieval, long-context inference
+ \end{IEEEkeywords}
+ 
+ \section{Introduction}
+-Long-context sparse attention replaces full-history attention with attention over selected tokens. Selection itself, however, requires scoring, ranking and memory access. The central design question is therefore how to preserve access to useful history at a fixed final token budget without spending the saved attention cost on retrieval. A page-to-token cascade makes this tension explicit: page screening reduces the candidate support for refinement, but a useful token cannot be recovered once its page is excluded.
++Long-context workloads such as retrieval, multi-document question answering and repository-level code analysis feed histories of tens of thousands of tokens into serving systems~\cite{longbench,ruler}. Decoding attention over such histories grows with the cache, and attention cost becomes a first-order serving constraint~\cite{quest,sparq}. Sparse attention replaces full-history attention with attention over selected tokens, but selection itself requires scoring, ranking and memory access over the full candidate set. The central design question is therefore how to preserve access to useful history at a fixed final token budget without spending the saved attention cost on retrieval. A page-to-token cascade makes this tension explicit: page screening reduces the candidate support for refinement, but a useful token cannot be recovered once its page is excluded.
+ 
+ Figure~\ref{fig:observation} connects these design choices to four Qwen3-8B diagnostics, retaining the token/page perspective of ClusterKV~\cite{clusterkv}. In the fixed example, mass-ranked, mean-score and extrema-score selection retain different pages (a), motivating a comparison of regional scorers rather than proving a pooling-only effect. Under feasible whole-bin budgets, reserving regional capacity changes distant-history access (b): mean far retention rises from .6759 to .7207, but falls on 43 of 128 correlated observations. Regional allocation is thus a trade-off, not a per-query improvement guarantee. The coordinate diagnostic (c) motivates compact scoring, without isolating frequency from RoPE-pair structure. Historical layer profiles (d) motivate examining selective far computation, but their single-query proxy is not the current gate statistic and provides no decode guarantee. These observations define hypotheses for the cascade; they do not establish production-selector fidelity or task-quality gains.
+ 
+@@ -141,6 +141,22 @@ L2 scoring support & full history before mask (C) \\\hline
+ \subsection{Q1: What do archived scoring configurations show?}
+ \textbf{Descriptive quality comparison.} Across HotpotQA, Qasper, MuSiQue, GovReport and RepoBench-P~\cite{longbench}, the mean scores are 47.588 (shared-subspace configuration), 47.910 (nominal full-dimensional page-scoring variant) and 47.666 (nominal full-dimensional token-scoring variant). Relative to the shared-subspace configuration, the nominal page- and token-scoring variants are higher by 0.322 and 0.078 points; the latter is 0.244 points below the former. Neither variant is verified as a controlled change in scoring dimensionality. Their score differences are therefore descriptive and do not isolate either stage's effect (Supplementary Fig.~S4 and Note~S7). The archived shared-subspace configuration score does not directly validate the current compact implementation. None is dense FullKV.
+ 
++\textbf{Sparse baselines.} Table~\ref{tab:baseline-comp} reports archived vendor-measured task averages for sparse-attention baselines on the same model and inputs (Qwen3-8B), under the vendor protocol used for the comparison figures: 16-task LongBench v1 and RULER at 32/64/128K, each row being the mean task score. Dense FullKV is the quality reference. Values are as archived; FASA's RULER-32K entry averages 6 of 11 tasks, and SparQ's RULER-64K/128K entries are still being measured. ClusterKV and MoBA measurements are in progress. TLI (ours) entries are left blank pending the matched evaluation above. The archived baseline protocol scores LongBench over 16 tasks, whereas the configuration scores in this section average five tasks; the rows therefore are not directly comparable to the 47.91 reference. A matched comparison requires the equal-$K$ controls described in the experimental setting.
++
++\begin{table}[t]\centering\small
++\caption{Vendor-measured task averages (Qwen3-8B; baseline protocol). TLI (ours) entries left blank pending matched evaluation; ClusterKV and MoBA in progress; FASA RULER-32K averages 6/11 tasks; SparQ RULER-64K/128K in progress.}\label{tab:baseline-comp}
++\begin{tabular}{lcccc}\hline
++Method & LBv1 (16 tasks) & RULER 32K & RULER 64K & RULER 128K \\\hline
++FullKV (dense) & 49.39 & 59.38 & 48.54 & 46.43 \\
++SparQ & 48.66 & 60.45 & -- & -- \\
++MInference & 47.71 & 49.94 & 50.29 & 49.53 \\
++Quest & 41.35 & 42.85 & 26.25 & 19.33 \\
++FASA & 33.31 & 24.00 & -- & -- \\
++ClusterKV & -- & -- & -- & -- \\
++MoBA & -- & -- & -- & -- \\
++TLI (ours) & -- & -- & -- & -- \\\hline
++\end{tabular}\end{table}
++
+ \subsection{Q2: How do regional budgets constrain candidate access?}
+ The regional diagnostic in Figure~\ref{fig:observation} motivates reserved capacity, but the available task scores do not isolate its benefit. The current compact candidate lacks a matched dense FullKV comparison. Figure~\ref{fig:fullkv-quality} preserves the historical 128K scores. Applying the inspected quota formula to the reported $\beta=.375$, $K_1=128$, page size 64, $\gamma=.625$ and 128/128 protection gives a nominal far-token quota of zero within the 768-token middle budget. Thus reserving far pages does not by itself guarantee a nonzero final far-token quota. This code/configuration inference does not verify the executed path or isolate the cause of the score gap.
+ 
+diff --git a/agent_doc/advice/dac_manuscript/source/paper_zh.tex b/agent_doc/advice/dac_manuscript/source/paper_zh.tex
+index d0c5ac3..cc5b7fa 100644
+--- a/agent_doc/advice/dac_manuscript/source/paper_zh.tex
++++ b/agent_doc/advice/dac_manuscript/source/paper_zh.tex
+@@ -17,12 +17,12 @@
+ \begin{document}
+ \maketitle
+ \begin{abstract}
+-稀疏注意力需要先决定哪些历史能够进入候选集，再在受限词元集合上计算注意力。本文研究固定最终词元预算下候选访问与选择成本的取舍。近远级联结合两项机制：页筛选与词元精筛共享32坐标RoPE评分映射，并为近远区域分别保留页配额；最终注意力仍使用原始全维查询、键和值。在Qwen3-8B的五项LongBench任务上，采用128/128保护的历史配置得分47.588，名义全维页评分和词元评分变体分别为47.910和47.666。这些描述性比较不能隔离评分维度效应，也不验证当前采用4/128保护的紧凑实现候选。独立合成实验中，共享子空间选择器的所报时间未低于名义全维页评分变体；历史同步TPOT也高于稠密注意力。因此，本文提供设计及初步评估，尚未建立质量--时延优势。现有证据明确了匹配评估需要回答的问题：区域候选访问与紧凑评分能否保留有用词元，同时使包含准备的成本低于所省去的注意力计算。
++长上下文KV缓存上的解码注意力随历史增长，稀疏注意力必须对全历史评分排序，才能选出最终真正计算的受限集合。因此选择本身必须廉价，否则其成本会吞噬它省去的注意力计算。尽管查询感知选择器缩小了注意力集合，它们仍以全坐标宽度评分候选、在单一池中排序页面，近端历史的主导地位可能挤掉远端证据。近远级联针对这两点结合两项机制：页筛选与词元精筛共享32坐标低频RoPE评分映射，近远区域分别保留页配额；最终注意力仍以原始全维查询、键和值重算。在Qwen3-8B的五项LongBench任务上，采用128/128保护的历史共享子空间配置得分47.588，名义全维页评分和词元评分变体分别为47.910和47.666，描述性差距不超过0.33分。比较与计时证据均未建立优势：紧凑4/128候选缺少匹配验证，共享子空间选择器在合成实验中所报时间未低于全维页评分，历史同步稀疏TPOT也高于稠密。因此，本文提供设计及初步评估，并明确匹配评估需要回答的问题：区域候选访问与紧凑评分能否保留有用词元，同时使包含准备的成本低于所省去的注意力计算。
+ \end{abstract}
+ \begin{IEEEkeywords}稀疏注意力，共享表示，区域检索，长上下文推理\end{IEEEkeywords}
+ 
+ \section{引言}
+-长上下文稀疏注意力用选中词元上的注意力替代全历史注意力，但选择本身也需要评分、排序与访存。因此，核心问题是在固定最终词元预算下，如何保留有用历史的访问机会，又不让检索耗尽省去的注意力成本。页到词元的级联使这一矛盾尤为明确：页筛选缩小精筛的候选范围，但有用词元所在页一旦被排除，就无法在后续恢复。
++检索、多文档问答与仓库级代码分析等长上下文负载，向服务系统输入数万词元的历史~\cite{longbench,ruler}。这类历史上的解码注意力随缓存增长，注意力成本成为服务系统的一阶约束~\cite{quest,sparq}。稀疏注意力用选中词元上的注意力替代全历史注意力，但选择本身也需要在全候选集上评分、排序与访存。因此，核心问题是在固定最终词元预算下，如何保留有用历史的访问机会，又不让检索耗尽省去的注意力成本。页到词元的级联使这一矛盾尤为明确：页筛选缩小精筛的候选范围，但有用词元所在页一旦被排除，就无法在后续恢复。
+ 
+ 图\ref{fig:observation}沿用ClusterKV的词元／页视角~\cite{clusterkv}，以四项Qwen3-8B诊断连接设计选择。固定示例中，质量排序、均值评分与极值评分保留的页不同(a)，为比较区域评分器提供动机，但不能证明纯粹的池化效应。在可行整箱预算下，预留区域容量改变远端历史的访问机会(b)：远区平均保留率从.6759升至.7207，但128条相关观测中有43条下降。因此，区域分配是一项取舍，并非逐查询改善保证。坐标诊断(c)为紧凑评分提供动机，却未将频率与RoPE配对结构分离。历史逐层统计(d)促使我们考察选择性远区计算，但其中单查询代理并非当前门控统计，也不保证解码需求。这些观察为级联提出可检验假设，尚不证明生产选择器保真或任务质量收益。
+ 
+@@ -133,6 +133,22 @@ L2评分范围 & 完整历史评分后施加掩码（C）\\\hline
+ \subsection{Q1：历史评分配置的得分能说明什么？}
+ \textbf{描述性质量比较。}在HotpotQA、Qasper、MuSiQue、GovReport和RepoBench-P五项任务~\cite{longbench}上，平均得分为47.588（共享子空间配置）、47.910（名义全维页评分变体）与47.666（名义全维词元评分变体）。后两者相对共享子空间配置分别高0.322与0.078分，名义全维词元评分变体比名义全维页评分变体低0.244分。两种名义变体运行尚未核实为仅改变页评分或词元评分维度的受控配置。因此，这些得分差值仅作描述，不能隔离任一级的作用（补充图S4及补充注S7）。归档共享子空间配置得分不能直接验证当前紧凑实现。这些配置均不等于稠密FullKV。
+ 
++\textbf{稀疏基线。}表\ref{tab:baseline-comp}给出各稀疏注意力基线在相同模型与输入（Qwen3-8B）上的归档vendor实测任务均值，协议与对比图一致：16任务LongBench v1及32/64/128K RULER，每行为任务均值。稠密FullKV为质量参照。表中数值为归档值；FASA的RULER-32K为6/11任务均值，SparQ的RULER-64K/128K仍在测量中。ClusterKV与MoBA测量进行中。TLI（ours）各行暂留白，待上述匹配评估完成。归档基线协议在LongBench上按16任务评分，而本节配置得分取五项任务均值，因此各行不可与47.91参考直接比较；匹配比较须满足实验设置中的等$K$控制。
++
++\begin{table}[t]\centering\small
++\caption{实测任务均值（Qwen3-8B；基线协议）。TLI（ours）各行待匹配评估后填写；ClusterKV与MoBA进行中；FASA的RULER-32K为6/11任务均值；SparQ的RULER-64K/128K进行中。}\label{tab:baseline-comp}
++\begin{tabular}{lcccc}\hline
++方法 & LBv1（16任务） & RULER 32K & RULER 64K & RULER 128K \\\hline
++FullKV（稠密） & 49.39 & 59.38 & 48.54 & 46.43 \\
++SparQ & 48.66 & 60.45 & -- & -- \\
++MInference & 47.71 & 49.94 & 50.29 & 49.53 \\
++Quest & 41.35 & 42.85 & 26.25 & 19.33 \\
++FASA & 33.31 & 24.00 & -- & -- \\
++ClusterKV & -- & -- & -- & -- \\
++MoBA & -- & -- & -- & -- \\
++TLI（ours） & -- & -- & -- & -- \\\hline
++\end{tabular}\end{table}
++
+ \subsection{Q2：区域预算如何约束候选访问？}
+ 图\ref{fig:observation}的区域诊断为预留容量提供动机，但现有任务得分不能隔离其收益。当前紧凑候选缺少匹配的稠密FullKV比较。图\ref{fig:fullkv-quality}保留历史128K得分。将报告的$\beta=.375$、$K_1=128$、页长64、$\gamma=.625$及128/128保护代入已检查的配额公式，在768个中间词元预算下推得名义远区词元配额为0。因此，预留远区页本身不保证最终远区词元配额非零。这项代码／报告配置推论不验证实际执行路径，也不隔离得分差的原因。
+ 
