@@ -5,47 +5,58 @@
   "machine_note": "E147d/e/f 与 E144amv 在 .187；E147cwys 在 wys。e146c 主口径基线（cwe 68.8/mk2 73.0）在 wys；E147c β.0625 quick（75.9/73.0）在 .187。FullKV 锚 cwe 83.5 / mk2 76.0。",
   "main_caliber": {
     "config": "K1=128, beta=.125, gamma=.625, alpha=.25, sink4/swa128, tail minmax/avg, K2=1024",
-    "far_pages": 112, "far_tokens": 252,
-    "cwe": 68.8, "mk2": 73.0
+    "far_pages": 112,
+    "far_tokens": 252,
+    "cwe": 68.8,
+    "mk2": 73.0
   },
   "arms": {
     "e147d": {
       "config": "beta=.03125, K1=128",
-      "far_pages": 124, "far_tokens": 732,
-      "cwe": 76.1, "mk2": 76.0,
+      "far_pages": 124,
+      "far_tokens": 732,
+      "cwe": 76.1,
+      "mk2": 76.0,
       "machine": ".187",
       "read": "far 词元 572→732（页近同 124≈120）：cwe +0.2 边际收益小；mk2 +3.0 恢复 FullKV 水平（76.0=76）——mk2 是 far 词元受限"
     },
     "e147e": {
       "config": "beta=.03125, K1=256",
-      "far_pages": 248, "far_tokens": 572,
-      "cwe": 79.8, "mk2": 74.0,
+      "far_pages": 248,
+      "far_tokens": 572,
+      "cwe": 79.8,
+      "mk2": 74.0,
       "machine": ".187",
       "read": "vs E147c（同 far 词元 572，far 页 120→248）：cwe 75.9→79.8（+3.9 纯页覆盖效应）——cwe 同时吃页多样性；距 FullKV 83.5 仅 -3.7"
     },
     "e147f": {
       "config": "beta=.0625, K1=256",
-      "far_pages": 240, "far_tokens": 252,
-      "cwe": 71.4, "mk2": 74.0,
+      "far_pages": 240,
+      "far_tokens": 252,
+      "cwe": 71.4,
+      "mk2": 74.0,
       "machine": ".187",
-      "read": "vs E147c（far 页 120→240 但 far 词元 572→252）：cwe 75.9→71.4（-4.5）——词元配额损失压过页增益，反向验证 cwe 是页+词元双因子；mk2 +1.0（页覆盖独立小增益）"
+      "read": "vs e146c 主口径（名义词元配额同 640/252，far 页 112→240 单名义变量）：cwe 68.8→71.4（+2.6 页覆盖增益）；vs E147c（320/572）cwe 75.9→71.4（-4.5）——词元配额损失压过页增益，反向验证 cwe 是页+词元双因子；mk2 +1.0（页覆盖独立小增益）。配对标签 v3 修正（GPT pairing_and_quick_labels）：本臂与 E147c 无名义配额匹配"
     },
     "e147cwys": {
       "config": "beta=.0625, K1=128（wys 跨机对照）",
-      "far_pages": 120, "far_tokens": 572,
-      "cwe": 75.9, "mk2": 73.0,
+      "far_pages": 120,
+      "far_tokens": 572,
+      "cwe": 75.9,
+      "mk2": 73.0,
       "machine": "wys",
       "read": "与 .187 E147c quick 同分（75.9/73.0）——支持 +7.1 为配置效应判读（同分非预测级一致性证明，v2 措辞）；greedy 同机复制零噪声（E147b）"
     },
     "e144amv": {
       "config": "Llama-3.1-8B FullKV niah_multivalue 重跑（.187 GPU7）",
-      "score": 51.75, "n": 100,
+      "score": 51.75,
+      "n": 100,
       "read": "与原锚 51.75 逐位一致——锚真实，Llama FullKV multivalue 自身弱（非环境问题）；e144a 判决 caveat 可解除"
     }
   },
   "judgment": {
-    "cross_machine": "E147cwys 同分复现 75.9/73.0（wys）→ 支持 β.0625 的 cwe +7.1 为配置效应的判读；同分只证报告记录一致，不构成预测级一致性证明、机器/运行混杂未完全排除（措辞 v2 修正，GPT 2026-10-17_e143a_e147_remaining_bounds 第 2 条采纳）。部分对照（E147f vs E147c：far 词元配额同 252）确有名义词元配额，非所有配置对照都混杂",
-    "factor_decomposition": "cwe 双因子：far 词元 572→732 仅 +0.2（E147d vs E147c）；far 页 120→248 在同词元 572 下 +3.9（E147e vs E147c）；页增益被词元损失抵消时净 -4.5（E147f）。mk2 单因子主导：far 词元 252→732 +3.0（E147d），页覆盖独立增益 ~+1.0（E147f）",
+    "cross_machine": "E147cwys 同分复现 75.9/73.0（wys）→ 支持 β.0625 的 cwe +7.1 为配置效应的判读；同分只证报告记录一致，不构成预测级一致性证明、机器/运行混杂未完全排除（措辞 v2 修正，GPT 2026-10-17_e143a_e147_remaining_bounds 第 2 条采纳）。名义配额配对更正（v3，GPT 2026-10-17_e147_pairing_and_quick_labels 第 1 条采纳）：E147f 为 k_near/k_far=640/252——名义词元配额真正匹配的是 E147f vs e146c 主口径（640/252，far 页 112→240 隔离页覆盖效应）与 E147e vs E147c（320/572，far 页 120→248）；初版「E147f vs E147c far 词元同 252」有误。名义匹配不证明实际执行/样本/运行条件构成受控比较",
+    "factor_decomposition": "cwe 双因子：far 词元 572→732 仅 +0.2（E147d vs E147c）；far 页 120→248 在同词元 572 下 +3.9（E147e vs E147c）；页增益被词元损失抵消时净 -4.5（E147f vs E147c，非名义配对）。mk2 单因子主导：far 词元 252→732 +3.0（E147d），页覆盖独立增益 ~+1.0（E147f）",
     "best_arm": "e147e（K1=256, beta=.03125）：cwe 79.8（距 FullKV -3.7，接近噪声带边缘）、mk2 74.0（距 76 仍 -2.0）",
     "remaining_gap": "cwe -3.7 / mk2 -2.0 未全达噪声级；32K 全任务判据未满足",
     "next_candidates": [
