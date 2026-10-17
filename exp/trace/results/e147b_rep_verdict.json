@@ -1,0 +1,30 @@
+{
+  "experiment": "e147b",
+  "title": "cwe/mk2 same-machine replication x2 — RULER 32K sink4 mavg copy-noise verdict",
+  "date": "2026-10-17",
+  "caliber": "identical to e146c 32K formal: sink4/swa128 alpha .25 beta .125 gamma .625 K1=128 K2=1024 tail minmax/avg, wys GPU3, greedy",
+  "arms": {
+    "cwe": {
+      "rep1": 68.8,
+      "rep2": 68.8,
+      "e146c_formal_reference": 68.8,
+      "fullkv_anchor": 83.5,
+      "delta_vs_fullkv": -14.7
+    },
+    "niah_multikey_2": {
+      "rep1": 73.0,
+      "rep2": 73.0,
+      "e146c_formal_reference": 73.0,
+      "fullkv_anchor": 76.0,
+      "delta_vs_fullkv": -3.0
+    }
+  },
+  "findings": [
+    "Same-machine greedy replication is bit-stable: rep1 == rep2 == e146c formal for both tasks. Copy noise at 32K on wys is zero.",
+    "Therefore cwe -14.7 and mk2 -3.0 vs FullKV are real drops, not within-copy noise band. The historical 58.8-83.5 cwe swing is cross-run/cross-machine, not within-config replication noise.",
+    "Improvement need confirmed: E147a K1=64 (far 252->572) is the primary candidate; verdict pending its completion.",
+    "Cross-config swing context retained: cwe across same-config arms on different machines/runs swings 58.8-83.5, so single-arm cross-machine comparisons carry config+machine confound; this within-machine pairing is the cleaner basis."
+  ],
+  "status": "replication verdict closed; improvement decision deferred to E147a",
+  "outputs": "wys:~/two-level-attention/exp/results_ruler/Qwen3-8B/L32768/pred/ gen-dirs 20261017111146/20261017115628 (cwe), 20261017113405/20261017121845 (mk2)"
+}
