@@ -1,0 +1,103 @@
+{
+  "id": "e147_improvement_verdict",
+  "date": "2026-10-17",
+  "title": "E147a K1=64 far 供给假设检验——否证，主口径维持 K1=128（#280）",
+  "config": {
+    "arm": "tli_64_64_1024_c4_Aa0.25_b0.125_g0.625_sk4_sw128（K1=64，其余同主口径）",
+    "baseline": "e146c_r32k_formal（K1=128，58.30）vs FullKV 锚 59.38",
+    "machine": ".187 GPU3 同机；E147b 复制判决（95587a0）已证 cwe/mk2 掉点为真非复制噪声"
+  },
+  "results": {
+    "k64_avg": 56.8227,
+    "k128_avg": 58.3,
+    "fullkv_avg": 59.38,
+    "per_task": {
+      "cwe": {
+        "k64": 58.9,
+        "k128": 68.8,
+        "fullkv_est": 83.5,
+        "k64_minus_k128": -9.9
+      },
+      "fwe": {
+        "k64": 27.0,
+        "k128": 15.0,
+        "fullkv_est": 15,
+        "k64_minus_k128": 12.0
+      },
+      "niah_multikey_1": {
+        "k64": 95.0,
+        "k128": 98.0,
+        "fullkv_est": 98,
+        "k64_minus_k128": -3.0
+      },
+      "niah_multikey_2": {
+        "k64": 68.0,
+        "k128": 73.0,
+        "fullkv_est": 76,
+        "k64_minus_k128": -5.0
+      },
+      "niah_multikey_3": {
+        "k64": 0.0,
+        "k128": 7.0,
+        "fullkv_est": 4,
+        "k64_minus_k128": -7.0
+      },
+      "niah_multiquery": {
+        "k64": 24.5,
+        "k128": 24.5,
+        "fullkv_est": 23,
+        "k64_minus_k128": 0.0
+      },
+      "niah_multivalue": {
+        "k64": 29.25,
+        "k128": 27.0,
+        "fullkv_est": 31,
+        "k64_minus_k128": 2.25
+      },
+      "niah_single_1": {
+        "k64": 100.0,
+        "k128": 100.0,
+        "fullkv_est": 100,
+        "k64_minus_k128": 0.0
+      },
+      "niah_single_2": {
+        "k64": 98.0,
+        "k128": 100.0,
+        "fullkv_est": 99,
+        "k64_minus_k128": -2.0
+      },
+      "niah_single_3": {
+        "k64": 94.0,
+        "k128": 97.0,
+        "fullkv_est": 97,
+        "k64_minus_k128": -3.0
+      },
+      "vt": {
+        "k64": 30.4,
+        "k128": 31.0,
+        "fullkv_est": 34,
+        "k64_minus_k128": -0.6
+      }
+    }
+  },
+  "conclusion": [
+    "K1=64 否证：AVG -1.48，目标任务全面恶化——cwe 58.9（k128 68.8，-9.9）、mk2 68（73，-5）、mk3 0（7，-7）；唯 fwe +12",
+    "机理归因：K1=64 使 far 页数减半（P_f 112→56）而 far 词元配额翻倍（252→572）——56 页×64 词元候选池里选 572 词元，页级多样性崩塌；'far 供给不足'的真瓶颈在**页级候选覆盖**而非词元配额上限",
+    "主口径维持 K1=128：cwe -14.7 / mk2 -3.0 vs FullKV 掉点仍未解决，32K 全任务噪声级判据未达标"
+  ],
+  "next_candidates": [
+    "首选：β 下调臂（K1=128、β .125→.0625、γ .625 不变）——P_n=round(.0625·128)=8 近区页、P_f=120 far 页、k_n=floor(.625·8·64)=320、k_f=892-320=572 far 词元：同时获得 far 页 120（>112）与 far 词元 572（>252），无 K1=64 的页多样性损失；代价 = near 词元 640→320",
+    "备选：K1=256 上探（P_f=224 页）——页覆盖翻倍但 L1 评分成本翻倍，与 E127 选择器优化目标冲突",
+    "备选：解码侧动态 far 配额（E151c oracle 结论迁移，工程量大）",
+    "验证协议：β.0625 臂先跑 cwe+mk2 两任务（~2 GPU h）快速判读，若恢复再全 11 任务 + LB 回归"
+  ],
+  "sources": {
+    "e147a_r32k_formal.json": "20b8412006b100d56422c6158bd640b94036c32dee259e82e9963012c377e3b3",
+    "e147a_r32k_formal.json.manifest.json": "e38b12c2691b25db96c92b854f9ccf0f3ad3e2d9302284eeceea141bb1091d29",
+    "e147a_r32k_formal.json.receipt.json": "de445f2ebce214daa91135b9d99d94e7167cc59c7d2a01c70aab7a59a5c00c18"
+  },
+  "caveats": [
+    "FullKV 锚值为 e146c 系列记录（跨机）；同机对照为 k64 vs k128"
+  ],
+  "generated_at": "2026-10-17T18:11:07.540286"
+}
