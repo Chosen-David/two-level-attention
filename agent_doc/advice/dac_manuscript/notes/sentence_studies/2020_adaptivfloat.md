@@ -144,6 +144,37 @@
 - paper_zh.tex 直译同步（「五项LongBench任务（问答、摘要与代码补全）」）。
 - **版式教训**：初版 "spanning multi-hop and single-document question answering..."（多 10 词）使 en 从 6 页溢出到 7 页——`\newpage` 平衡布局（远端 90edbf2 验证版）对增量极敏感；加句后必须查页数，超页即压缩为括号形。en 版式余量为零。
 
+---
+
+## §5 PE Architecture（第 15 轮，2026-10-17）
+
+### §5 开篇（3 句）
+句链：**能力→架构桥接句**（"AdaptivFloat's superior bit compression ability **paves the way to** efficient bit packing into resource-constrained accelerators"——上一节（§4）的算法结果铺路到本节的硬件设计，跨节承接）→ **混合权衡声明句**（"a hybrid Float-Integer (HFINT) PE that exploits the AdaptivFloat logic... and provides **an efficient compromise between the high accuracy of floating-point computations and the greater hardware density of fixed-point post-processing**"——混合设计的两头收益一句话声明）→ **基线代表性句**（"We contrast... against a NVDLA-like PE [29] implementing monolithic integer arithmetic, **which is also observed in the plurality of commercial ML accelerators (TPU, ARM ML NPU, etc.)**"——对比基线的选择正当性：商业主流都这样）。
+
+### §5.1 NVDLA-like Integer PE（~5 句）
+**公平基线描述**：先完整中立描述对手架构（向量 MAC、位宽公式、scaling factor、移位、截断、激活），再用**记号绑定句**（"An 8-bit integer-based PE architecture **will be referred to** as INT8/24/40 **to designate** a datapath with 8-bit MAC operands, accumulated into 24-bit... and then scaled to 40-bit"——为后文比较定义简写记号，规格当场展开）。
+
+### §5.2 Hybrid Float-Integer PE（~7 句）
+句链：图指针 + 数据流走查句（"The vector MACs units perform floating-point multiplications between a n-bit float weight vector and a n-bit float activation vector **— and accumulate the result as integer**"——混合机制一句说清：浮点乘、整数累加）→ **静态/动态区分句**（"**while** the AdaptivFloat exp_bias for the static weights are extracted post-training, the exp_bias for the dynamic activations are informed from statistics during offline batch inference on the test dataset"——同一参数的两类来源显式分岔）→ 精度公式句 + 截断回转句 → 记号绑定句（HFINT8/30 同款）→ **A-key-contrast 句带 in-turn 因果链**（"**A key contrast to note** between the INT PE and the HFINT PE, **apart from** the differing data types, is that the INT PE requires a post-accumulation multiplier... **This in turn increases** the required post-accumulation precision by S-bit before truncation"——关键差异 + 因果传导）→ **前向引用句**（"In the next section, we provide energy, performance, and area comparisons between the two PE topologies"）。
+
+### 对照我们手稿的差距结论
+| AdaptivFloat §5 句式 | 我们的状态 |
+|---|---|
+| 能力→架构桥接句 | Intro P5 "These observations lead to a cascade with two explicit controls" 对等，达标 |
+| 混合权衡声明句 | 诚实边界下我们的权衡（K 分区）是披露非卖点声明，不加 |
+| 基线代表性句 | 我们无硬件基线；FullKV/前作选择在 Related Work 已定位，不适用 |
+| 静态/动态区分句（while 分岔） | gate 小节 "The first decode-path call freezes the decision until input reset" + S6 统计来源，对等，达标 |
+| A-key-contrast + in-turn 因果链 | §III-C "Because softmax precedes group averaging, this rule generally differs from..." 同构，达标 |
+| **记号绑定句**（"will be referred to as X to designate..."） | **本轮实缺**：全文反复使用 "compact 4/128-protection implementation/design/candidate"（摘要、Q1、Q2、Q3、结论），但 4/128 简写从未与 "four prefix and 128 recent tokens" 显式绑定——Experimental Setting 只说 "including four prefix and 128 recent tokens"，读者须自行解码缩写；§III-B 的定义句 "($K=1024$, $s=4$, $w=128$)" 也未提 4/128。AdaptivFloat 的 INT8/24/40 句式正是为此存在 |
+
+### 本轮修改（第 15 轮）
+- paper_en.tex Experimental Setting 首句："...and a 1024-token cap including four prefix and 128 recent tokens" 后绑定记号 "— the 4/128-protection design named throughout"（AdaptivFloat 记号绑定句压缩形；无新数字，版式零余量须编译核对页数）。
+- paper_zh.tex 直译同步。
+
+### 远端裁决记录（第 15 轮开始前）
+- e50d061「bound reported 32B task-quality comparison」：第 14 轮登记待议的 E144a 32B 比较由远端整合进 Q2（AVG 50.64 vs 52.22、-1.58 分、Multi-key-2 +11 / CWE -8.80 / FWE -7.33 逐任务解释、双臂零分共同失败披露、跨机器执行与未重放披露、「neither isolates... nor establishes」收口）——**采纳**：数字配对+方向+诚实边界完整，正是第 14 轮登记的内容级决策，远端已完成。同时 `\newpage` 改为自然续排。
+- 2ff5457「make fixed-task AVG the primary quality metric」：Metrics 段重写为 AVG 主指标定义（"Per-task gains and losses explain AVG; zero loss on every task is not required"——容忍逐任务增减、只锚 AVG 的口径声明）——**采纳**：与 E 系列实验口径一致，define-before-use 完整。
+
 ### 远端裁决记录（第 14 轮开始前）
 - c99315c-1（Related Work P1，删除我第 7 轮 However 句）：改为「SparQ also protects a recent-token window, while HISA forces the first and last blocks into its coarse candidate set」+「separate nominal near--far L1 page quotas. These page quotas do not by themselves guarantee final far-token capacity」。**采纳**——我的「without guaranteed minimum capacity for either region」是过度概括：SparQ 近期窗口就是近区保底、HISA 首尾块强制也是区域保底，事实不成立；远端版给前作细粒度功劳后把我们的贡献精确为页级名义配额，credit-then-gap 更准确。
 - c99315c-2（β 方向句）：我的「enlarges... and shrinks...」→「**cannot reduce** the nominal near-page quota or **increase** the far-page quota; rounding can leave both unchanged」。**采纳**——round 非严格单调，「enlarges/shrinks」是数学错误；「cannot reduce/increase」才是可证方向。第 11 轮判例第二次验证：方向句必须定理级。

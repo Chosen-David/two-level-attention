@@ -21,13 +21,23 @@
 |---|---|---|---|
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
-| 3 | 2020_AdaptivFloat.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓ §4 ✓；待：§5 PE 架构 | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ |
+| 3 | 2020_AdaptivFloat.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓ §4 ✓ §5 ✓；待：§6 硬件评估 | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ |
 | 4 | 2021_Gemmini.pdf | 未开始 | — |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 15 轮（2026-10-17 23:0x，AdaptivFloat §5 PE Architecture）
+- **远端裁决**（fetch 发现 2ff5457/e50d061/ff5ea05，本地已同步）：(1) e50d061 把第 14 轮登记待议的 E144a 32B 比较整合进 Q2（AVG 50.64 vs 52.22 / -1.58 分 / 逐任务方向 +11、-8.80、-7.33 / 双臂零分披露 / 跨机器与未重放披露 / neither-isolates-nor-establishes 收口）——**采纳**，第 14 轮登记的内容级决策已由远端完成且边界完整；`\newpage` 改自然续排；(2) 2ff5457 Metrics 段重写为 AVG 主指标口径（"Per-task gains and losses explain AVG; zero loss on every task is not required"）——**采纳**，与 E 系列实验口径一致。
+- 拆解笔记：§5 部分（开篇：**能力→架构桥接句**（paves the way——§4 结果铺路 §5 设计）/**混合权衡声明句**（compromise between float accuracy and fixed-point density）/**基线代表性句**（NVDLA-like "observed in the plurality of commercial ML accelerators"）；§5.1：公平基线全描述+**记号绑定句**（"will be referred to as INT8/24/40 to designate..."）；§5.2：数据流走查+**静态/动态分岔句**（while weights post-training, activations offline stats）+**A-key-contrast 句带 in-turn 因果链**+前向引用句）。
+- 对照结论：桥接句（Intro P5）、静态/动态分岔（gate 冻结句）、A-key-contrast（Because softmax precedes...）均有对等物。**实缺 = 记号绑定句**：全文反复使用 "compact 4/128-protection implementation/design/candidate"（摘要/Q1/Q2/Q3/结论），但 4/128 从未与 four prefix + 128 recent 显式绑定。
+- paper_en.tex Experimental Setting 首句：加 ", referred to throughout as the 4/128-protection design"（AdaptivFloat INT8/24/40 句式压缩形，无新数字）。
+- paper_zh.tex 直译同步（「，下文统称4/128保护设计。」）。
+- 版式核对：en 6 / zh 6 页保持（记号绑定为句尾短语未触发溢出）。
+- 编译验证：双语通过，0 未定义引用。
+- 待后续轮次：AdaptivFloat §6 硬件评估（合成流量/能耗面积表）+ §7 结论。
 
 ### 第 14 轮（2026-10-17 21:0x，AdaptivFloat §4 Experimental Results）
 - **远端裁决**（fetch 发现 c99315c/10a3cd7 等，本地已同步）：(1) c99315c 删除我第 7 轮 However 句（"without guaranteed minimum capacity for either region"），改为 SparQ 近期窗口/HISA 首尾块细粒度功劳+「nominal near--far L1 page quotas... do not by themselves guarantee final far-token capacity」——**采纳**：我的原句是过度概括（SparQ 近期窗口即近区保底），远端版 credit-then-gap 更准确；(2) β 方向句我的「enlarges/shrinks」→远端「cannot reduce/increase; rounding can leave both unchanged」——**采纳**：round 非严格单调，我的版本是数学错误，第 11 轮判例第二次验证；(3) 10a3cd7 Token-Picker 句机制精确化——**采纳**。
