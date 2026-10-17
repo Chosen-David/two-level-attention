@@ -21,13 +21,23 @@
 |---|---|---|---|
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
-| 3 | 2020_AdaptivFloat.pdf | Abstract ✓ Intro ✓；待：§2 相关工作 | Intro-P2 机制归因句 ✓ |
+| 3 | 2020_AdaptivFloat.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3 方法 | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ |
 | 4 | 2021_Gemmini.pdf | 未开始 | — |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 12 轮（2026-10-17 17:0x，AdaptivFloat §2 Related Work）
+- **远端裁决**（fetch 发现 90edbf2/1ba9faf/7021966/b93f0dd/7f3b182/1010b06，本地已同步）：1010b06 把第 11 轮我的 Intro P2 归因句 "The asymmetry is mechanical: ... misses more pages while losing less total mass" 收敛为 "Mean pooling **can** dilute... **Neither property determines the observed ordering**"。**采纳远端**——对标 AdaptivFloat P1 机制归因句的前提是定理级机制（LayerNorm 不重参数化→权重绝对值大可证），我们的稀释是启发式级趋势，"mechanical" 属过度断言，远端版正是诚实边界要求。判例教训：**机制归因句只适用于可严格推导的性质，启发式性质只能 can-动词+不决定次序**。Q3 逐轮差值（0.0237/0.0046 ms）与 gate 段代理/质量区分重写为诚实增强，保留。
+- 拆解笔记：§2 部分（类别一**前作动词异质化**：[24] noticed+proposed+成本披露三连/[26] observed+can be used to+yielding/[22] performs in search of/Stripes performs to enable——每篇动词携带其贡献性质；类别收尾 **Rather-than 定位句**（他们改宽度、我们在固定宽度内调表示）；类别二 **appeal 句→However 失败机制句**（appeal stems from...→by collapsing the exponent... smaller magnitudes more prone to data loss）+ 近距离对比句；类别三互补性声明句划分比较域）。
+- 对照结论：互补性声明句已有对等物。**实缺两处**：(1) P1 三选择器统一动词 "use query-aware approximate selection" 一刀切（平铺列举病的动词层残留）→ 按 Quest 构造保证/SparQ 近似/HISA 分层差异化；(2) P2 Token-Picker 句缺 appeal 先行（limits reads 先功劳再 instead retains 分歧）。
+- paper_en.tex Related Work P1：改 "Quest supplies sign-aware page-extremum bounds for far-page scoring, SparQ approximates attention from partial key bits, and HISA prunes the attention set hierarchically"（原 "We adopt Quest's sign-aware page extrema" 信息保留于第一分句）。
+- paper_en.tex Related Work P2：改 "Token-Picker **limits selector reads by** estimating... and scheduling... on demand; our coordinate-based scorer instead retains..."。
+- paper_zh.tex 直译同步（「Quest以符号感知页极值为远区页评分提供构造保证，SparQ从部分键比特近似注意力，HISA则按层级剪枝注意力集合」「Token-Picker通过……来限制选择器读取量」）。
+- 编译验证：双语通过（en 6 / zh 6 页），0 未定义引用。
+- 待后续轮次：AdaptivFloat §3 方法（指数偏置机制句式）、§4 实验表、§5 PE 架构、§6 硬件评估、§7 结论。
 
 ### 第 11 轮（2026-10-17 15:0x，AdaptivFloat Abstract + Introduction —— 第 3 篇开始）
 - 远端检查：无新提交（本地 = origin/main 95587a0）。
