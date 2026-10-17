@@ -82,4 +82,53 @@
 - paper_en.tex Related Work P1 定位句：`We study these existing components with complete low-frequency RoPE pairs shared across both stages and separate nominal near--far L1 page quotas.` → 句尾加 `, which keep page and token access separate.`（Gemmini 编号能力句的 enabling 从句压缩形；定义级事实＝§III-B 既有定理句 "page and token access are separate constraints"，无新数字；同时补齐页/词元关键抽象向 Related Work 定位句的传播链，且为紧随其后的 "These page quotas do not by themselves guarantee final far-token capacity" 诚实句提供铺垫）。
 - paper_zh.tex 直译同步（「……结合，使页访问与词元访问保持相互独立。」）。
 - 版式零余量：+8 词，编译后核对 en 6 页。
+- **后记（远端裁决，第 19 轮 fetch 时发现）**：远端 1c3bcd8 把我的从句精化为 "distinguishing page-level eligibility from final token capacity"——**采纳**：远端版与全文既有抽象链逐点对齐（图 2 caption "Page masks limit eligibility"、摘要 "far-page reservation need not preserve far-token capacity"、结论 "far-page reservation from far-token coverage"），我的 "keep ... separate" 更模糊且可误读为配额分离了访问本身。判例：关键抽象传播时用全文既有术语对，不新造近义表述。
+
+---
+
+## §3 Gemmini Generator（第 19 轮，2026-10-18）
+
+### §3 开篇（4 句）：类别重申 + 两端跨度 + 用户能力句
+- 类别重申句（"Gemmini is an open-source, full-stack generator ..., spanning across different hardware architectures, programming interfaces, and system integration options"——与摘要 A3/Intro P2 登场句三度同构）。
+- **两端跨度句**（"users can generate everything from low-power edge accelerators to high-performance cloud accelerators equipped with out-of-order CPUs"——from-A-to-B 端点式设计空间声明）。
+- **用户能力句**（"Users can then investigate how the hardware, SoC, OS, and software overhead **interact to affect** overall performance and efficiency"——基础设施论文的贡献句式：用户能用它做什么调查）。
+
+### §3.A Architectural Template（~14 句 + Fig. 2/3）
+- 图指针句 → **中心单元定位句**（"The central unit ... is a spatial architecture with spatially distributed PEs, each of which performs dot products and accumulations"）→ 数据通路句（reads-from scratchpad / writes-to accumulator，**while 对比连接**读路径与写路径）→ **位宽差异句**（accumulator "with a higher bitwidth than the inputs"——设计细节里内嵌机理）→ 外设核枚举句（pooling/ReLU/matrix-scalar，through 短语挂实现方式）→ 集成句。
+- **We-design-目的句**（"We design Gemmini's spatial array with a two-level hierarchy **to provide a flexible template** for different microarchitecture structures, as demonstrated in Figure 2"——设计决策+目的+图证据三合一）。
+- **层级走查句链**（is-composed-of 双层递归：array→tiles（pipeline registers 分隔）→PEs（combinational 无寄存器）——同一 compositional 事实在两层各说一遍但连接词不同，第二遍是刻意的结构对称强调）。
+- **Fig. 3 灵活性结论句**（"Figure 3 illustrates how ... the flexibility to support anything from fully-pipelined TPU-like architectures to NVDLA-like ... or **any other design points in between these two extremes**"——两端+中间全覆盖）。
+- **双数字权衡句带双 due-to**（"We synthesized both designs with 256 PEs. We found that the TPU-like design achieves a 2.7× higher maximum frequency, **due to** its shorter MAC chains, but consumes 1.8× as much area ..., and 3.0× as much power, **due to** its pipeline registers"——同一决策的三数字同报：频率收益 vs 面积/功耗代价，各带机理归因）。
+- **探索能力收口句**（"With Gemmini, designers can explore such footprint vs. scalability trade-offs across different accelerator designs"——工具价值回扣）。
+
+### §3.B Programming Support（三小节）
+- **not-just-also 双层贡献句**（"produces not just a hardware stack, but also a tuned software stack, **boosting developers' productivity**"）。
+- **At-the-high-level / Alternatively-at-the-low-level 结构对称句对**（同一层级各一句能力描述）。
+- **Therefore 派生需求句**（"These functions must be tuned differently for different hardware instantiations ... **Therefore, every time a new accelerator is produced**, Gemmini also generates an accompanying header file ..."——需求→自动化供给的因果链，生成器卖点句式）。
+- **Data Staging 段**：At-runtime 条件句（based-on 双输入：层维度+硬件参数）→ 目的句（maximize data moved per iteration）→ 因果句（tile sizes determine when/how much data moves）→ **If-the-programmer-wishes 可选控制句**（低层 API 允许手动覆盖——自动化+手动逃逸阀双层披露）。
+- **Virtual Memory 段**：In-addition 双受众句（programmers 避免 manual translation / researchers investigate VM support——一句双 persona）→ For-example 图句 → **As-we-can-see 观察句带数字与归因**（miss rate climbs to 20-30%, **due to** tiled nature, **which is orders-of-magnitude greater than** prior CPU benchmarks [25]——图观察+量化+数量级对比三合一）→ **前向引用句带预告结论**（"Later, in Section V-A, we use Gemmini to co-design ... which achieves near-maximum end-to-end performance ..., with only a few TLB entries"——前向引用自带结论预览）。
+
+### §3.C System Support
+- 框架定位句 → **range 两端句**（from in-order microcontrollers ... all the way up to out-of-order server-class CPUs——第二个 from-to 跨度句）→ 多核扩展句 → SoC 参数枚举句（bus widths/cache size/associativity）→ **前向引用带数字预告**（"improve performance by over 8%"）。
+- **enables-so-that 能力链**（full software stack support → "This enables early exploration ... **where** context switches, page table evictions, and other unexpected events can happen at any time"）。
+- **环境价值句**（"These unexpected events can uncover bugs and inefficiencies that a 'baremetal' environment **would not bring to the surface**"——完整环境 vs baremetal 的对比价值句）。
+- **亲历 bug 双例句**（For example：非确定性死锁例 + 权限违规例——"On a 'baremetal' environment, these violations were **silently ignored**"——用亲历证据支撑环境价值句；这是 DREAMPlace 数值陷阱句的系统级版本）。
+
+### 对照我们手稿的差距结论（§III 方法节遍历）
+| Gemmini §3 句式 | 我们的状态 |
+|---|---|
+| We-design-目的句（设计决策+目的+图证据三合一） | §III 开头 "To control both selection cost and candidate access, the cascade uses two explicit mechanisms"——目的先行句式，等价，不改 |
+| **双数字权衡句带双 due-to**（同决策三数字同报：2.7×/1.8×/3.0× 各带机理） | 我们的诚实镜像分布在两处：Q2 的 β 比较带 confounding 披露、Q3 的比值序列 3.38/2.46/1.78 带方向句。方法节无设计权衡数字可诚实报（设计决策无实测支撑——诚实边界禁造），不改 |
+| 层级走查句链（compositional 双层递归） | §III-C GQA 小节有 L1→L2 走查句链（computes/applies/softmax/determine），等价，不改 |
+| **not-just-also 双层贡献句** | **本轮实缺候选**：§III-A 末段 "Preparing and maintaining the auxiliary views therefore adds work without compressing the original KV cache"——只有代价披露层，无前句说明评分视图带来什么（低维筛选收益已在开头段，但该段内部是 cost-without-benefit 单层结构）。加 benefit 层需新主张——评分视图的收益（缩小单点积宽度）是定义级事实，已在 §III-C "Width-32 scoring narrows each dot product"——**传播断裂同款**：该定义级收益句只在 §III-C 出现，§III-A 评分视图段无对应。可在 §III-A 末段把代价句改为 trade-off 句式 |
+| If-the-programmer-wishes 可选控制句 | gate 小节的 "OFF skips ... refilling near L2 within unchanged near pages" + S7 整数规则披露，等价，不改 |
+| As-we-can-see 观察句带数字与数量级对比 | Intro (a) 段漏页三口径句等价，不改 |
+| 前向引用带数字预告（8%/TLB 结论） | Intro P5 Q1/Q2/Q3 指针（第 17 轮已补）+ S 前向引用网，等价，不改 |
+| 亲历 bug 双例句 | 诚实镜像：Q2 k_f=0 配额推论（"neither verifies execution nor explains"）+ gate 段跨阶段代理句——我们报的是不可归因而非亲历 bug，边界更强，不改 |
+| range 两端跨度句 / 用户能力句 | 非生成器论文不适用；范围句由 "The gate supports one sequence" 等边界句承担 |
+
+### 本轮修改（第 19 轮）
+- paper_en.tex §III-A 末段：`Preparing and maintaining the auxiliary views therefore adds work without compressing the original KV cache (S7).` → `The views narrow each dot product but add work, without compressing the original KV cache (S7).`（benefit-but-cost 权衡句式；前半句＝§III-C 既有定义级事实 "Width-32 scoring narrows each dot product" 的传播，无新数字；使该段从纯代价披露变为 trade-off 披露——与摘要/结论的 narrows-scoring vs execution-work 区分链一致）。
+- paper_zh.tex 直译同步（「评分视图缩小每次点积，但辅助视图的准备与维护增加了执行工作，并未压缩原始KV缓存。」）。
+- **版式教训复现**：初版 "The width-32 views narrow each dot product, but preparing and maintaining them adds work ..."（+7 词）使 en 6→7 页——零余量规则第二次触发；压缩至 +2 词后 6 页恢复。
 

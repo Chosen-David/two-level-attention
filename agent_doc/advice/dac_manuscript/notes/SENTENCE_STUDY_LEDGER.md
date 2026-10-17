@@ -22,12 +22,22 @@
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
-| 4 | 2021_Gemmini.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3 生成器 | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓ |
+| 4 | 2021_Gemmini.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 评估 §5 案例 | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓ |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 19 轮（2026-10-18，Gemmini §3 Generator）
+- **远端裁决**（本地 = origin/main，1c3bcd8 已由并行会话合并）：远端把第 18 轮我的 enabling 从句 "which keep page and token access separate" 精化为 "distinguishing page-level eligibility from final token capacity"——**采纳**：与全文既有抽象链逐点对齐（图 2 caption "Page masks limit eligibility"、摘要 "far-page reservation need not preserve far-token capacity"、结论 "far-page reservation from far-token coverage"），我的版本更模糊且可误读为配额分离了访问本身。判例：关键抽象传播须用全文既有术语对。
+- 拆解笔记：§3 部分（开篇：两端跨度句（from-edge-to-cloud）+用户能力句（interact to affect）；§3.A：**We-design-目的句**（设计决策+目的+图证据三合一）+中心单元定位句+层级走查句链（compositional 双层递归）+**双数字权衡句带双 due-to**（2.7× 频率 vs 1.8× 面积/3.0× 功耗，各带机理归因）；§3.B：**not-just-also 双层贡献句**+At-high/Alternatively-low 结构对称句对+**Therefore 派生需求句**（需求→自动化供给）+If-the-programmer-wishes 可选控制句+**As-we-can-see 观察句带数量级对比**+前向引用带数字预告；§3.C：range 两端句+**enables-so-that 能力链**+环境价值句（baremetal would not bring to surface）+**亲历 bug 双例句**——DREAMPlace 数值陷阱句的系统级版本）。
+- 对照结论：We-design-目的句（§III 开头目的先行句等价）、层级走查（GQA 小节 L1→L2 走查链）、可选控制句（gate OFF 路径+S7）、观察句带数字（漏页三口径）、前向引用（Q 指针+S 网）、亲历证据（k_f=0 推论+代理句——我们边界更强）均不改；双数字权衡句诚实边界禁造。**唯一实缺 = §III-A 末段纯代价披露**（"adds work without compressing"——无 benefit 层；§III-C 定义级收益句 "Width-32 scoring narrows each dot product" 未传播到评分视图段）。
+- paper_en.tex §III-A 末段：改为 `The views narrow each dot product but add work, without compressing the original KV cache (S7).`（benefit-but-cost 权衡句式，前半句＝§III-C 定义级事实传播）。
+- paper_zh.tex 直译同步（「评分视图缩小每次点积，但辅助视图的准备与维护增加了执行工作，并未压缩原始KV缓存。」）。
+- **版式教训复现**：初版 +7 词使 en 6→7 页（零余量第二次触发），压缩至 +2 词后恢复 6 页。
+- 编译验证：en 6 / zh 6 页，0 未定义引用。
+- 待后续轮次：Gemmini §4 评估（area breakdown 占比句/im2col-BOOM 交互实验）、§5 案例研究。
 
 ### 第 18 轮（2026-10-18，Gemmini §2 Background and Motivation）
 - 远端检查：fetch 无新提交，本地 = origin/main（afbcde3 已合并含我第 17 轮提交；e1d584e 门控段 AVG 口径对齐、c84b5e9 Q2 β/K1=256 比较均已提交，工作区干净，无需裁决——内容与第 16 轮已采纳方向同源且边界完整）。
