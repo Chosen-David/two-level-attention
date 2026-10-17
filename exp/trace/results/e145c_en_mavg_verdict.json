@@ -1,0 +1,100 @@
+{
+ "experiment": "E145c-en",
+ "desc": "LongBench v1 英文13任务 sink4/swa128 mavg 主口径臂（decode-only 稀疏）",
+ "caliber": "α0.25/β0.125/γ0.625 tail minmax/avg K1=128 K2=1024 c4 sink4 swa128, T=e145c, .187 GPU3/4",
+ "anchor_source": "exp/trace/results/e109_full_lbv1.json（FullKV dense 无 sink 参数跨口径复用；mavg/aavg 为 sink128 同配置对照，跨机）",
+ "n_tasks": 13,
+ "mavg_sink4": {
+  "avg": 51.252,
+  "per_task": {
+   "2wikimqa": 41.8,
+   "gov_report": 33.95,
+   "hotpotqa": 58.71,
+   "lcc": 67.9,
+   "multi_news": 24.71,
+   "multifieldqa_en": 53.63,
+   "musique": 33.66,
+   "narrativeqa": 25.37,
+   "passage_retrieval_en": 100.0,
+   "qasper": 47.69,
+   "qmsum": 23.8,
+   "repobench": 65.74,
+   "triviaqa": 89.32
+  }
+ },
+ "fullkv_dense": {
+  "avg": 50.36,
+  "per_task": {
+   "2wikimqa": 38.29,
+   "gov_report": 33.17,
+   "hotpotqa": 53.48,
+   "lcc": 68.81,
+   "multifieldqa_en": 53.4,
+   "multi_news": 24.93,
+   "musique": 32.14,
+   "narrativeqa": 25.61,
+   "passage_retrieval_en": 100.0,
+   "qasper": 44.17,
+   "qmsum": 23.53,
+   "repobench": 66.5,
+   "triviaqa": 90.71
+  }
+ },
+ "mavg_sink128_cross_machine": {
+  "avg": 50.66,
+  "per_task": {
+   "2wikimqa": 39.64,
+   "gov_report": 33.4,
+   "hotpotqa": 53.53,
+   "lcc": 69.24,
+   "multifieldqa_en": 52.93,
+   "multi_news": 24.32,
+   "musique": 35.63,
+   "narrativeqa": 25.18,
+   "passage_retrieval_en": 98.5,
+   "qasper": 44.21,
+   "qmsum": 23.99,
+   "repobench": 67.96,
+   "triviaqa": 89.99
+  }
+ },
+ "delta_vs_fullkv": 0.892,
+ "delta_vs_mavg_sink128_cross_machine": 0.592,
+ "per_task_delta_vs_fullkv": {
+  "2wikimqa": 3.51,
+  "gov_report": 0.78,
+  "hotpotqa": 5.23,
+  "lcc": -0.91,
+  "multi_news": -0.22,
+  "multifieldqa_en": 0.23,
+  "musique": 1.52,
+  "narrativeqa": -0.24,
+  "passage_retrieval_en": 0.0,
+  "qasper": 3.52,
+  "qmsum": 0.27,
+  "repobench": -0.76,
+  "triviaqa": -1.39
+ },
+ "per_task_delta_vs_sink128": {
+  "2wikimqa": 2.16,
+  "gov_report": 0.55,
+  "hotpotqa": 5.18,
+  "lcc": -1.34,
+  "multi_news": 0.39,
+  "multifieldqa_en": 0.7,
+  "musique": -1.97,
+  "narrativeqa": 0.19,
+  "passage_retrieval_en": 1.5,
+  "qasper": 3.48,
+  "qmsum": -0.19,
+  "repobench": -2.22,
+  "triviaqa": -0.67
+ },
+ "cross_check": "hotpotqa 58.71 / musique 33.66 与 E149 DO 臂（sink4/swa128 同配置）逐位一致",
+ "caveats": [
+  "锚 e109 为 sink128 期跨机运行，其 dense hotpotqa 53.48 vs E149 本机锚 59.42，跨机锚单任务摆动可达 ~5 分；+0.89 总均值优势受此影响，方向与 RULER 三档 sink4 增益一致",
+  "mavg_sink128 对照跨机，+0.59 为方向性证据非同机配对",
+  "aavg(0,0) 单池参照臂在飞（10/13），收官后补齐面板 G 对照"
+ ],
+ "status": "mavg arm scored 13/13 @2026-10-17 09:01 CST; aavg arm in flight"
+}
