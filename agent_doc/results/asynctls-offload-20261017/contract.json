@@ -1,0 +1,59 @@
+{
+  "status": "CPU candidate; GPU and scientific acceptance open",
+  "gpu_jobs": 0,
+  "model_downloads": 0,
+  "environment": {
+    "python": "3.12.14",
+    "torch": "2.14.1+cpu",
+    "transformers": "4.57.1"
+  },
+  "source_sha256": {
+    "sparse_attn/asynctls_offload.py": "b6159370c23411026f4dfee074f3ab546b7ef7c8c8cdffcf0c0405438d20babb",
+    "sparse_attn/asynctls_component.py": "584e9e8f4f87e02ebc2c89c0aeb5061f6d5f877e652cdb13a24b1d954ef81630",
+    "sparse_attn/baseline_runtime.py": "14ec4b468fc664e7a367ac232c4d7199bf8fea69ed263946be223d584620a5b6",
+    "sparse_attn/arguments.py": "18b6e4313f38324b5ecea14bb5e10e32102a2f87cabb2efce482053d1ed0adf4",
+    "sparse_attn/info.py": "b3abee28bdc4da56da3fab9d38294a224fca7437b2352297af287a7fbe2dcf10",
+    "benchmark/LongBench/pred.py": "333844a7bd1a0b726904dd99cc393a72cc6a549d496a9c95499bfde3376d5dac",
+    "benchmark/RULER/pred_ruler.py": "bdf41416f5010ee7f37f5d3ee5b4a78a7b411bcdd67fe62302bb2dbbe822e3ab",
+    "tests/test_asynctls_offload.py": "b67048b113aeb711f2436f1db0307e702f58b06dbba77fdf7856a94d0366d165"
+  },
+  "logs": {
+    "component.log": "08a83f7211cebb46a9274d15d17b97352e140c748e65c4f946fd5e1f98df349b",
+    "component-optimized.log": "970958a0bf3028da71e19427fddd95fd1114e0dc00037acb7c89fbdc0942d3ee",
+    "optimized.log": "71852bdba3056d4fbecd0cab1ba48ed6a985f99618c11f64f3a9d397abd9950e",
+    "ffd-optimized.log": "b6a328b1c7a759ab09ce160cff73ec67fd1bd9b1e146782bf70d314a7c9fd8a0",
+    "ffd.log": "3e5b08158eae862ae896c598b7da7eea047d1eb087f7e77fdcc67aac28e2c069",
+    "normal.log": "f57f2a8022e30d5f682de17b45d60a1cf95937406f3535b2ad10a884661f2f87"
+  },
+  "tests": {
+    "offload": "6+6 normal/optimized",
+    "component": "4+4",
+    "ffd": "6+6"
+  },
+  "independent_review": {
+    "reviewer": "/root/independent_review",
+    "verdict": "usable-with-scope, no CPU blocker",
+    "offload_sha256": "b6159370c23411026f4dfee074f3ab546b7ef7c8c8cdffcf0c0405438d20babb",
+    "normal": 6,
+    "optimized": 6,
+    "cuda": "static only, no validation"
+  },
+  "known_inherited_failure": "prior unchanged-main full-suite SparQ missing receipt/stats: 1 failure + 2 errors; unrelated and not repaired",
+  "remote_ci": "not established",
+  "scope": {
+    "quality_ruler": [
+      32768
+    ],
+    "longbench": "actual existing task lengths",
+    "kernel": [
+      32768,
+      65536,
+      131072
+    ],
+    "e2e": [
+      32768,
+      65536,
+      98304
+    ]
+  }
+}

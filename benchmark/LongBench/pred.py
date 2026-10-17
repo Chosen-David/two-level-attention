@@ -515,7 +515,10 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
     # 防止静默跑 dense 却把输出文件打上稀疏方法标签。
     # 081（TL-E121-OUTPUT-SNAPSHOT-081）：snapshot 透传给每个 attention
     # 层的 TLIIndexer（共享同一冻结对象，不按层重开文件）。
-    if args.method == 'asynctls_component':
+    if args.method == 'asynctls_paper':
+        from sparse_attn.asynctls_offload import enable_system
+        n_patched = enable_system(model, args)
+    elif args.method == 'asynctls_component':
         from sparse_attn.asynctls_component import enable_component
         n_patched = enable_component(model, args)
     elif args.method == "quest_vendor":

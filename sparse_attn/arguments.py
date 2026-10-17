@@ -285,12 +285,14 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'asynctls_component', 'moba_vendor', 'tia', 'twi', 'tli', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'asynctls_component', 'asynctls_paper', 'moba_vendor', 'tia', 'twi', 'tli', 'none'])
     parser = _add_quest_args(parser)
     parser = _add_minference_args(parser)
     parser = _add_fasa_args(parser)
     parser = _add_sparq_args(parser)
     parser.add_argument('--baseline-execute', action='store_true', help='explicitly enable new FFD/SparQ candidate execution; plan: python -m sparse_attn.baseline_runtime')
+    parser.add_argument('--asynctls_backend', choices=['cpu','cuda'], default='cpu', help='paper reproduction transport; CUDA explicitly opt-in and unvalidated')
+    parser.add_argument('--asynctls_capacity', type=int, default=131200)
     parser.add_argument('--asynctls_calibration', help='held-out per-layer/head channel JSON, mandatory for component')
     parser.add_argument('--asynctls_blocks', type=int, default=128)
     parser.add_argument('--asynctls_tokens', type=int, default=1024)

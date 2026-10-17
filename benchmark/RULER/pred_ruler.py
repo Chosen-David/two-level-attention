@@ -210,6 +210,9 @@ def main():
     # 1024，派单时按 Quest 论文口径显式传 --quest_token_budget）。
     if args.method == "ffd_vendor":
         n_patched = model.config.num_hidden_layers
+    elif args.method == 'asynctls_paper':
+        from sparse_attn.asynctls_offload import enable_system
+        n_patched = enable_system(model, args)
     elif args.method == 'asynctls_component':
         from sparse_attn.asynctls_component import enable_component
         n_patched = enable_component(model, args)

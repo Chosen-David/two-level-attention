@@ -50,11 +50,14 @@ def baseline_preflight(args):
         if not getattr(args, 'baseline_execute', False):
             raise ValueError('candidate execution disabled; inspect python -m sparse_attn.baseline_runtime; pass --baseline-execute explicitly')
         verified_vendor(method)
-    if method == 'asynctls_component':
+    if method in ('asynctls_component','asynctls_paper'):
         if not getattr(args, 'baseline_execute', False):
             raise ValueError('component candidate requires --baseline-execute')
         from sparse_attn.asynctls_component import frozen_spec
         frozen_spec(args)
+        if method == 'asynctls_paper':
+            from sparse_attn.asynctls_offload import system_identity
+            system_identity(args)
     if method == 'ffd_vendor':
         ffd_settings(args)
         if getattr(args, 'context_length', 0) > 32768 or getattr(args, 'yarn', False):
@@ -230,8 +233,13 @@ def baseline_request(model):
     start = time.perf_counter()
     if not math.isfinite(start):
         raise ValueError('nonfinite baseline start clock')
-    yield result
-    sync()
+    try:
+        yield result
+    finally:
+        close = getattr(model, '_asynctls_close', None)
+        if close is not None:
+            close()  # Complete owned transfers before final sync/timing or exception exit.
+        sync()
     end = time.perf_counter()
     elapsed = (end - start) * 1000
     if not math.isfinite(end) or not math.isfinite(elapsed) or elapsed <= 0:
@@ -239,7 +247,7 @@ def baseline_request(model):
     diff = {k: v - before.get(k, 0) for k, v in stats.items()}
     if set(before) - set(stats) or any(v < 0 for v in diff.values()):
         raise RuntimeError('baseline counters reset within request')
-    sparse_key = {'ffd_vendor': 'sparse_path_calls', 'sparq_vendor': 'sparq_decode_calls', 'asynctls_component': 'component_decode_calls'}.get(identity['method'])
+    sparse_key = {'ffd_vendor': 'sparse_path_calls', 'sparq_vendor': 'sparq_decode_calls', 'asynctls_component': 'component_decode_calls', 'asynctls_paper': 'paper_decode_calls'}.get(identity['method'])
     if sparse_key and diff.get(sparse_key, 0) == 0:
         raise RuntimeError('baseline request never exercised sparse decode; no accepted receipt')
     result.update(identity=identity, routes=diff, request_wall_ms=elapsed,
@@ -249,6 +257,7 @@ def baseline_request(model):
 
 def plan():
     return dict(execution='disabled', gpu_started=False, methods={
+        'asynctls_paper':'paper-derived lagged selection/offload candidate; explicit CUDA opt-in; CPU state-machine verification only',
         'asynctls_component':'paper-derived synchronous section4.1 Qwen3 component; calibration required; NO offload or full-system equivalence',
         'ffd_vendor':'native Llama candidate; Qwen3/MLA unsupported; variable top-delta Q2+FP8',
         'sparq_vendor':'Qwen3 per-query-head gpt-fast adapter candidate; k=1024, context-derived r',

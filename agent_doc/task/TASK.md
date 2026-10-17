@@ -118,4 +118,4 @@
 
 ## 2026-10-17
 
-- [ ] [TL-ASYNC-FFD-20261017] AsyncTLS/FFD paper sources and bounded baseline integration; FFD original PDF/calibration/real-model acceptance remain blocked. ([详情](task_details/TL-ASYNC-FFD-20261017.md))
+- [ ] [TL-ASYNC-FFD-20261017] AsyncTLS/FFD sources and paper-derived lagged/offload candidate; real calibration/GPU scientific acceptance remain blocked. ([详情](task_details/TL-ASYNC-FFD-20261017.md))
