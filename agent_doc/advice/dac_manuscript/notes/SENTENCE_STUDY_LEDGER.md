@@ -109,9 +109,9 @@
 - GUIDE.md 禁改。
 - **基线表不回插**（2026-10-16 并行会话决定：GPT 重写 evaluation 节后锚点 "None is dense FullKV." 已不存在，WIP 备份 /tmp/wip_baseline_table_20261016.patch）。
 
-## 本地编译环境（2026-10-16 20:16 建成，全部验证通过）
-- **Python venv**：`/home/wangyuanshuo02/two-level-attention/.venv-paper`（pypdf 6.21 + pymupdf 1.28 + pillow 12.3 + fonttools）。PDF 逐句学习用它提取文本/图片：`.venv-paper/bin/python -c "import pymupdf; ..."`。
-- **TeX Live 2026**：`/home/wangyuanshuo02/texlive/2026`（scheme-basic + xetex/fontspec/unicode-math/lm-math/sttools(flushend)/tex-gyre；tlmgr 仓库=USTC，清华/阿里云/官方 CTAN/GitHub raw 均被墙，**PyPI 官方源与 USTC CTAN 可用**）。
-- **编译命令**：`bash /home/wangyuanshuo02/two-level-attention/agent_doc/advice/dac_manuscript/source/compile_local.sh [paper_en|paper_zh|supplement_en|supplement_zh]`（沙箱会清空 PATH/HOME 环境变量，此包装脚本用绝对路径；勿直接跑 build.sh）。
-- **字体兜底**（本地验证编译用，权威 PDF 仍以远端构建为准）：Nimbus OTF→TeX Gyre Termes/Heros 符号链接（`texlive/texmf-local/fonts/opentype/urwbase35/`，真 Nimbus 因 GitHub raw 被墙暂未取得，网络恢复可替换）；Noto CJK ttc→fontTools 用本地 SC OTF 合成（`texmf-local/fonts/opentype/notocjk/`，**Bold 字重本地缺失，中文粗体渲染为常规体**，远端有真 Bold）。fontconfig 已配 `~/.config/fontconfig/fonts.conf` 指向 TeX 字体树。
-- 验证状态：paper_en 7 页 / paper_zh 6 页 / supplement_en+zh 各 8 页，第三遍编译 0 未定义引用。
+## 本地编译环境（2026-10-17 升级：真字体版）
+- **Python venv**：`/home/wangyuanshuo02/two-level-attention/.venv-paper`（pypdf 6.21 + pymupdf 1.28 + pillow 12.3 + fonttools 4.67）。PDF 逐句学习用它提取文本/图片：`.venv-paper/bin/python -c "import pymupdf; ..."`。
+- **TeX Live 2026**：`/home/wangyuanshuo02/texlive/2026`（scheme-basic + xetex/fontspec/unicode-math/lm-math/sttools(flushend)/tex-gyre；tlmgr 仓库=USTC）。
+- **真字体包（2026-10-17 远端推送）**：`agent_doc/advice/dac_manuscript/fonts/`（Nimbus Roman/Sans 8 个真 OTF + Noto Serif/Sans CJK SC 含真 Bold + Liberation + licenses + check_fonts.py 校验）。**旧符号链接/ttc 合成兜底已废弃**，本地构建与远端排版一致。
+- **编译命令（必须带 TeX PATH）**：`cd source && PATH="/home/wangyuanshuo02/texlive/2026/bin/x86_64-linux:$PATH" bash compile_local.sh [paper_en|paper_zh|supplement_en|supplement_zh]`。compile_local.sh 已改为 portale 版（自带 source ../fonts/env.sh；不再固定 HOME）。注意：命令必须从 source 目录发起（cd source && ...），从仓库根直接跑会因相对路径失败。
+- 验证状态（2026-10-17 10:05）：四文档全编译，0 未定义引用；zh PDF 嵌入字体确认真 NotoSerifCJKsc-Bold / NotoSansCJKsc-Bold；en PDF 嵌入真 NimbusRoman Regular/Bold/Italic/BoldItalic + NimbusSans。
