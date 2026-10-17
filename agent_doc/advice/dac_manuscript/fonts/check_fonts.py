@@ -30,7 +30,7 @@ def main():
             if row is None or row[1].split(',')[0]!=item['family'] or row[2].split(',')[0]!=item['style'] or row[3]!=item['postscript']:
                 raise SystemExit('Incorrect internal font identity: '+rel)
             matched=subprocess.check_output(['fc-match','--format','%{file}\t%{family}\t%{style}\t%{postscriptname}',item['family']+':style='+item['style']],text=True).split('\t')
-            if (len(matched)!=4 or not Path(matched[0]).resolve().is_relative_to(ROOT)
+            if (len(matched)!=4 or Path(matched[0]).resolve()!=(ROOT/rel).resolve()
                     or item['family'] not in matched[1].split(',') or matched[3]!=item['postscript']):
                 raise SystemExit('Substituted requested face '+item['family']+' '+item['style']+': '+repr(matched))
         print('Verified exact bundled bytes and requested regular/bold/italic faces; no undeclared family substitution (Arial explicitly maps to Liberation Sans).')

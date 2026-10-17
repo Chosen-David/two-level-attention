@@ -24,3 +24,16 @@ def register_matplotlib():
         font_manager.fontManager.addfont(checked_font('noto/NotoSansCJKsc-'+face+'.otf'))
     for family in ('Nimbus Sans','Noto Sans CJK SC'):
         font_manager.findfont(family,fallback_to_default=False)
+
+
+def pin_cjk_text(fig):
+    """Bind existing Text artists to checked files, preserving size/style/weight."""
+    from matplotlib.text import Text
+    from matplotlib.font_manager import weight_dict
+    for text in fig.findobj(match=Text):
+        properties=text.get_fontproperties().copy()
+        weight=properties.get_weight()
+        numeric=weight_dict.get(weight,400) if isinstance(weight,str) else weight
+        face='Bold' if numeric>=600 else 'Regular'
+        properties.set_file(checked_font('noto/NotoSansCJKsc-'+face+'.otf'))
+        text.set_fontproperties(properties)
