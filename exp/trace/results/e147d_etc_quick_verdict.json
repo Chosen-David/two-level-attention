@@ -1,0 +1,65 @@
+{
+  "experiment": "e147d_etc_quick",
+  "date": "2026-10-17",
+  "series": "#280 主方法 32K 噪声级改进迭代第三轮（快速臂 cwe+mk2 探针）",
+  "machine_note": "E147d/e/f 与 E144amv 在 .187；E147cwys 在 wys。e146c 主口径基线（cwe 68.8/mk2 73.0）在 wys；E147c β.0625 quick（75.9/73.0）在 .187。FullKV 锚 cwe 83.5 / mk2 76.0。",
+  "main_caliber": {
+    "config": "K1=128, beta=.125, gamma=.625, alpha=.25, sink4/swa128, tail minmax/avg, K2=1024",
+    "far_pages": 112, "far_tokens": 252,
+    "cwe": 68.8, "mk2": 73.0
+  },
+  "arms": {
+    "e147d": {
+      "config": "beta=.03125, K1=128",
+      "far_pages": 124, "far_tokens": 732,
+      "cwe": 76.1, "mk2": 76.0,
+      "machine": ".187",
+      "read": "far 词元 572→732（页近同 124≈120）：cwe +0.2 边际收益小；mk2 +3.0 恢复 FullKV 水平（76.0=76）——mk2 是 far 词元受限"
+    },
+    "e147e": {
+      "config": "beta=.03125, K1=256",
+      "far_pages": 248, "far_tokens": 572,
+      "cwe": 79.8, "mk2": 74.0,
+      "machine": ".187",
+      "read": "vs E147c（同 far 词元 572，far 页 120→248）：cwe 75.9→79.8（+3.9 纯页覆盖效应）——cwe 同时吃页多样性；距 FullKV 83.5 仅 -3.7"
+    },
+    "e147f": {
+      "config": "beta=.0625, K1=256",
+      "far_pages": 240, "far_tokens": 252,
+      "cwe": 71.4, "mk2": 74.0,
+      "machine": ".187",
+      "read": "vs E147c（far 页 120→240 但 far 词元 572→252）：cwe 75.9→71.4（-4.5）——词元配额损失压过页增益，反向验证 cwe 是页+词元双因子；mk2 +1.0（页覆盖独立小增益）"
+    },
+    "e147cwys": {
+      "config": "beta=.0625, K1=128（wys 跨机对照）",
+      "far_pages": 120, "far_tokens": 572,
+      "cwe": 75.9, "mk2": 73.0,
+      "machine": "wys",
+      "read": "与 .187 E147c quick 逐位一致（75.9/73.0）——+7.1 是真实配置效应，跨机混杂排除；greedy 跨机亦零漂移"
+    },
+    "e144amv": {
+      "config": "Llama-3.1-8B FullKV niah_multivalue 重跑（.187 GPU7）",
+      "score": 51.75, "n": 100,
+      "read": "与原锚 51.75 逐位一致——锚真实，Llama FullKV multivalue 自身弱（非环境问题）；e144a 判决 caveat 可解除"
+    }
+  },
+  "judgment": {
+    "cross_machine": "E147cwys 复现 75.9/73.0 → β.0625 的 cwe +7.1 为真实配置效应，非 .187 机效应；此前 cwe 跨机摆动 58.8-83.5 是跨配置/跨运行效应",
+    "factor_decomposition": "cwe 双因子：far 词元 572→732 仅 +0.2（E147d vs E147c）；far 页 120→248 在同词元 572 下 +3.9（E147e vs E147c）；页增益被词元损失抵消时净 -4.5（E147f）。mk2 单因子主导：far 词元 252→732 +3.0（E147d），页覆盖独立增益 ~+1.0（E147f）",
+    "best_arm": "e147e（K1=256, beta=.03125）：cwe 79.8（距 FullKV -3.7，接近噪声带边缘）、mk2 74.0（距 76 仍 -2.0）",
+    "remaining_gap": "cwe -3.7 / mk2 -2.0 未全达噪声级；32K 全任务判据未满足",
+    "next_candidates": [
+      "beta=.015625 K1=256（far 页 ~252/far 词元 732 双上限）——外推 cwe 或再 +1-3，但 near 词元缩至 160 需查 near 任务回归",
+      "等 22:18 E147c rest 全量 11 任务均值综合判（β.0625 全量表现决定 K1=256 是否进全量）",
+      "解码侧动态 far 配额（任务自适应）"
+    ],
+    "anchor_recheck": "Llama FullKV mv 51.75 复现 → e144a 判决 mv 异常 caveat 解除，锚真实"
+  },
+  "sources": {
+    "e147d": "exp/results_ruler/Qwen3-8B/L32768/pred/{cwe,niah_multikey_2}-tli_64_128_1024_c4_Aa0.25_b0.03125_g0.625_sk4_sw128_h73b6a74519-e147d.jsonl（.187）",
+    "e147e": "exp/results_ruler/Qwen3-8B/L32768/pred/{cwe,niah_multikey_2}-tli_64_256_1024_c4_Aa0.25_b0.03125_g0.625_sk4_sw128_h9987847eb6-e147e.jsonl（.187）",
+    "e147f": "exp/results_ruler/Qwen3-8B/L32768/pred/{cwe,niah_multikey_2}-tli_64_256_1024_c4_Aa0.25_b0.0625_g0.625_sk4_sw128_h97506a9475-e147f.jsonl（.187）",
+    "e147cwys": "exp/results_ruler/Qwen3-8B/L32768/pred/{cwe,niah_multikey_2}-*e147cwys.jsonl（wys）",
+    "e144amv": "exp/results_ruler/Llama-3.1-8B-Instruct/L32768/pred/niah_multivalue-none-e144amv.jsonl（.187）"
+  }
+}
