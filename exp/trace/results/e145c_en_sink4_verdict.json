@@ -1,0 +1,44 @@
+{
+  "id": "e145c_en_sink4_verdict",
+  "date": "2026-10-17",
+  "title": "E145c-en：LB v1 英文 13 任务 sink4 双臂收官——两级 mavg vs 单池 aavg 同机配对",
+  "config": {
+    "mavg": "两级区域配额 K1=128 K2=1024 α0.25/β0.125/γ0.625 tail minmax/avg c4 sink4/swa128, T=e145c, .187",
+    "aavg": "单池 aavg(0,0)（α=0 β=0 全局 TopK）K1=128 K2=1024 tail c4 sink4/swa128, T=e145c, .187",
+    "pairing": "两臂同机 .187（mavg GPU3、aavg GPU3/4 轮转），同 cap_identity 口径配对；FullKV 锚为 e109 跨机 dense"
+  },
+  "results": {
+    "mavg_sink4": {"avg": 51.2523},
+    "aavg_sink4": {"avg": 50.8685},
+    "fullkv_dense_e109": {"avg": 50.36},
+    "mavg_sink128_cross_machine": {"avg": 50.66}
+  },
+  "per_task_diff_mavg_minus_aavg": {
+    "2wikimqa": -0.25, "gov_report": 0.38, "hotpotqa": -0.72, "lcc": 0.33,
+    "multi_news": -0.02, "multifieldqa_en": 0.38, "musique": -2.43,
+    "narrativeqa": 0.37, "passage_retrieval_en": 1.00, "qasper": 0.38,
+    "qmsum": -0.11, "repobench": 3.97, "triviaqa": 1.71
+  },
+  "per_task_scores": {
+    "mavg": {"2wikimqa": 41.8, "gov_report": 33.95, "hotpotqa": 58.71, "lcc": 67.9, "multi_news": 24.71, "multifieldqa_en": 53.63, "musique": 33.66, "narrativeqa": 25.37, "passage_retrieval_en": 100.0, "qasper": 47.69, "qmsum": 23.8, "repobench": 65.74, "triviaqa": 89.32},
+    "aavg": {"2wikimqa": 42.05, "gov_report": 33.57, "hotpotqa": 59.43, "lcc": 67.57, "multi_news": 24.73, "multifieldqa_en": 53.25, "musique": 36.09, "narrativeqa": 25.0, "passage_retrieval_en": 99.0, "qasper": 47.31, "qmsum": 23.91, "repobench": 61.77, "triviaqa": 87.61}
+  },
+  "judgment": [
+    "两级 vs 单池（mavg−aavg）同机配对 = +0.38（51.25 vs 50.87）——与既有证据链方向一致（LBv2 +2.59 / RULER 64K +2.77 / LB 中文 +0.36 / RULER 32K −0.07），区域配额价值在英文 LBv1 亦小幅为正",
+    "对 FullKV 锚：mavg +0.89 / aavg +0.51（锚为 e109 跨机 dense，单任务锚摆 caveat 保留）",
+    "对 sink128（跨机 mavg 50.66）：sink4 mavg +0.59，与 RULER 侧 sink4 优势方向一致",
+    "逐任务最大差 repobench +3.97（两级优，代码补全长上下文）；唯一超 1 分反向项 musique -2.43（单池优）；其余 11 任务 |diff| ≤ 1.0 噪声级",
+    "注：此前 MEMORY 证据链中「LB 英文 +0.89」为 mavg vs FullKV 锚；本判决补充同机 mavg vs aavg 干净配对值 +0.38"
+  ],
+  "anchor_source": "exp/trace/results/e109_full_lbv1.json（FullKV dense 无 sink 参数跨口径复用）；sink128 对照 = e116b 13 任务口径（跨机）",
+  "sources": {
+    "mavg": ".187:~/tmp_e146b_tree_187/exp/results_longbench/Qwen3-8B/pred_E145c_en_mavg/pred/result.json",
+    "aavg": ".187:~/tmp_e146b_tree_187/exp/results_longbench/Qwen3-8B/pred_E145c_en_aavg/pred/result.json（本轮 eval 收官）"
+  },
+  "caveats": [
+    "FullKV 锚跨机（e109 dense），单任务锚摆（hotpotqa 53.48 vs 本机 E149 59.42）",
+    "musique -2.43 属单池反超项，如实保留",
+    "LB v1 13 任务集与 LBv2/ZH 任务集不可横比均值，仅各自内部配对"
+  ],
+  "generated_at": "2026-10-17T21:3X"
+}
