@@ -48,3 +48,9 @@ H2O继续仅官方链接。此次不改代码、运行GPU或合main。
 [FFD-PMLR306-2026.pdf](FFD-PMLR306-2026.pdf) 已从[出版社页面](https://proceedings.mlr.press/v306/liu26da.html)的 Download PDF 公共链接下载，原样保存。Liu et al., ICML 2026, PMLR 306:77913–77928，16页、697221字节；独立 CC BY 4.0。SHA256：`6fa54f7eb14c0f9648a6b0fbb9cfd61889ab6b0d0c218a4df02ede96580d05e9`。
 
 这是 PMLR 出版版，不是 arXiv2609.00097v1。上节 arXiv 下载403是历史记录，该版本仍未下载；未重试该被拒链接，也未使用 OpenReview 浏览器验证。papers.json 将出版版作为当前本地条目，保留 arXiv 版本及失败事实于 related_versions；不推定两版内容相同。
+
+## JSSA (2026-10-17, original bytes pending)
+
+Jiwon Song, Yoongon Kim, and Jae-Joon Kim. *Joint Subspace Sparse Attention for Efficient Long-Context Decoding*. arXiv2610.19026v1, submitted2026-10-13. [Official paper](https://arxiv.org/abs/2610.19026v1) · [Original PDF](https://arxiv.org/pdf/2610.19026v1) · [CC BY4.0](https://creativecommons.org/licenses/by/4.0/), linked by the official abstract. Copyright remains with the authors.
+
+The executor's official original-byte downloads returned HTTP403. The web renderer reports32 pages, but no original local PDF/hash/byte count is claimed; no surrogate PDF generated. Status is link-only pending original bytes. Official code is separately MIT (vLLM-derived main patch Apache2.0), pinned34ce5abd82453b16ca6d5f16a1a8ae50fac5b920; source/environment packaging is on the engineering dev branch, not algorithm code on main.

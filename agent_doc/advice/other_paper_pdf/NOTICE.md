@@ -166,3 +166,9 @@ The papers are separately licensed CC BY 4.0 by their authors; see papers.json f
 Zhigeng Liu, Zhiyuan Ning, Ruixiao Li, Xiaoran Liu, Yuerong Song, Min Zhang, Ziwei He, and Xipeng Qiu. (2026). *Faster Than Flash: Exploiting Attention Sparsity for Efficient Long-Context Decoding*. Proceedings of the 43rd International Conference on Machine Learning, PMLR 306:77913–77928. [Original publication](https://proceedings.mlr.press/v306/liu26da.html).
 
 `FFD-PMLR306-2026.pdf` is included unchanged under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), per the [PMLR publication agreement](https://proceedings.mlr.press/pmlr-license-agreement.html). Copyright remains with the authors; the paper does not inherit the repository code license. 16 pages, 697221 bytes, SHA256 `6fa54f7eb14c0f9648a6b0fbb9cfd61889ab6b0d0c218a4df02ede96580d05e9`. This completes the local published-edition archive; the earlier arXiv-specific download failure remains historical and does not describe this successful publisher download. The two editions are not conflated.
+
+## JSSA (2026-10-17, original bytes pending)
+
+Jiwon Song, Yoongon Kim, and Jae-Joon Kim. *Joint Subspace Sparse Attention for Efficient Long-Context Decoding*. arXiv2610.19026v1, submitted2026-10-13. [Official paper](https://arxiv.org/abs/2610.19026v1) · [Original PDF](https://arxiv.org/pdf/2610.19026v1) · [CC BY4.0](https://creativecommons.org/licenses/by/4.0/), linked by the official abstract. Copyright remains with the authors.
+
+The executor's official original-byte downloads returned HTTP403. The web renderer reports32 pages, but no original local PDF/hash/byte count is claimed; no surrogate PDF generated. Status is link-only pending original bytes. Official code is separately MIT (vLLM-derived main patch Apache2.0), pinned34ce5abd82453b16ca6d5f16a1a8ae50fac5b920; source/environment packaging is on the engineering dev branch, not algorithm code on main.
