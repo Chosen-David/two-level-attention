@@ -1,54 +1,58 @@
 {
   "id": "e147c_series_verdict",
   "date": "2026-10-17",
-  "title": "E147c β.0625 全量 11 任务收官——AVG 59.29 距 FullKV -0.09 噪声级，近/远配额再平衡显著为正（#280 第二轮）",
+  "title": "E147c β.0625 全量 11 任务收官——AVG 59.29 距 FullKV 锚 -0.09，近/远配额再平衡显著为正（#280 第二轮；d3146d4+本轮已按 e116e 锚原件修正 FullKV 逐任务数组与近页计数）",
   "config": {
     "arm": "tli_64_128_1024_c4_Aa0.25_b0.0625_g0.625_sk4_sw128（β .125→.0625，其余同主口径 K1=128 K2=1024 sink4/swa128 tail minmax/avg）",
-    "quota": "P_n=8 near 页（不变）/P_f=120 far 页（112→120）；k_n=320 near 词元（640→320 减半）/k_f=572 far 词元（252→572 翻倍）",
-    "baseline": "e146c 主口径 K1=128 β.125（58.30，wys）vs FullKV 锚 59.38（wys 同机）",
-    "machine": ".187 GPU3/4；E147cwys 跨机对照已证 greedy 跨机零漂移（75.9/73.0 逐位一致），跨机比较有效"
+    "quota": "P_n=8 near 页（16→8 减半）/P_f=120 far 页（112→120）；k_n=320 near 词元（640→320 减半）/k_f=572 far 词元（252→572，×2.27）",
+    "baseline": "e146c 主口径 K1=128 β.125（58.30，wys）vs FullKV 锚 e116e_ruler32_formal_fullkv.json（L32768/none，AVG 59.3818，wys 同机）",
+    "machine": ".187 GPU3/4；E147cwys 跨机对照同分复现（75.9/73.0）支持配置效应判读，但不构成预测级一致性证明"
   },
   "results": {
-    "e147c_avg": 59.29,
-    "e146c_avg": 58.3,
-    "fullkv_avg": 59.38,
-    "diff_vs_e146c": 0.99,
-    "diff_vs_fullkv": -0.09,
+    "e147c_avg": 59.2909,
+    "e146c_avg": 58.30,
+    "fullkv_avg": 59.3818,
+    "diff_vs_e146c": 0.9909,
+    "diff_vs_fullkv": -0.0909,
     "per_task": {
       "niah_single_1": {"e147c": 99.0, "e146c": 100.0, "fullkv": 100.0, "d_vs_e146c": -1.0, "d_vs_fullkv": -1.0},
-      "niah_single_2": {"e147c": 99.0, "e146c": 100.0, "fullkv": 99.0, "d_vs_e146c": -1.0, "d_vs_fullkv": 0.0},
-      "niah_single_3": {"e147c": 95.0, "e146c": 97.0, "fullkv": 97.0, "d_vs_e146c": -2.0, "d_vs_fullkv": -2.0},
-      "niah_multikey_1": {"e147c": 95.0, "e146c": 98.0, "fullkv": 98.0, "d_vs_e146c": -3.0, "d_vs_fullkv": -3.0},
+      "niah_single_2": {"e147c": 99.0, "e146c": 100.0, "fullkv": 100.0, "d_vs_e146c": -1.0, "d_vs_fullkv": -1.0},
+      "niah_single_3": {"e147c": 95.0, "e146c": 97.0, "fullkv": 100.0, "d_vs_e146c": -2.0, "d_vs_fullkv": -5.0},
+      "niah_multikey_1": {"e147c": 95.0, "e146c": 98.0, "fullkv": 99.0, "d_vs_e146c": -3.0, "d_vs_fullkv": -4.0},
       "niah_multikey_2": {"e147c": 73.0, "e146c": 73.0, "fullkv": 76.0, "d_vs_e146c": 0.0, "d_vs_fullkv": -3.0},
       "niah_multikey_3": {"e147c": 9.0, "e146c": 7.0, "fullkv": 4.0, "d_vs_e146c": 2.0, "d_vs_fullkv": 5.0},
-      "niah_multiquery": {"e147c": 24.5, "e146c": 24.5, "fullkv": 23.0, "d_vs_e146c": 0.0, "d_vs_fullkv": 1.5},
-      "niah_multivalue": {"e147c": 30.0, "e146c": 27.0, "fullkv": 31.0, "d_vs_e146c": 3.0, "d_vs_fullkv": -1.0},
+      "niah_multiquery": {"e147c": 24.5, "e146c": 24.5, "fullkv": 24.5, "d_vs_e146c": 0.0, "d_vs_fullkv": 0.0},
+      "niah_multivalue": {"e147c": 30.0, "e146c": 27.0, "fullkv": 25.0, "d_vs_e146c": 3.0, "d_vs_fullkv": 5.0},
       "cwe": {"e147c": 75.9, "e146c": 68.8, "fullkv": 83.5, "d_vs_e146c": 7.1, "d_vs_fullkv": -7.6},
-      "fwe": {"e147c": 21.0, "e146c": 15.0, "fullkv": 15.0, "d_vs_e146c": 6.0, "d_vs_fullkv": 6.0},
-      "vt": {"e147c": 30.8, "e146c": 31.0, "fullkv": 34.0, "d_vs_e146c": -0.2, "d_vs_fullkv": -3.2}
+      "fwe": {"e147c": 21.0, "e146c": 15.0, "fullkv": 7.0, "d_vs_e146c": 6.0, "d_vs_fullkv": 14.0},
+      "vt": {"e147c": 30.8, "e146c": 31.0, "fullkv": 34.2, "d_vs_e146c": -0.2, "d_vs_fullkv": -3.4}
     }
   },
   "judgment": [
-    "AVG 59.29 距 FullKV 59.38 仅 -0.09（噪声级）——β.0625 把主口径 58.30 的 -1.08 缺口几乎全部收回（+0.99）；若判据按全任务均值口径，32K 已达标",
-    "近区代价实测（near 词元 640→320）：single_1/2 各 -1、single_3 -2、mk1 -3——近区精确检索小幅回落但全部在 1-3 分带内，远小于 far 侧收益",
-    "far 侧收益：cwe +7.1（75.9）、fwe +6（21.0 反超 FullKV 15）、mk3 +2（9.0 反超锚 4.0）、mv +3——与 E147cwys 跨机对照判读一致（+7.1 真实配置效应）",
-    "逐任务 vs FullKV 仍有超噪声带项：cwe -7.6、vt -3.2、mk1 -3、mk2 -3——『32K 全任务噪声级』若按逐任务口径未全达标；cwe 缺口与 E147e（K1=256 β.03125，cwe 79.8 距锚 -3.7）方向一致可再收",
-    "综合 E147d/e/f 快速臂因子分解：cwe 页+词元双因子，mk2 far 词元主导——E147e（far 页 248/词元 572、near 词元 320 与本臂同）是下一步全量验证首选"
+    "AVG 59.29 距 FullKV 锚 59.38 为 -0.09（0.1 分量级，历史单任务复制噪声带 ±1 以下）——固定任务集 AVG 为用户主指标，该值为描述性接近；无配对预测/统计不确定性证据，不表述为统计非劣验收",
+    "近区代价实测（near 页 16→8、near 词元 640→320）：single_1/2 各 -1、single_3 -2、mk1 -3（vs e146c）——温和，远小于 far 侧收益",
+    "far 侧收益（vs e146c）：cwe +7.1（75.9）、fwe +6（21.0）、mk3 +2（9.0）、mv +3——与 E147cwys 同分复现判读方向一致",
+    "逐任务 vs FullKV 锚（e116e 修正后）：正差 fwe +14（锚 7.0，稀疏过滤噪声有利型）、mk3 +5、mv +5；负差 cwe -7.6、single_3 -5、mk1 -4、vt -3.4、mk2 -3、single_1/2 -1——e146c 同口径负差为 cwe -14.7、s3 -3、mk1 -1、vt -3.2，β.0625 使 cwe 大幅收窄但 s3/mk1 负差略扩",
+    "综合 E147d/e/f 快速臂因子分解：cwe 页+词元双因子，mk2 far 词元主导——E147e（far 页 248/词元 572、near 配额与本臂同）是全量验证首选，正在跑"
   ],
   "next_candidates": [
-    "首选：E147e K1=256 β.03125 全量 11 任务——quick 已证 cwe 79.8（-3.7）/mk2 74.0（-2.0），near 配额与 E147c 相同（320）故 near 回归风险已知（-1~-3 带）；L1 评分成本翻倍须配性能核验（与 E127 选择器优化冲突注记）",
-    "备选：β.015625 K1=256（far 页 ~252/词元 732 双上限）——near 词元缩至 160，E147c 已证 near 词元 320 有 -1~-3 代价，160 风险更高",
-    "接受现状：AVG -0.09 已噪声级；若判据为均值口径可直接敲定 β.0625 为主口径候选，进入 LB 回归验证（LB EN/ZH/v2 三臂 β.0625 复跑）",
-    "判据口径问题上报用户：『32K 全任务噪声级』按均值（已达标 -0.09）还是逐任务（cwe -7.6 未达）解释，决定是否再跑 E147e 全量"
+    "首选：E147e K1=256 β.03125 全量 11 任务（在飞 .187 GPU3）——quick 已证 cwe 79.8（-3.7）/mk2 74.0（-2.0），near 配额 320 同本臂故 near 回归已知（-1~-4 带）；L1 评分成本翻倍须配性能核验（与 E127 选择器优化冲突注记）",
+    "备选：β.015625 K1=256 快速臂（E147g 在飞 .187 GPU5）——far 页 ~252/词元 732 双上限，near 词元缩至 160 风险探针",
+    "判据口径已定（GPT d3146d4 轮确认）：固定任务集 AVG 为主指标，逐任务差异作解释披露，不设逐项零损门槛，不拼接不同配置最佳任务值成 AVG。据此 β.0625 AVG -0.09 已处主指标接近带，E147e 全量结果决定是否换 K1=256 口径或直接进入 LB 回归验证",
+    "LB 回归验证：若敲定改进口径，LB EN/ZH/v2 三臂按同 β 复跑"
   ],
   "sources": {
-    "e147c_r32k_formal.json": "3eb3780fc50d5407…（.187 formal 四件套，本轮入仓）",
-    "baselines": "e146c_r32k_formal（58.30）/ e147_improvement_verdict.json（FullKV 锚 59.38 与逐任务）/ e147d_etc_quick_verdict.json（E147d/e/f 因子分解）"
+    "e147c_r32k_formal.json": "3eb3780fc50d5407…（.187 formal 四件套）",
+    "fullkv_anchor": "e116e_ruler32_formal_fullkv.json（L32768/none：s1 100/s2 100/s3 100/mk1 99/mk2 76/mk3 4/mq 24.5/mv 25/cwe 83.5/fwe 7/vt 34.2，AVG 59.3818）——本判决 fullkv 逐任务数组绑定该原件",
+    "baselines": "e146c_r32k_formal（58.30）/ e147_improvement_verdict.json / e147d_etc_quick_verdict.json"
   },
   "caveats": [
-    "FullKV 锚 59.38 与 e146c 基线在 wys，E147c 在 .187——E147cwys 跨机对照（75.9/73.0 逐位一致）已证 greedy 跨机零漂移，跨机差值可信",
-    "fwe 21.0 反超 FullKV 15.0 与 mk3 9.0 反超 4.0：稀疏过滤噪声反而有利型，如实保留",
-    "near 词元减半的代价在 32K 档温和（-1~-3）；64K/128K 档 far 供给压力更大，β.0625 长档迁移性未测"
+    "修正记录：初版判决 fullkv 逐任务数组误用混合来源（fwe 15/mk1 98/mq 23/mv 31/s2 99/s3 97/vt 34——含 e146c 稀疏分数与估计值），本轮按 e116e 锚原件全量重算；AVG 不受影响（两侧 AVG 均正确）",
+    "near 页计数修正：β.125→.0625 使 P_n 16→8（减半），初版误写「不变」；far 词元 252→572 为 ×2.27 非翻倍",
+    "「-0.09 噪声级」为描述性表述：E147b 同机复制零噪声（greedy）+ 单任务历史复制带支撑「量级小」判读，但无配对统计检验，不作验收等价主张",
+    "FullKV 锚 59.38 与 e146c 基线在 wys，E147c 在 .187——E147cwys 同分复现支持跨机差值可信，但机器/运行混杂未完全排除（同分只证报告记录一致，非预测级一致）",
+    "fwe/mk3/mv 反超 dense 锚（+14/+5/+5）：稀疏过滤噪声有利型与锚自身弱项（fwe 锚仅 7），如实保留",
+    "β.0625 的 64K/128K 长档迁移性未测"
   ],
-  "generated_at": "2026-10-17T22:25"
+  "generated_at": "2026-10-17T22:5X（修正版 v2，GPT 2026-10-17_e143a_e147_remaining_bounds 第 1/3 条采纳）"
 }

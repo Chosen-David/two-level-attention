@@ -21,13 +21,13 @@
       "fwe": {
         "k64": 27.0,
         "k128": 15.0,
-        "fullkv_est": 15,
+        "fullkv_est": 7,
         "k64_minus_k128": 12.0
       },
       "niah_multikey_1": {
         "k64": 95.0,
         "k128": 98.0,
-        "fullkv_est": 98,
+        "fullkv_est": 99,
         "k64_minus_k128": -3.0
       },
       "niah_multikey_2": {
@@ -45,13 +45,13 @@
       "niah_multiquery": {
         "k64": 24.5,
         "k128": 24.5,
-        "fullkv_est": 23,
+        "fullkv_est": 24.5,
         "k64_minus_k128": 0.0
       },
       "niah_multivalue": {
         "k64": 29.25,
         "k128": 27.0,
-        "fullkv_est": 31,
+        "fullkv_est": 25,
         "k64_minus_k128": 2.25
       },
       "niah_single_1": {
@@ -63,26 +63,26 @@
       "niah_single_2": {
         "k64": 98.0,
         "k128": 100.0,
-        "fullkv_est": 99,
+        "fullkv_est": 100,
         "k64_minus_k128": -2.0
       },
       "niah_single_3": {
         "k64": 94.0,
         "k128": 97.0,
-        "fullkv_est": 97,
+        "fullkv_est": 100,
         "k64_minus_k128": -3.0
       },
       "vt": {
         "k64": 30.4,
         "k128": 31.0,
-        "fullkv_est": 34,
+        "fullkv_est": 34.2,
         "k64_minus_k128": -0.6
       }
     }
   },
   "conclusion": [
     "K1=64 否证：AVG -1.48（未舍入 -1.477273）——cwe 58.9（k128 68.8，-9.9）、mk2 68（73，-5）、mk3 0（7，-7）；上升项 2 个（fwe +12、multivalue +2.25），7 降 2 平",
-    "机理归因（待验证解释，非因果证明）：K1=64 使 far 页数减半（P_f 112→56）而 far 词元配额翻倍（252→572）——56 页×64 词元候选池选 572 词元，页级候选覆盖收缩；'far 供给不足'瓶颈倾向页级覆盖而非词元配额上限。该解释由 E147c 变量结构旁证（对 K1=64 臂：近页 8 与两区词元配额 320/572 均相同、仅 far 页 56→120，cwe 58.9→75.9），仍非受控单因素实验",
+    "机理归因（待验证解释，非因果证明）：K1=64 使 far 页数减半（P_f 112→56）而 far 词元配额增 2.27 倍（252→572）——56 页×64 词元候选池选 572 词元，页级候选覆盖收缩；'far 供给不足'瓶颈倾向页级覆盖而非词元配额上限。该解释由 E147c 变量结构旁证（对 K1=64 臂：近页 8 与两区词元配额 320/572 均相同、仅 far 页 56→120，cwe 58.9→75.9），仍非受控单因素实验",
     "主口径维持 K1=128：cwe -14.7 / mk2 -3.0 vs FullKV 掉点仍未解决，32K 全任务噪声级判据未达标"
   ],
   "next_candidates": [
@@ -97,7 +97,8 @@
     "e147a_r32k_formal.json.receipt.json": "de445f2ebce214daa91135b9d99d94e7167cc59c7d2a01c70aab7a59a5c00c18"
   },
   "caveats": [
-    "FullKV 锚值为 e146c 系列记录（跨机）；同机对照为 k64 vs k128"
+    "FullKV 锚值为 e146c 系列记录（跨机）；同机对照为 k64 vs k128",
+    "fullkv_est 数组 v2 修正（GPT 2026-10-17_e143a_e147_remaining_bounds 第 1 条采纳）：初版 7 项为混合来源估计（fwe 15/mk1 98/mq 23/mv 31/s2 99/s3 97/vt 34），现绑定 e116e_ruler32_formal_fullkv.json 原件（fwe 7/mk1 99/mq 24.5/mv 25/s2 100/s3 100/vt 34.2，AVG 59.3818）；k64_minus_k128 差值不受影响（两臂均稀疏）"
   ],
   "generated_at": "2026-10-17T18:11:07.540286"
 }
