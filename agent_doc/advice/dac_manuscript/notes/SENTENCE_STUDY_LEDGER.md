@@ -21,13 +21,22 @@
 |---|---|---|---|
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
-| 3 | 2020_AdaptivFloat.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3 方法 | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ |
+| 3 | 2020_AdaptivFloat.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 实验表 | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓ |
 | 4 | 2021_Gemmini.pdf | 未开始 | — |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 13 轮（2026-10-17 19:0x，AdaptivFloat §3 Methodology）
+- **远端裁决**（fetch 发现 107bfb6/58d8457 等，本地已同步）：107bfb6 把 Design implications 从「Three constraints」清单改为「two distinct constraints + These are properties of the defined rules」+第三条挪入「A useful operating point additionally requires...」运行点要求——**采纳**：前两条是定义规则的固有性质（可从公式推出），第三条是未满足的实测要求，混排是层级混淆，对标 best paper 证据分层收口。58d8457：SparQ「query-selected key coordinates」术语精确化（改进我的第 12 轮句）+ Conclusion 区分 Qwen3 整箱诊断与历史配置两类证据来源——**采纳**。
+- 拆解笔记：§3 部分（§3.1：格式依托句→设计决策句→**问题句**（决策代价当场命名）→**牺牲换位句**（sacrifice ±min for ±0 + 图 2 佐证）→if/otherwise 规则句→公式+where→**类比锚定句**（similar to integer quantization scale）→**对比收益句带前向引用**（"A benefit of exp_bias is... compared to... Discussed in Section 5"）→**参数-性质方向句**（narrower datapoints → more negative exp_bias）；§3.2：问题重定义句（格式定了→问题降维为映射）→**analogous-but 句式**（类比+一句话点差异）→算法走查句链（first/then/before/finally 串联 Algorithm 1））。
+- 对照结论：牺牲换位句（无对应决策场景）、类比锚定（第 7 轮已确认达标）、analogous-but（已有对比句）、算法走查（gate 小节时序句达标）。**「A benefit of」句式判定不加**：AdaptivFloat 有实测支撑，我们的 32 维 vs 128 维填零是历史配置差异且收益未实测，诚实边界禁。**实缺 = 参数-性质方向句**：α/β/γ 段纯定义无方向性——β↑→P_n↑→P_f↓ 是纯代数事实（第 12 轮判例的定理级门槛达标），且为 Q2 的 β=.375→k_f=0 后果句提供方法节铺垫。
+- paper_en.tex §III-B：ties-to-even 句后加 "Raising $\beta$ enlarges the near page reservation and shrinks the far one, since $P_n$ grows with $\beta K_1$ while $P_f$ exhausts the same cap."
+- paper_zh.tex 直译同步（「提高$\beta$会扩大近区页预留并压缩远区……」）。**修复自身失误**：zh 编辑曾误删 k_n/k_f 定义句，当场发现并恢复（编译前 grep 双语定义句各 1 处确认）。
+- 编译验证：双语通过（en 6 / zh 6 页），0 未定义引用。
+- 待后续轮次：AdaptivFloat §4 实验表（精度-任务矩阵行=比特宽度、列=数据格式）、§5 PE 架构、§6 硬件评估、§7 结论。
 
 ### 第 12 轮（2026-10-17 17:0x，AdaptivFloat §2 Related Work）
 - **远端裁决**（fetch 发现 90edbf2/1ba9faf/7021966/b93f0dd/7f3b182/1010b06，本地已同步）：1010b06 把第 11 轮我的 Intro P2 归因句 "The asymmetry is mechanical: ... misses more pages while losing less total mass" 收敛为 "Mean pooling **can** dilute... **Neither property determines the observed ordering**"。**采纳远端**——对标 AdaptivFloat P1 机制归因句的前提是定理级机制（LayerNorm 不重参数化→权重绝对值大可证），我们的稀释是启发式级趋势，"mechanical" 属过度断言，远端版正是诚实边界要求。判例教训：**机制归因句只适用于可严格推导的性质，启发式性质只能 can-动词+不决定次序**。Q3 逐轮差值（0.0237/0.0046 ms）与 gate 段代理/质量区分重写为诚实增强，保留。

@@ -80,3 +80,34 @@
 ### 远端裁决记录（第 12 轮开始前）
 - 远端 1010b06 改写第 11 轮归因句：我的 "The asymmetry is mechanical: ... so misses more pages while losing less total mass" → 远端 "Mean pooling can dilute...; extrema bound... **Neither property determines the observed ordering**"。**采纳远端**：对标 AdaptivFloat P1 机制归因句的适用前提是定理级机制（LayerNorm 不重参数化→权重绝对值大可证）；我们的稀释是启发式级趋势，只能「can dilute」+「不决定次序」，我的 "mechanical" 是过度断言，远端版恰是诚实边界要求的表述。
 - Q3 选择器段逐轮差值（0.0237/0.0046 ms）与 gate 段代理/质量区分重写：诚实增强，保留。
+
+---
+
+## §3 Methodology（第 13 轮，2026-10-17）
+
+### §3 开篇（1 句）
+"This section articulates the AdaptivFloat format and describes the inner workings behind the adjustment of the available dynamic range of representable values in order to best fit the weights of neural network layers."——老式路线图句（现代写法可用 claim 替代，我们不用）。
+
+### §3.1 The AdaptivFloat Format（~8 句 + 公式 + 图 2）
+句链：**格式依托句**（"generally follows the IEEE 754 Standard floating-point format"——依托标准的先例）→ **设计决策句**（"we avoid the computation of denormal values"）→ **问题句**（"The main problem arising as a result of not using denormals is the lack of representation for the 'zero' point"——决策的代价当场命名）→ **解决句**（"We solve this constraint by sacrificing the positive and negative minimum values to allocate the slot for 'zero' as shown in Figure 2"——**牺牲换位句**：sacrifice X for Y，决策-代价-补偿三合一，图佐证）→ 规则定义句（"If both exponent bits and mantissa bits are zeros, ... Otherwise, ..."——if/otherwise 双分支）→ 公式 (1) + where 逐符号定义 → **类比锚定句**（"Thus, similar to integer quantization that uses a quantization scale, we formulate a bias value, exp_bias, to dynamically shift..."——新机制挂到读者已知概念上）→ **对比收益句**（"A benefit of using exp_bias is the simplicity of the hardware logic required... **compared to the multiplying quantization scale** used in integer quantization. This contrast is discussed in detail in Section 5"——机制级对比 + 前向引用实验/架构节闭环）→ **参数-性质方向句**（"the narrower the datapoints are..., the more negative exp_bias gets"——参数变化与行为的方向关系）。
+
+### §3.2 Quantization（~7 句 + Algorithm 1）
+句链：**问题重定义句**（"Having defined the data format, the quantization problem is simply mapping a full precision value to the nearest representable datapoint"——格式定了之后问题降维为映射）→ **类比差异句**（"This is analogous to determining the quantization scale for integer quantizations, but exp_bias is a small, typically negative, integer value rather than the high-precision floating-point scaling factor"——analogous-but 句式：类比+一句话点差异）→ **算法走查句链**（"We first compute... Then, the algorithm finds... Before doing quantization..., we first round... Then, we clamp... The quantization involves rewriting... Finally, the reconstructed"——first/then/before/finally 时序词串联 Algorithm 1 的每个步骤，与图 3 互证）→ 记号声明句（"We use the notation AdaptivFloat<n,e> to indicate..."）→ **方向规律句**（"Generally, the narrower the datapoints..., the more negative exp_bias gets"——规律收口）。
+
+### 对照我们 §III 方法节的差距结论
+| AdaptivFloat §3 句式 | 我们的状态 |
+|---|---|
+| 牺牲换位句（sacrifice X for Y + 图佐证） | 零点表示无对应物（我们的披露是「16 级量化非 INT4」类型披露）。§III-B P_f>0 不蕴含 k_f>0 是约束披露非牺牲决策，结构不同，不适用 |
+| 类比锚定句（挂到已知概念） | 第 7 轮已确认「共享坐标两角色」等价物存在，达标 |
+| analogous-but 句式 | L2 量化键 vs Quest 极值：「L2 uses quantize--dequantize token keys」已有对比句，达标 |
+| 算法走查句链（first/then/finally） | §III 段落无编号算法但有流程句（「L1 aggregates... whereas L2 uses...」）；gate 小节有「first decode-path call freezes...」时序句，达标 |
+| **对比收益句带前向引用**（"A benefit of X is... compared to Y. Discussed in Section 5"） | **实缺**：§III-A 紧凑 32 维评分张量 vs 历史 128 维填零实现是纯披露（"The compact implementation uses width-32 scoring tensors, whereas the historical quality runs used 32 active coordinates in width-128 L2 tensors (S7)"），无收益/代价方向；但这是历史配置差异非设计对比，且收益未实测（诚实边界禁 "A benefit of"）。**判定：不加**——AdaptivFloat 的收益句有实测支撑，我们没有。 |
+| 参数-性质方向句（narrower→more negative） | α/β/γ 参数段纯定义。历史 β=.375→k_f=0 在 Q2 承担后果展示，但**方法节内无一句参数-行为方向句**。可加诚实版：β 的方向性是纯代数事实（β↑→P_n↑→P_f↓，来自我们的公式 P_n=max(1,round(βK1))、P_f=K1-P_n）——**可严格推导，符合第 12 轮判例的定理级门槛**。**判定：做**——β 方向句插在公式段，补参数-性质方向而不引入任何未测主张。 |
+
+### 本轮修改（第 13 轮）
+- paper_en.tex §III-B 公式段（P_n/P_f/k_n/k_f 定义后、「Thus P_f>0 does not imply k_f>0」句前）：加参数-性质方向句 "Raising $\beta$ enlarges the near page reservation and shrinks the far one, since $P_n$ grows with $\beta K_1$ while $P_f$ exhausts the same cap."（纯代数方向，AdaptivFloat narrower→more-negative 句式的诚实对等物；为 Q2 的 β=.375→k_f=0 后果句提供方法节铺垫）。
+- paper_zh.tex 直译同步。
+
+### 远端裁决记录（第 13 轮开始前）
+- 107bfb6「separate design constraints from measured benefits」：Design implications 从「Three constraints. First/Second/Third」改为「two distinct constraints」+「These are properties of the defined rules」+第三条挪到「A useful operating point additionally requires...」。**采纳**——前两条是定义规则的固有性质（可从公式推出），第三条是未满足的实测要求，混排是层级混淆；对标 DREAMPlace/Token-Picker 的证据分层收口，远端版诚实边界更强。
+- 58d8457：(1) SparQ「partial key bits」→「query-selected key coordinates」术语精确化（我的第 12 轮句被改进），**采纳**；(2) Conclusion 区分 Qwen3 整箱诊断（部分观测下降）与历史配置（大幅损失+慢解码）两类证据来源，「without isolating the effects of individual modules」补充——**采纳**，与 107bfb6 的证据分层一致。
