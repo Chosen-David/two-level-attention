@@ -4,6 +4,60 @@ from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pathlib import Path
 R=Path(__file__).resolve().parents[1];p=R/'presentation/TwoLevel_UserEdited_20261014.pptx';r=Presentation(p)
+# Bounded layout/wording refresh: preserve all other slide XML and text.
+import argparse
+parser = argparse.ArgumentParser(description='Synchronize archived-evidence presentation assets.')
+parser.add_argument('--only', choices=['all', 'decode-ruler-q3'], default='all')
+args = parser.parse_args()
+if args.only == 'decode-ruler-q3':
+ from lxml import etree
+ import zipfile
+ import os
+ ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+       'p': 'http://schemas.openxmlformats.org/presentationml/2006/main',
+       'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
+ replacements = {}
+ with zipfile.ZipFile(p) as archive:
+  for number, stem in [(12, 'decode_tpot_current_zh'), (14, 'ruler128k_current_zh')]:
+   slide_path = f'ppt/slides/slide{number}.xml'
+   slide = etree.fromstring(archive.read(slide_path))
+   pictures = slide.findall('.//p:pic', ns)
+   if len(pictures) != 1:
+    raise ValueError(f'Expected exactly one evidence picture on slide {number}')
+   rid = pictures[0].find('.//a:blip', ns).get('{'+ns['r']+'}embed')
+   rels_path = f'ppt/slides/_rels/slide{number}.xml.rels'
+   rels = etree.fromstring(archive.read(rels_path))
+   relation = next(el for el in rels if el.get('Id') == rid)
+   # Give the two slides their own assets; shared image users remain untouched.
+   media_name = f'dac_layout_{stem}.png'
+   relation.set('Target', '../media/'+media_name)
+   replacements[rels_path] = etree.tostring(rels, xml_declaration=True, encoding='UTF-8', standalone=True)
+   replacements['ppt/media/'+media_name] = (R/'figures'/(stem+'.png')).read_bytes()
+  path = 'ppt/slides/slide15.xml'
+  slide = etree.fromstring(archive.read(path))
+  edits = {
+   '评分降维未降低该设置下的局部耗时': '共享子空间评分未显示一致计时优势',
+   '采样协议存在未核实差异，小幅时延差值不足以定位瓶颈。':
+    '相对名义页评分，两轮慢0.0237／快0.0046 ms，汇总仍较高。原始样本缺失、协议差异未解，不能认定等价或定位瓶颈。未与质量配对，未测完整请求成本。',
+  }
+  for old, new in edits.items():
+   nodes = [el for el in slide.findall('.//a:t', ns) if el.text in (old, new)]
+   if len(nodes) != 1:
+    raise ValueError('Expected unique existing Q3 text: '+old)
+   nodes[0].text = new
+  # Give the scope note three readable lines below the chart.
+  note = nodes[0]
+  shape = note
+  while shape.tag != '{'+ns['p']+'}sp': shape = shape.getparent()
+  extent = shape.find('.//a:xfrm/a:ext', ns)
+  extent.set('cy', str(int(Inches(1.08))))
+  replacements[path] = etree.tostring(slide, xml_declaration=True, encoding='UTF-8', standalone=True)
+  temp = p.with_suffix('.layout-tmp.pptx')
+  with zipfile.ZipFile(temp, 'w', zipfile.ZIP_DEFLATED) as out:
+   for item in archive.infolist(): out.writestr(item, replacements.pop(item.filename, archive.read(item.filename)))
+   for name, content in replacements.items(): out.writestr(name, content)
+ os.replace(temp, p)
+ raise SystemExit(0)
 def text(sl,x,y,w,h,value,size=22):
  s=sl.shapes.add_textbox(Inches(x),Inches(y),Inches(w),Inches(h));tf=s.text_frame;tf.word_wrap=True
  for i,line in enumerate(value.split('\n')):
