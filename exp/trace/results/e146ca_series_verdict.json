@@ -1,0 +1,65 @@
+{
+  "id": "e146ca_series_verdict",
+  "date": "2026-10-17",
+  "title": "RULER aavg(0,0) 单池臂 32K/64K formal 打分与 mavg 两级主口径同档对比（面板 G）",
+  "config": {
+    "method": "tli_64_128_1024_c4_Aa0_b0_g0_sk4_sw128 (aavg 单池, alpha=0 beta=0)",
+    "sink": 4,
+    "swa": 128,
+    "k1": 128,
+    "k2": 1024,
+    "tail_coords": 32,
+    "caliber": "sink4/swa128 新主口径；aavg=avg-only 单池无区域配额；mavg 对照=e146c 同配置两级"
+  },
+  "results": {
+    "ruler_32k": {
+      "aavg_avg": 58.3655,
+      "mavg_avg_e146c": 58.3,
+      "diff": 0.0655,
+      "machine": "aavg=.187 GPU3, mavg=e146c(wys) 跨机",
+      "per_task_diff_top": {
+        "cwe": 6.9,
+        "fwe": 4.67,
+        "mk1": -4.0,
+        "mk2": -2.0
+      }
+    },
+    "ruler_64k": {
+      "aavg_avg": 45.2727,
+      "mavg_avg_e146c": 48.0455,
+      "diff": -2.7727,
+      "machine": "两臂均 wys 同机",
+      "per_task_diff_top": {
+        "niah_single_3": -58.0,
+        "fwe": 29.0,
+        "mk2": 8.0,
+        "mk1": -7.0,
+        "single_2": -4.0
+      }
+    }
+  },
+  "interpretation": [
+    "32K 档 aavg(0,0) 与 mavg 两级基本持平（+0.07，跨机 caveat）——短档区域配额收益不明显",
+    "64K 档（同机）aavg 掉 2.78，主驱动 = niah_single_3 42 vs 100（-58）：单池全局 TopK 在长上下文挤掉远区精确单点检索词元，两级 far 配额保住该能力",
+    "fwe 反向 +29（aavg 37 vs mavg 8）：fwe 词频任务单池表现更好，与 32K cwe aavg +6.9 同类——单池对'高频统计型'远区任务有利，对'精确位置型'任务（single_3/mk1/single_2）不利",
+    "与 LBv2 结论一致方向：两级 vs 单池 LBv2 +2.59；RULER 64K +2.77；证据收敛于'区域配额在长上下文/精确检索上的必要性'"
+  ],
+  "sources": {
+    "r32k": {
+      "e146ca_r32k_formal.json": "3a18a70c15c39355d641ea83d7986786e0e3516167b58cfd3096dd7cbd597943",
+      "e146ca_r32k_formal.json.manifest.json": "6650bb9e60f0afe45750712d92c9c7b8524c74dffbb863fdc3ff47e184cce4e4",
+      "e146ca_r32k_formal.json.receipt.json": "8a022286de03da981ec6573a86e7a7feb47fec5b169c89173de847e6a97a19c4"
+    },
+    "r64k": {
+      "e146ca_r64k_formal.json": "97a65fcf6a1a7656d7325c6e037274a15b90910f200aa3dd831b462e9030088d",
+      "e146ca_r64k_formal.json.manifest.json": "5edeef800ee8df6fd755989c7bf9ded563ebab634bd0ac21f9efa24b18cb3545",
+      "e146ca_r64k_formal.json.receipt.json": "facb0d55f4d270c7edaef90709acb61bc844551115b516254bb7814f86d3904a"
+    }
+  },
+  "caveats": [
+    "32K 两臂跨机（aavg=.187 / mavg=e146c wys），单任务摆动可达数分（cwe 历史摆动 58.8-83.5）",
+    "64K 两臂同机 wys 但非同时段；cwe 两臂均 0.3-0.4 崩（FullKV 锚 yarn 外推自身塌陷）",
+    "128K aavg 在飞（.187 GPU6/7），本判决不含"
+  ],
+  "generated_at": "2026-10-17T15:50:40.176081"
+}
