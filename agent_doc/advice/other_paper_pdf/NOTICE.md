@@ -160,3 +160,9 @@ Local filename, SHA-256, byte size and page count: unknown/null; no PDF included
 ## AsyncTLS / FFD (2026-10-17)
 
 The papers are separately licensed CC BY 4.0 by their authors; see papers.json for full attribution, fixed arXiv versions, license evidence and hashes. AsyncTLS.pdf is reused unchanged from this repository. FFD remains link-only pending original bytes (HTTP403); no FFD PDF is claimed included. The official FFD code has its separate Apache-2.0 LICENSE in exp/vendor_baselines/ffd_vendor, unaffected by these paper licenses.
+
+## FFD published edition added (2026-10-17)
+
+Zhigeng Liu, Zhiyuan Ning, Ruixiao Li, Xiaoran Liu, Yuerong Song, Min Zhang, Ziwei He, and Xipeng Qiu. (2026). *Faster Than Flash: Exploiting Attention Sparsity for Efficient Long-Context Decoding*. Proceedings of the 43rd International Conference on Machine Learning, PMLR 306:77913–77928. [Original publication](https://proceedings.mlr.press/v306/liu26da.html).
+
+`FFD-PMLR306-2026.pdf` is included unchanged under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), per the [PMLR publication agreement](https://proceedings.mlr.press/pmlr-license-agreement.html). Copyright remains with the authors; the paper does not inherit the repository code license. 16 pages, 697221 bytes, SHA256 `6fa54f7eb14c0f9648a6b0fbb9cfd61889ab6b0d0c218a4df02ede96580d05e9`. This completes the local published-edition archive; the earlier arXiv-specific download failure remains historical and does not describe this successful publisher download. The two editions are not conflated.

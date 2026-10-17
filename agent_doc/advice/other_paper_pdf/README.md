@@ -42,3 +42,9 @@ H2O继续仅官方链接。此次不改代码、运行GPU或合main。
 
 - AsyncTLS: [existing original PDF](AsyncTLS.pdf), arXiv2604.07815v1, 11 pages, CC BY 4.0; reused unchanged, metadata/hash now indexed. No author implementation identified in checked paper and public search.
 - FFD: [official PDF](https://arxiv.org/pdf/2609.00097v1), CC BY 4.0; download HTTP403, original bytes still missing. [Official code](https://github.com/qluoluo/faster-flash-decoding) is already vendored at ca09458ab1536328e5f46502b27891412733cd6d under Apache-2.0; Llama support does not establish Qwen support.
+
+## 2026-10-17 FFD 出版版原件补齐
+
+[FFD-PMLR306-2026.pdf](FFD-PMLR306-2026.pdf) 已从[出版社页面](https://proceedings.mlr.press/v306/liu26da.html)的 Download PDF 公共链接下载，原样保存。Liu et al., ICML 2026, PMLR 306:77913–77928，16页、697221字节；独立 CC BY 4.0。SHA256：`6fa54f7eb14c0f9648a6b0fbb9cfd61889ab6b0d0c218a4df02ede96580d05e9`。
+
+这是 PMLR 出版版，不是 arXiv2609.00097v1。上节 arXiv 下载403是历史记录，该版本仍未下载；未重试该被拒链接，也未使用 OpenReview 浏览器验证。papers.json 将出版版作为当前本地条目，保留 arXiv 版本及失败事实于 related_versions；不推定两版内容相同。
