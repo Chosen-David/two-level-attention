@@ -29,6 +29,12 @@
 
 ## 修改日志
 
+### 第 8 轮（2026-10-17 10:3x，用户指令：文法机械审计 + 图美化）
+- **文法审计**（gate_mechanical 式，165 句全文扫描）：>40 词句仅 1 处（摘要尾句 44 词）——拆分为动作先行句 "Establishing a beneficial operating point therefore requires evaluating the compact 4/128-protection implementation with matched quality and preparation-inclusive cost."（en/zh 同步）。hedging 命中（may/rather）与被动命中 14 处逐条目检均为合法用法（许可义 may、对比义 rather than、状态性系表 is disabled by default 等），不虚改。
+- **图美化**（保守：不动数据/数字/结论）：(1) build_evidence_figures.py rcParams 字号 base 8→8.5、legend/tick 7→7.5（3.35in 列宽图缩印可读性）；(2) ruler128k 标题两行限定语压一行（"execution unverified" 警示仍在 caption 保留）；(3) decode_tpot y 上限 140→130（数据最大 119.9，去顶部松留白）；(4) build_evidence_figures.py 与 build_remote_observation.py 的 inkscape 调用加 cairosvg 兜底（本地无 inkscape，PyPI 可达）。四张 evidence 图 + o_observation 主图双语全部重生成（10:33/10:34）。
+- 编译验证：双语重编译通过，0 未定义引用，页数不变（en 6 / zh 6）。
+- 环境：matplotlib 3.11.2 装入 .venv-paper；cairosvg 装入（SVG→PDF 兜底，验证输出尺寸与 inkscape 一致 241x155pt 等）。
+
 ### 第 7 轮（2026-10-17 08:5x，DREAMPlace §2 Preliminaries；本轮前完成远端对齐）
 - **远端对齐（用户指令）**：fetch 发现 471a83b/7a7ebc8/3628501/57b3039 四新提交。裁决 471a83b（Metrics 段把 retention 拆成 (b)/(c) 两图各自分母定义）：**采纳**——精确定义符合 define-before-use 铁律。本地第 3-6 轮全部修改先提交（ab95268），merge origin/main（44df413），PDF 二进制冲突重编译解决，五处标记句全部存活，双语编译 0 未定义引用。
 - 拆解笔记：`notes/sentence_studies/2019_dreamplace.md` §2 部分（§2.1 术语铺垫+在哪耗时定位句；§2.2 **类比小节十五句链**：As 归并句→类比声明→图句→网络侧定义→换元声明（"we combine cell locations into w for brevity"）→替换句→推导句→带理由对应句→one-to-one mapping 收口+价值主张；尾段 toolkit 三层栈+only-need 工作量最小化句+Thus 痛点收口；§2.3 范式句+引用功劳+**参数-性质-代价三元组**（γ 句式）+公式→实现需求衔接句（"requires DCT/IDCT routines"））。
