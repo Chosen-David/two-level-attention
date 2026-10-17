@@ -21,13 +21,22 @@
 |---|---|---|---|
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
-| 3 | 2020_AdaptivFloat.pdf | 未开始 | — |
+| 3 | 2020_AdaptivFloat.pdf | Abstract ✓ Intro ✓；待：§2 相关工作 | Intro-P2 机制归因句 ✓ |
 | 4 | 2021_Gemmini.pdf | 未开始 | — |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 11 轮（2026-10-17 15:0x，AdaptivFloat Abstract + Introduction —— 第 3 篇开始）
+- 远端检查：无新提交（本地 = origin/main 95587a0）。
+- 拆解笔记：新建 `notes/sentence_studies/2020_adaptivfloat.md`（Abstract 5 句表：A1 痛点机制归因句（as 从句）/A2 方法句带粒度限定语/A3 consistently+四点名基线+精度范围限定/**A4 例外反转句**（only 2.1 degradation vs total accuracy loss——同句完成悲观/乐观双口径）/**A5 诚实双数字句**（0.9× 能耗与 1.14× 面积并排报）；Intro P1 五句链：目标语境→前作聚类→**评价范围批评句**→However+图证据→**The reason for this phenomenon is that 机制归因句**（batch norm vs layer norm 双机制）；P3 Unlike 对比带对方失败机制+However 背离 IEEE 754 声明带收益；P4 Rather-than 反范围句；P6 良性性质注记句+self-supervised as 从句）。
+- 对照结论：A5 好坏双数字并排（Q3 比值序列）、评价范围批评、Unlike 对比（第 7 轮 However 句）均有对等物；例外反转与 generalized blueprint 主张诚实边界不适用。**唯一实缺 = Intro P2 漏页-质量不对称无机制归因句**（avg 漏 13 页载 59.65% 质量 vs minmax 漏 17 页载 26.46%，数字已报但缺 The-reason-is-that 式解释）。
+- paper_en.tex Intro P2：加 "The asymmetry is mechanical: mean pooling dilutes pages whose mass concentrates on few tokens, whereas the extrema bound upper-bounds each page's best token score and so misses more pages while losing less total mass."（机制由 §III-B eq:bound 性质与均值池化稀释算术推出，无新数字，AdaptivFloat P1 机制归因句式）。
+- paper_zh.tex 直译同步（「这种不对称有其机制根源：……」）。
+- 编译验证：双语通过（en 6 / zh 6 页），0 未定义引用。
+- 待后续轮次：AdaptivFloat §2 相关工作（三类聚类：Adaptive Precision / DL on Quantization / posit）、§3 方法、§4 实验表。
 
 ### 第 10 轮（2026-10-17 13:0x，DREAMPlace §4 Experimental Results —— 第 2 篇拆解完毕）
 - 远端检查：无新提交（本地 = origin/main 9837d79）。
