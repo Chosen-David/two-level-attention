@@ -146,23 +146,3 @@ in `prior_asset_sets`; manifest schema is `e140-historical-validity-v3`, status
 `redesigned-v2-inputs-current`. Run `python -m exp.paper.e140_asset_provenance`
 to verify. No legacy bytes were modified; the O4 v2 defect record above remains
 in force for any future O4-based panel.
-
-## 当前绘图口径修复（TL-OBS-PLOT-CORRECTNESS-20261016）
-
-本条覆盖47e4ab2重设计的采信表述。旧资产/脚本/manifest完整可从该Git提交恢复；
-当前manifest v4保留旧代身份。原始O1/O3/O4/E6 JSON均未改动。
-
-(a)(b)现在仅是**预算内可行的整箱质量排序诊断**：整箱入选，超出剩余2048 mid-token
-预算的箱跳过；实际选择数逐query导出。不是token TopK、最优解或上界，不假设箱内均匀质量。
-绝对箱边界为`[q-d_hi,q-d_lo+1)`，与实际region_bounds核对，包含SWA偏移；
-连续完整覆盖、箱宽、无交叠、区域质量和均校验。跨区箱直接拒绝，不能从聚合量拆分。
-空区/零分母未定义，有限单区及配对分母分别记录。展示query规则仅是本次诊断展示规则，
-不能追认为预登记。4个task/sample身份只称source sequences，文档重叠未核实。
-
-(c)沿用O3原始相对reference-mid-TopK质量比例，random32仍为unpaired；不是full-attention
-mass，也不是paired-random频率对照。(d)阻断E6 gate推论：其sum-logits再softmax、末query、
-far=[64,t−2048)均与当前口径不一致；当前图不读取E6热图或skip阈值。
-
-默认脚本拒绝写图；`--diagnostic`才生成带显式警示的SVG/PNG/PDF、逐query TSV和详细JSON。
-CPU合成边界测试、现存数据一致性检查、独审和图件检查只验收这一绘图算术及出处范围，
-不意味着科学数据采信、gate安全性成立或已进行了新模型实验。

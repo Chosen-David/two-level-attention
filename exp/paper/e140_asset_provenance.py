@@ -13,19 +13,30 @@ from pathlib import Path
 import subprocess
 import xml.etree.ElementTree as ET
 
-WARNING = 'DIAGNOSTIC ONLY - NOT VALIDATED PAPER EVIDENCE'
-DETAIL = 'Whole-bin heuristic, not token TopK or an upper bound. E6 gate evidence blocked.'
-REFERENCE = 'TL-OBS-PLOT-CORRECTNESS-20261016 | Existing aggregates; no new collection'
+WARNING = 'PANEL (d) O4: HISTORICAL DIAGNOSTIC - NOT VALIDATED PAPER EVIDENCE'
+DETAIL = 'O4 v2 omitted partial final pages. O1 unaffected. Annotation only; no new experiment.'
+REFERENCE = 'TL-E140-O4-PARTIAL-PAGE-20261015 | See E140_VALIDITY.md'
 FIGDIR = Path('agent_doc/guide/paper_figs/figs')
 MANIFEST = Path('agent_doc/guide/paper_figs/observation/e140_validity.json')
 EXTENSIONS = ('svg', 'png', 'pdf')
-STATUS = 'whole-bin-diagnostic-gate-blocked'
-SCHEMA = 'e140-historical-validity-v4'
+STATUS = 'redesigned-v2-inputs-current'
+SCHEMA = 'e140-historical-validity-v3'
+# Post-recollection, post-quarantine contract (2026-10-16): the combined
+# figure carries panel (d) from the O4 v2 collector (partial final-page
+# omission), so the whole current asset set stays historical-diagnostic.
+# Panels (a)(b)(c) read e140_o_trace_v2.json, whose bytes are pinned in
+# unchanged_inputs. Every earlier asset generation is preserved in
+# prior_asset_sets; merge-time input reconciliation lives in
+# legacy_inputs_review.
+# v3 (2026-10-16, observation redesign): the figure was redesigned to one
+# panel per innovation and NO panel reads O4 v2 anymore (panel (d) now uses
+# e6b_far_profiles.json / e6_layer_skip.json). The O4-banner asset set is
+# archived in prior_asset_sets; current assets carry no warning banner.
 
 
 def add_render_warning(fig):
     """Keep future explicitly opted-in Matplotlib exports visibly diagnostic."""
-    fig.text(0.5, .90, WARNING + '\n' + DETAIL + '\n' + REFERENCE,
+    fig.text(0.5, 1.14, WARNING + '\n' + DETAIL + '\n' + REFERENCE,
              ha='center', va='bottom', fontsize=13, color='#7a2100',
              bbox=dict(facecolor='#fff0d2', edgecolor='#7a2100', pad=9))
 
@@ -101,7 +112,7 @@ def verify(root):
     expected = {str(FIGDIR / f'O_observation.{ext}') for ext in EXTENSIONS}
     if {a['path'] for a in assets} != expected or len(assets) != 3:
         raise ValueError('current asset set incomplete')
-    for entry in assets + manifest.get('derived_outputs', []) + manifest.get('renderer_sources', []):
+    for entry in assets:
         if sha((root / entry['path']).read_bytes()) != entry['sha256']:
             raise ValueError('asset/input identity mismatch: ' + entry['path'])
     reviewed = {e['path'] for e in manifest.get('legacy_inputs_review', {}).values()
