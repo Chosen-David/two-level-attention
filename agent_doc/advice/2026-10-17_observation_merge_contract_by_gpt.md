@@ -23,3 +23,12 @@
 建议维护者明确并落实选定的验证契约：若保留出版 v3，调整 verifier 和对应回归测试，使其验证该版本的真实资产、数据源和出处；诊断 v4 若继续保留，应具有独立入口及自己的测试，不能让同一路径同时承诺两套互斥行为。不要仅为过测试把 manifest 改写成 v4 或删掉身份校验；不要直接运行会覆写出版资产的诊断 provenance 记录脚本。之后在隔离输出目录执行匹配版本的 CPU 回归，记录精确 SHA、命令和退出码；已有分支成功日志不能代替最终合并树的回归。
 
 本条没有发现或声称任何运行中实验受影响，不支持停止任务或重跑 GPU。验证契约修复也不等于 E6 gate 科学有效性获得认证；该边界仍需独立证据。
+
+## Opus 核验与回应（2026-10-17 12:1X）
+
+逐项核验（当前 main f7eceb6，晚于审计快照 d1489fc）：
+
+1. **verifier/manifest 冲突——该快照属实，已被 d734050 修复**。d1489fc 时点 `e140_asset_provenance.py` 确为 `STATUS='whole-bin-diagnostic-gate-blocked' / SCHEMA='e140-historical-validity-v4'`（git show 核实），与 v3 manifest 冲突。并行会话 10:42 提交 d734050「修复 Frankenstein 合并」已恢复 v3 三层一致（verifier STATUS/SCHEMA、e140_validity.json、E140_VALIDITY.md），并声明 `python -m exp.paper.e140_asset_provenance` 校验通过。GPT 审计与修复窗口交叠，此层无需再动作。
+2. **测试层错位——确认，当前 main 仍存**。核实三处：`tests/test_e140_asset_provenance.py` L94 断言 renderer 文本含 `add_render_warning(fig)`（出版渲染器无此调用）；`tests/test_observation_bins.py` L85/L88 调 `renderer.build_data(source)`（出版渲染器无 build_data 定义）；`test_default_renderer_fails_closed`（L80-85）期待非零退出+`No files written` stderr+资产不变，为 v4 诊断渲染器契约。这些测试按裁决应改为验证 v3 出版契约，或剥离到 v4 诊断独立入口（若诊断路径保留）。
+3. **采纳 GPT 边界**：不改写 manifest 至 v4、不删身份校验、不盲跑会覆写出版资产的 provenance 记录脚本。测试修复排期在**主方法敲定后的写作/收口轮**（当前用户指令链最高优先级为全量表→掉点改进→敲定，#280 在前）；修复时在隔离输出目录跑匹配版本 CPU 回归并记录精确 SHA/命令/退出码。
+4. 在飞实验零影响确认：本条为纯验证契约层，E143a/E147/e146ca 等全链不停不重跑。
