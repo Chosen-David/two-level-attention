@@ -126,3 +126,37 @@
 ### 本轮修改（第 9 轮）
 - paper_en.tex §III-D gate 小节开头：加承接句 "GQA selection leaves a second opportunity: layers whose far region contributes little during prefill."
 - paper_zh.tex 直译同步。
+
+---
+
+## §4 Experimental Results（第 10 轮，2026-10-17）
+
+### §4 开篇 setup 段（6 句）
+句链：**工具链披露句**（"developed in Python with PyTorch for optimizers and API, and C++/CUDA for low-level operators"——实现栈按层拆分）→ **己方硬件句**（40-core E5-2698 v4 + 1 Tesla V100 Volta）→ **让分披露句**（"Only a single CPU thread was used by DREAMPlace for launching work to the GPU"——自曝约束，使后文加速数字在约束下更强）→ **基线环境句**（RePlAce 24-core 3.0GHz + 64GB——比较双方环境都披露 = 公平比较预设）→ **工作负载句**（ISPD 2005 + industrial designs）→ **局限→上行句**（"we only collected results with double-precision... so additional easy speedup is possible by switching to single-precision"——披露局限的同时把它转为未来空间）。
+
+**启示**：六个组件里我们缺硬件披露句，但我们的计时是「作者报告的独立研究」，硬件事实不在我们手里，诚实边界禁补——S6 承担此职责即可。
+
+### §4.1 Placement Acceleration（主结果段，~11 句）
+句链：**表指针句**（"Table 2 and Table 3 show the HPWL and runtime details"）→ **头牌句（质量门先行）**（"With almost the same solution quality (within 0.2% difference on average), DREAMPlace is able to achieve 35× and 43× speedup... compared to RePlAce with 40 threads"——质量限定语前置 + 双数字 + 点名基线及其线程数）→ **崩溃报告 + 谨慎归因句**（"RePlAce crashed... The potential reason is that the peak memory usage exceeded 64GB"——前作崩溃也如实报，归因用 potential reason 谨慎限定）→ **下界估算句**（"we made an estimation to the runtime lower bound 119 + 1000∗9 ≈ 9100 seconds"——算术当场展示 + 显式声明是估算）→ **组件级结果句**（"LG... around 10× faster... The speedup for the entire placement flow is 5×"——分阶段加速 + 全流程收口数字）→ **图解释带结论句**（"The speedup of RePlAce saturates quickly from single thread to 40 threads, i.e., maximum around 2.5×"）→ **稳定性主张句**（"both good stability and nearly linear scalability"）→ **分解定位句**（"GP and LG only take 11.7%... The majority of the runtime (76%) is taken by DP, which still relies on the external placer"——定位剩余瓶颈 + 归属外部组件）→ **量化未来句带内联算术**（"potential of 15×... e.g., 2463/(43+9+336/6+54) = 15.2 for bigblue4"——引用前作 6× + 自己的除法式当场算出潜力值）→ **内部占比回扣设计句**（"density-related computation takes longer than wirelength (67.8% v.s. 32.2%). With efficient DCT/IDCT implementation, the electric field computation is no longer the bottleneck"——回扣 §3 的 DCT/IDCT 设计决策闭环）。
+
+### §4.2 Acceleration of Low-Level Operators（算子 microbench 段，~5 句）
+句链：**下沉声明句**（"We further investigate the efficiency of our implementations of the low-level operators"——从模型级沉到算子级 = 双层评估）→ **臂命名句**（"'Net-by-Net' denotes...; 'Sparse' denotes the sparse matrix-vector multiplication approach [15]; 'Atomic' denotes..."——每个对照臂一个 denotation 定义句）→ **结果双比值句**（"1.9× speedup over the net-by-net one, 1.4× speedup over the sparse one"——**回收 §3.1 的 Although 分歧句**：[15] 建议 sparse、我们实测 atomic 更快，实验节用数字闭环方法节的分歧）→ **范围限定句**（"Considering the map sizes in the experiment (from 512×512 to 4096×4096)"）→ **诚实例外→仍然有利句**（"Although the runtime gap is decreasing, the N-point implementation still shows superior efficiency with typical map sizes"——Although 承认趋势收窄 + still 坚守结论）。
+
+表设计：Table 2/3 逐设计全披露（HPWL + GP/LG/DP/Total 分列）+ 底部 **ratio 行**（质量比 1.002/1.000 + 各阶段加速比一行收口）。
+
+### 对照我们评估节的差距结论
+| DREAMPlace §4 句式 | 我们的状态 |
+|---|---|
+| 质量门先行头牌句 | 诚实镜像已达标：Q3 开头 "The reported sparse configuration is slower than dense FullKV at every measured length"——claim-first + 方向（我们的「头牌」是负向的，句式功能等价） |
+| 崩溃报告 + potential reason 谨慎归因 | RULER k_f=0 段 "the algebra alone neither verifies its executed path nor attributes the loss to this quota"——同款谨慎归因，达标 |
+| 下界估算 + 算术当场展示 | "Substituting... gives K_mid=768 and k_f=0" + caption "code/configuration inference, not verified execution"——估算声明同款，达标 |
+| 分解定位句（76% 在 DP） | 我们无百分比级测量，诚实边界禁造；「L2 全历史评分」机制级定位已在 Design implications，不改 |
+| 量化未来句带内联算术（15×） | 诚实边界禁 speculative speedup，不加 |
+| **算子 microbench 段 claim-first** | **本轮实缺**：DREAMPlace §4.2 每个结果段首句带结论；我们 "Local selector cost" 段第一句是实验描述句（"A separate two-round synthetic experiment... reports steady-state times of..."），结论句（"no lower reported time than the nominal page-scoring variant"）埋在第二句——与第 5 轮修过的 Q1 同款「数据罗列开场」 |
+| 臂命名 denotation 句 | 我们的三臂是「报告变体、完整执行配置不可得」（Experimental Setting 已披露），无法诚实定义操作含义，保持名义标签 |
+| 诚实例外→still 句 | "Although the relative penalty decreases with length, absolute sparse TPOT increases"——镜像等价，达标 |
+
+### 本轮修改（第 10 轮）
+- paper_en.tex Q3 "Local selector cost" 段：结论句前置（"The shared-subspace selector reports no lower time than the nominal full-dimensional page-scoring variant in the synthetic study."），数据句随后，原第二句删除合并。
+- paper_zh.tex 直译同步。
+

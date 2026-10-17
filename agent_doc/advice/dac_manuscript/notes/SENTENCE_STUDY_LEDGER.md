@@ -20,7 +20,7 @@
 | 顺序 | 论文 | 章节拆解进度 | 手稿对应段落已修 |
 |---|---|---|---|
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
-| 2 | 2019_DREAMPlace.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ |
+| 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
 | 3 | 2020_AdaptivFloat.pdf | 未开始 | — |
 | 4 | 2021_Gemmini.pdf | 未开始 | — |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
@@ -28,6 +28,15 @@
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 10 轮（2026-10-17 13:0x，DREAMPlace §4 Experimental Results —— 第 2 篇拆解完毕）
+- 远端检查：无新提交（本地 = origin/main 9837d79）。
+- 拆解笔记：`notes/sentence_studies/2019_dreamplace.md` §4 部分（setup 六组件：工具链披露/己方硬件/**让分披露句**（单线程约束使加速更强）/基线环境/负载/**局限→上行句**；§4.1：**质量门先行头牌句**（within 0.2% 前置 + 35×/43× + 点名基线 40 线程）/崩溃+potential reason 谨慎归因/**下界估算句带内联算术**（119+1000∗9≈9100s）/分解定位句（76% 在 DP）/量化未来句（15×=除法式当场展示）/占比回扣设计句（67.8% v.s. 32.2%）；§4.2：**下沉声明句+臂命名 denotation 句**——microbench 用 1.9×/1.4× **回收 §3.1 Although 分歧句闭环**+诚实例外→still 句；表底 ratio 行）。
+- 对照结论：质量门先行/谨慎归因/估算算术/Although→still 均有诚实镜像对等物；分解百分比与未来潜力数字禁造。**唯一实缺 = Q3 "Local selector cost" 段数据罗列开场**（与第 5 轮 Q1 同款病）。
+- paper_en.tex Q3 选择器段：结论句前置 "The shared-subspace selector has no lower reported time than the nominal full-dimensional page-scoring variant in the synthetic study."，原 thus 句删除，数据句随后。
+- paper_zh.tex 直译同步（「在合成研究中，共享子空间选择器的所报时间未低于名义全维页评分变体。」前置）。
+- 编译验证：双语通过（en 6 / zh 6 页），0 未定义引用。注意：本会话 shell PATH 为空，编译前需 `export PATH="/usr/bin:/bin:/usr/local/bin:~/texlive/2026/bin/x86_64-linux:$PATH"`。
+- **DREAMPlace 四节全部拆解完毕**（Abstract/Intro/§2/§3/§4），累计手稿修改：Intro-P1 stakes 句、Related-Work However 缺口句、§III-D 承接句、Q3 选择器段 claim-first，en/zh 同步。下轮开始第 3 篇 **2020_AdaptivFloat.pdf**（Abstract+Intro）。
 
 ### 第 9 轮（2026-10-17 12:4x，DREAMPlace §3 The DREAMPlace Algorithms）
 - 远端检查：无新提交。
