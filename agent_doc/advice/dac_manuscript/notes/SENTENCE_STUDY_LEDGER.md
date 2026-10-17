@@ -21,13 +21,23 @@
 |---|---|---|---|
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
-| 3 | 2020_AdaptivFloat.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 实验表 | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓ |
+| 3 | 2020_AdaptivFloat.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓ §4 ✓；待：§5 PE 架构 | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ |
 | 4 | 2021_Gemmini.pdf | 未开始 | — |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 14 轮（2026-10-17 21:0x，AdaptivFloat §4 Experimental Results）
+- **远端裁决**（fetch 发现 c99315c/10a3cd7 等，本地已同步）：(1) c99315c 删除我第 7 轮 However 句（"without guaranteed minimum capacity for either region"），改为 SparQ 近期窗口/HISA 首尾块细粒度功劳+「nominal near--far L1 page quotas... do not by themselves guarantee final far-token capacity」——**采纳**：我的原句是过度概括（SparQ 近期窗口即近区保底），远端版 credit-then-gap 更准确；(2) β 方向句我的「enlarges/shrinks」→远端「cannot reduce/increase; rounding can leave both unchanged」——**采纳**：round 非严格单调，我的版本是数学错误，第 11 轮判例第二次验证；(3) 10a3cd7 Token-Picker 句机制精确化——**采纳**。
+- 拆解笔记：§4 部分（setup：**选择理由内嵌句**（distinct types + narrow-to-wide spread 当场声明）/实现披露句/**in-the-sense-that 类别定义句**/公平性句（in order to impose a fair comparison）/**反取巧披露句**（quantize all layers unlike [3] skip sensitive layers——把自己协议与前作取巧协议划界）；§4.1：指标递进开场/图结论句/**例外当场限定**（BFP spread thinnest — although higher mean）/**例外→假设句**（suggests BFP would fare best）/小节桥接句；§4.2：**要点蒸馏句**（The key observation we can distill）/头牌+due-to 归因/**反推设计原则句**（it is critical to have...）/算法→硬件收益链/**惊喜上报句带机制引用**（exceeding FP32 by up to +0.3）；§4.3：失败 as 从句归因）。
+- 对照结论：反取巧披露、失败 as 归因（我们显式不可归因）、公平性需求句均有对等物；例外-限定句式需逐任务数据（S4 仅三配置均值）禁造不加；**正向惊喜上报**：远端 E144a/E145/E146/E147 系列实验已产生配对正向证据（TLI vs FullKV RULER 32K +0.79、两级 vs 单池 LBv2 +2.59/RULER64K +2.77）——**是否整合进手稿（替换"lacks matched evaluation"口径）是用户/GPT 级内容决策，本轮仅登记待议**。实缺 = Workloads 段五任务无类型跨度声明。
+- paper_en.tex Workloads 段：加括号形类型跨度 "(question answering, summarization and code completion)"。
+- paper_zh.tex 直译同步（「（问答、摘要与代码补全）」）。
+- **版式教训（重要）**：初版 "spanning multi-hop and single-document..." 长 10 词使 en 6→7 页——`\newpage` 平衡布局（远端 90edbf2 验证版）余量为零，**任何加句必须编译后核对页数**，超页即压缩为括号形或删词。压缩后 6 页恢复。
+- 编译验证：双语通过（en 6 / zh 6 页），0 未定义引用。
+- 待后续轮次：AdaptivFloat §5 PE 架构、§6 硬件评估、§7 结论；E144a-E147 正向证据整合待用户决策。
 
 ### 第 13 轮（2026-10-17 19:0x，AdaptivFloat §3 Methodology）
 - **远端裁决**（fetch 发现 107bfb6/58d8457 等，本地已同步）：107bfb6 把 Design implications 从「Three constraints」清单改为「two distinct constraints + These are properties of the defined rules」+第三条挪入「A useful operating point additionally requires...」运行点要求——**采纳**：前两条是定义规则的固有性质（可从公式推出），第三条是未满足的实测要求，混排是层级混淆，对标 best paper 证据分层收口。58d8457：SparQ「query-selected key coordinates」术语精确化（改进我的第 12 轮句）+ Conclusion 区分 Qwen3 整箱诊断与历史配置两类证据来源——**采纳**。

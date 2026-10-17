@@ -111,3 +111,40 @@
 ### 远端裁决记录（第 13 轮开始前）
 - 107bfb6「separate design constraints from measured benefits」：Design implications 从「Three constraints. First/Second/Third」改为「two distinct constraints」+「These are properties of the defined rules」+第三条挪到「A useful operating point additionally requires...」。**采纳**——前两条是定义规则的固有性质（可从公式推出），第三条是未满足的实测要求，混排是层级混淆；对标 DREAMPlace/Token-Picker 的证据分层收口，远端版诚实边界更强。
 - 58d8457：(1) SparQ「partial key bits」→「query-selected key coordinates」术语精确化（我的第 12 轮句被改进），**采纳**；(2) Conclusion 区分 Qwen3 整箱诊断（部分观测下降）与历史配置（大幅损失+慢解码）两类证据来源，「without isolating the effects of individual modules」补充——**采纳**，与 107bfb6 的证据分层一致。
+
+---
+
+## §4 Experimental Results（第 14 轮，2026-10-17）
+
+### §4 setup（~7 句 + Table 1）
+句链：**选择理由内嵌句**（"we select three popular DNN models of **distinct neural types and applications, and exhibiting relatively narrow to wide spread in their weight distributions**"——工作负载选择的类型跨度+分布跨度当场声明，为泛化主张预埋）→ 逐模型资历句（Transformer "made a very consequential impact"——前作资历背书）+ 数据集句 → 基线点名句（"namely BFP, IEEE-like float, posit, and uniform"）→ **实现披露句**（"We created templates of these data types in Python"）→ **类别定义句**（"are self-adaptive **in the sense that** their dynamic range auto-adjusts, layer-by-layer"）→ 公平性句（exponent bits 逐格式搜索最优 + "kept the same for all five data types **in order to impose a fair comparison**"）→ **反取巧披露句**（"we quantize **all of the layers**... **unlike several works [3] that intentionally skip** quantization on the sensitive first and last layers to escape steeper accuracy loss"——把自己的协议与前作的取巧协议显式划界）。
+
+### §4.1 RMS（5 句）
+句链：**指标递进开场**（先便宜指标误差后贵指标精度，"We begin by quantifying the quantization error"）→ 图结论句（"AdaptivFloat **consistently** produces lower average quantization error"）→ Furthermore 第二指标 + **例外当场限定**（"while BFP's error spread is thinnest for the 6-bit and 8-bit versions of ResNet-50 **— although with a higher mean compared to AdaptivFloat**"——承认对手在某子指标赢，立即用主指标框住）→ **例外→假设句**（"This **suggests that** BFP would fare best in networks with slimmer weight distribution"——把负例外转成可检验假设，suggests 级 hedging 恰当）→ **小节桥接句**（"These results provide important insights... **as we dive into** the bare inference accuracy results in the next subsection"）。
+
+### §4.2 Inference（~8 句 + Table 2）
+句链：表指针+协议句（PTQ/QAR 双轨）→ 公平句（in order to impose a fair comparison）→ **要点蒸馏句**（"**The key observation we can distill is that** AdaptivFloat demonstrates much greater resiliency at very low precision (≤6-bit)"）→ 头牌+归因句（"a decent BLEU score of 25.5... **while** the impact from the other four number formats **is catastrophic due to insufficient dynamic range**"——对手全灭带 due to 归因）→ 类似观察+实例句（"For instance, only a 1.2 Top-1 accuracy drop"）→ 失败描述句（"essentially unable to provide expressible transcription"）→ **反推设计原则句**（"This suggests that... **it is critical to have** a quantization scheme that can adjust its available dynamic range"——实验证据反推回 §3 设计原则）→ **算法→硬件收益链句**（"enables higher compute density into reconfigurable architectures at a relatively lower penalty"）→ **惊喜上报句带机制引用**（regularization effect [23]，"performance **exceeding FP32 by up to +0.3** in BLEU"——反直觉正向结果如实报并引机制）。
+
+### §4.3 Weight+Activation（4 句）
+记号定义句（W_n/A_n）→ 主张句（"as good as, if not better than, the baseline FP32"）→ **Interestingly 惊喜句**（6-bit 正则效应超过 FP32 基线）→ **失败 as 从句归因**（"steeper on the sequence models... **as** many of the activations from the attention mechanism fall outside of the available dynamic range"）。
+
+### 对照我们评估节的差距结论
+| AdaptivFloat §4 句式 | 我们的状态 |
+|---|---|
+| 反取巧披露句（quantize all layers unlike [3]） | Experimental Setting "not treating the runs as controlled single-stage ablations" 已有对等物，达标 |
+| 例外当场限定（BFP spread thinnest — although higher mean） | Q1 逐任务数据不在 S4（仅三配置均值 47.910/47.588/47.666），禁造数字，不加 |
+| 例外→假设句（suggests BFP would fare best） | 假设生成需未做分析（43/128 下降的相关变量），诚实边界禁，不加 |
+| 失败 as 从句归因 | Q3 "Aggregate medians cannot locate the cause"——显式不可归因，诚实镜像，达标 |
+| 惊喜上报句（exceeding FP32 by up to +0.3） | 我们无正向惊喜结果可报；**但远端 E144a/E145/E146/E147 系列实验（TLI vs FullKV RULER 32K +0.79、两级 vs 单池 LBv2 +2.59 / RULER64K +2.77）已产生正向配对证据——是否整合进手稿是用户/GPT 级内容决策，本轮仅在账本登记待议，不动手稿** |
+| 公平性句（in order to impose a fair comparison） | "Controlled sparse comparisons must align..." 需求式对等物，达标 |
+| **工作负载类型跨度句**（distinct types... narrow to wide spread） | **本轮实缺**：Workloads 段「five LongBench tasks」无任务类型跨度声明；五任务（HotpotQA/MuSiQue 多跳问答、Qasper 单文档问答、GovReport 摘要、RepoBench-P 代码补全）的类型归属是 LongBench 公开事实，非新造数字 |
+
+### 本轮修改（第 14 轮）
+- paper_en.tex Experimental Setting Workloads 段："five LongBench tasks" 扩为 "five LongBench tasks (question answering, summarization and code completion)~\cite{longbench}"（AdaptivFloat 选择理由内嵌句式，括号压缩形，无新数字）。
+- paper_zh.tex 直译同步（「五项LongBench任务（问答、摘要与代码补全）」）。
+- **版式教训**：初版 "spanning multi-hop and single-document question answering..."（多 10 词）使 en 从 6 页溢出到 7 页——`\newpage` 平衡布局（远端 90edbf2 验证版）对增量极敏感；加句后必须查页数，超页即压缩为括号形。en 版式余量为零。
+
+### 远端裁决记录（第 14 轮开始前）
+- c99315c-1（Related Work P1，删除我第 7 轮 However 句）：改为「SparQ also protects a recent-token window, while HISA forces the first and last blocks into its coarse candidate set」+「separate nominal near--far L1 page quotas. These page quotas do not by themselves guarantee final far-token capacity」。**采纳**——我的「without guaranteed minimum capacity for either region」是过度概括：SparQ 近期窗口就是近区保底、HISA 首尾块强制也是区域保底，事实不成立；远端版给前作细粒度功劳后把我们的贡献精确为页级名义配额，credit-then-gap 更准确。
+- c99315c-2（β 方向句）：我的「enlarges... and shrinks...」→「**cannot reduce** the nominal near-page quota or **increase** the far-page quota; rounding can leave both unchanged」。**采纳**——round 非严格单调，「enlarges/shrinks」是数学错误；「cannot reduce/increase」才是可证方向。第 11 轮判例第二次验证：方向句必须定理级。
+- 10a3cd7（Token-Picker 句）：改为「conservative probability estimates from partial key-bit chunks to stop further key-chunk and value transfers for pruned tokens」+ 我方「ranks candidates using a fixed coordinate subset under page and token budgets」。**采纳**——机制精确性优先于修辞框架。
