@@ -1,0 +1,75 @@
+{
+  "id": "e145d_zh_aavg_verdict",
+  "date": "2026-10-17",
+  "title": "LongBench 中文 8 任务 aavg(0,0) 单池臂 sink4 打分（E145d zh aavg）",
+  "config": {
+    "method": "tli_64_128_1024_c4_Aa0_b0_g0_sk4_sw128（aavg 单池 α=0 β=0）",
+    "sink": 4,
+    "swa": 128,
+    "k1": 128,
+    "k2": 1024,
+    "machine": ".187 GPU5",
+    "scorer": "difflib:stdlib 官方口径",
+    "cap_effective": 31500
+  },
+  "results": {
+    "avg": 45.64,
+    "mavg_e145c_zh_same_machine": 46.0038,
+    "diff": -0.3638,
+    "per_task": {
+      "dureader": {
+        "aavg": 27.02,
+        "mavg": 28.28,
+        "diff": -1.26
+      },
+      "lsht": {
+        "aavg": 47.5,
+        "mavg": 47.0,
+        "diff": 0.5
+      },
+      "multifieldqa_zh": {
+        "aavg": 62.64,
+        "mavg": 62.88,
+        "diff": -0.24
+      },
+      "passage_count": {
+        "aavg": 0.0,
+        "mavg": 0.75,
+        "diff": -0.75
+      },
+      "passage_retrieval_zh": {
+        "aavg": 98.0,
+        "mavg": 98.0,
+        "diff": 0.0
+      },
+      "samsum": {
+        "aavg": 44.65,
+        "mavg": 44.65,
+        "diff": 0.0
+      },
+      "trec": {
+        "aavg": 71.5,
+        "mavg": 72.5,
+        "diff": -1.0
+      },
+      "vcsum": {
+        "aavg": 13.81,
+        "mavg": 13.97,
+        "diff": -0.16
+      }
+    }
+  },
+  "interpretation": [
+    "中文 8 任务两级 vs 单池差 -0.36，噪声级——与英文 LB v1 (+0.89) 方向一致幅度小",
+    "单池唯一可见损失 passage_count 0.0 vs 0.75（两臂均远低于稠密锚 2.0，该任务本就近崩溃）",
+    "跨三数据集证据链：LBv2 +2.59 / RULER 64K +2.78（主驱动 single_3 -58）/ LB中文 -0.36 / LB英文 +0.89 / RULER 32K +0.07——两级区域配额收益集中于长上下文精确检索，短上下文/摘要类任务两法等价"
+  ],
+  "sources": {
+    "e145d_zh_aavg_result.json": "c433620dbba87ec116e75f603d791264f9d23e8fdc49b5af35e7481472db3627"
+  },
+  "caveats": [
+    "mavg 对照 e145c zh verdict 为记录值（同机 .187 但非同时段）",
+    "passage_count 两臂均 <1 分（稠密锚仅 2.0），该任务区分度极低"
+  ],
+  "generated_at": "2026-10-17T15:59:41.914270"
+}
