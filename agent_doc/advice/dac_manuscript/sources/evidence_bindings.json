@@ -1355,5 +1355,21 @@
     "primary_metric": "unweighted arithmetic AVG over same11tasks; task deltas diagnostic only",
     "nominal_comparison": "near pages8 and near/far token quotas320/572; far pages120 to248; K1024/protection4/128",
     "scope": "Reported source-data/scorer/producer/model-config identities match; original prediction JSONLs absent locally, no independent replay. Nominal design comparison only, no capacity-displacement cause, noninferiority or performance claim."
+  },
+  "optional_gate_quality_scope_20261017": {
+    "source": "exp/trace/results/e137_dyn_dgate_verdict.json",
+    "sha256": "ad15fbddb5b1eda509b66e69e136578276499a946244d54c5d714a0f77134e17",
+    "aggregation": "arithmetic mean over the same five reported task scores; source precision retained",
+    "AVGs": {
+      "eps0.05": 47.876,
+      "eps0.10": 47.692,
+      "reused_reference": 47.91
+    },
+    "deltas": [
+      -0.034,
+      -0.218
+    ],
+    "scope": "Descriptive aggregate comparison; per-task differences are diagnostics, not a zero-loss acceptance requirement. Task-bootstrap intervals containing zero do not establish non-inferiority. Complete scoring identity, paired predictions and matched cost remain missing. Proxy shifts do not measure intervention quality loss.",
+    "manuscript_location": "Optional gate evaluation paragraph; presentation slide13 gate card"
   }
 }
