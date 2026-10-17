@@ -1,3 +1,4 @@
+from paper_font_paths import cjk_regular, register_matplotlib
 """Replot archived descriptive evidence; no model execution. See evidence_bindings.json."""
 from pathlib import Path
 import json, statistics, hashlib, os, subprocess
@@ -7,6 +8,7 @@ LANG=os.environ.get("DAC_FIG_LANG","en")
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+register_matplotlib()
 from observation_bins import diagnose
 ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/'sources/data'; OUT=ROOT/'figures'
@@ -26,7 +28,7 @@ def save(fig,name):
    ax.set_yticks(ax.get_yticks(),[TRANSLATE.get(t.get_text(),t.get_text()) for t in ax.get_yticklabels()])
    ax.set_xlim(xlim);ax.set_ylim(ylim)
   for t in fig.findobj(Text):
-   t.set_text(TRANSLATE.get(t.get_text(),t.get_text()));t.set_fontproperties(FontProperties(fname='/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',size=t.get_fontsize()))
+   t.set_text(TRANSLATE.get(t.get_text(),t.get_text()));t.set_fontproperties(FontProperties(fname=cjk_regular(),size=t.get_fontsize()))
  for ext in ['svg','png']:fig.savefig(OUT/(name+'.'+ext),dpi=220)
  subprocess.run(['inkscape',str(OUT/(name+'.svg')),'--export-type=pdf','--export-filename='+str(OUT/(name+'.pdf'))],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
  plt.close(fig)
