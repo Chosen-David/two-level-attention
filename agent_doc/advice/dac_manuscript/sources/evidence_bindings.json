@@ -1100,5 +1100,182 @@
       }
     },
     "scope": "Author-reported aggregate only; recorded model/data/scorer match; cross-machine execution, raw prediction replay absent; no causal, noninferiority, or matched quality-cost conclusion"
+  },
+  "ruler8b_reallocation_20261017": {
+    "baseline_commit": "ff5ea0597a362ce67c903660861399912e1b2a38",
+    "model": "Qwen3-8B",
+    "length": 32768,
+    "metric": "arithmeticAVG of same fixed11tasks; per-task changes explanatory",
+    "arms": {
+      "beta_00625": {
+        "scores": {
+          "niah_single_1": 99.0,
+          "niah_single_2": 99.0,
+          "niah_single_3": 95.0,
+          "niah_multikey_1": 95.0,
+          "niah_multikey_2": 73.0,
+          "niah_multikey_3": 9.0,
+          "niah_multiquery": 24.5,
+          "niah_multivalue": 30.0,
+          "cwe": 75.9,
+          "fwe": 21.0,
+          "vt": 30.8
+        },
+        "n": {
+          "niah_single_1": 100,
+          "niah_single_2": 100,
+          "niah_single_3": 100,
+          "niah_multikey_1": 100,
+          "niah_multikey_2": 100,
+          "niah_multikey_3": 100,
+          "niah_multiquery": 100,
+          "niah_multivalue": 100,
+          "cwe": 100,
+          "fwe": 100,
+          "vt": 100
+        },
+        "avg": "59.29090909090909090909090909",
+        "source_data_sha256": {
+          "32768/niah_single_1": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+          "32768/niah_single_2": "26af960be2fdcf7c7907b7fd2a17c6bb44958381e90ccc50ad297770b51eaf79",
+          "32768/niah_single_3": "1e383c1b27269f8796650d37012b212c1d51124b3388bc8fce56c809698b7bc8",
+          "32768/niah_multikey_1": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "32768/niah_multikey_2": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+          "32768/niah_multikey_3": "d13f08fb05ac73aa062377c764c602d762d6b9d1e22092ec1e522596bfbb0a76",
+          "32768/niah_multiquery": "273bb35ea339defdee27055947a7ea78512877c0e1648c701225ef49fcc8e91c",
+          "32768/niah_multivalue": "1da24401a722c00618e4d4d1b72583620a331d0a4c7b6df384dad3974b0bd234",
+          "32768/cwe": "07fcda888ce6d9f834639abafa23c8fd726a352227432a26175bc3c3ff2e0051",
+          "32768/fwe": "23a8073809df38f32194cf5cfec6a311a286f4776af6771a3912b33010a65206",
+          "32768/vt": "f34626c7908480ea16c6e7c77decd51326e202014570b107156730ea6e69f4b7"
+        },
+        "repository_sources": {
+          "exp/trace/results/e147c_r32k_formal.json": "3eb3780fc50d540764f976a851969be752d92378dc3b158715751e3156063754",
+          "exp/trace/results/e147c_r32k_formal.json.manifest.json": "69eebbc755171d420a5ed295f0dfdd05cb9dcfdb64c53e8afc5cd112806ba79a",
+          "exp/trace/results/e147c_r32k_formal.json.receipt.json": "a445819bba1a04dfafb709cd78498c402b07d0860f8b0e3f6d52abb218227f02"
+        },
+        "scorer": {
+          "script": "benchmark/RULER/score_ruler.py",
+          "sha256": "e5139e2dd914d92e87e036cdff3635a5136e10f79ae3efe0a3d13cd702c7319b"
+        },
+        "formal": {
+          "script": "benchmark/RULER/score_ruler_formal.py",
+          "sha256": "ae99067f36347307507ac6c2a9e4a7fa5bec77b35b3063273e10c54ab68f459c"
+        },
+        "identity_scope": "native receipt; raw unreplayed"
+      },
+      "beta_0125": {
+        "scores": {
+          "niah_single_1": 100.0,
+          "niah_single_2": 100.0,
+          "niah_single_3": 97.0,
+          "niah_multikey_1": 98.0,
+          "niah_multikey_2": 73.0,
+          "niah_multikey_3": 7.0,
+          "niah_multiquery": 24.5,
+          "niah_multivalue": 27.0,
+          "cwe": 68.8,
+          "fwe": 15.0,
+          "vt": 31.0
+        },
+        "n": {
+          "niah_single_1": 100,
+          "niah_single_2": 100,
+          "niah_single_3": 100,
+          "niah_multikey_1": 100,
+          "niah_multikey_2": 100,
+          "niah_multikey_3": 100,
+          "niah_multiquery": 100,
+          "niah_multivalue": 100,
+          "cwe": 100,
+          "fwe": 100,
+          "vt": 100
+        },
+        "avg": "58.3",
+        "source_data_sha256": {
+          "32768/niah_single_1": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+          "32768/niah_single_2": "26af960be2fdcf7c7907b7fd2a17c6bb44958381e90ccc50ad297770b51eaf79",
+          "32768/niah_single_3": "1e383c1b27269f8796650d37012b212c1d51124b3388bc8fce56c809698b7bc8",
+          "32768/niah_multikey_1": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "32768/niah_multikey_2": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+          "32768/niah_multikey_3": "d13f08fb05ac73aa062377c764c602d762d6b9d1e22092ec1e522596bfbb0a76",
+          "32768/niah_multiquery": "273bb35ea339defdee27055947a7ea78512877c0e1648c701225ef49fcc8e91c",
+          "32768/niah_multivalue": "1da24401a722c00618e4d4d1b72583620a331d0a4c7b6df384dad3974b0bd234",
+          "32768/cwe": "07fcda888ce6d9f834639abafa23c8fd726a352227432a26175bc3c3ff2e0051",
+          "32768/fwe": "23a8073809df38f32194cf5cfec6a311a286f4776af6771a3912b33010a65206",
+          "32768/vt": "f34626c7908480ea16c6e7c77decd51326e202014570b107156730ea6e69f4b7"
+        },
+        "repository_sources": {
+          "exp/trace/results/e146c_r32k_formal.json": "fef62458e98ce567cbb2ac8fb4063f4a0eca4e876319655626212384c4842c59",
+          "exp/trace/results/e146c_r32k_formal.json.manifest.json": "f691d18040370d6a944f0aaa08a3db5e7dca909dffcc7a4054a5010ec31c279c",
+          "exp/trace/results/e146c_r32k_formal.json.receipt.json": "7ae71d73244ff0c373fd9a8c3ded6425a3084f8b9785608a78780f1a5350d2de"
+        },
+        "scorer": {
+          "script": "benchmark/RULER/score_ruler.py",
+          "sha256": "e5139e2dd914d92e87e036cdff3635a5136e10f79ae3efe0a3d13cd702c7319b"
+        },
+        "formal": {
+          "script": "benchmark/RULER/score_ruler_formal.py",
+          "sha256": "ae99067f36347307507ac6c2a9e4a7fa5bec77b35b3063273e10c54ab68f459c"
+        },
+        "identity_scope": "native receipt; raw unreplayed"
+      },
+      "historical_fullkv": {
+        "scores": {
+          "niah_single_1": 100.0,
+          "niah_single_2": 100.0,
+          "niah_single_3": 100.0,
+          "niah_multikey_1": 99.0,
+          "niah_multikey_2": 76.0,
+          "niah_multikey_3": 4.0,
+          "niah_multiquery": 24.5,
+          "niah_multivalue": 25.0,
+          "cwe": 83.5,
+          "fwe": 7.0,
+          "vt": 34.2
+        },
+        "n": {
+          "niah_single_1": 100,
+          "niah_single_2": 100,
+          "niah_single_3": 100,
+          "niah_multikey_1": 100,
+          "niah_multikey_2": 100,
+          "niah_multikey_3": 100,
+          "niah_multiquery": 100,
+          "niah_multivalue": 100,
+          "cwe": 100,
+          "fwe": 100,
+          "vt": 100
+        },
+        "avg": "59.38181818181818181818181818",
+        "source_data_sha256": {
+          "32768/niah_single_1": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+          "32768/niah_single_2": "26af960be2fdcf7c7907b7fd2a17c6bb44958381e90ccc50ad297770b51eaf79",
+          "32768/niah_single_3": "1e383c1b27269f8796650d37012b212c1d51124b3388bc8fce56c809698b7bc8",
+          "32768/niah_multikey_1": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "32768/niah_multikey_2": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+          "32768/niah_multikey_3": "d13f08fb05ac73aa062377c764c602d762d6b9d1e22092ec1e522596bfbb0a76",
+          "32768/niah_multiquery": "273bb35ea339defdee27055947a7ea78512877c0e1648c701225ef49fcc8e91c",
+          "32768/niah_multivalue": "1da24401a722c00618e4d4d1b72583620a331d0a4c7b6df384dad3974b0bd234",
+          "32768/cwe": "07fcda888ce6d9f834639abafa23c8fd726a352227432a26175bc3c3ff2e0051",
+          "32768/fwe": "23a8073809df38f32194cf5cfec6a311a286f4776af6771a3912b33010a65206",
+          "32768/vt": "f34626c7908480ea16c6e7c77decd51326e202014570b107156730ea6e69f4b7"
+        },
+        "repository_sources": {
+          "exp/trace/results/e116e_ruler32_formal_fullkv.json": "e1dbf2691bcaa97ffc0a9c689e7f7c69869b23e49927a474d476fe6e79058d9c",
+          "exp/trace/results/e116e_ruler32_formal_fullkv.json.manifest.json": "9bdb946c624d42f03c08add78a57963e5fd24dfbf6e1e1b1a3ef814b5b8394ae",
+          "exp/trace/results/e116e_ruler32_formal_fullkv.json.receipt.json": "89904937193ea8ed4d95e6831a2db358f9a803863d79ebe1349081e02d51a981"
+        },
+        "scorer": {
+          "script": "benchmark/RULER/score_ruler.py",
+          "sha256": "ea771d2f8e352114cb6009cd255a30583076fef9203e00b1afef8ad9c73adf99"
+        },
+        "formal": {
+          "script": "benchmark/RULER/score_ruler_formal.py",
+          "sha256": "c6b70a27601143c9faa8bd22218f3cf6a79ba2d47633cf17893db92665b88e43"
+        },
+        "identity_scope": "legacy-partial"
+      }
+    },
+    "scope": "Author-reported aggregates; native sparse arms recorded identities match but cross-machine/raw unreplayed. Historical dense reference legacy-partial/different scorer; no common rescore or noninferiority acceptance. Joint page and token quota changes, not isolated mechanisms."
   }
 }
