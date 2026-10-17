@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+source ../fonts/env.sh
 mkdir -p ../output ../qa ../texmf-var
 # Standard TeX Live installs need none of these fallbacks. The current
 # workspace contains TeX files but lacks a generated system filename DB.
 if [ -d /usr/share/texlive/texmf-dist ]; then
   export TEXINPUTS=".:/usr/share/texlive/texmf-dist/tex//:"
   export TFMFONTS="/usr/share/texlive/texmf-dist/fonts/tfm//:/usr/share/texmf/fonts/tfm//:"
-  export OPENTYPEFONTS="/usr/share/texmf/fonts/opentype//:/usr/share/fonts/opentype//:"
+  export OPENTYPEFONTS="${PAPER_FONT_DIR}//:/usr/share/texmf/fonts/opentype//:/usr/share/fonts/opentype//:"
   export ENCFONTS="/usr/share/texlive/texmf-dist/fonts/enc//:"
   export TEXFONTMAPS="/usr/share/texlive/texmf-dist/fonts/map//:"
   export T1FONTS="/usr/share/texlive/texmf-dist/fonts/type1//:/usr/share/fonts/type1//:"
   export FONTFEATURES="/usr/share/texlive/texmf-dist/fonts/fea//:"
   export TEXFONTMAPS="/usr/share/texlive/texmf-dist/fonts/map//:"
-  export TEXFONTS="/usr/share/texlive/texmf-dist/fonts//:/usr/share/texmf/fonts//:"
+  export TEXFONTS="${PAPER_FONT_DIR}//:/usr/share/texlive/texmf-dist/fonts//:/usr/share/texmf/fonts//:"
   export TEXMFCACHE="$(pwd)/../texmf-var"
   export XDG_CACHE_HOME="$(pwd)/../texmf-var/cache"
   export TEXMFVAR="$(pwd)/../texmf-var"

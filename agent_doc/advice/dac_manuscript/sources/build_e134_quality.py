@@ -1,12 +1,14 @@
+from paper_font_paths import cjk_regular, register_matplotlib
 from pathlib import Path
 import os,subprocess
 os.environ.setdefault("MPLCONFIGDIR","/tmp/dac_detail_mpl")
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+register_matplotlib()
 from matplotlib import font_manager
-font_manager.fontManager.addfont("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
-cjk=font_manager.FontProperties(fname="/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc").get_name()
+font_manager.fontManager.addfont(cjk_regular())
+cjk=font_manager.FontProperties(fname=cjk_regular()).get_name()
 p=Path(__file__).resolve().parents[1]/'figures'
 for lang in ['en','zh']:
  plt.rcParams.update({'font.family':'DejaVu Sans' if lang=='en' else cjk,'font.size':10,'pdf.fonttype':42,'svg.fonttype':'path'})
