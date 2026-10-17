@@ -1277,5 +1277,83 @@
       }
     },
     "scope": "Author-reported aggregates; native sparse arms recorded identities match but cross-machine/raw unreplayed. Historical dense reference legacy-partial/different scorer; no common rescore or noninferiority acceptance. Joint page and token quota changes, not isolated mechanisms."
+  },
+  "q2_expanded_far_page_author_report": {
+    "repository_commit": "0cc66de",
+    "arms": {
+      "expanded_far_pages": {
+        "reported_config": "L32768/tli_64_256_1024_c4_Aa0.25_b0.03125_g0.625_sk4_sw128_h9987847eb6",
+        "scores": {
+          "niah_single_1": 97.0,
+          "niah_single_2": 99.0,
+          "niah_single_3": 95.0,
+          "niah_multikey_1": 96.0,
+          "niah_multikey_2": 74.0,
+          "niah_multikey_3": 14.0,
+          "niah_multiquery": 24.5,
+          "niah_multivalue": 27.75,
+          "cwe": 79.8,
+          "fwe": 11.33,
+          "vt": 30.2
+        },
+        "n": {
+          "niah_single_1": 100,
+          "niah_single_2": 100,
+          "niah_single_3": 100,
+          "niah_multikey_1": 100,
+          "niah_multikey_2": 100,
+          "niah_multikey_3": 100,
+          "niah_multiquery": 100,
+          "niah_multivalue": 100,
+          "cwe": 100,
+          "fwe": 100,
+          "vt": 100
+        },
+        "avg": "58.96181818181818181818181818",
+        "repository_sources": {
+          "exp/trace/results/e147ef_r32k_formal.json": "563c977f65c92e2f5c9126ab2795f215c4e57f20d70c39ee37e6cdf1da3873d5",
+          "exp/trace/results/e147ef_r32k_formal.json.manifest.json": "86fca92d05871141dfc62962169b122e0cda7744a9bdecca69d14965356143b6",
+          "exp/trace/results/e147ef_r32k_formal.json.receipt.json": "8e1ee2019a1f64019968faf752d50b37677a7ec850613804e11df51532480c49"
+        }
+      },
+      "reference_sparse": {
+        "reported_config": "L32768/tli_64_128_1024_c4_Aa0.25_b0.0625_g0.625_sk4_sw128_h7451fdcd60",
+        "scores": {
+          "niah_single_1": 99.0,
+          "niah_single_2": 99.0,
+          "niah_single_3": 95.0,
+          "niah_multikey_1": 95.0,
+          "niah_multikey_2": 73.0,
+          "niah_multikey_3": 9.0,
+          "niah_multiquery": 24.5,
+          "niah_multivalue": 30.0,
+          "cwe": 75.9,
+          "fwe": 21.0,
+          "vt": 30.8
+        },
+        "n": {
+          "niah_single_1": 100,
+          "niah_single_2": 100,
+          "niah_single_3": 100,
+          "niah_multikey_1": 100,
+          "niah_multikey_2": 100,
+          "niah_multikey_3": 100,
+          "niah_multiquery": 100,
+          "niah_multivalue": 100,
+          "cwe": 100,
+          "fwe": 100,
+          "vt": 100
+        },
+        "avg": "59.29090909090909090909090909",
+        "repository_sources": {
+          "exp/trace/results/e147c_r32k_formal.json": "3eb3780fc50d540764f976a851969be752d92378dc3b158715751e3156063754",
+          "exp/trace/results/e147c_r32k_formal.json.manifest.json": "69eebbc755171d420a5ed295f0dfdd05cb9dcfdb64c53e8afc5cd112806ba79a",
+          "exp/trace/results/e147c_r32k_formal.json.receipt.json": "a445819bba1a04dfafb709cd78498c402b07d0860f8b0e3f6d52abb218227f02"
+        }
+      }
+    },
+    "primary_metric": "unweighted arithmetic AVG over same11tasks; task deltas diagnostic only",
+    "nominal_comparison": "near pages8 and near/far token quotas320/572; far pages120 to248; K1024/protection4/128",
+    "scope": "Reported source-data/scorer/producer/model-config identities match; original prediction JSONLs absent locally, no independent replay. Nominal design comparison only, no capacity-displacement cause, noninferiority or performance claim."
   }
 }
