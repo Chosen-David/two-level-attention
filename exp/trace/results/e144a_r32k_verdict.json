@@ -1,0 +1,97 @@
+{
+  "id": "e144a_r32k_verdict",
+  "date": "2026-10-17",
+  "title": "Llama-3.1-8B-Instruct RULER 32K 双臂：TLI mavg sink4 vs FullKV（#264 跨模型族 rotate_half GQA 验证）",
+  "config": {
+    "model": "Llama-3.1-8B-Instruct（4 shards，wys/.187 ~/models/llama31 md5 指纹一致 0ded936cf1a5677ca21dd48008424706）",
+    "tli": "tli_64_128_1024_c4_Aa0.25_b0.125_g0.625_sk4_sw128（主口径 mavg sink4/swa128，decode-only）",
+    "fullkv": "none（dense 锚）",
+    "context": "32K native 无 yarn；n=100×11 任务"
+  },
+  "results": {
+    "tli_avg": 86.1909,
+    "fullkv_avg": 85.4045,
+    "diff": 0.7864,
+    "per_task": {
+      "cwe": {
+        "tli": 65.3,
+        "fullkv": 71.1,
+        "diff": -5.8
+      },
+      "fwe": {
+        "tli": 69.0,
+        "fullkv": 74.0,
+        "diff": -5.0
+      },
+      "niah_multikey_1": {
+        "tli": 98.0,
+        "fullkv": 100.0,
+        "diff": -2.0
+      },
+      "niah_multikey_2": {
+        "tli": 92.0,
+        "fullkv": 87.0,
+        "diff": 5.0
+      },
+      "niah_multikey_3": {
+        "tli": 75.0,
+        "fullkv": 88.0,
+        "diff": -13.0
+      },
+      "niah_multiquery": {
+        "tli": 93.75,
+        "fullkv": 100.0,
+        "diff": -6.25
+      },
+      "niah_multivalue": {
+        "tli": 89.25,
+        "fullkv": 51.75,
+        "diff": 37.5
+      },
+      "niah_single_1": {
+        "tli": 98.0,
+        "fullkv": 95.0,
+        "diff": 3.0
+      },
+      "niah_single_2": {
+        "tli": 99.0,
+        "fullkv": 99.0,
+        "diff": 0.0
+      },
+      "niah_single_3": {
+        "tli": 100.0,
+        "fullkv": 100.0,
+        "diff": 0.0
+      },
+      "vt": {
+        "tli": 68.8,
+        "fullkv": 73.6,
+        "diff": -4.8
+      }
+    }
+  },
+  "interpretation": [
+    "TLI 86.19 vs FullKV 85.40（+0.79）：Llama GQA rotate_half 路径下主口径无崩溃、整体噪声级偏正——跨模型族扩展成立（Qwen3 与 Llama 双族 + DeepSeek MLA 三架构链）",
+    "逐任务最大项：multivalue TLI 89.25 vs FullKV 51.75（+37.5）——FullKV 锚自身塌陷（dense 应强于稀疏），疑 Llama greedy 跨机差或锚臂问题，须 caveat 披露不宜作 TLI 优势主张",
+    "其余掉点项：mk3 -13、mq -6.25、cwe -5.8、fwe -5.0、vt -4.8；single_1-3 满分带",
+    "结论强度：跨机两臂（TLI=wys GPU3、FullKV=.187 GPU4），单任务摆动不可控；均值 +0.79 在噪声带内"
+  ],
+  "sources": {
+    "tli": {
+      "e144a_r32k_tli_formal.json": "d5033ce63badf075eb6734fd490bde54cbf3a615e19df30e047d6ade249fd39b",
+      "e144a_r32k_tli_formal.json.manifest.json": "9c4510d45497a89b6e80c7f9c83dd3d723d4166a151a37256c032bef5f605044",
+      "e144a_r32k_tli_formal.json.receipt.json": "28f7b0037b733387bed026321c025bccf77fc7f164baeae5a522bbb47e94b19a"
+    },
+    "fullkv": {
+      "e144a_r32k_fullkv_formal.json": "805d8b33535b482f55e6ce83186f9b55056e49cf494f5fdc04b3abbf79c9ef48",
+      "e144a_r32k_fullkv_formal.json.manifest.json": "47aff23759e1758efe2a24f6a40626eb3bb9ff0d5cb6adef326c89fec5698625",
+      "e144a_r32k_fullkv_formal.json.receipt.json": "2c3500f63b92f62bc63770078b354ed6ebc0ed7d6c78294a6f1beee71f175e0a"
+    }
+  },
+  "caveats": [
+    "跨机两臂（TLI=wys、FullKV=.187），模型文件 md5 一致但运行环境/时段不同",
+    "FullKV multivalue 51.75 异常低（Llama dense 锚），若复查确认锚臂问题需补锚重跑",
+    "无同机配对复制臂；结论为描述性"
+  ],
+  "generated_at": "2026-10-17T17:58:36.701598"
+}
