@@ -156,3 +156,7 @@ Version: 2306.14048v3; accessed 2026-10-15. [Source](https://arxiv.org/abs/2306.
 License: arXiv nonexclusive-distrib. Status: link-only. Repository redistribution rights not verified; official link only, no PDF copied.
 
 Local filename, SHA-256, byte size and page count: unknown/null; no PDF included in this update. Copyright remains with the authors/rightsholders; no repository code license applies to the paper.
+
+## AsyncTLS / FFD (2026-10-17)
+
+The papers are separately licensed CC BY 4.0 by their authors; see papers.json for full attribution, fixed arXiv versions, license evidence and hashes. AsyncTLS.pdf is reused unchanged from this repository. FFD remains link-only pending original bytes (HTTP403); no FFD PDF is claimed included. The official FFD code has its separate Apache-2.0 LICENSE in exp/vendor_baselines/ffd_vendor, unaffected by these paper licenses.

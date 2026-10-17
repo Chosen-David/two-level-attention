@@ -37,3 +37,8 @@ H2O始终仅链接。后续取得原件须核PDF文件头、作者/版本、逐�
 旧下载拒绝保留为历史，没有重试或绕过拒绝；资料包ZIP的声明hash仍未本地核验，
 不作为此次三份PDF的字节证据。完整逐文件证据见papers.json和NOTICE。
 H2O继续仅官方链接。此次不改代码、运行GPU或合main。
+
+## 2026-10-17 AsyncTLS / FFD
+
+- AsyncTLS: [existing original PDF](AsyncTLS.pdf), arXiv2604.07815v1, 11 pages, CC BY 4.0; reused unchanged, metadata/hash now indexed. No author implementation identified in checked paper and public search.
+- FFD: [official PDF](https://arxiv.org/pdf/2609.00097v1), CC BY 4.0; download HTTP403, original bytes still missing. [Official code](https://github.com/qluoluo/faster-flash-decoding) is already vendored at ca09458ab1536328e5f46502b27891412733cd6d under Apache-2.0; Llama support does not establish Qwen support.
