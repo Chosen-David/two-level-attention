@@ -24,7 +24,8 @@
     "Resolve and hash target CUDA wheel and complete transitive environment lock on authorized host",
     "Verify driver/CUDA variant and Triton compiler compatibility",
     "Require frozen basis provenance with checkpoint/tokenizer/data/producer and identical effective calibration/serving RoPE; upstream basis M alone is insufficient",
-    "HF flash-attn default calibration dependency/version/build unresolved; SDPA would be an explicit alternative",
+    "Validate FA2 implementation: flash-attn or documented optional HF kernels route; neither dependency is specified upstream, implementation/version/build unresolved; SDPA would be an explicit alternative",
+    "Compare explicit model path identity with config model_type and effective RoPE: upstream qwen3 substring dispatch can misclassify bare snapshots or omit YaRN",
     "No GPU numerical or benchmark acceptance; no project runtime adapter"
   ]
 }

@@ -27,6 +27,9 @@ class PackageTests(unittest.TestCase):
         data=json.loads(result.stdout)
         self.assertFalse(data['gpu_initialized']);self.assertFalse(data['installation_started'])
         self.assertFalse(data['execution_ready']);self.assertFalse(data['dependency_lock_complete'])
+        blockers=' '.join(data['blockers'])
+        for requirement in ('flash-attn','HF kernels','model_type','model path identity','effective RoPE'):
+            self.assertIn(requirement,blockers)
         bad=subprocess.run(['bash',str(ROOT/'environment/provision.sh'),'--install'],capture_output=True)
         self.assertEqual(bad.returncode,2)
     def test_original_basis_cpu_spectral_optimum(self):

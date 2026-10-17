@@ -8,6 +8,8 @@ Acceptance: official fixed identities, source-byte/patch integrity, truthful inc
 
 - Upstream18 tracked files preserved byte-for-byte at34ce5abd; requiredvLLM39910f2 is distinct. MIT and Apache2 licenses retained. No existing JSSA project route found; archive does not register one.
 - Source-lock binds sources/known constraints only. Upstream provides no complete lock; CUDA wheel and transitive dependency hashes unresolved. Offline check/recipe executes no pip/network/GPU operation.
-- Explicit blocks: effective calibration/serving RoPE mismatch risk for Qwen3, missing defaultHFflash-attn version/build, driver/Triton/compiler compatibility and no GPU acceptance. SeparatePython3.12 env; existing4.57 env unchanged.
+- Explicit blocks: effective calibration/serving RoPE mismatch risk for Qwen3, unresolved default FA2 implementation/version/build (flash-attn or optional HF kernels route), driver/Triton/compiler compatibility and no GPU acceptance. SeparatePython3.12 env; existing4.57 env unchanged.
 - PDF officialoriginalbyte downloads return403; browser32page reading does not supply local binary. Main metadata link-only/nullhash; archive completion remains open.
 - Validation/evidence: `agent_doc/results/jssa-package-20261017/`; source/environment handoff: `exp/vendor_baselines/jssa_vendor/README.md`.
+
+- Precision follow-up: documented model-path substring dispatch versus config model_type/effectiveRoPE, actual mixed-batch row routing, and GQA power-of-two gather-free eligibility. Offline plan continues execution_ready=false; upstream unchanged.
