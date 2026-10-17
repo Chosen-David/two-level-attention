@@ -1,0 +1,36 @@
+{
+  "task": "TL-ASYNC-FFD-20261017",
+  "base_main": "7a7ebc82b6ba29cce215e28557ee7cbf03f939c3",
+  "environment": "CPU torch2.14.1+cpu transformers4.57.1",
+  "scope": "component tensor and tiny-Qwen CPU correctness; FFD host doubles only",
+  "tests": {
+    "component_normal": 4,
+    "component_optimized": 4,
+    "ffd_normal": 6,
+    "ffd_optimized": 6
+  },
+  "inherited_main_failures": "unchanged main3628501: 15 baseline tests, 1 failure+2 errors, SparQ receipt metadata absent",
+  "files": {
+    "sparse_attn/asynctls_component.py": "584e9e8f4f87e02ebc2c89c0aeb5061f6d5f877e652cdb13a24b1d954ef81630",
+    "sparse_attn/baseline_runtime.py": "5318d4e99cdc68d5d25a2ad137eb989e0326830411cf4d305c13bf3f78262e6e",
+    "tests/test_asynctls_component.py": "664ddeedcfd65dc1638cf47c1375449e65df7d7e8179fec8c66e638bbb8ff339",
+    "tests/test_baseline_integration.py": "0aa2dbedc7bbc39133e3f67fc835eaaeeab627d5b3a01984429a0ac36aca36cc",
+    "benchmark/LongBench/pred.py": "3c82f0c2aa5ff50748e450aa2f81cc1471102c706bbf79b3a955c615c688fe65",
+    "benchmark/RULER/pred_ruler.py": "bf31e8a1db333f317754d875c667195b35237618421060c8ff7b2b6540c51942",
+    "sparse_attn/arguments.py": "1c78d79c37df72bc93310f2788298e5f73ab8fe1be6fdc6eb791203e77a0e6e0",
+    "sparse_attn/info.py": "c3644e7d0df9cdba8d3b8bbd63b21ef22db2c04fd80366628bfe647c03a6e1de"
+  },
+  "status": "usable-with-scope",
+  "unverified": [
+    "pretrained quality",
+    "real calibration",
+    "CUDA kernels/performance",
+    "full AsyncTLS system"
+  ],
+  "ci": "No tracked .github/workflows; no remote CI result claimed",
+  "independent_review": {
+    "owner": "/root/independent_review",
+    "result": "no remaining blocking findings; independently reran component normal/-O 4+4 and FFD 6+6",
+    "scope": "component tensor and tiny-Qwen CPU correctness; FFD host doubles only"
+  }
+}

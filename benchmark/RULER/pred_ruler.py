@@ -210,6 +210,9 @@ def main():
     # 1024，派单时按 Quest 论文口径显式传 --quest_token_budget）。
     if args.method == "ffd_vendor":
         n_patched = model.config.num_hidden_layers
+    elif args.method == 'asynctls_component':
+        from sparse_attn.asynctls_component import enable_component
+        n_patched = enable_component(model, args)
     elif args.method == "quest_vendor":
         vendor_dir = os.path.join(
             REPO, "exp", "vendor_baselines", "quest_vendor")

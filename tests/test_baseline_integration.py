@@ -158,6 +158,20 @@ class BaselineTests(unittest.TestCase):
             with baseline_request(model): model(input_ids=torch.ones(1,128))
         model.config.attn_settings['pattern_layers']=[]
         with self.assertRaises(ValueError): model(input_ids=torch.ones(1,128))
+    def test_ffd_append_positions_and_mask_before_update(self):
+        model=self.ffd();cache=model(input_ids=torch.ones(1,128)).past_key_values
+        bad=[{'cache_position':torch.tensor([0])}, {'cache_position':torch.tensor([128.])},
+             {'cache_position':torch.tensor([[128]])}, {'position_ids':torch.tensor([[0]])},
+             {'position_ids':torch.tensor([128])}, {'attention_mask':torch.ones(1,128)},
+             {'attention_mask':torch.ones(2,129)}, {'attention_mask':[1]*129}]
+        for extra in bad:
+            before=dict(model.stats)
+            with self.assertRaises(ValueError):model(input_ids=torch.ones(1,1),past_key_values=cache,**extra)
+            self.assertEqual(cache.get_seq_length(),128)
+            self.assertEqual(model.stats,before)
+        model(input_ids=torch.ones(1,1),past_key_values=cache,cache_position=torch.tensor([128]),
+              position_ids=torch.tensor([[128]]),attention_mask=torch.ones(1,129))
+        self.assertEqual(cache.get_seq_length(),129)
     def tiny(self):
         c=Qwen3Config(vocab_size=32,hidden_size=32,intermediate_size=64,num_hidden_layers=2,
                       num_attention_heads=4,num_key_value_heads=2,head_dim=8)

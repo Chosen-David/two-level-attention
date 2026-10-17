@@ -30,3 +30,10 @@
 - **跑批脚本/日志/ledger/mass 分片** → `exp/trace_archives/`（e98/e100/e101/e103/e104/e87/e89/m6/tli_chain/e135 + MANIFEST.md + md5 清单）
 - **trace dump（68GB）** → 本机 `~/.archive/trace-dumps/{qwen3-8b,qwen3-30b,qwen3-32b}`（不入 git，md5 见 exp/trace_archives/trace_dumps_md5/）
 - 查 raw 数据时先读 `exp/trace_archives/MANIFEST.md`（资产→原 /tmp 路径→去向→支撑论文数字）
+
+## AsyncTLS / FFD bounded candidates (2026-10-17)
+
+- `sparse_attn/asynctls_component.py`: paper-derived synchronous §4.1 Qwen3 component; frozen held-out calibration/checkpoint/effective-RoPE identity; no full AsyncTLS offload system. Both benchmark loaders use `asynctls_component` explicitly.
+- `exp/vendor_baselines/ffd_runtime_requirements.txt`: separate environment specification for untouched official Llama FFD vendor; upstream editable metadata is malformed.
+- `tests/test_asynctls_component.py`: CPU scalar selection oracle, actual tiny-Qwen wiring and contract tests; no real-model quality claim.
+- `agent_doc/results/asynctls-ffd-20261017/`: CPU normal/-O logs plus inherited main SparQ failures; scope in matching advice/task detail.

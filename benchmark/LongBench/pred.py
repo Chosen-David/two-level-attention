@@ -515,7 +515,10 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
     # 防止静默跑 dense 却把输出文件打上稀疏方法标签。
     # 081（TL-E121-OUTPUT-SNAPSHOT-081）：snapshot 透传给每个 attention
     # 层的 TLIIndexer（共享同一冻结对象，不按层重开文件）。
-    if args.method == "quest_vendor":
+    if args.method == 'asynctls_component':
+        from sparse_attn.asynctls_component import enable_component
+        n_patched = enable_component(model, args)
+    elif args.method == "quest_vendor":
         # B 轨 vendor（官方源码复用）：不走 indexer_type_dict（A 轨
         # quest_indexer 是语义复现），改为把官方 Quest forward 原样绑定
         # Qwen3Attention——quest_attention_official.py 与官方仓库逐字节

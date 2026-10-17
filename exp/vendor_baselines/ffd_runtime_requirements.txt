@@ -1,0 +1,13 @@
+# Explicit environment requirements for pinned official FFD source ca09458a.
+# Do NOT rely on its malformed project.urls.dependencies or pip install -e .
+# Provision only in a separately authorized CUDA >=12.8 environment.
+# Upstream source/license remain untouched. No environment installation performed.
+torch==2.8.0
+triton==3.4.0
+transformers==4.57.3
+flash-attn==2.8.3
+numpy>=1.26
+sentencepiece>=0.2.1
+safetensors>=0.7.0
+# Local HF device_map='auto' adapter requirement (not pinned by upstream):
+accelerate>=0.26.0

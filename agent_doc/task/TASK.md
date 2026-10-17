@@ -115,3 +115,7 @@
 
 - [x] [TL-OBS-PLOT-CORRECTNESS-20261016] 有界修复整箱预算、真实区域、有限配对分母和E6证据标注；CPU独审后仅推原dev。合并裁决（Opus 2026-10-17）：O 图系列保留 main 出版版渲染器（e021281 四带呈现 + e5f5b7e 统计修正已吸收 whole-bin 预算/区域归属修正），GPT 诊断版渲染器与 validity v4 降级主张未采纳——(a)(b)(c)(d) 限定手稿 caption 已如实披露（mass-rank 参考、whole-bin 预算、gate 默认关闭）；诊断资产 O_observation_diagnostic.json 与 record_provenance.py 保留入库。
   ([详情](task_details/TL-OBS-PLOT-CORRECTNESS-20261016.md))
+
+## 2026-10-17
+
+- [ ] [TL-ASYNC-FFD-20261017] AsyncTLS/FFD paper sources and bounded baseline integration; FFD original PDF/calibration/real-model acceptance remain blocked. ([详情](task_details/TL-ASYNC-FFD-20261017.md))

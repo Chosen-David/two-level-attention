@@ -805,6 +805,11 @@ def _minference_cfg_sha8(args):
 def get_method_name_with_info(args, snapshot=None):
     # 081：snapshot 提供时 tli 名的 _h<hash10> 段从冻结 manifest_json
     # 派生（与 sidecar/receipt 同源）；非 tli 分支不消费 snapshot。
+    if args.method == 'asynctls_component':
+        from sparse_attn.asynctls_component import frozen_spec
+        _, identity = frozen_spec(args)
+        digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:16]
+        return f'asynctls_component_sync_{digest}'
     if args.method == "ffd_vendor":
         from sparse_attn.baseline_runtime import ffd_identity
         identity = ffd_identity(args)
