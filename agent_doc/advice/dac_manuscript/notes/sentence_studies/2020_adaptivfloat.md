@@ -175,6 +175,41 @@
 - e50d061「bound reported 32B task-quality comparison」：第 14 轮登记待议的 E144a 32B 比较由远端整合进 Q2（AVG 50.64 vs 52.22、-1.58 分、Multi-key-2 +11 / CWE -8.80 / FWE -7.33 逐任务解释、双臂零分共同失败披露、跨机器执行与未重放披露、「neither isolates... nor establishes」收口）——**采纳**：数字配对+方向+诚实边界完整，正是第 14 轮登记的内容级决策，远端已完成。同时 `\newpage` 改为自然续排。
 - 2ff5457「make fixed-task AVG the primary quality metric」：Metrics 段重写为 AVG 主指标定义（"Per-task gains and losses explain AVG; zero loss on every task is not required"——容忍逐任务增减、只锚 AVG 的口径声明）——**采纳**：与 E 系列实验口径一致，define-before-use 完整。
 
+---
+
+## §6 Hardware Evaluation + §7 Conclusion（第 16 轮，2026-10-18）—— 本篇收官
+
+### §6.1 setup（~5 句）
+句链：**负载-架构匹配理由句**（"targeted for RNN and FC sequence-to-sequence networks **where we have seen wider parameter distributions** compared to convolution networks"——硬件评估负载的选择理由回扣 §1 图 1 的分布发现，跨节闭环）→ 规格句（4 PEs + GB + crossbar）→ **设计工具链披露句**（SystemC + MatchLib + Catapult HLS，"constraints uniformly set **with the goal to achieve maximum throughput**"）→ **公平比较声明句**（"**For fair comparison**, the two designs employ the same evaluation methodology"——方法论级公平，非仅参数对齐）。
+
+### §6.2 EPA 分析（~6 句 + 图 7 + 表 4）
+句链：变量定义句（K = MAC lanes = 并行度）→ 图结论句带方向修饰（"larger vector sizes and operand bit widths **benefits more the HFINT PE than the INT PE** in terms of energy efficiency"）→ **精确范围句**（"from 4-bit operands and vector size of 4 — to 8-bit operands and vector size of 16, the per-operation energy... is 0.97× to 0.90× that of the INT PE"——范围双端点显式给出）→ **机制归因句**（"**stems from the fact that** its vector MACs contain smaller mantissa multipliers and exponent adders that consume less overall power than the full bitwidth multipliers"）→ **On-the-other-hand 对手赢句**（"the INT PEs exhibit 1.04× to 1.21× **higher** performance per unit area... due to its more compact and homogeneous logic"——对手的赢面照报+归因）→ 表 4 句带 **confirming 回收句**（"confirming the efficiency trends reported in Figure 7"——表与图交叉验证收口）。
+
+### §7 Conclusion（3 句）
+句链：方法重申句（与摘要 A2 同构，无新信息）→ 结果句（PE 能效主张）→ **Altogether 收口句**（"offers a **tangible** accuracy and energy advantage"——tangible 而非 vague "significant"，收口词克制）。结论零新信息零新数字，全部回收正文。
+
+### 对照我们手稿的差距结论
+| AdaptivFloat §6/§7 句式 | 我们的状态 |
+|---|---|
+| 负载-架构匹配理由句（跨节闭环） | Q2 的 128K/32K RULER 负载与 Intro 基准引用句闭环，达标 |
+| 公平比较声明句（methodology 级） | Metrics 段 "Controlled comparisons require matched models, samples, lengths, scorers..." 需求式对等，达标 |
+| 精确范围句（0.97× to 0.90× 双端点） | Q3 "ratios are 3.38, 2.46 and 1.78" 三端点全列，达标 |
+| 机制归因句（stems from the fact that） | 显式不可归因口径（cannot locate the cause），诚实镜像，达标 |
+| **On-the-other-hand 对手赢句** | Q3 Model-level 段 "Although the relative penalty decreases with length" 是己方部分缓和；**32B 比较段 Multi-key-2 improves by 11 points（稀疏臂赢的任务）与 CWE/FWE 下降并排**——对手/己方赢面双向已齐（e50d061 已完成），达标 |
+| confirming 交叉验证收口句 | 我们的图/表互证结构（fig:fullkv-quality 与 Q2 正文数字一致）已隐含，达标 |
+| 结论克制收口词（tangible） | "the available separate studies do not yet establish that benefit"——比 tangible 更克制，诚实边界要求，达标 |
+
+**对照结论**：§6/§7 的句式在我们稿中均有诚实对等物或已被远端最新整合补齐（32B 双向赢面、8B β 对比）。**本轮无强实缺**——诚实边界下唯一可做的是收尾性微修：摘要尾句（e4c74f7 新版）"Establishing benefit for the compact 4/128-protection design still requires matched quality and complete-request cost, including preparation." 中 "including preparation" 是悬垂分词修饰（修饰对象在语义上是 cost 的组成，语法上可读作修饰 quality），压缩为前置形容词消除歧义。
+
+### 本轮修改（第 16 轮）
+- paper_en.tex 摘要尾句："...matched quality and complete-request cost, including preparation." → "...matched quality and preparation-inclusive complete-request cost."（消除悬垂分词；词数不变，版式零余量须核对页数）。
+- paper_zh.tex 直译同步。
+
+### 远端裁决记录（第 16 轮开始前）
+- 242c821「add bounded 8B allocation evidence」：Q2 整合 E147c β 对比（58.30→59.29、页 16/112→8/120、词元 640/252→320/572、CWE +7.1 / mk1 -3、0.09 差距对 59.38 历史参照、descriptive not non-inferiority 收口）——**采纳**：数字配对+方向+机制不隔离披露齐全（AdaptivFloat A4 式双数字+诚实限定）。首句改 claim-first "Regional reservation changes candidate access unevenly"。
+- e4c74f7「summarize full-task evidence in bilingual abstract」：摘要重写为三组实测数字证据版（58.30/59.29、50.64 vs 52.22）+边界句——**采纳**：Token-Picker/DREAMPlace 头牌数字摘要范式，诚实边界句完整。
+- 933edcd：E147 系列实验判决修正（advice 文档，不动 tex）。
+
 ### 远端裁决记录（第 14 轮开始前）
 - c99315c-1（Related Work P1，删除我第 7 轮 However 句）：改为「SparQ also protects a recent-token window, while HISA forces the first and last blocks into its coarse candidate set」+「separate nominal near--far L1 page quotas. These page quotas do not by themselves guarantee final far-token capacity」。**采纳**——我的「without guaranteed minimum capacity for either region」是过度概括：SparQ 近期窗口就是近区保底、HISA 首尾块强制也是区域保底，事实不成立；远端版给前作细粒度功劳后把我们的贡献精确为页级名义配额，credit-then-gap 更准确。
 - c99315c-2（β 方向句）：我的「enlarges... and shrinks...」→「**cannot reduce** the nominal near-page quota or **increase** the far-page quota; rounding can leave both unchanged」。**采纳**——round 非严格单调，「enlarges/shrinks」是数学错误；「cannot reduce/increase」才是可证方向。第 11 轮判例第二次验证：方向句必须定理级。

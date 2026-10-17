@@ -21,13 +21,22 @@
 |---|---|---|---|
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
-| 3 | 2020_AdaptivFloat.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓ §4 ✓ §5 ✓；待：§6 硬件评估 | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ |
+| 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
 | 4 | 2021_Gemmini.pdf | 未开始 | — |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 16 轮（2026-10-18，AdaptivFloat §6 Hardware Evaluation + §7 Conclusion —— 第 3 篇拆解完毕）
+- **远端裁决**（fetch 发现 242c821/e4c74f7，本地已同步）：(1) 242c821 把 8B β 分配比较（β.125→.0625，AVG 58.30→59.29，页/词元配额 16/112→8/120、640/252→320/572 同报）整合进 Q2——**采纳**，完整披露「比较不能隔离页与词元分配作用」+ 非劣性边界；(2) e4c74f7 摘要重写为三实测数字证据版（58.30/59.29 + 50.64/52.22）——**采纳**，Token-Picker 头牌数字句范式的诚实镜像。
+- 拆解笔记：§6+§7 部分（setup：负载-架构匹配理由句闭环 §1 Figure 1/公平比较声明句（"the two designs employ the same evaluation methodology"）；结果：**精确区间句**（"0.97× to 0.90×" 双端点）/**stems from the fact that 机制归因句**/On-the-other-hand 竞争者胜出句/**证实性交叉验证收口句**；结论：**tangible 节制词收口**——量化收益用 tangible 限定而非形容词堆砌）。
+- 对照结论：公平比较声明（Metrics 段"受控比较须匹配……"已对等）、精确区间（TPOT 比值 3.38/2.46/1.78 序列同构）、交叉验证收口（诚实边界禁造新验证）。**唯一实缺 = 摘要尾句悬垂分词**："matched quality and complete-request cost, including preparation" 中 "including preparation" 语法上可挂到 "quality" 而非预期的 "cost"。
+- paper_en.tex 摘要尾句：改 "matched quality and preparation-inclusive complete-request cost"（消除歧义，词数不变）。
+- paper_zh.tex 直译同步（「含准备开销的完整请求成本」）。
+- 版式核对：en 6 / zh 6 页保持，0 未定义引用。
+- **AdaptivFloat 七节全部拆解完毕**（第 11-16 轮），累计手稿修改 6 处（机制归因→远端收敛、动词异质化、appeal 句、β 方向句→远端定理级、类型跨度、记号绑定、悬垂分词），en/zh 同步。下轮开始第 4 篇 **2021_Gemmini.pdf**（Abstract+Intro）。
 
 ### 第 15 轮（2026-10-17 23:0x，AdaptivFloat §5 PE Architecture）
 - **远端裁决**（fetch 发现 2ff5457/e50d061/ff5ea05，本地已同步）：(1) e50d061 把第 14 轮登记待议的 E144a 32B 比较整合进 Q2（AVG 50.64 vs 52.22 / -1.58 分 / 逐任务方向 +11、-8.80、-7.33 / 双臂零分披露 / 跨机器与未重放披露 / neither-isolates-nor-establishes 收口）——**采纳**，第 14 轮登记的内容级决策已由远端完成且边界完整；`\newpage` 改自然续排；(2) 2ff5457 Metrics 段重写为 AVG 主指标口径（"Per-task gains and losses explain AVG; zero loss on every task is not required"）——**采纳**，与 E 系列实验口径一致。
