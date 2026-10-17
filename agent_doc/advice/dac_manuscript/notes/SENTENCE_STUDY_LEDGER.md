@@ -22,12 +22,21 @@
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
-| 4 | 2021_Gemmini.pdf | Abstract ✓ Intro ✓；待：§2 背景动机 | Intro-P5 Q1/Q2/Q3 前向指针 ✓ |
+| 4 | 2021_Gemmini.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3 生成器 | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓ |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 18 轮（2026-10-18，Gemmini §2 Background and Motivation）
+- 远端检查：fetch 无新提交，本地 = origin/main（afbcde3 已合并含我第 17 轮提交；e1d584e 门控段 AVG 口径对齐、c84b5e9 Q2 β/K1=256 比较均已提交，工作区干净，无需裁决——内容与第 16 轮已采纳方向同源且边界完整）。
+- 拆解笔记：§2 部分（开篇：路线图句带结论（roadmap 自带 motivating-the-need 结论）+ **Table I 特性对比矩阵**（8 生成器×三层特性打勾矩阵+表指针句）；§2.A：双层 to 手段-目的链+**分类句带双 exemplar**（TPU systolic / Brainwave+NVDLA vector）+Based-on-these-templates 前沿承接句；§2.B：**类别对比句**（实例 vs 生成器+improving 分词收益）+Here-we-discuss 三轴预告句+**三段同构需求模板**（must-provide 需求句→Most-today 局限句→making-it-challenging 评价困难后果→**In-contrast 编号能力句每项挂 enabling 从句**）+**双 persona 句对各挂点名前作**+first-infrastructure 声明句+**77% 行业证据句带 even-in-presence-of 让步与双归因**+Motivated-by-this-observation 回收句）。
+- 对照结论：路线图句（claim-first opener 等价）、Table I（版式零余量+前作特性不可诚实补全，不可行）、类别对比句（无诚实类别对立）、persona/首创声明/行业数字（诚实边界不可用——AsyncTLS-already-combines 是首创声明的诚实镜像）、评价困难后果（nominal labels 句已有）、Motivated-by 回收句（Intro P4 已有）均不改。**唯一实缺 = Related Work 定位句缺 enabling 从句**（Gemmini 编号能力句每项带 to-handle/enabling 目的；且 Stage-4 集成检查项「页/词元关键抽象传播到 Related Work positioning」断裂——"page and token access are separate constraints" 只在 §III-B/Q2/结论出现）。
+- paper_en.tex Related Work P1 定位句：句尾加 `, which keep page and token access separate.`（定义级事实＝§III-B 定理句，无新数字；为紧随其后的配额不保证句提供铺垫）。
+- paper_zh.tex 直译同步（「……结合，使页访问与词元访问保持相互独立。」）。
+- 版式核对：en 6 / zh 6 页保持，0 未定义引用。
+- 待后续轮次：Gemmini §3 生成器（两级阵列微架构/数据流句式）、§4 评估、§5 案例研究。
 
 ### 第 17 轮（2026-10-18，Gemmini Abstract + Introduction —— 第 4 篇开始）
 - 远端检查：无新提交；工作区干净（结论节 β 比较版已由 6490873/ba930db 等提交纳入，无需裁决——内容与第 16 轮已采纳的 242c821/e4c74f7 同源）。

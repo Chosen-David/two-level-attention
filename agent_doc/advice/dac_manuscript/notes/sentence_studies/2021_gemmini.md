@@ -45,3 +45,41 @@
 - paper_en.tex Intro P5：`The evaluation examines task quality, regional coverage and execution cost.` → `The evaluation examines task quality (Q1), regional coverage (Q2) and execution cost (Q3).`
 - paper_zh.tex 直译同步（「评估考察任务质量（Q1）、区域覆盖（Q2）与执行成本（Q3）。」）。
 - 版式零余量：+6 字符级改动，编译后核对 en 6 页。
+
+---
+
+## §2 Background and Motivation（第 18 轮，2026-10-18）
+
+### §2 开篇（2 句 + Table I）
+- 需求-语境句（"The demand ... has led to a significant effort in developing novel accelerator instances"——需求→努力归因，与前作聚类）。
+- **路线图句带结论**（"This section discusses recent advances ..., **motivating the need for a full-stack approach** to evaluate ..."——roadmap 句自带本节结论而非空导航）。
+- **Table I 特性对比矩阵**：8 个生成器 × 硬件/编程/系统三层特性（打勾矩阵 + Gemmini 末列）+ **表指针句**（"Table I compares the different features supported by existing hardware generators compared to Gemmini"）。定位证据从 prose 升级为可扫读矩阵。
+
+### §2.A DNN Accelerators（5 句，纯铺垫小节）
+- 多样性句带引用簇 [1],[12]–[14] → **At-the-architecture-level 手段-目的链**（exploit reuse patterns **to build** hierarchies/interconnects **to improve** performance/efficiency——双层 to 不定式链）。
+- **分类句带双 exemplar**（"largely spatial, where ... either in a systolic fashion, **as in the case of** the TPU, or in parallel vector units **like** Brainwave and NVDLA"——分类树每个分支挂点名实例）。
+- **Based-on-these-templates 承接句**（从既有模板接到前沿方向：sparsity 与 in-memory computing——分类节自身的前进方向句）。
+
+### §2.B DNN Accelerator Generators（三段需求论证——本节最值得学的结构）
+- 开篇 4 句：Recent-research 句 → 表指针句 → **类别对比句**（"In contrast to building specific instances of hardware, generator-based approaches provide parameterizable templates ..., **improving hardware design productivity**"——实例 vs 生成器的类别级定位 + improving 分词收益）→ **Here-we-discuss 三轴预告句**（hardware/software/system 三需求轴预告，为下文三段提供骨架）。
+- **需求段模板**（三段同构，以段1为例）：must-provide 需求句带 to-cover 目的 → **Most-today 现状局限句**（"today focus only on fixed-point and/or only support a single dataflow"）→ In-addition 第二局限 + **making-it-challenging 后果分词**（后果是评价困难「systematically compare」而非性能差——回扣 A1 评价缺口）→ **In-contrast 编号能力句**（"Gemmini supports 1) ... **to handle** ..., 2) ..., 3) ..., **enabling** quantitative comparison ..., and 4) ..."——每项能力挂 to-handle/enabling 目的从句）。
+- 需求段2（编程接口）：Moreover need 句带 **so-that 目的** → Different-developers 偏好声明句 → **For-example 双 persona 句对**（practitioners 要框架隐藏硬件，as in VTA/DNNWeaver / At-the-same-time 系统程序员要 C/asm 低级控制，as in MAGNet/Maeri——两类用户各挂点名前作）→ Unlike-one-requirement Unlike 句 → **first-infrastructure 首创声明句**（"the first infrastructure that provides hardware support for virtual memory without ... driver software, **making it significantly easier** ..."）。
+- 需求段3（系统集成）：Third critical 句 → Today's isolated 句 → However 部署现实句 → **In fact 77% 行业证据句带双机制**（"spend as much as 77% of their time running on CPUs, **even in the presence of** a hardware accelerator, to execute either new operators **or** to move data ..."——量化 + 让步嵌入 + 双归因枚举）→ However-unfortunately none-support 缺口句 → **Motivated-by-this-observation 回收句**（77% 观察直接成为设计动机，"directly enabling architects to evaluate subtle trade-offs"——证据→设计→评价能力闭环）。
+
+### 对照我们手稿的差距结论（Related Work / Intro / §III-B 遍历）
+| Gemmini §2 句式 | 我们的状态 |
+|---|---|
+| 路线图句带结论 | 我们各节 opener 均 claim-first（直接下结论），等价且更优，不改 |
+| Table I 对比矩阵 | 不可行：版式零余量容不下表格 + 前作特性事实不可诚实补全（我们只有文献级机制描述）；tab:settings 承担自我披露职责 |
+| 类别对比句（实例 vs 生成器） | 无诚实可用的类别级对立（领域内方法均逐一引用），不加 |
+| **编号能力句的 enabling 从句**（每项能力挂 to-handle/enabling 目的） | **本轮实缺**：Related Work 定位句 "We study these existing components with ... shared across both stages and separate nominal near--far L1 page quotas." 两项控制均无目的从句。配额的诚实定义级后果（页访问与词元访问是分离约束）已在 §III-B（"page and token access are separate constraints"），但**关键抽象未传播到 Related Work 定位句**——Stage-4 集成检查项「Key abstraction propagation: Intro Move-3 概念须出现在 Related Work positioning」断裂 |
+| 双 persona 句对 / first-infrastructure 声明 / 77% 行业证据 | 诚实边界不可用（无用户画像、不可 claim 首创——AsyncTLS already combines 是我们的诚实镜像、无外部行业数字可引），不加 |
+| making-it-challenging 评价困难后果 | 诚实镜像已有（"nominal labels without treating the runs as controlled single-stage ablations"），不改 |
+| Motivated-by-this-observation 回收句 | 已有（Intro P4 "These observations lead to a cascade with two explicit controls"），不改 |
+| At-the-architecture-level 双 to 手段-目的链 / 分类句带 exemplar | Intro P2 双目标句与评分目标分类已有等价物（exemplar 归属不可诚实补全），不改 |
+
+### 本轮修改（第 18 轮）
+- paper_en.tex Related Work P1 定位句：`We study these existing components with complete low-frequency RoPE pairs shared across both stages and separate nominal near--far L1 page quotas.` → 句尾加 `, which keep page and token access separate.`（Gemmini 编号能力句的 enabling 从句压缩形；定义级事实＝§III-B 既有定理句 "page and token access are separate constraints"，无新数字；同时补齐页/词元关键抽象向 Related Work 定位句的传播链，且为紧随其后的 "These page quotas do not by themselves guarantee final far-token capacity" 诚实句提供铺垫）。
+- paper_zh.tex 直译同步（「……结合，使页访问与词元访问保持相互独立。」）。
+- 版式零余量：+8 词，编译后核对 en 6 页。
+
