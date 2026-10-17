@@ -1,7 +1,7 @@
 {
   "id": "e146ca_series_verdict",
   "date": "2026-10-17",
-  "title": "RULER aavg(0,0) 单池臂 32K/64K formal 打分与 mavg 两级主口径同档对比（面板 G）",
+  "title": "RULER aavg(0,0) 单池臂 32K/64K/128K 三档 formal 打分与 mavg 两级主口径同档对比（面板 G，三档齐）",
   "config": {
     "method": "tli_64_128_1024_c4_Aa0_b0_g0_sk4_sw128 (aavg 单池, alpha=0 beta=0)",
     "sink": 4,
@@ -36,13 +36,30 @@
         "mk1": -7.0,
         "single_2": -4.0
       }
+    },
+    "ruler_128k": {
+      "aavg_avg": 39.2527,
+      "mavg_avg_e146c": 46.02,
+      "diff": -6.7673,
+      "machine": "aavg=.187 GPU6/7（yarn 4.0）, mavg=e146c(.187 GPU6/7) 同机同卡",
+      "per_task_diff_top": {
+        "niah_single_3": -67.0,
+        "niah_single_1": -25.0,
+        "niah_multivalue": 26.5,
+        "niah_multikey_1": -13.0,
+        "niah_multiquery": 7.0,
+        "niah_multikey_2": 6.0
+      }
     }
   },
   "interpretation": [
+    "口径注：数值 diff 字段按 aavg−mavg 定义；文字表述统一 mavg−aavg（两级 − 单池）",
+    "三档总览（mavg−aavg）：32K +0.07（跨机）→ 64K +2.77（同机）→ 128K +6.77（同机同卡）——区域配额收益随上下文长度单调增长，128K 为最大档",
     "32K 档 aavg(0,0) 与 mavg 两级基本持平（+0.07，跨机 caveat）——短档区域配额收益不明显",
-    "64K 档（同机）aavg 掉 2.77，主驱动 = niah_single_3 42 vs 100（-58）：单池全局 TopK 在长上下文挤掉远区精确单点检索词元，两级 far 配额保住该能力",
-    "fwe 反向 +29（aavg 37 vs mavg 8）：fwe 词频任务单池表现更好，与 32K cwe aavg +6.9 同类——单池对'高频统计型'远区任务有利，对'精确位置型'任务（single_3/mk1/single_2）不利",
-    "与 LBv2 结论一致方向：两级 vs 单池 LBv2 +2.59；RULER 64K +2.77；证据收敛于'区域配额在长上下文/精确检索上的必要性'"
+    "64K 档（同机）单池掉 2.77，主驱动 = niah_single_3 42 vs 100（-58）",
+    "128K 档（同机同卡）单池掉 6.77，主驱动仍是远区精确单点检索：single_3 33 vs 100（-67）、single_1 75 vs 100（-25）、mk1 86 vs 99（-13）——单池全局 TopK 长上下文挤掉远区单点词元，两级 far 配额保住该能力；single_3 崩塌幅度 64K→128K 由 -58 扩至 -67",
+    "反向项：128K multivalue +26.5（单池优，mavg 3.5 vs aavg 30.0）、mq +7、mk2 +6——高频统计型远区任务单池有利，与 64K fwe +29 同型；mavg 128K mv 3.5 低分须结合 FullKV 锚 yarn 外推塌陷 caveat 读取",
+    "与 LBv2 (+2.59)、LB 中文 (+0.36)、LB 英文 (+0.38 同机) 收敛：区域配额价值在长上下文精确检索上随 L 单调增强"
   ],
   "sources": {
     "r32k": {
@@ -54,12 +71,17 @@
       "e146ca_r64k_formal.json": "97a65fcf6a1a7656d7325c6e037274a15b90910f200aa3dd831b462e9030088d",
       "e146ca_r64k_formal.json.manifest.json": "5edeef800ee8df6fd755989c7bf9ded563ebab634bd0ac21f9efa24b18cb3545",
       "e146ca_r64k_formal.json.receipt.json": "facb0d55f4d270c7edaef90709acb61bc844551115b516254bb7814f86d3904a"
+    },
+    "r128k": {
+      "e146ca_r128k_formal.json": "1455cdcc45e3564831a4dad9c335d9d71041621c8e6f3c2f8f79b438c2101220",
+      "e146ca_r128k_formal.json.manifest.json": "e4fc3d07c78c188c160ad1cb5f8db78f70116c02ce319657062f2fc3ca01f9e2",
+      "e146ca_r128k_formal.json.receipt.json": "1e15423616e57e3d3e255e21291667e31e6a97f3b5851d65f8c6b6e071768cef"
     }
   },
   "caveats": [
     "32K 两臂跨机（aavg=.187 / mavg=e146c wys），单任务摆动可达数分（cwe 历史摆动 58.8-83.5）",
     "64K 两臂同机 wys 但非同时段；cwe 两臂均 0.3-0.4 崩（FullKV 锚 yarn 外推自身塌陷）",
-    "128K aavg 在飞（.187 GPU6/7），本判决不含"
+    "128K 两臂同机同卡（.187 GPU6/7）但非同时段；cwe 两臂均 0.2-0.4 崩（同 64K caveat）；mv 两臂差异大（3.5 vs 30.0），mavg 侧低分与 FullKV 锚 yarn 外推塌陷并存，属退化档逐格披露项"
   ],
   "generated_at": "2026-10-17T15:50:40.176081"
 }
