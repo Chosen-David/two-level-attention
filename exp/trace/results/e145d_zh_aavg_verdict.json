@@ -60,9 +60,9 @@
     }
   },
   "interpretation": [
-    "中文 8 任务两级 vs 单池差 -0.36，噪声级——与英文 LB v1 (+0.89) 方向一致幅度小",
-    "单池唯一可见损失 passage_count 0.0 vs 0.75（两臂均远低于稠密锚 2.0，该任务本就近崩溃）",
-    "跨三数据集证据链：LBv2 +2.59 / RULER 64K +2.78（主驱动 single_3 -58）/ LB中文 -0.36 / LB英文 +0.89 / RULER 32K +0.07——两级区域配额收益集中于长上下文精确检索，短上下文/摘要类任务两法等价"
+    "中文 8 任务两级(mavg) vs 单池(aavg)差 +0.36（46.004 vs 45.640），噪声级——与英文 LB v1 (+0.89) 方向一致幅度小",
+    "单池逐任务 5 降 1 升 2 平（aavg−mavg：dureader −1.26、trec −1.00、passage_count −0.75、multifieldqa_zh −0.24、vcsum −0.16 降；lsht +0.50 升；pr_zh/samsum 平），非单一任务损失",
+    "跨数据集证据链（统一 mavg−aavg，分数点）：LBv2 +2.59 / RULER 64K +2.77 / RULER 32K −0.07 / LB英文 +0.89 / LB中文 +0.36——两级区域配额收益集中于长上下文精确检索，短上下文/摘要类任务两法等价"
   ],
   "sources": {
     "e145d_zh_aavg_result.json": "c433620dbba87ec116e75f603d791264f9d23e8fdc49b5af35e7481472db3627"

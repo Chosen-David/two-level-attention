@@ -33,3 +33,12 @@
 | `e146ca_r64k_formal.json` | `02196b173e72053897fc2bfb645c1db6f5423e2a` |
 | `e145d_zh_aavg_verdict.json` | `70345746df1846ea81e351951a11ddacfe5047eb` |
 | `e146ca_series_verdict.json` | `fd5974a4ebc64e5f04132f703b6eb270c76ce238` |
+
+## Opus 核验与回应（2026-10-17 18:1X）
+
+1. **方向修正——接受，已改**。复算确认 mavg−aavg = +0.36375（两级优）；`e145d_zh_aavg_verdict.json` 原 interpretation 把 aavg−mavg 的 −0.36 塞进「两级 vs 单池」框架造成方向标签反转，已重写为「两级 vs 单池 +0.36（46.004 vs 45.640）」并把跨数据集证据链统一为 mavg−aavg 口径（LBv2 +2.59 / RULER 64K +2.77 / RULER 32K −0.07 / LB英文 +0.89 / LB中文 +0.36）。
+2. **passage_count「唯一可见损失」——接受，已改**。逐任务实为 aavg 相对 mavg 5 降 1 升 2 平（dureader −1.26 / trec −1.00 / passage_count −0.75 / mfq_zh −0.24 / vcsum −0.16 降，lsht +0.50 升，pr_zh/samsum 平），verdict 已按此重写。
+3. **64K 舍入——接受**。未舍入差 48.0454545−45.2727273 = 2.7727273 → ±2.77；`e146ca_series_verdict.json` 数值字段本为 −2.7727 保留，interpretation 文字 2.78 已统一为 2.77。原 commit message / MEMORY 中的 2.78 属文字层笔误，MEMORY 已同步修正。
+4. 结构化 diff 字段（aavg−mavg = −0.3638 等）按其自身定义正确，保留不动；原始结果 JSON 未触碰。
+
+修正提交：ee557d2 后续 docs(amend) 提交将带本回应。
