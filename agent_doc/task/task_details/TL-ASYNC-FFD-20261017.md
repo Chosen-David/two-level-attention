@@ -21,3 +21,7 @@ Method: reuse existing native FFD Llama vendor; synchronous AsyncTLS §4.1 Qwen3
 - FFD original publisher PDF subsequently archived main57b30397; prior missing-PDF statement is historical.
 - Latest quality scope is RULER32K + existing LongBench lengths; existing64/128K negative data retained for supplement. Kernel32/64/128K; E2E32/64/96K. No1M/new-model/long-quality matrix and no128K-lossless claim from32K quality.
 - Real held-out calibration, GPU transport/numerics/performance and scientific acceptance remain open. Engineering publishes only original dev; user owns main merge.
+
+## Bounded priority clarification
+
+Dry-run output separates `ruler_quality_lengths=[32768]` from LongBench actual existing task lengths. Prioritize a few frontier baselines: representation discussion JSSA/FASA/ours; full-method discussion Quest/AsyncTLS/ours + FullKV. Complete JSSA is a potential competitor only, not implementation authorization. No further SparQ/HISA integration; preserve existing code/history and known regression failures, and do not stop host jobs. FFD remains backup: no Qwen port or new Llama matrix. This clarification starts no experiment or new integration.

@@ -301,7 +301,7 @@ def enable_system(model,args):
 
 def plan():
     return dict(method='asynctls_paper',status='dry-run only',gpu_started=False,
-                quality_lengths=[32768],quality_suite='existing LongBench',
+                ruler_quality_lengths=[32768],longbench='actual existing task lengths',
                 kernel_lengths=[32768,65536,131072],e2e_lengths=[32768,65536,98304],
                 calibration='required: frozen held-out checkpoint/RoPE identity',
                 limitations=['paper-derived assumptions','GPU unvalidated','not packed int4 index','batch1 candidate'])
