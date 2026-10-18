@@ -1,0 +1,51 @@
+{
+  "id": "asynctls_r32k_reverify",
+  "date": "2026-10-18",
+  "title": "AsyncTLS vendor RULER 32K 独立复算确认——AVG 50.09 与 E119 final 逐位一致；TLI 主口径大幅领先",
+  "config": {
+    "arm": "asynctls_vendor（论文语义复现 C 轨）：channel 选择 qasper 校准（dimension_channels/qwen3-8b/qasper_channels.json）、token_budget=512（论文 RULER kt=512）、block_size=64、top_kb=128（论文 §4 默认）",
+    "model": "Qwen3-8B；RULER 32K 11 任务；native 无 yarn",
+    "machine": "本机（数据 10-17 18:02-23:13 产出，复算 10-18 16:55）"
+  },
+  "results": {
+    "asynctls_avg": 50.09,
+    "per_task": {
+      "niah_single_1": 94.0,
+      "niah_single_2": 89.0,
+      "niah_single_3": 58.0,
+      "niah_multikey_1": 95.0,
+      "niah_multikey_2": 43.0,
+      "niah_multikey_3": 0.0,
+      "niah_multiquery": 38.25,
+      "niah_multivalue": 47.5,
+      "cwe": 30.2,
+      "fwe": 15.67,
+      "vt": 40.4
+    },
+    "vs_tli": {
+      "tli_beta0625_e147c": 59.29,
+      "tli_lead_beta0625": 9.20,
+      "tli_beta125_e146c": 58.30,
+      "tli_lead_beta125": 8.21,
+      "fullkv_e116e": 59.38
+    }
+  },
+  "judgment": [
+    "独立复算与 e119_ruler32768_formal_asynctls_vendor_final.json 逐位一致（11 任务全同）——E119 判决的 AsyncTLS 32K AVG 50.09 确认为可引用基线数字",
+    "TLI 领先：β.0625 主口径候选 59.29（+9.20）/ β.125 旧主口径 58.30（+8.21）vs AsyncTLS 50.09——远区检索差距主驱动：mk2 43 vs 73-74（-30）、single_3 58 vs 95-97（-38+）、mk3 0 vs 9-14、cwe 30.2 vs 75.9-79.8",
+    "预算口径注：AsyncTLS kt=512 为其论文 RULER 原口径；TLI K2=1024（近翻倍预算）——同预算 armB（K2=512）对照见 E139 k2_512 消融臂可引用，避免预算不对齐的公平性质疑",
+    "AsyncTLS 64K/128K 在跑（本机 GPU0/1，10-18 16:18/16:20 起，kt=512 同口径）——出数后同协议 formal 打分补齐三档"
+  ],
+  "sources": {
+    "reverify_formal": "exp/trace/results/asynctls_r32k_formal.json（+manifest+receipt，本轮复算四件套）",
+    "e119_final": "exp/trace/results/e119_ruler32768_formal_asynctls_vendor_final.json（原始 formal）",
+    "raw": "exp/results_ruler/Qwen3-8B/L32768/pred_asynctls/（11×100 jsonl 指针协议）",
+    "tli_baselines": "e147c_r32k_formal（59.29）/ e146c_r32k_formal（58.30）/ e116e_ruler32_formal_fullkv（59.38）"
+  },
+  "caveats": [
+    "AsyncTLS 为 C 轨语义复现（论文协议移植）非官方代码直跑——官方代码未开源，faithful-port 边界如实披露",
+    "预算不对齐（512 vs 1024）：论文级对比表须同预算口径行（E139 K2=512 臂）或预算归一化注记",
+    "mk3 0.0 / single_1 94 与 AsyncTLS 论文自报数字（RULER 10 任务子集 budget 512）任务集不同不可直比"
+  ],
+  "generated_at": "2026-10-18T16:58"
+}

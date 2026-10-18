@@ -1,0 +1,797 @@
+{
+ "run_id": "20261018165530-3374898-3127",
+ "status": "success",
+ "generated": "2026-10-18T16:55:31.186695",
+ "publish_protocol": "e116i-generation-v3",
+ "formal": {
+  "script": "benchmark/RULER/score_ruler_formal.py",
+  "sha256": "ae99067f36347307507ac6c2a9e4a7fa5bec77b35b3063273e10c54ab68f459c"
+ },
+ "scorer": {
+  "script": "benchmark/RULER/score_ruler.py",
+  "sha256": "e5139e2dd914d92e87e036cdff3635a5136e10f79ae3efe0a3d13cd702c7319b"
+ },
+ "inputs": {
+  "root": "/tmp/asynctls_r32k_root",
+  "pred_postfix": "_asynctls",
+  "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+  "expect_tasks": 11,
+  "min_samples": 100,
+  "run_identity": {
+   "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+   "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+   "yarn": false,
+   "yarn_factor": null,
+   "yarn_factor_provenance": "producer_receipt",
+   "yarn_factor_operator_declared": null,
+   "producer_evidence": {
+    "status": "present",
+    "protocol": "producer-yarn-config-v2",
+    "same_generation_bound": true,
+    "config_consistency_enforced": true,
+    "model_config_closure": true,
+    "generation_binding_modes": [
+     "pointer-v1"
+    ],
+    "cells_with_receipt": 11,
+    "cells_total": 11,
+    "yarn_enabled": false,
+    "effective_yarn_factor": null,
+    "receipts": {
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/cwe": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017180239-3140439-2824/cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700-yarn_receipt.json",
+      "sha256": "41e0df45860caaaf043a1deb470e01dee80e3081ddb16a82bbc01916df67741c"
+     },
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/fwe": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017182532-3144704-2824/fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700-yarn_receipt.json",
+      "sha256": "1b698d8aefd58d275a85ef53287244798a0528ea1d8fb4e1c3ff3b1a076e9894"
+     },
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/niah_multikey_1": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017214208-3183516-2824/niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "be232cc525166d797599260f87702129bac3537926c4290556984afa3039a92b"
+     },
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/niah_multikey_2": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017220540-3187549-2824/niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "be26d2c199ab9000ec23127a6b2ce69dadfd1c3e4a73067c64f8b178f80622bd"
+     },
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/niah_multikey_3": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017222857-3192584-2824/niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "02acf041f32635d79372d7ab28bdbca3604f4e1b289131fe2f958898c4a7fd3a"
+     },
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/niah_multiquery": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017225226-3195483-2824/niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "1060d2081a2b09a16a8659cd6a9302cdc3524d2bbebb2f82a39ac1e210f045d4"
+     },
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/niah_multivalue": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017231353-3198839-2824/niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "0aa97b115829619a573e1f3bbe87c3227a51775da8e0964cec8426d7f88930dd"
+     },
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/niah_single_1": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017203208-3168986-2824/niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "8d46c6f6c8502d0745edcb5c4b24ecc29b987645ebb20ca6c64ddab92f142db0"
+     },
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/niah_single_2": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017205545-3173061-2824/niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "2b938439ecf2b1db8a9b69293249088d7496800430a3bc4343db6ab7378a3e22"
+     },
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/niah_single_3": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017211857-3181560-2824/niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "82b1de47736ae4fd2f125565ed772515527b0c0a816cb0186d33d453682ceb75"
+     },
+     "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128/vt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017184800-3149547-2824/vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700-yarn_receipt.json",
+      "sha256": "130a80c0f3ccf6d6a8299e996d284cf160f8c7ced05f9bd35ead46e11b6d70ce"
+     }
+    }
+   },
+   "extra_params": {
+    "asynctls_token_budget": "512",
+    "asynctls_block_size": "64",
+    "asynctls_top_kb": "128"
+   },
+   "formal_script_sha256": "ae99067f36347307507ac6c2a9e4a7fa5bec77b35b3063273e10c54ab68f459c",
+   "scorer_sha256": "e5139e2dd914d92e87e036cdff3635a5136e10f79ae3efe0a3d13cd702c7319b",
+   "note": "model_path 为操作者声明值；yarn_factor 按 yarn_factor_provenance 区分：producer_receipt=生成进程旁挂 v2 回执证实的实际生效值（回执与best-file 经 prediction SHA/行数逐位同代绑定，059），producer_receipt_v1_partial=v1 回执只证 factor 口径不证回执与预测同代（059 降级标注），operator_declared=legacy 产物无生产者证据时的操作者事后声明（实际生效值未闭合，不冒充）；legacy 数据无法从文件恢复完整输入身份（identity_mode=legacy-partial），native 数据由 pred_ruler.py 落盘"
+  }
+ },
+ "outputs": {
+  "json": "/tmp/asynctls_r32k_formal.json",
+  "md": "/tmp/asynctls_r32k_formal.md",
+  "manifest": "/tmp/asynctls_r32k_formal.json.manifest.json",
+  "derived_dir": "/tmp/asynctls_r32k_formal.json.run-20261018165530-3374898-3127",
+  "generation_files": {
+   "json": "result.json",
+   "md": "result.md",
+   "manifest": "manifest.json",
+   "receipt": "receipt.json"
+  }
+ },
+ "manifest_sha256": "69281ee6a2affc561903d822634919b3dceecf63755ba05a067ead8e077a6084",
+ "result_sha256": "87baab0f1a8cda36709f23dd7d6b6515e307a381fe65ac46d591d86c8eda5e8f",
+ "source_data_sha256": {
+  "32768/niah_single_1": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_single_1.jsonl",
+   "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db"
+  },
+  "32768/niah_single_2": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_single_2.jsonl",
+   "sha256": "26af960be2fdcf7c7907b7fd2a17c6bb44958381e90ccc50ad297770b51eaf79"
+  },
+  "32768/niah_single_3": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_single_3.jsonl",
+   "sha256": "1e383c1b27269f8796650d37012b212c1d51124b3388bc8fce56c809698b7bc8"
+  },
+  "32768/niah_multikey_1": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_1.jsonl",
+   "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23"
+  },
+  "32768/niah_multikey_2": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_2.jsonl",
+   "sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8"
+  },
+  "32768/niah_multikey_3": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_3.jsonl",
+   "sha256": "d13f08fb05ac73aa062377c764c602d762d6b9d1e22092ec1e522596bfbb0a76"
+  },
+  "32768/niah_multiquery": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multiquery.jsonl",
+   "sha256": "273bb35ea339defdee27055947a7ea78512877c0e1648c701225ef49fcc8e91c"
+  },
+  "32768/niah_multivalue": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multivalue.jsonl",
+   "sha256": "1da24401a722c00618e4d4d1b72583620a331d0a4c7b6df384dad3974b0bd234"
+  },
+  "32768/cwe": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/cwe.jsonl",
+   "sha256": "07fcda888ce6d9f834639abafa23c8fd726a352227432a26175bc3c3ff2e0051"
+  },
+  "32768/fwe": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/fwe.jsonl",
+   "sha256": "23a8073809df38f32194cf5cfec6a311a286f4776af6771a3912b33010a65206"
+  },
+  "32768/vt": {
+   "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/vt.jsonl",
+   "sha256": "f34626c7908480ea16c6e7c77decd51326e202014570b107156730ea6e69f4b7"
+  }
+ },
+ "cells": {
+  "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128": {
+   "length_dir": 32768,
+   "identity_mode": "native",
+   "tasks": {
+    "niah_single_1": {
+     "n": 100,
+     "best_file": "niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017203208-3168986-2824/niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "a34023c87feb2bf31c256311c7a270525c3f1fb55947511f85ce8a6abfb27ffe",
+     "derived_sha256": "a34023c87feb2bf31c256311c7a270525c3f1fb55947511f85ce8a6abfb27ffe",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017203208-3168986-2824/niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "8d46c6f6c8502d0745edcb5c4b24ecc29b987645ebb20ca6c64ddab92f142db0",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.tli_gen",
+       "gen_dir_name": "niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017203208-3168986-2824",
+       "gen_pred_sha256": "a34023c87feb2bf31c256311c7a270525c3f1fb55947511f85ce8a6abfb27ffe",
+       "gen_rcp_sha256": "8d46c6f6c8502d0745edcb5c4b24ecc29b987645ebb20ca6c64ddab92f142db0"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_single_1",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017203208-3168986-2824",
+       "prediction_basename": "niah_single_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+       "prediction_sha256": "a34023c87feb2bf31c256311c7a270525c3f1fb55947511f85ce8a6abfb27ffe",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "a34023c87feb2bf31c256311c7a270525c3f1fb55947511f85ce8a6abfb27ffe",
+       "source_sha256_at_freeze": "a34023c87feb2bf31c256311c7a270525c3f1fb55947511f85ce8a6abfb27ffe"
+      },
+      "source_sha256": "a34023c87feb2bf31c256311c7a270525c3f1fb55947511f85ce8a6abfb27ffe",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6.5e-05
+     }
+    },
+    "niah_single_2": {
+     "n": 100,
+     "best_file": "niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017205545-3173061-2824/niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "2da7a41856bf068ed78071032ee2bc682a2410fafde9aae286e42d8efce3e694",
+     "derived_sha256": "2da7a41856bf068ed78071032ee2bc682a2410fafde9aae286e42d8efce3e694",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017205545-3173061-2824/niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "2b938439ecf2b1db8a9b69293249088d7496800430a3bc4343db6ab7378a3e22",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.tli_gen",
+       "gen_dir_name": "niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017205545-3173061-2824",
+       "gen_pred_sha256": "2da7a41856bf068ed78071032ee2bc682a2410fafde9aae286e42d8efce3e694",
+       "gen_rcp_sha256": "2b938439ecf2b1db8a9b69293249088d7496800430a3bc4343db6ab7378a3e22"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_single_2",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017205545-3173061-2824",
+       "prediction_basename": "niah_single_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+       "prediction_sha256": "2da7a41856bf068ed78071032ee2bc682a2410fafde9aae286e42d8efce3e694",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "2da7a41856bf068ed78071032ee2bc682a2410fafde9aae286e42d8efce3e694",
+       "source_sha256_at_freeze": "2da7a41856bf068ed78071032ee2bc682a2410fafde9aae286e42d8efce3e694"
+      },
+      "source_sha256": "2da7a41856bf068ed78071032ee2bc682a2410fafde9aae286e42d8efce3e694",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 5.4e-05
+     }
+    },
+    "niah_single_3": {
+     "n": 100,
+     "best_file": "niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017211857-3181560-2824/niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "863e8a89974cad8c3e6e449d8728b95b0fac98b61258cab9b641fbff0e8122d2",
+     "derived_sha256": "863e8a89974cad8c3e6e449d8728b95b0fac98b61258cab9b641fbff0e8122d2",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017211857-3181560-2824/niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "82b1de47736ae4fd2f125565ed772515527b0c0a816cb0186d33d453682ceb75",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.tli_gen",
+       "gen_dir_name": "niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017211857-3181560-2824",
+       "gen_pred_sha256": "863e8a89974cad8c3e6e449d8728b95b0fac98b61258cab9b641fbff0e8122d2",
+       "gen_rcp_sha256": "82b1de47736ae4fd2f125565ed772515527b0c0a816cb0186d33d453682ceb75"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_single_3",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017211857-3181560-2824",
+       "prediction_basename": "niah_single_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+       "prediction_sha256": "863e8a89974cad8c3e6e449d8728b95b0fac98b61258cab9b641fbff0e8122d2",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "863e8a89974cad8c3e6e449d8728b95b0fac98b61258cab9b641fbff0e8122d2",
+       "source_sha256_at_freeze": "863e8a89974cad8c3e6e449d8728b95b0fac98b61258cab9b641fbff0e8122d2"
+      },
+      "source_sha256": "863e8a89974cad8c3e6e449d8728b95b0fac98b61258cab9b641fbff0e8122d2",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 6e-05
+     }
+    },
+    "niah_multikey_1": {
+     "n": 100,
+     "best_file": "niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017214208-3183516-2824/niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "6659fe9124322ebe7b1485eb4d5d033e109a64d9ae9dac0b10b6b9a5c3e60403",
+     "derived_sha256": "6659fe9124322ebe7b1485eb4d5d033e109a64d9ae9dac0b10b6b9a5c3e60403",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017214208-3183516-2824/niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "be232cc525166d797599260f87702129bac3537926c4290556984afa3039a92b",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.tli_gen",
+       "gen_dir_name": "niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017214208-3183516-2824",
+       "gen_pred_sha256": "6659fe9124322ebe7b1485eb4d5d033e109a64d9ae9dac0b10b6b9a5c3e60403",
+       "gen_rcp_sha256": "be232cc525166d797599260f87702129bac3537926c4290556984afa3039a92b"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_multikey_1",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017214208-3183516-2824",
+       "prediction_basename": "niah_multikey_1-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+       "prediction_sha256": "6659fe9124322ebe7b1485eb4d5d033e109a64d9ae9dac0b10b6b9a5c3e60403",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "6659fe9124322ebe7b1485eb4d5d033e109a64d9ae9dac0b10b6b9a5c3e60403",
+       "source_sha256_at_freeze": "6659fe9124322ebe7b1485eb4d5d033e109a64d9ae9dac0b10b6b9a5c3e60403"
+      },
+      "source_sha256": "6659fe9124322ebe7b1485eb4d5d033e109a64d9ae9dac0b10b6b9a5c3e60403",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 5.8e-05
+     }
+    },
+    "niah_multikey_2": {
+     "n": 100,
+     "best_file": "niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017220540-3187549-2824/niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "7a920496a1b1c3058bd7c5a2b62f7f46b87208b5104d578bef7c361aeb89e7e4",
+     "derived_sha256": "7a920496a1b1c3058bd7c5a2b62f7f46b87208b5104d578bef7c361aeb89e7e4",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017220540-3187549-2824/niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "be26d2c199ab9000ec23127a6b2ce69dadfd1c3e4a73067c64f8b178f80622bd",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.tli_gen",
+       "gen_dir_name": "niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017220540-3187549-2824",
+       "gen_pred_sha256": "7a920496a1b1c3058bd7c5a2b62f7f46b87208b5104d578bef7c361aeb89e7e4",
+       "gen_rcp_sha256": "be26d2c199ab9000ec23127a6b2ce69dadfd1c3e4a73067c64f8b178f80622bd"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_multikey_2",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017220540-3187549-2824",
+       "prediction_basename": "niah_multikey_2-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+       "prediction_sha256": "7a920496a1b1c3058bd7c5a2b62f7f46b87208b5104d578bef7c361aeb89e7e4",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "7a920496a1b1c3058bd7c5a2b62f7f46b87208b5104d578bef7c361aeb89e7e4",
+       "source_sha256_at_freeze": "7a920496a1b1c3058bd7c5a2b62f7f46b87208b5104d578bef7c361aeb89e7e4"
+      },
+      "source_sha256": "7a920496a1b1c3058bd7c5a2b62f7f46b87208b5104d578bef7c361aeb89e7e4",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 5e-05
+     }
+    },
+    "niah_multikey_3": {
+     "n": 100,
+     "best_file": "niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017222857-3192584-2824/niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "033360317262a6b216d8127df3293276ebb0e527dafab5e23f4b427bfc8eea13",
+     "derived_sha256": "033360317262a6b216d8127df3293276ebb0e527dafab5e23f4b427bfc8eea13",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017222857-3192584-2824/niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "02acf041f32635d79372d7ab28bdbca3604f4e1b289131fe2f958898c4a7fd3a",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.tli_gen",
+       "gen_dir_name": "niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017222857-3192584-2824",
+       "gen_pred_sha256": "033360317262a6b216d8127df3293276ebb0e527dafab5e23f4b427bfc8eea13",
+       "gen_rcp_sha256": "02acf041f32635d79372d7ab28bdbca3604f4e1b289131fe2f958898c4a7fd3a"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_multikey_3",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017222857-3192584-2824",
+       "prediction_basename": "niah_multikey_3-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+       "prediction_sha256": "033360317262a6b216d8127df3293276ebb0e527dafab5e23f4b427bfc8eea13",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "033360317262a6b216d8127df3293276ebb0e527dafab5e23f4b427bfc8eea13",
+       "source_sha256_at_freeze": "033360317262a6b216d8127df3293276ebb0e527dafab5e23f4b427bfc8eea13"
+      },
+      "source_sha256": "033360317262a6b216d8127df3293276ebb0e527dafab5e23f4b427bfc8eea13",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 4.8e-05
+     }
+    },
+    "niah_multiquery": {
+     "n": 100,
+     "best_file": "niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017225226-3195483-2824/niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "e0d84308dbca88eb8437bdf64aa607692af9ec865fd73dd81b5d0890914b6742",
+     "derived_sha256": "e0d84308dbca88eb8437bdf64aa607692af9ec865fd73dd81b5d0890914b6742",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017225226-3195483-2824/niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "1060d2081a2b09a16a8659cd6a9302cdc3524d2bbebb2f82a39ac1e210f045d4",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.tli_gen",
+       "gen_dir_name": "niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017225226-3195483-2824",
+       "gen_pred_sha256": "e0d84308dbca88eb8437bdf64aa607692af9ec865fd73dd81b5d0890914b6742",
+       "gen_rcp_sha256": "1060d2081a2b09a16a8659cd6a9302cdc3524d2bbebb2f82a39ac1e210f045d4"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_multiquery",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017225226-3195483-2824",
+       "prediction_basename": "niah_multiquery-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+       "prediction_sha256": "e0d84308dbca88eb8437bdf64aa607692af9ec865fd73dd81b5d0890914b6742",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "e0d84308dbca88eb8437bdf64aa607692af9ec865fd73dd81b5d0890914b6742",
+       "source_sha256_at_freeze": "e0d84308dbca88eb8437bdf64aa607692af9ec865fd73dd81b5d0890914b6742"
+      },
+      "source_sha256": "e0d84308dbca88eb8437bdf64aa607692af9ec865fd73dd81b5d0890914b6742",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 4.9e-05
+     }
+    },
+    "niah_multivalue": {
+     "n": 100,
+     "best_file": "niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017231353-3198839-2824/niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "643c3e25e3c61569838b48f27421974e497f0a967c7a6164714310b163c178d8",
+     "derived_sha256": "643c3e25e3c61569838b48f27421974e497f0a967c7a6164714310b163c178d8",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017231353-3198839-2824/niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800-yarn_receipt.json",
+      "sha256": "0aa97b115829619a573e1f3bbe87c3227a51775da8e0964cec8426d7f88930dd",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.tli_gen",
+       "gen_dir_name": "niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl.gen-20261017231353-3198839-2824",
+       "gen_pred_sha256": "643c3e25e3c61569838b48f27421974e497f0a967c7a6164714310b163c178d8",
+       "gen_rcp_sha256": "0aa97b115829619a573e1f3bbe87c3227a51775da8e0964cec8426d7f88930dd"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "niah_multivalue",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017231353-3198839-2824",
+       "prediction_basename": "niah_multivalue-asynctls_vendor_qasper_channels_k512_b64_kb128-10171800.jsonl",
+       "prediction_sha256": "643c3e25e3c61569838b48f27421974e497f0a967c7a6164714310b163c178d8",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "643c3e25e3c61569838b48f27421974e497f0a967c7a6164714310b163c178d8",
+       "source_sha256_at_freeze": "643c3e25e3c61569838b48f27421974e497f0a967c7a6164714310b163c178d8"
+      },
+      "source_sha256": "643c3e25e3c61569838b48f27421974e497f0a967c7a6164714310b163c178d8",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 5.3e-05
+     }
+    },
+    "cwe": {
+     "n": 100,
+     "best_file": "cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017180239-3140439-2824/cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "185bc2b7697d974337d700f4624c9f095b8b759188ce6bcb7b35e11a93f972f7",
+     "derived_sha256": "185bc2b7697d974337d700f4624c9f095b8b759188ce6bcb7b35e11a93f972f7",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017180239-3140439-2824/cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700-yarn_receipt.json",
+      "sha256": "41e0df45860caaaf043a1deb470e01dee80e3081ddb16a82bbc01916df67741c",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.tli_gen",
+       "gen_dir_name": "cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017180239-3140439-2824",
+       "gen_pred_sha256": "185bc2b7697d974337d700f4624c9f095b8b759188ce6bcb7b35e11a93f972f7",
+       "gen_rcp_sha256": "41e0df45860caaaf043a1deb470e01dee80e3081ddb16a82bbc01916df67741c"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "cwe",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017180239-3140439-2824",
+       "prediction_basename": "cwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+       "prediction_sha256": "185bc2b7697d974337d700f4624c9f095b8b759188ce6bcb7b35e11a93f972f7",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "185bc2b7697d974337d700f4624c9f095b8b759188ce6bcb7b35e11a93f972f7",
+       "source_sha256_at_freeze": "185bc2b7697d974337d700f4624c9f095b8b759188ce6bcb7b35e11a93f972f7"
+      },
+      "source_sha256": "185bc2b7697d974337d700f4624c9f095b8b759188ce6bcb7b35e11a93f972f7",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 4.5e-05
+     }
+    },
+    "fwe": {
+     "n": 100,
+     "best_file": "fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017182532-3144704-2824/fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "6eebfaac9a9d672564e85194765957b9030391a9f73b8a340489d0d565e3b598",
+     "derived_sha256": "6eebfaac9a9d672564e85194765957b9030391a9f73b8a340489d0d565e3b598",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017182532-3144704-2824/fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700-yarn_receipt.json",
+      "sha256": "1b698d8aefd58d275a85ef53287244798a0528ea1d8fb4e1c3ff3b1a076e9894",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.tli_gen",
+       "gen_dir_name": "fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017182532-3144704-2824",
+       "gen_pred_sha256": "6eebfaac9a9d672564e85194765957b9030391a9f73b8a340489d0d565e3b598",
+       "gen_rcp_sha256": "1b698d8aefd58d275a85ef53287244798a0528ea1d8fb4e1c3ff3b1a076e9894"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "fwe",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017182532-3144704-2824",
+       "prediction_basename": "fwe-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+       "prediction_sha256": "6eebfaac9a9d672564e85194765957b9030391a9f73b8a340489d0d565e3b598",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "6eebfaac9a9d672564e85194765957b9030391a9f73b8a340489d0d565e3b598",
+       "source_sha256_at_freeze": "6eebfaac9a9d672564e85194765957b9030391a9f73b8a340489d0d565e3b598"
+      },
+      "source_sha256": "6eebfaac9a9d672564e85194765957b9030391a9f73b8a340489d0d565e3b598",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 4.5e-05
+     }
+    },
+    "vt": {
+     "n": 100,
+     "best_file": "vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+     "source_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017184800-3149547-2824/vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+     "source_final_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+     "generation_binding": "pointer-v1",
+     "source_sha256": "99958b1de59402f156528178a8fff9f8f3b1fef063551f933aa434f62d090e5b",
+     "derived_sha256": "99958b1de59402f156528178a8fff9f8f3b1fef063551f933aa434f62d090e5b",
+     "producer_yarn_receipt": {
+      "path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017184800-3149547-2824/vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700-yarn_receipt.json",
+      "sha256": "130a80c0f3ccf6d6a8299e996d284cf160f8c7ced05f9bd35ead46e11b6d70ce",
+      "receipt_version": "producer-yarn-config-v2",
+      "generation_binding": "pointer-v1",
+      "generation": {
+       "pointer_path": "/tmp/asynctls_r32k_root/L32768/pred_asynctls/vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.tli_gen",
+       "gen_dir_name": "vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl.gen-20261017184800-3149547-2824",
+       "gen_pred_sha256": "99958b1de59402f156528178a8fff9f8f3b1fef063551f933aa434f62d090e5b",
+       "gen_rcp_sha256": "130a80c0f3ccf6d6a8299e996d284cf160f8c7ced05f9bd35ead46e11b6d70ce"
+      },
+      "yarn_enabled": false,
+      "effective_yarn_factor": null,
+      "yarn_factor_source": "off",
+      "context_length": 32768,
+      "task": "vt",
+      "prediction_binding": {
+       "status": "complete",
+       "run_id": "20261017184800-3149547-2824",
+       "prediction_basename": "vt-asynctls_vendor_qasper_channels_k512_b64_kb128-10171700.jsonl",
+       "prediction_sha256": "99958b1de59402f156528178a8fff9f8f3b1fef063551f933aa434f62d090e5b",
+       "prediction_lines": 100,
+       "verified_same_generation": true,
+       "staged_sha256": "99958b1de59402f156528178a8fff9f8f3b1fef063551f933aa434f62d090e5b",
+       "source_sha256_at_freeze": "99958b1de59402f156528178a8fff9f8f3b1fef063551f933aa434f62d090e5b"
+      },
+      "source_sha256": "99958b1de59402f156528178a8fff9f8f3b1fef063551f933aa434f62d090e5b",
+      "config_fingerprint": {
+       "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+       "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+       "rope_scaling": null,
+       "native_max_position_embeddings": 40960,
+       "seed": 42,
+       "max_gen": 64,
+       "max_num": 100,
+       "producer_script": {
+        "path": "benchmark/RULER/pred_ruler.py",
+        "sha256": "889210048f290f5154c6270a54c50c47de80bf26797180357cc261997fe800bc"
+       },
+       "effective_config_sha256": "44c6e10a0fa558fa8ae98e65c25caf05f3f0f105a5c1d5c55f68ba08c537d6e1",
+       "config_identity": "config_json_sha256_bound"
+      }
+     },
+     "freeze_lock": {
+      "n_files": 1,
+      "acquire_wait_seconds": 4.6e-05
+     }
+    }
+   }
+  }
+ },
+ "avg": {
+  "L32768/asynctls_vendor_qasper_channels_k512_b64_kb128": 50.09
+ },
+ "legacy_stamp": {
+  "n_stamped": 0,
+  "invariant_fields": [
+   "pred",
+   "answers",
+   "length",
+   "budget"
+  ],
+  "invariant_asserted": true,
+  "note": "补刻只发生在 staging 派生副本；源文件 SHA256 记录于 cells[].tasks[].source_sha256，全程只读"
+ },
+ "gen_md_sha256": "c7283b5182edc0fb76424c2f1b90f088f7b6ff9cc9b6df817190f3a7b950990a",
+ "gen_receipt_sha256": "62d2a8d9b4347aeeb33ce02abaafd6942f7a90db6bfcff4f110d6810a2b3f20e"
+}
