@@ -1,6 +1,6 @@
 # Entire Introduction: original sentences, bilingual revisions and evidence
 
-This document records the complete bilingual Introduction revision: original sentences, revised sentences, reference functions and editorial reasons. Figure captions and other sections are outside the prose rewrite.
+This document preserves the earlier OEN/OZH to N01–N23 mapping for the accepted manuscript snapshot at `44d09d7781d235db94d7ec5ffe5a90b529221af3`. Those sections are historical, not the current wording. The current complete bilingual Introduction is recorded as C01–C24 below, with exact correspondence to that earlier version. Figure captions and other sections remain outside this prose revision.
 
 ## Verified reference and sentence roles
 
@@ -671,3 +671,201 @@ Final ZH: 均值池化可能稀释孤立的高词元分数，符号感知极值�
 | N23 | 保留：完整请求含准备维护选择，非局部kernel或代理指标。 | 与N03净收益目标闭合 |
 
 Whole-section check: five paragraphs now form cost problem → existing cascade and page-summary gap → regional capacity gap → actual mechanism and cost boundary → contributions and mixed evidence. The two numerical examples serve different functions: Fig1 diagnoses selection behavior; complete RULER task sets report descriptive quality. They are not joined into a matched quality–latency point.
+
+## Current Introduction: C01–C24
+
+These are original manuscript sentences, not translated reference prose. Reference functions come from the actual Token-Picker Introduction on physical page1; its algorithms, hardware assumptions and positive results are not transferred. Earlier N labels below provide exact prior wording and the original OEN/OZH crosswalk. Retained sentences are deliberately retained rather than cosmetically rewritten.
+
+Current Introduction SHA256: EN `eba73704cd21b2ecc3abfb486a6f3323ab0f3c54c35e16df799f45e3604639f7`; ZH `0af79efef16c1f04122bd48be50d17e0dc743dfead0d270474b669e8745452e3`.
+
+### C01 · previous N01 · revised/split
+
+EN: In dense long-context decoding, each new token attends to a growing history of cached keys and values.
+
+ZH: 在稠密长上下文解码中，每个新词元都对不断增长的缓存键和值进行注意力计算。
+
+Function and reason: Dense decoding scope; avoids generalizing the baseline to every attention policy. Reference location/function: p1 left §1 ¶2 workload.
+
+### C02 · previous N02 · retained
+
+EN: Sparse attention restricts final attention to selected tokens, but selecting them requires scoring, ranking and memory accesses.
+
+ZH: 稀疏注意力将最终计算限制在入选词元上，但选择这些词元仍需要评分、排序与访存。
+
+Function and reason: Sparse final support and the separate scoring, ranking and memory costs. Reference location/function: p1 left §1 ¶2 cost.
+
+### C03 · previous N03 · revised/split
+
+EN: The design goal is to preserve task-relevant tokens within a fixed budget while keeping selection cheaper than the attention work it removes.
+
+ZH: 设计目标是在固定预算内保留与任务相关的词元，并使选择成本低于省去的注意力计算成本。
+
+Function and reason: Explicit design goal; no achieved cost or universal usefulness claim. Reference location/function: p1 left §1 ¶2 closing objective.
+
+### C04 · previous N04 · revised/split
+
+EN: Both candidate selection and final attention-set size are therefore central design problems.
+
+ZH: 除了最终注意力集合的大小，候选选择过程也是核心设计问题。
+
+Function and reason: Candidate selection and final support size are both central questions; no equal-importance assertion. Reference location/function: p1 left §1 ¶2 closing objective.
+
+### C05 · previous N05 · retained
+
+EN: Cascades such as AsyncTLS shortlist pages before selecting eligible tokens~\cite{asynctls}.
+
+ZH: AsyncTLS等级联先筛选页面，再选择符合条件的词元~\cite{asynctls}。
+
+Function and reason: AsyncTLS owns the existing cascade precedent. Reference location/function: p1 left/right §1 ¶3 prior-work gap.
+
+### C06 · previous N06 · revised/split
+
+EN: Coarse ranking by cheap page summaries can omit pages carrying substantial full-attention weight.
+
+ZH: 粗筛按低成本页摘要排序，可能漏选在完整注意力中承载较多权重的页面。
+
+Function and reason: Coarse page summaries may omit full-attention page weight; evidence granularity is pages. Reference location/function: p1 left/right §1 ¶3 prior-work gap.
+
+### C07 · previous N07 · retained
+
+EN: Mean pooling can dilute an isolated high token score, while sign-aware extrema provide a potentially loose upper bound on unquantized token scores in the scoring coordinates; neither ranks pages by their total attention weight.
+
+ZH: 均值池化可能稀释孤立的高词元分数，符号感知极值则给出评分坐标内未量化词元分数的上界，但该界可能较松；二者都不按页内注意力权重总和排序。
+
+Function and reason: Mean/extrema distinction and unquantized scoring-coordinate bound remain intact. Reference location/function: p1 left/right §1 ¶3 prior-work gap.
+
+### C08 · previous N08 · retained
+
+EN: Following ClusterKV's token/page perspective~\cite{clusterkv}, our Qwen3 diagnostic in Figure~\ref{fig:observation}(a) exposes this mismatch: mean and extrema scoring miss 13 and 17 of 32 mass-rank reference pages, respectively.
+
+ZH: 沿用ClusterKV的词元／页分析视角~\cite{clusterkv}，图\ref{fig:observation}(a)的Qwen3诊断展示了这种不一致：均值与极值评分分别漏选32个注意力权重排序参考页中的13个和17个。
+
+Function and reason: ClusterKV analytical perspective is credited; Qwen single-query counts remain this diagnostic. Reference location/function: p1 right §1 ¶3 gap specificity.
+
+### C09 · previous N09 · retained
+
+EN: Those missed pages contain 59.65\% and 26.46\% of the reference-page attention mass, so fewer misses need not mean less missed mass.
+
+ZH: 漏选页分别包含参考页注意力权重总和的59.65\%和26.46\%，因此漏页更少并不意味着漏失的权重更少。
+
+Function and reason: Missed reference-page mass is distinct from missed-page count; denominator retained. Reference location/function: p1 right §1 ¶4 outcome function.
+
+### C10 · previous N10 · retained
+
+EN: This single-query comparison motivates examining candidate access; it does not rank the selectors by task quality.
+
+ZH: 这一单查询比较促使我们考察候选能否进入后续筛选，但不构成选择器任务质量的排名。
+
+Function and reason: Single-query diagnostic does not rank task quality. Reference location/function: p1 right §1 ¶3 gap scope.
+
+### C11 · previous N11 · retained
+
+EN: Candidate access also depends on how capacity is divided between recent and distant history.
+
+ZH: 候选能否进入后续筛选，还取决于近期与远端历史之间如何分配容量。
+
+Function and reason: Regional capacity is a second determinant of candidate access. Reference location/function: p1 left §1 ¶2 remaining cost.
+
+### C12 · previous N12 · retained
+
+EN: A global TopK can devote all available slots to one region, whereas regional quotas can reserve nominal capacity for each.
+
+ZH: 全局TopK可能将全部可用名额分配给一个区域，区域配额则可以为两侧分别预留名义容量。
+
+Function and reason: Reservation is nominal capacity, not guaranteed successful retention. Reference location/function: p1 left §1 ¶2 remaining cost.
+
+### C13 · previous N13 · revised/split
+
+EN: In the diagnostic that selects whole bins in Figure~\ref{fig:observation}(b), separate near and far reservations raise the mean retained fraction of far-region attention weight from .6759 to .7207, but reduce it in 43 of 128 correlated observations.
+
+ZH: 图\ref{fig:observation}(b)按整箱选择的诊断中，分别预留近远容量使远区注意力权重的平均保留比例从.6759升至.7207，但128条相关观测中仍有43条下降。
+
+Function and reason: Whole-bin selection and far-region weight fraction are explicit; correlated decreases retained. Reference location/function: p1 left §1 ¶2 operational scope.
+
+### C14 · previous N14 · revised/split
+
+EN: The design must address both stages: admitting far pages alone does not reserve final slots for their tokens.
+
+ZH: 设计必须兼顾两级筛选：允许远区页进入候选集，本身并不为页内词元预留最终名额。
+
+Function and reason: Page admission alone does not reserve final token slots. Reference location/function: p1 right §1 ¶4 problem-to-solution transition.
+
+### C15 · previous N15 · retained
+
+EN: We study a two-level selector that couples a shared scoring view with explicit regional budgets.
+
+ZH: 本文研究一种将共享评分视图与显式区域预算结合的两级选择器。
+
+Function and reason: The studied selector combines a scoring view with regional budgets. Reference location/function: p1 right §1 ¶4 solution lead-in.
+
+### C16 · previous N16 · revised/split
+
+EN: Both stages use a fixed set of 32 coordinates comprising 16 complete low-frequency RoPE pairs; separate near and far page quotas control eligibility for token refinement.
+
+ZH: 两级共用一组固定的32个坐标，即16个完整的低频RoPE旋转对；独立近远页配额分别限制近区和远区可供词元精筛的页数。
+
+Function and reason: Fixed32coordinates/16completepairs and regional page capacity are explicit; not adaptive selection. Reference location/function: p1 right §1 ¶4 mechanism steps.
+
+### C17 · previous N17 · retained
+
+EN: Regional token quotas then divide the remaining final budget after prefix and recent-token protection; selected tokens use original-dimensional Q/K/V in one final attention operation.
+
+ZH: 扣除前缀与近期词元保护后，区域词元配额分配剩余最终预算；入选词元使用原始全维Q/K/V完成一次最终注意力计算。
+
+Function and reason: Protection precedes regional token quotas; original-dimensional final attention has selected support. Reference location/function: p1 right §1 ¶4 mechanism steps.
+
+### C18 · previous N18 · revised/split
+
+EN: Compact coordinates narrow scoring dot products, but ordinary token scoring still spans full history before masking; fewer shortlisted pages alone do not remove that work.
+
+ZH: 紧凑坐标缩短评分点积的维度，但普通词元评分仍在掩码前遍历完整历史，因此减少候选页本身不会省去这部分工作。
+
+Function and reason: Scoring dot products are narrower, but full-history token scoring remains; page shortlists alone do not remove it. Reference location/function: p1 right §1 ¶4 cost handling.
+
+### C19 · previous N19 · retained
+
+EN: We also formulate a prefill-informed far gate as an optional extension; it is disabled by default, and its quality and cost require separate evaluation.
+
+ZH: 本文还给出基于预填充观测的可选远区门控扩展；该门控默认关闭，其质量与成本需要单独评估。
+
+Function and reason: Optional far gate remains default-off and requires separate quality/cost evaluation. Reference location/function: p1 right §1 ¶4 mechanism scope.
+
+### C20 · previous N20 · revised/split
+
+EN: We contribute a shared-coordinate regional selector, joint page/token capacity analysis, and separate evaluations of task quality, regional coverage and execution cost.
+
+ZH: 本文的贡献是给出共享坐标区域选择器，分析页／词元容量的联合约束，并分别评估任务质量、区域覆盖和执行成本。
+
+Function and reason: Combined selector, joint capacity analysis and three separate evaluation objects define contributions. Reference location/function: p1 right §1 contribution lead-in/bullets.
+
+### C21 · previous N21 · revised/split
+
+EN: On complete 11-task RULER32K sets, reported Qwen3-8B AVG is 0.99 points higher for near-page allocation parameter $\beta=.0625$ than $.125$, with page and token quotas changing together.
+
+ZH: 在完整11任务RULER32K集合上，已报告的Qwen3-8B AVG在近区页分配参数$\beta=.0625$时比$.125$高0.99点，其中页配额与词元配额同时改变。
+
+Function and reason: 8B comparison names beta as near-page allocation parameter; page/token quotas change jointly. Reference location/function: p1 right §1 contribution outcomes.
+
+### C22 · previous N21 · revised/split
+
+EN: A separate 11-task RULER32K comparison on Qwen3-32B shows a 1.58-point sparse deficit relative to dense attention.
+
+ZH: 另一项Qwen3-32B的11任务RULER32K比较中，稀疏臂比稠密注意力低1.58点。
+
+Function and reason: 32B sparse/dense deficit is a separate complete11-taskRULER32K comparison, not a cross-model paired result. Reference location/function: p1 right §1 contribution outcomes.
+
+### C23 · previous N22 · retained
+
+EN: These descriptive comparisons do not isolate either mechanism, and the archived sparse configuration decodes more slowly than dense attention at every measured length.
+
+ZH: 这些描述性比较不能隔离任一机制的作用，归档稀疏配置在所有已测长度上的解码也均慢于稠密注意力。
+
+Function and reason: Descriptive comparisons do not identify mechanisms; archived sparse decoding is slower. Reference location/function: p1 right §1 contribution outcomes, contrasting evidence boundary.
+
+### C24 · previous N23 · revised/split
+
+EN: Establishing a quality--latency benefit for the compact design with four-token prefix and 128-token recent-window protection requires matched task-quality and complete-request measurements, including preparation, maintenance and selection.
+
+ZH: 要证明采用前缀4词元、近期128词元保护的紧凑设计具有质量--时延收益，需要匹配的任务质量与完整请求测量，后者包括准备、维护与选择。
+
+Function and reason: Protection lengths are named, without assuming132distinct positions; matched complete-request evaluation remains required. Reference location/function: p1 right §1 contribution outcomes, contrasting evidence boundary.
