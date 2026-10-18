@@ -1,6 +1,6 @@
 # Publication source and bilingual PDFs
 
-The complete bilingual Introduction now opens with the cost of candidate selection, credits the existing page-to-token cascade, and connects page-score mismatch and regional budgets to the shared-coordinate selector. It retains mixed coverage, descriptive quality comparisons and slower historical sparse decoding; matched task quality and complete-request cost remain necessary for a benefit claim. This revision changes no experiment, method configuration or presentation result.
+The closing evaluation paragraph now distinguishes far-page admission to refinement from final far-token capacity, and states the complete-request benefit requirement directly. It retains the reported historical sparse configuration's slower decoding, the missing matched quality/cost measurements for the compact 4/128 design, and incomplete gate configuration identity. Redundant summaries are removed in both languages; the accepted Introduction and the 17-slide presentation remain unchanged. No experiment, configuration or reported value changes.
 
 Rebuild all figure PDFs referenced by the four documents, then compile them:
 
