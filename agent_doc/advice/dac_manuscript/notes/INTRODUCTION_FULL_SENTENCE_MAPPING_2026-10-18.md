@@ -1,6 +1,6 @@
 # Entire Introduction: original sentences, bilingual revisions and evidence
 
-Baseline main `eea3bc7bcd178769ce6965d8c2491fe4adf93ae9`; advice-only checkpoint `800ddaafa910a241e67a1ab538fedc81dcaac67e`. This is the user-requested entire-Introduction revision, not the scheduled one-paragraph round. Captions and other sections remain outside the prose rewrite.
+This document records the complete bilingual Introduction revision: original sentences, revised sentences, reference functions and editorial reasons. Figure captions and other sections are outside the prose rewrite.
 
 ## Verified reference and sentence roles
 
@@ -414,13 +414,13 @@ ZH: 要证明紧凑4/128保护设计具有质量--时延收益，需要匹配的
 | N19 | Current gate is optional/defaultoff; unchanged caption and S5/S6 preserve old diagnostic mismatch, single-query logit aggregation and calibration limits. No MLA evidence promoted; no gate effectiveness claim. |
 | N20–23 | Q2/S8 and conclusion already report complete11-task32K AVG: 8B59.290909−58.30=.990909; 32B50.642727−52.218182=−1.575455. β changes page and token allocations jointly; comparisons span machines and retain scorer/raw-prediction caveats in caption/S8. Archived E152v2 sparse TPOT slower at all lengths; current compact4/128 has no matched quality–complete-cost result. No noninferiority, no same-budget win over AsyncTLS, no lossless or production speedup. |
 
-## Review and publication status
+## Public scope
 
-Independent science and reader review, author disposition, final compilation/render checks and immutable delivery identities are recorded separately in the same run scratch evidence. This mapping is not itself a claim that those gates passed; publication receipt binds the accepted version. The Best Paper PDF and this internal study are not members of the public manuscript package.
+This complete sentence mapping is included in the curated public manuscript package. Independent review records, internal workflow records and the third-party reference PDF are excluded. Reference prose is represented by function paraphrases and precise locations; the full original and revised text reproduced here is our own manuscript.
 
-## Sentence-by-sentence editorial iteration requested at 11:15 UTC
+## Sentence-by-sentence editorial iteration
 
-This is an editorial record, not private internal reasoning. Each original sentence is assessed for its DAC-paper function, specificity, logical placement and evidence scope; its exact text and complete bilingual revision remain above. The first full rewrite was published at `4828e4df4a236692379778d80426fd9d0774cec6`. This second pass actually rewrites N02 in both languages and smooths N07 Chinese; the other accepted sentences are rechecked individually below. No overlapping automated paragraph writer was started.
+Each original sentence is assessed for its DAC-paper function, specificity, logical placement and evidence scope. Its exact text and complete bilingual revision appear above. A second pass refines N02 in both languages and N07 in Chinese; the other revised sentences are individually rechecked below.
 
 Reference locations count prose sentences within the four Introduction paragraphs, excluding the footnote; paragraph3 crosses the left/right column boundary. The three bullets follow paragraph4 in the right column. This locator convention makes every reference function recoverable on physical page1 without reproducing the reference wording.
 
@@ -470,7 +470,7 @@ Reference locations count prose sentences within the four Introduction paragraph
 
 - DAC editorial diagnosis: 平均响应/极值界的对照有技术依据，但句子与后文重复；上界必须保留同坐标未量化限制。
 - Comparable reference function/location: R14 · p1右栏¶3续句2；对应功能见R01–23表。
-- Actual revision and evidence limit: 合并到N07：平均可能稀释高分，极值界可能松；独审补回未量化对象。第二轮中文实际拆开生硬定语，科学范围不变。
+- Actual revision and evidence limit: 合并到N07：平均可能稀释高分，极值界可能松；明确补回未量化对象。第二轮中文实际拆开生硬定语，科学范围不变。
 - Neighboring transition check: 接N06近似风险，为N08页权重诊断提供解释背景，而非预言哪臂更好。
 
 ### OEN08/OZH08
@@ -526,7 +526,7 @@ Reference locations count prose sentences within the four Introduction paragraph
 
 - DAC editorial diagnosis: 直接跳到TopK，缺少从页误筛到区域竞争的桥；reserve一词还易被误解为实际覆盖保证。
 - Comparable reference function/location: R14 · p1右栏¶3句2；对应功能见R01–23表。
-- Actual revision and evidence limit: 新增N11桥句，N12比较全局与区域名义容量；独审把保证性retain改为can reserve nominal。
+- Actual revision and evidence limit: 新增N11桥句，N12比较全局与区域名义容量；将保证性retain改为can reserve nominal。
 - Neighboring transition check: N11说明同一候选访问问题的第二因素，N12说明机制，N13给混合观测。
 
 ### OEN16/OZH15
@@ -617,7 +617,7 @@ Reference locations count prose sentences within the four Introduction paragraph
 
 - DAC editorial diagnosis: “仍缺少评估”是状态陈述，未说明怎样的系统测量才能支持论文目标。
 - Comparable reference function/location: R23 · p1右栏bullet3；对应功能见R01–23表。
-- Actual revision and evidence limit: N23改为收益主张所需的匹配质量与完整请求测量；独审补齐准备、维护、选择，不能只测覆盖代理和局部开销。
+- Actual revision and evidence limit: N23改为收益主张所需的匹配质量与完整请求测量；明确补齐准备、维护、选择，不能只测覆盖代理和局部开销。
 - Neighboring transition check: 结尾回扣N03净收益目标；不许把未完成条件写成已证结论。
 
 ## Actual second-pass edits
@@ -670,4 +670,4 @@ Final ZH: 均值池化可能稀释孤立的高词元分数，符号感知极值�
 | N22 | 保留：两个负向边界直接相关，不删除更慢结果。 | N23收益条件回扣开篇 |
 | N23 | 保留：完整请求含准备维护选择，非局部kernel或代理指标。 | 与N03净收益目标闭合 |
 
-Whole-section check: five paragraphs now form cost problem → existing cascade and page-summary gap → regional capacity gap → actual mechanism and cost boundary → contributions and mixed evidence. The two numerical examples serve different functions: Fig1 diagnoses selection behavior; complete RULER task sets report descriptive quality. They are not joined into a matched quality–latency point. Exact independent review and final PDF identities for this second pass are in the refreshed private review receipt.
+Whole-section check: five paragraphs now form cost problem → existing cascade and page-summary gap → regional capacity gap → actual mechanism and cost boundary → contributions and mixed evidence. The two numerical examples serve different functions: Fig1 diagnoses selection behavior; complete RULER task sets report descriptive quality. They are not joined into a matched quality–latency point.
