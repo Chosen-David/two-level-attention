@@ -1,0 +1,94 @@
+Raw log excerpts, in order: before 5 tests; after ops normal; after ops -O;
+adjacent normal (shared GQA, quota route, E143); adjacent -O.
+Exit codes: 1; 0; 0; 0; 0. Times are test runtimes, NOT benchmarks.
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.963s
+
+FAILED (failures=3)
+
+----------------------------------------------------------------------
+Ran 75 tests in 1.623s
+
+OK
+
+----------------------------------------------------------------------
+Ran 75 tests in 1.779s
+
+OK
+test_actual_selector_boundaries_and_switch (test_e139_shared_gqa_indices.SharedIndices.test_actual_selector_boundaries_and_switch) ... ok
+test_candidate_invariant_oracle_negative_controls (test_e139_shared_gqa_indices.SharedIndices.test_candidate_invariant_oracle_negative_controls) ... ok
+test_cpu_allocation_proxy (test_e139_shared_gqa_indices.SharedIndices.test_cpu_allocation_proxy) ... ok
+test_gqa_normalization_negative_control (test_e139_shared_gqa_indices.SharedIndices.test_gqa_normalization_negative_control) ... CPU_ALLOCATION_PROXY {"Hkv": 2, "G": 4, "C": 128, "width": 512, "baseline_positive_self_cpu_bytes": 29700, "shared_positive_self_cpu_bytes": 6156, "full_history_softmax_unchanged": true, "cuda_measured": false}
+ok
+test_graph_key_binds_switch (test_e139_shared_gqa_indices.SharedIndices.test_graph_key_binds_switch) ... ok
+test_noncontiguous_layout_and_schema_rejections (test_e139_shared_gqa_indices.SharedIndices.test_noncontiguous_layout_and_schema_rejections) ... ok
+test_scatter_softmax_gqa_and_ties (test_e139_shared_gqa_indices.SharedIndices.test_scatter_softmax_gqa_and_ties) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.945s
+
+OK
+test_candidate_real_quota_and_decode_handoff (test_e151c_prefill_routing.QuotaRouting.test_candidate_real_quota_and_decode_handoff) ... ok
+test_empty_and_dense_inputs_do_not_activate_selector (test_e151c_prefill_routing.QuotaRouting.test_empty_and_dense_inputs_do_not_activate_selector) ... ok
+test_exception_clears_prefill_flag (test_e151c_prefill_routing.QuotaRouting.test_exception_clears_prefill_flag) ... ok
+test_gate_preserves_absent_and_none_quota (test_e151c_prefill_routing.QuotaRouting.test_gate_preserves_absent_and_none_quota) ... ok
+test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) ... ok
+test_grouped_candidate_cpu_fallback_keeps_quota (test_e151c_prefill_routing.QuotaRouting.test_grouped_candidate_cpu_fallback_keeps_quota) ... ok
+test_reference_and_candidate_same_selection_and_output (test_e151c_prefill_routing.QuotaRouting.test_reference_and_candidate_same_selection_and_output) ... ok
+test_reference_real_quota_and_decode_handoff (test_e151c_prefill_routing.QuotaRouting.test_reference_real_quota_and_decode_handoff) ... ok
+test_required_graph_rejects_quota_before_tensor_work (test_e151c_prefill_routing.QuotaRouting.test_required_graph_rejects_quota_before_tensor_work) ... ok
+test_unconfigured_real_selector_keeps_existing_output (test_e151c_prefill_routing.QuotaRouting.test_unconfigured_real_selector_keeps_existing_output) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.960s
+
+OK
+PASS  C1 构造门禁：sink 子块放行（4/0/16），swa 非对齐仍 fail-closed  -- sk4=放行；sk0=放行；sk16=放行；sk63=放行；swa100=拒绝
+PASS  C2 ① 强制区恰 [0,4)∪尾128（token 级）  -- sink全选=True swa全选=True
+PASS  C2 ②a 无死区：γ=None 单池 dense 极限缺失 ≤ sink%bs=4（重叠虚耗）  -- 缺失=4 [4,64)全选=True
+PASS  C2 ②b 无死区：注入 fine[4:64]=+100 → 块0非sink段必选中  -- [4,64)全选=True
+PASS  C2 ③ 预算上界 unique ≤ K2=1024（重叠虚耗 ≤4 保守）  -- unique=1024
+PASS  C2 ④ 池左界 floor(4/64)=0（sink 所在块参与池竞争）  -- _sink_pool_lo_blk=0
+PASS  C3 默认 128/128 回归：预算身份 sink128+mid768+swa128=1024 逐位不变  -- unique=1024 池左界=2 sink全选=True swa全选=True
+PASS  C4 sink=0：构造放行、无强制头区、预算上界守恒  -- unique=1024 池左界=0 swa全选=True
+
+===== E143 sub-block sink 门禁：executed 8/8 PASS（0 SKIP）=====
+test_actual_selector_boundaries_and_switch (test_e139_shared_gqa_indices.SharedIndices.test_actual_selector_boundaries_and_switch) ... ok
+test_candidate_invariant_oracle_negative_controls (test_e139_shared_gqa_indices.SharedIndices.test_candidate_invariant_oracle_negative_controls) ... ok
+test_cpu_allocation_proxy (test_e139_shared_gqa_indices.SharedIndices.test_cpu_allocation_proxy) ... CPU_ALLOCATION_PROXY {"Hkv": 2, "G": 4, "C": 128, "width": 512, "baseline_positive_self_cpu_bytes": 29700, "shared_positive_self_cpu_bytes": 6156, "full_history_softmax_unchanged": true, "cuda_measured": false}
+ok
+test_gqa_normalization_negative_control (test_e139_shared_gqa_indices.SharedIndices.test_gqa_normalization_negative_control) ... ok
+test_graph_key_binds_switch (test_e139_shared_gqa_indices.SharedIndices.test_graph_key_binds_switch) ... ok
+test_noncontiguous_layout_and_schema_rejections (test_e139_shared_gqa_indices.SharedIndices.test_noncontiguous_layout_and_schema_rejections) ... ok
+test_scatter_softmax_gqa_and_ties (test_e139_shared_gqa_indices.SharedIndices.test_scatter_softmax_gqa_and_ties) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.915s
+
+OK
+test_candidate_real_quota_and_decode_handoff (test_e151c_prefill_routing.QuotaRouting.test_candidate_real_quota_and_decode_handoff) ... ok
+test_empty_and_dense_inputs_do_not_activate_selector (test_e151c_prefill_routing.QuotaRouting.test_empty_and_dense_inputs_do_not_activate_selector) ... ok
+test_exception_clears_prefill_flag (test_e151c_prefill_routing.QuotaRouting.test_exception_clears_prefill_flag) ... ok
+test_gate_preserves_absent_and_none_quota (test_e151c_prefill_routing.QuotaRouting.test_gate_preserves_absent_and_none_quota) ... ok
+test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) ... ok
+test_grouped_candidate_cpu_fallback_keeps_quota (test_e151c_prefill_routing.QuotaRouting.test_grouped_candidate_cpu_fallback_keeps_quota) ... ok
+test_reference_and_candidate_same_selection_and_output (test_e151c_prefill_routing.QuotaRouting.test_reference_and_candidate_same_selection_and_output) ... ok
+test_reference_real_quota_and_decode_handoff (test_e151c_prefill_routing.QuotaRouting.test_reference_real_quota_and_decode_handoff) ... ok
+test_required_graph_rejects_quota_before_tensor_work (test_e151c_prefill_routing.QuotaRouting.test_required_graph_rejects_quota_before_tensor_work) ... ok
+test_unconfigured_real_selector_keeps_existing_output (test_e151c_prefill_routing.QuotaRouting.test_unconfigured_real_selector_keeps_existing_output) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.908s
+
+OK
+PASS  C1 构造门禁：sink 子块放行（4/0/16），swa 非对齐仍 fail-closed  -- sk4=放行；sk0=放行；sk16=放行；sk63=放行；swa100=拒绝
+PASS  C2 ① 强制区恰 [0,4)∪尾128（token 级）  -- sink全选=True swa全选=True
+PASS  C2 ②a 无死区：γ=None 单池 dense 极限缺失 ≤ sink%bs=4（重叠虚耗）  -- 缺失=4 [4,64)全选=True
+PASS  C2 ②b 无死区：注入 fine[4:64]=+100 → 块0非sink段必选中  -- [4,64)全选=True
+PASS  C2 ③ 预算上界 unique ≤ K2=1024（重叠虚耗 ≤4 保守）  -- unique=1024
+PASS  C2 ④ 池左界 floor(4/64)=0（sink 所在块参与池竞争）  -- _sink_pool_lo_blk=0
+PASS  C3 默认 128/128 回归：预算身份 sink128+mid768+swa128=1024 逐位不变  -- unique=1024 池左界=2 sink全选=True swa全选=True
+PASS  C4 sink=0：构造放行、无强制头区、预算上界守恒  -- unique=1024 池左界=0 swa全选=True
+
+===== E143 sub-block sink 门禁：executed 8/8 PASS（0 SKIP）=====

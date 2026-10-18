@@ -267,8 +267,10 @@ def _gate_ok(indexer, q, k):
             # 子空间仅支持 tail（生产口径；rope/nope/random/highfreq 未对拍）
             and indexer.enable_subspace and indexer.subspace == "tail"
             and not indexer.static_pair
-            # 正交强制区块对齐（构造期已 raise，此处防御性复查）
-            and indexer.sink_tokens % bs == 0
+            # Invalid L1 slots scatter -inf to token zero. It must lie in a
+            # protected sink block, never in the candidate pool. Zero sink is
+            # legal for the sequential selector, but unsafe on this fast path.
+            and indexer.sink_tokens >= bs and indexer.sink_tokens % bs == 0
             and indexer.sliding_window_size % bs == 0
             and k.dim() == 4 and k.shape[0] == 1 and k.shape[-1] == 128
             and k.is_cuda and q.is_cuda and q.shape[0] == 1
