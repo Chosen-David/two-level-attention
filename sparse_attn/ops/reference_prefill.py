@@ -187,9 +187,19 @@ def sparse_prefill_attn(
             last_q = q[:, c1 - 1 : c1]  # [1, 1, H, D]
             cu = torch.tensor([0, c1], dtype=torch.int32, device=k.device)
             q_ids = cu[1:] - 1  # 末行位置（= prepare_seqlens(cu) - 1 口径）
-            mask, _bs = indexer.prepare_mask(
-                last_q, q_ids, k_c, cu, softmax_scale
-            )
+            # E151c is a prefill-only treatment in either runtime. Keep the
+            # same activation/cleanup scope as the candidate's sequential
+            # selector so reference dispatch cannot silently ignore quotas.
+            quota_on = getattr(indexer, "_e151c_quota", None) is not None
+            if quota_on:
+                indexer._e151c_on = True
+            try:
+                mask, _bs = indexer.prepare_mask(
+                    last_q, q_ids, k_c, cu, softmax_scale
+                )
+            finally:
+                if quota_on:
+                    indexer._e151c_on = False
             m0 = mask[0, 0]        # [h, T_pad]（h=Hkv 共享 或 H per_q_head）
             sel = m0[..., :c1]     # 截到真实 token 数（pad 块尾巴去除）
             # 稀疏 chunk：行级保护带生效（TL-PREFILL-SWA-002）

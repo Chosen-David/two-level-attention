@@ -254,6 +254,11 @@ def _gate_ok(indexer, q, k):
             and not indexer.sinkswa_only
             # async prev_mask 会跨步复用上一 mask——批量版无对应语义
             and not getattr(indexer, "enable_async", False)
+            # E151c overrides per-layer L2 budgets only in prepare_mask.
+            # Batch selection bypasses that method and does not implement the
+            # override. Check configuration, not _e151c_on: batch dispatch
+            # occurs before the sequential prefill activation scope.
+            and getattr(indexer, "_e151c_quota", None) is None
             # 投影基路径 k_qat 为投影特征（散布语义不同），不支持
             and indexer._basis is None and indexer._basis_all is None
             # L2 细筛维度必须与 L1 子空间同源（l2=full 是 128 维全量化，
