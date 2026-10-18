@@ -1398,5 +1398,10 @@
     "source": "sources/data/observation_plot_input.json",
     "implementation": "sources/build_remote_observation.py whole-bin selection, global2048 vs far/near1024 each without refill",
     "scope": "Four sequences,128 correlated observations paired by query; arm minima need not identify the same query. No new experiment or quality/cost claim."
+  },
+  "compact_view_tradeoff_scope_20261018": {
+    "claim": "Only compact scoring narrows scoring dot products; preparation and maintenance of auxiliary views add work while original KV remains full width.",
+    "implementation": "sparse_attn/indexer/tli_indexer.py at292ed22; S7 records compact vs historical tensor widths",
+    "scope": "Compact selected-coordinate scoring, not historical width128 tensors or original-dimensional final attention. No net-latency or storage-compression benefit established."
   }
 }
