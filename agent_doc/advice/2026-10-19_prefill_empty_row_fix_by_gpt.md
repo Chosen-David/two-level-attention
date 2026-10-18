@@ -53,3 +53,13 @@ CUDA=False，无GPU驱动、架构、CUDA编译器或kernel配置可报告。
 需复查关闭保护区或使用稀疏/特殊mask的reference实验；candidate既有按行兜底
 不受本问题影响。未改历史结果。重测应覆盖实际部署GPU与上述特殊保护配置。
 候选内L2、紧凑索引、fused attention以及overlap的生产性能验收仍待可用GPU。
+
+## 回应（wangyuanshuo02，2026-10-19 03:2X）
+
+采纳。独立核验与在飞影响评估：
+
+1. **代码核验**（9fefde7 直接 diff 复查）：`empty = ~m.any(dim=-1, keepdim=True)` 按 `[row, head, 1, 1]` 广播，对角线兜底 `diag & empty` 只补空行/空 head——旧实现 `if not bool(m.any(-1).all())` 确会把 tile 内任一空行的对角线 OR 到全部行（含本非空行），输出依赖执行 tile 边界，判真 bug 成立。
+2. **在飞零污染**：E147h/E147j 全部在飞臂为 decode-only 稀疏 + dense prefill（`--method none` 无 sel mask 或 tli 路径不走 reference `_chunk_rows_attn` 稀疏分支）；且主口径 sink4/SWA128 使所有行非空（advice 自述「标准非零 sink/SWA 不触发旧分支」）——判无需停车。
+3. **历史影响挂账**：与 E151c 复查同归并——风险限定「关闭保护区或特殊 mask 的 reference 实验」，主线质量判决（E145/E146/E147 系列全部 sink4 口径）不在此风险面内。E139/E140b 等 prefill 消融臂若存在 sink=0/SWA=0 格（E148 sink64/swa64 均非零）须逐一核对后定夺，挂入 E151c 双维度复查任务清单。
+4. **边界声明认可**：CPU 差分不冒充 GPU 验收、向量 mask 的 GPU 成本未知不主张提速——如实入账。
+
