@@ -168,3 +168,79 @@
 ### 本轮修改（第 24 轮）
 - §III-B 首句：`In decoding, zero-based position $t$ includes prefill, and $S=t+1$ counts valid cached positions through the current token, excluding padding.` → `In decoding, $t$ indexes the current token from zero across the full sequence including prefill, and $S=t+1$ counts valid cached positions, excluding padding.`（主谓修复：t 作索引主动计数；「through the current token」由 t=当前位置定义蕴含；+4 词；zh 已清晰无需改）。
 - 版式核对：编译后核对 en 6 页。
+
+---
+
+## §4 Experiment + §5 Conclusion（第 25 轮，2026-10-18）
+
+### §4.A Experiment Setup（1 段）
+- 工具与真值来源句（ABC 生成 + ground truth by extraction command——工具链完整披露）。
+- **编号双库枚举句**（two technology libraries: (1) mcnc.genlib (gate input size <=3); (2) ASAP 7nm——每库带括注量化）。
+- **双模型分述句**（shallow 4-layer/32-channel for simple netlists; deep 8-layer/80-channel for Booth+complex mapping——模型按设计复杂度分化，括注用途）。
+- 环境/框架句（PyTorch Geometric + EPYC 7742 + A100 40GB）。
+- **Setup 收尾泛化范围句**（"In general, GAMORA is trained on small bitwidth multipliers (**typically less than 32-bit**) and evaluated on large bitwidth multipliers (**up to 2048-bit**)"——训练-评估不对称范围声明，为全部后续评估定性）。
+
+### §4.B Evaluation on Reasoning Performance（开头 + 三小节）
+- **编号三方面评估路线图句**（"from three aspects: (1) how ...; (2) how ...; (3) how ... and what domain insights can be derived"——评估维度编号+how 从句，与 §3.B 路线图同构）。
+
+#### 1) Reasoning Precision Analysis
+- 图题句带三因子枚举（Figure 4 illustrates how ... affected by bitwidth/single-multi-task/functional info）。
+- **First/Second/Third 三发现枚举**（每条带机制归因）：
+  - **the-larger-the-higher 单调句带收敛点**（"the larger bitwidth multiplier is adopted for training, the higher precision ..., which typically **converges after** training with 8-bit"）+ **The-main-reason-is 归因句带充分性论证**（8-bit provides a **sufficient variety** of structural properties, learned and **well generalized**）。
+  - **conspicuously-outperforms 比较句带 indicating 归因**（multi-task vs single-task, indicating knowledge sharing greatly benefits every single task）。
+  - **there-is-always-a-boost 句带 since 归因**（functional info always helps, since role identification relies on not-only-structure-but-also-function——not-only-but-also 的归因从句版）。
+- **实验发现→前作机制类比句**（"The synergy of structural and functional information in GAMORA **is analogous to** the combination of structural hashing and functional propagation in conventional symbolic reasoning"——评估发现回收 §2 对应铺垫，corresponding-to 的评估节回声）。
+- **头牌句**（achieves almost 100% prediction accuracy for CSA）。
+- **诚实失败句带可纠正性**（"several nodes near LSB are always mispredicted ... The HA at LSB **cannot** be automatically extracted, **but can be easily corrected during post-processing**"——失败+简单补救收尾——方法节失败定界的评估节版本，but 转折化解）。
+
+#### 2) The Impact of Design Complexity
+- **From-X-aspect 句式 ×2**（From the model selection aspect, ...; From the training aspect, ...——双视角分述同一实验）。
+- thus-guaranteeing 分词收口；**adequate-variety 训练多样性归因句**（larger multipliers required **such that** adequate variety and representativeness ... are exposed to and well captured）。
+
+#### 3) The Impact of Technology Mapping
+- **known-challenge 引用句 + Thus 评估动机句**（"It is a **known challenge** that technology mapping can increase the complexity ... [15][20][25]. **Thus**, we evaluate GAMORA with respect to different technology mapping options"——难度归前作引用→评估正当性）。
+- **库规模量化句带复杂度归因**（"ASAP 7nm library contains **161** standard-cell gates, **including** multi-output cells such as the full adder cell, **which significantly increases** the complexity and irregularity"）。
+- **好情形双数字句**（still reaching **over 99% and 92%** for CSA and Booth——simple mapping 泛化）。
+- **The-scenario-is-fairly-different 反转句 + first/second/third 反转三点枚举**（7nm：泛化受限/精度略降即使重训/需大训练乘法器——三点递进恶化）。
+- **These-observations-imply-several-takeaways 收口句 + First/Second takeaway 枚举**（观察→教训编号收口——takeaway synthesis 的编号版）：
+  - the-more-the-more 单调归因句带 since（more complex library → more difficult, since more complexity both in structures and functionality）。
+  - **comes-at-the-expense-of 代价句**（"the capability to cope with intricate AIG netlists **comes at the expense of** more comprehensive training data"——能力-代价对偶）。
+  - 理论引用支撑句（ERM+Vapnik [22]——训练数据增大→泛化的理论背书——takeaway 挂理论引用）。
+
+### §4.C Runtime and Scalability Analysis
+- **In-addition-to-quality 递进登场句**（"**In addition to** the high reasoning performance, we demonstrate the superiority of GAMORA **by analyzing** its runtime and scalability"——质量→速度双口径递进）。
+- **粗体 run-in 段落标签**（Runtime complexity analysis. / Batched reasoning with single GPU.）。
+- **规模量化锚定句**（"a 2048-bit CSA multiplier with **around 34 million nodes and 67 million edges**"——把 bitwidth 翻译成 |V|/|E| 物理规模）。
+- **头牌速度句**（speedup of **up to six orders of magnitude**）。
+- **This-shows-not-only-but-also 收口句**（not only great efficiency ... but also the scalability to extremely large designs——图证→双收益收口）。
+- **当前限制披露句带 future work**（"we focus on single GPU ..., and **leave multi-GPU implementation as our future work**"——范围限制+出路）。
+- **Even-with 让步正面收口**（"**Even with** a single GPU, there already reveal promising results and positive trends"）。
+
+### §5 Conclusion
+- 四度同构登场句（benefited 枚举=摘要 A1）+ 提案句（exploits GNNs **to imitate** structural hashing and functional aggregation——一句话点机制）。
+- **编号三贡献复述句**（"(1) ... almost 100% and over 97% ..., still over 92% after complex technology mapping; (2) ... over 33 million nodes, up to six orders of magnitude speedups ...; (3) ... generalization from simple to complex ..., from before to after technology mapping"——与摘要 A5 同构，质量/速度/泛化三贡献各一句，数字全带）。
+- 潜力收口句（reveals the great potential of applying GNNs and GPU acceleration）。
+
+### 对照我们手稿的差距结论（Setting/Evaluation/Conclusion 遍历）
+| Gamora §4/§5 句式 | 我们的状态 |
+|---|---|
+| 编号三方面评估路线图句 | Setting opener Q1/Q2/Q3 标签+小节问句标题（第 17/20 轮已建）等价，不改 |
+| Setup 收尾泛化范围句（train-small/test-large） | 我们的 compact/historical 臂身份绑定句（远端 7d33672）+ Workloads 段枚举覆盖范围声明，等价，不改 |
+| First/Second/Third 三发现枚举 | Q2 各证据块是异质记录非平行轴，编号会暗示不存在的平行结构，不加 |
+| the-larger-the-higher 单调句 | Q3「Although the relative penalty decreases with length, absolute sparse TPOT increases」等价（带方向的让步单调句），不改 |
+| 失败句带可纠正性（cannot ..., but easily corrected） | 诚实边界禁：22.45 分损失无可纠正性主张，不加 |
+| known-challenge 引用句+Thus 动机 | gate 小节负范围 opener 等价（"does not establish that ... can be safely skipped"），不改 |
+| The-scenario-is-fairly-different 反转句 | Q2 顺序证据链承担对比功能，反转句式无对应物需求，不加 |
+| takeaways 编号收口 | 「Design implications and limitations」段（两约束枚举+Likewise 连接）等价，不改 |
+| comes-at-the-expense-of 代价句 | 「narrows dot products but adds work」诚实代价对偶等价，不改 |
+| In-addition-to-quality 递进登场 | 我们无已确立的质量优势可递进（诚实边界），Q3 问句标题承担动机，不加 |
+| 粗体 run-in 段落标签 | Model-level decoding. / Local selector cost. 等价，不改 |
+| 规模量化锚定句 | TPOT 三长度带毫秒数+比值等价，不改 |
+| 当前限制披露带 future work | 「remains missing/ unresolved」需求句式等价（出路=条件而非承诺），不改 |
+| 编号三贡献复述句 | 结论顺序描述性结果+诚实边界收口（既有判定：诚实镜像），不改 |
+| **本轮实缺 = Q2 128K 句裸形容词缺中心词+比较对象缺失** | "Historical 128K sparse scores 23.98 versus 46.43"——"sparse" 悬空（Q2 既有术语是 sparse arm/configuration），46.43 的参照（稠密 FullKV）未点名；zh「历史128K稀疏得分23.98，对照46.43」同病 |
+
+### 本轮修改（第 25 轮）
+- Q2 128K 句：`Historical 128K sparse scores 23.98 versus 46.43.` → `The historical 128K sparse arm scores 23.98 against dense FullKV's 46.43.`（补中心词 arm 对齐 Q2 术语、点名比较对象；+4 词，远端压缩后版式有余量）。
+- paper_zh.tex 直译同步：「历史128K稀疏得分23.98，对照46.43」→「历史128K稀疏臂得分23.98，对照稠密FullKV的46.43」。
+- 版式核对：编译后核对 en 6 页。

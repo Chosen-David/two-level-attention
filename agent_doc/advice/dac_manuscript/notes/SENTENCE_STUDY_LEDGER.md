@@ -23,11 +23,20 @@
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
-| 5 | 2023_Gamora.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 实验 | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ §III-B 首句主谓修复（t indexes the current token） ✓ |
+| 5 | 2023_Gamora.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5） | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ §III-B 首句主谓修复（t indexes the current token） ✓ Q2 128K 句中心词+比较对象补全（sparse arm / dense FullKV's 46.43） ✓ |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 25 轮（2026-10-18，Gamora §4 Experiment + §5 Conclusion —— 第 5 篇拆解完毕）
+- 远端检查：fetch 无新提交（HEAD = origin/main cbbfbe9 已合并），无裁决需求。
+- 拆解笔记（追加至 `notes/sentence_studies/2023_gamora.md`）：§4.A：编号双库枚举句/**双模型分述句**（shallow/deep 按设计复杂度分化）/**Setup 收尾泛化范围句**（trained on small bitwidth, typically less than 32-bit / evaluated up to 2048-bit——训练-评估不对称范围声明）；§4.B 开头：**编号三方面评估路线图句**（how 从句版）；1)：**First/Second/Third 三发现枚举**（the-larger-the-higher 单调句带收敛点+The-main-reason-is 充分性归因 / conspicuously-outperforms 带 indicating 归因 / there-is-always-a-boost 带 since 归因）/**实验发现→前作机制类比句**（synergy is analogous to structural hashing+functional propagation——corresponding-to 的评估节回声）/头牌句/**诚实失败句带可纠正性**（cannot be extracted, but can be easily corrected during post-processing）；2)：**From-X-aspect 双视角句**（model selection aspect / training aspect）/adequate-variety 训练多样性归因句；3)：**known-challenge 引用句+Thus 评估动机**/**库规模量化句**（161 gates including multi-output cells, which significantly increases）/**好情形双数字句**（over 99% and 92%）/**The-scenario-is-fairly-different 反转句+first/second/third 三点恶化枚举**/**takeaways 编号收口**（the-more-the-more 带 since / **comes-at-the-expense-of 代价句**/ERM+Vapnik 理论引用支撑）；§4.C：**In-addition-to-quality 递进登场**/粗体 run-in 标签/**规模量化锚定句**（34M nodes/67M edges）/头牌速度句/This-shows-not-only-but-also 收口/**当前限制披露带 future work**/Even-with 让步收口；§5：**编号三贡献复述句**（(1)(2)(3) 与摘要 A5 同构——质量/速度/泛化三贡献各一句数字全带）。
+- 对照结论：16 项句式均有诚实镜像/等价物/判定不加（三发现枚举——Q2 是异质记录非平行轴；失败可纠正性——22.45 分损失无补救主张禁；In-addition-to 递进——无已确立质量优势可递进；编号贡献复述——既有判定诚实镜像）。**唯一实缺 = Q2 128K 句裸形容词+比较对象缺失**（"Historical 128K sparse scores 23.98 versus 46.43"——sparse 悬空缺中心词 arm，46.43 参照未点名稠密 FullKV；zh 同病）。
+- paper_en.tex Q2：→ `The historical 128K sparse arm scores 23.98 against dense FullKV's 46.43.`（+4 词，远端压缩后版式有余量）。
+- paper_zh.tex 直译同步：「历史128K稀疏臂得分23.98，对照稠密FullKV的46.43」。
+- 编译验证：en 6 / zh 6 页，0 未定义引用。
+- **Gamora 五节全部拆解完毕**（第 22-25 轮），累计手稿修改 3 处。下轮开始第 6 篇 **2023_RL_CCD.pdf**（Abstract+Intro）。
 
 ### 第 24 轮（2026-10-18，Gamora §3 Proposed Approach）
 - **远端检查与裁决**：fetch 发现 cbbfbe9（Q2 重写 + 新增 fig:ruler32k-quality 双语全宽图 + \dbltextfloatsep 版式调整）。四点裁决**采纳**：(1) 图文一致——旧 fig:fullkv-quality 引用零残留、新图资产齐全（ruler32k_avg_compact_en/zh.pdf）、S8 补充图承接逐任务分数；(2) 量化口径完整——58.30→59.29、58.96、−0.09（评分器不同）、−1.58（清单匹配）、23.98/46.43、26.09/47.91 全保留，32B 逐任务数字移入图+S8（figure-promotion 压缩，非删除）；(3) 收口句支撑链完整（"establish neither allocation causality nor non-inferiority" 由前句披露的 different scorers/cross-machine/unreplayed 支撑）；(4) 诚实边界全存活（"not task-quality evidence"、k_f=0 推论、protection-only 混合披露）。en 版 "change jointly" 弱于 zh「归因存在混杂」，由收口句覆盖，不回插。另：本地第 23 轮提交被并行会话 rebase 推送为 6f5d1a5（内容核验存活），merge 无冲突。
