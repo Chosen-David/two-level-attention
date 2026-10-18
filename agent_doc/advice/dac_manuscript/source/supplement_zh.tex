@@ -98,7 +98,7 @@ b_n=\max\!\left(\lfloor s/B\rfloor,\left\lfloor(S-w-L)/B\right\rfloor\right).
 \clearpage
 \section*{补充图S8：RULER 32K／64K逐任务得分}
 \noindent\includegraphics[width=\textwidth]{ruler32k_comparison/ruler32k_comparison_zh.pdf}
-\par\medskip\noindent 作者报告的11任务得分，每任务每臂100例，覆盖32K（Qwen3-8B、Qwen3-32B）与64K（Qwen3-8B）。主指标AVG为完整11任务得分的算术平均；逐任务结果解释差异，不另设逐项零损门槛。差值为本方法减稠密FullKV的分数点，无配对置信区间。32K两方法臂使用不同分配：Qwen3-8B的$\beta=.0625$，Qwen3-32B为$.125$。64K面板比较$\beta=.0625$与$\beta=.125$两种稀疏分配及复用的稠密FullKV锚。报告标签共同包含页长64、$K_1=128$、$K=1024$、$\alpha=.25$、$\gamma=.625$、前缀4／近期128及压缩比4。门控状态、实际L1/L2维数与实际选集未独立核验，不能标为已验的共享子空间加门控结果。
+\par\medskip\noindent 作者报告的11任务得分，每任务每臂100例，覆盖32K（Qwen3-8B、Qwen3-32B）与64K（Qwen3-8B）。主指标AVG为完整11任务得分的算术平均；逐任务结果解释差异，不另设逐项零损门槛。差值为本方法减稠密FullKV的分数点，无配对置信区间。32K两方法臂使用不同分配：Qwen3-8B的$\beta=.0625$，Qwen3-32B为$.125$。64K面板比较$\beta=.0625$与$\beta=.125$两种稀疏分配及复用的稠密FullKV锚。稀疏臂的报告标签共同包含页长64、$K_1=128$、$K=1024$、$\alpha=.25$、$\gamma=.625$、前缀4／近期128及压缩比4。门控状态、实际L1/L2维数与实际选集未独立核验，不能标为已验的共享子空间加门控结果。
 
 \par\medskip\noindent 两组32K比较均跨机器。8B的任务ID、答案哈希、长度与源数据哈希在清单层面相符，但评分器不同，输入身份分别为native与legacy-partial。其$-0.09$分AVG差异仅为未匹配历史汇总的算术差。32B的源数据哈希、评分器、生产脚本与模型配置记录相符，但原始预测配对及跨机重放尚未核验。$-1.58$分AVG差异包括MK2提高11分、CWE下降8.80分、FWE下降7.33分；两臂MQ/MV均零不能定因。两面板均不证明统计非劣、同一配置的跨模型规模验证或匹配质量--成本收益。
 
