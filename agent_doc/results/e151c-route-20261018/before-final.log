@@ -1,0 +1,118 @@
+test_candidate_real_quota_and_decode_handoff (test_e151c_prefill_routing.QuotaRouting.test_candidate_real_quota_and_decode_handoff) ... ok
+test_empty_and_dense_inputs_do_not_activate_selector (test_e151c_prefill_routing.QuotaRouting.test_empty_and_dense_inputs_do_not_activate_selector) ... ok
+test_exception_clears_prefill_flag (test_e151c_prefill_routing.QuotaRouting.test_exception_clears_prefill_flag) ... 
+  test_exception_clears_prefill_flag (test_e151c_prefill_routing.QuotaRouting.test_exception_clears_prefill_flag) (module='sparse_attn.ops.reference_prefill') ... FAIL
+test_gate_preserves_absent_and_none_quota (test_e151c_prefill_routing.QuotaRouting.test_gate_preserves_absent_and_none_quota) ... ok
+test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) ... 
+  test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[0], active=False) ... FAIL
+  test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[0], active=True) ... FAIL
+  test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[32], active=False) ... FAIL
+  test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[32], active=True) ... FAIL
+  test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[], active=False) ... FAIL
+  test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[], active=True) ... FAIL
+test_grouped_candidate_cpu_fallback_keeps_quota (test_e151c_prefill_routing.QuotaRouting.test_grouped_candidate_cpu_fallback_keeps_quota) ... ok
+test_reference_and_candidate_same_selection_and_output (test_e151c_prefill_routing.QuotaRouting.test_reference_and_candidate_same_selection_and_output) ... FAIL
+test_reference_real_quota_and_decode_handoff (test_e151c_prefill_routing.QuotaRouting.test_reference_real_quota_and_decode_handoff) ... 
+  test_reference_real_quota_and_decode_handoff (test_e151c_prefill_routing.QuotaRouting.test_reference_real_quota_and_decode_handoff) (quota=32) ... FAIL
+  test_reference_real_quota_and_decode_handoff (test_e151c_prefill_routing.QuotaRouting.test_reference_real_quota_and_decode_handoff) (quota=128) ... FAIL
+test_required_graph_rejects_quota_before_tensor_work (test_e151c_prefill_routing.QuotaRouting.test_required_graph_rejects_quota_before_tensor_work) ... ok
+test_unconfigured_real_selector_keeps_existing_output (test_e151c_prefill_routing.QuotaRouting.test_unconfigured_real_selector_keeps_existing_output) ... ok
+
+======================================================================
+FAIL: test_exception_clears_prefill_flag (test_e151c_prefill_routing.QuotaRouting.test_exception_clears_prefill_flag) (module='sparse_attn.ops.reference_prefill')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 182, in test_exception_clears_prefill_flag
+    self.assertEqual(active, [True])
+AssertionError: Lists differ: [False] != [True]
+
+First differing element 0:
+False
+True
+
+- [False]
++ [True]
+
+======================================================================
+FAIL: test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[0], active=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 78, in test_gate_rejects_configured_quota_even_before_flag_activation
+    self.assertFalse(batch_select._gate_ok(idx, CudaMetadata(), CudaMetadata()))
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[0], active=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 78, in test_gate_rejects_configured_quota_even_before_flag_activation
+    self.assertFalse(batch_select._gate_ok(idx, CudaMetadata(), CudaMetadata()))
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[32], active=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 78, in test_gate_rejects_configured_quota_even_before_flag_activation
+    self.assertFalse(batch_select._gate_ok(idx, CudaMetadata(), CudaMetadata()))
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[32], active=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 78, in test_gate_rejects_configured_quota_even_before_flag_activation
+    self.assertFalse(batch_select._gate_ok(idx, CudaMetadata(), CudaMetadata()))
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[], active=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 78, in test_gate_rejects_configured_quota_even_before_flag_activation
+    self.assertFalse(batch_select._gate_ok(idx, CudaMetadata(), CudaMetadata()))
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_gate_rejects_configured_quota_even_before_flag_activation (test_e151c_prefill_routing.QuotaRouting.test_gate_rejects_configured_quota_even_before_flag_activation) (quota=[], active=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 78, in test_gate_rejects_configured_quota_even_before_flag_activation
+    self.assertFalse(batch_select._gate_ok(idx, CudaMetadata(), CudaMetadata()))
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_reference_and_candidate_same_selection_and_output (test_e151c_prefill_routing.QuotaRouting.test_reference_and_candidate_same_selection_and_output)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 139, in test_reference_and_candidate_same_selection_and_output
+    ref, ref_mask = self.run_real('reference', 32)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 115, in run_real
+    self.assertEqual(mask[..., 64:256].sum().item(), quota)
+AssertionError: 0 != 32
+
+======================================================================
+FAIL: test_reference_real_quota_and_decode_handoff (test_e151c_prefill_routing.QuotaRouting.test_reference_real_quota_and_decode_handoff) (quota=32)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 128, in test_reference_real_quota_and_decode_handoff
+    self.run_real('reference', quota)
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 115, in run_real
+    self.assertEqual(mask[..., 64:256].sum().item(), quota)
+AssertionError: 0 != 32
+
+======================================================================
+FAIL: test_reference_real_quota_and_decode_handoff (test_e151c_prefill_routing.QuotaRouting.test_reference_real_quota_and_decode_handoff) (quota=128)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 128, in test_reference_real_quota_and_decode_handoff
+    self.run_real('reference', quota)
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_prefill_routing.py", line 115, in run_real
+    self.assertEqual(mask[..., 64:256].sum().item(), quota)
+AssertionError: 0 != 128
+
+----------------------------------------------------------------------
+Ran 10 tests in 1.104s
+
+FAILED (failures=10)
