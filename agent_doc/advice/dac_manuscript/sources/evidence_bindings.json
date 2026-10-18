@@ -1403,5 +1403,17 @@
     "claim": "Only compact scoring narrows scoring dot products; preparation and maintenance of auxiliary views add work while original KV remains full width.",
     "implementation": "sparse_attn/indexer/tli_indexer.py at292ed22; S7 records compact vs historical tensor widths",
     "scope": "Compact selected-coordinate scoring, not historical width128 tensors or original-dimensional final attention. No net-latency or storage-compression benefit established."
+  },
+  "longbench_arm_identity_scope_20261018": {
+    "claim": "The historical five-task shared-subspace LongBench arm is linked to producer35b39bd8e43cf478bb4f0ab64a8457f08d87c864; code-derived128/128 protection and width128/active32 L2 properties belong to that arm, not all nominal comparators.",
+    "scope": "Experimental Setting paragraph only; current compact candidate remains distinct; metadata/code linkage does not certify unrecorded runtime execution.",
+    "evidence": "Five shared-subspace execution receipts and manifests; historical producer tli_indexer.py; Supplementary Note S7.",
+    "excluded_inferences": [
+      "Comparator execution identity from shared arm metadata",
+      "Controlled single-stage ablation",
+      "Compact-design quality validation",
+      "Matched quality/complete-request cost benefit"
+    ],
+    "numeric_changes": false
   }
 }
