@@ -1,0 +1,45 @@
+{
+  "id": "e147h_en",
+  "date": "2026-10-19",
+  "title": "E147h LB 英文 β.0625 迁移收官——AVG 50.651 距 β.125 51.252 -0.60 噪声带内（边缘），vs dense 锚 +0.29 保持，判据通过",
+  "config": {
+    "arm": "tli_64_128_1024_c4_Aa0.25_b0.0625_g0.625_sk4_sw128（LB v1 英文 13 任务 mavg，31.5K 截断）",
+    "machine": "wys GPU1/3 双卡（repobench 500 样本尾任务收尾）；eval benchmark.LongBench.eval --output-dir pred_E147h_en_mavg（英文免 jieba）"
+  },
+  "results": {
+    "e147h_beta0625_avg": 50.651,
+    "e145c_beta125_avg": 51.252,
+    "fullkv_dense_e109": 50.36,
+    "diff_vs_beta125": -0.601,
+    "diff_vs_dense": 0.29,
+    "per_task_beta0625": {
+      "2wikimqa": 42.7, "gov_report": 33.26, "hotpotqa": 60.49, "lcc": 67.93,
+      "multi_news": 24.85, "multifieldqa_en": 53.0, "musique": 33.85,
+      "narrativeqa": 24.09, "passage_retrieval_en": 96.0, "qasper": 46.6,
+      "qmsum": 23.78, "repobench": 65.51, "triviaqa": 86.4
+    },
+    "per_task_delta_vs_beta125": {
+      "2wikimqa": 0.9, "gov_report": -0.69, "hotpotqa": 1.78, "lcc": 0.03,
+      "multi_news": 0.14, "multifieldqa_en": -0.63, "musique": 0.19,
+      "narrativeqa": -1.28, "passage_retrieval_en": -4.0, "qasper": -1.09,
+      "qmsum": -0.02, "repobench": -0.23, "triviaqa": -2.92
+    }
+  },
+  "judgment": [
+    "LB 英文 β.0625 = 50.651：vs β.125 51.252 为 -0.60——13 任务 AVG 噪声带（约 ±0.6-1.0）边缘内，判据「不低于 β.125 同档或噪声带内」通过（边缘，与 LB 中文 -0.36 同向幅度更大）",
+    "vs dense 锚 50.36 为 +0.29 仍持平（β.125 为 +0.89）——β.0625 在 LB 英文从超锚滑到贴锚，未破锚",
+    "结构：5 升 8 降——hotpotqa +1.78 / 2wikimqa +0.9；大损 pr_en -4.0（96 vs 100，远区单点检索 near 减半代价）与 triviaqa -2.92——near 供给代价型，与 Llama/ZH 同向",
+    "E147h 记分累计（6.5/7）：LBv2 ✓（-0.20）/ LB ZH ✓（-0.36 边缘）/ LB EN ✓（-0.60 边缘）/ RULER 64K ✓（+0.80）/ 32B ✓（-0.61 边缘）/ β 曲线齐 / Llama ✗（-2.31）——唯剩 128K 终臂",
+    "β 迁移综合画像：far 受益任务（cwe/mk2/RULER 长档）升、near 受益任务（pr_en/triviaqa/narrativeqa）降——β.0625 为任务结构依赖的甜点，LB 三件套均边缘通过"
+  ],
+  "sources": {
+    "pred_result": "exp/trace/results/e147h_en_pred_result.json（wys eval result.json 拉回原件）",
+    "raw": "wys:~/two-level-attention/exp/results_longbench/Qwen3-8B/pred_E147h_en_mavg/pred/*.jsonl（13 任务）",
+    "baselines": "e145c_en_mavg_verdict.json（β.125 51.252 / dense 锚 50.36 复用）"
+  },
+  "caveats": [
+    "跨机配对：β.0625 在 wys、β.125 e145c-en 在 .187——LB v1 单任务锚摆 ~5 分既有口径（e145c-en 判决已披露），AVG 级 -0.60 在噪声带内判读",
+    "repobench 500 样本为 LB v1 最长尾任务（此前 e145c-en 同规格）"
+  ],
+  "generated_at": "2026-10-19T03:15"
+}
