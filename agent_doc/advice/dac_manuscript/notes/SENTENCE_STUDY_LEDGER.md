@@ -23,11 +23,19 @@
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
-| 5 | 2023_Gamora.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3 方法 | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ |
+| 5 | 2023_Gamora.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 实验 | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ §III-B 首句主谓修复（t indexes the current token） ✓ |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 24 轮（2026-10-18，Gamora §3 Proposed Approach）
+- **远端检查与裁决**：fetch 发现 cbbfbe9（Q2 重写 + 新增 fig:ruler32k-quality 双语全宽图 + \dbltextfloatsep 版式调整）。四点裁决**采纳**：(1) 图文一致——旧 fig:fullkv-quality 引用零残留、新图资产齐全（ruler32k_avg_compact_en/zh.pdf）、S8 补充图承接逐任务分数；(2) 量化口径完整——58.30→59.29、58.96、−0.09（评分器不同）、−1.58（清单匹配）、23.98/46.43、26.09/47.91 全保留，32B 逐任务数字移入图+S8（figure-promotion 压缩，非删除）；(3) 收口句支撑链完整（"establish neither allocation causality nor non-inferiority" 由前句披露的 different scorers/cross-machine/unreplayed 支撑）；(4) 诚实边界全存活（"not task-quality evidence"、k_f=0 推论、protection-only 混合披露）。en 版 "change jointly" 弱于 zh「归因存在混杂」，由收口句覆盖，不回插。另：本地第 23 轮提交被并行会话 rebase 推送为 6f5d1a5（内容核验存活），merge 无冲突。
+- 拆解笔记（追加至 `notes/sentence_studies/2023_gamora.md`）：§3.A：**粗体段落标签句**（Problem Formulation./Case Study on Multipliers.）/**输入定义句带 without 排除声明**/**目标句带 by-机制与 after-which 下游后果**/**难度句带 especially-子类聚焦**/**前作 SOTA 点名句带量化上限与代价**（up to 2048-bit but with extremely long runtime——credit-then-but 正文版）/**Thus 收口登场句带双收益 which 从句**；§3.B 开头：**机制对应声明句**（需求→GNN 可模仿同位语从句）/**两步程序引用句**（编号流程挂引用）/**Therefore 提案句带本质贴合论证**（to approach its nature）/**编号路线图句**（(1)(2)(3) 与小节 1:1）；1)：**not-only-but-also 双收益句**/图例走查句链（节点特征向量实例枚举）/**模型选择句带强调理由回收**（With the emphasis on→GraphSAGE，回收 Intro Unlike 伏笔）；2)：**标注规则句带 Since 归因**/**MTL 双收益论证句**（not-only-but-also + since 单任务难度归因）/**超参具体值披露句**（α=0.8, β=γ=1）；3)：**完整算法图内走查长链**/**诚实失败案例句（方法节内）**（Figure 3(e) 一个 HA 无法提取 due to misprediction）/**失败定界句三级止损**（only several+due to+subtle impact）/**期望收口句带诚实动词**（is expected to reach as close as possible to）。
+- 对照结论：16 项句式中 15 项有诚实镜像/等价物/判定不加（Thus 双收益句受诚实边界约束禁挂未证收益；编号路线图句与 §III 开头既有分句预览重复且零版式余量；方法节失败案例句需新测量支撑不可用观察图单查询数字泛化）。**唯一实缺 = §III-B 首句主谓失配**（"zero-based position $t$ includes prefill"——位置不能「包含」预填充，计数范围才能；zh 括注「在完整序列中从0计数的位置（包含预填充词元）」清晰而 en 语义悬空）。
+- paper_en.tex §III-B 首句：→ `In decoding, $t$ indexes the current token from zero across the full sequence including prefill, and $S=t+1$ counts valid cached positions, excluding padding.`（主谓修复，主动动词 indexes；+4 词；zh 已清晰无需改）。
+- 编译验证：en 6 / zh 6 页，0 未定义引用。
+- 待后续轮次：Gamora §4 Experiment（约第 25-26 轮拆完）。
 
 ### 第 23 轮（2026-10-18，Gamora §2 Preliminary and Motivation）
 - 远端检查：仅 4d51efc / abb5a12（构建产物对账，不动 tex），无内容裁决需求。

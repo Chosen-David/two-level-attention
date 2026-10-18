@@ -63,7 +63,7 @@ L1 aggregates selected key coordinates into page summaries for coarse ranking; L
 
 
 \subsection{Regional page and token budgets}
-In decoding, zero-based position $t$ includes prefill, and $S=t+1$ counts valid cached positions through the current token, excluding padding. Let $s$ and $w$ denote the protected prefix and recent-window lengths. Their union and the unprotected middle are
+In decoding, $t$ indexes the current token from zero across the full sequence including prefill, and $S=t+1$ counts valid cached positions, excluding padding. Let $s$ and $w$ denote the protected prefix and recent-window lengths. Their union and the unprotected middle are
 \begin{align}
 \mathcal P_t&=\{i:0\le i\le t,\ i<s\ \text{or}\ i>t-w\},\\
 \mathcal M_t&=\{0,\ldots,t\}\setminus\mathcal P_t.

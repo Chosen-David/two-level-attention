@@ -104,3 +104,67 @@
 ### 本轮修改（第 23 轮）
 - 遍历 §2 各句式后均有诚实镜像或判定不加（维持第 22 轮 corresponding-to 判定）。转向**§III-A 首句的对应物检查**：Gamora §2.A 的「表示选择理由句带 since」（AIG 统一数据结构）——我们 §III-A 首句 "Both regions and both selection stages use the same coordinate map within each layer and KV head, while each query head is scored separately." 是**共享事实句但无 since 理由**；共享的理由（同一评分视图服务两级→选择成本与视图一致性）在 §III 开头段（"To control both selection cost and candidate access"）而 §III-A 小节内无。实缺确认：**§III-A 首句缺 since 理由从句**——共享坐标图的「复用」性质（两个区域两个阶段共用→无需两套评分表示）是定义级事实。加理由：`Both regions and both selection stages use the same coordinate map within each layer and KV head, so the two stages share one scoring view, while each query head is scored separately.`——检查后判定更简形式：句内已有 "use the same coordinate map"，加 "so ..." 会同义重复。**改为另一实缺**：§III-A 第二句 "For Qwen3-8B, we select post-RoPE coordinates $J=...$ from each 128-dimensional query and key." 的 "For Qwen3-8B" 限定语——Qwen3-8B 是 8B 模型、128 维 RoPE；「每层每头」的层域已在首句，此句的 For 限定是模型限定（对非 Qwen3 模型坐标需重选）——**该限定语已充分**。最终定论：§III-A 句式对齐度已高（第 9/19 轮累积修复），**本轮实缺 = §III-A 末段 L1/L2 分工句的「用于粗粒度排序/精筛」目的从句缺失的 zh 版**——zh 版 "L1将选定的键坐标聚合为页摘要，用于粗粒度排序" 已有「用于」；en 版 "L1 aggregates selected key coordinates into page summaries"（第 19 轮远端精化删去了 for coarse ranking）——**en 版目的从句被删**。恢复定义级目的从句：`L1 aggregates selected key coordinates into page summaries for coarse ranking; L2 refines candidates using quantize--dequantize token keys.`（+3 词，恢复远端 55b9a17 精化前的功能等价信息；zh 保持不变）。
 - 版式核对：+3 词，编译后核对 en 6 页。
+
+---
+
+## §3 Proposed Approach（第 24 轮，2026-10-18）
+
+### §3.A Overview（2 段）
+- **粗体段落标签句**（"**Problem Formulation.** Figure 3(a) illustrates the overview of GAMORA."——run-in 粗体标签自带命名，段首即功能声明）。
+- **输入定义句带 without 排除声明**（"The inputs are flattened gate-level netlists in AIG format, **without any** micro-architectural or RTL information"——输入界定同时声明排除项，范围诚实边界）。
+- **目标句带 by-机制与 after-which 下游后果**（"The goal is to exploit a multi-task GNN to reason ... **by performing** node-level classification ..., **after which** functional blocks (e.g., adders) can be extracted"——目标→机制→下游后果三段链）。
+- **Case Study on Multipliers 段**（第二个粗体标签）：stakes 句（indispensable+双应用枚举挂引用）→ 趋势句（Recent years also witness+同态加密引用）→ **难度句带 especially-子类聚焦**（"formal multiplier verification is challenging, **especially for** structurally complex designs such as Booth multipliers"）→ SCA 功劳句（successfully employed+引用簇+relies heavily on 依赖声明）→ **前作 SOTA 点名句带量化上限与代价**（ABC fast algebraic rewriting "can handle large bitwidth multipliers (**up to 2048-bit**) **but with** extremely long runtime"——credit-then-but 正文版，上限量化+代价直报）→ **Thus 收口登场句带双收益 which 从句**（"**Thus**, targeting integer multipliers, we leverage GNNs to ..., **which improves** the efficiency of word-level abstraction ... **and has** strong scalability enabled by GPU acceleration"——定位词+机制+双收益收口）。
+
+### §3.B Multi-Task Learning（开头段 + 三小节）
+- **机制对应声明句**（"Boolean reasoning **requires** gathering structural and functional information from neighbor nodes, **a process that can be imitated by** the message-passing mechanism in GNNs"——需求→GNN 可模仿，同位语从句；对应 §2.C 铺垫）。
+- **两步程序引用句**（"involves a two-step procedure [15][20][26]: (1) detecting XOR/MAJ functions to construct adders, and then (2) identifying their boundaries"——编号流程挂引用，程序结构归前作）。
+- **Therefore 提案句带本质贴合论证**（"we propose to apply MTL for Boolean reasoning **to approach its nature**, in which knowledge sharing across sub-tasks provides higher reasoning precision"——贴合问题本质=设计正当性）。
+- **编号路线图句**（"This section details (1) ... (2) ... (3) ..."——与小节 1)2)3) 一一对应）。
+
+#### 1) Fusing Structural and Functional Information
+- We-leverage 目的句（generate node embeddings that **simultaneously fuse**——目的+双信息融合）。
+- First/Second 双机制分述句。
+- **not-only-but-also 双收益句**（"These compressed node features **not only** encapsulate Boolean functionality **but also** enable high compute and memory efficiency"——设计决策双收益）。
+- **图例走查句链**（"node 1 is a PI with the feature vector [0, 0, 0]; node 7 ... [1, 0, 0]; node 17 ... [1, 1, 1]"——具体节点特征向量实例枚举）。
+- **模型选择句带强调理由回收**（"**With the emphasis on** generalization from simple to complex designs, the specific model employed is GraphSAGE"——回收 Intro Unlike 句伏笔：强调什么→选什么）。
+- 公式后性质收口句（"After stacking K layers, the ... within K-hop search depth is fused"——公式→性质）。
+
+#### 2) Multi-Task Classification
+- **We-identify 本质贴合句带冒号展开**（"to approach the nature of the problem: there are two steps involved"）。
+- **标注规则句带 Since 归因**（"**Since** each XOR/MAJ function consists of multiple nodes, only the root nodes are labeled ..., with other nodes marked as plain nodes"——结构性原因→标注设计决策）。
+- 等价扩展披露句（negation-permutation-negation equivalent functions also labeled——鲁棒性扩展边界）。
+- **MTL 双收益论证句**（"MTL **not only** follows the intuition of this two-step reasoning **but also** exploits divide and conquer, **since** it is extremely hard for GNNs to reach high accuracy with a single-task multi-label classification"——not-only-but-also + since 单任务难度机制归因——设计选择双重理由）。
+- **The-employment-of enables 句**（"enables knowledge sharing ... and improves sample efficiency ..., **which guarantees** high reasoning performance"）。
+- Specifically 解耦句（two-step decoupled into three simpler tasks——数量转换明确）。
+- **超参具体值披露句**（"In our implementation, α = 0.8 and β = γ = 1"——具体数值进正文）。
+
+#### 3) Adder Tree Extraction
+- 匹配规则句（XOR and MAJ pairs with identical inputs are matched）。
+- **完整算法图内走查长链**（集合枚举 X={12,17,...} M={10,22,...} → 移除非根 → 逐对匹配 node 12 is XOR3(8,9,0) ... "matching continues until all six pairs"——算法全流程用图实例走查）。
+- **诚实失败案例句（方法节内！）**（"In Figure 3(e), one HA **cannot** be automatically extracted **due to the misprediction of** node 10"——方法节直接展示失败案例图）。
+- **失败定界句三级止损**（"**only several** nodes near the least significant bit are **always** mispredicted **due to** their shallow neighborhood structure, **which has a subtle impact** on ..."——失败范围 only-限定+机制归因+影响量化 subtle——把失败钉死在小范围）。
+- **期望收口句带诚实动词**（"GAMORA **is expected to** reach **as close as possible to** the exact reasoning precision"——By-doing 收口+expected/as-close-as-possible 不做等价声明）。
+
+### 对照我们手稿的差距结论（§III 方法节遍历）
+| Gamora §3 句式 | 我们的状态 |
+|---|---|
+| 粗体段落标签句 | subsection 标题等价，不改 |
+| 输入 without 排除声明 | §III 开头 "operates only during decoding; prefill remains dense" 等价（范围排除），不改 |
+| 目标句 by-机制 after-which | §III 开头 "To control both selection cost and candidate access, the cascade uses two explicit mechanisms" 等价，不改 |
+| SOTA 点名带量化上限与代价 | Related Work credit-then-gap 已建（第 7/12/18 轮），不改 |
+| Thus 收口登场句带双收益 which | 诚实边界禁（我们的论点即「无既定联合优势」，方法节不能挂未证双收益），不加 |
+| 编号路线图句 (1)(2)(3) | §III 开头段已分句预览 A（共享视图）/B（配额）/C（合并+原维注意力），D 有自带承接句（"Beyond scoring and budgeting"）；零版式余量下全节路线图与既有预览重复，判定不加 |
+| not-only-but-also 双收益 | 我们是诚实反称版 "narrows dot products but adds work"（收益+反收益对），等价不改 |
+| 图例走查句链（具体实例枚举） | §III-B 已有数值走查（$K_1=128$/$\beta=.125$→16/112 页；892 槽→640/252），等价不改 |
+| 模型选择句带理由回收 | 无模型选择自由度（Qwen3-8B 固定）；坐标选择已有慢旋转动机句，等价不改 |
+| 标注规则 Since 归因句 | §III-C "Because softmax precedes group averaging..." + §III-B "The partial prefix page can reselect up to four protected tokens, so 252 is nominal" 等价，不改 |
+| 超参具体值披露句 | 表 1 + 行内数值（$K_1=128$、$\beta=.125$、$K=1024$）已覆盖，不改 |
+| 算法走查长链 | eq:bound 段+配置走查等价，不改 |
+| **诚实失败案例句（方法节内）** | 我们失败案例在评估节（观察图漏页）；方法节已有诚实界限句（"does not guarantee preservation"、"loose enough to misrank"、"cannot recover omitted tokens"）。方法节新增失败实例需新测量支撑（观察图单查询数字不可泛化为方法级失败定界），诚实边界下不加 |
+| 失败定界句三级止损 | "Extrema may come from different tokens, making the bound loose enough to misrank pages and miss important tokens"——失败机制+后果等价；范围量化需新数据，不加 |
+| 期望收口句 | §III-D 末句诚实界限收口等价（"The prefill threshold does not bound decoding error"），不加 |
+| **本轮实缺 = §III-B 首句主谓失配** | "zero-based position $t$ includes prefill"——位置不能「包含」预填充（包含的是计数范围），主语-谓语语义悬空；zh 版括注清晰（「在完整序列中从0计数的位置（包含预填充词元）」），en 版未达到同等清晰度。属表述精度问题 |
+
+### 本轮修改（第 24 轮）
+- §III-B 首句：`In decoding, zero-based position $t$ includes prefill, and $S=t+1$ counts valid cached positions through the current token, excluding padding.` → `In decoding, $t$ indexes the current token from zero across the full sequence including prefill, and $S=t+1$ counts valid cached positions, excluding padding.`（主谓修复：t 作索引主动计数；「through the current token」由 t=当前位置定义蕴含；+4 词；zh 已清晰无需改）。
+- 版式核对：编译后核对 en 6 页。
