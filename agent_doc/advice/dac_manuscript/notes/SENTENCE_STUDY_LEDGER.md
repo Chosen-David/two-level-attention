@@ -24,10 +24,19 @@
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
 | 5 | 2023_Gamora.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5） | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ §III-B 首句主谓修复（t indexes the current token） ✓ Q2 128K 句中心词+比较对象补全（sparse arm / dense FullKV's 46.43） ✓ |
-| 6 | 2023_RL_CCD.pdf | Abstract ✓ Intro ✓；待：§2 相关工作 | Intro P4 门控句主语补全（the diagnostic uses） ✓ |
+| 6 | 2023_RL_CCD.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3 框架 | Intro P4 门控句主语补全（the diagnostic uses） ✓ Intro P4 (c)/(d) 面板引用恢复（远端 784c1a4 裁决回插，压缩版） ✓ |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 27 轮（2026-10-18，远端 Intro 裁决 + RL-CCD §2 Related Works）
+- **远端检查与裁决**：fetch 发现 784c1a4（Intro 重写「sanitized introduction mapping」）、b9988a0（qwen 静态掩码测试，不动 tex）、44d09d7（Design implications 措辞精化）。逐点裁决：
+  - **784c1a4 Intro 重写：整体采纳，但面板 (c)/(d) 主文引用被整句删除——恢复**。重写质量高（P1 需求链更紧、P2 "so fewer misses need not mean less missed mass" 反直觉收口、P3 设计问句化、P5 新增 We-contribute 枚举——正式采纳 best-paper 贡献列表句式；第 26 轮 the-diagnostic 主语修复随之删除）。但四面板图两面板（(c)(d)）无任何正文引用——图文一致性缺口（裁决点 1）；P4「低频坐标对」主张失去动机诊断支撑链（裁决点 3）。恢复最小引用形：en P4 插入 `The coordinate diagnostic in Figure~4(c) motivates the compact view; its random baseline does not preserve RoPE pairs.` + 门控句改 `...far gate motivated by the layer variation in Figure~4(d); it is disabled by default and requires separate evaluation.`（zh 直译同步）。**版式溢出处置**：初版含完整 caveat +46 词致 en 正文溢至 6 页+references 第 7 页（零余量失败模式第三次）；压缩至 +12 词净增恢复 6 页总页数；caveat 主文版移位至 caption（"random32 does not preserve RoPE pairs"/"It uses ... unlike the current gate" 已在 caption 承载，诚实信息未删）。第 24 轮 §III-B（t indexes）、第 25 轮 Q2（sparse arm）修复核验存活。
+  - **44d09d7 Design implications 压缩：采纳**。Thus 收口句删除但 takeaway 在结论完整存活（"Establishing benefit ... requires matched quality and complete-request cost"）；「Likewise, reserving far pages does not guarantee...」→「Far-page quotas admit candidates to refinement without guaranteeing final far-token capacity」为术语精确化。属零余量压缩非信息删除，不回插。
+- 拆解笔记（追加至 `notes/sentence_studies/2023_rl_ccd.md`）：§2.A：**well-known 功劳句 + However as-pointed-out 引用缺口**（判词外包给文献）/**chicken-egg 习语锚定缺口句**（问题命名的记忆点+i.e. 形式化+引号命名）/**In-this-paper-since 范围排除定位句**（既然工具已做好 X→不做 X→专做 Y 且 Y 欠研究——三步边界即定位）；§2.B：前作枚举句链带 1400x 量化/**Nonetheless 不比较诚实声明句**（主动声明不比较+理由——防审稿人质疑漏比）；§2.C：小节标题即宣言/**时代让步代价句**（scaling saturates→even at the cost of runtime）/**RL 双优点句**/**superlative 前作枚举**（superhuman floorplans）/**With-the-above-success-stories 收口宣言句**（Related Work 收口即立场）。
+- 对照结论：9 项句式均有诚实镜像/判定不加（flaw 判词资格、going-beyond 立场均受诚实边界约束；Nonetheless 不比较声明——Setting 节 nominal-labels 句等价；under-researched 定位——AsyncTLS 重叠禁用）。本轮手稿修改=远端裁决恢复（上文）。
+- 编译验证：en 6 / zh 6 页，0 未定义引用。
+- 待后续轮次：RL-CCD §3 框架（MDP 形式化+三模块）、§4 实验。
 
 ### 第 26 轮（2026-10-18，RL-CCD Abstract + Introduction —— 第 6 篇开始）
 - 远端检查：fetch 无新提交（HEAD = origin/main），无裁决需求。

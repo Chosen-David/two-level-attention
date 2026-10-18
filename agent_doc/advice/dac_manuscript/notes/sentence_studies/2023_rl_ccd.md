@@ -68,3 +68,45 @@
 - Intro P4：`The historical layer variation in panel (d) motivates this extension, but uses a different single-query statistic;` → `The historical layer variation in panel (d) motivates this extension, but the diagnostic uses a different single-query statistic;`（+2 词，补主语 the diagnostic——panel (d) 的诊断；消除歧义）。
 - paper_zh.tex 直译同步：「但采用不同的单查询统计」→「但该诊断采用不同的单查询统计」。
 - 版式核对：编译后核对 en 6 页。
+
+---
+
+## §2 Related Works（第 27 轮，2026-10-18）
+
+### §2.A Predictive Useful Skew（1 段）
+- **well-known 功劳句 + However as-pointed-out 引用缺口**（"Useful skew is a well-known technique that improves design timing ... **However, as pointed out in** [11], computed skew adjustments often require redo synthesis or placement to truly realize timing benefits"——缺口挂别人引用：as pointed out in——判词外包给文献，非本文自判）。
+- **chicken-egg 习语锚定缺口句**（"To break the **chicken-egg problem** (i.e., iterative back annotation of skew), the authors of [1] proposed a 'predictive' useful skew technique ... where the TNS value can be improved by **up to 5%**"——习语命名问题+i.e. 形式化+引号命名+量化收益——问题命名的记忆点）。
+- **In-this-paper-since 范围排除定位句**（"**In this paper, since** commercial PD tools have well-integrated useful skew techniques into CCD optimization and reach considerable success, **we are not focusing on** improving the native useful skew implementation in tools. **Our specific focus is to** balance clock-path and data-path optimization ... via endpoint prioritization, **which is an under-researched problem**"——三步定位：既然工具已做好 X→我们不做 X→我们专做 Y 且 Y 欠研究——边界声明即定位）。
+
+### §2.B Learning-Driven Timing Prediction（1 段）
+- 前作枚举句链（tree-based PBA 预测 [7] / GNN slack 预测 [2] / **Transformer gate sizing 带 1400x 量化**（"where a 1400x speed up is achieved in obtaining tool-accurate sizing moves on unseen netlists"）——每前作一句带量化或方法名）。
+- **Nonetheless 不比较诚实声明句**（"**Nonetheless**, in this paper, **we are not comparing** RL-CCD with above methods **as** the focus of RL is to improve optimization quality **rather than** prediction accuracy"——主动声明不比较+理由——比较范围的诚实边界，防审稿人质疑漏比）。
+
+### §2.C RL in EDA: Going Beyond Commercial Tool Quality（1 段）
+- 小节标题即宣言（Going Beyond Commercial Tool Quality——标题带立场）。
+- **时代让步代价句**（"**As the benefit of scaling saturates**, leading-edge commercial tools are seeking more powerful methods for PPA optimization **even at the cost of** runtime"——宏观趋势+even-at-the-cost-of 让步——为 RL 高运行时铺路）。
+- **RL 双优点句**（"RL thus becomes a promising solution **as** it does not require any labeled data and has been demonstrated to achieve never-seen, high-quality optimization results in many fields [12]"——无需标注+never-seen 双卖点挂引用）。
+- **superlative 前作枚举句**（floorplanning "generates **superhuman** floorplans that human labor is not able to achieve" [6]；RL-Sizer "can outperform the default sizing algorithms in a commercial tool **although it adopts a fundamentally different approach**" [5]——让步异曲同工的胜利证据）。
+- **With-the-above-success-stories 收口宣言句**（"**With the above success stories**, in this paper, we decide to continue the research of RL in PD, **aiming at going beyond what state-of-the-art commercial tools are able to achieve**"——前作胜利回收→本文目标宣言——Related Work 收口即立场）。
+
+### 对照我们手稿的差距结论（Related Work 遍历）
+| RL-CCD §2 句式 | 我们的状态 |
+|---|---|
+| well-known 功劳 + as-pointed-out 引用缺口 | Quest/SparQ/HISA 功劳句（不带判词）+ AsyncTLS already-combines 等价；缺口挂引用形式不适用（我们对前作无 flaw 判词资格——诚实边界） |
+| chicken-egg 习语锚定缺口 | 无习语可用（我们的缺口是设计约束非循环依赖），不加 |
+| **In-this-paper-since 范围排除定位句** | P1 双定位句（"Our selector instead..."）+ AsyncTLS already-combines + "distinguishing page-level eligibility" 覆盖定位；「since 工具已做好→不做」形式无诚实对应物（我们的组件与 AsyncTLS 重叠，不能宣称工具已做好），不加 |
+| **Nonetheless 不比较诚实声明句** | Setting 节 "We retain these nominal labels without treating the runs as controlled single-stage ablations" 等价（诚实不比较声明），不改 |
+| 时代让步代价句 | 无宏观趋势可引，不加 |
+| RL 双优点句 | 不适用（非 RL 方法），不加 |
+| superlative 前作枚举 | 诚实边界禁（对前作无 superhuman 级判词），不加 |
+| With-the-above-success-stories 收口宣言 | 诚实边界禁（无 going-beyond 立场可主张——我们的定位是「组合+区分约束」），不加 |
+| 小节标题即宣言 | 我们的 Related Work 无小节（单层两段），结构不同，不加 |
+
+### 本轮修改（第 27 轮）
+- 本轮手稿修改来自**远端裁决**（784c1a4 Intro 重写四点裁决）：整体采纳（claim-first、We-contribute 枚举正是 best-paper 贡献列表句式），但**面板 (c)/(d) 主文引用被整句删除**——四面板图两面板无正文引用（图文一致性缺口，裁决点 1），且 P4 低频坐标主张失去动机诊断支撑链（裁决点 3）。恢复最小引用（caveat 细节 caption 已承载——"random32 does not preserve RoPE pairs"、"It uses ... unlike the current gate"——正文只补引用与最短限定）：
+  - en P4 插入 (c) 句：`The coordinate diagnostic in Figure~4(c) motivates the compact view; its random baseline does not preserve RoPE pairs.`
+  - en P4 门控句恢复 (d) 引用：`We also formulate a prefill-informed far gate motivated by the layer variation in Figure~4(d); it is disabled by default and requires separate evaluation.`
+  - zh 直译同步两句：「图(c)的坐标诊断为紧凑视图提供动机；其随机基线未保留RoPE旋转对。」「本文还给出由图(d)中历史层间差异提供动机的预填充远区门控扩展；该门控默认关闭，需要单独评估。」
+  - **版式溢出处置**：初版恢复（含完整 caveat，+46 词）使 en 正文溢至 6 页内容+references 第 7 页（零余量失败模式第三次）；两次压缩至 +12 词净增后回到 6 页总页数。caveat 的主文版（"cannot isolate frequency from pair structure"/"different single-query statistic"）以 caption 版为准——诚实信息未删，仅移位。
+- 44d09d7（Design implications 压缩，Thus 收口句移除）裁决**采纳**：takeaway「quality--cost benefit remains unresolved→requires matched measurements」在结论完整存活，属零余量压缩非信息删除，不回插。
+- 编译验证：en 6 / zh 6 页，0 未定义引用。
