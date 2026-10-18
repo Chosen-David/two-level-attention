@@ -76,6 +76,8 @@
 
 ## 待办池（未排期，均有用户指令或审计来源）
 
+- [x] [TL-E151C-INPUT-20261018] quota JSON 构造期拒绝字符/对象键误读、空表及非法数值；保留合法取整，13项普通/-O专项通过。短表/配置支持仍待办。([详情](task_details/TL-E151C-INPUT-20261018.md))
+
 - [ ] [TL-E151C-ROUTE-20261018] prefill 配额路由修复：reference 激活/异常清理，batch 回退逐组；35项/场景普通及-O CPU验证，GPU/实模/性能与历史配额臂重测待办。([详情](task_details/TL-E151C-ROUTE-20261018.md))
 
 - [ ] [TL-DAC-BEST-PAPERS-20261016] DAC 2017–2026 Best Paper PDF 收集：13 篇获奖名单已核实，7 篇有效 PDF 已入 advice/DAC_best_paper，6 篇因全文入口受阻/失效待补；2026-10-16 第三轮 arXiv/作者关键词补查新增 1 篇明确标注的后续期刊 PDF（不计入 7/13），第五轮 arXiv 专项 24 组查询及 v1 版本核查仍缺 6 篇；用户明确不发邮件，已取消发送路线；附来源、版本、页数与 SHA-256。

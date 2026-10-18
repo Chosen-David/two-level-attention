@@ -123,7 +123,22 @@ class TLIIndexer(TIAIndexer):
         _e151c_path = os.environ.get("TLI_E151C_ORACLE_QUOTA")
         if _e151c_path:
             with open(_e151c_path) as _f:
-                self._e151c_quota = [int(round(float(x))) for x in json.load(_f)]
+                quotas = json.load(_f)
+            if not isinstance(quotas, list) or not quotas:
+                raise ValueError("E151c quota must be a nonempty JSON array")
+            parsed = []
+            for value in quotas:
+                if type(value) not in (int, float):
+                    raise ValueError("E151c quotas must be finite nonnegative numbers")
+                try:
+                    number = float(value)
+                except OverflowError as exc:
+                    raise ValueError("E151c quotas must be finite nonnegative numbers") from exc
+                if not math.isfinite(number) or number < 0:
+                    raise ValueError("E151c quotas must be finite nonnegative numbers")
+                # Preserve the existing nearest-even rounding of oracle means.
+                parsed.append(int(round(number)))
+            self._e151c_quota = parsed
         self.near_len = 2048                                      # 近端窗（D'/B 共用）
         # ---- E64j method 组合参数化（用户命名: mminmax/cavg/aavg 等）----
         self.far_method = getattr(args, "tli_far_method", "minmax")

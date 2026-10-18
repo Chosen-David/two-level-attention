@@ -1,0 +1,208 @@
+test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) ... 
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=True) ... FAIL
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=False) ... FAIL
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value='32') ... FAIL
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=None) ... ERROR
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value={}) ... ERROR
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=[]) ... ERROR
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=-1) ... FAIL
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=-0.1) ... FAIL
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=inf) ... ERROR
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=-inf) ... ERROR
+  test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000) ... ERROR
+test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) ... 
+  test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) (value='32') ... FAIL
+  test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) (value={'32': 999}) ... FAIL
+  test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) (value=[]) ... FAIL
+  test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) (value=None) ... ERROR
+  test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) (value=32) ... ERROR
+test_numeric_rounding_is_preserved (test_e151c_quota_input.QuotaInputTests.test_numeric_rounding_is_preserved) ... ok
+
+======================================================================
+ERROR: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=None)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 37, in test_invalid_elements_rejected
+    self.load([32, value])
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 19, in load
+    return TLIIndexer(SimpleNamespace(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "cb0c8f430b9e2595caef48590b01690a99d416b3:sparse_attn/indexer/tli_indexer.py", line 126, in __init__
+    quotas = json.load(_f)
+                           
+TypeError: float() argument must be a string or a real number, not 'NoneType'
+
+======================================================================
+ERROR: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value={})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 37, in test_invalid_elements_rejected
+    self.load([32, value])
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 19, in load
+    return TLIIndexer(SimpleNamespace(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "cb0c8f430b9e2595caef48590b01690a99d416b3:sparse_attn/indexer/tli_indexer.py", line 126, in __init__
+    quotas = json.load(_f)
+                           
+TypeError: float() argument must be a string or a real number, not 'dict'
+
+======================================================================
+ERROR: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=[])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 37, in test_invalid_elements_rejected
+    self.load([32, value])
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 19, in load
+    return TLIIndexer(SimpleNamespace(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "cb0c8f430b9e2595caef48590b01690a99d416b3:sparse_attn/indexer/tli_indexer.py", line 126, in __init__
+    quotas = json.load(_f)
+                           
+TypeError: float() argument must be a string or a real number, not 'list'
+
+======================================================================
+ERROR: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=inf)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 37, in test_invalid_elements_rejected
+    self.load([32, value])
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 19, in load
+    return TLIIndexer(SimpleNamespace(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "cb0c8f430b9e2595caef48590b01690a99d416b3:sparse_attn/indexer/tli_indexer.py", line 126, in __init__
+    quotas = json.load(_f)
+                           
+OverflowError: cannot convert float infinity to integer
+
+======================================================================
+ERROR: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=-inf)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 37, in test_invalid_elements_rejected
+    self.load([32, value])
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 19, in load
+    return TLIIndexer(SimpleNamespace(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "cb0c8f430b9e2595caef48590b01690a99d416b3:sparse_attn/indexer/tli_indexer.py", line 126, in __init__
+    quotas = json.load(_f)
+                           
+OverflowError: cannot convert float infinity to integer
+
+======================================================================
+ERROR: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 37, in test_invalid_elements_rejected
+    self.load([32, value])
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 19, in load
+    return TLIIndexer(SimpleNamespace(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "cb0c8f430b9e2595caef48590b01690a99d416b3:sparse_attn/indexer/tli_indexer.py", line 126, in __init__
+    quotas = json.load(_f)
+                           
+OverflowError: int too large to convert to float
+
+======================================================================
+ERROR: test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) (value=None)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 30, in test_non_arrays_and_empty_arrays_rejected
+    self.load(value)
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 19, in load
+    return TLIIndexer(SimpleNamespace(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "cb0c8f430b9e2595caef48590b01690a99d416b3:sparse_attn/indexer/tli_indexer.py", line 126, in __init__
+    quotas = json.load(_f)
+                           
+TypeError: 'NoneType' object is not iterable
+
+======================================================================
+ERROR: test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) (value=32)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 30, in test_non_arrays_and_empty_arrays_rejected
+    self.load(value)
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 19, in load
+    return TLIIndexer(SimpleNamespace(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "cb0c8f430b9e2595caef48590b01690a99d416b3:sparse_attn/indexer/tli_indexer.py", line 126, in __init__
+    quotas = json.load(_f)
+                           
+TypeError: 'int' object is not iterable
+
+======================================================================
+FAIL: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 36, in test_invalid_elements_rejected
+    with self.assertRaises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 36, in test_invalid_elements_rejected
+    with self.assertRaises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value='32')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 36, in test_invalid_elements_rejected
+    with self.assertRaises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=-1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 36, in test_invalid_elements_rejected
+    with self.assertRaises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_invalid_elements_rejected (test_e151c_quota_input.QuotaInputTests.test_invalid_elements_rejected) (value=-0.1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 36, in test_invalid_elements_rejected
+    with self.assertRaises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) (value='32')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 29, in test_non_arrays_and_empty_arrays_rejected
+    with self.assertRaises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) (value={'32': 999})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 29, in test_non_arrays_and_empty_arrays_rejected
+    with self.assertRaises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_non_arrays_and_empty_arrays_rejected (test_e151c_quota_input.QuotaInputTests.test_non_arrays_and_empty_arrays_rejected) (value=[])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-oct18-review/tests/test_e151c_quota_input.py", line 29, in test_non_arrays_and_empty_arrays_rejected
+    with self.assertRaises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.021s
+
+FAILED (failures=8, errors=8)
