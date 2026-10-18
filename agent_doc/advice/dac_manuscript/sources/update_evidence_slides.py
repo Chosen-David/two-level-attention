@@ -7,8 +7,61 @@ R=Path(__file__).resolve().parents[1];p=R/'presentation/TwoLevel_UserEdited_2026
 # Bounded layout/wording refresh: preserve all other slide XML and text.
 import argparse
 parser = argparse.ArgumentParser(description='Synchronize archived-evidence presentation assets.')
-parser.add_argument('--only', choices=['all', 'decode-ruler-q3'], default='all')
+parser.add_argument('--only', choices=['all', 'decode-ruler-q3', 'ruler32-64'], default='all')
 args = parser.parse_args()
+if args.only == 'ruler32-64':
+ # Surgical ZIP edits preserve all other slide XML, diagrams and user material.
+ from lxml import etree
+ import zipfile, copy
+ ns = {'a':'http://schemas.openxmlformats.org/drawingml/2006/main',
+       'p':'http://schemas.openxmlformats.org/presentationml/2006/main',
+       'r':'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
+ updates = {
+ 14: {2: ['RULER 32K／64K：方法配置与稠密 FullKV 的 AVG'],
+      4: ['11任务 × 100例／任务／臂；32K跨机：8B β=.0625、评分器不同；32B β=.125、清单匹配。',
+          '64K稀疏两臂报告同机、评分器哈希相同，但生成脚本／有效配置不同；稠密锚另次运行、评分器不同、legacy-partial。',
+          '仅稀疏臂K=1024，页64／K₁=128／保护4+128／cmp4；门控与实际评分维数未核。',
+          '描述性汇总；预测未重放、无配对区间，不证明因果、非劣或匹配质量—完整请求成本收益。']},
+ 16: {2: ['32K／64K逐任务差异解释 AVG，不另设逐项零损门槛'],
+      4: ['64K：三臂MultiKey-3均为0、CWE均低于1；稀疏臂评分器哈希相同，生成脚本／有效配置不同。',
+          '稠密锚另次运行、不同评分器、legacy-partial；预测未重放，无配对区间；门控与实际维数未核。']}}
+ replacement={}
+ with zipfile.ZipFile(p) as z:
+  for number, edits in updates.items():
+   name=f'ppt/slides/slide{number}.xml';xml=etree.fromstring(z.read(name))
+   shapes=list(xml.find('p:cSld/p:spTree',ns))[2:]
+   for index, lines in edits.items():
+    body=shapes[index].find('p:txBody',ns);old=body.findall('a:p',ns);template=copy.deepcopy(old[0])
+    for para in old:body.remove(para)
+    for line in lines:
+     para=copy.deepcopy(template);texts=para.findall('.//a:t',ns)
+     texts[0].text=line
+     for extra in texts[1:]:extra.text=''
+     if index==4:
+      for prop in para.findall('.//a:rPr',ns)+para.findall('.//a:defRPr',ns)+para.findall('.//a:endParaRPr',ns):prop.set('sz','1600' if number==14 else '1500')
+     body.append(para)
+   box=shapes[4].find('p:spPr/a:xfrm',ns)
+   if number==14:
+    box.find('a:off',ns).set('y',str(int(6.35*914400)));box.find('a:ext',ns).set('cy',str(int(1.55*914400)))
+   else:
+    box.find('a:off',ns).set('y',str(int(8.40*914400)));box.find('a:ext',ns).set('cy',str(int(.65*914400)))
+    pic=shapes[3].find('p:spPr/a:xfrm',ns)
+    pic.find('a:off',ns).set('x',str(int(3.0*914400)))
+    pic.find('a:ext',ns).set('cx',str(int(10.7*914400)));pic.find('a:ext',ns).set('cy',str(int(10.7*4.5/7.1*914400)))
+   picture=xml.find('.//p:pic',ns);rid=picture.find('.//a:blip',ns).get('{'+ns['r']+'}embed')
+   relname=f'ppt/slides/_rels/slide{number}.xml.rels';rels=etree.fromstring(z.read(relname))
+   media=f'ruler32_64_slide{number}.png'
+   next(el for el in rels if el.get('Id')==rid).set('Target','../media/'+media)
+   stem='ruler32k_avg_compact_zh' if number==14 else 'ruler32k_comparison_zh'
+   replacement['ppt/media/'+media]=(R/'figures/ruler32k_comparison'/f'{stem}.png').read_bytes()
+   replacement[name]=etree.tostring(xml,xml_declaration=True,encoding='UTF-8',standalone=True)
+   replacement[relname]=etree.tostring(rels,xml_declaration=True,encoding='UTF-8',standalone=True)
+  tmp=p.with_suffix('.tmp.pptx')
+  with zipfile.ZipFile(tmp,'w',zipfile.ZIP_DEFLATED) as out:
+   for item in z.infolist():out.writestr(item,replacement.pop(item.filename,z.read(item.filename)))
+   for name,data in replacement.items():out.writestr(name,data)
+ tmp.replace(p)
+ raise SystemExit(0)
 if args.only == 'decode-ruler-q3':
  from lxml import etree
  import zipfile
