@@ -1,0 +1,53 @@
+{
+  "id": "e147h_r128k",
+  "date": "2026-10-19",
+  "title": "E147h 第 7 臂收官：RULER 128K β.0625 = 45.73 距 β.125 -0.29 噪声带内通过（vs FullKV -0.70）——七臂全闭合",
+  "config": {
+    "arm": "tli_64_128_1024_c4_Aa0.25_b0.0625_g0.625_sk4_sw128（RULER 128K 11 任务，yarn factor 4.0，native 131072）",
+    "machine": ".187 GPU6/7（10-18 16:20 起过夜，vt 尾任务 05:26 完）"
+  },
+  "results": {
+    "e147h_beta0625_avg": 45.73,
+    "e146c_beta125_avg": 46.02,
+    "fullkv_anchor": 46.43,
+    "diff_vs_beta125": -0.29,
+    "diff_vs_fullkv": -0.70,
+    "retention_vs_fullkv_pct": 98.49,
+    "per_task_beta0625": {
+      "niah_single_1": 100.0, "niah_single_2": 100.0, "niah_single_3": 100.0,
+      "niah_multikey_1": 98.0, "niah_multikey_2": 36.0, "niah_multikey_3": 0.0,
+      "niah_multiquery": 17.5, "niah_multivalue": 3.75,
+      "cwe": 0.6, "fwe": 24.33, "vt": 22.8
+    },
+    "per_task_beta125_e146c": {
+      "niah_single_1": 100.0, "niah_single_2": 100.0, "niah_single_3": 100.0,
+      "niah_multikey_1": 99.0, "niah_multikey_2": 39.0, "niah_multikey_3": 0.0,
+      "niah_multiquery": 18.25, "niah_multivalue": 3.5,
+      "cwe": 0.4, "fwe": 22.67, "vt": 23.4
+    },
+    "per_task_delta_vs_beta125": {
+      "niah_single_1": 0.0, "niah_single_2": 0.0, "niah_single_3": 0.0,
+      "niah_multikey_1": -1.0, "niah_multikey_2": -3.0, "niah_multikey_3": 0.0,
+      "niah_multiquery": -0.75, "niah_multivalue": 0.25,
+      "cwe": 0.2, "fwe": 1.66, "vt": -0.6
+    }
+  },
+  "judgment": [
+    "128K β.0625 = 45.73：vs β.125 46.02 为 -0.29——11 任务 AVG 噪声带（约 ±0.6-1.0）内，判据「不低于 β.125 同档或噪声带内」通过（边缘）",
+    "vs FullKV 锚 46.43 为 -0.70（保持率 98.49%；β.125 为 -0.41 / 99.1%）——far 压力最大的 128K 档 near 减半代价温和显现但未破带",
+    "结构：3 升 6 降 2 平且全部小幅度——far 型 fwe +1.66 继续兑现 β.0625 far 配额翻倍收益（24.33 vs 22.67）；near 代价 mk2 -3 / mk1 -1 / vt -0.6 与 64K/32B 同型温和",
+    "single_1-3 三档满分与 β.125 完全一致——128K 精确单点检索零损；mk3 双零、cwe 0.6 为双臂同低（FullKV 锚自身 yarn 外推塌陷既有口径，非 β 特异）",
+    "E147h 七臂记分闭合：LBv2 ✓（-0.20）/ LB ZH ✓（-0.36 边缘）/ LB EN ✓（-0.60 边缘）/ RULER 64K ✓（+0.80）/ 128K ✓（-0.29 边缘）/ 32B ✓（-0.61 边缘）/ β 曲线 ✓（59.29 峰值）/ Llama ✗（-2.31 唯一否决）——Qwen3-8B/32B 全数据集 + RULER 三档全过，唯跨模型族否决"
+  ],
+  "sources": {
+    "formal": "exp/trace/results/e147h_r128k_formal.json（四件套，.187 打分原件拉回，staging root /tmp/e147h_128k_root 单 L 档）",
+    "raw": ".187:~/tmp_e146b_tree_187/exp/results_ruler/Qwen3-8B/L131072/pred/*e147h*（11 任务 100 行/格核验）",
+    "baselines": "e146c_r128k_formal.json（β.125 46.02）+ e146c_series_verdict.json（FullKV 锚 46.43）复用"
+  },
+  "caveats": [
+    "跨机配对：β.0625 在 .187、β.125 e146c 128K 亦在 .187（同树 tmp_e146b_tree_187）——同机同树干净配对",
+    "cwe 0.6 双臂同低 + FullKV 锚 yarn 外推塌陷为既有披露口径；vt 22.8 为 yarn factor 4.0 外推值",
+    "128K native 131072 超 32K native 池，yarn producer receipt v2 闭合 11/11"
+  ],
+  "generated_at": "2026-10-19T05:52"
+}

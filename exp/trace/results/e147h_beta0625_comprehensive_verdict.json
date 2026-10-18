@@ -1,0 +1,58 @@
+{
+  "id": "e147h_comprehensive",
+  "date": "2026-10-19",
+  "title": "E147h β.0625 主口径全量重测综合判决——七臂六过一否决：Qwen3-8B/32B 全数据集 + RULER 三档 + LB 三件套全过，Llama 跨模型族 -2.31 唯一边界；β.0625 敲定 Qwen3 主口径（β.125 全量数据并行保留）",
+  "decision": "ADOPTED_WITH_BOUNDARY",
+  "config": {
+    "protocol": "β.125→β.0625 单变量（near 页 16→8、near 词元 640→320 减半；far 页 120/词元 572 增），其余全同（α0.25/γ0.625/K1=128/K2=1024/sink4/swa128/tail minmax+avg）",
+    "arms": [
+      "LBv2（503 MCQ 31.5K 截断，.187 GPU2）",
+      "LB 中文（8 任务，.187 GPU3/4）",
+      "LB 英文（13 任务 31.5K 截断，wys GPU1/3）",
+      "RULER 64K（wys GPU0/2 同机 β.125 配对）",
+      "RULER 128K（.187 GPU6/7 过夜）",
+      "Qwen3-32B RULER 32K（wys GPU2/3）",
+      "Llama-3.1-8B RULER 32K（.187 GPU5）",
+      "β 消融三点曲线（β.03125 补全量 .187 GPU0）"
+    ]
+  },
+  "results": {
+    "scoreboard": {
+      "lbv2": {"beta0625": 32.21, "beta125": 32.41, "delta": -0.20, "verdict": "PASS"},
+      "lb_zh": {"beta0625": 45.646, "beta125": 46.004, "delta": -0.36, "verdict": "PASS_EDGE"},
+      "lb_en": {"beta0625": 50.651, "beta125": 51.252, "delta": -0.60, "verdict": "PASS_EDGE"},
+      "ruler_64k": {"beta0625": 48.85, "beta125": 48.05, "delta": 0.80, "verdict": "PASS"},
+      "ruler_128k": {"beta0625": 45.73, "beta125": 46.02, "delta": -0.29, "verdict": "PASS_EDGE"},
+      "qwen3_32b_32k": {"beta0625": 50.03, "beta125": 50.64, "delta": -0.61, "verdict": "PASS_EDGE"},
+      "beta_curve_32k": {"beta125": 58.30, "beta0625": 59.29, "beta03125": 58.07, "verdict": "PASS_PEAK"},
+      "llama_32k": {"beta0625": 83.88, "beta125": 86.19, "delta": -2.31, "verdict": "REJECT"}
+    },
+    "beta_curve": "三点倒 U：.125 58.30 / .0625 59.29（峰值）/ .03125 58.07——+0.99/-1.22 不对称超噪声带，β.0625 峰值甜点确认",
+    "migration_picture": "far 受益任务（cwe/mk2/RULER 长档 fwe）升、near 受益任务（pr_en/triviaqa/narrativeqa/single_3/mk2@Llama）降——β.0625 为任务结构依赖甜点，near 供给代价在 Qwen3 上温和、在 Llama rotate_half GQA 上放大 -2.31"
+  },
+  "judgment": [
+    "β.0625 在 Qwen3-8B 全数据集（LBv2/LB ZH/LB EN/RULER 32/64/128K）+ Qwen3-32B 跨规模全部通过（四臂边缘带内 + 64K 反超 +0.80 + β 曲线峰值），唯 Llama-3.1-8B 跨模型族否决 -2.31——判 β.0625 敲定 Qwen3 主口径",
+    "论文口径：Qwen3 全表主行 β.0625（32K 59.29 距 FullKV -0.09）；Llama 表 β.125 主行 + β 迁移边界披露（β.0625 甜点为 Qwen3 特异，Llama near 减半代价 -2.31 系 rotate_half GQA 放大）",
+    "vs 四 baseline 战绩（β.0625 口径）：Quest 42.85 三档全胜 / AsyncTLS 50.09 +9.2 / JSSA 58.7 +0.59 噪声带边缘（K2=1024 同预算）/ FASA LB 33.40——β.0625 后四基线击败战全部成立（E147j K2=512 半预算行另计 +5.91）",
+    "边缘通过四臂（LB ZH -0.36 / LB EN -0.60 / 128K -0.29 / 32B -0.61）如实披露：均在天花板噪声带内但方向一致向下，与 β.125 并行数据保留，非静默挑选",
+    "E153 ablation 全网格重跑（#279）随本判决解锁：47 格按 β.0625 重跑 + β 轴三点曲线入消融面板"
+  ],
+  "sources": {
+    "arms": [
+      "e147h_r128k_verdict.json（本批）",
+      "e147h_en_verdict.json（LB EN）",
+      "e147c32b_beta0625_verdict.json（32B）",
+      "e147d_beta03125_verdict.json（β 曲线）",
+      "e147c_series_verdict.json v2（32K 59.29）",
+      "e147h_r64k formal + e146c_series_verdict.json（64K 48.85）",
+      "e145d_lbv2_verdict.json / e145c 系列（LBv2/LB ZH）",
+      "e147hl_r32k_formal（Llama）"
+    ]
+  },
+  "caveats": [
+    "跨机配对臂（LB EN β.0625 wys vs β.125 e145c-en .187；Llama 双臂跨机）——E147cwys 已证跨机 greedy 零漂移，LB v1 单任务锚摆 ~5 分既有口径，AVG 级判读",
+    "Llama 否决臂 -2.31 的归因（rotate_half GQA near 供给放大）为待验证解释，论文以边界披露而非机制断言表述",
+    "β.03125 臂 58.07 与 β.125 58.30 在噪声带内不可区分——曲线左半斜率判读为描述性"
+  ],
+  "generated_at": "2026-10-19T05:55"
+}
