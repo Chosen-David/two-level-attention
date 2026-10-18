@@ -96,12 +96,14 @@ b_n=\max\!\left(\lfloor s/B\rfloor,\left\lfloor(S-w-L)/B\right\rfloor\right).
 \textbf{表示维护与成本记账。}追加键、移动区域边界及改变坐标映射时，派生视图、逻辑词元索引与区域归属须保持一致；共享映射恒等式并未规定增量维护算法。量化--反量化键使用16级浮点数值，不是打包INT4算术。完整请求计时包含表示准备、维护、标定、选择、KV聚集、注意力与同步，重叠工作计一次。TTFT截止首个返回词元，TPOT为后续返回间隔均值。这些定义是匹配评估要求，不表示历史研究已测得完整请求成本。
 
 \clearpage
-\section*{补充图S8：RULER 32K逐任务得分}
+\section*{补充图S8：RULER 32K／64K逐任务得分}
 \noindent\includegraphics[width=\textwidth]{ruler32k_comparison/ruler32k_comparison_zh.pdf}
-\par\medskip\noindent 作者报告的11任务得分，每任务每臂100例。主指标AVG为完整11任务得分的算术平均；逐任务结果解释差异，不另设逐项零损门槛。差值为本方法减稠密FullKV的分数点，无配对置信区间。两方法臂使用不同分配：Qwen3-8B的$\beta=.0625$，Qwen3-32B为$.125$。报告标签共同包含页长64、$K_1=128$、$K=1024$、$\alpha=.25$、$\gamma=.625$、前缀4／近期128及压缩比4。门控状态、实际L1/L2维数与实际选集未独立核验，不能标为已验的共享子空间加门控结果。
+\par\medskip\noindent 作者报告的11任务得分，每任务每臂100例，覆盖32K（Qwen3-8B、Qwen3-32B）与64K（Qwen3-8B）。主指标AVG为完整11任务得分的算术平均；逐任务结果解释差异，不另设逐项零损门槛。差值为本方法减稠密FullKV的分数点，无配对置信区间。32K两方法臂使用不同分配：Qwen3-8B的$\beta=.0625$，Qwen3-32B为$.125$。64K面板比较$\beta=.0625$与$\beta=.125$两种稀疏分配及复用的稠密FullKV锚。报告标签共同包含页长64、$K_1=128$、$K=1024$、$\alpha=.25$、$\gamma=.625$、前缀4／近期128及压缩比4。门控状态、实际L1/L2维数与实际选集未独立核验，不能标为已验的共享子空间加门控结果。
 
 \par\medskip\noindent 两组比较均跨机器。8B的任务ID、答案哈希、长度与源数据哈希在清单层面相符，但评分器不同，输入身份分别为native与legacy-partial。其$-0.09$分AVG差异仅为未匹配历史汇总的算术差。32B的源数据哈希、评分器、生产脚本与模型配置记录相符，但原始预测配对及跨机重放尚未核验。$-1.58$分AVG差异包括MK2提高11分、CWE下降8.80分、FWE下降7.33分；两臂MQ/MV均零不能定因。两面板均不证明统计非劣、同一配置的跨模型规模验证或匹配质量--成本收益。
 
-\par\medskip\noindent 来源：8B为E147c稀疏与E116e历史FullKV；32B为E143a稀疏与FullKV，固定仓库版本\texttt{b5a97b31\allowbreak{}4119006d\allowbreak{}c7e1624b\allowbreak{}f60268ff\allowbreak{}2501e44d}。可编辑图目录保存8份精确JSON／manifest快照、Git blob来源、24行得分／差值CSV及复现脚本。这是汇总算术复核，不是新增实验；128K历史损失仍保留在主文及S6。
+\par\medskip\noindent 64K比较中，$\beta=.0625$（E147h）与$\beta=.125$（E146c）两稀疏臂同机配对；稠密锚（E119，48.54）来自另一次运行。$\beta=.0625$臂AVG为48.85，$\beta=.125$臂为48.05：稀疏两臂差$+0.80$，对锚分别为$+0.31$与$-0.49$。三臂在MultiKey-3上均得零分、CWE均低于1分，说明64K整体水平偏低是稠密与稀疏共有的现象。无配对置信区间，预测也未重放；这些是作者报告的描述性汇总。
+
+\par\medskip\noindent 来源：8B为E147c稀疏与E116e历史FullKV；32B为E143a稀疏与FullKV，固定仓库版本\texttt{b5a97b31\allowbreak{}4119006d\allowbreak{}c7e1624b\allowbreak{}f60268ff\allowbreak{}2501e44d}；64K为E147h／E146c稀疏两臂与E119 FullKV锚，版本\texttt{51b4679c\allowbreak{}52feebc5\allowbreak{}327775c6\allowbreak{}60db4155\allowbreak{}0b1c8782}。可编辑图目录保存8份精确JSON／manifest快照、Git blob来源、48行得分／差值CSV及复现脚本。这是汇总算术复核，不是新增实验；128K历史损失仍保留在主文及S6。
 
 \end{document}

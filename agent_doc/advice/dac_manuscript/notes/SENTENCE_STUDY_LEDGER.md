@@ -29,6 +29,17 @@
 
 ## 修改日志
 
+### 第 28 轮（2026-10-18，用户改指令：Intro 逐句 in place 修复 + E147h 64K 图美化 + 推送远端）
+
+- **指令变化**：不写新拆解笔记，直接对照 best paper 范式逐句审计引言并 in place 修复；同步中文；**推送远端**；新数据（E147h RULER 64K）可视化美化。
+- **Intro 逐句审计修复（en+zh）**：P2 删 hedging 虚词 "potentially"（"can be loose" 保留方向性）；P5 β 比较平行化（"0.99 points higher for $\beta=.0625$ than for $\beta=.125$"）。
+- **E147h RULER 64K 新数据接入图目录**：`inputs/` 增 e147h（β.0625，AVG 48.85）/e146c（β.125，48.05）/e119（FullKV 锚，48.54）三份 JSON，`provenance.json` 补 SHA256 与 commit 51b4679；`draw.py` 全图与紧凑图各加第三面板（64K 三臂：锚白圆、β.125 白菱淡边、β.0625 实心深蓝菱；紧凑图为三横条），`scores.csv` 扩至 48 行，`arithmetic_check.json` 加 8B-64K 断言（Δβ 两臂 +0.80、对锚 +0.31/−0.49，1e-6 容差通过）。
+- **zh 图渲染 bug 根因修复**：`ValueError: bytes must be in range(0,256)` —— matplotlib ≥3.11 的 PDF 字形子集 tracker 从 **`ps.fonttype`**（而非 `pdf.fonttype`）取子集宽度；draw.py 只切 pdf.fonttype 致 CJK 码点原样进单字节 chunk。修复：两 rcParams 同步赋值（en 42 / zh 3）。README 已记坑。
+- **主文与补充材料 64K 接入（en+zh）**：fig:ruler32k-quality 图注改 32K/64K 并披露"64K 稀疏两臂同机、锚另一次运行"；Q2 段 Against-dense 句改为三口径并列（−0.09 / −1.58 / +0.31，β.125 −0.49，同机披露句内）；Workloads 段证据清单补 64K；S8 补充材料标题改 32K/64K、新增 64K 三臂披露段（MK3 三臂全零、CWE 均 <1——64K 低水平为稠密稀疏共有，非稀疏特有损失）、来源段补 51b4679 修订号。
+- **版式零余量第五次触发**：64K 新增 +45 词致 en 溢至 7 页（AI 声明块被挤到第 6 页、references 落第 7 页）；三波压缩回收（图注三句合并、Workloads/实验设置/Q1/Q2/Q3/设计启示/结论逐句收紧共约 40 词）恢复 6 页。诚实信息全部保留（"8B scorers differ; 32B manifests match, predictions unreplayed" 并入图注单句）。
+- **编译验证**：四文档 6/6/9/9 页、0 未定义引用、zh 字体全嵌入、48.85 上图（en 第 5 页）。
+- **远端 cb0c8f4 Intro 重写裁决**（合并时执行）：P1/P3/P5 采纳（否定先行句式删除、(b) 图口径精化 whole-bins/retained-fraction、β 定义为近区页分配参数+配额同变披露、4/128 展开）；P2 首句 claim-first 重写采纳但拒绝恢复 "potentially"；**P4 面板 (c)/(d) 引用再删——按第 27 轮判例恢复压缩版**。
+
 ### 第 27 轮（2026-10-18，远端 Intro 裁决 + RL-CCD §2 Related Works）
 - **远端检查与裁决**：fetch 发现 784c1a4（Intro 重写「sanitized introduction mapping」）、b9988a0（qwen 静态掩码测试，不动 tex）、44d09d7（Design implications 措辞精化）。逐点裁决：
   - **784c1a4 Intro 重写：整体采纳，但面板 (c)/(d) 主文引用被整句删除——恢复**。重写质量高（P1 需求链更紧、P2 "so fewer misses need not mean less missed mass" 反直觉收口、P3 设计问句化、P5 新增 We-contribute 枚举——正式采纳 best-paper 贡献列表句式；第 26 轮 the-diagnostic 主语修复随之删除）。但四面板图两面板（(c)(d)）无任何正文引用——图文一致性缺口（裁决点 1）；P4「低频坐标对」主张失去动机诊断支撑链（裁决点 3）。恢复最小引用形：en P4 插入 `The coordinate diagnostic in Figure~4(c) motivates the compact view; its random baseline does not preserve RoPE pairs.` + 门控句改 `...far gate motivated by the layer variation in Figure~4(d); it is disabled by default and requires separate evaluation.`（zh 直译同步）。**版式溢出处置**：初版含完整 caveat +46 词致 en 正文溢至 6 页+references 第 7 页（零余量失败模式第三次）；压缩至 +12 词净增恢复 6 页总页数；caveat 主文版移位至 caption（"random32 does not preserve RoPE pairs"/"It uses ... unlike the current gate" 已在 caption 承载，诚实信息未删）。第 24 轮 §III-B（t indexes）、第 25 轮 Q2（sparse arm）修复核验存活。
