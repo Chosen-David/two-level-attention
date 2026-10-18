@@ -23,11 +23,19 @@
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
-| 5 | 2023_Gamora.pdf | Abstract ✓ Intro ✓；待：§2 背景动机 | 摘要近远覆盖句（标题词注入） ✓ |
+| 5 | 2023_Gamora.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3 方法 | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 23 轮（2026-10-18，Gamora §2 Preliminary and Motivation）
+- 远端检查：仅 4d51efc / abb5a12（构建产物对账，不动 tex），无内容裁决需求。
+- 拆解笔记（追加至 `notes/sentence_studies/2023_gamora.md`）：§2.A：**成熟度声明句带多域枚举**（BNs well-studied+四域）/表示选择理由句带 since（AIG 统一数据结构=五任务共享同一表示）/定义句组/**转换保证句带性质副词**（fast and scalable）/cut 定义段图例走查句链（Thus 收口+By-pairing 提取机制句：机制→提取→聚合三层目的链）；§2.B：**收益+机制+普及三合一开场句**（分词双机制+引用簇）/**However 三连缺口句**（三方法逐个缺口各带机制归因——Intro 编号局限的正文展开版）/**Motivated-by 小节收口句**（双缺口→提案）；§2.C：**Since-自然适配句四任务版**/**Promising-as-they-are 让步缺口句**（ML 前作也双缺口：规模上限+泛化方向反——为 Unlike 句铺垫）/**双 corresponding/analogous 机制映射句**（把 §2.A/§2.B 铺垫机制逐点映射到 GNN——Intro corresponding-to 的正文完整版）/**Motivated-by-the-analogy 登场句**（与 §2.B 末句同构双收口）。
+- 对照结论：表示选择理由句（§III-A 慢旋转动机句=动机+诚实限定版等价）、转换保证句（eq:bound 定理级保证等价）、Promising-as-they-are（领域内无学习型稀疏注意力前作可诚实枚举，不适用）、双 corresponding/analogous（重审维持第 22 轮不加判定——类比仍暗示消息传递级等价，需实测）、However 三连缺口（credit-then-gap 已建）、Motivated-by 小节收口 ×2（§III 开头段已有需求承接句+gate 小节承接句，方法直述结构等价判定不加）、By-pairing 组合结构识别句（§III 开头 "two explicit mechanisms" 已分句覆盖两机制角色分工）均不改。**唯一实缺 = en §III-A L1 句目的从句被远端 55b9a17 精化删去**（"for coarse ranking" 丢失；zh 版「用于粗粒度排序」仍在——L1/L2 定义级目的平行性 en/zh 不一致）。
+- paper_en.tex §III-A：`L1 aggregates selected key coordinates into page summaries; L2 refines candidates...` → `...into page summaries for coarse ranking; L2 refines...`（恢复定义级目的从句，+3 词；zh 无需改）。
+- 编译验证：en 6 / zh 6 页，0 未定义引用。
+- 待后续轮次：Gamora §3 Proposed Approach、§4 实验。
 
 ### 第 22 轮（2026-10-18，Gamora Abstract + Introduction —— 第 5 篇开始）
 - 远端检查：仅 9690ba7（构建产物对账，不动 tex），无内容裁决需求。

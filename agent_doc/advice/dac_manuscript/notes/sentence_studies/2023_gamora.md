@@ -63,3 +63,44 @@
 - 判定上述各候选后，摘要与 Intro 的 Gamora 句式均有诚实镜像或不适用。转向**摘要句长审计**发现实缺：摘要第 2 句 "We study a near--far page-to-token cascade sharing 32 low-frequency RoPE scoring coordinates and using original-dimensional attention on selected tokens."（方法句 27 词）与 Gamora A3 对照——Gamora 登场句带三能力枚举（suffering 缺口逐点对应），我们的方法句无能力/范围枚举，但**「近远分区」区域属性在方法句中缺失**（题名 Near--Far、级联核心属性「区域配额控制两区访问」未出现在摘要方法句——读者从摘要只知道 cascade+共享坐标+原维注意力，不知道 near--far 分区这一标题词）。加 "near--far" 修饰：`We study a near--far page-to-token cascade ...` 句首已有 near--far；**改判定为句 3 与标题词对齐检查**：句 3 "Regional coverage involves trade-offs" 已承载区域属性。**最终实缺 = 摘要第 3 句被动泛指**："Regional coverage involves trade-offs" 无主语施动者（谁产生取舍？设计约束），与 claim-first/主动语态规则弱冲突，且未连接到标题词 near--far。改为 "Near--far coverage involves trade-offs"（把标题关键词注入摘要首三句，同时保留原义；-1 词无溢出风险）。
 - paper_zh.tex 直译同步（「近远覆盖存在取舍」——原句「区域覆盖存在取舍」）。
 - 版式核对：词数不变（近远 2 字替换区域 2 字），编译后核对 en 6 页。
+
+---
+
+## §2 Preliminary and Motivation（第 23 轮，2026-10-18）
+
+### §2.A Boolean Networks and AIGs（2 段）
+- **成熟度声明句带多域枚举**（"BNs are well-studied discrete mathematical models with broad applications in chemistry, biology, circuit design, formal verification"——铺垫节 opener=对象地位声明）。
+- **表示选择理由句带 since**（"a concise and uniform representation ..., known as AIGs, has found successful use in diverse EDA tasks, **since** AIGs allow rewriting, simulation, technology mapping, placement, and verification to **share the same data structure** [18]"——数据结构统一性=选择理由，五任务枚举）。
+- **定义句组**（each node at most two incoming / PI / PO / internal AND——教科书式 but 每句一个性质）。
+- **转换保证句带性质副词**（"Based on De Morgan's laws, any combinational BN can be converted into an AIG [4] **in a fast and scalable manner**"——定理引用+性质限定）。
+- **cut 定义段**：可行 cut 定义句（transitive fan-in cone / truth value assignments completely determine）→ K-feasible 定义句 → **图例走查句链**（Figure 2(a) 3-feasible cut of node 9 → truth table computation → **Thus 推导收口**（node 6 is XOR2, node 9 is XOR3）→ **By-pairing 提取机制句**（pairing XOR3 with MAJ3 with identical inputs → full adder bitslice → word-level aggregation——机制→提取→聚合三层目的链）。
+
+### §2.B Word-Level Abstraction（1 段）
+- **收益+机制+普及三合一开场句**（"Word-level abstraction **significantly reduces** the complexity ... **by grouping** wires ... **and keeping** useful information ..., which is widely applied in ... [15],[20],[26]"——分词双机制+引用簇）。
+- 双方法定义句（shape hashing 定义含 constructed-by 被动结构 / bitslice aggregation 定义）。
+- **However 三连缺口句**（"for large-scale BNs, structural hashing is memory-consuming; functional bitslice aggregation is not efficient due to the requirement of bit-blasting; the computation of symbolic evaluation is also expensive"——三方法逐个缺口，各带机制归因——Intro P3 编号局限的正文展开版）。
+- **Motivated-by 收口句**（"Motivated by the limited scalability and the difficulty of parallelism, we propose to exploit graph learning and GPU acceleration for highly scalable reasoning"——小节级动机回收，双缺口→提案）。
+
+### §2.C Graph Neural Network（2 段）
+- **Since-自然适配句四任务版**（"Since BNs ... are naturally represented as graphs, GNNs can be leveraged to classify ..., predict ..., analyze ..., and predict ..."——适配句+四前作枚举）。
+- **Promising-as-they-are 让步缺口句**（"**Promising as they are**, these approaches focus on graphs with tens of thousands of nodes, and conduct training on complex designs and inference on relatively simpler ones, in which the generalization capability ... is not well examined"——先功劳后双缺口：规模上限+泛化方向反——为贡献 bullet 3 的 Unlike 句铺垫）。
+- **GNN 机制对应段**（operate-by 句 / 初始化句 / 更新句）→ **双 corresponding/analogous 句**（"The propagation along edges ... **corresponding to** structural shape hashing; ... neighborhood aggregation **is analogous to** functional aggregation"——把 §2.A/§2.B 铺垫的两机制逐点映射到 GNN——Intro bullet 1 corresponding-to 句的正文完整版）。
+- **Thus 机制收口句**（"Thus, the inherent message-passing mechanism in GNNs enables simultaneously handling structural and functional information"）。
+- **Motivated-by-the-analogy 登场句**（"Motivated by the analogy between GNN computation and conventional reasoning, we propose a multi-task GNN ..."——类比回收→提案；与 §2.B 末句形成同构双 Motivated-by 收口）。
+
+### 对照我们手稿的差距结论（§III 方法节遍历）
+| Gamora §2 句式 | 我们的状态 |
+|---|---|
+| 表示选择理由句带 since（统一数据结构=理由） | §III-A 坐标选择动机句 "Their slower positional rotation motivates this selection, although it does not guarantee ..."——动机+诚实限定版，等价，不改 |
+| 转换保证句带性质副词（fast and scalable） | eq:bound 段 "$z_q^\top z_i\leq U_b(z_q)$ for every unquantized shared-space key"——定理级保证+范围限定（我们的性质副词=精确限定域），等价，不改 |
+| **Promising-as-they-are 让步缺口句**（ML 前作也双缺口：规模+泛化方向） | 我们 Related Work 无 ML 前作类（领域内无「学习型稀疏注意力」先例可诚实枚举四篇），不适用 |
+| **双 corresponding/analogous 机制映射句**（正文版） | 第 22 轮已判定诚实边界下不加（等价性主张需实测）；但注意 Gamora 的用法是**类比**（analogous）非等价（equivalent）——类比声明弱于功能等价声明。重审：我们的诚实对应物是 Intro P4 "supplies the scoring coordinates for both stages"（共享事实）而非机制类比；类比仍会暗示消息传递级等价，维持不加判定 |
+| However 三连缺口句（正文版编号局限） | credit-then-gap 已建（第 7/12/18 轮），改 |
+| Motivated-by 小节收口×2（双缺口→提案 / 类比→提案） | **本轮实缺候选**：我们 §III 各小节无 Motivated-by 收口——但 §III 开头段已有需求承接句（"To control both selection cost and candidate access, the cascade uses two explicit mechanisms"）+ gate 小节承接句（第 9 轮加）；小节级 Motivated-by 是 Gamora 背景节的结构（背景铺垫→动机收口→方法），我们的结构是方法直述（Intro 动机→方法），两种组织均常见，判定不加 |
+| By-pairing 提取机制句（机制→提取→聚合目的链） | §III-C→§III-D 走查链等价，不改 |
+| 图例走查句链（Thus 推导收口） | eq:bound 段 Each-signed-coordinate 句→so 收口（第 9 轮已确认达标），不改 |
+| **By-pairing 式「组合结构识别」句** | 重审无对应物：我们的页/词元两级组合（配额+共享坐标）在 §III 开头以 "two explicit mechanisms" 列出，但**两机制如何相互作用**（配额决定候选资格、坐标决定排序——两级各自的角色分工句）从未一句话点明。诚实可写：L1 配额决定哪些页可提供候选（eligibility），L2 共享坐标决定哪些词元被选（ranking）——这是定义级角色分工，§III 开头段 "L1 assigns separate page quotas ... In the ordinary L2 path, full-history scoring precedes ..." 已分句覆盖。判定：已覆盖，不加 |
+
+### 本轮修改（第 23 轮）
+- 遍历 §2 各句式后均有诚实镜像或判定不加（维持第 22 轮 corresponding-to 判定）。转向**§III-A 首句的对应物检查**：Gamora §2.A 的「表示选择理由句带 since」（AIG 统一数据结构）——我们 §III-A 首句 "Both regions and both selection stages use the same coordinate map within each layer and KV head, while each query head is scored separately." 是**共享事实句但无 since 理由**；共享的理由（同一评分视图服务两级→选择成本与视图一致性）在 §III 开头段（"To control both selection cost and candidate access"）而 §III-A 小节内无。实缺确认：**§III-A 首句缺 since 理由从句**——共享坐标图的「复用」性质（两个区域两个阶段共用→无需两套评分表示）是定义级事实。加理由：`Both regions and both selection stages use the same coordinate map within each layer and KV head, so the two stages share one scoring view, while each query head is scored separately.`——检查后判定更简形式：句内已有 "use the same coordinate map"，加 "so ..." 会同义重复。**改为另一实缺**：§III-A 第二句 "For Qwen3-8B, we select post-RoPE coordinates $J=...$ from each 128-dimensional query and key." 的 "For Qwen3-8B" 限定语——Qwen3-8B 是 8B 模型、128 维 RoPE；「每层每头」的层域已在首句，此句的 For 限定是模型限定（对非 Qwen3 模型坐标需重选）——**该限定语已充分**。最终定论：§III-A 句式对齐度已高（第 9/19 轮累积修复），**本轮实缺 = §III-A 末段 L1/L2 分工句的「用于粗粒度排序/精筛」目的从句缺失的 zh 版**——zh 版 "L1将选定的键坐标聚合为页摘要，用于粗粒度排序" 已有「用于」；en 版 "L1 aggregates selected key coordinates into page summaries"（第 19 轮远端精化删去了 for coarse ranking）——**en 版目的从句被删**。恢复定义级目的从句：`L1 aggregates selected key coordinates into page summaries for coarse ranking; L2 refines candidates using quantize--dequantize token keys.`（+3 词，恢复远端 55b9a17 精化前的功能等价信息；zh 保持不变）。
+- 版式核对：+3 词，编译后核对 en 6 页。
