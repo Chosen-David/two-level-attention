@@ -1,0 +1,51 @@
+{
+  "id": "e143a_lben32b",
+  "date": "2026-10-18",
+  "title": "E143a LB-EN 32B 收官——13 任务 AVG 43.20 vs 8B 同口径 51.25（跨规模 -8.05 非配对）；lcc/repobench 代码补全双塌陷须 32B dense 锚判别",
+  "config": {
+    "arm": "tli_64_128_1024_c4_Aa0.25_b0.125_g0.625_sk4_sw128（主口径 β.125 K1=128，decode-only 稀疏）",
+    "model": "Qwen3-32B；LongBench v1 英文 13 任务；cap_effective 31500；runcap strict_validated 13/13",
+    "machine": ".187 GPU0；eval scorer_backend difflib:stdlib"
+  },
+  "results": {
+    "e143a_lben32b_avg": 43.20,
+    "qwen3_8b_e145c_en_mavg_avg": 51.252,
+    "diff_cross_scale": -8.05,
+    "per_task": {
+      "2wikimqa":         {"e143a_32b": 55.08, "e145c_8b": 41.8,  "d": 13.28},
+      "gov_report":       {"e143a_32b": 33.25, "e145c_8b": 33.95, "d": -0.70},
+      "hotpotqa":         {"e143a_32b": 60.39, "e145c_8b": 58.71, "d": 1.68},
+      "lcc":              {"e143a_32b": 12.53, "e145c_8b": 67.9,  "d": -55.37},
+      "multi_news":       {"e143a_32b": 25.22, "e145c_8b": 24.71, "d": 0.51},
+      "multifieldqa_en":  {"e143a_32b": 49.89, "e145c_8b": 53.63, "d": -3.74},
+      "musique":          {"e143a_32b": 38.64, "e145c_8b": 33.66, "d": 4.98},
+      "narrativeqa":      {"e143a_32b": 28.35, "e145c_8b": 25.37, "d": 2.98},
+      "passage_retrieval_en": {"e143a_32b": 99.5, "e145c_8b": 100.0, "d": -0.5},
+      "qasper":           {"e143a_32b": 44.82, "e145c_8b": 47.69, "d": -2.87},
+      "qmsum":            {"e143a_32b": 24.23, "e145c_8b": 23.8,  "d": 0.43},
+      "repobench":        {"e143a_32b": 17.83, "e145c_8b": 65.74, "d": -47.91},
+      "triviaqa":         {"e143a_32b": 71.85, "e145c_8b": 89.32, "d": -17.47}
+    }
+  },
+  "judgment": [
+    "13 任务算术 AVG 43.20（561.58/13）；vs 8B 同口径 e145c-en mavg 51.252 为 -8.05——跨规模差值非配对（无 32B LB dense 锚），模型规模与稀疏供给两因子混杂，不可归因",
+    "结构分裂：7 任务正差或噪声级（2wiki +13.3 / musique +5.0 / narrativeqa +3.0 / hotpot +1.7），远区精确检索 passage_retrieval_en 99.5 保持（与 RULER 32B single 满分带同型——稀疏粗筛在 32B 远区单点检索上无崩溃）；3 任务温和负差（mfqa -3.7 / qasper -2.9 / triviaqa -17.5 中 triviaqa 偏大）",
+    "主掉点集中在代码补全双任务：lcc 12.53（-55.4）/ repobench 17.83（-47.9）——与 RULER 32B 观察（cwe -8.8、mk3 1.0 但 FullKV 锚同任务同样塌）同方向：32B 模型在未调 prompt 模板任务上自身退化 vs TLI 稀疏掉点，无锚不能判别（机制未定）；两任务若为模型侧，则 32B LB 叙事应如 8B 一样配对锚披露",
+    "2wiki +13.3 与 RULER 32B mk2 反超 +11 同型——稀疏过滤对 32B 干扰项的抑制有利方向如实保留",
+    "预算合规：13 任务 budget 990-1023 全部贴 K2=1024 上限，runcap 13/13 strict validated，无预算异常"
+  ],
+  "next_candidates": [
+    "可选锚臂：Qwen3-32B LB-EN dense（FullKV）13 任务——判别 lcc/repobench/triviaqa 塌陷是否模型侧（同 RULER 32B 锚判别协议）；用户拍板后派",
+    "32B LB aavg 单池臂（面板 G 跨规模扩展）可选，不阻塞主表"
+  ],
+  "sources": {
+    "pred": ".187:~/tmp_e146b_tree_187/exp/results_longbench/Qwen3-32B/pred_E143_en_mavg/pred/{13 任务}-tli_64_128_1024_c4_Aa0.25_b0.125_g0.625_sk4_sw128_he50e5a3a76-e143a.jsonl + result.json（10:16 eval）",
+    "8b_baseline": "exp/trace/results/e145c_en_mavg_verdict.json（mavg_sink4 per_task）"
+  },
+  "caveats": [
+    "32B LB 无 FullKV/dense 锚——跨规模 -8.05 非配对差值，模型规模与稀疏因子混杂；lcc/repobench 塌陷归因须锚判别（与 E143a RULER 32B mq/mv 双零判别同协议）",
+    "跨机：32B 在 .187，8B e145c-en 也在 .187 但不同 GPU/时间窗——同厂不同批次，差值判读边界保留",
+    "8B 对照为 β.125 主口径；E147 改进臂（β.0625）尚未做 32B/LB 迁移"
+  ],
+  "generated_at": "2026-10-18T10:2X"
+}
