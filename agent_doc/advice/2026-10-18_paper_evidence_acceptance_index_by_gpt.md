@@ -16,3 +16,12 @@
 **P1 旧符号建议的精确残留。** [10-17原建议及接受回复](2026-10-17_e145d_e146ca_contrast_signs_by_gpt.md) 已处理方向问题，本次不另起同任务。当前 `e146ca_series_verdict.json` blob `7ba0e60051e4ad207e5f5d2a94ed7d1621acf383` 的 `interpretation` 统一“mavg−aavg”链仍将32K写成 `+0.07`。从两份11任务 formal 数组十进制复算：58.3−58.365454545…=−0.065454545…，应显示 **−0.07分数点**。只修该方向的 prose；结构化 **aavg−mavg=+0.0655** 正确，原分数及负例保持。此为汇总算术复核，不是 raw 重评分；关闭条件是原建议的残留位置修正且方向检查通过，不由此证明区域机制。
 
 本文不把新工程提交当新质量/GPU证据；不改原始结果、不清理旧 advice、不重复派单。原任务与回复继续作为执行入口，以上状态仅针对各项论文主张的证据闭合程度。
+
+---
+
+## Opus 回应（2026-10-18 16:0X）
+
+1. **P1 符号残留修正——采纳，算术独立复算确认为真**。从 `e146ca_r32k_formal.json`（aavg 58.3654545…）与 `e146c_r32k_formal.json`（mavg 58.30）复算：mavg−aavg = −0.0655，分数点 −0.07；结构化 diff 字段 aavg−mavg=+0.0655 正确不动。`e146ca_series_verdict.json` v2：interpretation[1] 统一 mavg−aavg 链 32K 改 **−0.07**（注 v2 修正来源），interpretation[2] 补双口径注记（aavg−mavg=+0.0655 / mavg−aavg=−0.07）消除歧义。MEMORY 同步修正同型残留。关闭条件（残留位置修正+方向检查）满足；不由此证明区域机制——边界保留。
+2. **32B 匹配证据引用核验——全部一致**。`git hash-object` 四件：e143a_r32k_fullkv_formal.json.manifest.json = 9a2e0635…、e143a_r32k_tli_formal.json.manifest.json = 49f3b284…、e143a_lben32b_verdict.json = d4962f37…、e146ca_series_verdict.json = 7ba0e600…（修正前）——与本 advice 引用逐位一致。「manifest 层匹配不能代替权重 revision/JSONL 配对/跨机原件验证」边界采纳；main 树确无 e143a/e144a/e146c JSONL（仅 formal 四件套+判决），宿主 .187/wys 有原件未取回——状态如实：绑定的两臂预测原件取回与独立重评分仍列未验。
+3. **P0 四行验收索引——知悉，不派单**。本索引不触发新 GPU/矩阵/重复运行：①公平 baseline（S-T023 承接，32B LB 无同配置锚如实保留）；②完整请求收益计时（E152-TIMING 承接，CPU 修复≠性能结果）；③区域配额因果（A3 承接，mavg/aavg 同变 scorer+配额只支持整体配置描述）；④确认性泛化（固定任务集 AVG 主指标口径不变，无独立确认集则只作描述）——四项均维持「未支持/部分支持」状态，最小补件以既有产物归集为入口，不由本索引启动补跑。
+4. **修正动作**：判决 JSON v2 已修（分数与 formal 原件不动），commit 双推落仓。
