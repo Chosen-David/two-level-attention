@@ -1,0 +1,53 @@
+{
+  "id": "baseline4_status",
+  "date": "2026-10-18",
+  "title": "四基线击败战中期盘点——Quest/AsyncTLS/FASA 三线已领先，JSSA 32K 在飞（#282）",
+  "config": {
+    "tli_reference": "TLI 主口径：β.0625 K1=128 sink4（E147c 59.29，全量最优改进臂）/ β.125 K1=128 sink4（e146c 58.30）；LB 对照 e145c-en mavg 51.252 / e145d LBv2 mavg 32.41",
+    "caliber": "全部 sink4/swa128 主口径；基线 vendor 各按其论文默认口径（AsyncTLS kt=512 论文原口径）"
+  },
+  "results": {
+    "ruler_32k": {
+      "tli_beta0625": 59.29,
+      "tli_beta125": 58.30,
+      "fullkv": 59.38,
+      "quest_e119": 42.85,
+      "asynctls_e119_reverified": 50.09,
+      "jssa": "在飞（GPU0，basis qwen3_8b_32k.pt 已校准+smoke 铁律通过）",
+      "fasa": "待派（run_ruler_fasa.sh budget 1024，校准 qasper_agreement.pkl 就绪）"
+    },
+    "ruler_64k_128k": {
+      "tli_beta125": "48.05 / 46.02",
+      "quest_e119": "26.25 / 19.33",
+      "asynctls": "在飞（本机 GPU0/1，10-18 16:18 起）"
+    },
+    "longbench_en_13": {
+      "tli_e145c": 51.252,
+      "fullkv": 50.36,
+      "fasa_13task_reslice": 32.831
+    },
+    "lbv2": {
+      "tli_e145d": 32.41,
+      "fasa": 11.93
+    }
+  },
+  "judgment": [
+    "Quest：RULER 三档全败于 TLI（32K 42.85 vs 58.30 = +15.4；64K 26.25 vs 48.05 = +21.8；128K 19.33 vs 46.02 = +26.7）——领先随 L 单调扩大",
+    "AsyncTLS：32K 50.09 vs 59.29 = +9.2（复算与 E119 逐位一致）；远区检索差距主驱动 mk2 43 vs 73、single_3 58 vs 95、mk3 0 vs 9；64K/128K 在飞",
+    "FASA：LB-EN 13 任务口径 32.83 vs 51.25 = +18.4（hotpotqa 12.6/musique 4.2/narrativeqa 2.5 塌陷）；LBv2 11.93 vs 32.41 = +20.5；RULER 32K 待派（旧产物 fasa_32k.json 崩溃作废）",
+    "JSSA：链路本轮打通（校准兼容补丁 + basis + smoke 铁律），RULER 32K 11 任务在飞——出数后四线闭合",
+    "预算口径注：AsyncTLS kt=512 为其论文 RULER 原口径 vs TLI K2=1024；论文对比表须带同预算行（E139 K2=512 臂可引用）或预算归一化注记，避免 fair 质疑"
+  ],
+  "sources": {
+    "quest": "exp/trace/results/e119_ruler{32k,64k,128k}_formal_quest_vendor.json",
+    "asynctls": "exp/trace/results/e119_ruler32768_formal_asynctls_vendor_final.json + asynctls_r32k_reverify_verdict.json（42f071c）",
+    "fasa": "exp/results_longbench_fasa/Qwen3-8B/pred_fasa_1024/pred/result.json（13 任务重切）+ pred_fasa_1024_lbv2/pred/result.json",
+    "tli": "e147c_r32k_formal / e146c_r32k_formal / e145c_en_mavg_verdict / e145d_lbv2_verdict"
+  },
+  "caveats": [
+    "FASA LB-EN 为 17 任务旧产物切 13 任务重切（qasper 两批取首个）；打分时间 10-13，非 sink4 期同步段",
+    "AsyncTLS/JSSA/HISA/FASA vendor 均为本仓 Qwen3 适配层（B/C 轨语义复现），faithful-port 边界按各自 README 披露",
+    "JSSA 校准序列 8×~32K（部分样本不足 32K），论文默认 8×131072——64K/128K 对比档如需再出长校准"
+  ],
+  "generated_at": "2026-10-18T17:30"
+}
