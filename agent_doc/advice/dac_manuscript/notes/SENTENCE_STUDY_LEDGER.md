@@ -25,9 +25,17 @@
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
 | 5 | 2023_Gamora.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5） | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ §III-B 首句主谓修复（t indexes the current token） ✓ Q2 128K 句中心词+比较对象补全（sparse arm / dense FullKV's 46.43） ✓ |
 | 6 | 2023_RL_CCD.pdf | **全部完成**（Abstract/Intro/§2/§3/§4 实验+§5 结论扫描） | Intro P4 门控句主语补全（the diagnostic uses） ✓ Intro P4 (c)/(d) 面板引用恢复（远端 784c1a4 裁决回插，压缩版） ✓ §III-A 坐标动机句指代悬垂修复（retained pairs'） ✓ §III-B S 定义移入 S7（define-before-use）+ fourfold 倍数锚 ✓ Q3 选择器段前向引用倒置修复（study-first + exceeds 直接比较） ✓ 128K "22.45-point loss" en 回插（远端 b1f5073 删 zh 留，数字带方向裁决） ✓ |
-| 7 | 2026_Miter_Aware_LUT_Mapping.pdf | Abstract ✓ Intro ✓；待：§2 Related Work | Related-Work-P1 收口句加 Rather-than 边界前缀（不提出新级联） ✓ |
+| 7 | 2026_Miter_Aware_LUT_Mapping.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3 Methodology | Related-Work-P1 收口句加 Rather-than 边界前缀（不提出新级联） ✓ Related-Work-P2 对比轴显式化（In contrast to pruning token transfers from partial key bits） ✓ |
 
 ## 修改日志
+
+### 第 32 轮（2026-10-19，Miter-Aware LUT Mapping §2 Related Work 拆解）
+
+- **远端检查**：无新提交（HEAD 与 origin/main 同步），工作区干净。
+- **§2 全拆解**（§2.1 LEC 9 句 + §2.2 LUT Mapping 11 句，追加至 sentence_studies/2026_miter_aware_lut.md，现 198 行）：入库范式——**disrupts-but-retains 双面伤害句**（摧毁有利项同时保留有害项，一个 but 合并两类痛点为单一因果源）、**yet-overlooking 盲区命名句**（credit 完整给足 + 盲区即自己战场）、**While-effective + rely-heavily-on 让步限制句**、**In-contrast-to + 双动名词定位收口**（对比轴显式命名，动名词与 Intro 挑战 1:1）、**Recently 转用句**（经典用途→新用途转向）、**段首机制断言句**（advantage-arises-from-ability-to，topic sentence 即机理主张）、**once-条件从句**（机制时间触发点写明）、**This-leads-to 三联结果收口**（微观→宏观三层）、**收口动词按关系亲疏选型**（§2.1 批判性距离用 In-contrast-to / §2.2 继承性延伸用 extends）。诚实边界排除：cornerstone 属领域公认定性可容忍，不自创新判词。
+- **手稿修复 1 处（en+zh）**：Related Work P2 对比轴显式化——旧版「Our selector instead ranks candidates using a fixed coordinate subset under page and token budgets; original-dimensional KV remain available for final attention.」的 "instead" 对比对象（按部分键比特剪枝传输）隐没在上文；按 Miter §2.1 收口句式改为「**In contrast to pruning token transfers from partial key bits**, our selector ranks candidates with a fixed coordinate subset under page and token budgets, **keeping** original-dimensional KV for final attention.」（对比轴点名 + keeping-gerund 收尾替代分号并列）。zh：「与按部分键比特剪枝词元传输不同，本文的选择器在页与词元预算约束下使用固定坐标子集对候选排序，并保留原维KV供最终注意力使用。」
+- **版式验证**：en 6 页（AI 声明完整第 5 页）、zh 6 页、0 LaTeX Warning——零余量第 7 次风险未触发。
+- **待后续轮次**：§3 Methodology、§4 Experiments、§5 Conclusion（论文 7 收官后整个 7 篇队列完结）。
 
 ### 第 31 轮（2026-10-19，第 7 篇开始：Miter-Aware LUT Mapping Abstract+Intro 拆解 + 远端 7eb4241 裁决）
 

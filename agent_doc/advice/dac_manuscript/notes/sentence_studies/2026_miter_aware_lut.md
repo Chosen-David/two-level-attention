@@ -126,3 +126,73 @@
   （"Rather than introducing a new mapping framework, we embed..." 的诚实定位句式；我们的事实正是组合先例组件——AsyncTLS 级联 + Quest 极值，见同段上文，无新增主张。）
 - zh 同步直译：「本文不提出新级联，而是研究将这些已有组成部分与……」
 - 版式风险：+6 词，编译后须复验 en 仍 6 页（零余量已 6 次触发）。
+
+## §2 Related Work（第 32 轮）
+
+### §2.1 Logic Equivalence Checking（9 句）
+
+1. "LEC is a cornerstone of formal verification in EDA, aiming to ensure that two circuits, typically before and after synthesis, implement the same Boolean function [20]."
+   - **cornerstone 定性句 + aiming-to 任务定义**：与摘要分工（摘要讲痛点，正文讲地位）；括注 typical 场景（synthesis 前后）预埋后文的综合扰动。
+2. "The standard approach is to build a miter circuit by XORing corresponding outputs and ORing all XOR results together."
+   - 标准做法机制句：双动名词（XORing/ORing）一步写完构造。
+3. "Unsatisfiability of the resulting miter indicates functional equivalence."
+   - **判定语义句**：UNSAT ⟺ 等价，一句给 soundness——方法段的知识基线压缩成 5 词。
+4. "Typically, when two designs share a high degree of structural correspondence, equivalence points (i.e., functionally identical node pairs) can often be detected, making the miter instance of LEC easy to solve."
+   - **有利情形句**：when 条件 + i.e. 括注定义 + making-gerund 后果——先立「什么时候容易」再让 However 打碎它。
+5. "However, aggressive logic synthesis disrupts the structural similarity [refs] but retains the hard-to-solve regions (i.e., XOR-dense regions) [refs]."
+   - **However + disrupts-but-保留 双面伤害句**：摧毁有利项（结构相似）同时保留有害项（XOR 密集区）——一个 but 把两类痛点合并为单一因果源。修辞上比罗列两个缺点强一档。
+6. "Recent efforts apply preprocessing to the flattened miter to simplify the SAT instance prior to solving [33,37], yet overlooking the inherent cross-design correlations between the golden and implementation sides."
+   - **credit + yet-overlooking 盲区命名句**：前作动词完整给功劳，yet-gerund 点名盲区（cross-design correlations）——盲区即我们的战场。
+7. "Another line of research combines multiple engines, such as simulation-guided engine [13,28] or non-SAT alternatives [30], to solve the miter instance."
+   - 第二路线枚举句（another line + such-as 双例）。
+8. "While effective on certain classes of designs, these methods still rely heavily on favorable problem features and initial decisions."
+   - **While-effective 让步 + rely-heavily-on 依赖性限制**：夸一句再点「依赖运气/初始决策」的软肋。
+9. "In contrast to operating solely on a flattened miter, our work targets the initial modeling stage of LEC, reconstructing similar structure and neutralizing hard-to-solve regions before SAT solving."
+   - **In-contrast-to + targets + 双动名词定位收口**：对比轴显式命名（solely on a flattened miter）；reconstructing/neutralizing 与 Intro 双挑战 1:1 映射——收口即回到自己的主战场。
+
+### §2.2 Look-up Table (LUT) Mapping（11 句）
+
+1. "LUT mapping is a fundamental step in logic synthesis, where a Boolean network is decomposed into a network of k-input LUTs for FPGA [8]."
+   - 第二社区背景定义句（给 LUT 社区读者的 anchor）。
+2. "In a typical mapping procedure, the circuit is traversed in an output-to-input direction."
+   - 流程定向句（遍历方向一短语交代）。
+3. "For each node, multiple candidate LUTs are enumerated based on feasible input cuts and their corresponding Boolean functions, and the most suitable one is selected to optimize delay and latency."
+   - **枚举-后-选择机制句**：enumerate candidates → select the most suitable——与我们两级筛选同构；For-each-node 逐节点视角。
+4. "Recently, it has also attracted attention as a structure-preserving abstraction for SAT solving, where multiple logic gates are packed into solver-friendly LUTs to reduce CNF size and improve clause locality [33,37]."
+   - **Recently 转用句**：经典用途→新用途一步转向；where-从句机制 + to-不定式双收益（reduce size / improve locality）。
+5. "Each LUT encapsulates a small truth table, offering flexibility for customized encoding strategies and fine-grained control over structural granularity."
+   - 性质-可供性句（encapsulates + offering flexibility）。
+6. "The SAT-solving advantage of LUT-based abstraction arises from its ability to preserve local functional coherence [5,33]."
+   - **段首机制断言句**：advantage-arises-from-ability-to——段落 topic sentence 直接是机理主张（不是背景复述）。
+7. "By grouping strongly related logic signals into a single LUT, the circuit representation becomes more compact and semantically cohesive, which helps remove redundant variables and clauses in the resulting CNF."
+   - By-gerund 因果链 + which-helps 后果（紧接到具体 CNF 层）。
+8. "Moreover, each LUT inherently defines a deterministic mapping between its inputs and output, enabling stronger inferences once partial assignments are known."
+   - 第二机制 + enabling-gerund + **once-条件从句**（部分赋值已知时推理更强——机制的时间触发点写明）。
+9. "This leads to more concentrated propagation, shorter implication chains, and overall improvement in solver efficiency."
+   - **This-leads-to 三联结果收口**：concentrated propagation / shorter chains / solver efficiency——从微观到宏观三层。
+10. "However, existing approaches primarily target single-circuit optimization and overlook miter-specific structural patterns that arise in equivalence checking."
+    - However 缺口句：target-X-and-overlook-Y 并列双动词。
+11. "Our work extends this line of research by performing miter-aware, solver-friendly LUT mapping, jointly considering structural alignment, XOR reasoning, and CNF-level propagation properties."
+    - **extends-this-line-by-performing 收口**：extends（非 replaces——给前作留地位）+ jointly-considering 三要素——Related Work 两个小节都以定位收口，且动词不同（§2.1 用 In-contrast-to、§2.2 用 extends）——**收口动词按与前作的关系亲疏选型**。
+
+### 入库范式（本轮新增）
+
+- **disrupts-but-retains 双面伤害句**（一个 but 合并两类痛点为单一因果源）
+- **yet-overlooking 盲区命名句**（credit 完整给足 + 盲区即自己战场）
+- **While-effective + rely-heavily-on 让步限制句**
+- **In-contrast-to + 双动名词定位收口**（对比轴显式命名；动名词与 Intro 挑战 1:1）
+- **Recently 转用句**（经典用途→新用途转向 + to-不定式双收益）
+- **段首机制断言句**（advantage-arises-from-ability-to；topic sentence 即机理主张）
+- **once-条件从句**（机制的时间触发点写明）
+- **This-leads-to 三联结果收口**（微观→宏观三层）
+- **收口动词按关系亲疏选型**（In-contrast-to 用于批判性距离 / extends 用于继承性延伸）
+
+诚实边界排除：cornerstone（判词但属领域公认定性，我们可容忍同等地位的公认定性，不自创新判词）。
+
+## 本轮修改（第 32 轮）
+
+- en（Related Work P2 对比轴显式化，In-contrast-to 句式）：
+  旧：`Our selector instead ranks candidates using a fixed coordinate subset under page and token budgets; original-dimensional KV remain available for final attention.`
+  新：`In contrast to pruning token transfers from partial key bits, our selector ranks candidates with a fixed coordinate subset under page and token budgets, keeping original-dimensional KV for final attention.`
+  （Miter §2.1 收口句式：对比轴显式命名——旧版 "instead" 的对比对象（按部分键比特剪枝）隐没在上文，新版点名；keeping-gerund 收尾替代分号并列。）
+- zh 同步直译。
