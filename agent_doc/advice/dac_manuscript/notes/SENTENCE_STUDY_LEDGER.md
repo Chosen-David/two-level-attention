@@ -25,9 +25,17 @@
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
 | 5 | 2023_Gamora.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5） | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ §III-B 首句主谓修复（t indexes the current token） ✓ Q2 128K 句中心词+比较对象补全（sparse arm / dense FullKV's 46.43） ✓ |
 | 6 | 2023_RL_CCD.pdf | **全部完成**（Abstract/Intro/§2/§3/§4 实验+§5 结论扫描） | Intro P4 门控句主语补全（the diagnostic uses） ✓ Intro P4 (c)/(d) 面板引用恢复（远端 784c1a4 裁决回插，压缩版） ✓ §III-A 坐标动机句指代悬垂修复（retained pairs'） ✓ §III-B S 定义移入 S7（define-before-use）+ fourfold 倍数锚 ✓ Q3 选择器段前向引用倒置修复（study-first + exceeds 直接比较） ✓ 128K "22.45-point loss" en 回插（远端 b1f5073 删 zh 留，数字带方向裁决） ✓ |
-| 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
+| 7 | 2026_Miter_Aware_LUT_Mapping.pdf | Abstract ✓ Intro ✓；待：§2 Related Work | Related-Work-P1 收口句加 Rather-than 边界前缀（不提出新级联） ✓ |
 
 ## 修改日志
+
+### 第 31 轮（2026-10-19，第 7 篇开始：Miter-Aware LUT Mapping Abstract+Intro 拆解 + 远端 7eb4241 裁决）
+
+- **远端 7eb4241 裁决：采纳**（docs: clarify final selection when retained support is scarce）。四点核验：①Fig S2 假设句保留，无图文脱节；②无数字口径变化；③收口句 "Occurrence and quality effects in the reported runs remain unverified" 诚实披露保留且更清晰；④新增 "final selection does not reapply L1 eligibility" 机制澄清，en/zh 对称（zh 多一句 GQA 平均细节，轻微双语不对称，不涉数字，不回插）。仅动 S7 稀缺支持段+README/MANIFEST，主文未动。
+- **第 7 篇 Abstract+Intro 全拆解**（新建 sentence_studies/2026_miter_aware_lut.md）：入库范式——**contend-that + as-critical-as 论点宣言句**（摘要第二句即立场：建模与求解器同等重要——一句翻转领域默认假设）、**de facto 流水线命名句**（build+check 双动词走完默认做法）、**has-scaled-thanks-to 先功劳句**（7 引用记满功劳再 However）、**However 双挑战总起 + First/Second 括注算例**、**后果链句+同位语机理层**（lack→inhibits + "a key simplification step shrinking..."）、**Unfortunately 机理归因句**（deducing-a-literal-requires——为什么慢讲到算法机理层）、**Although-attempt-remains-insufficient 缺口句**（solely-on-X 点死穴）、**We-attribute + how-clause 归因宣言句**（与摘要 contends 首尾呼应）、**Rather-than-hoping 对比句**（hoping-the-solver-compensates 轻贬现状）、**登场句 instead-of 现状全写**、**By-gerund 三收益连环句**、**bullet 品牌名+动词链**（equivalence-preserving/Gaussian-guided/solver-oriented 三词复合品牌名×3）、**up-to/avg 双口径 + alone×2 消融预览**（Intro 组件级数字背书 62.5%/36.8%）、**Rather-than-introducing 边界句 + rather-than-merely 价值升格**（不做新框架、嵌入标准流程、"not merely compact but solver-friendly"）、**marks-a-departure + While-their-our 核心差异句**、**a-challenge-unique-to 独有性收口**、**Consequently not-only-but-also 双层收口**（实用+概念层）。诚实边界排除：fundamentally/novel/systematically/significant-departure 判词层。
+- **手稿修复 1 处（en+zh）**：Related Work P1 收口句加 Rather-than 边界前缀——「Rather than proposing a new cascade, we study these existing components with...」（Miter 论文「Rather than introducing a new mapping framework, we embed...」的诚实定位句式；我们的事实正是组合先例组件——AsyncTLS 级联+Quest 极值，同段上文已披露先例属性，无新增主张）。zh：「本文不提出新级联，而是研究将……」。
+- **版式验证**：+6 词后 en 仍恰 6 页（AI 声明完整在第 5 页，References 独占第 6 页），zh 6 页，0 LaTeX Warning。零余量第 6 次风险未触发。
+- **待后续轮次**：§2 Related Work、§3 Methodology、§4 Experiments、§5 Conclusion。
 
 ### 第 30 轮（2026-10-19，RL-CCD §4 实验拆解 + 远端 b1f5073 裁决——第 6 篇完结）
 
