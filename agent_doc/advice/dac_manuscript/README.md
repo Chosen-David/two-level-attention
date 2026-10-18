@@ -1,6 +1,6 @@
 # Publication source and bilingual PDFs
 
-The complete bilingual Introduction now opens with the cost of candidate selection, credits the existing page-to-token cascade, and connects page-score mismatch and regional budgets to the shared-coordinate selector. It retains mixed coverage, descriptive quality comparisons and slower historical sparse decoding; matched task quality and complete-request cost remain necessary for a benefit claim. This revision changes no experiment, method configuration or presentation result.
+The closing evaluation paragraph now distinguishes far-page admission to refinement from final far-token capacity, and states the complete-request benefit requirement directly. It retains the reported historical sparse configuration's slower decoding, the missing matched quality/cost measurements for the compact 4/128 design, and incomplete gate configuration identity. Redundant summaries are removed in both languages; the accepted Introduction and the 17-slide presentation remain unchanged. No experiment, configuration or reported value changes.
 
 Rebuild all figure PDFs referenced by the four documents, then compile them:
 
@@ -8,7 +8,7 @@ Rebuild all figure PDFs referenced by the four documents, then compile them:
 bash source/rebuild_current.sh
 ```
 
-The 156-member public package includes the project-authored `sources/build_method_architecture.py` required by the method-detail wrapper. The entrypoint loads bundled fonts before plotting, regenerates both Observation panels and the other referenced figures from bundled sources/data, then compiles the four documents. Existing editable gate SVGs are authoritative sources for their PDF exports. This route requires Python3 with NumPy/Matplotlib, Inkscape, Poppler and XeLaTeX; it performs no model execution or data collection. The missing-generator failure from the previous 155-member package is retained in the earlier delivery evidence and is closed by this package's actual isolated rebuild.
+The 157-member public package includes the project-authored `sources/build_method_architecture.py` required by the method-detail wrapper. The entrypoint loads bundled fonts before plotting, regenerates both Observation panels and the other referenced figures from bundled sources/data, then compiles the four documents. Existing editable gate SVGs are authoritative sources for their PDF exports. This route requires Python3 with NumPy/Matplotlib, Inkscape, Poppler and XeLaTeX; it performs no model execution or data collection. The missing-generator failure from the previous 155-member package is retained in the earlier delivery evidence and is closed by this package's actual isolated rebuild.
 
 For document-only compilation against the bundled figure assets:
 
@@ -62,4 +62,4 @@ This public source package retains the validated Figure3/4 and Q3 revisions. The
 
 Replot only the repaired figures with `python3 sources/build_evidence_figures.py --only decode-ruler` and `DAC_FIG_LANG=zh python3 sources/build_evidence_figures.py --only decode-ruler`. Synchronize only presentation slides12/14/15 with `python3 sources/update_evidence_slides.py --only decode-ruler-q3`. Export the PPTX with LibreOffice under the same `source fonts/env.sh` font environment. The supplied PDF is an actual17page export.
 
-The current public dependencies are enumerated in MANIFEST.json, including fonts and licenses. Notes, private histories, human guides and review records are excluded. The separate complete private-source archive remains at version93; a candidate integration has not passed complete build validation. This public delivery does not claim that private history is synchronized. The official DAC2027 template and outstanding scientific evidence remain unverified.
+The current public dependencies are enumerated in MANIFEST.json, including fonts and licenses. The complete public Introduction sentence mapping is included at `notes/INTRODUCTION_FULL_SENTENCE_MAPPING_2026-10-18.md`; other notes, private histories, human guides and review records are excluded. The separate complete private-source archive remains at version93; a candidate integration has not passed complete build validation. This public delivery does not claim that private history is synchronized. The official DAC2027 template and outstanding scientific evidence remain unverified.

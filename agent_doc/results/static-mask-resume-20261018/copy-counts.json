@@ -1,0 +1,45 @@
+{
+  "scope": "CPU full attention forward operator counts, not timing",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "python": "3.12.14",
+  "torch": "2.8.0+cpu",
+  "transformers": "4.56.2",
+  "cuda_available": false,
+  "seed": 20261018,
+  "input_sha256": "a6ce3e9c043b38acf6e182dc9b307cd7951f08038bd3dd112cf64c87773b0349",
+  "shape": [
+    1,
+    3,
+    16
+  ],
+  "q_heads": 4,
+  "kv_heads": 2,
+  "head_dim": 4,
+  "baseline_source_sha256": "fa94cf350630d31c870b19ca8e3d313bec5a68d4f0081fad704dcf492b3d024f",
+  "candidate_source_sha256": "ca59e6d52e6ba55c509d093d7dea5836705684b1c31b003f1e8e966ff79c05e3",
+  "output_equal": true,
+  "baseline": {
+    "aten::_local_scalar_dense": {
+      "count": 1,
+      "cpu_memory_bytes": 0
+    },
+    "aten::clone": {
+      "count": 3,
+      "cpu_memory_bytes": 576
+    },
+    "aten::contiguous": {
+      "count": 1,
+      "cpu_memory_bytes": 192
+    }
+  },
+  "candidate": {
+    "aten::clone": {
+      "count": 3,
+      "cpu_memory_bytes": 576
+    },
+    "aten::contiguous": {
+      "count": 1,
+      "cpu_memory_bytes": 192
+    }
+  }
+}
