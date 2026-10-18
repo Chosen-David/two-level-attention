@@ -272,9 +272,9 @@ ZH: 长上下文生成每产生一个新词元，都要对不断增长的缓存�
 
 ### N02
 
-EN: Sparse attention reduces the selected history, but finding that history also requires scoring, ranking and memory accesses.
+EN: Sparse attention restricts final attention to selected tokens, but selecting them requires scoring, ranking and memory accesses.
 
-ZH: 稀疏注意力缩小参与计算的历史词元集合，但寻找这一集合本身也需要评分、排序与访存。
+ZH: 稀疏注意力将最终计算限制在入选词元上，但选择这些词元仍需要评分、排序与访存。
 
 ### N03
 
@@ -304,7 +304,7 @@ ZH: 粗筛阶段引入一项关键近似：低成本的页面分数未必能保�
 
 EN: Mean pooling can dilute an isolated high token score, while sign-aware extrema provide a potentially loose upper bound on unquantized token scores in the scoring coordinates; neither ranks pages by their total attention weight.
 
-ZH: 均值池化可能稀释孤立的高词元分数，符号感知极值则在评分坐标内给出未量化词元分数的、可能较松的上界；二者都不按页内注意力权重总和排序。
+ZH: 均值池化可能稀释孤立的高词元分数，符号感知极值则给出评分坐标内未量化词元分数的上界，但该界可能较松；二者都不按页内注意力权重总和排序。
 
 ### N08
 
@@ -417,3 +417,257 @@ ZH: 要证明紧凑4/128保护设计具有质量--时延收益，需要匹配的
 ## Review and publication status
 
 Independent science and reader review, author disposition, final compilation/render checks and immutable delivery identities are recorded separately in the same run scratch evidence. This mapping is not itself a claim that those gates passed; publication receipt binds the accepted version. The Best Paper PDF and this internal study are not members of the public manuscript package.
+
+## Sentence-by-sentence editorial iteration requested at 11:15 UTC
+
+This is an editorial record, not private internal reasoning. Each original sentence is assessed for its DAC-paper function, specificity, logical placement and evidence scope; its exact text and complete bilingual revision remain above. The first full rewrite was published at `4828e4df4a236692379778d80426fd9d0774cec6`. This second pass actually rewrites N02 in both languages and smooths N07 Chinese; the other accepted sentences are rechecked individually below. No overlapping automated paragraph writer was started.
+
+Reference locations count prose sentences within the four Introduction paragraphs, excluding the footnote; paragraph3 crosses the left/right column boundary. The three bullets follow paragraph4 in the right column. This locator convention makes every reference function recoverable on physical page1 without reproducing the reference wording.
+
+### OEN01/OZH01
+
+- DAC editorial diagnosis: 基准名称起笔只回答在哪里测，没有指出DAC读者关心的系统代价；信息正确但论证功能偏离问题入口。
+- Comparable reference function/location: R01–02 · p1左栏¶1句1–2；对应功能见R01–23表。
+- Actual revision and evidence limit: N01/N04改从逐词元缓存访问与选择成本起笔；LongBench/RULER介绍留在实验设置。
+- Neighboring transition check: 从工作负载直接接N02选择开销，避免基准名→系统问题的跳跃。
+
+### OEN02/OZH02
+
+- DAC editorial diagnosis: 反复访问KV是准确背景，但没有把逐步增长的历史与每一步解码联系起来，具体性不足。
+- Comparable reference function/location: R06–07 · p1左栏¶2句4–5；对应功能见R01–23表。
+- Actual revision and evidence limit: N01明确每个新词元面对增长的缓存历史；不扩张为所有硬件上的带宽瓶颈断言。
+- Neighboring transition check: N01给出对象，N02给出减少最终计算的做法与额外成本。
+
+### OEN03/OZH03
+
+- DAC editorial diagnosis: 同时包含节省与选择开销，功能正确；旧句work指代宽泛，应落到最终注意力集合。
+- Comparable reference function/location: R07、R10 · p1左栏¶2句5、8；对应功能见R01–23表。
+- Actual revision and evidence limit: N02首轮改为selected history后仍有finding history歧义；第二轮实际改为限制最终注意力于入选词元，并明确选择操作。
+- Neighboring transition check: 承接N01历史对象，导向N03净收益判据；不暗示删KV存储。
+
+### OEN04/OZH04
+
+- DAC editorial diagnosis: 介绍已有解决路径，却未在首次出现时给出先例，容易把级联误读为本文独有。
+- Comparable reference function/location: R08–09 · p1左栏¶2句6–7；对应功能见R01–23表。
+- Actual revision and evidence limit: N05前置AsyncTLS引用并压缩两级流程；贡献落在本文具体组合及分析，不占用已有机制的新颖性。
+- Neighboring transition check: 由N04设计问题转向已有路径，N06随即说明该路径尚存的近似。
+
+### OEN05/OZH05
+
+- DAC editorial diagnosis: 目标句方向正确，但retain useful candidates不够具体；需要区分设计要求与已测收益。
+- Comparable reference function/location: R12 · p1左栏¶2句10；对应功能见R01–23表。
+- Actual revision and evidence limit: N03明确任务相关词元、固定预算与选择成本小于省去的注意力成本，用must表达要求。
+- Neighboring transition check: N03承接开销，N04将要求收束为候选选择问题。
+
+### OEN06/OZH06
+
+- DAC editorial diagnosis: “不同评分目标”像分类目录，尚未解释为什么差异妨碍系统目标。
+- Comparable reference function/location: R13–14 · p1左栏¶3句1至右栏续句2；对应功能见R01–23表。
+- Actual revision and evidence limit: N06先说明低成本页评分可能丢掉后续注意力所需词元，再让N07解释具体评分差异。
+- Neighboring transition check: 从N05级联走向N06误筛风险，再以N07给出原因。
+
+### OEN07/OZH07
+
+- DAC editorial diagnosis: 平均响应/极值界的对照有技术依据，但句子与后文重复；上界必须保留同坐标未量化限制。
+- Comparable reference function/location: R14 · p1右栏¶3续句2；对应功能见R01–23表。
+- Actual revision and evidence limit: 合并到N07：平均可能稀释高分，极值界可能松；独审补回未量化对象。第二轮中文实际拆开生硬定语，科学范围不变。
+- Neighboring transition check: 接N06近似风险，为N08页权重诊断提供解释背景，而非预言哪臂更好。
+
+### OEN08/OZH08
+
+- DAC editorial diagnosis: 否定两个评分等同页质量有必要，但单独一句打断机制解释。
+- Comparable reference function/location: R14 · p1右栏¶3续句2；对应功能见R01–23表。
+- Actual revision and evidence limit: 并入N07分号后，明确二者不按总注意力权重排序。
+- Neighboring transition check: N07至N08自然引出与mass-rank参照的不一致。
+
+### OEN09/OZH09前半
+
+- DAC editorial diagnosis: 诊断信息充分但句子过长，名词重复；例子应支持缺口而非暗示普遍优劣。
+- Comparable reference function/location: R14、R19 · p1右栏¶3句2、¶4句4；对应功能见R01–23表。
+- Actual revision and evidence limit: N08保留ClusterKV视角、Qwen3、图a及13/17/32，压缩定位；单查询及对照混杂保留N10/图注。
+- Neighboring transition check: 先漏页数N08，再漏失权重N09，随后N10限制用途。
+
+### OEN10/OZH09后半
+
+- DAC editorial diagnosis: 数字正确却缺直接解释：读者可能只依据漏页数给方法排名。
+- Comparable reference function/location: R19 · p1右栏¶4句4；对应功能见R01–23表。
+- Actual revision and evidence limit: N09保留59.65%/26.46%并明确“漏页少未必漏权重少”。
+- Neighboring transition check: N08与N09构成同一例子的两个指标，N10阻止外推任务质量。
+
+### OEN11/OZH10
+
+- DAC editorial diagnosis: 重复OEN07机制，占用引言空间；不是新增证据。
+- Comparable reference function/location: R17–18 · p1右栏¶4句2–3；对应功能见R01–23表。
+- Actual revision and evidence limit: 并入N07，不重复讲均值稀释和极值界；不删除技术限制。
+- Neighboring transition check: 缩短数值例子后回头解释机制的折返，保持机制→例子顺序。
+
+### OEN12/OZH11
+
+- DAC editorial diagnosis: 科学限制正确，但“性质不能决定次序”过于抽象，像审计注释。
+- Comparable reference function/location: R14–15 · p1右栏¶3句2–3；对应功能见R01–23表。
+- Actual revision and evidence limit: N09改为可直接由数字理解的关系，N10限定任务结论；保留图注中的区域/实际预算混杂。
+- Neighboring transition check: 由指标差异转向诊断能回答的候选访问问题。
+
+### OEN13/OZH12
+
+- DAC editorial diagnosis: 正概率候选足够等条件来自实现细节，引言中展开会遮蔽主问题；删条件而保留绝对不可能结论也不正确。
+- Comparable reference function/location: R14 · p1右栏¶3句2；对应功能见R01–23表。
+- Actual revision and evidence limit: N05/N06保留候选资格与误筛风险，不再作无条件无法恢复断言；具体实现留Method。
+- Neighboring transition check: 不插入执行分支，把N10作为本段结论。
+
+### OEN14/OZH13
+
+- DAC editorial diagnosis: 必要评价维度正确，但与第一段成本要求重复；可改为这项诊断带来的具体启示。
+- Comparable reference function/location: R12 · p1左栏¶2句10；对应功能见R01–23表。
+- Actual revision and evidence limit: N10用单查询候选访问诊断收束；N03负责整体成本目标，避免两处重复。
+- Neighboring transition check: N10候选访问直接衔接N11区域容量。
+
+### OEN15/OZH14
+
+- DAC editorial diagnosis: 直接跳到TopK，缺少从页误筛到区域竞争的桥；reserve一词还易被误解为实际覆盖保证。
+- Comparable reference function/location: R14 · p1右栏¶3句2；对应功能见R01–23表。
+- Actual revision and evidence limit: 新增N11桥句，N12比较全局与区域名义容量；独审把保证性retain改为can reserve nominal。
+- Neighboring transition check: N11说明同一候选访问问题的第二因素，N12说明机制，N13给混合观测。
+
+### OEN16/OZH15
+
+- DAC editorial diagnosis: 这句本身已有均值提升与负向样本，证据平衡；应保留而非为主张删除43例。
+- Comparable reference function/location: R19 · p1右栏¶4句4；对应功能见R01–23表。
+- Actual revision and evidence limit: N13基本保留准确量值，but明确转折，仍称128条相关观测。
+- Neighboring transition check: 接N12容量机制，导向N14覆盖取舍而非普遍提升。
+
+### OEN17/OZH16
+
+- DAC editorial diagnosis: 再加两臂极小值和非配对说明使引言拥挤，且对主机制没有比N13更强的证据。
+- Comparable reference function/location: R19 · p1右栏¶4句4；对应功能见R01–23表。
+- Actual revision and evidence limit: 正文删去极小值句；原值/非配对限定保留本映射与原数据，平均提升及43例负向仍留N13。
+- Neighboring transition check: N13之后直接提出N14两级容量问题，避免指标堆叠。
+
+### OEN18/OZH17
+
+- DAC editorial diagnosis: 准确指出页与词元预算区别，但结论略像规范要求，尚未接到本文要回答的问题。
+- Comparable reference function/location: R16 · p1右栏¶4句1；对应功能见R01–23表。
+- Actual revision and evidence limit: N14改为设计问题，并以“进远页不预留最终词元位”解释两级约束。
+- Neighboring transition check: 从N13混合覆盖到N15本文方案，桥接明确。
+
+### OEN19/OZH18前半
+
+- DAC editorial diagnosis: “两个控制”计数抽象，未命名本文研究对象。
+- Comparable reference function/location: R16 · p1右栏¶4句1；对应功能见R01–23表。
+- Actual revision and evidence limit: N15命名两级选择器及共享评分/区域预算，避免宣称首次级联。
+- Neighboring transition check: 接N14问题，N16–17展开具体实现而非继续抽象总述。
+
+### OEN20/OZH18后半
+
+- DAC editorial diagnosis: 完整RoPE对与区域页配额具体且必要，但还缺最终词元预算如何连接。
+- Comparable reference function/location: R17–18 · p1右栏¶4句2–3；对应功能见R01–23表。
+- Actual revision and evidence limit: N16保留两项实现，N17补扣保护后的区域词元配额；不把页名额当词元保证。
+- Neighboring transition check: N16粗筛坐标/资格→N17最终预算/注意力，符合数据路径。
+
+### OEN21/OZH19
+
+- DAC editorial diagnosis: 随机对照混杂必须披露，但它不是频率优越性证据；放在机制主句中会让动机依赖无判别力对照。
+- Comparable reference function/location: R18 · p1右栏¶4句3；对应功能见R01–23表。
+- Actual revision and evidence limit: 引言正文不据此声称频率收益；图1(c)原caption与补充保留不配对结构的限制。N18转述代码可确认的计算宽度事实。
+- Neighboring transition check: N16讲设计选择，N18讲其实际计算边界，避免以诊断替代机制验证。
+
+### OEN22/OZH20
+
+- DAC editorial diagnosis: 原维Q/K/V边界正确，但“通过选择引入近似”仍需读者自己连到最终输出。
+- Comparable reference function/location: R18 · p1右栏¶4句3；对应功能见R01–23表。
+- Actual revision and evidence limit: N17明确一次最终注意力使用原维Q/K/V；Method继续说明受限分母不是dense等价。
+- Neighboring transition check: 接区域预算，随后N18说明筛选自身仍做哪些计算。
+
+### OEN23/OZH21
+
+- DAC editorial diagnosis: 独立一句引出门控，容易抬高未验证扩展在主贡献中的地位。
+- Comparable reference function/location: R18 · p1右栏¶4句3；对应功能见R01–23表。
+- Actual revision and evidence limit: 并入N19，明确optional/defaultoff且质量与成本单独评估。
+- Neighboring transition check: 置于主路径之后，不与两项核心控制争夺主线。
+
+### OEN24/OZH22
+
+- DAC editorial diagnosis: 历史单查询与当前门控不匹配，不能承担已验证门控动机的强结论；正文细述像状态审计。
+- Comparable reference function/location: R15、R19 · p1右栏¶3句3、¶4句4；对应功能见R01–23表。
+- Actual revision and evidence limit: N19保留可选与独立验收边界，图1(d)/S5/S6继续完整披露历史统计差异。
+- Neighboring transition check: 以简短扩展限定收束机制段，再进N20贡献。
+
+### OEN25/OZH23
+
+- DAC editorial diagnosis: 只说formulate/analyze没有集中呈现读者可获得的成果。
+- Comparable reference function/location: R20–22 · p1右栏贡献引导句与bullet1–2；对应功能见R01–23表。
+- Actual revision and evidence limit: N20明确selector、联合容量分析、三方面评估三个交付物，不冒充新硬件/新概率估计。
+- Neighboring transition check: 先贡献清单，再N21现有质量证据，不从未验收方案直接跳收益。
+
+### OEN26/OZH24
+
+- DAC editorial diagnosis: Q1/Q2/Q3标签适合章节导航，放引言结尾像实验提纲而非贡献。
+- Comparable reference function/location: R20–23 · p1右栏贡献引导句与bullet1–3；对应功能见R01–23表。
+- Actual revision and evidence limit: 合并N20并直接写任务质量/覆盖/成本；详细编号留实验节。
+- Neighboring transition check: 减少标签负担，让N21/N22实际结果回应评价维度。
+
+### OEN27/OZH25
+
+- DAC editorial diagnosis: 负结果诚实但概括过宽，没有让读者看到既有完整任务证据和具体比较对象。
+- Comparable reference function/location: R19、R21–23 · p1右栏¶4句4与三bullet；对应功能见R01–23表。
+- Actual revision and evidence limit: N21补已经在Q2/S8/结论中的+.99与−1.58，两种对照分开；N22保留机制不可隔离与更慢解码。
+- Neighboring transition check: 贡献→有范围数字→负结果，不能用参考文献正收益句式替换自己的反证。
+
+### OEN28/OZH26
+
+- DAC editorial diagnosis: “仍缺少评估”是状态陈述，未说明怎样的系统测量才能支持论文目标。
+- Comparable reference function/location: R23 · p1右栏bullet3；对应功能见R01–23表。
+- Actual revision and evidence limit: N23改为收益主张所需的匹配质量与完整请求测量；独审补齐准备、维护、选择，不能只测覆盖代理和局部开销。
+- Neighboring transition check: 结尾回扣N03净收益目标；不许把未完成条件写成已证结论。
+
+## Actual second-pass edits
+
+### N02
+
+Prior EN: Sparse attention reduces the selected history, but finding that history also requires scoring, ranking and memory accesses.
+
+Final EN: Sparse attention restricts final attention to selected tokens, but selecting them requires scoring, ranking and memory accesses.
+
+Prior ZH: 稀疏注意力缩小参与计算的历史词元集合，但寻找这一集合本身也需要评分、排序与访存。
+
+Final ZH: 稀疏注意力将最终计算限制在入选词元上，但选择这些词元仍需要评分、排序与访存。
+
+### N07
+
+Prior EN: Mean pooling can dilute an isolated high token score, while sign-aware extrema provide a potentially loose upper bound on unquantized token scores in the scoring coordinates; neither ranks pages by their total attention weight.
+
+Final EN: Mean pooling can dilute an isolated high token score, while sign-aware extrema provide a potentially loose upper bound on unquantized token scores in the scoring coordinates; neither ranks pages by their total attention weight.
+
+Prior ZH: 均值池化可能稀释孤立的高词元分数，符号感知极值则在评分坐标内给出未量化词元分数的、可能较松的上界；二者都不按页内注意力权重总和排序。
+
+Final ZH: 均值池化可能稀释孤立的高词元分数，符号感知极值则给出评分坐标内未量化词元分数的上界，但该界可能较松；二者都不按页内注意力权重总和排序。
+
+## Final sentence and whole-section recheck
+
+| Sentence pair | Concrete editorial disposition | Transition |
+| --- | --- | --- |
+| N01 | 保留：对象是每一步解码和增长KV，未套用参考论文未经本项目测量的memory-bound结论。 | N02从对象转成本 |
+| N02 | 实际再改：selected tokens替代history歧义，避免暗示删缓存存储。 | N01→N02→N03对象与代价连续 |
+| N03 | 保留：must是设计要求，固定预算与净开销清楚，未假装收益已测。 | N04收束问题 |
+| N04 | 保留：把N02/N03凝练成候选选择问题。 | N05以已有级联接问题 |
+| N05 | 保留：先例引用明确，不认领已有级联创新。 | N06立即解释剩余近似 |
+| N06 | 保留：指出低成本摘要可能丢候选，未声称任何页分数一定失败。 | N07具体化评分目标 |
+| N07 | 英文保留、中文再改：上界对象/坐标/未量化限制完整，去掉生硬长定语。 | 机制解释→N08诊断 |
+| N08 | 保留：Qwen3及13/17/32例子准确，未推出优劣。 | N09补漏失权重 |
+| N09 | 保留：59.65/26.46与漏页数形成具体解释。 | N10限定任务推断 |
+| N10 | 保留：单查询限定是必要证据边界，简短而非日志。 | N11继续同一候选访问主题 |
+| N11 | 保留：页评分到区域容量的桥句有独立功能。 | N12机制,N13观测 |
+| N12 | 保留：can与nominal避免保证覆盖，区别全局与分区。 | N13给真实混合结果 |
+| N13 | 保留：平均提升和43下降共同呈现，correlated不删。 | N14从取舍提出问题 |
+| N14 | 保留：明确页资格与最终词元容量不是一回事。 | N15回应两级问题 |
+| N15 | 保留：study措辞不夸新颖性，研究对象命名具体。 | N16/N17展开 |
+| N16 | 保留：完整低频对、同坐标、页配额均与代码对应。 | N17最终容量 |
+| N17 | 保留：保护计入总预算，原维QKV边界清楚。 | N18说明开销范围 |
+| N18 | 保留：全历史评分事实阻止“页少即计算少”的误读。 | N19可选扩展不承诺提速 |
+| N19 | 保留：optional/defaultoff/独立评估三项足够，不重复历史审计细节。 | N20回主贡献 |
+| N20 | 保留：三交付物具体，不声称新增硬件或首次级联。 | N21以已有完整集合证据支持 |
+| N21 | 保留：+.99与−1.58的比较对象分开，非预算匹配胜出或β因果效果。 | N22立即给非因果和慢时延边界 |
+| N22 | 保留：两个负向边界直接相关，不删除更慢结果。 | N23收益条件回扣开篇 |
+| N23 | 保留：完整请求含准备维护选择，非局部kernel或代理指标。 | 与N03净收益目标闭合 |
+
+Whole-section check: five paragraphs now form cost problem → existing cascade and page-summary gap → regional capacity gap → actual mechanism and cost boundary → contributions and mixed evidence. The two numerical examples serve different functions: Fig1 diagnoses selection behavior; complete RULER task sets report descriptive quality. They are not joined into a matched quality–latency point. Exact independent review and final PDF identities for this second pass are in the refreshed private review receipt.
