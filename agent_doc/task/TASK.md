@@ -76,6 +76,8 @@
 
 ## 待办池（未排期，均有用户指令或审计来源）
 
+- [x] [TL-PREFILL-EMPTY-20261019] reference空行兜底按行/head隔离，避免污染非空选集；普通/-O各67项、相邻21项及独立1324场景通过，发布回读主控闭环，GPU/模型/性能未验。([详情](task_details/TL-PREFILL-EMPTY-20261019.md))
+
 - [x] [TL-E151C-LAYER-20261019] 配额消费点拒绝缺失/非法/未覆盖层号；21项E151c测试及24场景旧实现选集差分普通/-O通过，GPU/模型/性能未验。([详情](task_details/TL-E151C-LAYER-20261019.md))
 
 - [x] [TL-E151C-MODES-20261018] oracle配额与gamma-off/非E64/sinkswa/MoBA/sigma不兼容组合构造期拒绝；普通/-O各41项或场景通过及独立复核，GPU/质量/性能无新增结论。([详情](task_details/TL-E151C-MODES-20261018.md))

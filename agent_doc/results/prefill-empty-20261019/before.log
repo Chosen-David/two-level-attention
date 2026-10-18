@@ -1,0 +1,51 @@
+test_fallback_is_local_to_empty_row_and_head (test_prefill_empty_rows.EmptyRowFallbackTest.test_fallback_is_local_to_empty_row_and_head) ... 
+  test_fallback_is_local_to_empty_row_and_head (test_prefill_empty_rows.EmptyRowFallbackTest.test_fallback_is_local_to_empty_row_and_head) (runtime='reference', mask_heads=1) ... FAIL
+  test_fallback_is_local_to_empty_row_and_head (test_prefill_empty_rows.EmptyRowFallbackTest.test_fallback_is_local_to_empty_row_and_head) (runtime='reference', mask_heads=2) ... FAIL
+  test_fallback_is_local_to_empty_row_and_head (test_prefill_empty_rows.EmptyRowFallbackTest.test_fallback_is_local_to_empty_row_and_head) (runtime='reference', mask_heads=4) ... FAIL
+
+======================================================================
+FAIL: test_fallback_is_local_to_empty_row_and_head (test_prefill_empty_rows.EmptyRowFallbackTest.test_fallback_is_local_to_empty_row_and_head) (runtime='reference', mask_heads=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-current/sparse_attn/ops/tests/test_prefill_empty_rows.py", line 50, in test_fallback_is_local_to_empty_row_and_head
+    torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+  File "/root/.local/lib/python3.12/site-packages/torch/testing/_comparison.py", line 1587, in assert_close
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not equal!
+
+Mismatched elements: 16 / 128 (12.5%)
+Greatest absolute difference: 0.5 at index (0, 7, 0, 0)
+Greatest relative difference: 0.0833333358168602 at index (0, 7, 0, 0)
+
+======================================================================
+FAIL: test_fallback_is_local_to_empty_row_and_head (test_prefill_empty_rows.EmptyRowFallbackTest.test_fallback_is_local_to_empty_row_and_head) (runtime='reference', mask_heads=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-current/sparse_attn/ops/tests/test_prefill_empty_rows.py", line 50, in test_fallback_is_local_to_empty_row_and_head
+    torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+  File "/root/.local/lib/python3.12/site-packages/torch/testing/_comparison.py", line 1587, in assert_close
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not equal!
+
+Mismatched elements: 40 / 128 (31.2%)
+Greatest absolute difference: 3.5 at index (0, 7, 2, 0)
+Greatest relative difference: inf at index (0, 4, 2, 0)
+
+======================================================================
+FAIL: test_fallback_is_local_to_empty_row_and_head (test_prefill_empty_rows.EmptyRowFallbackTest.test_fallback_is_local_to_empty_row_and_head) (runtime='reference', mask_heads=4)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-current/sparse_attn/ops/tests/test_prefill_empty_rows.py", line 50, in test_fallback_is_local_to_empty_row_and_head
+    torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+  File "/root/.local/lib/python3.12/site-packages/torch/testing/_comparison.py", line 1587, in assert_close
+    raise error_metas[0].to_error(msg)
+AssertionError: Tensor-likes are not equal!
+
+Mismatched elements: 52 / 128 (40.6%)
+Greatest absolute difference: 3.5 at index (0, 7, 1, 0)
+Greatest relative difference: inf at index (0, 4, 1, 0)
+
+----------------------------------------------------------------------
+Ran 1 test in 1.280s
+
+FAILED (failures=3)
