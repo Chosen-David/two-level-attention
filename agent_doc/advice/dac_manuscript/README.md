@@ -1,5 +1,7 @@
 # Publication source and bilingual PDFs
 
+The complete bilingual Introduction now opens with the cost of candidate selection, credits the existing page-to-token cascade, and connects page-score mismatch and regional budgets to the shared-coordinate selector. It retains mixed coverage, descriptive quality comparisons and slower historical sparse decoding; matched task quality and complete-request cost remain necessary for a benefit claim. This revision changes no experiment, method configuration or presentation result.
+
 Rebuild all figure PDFs referenced by the four documents, then compile them:
 
 ```sh
