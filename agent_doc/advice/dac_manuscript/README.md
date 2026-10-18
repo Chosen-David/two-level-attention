@@ -1,15 +1,18 @@
 # Publication source and bilingual PDFs
 
-Rebuild current method diagrams, bilingual comparison charts and four documents:
-  bash source/rebuild_current.sh
+Compile all four documents from the bundled sources and frozen figure assets:
 
-Requires Python3, Matplotlib, Inkscape, Poppler, XeLaTeX and Noto CJK fonts. Document-only build: bash source/build.sh paper_en paper_zh supplement_en supplement_zh.
+```sh
+bash source/build.sh paper_en paper_zh supplement_en supplement_zh
+```
+
+This public-package route requires Python3, XeLaTeX and the bundled fonts. The broader `source/rebuild_current.sh` is not a self-contained public-package command: `figures/method_details/build_details.py` requires `sources/build_method_architecture.py`, which is not among the 155 public members. Its attempted execution failed at that missing dependency during the 2026-10-18 alignment check. The failed log is retained with the delivery evidence; no complete figure-regeneration success is claimed. Individual chart-regeneration routes below additionally require their stated plotting tools.
 
 The current English and Chinese manuscripts each contain five content pages and one references page; both supplements have nine pages. The presentation retains17slides. Main figures retain the Qwen3 observation and method architecture, now add a full-width RULER32K AVG comparison, and retain historical decode TPOT. The former128K chart is replaced in the main layout; its negative scores46.43/23.98 and22.45-point gap remain in the text and S6. Supplementary FigureS8 adds all11task scores for both model sizes. Slides14 and16 show the AVG and task views; slide13 retains the protection/budget-confounded diagnostic.
 
 RULER32K figures are descriptive author aggregates:8B uses different scorers despite matching source-data hashes;32B has matching manifests but unreplayed predictions. Both comparisons span machines and use different beta allocations (.0625/.125). Gate status and actual scoring dimensions are unverified. No non-inferiority, causal allocation effect or matched quality-cost benefit is established. Figure sources, eight fixed Git-blob JSON/manifest snapshots, CSV and provenance are in `figures/ruler32k_comparison/`. These original repository manifests retain their existing path metadata; no private advice or third-party paper is included.
 
-Run `python3 figures/ruler32k_comparison/draw.py` to regenerate the four new charts, or use the full rebuild command above. The new Chinese chart PDFs use Type3 glyphs to avoid CFF/Type42 reader incompatibility; they render correctly in MuPDF and Poppler but Chinese text is not reliably extractable. Editable SVG text and Python source remain available. Other historical chart export paths retain their documented SVG/Inkscape conversion. Native7.1-inch figure widths preserve the7.5pt minimum; the main plot is not reduced to one column. All source and derived scores remain reported aggregates, not new model experiments. Older dated revision notes below describe their own historical snapshots.
+Run `python3 figures/ruler32k_comparison/draw.py` to regenerate the four new charts, then compile the documents with the command above. The new Chinese chart PDFs use Type3 glyphs to avoid CFF/Type42 reader incompatibility; they render correctly in MuPDF and Poppler but Chinese text is not reliably extractable. Editable SVG text and Python source remain available. Other historical chart export paths retain their documented SVG/Inkscape conversion. Native7.1-inch figure widths preserve the7.5pt minimum; the main plot is not reduced to one column. All source and derived scores remain reported aggregates, not new model experiments. Older dated revision notes below describe their own historical snapshots.
 
 This archive contains current manuscript dependencies and the current editable17-slide presentation with its matching PDF. Private project history and presentation rebuild inputs remain in the separate complete editable-source archive. Publication status and exact identities are recorded in the accompanying delivery receipt; this archive contains only the curated manuscript payload.
 
