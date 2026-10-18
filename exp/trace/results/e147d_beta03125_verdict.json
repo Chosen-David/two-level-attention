@@ -1,0 +1,40 @@
+{
+  "id": "e147d_beta03125",
+  "date": "2026-10-18",
+  "title": "E147d β.03125 全量收官——AVG 58.07 居三点 β 曲线谷底侧，倒 U 峰值确认 β.0625 为甜点",
+  "config": {
+    "arm": "tli_64_128_1024_c4_Aa0.25_b0.03125_g0.625_sk4_sw128（K1=128，far 页 124/词元 732，near 词元 320）",
+    "machine": ".187 GPU0（tmp_e146b_tree_187 树，rest9 脚本 22:05 ALL DONE）；formal score_ruler_formal --pred-postfix e147d --expect-tasks 11 --min-samples 100（staging root /tmp/e147d_root）"
+  },
+  "results": {
+    "e147d_beta03125_avg": 58.07,
+    "beta125_e146c": 58.30,
+    "beta0625_e147c": 59.29,
+    "fullkv_anchor_e116e": 59.38,
+    "diff_vs_beta125": -0.23,
+    "diff_vs_beta0625": -1.22,
+    "per_task_beta03125": {
+      "niah_single_1": 97.0, "niah_single_2": 95.0, "niah_single_3": 90.0,
+      "niah_multikey_1": 95.0, "niah_multikey_2": 76.0, "niah_multikey_3": 7.0,
+      "niah_multiquery": 24.25, "niah_multivalue": 28.0,
+      "cwe": 76.1, "fwe": 19.67, "vt": 30.8
+    }
+  },
+  "judgment": [
+    "β.03125 全量 = 58.07：vs β.125 58.30 为 -0.23（噪声带内）、vs β.0625 59.29 为 -1.22——三点 β 曲线 .125 58.30 / .0625 59.29 / .03125 58.07 成倒 U 型，β.0625 确认为甜点峰值（远超噪声带不对称：+0.99 / -1.22）",
+    "quick→full 一致性：全量 cwe 76.1 / mk2 76.0 与 quick 两任务快报逐位一致——β 下探至 .03125 的 cwe 增益（+7.3 vs β.0625 68.8）与 mk2 恢复（+3.0 vs 73.0，FullKV 76 水平）兑现，但被 single_3 -10/mq/fwe/vt 小损全额抵消",
+    "结构：far 词元 732 极限供给在 far 检索型任务（cwe/mk2）继续兑现已到边际；near 侧持续小损（single_3 90 vs β.0625 95/β.125 97）——与 Llama β.0625 否决臂同型的 near 供给代价，Qwen3-8B 上幅度温和",
+    "β 消融轴三点齐 + far=0 崩溃边界（E146 β.375 128K 23.98）：E147h 判据记分补全 β.03125 数据集点——β.0625 主口径候选证据链完整",
+    "E147h 七臂累计：LBv2 ✓ / LB ZH ✓（边缘）/ RULER 64K ✓ / Llama ✗ / β 消融第三点齐（58.07 噪声带内 vs β.125）——剩 128K、32B、LB EN 三臂在飞"
+  ],
+  "sources": {
+    "formal": "exp/trace/results/e147d_r32k_formal.json（四件套，.187 打分原件拉回）",
+    "raw": ".187:~/tmp_e146b_tree_187/exp/results_ruler/Qwen3-8B/L32768/pred/*e147d*（11 任务 100 行/格核验）",
+    "baselines": "e146c_r32k_formal（58.30）/ e147c_r32k_formal（59.29）/ e116e fullkv 锚（59.38）复用"
+  },
+  "caveats": [
+    "同机配对：β.03125 e147d 在 .187、β.0625 e147c 在 .187、β.125 e146c 在 wys——β.0625 vs β.125 +0.99 为跨机，但 E147cwys 复跑已证跨机 greedy 零漂移",
+    "mk3 7.0 为稀疏臂通病区间（β.0625 7/β.125 0/JSSA 2），FullKV 锚 12"
+  ],
+  "generated_at": "2026-10-18T23:20"
+}
