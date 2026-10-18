@@ -24,10 +24,19 @@
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
 | 5 | 2023_Gamora.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5） | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ §III-B 首句主谓修复（t indexes the current token） ✓ Q2 128K 句中心词+比较对象补全（sparse arm / dense FullKV's 46.43） ✓ |
-| 6 | 2023_RL_CCD.pdf | 未开始 | — |
+| 6 | 2023_RL_CCD.pdf | Abstract ✓ Intro ✓；待：§2 相关工作 | Intro P4 门控句主语补全（the diagnostic uses） ✓ |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 26 轮（2026-10-18，RL-CCD Abstract + Introduction —— 第 6 篇开始）
+- 远端检查：fetch 无新提交（HEAD = origin/main），无裁决需求。
+- 拆解笔记：新建 `notes/sentence_studies/2023_rl_ccd.md`（Abstract 4 句表：**well-adopted 信誉句**/**However 直判 flaw 句 + Particularly 收窄**（are flawed 一个判词极 blunt）/**Overcome 登场句**（In-response 家族强势动词变体）/**范围限定证据句**（19 industrial designs in 5-12nm 前置状语+双指标 up-to+基线点名 native implementation）；Intro P1：In-general-aims 平衡句+**However mainly-because 归因引子句带冒号**；Bullet：**一行论点句**（Not all violating endpoints are equal.——6 词承载全文核心洞察）/**better-fixed-more while-others 平行机制句**（引号口语+i.e. 形式化双轨）/However no-intelligence 复述——bullet 自身即微型 P1-P5 弧；P2：Overcome 第二变体（built-upon 挂引用）/**Prior-to 范围句带 rather-than 排除**（一句话说清做/不做/为什么）；P3：**The-goal unleash 一行大目标**/**Note-that 阶段收窄句链**（整流程→placement 两级收窄）/参照工具点名 ICC2；P4：**图差异载体句**（highlights innovations and key differences）/**Given-X-unlike-Y 走查句**/**Note-that 公平比较声明×2**（步骤数恒等+无额外步骤——把公平性写成卖点）；P5：The-outcome-of-our-effort 带 i.e. 括注；贡献 bullets：**问题发现即贡献**（We discover a new PD problem+That-is）/**first-ever+up-to/avg 双口径**（up to 64% (avg. 23%)、up to 66% (avg. 19%)——每指标成对）/可迁移性收益句带 pre-trained+only-few-iterations）。
+- 对照结论：14 项句式均有诚实镜像/等价物/判定不加（flaw 判词与 overcome 受诚实边界约束——我们的比较未隔离机制，无资格判前作 flawed 也无已证问题可 overcome；first-ever 受 AsyncTLS already-combines 制约；up-to/avg 双口径——我们的指标本身是 AVG 单口径无分层可报；问题发现即贡献——无贡献 bullet 惯例已判定保持）。**唯一实缺 = Intro P4 门控句主谓失配+指代歧义**（"layer variation ... motivates this extension, **but uses** a different single-query statistic"——uses 无合法主语：variation 不能采用统计，若挂 extension 则语义反转（真义=panel (d) 诊断统计异于当前门控，caption "It uses ... unlike the current gate" 已明示）；zh「但采用」同样悬空；第 24 轮同类病灶再现）。
+- paper_en.tex Intro P4：→ `...motivates this extension, but the diagnostic uses a different single-query statistic;`（+2 词补主语）。
+- paper_zh.tex 直译同步：「但该诊断采用不同的单查询统计」。
+- 编译验证：en 6 / zh 6 页，0 未定义引用。
+- 待后续轮次：RL-CCD §2 Related Works（三小节 credit-then-focus 已在原文可见）、§3 框架、§4 实验。
 
 ### 第 25 轮（2026-10-18，Gamora §4 Experiment + §5 Conclusion —— 第 5 篇拆解完毕）
 - 远端检查：fetch 无新提交（HEAD = origin/main cbbfbe9 已合并），无裁决需求。
