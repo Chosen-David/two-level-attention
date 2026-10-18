@@ -1,12 +1,20 @@
 # Publication source and bilingual PDFs
 
-Compile all four documents from the bundled sources and frozen figure assets:
+Rebuild all figure PDFs referenced by the four documents, then compile them:
+
+```sh
+bash source/rebuild_current.sh
+```
+
+The 156-member public package includes the project-authored `sources/build_method_architecture.py` required by the method-detail wrapper. The entrypoint loads bundled fonts before plotting, regenerates both Observation panels and the other referenced figures from bundled sources/data, then compiles the four documents. Existing editable gate SVGs are authoritative sources for their PDF exports. This route requires Python3 with NumPy/Matplotlib, Inkscape, Poppler and XeLaTeX; it performs no model execution or data collection. The missing-generator failure from the previous 155-member package is retained in the earlier delivery evidence and is closed by this package's actual isolated rebuild.
+
+For document-only compilation against the bundled figure assets:
 
 ```sh
 bash source/build.sh paper_en paper_zh supplement_en supplement_zh
 ```
 
-This public-package route requires Python3, XeLaTeX and the bundled fonts. The broader `source/rebuild_current.sh` is not a self-contained public-package command: `figures/method_details/build_details.py` requires `sources/build_method_architecture.py`, which is not among the 155 public members. Its attempted execution failed at that missing dependency during the 2026-10-18 alignment check. The failed log is retained with the delivery evidence; no complete figure-regeneration success is claimed. Individual chart-regeneration routes below additionally require their stated plotting tools.
+The editable 17-slide PPTX is unchanged. Its PDF was separately exported with LibreOffice 25.2.3.2 under `source fonts/env.sh` and compared; the shell entrypoint above does not itself export the presentation. Verification compares extracted text and RGB/grayscale rendering, not PDF container-byte determinism.
 
 The current English and Chinese manuscripts each contain five content pages and one references page; both supplements have nine pages. The presentation retains17slides. Main figures retain the Qwen3 observation and method architecture, now add a full-width RULER32K AVG comparison, and retain historical decode TPOT. The former128K chart is replaced in the main layout; its negative scores46.43/23.98 and22.45-point gap remain in the text and S6. Supplementary FigureS8 adds all11task scores for both model sizes. Slides14 and16 show the AVG and task views; slide13 retains the protection/budget-confounded diagnostic.
 
