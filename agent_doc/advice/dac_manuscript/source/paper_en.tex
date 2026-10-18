@@ -102,7 +102,7 @@ The gate supports one sequence; the skip path requires valid length and nonempty
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\textwidth]{ruler32k_comparison/ruler32k_avg_compact_en.pdf}
-\caption{Author-reported RULER 32K/64K AVG: 11 tasks, 100 examples/task/arm. FullKV is dense; sparse arms report $K=1024$, protection 4/128, $\beta=.0625$ (8B) or $.125$ (32B). The 32K comparisons span machines (8B scorers differ; 32B manifests match, predictions unreplayed); the 64K sparse arms share one machine, the FullKV anchor a separate run. Gate status and scoring dimensions are unverified. These descriptive scores establish neither non-inferiority nor matched quality--cost benefit (S8).}
+\caption{Author-reported RULER 32K/64K AVG: 11 tasks, 100 examples/task/arm. FullKV is dense; sparse arms report $K=1024$, protection 4/128. At 32K, $\beta=.0625$ (8B) or $.125$ (32B); at 64K, both $\beta$ values are shown for 8B. The 32K comparisons span machines (8B scorers differ; 32B manifests match, predictions unreplayed); the 64K sparse arms are reported on one machine, the FullKV anchor a separate run. Gate status and scoring dimensions are unverified. These descriptive scores establish neither non-inferiority nor matched quality--cost benefit (S8).}
 \label{fig:ruler32k-quality}\end{figure*}
 
 \section{Experimental Setting}
@@ -136,7 +136,7 @@ Five-task means sit within a descriptive 0.33-point spread across the three nomi
 \subsection{Q2: How do regional budgets constrain candidate access?}
 Regional quotas lower far retention in 43/128 correlated observations despite improving its mean (Fig.~\ref{fig:observation}(b)); this is not task-quality evidence. Reported 8B 32K AVG rises 58.30$\rightarrow$59.29 when $\beta=.125\!\rightarrow\!.0625$ at $K_1=128$, $K=1024$, protection 4/128. Pages 16/112$\rightarrow$8/120 and tokens 640/252$\rightarrow$320/572 change jointly. At $K_1=256$, $\beta=.03125$, near pages/tokens stay 8/320, far pages rise 120$\rightarrow$248 and far tokens stay 572, yet AVG falls to 58.96; CWE rises 3.9 and FWE falls 9.67. Data/scorer records match these sparse arms; predictions remain unreplayed.
 
-Against dense FullKV, reported differences are $-0.09$ (8B 32K, different scorers), $-1.58$ (32B 32K, matching manifests) and $+0.31$ for the 64K $\beta=.0625$ arm over its separate-run anchor, with $\beta=.125$ at $-0.49$; the 64K sparse arms share one machine (Fig.~\ref{fig:ruler32k-quality}). Cross-machine execution and unreplayed predictions limit all three; S8 keeps task differences and provenance, establishing neither allocation causality nor non-inferiority.
+Against dense FullKV, reported differences are $-0.09$ (8B 32K, different scorers), $-1.58$ (32B 32K, matching manifests) and $+0.31$ for the 64K $\beta=.0625$ arm over its separate-run anchor, with $\beta=.125$ at $-0.49$; the 64K sparse arms are reported on one machine (Fig.~\ref{fig:ruler32k-quality}). Cross-machine 32K comparisons, the separate-run 64K anchor and unreplayed predictions limit interpretation; S8 keeps task differences and provenance, establishing neither allocation causality nor non-inferiority.
 
 The historical 128K sparse arm scores 23.98 against dense FullKV's 46.43. Reported budgets imply $k_f=0$ despite retained far pages, but this neither verifies execution nor explains the 22.45-point loss (S6). Protection-only scores 26.09 versus 47.91 at 256 versus 1024 tokens, jointly changing retrieval and budget.
 

@@ -1,5 +1,7 @@
 # Entire Introduction: original sentences, bilingual revisions and evidence
 
+Snapshot status: the C01–C24 text and references to “current” below describe the accepted Introduction at commit `cb0c8f430b9e2595caef48590b01690a99d416b3`. Subsequent manuscript integration at `d0d4995cc1fa67fb4b3e4d6803d32d77311efbe3` revises that Introduction, including panel references. This mapping is preserved as a historical editorial record; it is not an exact mapping of the later source.
+
 This document preserves the earlier OEN/OZH to N01–N23 mapping for the accepted manuscript snapshot at `44d09d7781d235db94d7ec5ffe5a90b529221af3`. Those sections are historical, not the current wording. The current complete bilingual Introduction is recorded as C01–C24 below, with exact correspondence to that earlier version. Figure captions and other sections remain outside this prose revision.
 
 ## Verified reference and sentence roles
