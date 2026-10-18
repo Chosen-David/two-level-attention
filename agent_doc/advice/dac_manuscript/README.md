@@ -1,6 +1,6 @@
 # Publication source and bilingual PDFs
 
-The Workloads and comparisons paragraph distinguishes the final unique-token cap, including protection, from coarse candidate coverage and nominal configuration labels. Native phase routes and policy-matched adaptations retain separate reporting requirements. Equal caps alone establish neither equal quality nor matched preparation-inclusive complete-request cost; actual counts and head sharing remain relevant to KV traffic. This bilingual paragraph revision preserves the concurrent Related Work clarification, all reported results, the S7 support-scarcity boundary and the current32K/64K17-slide presentation. New result interpretations do not enter the manuscript or plots.
+The Related Work selector paragraph distinguishes unchanged original-KV capacity from an unestablished complete-request latency benefit. The smaller scoring view alone does not prove lower full-request latency. Both language versions now express this evidence boundary consistently, while preserving the concurrent Token-Picker contrast. Reported results, Workloads, Q2, S7 and the current32K/64K17-slide presentation remain unchanged. No new experiment or performance claim is added.
 
 The four document PDFs are rebuilt from this source and compared directly with the fresh-main input PDFs. Differences are reported as text/render changes where observed, without reducing them to PDF container changes. The current presentation retains its existing artifact bytes and is independently re-exported during the isolated package check.
 
