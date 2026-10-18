@@ -97,11 +97,13 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
                 m = m | (prot & causal)[:, None, None, :]
         # 防御：选择 ∩ 因果全空的行兜底对角线（sink 强制 + pos>=2048 下
         # 不应触发；防御性保 softmax 无 NaN）
-        if not bool(m.any(dim=-1).all()):
-            diag = torch.arange(pos_lo + r0, pos_lo + r1, device=device)[
-                :, None
-            ] == kcol[None, :]
-            m = m | diag[:, None, None, :]
+        empty = ~m.any(dim=-1, keepdim=True)
+        diag = torch.arange(pos_lo + r0, pos_lo + r1, device=device)[
+            :, None
+        ] == kcol[None, :]
+        # Fallback is local to each row/head. An empty selection elsewhere in
+        # the execution tile must not add a token to an already nonempty row.
+        m = m | (diag[:, None, None, :] & empty)
         b_s = torch.where(m, b_s, float("-inf"))
         b_p = F.softmax(b_s, dim=-1).to(q_c.dtype)
         b_o = einsum(b_p, v_c[0], "r h g t, t h d -> r h g d")
