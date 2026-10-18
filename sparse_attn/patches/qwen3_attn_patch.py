@@ -1,5 +1,6 @@
 import os
 import sys
+import weakref
 
 import torch
 from transformers.cache_utils import Cache
@@ -27,6 +28,38 @@ def _paper_route(layer,route):
     if observer is not None:observer.record_qwen_route(layer,route)
 
 
+def _can_drop_static_mask(cache, mask, length, *, prefill):
+    """Only an exact, unpadded bool causal mask can be replaced by None.
+
+    Cross-layer reuse is tied to the same live tensor and mutation version.
+    Inference tensors without a version counter are validated on every call.
+    A weak reference avoids retaining the quadratic prefill mask in the cache.
+    """
+    if (mask.dim() != 4 or mask.dtype != torch.bool or length < 1
+            or mask.shape[:2] != (1, 1)
+            or mask.shape[2] != (length if prefill else 1)
+            or mask.shape[-1] < length):
+        return False
+    try:
+        version = mask._version
+    except RuntimeError:
+        version = None
+    signature = (version, length, prefill, tuple(mask.shape), tuple(mask.stride()), mask.dtype, mask.device)
+    previous = getattr(cache, '_tli_mask_validation', None)
+    if (version is not None and previous is not None
+            and previous[0]() is mask and previous[1] == signature):
+        return previous[2]
+    prefix = mask[..., :length]
+    if prefill:
+        valid = torch.equal(prefix, torch.ones_like(prefix).tril_())
+    else:
+        valid = bool(prefix.all())
+    valid = valid and not bool(mask[..., length:].any())
+    cache._tli_mask_validation = ((weakref.ref(mask), signature, valid)
+                                  if version is not None else None)
+    return valid
+
+
 def qwen3_attn_forward(
     self,
     hidden_states: torch.Tensor,
@@ -47,18 +80,21 @@ def qwen3_attn_forward(
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
     cur_len = 0
+    is_static_cache = False
     if past_key_values is not None:
         # sin and cos are specific to RoPE models; cache_position needed for the static cache
         cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
         key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
         # 【E134-pre】StaticCache 支持（opt-in）：update 返回全容量缓冲
         # （index_copy_ 就地写、零拷贝 append），下游统一切到当前序列长。
-        # 判别用 get_max_cache_shape()（静态缓存返回 int，DynamicCache 返回
-        # None），避免版本敏感的 isinstance。长度提示只在 layer 0 每步刷新
+        # 判别用正的 get_max_cache_shape()（HF 4.56.2 DynamicCache 返回
+        # -1；兼容无上限返回 None 的接口）。长度提示在 layer 0 每步刷新
         # 一次（cache_position[-1]+1，一次 .item 同步；StaticLayer.
         # get_seq_length 是 GPU any() 归约，逐层调用会引入 36 次隐式同步）。
-        # DynamicCache 路径（get_max_cache_shape() is None）零扰动。
-        if past_key_values.get_max_cache_shape() is not None:
+        # HF 4.56.2 DynamicCache uses -1, not None, for unbounded capacity.
+        capacity = past_key_values.get_max_cache_shape()
+        is_static_cache = capacity is not None and capacity > 0
+        if is_static_cache:
             if (self.layer_idx == 0
                     or getattr(past_key_values, "_tli_seq_len", None) is None):
                 if cache_position is not None:
@@ -109,32 +145,17 @@ def qwen3_attn_forward(
         # SDPA 走 is_causal=True flash 路径，因果语义逐位等价。仅 bool
         # mask（4D float additive 不旁路，fail-closed 回原路径）；
         # sliding_window 激活时不旁路（SWA 语义编码在 mask 里）。
-        # layer 0 一次验证（S² 元素归约 + 一次同步），DynamicCache 零扰动。
+        # 同一 live mask + version 可跨层复用验证；不同/已修改 mask 重验。
+        # 版本计数不可用的 inference tensor 不复用，避免静默吞掉新限制。
         if os.environ.get("TLI_E134_DEBUG") and self.layer_idx == 0 and attention_mask is not None:
             print(f"[E134dbg] L{self.layer_idx} mask dim={attention_mask.dim()} "
                   f"dtype={attention_mask.dtype} shape={tuple(attention_mask.shape)} "
-                  f"sw={self.sliding_window} _S={_S}", flush=True)
-        if (attention_mask is not None and attention_mask.dim() == 4
-                and attention_mask.dtype == torch.bool
+                  f"sw={self.sliding_window} _S={cur_len}", flush=True)
+        if (attention_mask is not None
                 and self.sliding_window is None
-                and past_key_values.get_max_cache_shape() is not None):
-            if (self.layer_idx == 0
-                    or getattr(past_key_values, "_tli_pmask_ok", None) is None):
-                _m = attention_mask
-                _ok_shape = (_m.shape[0] == 1 and _m.shape[1] == 1
-                             and _m.shape[2] == _S and _m.shape[-1] >= _S)
-                # 注意：X.tril().all() 恒 False（tril 清零上三角），
-                # 因果性判据必须是 torch.equal(X, X.tril())
-                _lo = _m[..., :_S, :_S]
-                _ok = bool(_ok_shape
-                           and torch.equal(_lo, _lo.tril())
-                           and int(_m[..., _S:].sum()) == 0)
-                past_key_values._tli_pmask_ok = _ok
-                if os.environ.get("TLI_E134_DEBUG"):
-                    print(f"[E134dbg] L{self.layer_idx} prefill mask _ok={_ok} "
-                          f"(shape_ok={_ok_shape})", flush=True)
-            if past_key_values._tli_pmask_ok:
-                attention_mask = None
+                and is_static_cache
+                and _can_drop_static_mask(past_key_values, attention_mask, cur_len, prefill=True)):
+            attention_mask = None
         # E85f：prefill 走 dense，但旁路采集 post-RoPE q 统计供 per-layer 静态
         # pair 选取（decode 侧 _subspace_indices 消费；非静态 pair 模式为 no-op）
         if hasattr(indexer, "observe_prefill_q"):
@@ -215,22 +236,13 @@ def qwen3_attn_forward(
         # 【E134-pre】StaticCache decode：HF 为静态缓存生成 4D bool 容量尺寸
         # causal mask（掩盖未写区）。K/V 上方已切到当前序列长 S=cur_len，
         # q_len=1 因果约束空转（单 query 只看 ≤ 自身位置的全部有效缓存）。
-        # layer 0 逐步验证「[:S] 全真、[S:] 全假」（一次 GPU 归约 + 同步），
-        # 其余层复用判据；验证不过不吞掉，仍走下方原 B2 拒绝路径。
+        # 验证「bool、[:S] 全真、[S:] 全假」，只对同一 live tensor/version
+        # 复用；验证不过不吞掉，仍走下方原 B2 拒绝路径。
         # DynamicCache（mask=None）路径零扰动。
-        if (attention_mask is not None and attention_mask.dim() == 4
-                and past_key_values.get_max_cache_shape() is not None
-                and input_shape[0] == 1 and input_shape[1] == 1):
-            if (self.layer_idx == 0
-                    or getattr(past_key_values, "_tli_mask_ok", None) is None):
-                _m, _S = attention_mask, past_key_values._tli_seq_len
-                _ok_shape = (_m.shape[0] == 1 and _m.shape[2] == 1
-                             and _m.shape[-1] >= _S)
-                _ok = bool(_ok_shape and _m[..., :_S].all()
-                           and int(_m[..., _S:].sum()) == 0)
-                past_key_values._tli_mask_ok = _ok
-            if past_key_values._tli_mask_ok:
-                attention_mask = None
+        if (attention_mask is not None and is_static_cache
+                and self.sliding_window is None
+                and _can_drop_static_mask(past_key_values, attention_mask, cur_len, prefill=False)):
+            attention_mask = None
         if attention_mask is not None and (
             attention_mask.dim() != 2 or attention_mask.dtype != torch.bool
         ):

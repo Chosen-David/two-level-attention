@@ -1,0 +1,126 @@
+{
+  "issue": "TL-STATIC-MASK-20261016",
+  "run": "static-mask-resume-20261018",
+  "baseline": "4828e4df4a236692379778d80426fd9d0774cec6",
+  "publication_parent": "784c1a4038417a084e087c6df05e46f9d26c8e41",
+  "baseline_failures": 3,
+  "baseline_tests": 4,
+  "checks": [
+    {
+      "log": "static-final.log",
+      "tests": 12,
+      "passed": true
+    },
+    {
+      "log": "static-final-O.log",
+      "tests": 12,
+      "passed": true
+    },
+    {
+      "log": "ops.log",
+      "tests": 66,
+      "passed": true
+    },
+    {
+      "log": "ops-O.log",
+      "tests": 66,
+      "passed": true
+    },
+    {
+      "log": "e152.log",
+      "tests": 16,
+      "passed": true
+    },
+    {
+      "log": "e152-O.log",
+      "tests": 16,
+      "passed": true
+    },
+    {
+      "log": "capture.log",
+      "tests": 11,
+      "passed": true
+    },
+    {
+      "log": "capture-O.log",
+      "tests": 11,
+      "passed": true
+    }
+  ],
+  "boolean_mask_census": 512,
+  "unique_cpu_tests": 105,
+  "gpu_tested": false,
+  "latency_measured": false,
+  "independent_agent_review": false,
+  "source_loading": "actual production AST functions + actual HF cache, Qwen3 attention and CPU SDPA; unrelated indexer imports excluded",
+  "profiler": "copy-counts.json",
+  "negative_result": "copy-probe.log: initial two-copy-removal hypothesis rejected; actual clone/contiguous counts unchanged",
+  "reproduce": [
+    "python -m unittest discover -s tests -p test_qwen_static_mask.py -v",
+    "python -O -m unittest discover -s tests -p test_qwen_static_mask.py -v",
+    "python -m unittest discover -s sparse_attn/ops/tests -v",
+    "python -O -m unittest discover -s sparse_attn/ops/tests -v",
+    "python -m unittest discover -s tests -p \"test_e152*.py\" -v",
+    "python -O -m unittest discover -s tests -p \"test_e152*.py\" -v",
+    "python -m unittest discover -s tests -p test_longbench_request_capture.py -v",
+    "python -O -m unittest discover -s tests -p test_longbench_request_capture.py -v"
+  ],
+  "files": {
+    "sparse_attn/patches/qwen3_attn_patch.py": {
+      "sha256": "ca59e6d52e6ba55c509d093d7dea5836705684b1c31b003f1e8e966ff79c05e3",
+      "bytes": 15829
+    },
+    "tests/test_qwen_static_mask.py": {
+      "sha256": "3a60da56ef1628fa18b47e073c551f939758fb12cf5bd3d428a933309a698fe7",
+      "bytes": 7496
+    },
+    "agent_doc/results/static-mask-resume-20261018/capture-O.log": {
+      "sha256": "34e0bd22e182b5de0f5f204f8da0f521a1134eb56f7139ecda25872836dd793e",
+      "bytes": 1989
+    },
+    "agent_doc/results/static-mask-resume-20261018/capture.log": {
+      "sha256": "46d6c05a4072847fab84a76566bf5c682a98e68bb51175c4a1718b485197a999",
+      "bytes": 1989
+    },
+    "agent_doc/results/static-mask-resume-20261018/check_copy_counts.py": {
+      "sha256": "b04b8fc2d0188a193be8e5eb9bb1aa38369447e40febf3b9c8d5b0910b1e110b",
+      "bytes": 2668
+    },
+    "agent_doc/results/static-mask-resume-20261018/copy-counts.json": {
+      "sha256": "8cf5d4082bbf3863c2ab02a82e2e408c7308c777dad2b80aa421e76ae2d395cb",
+      "bytes": 1082
+    },
+    "agent_doc/results/static-mask-resume-20261018/copy-probe.log": {
+      "sha256": "a9bd489a408b8f0130e521d6cc617976d0e53ca65400c98b141f8976c375e127",
+      "bytes": 609
+    },
+    "agent_doc/results/static-mask-resume-20261018/e152-O.log": {
+      "sha256": "444abb02b5dd58d4a46904cd82ec509620de422b4badc197585ebc47c28d8445",
+      "bytes": 2451
+    },
+    "agent_doc/results/static-mask-resume-20261018/e152.log": {
+      "sha256": "267ee71625733ece498f9c8be43d7586708d2c2cffd6e8a6c0e6cce8ab22acc0",
+      "bytes": 2451
+    },
+    "agent_doc/results/static-mask-resume-20261018/ops-O.log": {
+      "sha256": "20e9c23b1b18badadefcecba0a250c54353740afb6268edca1ba059ec4d252ca",
+      "bytes": 10711
+    },
+    "agent_doc/results/static-mask-resume-20261018/ops.log": {
+      "sha256": "59f12b15c6cded68b26b7b3c8a883b26f813b7f0ebd77c8c7dc1ad54962541d5",
+      "bytes": 10711
+    },
+    "agent_doc/results/static-mask-resume-20261018/static-before-final.log": {
+      "sha256": "5ca2b4dc2a8325598b4f4fd35ca126c2b330303202231341123a1edd419cdc75",
+      "bytes": 2408
+    },
+    "agent_doc/results/static-mask-resume-20261018/static-final-O.log": {
+      "sha256": "d845d71c94c78382b3c90af8756ae103319b8ecccb1c54868d097765b193ba95",
+      "bytes": 1589
+    },
+    "agent_doc/results/static-mask-resume-20261018/static-final.log": {
+      "sha256": "848c123606c1be1d74eae4c3c49f18d04a62fd6d473d4ca3b0a3c10c21cfc169",
+      "bytes": 1589
+    }
+  }
+}

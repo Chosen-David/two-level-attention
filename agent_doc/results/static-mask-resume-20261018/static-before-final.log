@@ -1,0 +1,37 @@
+test_forward_canonical_static_matches_dynamic (static_tests.StaticMask.test_forward_canonical_static_matches_dynamic) ... ok
+test_forward_changed_layer_mask_not_reused (static_tests.StaticMask.test_forward_changed_layer_mask_not_reused) ... FAIL
+test_forward_dynamic_cache_is_not_static (static_tests.StaticMask.test_forward_dynamic_cache_is_not_static) ... FAIL
+test_forward_preserves_fully_blocked_rows (static_tests.StaticMask.test_forward_preserves_fully_blocked_rows) ... FAIL
+
+======================================================================
+FAIL: test_forward_changed_layer_mask_not_reused (static_tests.StaticMask.test_forward_changed_layer_mask_not_reused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-review/tests/test_qwen_static_mask.py", line 93, in test_forward_changed_layer_mask_not_reused
+    self.assertIs(seen[0], blocked)
+AssertionError: None is not tensor([[[[False, False, False, False, False],
+          [False, False, False, False, False],
+          [False, False, False, False, False]]]])
+
+======================================================================
+FAIL: test_forward_dynamic_cache_is_not_static (static_tests.StaticMask.test_forward_dynamic_cache_is_not_static)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-review/tests/test_qwen_static_mask.py", line 81, in test_forward_dynamic_cache_is_not_static
+    self.assertFalse(hasattr(cache, '_tli_seq_len'))
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_forward_preserves_fully_blocked_rows (static_tests.StaticMask.test_forward_preserves_fully_blocked_rows)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-review/tests/test_qwen_static_mask.py", line 75, in test_forward_preserves_fully_blocked_rows
+    self.assertIs(seen[0], mask)
+AssertionError: None is not tensor([[[[False, False, False, False, False],
+          [False, False, False, False, False],
+          [False, False, False, False, False]]]])
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.068s
+
+FAILED (failures=3)
