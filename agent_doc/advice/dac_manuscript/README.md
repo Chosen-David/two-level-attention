@@ -1,6 +1,6 @@
 # Publication source and bilingual PDFs
 
-The closing evaluation paragraph now distinguishes far-page admission to refinement from final far-token capacity, and states the complete-request benefit requirement directly. It retains the reported historical sparse configuration's slower decoding, the missing matched quality/cost measurements for the compact 4/128 design, and incomplete gate configuration identity. Redundant summaries are removed in both languages; the accepted Introduction and the 17-slide presentation remain unchanged. No experiment, configuration or reported value changes.
+The bilingual Introduction now defines the dense-decoding baseline and selection objective, aligns page-weight diagnostics with their evidence, explains regional retention and fixed32-coordinate scoring, and separates the two reported RULER32K comparisons. It preserves mixed coverage, slower archived decoding and the missing matched quality/complete-request evaluation. The current C01–C24 sentence mapping accompanies the historical OEN/OZH–N mapping. Main PDFs retain five content pages plus references; supplements and the17-slide presentation retain their accepted content. No experiment, configuration or reported value changes.
 
 Rebuild all figure PDFs referenced by the four documents, then compile them:
 
