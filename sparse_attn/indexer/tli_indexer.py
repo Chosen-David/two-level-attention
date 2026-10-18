@@ -1854,6 +1854,17 @@ class TLIIndexer(TIAIndexer):
         return m
 
     def compute_mask(self, q_ids, score_dict):
+        oracle_far_budget = None
+        if self._e151c_quota is not None and self._e151c_on:
+            # layer_idx is injected after construction. Never silently use
+            # layer zero or Python's negative indexing for a missing identity.
+            layer = self.layer_idx
+            if type(layer) is not int or not 0 <= layer < len(self._e151c_quota):
+                raise ValueError(
+                    f"E151c layer_idx must be an integer in [0, {len(self._e151c_quota)}), "
+                    f"got {layer!r}"
+                )
+            oracle_far_budget = self._e151c_quota[layer]
         score_coarse = score_dict["score_coarse"]
         score_fine = score_dict["score_fine"]
         # ---- 【075 修复 2026-10-10（GPT 审计 TL-E121-PROJ-PAD-S-075，P1）】----
@@ -2326,9 +2337,9 @@ class TLIIndexer(TIAIndexer):
                         nt_near = min(int(nb_near * bs * self.gamma), K2_mid)
                         # TASK.md L172 严格口径（与 E109a-γ 同步）：无 64 保底
                         far_budget = max(0, K2_mid - nt_near)
-                        if self._e151c_quota is not None and self._e151c_on:
+                        if oracle_far_budget is not None:
                             # E151c oracle 逐层配额终审：far 覆盖为该层 oracle 需求
-                            far_budget = min(self._e151c_quota[self.layer_idx or 0], K2_mid)
+                            far_budget = min(oracle_far_budget, K2_mid)
                     elif self.alpha == 0 and self.beta == 0:
                         # TASK.md L231 严格口径：cluster 组合 (0,0) 单池点
                         # far（簇分）拿全部 mid 预算（near 区已空）。
@@ -2357,9 +2368,9 @@ class TLIIndexer(TIAIndexer):
                     if e64_partition:
                         nt_near = min(int(nb_near * bs * self.gamma), K2_mid)
                         far_budget = max(0, K2_mid - nt_near)
-                        if self._e151c_quota is not None and self._e151c_on:
+                        if oracle_far_budget is not None:
                             # E151c oracle 逐层配额终审（minmax/avg 臂实际走本分支）
-                            far_budget = min(self._e151c_quota[self.layer_idx or 0], K2_mid)
+                            far_budget = min(oracle_far_budget, K2_mid)
                     else:
                         far_budget = self.far_tokens
                     # 默认：远端与近端同用 4bit 精筛分数，仅在独立池内 topk

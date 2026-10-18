@@ -1,0 +1,43 @@
+test_actual_callsite_geometry_and_cross_layer_reuse (test_e139_graph_contract.Contracts.test_actual_callsite_geometry_and_cross_layer_reuse) ... ok
+test_hard_gates_subprocess_exit (test_e139_graph_contract.Contracts.test_hard_gates_subprocess_exit) ... EXIT optimized=False expected=0 actual=0 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.ones(2,dtype=torch.bool)], 1)
+EXIT optimized=False expected=0 actual=0 case=require_outputs(torch.ones(2), torch.ones(2))
+EXIT optimized=False expected=1 actual=1 case=require_masks(None, [], 1)
+EXIT optimized=False expected=1 actual=1 case=require_masks([], [], 1)
+EXIT optimized=False expected=1 actual=1 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.zeros(2,dtype=torch.bool)], 1)
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.ones(2), torch.zeros(2))
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.tensor([float('nan')]), torch.ones(1))
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.tensor([float('inf')]), torch.tensor([float('inf')]))
+EXIT optimized=False expected=1 actual=1 case=require_outputs(torch.ones(2), torch.ones(1))
+EXIT optimized=False expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=1,replay=1),'replay')
+EXIT optimized=False expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=0,replay=0),'replay')
+EXIT optimized=True expected=0 actual=0 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.ones(2,dtype=torch.bool)], 1)
+EXIT optimized=True expected=0 actual=0 case=require_outputs(torch.ones(2), torch.ones(2))
+EXIT optimized=True expected=1 actual=1 case=require_masks(None, [], 1)
+EXIT optimized=True expected=1 actual=1 case=require_masks([], [], 1)
+EXIT optimized=True expected=1 actual=1 case=require_masks([torch.ones(2,dtype=torch.bool)], [torch.zeros(2,dtype=torch.bool)], 1)
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.ones(2), torch.zeros(2))
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.tensor([float('nan')]), torch.ones(1))
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.tensor([float('inf')]), torch.tensor([float('inf')]))
+EXIT optimized=True expected=1 actual=1 case=require_outputs(torch.ones(2), torch.ones(1))
+EXIT optimized=True expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=1,replay=1),'replay')
+EXIT optimized=True expected=1 actual=1 case=require_graph(dict(fallback=0,replay=0),dict(fallback=0,replay=0),'replay')
+ok
+test_real_hit_checks_before_copy_or_replay (test_e139_graph_contract.Contracts.test_real_hit_checks_before_copy_or_replay) ... ok
+test_scalar_signature_boundaries (test_e139_graph_contract.Contracts.test_scalar_signature_boundaries) ... ok
+test_schema_and_backend_signature (test_e139_graph_contract.Contracts.test_schema_and_backend_signature) ... ok
+test_values_and_noncontiguous_copy (test_e139_graph_contract.Contracts.test_values_and_noncontiguous_copy) ... ok
+test_actual_selector_boundaries_and_switch (test_e139_shared_gqa_indices.SharedIndices.test_actual_selector_boundaries_and_switch) ... ok
+test_candidate_invariant_oracle_negative_controls (test_e139_shared_gqa_indices.SharedIndices.test_candidate_invariant_oracle_negative_controls) ... ok
+test_cpu_allocation_proxy (test_e139_shared_gqa_indices.SharedIndices.test_cpu_allocation_proxy) ... Failed to read process name for pid 29
+Failed to read process name for pid 29
+CPU_ALLOCATION_PROXY {"Hkv": 2, "G": 4, "C": 128, "width": 512, "baseline_positive_self_cpu_bytes": 29700, "shared_positive_self_cpu_bytes": 6156, "full_history_softmax_unchanged": true, "cuda_measured": false}
+ok
+test_gqa_normalization_negative_control (test_e139_shared_gqa_indices.SharedIndices.test_gqa_normalization_negative_control) ... ok
+test_graph_key_binds_switch (test_e139_shared_gqa_indices.SharedIndices.test_graph_key_binds_switch) ... ok
+test_noncontiguous_layout_and_schema_rejections (test_e139_shared_gqa_indices.SharedIndices.test_noncontiguous_layout_and_schema_rejections) ... ok
+test_scatter_softmax_gqa_and_ties (test_e139_shared_gqa_indices.SharedIndices.test_scatter_softmax_gqa_and_ties) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 43.357s
+
+OK
