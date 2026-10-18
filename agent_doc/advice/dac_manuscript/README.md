@@ -1,5 +1,7 @@
 # Publication source and bilingual PDFs
 
+Workload coverage distinguishes Qwen3-8B at 32K/64K and historical 128K from Qwen3-32B at 32K. Native-method phase routes are distinguished from separately reported policy-matched adaptations; the Metrics paragraph now explicitly scopes its phase-matching requirement to controls. The unique-token budget includes protection and applies to sparse decoding, not dense FullKV. Existing task scores and the 17-slide presentation are unchanged; no new competitor ranking or experiment is added.
+
 Supplement S7 clarifies future attribution controls: per-step matching for representation reuse/reconstruction, a separate L1-allocation intervention, and near-L2 refill with a fixed near-L1 page cap. Concurrent manuscript updates retain the revised Introduction and RULER 32K/64K panels. The C01–C24 mapping records the earlier accepted Introduction at cb0c8f4, not the later integrated wording. No new experiment was run for this revision.
 
 Rebuild all figure PDFs referenced by the four documents, then compile them:
