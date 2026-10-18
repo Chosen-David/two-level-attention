@@ -1,0 +1,45 @@
+{
+  "id": "e147h_r64k",
+  "date": "2026-10-18",
+  "title": "E147h RULER 64K β.0625 迁移验证——AVG 48.85 超 β.125 48.05 +0.80、反超 FullKV 锚 48.54，判据通过",
+  "config": {
+    "arm": "tli_64_128_1024_c4_Aa0.25_b0.0625_g0.625_sk4_sw128（RULER 64K yarn 2.0）",
+    "machine": "wys GPU0/2 双卡（vt 尾任务 21:0X 完）；formal score_ruler_formal --yarn --yarn-factor 2.0 --expect-tasks 11 --min-samples 100（producer_receipt v2 证实 effective_factor=2.0）"
+  },
+  "results": {
+    "e147h_beta0625_avg": 48.85,
+    "e146c_beta125_avg": 48.05,
+    "fullkv_anchor_e119": 48.54,
+    "diff_vs_beta125": 0.80,
+    "diff_vs_fullkv": 0.31,
+    "per_task_beta0625": {
+      "niah_single_1": 97.0, "niah_single_2": 100.0, "niah_single_3": 100.0,
+      "niah_multikey_1": 98.0, "niah_multikey_2": 38.0, "niah_multikey_3": 0.0,
+      "niah_multiquery": 26.25, "niah_multivalue": 38.0,
+      "cwe": 0.3, "fwe": 9.0, "vt": 30.8
+    },
+    "per_task_delta_vs_beta125": {
+      "niah_single_1": 4.0, "niah_single_2": 0.0, "niah_single_3": 0.0,
+      "niah_multikey_1": -1.0, "niah_multikey_2": 1.0, "niah_multikey_3": 0.0,
+      "niah_multiquery": 0.5, "niah_multivalue": 2.75,
+      "cwe": 0.0, "fwe": 1.0, "vt": 0.6
+    }
+  },
+  "judgment": [
+    "64K β.0625 = 48.85：vs β.125 48.05 为 +0.80——判据「不低于 β.125 同档或噪声带内」通过（超出而非噪声级）",
+    "vs FullKV 锚 48.54 反超 +0.31——far 配额翻倍（128→252）在长档持续兑现（β.125 64K vs 锚为 -0.49）",
+    "逐任务：single_1 +4、mv +2.75、fwe +1.0、mk2 +1.0 全面小升，仅 mk1 -1——near 减半代价在 64K 无体现（Qwen3-8B 上 far 增益主导）",
+    "cwe 0.3/fwe 9.0 低绝对值与 β.125 同档（0.3/8.0）且 FullKV 锚 yarn 外推同样塌陷（既有口径 caveat 复用）",
+    "E147h 记分累计：LBv2 ✓（-0.20）/ LB ZH ✓（-0.36 边缘）/ RULER 64K ✓（+0.80）/ Llama ✗（-2.31）——Qwen3-8B 全数据集方向通过，唯跨模型族否决"
+  ],
+  "sources": {
+    "formal": "exp/trace/results/e147h_r64k_formal.json（四件套，wys 打分原件拉回）",
+    "raw": "wys:~/two-level-attention/exp/results_ruler/Qwen3-8B/L65536/pred/*e147h*（11 任务）",
+    "baselines": "e146c_r64k_formal.json（β.125 48.05）/ e119_ruler64k_formal_fullkv.json（48.54 复用）"
+  },
+  "caveats": [
+    "跨机：β.0625 在 wys、β.125 e146c 64K 同在 wys——本臂同机干净配对",
+    "mk3 双臂均 0（64K mk3 全模型塌陷既有边界，锚亦低）"
+  ],
+  "generated_at": "2026-10-18T21:08"
+}
