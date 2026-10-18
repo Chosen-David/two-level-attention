@@ -25,9 +25,18 @@
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
 | 5 | 2023_Gamora.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5） | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ §III-B 首句主谓修复（t indexes the current token） ✓ Q2 128K 句中心词+比较对象补全（sparse arm / dense FullKV's 46.43） ✓ |
 | 6 | 2023_RL_CCD.pdf | **全部完成**（Abstract/Intro/§2/§3/§4 实验+§5 结论扫描） | Intro P4 门控句主语补全（the diagnostic uses） ✓ Intro P4 (c)/(d) 面板引用恢复（远端 784c1a4 裁决回插，压缩版） ✓ §III-A 坐标动机句指代悬垂修复（retained pairs'） ✓ §III-B S 定义移入 S7（define-before-use）+ fourfold 倍数锚 ✓ Q3 选择器段前向引用倒置修复（study-first + exceeds 直接比较） ✓ 128K "22.45-point loss" en 回插（远端 b1f5073 删 zh 留，数字带方向裁决） ✓ |
-| 7 | 2026_Miter_Aware_LUT_Mapping.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3 Methodology | Related-Work-P1 收口句加 Rather-than 边界前缀（不提出新级联） ✓ Related-Work-P2 对比轴显式化（In contrast to pruning token transfers from partial key bits） ✓ |
+| 7 | 2026_Miter_Aware_LUT_Mapping.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 实验 §5 结论 | Related-Work-P1 收口句加 Rather-than 边界前缀（不提出新级联） ✓ Related-Work-P2 对比轴显式化（In contrast to pruning token transfers from partial key bits） ✓ §III-B β 规则句升级为方向判例句（For-example+hence：16→8 页、112→120） ✓ |
 
 ## 修改日志
+
+### 第 33 轮（2026-10-19，Miter-Aware LUT Mapping §3 Methodology 拆解 + 远端 f863163 快进）
+
+- **远端检查**：f863163（fix: guard candidate topk padding by block size）纯代码修复（batch_select.py + 测试），不碰 dac_manuscript，无冲突快进合并，无裁决项。
+- **§3 全拆解**（3.1 Overview 三目标 / 3.2 等价保持映射 / 3.3 高斯 XOR 建模 / 3.4 求解器友好度量族，追加至 sentence_studies/2026_miter_aware_lut.md，现 320 行）：入库范式——**To-mitigate-X 使命开场句**（小节首句=痛点回指+机制）、**Building-upon 继承句 + identifies-X-as-Y 发现物命名**（natural comparison anchors）、**approximate-yet-practical 诚实降格句**、**三要素启发式披露句**（成分透明即复现）、**While-前作-our-轻量互补句**（complements 不贬前作）、**It-is-worth-noting 机制显影句**（absorbs/leaving-exposed 变量可见性动词对）、**If-no-X 失败分支句**（e.g. 归因+回退+前向引用）、**痛点-机理 since 句**、**For-example+hence 判例句**（AND vs XOR 真值表数字裁决度量：3 vs 4 分支）、**度量三段式模板**（定义公式→Intuitively 直觉→求解器收益，每度量同构）、**方向句模板**（Lower/Higher-X indicates-Y and leads-to-Z）、**For-X-For-Y 双受众收益句**、**复杂度诚实披露段**（Although-since+five seconds+no-overhead）、**While-调参-鲁棒性声明**（过拟合质疑前置消解）、**权重结果→机理回读句**（学到的权重升格为 insight：SAT 偏 f_det / UNSAT 偏 f_branch）、**跨节零漂移**（Related Work 流程句在 Methodology 原样复用）。诚实边界排除：easy-to-solve/amplifying/naturally。
+- **手稿修复 1 处（en+zh）**：§III-B β 规则句后的静态数字例「For $K_1=128$ and $\beta=.125$, L1 reserves 16 near and 112 far pages.」升级为方向判例句（Miter For-example+hence 句式）：「**For example**, $K_1=128$ **halves** the near-page quota from 16 to 8 when $\beta$ drops from $.125$ to $.0625$, **hence** far pages rise 112$\rightarrow$120 under the unchanged cap.」——静态例变方向例；16/8/112/120 全为下文 Q2 已报数字与 round 规则算术结果，无新数字。zh：「例如，$K_1=128$时$\beta$从$.125$降到$.0625$使近区页配额从16减半到8，故在页上限不变时远区页由112增至120。」
+- **零余量版式第 7 次触发与回收**：判例句 +3 词把 AI 声明尾两行挤到第 6 页。四处无损压缩回收：① Q1「respectively. These differences describe the recorded configurations; they do not show that」→「. These differences describe recorded configurations, not evidence that」；② Q3 尾「details are in S6」括号化「(S6)」；③ implications 段分号改逗号连词；④ 结论尾句删「including preparation, maintenance and selection」（同页 implications 段保留完整版，同页去重）。en 回到 6 页。
+- **版式验证**：en 6 页（AI 声明完整第 5 页）、zh 6 页、0 LaTeX Warning。
+- **待后续轮次**：§4 Experiments、§5 Conclusion（第 7 篇收官轮）。
 
 ### 第 32 轮（2026-10-19，Miter-Aware LUT Mapping §2 Related Work 拆解）
 

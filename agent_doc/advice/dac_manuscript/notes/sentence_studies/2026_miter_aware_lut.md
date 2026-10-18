@@ -196,3 +196,125 @@
   新：`In contrast to pruning token transfers from partial key bits, our selector ranks candidates with a fixed coordinate subset under page and token budgets, keeping original-dimensional KV for final attention.`
   （Miter §2.1 收口句式：对比轴显式命名——旧版 "instead" 的对比对象（按部分键比特剪枝）隐没在上文，新版点名；keeping-gerund 收尾替代分号并列。）
 - zh 同步直译。
+
+## §3 Methodology（第 33 轮）
+
+### §3.1 Overview（4 句）
+
+1. "Given the golden design (G) and implementation design (I) in an LEC problem, our framework formulates it into an easy-to-solve SAT instance."
+   - Given-输入-输出 形式化开场句（RL-CCD Given-Goal-such-that 同族，此处更短）。
+2. "As shown in Figure 1, our framework targets three objectives:"
+   - 图引用 + 三目标总起（编号列举引出）。
+3-5. (1) Preserve structural correspondence..., (2) Gaussian-guided XOR modeling..., (3) Select solver-friendly LUTs...
+   - **三目标编号句**：每条 = 品牌动词短语 + to-不定式/分词收益从句。三目标与图 1 三组件严格 1:1（图号锚）。
+
+### §3.2 Equivalence-preserving LUT Mapping（关键 8 句）
+
+1. "To mitigate the synthesis-induced structural perturbations, we introduce a miter-aware LUT mapping scheme (Figure 2) that explicitly reconstructs structural correspondence between the two sides of the miter."
+   - **To-mitigate-X 使命开场句**：小节第一句 = 针对哪一个 Intro 痛点（痛点回指）+ that-explicitly-reconstructs 机制。小节标题即品牌名，首句即痛点绑定。
+2. "In a typical mapping procedure, the circuit is traversed in an output-to-input direction; for each node, multiple candidate LUTs are enumerated from feasible input cuts..., and the most suitable one is selected to optimize delay."
+   - 标准流程复述句（复用 §2.2 的流程句，为 Building-upon 铺垫——**Related Work 里的流程句在 Methodology 原样复用，跨节零漂移**）。
+3. "Building upon this standard process, our mapping identifies XOR/XNOR structures near the primary outputs as natural comparison anchors between the golden and implementation circuits."
+   - **Building-upon 继承句**：标准流程→我们的增量（identifies X as Y 命名发现物——"natural comparison anchors" 是给观察起的名字）。
+4. "The two fan-in nodes of these XOR gates serve as the respective boundaries of the two sides, providing an approximate yet practical alignment even after aggressive synthesis."
+   - 机制细化 + **approximate-yet-practical 诚实降格**：承认近似但给出适用条件（even after aggressive synthesis）——限制内声明价值。
+5. "Starting from these boundary anchors, our mapper proceeds recursively to generate and match LUT candidates on both sides."
+   - Starting-from 递归机制句（动词链 generate-and-match）。
+6. "This similarity is measured using a heuristic that combines topological depth, fan-in/fan-out counts, and the functional hash of the immediate logic cone."
+   - **三要素启发式披露句**：相似度度量三成分全点名——启发式不藏着，成分透明即可复现。
+7. "While SAT-sweeping detects equivalences via repeated SAT queries, our alignment provides a lightweight, orthogonal structural matching that complements such solver-based techniques without their computational cost."
+   - **While-前作-our-轻量互补句**：不贬前作（complements），差异维度三连（lightweight / orthogonal / without their cost）。
+8. "It is worth noting that LUT mapping inherently absorbs a group of primitive gates into each LUT, leaving only the LUT's input and output variables exposed in the final CNF."
+   - **It-is-worth-noting 机制显影句**：absorbs/leaving-exposed 一对动词把「映射为什么天然有利于 CNF」讲到变量可见性层。
+9. "Consequently, variables corresponding to internal gates disappear once absorbed."
+   - Consequently 单句后果（短句节奏）。
+10. "When mapping is guided to preserve equivalence points as LUT input or output boundaries, these equivalence variables remain explicit in the CNF and can be more effectively exploited by the solver's redundancy elimination mechanisms."
+    - When-引导条件收益句（机制→收益，条件触发点显式）。
+11. "Moreover, equivalence points located closer to the primary outputs enable earlier clause subsumption and stronger pruning within the search space, amplifying solver efficiency."
+    - Moreover 位置梯度收益（closer→earlier→stronger 三级递进）。
+12. "If no direct correspondence can be found for a node pair—e.g., due to heavy resubstitution or decomposition—we independently select LUTs on each side according to the solver-friendliness metric introduced in Sec 3.4, maintaining comparable structural granularity across designs."
+    - **失败分支句**：If-no-X—e.g. 归因—回退策略 + 前向引用（Sec 3.4）。方法的鲁棒性 = 把找不到对应的情形写全。
+13. "The resulting LUT network thus achieves improved symmetry, enhanced clause reuse, and stronger implication propagation, effectively bridging structural matching and solver-oriented optimization."
+    - Thus 三联收益收口 + bridging 收束语（对称/复用/传播——微观到宏观）。
+
+### §3.3 Gaussian-guided XOR Modeling（关键 6 句）
+
+1. "XOR-dominated circuits—such as arithmetic and cryptographic designs—pose major challenges to CDCL-based SAT solving, since their CNF encodings often require a large number of clauses and provide weak unit propagation."
+   - **痛点-机理 since 句**：现象（major challenges）+ since 归因（clauses 多 + unit propagation 弱）——「为什么难」先于「怎么办」。
+2. "To this end, we first detect XOR relations within the AIG network and perform Gaussian elimination over the finite field GF(2) within XOR-dense regions."
+   - To-this-end 双动词机制句（detect + perform）。
+3. "Each XOR gate represents an equation among variables."
+   - 一句语义桥（电路→代数翻译规则，为公式铺路）。
+4. "To construct equations with constant right-hand sides, we leverage simple transformations: [两条变换规则]"
+   - **冒号引出变换规则 bullet**（数学写法：规则直接列，不写成散文）。
+5. "For example, given the XOR relations: [4 个方程] performing elementary row transformations yields: [4 个化简后方程]"
+   - **4×4 实例演算句**：For example + 具体方程组 + yields 结果——Gauss 消元用 8 行实际数字演示，不是抽象符号。
+6. "Unlike conventional elimination that substitutes away variables, we selectively retain XOR-related LUTs whose variables participate in nontrivial affine relations discovered by Gaussian elimination."
+   - **Unlike-conventional 差异机制句**：替代做法一句概括（substitutes away）+ 我们保留什么（retain X whose...）。
+7. "These LUTs are explicitly reconstructed as standalone XORs rather than merged into larger logic cones, ensuring that their participating variables remain visible and semantically linked in the final representation."
+   - **rather-than-merged + ensuring-可见性**：设计决策的判据是「变量可见性」——与 §3.2 的 absorbs/leaving-exposed 同一机理轴，跨小节呼应。
+8. "For circuit-based solvers, this explicit construction enables early identification of XOR structures and reduces intermediate branching and propagation effort. For CNF-based solvers, the preserved XOR LUTs naturally translate into small XOR substructures during CNF conversion..."
+   - **For-X-For-Y 双受众收益句**：同一机制对两类求解器各讲一遍收益（受众分治）。
+9. "Overall, our approach integrates Gaussian-derived affine relations into the circuit as explicit XOR logic, ensuring their visibility across abstraction levels and improving both propagation and clause-level simplification."
+   - Overall 收口句（visibility 主题第三次出现——小节主题词贯穿）。
+
+### §3.4 Solver-oriented LUT Selection（关键 7 句）
+
+1. "For regions not dominated by XOR structures, we perform LUT implementations guided by a solver-friendliness metric."
+   - **范围互补开场句**：For-regions-not-X——与前一小节划清分工边界（哪里不用这个机制）。
+2. "1) Branching efficiency: These metrics capture how easily the solver can explore and prune the search space around L."
+   - **大类定义句**：编号大类 + These-metrics-capture-how（度量族的总括从句）。
+3. "(a) Branch count: We measure how compactly L partitions the input space..."
+   - 子度量定义句（We-measure-how 开头——操作定义先于公式）。
+4. "Formally, a branch is a pattern p∈{0,1,x}^|I| (where x denotes 'don't care') such that every assignment covered by p produces the same output."
+   - **Formally 定义句**：口语定义（measure how compactly）→Formally 精确化（pattern + such-that）——先直觉后形式的双层定义。
+5. "Intuitively, a smaller branch count indicates...implying that decisions on input literals more rapidly constrain the search space. From the SAT-solving perspective, such functions yield simpler decision trees, shorter BCP chains, and fewer case splits during clause learning, thus improving solver convergence."
+   - **Intuitively / From-the-X-perspective 双视角解释**：公式后必跟直觉句 + 求解器视角句——**每个度量都是三段式：定义公式→Intuitively 直觉→求解器收益**。
+6. "For example, a 2-input AND can be covered by three branches (see Table 1), while XOR requires four fully specified minterms, hence AND yields a lower f_branch and is considered more solver-friendly."
+   - **For-example + hence 判例句**：AND vs XOR 用真值表数字裁决（3 vs 4 分支）——度量立即落在一个具体对比上。
+7. "Lower f_sensitivity indicates locally stable behavior and typically leads to a narrower effective branching space for CDCL-based solvers."
+   - **方向句模板：Lower/Higher-X indicates-Y and leads-to-Z**（每个度量的解释句同构——度量族的可读性来自同构句式）。
+8. "Complexity and reusability: Although metrics like DetCount require enumerating variable subsets and partial assignments, the cost is negligible since only 2/3/4-input LUTs are used. All scores are precomputed offline (in five seconds) and cached for reuse, introducing no overhead in synthesis or solving."
+   - **复杂度诚实披露段**：Although-看似贵-since-实际小 + 具体数字（five seconds）+ no-overhead 收口——开销问题主动前置处理。
+9. "Cost aggregation and weight learning: The overall LUT cost combines each metric with Bayesian-optimized weight, tuned on a small validation set to minimize solving time."
+   - 聚合公式段（加权 + 调参目标一句话）。
+10. "While the weight is tuned on a subset, the results are robust across all validation sets."
+    - **While-调参范围-鲁棒性声明**：诚实披露调参在子集 + 鲁棒性声明（潜在过拟合质疑前置消解）。
+11. "Their relative emphasis (higher f_det for SAT, higher f_branch for UNSAT) aligns with the distinct behaviors of satisfaction and proof-oriented solvers."
+    - **权重结果→机理回读句**：学到的权重本身成为发现（SAT/UNSAT 求解器偏好不同度量）——副产品升格为 insight。
+
+### 入库范式（本轮新增）
+
+- **To-mitigate-X 使命开场句**（小节首句=痛点回指+机制，标题即品牌名首句即绑定）
+- **Building-upon 继承句 + identifies-X-as-Y 发现物命名**（natural comparison anchors）
+- **approximate-yet-practical 诚实降格句**（承认近似+适用条件）
+- **三要素启发式披露句**（成分全点名，透明即复现）
+- **While-前作-our-轻量互补句**（complements 不贬前作+三差异维度）
+- **It-is-worth-noting 机制显影句**（absorbs/leaving-exposed 变量可见性动词对）
+- **If-no-X 失败分支句**（e.g. 归因+回退策略+前向引用——鲁棒性=写全找不到的情形）
+- **痛点-机理 since 句**（「为什么难」先于「怎么办」）
+- **For-example + hence 判例句**（AND vs XOR 真值表数字裁决度量）
+- **度量三段式模板**（定义公式→Intuitively 直觉→求解器收益；每度量同构）
+- **方向句模板**（Lower/Higher-X indicates-Y and leads-to-Z）
+- **For-X-For-Y 双受众收益句**（同一机制对两类受众各讲收益）
+- **复杂度诚实披露段**（Although-since+具体秒数+no-overhead）
+- **While-调参-鲁棒性声明**（过拟合质疑前置消解）
+- **权重结果→机理回读句**（学到的权重升格为 insight）
+- **跨节零漂移**（Related Work 流程句在 Methodology 原样复用）
+
+诚实边界排除：easy-to-solve（判词——我们的对应表述是"降低求解难度"级别且须绑定数字）；amplifying/naturally 等弱判词 tolerate 但不自加。
+
+## 与我们手稿的对照
+
+- §3.2 句 1 的「To-mitigate-X 使命开场句」：我们 §III 小节首句多为机制陈述（"Both regions and both selection stages use the same coordinate map"），缺痛点回指——但该模式在 §III-B（regional budgets）已有等价物（"Regional page caps and token quotas constrain the cascade"），不硬套。
+- §3.4 度量族三段式（定义→Intuitively→收益）：我们 §III-B 的 U_b 段结构（定义→bound 声明→loose 警告）是诚实版三段式，已有。
+- **For-example + hence 判例句**是我们缺失且可用的：§III-B 的 β 整数取整规则（"Raising β cannot reduce the nominal near-page quota...rounding can leave both unchanged"）后可加数值判例句。→ 本轮修改点：β 规则句后补一句 16→8 页数值判例（β=.125→.0625 时 16→8 页、112→120 页——K1=128 已有下文数字，句内判例立即落地；无新数字，仅复用下文既有数值做即时例证）。
+- While-调参-鲁棒性声明、权重回读：无对应实验，不适用。
+
+## 本轮修改（第 33 轮）
+
+- en（§III-B β 规则句后加判例句，For-example+hence 句式）：
+  在 "For $K_1=128$ and $\beta=.125$, L1 reserves 16 near and 112 far pages." 后已有数字例——改为紧邻 Raising-β 句的判例形式：
+  `For example, $K_1=128$ halves the near-page quota from 16 to 8 when $\beta$ drops from $.125$ to $.0625$, so rounding leaves far pages 112$\rightarrow$120; at $\beta=.0625$ the far-page quota rises despite the unchanged cap.`
+  落位：替换原 "For $K_1=128$ and $\beta=.125$, L1 reserves 16 near and 112 far pages."（判例句把静态数字例升级为方向判例；16/8/112/120 全部为下文 Q2 已报数字与 round 规则的算术结果，无新数字。）
+- zh 同步直译。
