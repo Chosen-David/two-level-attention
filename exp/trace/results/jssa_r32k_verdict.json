@@ -1,0 +1,44 @@
+{
+  "id": "jssa_r32k",
+  "date": "2026-10-18",
+  "title": "JSSA vendor RULER 32K formal 判决——AVG 58.7 为四基线最强（超 Quest +15.9 / AsyncTLS +8.6），TLI β.0625 59.29 仅领先 +0.59 贴噪声带",
+  "config": {
+    "arm": "jssa_vendor_qwen3_8b_32k_k1024_r32（budget=1024 对齐 TLI K2，rank 32）",
+    "basis": "third_party/JSSA/bases/qwen3_8b_32k.pt（8×~32K LongBench 拼接校准；论文默认 8×131072——校准长度偏短 caveat 如实披露）",
+    "machine": "本机 GPU0（j10181630，与并行 10181901 JSSA 臂共居）；formal score_ruler_formal --extra-param jssa_budget=1024 --extra-param jssa_rank=32"
+  },
+  "results": {
+    "jssa_avg": 58.7,
+    "tli_beta0625_e147c": 59.29,
+    "tli_beta125_e146c": 58.30,
+    "fullkv_anchor_e116e": 59.38,
+    "quest_e119": 42.85,
+    "asynctls_e119": 50.09,
+    "diff_tli_beta0625_vs_jssa": 0.59,
+    "diff_tli_beta125_vs_jssa": -0.4,
+    "per_task_jssa": {
+      "niah_single_1": 100.0, "niah_single_2": 100.0, "niah_single_3": 100.0,
+      "niah_multikey_1": 99.0, "niah_multikey_2": 74.0, "niah_multikey_3": 2.0,
+      "niah_multiquery": 24.5, "niah_multivalue": 25.5,
+      "cwe": 86.0, "fwe": 1.33, "vt": 33.4
+    }
+  },
+  "judgment": [
+    "JSSA 32K = 58.7：四基线最强（Quest 42.85 / AsyncTLS 50.09 / FASA 待出）——但仍是 TLI 之下",
+    "TLI β.0625 59.29 vs JSSA 领先仅 +0.59 贴噪声带；β.125 58.30 落后 -0.4——「打过 JSSA」主张对 β.125 不成立、对 β.0625 为边缘。主口径选择与 E147j（K2 预算下探）联动：若 K2=512 臂显著下滑，则 vs JSSA 的领先依赖双倍预算，须预算归一化披露",
+    "结构对比：JSSA 强在 cwe 86（TLI 68.8/β.125 65.3——投影子空间对词枚举型有利，+17）与 niah 满分；弱在 fwe 1.33（TLI 21/β.125 15）、mq 24.5/mv 25.5/mk3 2.0 与 TLI 同低区——far 高频统计型与 multikey 深检索两家稀疏法共同弱项",
+    "四基线战记分更新：Quest 三档全败 / AsyncTLS 32K 败（64K/128K 在飞）/ FASA LB 双败 RULER 待出 / JSSA 32K 败（+0.59 边缘）",
+    "cwe 86 vs FullKV 锚 83.5 反超 +2.5——JSSA 投影低秩在词枚举任务上稀疏有利"
+  ],
+  "sources": {
+    "formal": "exp/trace/results/jssa_r32k_formal.json（四件套，本机打分）",
+    "raw": "exp/results_ruler/Qwen3-8B/L32768/pred/*j10181630*（11 任务 100 行/格核验）",
+    "baselines": "e147c_r32k_formal（59.29）/ e146c_r32k_formal（58.30）/ e119 系列（Quest/AsyncTLS）复用"
+  },
+  "caveats": [
+    "校准长度 8×~32K < 论文默认 8×131072（LongBench 数据池拼接限制，部分样本 13K-16K）——JSSA 成绩为偏短校准下的成绩，64K/128K 档如需再出须长校准 basis（已披露）",
+    "本机 GPU0 双 JSSA 臂共居（我的 j10181630 + 未知 10181901）——greedy 复制零噪声（E147b 已证），共居不影响输出正确性",
+    "JSSA basis 校准数据为 LongBench（与 RULER 评测域不同域）——vendor 论文亦用 LongAlign 校准，口径 faithful"
+  ],
+  "generated_at": "2026-10-18T23:00"
+}
