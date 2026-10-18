@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [ ] [TL-BATCH-TOPK-BLOCK-20261019] 非64块保留全宽L2 topk，避免64特化补位错误；CPU回归通过，GPU及历史重测未验。([详情](task_details/TL-BATCH-TOPK-BLOCK-20261019.md))
+
 - [ ] [TL-DECODE-CU-STRIDE-20261019] fused decode 长度数组按需连续化；70项CPU普通/-O及独立30布局通过，GPU/性能未验。([详情](task_details/TL-DECODE-CU-STRIDE-20261019.md))
 
 这是 two-level-attention 主项目的唯一 AI 任务索引（agent_doc 口径），

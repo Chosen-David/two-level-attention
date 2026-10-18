@@ -1,0 +1,17 @@
+Independent CPU host/glue verification (scoring and CUDA metadata mocked).
+Baseline: 4f577242bcd88aa30e2eb25107961030fd3c4aa9
+
+$ python agent_doc/results/tl-batch-topk-block-20261019/independent/check_cpu.py
+Ran 2 tests in 0.798s
+OK
+PASS 50 budget/block/shared-index scenarios; baseline differential
+PASS 5 host graph-signature cases; no CUDA capture/replay performed
+
+$ python -O agent_doc/results/tl-batch-topk-block-20261019/independent/check_cpu.py
+Ran 2 tests in 0.456s
+OK
+PASS 50 budget/block/shared-index scenarios; baseline differential
+PASS 5 host graph-signature cases; no CUDA capture/replay performed
+
+$ git diff --check
+No output, exit status 0.

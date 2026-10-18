@@ -455,7 +455,11 @@ def batched_group_sels(indexer, q, k, softmax_scale, group_ends, dense_below,
     # （[Hkv,C] 微 grid × 2N 次 topk 的 launch/延迟 > topk 节省）→ v2
     # 批量化：池掩码/topk/rank 过滤全部跨行批量（层内 2 次大 topk），
     # 逐行仅剩 pc gather + mask scatter 两个不可批量 kernel。
-    use_cand_topk = os.environ.get("TLI_PREFILL_L2_TOPK_CAND", "0") == "1"
+    # Candidate zero-padding counts and offsets below are specialized for 64
+    # tokens per block. Other block sizes retain full-width L2 topk; applying
+    # the specialization would underfill or write outside the intended pool.
+    use_cand_topk = (os.environ.get("TLI_PREFILL_L2_TOPK_CAND", "0") == "1"
+                     and bs == 64)
     # Opt-in allocation reduction only. A protected dummy token and GQA
     # replication are required; unsupported geometry retains the baseline.
     use_shared_indices = (

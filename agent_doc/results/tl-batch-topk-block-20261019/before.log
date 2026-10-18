@@ -1,0 +1,36 @@
+test_64_block_candidate_specialization_remains_reachable (sparse_attn.ops.tests.test_batch_topk_block_size.BatchTopkBlockSizeTest.test_64_block_candidate_specialization_remains_reachable) ... ok
+test_non64_blocks_retain_full_width_selection (sparse_attn.ops.tests.test_batch_topk_block_size.BatchTopkBlockSizeTest.test_non64_blocks_retain_full_width_selection) ... 
+  test_non64_blocks_retain_full_width_selection (sparse_attn.ops.tests.test_batch_topk_block_size.BatchTopkBlockSizeTest.test_non64_blocks_retain_full_width_selection) (block_size=16) ... ERROR
+  test_non64_blocks_retain_full_width_selection (sparse_attn.ops.tests.test_batch_topk_block_size.BatchTopkBlockSizeTest.test_non64_blocks_retain_full_width_selection) (block_size=32) ... ERROR
+  test_non64_blocks_retain_full_width_selection (sparse_attn.ops.tests.test_batch_topk_block_size.BatchTopkBlockSizeTest.test_non64_blocks_retain_full_width_selection) (block_size=128) ... FAIL
+
+======================================================================
+ERROR: test_non64_blocks_retain_full_width_selection (sparse_attn.ops.tests.test_batch_topk_block_size.BatchTopkBlockSizeTest.test_non64_blocks_retain_full_width_selection) (block_size=16)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-0626/sparse_attn/ops/tests/test_batch_topk_block_size.py", line 40, in test_non64_blocks_retain_full_width_selection
+    for a, b in zip(actual, expected):
+                ^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not iterable
+
+======================================================================
+ERROR: test_non64_blocks_retain_full_width_selection (sparse_attn.ops.tests.test_batch_topk_block_size.BatchTopkBlockSizeTest.test_non64_blocks_retain_full_width_selection) (block_size=32)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-0626/sparse_attn/ops/tests/test_batch_topk_block_size.py", line 40, in test_non64_blocks_retain_full_width_selection
+    for a, b in zip(actual, expected):
+                ^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not iterable
+
+======================================================================
+FAIL: test_non64_blocks_retain_full_width_selection (sparse_attn.ops.tests.test_batch_topk_block_size.BatchTopkBlockSizeTest.test_non64_blocks_retain_full_width_selection) (block_size=128)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-0626/sparse_attn/ops/tests/test_batch_topk_block_size.py", line 41, in test_non64_blocks_retain_full_width_selection
+    self.assertTrue(torch.equal(a, b), f'block size {bs}: changed selection')
+AssertionError: False is not true : block size 128: changed selection
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.121s
+
+FAILED (failures=1, errors=2)
