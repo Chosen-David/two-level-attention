@@ -56,19 +56,19 @@ To control both selection cost and candidate access, the cascade uses two explic
 \label{fig:architecture}\end{figure*}
 
 \subsection{Shared low-frequency coordinates}
-Both regions and both selection stages use the same coordinate map within each layer and KV head, while each query head is scored separately. For Qwen3-8B, we select post-RoPE coordinates $J=\{48,\ldots,63,112,\ldots,127\}$ from each 128-dimensional query and key. The indices retain 16 complete low-frequency split-half RoPE pairs (Supplementary Fig.~S1). With coordinate-selection matrix $E_J\in\mathbb R^{128\times32}$, the scoring vectors are $z_q=E_J^\top q$ and $z_i=E_J^\top k_i$. Their slower positional rotation motivates this selection, although it does not guarantee preservation of important tokens. The compact implementation uses width-32 scoring tensors, whereas the historical quality runs used 32 active coordinates in width-128 L2 tensors (S7).
+Both regions and both selection stages use the same coordinate map within each layer and KV head, while each query head is scored separately. For Qwen3-8B, we select post-RoPE coordinates $J=\{48,\ldots,63,112,\ldots,127\}$ from each 128-dimensional query and key. The indices retain 16 complete low-frequency split-half RoPE pairs (Supplementary Fig.~S1). With coordinate-selection matrix $E_J\in\mathbb R^{128\times32}$, the scoring vectors are $z_q=E_J^\top q$ and $z_i=E_J^\top k_i$. The retained pairs' slow positional rotation motivates this selection, although it does not guarantee preservation of important tokens. The compact implementation uses width-32 scoring tensors, whereas the historical quality runs used 32 active coordinates in width-128 L2 tensors (S7).
 
-L1 aggregates selected key coordinates into page summaries for coarse ranking; L2 refines candidates using quantize--dequantize token keys. L2 uses 16 floating-point quantize--dequantize levels, not packed four-bit storage or INT4 arithmetic (S7). The two scoring views occupy separate buffers. Original KV remain full width. Compact scoring narrows dot products, but view preparation and maintenance add work without compressing the original KV cache (S7).
+L1 aggregates selected key coordinates into page summaries for coarse ranking; L2 refines candidates using quantize--dequantize token keys. L2 uses 16 floating-point quantize--dequantize levels, not packed four-bit storage or INT4 arithmetic (S7). The two scoring views occupy separate buffers. Original KV remain full width. Compact scoring narrows each dot product fourfold, but view preparation and maintenance add work without compressing the original KV cache (S7).
 
 
 
 \subsection{Regional page and token budgets}
-In decoding, $t$ indexes the current token from zero across the full sequence including prefill, and $S=t+1$ counts valid cached positions, excluding padding. Let $s$ and $w$ denote the protected prefix and recent-window lengths. Their union and the unprotected middle are
+In decoding, $t$ indexes the current token from zero across the full sequence including prefill. Let $s$ and $w$ denote the protected prefix and recent-window lengths. Their union and the unprotected middle are
 \begin{align}
 \mathcal P_t&=\{i:0\le i\le t,\ i<s\ \text{or}\ i>t-w\},\\
 \mathcal M_t&=\{0,\ldots,t\}\setminus\mathcal P_t.
 \end{align}
-Overlapping protection counts once. Near is a suffix of $\mathcal M_t$; far is its complement there. Near excludes the protected recent window. Near uses fraction $\alpha$ of unprotected history, a one-page minimum and a downward page-aligned start; S7 specifies integer rules.
+Overlapping protection counts once. Near is a suffix of $\mathcal M_t$; far is the rest of $\mathcal M_t$. Near excludes the protected recent window. Near uses fraction $\alpha$ of unprotected history, a one-page minimum and a downward page-aligned start; S7 specifies integer rules.
 
 Regional page caps and token quotas constrain the cascade (Supplementary Fig.~S2). Near pages use query--mean-key dot products to summarize page-level relevance; far pages use sign-aware extrema to bound unquantized shared-space token scores. This regional assignment is a heuristic. Summaries cover full physical pages, including protected boundary positions; L2 separately limits token regions (S7). For a nonempty page $b$, let $m_{b,j}=\min_{i\in b}z_{i,j}$ and $M_{b,j}=\max_{i\in b}z_{i,j}$. Quest's construction~\cite{quest} gives
 \begin{equation}

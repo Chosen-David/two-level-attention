@@ -63,7 +63,7 @@ The following records retain the numerical detail behind the main-text limitatio
 \section*{Supplementary Note S7: Budgets and configuration identity}
 \textbf{Selected prefix/recent configuration.} The selected candidate uses 4/128 prefix/recent protection, dense prefill and sparse decode; implementation defaults remain 128/128. The reported E149 configuration selects 4/128, but complete predictions and execution identity are unavailable. With disjoint protection, $1024-132=892$ nominal middle slots split into 640 near and 252 far. The partial 64-token prefix page can reselect four protected positions, so 252 distinct unprotected far tokens are not guaranteed. StreamingLLM motivates small sinks but also reports benefits from longer semantic prefixes on LongBench; it establishes neither four-token optimality for Qwen3 nor a 128-token window. Changing 128/128 to 4/128 releases 124 retrieval slots at fixed $K$, confounding sink-length and retrieval-capacity effects. Historical representation scores, timing and protection diagnostics retain their own settings, not 4/128 labels.
 
-\textbf{Integer boundaries and summary support.} In the ordinary partitioned path ($\alpha,\beta>0$), let $M=\max(0,S-s-w)$, $L=\max(B,\lfloor\alpha M\rfloor)$ and
+\textbf{Integer boundaries and summary support.} In the ordinary partitioned path ($\alpha,\beta>0$), with $S=t+1$ valid cached positions including the current token and excluding padding, let $M=\max(0,S-s-w)$, $L=\max(B,\lfloor\alpha M\rfloor)$ and
 \begin{align*}
 b_n&=\max(\lfloor s/B\rfloor,\lfloor(S-w-L)/B\rfloor),\\
 b_w&=\max(b_n,\lceil S/B\rceil-\max(1,\lfloor w/B\rfloor)).

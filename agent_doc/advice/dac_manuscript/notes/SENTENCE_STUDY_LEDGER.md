@@ -24,10 +24,17 @@
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
 | 5 | 2023_Gamora.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5） | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ §III-B 首句主谓修复（t indexes the current token） ✓ Q2 128K 句中心词+比较对象补全（sparse arm / dense FullKV's 46.43） ✓ |
-| 6 | 2023_RL_CCD.pdf | Abstract ✓ Intro ✓ §2 ✓；待：§3 框架 | Intro P4 门控句主语补全（the diagnostic uses） ✓ Intro P4 (c)/(d) 面板引用恢复（远端 784c1a4 裁决回插，压缩版） ✓ |
+| 6 | 2023_RL_CCD.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 实验 | Intro P4 门控句主语补全（the diagnostic uses） ✓ Intro P4 (c)/(d) 面板引用恢复（远端 784c1a4 裁决回插，压缩版） ✓ §III-A 坐标动机句指代悬垂修复（retained pairs'） ✓ §III-B S 定义移入 S7（define-before-use）+ fourfold 倍数锚 ✓ |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 29 轮（2026-10-18，RL-CCD §3 框架拆解 + 远端 1ecc63d 裁决）
+
+- **远端 1ecc63d 裁决：整体采纳**（先逐项核验 manifest 事实：三臂 source_data_sha256/ids/answers_sha/lengths 全等、稀疏两臂 scorer+script 哈希一致而与锚不同、锚 legacy-partial+operator-declared YaRN——全部与本地数据一致）。采纳点：图注按长度区分 β 归属（64K 展示 8B 两 β，真实纠错）；S8 64K 段 manifest 级披露深化；「are reported on one machine」归因严谨化；S7 attribution-controls 重写；draw.py 相对字体路径+去重复 y 轴标签。无回插项。
+- **RL-CCD §3 全拆解**（4 小节，写入 sentence_studies/2023_rl_ccd.md）：新增范式入库——Given-Goal-such-that 形式化开篇、替代路线承认+经验裁决（We understand another route may also work...empirically observe significantly better）、问题分类句（we choose to formulate as）、借用-定制句（inspired by the renowned...customize by replacing and by simplifying）、收益带规模锚句（millions of instances）、Rationale-first 组件引入（The rationale behind using X is that Y）、公式大白话复述（Basically, Equation aims to）、单调性解释句、性质链收口（Note→That-is→Hence）、Two-fold 理由枚举（otherwise 反例+自适应性）、算法逐行走读（first/then/when/finally+行号锚+repeat-until）。诚实边界排除：drastically/generalizable-to-any/空配置披露不适用。
+- **手稿修复 4 处（en+zh）**：① §III-B 主文删 S 定义（主文 0 使用），S=t+1 定义移入 S7 Integer boundaries 使用处——define-before-use 正向修复，主文 -10 词；② §III-A「Their slower positional rotation」→「The retained pairs' slow positional rotation」（指代悬垂：最近先行词是 z_q/z_i 而非 16 个旋转对）；③「far is its complement there」→「far is the rest of $\mathcal M_t$」；④「Compact scoring narrows dot products」→「narrows each dot product fourfold」（RL-CCD 收益带倍数锚；32/128=4× 算术事实非判词）。
+- **编译验证**：四文档 6/6/9/9 页，0 未定义引用（log 中 undefined 全为字形替换警告，既有）。
 
 ### 第 28 轮（2026-10-18，用户改指令：Intro 逐句 in place 修复 + E147h 64K 图美化 + 推送远端）
 
