@@ -22,12 +22,21 @@
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
-| 4 | 2021_Gemmini.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 评估 §5 案例 | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓ |
+| 4 | 2021_Gemmini.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓ §4 ✓；待：§5 案例 | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 20 轮（2026-10-18，Gemmini §4 Evaluation）
+- **远端裁决**（本地 = origin/main，55b9a17 已由并行会话合并）：远端把第 19 轮我的权衡句 "The views narrow each dot product but add work" 再精化为 "Compact scoring narrows dot products, but view preparation and maintenance add work"——**采纳**：收益主语限定为 compact scoring（历史 width-128 L2 张量也是视图但不缩小点积宽度），"The views" 主语过宽；远端版与 §III-C 及全文 compact 术语一致。判例：收益归属主语必须精确到实现变体层级。
+- 拆解笔记：§4 部分（开篇纯路线图句点名双基线；§4.A：平台披露句（FireSim）/负载枚举/环境完整句回扣 §3.C/**分解定位句带 only/a-higher 方向词**（67.1%/11.3%/16.6% 三连）；§4.B：**目的内嵌 setup 句**（to determine how X interact to impact Y）/**臂定义句带功能从句**（relieving the host CPU）/**As-illustrated 条件机制链**（配置→依赖责任转移）/**The-less-the-more 单调方向句带 giving 后果分词**/**However 反转句带 because 归因**/**设计原则句带 while-preserving**/工具价值收口/头牌双基线句（2670×/1130×）/**诚实失败句带机制+Therefore+only**（MobileNet 127× due to 低数据复用）/**对抗案例句**（SqueezeNet 专为 CPU 设计仍 1760×）/**匹配条件可比句带图锚**（same number of PEs as Figure 6a）/BERT 覆盖句）。
+- 对照结论：问句标题+Intro Q 指针共同承担目的内嵌（问句形式写进 opener 会与 Intro P5 重复且 +13 词超余量）；分解定位（TPOT 比值方向句）、单调方向（β 定理级句）、However 反转、设计原则（诚实边界决定用 requirement 而非 principle）、诚实失败（我们的"cannot locate the cause"边界更强——MobileNet 的 due-to 有实测支撑我们没有）、对抗案例（双臂零分句）、匹配条件（报不可比性镜像）均不改。**唯一实缺（弱）= Setting opener 无 Q 标签**（评估节入口缺编号导航；Gemmini §3 登场句三度同构证明 deliberate reprise 合法）。
+- paper_en.tex Experimental Setting 首句：`...task quality, regional candidate coverage and execution cost.` → 三方面各挂 Q 标签（+3 词）。
+- paper_zh.tex 直译同步（「任务质量（Q1）、区域候选覆盖（Q2）与执行成本（Q3）」）。
+- 编译验证：en 6 / zh 6 页，0 未定义引用。
+- 待后续轮次：Gemmini §5 Case Studies（两案例：TLB 设计空间探索/filter registers 低成本优化句式）——下轮收尾本篇。
 
 ### 第 19 轮（2026-10-18，Gemmini §3 Generator）
 - **远端裁决**（本地 = origin/main，1c3bcd8 已由并行会话合并）：远端把第 18 轮我的 enabling 从句 "which keep page and token access separate" 精化为 "distinguishing page-level eligibility from final token capacity"——**采纳**：与全文既有抽象链逐点对齐（图 2 caption "Page masks limit eligibility"、摘要 "far-page reservation need not preserve far-token capacity"、结论 "far-page reservation from far-token coverage"），我的版本更模糊且可误读为配额分离了访问本身。判例：关键抽象传播须用全文既有术语对。

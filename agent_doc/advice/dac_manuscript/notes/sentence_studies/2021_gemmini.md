@@ -131,4 +131,44 @@
 - paper_en.tex §III-A 末段：`Preparing and maintaining the auxiliary views therefore adds work without compressing the original KV cache (S7).` → `The views narrow each dot product but add work, without compressing the original KV cache (S7).`（benefit-but-cost 权衡句式；前半句＝§III-C 既有定义级事实 "Width-32 scoring narrows each dot product" 的传播，无新数字；使该段从纯代价披露变为 trade-off 披露——与摘要/结论的 narrows-scoring vs execution-work 区分链一致）。
 - paper_zh.tex 直译同步（「评分视图缩小每次点积，但辅助视图的准备与维护增加了执行工作，并未压缩原始KV缓存。」）。
 - **版式教训复现**：初版 "The width-32 views narrow each dot product, but preparing and maintaining them adds work ..."（+7 词）使 en 6→7 页——零余量规则第二次触发；压缩至 +2 词后 6 页恢复。
+- **后记（远端裁决，第 20 轮 fetch 时发现）**：远端 55b9a17 把该句再精化为 "Compact scoring narrows dot products, but view preparation and maintenance add work"——**采纳**：收益主语限定为 compact scoring（历史 width-128 L2 张量也是视图但不缩小点积宽度），我的 "The views" 主语过宽；远端版与 §III-C "Width-32 scoring narrows each dot product" 及全文 compact 术语一致。
+
+---
+
+## §4 Gemmini Evaluation（第 20 轮，2026-10-18）
+
+### §4 开篇（1 句）
+- 纯路线图句（"This section discusses our evaluation methodology and evaluation results ... compared to both CPUs and state-of-the-art, commercial accelerators"——点名两类基线；无结论，比 §2 开篇的带结论版弱，是本文少数非 claim-first 处）。
+
+### §4.A Evaluation Methodology（5 句）
+- **平台披露句**（FireSim FPGA 加速仿真 [27]——评价基础设施论文的方法学第一句=平台）→ **负载枚举句**（五个 DNN 全点名）→ **环境完整句**（full Linux + cycle-exact simulated SoC——回扣 §3.C 环境价值句）→ **工具链句**（Cadence Genus 22nm + Innovus）→ **分解定位句带方向词**（"the SRAMs **alone** consume 67.1% ... The spatial array itself **only** consumes 11.3%, while the host CPU consumed **a higher** 16.6%"——百分比三连，only/a-higher 方向词内嵌；DREAMPlace 分解定位句同款）。
+
+### §4.B Performance Results（~14 句）
+- **目的内嵌 setup 句**（"We evaluated ... **to determine how** the accelerator and host CPU configuration may **interact to impact** end-to-end performance"——实验目的=交互问题，非单纯枚举臂）。
+- **臂定义句带功能从句**（Rocket/BOOM 两 CPU + 无/有 im2col 两配置，"relieving the host CPU of that burden"——每个臂挂其功能）。
+- **As-illustrated 条件机制链**（"when built without an on-the-fly im2col unit, its performance depends heavily on the host-CPU which becomes responsible for performing im2col"——配置→依赖责任转移）→ 量化方向句（BOOM 2.0× across all CNNs）→ **The-less-the-more 单调方向句带 giving 后果分词**（"The less complex the DNN accelerator is, the more the computational burden is shifted onto the CPU, **giving** the host CPU a larger impact"）。
+- **However 反转句带 because 归因**（有 im2col 时 CPU 选择 far less important，because 负担转回加速器）。
+- **设计原则句带 while-preserving**（"Adding a small amount of complexity to the accelerator **allows us to** reduce the area and complexity of the host CPU ... **while preserving** performance"——从实验提炼可执行原则）→ 工具价值收口句（"Gemmini enables hardware designers to easily make these performance-efficiency tradeoffs"）。
+- **头牌双基线句**（22.8 FPS ResNet50＝2670× over Rocket、1130× over BOOM）。
+- **诚实失败句带机制+Therefore+only**（"Some DNN models such as MobileNet are not efficiently mapped ... **due to** the low data reuse within the depthwise convolution layers. **Therefore**, Gemmini demonstrates **only** a 127× speedup"——例外任务当场给机制与降级数字）。
+- **对抗案例句**（SqueezeNet 专为 CPU 高效设计——最不利情形仍 1,760×）。
+- **匹配条件可比句带图锚**（"comparable to ... NVDLA, **when running with the same number of PEs as the configuration in Figure 6a**"）。
+- 语言模型覆盖句（BERT 144×——负载类别跨度收口）。
+
+### 对照我们手稿的差距结论（Experimental Setting + Q1-Q3 遍历）
+| Gemmini §4 句式 | 我们的状态 |
+|---|---|
+| 目的内嵌 setup 句（to determine how X interacts） | Q1/Q2/Q3 小节标题本身即问句（问题形式内嵌于结构）；Experimental Setting opener 为方面枚举。**判定**：问句标题+Intro P5 Q 指针共同承担该功能；把问句形式再写进 opener 会与 Intro P5 重复且 +13 词超版式余量（上轮 +7 词已溢出），不加 |
+| 分解定位句带 only/a-higher 方向词 | Q3 比值序列 3.38/2.46/1.78 + 方向句（"Although the relative penalty decreases ... absolute increases"）——数字带方向的诚实镜像，无面积数据不可加，不改 |
+| The-less-the-more 单调方向句 | β 方向句（第 13 轮定理级版）已是同型，不改 |
+| However 反转+because 归因 / 设计原则句 / 工具价值收口 | gate 段跨阶段句、Design implications 要求句（诚实边界决定用 requirement 而非 principle——无已建立收益不可提炼原则）、Design implications 收口句，分别对等或边界更强，不改 |
+| 诚实失败句带机制+Therefore+only | 我们的边界更强（"cannot locate the cause"——机制不可归因时诚实披露不可归因本身；MobileNet 的 due-to 有实测支撑，我们没有），不改 |
+| 对抗案例句 / 匹配条件可比句带图锚 | multi-query/multi-value 双臂零分句（共同低分不定位原因）；"0.09 points below + incomplete execution identity"（报不可比性而非可比性——边界镜像），不改 |
+| **节入口 Q 标签（登句重申 deliberate reprise）** | **本轮实缺（弱）**：Experimental Setting opener "We evaluate three aspects separately: task quality, regional coverage and execution cost." 无 Q 标签——读者从评估设置节入口进入时不知道三方面对应三个编号问题；Gemmini §3 开篇类别重申句（与摘要/Intro 登场句三度同构）证明 deliberate reprise 是合法模式。+3 词可行 |
+| 负载类别跨度句（BERT） | Workloads 段类型跨度括号（第 14 轮已加），不改 |
+
+### 本轮修改（第 20 轮）
+- paper_en.tex Experimental Setting 首句：`We evaluate three aspects separately: task quality, regional candidate coverage and execution cost.` → `We evaluate three aspects separately: task quality (Q1), regional candidate coverage (Q2) and execution cost (Q3).`（deliberate reprise：与 Intro P5 同构，评估节入口建立 Q 导航；+3 词在版式余量内）。
+- paper_zh.tex 直译同步（「本文分别评估任务质量（Q1）、区域覆盖（Q2）与执行成本（Q3）。」）。
+- 版式核对：+3 词，编译后核对 en 6 页。
 
