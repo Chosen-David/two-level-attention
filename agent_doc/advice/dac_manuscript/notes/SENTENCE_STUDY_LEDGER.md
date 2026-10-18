@@ -24,10 +24,19 @@
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
 | 5 | 2023_Gamora.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5） | 摘要近远覆盖句（标题词注入） ✓ §III-A L1 目的从句恢复 ✓ §III-B 首句主谓修复（t indexes the current token） ✓ Q2 128K 句中心词+比较对象补全（sparse arm / dense FullKV's 46.43） ✓ |
-| 6 | 2023_RL_CCD.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓；待：§4 实验 | Intro P4 门控句主语补全（the diagnostic uses） ✓ Intro P4 (c)/(d) 面板引用恢复（远端 784c1a4 裁决回插，压缩版） ✓ §III-A 坐标动机句指代悬垂修复（retained pairs'） ✓ §III-B S 定义移入 S7（define-before-use）+ fourfold 倍数锚 ✓ |
+| 6 | 2023_RL_CCD.pdf | **全部完成**（Abstract/Intro/§2/§3/§4 实验+§5 结论扫描） | Intro P4 门控句主语补全（the diagnostic uses） ✓ Intro P4 (c)/(d) 面板引用恢复（远端 784c1a4 裁决回插，压缩版） ✓ §III-A 坐标动机句指代悬垂修复（retained pairs'） ✓ §III-B S 定义移入 S7（define-before-use）+ fourfold 倍数锚 ✓ Q3 选择器段前向引用倒置修复（study-first + exceeds 直接比较） ✓ 128K "22.45-point loss" en 回插（远端 b1f5073 删 zh 留，数字带方向裁决） ✓ |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 30 轮（2026-10-19，RL-CCD §4 实验拆解 + 远端 b1f5073 裁决——第 6 篇完结）
+
+- **远端 b1f5073 裁决：采纳 + en 回插 1 处**（docs: distinguish historical benchmark and comparator identities）。核实：47.91 比较对象确为「含中间检索的稀疏基线」（S6 一致），远端将「Protection-only scores 26.09 versus 47.91 at 256 versus 1024 tokens」改写为「Five-task LongBench means are 26.09 (protection-only, 256 tokens) versus 47.91 (reused sparse baseline, 1024)」——比较对象身份更准确，采纳。但 en 版同时删掉「22.45-point」而 zh 版保留：数字带方向铁律裁决回插 en（「nor explain the 22.45-point loss」），消除双语不对称。
+- **RL-CCD §4 全拆解 + §5 结论扫描**（追加至 sentence_studies/2023_rl_ccd.md，现 222 行）：新增范式入库——**环境-指标-基线-协议四件套设置段**（18-core / Xeon W-2255 / RTX 6000 + GCC/PyTorch 版本 + 随机种子声明）、**双口径头牌数字句**（up-to 64% 与 avg. 23% 并报，每指标成对）、**without-bell-whistles 反向公平声明**（不加技巧直接比，劣势即真实劣势）、**Table-Verbs 指差同句**（outperforms, reduces, and achieves 三动词连环带具体数字）、**通用性扫描句**（five industrial designs at 5/7/12nm）、**消融双问句**（better model? better sampling?→各自独立答）、**机制证据带数字锚**（better objective landscape 的代理指标量化）、**模型规模升级实验**（5M→30M→130M 三档）、**we-agree-but-too-expensive 范围限制句**（Acknowledge 定性认同+quantify 成本拒绝）、**教训-保留双面句**（interference survives in larger nets）、**Conclusions 三段式**（一句总结贡献+一句数字复述+一句框架泛化）。诚实边界排除：superhuman（判词）、drastically、which-is-proved-in-Fig（图文因果过度声明——我们只允许 shows/confirms 级）。
+- **手稿修复 1 处（en+zh）**：Q3「Local selector cost」段前向引用倒置——旧版首句「The shared-subspace selector has no lower reported aggregate time than the nominal full-dimensional page-scoring variant in the synthetic study」先给结论再介绍 study（study 未定义先引用，RL-CCD 范式：先环境后结果）；且「has no lower...than」否定式比较弱于直接陈述。改为 study-first + 结果 so-从句直接比较：「In the synthetic study, a separate two-round experiment (...) reports ... 1.3502 ms ..., 1.3598 ms ... and 1.4634 ms ..., so the shared-subspace aggregate time exceeds the page-scoring variant's.」zh 同步直译。
+- **零余量版式第 6 次触发与回收**：b1f5073 扩写（+10 词）+ 22.45-point 回插（+4 词）把 AI 声明挤到第 6 页、References 落第 7 页。两处无损压缩回收：① Q3「Relative to nominal page scoring, shared-subspace scoring is...」→「Shared-subspace scoring runs 0.0237 ms slower in round one and...」（比较对象上句已给）；② 门控段「Separately, reported...arithmetic five-task AVGs...: decreases of」→「Reported...five-task AVGs..., decreases of」（冗词删除）。en 回到 6 页。
+- **编译验证**：四文档 6/6/9/9 页，0 未定义引用（0 LaTeX Warning）。
+- **RL-CCD 完结**：第 6 篇全章节拆解完毕。下一轮进入第 7 篇 2026_Miter_Aware_LUT_Mapping.pdf（队列最后一篇）。
 
 ### 第 29 轮（2026-10-18，RL-CCD §3 框架拆解 + 远端 1ecc63d 裁决）
 

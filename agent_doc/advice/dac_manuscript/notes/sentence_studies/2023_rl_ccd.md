@@ -172,3 +172,51 @@
 3. en §III-B：「far is its complement there」→「far is the rest of $\mathcal M_t$」；zh 已显式（「远区为它在M_t内的补集」）不动。
 4. en §III-A：「Compact scoring narrows dot products」→「narrows each dot product fourfold」（RL-CCD 收益带倍数锚句式；32/128 算术事实）；zh「缩小评分点积」→「将每次评分点积缩窄至四分之一」。
 5. 远端 1ecc63d 裁决**整体采纳**（先逐项核验 manifest：三臂 source_data_sha256/ids/answers_sha/lengths 全等 ✓、稀疏两臂 scorer+script 哈希一致而与锚不同 ✓、锚 legacy-partial+operator-declared YaRN ✓）：图注按长度区分 β 归属（64K 展示 8B 两 β）为真实纠错；S8 64K 段 manifest 级披露深化诚实边界；「are reported on one machine」归因严谨化；S7 attribution-controls 段重写更可执行；draw.py 相对字体路径+去重复 y 轴标签。
+
+## §4 Experimental Results（第 30 轮拆解，3 小节全；§5 结论一并扫过）
+
+### §4 开篇：公平性设置段（1 段）
+- **范围锚定句**（"we validate RL-CCD on **19 commercial designs** (renamed due to confidentiality) in **advanced technologies 5-12nm**"——数量+技术范围+保密注——实验开篇的规模锚）。
+- **公平性三连声明**（fair-and-apple-to-apple）：①同种子（"we use **the same seed** in each run to **completely remove** non-deterministic run-to-run variation"——把消除随机性写成完全动词）；②同配方（"RL-CCD **does not leverage any additional optimization step** other than the original ones...**exact same recipe is used for both**"——排除额外步骤的否定式声明）；③同硬件（"measured on **the same farm machine** without GPU support"）——公平性是卖点，三条独立声明各占一句。**我们的对应物**：64K 稀疏两臂同机+清单匹配已在图注/S8 披露；「同种子」级声明无核实依据不加。
+- **实现披露句**（"implemented using Python and TCL (**no internal C++ code needed**)"——括号否定式排除依赖——轻量实现的卖点注法）。
+- **方向路线图句**（"**Below, we clearly demonstrate that** RL-CCD significantly improves..."——段落收口即下节预告；significantly 级判词诚实边界禁）。
+
+### §4.A Single-Design Optimization Results
+- **表前置信句**（"Table II demonstrates the optimization results achieved by **training Algorithm 1 from scratch**"——表指针+从零训练声明（与 §4.B transfer 对照埋线——from scratch 是 transfer learning 的基线伏笔））。
+- **up-to/avg 配对头牌句**（"RL-CCD **consistently outperforms**...**across all benchmarks**, where we observe significant timing improvements in TNS **by up to 64.4%** (with an **average** improvement of **24%**), and in NVE by up to 66.5% (with an average of 19.4%)"——consistently+across-all 极值声明、up-to X（average Y）双数字——两个指标各配一对；此句式我们已在前轮入库 ✓）。
+- **机制证据数字锚句**（"Figure 5 further demonstrates the prioritization impact...**by intelligently prioritizing 74 critical endpoints** out of the entire design (block11 with **180K cells**), RL-CCD is able to efficiently affect the behaviour of the underlying useful skew engine"——图→机制→具体数字（74/180K）→对底层引擎的影响——机制段必须带数字锚。我们 (a) 面板 13/17/59.65%/26.46% 同构 ✓）。
+- **未优化维度检查句**（"**We believe** the significant timing improvements **are not coming from the sacrifice of power**, **because** RL-CCD is not degrading the power quality...**In fact, although power is not an explicit objective**, RL-CCD still achieves an average of **0.2% improvement**"——优化 A 时检查 B 未受损：believe-because（弱形式）+ although-not-explicit-objective + 意外正收益——展示无隐藏 tradeoff 的模板。**诚实边界裁注**：believe-because 我们不可用（无此证据）；「检查未优化维度」思想已在我们任务异质性披露（CWE 升/FWE 降）中体现 ✓）。
+- **我们同意-但-太贵-故限定范围句**（"**Nonetheless**...**we agree that** the most accurate approach to justify power impact **is to run through the entire PD flow, which, however, would easily take weeks**...**Hence, in this paper, we specifically focus on** improving the CCD optimization quality at the placement stage"——承认最准确做法→成本否决→范围收口——诚实局限的标准三步。**我们的对应物**：完整请求测量缺失的多处披露同构 ✓；此句式是「为什么不测 e2e」的标准答法，若被审稿人质询可套用结构（承认完整请求成本是唯一严格口径→跨机/未重放的限制→本文限定描述性范围））。
+- **训练终止判据句**（"The training is **terminated when** the TNS value no longer improves in 3 consecutive iterations"——可复现性细节入正文）。
+- **局限预告+方案前指句**（"**We understand that** the runtime of RL-CCD **may be prohibitive** for other industrial designs in the real-world. **Hence, we leverage transfer learning** to further improve it **as follows**"——主动承认运行时局限→立即给下一小节的解法——局限不藏，作为下节动机）。
+
+### §4.B Transfer Learning on Unseen Designs
+- **术语定义先行句**（"**The key idea of transfer learning is to reuse** pre-trained parameters in unseen domains, **so that** a framework...can reach faster convergence"——先用一句定义通用术语再用——define-before-use 的章节级应用）。
+- **流程顺序句**（"**Particularly, we first** use the same EP-GNN model to perform RL training on different designs...**Then, after the training is completed, we load** the weights and biases of the pre-trained EP-GNN model (with a new encoder-decoder framework) to perform RL training on 'unseen' designs"——first/then 两步流程+引号强调 unseen）。
+- **假设-证明指针句**（"**The key rationale behind** our transfer learning approach **is that** GNN netlist encoding **should be universal** (at least in the same technology). **Hence**, starting from more accurate embeddings, RL-CCD should be able to reach optimized solutions in faster convergence, **which is proved in Figure 6**"——rationale 假设→Hence 预测→which-is-proved-in-Fig 证据指针。**诚实边界裁注**：单设计（block19）证据配 "proved" 属过度判词；我们若用此结构须降级为 "Figure 6 shows" 或 "consistent with"——already our house style）。
+
+### §4.C Discussion: Why Does RL-CCD Work?
+- **问句式小节标题**（"Why Does RL-CCD Work?"——讨论节以机制问题命名——我们的诚实边界禁用（无已建立收益可解释），「Design implications and limitations」已覆盖对应职能）。
+- **缺口重述-学习内容点题句**（"commercial tools **are ignoring** endpoint sensitivity 'across different optimization strategies'...they **fail to make use of the fact that** different endpoints react to various strategies distinctly...**This is the key information that RL-CCD is learning**"——重述引言缺口→直接点出方法学到什么——Why-it-works 讨论的核心句式）。
+- **部分归因收口句**（"we **attribute part of our success to** the proposed fan-in cone overlap masking technique, which efficiently prunes out the action space, **while allowing** the RL agent to decide...**subject to design characteristics**"——只归因 part of（诚实留白）+ while-allowing 的设计权衡复述——讨论节收口）。
+
+### §5 Conclusion（一并扫过）
+- **问题-方法-结果-规模四要素收口**（"we **discover a new problem** of balancing clock-path and data-path optimization in commercial tool flows, and **solve it by** using endpoint prioritization with RL. The proposed framework...**significantly improves** the timing optimization quality of an **industry-leading commercial tool** across **19 commercial benchmarks**"——discover-a-new-problem + solve-it-by + 头牌判词+规模锚——结论复述贡献的完整链）。
+
+### 对照我们手稿评估节的差距结论与修复
+| RL-CCD §4 句式 | 我们的状态 | 本轮处置 |
+|---|---|---|
+| 公平性三连声明（种子/配方/硬件） | 同机+清单匹配披露在图注/S8 ✓；种子级声明无核实依据 | 不加 |
+| up-to/avg 配对 | Q3 三长度中位数+比值全列 ✓ | 已达标 |
+| 机制证据数字锚 | (a) 面板 13/17/59.65%/26.46% ✓ | 已达标 |
+| 未优化维度检查 | 任务异质性（CWE/FWE 双向）披露 ✓ | 已达标 |
+| we-agree-但-太贵-故范围 | 完整请求测量缺失披露多处 ✓（结构同构） | 不改 |
+| 局限预告+方案前指 | Q3 慢→S6 细节指针同构 ✓ | 不改 |
+| which-is-proved-in-Fig 过度判词 | 我们 house style 已用 "shows/consistent with" | 保持 |
+| 问句式讨论节标题 | 诚实边界禁 | 不加 |
+| **define-before-use 章节级（研究先定义后引用）** | **Q3 选择器段违例**：「The shared-subspace selector has no lower reported aggregate time...**in the synthetic study**」——synthetic study 在下一句才被定义（前向引用倒置）；且 "has no lower...than" 否定式绕口 | **修复：合并为研究先行+直接比较句** |
+
+### 本轮修改（第 30 轮）
+1. **Q3 选择器段前向引用倒置修复（en+zh）**：旧序「结论句（引用未定义的 synthetic study）→实验定义句」→ 新序「研究定义+三数字 → so-直接比较结论」。en：`In the synthetic study, a separate two-round experiment (single layer, batch one, one query, 64K QKV) reports steady-state summaries of 1.3502 ms for nominal full-dimensional page scoring, 1.3598 ms for shared-subspace scoring and 1.4634 ms for nominal full-dimensional token scoring, so the shared-subspace aggregate time exceeds the page-scoring variant's.`（"has no lower...than" 否定式换为 exceeds 直接比较）；zh 同步直译。
+2. **en 恢复 "22.45-point loss"**：远端 b1f5073 en 版删掉该数字（zh 保留）造成双语不对称；恢复（数字带方向铁律）。
+3. **远端 b1f5073 裁决：采纳**——旧句把 LongBench 的 26.09/47.91（仅保护 vs 复用稀疏基线）混在 RULER 128K 语境且对照身份不明，远端按基准名+对照身份+括号预算修正（经 S6 核验 47.91 对照确为「含中间检索」稀疏臂），真实事实纠错；唯 en 数字删减回补。
