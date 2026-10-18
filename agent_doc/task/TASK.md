@@ -76,6 +76,8 @@
 
 ## 待办池（未排期，均有用户指令或审计来源）
 
+- [x] [TL-E151C-LAYER-20261019] 配额消费点拒绝缺失/非法/未覆盖层号；21项E151c测试及24场景旧实现选集差分普通/-O通过，GPU/模型/性能未验。([详情](task_details/TL-E151C-LAYER-20261019.md))
+
 - [x] [TL-E151C-MODES-20261018] oracle配额与gamma-off/非E64/sinkswa/MoBA/sigma不兼容组合构造期拒绝；普通/-O各41项或场景通过及独立复核，GPU/质量/性能无新增结论。([详情](task_details/TL-E151C-MODES-20261018.md))
 
 - [x] [TL-E151C-INPUT-20261018] quota JSON 构造期拒绝字符/对象键误读、空表及非法数值；保留合法取整，13项普通/-O专项通过。短表/配置支持仍待办。([详情](task_details/TL-E151C-INPUT-20261018.md))
