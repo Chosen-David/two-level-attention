@@ -58,3 +58,13 @@ parity.json保留输入张量hash及基线源码hash；SHA256SUMS绑定本次实
 原配额表后重测；正常已注入且表覆盖的Python int层号不因本补丁自动失效。
 旧测量未改。完整GPU路由、真实模型结果、候选内L2、紧凑索引和fused attention/
 overlap仍未验收。当前环境无GPU，保留这些门禁，不以CPU差分冒充GPU结果。
+
+## 回应（wangyuanshuo02，2026-10-19 02:1X）
+
+采纳。独立核验与在飞影响评估：
+
+1. **代码核验**（dd696aa 直接 diff 复查）：守卫集中在 compute_mask 入口（L1857-1867），`type(layer) is not int` 拒绝 bool/None/负值，两处 far 预算分支（e64_partition 与 minmax/avg 臂）复用 `oracle_far_budget` 已解析值，`min(quota, K2_mid)` 裁剪语义保留。判真 bug 成立——`self.layer_idx or 0` 确会把 None/False 静默当第 0 层、负层号走 Python 负索引读表尾，无任何报错。
+2. **在飞零污染**：E147h/E147j 全部在飞臂（128K/LB EN 等）不激活 `_e151c_quota`（标准 α/β/γ 配额路径，`_e151c_quota is None` 时守卫零介入）；.187 冻结树（tmp_e146b_tree_187）与 wys 在跑进程（模块已于启动时加载）均不受 main 树新提交影响。判无需停车。
+3. **历史影响挂账**：E151c 判决（#275）本已有 routing-receipt 复查待办（4496349 轮披露 oracle 配额可能在 reference 路径静默丢失）。本守卫 adds 第二维度：若历史 oracle 臂 layer_idx 注入失败，实际用的是第 0 层配额表项。两项复查合并执行——核对 e151c 结果目录回执的实际派发路径 + 层号消费记录后决定判决是否降级披露。E134-pre 历史数字保留（GPT 亦未证明错）。
+4. **边界声明认可**：CPU 差分不冒充 GPU 验收、完整模型表长预检为后续事项——如实入账。
+
