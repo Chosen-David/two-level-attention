@@ -1,0 +1,49 @@
+{
+  "id": "e147j_k2down",
+  "date": "2026-10-19",
+  "title": "E147j K2 预算下探双臂判决——K2=512 半预算 AVG 56.00 仍胜 AsyncTLS +5.9（cwe -43 须披露）、K2=384 悬崖崩 15.00 预算下界锁定",
+  "config": {
+    "arm": "tli_64_128_{512,384}_c4_Aa0.25_b0.0625_g0.625_sk4_sw128（K2 1024→512/384，β.0625 sink4 主口径候选，其余全同 E147c）",
+    "machine": "wys GPU0（K2=512）/ GPU2（K2=384）；formal score_ruler_formal --pred-postfix e147j_{k2512,k2384} --expect-tasks 11 --min-samples 100（staging root /tmp/e147j_root，native 32K 免 yarn）"
+  },
+  "results": {
+    "k2_512_avg": 56.00,
+    "k2_384_avg": 15.00,
+    "k2_1024_e147c": 59.29,
+    "asynctls_e119": 50.09,
+    "quest_e119": 42.85,
+    "jssa_r32k": 58.7,
+    "diff_k2_512_vs_asynctls": 5.91,
+    "diff_k2_512_vs_k2_1024": -3.29,
+    "per_task_k2_512": {
+      "niah_single_1": 100.0, "niah_single_2": 99.0, "niah_single_3": 94.0,
+      "niah_multikey_1": 97.0, "niah_multikey_2": 75.0, "niah_multikey_3": 8.0,
+      "niah_multiquery": 24.75, "niah_multivalue": 32.25,
+      "cwe": 32.5, "fwe": 22.33, "vt": 31.2
+    },
+    "per_task_k2_384": {
+      "niah_single_1": 20.0, "niah_single_2": 22.0, "niah_single_3": 18.0,
+      "niah_multikey_1": 23.0, "niah_multikey_2": 11.0, "niah_multikey_3": 0.0,
+      "niah_multiquery": 8.0, "niah_multivalue": 10.5,
+      "cwe": 3.8, "fwe": 44.33, "vt": 4.4
+    }
+  },
+  "judgment": [
+    "K2=512（半预算，对齐 AsyncTLS kt=512 同预算行）AVG 56.00：胜 AsyncTLS 50.09（+5.91）/ Quest 42.85（+13.2）——「半预算打过 AsyncTLS」主张成立；低于 K2=1024 的 59.29（-3.29）与 JSSA 58.7（-2.7）",
+    "K2=512 结构：niah 全线零损（single 100/99/94、mk1 97、mk2 75 均 ≥ K2=1024）+ mv 32.25（+2.25）/fwe 22.33（+1.33）反升，**唯一大损 cwe 32.5（vs 75.9，-43.4）**——far 配额挤兑（K2_mid=380）代价全部集中于词枚举型任务，高频统计型反而有利",
+    "K2=384 悬崖崩塌 AVG 15.00：niah ~20 分带、cwe 3.8/vt 4.4——结构性断裂（near 320 亦被挤），唯 fwe 44.33（+23 vs K2=1024）反常高（高频统计对预算不敏感的单池效应证据）。预算下界锁定 512/384 之间，与 E139 K2 悬崖（sink128 旧口径）方向一致",
+    "论文口径三行建议：①K2=1024 主行（vs JSSA budget=1024 同预算、vs AsyncTLS kt=512 打分预算+8192 attention 覆盖双层注记）；②K2=512 预算公平行（vs AsyncTLS 同 kt，胜 +5.9，cwe -43 如实披露）；③K2=384 下界披露行（悬崖边界）",
+    "用户指令①「用更少的预算达到效果/打过 baseline」的回答：K2=512 行成立（AsyncTLS/Quest 双胜）；JSSA 在同 budget=1024 才可比（TLI K2=1024 领先 +0.59 噪声带边缘），半预算行不覆盖 JSSA"
+  ],
+  "sources": {
+    "formal": "exp/trace/results/e147j_{k2512,k2384}_r32k_formal.json（八件套，wys 打分原件拉回）",
+    "raw": "wys:~/two-level-attention/exp/results_ruler/Qwen3-8B/L32768/pred/*e147j_k2{512,384}*（11 任务×2 臂 100 行/格核验）",
+    "baselines": "e147c_r32k_formal（59.29）/ e119 系列（AsyncTLS 50.09/Quest 42.85）/ jssa_r32k_formal（58.7）复用"
+  },
+  "caveats": [
+    "同机配对：E147j 双臂与 E147c（K2=1024）均在 wys——E147cwys 已证跨机 greedy 零漂移，三预算行同机可比",
+    "K2=512/384 的 method 段嵌入 K2 值（tli_64_128_{512,384}），配置指纹与 K2=1024 不同为预期",
+    "quick 快报与 formal 逐位一致（vt 31.2/fwe 44.33 为正式值，quick 期未出）"
+  ],
+  "generated_at": "2026-10-19T02:10"
+}
