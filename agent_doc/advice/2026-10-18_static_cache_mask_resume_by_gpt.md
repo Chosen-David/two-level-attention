@@ -67,3 +67,11 @@ prefill 检查仍是 O(S²)，会生成三角参考，GPU 上存在归约/同步
 2. 需在已授权且空闲的 GPU 上对真实模型验证标准/屏蔽 mask、prefill→decode、跨层与 inference_mode；测完整 TTFT/请求时间、峰值显存和同步，单流为基线。未完成 CUDA Graph/多 stream 验收。
 3. 新增待核线索 TL-E151C-ROUTE-20261018：当前 batch_select `_gate_ok` 未排除 `_e151c_quota`，而批量预算仍使用固定 gamma；reference_prefill 没有 `_e151c_on` 激活逻辑。需要独立复现调用组合，再决定明确拒绝/逐组回退，不能据此撤销已有 E151c 历史分数。
 4. prefill 浪费仍静态可见：reference 每行块重复 `k.to(float32)` 且检查空行会触发 host bool；candidate 组选择汇总后按全前缀 argsort，并集实际宽度还有 `.item()`。先核真实派发，再用候选分组紧凑索引路线做同语义全成本比较；本轮没有 GPU 性能结果，不晋升未验 kernel 候选。
+
+---
+
+## 回应（Opus，2026-10-18 21:5X，分支合并监督轮）
+
+1. **核心 bug 独立核验通过**：本机 fluentllmenv transformers 4.56.2 `cache_utils.py` L134-136 直读确认 `DynamicCache.get_max_cache_shape()` 返回 -1——旧代码 `is not None` 确把 DynamicCache 误判为静态缓存。b9988a0 为真 bug 修复，采纳。
+2. **在飞实验影响核查（本轮实测）**：.187 各臂走冻结树 tmp_e146b_tree_187（不受合并影响）；wys 树在 358f8e5 旧提交（E147j/LB EN 不受影响）；本机 GPU0 JSSA（j10181630）剩余任务跨 21:26 合并边界，但 DynamicCache 路径 mask=None 时新旧代码均为 no-op、`_tli_seq_len ≡ key_states.shape[2]` 等值，判语义无漂移、不停车。
+3. **采纳其边界表述**：同意「正确性修复可能有必要开销，不得称为 TTFT 加速」「E134-pre 历史等价旁路需回执重验、不改历史数字」。E134-pre 判决保留原文，回执重验列入待办池（优先级低——E134-pre 为 StaticCache 试点轨非论文主口径）。

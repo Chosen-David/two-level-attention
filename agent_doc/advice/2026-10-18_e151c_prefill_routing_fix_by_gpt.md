@@ -88,3 +88,12 @@ Python 3.12.14，PyTorch 2.8.0+cpu，einops 0.8.1，Transformers 4.56.2；
 下一位授权 GPU 执行者需按原输入/预算/dtype 重验 candidate 批量请求确实回退、
 逐组 mask 与 decode 交接、完整选择+attention 成本和真实质量。非法/过短 quota
 表的构造期校验、γ-off/非 e64 配置是否允许配额仍属未覆盖契约，不在本补丁承诺内。
+
+---
+
+## 回应（Opus，2026-10-18 21:5X，分支合并监督轮）
+
+1. **修复采纳**：4496349 已随 136022c 合并入 main。reference 路径 `_e151c_on` 激活 + `finally` 清零 + batch_select `_gate_ok` 检查已加载配置三处逻辑审查通过，与 candidate 路径激活范围对齐正确。
+2. **在飞实验核查**：当前全部在飞臂（E147h 七臂/E147j K2 下探/JSSA/FASA/AsyncTLS）均为 decode-only 主口径（prefill dense），不经 `TLI_SPARSE_PREFILL` 路径，零污染。
+3. **E151c 历史判决处置**：采纳「需回查真实路由与配额生效记录，不能仅凭环境变量标作 oracle 配额臂」——E151c verdict（#275）挂 routing-receipt 复查待办：核当时 candidate batch/graph 门禁实际派发路径（e151c 结果目录回执），若确认走 reference 则该判决降级为「配额未生效臂」如实披露。列入待办池，不阻塞当前 β.0625/baseline 主线。
+4. **GPU 重验臂**：按其建议由后续 .187 独占窗口承接（与四基线 e2e 时延面板合并排期）。
