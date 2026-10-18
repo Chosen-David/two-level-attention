@@ -1,0 +1,33 @@
+{
+  "id": "e147h_lbv2",
+  "date": "2026-10-18",
+  "title": "E147h LBv2 β.0625 迁移验证——32.21 与 FullKV 锚同分、距 β.125 32.41 -0.20 噪声带内，判据通过",
+  "config": {
+    "arm": "tli_64_128_1024_c4_Aa0.25_b0.0625_g0.625_sk4_sw128（β.0625 主口径候选）",
+    "dataset": "LBv2 503 MCQ，官方严格 parser，31.5K 截断，scorer difflib:stdlib",
+    "machine": ".187 GPU2（tmp_e146b_tree_187）；runcap strict_validated 1/1，budget_avg 1021.65 贴 K2=1024 上限合规"
+  },
+  "results": {
+    "e147h_beta0625_avg": 32.21,
+    "beta125_mavg_e145d": 32.41,
+    "fullkv_anchor_e109v2": 32.21,
+    "diff_vs_beta125": -0.20,
+    "diff_vs_fullkv": 0.0
+  },
+  "judgment": [
+    "β.0625 LBv2 = 32.21：vs β.125 同档 32.41 为 -0.20（单数据集 MCQ 1 题约 0.2 分粒度，噪声带内）——判据「不低于 β.125 同档或噪声带内」通过",
+    "vs FullKV 锚 32.21 恰好同分（0.0）——β.0625 在 LBv2 与 dense 锚完全持平，与 β.125 +0.20 同为噪声级",
+    "E147h 七臂之一收官：LBv2 迁移不否决 β.0625 主口径候选（32K RULER +0.99 / LBv2 -0.20 噪声带内）",
+    "预算合规：budget_avg 1021.65 贴 1024 上限、runcap strict_validated、cap_identity_hash 40a8a9b0b9 单一身份"
+  ],
+  "sources": {
+    "pred_result": "exp/trace/results/e147h_lbv2_pred_result.json（.187 eval result.json 拉回原件）",
+    "raw": ".187:~/tmp_e147h_lbv2/pred_E147h_lbv2_mavg/pred/lbv2-*-e147h.jsonl（503 行）",
+    "baselines": "e145d_lbv2_verdict.json（β.125 32.41 wys / FullKV 锚 32.21 复用）"
+  },
+  "caveats": [
+    "跨机：β.0625 在 .187、β.125 在 wys——LBv2 为 MCQ 单数据集跨机摆动粒度约 1 题（0.2），-0.20 在粒度内",
+    "LBv2 单 dataset 无逐任务分解，判据按数据集 AVG 口径"
+  ],
+  "generated_at": "2026-10-18T18:45"
+}
