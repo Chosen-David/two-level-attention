@@ -1,0 +1,57 @@
+Post-replay validation on main b1f50739f0c164db7d380c610f3fc2ebe4402fd2
+CPU only; elapsed test times are not performance benchmarks.
+Excerpt: command, raw outcome lines and return codes; repeated traceback omitted.
+Private complete raw log SHA256: 1e68926625725756e2dc755583d5c0891a1f557497b5cb59fb977936f44066d6
+
+COMMAND: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python agent_doc/results/e151c-modes-20261018/baseline_runner.py
+input_sha256=df266f3eaba6a69c245a64fc62f22790ecfaabbe8ccee34c5c9940b8cbc202ca
+quota=0 far=65 total=256
+quota=128 far=65 total=256
+quota_masks_equal=True
+Ran 3 tests in 0.031s
+FAILED (failures=18)
+EXIT: 1; EXPECTED: 1
+COMMAND: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python -m unittest discover -s tests -p test_e151c*.py -v
+Ran 16 tests in 1.134s
+OK
+EXIT: 0; EXPECTED: 0
+COMMAND: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python -m unittest discover -s tests -p test_e139*.py -v
+Ran 13 tests in 48.986s
+OK
+EXIT: 0; EXPECTED: 0
+COMMAND: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python -m unittest discover -s tests -p test_paper_runtime.py -v
+Ran 5 tests in 0.918s
+OK
+EXIT: 0; EXPECTED: 0
+COMMAND: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python test_sparse_prefill_impl.py
+PASS  T1 S=800(<1024) 全 dense == fp32 参考  -- max|Δ|=0.00e+00
+PASS  T2 S=3000 两 chunk：首 chunk 行==dense / 无 NaN / shape 正确  -- 首 chunk max|Δ|=5.22e-08
+PASS  T3 S=3000 chunk1 == 末行选择∩因果 参考；sink/swa 强制区（分区臂）  -- chunk1 max|Δ|=0.00e+00
+PASS  T4 S=5000 三 chunk：中间 chunk 选择只可见前缀（k 长度=块末+1）  -- k_len 序列=[(4096, 4095), (5000, 4999)] chunk1 max|Δ|=5.22e-08
+PASS  T5 per_q_head（mask [H,S]）路径输出有限且 == 参考  -- chunk1 max|Δ|=0.00e+00
+PASS  T6 _chunk_rows_attn(sel=None) == dense 参考（任意行子块）  -- max|Δ|=0.00e+00
+PASS  T7 逐行 SWA/sink 保护带：最小选集下首/中/末行自身窗口恢复  -- 首/中/末行自身 SWA 恢复（0.5）；dense 行不受扰
+===== 7/7 PASS =====
+EXIT: 0; EXPECTED: 0
+COMMAND: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python -O -m unittest discover -s tests -p test_e151c*.py -v
+Ran 16 tests in 4.020s
+OK
+EXIT: 0; EXPECTED: 0
+COMMAND: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python -O -m unittest discover -s tests -p test_e139*.py -v
+Ran 13 tests in 50.696s
+OK
+EXIT: 0; EXPECTED: 0
+COMMAND: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python -O -m unittest discover -s tests -p test_paper_runtime.py -v
+Ran 5 tests in 1.075s
+OK
+EXIT: 0; EXPECTED: 0
+COMMAND: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python -O test_sparse_prefill_impl.py
+PASS  T1 S=800(<1024) 全 dense == fp32 参考  -- max|Δ|=0.00e+00
+PASS  T2 S=3000 两 chunk：首 chunk 行==dense / 无 NaN / shape 正确  -- 首 chunk max|Δ|=5.22e-08
+PASS  T3 S=3000 chunk1 == 末行选择∩因果 参考；sink/swa 强制区（分区臂）  -- chunk1 max|Δ|=0.00e+00
+PASS  T4 S=5000 三 chunk：中间 chunk 选择只可见前缀（k 长度=块末+1）  -- k_len 序列=[(4096, 4095), (5000, 4999)] chunk1 max|Δ|=5.22e-08
+PASS  T5 per_q_head（mask [H,S]）路径输出有限且 == 参考  -- chunk1 max|Δ|=0.00e+00
+PASS  T6 _chunk_rows_attn(sel=None) == dense 参考（任意行子块）  -- max|Δ|=0.00e+00
+PASS  T7 逐行 SWA/sink 保护带：最小选集下首/中/末行自身窗口恢复  -- 首/中/末行自身 SWA 恢复（0.5）；dense 行不受扰
+===== 7/7 PASS =====
+EXIT: 0; EXPECTED: 0

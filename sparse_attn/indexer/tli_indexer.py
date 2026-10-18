@@ -349,6 +349,20 @@ class TLIIndexer(TIAIndexer):
         # （取消 L2 near/far 配额分割，mid 单池 topk，见 compute_mask use_partition
         # 分支的 γ=off 段）；数值照旧 float。缺省 1.0 兼容不传该参数的旧 harness。
         self.gamma = getattr(args, "tli_gamma", 1.0)
+        # E151c is implemented only in the E64 split-budget top-k branches.
+        # Other selection modes return before those branches or use a different
+        # budget contract; accepting the table there would silently ignore it.
+        if self._e151c_quota is not None and (
+            not (self.alpha > 0 and self.beta > 0)
+            or self.gamma is None
+            or self.sinkswa_only
+            or self.moba_gate
+            or self.sigma_select != "none"
+        ):
+            raise ValueError(
+                "E151c oracle quota requires alpha>0, beta>0, numeric gamma "
+                "and ordinary two-level top-k (no sinkswa_only, MoBA or sigma selection)"
+            )
         self._basis_all = None
         bp_path = getattr(args, "tli_proj_basis", None)
         if bp_path:

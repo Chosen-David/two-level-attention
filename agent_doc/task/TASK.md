@@ -76,6 +76,8 @@
 
 ## 待办池（未排期，均有用户指令或审计来源）
 
+- [x] [TL-E151C-MODES-20261018] oracle配额与gamma-off/非E64/sinkswa/MoBA/sigma不兼容组合构造期拒绝；普通/-O各41项或场景通过及独立复核，GPU/质量/性能无新增结论。([详情](task_details/TL-E151C-MODES-20261018.md))
+
 - [x] [TL-E151C-INPUT-20261018] quota JSON 构造期拒绝字符/对象键误读、空表及非法数值；保留合法取整，13项普通/-O专项通过。短表/配置支持仍待办。([详情](task_details/TL-E151C-INPUT-20261018.md))
 
 - [ ] [TL-E151C-ROUTE-20261018] prefill 配额路由修复：reference 激活/异常清理，batch 回退逐组；35项/场景普通及-O CPU验证，GPU/实模/性能与历史配额臂重测待办。([详情](task_details/TL-E151C-ROUTE-20261018.md))

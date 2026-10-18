@@ -1,0 +1,192 @@
+input_sha256=df266f3eaba6a69c245a64fc62f22790ecfaabbe8ccee34c5c9940b8cbc202ca
+quota=0 far=65 total=256
+quota=128 far=65 total=256
+quota_masks_equal=True
+test_supported_modes_preserve_quota (test_e151c_quota_modes.QuotaModeTests.test_supported_modes_preserve_quota) ... ok
+test_unconfigured_modes_still_construct (test_e151c_quota_modes.QuotaModeTests.test_unconfigured_modes_still_construct) ... ok
+test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) ... 
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_gamma': None}, quota=[0]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_gamma': None}, quota=[32]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_alpha': 0}, quota=[0]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_alpha': 0}, quota=[32]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_beta': 0}, quota=[0]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_beta': 0}, quota=[32]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_alpha': 0, 'tli_beta': 0}, quota=[0]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_alpha': 0, 'tli_beta': 0}, quota=[32]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sinkswa_only': True}, quota=[0]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sinkswa_only': True}, quota=[32]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_moba': True}, quota=[0]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_moba': True}, quota=[32]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'far'}, quota=[0]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'far'}, quota=[32]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'near'}, quota=[0]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'near'}, quota=[32]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'mid'}, quota=[0]) ... FAIL
+  test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'mid'}, quota=[32]) ... FAIL
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_gamma': None}, quota=[0])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_gamma': None}, quota=[32])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_alpha': 0}, quota=[0])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_alpha': 0}, quota=[32])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_beta': 0}, quota=[0])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_beta': 0}, quota=[32])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_alpha': 0, 'tli_beta': 0}, quota=[0])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_alpha': 0, 'tli_beta': 0}, quota=[32])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sinkswa_only': True}, quota=[0])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sinkswa_only': True}, quota=[32])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_moba': True}, quota=[0])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_moba': True}, quota=[32])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'far'}, quota=[0])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'far'}, quota=[32])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'near'}, quota=[0])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'near'}, quota=[32])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'mid'}, quota=[0])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_modes_reject_configured_quota (test_e151c_quota_modes.QuotaModeTests.test_unsupported_modes_reject_configured_quota) (config={'tli_sigma_select': 'mid'}, quota=[32])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-quota-modes/tests/test_e151c_quota_modes.py", line 48, in test_unsupported_modes_reject_configured_quota
+    with self.assertRaisesRegex(ValueError, 'E151c'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.031s
+
+FAILED (failures=18)
