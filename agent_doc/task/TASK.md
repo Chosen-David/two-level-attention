@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [ ] [TL-DECODE-CU-STRIDE-20261019] fused decode 长度数组按需连续化；70项CPU普通/-O及独立30布局通过，GPU/性能未验。([详情](task_details/TL-DECODE-CU-STRIDE-20261019.md))
+
 这是 two-level-attention 主项目的唯一 AI 任务索引（agent_doc 口径），
 由主 AI 串行维护。
 **优先级从属关系：sglang 主仓根目录 `/home/wangyuanshuo02/sglang/TASK.md`

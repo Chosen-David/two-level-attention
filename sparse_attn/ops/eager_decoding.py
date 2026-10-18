@@ -385,6 +385,10 @@ def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
     # < 2^31 无溢出），值逐位同。
     if cu_seqlens_k.dtype != torch.int32:
         cu_seqlens_k = cu_seqlens_k.to(torch.int32)
+    # Kernel A reads CUK and CUK + 1 without a stride argument. Already-int32
+    # views skip the cast above, so normalize gapped views before launch.
+    if cu_seqlens_k.stride(0) != 1:
+        cu_seqlens_k = cu_seqlens_k.contiguous()
     R = m0.shape[0]
     H = q.shape[-2]
     D = k.shape[-1]

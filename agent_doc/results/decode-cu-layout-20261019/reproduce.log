@@ -1,0 +1,70 @@
+baseline bb14bc8a0347f1e440c78d397a3e2019e4a16c82
+Python 3.12.14 torch 2.8.0+cpu CUDA available False
+cu logical [0, 16384] stride (2,) offset 1
+cu logical bytes sha256 45055f7d65263fdd23060bb67886e2269ca996e23f5d9423ee2c445432dbfe73
+cu physical adjacent [0, 777]
+baseline tests 3 errors 2 failures 2
+test_contiguous_int32_no_copy_including_storage_offset (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_contiguous_int32_no_copy_including_storage_offset) ... ok
+test_gapped_length_array_preserves_logical_values (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_gapped_length_array_preserves_logical_values) ... 
+  test_gapped_length_array_preserves_logical_values (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_gapped_length_array_preserves_logical_values) (dtype=torch.int32, public=False) ... ERROR
+  test_gapped_length_array_preserves_logical_values (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_gapped_length_array_preserves_logical_values) (dtype=torch.int32, public=True) ... ERROR
+test_invalid_logical_length_cannot_hide_behind_adjacent_value (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_invalid_logical_length_cannot_hide_behind_adjacent_value) ... 
+  test_invalid_logical_length_cannot_hide_behind_adjacent_value (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_invalid_logical_length_cannot_hide_behind_adjacent_value) (public=False) ... FAIL
+  test_invalid_logical_length_cannot_hide_behind_adjacent_value (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_invalid_logical_length_cannot_hide_behind_adjacent_value) (public=True) ... FAIL
+
+======================================================================
+ERROR: test_gapped_length_array_preserves_logical_values (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_gapped_length_array_preserves_logical_values) (dtype=torch.int32, public=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-next/sparse_attn/ops/tests/test_eager_cu_layout.py", line 61, in test_gapped_length_array_preserves_logical_values
+    self.invoke(cu, public)
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-next/sparse_attn/ops/tests/test_eager_cu_layout.py", line 48, in invoke
+    ed.eager_decoding_check_errors()
+  File "bb14bc8a0347f1e440c78d397a3e2019e4a16c82:sparse_attn/ops/eager_decoding.py", line 53, in eager_decoding_check_errors
+  File "bb14bc8a0347f1e440c78d397a3e2019e4a16c82:sparse_attn/ops/eager_decoding.py", line 79, in _raise_for_code
+RuntimeError: eager_decoding_attn: cu_seqlens_k 契约破坏——gather 路径的零同步长度推导假设 cu == [0, S]（prepare_cu_seqlens 构造保证、B=1 生产路径恒成立），实测不符。本提示在校验点 raise，整次生成作废；请检查调用方传入的 cu_seqlens_k。
+
+======================================================================
+ERROR: test_gapped_length_array_preserves_logical_values (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_gapped_length_array_preserves_logical_values) (dtype=torch.int32, public=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-next/sparse_attn/ops/tests/test_eager_cu_layout.py", line 61, in test_gapped_length_array_preserves_logical_values
+    self.invoke(cu, public)
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-next/sparse_attn/ops/tests/test_eager_cu_layout.py", line 48, in invoke
+    ed.eager_decoding_check_errors()
+  File "bb14bc8a0347f1e440c78d397a3e2019e4a16c82:sparse_attn/ops/eager_decoding.py", line 53, in eager_decoding_check_errors
+  File "bb14bc8a0347f1e440c78d397a3e2019e4a16c82:sparse_attn/ops/eager_decoding.py", line 79, in _raise_for_code
+RuntimeError: eager_decoding_attn: cu_seqlens_k 契约破坏——gather 路径的零同步长度推导假设 cu == [0, S]（prepare_cu_seqlens 构造保证、B=1 生产路径恒成立），实测不符。本提示在校验点 raise，整次生成作废；请检查调用方传入的 cu_seqlens_k。
+
+======================================================================
+FAIL: test_invalid_logical_length_cannot_hide_behind_adjacent_value (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_invalid_logical_length_cannot_hide_behind_adjacent_value) (public=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-next/sparse_attn/ops/tests/test_eager_cu_layout.py", line 76, in test_invalid_logical_length_cannot_hide_behind_adjacent_value
+    with self.assertRaisesRegex(RuntimeError, 'cu_seqlens_k'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_invalid_logical_length_cannot_hide_behind_adjacent_value (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_invalid_logical_length_cannot_hide_behind_adjacent_value) (public=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit-next/sparse_attn/ops/tests/test_eager_cu_layout.py", line 76, in test_invalid_logical_length_cannot_hide_behind_adjacent_value
+    with self.assertRaisesRegex(RuntimeError, 'cu_seqlens_k'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: RuntimeError not raised
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.011s
+
+FAILED (failures=2, errors=2)
+
+patched tests 3 errors 0 failures 0
+test_contiguous_int32_no_copy_including_storage_offset (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_contiguous_int32_no_copy_including_storage_offset) ... ok
+test_gapped_length_array_preserves_logical_values (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_gapped_length_array_preserves_logical_values) ... ok
+test_invalid_logical_length_cannot_hide_behind_adjacent_value (sparse_attn.ops.tests.test_eager_cu_layout.EagerCuLayoutTest.test_invalid_logical_length_cannot_hide_behind_adjacent_value) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.008s
+
+OK
