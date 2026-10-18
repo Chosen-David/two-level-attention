@@ -23,11 +23,20 @@
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
 | 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
-| 5 | 2023_Gamora.pdf | 未开始 | — |
+| 5 | 2023_Gamora.pdf | Abstract ✓ Intro ✓；待：§2 背景动机 | 摘要近远覆盖句（标题词注入） ✓ |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 22 轮（2026-10-18，Gamora Abstract + Introduction —— 第 5 篇开始）
+- 远端检查：仅 9690ba7（构建产物对账，不动 tex），无内容裁决需求。
+- 拆解笔记：新建 `notes/sentence_studies/2023_gamora.md`（Abstract 6 句表：stakes 多域枚举句/**前作 suffering-from 双缺口句**/**In-response 登场句带三能力枚举**（与缺口逐点对应）/**压力测试预告句带 since 归因**（主动评估已知更难场景——technology mapping known to make reasoning much more challenging）/**编号双口径证据句**（(1) 质量+速度对+点名基线 ABC；(2) 抗压质量+分析承诺）；Intro P1：时代定位句带冒号内嵌行业量化（40%+引用）；P2：**三层嵌套归因句**（工具优化→信息丢失→结构复杂化）+goes-further 递进句；P3：**Despite 功劳让步句+编号局限枚举**（三点各带机制归因，第 3 点是算法类共性缺口）；P4：**Since-自然适配句**（领域对象天然是图→GNN 天然适用）；P5：**双回收登场句**（Motivated by 局限+潜力两源）；贡献 bullet：**粗体短语标题式**+**corresponding-to 新旧机制逐点对应句**+Unlike-反向泛化句+双 Regarding 分口径）。
+- 对照结论：压力测试预告（慢解码+128K 失败案例在摘要/Q2——诚实镜像）、编号双口径（三实测数字）、三层归因（Intro P1 机制链）、Despite+编号局限（credit-then-gap 已建）、Since 适配（慢旋转动机句）、双回收（Intro P4 句）、粗体 bullet vs 问句标题（既有判定保持）、量化背景句（无可引来源禁造）、Unlike 反向泛化（无诚实对应物）均不改。corresponding-to 新旧机制对应句：判定**诚实边界下不加**（对应关系会暗示等价性/优越性主张，AsyncTLS already-combines 句已覆盖组合先例）。**唯一实缺 = 摘要第 3 句缺标题词 near--far**（"Regional coverage" 未与题名 Near--Far Sparse Attention 对齐——摘要前两句均无区域属性词，标题关键词在摘要缺席）。
+- paper_en.tex 摘要第 3 句：`Regional coverage involves trade-offs` → `Near--far coverage involves trade-offs`（标题词注入摘要，词数不变）。
+- paper_zh.tex 直译同步（「近远覆盖存在取舍」）。
+- 编译验证：en 6 / zh 6 页，0 未定义引用。
+- 待后续轮次：Gamora §2 Preliminary and Motivation（AIG 基础+方法图解）、§3 方法、§4 实验。
 
 ### 第 21 轮（2026-10-18，Gemmini §5 Case Studies + §6 Conclusion —— 第 4 篇拆解完毕）
 - **远端检查与处置**：fetch 发现 7d33672（LongBench 臂身份绑定：available→historical five-task LongBench shared-subspace arm is linked to——与 Q1 节 "the shared-subspace run uses the earlier 128/128-protection implementation" 证据分层一致，无需裁决、保留）与 d9de7d7（advice 实验 E143a，不动 tex）。**重定基处置**：本地第 20 轮提交 0323e0b 被并行会话 rebase 重写为 4b4d714（内容相同：Setting opener Q 标签；基底更新为含 7d33672 的远端链）——处置=接受重写版，0323e0b 弃用不作处置。账本核对：第 20 轮登记内容在 4b4d714 中完整存活。
