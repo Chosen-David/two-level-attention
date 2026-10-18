@@ -172,3 +172,48 @@
 - paper_zh.tex 直译同步（「本文分别评估任务质量（Q1）、区域覆盖（Q2）与执行成本（Q3）。」）。
 - 版式核对：+3 词，编译后核对 en 6 页。
 
+
+---
+
+## §5 Case Studies + §6 Conclusion（第 21 轮，2026-10-18 —— 第 4 篇拆解完毕）
+
+### §5 开篇（2 句）
+- **demonstrates-how 能力开场句**（"This section demonstrates how Gemmini enables full system co-design with two case studies"——案例研究节 opener=工具能力声明）→ 双案例枚举句（虚地址翻译 + 存储划分）。
+
+### §5.A Virtual Address Translation（~20 句）
+- 能力句（With an RTL-level implementation ..., users can co-design their own ...）。
+- **前作分歧双极句**（"Prior works ... have proposed very different translation schemes, **from** NeuMMU [28], which calls for ... 128 PTWs, **to** Cong et al. [29], who recommend a more modest two-level TLB hierarchy"——from-to 前作光谱：两个极端各挂引用与配置细节）。
+- **This-lack-of-convergence 缺口句**（"This lack of convergence in the prior literature **motivates** a platform that allows co-design and design-space exploration"——分歧本身成为平台需求动机：不是某前作有缺陷，而是领域未收敛）。
+- Fortunately 承接句（缺口→Gemmini 能力）→ To-demonstrate 配置句 → **迭代句含极端设计点**（"including over a design point where the shared L2 TLB has **zero entries**"——把零配置纳入探索）。
+- **图结论+不对称双数字句**（"the private accelerator TLB has a far greater impact ... Increasing the private TLB size from **just four to 16** improves performance by up to 11%. However, adding **even 512 entries** to the L2 TLB **never** improves performance by more than 8%"——4→16 vs 512 的剂量不对称对比，just/even/never 限定词三连）。
+- **This-is-because 机制归因句**（high page locality；hit rate above 84%）→ **In fact 量化证据句**（87% read / 83% write same-page——归因后立即给二次量化支撑）→ However 让步句（读写互逐）。
+- **Fortunately-低垂果实句**（"we were able to implement **a simple optimization**: a single register that caches the last TLB hit"——简单方案命名式）→ 双功能句（allow skip + help reduce contention）→ **极限结果句**（"reduce the TLB hit latency to **0 cycles**"）→ As-Fig-shows 收口带 **especially 条件限定**（especially for small private TLB sizes）。
+- **诚实余量句**（"achieved **only 2% less than** the maximum performance recorded"——near-max 的诚实表达：报差距而非报达成）→ **边际递减句**（"further increases ... improved performance by less than 2%, **even if** hundreds of new entries were added"）。
+- 案例总结句（Using Gemmini, we have demonstrated that a modest ... system ... can achieve near maximum performance）→ 平台回扣句。
+
+### §5.B System-Level Resource Partition（~15 句）
+- also-enables 承接句 → **决策命名句**（"a case study describing a system-level design decision: **memory partitioning based on application characteristics**"——冒号命名决策+依据）。
+- **应用异质性三级递减枚举**（convolutions high arithmetic intensity / matmul less / residual additions **almost no data reuse at all**）→ Additionally-unlike 特殊层句 → **These-different-suggest 需求推导句** → **must-balance 设计者责任句**。
+- 基线配置句（Base/BigSP/BigL2 三臂）→ **预算决策句**（"We presume that we have 1 MB of extra SRAM ... but we need to **decide whether to allocate** ... to the accelerators' private memory, or to the L2 caches"——实验问题=分配决策，问题即叙事）。
+- **逐层收益句带 due-to**（conv 10%/8% due to high intensity；matmul only 1%/3% due to lower；residual **no speedup + minor 1%-4% slowdown due to increased cache thrashing**——负收益也报并归因）。
+- 单核结论句 → **However 双核反转句**（双进程竞争共享 L2 时最优分配反转——配置结论随场景反转的结构性发现）→ **more-than-negated 净额句**（"this improvement is **more than negated by** the 22% speedup of residual additions"——一层收益被另一层更大收益抵消）→ **跨核干扰机制句**（each core's residual addition evicts the input layer that the other one is expecting——干扰方向具体到层级行为）。
+- **双指标收口**（BigL2: miss rate -7.1% + performance +8.0% vs BigSP only +4.2%）→ 案例总结句（partitioning strategy can be decided based upon application characteristics, such as layer composition and process count——回收决策命名句）。
+
+### §6 Conclusion（4 句）
+- **登场句四度同构**（We present Gemmini, a full-stack, open-source generator ... that enables systematic evaluations——与摘要 A3/Intro P2/§3 开篇第四次重复）→ 三贡献各一句（flexible template / push-button flow / full SoC）→ 评估+案例回收句（Our evaluation shows ... and our case studies show how ...）。
+
+### 对照我们手稿的差距结论（结论节 + Q2/gate 遍历）
+| Gemmini §5/§6 句式 | 我们的状态 |
+|---|---|
+| 登场句四度同构 | 结论首句 "We studied shared low-frequency page/token scoring and regional allocation, retaining original-dimensional attention on selected tokens"——摘要方法句的变体重申，等价，不改 |
+| 负收益也报带 due-to（residual 1-4% slowdown） | 逐任务损失全报（multi-key-1 -3、CWE -8.80、FWE -9.67）——但我们的归因句是「cannot identify the cause」（诚实边界：无配对机制证据），比 Gemmini 的 due-to 更保守，不改 |
+| 不对称双数字句（4→16 vs 512，just/even/never） | Q2 β 比较（页/词元配额同变+混杂披露）与 Q3 比值序列——诚实镜像，无新数据不可加 |
+| This-lack-of-convergence 缺口句（前作分歧→平台动机） | 我们的前作描述是机制差异化（Quest supplies/SparQ approximates/HISA prunes）非分歧声明；声称领域未收敛需文献计量支撑，诚实边界禁，不加 |
+| 低垂果实句/极限结果句/边际递减句 | 均需实测数据（0 cycles、<2% 边际），诚实边界禁造，不加 |
+| **more-than-negated 净额句 / 双核反转句（配置结论随场景反转）** | β=.0625 的 +0.99 是混杂净额（页与词元配额同变——我们的版本是把不可归因作为披露而非叙事），结构等价物已存在，不改 |
+| 案例总结句回收决策命名 | Design implications "The analysis therefore identifies implementation requirements, while ... remains unresolved"——诚实镜像（识别要求而非宣告发现），不改 |
+| **结论 β 句比较短语非平行形** | **本轮实缺（轻）**：en 结论 "0.99 points higher at $\beta=.0625$ than .125" 尾端省略 at 与 math 模式，与句首 "$\beta=.0625$" 不平行；zh 版已是完整形（「比$\beta=.125$稀疏分配」）。改为 "than at $\beta=.125$"（+2 词） |
+
+### 本轮修改（第 21 轮）
+- paper_en.tex 结论 β 句：`0.99 points higher at $\beta=.0625$ than .125` → `0.99 points higher at $\beta=.0625$ than at $\beta=.125$`（比较短语平行形+math 模式一致；zh 已是完整形无需改）。
+- 版式核对：+2 词，编译后核对 en 6 页。

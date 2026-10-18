@@ -22,12 +22,20 @@
 | 1 | 2024_Token_Picker.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Abstract ✓ Intro-P1 ✓ Intro-(b)尾句 ✓ §III开头段 ✓（承接句+阶段声明句） Q1开头句 ✓ |
 | 2 | 2019_DREAMPlace.pdf | **全部完成**（Abstract/Intro/§2/§3/§4） | Intro-P1 引用型 stakes 句 ✓ Related-Work-P1 However 缺口句 ✓ §III-D 承接句 ✓ Q3选择器段 claim-first ✓ |
 | 3 | 2020_AdaptivFloat.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5/§6+§7） | Intro-P2 机制归因句 ✓（后被远端 1010b06 收敛为诚实版，裁决采纳） Related-Work-P1 动词异质化 ✓ Related-Work-P2 appeal 句 ✓ §III-B β 参数-性质方向句 ✓（后被远端 c99315c 收敛为定理级方向，裁决采纳） Workloads 类型跨度句 ✓ 4/128 记号绑定句 ✓ 摘要尾句悬垂分词修复 ✓ |
-| 4 | 2021_Gemmini.pdf | Abstract ✓ Intro ✓ §2 ✓ §3 ✓ §4 ✓；待：§5 案例 | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ |
+| 4 | 2021_Gemmini.pdf | **全部完成**（Abstract/Intro/§2/§3/§4/§5+§6） | Intro-P5 Q1/Q2/Q3 前向指针 ✓ Related-Work-P1 定位句 enabling 从句 ✓（后被远端 1c3bcd8 精化为 eligibility/capacity 术语对，裁决采纳） §III-A 末段 trade-off 句 ✓（后被远端 55b9a17 精化主语为 compact scoring，裁决采纳） Setting opener Q 标签 ✓ 结论 β 句平行形 ✓ |
 | 5 | 2023_Gamora.pdf | 未开始 | — |
 | 6 | 2023_RL_CCD.pdf | 未开始 | — |
 | 7 | 2026_Miter_Aware_LUT_Mapping.pdf | 未开始 | — |
 
 ## 修改日志
+
+### 第 21 轮（2026-10-18，Gemmini §5 Case Studies + §6 Conclusion —— 第 4 篇拆解完毕）
+- **远端检查与处置**：fetch 发现 7d33672（LongBench 臂身份绑定：available→historical five-task LongBench shared-subspace arm is linked to——与 Q1 节 "the shared-subspace run uses the earlier 128/128-protection implementation" 证据分层一致，无需裁决、保留）与 d9de7d7（advice 实验 E143a，不动 tex）。**重定基处置**：本地第 20 轮提交 0323e0b 被并行会话 rebase 重写为 4b4d714（内容相同：Setting opener Q 标签；基底更新为含 7d33672 的远端链）——处置=接受重写版，0323e0b 弃用不作处置。账本核对：第 20 轮登记内容在 4b4d714 中完整存活。
+- 拆解笔记：§5.A：**前作分歧双极句**（from NeuMMU 128 PTWs to Cong et al. 两级 TLB——两个极端各挂引用）/**This-lack-of-convergence 缺口句**（分歧本身成为平台动机）/迭代句含零配置极端设计点/**不对称双数字句**（4→16 提升 11% vs even 512 entries never >8%，just/even/never 三限定词）/This-is-because 归因+In fact 二次量化（87%/83%）/**低垂果实句**（a simple optimization: a single register）/极限结果句（0 cycles）/**诚实余量句**（only 2% less than maximum——near-max 报差距而非报达成）/边际递减句；§5.B：**决策命名句**（design decision: memory partitioning based on application characteristics）/**三级递减枚举**（high/less/almost none）/must-balance 责任句/**预算决策句**（问题即分配决策）/**负收益也报带 due-to**（residual 1-4% slowdown due to cache thrashing）/**双核反转句**（单核 BigSP 最优→双核 BigL2 反转）/**more-than-negated 净额句**/跨核干扰机制句/双指标收口（-7.1% miss rate +8.0% vs +4.2%）；§6：登场句四度同构+三贡献各一句。
+- 对照结论：登场句四度同构（结论首句等价）、负收益全报（我们归因更保守——"cannot identify the cause"）、不对称双数字（β 比较镜像）、净额句（混杂披露=不可归因版的净额）、案例总结（识别要求镜像）、lack-of-convergence 缺口（需文献计量支撑，诚实边界禁）均不改或不可用。**唯一实缺（轻）= en 结论 β 句比较短语非平行形**（"higher at $\beta=.0625$ than .125" 尾端缺 at 与 math 模式；zh 已是完整形）。
+- paper_en.tex 结论 β 句：→ `0.99 points higher at $\beta=.0625$ than at $\beta=.125$`（+2 词；zh 无需改）。
+- 编译验证：en 6 / zh 6 页，0 未定义引用。
+- **Gemmini 六节全部拆解完毕**（第 17-21 轮），累计手稿修改 5 处（Q 指针×2、enabling 从句、trade-off 句、β 平行形），en/zh 同步，其中 2 处被远端后续精化并裁决采纳。下轮开始第 5 篇 **2023_Gamora.pdf**（Abstract+Intro）。
 
 ### 第 20 轮（2026-10-18，Gemmini §4 Evaluation）
 - **远端裁决**（本地 = origin/main，55b9a17 已由并行会话合并）：远端把第 19 轮我的权衡句 "The views narrow each dot product but add work" 再精化为 "Compact scoring narrows dot products, but view preparation and maintenance add work"——**采纳**：收益主语限定为 compact scoring（历史 width-128 L2 张量也是视图但不缩小点积宽度），"The views" 主语过宽；远端版与 §III-C 及全文 compact 术语一致。判例：收益归属主语必须精确到实现变体层级。
