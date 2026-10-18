@@ -1,0 +1,44 @@
+{
+  "id": "e147hl_llama_beta0625",
+  "date": "2026-10-18",
+  "title": "E147h Llama β.0625 迁移判决——AVG 83.88 距 β.125 86.19 -2.31 超噪声带，near 配额减半代价跨模型族暴露，判据不通过",
+  "config": {
+    "arm": "tli_64_128_1024_c4_Aa0.25_b0.0625_g0.625_sk4_sw128（Llama-3.1-8B RULER 32K native 免 yarn）",
+    "machine": ".187（tmp_e146b_tree_187 树，GPU4 独占跑完 11/11）；formal score_ruler_formal --pred-postfix e147hl --expect-tasks 11 --min-samples 100"
+  },
+  "results": {
+    "e147hl_beta0625_avg": 83.88,
+    "e144a_beta125_avg": 86.19,
+    "e144a_fullkv_anchor": 85.40,
+    "diff_vs_beta125": -2.31,
+    "diff_vs_fullkv_same_machine": -1.52,
+    "per_task_beta0625": {
+      "niah_single_1": 99.0, "niah_single_2": 95.0, "niah_single_3": 98.0,
+      "niah_multikey_1": 96.0, "niah_multikey_2": 87.0, "niah_multikey_3": 71.0,
+      "niah_multiquery": 87.25, "niah_multivalue": 80.5,
+      "cwe": 68.9, "fwe": 74.67, "vt": 65.4
+    },
+    "per_task_delta_vs_beta125": {
+      "niah_single_1": 1.0, "niah_single_2": -4.0, "niah_single_3": -2.0,
+      "niah_multikey_1": -2.0, "niah_multikey_2": -5.0, "niah_multikey_3": -4.0,
+      "niah_multiquery": -6.5, "niah_multivalue": -8.75,
+      "cwe": 3.6, "fwe": 5.67, "vt": -3.4
+    }
+  },
+  "judgment": [
+    "Llama 32K β.0625 = 83.88：vs β.125 86.19 为 -2.31——判据「不低于 β.125 同档或噪声带内」不通过（E147h 七臂中首个否决臂）",
+    "vs 同机 FullKV 锚 85.40 为 -1.52（β.125 为 +0.79）——β.0625 在 Llama 上从持平变掉点，与 Qwen3-8B +0.99 方向相反",
+    "结构归因（待验证解释）：near 词元配额 640→320 减半的代价在 Llama GQA rotate_half 路径上放大——near 类全线下滑（single_2 -4/mk2 -5/mq -6.5/mv -8.75），far 收益仅 cwe +3.6/fwe +5.67 不能补",
+    "fwe 74.67 反超 FullKV 锚 74.0（+0.67）——Llama 远区高频统计型稀疏有利方向与 Qwen3-8B 一致",
+    "口径含义：β.0625 甜点为 Qwen3-8B 特异（模型族 × near 供给交互），论文若敲 β.0625 主口径须披露 Llama 迁移边界；或主口径维持 β.125（全模型族安全），β.0625 作为 Qwen3-8B 最优配置行"
+  ],
+  "sources": {
+    "formal": "exp/trace/results/e147hl_r32k_formal.json（四件套，.187 打分原件拉回）",
+    "baselines": "e144a_r32k_{tli,fullkv}_formal.json（β.125 86.19 / FullKV 85.40 复用）"
+  },
+  "caveats": [
+    "跨机配对：β.0625 在 .187、β.125 e144a 在 wys；但 vs FullKV 锚（同在 .187）-1.52 与 vs β.125 -2.31 同向，跨机混杂不解释主结论",
+    "β.125 Llama 86.19 的 mv 89.25 远超锚 51.75（锚自身塌陷 caveat 保留，e144a 判决已披露）"
+  ],
+  "generated_at": "2026-10-18T20:20"
+}

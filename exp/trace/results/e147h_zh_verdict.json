@@ -1,0 +1,41 @@
+{
+  "id": "e147h_zh",
+  "date": "2026-10-18",
+  "title": "E147h LB 中文 β.0625 迁移验证——AVG 45.646 距 β.125 46.004 -0.36 噪声带内，判据通过（边缘）",
+  "config": {
+    "arm": "tli_64_128_1024_c4_Aa0.25_b0.0625_g0.625_sk4_sw128（LB 中文 8 任务 mavg）",
+    "machine": ".187（tmp_e146b_tree_187，GPU3/4 双卡跑完 8/8）；eval jieba fix 前置，scorer difflib:stdlib，cap 31500",
+    "protocol": "runcap strict_validated 8/8，budget_avg 1021.57 贴 K2=1024 上限合规"
+  },
+  "results": {
+    "e147h_beta0625_avg": 45.646,
+    "e145c_beta125_avg": 46.004,
+    "dense_anchor_e145": 46.003,
+    "diff_vs_beta125": -0.358,
+    "diff_vs_anchor": -0.357,
+    "per_task": {
+      "dureader": 27.7, "lsht": 48.0, "multifieldqa_zh": 62.43, "passage_count": 0.25,
+      "passage_retrieval_zh": 96.5, "samsum": 44.44, "trec": 72.0, "vcsum": 13.85
+    },
+    "per_task_delta_vs_beta125": {
+      "dureader": -0.58, "lsht": +1.0, "multifieldqa_zh": -0.45, "passage_count": -0.5,
+      "passage_retrieval_zh": -1.5, "samsum": -0.21, "trec": -0.5, "vcsum": -0.12
+    }
+  },
+  "judgment": [
+    "LB 中文 β.0625 = 45.646：vs β.125 46.004 为 -0.36——8 任务 AVG 噪声带内，判据「不低于 β.125 同档或噪声带内」通过（边缘）",
+    "vs dense 锚 46.003 为 -0.36（β.125 为 +0.001）——β.0625 使中文 LB 从持平滑到轻微负漂",
+    "结构：6 降 1 升（lsht +1.0），最大单任务 pr_zh -1.5——near 配额减半的温和代价型，与 LBv2 -0.20 同向但幅度更大",
+    "E147h 判据记分：LBv2 通过（-0.20）/ LB 中文 通过（-0.36 边缘）/ Llama 不通过（-2.31）——β.0625 迁移性按数据集分化，综合判决等七臂齐"
+  ],
+  "sources": {
+    "pred_result": "exp/trace/results/e147h_zh_pred_result.json（.187 eval result.json 拉回原件）",
+    "raw": ".187:~/tmp_e146b_tree_187/exp/results_longbench/Qwen3-8B/pred_E147h_zh_mavg/pred/*.jsonl（8 任务）",
+    "baselines": "e145c_zh_verdict.json（β.125 46.004 / dense 锚 46.003 复用）"
+  },
+  "caveats": [
+    "跨机：β.0625 在 .187、β.125 e145c zh 同在 .187（e145c 中文 8 任务 .187 GPU3/4）——本臂同机干净配对",
+    "passage_count 两臂均崩（0.25/0.75，锚 2.0 区分度极低）持续 caveat"
+  ],
+  "generated_at": "2026-10-18T20:25"
+}
