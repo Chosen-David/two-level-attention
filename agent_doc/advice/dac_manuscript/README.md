@@ -1,6 +1,6 @@
 # Publication source and bilingual PDFs
 
-The Related Work selector paragraph distinguishes unchanged original-KV capacity from an unestablished complete-request latency benefit. The smaller scoring view alone does not prove lower full-request latency. Both language versions now express this evidence boundary consistently, while preserving the concurrent Token-Picker contrast. Reported results, Workloads, Q2, S7 and the current32K/64K17-slide presentation remain unchanged. No new experiment or performance claim is added.
+This package integrates the concurrent bilingual beta-allocation example: at a fixed 128-page cap, reducing beta from .125 to .0625 changes nominal near/far page quotas from16/112 to8/120. The accompanying Q1, model-level timing, limitations and conclusion edits shorten wording while retaining the historical-configuration, noncausal and complete-request-cost boundaries. All reported scores, negative results,64K comparisons and the17-slide presentation are retained. No new experiment or performance claim is added. The four document PDFs are rebuilt from the integrated source; MANIFEST records the resulting source, artifact and metadata identities.
 
 The four document PDFs are rebuilt from this source and compared directly with the fresh-main input PDFs. Differences are reported as text/render changes where observed, without reducing them to PDF container changes. The current presentation retains its existing artifact bytes and is independently re-exported during the isolated package check.
 
