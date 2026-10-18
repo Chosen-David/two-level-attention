@@ -1,0 +1,46 @@
+{
+  "id": "e147c32b",
+  "date": "2026-10-19",
+  "title": "E147c-32B β.0625 跨规模迁移收官——AVG 50.03 距 β.125 50.64 -0.61 边缘带内，判据通过；near 供给代价在 32B 温和显现",
+  "config": {
+    "arm": "tli_64_128_1024_c4_Aa0.25_b0.0625_g0.625_sk4_sw128（Qwen3-32B RULER 32K native 免 yarn）",
+    "machine": ".187 GPU2/3 rerun（原 GPU1 共驻 OOM 9 任务空壳废弃重跑）；formal score_ruler_formal --pred-postfix e147c32b --expect-tasks 11 --min-samples 100（staging root /tmp/e147c32b_root，双层 L32768/L32768 修正为单 L32768）"
+  },
+  "results": {
+    "e147c32b_beta0625_avg": 50.03,
+    "e143a_beta125_avg": 50.64,
+    "e143a_fullkv_anchor": 52.22,
+    "diff_vs_beta125": -0.61,
+    "diff_vs_fullkv": -2.19,
+    "per_task_beta0625": {
+      "niah_single_1": 82.0, "niah_single_2": 96.0, "niah_single_3": 92.0,
+      "niah_multikey_1": 77.0, "niah_multikey_2": 53.0, "niah_multikey_3": 1.0,
+      "niah_multiquery": 0.0, "niah_multivalue": 0.0,
+      "cwe": 42.0, "fwe": 10.33, "vt": 97.0
+    },
+    "per_task_delta_vs_beta125": {
+      "niah_single_1": -4.0, "niah_single_2": -3.0, "niah_single_3": -1.0,
+      "niah_multikey_1": 0.0, "niah_multikey_2": -4.0, "niah_multikey_3": 0.0,
+      "niah_multiquery": 0.0, "niah_multivalue": 0.0,
+      "cwe": 5.8, "fwe": -1.34, "vt": 0.8
+    }
+  },
+  "judgment": [
+    "32B β.0625 = 50.03：vs β.125 e143a 50.64 为 -0.61——RULER 32K 全任务 100 行配对噪声带（约 ±1）边缘内，判据「不低于 β.125 同档或噪声带内」通过（边缘）。β.0625 在 32B 上无崩溃，跨规模迁移成立",
+    "vs FullKV 锚 52.22 为 -2.19（β.125 为 -1.58）：保持率 95.8%（β.125 为 96.98%）——near 词元减半（640→320）代价在 32B 温和显现（single_1 -4/single_2 -3/mk2 -4），far 收益 cwe +5.8 继续兑现",
+    "mq/mv/mk3 双零与 β.125 完全一致（E143a 判决既有结论：32B 模型自身在 prompt 模板未调优任务上退化，非 TLI 掉点）——两臂同条件配对内部有效",
+    "E147h 记分累计（6/7）：LBv2 ✓（-0.20）/ LB ZH ✓（-0.36 边缘）/ RULER 64K ✓（+0.80）/ Llama ✗（-2.31）/ β 三点曲线齐（倒 U 峰值 β.0625）/ 32B ✓（-0.61 边缘）——Qwen3-8B/32B 全数据集通过，唯跨模型族 Llama 否决；剩 128K 一臂在飞",
+    "结论方向：β.0625 主口径敲定证据基本齐备（论文须披露 Llama 迁移边界），等 128K 终臂闭合后出综合判决"
+  ],
+  "sources": {
+    "formal": "exp/trace/results/e147c32b_r32k_formal.json（四件套，.187 打分原件拉回）",
+    "raw": ".187:~/tmp_e146b_tree_187/exp/results_ruler/Qwen3-32B/L32768/L32768/pred/*e147c32b*（11 任务 100 行/格核验）",
+    "baselines": "e143a_r32k_verdict.json（β.125 50.64 / FullKV 52.22 复用）"
+  },
+  "caveats": [
+    "跨机配对：β.0625 e147c32b 全程 .187 GPU2/3；β.125 e143a 任务 1-6=wys、7-11=.187 跨机组装——E147cwys 已证跨机 greedy 零漂移，判无口径漂移",
+    "原 GPU1 共驻 OOM 空壳 9 任务（单层 L32768/pred 18 项残留）已废弃不用，staging 只取双层目录 11 指针",
+    "fwe/vt 两任务来自 e147c32b_fix 脚本（与 rerun 同参数同 GPU2），其余 9 任务来自 rerun 脚本 GPU2/3"
+  ],
+  "generated_at": "2026-10-19T01:45"
+}
