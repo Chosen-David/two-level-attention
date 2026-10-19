@@ -29,6 +29,16 @@
 
 ## 修改日志
 
+### 第 36 轮（2026-10-19，**数据同步轮（用户指令）**：E147h/E147j 新实验数据入手稿）
+
+- **触发**：用户指示「代码方法和数据似乎有了新的更新，记得同步反应到论文」+「之后根据 best paper 精修语法表达，此后的每一轮记得关注本地的最新数据和结论」。远端无新提交。
+- **数据甄别**：本地近期提交中 fig4 重写（cecc621，exp/figures/fig4_partition_gain.py）属 sglang 论文线不入 DAC 手稿；TASK.md 在飞任务（TL-PREFILL-SIGMA-CAP 等）为代码加固无手稿级数据。**入稿数据两批**：E147h 七臂综合判决（β.0625 敲定 Qwen3 主口径）与 E147j K2 预算下探（半预算胜 AsyncTLS、384 悬崖）。判决 JSON 逐个核读：e147h_beta0625_comprehensive / e147h_r128k / e147d_beta03125 / e147j_k2down / jssa_r32k / asynctls_r32k_reverify。
+- **入稿数字**（均带 manifest/receipt 的 formal 记录，非第三方重放、无配对区间——主文如实披露）：① β 曲线第三点 K1=128/β.03125 = 58.07（远区词元 732），与 58.96（K1=256）共同夹出 .0625 峰值；② 同机 128K 重跑对 45.73（β.0625）vs 46.02（β.125），保持 46.43 锚的 98.49%（FullKV 锚另跑）；③ 移植基线 32K：JSSA 58.7（预算 1024）/ AsyncTLS 50.09（词元预算 512，语义复现）/ Quest 42.85 vs 选择器 59.29；④ K2=512 半预算 56.00（+5.91 vs AsyncTLS 同 kt，CWE -43.4=32.5 vs 75.9），K2=384 崩塌 15.00（预算下界 512/384 之间）；⑤ Llama-3.1-8B 迁移边界 83.88 vs 86.19（-2.31，rotate-half GQA 解释未验证）。32B β.0625 复跑 50.03 下沉 S8。
+- **主文五处修改（en+zh 直译同步）**：(1) Q2 β 句改三点曲线（58.96/58.07 夹峰值）；(2) Q2 新增「Budget-aligned comparisons」段（基线三臂+半预算+K2 悬崖+Llama 边界，出处下沉 S8）；(3) Q2 128K 句前置新配对结果、历史 23.98 保留为历史披露；(4) 结论加 β 峰值夹逼句+128K 保持率+Llama 边界；(5) Workloads 补基线/迁移臂覆盖声明。S8（en+zh）追加「预算对齐比较臂（新记录，未入图）」出处段（含 JSSA 校准偏短、AsyncTLS 语义复现、逐任务细节、九个 formal 文件名）。
+- **零余量版式第 9 次触发与回收**：净增约 80 词（新增数据句减去压缩）先把 AI 声明整块挤到第 6 页。回收手段（约 25 处无损压缩）：Q1 两句合并+变体标签去重、Q3 删派生比值句（3.38/2.46/1.78 为中位数冗余算术，主数字保留）、门控/结论/implications 措辞压缩、摘要句式压缩、Workloads 删与 Metrics 重复的匹配要求句、AI 声明改 run-in 粗体标签（\section*→\medskip\noindent\textbf，披露内容不变）、\abovecaptionskip 8→6pt。en 回到恰 6 页（AI 声明完整第 5 页、References 独占第 6 页）。
+- **版式验证**：en 6 页、zh 6 页、supplement_en/zh 各 10 页、四文档 0 未定义引用。机械门 grep：新增句 0 违规（唯一 em-dash 命中为既有 observation 段，定域保护不动）。
+- **协议更新（用户 2026-10-19 指令）**：此后每轮先查本地最新数据与结论（exp/trace/results/ 新判决 JSON、git log 新提交），发现手稿级数据即同步入稿；best paper 范式精修继续并行。
+
 ### 第 35 轮（2026-10-19，**范式自查模式启动**：§III 设计节逐段审计）
 
 - **模式切换**：7 篇队列已收官（第 34 轮），远端无新提交、DAC_best_paper 目录无新增 PDF。按第 34 轮交接注记转入范式自查模式：对 paper_en.tex 逐段跑 7 篇沉淀的范式清单。本轮审计 §III（Near--Far Selection in a Shared Subspace，§III 开头段 + A 坐标 / B 预算 / C GQA / D 门控四个小节）。
