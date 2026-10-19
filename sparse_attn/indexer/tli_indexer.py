@@ -90,8 +90,8 @@ class TLIIndexer(TIAIndexer):
         # 【E142a】mla_rope：DeepSeek-V2 MLA 布局（nope 128 + rope 64 = 192，
         # rope 在尾段、MQA 共享）。E141 trace 判决：rope-only 64d 选择与
         # full 192d 持平（≤.02）——GQA tail 子空间结论的跨架构对应臂。
-        assert self.subspace in ("full", "rope", "nope", "tail", "random", "highfreq", "mla_rope"), \
-            f"tli_subspace 非法取值: {self.subspace}"
+        if self.subspace not in ("full", "rope", "nope", "tail", "random", "highfreq", "mla_rope"):
+            raise ValueError(f"tli_subspace 非法取值: {self.subspace}")
         self.enable_subspace = getattr(args, "tli_enable_subspace", True)
         if self.subspace == "full":
             self.enable_subspace = False      # 全维（用户默认）
@@ -101,8 +101,8 @@ class TLIIndexer(TIAIndexer):
         #   same = L2 与 L1 同一子空间（现状，E85f 口径：粗筛+细筛同特征）
         #   full = L2 细筛 k_qat 全 128 维量化（L1 仍由 tli_subspace 决定）
         self.l2_subspace = getattr(args, "tli_l2_subspace", "same")
-        assert self.l2_subspace in ("same", "full"), \
-            f"tli_l2_subspace 非法取值: {self.l2_subspace}"
+        if self.l2_subspace not in ("same", "full"):
+            raise ValueError(f"tli_l2_subspace 非法取值: {self.l2_subspace}")
         # ---- B：远端 kmeans（far_select='cluster' 时才构建，默认 4bit 分区）----
         self.enable_kmeans = getattr(args, "tli_enable_kmeans", True)
         self.far_select = getattr(args, "tli_far_select", "4bit")
@@ -152,12 +152,12 @@ class TLIIndexer(TIAIndexer):
         #   默认双双 '4bit'（现状，回归保护：不开新 flag 行为逐位不变）。
         #   注意：cluster/sim_greedy 臂须 --tli_enable_kmeans true（沿用 cavg 惯例）。
         self.near_select = getattr(args, "tli_near_select", "4bit")
-        assert self.near_select in ("4bit", "cluster", "sim_greedy"), \
-            f"tli_near_select 非法取值: {self.near_select}"
+        if self.near_select not in ("4bit", "cluster", "sim_greedy"):
+            raise ValueError(f"tli_near_select 非法取值: {self.near_select}")
         self.sim = getattr(args, "tli_sim", 0.9)
         self.sim_dims = getattr(args, "tli_sim_dims", "subspace")
-        assert self.sim_dims in ("subspace", "nope", "tail", "full"), \
-            f"tli_sim_dims 非法取值: {self.sim_dims}"
+        if self.sim_dims not in ("subspace", "nope", "tail", "full"):
+            raise ValueError(f"tli_sim_dims 非法取值: {self.sim_dims}")
         # ---- E87：top-σ 选择（far/near/mid 侧不做两级，细筛分 ≥ sink max − σ 即选中）----
         self.sigma_select = getattr(args, "tli_sigma_select", "none")
         self.moba_gate = getattr(args, "tli_moba", False)
