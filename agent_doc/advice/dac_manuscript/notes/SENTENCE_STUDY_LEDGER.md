@@ -29,6 +29,17 @@
 
 ## 修改日志
 
+### 第 41 轮（2026-10-19，**手稿全面重写轮：绝对几何 + 隐式预算耦合新主线 + bf16 阵营定位**）
+
+- **用户指令**：「全部重写，对齐新口径」。新主线两条：(1) 参数界面全部换绝对量（sink s=4 / 近窗 w=128 / 近区范围 L_n / 近页配额 n_p / 近词元配额 n_k，远区容量按差值确定）；(2) 新贡献级发现＝**隐式预算耦合失效模式**——一个表达式（新式 eq:coupling，k_f = max(0, K_mid − min(γn_pB, K_mid))）把远区词元预算连到 K1/β/γ 三个旋钮，归档诊断展示全部三种失效（E140 整数枚举 K1=156 精确阈值且 K1=155 余 8；E109 HotpotQA 53.6–57.3→37.7 恰在零远区预算臂、按 far 占比分级 .875→16.4 分；E130 生产格自由竞争 .852 vs 最优 γ .8515 平手、γ=0 语义陷阱压近区配额归零掉 .827；历史 128K k_f=0）。显式配额构造上免疫：n_k 以 K_mid 为界，远区容量是陈述值而非派生值。
+- **等价映射**：(8,320) ≡ 归档 (α.25, β.0625, γ.625)；(16,640) ≡ (α.25, β.125, γ.625)。全部正式数字经映射保留，零数字改动。图 PDF 烤入 β 标签 → 图题双记法「near quotas (8,320) ($\beta=.0625$, 8B)」。
+- **量化退役**：4bit 退出方法节叙事（归档运行保留披露句于 Experimental Setting + S7），§III-A 改为「L2 refines candidates with per-token scores in the same coordinate view」。
+- **bf16 阵营定位句（用户新消息，量化使用地图结论）**：Related Work 第二段新增「TLI keeps both selection stages in bf16: AsyncTLS token keys are INT4, FFD scans 2-bit keys, and official HISA pools block summaries in FP8; our efficiency comes from candidacy structure, regional quotas and page-level narrowing, not numeric compression」。FFD 新增 bibitem（Liu et al., ICML 2026, PMLR 306:77913–77928，出版版原件已本地归档）。执行口径：HISA/JSSA 的 FP8 表述为「官方实现使用」，绝不写成「我们复现用了 FP8」（vendor 复现是 bf16 等价，identity 已标注）。
+- **远端合并（批判性择优）**：bcd5b58（作者本人诚实口径强化）三处吸收——排序修复因果弱化（「作者称其为排序索引重跑，取代50.09；排序效果尚未独立核实」替代 bfloat16 matmul 机制归因）、移植基线改「作者报告」口径、工件可得性披露更新为准确事实（新 AsyncTLS/FASA JSON/manifest/receipt 仅存本地未跟踪 exp/ 目录，.gitignore 排除，不构成仓库工件可得性）。
+- **零余量回收（en 7→6 页，两轮压缩）**：新增两句后溢出 8 行；第一轮 12 处微压缩（~65 词：ES/Workloads/Metrics/Q1/Q3/Conclusion 句式收紧，零正式数字触碰）；第二轮 Observation caption 名词化改写（「Blue: selected reference pages; red hatching: missed reference」）+ 术语统一（Mean/extrema→avg/minmax）。en/zh 均 6 页、AI 声明 p5、References 独占 p6，四文档 0 LaTeX Warning。
+- **Supplement**：S6 开头加全局映射句（β→绝对配额换算 + 两等价对）；S6/S7 其余 β 保留为归档身份披露（其职责即记录历史配置身份）。
+- **机械门**：本轮新增文本 0 em-dash / 0 banned words / 0 喉语；红队修正一处 define-before-use（stage-0→block summaries）；zh supplement 历史遗留中文破折号「——」改括号。
+
 ### 第 40 轮（2026-10-19，**vendor 基线数据同步轮 + Metrics 范式自查**）
 
 - **远端合并（68c9eb3，FF 干净）**：把我上轮 S6 词元配额段进一步诚实化——口径明确为「保留的因果注意力质量（含保护词元）而非任务精度」、E109 零远区配额「不足以确立坍塌」、删悬崖定级框架、收口改为「既不能隔离保护效果也不能排除调参收益」。按判例整体采纳（数字全保留，框架收敛更诚实）。
