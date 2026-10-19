@@ -30,3 +30,9 @@
 - **跑批脚本/日志/ledger/mass 分片** → `exp/trace_archives/`（e98/e100/e101/e103/e104/e87/e89/m6/tli_chain/e135 + MANIFEST.md + md5 清单）
 - **trace dump（68GB）** → 本机 `~/.archive/trace-dumps/{qwen3-8b,qwen3-30b,qwen3-32b}`（不入 git，md5 见 exp/trace_archives/trace_dumps_md5/）
 - 查 raw 数据时先读 `exp/trace_archives/MANIFEST.md`（资产→原 /tmp 路径→去向→支撑论文数字）
+
+## 2026-10-19 增量审计
+
+| 代号 | 结论 | 实现/测试 | 证据 | 论文口径 |
+|---|---|---|---|---|
+| TL-PREFILL-MASK-CONTRACT-20261019 | token-mask消费端拒绝短mask广播、错误维度及块粒度误读；非性能优化 | `sparse_attn/ops/prefill_contract.py`、`sparse_attn/ops/tests/test_prefill_mask_contract.py` | `agent_doc/advice/2026-10-19_prefill_mask_contract_fix.md`、`agent_doc/results/prefill-mask-contract-20261019/`；基线3b0cfea | CPU正确性守卫，无新增GPU/模型/速度结论；历史非法mask样本需重测 |
