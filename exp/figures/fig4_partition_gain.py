@@ -1,13 +1,17 @@
-# Fig 4 (round3 新增): 分区收益双 panel
-# (a) RULER 长度梯度：FullKV / PSI-单池(C0) / PSI(B7s 分区) 三长度 AVG 折线
-#     —— 支撑「分区 far 检索收益区 = 超长上下文」(长度梯度 −0.14 → −0.25 → +0.98)
-# (b) LongBench per-task Δ 条形：PSI(50.54, E72 mavg) vs PSI-单池(C0 50.16)
-#     —— 支撑「13 任务互有胜负、musique +5.02 主导」的诚实分解
-# 数据快照（落袋 JSON，勿手改数字）：
-#   exp/results_ruler/ruler_c0.json         单池 C0 分长度 per-task
-#   exp/results_ruler/ruler_b7s.json        分区 B7s 分长度 per-task
-#   exp/results_ruler/ruler_table_final.json none/quest/tia 分长度 per-task
-#   exp/trace/results/e71_main_table.json   LongBench 13 臂 × 13 任务
+# Fig 4 (2026-10-19 部署口径重写): 分区收益 + 长上下文 baseline 对比双 panel
+# (a) RULER 长度梯度 32/64/128K: FullKV / PSI β.0625 主臂 / PSI 同预算单池
+#     —— 支撑「分区增益随长度单调增长 +0.93/+3.58/+6.47」(32K 同机配对)
+# (b) RULER 三档 baseline 对比: PSI / FullKV / Quest / AsyncTLS 分档 grouped bars
+#     —— 支撑「Quest/AsyncTLS 随长度崩塌、PSI 全档贴住 FullKV」
+# 数据快照（落袋 formal JSON，勿手改数字）：
+#   exp/trace/results/e146c_series_verdict.json           FullKV + β.125 三档
+#   exp/trace/results/e147c_r32k_formal.json              β.0625 32K 59.29
+#   exp/trace/results/e147h_r64k_formal.json              β.0625 64K 48.85
+#   exp/trace/results/e147h_r128k_formal.json             β.0625 128K 45.73
+#   exp/trace/results/e146ca_r{32,64,128}k_formal.json    同预算单池三档
+#   exp/trace/results/e119_ruler{32,64,128}k_formal_quest_vendor.json
+#   exp/trace/results/asynctls_r32k_formal.json
+#   exp/trace/results/e119_ruler65536_formal_asynctls_vendor_64k.json
 # house style: okabe_ito、白底、全英文、矢量 PDF+PNG
 import json
 import matplotlib
@@ -15,8 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-RR = "/home/wangyuanshuo02/two-level-attention/exp/results_ruler"
-LB = "/home/wangyuanshuo02/two-level-attention/exp/trace/results"
+TR = "/home/wangyuanshuo02/two-level-attention/exp/trace/results"
 OUTS = ["/home/wangyuanshuo02/sglang/paper/figures",
         "/home/wangyuanshuo02/two-level-attention/exp/figures"]
 
@@ -28,71 +31,96 @@ plt.rcParams.update({
     "axes.spines.top": False, "axes.spines.right": False,
 })
 
-# ---------- 数据 ----------
-c0 = json.load(open(f"{RR}/ruler_c0.json"))
-b7s = json.load(open(f"{RR}/ruler_b7s.json"))
-fin = json.load(open(f"{RR}/ruler_table_final.json"))
-e71 = json.load(open(f"{LB}/e71_main_table.json"))
+# ---------- 数据（全部读 formal JSON） ----------
+def cell_avg(path):
+    d = json.load(open(path))
+    for tasks in d["scores"].values():
+        return float(np.mean(list(tasks.values())))
 
-LENS = ["L4096", "L8192", "L16384"]
-def avg(d, key):
-    v = d[f"{key}"]
-    return float(np.mean([v[t] for t in v if t != "AVG"]))
-full_kv = [avg(fin, f"{L}/none") for L in LENS]
-psi_c0 = [avg(c0, f"{L}/tli_64_128_1024_c4_A") for L in LENS]
-psi_b7s = [avg(b7s, f"{L}/tli_64_128_1024_c4_A") for L in LENS]
+fullkv = []
+b125 = []
+d = json.load(open(f"{TR}/e146c_series_verdict.json"))["three_lengths"]
+for L in ["L32768", "L65536", "L131072"]:
+    fullkv.append(d[L]["fullkv"])
+    b125.append(d[L]["sink4"])
 
-# LongBench per-task Δ (PSI = E72 mavg 头条臂 50.54；单池 = C0 50.16)
-tasks = [t for t in e71["TLI_C0"].keys() if t != "AVG"]
-delta = np.array([e71["TLI_E72"][t] - e71["TLI_C0"][t] for t in tasks])
+b0625 = [cell_avg(f"{TR}/e147c_r32k_formal.json"),
+         cell_avg(f"{TR}/e147h_r64k_formal.json"),
+         cell_avg(f"{TR}/e147h_r128k_formal.json")]
+single = [cell_avg(f"{TR}/e146ca_r32k_formal.json"),
+          cell_avg(f"{TR}/e146ca_r64k_formal.json"),
+          cell_avg(f"{TR}/e146ca_r128k_formal.json")]
+quest = [cell_avg(f"{TR}/e119_ruler32k_formal_quest_vendor.json"),
+         cell_avg(f"{TR}/e119_ruler64k_formal_quest_vendor.json"),
+         cell_avg(f"{TR}/e119_ruler128k_formal_quest_vendor.json")]
+async_tls = [cell_avg(f"{TR}/asynctls_r32k_formal.json"),
+             cell_avg(f"{TR}/e119_ruler65536_formal_asynctls_vendor_64k.json"),
+             None]  # 128K 未测
+
+LENS = ["32K", "64K", "128K"]
+delta = [b - a for a, b in zip(single, b0625)]
 
 # ---------- 画布 ----------
-fig, axes = plt.subplots(1, 2, figsize=(11.6, 3.6), gridspec_kw={"width_ratios": [1, 1.35]})
+fig, axes = plt.subplots(1, 2, figsize=(11.6, 3.8), gridspec_kw={"width_ratios": [1, 1.25]})
 
-# (a) RULER 长度梯度
+# (a) 分区收益长度梯度
 ax = axes[0]
 x = np.arange(3)
-ax.plot(x, full_kv, "s-", color=OI["gray"], lw=1.6, ms=5, label="FullKV")
-ax.plot(x, psi_c0, "^--", color=OI["orange"], lw=1.6, ms=5.5, label="PSI single-pool")
-ax.plot(x, psi_b7s, "o-", color=OI["blue"], lw=1.9, ms=5.5, label="PSI partitioned")
-for i, (a, b) in enumerate(zip(psi_c0, psi_b7s)):
+ax.plot(x, fullkv, "s-", color=OI["gray"], lw=1.6, ms=5, label="FullKV")
+ax.plot(x, single, "^--", color=OI["orange"], lw=1.6, ms=5.5, label="PSI single-pool (same budget)")
+ax.plot(x, b0625, "o-", color=OI["blue"], lw=1.9, ms=5.5, label="PSI partitioned ($\\beta{=}.0625$)")
+for i, (a, b) in enumerate(zip(single, b0625)):
     ax.annotate(f"{b - a:+.2f}", (i, (a + b) / 2), textcoords="offset points",
-                xytext=(14, 0), fontsize=7.4, ha="left",
-                color=OI["blue"] if b >= a else OI["orange"])
+                xytext=(14, 0), fontsize=7.6, ha="left", color=OI["blue"])
 ax.set_xticks(x)
-ax.set_xticklabels(["4K", "8K", "16K"], fontsize=8.5)
+ax.set_xticklabels(LENS, fontsize=8.5)
 ax.set_xlabel("RULER context length", fontsize=8.5)
 ax.set_ylabel("11-task average score", fontsize=8.5)
-ax.set_ylim(80, 93.5)
-ax.set_title("(a) partition gain grows with length\nfar-retrieval benefit zone = 16K",
+ax.set_ylim(35, 62)
+ax.set_title("(a) partition gain grows with length\n+0.93 / +3.58 / +6.47 at 32/64/128K",
              fontsize=8.6)
 ax.legend(fontsize=7.2, frameon=False, loc="lower left")
 ax.tick_params(labelsize=7.5)
 
-# (b) LongBench per-task Δ
+# (b) 长上下文 baseline 对比（分档 grouped bars）
 ax = axes[1]
-order = np.argsort(delta)[::-1]
-dl = delta[order]
-tl = [tasks[i] for i in order]
-colors = [OI["blue"] if v >= 0 else OI["orange"] for v in dl]
-ax.bar(np.arange(len(dl)), dl, 0.62, color=colors)
-ax.axhline(0, color="#555555", lw=0.8)
-for i, v in enumerate(dl):
-    if abs(v) >= 1.0:  # 只标显著项，避免拥挤
-        ax.annotate(f"{v:+.2f}", (i, v), textcoords="offset points",
-                    xytext=(0, 5 if v >= 0 else -10), fontsize=6.6,
-                    ha="center", color="#333333")
-ax.set_xticks(np.arange(len(tl)))
-ax.set_xticklabels([t[:11] for t in tl], rotation=42, ha="right", fontsize=6.4)
-ax.set_ylabel("PSI $-$ single-pool (per task)", fontsize=8.5)
-ax.set_title("(b) LongBench per-task deltas\n13 tasks, aggregate +0.38, musique +5.02 dominates",
+systems = [("FullKV", fullkv, OI["gray"]),
+           ("PSI", b0625, OI["blue"]),
+           ("Quest@1024", quest, OI["orange"]),
+           ("AsyncTLS", async_tls, OI["purple"])]
+n = len(systems)
+w = 0.19
+for j, (name, vals, color) in enumerate(systems):
+    xs, ys = [], []
+    for i, v in enumerate(vals):
+        if v is not None:
+            xs.append(i + (j - (n - 1) / 2) * w)
+            ys.append(v)
+    ax.bar(xs, ys, w * 0.92, color=color, label=name)
+    for xx, vv in zip(xs, ys):
+        ax.annotate(f"{vv:.1f}", (xx, vv), textcoords="offset points",
+                    xytext=(0, 3), fontsize=6.2, ha="center", color="#333333")
+# AsyncTLS 128K 未测标记
+i_missing = 2 + (3 - (n - 1) / 2) * w
+ax.annotate("not\nmeasured", (i_missing, 1.5), fontsize=6.0, ha="center",
+            color=OI["purple"], style="italic")
+ax.set_xticks(np.arange(3))
+ax.set_xticklabels(LENS, fontsize=8.5)
+ax.set_xlabel("RULER context length", fontsize=8.5)
+ax.set_ylabel("11-task average score", fontsize=8.5)
+ax.set_ylim(0, 66)
+ax.set_title("(b) baselines collapse with length, PSI tracks FullKV\nJSSA 58.7 at 32K (budget$=$1024) sits between PSI and single-pool",
              fontsize=8.6)
+ax.legend(fontsize=7.2, frameon=False, loc="upper right", ncol=2)
 ax.tick_params(labelsize=7.5)
 
 fig.tight_layout(w_pad=2.4)
 for out in OUTS:
     fig.savefig(f"{out}/fig4_partition_gain.pdf")
     fig.savefig(f"{out}/fig4_partition_gain.png")
-print("saved fig4_partition_gain")
-print("RULER lens:", dict(zip(LENS, zip(full_kv, psi_c0, psi_b7s))))
-print("LB delta sorted:", {t: round(v, 2) for t, v in zip(tl, dl)})
+print("saved fig4_partition_gain (deployment caliber)")
+print("lens:", {L: dict(fullkv=round(f, 2), b0625=round(m, 2), b125=round(s, 2),
+                       single=round(c, 2), quest=round(q, 2),
+                       asynctls=None if t is None else round(t, 2))
+               for L, f, m, s, c, q, t in zip(LENS, fullkv, b0625, b125, single, quest, async_tls)})
+print("partition deltas:", [round(v, 2) for v in delta])
