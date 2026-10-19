@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [ ] [TL-EXPLICIT-NEAR-WIDTH-20261019] 固定配额nl<bs仍被旧整页保底放大，与D′标定不一致；210配置host复现，三行候选270错误→0；补丁仅留档、生产源码未改，实际选集/GPU/性能待验。([详情](task_details/TL-EXPLICIT-NEAR-WIDTH-20261019.md))
+
 - [x] [TL-PARTITION-RATIO-20261019] alpha/beta非法比例构造期拒绝；修前普通/-O各28子用例失败，修后各16项host回归通过，独立641构造差分通过；GPU/模型/性能未验，发布回读单独确认。([详情](task_details/TL-PARTITION-RATIO-20261019.md))
 
 - [x] [TL-EXPLICIT-FREE-PROTECTED-20261019] 显式nt=off保护区预算不足构造期拒绝；修前18子用例失败，修后普通/-O各13项host测试通过，独立1080构造差分符合预期。GPU/模型/性能未验。([详情](task_details/TL-EXPLICIT-FREE-PROTECTED-20261019.md))

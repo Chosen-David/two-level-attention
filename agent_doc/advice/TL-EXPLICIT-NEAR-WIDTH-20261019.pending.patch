@@ -1,0 +1,31 @@
+diff --git a/sparse_attn/indexer/tli_indexer.py b/sparse_attn/indexer/tli_indexer.py
+index 5c59015..60f845a 100644
+--- a/sparse_attn/indexer/tli_indexer.py
++++ b/sparse_attn/indexer/tli_indexer.py
+@@ -1085,7 +1085,7 @@ class TLIIndexer(TIAIndexer):
+                 # E155d：near 区宽显式整数（α·mid_len 规则被覆盖，与
+                 # compute_mask 同源）——几何派单下 α 已填充 1.0，不覆盖
+                 # 会把簇覆盖范围错扩到全 mid。
+-                near_len_dyn = max(bs, int(self.nt_near_len))
++                near_len_dyn = int(self.nt_near_len)
+             else:
+                 near_len_dyn = max(bs, int(self.alpha * mid_len))
+             near_base = S - swa_tok
+@@ -1506,7 +1506,7 @@ class TLIIndexer(TIAIndexer):
+                 if self.nt_near_len is not None:
+                     # E155d：near 区宽显式整数（α·mid_len 规则被覆盖，与
+                     # compute_mask 同源）
+-                    _near_len_dyn = max(_bs, int(self.nt_near_len))
++                    _near_len_dyn = int(self.nt_near_len)
+                 else:
+                     _near_len_dyn = max(_bs, int(self.alpha * _mid_len))
+                 _near_blks = max(self._sink_pool_lo_blk,
+@@ -2099,7 +2099,7 @@ class TLIIndexer(TIAIndexer):
+             mid_len = max(0, S_real - sink_tok - swa_tok)
+             if self.nt_near_len is not None:
+                 # E155 固定几何：near 区宽显式整数（α·mid_len 规则被覆盖）
+-                near_len_dyn = max(bs, int(self.nt_near_len))
++                near_len_dyn = int(self.nt_near_len)
+             else:
+                 near_len_dyn = max(bs, int(self.alpha * mid_len))  # near 只算 mid 部分（不含 swa）
+             near_base = S_real - swa_tok   # near 右界 = swa 起点（B10；真实 S 口径 F5）
