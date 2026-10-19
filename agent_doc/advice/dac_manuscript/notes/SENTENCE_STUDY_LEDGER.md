@@ -29,6 +29,16 @@
 
 ## 修改日志
 
+### 第 43 轮（2026-10-19，**范式自查：Q1 段——比较对象悬空修复**）
+
+- **数据与远端检查**：git fetch 干净；本地 main 推进至 ecfbd4f（E155d 参数退役，并行代码线，用户拍板全面转向 nl/nb/nt 绝对配额，与手稿方向一致）+ 22e3f8d（vendor 蓝本更新：AsyncTLS 修复版 LongBench 16/16 打分 AVG16 45.13/AVG13 46.82，与乱序版几乎持平；RULER 128K 修复版在飞）。vendor LongBench 属 vendor 批数据（手稿不报告 vendor LongBench），非手稿级，不入稿；128K 修复版成稿后下轮评估。
+- **Q1 段逐句范式审计**：四句中三句合规（claim-first 数字开局 / 诚实收口居中 / 范围边界收尾）。一处 MINOR：
+  - 「the shared-subspace arm sits 0.322 and 0.078 lower」比较对象悬空——"lower" 的宾语须回溯上一句；且「nominal full-dimensional page 47.910 and token 47.666」椭圆省略致名词平行结构破损（token 缺 variant）。修复为「the nominal page variant 47.910 and the token variant 47.666 ... trails the two variants by 0.322 and 0.078」（net +3 词，方向动词 trails 替代 sits lower）。
+  - zh 同步：「共享子空间臂分别低」→「分别比两变体低」（+4 字）。zh 原句名词平行结构本已完整。
+- **版式验证**：en/zh 均 6 页（AI p5 / refs p6）、0 LaTeX Warning；新增句机械门 0 违规。
+- **自查队列推进**：Q1 ✓。剩余：Q2 / Q3 / 结论 / 摘要。
+- **观察**：Q2 已在第 41 轮全面重写中重构（隐式耦合失效段），下轮 Q2 复审重点＝三证据链句的数字方向与收口；Q3 复审重点＝「no decode-time benefit」收口链。
+
 ### 第 42 轮（2026-10-19，**范式自查：Workloads 段——第 41 轮过度压缩回修**）
 
 - **数据与远端检查**：git fetch 干净（远端 HEAD 仍为 73034b5 系）；exp/trace/results/ 无新判决 JSON（e119/e147 批均已入稿）。
