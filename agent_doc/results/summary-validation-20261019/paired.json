@@ -1,0 +1,122 @@
+{
+  "baseline_commit": "68c9eb350194943a657ba09ce3548e6ea9aa1132",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "processor": "x86_64",
+  "timer": "perf_counter_ns; full summarize only",
+  "warmup_per_implementation": 1,
+  "includes": "protocol, all row checks, pairing and summary",
+  "excludes": "fixture creation, imports, hashing, JSON serialization; no GPU",
+  "baseline_source_sha256": "695fb5427c2d528356135fbd20cba5b682a678060b39a7000ef7aa6011c40611",
+  "candidate_source_sha256": "6d5382abd1e0efb550cf427a1d04028166b1e72a209f6e960d7f94a709608f05",
+  "cases": [
+    {
+      "samples": 1,
+      "rows": 4,
+      "input_sha256": "979a229de6b7ef562086b6dd3c4a8fbe6420fa83446168c061f9643095cdfa8c",
+      "summary_sha256": "3881859446cafaffb1c4413abe933385b506f472167f9d5783addc752c61f6c4",
+      "wall_ms": {
+        "baseline": [
+          0.247209,
+          0.267209,
+          0.224666,
+          0.226949,
+          0.261691
+        ],
+        "candidate": [
+          0.115423,
+          0.104586,
+          0.10003,
+          0.10035,
+          0.101402
+        ]
+      },
+      "median_ms": {
+        "baseline": 0.247209,
+        "candidate": 0.101402
+      },
+      "baseline_over_candidate": 2.437910494862034
+    },
+    {
+      "samples": 32,
+      "rows": 128,
+      "input_sha256": "407f9a8f9219d5f27579ea7dfa2b64a2a8562f787a332e57ed9769e154d3a3f1",
+      "summary_sha256": "f58d0df417d5d8397682672d2124a467d762e298cb5079732b2449d3a462e8ba",
+      "wall_ms": {
+        "baseline": [
+          19.218471,
+          19.934651,
+          19.383338,
+          20.002653,
+          19.802603
+        ],
+        "candidate": [
+          2.241939,
+          2.276811,
+          2.205615,
+          2.998229,
+          2.234128
+        ]
+      },
+      "median_ms": {
+        "baseline": 19.802603,
+        "candidate": 2.241939
+      },
+      "baseline_over_candidate": 8.832801873735193
+    },
+    {
+      "samples": 128,
+      "rows": 512,
+      "input_sha256": "f420210d472056e191c6d39464672559b180ee5e53333459a41a12639860a962",
+      "summary_sha256": "c36632262d7852f6b13e9982f35a2fee0991bd11c5ef66cd19b12ebee8a8d302",
+      "wall_ms": {
+        "baseline": [
+          252.673363,
+          258.070591,
+          260.075005,
+          263.702274,
+          259.95761
+        ],
+        "candidate": [
+          9.76656,
+          8.813007,
+          9.592591,
+          9.85325,
+          8.833747
+        ]
+      },
+      "median_ms": {
+        "baseline": 259.95761,
+        "candidate": 9.592591
+      },
+      "baseline_over_candidate": 27.09983256869807
+    },
+    {
+      "samples": 512,
+      "rows": 2048,
+      "input_sha256": "71a6a91f3a224b046fbcda38c5defcd8fb1b44cc69a5bcb3776365659ab56911",
+      "summary_sha256": "be875b9555ecd62de6e7136c13b7f9932ba4e421736948f7a92351d990d5b92a",
+      "wall_ms": {
+        "baseline": [
+          4392.279229,
+          4432.084178,
+          4542.725129,
+          4196.006786,
+          4337.226021
+        ],
+        "candidate": [
+          47.412189,
+          50.2166,
+          44.445155,
+          41.190118,
+          64.430384
+        ]
+      },
+      "median_ms": {
+        "baseline": 4392.279229,
+        "candidate": 47.412189
+      },
+      "baseline_over_candidate": 92.64029612722585
+    }
+  ]
+}

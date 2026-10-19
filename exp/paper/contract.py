@@ -109,10 +109,18 @@ def protocol_errors(p):
 
 def validate_timing(row, p, protocol_sha):
     errors=protocol_errors(p); need(not errors, 'unfrozen protocol: '+','.join(errors))
+    _validate_timing_row(row, p, protocol_sha, {r['sample_id']:r for r in p['samples']})
+
+
+def _validate_timing_row(row, p, protocol_sha, samples):
+    """Internal row checks after this invocation has validated the protocol.
+
+    No validation state survives a public call. summarize reuses only the
+    protocol check and sample lookup, never a row's validation result.
+    """
     need(row.get('protocol_sha256')==protocol_sha, 'protocol identity mismatch')
     expected_identity=dict(p['identity'],**p['arm_overrides'].get(row.get('arm'),{}))
     need(row.get('identity')==expected_identity, 'run identity mismatch')
-    samples={r['sample_id']:r for r in p['samples']}
     sample=samples.get(row.get('sample_id')); need(sample is not None, 'unplanned sample')
     for key in ('document_id','input_ids_sha256'): need(row.get(key)==sample[key], 'sample identity mismatch')
     need(row.get('arm') in p['arms'], 'unknown arm')
@@ -162,10 +170,11 @@ def validate_timing(row, p, protocol_sha):
 def summarize(rows,p,sha):
     """No CI invented. Preserve failure denominator and pair repetitions exactly."""
     errors=protocol_errors(p); need(not errors, 'unfrozen protocol: '+','.join(errors))
+    samples={r['sample_id']:r for r in p['samples']}
     expected={(s['sample_id'],a,i) for s in p['samples'] for a in p['arms'] for i in range(p['repeats'])}
     indexed={}
     for row in rows:
-        validate_timing(row,p,sha)
+        _validate_timing_row(row,p,sha,samples)
         key=(row['sample_id'],row['arm'],row['repetition'])
         need(key not in indexed,'duplicate timing row');indexed[key]=row
     missing=expected-set(indexed); failed=[k for k,r in indexed.items() if r['status']!='ok']
