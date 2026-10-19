@@ -29,6 +29,15 @@
 
 ## 修改日志
 
+### 第 35 轮（2026-10-19，**范式自查模式启动**：§III 设计节逐段审计）
+
+- **模式切换**：7 篇队列已收官（第 34 轮），远端无新提交、DAC_best_paper 目录无新增 PDF。按第 34 轮交接注记转入范式自查模式：对 paper_en.tex 逐段跑 7 篇沉淀的范式清单。本轮审计 §III（Near--Far Selection in a Shared Subspace，§III 开头段 + A 坐标 / B 预算 / C GQA / D 门控四个小节）。
+- **审计通过项**（不改动）：§III 开头段 To-control 使命开场句（=Miter To-mitigate-X 范式）✓；§III-A 动机句+fourfold 倍数锚 ✓；§III-B U_b 公式后跟大白话复述（Each signed coordinate contribution is bounded by...）=RL-CCD Basically-Equation 范式 ✓；β 方向性质句（Raising β cannot...）+ For-example+hence 判例句（第 33 轮加）✓；Thus 收口（Thus $P_f>0$ does not imply $k_f>0$）✓；诚实披露三连（This regional assignment is a heuristic / loose bound 警告 / 252 is nominal）✓；§III-D 失败边界句（does not bound decoding error）✓；短句节奏（The cascade operates only during decoding; prefill remains dense.）✓。
+- **发现并修复 1 处（en+zh）**：GQA 缩写 define-before-use 违规——Related Work 首用「GQA probability aggregation」未展开，§III-C 才给全称定义。修复：首用处展开「grouped-query-attention (GQA) probability aggregation」(+2 词)，§III-C 去重复定义「GQA assigns four of...」(-2 词)，净 0 词（零余量下防溢出）。zh 同步：「分组查询注意力（GQA）概率聚合」+「GQA将32个查询头按每个KV组4个分到8个KV头」。
+- **记 MINOR 项暂缓**（本轮不动，留档）：L1/L2 在 Related Work 首用、§III 开头才隐式定义（L1 page screening / L2 token refinement）——Intro P2 已建立 page-to-token 两级概念，自解释性可容忍；若后续轮次版式有余量可加首用括注。
+- **版式验证**：en 6 页（AI 声明完整第 5 页）、zh 6 页、0 LaTeX Warning。
+- **后续轮次**：范式自查继续——待审段落：Intro P1–P5、Experimental Setting（Workloads/Metrics）、Q1/Q2/Q3、结论、摘要。
+
 ### 第 34 轮（2026-10-19，Miter-Aware LUT Mapping §4+§5 拆解——**第 7 篇完结，7 篇队列全部收官**）
 
 - **远端检查**：无新提交，工作区干净。
