@@ -343,40 +343,105 @@ class TLIIndexer(TIAIndexer):
         self._quant_ok = True
         self._qat_idx_cache = None
         # ---- E64 框架参数化：α/β/γ 分区 + sup_wsvd 投影基（B 配置帕累托点）----
-        self.alpha = getattr(args, "tli_alpha", 0.0)
-        self.beta = getattr(args, "tli_beta", 0.0)
-        # E122：tli_gamma 可为 None（CLI 'off'，大小写不敏感）= 自由竞争模式
-        # （取消 L2 near/far 配额分割，mid 单池 topk，见 compute_mask use_partition
-        # 分支的 γ=off 段）；数值照旧 float。缺省 1.0 兼容不传该参数的旧 harness。
-        self.gamma = getattr(args, "tli_gamma", 1.0)
-        # ---- E155 固定配额几何（用户 2026-10-19 拍板：全面转向 nt/nb 绝对配额）----
-        # 三参数显式传入时优先于 α/β/γ 比例语义（内部换算后覆盖），None 回退
-        # 旧比例路径逐位不变。语义映射（K1/K2 固定部署口径）：
-        #   nb_near = tli_near_pages        （旧 = max(1, round(K1·β))）
-        #   nt_near = tli_near_tokens       （旧 = min(nb_near·bs·γ, K2_mid)）
-        #   near_L  = tli_near_len          （旧 = max(bs, int(α·mid_len))）
+        # 【E155d 参数退役（用户 2026-10-19 拍板：全面转向 nl/nb/nt）】
+        # α/β/γ 降级为 legacy 比例口径：argparse 缺省翻转为 None=未传，
+        # 此处归一回旧缺省（0.0/0.0/1.0）——纯比例派单逐位不变；显式
+        # 几何（nb/nt/nl 任一传入，含 nt=off 哨兵）与 α/β/γ 任意显式
+        # 同传一律构造期拒绝（fail-closed 互斥——比例/绝对两口径混配
+        # 即歧义配置，ctrl_singlepool 型「单池意图 + 几何参数」事故从此
+        # 结构上不可达）。
+        _a_raw = getattr(args, "tli_alpha", None)
+        _b_raw = getattr(args, "tli_beta", None)
+        self.alpha = 0.0 if _a_raw is None else float(_a_raw)
+        self.beta = 0.0 if _b_raw is None else float(_b_raw)
+        # γ 三态：None=未传（几何归一或 legacy 缺省 1.0）；"off"=自由竞争
+        # （E122 语义，运行时 γ=None）；数值=配额折扣。self.gamma=None
+        # 的消费端为 compute_mask 的自由竞争分支（L2370 同源）。
+        _g_raw = getattr(args, "tli_gamma", None)
+        if isinstance(_g_raw, str) and _g_raw.strip().lower() == "off":
+            self.gamma = None
+        else:
+            self.gamma = 1.0 if _g_raw is None else float(_g_raw)
+        _abg_explicit = (_a_raw is not None or _b_raw is not None
+                         or _g_raw is not None)
+        # ---- E155/E155d 固定配额几何（用户 2026-10-19 拍板：全面转向 nt/nb 绝对配额）----
+        # 语义映射（K1/K2 固定部署口径）：
+        #   nb_near = tli_near_pages        （legacy = max(1, round(K1·β))）
+        #   nt_near = tli_near_tokens       （legacy = min(nb_near·bs·γ, K2_mid)）
+        #   near_L  = tli_near_len          （legacy = max(bs, int(α·mid_len))）
+        #   nt=off  = 自由竞争哨兵（≡ γ-off 的显式几何等价物）：L1 双池
+        #            照旧（nb 生效）、L2 取消 near/far 配额分割单池竞争。
+        #            与数值 nt=K2_mid（near 独吞 far=0 退化臂）语义严格分开。
         # far 侧均为减法：nb_far = K1 − nb_near；far_budget = K2_mid − nt_near。
+        _nt_raw = getattr(args, "tli_near_tokens", None)
+        _nt_off = isinstance(_nt_raw, str) and str(_nt_raw).strip().lower() == "off"
         self.nt_near_pages = getattr(args, "tli_near_pages", None)
-        self.nt_near_tokens = getattr(args, "tli_near_tokens", None)
+        self.nt_near_tokens = None if (_nt_raw is None or _nt_off) else int(_nt_raw)
         self.nt_near_len = getattr(args, "tli_near_len", None)
-        if (self.nt_near_pages is not None or self.nt_near_tokens is not None
-                or self.nt_near_len is not None):
-            # 显式几何要求全部三值齐备（near_L 允许缺省回退 α·mid_L 规则）
-            if self.nt_near_pages is None or self.nt_near_tokens is None:
+        _geo = (self.nt_near_pages is not None or _nt_raw is not None
+                or self.nt_near_len is not None)
+        if _geo:
+            # fail-closed 互斥（用户 2026-10-19）：α/β/γ 任意显式与显式
+            # 几何同传 → 构造期拒绝（含 α0β0 单池意图 + 几何的混配事故面）。
+            if _abg_explicit:
                 raise ValueError(
-                    "tli_near_pages/tli_near_tokens 必须同时显式传入（固定配额几何"
-                    "不混配比例参数；near_L 可用 tli_near_len 单独固定）"
+                    "tli_near_pages/tokens/len（固定配额几何）与 tli_alpha/beta/gamma"
+                    "（legacy 比例口径）不可同传——两口径混配即歧义配置"
+                    "（E155d 参数退役，fail-closed；单池派法 = 只传 α0β0、"
+                    "不传任何几何参数）"
                 )
-            # 激活分区（等价 α>0 且 β>0 的几何条件，避免落单池分支）。
-            # GPT 审计 2026-10-19（α/β clobber 边角）：只补零值字段、
-            # 不冲掉用户显式传的 α/β——near_L 缺省回退 α·mid_len 规则
-            # （compute_mask 的 near_len_dyn 分支）消费 self.alpha，整对
-            # 冲 1.0 会让「传 nb/nt + α 但忘 β」的合法配置 near 区翻倍
-            # 且文件名虚标 a1_b1；β 同理只补缺失侧。
-            if self.alpha <= 0:
-                self.alpha = 1.0
-            if self.beta <= 0:
-                self.beta = 1.0
+            # 几何齐备性：nb 必传；nt 传数值或 off；nl 必传（几何下 α/β/γ
+            # 禁传 → near_L 无比例回退）。
+            if self.nt_near_pages is None:
+                raise ValueError(
+                    "固定配额几何须显式传 tli_near_pages（配 tli_near_tokens "
+                    "数值或 off；tli_near_len 亦须显式——几何下无比例回退）")
+            if self.nt_near_tokens is None and not _nt_off:
+                raise ValueError(
+                    "tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——"
+                    "只传 tli_near_pages 而缺 nt 属歧义配置")
+            if self.nt_near_len is None:
+                raise ValueError(
+                    "固定配额几何须显式传 tli_near_len（E155d：几何派单下 "
+                    "α/β/γ 禁传，near 区宽无比例规则回退）")
+            if _nt_off:
+                # nt=off 归一：γ → 自由竞争（消费端与 E122 γ-off 同一分支，
+                # 逐位等价）；nb/nl 显式覆盖照常生效。
+                self.gamma = None
+            # 激活分区（e64_partition = α>0 且 β>0；几何显式时 α/β/γ 对
+            # 主路径全部失活——nb/nt/nl 三处消费点均显式优先，L522/L995/
+            # L1411 的 α·mid_len 消费点同已改为 nt_near_len 显式优先）。
+            self.alpha = 1.0
+            self.beta = 1.0
+            # 构造期几何约束（用户 2026-10-19 三维网格：nb·bs ≤ nl；
+            # nt ≤ nb·bs；far = K2 − sink − swa − nt ≥ 0）。
+            _bs_c = int(getattr(args, "tia_block_size", 64))
+            _k2_c = int(getattr(args, "tia_level2_topk", 1024))
+            _nb_c = int(self.nt_near_pages)
+            _nl_c = int(self.nt_near_len)
+            if _nb_c < 0:
+                raise ValueError(f"tli_near_pages 须非负，收到 {_nb_c}")
+            if _nb_c * _bs_c > _nl_c:
+                raise ValueError(
+                    f"网格约束破坏：nb·bs ≤ nl（nb={_nb_c}·bs={_bs_c}="
+                    f"{_nb_c * _bs_c} > nl={_nl_c}）——near 页配额超出 "
+                    "near 区宽度能供给的页数")
+            if not _nt_off:
+                _nt_c = int(self.nt_near_tokens)
+                if _nt_c < 0:
+                    raise ValueError(f"tli_near_tokens 须非负，收到 {_nt_c}")
+                if _nt_c > _nb_c * _bs_c:
+                    raise ValueError(
+                        f"网格约束破坏：nt ≤ nb·bs（nt={_nt_c} > nb={_nb_c}·"
+                        f"bs={_bs_c}={_nb_c * _bs_c}）——near token 配额超出 "
+                        "near 页几何容量")
+                _far_c = (_k2_c - int(self.sink_tokens)
+                          - int(self.sliding_window_size) - _nt_c)
+                if _far_c < 0:
+                    raise ValueError(
+                        f"网格约束破坏：far = K2−sink−swa−nt = {_far_c} < 0"
+                        f"（K2={_k2_c}, sink={self.sink_tokens}, "
+                        f"swa={self.sliding_window_size}, nt={_nt_c}）")
         # ---- E155b 新口径双开关（用户 2026-10-19 拍板）----
         # ① 边界页保送：sink 所在页 + swa 跨界页移出 L1 竞争池直通 L2 候选
         #   （不占 K1 配额；页统计不再混保护/竞争 token）。false 逐位回旧口径。
@@ -518,8 +583,15 @@ class TLIIndexer(TIAIndexer):
         sink_tok = self.sink_tokens
         swa_tok = self.sliding_window_size
         mid_len = S - swa_tok - sink_tok
-        # 生产 far 区右界（E135 analyze 同式）：far = [sink, sink+(1-α)·mid)
-        far_hi = sink_tok + int((1.0 - self.alpha) * mid_len)
+        # 生产 far 区右界（E135 analyze 同式）：far = [sink, sink+(1-α)·mid)。
+        # E155d：near 区宽显式（nt_near_len）时覆盖 α 规则（与 compute_mask
+        # L2000 同源）——几何派单下 α 已填充 1.0，不覆盖会静默把 far 区
+        # 标定成空（far_hi=sink）。
+        if self.nt_near_len is not None:
+            _nl_c = max(int(self.nt_near_len), 0)
+            far_hi = sink_tok + max(0, mid_len - _nl_c)
+        else:
+            far_hi = sink_tok + int((1.0 - self.alpha) * mid_len)
         far_lo = sink_tok
         if far_hi <= far_lo:          # 序列太短：far 区空，跳过标定不 skip
             return
@@ -992,7 +1064,13 @@ class TLIIndexer(TIAIndexer):
         if self.alpha > 0 and self.beta > 0:
             sink_tok = self.sink_tokens          # E135：强制区宽单一事实源
             mid_len = max(0, S - sink_tok - swa_tok)
-            near_len_dyn = max(bs, int(self.alpha * mid_len))
+            if self.nt_near_len is not None:
+                # E155d：near 区宽显式整数（α·mid_len 规则被覆盖，与
+                # compute_mask 同源）——几何派单下 α 已填充 1.0，不覆盖
+                # 会把簇覆盖范围错扩到全 mid。
+                near_len_dyn = max(bs, int(self.nt_near_len))
+            else:
+                near_len_dyn = max(bs, int(self.alpha * mid_len))
             near_base = S - swa_tok
         elif self.far_select != "4bit" and self.alpha == 0 and self.beta == 0:
             # TASK.md L231 严格口径：cluster 组合 (0,0) 单池点 = 纯 cluster 全 mid
@@ -1408,7 +1486,12 @@ class TLIIndexer(TIAIndexer):
                 _sink_tok = self.sink_tokens          # E135：强制区宽单一事实源
                 _swa_tok = self.sliding_window_size
                 _mid_len = max(0, int(_vl) - _sink_tok - _swa_tok)
-                _near_len_dyn = max(_bs, int(self.alpha * _mid_len))
+                if self.nt_near_len is not None:
+                    # E155d：near 区宽显式整数（α·mid_len 规则被覆盖，与
+                    # compute_mask 同源）
+                    _near_len_dyn = max(_bs, int(self.nt_near_len))
+                else:
+                    _near_len_dyn = max(_bs, int(self.alpha * _mid_len))
                 _near_blks = max(self._sink_pool_lo_blk,
                                  ((int(_vl) - _swa_tok) - _near_len_dyn) // _bs)
                 if self._sink_pool_lo_blk < _near_blks:

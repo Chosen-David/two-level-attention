@@ -347,7 +347,21 @@ def resolve_treatment_snapshot(args):
     for f, d in _TREATMENT_FIELD_DEFAULTS.items():
         if f in _FILE_IDENTITY_FIELDS:
             continue
-        manifest[f] = getattr(args, f, d)
+        v = getattr(args, f, d)
+        # 【E155d 参数退役归一】α/β/γ argparse 缺省翻转为 None=未传，
+        # manifest 归一回 legacy 数值缺省（0.0/0.0/1.0）；γ CLI "off"
+        # 哨兵字符串归一为 None（JSON null，E122 既有口径）——既有
+        # treatment hash 逐位不变，未传 γ 的全部在跑/历史链身份稳定。
+        if f == "tli_alpha" and v is None:
+            v = 0.0
+        elif f == "tli_beta" and v is None:
+            v = 0.0
+        elif f == "tli_gamma":
+            if v is None:
+                v = 1.0
+            elif isinstance(v, str) and v.strip().lower() == "off":
+                v = None
+        manifest[f] = v
     manifest_json = json.dumps(manifest, sort_keys=True,
                               ensure_ascii=False, default=str)
     return TreatmentSnapshot(manifest=manifest, manifest_json=manifest_json,
@@ -956,7 +970,17 @@ def get_method_name_with_info(args, snapshot=None):
         # 文件名/行为失配（B09 族）。
         alpha = getattr(args, "tli_alpha", 0.0)
         beta = getattr(args, "tli_beta", 0.0)
+        # 【E155d 参数退役归一】None=未传 → legacy 缺省渲染（既有文件名
+        # 逐位不变）；"off" 哨兵 → None → goff（与 E122 γ-off 同渲染）。
+        if alpha is None:
+            alpha = 0.0
+        if beta is None:
+            beta = 0.0
         gamma = getattr(args, "tli_gamma", 1.0)
+        if isinstance(gamma, str) and gamma.strip().lower() == "off":
+            gamma = None
+        elif gamma is None:
+            gamma = 1.0
         g_str = "off" if gamma is None else f"{gamma:g}"
         # 【10-09 TL-PREFILL-PROVENANCE-001 修复】稀疏 prefill 开关必须进输出文件名，
         # 否则 P-off/P-on 同路径 w 模式互相覆盖（GPT 审计 B09 族新实例）。默认不传
@@ -999,10 +1023,15 @@ def get_method_name_with_info(args, snapshot=None):
         _np = getattr(args, "tli_near_pages", None)
         _nt = getattr(args, "tli_near_tokens", None)
         _nl = getattr(args, "tli_near_len", None)
+        # E155d：nt=off 哨兵渲染 _ntoff（自由竞争几何臂），与数值 nt
+        # 天然区分（f"{_nt:g}" 对 str 会崩，须先分流）。
+        _nt_off = isinstance(_nt, str) and str(_nt).strip().lower() == "off"
         if _np is not None or _nt is not None:
             if _np is not None:
                 e155 += f"_np{_np:g}"
-            if _nt is not None:
+            if _nt_off:
+                e155 += "_ntoff"
+            elif _nt is not None:
                 e155 += f"_nt{_nt:g}"
         if _nl is not None:
             e155 += f"_nl{_nl:g}"

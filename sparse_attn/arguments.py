@@ -177,15 +177,37 @@ def _add_hisa_args(parser: argparse.ArgumentParser):
 
 
 def _parse_gamma(x):
-    """E122：γ 支持 'off'（大小写不敏感）→ None = 自由竞争模式。
+    """E122：γ 支持 'off'（大小写不敏感）→ 自由竞争模式。
 
     γ=off 语义（用户 2026-10-10 指令，cavg 探索臂）：取消 L2 near/far 配额
     分割，全部 mid 候选在统一预算 K2_mid 内单池 topk 竞争（消费端
     tli_indexer.compute_mask 的 use_partition 分支）。数值照旧解析为 float。
+
+    【E155d 参数退役（用户 2026-10-19）】CLI 'off' 解析为哨兵字符串 "off"
+    （与缺省 None=未传区分——γ 缺省从 1.0 翻转为 None 以支持几何/比例
+    fail-closed 互斥检测），TLIIndexer.__init__ / info.py 归一为运行时
+    γ=None（自由竞争），legacy 行为与 treatment hash 均逐位不变。
     """
     if str(x).strip().lower() == "off":
-        return None
+        return "off"
     return float(x)
+
+
+def _parse_near_tokens(x):
+    """E155d：--tli_near_tokens 支持 'off' 哨兵（用户 2026-10-19 指令）。
+
+    nt=off ≡ γ-off 的显式几何等价物：L1 双池照旧（nb 生效）、L2 取消
+    near/far 配额分割自由竞争。与数值 nt（near 配额 + far=K2_mid−nt
+    减法）语义严格分开——nt=K2_mid 是 near 独吞 far=0 的退化臂，不是
+    off。须与 tli_near_pages 同传（构造期强制）。
+    """
+    if str(x).strip().lower() == "off":
+        return "off"
+    try:
+        return int(x)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            f"--tli_near_tokens 须为非负整数或 'off'（自由竞争哨兵），收到 {x!r}")
 
 
 def _parse_dgate_rows(x):
@@ -256,23 +278,33 @@ def _add_tli_args(parser: argparse.ArgumentParser):
                        help='far 池 L1 粗筛分数源: minmax=块上界(默认) / avg=块均值')
     group.add_argument('--tli_near_method', type=str, default='avg', choices=['avg', 'minmax'],
                        help='near 池 L1 粗筛分数源: avg=块均值(默认) / minmax=块上界')
-    group.add_argument('--tli_alpha', type=float, default=0.0,
-                       help='near 区占 mid 长度比（E64 alpha；0=单池老逻辑）')
-    group.add_argument('--tli_beta', type=float, default=0.0,
-                       help='near 块预算占 K1 比（E64 beta）')
-    group.add_argument('--tli_gamma', type=_parse_gamma, default=1.0,
-                       help='near 细筛 token 折扣（E64 gamma）；off=自由竞争'
-                            '（E122：取消 near/far L2 配额分割，mid 单池 topk 竞争）')
+    # 【E155d 参数退役（用户 2026-10-19 拍板：全面转向 nl/nb/nt）】α/β/γ
+    # 降级为 legacy 比例口径：缺省翻转为 None=未传，仅在未传任何显式几何
+    # 参数时按旧语义生效（构造期归一回 0.0/0.0/1.0，逐位不变）；与
+    # nb/nt/nl 显式几何同传一律构造期拒绝（fail-closed 互斥——杜绝
+    # ctrl_singlepool 型「单池意图 + 几何参数」混配事故）。
+    group.add_argument('--tli_alpha', type=float, default=None,
+                       help='near 区占 mid 长度比（E64 alpha，legacy 比例口径；缺省=单池老逻辑）。'
+                            'E155d：固定配额派单改传 tli_near_pages/tokens/len，与本参数同传会构造期拒绝')
+    group.add_argument('--tli_beta', type=float, default=None,
+                       help='near 块预算占 K1 比（E64 beta，legacy 比例口径）。'
+                            'E155d：改传 tli_near_pages，同传会构造期拒绝')
+    group.add_argument('--tli_gamma', type=_parse_gamma, default=None,
+                       help='near 细筛 token 折扣（E64 gamma，legacy 比例口径；缺省 1.0）；'
+                            'off=自由竞争（E122）。E155d：等价物为 tli_near_tokens off，'
+                            '与显式几何同传会构造期拒绝')
     # ---- E155 固定配额几何（用户 2026-10-19 拍板：nt/nb 绝对配额全面转向）----
     group.add_argument('--tli_near_pages', type=int, default=None,
                        help='E155 固定配额：near 块数 nb_near 显式整数（覆盖 round(K1·β)）；'
-                            '须与 tli_near_tokens 同时传入')
-    group.add_argument('--tli_near_tokens', type=int, default=None,
-                       help='E155 固定配额：near token 配额 nt_near 显式整数（覆盖 min(nb·64·γ, K2_mid)）；'
-                            'far_budget = K2_mid − nt_near')
+                            '须与 tli_near_tokens（数值或 off）同时传入')
+    group.add_argument('--tli_near_tokens', type=_parse_near_tokens, default=None,
+                       help='E155 固定配额：near token 配额 nt_near 显式整数（覆盖 min(nb·64·γ, K2_mid)），'
+                            'far_budget = K2_mid − nt_near；off=自由竞争哨兵（L2 取消配额分割，'
+                            'L1 双池照旧——γ-off 的显式几何等价物）')
     group.add_argument('--tli_near_len', type=int, default=None,
                        help='E155 固定配额：near 区宽度 near_L 显式整数 token 数（覆盖 α·mid_len 规则）；'
-                            'L 轴扫描用，缺省回退比例规则')
+                            'L 轴扫描用。E155d：几何派单下 α/β/γ 全部禁传，near_L 无比例回退，'
+                            '须显式传入')
     group.add_argument('--tli_boundary_bypass', type=lambda x: str(x).lower() != 'false', default=True,
                        help='E155b 边界页保送（默认开，新口径）：sink 所在页与 swa 跨界页移出 L1 竞争池'
                             '直通 L2 细筛候选（页统计不混保护/竞争 token，保送页不占 K1 配额）；'
