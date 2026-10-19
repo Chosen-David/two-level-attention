@@ -432,6 +432,12 @@ class TLIIndexer(TIAIndexer):
                     f"网格约束破坏：nb·bs ≤ nl（nb={_nb_c}·bs={_bs_c}="
                     f"{_nb_c * _bs_c} > nl={_nl_c}）——near 页配额超出 "
                     "near 区宽度能供给的页数")
+            # nt=off 仅取消 near/far 的 L2 分额；保护区仍计入 K2。
+            # K2_mid 截到 0 不能消除最终 mask 强制保留的 sink/SWA。
+            if _k2_c < self.sink_tokens + self.sliding_window_size:
+                raise ValueError(
+                    f"K2={_k2_c} 不可小于 sink+swa="
+                    f"{self.sink_tokens + self.sliding_window_size}（保护区总预算）")
             if not _nt_off:
                 _nt_c = int(self.nt_near_tokens)
                 if _nt_c < 0:

@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [x] [TL-EXPLICIT-FREE-PROTECTED-20261019] 显式nt=off保护区预算不足构造期拒绝；修前18子用例失败，修后普通/-O各13项host测试通过，独立1080构造差分符合预期。GPU/模型/性能未验。([详情](task_details/TL-EXPLICIT-FREE-PROTECTED-20261019.md))
+
 - [x] [TL-EXPLICIT-L1-BUDGET-20261019] 显式near页配额超K1构造期拒绝，修前24子用例失败，修后普通/-O各4项及相邻6项host测试通过；GPU/模型/性能未验。([详情](task_details/TL-EXPLICIT-L1-BUDGET-20261019.md))
 
 - [ ] [TL-BATCH-EXPLICIT-QUOTA-20261019] E155显式near配额误入batch旧比例公式：入口回退逐组，含最新E155d归一配置，修前25子用例失败，修后普通/-O各6项host测试通过；GPU/模型/性能及历史重测待验。([详情](task_details/TL-BATCH-EXPLICIT-QUOTA-20261019.md))
