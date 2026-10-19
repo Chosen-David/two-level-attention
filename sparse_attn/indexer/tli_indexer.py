@@ -421,6 +421,12 @@ class TLIIndexer(TIAIndexer):
             _nl_c = int(self.nt_near_len)
             if _nb_c < 0:
                 raise ValueError(f"tli_near_pages 须非负，收到 {_nb_c}")
+            # L1 两池共享 K1；far 截到 0 并不能限制过大的 near 配额。
+            # nt=off 只取消 L2 分区，仍须遵守同一 L1 页预算。
+            if _nb_c > self.args.tia_level1_topk:
+                raise ValueError(
+                    f"tli_near_pages={_nb_c} 不可超过 "
+                    f"tia_level1_topk={self.args.tia_level1_topk}（L1 总页预算）")
             if _nb_c * _bs_c > _nl_c:
                 raise ValueError(
                     f"网格约束破坏：nb·bs ≤ nl（nb={_nb_c}·bs={_bs_c}="
