@@ -15,6 +15,7 @@
 """
 import json
 import math
+import operator
 import os
 
 import torch
@@ -380,9 +381,25 @@ class TLIIndexer(TIAIndexer):
         # far 侧均为减法：nb_far = K1 − nb_near；far_budget = K2_mid − nt_near。
         _nt_raw = getattr(args, "tli_near_tokens", None)
         _nt_off = isinstance(_nt_raw, str) and str(_nt_raw).strip().lower() == "off"
-        self.nt_near_pages = getattr(args, "tli_near_pages", None)
-        self.nt_near_tokens = None if (_nt_raw is None or _nt_off) else int(_nt_raw)
-        self.nt_near_len = getattr(args, "tli_near_len", None)
+        def _quota_integer(name, value):
+            # Direct Python callers bypass argparse's integer conversion.
+            # int(-0.5) == 0 would otherwise bypass the nonnegative guards.
+            if value is None:
+                return None
+            if not isinstance(value, bool):
+                try:
+                    # Preserve existing integer-string inputs and integer-like
+                    # objects, but never truncate floating point quota values.
+                    return int(value) if isinstance(value, str) else operator.index(value)
+                except (TypeError, ValueError, OverflowError):
+                    pass
+            raise ValueError(f"{name} 须为整数计数，收到 {value!r}")
+
+        self.nt_near_pages = _quota_integer(
+            "tli_near_pages", getattr(args, "tli_near_pages", None))
+        self.nt_near_tokens = None if _nt_off else _quota_integer("tli_near_tokens", _nt_raw)
+        self.nt_near_len = _quota_integer(
+            "tli_near_len", getattr(args, "tli_near_len", None))
         _geo = (self.nt_near_pages is not None or _nt_raw is not None
                 or self.nt_near_len is not None)
         if _geo:

@@ -1,0 +1,157 @@
+{
+  "baseline": "bf9b07994b187cdebfd5070d94b80d27292e73ec",
+  "source_sha256": "1ac64c9c4fa1d5c1885a29ed2c481edfab003f1266b6199daa079c29726a17e1",
+  "input_sha256": "f12004f7b402a9eed2dc1c070ef343fc46b20889f326f23dbcbdc36c0e07d76a",
+  "scope": "complete host constructor bodies; no tensor work",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "before_unittest": "Ran 3 tests; FAILED (failures=21, errors=3)",
+  "after_each_mode": "10 explicit + 3 partition ratio + 6 batch guard tests: OK",
+  "differential_normal": {
+    "truncated_fractional_inputs_before": 6,
+    "rejected_fractional_inputs_after": 6,
+    "identical_controls": 108,
+    "accepted_controls": 90
+  },
+  "differential_optimized": {
+    "truncated_fractional_inputs_before": 6,
+    "rejected_fractional_inputs_after": 6,
+    "identical_controls": 108,
+    "accepted_controls": 90
+  },
+  "regressions": [
+    {
+      "input": {
+        "tli_near_pages": -0.5,
+        "tli_near_tokens": 0,
+        "tli_near_len": 1024
+      },
+      "before": {
+        "nt_near_pages": -0.5,
+        "nt_near_tokens": 0,
+        "nt_near_len": 1024,
+        "alpha": 1.0,
+        "beta": 1.0,
+        "gamma": 1.0,
+        "sink_tokens": 64,
+        "sliding_window_size": 64
+      },
+      "after": {
+        "error": "ValueError",
+        "message": "tli_near_pages 须为整数计数，收到 -0.5"
+      }
+    },
+    {
+      "input": {
+        "tli_near_pages": 0.5,
+        "tli_near_tokens": 0,
+        "tli_near_len": 1024
+      },
+      "before": {
+        "nt_near_pages": 0.5,
+        "nt_near_tokens": 0,
+        "nt_near_len": 1024,
+        "alpha": 1.0,
+        "beta": 1.0,
+        "gamma": 1.0,
+        "sink_tokens": 64,
+        "sliding_window_size": 64
+      },
+      "after": {
+        "error": "ValueError",
+        "message": "tli_near_pages 须为整数计数，收到 0.5"
+      }
+    },
+    {
+      "input": {
+        "tli_near_pages": 0,
+        "tli_near_tokens": -0.5,
+        "tli_near_len": 1024
+      },
+      "before": {
+        "nt_near_pages": 0,
+        "nt_near_tokens": 0,
+        "nt_near_len": 1024,
+        "alpha": 1.0,
+        "beta": 1.0,
+        "gamma": 1.0,
+        "sink_tokens": 64,
+        "sliding_window_size": 64
+      },
+      "after": {
+        "error": "ValueError",
+        "message": "tli_near_tokens 须为整数计数，收到 -0.5"
+      }
+    },
+    {
+      "input": {
+        "tli_near_pages": 0,
+        "tli_near_tokens": 0.5,
+        "tli_near_len": 1024
+      },
+      "before": {
+        "nt_near_pages": 0,
+        "nt_near_tokens": 0,
+        "nt_near_len": 1024,
+        "alpha": 1.0,
+        "beta": 1.0,
+        "gamma": 1.0,
+        "sink_tokens": 64,
+        "sliding_window_size": 64
+      },
+      "after": {
+        "error": "ValueError",
+        "message": "tli_near_tokens 须为整数计数，收到 0.5"
+      }
+    },
+    {
+      "input": {
+        "tli_near_pages": 0,
+        "tli_near_tokens": 0,
+        "tli_near_len": -0.5
+      },
+      "before": {
+        "nt_near_pages": 0,
+        "nt_near_tokens": 0,
+        "nt_near_len": -0.5,
+        "alpha": 1.0,
+        "beta": 1.0,
+        "gamma": 1.0,
+        "sink_tokens": 64,
+        "sliding_window_size": 64
+      },
+      "after": {
+        "error": "ValueError",
+        "message": "tli_near_len 须为整数计数，收到 -0.5"
+      }
+    },
+    {
+      "input": {
+        "tli_near_pages": 0,
+        "tli_near_tokens": 0,
+        "tli_near_len": 0.5
+      },
+      "before": {
+        "nt_near_pages": 0,
+        "nt_near_tokens": 0,
+        "nt_near_len": 0.5,
+        "alpha": 1.0,
+        "beta": 1.0,
+        "gamma": 1.0,
+        "sink_tokens": 64,
+        "sliding_window_size": 64
+      },
+      "after": {
+        "error": "ValueError",
+        "message": "tli_near_len 须为整数计数，收到 0.5"
+      }
+    }
+  ],
+  "unverified": [
+    "full tensor-stack import",
+    "GPU selection/output",
+    "model quality",
+    "TTFT/performance/peak memory"
+  ],
+  "test_sha256": "1471684f6eaeb00bd5638f1505c9d4257e1ef2671adb2b2eae29a95bc9a479a5"
+}

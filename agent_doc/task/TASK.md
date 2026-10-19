@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [x] [TL-EXPLICIT-INTEGER-20261019] 固定配额nb/nt/nl禁止小数静默截断；修前21失败3错误，修后普通/-O各19项host回归通过，6反例拒绝、108对照不变；完整依赖/GPU/性能未验。([详情](task_details/TL-EXPLICIT-INTEGER-20261019.md))
+
 - [ ] [TL-EXPLICIT-NEAR-WIDTH-20261019] 固定配额nl<bs仍被旧整页保底放大，与D′标定不一致；210配置host复现，三行候选270错误→0；补丁仅留档、生产源码未改，实际选集/GPU/性能待验。([详情](task_details/TL-EXPLICIT-NEAR-WIDTH-20261019.md))
 
 - [x] [TL-PARTITION-RATIO-20261019] alpha/beta非法比例构造期拒绝；修前普通/-O各28子用例失败，修后各16项host回归通过，独立641构造差分通过；GPU/模型/性能未验，发布回读单独确认。([详情](task_details/TL-PARTITION-RATIO-20261019.md))

@@ -7,6 +7,7 @@ any Torch use fails. This remains runnable on audit hosts without Torch.
 import ast
 import json
 import math
+import operator
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -22,7 +23,7 @@ def load_constructors():
         def __getattr__(self, name):
             raise AssertionError('unexpected tensor work: ' + name)
 
-    scope = dict(os=os, math=math, json=json, torch=NoTensorWork(),
+    scope = dict(os=os, math=math, operator=operator, json=json, torch=NoTensorWork(),
                  DEFAULT_MASK='unused-with-layer-skip-disabled',
                  get_metrics=lambda: None)
     for filename, name in (('base.py', 'Indexer'),
