@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [x] [TL-EXPLICIT-ORACLE-20261020] 固定配额拒绝E151c prefill oracle混配；9个错误接受配置修复，普通/-O各25项host测试及212合法状态差分通过；GPU/质量/性能未验。([详情](task_details/TL-EXPLICIT-ORACLE-20261020.md))
+
 - [x] [TL-EXPLICIT-MODES-20261020] 固定配额拒绝sinkswa_only/MoBA/sigma旁路组合；15反例拒绝，普通/-O各21项host测试及181合法构造状态对照通过，GPU/性能未验。([详情](task_details/TL-EXPLICIT-MODES-20261020.md))
 
 - [x] [TL-DEBUG-OFF-20261020] 六处调试关闭契约统一：54次误入→0，普通/-O各24项host测试通过；固定配额与算法未改，实际GPU/性能待验。([详情](task_details/TL-DEBUG-OFF-20261020.md))

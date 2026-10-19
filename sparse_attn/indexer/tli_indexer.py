@@ -426,6 +426,13 @@ class TLIIndexer(TIAIndexer):
                 raise ValueError(
                     "固定配额几何须显式传 tli_near_len（E155d：几何派单下 "
                     "α/β/γ 禁传，near 区宽无比例规则回退）")
+            # E151c replaces far_budget only during prefill, overriding nt.
+            # Do not silently combine that per-layer experiment with a fixed
+            # nb/nt/nl contract (even if one layer happens to match its quota).
+            if self._e151c_quota is not None:
+                raise ValueError(
+                    "fixed geometry (tli_near_pages/tokens/len) cannot be combined "
+                    "with TLI_E151C_ORACLE_QUOTA (E151c prefill quota override)")
             # These branches return before fixed L2 quotas are consumed.
             # nt=off is fixed-budget free competition, not variable top-sigma.
             if self.sinkswa_only or self.moba_gate or self.sigma_select != "none":
