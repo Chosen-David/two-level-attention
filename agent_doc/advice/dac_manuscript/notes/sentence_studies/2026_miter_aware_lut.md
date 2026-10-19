@@ -318,3 +318,114 @@
   `For example, $K_1=128$ halves the near-page quota from 16 to 8 when $\beta$ drops from $.125$ to $.0625$, so rounding leaves far pages 112$\rightarrow$120; at $\beta=.0625$ the far-page quota rises despite the unchanged cap.`
   落位：替换原 "For $K_1=128$ and $\beta=.125$, L1 reserves 16 near and 112 far pages."（判例句把静态数字例升级为方向判例；16/8/112/120 全部为下文 Q2 已报数字与 round 规则的算术结果，无新数字。）
 - zh 同步直译。
+
+## §4 Experiments + §5 Conclusion（第 34 轮，第 7 篇收官）
+
+### §4.1 Experiment Setting（5 句）
+
+1. "We construct a comprehensive benchmark suite to evaluate the efficiency of our proposed LEC formulation framework."
+   - 基准构造开场句（We construct——评测资产本身是贡献姿态）。
+2. "This suite includes the circuit pairs derived from industrial LEC problem and the instances built from public sources: ForgeEDA, ITC99, EPFL, and Opencore."
+   - **工业+公开双源枚举句**：来源分层（industrial / public 四套件点名）。
+3. "To build the equivalent circuit pairs, each circuit is synthesized and conjunctive with the original one to form a miter. To build the inequivalent circuit pairs, we introduce small functional perturbations by randomly modifying a few nodes in the synthesized AIGERs before miter construction."
+   - **成对构造披露句×2**：等价对与不等价对的构造法各一句——正负两类测试都交代生成方式（防「只测容易的」质疑）。
+4. "All circuits are synthesized with ABC, and LUT networks are generated using a customized cost-driven mapper built on Mockturtle, restricted to 2-, 3-, and 4-input LUTs, since larger LUTs (i.e., ≥5 inputs) would produce exponentially more complex CNF encodings (2^n clauses) and thus hinder subsequent SAT solving."
+   - **工具链披露 + 限制带原因句**：restricted-to-X **since**-Y-would-hinder-Z——设计限制不是拍脑袋，有机理（2^n 子句）。
+5. "Each instance runs on a single Intel Xeon Platinum 8375C core with a 3,600 seconds timeout."
+   - 硬件/超时单句披露（RL-CCD 环境四件套的极简版）。
+
+### §4.2 Main Results（关键 7 句）
+
+1. "To validate the effectiveness of our proposed framework, we compare the solving time of LEC instances formulated by our framework (Ours) and the baseline flow (Baseline)."
+   - 验证目的开场句（To-validate + 双臂命名绑定 Ours/Baseline）。
+2. "The performance is measured using average PAR2 score, where any instance failing the 3,600s timeout is penalized with 7,200s."
+   - **指标定义带惩罚规则**：where-从句写明超时怎么罚（指标的可复现性在罚则里）。
+3. "The PAR2 score for 'Ours' includes both solving time and LUT mapping runtime, where the formulation overhead accounts for < 10%."
+   - **开销计入声明句（本文最诚实的一句）**：报告数字包含自己方法的 formulation 开销，且给出占比上限——「收益不是靠不计成本换来的」一句话锁死。对应我们「完整请求成本含准备维护选择」主张——他们有 <10% 数字，我们尚无，这是差距也是目标。
+4. "Besides, we also record the number of solved instance within 3,600s time limit as #Solved."
+   - 次指标补充句（#Solved 命名绑定）。
+5. "After formulating SAT instance..., we employ two state-of-the-art CNF-based SAT solvers (Kissat and CaDiCaL), two circuit-based SAT solvers (X-SAT and CSAT) and an advanced LEC engine (command cec in ABC, denoted as CEC in Table 2), respectively."
+   - **五引擎三分类枚举**：括注全名+表内简称绑定。
+6. "Since CEC constructs the miter and translates it to CNF before calling solver, our approach is seamlessly inserted as a plugin-like pre-CNF optimization layer."
+   - **Since-机制 + 插件式集成定位句**：与现有工具的关系一句话（plugin-like pre-CNF layer）——集成兼容性写成位置声明。
+7. "The results are summarized in Table 2, from which three key observations emerge. First, ... This is most dramatic with the CaDiCaL solver, where our approach reduces the PAR2 score by nearly an order of magnitude (from 856.6 to 67.4). Second, ... We attribute this to our framework's ability to leverage circuit-based methods for effective elimination—optimizations that CNF-based solvers cannot perform on their own. Third, our framework still provides a 66.49% PAR2 reduction when used with the advanced CEC engine. Therefore, our approach is fully compatible with existing LEC tools, acting as a powerful pre-processing step that provides additional simplification, logic packing, and solver-friendly reformulation."
+   - **「from which three key observations emerge」+ First/Second/Third 观察枚举**：表格解读结构化；每条观察 = 总括 + 最极端锚点（most dramatic + from 856.6 to 67.4 双数字）/ We-attribute-this-to 机理归因 / still-兼容性收口 + Therefore 三联收益收束。**Third 用 still**（连 LEC 引擎都能增益——弱场合仍成立是兼容性证据）。
+
+### §4.3 Ablation Studies（关键 9 句）
+
+1. "We further perform ablation studies to assess the effectiveness of the three key components in our framework using Kissat, the strongest solver among those tested."
+   - 消融总起句：三组件预告 + **求解器选择带理由**（the strongest——最难场合做消融）。
+2. "To assess the impact of our equivalence-preserving LUT mapping, we conduct an ablation study comparing the configurations with (Ours.) or without (Ours.w/o Equiv) the proposed method."
+   - **with/without 命名约定句**：臂名直接编码消融变量（Ours.w/o Equiv）。
+3. "Besides, we also evaluate the configurations with (w CCC) or without (w/o CCC) Clausal Congruence Closure."
+   - 第二消融轴引入（外部技术 CCC 的有/无）——**双轴消融 = 2×2 四设置**，证明与后续 CNF 级优化互补。
+4. "We include such comparison to demonstrate our LUT mapping provides benefits that are complementary to the subsequent CNF-based optimizations."
+   - **比较目的前置声明句**：为什么加第二轴——给互补性铺路（先说目的再给四设置）。
+5. "Here, Clausal Congruence Closure serves as a CNF-level circuit simplification technique... In contrast, our equivalence-preserving mapping operates at the circuit level during LUT decomposition..."
+   - **对照技术定位句对**：CCC 在 CNF 级 / 我们在电路级——**层次正交性**是互补性的论据。
+6. "We include both with and without CCC settings to demonstrate that our method is complementary to CNF-level simplification—our mapping enhances structural regularity before CNF translation, while CCC further eliminates redundancy after translation."
+   - **before/after 阶段互补句**（重复强调——两处出现，跨段呼应）。
+7. "Comparing Ours.w/o Equiv w/o CCC and Ours.w/o Equiv w CCC shows that CCC alone contributes a noticeable performance gain... However, when our equivalence-preserving mapping is enabled (Ours.w/o CCC), an even larger improvement is observed, indicating that preserving equivalence alignment early at the circuit level leads to substantially better clause reuse and stronger implication propagation."
+   - **成对走读 + However + indicating-that 归因收口**：指定比较哪两臂→结果→However 转折（我们的更大）→indicating-that 机理。
+8. "While we observe an average 5.3% PAR2 reduction across the entire dataset by using Gaussian-guided XOR modeling, the gain is especially significant on XOR-dense datapath circuits. Therefore, we perform a deeper analysis on 20 circuits constructed from 32×32 multipliers implemented with diverse architectures."
+   - **While-平均-深钻转折句（本轮最可移植范式）**：全集平均 modest → 子集显著 → Therefore 深钻 20 例。平均掩盖异质性时，深钻就是第二层证据。
+9. "These multipliers pose one of the most challenging verification tasks [19] due to their deep and XOR-dense structures."
+   - **子集难度合法性句**：深钻对象为什么选它——最难+机理（due to）。
+10. "First, a large improvement on solving efficiency is seen when our method is applied... With our method, all 20 XOR-dense instances are solved within 2,000 seconds. In contrast, the configuration without our Gaussian modeling solves only 7 instances by the 2,000s mark and 19 instances by 3,600s."
+    - **all-20 vs only-7 时间检查点计数对比**：两臂在两个时刻的解决数——分辨率比均值高一级。
+11. "Second, the two techniques are not conflicting, as they operate at different stages of the flow and can be applied simultaneously—Ours.w CCC achieves the best overall performance, yielding an average speedup of 36.8%."
+    - **不冲突声明句**：as-原因（不同阶段）+ 破折号最优组合数字——「能同时用」本身是结果。
+12. "To evaluate the effectiveness of our proposed solver-friendliness metric, we isolate it from the other two components and activate only the metric-guided LUT selection module (denoted as Ours.metric)."
+    - **隔离声明句**：we-isolate-it-from——单组件评估的纯净性交代。
+13. "Two baselines are included for comparison: Comp.1, from prior work [37], which employs a branching-based LUT cost function emphasizing structural complexity. Comp.2, from prior work [14], which uses area-oriented cost functions..."
+    - **外部基线带出处与机制描述**：每个基线 = 出处引用 + 一句话机制（比什么、差异在哪）。
+14. "As shown in Figure 4, Ours.metric consistently outperforms both Comp.1 and Comp.2 across the runtime range. Compared with Comp.1, it solves 5.5% more instances within 3,600 seconds and yields an overall 34.1% average speedup. These results demonstrate that our metric effectively captures solver-oriented behaviors beyond structural complexity, leading to a more solver-efficient formulation."
+    - outperforms + 双数字 + **These-results-demonstrate-that 收口**（结果→能力声明→leading-to 最终收益）。
+
+### §5 Conclusion（3 句）
+
+1. "This paper presented a mapping-based modeling framework for Logic Equivalence Checking."
+   - 一句总结句（presented 过去时，框架名）。
+2. "By integrating equivalence-preserving LUT mapping, Gaussian-guided XOR modeling, and solver-oriented LUT selection into a unified flow, our method formulates the miter into a structurally symmetric, algebraically simplified, and solver-efficient form."
+   - **By-integrating 三组件 + 三形容词形式收口**：三组件名第四次全文贯穿；形式三形容词与三组件一一对应（对称↔映射、代数↔高斯、高效↔选择）。
+3. "Experiments on comprehensive benchmarks confirm substantial and consistent improvements across multiple solver paradigms, demonstrating that modeling formulation can markedly enhance LEC efficiency and bridge the gap between logic synthesis and SAT-based formal verification."
+   - **experiments-confirm + demonstrating-that 论点回读 + bridge-the-gap 收口**：结论最后一句回到摘要 contends 的同一主张（建模与求解器同等重要）+ 呼应 Intro 尾句 "forges a conceptual bridge"——**首尾三重闭环**（摘要论点→Intro 概念桥→结论 bridge-the-gap）。"substantial/consistent/markedly" 属判词（诚实边界排除；我们的结论用数字复述替代）。
+
+### 入库范式（本轮新增）
+
+- **成对构造披露句**（等价对+不等文对各自的生成法——正负测试都交代）
+- **限制带原因句**（restricted-to-X since-Y-would-hinder-Z，机理级理由）
+- **开销计入声明句**（报告数字含自身 formulation 开销 + 占比上限 <10%——收益不靠隐藏成本）
+- **指标定义带惩罚规则**（超时罚则写进 where-从句）
+- **插件式集成定位句**（Since-机制 + plugin-like pre-CNF layer——兼容性写成位置声明）
+- **「from which three key observations emerge」+ First/Second/Third 观察枚举**（每条=总括+最极端锚点/机理归因/still-弱场合）
+- **most-dramatic + from-to 双数字锚**（856.6→67.4）
+- **Third-still 兼容性证据句**（弱场合仍成立）
+- **with/without 命名约定**（臂名编码消融变量）+ **双轴 2×2 消融设计**
+- **比较目的前置声明句**（为什么加第二轴先说）
+- **层次正交性定位句对**（CCC 在 CNF 级 / 我们在电路级）
+- **成对走读 + However + indicating-that 归因收口**
+- **While-平均-深钻转折句**（全集平均 modest→子集显著→Therefore 深钻——平均掩盖异质性时深钻是第二层证据）
+- **子集难度合法性句**（深钻对象=最难+due-to 机理）
+- **all-N vs only-M 时间检查点计数对比**（两个时刻两臂解决数，分辨率高于均值）
+- **不冲突声明句**（as-不同阶段 + 最优组合数字——「能同时用」是结果）
+- **隔离声明句**（we-isolate-it-from 单组件纯净性）
+- **外部基线带出处+机制描述**（每基线=引用+一句话差异）
+- **These-results-demonstrate-that 收口**（结果→能力→最终收益三连）
+- **结论三句式**（一句总结 / By-integrating 三组件+三形容词一一对应 / experiments-confirm+bridge-the-gap 论点回读——首尾三重闭环）
+
+诚实边界排除：substantial/consistent/markedly/dramatic（判词）；我们的结论以数字复述替代判词（已达成）；「开销计入声明」是我们的目标差距——需完整请求测量给出占比后才能写同款句。
+
+## 与我们手稿的对照（收官总结）
+
+- **开销计入声明句**是我们与本文最大的诚实姿态差距：他们写 "includes both solving time and LUT mapping runtime, where the formulation overhead accounts for <10%"；我们只能说 "still requires matched quality and complete-request cost"——目标一致，缺的是那个 <10% 级别的数字。这是投稿后第一优先实验（完整请求 E2E 计时含准备维护选择）。
+- **While-平均-深钻转折句**：我们门控段有现成素材（AVG 降 .034/.218 vs HotpotQA 降 1.05/1.26）但写成三个平列句。→ 本轮修改点。
+- 结论三句式：我们结论段已有数字复述版（β 0.99 分、58.96、1.58 分），比本文判词版更符合诚实边界；By-integrating 三组件收口句可对照检查（我们结论首句 "We studied shared low-frequency page/token scoring and regional allocation" 已是等价物）。不硬套。
+
+## 本轮修改（第 34 轮）
+
+- en（门控段 While-平均-深钻转折句，合并三句为两句）：
+  旧：`...decreases of .034 and .218 points. AVG is the primary quality measure. Three tasks decline in each arm, including HotpotQA by 1.05 and 1.26 points; these differences describe heterogeneity, not a per-task zero-loss requirement.`
+  新：`...decreases of .034 and .218 points. While the AVG decreases are small, three tasks decline in each arm, including HotpotQA by 1.05 and 1.26 points; AVG remains the primary quality measure, and these differences describe heterogeneity, not a per-task zero-loss requirement.`
+  （Miter §4.3.2 "While we observe an average 5.3%...the gain is especially significant on XOR-dense datapath circuits" 句式：平均口径与逐任务口径在同一 While 从句里对撞，异质性不用额外解释句；"small" 由句内 .034/.218 vs 1.05/1.26 四个数字锚定。AVG 主判据声明保留。）
+- zh 同步直译。
