@@ -125,6 +125,57 @@ def _add_clusterkv_args(parser: argparse.ArgumentParser):
                        help='官方 top-k 命中率统计（默认关闭）')
     return parser
 
+def _add_asynctls_args(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title='asynctls')
+    # AsyncTLS vendor（C 轨语义复现，arXiv:2604.07815，无官方开源仓库）：三级流水
+    # Stage-1 块粗筛（B=64，top-kb=128 块 ≈8192 token）+ Stage-2 channel 细筛
+    # （Double-Sparsity 校准 top-dc=32 channel + INT4 key + 组内平均 softmax）+
+    # Stage-3 全维 KV sparse attn。channel_file 由
+    # exp/vendor_baselines/asynctls_vendor/identify_channel.py 校准产出（必填）。
+    group.add_argument('--asynctls_channel_file', type=str, default=None,
+                       help='Double-Sparsity channel 校准文件（identify_channel.py 产出；'
+                            'None = 拒绝启动）')
+    group.add_argument('--asynctls_token_budget', type=int, default=1024,
+                       help='Stage-3 最终 token 预算（论文口径：RULER 512 / LongBench 1024）')
+    group.add_argument('--asynctls_block_size', type=int, default=64,
+                       help='Stage-1 块长（论文默认 64）')
+    group.add_argument('--asynctls_top_kb', type=int, default=128,
+                       help='Stage-1 保留块数（论文默认 128，≈8192 token 候选）')
+    return parser
+
+
+def _add_jssa_args(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title='jssa')
+    # JSSA vendor（B 轨官方 vLLM patch 语义 torch 等价，arXiv:2610.19026v1）。
+    # 单级 token 稀疏 decode：校准基 M=TopEig_r(G_Qm/tr+G_K/tr)（r=32）+ 投影打分
+    # top-budget/head + 精确注意力；prefill dense。basis_path 由
+    # third_party/JSSA/calibration/jssa_calibrate.py 产出（必填，None=拒绝启动）。
+    # 主表预算口径对齐 K2=1024：budget = 每 kv head top-B token（GQA 组内共享）。
+    group.add_argument('--jssa_budget', type=int, default=1024,
+                       help='JSSA 每 kv head top-B token 预算（主表口径对齐 K2=1024）')
+    group.add_argument('--jssa_rank', type=int, default=32,
+                       help='JSSA 投影子空间秩 r（官方默认 head_size//4=32 for d=128）')
+    group.add_argument('--jssa_basis_path', type=str, default=None,
+                       help='JSSA 校准基 .pt（jssa_calibrate.py 产出 {"M": {layer: [H_kv,r,d]}}；'
+                            'None = 拒绝启动）')
+    return parser
+
+
+def _add_hisa_args(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group(title='hisa')
+    # HISA vendor（B 轨官方 kernel 语义 torch 等价，COLM 2026 / arXiv:2603.28458v4）。
+    # 两级 indexer：Stage-1 块均值池化 + Q·BlockedK 线性打分 + 首/末块 +inf 保护 +
+    # top-block_topk 块；Stage-2 块内全分辨率打分 + top-hisa_budget token。
+    # 官方 TileLang kernels：third_party/tilelang_dsa_hisa/（MIT，pinned 7940102813）。
+    group.add_argument('--hisa_budget', type=int, default=1024,
+                       help='最终 token 预算（对齐主表 K2=1024；论文默认 topk_tokens=1024）')
+    group.add_argument('--hisa_k_block_size', type=int, default=128,
+                       help='Stage-0 块长（官方默认 128）')
+    group.add_argument('--hisa_block_topk', type=int, default=64,
+                       help='Stage-1 保留块数（官方默认 64，≈64×128=8192 token 候选）')
+    return parser
+
+
 def _parse_gamma(x):
     """E122：γ 支持 'off'（大小写不敏感）→ None = 自由竞争模式。
 
@@ -212,6 +263,16 @@ def _add_tli_args(parser: argparse.ArgumentParser):
     group.add_argument('--tli_gamma', type=_parse_gamma, default=1.0,
                        help='near 细筛 token 折扣（E64 gamma）；off=自由竞争'
                             '（E122：取消 near/far L2 配额分割，mid 单池 topk 竞争）')
+    # ---- E155 固定配额几何（用户 2026-10-19 拍板：nt/nb 绝对配额全面转向）----
+    group.add_argument('--tli_near_pages', type=int, default=None,
+                       help='E155 固定配额：near 块数 nb_near 显式整数（覆盖 round(K1·β)）；'
+                            '须与 tli_near_tokens 同时传入')
+    group.add_argument('--tli_near_tokens', type=int, default=None,
+                       help='E155 固定配额：near token 配额 nt_near 显式整数（覆盖 min(nb·64·γ, K2_mid)）；'
+                            'far_budget = K2_mid − nt_near')
+    group.add_argument('--tli_near_len', type=int, default=None,
+                       help='E155 固定配额：near 区宽度 near_L 显式整数 token 数（覆盖 α·mid_len 规则）；'
+                            'L 轴扫描用，缺省回退比例规则')
     group.add_argument('--tli_subspace', type=str, default='full',
                        choices=['full', 'rope', 'nope', 'tail', 'random', 'highfreq', 'mla_rope'],
                        help='子空间选择: full=全128维(默认) / rope=前64旋转维 / nope=后64非旋转维 / tail=旧口径低频尾维32(E71/B7/C0复现) / '
@@ -285,7 +346,7 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'moba_vendor', 'tia', 'twi', 'tli', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'moba_vendor', 'clusterkv_vendor', 'asynctls_vendor', 'hisa_vendor', 'jssa_vendor', 'tia', 'twi', 'tli', 'none'])
     parser = _add_quest_args(parser)
     parser = _add_minference_args(parser)
     parser = _add_fasa_args(parser)
@@ -295,6 +356,9 @@ def add_sparse_attn_args(parser: argparse.ArgumentParser):
     parser.add_argument('--ffd_cache_length', type=int, default=131200)
     parser = _add_moba_args(parser)
     parser = _add_clusterkv_args(parser)
+    parser = _add_asynctls_args(parser)
+    parser = _add_hisa_args(parser)
+    parser = _add_jssa_args(parser)
     parser = _add_twilight_args(parser)
     parser = _add_tia_args(parser)
     parser = _add_tli_args(parser)

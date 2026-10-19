@@ -349,6 +349,27 @@ class TLIIndexer(TIAIndexer):
         # （取消 L2 near/far 配额分割，mid 单池 topk，见 compute_mask use_partition
         # 分支的 γ=off 段）；数值照旧 float。缺省 1.0 兼容不传该参数的旧 harness。
         self.gamma = getattr(args, "tli_gamma", 1.0)
+        # ---- E155 固定配额几何（用户 2026-10-19 拍板：全面转向 nt/nb 绝对配额）----
+        # 三参数显式传入时优先于 α/β/γ 比例语义（内部换算后覆盖），None 回退
+        # 旧比例路径逐位不变。语义映射（K1/K2 固定部署口径）：
+        #   nb_near = tli_near_pages        （旧 = max(1, round(K1·β))）
+        #   nt_near = tli_near_tokens       （旧 = min(nb_near·bs·γ, K2_mid)）
+        #   near_L  = tli_near_len          （旧 = max(bs, int(α·mid_len))）
+        # far 侧均为减法：nb_far = K1 − nb_near；far_budget = K2_mid − nt_near。
+        self.nt_near_pages = getattr(args, "tli_near_pages", None)
+        self.nt_near_tokens = getattr(args, "tli_near_tokens", None)
+        self.nt_near_len = getattr(args, "tli_near_len", None)
+        if (self.nt_near_pages is not None or self.nt_near_tokens is not None
+                or self.nt_near_len is not None):
+            # 显式几何要求全部三值齐备（near_L 允许缺省回退 α·mid_L 规则）
+            if self.nt_near_pages is None or self.nt_near_tokens is None:
+                raise ValueError(
+                    "tli_near_pages/tli_near_tokens 必须同时显式传入（固定配额几何"
+                    "不混配比例参数；near_L 可用 tli_near_len 单独固定）"
+                )
+            # 激活分区（等价 α>0 且 β>0 的几何条件，避免落单池分支）
+            if not (self.alpha > 0 and self.beta > 0):
+                self.alpha, self.beta = 1.0, 1.0  # 仅激活 e64_partition 几何，实际值由绝对参数覆盖
         # E151c is implemented only in the E64 split-budget top-k branches.
         # Other selection modes return before those branches or use a different
         # budget contract; accepting the table there would silently ignore it.
@@ -1946,7 +1967,11 @@ class TLIIndexer(TIAIndexer):
         if e64_partition:
             sink_tok = self.sink_tokens          # E135：强制区宽单一事实源
             mid_len = max(0, S_real - sink_tok - swa_tok)
-            near_len_dyn = max(bs, int(self.alpha * mid_len))  # near 只算 mid 部分（不含 swa）
+            if self.nt_near_len is not None:
+                # E155 固定几何：near 区宽显式整数（α·mid_len 规则被覆盖）
+                near_len_dyn = max(bs, int(self.nt_near_len))
+            else:
+                near_len_dyn = max(bs, int(self.alpha * mid_len))  # near 只算 mid 部分（不含 swa）
             near_base = S_real - swa_tok   # near 右界 = swa 起点（B10；真实 S 口径 F5）
         elif self.far_select != "4bit" and self.alpha == 0 and self.beta == 0:
             # TASK.md L231 严格口径：cluster 组合 (0,0) 单池点 = 纯 cluster 全 mid
@@ -2010,7 +2035,11 @@ class TLIIndexer(TIAIndexer):
             ).mean(dim=-2)
         if e64_partition:
             # ---- E64 L1 双池：far 池=minmax 上界分（α 区外），near 池=avg 分（近区）----
-            nb_near = max(1, int(round(k1 * self.beta)))
+            if self.nt_near_pages is not None:
+                # E155 固定配额：nb_near 显式整数（β 语义被覆盖）
+                nb_near = max(0, int(self.nt_near_pages))
+            else:
+                nb_near = max(1, int(round(k1 * self.beta)))
             # TASK.md L158 严格口径：far_budget_page_topk = budget_page_topk
             # − near_budget_page_topk（无保底；topk k=0 已验证安全）
             nb_far = max(0, k1 - nb_near)
@@ -2334,7 +2363,11 @@ class TLIIndexer(TIAIndexer):
                         # （cavg/ccluster 的 far 簇分路径同样按 γ 切
                         # near_token/far_token 预算；原「cavg far_tokens=512
                         # γ 死参数」回归口径随 E109a 污染重跑一并废弃）
-                        nt_near = min(int(nb_near * bs * self.gamma), K2_mid)
+                        if self.nt_near_tokens is not None:
+                            # E155 固定配额：nt_near 显式整数（γ 语义被覆盖）
+                            nt_near = min(int(self.nt_near_tokens), K2_mid)
+                        else:
+                            nt_near = min(int(nb_near * bs * self.gamma), K2_mid)
                         # TASK.md L172 严格口径（与 E109a-γ 同步）：无 64 保底
                         far_budget = max(0, K2_mid - nt_near)
                         if oracle_far_budget is not None:
@@ -2366,7 +2399,11 @@ class TLIIndexer(TIAIndexer):
                     # near_budget_token（去掉旧 64 保底——γ 高值下 far=0 即
                     # near 让渡满额，topk k=0 已验证安全）
                     if e64_partition:
-                        nt_near = min(int(nb_near * bs * self.gamma), K2_mid)
+                        if self.nt_near_tokens is not None:
+                            # E155 固定配额：nt_near 显式整数（γ 语义被覆盖）
+                            nt_near = min(int(self.nt_near_tokens), K2_mid)
+                        else:
+                            nt_near = min(int(nb_near * bs * self.gamma), K2_mid)
                         far_budget = max(0, K2_mid - nt_near)
                         if oracle_far_budget is not None:
                             # E151c oracle 逐层配额终审（minmax/avg 臂实际走本分支）
