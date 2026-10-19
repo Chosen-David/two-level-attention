@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [ ] [TL-PREFILL-SCORE-BUDGET-20261019] candidate eager GQA行块预算漏算查询头；源码绑定反例推导单score为928MiB而预算512MiB。仅审计/复现，非GPU峰值或OOM；生产修复待实际张量与GPU验证。([详情](task_details/TL-PREFILL-SCORE-BUDGET-20261019.md))
+
 - [x] [TL-SUMMARY-VALIDATION-20261019] CPU汇总复用单次协议校验/样本索引，逐行门禁不变；普通/-O各34项通过，512样本配对中位4392.28→47.41ms。非GPU/请求收益。([详情](task_details/TL-SUMMARY-VALIDATION-20261019.md))
 
 - [ ] [TL-PREFILL-SIGMA-CAP-20261019] top-σ 可变基数使用真实 mask 容量，修复 candidate 无组截断；普通/-O各108项CPU回归及独立各10case通过，GPU/性能及历史重测未验。([详情](task_details/TL-PREFILL-SIGMA-CAP-20261019.md))
