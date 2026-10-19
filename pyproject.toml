@@ -1,0 +1,43 @@
+# two-level-attention 研究/评测环境声明（uv 管理）
+#
+# 用法：uv sync --python /home/fluentllmenv/bin/python（或任意 3.11 解释器）
+# 跨机同步纪律：.venv 不进 git（机器相关二进制/绝对路径）；git 只同步
+# pyproject.toml + uv.lock，各节点 uv sync 重建逐位一致的环境。
+# flash-attn 为本地编译 wheel（pypi 只有 sdist），经 tool.uv.sources 指向
+# BeeGFS 共享盘 /mnt/dolphinfs/.../tla/wheels/（全机群可达）。
+# pylibraft(ClusterKV) 不在此环境：pypi 无 24.10 wheel，走 conda env clusterkv。
+
+[project]
+name = "tla-env"
+version = "0.1.0"
+requires-python = "==3.11.*"
+dependencies = [
+    # 核心推理栈（对齐 fluentllmenv 实测工作版本）
+    "torch==2.8.0",
+    "transformers==4.56.2",
+    "accelerate==1.10.1",
+    "triton==3.4.0",
+    "einops==0.8.2",
+    # 数据与评测
+    "datasets==4.0.0",
+    "numpy==2.4.4",
+    "scipy==1.17.1",
+    "pandas==3.0.2",
+    "tqdm==4.67.3",
+    "jieba==0.42.1",
+    "rouge==1.0.1",
+    # 模型 IO
+    "safetensors==0.7.0",
+    "tiktoken==0.12.0",
+    "protobuf==7.34.1",
+    "openai==1.99.1",
+    # pypi 无预编译 wheel；本机 H20 源码编译（sm90-only），wheel 存 BeeGFS
+    # sha256=06abc578bf4d3fb41f57c307b12f34361ee18e2d196d21e689707fc1c5b3bfe7
+    "flash-attn==2.8.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+flash-attn = { path = "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/wheels/flash_attn-2.8.3-cp311-cp311-linux_x86_64.whl" }
