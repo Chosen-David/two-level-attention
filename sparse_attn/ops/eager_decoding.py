@@ -352,6 +352,12 @@ def _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero=False):
                       f"K 的 stride 寻址 V，非同布局 V 必错址）")
     if int(block_size) != block_size or int(block_size) < 1:
         _fail(f"block_size={block_size} 非正整数")
+    # A singleton token axis broadcasts in torch.where. Without this check,
+    # a one-slot mask can silently select every cached key in the dense
+    # fallback. Extra block padding is valid and is cropped by the consumer.
+    if mask.shape[-1] * block_size < k.shape[-3]:
+        _fail(f"mask must cover all K/V tokens: blocks={mask.shape[-1]}, "
+              f"block_size={block_size}, tokens={k.shape[-3]}")
     if mask.dim() < 2:
         _fail(f"mask 维度 {mask.dim()} < 2（须为 [..,R,blocks]）")
     R = mask.shape[-2]
