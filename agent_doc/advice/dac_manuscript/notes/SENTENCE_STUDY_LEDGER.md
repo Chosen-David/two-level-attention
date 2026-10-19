@@ -29,6 +29,16 @@
 
 ## 修改日志
 
+### 第 38 轮（2026-10-19，**优势写作策略轮（用户提问）**：结合 best paper 范式分析优势写法并落地）
+
+- **用户提问**：「思考论文表述结合 best paper 分析如何写出我们的优势」。
+- **优势资产分层**：T1 同预算质量优势（K2=512 对 AsyncTLS 同词元预算 +5.91、Quest 三档全胜；JSSA +0.59 噪声带边缘只能并列）＞ T2 可控轴优势（β 三点倒 U＝两区联合必要；配额保底 0.00→.27）＞ T3 极限保持（128K 98.49%）＞ T4 诊断方法论（0.84/.51/.24 已绑 P4）；边界＝Llama -2.31 写成范围声明。不可主张：联合质量-时延收益／统计非劣／因果隔离／significantly 级判词。
+- **范式映射**：Gemmini/Miter alone×2 ↔ β 曲线（近重/远重/均衡三点）；Miter 最极端锚点句 ↔ K2=384 崩塌 15.00 与 98.49% 保持锚；claim-first 段首 ↔ Budget-aligned 段；数字即判词（retains .84 / leads by 5.91 at matched budget）与诚实边界天然兼容。
+- **落地 2 处（en+zh）**：(1) Budget-aligned 段 claim-first 重排——最强主张（同预算胜 AsyncTLS +5.91）从第二分句提至段首：「At AsyncTLS's token budget of 512, the half-budget arm scores 56.00 against the port's 50.09 ($+5.91$)」；JSSA 保持 versus 并列（噪声带边缘不做 exceeds 宣称）。(2) 128K 句改 stress 锚点开题：「At the farthest length, a same-machine 128K pair retains 98.49\% of the 46.43 dense anchor」。
+- **零余量版式第 10 次触发与回收**：两处重排净增约 10 词把 AI 声明整块挤回第 6 页；回收：删「placing the floor between 512 and 384」（S8 已有下界披露）、删「the selector scores」（主语承前省略）、删「the farthest measured」的 measured、128K 历史句「with execution unverified and the」→「execution unverified,」。en 回 6 页。
+- **下轮候选（已起草，待配压缩入稿）**：提案 3 β 曲线 alone×2 收口句「Near-heavy and far-heavy arms sit 0.99 and 1.22 points below the balanced peak」（纯数字带方向）；提案 4 结论优势汇成句「The balanced allocation is bracketed on both sides, the half-budget arm leads ported AsyncTLS, and the 128K pair retains 98.49\% of dense quality」。
+- **版式验证**：en 6 页（AI 声明完整第 5 页）、zh 6 页、0 LaTeX Warning；机械门新增句 0 违规。
+
 ### 第 37 轮（2026-10-19，数据检查 + Intro P1–P5 范式自查）
 
 - **新数据检查（协议更新后首轮）**：远端无新提交；`exp/trace/results/` 无新判决 JSON（11:00 后仅一条 AsyncTLS 128K yarn receipt 原始生成件，尚无 formal 判决，不入稿）。
