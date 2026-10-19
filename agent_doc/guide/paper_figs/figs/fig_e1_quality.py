@@ -80,6 +80,16 @@ tli_scores = [mv["avg16"], lb["lbv2_503"]["mavg_new"], ruler_mavg]
 # quest_vendor.json 程序化读取）。主方法 TLI 臂不动，只追加 baseline 臂。
 quest_scores = [41.35, 30.22, ruler_quest]
 QUEST_SRC = "main_table_quest_vs_tli_draft.md §1/§2 + e119_ruler128k_formal_quest_vendor.json"
+# FASA（表示轴，deepseek 轨接入）：LBv1 = fasa_lb_16.json AVG16；LBv2 =
+# pred_fasa_1024_lbv2/pred/result.json score；RULER 128K 未测（方法局限，仅
+# RULER 32K 6/11 任务 s1=0），按缺失留空（np.nan），不做外推。程序化读取。
+_fasa_lb1 = json.load(open(R + "fasa_lb_16.json"))
+_fasa_lb2 = json.load(open(
+    REPO + "/exp/results_longbench_fasa/Qwen3-8B/"
+    "pred_fasa_1024_lbv2/pred/result.json"))
+fasa_scores = [_fasa_lb1["AVG16"], list(_fasa_lb2.values())[0]["score"], np.nan]
+FASA_SRC = ("exp/trace/results/fasa_lb_16.json + "
+            "exp/results_longbench_fasa/Qwen3-8B/pred_fasa_1024_lbv2/pred/result.json")
 
 # ---------------- 画布 1x2 ----------------
 fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(20, 9),
@@ -110,19 +120,28 @@ ax_a.text(0.98, 0.03, "avg16: 48.11 (FullKV) vs 48.90 (TLI)", transform=ax_a.tra
 
 # ---- (b) 套件级总分 ----
 xb = np.arange(3)
-w = 0.26
-ax_b.bar(xb - w, fullkv_scores, width=w, color=C_NEU, label="dense FullKV",
+w = 0.19
+ax_b.bar(xb - 0.285, fullkv_scores, width=w, color=C_NEU, label="dense FullKV",
          edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
-ax_b.bar(xb, quest_scores, width=w, color=C_SEC, label="Quest vendor (K=1024)",
+ax_b.bar(xb - 0.095, quest_scores, width=w, color=C_SEC, label="Quest vendor (K=1024)",
          edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
-ax_b.bar(xb + w, tli_scores, width=w, color=C_MAIN, label="TLI (mavg, K2=1024)",
+ax_b.bar(xb + 0.095, fasa_scores, width=w, color=C_HL, label="FASA vendor (K=1024)",
          edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
-for xi, v in zip(xb - w, fullkv_scores):
-    ax_b.text(xi, v + 0.8, f"{v:.2f}", ha="center", fontsize=FONT_SIZES["annotation"] - 3)
-for xi, v in zip(xb, quest_scores):
-    ax_b.text(xi, v + 0.8, f"{v:.2f}", ha="center", fontsize=FONT_SIZES["annotation"] - 3)
-for xi, v in zip(xb + w, tli_scores):
-    ax_b.text(xi, v + 0.8, f"{v:.2f}", ha="center", fontsize=FONT_SIZES["annotation"] - 3)
+ax_b.bar(xb + 0.285, tli_scores, width=w, color=C_MAIN, label="TLI (mavg, K2=1024)",
+         edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
+for xi, v in zip(xb - 0.285, fullkv_scores):
+    if not np.isnan(v):
+        ax_b.text(xi, v + 0.8, f"{v:.2f}", ha="center", fontsize=FONT_SIZES["annotation"] - 3)
+for xi, v in zip(xb - 0.095, quest_scores):
+    if not np.isnan(v):
+        ax_b.text(xi, v + 0.8, f"{v:.2f}", ha="center", fontsize=FONT_SIZES["annotation"] - 3)
+for xi, v in zip(xb + 0.095, fasa_scores):
+    if not np.isnan(v):
+        ax_b.text(xi, v + 0.8, f"{v:.2f}", ha="center",
+                  fontsize=FONT_SIZES["annotation"] - 3)
+for xi, v in zip(xb + 0.285, tli_scores):
+    if not np.isnan(v):
+        ax_b.text(xi, v + 0.8, f"{v:.2f}", ha="center", fontsize=FONT_SIZES["annotation"] - 3)
 ax_b.set_xticks(xb)
 ax_b.set_xticklabels(suites)
 ax_b.set_ylabel("task score")
@@ -130,13 +149,16 @@ ax_b.set_title("Suite-level totals", loc="left", pad=10)
 ax_b.legend(ncol=2, loc="upper center", bbox_to_anchor=(0.5, 1.12),
             fontsize=FONT_SIZES["legend"] - 3)
 ax_b.set_ylim(0, 62)
-ax_b.text(0.02, 0.02, "tail32 AVG5: "
-          + f"{t32:.2f}, Δ{e133['avg']['delta']:+.2f} CI[{t32_ci[0]:.2f},{t32_ci[1]:.2f}]"
+ax_b.text(0.005, 0.005, "tail32 AVG5: "
+          + f"{t32:.2f}, Δ{e133['avg']['delta']:+.2f} "
+          + f"CI[{t32_ci[0]:.2f},{t32_ci[1]:.2f}]"
           + "\nLB v1 FullKV 13-task reused pre-E121"
-          + "\nRULER 128K: both arms collapse vs 32K (yarn 4.0 extrapolation),"
-          + "\nTLI retention 51.7% — long-context quality boundary (E146 formal)"
-          + "\nQuest LBv1/LBv2 from main_table draft; ClusterKV pending",
-          transform=ax_b.transAxes, fontsize=FONT_SIZES["annotation"] - 5,
+          + "\nRULER 128K: both arms collapse (yarn 4.0); "
+          + "TLI retention 51.7% (E146)"
+          + "\nQuest LBv1/LBv2 draft; FASA vendor; "
+          + "FASA RULER 128K untested (6/11 @32K, s1=0)"
+          + "\nClusterKV/MoBA pending",
+          transform=ax_b.transAxes, fontsize=FONT_SIZES["annotation"] - 6,
           color=pal["neutral"], va="bottom", style="italic")
 
 # 面板字母（轴内左上角，与轴外顶部 legend 不冲突）
@@ -167,17 +189,23 @@ for t in tasks:
     rows.append(f"E1\ta\t{t}\tpaired_delta\tpoints\t{delta[t]:+.2f}\t\t\t{src116}:arms.*.per_task.{t}")
     rows.append(f"E1\ta\t{t}\tfullkv\tscore\t{fk['per_task'][t]:.2f}\t\t\t{src116}")
     rows.append(f"E1\ta\t{t}\ttli_mavg\tscore\t{mv['per_task'][t]:.2f}\t\t\t{src116}")
-for s, fv, tv, qv in zip(("lbv1_16", "lbv2_503", "ruler_128k"),
-                         fullkv_scores, tli_scores, quest_scores):
+for s, fv, tv, qv, fsa in zip(("lbv1_16", "lbv2_503", "ruler_128k"),
+                              fullkv_scores, tli_scores, quest_scores,
+                              fasa_scores):
     src_r = "e146_ruler128k_verdict.json (E146 formal)" if s == "ruler_128k" \
         else f"{src116}/e116b_ruler128k"
     rows.append(f"E1\tb\t{s}\tfullkv\tscore\t{fv:.2f}\t\t\t{src_r}")
     rows.append(f"E1\tb\t{s}\ttli_mavg\tscore\t{tv:.2f}\t\t\t{src_r}")
     rows.append(f"E1\tb\t{s}\tquest\tscore\t{qv:.2f}\t\t\t{QUEST_SRC}")
+    _fsa = f"{fsa:.2f}" if not np.isnan(fsa) else ""
+    rows.append(f"E1\tb\t{s}\tfasa\tscore\t{_fsa}\t\t\t{FASA_SRC}")
     rows.append(f"E1\tb\t{s}\tclusterkv\tscore\t\t\t\tpending")
 rows.append("E1\b_note\te116b_tli_128k_invalid\tnote\t-\t"
             "niah_single 100/100/99 = FullKV-shaped, sparse path not effective; "
             "superseded by E146 formal 23.98")
+rows.append("E1\b_note\tfasa_ruler128k_missing\tnote\t-\t"
+            "FASA RULER 128K untested (method limits: only RULER 32K 6/11 "
+            "tasks with s1=0); not extrapolated")
 rows.append(f"E1\tb\ttail32_avg5\tscore\t{t32:.2f}\t{t32_ci[0]:.2f}\t{t32_ci[1]:.2f}\t"
             "e133_subspace_verdict.json")
 with open(os.path.join(OUT, "E1_quality_figure_data.tsv"), "w") as f:

@@ -25,11 +25,6 @@ Host wys_8xh20
   User wangyuanshuo02
   Port 8416
 
-Host wys2-8xh20 （不可用，被删除了已经）
-  HostName 33.32.33.24
-  User wangyuanshuo02
-  Port 8416
-
 
 Host wys-4xh20
   HostName 10.238.122.187
@@ -41,6 +36,19 @@ Host 2xh20-8100
   HostName 10.238.139.251
   User wangyuanshuo02
   Port 8416
+
+Host 2xh20-reg0519
+    HostName        10.245.58.57
+    User            wangyuanshuo02
+    Port            8416
+
+Host wys-dsa
+  HostName 10.245.84.251
+  User wangyuanshuo02
+  Port 8416
+
+
+
 密码均为：zHWXp=eK5JvX~I|v
 ```
 记得合理分配任务链给所有的CPU，GPU资源，尽量并行化起来，记住不要免密码登录要输入密码登录才行
