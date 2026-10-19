@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [x] [TL-DEBUG-OFF-20261020] 六处调试关闭契约统一：54次误入→0，普通/-O各24项host测试通过；固定配额与算法未改，实际GPU/性能待验。([详情](task_details/TL-DEBUG-OFF-20261020.md))
+
 - [x] [TL-ENUM-CONTRACT-20261020] 四个选择枚举不再被-O取消校验；32非法构造拒绝，336合法对照不变，普通/-O各21项host测试通过；Torch依赖/GPU/性能未验。([详情](task_details/TL-ENUM-CONTRACT-20261020.md))
 
 - [x] [TL-EXPLICIT-INTEGER-20261019] 固定配额nb/nt/nl禁止小数静默截断；修前21失败3错误，修后普通/-O各19项host回归通过，6反例拒绝、108对照不变；完整依赖/GPU/性能未验。([详情](task_details/TL-EXPLICIT-INTEGER-20261019.md))

@@ -578,7 +578,8 @@ class TLIIndexer(TIAIndexer):
         pair_mag = qm[:64] + qm[64:]                     # [64]（频率 j）
         top_pairs = torch.topk(pair_mag, 16).indices     # 频率 j
         self._pair_idx = torch.cat([top_pairs, top_pairs + 64]).sort().values.to(q.device)
-        if os.environ.get("TLI_DEBUG") and self.layer_idx is not None:
+        if (os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                and self.layer_idx is not None):
             print(f"[E85f] L{self.layer_idx} static pairs (freq j): "
                   f"{sorted(top_pairs.tolist())}", flush=True)
 
@@ -654,7 +655,8 @@ class TLIIndexer(TIAIndexer):
         # 消费「完整 prompt 标定」的决策（未来后缀影响较早 chunk 路由的
         # 非因果缺陷修复）。对现产线（decode 才消费）等价。
         self._dyn_skip_pending = bool(r_l < self.dyn_dgate_eps)
-        if os.environ.get("TLI_DEBUG") and self.layer_idx is not None:
+        if (os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                and self.layer_idx is not None):
             print(f"[E137] L{self.layer_idx} r_l={r_l:.6f} eps={self.dyn_dgate_eps} "
                   f"pending_skip_far={self._dyn_skip_pending}", flush=True)
 
@@ -670,7 +672,8 @@ class TLIIndexer(TIAIndexer):
             return
         self.skip_far = bool(self._dyn_skip_pending)
         self._dyn_frozen = True
-        if os.environ.get("TLI_DEBUG") and self.layer_idx is not None:
+        if (os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                and self.layer_idx is not None):
             print(f"[E137] L{self.layer_idx} decode 首步冻结 "
                   f"skip_far={self.skip_far}", flush=True)
 
@@ -2016,7 +2019,8 @@ class TLIIndexer(TIAIndexer):
         m[..., :sink_tok] = True
         m[..., max(0, S_real - swa_tok):S_real] = True
         import os as _os
-        if _os.environ.get("TLI_DEBUG") and self.layer_idx == 1:
+        if (_os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                and self.layer_idx == 1):
             n_sel = int(m[..., :tok_hi].sum(dim=-1).float().mean().item())
             print(f"[MObadb] nb_sel={nb_sel} sel_total={n_sel}", flush=True)
         return m
@@ -2415,7 +2419,8 @@ class TLIIndexer(TIAIndexer):
             m[..., :sink_tok] = True
             m[..., swa_lo_tok:S_real] = True
             import os as _os
-            if _os.environ.get("TLI_DEBUG") and self.layer_idx == 1:
+            if (_os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                    and self.layer_idx == 1):
                 n_sig = int(m[..., far_tok_lo:swa_lo_tok].sum(dim=-1).float().mean().item())
                 print(f"[SIGdbg] mode={self.sigma_select} sigma={self.sigma} "
                       f"mid_selected={n_sig} sink_max={float(sink_max.mean()):.3f}",
@@ -2619,7 +2624,8 @@ class TLIIndexer(TIAIndexer):
                     far_p = p[..., far_tok_lo:far_tok_hi]
                     i_f = torch.topk(far_p, k2_far, dim=-1).indices + far_tok_lo
                     import os as _os
-                    if _os.environ.get("TLI_DEBUG") and self.layer_idx == 1:
+                    if (_os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                            and self.layer_idx == 1):
                         nfin = int((far_p > float("-inf")).sum(dim=-1).max().item())
                         print(f"[L2dbg] K2={K2} K2_mid={K2_mid} sink_tok={sink_tok} "
                               f"swa_tok={p.shape[-1] - swa_lo_tok} nt_near={nt_near} "
