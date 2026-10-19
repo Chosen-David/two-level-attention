@@ -6,7 +6,9 @@
 #   = 官方默认口径（同 run_ruler_clusterkv.sh 说明，接入验收时按总预算换算对齐）。
 # 任务集与 MoBA/Quest/FASA 主表 vendor 口径一致（16 任务，fasa_lb_16 同集）。
 # 数据源：KVCache-Factory/data/LongBench（MoBA/FASA/Quest 同源，fingerprint 一致）。
+# 运行环境：source ckv_env.sh（见 run_ruler_clusterkv.sh 说明）。
 cd /home/wangyuanshuo02/two-level-attention || exit 1
+source exp/vendor_baselines/clusterkv_vendor/ckv_env.sh || exit 1
 MODEL=/home/wangyuanshuo02/Qwen3-8B
 DATA=/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/LongBench
 GPU=$1
@@ -15,11 +17,11 @@ SINK=$3
 WIN=$4
 TS=$5
 TASKS=${6:-"narrativeqa qasper multifieldqa_en hotpotqa 2wikimqa musique multi_news gov_report qmsum trec triviaqa samsum passage_count passage_retrieval_en lcc repobench-p"}
-PYBIN=${PYTHON_BIN:-python}
+PYBIN=${PYTHON_BIN:-$CKV_PYTHON}
 FAILED=0
 for T in $TASKS; do
   echo "=== [$(date +%H:%M:%S)] task=$T tb=$TB sink=$SINK win=$WIN ==="
-  PYTHONPATH=~/local_pylibs CUDA_VISIBLE_DEVICES=$GPU $PYBIN -u -m benchmark.LongBench.pred \
+  CUDA_VISIBLE_DEVICES=$GPU $PYBIN -u -m benchmark.LongBench.pred \
     --model Qwen3-8B --model_path $MODEL \
     --task $T --method clusterkv_vendor \
     --config-path benchmark/LongBench/config \

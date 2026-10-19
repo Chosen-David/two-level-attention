@@ -342,6 +342,70 @@ def main():
             topk=getattr(args, "moba_topk", None),
             budget=getattr(args, "moba_budget", 1024),
         )
+    elif args.method == "asynctls_vendor":
+        # AsyncTLS（arXiv:2604.07815，人大+美团）C 轨语义复现——官方尚无开源
+        # 仓库（用户 2026-10-17 授权「无源码则读论文给出近似实现」），三级流水：
+        # Stage-1 块粗筛（B=64 top-kb=128 块符号感知 GEMM 打分）+ Stage-2 channel
+        # 细筛（Double-Sparsity 校准 top-dc=32 channel + INT4 key + 组内平均
+        # softmax）+ Stage-3 全维 KV sparse attn（kt=token_budget）。
+        # qwen3_asynctls_patch.py 全为语义复现（_baseline_identity 已标注非官方）。
+        # 校准文件（--asynctls_channel_file）必填：identify_channel.py 离线产出。
+        vendor_dir = os.path.join(
+            REPO, "exp", "vendor_baselines", "asynctls_vendor")
+        if vendor_dir not in sys.path:
+            sys.path.insert(0, vendor_dir)
+        from qwen3_asynctls_patch import enable_asynctls  # noqa: E402
+        _atls_chan = getattr(args, "asynctls_channel_file", None)
+        if not _atls_chan or not os.path.isfile(_atls_chan):
+            raise RuntimeError(
+                "method=asynctls_vendor 需要 --asynctls_channel_file 指向校准产物"
+                "（exp/vendor_baselines/asynctls_vendor/identify_channel.py 生成）")
+        n_patched = enable_asynctls(
+            model,
+            channel_file=_atls_chan,
+            token_budget=getattr(args, "asynctls_token_budget", 1024),
+            block_size=getattr(args, "asynctls_block_size", 64),
+            top_kb=getattr(args, "asynctls_top_kb", 128),
+        )
+    elif args.method == "hisa_vendor":
+        # HISA（COLM 2026，arXiv:2603.28458v4）B 轨官方 kernel 语义 torch 等价——
+        # 官方 GPU kernels 为 TileLang（tile-ai/tilelang examples/dsa_hisa，
+        # pinned 7940102813，MIT，third_party/tilelang_dsa_hisa/ 逐字落地）。
+        # 选择器两级：Stage-0/1 块均值池化 + Q·BlockedK 线性打分 + 首/末块 +inf
+        # 保护 + top-block_topk；Stage-2 块内全分辨率打分 + top-hisa_budget。
+        # Qwen3 适配：GQA 组内平均替代 DSA per-head weights、bf16 均值替代 fp8
+        # （identity 标注，统一后端机制轨）。qwen3_hisa_patch.py 按官方 kernel
+        # 语义用纯 torch 实现，非官方文件逐字节复用。
+        vendor_dir = os.path.join(
+            REPO, "exp", "vendor_baselines", "hisa_vendor")
+        if vendor_dir not in sys.path:
+            sys.path.insert(0, vendor_dir)
+        from qwen3_hisa_patch import enable_hisa  # noqa: E402
+        n_patched = enable_hisa(
+            model,
+            hisa_budget=getattr(args, "hisa_budget", 1024),
+            k_block_size=getattr(args, "hisa_k_block_size", 128),
+            block_topk=getattr(args, "hisa_block_topk", 64),
+        )
+    elif args.method == "jssa_vendor":
+        # JSSA（Joint Subspace Sparse Attention，arXiv:2610.19026v1）B 轨官方
+        # vLLM patch 语义 torch 等价——官方实现为 vLLM v1 attention backend
+        # （third_party/JSSA/vllm_patch/jssa_vllm.patch）。语义：decode 单级
+        # token 稀疏，校准基 M=TopEig_r(G_Qm/tr+G_K/tr)（r=32）投影打分 top-
+        # budget/head + 精确注意力，prefill dense。qwen3_jssa_patch.py 按官方
+        # 语义纯 torch 等价实现（identity 标注）。basis_path 必填（None=拒绝
+        # 启动，GATE-FAIL）。
+        vendor_dir = os.path.join(
+            REPO, "exp", "vendor_baselines", "jssa_vendor")
+        if vendor_dir not in sys.path:
+            sys.path.insert(0, vendor_dir)
+        from qwen3_jssa_patch import enable_jssa  # noqa: E402
+        n_patched = enable_jssa(
+            model,
+            basis_path=getattr(args, "jssa_basis_path", None),
+            budget=getattr(args, "jssa_budget", 1024),
+            rank=getattr(args, "jssa_rank", 32),
+        )
     elif args.method == "clusterkv_vendor":
         # ClusterKV（KMeans 聚类稀疏）B 轨官方源码复用——官方语义：
         # prefill dense（官方 flash_forward 分支）；decode 后期对 prefill key
@@ -359,10 +423,10 @@ def main():
         vendor_dir = os.path.join(
             REPO, "exp", "vendor_baselines", "clusterkv_vendor")
         if vendor_dir not in sys.path:
-            sys.path.insert(0, vendor_dir)
+            sys.path.insert(0, vendor_dir)  # vendor clusterkv/ stub 必须最前
         ckv_root = os.path.join(REPO, "third_party", "ClusterKV")
         if ckv_root not in sys.path:
-            sys.path.insert(0, ckv_root)
+            sys.path.append(ckv_root)  # 官方树放 vendor 之后
         from qwen3_clusterkv_patch import enable_clusterkv  # noqa: E402
         n_patched = enable_clusterkv(
             model,

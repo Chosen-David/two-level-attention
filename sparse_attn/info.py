@@ -881,6 +881,42 @@ def get_method_name_with_info(args, snapshot=None):
             _moba_budget = getattr(args, "moba_budget", 1024)
             _moba_topk = max(2, -(-_moba_budget // _moba_chunk))
         return f"moba_vendor_c{_moba_chunk}_k{_moba_topk}"
+    elif args.method == "clusterkv_vendor":
+        # B 轨 vendor（官方源码复用）：ClusterKV KMeans 聚类稀疏。token_budget
+        # /sink/nlist 决定选择器预算与建簇粒度，全编码进 treatment 名（防不同
+        # 预算口径同名互覆）。sink 已含在 token_budget 内（官方口径），不再
+        # 重复计入；命名同 quest_vendor_<budget>_<sink> 风格。
+        _tb = getattr(args, "clusterkv_token_budget", 1024)
+        _sink = getattr(args, "clusterkv_sink", 16)
+        _nlist = getattr(args, "clusterkv_nlist", 400)
+        return f"clusterkv_vendor_{_tb}_{_sink}_nl{_nlist}"
+    elif args.method == "asynctls_vendor":
+        # C 轨语义复现（arXiv:2604.07815，无官方开源）：三级流水。channel 文件
+        # 名（校准内容身份）+ token_budget/block/top_kb 全编码进 treatment 名，
+        # 防不同校准/预算口径同名互覆（与 clusterkv 命名风格一致）。
+        import os as _os
+        _chan = getattr(args, "asynctls_channel_file", None)
+        _chan_tag = _os.path.splitext(_os.path.basename(_chan))[0] if _chan else "nochan"
+        _kb = getattr(args, "asynctls_token_budget", 1024)
+        _bs = getattr(args, "asynctls_block_size", 64)
+        _tk = getattr(args, "asynctls_top_kb", 128)
+        return f"asynctls_vendor_{_chan_tag}_k{_kb}_b{_bs}_kb{_tk}"
+    elif args.method == "hisa_vendor":
+        # B 轨官方 kernel 语义 torch 等价（COLM 2026 / arXiv:2603.28458v4）。
+        # budget（最终 token）/块长/保留块数全编码，防不同口径同名互覆。
+        _hb = getattr(args, "hisa_budget", 1024)
+        _hbs = getattr(args, "hisa_k_block_size", 128)
+        _htk = getattr(args, "hisa_block_topk", 64)
+        return f"hisa_vendor_k{_hb}_b{_hbs}_kb{_htk}"
+    elif args.method == "jssa_vendor":
+        # B 轨官方 vLLM patch 语义 torch 等价（arXiv:2610.19026v1）。budget/rank
+        # 全编码（basis 文件名段含校准内容身份，rank 影响子空间维度），防互覆。
+        import os as _os
+        _jp = getattr(args, "jssa_basis_path", None)
+        _jtag = _os.path.splitext(_os.path.basename(_jp))[0] if _jp else "nobasis"
+        _jb = getattr(args, "jssa_budget", 1024)
+        _jr = getattr(args, "jssa_rank", 32)
+        return f"jssa_vendor_{_jtag}_k{_jb}_r{_jr}"
     elif args.method == "twi":
         return f"twi_{args.twi_block_size}_{args.twi_level1_topk}_{args.twi_level2_topp}"
     elif args.method == "tia":
