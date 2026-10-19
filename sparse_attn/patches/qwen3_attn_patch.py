@@ -245,10 +245,12 @@ def qwen3_attn_forward(
             attention_mask = None
         if attention_mask is not None and (
             attention_mask.dim() != 2 or attention_mask.dtype != torch.bool
+            or tuple(attention_mask.shape) != (1, key_states.shape[-2])
+            or not bool(attention_mask[0, -1])
         ):
             raise RuntimeError(
-                f"TLI 稀疏 decode 路径的 attention_mask 分支仅支持 2D bool "
-                f"padding mask；当前 dim={attention_mask.dim()}、"
+                f"TLI 稀疏 decode 路径的 attention_mask 须为 [1, S] 2D bool "
+                f"padding mask，且当前 query（最后位置）须有效；当前 dim={attention_mask.dim()}、"
                 f"dtype={attention_mask.dtype}（HF 实际传 4D float causal "
                 f"mask，按 2D 假设处理不正确），拒绝执行。"
             )
@@ -263,7 +265,9 @@ def qwen3_attn_forward(
         query_states, key_states, value_states = (x.transpose(1, 2) for x in (query_states, key_states, value_states))
         if attention_mask is not None:
             cu_seqlens_k = prepare_cu_seqlens_from_mask(attention_mask)
-            query_states, key_states, value_states = (unpad_tensor(x, attention_mask) for x in (query_states, key_states, value_states))
+            # Decode has one live query but S cached keys. The KV-length mask
+            # cannot index Q; the guard above guarantees this query is valid.
+            key_states, value_states = (unpad_tensor(x, attention_mask) for x in (key_states, value_states))
         else:
             cu_seqlens_k = prepare_cu_seqlens(key_states)
             query_states, key_states, value_states = (x.view(1, -1, *x.shape[-2:]) for x in (query_states, key_states, value_states))

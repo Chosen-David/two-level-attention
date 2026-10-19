@@ -133,3 +133,5 @@
   ([详情](task_details/TL-OBS-PLOT-CORRECTNESS-20261016.md))
 
 - [ ] [TL-STATIC-MASK-20261016] 恢复授权：StaticCache mask 精确旁路与 DynamicCache 哨兵修复，105 项指定 CPU 测试普通/-O通过；GPU/实模/性能仍待验。([详情](task_details/TL-STATIC-MASK-20261016.md))
+
+- [x] [TL-DECODE-PADDING-Q-20261019] Qwen3/Llama 单 query decode 仅压紧 K/V，修复合法 2D padding mask 对 Q 的越界形状索引；33 项普通/-O CPU 回归及独立多步/长序列 gather 复核。GPU/真实 selector/性能另待验证，不宣称提速。([详情](task_details/TL-DECODE-PADDING-Q-20261019.md))
