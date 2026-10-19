@@ -31,6 +31,7 @@ import os
 import torch
 import torch.nn.functional as F
 from einops import rearrange, einsum
+from .prefill_contract import token_selection
 
 # MoBA 口径的 chunk 行数（gate 粒度）
 SPARSE_PREFILL_CHUNK = 2048
@@ -202,8 +203,8 @@ def sparse_prefill_attn(
             finally:
                 if quota_on:
                     indexer._e151c_on = False
-            m0 = mask[0, 0]        # [h, T_pad]（h=Hkv 共享 或 H per_q_head）
-            sel = m0[..., :c1]     # 截到真实 token 数（pad 块尾巴去除）
+            sel = token_selection(mask, _bs, length=c1, heads=H,
+                                  kv_heads=Hkv, device=q.device)
             # 稀疏 chunk：行级保护带生效（TL-PREFILL-SWA-002）
             prot_args = dict(sink_tok=sink_tok, swa_tok=swa_tok)
         o[:, c0:c1] = _chunk_rows_attn(

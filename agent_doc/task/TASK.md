@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [ ] [TL-PREFILL-MASK-CONTRACT-20261019] reference/candidate拒绝错误token mask元数据，防止单槽广播、维度截取及块索引误读；ops普通/-O各84项通过，GPU/模型/性能未验。([详情](task_details/TL-PREFILL-MASK-CONTRACT-20261019.md))
+
 - [ ] [TL-DECODE-MASK-EXTENT-20261019] 拒绝覆盖不足的decode选择mask，避免单槽广播扩大选集；普通/-O各25项CPU测试、独立48合法+12非法对照通过；有界修复验收，GPU/性能及真实selector重测未验。([详情](task_details/TL-DECODE-MASK-EXTENT-20261019.md))
 
 - [ ] [TL-BATCH-TOPK-BLOCK-20261019] 非64块保留全宽L2 topk，避免64特化补位错误；CPU回归通过，GPU及历史重测未验。([详情](task_details/TL-BATCH-TOPK-BLOCK-20261019.md))

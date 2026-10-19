@@ -42,6 +42,7 @@ import os
 import torch
 import torch.nn.functional as F
 from einops import rearrange, einsum
+from .prefill_contract import token_selection
 
 # MoBA 口径的 chunk 行数（gate 粒度）
 RUNTIME_COUNTS = dict(calls=0, fused=0, fused_fallback=0, batch_select=0, batch_fallback=0)
@@ -459,8 +460,8 @@ def sparse_prefill_attn(
         finally:
             if _e151c:
                 indexer._e151c_on = False
-        m0 = mask[0, 0]        # [h, T_pad]（h=Hkv 共享 或 H per_q_head）
-        return m0[..., :c1]    # 截到真实 token 数（pad 块尾巴去除）
+        return token_selection(mask, _bs, length=c1, heads=H,
+                               kv_heads=Hkv, device=q.device)
 
     # 【E139 纲领②③】组选择批量化（sparse_attn/ops/batch_select.py）：整层
     # 一次统计 + 批量两级选择，替代 ~496 次逐组三段式（主因 ~20k launch/层）。

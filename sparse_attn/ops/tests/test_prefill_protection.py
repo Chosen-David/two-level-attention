@@ -28,7 +28,7 @@ class ProtectionIndexer:
         mask = torch.zeros(1, 1, self.mask_heads, length, dtype=torch.bool)
         mask[..., :self.sink_tokens] = True
         mask[..., max(0, length - self.sliding_window_size):] = True
-        return mask, self.args.tia_block_size
+        return mask, 1  # Token mask, matching TLIIndexer.get_block_size().
 
 
 class PrefillProtectionTest(unittest.TestCase):
