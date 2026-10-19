@@ -370,6 +370,16 @@ class TLIIndexer(TIAIndexer):
             # 激活分区（等价 α>0 且 β>0 的几何条件，避免落单池分支）
             if not (self.alpha > 0 and self.beta > 0):
                 self.alpha, self.beta = 1.0, 1.0  # 仅激活 e64_partition 几何，实际值由绝对参数覆盖
+        # ---- E155b 新口径双开关（用户 2026-10-19 拍板）----
+        # ① 边界页保送：sink 所在页 + swa 跨界页移出 L1 竞争池直通 L2 候选
+        #   （不占 K1 配额；页统计不再混保护/竞争 token）。false 逐位回旧口径。
+        # ② L2 细筛去量化：min_max_per_token_quant 是量化-反量化 round-trip
+        #   （k_qat 存 bf16 反量化值，无压缩收益），关掉 = 细筛用原始子空间
+        #   切片（质量 +0.03 E140 罚回收 + 每步省 ~10 个 quant 小 launch）。
+        #   false(=不量化) 为新默认；true 逐位回旧口径。两开关只影响分区
+        #   主管线（e64 L1 双池 + k_qat 构造），单池/簇路径不受保送影响。
+        self.boundary_bypass = getattr(args, "tli_boundary_bypass", True)
+        self.l2_quant = getattr(args, "tli_l2_quant", False)
         # E151c is implemented only in the E64 split-budget top-k branches.
         # Other selection modes return before those branches or use a different
         # budget contract; accepting the table there would silently ignore it.
@@ -778,8 +788,12 @@ class TLIIndexer(TIAIndexer):
             inc["k_qat_buf"], inc["k_qat_cap"] = new_buf, new_cap
             buf = new_buf
         if self.l2_subspace == "full":
-            buf[lo:S_now] = self.min_max_per_token_quant(
-                k[0, lo:S_now])                             # 全 128 维量化直写
+            # 【E155b 去量化（新口径默认）】l2_quant=False 时细筛直接用原始
+            # 切片（假量化无压缩收益，仅数值罚 + launch 开销），true 回旧口径
+            seg = k[0, lo:S_now]
+            if self.l2_quant:
+                seg = self.min_max_per_token_quant(seg)     # 全 128 维量化直写
+            buf[lo:S_now] = seg
         else:
             # 【E133c-A5】量化链融合：gather 物化 + minmax 4bit 量化（~10 个
             # elementwise/reduction 小 launch）+ buf 直写 ≈ 12 launch → 1
@@ -787,8 +801,11 @@ class TLIIndexer(TIAIndexer):
             # bf16，PyTorch CUDA opmath=fp32 口径实测逐位一致）；torch.round
             # 的 round-half-to-even 用 libdevice.rint 复现。异常由 wrapper 置
             # _quant_ok=False 后回退原版（fail-closed）。
+            # 【E155b】l2_quant=False（新口径默认）时整段旁路——gather 直拷
+            # 进 buf（量化 kernel 链不发射）。
             quant_fused = False
-            if (_HAS_TRITON and self._triton_ok and self._quant_ok
+            if (self.l2_quant
+                    and _HAS_TRITON and self._triton_ok and self._quant_ok
                     and k.dim() == 4 and k.shape[0] == 1 and k.is_cuda
                     and k.stride(-1) == 1 and indices.dtype == torch.int64
                     and (indices.numel() & (indices.numel() - 1)) == 0):
@@ -798,8 +815,10 @@ class TLIIndexer(TIAIndexer):
                 except Exception:
                     pass
             if not quant_fused:
-                buf[lo:S_now] = self.min_max_per_token_quant(
-                    k[0, lo:S_now, :, indices])
+                seg = k[0, lo:S_now, :, indices]
+                if self.l2_quant:
+                    seg = self.min_max_per_token_quant(seg)
+                buf[lo:S_now] = seg
         k_qat = buf[:S_now].unsqueeze(0)                     # [1, S, Hkv, delta] 视图（l2=full 时 128 宽）
 
         index_dict = {
@@ -861,7 +880,8 @@ class TLIIndexer(TIAIndexer):
             k_max = k_coarse.amax(dim=2)
             cu_seqlens_k_coarse = pad_cu_seqlens_k // self.args.tia_block_size
             # L2 4bit 精筛：投影特征逐 token 量化（任意 last-dim 通用）
-            k_qat = self.min_max_per_token_quant(kp)
+            # 【E155b 去量化】l2_quant=False 直接用原始投影特征（同 dtype 视图语义）
+            k_qat = self.min_max_per_token_quant(kp) if self.l2_quant else kp
             index_dict = {
                 "k_min": k_min,
                 "k_max": k_max,
@@ -920,10 +940,13 @@ class TLIIndexer(TIAIndexer):
         # 决定）——sub+full 臂消费端，score_fine 宽度 = 全维（128 宽 dense，
         # 无紧凑化问题）。
         if self.l2_subspace == "full":
-            k_qat = self.min_max_per_token_quant(k)   # [1, S, Hkv, 128] 全维量化
+            # 【E155b 去量化】l2_quant=False 直接用原始 k（无压缩收益的假量化旁路）
+            k_qat = self.min_max_per_token_quant(k) if self.l2_quant else k   # [1, S, Hkv, 128]
         else:
             indices = idx_sub if idx_sub is not None else self._qat_indices(k.device)
-            k_qat = self.min_max_per_token_quant(k[..., indices])
+            # 【E155b 去量化】同上——原始子空间切片直用（gather 拷贝保持紧凑布局）
+            k_qat = (self.min_max_per_token_quant(k[..., indices]) if self.l2_quant
+                     else k[..., indices])
         index_dict = {
             "k_min": k_min,
             "k_max": k_max,
@@ -2051,21 +2074,60 @@ class TLIIndexer(TIAIndexer):
                 n_valid_far = 0
                 nb_far = min(nb_far, max(n_valid_far, 0))
             # far 池分数源：minmax（默认=块上界）或 avg（块均值，aavg 组合）
+            # 【E155b 边界页保送（新口径默认开）】sink 跨界页 + swa 跨界页
+            # 移出双池、直通 L2 细筛候选。旧口径下 sink 页靠「minmax 上界被
+            # sink 离群值撑大」隐性赢得 L1（暗通道：页统计混保护/竞争 token，
+            # 挤占其他 far 页配额）；swa 跨界页同理混 swa 保护 token。新口径
+            # 显式保送：双池页统计纯竞争 token、保送页不占 K1 配额（nb_far/
+            # nb_near 照旧从收缩后的池内选）、保送页 token 仍在 L2 按配额
+            # 竞争（sink/swa 强制 token 语义不变，L2 分区边界天然覆盖保送页
+            # ——sink 页在 far 段 [far_tok_lo, far_tok_hi)、swa 页在 near 段）。
+            # 跨界判定（token 域单一事实源）：sink_tok % bs != 0 → sink 跨界页
+            # = far_lo_blk（floor 口径下恰为 far 池第一块；sink 整页对齐时本就
+            # 被池左界排除，无跨界页）；swa_lo_tok % bs != 0 → swa 跨界页 =
+            # swa_lo_tok // bs（mid 侧最后一块；swa 整块对齐时被池右界排除）。
+            # boundary_bypass=false 逐位回旧口径（对拍/消融臂）。
+            bypass_blks = ()
+            far_pool_lo, far_pool_hi = far_lo_blk, far_hi_blk
+            near_pool_lo, near_pool_hi = near_blks, swa_lo_blk
+            if self.boundary_bypass:
+                _bp = []
+                if sink_tok % bs != 0:
+                    _bp.append(far_lo_blk)
+                _swa_lo_tok = max(0, S_real - swa_tok)
+                if _swa_lo_tok % bs != 0:
+                    _cb = _swa_lo_tok // bs
+                    if _cb >= far_lo_blk:
+                        _bp.append(_cb)
+                bypass_blks = _bp
+                for _b in _bp:
+                    # 双池区间端点收缩（跨界页恒位于区间端：sink 页=far 左端、
+                    # swa 页=near 右缘或退化短序列时 far 右缘），池内块不受影响
+                    if far_pool_lo <= _b < far_pool_hi:
+                        if _b == far_pool_lo:
+                            far_pool_lo = _b + 1
+                        else:
+                            far_pool_hi = min(far_pool_hi, _b)
+                    if near_pool_lo <= _b < near_pool_hi:
+                        if _b == near_pool_hi - 1:
+                            near_pool_hi = _b
+                        else:
+                            near_pool_lo = max(near_pool_lo, _b + 1)
             if self.far_method == "avg" and score_coarse_avg is not None:
-                sc_far = score_coarse_avg[..., far_lo_blk:far_hi_blk]
+                sc_far = score_coarse_avg[..., far_pool_lo:far_pool_hi]
             else:
-                sc_far = score_coarse[..., far_lo_blk:far_hi_blk]
-            i_f = torch.topk(sc_far, min(nb_far, sc_far.shape[-1]), dim=-1).indices + far_lo_blk
+                sc_far = score_coarse[..., far_pool_lo:far_pool_hi]
+            i_f = torch.topk(sc_far, min(nb_far, sc_far.shape[-1]), dim=-1).indices + far_pool_lo
             # near 池上界 = swa_lo_blk：swa 块（含当前块）完全排除出双池，
             # 纯靠 mask 强制（p[-swa:]=1）——正交区不占创新管线配额
             # near 池分数源：avg（默认=块均值）或 minmax（块上界，mminmax 组合）
             if self.near_method == "minmax" or score_coarse_avg is None:
-                sc_near = score_coarse[..., near_blks:swa_lo_blk]
+                sc_near = score_coarse[..., near_pool_lo:near_pool_hi]
             else:
-                sc_near = score_coarse_avg[..., near_blks:swa_lo_blk]
+                sc_near = score_coarse_avg[..., near_pool_lo:near_pool_hi]
             sc_near = sc_near.clone()
             if sc_near.shape[-1] > 0:
-                i_n = torch.topk(sc_near, min(nb_near, sc_near.shape[-1]), dim=-1).indices + near_blks
+                i_n = torch.topk(sc_near, min(nb_near, sc_near.shape[-1]), dim=-1).indices + near_pool_lo
             else:
                 i_n = i_f[..., :0]  # near 池空（mid 不足一块）→ 不选
             # 严格口径（2026-09-29 用户最终澄清）：sink 块完全不进 L1 池——
@@ -2076,6 +2138,10 @@ class TLIIndexer(TIAIndexer):
             topk_mask = torch.zeros_like(score_coarse, dtype=torch.bool).scatter_(
                 -1, indices, torch.ones_like(indices, dtype=torch.bool)
             )
+            # E155b：保送页 OR 进 L1 候选集（全 head 广播；indices 不含保送
+            # 页 → 不占 K1 配额；其 token 在 L2 细筛按 far/near 配额竞争）
+            for _b in bypass_blks:
+                topk_mask[..., _b] = True
             import os as _os
             # TLI_DEBUG 显式布尔解析（字符串 "0"/"" 均为关——原字符串真值
             # 会把 TLI_DEBUG=0 也判开）；far-empty（i_f 空）时 min/max 用
@@ -2087,7 +2153,7 @@ class TLIIndexer(TIAIndexer):
                 i_f_min = i_f.min().item() if i_f.numel() else -1
                 i_f_max = i_f.max().item() if i_f.numel() else -1
                 print(f"[L1dbg] kt={kt} near_blks={near_blks} swa_lo_blk={swa_lo_blk} "
-                      f"nb_far={nb_far} nb_near={nb_near} "
+                      f"nb_far={nb_far} nb_near={nb_near} bypass={list(bypass_blks)} "
                       f"i_f_blk_min={i_f_min} i_f_blk_max={i_f_max} "
                       f"i_n_blk_min={i_n_min} i_n_blk_max={i_n_max}", flush=True)
         else:

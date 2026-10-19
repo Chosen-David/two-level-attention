@@ -273,6 +273,15 @@ def _add_tli_args(parser: argparse.ArgumentParser):
     group.add_argument('--tli_near_len', type=int, default=None,
                        help='E155 固定配额：near 区宽度 near_L 显式整数 token 数（覆盖 α·mid_len 规则）；'
                             'L 轴扫描用，缺省回退比例规则')
+    group.add_argument('--tli_boundary_bypass', type=lambda x: str(x).lower() != 'false', default=True,
+                       help='E155b 边界页保送（默认开，新口径）：sink 所在页与 swa 跨界页移出 L1 竞争池'
+                            '直通 L2 细筛候选（页统计不混保护/竞争 token，保送页不占 K1 配额）；'
+                            'false 逐位回旧口径（对拍/消融臂）')
+    group.add_argument('--tli_l2_quant', type=lambda x: str(x).lower() != 'false', default=False,
+                       help='E155b L2 细筛 4bit minmax 假量化（默认关，新口径）：min_max_per_token_quant 为'
+                            '量化-反量化 round-trip，k_qat 存 bf16 反量化值、无压缩/带宽收益，仅引入 ~0.03 '
+                            'retained mass 数值罚（E140）+ 每步 ~10 个小 kernel launch（launch-bound decode 为'
+                            '负收益）。关 = 细筛直接用原始子空间切片；true 逐位回旧口径（对拍/消融臂）')
     group.add_argument('--tli_subspace', type=str, default='full',
                        choices=['full', 'rope', 'nope', 'tail', 'random', 'highfreq', 'mla_rope'],
                        help='子空间选择: full=全128维(默认) / rope=前64旋转维 / nope=后64非旋转维 / tail=旧口径低频尾维32(E71/B7/C0复现) / '
