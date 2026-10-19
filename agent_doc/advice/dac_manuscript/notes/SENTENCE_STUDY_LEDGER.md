@@ -29,6 +29,19 @@
 
 ## 修改日志
 
+### 第 42 轮（2026-10-19，**范式自查：Workloads 段——第 41 轮过度压缩回修**）
+
+- **数据与远端检查**：git fetch 干净（远端 HEAD 仍为 73034b5 系）；exp/trace/results/ 无新判决 JSON（e119/e147 批均已入稿）。
+- **Workloads 段逐句范式自查**：五句中三句合规（枚举 claim-first / 诚实边界 / 对照定义）。两处为第 41 轮零余量压缩的**可读性回归**：
+  - MAJOR：「Native protocols retain disclosed prefill/decode」主谓搭配破碎（协议不能「保留」路径），zh 版始终保留完整句。回修为「Method comparisons must retain and disclose each baseline's native prefill/decode path; policy-matched adaptations need separate reporting」（+5 词）。
+  - MINOR：「establishes neither matching」neither 悬空缺第二项，回修「neither quality nor cost matching」（+3 词）。
+  - 附带：Settings 首段平行结构修复「retain them as nominal, not as controlled single-stage ablations」→「treat them as nominal labels, not controlled single-stage ablations」（净 0）。
+- **零余量回收（en 溢出 4 行 AI 声明→回 6 页）**：Settings 尾句指针句收紧（「S6/S7 detail configurations and measurements」→「(S6/S7)」）；Metrics 括号短语压缩（「model-level intervals after the first output token」→「model-level post-first-output intervals」）。零正式数字触碰。
+- **zh 同步**：三处修复 zh 均已有对应完整表述（zh 未被第 41 轮压缩），无需改动；zh 6 页结构不动。
+- **版式验证**：en 6 页（AI p5 / refs p6）、zh 6 页不变、0 LaTeX Warning（含新增句机械门 0 违规）。
+- **自查队列推进**：Workloads ✓。剩余：Q1 / Q2 / Q3 / 结论 / 摘要。
+- **教训入账**：零余量压缩的止损线＝不得牺牲句法完整性（主谓搭配、neither/nor 配对、平行结构）；宁可多花一轮找空间也不留不可解析句。
+
 ### 第 41 轮（2026-10-19，**手稿全面重写轮：绝对几何 + 隐式预算耦合新主线 + bf16 阵营定位**）
 
 - **用户指令**：「全部重写，对齐新口径」。新主线两条：(1) 参数界面全部换绝对量（sink s=4 / 近窗 w=128 / 近区范围 L_n / 近页配额 n_p / 近词元配额 n_k，远区容量按差值确定）；(2) 新贡献级发现＝**隐式预算耦合失效模式**——一个表达式（新式 eq:coupling，k_f = max(0, K_mid − min(γn_pB, K_mid))）把远区词元预算连到 K1/β/γ 三个旋钮，归档诊断展示全部三种失效（E140 整数枚举 K1=156 精确阈值且 K1=155 余 8；E109 HotpotQA 53.6–57.3→37.7 恰在零远区预算臂、按 far 占比分级 .875→16.4 分；E130 生产格自由竞争 .852 vs 最优 γ .8515 平手、γ=0 语义陷阱压近区配额归零掉 .827；历史 128K k_f=0）。显式配额构造上免疫：n_k 以 K_mid 为界，远区容量是陈述值而非派生值。
