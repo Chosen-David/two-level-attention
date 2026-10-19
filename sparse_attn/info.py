@@ -133,6 +133,18 @@ _TREATMENT_FIELD_DEFAULTS = {
     "tli_dyn_dgate": False,
     "tli_dyn_dgate_eps": 0.05,
     "tli_dyn_dgate_rows": 256,
+    # E155/E155b：固定配额几何三参数 + 新口径双开关（GPT 审计 2026-10-19
+    # 阻塞级修复：不入 manifest 则 nb/nt/near_L 不同的格子共享同一
+    # treatment hash——pred_postfix 目录隔离之外的任何路径（复用格/重跑/
+    # 归档）同名 w 模式静默互覆，B09 族事故形态；叠加 CLI 默认翻转，
+    # 旧口径重跑还会同名不同义覆盖归档）。默认 None/None/None/True/False
+    # （新口径）；manifest 扩字段使全部 treatment hash 移位一轮（E134/E135
+    # 先例，既有锚点文件名不重算不受影响）。
+    "tli_near_pages": None,
+    "tli_near_tokens": None,
+    "tli_near_len": None,
+    "tli_boundary_bypass": True,
+    "tli_l2_quant": False,
 }
 
 # 079②：文件型配置字段集合（值非 None → 内容身份解析，见上）
@@ -978,6 +990,26 @@ def get_method_name_with_info(args, snapshot=None):
         # E122 合并说明：γ=off 自由竞争经 g_str="off" 渲染进文件名
         # （a…_b…_goff），与 γ 数值臂天然区分，无需独立 _goff 后缀；
         # 默认缺省 γ 按 1.0 处理（getattr 兜底，只有显式 off 才是 None）。
+        # E155/E155b：固定配额几何 + 双开关标记进可读名（GPT 审计
+        # 2026-10-19 阻塞级）。参照系已翻转到新口径——默认（无几何/
+        # bypass 开/quant 关）不加后缀；几何显式时 _np/_nt/_nl，旧口径
+        # 消融臂显式 _bb0（bypass 关）/ _lq4（quant 开）。身份单射由
+        # manifest/hash 恒承载（可读段仅防御性冗余）。
+        e155 = ""
+        _np = getattr(args, "tli_near_pages", None)
+        _nt = getattr(args, "tli_near_tokens", None)
+        _nl = getattr(args, "tli_near_len", None)
+        if _np is not None or _nt is not None:
+            if _np is not None:
+                e155 += f"_np{_np:g}"
+            if _nt is not None:
+                e155 += f"_nt{_nt:g}"
+        if _nl is not None:
+            e155 += f"_nl{_nl:g}"
+        if not getattr(args, "tli_boundary_bypass", True):
+            e155 += "_bb0"
+        if getattr(args, "tli_l2_quant", False):
+            e155 += "_lq4"
         # 076（TL-E121-OUTPUT-ID）：可读段逐位不动（B09 口径），追加
         # canonical treatment hash 尾段 _h<hash10>——全部输出相关参数
         # （far/near method/select、subspace 具体值、投影基、per_q_head、
@@ -987,7 +1019,7 @@ def get_method_name_with_info(args, snapshot=None):
         # 文件被替换时文件名与 runtime/sidecar 仍同源。
         return (f"tli_{args.tia_block_size}_{args.tia_level1_topk}_"
                 f"{args.tia_level2_topk}_c{args.tia_level2_cmp_ratio}_"
-                f"{ab}a{alpha:g}_b{beta:g}_g{g_str}{p}{pdd}{e135}"
+                f"{ab}a{alpha:g}_b{beta:g}_g{g_str}{p}{pdd}{e135}{e155}"
                 f"_h{_treatment_hash(args, snapshot)}")
     elif args.method == "none":
         return "none"

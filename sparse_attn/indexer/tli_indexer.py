@@ -367,9 +367,16 @@ class TLIIndexer(TIAIndexer):
                     "tli_near_pages/tli_near_tokens 必须同时显式传入（固定配额几何"
                     "不混配比例参数；near_L 可用 tli_near_len 单独固定）"
                 )
-            # 激活分区（等价 α>0 且 β>0 的几何条件，避免落单池分支）
-            if not (self.alpha > 0 and self.beta > 0):
-                self.alpha, self.beta = 1.0, 1.0  # 仅激活 e64_partition 几何，实际值由绝对参数覆盖
+            # 激活分区（等价 α>0 且 β>0 的几何条件，避免落单池分支）。
+            # GPT 审计 2026-10-19（α/β clobber 边角）：只补零值字段、
+            # 不冲掉用户显式传的 α/β——near_L 缺省回退 α·mid_len 规则
+            # （compute_mask 的 near_len_dyn 分支）消费 self.alpha，整对
+            # 冲 1.0 会让「传 nb/nt + α 但忘 β」的合法配置 near 区翻倍
+            # 且文件名虚标 a1_b1；β 同理只补缺失侧。
+            if self.alpha <= 0:
+                self.alpha = 1.0
+            if self.beta <= 0:
+                self.beta = 1.0
         # ---- E155b 新口径双开关（用户 2026-10-19 拍板）----
         # ① 边界页保送：sink 所在页 + swa 跨界页移出 L1 竞争池直通 L2 候选
         #   （不占 K1 配额；页统计不再混保护/竞争 token）。false 逐位回旧口径。
@@ -2102,17 +2109,31 @@ class TLIIndexer(TIAIndexer):
                 bypass_blks = _bp
                 for _b in _bp:
                     # 双池区间端点收缩（跨界页恒位于区间端：sink 页=far 左端、
-                    # swa 页=near 右缘或退化短序列时 far 右缘），池内块不受影响
+                    # swa 页=near 右缘或退化短序列时 far 右缘），池内块不受影响。
+                    # GPT 审计 2026-10-19（端点隐性假设显式化）：保送页必在
+                    # 池端点——当前几何三种形态（near 非空/空/短序列退化）已
+                    # 逐一验证恒成立；未来几何变化若破坏该假设，非端点分支
+                    # 会静默多收缩一整段池，fail-closed 断言把契约变成硬错误。
                     if far_pool_lo <= _b < far_pool_hi:
                         if _b == far_pool_lo:
                             far_pool_lo = _b + 1
+                        elif _b == far_pool_hi - 1:
+                            far_pool_hi = _b
                         else:
-                            far_pool_hi = min(far_pool_hi, _b)
+                            raise ValueError(
+                                f"boundary bypass 页 {_b} 非 far 池端点 "
+                                f"[{far_pool_lo},{far_pool_hi})——池收缩几何"
+                                "假设被破坏（当前几何下保送页恒位于端点）")
                     if near_pool_lo <= _b < near_pool_hi:
                         if _b == near_pool_hi - 1:
                             near_pool_hi = _b
+                        elif _b == near_pool_lo:
+                            near_pool_lo = _b + 1
                         else:
-                            near_pool_lo = max(near_pool_lo, _b + 1)
+                            raise ValueError(
+                                f"boundary bypass 页 {_b} 非 near 池端点 "
+                                f"[{near_pool_lo},{near_pool_hi})——池收缩几何"
+                                "假设被破坏（当前几何下保送页恒位于端点）")
             if self.far_method == "avg" and score_coarse_avg is not None:
                 sc_far = score_coarse_avg[..., far_pool_lo:far_pool_hi]
             else:
