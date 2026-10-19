@@ -12,8 +12,18 @@
   8 步生成第 5 token 起分歧）→ **乱序版数据不能进主表，须排序修复版重跑**。
 - **已完成替换**：RULER 32K AVG11 **48.33**（2026-10-19 13:09 正式发布
   `e119_ruler32768_formal_asynctls_vendor_fix.json`，ts=10191101/2/3）。
-- **进行中**：LongBench 16 任务重跑（.187 GPU1-6 ts=10191104，已 11/16）+ RULER 64K/128K
-  重跑规划（本机 128K 乱序版 cwe/fwe 在跑，完成后 .187 GPU0/7 接重跑）。
+- **LongBench 16/16 已替换**（2026-10-19 17:5X 正式打分 AVG16 **45.13** / AVG13 **46.82**，
+  隔离目录 `pred_asynctls_vendor_fix/` strict runcap 16；组成 = 10191104 批 12 任务
+  + 10191920 批 4 任务（qmsum/multi_news/gov_report/repobench，.187 relay GPU3/4/6）。
+  **与乱序版几乎持平**（AVG16 44.97→45.13，逐任务 ±0.02~1.75 双向），符合预期——
+  LongBench 上下文短（多数 <8k），排序修复影响小，与 RULER 32K 差异（48.33 vs 50.09）方向一致）。
+- **进行中**：RULER 128K 修复版 .187 在飞（ts=10191920，11 任务：single_1/2/3 +
+  multikey_1/2 已完成 100 行，multiquery/fwe ~70 行、multikey_3/multivalue/cwe ~35 行在跑，
+  vt 待 GPU；relay PID 4034989 健康无连环重派，全齐后同口径打分）。64K 修复版重跑待
+  128K 完成后评估（当前 64K 表 34.11 为乱序版）。**2026-10-19 18:3X 已停 lb_relay2 重复
+  repobench-p 进程**（LongBench 修复版 16/16 已全部完整，.187 repobench 文件 500 行
+  md5 与本机打分数据一致，runcap gate 未覆盖损坏；教训：LongBench repobench-p 落盘名
+  去掉 `-p`，relay 判定须用实际落盘名）。
 - 旧乱序版数字（LongBench AVG13 46.51 / AVG16 44.97、RULER 32K AVG11 50.09）仅供参考。
 
 ## 预算口径（统一对齐主表 K2=1024）
@@ -25,26 +35,28 @@
 ## LongBench 13 任务表（统一 vendor 批，13 = 16 减 passage_count/trec/samsum）
 | task | FullKV | Quest | AsyncTLS | FASA | JSSA |
 |---|---|---|---|---|---|
-| hotpotqa | 59.07 | 45.09 | 49.03 | 12.58 | **60.20** |
-| 2wikimqa | 43.29 | 30.78 | 38.31 | 24.73 | **42.34** |
-| musique | 35.44 | 23.12 | 20.99 | 4.15 | **34.25** |
-| passage_retrieval_en | 100.00 | 88.25 | 95.50 | 60.12 | **100.00** |
-| qasper | 47.47 | 36.43 | 45.41 | 34.85 | **48.16** |
-| multifieldqa_en | 53.19 | 47.86 | 50.74 | 37.90 | **53.83** |
-| gov_report | 33.36 | 32.32 | 32.38 | 28.35 | **33.58** |
-| qmsum | 23.92 | 23.20 | 23.37 | 18.80 | **24.24** |
-| multi_news | 24.78 | 25.46 | 24.65 | 25.33 | **24.64** |
-| narrativeqa | 27.59 | 18.85 | 17.85 | 2.53 | **26.47** |
-| triviaqa | 91.11 | 72.73 | 81.91 | 71.36 | **89.82** |
-| lcc | 68.10 | 60.23 | 67.13 | 61.26 | **68.37** |
-| repobench | 64.74 | 53.63 | 57.39 | 44.84 | **65.54** |
-| **AVG13** | **51.70** | **42.92** | **46.51** | **32.83** | **51.65** |
+| hotpotqa | 59.07 | 45.09 | 48.23 | 12.58 | **60.20** |
+| 2wikimqa | 43.29 | 30.78 | 39.30 | 24.73 | **42.34** |
+| musique | 35.44 | 23.12 | 21.62 | 4.15 | **34.25** |
+| passage_retrieval_en | 100.00 | 88.25 | 97.25 | 60.12 | **100.00** |
+| qasper | 47.47 | 36.43 | 45.32 | 34.85 | **48.16** |
+| multifieldqa_en | 53.19 | 47.86 | 50.85 | 37.90 | **53.83** |
+| gov_report | 33.36 | 32.32 | 32.63 | 28.35 | **33.58** |
+| qmsum | 23.92 | 23.20 | 23.17 | 18.80 | **24.24** |
+| multi_news | 24.78 | 25.46 | 24.67 | 25.33 | **24.64** |
+| narrativeqa | 27.59 | 18.85 | 18.74 | 2.53 | **26.47** |
+| triviaqa | 91.11 | 72.73 | 81.14 | 71.36 | **89.82** |
+| lcc | 68.10 | 60.23 | 67.61 | 61.26 | **68.37** |
+| repobench | 64.74 | 53.63 | 58.24 | 44.84 | **65.54** |
+| **AVG13** | **51.70** | **42.92** | **46.82** | **32.83** | **51.65** |
 
 来源：FullKV=`exp/results_longbench_vendor/Qwen3-8B/fullkv/pred/result.json`；Quest=`pred_qv_1024_16/pred/`；
-AsyncTLS=`pred_asynctls/`；FASA=`exp/results_longbench_fasa/Qwen3-8B/pred_fasa_1024/pred/`；JSSA=
+AsyncTLS=`pred_asynctls_vendor_fix/`（**排序修复版**，2026-10-19 17:5X 正式打分，strict runcap 16；
+  组成 ts=10191104 12 任务 + 10191920 4 任务，relay GPU3/4/6 无重复派单）；FASA=
+`exp/results_longbench_fasa/Qwen3-8B/pred_fasa_1024/pred/`；JSSA=
 `exp/results_longbench_vendor/Qwen3-8B/pred_jssa_vendor_qwen3_8b_k1024_r32/result.json`（2026-10-19 03:36，
 strict runcap 校验，16/16 任务）。
-16 任务 AVG：FullKV 49.39 / Quest 41.35 / AsyncTLS 44.97 / FASA 33.31 / **JSSA 49.28**。
+16 任务 AVG：FullKV 49.39 / Quest 41.35 / **AsyncTLS 45.13** / FASA 33.31 / **JSSA 49.28**。
 JSSA AVG13=51.65 ≈ FullKV 51.70（triviaqa 89.82 接近 91.11、passage_retrieval_en 100 持平、hotpotqa
 60.20 反超 59.07）——**JSSA LongBench 与 dense 几乎持平**，远超 Quest/AsyncTLS/FASA。
 
