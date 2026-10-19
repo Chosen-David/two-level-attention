@@ -36,3 +36,4 @@
 | 代号 | 结论 | 实现/测试 | 证据 | 论文口径 |
 |---|---|---|---|---|
 | TL-PREFILL-MASK-CONTRACT-20261019 | token-mask消费端拒绝短mask广播、错误维度及块粒度误读；非性能优化 | `sparse_attn/ops/prefill_contract.py`、`sparse_attn/ops/tests/test_prefill_mask_contract.py` | `agent_doc/advice/2026-10-19_prefill_mask_contract_fix.md`、`agent_doc/results/prefill-mask-contract-20261019/`；基线3b0cfea | CPU正确性守卫，无新增GPU/模型/速度结论；历史非法mask样本需重测 |
+| TL-PREFILL-SIGMA-CAP-20261019 | 无组top-σ复用真实选集容量，修复K2固定cap截断 | `sparse_attn/ops/eager_prefill.py`、`sparse_attn/ops/tests/test_prefill_sigma_capacity.py` | `agent_doc/advice/2026-10-19_prefill_sigma_capacity_fix.md`、`agent_doc/results/prefill-sigma-cap-20261019/`；基线60f469e | CPU正确性修复，增加必要计数/同步；GPU、速度、质量及历史sigma重测未验 |

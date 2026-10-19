@@ -162,7 +162,7 @@ def _chunk_rows_attn(q_c, k_c, v_c, sel, pos_lo, G, softmax_scale,
         sel_e = sel if not per_qh else sel.reshape(-1, T)  # [RhG, T]
     # 共享选择满额上界：w_sel_cap（调用方按 indexer 配置算的理论满额，
     # K2 mid + sink + 末行 swa + 块对齐松弛）；w_sel_cap=0 时回退 GPU
-    # 实测（.item() 同步，仅独立调用形态兜底）。上界宽松无害——W 用
+    # 实测（.item() 同步，用于可变基数 sigma 及独立调用兜底）。上界宽松无害——W 用
     # 上界多出的 pad 列由 valid mask 屏蔽（exp=0 不进 softmax 分母）
     if w_sel_cap > 0:
         w_sel_max = int(w_sel_cap)
@@ -388,6 +388,11 @@ def sparse_prefill_attn(
         int(getattr(indexer.args, "tia_level2_topk", 1024)) + _bs
         + sink_tok + swa_tok + _bs
     )
+    # Top-sigma is threshold-based, not bounded by K2. Reuse the existing
+    # actual-count path rather than truncate valid selections (and row SWA)
+    # when packing. Ordinary top-k keeps its synchronization-free static cap.
+    if getattr(indexer, "sigma_select", "none") != "none":
+        w_sel_cap = 0
     o = torch.empty_like(q)
     # 【E138c chunk 级双流预取（2026-10-14 用户「全面性能优化」指令）】
     # chunk c+1 的选择（prepare_mask 只依赖 K/V 前缀与末行 q，不依赖
