@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [ ] [TL-BATCH-EXPLICIT-QUOTA-20261019] E155显式near配额误入batch旧比例公式：入口回退逐组，含最新E155d归一配置，修前25子用例失败，修后普通/-O各6项host测试通过；GPU/模型/性能及历史重测待验。([详情](task_details/TL-BATCH-EXPLICIT-QUOTA-20261019.md))
+
 - [ ] [TL-PREFILL-SCORE-BUDGET-20261019] candidate eager GQA行块预算漏算查询头；源码绑定反例推导单score为928MiB而预算512MiB。仅审计/复现，非GPU峰值或OOM；生产修复待实际张量与GPU验证。([详情](task_details/TL-PREFILL-SCORE-BUDGET-20261019.md))
 
 - [x] [TL-SUMMARY-VALIDATION-20261019] CPU汇总复用单次协议校验/样本索引，逐行门禁不变；普通/-O各34项通过，512样本配对中位4392.28→47.41ms。非GPU/请求收益。([详情](task_details/TL-SUMMARY-VALIDATION-20261019.md))

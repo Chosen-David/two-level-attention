@@ -259,6 +259,13 @@ def _gate_ok(indexer, q, k):
             # override. Check configuration, not _e151c_on: batch dispatch
             # occurs before the sequential prefill activation scope.
             and getattr(indexer, "_e151c_quota", None) is None
+            # E155 absolute near quotas/window override alpha/beta/gamma in
+            # compute_mask. This batch implementation still uses the legacy
+            # ratio formulas; reject before preparing shared indices/graphs.
+            # Zero is an explicit quota too, not an absent value.
+            and getattr(indexer, "nt_near_pages", None) is None
+            and getattr(indexer, "nt_near_tokens", None) is None
+            and getattr(indexer, "nt_near_len", None) is None
             # 投影基路径 k_qat 为投影特征（散布语义不同），不支持
             and indexer._basis is None and indexer._basis_all is None
             # L2 细筛维度必须与 L1 子空间同源（l2=full 是 128 维全量化，
