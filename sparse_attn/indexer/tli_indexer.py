@@ -426,6 +426,12 @@ class TLIIndexer(TIAIndexer):
                 raise ValueError(
                     "固定配额几何须显式传 tli_near_len（E155d：几何派单下 "
                     "α/β/γ 禁传，near 区宽无比例规则回退）")
+            # These branches return before fixed L2 quotas are consumed.
+            # nt=off is fixed-budget free competition, not variable top-sigma.
+            if self.sinkswa_only or self.moba_gate or self.sigma_select != "none":
+                raise ValueError(
+                    "fixed geometry (tli_near_pages/tokens/len) requires ordinary "
+                    "two-level top-k; no sinkswa_only, MoBA or sigma selection")
             if _nt_off:
                 # nt=off 归一：γ → 自由竞争（消费端与 E122 γ-off 同一分支，
                 # 逐位等价）；nb/nl 显式覆盖照常生效。
