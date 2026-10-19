@@ -29,6 +29,16 @@
 
 ## 修改日志
 
+### 第 37 轮（2026-10-19，数据检查 + Intro P1–P5 范式自查）
+
+- **新数据检查（协议更新后首轮）**：远端无新提交；`exp/trace/results/` 无新判决 JSON（11:00 后仅一条 AsyncTLS 128K yarn receipt 原始生成件，尚无 formal 判决，不入稿）。
+- **审计范围**：Intro P1（stakes）/ P2（级联）/ P3（容量）/ P4（设计）/ P5（贡献）。
+- **审计通过项**：P1 成本归因句（keeping selection cheaper than the attention work it removes）+ therefore 收口 ✓；P2 先功劳（AsyncTLS shortlist）后缺口 + motivates 收口 ✓；P3 数字带方向（.6759→.7207、43/128）+ 双阶段收口 ✓；P5 贡献三联 + 0.99/1.58 带方向 + 诚实披露句 ✓。
+- **发现并修复 1 处 MAJOR（en+zh）**：P4 的 (c) 句（远端 ca70de0 版）只说「均值最高」不绑数字，违反铁律「观察绑定量化数字」——图注与 caption 均无 0.84/0.51/0.24，正文是该数字唯一落点（O_observation_meta 注册值）。修复：en「Among the three 32-coordinate subsets in Figure~\ref{fig:observation}(c), low-frequency pairs **retain .84** of full-dimensional reference mid-TopK mass on average, random coordinates **.51**, high-frequency pairs **.24**; the random subset does not preserve RoPE pairs.」zh「低频配对平均保留全维参考mid-TopK权重和的.84，随机坐标.51，高频配对.24」。远端句的「最高」定性判断升级为三比值显式排序，random 披露保留。
+- **零余量配套压缩（段内近净 0）**：P4「the remaining final budget after prefix and recent-token protection」→「the remaining budget after prefix and recent protection」（-3 词，吸收 +7 词的数字绑定）；zh 同步「剩余最终预算…近期词元保护」→「剩余预算…近期保护」。
+- **记 MINOR 项不动**：P2 em-dash 插入语（summaries our selector also uses）属 observation 定域保护（历轮裁决维持）；P1「final attention-set size」名词堆叠但语义明确。
+- **版式验证**：en 6 页（AI 声明完整第 5 页）、zh 6 页、0 LaTeX Warning；机械门对新增句 0 违规。
+
 ### 第 36 轮（2026-10-19，**数据同步轮（用户指令）**：E147h/E147j 新实验数据入手稿）
 
 - **触发**：用户指示「代码方法和数据似乎有了新的更新，记得同步反应到论文」+「之后根据 best paper 精修语法表达，此后的每一轮记得关注本地的最新数据和结论」。远端无新提交。
