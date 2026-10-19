@@ -354,6 +354,11 @@ class TLIIndexer(TIAIndexer):
         _b_raw = getattr(args, "tli_beta", None)
         self.alpha = 0.0 if _a_raw is None else float(_a_raw)
         self.beta = 0.0 if _b_raw is None else float(_b_raw)
+        # 比例同时控制分区开关与区宽/页预算；NaN 会静默关闭分区，
+        # beta>1 可让 near 页配额超过 K1。构造期拒绝，不截断或改算法。
+        for name, value in (("tli_alpha", self.alpha), ("tli_beta", self.beta)):
+            if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+                raise ValueError(f"{name} 必须是 [0, 1] 内的有限比例，收到 {value!r}")
         # γ 三态：None=未传（几何归一或 legacy 缺省 1.0）；"off"=自由竞争
         # （E122 语义，运行时 γ=None）；数值=配额折扣。self.gamma=None
         # 的消费端为 compute_mask 的自由竞争分支（L2370 同源）。
