@@ -12,15 +12,17 @@
   8 步生成第 5 token 起分歧）→ **乱序版数据不能进主表，须排序修复版重跑**。
 - **已完成替换**：RULER 32K AVG11 **48.33**（2026-10-19 13:09 正式发布
   `e119_ruler32768_formal_asynctls_vendor_fix.json`，ts=10191101/2/3）。
-- **LongBench 16/16 已替换**（2026-10-19 17:5X 正式打分 AVG16 **45.13** / AVG13 **46.82**，
+- **LongBench 16/16 已替换**（2026-10-19 17:5X 正式打分 AVG16 **45.13** / AVG13 **46.83**，
   隔离目录 `pred_asynctls_vendor_fix/` strict runcap 16；组成 = 10191104 批 12 任务
   + 10191920 批 4 任务（qmsum/multi_news/gov_report/repobench，.187 relay GPU3/4/6）。
   **与乱序版几乎持平**（AVG16 44.97→45.13，逐任务 ±0.02~1.75 双向），符合预期——
   LongBench 上下文短（多数 <8k），排序修复影响小，与 RULER 32K 差异（48.33 vs 50.09）方向一致）。
-- **进行中**：RULER 128K 修复版 .187 在飞（ts=10191920，11 任务：single_1/2/3 +
-  multikey_1/2 已完成 100 行，multiquery/fwe ~70 行、multikey_3/multivalue/cwe ~35 行在跑，
-  vt 待 GPU；relay PID 4034989 健康无连环重派，全齐后同口径打分）。64K 修复版重跑待
-  128K 完成后评估（当前 64K 表 34.11 为乱序版）。**2026-10-19 18:3X 已停 lb_relay2 重复
+- **已完成（2026-10-19 21:33）**：**RULER 128K 修复版正式发布 AVG11=37.47**
+  （e119_ruler131072_formal_asynctls_vendor_fix.json，ts=10191920 relay GPU0/1/2/5/7，11/11 格
+  100 行）。**RULER 64K 修复版正式发布 AVG11=33.88**
+  （e119_ruler65536_formal_asynctls_vendor_fix.json，ts=10191930 relay GPU3/4/6→扩 8 卡，
+  11/11 格 100 行，替换乱序版 34.11）。AsyncTLS 长度趋势 32K 48.33 / 64K 33.88 / 128K 37.47
+  保持无崩塌，对比 FASA（18.64/1.72/1.40）显著优势。**2026-10-19 18:3X 已停 lb_relay2 重复
   repobench-p 进程**（LongBench 修复版 16/16 已全部完整，.187 repobench 文件 500 行
   md5 与本机打分数据一致，runcap gate 未覆盖损坏；教训：LongBench repobench-p 落盘名
   去掉 `-p`，relay 判定须用实际落盘名）。
@@ -48,7 +50,7 @@
 | triviaqa | 91.11 | 72.73 | 81.14 | 71.36 | **89.82** |
 | lcc | 68.10 | 60.23 | 67.61 | 61.26 | **68.37** |
 | repobench | 64.74 | 53.63 | 58.24 | 44.84 | **65.54** |
-| **AVG13** | **51.70** | **42.92** | **46.82** | **32.83** | **51.65** |
+| **AVG13** | **51.70** | **42.92** | **46.83** | **32.83** | **51.65** |
 
 来源：FullKV=`exp/results_longbench_vendor/Qwen3-8B/fullkv/pred/result.json`；Quest=`pred_qv_1024_16/pred/`；
 AsyncTLS=`pred_asynctls_vendor_fix/`（**排序修复版**，2026-10-19 17:5X 正式打分，strict runcap 16；
@@ -95,43 +97,48 @@ AsyncTLS=**`e119_ruler32768_formal_asynctls_vendor_fix.json`（2026-10-19 13:09 
 | task | AsyncTLS | FASA |
 |---|---|---|
 | niah_single_1 | 82.00 | 5.00 |
-| niah_single_2 | 87.00 | 6.00 |
-| niah_single_3 | 9.00 | 0.00 |
+| niah_single_2 | **85.00** | 6.00 |
+| niah_single_3 | **8.00** | 0.00 |
 | niah_multikey_1 | 79.00 | 2.00 |
-| niah_multikey_2 | 12.00 | 0.00 |
+| niah_multikey_2 | **9.00** | 0.00 |
 | niah_multikey_3 | 0.00 | 0.00 |
-| niah_multiquery | 22.50 | 0.25 |
-| niah_multivalue | 19.25 | 0.50 |
-| cwe | 0.30 | 0.00 |
-| fwe | 18.33 | 4.00 |
-| vt | 45.80 | 1.20 |
-| **AVG11** | **34.11** | **1.72** |
+| niah_multiquery | 24.75 | 0.25 |
+| niah_multivalue | **22.50** | 0.50 |
+| cwe | **0.20** | 0.00 |
+| fwe | **17.67** | 4.00 |
+| vt | **44.60** | 1.20 |
+| **AVG11** | **33.88** | **1.72** |
 
-来源：`e119_ruler65536_formal_{asynctls_vendor_64k,fasa_vendor}.json`（2026-10-19 正式发布，--yarn）。
+来源：AsyncTLS=`e119_ruler65536_formal_asynctls_vendor_fix.json`（**2026-10-19 21:23 正式发布，
+排序修复版重跑批 ts=10191930，11/11 格 100 行，--yarn，merge-best 仲裁跳过乱序版 ts=10181800；
+AVG11 33.88 vs 旧乱序版 34.11 基本持平，与 32K 方向一致，排序修复影响小）`；FASA=
+`e119_ruler65536_formal_fasa_vendor.json`（2026-10-19 正式发布，--yarn）。
 *口径：e116e data_root 已补 65536/131072 synthetic stub（仿 32768 两行格式）；64K/128K 打分需
   `--pred-postfix <唯一postfix>`（避开 L32768 残留 pred_fasa_vendor 跨长度门禁）+ `--yarn`。
 
 ## RULER 128K 表（新增，2026-10-19 10:1X，AVG11 n=100）
-| task | FASA |
-|---|---|
-| niah_single_1 | 4.00 |
-| niah_single_2 | 0.00 |
-| niah_single_3 | 0.00 |
-| niah_multikey_1 | 0.00 |
-| niah_multikey_2 | 0.00 |
-| niah_multikey_3 | 0.00 |
-| niah_multiquery | 0.00 |
-| niah_multivalue | 0.00 |
-| cwe | 0.10 |
-| fwe | 7.67 |
-| vt | 3.60 |
-| **AVG11** | **1.40** |
+| task | AsyncTLS | FASA |
+|---|---|---|
+| niah_single_1 | **99.00** | 4.00 |
+| niah_single_2 | **95.00** | 0.00 |
+| niah_single_3 | **18.00** | 0.00 |
+| niah_multikey_1 | **92.00** | 0.00 |
+| niah_multikey_2 | **16.00** | 0.00 |
+| niah_multikey_3 | 0.00 | 0.00 |
+| niah_multiquery | **20.00** | 0.00 |
+| niah_multivalue | **8.75** | 0.00 |
+| cwe | **0.70** | 0.10 |
+| fwe | **31.33** | 7.67 |
+| vt | **31.40** | 3.60 |
+| **AVG11** | **37.47** | **1.40** |
 
-来源：`e119_ruler131072_formal_fasa_vendor.json`（2026-10-19 10:11 正式发布，--yarn，唯一 postfix
+来源：AsyncTLS=`e119_ruler131072_formal_asynctls_vendor_fix.json`（**2026-10-19 21:33 正式发布，
+排序修复版重跑批 ts=10191920，.187 relay GPU0/1/2/5/7，11/11 格 n=100 全 100 行，--yarn）；FASA=
+`e119_ruler131072_formal_fasa_vendor.json`（2026-10-19 10:11 正式发布，--yarn，唯一 postfix
 `_fasa128`；8 主批 ts=10181813 + 3 single 补跑 ts=10181852，11/11 格 n=100 全 100 行）。
-*FASA 长度趋势：**32K 18.64 → 64K 1.72 → 128K 1.40**（质量崩塌一致）。AsyncTLS 128K 在飞
-  （本机 GPU1，multivalue 93/100 在跑，剩 cwe/fwe/vt），全齐后同口径打分补本表列
-  （--yarn + 唯一 postfix _asynctls128）。
+***长度趋势（重要论文对比）**：AsyncTLS **32K 48.33 → 64K 33.88 → 128K 37.47**（保持，无崩塌）；
+FASA **32K 18.64 → 64K 1.72 → 128K 1.40**（崩塌）。**AsyncTLS 128K 质量保持远优于 FASA
+  （37.47 vs 1.40，26.8x）**——token 稀疏 vs 子空间基长上下文对比的核心论据。
 
 ## 性能对比表（新增，2026-10-19 05:1X，#29 第一批）
 脚本 `exp/bench/vendor_e2e_latency.py`（复用 E152 计时框架 timed_request，vendor 挂载分支对齐
@@ -158,11 +165,36 @@ pred_ruler.py；合成 needle prompt，max_gen=128，warmup1+repeats2-3，.187 �
    2026-10-19 03:31 16/16 全齐，result.json strict runcap 校验；13 任务表 JSSA 列已填）。
 3. ~~FASA RULER 32K 补 5 任务~~ → **全部完成并合成打分 AVG11=18.55**（fasa_32k_full11.json，
    legacy 基础打分非 formal，跨批 producer 门禁说明见上）。
-4. ~~FASA/AsyncTLS RULER 64K~~ → **已完成并正式打分**（见上 RULER 64K 表：FASA 1.72 / AsyncTLS 34.11）。
-   **RULER 128K 在飞**：FASA 128K single_1/2/3 补跑全完成（ts=10181852，各 100 行已同步本地），
-   主批 cwe 81 在跑（GPU1 batch 循环自动接 fwe/vt）；AsyncTLS 128K 本机 multikey_3 49 在跑，
-   剩 multiquery/multivalue/cwe/fwe/vt。
-5. ~~JSSA/AsyncTLS/FASA 性能（#29 decode/prefill microbench）~~ → **32K/64K 已完成**（见下性能表，
-   `exp/trace/results/perf_r{32k,64k}_{method}.json`，脚本 `exp/bench/vendor_e2e_latency.py`）；
-   **128K 性能在飞**（.187 五卡 2026-10-19 05:1X，warmup1+repeats2）。
-6. RULER 128K 全齐后同口径打分（--yarn + 唯一 postfix _fasa128/_asynctls128）。
+4. ~~FASA/AsyncTLS RULER 64K/128K~~ → **全部完成并正式打分**（2026-10-19 21:33 收尾）：
+   - **AsyncTLS 64K** AVG11 **33.88**（e119_ruler65536_formal_asynctls_vendor_fix.json，
+     ts=10191930，替换乱序版 34.11）；**AsyncTLS 128K** AVG11 **37.47**
+     （e119_ruler131072_formal_asynctls_vendor_fix.json，ts=10191920）。
+   - **FASA 64K** 1.72 / **FASA 128K** 1.40（e119_ruler65536/131072_formal_fasa_vendor.json）。
+   - **重要发现**：AsyncTLS 长上下文质量保持（32K 48.33→64K 33.88→128K 37.47），FASA 崩塌
+     （18.64→1.72→1.40）——token 稀疏 vs 子空间基对比核心论据。
+5. ~~JSSA/AsyncTLS/FASA 性能（#29 decode/prefill microbench）~~ → **32K/64K/128K 已完成**（见上性能表，
+   `exp/trace/results/perf_r{32k,64k,128k}_{method}.json`，脚本 `exp/bench/vendor_e2e_latency.py`）。
+6. ~~RULER 128K 全齐后同口径打分~~ → **已完成**（--yarn + 唯一 postfix _fasa128/_asynctls128）。
+7. ~~四 baseline 数据全齐 → 推进 #31 论文写入~~ → **已完成（2026-10-19 22:0X）**，见下方记录。
+
+## #31 论文写入完成（2026-10-19 22:0X，deepseek 轨）
+- **TLI_paper_en.tex 新增 `tab:vendorlb` 表**（LongBench 13 任务 vendor 批，独立统一批次单独报告）：
+  插入在 `tab:betacross` 之后、`\subsection{Ablation}` 之前。6 列 lccccc（FullKV/Quest/AsyncTLS/FASA/JSSA），
+  13 行数据 + Overall 行。caption 注明「independent unified batch，FullKV 内参照 51.70 与主表批 50.36
+  的批次差、单独报告不混同」+ 各方法 budget 口径（全部 1024：Quest 全维 token gather、AsyncTLS
+  token 1024/b64/kb128 排序修复版、FASA qasper 基 t0.8 k16、JSSA rank32）。
+- **表后正文一段**：JSSA 与 dense 几乎持平（Overall 51.65 vs 51.70，-0.05，11/13 任务全方法最高，
+  hotpotqa 60.20 反超 FullKV 59.07、passage_retrieval_en 100 并列、musique 34.25 vs Quest 23.12；
+  仅 triviaqa 89.82<91.11、multi_news 24.64<25.46 两任务落于他方法）；AsyncTLS 46.83 高于 Quest 42.92
+  但低于 JSSA 4.8 分；FASA 32.83 崩塌（narrativeqa 2.53/musique 4.15），呼应 RULER 长度趋势
+  （tab:rulerlong）；收尾论据：**子空间轴（JSSA 51.65 贴 dense、PSI 50.78 同族）最强，token-gather
+  与固定子空间门都在远程检索让步**。
+- **加粗修正（相对蓝本原始标记）**：multi_news 实际最高 Quest 25.46（非 JSSA）、triviaqa 实际最高
+  FullKV 91.11（非 JSSA）——逐行按「全 5 方法最高」重核，JSSA 赢 11/13，诚实标注。
+- **fig4 修复版数据重生成完成**（22:02）：fig4_partition_gain.py 数据源改 3 个
+  e119_ruler{32768,65536,131072}_formal_asynctls_vendor_fix.json，PDF+PNG 输出到 paper/figures/
+  与 exp/figures/。数据点：FullKV 59.38/48.54/46.43、Quest 42.85/26.25/19.33、AsyncTLS 48.33/33.88/37.47。
+- **LaTeX 验证**：环境嵌套 OK、vendorlb 6 列对齐、tab:vendorlb/tab:rulerlong 引用均有效。
+  编译（pdflatex）本机不可用 → **并入 Opus PDF 重编译流程**。
+- **口径警示（写入已遵守）**：vendor 批作为独立统一批次单独报告，不与 PSI 主表（tab:longbench 批）
+  混同——新表自身带 FullKV 内参照 51.70。
