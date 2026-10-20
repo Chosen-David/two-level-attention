@@ -14,7 +14,8 @@
     5 任务分均值。排序按 AVG5 降序。
   - top-3 配对 CI（预登记纪律「不按点估计拍板」）：分层配对 bootstrap
     （任务内按 _id 对齐逐例分差、任务内重采样、任务均值差的均值），
-    B=10000、2.5/97.5 分位。
+    B=10000、2.5/97.5 分位；点差/区间以 score points 输出，与 AVG5
+    的 0–100 分制一致（逐例原始分数仍为 0–1）。
   - 预登记故事分支：nt 甜区赢 / ntoff 赢 / 原位赢（nb8nt320nl8192，
     即 β.0625 锚 (8,320,8192)）/ nl 单调。
   - 轴外目录（legacy nt160 / pred_legacy_ratio_*）显式排除不计数。
@@ -231,7 +232,7 @@ def per_example_scores(cell_info):
 
 
 def paired_bootstrap(cell_a, cell_b, B=10000, seed=20261020):
-    """分层配对 bootstrap：任务内非空、完全相同的 _id 集合才可配对。"""
+    """配对 0–1 逐例分数，返回 AVG5 分制的分差；要求相同非空 ID 集合。"""
     import random
     rng = random.Random(seed)
     per_task_diffs, per_task_ids = {}, {}
@@ -258,7 +259,11 @@ def paired_bootstrap(cell_a, cell_b, B=10000, seed=20261020):
     lo, hi = stats[int(0.025 * B)], stats[int(0.975 * B) - 1]
     point = sum(sum(d) / len(d) for d in per_task_diffs.values()) / len(AVG5_TASKS)
     aligned = {t: len(per_task_ids[t]) for t in AVG5_TASKS}
-    return {"point_diff": round(point, 4), "ci95": [round(lo, 4), round(hi, 4)],
+    # eval.scorer multiplies by 100; convert only at the reporting boundary,
+    # before rounding, leaving sampling and the unrounded zero test unchanged.
+    return {"point_diff": round(100 * point, 4),
+            "ci95": [round(100 * lo, 4), round(100 * hi, 4)],
+            "unit": "score_points",
             "ci_excludes_zero": not (lo <= 0 <= hi), "aligned_n": aligned,
             "B": B}
 
@@ -343,6 +348,7 @@ def main():
             "collect_root": COLLECT_ROOT,
             "hosts": HOSTS,
             "avg5_tasks": AVG5_TASKS,
+            "score_unit": "points_0_100",
             "bootstrap_B": args.bootstrap,
             "notes": "单主机完整副本口径（不跨机拼 partial）；多副本 sha 全等去重；"
                      "排序按 AVG5 点估计、判决按 top-3 配对 CI（不按点估计拍板）；"

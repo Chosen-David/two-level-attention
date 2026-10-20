@@ -48,7 +48,7 @@ class PairingTests(unittest.TestCase):
         self.assertEqual(result, grid.paired_bootstrap(
             {t: dict(reversed(list(v.items()))) for t, v in a.items()}, b, B=40))
         self.assertEqual(result["aligned_n"], {t: 3 for t in grid.AVG5_TASKS})
-        self.assertEqual(result["point_diff"], .0333)
+        self.assertEqual(result["point_diff"], 3.3333)
 
     def read_rows(self, rows):
         fake_eval = types.ModuleType("benchmark.LongBench.eval")
