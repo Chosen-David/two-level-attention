@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [ ] [TL-LBV1-INPUT-IDENTITY-20261020] v1指纹遗漏问题/context，4组实际AST反例/3对照及普通/-O复现；仅登记新发现，版本化生产修复/真实输入与历史影响待验。([详情](task_details/TL-LBV1-INPUT-IDENTITY-20261020.md))
+
 - [x] [TL-E155D-SNAPSHOT-20261020] 固定配额排名/CI绑定暂存预测字节，修复源替换造成方向反转；普通/-O各41项及各24组差分通过，独审通过；真实T2/GPU/性能未验，发布回读另核。([详情](task_details/TL-E155D-SNAPSHOT-20261020.md))
 
 - [x] [TL-E155D-SCORE-UNITS-20261020] 固定配额 CI 与 AVG5 统一为分值单位并显式标注；修前5失败，普通/-O各32项、相邻17项及24组基线差分通过；真实T2重评/GPU/性能未验。([详情](task_details/TL-E155D-SCORE-UNITS-20261020.md))
