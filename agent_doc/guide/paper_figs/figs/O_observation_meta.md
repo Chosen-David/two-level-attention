@@ -128,6 +128,21 @@ high32（高频）0.24。主指标 = 选中质量 / 参考 top-K 质量（非全
 6. (b) 两臂最小值不配对（禁止写成单一 query 的「0→0.27 配对提升」）；
    43/128 条 query 配额臂更低，间隙不得一概称「逐 query 保底收益」。
 
+## 半覆盖律桥接（2026-10-21，E155d 网格判决后新增）
+
+O 图 (a) 的「近区质量集中、远区稀疏尖峰」观察在 E155d 固定配额网格中得到配额侧
+对应物：最优格落在对角线 nb·64 = nl/2（近区 L1 页池恰覆盖近区一半）。机制数据
+= `exp/trace/results/e155d_half_coverage_anatomy.json`（离线重析 E140b，120/128
+query）：近区 64-token 页按质量降序，top-½ 页累计份额 median 0.933 / mean 0.909 /
+p10 0.802（均匀基线 0.5）——近区 mass 本身集中在约一半页里，与网格最优一致。
+
+- 该机制面板渲染在 **A6 消融图 (c)**（`figs/fig_a_e155d_grid.py`，
+  `A_e155d_quota_grid.*` + TSV panel_id=c），O 图四面板不变、不重渲染。
+- 口径边界沿用 E140b：32 Q-head mean z 分数诊断平面，非生产评分器、非任务质量；
+  一致性证据非因果证明。
+- 叙事链：O(a) mass 异质性 → A6(c) 半覆盖律 mass 集中度 → A6(a) 网格最优对角线
+  nb·64=nl/2。观察图 caption 引 A6 即可，勿在 O 图内堆数字（版式铁律）。
+
 ## 下游同步清单
 
 - `agent_doc/advice/dac_manuscript/figures/o_observation.pdf`（从本目录拷贝）
