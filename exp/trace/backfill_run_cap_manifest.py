@@ -323,6 +323,13 @@ def check_id_fingerprint(rows, task, recomputed_fp):
                     f"{{dataset}}:{{指纹12}}:{{行号}} 生产格式——无法验证"
                     f"全集绑定，拒绝补制（该文件可能非 E116a 后生产产物），"
                     f"fail loudly")
+        # A legacy first row cannot waive identity checks for later rows.
+        has_id = "_id" in rows[0]
+        for lineno, row in enumerate(rows, 1):
+            if ("_id" in row) != has_id or ":" in str(row.get("_id", "")):
+                raise SystemExit(
+                    f"[GATE-FAIL] backfill: 第 {lineno} 行 _id 格式与旧格式"
+                    f"回退不一致——缺失/官方 ID 不得与复合 ID 混行，拒绝补制")
         return None, False   # lbv2 官方 id / 旧 v1 无 _id → ④ 计数口径
     embedded_fp = first_m.group(1)
     idxs = []
