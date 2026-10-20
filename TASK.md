@@ -43,6 +43,14 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
       exp/trace/results/e155d_grid_verdict.json。纪律：前 3 名进配对 CI，
       不按点估计拍板；预登记故事分支（nt 甜区赢/ntoff 赢/原位赢/nl 单调）。
 - [ ] **T3 nl=全mid 退化端点**：top-2 各 1 格（网格判决后才知道是谁）。
+- [ ] **TG harness CUDA Graph 化（用户 10-20 14:3X 指令）**：eval harness
+      decode 步 Graph 化（StaticCache 静态槽位 + 长度分桶 capture + host
+      算术 GPU 化，E134-pre StaticCache + E139 graph 门禁先例移植），
+      **逐位门禁（graph vs eager 逐例对拍）过了才切**。纪律：**不动六机
+      网格在用树/派单路径**（逐任务新进程会吸树内代码，改=网格混版本
+      provenance 事故）；实现走独立 worktree 纯代码先行，GPU 对拍验证
+      等网格收官；**收益落点 = T3/T4/T6 后续派单提速**（T6 三模型全量
+      为最大消耗方）。
 - [ ] **T4 RULER canary**：仅 AVG5 前 10 + 边界格（不再逐格）。
 - [ ] **T5 ablation 论文部分**：网格结果写入论文 ablation 节
       （TLI_paper_en.tex / TLI_paper.tex 双语镜像）。
