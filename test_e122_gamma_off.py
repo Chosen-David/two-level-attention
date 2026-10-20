@@ -152,7 +152,7 @@ def t1_default_path_free_vs_quota():
         cfg = dict(tli_enable_layer_skip=False, tli_far_method="minmax",
                    tli_near_method="avg", tli_alpha=0.25, tli_beta=0.125,
                    tli_enable_kmeans=False)
-        _, m_off = drive_compute_mask(make_args(**cfg, tli_gamma=None), fine, kt)
+        _, m_off = drive_compute_mask(make_args(**cfg, tli_gamma="off"), fine, kt)
         _, m_q = drive_compute_mask(make_args(**cfg, tli_gamma=0.625), fine, kt)
         for tag, m in (("off", m_off), ("quota", m_q)):
             if m.dtype != torch.bool or m.shape[-1] != T:
@@ -218,7 +218,7 @@ def t2_cavg_concat_mapping():
                    tli_far_select="cluster", tli_near_select="4bit",
                    tli_enable_kmeans=True)
         idx_off, m_off = drive_compute_mask(
-            make_args(**cfg, tli_gamma=None), fine, kt, far_inject=inj)
+            make_args(**cfg, tli_gamma="off"), fine, kt, far_inject=inj)
         # 簇分数实际值核验（1.0/0.0 两档）
         fs = idx_off._far_token_score(idx_off._last_q)
         if fs is None or fs.shape != (2, Tfar):
@@ -278,7 +278,7 @@ def t3_zero_zero_near_empty():
                    tli_near_method="avg", tli_alpha=0.0, tli_beta=0.0,
                    tli_far_select="cluster", tli_near_select="4bit",
                    tli_enable_kmeans=True)
-        _, m = drive_compute_mask(make_args(**cfg, tli_gamma=None), fine, kt,
+        _, m = drive_compute_mask(make_args(**cfg, tli_gamma="off"), fine, kt,
                                   far_inject=inj)
         h0 = m[0, 0, 0]
         if not bool(h0[:sink_tok].all()) or not bool(h0[swa_lo:].all()):
@@ -307,7 +307,7 @@ def t4_edges():
         fine = torch.zeros(S)
         cfg_a = dict(tli_enable_layer_skip=False, tli_far_method="minmax",
                      tli_near_method="avg", tli_alpha=1.0, tli_beta=0.25,
-                     tli_gamma=None, tli_enable_kmeans=False,
+                     tli_gamma="off", tli_enable_kmeans=False,
                      tia_level2_topk=100)
         _, m_a = drive_compute_mask(make_args(**cfg_a), fine, S // 64)
         if m_a.dtype != torch.bool or m_a.shape[-1] != S:
@@ -324,7 +324,7 @@ def t4_edges():
         cfg_b = dict(tli_enable_layer_skip=False, tli_far_method="minmax",
                      tli_near_method="avg", tli_alpha=0.25, tli_beta=0.125,
                      tli_far_select="cluster", tli_near_select="4bit",
-                     tli_enable_kmeans=True, tli_gamma=None)
+                     tli_enable_kmeans=True, tli_gamma="off")
         idx_b, m_b = drive_compute_mask(make_args(**cfg_b), fine2, S2 // 64,
                                         far_inject=inj)
         h0 = m_b[0, 0, 0]
@@ -352,12 +352,12 @@ def t5_cli_and_info():
     name = "T5 CLI 三态解析（off/OFF/0.625）+ info.py γ=off 渲染"
     try:
         pg = _args_mod._parse_gamma
-        if pg("off") is not None:
-            raise AssertionError("_parse_gamma('off') 应为 None")
-        if pg("OFF") is not None:
-            raise AssertionError("_parse_gamma('OFF') 应为 None（大小写不敏感）")
-        if pg(" Off ") is not None:
-            raise AssertionError("_parse_gamma(' Off ') 应为 None（strip）")
+        if pg("off") != "off":
+            raise AssertionError("_parse_gamma('off') 应为哨兵字符串 'off'")
+        if pg("OFF") != "off":
+            raise AssertionError("_parse_gamma('OFF') 应为 'off'（大小写不敏感）")
+        if pg(" Off ") != "off":
+            raise AssertionError("_parse_gamma(' Off ') 应为 'off'（strip）")
         if pg("0.625") != 0.625:
             raise AssertionError("_parse_gamma('0.625') 应为 0.625")
         # argparse 全链：三态 + 非法值 fail loudly
@@ -366,8 +366,9 @@ def t5_cli_and_info():
         parser = _args_mod.add_sparse_attn_args(parser)
         a1 = parser.parse_args(["--method", "tli", "--tli_gamma", "off"])
         a2 = parser.parse_args(["--method", "tli", "--tli_gamma", "0.625"])
-        if a1.tli_gamma is not None:
-            raise AssertionError("argparse off 应解析为 None")
+        if a1.tli_gamma != "off":
+            raise AssertionError("argparse off 应解析为哨兵 'off'"
+                                 "（E155d 后 None=未传→γ=1.0）")
         if a2.tli_gamma != 0.625:
             raise AssertionError(f"argparse 数值应 0.625，实际 {a2.tli_gamma}")
         if a1.tli_gamma == a2.tli_gamma:
@@ -384,7 +385,7 @@ def t5_cli_and_info():
             method="tli", tia_block_size=64, tia_level1_topk=128,
             tia_level2_topk=1024, tia_level2_cmp_ratio=4,
             tli_enable_subspace=True, tli_enable_kmeans=True,
-            tli_enable_layer_skip=True, tli_gamma=None,
+            tli_enable_layer_skip=True, tli_gamma="off",
         )
         name_off = _info_mod.get_method_name_with_info(ns)
         ns.tli_gamma = 1.0
@@ -408,7 +409,10 @@ def t5_cli_and_info():
         # 缺口 ① 修复（本 ns layer_skip=True 且未声明 path → manifest
         # 解析 tracked DEFAULT_MASK 内容身份）→ 由 h1483e0db94 经
         # h7c17d0b763 再重算为 hbb27186a72。
-        if name_f != "tli_64_128_1024_c4_BDa0_b0_g1_hbb27186a72":
+        # 【E155c/E155d 锚点重算】五新参数（near_pages/tokens/len/
+        # boundary_bypass/l2_quant）入 _TREATMENT_FIELD_DEFAULTS →
+        # hash 由 hbb27186a72 移位至 h7c135836f7（076 纪律同步更新）。
+        if name_f != "tli_64_128_1024_c4_BDa0_b0_g1_h7c135836f7":
             raise AssertionError(f"数值 γ 文件名应含生效 α/β/γ（E121 B09 口径）"
                                  f"+ 076 treatment hash：{name_f!r}")
         del ns.tli_gamma                      # 缺省属性按 1.0 兜底（不加 goff）
@@ -455,7 +459,7 @@ def t6_full_pipeline():
         base = dict(tli_enable_layer_skip=False, tli_far_method="minmax",
                     tli_near_method="avg", tli_alpha=0.25, tli_beta=0.125,
                     tia_level2_topk=1024, tli_enable_kmeans=False)
-        _, m_off = run_mask(make_args(**base, tli_gamma=None), k, q)
+        _, m_off = run_mask(make_args(**base, tli_gamma="off"), k, q)
         _, m_q = run_mask(make_args(**base, tli_gamma=0.625), k, q)
         for tag, m in (("off", m_off), ("quota", m_q)):
             if m.dtype != torch.bool or m.shape[-1] != S:
@@ -480,7 +484,7 @@ def t6_full_pipeline():
                         tli_near_method="avg", tli_alpha=0.25, tli_beta=0.125,
                         tli_far_select="cluster", tli_near_select="4bit",
                         tli_enable_kmeans=True, tli_far_clusters=8,
-                        tli_far_niter=3, tia_level2_topk=1024, tli_gamma=None)
+                        tli_far_niter=3, tia_level2_topk=1024, tli_gamma="off")
         idx_c, m_c = run_mask(make_args(**cfg_cavg), k, q)
         if idx_c._km_centroids is None:
             raise AssertionError("cavg 全链未建簇（Tfar < far_clusters*4？）")

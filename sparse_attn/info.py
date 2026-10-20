@@ -150,6 +150,68 @@ _TREATMENT_FIELD_DEFAULTS = {
 # 079②：文件型配置字段集合（值非 None → 内容身份解析，见上）
 _FILE_IDENTITY_FIELDS = ("tli_proj_basis", "tli_layer_skip_path")
 
+# 【E155e vendor treatment 身份补齐（用户问题 ①「R3 manifest 登记缺口，
+# 2026-10-20」】46 个 vendor CLI 参数此前不进任何 treatment 身份：076 注释
+# 「非 tli 方法可读段已编码其全部旋钮」对 vendor 方法不成立——
+#   * clusterkv：window/fit_iter/head_sel/balance/dist_t/gqa_policy/
+#     topk_stat 7 参数完全不进可读名（异配置同名互覆可达）；
+#   * asynctls/jssa：channel/basis 文件只编 basename（同 basename 异内容
+#     = 同名，142/149 已修 minference/fasa 的同构缺陷，此两家漏网）；
+#   * 其余 vendor（quest_vendor/minference/fasa/sparq/moba/hisa/ffd）旋钮
+#     已全参数或内容身份编码，但登记进 manifest 使 hash 承载全部身份
+#     （可读段降级为防御性冗余，与 tli 同构）。
+# 修复 = vendor 参数按 method 条件入 manifest（tli/none/tia/twi 的
+# manifest 逐位不变——E155d 在飞网格与全部 tli hash 锚点稳定），
+# vendor 方法名统一追加 _h<hash10> 尾段（身份单射结构性成立；既有
+# vendor 输出文件名不追溯改动，同 142/149 追加段先例）。quest/tia/twi/
+# none 可读段本就全参数编码，维持 076 旧口径不动。
+_VENDOR_TREATMENT_FIELDS = {
+    "quest_vendor": {"quest_token_budget": 1024, "quest_chunk_size": 16},
+    "minference_vendor": {"minference_starting_layer": -1,
+                          "minference_config_path": None},
+    "sparq_vendor": {"sparq_k": 1024, "sparq_context_length": None},
+    "moba_vendor": {"moba_chunk_size": 4096, "moba_topk": None,
+                    "moba_budget": 1024},
+    "clusterkv_vendor": {
+        "clusterkv_token_budget": 1024, "clusterkv_sink": 16,
+        "clusterkv_window": 320, "clusterkv_nlist": 400,
+        "clusterkv_fit_iter": 20, "clusterkv_head_sel": "truc",
+        "clusterkv_balance": False, "clusterkv_dist_t": "cosine",
+        "clusterkv_gqa_policy": None, "clusterkv_topk_stat": False},
+    "asynctls_vendor": {"asynctls_token_budget": 1024,
+                        "asynctls_block_size": 64, "asynctls_top_kb": 128,
+                        "asynctls_channel_file": None},
+    "hisa_vendor": {"hisa_budget": 1024, "hisa_k_block_size": 128,
+                    "hisa_block_topk": 64},
+    "jssa_vendor": {"jssa_budget": 1024, "jssa_rank": 32,
+                    "jssa_basis_path": None},
+    "fasa_vendor": {"fasa_budget": 1024, "fasa_dataset": "qasper",
+                    "fasa_threshold_ratio": 0.8, "fasa_min_k": 16,
+                    "fasa_max_k": 16, "fasa_mode": "topk"},
+}
+# vendor 文件型字段：值非 None → 内容身份 {basename, sha256}（079② 同
+# 哲学——运行时必读这些文件，缺失 = 运行时必炸，manifest 侧提前 fail
+# closed 不留「能算名不能跑」半配置）。fasa_agreement_dir 是目录型：
+# 经 resolve_fasa_agreement_path 归一到具体 pkl 再取内容身份（142 的
+# 路径唯一口径复用）。
+_VENDOR_FILE_IDENTITY_FIELDS = (
+    "minference_config_path", "asynctls_channel_file", "jssa_basis_path")
+
+
+def _vendor_file_identity(field, path):
+    """E155e：vendor 文件型配置的内容身份（fail closed）。"""
+    rp = os.path.realpath(path)
+    try:
+        with open(rp, "rb") as f:
+            raw = f.read()
+    except OSError as e:
+        raise SystemExit(
+            f"[GATE-FAIL] E155e: {field} 文件不可读（{path!r}）——"
+            f"vendor 文件型配置必须绑定实际内容，拒绝运行，fail loudly"
+            f"（{type(e).__name__}: {e}）")
+    return {"basename": os.path.basename(rp),
+            "sha256": hashlib.sha256(raw).hexdigest()}
+
 # treatment hash 尾段格式：_h + 10 hex。锚定尾正则拆分（可读段以
 # g 段/_P 结尾、非 tli 名以数值/async/none 结尾，不与该模式误撞）。
 _TREATMENT_HASH_HEX_LEN = 10
@@ -362,6 +424,30 @@ def resolve_treatment_snapshot(args):
             elif isinstance(v, str) and v.strip().lower() == "off":
                 v = None
         manifest[f] = v
+    # ---- E155e：vendor 参数按 method 条件入 manifest ----
+    # tli/none/tia/twi/quest 不进本分支 → manifest 逐位不变（E155d 在飞
+    # 网格与全部 tli hash 锚点稳定）。vendor 方法登记 method 键 + 该
+    # method 的全部旋钮；文件型字段（channel/basis/config）解析为内容
+    # 身份，fasa_agreement_dir 经 142 路径口径归一到具体 pkl 内容身份。
+    _m = getattr(args, "method", None)
+    if _m in _VENDOR_TREATMENT_FIELDS:
+        manifest["method"] = _m
+        for f, d in _VENDOR_TREATMENT_FIELDS[_m].items():
+            v = getattr(args, f, d)
+            if f in _VENDOR_FILE_IDENTITY_FIELDS and v is not None:
+                manifest[f] = _vendor_file_identity(f, v)
+            else:
+                manifest[f] = v
+        if _m == "fasa_vendor":
+            _agr = resolve_fasa_agreement_path(args)
+            if _agr is not None and os.path.isfile(_agr):
+                manifest["fasa_agreement"] = _vendor_file_identity(
+                    "fasa_agreement_dir", _agr)
+            else:
+                # 142 口径：源文件须先物化（qwen3_identify_fre.py 产出），
+                # 缺失如实记 null——stage_fasa_agreement 的 GATE-FAIL
+                # 在命名侧先拦截，manifest 不重复设防。
+                manifest["fasa_agreement"] = None
     manifest_json = json.dumps(manifest, sort_keys=True,
                               ensure_ascii=False, default=str)
     return TreatmentSnapshot(manifest=manifest, manifest_json=manifest_json,
@@ -828,9 +914,20 @@ def _minference_cfg_sha8(args):
     return freeze_minference_pattern_sha8(args)
 
 
+def _vendor_name_with_hash(args, base, snapshot=None):
+    """E155e：vendor 方法名追加 canonical treatment hash 尾段（与 tli
+    076 同构）。base = 既有可读段（含 142/149 的 _agr/_cfg/_src 内容
+    身份段），追加段不改既有语义字段——既有 vendor 文件名不追溯改动。
+    hash 从 vendor manifest（method 条件字段 + 文件内容身份）派生，
+    身份单射结构性成立（clusterkv 7 旋钮 / asynctls channel / jssa
+    basis 内容全部由 hash 承载，可读段降级为防御性冗余）。"""
+    return f"{base}_h{_treatment_hash(args, snapshot)}"
+
+
 def get_method_name_with_info(args, snapshot=None):
     # 081：snapshot 提供时 tli 名的 _h<hash10> 段从冻结 manifest_json
-    # 派生（与 sidecar/receipt 同源）；非 tli 分支不消费 snapshot。
+    # 派生（与 sidecar/receipt 同源）；E155e 起 vendor 分支同样消费
+    # snapshot 的冻结 manifest（_vendor_name_with_hash）。
     if args.method == "ffd_vendor":
         from sparse_attn.baseline_runtime import ffd_identity
         identity = ffd_identity(args)
@@ -841,7 +938,11 @@ def get_method_name_with_info(args, snapshot=None):
     elif args.method == "quest_vendor":
         # B 轨 vendor（官方源码复用）：Quest 官方口径
         # token_budget/chunk_size 全参数编码进文件名。
-        return f"quest_vendor_{args.quest_token_budget}_{args.quest_chunk_size}"
+        # E155e：追加 _h<hash10> 尾段（manifest 条件字段承载身份）。
+        return _vendor_name_with_hash(
+            args,
+            f"quest_vendor_{args.quest_token_budget}_"
+            f"{args.quest_chunk_size}", snapshot)
     elif args.method == "minference_vendor":
         # B 轨 vendor（官方源码复用）：MInference prefill 动态稀疏 + decode dense。
         # pattern 文件（config_path）不同 = treatment 不同（不同模型/搜索口径），
@@ -857,8 +958,11 @@ def get_method_name_with_info(args, snapshot=None):
         pattern_tag = os.path.basename(
             getattr(args, "minference_config_path", "pattern")
         ).replace(".json", "")
-        return (f"minference_vendor_{pattern_tag}_"
-                f"{getattr(args, 'minference_starting_layer', -1)}_cfg{cfg_sha8}")
+        return _vendor_name_with_hash(
+            args,
+            (f"minference_vendor_{pattern_tag}_"
+             f"{getattr(args, 'minference_starting_layer', -1)}_cfg{cfg_sha8}"),
+            snapshot)
     elif args.method == "fasa_vendor":
         # B 轨 vendor（官方源码复用）：FASA decode 频域剪枝。校准数据集 +
         # budget/threshold_ratio/min_k/max_k/mode 全参数编码进文件名——
@@ -872,11 +976,13 @@ def get_method_name_with_info(args, snapshot=None):
         # 尾段 `_agr<sha8>`（内容身份，与 checkout/路径无关），追加段
         # 不改既有语义字段（既有文件名不追溯改动）。
         fasa_dataset = getattr(args, "fasa_dataset", "qasper")
-        return (f"fasa_vendor_{fasa_dataset}_b{getattr(args, 'fasa_budget', 1024)}"
-                f"_t{getattr(args, 'fasa_threshold_ratio', 0.8):g}"
-                f"_k{getattr(args, 'fasa_min_k', 16)}-{getattr(args, 'fasa_max_k', 16)}"
-                f"_{getattr(args, 'fasa_mode', 'topk')}"
-                f"_agr{_fasa_agreement_sha8(args)}")
+        return _vendor_name_with_hash(
+            args,
+            (f"fasa_vendor_{fasa_dataset}_b{getattr(args, 'fasa_budget', 1024)}"
+             f"_t{getattr(args, 'fasa_threshold_ratio', 0.8):g}"
+             f"_k{getattr(args, 'fasa_min_k', 16)}-{getattr(args, 'fasa_max_k', 16)}"
+             f"_{getattr(args, 'fasa_mode', 'topk')}"
+             f"_agr{_fasa_agreement_sha8(args)}"), snapshot)
     elif args.method == "sparq_vendor":
         # B 轨 vendor（官方源码复用）：SparQ decode top-k + V_mean 插值。
         # 主表口径（用户 2026-10-14 拍板）：k 固定 1024；r 由
@@ -893,8 +999,10 @@ def get_method_name_with_info(args, snapshot=None):
         from pathlib import Path
         adapter = Path(__file__).resolve().parents[1] / 'exp/vendor_baselines/sparq_vendor/qwen3_sparq_patch.py'
         source_hash = hashlib.sha256(adapter.read_bytes()).hexdigest()[:16]
-        return (f"sparq_vendor_k{getattr(args, 'sparq_k', 1024)}"
-                f"_cl{_ctx:g}_src{source_hash}")
+        return _vendor_name_with_hash(
+            args,
+            (f"sparq_vendor_k{getattr(args, 'sparq_k', 1024)}"
+             f"_cl{_ctx:g}_src{source_hash}"), snapshot)
     elif args.method == "moba_vendor":
         # B 轨 vendor（官方源码复用）：MoBA prefill 块级 gate 稀疏 + decode
         # dense。chunk/topk/budget 决定每 query 有效预算，必须进 treatment 名
@@ -906,7 +1014,8 @@ def get_method_name_with_info(args, snapshot=None):
         if _moba_topk is None:
             _moba_budget = getattr(args, "moba_budget", 1024)
             _moba_topk = max(2, -(-_moba_budget // _moba_chunk))
-        return f"moba_vendor_c{_moba_chunk}_k{_moba_topk}"
+        return _vendor_name_with_hash(
+            args, f"moba_vendor_c{_moba_chunk}_k{_moba_topk}", snapshot)
     elif args.method == "clusterkv_vendor":
         # B 轨 vendor（官方源码复用）：ClusterKV KMeans 聚类稀疏。token_budget
         # /sink/nlist 决定选择器预算与建簇粒度，全编码进 treatment 名（防不同
@@ -915,7 +1024,8 @@ def get_method_name_with_info(args, snapshot=None):
         _tb = getattr(args, "clusterkv_token_budget", 1024)
         _sink = getattr(args, "clusterkv_sink", 16)
         _nlist = getattr(args, "clusterkv_nlist", 400)
-        return f"clusterkv_vendor_{_tb}_{_sink}_nl{_nlist}"
+        return _vendor_name_with_hash(
+            args, f"clusterkv_vendor_{_tb}_{_sink}_nl{_nlist}", snapshot)
     elif args.method == "asynctls_vendor":
         # C 轨语义复现（arXiv:2604.07815，无官方开源）：三级流水。channel 文件
         # 名（校准内容身份）+ token_budget/block/top_kb 全编码进 treatment 名，
@@ -926,14 +1036,17 @@ def get_method_name_with_info(args, snapshot=None):
         _kb = getattr(args, "asynctls_token_budget", 1024)
         _bs = getattr(args, "asynctls_block_size", 64)
         _tk = getattr(args, "asynctls_top_kb", 128)
-        return f"asynctls_vendor_{_chan_tag}_k{_kb}_b{_bs}_kb{_tk}"
+        return _vendor_name_with_hash(
+            args,
+            f"asynctls_vendor_{_chan_tag}_k{_kb}_b{_bs}_kb{_tk}", snapshot)
     elif args.method == "hisa_vendor":
         # B 轨官方 kernel 语义 torch 等价（COLM 2026 / arXiv:2603.28458v4）。
         # budget（最终 token）/块长/保留块数全编码，防不同口径同名互覆。
         _hb = getattr(args, "hisa_budget", 1024)
         _hbs = getattr(args, "hisa_k_block_size", 128)
         _htk = getattr(args, "hisa_block_topk", 64)
-        return f"hisa_vendor_k{_hb}_b{_hbs}_kb{_htk}"
+        return _vendor_name_with_hash(
+            args, f"hisa_vendor_k{_hb}_b{_hbs}_kb{_htk}", snapshot)
     elif args.method == "jssa_vendor":
         # B 轨官方 vLLM patch 语义 torch 等价（arXiv:2610.19026v1）。budget/rank
         # 全编码（basis 文件名段含校准内容身份，rank 影响子空间维度），防互覆。
@@ -942,7 +1055,8 @@ def get_method_name_with_info(args, snapshot=None):
         _jtag = _os.path.splitext(_os.path.basename(_jp))[0] if _jp else "nobasis"
         _jb = getattr(args, "jssa_budget", 1024)
         _jr = getattr(args, "jssa_rank", 32)
-        return f"jssa_vendor_{_jtag}_k{_jb}_r{_jr}"
+        return _vendor_name_with_hash(
+            args, f"jssa_vendor_{_jtag}_k{_jb}_r{_jr}", snapshot)
     elif args.method == "twi":
         return f"twi_{args.twi_block_size}_{args.twi_level1_topk}_{args.twi_level2_topp}"
     elif args.method == "tia":

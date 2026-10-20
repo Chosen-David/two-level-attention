@@ -362,30 +362,33 @@ def a4_method_name_abg():
         # DEFAULT_MASK 内容身份），第三个锚点（唯一 layer_skip=True
         # 案例）双重漂移。
         # B09：冠军配置 α/β/γ 进名；F11：full 口径不写 A（生效值）
+        # 【E155c/E155d 锚点重算】near_pages/tokens/len/boundary_bypass/
+        # l2_quant 五新参数入 _TREATMENT_FIELD_DEFAULTS → 全部 tli hash
+        # 移位一轮（079/081 先例同纪律同步更新）。
         got = f(mk())
-        _require(got == "tli_64_128_1024_c4_a0.25_b0.125_g0.625_h562141be42",
+        _require(got == "tli_64_128_1024_c4_a0.25_b0.125_g0.625_hc69f95ad45",
                  f"冠军配置名应含 α/β/γ 且 full 不写 A，实际 {got!r}")
         # F11 正向：rope 子空间（生效开）→ 写 A，即使 flag 原值 False
         # （名格式：ab 直拼 a 段——c4_Aa0.25，无分隔下划线）
         got = f(mk(tli_subspace="rope", tli_enable_subspace=False))
         _require(got == "tli_64_128_1024_c4_Aa0.25_b0.125_g0.625"
-                         "_h08a067c3c5",
+                         "_h52631b3aaa",
                  f"rope 生效子空间应写 A（不受 flag 原值 False 影响），实际 {got!r}")
-        # B/D 与 γ None（"off"）
+        # B/D 与 γ off（哨兵字符串，E155d 后 None=未传）
         got = f(mk(tli_subspace="rope", tli_enable_kmeans=True,
                    tli_enable_layer_skip=True, tli_alpha=0.0, tli_beta=0.0,
-                   tli_gamma=None))
-        _require(got == "tli_64_128_1024_c4_ABDa0_b0_goff_h1ee5503c61",
-                 f"kmeans+layer_skip 应写 BD；γ=None 应写 off，实际 {got!r}")
+                   tli_gamma="off"))
+        _require(got == "tli_64_128_1024_c4_ABDa0_b0_goff_he32b97f728",
+                 f"kmeans+layer_skip 应写 BD；γ=off 应写 off，实际 {got!r}")
         # 稀疏 prefill 后缀 _P
         got = f(mk(tli_sparse_prefill=True))
         _require(got == "tli_64_128_1024_c4_a0.25_b0.125_g0.625_P"
-                         "_hd891baff79",
+                         "_ha1f7f42330",
                  f"稀疏 prefill 应加 _P 后缀，实际 {got!r}")
         # 小数格式化（0.0625 不丢位）
         got = f(mk(tli_alpha=0.0625, tli_beta=0.03125, tli_gamma=0.5))
         _require(got == "tli_64_128_1024_c4_a0.0625_b0.03125_g0.5"
-                         "_h3396bc828c",
+                         "_h4dabd9495d",
                  f"α/β/γ 小数应完整保位，实际 {got!r}")
         # 非 tli 方法不回归（quest/twia/tia/none）
         _require(f(types.SimpleNamespace(
@@ -612,9 +615,15 @@ def b1_skip_layer_sink_force():
                  f"实际最小 head 选中 {n_sink}/128——F1 缺陷复现（attention "
                  f"sink 永久丢失）")
         _require(bool(mm[..., S - 128:].all()), "skip 层 swa 强制区缺失")
-        # sink 强制不占 K2 预算：总选中 = K2 + sink（1152）
-        _require(int(mm[0].sum()) == 1024 + 128,
-                 f"skip 层总选中应 = K2+sink = 1152（sink 正交不占预算），"
+        # 【E111 后口径更新】skip+e64 已改走分区路径（use_partition=True，
+        # far 池结构性置空 → k2_far=0 → K2_mid 全额让渡 near 池，用户
+        # 「near 最终多取几个 topk」方案语义，tli_indexer L2521-2526 在案）
+        # ——旧 legacy 尾部 topk 路径的预算身份 K2+sink=1152 不再适用。
+        # 当前口径：sink/swa 照常强制（F1 本质断言，上方已过），mid =
+        # near 池宽截断 512 → 总选中 768，与非 skip 分区路径同值。
+        _require(int(mm[0].sum()) == 768,
+                 f"skip 层总选中应 = sink128+mid512+swa128 = 768"
+                 f"（E111 skip+e64 分区路由，near 池全额让渡后池宽截断），"
                  f"实际 {int(mm[0].sum())}")
         # 回归位：非 skip 层走分区路径，sink/swa 照常强制（两侧同绿）。
         # 总选中 768 = sink 128 + mid 512 + swa 128——S=4352 mavg 冠军的
@@ -628,7 +637,7 @@ def b1_skip_layer_sink_force():
                  f"非 skip 层总选中应 = sink+mid+swa = 128+512+128 = 768"
                  f"（N5 池截断 mid=512 判例，B1 不扰分区路径），"
                  f"实际 {int(mask2[0, 0][0].sum())}")
-        report(name, True, f"skip sink={n_sink}/128 强制、总选中 1152；非 skip 768 不变")
+        report(name, True, f"skip sink={n_sink}/128 强制、总选中 768（E111 分区路由）；非 skip 768 不变")
     except RuntimeError as e:
         report(name, False, str(e))
     except Exception as e:
@@ -683,6 +692,11 @@ def b2_patch_branch_guards():
 
             def get_seq_length(self, layer_idx=0):
                 return self._s
+
+            def get_max_cache_shape(self):
+                # b9988a0 静态缓存判别协议：DynamicCache 语义返回 -1
+                # （桩保持动态路径，与测试原分支意图一致）
+                return -1
 
             def update(self, k, v, layer_idx, cache_kwargs=None):
                 return self.k, self.v

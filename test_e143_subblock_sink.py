@@ -150,7 +150,7 @@ def c2_subblock_geometry():
     fine0 = torch.zeros(S2)
     args_dense = make_args(tli_sink_tokens=4, tli_swa_size=128,
                            tia_level2_topk=S2, tli_alpha=0.25, tli_beta=0.125,
-                           tli_gamma=None, tli_far_method="minmax",
+                           tli_gamma="off", tli_far_method="minmax",
                            tli_near_method="avg", tli_enable_kmeans=False,
                            tli_enable_layer_skip=False)
     _, m_dense = drive_compute_mask(args_dense, fine0, S2 // 64)
@@ -165,7 +165,7 @@ def c2_subblock_geometry():
     fine_inj[4:64] = 100.0                    # 块 0 非 sink 段打满分
     args_inj = make_args(
         tli_sink_tokens=4, tli_swa_size=128, tia_level2_topk=1024,
-        tli_alpha=0.25, tli_beta=0.125, tli_gamma=None,
+        tli_alpha=0.25, tli_beta=0.125, tli_gamma="off",
         tli_far_method="minmax", tli_near_method="avg",
         tli_enable_kmeans=False, tli_enable_layer_skip=False)
     _, m_inj = drive_compute_mask(args_inj, fine_inj, S2 // 64)

@@ -11,7 +11,7 @@ from sparse_attn.indexer import TLIIndexer
 
 
 UNSUPPORTED = (
-    dict(tli_gamma=None),
+    dict(tli_gamma="off"),
     dict(tli_alpha=0),
     dict(tli_beta=0),
     dict(tli_alpha=0, tli_beta=0),

@@ -279,6 +279,54 @@ _R3_WHITELIST = {
     "twi_block_size": 32,
     "twi_level1_topk": 64,
     "twi_level2_topp": 0.9,
+    # ── E155e 补齐（用户问题①「R3 manifest 登记缺口」收官）──
+    # vendor 旋钮在 method=tli 下不被消费（manifest 条件登记——tli 名
+    # 不含 vendor 键，惰性由本测试断言验证而非假设）；vendor 方法侧的
+    # 身份单射由 E155e 门禁（test_e155e_vendor_identity.py：_VENDOR_
+    # TREATMENT_FIELDS 条件入 manifest + _h<hash10> 尾段 + 文件内容
+    # 身份 fail closed）承载；ffd_vendor 另有 ffd_identity 全量 digest
+    # 通道（含上游 SHA + adapter SHA）。
+    "quest_token_budget": 2048,
+    "quest_chunk_size": 32,
+    "minference_starting_layer": 4,
+    "minference_config_path": "e155e_pattern.json",
+    "fasa_budget": 2048,
+    "fasa_dataset": "narrativeqa",
+    "fasa_threshold_ratio": 0.5,
+    "fasa_min_k": 8,
+    "fasa_max_k": 32,
+    "fasa_mode": "dynamic",
+    "fasa_agreement_dir": "e155e_agr_dir",
+    "sparq_k": 2048,
+    "sparq_context_length": 65536,
+    "moba_chunk_size": 512,
+    "moba_topk": 64,
+    "moba_budget": 2048,
+    "clusterkv_token_budget": 2048,
+    "clusterkv_sink": 8,
+    "clusterkv_window": 256,
+    "clusterkv_nlist": 200,
+    "clusterkv_fit_iter": 10,
+    "clusterkv_head_sel": "pad",
+    "clusterkv_balance": True,
+    "clusterkv_dist_t": "l2",
+    "clusterkv_gqa_policy": "qavg",
+    "clusterkv_topk_stat": True,
+    "asynctls_token_budget": 2048,
+    "asynctls_block_size": 128,
+    "asynctls_top_kb": 64,
+    "asynctls_channel_file": "e155e_channels.bin",
+    "hisa_budget": 2048,
+    "hisa_k_block_size": 64,
+    "hisa_block_topk": 32,
+    "jssa_budget": 2048,
+    "jssa_rank": 16,
+    "jssa_basis_path": "e155e_basis.pt",
+    "ffd_delta": 4.0,
+    "ffd_cache_length": 65536,
+    # baseline_execute 是 ffd/sparq vendor 的候选执行安全闸（079②
+    # fail-loudly 哲学），非输出影响旋钮——对 treatment 身份惰性
+    "baseline_execute": True,
 }
 # 081 + kimi3 0316 追加修复 2：tli_enable_kmeans/tli_enable_layer_skip
 # 从 _R3_READABLE 升格入 _R3_MUTATIONS——076 residual「可读段 B/D 已
@@ -319,6 +367,21 @@ _R3_MUTATIONS = {
     "tli_moba": True,
     "tli_per_q_head": True,
     "tli_static_pair": True,
+    # E155b/E155c/E155d 入 manifest 的 tli 旋钮（问题①补齐——此前
+    # manifest 侧已登记但 R3 登记面未同步，argparse→manifest 完备性
+    # 检查出现缺口）
+    "tli_sink_tokens": 64,
+    "tli_swa_size": 64,
+    "tli_near_pages": 8,
+    "tli_near_tokens": 320,
+    "tli_near_len": 4096,
+    "tli_boundary_bypass": False,
+    "tli_l2_quant": True,
+    "tli_l2_subspace": "full",
+    "tli_sinkswa_only": True,
+    "tli_dyn_dgate": True,
+    "tli_dyn_dgate_eps": 0.1,
+    "tli_dyn_dgate_rows": 512,
 }
 
 
@@ -340,8 +403,9 @@ def test_R3_mutation_over_argparse(base):
     h_base = INFO._treatment_hash(ns_base)
 
     manifest_fields = set(INFO._TREATMENT_FIELD_DEFAULTS)
-    # tli_sparse_prefill 在 manifest 但不经 argparse 注册（程序化注入）——
-    # argparse→manifest 完备性只查注册面；manifest 侧由 076/079 套件覆盖
+    # tli_sparse_prefill/tli_decode_dense 在 manifest 但不经 argparse 注册
+    # （程序化注入——运行时路径选择器）——argparse→manifest 完备性只查
+    # 注册面；manifest 侧由 076/079 套件覆盖
     covered = (set(_R3_MUTATIONS) | set(_R3_READABLE) | set(_R3_WHITELIST)
                | set(_R3_FILE_FIELDS))
     uncovered = [x for x in dests if x not in covered]
@@ -349,7 +413,8 @@ def test_R3_mutation_over_argparse(base):
            f"add_sparse_attn_args 存在未登记参数 {uncovered}——每个可独立"
            f"改变行为的参数必须进 manifest、readable 编码或白名单（注明"
            f"理由），否则 treatment 单射出现缺口（079 教训）")
-    _check(manifest_fields <= covered | {"tli_sparse_prefill"},
+    _check(manifest_fields <= covered
+           | {"tli_sparse_prefill", "tli_decode_dense"},
            f"manifest 字段未被本测试覆盖：{sorted(manifest_fields - covered)}")
 
     for dest in dests:
@@ -381,12 +446,12 @@ def test_R3_mutation_over_argparse(base):
             _check(n == n_base,
                    f"白名单字段 {dest} 突变竟改变了 tli 名（白名单理由不"
                    f"成立，须移入 manifest）：{n!r} vs {n_base!r}")
-    # γ=off（None，JSON null 渲染）独立通道
+    # γ=off（哨兵 "off"，E155d 后 namespace 显式 None=未传→1.0）独立通道
     ns = parser.parse_args(["--method", "tli"])
-    ns.tli_gamma = None
+    ns.tli_gamma = "off"
     _check(INFO._treatment_hash(ns) != h_base
            and INFO.get_method_name_with_info(ns) != n_base,
-           "γ=None（off）突变未改 hash/名")
+           "γ=off 突变未改 hash/名")
     return "PASS"
 
 

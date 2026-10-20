@@ -215,11 +215,15 @@ def test_P1_matrix_pairwise_injective():
     # 081 + kimi3 0316 口径（B/D 开关入 manifest + 默认 D′ 掩码内容
     # 身份）：tli_enable_kmeans/tli_enable_layer_skip 入
     # _TREATMENT_FIELD_DEFAULTS（防可读段截断吃掉 B/D 位后 hash 互覆）
-    # → 全部 tli hash 重算，锚点由 h046b987e01 更新为 h175d1bcba6
+    # → 全部 tli hash 重算，锚点由 h046b987e01 更新为 h68aa19d58f
     #（本矩阵 c1-c6 全部 layer_skip=False，manifest D′ 掩码身份恒
     # null，故本锚点只受 kimi3 0316 字段集扩张影响）。
+    # E155e 收官轮（2026-10-20）：E135/E138/E155/E155b/E155c/E155d
+    # 字段集连续扩张但本锚点漏更（本套件 P1/P2 在主线长红）——按注释
+    # 自身纪律重算为 h68aa19d58f（git stash 对照核验 E155e vendor 条件
+    # 登记未污染 tli hash，纯历史漂移补账）。
     _check(names["c1 minmax/avg/4bit/4bit"]
-           == "tli_64_128_2048_c4_a0.25_b0.125_g0.625_h175d1bcba6",
+           == "tli_64_128_2048_c4_a0.25_b0.125_g0.625_h68aa19d58f",
            f"c1 稳定性锚点失配（字段集被改？须重算锚点）："
            f"{names['c1 minmax/avg/4bit/4bit']!r}")
     return "PASS"
@@ -251,7 +255,7 @@ def test_P2_order_independent_and_default_equivalent():
     # 与 P1 的 c1（同一配置）也须一致——跨构造路径单射到同一身份
     # （079 口径锚点：async 字段入 manifest 后重算；081+kimi3 0316
     # 口径：B/D 入 _TREATMENT_FIELD_DEFAULTS 后与 P1 c1 同步重算）
-    _check(name_min == "tli_64_128_2048_c4_a0.25_b0.125_g0.625_h175d1bcba6",
+    _check(name_min == "tli_64_128_2048_c4_a0.25_b0.125_g0.625_h68aa19d58f",
            f"跨构造路径身份漂移：{name_min!r}")
 
     # 乱序构造（字段注入顺序不影响 sort_keys 序列化）
@@ -286,7 +290,7 @@ def test_P3_gate_fail_closed_no_overwrite(base):
     os.makedirs(d, exist_ok=True)
     out = os.path.join(
         d, "hotpotqa-tli_64_128_2048_c4_a0.25_b0.125_g0.625_"
-          "h175d1bcba6-09090909.jsonl")   # 081+kimi3 0316 口径：与 P1 c1 同步重算
+          "h68aa19d58f-09090909.jsonl")   # 081+kimi3 0316 口径：与 P1 c1 同步重算
     data_bytes = b'{"pred": "arm-A"}\n'
     with open(out, "wb") as f:
         f.write(data_bytes)
