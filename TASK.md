@@ -4,7 +4,9 @@
 > 敲定论文主方法 → 全量任务测试 + baseline 对比 → 修复性能浪费点。
 > 完成后及时推送远端 main。用 TASK.md 维护任务链并推进直到全部完成。
 
-## 当前阶段：T2 终版判决已出（06:19）→ TDS 已过 → T6 全量派单
+## 当前阶段：T2/TDS 收官 → **T6 暂缓等 TG 升级**（用户 10-21 06:4X：
+## 先做库 batch 化 + CUDA Graph，性能提速确证后再跑论文主方法全量——
+## bs=1 单卡利用率不高，全量测试等升级后代码库跑）
 
 **【T2 终版判决 06:19（87/87 格，零 eval 失败，零 SHA 冲突）】**
 - **冠军 nb32nt448nl4096 AVG5=48.668**（vs CTRL 单池 47.462，**+1.21**）；
@@ -111,11 +113,16 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
       主导 best_per_nb、nl4096 档最强、+1.21 vs CTRL）。
 - [ ] **T3 nl=全mid 退化端点**：top-2 = nb32nt448nl4096 / nb32nt320nl4096
       （CI 等价，几何叙事用），各 1 格 nl=全 mid 退化端点补跑。
-- [ ] **TG harness CUDA Graph 化（用户 10-20 14:3X 指令；14:4X 改派并行
-      会话实现）**：eval harness decode 步 Graph 化（StaticCache 静态
+- [ ] **TG harness CUDA Graph 化（用户 10-20 14:3X 指令；10-21 06:4X 提级
+      为 T6 前置硬门）**：eval harness decode 步 Graph 化（StaticCache 静态
       槽位 + 长度分桶 capture + host 算术 GPU 化，E134-pre StaticCache +
       E139 graph 门禁先例移植）+ 大 bs 化，**实现由另一 AI 会话承担**，
-      本链只做协调：①升级会话不动六机网格在用树（网格收官前）；②逐位
+      地基已就位：DeepSeek 阶段 0（E156 候选化 = batch 省算前提，B×R vs
+      B×T）+ 阶段 1（HF batch>1 decode 逐行核心 + pred_ruler_batch 入口
+      + BatchCtx）已入库（09735a2，门禁 15/15+26/26）；阶段 2（graph
+      capture + 批量张量化）见 research/docs/TLI_batch化 阶段1交付 §衔接。
+      本链只做协调：①网格已收官，六机全空闲可自由升级（主树 a28d12d
+      即升级基线）；②逐位
       门禁（graph vs eager 逐例对拍 + 大 bs vs bs1 锚点对拍）过了才切；
       ③**收益落点 = T3/T4/T6 派单用升级后代码库跑**（T6 三模型全量 +
       四 baseline 对比为最大消耗方；大 bs 口径与 E125/E147h 锚点可比
@@ -128,7 +135,8 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
       全过（E127 15/15 + batch 26/26 + E133c 开关对照轮廓全等），代码审查
       E156c 重建修复正确。WIP 已按 DeepSeek 轨提交入库；详见顶部 TDS 段
       与 research/docs/{E156,TLI_batch化,论文同模型对齐验证报告}_*by_deepseek.md。
-- [ ] **T6 主方法敲定 + 全量测试（用户 10-20 17:5X 更新范围）**：冠军几何
+- [ ] **T6 主方法敲定 + 全量测试（用户 10-21 06:4X 改序：暂缓，等 TG
+      升级落地提速确证后再跑）**：冠军几何
       **nb32nt448nl4096（+1.21 vs 单池）**
       → **主文 Qwen3-8B + Qwen3-14B 全量**（Qwen3-8B 全量主战场：LB
       16+5 + RULER 三档；Qwen3-14B 组件轴：本地 ~/Qwen3-14B 已就位
@@ -137,7 +145,12 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
       → **vs 四 baseline（JSSA/FASA/Quest/AsyncTLS）对比表更新**
       （既有战况：JSSA 58.7 四家最强 / AsyncTLS 50.09+64K 33.88+128K
       37.47 / Quest 三档全崩 / FASA LB-EN 33.40——四家 RULER/LB 逐档
-      补齐到同口径，冠军几何同预算行）。
+      补齐到同口径，冠军几何同预算行）。**派单已预置未启动（06:4X 用户
+      叫停于起跑线前，零进程零清理）**：/tmp/t6_lb_{local,8100,pc31,pc32,
+      pc02}.sh（LB 21 任务 12 GPU 分配 + SKIP 幂等）+ .187 RULER 三档
+      8 线方案；六机 21 任务数据/RULER 数据/模型普查全过（14B 在
+      pc02/8100/pc32+本机）。升级后重跑即用（注意按新 harness 入口
+      改命令行）。
 - [ ] **T7 性能浪费点修复**：E133c A1-A4/A6 **实现已全部在 main**（逐位
       对拍硬门已过；A5 被 l2_quant=false 默认淘汰）+ E152 launch-bound
       归因落地；**剩余未闭合项 = .187 独占窗口稳态 bench 同机对照**
