@@ -53,9 +53,9 @@ single = [cell_avg(f"{TR}/e146ca_r32k_formal.json"),
 quest = [cell_avg(f"{TR}/e119_ruler32k_formal_quest_vendor.json"),
          cell_avg(f"{TR}/e119_ruler64k_formal_quest_vendor.json"),
          cell_avg(f"{TR}/e119_ruler128k_formal_quest_vendor.json")]
-async_tls = [cell_avg(f"{TR}/asynctls_r32k_formal.json"),
-             cell_avg(f"{TR}/e119_ruler65536_formal_asynctls_vendor_64k.json"),
-             None]  # 128K 未测
+async_tls = [cell_avg(f"{TR}/e119_ruler32768_formal_asynctls_vendor_fix.json"),
+             cell_avg(f"{TR}/e119_ruler65536_formal_asynctls_vendor_fix.json"),
+             cell_avg(f"{TR}/e119_ruler131072_formal_asynctls_vendor_fix.json")]  # 排序修复版 32/64/128K
 
 LENS = ["32K", "64K", "128K"]
 delta = [b - a for a, b in zip(single, b0625)]
@@ -100,16 +100,12 @@ for j, (name, vals, color) in enumerate(systems):
     for xx, vv in zip(xs, ys):
         ax.annotate(f"{vv:.1f}", (xx, vv), textcoords="offset points",
                     xytext=(0, 3), fontsize=6.2, ha="center", color="#333333")
-# AsyncTLS 128K 未测标记
-i_missing = 2 + (3 - (n - 1) / 2) * w
-ax.annotate("not\nmeasured", (i_missing, 1.5), fontsize=6.0, ha="center",
-            color=OI["purple"], style="italic")
 ax.set_xticks(np.arange(3))
 ax.set_xticklabels(LENS, fontsize=8.5)
 ax.set_xlabel("RULER context length", fontsize=8.5)
 ax.set_ylabel("11-task average score", fontsize=8.5)
 ax.set_ylim(0, 66)
-ax.set_title("(b) baselines collapse with length, PSI tracks FullKV\nJSSA 58.7 at 32K (budget$=$1024) sits between PSI and single-pool",
+ax.set_title("(b) Quest collapses with length, PSI and AsyncTLS keep quality\nJSSA 58.7 at 32K (budget$=$1024) sits between PSI and single-pool",
              fontsize=8.6)
 ax.legend(fontsize=7.2, frameon=False, loc="upper right", ncol=2)
 ax.tick_params(labelsize=7.5)
