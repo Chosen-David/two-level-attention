@@ -434,13 +434,27 @@ def resolve_treatment_snapshot(args):
         manifest["method"] = _m
         for f, d in _VENDOR_TREATMENT_FIELDS[_m].items():
             v = getattr(args, f, d)
-            if f in _VENDOR_FILE_IDENTITY_FIELDS and v is not None:
+            frozen_pattern = getattr(args, "_minference_pattern_frozen", None)
+            if f == "minference_config_path" and frozen_pattern is not None:
+                # Runtime and the readable _cfg suffix already use this
+                # snapshot. Reopening the source here can label runtime A as B.
+                manifest[f] = {
+                    "basename": frozen_pattern.identity_basename or os.path.basename(
+                        os.path.realpath(frozen_pattern.config_path)),
+                    "sha256": frozen_pattern.sha256}
+            elif f in _VENDOR_FILE_IDENTITY_FIELDS and v is not None:
                 manifest[f] = _vendor_file_identity(f, v)
             else:
                 manifest[f] = v
         if _m == "fasa_vendor":
+            frozen_agreement = getattr(args, "_fasa_staged_snapshot", None)
             _agr = resolve_fasa_agreement_path(args)
-            if _agr is not None and os.path.isfile(_agr):
+            if frozen_agreement is not None:
+                manifest["fasa_agreement"] = {
+                    "basename": frozen_agreement.identity_basename or os.path.basename(
+                        os.path.realpath(frozen_agreement.src_path)),
+                    "sha256": frozen_agreement.sha256}
+            elif _agr is not None and os.path.isfile(_agr):
                 manifest["fasa_agreement"] = _vendor_file_identity(
                     "fasa_agreement_dir", _agr)
             else:
@@ -648,6 +662,7 @@ class FasaAgreementSnapshot:
                      # 目录段用完整 sha256，见 stage_fasa_agreement）
     raw: bytes       # stage 时刻的源 bytes（目标物化与身份共用同一批）
     staged_root: str = ""   # 内容寻址 staged 根（adapter chdir 目标）
+    identity_basename: str = ""  # Freeze realpath basename before source replacement.
 
 
 def resolve_fasa_agreement_path(args, repo_root=None):
@@ -764,7 +779,8 @@ def stage_fasa_agreement(args, repo_root=None):
     snap = FasaAgreementSnapshot(
         src_path=src_agr, dst_path=dst_agr,
         sha256=full_sha, sha8=full_sha[:8], raw=raw,
-        staged_root=staged_root)
+        staged_root=staged_root,
+        identity_basename=os.path.basename(os.path.realpath(src_agr)))
     if os.path.isfile(dst_agr):
         try:
             with open(dst_agr, "rb") as f:
@@ -848,6 +864,7 @@ class MinferencePatternSnapshot:
     sha8: str         # 前 8 hex（treatment 名 _cfg<sha8> 尾段）
     raw: bytes        # freeze 时刻的源 bytes（身份与内容共用同一批）
     pattern: object = None  # json.loads(raw)（adapter 直接消费，不再 open）
+    identity_basename: str = ""  # Freeze realpath basename with content identity.
 
 
 def freeze_minference_pattern_sha8(args):
@@ -891,7 +908,8 @@ def freeze_minference_pattern_sha8(args):
     full_sha = hashlib.sha256(raw).hexdigest()
     snap = MinferencePatternSnapshot(
         config_path=cfg_path, sha256=full_sha, sha8=full_sha[:8],
-        raw=raw, pattern=parsed)
+        raw=raw, pattern=parsed,
+        identity_basename=os.path.basename(os.path.realpath(cfg_path)))
     setattr(args, "_minference_pattern_frozen", snap)
     setattr(args, "_minference_pattern_sha8", snap.sha8)
     return snap.sha8

@@ -1,0 +1,71 @@
+test_fasa_deletion (test_vendor_frozen_manifest.VendorFrozenManifestTests.test_fasa_deletion) ... ERROR
+test_fasa_replacement (test_vendor_frozen_manifest.VendorFrozenManifestTests.test_fasa_replacement) ... FAIL
+test_minference_deletion (test_vendor_frozen_manifest.VendorFrozenManifestTests.test_minference_deletion) ... ERROR
+test_minference_replacement (test_vendor_frozen_manifest.VendorFrozenManifestTests.test_minference_replacement) ... FAIL
+test_unchanged_sources (test_vendor_frozen_manifest.VendorFrozenManifestTests.test_unchanged_sources) ... ok
+
+======================================================================
+ERROR: test_fasa_deletion (test_vendor_frozen_manifest.VendorFrozenManifestTests.test_fasa_deletion)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/tests/test_vendor_frozen_manifest.py", line 71, in test_fasa_deletion
+    self.check_frozen('fasa_vendor', 'delete')
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/tests/test_vendor_frozen_manifest.py", line 57, in check_frozen
+    self.assertEqual(manifest[key]['sha256'], hashlib.sha256(payload).hexdigest())
+                     ~~~~~~~~~~~~~^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_minference_deletion (test_vendor_frozen_manifest.VendorFrozenManifestTests.test_minference_deletion)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/sparse_attn/info.py", line 205, in _vendor_file_identity
+    with open(rp, "rb") as f:
+         ^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmpqf0ecz0p/pattern.json'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/tests/test_vendor_frozen_manifest.py", line 65, in test_minference_deletion
+    self.check_frozen('minference_vendor', 'delete')
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/tests/test_vendor_frozen_manifest.py", line 56, in check_frozen
+    manifest = self.info.resolve_treatment_snapshot(args).manifest
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/sparse_attn/info.py", line 438, in resolve_treatment_snapshot
+    manifest[f] = _vendor_file_identity(f, v)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/sparse_attn/info.py", line 208, in _vendor_file_identity
+    raise SystemExit(
+SystemExit: [GATE-FAIL] E155e: minference_config_path 文件不可读（'/tmp/tmpqf0ecz0p/pattern.json'）——vendor 文件型配置必须绑定实际内容，拒绝运行，fail loudly（FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmpqf0ecz0p/pattern.json'）
+
+======================================================================
+FAIL: test_fasa_replacement (test_vendor_frozen_manifest.VendorFrozenManifestTests.test_fasa_replacement)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/tests/test_vendor_frozen_manifest.py", line 68, in test_fasa_replacement
+    self.check_frozen('fasa_vendor', 'replace')
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/tests/test_vendor_frozen_manifest.py", line 57, in check_frozen
+    self.assertEqual(manifest[key]['sha256'], hashlib.sha256(payload).hexdigest())
+AssertionError: '65fb8a77a8202b314c61cd0c62b5a75dd67200acac01a94c44cb6795f2d79e73' != '1fa96eaaf7cd5c81782e3c973bb3d4f4c191cdbb5821d9cd4f5fcce9ddb1b8dd'
+- 65fb8a77a8202b314c61cd0c62b5a75dd67200acac01a94c44cb6795f2d79e73
++ 1fa96eaaf7cd5c81782e3c973bb3d4f4c191cdbb5821d9cd4f5fcce9ddb1b8dd
+
+
+======================================================================
+FAIL: test_minference_replacement (test_vendor_frozen_manifest.VendorFrozenManifestTests.test_minference_replacement)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/tests/test_vendor_frozen_manifest.py", line 62, in test_minference_replacement
+    self.check_frozen('minference_vendor', 'replace')
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit75/tests/test_vendor_frozen_manifest.py", line 57, in check_frozen
+    self.assertEqual(manifest[key]['sha256'], hashlib.sha256(payload).hexdigest())
+AssertionError: '65fb8a77a8202b314c61cd0c62b5a75dd67200acac01a94c44cb6795f2d79e73' != '1fa96eaaf7cd5c81782e3c973bb3d4f4c191cdbb5821d9cd4f5fcce9ddb1b8dd'
+- 65fb8a77a8202b314c61cd0c62b5a75dd67200acac01a94c44cb6795f2d79e73
++ 1fa96eaaf7cd5c81782e3c973bb3d4f4c191cdbb5821d9cd4f5fcce9ddb1b8dd
+
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.019s
+
+FAILED (failures=2, errors=2)
