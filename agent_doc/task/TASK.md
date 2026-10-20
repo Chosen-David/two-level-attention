@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [x] [TL-E155D-STAGING-20261021] T2每次打分独占快照，避免重复/并发调用删除前次证据；新增5反例、普通/-O各72项及各24入口对照通过；独立双进程/删源后20预测20manifest及CI通过，发布回读另核，真实T2/GPU未验。([详情](task_details/TL-E155D-STAGING-20261021.md))
+
 - [x] [TL-E155D-ATOMIC-VERDICT-20261021] T2写入中断保留旧判决、避免公开半JSON；修前10项9失败，普通/-O各67项CPU回归通过，独立24入口完整JSON及87几何对照通过；真实T2/GPU/并发staging未验，发布回读另核。([详情](task_details/TL-E155D-ATOMIC-VERDICT-20261021.md))
 
 - [x] [TL-BACKFILL-ID-FORMAT-20261020] 回填旧格式回退前检查全行ID格式，修复首行掩盖后续混行；普通/-O各8方法及旧105各10项通过，独立200行默认计数CLI/sidecar保留通过；非正文/token身份或GPU/性能验收。([详情](task_details/TL-BACKFILL-ID-FORMAT-20261020.md))

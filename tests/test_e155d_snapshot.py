@@ -87,6 +87,63 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(ci['point_diff'], 25)
         self.assertEqual(ci['ci95'], [25, 25])
 
+    def test_repeated_scoring_preserves_prior_prediction_snapshot(self):
+        complete, *_ = grid.collect_cells()
+        with patch.object(grid.subprocess, 'run', side_effect=self.eval_stub):
+            first = grid.stage_and_score(complete)
+            for path in self.paths.values():
+                self.write_rows(path, 0)
+            second = grid.stage_and_score(grid.collect_cells()[0])
+        for tag in self.tags:
+            self.assertNotEqual(first[tag]['files'], second[tag]['files'])
+            self.assertEqual(grid.per_example_scores(first[tag]),
+                             {t: {0: .75 if tag == self.tags[0] else .5,
+                                  1: .75 if tag == self.tags[0] else .5}
+                              for t in grid.AVG5_TASKS})
+
+    def test_scoring_preserves_unowned_staging_contents(self):
+        sentinel = Path(grid.STAGING) / 'other-active-run' / 'evidence.txt'
+        sentinel.parent.mkdir(parents=True)
+        sentinel.write_bytes(b'owned by another invocation')
+        with patch.object(grid.subprocess, 'run', side_effect=self.eval_stub):
+            grid.stage_and_score(grid.collect_cells()[0])
+        self.assertEqual(sentinel.read_bytes(), b'owned by another invocation')
+
+    def test_interleaved_scoring_keeps_both_snapshots_usable_for_ci(self):
+        nested = {}
+        def interleave(tag, pred):
+            if not nested:
+                nested['started'] = True
+                nested['scored'] = grid.stage_and_score(grid.collect_cells()[0])
+        self.after_eval = interleave
+        with patch.object(grid.subprocess, 'run', side_effect=self.eval_stub):
+            first = grid.stage_and_score(grid.collect_cells()[0])
+        for scored in (first, nested['scored']):
+            self.assertEqual([scored[t]['avg5'] for t in self.tags], [75, 50])
+            a, b = [grid.per_example_scores(scored[t]) for t in self.tags]
+            self.assertEqual(grid.paired_bootstrap(a, b, B=40)['ci95'], [25, 25])
+        self.assertNotEqual(first[self.tags[0]]['files'],
+                            nested['scored'][self.tags[0]]['files'])
+
+    def test_failed_new_evaluation_preserves_prior_result_file(self):
+        complete, *_ = grid.collect_cells()
+        with patch.object(grid.subprocess, 'run', side_effect=self.eval_stub):
+            first = grid.stage_and_score(complete)
+        prior = Path(first[self.tags[0]]['files']['qasper']).parent / 'result.json'
+        raw = prior.read_bytes()
+        failed = types.SimpleNamespace(returncode=1, stdout='', stderr='injected failure')
+        with patch.object(grid.subprocess, 'run', return_value=failed):
+            second = grid.stage_and_score(complete)
+        self.assertTrue(all('eval_error' in row for row in second.values()))
+        self.assertEqual(prior.read_bytes(), raw)
+
+    def test_empty_scoring_does_not_delete_existing_snapshots(self):
+        with patch.object(grid.subprocess, 'run', side_effect=self.eval_stub):
+            first = grid.stage_and_score(grid.collect_cells()[0])
+        self.assertEqual(grid.stage_and_score({}), {})
+        self.assertEqual(grid.per_example_scores(first[self.tags[0]]),
+                         {t: {0: .75, 1: .75} for t in grid.AVG5_TASKS})
+
     def test_source_deletion_after_score_does_not_break_ci(self):
         self.after_eval = lambda tag, pred: [self.paths[tag, t].unlink() for t in grid.AVG5_TASKS]
         self.assertEqual(next(iter(self.run_main()['paired_ci'].values()))['point_diff'], 25)

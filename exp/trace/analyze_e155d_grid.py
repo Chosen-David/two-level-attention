@@ -32,6 +32,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import uuid
 from collections import defaultdict
 
@@ -201,11 +202,15 @@ def collect_cells():
 
 def stage_and_score(complete):
     """完整格 → staging cells/<tag>/pred/ → eval.py 打分 → AVG5。"""
-    if os.path.isdir(STAGING):
-        shutil.rmtree(STAGING)
+    if not complete:
+        return {}
+    os.makedirs(STAGING, exist_ok=True)
+    # Verdict paths remain evidence after scoring/CI; never recycle another
+    # invocation's directory, even after a failed or overlapping analysis.
+    run_staging = tempfile.mkdtemp(prefix='run-', dir=STAGING)
     results = {}
     for name, info in complete.items():
-        cell_root = os.path.join(STAGING, name)
+        cell_root = os.path.join(run_staging, name)
         pred_dir = os.path.join(cell_root, "pred")
         os.makedirs(pred_dir)
         staged_files = {}
