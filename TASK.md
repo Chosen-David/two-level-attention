@@ -131,7 +131,21 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
       首调即 TypeError（已修：None 时省略 kwarg）。sglang 侧 WIP N1
       哨兵修复审计通过 + 补齐 i_g/skip_far 两处整行 topk 同族饥饿
       泄漏守卫（哨兵 S 协议与 B02/#58 统一）。两处修复均在 TG 会话
-      WIP 文件内未提交，由其会话一并集成；②逐位
+      WIP 文件内未提交，由其会话一并集成；**同轮第二批 WIP（E155e
+      缺省几何翻转：三 --tli_near_* 缺省隐式注入冠军 nb32/nl4096/
+      ntoff，SUPPRESS+hasattr 三元判定）审计**：注入构造逻辑自洽
+      （隐式 ≡ 显式 nb32ntoffnl4096 逐位等价、显式 None=legacy 意图、
+      fail-closed 互斥保留）；**又修一处身份碰撞级 bug**：
+      resolve_treatment_snapshot 读 args 原始态看不见 __init__ 里的
+      隐式注入 → 新默认与旧默认（无参数=单池老逻辑）manifest 完全
+      同值 → treatment hash + _h<hash10> 文件名尾段碰撞（E155c 同类）。
+      已修（info.py manifest 镜像，gating method==tli）：五场景对拍
+      全过——隐式默认 ≡ 显式冠军臂 manifest_json 全等（同一有效
+      treatment 同一身份）、③α0β0 ④无method ⑤pages=None 三路全
+      分离、显式几何臂 manifest 逐位不变（网格/历史锚点身份稳定）。
+      注意：nt 默认 off 是用户 10-21 在升级会话的拍板（nt448 点估计
+      略优但取 off，长上下文去轴判决见 T4 预登记）——T4 RULER 64K
+      结果将终审此默认值；②逐位
       门禁（graph vs eager 逐例对拍 + 大 bs vs bs1 锚点对拍）过了才切；
       ③**收益落点 = T3/T4/T6 派单用升级后代码库跑**（T6 三模型全量 +
       四 baseline 对比为最大消耗方；大 bs 口径与 E125/E147h 锚点可比
