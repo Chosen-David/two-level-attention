@@ -212,22 +212,38 @@ def per_example_scores(cell_info):
     for t, path in cell_info["files"].items():
         d = {}
         with open(path, "r", encoding="utf-8") as f:
-            for line in f:
+            for lineno, line in enumerate(f, 1):
                 row = json.loads(line)
-                d[row.get("_id", len(d))] = sample_score(
+                sample_id = row.get("_id")
+                if not ((isinstance(sample_id, str) and sample_id)
+                        or type(sample_id) is int):
+                    raise ValueError(
+                        f"{t}: invalid/missing _id at line {lineno}; "
+                        "paired CI requires explicit sample identities")
+                if sample_id in d:
+                    raise ValueError(
+                        f"{t}: duplicate _id at line {lineno}; "
+                        "paired CI cannot overwrite samples")
+                d[sample_id] = sample_score(
                     t, row["pred"], row["answers"], row.get("all_classes"))
         out[t] = d
     return out
 
 
 def paired_bootstrap(cell_a, cell_b, B=10000, seed=20261020):
-    """分层配对 bootstrap：AVG5(A−B) 差的 95% CI（任务内 _id 对齐）。"""
+    """分层配对 bootstrap：任务内非空、完全相同的 _id 集合才可配对。"""
     import random
     rng = random.Random(seed)
     per_task_diffs, per_task_ids = {}, {}
     for t in AVG5_TASKS:
         a, b = cell_a[t], cell_b[t]
-        ids = sorted(set(a) & set(b))
+        a_ids, b_ids = set(a), set(b)
+        if not a_ids or a_ids != b_ids:
+            raise ValueError(
+                f"{t}: paired CI requires nonempty identical ID sets "
+                f"(A={len(a_ids)}, B={len(b_ids)}, "
+                f"A_only={len(a_ids - b_ids)}, B_only={len(b_ids - a_ids)})")
+        ids = sorted(a_ids, key=lambda value: (type(value).__name__, value))
         per_task_ids[t] = ids
         per_task_diffs[t] = [a[i] - b[i] for i in ids]
     stats = []

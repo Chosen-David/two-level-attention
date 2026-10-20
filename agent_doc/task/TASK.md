@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [x] [TL-E155D-PAIRING-20261020] 固定配额top-N CI拒绝样本ID错配、缺失和重复；修前5失败2错误，普通/-O各25项及17项相邻host回归通过；独立24合法差分和20主入口失败场景通过，真实评分/GPU/性能未验。([详情](task_details/TL-E155D-PAIRING-20261020.md))
+
 - [x] [TL-E155D-ADMISSION-20261020] 固定配额网格汇总拒绝歧义文件和冲突完整副本；修前3失败、修后普通/-O各13项及40项相邻host回归通过；独立87格合法对照与冲突过滤通过，真实快照/GPU/性能未验。([详情](task_details/TL-E155D-ADMISSION-20261020.md))
 
 - [x] [TL-VENDOR-FROZEN-MANIFEST-20261020] 修复E155e重读已冻结源造成vendor结果身份漂移；4反例修复、7项普通/-O host测试及独立32配置身份对照通过；固定配额/kernel未改，GPU未验，发布回读另核。([详情](task_details/TL-VENDOR-FROZEN-MANIFEST-20261020.md))
