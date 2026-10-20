@@ -46,8 +46,14 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
 - [ ] **T4 RULER canary**：仅 AVG5 前 10 + 边界格（不再逐格）。
 - [ ] **T5 ablation 论文部分**：网格结果写入论文 ablation 节
       （TLI_paper_en.tex / TLI_paper.tex 双语镜像）。
-- [ ] **T6 主方法敲定 + 全量测试**：冠军几何 → 全量任务（LB 16+5、
-      RULER 三档、32B/Llama 迁移）→ vs 四 baseline 对比表更新。
+- [ ] **T6 主方法敲定 + 全量测试（用户 10-20 指令定稿范围）**：冠军几何
+      → **主文三模型全量**（①Qwen3-8B 全量主战场：LB 16+5 + RULER 三档；
+      ②Qwen3-32B 规模轴：RULER 已落袋 50.64/52.22 锚 + 补 LB 主表；
+      ③Llama-3.1-8B 跨族轴：RULER 已有 86.19/85.40 + **补 LB 主表**）
+      → **vs 四 baseline（JSSA/FASA/Quest/AsyncTLS）对比表更新**
+      （既有战况：JSSA 58.7 四家最强 / AsyncTLS 50.09+64K 33.88+128K
+      37.47 / Quest 三档全崩 / FASA LB-EN 33.40——四家 RULER/LB 逐档
+      补齐到与三模型同口径，冠军几何同预算行）。
 - [ ] **T7 性能浪费点修复**：E133c A1-A4/A6 **实现已全部在 main**（逐位
       对拍硬门已过；A5 被 l2_quant=false 默认淘汰）+ E152 launch-bound
       归因落地；**剩余未闭合项 = .187 独占窗口稳态 bench 同机对照**
