@@ -1298,7 +1298,14 @@ class TLIIndexer(TIAIndexer):
         对拍 exp/bench/e131s2_v2_validate.py V1-V5 全过（assign/k_live 逐位
         + 状态 allclose）。开关 TLI_E131_GREEDY_V2=0 回退 v1；v2 编译/执行
         异常 fail-closed 回退本调度器（值同锚点路径，仅性能回退）。
+        【e113b T3/T5 存量失败根因修复 2026-10-20】kill-switch
+        SGLANG_TLI_GREEDY_KERNEL=0 必须**先于 v2/v1 kernel 分支判定**——
+        原 v2 分支判于前直接 return，kill-switch 被绕过（env=0 仍走
+        Triton），违反本 docstring 与 greedy_triton.py 头注的「0 = 强制
+        Python 循环」契约。生产零扰动：不设 env 时路由不变（仍 v2）。
         """
+        if (os.environ.get("SGLANG_TLI_GREEDY_KERNEL", "1") in ("0", "false", "False")):
+            return TLIIndexer._greedy_cluster_pass_python(x, sim, sums, cnt, sq, k_live)
         if (os.environ.get("TLI_E131_GREEDY_V2", "1") not in ("0", "false", "False")
                 and x.is_cuda
                 and x.dim() == 3
@@ -1312,8 +1319,7 @@ class TLIIndexer(TIAIndexer):
                     x, sim, sums, cnt, sq, k_live, greedy_pass_triton_v2)
             except Exception:
                 pass   # fail-closed：v2 不可用 → v1/Python 锚点调度器（值同）
-        if (os.environ.get("SGLANG_TLI_GREEDY_KERNEL", "1") not in ("0", "false", "False")
-                and x.is_cuda):
+        if x.is_cuda:
             fn = _load_greedy_triton()
             T, H, dd = x.shape
             if fn is not None and T > 0 and dd > 0 and (dd & (dd - 1)) == 0:
