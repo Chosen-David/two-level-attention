@@ -1,0 +1,36 @@
+{
+  "baseline": "143ff2cf39fe5012d929afe81d71229f054c3f4d",
+  "input_sha256": "3aaf366af9095b401cb7517f1767b986d99093e03091adf1b3be7d9f3125f8f9",
+  "environment": {
+    "python": "3.12.14",
+    "compiler": "Clang22.1.3",
+    "os": "Linux6.18.55-x86_64/glibc2.39",
+    "torch": false,
+    "transformers": false,
+    "nvidia_smi": false
+  },
+  "files": {
+    "exp/trace/analyze_e155d_grid.py": "5bb6cf15651a32e226dd0c464efeaa55b4daf4ddd6c5fa83405abe9423d4a236",
+    "tests/test_e155d_snapshot.py": "d7116a3c1d20aca8fbe67e7108d61af283f62e05d1264bc393256ecfa4f16c38",
+    "tests/check_e155d_staging.py": "35d5f62d32dfb6a6265a4fb0a2ec740c9053df50c2a477d25bc961190fc617dc",
+    ".agent-runs/staging97/before.log": "2eb0e471f5dcefd986aceec8e9e2e2d6c81434727101ec69c784d5988ded6fd2",
+    ".agent-runs/staging97/after.log": "71b63a0a0405088f8faa053dd5201dcfdf4d2ed2e41860df7251a3a49c4a26e7",
+    ".agent-runs/staging97/after-O.log": "60aeeea792eaca3beeb9e85df1e8e8b280f07b850e07f540f404a4d8f9d98412"
+  },
+  "results": {
+    "new5_before": "1 failure / 4 errors, 9 original snapshot tests pass",
+    "E155d_after": {
+      "ordinary": 72,
+      "optimized_python": 72
+    },
+    "direct_parent_comparisons": {
+      "ordinary": 24,
+      "optimized_python": 24
+    },
+    "producer_geometry": 87,
+    "wrong_label_rejections": 51,
+    "historical_snapshot_comparisons": 24,
+    "score_unit_comparisons": 24
+  },
+  "scope": "CPU files, real main with synthetic scoring; no model quality/performance/realT2/GPU claims"
+}

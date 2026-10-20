@@ -29,8 +29,11 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
+import uuid
 from collections import defaultdict
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -99,6 +102,40 @@ def file_sha(path):
     return h.hexdigest()
 
 
+def cell_treatment_hashes(name, files):
+    """Bind the grid label to the frozen producer manifest and filename hash."""
+    parsed = parse_tag(name)
+    if parsed is None:
+        raise ValueError('invalid grid label')
+    _, nb, nt, nl = parsed
+    expected = dict(tli_near_pages=nb, tli_near_tokens=nt, tli_near_len=nl,
+                    tia_block_size=64)
+    hashes = {}
+    for task, path in files.items():
+        with open(path + '.tli_manifest.json', 'rb') as f:
+            raw = f.read()
+        manifest = json.loads(raw)
+        if not isinstance(manifest, dict):
+            raise ValueError(f'{task}: treatment manifest must be an object')
+        if (not os.path.basename(path).startswith(task + '-tli_')
+                or manifest.get('method', 'tli') != 'tli'):
+            raise ValueError(f'{task}: grid requires a TLI treatment')
+        for key, value in expected.items():
+            if key not in manifest or type(manifest[key]) is not type(value) or manifest[key] != value:
+                raise ValueError(f'{task}: grid label disagrees with treatment {key}')
+        if parsed[0] == 'ctrl' and any(
+                type(manifest.get(key)) not in (int, float) or manifest[key] != 0
+                for key in ('tli_alpha', 'tli_beta')):
+            raise ValueError(f'{task}: single-pool control requires alpha=beta=0')
+        canonical = json.dumps(manifest, sort_keys=True, ensure_ascii=False)
+        digest = hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:10]
+        named = re.findall(r'_h([0-9a-f]{10})-', os.path.basename(path))
+        if named != [digest]:
+            raise ValueError(f'{task}: treatment manifest disagrees with filename hash')
+        hashes[task] = hashlib.sha256(raw).hexdigest()
+    return hashes
+
+
 def collect_cells():
     """跨主机合并：单主机完整副本优先 + sha 去重。"""
     per_cell = defaultdict(dict)   # tag -> {host: {task: (path, rows)}}
@@ -151,6 +188,7 @@ def collect_cells():
                 continue
             complete[name] = {"source_host": base, "dup_hosts": dups,
                                "sha_conflicts": conflicts,
+                               "file_sha256": base_shas,
                                "files": {t: hosts[base][t][0] for t in AVG5_TASKS}}
         else:
             # 无单主机完整副本：不跨机拼 partial（口径单一性）
@@ -164,19 +202,37 @@ def collect_cells():
 
 def stage_and_score(complete):
     """完整格 → staging cells/<tag>/pred/ → eval.py 打分 → AVG5。"""
-    if os.path.isdir(STAGING):
-        shutil.rmtree(STAGING)
+    if not complete:
+        return {}
+    os.makedirs(STAGING, exist_ok=True)
+    # Verdict paths remain evidence after scoring/CI; never recycle another
+    # invocation's directory, even after a failed or overlapping analysis.
+    run_staging = tempfile.mkdtemp(prefix='run-', dir=STAGING)
     results = {}
     for name, info in complete.items():
-        cell_root = os.path.join(STAGING, name)
+        cell_root = os.path.join(run_staging, name)
         pred_dir = os.path.join(cell_root, "pred")
         os.makedirs(pred_dir)
+        staged_files = {}
         for t, src in info["files"].items():
             # jsonl + runcap sidecar + tli_manifest 同名伴生文件一并拷贝
             for suffix in ("", ".runcap.json", ".tli_manifest.json"):
                 s = src + suffix
                 if os.path.exists(s):
                     shutil.copy2(s, os.path.join(pred_dir, os.path.basename(s)))
+            staged_files[t] = os.path.join(pred_dir, os.path.basename(src))
+        # Bind admission, scoring and CI to the same prediction bytes. The
+        # collector may replace its source files while this analysis runs.
+        expected_shas = info["file_sha256"]
+        if any(not os.path.isfile(path) or file_sha(path) != expected_shas[t]
+               for t, path in staged_files.items()):
+            results[name] = {"eval_error": "prediction snapshot changed after admission"}
+            continue
+        try:
+            treatment_shas = cell_treatment_hashes(name, staged_files)
+        except (OSError, ValueError) as exc:
+            results[name] = {"eval_error": f"treatment identity: {exc}"}
+            continue
         r = subprocess.run(
             [sys.executable, "-m", "benchmark.LongBench.eval",
              "--output-dir", cell_root, "--expect-count", "200"],
@@ -185,7 +241,18 @@ def stage_and_score(complete):
         if r.returncode != 0 or not os.path.exists(rj):
             results[name] = {"eval_error": r.stdout[-500:] + r.stderr[-500:]}
             continue
-        scores = json.load(open(rj))
+        if any(not os.path.isfile(path) or file_sha(path) != expected_shas[t]
+               for t, path in staged_files.items()):
+            results[name] = {"eval_error": "prediction snapshot changed during evaluation"}
+            continue
+        try:
+            if cell_treatment_hashes(name, staged_files) != treatment_shas:
+                raise ValueError('treatment snapshot changed during evaluation')
+        except (OSError, ValueError) as exc:
+            results[name] = {"eval_error": f"treatment identity: {exc}"}
+            continue
+        with open(rj, encoding="utf-8") as f:
+            scores = json.load(f)
         task_scores, budgets = {}, []
         for t in AVG5_TASKS:
             hit = [k for k in scores if k.startswith(t + "-") or k == t]
@@ -202,6 +269,9 @@ def stage_and_score(complete):
                 "source_host": info["source_host"],
                 "dup_hosts": info["dup_hosts"],
                 "sha_conflicts": info["sha_conflicts"],
+                "files": staged_files,
+                "file_sha256": dict(expected_shas),
+                "treatment_sha256": treatment_shas,
             }
     return results
 
@@ -212,8 +282,12 @@ def per_example_scores(cell_info):
     out = {}
     for t, path in cell_info["files"].items():
         d = {}
-        with open(path, "r", encoding="utf-8") as f:
+        digest = hashlib.sha256()
+        # Universal line splitting with untranslated endings preserves both
+        # legacy CR/CRLF inputs and the exact UTF-8 bytes used for the digest.
+        with open(path, "r", encoding="utf-8", newline="") as f:
             for lineno, line in enumerate(f, 1):
+                digest.update(line.encode("utf-8"))
                 row = json.loads(line)
                 sample_id = row.get("_id")
                 if not ((isinstance(sample_id, str) and sample_id)
@@ -227,6 +301,9 @@ def per_example_scores(cell_info):
                         "paired CI cannot overwrite samples")
                 d[sample_id] = sample_score(
                     t, row["pred"], row["answers"], row.get("all_classes"))
+        expected = cell_info.get("file_sha256")
+        if expected is not None and digest.hexdigest() != expected[t]:
+            raise ValueError(f"{t}: prediction snapshot changed before/during CI")
         out[t] = d
     return out
 
@@ -304,6 +381,32 @@ def story_slices(ranked_geo):
     return stories
 
 
+def _publish_verdict(path, verdict):
+    """Publish complete JSON; a failed write must preserve the prior verdict."""
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, exist_ok=True)
+    if os.path.islink(path):
+        raise ValueError('verdict destination must not be a symlink')
+    mode = stat.S_IMODE(os.stat(path).st_mode) if os.path.exists(path) else None
+    temporary = os.path.join(parent, f'.{os.path.basename(path)}.tmp-{uuid.uuid4().hex}')
+    owned = False
+    try:
+        with open(temporary, 'x', encoding='utf-8') as stream:
+            owned = True
+            if mode is not None:
+                os.fchmod(stream.fileno(), mode)
+            json.dump(verdict, stream, ensure_ascii=False, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if owned:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bootstrap", type=int, default=10000)
@@ -334,7 +437,7 @@ def main():
     if len(top) >= 2:
         pes = {}
         for c in top:
-            pes[c["tag"]] = per_example_scores(complete[c["tag"]])
+            pes[c["tag"]] = per_example_scores(results[c["tag"]])
         for i in range(len(top)):
             for j in range(i + 1, len(top)):
                 a, b = top[i], top[j]
@@ -361,13 +464,12 @@ def main():
         "ranking": ranked_geo,
         "ctrl_singlepool": ctrl,
         "paired_ci": paired,
+        "evaluation_errors": {k: v['eval_error'] for k, v in results.items() if 'eval_error' in v},
         "stories": story_slices(ranked_geo),
         "incomplete_cells": incomplete,
         "incomplete_before_closure": needs_redispatch,
     }
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w") as f:
-        json.dump(verdict, f, ensure_ascii=False, indent=2)
+    _publish_verdict(OUT, verdict)
     print(f"\n===== E155d 网格判决（部分快照亦可跑，收官后重跑即终版）=====")
     print(f"输出：{OUT}")
     for i, c in enumerate(ranked_geo[:10]):
