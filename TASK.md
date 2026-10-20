@@ -122,7 +122,16 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
       + BatchCtx）已入库（09735a2，门禁 15/15+26/26）；阶段 2（graph
       capture + 批量张量化）见 research/docs/TLI_batch化 阶段1交付 §衔接。
       本链只做协调：①网格已收官，六机全空闲可自由升级（主树 a28d12d
-      即升级基线）；②逐位
+      即升级基线）；**10-21 主 AI 审计轮**：TG WIP（阶段 2a 固定宽度
+      plumbing，base.py+tli_indexer.py）审计通过——valid_length kwarg
+      全链贯通、inc 硬门 S_now>S 恒假固定宽度恒全量（无 stale）、
+      S_real 单源 min(_vl,S_width)、compute_mask 与 _select_l1_blocks
+      双副本对称改写、E127 15/15 复跑零回归；**修一处硬 bug**：
+      base.prepare_mask 无条件传 valid_length kwarg → quest/tia/twi
+      首调即 TypeError（已修：None 时省略 kwarg）。sglang 侧 WIP N1
+      哨兵修复审计通过 + 补齐 i_g/skip_far 两处整行 topk 同族饥饿
+      泄漏守卫（哨兵 S 协议与 B02/#58 统一）。两处修复均在 TG 会话
+      WIP 文件内未提交，由其会话一并集成；②逐位
       门禁（graph vs eager 逐例对拍 + 大 bs vs bs1 锚点对拍）过了才切；
       ③**收益落点 = T3/T4/T6 派单用升级后代码库跑**（T6 三模型全量 +
       四 baseline 对比为最大消耗方；大 bs 口径与 E125/E147h 锚点可比
