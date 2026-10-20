@@ -54,6 +54,13 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
       （tail 臂 ≤ full 锚点 1.6884ms 判据）+ 判决 JSON——等网格收官
       释放卡位。问题③ 判定已闭环（契约 084f6b5 与 T7 零冲突，见
       agent_doc/advice/2026-10-20_t7_vs_prefill_mask_contract_adjudication.md）。
+      **10-20 双仓审计轮（用户指令）**：e113b kill-switch 绕过已修
+      （d27009b：SGLANG_TLI_GREEDY_KERNEL=0 提到 v2 分支前；生产零扰动，
+      e113b GPU 复跑等网格收官）+ T7 stub 块粒度修正（06efa4c，并行会话
+      代审）。sglang backend/kernels + 几何语义对拍审计在飞。**三真问题
+      裁定：全部无需重跑**（网格 Geo-only 走 reference 默认路径，
+      TLI_PREFILL_BATCH_SELECT / TLI_PREFILL_RUNTIME=candidate 均未设，
+      20 线零 FAIL + E155c 逐位门 + sha 去重三重兜底）。
 - [ ] **T8 推送远端 main**：全部判决/论文/代码提交后 origin push
       （含历史挂账：ecfbd4f 等）。
 
