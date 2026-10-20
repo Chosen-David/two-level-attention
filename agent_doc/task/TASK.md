@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [x] [TL-E155D-ATOMIC-VERDICT-20261021] T2写入中断保留旧判决、避免公开半JSON；修前10项9失败，普通/-O各67项CPU回归通过，独立24入口完整JSON及87几何对照通过；真实T2/GPU/并发staging未验，发布回读另核。([详情](task_details/TL-E155D-ATOMIC-VERDICT-20261021.md))
+
 - [x] [TL-BACKFILL-ID-FORMAT-20261020] 回填旧格式回退前检查全行ID格式，修复首行掩盖后续混行；普通/-O各8方法及旧105各10项通过，独立200行默认计数CLI/sidecar保留通过；非正文/token身份或GPU/性能验收。([详情](task_details/TL-BACKFILL-ID-FORMAT-20261020.md))
 
 - [x] [TL-E155D-GEOMETRY-20261020] T2目录几何绑定冻结manifest/文件名hash；修前8项7失败，普通/-O各57项、87合法producer/51错标签及24组差分与独审通过；仅汇总门禁完成，真实T2/GPU/性能未验。([详情](task_details/TL-E155D-GEOMETRY-20261020.md))

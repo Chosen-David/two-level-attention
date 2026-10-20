@@ -29,8 +29,10 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import uuid
 from collections import defaultdict
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -374,6 +376,32 @@ def story_slices(ranked_geo):
     return stories
 
 
+def _publish_verdict(path, verdict):
+    """Publish complete JSON; a failed write must preserve the prior verdict."""
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, exist_ok=True)
+    if os.path.islink(path):
+        raise ValueError('verdict destination must not be a symlink')
+    mode = stat.S_IMODE(os.stat(path).st_mode) if os.path.exists(path) else None
+    temporary = os.path.join(parent, f'.{os.path.basename(path)}.tmp-{uuid.uuid4().hex}')
+    owned = False
+    try:
+        with open(temporary, 'x', encoding='utf-8') as stream:
+            owned = True
+            if mode is not None:
+                os.fchmod(stream.fileno(), mode)
+            json.dump(verdict, stream, ensure_ascii=False, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if owned:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bootstrap", type=int, default=10000)
@@ -436,9 +464,7 @@ def main():
         "incomplete_cells": incomplete,
         "incomplete_before_closure": needs_redispatch,
     }
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w") as f:
-        json.dump(verdict, f, ensure_ascii=False, indent=2)
+    _publish_verdict(OUT, verdict)
     print(f"\n===== E155d 网格判决（部分快照亦可跑，收官后重跑即终版）=====")
     print(f"输出：{OUT}")
     for i, c in enumerate(ranked_geo[:10]):
