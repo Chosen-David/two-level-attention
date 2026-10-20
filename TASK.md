@@ -4,7 +4,33 @@
 > 敲定论文主方法 → 全量任务测试 + baseline 对比 → 修复性能浪费点。
 > 完成后及时推送远端 main。用 TASK.md 维护任务链并推进直到全部完成。
 
-## 当前阶段：E155d 三维网格在飞（20 线 / 6 机）
+## 当前阶段：T2 终版判决已出（06:19）→ TDS 已过 → T6 全量派单
+
+**【T2 终版判决 06:19（87/87 格，零 eval 失败，零 SHA 冲突）】**
+- **冠军 nb32nt448nl4096 AVG5=48.668**（vs CTRL 单池 47.462，**+1.21**）；
+  top-3 = nb32nt448/nt320/nt128nl4096（48.668/48.512/48.468），配对 CI
+  全含 0 → 前三名噪声带内等价，但**全部同族（nb32 nl4096）**，几何结论稳健。
+- **故事分支判定**：nt 甜区赢（best_per_nb 的 nb16/32/64 最优格全 nt448；
+  nt-vs-off 70 对中 42 对正，最大 +0.5）；nl 单调**否决**（档均值 1024:
+  47.96 / 2048: 47.82 / 4096: 47.82 / 8192: 47.25——nl8192 塌 -0.7）；
+  原位锚 (8,320,8192) **否决**（不在榜首）。
+- **几何规律**：best_per_nb 全落在 **nb·64 = nl/2**（near 区半填充）对角
+  线：nb16→nl2048、nb32→nl4096、nb64→nl8192，最优 nt 恒 448。
+- 预算恒 ~1021.5（K2=1024 同预算口径成立）。判决文件：
+  exp/trace/results/e155d_grid_verdict.json（06:19 终版）。
+- 收官清理：五台远端 + 本机网格进程全清零（gpu=0 × 6 机核实）。
+
+**【TDS DeepSeek T7 fix 审查通过（06:1X，三重独立复跑）】**
+①E127 门禁独立复跑 **15 PASS / 0 FAIL**（含 fine_gather 候选 vs 全宽
+mask 逐位一致 80/80 步、cand_ulp=0）；②batch 化门禁独立复跑 **26 PASS
+/ 0 FAIL**（G1-G4 全过）；③E133c mavg 开关对照——TLI_FINE_GATHER 0/1
+两跑 full-vs-tail 差异轮廓**逐步逐位全等**（8804/8236/… 24 步全同）→
+候选化对存量路径零扰动。代码审查：E156c 重建修复（cand_idx 存在即
+无条件 scatter，修 R_max==S_width 形状守卫漏网）+ fail-closed 门控
+（σ/ccluster/投影/moba/per_q_head 臂全回退全宽）+ _select_l1_blocks
+单源防口径漂移——设计正确。**fix 采纳，WIP 已提交入库（DeepSeek 轨
+提交），T6 消费含候选化代码库。**诚实注记：B=1 无 wall 收益（全宽路径
+在 H20 已 flat ~0.9ms），候选化真实价值 = batch 化地基 + 消全宽物化。
 
 **监督快照 00:39 + 🔴 主树 WIP 污染事故处置**：唯一 tag 并集 **86/87 过门**
 （85 geo + CTRL；nt160 两目录轴外残留不计）。**事故**：DeepSeek 会话在
@@ -77,12 +103,14 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
 
 ## 任务链（顺序推进）
 
-- [ ] **T1 网格监督**（cron ~50min）：四机进度/FAIL 诊断/SKIP 幂等；
-      全部 87 格 × 5 任务行数门通过后进 T2。
-- [ ] **T2 网格打分 + 判决**：LB eval 打分 → AVG5 排序 →
-      exp/trace/results/e155d_grid_verdict.json。纪律：前 3 名进配对 CI，
-      不按点估计拍板；预登记故事分支（nt 甜区赢/ntoff 赢/原位赢/nl 单调）。
-- [ ] **T3 nl=全mid 退化端点**：top-2 各 1 格（网格判决后才知道是谁）。
+- [x] **T1 网格监督**（已完成 06:0X）：87/87 唯一 tag 并集过门（缺口格
+      nb32ntoffnl2048 本机钉版补跑 05:19 过门收官）；六机进程清零核实。
+- [x] **T2 网格打分 + 判决**（终版 06:19）：87 格零 eval 失败零冲突；
+      判决摘要见顶部；纪律执行：top-3 配对 CI 全含 0（不按点估计拍板）
+      → 冠军几何 = **nb32nt448nl4096**（点估计第一 + 同族稳健：nt448
+      主导 best_per_nb、nl4096 档最强、+1.21 vs CTRL）。
+- [ ] **T3 nl=全mid 退化端点**：top-2 = nb32nt448nl4096 / nb32nt320nl4096
+      （CI 等价，几何叙事用），各 1 格 nl=全 mid 退化端点补跑。
 - [ ] **TG harness CUDA Graph 化（用户 10-20 14:3X 指令；14:4X 改派并行
       会话实现）**：eval harness decode 步 Graph 化（StaticCache 静态
       槽位 + 长度分桶 capture + host 算术 GPU 化，E134-pre StaticCache +
@@ -95,14 +123,13 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
 - [ ] **T4 RULER canary**：仅 AVG5 前 10 + 边界格（不再逐格）。
 - [ ] **T5 ablation 论文部分**：网格结果写入论文 ablation 节
       （TLI_paper_en.tex / TLI_paper.tex 双语镜像）。
-- [ ] **TDS DeepSeek fix 审查（用户 10-20 17:5X 指令）**：DeepSeek 会话在修
-      T7 性能浪费（HF 侧选择器 L2「全量 token 打分再 mask」→ sglang 端
-      「只算候选（压实+gather）」对齐；组件对照表：L1 两端同全量块打分
-      ~0.4% 成本设计使然 / L2 HF 待修 vs sglang 已候选化 / 注意力本体
-      两端同只对选中集 gather）。**今晚网格收官后先审 fix 正确性**
-      （逐位对拍门禁：改造前后 mask/输出逐位一致），对了才切 T6 全量。
-      审查入口：两仓新提交 diff + E127/E133c 对拍脚本复跑。
+- [x] **TDS DeepSeek fix 审查（用户 10-20 17:5X 指令，已通过 06:1X）**：
+      E156 精筛候选化（阶段 0）+ TLI batch decode（阶段 1）三重独立复跑
+      全过（E127 15/15 + batch 26/26 + E133c 开关对照轮廓全等），代码审查
+      E156c 重建修复正确。WIP 已按 DeepSeek 轨提交入库；详见顶部 TDS 段
+      与 research/docs/{E156,TLI_batch化,论文同模型对齐验证报告}_*by_deepseek.md。
 - [ ] **T6 主方法敲定 + 全量测试（用户 10-20 17:5X 更新范围）**：冠军几何
+      **nb32nt448nl4096（+1.21 vs 单池）**
       → **主文 Qwen3-8B + Qwen3-14B 全量**（Qwen3-8B 全量主战场：LB
       16+5 + RULER 三档；Qwen3-14B 组件轴：本地 ~/Qwen3-14B 已就位
       ——40 层/40 头/8 KV 头，GQA kv=8 与 8B 同构 TLI patch 直接兼容；
