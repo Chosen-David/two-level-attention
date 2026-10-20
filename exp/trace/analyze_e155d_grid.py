@@ -14,7 +14,8 @@
     5 任务分均值。排序按 AVG5 降序。
   - top-3 配对 CI（预登记纪律「不按点估计拍板」）：分层配对 bootstrap
     （任务内按 _id 对齐逐例分差、任务内重采样、任务均值差的均值），
-    B=10000、2.5/97.5 分位。
+    B=10000、2.5/97.5 分位；点差/区间以 score points 输出，与 AVG5
+    的 0–100 分制一致（逐例原始分数仍为 0–1）。
   - 预登记故事分支：nt 甜区赢 / ntoff 赢 / 原位赢（nb8nt320nl8192，
     即 β.0625 锚 (8,320,8192)）/ nl 单调。
   - 轴外目录（legacy nt160 / pred_legacy_ratio_*）显式排除不计数。
@@ -84,6 +85,9 @@ def task_files(cell_dir):
             with open(os.path.join(cell_dir, fn), "rb") as f:
                 rows = sum(1 for _ in f)
             out[task] = (os.path.join(cell_dir, fn), rows)
+    # A warning alone must not admit whichever filename sorts last.
+    for task in set(amb):
+        out.pop(task, None)
     return out, amb
 
 
@@ -131,8 +135,20 @@ def collect_cells():
                 if shas == base_shas:
                     dups.append(h)
                 else:
-                    conflicts.append({t: [base_shas[t][:12], shas[t][:12]]
-                                      for t in AVG5_TASKS if shas[t] != base_shas[t]})
+                    conflicts.append({"host": h, "task_sha256": {
+                        t: [base_shas[t], shas[t]]
+                        for t in AVG5_TASKS if shas[t] != base_shas[t]}})
+            if conflicts:
+                # Fail closed: host priority is only for identical replicas.
+                miss = {h: [t for t in AVG5_TASKS
+                            if t not in tf or tf[t][1] < MIN_ROWS.get(t, 200)]
+                        for h, tf in hosts.items()}
+                incomplete[name] = miss
+                needs_redispatch.append({
+                    "tag": name, "reason": "sha_conflict",
+                    "source_host": base, "sha_conflicts": conflicts,
+                    "per_host_missing": miss})
+                continue
             complete[name] = {"source_host": base, "dup_hosts": dups,
                                "sha_conflicts": conflicts,
                                "files": {t: hosts[base][t][0] for t in AVG5_TASKS}}
@@ -197,22 +213,38 @@ def per_example_scores(cell_info):
     for t, path in cell_info["files"].items():
         d = {}
         with open(path, "r", encoding="utf-8") as f:
-            for line in f:
+            for lineno, line in enumerate(f, 1):
                 row = json.loads(line)
-                d[row.get("_id", len(d))] = sample_score(
+                sample_id = row.get("_id")
+                if not ((isinstance(sample_id, str) and sample_id)
+                        or type(sample_id) is int):
+                    raise ValueError(
+                        f"{t}: invalid/missing _id at line {lineno}; "
+                        "paired CI requires explicit sample identities")
+                if sample_id in d:
+                    raise ValueError(
+                        f"{t}: duplicate _id at line {lineno}; "
+                        "paired CI cannot overwrite samples")
+                d[sample_id] = sample_score(
                     t, row["pred"], row["answers"], row.get("all_classes"))
         out[t] = d
     return out
 
 
 def paired_bootstrap(cell_a, cell_b, B=10000, seed=20261020):
-    """分层配对 bootstrap：AVG5(A−B) 差的 95% CI（任务内 _id 对齐）。"""
+    """配对 0–1 逐例分数，返回 AVG5 分制的分差；要求相同非空 ID 集合。"""
     import random
     rng = random.Random(seed)
     per_task_diffs, per_task_ids = {}, {}
     for t in AVG5_TASKS:
         a, b = cell_a[t], cell_b[t]
-        ids = sorted(set(a) & set(b))
+        a_ids, b_ids = set(a), set(b)
+        if not a_ids or a_ids != b_ids:
+            raise ValueError(
+                f"{t}: paired CI requires nonempty identical ID sets "
+                f"(A={len(a_ids)}, B={len(b_ids)}, "
+                f"A_only={len(a_ids - b_ids)}, B_only={len(b_ids - a_ids)})")
+        ids = sorted(a_ids, key=lambda value: (type(value).__name__, value))
         per_task_ids[t] = ids
         per_task_diffs[t] = [a[i] - b[i] for i in ids]
     stats = []
@@ -227,7 +259,11 @@ def paired_bootstrap(cell_a, cell_b, B=10000, seed=20261020):
     lo, hi = stats[int(0.025 * B)], stats[int(0.975 * B) - 1]
     point = sum(sum(d) / len(d) for d in per_task_diffs.values()) / len(AVG5_TASKS)
     aligned = {t: len(per_task_ids[t]) for t in AVG5_TASKS}
-    return {"point_diff": round(point, 4), "ci95": [round(lo, 4), round(hi, 4)],
+    # eval.scorer multiplies by 100; convert only at the reporting boundary,
+    # before rounding, leaving sampling and the unrounded zero test unchanged.
+    return {"point_diff": round(100 * point, 4),
+            "ci95": [round(100 * lo, 4), round(100 * hi, 4)],
+            "unit": "score_points",
             "ci_excludes_zero": not (lo <= 0 <= hi), "aligned_n": aligned,
             "B": B}
 
@@ -276,8 +312,8 @@ def main():
     args = ap.parse_args()
 
     complete, incomplete, needs_redispatch, excluded = collect_cells()
-    print(f"完整格 {len(complete)} / 在飞或不完整 {len(incomplete)} / "
-          f"轴外排除 {len(excluded)}")
+    print(f"完整格 {len(complete)} / 在飞、不完整或冲突 {len(incomplete)} / "
+          f"轴外或歧义记录 {len(excluded)}")
 
     results = stage_and_score(complete)
     n_err = sum(1 for v in results.values() if "eval_error" in v)
@@ -312,11 +348,13 @@ def main():
             "collect_root": COLLECT_ROOT,
             "hosts": HOSTS,
             "avg5_tasks": AVG5_TASKS,
+            "score_unit": "points_0_100",
             "bootstrap_B": args.bootstrap,
             "notes": "单主机完整副本口径（不跨机拼 partial）；多副本 sha 全等去重；"
                      "排序按 AVG5 点估计、判决按 top-3 配对 CI（不按点估计拍板）；"
-                     "incomplete_before_closure = 在飞格（收官后重跑自动消化）；"
-                     "closure 后仍残留的 incomplete 才是真需重派",
+                     "incomplete_before_closure 含在飞、不完整和SHA冲突格；"
+                     "SHA冲突须核对原始副本，歧义文件须核对来源；"
+                     "未解决项不得用于排名或CI，不自动重派作业",
         },
         "counts": {"complete": len(complete), "incomplete": len(incomplete),
                    "eval_errors": n_err, "excluded": excluded},
@@ -335,8 +373,8 @@ def main():
     for i, c in enumerate(ranked_geo[:10]):
         print(f"  #{i+1} {c['tag']}: AVG5={c['avg5']}")
     if needs_redispatch:
-        print(f"  ◇ 在飞格 {len(needs_redispatch)}（收官后重收重跑即终版；"
-              f"closure 后仍残留才是真需重派）")
+        print(f"  ◇ 待核查格 {len(needs_redispatch)}（含在飞/不完整/SHA冲突；"
+              f"冲突须核对来源，重收重跑不会自动解决）")
     return 0
 
 
