@@ -84,6 +84,9 @@ def task_files(cell_dir):
             with open(os.path.join(cell_dir, fn), "rb") as f:
                 rows = sum(1 for _ in f)
             out[task] = (os.path.join(cell_dir, fn), rows)
+    # A warning alone must not admit whichever filename sorts last.
+    for task in set(amb):
+        out.pop(task, None)
     return out, amb
 
 
@@ -131,8 +134,20 @@ def collect_cells():
                 if shas == base_shas:
                     dups.append(h)
                 else:
-                    conflicts.append({t: [base_shas[t][:12], shas[t][:12]]
-                                      for t in AVG5_TASKS if shas[t] != base_shas[t]})
+                    conflicts.append({"host": h, "task_sha256": {
+                        t: [base_shas[t], shas[t]]
+                        for t in AVG5_TASKS if shas[t] != base_shas[t]}})
+            if conflicts:
+                # Fail closed: host priority is only for identical replicas.
+                miss = {h: [t for t in AVG5_TASKS
+                            if t not in tf or tf[t][1] < MIN_ROWS.get(t, 200)]
+                        for h, tf in hosts.items()}
+                incomplete[name] = miss
+                needs_redispatch.append({
+                    "tag": name, "reason": "sha_conflict",
+                    "source_host": base, "sha_conflicts": conflicts,
+                    "per_host_missing": miss})
+                continue
             complete[name] = {"source_host": base, "dup_hosts": dups,
                                "sha_conflicts": conflicts,
                                "files": {t: hosts[base][t][0] for t in AVG5_TASKS}}
@@ -276,8 +291,8 @@ def main():
     args = ap.parse_args()
 
     complete, incomplete, needs_redispatch, excluded = collect_cells()
-    print(f"完整格 {len(complete)} / 在飞或不完整 {len(incomplete)} / "
-          f"轴外排除 {len(excluded)}")
+    print(f"完整格 {len(complete)} / 在飞、不完整或冲突 {len(incomplete)} / "
+          f"轴外或歧义记录 {len(excluded)}")
 
     results = stage_and_score(complete)
     n_err = sum(1 for v in results.values() if "eval_error" in v)
@@ -315,8 +330,9 @@ def main():
             "bootstrap_B": args.bootstrap,
             "notes": "单主机完整副本口径（不跨机拼 partial）；多副本 sha 全等去重；"
                      "排序按 AVG5 点估计、判决按 top-3 配对 CI（不按点估计拍板）；"
-                     "incomplete_before_closure = 在飞格（收官后重跑自动消化）；"
-                     "closure 后仍残留的 incomplete 才是真需重派",
+                     "incomplete_before_closure 含在飞、不完整和SHA冲突格；"
+                     "SHA冲突须核对原始副本，歧义文件须核对来源；"
+                     "未解决项不得用于排名或CI，不自动重派作业",
         },
         "counts": {"complete": len(complete), "incomplete": len(incomplete),
                    "eval_errors": n_err, "excluded": excluded},
@@ -335,8 +351,8 @@ def main():
     for i, c in enumerate(ranked_geo[:10]):
         print(f"  #{i+1} {c['tag']}: AVG5={c['avg5']}")
     if needs_redispatch:
-        print(f"  ◇ 在飞格 {len(needs_redispatch)}（收官后重收重跑即终版；"
-              f"closure 后仍残留才是真需重派）")
+        print(f"  ◇ 待核查格 {len(needs_redispatch)}（含在飞/不完整/SHA冲突；"
+              f"冲突须核对来源，重收重跑不会自动解决）")
     return 0
 
 

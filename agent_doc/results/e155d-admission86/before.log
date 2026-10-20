@@ -1,0 +1,37 @@
+test_ambiguous_task_is_not_complete (test_e155d_grid_collection.GridCollectionTests.test_ambiguous_task_is_not_complete) ... FAIL
+test_complementary_partial_hosts_are_not_merged (test_e155d_grid_collection.GridCollectionTests.test_complementary_partial_hosts_are_not_merged) ... ok
+test_conflicting_complete_replicas_are_not_scored (test_e155d_grid_collection.GridCollectionTests.test_conflicting_complete_replicas_are_not_scored) ... FAIL
+test_identical_complete_replicas_are_deduplicated (test_e155d_grid_collection.GridCollectionTests.test_identical_complete_replicas_are_deduplicated) ... ok
+test_valid_host_can_replace_ambiguous_host (test_e155d_grid_collection.GridCollectionTests.test_valid_host_can_replace_ambiguous_host) ... FAIL
+
+======================================================================
+FAIL: test_ambiguous_task_is_not_complete (test_e155d_grid_collection.GridCollectionTests.test_ambiguous_task_is_not_complete)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit86/tests/test_e155d_grid_collection.py", line 40, in test_ambiguous_task_is_not_complete
+    self.assertNotIn(self.tag, complete)
+AssertionError: 'pred_nb8nt320nl8192' unexpectedly found in {'pred_nb8nt320nl8192': {'source_host': 'a', 'dup_hosts': [], 'sha_conflicts': [], 'files': {'hotpotqa': '/tmp/tmp6i4azx_l/a/pred_nb8nt320nl8192/hotpotqa-run.jsonl', 'musique': '/tmp/tmp6i4azx_l/a/pred_nb8nt320nl8192/musique-run.jsonl', 'gov_report': '/tmp/tmp6i4azx_l/a/pred_nb8nt320nl8192/gov_report-run.jsonl', 'qasper': '/tmp/tmp6i4azx_l/a/pred_nb8nt320nl8192/qasper-run.jsonl', 'repobench': '/tmp/tmp6i4azx_l/a/pred_nb8nt320nl8192/repobench-run.jsonl'}}}
+
+======================================================================
+FAIL: test_conflicting_complete_replicas_are_not_scored (test_e155d_grid_collection.GridCollectionTests.test_conflicting_complete_replicas_are_not_scored)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit86/tests/test_e155d_grid_collection.py", line 54, in test_conflicting_complete_replicas_are_not_scored
+    self.assertNotIn(self.tag, complete)
+AssertionError: 'pred_nb8nt320nl8192' unexpectedly found in {'pred_nb8nt320nl8192': {'source_host': 'a', 'dup_hosts': [], 'sha_conflicts': [{'hotpotqa': ['2e4fe4bd50e9', '082c595a9a0f'], 'musique': ['2e4fe4bd50e9', '082c595a9a0f'], 'gov_report': ['2e4fe4bd50e9', '082c595a9a0f'], 'qasper': ['2e4fe4bd50e9', '082c595a9a0f'], 'repobench': ['65d2aa4d14e2', 'bad3a0ebab78']}], 'files': {'hotpotqa': '/tmp/tmpe47zo7z1/a/pred_nb8nt320nl8192/hotpotqa-run.jsonl', 'musique': '/tmp/tmpe47zo7z1/a/pred_nb8nt320nl8192/musique-run.jsonl', 'gov_report': '/tmp/tmpe47zo7z1/a/pred_nb8nt320nl8192/gov_report-run.jsonl', 'qasper': '/tmp/tmpe47zo7z1/a/pred_nb8nt320nl8192/qasper-run.jsonl', 'repobench': '/tmp/tmpe47zo7z1/a/pred_nb8nt320nl8192/repobench-run.jsonl'}}}
+
+======================================================================
+FAIL: test_valid_host_can_replace_ambiguous_host (test_e155d_grid_collection.GridCollectionTests.test_valid_host_can_replace_ambiguous_host)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit86/tests/test_e155d_grid_collection.py", line 48, in test_valid_host_can_replace_ambiguous_host
+    self.assertEqual(complete[self.tag]["source_host"], "b")
+AssertionError: 'a' != 'b'
+- a
++ b
+
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.007s
+
+FAILED (failures=3)
