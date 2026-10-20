@@ -126,14 +126,20 @@ def t1_dispatcher_bitwise():
                         x, sim, sums, cnt, sq, kl)
                 states[val] = (sums, cnt, sq, kl, assign)
             (s0, c0, q0, kl0, a0), (s1, c1, q1, kl1, a1) = states["0"], states["1"]
-            assert torch.equal(kl0, kl1), f"sim={sim}: k_live 不一致"
+            if not (torch.equal(kl0, kl1)):
+                raise AssertionError(f"sim={sim}: k_live 不一致")
             n = int((a0 != a1).sum())
-            assert n == 0, f"sim={sim}: assign 逐位不一致 {n}/{a0.numel()} 处"
+            if not (n == 0):
+                raise AssertionError(f"sim={sim}: assign 逐位不一致 {n}/{a0.numel()} 处")
             live = int(kl0.max().item())
-            assert 0 < live < T, f"sim={sim}: 簇数 {live} 异常（应发生归并）"
-            assert torch.allclose(c0[:, :live], c1[:, :live], atol=1e-6)
-            assert torch.allclose(q0[:, :live], q1[:, :live], rtol=1e-5, atol=1e-5)
-            assert torch.allclose(s0[:, :live], s1[:, :live], atol=1e-5)
+            if not (0 < live < T):
+                raise AssertionError(f"sim={sim}: 簇数 {live} 异常（应发生归并）")
+            if not (torch.allclose(c0[:, :live], c1[:, :live], atol=1e-6)):
+                raise AssertionError('torch.allclose(c0[:, :live], c1[:, :live], atol=1e-6)')
+            if not (torch.allclose(q0[:, :live], q1[:, :live], rtol=1e-5, atol=1e-5)):
+                raise AssertionError('torch.allclose(q0[:, :live], q1[:, :live], rtol=1e-5, atol=1e-5)')
+            if not (torch.allclose(s0[:, :live], s1[:, :live], atol=1e-5)):
+                raise AssertionError('torch.allclose(s0[:, :live], s1[:, :live], atol=1e-5)')
         report(name, True, f"3 sim 全过：assign 逐位一致，平均簇数 "
                            f"{live}/{T}（sim={sim}）")
     except AssertionError as e:
@@ -164,13 +170,16 @@ def t2_incremental_equals_replay():
             idx2 = TLI(args)
             idx2.layer_idx = 3
             idx2.prepare_index(k[:, :S1 + DS], torch.tensor([0, S1 + DS]))
-        assert torch.equal(idx._km_token_assign, idx2._km_token_assign), \
-            "增量 assign 与全量重放不一致（E110 铁律破坏）"
-        assert torch.equal(idx._km_greedy_klive, idx2._km_greedy_klive), "k_live 不一致"
+        if not (torch.equal(idx._km_token_assign, idx2._km_token_assign)):
+            raise AssertionError("增量 assign 与全量重放不一致（E110 铁律破坏）")
+        if not (torch.equal(idx._km_greedy_klive, idx2._km_greedy_klive)):
+            raise AssertionError("k_live 不一致")
         live = int(idx._km_greedy_klive.max().item())
-        assert torch.allclose(idx._km_centroids[:, :live],
-                              idx2._km_centroids[:, :live], atol=1e-6), "簇心不一致"
-        assert live < S1, "sim=0.9 应有归并发生"
+        if not (torch.allclose(idx._km_centroids[:, :live],
+                              idx2._km_centroids[:, :live], atol=1e-6)):
+            raise AssertionError("簇心不一致")
+        if not (live < S1):
+            raise AssertionError("sim=0.9 应有归并发生")
         report(name, True, f"S {S1}→{S1+DS} 增量 8 次，assign 逐位一致，簇数 {live}/{S1}")
     except AssertionError as e:
         report(name, False, str(e))
@@ -208,20 +217,23 @@ def t3_pipeline_mask_bitwise():
                         masks.setdefault(val, []).append(m)
                 idxs[val] = ix
             for si, (m0, m1) in enumerate(zip(masks["0"], masks["1"])):
-                assert m0.shape == m1.shape and m0.dtype == m1.dtype
+                if not (m0.shape == m1.shape and m0.dtype == m1.dtype):
+                    raise AssertionError('m0.shape == m1.shape and m0.dtype == m1.dtype')
                 n = int((m0 != m1).sum())
-                assert n == 0, f"{tag} step{si}: mask 逐位不一致 {n}/{m0.numel()} 处"
+                if not (n == 0):
+                    raise AssertionError(f"{tag} step{si}: mask 逐位不一致 {n}/{m0.numel()} 处")
             # 终态贪心状态也对拍（assign/簇心）
             a0, a1 = idxs["0"]._km_token_assign, idxs["1"]._km_token_assign
-            assert torch.equal(a0, a1), f"{tag}: 终态 token_assign 不一致"
+            if not (torch.equal(a0, a1)):
+                raise AssertionError(f"{tag}: 终态 token_assign 不一致")
             live = int(idxs["1"]._km_greedy_klive.max().item())
-            assert torch.allclose(idxs["0"]._km_centroids[:, :live],
-                                  idxs["1"]._km_centroids[:, :live], atol=1e-5), \
-                f"{tag}: 终态簇心不一致"
+            if not (torch.allclose(idxs["0"]._km_centroids[:, :live],
+                                  idxs["1"]._km_centroids[:, :live], atol=1e-5)):
+                raise AssertionError(f"{tag}: 终态簇心不一致")
             # kernel 版应真的走过 Triton 路径（加载成功缓存非 False）
             import sparse_attn_e113b.indexer.tli_indexer as tmod  # noqa: F401
-            assert tmod._GREEDY_TRITON_FN is not None and tmod._GREEDY_TRITON_FN is not False, \
-                "Triton kernel 未加载成功（T3 的 kernel=1 实际走的是 Python）"
+            if not (tmod._GREEDY_TRITON_FN is not None and tmod._GREEDY_TRITON_FN is not False):
+                raise AssertionError("Triton kernel 未加载成功（T3 的 kernel=1 实际走的是 Python）")
         report(name, True, f"2 配置 × 5 步 mask 逐位一致（prefill {S0} + decode {DS}）")
     except AssertionError as e:
         report(name, False, str(e))
@@ -252,9 +264,10 @@ def t4_clear_reset():
                 ix2 = TLI(args)
                 ix2.layer_idx = 3
                 ix2.prepare_index(k[:, :Sreq], torch.tensor([0, Sreq]))
-                assert torch.equal(a_short, ix2._km_token_assign), \
-                    f"S={Sreq}: clear 后重跑 assign != 冷启动（greedy 增量状态残留）"
-                assert torch.equal(ix._km_greedy_klive, ix2._km_greedy_klive)
+                if not (torch.equal(a_short, ix2._km_token_assign)):
+                    raise AssertionError(f"S={Sreq}: clear 后重跑 assign != 冷启动（greedy 增量状态残留）")
+                if not (torch.equal(ix._km_greedy_klive, ix2._km_greedy_klive)):
+                    raise AssertionError('torch.equal(ix._km_greedy_klive, ix2._km_greedy_klive)')
         report(name, True, f"两请求长度 {S+DS}/{S}，clear 后均 == 冷启动")
     except AssertionError as e:
         report(name, False, str(e))
@@ -289,11 +302,13 @@ def t5_fallback_paths():
             kl = torch.zeros(4, dtype=torch.long, device=x.device)
             with env_switch("0"):
                 TLI._greedy_cluster_pass(x, 0.9, sums, cnt, sq, kl)
-            assert calls == {"py": 1, "tri": 0}, f"env=0 应走 Python, 实际 {calls}"
+            if not (calls == {"py": 1, "tri": 0}):
+                raise AssertionError(f"env=0 应走 Python, 实际 {calls}")
             calls.update(py=0, tri=0)
             with env_switch("1"):
                 TLI._greedy_cluster_pass(x, 0.9, sums, cnt, sq, kl)
-            assert calls == {"py": 0, "tri": 1}, f"env=1 应走 Triton, 实际 {calls}"
+            if not (calls == {"py": 0, "tri": 1}):
+                raise AssertionError(f"env=1 应走 Triton, 实际 {calls}")
             # 非 2 的幂 dd（42）：防御性回退 Python，不抛异常
             calls.update(py=0, tri=0)
             x42 = gen_structured(200, 2, 42, seed=6)
@@ -303,8 +318,10 @@ def t5_fallback_paths():
             kl42 = torch.zeros(2, dtype=torch.long, device=x42.device)
             with env_switch("1"):
                 r = TLI._greedy_cluster_pass(x42, 0.9, s42, c42, q42, kl42)
-            assert calls == {"py": 1, "tri": 0}, f"dd=42 应回退 Python, 实际 {calls}"
-            assert r[4].shape == (2, 200)
+            if not (calls == {"py": 1, "tri": 0}):
+                raise AssertionError(f"dd=42 应回退 Python, 实际 {calls}")
+            if not (r[4].shape == (2, 200)):
+                raise AssertionError('r[4].shape == (2, 200)')
         finally:
             TLI._greedy_cluster_pass_python = staticmethod(py_orig)
             TLI._greedy_cluster_pass_triton = staticmethod(tri_orig)

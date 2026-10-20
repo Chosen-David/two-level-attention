@@ -135,8 +135,8 @@ def n1_aligned_counterexample():
             idx_proto, _ = run_mask(IDX_NEW, args, k, q)
             fh_repo = int(idx_repo._km_far_hi_cached)
             fh_proto = int(idx_proto._km_far_hi_cached)
-            assert fh_repo == 2176 and fh_proto == 2176, \
-                f"B10 合入态 far_hi 应 2176，repo={fh_repo} proto={fh_proto}"
+            if not (fh_repo == 2176 and fh_proto == 2176):
+                raise AssertionError(f"B10 合入态 far_hi 应 2176，repo={fh_repo} proto={fh_proto}")
             report(name, True, f"[已合入] 一致性核对：repo=proto=2176（near 宽 2048）"
                                f"——红绿历史断言已并入 test_near_swa_boundary.py N1")
         except AssertionError as e:
@@ -158,14 +158,16 @@ def n1_aligned_counterexample():
         # 建簇侧 far_hi（= near 左界）：旧 (S-2048)//64*64=2304，新 (S-128-2048)//64*64=2176
         fh_old = int(idx_old._km_far_hi_cached)
         fh_new = int(idx_new._km_far_hi_cached)
-        assert fh_old == 2304, f"旧 far_hi 应 2304（near 宽 1920 = 目标-128），实际 {fh_old}"
-        assert fh_new == 2176, f"新 far_hi 应 2176（near 宽 2048 = 目标），实际 {fh_new}"
+        if not (fh_old == 2304):
+            raise AssertionError(f"旧 far_hi 应 2304（near 宽 1920 = 目标-128），实际 {fh_old}")
+        if not (fh_new == 2176):
+            raise AssertionError(f"新 far_hi 应 2176（near 宽 2048 = 目标），实际 {fh_new}")
         # near 簇覆盖区（消费侧同源）：宽 旧 1920 / 新 2048
         swa_lo = S - 128
         nw_old = swa_lo - fh_old
         nw_new = swa_lo - fh_new
-        assert nw_old == 1920 and nw_new == 2048, \
-            f"near 区宽 old={nw_old}（应 1920，缺陷实锤）new={nw_new}（应 2048）"
+        if not (nw_old == 1920 and nw_new == 2048):
+            raise AssertionError(f"near 区宽 old={nw_old}（应 1920，缺陷实锤）new={nw_new}（应 2048）")
         report(name, True, f"far_hi: old={fh_old}(near 1920) new={fh_new}(near 2048)")
     except AssertionError as e:
         report(name, False, str(e))
@@ -185,8 +187,8 @@ def n3_single_pool_invariant():
         args = make_args(**CCLUSTER_CFG, tli_alpha=0.0, tli_beta=0.0)
         _, m_old = run_mask(IDX_OLD, args, k, q)
         _, m_new = run_mask(IDX_NEW, args, k, q)
-        assert torch.equal(m_old, m_new), \
-            f"(0,0) 单池 mask 漂移 {int((m_old != m_new).sum())} 位 —— 修复破坏单池语义"
+        if not (torch.equal(m_old, m_new)):
+            raise AssertionError(f"(0,0) 单池 mask 漂移 {int((m_old != m_new).sum())} 位 —— 修复破坏单池语义")
         report(name, True, "逐位一致（far 区仍 = 全 mid）")
     except AssertionError as e:
         report(name, False, str(e))
@@ -203,11 +205,16 @@ def n4_legacy_invariant():
     try:
         S = 4352
         k, q = gen_kq(S)
-        args = make_args(tli_enable_layer_skip=False)   # 默认 4bit/4bit，near_len=2048 老语义
+        # l2_quant=True 显式锚定（E155b 退役翻转归因）：本对照目的是
+        # near-SWA 几何身份（红侧主树 vs 绿侧 /tmp/near_fix_v2 原型副本），
+        # 原型副本早于 E155b（旧默认 l2_quant=True）——不锚定则量化退役
+        # 混入 144/8704 位假漂移（归因实验已核清：l2_quant=True → 0 位）。
+        args = make_args(tli_enable_layer_skip=False,
+                         tli_l2_quant=True)   # 默认 4bit/4bit，near_len=2048 老语义
         _, m_old = run_mask(IDX_OLD, args, k, q)
         _, m_new = run_mask(IDX_NEW, args, k, q)
-        assert torch.equal(m_old, m_new), \
-            f"老逻辑 mask 漂移 {int((m_old != m_new).sum())} 位"
+        if not (torch.equal(m_old, m_new)):
+            raise AssertionError(f"老逻辑 mask 漂移 {int((m_old != m_new).sum())} 位")
         report(name, True)
     except AssertionError as e:
         report(name, False, str(e))
@@ -247,11 +254,10 @@ def n5_budget_conservation():
             _, m = run_mask(IDX_NEW, args, k, q)
             mm = m[0, 0]
             n_mid = int(mm[0, 128:S - 128].sum())
-            assert n_mid == mid_expect, \
-                f"{tag}: mid 选中 {n_mid} != {mid_expect}" + \
-                ("（饱食守恒）" if mid_expect == K2_mid else "（饥饿池内截断）")
-            assert bool(mm[..., :128].all()) and bool(mm[..., S - 128:].all()), \
-                f"{tag}: sink/swa 强制区缺失"
+            if not (n_mid == mid_expect):
+                raise AssertionError(f"{tag}: mid 选中 {n_mid} != {mid_expect}" +  ("（饱食守恒）" if mid_expect == K2_mid else "（饥饿池内截断）"))
+            if not (bool(mm[..., :128].all()) and bool(mm[..., S - 128:].all())):
+                raise AssertionError(f"{tag}: sink/swa 强制区缺失")
         report(name, True, "ccluster mid=768 守恒；mavg mid=512 饥饿截断；sink/swa 强制齐")
     except AssertionError as e:
         report(name, False, str(e))

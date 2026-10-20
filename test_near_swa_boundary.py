@@ -121,23 +121,29 @@ def n1_aligned_near_width():
         near_len_dyn = max(bs, int(0.5 * mid_len))         # 2048
         near_base = kt * bs - swa_tok                      # 4224（B10）
         near_blks = max(2, (near_base - near_len_dyn) // bs)  # 34
-        assert near_blks * bs == 2176, \
-            f"near 左界应 2176（B10 口径），公式重放实得 {near_blks * bs}"
+        if not (near_blks * bs == 2176):
+            raise AssertionError(f"near 左界应 2176（B10 口径），公式重放实得 {near_blks * bs}")
         near_w = (S - swa_tok) - near_blks * bs
-        assert near_w == 2048, f"near 池宽应 = α·mid = 2048，实得 {near_w}"
+        if not (near_w == 2048):
+            raise AssertionError(f"near 池宽应 = α·mid = 2048，实得 {near_w}")
         k, q = gen_kq(S)
         args = make_args(**CCLUSTER_CFG, tli_alpha=0.5, tli_beta=0.25, tli_gamma=0.5)
         idx_impl, mask_impl = run_mask(IDX_OLD, args, k, q)
         # 建簇侧 far_hi 哨兵：旧 2304（near 宽 1920 缺陷态）→ B10 后 2176
         fh = int(idx_impl._km_far_hi_cached)
-        assert fh == 2176, f"far_hi 应 2176（B10 后；旧缺陷态 2304），实际 {fh}"
+        if not (fh == 2176):
+            raise AssertionError(f"far_hi 应 2176（B10 后；旧缺陷态 2304），实际 {fh}")
         # 消费侧预算：nt_near = min(32·64·0.5, 768) = 768、far_budget = 0
         # → mid 全部由 near 池供给且 = K2_mid（near 池宽 2048 ≥ 配额）
-        assert mask_impl.dtype == torch.bool and mask_impl.shape[-1] == S
-        assert bool(mask_impl[..., :sink_tok].all()), "sink 强制区缺失"
-        assert bool(mask_impl[..., S - swa_tok:].all()), "swa 强制区缺失"
+        if not (mask_impl.dtype == torch.bool and mask_impl.shape[-1] == S):
+            raise AssertionError('mask_impl.dtype == torch.bool and mask_impl.shape[-1] == S')
+        if not (bool(mask_impl[..., :sink_tok].all())):
+            raise AssertionError("sink 强制区缺失")
+        if not (bool(mask_impl[..., S - swa_tok:].all())):
+            raise AssertionError("swa 强制区缺失")
         n_mid = int(mask_impl[0, 0][0, sink_tok:S - swa_tok].sum())
-        assert n_mid == 768, f"mid 应 768（near 池宽 2048 ≥ 配额 768 满额），实际 {n_mid}"
+        if not (n_mid == 768):
+            raise AssertionError(f"mid 应 768（near 池宽 2048 ≥ 配额 768 满额），实际 {n_mid}")
         report(name, True, f"far_hi=2176(旧缺陷态 2304)、near 池宽 {near_w}=α·mid、mid={n_mid}")
     except AssertionError as e:
         report(name, False, str(e))
@@ -162,29 +168,33 @@ def n2_alpha_one_near_max():
         near_len_dyn = max(bs, int(1.0 * mid_len))            # 4096
         near_base = kt * bs - swa_tok                         # 4224（B10）
         near_blks = max(2, (near_base - near_len_dyn) // bs)   # 2
-        assert near_blks * bs == sink_tok, \
-            f"α=1 应使 far 池空（near_blks={near_blks} 应 == sink_blocks），公式重放失败"
+        if not (near_blks * bs == sink_tok):
+            raise AssertionError(f"α=1 应使 far 池空（near_blks={near_blks} 应 == sink_blocks），公式重放失败")
         near_pool_w = (S - swa_tok) - near_blks * bs
-        assert near_pool_w == mid_len == 4096, \
-            f"near 池宽应 = α·mid = 4096（B10 语义），实际 {near_pool_w}"
+        if not (near_pool_w == mid_len == 4096):
+            raise AssertionError(f"near 池宽应 = α·mid = 4096（B10 语义），实际 {near_pool_w}")
         k, q = gen_kq(S)
         args = make_args(**CCLUSTER_CFG, tli_alpha=1.0, tli_beta=0.25, tli_gamma=0.5)
         idx_impl, mask_impl = run_mask(IDX_OLD, args, k, q)
         # B10 哨兵（翻转后形态）：kmeans 构建侧 far_hi = 192（max(sink+1,·)
         # 下限撑 1 块），消费侧 far 池空
         fh = int(idx_impl._km_far_hi_cached)
-        assert fh == 192, f"far_hi 应 192（B10 修复后哨兵），实际 {fh}"
+        if not (fh == 192):
+            raise AssertionError(f"far_hi 应 192（B10 修复后哨兵），实际 {fh}")
         # C-1 回归（far-empty 下分区不旁路）：sink/swa 必强制、mid 走分区
         # 预算 768（单池兜底会给 896）、near 配额独占 mid
-        assert mask_impl.dtype == torch.bool and mask_impl.shape[-1] == S
-        assert bool(mask_impl[..., :128].all()) and bool(mask_impl[..., S - 128:].all()), \
-            "sink/swa 强制区缺失——C-1 回归失败（bb8c6712c 被破坏）"
+        if not (mask_impl.dtype == torch.bool and mask_impl.shape[-1] == S):
+            raise AssertionError('mask_impl.dtype == torch.bool and mask_impl.shape[-1] == S')
+        if not (bool(mask_impl[..., :128].all()) and bool(mask_impl[..., S - 128:].all())):
+            raise AssertionError("sink/swa 强制区缺失——C-1 回归失败（bb8c6712c 被破坏）")
         mm = mask_impl[0, 0]
         n_mid = int(mm[0, 128:S - 128].sum())
-        assert n_mid == 768, f"α=1 mid 应 768（C-1 分区预算；单池兜底 896），实际 {n_mid}"
+        if not (n_mid == 768):
+            raise AssertionError(f"α=1 mid 应 768（C-1 分区预算；单池兜底 896），实际 {n_mid}")
         # 总预算闭合：sink 128 + mid 768 + swa 128 = K2 1024
         n_total = int(mm[0].sum())
-        assert n_total == 1024, f"总选中应 K2=1024，实际 {n_total}"
+        if not (n_total == 1024):
+            raise AssertionError(f"总选中应 K2=1024，实际 {n_total}")
         report(name, True, f"far_hi=192(哨兵翻转)、far 池空、near 池宽 {near_pool_w}=α·mid、"
                            f"sink/swa 强制齐、mid={n_mid}、总={n_total}")
     except AssertionError as e:
@@ -217,20 +227,20 @@ def n6_short_seq_far_empty():
         near_blks = max(sink_blocks, (near_base - near_len_dyn) // bs)  # 2
         far_tok_lo = sink_blocks * bs                     # 128
         far_tok_hi = min(near_blks * bs, kt * bs)         # 128
-        assert far_tok_hi <= far_tok_lo, \
-            f"公式重放 far 区非空 ({far_tok_lo},{far_tok_hi})——配置未触达 far-empty"
+        if not (far_tok_hi <= far_tok_lo):
+            raise AssertionError(f"公式重放 far 区非空 ({far_tok_lo},{far_tok_hi})——配置未触达 far-empty")
         far_width = far_tok_hi - far_tok_lo
         k, q = gen_kq(S)
         args = make_args(tli_enable_layer_skip=False, tli_far_method="minmax",
                          tli_near_method="avg", tli_alpha=1.0, tli_beta=0.25,
                          tli_gamma=0.5, tia_level2_topk=100)
         _, mask = run_mask(IDX_OLD, args, k, q)
-        assert mask.dtype == torch.bool and mask.shape[-1] == S
+        if not (mask.dtype == torch.bool and mask.shape[-1] == S):
+            raise AssertionError('mask.dtype == torch.bool and mask.shape[-1] == S')
         # C-1 修复路径：强制区覆盖全序列 → 全 True（判别：旁路单池只 100 True）
         n_true = int(mask[0, 0].sum())
-        assert bool(mask.all()), (
-            f"far-empty 路径 mask 非全 True（{n_true}/{S}）——C-1 空池控制流被"
-            f"旁路（单池兜底只给 K2=100）或强制区缺失")
+        if not (bool(mask.all())):
+            raise AssertionError(( f"far-empty 路径 mask 非全 True（{n_true}/{S}）——C-1 空池控制流被" f"旁路（单池兜底只给 K2=100）或强制区缺失"))
         # 【TL-DEBUG-FAR-EMPTY-006 回归】far-empty + layer_idx=1 + TLI_DEBUG=1：
         # 调试打印访问空 i_f 的 min/max 须用 -1 哨兵不崩（修复前直接
         # i_f.min() RuntimeError）；同时核对哨兵值确实打印出来
@@ -252,10 +262,12 @@ def n6_short_seq_far_empty():
             else:
                 os.environ["TLI_DEBUG"] = _old_dbg
         dbg = buf.getvalue()
-        assert "i_f_blk_min=-1" in dbg, \
-            f"far-empty 调试打印未出空哨兵（TL-DEBUG-FAR-EMPTY-006 回归）: {dbg!r}"
-        assert bool(mask[..., :sink_blocks * bs].all()), "sink 强制区缺失"
-        assert bool(mask[..., max(0, S - swa_tok):].all()), "swa 强制区缺失"
+        if not ("i_f_blk_min=-1" in dbg):
+            raise AssertionError(f"far-empty 调试打印未出空哨兵（TL-DEBUG-FAR-EMPTY-006 回归）: {dbg!r}")
+        if not (bool(mask[..., :sink_blocks * bs].all())):
+            raise AssertionError("sink 强制区缺失")
+        if not (bool(mask[..., max(0, S - swa_tok):].all())):
+            raise AssertionError("swa 强制区缺失")
         report(name, True, f"far 区宽 {far_width}（空）、i_f/sc_near 空池不崩、"
                            f"强制区全 True（K2=100<S 判别过）")
     except AssertionError as e:
@@ -270,7 +282,8 @@ if __name__ == "__main__":
     n6_short_seq_far_empty()
     n_pass = sum(1 for _, s, _ in RESULTS if s == "PASS")
     n_fail = sum(1 for _, s, _ in RESULTS if s == "FAIL")
-    assert n_pass + n_fail == len(RESULTS) == 3, "门禁不允许 SKIP/漏项"
+    if not (n_pass + n_fail == len(RESULTS) == 3):
+        raise AssertionError("门禁不允许 SKIP/漏项")
     print(f"\n===== near-SWA/C-1 门禁：executed {n_pass}/{n_pass + n_fail} PASS"
           f"（0 SKIP；红绿对照见非门禁 test_near_swa_redgreen.py）=====")
     sys.exit(1 if n_fail else 0)
