@@ -64,14 +64,22 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
 - [ ] **T4 RULER canary**：仅 AVG5 前 10 + 边界格（不再逐格）。
 - [ ] **T5 ablation 论文部分**：网格结果写入论文 ablation 节
       （TLI_paper_en.tex / TLI_paper.tex 双语镜像）。
-- [ ] **T6 主方法敲定 + 全量测试（用户 10-20 指令定稿范围）**：冠军几何
-      → **主文三模型全量**（①Qwen3-8B 全量主战场：LB 16+5 + RULER 三档；
-      ②Qwen3-32B 规模轴：RULER 已落袋 50.64/52.22 锚 + 补 LB 主表；
-      ③Llama-3.1-8B 跨族轴：RULER 已有 86.19/85.40 + **补 LB 主表**）
+- [ ] **TDS DeepSeek fix 审查（用户 10-20 17:5X 指令）**：DeepSeek 会话在修
+      T7 性能浪费（HF 侧选择器 L2「全量 token 打分再 mask」→ sglang 端
+      「只算候选（压实+gather）」对齐；组件对照表：L1 两端同全量块打分
+      ~0.4% 成本设计使然 / L2 HF 待修 vs sglang 已候选化 / 注意力本体
+      两端同只对选中集 gather）。**今晚网格收官后先审 fix 正确性**
+      （逐位对拍门禁：改造前后 mask/输出逐位一致），对了才切 T6 全量。
+      审查入口：两仓新提交 diff + E127/E133c 对拍脚本复跑。
+- [ ] **T6 主方法敲定 + 全量测试（用户 10-20 17:5X 更新范围）**：冠军几何
+      → **主文 Qwen3-8B + Qwen3-14B 全量**（Qwen3-8B 全量主战场：LB
+      16+5 + RULER 三档；Qwen3-14B 组件轴：本地 ~/Qwen3-14B 已就位
+      ——40 层/40 头/8 KV 头，GQA kv=8 与 8B 同构 TLI patch 直接兼容；
+      旧 32B/Llama 落袋锚保留可用，主表阵容以今晚指令为准）
       → **vs 四 baseline（JSSA/FASA/Quest/AsyncTLS）对比表更新**
       （既有战况：JSSA 58.7 四家最强 / AsyncTLS 50.09+64K 33.88+128K
       37.47 / Quest 三档全崩 / FASA LB-EN 33.40——四家 RULER/LB 逐档
-      补齐到与三模型同口径，冠军几何同预算行）。
+      补齐到同口径，冠军几何同预算行）。
 - [ ] **T7 性能浪费点修复**：E133c A1-A4/A6 **实现已全部在 main**（逐位
       对拍硬门已过；A5 被 l2_quant=false 默认淘汰）+ E152 launch-bound
       归因落地；**剩余未闭合项 = .187 独占窗口稳态 bench 同机对照**
