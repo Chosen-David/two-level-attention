@@ -22,9 +22,12 @@ exec(compile(source, '<snapshot-baseline>', 'exec'), baseline.__dict__)
 
 def normalized(verdict):
     verdict['meta'].pop('generated')
+    if verdict.pop('evaluation_errors', {}):
+        raise AssertionError('valid differential input has evaluation errors')
     for row in verdict['ranking'] + list(verdict['ctrl_singlepool'].values()):
         row.pop('files', None)
         row.pop('file_sha256', None)
+        row.pop('treatment_sha256', None)
     return verdict
 
 

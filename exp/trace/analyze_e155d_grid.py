@@ -99,6 +99,40 @@ def file_sha(path):
     return h.hexdigest()
 
 
+def cell_treatment_hashes(name, files):
+    """Bind the grid label to the frozen producer manifest and filename hash."""
+    parsed = parse_tag(name)
+    if parsed is None:
+        raise ValueError('invalid grid label')
+    _, nb, nt, nl = parsed
+    expected = dict(tli_near_pages=nb, tli_near_tokens=nt, tli_near_len=nl,
+                    tia_block_size=64)
+    hashes = {}
+    for task, path in files.items():
+        with open(path + '.tli_manifest.json', 'rb') as f:
+            raw = f.read()
+        manifest = json.loads(raw)
+        if not isinstance(manifest, dict):
+            raise ValueError(f'{task}: treatment manifest must be an object')
+        if (not os.path.basename(path).startswith(task + '-tli_')
+                or manifest.get('method', 'tli') != 'tli'):
+            raise ValueError(f'{task}: grid requires a TLI treatment')
+        for key, value in expected.items():
+            if key not in manifest or type(manifest[key]) is not type(value) or manifest[key] != value:
+                raise ValueError(f'{task}: grid label disagrees with treatment {key}')
+        if parsed[0] == 'ctrl' and any(
+                type(manifest.get(key)) not in (int, float) or manifest[key] != 0
+                for key in ('tli_alpha', 'tli_beta')):
+            raise ValueError(f'{task}: single-pool control requires alpha=beta=0')
+        canonical = json.dumps(manifest, sort_keys=True, ensure_ascii=False)
+        digest = hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:10]
+        named = re.findall(r'_h([0-9a-f]{10})-', os.path.basename(path))
+        if named != [digest]:
+            raise ValueError(f'{task}: treatment manifest disagrees with filename hash')
+        hashes[task] = hashlib.sha256(raw).hexdigest()
+    return hashes
+
+
 def collect_cells():
     """跨主机合并：单主机完整副本优先 + sha 去重。"""
     per_cell = defaultdict(dict)   # tag -> {host: {task: (path, rows)}}
@@ -187,6 +221,11 @@ def stage_and_score(complete):
                for t, path in staged_files.items()):
             results[name] = {"eval_error": "prediction snapshot changed after admission"}
             continue
+        try:
+            treatment_shas = cell_treatment_hashes(name, staged_files)
+        except (OSError, ValueError) as exc:
+            results[name] = {"eval_error": f"treatment identity: {exc}"}
+            continue
         r = subprocess.run(
             [sys.executable, "-m", "benchmark.LongBench.eval",
              "--output-dir", cell_root, "--expect-count", "200"],
@@ -198,6 +237,12 @@ def stage_and_score(complete):
         if any(not os.path.isfile(path) or file_sha(path) != expected_shas[t]
                for t, path in staged_files.items()):
             results[name] = {"eval_error": "prediction snapshot changed during evaluation"}
+            continue
+        try:
+            if cell_treatment_hashes(name, staged_files) != treatment_shas:
+                raise ValueError('treatment snapshot changed during evaluation')
+        except (OSError, ValueError) as exc:
+            results[name] = {"eval_error": f"treatment identity: {exc}"}
             continue
         with open(rj, encoding="utf-8") as f:
             scores = json.load(f)
@@ -219,6 +264,7 @@ def stage_and_score(complete):
                 "sha_conflicts": info["sha_conflicts"],
                 "files": staged_files,
                 "file_sha256": dict(expected_shas),
+                "treatment_sha256": treatment_shas,
             }
     return results
 
@@ -385,6 +431,7 @@ def main():
         "ranking": ranked_geo,
         "ctrl_singlepool": ctrl,
         "paired_ci": paired,
+        "evaluation_errors": {k: v['eval_error'] for k, v in results.items() if 'eval_error' in v},
         "stories": story_slices(ranked_geo),
         "incomplete_cells": incomplete,
         "incomplete_before_closure": needs_redispatch,

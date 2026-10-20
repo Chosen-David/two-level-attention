@@ -1,5 +1,6 @@
 """T2 ranking and CI must consume the same admitted prediction bytes."""
 import contextlib
+import hashlib
 import importlib.util
 import io
 import json
@@ -26,9 +27,15 @@ class SnapshotTests(unittest.TestCase):
         for tag, score in zip(self.tags, (.75, .5)):
             directory = self.root / 'collect/local' / tag
             directory.mkdir(parents=True)
+            _, nb, nt, nl = grid.parse_tag(tag)
+            manifest = json.dumps(dict(tli_near_pages=nb, tli_near_tokens=nt,
+                                       tli_near_len=nl, tia_block_size=64),
+                                  sort_keys=True, ensure_ascii=False)
+            digest = hashlib.sha256(manifest.encode()).hexdigest()[:10]
             for task in grid.AVG5_TASKS:
-                path = directory / (task + '-run.jsonl')
+                path = directory / (task + '-tli_h' + digest + '-run.jsonl')
                 self.write_rows(path, score)
+                Path(str(path) + '.tli_manifest.json').write_text(manifest)
                 self.paths[tag, task] = path
         for name, value in [('COLLECT_ROOT', str(self.root / 'collect')),
                             ('STAGING', str(self.root / 'staging')),
@@ -85,7 +92,7 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(next(iter(self.run_main()['paired_ci'].values()))['point_diff'], 25)
 
     def test_changed_staging_during_eval_is_not_ranked(self):
-        self.after_eval = lambda tag, pred: self.write_rows(pred / 'qasper-run.jsonl', 0)
+        self.after_eval = lambda tag, pred: self.write_rows(next(pred.glob('qasper-*.jsonl')), 0)
         verdict = self.run_main()
         self.assertEqual(verdict['ranking'], [])
         self.assertEqual(verdict['counts']['eval_errors'], 2)
