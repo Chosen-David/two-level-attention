@@ -45,8 +45,12 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
       （TLI_paper_en.tex / TLI_paper.tex 双语镜像）。
 - [ ] **T6 主方法敲定 + 全量测试**：冠军几何 → 全量任务（LB 16+5、
       RULER 三档、32B/Llama 迁移）→ vs 四 baseline 对比表更新。
-- [ ] **T7 性能浪费点修复**：E133c 计划（A1-A4/A6，A5 已被 l2_quant=false
-      默认淘汰）+ E152 launch-bound 归因落地；kernel microbench 与 e2e 双口径。
+- [ ] **T7 性能浪费点修复**：E133c A1-A4/A6 **实现已全部在 main**（逐位
+      对拍硬门已过；A5 被 l2_quant=false 默认淘汰）+ E152 launch-bound
+      归因落地；**剩余未闭合项 = .187 独占窗口稳态 bench 同机对照**
+      （tail 臂 ≤ full 锚点 1.6884ms 判据）+ 判决 JSON——等网格收官
+      释放卡位。问题③ 判定已闭环（契约 084f6b5 与 T7 零冲突，见
+      agent_doc/advice/2026-10-20_t7_vs_prefill_mask_contract_adjudication.md）。
 - [ ] **T8 推送远端 main**：全部判决/论文/代码提交后 origin push
       （含历史挂账：ecfbd4f 等）。
 
