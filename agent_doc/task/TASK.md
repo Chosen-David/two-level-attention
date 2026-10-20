@@ -1,5 +1,25 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [x] [TL-EXPLICIT-ORACLE-20261020] 固定配额拒绝E151c prefill oracle混配；9个错误接受配置修复，普通/-O各25项host测试及212合法状态差分通过；GPU/质量/性能未验。([详情](task_details/TL-EXPLICIT-ORACLE-20261020.md))
+
+- [x] [TL-EXPLICIT-MODES-20261020] 固定配额拒绝sinkswa_only/MoBA/sigma旁路组合；15反例拒绝，普通/-O各21项host测试及181合法构造状态对照通过，GPU/性能未验。([详情](task_details/TL-EXPLICIT-MODES-20261020.md))
+
+- [x] [TL-DEBUG-OFF-20261020] 六处调试关闭契约统一：54次误入→0，普通/-O各24项host测试通过；固定配额与算法未改，实际GPU/性能待验。([详情](task_details/TL-DEBUG-OFF-20261020.md))
+
+- [x] [TL-ENUM-CONTRACT-20261020] 四个选择枚举不再被-O取消校验；32非法构造拒绝，336合法对照不变，普通/-O各21项host测试通过；Torch依赖/GPU/性能未验。([详情](task_details/TL-ENUM-CONTRACT-20261020.md))
+
+- [x] [TL-EXPLICIT-INTEGER-20261019] 固定配额nb/nt/nl禁止小数静默截断；修前21失败3错误，修后普通/-O各19项host回归通过，6反例拒绝、108对照不变；完整依赖/GPU/性能未验。([详情](task_details/TL-EXPLICIT-INTEGER-20261019.md))
+
+- [ ] [TL-EXPLICIT-NEAR-WIDTH-20261019] 固定配额nl<bs仍被旧整页保底放大，与D′标定不一致；210配置host复现，三行候选270错误→0；补丁仅留档、生产源码未改，实际选集/GPU/性能待验。([详情](task_details/TL-EXPLICIT-NEAR-WIDTH-20261019.md))
+
+- [x] [TL-PARTITION-RATIO-20261019] alpha/beta非法比例构造期拒绝；修前普通/-O各28子用例失败，修后各16项host回归通过，独立641构造差分通过；GPU/模型/性能未验，发布回读单独确认。([详情](task_details/TL-PARTITION-RATIO-20261019.md))
+
+- [x] [TL-EXPLICIT-FREE-PROTECTED-20261019] 显式nt=off保护区预算不足构造期拒绝；修前18子用例失败，修后普通/-O各13项host测试通过，独立1080构造差分符合预期。GPU/模型/性能未验。([详情](task_details/TL-EXPLICIT-FREE-PROTECTED-20261019.md))
+
+- [x] [TL-EXPLICIT-L1-BUDGET-20261019] 显式near页配额超K1构造期拒绝，修前24子用例失败，修后普通/-O各4项及相邻6项host测试通过；GPU/模型/性能未验。([详情](task_details/TL-EXPLICIT-L1-BUDGET-20261019.md))
+
+- [ ] [TL-BATCH-EXPLICIT-QUOTA-20261019] E155显式near配额误入batch旧比例公式：入口回退逐组，含最新E155d归一配置，修前25子用例失败，修后普通/-O各6项host测试通过；GPU/模型/性能及历史重测待验。([详情](task_details/TL-BATCH-EXPLICIT-QUOTA-20261019.md))
+
 - [ ] [TL-PREFILL-SCORE-BUDGET-20261019] candidate eager GQA行块预算漏算查询头；源码绑定反例推导单score为928MiB而预算512MiB。仅审计/复现，非GPU峰值或OOM；生产修复待实际张量与GPU验证。([详情](task_details/TL-PREFILL-SCORE-BUDGET-20261019.md))
 
 - [x] [TL-SUMMARY-VALIDATION-20261019] CPU汇总复用单次协议校验/样本索引，逐行门禁不变；普通/-O各34项通过，512样本配对中位4392.28→47.41ms。非GPU/请求收益。([详情](task_details/TL-SUMMARY-VALIDATION-20261019.md))

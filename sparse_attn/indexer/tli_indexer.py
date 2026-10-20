@@ -15,6 +15,7 @@
 """
 import json
 import math
+import operator
 import os
 
 import torch
@@ -89,8 +90,8 @@ class TLIIndexer(TIAIndexer):
         # 【E142a】mla_rope：DeepSeek-V2 MLA 布局（nope 128 + rope 64 = 192，
         # rope 在尾段、MQA 共享）。E141 trace 判决：rope-only 64d 选择与
         # full 192d 持平（≤.02）——GQA tail 子空间结论的跨架构对应臂。
-        assert self.subspace in ("full", "rope", "nope", "tail", "random", "highfreq", "mla_rope"), \
-            f"tli_subspace 非法取值: {self.subspace}"
+        if self.subspace not in ("full", "rope", "nope", "tail", "random", "highfreq", "mla_rope"):
+            raise ValueError(f"tli_subspace 非法取值: {self.subspace}")
         self.enable_subspace = getattr(args, "tli_enable_subspace", True)
         if self.subspace == "full":
             self.enable_subspace = False      # 全维（用户默认）
@@ -100,8 +101,8 @@ class TLIIndexer(TIAIndexer):
         #   same = L2 与 L1 同一子空间（现状，E85f 口径：粗筛+细筛同特征）
         #   full = L2 细筛 k_qat 全 128 维量化（L1 仍由 tli_subspace 决定）
         self.l2_subspace = getattr(args, "tli_l2_subspace", "same")
-        assert self.l2_subspace in ("same", "full"), \
-            f"tli_l2_subspace 非法取值: {self.l2_subspace}"
+        if self.l2_subspace not in ("same", "full"):
+            raise ValueError(f"tli_l2_subspace 非法取值: {self.l2_subspace}")
         # ---- B：远端 kmeans（far_select='cluster' 时才构建，默认 4bit 分区）----
         self.enable_kmeans = getattr(args, "tli_enable_kmeans", True)
         self.far_select = getattr(args, "tli_far_select", "4bit")
@@ -151,12 +152,12 @@ class TLIIndexer(TIAIndexer):
         #   默认双双 '4bit'（现状，回归保护：不开新 flag 行为逐位不变）。
         #   注意：cluster/sim_greedy 臂须 --tli_enable_kmeans true（沿用 cavg 惯例）。
         self.near_select = getattr(args, "tli_near_select", "4bit")
-        assert self.near_select in ("4bit", "cluster", "sim_greedy"), \
-            f"tli_near_select 非法取值: {self.near_select}"
+        if self.near_select not in ("4bit", "cluster", "sim_greedy"):
+            raise ValueError(f"tli_near_select 非法取值: {self.near_select}")
         self.sim = getattr(args, "tli_sim", 0.9)
         self.sim_dims = getattr(args, "tli_sim_dims", "subspace")
-        assert self.sim_dims in ("subspace", "nope", "tail", "full"), \
-            f"tli_sim_dims 非法取值: {self.sim_dims}"
+        if self.sim_dims not in ("subspace", "nope", "tail", "full"):
+            raise ValueError(f"tli_sim_dims 非法取值: {self.sim_dims}")
         # ---- E87：top-σ 选择（far/near/mid 侧不做两级，细筛分 ≥ sink max − σ 即选中）----
         self.sigma_select = getattr(args, "tli_sigma_select", "none")
         self.moba_gate = getattr(args, "tli_moba", False)
@@ -354,6 +355,11 @@ class TLIIndexer(TIAIndexer):
         _b_raw = getattr(args, "tli_beta", None)
         self.alpha = 0.0 if _a_raw is None else float(_a_raw)
         self.beta = 0.0 if _b_raw is None else float(_b_raw)
+        # 比例同时控制分区开关与区宽/页预算；NaN 会静默关闭分区，
+        # beta>1 可让 near 页配额超过 K1。构造期拒绝，不截断或改算法。
+        for name, value in (("tli_alpha", self.alpha), ("tli_beta", self.beta)):
+            if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+                raise ValueError(f"{name} 必须是 [0, 1] 内的有限比例，收到 {value!r}")
         # γ 三态：None=未传（几何归一或 legacy 缺省 1.0）；"off"=自由竞争
         # （E122 语义，运行时 γ=None）；数值=配额折扣。self.gamma=None
         # 的消费端为 compute_mask 的自由竞争分支（L2370 同源）。
@@ -375,9 +381,25 @@ class TLIIndexer(TIAIndexer):
         # far 侧均为减法：nb_far = K1 − nb_near；far_budget = K2_mid − nt_near。
         _nt_raw = getattr(args, "tli_near_tokens", None)
         _nt_off = isinstance(_nt_raw, str) and str(_nt_raw).strip().lower() == "off"
-        self.nt_near_pages = getattr(args, "tli_near_pages", None)
-        self.nt_near_tokens = None if (_nt_raw is None or _nt_off) else int(_nt_raw)
-        self.nt_near_len = getattr(args, "tli_near_len", None)
+        def _quota_integer(name, value):
+            # Direct Python callers bypass argparse's integer conversion.
+            # int(-0.5) == 0 would otherwise bypass the nonnegative guards.
+            if value is None:
+                return None
+            if not isinstance(value, bool):
+                try:
+                    # Preserve existing integer-string inputs and integer-like
+                    # objects, but never truncate floating point quota values.
+                    return int(value) if isinstance(value, str) else operator.index(value)
+                except (TypeError, ValueError, OverflowError):
+                    pass
+            raise ValueError(f"{name} 须为整数计数，收到 {value!r}")
+
+        self.nt_near_pages = _quota_integer(
+            "tli_near_pages", getattr(args, "tli_near_pages", None))
+        self.nt_near_tokens = None if _nt_off else _quota_integer("tli_near_tokens", _nt_raw)
+        self.nt_near_len = _quota_integer(
+            "tli_near_len", getattr(args, "tli_near_len", None))
         _geo = (self.nt_near_pages is not None or _nt_raw is not None
                 or self.nt_near_len is not None)
         if _geo:
@@ -404,6 +426,19 @@ class TLIIndexer(TIAIndexer):
                 raise ValueError(
                     "固定配额几何须显式传 tli_near_len（E155d：几何派单下 "
                     "α/β/γ 禁传，near 区宽无比例规则回退）")
+            # E151c replaces far_budget only during prefill, overriding nt.
+            # Do not silently combine that per-layer experiment with a fixed
+            # nb/nt/nl contract (even if one layer happens to match its quota).
+            if self._e151c_quota is not None:
+                raise ValueError(
+                    "fixed geometry (tli_near_pages/tokens/len) cannot be combined "
+                    "with TLI_E151C_ORACLE_QUOTA (E151c prefill quota override)")
+            # These branches return before fixed L2 quotas are consumed.
+            # nt=off is fixed-budget free competition, not variable top-sigma.
+            if self.sinkswa_only or self.moba_gate or self.sigma_select != "none":
+                raise ValueError(
+                    "fixed geometry (tli_near_pages/tokens/len) requires ordinary "
+                    "two-level top-k; no sinkswa_only, MoBA or sigma selection")
             if _nt_off:
                 # nt=off 归一：γ → 自由竞争（消费端与 E122 γ-off 同一分支，
                 # 逐位等价）；nb/nl 显式覆盖照常生效。
@@ -421,11 +456,23 @@ class TLIIndexer(TIAIndexer):
             _nl_c = int(self.nt_near_len)
             if _nb_c < 0:
                 raise ValueError(f"tli_near_pages 须非负，收到 {_nb_c}")
+            # L1 两池共享 K1；far 截到 0 并不能限制过大的 near 配额。
+            # nt=off 只取消 L2 分区，仍须遵守同一 L1 页预算。
+            if _nb_c > self.args.tia_level1_topk:
+                raise ValueError(
+                    f"tli_near_pages={_nb_c} 不可超过 "
+                    f"tia_level1_topk={self.args.tia_level1_topk}（L1 总页预算）")
             if _nb_c * _bs_c > _nl_c:
                 raise ValueError(
                     f"网格约束破坏：nb·bs ≤ nl（nb={_nb_c}·bs={_bs_c}="
                     f"{_nb_c * _bs_c} > nl={_nl_c}）——near 页配额超出 "
                     "near 区宽度能供给的页数")
+            # nt=off 仅取消 near/far 的 L2 分额；保护区仍计入 K2。
+            # K2_mid 截到 0 不能消除最终 mask 强制保留的 sink/SWA。
+            if _k2_c < self.sink_tokens + self.sliding_window_size:
+                raise ValueError(
+                    f"K2={_k2_c} 不可小于 sink+swa="
+                    f"{self.sink_tokens + self.sliding_window_size}（保护区总预算）")
             if not _nt_off:
                 _nt_c = int(self.nt_near_tokens)
                 if _nt_c < 0:
@@ -544,7 +591,8 @@ class TLIIndexer(TIAIndexer):
         pair_mag = qm[:64] + qm[64:]                     # [64]（频率 j）
         top_pairs = torch.topk(pair_mag, 16).indices     # 频率 j
         self._pair_idx = torch.cat([top_pairs, top_pairs + 64]).sort().values.to(q.device)
-        if os.environ.get("TLI_DEBUG") and self.layer_idx is not None:
+        if (os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                and self.layer_idx is not None):
             print(f"[E85f] L{self.layer_idx} static pairs (freq j): "
                   f"{sorted(top_pairs.tolist())}", flush=True)
 
@@ -620,7 +668,8 @@ class TLIIndexer(TIAIndexer):
         # 消费「完整 prompt 标定」的决策（未来后缀影响较早 chunk 路由的
         # 非因果缺陷修复）。对现产线（decode 才消费）等价。
         self._dyn_skip_pending = bool(r_l < self.dyn_dgate_eps)
-        if os.environ.get("TLI_DEBUG") and self.layer_idx is not None:
+        if (os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                and self.layer_idx is not None):
             print(f"[E137] L{self.layer_idx} r_l={r_l:.6f} eps={self.dyn_dgate_eps} "
                   f"pending_skip_far={self._dyn_skip_pending}", flush=True)
 
@@ -636,7 +685,8 @@ class TLIIndexer(TIAIndexer):
             return
         self.skip_far = bool(self._dyn_skip_pending)
         self._dyn_frozen = True
-        if os.environ.get("TLI_DEBUG") and self.layer_idx is not None:
+        if (os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                and self.layer_idx is not None):
             print(f"[E137] L{self.layer_idx} decode 首步冻结 "
                   f"skip_far={self.skip_far}", flush=True)
 
@@ -1982,7 +2032,8 @@ class TLIIndexer(TIAIndexer):
         m[..., :sink_tok] = True
         m[..., max(0, S_real - swa_tok):S_real] = True
         import os as _os
-        if _os.environ.get("TLI_DEBUG") and self.layer_idx == 1:
+        if (_os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                and self.layer_idx == 1):
             n_sel = int(m[..., :tok_hi].sum(dim=-1).float().mean().item())
             print(f"[MObadb] nb_sel={nb_sel} sel_total={n_sel}", flush=True)
         return m
@@ -2381,7 +2432,8 @@ class TLIIndexer(TIAIndexer):
             m[..., :sink_tok] = True
             m[..., swa_lo_tok:S_real] = True
             import os as _os
-            if _os.environ.get("TLI_DEBUG") and self.layer_idx == 1:
+            if (_os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                    and self.layer_idx == 1):
                 n_sig = int(m[..., far_tok_lo:swa_lo_tok].sum(dim=-1).float().mean().item())
                 print(f"[SIGdbg] mode={self.sigma_select} sigma={self.sigma} "
                       f"mid_selected={n_sig} sink_max={float(sink_max.mean()):.3f}",
@@ -2585,7 +2637,8 @@ class TLIIndexer(TIAIndexer):
                     far_p = p[..., far_tok_lo:far_tok_hi]
                     i_f = torch.topk(far_p, k2_far, dim=-1).indices + far_tok_lo
                     import os as _os
-                    if _os.environ.get("TLI_DEBUG") and self.layer_idx == 1:
+                    if (_os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
+                            and self.layer_idx == 1):
                         nfin = int((far_p > float("-inf")).sum(dim=-1).max().item())
                         print(f"[L2dbg] K2={K2} K2_mid={K2_mid} sink_tok={sink_tok} "
                               f"swa_tok={p.shape[-1] - swa_lo_tok} nt_near={nt_near} "
