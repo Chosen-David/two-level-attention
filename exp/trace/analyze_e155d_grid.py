@@ -151,6 +151,7 @@ def collect_cells():
                 continue
             complete[name] = {"source_host": base, "dup_hosts": dups,
                                "sha_conflicts": conflicts,
+                               "file_sha256": base_shas,
                                "files": {t: hosts[base][t][0] for t in AVG5_TASKS}}
         else:
             # 无单主机完整副本：不跨机拼 partial（口径单一性）
@@ -171,12 +172,21 @@ def stage_and_score(complete):
         cell_root = os.path.join(STAGING, name)
         pred_dir = os.path.join(cell_root, "pred")
         os.makedirs(pred_dir)
+        staged_files = {}
         for t, src in info["files"].items():
             # jsonl + runcap sidecar + tli_manifest 同名伴生文件一并拷贝
             for suffix in ("", ".runcap.json", ".tli_manifest.json"):
                 s = src + suffix
                 if os.path.exists(s):
                     shutil.copy2(s, os.path.join(pred_dir, os.path.basename(s)))
+            staged_files[t] = os.path.join(pred_dir, os.path.basename(src))
+        # Bind admission, scoring and CI to the same prediction bytes. The
+        # collector may replace its source files while this analysis runs.
+        expected_shas = info["file_sha256"]
+        if any(not os.path.isfile(path) or file_sha(path) != expected_shas[t]
+               for t, path in staged_files.items()):
+            results[name] = {"eval_error": "prediction snapshot changed after admission"}
+            continue
         r = subprocess.run(
             [sys.executable, "-m", "benchmark.LongBench.eval",
              "--output-dir", cell_root, "--expect-count", "200"],
@@ -185,7 +195,12 @@ def stage_and_score(complete):
         if r.returncode != 0 or not os.path.exists(rj):
             results[name] = {"eval_error": r.stdout[-500:] + r.stderr[-500:]}
             continue
-        scores = json.load(open(rj))
+        if any(not os.path.isfile(path) or file_sha(path) != expected_shas[t]
+               for t, path in staged_files.items()):
+            results[name] = {"eval_error": "prediction snapshot changed during evaluation"}
+            continue
+        with open(rj, encoding="utf-8") as f:
+            scores = json.load(f)
         task_scores, budgets = {}, []
         for t in AVG5_TASKS:
             hit = [k for k in scores if k.startswith(t + "-") or k == t]
@@ -202,6 +217,8 @@ def stage_and_score(complete):
                 "source_host": info["source_host"],
                 "dup_hosts": info["dup_hosts"],
                 "sha_conflicts": info["sha_conflicts"],
+                "files": staged_files,
+                "file_sha256": dict(expected_shas),
             }
     return results
 
@@ -212,8 +229,12 @@ def per_example_scores(cell_info):
     out = {}
     for t, path in cell_info["files"].items():
         d = {}
-        with open(path, "r", encoding="utf-8") as f:
+        digest = hashlib.sha256()
+        # Universal line splitting with untranslated endings preserves both
+        # legacy CR/CRLF inputs and the exact UTF-8 bytes used for the digest.
+        with open(path, "r", encoding="utf-8", newline="") as f:
             for lineno, line in enumerate(f, 1):
+                digest.update(line.encode("utf-8"))
                 row = json.loads(line)
                 sample_id = row.get("_id")
                 if not ((isinstance(sample_id, str) and sample_id)
@@ -227,6 +248,9 @@ def per_example_scores(cell_info):
                         "paired CI cannot overwrite samples")
                 d[sample_id] = sample_score(
                     t, row["pred"], row["answers"], row.get("all_classes"))
+        expected = cell_info.get("file_sha256")
+        if expected is not None and digest.hexdigest() != expected[t]:
+            raise ValueError(f"{t}: prediction snapshot changed before/during CI")
         out[t] = d
     return out
 
@@ -334,7 +358,7 @@ def main():
     if len(top) >= 2:
         pes = {}
         for c in top:
-            pes[c["tag"]] = per_example_scores(complete[c["tag"]])
+            pes[c["tag"]] = per_example_scores(results[c["tag"]])
         for i in range(len(top)):
             for j in range(i + 1, len(top)):
                 a, b = top[i], top[j]

@@ -1,0 +1,97 @@
+test_changed_source_after_admission_is_not_ranked (test_e155d_snapshot.SnapshotTests.test_changed_source_after_admission_is_not_ranked) ... FAIL
+test_changed_staging_during_eval_is_not_ranked (test_e155d_snapshot.SnapshotTests.test_changed_staging_during_eval_is_not_ranked) ... FAIL
+test_ci_change_stops_main_before_new_verdict (test_e155d_snapshot.SnapshotTests.test_ci_change_stops_main_before_new_verdict) ... ERROR
+test_line_endings_and_unicode_bytes_remain_bound (test_e155d_snapshot.SnapshotTests.test_line_endings_and_unicode_bytes_remain_bound) ... ok
+test_source_deleted_after_admission_is_not_ranked (test_e155d_snapshot.SnapshotTests.test_source_deleted_after_admission_is_not_ranked) ... ok
+test_source_deletion_after_score_does_not_break_ci (test_e155d_snapshot.SnapshotTests.test_source_deletion_after_score_does_not_break_ci) ... ERROR
+test_source_replacement_after_score_cannot_reverse_ci (test_e155d_snapshot.SnapshotTests.test_source_replacement_after_score_cannot_reverse_ci) ... FAIL
+test_staged_prediction_change_before_ci_is_rejected (test_e155d_snapshot.SnapshotTests.test_staged_prediction_change_before_ci_is_rejected) ... FAIL
+test_unchanged_snapshot_preserves_scores_and_exposes_hashes (test_e155d_snapshot.SnapshotTests.test_unchanged_snapshot_preserves_scores_and_exposes_hashes) ... ERROR
+
+======================================================================
+ERROR: test_ci_change_stops_main_before_new_verdict (test_e155d_snapshot.SnapshotTests.test_ci_change_stops_main_before_new_verdict)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit92/tests/test_e155d_snapshot.py", line 134, in test_ci_change_stops_main_before_new_verdict
+    self.run_main()
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit92/tests/test_e155d_snapshot.py", line 68, in run_main
+    grid.main()
+  File "<snapshot92-baseline>", line 318, in main
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1139, in __call__
+    return self._mock_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1143, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1204, in _execute_mock_call
+    result = effect(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit92/tests/test_e155d_snapshot.py", line 130, in stage_then_change
+    self.write_rows(Path(scored[self.tags[0]]['files']['qasper']), 0)
+                         ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+KeyError: 'files'
+
+======================================================================
+ERROR: test_source_deletion_after_score_does_not_break_ci (test_e155d_snapshot.SnapshotTests.test_source_deletion_after_score_does_not_break_ci)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit92/tests/test_e155d_snapshot.py", line 85, in test_source_deletion_after_score_does_not_break_ci
+    self.assertEqual(next(iter(self.run_main()['paired_ci'].values()))['point_diff'], 25)
+                               ^^^^^^^^^^^^^^^
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit92/tests/test_e155d_snapshot.py", line 68, in run_main
+    grid.main()
+  File "<snapshot92-baseline>", line 337, in main
+  File "<snapshot92-baseline>", line 215, in per_example_scores
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmpmsrpp0vl/collect/local/pred_nb8nt320nl8192/hotpotqa-run.jsonl'
+
+======================================================================
+ERROR: test_unchanged_snapshot_preserves_scores_and_exposes_hashes (test_e155d_snapshot.SnapshotTests.test_unchanged_snapshot_preserves_scores_and_exposes_hashes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit92/tests/test_e155d_snapshot.py", line 114, in test_unchanged_snapshot_preserves_scores_and_exposes_hashes
+    self.assertEqual(set(row['file_sha256']), set(grid.AVG5_TASKS))
+                         ~~~^^^^^^^^^^^^^^^
+KeyError: 'file_sha256'
+
+======================================================================
+FAIL: test_changed_source_after_admission_is_not_ranked (test_e155d_snapshot.SnapshotTests.test_changed_source_after_admission_is_not_ranked)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit92/tests/test_e155d_snapshot.py", line 98, in test_changed_source_after_admission_is_not_ranked
+    self.assertIn('eval_error', scored[self.tags[0]])
+AssertionError: 'eval_error' not found in {'avg5': 60.0, 'tasks': {'hotpotqa': 75.0, 'musique': 75.0, 'gov_report': 75.0, 'qasper': 0.0, 'repobench': 75.0}, 'budget_avg': -1.0, 'source_host': 'local', 'dup_hosts': [], 'sha_conflicts': []}
+
+======================================================================
+FAIL: test_changed_staging_during_eval_is_not_ranked (test_e155d_snapshot.SnapshotTests.test_changed_staging_during_eval_is_not_ranked)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit92/tests/test_e155d_snapshot.py", line 90, in test_changed_staging_during_eval_is_not_ranked
+    self.assertEqual(verdict['ranking'], [])
+AssertionError: Lists differ: [{'tag': 'pred_nb8nt320nl8192', 'nb': 8, '[475 chars] []}] != []
+
+First list contains 2 additional elements.
+First extra element 0:
+{'tag': 'pred_nb8nt320nl8192', 'nb': 8, 'nt': 320, 'nl': 8192, 'avg5': 75.0, 'tasks': {'hotpotqa': 75.0, 'musique': 75.0, 'gov_report': 75.0, 'qasper': 75.0, 'repobench': 75.0}, 'budget_avg': -1.0, 'source_host': 'local', 'dup_hosts': [], 'sha_conflicts': []}
+
+Diff is 717 characters long. Set self.maxDiff to None to see it.
+
+======================================================================
+FAIL: test_source_replacement_after_score_cannot_reverse_ci (test_e155d_snapshot.SnapshotTests.test_source_replacement_after_score_cannot_reverse_ci)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit92/tests/test_e155d_snapshot.py", line 80, in test_source_replacement_after_score_cannot_reverse_ci
+    self.assertEqual(ci['point_diff'], 25)
+AssertionError: -50.0 != 25
+
+======================================================================
+FAIL: test_staged_prediction_change_before_ci_is_rejected (test_e155d_snapshot.SnapshotTests.test_staged_prediction_change_before_ci_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/5d3e4236a5b4/twolevel-audit92/tests/test_e155d_snapshot.py", line 106, in test_staged_prediction_change_before_ci_is_rejected
+    self.assertIn('files', info)
+AssertionError: 'files' not found in {'avg5': 75.0, 'tasks': {'hotpotqa': 75.0, 'musique': 75.0, 'gov_report': 75.0, 'qasper': 75.0, 'repobench': 75.0}, 'budget_avg': -1.0, 'source_host': 'local', 'dup_hosts': [], 'sha_conflicts': []}
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.039s
+
+FAILED (failures=4, errors=3)

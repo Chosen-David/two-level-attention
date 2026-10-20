@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [x] [TL-E155D-SNAPSHOT-20261020] 固定配额排名/CI绑定暂存预测字节，修复源替换造成方向反转；普通/-O各41项及各24组差分通过，独审通过；真实T2/GPU/性能未验，发布回读另核。([详情](task_details/TL-E155D-SNAPSHOT-20261020.md))
+
 - [x] [TL-E155D-SCORE-UNITS-20261020] 固定配额 CI 与 AVG5 统一为分值单位并显式标注；修前5失败，普通/-O各32项、相邻17项及24组基线差分通过；真实T2重评/GPU/性能未验。([详情](task_details/TL-E155D-SCORE-UNITS-20261020.md))
 
 - [x] [TL-E155D-PAIRING-20261020] 固定配额top-N CI拒绝样本ID错配、缺失和重复；修前5失败2错误，普通/-O各25项及17项相邻host回归通过；独立24合法差分和20主入口失败场景通过，真实评分/GPU/性能未验。([详情](task_details/TL-E155D-PAIRING-20261020.md))
