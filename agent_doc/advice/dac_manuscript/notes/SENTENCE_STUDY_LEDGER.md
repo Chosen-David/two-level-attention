@@ -29,6 +29,17 @@
 
 ## 修改日志
 
+### 第 44 轮（2026-10-20，**叙事口径确认 + Q2 段精修：production 术语退役**）
+
+- **用户提问**：「我们论文的叙事全面转向固定配额了吗，转向完后对照 best paper 开始逐句精修」。
+- **全面审计结论（en+zh）**：✅ 已全面转向。剩余 α/β/γ 仅存三个合法角色：(1) 被批判对象（摘要+§III-B 耦合失效主线本身）；(2) 归档运行身份括注（Settings 等价映射/Q2 archived β/S6/S8）；(3) 图题双记法（图 PDF 烤入 β 标签）。所有句子主语均为配额/容量。与代码线一致（E155d ecfbd4f 已 fail-closed 退役 α/β/γ）。
+- **Q2 段逐句精修**：三段 11 句中 9 句合规（claim-first/数字带方向/jointly 混杂标记/诚实收口链）。两处**术语滞后**修复：
+  - 「Integer enumeration of the production formulas」→「archived formulas」（公式属归档参数化，当前生产接口已是绝对配额）
+  - 「At the production cell $(\alpha,\beta)=(.25,.125)$」→「archived grid cell」（E130 诊断跑在归档网格上）
+  - zh 同步：「生产公式」→「归档公式」、「生产格」→「归档网格点」。supplement 三处 "production" 均指当前生产实现（绝对配额版），语义正确保留。
+- **版式验证**：en/zh 均 6 页（AI p5 / refs p6）、0 LaTeX Warning。
+- **自查队列推进**：Q2 ✓。剩余：Q3 / 结论 / 摘要。
+
 ### 第 43 轮（2026-10-19，**范式自查：Q1 段——比较对象悬空修复**）
 
 - **数据与远端检查**：git fetch 干净；本地 main 推进至 ecfbd4f（E155d 参数退役，并行代码线，用户拍板全面转向 nl/nb/nt 绝对配额，与手稿方向一致）+ 22e3f8d（vendor 蓝本更新：AsyncTLS 修复版 LongBench 16/16 打分 AVG16 45.13/AVG13 46.82，与乱序版几乎持平；RULER 128K 修复版在飞）。vendor LongBench 属 vendor 批数据（手稿不报告 vendor LongBench），非手稿级，不入稿；128K 修复版成稿后下轮评估。
