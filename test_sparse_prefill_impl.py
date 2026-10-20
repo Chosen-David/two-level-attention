@@ -286,7 +286,11 @@ def t7_row_protection_band():
             m = torch.zeros(1, 1, Hkv, c1, dtype=torch.bool)
             m[..., :128] = True
             m[..., c1 - 128:] = True
-            return m, 0
+            # 契约（prefill_contract.token_selection）：第二返回值须如实声明
+            # 块粒度——本 stub 返回 token 级 mask，必须声明 1（生产
+            # TLIIndexer.get_block_size() 同口径）；旧值 0 在契约修复后
+            # 被正确 fail-closed 拒绝
+            return m, 1
 
         idx.prepare_mask = minimal_sel
         scale = D ** -0.5
