@@ -57,10 +57,17 @@ hotpotqa 跑完即止，L7 后到 SKIP 兜底。
       **10-20 双仓审计轮（用户指令）**：e113b kill-switch 绕过已修
       （d27009b：SGLANG_TLI_GREEDY_KERNEL=0 提到 v2 分支前；生产零扰动，
       e113b GPU 复跑等网格收官）+ T7 stub 块粒度修正（06efa4c，并行会话
-      代审）。sglang backend/kernels + 几何语义对拍审计在飞。**三真问题
+      代审）。**审计收官（sglang 侧三役全落）**：①几何语义审计 →
+      boundary_bypass 移植（39847a7fe，E155b 新口径三消费点 + host 冒烟
+      全 PASS）；②backend/kernels 只读深审（20 项发现）→ **15 修 5 缓行**
+      （5ba097eb3：B1 兜底分支双重累加 🔴 正确性 / B2 行回收过回收 🔴
+      性能塌方 / B4-B7 防线 + P1-P4/P6/P7/P9/P10 冗余消除；P5/P8/P11-P13
+      缓行随 E133c bench 验证）——双提交已推 sglang origin main。
+      **三真问题
       裁定：全部无需重跑**（网格 Geo-only 走 reference 默认路径，
       TLI_PREFILL_BATCH_SELECT / TLI_PREFILL_RUNTIME=candidate 均未设，
-      20 线零 FAIL + E155c 逐位门 + sha 去重三重兜底）。
+      20 线零 FAIL + E155c 逐位门 + sha 去重三重兜底；sglang 仓与网格
+      仓互不相扰）。
 - [ ] **T8 推送远端 main**：全部判决/论文/代码提交后 origin push
       （含历史挂账：ecfbd4f 等）。
 
