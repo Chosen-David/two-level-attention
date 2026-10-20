@@ -1,5 +1,17 @@
-"""Safe baseline planning and guarded native FFD integration."""
+"""Safe baseline planning and guarded native FFD integration.
+
+【2026-10-20 batch decode 基础设施（deepseek 轨，Phase 0）】
+本模块同时承载 vendor 稀疏 decode 的 batch>1 支持：模块级全局
+`_BATCH_DECODE_CTX`（BatchCtx dataclass）与 E127 `_ERR_FLAG` 同模式
+（模块级全局单例、set/clear 显式管理）。`require_unmasked_decode`
+因此改为双路径：ctx is None → 旧单序列语义逐字保留（bsz=1 拒绝 +
+原报错文案，既有 smoke/E127 零扰动）；ctx 非 None → 新 batch 契约
+（校验 bsz==ctx.batch、4D mask 且 q_len==1、mask 派生有效长 ==
+ctx.seq_lens 交叉校验）。各 vendor patch 在 batch 模式用
+`batch_valid_mask(key_states, ctx)` 排除 left-pad 的 pad 列。
+"""
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 import hashlib
 import json
@@ -58,16 +70,117 @@ def baseline_preflight(args):
             raise ValueError('FFD fixed source requires Llama; Qwen3/MLA unsupported')
 
 
+@dataclass
+class BatchCtx:
+    """batch>1 稀疏 decode 的行状态上下文（left-pad 协议）。
+
+    - batch: 固定 batch 大小（graph/缓存形状稳定的契约）
+    - seq_lens: 每行当前真实上下文长度（decode 前，含已生成 token）
+    - gen_lens: 每行已生成 token 数（不含首个预填充 token 自身计数口径，
+      与 pred_ruler_batch 主循环的 gen 列表对齐）
+    - alive: 每行是否存活（未触发 EOS 停止，False 后该行只吃 filler 计算）
+    - pad_id: pad token id（left-pad 填充用）
+    """
+    batch: int
+    seq_lens: list
+    gen_lens: list
+    alive: list
+    pad_id: int
+
+
+# 模块级全局 batch 上下文：None = legacy 单序列模式（各 vendor 既有行为
+# 逐字保留）；非 None = batch 模式（由 pred_ruler_batch/pred_batch 在
+# decode 循环外层 set/clear，与 E127 _ERR_FLAG 的显式生命周期管理同模式）。
+_BATCH_DECODE_CTX = None
+
+
+def set_batch_decode_ctx(ctx):
+    """进入 batch decode 模式（ctx: BatchCtx）。必须与 clear 成对使用。"""
+    global _BATCH_DECODE_CTX
+    _BATCH_DECODE_CTX = ctx
+
+
+def clear_batch_decode_ctx():
+    """退出 batch decode 模式（恢复 legacy 单序列语义）。"""
+    global _BATCH_DECODE_CTX
+    _BATCH_DECODE_CTX = None
+
+
+def batch_decode_ctx():
+    """读取当前 batch 上下文（None = legacy 模式）。"""
+    return _BATCH_DECODE_CTX
+
+
+def batch_valid_mask(key_states, ctx=None):
+    """生成 [B, 1, S] 有效列 mask（True=真实 token，False=left-pad 列）。
+
+    left-pad 判据：行 b 的 pad 前缀长 = S - seq_lens[b]，因此有效列 =
+    [S - seq_lens[b], S)。key_states: [B, kv_heads, S, d]。返回 broadcast
+    到 [B, 1, S]（各 vendor 按需 expand 到 kv_heads 维或直接高级索引）。
+    """
+    import torch
+    ctx = ctx if ctx is not None else _BATCH_DECODE_CTX
+    if ctx is None:
+        raise ValueError('batch_valid_mask requires an active batch decode ctx')
+    S = key_states.shape[-2]
+    if key_states.shape[0] != ctx.batch:
+        raise ValueError(
+            f'batch_valid_mask key batch {key_states.shape[0]} != ctx.batch '
+            f'{ctx.batch}')
+    col = torch.arange(S, device=key_states.device).view(1, 1, S)
+    lens = torch.tensor(ctx.seq_lens, device=key_states.device,
+                        dtype=torch.long).view(ctx.batch, 1, 1)
+    return col >= (S - lens)  # [B, 1, S]
+
+
+def batch_valid_len_from_mask(mask):
+    """从 4D attention mask 派生每行有效长（防御性交叉校验用）。
+
+    mask: [B, 1, q_len, S]。取末行（q_len==1）的非 pad 列数即有效长。
+    """
+    import torch
+    if mask.ndim != 4:
+        raise ValueError('batch_valid_len_from_mask expects a 4D mask')
+    if mask.shape[1] != 1 or mask.shape[2] != 1:
+        raise ValueError('batch_valid_len_from_mask expects q_len==1 mask')
+    row = mask[..., 0, :]  # [B, S]
+    if mask.dtype == torch.bool:
+        return row.sum(dim=-1).tolist()
+    return (row != 0).sum(dim=-1).tolist()
+
+
 def require_unmasked_decode(hidden_states, attention_mask, cache, position):
-    if hidden_states.shape[0] != 1 or cache is None or position is None:
-        raise ValueError('vendor sparse decode requires batch=1, cache and explicit position')
-    if attention_mask is not None:
-        import torch
-        if attention_mask.ndim != 4 or attention_mask.shape[-2] != 1:
-            raise ValueError('vendor sparse decode requires a 4D trivial attention mask')
-        ok = attention_mask.all() if attention_mask.dtype == torch.bool else (attention_mask == 0).all()
-        if not bool(ok):
-            raise ValueError('vendor sparse decode padding/custom masks unsupported')
+    ctx = _BATCH_DECODE_CTX
+    if ctx is None:
+        # ---- legacy 单序列语义（逐字保留，bsz=1 拒绝 + 原报错文案）----
+        if hidden_states.shape[0] != 1 or cache is None or position is None:
+            raise ValueError('vendor sparse decode requires batch=1, cache and explicit position')
+        if attention_mask is not None:
+            import torch
+            if attention_mask.ndim != 4 or attention_mask.shape[-2] != 1:
+                raise ValueError('vendor sparse decode requires a 4D trivial attention mask')
+            ok = attention_mask.all() if attention_mask.dtype == torch.bool else (attention_mask == 0).all()
+            if not bool(ok):
+                raise ValueError('vendor sparse decode padding/custom masks unsupported')
+        return
+    # ---- batch 契约（ctx 非 None）----
+    import torch
+    bsz = hidden_states.shape[0]
+    if bsz != ctx.batch or cache is None or position is None:
+        raise ValueError(
+            f'batch vendor sparse decode requires bsz==ctx.batch '
+            f'({ctx.batch}), cache and explicit position')
+    if attention_mask is None:
+        raise ValueError('batch vendor sparse decode requires a 4D attention mask')
+    if attention_mask.ndim != 4 or attention_mask.shape[-2] != 1:
+        raise ValueError('batch vendor sparse decode requires a 4D attention mask with q_len=1')
+    # 交叉校验：mask 派生有效长 == ctx.seq_lens（防 left-pad 协议漂移）
+    derived = batch_valid_len_from_mask(attention_mask)
+    if derived != ctx.seq_lens:
+        raise ValueError(
+            f'batch vendor sparse decode mask derived lengths {derived} '
+            f'!= ctx.seq_lens {ctx.seq_lens}')
+    _ = torch  # 保持 import（与 legacy 分支同构）
 
 
 def validate_minference_pattern(pattern, layers, heads, starting_layer):

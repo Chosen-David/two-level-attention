@@ -206,16 +206,32 @@ def t3_pipeline_mask_bitwise():
                 tli_far_method="minmax", tli_near_method="avg",
                 tli_sim=0.9, **extra,
             )
+            # 「kernel=1 臂真的走了 Triton」判据：spy 分段驱动器
+            # _greedy_cluster_pass_triton（v1/v2 统一必经）。旧判据读 v1
+            # 加载器缓存 _GREEDY_TRITON_FN——E131-S2 后默认走 v2
+            # （greedy_triton.greedy_pass_triton_v2 直调，不碰 v1 加载器），
+            # 该缓存恒 None，旧判据已过期失效。
+            tri_calls = {"n": 0}
+            drv_orig = TLI._greedy_cluster_pass_triton
+
+            def spy_drv(*a, **kw):
+                tri_calls["n"] += 1
+                return drv_orig(*a, **kw)
+
             # env 开/关各一份 indexer，同步走 prefill + 多步 decode，逐步比对 mask
             idxs, masks = {}, {}
-            for val in ("0", "1"):
-                with env_switch(val):
-                    ix = TLI(args)
-                    ix.layer_idx = 3
-                    for S in [S0] + list(range(S0 + 64, S0 + DS + 1, 64)):
-                        m = run_mask(ix, k, q, S)
-                        masks.setdefault(val, []).append(m)
-                idxs[val] = ix
+            TLI._greedy_cluster_pass_triton = staticmethod(spy_drv)
+            try:
+                for val in ("0", "1"):
+                    with env_switch(val):
+                        ix = TLI(args)
+                        ix.layer_idx = 3
+                        for S in [S0] + list(range(S0 + 64, S0 + DS + 1, 64)):
+                            m = run_mask(ix, k, q, S)
+                            masks.setdefault(val, []).append(m)
+                    idxs[val] = ix
+            finally:
+                TLI._greedy_cluster_pass_triton = staticmethod(drv_orig)
             for si, (m0, m1) in enumerate(zip(masks["0"], masks["1"])):
                 if not (m0.shape == m1.shape and m0.dtype == m1.dtype):
                     raise AssertionError('m0.shape == m1.shape and m0.dtype == m1.dtype')
@@ -230,9 +246,9 @@ def t3_pipeline_mask_bitwise():
             if not (torch.allclose(idxs["0"]._km_centroids[:, :live],
                                   idxs["1"]._km_centroids[:, :live], atol=1e-5)):
                 raise AssertionError(f"{tag}: 终态簇心不一致")
-            # kernel 版应真的走过 Triton 路径（加载成功缓存非 False）
-            import sparse_attn_e113b.indexer.tli_indexer as tmod  # noqa: F401
-            if not (tmod._GREEDY_TRITON_FN is not None and tmod._GREEDY_TRITON_FN is not False):
+            # spy 计数 > 0 即证明 kernel=1 臂真实走了 Triton（驱动器是
+            # v1/v2 共同路径；env=0 臂走 Python 不触驱动器）
+            if not (tri_calls["n"] > 0):
                 raise AssertionError("Triton kernel 未加载成功（T3 的 kernel=1 实际走的是 Python）")
         report(name, True, f"2 配置 × 5 步 mask 逐位一致（prefill {S0} + decode {DS}）")
     except AssertionError as e:

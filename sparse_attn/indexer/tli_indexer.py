@@ -499,6 +499,12 @@ class TLIIndexer(TIAIndexer):
         #   主管线（e64 L1 双池 + k_qat 构造），单池/簇路径不受保送影响。
         self.boundary_bypass = getattr(args, "tli_boundary_bypass", True)
         self.l2_quant = getattr(args, "tli_l2_quant", False)
+        # 【E156 精筛候选化】score_fine 只对 L1 候选 token + 强制区打分
+        # （消除全宽 [1,H,T] einsum）。默认开；env TLI_FINE_GATHER=0 关
+        # （对拍/回退臂）。投影/per_q_head/moba 由 compute_score 条件守卫
+        # 自动回退全宽，不受本标志影响。
+        self._fine_gather = (
+            os.environ.get("TLI_FINE_GATHER", "1").strip() != "0")
         # E151c is implemented only in the E64 split-budget top-k branches.
         # Other selection modes return before those branches or use a different
         # budget contract; accepting the table there would silently ignore it.
@@ -1443,6 +1449,167 @@ class TLIIndexer(TIAIndexer):
             self.near_method == "avg" and self.alpha > 0 and self.beta > 0
         )
 
+    def _gather_fine_cand(self, score_coarse, score_coarse_avg, k_qat,
+                          b_q_full, valid_length):
+        """【E156 单源】L1 候选 token 集 fine 打分 helper（per-head）。
+
+        compute_score 主路径与父类捷径共用同一实现（杜绝两份口径漂移）：
+        用 _select_l1_blocks 选 L1 块 → 每 kv-head 独立候选 token 集（本
+        head L1 块 ∪ E155b bypass ∪ sink ∪ swa）→ 对角 GQA gather k →
+        批量 einsum。候选集与 compute_mask 的 _select_l1_blocks 单源。
+
+        【E156b 修复 2026-10-20】初版用「所有 head 选中块并集」——多 head
+        attention 下并集覆盖近全序列（32K 实测 27904/32768），einsum 无省
+        算且 nonzero/unique/sort 开销反超（+7×）。改 per-head 行矩阵：每个
+        kv-head 只对「本 head 的 K1=128 块 + 强制区」打分（~8.5K/head vs
+        全宽 32K → fine 打分 ~4× 下降）。返回 q-head 空间 [H,R_max] 带
+        每 head 实长 cand_len（短序列/尾块截断时 pad，重建设 scatter 用
+        cand_len 门控防 sentinel 污染）。
+
+        返回 (score_fine_cand [1,H,R_max], cand_idx [H,R_max],
+        cand_len [H])；任一异常 / 形状不符 / 门控不适用 → (None,None,None)
+        fail-closed（调用方回退原全宽路径，值逐位不变）。E156 门控内联：
+        σ / ccluster（near/far cluster 分）实验臂直接读全宽原始 score_fine
+        可超出候选集 → 这些臂拒绝候选化。
+        """
+        try:
+            if not (self._fine_gather and self._basis is None
+                    and not self.moba_gate and not self.per_q_head):
+                return None, None, None
+            _raw = (self.sigma_select != "none"
+                    or self.far_select in ("cluster", "sim_greedy")
+                    or self.near_select in ("cluster", "sim_greedy"))
+            if _raw:
+                return None, None, None
+            _S_r = (int(valid_length)
+                    if valid_length is not None else k_qat.shape[1])
+            _sel = self._select_l1_blocks(
+                score_coarse, score_coarse_avg, _S_r)
+            _bs_c = _sel["bs"]
+            _tmb = _sel["topk_mask_block"]          # [1,1,Hkv,kt]
+            _dev = _tmb.device
+            _Hkv = _tmb.shape[2]
+            _sink_t = torch.arange(min(_sel["sink_tok"], _S_r), device=_dev)
+            _swa_lo = max(0, _S_r - _sel["swa_tok"])
+            _swa_t = torch.arange(_swa_lo, _S_r, device=_dev)
+            # 每 kv-head 独立候选 token 集（sink/swa 全 head 共享；块与强制区
+            # 重叠产生重复索引无害——打分重复物化、重建 scatter 幂等同值）。
+            # 【E156c 向量化构建】per-head Python 循环 = 8×~20 个小 CUDA
+            # launch ≈ 1ms host 开销（32K 实测 build_cand=1.04ms，占候选
+            # compute_score 55%），且 Phase 1 batch 化后该开销再乘 B——必须
+            # 向量化。语义逐位等价：
+            #   L1 段：torch.nonzero 行优先天然按 head 分组、块升序（与循环
+            #   `torch.where(_tmb[0,0,h])[0]` 逐位同序）；截断 < S_r 全局等价
+            #   于逐 head 截断（只有尾块可能超界）。
+            #   共享段（bypass+sink+swa）：每 head 相同，scatter 到各自行的
+            #   [cnt_l1[h], cnt_l1[h]+M) 列区间（= 循环 concat 顺序）。
+            _tmb4 = _tmb[0, 0]                          # [Hkv, kt] bool
+            _l1_h, _l1_b = torch.nonzero(_tmb4, as_tuple=True)
+            if _l1_b.numel():
+                _l1_tok = (_l1_b.view(-1, 1) * _bs_c
+                           + torch.arange(_bs_c, device=_dev).view(1, _bs_c))
+                _l1_h_exp = _l1_h.view(-1, 1).expand(-1, _bs_c)
+                _l1_keep = _l1_tok < _S_r
+                _l1_tok = _l1_tok[_l1_keep].reshape(-1)
+                _l1_h = _l1_h_exp[_l1_keep].reshape(-1)
+                _l1_cnt = torch.bincount(
+                    _l1_h, minlength=_Hkv).to(torch.long)   # [Hkv]
+                _l1_base = torch.cat(
+                    [torch.zeros(1, dtype=torch.long, device=_dev),
+                     torch.cumsum(_l1_cnt, 0)[:-1]])
+                _l1_col = (torch.arange(_l1_tok.numel(), device=_dev,
+                                        dtype=torch.long)
+                           - torch.repeat_interleave(_l1_base, _l1_cnt,
+                                                     dim=0))
+            else:
+                _l1_tok = torch.empty(0, dtype=torch.long, device=_dev)
+                _l1_h = torch.empty(0, dtype=torch.long, device=_dev)
+                _l1_cnt = torch.zeros(_Hkv, dtype=torch.long, device=_dev)
+                _l1_col = torch.empty(0, dtype=torch.long, device=_dev)
+            _shared = []
+            if _sel["bypass_blks"]:
+                _bt = torch.tensor(_sel["bypass_blks"],
+                                   dtype=torch.long, device=_dev)
+                _tbp = (_bt.view(-1, 1) * _bs_c
+                        + torch.arange(_bs_c, device=_dev).view(1, _bs_c))
+                _tbp = _tbp[_tbp < _S_r].reshape(-1)
+                if _tbp.numel():
+                    _shared.append(_tbp)
+            if _sink_t.numel():
+                _shared.append(_sink_t)
+            if _swa_t.numel():
+                _shared.append(_swa_t)
+            if _shared:
+                _shared_t = torch.cat(_shared)             # [M]
+                _M = _shared_t.numel()
+            else:
+                _shared_t = None
+                _M = 0
+            _R_max = int((_l1_cnt + _M).max().item())
+            if _R_max == 0:
+                return None, None, None
+            _cand = torch.zeros((_Hkv, _R_max),
+                                dtype=torch.long, device=_dev)
+            _cand_len = _l1_cnt + _M                      # [Hkv]
+            if _l1_tok.numel():
+                _cand[_l1_h, _l1_col] = _l1_tok
+            if _M:
+                _sh_h = torch.arange(_Hkv, device=_dev
+                                     ).view(-1, 1).expand(_Hkv, _M)
+                _sh_col = (_l1_cnt.view(-1, 1).expand(_Hkv, _M)
+                           + torch.arange(_M, device=_dev
+                                          ).view(1, -1).expand(_Hkv, _M))
+                _cand[_sh_h.reshape(-1), _sh_col.reshape(-1)] = (
+                    _shared_t.expand(_Hkv, _M).reshape(-1))
+            # 对角 GQA gather：行 h 只用 kv-head h 的 k 特征（免 [Hkv,R,Hkv,d]
+            # 全展开物化——首版 70MB 中间量，对角直取省 8×）。
+            # 【E156c】Triton 融合候选 kernel（_fast_score_fine_cand）替代
+            # gather+repeat+einsum 链：单 launch 内 cand gather + GQA K 寄存器
+            # 复用 + fp32 累加，免 fp32 repeat 物化。门控对齐 _fast_score_fine
+            # （非投影/紧凑 4D/连续末维/fp32 q/同维同头数）；测试臂强制
+            # _triton_ok=False 走下方原版 einsum 表达式（两臂同构隔离）。
+            _use_triton = (self._triton_ok and _HAS_TRITON
+                           and k_qat.is_cuda and k_qat.dim() == 4
+                           and k_qat.shape[0] == 1
+                           and (k_qat.shape[-1] & (k_qat.shape[-1] - 1)) == 0
+                           and k_qat.stride(-1) == 1
+                           and b_q_full.stride(-1) == 1
+                           and b_q_full.dtype == torch.float32
+                           and k_qat.shape[-1] == b_q_full.shape[-1]
+                           and k_qat.shape[2] * self.group_size
+                           == b_q_full.shape[0])
+            if _use_triton:
+                try:
+                    _sfc = self._fast_score_fine_cand(
+                        k_qat[0], b_q_full, _cand, _cand_len, _R_max,
+                        k_qat.dtype)
+                except Exception:
+                    _use_triton = False
+            if not _use_triton:
+                _kv_id = torch.arange(_Hkv, device=_dev).view(-1, 1)   # [Hkv,1]
+                _kqc_diag = k_qat[0][_cand, _kv_id, :]                 # [Hkv,R,d']
+                _bkqc = repeat(_kqc_diag, "kv r d -> (kv g) r d",
+                               g=self.group_size).to(torch.float32)   # [H,R,d']
+                _sfc = einsum(b_q_full, _bkqc, "h d, h r d -> h r")   # [H,R]
+                _sfc = _sfc.to(k_qat.dtype)
+            _r_mask = (torch.arange(_R_max, device=_dev).view(1, _R_max)
+                       < _cand_len.view(_Hkv, 1))                 # [Hkv,R]
+            _r_mask_h = repeat(_r_mask, "kv r -> (kv g) r",
+                               g=self.group_size)                 # [H,R]
+            _score_fine_cand = k_qat.new_full(
+                (1, b_q_full.shape[0], _R_max), float("-inf"))
+            _score_fine_cand[0] = torch.where(
+                _r_mask_h, _sfc, torch.full_like(_sfc, float("-inf")))
+            # q-head 空间 [H,R_max]（与 score_fine 同构；compute_mask scatter 用）
+            _cand_h = repeat(_cand, "kv r -> (kv g) r", g=self.group_size)
+            _cand_len_h = repeat(_cand_len, "kv -> (kv g)",
+                                 g=self.group_size)
+            return _score_fine_cand, _cand_h, _cand_len_h
+        except Exception:
+            # fail-closed：候选化任何异常回退全宽原分支（值同原路径）。
+            # 返回值独立于调用方的 score_fine（不污染全宽原张量）。
+            return None, None, None
+
     def compute_score(self, q, q_ids, index_dict, softmax_scale):
         # 缓存 squeeze 后的 q 供远端簇分数使用
         # 【C3 修复 2026-10-08】缓存时统一乘 softmax_scale——_near_token_score
@@ -1490,6 +1657,22 @@ class TLIIndexer(TIAIndexer):
             # 075：父类捷径同样携带真实长度（该路径无投影，valid_length ==
             # score_fine 宽度，行为不变；保持 score_dict 接口统一）
             d["valid_length"] = index_dict.get("valid_length")
+            # 【E156】父类捷径同样候选化（单源 _gather_fine_cand）：父类
+            # 返回全宽 score_fine [1,1,H,T] 与 b_q=(q*scale).to(f32)（全维，
+            # 对应 k_qat 展开 dense 后 128 宽）。候选位 fine 打分逐 token 独立
+            # → 候选 gather einsum 与全宽 einsum 逐位一致（N 维不同仅累加
+            # 调度）。k_qat 此处为 dense 展开副本（L1487-1494），consumed
+            # 维度与 b_q 匹配。
+            if self._fine_gather:
+                _cd, _ci, _cl = self._gather_fine_cand(
+                    d["score_coarse"], None, index_dict["k_qat"],
+                    (q[0, 0] * softmax_scale).to(torch.float32),
+                    index_dict.get("valid_length"))
+                if _cd is not None and _ci is not None:
+                    d["score_fine"] = _cd.unsqueeze(0)
+                    d["cand_idx"] = _ci
+                    d["cand_len"] = _cl
+                    d["cand_width"] = index_dict["k_qat"].shape[1]
             return d
         # A：L1 上界只在 d' 子空间维上算（q 同步取子空间，与 k_min/k_max 对齐）
         assert q.shape[0] == 1 and q.shape[1] == 1
@@ -1678,52 +1861,86 @@ class TLIIndexer(TIAIndexer):
                 b_q_full = b_q
             else:
                 b_q_full = q_full[..., self._qat_indices(q_sq.device)]
-        if dgate_short:
-            # E111 省算：far 段 token [sink_tok, near_blks·bs) 的细筛分
-            # 保持 -inf（skip 层 far 池置空后不可达）。分段对保留段逐位
-            # 一致（token 维是输出维非收缩维）。
-            b_k_qat = repeat(k_qat.squeeze(0), "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
-            _ftl = _sb * self.args.tia_block_size
-            _fth = dgate_near_blks * self.args.tia_block_size
-            sf_head = einsum(b_q_full, b_k_qat[:_ftl], "h d, kt h d -> h kt")
-            sf_tail = einsum(b_q_full, b_k_qat[_fth:], "h d, kt h d -> h kt")
-            if self._basis is not None:
-                score_fine[0, :, :_ftl] = sf_head
-                score_fine[0, :, _fth:] = sf_tail
+        # ---- 【E156 精筛候选化】只对 L1 候选 token + 强制区打分 ----
+        # 消除全宽 [1,H,T] einsum 物化（T=全序列 token）：fine 打分逐 token
+        # 独立（q·k_qat），softmax 归约集合 = 候选∪强制区 ≡ 现状 where 屏蔽
+        # 后的非 -inf 集合（未选位置 -inf 的 exp=0 精确不贡献）→ 逐位等价。
+        # 候选集 = L1 选中块 ∪ E155b bypass ∪ sink ∪ swa（与 compute_mask 共用
+        # _select_l1_blocks 单源）。env TLI_FINE_GATHER=0 关 / 投影 / per_q_head /
+        # moba / 任何异常 fail-closed 回退原全宽路径。
+        # 【E156 门控】σ / ccluster（near/far cluster 分）实验臂直接读
+        # score_dict["score_fine"] 全宽原始分（未 L1 屏蔽），可选中 token 集合
+        # 可超出 L1 候选集——候选化把这些位置置 -inf 会语义漂移 → 这些臂
+        # fail-closed 走原全宽路径（行为逐位不变）。生产默认（σ=none、
+        # far/near=4bit）非此列。
+        _raw_fine_read = (self.sigma_select != "none"
+                          or self.far_select in ("cluster", "sim_greedy")
+                          or self.near_select in ("cluster", "sim_greedy"))
+        cand_idx = None
+        cand_len = None
+        _score_fine_cand = None
+        if (self._fine_gather and self._basis is None and not self.moba_gate
+                and not self.per_q_head and not _raw_fine_read):
+            # 单源 _gather_fine_cand（与父类捷径共用）：内部 fail-closed，
+            # 任一异常/形状不符返回 (None,None,None) → 走原全宽路径（值逐位不变）。
+            _score_fine_cand, cand_idx, cand_len = self._gather_fine_cand(
+                score_coarse, score_coarse_avg, k_qat, b_q_full,
+                index_dict.get("valid_length"))
+        if cand_idx is not None and _score_fine_cand is not None:
+            score_fine = _score_fine_cand
+        if cand_idx is None:
+            # ---- 原全宽 L2 精筛打分（dgate_short / Triton / 投影 / einsum）----
+            # 注意：整个 if/elif 链（dgate_short/Triton/投影/einsum）必须整体
+            # 嵌套在 `if cand_idx is None:` 内——候选化成功时（cand_idx 非 None）
+            # 本链完全跳过（score_fine 已是候选尺寸），否则 elif 链会被错误地
+            # 接到 cand_idx 判定上导致形状错位（2026-10-20 实测 shape 1277 vs
+            # 4093 即此因）。
+            if dgate_short:
+                # E111 省算：far 段 token [sink_tok, near_blks·bs) 的细筛分
+                # 保持 -inf（skip 层 far 池置空后不可达）。分段对保留段逐位
+                # 一致（token 维是输出维非收缩维）。
+                b_k_qat = repeat(k_qat.squeeze(0), "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
+                _ftl = _sb * self.args.tia_block_size
+                _fth = dgate_near_blks * self.args.tia_block_size
+                sf_head = einsum(b_q_full, b_k_qat[:_ftl], "h d, kt h d -> h kt")
+                sf_tail = einsum(b_q_full, b_k_qat[_fth:], "h d, kt h d -> h kt")
+                if self._basis is not None:
+                    score_fine[0, :, :_ftl] = sf_head
+                    score_fine[0, :, _fth:] = sf_tail
+                else:
+                    score_fine[0, :, :_ftl] = sf_head.to(q_sq.dtype)
+                    score_fine[0, :, _fth:] = sf_tail.to(q_sq.dtype)
+            elif (_HAS_TRITON and self._basis is None and k_qat.dim() == 4
+                    and k_qat.is_cuda
+                    and k_qat.shape[0] == 1
+                    and (k_qat.shape[-1] & (k_qat.shape[-1] - 1)) == 0
+                    and k_qat.stride(-1) == 1 and b_q_full.stride(-1) == 1
+                    and b_q_full.dtype == torch.float32
+                    and k_qat.shape[-1] == b_q_full.shape[-1]
+                    and k_qat.shape[2] * self.group_size == b_q_full.shape[0]
+                    and self._triton_ok):
+                # 【E127 iter6】非投影路径 Triton GQA K 复用（K 读带宽 4× 削减，
+                # 免 [T,H,128] fp32 repeat 物化；fp32 累加与原版 einsum 仅累加
+                # 顺序不同 → bf16 舍入后 ULP 级漂移，mask 门禁实测逐位不变）。
+                # 投影/异形布局/Triton 异常回退原版 repeat+einsum。
+                # 【E132b TL-E127-FEATURE-STRIDE-129】补 k_qat/b_q_full 末维
+                # stride 检查：_score_fine_kernel 以 base+offs_d 硬编码末维
+                # stride=1 访问特征，合法非连续布局（如 permute/转置 dense 视
+                # 图）会静默读错物理地址——与 coarse 门禁（k_min/k_max/b_q 三
+                # 检查）对齐；非连续输入回退原版 einsum 表达式（fail-closed，
+                # 值同）。
+                try:
+                    score_fine[0] = self._fast_score_fine(
+                        k_qat.squeeze(0), b_q_full, q_sq.dtype)
+                except Exception:
+                    b_k_qat = repeat(k_qat.squeeze(0), "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
+                    score_fine[0] = einsum(b_q_full, b_k_qat, "h d, kt h d -> h kt").to(q_sq.dtype)
+            elif self._basis is not None:
+                b_k_qat = repeat(k_qat.squeeze(0), "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
+                score_fine[0] = einsum(b_q_full, b_k_qat, "h d, kt h d -> h kt")
             else:
-                score_fine[0, :, :_ftl] = sf_head.to(q_sq.dtype)
-                score_fine[0, :, _fth:] = sf_tail.to(q_sq.dtype)
-        elif (_HAS_TRITON and self._basis is None and k_qat.dim() == 4
-                and k_qat.is_cuda
-                and k_qat.shape[0] == 1
-                and (k_qat.shape[-1] & (k_qat.shape[-1] - 1)) == 0
-                and k_qat.stride(-1) == 1 and b_q_full.stride(-1) == 1
-                and b_q_full.dtype == torch.float32
-                and k_qat.shape[-1] == b_q_full.shape[-1]
-                and k_qat.shape[2] * self.group_size == b_q_full.shape[0]
-                and self._triton_ok):
-            # 【E127 iter6】非投影路径 Triton GQA K 复用（K 读带宽 4× 削减，
-            # 免 [T,H,128] fp32 repeat 物化；fp32 累加与原版 einsum 仅累加
-            # 顺序不同 → bf16 舍入后 ULP 级漂移，mask 门禁实测逐位不变）。
-            # 投影/异形布局/Triton 异常回退原版 repeat+einsum。
-            # 【E132b TL-E127-FEATURE-STRIDE-129】补 k_qat/b_q_full 末维
-            # stride 检查：_score_fine_kernel 以 base+offs_d 硬编码末维
-            # stride=1 访问特征，合法非连续布局（如 permute/转置 dense 视
-            # 图）会静默读错物理地址——与 coarse 门禁（k_min/k_max/b_q 三
-            # 检查）对齐；非连续输入回退原版 einsum 表达式（fail-closed，
-            # 值同）。
-            try:
-                score_fine[0] = self._fast_score_fine(
-                    k_qat.squeeze(0), b_q_full, q_sq.dtype)
-            except Exception:
                 b_k_qat = repeat(k_qat.squeeze(0), "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
                 score_fine[0] = einsum(b_q_full, b_k_qat, "h d, kt h d -> h kt").to(q_sq.dtype)
-        elif self._basis is not None:
-            b_k_qat = repeat(k_qat.squeeze(0), "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
-            score_fine[0] = einsum(b_q_full, b_k_qat, "h d, kt h d -> h kt")
-        else:
-            b_k_qat = repeat(k_qat.squeeze(0), "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
-            score_fine[0] = einsum(b_q_full, b_k_qat, "h d, kt h d -> h kt").to(q_sq.dtype)
         return {
             "score_coarse": score_coarse.unsqueeze(0),
             "score_coarse_avg": None if score_coarse_avg is None else score_coarse_avg.unsqueeze(0),
@@ -1732,6 +1949,16 @@ class TLIIndexer(TIAIndexer):
             # 075：真实序列长度随分数透传给 compute_mask（投影路径
             # score_fine 宽 = Tpad ≠ 真实 S；无值时消费端回退宽度口径）
             "valid_length": index_dict.get("valid_length"),
+            # 【E156 精筛候选化】per-head 候选 token 绝对位置 [H,R_max]
+            # （None = 全宽路径）。compute_mask 检测到非 None 时把稀疏
+            # score_fine scatter 回全宽（cand_len 门控防 pad sentinel 污染）。
+            "cand_idx": cand_idx,
+            # 【E156b】per-head 候选实长 [H]（短序列/尾块截断时 < R_max；
+            # 重建设 scatter 只写实长前缀）。
+            "cand_len": cand_len,
+            # 【E156】候选化时的全宽（= k_qat 原宽，scatter 重建目标宽；
+            # 非投影路径 == valid_length == 原 score_fine 宽）。None = 全宽路径。
+            "cand_width": (None if cand_idx is None else k_qat.shape[1]),
         }
 
     # ------------------------------------------------ 【E127 iter6/8】Triton
@@ -1775,6 +2002,39 @@ class TLIIndexer(TIAIndexer):
             _score_fine_kernel[grid](
                 kq, b_q_full, out, T,
                 kq.stride(0), kq.stride(1), b_q_full.stride(0),
+                out.stride(0), out.stride(1),
+                Hkv=Hkv, G=g, D=D, BT=bt, num_warps=nw)
+            return out
+        except Exception:
+            self._triton_ok = False
+            raise
+
+    def _fast_score_fine_cand(self, kq, b_q_full, cand_idx, cand_len, R,
+                              out_dtype):
+        """【E156c】候选 fine 打分 Triton 融合 kernel（非投影路径专用）。
+
+        数学：score[h, r] = sum_d b_q_full[h, d] * kq[cand_idx[kv, r], kv, d]
+        （kv = h // g），与 _gather_fine_cand 的 einsum 路径数学等价。单
+        launch 内完成 cand gather + GQA K 寄存器复用（读带宽 /g）+ fp32 累加
+        + -inf 门控，替代 gather + repeat fp32 物化 + einsum + where 链。
+
+        数值：与 _fast_score_fine 同口径（fp32 累加顺序 vs einsum 不同 →
+        bf16 舍入后 ULP 级漂移，mask 门禁实测逐位不变）；测试臂强制
+        _triton_ok=False 走 einsum 表达式，本 kernel 仅生产路径触发。
+
+        fail-closed：Triton 编译/执行异常 → 置 _triton_ok=False 并 raise
+        （调用点 except 回退 einsum 表达式，值同）。"""
+        try:
+            T_, Hkv, D = kq.shape
+            H = b_q_full.shape[0]
+            g = H // Hkv
+            out = torch.empty((H, R), device=kq.device, dtype=out_dtype)
+            bt, nw = self._TILE_FINE.get(D, (64, 4))
+            grid = (triton.cdiv(R, bt), Hkv)
+            _score_fine_cand_kernel[grid](
+                kq, b_q_full, cand_idx, cand_len, out, R,
+                kq.stride(0), kq.stride(1), b_q_full.stride(0),
+                cand_idx.stride(0), cand_idx.stride(1),
                 out.stride(0), out.stride(1),
                 Hkv=Hkv, G=g, D=D, BT=bt, num_warps=nw)
             return out
@@ -2069,6 +2329,52 @@ class TLIIndexer(TIAIndexer):
         #   ③ SWA 强制区与 near/far 边界全按真实 S 计算。
         # 无 valid_length（外部直接合成 score_dict 驱动 compute_mask 的
         # 既有测试/回放 harness）→ 回退 score_fine 宽度口径，逐位兼容。
+        # 【E156 精筛候选化】compute_score 返回稀疏 score_fine [1,1,H,R_cand]
+        # + cand_idx（候选 token 绝对位置，升序）时，先 scatter 回全宽
+        # [1,1,H,T] 再走原消费逻辑。未选位置保持 -inf（exp(-inf)=0 精确不
+        # 贡献 softmax/max/mean 归约 → 与现状 where 屏蔽后的归约集合逐位
+        # 等价）。σ/ccluster 臂因全宽原始分语义已由 compute_score 侧门控
+        # fail-closed 走全宽路径，本分支只被生产默认路径触发。
+        cand_idx = score_dict.get("cand_idx")
+        if cand_idx is not None:
+            _cw = score_dict.get("cand_width")
+            S_width = int(_cw) if _cw is not None else \
+                (int(cand_idx.max().item()) + 1)
+            # 【E156c】取消 `score_fine.shape[-1] != S_width` 形状守卫：
+            # 候选矩阵列是「候选秩」而非 token 索引（per-head 候选按
+            # L1∪bypass∪sink∪swa 拼接），列序与 token 序只在候选集恰好
+            # 全覆盖且有序时重合——S=kt·bs 整块边界（候选 R_max 恰等于
+            # S_width，如 4096）时形状相等但列序 ≠ token 序，旧守卫跳过
+            # 重建会让下游把候选秩当 token 索引 → mask 错位。cand_idx
+            # 存在即无条件 scatter 重建（块∪强制区重复索引 scatter 幂等
+            # 同值；R_max<S_width 与 R_max==S_width 一视同仁）。
+            # 【E156b】per-head 重建：cand_idx [H,R_max]（q-head 空间），
+            # cand_len [H] 门控——只写实长前缀（pad sentinel 0 不污染
+            # token 0 的真实 sink 分；块∪强制区重复索引 scatter 幂等同值）。
+            sf_full = torch.full(
+                (score_fine.shape[0], score_fine.shape[1],
+                 score_fine.shape[2], S_width),
+                float("-inf"), dtype=score_fine.dtype,
+                device=score_fine.device)
+            _H_h = score_fine.shape[2]
+            _R_max = cand_idx.shape[1]
+            _hidx = torch.arange(_H_h, device=score_fine.device
+                                 ).view(-1, 1).expand(_H_h, _R_max)
+            _cand_len = score_dict.get("cand_len")
+            if _cand_len is None:
+                # 防御：无 cand_len（外部合成 score_dict 回放 harness）
+                # → 假定无 padding（逐位兼容旧 1D 语义）。
+                _cand_len = torch.full(
+                    (_H_h,), _R_max, dtype=torch.long,
+                    device=score_fine.device)
+            _rmask = (torch.arange(_R_max, device=score_fine.device
+                                   ).view(1, _R_max)
+                      < _cand_len.view(-1, 1))
+            _ih = _hidx[_rmask]
+            _it = cand_idx[_rmask]
+            sf_full[0, 0, _ih, _it] = score_fine[0, 0][_rmask]
+            score_dict["score_fine"] = sf_full
+            score_fine = sf_full
         _vl = score_dict.get("valid_length")
         S_width = score_fine.shape[-1]
         S_real = S_width if _vl is None else min(int(_vl), S_width)
@@ -2727,6 +3033,174 @@ class TLIIndexer(TIAIndexer):
             topk_mask[..., :sink_tok] = True
         return topk_mask
 
+    # ---------------- 【E156 精筛候选化】L1 块选择单源 helper ----------------
+    # compute_score（候选化）与 compute_mask（消费端）共用同一 L1 块级选择
+    # 实现，杜绝两份口径漂移。逻辑逐字抽取自 compute_mask 原 L1 选择段
+    # （e64 双池 / 单池 / skip / E155b bypass / _sink_pool_lo_blk），原地写
+    # score_coarse（skip far 置位 + 当前块强制 inf，与原行为逐字一致）。
+
+    def _select_l1_blocks(self, score_coarse, score_coarse_avg, S_real):
+        """L1 块级选择单源实现（compute_score 候选化 / compute_mask 共用）。
+
+        输入 score_coarse [1,1,Hkv,kt]（共享口径）或 [1,1,H,kt]（per_q_head）、
+        score_coarse_avg 可选（同前）；S_real = 真实序列长（valid_length 口径）。
+        返回 dict：topk_mask_block（块级选中 bool mask，同输入聚合后形状）、
+        bypass_blks（E155b 保送页块列表）、几何上下文（compute_mask L2 分支
+        消费：kt/bs/t/e64_partition/sink_tok/swa_tok/mid_len/near_len_dyn/
+        near_base/near_blks/far_lo_blk/far_hi_blk/swa_lo_blk/nb_near/nb_far/
+        far_pool_lo/far_pool_hi/near_pool_lo/near_pool_hi/use_partition）。
+        """
+        per_q_head = self.per_q_head
+        if score_coarse.ndim == 3:
+            # compute_score 路径传入未 unsqueeze 的 [1,H,kt]；统一成 4D
+            # [1,1,H,kt]（与 compute_mask 侧 score_dict 口径一致）
+            score_coarse = score_coarse.unsqueeze(0)
+            if score_coarse_avg is not None and score_coarse_avg.ndim == 3:
+                score_coarse_avg = score_coarse_avg.unsqueeze(0)
+        if not per_q_head:
+            score_coarse = rearrange(
+                score_coarse, "b qt (h g) kt -> b qt h g kt", g=self.group_size
+            ).mean(dim=-2)  # [1,1,Hkv,kt]
+        kt = score_coarse.shape[-1]
+        bs = self.args.tia_block_size
+        t = kt * bs - 1  # 当前序列长度（pad 后）近似
+        # ---- E64 α/β/γ 分区：near 区动态长度（与 compute_mask 原逻辑逐字一致，
+        #      含 B10 near 左界基准分支化 / F5 真实 S 口径 / 075 真实域）----
+        e64_partition = self.alpha > 0 and self.beta > 0
+        swa_tok = self.sliding_window_size
+        sink_tok = self.sink_tokens            # E135：强制区宽单一事实源
+        mid_len = max(0, S_real - sink_tok - swa_tok)
+        if e64_partition:
+            if self.nt_near_len is not None:
+                near_len_dyn = max(bs, int(self.nt_near_len))
+            else:
+                near_len_dyn = max(bs, int(self.alpha * mid_len))
+            near_base = S_real - swa_tok
+        elif self.far_select != "4bit" and self.alpha == 0 and self.beta == 0:
+            near_len_dyn = swa_tok
+            near_base = kt * bs
+        else:
+            near_len_dyn = self.near_len
+            near_base = kt * bs
+        near_blks = max(self._sink_pool_lo_blk, (near_base - near_len_dyn) // bs)
+        far_lo_blk, far_hi_blk = self._sink_pool_lo_blk, near_blks
+        swa_lo_blk = max(near_blks, kt - max(1, swa_tok // bs))
+        # ---- D'：跳层 → 远端块全部 -inf（与 compute_mask 原 L1 前置一致）----
+        if self.skip_far:
+            score_coarse[..., far_lo_blk:far_hi_blk] = float("-inf")
+        use_partition = (self.enable_kmeans or e64_partition) \
+            and not (self.skip_far and not e64_partition)
+        score_coarse[..., -1] = float("inf")  # TIA 语义：当前块强制
+        k1 = self.args.tia_level1_topk
+        # E109a：avg 分数源提取提前到分支外（与 compute_mask 原逻辑一致）
+        if score_coarse_avg is not None and not per_q_head:
+            score_coarse_avg = rearrange(
+                score_coarse_avg, "b qt (h g) kt -> b qt h g kt", g=self.group_size
+            ).mean(dim=-2)
+        # ---- L1 双池 / 单池 topk + E155b bypass（逐字抽取自 compute_mask）----
+        bypass_blks = ()
+        far_pool_lo, far_pool_hi = far_lo_blk, far_hi_blk
+        near_pool_lo, near_pool_hi = near_blks, swa_lo_blk
+        nb_near = 0
+        nb_far = 0
+        if e64_partition:
+            if self.nt_near_pages is not None:
+                nb_near = max(0, int(self.nt_near_pages))
+            else:
+                nb_near = max(1, int(round(k1 * self.beta)))
+            nb_far = max(0, k1 - nb_near)
+            if self.skip_far:
+                n_valid_far = 0
+                nb_far = min(nb_far, max(n_valid_far, 0))
+            if self.boundary_bypass:
+                _bp = []
+                if sink_tok % bs != 0:
+                    _bp.append(far_lo_blk)
+                _swa_lo_tok = max(0, S_real - swa_tok)
+                if _swa_lo_tok % bs != 0:
+                    _cb = _swa_lo_tok // bs
+                    if _cb >= far_lo_blk:
+                        _bp.append(_cb)
+                bypass_blks = _bp
+                for _b in _bp:
+                    if far_pool_lo <= _b < far_pool_hi:
+                        if _b == far_pool_lo:
+                            far_pool_lo = _b + 1
+                        elif _b == far_pool_hi - 1:
+                            far_pool_hi = _b
+                        else:
+                            raise ValueError(
+                                f"boundary bypass 页 {_b} 非 far 池端点 "
+                                f"[{far_pool_lo},{far_pool_hi})——池收缩几何"
+                                "假设被破坏（当前几何下保送页恒位于端点）")
+                    if near_pool_lo <= _b < near_pool_hi:
+                        if _b == near_pool_hi - 1:
+                            near_pool_hi = _b
+                        elif _b == near_pool_lo:
+                            near_pool_lo = _b + 1
+                        else:
+                            raise ValueError(
+                                f"boundary bypass 页 {_b} 非 near 池端点 "
+                                f"[{near_pool_lo},{near_pool_hi})——池收缩几何"
+                                "假设被破坏（当前几何下保送页恒位于端点）")
+            if self.far_method == "avg" and score_coarse_avg is not None:
+                sc_far = score_coarse_avg[..., far_pool_lo:far_pool_hi]
+            else:
+                sc_far = score_coarse[..., far_pool_lo:far_pool_hi]
+            i_f = torch.topk(
+                sc_far, min(nb_far, sc_far.shape[-1]), dim=-1
+            ).indices + far_pool_lo
+            if self.near_method == "minmax" or score_coarse_avg is None:
+                sc_near = score_coarse[..., near_pool_lo:near_pool_hi]
+            else:
+                sc_near = score_coarse_avg[..., near_pool_lo:near_pool_hi]
+            sc_near = sc_near.clone()
+            if sc_near.shape[-1] > 0:
+                i_n = torch.topk(
+                    sc_near, min(nb_near, sc_near.shape[-1]), dim=-1
+                ).indices + near_pool_lo
+            else:
+                i_n = i_f[..., :0]  # near 池空（mid 不足一块）→ 不选
+            indices = torch.cat([i_f, i_n], dim=-1)
+            topk_mask = torch.zeros_like(
+                score_coarse, dtype=torch.bool
+            ).scatter_(
+                -1, indices, torch.ones_like(indices, dtype=torch.bool)
+            )
+            for _b in bypass_blks:
+                topk_mask[..., _b] = True
+        else:
+            sc_pool = score_coarse
+            if self.far_method == "avg" and score_coarse_avg is not None:
+                sc_pool = score_coarse_avg.clone()
+                sc_pool[..., -1] = float("inf")
+                if self.skip_far:
+                    sc_pool[..., far_lo_blk:far_hi_blk] = float("-inf")
+            if self.skip_far:
+                n_valid = kt - max(0, far_hi_blk - far_lo_blk)
+                k1 = min(k1, max(n_valid, 1))
+            values, indices = torch.topk(
+                sc_pool, min(sc_pool.shape[-1], k1), dim=-1
+            )
+            topk_mask = torch.zeros_like(
+                score_coarse, dtype=torch.bool
+            ).scatter_(
+                -1, indices, torch.ones_like(values, dtype=torch.bool)
+            )
+        return {
+            "topk_mask_block": topk_mask,
+            "bypass_blks": bypass_blks,
+            "kt": kt, "bs": bs, "t": t, "e64_partition": e64_partition,
+            "sink_tok": sink_tok, "swa_tok": swa_tok, "mid_len": mid_len,
+            "near_len_dyn": near_len_dyn, "near_base": near_base,
+            "near_blks": near_blks, "far_lo_blk": far_lo_blk,
+            "far_hi_blk": far_hi_blk, "swa_lo_blk": swa_lo_blk,
+            "nb_near": nb_near, "nb_far": nb_far,
+            "far_pool_lo": far_pool_lo, "far_pool_hi": far_pool_hi,
+            "near_pool_lo": near_pool_lo, "near_pool_hi": near_pool_hi,
+            "use_partition": use_partition,
+        }
+
     def clear(self):
         super().clear()
         self._km_centroids = None
@@ -2837,6 +3311,44 @@ if _HAS_TRITON:
             s = tl.sum(kmin * q_low[None, :], axis=1) + tl.sum(kmax * q_high[None, :], axis=1)
             tl.store(OUT + h * stride_oh + offs_t * stride_ot,
                      s.to(OUT.dtype.element_ty), mask=mask_t)
+
+    @triton.jit
+    def _score_fine_cand_kernel(
+        KQ, Q, CAND, CLEN, OUT,
+        # KQ [T,Hkv,D] bf16；Q [H,D] fp32（已乘 scale）；CAND [Hkv,R] int64；
+        # CLEN [Hkv] int64；OUT [H,R] out_dtype
+        R, stride_kt, stride_kh, stride_qh, stride_ch, stride_cr,
+        stride_oh, stride_or,
+        Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
+    ):
+        """【E156c】候选 fine 打分融合 kernel：每 program 处理 (候选列块 × 1
+        kv 头)，cand_idx gather k 行 [BT,D] 载入寄存器后循环 g 个 q 头逐头
+        点积（K 读带宽 /g，同 _score_fine_kernel）；-inf 门控（r ≥ CLEN[kv]
+        的 pad 列）在 kernel 内完成，替代 einsum 路径的 where。
+
+        数学：score[h, r] = Σ_d b_q_full[h, d]·kq[CAND[kv, r], kv, d]，与
+        einsum(b_q_full, kq[CAND] 展开) 数学等价；fp32 累加顺序与 einsum
+        不同 → bf16 舍入后 ULP 级漂移（与 _fast_score_fine 同口径）。
+        """
+        pid_t = tl.program_id(0)
+        pid_h = tl.program_id(1)
+        kv = pid_h
+        offs_r = pid_t * BT + tl.arange(0, BT)
+        offs_d = tl.arange(0, D)
+        mask_r = offs_r < R
+        cand = tl.load(CAND + kv * stride_ch + offs_r * stride_cr,
+                       mask=mask_r, other=0)                     # [BT] int64
+        k = tl.load(KQ + cand[:, None] * stride_kt + kv * stride_kh
+                    + offs_d[None, :],
+                    mask=mask_r[:, None], other=0.0).to(tl.float32)   # [BT, D]
+        cl = tl.load(CLEN + kv)
+        for j in tl.static_range(G):
+            h = kv * G + j
+            q = tl.load(Q + h * stride_qh + offs_d)              # [D] fp32
+            s = tl.sum(k * q[None, :], axis=1)                   # [BT] fp32
+            res = tl.where(offs_r < cl, s, float("-inf"))
+            tl.store(OUT + h * stride_oh + offs_r * stride_or,
+                     res.to(OUT.dtype.element_ty), mask=mask_r)
 
     @triton.jit
     def _tok_score_kernel(

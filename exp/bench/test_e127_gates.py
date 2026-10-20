@@ -358,14 +358,23 @@ def test_score_mask_derived():
     def _ulp_ok(fa, fb):
         """【iter6/iter8】Triton 累加顺序不同 → fp32 ULP 漂移，bf16 舍入后
         个别元素差 1 ULP。口径：差异元素比例 ≤ 1e-4 且相对幅度 ≤ 2%
-        （1 bf16 ULP @小分数值）。返回 (nd, rel, ok)。"""
+        （1 bf16 ULP @小分数值）。返回 (nd, rel, ok)。
+
+        【E156 候选化适配】候选化后 score_fine 的未选候选位置为 -inf
+        （两臂同候选集 → 逐位相等），但 -inf - (-inf) = nan 会污染全局
+        rel max（skip 层 R_max<<S_width 大量 -inf 时 rel 变 nan 误判）。
+        修法：两臂 isfinite 布局必须逐位一致（候选集单源，不一致即真差异
+        强制 FAIL），相对幅度只对两臂均有限的位置计算。"""
         if fa.shape != fb.shape:
             return -1, float("inf"), False
         nd = int((fa != fb).sum().item())
         if nd == 0:
             return 0, 0.0, True
-        rel = ((fa.float() - fb.float()).abs()
-               / fa.float().abs().clamp(min=1e-3)).max().item()
+        if not torch.equal(torch.isfinite(fa), torch.isfinite(fb)):
+            return nd, float("inf"), False
+        fin = torch.isfinite(fa)
+        rel = ((fa[fin].float() - fb[fin].float()).abs()
+               / fa[fin].float().abs().clamp(min=1e-3)).max().item()
         return nd, rel, nd <= fa.numel() * 1e-4 and rel <= 0.02
 
     for cname, args in configs:
@@ -464,6 +473,130 @@ def test_score_mask_derived():
           ok_back)
 
 
+def test_fine_gather():
+    """E156：精筛候选化（TLI_FINE_GATHER=1）vs 全宽（=0）——score ULP 口径 +
+    mask 逐位 ==。
+
+    同一 compute_score/compute_mask，仅 L2 fine 打分范围不同（候选集 vs 全宽
+    [1,H,T]）。候选位 score 应与全宽同位置一致（同 einsum 同 k_qat 元素；
+    einsum N 维不同仅影响累加调度 → ULP 口径）；最终 mask 逐位 ==。
+    两臂均强制 _triton_ok=False（都走 repeat+einsum 表达式），隔离 Triton
+    噪声，纯粹对比候选化 vs 全宽。
+    覆盖：e64 champion / (0,0) 单池 × minmax/avg 分数源 × normal/skip ×
+    多 token 步 + S 非对齐起点（4093）。
+    """
+    import torch as T
+    from exp.bench.e127_stage_bench import make_args
+    from sparse_attn.indexer.tli_indexer import TLIIndexer
+    from sparse_attn.patches.utils import prepare_cu_seqlens
+
+    dev = T.device('cuda:0')
+    H, Hkv, D = 32, 8, 128
+    scale = D ** -0.5
+
+    def make_cfg(alpha, beta, gamma, far, near):
+        a = make_args(alpha, beta, gamma)
+        a.tli_far_method, a.tli_near_method = far, near
+        return a
+
+    configs = [
+        ("champion_e64", make_cfg(0.25, 0.125, 0.625, "minmax", "avg")),
+        ("singlepool_00", make_cfg(0.0, 0.0, 0.625, "minmax", "minmax")),
+        ("aavg_e64", make_cfg(0.125, 0.125, 0.375, "avg", "avg")),
+        ("aavg_00", make_cfg(0.0, 0.0, 0.375, "avg", "avg")),
+    ]
+
+    def run(gather_on, args, layer_idx, S0, n_steps, seed):
+        os.environ["TLI_FINE_GATHER"] = "1" if gather_on else "0"
+        T.manual_seed(seed)
+        idx = TLIIndexer(args)
+        idx.layer_idx = layer_idx
+        idx.clear()
+        idx._triton_ok = False   # 两臂同走 repeat+einsum，隔离 Triton 噪声
+        k = T.randn(1, S0, Hkv, D, device=dev, dtype=T.bfloat16)
+        outs = []
+        for step in range(n_steps):
+            n_new = 3 if step == 5 else 1
+            if step > 0:
+                k = T.cat([k, T.randn(1, n_new, Hkv, D, device=dev,
+                                      dtype=T.bfloat16)], dim=1)
+            q = T.randn(1, 1, H, D, device=dev, dtype=T.bfloat16)
+            cu = prepare_cu_seqlens(k)
+            q_ids = cu[1:] - cu[:-1] - 1
+            d = idx.prepare_index(k, cu)
+            sc = idx.compute_score(q, q_ids, d, scale)
+            # 【E156】compute_mask 会把 score_dict["score_fine"] 原地替换为
+            # 重建的全宽张量——score 对比必须在 compute_mask 之前快照原始
+            # compute_score 输出（mask 对比用 compute_mask 返回值）。
+            sc_snap = {kk: (vv.clone() if T.is_tensor(vv) else vv)
+                       for kk, vv in sc.items()}
+            m = idx.compute_mask(q_ids, sc)
+            outs.append((sc_snap, m))
+        return outs
+
+    n_fail = 0
+    n_cand_ulp, n_cand_tot = 0, 0
+    maxrel = 0.0
+    n_cand_path = 0
+
+    def _cand_ulp_ok(full, cand, cand_idx, cand_len):
+        # 【E156b】per-head 候选：cand_idx [H,R_max]，cand_len [H] 门控实长
+        # 前缀（pad sentinel 不参与）。全宽 score_fine 候选位 vs 候选化
+        # score_fine（形状不同，按实长掩码抽）。
+        _h_idx = torch.arange(cand_idx.shape[0], device=cand.device
+                              ).view(-1, 1).expand_as(cand_idx)
+        _r_mask = (torch.arange(cand_idx.shape[1], device=cand.device
+                                ).view(1, -1) < cand_len.view(-1, 1))
+        fa = full[0, 0][_h_idx[_r_mask], cand_idx[_r_mask]]  # [N]
+        fb = cand[0, 0][_r_mask]                              # [N]
+        if fa.shape != fb.shape:
+            return -1, float("inf"), False
+        nd = int((fa != fb).sum().item())
+        if nd == 0:
+            return 0, 0.0, True
+        rel = ((fa.float() - fb.float()).abs()
+               / fa.float().abs().clamp(min=1e-3)).max().item()
+        return nd, rel, nd <= fa.numel() * 1e-4 and rel <= 0.02
+
+    for cname, args in configs:
+        for layer_idx, ltag in [(2, "normal"), (0, "skip")]:
+            a = run(False, args, layer_idx, 4093, 10, 20261020)
+            b = run(True, args, layer_idx, 4093, 10, 20261020)
+            for step in range(10):
+                sa, sb = a[step][0], b[step][0]
+                cidx = sb.get("cand_idx")
+                if cidx is None:
+                    # 候选化未触发（异常/门控 fail-closed）→ 两臂应同构全宽
+                    if (sa["score_fine"].shape != sb["score_fine"].shape
+                            or not T.equal(sa["score_fine"],
+                                            sb["score_fine"])):
+                        n_fail += 1
+                        print(f"  {cname} {ltag} step{step} 候选化未触发但 "
+                              f"score_fine 不一致")
+                else:
+                    n_cand_path += 1
+                    nd, rel, ok = _cand_ulp_ok(
+                        sa["score_fine"], sb["score_fine"], cidx,
+                        sb.get("cand_len"))
+                    n_cand_tot += sb["score_fine"].numel()
+                    n_cand_ulp += max(nd, 0)
+                    if nd:
+                        maxrel = max(maxrel, rel)
+                    if not ok:
+                        n_fail += 1
+                        print(f"  {cname} {ltag} step{step} 候选位 score ULP "
+                              f"超界: nd={nd}/{sb['score_fine'].numel()} "
+                              f"rel={rel:.3e}")
+                if not T.equal(a[step][1], b[step][1]):
+                    n_fail += 1
+                    print(f"  {cname} {ltag} step{step} MASK MISMATCH")
+    check("fine_gather: TLI_FINE_GATHER 0/1 候选位 score ULP + mask 逐位一致"
+          f"（4 配置 × normal/skip × 10 步，候选路径 {n_cand_path}/80 步）",
+          n_fail == 0,
+          f"mismatch={n_fail} cand_ulp={n_cand_ulp}/{n_cand_tot} "
+          f"maxrel={maxrel:.2e}")
+
+
 def test_pipeline_zero_sync():
     """iter5：prepare_index → compute_score → compute_mask 全管线零 host 同步
     （sync_debug_mode=error，20 步 × normal/skip 层；含 rep 扩容步）。"""
@@ -526,6 +659,8 @@ if __name__ == '__main__':
     if "iter5" in selected:
         test_score_mask_derived()
         test_pipeline_zero_sync()
+    if "fine_gather" in selected:
+        test_fine_gather()
     print(f"\n=== {len(PASS)} PASS / {len(FAIL)} FAIL ===")
     for f in FAIL:
         print(f"FAILED: {f}")

@@ -29,16 +29,74 @@ from transformers.models.qwen3.modeling_qwen3 import (
 from fasa_utils import constructe_adaptive_selection, core_module_with_padding_old
 
 
-def _qwen3_decode_eager(query, key, value, attention_mask, scaling):
-    """decode 剪枝后的 eager attention（避免 attention_interface 二次 repeat_kv）。"""
+def _qwen3_decode_eager(query, key, value, attention_mask, scaling, sel_idx=None):
+    """decode 剪枝后的 eager attention（避免 attention_interface 二次 repeat_kv）。
+
+    sel_idx（batch 模式特有）：[B, num_heads, k] 每行每 head 选中 token 的稠密
+    KV 列位置。非 None 时 attention_mask 按选中列 gather（topk 选中 token 乱序、
+    pad 列需按实际选中位置取 mask）；None 时走官方 slice 前 k 列（legacy
+    batch=1 全 1 mask 恒等）。
+    """
     attn_weights = torch.matmul(query, key.transpose(-2, -1)) * scaling
     if attention_mask is not None and attention_mask.ndim == 4:
-        causal_mask = attention_mask[:, :, :, : key.shape[-2]]
+        if sel_idx is not None:
+            B, H = query.shape[0], query.shape[1]
+            mask_b = attention_mask.expand(B, H, 1, -1)  # [B, H, 1, S]
+            causal_mask = mask_b.gather(
+                dim=-1,
+                index=sel_idx.unsqueeze(2).expand(B, H, 1, -1))  # [B, H, 1, k]
+        else:
+            causal_mask = attention_mask[:, :, :, : key.shape[-2]]
         attn_weights = attn_weights + causal_mask
     attn_weights = nn.functional.softmax(
         attn_weights, dim=-1, dtype=torch.float32).to(query.dtype)
     attn_output = torch.matmul(attn_weights, value)
     return attn_output.transpose(1, 2).contiguous(), attn_weights
+
+
+def _fasa_batch_core(query_states, key_states, value_states, layer_idx,
+                     budget, records, valid_mask):
+    """语义复现官方 core_module_with_padding_old，支持 batch（left-pad）。
+
+    官方函数（fasa_utils.py:101-138）bs 维贯穿本身 batch 通用，唯一 batch 差异
+    是稠密 KV 含 left-pad 的 pad 列：本函数在 attn_weights 对 pad 列置 -inf
+    再 topk，天然排除 pad（官方 batch=1 无 pad，此步恒等）。valid_mask:
+    [B, 1, S] bool（True=真实 token）。额外返回 sel_idx [B, H, k]（每行每
+    head 选中 token 的稠密 KV 列位置，供 _qwen3_decode_eager 按选中列 gather
+    attention_mask）。bs=1 且无 pad 时与官方输出逐位一致（-inf 加法零影响）。
+    """
+    bs, num_heads, query_len, head_dim = query_states.shape
+    _, _, seq_len, _ = key_states.shape
+    preceding_token_num = int(budget) if budget >= 1 else int(seq_len * budget)
+    preceding_token_num = min(preceding_token_num, seq_len)
+    head_selections = records[layer_idx]["head_selection"].to(query_states.device)
+    selection_masks = records[layer_idx]["selection_masks"].to(query_states.device)
+    selection_expanded = head_selections.unsqueeze(0).unsqueeze(2).expand(
+        bs, -1, query_len, -1)
+    query_selected = torch.gather(query_states, dim=-1, index=selection_expanded)
+    key_selection_expanded = head_selections.unsqueeze(0).unsqueeze(2).expand(
+        bs, -1, seq_len, -1)
+    key_selected = torch.gather(key_states, dim=-1, index=key_selection_expanded)
+    selection_masks_expanded_query = selection_masks.unsqueeze(0).unsqueeze(2).expand(
+        bs, -1, query_len, -1)
+    selection_masks_expanded_key = selection_masks.unsqueeze(0).unsqueeze(2).expand(
+        bs, -1, seq_len, -1)
+    query_selected = torch.where(selection_masks_expanded_query, query_selected, 0)
+    key_selected = torch.where(selection_masks_expanded_key, key_selected, 0)
+    attn_weights = torch.matmul(query_selected, key_selected.transpose(2, 3))
+    if valid_mask is not None:
+        # batch：pad 列 -inf 排除（官方 batch=1 无 pad，此步恒等）
+        neg_inf = torch.finfo(attn_weights.dtype).min
+        pad_mask = ~valid_mask  # [B, 1, S]
+        attn_weights = attn_weights + (
+            pad_mask[:, None, :, :].to(attn_weights.dtype) * neg_inf)
+    top_indices = torch.topk(
+        attn_weights, k=preceding_token_num, dim=-1).indices  # [B,H,q_len,k]
+    sel_idx = top_indices[..., 0, :]  # [B, H, k]（query_len==1）
+    top_indices = top_indices.transpose(2, 3).expand(-1, -1, -1, head_dim)
+    key_output = torch.gather(key_states, dim=2, index=top_indices)
+    value_output = torch.gather(value_states, dim=2, index=top_indices)
+    return key_output, value_output, sel_idx
 
 
 def _qwen3_fasa_forward(
@@ -58,7 +116,8 @@ def _qwen3_fasa_forward(
             past_key_values, cache_position, **kwargs,
         )
 
-    from sparse_attn.baseline_runtime import require_unmasked_decode
+    from sparse_attn.baseline_runtime import (
+        require_unmasked_decode, batch_decode_ctx, batch_valid_mask)
     require_unmasked_decode(hidden_states, attention_mask, past_key_values, cache_position)
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
@@ -75,15 +134,26 @@ def _qwen3_fasa_forward(
         key_states, value_states = past_key_values.update(
             key_states, value_states, self.layer_idx, cache_kwargs)
 
-    # FASA 剪枝：展开 GQA kv → core_module_with_padding_old → budget 个 token
+    # FASA 剪枝：展开 GQA kv → budget 个 token（batch 模式 pad 列 -inf 排除）
     key_states = repeat_kv(key_states, self.num_key_value_groups)
     value_states = repeat_kv(value_states, self.num_key_value_groups)
-    key_states, value_states = core_module_with_padding_old(
-        query_states, key_states, value_states,
-        self.layer_idx, self.fasa_budget, self.fasa_records)
+    _ctx = batch_decode_ctx()
+    if _ctx is None:
+        # legacy 单序列：官方 core_module_with_padding_old 逐字（零改动）
+        key_states, value_states = core_module_with_padding_old(
+            query_states, key_states, value_states,
+            self.layer_idx, self.fasa_budget, self.fasa_records)
+        sel_idx = None
+    else:
+        # batch：语义复现官方 + left-pad 排除 + 按选中列 mask
+        valid_mask = batch_valid_mask(key_states, _ctx)
+        key_states, value_states, sel_idx = _fasa_batch_core(
+            query_states, key_states, value_states,
+            self.layer_idx, self.fasa_budget, self.fasa_records, valid_mask)
 
     attn_output, attn_weights = _qwen3_decode_eager(
-        query_states, key_states, value_states, attention_mask, self.scaling)
+        query_states, key_states, value_states, attention_mask, self.scaling,
+        sel_idx=sel_idx)
     attn_output = attn_output.reshape(*input_shape, -1).contiguous()
     attn_output = self.o_proj(attn_output)
     return attn_output, attn_weights

@@ -15,6 +15,9 @@ from transformers.models.qwen3.modeling_qwen3 import (
 from typing import Optional, Callable
 from ..indexer import Indexer
 from ..ops.eager_decoding import eager_decoding_attn
+# 【阶段 1（deepseek 轨）】batch>1 TLI 稀疏 decode：pred_ruler_batch 批量
+# 入口在 decode 循环外层 set/clear BatchCtx（sparse_attn/baseline_runtime.py）。
+from ..baseline_runtime import batch_decode_ctx
 from .utils import (
     prepare_seqlens,
     prepare_cu_seqlens, 
@@ -58,6 +61,44 @@ def _can_drop_static_mask(cache, mask, length, *, prefill):
     cache._tli_mask_validation = ((weakref.ref(mask), signature, valid)
                                   if version is not None else None)
     return valid
+
+
+def _tl_decode_batched(self, indexer, query_states, key_states,
+                       value_states, ctx):
+    """【阶段 1】TLI batch>1 稀疏 decode（deepseek 轨，正确性优先版）。
+
+    right-pad KV 布局（pred_ruler_batch left-pad 协议）：cache 行 b 的
+    有效 KV 占尾部 ctx.seq_lens[b] 列、pad 前缀在前。逐行切有效列后
+    完全复用单序列 TLI 核心（prepare_mask + eager_decoding_attn），
+    共享 indexer clear + 全量重建——无跨行增量状态，行间互不污染。
+    全量 vs 单序列增量逐位一致（E133c：块统计/量化确定性归纳），故
+    B=1 batch 模式与旧单序列入口逐位一致（gate_bs1_equiv 依据）。
+
+    形状流：query_states [B,H,1,D]（cache.update 后 head-first）→
+    q [B,1,H,D]；key/value_states [B,Hkv,S_total,D] → k/v
+    [B,S_total,Hkv,D]；逐行 b：q_b [1,1,H,D]、k_b/v_b [1,L_b,Hkv,D]、
+    cu=[0,L_b]、pos=[L_b-1]（该 query 行内绝对位置）。返回 [B,1,H,D]。
+    """
+    B = query_states.shape[0]
+    q = query_states.transpose(1, 2)   # [B, 1, H, D]
+    k = key_states.transpose(1, 2)     # [B, S_total, Hkv, D]
+    v = value_states.transpose(1, 2)   # [B, S_total, Hkv, D]
+    dev = q.device
+    outs = []
+    for b in range(B):
+        L_b = ctx.seq_lens[b]
+        q_b = q[b:b + 1]                    # [1, 1, H, D]
+        k_b = k[b:b + 1, -L_b:]             # [1, L_b, Hkv, D]
+        v_b = v[b:b + 1, -L_b:]             # [1, L_b, Hkv, D]
+        cu = torch.tensor([0, L_b], device=dev, dtype=torch.int32)
+        pos = torch.tensor([L_b - 1], device=dev, dtype=torch.long)
+        indexer.clear()
+        mask, block_size = indexer.prepare_mask(
+            q_b, pos, k_b, cu, softmax_scale=self.scaling)
+        outs.append(eager_decoding_attn(
+            q_b, k_b, v_b, mask, block_size, cu,
+            softmax_scale=self.scaling))
+    return torch.cat(outs, dim=0)            # [B, 1, H, D]
 
 
 def qwen3_attn_forward(
@@ -196,6 +237,24 @@ def qwen3_attn_forward(
             )
             _paper_route(self.layer_idx,"dense-prefill")
     else:
+        # 【阶段 1（deepseek 轨）】TLI batch>1 稀疏 decode：pred_ruler_batch
+        # 批量入口在 decode 循环外层 set BatchCtx。ctx 非 None 时走
+        # _tl_decode_batched（逐行单序列核心 + 共享 indexer clear 全量
+        # 重建，正确性最稳）。B=1 batch 模式与旧单序列入口逐位一致
+        # （gate_bs1_equiv 依据）；非 batch 模式（ctx None）走既有路径
+        # 逐位不变（铁律）。batch 分支独立于 TLI_DECODE_DENSE 消融
+        # （消融仅单序列口径，batch 模式无意义）与 B2 守卫（B2 的
+        # batch 拒绝在此分支之前已绕开；batch 分支自身要求
+        # past_key_values 非 None，而 decode 分支进入条件已保证）。
+        _ctx = batch_decode_ctx()
+        if _ctx is not None:
+            attn_output = _tl_decode_batched(
+                self, self.indexer, query_states, key_states,
+                value_states, _ctx)
+            attn_output = attn_output.reshape(*input_shape, -1).contiguous()
+            attn_output = self.o_proj(attn_output)
+            _paper_route(self.layer_idx, "sparse-decode-batch")
+            return attn_output, None
         # E138 消融①（prefill-only 稀疏，2026-10-14 用户指令）：TLI_DECODE_DENSE=1
         # 时 decode 显式回退 dense 原生前向——patch 保持挂载（prefill 稀疏
         # 选择消费 indexer），decode 不做稀疏选择。用于分离「prefill 稀疏

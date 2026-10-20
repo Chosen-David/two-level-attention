@@ -31,6 +31,11 @@ Host wys-4xh20
   User wangyuanshuo02
   Port 8416
 
+Host wys2-4xh20
+  HostName 10.245.61.254
+  User wangyuanshuo02
+  Port 8416
+
 
 Host 2xh20-8100
   HostName 10.238.139.251
@@ -46,6 +51,8 @@ Host wys-dsa
   HostName 10.245.84.251
   User wangyuanshuo02
   Port 8416
+
+
 
 
 
