@@ -117,10 +117,12 @@ minmax 漏在近区（均匀 mass 下极值不占优）。设计蕴含 = 分区�
 （near block-avg + far minmax），预算分配不在本图判定（见下 hybrid 扫描披露）。
 
 **hybrid 模拟臂披露（不做进图）**：near 预算扫描（128..1536 步长 64，
-总预算 2048 不变，near 用 avg / far 用 minmax）显示 hybrid 最优漏失 0.137
-@near=1280，仍高于全局 minmax 0.121——在本诊断平面上预算拆分无收益。
-预算分配属 **E155d 固定配额网格轴**（nb/nl 绝对配额，任务精度口径），
-mass ≠ e2e，本图不做 hybrid 模拟臂（TSV 留 retired 披露行）。
+总预算 2048 不变，near 用 avg / far 用 minmax）显示 hybrid 最优漏失 0.1345
+@near=1408，仍高于全局 minmax 0.1208——在本诊断平面上预算拆分无收益。
+可复现脚本：`dac_manuscript/sources/build_region_miss_stats.py`（生成
+`region_miss_stats.json`，选择复现断言 fail-closed）。预算分配属
+**E155d 固定配额网格轴**（nb/nl 绝对配额，任务精度口径），mass ≠ e2e，
+本图不做 hybrid 模拟臂（TSV 留 retired 披露行）。
 
 **旧 (b) 面板已退役（2026-10-21）**：原「quota floors far capture」
 （配额臂 far 捕获率曲线，0.68→0.72 / p10 0.18→0.34 等）随 nt 轴降格整体

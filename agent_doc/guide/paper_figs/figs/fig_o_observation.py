@@ -60,9 +60,10 @@
   7) 新 (b) = 区域互补漏失堆叠柱（128 query 均值，near/far 分解；页级
      区域归属沿用修正后绝对区间口径，bin↔page 一一对齐断言）；
   8) (a) 选择条带加 near/far 区域底色（贯穿全高），漏页区域归属可视化；
-  9) 区域预算敏感性已离线扫描（near 预算 128..1536，hybrid 最优 0.137
-     @1280 仍高于全局 minmax 0.121）：预算分配属 E155d 网格轴（任务精度
-     口径），本图不做 hybrid 模拟臂（mass≠e2e，防口径混淆）。
+  9) 区域预算敏感性已离线扫描（near 预算 128..1536 步长 64，hybrid 最优
+     0.1345@1408 仍高于全局 minmax 0.1208；可复现脚本
+     dac_manuscript/sources/build_region_miss_stats.py）：预算分配属 E155d
+     网格轴（任务精度口径），本图不做 hybrid 模拟臂（mass≠e2e，防口径混淆）。
 
 数据源（全部为有效输入，不再使用 O4 v2——其部分末页缺陷见 E140_VALIDITY.md，
 本图不含 O4 面板，因此无需历史诊断警示）：
@@ -538,7 +539,7 @@ rows.append(f"O\tb\tall\tmiss_mass_minmax\tnear,far\t{mm_near_m:.4f},{mm_far_m:.
 rows.append(f"O\tb\tall\tmiss_mass_totals\tavg,mm\t{ams_mean:.4f},{mms_mean:.4f}\t{srcb}\tmean over {len(ams_all)} queries (region-unresolved included)")
 rows.append(f"O\tb\tall\tmiss_pages_block_avg\tnear,far\t{avg_near_p:.2f},{avg_far_p:.2f}\t{srcb}\tmean missed pages; page-count criterion differs from mass criterion")
 rows.append(f"O\tb\tall\tmiss_pages_minmax\tnear,far\t{mm_near_p:.2f},{mm_far_p:.2f}\t{srcb}\tmean missed pages")
-rows.append(f"O\tb\tretired\tquota_floor_panel\t-\t-\t-\t2026-10-21 fourth revision: old far-quota paired-arm panel withdrawn (nt demoted; nb/nl absolute-quota caliber). Hybrid near-budget scan (offline, diagnostic plane): best 0.137@near-budget-1280 still above global minmax 0.121; budget split is the E155d grid axis (task-accuracy caliber), not simulated here (mass != e2e)")
+rows.append(f"O\tb\tretired\tquota_floor_panel\t-\t-\t-\t2026-10-21 fourth revision: old far-quota paired-arm panel withdrawn (nt demoted; nb/nl absolute-quota caliber). Hybrid near-budget scan (offline, diagnostic plane; reproducible via dac_manuscript/sources/build_region_miss_stats.py): best 0.1345@near-budget-1408 still above global minmax 0.1208; budget split is the E155d grid axis (task-accuracy caliber), not simulated here (mass != e2e)")
 for a in arms:
     for mm, v in zip(mets_all, arm_val[a]):
         rows.append(f"O\tc\t{a}\t{mm}\tfrac\t{v:.4f}\t{src}\to3.{a}.{mm}.mean")
