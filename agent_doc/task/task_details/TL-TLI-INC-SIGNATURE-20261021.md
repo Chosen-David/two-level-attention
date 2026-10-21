@@ -73,3 +73,12 @@ This is the existing multi-step incremental-vs-full index/mask gate (including p
 - Whole-cache Graph eviction: changing it alters live graph/buffer lifetimes and retained memory. No current host reuse distribution or GPU memory trace is available; leave the policy unchanged in this PR.
 
 Draft status remains appropriate: CPU correctness and reduced work are verified, while fused GPU behavior, model outputs and speed are not.
+
+
+## Follow-up: remove overwritten growth-buffer zero fills
+
+Four growth allocations (min/max/optional mean and fine K buffers) now use `new_empty`. Every exposed statistic row is initialized by prefix copy plus tail write; every exposed fine token is initialized by prefix copy plus `[lo:S_now]` overwrite. Spare capacity is never exposed and is written before subsequent growth returns it. Genuine zero padding and the leading cumulative-length zero remain unchanged. This does not change Graph policy or eliminate required prefix copying.
+
+A real CPU probe at S=64→65, Hkv=4, tail32, float32, with average statistics enabled observed six `new_zeros` calls before versus two afterward: 199688 versus 131080 zero-filled bytes, removing **68608 bytes** of redundant initialization in this synthetic case. This is an operation-volume measurement, not a timing or GPU bandwidth result.
+
+The new test poisons every growth `new_empty` buffer with NaN and checks 12 configurations (three initial boundary lengths, same/full L2, quantization off/on), each through four successive lengths. It compares each visible index tensor exactly with fresh full preparation, verifies expected allocation counts, and observes poisoned spare capacity surviving until overwritten. The baseline fails 12 allocation subcases plus the spare-poison check; the fix passes. Current suite: **45 normal and 45 optimized-Python tests**, independently rerun. CUDA behavior and latency remain unverified. Earlier incomplete historical comparisons remain incomplete.

@@ -140,6 +140,48 @@ class IncrementalMetadataTensorTests(unittest.TestCase):
                         self.assertIsNone(b)
                 self.assertTrue(torch.equal(outputs[0][1], outputs[1][1]))
 
+    def test_growth_buffers_are_not_zeroed_and_poison_never_leaks(self):
+        original_empty = torch.Tensor.new_empty
+        original_zeros = torch.Tensor.new_zeros
+        saw_spare_poison = False
+        for width in ("same", "full"):
+            for quantized in (False, True):
+                for previous in (63, 64, 65):
+                    with self.subTest(l2=width, quantized=quantized, previous=previous):
+                        args = make_args(tli_l2_subspace=width,
+                                         tli_l2_quant=quantized,
+                                         tli_far_method="avg")
+                        indexer = TLIIndexer(args)
+                        key = torch.randn(1, previous + 200, 4, 128,
+                                          generator=self.generator)
+                        self.prepare(indexer, key[:, :previous])
+                        for length in (previous + 1, previous + 2,
+                                       previous + 81, previous + 200):
+                            empty_sizes, zero_sizes = [], []
+                            def poisoned(tensor, *a, **kw):
+                                out = original_empty(tensor, *a, **kw)
+                                empty_sizes.append(out.numel())
+                                return out.fill_(float("nan"))
+                            def zeros(tensor, *a, **kw):
+                                out = original_zeros(tensor, *a, **kw)
+                                zero_sizes.append(tuple(out.shape))
+                                return out
+                            inc = indexer._inc
+                            stat_grows = (length + 63) // 64 > inc["stat_blk_cap"]
+                            fine_grows = length > inc["k_qat_cap"]
+                            with patch.object(torch.Tensor, "new_empty", poisoned), patch.object(
+                                    torch.Tensor, "new_zeros", zeros):
+                                actual = self.prepare(indexer, key[:, :length])
+                            self.assertEqual(len(empty_sizes), 3 * stat_grows + fine_grows)
+                            # Keep genuine zero padding and the cu-seqlens zero;
+                            # no cache-capacity allocation may be zero-filled.
+                            self.assertEqual(len(zero_sizes), 2)
+                            self.assert_matches_fresh(actual, key[:, :length], args)
+                            spare = indexer._inc["k_qat_buf"][length:]
+                            if spare.numel():
+                                saw_spare_poison |= bool(torch.isnan(spare).all())
+        self.assertTrue(saw_spare_poison)
+
     def test_clear_discards_previous_request_cache(self):
         args = make_args()
         indexer = TLIIndexer(args)

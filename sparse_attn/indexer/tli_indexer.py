@@ -865,15 +865,17 @@ class TLIIndexer(TIAIndexer):
             inc["k_min_buf"], inc["k_max_buf"], inc["k_avg_buf"])
         if k_min_buf is not None and T_blk > inc["stat_blk_cap"]:
             # 扩容（翻倍摊销；只搬前缀 [0, fb)——尾段本步全量重写）
+            # Only [:T_blk] is exposed: prefix copy plus tail writes initialize
+            # every live row. Spare capacity is never read, so do not zero it.
             new_cap = max(2 * inc["stat_blk_cap"], T_blk)
-            _nb = k_min_buf.new_zeros((1, new_cap) + k_min_buf.shape[2:])
+            _nb = k_min_buf.new_empty((1, new_cap) + k_min_buf.shape[2:])
             _nb[:, :fb] = k_min_buf[:, :fb]
             k_min_buf = _nb
-            _nb = k_max_buf.new_zeros((1, new_cap) + k_max_buf.shape[2:])
+            _nb = k_max_buf.new_empty((1, new_cap) + k_max_buf.shape[2:])
             _nb[:, :fb] = k_max_buf[:, :fb]
             k_max_buf = _nb
             if k_avg_buf is not None:
-                _nb = k_avg_buf.new_zeros((1, new_cap) + k_avg_buf.shape[2:])
+                _nb = k_avg_buf.new_empty((1, new_cap) + k_avg_buf.shape[2:])
                 _nb[:, :fb] = k_avg_buf[:, :fb]
                 k_avg_buf = _nb
             inc["stat_blk_cap"] = new_cap
@@ -938,8 +940,10 @@ class TLIIndexer(TIAIndexer):
         indices = idx_sub if idx_sub is not None else self._qat_indices(k.device)
         buf, cap = inc["k_qat_buf"], inc["k_qat_cap"]
         if S_now > cap:   # 扩容（翻倍摊销）
+            # [:S_prev] and [lo:S_now] cover all exposed tokens (lo <= S_prev).
+            # Future tokens are initialized before their views are returned.
             new_cap = max(2 * cap, S_now)
-            new_buf = buf.new_zeros((new_cap,) + buf.shape[1:])
+            new_buf = buf.new_empty((new_cap,) + buf.shape[1:])
             new_buf[:S_prev] = buf[:S_prev]
             inc["k_qat_buf"], inc["k_qat_cap"] = new_buf, new_cap
             buf = new_buf
@@ -1488,10 +1492,12 @@ class TLIIndexer(TIAIndexer):
         fail-closed（调用方回退原全宽路径，值逐位不变）。E156 门控内联：
         σ / ccluster（near/far cluster 分）实验臂直接读全宽原始 score_fine
         可超出候选集 → 这些臂拒绝候选化。
+        async 消费上一轮 L1 mask，当前候选不保证覆盖它，必须回退全宽评分。
         """
         try:
             if not (self._fine_gather and self._basis is None
-                    and not self.moba_gate and not self.per_q_head):
+                    and not self.moba_gate and not self.per_q_head
+                    and not self.enable_async):
                 return None, None, None
             _raw = (self.sigma_select != "none"
                     or self.far_select in ("cluster", "sim_greedy")
