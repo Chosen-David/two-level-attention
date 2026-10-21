@@ -202,7 +202,20 @@ def extract_choice_letter(text):
     return extract_choice_official(text)
 
 
-def _manual_generate(model, material_ids, question_ids, max_gen, eos_token_id, capture=None):
+def _drop_leading_bos(input_ids, bos_token_id):
+    """Remove an actual leading BOS without indexing an empty token row."""
+    if (
+        input_ids.shape[-1] > 0
+        and bos_token_id is not None
+        and int(input_ids[0, 0].item()) == bos_token_id
+    ):
+        return input_ids[:, 1:]
+    return input_ids
+
+
+def _manual_generate(
+    model, material_ids, question_ids, max_gen, eos_token_id, capture=None
+):
     """Existing LongBench greedy loop, instrumented only when capture is enabled."""
     if type(max_gen) is not int or max_gen<1:raise ValueError('max_gen must be positive')
     if capture is not None:
@@ -210,7 +223,20 @@ def _manual_generate(model, material_ids, question_ids, max_gen, eos_token_id, c
     def invoke(phase,**kwargs):
         return model(**kwargs) if capture is None else capture.call(phase,model,**kwargs)
     with torch.no_grad():
-        output=invoke('material',input_ids=material_ids,past_key_values=None,use_cache=True)
+        if material_ids.shape[-1] > 0:
+            output=invoke(
+                'material', input_ids=material_ids,
+                past_key_values=None, use_cache=True)
+        elif question_ids.shape[-1] > 0:
+            # Short prompts can be entirely assigned to the question phase.
+            # Seed the cache with its first token instead of issuing an invalid
+            # zero-token model call, then continue the same tokenwise path.
+            output=invoke(
+                'question', input_ids=question_ids[:, :1],
+                past_key_values=None, use_cache=True)
+            question_ids=question_ids[:, 1:]
+        else:
+            raise ValueError('manual generation has no input tokens')
         cache=output.past_key_values
         for token in question_ids[0]:
             output=invoke('question',input_ids=token.unsqueeze(0).unsqueeze(0),past_key_values=cache,use_cache=True)
@@ -336,11 +362,8 @@ def get_pred(
             # R01 修复（kimi3 清单 2026-10-08）：原无条件 [:, 1:] 去首 token
             # 假定 tokenizer 加 BOS，但 Qwen3 系不加 → question 被切掉真实
             # 首 token。仅当首 token 确为 BOS 且非 None 时才切。
-            if (
-                tokenizer.bos_token_id is not None
-                and int(q_input.input_ids[0, 0].item()) == tokenizer.bos_token_id
-            ):
-                q_input.input_ids = q_input.input_ids[:, 1:]
+            q_input.input_ids = _drop_leading_bos(
+                q_input.input_ids, tokenizer.bos_token_id)
 
             # TL-LBV1-INPUT-IDENTITY-20261020：在 CPU BatchEncoding 上冻结
             # 模板、截断与 question split 后**实际送模**的 token ID。先 hash
