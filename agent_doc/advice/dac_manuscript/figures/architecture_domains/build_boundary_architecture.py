@@ -16,7 +16,7 @@ for lang in ('en','zh'):
   scene.append(dict(type='rect',x=x,y=y,w=w,h=h,fill=fill,stroke=stroke,sw=sw))
  def line(x1,y1,x2,y2,color='#4E626E',arrow=True):
   scene.append(dict(type='line',x1=x1,y1=y1,x2=x2,y2=y2,color=color,arrow=arrow))
- text(550,25,'One chronological sequence · page IDs remain unchanged','同一时间顺序 · 页面 ID 始终不变',23)
+ text(550,25,'One chronology · nl sets the near range','同一时间顺序 · nl 确定近区范围',23)
  text(211,57,'far','远区',21);text(600,57,'near (unprotected middle)','近区（未保护中间区）',21)
  text(944,57,'SWA','保护滑窗',21)
  # 6 physical pages, last has only two real tokens. B=8, S=42, sink=4, w=8.
@@ -36,7 +36,7 @@ for lang in ('en','zh'):
  text(550,186,'Illustration only: B=8, S=42, sink=4, SWA=8; near/far cut=16','仅示例：页宽8，长度42，前缀4，滑窗8；近远分界16',18)
  # Three explicitly distinct paths; protected tokens never depend on page TopK.
  rect(35,216,300,95,'#FAF0E9');text(185,242,'L1 · page competition','L1 · 区域页竞争',21)
- text(185,270,'far: b   |   near: c, d','远区：b   |   近区：c、d',19)
+ text(185,270,'far: K1-nb  |  near: nb','远区：K1-nb  |  近区：nb',19)
  text(185,296,'32D: far extrema / near mean','32维：远区极值／近区均值',17)
  rect(370,216,350,95,'#EDF5F9');text(545,242,'Boundary pages a, e → eligibility','边界页 a、e → 候选资格',21)
  text(545,270,'outside K1 / regional page quotas','在 K1／区域页配额之外追加',19)
@@ -48,7 +48,7 @@ for lang in ('en','zh'):
  rect(35,339,685,93,'#F5F8FA')
  text(377,365,'Shared 32-coordinate Q/K · L2 logits over full history','共享32坐标 Q/K · L2 对全历史评分',21)
  text(377,394,'page mask → per-Q softmax → KV-group probability mean','页掩码 → 逐Q softmax → KV组概率均值',18)
- text(377,419,'unprotected tokens compete under regional token quotas','未保护词元仍按区域词元配额竞争',18)
+ text(377,419,'One pooled L2 TopK · no regional token quotas','一次合并 L2 TopK · 无区域词元配额',18)
  line(377,432,377,462);line(1048,311,1048,485);line(1048,485,730,485)
  rect(35,462,695,48,'#EDF2F5');text(382,493,'Selected ∪ protected IDs · deduplicate · |support| ≤ K','入选 ∪ 保护 ID · 去重 · 支持集大小 ≤ K',21)
  line(382,510,382,543)
