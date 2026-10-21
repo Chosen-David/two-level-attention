@@ -115,7 +115,7 @@ class SparQRequestLifecycle(unittest.TestCase):
         self.forward = load_wrapper()
 
     def call(self, attention, values, cache):
-        return self.forward(attention, values, (None, None), past_key_values=cache)[0]
+        return self.forward(attention, values, (None, None), past_key_values=cache, cache_position=torch.tensor([0]))[0]
 
     def values(self, length, offset):
         return torch.arange(length * 4, dtype=torch.float32).reshape(1, length, 4) / 16 + offset
@@ -200,13 +200,12 @@ class SparQRequestLifecycle(unittest.TestCase):
                 with NoHostScalar():
                     self.call(attn, self.values(1, 3), cache)
 
-    def test_no_cache_calls_rebuild_independent_values(self):
+    def test_no_cache_decode_is_rejected_without_mean_mutation(self):
         attn = Attention()
-        for offset in (10, -3, 2):
-            values = self.values(1, offset)
-            self.call(attn, values, None)
-            torch.testing.assert_close(attn.sparq_vmean.V_mean, values.unsqueeze(1))
-            self.assertEqual(attn.sparq_vmean.n.item(), 1)
+        before = attn.sparq_vmean.V_mean.clone()
+        with self.assertRaises(ValueError):
+            self.call(attn, self.values(1, 10), None)
+        torch.testing.assert_close(attn.sparq_vmean.V_mean, before, equal_nan=True)
 
     def test_owner_does_not_keep_cache_alive(self):
         attn, cache = Attention(), Cache()

@@ -177,6 +177,40 @@ class BaselineTests(unittest.TestCase):
                 torch.testing.assert_close(a.logits,b.logits,rtol=1e-5,atol=1e-6)
         self.assertEqual(receipt['routes'],{'native_prefill_calls':2,'sparq_decode_calls':4})
         with self.assertRaises(ValueError): enable_sparq(model)
+    def test_sparq_rejects_unsupported_decode_before_mutation(self):
+        from sparse_attn.baseline_runtime import BatchCtx, batch_decode_scope
+        model=self.tiny();enable_sparq(model,k=2,context_length=16)
+        with torch.no_grad():
+            out=model(input_ids=torch.tensor([[1,2,3,4]]),use_cache=True)
+        attn=model.model.layers[0].self_attn
+        cache=out.past_key_values
+        before=cache.get_seq_length(0)
+        stats=dict(getattr(model,'_baseline_stats',{}))
+        base=dict(hidden_states=torch.zeros(1,1,32),position_embeddings=(torch.ones(1,1,8),torch.zeros(1,1,8)),
+                  past_key_values=cache,cache_position=torch.tensor([4]))
+        for changes in (dict(attention_mask=torch.tensor([[[[True,False,True,True,True]]]])),
+                        dict(attention_mask=torch.tensor([[[[0.,-1.,0.,0.,0.]]]])),
+                        dict(attention_mask=torch.ones(1,5)), dict(cache_position=None),
+                        dict(past_key_values=None), dict(use_cache=False)):
+            with self.subTest(changes=tuple(changes)):
+                with self.assertRaises(ValueError):attn(**dict(base,**changes))
+                self.assertEqual(cache.get_seq_length(0),before)
+                self.assertEqual(getattr(model,'_baseline_stats',{}),stats)
+        with batch_decode_scope(BatchCtx(1,[4],[0],[True],0)):
+            with self.assertRaisesRegex(ValueError,'batched decode contexts'):
+                attn(**base)
+        self.assertEqual(cache.get_seq_length(0),before)
+        self.assertEqual(getattr(model,'_baseline_stats',{}),stats)
+
+    def test_sparq_invalid_installation_is_atomic(self):
+        for kwargs in (dict(k=0),dict(k=True),dict(context_length=0),
+                       dict(context_length=1),dict(context_length=1.5)):
+            model=self.tiny()
+            before=[m.self_attn.forward for m in model.model.layers]
+            with self.assertRaises(ValueError):enable_sparq(model,**kwargs)
+            self.assertEqual(before,[m.self_attn.forward for m in model.model.layers])
+            self.assertFalse(hasattr(model,'_baseline_stats'))
+
     def test_quest_real_hf_full_budget_and_position_rejection(self):
         sys.path.insert(0,str(ROOT/'exp/vendor_baselines/quest_vendor'))
         from qwen3_quest_patch import enable_quest

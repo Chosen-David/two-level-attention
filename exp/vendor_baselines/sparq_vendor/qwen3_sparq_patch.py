@@ -49,6 +49,8 @@ def _qwen3_sparq_wrapper(
 ) -> Tuple[torch.Tensor, None]:
     """Qwen3Attention forward：prefill 走原生；decode 走官方 SparQ 稀疏路径。"""
     q_len = hidden_states.shape[1]
+    if hidden_states.shape[0] != 1 or q_len < 1:
+        raise ValueError('SparQ adapter supports nonempty batch=1 only')
 
     if q_len > 1:
         # Native prefill may replace/refill the same cache object, even with a
@@ -57,10 +59,21 @@ def _qwen3_sparq_wrapper(
         self._sparq_mean_cache = None
         self._sparq_mean_length = None
         # prefill：原生 dense（与 fullkv 锚点一致；官方 SparQ prefill 也是 SDPA dense）
-        return self.flash_forward(
+        result = self.flash_forward(
             hidden_states, position_embeddings, attention_mask,
             past_key_values, cache_position, **kwargs,
         )
+        stats = getattr(self, '_sparq_stats', None)
+        if stats is not None:
+            stats['native_prefill_calls'] = stats.get('native_prefill_calls', 0) + 1
+        return result
+
+    from sparse_attn.baseline_runtime import batch_decode_ctx, require_unmasked_decode
+    if batch_decode_ctx() is not None:
+        raise ValueError('SparQ adapter does not support batched decode contexts')
+    require_unmasked_decode(hidden_states, attention_mask, past_key_values, cache_position)
+    if kwargs.get('use_cache', True) is not True:
+        raise ValueError('SparQ decode requires use_cache=True')
 
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
@@ -135,6 +148,9 @@ def _qwen3_sparq_wrapper(
     attn_output = attn_weights.transpose(1, 2).contiguous()
     attn_output = attn_output.reshape(*input_shape, -1)
     attn_output = self.o_proj(attn_output)
+    stats = getattr(self, '_sparq_stats', None)
+    if stats is not None:
+        stats['sparq_decode_calls'] = stats.get('sparq_decode_calls', 0) + 1
     return attn_output, None
 
 
@@ -148,6 +164,16 @@ def enable_sparq(
     r/k 主表口径：k 固定（默认 1024）；r = round(head_dim/ratio)，
     ratio = context_length/(2*k)（官方 get_r_k_for_compression_ratio 反推）。
     """
+    if type(k) is not int or k <= 0 or type(context_length) is not int or context_length <= 0:
+        raise ValueError('SparQ k/context_length must be positive integers')
+    layers = [m for m in model.modules() if isinstance(m, Qwen3Attention)]
+    if not layers or len(layers) != model.config.num_hidden_layers:
+        raise ValueError('SparQ adapter requires a complete Qwen3 attention model')
+    if any(hasattr(m, 'sparq_config') for m in layers):
+        raise ValueError('SparQ already installed')
+    if any(max(1, round(m.head_dim / (context_length / (2 * k)))) > m.head_dim for m in layers):
+        raise ValueError('SparQ derived r exceeds head_dim; invalid k/context_length')
+    stats = {}
     n_patched = 0
     layer_id = 0
     _ratio = context_length / (2 * k)
@@ -160,6 +186,7 @@ def enable_sparq(
                 layer_id += 1
                 module.sparq_r = max(1, round(module.head_dim / _ratio))
                 module.sparq_k = k
+                module._sparq_stats = stats
                 module.sparq_config = SparQArgs()
                 module.sparq_vmean = RunningVMean(
                     max_batch_size=1,
@@ -177,4 +204,16 @@ def enable_sparq(
                 _patch_recursive(module)
 
     _patch_recursive(model)
+    import hashlib
+    from pathlib import Path
+    model._baseline_stats = stats
+    model._baseline_identity = dict(
+        method='sparq_vendor',
+        adapter_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        upstream='f2eeb9d10e79d3ffecc48015e55157bab0f6e269',
+        k=k, context_length=context_length,
+        r_by_head_dim={str(m.head_dim): m.sparq_r for m in layers},
+        selection='per-query-head; running mean-V compensation; full resident KV',
+        comparison='Qwen3 adapter; cross-head union K unobserved',
+        gpu_quality_validated=False)
     return n_patched
