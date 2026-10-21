@@ -108,7 +108,7 @@ for lang in ['en','zh']:
  s.r(0,178,9,6,'near',None,1);s.t(14,185,'Near (top)','近区（上）',size=8,c='near',bold=True)
  s.r(98,178,9,6,'far',None,1);s.t(112,185,'Far (bottom)','远区（下）',size=8,c='far',bold=True)
  s.t(252,185,'╱ = skip','╱ = 跳过',size=8,c='gate',anchor='end')
- s.t(0,199,'OFF: pool = near pages; near L1 cap fixed','OFF：单池仅近区页；近区 L1 上限不变',size=8)
+ s.t(0,199,'OFF: L2 refill → near; near L1 cap fixed','OFF：L2 余量回填近区；近区 L1 上限不变',size=8)
  s.t(0,212,'Illustrative layers · gate disabled by default','层级状态仅作示意 · 门控默认不启用',size=8,c='gate',bold=True)
  s.save('gate')
  s=S(516,190,lang)

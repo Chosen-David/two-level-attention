@@ -36,7 +36,7 @@ for lang in ['en','zh']:
  plt.rcParams['pdf.fonttype']=plt.rcParams['ps.fonttype']=3 if lang=='zh' else 42  # CFF OTF must not be embedded as Type42.
  fp=ZH if lang=='zh' else None
  fig,axs=plt.subplots(1,2,figsize=(7.1,4.5))
- fig.subplots_adjust(left=.12,right=.955,bottom=.25,top=.76,wspace=.58)
+ fig.subplots_adjust(left=.12,right=.90,bottom=.25,top=.76,wspace=.58)
  for ax,(model,a,b) in zip(axs,data):
   yy=list(range(12));ax.axhspan(10.5,11.5,color='#edf0f2',zorder=0)
   ax.scatter(b,[y-.10 for y in yy],s=22,facecolors='white',edgecolors='#272727',linewidth=.9,marker='o',zorder=4,label='FullKV')

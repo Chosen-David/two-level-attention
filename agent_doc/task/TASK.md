@@ -2,6 +2,8 @@
 
 ## 2026-10-21
 
+- [x] [TL-LB-SHORT-PROMPT-SPLIT-20261021] LongBench 手动生成入口将无锚点短 prompt 的 `-1` 切片修为零边界，恢复完整问题阶段并保持长输入 100 字符上限/锚点优先级；修前最小复现与新增回归失败，修后普通/-O各22项通过。当前无torch/GPU/真实模型，端到端token、质量与性能未验。([详情](task_details/TL-LB-SHORT-PROMPT-SPLIT-20261021.md))
+
 - [x] [TL-LB-DATASET-BINDING-20261021] 评分文件前缀绑定sidecar数据集，拒绝错集评分/输入身份分组，保留repobench-p前缀兼容；修前3失败，修后普通/-O各26项通过。完整评分依赖、历史重评及GPU未验。([详情](task_details/TL-LB-DATASET-BINDING-20261021.md))
 
 - [x] [TL-LBV1-INPUT-UNIFORMITY-20261021] LBv1 聚合按数据集拒绝跨 method 的源行、模板、实际 token 身份漂移及 v2/legacy strict 混挂；修前入口无门禁，修后普通/-O各7项及相邻各15项通过。当前无jieba/torch/GPU，完整eval、历史重评、质量与性能未验。([详情](task_details/TL-LBV1-INPUT-UNIFORMITY-20261021.md))
