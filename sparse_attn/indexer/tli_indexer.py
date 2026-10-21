@@ -755,6 +755,18 @@ class TLIIndexer(TIAIndexer):
           - clear() 使 _inc 失效 → 新请求首步全量。
           - 投影基/moba/异形 D≠128 一律全量（值同原版路径，逐位不变）。
         """
+        # This implementation owns exactly one request. Validate before the
+        # incremental dispatch: that path indexes k[0] and would otherwise
+        # silently discard every additional request once a B=1 cache exists.
+        # Use explicit exceptions because Python -O removes assertions.
+        if k.shape[0] != 1:
+            raise ValueError(
+                f"TLIIndexer prepare_index requires batch=1, got batch={k.shape[0]}")
+        expected_dim = 192 if self.subspace == "mla_rope" else 128
+        if k.shape[-1] != expected_dim:
+            raise ValueError(
+                f"tli_subspace={self.subspace} 需要的 k 末维 = {expected_dim}，"
+                f"实际 {k.shape[-1]}")
         inc = getattr(self, "_inc", None)
         S_now = k.shape[1]
         if (
@@ -994,7 +1006,6 @@ class TLIIndexer(TIAIndexer):
 
     def _prepare_index_base(self, k, cu_seqlens_k):
         from .utils import prepare_pad_mask, pad_tensor
-        assert k.shape[0] == 1
         self._resolve_skip()
         idx_sub = self._subspace_indices(k.device) if self.enable_subspace else None
 
@@ -1059,9 +1070,6 @@ class TLIIndexer(TIAIndexer):
         # 【E142a】维度门：Qwen3 GQA 128 维 / DeepSeek MLA mla_rope 臂 192 维
         # （nope 128 + rope 64；选择子空间 mla_rope 只取尾 64 维）。
         # 其他模式（full/tail/rope/nope/random/highfreq）保持 128 硬门不变。
-        assert k.shape[-1] == (192 if self.subspace == "mla_rope" else 128), \
-            f"tli_subspace={self.subspace} 需要的 k 末维 = " \
-            f"{192 if self.subspace == 'mla_rope' else 128}，实际 {k.shape[-1]}"
         # E85f 口径修正：L2 细筛 k_qat 与 L1 粗筛用同一子空间（idx_sub）——
         # E85e 重放口径是粗筛+细筛同特征；tail 臂 idx_sub 与旧硬编码 tail32
         # 逐位相同（cmp_ratio=2），仅 rope/nope 探索臂与静态 pair 臂行为改变
@@ -1611,6 +1619,10 @@ class TLIIndexer(TIAIndexer):
             return None, None, None
 
     def compute_score(self, q, q_ids, index_dict, softmax_scale):
+        if q.shape[0] != 1 or q.shape[1] != 1:
+            raise ValueError(
+                "TLIIndexer compute_score requires batch=1 and one query token; "
+                f"got query shape prefix={tuple(q.shape[:2])}")
         # 缓存 squeeze 后的 q 供远端簇分数使用
         # 【C3 修复 2026-10-08】缓存时统一乘 softmax_scale——_near_token_score
         # 的簇分会与已缩放的 score_fine 回退段（b_q_full = q_sq[0]*softmax_scale）
@@ -1675,7 +1687,6 @@ class TLIIndexer(TIAIndexer):
                     d["cand_width"] = index_dict["k_qat"].shape[1]
             return d
         # A：L1 上界只在 d' 子空间维上算（q 同步取子空间，与 k_min/k_max 对齐）
-        assert q.shape[0] == 1 and q.shape[1] == 1
         from einops import rearrange as _rearrange
         k_min, k_max = (x.squeeze(0) for x in (index_dict["k_min"], index_dict["k_max"]))
         k_qat = index_dict["k_qat"]
@@ -2274,7 +2285,10 @@ class TLIIndexer(TIAIndexer):
         落 padded 尾部。
         """
         sm = score_dict.get("score_moba")
-        assert sm is not None, "moba 臂需 prepare_index/compute_score 走 moba_gate 路径"
+        if sm is None:
+            raise ValueError(
+                "moba 臂缺少 score_moba；需 prepare_index/compute_score "
+                "走 moba_gate 路径")
         sm = rearrange(sm, "b qt (h g) kt -> b qt h g kt", g=self.group_size).mean(dim=-2)
         sf = score_dict["score_fine"]
         K2 = min(sf.shape[-1], self.args.tia_level2_topk)
