@@ -91,6 +91,15 @@ def validate_runcap_sidecar(jsonl_path, legacy_allowed,
             f"降级打分（cap 身份未知，不入 cap 敏感聚合）。fail loudly，"
             f"不写 result.json")
     manifest = read_run_cap_manifest(sidecar)   # ② schema fail-closed
+    # pred.py uses dataset.split("-")[0] as the output prefix (repobench-p
+    # becomes repobench). Bind that prefix to the scorer's dataset selection.
+    dataset = manifest["dataset"]
+    file_dataset = os.path.basename(jsonl_path).split("-")[0]
+    if not isinstance(dataset, str) or dataset.split("-")[0] != file_dataset:
+        raise SystemExit(
+            f"[RUNCAP-FAIL] DATASET-BINDING: {jsonl_path} 文件名前缀 "
+            f"{file_dataset!r} 与 manifest.dataset={dataset!r} 不一致，"
+            "拒绝用错误数据集评分或分组，不写 result.json")
     if manifest["status"] != "complete":
         raise SystemExit(
             f"[RUNCAP-FAIL] 102: {jsonl_path} 的 run-cap manifest "
