@@ -1,8 +1,12 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-21
+
 - [x] [TL-E155D-STAGING-20261021] T2每次打分独占快照，避免重复/并发调用删除前次证据；新增5反例、普通/-O各72项及各24入口对照通过；独立双进程/删源后20预测20manifest及CI通过，发布回读另核，真实T2/GPU未验。([详情](task_details/TL-E155D-STAGING-20261021.md))
 
 - [x] [TL-E155D-ATOMIC-VERDICT-20261021] T2写入中断保留旧判决、避免公开半JSON；修前10项9失败，普通/-O各67项CPU回归通过，独立24入口完整JSON及87几何对照通过；真实T2/GPU/并发staging未验，发布回读另核。([详情](task_details/TL-E155D-ATOMIC-VERDICT-20261021.md))
+
+## 2026-10-20
 
 - [x] [TL-BACKFILL-ID-FORMAT-20261020] 回填旧格式回退前检查全行ID格式，修复首行掩盖后续混行；普通/-O各8方法及旧105各10项通过，独立200行默认计数CLI/sidecar保留通过；非正文/token身份或GPU/性能验收。([详情](task_details/TL-BACKFILL-ID-FORMAT-20261020.md))
 
@@ -27,6 +31,8 @@
 - [x] [TL-DEBUG-OFF-20261020] 六处调试关闭契约统一：54次误入→0，普通/-O各24项host测试通过；固定配额与算法未改，实际GPU/性能待验。([详情](task_details/TL-DEBUG-OFF-20261020.md))
 
 - [x] [TL-ENUM-CONTRACT-20261020] 四个选择枚举不再被-O取消校验；32非法构造拒绝，336合法对照不变，普通/-O各21项host测试通过；Torch依赖/GPU/性能未验。([详情](task_details/TL-ENUM-CONTRACT-20261020.md))
+
+## 2026-10-19
 
 - [x] [TL-EXPLICIT-INTEGER-20261019] 固定配额nb/nt/nl禁止小数静默截断；修前21失败3错误，修后普通/-O各19项host回归通过，6反例拒绝、108对照不变；完整依赖/GPU/性能未验。([详情](task_details/TL-EXPLICIT-INTEGER-20261019.md))
 
@@ -196,3 +202,19 @@
 - [ ] [TL-STATIC-MASK-20261016] 恢复授权：StaticCache mask 精确旁路与 DynamicCache 哨兵修复，105 项指定 CPU 测试普通/-O通过；GPU/实模/性能仍待验。([详情](task_details/TL-STATIC-MASK-20261016.md))
 
 - [x] [TL-DECODE-PADDING-Q-20261019] Qwen3/Llama 单 query decode 仅压紧 K/V，修复合法 2D padding mask 对 Q 的越界形状索引；33 项普通/-O CPU 回归及独立多步/长序列 gather 复核。GPU/真实 selector/性能另待验证，不宣称提速。([详情](task_details/TL-DECODE-PADDING-Q-20261019.md))
+
+## 2026-10-21
+
+E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁移，见
+`legacy/TASK.7679d9be4f96….md`）。
+
+- [x] [TL-E155D-T1-20261021] E155d 网格监督 87/87 收官（缺口格补跑过门，六机进程清零核实） ([详情](task_details/TL-E155D-T1-20261021.md))
+- [x] [TL-E155D-T2-20261021] E155d 网格打分终版判决：冠军 nb32nt448nl4096 AVG5 48.668（+1.21 vs CTRL 单池；top-3 配对 CI 全含 0，同族几何稳健） ([详情](task_details/TL-E155D-T2-20261021.md))
+- [ ] [TL-E155D-T3-20261021] nl=全mid 退化端点补跑（top-2 几何叙事用，各 1 格，未跑） ([详情](task_details/TL-E155D-T3-20261021.md))
+- [ ] [TL-E155D-TG-20261021] eval harness CUDA Graph 化 + 大 bs 化（用户提级为 T6 前置硬门；阶段 0/1 已入库，实现由 TG 会话承担，本链只做协调审计） ([详情](task_details/TL-E155D-TG-20261021.md))
+- [ ] [TL-E155D-T4-20261021] nt 轴可分性 RULER 64K 七臂实验（预登记判定规则；TG 升级完成后跑；LongBench 先验 nt448 vs ntoff +0.405 排除 0） ([详情](task_details/TL-E155D-T4-20261021.md))
+- [ ] [TL-E155D-T5-20261021] ablation 论文部分写入（TLI_paper_en.tex / TLI_paper.tex 双语镜像） ([详情](task_details/TL-E155D-T5-20261021.md))
+- [x] [TL-E155D-TDS-20261021] DeepSeek T7 fix 三重独立复跑审查通过（E127 15/15 + batch 门禁 26/26 + E133c 开关对照轮廓逐步全等） ([详情](task_details/TL-E155D-TDS-20261021.md))
+- [ ] [TL-E155D-T6-20261021] 主方法敲定 + 全量测试（用户改序暂缓：等 TG 提速确证；六机派单已预置未启动，零进程零清理） ([详情](task_details/TL-E155D-T6-20261021.md))
+- [ ] [TL-E155D-T7-20261021] 性能浪费点修复（E133c A1-A4/A6 已入库；剩余 .187 独占窗口稳态 bench 同机对照 + 判决 JSON） ([详情](task_details/TL-E155D-T7-20261021.md))
+- [ ] [TL-E155D-T8-20261021] 推送远端 main（全部判决/论文/代码提交后 origin push，含历史挂账） ([详情](task_details/TL-E155D-T8-20261021.md))
