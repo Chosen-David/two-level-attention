@@ -184,6 +184,42 @@ def _ordered_digest_hash(values):
     return digest.hexdigest()
 
 
+def validate_input_identity_uniformity(runcap_metas):
+    """Reject unfair same-dataset method aggregates before publication."""
+    grouped = {}
+    for filename, meta in runcap_metas.items():
+        if meta is not None:
+            grouped.setdefault(meta["dataset"], []).append((filename, meta))
+    for dataset, entries in grouped.items():
+        if len(entries) < 2:
+            continue
+        schemas = {meta["input_identity_schema"] for _, meta in entries}
+        if len(schemas) != 1:
+            raise SystemExit(
+                f"[RUNCAP-FAIL] LBV1-INPUT-UNIFORMITY: dataset={dataset!r} "
+                "混合 v2 与 legacy strict 输入身份——同一比较表无法证明各 "
+                "method 使用相同输入，拒绝写 result.json")
+        if schemas == {None}:
+            continue
+        identities = {
+            (meta["source_fingerprint"], meta["prompt_template_sha256"],
+             meta["actual_input_ids_ordered_sha256"])
+            for _, meta in entries
+        }
+        if any(value is None for identity in identities for value in identity):
+            raise SystemExit(
+                f"[RUNCAP-FAIL] LBV1-INPUT-UNIFORMITY: dataset={dataset!r} "
+                "v2 身份缺 source/template/actual-token 闭包，拒绝比较")
+        if len(identities) != 1:
+            files = [filename for filename, _ in entries]
+            raise SystemExit(
+                f"[RUNCAP-FAIL] LBV1-INPUT-UNIFORMITY: dataset={dataset!r} 的 "
+                f"{len(entries)} 个 method 产物使用了 {len(identities)} 组不同 "
+                f"source/template/actual-token 身份（文件 {files}），拒绝写 "
+                "result.json")
+    return True
+
+
 def resolve_producer_identity(script_path):
     """producer 代码身份：{script_sha256, git_commit, script_path}。
 

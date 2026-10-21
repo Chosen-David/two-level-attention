@@ -30,6 +30,7 @@ from .run_cap_manifest import (
     read_run_cap_manifest,
     runcap_gate_lock,
     cap_comparability_key,
+    validate_input_identity_uniformity,
 )
 
 
@@ -130,6 +131,7 @@ def validate_runcap_sidecar(jsonl_path, legacy_allowed,
     actual_input_ids = input_identity.get("actual_input_ids") \
         if isinstance(input_identity.get("actual_input_ids"), dict) else {}
     return {
+        "dataset": manifest["dataset"],
         "cap_effective": manifest["effective_cap"],
         "cap_protocol": manifest["protocol_cap"],
         "cap_identity_hash": manifest["cap_identity"]["hash"],
@@ -152,6 +154,7 @@ def validate_runcap_sidecar(jsonl_path, legacy_allowed,
         "result_sha256": actual_sha,
         "sidecar": os.path.basename(sidecar),
     }
+
 
 def lbv2_choice_score(prediction, ground_truth, all_classes=None):
     """LongBench-v2（lbv2）四选一 accuracy：官方口径（THUDM/LongBench）两条
@@ -439,6 +442,10 @@ if __name__ == "__main__":
             f"混入同一聚合被当同一口径均值，16K 受限 treatment 与 31.5K "
             f"协议口径必须分目录分别打分），拒绝写 result.json，"
             f"fail loudly")
+    # TL-LBV1-INPUT-UNIFORMITY-20261021：逐文件拥有 v2 provenance 仍不
+    # 足以形成公平 method 对比；同一 dataset 的 source/template/实际 token
+    # 身份必须一致。门禁位于任何 result.json 发布之前。
+    validate_input_identity_uniformity(runcap_metas)
     cap_hashes = sorted({m["cap_identity_hash"] for m in strict_metas})
     input_identity_by_file = {
         filename: {

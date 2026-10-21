@@ -2,6 +2,8 @@
 
 ## 2026-10-21
 
+- [x] [TL-LBV1-INPUT-UNIFORMITY-20261021] LBv1 聚合按数据集拒绝跨 method 的源行、模板、实际 token 身份漂移及 v2/legacy strict 混挂；修前入口无门禁，修后普通/-O各7项及相邻各15项通过。当前无jieba/torch/GPU，完整eval、历史重评、质量与性能未验。([详情](task_details/TL-LBV1-INPUT-UNIFORMITY-20261021.md))
+
 - [x] [TL-BATCH-TREATMENT-SNAPSHOT-20261021] RULER batch TLI 的 runtime、输出名与完成回执改为共享模型加载前冻结的唯一 treatment 快照；修前入口级复现证明快照晚于模型且回执无 manifest，修后普通/-O各1项通过。当前无torch/GPU，真实模型、历史产物与性能未验。([详情](task_details/TL-BATCH-TREATMENT-SNAPSHOT-20261021.md))
 
 - [x] [TL-BATCH-ADDITIVE-MASK-20261021] FASA batch decode 的加性 mask 有效长度由统计非零修为统计零值；修前真实契约例把 `[3,4]` 反算为 padding 长 `[2,1]` 并拒绝，修后普通/-O各4项通过并保留bool语义；当前无torch/GPU，实模质量与性能未验。([详情](task_details/TL-BATCH-ADDITIVE-MASK-20261021.md))
