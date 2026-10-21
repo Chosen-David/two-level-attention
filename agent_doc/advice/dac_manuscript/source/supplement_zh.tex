@@ -12,6 +12,7 @@
 \graphicspath{{../figures/}}
 \pagestyle{plain}
 \begin{document}
+\section*{LoDA-SA：机制补充与历史证据}
 \section*{机制补充图 S1: 低频子空间选取}
 本补充给出子空间选取与当前统一L2流程，并单独保留历史数值词元配额门控。\par\medskip
 \noindent\includegraphics[width=\textwidth]{method_details/subspace_zh.pdf}
@@ -19,7 +20,7 @@
 \clearpage
 \section*{机制补充图 S2: 区域页与统一词元竞争}
 \noindent\includegraphics[width=\textwidth]{architecture_domains/fig2_domains_zh.pdf}
-\par\medskip\noindent 当前$n_l/n_b$选择：同一时间顺序页面按显式近区长度$n_l$划分，近区$n_b$页与远区$K_1-n_b$页分别竞争。非对齐的前缀结束页和滑窗起始页在页预算之外加入。逐查询归一化、KV组概率平均后，所有获准中间候选进行一次L2 TopK；保护词元另行并入最终支持集。图示以$B=8$、sink4、window8展示边界格，不代表主配置的window128。4/128保护不重叠且$K=1024$时，名义共享中间预算为892；部分前缀重复选择可能减少不同未保护入选词元数，不设置近远词元拆分。
+\par\medskip\noindent LoDA-SA的$n_l/n_b$选择：同一时间顺序页面按显式近区长度$n_l$划分，近区$n_b$页与远区$K_1-n_b$页分别竞争。非对齐的前缀结束页和滑窗起始页在页预算之外加入。逐查询归一化、KV组概率平均后，所有获准中间候选进行一次L2 TopK；保护词元另行并入最终支持集。图示以$B=8$、sink4、window8展示边界格，不代表主配置的window128。4/128保护不重叠且$K=1024$时，名义共享中间预算为892；部分前缀重复选择可能减少不同未保护入选词元数，不设置近远词元拆分。
 \clearpage
 \section*{机制补充图 S3: 历史数值词元配额门控}
 \noindent\includegraphics[width=\textwidth]{architecture_domains/fig2_gate_zh.pdf}
@@ -69,7 +70,7 @@
 
 
 \section*{补充注 S7：预算与配置身份}
-\textbf{当前配置与历史身份。}当前设计使用显式$n_l/n_b$、统一L2、4/128保护、稠密预填充与稀疏解码，并关闭门控。$K=1024$且保护不重叠时，名义中间预算892由合并候选共享，不拆分为320/572或640/252；后两种分配属于历史数值词元配额配置。部分前缀重复选择可能减少不同未保护入选词元数。源码接口目前要求显式近区长度和页数同时指定\texttt{tli\_near\_tokens=off}；零或省略不选择此分支。这是兼容开关，不是可调词元预算。本文未提供经验证的当前$n_l/n_b$数值运行manifest。少量sink不证明4词元最优，改变保护还会改变检索容量；历史得分与计时保留原设置。
+\textbf{当前配置与历史身份。}LoDA-SA使用显式$n_l/n_b$、统一L2、4/128保护、稠密预填充与稀疏解码，并关闭门控。$K=1024$且保护不重叠时，名义中间预算892由合并候选共享，不拆分为320/572或640/252；后两种分配属于历史数值词元配额配置。部分前缀重复选择可能减少不同未保护入选词元数。源码接口目前要求显式近区长度和页数同时指定\texttt{tli\_near\_tokens=off}；零或省略不选择此分支。这是兼容开关，不是可调词元预算。本文未提供经验证的当前$n_l/n_b$数值运行manifest。少量sink不证明4词元最优，改变保护还会改变检索容量；历史得分与计时保留原设置。
 
 \textbf{整数边界与摘要覆盖范围。}对当前显式$n_l/n_b$分区路径、有效长度$S=t+1$（含当前位置、排除填充位置的有效缓存位置数）、页长$B$及不重叠的前缀／近期保护，令$M=\max(0,S-s-w)$、$L=\max(B,n_l)$，并取
 \[
@@ -112,6 +113,8 @@ b_n=\max\!\left(\lfloor s/B\rfloor,\left\lfloor(S-w-L)/B\right\rfloor\right).
 
 \par\medskip\noindent\textbf{移植基线比较臂（新记录，未入图）。}移植的32K基线：JSSA 58.7（预算1024、rank 32；basis 校准 8$\times\sim$32K 短于 vendor 默认 8$\times$131072，已披露）、AsyncTLS 48.33（名义词元预算512；官方代码未开源故为论文协议语义复现；作者称其为排序索引重跑，取代50.09；排序效果尚未独立核实）、Quest 42.85（原生配置）与 FASA 18.64（预算1024、阈值0.8、k16）。报告的更长上下文得分为：AsyncTLS 64K 得33.88、128K 得37.47（均为排序索引重跑，取代乱序版记录）；FASA 64K/128K分别得1.72/1.40。同一批移植的 eager-torch 时延记录（单张H20、合成needle提示、生成128词元）给出32/64/128K解码TPOT：稠密 26.05/39.62/66.94 毫秒，JSSA 33.30/39.68/61.69（128K 低于稠密），FASA 75.64/133.00/265.91，AsyncTLS 105.29/123.42/160.25，Quest 177.04/317.38/621.37。这些 eager 实现表征方法语义而非官方 kernel 成本，既未与任务质量运行配对，也未与主文历史解码计时对接。同机 K2 预算行：$K=512$ 得 56.00，CWE 32.5（$K=1024$ 为 75.9，降 43.4 分），两个 NIAH 任务各降 1 分、FWE 升 1.33；$K=384$ 崩塌至 15.00，这两个测试点不能确定预算下界。β 曲线第三点 $K_1=128$、$\beta=.03125$（远区页124、远区词元732）得 58.07；$\beta=.0625$ 位于原始0.125步长网格点之间，相对.125臂将近区页减半（16$\rightarrow$8）、远区词元配额由252升至572。同机 128K 对得 45.73（$\beta=.0625$）对 46.02（$\beta=.125$），46.43 FullKV 锚来自另一次运行（$\beta=.0625$比值98.49\%）。这些得分为作者报告，非第三方重放，均无配对区间。新AsyncTLS/FASA结果JSON、manifest与receipt仅存于本地未跟踪的\texttt{exp/}目录；下列来源标识不构成仓库工件可得性。\par\noindent 来源：\texttt{jssa\_\allowbreak r32k\_\allowbreak formal}、\\\texttt{e119\_\allowbreak ruler32768\_\allowbreak formal\_\allowbreak asynctls\_\allowbreak vendor\_\allowbreak fix}、\\\texttt{e119\_\allowbreak ruler32k\_\allowbreak formal\_\allowbreak quest\_\allowbreak vendor}、\\\texttt{e119\_\allowbreak ruler32768\_\allowbreak formal\_\allowbreak fasa\_\allowbreak vendor\_\allowbreak 10182330}、\\\texttt{e119\_\allowbreak ruler65536\_\allowbreak formal\_\allowbreak asynctls\_\allowbreak vendor\_\allowbreak 64k}、\\\texttt{e119\_\allowbreak ruler65536/\allowbreak 131072\_\allowbreak formal\_\allowbreak fasa\_\allowbreak vendor}、\\\texttt{e147j\_\allowbreak k2512/\allowbreak k2384\_\allowbreak r32k\_\allowbreak formal}、\\\texttt{e147d\_\allowbreak r32k\_\allowbreak formal}、\\\texttt{e147h\_\allowbreak r128k\_\allowbreak formal}。
 
-\textbf{历史跨模型记录（不属主文范围）。}作者报告的Qwen3-32B RULER32K AVG为稀疏50.64、稠密52.22（$-1.58$）。跨机Llama-3.1-8B两臂在历史近区页／词元配额(8,320)/(16,640)下报告83.88/86.19。这些描述性记录缺少匹配执行与配对不确定性，不扩大当前Qwen3-8B主文范围，也不验证其$n_l/n_b$统一L2配置。
+\begin{sloppypar}
+\textbf{历史跨模型记录（不属主文范围）。}作者报告的Qwen3-32B RULER32K AVG为稀疏50.64、稠密52.22（$-1.58$）。跨机Llama-3.1-8B两臂在历史近区页／词元配额(8,320)和(16,640)下分别报告83.88与86.19。这些描述性记录缺少匹配执行与配对不确定性，不扩大当前Qwen3-8B主文范围，也不验证其$n_l/n_b$统一L2配置。
+\end{sloppypar}
 
 \end{document}

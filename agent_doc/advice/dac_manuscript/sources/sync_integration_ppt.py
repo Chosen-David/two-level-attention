@@ -95,5 +95,24 @@ replace_text(p.slides[16].shapes[12],'nb 控制候选页准入，不保证最终
 for idx in [10,11,12,13,14,15]:
  sh=p.slides[idx].shapes[2 if idx in [13,15] else 1]
  if sh.has_text_frame and not sh.text.startswith('历史'):replace_text(sh,'历史记录：'+sh.text)
+# LoDA-SA naming and distance-first explanation; execution still prepares the shared view first.
+replace_text(p.slides[0].shapes[1],'LoDA-SA：低频距离感知稀疏注意力')
+replace_text(p.slides[0].shapes[3],'Low-Frequency Distance-Aware Sparse Attention')
+replace_text(p.slides[0].shapes[12],'距离区域候选准入 → 共享低频评分 → 统一 L2')
+replace_text(p.slides[1].shapes[1],'LoDA-SA：有限预算下保留不同距离的候选入口')
+replace_text(p.slides[1].shapes[3],'全局排名不预留位置区域入口；先明确候选覆盖，再控制筛选成本。\n不假设近处总重要，也不假设注意力随距离单调衰减。')
+replace_text(p.slides[1].shapes[5],'nl定义近区、nb预留L1近区页；两级共享32个低频RoPE坐标；合并候选统一L2，最终原维Q/K/V。')
+replace_text(p.slides[4].shapes[1],'LoDA-SA：先说明距离策略，再说明共享评分')
+replace_text(p.slides[4].shapes[3],'距离区域与页预算')
+replace_text(p.slides[4].shapes[4],'nl 指定近区范围；nb 预留近区页\n远区获得剩余 L1 页预算')
+replace_text(p.slides[4].shapes[5],'页准入不保证最终区域份额')
+replace_text(p.slides[4].shapes[8],'共享低频 RoPE 评分')
+replace_text(p.slides[4].shapes[9],'16完整旋转对，两级共用\n合并候选统一L2，最终原维注意力')
+replace_text(p.slides[4].shapes[10],'执行仍先准备表示，再进行区域选择')
+replace_text(p.slides[5].shapes[1],'LoDA-SA：同一时间序列上的两级筛选')
+replace_text(p.slides[6].shapes[1],'LoDA-SA：两级共享完整低频 RoPE 对')
+replace_text(p.slides[7].shapes[1],'LoDA-SA：nl / nb 页准入与统一词元竞争')
+replace_text(p.slides[9].shapes[1],'LoDA-SA：统一 L2 与原维注意力')
+replace_text(p.slides[16].shapes[1],'LoDA-SA：距离准入、共享评分与完整请求成本')
 assert len(p.slides)==17
 p.save(P)

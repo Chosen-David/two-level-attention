@@ -16,7 +16,7 @@ for lang in ('en','zh'):
   scene.append(dict(type='rect',x=x,y=y,w=w,h=h,fill=fill,stroke=stroke,sw=sw))
  def line(x1,y1,x2,y2,color='#4E626E',arrow=True):
   scene.append(dict(type='line',x1=x1,y1=y1,x2=x2,y2=y2,color=color,arrow=arrow))
- text(550,25,'One chronology · nl sets the near range','同一时间顺序 · nl 确定近区范围',23)
+ text(550,25,'LoDA-SA · nl sets the near range','LoDA-SA · 同一时间顺序，nl 确定近区',23)
  text(211,57,'far','远区',21);text(600,57,'near (unprotected middle)','近区（未保护中间区）',21)
  text(944,57,'SWA','保护滑窗',21)
  # 6 physical pages, last has only two real tokens. B=8, S=42, sink=4, w=8.

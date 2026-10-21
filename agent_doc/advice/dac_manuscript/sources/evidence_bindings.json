@@ -1451,5 +1451,31 @@
     "method": "nl near length; nb near L1 page budget; far K1-nb; single pooled L2; sink4/SWA128; gate disabled",
     "compatibility_flag": "tli_near_tokens=off; zero or omission is not equivalent",
     "limits": "No verified current numeric nl/nb run manifest. Historical numeric-token-quota scores are not current-method validation."
+  },
+  "loda_naming_and_scope": {
+    "name": "LoDA-SA",
+    "title": "LoDA-SA: Low-Frequency Distance-Aware Sparse Attention",
+    "source": "62522a685cb298c04093510d499c8da6182b7be5",
+    "tail_indices": "tli_indexer.py708-743; delta64/cmp_ratio; [64-delta,64) plus [128-delta,128)",
+    "applicability": "Qwen3-8B tail configuration with split-half RoPE; not generic full/static/projection/MLA",
+    "prior_work": [
+      {
+        "paper": "AsyncTLS",
+        "version": "2604.07815v1",
+        "location": "section4.1",
+        "url": "https://arxiv.org/html/2604.07815v1",
+        "relationship": "coarse following Quest; fine Double Sparsity; inherited hierarchical paradigm, no verified direct code inheritance"
+      },
+      {
+        "paper": "Twilight",
+        "version": "2502.02770v1",
+        "location": "section4.1",
+        "url": "https://arxiv.org/html/2502.02770v1",
+        "relationship": "earlier select-then-prune architecture"
+      }
+    ],
+    "narrative_order": "distance-region candidate access, nl/nb page budgets, shared low-frequency scoring, pooled L2, original-QKV attention",
+    "execution_order": "prepare shared representation before regional selection",
+    "claims": "No two-level-first, lossless, measured efficient, monotonic distance decay or near-always-important claim"
   }
 }

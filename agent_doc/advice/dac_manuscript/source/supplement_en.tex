@@ -5,11 +5,12 @@
 \setsansfont{NimbusSans-Regular.otf}[BoldFont=NimbusSans-Bold.otf,ItalicFont=NimbusSans-Italic.otf,BoldItalicFont=NimbusSans-BoldItalic.otf]
 \setmathfont{Latin Modern Math}
 \usepackage[hidelinks]{hyperref}
-\hypersetup{pdfauthor={},pdftitle={Supplementary mechanism diagrams}}
+\hypersetup{pdfauthor={},pdftitle={LoDA-SA: Supplementary mechanisms and historical evidence}}
 \graphicspath{{../figures/}}
 \pagestyle{plain}
 \setlength{\emergencystretch}{1em}
 \begin{document}
+\section*{LoDA-SA: Supplementary mechanisms and historical evidence}
 \section*{Supplementary Figure S1: Shared scoring coordinates}
 Detailed views of subspace selection, regional allocation, and the gate lifecycle under the assumptions stated in the main text.\par\medskip
 \noindent\includegraphics[width=\textwidth]{method_details/subspace_en.pdf}
@@ -17,7 +18,7 @@ Detailed views of subspace selection, regional allocation, and the gate lifecycl
 \clearpage
 \section*{Supplementary Figure S2: Regional pages and unified token competition}
 \noindent\includegraphics[width=\textwidth]{architecture_domains/fig2_domains_en.pdf}
-\par\medskip\noindent Current $n_l/n_b$ selection: one chronological page sequence is partitioned by explicit near length $n_l$; $n_b$ near pages and $K_1-n_b$ far pages compete separately. Nonaligned sink-end and window-start pages join outside those page budgets. All admitted middle candidates compete in one L2 TopK after per-query normalization and KV-group probability averaging. Protected tokens join the final support separately. The schematic uses $B=8$, sink4 and window8 to show boundary cells, not the main configuration's window128. With disjoint 4/128 protection and $K=1024$, the nominal shared middle budget is 892; partial-sink reselection can reduce distinct unprotected winners. No near/far token split is imposed.
+\par\medskip\noindent LoDA-SA $n_l/n_b$ selection: one chronological page sequence is partitioned by explicit near length $n_l$; $n_b$ near pages and $K_1-n_b$ far pages compete separately. Nonaligned sink-end and window-start pages join outside those page budgets. All admitted middle candidates compete in one L2 TopK after per-query normalization and KV-group probability averaging. Protected tokens join the final support separately. The schematic uses $B=8$, sink4 and window8 to show boundary cells, not the main configuration's window128. With disjoint 4/128 protection and $K=1024$, the nominal shared middle budget is 892; partial-sink reselection can reduce distinct unprotected winners. No near/far token split is imposed.
 \clearpage
 \section*{Supplementary Figure S3: Historical numeric-quota gate}
 \noindent\includegraphics[width=\textwidth]{architecture_domains/fig2_gate_en.pdf}
@@ -63,7 +64,7 @@ The following records retain the numerical detail behind the main-text limitatio
 
 
 \section*{Supplementary Note S7: Budgets and configuration identity}
-\textbf{Current configuration and historical identities.} The current design uses explicit $n_l/n_b$, unified L2, 4/128 protection, dense prefill and sparse decode, with gating disabled. At $K=1024$, disjoint protection leaves 892 nominal pooled middle slots, not a 320/572 or 640/252 regional split. Those splits belong to historical numeric-token-quota configurations. Partial-sink reselection can reduce distinct unprotected winners. The source interface currently requires \texttt{tli\_near\_tokens=off} alongside explicit near length and pages; zero or omission does not select this branch. This compatibility sentinel is not a tunable token budget. No verified current numeric $n_l/n_b$ run manifest is supplied. Small sinks do not establish four-token optimality; changing protection also changes retrieval capacity. Historical scores and timings retain their own settings.
+\textbf{Current configuration and historical identities.} LoDA-SA uses explicit $n_l/n_b$, unified L2, 4/128 protection, dense prefill and sparse decode, with gating disabled. At $K=1024$, disjoint protection leaves 892 nominal pooled middle slots, not a 320/572 or 640/252 regional split. Those splits belong to historical numeric-token-quota configurations. Partial-sink reselection can reduce distinct unprotected winners. The source interface currently requires \texttt{tli\_near\_tokens=off} alongside explicit near length and pages; zero or omission does not select this branch. This compatibility sentinel is not a tunable token budget. No verified current numeric $n_l/n_b$ run manifest is supplied. Small sinks do not establish four-token optimality; changing protection also changes retrieval capacity. Historical scores and timings retain their own settings.
 
 \textbf{Integer boundaries and summary support.} In the current explicit-$n_l/n_b$ partitioned path, with $S=t+1$ valid cached positions including the current token and excluding padding, let $M=\max(0,S-s-w)$, $L=\max(B,n_l)$ and
 \begin{align*}
