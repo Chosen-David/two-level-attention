@@ -63,7 +63,8 @@ from sparse_attn.baseline_runtime import (  # noqa: E402
     batch_decode_scope,
 )
 from sparse_attn.info import (  # noqa: E402
-    get_method_name_with_info, resolve_treatment_snapshot,
+    get_method_name_with_info, get_treatment_manifest_json,
+    resolve_treatment_snapshot,
     stage_fasa_agreement)
 # 【阶段 1】TLI 主方法挂载（同步义务：pred_ruler.py L81/L184-185/L444）。
 from sparse_attn.patches import register_patch  # noqa: E402
@@ -262,6 +263,15 @@ def main():
     print(f"[ruler-batch] task={args.task} L={args.context_length} "
           f"n={len(rows)} method={args.method} batch={args.batch_size}")
 
+    # 081 treatment 闭包须与单样本入口一致：TLI 在模型加载/patch 前只
+    # 解析一次文件型配置，runtime、输出名和完成回执随后共享同一快照。
+    # 旧批量入口在模型加载后才冻结 runtime 快照，命名时又传 None 重读，
+    # 回执还固定不写 manifest；生成窗口内替换 D' mask/投影基即可造成
+    # runtime A / basename B / receipt 无身份的混装，消费侧因 legacy
+    # 兼容无法检出。非 TLI 臂保持 snapshot=None 的既有行为。
+    snapshot = (resolve_treatment_snapshot(args)
+                if args.method == "tli" else None)
+
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_path, trust_remote_code=True)
     config = AutoConfig.from_pretrained(args.model_path,
@@ -299,7 +309,6 @@ def main():
         # 【同步义务】内联自 pred_ruler.py（L184-185 snapshot 冻结 +
         # L444 register_patch 挂载）；081 快照契约：模型加载前冻结一次，
         # D′ 掩码/投影基每个文件只 open 一次。
-        snapshot = resolve_treatment_snapshot(args)
         n_patched = register_patch(model, args, snapshot)
     else:
         n_patched = 0  # method=none：dense，不挂任何 patch
@@ -317,7 +326,7 @@ def main():
     out_dir = os.path.join(args.output_dir, f"L{args.context_length}",
                            f"pred{args.pred_postfix}")
     os.makedirs(out_dir, exist_ok=True)
-    method_name = get_method_name_with_info(args, None)
+    method_name = get_method_name_with_info(args, snapshot)
     out_path = os.path.join(
         out_dir, f"{args.task}-{method_name}-{args.t}.jsonl")
 
@@ -370,6 +379,9 @@ def main():
         pred_sha = _file_sha256(tmp_pred)
         pred_lines = sum(1 for _ in open(tmp_pred, "rb"))
         model_cfg_path = os.path.join(args.model_path, "config.json")
+        treatment_manifest_json = (
+            get_treatment_manifest_json(args, snapshot)
+            if args.method == "tli" else None)
         yarn_receipt = build_yarn_receipt(
             yarn_enabled=use_yarn,
             effective_factor=factor,
@@ -393,7 +405,7 @@ def main():
             prediction_basename=os.path.basename(out_path),
             prediction_sha256=pred_sha,
             prediction_lines=pred_lines,
-            treatment_manifest_json=None)
+            treatment_manifest_json=treatment_manifest_json)
         tmp_rcp = stage_yarn_receipt(out_path, yarn_receipt, attempt_id)
         commit_yarn_generation(tmp_pred, tmp_rcp, out_path)
         print(f"[pred-batch] 提交：指针 {generation_pointer_path(out_path)} -> "
