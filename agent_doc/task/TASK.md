@@ -2,7 +2,7 @@
 
 ## 2026-10-21
 
-- [ ] [TL-TLI-INC-SIGNATURE-20261021] 增量索引缓存绑定device/dtype/KV头几何/页大小，不兼容时全量重建；CPU张量精确对照及普通/-O各42回归通过，独立审查通过，CUDA数值和性能待验；仅修复分支/draft PR，不合main。([详情](task_details/TL-TLI-INC-SIGNATURE-20261021.md))
+- [ ] [TL-TLI-INC-SIGNATURE-20261021] 增量索引缓存绑定device/dtype/KV头几何/页大小，不兼容时全量重建；跳过已完整页的冗余重算，CPU张量精确对照及普通/-O各44回归通过，独立审查通过，CUDA数值和性能待验；仅修复分支/draft PR，不合main。([详情](task_details/TL-TLI-INC-SIGNATURE-20261021.md))
 
 - [x] [TL-TLI-RUNTIME-SHAPE-20261021] TLI 公共入口在增量/快捷分流前显式拒绝多请求、多 query、错误 K 宽度及缺失 MoBA 分数，避免增量路径静默只消费 `k[0]`，且校验不再被 `python -O` 删除；修前普通4失败、-O为3失败1错误，修后普通/-O各13项host回归通过。当前无torch/GPU，生产张量、质量、显存与性能未验。([详情](task_details/TL-TLI-RUNTIME-SHAPE-20261021.md))
 

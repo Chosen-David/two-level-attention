@@ -839,7 +839,9 @@ class TLIIndexer(TIAIndexer):
         self._resolve_skip()   # 与原版头部同构（幂等；影响 _maybe_build_kmeans 条件）
         bs = self.args.tia_block_size
         S_prev, S_now = inc["S"], k.shape[1]
-        fb = (S_prev - 1) // bs        # 第一个可能变更的块（含新 token 的块）
+        # Append-only input: complete prefix pages cannot change. At an exact
+        # page boundary start at the new page, not the previous complete page.
+        fb = S_prev // bs              # partial previous page, or first new page
         lo = fb * bs                   # 复用前缀 = token [0, lo)（块 [0, fb)）
         idx_sub = self._subspace_indices(k.device) if self.enable_subspace else None
 
