@@ -27,9 +27,12 @@
       +0.40 / repo +4.74）+ AVG5 总差 +1.21 —— 两级+分区 vs 单池自由竞争的
       同批干净对照（CTRL 无 α/β/γ 耦合）。
 
-版式硬约束（用户 2026-10-16）：图内不堆说明文字、无 note box，数字/结论进
-caption/元数据；本图沿用 O 图小字号口径（title 15 / label 13 / tick 11.5 /
-annotation 10.5），figsize 9.5in 对 IEEE 双栏缩放比 ≈0.75。
+版式硬约束（用户 2026-10-16 + 2026-10-21 美观迭代）：图内不堆说明文字、无
+note box，数字/结论进 caption/元数据；2026-10-21 起顶会美观口径：柱顶数字/
+箭头差值/分nb均值等图内数字全部退役进 caption/TSV（图内只留柱/曲线/图例/轴），
+title 13 / label 13 / tick 11.5 / annotation 10.5（ytick 显式设号防 skill 20pt
+默认），figsize 9.5in 对 IEEE 双栏缩放比 ≈0.75。验收门 = PyMuPDF 字形级
+span-bbox 交集 >0.1px² 计零（lint 的 artist bbox 抓不住旋转/紧贴字形碰撞）。
 
 诚实边界：in_place_top1=false（当前手稿紧凑设计 (8,320) 族非网格选择）；
 top-3 配对 CI 全含 0（同族格噪声带内等价）；5 任务 LongBench 口径
@@ -66,7 +69,7 @@ C_SEC = pal["secondary"]
 C_HL = pal["highlight"]
 C_NEU = pal["neutral"]
 
-T, L, TK, AN = 15, 13, 11.5, 10.5   # O 图小字号口径
+T, L, TK, AN = 13, 13, 11.5, 10.5   # 标题 13pt：2x3 面板宽内不越界（15pt 长标题曾跨面板互撞）
 
 d = json.load(open(SRC))
 rank = d["ranking"]
@@ -119,7 +122,7 @@ avg_delta = champ["avg5"] - ctrl["avg5"]
 
 # ---------------- 画布 2x3，(e) 横跨下排右侧两列 ----------------
 fig, axes = plt.subplots(2, 3, figsize=(9.5, 6.6),
-                         gridspec_kw={"wspace": 0.50, "hspace": 0.44})
+                         gridspec_kw={"wspace": 0.50, "hspace": 0.58})
 ax_a, ax_b, ax_c = axes[0]
 ax_d, ax_e = axes[1][:2]
 fig.delaxes(axes[1][2])
@@ -143,54 +146,41 @@ for i, nb in enumerate(NBS):
         if (nb, nl) in diag_cells:
             ax_a.add_patch(plt.Rectangle((j - .5, i - .5), 1, 1, fill=False,
                                         edgecolor=C_HL, lw=2.2))
-            ax_a.text(j, i - .34, "½", ha="center", va="center",
-                      fontsize=AN - 1.5, color=C_HL, fontweight="bold")
         if (nb, nl) == (champ_nb, champ_nl):
-            ax_a.plot(j + .30, i - .30, marker="*", markersize=15,
+            ax_a.plot(j + .35, i - .35, marker="*", markersize=11,
                       color=C_HL, markeredgecolor="black",
                       markeredgewidth=.7, zorder=5)
 ax_a.set_xticks(range(len(NLS)))
 ax_a.set_xticklabels([str(n) for n in NLS], fontsize=TK - 1)
 ax_a.set_yticks(range(len(NBS)))
 ax_a.set_yticklabels([str(b) for b in NBS], fontsize=TK - 1)
-ax_a.set_xlabel("near length $n_l$ (tokens)", fontsize=L)
-ax_a.set_ylabel("near pages $n_b$", fontsize=L)
-ax_a.set_title("(a)  Grid AVG5: half-coverage diagonal", loc="left",
-               pad=10, fontsize=T, fontweight="bold")
+ax_a.set_xlabel("near length $n_l$", fontsize=L, labelpad=12)
+ax_a.set_ylabel("near pages $n_b$", fontsize=L, labelpad=26)
+ax_a.set_title("(a)  Half-coverage", loc="left",
+               pad=8, fontsize=T, fontweight="bold")
 # 不加 colorbar：20 格全部印有点估计，量程进 caption（用户版式铁律）
 
-# ---- (b) 边缘均值 ----
+# ---- (b) 边缘均值（数字进 caption/TSV，图内只留柱与图例）----
 xb = np.arange(len(NBS))
 ax_b.bar(xb, nb_mar, width=0.58, color=C_MAIN,
          edgecolor="black", linewidth=.7)
-for xi, v in zip(xb, nb_mar):
-    ax_b.text(xi, v + 0.09, f"{v:.2f}", ha="center", va="bottom",
-              fontsize=AN - 2, rotation=90)
-for k, (xi, dv) in enumerate(zip(xb[1:], np.diff(nb_mar))):
-    ax_b.annotate("", xy=(xi - .5, max(nb_mar) + 1.55),
-                  xytext=(xi - 1.45, max(nb_mar) + 1.55),
-                  arrowprops=dict(arrowstyle="->", color=C_NEU, lw=1.1))
-    ax_b.text(xi - .95, max(nb_mar) + 1.72 + (0.60 if k % 2 else 0),
-              f"{dv:+.2f}", ha="center", fontsize=AN - 3, color=C_NEU)
-# nl 边缘放同轴右侧（第二组）
 xn = np.arange(len(NLS)) + len(NBS) + 1
 ax_b.bar(xn, nl_mar, width=0.58, color=C_SEC,
          edgecolor="black", linewidth=.7)
-for xi, v in zip(xn, nl_mar):
-    ax_b.text(xi, v + 0.09, f"{v:.2f}", ha="center", va="bottom",
-              fontsize=AN - 2, rotation=90)
 ax_b.set_xticks(list(xb) + list(xn))
 ax_b.set_xticklabels([str(b) for b in NBS] + [str(n // 1024) + "K" for n in NLS],
                      fontsize=TK - 2.5)
 ax_b.set_xlim(-0.7, xn[-1] + 0.95)
 ax_b.set_ylabel("marginal mean (points)", fontsize=L)
-ax_b.set_title("(b)  Marginals: $n_b$ axis; $n_l$ penalty at 8192",
-               loc="left", pad=10, fontsize=T, fontweight="bold")
-ax_b.set_ylim(43.8, 51.3)
-ax_b.set_yticks([44, 46, 48, 50])
-ax_b.plot([], [], color=C_MAIN, lw=6, label="$n_b$ (near pages)")
-ax_b.plot([], [], color=C_SEC, lw=6, label="$n_l$ (near length)")
-ax_b.legend(loc="lower center", fontsize=AN - 1.5, framealpha=0.92)
+ax_b.set_title("(b)  Marginals", loc="left", pad=8,
+               fontsize=T, fontweight="bold")
+ax_b.set_ylim(45.6, 49.6)
+ax_b.set_yticks([46, 47, 48, 49])
+ax_b.tick_params(axis="y", labelsize=TK - 1)
+ax_b.plot([], [], color=C_MAIN, lw=6, label="$n_b$")
+ax_b.plot([], [], color=C_SEC, lw=6, label="$n_l$")
+ax_b.legend(loc="upper center", fontsize=AN - 1.5, framealpha=0.92,
+            ncol=2, columnspacing=1.2)
 
 # ---- (c) 半覆盖律 mass 机制（120/128 query 离线重析）----
 qmat = np.array([[q["top_frac_share"][f"{f:.3f}"] for f in HC_FRACS]
@@ -212,16 +202,18 @@ ax_c.annotate(f"{med[hi]:.3f}", xy=(0.5, med[hi]),
               color=C_HL, fontweight="bold")
 ax_c.set_xticks(HC_FRACS)
 ax_c.set_xticklabels(["1/8", "1/4", "1/2", "3/4"], fontsize=TK - 1)
-ax_c.set_xlabel("top-$f$ fraction of near pages", fontsize=L)
+ax_c.set_xlabel("top-$f$ fraction of near pages", fontsize=L, labelpad=14)
 ax_c.set_ylabel("cumulative mass share", fontsize=L)
-ax_c.set_title("(c)  Half-coverage: near mass concentration", loc="left",
-               pad=10, fontsize=T, fontweight="bold")
+ax_c.set_title("(c)  Near mass share", loc="left",
+               pad=8, fontsize=T, fontweight="bold")
 ax_c.set_xlim(0.09, 0.78)
 ax_c.set_ylim(-0.02, 1.04)
 ax_c.set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
-ax_c.legend(loc="lower right", fontsize=AN - 2, framealpha=0.92)
+ax_c.tick_params(axis="y", labelsize=TK - 1)
+ax_c.legend(loc="lower right", fontsize=AN - 2, framealpha=0.92,
+            labelspacing=0.7)
 
-# ---- (d) nt null ----
+# ---- (d) nt null（分 nb 均值数字进 caption/TSV，图内只留散点+均值杠）----
 rng = np.random.default_rng(20261021)
 for k, b in enumerate(NBS):
     vals = by_nb[b]
@@ -231,41 +223,32 @@ for k, b in enumerate(NBS):
     m = nb_delta_mean[b]
     ax_d.plot([k - 0.30, k + 0.30], [m, m], color=C_HL, lw=2.6,
               solid_capstyle="round", zorder=4)
-    ax_d.text(k, 0.62 + (0.13 if k % 2 else 0), f"{m:+.2f}", ha="center",
-              fontsize=AN - 3, color=C_HL, fontweight="bold")
 ax_d.axhline(0, color="black", lw=1.0, linestyle="--")
 ax_d.set_xticks(range(len(NBS)))
 ax_d.set_xticklabels([str(b) for b in NBS], fontsize=TK - 1)
-ax_d.set_xlabel("near pages $n_b$", fontsize=L)
+ax_d.set_xlabel("near pages $n_b$", fontsize=L, labelpad=10)
 ax_d.set_ylabel("best-$n_t$ minus $n_t$-off (points)", fontsize=L)
-ax_d.set_title("(d)  $n_t$ main effect: null (69 pairs)", loc="left",
-               pad=10, fontsize=T, fontweight="bold")
+ax_d.set_title("(d)  $n_t$ effect: null", loc="left",
+               pad=8, fontsize=T, fontweight="bold")
 ax_d.set_yticks([-0.5, 0.0, 0.5])
-ax_d.set_ylim(-0.75, 0.85)
-ax_d.text(0.985, 0.05,
-          f"mean {np.mean(all_deltas):+.2f};  {sum(1 for x in all_deltas if x>0)}/69 > 0",
-          transform=ax_d.transAxes, fontsize=AN - 1, ha="right",
-          color=C_NEU)
+ax_d.set_ylim(-0.75, 0.75)
+ax_d.tick_params(axis="y", labelsize=TK - 1)
 
-# ---- (e) 冠军 vs 单池 ----
+# ---- (e) 冠军 vs 单池（逐任务差数字进 caption/TSV，图内只留柱）----
 xd = np.arange(len(TASKS) + 1)
 vals = task_delta + [avg_delta]
 cols = [C_MAIN if v >= 0 else "#B2182B" for v in vals[:-1]] + [C_HL]
 ax_e.bar(xd, vals, width=0.58, color=cols,
          edgecolor="black", linewidth=.7)
-for xi, v in zip(xd, vals):
-    ax_e.text(xi, v + (0.14 if v >= 0 else -0.34), f"{v:+.2f}",
-              ha="center", fontsize=AN - 1.5,
-              color=C_HL if xi == len(TASKS) else "black",
-              fontweight="bold" if xi == len(TASKS) else "normal")
 ax_e.axhline(0, color="black", lw=1.0)
 ax_e.set_xticks(xd)
 ax_e.set_xticklabels(TASK_LAB + ["AVG5"], fontsize=TK - 2.5)
 ax_e.set_ylabel("champion minus single pool (points)", fontsize=L - 1)
-ax_e.set_title("(e)  Champion vs single-pool control", loc="left",
-               pad=10, fontsize=T, fontweight="bold")
+ax_e.set_title("(e)  Champion vs single pool", loc="left",
+               pad=8, fontsize=T, fontweight="bold")
 ax_e.set_yticks([-2, 0, 2, 4, 6])
 ax_e.set_ylim(-2.4, 6.0)
+ax_e.tick_params(axis="y", labelsize=TK - 2.5)
 
 # ---------------- lint + 导出 ----------------
 report = lint_figure(fig)
