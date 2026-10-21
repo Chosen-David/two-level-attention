@@ -160,6 +160,31 @@ def build_chat(tokenizer, prompt, model_name):
     return prompt
 
 
+def _split_prompt_question(prompt, dataset):
+    """Split the material prefix from the final question-stage suffix.
+
+    The manual generation path sends at most the last 100 characters through
+    the question phase, unless a later task-specific anchor narrows that
+    suffix.  Clamp the fallback boundary to zero: Python's ``-1`` slice would
+    otherwise route only the final character for every unanchored prompt
+    shorter than 100 characters.
+    """
+    if dataset in ("qasper", "hotpotqa"):
+        anchor_pos = prompt.rfind("Question:")
+    elif dataset == "lbv2":
+        anchor_pos = prompt.rfind("Choices:")
+    elif dataset in ("multifieldqa_en", "gov_report"):
+        anchor_pos = prompt.rfind("Now,")
+    elif dataset == "triviaqa":
+        anchor_pos = prompt.rfind("Answer the question")
+    elif dataset == "narrativeqa":
+        anchor_pos = prompt.rfind("Do not provide")
+    else:
+        anchor_pos = -1
+    split_at = max(0, len(prompt) - 100, anchor_pos)
+    return prompt[:split_at], prompt[split_at:]
+
+
 def post_process(response, model_name):
     if "xgen" in model_name:
         response = response.strip().replace("Assistant:", "")
@@ -282,27 +307,10 @@ def get_pred(
             prompt = build_chat(tokenizer, prompt, model_name)
             chat_template_applied = True
 
-        # split the prompt and question (simulate decoding in the question stage)
-        if dataset in ["qasper", "hotpotqa"]:
-            q_pos = prompt.rfind("Question:")
-        elif dataset == "lbv2":
-            # 官方模板无 "Question:" 锚点；question stage 取选项块起点
-            q_pos = prompt.rfind("Choices:")
-        elif dataset in ["multifieldqa_en", "gov_report"]:
-            q_pos = prompt.rfind("Now,")
-        elif dataset in ["triviaqa"]:
-            q_pos = prompt.rfind("Answer the question")
-        elif dataset in ["narrativeqa"]:
-            q_pos = prompt.rfind("Do not provide")
-        else:
-            q_pos = -1
-
-        # max simulation length is 100
-        q_pos = max(len(prompt) - 100, q_pos)
-
-        if q_pos != None:
-            question = prompt[q_pos:]
-            prompt = prompt[:q_pos]
+        # Split the prompt and question (simulate decoding in the question
+        # stage).  The helper also handles empty/short prompts without Python's
+        # negative-index fallback silently turning the question into one char.
+        prompt, question = _split_prompt_question(prompt, dataset)
 
         if "chatglm3" in model_name:
             # input = prompt.to(device)
