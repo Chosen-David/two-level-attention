@@ -26,10 +26,12 @@ from benchmark.LongBench.context_capability_gate import (
 # cap 绑进结果产物身份，与 081 treatment snapshot 是两个独立层（cap 不进
 # info.py treatment manifest，见 run_cap_manifest.py 模块头注释）。
 from benchmark.LongBench.run_cap_manifest import (
+    build_lbv1_input_identity,
     build_run_cap_core,
     compute_result_binding,
     finalize_run_cap_manifest,
     gate_run_cap_identity,
+    input_ids_sha256,
     resolve_producer_identity,
     runcap_gate_lock,   # 103（TL-E096-CAP-GATE-TOCTOU-103）：gate→发布锁
     write_run_cap_manifest,
@@ -318,13 +320,11 @@ def get_pred(
                 input = tokenizer(
                     prompt, truncation=False, return_tensors="pt",
                     add_special_tokens=False,
-                ).to("cuda")
+                )
             else:
                 # input = tokenizer(prompt, truncation=False, return_tensors="pt").to(device)
-                input = tokenizer(prompt, truncation=False, return_tensors="pt").to("cuda")
-            q_input = tokenizer(question, truncation=False, return_tensors="pt").to(
-                "cuda"
-            )
+                input = tokenizer(prompt, truncation=False, return_tensors="pt")
+            q_input = tokenizer(question, truncation=False, return_tensors="pt")
             # R01 修复（kimi3 清单 2026-10-08）：原无条件 [:, 1:] 去首 token
             # 假定 tokenizer 加 BOS，但 Qwen3 系不加 → question 被切掉真实
             # 首 token。仅当首 token 确为 BOS 且非 None 时才切。
@@ -333,6 +333,21 @@ def get_pred(
                 and int(q_input.input_ids[0, 0].item()) == tokenizer.bos_token_id
             ):
                 q_input.input_ids = q_input.input_ids[:, 1:]
+
+            # TL-LBV1-INPUT-IDENTITY-20261020：在 CPU BatchEncoding 上冻结
+            # 模板、截断与 question split 后**实际送模**的 token ID。先 hash
+            # 再搬 CUDA，避免为 provenance 新增 device→host 同步；上面的 BOS
+            # 判定也因此不再在 GPU tensor 上调用 .item()。哈希口径由
+            # run_cap_manifest.input_ids_sha256 固定为 signed-int64 little-endian。
+            if run_stats is not None:
+                realized_ids = (
+                    input.input_ids[0].tolist()
+                    + q_input.input_ids[0].tolist()
+                )
+                run_stats.setdefault("input_ids_sha256", []).append(
+                    input_ids_sha256(realized_ids))
+            input = input.to("cuda")
+            q_input = q_input.to("cuda")
 
         context_length = input.input_ids.shape[-1] + q_input.input_ids.shape[-1]
         # 096（TL-DSV2-CAP-PROVENANCE-096）：每样本实际输入 token 数（chat
@@ -901,17 +916,16 @@ if __name__ == "__main__":
 
         prompt_format = dataset2prompt[dataset]
         max_gen = dataset2maxlen[dataset]
-        # E116a：数据指纹（answers+length 逐行 canonical JSON 的 SHA256 前 12 位），
-        # 进 _id 绑定冻结输入身份；lbv2 已有官方 _id 不需要
+        # TL-LBV1-INPUT-IDENTITY-20261020：LBv1 v2 数据身份覆盖有序完整源行，
+        # 并把 prompt template 单独绑定进 run identity。旧 E116a 仅哈希
+        # answers+length，会让 context/question 改写后仍沿用同一 _id/run-cap。
+        # lbv2 有官方 _id，继续沿用其独立口径。
         if dataset == "lbv2":
             data_fp = ""
+            input_identity = None
         else:
-            import hashlib as _hashlib
-            _fp_src = json.dumps(
-                [[obj.get("answers"), obj.get("length")] for obj in data],
-                ensure_ascii=False, sort_keys=True,
-            )
-            data_fp = _hashlib.sha256(_fp_src.encode("utf-8")).hexdigest()[:12]
+            input_identity = build_lbv1_input_identity(data, prompt_format)
+            data_fp = input_identity["source_fingerprint"]
 
         # 096（TL-DSV2-CAP-PROVENANCE-096）：method_name/out_fn/out_path 从
         # get_pred 之后上移到此处——run-cap 写门的早期 [CAP-CLASH] 检测在
@@ -958,6 +972,7 @@ if __name__ == "__main__":
             cap_gate_info=cap_gate_info,
             max_new_tokens=max_gen,
             producer=resolve_producer_identity(__file__),
+            input_identity=input_identity,
         )
         # 103（TL-E096-CAP-GATE-TOCTOU-103，GPT 审计 2026-10-12_0739）：
         # gate 与发布间的跨进程独占锁（fcntl.flock，锁文件 = 输出目录下
@@ -1027,7 +1042,8 @@ if __name__ == "__main__":
                 input_tokens=run_stats.get("input_tokens"),
                 truncated_flags=run_stats.get("truncated"),
                 result_file=os.path.basename(out_path),
-                result_sha256=None, result_lines=None))
+                result_sha256=None, result_lines=None,
+                input_ids_sha256=run_stats.get("input_ids_sha256")))
 
             with open(out_path, "w", encoding="utf-8") as f:
                 for pred in preds:
@@ -1042,7 +1058,8 @@ if __name__ == "__main__":
                 input_tokens=run_stats.get("input_tokens"),
                 truncated_flags=run_stats.get("truncated"),
                 result_file=os.path.basename(out_path),
-                result_sha256=runcap_sha, result_lines=runcap_lines))
+                result_sha256=runcap_sha, result_lines=runcap_lines,
+                input_ids_sha256=run_stats.get("input_ids_sha256")))
 
         budgets = [pred["budget"] for pred in preds if pred["budget"] is not None]
         ave_budget = sum(budgets) / len(budgets) if len(budgets) > 0 else None

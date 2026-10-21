@@ -59,6 +59,14 @@ class IdentityFormatTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, 'GATE-FAIL'):
             self.check_rows(rows_with('hotpotqa:aaaaaaaaaaaa:0', None))
 
+    def test_v2_ids_cannot_be_backfilled_without_source_and_token_evidence(self):
+        rows = rows_with(
+            'hotpotqa:v2-' + 'a' * 64 + ':0',
+            'hotpotqa:v2-' + 'a' * 64 + ':1',
+        )
+        with self.assertRaisesRegex(SystemExit, 'GATE-FAIL'):
+            self.check_rows(rows)
+
     def test_cli_rejects_mixed_file_without_publishing_sidecar(self):
         rows = rows_with(None, 'hotpotqa:aaaaaaaaaaaa:1')
         with tempfile.TemporaryDirectory() as td:

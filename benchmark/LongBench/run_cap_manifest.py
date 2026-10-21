@@ -72,6 +72,9 @@ import sys
 # 本后缀更短不超 ext4 255 单文件名上限。
 RUN_CAP_SIDECAR_SUFFIX = ".runcap.json"
 RUN_CAP_SCHEMA = "run-cap-manifest-v1"
+INPUT_IDENTITY_SCHEMA = "longbench-input-identity-v2"
+INPUT_IDENTITY_CANONICALIZATION = "ordered-json-utf8-length-prefix-v1"
+INPUT_IDS_ENCODING = "signed-int64-little-endian-v1"
 # 103（TL-E096-CAP-GATE-TOCTOU-103）gate 写门锁后缀（**结果文件级**，
 # 2026-10-12 粒度修正：首版为目录级，其「生产调度本就是串行 bash 链」
 # 前提被生产打破——同目录多任务并发是常态派单形态，目录级锁令后到
@@ -111,6 +114,110 @@ def _sha256_file(path):
 def _canonical(obj):
     return json.dumps(obj, sort_keys=True, ensure_ascii=False,
                       default=str)
+
+
+def _sha256_hex(value):
+    return hashlib.sha256(value).hexdigest()
+
+
+def build_lbv1_input_identity(data, prompt_template):
+    """Build the v2 LongBench-v1 source and prompt-template identity.
+
+    The old E116a fingerprint hashed only ``answers`` and ``length``.  This
+    version hashes every ordered source row using unambiguous length framing,
+    so a question/context/metadata edit or row reorder changes identity.  The
+    prompt template is a separate field because source equality and rendering
+    equality are different claims.
+    """
+    digest = hashlib.sha256()
+    count = 0
+    for row in data:
+        encoded = json.dumps(
+            row, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "little", signed=False))
+        digest.update(encoded)
+        count += 1
+    source_sha = digest.hexdigest()
+    return {
+        "schema": INPUT_IDENTITY_SCHEMA,
+        "canonicalization": INPUT_IDENTITY_CANONICALIZATION,
+        "source_sha256": source_sha,
+        "source_fingerprint": "v2-" + source_sha,
+        "sample_count": count,
+        "prompt_template_sha256": _sha256_hex(
+            str(prompt_template).encode("utf-8")),
+    }
+
+
+def input_ids_sha256(token_ids):
+    """Hash one realized model input using a portable int64 byte contract."""
+    digest = hashlib.sha256()
+    for raw in token_ids:
+        value = int(raw)
+        if value < -(1 << 63) or value >= (1 << 63):
+            raise ValueError("token id is outside signed int64 range")
+        digest.update(value.to_bytes(8, "little", signed=True))
+    return digest.hexdigest()
+
+
+def _input_identity_contract(identity):
+    if identity is None:
+        return None
+    return {
+        "schema": identity.get("schema"),
+        "canonicalization": identity.get("canonicalization"),
+        "source_sha256": identity.get("source_sha256"),
+        "source_fingerprint": identity.get("source_fingerprint"),
+        "sample_count": identity.get("sample_count"),
+        "prompt_template_sha256": identity.get("prompt_template_sha256"),
+    }
+
+
+def _ordered_digest_hash(values):
+    digest = hashlib.sha256()
+    for value in values:
+        raw = bytes.fromhex(value)
+        digest.update(len(raw).to_bytes(8, "little", signed=False))
+        digest.update(raw)
+    return digest.hexdigest()
+
+
+def validate_input_identity_uniformity(runcap_metas):
+    """Reject unfair same-dataset method aggregates before publication."""
+    grouped = {}
+    for filename, meta in runcap_metas.items():
+        if meta is not None:
+            grouped.setdefault(meta["dataset"], []).append((filename, meta))
+    for dataset, entries in grouped.items():
+        if len(entries) < 2:
+            continue
+        schemas = {meta["input_identity_schema"] for _, meta in entries}
+        if len(schemas) != 1:
+            raise SystemExit(
+                f"[RUNCAP-FAIL] LBV1-INPUT-UNIFORMITY: dataset={dataset!r} "
+                "混合 v2 与 legacy strict 输入身份——同一比较表无法证明各 "
+                "method 使用相同输入，拒绝写 result.json")
+        if schemas == {None}:
+            continue
+        identities = {
+            (meta["source_fingerprint"], meta["prompt_template_sha256"],
+             meta["actual_input_ids_ordered_sha256"])
+            for _, meta in entries
+        }
+        if any(value is None for identity in identities for value in identity):
+            raise SystemExit(
+                f"[RUNCAP-FAIL] LBV1-INPUT-UNIFORMITY: dataset={dataset!r} "
+                "v2 身份缺 source/template/actual-token 闭包，拒绝比较")
+        if len(identities) != 1:
+            files = [filename for filename, _ in entries]
+            raise SystemExit(
+                f"[RUNCAP-FAIL] LBV1-INPUT-UNIFORMITY: dataset={dataset!r} 的 "
+                f"{len(entries)} 个 method 产物使用了 {len(identities)} 组不同 "
+                f"source/template/actual-token 身份（文件 {files}），拒绝写 "
+                "result.json")
+    return True
 
 
 def resolve_producer_identity(script_path):
@@ -192,7 +299,8 @@ def summarize_cap_gate(cap_gate_info, effective_cap):
 
 def cap_identity_payload(model_name, dataset, dataset_fingerprint, method,
                          run_timestamp, effective_cap, protocol_cap,
-                         cap_treatment_type, max_new_tokens):
+                         cap_treatment_type, max_new_tokens,
+                         input_identity=None):
     """cap_identity hash 的输入子集（cap 进输出身份的核心）。
 
     刻意只含「run 口径」字段（模型/数据/method/时间戳/cap 三方/生成预算）
@@ -201,7 +309,7 @@ def cap_identity_payload(model_name, dataset, dataset_fingerprint, method,
     幂等重跑；cap/数据/时间戳任一不同则 identity 必不同（排序键 JSON→
     sha256 前 10 hex，与 076 treatment hash 同构造纪律）。
     """
-    return {
+    payload = {
         "schema": RUN_CAP_SCHEMA,
         "model_name": model_name,
         "dataset": dataset,
@@ -213,6 +321,10 @@ def cap_identity_payload(model_name, dataset, dataset_fingerprint, method,
         "cap_treatment_type": cap_treatment_type,
         "max_new_tokens": max_new_tokens,
     }
+    identity_contract = _input_identity_contract(input_identity)
+    if identity_contract is not None:
+        payload["input_identity"] = identity_contract
+    return payload
 
 
 def cap_identity_hash(**kwargs):
@@ -268,7 +380,7 @@ def cap_comparability_key(effective_cap, protocol_cap,
 def build_run_cap_core(model_name, model_path, method, dataset,
                        dataset_fingerprint, run_timestamp, effective_cap,
                        cap_gate_info, max_new_tokens, producer,
-                       treatment_type_hint=None):
+                       treatment_type_hint=None, input_identity=None):
     """run 级 manifest 核心字段（生成前可算——写门早期 CAP-CLASH 检测
     不必等整轮生成烧完 GPU 才发现口径冲突）。
 
@@ -290,8 +402,8 @@ def build_run_cap_core(model_name, model_path, method, dataset,
         run_timestamp=run_timestamp, effective_cap=effective_cap,
         protocol_cap=summ["protocol_cap"],
         cap_treatment_type=summ["cap_treatment"]["type"],
-        max_new_tokens=max_new_tokens)
-    return {
+        max_new_tokens=max_new_tokens, input_identity=input_identity)
+    core = {
         "schema": RUN_CAP_SCHEMA,
         "provenance": "inline",
         "status": None,   # generating / complete（finalize 阶段定）
@@ -317,12 +429,15 @@ def build_run_cap_core(model_name, model_path, method, dataset,
             "payload": payload,
         },
     }
+    if input_identity is not None:
+        core["input_identity"] = _input_identity_contract(input_identity)
+    return core
 
 
 def finalize_run_cap_manifest(core, status, n_samples, input_tokens,
                               truncated_flags, result_file, result_sha256,
                               result_lines, provenance="inline",
-                              created_utc=None):
+                              created_utc=None, input_ids_sha256=None):
     """组装完整 manifest（validate_run_cap_manifest 的消费口径）。
 
     input_tokens/truncated_flags：每样本列表（inline 生产路径）或 None
@@ -356,6 +471,19 @@ def finalize_run_cap_manifest(core, status, n_samples, input_tokens,
     manifest["result_file"] = result_file
     manifest["result_sha256"] = result_sha256
     manifest["result_lines"] = result_lines
+    if "input_identity" in manifest:
+        identity = dict(manifest["input_identity"])
+        if input_ids_sha256 is None:
+            identity["actual_input_ids"] = None
+        else:
+            hashes = [str(value) for value in input_ids_sha256]
+            identity["actual_input_ids"] = {
+                "encoding": INPUT_IDS_ENCODING,
+                "count": len(hashes),
+                "per_sample_sha256": hashes,
+                "ordered_sha256": _ordered_digest_hash(hashes),
+            }
+        manifest["input_identity"] = identity
     validate_run_cap_manifest(manifest)
     return manifest
 
@@ -438,6 +566,57 @@ def validate_run_cap_manifest(manifest):
               f"{payload.get('cap_treatment_type')!r} != 外层 "
               f"cap_treatment.type="
               f"{manifest['cap_treatment'].get('type')!r}（115 fail-closed）")
+    payload_identity = payload.get("input_identity")
+    manifest_identity = manifest.get("input_identity")
+    if (payload_identity is None) != (manifest_identity is None):
+        _fail("input_identity 在 cap payload 与外层 manifest 间仅单侧存在")
+    if manifest_identity is not None:
+        if not isinstance(manifest_identity, dict):
+            _fail("input_identity 须为对象")
+        contract = _input_identity_contract(manifest_identity)
+        if payload_identity != contract:
+            _fail("cap payload.input_identity 与外层身份合同不一致")
+        if contract["schema"] != INPUT_IDENTITY_SCHEMA:
+            _fail(f"input_identity.schema={contract['schema']!r} 非法")
+        if contract["canonicalization"] != INPUT_IDENTITY_CANONICALIZATION:
+            _fail("input_identity canonicalization 非法")
+        source_sha = contract["source_sha256"]
+        prompt_sha = contract["prompt_template_sha256"]
+        if (not isinstance(source_sha, str) or len(source_sha) != 64
+                or any(c not in "0123456789abcdef" for c in source_sha)):
+            _fail("input_identity.source_sha256 不是小写 SHA-256")
+        if contract["source_fingerprint"] != "v2-" + source_sha:
+            _fail("input_identity source_fingerprint 未绑定 source_sha256")
+        if manifest["dataset_fingerprint"] != contract["source_fingerprint"]:
+            _fail("dataset_fingerprint 与 v2 source_fingerprint 不一致")
+        if (not isinstance(prompt_sha, str) or len(prompt_sha) != 64
+                or any(c not in "0123456789abcdef" for c in prompt_sha)):
+            _fail("input_identity.prompt_template_sha256 不是小写 SHA-256")
+        sample_count = contract["sample_count"]
+        if (isinstance(sample_count, bool) or not isinstance(sample_count, int)
+                or sample_count < 0 or sample_count != manifest["n_samples"]):
+            _fail("input_identity.sample_count 必须等于 n_samples")
+        actual = manifest_identity.get("actual_input_ids")
+        if (manifest.get("provenance") == "inline"
+                and not isinstance(actual, dict)):
+            _fail("v2 inline manifest 必须记录 actual_input_ids")
+        if actual is not None:
+            if not isinstance(actual, dict):
+                _fail("actual_input_ids 须为对象或 null")
+            if actual.get("encoding") != INPUT_IDS_ENCODING:
+                _fail("actual_input_ids encoding 非法")
+            hashes = actual.get("per_sample_sha256")
+            if not isinstance(hashes, list):
+                _fail("actual_input_ids.per_sample_sha256 须为列表")
+            if actual.get("count") != len(hashes) \
+                    or len(hashes) != manifest["n_samples"]:
+                _fail("actual_input_ids 数量必须等于 n_samples")
+            if any(not isinstance(value, str) or len(value) != 64
+                   or any(c not in "0123456789abcdef" for c in value)
+                   for value in hashes):
+                _fail("actual_input_ids 含非法 SHA-256")
+            if actual.get("ordered_sha256") != _ordered_digest_hash(hashes):
+                _fail("actual_input_ids ordered_sha256 与逐样本列表不一致")
     prov = manifest["provenance"]
     if manifest["effective_cap"] is None and prov != "provenance_incomplete":
         _fail("effective_cap=null 仅允许 provenance_incomplete")
