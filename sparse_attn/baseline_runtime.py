@@ -1,9 +1,9 @@
 """Safe baseline planning and guarded native FFD integration.
 
 【2026-10-20 batch decode 基础设施（deepseek 轨，Phase 0）】
-本模块同时承载 vendor 稀疏 decode 的 batch>1 支持：模块级全局
-`_BATCH_DECODE_CTX`（BatchCtx dataclass）与 E127 `_ERR_FLAG` 同模式
-（模块级全局单例、set/clear 显式管理）。`require_unmasked_decode`
+本模块同时承载 vendor 稀疏 decode 的 batch>1 支持：请求局部
+`_BATCH_DECODE_CTX`（BatchCtx dataclass）使用请求上下文局部存储并由
+set/clear 显式管理，避免并发请求互相覆盖。`require_unmasked_decode`
 因此改为双路径：ctx is None → 旧单序列语义逐字保留（bsz=1 拒绝 +
 原报错文案，既有 smoke/E127 零扰动）；ctx 非 None → 新 batch 契约
 （校验 bsz==ctx.batch、4D mask 且 q_len==1、mask 派生有效长 ==
@@ -11,6 +11,7 @@ ctx.seq_lens 交叉校验）。各 vendor patch 在 batch 模式用
 `batch_valid_mask(key_states, ctx)` 排除 left-pad 的 pad 列。
 """
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 import hashlib
@@ -88,27 +89,36 @@ class BatchCtx:
     pad_id: int
 
 
-# 模块级全局 batch 上下文：None = legacy 单序列模式（各 vendor 既有行为
+# 请求局部 batch 上下文：None = legacy 单序列模式（各 vendor 既有行为
 # 逐字保留）；非 None = batch 模式（由 pred_ruler_batch/pred_batch 在
-# decode 循环外层 set/clear，与 E127 _ERR_FLAG 的显式生命周期管理同模式）。
-_BATCH_DECODE_CTX = None
+# decode 循环外层 set/clear）。ContextVar 同时隔离线程与异步任务上下文，
+# 避免两个并发请求在逐层 forward 之间覆盖彼此的长度/存活状态。
+_BATCH_DECODE_CTX = ContextVar("tli_batch_decode_ctx", default=None)
 
 
 def set_batch_decode_ctx(ctx):
     """进入 batch decode 模式（ctx: BatchCtx）。必须与 clear 成对使用。"""
-    global _BATCH_DECODE_CTX
-    _BATCH_DECODE_CTX = ctx
+    _BATCH_DECODE_CTX.set(ctx)
 
 
 def clear_batch_decode_ctx():
     """退出 batch decode 模式（恢复 legacy 单序列语义）。"""
-    global _BATCH_DECODE_CTX
-    _BATCH_DECODE_CTX = None
+    _BATCH_DECODE_CTX.set(None)
 
 
 def batch_decode_ctx():
     """读取当前 batch 上下文（None = legacy 模式）。"""
-    return _BATCH_DECODE_CTX
+    return _BATCH_DECODE_CTX.get()
+
+
+@contextmanager
+def batch_decode_scope(ctx):
+    """为单个请求激活 ctx，并在正常/异常/嵌套退出时恢复原 owner。"""
+    token = _BATCH_DECODE_CTX.set(ctx)
+    try:
+        yield ctx
+    finally:
+        _BATCH_DECODE_CTX.reset(token)
 
 
 def batch_valid_mask(key_states, ctx=None):
@@ -119,7 +129,7 @@ def batch_valid_mask(key_states, ctx=None):
     到 [B, 1, S]（各 vendor 按需 expand 到 kv_heads 维或直接高级索引）。
     """
     import torch
-    ctx = ctx if ctx is not None else _BATCH_DECODE_CTX
+    ctx = ctx if ctx is not None else batch_decode_ctx()
     if ctx is None:
         raise ValueError('batch_valid_mask requires an active batch decode ctx')
     S = key_states.shape[-2]
@@ -146,11 +156,16 @@ def batch_valid_len_from_mask(mask):
     row = mask[..., 0, :]  # [B, S]
     if mask.dtype == torch.bool:
         return row.sum(dim=-1).tolist()
-    return (row != 0).sum(dim=-1).tolist()
+    # Additive attention masks use 0 for visible columns and a negative value
+    # (normally -inf or the dtype minimum) for padding.  Counting non-zero
+    # entries here returns the padding length, which is the inverse of the
+    # BatchCtx contract and rejects the mask emitted by pred_ruler_batch.
+    # Requiring an exact zero also fails closed for unsupported custom biases.
+    return (row == 0).sum(dim=-1).tolist()
 
 
 def require_unmasked_decode(hidden_states, attention_mask, cache, position):
-    ctx = _BATCH_DECODE_CTX
+    ctx = batch_decode_ctx()
     if ctx is None:
         # ---- legacy 单序列语义（逐字保留，bsz=1 拒绝 + 原报错文案）----
         if hidden_states.shape[0] != 1 or cache is None or position is None:
