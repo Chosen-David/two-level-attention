@@ -772,6 +772,11 @@ class TLIIndexer(TIAIndexer):
         if (
             inc is not None
             and S_now > inc["S"]
+            # Reusing old buffers across metadata changes can broadcast a
+            # single KV head or cast the tail into the previous dtype/device.
+            # Shape/device/dtype are host metadata: no device synchronization.
+            and inc.get("input_signature") == (
+                k.device, k.dtype, k.shape[2], k.shape[3], self.args.tia_block_size)
             and self._basis is None
             and self._basis_all is None
             and not self.moba_gate
@@ -812,6 +817,8 @@ class TLIIndexer(TIAIndexer):
             k_avg_buf = d["k_avg"].clone() if d.get("k_avg") is not None else None
         self._inc = {
             "S": k.shape[1],
+            "input_signature": (
+                k.device, k.dtype, k.shape[2], k.shape[3], self.args.tia_block_size),
             "k_min": d["k_min"],
             "k_max": d["k_max"],
             "k_avg": d.get("k_avg"),
