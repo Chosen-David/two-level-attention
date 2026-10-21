@@ -42,7 +42,7 @@ AsyncTLS等级联使用低成本页摘要筛选候选页，再进行词元精筛
 \section{相关工作}
 Quest提供符号感知页极值界，SparQ从查询选择键坐标，HISA按层级剪枝注意力集合~\cite{quest,sparq,hisa}。AsyncTLS明确在粗粒度选块时沿用Quest，在细粒度选词元时采用Double Sparsity，并结合量化、逐查询归一化与GQA概率聚合及原始KV注意力~\cite{asynctls}；更早的Twilight采用先选择再剪枝架构~\cite{twilight}。LoDA-SA沿用这一广义层级选择范式，研究显式距离区域页准入、两级共享完整低频RoPE对与统一L2竞争的组合。这里陈述的是算法思想关系，不是已核实的直接代码继承。
 
-选择器自身读取什么同样重要。Token-Picker从部分键比特块构造保守概率估计，对被剪枝词元停止后续键比特块和value的传输~\cite{tokenpicker}；本文的选择器则在页预算约束下用固定坐标子集对候选排序，并保留原维KV。本文的两级选择均保持bf16。AsyncTLS词元键为INT4，FFD扫描2-bit键，HISA官方实现以FP8池化块摘要~\cite{asynctls,ffd,hisa}；我们的效率来自候选结构、区域配额与页级收窄，而非数值压缩。KV压缩与放置方法关注互补的存储和数据移动约束~\cite{shadowkv,million,clusterkv}；较小的评分视图不减少原始KV容量，也不能据此证明完整请求时延收益。
+选择器自身读取什么同样重要。Token-Picker从部分键比特块构造保守概率估计，对被剪枝词元停止后续键比特块和value的传输~\cite{tokenpicker}；本文的选择器则在页预算约束下用固定坐标子集对候选排序，并保留原维KV。本文的两级选择均保持bf16。AsyncTLS词元键为INT4，FFD扫描2-bit键，HISA官方实现以FP8池化块摘要~\cite{asynctls,ffd,hisa}；LoDA-SA期望通过紧凑评分与结构化候选准入降低选择开销；普通L2仍对全历史评分，因此仅凭页级收窄不能证明这一节省。KV压缩与放置方法关注互补的存储和数据移动约束~\cite{shadowkv,million,clusterkv}；较小的评分视图不减少原始KV容量，也不能据此证明完整请求时延收益。
 
 \section{LoDA-SA：共享子空间中的距离感知选择}
 LoDA-SA区分三项决策：哪些距离区域能够提供候选页、如何用共享紧凑视图评分，以及合并候选中的哪些词元进入最终注意力。距离策略用$n_l$指定近区范围、$n_b$指定近区页预算，远区获得$K_1-n_b$页。实现先准备共享32坐标表示，再执行区域L1选择（图\ref{fig:architecture}）；这一执行顺序不同于从距离策略开始的叙述顺序。选择仅在解码阶段执行，预填充保持稠密；该参考配置关闭门控与候选收集，归档运行不验证当前LoDA-SA。
