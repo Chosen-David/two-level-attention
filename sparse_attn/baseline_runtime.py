@@ -156,7 +156,12 @@ def batch_valid_len_from_mask(mask):
     row = mask[..., 0, :]  # [B, S]
     if mask.dtype == torch.bool:
         return row.sum(dim=-1).tolist()
-    return (row != 0).sum(dim=-1).tolist()
+    # Additive attention masks use 0 for visible columns and a negative value
+    # (normally -inf or the dtype minimum) for padding.  Counting non-zero
+    # entries here returns the padding length, which is the inverse of the
+    # BatchCtx contract and rejects the mask emitted by pred_ruler_batch.
+    # Requiring an exact zero also fails closed for unsupported custom biases.
+    return (row == 0).sum(dim=-1).tolist()
 
 
 def require_unmasked_decode(hidden_states, attention_mask, cache, position):

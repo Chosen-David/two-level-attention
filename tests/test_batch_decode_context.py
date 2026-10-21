@@ -1,12 +1,17 @@
 import asyncio
+import sys
 import threading
+import types
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from sparse_attn.baseline_runtime import (
     BatchCtx,
     batch_decode_ctx,
     batch_decode_scope,
     clear_batch_decode_ctx,
+    require_unmasked_decode,
     set_batch_decode_ctx,
 )
 
@@ -91,6 +96,78 @@ class BatchDecodeContextTests(unittest.TestCase):
         self.assertEqual(short.seq_lens, [24])
         self.assertEqual(long.seq_lens, [96])
         self.assertIsNone(batch_decode_ctx())
+
+    def test_additive_mask_counts_visible_zero_columns(self):
+        """The RULER batch mask is 0 for visible and negative for padding."""
+
+        class Reduced:
+            def __init__(self, values):
+                self.values = values
+
+            def tolist(self):
+                return self.values
+
+        class ComparedRows:
+            def __init__(self, rows):
+                self.rows = rows
+
+            def sum(self, dim=-1):
+                if dim != -1:
+                    raise AssertionError(f"unexpected reduction dim: {dim}")
+                return Reduced([sum(row) for row in self.rows])
+
+        class Rows:
+            def __init__(self, rows):
+                self.rows = rows
+
+            def sum(self, dim=-1):
+                if dim != -1:
+                    raise AssertionError(f"unexpected reduction dim: {dim}")
+                return Reduced([sum(row) for row in self.rows])
+
+            def __eq__(self, value):
+                return ComparedRows([
+                    [item == value for item in row] for row in self.rows
+                ])
+
+            def __ne__(self, value):
+                return ComparedRows([
+                    [item != value for item in row] for row in self.rows
+                ])
+
+        class AdditiveMask:
+            ndim = 4
+            shape = (2, 1, 1, 5)
+            dtype = "float32"
+
+            def __getitem__(self, key):
+                return Rows([
+                    [-999.0, -999.0, 0.0, 0.0, 0.0],
+                    [-999.0, 0.0, 0.0, 0.0, 0.0],
+                ])
+
+        class BooleanMask(AdditiveMask):
+            def __getitem__(self, key):
+                return Rows([
+                    [False, False, True, True, True],
+                    [False, True, True, True, True],
+                ])
+
+        fake_torch = types.ModuleType("torch")
+        fake_torch.bool = object()
+        ctx = BatchCtx(2, [3, 4], [0, 0], [True, True], 0)
+        hidden = SimpleNamespace(shape=(2, 1, 8))
+
+        with patch.dict(sys.modules, {"torch": fake_torch}):
+            with batch_decode_scope(ctx):
+                require_unmasked_decode(
+                    hidden, AdditiveMask(), object(), object())
+
+            boolean_mask = BooleanMask()
+            boolean_mask.dtype = fake_torch.bool
+            with batch_decode_scope(ctx):
+                require_unmasked_decode(
+                    hidden, boolean_mask, object(), object())
 
 
 if __name__ == "__main__":
