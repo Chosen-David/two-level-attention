@@ -4,7 +4,7 @@ LoDA-SA explains finite-budget regional candidate access before shared low-frequ
 
 The English paper contains six content pages plus a references-only page; the Chinese companion contains five content pages plus references. DAC 2027 permits at most six content pages and one references-only page: https://dac.com/2027/program/research-manuscript-submissions . Page-count compliance does not establish full submission readiness.
 
-The current mechanism is `figures/architecture_domains/fig2_domains_{en,zh}` and slides 6/8. Supplement S3 and slide 9 explicitly retain the historical numeric-token-quota gate; retained `method_details/near_far_*` assets are legacy diagrams and do not define the current algorithm.
+The current mechanism is `figures/architecture_domains/fig2_domains_{en,zh}` and slides 6/8. Supplement S3 and slide 9 explicitly retain the historical numeric-token-quota gate; `method_details/near_far_*` depicts an illustrative pooled-L2 geometry, while the gate assets retain historical numeric-quota semantics. The illustrative 32/4096 point is not a validated current operating point.
 
 Rebuild figures and both main texts/supplements with `bash source/rebuild_current.sh`. Dependencies are Python3 with NumPy/Matplotlib/Pillow, Inkscape, XeLaTeX/TeX Live and bundled fonts. The editable 17-slide presentation is synchronized by `python3 sources/sync_integration_ppt.py`; export it with LibreOffice/soffice after sourcing `fonts/env.sh`.
 
