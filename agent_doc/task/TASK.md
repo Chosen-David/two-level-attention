@@ -2,6 +2,8 @@
 
 ## 2026-10-21
 
+- [x] [TL-BATCH-CONTEXT-ISOLATION-20261021] 批量decode请求上下文由进程全局改为ContextVar并用scope恢复owner；修前双线程确定串扰，修后线程/async/嵌套异常普通及-O各3项通过，独立复核无blocker；当前环境缺torch，GPU/实模/性能及显式线程池传播未验。([详情](task_details/TL-BATCH-CONTEXT-ISOLATION-20261021.md))
+
 - [x] [TL-E155D-STAGING-20261021] T2每次打分独占快照，避免重复/并发调用删除前次证据；新增5反例、普通/-O各72项及各24入口对照通过；独立双进程/删源后20预测20manifest及CI通过，发布回读另核，真实T2/GPU未验。([详情](task_details/TL-E155D-STAGING-20261021.md))
 
 - [x] [TL-E155D-ATOMIC-VERDICT-20261021] T2写入中断保留旧判决、避免公开半JSON；修前10项9失败，普通/-O各67项CPU回归通过，独立24入口完整JSON及87几何对照通过；真实T2/GPU/并发staging未验，发布回读另核。([详情](task_details/TL-E155D-ATOMIC-VERDICT-20261021.md))

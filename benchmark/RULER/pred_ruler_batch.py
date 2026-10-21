@@ -60,7 +60,7 @@ from benchmark.RULER.yarn_receipt import (  # noqa: E402
 from sparse_attn.arguments import add_sparse_attn_args  # noqa: E402
 from sparse_attn.baseline_runtime import (  # noqa: E402
     baseline_request, baseline_preflight, BatchCtx,
-    batch_decode_ctx, set_batch_decode_ctx, clear_batch_decode_ctx,
+    batch_decode_scope,
 )
 from sparse_attn.info import (  # noqa: E402
     get_method_name_with_info, resolve_treatment_snapshot,
@@ -178,53 +178,51 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
     ctx = BatchCtx(
         batch=B, seq_lens=list(lens), gen_lens=[0] * B,
         alive=[True] * B, pad_id=pad_id)
-    set_batch_decode_ctx(ctx)
+    with batch_decode_scope(ctx):
+        # prefill：显式 position_ids + 2D mask（create_causal_mask 内部转 4D，
+        # pad 前缀由 mask 0 屏蔽）。logits 超 32K 档取末 token（省显存）。
+        output = model(input_ids=input_ids, position_ids=position_ids,
+                       attention_mask=mask2d, past_key_values=None,
+                       use_cache=True,
+                       **({"logits_to_keep": 1} if keep_logits else {}))
+        past = output.past_key_values
+        pred = output.logits[:, -1, :].argmax(dim=-1)  # [B]
+        gen = [[p] for p in pred.tolist()]             # 每行一个 gen 列表
 
-    # prefill：显式 position_ids + 2D mask（create_causal_mask 内部转 4D，
-    # pad 前缀由 mask 0 屏蔽）。logits 超 32K 档取末 token（省显存）。
-    output = model(input_ids=input_ids, position_ids=position_ids,
-                   attention_mask=mask2d, past_key_values=None,
-                   use_cache=True,
-                   **({"logits_to_keep": 1} if keep_logits else {}))
-    past = output.past_key_values
-    pred = output.logits[:, -1, :].argmax(dim=-1)  # [B]
-    gen = [[p] for p in pred.tolist()]             # 每行一个 gen 列表
-
-    for step in range(MAX_GEN - 1):
-        if not any(ctx.alive):
-            break
-        # 本步喂入 token：alive 行 = 当前最后产生 token，dead 行 = pad_id
-        nxt = [gen[b][-1] if ctx.alive[b] else pad_id for b in range(B)]
-        nxt_ids = torch.tensor(nxt, dtype=torch.long, device=device).view(B, 1)
-        # 位置：alive 行 = lens[b] + step（当前绝对位置）；dead 行同式递增
-        # （被 mask 排除，无影响）。
-        pos = torch.tensor([lens[b] + step for b in range(B)],
-                           dtype=torch.long, device=device).view(B, 1)
-        # 【2026-10-20 修复】seq_lens/gen_lens 在 forward 前 +1：本步新 token
-        # 计入真实上下文长（与 KV append 同步）——否则 4D mask 的「尾部
-        # 真实长列」少 1，最长行（无 pad）会把第 0 列（真实首 token）误
-        # 屏蔽 → decode 首步后全行输出跑偏。修复前 batch=2 dense 冒烟
-        # row0 首 token 对、后续全错即此因。
-        for b in range(B):
-            if ctx.alive[b]:
-                ctx.seq_lens[b] += 1
-                ctx.gen_lens[b] += 1
-        # mask 列数 = cache 更新后总列 = S_max + step + 1；行 b 可见长 =
-        # 更新后的 seq_lens[b]（= lens[b] + step + 1，含本步新 token）。
-        m4 = _decode_4d_mask(len(input_ids[0]) + step + 1, ctx.seq_lens,
-                             neg_inf, dtype, device)
-        out = model(input_ids=nxt_ids, position_ids=pos,
-                    attention_mask=m4, past_key_values=past, use_cache=True)
-        past = out.past_key_values
-        pred = out.logits[:, -1, :].argmax(dim=-1)  # [B]
-        for b in range(B):
-            if not ctx.alive[b]:
-                continue
-            gen[b].append(pred[b].item())
-            if pred[b].item() in eos_ids and len(gen[b]) > 1:
-                ctx.alive[b] = False
-    clear_batch_decode_ctx()
-    return gen
+        for step in range(MAX_GEN - 1):
+            if not any(ctx.alive):
+                break
+            # 本步喂入 token：alive 行 = 当前最后产生 token，dead 行 = pad_id
+            nxt = [gen[b][-1] if ctx.alive[b] else pad_id for b in range(B)]
+            nxt_ids = torch.tensor(nxt, dtype=torch.long, device=device).view(B, 1)
+            # 位置：alive 行 = lens[b] + step（当前绝对位置）；dead 行同式递增
+            # （被 mask 排除，无影响）。
+            pos = torch.tensor([lens[b] + step for b in range(B)],
+                               dtype=torch.long, device=device).view(B, 1)
+            # 【2026-10-20 修复】seq_lens/gen_lens 在 forward 前 +1：本步新 token
+            # 计入真实上下文长（与 KV append 同步）——否则 4D mask 的「尾部
+            # 真实长列」少 1，最长行（无 pad）会把第 0 列（真实首 token）误
+            # 屏蔽 → decode 首步后全行输出跑偏。修复前 batch=2 dense 冒烟
+            # row0 首 token 对、后续全错即此因。
+            for b in range(B):
+                if ctx.alive[b]:
+                    ctx.seq_lens[b] += 1
+                    ctx.gen_lens[b] += 1
+            # mask 列数 = cache 更新后总列 = S_max + step + 1；行 b 可见长 =
+            # 更新后的 seq_lens[b]（= lens[b] + step + 1，含本步新 token）。
+            m4 = _decode_4d_mask(len(input_ids[0]) + step + 1, ctx.seq_lens,
+                                 neg_inf, dtype, device)
+            out = model(input_ids=nxt_ids, position_ids=pos,
+                        attention_mask=m4, past_key_values=past, use_cache=True)
+            past = out.past_key_values
+            pred = out.logits[:, -1, :].argmax(dim=-1)  # [B]
+            for b in range(B):
+                if not ctx.alive[b]:
+                    continue
+                gen[b].append(pred[b].item())
+                if pred[b].item() in eos_ids and len(gen[b]) > 1:
+                    ctx.alive[b] = False
+        return gen
 
 
 def main():
