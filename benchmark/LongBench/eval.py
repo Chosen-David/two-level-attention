@@ -125,6 +125,10 @@ def validate_runcap_sidecar(jsonl_path, legacy_allowed,
             f"拒绝打分，不写 result.json")
     ct = manifest["cap_treatment"] \
         if isinstance(manifest["cap_treatment"], dict) else {}
+    input_identity = manifest.get("input_identity") \
+        if isinstance(manifest.get("input_identity"), dict) else {}
+    actual_input_ids = input_identity.get("actual_input_ids") \
+        if isinstance(input_identity.get("actual_input_ids"), dict) else {}
     return {
         "cap_effective": manifest["effective_cap"],
         "cap_protocol": manifest["protocol_cap"],
@@ -137,6 +141,14 @@ def validate_runcap_sidecar(jsonl_path, legacy_allowed,
             cap_treatment_type=ct.get("type"),
             cap_treatment_divergence=ct.get("divergence")),
         "provenance": manifest["provenance"],
+        # LBv1 v2 输入闭包的聚合元数据。旧 sidecar 明确返回 null，不把
+        # answers+length 旧指纹冒充完整 source/template/token 身份。
+        "input_identity_schema": input_identity.get("schema"),
+        "source_fingerprint": input_identity.get("source_fingerprint"),
+        "prompt_template_sha256": input_identity.get(
+            "prompt_template_sha256"),
+        "actual_input_ids_ordered_sha256": actual_input_ids.get(
+            "ordered_sha256"),
         "result_sha256": actual_sha,
         "sidecar": os.path.basename(sidecar),
     }
@@ -428,6 +440,20 @@ if __name__ == "__main__":
             f"协议口径必须分目录分别打分），拒绝写 result.json，"
             f"fail loudly")
     cap_hashes = sorted({m["cap_identity_hash"] for m in strict_metas})
+    input_identity_by_file = {
+        filename: {
+            "schema": meta["input_identity_schema"],
+            "source_fingerprint": meta["source_fingerprint"],
+            "prompt_template_sha256": meta["prompt_template_sha256"],
+            "actual_input_ids_ordered_sha256": meta[
+                "actual_input_ids_ordered_sha256"],
+        }
+        for filename, meta in sorted(runcap_metas.items())
+        if meta is not None and meta["input_identity_schema"] is not None
+    }
+    legacy_strict_identity_count = sum(
+        1 for meta in strict_metas
+        if meta["input_identity_schema"] is None)
     # E116a：scorer 后端身份随 result.json 落盘（跨环境复现性锚点）
     # 102/112：cap 身份（effective/protocol/comparability key/identity
     # hash/provenance）随 result.json _meta 落盘——分数与打分时验证过的
@@ -447,6 +473,14 @@ if __name__ == "__main__":
         "cap_identity_hashes": cap_hashes,
         "provenance": sorted({m["provenance"] for m in strict_metas})
         if strict_metas else None,
+        # 各 task 的 source/template/token hash 天然不同，不压成伪造的
+        # “单一值”；逐文件留证，并把通过旧 run-cap schema 的 strict
+        # sidecar 单独计数为 legacy（其 cap 仍可验证，输入闭包不可验证）。
+        "input_identity": {
+            "v2_validated": len(input_identity_by_file),
+            "legacy_strict": legacy_strict_identity_count,
+            "by_file": input_identity_by_file,
+        },
     }
     scores["_meta"] = {"scorer_backend": SCORER_BACKEND_ID,
                        "runcap": runcap_meta}
