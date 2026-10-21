@@ -17,7 +17,10 @@ class S:
    for col in range(cols):self.r(x+col*(cw+gap),y+r*(ch+gap),cw,ch,c if sel is None or col in sel else 'pale')
  def title(self,n,en,zh):self.t(0,10,n,size=10,c='purple',bold=True);self.t(17,10,en,zh,size=9.2,bold=True);self.line([(0,17),(self.w,17)])
  def save(self,n):
-  f=OUT/f'{n}_{self.lang}.svg';f.write_text('\n'.join(self.a+['</svg>']));subprocess.run(['inkscape',str(f),'--export-text-to-path',f'--export-filename={f.with_suffix(".pdf")}'],capture_output=True,check=True);subprocess.run(['pdftoppm','-scale-to','1300','-png','-singlefile',str(f.with_suffix('.pdf')),str(f.with_suffix(''))],capture_output=True,check=True)
+  f=OUT/f'{n}_{self.lang}.svg';f.write_text('\n'.join(self.a+['</svg>']))
+  import cairosvg
+  cairosvg.svg2pdf(url=str(f),write_to=str(f.with_suffix('.pdf')))
+  cairosvg.svg2png(url=str(f),write_to=str(f.with_suffix('.png')),output_width=1300)
 
 def page(s,x,y,c,selected=True):
  s.r(x,y,16,22,'white',c if selected else 'line',2)
@@ -54,9 +57,9 @@ for lang in ['en','zh']:
  for r in range(4):s.grid(189,123+r*6,1,8,'purple',cw=4,ch=4,gap=1)
  s.t(184,154,'Separate Q heads','独立 Q 头',size=8,c='purple')
  s.save('subspace')
- s=S(252,228,lang);s.title('b','Pages first, then regional tokens','先筛选区域页，再精选词元')
+ s=S(252,228,lang);s.title('b','Regional pages, one token pool','区域选页，单一词元池')
  # Two equal, aligned region cards. Page glyphs instead of anonymous grids.
- for x,c,en,zh,quota in [(0,'far','Far · extrema','远区 · 极值',112),(130,'near','Near · mean key','近区 · 均值键',16)]:
+ for x,c,en,zh,quota in [(0,'far','Far · extrema','远区 · 极值',96),(130,'near','Near · mean key','近区 · 均值键',32)]:
   s.r(x,25,122,62,'fl' if c=='far' else 'nl',None,4)
   s.t(x+7,37,en,zh,size=8.5,c=c,bold=True)
   for i in range(4):page(s,x+7+i*21,44,c,i!=1)
@@ -74,10 +77,9 @@ for lang in ['en','zh']:
  s.t(126,164,'Per-Q softmax → GQA probability mean','逐 Q softmax → GQA 组内概率均值',size=8.5,bold=True,anchor='middle')
  s.line([(126,171),(126,177),(61,177),(61,183)],'far',True)
  s.line([(126,177),(191,177),(191,183)],'near',True)
- s.t(0,194,'Far quota · 252','远区配额 · 252',size=8.5,c='far',bold=True)
- s.t(130,194,'Near TopK · 640','近区 TopK · 640',size=8.5,c='near',bold=True)
- s.grid(0,200,1,8,'far',cw=5,ch=4,gap=1);s.grid(130,200,1,20,'near',cw=5,ch=4,gap=1)
- s.line([(23.5,206),(23.5,211),(126,211)],'far');s.line([(189.5,206),(189.5,211),(126,211)],'near');s.line([(126,211),(126,215)],'ink',True)
+ s.t(126,194,'Single pool · free-competition TopK','单池 · 自由竞争 TopK',size=8.5,c='ink',bold=True,anchor='middle')
+ s.grid(0,200,1,28,'purple',cw=8,ch=4,gap=1)
+ s.line([(116,206),(116,211),(126,211)],'purple');s.line([(126,211),(126,215)],'ink',True)
  s.t(126,224,'Indices ∪ protection → original-space attention','词元索引 ∪ 保护集 → 原维注意力',size=8.5,bold=True,anchor='middle')
  s.save('near_far')
  s=S(252,218,lang);s.title('c','Layerwise gates: prefill → decode','逐层门控：prefill → decode')
@@ -106,7 +108,7 @@ for lang in ['en','zh']:
  s.r(0,178,9,6,'near',None,1);s.t(14,185,'Near (top)','近区（上）',size=8,c='near',bold=True)
  s.r(98,178,9,6,'far',None,1);s.t(112,185,'Far (bottom)','远区（下）',size=8,c='far',bold=True)
  s.t(252,185,'╱ = skip','╱ = 跳过',size=8,c='gate',anchor='end')
- s.t(0,199,'OFF: L2 refill → near; near L1 cap fixed','OFF：L2 余量回填近区；近区 L1 上限不变',size=8)
+ s.t(0,199,'OFF: pool = near pages; near L1 cap fixed','OFF：单池仅近区页；近区 L1 上限不变',size=8)
  s.t(0,212,'Illustrative layers · gate disabled by default','层级状态仅作示意 · 门控默认不启用',size=8,c='gate',bold=True)
  s.save('gate')
  s=S(516,190,lang)
@@ -119,14 +121,14 @@ for lang in ['en','zh']:
  s.t(123,55,'Far: extrema','远区：极值',c='far',bold=True);s.t(123,103,'Near: mean key','近区：均值键',c='near',bold=True)
  for y,c in [(64,'far'),(112,'near')]:
   for i in range(5):s.grid(123+i*22,y,2,3,c if i!=2 else 'pale',cw=4,ch=4)
- s.t(123,88,'112 pages','112 页',size=7.7,c='far');s.t(123,136,'16 pages','16 页',size=7.7,c='near')
+ s.t(123,88,'96 pages','96 页',size=7.7,c='far');s.t(123,136,'16 pages','16 页',size=7.7,c='near')
  s.line([(234,77),(250,77)],'far',True);s.line([(234,120),(250,120)],'near',True)
  
  for r in range(4):
   for j in range(22):s.r(261+j*5,52+r*5,4,4,'pale' if j in [0,1,6,7,16,17,21] else ('far' if j<12 else 'near'))
  s.t(282,79,'far',size=6.5,c='far');s.t(331,79,'near',size=6.5,c='near');s.t(261,90,'Full-history scoring','全历史评分',size=8,bold=True)
  s.t(261,102,'Mask → per-Q softmax','掩码 → 逐 Q softmax',size=7.8);s.t(261,114,'→ GQA probability mean','→ GQA 概率均值',size=7.8)
- s.t(261,126,'Regional TopK','区域 TopK',size=8,bold=True);s.grid(261,134,1,5,'far',cw=5,ch=5);s.grid(295,134,1,12,'near',cw=5,ch=5)
+ s.t(261,126,'Single-pool TopK','单池 TopK',size=8,bold=True);s.grid(261,134,1,17,'purple',cw=5,ch=5)
  s.line([(382,77),(397,77)],'ink',True)
  s.t(404,55,'Indices ∪ protection','词元索引 ∪ 保护集',size=8,bold=True);s.grid(404,65,1,3,'far',cw=5,ch=5);s.grid(424,65,1,8,'near',cw=5,ch=5);s.grid(474,65,1,4,'ink',cw=5,ch=5);s.t(404,79,'far','远区',size=6.5,c='far',bold=True);s.t(438,79,'near','近区',size=6.5,c='near',bold=True);s.t(477,79,'protected','保护',size=6.5,c='ink',bold=True);s.t(404,93,'Gather original K/V','聚集原始 K/V',size=8);s.t(404,109,'Original Q · 128D','原始 Q · 128 维',size=8);s.t(404,124,'Per-Q attention','每个 Q 独立注意力',size=8,bold=True)
  s.line([(0,140),(0,154),(459,154),(459,135)],'muted',True);s.t(145,151,'Original Q/K/V bypass · protected tokens retained','原始 Q/K/V 旁路 · 始终保留保护词元',size=7.7,c='muted')

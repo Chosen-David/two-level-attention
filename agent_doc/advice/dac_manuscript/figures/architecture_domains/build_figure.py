@@ -1,6 +1,5 @@
 from pathlib import Path
 from xml.sax.saxutils import escape
-import subprocess
 R=Path(__file__).resolve().parent; O=R;O.mkdir(exist_ok=True)
 for lang in ('en','zh'):
  z=lang=='zh';s=[]
@@ -60,7 +59,7 @@ for lang in ('en','zh'):
  text(559,313,'mask → softmax/Q → KV-group mean','掩码 → 逐Q softmax → KV组均值',14)
  line([(563,253),(563,258),(430,258),(430,299)])
  line([(559,321),(559,341)])
- text(559,358,'Regional token TopK(kₙ, k_f)','分区token TopK(kₙ, k_f)',16)
+ text(559,358,'Single-pool token TopK','单池token TopK',16)
  text(310,374,'prefix ∪ recent IDs','前缀 ∪ 滑窗ID',14)
  line([(397,370),(455,370),(455,384),(698,384),(698,367)])
  line([(678,351),(693,351)])
@@ -83,15 +82,17 @@ for lang in ('en','zh'):
  line([(987,365),(1005,365)],width=2);text(996,408,'o','o',18)
  
  defs='<defs><marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#424a50"/></marker></defs>'
- svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="7in" height="3.3in" viewBox="0 0 1008 475">{defs}<g font-family="'+('Noto Sans CJK SC' if z else 'Arial')+'">'+''.join(s)+'</g></svg>'
+ svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="7in" height="3.3in" viewBox="0 0 1008 475">{defs}<g font-family="'+('Noto Sans CJK SC' if z else 'Liberation Sans')+'">'+''.join(s)+'</g></svg>'
  # SVG subscripts keep Latin n/f, avoiding unrelated unicode lookalikes.
- svg=svg.replace('Pₙ','P<tspan baseline-shift="sub" font-size="11">n</tspan>').replace('P_f','P<tspan baseline-shift="sub" font-size="11">f</tspan>').replace('kₙ','k<tspan baseline-shift="sub" font-size="11">n</tspan>').replace('k_f','k<tspan baseline-shift="sub" font-size="11">f</tspan>')
+ svg=svg.replace('Pₙ','P<tspan baseline-shift="sub" font-size="11">n</tspan>').replace('P_f','P<tspan baseline-shift="sub" font-size="11">f</tspan>')
  p=O/f'fig2_domains_{lang}.svg';p.write_text(svg)
- for typ in ('pdf','png'):
-  subprocess.run(['inkscape',str(p),f'--export-type={typ}', '--export-width=1600',f'--export-filename={O/f"fig2_domains_{lang}.{typ}"}'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+ import cairosvg
+ cairosvg.svg2pdf(url=str(p), write_to=str(O/f'fig2_domains_{lang}.pdf'))
+ cairosvg.svg2png(url=str(p), write_to=str(O/f'fig2_domains_{lang}.png'), output_width=1600)
 
 # The editable optional-control inset is retained as a separately scoped source.
+import cairosvg
 for lang in ("en","zh"):
  p=O/f"fig2_gate_{lang}.svg"
- for typ in ("pdf","png"):
-  subprocess.run(["inkscape",str(p),f"--export-type={typ}","--export-width=1600",f"--export-filename={O/f"fig2_gate_{lang}.{typ}"}"],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+ cairosvg.svg2pdf(url=str(p), write_to=str(O/f'fig2_gate_{lang}.pdf'))
+ cairosvg.svg2png(url=str(p), write_to=str(O/f'fig2_gate_{lang}.png'), output_width=1600)
