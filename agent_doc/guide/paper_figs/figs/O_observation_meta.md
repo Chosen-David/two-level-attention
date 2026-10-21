@@ -110,7 +110,8 @@ minmax 上界 ≥ 该 token 分而保留。
 - minmax 漏失：near **0.0787** / far **0.0420**（约 2/3 的漏质量在近区）；
 - 近区两打分器打平（0.0843 vs 0.0787，near 区域 mass 均匀 → 页均分不损失，
   block-avg 在近区免费）；远区 minmax 比 avg 好 **4 倍**（0.0420 vs 0.1699）。
-- 漏页数（128q 均值）：avg near 1.78 / far 6.11 页；minmax near 2.57 / far 1.72 页。
+- 漏页数（128q 均值）：avg near 3.98 / far 3.89 页；minmax near 5.27 / far 3.77 页
+  （总量 avg 7.87 < minmax 9.03，与质量准则排序相反：页数准则偏 avg、质量准则偏 minmax）。
 
 → 结论：**两打分器的失效区域互补**——avg 漏在远区（稀疏尖峰被页均分稀释），
 minmax 漏在近区（均匀 mass 下极值不占优）。设计蕴含 = 分区异构打分
