@@ -2,6 +2,8 @@
 
 ## 2026-10-21
 
+- [x] [TL-ASYNC-CANDIDATE-20261021] 候选L2拒绝async组合并回退既有全宽路由，避免当前候选丢掉上一轮L1掩码所需分数；修前2失败，修后普通/-O各16项host回归通过。实际Torch/GPU、质量、性能与显存未验。([详情](task_details/TL-ASYNC-CANDIDATE-20261021.md))
+
 - [x] [TL-TLI-RUNTIME-SHAPE-20261021] TLI 公共入口在增量/快捷分流前显式拒绝多请求、多 query、错误 K 宽度及缺失 MoBA 分数，避免增量路径静默只消费 `k[0]`，且校验不再被 `python -O` 删除；修前普通4失败、-O为3失败1错误，修后普通/-O各13项host回归通过。当前无torch/GPU，生产张量、质量、显存与性能未验。([详情](task_details/TL-TLI-RUNTIME-SHAPE-20261021.md))
 
 - [x] [TL-LB-EMPTY-HANDOFF-20261021] LongBench 手动生成在短 prompt 全部进入 question 时不再向模型提交 0-token material；空 question 的 BOS 归一化也不再越界。修前基线确定触发空输入调用，修后普通/-O各28项相邻回归通过；当前无torch/GPU/真实tokenizer，实模输出和性能未验。([详情](task_details/TL-LB-EMPTY-HANDOFF-20261021.md))

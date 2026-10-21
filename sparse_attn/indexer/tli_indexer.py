@@ -1479,10 +1479,12 @@ class TLIIndexer(TIAIndexer):
         fail-closed（调用方回退原全宽路径，值逐位不变）。E156 门控内联：
         σ / ccluster（near/far cluster 分）实验臂直接读全宽原始 score_fine
         可超出候选集 → 这些臂拒绝候选化。
+        async 消费上一轮 L1 mask，当前候选不保证覆盖它，必须回退全宽评分。
         """
         try:
             if not (self._fine_gather and self._basis is None
-                    and not self.moba_gate and not self.per_q_head):
+                    and not self.moba_gate and not self.per_q_head
+                    and not self.enable_async):
                 return None, None, None
             _raw = (self.sigma_select != "none"
                     or self.far_select in ("cluster", "sim_greedy")
