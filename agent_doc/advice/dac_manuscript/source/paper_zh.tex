@@ -1,7 +1,7 @@
 \documentclass[conference,9pt,letterpaper]{IEEEtran}
 \usepackage{amsmath,amssymb,graphicx,booktabs,array,fontspec,unicode-math}
-\setmainfont{NotoSerifCJKsc-Regular.otf}[BoldFont=NotoSerifCJKsc-Bold.otf]
-\setsansfont{NotoSansCJKsc-Regular.otf}[BoldFont=NotoSansCJKsc-Bold.otf]
+\setmainfont{NotoSerifCJKsc-Regular.otf}[Path=../fonts/noto/,BoldFont=NotoSerifCJKsc-Bold.otf]
+\setsansfont{NotoSansCJKsc-Regular.otf}[Path=../fonts/noto/,BoldFont=NotoSansCJKsc-Bold.otf]
 \setmathfont{Latin Modern Math}
 \XeTeXlinebreaklocale "zh"
 \XeTeXlinebreakskip=0pt plus 1pt
@@ -26,7 +26,7 @@
 \section{引言}
 长上下文解码需要在有限注意力预算下保留对有用历史的访问。不同距离的词元竞争同一预算，而全局排名本身不为某个位置区域预留候选入口。因此，距离可以用来组织选择，但不意味着重要性随距离单调下降，也不意味着近处词元总是更重要。选择器需要先明确哪些区域能够提供候选，再以足够低的成本排序，使限制最终注意力支持集具有意义。
 
-AsyncTLS等级联使用低成本页摘要筛选候选页，再进行词元精筛~\cite{asynctls}。均值池化与符号感知极值都不按页内注意力权重总和排序，本文的选择器也采用这两类摘要。沿用ClusterKV的词元／页分析视角~\cite{clusterkv}，图\ref{fig:observation}(a)中的单个Qwen3查询显示：按注意力权重总和排序的参考页漏选更少时，漏失的参考页权重反而更多。由于区域分配与实际词元数不同，这一诊断不是受控比较，但促使我们考察评分与预算如何共同影响候选进入后续筛选的机会。
+词元级选择追踪细粒度相关性，但要为逐词元索引付费；页级摘要削减了这份成本，却模糊了注意力在页内的集中位置~\cite{asynctls}。沿用ClusterKV的词元／页分析视角~\cite{clusterkv}，图\ref{fig:observation}(a)用单个Qwen3查询展示两类摘要以各自的方式失效：均值键池化稀释集中质量，漏掉承载59.65\%参考质量的13个参考页；min--max极值漏页更多（17页）但漏质量更少（26.46\%），其松弛界反而引入许多参考外入选页。两种机制还各自携带一套评分视图，级联因此重算本可由同一共享集服务的坐标与摘要。由于区域分配与实际词元数不同，这一诊断不是受控比较，但促使我们考察评分与预算如何共同影响候选进入后续筛选的机会。
 
 在四条序列的128条相关观测中，两种全局选择器呈现不同的区域漏失质量构成（图\ref{fig:observation}(b)）。以每条查询的质量排序参考集总质量归一化后，block-avg的近区／远区平均漏失份额为.084／.170，符号感知极值为.079／.042。极值摘要在两区的平均漏失均较低；这些诊断不能证明区域分工或近区等价。在固定2048词元上限下，所测23种near-avg／far-extrema配额拆分中，最佳平均漏失为.135，全局极值为.121。这一有界诊断扫描既未建立混合方案优势，也未建立任务质量收益。
 
