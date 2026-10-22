@@ -362,7 +362,13 @@ def get_pred(
             # R01 修复（kimi3 清单 2026-10-08）：原无条件 [:, 1:] 去首 token
             # 假定 tokenizer 加 BOS，但 Qwen3 系不加 → question 被切掉真实
             # 首 token。仅当首 token 确为 BOS 且非 None 时才切。
-            q_input.input_ids = _drop_leading_bos(
+            # 【LB-DEV-BS 修复（主 AI 审计 2026-10-22）】必须走 __setitem__ 写入
+            # BatchEncoding.data 字典，不能用属性赋值：BatchEncoding 是 UserDict
+            # 子类，属性赋值会创建实例属性遮蔽 data，后续 .to("cuda") 只搬
+            # self.data → 遮蔽属性留 CPU → _manual_generate 逐 token invoke
+            # 报设备不匹配（d8bdef1 把条件赋值改为无条件后每行必触发；旧代码
+            # 仅首 token 真为 BOS 才赋值，Qwen3 bos=None 从不触发故未暴露）。
+            q_input["input_ids"] = _drop_leading_bos(
                 q_input.input_ids, tokenizer.bos_token_id)
 
             # TL-LBV1-INPUT-IDENTITY-20261020：在 CPU BatchEncoding 上冻结
