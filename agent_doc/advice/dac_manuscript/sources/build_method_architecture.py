@@ -17,10 +17,7 @@ class S:
    for col in range(cols):self.r(x+col*(cw+gap),y+r*(ch+gap),cw,ch,c if sel is None or col in sel else 'pale')
  def title(self,n,en,zh):self.t(0,10,n,size=10,c='purple',bold=True);self.t(17,10,en,zh,size=9.2,bold=True);self.line([(0,17),(self.w,17)])
  def save(self,n):
-  f=OUT/f'{n}_{self.lang}.svg';f.write_text('\n'.join(self.a+['</svg>']))
-  import cairosvg
-  cairosvg.svg2pdf(url=str(f),write_to=str(f.with_suffix('.pdf')))
-  cairosvg.svg2png(url=str(f),write_to=str(f.with_suffix('.png')),output_width=1300)
+  f=OUT/f'{n}_{self.lang}.svg';f.write_text('\n'.join(self.a+['</svg>']));subprocess.run(['inkscape',str(f),'--export-text-to-path',f'--export-filename={f.with_suffix(".pdf")}'],capture_output=True,check=True);subprocess.run(['pdftoppm','-scale-to','1300','-png','-singlefile',str(f.with_suffix('.pdf')),str(f.with_suffix(''))],capture_output=True,check=True)
 
 def page(s,x,y,c,selected=True):
  s.r(x,y,16,22,'white',c if selected else 'line',2)
@@ -132,5 +129,5 @@ for lang in ['en','zh']:
  s.line([(382,77),(397,77)],'ink',True)
  s.t(404,55,'Indices ∪ protection','词元索引 ∪ 保护集',size=8,bold=True);s.grid(404,65,1,3,'far',cw=5,ch=5);s.grid(424,65,1,8,'near',cw=5,ch=5);s.grid(474,65,1,4,'ink',cw=5,ch=5);s.t(404,79,'far','远区',size=6.5,c='far',bold=True);s.t(438,79,'near','近区',size=6.5,c='near',bold=True);s.t(477,79,'protected','保护',size=6.5,c='ink',bold=True);s.t(404,93,'Gather original K/V','聚集原始 K/V',size=8);s.t(404,109,'Original Q · 128D','原始 Q · 128 维',size=8);s.t(404,124,'Per-Q attention','每个 Q 独立注意力',size=8,bold=True)
  s.line([(0,140),(0,154),(459,154),(459,135)],'muted',True);s.t(145,151,'Original Q/K/V bypass · protected tokens retained','原始 Q/K/V 旁路 · 始终保留保护词元',size=7.7,c='muted')
- s.r(0,167,516,23,'gl');s.t(7,182,'Optional far gate: prefill → freeze → reuse; OFF skips far L1 + L2','可选远区门控：prefill → 冻结 → 复用；OFF 跳过远区 L1 + L2',size=8,c='gate');s.t(509,182,'Disabled by default','默认不启用',size=8,c='gate',bold=True,anchor='end')
+ s.r(0,167,516,23,'gl');s.t(7,182,'Optional far gate: prefill → freeze → reuse; OFF removes far competition','可选远区门控：prefill → 冻结 → 复用；OFF 停止远区竞争',size=8,c='gate');s.t(509,182,'Disabled by default','默认不启用',size=8,c='gate',bold=True,anchor='end')
  s.save('overview')

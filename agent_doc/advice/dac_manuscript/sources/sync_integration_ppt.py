@@ -114,5 +114,9 @@ replace_text(p.slides[6].shapes[1],'LoDA-SA：两级共享完整低频 RoPE 对'
 replace_text(p.slides[7].shapes[1],'LoDA-SA：nl / nb 页准入与统一词元竞争')
 replace_text(p.slides[9].shapes[1],'LoDA-SA：统一 L2 与原维注意力')
 replace_text(p.slides[16].shapes[1],'LoDA-SA：距离准入、共享评分与完整请求成本')
+replace_text(p.slides[12].shapes[8],'归档网格：描述性结果')
+replace_text(p.slides[12].shapes[9],'48.264 / 47.462')
+replace_text(p.slides[12].shapes[10],'免配额 / 单池对照\n同几何配额448：48.668\n69比较、17几何：均差+0.040\n不证明无效应或当前配置质量')
+replace_text(p.slides[16].shapes[12],'nb 控制候选准入，不保证最终区域份额\n网格均值不证明无配额效应；仍缺匹配质量—成本')
 assert len(p.slides)==17
 p.save(P)
