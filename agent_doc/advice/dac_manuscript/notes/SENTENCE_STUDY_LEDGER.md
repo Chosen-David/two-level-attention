@@ -491,3 +491,8 @@
 - **拷贝大小写坑修复**：前段会话把 O 图拷成大写 `O_observation*.pdf` 而 tex 引用小写 → 编译进了旧图；以小写为准覆盖并删 6 个大写重复（MANIFEST 233→227）。
 - 编译环境坑：沙箱 shell `$HOME` 展开错误，编译命令必须字面路径 `env PATH="/home/wangyuanshuo02/texlive/2026/bin/x86_64-linux:..." HOME=/home/wangyuanshuo02`。
 - 验收：四文档 6/6/11/10 页、0 未定义引用；paper_en p2 嵌入第六轮标题「(a) Avg misses far; minmax near / (c) Which 32 dims」实检通过；MANIFEST 重生成 227 条；图-文一致性核对（n_b/K₁−n_b/K_mid/边界保送/单池/1/√128/门控默认关闭 逐标签对 §III 小节）通过，§III 表述维持第 47 轮口径。
+
+## 第 51 轮（2026-10-22）自查队列收官 + 后台重渲染处置
+- 后台 O 图重渲染任务（bgwl4pty0）完成处置：确定性渲染（字节与 manifest 一致、provenance 复核过）；lint 3 处 CLIPPED（10⁻⁵/10⁻¹/10⁰）均为色标 LogNorm(2e-4,2e-2) 范围外 locator tick，最终 PDF 页外字形复核 0 → meta 披露从「1 条」修正为「3 条同类假阳性」并推送（2dfb3d4）。
+- **best-paper 范式自查队列收官**（第 35 轮起）：本轮 Workloads/Q1/Q3/门控小节 + 结论 + 摘要（S1/S2 待用户裁决）——Q3 双口径诚实报告达标（slower at every measured length + 无一致优势，DAC 反向 tradeoff 铁律）；唯一发现＝**Workloads 基线清单漏 FASA**（Q2/S8 有 18.64 分），en/zh 补 `/FASA` 一词，双语文档保 6 页 0 未定义引用；机械门 grep 证据（2 命中均为 diff 头部非正文）。
+- 无远端新提交、无新判决数据（最新 e119 批已于第 45/48 轮裁决）。
