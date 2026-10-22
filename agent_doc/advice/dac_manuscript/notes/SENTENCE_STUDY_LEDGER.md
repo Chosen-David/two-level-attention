@@ -472,3 +472,22 @@
 - **真字体包（2026-10-17 远端推送）**：`agent_doc/advice/dac_manuscript/fonts/`（Nimbus Roman/Sans 8 个真 OTF + Noto Serif/Sans CJK SC 含真 Bold + Liberation + licenses + check_fonts.py 校验）。**旧符号链接/ttc 合成兜底已废弃**，本地构建与远端排版一致。
 - **编译命令（必须带 TeX PATH）**：`cd source && PATH="/home/wangyuanshuo02/texlive/2026/bin/x86_64-linux:$PATH" bash compile_local.sh [paper_en|paper_zh|supplement_en|supplement_zh]`。compile_local.sh 已改为 portale 版（自带 source ../fonts/env.sh；不再固定 HOME）。注意：命令必须从 source 目录发起（cd source && ...），从仓库根直接跑会因相对路径失败。
 - 验证状态（2026-10-17 10:05）：四文档全编译，0 未定义引用；zh PDF 嵌入字体确认真 NotoSerifCJKsc-Bold / NotoSansCJKsc-Bold；en PDF 嵌入真 NimbusRoman Regular/Bold/Italic/BoldItalic + NimbusSans。
+
+## 第 48 轮（2026-10-22，88c7969 已推送）远端描述性网格诚实化裁决 + en 六页保卫战 + Overleaf zip
+- 远端 4d49ebb/4abfd4f/0c500b0 三连诚实化逐点裁决：**采纳** eq:coupling 加 floor、绝对接口双重边界句（n_b=K_1 挤占远页 / 单池可选不出远 token）、nt448 48.668 vs 48.264 同几何 +0.404 披露、top-3 CI 是配额臂互比非对免配额澄清、selector 轮间差值 +0.0237/−0.0046、(8,320) 记号澄清（near pages/tokens 非 (n_l,n_b)）；**恢复**被删的 nb 边际单调序列（46.37→48.21→48.11）+ 半覆盖律聚集句（n_bB≈nl/2 + top-half median .93）——图文脱节裁决：S6 A6 图还展示这些，主文必须有正文支撑，但降格为 descriptive 限定（"single-run marginals support no causal isolation"），en/zh 双语同步。
+- en 7→6 页（第十一/二次零余量触发）压缩主导手法：远端加词 ~250 词 → 七批定向回收（摘要合并句式 / Ported baselines 名词化 / selector cost 差值句合并 / Q2 69-配对句压半 / Design implications 并结论去重 / Observation+Fig3+Fig4 caption 名词化三连 / 表格删 dense-sparse 行）+ Fig.4 0.9\columnwidth + Fig.3 0.85\textwidth。字体 fontspec 加 `Path=../fonts/urw/`（en 两文档）——本地与 Overleaf 自包含，不再依赖 env.sh 的 OPENTYPEFONTS。
+- Overleaf zip 交付：`loda_sa_en_overleaf_20261022.zip`（1.2M，项目根 untracked）：source/{paper_en,references_en,supplement_en,IEEEtran.cls} + figures/ 10 个 en PDF + fonts/urw 8 OTF + README；模拟 Overleaf 干净环境（unset 字体 env、假 HOME）编译验证 6 页通过。
+- 新数据核查：e119 bsa_avg 58.96 = 已入稿 K1=256 臂源文件（非新数字）；quest_1024 失败记录无手稿级数据；5964816/e6faba3 为 async-candidate/shape-contract 代码修复（新增 advice TL-ASYNC-CANDIDATE-20261021.md 待核验裁决）。
+
+## 第 49 轮（2026-10-22，d258060 已推送）Intro P2 故事句 + 双语 Overleaf zip
+- **Intro P2 故事优先改写**（用户裁决「按最好的讲」）：两难开场（token 级索引成本 vs 页级摘要模糊集中位置）→ avg 稀释绑 Fig.1(a) 数字（漏 13 页载 59.65%）→ minmax 界松绑数字（17 页/26.46%/参考外入选多）→ 繁琐缺口句（级联每阶段一套评分视图，重算本可共享的坐标与摘要）为 P4 共享 32 坐标伏笔；「superior accuracy/sacrifice precision」无测量定性断言改结构性陈述（tracks/blur）。en/zh 同步，6/6 页保持。
+- **双语 Overleaf zip 交付**：`loda_sa_overleaf_20261022.zip`（4.7M，41 文件，替代 en-only 版）：四 tex + latexmkrc 强制 xelatex + magic comment（用户 Overleaf 报 fontspec fatal → pdfLaTeX 默认引擎问题）+ figures en/zh 20 PDF + fonts/urw 全量 + **fonts/noto 子集**（pyftsubset 按 zh 两文档 714 CJK 唯一字符子集化，82MB→1.7M；README 警示新增中文需重子集）。zh/supplement_zh fontspec 加 `Path=../fonts/noto/`（urw 同理），四文档脱离 env.sh 相对路径自包含；干净环境四文档 6/11/6/10 页全过，zh Bold 嵌入验证（NotoSerifCJKsc-Bold-Identity-H 在嵌入列表）。
+- 摘要 S1/S2 改写方案已给用户（对标级联每阶段一套视图 + 单阶段子空间全局池无页准入 → LoDA-SA 共享变换句），待用户裁决后入稿。
+
+## 第 50 轮（2026-10-22）O 图第六轮 1×4 定版 + 架构图 cairosvg tspan 缺陷重建（字形门全绿）
+- **O 图第六轮**（前段会话完成，本轮收尾入稿）：(b') 统计柱从 inset_axes 浮动定位改为**真实网格列**（1×4，width_ratios [1.85,0.50,0.78,0.76]，wspace 0.56，figsize 10.2×3.9in）；标题 T 15→13、(a)/(c) 英文标题收短；色标 shrink .72 锚底 + 标签置顶右上空带；尖峰 ▼ 入 ylim(0,4.35) 头部；图例行距 labelspacing 0.55→1.2。字形门（45% 比例 + pt² 面积双口径）en/zh **0 硬/0 软/0 页外**；e140_validity.json 轮换并经 `python -m exp.paper.e140_asset_provenance` 复核。
+- **架构图 fig2_domains 渲染层重建**：字形门首次跑架构图暴露 cairosvg `baseline-shift` tspan 笔位缺陷——下标后续文本错位（en 12 处/zh 6 处真碰撞：`K_mid slots` 的 slots 压上 `∪/dedup`、`K₁−n_b` 各 run 互叠、`TopK(Pₙ)` 下标落行首）。修法＝**探针两遍法**：先渲染探针 SVG 实测每 run 宽度，再按累计笔位发独立 `<text>`（build_figure.py 重写，SUB_LABELS 表驱动，导出块收回 for 循环——旧版只导 zh，en 资产系历史产物）；右页眉 913→911 修 0.8pt 页外溢出。en/zh 字形门 0/0/0。
+- **fig2_gate 双行标签行距修复**：盒内 20px 行距 < bbox 高 23px → 基线 72/92→69/95，en/zh 各 2 处 78pt² 级碰撞清零。
+- **拷贝大小写坑修复**：前段会话把 O 图拷成大写 `O_observation*.pdf` 而 tex 引用小写 → 编译进了旧图；以小写为准覆盖并删 6 个大写重复（MANIFEST 233→227）。
+- 编译环境坑：沙箱 shell `$HOME` 展开错误，编译命令必须字面路径 `env PATH="/home/wangyuanshuo02/texlive/2026/bin/x86_64-linux:..." HOME=/home/wangyuanshuo02`。
+- 验收：四文档 6/6/11/10 页、0 未定义引用；paper_en p2 嵌入第六轮标题「(a) Avg misses far; minmax near / (c) Which 32 dims」实检通过；MANIFEST 重生成 227 条；图-文一致性核对（n_b/K₁−n_b/K_mid/边界保送/单池/1/√128/门控默认关闭 逐标签对 §III 小节）通过，§III 表述维持第 47 轮口径。
