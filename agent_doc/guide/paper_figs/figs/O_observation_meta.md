@@ -25,8 +25,9 @@ width_ratios [1.85, 0.50, 0.78, 0.76]，wspace 0.56，对 IEEE 双栏
 (a) 条带边与 (b') ytick 带）；尖峰 ▼ 移入 ylim(0, 4.35) 头部（旧 4.12 越轴顶
 压图例带）；(b') ylabel「missed ref mass」退役进 caption；(c) xtick 单行
 tail/rand/high（"32" 上移标题）。导出前经 `figure_lint`（**0 overlap**；
-1 条 clipped 为 (a) 色标 LogNorm(2e-4, 2e-2) 显示范围外的 locator tick
-10⁻⁵ 位置，bbox 在画布外恰证明不实际渲染，属假阳性）。
+3 条 clipped 均为 (a) 色标 LogNorm(2e-4, 2e-2) 显示范围外的 locator tick
+10⁻⁵/10⁻¹/10⁰ 位置，bbox 在画布外恰证明不实际渲染，属假阳性；最终 PDF
+页外字形复核 = 0）。
 
 **验收门（2026-10-21 第四轮起加严）**：lint 的 artist bbox 抓不住旋转/紧贴
 字形碰撞，最终验收 = PyMuPDF **字形级（rawdict char）跨 span bbox 交集**：
