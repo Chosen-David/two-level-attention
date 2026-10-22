@@ -103,7 +103,19 @@ OUT = os.path.join(REPO, "agent_doc", "guide", "paper_figs", "figs")
 os.makedirs(OUT, exist_ok=True)
 
 pal = apply_style("ocean")
-matplotlib.rcParams["font.family"] = "DejaVu Sans"
+# 双语模式：O_LANG=zh 输出中文标签版（stem 加 _zh 后缀）；默认英文。
+ZH = os.environ.get("O_LANG") == "zh"
+if ZH:
+    from matplotlib import font_manager as _fm
+    for _fp in ("/home/wangyuanshuo02/.local/share/fonts/cjk/NotoSansCJKsc-Regular.otf",
+                "/home/wangyuanshuo02/.local/share/fonts/cjk/NotoSansCJKsc-Bold.otf"):
+        if os.path.exists(_fp):
+            _fm.fontManager.addfont(_fp)
+    # mpl≥3.11 坑：字形子集 tracker 读 ps.fonttype 而非 pdf.fonttype，
+    # CJK 必须两个 fonttype 同步设 42（TrueType），否则 Type3 + ToUnicode 丢失。
+    matplotlib.rcParams["pdf.fonttype"] = 42
+    matplotlib.rcParams["ps.fonttype"] = 42
+matplotlib.rcParams["font.family"] = "Noto Sans CJK SC" if ZH else "DejaVu Sans"
 C_MAIN = pal["primary"]
 C_SEC = pal["secondary"]
 C_TER = pal["tertiary"]
@@ -113,7 +125,7 @@ C_NEU = pal["neutral"]
 # 本图为 1x4 宽版多面板，style_config 的 PPT 级字号过大，按面板宽度收敛。
 # figsize 9.5in 对 IEEE 双栏 \textwidth≈7.16in 的缩放比 ≈0.75，
 # 有效字号 ≈ title 11.3 / label 9.8 / tick 8.6 / annotation 7.9pt
-T = 15      # 面板标题
+T = 13      # 面板标题（第六轮 15→13：旧 (a)/(c) 标题宽于所在列互叠）
 L = 13      # 轴标签
 TK = 11.5   # 刻度
 AN = 10.5   # 图内注释
@@ -302,9 +314,9 @@ conc_mean = float(np.mean(conc))
 
 # ================= (c) O3 三臂（主指标 selected/reference topK mass） =================
 arms = ["tail32", "random32", "high32"]
-# xtick 单行（2026-10-21：两行 xtick 字符级真实互叠 max 40px²，
-# 副行语义进 caption/元数据）
-arm_lab = {"tail32": "tail32", "random32": "random32", "high32": "high32"}
+# xtick 单行（2026-10-21 两行互叠改单行；第六轮列收窄再删副行 "32"，
+# "32" 上移面板标题，副行语义进 caption/元数据）
+arm_lab = {"tail32": "tail", "random32": "rand", "high32": "high"}
 arm_rm = {a: float(np.mean([c["o3"][a]["selected_mass_over_reference_topk_mass"]["mean"]
                             for c in cells])) for a in arms}
 mets_all = ["reference_token_page_coverage", "reference_token_overlap_recall",
@@ -335,14 +347,26 @@ lay_med = np.median(M, axis=0)
 n_light = int((lay_med < 0.01).sum())
 skip_rng = (M < 0.01).sum(axis=1)  # 逐 prompt <0.01 层数（同源重算）
 
-# ================= 画布 2x2（IEEE 双栏 \textwidth≈7.16in，缩放比 ≈0.75，
-# 有效字号 ≈ title 11 / label 9.8 / tick 8.6pt） =================
+# ================= 画布 1x4 网格（IEEE 双栏 \textwidth≈7.16in，缩放比 ≈0.70） =================
+# 2026-10-22 第五轮重设计（用户裁决）：(a)+(b) 合并为单面板——条带图展示单查询
+# 互补漏失例证，右侧嵌入 128 查询区域漏失堆叠柱作统计支撑；(c) 共享坐标、
+# (d) 门控分别独立面板。三面板 = 三个创新点 1:1（分区 / 共享坐标 / 门控）。
 # 2026-10-16 用户指示：图内不堆说明文字，面板数字与结论全部并入手稿 caption，
 # 图内仅保留坐标/图例/带名/区域标签等最小可读元素。
-fig, ((ax_a, ax_b), (ax_c, ax_d)) = plt.subplots(
-    2, 2, figsize=(9.5, 6.9),
-    gridspec_kw={"wspace": 0.48, "hspace": 0.52,
-                 "width_ratios": [1.2, 1.0]})
+# 2026-10-22 第六轮（字形级验收门驱动）：(b') 统计柱从 inset_axes 浮动定位改为
+# 真实网格列（旧定位 [1.16,...] 越界压 (c) 的 ytick/标题，9 处字形碰撞）；
+# 标题字号 T 15→13 且收短（旧 (a)/(c) 标题宽于所在列互叠）；色标竖排 + shrink
+# 锚定底部（旧顶部横排标签与 inset 标题相撞）；尖峰 ▼ 移入 ylim(0,4.35) 头部
+# （旧 4.12 越轴顶压图例）。
+fig = plt.figure(figsize=(10.2, 3.9))
+gs = fig.add_gridspec(
+    1, 4, width_ratios=[1.85, 0.50, 0.78, 0.76],
+    wspace=0.56,
+    left=0.105, right=0.90, top=0.85, bottom=0.22)
+ax_a = fig.add_subplot(gs[0, 0])
+ax_b = fig.add_subplot(gs[0, 1])   # (b') 统计柱：真实子列
+ax_c = fig.add_subplot(gs[0, 2])
+ax_d = fig.add_subplot(gs[0, 3])
 
 
 # ---- (a) token strip：质量带 + 三个选择带（对称四态编码，灰度可辨） ----
@@ -390,28 +414,31 @@ _tagbox = dict(boxstyle="round,pad=0.2", facecolor="white",
                edgecolor="none", alpha=0.85)
 # near/far 区域标注（顶带；far 标签置于图例右缘与 near 标签之间的空窗，
 # 中心 x10500；far token 占比数字进 caption/TSV——版式铁律）
-ax_a.text(10500, 3.5, "far", ha="center",
+ax_a.text(9700, 3.5, "远区" if ZH else "far", ha="center",
           va="center", fontsize=AN - 2, color=C_HL, fontweight="bold",
           bbox=_tagbox)
-ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 3.5, "near", ha="center",
-          fontsize=AN, color=C_MAIN, fontweight="bold", bbox=_tagbox)
+ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 3.5, "近区" if ZH else "near",
+          ha="center", fontsize=AN, color=C_MAIN, fontweight="bold", bbox=_tagbox)
 ax_a.axvline(rb["near_lo"], color=C_HL, lw=1.6, linestyle="--")
 # 尖峰页标记（▼，页 @spike.pos_lo：单 token 占页质量 99.8%，被 avg 稀释落选，
 # minmax 救回；说明在 caption）
 i_sp = bin_lo.index(spike["pos_lo"])
-ax_a.plot([pos_c[i_sp]], [4.12], marker="v", color=C_MISS, markersize=8,
-          clip_on=False, zorder=6)
+# ▼ 置于 ylim(0,4.35) 头部（图例带之下、顶带之上）；旧 4.12+clip_on=False
+# 越轴顶与图例 bbox 相撞（字形级门只测文字，此处防视觉压叠）
+ax_a.plot([pos_c[i_sp]], [4.18], marker="v", color=C_MISS, markersize=7,
+          zorder=6)
 # 紧凑图例（用户 2026-10-16：图内不堆文字，数字解释并入 caption；
 # 2026-10-21 标签缩短——ncol=2 长标签组占满顶带左 60% 致 far 区标注无处安放）
-leg_a = [Patch(fc=C_MAIN, label="in ref, selected"),
+leg_a = [Patch(fc=C_MAIN, label="参考内选中" if ZH else "in ref, selected"),
          Patch(fc=C_MISS, hatch="///", ec="black", lw=0.5,
-               label="ref missed"),
+               label="参考漏页" if ZH else "ref missed"),
          Patch(fc=C_EXTRA, hatch="..", ec="black", lw=0.5,
-               label="outside ref"),
-         Patch(fc="#e9e9e9", ec="0.6", label="unselected")]
-ax_a.legend(handles=leg_a, loc="upper left", bbox_to_anchor=(0.005, 1.005),
-            fontsize=LG - 3, framealpha=0.92, handlelength=1.2,
-            borderpad=0.35, labelspacing=1.3, ncol=2, columnspacing=0.9)
+               label="参考外入选" if ZH else "outside ref"),
+         Patch(fc="#e9e9e9", ec="0.6",
+               label="未选" if ZH else "unselected")]
+ax_a.legend(handles=leg_a, loc="upper left", bbox_to_anchor=(0.005, 1.02),
+            fontsize=LG - 4, framealpha=0.92, handlelength=1.0,
+            borderpad=0.30, labelspacing=0.9, ncol=4, columnspacing=0.55)
 if os.environ.get("O_DEBUG_BB"):  # 量 legend/tag 数据坐标盒（布局调试用）
     fig.canvas.draw()
     _r = fig.canvas.get_renderer()
@@ -422,41 +449,55 @@ if os.environ.get("O_DEBUG_BB"):  # 量 legend/tag 数据坐标盒（布局调�
               f"y:[{_bb.y0:.2f},{_bb.y1:.2f}]")
 ax_a.set_xlim(0, q_a + 1)
 ax_a.set_xticks(range(0, 15000, 3000))
-ax_a.set_ylim(0, 4.0)
+ax_a.set_ylim(0, 4.35)   # 头部 0.35 给 ▼ 标记（第六轮）
 ax_a.set_yticks([0.5, 1.5, 2.5, 3.5])
-ax_a.set_yticklabels(["minmax", "avg", "mass ref", "attn mass"],
+ax_a.set_yticklabels(["极值" if ZH else "minmax", "均值" if ZH else "avg",
+                      "质量参考" if ZH else "mass ref",
+                      "注意力质量" if ZH else "attn mass"],
                      fontsize=TK - 1.5)
-ax_a.set_xlabel("key position (tokens); query at right end", fontsize=L,
-                labelpad=12)
-ax_a.set_title("(a) Avg pool misses sparse far spikes",
+ax_a.set_xlabel("key 位置（词元）；query 在右端" if ZH
+                else "key position (tokens); query at right end",
+                fontsize=L, labelpad=12)
+ax_a.set_title("(a) 均值漏远端尖峰；极值漏近端" if ZH
+               else "(a) Avg misses far; minmax near",
                loc="left", pad=10, fontsize=T, fontweight="bold")
 ax_a.tick_params(axis="x", labelsize=TK)
 sm = plt.cm.ScalarMappable(cmap=cmap_mass, norm=norm_mass)
-cb = fig.colorbar(sm, ax=ax_a, fraction=0.04, pad=0.015)
-cb.set_label("mass (log)", fontsize=AN - 1.5)
+# 色标：竖排标签 + shrink 0.72 锚定底部（第六轮——旧顶部横排标签压 inset
+# 标题/图例；锚底后标签位于柱区中部，与 (b') ytick 横向分离 >20pt）
+cb = fig.colorbar(sm, ax=ax_a, fraction=0.028, pad=0.045,
+                  shrink=0.72, anchor=(0.0, 0.0))
+# 标签横排放色标顶右上（列间空带；竖排左右两侧分别压 (a) 条带边与 (b') ytick）
+cb.ax.text(1.05, 1.02, "log 质量" if ZH else "log mass",
+           transform=cb.ax.transAxes, ha="left", va="bottom",
+           fontsize=AN - 2)
 cb.ax.tick_params(labelsize=TK - 3)
 
-# ---- (b) 区域互补漏失堆叠柱（128 query 均值）----
+# ---- (b') 区域互补漏失堆叠柱（(a) 右侧真实网格列，128 query 均值）----
 # 设计：两根柱 = block-avg / minmax 打分器，各自漏失的参考质量按区域堆叠
 # （底段 near=C_MAIN、顶段 far=C_HL，与 (a) 区域底色/标注配色一致）。
-# 数字（0.084/0.170/0.079/0.042 与页数口径）全部进 caption/TSV（版式铁律）。
+# 第六轮：inset_axes → 网格列；ylabel「missed ref mass」退役进 caption
+# （左旋 ylabel 会与 (a) 色标标签同带相撞，yticks 0/.1/.2 已表量纲）。
 xb = np.arange(2)
 near_vals = [avg_near_m, mm_near_m]
 far_vals = [avg_far_m, mm_far_m]
 ax_b.bar(xb, near_vals, width=0.52, color=C_MAIN,
-         edgecolor="black", linewidth=.7, label="near missed")
+         edgecolor="black", linewidth=.7, label="近区" if ZH else "near")
 ax_b.bar(xb, far_vals, width=0.52, bottom=near_vals, color=C_HL,
-         edgecolor="black", linewidth=.7, label="far missed")
+         edgecolor="black", linewidth=.7, label="远区" if ZH else "far")
 ax_b.set_xticks(xb)
-ax_b.set_xticklabels(["block-avg", "minmax"], fontsize=TK)
-ax_b.set_ylabel("missed reference mass", fontsize=L)
-ax_b.set_ylim(0, 0.30)
-ax_b.set_yticks([0.0, 0.1, 0.2, 0.3])
-ax_b.tick_params(axis="y", labelsize=TK)
-ax_b.set_title("(b) Missed mass by region", loc="left", pad=10,
-               fontsize=T, fontweight="bold")
-ax_b.legend(loc="upper right", fontsize=LG - 2, framealpha=0.92,
-            labelspacing=0.75)
+ax_b.set_xticklabels(["avg", "mm"], fontsize=TK - 4)
+# ylim 头部 0.36 留给带标题的轴内左上图例（柱顶 .254 之上）
+ax_b.set_ylim(0, 0.36)
+ax_b.set_yticks([0.0, 0.1, 0.2])
+ax_b.tick_params(axis="y", labelsize=TK - 4)
+# 「N = 128」并入图例标题（样本量记法；旧 "128 queries" 在窄列探入 (c) ylabel）
+leg_b = ax_b.legend(loc="upper left", fontsize=LG - 4.5, framealpha=0.92,
+                    labelspacing=1.2, handlelength=1.0,
+                    title="N = 128")
+leg_b.get_title().set_fontsize(AN - 3)
+leg_b.get_title().set_fontweight("bold")
+leg_b._legend_box.align = "left"
 
 # ---- (c) O3 三臂 ----
 colors3 = [C_MAIN, C_NEU, C_SEC]
@@ -466,11 +507,13 @@ for i, (a, col) in enumerate(zip(arms, colors3)):
     ax_c.text(i, arm_rm[a] + 0.025, f"{arm_rm[a]:.2f}", ha="center",
               fontsize=AN, fontweight="bold")
 ax_c.set_xticks(np.arange(3))
-ax_c.set_xticklabels([arm_lab[a] for a in arms], fontsize=TK - 1)
-ax_c.set_ylabel("selected / reference mass", fontsize=L)
+ax_c.set_xticklabels([arm_lab[a] for a in arms], fontsize=TK - 4.5)
+ax_c.set_ylabel("选中 / 参考质量" if ZH else "selected / reference mass",
+                fontsize=L)
 ax_c.set_ylim(0, 1.0)
 ax_c.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
-ax_c.set_title("(c) Which 32 of 128 dims", loc="left", pad=10, fontsize=T,
+ax_c.set_title("(c) 选哪 32 维" if ZH else "(c) Which 32 dims",
+               loc="left", pad=10, fontsize=T,
                fontweight="bold")
 ax_c.tick_params(labelsize=TK)
 
@@ -481,12 +524,12 @@ im = ax_d.imshow(M, aspect="auto", cmap=cmap_mass, norm=norm6,
 ax_d.set_xticks([0, 8, 16, 24, 32])
 ax_d.set_yticks(range(len(ROW_ORDER)))
 ax_d.set_yticklabels([ROW_LAB[k] for k in ROW_ORDER], fontsize=TK - 5.3)
-ax_d.set_xlabel("layer", fontsize=L, labelpad=12)
-ax_d.set_title("(d) Far mass by layer", loc="left", pad=10,
+ax_d.set_xlabel("层" if ZH else "layer", fontsize=L, labelpad=12)
+ax_d.set_title("(d) 逐层远区质量" if ZH else "(d) Far mass by layer",
+               loc="left", pad=10,
                fontsize=T, fontweight="bold")
 ax_d.tick_params(axis="x", labelsize=TK)
-cb6 = fig.colorbar(im, ax=ax_d, fraction=0.04, pad=0.015)
-cb6.set_label("far mass (log)", fontsize=AN - 2)
+cb6 = fig.colorbar(im, ax=ax_d, fraction=0.045, pad=0.12)
 cb6.ax.tick_params(labelsize=TK - 3)
 
 fig.subplots_adjust(left=0.10, right=0.93, top=0.94, bottom=0.09)
@@ -505,7 +548,7 @@ def export(fig, stem):
         fig.savefig(os.path.join(OUT, f"{stem}.{ext}"), dpi=300, bbox_inches="tight")
 
 
-export(fig, "O_observation")
+export(fig, "O_observation_zh" if ZH else "O_observation")
 
 # ---------------- figure_data.tsv ----------------
 rows = ["figure_id\tpanel_id\tarm_id\tmetric_id\tunit\testimate\tsource_run_id\tsource_field"]
@@ -548,7 +591,8 @@ for k, row in zip(ROW_ORDER, M):
         rows.append(f"O\td\t{k}\tfar_mass\tfrac\t{v:.4e}\te6b_far_profiles.json\tlayer={li}")
 rows.append(f"O\td\tall\tlayers_median_lt_0.01\tcount\t{n_light}\te6b_far_profiles.json\t-")
 rows.append(f"O\td\tall\tlayers_lt_0.01_per_prompt\trange\t{int(skip_rng.min())}-{int(skip_rng.max())}\te6b_far_profiles.json\trecomputed per-row from the same 16x36 heatmap (single source; GPT-review fix: e6_layer_skip.json 10-prompt summary withdrawn)")
-with open(os.path.join(OUT, "O_observation_figure_data.tsv"), "w") as f:
-    f.write("\n".join(rows) + "\n")
-print("exported O_observation_figure_data.tsv")
+if not ZH:  # TSV 仅英文渲染时写（内容语言无关，避免双写）
+    with open(os.path.join(OUT, "O_observation_figure_data.tsv"), "w") as f:
+        f.write("\n".join(rows) + "\n")
+    print("exported O_observation_figure_data.tsv")
 print("DONE")

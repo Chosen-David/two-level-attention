@@ -12,21 +12,35 @@ python3 agent_doc/guide/paper_figs/figs/fig_o_observation.py
 # 输出：O_observation.{pdf,png,svg} + O_observation_figure_data.tsv（同目录）
 ```
 
-版式：2×2，figsize 9.5×6.9in，对 IEEE 双栏 \textwidth≈7.16in 缩放 ≈0.75，
-有效字号 ≈ title 11.3 / label 9.8 / tick 8.6pt。
-导出前经 `figure_lint`（0 overlap；2 条 clipped 为 tight-bbox 前的 colorbar tick，导出件内无裁切）。
+版式（2026-10-22 第六轮起）：**1×4 网格**（(a) 条带；(b') 统计柱为**真实网格列**
+（原 inset_axes 浮动定位 [1.16,·] 越界压 (c) ytick/标题，字形级门检出 9 处碰撞
+后改列）；(c) 坐标三臂；(d) 逐层热图），figsize 10.2×3.9in，
+width_ratios [1.85, 0.50, 0.78, 0.76]，wspace 0.56，对 IEEE 双栏
+\textwidth≈7.16in 缩放 ≈0.70。用户指示「ab 只留一个，cd 分别另外两个创新点」：
+面板与三创新点 1:1（(a) 分区 / (c) 共享坐标 / (d) 门控），区域互补统计为
+(a) 右侧 (b') 列（两根堆叠柱 avg/mm × near/far，图例标题 N = 128）。
+第六轮同步收敛：标题字号 T 15→13 且 (a) 英文标题收短为
+「Avg misses far; minmax near」、(c)「Which 32 dims」（旧标题宽于所在列互叠）；
+(a) 色标 shrink 0.72 锚底 + 横排标签置于色标顶右上空带（竖排两侧分别压
+(a) 条带边与 (b') ytick 带）；尖峰 ▼ 移入 ylim(0, 4.35) 头部（旧 4.12 越轴顶
+压图例带）；(b') ylabel「missed ref mass」退役进 caption；(c) xtick 单行
+tail/rand/high（"32" 上移标题）。导出前经 `figure_lint`（**0 overlap**；
+1 条 clipped 为 (a) 色标 LogNorm(2e-4, 2e-2) 显示范围外的 locator tick
+10⁻⁵ 位置，bbox 在画布外恰证明不实际渲染，属假阳性）。
 
 **验收门（2026-10-21 第四轮起加严）**：lint 的 artist bbox 抓不住旋转/紧贴
 字形碰撞，最终验收 = PyMuPDF **字形级（rawdict char）跨 span bbox 交集**：
->0.5pt² 必须为 0；0.05–0.5pt² 为容忍软带（bbox 相触而墨迹不碰，如 (d) 密集
-ytick 邻格相靠）；页外 span 必须为 0。当前渲染：硬碰撞 0 / 页外 0 / 软带 83
-（全部为 (d) 密集 ytick 的 bbox 相靠）。
+>0.5pt² 必须为 0；0.05–0.5pt² 为容忍软带（bbox 相触而墨迹不碰）；页外 span
+必须为 0。检测器：`exp/trace/check_glyph_overlap.py`（45% 比例阈值口径）+
+pt² 面积口径复核。当前渲染（第六轮，双语）：**硬碰撞 0 / 软带 0 / 页外 0**
+（优于第五轮的软带 83；图例行距 labelspacing 0.55→1.2 消除 (b') 图例三行
+bbox 相触）。
 
 **2026-10-16 版式约束（用户指示）**：图内不堆说明文字（note box 已全部移除），
 面板数字与结论并入手稿 caption。图内仅保留：坐标轴/刻度、面板 (a) 的带名 ytick、
 far/near 区域标签与区域底色、紧凑四态图例（蓝=in ref 且选中 / 红///=ref 漏页 /
-橙..=ref 外入选 / 灰=未选）与尖峰页 ▼ 标记（page@7936）；面板 (b) 仅图例 +
-坐标轴。
+橙..=ref 外入选 / 灰=未选）与尖峰页 ▼ 标记（page@7936）；(b') 列仅 near/far
+图例（标题 N = 128）+ 坐标轴。
 
 **2026-10-16 GPT 统计审查（e5f5b7e）五点修正已并入**（v3 → v4）：
 
@@ -98,7 +112,7 @@ minmax 上界 ≥ 该 token 分而保留。
 漏筛同时含 32 维表示误差与 pooling 稀释，二者未在图内分离；
 参考集是质量排序单池上界，集合差异不能判定打分器质量优劣。
 
-### (b) Missed mass by region — 区域互补性（near-avg + far-minmax 组合动机）
+### (a) inset Missed mass by region — 区域互补性（2026-10-22 起内嵌于 (a)，独立 (b) 面板退役）
 
 两根堆叠柱（block-avg / minmax），每柱 = 128 query 平均漏失参考质量按 near/far
 区域分解（近区段主色在下 / 远区段高亮色在上）。区域归属 = bin 绝对区间
