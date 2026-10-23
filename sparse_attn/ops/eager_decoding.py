@@ -236,6 +236,104 @@ if _HAS_TRITON:
         tl.store(OUT + qh * stride_oh + offs_d, o.to(OUT.dtype.element_ty))
 
 
+if _HAS_TRITON:
+
+    @triton.jit
+    def _eager_expand_kernel_b(
+        MASK, IDX, COUNT, FLAG, CUK,
+        R, T, stride_mb, stride_mr,
+        W: tl.constexpr, TP: tl.constexpr,
+    ):
+        """【阶段 2b 批量】kernel A 批量版：grid (B*R,)，program (b,r) 独立
+        expand 一行。与单 query 版逐 program 逻辑逐位相同（同一 running
+        cumsum + 同一校验码），仅寻址加 batch 维。CUK 为 [B+1] varlen：
+        行 b 校验 cu[b]==b*T 且 cu[b+1]-cu[b]==T（固定全宽 T 契约）。"""
+        pid = tl.program_id(0)
+        b = pid // R
+        r = pid % R
+        cu0 = tl.load(CUK + b)
+        cu1 = tl.load(CUK + b + 1)
+        f = tl.where((cu0 == b * T) & ((cu1 - cu0) == T), 0, 3)
+        base = tl.zeros((), tl.int32)
+        for c0 in range(0, T, TP):
+            offs = c0 + tl.arange(0, TP)
+            tm = offs < T
+            sel = tl.load(MASK + b * stride_mb + r * stride_mr + offs,
+                          mask=tm, other=0).to(tl.int32)
+            csum = tl.cumsum(sel, axis=0)
+            pos = base + csum - sel                  # exclusive 位置
+            w = (sel != 0) & tm & (pos < W)
+            tl.store(IDX + b * (R * W) + r * W + tl.where(w, pos, 0),
+                     tl.where(w, offs, 0), mask=w)
+            over = (sel != 0) & tm & (pos >= W)
+            f = tl.maximum(f, tl.where(tl.sum(over, axis=0) > 0, 2, 0))
+            base += tl.sum(sel, axis=0)
+        tl.store(COUNT + b * R + r, base)
+        f = tl.maximum(f, tl.where(base == 0, 1, 0))
+        tl.atomic_max(FLAG, f)
+
+    @triton.jit
+    def _eager_attn_kernel_b(
+        IDX, COUNT, Q, K, V, OUT,
+        R, stride_qb, stride_kb, stride_kt, stride_kh, stride_qh, stride_ob,
+        G: tl.constexpr, D: tl.constexpr,
+        PER_QH: tl.constexpr, BW: tl.constexpr, W: tl.constexpr,
+    ):
+        """【阶段 2b 批量】kernel B 批量版：grid = B × _attn_grid_size，
+        program (b,r) 独立 online-softmax 一行（per_qh 一行一 program /
+        共享口径行×组内头展平——语义与单 query 版逐 program 相同）。
+        每 program 只读自己行的 IDX/COUNT/Q/K/V/OUT → 归约循环与单 query
+        版逐位相同（唯一差异是 batch 维寻址偏移）。"""
+        pid = tl.program_id(0)
+        if PER_QH:
+            b = pid // R
+            r = pid % R
+            kvh = r // G
+            qh = r
+        else:
+            b = pid // (R * G)
+            r = (pid // G) % R
+            j = pid % G
+            kvh = r
+            qh = r * G + j
+        cnt = tl.load(COUNT + b * R + r)
+        cnt = tl.minimum(cnt, W)   # 超上界只取前 W（漏选保护 flag=2 由 expand 记录）
+        offs_d = tl.arange(0, D)
+        qv = tl.load(Q + b * stride_qb + qh * stride_qh + offs_d)
+        m = float('-inf')
+        l = 0.0
+        acc = tl.zeros((D,), tl.float32)
+        for w0 in range(0, cnt, BW):
+            offs_w = w0 + tl.arange(0, BW)
+            wm = offs_w < cnt
+            tok = tl.load(IDX + b * (R * W) + r * W + offs_w, mask=wm, other=0)
+            kk = tl.load(K + b * stride_kb + tok[:, None] * stride_kt
+                         + kvh * stride_kh + offs_d[None, :],
+                         mask=wm[:, None], other=0.0).to(tl.float32)
+            vv = tl.load(V + b * stride_kb + tok[:, None] * stride_kt
+                         + kvh * stride_kh + offs_d[None, :],
+                         mask=wm[:, None], other=0.0).to(tl.float32)
+            s = tl.sum(kk * qv[None, :], axis=1)
+            s = tl.where(wm, s, float('-inf'))
+            m_new = tl.maximum(m, tl.max(s, axis=0))
+            m_safe = tl.where(m_new == float('-inf'), 0.0, m_new)
+            m_old = tl.where(m == float('-inf'), 0.0, m)
+            alpha = tl.exp(m_old - m_safe)
+            p = tl.exp(s - m_safe)
+            p = tl.where(wm, p, 0.0)
+            l = l * alpha + tl.sum(p, axis=0)
+            acc = acc * alpha + tl.sum(p[:, None] * vv, axis=0)
+            m = m_new
+        o = acc / tl.where(l == 0.0, 1.0, l)
+        # OUT 头维 stride 复用 stride_qh（OUT [B,H,D] 与 Q [B,H,D] 同布局，
+        # 头维 stride 均 = D）；签名只传 stride_qb/stride_ob，无独立 stride_oh
+        # （单 query 版签名有 stride_oh——批量版改 stride_qh，修复 2026-10-20：
+        # 原误写 stride_oh 未定义 → Triton 编译必炸 → 批量路径永久回退 torch
+        # gather，批量 Triton 从未真正生效）。
+        tl.store(OUT + b * stride_ob + qh * stride_qh + offs_d,
+                 o.to(OUT.dtype.element_ty))
+
+
 def _attn_grid_size(R: int, G: int, per_qh: bool) -> int:
     """【E127 097 修复】kernel B 的 program 数（独立纯函数供门禁直断）：
     per_qh 口径一行一 program（R 个——修复前误为 R*G，Qwen3 G=4 时
@@ -368,6 +466,62 @@ def _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero=False):
     return True
 
 
+def _validate_gqa_shape_batch(q, k, v, mask, block_size, allow_kv_hetero=False):
+    """【阶段 2b 批量】批量 decode 的 host 边界门（101 批量版）。
+
+    契约：q [B,1,H,D] / k,v [B,T,Hkv,D] / mask [B,1,R,blocks]（或
+    mask [1,1,R,blocks] 广播）；B≥1。检查项与单 query validator 对齐
+    （H%Hkv、K/V 头数/token 长度/head_dim/stride、R∈{Hkv,H}、
+    block_size≥1、mask 覆盖全部 KV），另加 batch 维一致性。fail-closed：
+    launch/分配前 ValueError 拒绝，不静默越界读。"""
+    def _fail(msg):
+        raise ValueError(
+            f"eager_decoding_attn (batch): 非法 GQA/shape 输入（阶段 2b "
+            f"fail-closed）——{msg}。契约：q [B,1,H,D] / k,v [B,T,Hkv,D] / "
+            f"mask [B,1,R,blocks]、B≥1、H%Hkv==0、R∈{{Hkv,H}}、"
+            f"block_size≥1、mask 覆盖全部 KV。")
+    if (q.dim() != 4 or k.dim() != 4 or v.dim() != 4 or mask.dim() != 4
+            or q.shape[1] != 1
+            or q.shape[0] != k.shape[0] or q.shape[0] != v.shape[0]
+            or k.shape[0] != v.shape[0]
+            or mask.shape[0] not in (1, q.shape[0])
+            or mask.shape[1] != 1
+            or q.shape[0] < 1):
+        _fail(f'batch decode 要求 q=[B,1,H,D]、k/v=[B,T,Hkv,D]、'
+              f'mask=[B,1,R,blocks]；实际 q={tuple(q.shape)} k={tuple(k.shape)} '
+              f'v={tuple(v.shape)} mask={tuple(mask.shape)}')
+    if q.shape[-1] <= 0 or q.shape[-1] != k.shape[-1]:
+        _fail(f'Q/K head_dim 须匹配且为正：q={q.shape[-1]} k={k.shape[-1]}')
+    H = q.shape[-2]
+    Hkv = k.shape[-2]
+    if H <= 0 or Hkv <= 0:
+        _fail(f"零/负头数 H={H} Hkv={Hkv}")
+    if H % Hkv != 0:
+        _fail(f"H={H} 不能被 Hkv={Hkv} 整除（G={H // Hkv} 截断）")
+    # 批量 K/V token 长一致（同一 S_cap）
+    if k.shape[1] != v.shape[1]:
+        _fail(f"K/V token 长度不一致：k={k.shape[1]} v={v.shape[1]}")
+    if allow_kv_hetero:
+        if v.stride(-1) != 1:
+            _fail(f"V stride[-1]={v.stride(-1)} != 1（E142a MLA 异维口径）")
+    else:
+        if v.shape[-1] != k.shape[-1]:
+            _fail(f"V head_dim {v.shape[-1]} != K head_dim {k.shape[-1]}")
+        for _ax in (-3, -2, -1):
+            if v.stride(_ax) != k.stride(_ax):
+                _fail(f"V stride[{_ax}]={v.stride(_ax)} != K stride"
+                      f"[{_ax}]={k.stride(_ax)}（116）")
+    if int(block_size) != block_size or int(block_size) < 1:
+        _fail(f"block_size={block_size} 非正整数")
+    if mask.shape[-1] * block_size < k.shape[1]:
+        _fail(f"mask 须覆盖全部 K/V token：blocks={mask.shape[-1]}, "
+              f"block_size={block_size}, tokens={k.shape[1]}")
+    R = mask.shape[-2]
+    if R != Hkv and R != H:
+        _fail(f"mask 行数 R={R} ∉ {{Hkv={Hkv}, H={H}}}")
+    return True
+
+
 def _triton_kv_layout_compatible(k, v):
     """The fused kernel shares K's width and strides when addressing V.
 
@@ -423,6 +577,50 @@ def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
     return o[None, None]
 
 
+if _HAS_TRITON:
+
+    def _eager_gather_triton_batch(q, k, v, m0, per_qh, G, W_upper,
+                                   cu_seqlens_k, softmax_scale):
+        """【阶段 2b 批量】Triton 融合批量 launch 封装：grid (B*R,) / B×grid，
+        每个 (b,r) program 与单 query 版对应 program 逻辑逐位相同（同一
+        kernel 归约循环，仅 batch 维寻址）。q [B,1,H,D]；k/v [B,T,Hkv,D]；
+        m0 [B,R,T] bool（token 级，block_size==1 前置已保证）；
+        cu_seqlens_k [B+1] varlen（固定全宽 T 契约，kernel A 逐行校验
+        cu[b]==b*T）。返回 [B,1,H,D]。"""
+        if not _triton_kv_layout_compatible(k, v):
+            raise ValueError(
+                "Triton eager attention (batch) requires matching K/V shapes "
+                "and strides")
+        if cu_seqlens_k.dtype != torch.int32:
+            cu_seqlens_k = cu_seqlens_k.to(torch.int32)
+        if cu_seqlens_k.stride(0) != 1:
+            cu_seqlens_k = cu_seqlens_k.contiguous()
+        B = q.shape[0]
+        R = m0.shape[1]
+        H = q.shape[-2]
+        D = k.shape[-1]
+        T = k.shape[1]
+        dev = q.device
+        idx = torch.full((B, R, W_upper), -1, device=dev, dtype=torch.int32)
+        cnt = torch.empty((B, R), device=dev, dtype=torch.int32)
+        flag = _err_flag(dev)
+        _eager_expand_kernel_b[(B * R,)](
+            m0, idx, cnt, flag, cu_seqlens_k, R, T,
+            m0.stride(0), m0.stride(1),
+            W=W_upper, TP=1024, num_warps=8)
+        qs = (q[:, 0] * softmax_scale).to(torch.float32)   # [B, H, D]
+        if qs.stride(-1) != 1:
+            qs = qs.contiguous()
+        o = torch.empty((B, H, D), device=dev, dtype=q.dtype)
+        grid = B * _attn_grid_size(R, G, per_qh)
+        _eager_attn_kernel_b[(grid,)](
+            idx, cnt, qs, k, v, o, R,
+            qs.stride(0), k.stride(0), k.stride(1), k.stride(2),
+            qs.stride(1), o.stride(0),
+            G=G, D=D, PER_QH=per_qh, BW=256, W=W_upper, num_warps=4)
+        return o[:, None]   # [B,1,H,D]
+
+
 def eager_decoding_attn(
     q: torch.Tensor, # [1, tq, hq, d]
     k: torch.Tensor, # [1, tk, h, d]
@@ -432,6 +630,7 @@ def eager_decoding_attn(
     cu_seqlens_k: torch.Tensor,
     softmax_scale: float = None,
     allow_kv_hetero: bool = False,
+    valid_length: int = None,
 ):
     """【E127 iter2+3】稀疏 attention 消费端入口（原实现原样保留为 _dense 版）。
 
@@ -454,16 +653,117 @@ def eager_decoding_attn(
     口径——validator 的 V/K head_dim+stride 一致门收窄为 V 自身连续，
     不兼容的 K/V 由显式布局门排除 Triton，消费走 torch gather/dense。
     """
+    # 【阶段 2b 批量】B>1 批量 decode（固定宽度 KV、逐行独立归约 → 与
+    # 单 query 逐位一致）：q [B,1,H,D] / k,v [B,T,Hkv,D] / mask [B,1,R,T] /
+    # cu_seqlens_k [B+1] varlen（固定全宽 T 契约）。B=1 走原路径零扰动。
+    if q.shape[0] != 1:
+        return _eager_decoding_attn_batch(
+            q, k, v, mask, block_size, cu_seqlens_k, softmax_scale,
+            allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
     _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero)
     # 【E127 inplace 合并（2026-10-12）】gather 路径并为默认——env 门反转，
     # TLI_E127_FAST=0 显式回退 dense 路径（紧急逃生口，归档复现用）。
     if os.environ.get("TLI_E127_FAST", "1") != "0":
         return _eager_decoding_attn_gather(
             q, k, v, mask, block_size, cu_seqlens_k, softmax_scale,
-            allow_kv_hetero=allow_kv_hetero)
+            allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
     return _eager_decoding_attn_dense(
         q, k, v, mask, block_size, cu_seqlens_k, softmax_scale,
-        allow_kv_hetero=allow_kv_hetero)
+        allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
+
+
+def _eager_decoding_attn_batch(
+    q: torch.Tensor, # [B, 1, H, D]
+    k: torch.Tensor, # [B, T, Hkv, D]
+    v: torch.Tensor, # [B, T, Hkv, D]
+    mask: torch.Tensor, # [B, 1, R, T]
+    block_size: int,
+    cu_seqlens_k: torch.Tensor, # [B+1] varlen（固定全宽 T 契约）或 [B,2]
+    softmax_scale: float = None,
+    allow_kv_hetero: bool = False,
+    valid_length: int = None,
+):
+    """【阶段 2b 批量】批量 decode 主路径。
+
+    逐位一致论证：每行 (b,r) 独立 program 归约（kernel A 独立 expand +
+    kernel B 独立 online-softmax，仅 batch 维寻址偏移），归约树与单 query
+    版逐位相同 → 批量输出 == 逐行调用单 query eager_decoding_attn 的逐位
+    一致（有限步门禁硬门）。torch 批量回退逐行独立 topk+einsum，同口径。
+
+    cu 契约：[B+1] varlen，行 b 为 [b*T, (b+1)*T]（固定全宽 T=S_cap）；
+    kernel A 逐行校验 cu[b]==b*T。调用方传入 [B,2] 时按固定全宽 T 归一。
+    """
+    _validate_gqa_shape_batch(q, k, v, mask, block_size, allow_kv_hetero)
+    if softmax_scale is None:
+        softmax_scale = k.shape[-1] ** -0.5
+    if block_size != 1:
+        raise ValueError("批量路径要求 block_size==1（TLI 生产 mask token 级）")
+    B = q.shape[0]
+    H = q.shape[-2]
+    Hkv = k.shape[-2]
+    T = k.shape[1]
+    dev = q.device
+    m0 = mask[:, 0]  # [B, R, T]（block_size==1 → token 级）
+    R = m0.shape[1]
+    # cu 归一：[B+1] varlen 固定全宽 T；[B,2] 时校验后按 T 构造
+    if cu_seqlens_k.dim() == 2 and cu_seqlens_k.shape[1] == 2:
+        cu_row = int(cu_seqlens_k[0, 1].item()) - int(cu_seqlens_k[0, 0].item())
+        if cu_row != T:
+            raise ValueError(
+                f"批量 cu [B,2] 行宽 {cu_row} != K 全宽 {T}")
+        cu = torch.arange(B + 1, device=dev, dtype=torch.int32) * T
+    elif cu_seqlens_k.dim() == 1 and cu_seqlens_k.shape[0] == B + 1:
+        cu = cu_seqlens_k
+    else:
+        raise ValueError(
+            f"批量 cu 须为 [B+1] varlen 或 [B,2]；实际 {tuple(cu_seqlens_k.shape)}")
+    per_qh = R == H and H != Hkv
+    G = H // Hkv
+    # Triton 融合批量主路径（路由条件与单 query 对齐 + batch 契约）：
+    # T≥16K（gather）、block_size==1、D 为 2 的幂、K/V 布局一致、m0 bool。
+    if (T >= 16384 and _HAS_TRITON and _EAGER_TRITON_OK["ok"]
+            and m0.dtype == torch.bool
+            and (k.shape[-1] & (k.shape[-1] - 1)) == 0
+            and _triton_kv_layout_compatible(k, v)
+            and m0.stride(-1) == 1 and k.stride(-1) == 1 and v.stride(-1) == 1
+            and cu.dtype in (torch.int32, torch.int64)):
+        W_up = min(int(os.environ.get("TLI_E127_W_UPPER", "2048")), T)
+        if W_up * 8 <= T:
+            try:
+                return _eager_gather_triton_batch(
+                    q, k, v, m0, per_qh, G, W_up, cu, softmax_scale)
+            except Exception:
+                _EAGER_TRITON_OK["ok"] = False
+    # torch 批量回退：逐行独立单 query gather（与单 query 逐位一致）
+    return _eager_decoding_attn_gather_batch(
+        q, k, v, mask, block_size, cu, softmax_scale, valid_length)
+
+
+def _eager_decoding_attn_gather_batch(
+    q, k, v, mask, block_size, cu_seqlens_k, softmax_scale, valid_length=None,
+):
+    """【阶段 2b 批量】torch 批量 gather 回退：逐行独立调用单 query gather
+    （每行 cu=[0,T] 固定全宽契约），归约与单 query 逐位一致。仅 Triton
+    批量不可用时走（fail-closed 值同，性能回退）。
+
+    valid_length 支持逐行 list[int]/[B] 张量（批量固定宽 T>有效长 L_b 时，
+    T<16384 的 dense 回退须逐行裁剪归约域 [0, L_b) 使归约树与变长路径
+    逐位一致——否则 pad 0 项参与归约树致 ULP 翻硬币；Triton 批量路径
+    只消费 mask 不需 valid_length）。标量（None/int）向后兼容逐行同值。
+    """
+    B = q.shape[0]
+    T = k.shape[1]
+    per_row = isinstance(valid_length, (list, tuple)) or (
+        torch.is_tensor(valid_length) and valid_length.numel() > 1)
+    outs = []
+    for b in range(B):
+        cu_row = torch.tensor([0, T], device=q.device, dtype=torch.int32)
+        vl = valid_length[b] if per_row else valid_length
+        outs.append(_eager_decoding_attn_gather(
+            q[b:b + 1], k[b:b + 1], v[b:b + 1], mask[b:b + 1], block_size,
+            cu_row, softmax_scale, allow_kv_hetero=False,
+            valid_length=vl))
+    return torch.cat(outs, dim=0)
 
 
 def _eager_decoding_attn_dense(
@@ -475,6 +775,7 @@ def _eager_decoding_attn_dense(
     cu_seqlens_k: torch.Tensor,
     softmax_scale: float = None,
     allow_kv_hetero: bool = False,
+    valid_length: int = None,
 ):
     # 101：直呼本函数同样受 host 边界门保护（公共入口之外的第二防线）
     _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero)
@@ -526,6 +827,15 @@ def _eager_decoding_attn_dense(
             "产生 NaN。indexer 契约应保证 sink/swa 强制区使每行至少一个"
             "有效 token；请检查 indexer 的 mask 输出。"
         )
+    # 【阶段 2a 固定宽度】归约域裁剪到真实有效长 valid_length：固定全宽
+    # KV（mask 宽 = S_cap 容量 > 有效长 L）下 dense 路径对全宽 [0, S_cap)
+    # softmax 归约，pad 区 -inf→0 虽精确不贡献，但 0 项参与浮点归约树
+    # 使归约形状与变长 [0, L) 不同 → ULP 级漂移（个别元素跨 bf16 舍入
+    # 边界）。裁剪到 [0, L) 后归约树与变长逐位相同 → 固定宽/变长 dense
+    # 逐位一致。变长路径（valid_length=None）不裁剪，行为逐位不变。
+    if valid_length is not None and valid_length < b_s.shape[-1]:
+        b_s = b_s[..., :valid_length]
+        b_v = b_v[:valid_length]
     b_p = F.softmax(b_s, dim=-1).to(q.dtype)
     b_o = rearrange(einsum(b_p, b_v, 'h g t, t h d -> h g d'), 'h g d -> (h g) d')
     o[0] = b_o
@@ -541,6 +851,7 @@ def _eager_decoding_attn_gather(
     cu_seqlens_k: torch.Tensor,
     softmax_scale: float = None,
     allow_kv_hetero: bool = False,
+    valid_length: int = None,
 ):
     """E127 gather 路径（数学语义 = _dense，仅归约顺序不同）。
 
@@ -577,7 +888,7 @@ def _eager_decoding_attn_gather(
         return _eager_decoding_attn_dense(
             q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),
             mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale,
-            allow_kv_hetero=allow_kv_hetero)
+            allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
     m0 = mask[0]
     # 101：per_qh 判定显式化（与 _dense 同口径——validator 保证 R∈{Hkv,H}
     # 下与旧推断「R != Hkv」布尔等价，合法路径逐位不变）。
@@ -641,7 +952,7 @@ def _eager_decoding_attn_gather(
         return _eager_decoding_attn_dense(
             q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),
             mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale,
-            allow_kv_hetero=allow_kv_hetero)
+            allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
     counts = bm2.sum(dim=-1)                            # [R]（GPU int64，无同步）
 
     # 【iter3】零同步化：W 用 host 已知的契约上界（indexer 契约：每行选中
@@ -658,7 +969,7 @@ def _eager_decoding_attn_gather(
         return _eager_decoding_attn_dense(
             q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),
             mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale,
-            allow_kv_hetero=allow_kv_hetero)
+            allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
 
     # 【iter3】GPU 端契约校验（无同步，替代原 stats 读回 + 当场 raise）：
     #   counts.min()==0   → B7 全 False 行（code=1，文案与 _dense 一致）

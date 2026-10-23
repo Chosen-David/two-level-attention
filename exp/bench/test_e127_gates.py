@@ -375,7 +375,21 @@ def test_score_mask_derived():
         fin = torch.isfinite(fa)
         rel = ((fa[fin].float() - fb[fin].float()).abs()
                / fa[fin].float().abs().clamp(min=1e-3)).max().item()
-        return nd, rel, nd <= fa.numel() * 1e-4 and rel <= 0.02
+        # 【E152v4 判据迁移】候选化（AKO iter-2 起）把 score_fine 比较
+        # 域从全宽 S_cap（~262k 元素/步）缩到候选域 R_max（~7.7k/步，
+        # 非候选位两臂同 -inf 逐位等不再参与）。bf16 einsum-vs-Triton
+        # 累加序漂移的绝对计数不变（全宽时代实测 254/10.49M，候选化后
+        # 274/7.75M 同级），但分母缩 ~34× → 同一物理噪声在纯比例阈
+        # 1e-4 下边缘超界（实测最差步 nd=8/77824，阈 7.78）。二分定位
+        # iter-1 PASS / iter-2 FAIL 确认为判据口径迁移而非漂移回归：
+        # ① mask 逐位（==）全绿——漂移元素全部深排名非选中位
+        # （rank 1167-1602 ≫ K2=1024，实 dump 验证）；② 漂移密度与
+        # 候选域高分段 bf16 ULP 物理特性一致。修正：计数阈加绝对下限
+        # max(numel×1e-4, 12)——12 ≈ 全宽时代每步等效阈 26 的保守折半，
+        # 较实测最差 8 留 50% 余量（非按失败值拟合）。rel≤2% 不变，
+        # isfinite 布局逐位硬门不变，mask 逐位不变。
+        return nd, rel, (nd <= max(fa.numel() * 1e-4, 12)
+                         and rel <= 0.02)
 
     for cname, args in configs:
         for layer_idx, ltag in [(2, "normal"), (0, "skip")]:
@@ -455,7 +469,9 @@ def test_score_mask_derived():
             nd = (fa != fb).sum().item()
             rel = ((fa.float() - fb.float()).abs()
                    / fa.float().abs().clamp(min=1e-3)).max().item() if nd else 0.0
-            if not (nd <= fa.numel() * 1e-4 and rel <= 0.02):
+            # 【E152v4 判据迁移】同 _ulp_ok：候选域绝对下限 12（口径迁移
+            # 依据见 _ulp_ok 注释）。
+            if not (nd <= max(fa.numel() * 1e-4, 12) and rel <= 0.02):
                 return False
         return True
 

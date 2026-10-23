@@ -282,7 +282,9 @@ def _add_tli_args(parser: argparse.ArgumentParser):
     # 降级为 legacy 比例口径：缺省翻转为 None=未传，仅在未传任何显式几何
     # 参数时按旧语义生效（构造期归一回 0.0/0.0/1.0，逐位不变）；与
     # nb/nt/nl 显式几何同传一律构造期拒绝（fail-closed 互斥——杜绝
-    # ctrl_singlepool 型「单池意图 + 几何参数」混配事故）。
+    # ctrl_singlepool 型「单池意图 + 几何参数」混配事故）。缺省主路径 =
+    # legacy 单池（E155e 隐式冠军几何注入已回退，主 AI 审计 2026-10-21：
+    # indexer 无注入而 manifest 镜像注入致身份失配，三处须同改同测）。
     group.add_argument('--tli_alpha', type=float, default=None,
                        help='near 区占 mid 长度比（E64 alpha，legacy 比例口径；缺省=单池老逻辑）。'
                             'E155d：固定配额派单改传 tli_near_pages/tokens/len，与本参数同传会构造期拒绝')
@@ -294,14 +296,16 @@ def _add_tli_args(parser: argparse.ArgumentParser):
                             'off=自由竞争（E122）。E155d：等价物为 tli_near_tokens off，'
                             '与显式几何同传会构造期拒绝')
     # ---- E155 固定配额几何（用户 2026-10-19 拍板：nt/nb 绝对配额全面转向）----
-    group.add_argument('--tli_near_pages', type=int, default=None,
+    # SUPPRESS 缺省（属性不存在 ≡ None，indexer getattr 兜底）——与 default=None
+    # 行为一致，仅省去冗余属性写入。
+    group.add_argument('--tli_near_pages', type=int, default=argparse.SUPPRESS,
                        help='E155 固定配额：near 块数 nb_near 显式整数（覆盖 round(K1·β)）；'
                             '须与 tli_near_tokens（数值或 off）同时传入')
-    group.add_argument('--tli_near_tokens', type=_parse_near_tokens, default=None,
+    group.add_argument('--tli_near_tokens', type=_parse_near_tokens, default=argparse.SUPPRESS,
                        help='E155 固定配额：near token 配额 nt_near 显式整数（覆盖 min(nb·64·γ, K2_mid)），'
                             'far_budget = K2_mid − nt_near；off=自由竞争哨兵（L2 取消配额分割，'
                             'L1 双池照旧——γ-off 的显式几何等价物）')
-    group.add_argument('--tli_near_len', type=int, default=None,
+    group.add_argument('--tli_near_len', type=int, default=argparse.SUPPRESS,
                        help='E155 固定配额：near 区宽度 near_L 显式整数 token 数（覆盖 α·mid_len 规则）；'
                             'L 轴扫描用。E155d：几何派单下 α/β/γ 全部禁传，near_L 无比例回退，'
                             '须显式传入')

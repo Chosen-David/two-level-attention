@@ -25,6 +25,13 @@ from einops import rearrange, repeat, einsum
 from .tia_indexer import TIAIndexer
 from ..info import DEFAULT_LAYER_SKIP_MASK_PATH
 
+# 【E152v4】graph 共享状态（ops 包独立模块，无循环导入风险）。导入失败 =
+# 环境裁剪 → graph 增量 prepare 路径整体禁用（回退全量重建，fail-closed）。
+try:
+    from ..ops.cuda_graph_state import graph_state as _graph_state_fn
+except Exception:
+    _graph_state_fn = None
+
 # 【E127 inplace 合并（用户 2026-10-12 指令）】原 TLIIndexerFast 子类
 # （tli_indexer_fast.py）语义并入基类：Triton 依赖惰性导入——CPU 环境
 # （无 GPU / 无 triton）不破模块导入，_HAS_TRITON=False 时三处 fast
@@ -33,10 +40,18 @@ try:
     import triton
     import triton.language as tl
     _HAS_TRITON = True
+    # 【AKO iter-9】tl.sort 能力探测（Triton ≥3.x；缺则 _compact_topk
+    # 排序内联化守卫短路回退 torch.sort，逐位不变）
+    _TL_HAS_SORT = hasattr(tl, "sort")
+    # 【AKO iter-15】tl.gather 能力探测（寄存器张量动态索引；缺则
+    # _compact_topk 排序内联融合守卫短路回退 iter-9 两 kernel 路径）
+    _TL_HAS_GATHER = hasattr(tl, "gather")
 except Exception:   # triton 缺失或导入异常：fast path 整体退役
     triton = None
     tl = None
     _HAS_TRITON = False
+    _TL_HAS_SORT = False
+    _TL_HAS_GATHER = False
 
 # 081（TL-E121-OUTPUT-SNAPSHOT-081）：默认 D′ 掩码路径定义上移到
 # sparse_attn/info.py（DEFAULT_LAYER_SKIP_MASK_PATH，单一事实源）——
@@ -505,6 +520,8 @@ class TLIIndexer(TIAIndexer):
         # 自动回退全宽，不受本标志影响。
         self._fine_gather = (
             os.environ.get("TLI_FINE_GATHER", "1").strip() != "0")
+        # 【AKO iter-19】topk_mask 融合装配独立永久门（异常回退 torch 链）
+        self._tmask_ok = True
         # E151c is implemented only in the E64 split-budget top-k branches.
         # Other selection modes return before those branches or use a different
         # budget contract; accepting the table there would silently ignore it.
@@ -744,7 +761,11 @@ class TLIIndexer(TIAIndexer):
         self._idx_sub_cache = (device, out)
         return out
 
-    def prepare_index(self, k, cu_seqlens_k):
+    # 声明支持外部 valid_length 覆盖（base.prepare_mask 据此决定是否传
+    # kwarg；其他 indexer 不支持时不传 → None 分支逐位不变）。
+    supports_valid_length = True
+
+    def prepare_index(self, k, cu_seqlens_k, valid_length=None):
         """【E127 inplace 合并（用户 2026-10-12 指令）】decode 热路径增量缓存
         入口（原 TLIIndexerFast.prepare_index 语义原样并入，env 门退役——
         fast 成为唯一路径）：k append-only 且前置条件满足时尾段增量重算，
@@ -754,6 +775,11 @@ class TLIIndexer(TIAIndexer):
             或任一前置不符 → 全量重建缓存。
           - clear() 使 _inc 失效 → 新请求首步全量。
           - 投影基/moba/异形 D≠128 一律全量（值同原版路径，逐位不变）。
+        【阶段 2a 固定宽度】valid_length：固定全宽 KV 下 k.shape[1]=S_cap
+        （容量）≠ 真实有效长。外部显式传入（batch decode 每行 L_b）时覆盖
+        返回 dict 的 "valid_length"（_prepare_index_base/_inc 内部设 k.shape[1]，
+        该 key 只被 compute_score/_gather_fine_cand 消费 → 入口覆盖语义安全）。
+        valid_length=None（可变宽/单序列旧入口）行为逐位不变。
         """
         # This implementation owns exactly one request. Validate before the
         # incremental dispatch: that path indexes k[0] and would otherwise
@@ -767,6 +793,21 @@ class TLIIndexer(TIAIndexer):
             raise ValueError(
                 f"tli_subspace={self.subspace} 需要的 k 末维 = {expected_dim}，"
                 f"实际 {k.shape[-1]}")
+        # 【E152v4】graph 增量优先：cuda_graph_state 模式（decode 整步
+        # capture/replay）下走 pos_buf 驱动的容量宽持久 buffer 增量更新
+        # （_prepare_index_graph；每步仅重算 pos 所在块统计 + k_qat[pos]
+        # 行，替代 patch 旧口径下每步每层的 _prepare_index_base 容量宽
+        # 全量重建 ~15ms/步 index 税）。不兼容配置返回 None → 回退下方
+        # 原路径，行为逐位不变（fail-closed）。_ginc 生命周期独立于 _inc
+        # （clear() 同时失效两者 = 请求边界全量重建；graph 步进不再每步
+        # clear —— 见 patch _tl_decode_batched_graph）。
+        if (_graph_state_fn is not None
+                and os.environ.get("TLI_GRAPH_INC", "1") != "0"):
+            _gs = _graph_state_fn()
+            if _gs.enabled:
+                _gd = self._prepare_index_graph(k, cu_seqlens_k)
+                if _gd is not None:
+                    return _gd
         inc = getattr(self, "_inc", None)
         S_now = k.shape[1]
         if (
@@ -779,8 +820,13 @@ class TLIIndexer(TIAIndexer):
             and inc["sub_key"] == self._sub_key()
             and (not self._need_avg_score() or inc["k_avg"] is not None)
         ):
-            return self._prepare_index_inc(k, cu_seqlens_k, inc)
-        return self._prepare_index_full(k, cu_seqlens_k)
+            d = self._prepare_index_inc(k, cu_seqlens_k, inc)
+        else:
+            d = self._prepare_index_full(k, cu_seqlens_k,
+                                         valid_length=valid_length)
+        if valid_length is not None:
+            d["valid_length"] = valid_length
+        return d
 
     def _sub_key(self):
         """子空间一致性 key：跨步 idx_sub 不变才可增量（static_pair 的
@@ -791,8 +837,8 @@ class TLIIndexer(TIAIndexer):
             return ("pair", int(self._pair_idx.numel()))
         return (self.subspace, self.cmp_ratio)
 
-    def _prepare_index_full(self, k, cu_seqlens_k):
-        d = self._prepare_index_base(k, cu_seqlens_k)
+    def _prepare_index_full(self, k, cu_seqlens_k, valid_length=None):
+        d = self._prepare_index_base(k, cu_seqlens_k, valid_length=valid_length)
         # 建缓存（k_qat 仅非投影路径可作增量 buffer——投影路径 k_qat 为
         # 全维量化特征，散布语义不同；_basis 非 None 时 can_inc 已挡，
         # 此处再防御一次）
@@ -824,6 +870,166 @@ class TLIIndexer(TIAIndexer):
             "sub_key": self._sub_key(),
         }
         return d
+
+    def _prepare_index_graph(self, k, cu_seqlens_k):
+        """【E152v4】graph 专用增量 prepare（pos_buf 驱动，capture 安全）。
+
+        背景：graph 模式下 patch 每步每层 clear()+prepare_index →
+        _prepare_index_base 对整条 S_cap 容量全量重建（index_put_/
+        nonzero/amin/amax/mean/gather 全量 kernel，with_stack 归因
+        ~15ms/步 36 层 index 税）。decode 稳态每步只写 1 个新 token
+        （pos_buf 指示列），前缀 token 内容跨步不变（静态 cache 追加写）
+        + pad 区恒零 → 容量宽块统计/k_qat 可持久化，每步只增量更新 pos
+        所在块 + k_qat[pos] 行（~7 个固定形状小 kernel/层）。
+
+        等价性（与每步全量重建逐位一致）：
+          - 首调（warmup，capture 外）全量建 buffer：_prepare_index_base
+            产物原样接管（valid_length=None 容量宽口径同款）；
+          - 增量步：块统计块独立归约（E127 归纳）→ 单块重算 ≡ 全量对应
+            块；k_qat 逐 token 独立（切片/quant 均行独立）→ 单行直写 ≡
+            全量对应行；末块不满时全量路径 pad 零，这里 clamp+where(+0)
+            复现（where 显式给 +0，规避乘零的 -0 陷阱）；
+          - 均为纯固定形状张量 op（index_select/reduce/index_copy_），
+            无 host 读回 → capture/replay 合法。
+
+        生命周期：clear() 失效 _ginc（prefill 前每层 clear = 请求边界
+        全量重建）；跨 repeat 同存储 refills 时 e152v4 协议保证逐位相同
+        prompt（input_ids sha 落盘）→ 前缀恒有效。生产 pred_ruler 每
+        请求先 prefill（clear）→ 首步 decode 全量重建，安全。
+
+        前置门（host 侧，仅 capture 外评估；不满足返回 None → 调用方
+        回退全量路径，fail-closed）：graph_state.enabled 且 pos_buf 就
+        绪、B=1 容量宽、非投影/非 moba/D=128、非 kmeans 消费臂。
+        """
+        if _graph_state_fn is None:
+            return None
+        gs = _graph_state_fn()
+        if not gs.enabled or gs.pos_buf is None:
+            return None
+        if (self._basis is not None or self._basis_all is not None
+                or self.moba_gate or k.dim() != 4 or k.shape[0] != 1
+                or not k.is_cuda or k.shape[-1] != 128):
+            return None
+        if (self.enable_kmeans
+                and (self.far_select != "4bit" or self.near_select != "4bit")):
+            return None
+        bs = self.args.tia_block_size
+        if (bs & (bs - 1)) != 0:
+            return None
+        S_cap = k.shape[1]
+        kt_cap = (S_cap + bs - 1) // bs
+        need_avg = self._need_avg_score()
+        dev = k.device
+        _g = getattr(self, "_ginc", None)
+        stale = _g is not None and _g.get("stale", False)
+        if (_g is None
+                or stale
+                or _g["S_cap"] != S_cap
+                or _g["kt_cap"] != kt_cap
+                or _g["bs"] != bs
+                or _g["data_ptr"] != k.data_ptr()
+                or _g["dtype"] != k.dtype
+                or _g["sub_key"] != self._sub_key()
+                or _g["need_avg"] != need_avg):
+            # 首调/缓存失效：全量建 buffer。必须发生在 capture 外
+            #（warmup 必先跑）；capture 内触发 = 状态异常 → 拒绝增量。
+            if torch.cuda.is_current_stream_capturing():
+                return None
+            self._resolve_skip()
+            d = self._prepare_index_base(k, cu_seqlens_k)
+            k_qat = d["k_qat"]
+            # l2_subspace=full 且 l2_quant=False 时 base 返回 k 本体
+            #（视图）——持久 buffer 会被下方 index_copy_ 原地改写 →
+            # 污染静态 cache，必须物化拷贝
+            if k_qat is k:
+                k_qat = k_qat.clone()
+            if (k_qat.dim() != 4 or k_qat.shape[1] != S_cap
+                    or k_qat.data_ptr() == k.data_ptr()):
+                return None
+            if need_avg and d.get("k_avg") is None:
+                return None
+            # 【E152v4-修复·根因】同形状 stale 旧 buffer 存在（图 replay
+            # 仍 pin 其内存）→ in-place 全量刷新代替重新分配：旧图 kernel
+            # 读写同一地址，跨请求复用图安全；若改为新分配，旧 buffer 被
+            # allocator 回收复用 → replay 静默读写被覆写内存。
+            if (stale
+                    and _g["S_cap"] == S_cap
+                    and _g["kt_cap"] == kt_cap
+                    and _g["bs"] == bs
+                    and _g["data_ptr"] == k.data_ptr()
+                    and _g["dtype"] == k.dtype
+                    and _g["sub_key"] == self._sub_key()
+                    and _g["need_avg"] == need_avg
+                    and k_qat.shape == _g["k_qat"].shape
+                    and d["k_min"].shape == _g["k_min"].shape):
+                _g["k_min"].copy_(d["k_min"])
+                _g["k_max"].copy_(d["k_max"])
+                if need_avg:
+                    _g["k_avg"].copy_(d["k_avg"])
+                _g["k_qat"].copy_(k_qat)
+                _g.pop("stale", None)
+                return {
+                    "k_min": _g["k_min"],
+                    "k_max": _g["k_max"],
+                    "k_avg": _g["k_avg"],
+                    "k_avg_full": None,
+                    "k_qat": _g["k_qat"],
+                    "cu_seqlens_k_coarse": _g["cu_coarse"],
+                    "cu_seqlens_k_fine": cu_seqlens_k,
+                    "valid_length": S_cap,
+                }
+            self._ginc = {
+                "S_cap": S_cap, "kt_cap": kt_cap, "bs": bs,
+                "data_ptr": k.data_ptr(), "dtype": k.dtype,
+                "sub_key": self._sub_key(), "need_avg": need_avg,
+                "k_min": d["k_min"], "k_max": d["k_max"],
+                "k_avg": d.get("k_avg"),
+                "k_qat": k_qat,
+                "cu_coarse": d["cu_seqlens_k_coarse"],
+                "ar_bs": torch.arange(bs, device=dev),
+                "zero_k": k.new_zeros(()),
+            }
+            return d
+        # ---- 增量步（固定形状纯张量 op，capture/replay 安全）----
+        pos = gs.pos_buf                       # [1] long（本步写列）
+        if pos.dtype != torch.long or pos.device != dev:
+            return None
+        fb = pos // bs                         # [1] 新 token 所在块
+        idx_blk = fb * bs + _g["ar_bs"]        # [bs] 该块 token 下标
+        inb = idx_blk < S_cap                  # 末块越界门（pad 零语义）
+        blk = k[0].index_select(0, idx_blk.clamp(max=S_cap - 1))
+        blk = torch.where(inb.view(bs, 1, 1), blk, _g["zero_k"])
+        idx_sub = (self._subspace_indices(dev)
+                   if self.enable_subspace else None)
+        blk_sub = blk[..., idx_sub] if idx_sub is not None else blk
+        # 归约形态对齐全量表达式（[1,1,bs,Hkv,d] mean(dim=2)/amin(dim=2)，
+        # 同元素序同 stride → 逐位一致）。blk_sub 恒 3D [bs,Hkv,d']（末维
+        # gather/直用均不升维）
+        t5 = blk_sub.view(1, 1, bs, blk_sub.shape[1], blk_sub.shape[2])
+        _g["k_min"][0].index_copy_(0, fb, t5.amin(dim=2)[0, 0].unsqueeze(0))
+        _g["k_max"][0].index_copy_(0, fb, t5.amax(dim=2)[0, 0].unsqueeze(0))
+        if need_avg:
+            _g["k_avg"][0].index_copy_(0, fb, t5.mean(dim=2)[0, 0].unsqueeze(0))
+        # k_qat 行：逐 token 独立 → 单行 gather + 直写
+        row = k[0].index_select(0, pos)         # [1,Hkv,D]
+        if self.l2_subspace == "full":
+            seg = self.min_max_per_token_quant(row) if self.l2_quant else row
+        else:
+            indices = idx_sub if idx_sub is not None else self._qat_indices(dev)
+            seg = row[..., indices]
+            if self.l2_quant:
+                seg = self.min_max_per_token_quant(seg)
+        _g["k_qat"][0].index_copy_(0, pos, seg)
+        return {
+            "k_min": _g["k_min"],
+            "k_max": _g["k_max"],
+            "k_avg": _g["k_avg"],
+            "k_avg_full": None,
+            "k_qat": _g["k_qat"],
+            "cu_seqlens_k_coarse": _g["cu_coarse"],
+            "cu_seqlens_k_fine": cu_seqlens_k,
+            "valid_length": S_cap,
+        }
 
     def _prepare_index_inc(self, k, cu_seqlens_k, inc):
         """【E127 iter4】增量缓存：复用块 [0, fb) + 尾段重算（pad 语义
@@ -1004,13 +1210,43 @@ class TLIIndexer(TIAIndexer):
         self._qat_idx_cache = (key, idx)
         return idx
 
-    def _prepare_index_base(self, k, cu_seqlens_k):
+    def _prepare_index_base(self, k, cu_seqlens_k, valid_length=None):
         from .utils import prepare_pad_mask, pad_tensor
         self._resolve_skip()
         idx_sub = self._subspace_indices(k.device) if self.enable_subspace else None
-
-        pad_mask, pad_cu_seqlens_k = prepare_pad_mask(self.args.tia_block_size, cu_seqlens_k)
-        pad_k = pad_tensor(k, pad_mask)
+        # 【阶段 2a 固定宽度】块统计有效区：固定全宽 KV（k.shape[1]=S_cap
+        # 容量 > valid_length 有效长）下 pad 列进入块统计 → k_min/k_max/k_avg
+        # 与变长路径（无 pad 列）不一致 → score_coarse 漂移 → L1 选择/mask
+        # 漂移（G5 aavg_e64 normal 反例）。非投影分支的块统计从有效区切片算
+        # （宽 ceil(vl/bs)），下游 kt=score_coarse 宽随之有效化 → 近池/
+        # swa_lo_blk 边界与变长一致（G6 bypass 断言反例同源消解）。k_qat
+        # 保持全宽（非候选化路径 score_fine 需全宽 S_cap；pad 列由
+        # compute_mask 显式置 -inf）。投影分支（_basis 非 None，消融臂）
+        # 保持全宽旧行为逐位不变。
+        k_stat = k
+        cu_stat = cu_seqlens_k
+        if (valid_length is not None and valid_length < k.shape[1]
+                and self._basis is None):
+            k_stat = k[:, :valid_length]
+            cu_stat = torch.tensor([0, valid_length],
+                                   dtype=cu_seqlens_k.dtype,
+                                   device=cu_seqlens_k.device)
+        # 【阶段 2c-5】CUDA Graph capture 纯张量路径：prepare_pad_mask 的
+        # 逐元素迭代与 pad_tensor 的 bool 掩码散射都需要 host 侧元素个数
+        # 同步（capture 期非法）。单行（k_stat.shape[0]==1，本函数断言）且
+        # pad_mask 恒为前缀 True 布局 → 静态 total + 切片写入，值逐位相同。
+        if torch.cuda.is_current_stream_capturing():
+            _pbs = self.args.tia_block_size
+            _total = (k_stat.shape[1] + _pbs - 1) // _pbs * _pbs
+            pad_mask, pad_cu_seqlens_k = prepare_pad_mask(_pbs, cu_stat,
+                                                          total=_total)
+            pad_k = k_stat.new_zeros((k_stat.shape[0], _total)
+                                     + tuple(k_stat.shape[2:]))
+            pad_k[:, :k_stat.shape[1]] = k_stat
+        else:
+            pad_mask, pad_cu_seqlens_k = prepare_pad_mask(
+                self.args.tia_block_size, cu_stat)
+            pad_k = pad_tensor(k_stat, pad_mask)
         # ---- 投影基惰性提取（每层一次）：full-D [128,r] → 子空间 [32,r] ----
         if self._basis_all is not None and self._basis is None and self.layer_idx is not None:
             li = min(self.layer_idx, self._basis_all.shape[0] - 1)
@@ -1458,7 +1694,8 @@ class TLIIndexer(TIAIndexer):
         )
 
     def _gather_fine_cand(self, score_coarse, score_coarse_avg, k_qat,
-                          b_q_full, valid_length):
+                          b_q_full, valid_length, sc_mean=None,
+                          sc_avg_mean=None):
         """【E156 单源】L1 候选 token 集 fine 打分 helper（per-head）。
 
         compute_score 主路径与父类捷径共用同一实现（杜绝两份口径漂移）：
@@ -1474,9 +1711,15 @@ class TLIIndexer(TIAIndexer):
         每 head 实长 cand_len（短序列/尾块截断时 pad，重建设 scatter 用
         cand_len 门控防 sentinel 污染）。
 
-        返回 (score_fine_cand [1,H,R_max], cand_idx [H,R_max],
-        cand_len [H])；任一异常 / 形状不符 / 门控不适用 → (None,None,None)
-        fail-closed（调用方回退原全宽路径，值逐位不变）。E156 门控内联：
+        返回 (score_fine_cand [1,H,R_max], cand_idx [Hkv,R_max],
+        cand_len [Hkv], l1_sel dict)；任一异常 / 形状不符 / 门控不适用 →
+        (None,None,None,None) fail-closed（调用方回退原全宽路径，值逐位
+        不变）。l1_sel = 内部 _select_l1_blocks 完整产出 dict（【AKO
+        iter-6】compute_mask fused 臂复用 L1 选择用；None 伴随 fail 路径）。
+        【AKO iter-20】cand_idx/cand_len 以 **kv-head 空间**返回（行在
+        GQA 组内恒同——cand_gqa_shared 契约），score_dict 附 cand_kv_space
+        标记；消费端 kernel 用 h//g 折叠行地址，冷路径按需展开回 q-head。
+        E156 门控内联：
         σ / ccluster（near/far cluster 分）实验臂直接读全宽原始 score_fine
         可超出候选集 → 这些臂拒绝候选化。
         async 消费上一轮 L1 mask，当前候选不保证覆盖它，必须回退全宽评分。
@@ -1485,23 +1728,24 @@ class TLIIndexer(TIAIndexer):
             if not (self._fine_gather and self._basis is None
                     and not self.moba_gate and not self.per_q_head
                     and not self.enable_async):
-                return None, None, None
+                return None, None, None, None
             _raw = (self.sigma_select != "none"
                     or self.far_select in ("cluster", "sim_greedy")
                     or self.near_select in ("cluster", "sim_greedy"))
             if _raw:
-                return None, None, None
+                return None, None, None, None
             _S_r = (int(valid_length)
                     if valid_length is not None else k_qat.shape[1])
+            # 【AKO iter-21】粗筛 kernel 同趟产出的 GQA 组均值透传（None =
+            # 回退臂，_select_l1_blocks 内部 torch mean 逐位不变）
             _sel = self._select_l1_blocks(
-                score_coarse, score_coarse_avg, _S_r)
+                score_coarse, score_coarse_avg, _S_r,
+                sc_mean=sc_mean, sc_avg_mean=sc_avg_mean)
             _bs_c = _sel["bs"]
             _tmb = _sel["topk_mask_block"]          # [1,1,Hkv,kt]
             _dev = _tmb.device
             _Hkv = _tmb.shape[2]
-            _sink_t = torch.arange(min(_sel["sink_tok"], _S_r), device=_dev)
             _swa_lo = max(0, _S_r - _sel["swa_tok"])
-            _swa_t = torch.arange(_swa_lo, _S_r, device=_dev)
             # 每 kv-head 独立候选 token 集（sink/swa 全 head 共享；块与强制区
             # 重叠产生重复索引无害——打分重复物化、重建 scatter 幂等同值）。
             # 【E156c 向量化构建】per-head Python 循环 = 8×~20 个小 CUDA
@@ -1513,64 +1757,95 @@ class TLIIndexer(TIAIndexer):
             #   于逐 head 截断（只有尾块可能超界）。
             #   共享段（bypass+sink+swa）：每 head 相同，scatter 到各自行的
             #   [cnt_l1[h], cnt_l1[h]+M) 列区间（= 循环 concat 顺序）。
-            _tmb4 = _tmb[0, 0]                          # [Hkv, kt] bool
-            _l1_h, _l1_b = torch.nonzero(_tmb4, as_tuple=True)
-            if _l1_b.numel():
-                _l1_tok = (_l1_b.view(-1, 1) * _bs_c
-                           + torch.arange(_bs_c, device=_dev).view(1, _bs_c))
-                _l1_h_exp = _l1_h.view(-1, 1).expand(-1, _bs_c)
-                _l1_keep = _l1_tok < _S_r
-                _l1_tok = _l1_tok[_l1_keep].reshape(-1)
-                _l1_h = _l1_h_exp[_l1_keep].reshape(-1)
-                _l1_cnt = torch.bincount(
-                    _l1_h, minlength=_Hkv).to(torch.long)   # [Hkv]
-                _l1_base = torch.cat(
-                    [torch.zeros(1, dtype=torch.long, device=_dev),
-                     torch.cumsum(_l1_cnt, 0)[:-1]])
-                _l1_col = (torch.arange(_l1_tok.numel(), device=_dev,
-                                        dtype=torch.long)
-                           - torch.repeat_interleave(_l1_base, _l1_cnt,
-                                                     dim=0))
-            else:
-                _l1_tok = torch.empty(0, dtype=torch.long, device=_dev)
-                _l1_h = torch.empty(0, dtype=torch.long, device=_dev)
-                _l1_cnt = torch.zeros(_Hkv, dtype=torch.long, device=_dev)
-                _l1_col = torch.empty(0, dtype=torch.long, device=_dev)
-            _shared = []
-            if _sel["bypass_blks"]:
-                _bt = torch.tensor(_sel["bypass_blks"],
-                                   dtype=torch.long, device=_dev)
-                _tbp = (_bt.view(-1, 1) * _bs_c
-                        + torch.arange(_bs_c, device=_dev).view(1, _bs_c))
-                _tbp = _tbp[_tbp < _S_r].reshape(-1)
-                if _tbp.numel():
-                    _shared.append(_tbp)
-            if _sink_t.numel():
-                _shared.append(_sink_t)
-            if _swa_t.numel():
-                _shared.append(_swa_t)
-            if _shared:
-                _shared_t = torch.cat(_shared)             # [M]
-                _M = _shared_t.numel()
-            else:
-                _shared_t = None
-                _M = 0
-            _R_max = int((_l1_cnt + _M).max().item())
+            # 【AKO iter-16】免同步候选构建（消 4 处/步 device 同步 + E134
+            # graph capture 阻断项）：旧 torch.nonzero(_tmb4)（输出形状依赖
+            # count → D2H 同步）+ 2 处 bool 索引过滤（同步）+
+            # (_l1_cnt+_M).max().item()（同步）+ bincount/cumsum/col 推导/
+            # L1 scatter 链 → 全 host 已知形状张量算术。序恒等：i_all 与
+            # topk_mask True 集恒等（见 _select_l1_blocks i_all 注），per-head
+            # sort 升序展开 = nonzero 行主序（head 升序、head 内块升序、
+            # token 升序）。截断 token（tok≥S_r）所在块恒排行尾 → 有效候选
+            # = 行前缀，cnt = Σ_b clamp(S_r-b·bs,0,bs) 与旧 bincount(keep)
+            # 逐位同值；R_max = nb·bs + M host 常量（S_r%bs==0 时与旧
+            # max().item() 严格相等；有部分块时仅多 ≤bs-1 列 -inf pad，
+            # cand_len 门控下 mask 逐位不变）。探针：128 步对拍 0 失配
+            # （e64/非 e64/sink 变体 ×32）。
+            _i_all = _sel.get("i_all")
+            if _i_all is None:
+                return None, None, None, None   # 理论不可达（两分支均产出）
+            _bp = _sel["bypass_blks"]
+            # 【AKO iter-22】共享段 host 端点/宽度直算（零宽段剔除，段序 =
+            # 旧 cat 程序序：bypass 序 + sink + swa）：fused 路径 4×(lo,w)
+            # 标量直进 K2（免 arange×4 + cat + bp as_tensor H2D）；
+            # fallback 路径按同段表现建 arange（值逐位同旧链）。
+            # 宽度全 host 可知：bypass 段 = min((b+1)·bs, S_r) − b·bs
+            # （iter-16 host 宽度直构口径）；sink = min(sink_tok, S_r)；
+            # swa = S_r − max(0, S_r−swa_tok)。
+            _seg_los, _seg_ws = [], []
+            for _b in _bp:
+                _lo, _hi = _b * _bs_c, min(_b * _bs_c + _bs_c, _S_r)
+                if _hi > _lo:
+                    _seg_los.append(_lo)
+                    _seg_ws.append(_hi - _lo)
+            _sink_w = min(_sel["sink_tok"], _S_r)
+            if _sink_w > 0:
+                _seg_los.append(0)
+                _seg_ws.append(_sink_w)
+            if _S_r > _swa_lo:
+                _seg_los.append(_swa_lo)
+                _seg_ws.append(_S_r - _swa_lo)
+            _M = int(sum(_seg_ws))
+            _nb = _i_all.shape[-1] + len(_bp)
+            # 【AKO iter-17】融合构建 K1（per-head 排序+cnt）+ K2（行装配），
+            # 2 launch 替代 torch 链 ~16 launch（cat+sort+arange 展开+
+            # clamp.sum+zeros+直填+index_put_）；纯整数域与 torch 链逐位
+            # 恒等（哨兵 pad 排序 ≡ torch.sort 升序，互异块号无 tie）。
+            # 门禁：末维连续 / nb ≥ 2（tl.sort 单元素编译崩，iter-9 坑）/
+            # nb_pow2 ≤ 256（iter-9 同界）；异常回退 torch 链值同。
+            _use_fused = (self._triton_ok and _HAS_TRITON
+                          and _i_all.stride(-1) == 1
+                          and _i_all.shape[-1] + len(_bp) >= 2)
+            if _use_fused:
+                try:
+                    _cand, _l1_cnt = self._fast_cand_build(
+                        _i_all, _bp, _seg_los, _seg_ws, _S_r, _bs_c, _nb)
+                except Exception:
+                    _use_fused = False
+            if not _use_fused:
+                _shared = [torch.arange(_lo, _lo + _w, device=_dev)
+                           for _lo, _w in zip(_seg_los, _seg_ws)]
+                _shared_t = torch.cat(_shared) if _shared else None
+                if _bp:
+                    _bt = torch.as_tensor(_bp, dtype=torch.long, device=_dev)
+                    _i_all = torch.cat(
+                        [_i_all, _bt.view(1, 1, 1, -1).expand(
+                            *_i_all.shape[:-1], len(_bp))], dim=-1)
+                _nb2 = _i_all.shape[-1]
+                _blk = torch.sort(_i_all, dim=-1).values.reshape(_Hkv, _nb2)
+                _l1_tok = (_blk * _bs_c).unsqueeze(-1) \
+                    + torch.arange(_bs_c, device=_dev).view(1, 1, _bs_c)
+                _l1_tok = _l1_tok.reshape(_Hkv, _nb2 * _bs_c)   # 行 token 升序
+                _l1_cnt = torch.clamp(
+                    _S_r - _blk * _bs_c, min=0, max=_bs_c
+                ).sum(dim=-1).to(torch.long)                    # [Hkv]
+                _R_max = _nb2 * _bs_c + _M
+                if _R_max == 0:
+                    return None, None, None, None
+                _cand = torch.zeros((_Hkv, _R_max),
+                                    dtype=torch.long, device=_dev)
+                _cand[:, :_nb2 * _bs_c] = _l1_tok  # L1 段直填（升序前缀）
+                if _M:
+                    _sh_h = torch.arange(_Hkv, device=_dev
+                                         ).view(-1, 1).expand(_Hkv, _M)
+                    _sh_col = (_l1_cnt.view(-1, 1).expand(_Hkv, _M)
+                               + torch.arange(_M, device=_dev
+                                              ).view(1, -1).expand(_Hkv, _M))
+                    _cand[_sh_h.reshape(-1), _sh_col.reshape(-1)] = (
+                        _shared_t.expand(_Hkv, _M).reshape(-1))
+            _R_max = _nb * _bs_c + _M
             if _R_max == 0:
-                return None, None, None
-            _cand = torch.zeros((_Hkv, _R_max),
-                                dtype=torch.long, device=_dev)
+                return None, None, None, None
             _cand_len = _l1_cnt + _M                      # [Hkv]
-            if _l1_tok.numel():
-                _cand[_l1_h, _l1_col] = _l1_tok
-            if _M:
-                _sh_h = torch.arange(_Hkv, device=_dev
-                                     ).view(-1, 1).expand(_Hkv, _M)
-                _sh_col = (_l1_cnt.view(-1, 1).expand(_Hkv, _M)
-                           + torch.arange(_M, device=_dev
-                                          ).view(1, -1).expand(_Hkv, _M))
-                _cand[_sh_h.reshape(-1), _sh_col.reshape(-1)] = (
-                    _shared_t.expand(_Hkv, _M).reshape(-1))
             # 对角 GQA gather：行 h 只用 kv-head h 的 k 特征（免 [Hkv,R,Hkv,d]
             # 全展开物化——首版 70MB 中间量，对角直取省 8×）。
             # 【E156c】Triton 融合候选 kernel（_fast_score_fine_cand）替代
@@ -1602,23 +1877,30 @@ class TLIIndexer(TIAIndexer):
                                g=self.group_size).to(torch.float32)   # [H,R,d']
                 _sfc = einsum(b_q_full, _bkqc, "h d, h r d -> h r")   # [H,R]
                 _sfc = _sfc.to(k_qat.dtype)
-            _r_mask = (torch.arange(_R_max, device=_dev).view(1, _R_max)
-                       < _cand_len.view(_Hkv, 1))                 # [Hkv,R]
-            _r_mask_h = repeat(_r_mask, "kv r -> (kv g) r",
-                               g=self.group_size)                 # [H,R]
-            _score_fine_cand = k_qat.new_full(
-                (1, b_q_full.shape[0], _R_max), float("-inf"))
-            _score_fine_cand[0] = torch.where(
-                _r_mask_h, _sfc, torch.full_like(_sfc, float("-inf")))
-            # q-head 空间 [H,R_max]（与 score_fine 同构；compute_mask scatter 用）
-            _cand_h = repeat(_cand, "kv r -> (kv g) r", g=self.group_size)
-            _cand_len_h = repeat(_cand_len, "kv -> (kv g)",
-                                 g=self.group_size)
-            return _score_fine_cand, _cand_h, _cand_len_h
+            # 【AKO iter-17】Triton 路径 -inf 门控已在 _score_fine_cand_kernel
+            # 内完成（L4207 offs_r < cl，cl = _cand_len 组内共享同界）→ 外层
+            # arange/repeat/where/new_full 尾链纯冗余（对 -inf 再 where 逐位
+            # 同值），免 6+ launch；einsum 回退路径保持原 where 链。
+            if _use_triton:
+                _score_fine_cand = _sfc.unsqueeze(0)
+            else:
+                _r_mask = (torch.arange(_R_max, device=_dev).view(1, _R_max)
+                           < _cand_len.view(_Hkv, 1))                 # [Hkv,R]
+                _r_mask_h = repeat(_r_mask, "kv r -> (kv g) r",
+                                   g=self.group_size)                 # [H,R]
+                _score_fine_cand = k_qat.new_full(
+                    (1, b_q_full.shape[0], _R_max), float("-inf"))
+                _score_fine_cand[0] = torch.where(
+                    _r_mask_h, _sfc, torch.full_like(_sfc, float("-inf")))
+            # 【AKO iter-20】候选索引保持 kv-head 空间（组内行恒同 =
+            # cand_gqa_shared 契约），免 repeat expand+clone 物化
+            # （(8,4,8576) int64 clone+copy ~2.2MB/步）；消费端
+            # _ako_rebuild_scatter_kernel 用 h//g 折叠，冷路径按需展开。
+            return _score_fine_cand, _cand, _cand_len, _sel
         except Exception:
             # fail-closed：候选化任何异常回退全宽原分支（值同原路径）。
             # 返回值独立于调用方的 score_fine（不污染全宽原张量）。
-            return None, None, None
+            return None, None, None, None
 
     def compute_score(self, q, q_ids, index_dict, softmax_scale):
         if q.shape[0] != 1 or q.shape[1] != 1:
@@ -1677,8 +1959,16 @@ class TLIIndexer(TIAIndexer):
             # → 候选 gather einsum 与全宽 einsum 逐位一致（N 维不同仅累加
             # 调度）。k_qat 此处为 dense 展开副本（L1487-1494），consumed
             # 维度与 b_q 匹配。
-            if self._fine_gather:
-                _cd, _ci, _cl = self._gather_fine_cand(
+            # 【R4 修复 2026-10-20】async 两步 topk 同列排除：候选化使
+            # score_fine 收成候选宽 + cand_idx，compute_mask scatter 回全宽
+            # 后 score_fine 只在本步 L1 候选块位置有 finite 值（其余 -inf）。
+            # async step2 swap 后 topk_mask = step1 块，where 后 step1 块
+            # 位置因非 step2 候选 → -inf → L2 topk 有效 token 不足 K2 → 用
+            # p=0 填充 → 选出 step2 自己的候选块（async 候选替换语义被
+            # 破坏，test_e121_fix_079 R4 红）。enable_async 默认关，开后须
+            # 全宽 score_fine 保证 step2 在 step1 候选位置有分。
+            if self._fine_gather and not self.enable_async:
+                _cd, _ci, _cl, _l4 = self._gather_fine_cand(
                     d["score_coarse"], None, index_dict["k_qat"],
                     (q[0, 0] * softmax_scale).to(torch.float32),
                     index_dict.get("valid_length"))
@@ -1687,6 +1977,12 @@ class TLIIndexer(TIAIndexer):
                     d["cand_idx"] = _ci
                     d["cand_len"] = _cl
                     d["cand_width"] = index_dict["k_qat"].shape[1]
+                    # 【AKO iter-3】同主路径：组内行共享契约标记（见下）
+                    d["cand_gqa_shared"] = True
+                    # 【AKO iter-20】同主路径：kv 空间候选标记
+                    d["cand_kv_space"] = True
+                    # 【AKO iter-6】同主路径：L1 选择产出透传（见主路径注释）
+                    d["l1_sel"] = _l4
             return d
         # A：L1 上界只在 d' 子空间维上算（q 同步取子空间，与 k_min/k_max 对齐）
         from einops import rearrange as _rearrange
@@ -1699,7 +1995,6 @@ class TLIIndexer(TIAIndexer):
         H = q_sq.shape[1]
         self.group_size = H // k_min.shape[1]
         coarse_shape = (1, H, k_min.shape[0])
-        score_coarse = q_sq.new_full(coarse_shape, float("-inf"))
         # E109a 修复：full（enable_subspace=False）时 idx_sub=None（全维）
         # ——原实现此处无守卫，full 落 _subspace_indices 默认 tail 分支（32 维），
         # 但 k_min/k_max 是 prepare_index 产的全 128 维 → einsum 维度崩。
@@ -1749,6 +2044,31 @@ class TLIIndexer(TIAIndexer):
                 if self._sink_pool_lo_blk < _near_blks:
                     dgate_short = True
                     dgate_near_blks = _near_blks
+        # 【AKO iter-21】候选化臂资格 + pow2 守卫提前判定（原 L2015 处
+        # _raw_fine_read 条件原样上移复用，纯代码移动零语义变化）：
+        # 粗筛 Triton 分支据此决定是否同趟写 GQA 组均值（均值缓冲只在
+        # 候选化路径被 _select_l1_blocks 消费；臂不适用时零分配零浪费）。
+        _raw_fine_read = (self.sigma_select != "none"
+                          or self.far_select in ("cluster", "sim_greedy")
+                          or self.near_select in ("cluster", "sim_greedy"))
+        _cand_eligible = (self._fine_gather and self._basis is None
+                          and not self.moba_gate and not self.per_q_head
+                          and not _raw_fine_read and not self.enable_async)
+        # 【AKO iter-19】非 dgate_short 路径三个粗筛分支（dgate/Triton/
+        # einsum）均整片覆写 [0] 切片 → new_full(-inf) 填充是死代码，
+        # new_empty + Triton out= 直写消 fill+copy 各 2 launch；dgate_short
+        # 分段写保留 -inf 语义不变。
+        if dgate_short:
+            score_coarse = q_sq.new_full(coarse_shape, float("-inf"))
+        else:
+            score_coarse = q_sq.new_empty(coarse_shape)
+        # 【AKO iter-21】GQA 组均值缓冲（kv 空间 [1,Hkv,T]）：kernel 同趟
+        # 直写，_select_l1_blocks 免 torch mean reduce launch（×2 ~11us）。
+        # 仅候选化臂 + pow2 G 分配；dgate_short / einsum / 投影等回退臂
+        # 恒 None → _select_l1_blocks 回退 torch mean 逐位不变。
+        _mean_out = _cand_eligible and (self.group_size & (self.group_size - 1)) == 0
+        sc_mean = None
+        sc_avg_mean = None
         if dgate_short:
             b_k_min = repeat(k_min, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
             b_k_max = repeat(k_max, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
@@ -1780,9 +2100,17 @@ class TLIIndexer(TIAIndexer):
             # 漂移（实测 ~5e-5 比例元素差 1 ULP）。异形布局/Triton 异常
             # 回退原版表达式（fail-closed）。
             try:
-                score_coarse[0] = self._fast_score_coarse(
-                    k_min, k_max, b_q, q_sq.dtype)
+                # 【AKO iter-19】kernel out= 直写 [0] 切片（免中间物化+copy）
+                if _mean_out:
+                    sc_mean = q_sq.new_empty((1, k_min.shape[1], k_min.shape[0]))
+                    self._fast_score_coarse(
+                        k_min, k_max, b_q, q_sq.dtype, out=score_coarse[0],
+                        mean_out=sc_mean[0])
+                else:
+                    self._fast_score_coarse(
+                        k_min, k_max, b_q, q_sq.dtype, out=score_coarse[0])
             except Exception:
+                sc_mean = None
                 b_k_min = repeat(k_min, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
                 b_k_max = repeat(k_max, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
                 b_score = (
@@ -1813,7 +2141,11 @@ class TLIIndexer(TIAIndexer):
         # E64f：near 粗筛 avg 分数（块均值精确分，不 clamp）
         score_coarse_avg = None
         if k_avg is not None:
-            score_coarse_avg = q_sq.new_full(coarse_shape, float("-inf"))
+            # 【AKO iter-19】同 score_coarse：非 dgate_short 全量覆写 → 免 -inf 填充
+            if dgate_short:
+                score_coarse_avg = q_sq.new_full(coarse_shape, float("-inf"))
+            else:
+                score_coarse_avg = q_sq.new_empty(coarse_shape)
             if dgate_short:
                 # E111 省算同款：far 段 avg 分保持 -inf（skip 层 far 池置空
                 # 后不可达；分段 einsum 对保留段逐位一致）
@@ -1839,9 +2171,18 @@ class TLIIndexer(TIAIndexer):
                 # 检查（kernel 以 base+offs_d 硬编码末维 stride=1 访问 Q；
                 # coarse 门禁同款检查已有 k 侧，此处补齐 q 侧）。
                 try:
-                    score_coarse_avg[0] = self._fast_score_fine(
-                        k_avg, b_q, q_sq.dtype)
+                    # 【AKO iter-19】kernel out= 直写 [0] 切片
+                    if _mean_out:
+                        sc_avg_mean = q_sq.new_empty(
+                            (1, k_avg.shape[1], k_avg.shape[0]))
+                        self._fast_score_fine(
+                            k_avg, b_q, q_sq.dtype, out=score_coarse_avg[0],
+                            mean_out=sc_avg_mean[0])
+                    else:
+                        self._fast_score_fine(
+                            k_avg, b_q, q_sq.dtype, out=score_coarse_avg[0])
                 except Exception:
+                    sc_avg_mean = None
                     b_k_avg = repeat(k_avg, "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
                     score_coarse_avg[0] = einsum(b_q, b_k_avg, "h d, kt h d -> h kt").to(q_sq.dtype)
             else:
@@ -1850,11 +2191,9 @@ class TLIIndexer(TIAIndexer):
         # L2 精筛分数：非投影=全维 k_qat；投影=投影特征 k_qat（E64f 协议）
         # 投影路径必须 fp32：8 维点积幅度 ~O(0.5)，bf16 绝对步长会折叠 top-K 边界
         # 的小 gap 分数成同值 → topk 退化为位置偏置（e2e mass 0.99→0.81 实测）
-        fine_shape = (1, H, k_qat.shape[1])
-        if self._basis is not None:
-            score_fine = q_sq.new_full(fine_shape, float("-inf"), dtype=torch.float32)
-        else:
-            score_fine = q_sq.new_full(fine_shape, float("-inf"))
+        # 【iter-18】全宽 score_fine 分配下沉到 cand_idx is None 分支——
+        # 候选化成功时（生产默认）原分配即被 _score_fine_cand 整体替换，
+        # 4.2MB new_full(-inf) 是纯死代码；失败回退路径在分支内按需分配。
         if self._basis is not None:
             b_q_full = b_q
         else:
@@ -1886,22 +2225,29 @@ class TLIIndexer(TIAIndexer):
         # 可超出 L1 候选集——候选化把这些位置置 -inf 会语义漂移 → 这些臂
         # fail-closed 走原全宽路径（行为逐位不变）。生产默认（σ=none、
         # far/near=4bit）非此列。
-        _raw_fine_read = (self.sigma_select != "none"
-                          or self.far_select in ("cluster", "sim_greedy")
-                          or self.near_select in ("cluster", "sim_greedy"))
+        # 【AKO iter-21】_raw_fine_read / 臂资格已上移至粗筛分支前（复用同值）
         cand_idx = None
         cand_len = None
         _score_fine_cand = None
-        if (self._fine_gather and self._basis is None and not self.moba_gate
-                and not self.per_q_head and not _raw_fine_read):
+        _l1_sel = None
+        if _cand_eligible:
             # 单源 _gather_fine_cand（与父类捷径共用）：内部 fail-closed，
-            # 任一异常/形状不符返回 (None,None,None) → 走原全宽路径（值逐位不变）。
-            _score_fine_cand, cand_idx, cand_len = self._gather_fine_cand(
+            # 任一异常/形状不符返回 (None,None,None,None) → 走原全宽路径
+            # （值逐位不变）。
+            _score_fine_cand, cand_idx, cand_len, _l1_sel = \
+                self._gather_fine_cand(
                 score_coarse, score_coarse_avg, k_qat, b_q_full,
-                index_dict.get("valid_length"))
+                index_dict.get("valid_length"),
+                sc_mean=sc_mean, sc_avg_mean=sc_avg_mean)
         if cand_idx is not None and _score_fine_cand is not None:
             score_fine = _score_fine_cand
         if cand_idx is None:
+            # 【iter-18】全宽 -inf 预填充在此按需分配（候选化成功时不执行）。
+            fine_shape = (1, H, k_qat.shape[1])
+            if self._basis is not None:
+                score_fine = q_sq.new_full(fine_shape, float("-inf"), dtype=torch.float32)
+            else:
+                score_fine = q_sq.new_full(fine_shape, float("-inf"))
             # ---- 原全宽 L2 精筛打分（dgate_short / Triton / 投影 / einsum）----
             # 注意：整个 if/elif 链（dgate_short/Triton/投影/einsum）必须整体
             # 嵌套在 `if cand_idx is None:` 内——候选化成功时（cand_idx 非 None）
@@ -1972,6 +2318,23 @@ class TLIIndexer(TIAIndexer):
             # 【E156】候选化时的全宽（= k_qat 原宽，scatter 重建目标宽；
             # 非投影路径 == valid_length == 原 score_fine 宽）。None = 全宽路径。
             "cand_width": (None if cand_idx is None else k_qat.shape[1]),
+            # 【AKO iter-3】候选行 GQA 组内共享契约标记：_gather_fine_cand
+            # 经 repeat(kv g) 展开到 q-head 空间，组内行恒同——compute_mask
+            # 的 compact softmax 路径依赖该不变量做 kv-head view 折叠（mean
+            # 与 scatter 索引行折叠）。合成回放输入缺此键 → fused 门拒绝 →
+            # E156 全宽重建路径，逐位兼容。
+            "cand_gqa_shared": cand_idx is not None,
+            # 【AKO iter-20】候选索引 kv-head 空间标记（组内行恒同）：
+            # fused kernel 用 h//g 折叠；缺标记（合成回放）= q-head 空间
+            # 旧口径，消费端按旧行为处理。
+            "cand_kv_space": cand_idx is not None,
+            # 【AKO iter-6】L1 选择复用：_gather_fine_cand 内 _select_l1_blocks
+            # 的完整产出 dict（topk_mask_block/几何/i_f/i_n/l1_s_real）——
+            # compute_mask fused 臂在 kt/bs/S_real/几何逐项一致时直取，
+            # 消 2×topk+cat+scatter+bypass GPU 写重跑（同源 score_coarse、
+            # 同 GQA mean 聚合、逐字同实现 → bit-identical）。None = 全宽
+            # 路径/fail-closed/合成回放 → compute_mask 回退内联 L1 逐位不变。
+            "l1_sel": _l1_sel,
         }
 
     # ------------------------------------------------ 【E127 iter6/8】Triton
@@ -1985,7 +2348,7 @@ class TLIIndexer(TIAIndexer):
     _TILE_FINE = {32: (16, 1), 64: (64, 4), 128: (64, 4)}
     _TILE_COARSE = {32: (128, 8), 64: (64, 4), 128: (64, 4)}
 
-    def _fast_score_fine(self, kq, b_q_full, out_dtype):
+    def _fast_score_fine(self, kq, b_q_full, out_dtype, out=None, mean_out=None):
         """score_fine 的 Triton GQA K 复用 kernel（非投影路径专用）。
 
         数学：score[h, t] = sum_d b_q_full[h, d] * k_qat32[t, h//g, d]，
@@ -2009,14 +2372,29 @@ class TLIIndexer(TIAIndexer):
             T, Hkv, D = kq.shape
             H = b_q_full.shape[0]
             g = H // Hkv
-            out = torch.empty((H, T), device=kq.device, dtype=out_dtype)
+            # 【AKO iter-19】out= 直写调用方切片（[H,T] 连续），免中间物化
+            # + 整片 copy_；缺省自建保持既有调用点（compute_mask 内联段等）。
+            if out is None:
+                out = torch.empty((H, T), device=kq.device, dtype=out_dtype)
             bt, nw = self._TILE_FINE.get(D, (64, 4))
             grid = (triton.cdiv(T, bt), Hkv)
+            # 【AKO iter-21】可选 GQA 组均值同趟写出（消 _select_l1_blocks
+            # torch mean reduce launch）；非 pow2 G fail-closed raise（调用
+            # 方 except 回退 einsum 臂 + torch mean，值逐位不变）。
+            if mean_out is not None:
+                if (g & (g - 1)) != 0 or not mean_out.is_contiguous():
+                    raise ValueError(
+                        f"mean_out 守卫失败：g={g} 非 2 幂或 MOUT 非连续")
+                mout, smh, smt = mean_out, mean_out.stride(0), mean_out.stride(1)
+            else:
+                mout, smh, smt = out, out.stride(0), out.stride(1)
             _score_fine_kernel[grid](
-                kq, b_q_full, out, T,
+                kq, b_q_full, out, mout, T,
                 kq.stride(0), kq.stride(1), b_q_full.stride(0),
                 out.stride(0), out.stride(1),
-                Hkv=Hkv, G=g, D=D, BT=bt, num_warps=nw)
+                smh, smt,
+                Hkv=Hkv, G=g, D=D, BT=bt,
+                HAS_MEAN=mean_out is not None, num_warps=nw)
             return out
         except Exception:
             self._triton_ok = False
@@ -2055,7 +2433,99 @@ class TLIIndexer(TIAIndexer):
             self._triton_ok = False
             raise
 
-    def _fast_score_coarse(self, k_min, k_max, b_q, out_dtype):
+    def _fast_cand_build(self, i_all, bypass_blks, seg_los, seg_ws,
+                         s_r, bs, nb):
+        """【AKO iter-17】候选构建融合 wrapper（K1 排序+cnt / K2 行装配，
+        2 launch 替代 iter-16 torch 链 ~16 launch：cat+sort+arange 展开+
+        clamp.sum+zeros+直填+index_put_）。
+
+        【AKO iter-22】共享段下沉：bypass 块号标量化（b0/b1，≤2 门禁）+
+        共享段 4×(lo,w) 标量直出（消 bp as_tensor H2D + arange×4 +
+        cat）——段序 = 旧 torch _shared cat 程序序（bypass 序 + sink +
+        swa），段内 token = lo + (k−段前缀宽) ≡ arange(lo,lo+w) 连接，
+        纯整数域逐位恒等。
+
+        数学：与 iter-16 torch 链逐位恒等（纯整数域）——K1 哨兵 pad 排序
+        ≡ torch.sort 升序（互异块号无 tie）；cnt 同 clamp 行和（零宽
+        bypass 块贡献恒 0，与旧链 clamp(s_r−b·bs,0,bs)=0 同值）；K2 列三态
+        与「直填 L1 + index_put shared + zeros pad」程序序同值。探针：
+        4 臂变体逐位对拍 + bench bitexact 双门。
+
+        fail-closed：异常 raise（调用点 except 回退 torch 链，值同）。"""
+        Hkv = i_all.shape[2]
+        n_l1 = i_all.shape[-1]
+        n_bp = len(bypass_blks)
+        if n_bp > 2:
+            raise ValueError(f"cand_build n_bp={n_bp} > 2 标量守卫")
+        if len(seg_los) > 4 or len(seg_ws) > 4:
+            raise ValueError("cand_build 共享段 >4 守卫")
+        _M = int(sum(seg_ws))
+        dev = i_all.device
+        nb_pow2 = triton.next_power_of_2(max(nb, 2))
+        if nb_pow2 > 256:
+            raise ValueError(f"cand_build nb_pow2={nb_pow2} > 256 守卫")
+        scr = torch.empty((Hkv, nb_pow2), dtype=torch.long, device=dev)
+        cnt = torch.empty((Hkv,), dtype=torch.long, device=dev)
+        b0 = int(bypass_blks[0]) if n_bp > 0 else 0
+        b1 = int(bypass_blks[1]) if n_bp > 1 else 0
+        _ako_cand_sort_kernel[(Hkv,)](
+            i_all, scr, cnt, n_l1, n_bp, b0, b1, s_r, bs,
+            i_all.stride(2), scr.stride(0), NB_POW2=nb_pow2)
+        _R_max = nb * bs + _M
+        cand = torch.empty((Hkv, _R_max), dtype=torch.long, device=dev)
+        los = list(seg_los) + [0] * (4 - len(seg_los))
+        ws = list(seg_ws) + [0] * (4 - len(seg_ws))
+        _ako_cand_build_kernel[(Hkv, triton.cdiv(_R_max, 512))](
+            scr, cnt, cand, nb, bs, _M, _R_max,
+            los[0], ws[0], los[1], ws[1], los[2], ws[2], los[3], ws[3],
+            scr.stride(0), cand.stride(0), BLOCK=512)
+        return cand, cnt
+
+    def _fast_topk_mask(self, indices, bypass_blks, kt):
+        """【AKO iter-19】topk_mask 装配融合 wrapper（1 launch 替代
+        zeros_like+scatter_+ones_like+bypass setitem ×2 ≈ 5 launch）。
+
+        数学：与 torch 装配程序序逐位恒等（纯 bool/整数域）——全 False
+        基座 + topk 索引/bypass 块位置置 True；_ako_topk_mask_kernel 注
+        （barrier 写序 / 索引互异无位置竞争）。
+
+        fail-closed：K>128 / bypass>2 / 异常 raise（调用点 _build_topk_mask
+        回退 torch 装配链，值同；不动 _triton_ok——独立 kernel 独立门）。
+        """
+        heads = indices.shape[-2]
+        K = indices.shape[-1]
+        if K > 128 or len(bypass_blks) > 2:
+            raise ValueError(f"topk_mask K={K}/bypass={len(bypass_blks)} 守卫")
+        b0 = bypass_blks[0] if len(bypass_blks) > 0 else -1
+        b1 = bypass_blks[1] if len(bypass_blks) > 1 else -1
+        out = torch.empty((heads, kt), dtype=torch.bool,
+                          device=indices.device)
+        _ako_topk_mask_kernel[(heads, triton.cdiv(kt, 512))](
+            indices, out, K, kt, b0, b1,
+            indices.stride(-2), indices.stride(-1), out.stride(0),
+            BLOCK=512, num_warps=4)
+        return out.view(*indices.shape[:-2], heads, kt)
+
+    def _build_topk_mask(self, indices, bypass_blks, like):
+        """topk_mask 装配单源（e64/非 e64 两分支共用）：
+        Triton 融合优先（_tmask_ok 独立永久门），超界/异常回退 torch
+        zeros_like+scatter_+ones_like+setitem 链（值同）。like = 与
+        topk_mask 同形的分数张量（取 heads/kt/设备）。"""
+        if getattr(self, "_tmask_ok", True) and self._triton_ok \
+                and _HAS_TRITON:
+            try:
+                return self._fast_topk_mask(indices, bypass_blks,
+                                            like.shape[-1])
+            except Exception:
+                self._tmask_ok = False
+        topk_mask = torch.zeros_like(like, dtype=torch.bool).scatter_(
+            -1, indices, torch.ones_like(indices, dtype=torch.bool))
+        for _b in bypass_blks:
+            topk_mask[..., _b] = True
+        return topk_mask
+
+    def _fast_score_coarse(self, k_min, k_max, b_q, out_dtype, out=None,
+                           mean_out=None):
         """【iter8】score_coarse 的 Triton GQA K 复用 kernel（非投影路径）。
 
         数学：score_coarse[h, t] = Σ_d min(b_q[h,d],0)·k_min32[t,h//g,d]
@@ -2074,16 +2544,28 @@ class TLIIndexer(TIAIndexer):
             T, Hkv, D = k_min.shape
             H = b_q.shape[0]
             g = H // Hkv
-            out = torch.empty((H, T), device=k_min.device, dtype=out_dtype)
+            # 【AKO iter-19】out= 直写调用方切片（[H,T] 连续），同 _fast_score_fine
+            if out is None:
+                out = torch.empty((H, T), device=k_min.device, dtype=out_dtype)
             bt, nw = self._TILE_COARSE.get(D, (64, 4))
             grid = (triton.cdiv(T, bt), Hkv)
+            # 【AKO iter-21】可选 GQA 组均值同趟写出（守卫同 _fast_score_fine）
+            if mean_out is not None:
+                if (g & (g - 1)) != 0 or not mean_out.is_contiguous():
+                    raise ValueError(
+                        f"mean_out 守卫失败：g={g} 非 2 幂或 MOUT 非连续")
+                mout, smh, smt = mean_out, mean_out.stride(0), mean_out.stride(1)
+            else:
+                mout, smh, smt = out, out.stride(0), out.stride(1)
             _score_coarse_kernel[grid](
-                k_min, k_max, b_q, out, T,
+                k_min, k_max, b_q, out, mout, T,
                 k_min.stride(0), k_min.stride(1),
                 k_max.stride(0), k_max.stride(1),
                 b_q.stride(0),
                 out.stride(0), out.stride(1),
-                Hkv=Hkv, G=g, D=D, BT=bt, num_warps=nw)
+                smh, smt,
+                Hkv=Hkv, G=g, D=D, BT=bt,
+                HAS_MEAN=mean_out is not None, num_warps=nw)
             return out
         except Exception:
             self._triton_ok = False
@@ -2352,8 +2834,37 @@ class TLIIndexer(TIAIndexer):
         # 等价）。σ/ccluster 臂因全宽原始分语义已由 compute_score 侧门控
         # fail-closed 走全宽路径，本分支只被生产默认路径触发。
         cand_idx = score_dict.get("cand_idx")
-        if cand_idx is not None:
-            _cw = score_dict.get("cand_width")
+        _cw = score_dict.get("cand_width") if cand_idx is not None else None
+        _cand_len = score_dict.get("cand_len")
+        _vl = score_dict.get("valid_length")
+        # 【AKO iter-2】fused 重建门：cand_width/cand_len/valid_length 齐备
+        # 且均 host int（无 .item()/nonzero 同步需求）→ 跳过全宽 scatter
+        # 重建，S_width/S_real 全 host 口径，全宽化推迟到 L1 topk_mask
+        # 产出后的单次静态形状哨兵 scatter（见下方 where 站点）完成。
+        # cand_idx 存在 ⇒ compute_score 侧生产门（L1947-1949）已排除
+        # σ/ccluster/moba/async/per_q_head 全部全宽 sf_raw 消费臂；本门
+        # 再硬挡 compute_mask 内的 shape 消费者（sinkswa_only）与合成
+        # 回放 harness（cand_width/cand_len/valid_length 缺失或非 host
+        # int）→ 回退原重建路径，逐位不变。
+        # 【AKO iter-3】新增 cand_gqa_shared 契约检查：compact softmax 的
+        # kv-head view 折叠依赖候选行组内共享不变量（仅 _gather_fine_cand
+        # 单源生产恒成立）——契约缺位（合成回放）一律回退 E156 重建。
+        _fused_rebuild = (
+            cand_idx is not None
+            and isinstance(_cw, int) and not isinstance(_cw, bool)
+            and _cand_len is not None
+            and isinstance(_vl, int) and not isinstance(_vl, bool)
+            and score_dict.get("cand_gqa_shared") is True
+            and not self.sinkswa_only)
+        if cand_idx is not None and not _fused_rebuild:
+            # 【AKO iter-20】kv 空间候选（生产标记）→ q-head 按需展开
+            # （本分支消费者按 q-head 行语义 scatter；冷路径可付拷贝）。
+            if score_dict.get("cand_kv_space"):
+                cand_idx = repeat(
+                    cand_idx, "kv r -> (kv g) r", g=self.group_size)
+                if _cand_len is not None:
+                    _cand_len = repeat(
+                        _cand_len, "kv -> (kv g)", g=self.group_size)
             S_width = int(_cw) if _cw is not None else \
                 (int(cand_idx.max().item()) + 1)
             # 【E156c】取消 `score_fine.shape[-1] != S_width` 形状守卫：
@@ -2376,7 +2887,6 @@ class TLIIndexer(TIAIndexer):
             _R_max = cand_idx.shape[1]
             _hidx = torch.arange(_H_h, device=score_fine.device
                                  ).view(-1, 1).expand(_H_h, _R_max)
-            _cand_len = score_dict.get("cand_len")
             if _cand_len is None:
                 # 防御：无 cand_len（外部合成 score_dict 回放 harness）
                 # → 假定无 padding（逐位兼容旧 1D 语义）。
@@ -2391,13 +2901,19 @@ class TLIIndexer(TIAIndexer):
             sf_full[0, 0, _ih, _it] = score_fine[0, 0][_rmask]
             score_dict["score_fine"] = sf_full
             score_fine = sf_full
-        _vl = score_dict.get("valid_length")
-        S_width = score_fine.shape[-1]
-        S_real = S_width if _vl is None else min(int(_vl), S_width)
-        if _vl is not None and S_real < S_width:
-            # 原地写 score_dict：p（softmax 源）、σ 分支与 ccluster 分支的
-            # sf_raw 均从 score_dict["score_fine"] 现读 → 同一份屏蔽全生效
-            score_dict["score_fine"][..., S_real:] = float("-inf")
+        if _fused_rebuild:
+            # score_fine 保持稀疏 [1,1,H,R_max]；075 pad 段语义由 fused
+            # scatter 的 `cand_idx < S_real` 门承载（越界候选不写入 →
+            # 目标位保持 -inf），无需整段写 -inf。
+            S_width = int(_cw)
+            S_real = min(int(_vl), S_width)
+        else:
+            S_width = score_fine.shape[-1]
+            S_real = S_width if _vl is None else min(int(_vl), S_width)
+            if _vl is not None and S_real < S_width:
+                # 原地写 score_dict：p（softmax 源）、σ 分支与 ccluster 分支的
+                # sf_raw 均从 score_dict["score_fine"] 现读 → 同一份屏蔽全生效
+                score_dict["score_fine"][..., S_real:] = float("-inf")
         # ---- E135a：sinkswa_only 归因臂（用户 2026-10-13 批准）----
         # mask 只含正交强制区（sink 头 sink_tokens + swa 尾 swa_tok），
         # mid 全丢、L1/L2 两级索引分数全旁路（prepare_index/compute_score
@@ -2418,10 +2934,34 @@ class TLIIndexer(TIAIndexer):
         # 共享口径（默认）：组内 mean 聚合到 kv-head 级 [1,1,Hkv,kt]；
         # per_q_head：旁路聚合，保留 per-q-head 分数 [1,1,H,kt] 直接进 topk
         # （topk 沿最后一维，H 维天然独立——32 个 q-head 各选各的块/token）。
+        # 【AKO iter-12】L1 复用外门前移 + score_coarse GQA mean 稳态免跑：
+        # iter-6 复用门判决的补完——复用命中臂（生产同调用稳态）下游对
+        # mean 结果零消费（i_f/i_n/topk_mask 全取自 l1_sel dict；sc_far/
+        # sc_near/sc_pool/zeros_like 全在 not _l1_reuse 臂）→ mean
+        # （reduce_kernel<512,1> ~3.4us/步）与其后的 skip_far 区间写均死
+        # 代码。外门（与原 L2634 处逐字同式；kt 取 mean 前后同值、bs/e64
+        # 表达式同源）任一不符（合成回放/几何漂移/非 fused 臂/per_q_head
+        # 生产门天然缺席）→ mean 照跑逐位不变。内门（e64 池端点）失败的
+        # 补偿路径在下方 e64 分支 `if not _l1_reuse:` 前 fail-closed 补跑
+        # （保真复刻旧序：mean → skip_far 区间写；[-1]=inf 与 avg mean 在
+        # 外门通过时点旧路径本就跳过，同序不复刻，见 L2643 注释）。
+        _l1_rs = score_dict.get("l1_sel") if _fused_rebuild else None
+        _l1_reuse = (
+            isinstance(_l1_rs, dict)
+            and _l1_rs.get("kt") == score_coarse.shape[-1]
+            and _l1_rs.get("bs") == self.args.tia_block_size
+            and _l1_rs.get("l1_s_real") == S_real
+            and _l1_rs.get("e64_partition") == (self.alpha > 0 and self.beta > 0)
+            and "topk_mask_block" in _l1_rs
+        )
+        _sc_mean_skipped = False
         if not self.per_q_head:
-            score_coarse = rearrange(
-                score_coarse, "b qt (h g) kt -> b qt h g kt", g=self.group_size
-            ).mean(dim=-2)  # [1,1,Hkv,kt]
+            if _l1_reuse:
+                _sc_mean_skipped = True
+            else:
+                score_coarse = rearrange(
+                    score_coarse, "b qt (h g) kt -> b qt h g kt", g=self.group_size
+                ).mean(dim=-2)  # [1,1,Hkv,kt]
 
         kt = score_coarse.shape[-1]
         bs = self.args.tia_block_size
@@ -2480,7 +3020,10 @@ class TLIIndexer(TIAIndexer):
         swa_lo_blk = max(near_blks, kt - max(1, swa_tok // bs))
 
         # ---- D'：跳层 → 远端块全部 -inf（保留 sink + 近端）----
-        if self.skip_far:
+        # 【AKO iter-12】复用命中臂（_sc_mean_skipped）下本写目标为死代码
+        # （mean 结果无消费者）且免跑后 dict 原张量绝不被触碰（旧路径写
+        # 进 mean 新张量、同样不触 dict）→ 两路 dict 张量均零变异。
+        if self.skip_far and not _sc_mean_skipped:
             # 【E127 iter5】far_range 恒为连续区间 [far_lo_blk, far_hi_blk)——
             # tensor 高级索引赋值（index_put_）触发 host 同步，连续区间
             # 切片赋值数学恒等（区间空时两者同为空操作）→ 零同步改写
@@ -2517,14 +3060,34 @@ class TLIIndexer(TIAIndexer):
             if q_last is not None:
                 near_tok_score = self._near_token_score(q_last)  # [Hkv, Tn]
 
-        score_coarse[..., -1] = float("inf")  # TIA 语义：当前块强制
+        # 【AKO iter-6】L1 选择复用门：_gather_fine_cand 内 _select_l1_blocks
+        # 已在 compute_score 侧用同源 score_coarse（同张量 lineage、同 GQA
+        # mean 聚合、逐字同实现）完成同一 L1 选择 → 下方 e64/非 e64 两分支
+        # 的 2×topk + cat + zeros+scatter + clone + bypass GPU 写全链免重跑，
+        # 直接复用 bit-identical 的 topk_mask/i_f/i_n。硬门：fused 臂（生产
+        # 单源契约已在 compute_score 侧排除 σ/ccluster/moba/async/per_q_head）
+        # + kt/bs/S_real/e64_partition 逐项一致 + 键齐备；任一不符 → 下方
+        # 原内联 L1 段逐位不变（合成回放/几何漂移 fail-closed）。
+        # 【AKO iter-12】外门已前移至 GQA mean 前（见 E103 消融段上方）——
+        # 此处直接复用前置处算得的 _l1_rs/_l1_reuse（kt/bs/e64 前后取值
+        # 恒等：mean 不改末维宽，bs/e64 表达式同源），几何单源不二算。
+        if not _l1_reuse:
+            # TIA 语义：当前块强制（复用臂生产侧 _select_l1_blocks 已在
+            # 其聚合副本上完成同置位；本张量复用臂下无后续消费）
+            score_coarse[..., -1] = float("inf")
         k1 = self.args.tia_level1_topk
         # E109a：avg 分数源提取提前到分支外（单池路径也要按 far_method 选分数源）
         score_coarse_avg = score_dict.get("score_coarse_avg")
-        if score_coarse_avg is not None and not self.per_q_head:
+        if not _l1_reuse and score_coarse_avg is not None \
+                and not self.per_q_head:
             score_coarse_avg = rearrange(
                 score_coarse_avg, "b qt (h g) kt -> b qt h g kt", g=self.group_size
             ).mean(dim=-2)
+        # 【AKO iter-1 候选域压缩前置】e64 分支内填充（L1 块级索引 + 池端点）；
+        # 非 e64 臂保持 None/() → _compact_topk 拒绝 → 旧全宽 topk 逐位不变。
+        _l1_far_blk = _l1_near_blk = None
+        _far_pool_hi_tok = _near_pool_hi_tok = 0
+        bypass_blks = ()
         if e64_partition:
             # ---- E64 L1 双池：far 池=minmax 上界分（α 区外），near 池=avg 分（近区）----
             if self.nt_near_pages is not None:
@@ -2596,35 +3159,72 @@ class TLIIndexer(TIAIndexer):
                                 f"boundary bypass 页 {_b} 非 near 池端点 "
                                 f"[{near_pool_lo},{near_pool_hi})——池收缩几何"
                                 "假设被破坏（当前几何下保送页恒位于端点）")
-            if self.far_method == "avg" and score_coarse_avg is not None:
-                sc_far = score_coarse_avg[..., far_pool_lo:far_pool_hi]
-            else:
-                sc_far = score_coarse[..., far_pool_lo:far_pool_hi]
-            i_f = torch.topk(sc_far, min(nb_far, sc_far.shape[-1]), dim=-1).indices + far_pool_lo
-            # near 池上界 = swa_lo_blk：swa 块（含当前块）完全排除出双池，
-            # 纯靠 mask 强制（p[-swa:]=1）——正交区不占创新管线配额
-            # near 池分数源：avg（默认=块均值）或 minmax（块上界，mminmax 组合）
-            if self.near_method == "minmax" or score_coarse_avg is None:
-                sc_near = score_coarse[..., near_pool_lo:near_pool_hi]
-            else:
-                sc_near = score_coarse_avg[..., near_pool_lo:near_pool_hi]
-            sc_near = sc_near.clone()
-            if sc_near.shape[-1] > 0:
-                i_n = torch.topk(sc_near, min(nb_near, sc_near.shape[-1]), dim=-1).indices + near_pool_lo
-            else:
-                i_n = i_f[..., :0]  # near 池空（mid 不足一块）→ 不选
-            # 严格口径（2026-09-29 用户最终澄清）：sink 块完全不进 L1 池——
-            # 正交强制区不进粗筛管线、不占 K1 配额。sink token 由 L2 最终
-            # mask 直接置位（必选），mass 覆盖不受影响（旧 cat 版 sink 走管线
-            # 抢配额；此前「漏 sink 即崩」由 mask 强制兜住）
-            indices = torch.cat([i_f, i_n], dim=-1)
-            topk_mask = torch.zeros_like(score_coarse, dtype=torch.bool).scatter_(
-                -1, indices, torch.ones_like(indices, dtype=torch.bool)
-            )
-            # E155b：保送页 OR 进 L1 候选集（全 head 广播；indices 不含保送
-            # 页 → 不占 K1 配额；其 token 在 L2 细筛按 far/near 配额竞争）
-            for _b in bypass_blks:
-                topk_mask[..., _b] = True
+            # 【AKO iter-6】几何一致性硬门：dict 几何与本步 host 几何逐项
+            # 对齐才复用（生产同调用内恒真；任何漂移 fail-closed 落回下方
+            # 原 GPU 选择段，逐位不变）。
+            if _l1_reuse:
+                if (_l1_rs["nb_near"] == nb_near
+                        and _l1_rs["nb_far"] == nb_far
+                        and tuple(_l1_rs["bypass_blks"]) == tuple(bypass_blks)
+                        and _l1_rs["far_pool_lo"] == far_pool_lo
+                        and _l1_rs["far_pool_hi"] == far_pool_hi
+                        and _l1_rs["near_pool_lo"] == near_pool_lo
+                        and _l1_rs["near_pool_hi"] == near_pool_hi):
+                    i_f = _l1_rs["i_f"]
+                    i_n = _l1_rs["i_n"]
+                    topk_mask = _l1_rs["topk_mask_block"]
+                else:
+                    _l1_reuse = False
+            if not _l1_reuse:
+                if _sc_mean_skipped:
+                    # 【AKO iter-12】外门过而内门败（生产不可达——同调用内
+                    # 几何逐项恒一致，仅未来几何漂移可入）：补跑被免的 mean +
+                    # skip_far 区间写，张量状态与旧路径该点逐位一致（mean 新
+                    # 张量，dict 原张量两路均零变异）。
+                    score_coarse = rearrange(
+                        score_coarse, "b qt (h g) kt -> b qt h g kt",
+                        g=self.group_size
+                    ).mean(dim=-2)  # [1,1,Hkv,kt]
+                    if self.skip_far:
+                        score_coarse[..., far_lo_blk:far_hi_blk] = float("-inf")
+                    _sc_mean_skipped = False
+                if self.far_method == "avg" and score_coarse_avg is not None:
+                    sc_far = score_coarse_avg[..., far_pool_lo:far_pool_hi]
+                else:
+                    sc_far = score_coarse[..., far_pool_lo:far_pool_hi]
+                i_f = torch.topk(sc_far, min(nb_far, sc_far.shape[-1]), dim=-1).indices + far_pool_lo
+                # near 池上界 = swa_lo_blk：swa 块（含当前块）完全排除出双池，
+                # 纯靠 mask 强制（p[-swa:]=1）——正交区不占创新管线配额
+                # near 池分数源：avg（默认=块均值）或 minmax（块上界，mminmax 组合）
+                if self.near_method == "minmax" or score_coarse_avg is None:
+                    sc_near = score_coarse[..., near_pool_lo:near_pool_hi]
+                else:
+                    sc_near = score_coarse_avg[..., near_pool_lo:near_pool_hi]
+                sc_near = sc_near.clone()
+                if sc_near.shape[-1] > 0:
+                    i_n = torch.topk(sc_near, min(nb_near, sc_near.shape[-1]), dim=-1).indices + near_pool_lo
+                else:
+                    i_n = i_f[..., :0]  # near 池空（mid 不足一块）→ 不选
+                # 严格口径（2026-09-29 用户最终澄清）：sink 块完全不进 L1 池——
+                # 正交强制区不进粗筛管线、不占 K1 配额。sink token 由 L2 最终
+                # mask 直接置位（必选），mass 覆盖不受影响（旧 cat 版 sink 走管线
+                # 抢配额；此前「漏 sink 即崩」由 mask 强制兜住）
+                indices = torch.cat([i_f, i_n], dim=-1)
+                topk_mask = torch.zeros_like(score_coarse, dtype=torch.bool).scatter_(
+                    -1, indices, torch.ones_like(indices, dtype=torch.bool)
+                )
+                # E155b：保送页 OR 进 L1 候选集（全 head 广播；indices 不含保送
+                # 页 → 不占 K1 配额；其 token 在 L2 细筛按 far/near 配额竞争）
+                for _b in bypass_blks:
+                    topk_mask[..., _b] = True
+            # 【AKO iter-1 捕获】L2 复用 i_f/i_n 名字前保存块级索引（含
+            # far_pool_lo/near_pool_lo 偏移后的绝对块号）与池收缩后端点。
+            # 池端点 host 不变量：far_pool_hi·bs ≤ far 段上界、
+            # near_pool_hi·bs ≤ swa_lo_tok（保送页收缩/对齐时成立；
+            # 退化几何由 _compact_topk 的 pool_hi_tok>seg_hi 守卫回退）。
+            _l1_far_blk, _l1_near_blk = i_f, i_n
+            _far_pool_hi_tok = far_pool_hi * bs
+            _near_pool_hi_tok = near_pool_hi * bs
             import os as _os
             # TLI_DEBUG 显式布尔解析（字符串 "0"/"" 均为关——原字符串真值
             # 会把 TLI_DEBUG=0 也判开）；far-empty（i_f 空）时 min/max 用
@@ -2642,57 +3242,203 @@ class TLIIndexer(TIAIndexer):
         else:
             # E109a 修复：单池（α=0 或 β=0）L1 分数源按 far_method 选择
             # （原实现固定 score_coarse=minmax → aavg/mavg(0,0) 单池实际跑成纯 minmax）
-            sc_pool = score_coarse
-            if self.far_method == "avg" and score_coarse_avg is not None:
-                sc_pool = score_coarse_avg.clone()
-                sc_pool[..., -1] = float("inf")  # TIA 语义：当前块强制（avg 分无此置位）
-                if self.skip_far:  # D' skip 语义与 score_coarse 同步（far 区 -inf）
-                    # 【E127 iter5】同上：连续区间切片赋值零同步等价改写
-                    sc_pool[..., far_lo_blk:far_hi_blk] = float("-inf")
-            if self.skip_far:
-                # D' 真正兑现省算：跳层时 far 块已 -inf，topk 只取有效块数
-                # （否则 topk 会用 -inf far 块填满 K1，far token 照样进 L2，白算）。
-                # 【E127 iter5】sc_pool 除 far 区（minmax/avg 两口径均在
-                # 上方整段置 -inf）外全有限（分数矩阵被全量覆写过）→
-                # 有效块数 = kt − far 区块数，host 可算免同步（逐位等价）
-                n_valid = kt - max(0, far_hi_blk - far_lo_blk)
-                k1 = min(k1, max(n_valid, 1))
-            values, indices = torch.topk(
-                sc_pool, min(sc_pool.shape[-1], k1), dim=-1
-            )
-            topk_mask = torch.zeros_like(score_coarse, dtype=torch.bool).scatter_(
-                -1, indices, torch.ones_like(values, dtype=torch.bool)
-            )
-        if self.per_q_head:
-            # E103：mask 已是 per-q-head [1,1,H,kt]，只做块→token 展开（不按 G 扩）
-            topk_mask = repeat(
-                topk_mask, "b qt h kt -> b qt h (kt bs)", bs=bs
-            )
-        else:
-            topk_mask = repeat(
-                topk_mask, "b qt h kt -> b qt (h g) (kt bs)", g=self.group_size, bs=bs
-            )
-
-        if self.enable_async:
-            if self.prev_mask is not None:
-                topk_mask, self.prev_mask = self.prev_mask, topk_mask
-                if topk_mask.shape[-1] < score_fine.shape[-1]:
-                    pad_len = score_fine.shape[-1] - topk_mask.shape[-1]
-                    topk_mask = F.pad(topk_mask, (0, pad_len), value=True)
+            # 【AKO iter-6】复用臂直取生产侧 topk_mask_block（几何一致性外门
+            # 已核 kt/bs/S_real/e64/near_blks/far_lo/far_hi/swa_lo；skip 臂
+            # k1 收缩在生产侧同 shrink 算过）。
+            if _l1_reuse:
+                topk_mask = _l1_rs["topk_mask_block"]
             else:
-                self.prev_mask = topk_mask
+                sc_pool = score_coarse
+                if self.far_method == "avg" and score_coarse_avg is not None:
+                    sc_pool = score_coarse_avg.clone()
+                    sc_pool[..., -1] = float("inf")  # TIA 语义：当前块强制（avg 分无此置位）
+                    if self.skip_far:  # D' skip 语义与 score_coarse 同步（far 区 -inf）
+                        # 【E127 iter5】同上：连续区间切片赋值零同步等价改写
+                        sc_pool[..., far_lo_blk:far_hi_blk] = float("-inf")
+                if self.skip_far:
+                    # D' 真正兑现省算：跳层时 far 块已 -inf，topk 只取有效块数
+                    # （否则 topk 会用 -inf far 块填满 K1，far token 照样进 L2，白算）。
+                    # 【E127 iter5】sc_pool 除 far 区（minmax/avg 两口径均在
+                    # 上方整段置 -inf）外全有限（分数矩阵被全量覆写过）→
+                    # 有效块数 = kt − far 区块数，host 可算免同步（逐位等价）
+                    n_valid = kt - max(0, far_hi_blk - far_lo_blk)
+                    k1 = min(k1, max(n_valid, 1))
+                values, indices = torch.topk(
+                    sc_pool, min(sc_pool.shape[-1], k1), dim=-1
+                )
+                topk_mask = torch.zeros_like(score_coarse, dtype=torch.bool).scatter_(
+                    -1, indices, torch.ones_like(values, dtype=torch.bool)
+                )
+        # 【AKO iter-3】块级 L1 掩码快照（token repeat 物化前）——fused
+        # compact 路径用「候选块 = cand_idx//bs 的块掩码查表」替代
+        # [1,1,H,kt*bs] token 级 bool repeat（token ∈ 选中块 ⟺ 块掩码
+        # 选中，含保送页 OR，逐位同集）。
+        _topk_blk = topk_mask
+        # 【AKO iter-3】fused compact 模式跳过 [1,1,H,kt*bs] token 级 bool
+        # repeat 物化与 async prev_mask 交换（fused 生产门已排除 async 臂；
+        # token 掩码在本模式的唯一消费者——p 哨兵 scatter 的 _keep——已改由
+        # 上方块掩码快照查表得到，见下方 fused 分支）。非 fused 臂逐位不变。
+        if not _fused_rebuild:
+            if self.per_q_head:
+                # E103：mask 已是 per-q-head [1,1,H,kt]，只做块→token 展开（不按 G 扩）
+                topk_mask = repeat(
+                    topk_mask, "b qt h kt -> b qt h (kt bs)", bs=bs
+                )
+            else:
+                topk_mask = repeat(
+                    topk_mask, "b qt h kt -> b qt (h g) (kt bs)", g=self.group_size, bs=bs
+                )
 
-        topk_mask = topk_mask[..., : score_fine.shape[-1]]
-        score_fine = torch.where(topk_mask, score_fine, float("-inf"))
-        p = F.softmax(score_fine, dim=-1).nan_to_num(nan=0)
-        if not self.per_q_head:
-            # E103：共享口径组内 mean；per_q_head 保留 [1,1,H,T] 直接 topk
-            p = rearrange(p, "b qt (h g) kt -> b qt h g kt", g=self.group_size).mean(dim=-2)
+            if self.enable_async:
+                if self.prev_mask is not None:
+                    topk_mask, self.prev_mask = self.prev_mask, topk_mask
+                    if topk_mask.shape[-1] < score_fine.shape[-1]:
+                        pad_len = score_fine.shape[-1] - topk_mask.shape[-1]
+                        topk_mask = F.pad(topk_mask, (0, pad_len), value=True)
+                else:
+                    self.prev_mask = topk_mask
+
+        _sf_w = score_fine.shape[-1]
+        if _fused_rebuild:
+            # 【AKO iter-5】keep 链 + 哨兵 scatter 融合为单 Triton kernel
+            # （_ako_rebuild_scatter_kernel）：iter-4 的块掩码查表 L1 门
+            # （E2a）语义不变，仅把 arange+compare+and+div+clamp+
+            # index_select+gather+where+scatter_ 九个小 kernel 的逐元素
+            # 链单趟化。纯整数/布尔/拷贝语义、无浮点归约参与 → 逐位
+            # 等价（重复索引同值幂等；idx<S_real 门无条件施加——
+            # S_real≥S_width 时恒真，与旧条件分支逐位同）。
+            # 【AKO iter-8】无效槽路由 = 牺牲位 DUMMY[h]（Triton 路径）
+            # / 尾列哨兵 W 切片（回退路径），可见域两路逐位同。
+            # 非连续输入回退 iter-4 torch 链。
+            _R = cand_idx.shape[-1]
+            _H = score_fine.shape[2]
+            _sf2 = score_fine[0, 0]
+            _blk2 = _topk_blk[0, 0]
+            if (_HAS_TRITON and score_dict.get("cand_kv_space")
+                    and cand_idx.is_contiguous()
+                    and _cand_len.is_contiguous() and _blk2.is_contiguous()):
+                # 【AKO iter-20】kernel CAND/CLEN 行地址按 h//g 折叠——仅
+                # kv 空间候选（生产 cand_kv_space 标记）可用；缺标记
+                # （合成回放 q-head 口径）回退 torch 链逐位不变。
+                # 【AKO iter-8】哨兵列退役：[W] 连续重建目标（keep 位同值
+                # 同址、未访位 -inf 预填充同值 → 重建结果逐位同旧）+ 微型
+                # 牺牲位缓冲吸收无效槽写入（内容永不读）；score_fine 不再
+                # 是 [W+1] 的行距切片 → softmax 免 strided 触发的 4MB
+                # contiguous clone（aten::contiguous→clone→copy_ 微测
+                # ~22us/步，共居口径 direct_copy ~8.8us）。
+                sf_full = torch.full(
+                    (score_fine.shape[0], score_fine.shape[1],
+                     score_fine.shape[2], S_width),
+                    float("-inf"), dtype=score_fine.dtype,
+                    device=score_fine.device)
+                _dummy = torch.empty(
+                    (_H, 1), dtype=score_fine.dtype,
+                    device=score_fine.device)
+                _n = _H * _R
+                _ako_rebuild_scatter_kernel[(
+                    triton.cdiv(_n, 1024),)](
+                    cand_idx, _sf2, _blk2, _cand_len, sf_full[0, 0],
+                    _dummy,
+                    _R, _n, S_width, S_real, bs, kt, self.group_size,
+                    _sf2.stride(0), _sf2.stride(1),
+                    cand_idx.stride(0), cand_idx.stride(1),
+                    _blk2.stride(0), _blk2.stride(1),
+                    BLOCK=1024, num_warps=4)
+                score_fine = sf_full
+            else:
+                sf_full = torch.full(
+                    (score_fine.shape[0], score_fine.shape[1],
+                     score_fine.shape[2], S_width + 1),
+                    float("-inf"), dtype=score_fine.dtype,
+                    device=score_fine.device)
+                # iter-4 torch 链回退（非连续/无 Triton）。
+                # 【AKO iter-20】kv 空间候选冷路径按需展开回 q-head 空间
+                # （expand 后 reshape 触发拷贝，冷路径可付）。
+                if score_dict.get("cand_kv_space"):
+                    cand_idx = repeat(
+                        cand_idx, "kv r -> (kv g) r", g=self.group_size)
+                    _cand_len = repeat(
+                        _cand_len, "kv -> (kv g)", g=self.group_size)
+                _hkv = getattr(self, "_ako_hkv_row", None)
+                if _hkv is None or _hkv.device != cand_idx.device \
+                        or _hkv.numel() != _H:
+                    _hkv = torch.arange(
+                        _H, device=cand_idx.device) // self.group_size
+                    self._ako_hkv_row = _hkv
+                _bid = torch.div(cand_idx, bs, rounding_mode="floor").clamp(
+                    max=kt - 1)
+                _keep = _blk2.index_select(
+                    0, _hkv).gather(-1, _bid)
+                _rmask2 = (torch.arange(_R, device=cand_idx.device
+                                        ).view(1, _R) < _cand_len.view(-1, 1))
+                _keep = _keep & _rmask2
+                if S_real < S_width:
+                    _keep = _keep & (cand_idx < S_real)
+                _safe = torch.where(
+                    _keep, cand_idx, S_width)      # 无效槽 → 尾列哨兵
+                sf_full[0, 0].scatter_(1, _safe, _sf2)
+                score_fine = sf_full[..., :S_width]
+        else:
+            if topk_mask.shape[-1] > _sf_w:
+                topk_mask = topk_mask[..., :_sf_w]
+            elif topk_mask.shape[-1] < _sf_w:
+                # 【阶段 2a 固定宽度】块统计有效区化后 kt_eff=ceil(S_real/bs) →
+                # topk_mask 宽 kt_eff*bs 可小于全宽 score_fine（S_cap）——pad
+                # False 补齐（pad 列 score_fine 已被上方显式置 -inf，where 后
+                # 仍 -inf，softmax 不归约，逐位等价变长路径）。
+                topk_mask = F.pad(topk_mask,
+                                  (0, _sf_w - topk_mask.shape[-1]), value=False)
+            score_fine = torch.where(topk_mask, score_fine, float("-inf"))
+        _G_ = self.group_size
+        _sm = F.softmax(score_fine, dim=-1)
+        if (not self.per_q_head and _HAS_TRITON and _sm.is_contiguous()
+                and isinstance(_G_, int) and _G_ > 0
+                and (_G_ & (_G_ - 1)) == 0
+                and _sm.shape[2] % _G_ == 0):
+            # 【AKO iter-11】softmax 输出 nan_to_num + GQA 组 mean 单趟
+            # 融合（_ako_gqa_mean_kernel）：strided reduce + nan_to_num 两
+            # kernel → 1。等价性论证见 kernel docstring；守卫不齐（per_q_head
+            # / G 非 2 幂 / 非连续）→ 回退 torch 链逐位不变。
+            _Wm = _sm.shape[-1]
+            _Rm = _sm.shape[2] // _G_
+            p = torch.empty(
+                (_sm.shape[0], _sm.shape[1], _Rm, _Wm),
+                dtype=_sm.dtype, device=_sm.device)
+            # 【AKO iter-13】swa 强制区 [max(0,S_real−swa_tok), S_real)
+            # 直写 1.0 折叠进 mean kernel——消独立 setitem fill kernel
+            # （FillFunctor ~1.8us/步）+ torch 2.8 标量 setitem 固有
+            # lift_fresh→fill_→item CPU 分发链（~10us host，共居下被 GPU
+            # 积压掩盖但计入 launch 开销）。等价性见 kernel docstring；
+            # S_real/swa_tok 非 host int → 传 (0,0)（forced 恒空）+ 下方
+            # 旧 fill 行照跑 fail-closed 逐位不变。
+            if isinstance(S_real, int) and isinstance(swa_tok, int):
+                _swa_lo_t = S_real - swa_tok
+                if _swa_lo_t < 0:
+                    _swa_lo_t = 0
+                _swa_s_t = S_real
+                _swa_filled = True
+            else:
+                _swa_lo_t = 0
+                _swa_s_t = 0
+                _swa_filled = False
+            _ako_gqa_mean_kernel[(_Rm, triton.cdiv(_Wm, 1024))](
+                _sm[0, 0], p[0, 0], _Wm,
+                _swa_lo_t, _swa_s_t,
+                G=_G_, BLOCK=1024, num_warps=4)
+        else:
+            p = _sm.nan_to_num(nan=0)
+            if not self.per_q_head:
+                # E103：共享口径组内 mean；per_q_head 保留 [1,1,H,T] 直接 topk
+                p = rearrange(p, "b qt (h g) kt -> b qt h g kt", g=self.group_size).mean(dim=-2)
+            _swa_filled = False
         # 【075 修复】SWA 强制区按真实 S：p[..., -swa:] 在投影路径落 padded
         # 尾部（消费端裁剪后真实序列尾只保 swa−(Tpad−S) 个 token，S=6145
         # 实测 65/128）。改为 [S_real−swa, S_real)；非投影路径 S_real==宽度
         # → 与旧 p[..., -swa:] 逐位等价（S_real<swa 时两者同为全宽度置位）。
-        p[..., max(0, S_real - swa_tok):S_real] = 1.0
+        # 【AKO iter-13】host int 几何 + fused mean 臂已由 kernel 直写覆盖
+        # （_swa_filled）→ 本 fill 免跑；其余臂照旧。
+        if not _swa_filled:
+            p[..., max(0, S_real - swa_tok):S_real] = 1.0
         # 【B4 修复（kimi3 清单 F4，2026-10-08）】σ 死参数 fail-closed：
         # sigma_select≠none 但分区选择路径不可用（use_partition=False：
         # enable_kmeans 与 α/β 分区均未开，或 skip_far 跳层）或与
@@ -2898,6 +3644,14 @@ class TLIIndexer(TIAIndexer):
             # （形状对齐 scatter，且下方 `i_n = i_f[..., :0]` 依赖该变量）。
             k2_far = 0
             i_f = torch.zeros_like(p[..., :0], dtype=torch.long)
+            # 【AKO iter-10】装配融合守卫：几何标量全 host int + p 连续 +
+            # Triton 可用 → far/near 走 _raw 出口（cand_idx+sel），装配尾部
+            # 单趟化（_ako_l2_mask_kernel）。任一守卫失败 → _raw=False →
+            # far/near/装配全链与旧口径逐位相同（fail-closed）。
+            _asm_fuse = (_HAS_TRITON and p.is_contiguous()
+                         and isinstance(sink_tok, int)
+                         and isinstance(swa_lo_tok, int)
+                         and isinstance(S_real, int))
             # 【E111 D' gate 短路】skip 层 far 池结构性置空：far 段粗筛分
             # 已 -inf（compute_score 省算或上方 L945 置位）→ L1 双池 far 池
             # 空载 → 细筛 p far 段全 0，旧版 topk 会把 p=0 的 far token 当
@@ -2962,8 +3716,18 @@ class TLIIndexer(TIAIndexer):
                         far_budget = self.far_tokens
                     # 默认：远端与近端同用 4bit 精筛分数，仅在独立池内 topk
                     k2_far = min(far_budget, far_tok_hi - far_tok_lo, K2_mid)
-                    far_p = p[..., far_tok_lo:far_tok_hi]
-                    i_f = torch.topk(far_p, k2_far, dim=-1).indices + far_tok_lo
+                    # 【AKO iter-1 候选域压缩】far 段 p>0 support = L1 far 池
+                    # 选中块 ∪ far 侧保送页 token（其余位 softmax(-inf)=0，
+                    # k2_far ≤ 选中块 token 数时永不出线）→ 段全宽 topk 换
+                    # 候选域 topk，选择集合等价、宽度 48960 → ~nb_far·bs。
+                    i_f = self._compact_topk(
+                        p, far_tok_lo, far_tok_hi, k2_far,
+                        _l1_far_blk, _far_pool_hi_tok, bypass_blks, bs,
+                        _raw=_asm_fuse)
+                    if i_f is None:
+                        far_p = p[..., far_tok_lo:far_tok_hi]
+                        i_f = torch.topk(far_p, k2_far, dim=-1).indices \
+                            + far_tok_lo
                     import os as _os
                     if (_os.environ.get("TLI_DEBUG", "").strip().lower() not in ("", "0", "false")
                             and self.layer_idx == 1):
@@ -2982,7 +3746,6 @@ class TLIIndexer(TIAIndexer):
             # near 区宽)——饥饿语义：剩余预算不跨池回补 far）。
             k2_near = max(0, K2_mid - k2_far)
             if swa_lo_tok > far_tok_hi:
-                near_p = p[..., far_tok_hi:swa_lo_tok]
                 if near_tok_score is not None:
                     # E110 ccluster：near 池换「簇分数（簇覆盖段）+ 细筛原始分
                     # （未覆盖段）」。两源均为 group-mean 缩放点积分（量纲一致：
@@ -3006,9 +3769,55 @@ class TLIIndexer(TIAIndexer):
                         near_sc[..., cs_lo - far_tok_hi:cs_hi - far_tok_hi] = \
                             seg.unsqueeze(0).unsqueeze(0)
                     near_p = near_sc
-                i_n = torch.topk(near_p, min(k2_near, near_p.shape[-1]), dim=-1).indices + far_tok_hi
+                    i_n = torch.topk(near_p, min(k2_near, near_p.shape[-1]), dim=-1).indices + far_tok_hi
+                else:
+                    # 【AKO iter-1 候选域压缩】near 段 p>0 support = L1 near
+                    # 池选中块 ∪ near 侧保送页（swa 跨界页 < swa_lo_tok 部分）
+                    # → 段全宽 topk 换候选域 topk（同 far 侧注释）。
+                    k_near_eff = min(k2_near, swa_lo_tok - far_tok_hi)
+                    i_n = self._compact_topk(
+                        p, far_tok_hi, swa_lo_tok, k_near_eff,
+                        _l1_near_blk, _near_pool_hi_tok, bypass_blks, bs,
+                        _raw=_asm_fuse)
+                    if i_n is None:
+                        near_p = p[..., far_tok_hi:swa_lo_tok]
+                        i_n = torch.topk(near_p, min(k2_near, near_p.shape[-1]),
+                                         dim=-1).indices + far_tok_hi
             else:
-                i_n = i_f[..., :0]
+                # 【AKO iter-10】far 为 _raw 形态（cand_f, sel_f）时空近端
+                # 同走 raw：(cand_f, sel_f[..., :0])——回退路径 gather 出
+                # [..., :0] 与旧 i_f[..., :0] 同形同 dtype 同空值；融合路径
+                # kn=0 近端零置位（探针 trial1 判据）。
+                if isinstance(i_f, tuple):
+                    i_n = (i_f[0], i_f[1][..., :0])
+                else:
+                    i_n = i_f[..., :0]
+            # 【AKO iter-10】L2 mask 装配尾部单趟化（_ako_l2_mask_kernel）：
+            # back-gather（2× cand_idx.gather）+ zeros 填充 + 2× scatter_ +
+            # sink/swa 强制区 → 1 launch。纯整数/幂等 bool 置位语义 → 逐位
+            # 恒等。far/near 任一非 raw 形态（compact 守卫失败/全宽回退/
+            # 簇分臂）→ 手动 gather 补齐后走旧 torch 链逐位不变。
+            if isinstance(i_f, tuple) and isinstance(i_n, tuple):
+                cand_f, sel_f = i_f
+                cand_n, sel_n = i_n
+                kf = int(sel_f.shape[-1])
+                kn = int(sel_n.shape[-1])
+                W = p.shape[-1]
+                R = p.numel() // W if W else 0
+                topk_mask = torch.empty(
+                    p.shape, dtype=torch.bool, device=p.device)
+                _ako_l2_mask_kernel[(R, triton.cdiv(W, 4096))](
+                    cand_f, sel_f, cand_n, sel_n, topk_mask,
+                    kf, kn, int(cand_f.shape[-1]), int(cand_n.shape[-1]),
+                    W, sink_tok, swa_lo_tok, S_real,
+                    KF_POW2=max(1, triton.next_power_of_2(kf)),
+                    KN_POW2=max(1, triton.next_power_of_2(kn)),
+                    BLOCK=4096, num_warps=4)
+                return topk_mask
+            if isinstance(i_f, tuple):
+                i_f = i_f[0].gather(-1, i_f[1])
+            if isinstance(i_n, tuple):
+                i_n = i_n[0].gather(-1, i_n[1])
             topk_mask = torch.zeros_like(p, dtype=torch.bool)
             topk_mask.scatter_(-1, i_f, True)
             topk_mask.scatter_(-1, i_n, True)
@@ -3049,17 +3858,453 @@ class TLIIndexer(TIAIndexer):
             topk_mask[..., :sink_tok] = True
         return topk_mask
 
+    # ---------------- 【AKO iter-1】L2 段 topk 候选域压缩 ----------------
+    # p = softmax(where(L1 块掩码 ∪ 保送页, score_fine, -inf)) → p>0 的
+    # support 恰为「L1 选中块 + 保送页」的 token；段内其余位恒 p=0（严格
+    # 大于 0 的正候选数 = 选中块·bs + 保送页相交 token）。k ≤ 选中块 token
+    # 数时 p=0 位两侧都永不出线 → 段全宽 topk 与候选域 topk 选择集合逐位
+    # 等价，输入宽度从 O(S) 降到 O(K1·bs)。等价性前提不满足（k 超正候选
+    # 下界 / 池端点越段 / 非 e64 单池臂 / 退化几何）时返回 None，调用方
+    # 回退旧全宽 topk——各消融臂逐位不变。
+    def _compact_topk(self, p, seg_lo, seg_hi, k, l1_blk, pool_hi_tok,
+                      bypass_blks, bs, _raw=False):
+        if (l1_blk is None or k <= 0 or seg_hi <= seg_lo
+                or seg_hi > p.shape[-1] or pool_hi_tok > seg_hi
+                or k > l1_blk.shape[-1] * bs):
+            return None
+        dev = p.device
+        offs = getattr(self, "_ct_offs", None)
+        if offs is None or offs.device != dev or offs.numel() != bs:
+            offs = torch.arange(bs, device=dev, dtype=torch.int64)
+            self._ct_offs = offs
+        # 块升序展开成 token 索引（升序保 tie-break 的原 token 顺序；
+        # L1 块 token 全部真实有限分 → p>0，构成正候选下界）
+        lead = l1_blk.shape[:-1]
+        nb = l1_blk.shape[-1]
+        # 保送页与段相交 token（宿主侧段枚举；保送块已移出双池 → 与
+        # L1 块无重复索引；bypass_blks ≤ 2 块（sink 跨界页 + swa 跨界页）
+        # → 相交段 ≤ 2，段序 = 旧 cat 序逐位复刻）
+        segs = []
+        for b in bypass_blks:
+            lo_b = max(b * bs, seg_lo)
+            hi_b = min((b + 1) * bs, seg_hi)
+            if hi_b > lo_b:
+                segs.append((lo_b, hi_b))
+        n_byp = sum(hi - lo for lo, hi in segs)
+        R_cand = nb * bs + n_byp
+        # 【AKO iter-15】排序+展开融合（_ako_cand_expand_sort_kernel）：
+        # iter-9 l1_sort + iter-7 cand_expand 两 kernel → 1 launch。每列
+        # 切片 program 冗余 load 未排序块号行 → 寄存器 pad 哨兵 tl.sort
+        # 升序 → tl.gather 动态取 BLK[j]（clamp nb-1 防 bypass lane 越界）
+        # → 展开/bypass/p.gather。互异块号升序唯一 → 与独立 kernel 写回
+        # sorted blk 后展开逐位恒等。守卫不齐（无 tl.sort/tl.gather /
+        # nb=1 退化（tl.sort 单元素编译 bug）/ nb>256 / 非连续 / >2 bypass
+        # 段 / lead 与 p 不匹配）→ 回退 iter-9+iter-7 两 kernel 路径或
+        # torch 链逐位不变。探针 5 形状 ×3 重复对拍全 PASS。
+        if (_HAS_TRITON and _TL_HAS_SORT and _TL_HAS_GATHER
+                and l1_blk.is_contiguous()
+                and 2 <= nb and 1 << (nb - 1).bit_length() <= 256
+                and len(segs) <= 2 and p.is_contiguous()
+                and tuple(p.shape[:-1]) == tuple(lead)):
+            S_w = p.shape[-1]
+            R_l = p.numel() // S_w
+            ba = segs[0] if len(segs) > 0 else (0, 0)
+            bb = segs[1] if len(segs) > 1 else (0, 0)
+            cand_idx = torch.empty(
+                (R_l, R_cand), dtype=torch.int64, device=dev)
+            cand_p = torch.empty(
+                (R_l, R_cand), dtype=p.dtype, device=dev)
+            _ako_cand_expand_sort_kernel[(R_l, triton.cdiv(R_cand, 256))](
+                l1_blk, p, cand_idx, cand_p,
+                R_cand, nb, S_w,
+                ba[0], ba[1], bb[0], bb[1],
+                S_w,
+                BS=bs, NB_POW2=1 << (nb - 1).bit_length(),
+                BLOCK=256, num_warps=4)
+            cand_idx = cand_idx.view(*lead, R_cand)
+            cand_p = cand_p.view(*lead, R_cand)
+        else:
+            # 【AKO iter-9】升序排序内联 Triton 化（_ako_l1_sort_kernel）：
+            # L1 块号来自 topk indices 互异 → 升序唯一 → 与 torch.sort 逐位
+            # 恒等，消 2×(radixSortKVInPlace<long>+bitonic+DtoD 首拷)
+            # ~19us/步；nb>256 / 非连续 / 无 tl.sort 回退 torch.sort 逐位不变。
+            if (_HAS_TRITON and _TL_HAS_SORT and l1_blk.is_contiguous()
+                    and 0 < nb and 1 << (nb - 1).bit_length() <= 256):
+                _nbp = 1 << (nb - 1).bit_length()
+                _Rl = l1_blk.numel() // nb
+                blk = torch.empty((_Rl, nb), dtype=torch.int64, device=dev)
+                _ako_l1_sort_kernel[(_Rl,)](
+                    l1_blk, blk, nb, nb, nb,
+                    NB_POW2=_nbp, num_warps=max(1, min(8, _nbp // 32)))
+                blk = blk.view(*lead, nb)
+            else:
+                blk = torch.sort(l1_blk, dim=-1).values
+            # 【AKO iter-7】块展开 × bypass 拼接 × p.gather 单趟 Triton 融合
+            # （_ako_cand_expand_kernel）：mul+add+arange+cat+gather 五 kernel
+            # 链 → 1 launch，输出布局逐位恒等（升序展开 + 旧 cat 段序）→
+            # cand_p 逐位一致 → topk tie-break 逐位不变。守卫不齐（无
+            # Triton / >2 bypass 段 / 非连续 / lead 与 p 不匹配）→ 回退旧
+            # torch 链逐位不变。
+            if (_HAS_TRITON and len(segs) <= 2 and p.is_contiguous()
+                    and blk.is_contiguous()
+                    and tuple(p.shape[:-1]) == tuple(lead)):
+                S_w = p.shape[-1]
+                R_l = p.numel() // S_w
+                ba = segs[0] if len(segs) > 0 else (0, 0)
+                bb = segs[1] if len(segs) > 1 else (0, 0)
+                cand_idx = torch.empty(
+                    (R_l, R_cand), dtype=torch.int64, device=dev)
+                cand_p = torch.empty(
+                    (R_l, R_cand), dtype=p.dtype, device=dev)
+                _ako_cand_expand_kernel[(R_l, triton.cdiv(R_cand, 256))](
+                    blk, p, cand_idx, cand_p,
+                    R_cand, nb, S_w,
+                    ba[0], ba[1], bb[0], bb[1],
+                    nb, S_w, R_cand, R_cand,
+                    BS=bs, BLOCK=256, num_warps=4)
+                cand_idx = cand_idx.view(*lead, R_cand)
+                cand_p = cand_p.view(*lead, R_cand)
+            else:
+                cand_idx = (blk * bs).unsqueeze(-1).add(offs).reshape(*lead, -1)
+                for lo, hi in segs:
+                    part = torch.arange(
+                        lo, hi, device=dev, dtype=torch.int64)
+                    cand_idx = torch.cat(
+                        [cand_idx,
+                         part.view(*((1,) * len(lead)), -1).expand(*lead, -1)],
+                        dim=-1)
+                cand_p = p.gather(-1, cand_idx)
+        sel = torch.topk(cand_p, k, dim=-1).indices
+        # 【AKO iter-10】_raw=True：装配融合守卫齐备时免尾部 back-gather
+        # （(cand_idx, sel) 直交 _ako_l2_mask_kernel 内联 gather）；默认
+        # False 与旧口径逐位相同。
+        if _raw:
+            return cand_idx, sel
+        return cand_idx.gather(-1, sel)
+
+    # ---------------- 【阶段 2c-2】graph 专用全张量 compute_mask ----------------
+    # CUDA Graph decode 专用路径：与 eager compute_mask（Python 分支版）逐位
+    # 一致（有限步验收口径），但零 host 同步 / 零 Python int 分支 / 全程固定
+    # 形状——capture 后 replay 可用 copy_ 注入 q/valid_len 重复执行。
+    #
+    # 核心简化（decode 语义保证，下面各点详细论证）：
+    #   * decode 期间 StaticCache 前缀 [0, S_cap) 不覆盖（append-only）→
+    #     index_dict 容量宽一次烘焙（capture 前 prepare_index 全量），replay
+    #     期间为常量张量；尾块（含新 token 的块）统计过时但恒在 swa 强制区
+    #     （swa_lo_blk ≤ kt_eff−max(1,swa//bs)）→ 不进 L1 池、不进候选集、
+    #     不消费 → 过时值零影响。
+    #   * 当前块强制（eager `score_coarse[..., -1]=inf`）：强制块 = 有效区最后
+    #     块 = 新 token 所在块 ∈ swa 区 → 不进 L1 池 → inf 不影响任何选择 →
+    #     graph 省略，与 eager 选择逐位一致。
+    #   * 池区间（far∪near = [sink_pool_lo, swa_lo_blk)）内块全部在前缀真实
+    #     KV 区 → 烘焙统计正确。
+    # 动态几何（near_blks/swa_lo_blk/swa_lo_tok/K2_mid/bypass/pad 界）全部从
+    # valid_len [1] long tensor 派生，形状固定（张量比较/区间掩码/固定 k
+    # topk + rank 截断），零 Python 分支。
+    #
+    # 生产主配置强制（其余 fail-closed raise，调用方回 eager 逐行路径）：
+    #   e64 固定几何（alpha=beta=1.0 由 E155d 归一）+ gamma=None（nt=off 自由
+    #   竞争）+ boundary_bypass + 非投影 + 非 per_q_head + 非 cluster 簇分 +
+    #   非 moba/sigma/async + skip_far=False。
+
+    def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len):
+        """graph 专用全张量 compute_mask（生产主配置，逐位对齐 eager）。
+
+        输入：q [1,1,H,D]（replay 注入）、index_dict（容量宽：k_min/k_max/
+        k_avg/k_qat 全宽块统计，capture 前烘焙为常量）、softmax_scale、
+        valid_len [1] long（replay 注入，decode 当前行有效长）。
+        输出：mask [1,1,Hkv,S_cap] bool（固定全宽，消费端 eager 批量路径）。
+        """
+        # ---- 0. 生产主配置守卫（fail-closed 回 eager 逐行路径）----
+        if not (self.alpha > 0 and self.beta > 0 and self.gamma is None
+                and self.nt_near_pages is not None
+                and self.nt_near_len is not None
+                and not self.per_q_head and self._basis is None
+                and self.far_select not in ("cluster", "sim_greedy")
+                and self.near_select not in ("cluster", "sim_greedy")
+                and not self.moba_gate and self.sigma_select == "none"
+                and not self.enable_async and not self.skip_far):
+            raise NotImplementedError(
+                "compute_mask_graph 仅支持生产主配置（e64 固定几何 + γ=None "
+                "自由竞争 + boundary_bypass + 非投影 + 非 per_q_head + 非簇分/"
+                "moba/sigma/async + 非 skip_far）；其余配置调用方应回退 eager "
+                "逐行路径（行为不变）")
+        dev = q.device
+        bs = self.args.tia_block_size
+        sink_tok = self.sink_tokens
+        swa_tok = self.sliding_window_size
+        K1 = self.args.tia_level1_topk
+        K2 = self.args.tia_level2_topk
+        nb_near = max(0, int(self.nt_near_pages))
+        nb_far = max(0, K1 - nb_near)
+        nl = max(bs, int(self.nt_near_len))
+        sink_pool_lo = self._sink_pool_lo_blk
+        H = q.shape[2]
+        # 【2c-2 修复】graph 专用路径自洽：Hkv/group_size 从容量宽 index_dict
+        # 派生（等价 compute_score 设的 self.group_size = H // k_min.shape[1]）。
+        # replay 时 compute_score 不先跑、实例状态不可依赖（原 self.group_size
+        # 在 eager 路径因 compute_score 先跑而掩盖，graph 直调必 None 崩）。
+        k_min = index_dict["k_min"].squeeze(0)   # [kt_cap, Hkv, d]（前置供 Hkv 派生）
+        Hkv = k_min.shape[1]
+        group_size = H // Hkv
+        # 容量宽特征（squeeze(0) 后）[kt_cap, Hkv, d] / [S_cap, Hkv, d]
+        k_max = index_dict["k_max"].squeeze(0)
+        k_qat = index_dict["k_qat"]            # [1, S_cap, Hkv, d]
+        k_avg = index_dict.get("k_avg")
+        if k_avg is not None:
+            k_avg = k_avg.squeeze(0)
+        kt_cap = k_min.shape[0]
+        S_cap = k_qat.shape[1]
+        # 静态常量（capture 安全）：torch.tensor(..., device=) 是 host→device
+        # 拷贝，CUDA Graph capture 期禁止（cudaMemcpyAsync from pageable）→
+        # 实例级缓存（首调 = warmup，在 capture 之外构建；key 含形状/dtype
+        # 与几何常量，配置级常量）。arange 走设备 kernel，本身可 capture，
+        # 一并缓存省 replay 轮次的重复 launch。
+        _cst_key = (dev, q.dtype, kt_cap, S_cap, bs, sink_pool_lo, sink_tok)
+        _cst = getattr(self, "_graph_const_cache", None)
+        if _cst is None or _cst[0] != _cst_key:
+            _cst = (_cst_key, {
+                "ar_blk": torch.arange(kt_cap, device=dev),
+                "ar_tok": torch.arange(S_cap, device=dev),
+                "ar_bs": torch.arange(bs, device=dev),
+                "inf_t": torch.tensor(float("-inf"), dtype=q.dtype, device=dev),
+                "zero_l": torch.tensor(0, dtype=torch.long, device=dev),
+                "sink_cross": torch.tensor(sink_tok % bs != 0, device=dev),
+                "far_lo": torch.tensor(sink_pool_lo, dtype=torch.long,
+                                       device=dev),
+            })
+            self._graph_const_cache = _cst
+        ar_blk = _cst[1]["ar_blk"]
+        ar_tok = _cst[1]["ar_tok"]
+        ar_bs = _cst[1]["ar_bs"]
+        inf_t = _cst[1]["inf_t"]
+        zero_l = _cst[1]["zero_l"]
+        # ---- 1. 动态几何（全部从 valid_len tensor 派生，固定形状）----
+        S_real = valid_len[0].to(torch.long)                 # [1]
+        swa_lo_tok = torch.clamp(S_real - swa_tok, min=0)   # [1]
+        kt_eff = (S_real + bs - 1) // bs                    # [1]
+        # near_blks = max(sink_pool_lo, (S_real − swa_tok − nl) // bs)（B10/F5）
+        near_blks = torch.clamp((S_real - swa_tok - nl) // bs, min=sink_pool_lo)
+        # swa_lo_blk = max(near_blks, kt_eff − max(1, swa_tok//bs))
+        swa_lo_blk = torch.maximum(
+            near_blks, kt_eff - max(1, swa_tok // bs))
+        # bypass 页：sink 跨界（静态）+ swa 跨界（动态，cond 门控）
+        # （far_lo_blk 在下方池掩码段定义；slot0 消费时已就绪）
+        swa_byp_blk = swa_lo_tok // bs                      # [1]
+        swa_byp_cond = (swa_lo_tok % bs != 0) & (
+            swa_byp_blk >= sink_pool_lo)                    # [1] bool
+        # ---- 2. 池掩码（tensor 区间，固定形状 kt_cap）----
+        far_lo_blk = sink_pool_lo
+        far_pool_mask = (ar_blk >= far_lo_blk) & (ar_blk < near_blks)
+        near_pool_mask = (ar_blk >= near_blks) & (ar_blk < swa_lo_blk)
+        if sink_tok % bs != 0:
+            far_pool_mask = far_pool_mask & (ar_blk != far_lo_blk)
+        # swa 跨界页移出 near 池（等价 eager 端点收缩，且免端点假设）
+        byp_excl = (ar_blk == swa_byp_blk.view(-1)) & swa_byp_cond.view(-1)
+        near_pool_mask = near_pool_mask & ~byp_excl
+        # 【2c-2 修复】sink 跨界页同样移出 near 池——eager _select_l1_blocks
+        # 对 bypass_blks 逐块端点收缩（sink 跨界页 == near 池近端端点 →
+        # near_pool_lo = far_lo_blk + 1），原实现只排除了 swa 跨界页，sink
+        # 跨界页仍留 near 池参与 topk → graph L1 选块与 eager 不同（topk
+        # 槽被跨界页占用 + 候选重复）→ 候选集漂移 → mask 对拍失败（G8
+        # 中长序列 diff ~7700 根因）。仅当 sink 跨界存在且该页在 near 池
+        # 内（near_blks ≤ far_lo_blk < swa_lo_blk）才排除。
+        if sink_tok % bs != 0:
+            sink_in_near = (ar_blk == far_lo_blk) & (
+                ar_blk >= near_blks) & (ar_blk < swa_lo_blk)
+            near_pool_mask = near_pool_mask & ~sink_in_near
+        # ---- 3. coarse 分（Triton，与 eager 同 kernel 逐位一致）----
+        # 【2c-2 修复】Q 侧子空间 gather 与 eager 同源（compute_score L1742-1743
+        # b_q = q_full[..., idx_sub]）：生产主配置 tail/l2_subspace=same 下
+        # k_qat 为子空间 32 维切片，coarse/fine 打分 kernel 期望 Q [H,32]。
+        # 原用全维 b_q [H,128] 传给 _score_fine_cand_kernel → kernel 只读 q
+        # 前 32 维 [0:32]（非 tail 子空间 [48:64]∪[112:128]）→ fine 分错误 →
+        # p 值偏移（G8 对拍 ~25% 差异根因）。gather 后与 eager 逐位一致。
+        q_full32 = (q[0, 0] * softmax_scale).to(torch.float32)   # [H, D]
+        idx_sub = (self._subspace_indices(q.device)
+                   if self.enable_subspace else None)
+        # coarse 用 b_q（与 k_min/k_max 同宽：idx_sub=None 时 = 全维，对应
+        # prepare 侧 k_for_coarse 未切片）
+        b_q = q_full32 if idx_sub is None else q_full32[..., idx_sub]  # [H, d']
+        # 【2c-2 修复】fine 侧 q 的宽度由 k_qat 决定，与 coarse 可能不同：
+        # 镜像 eager compute_score L1896-1901（l2_subspace=full → 全维；
+        # idx_sub 非 None → b_q；否则 _qat_indices 尾段 32 维）。原实现
+        # fine kernel 复用 coarse 的 b_q，full 模式（idx_sub=None）下传入
+        # 128 维 → kernel 只读前 32 维（非 tail 子空间）→ fine 分/p 全错
+        # （G8 对拍 diff ~7700 根因）。
+        if self.l2_subspace == "full":
+            b_q_fine = q_full32
+        elif idx_sub is not None:
+            b_q_fine = b_q
+        else:
+            b_q_fine = q_full32[..., self._qat_indices(q.device)]
+        score_coarse = torch.full((1, H, kt_cap), float("-inf"),
+                                  dtype=q.dtype, device=dev)
+        try:
+            score_coarse[0] = self._fast_score_coarse(
+                k_min, k_max, b_q, q.dtype)
+        except Exception:
+            # 与 eager 回退同路径（einsum minmax，fail-closed 逐位）
+            b_k_min = repeat(k_min, "t h d -> t (h g) d", g=group_size).to(torch.float32)
+            b_k_max = repeat(k_max, "t h d -> t (h g) d", g=group_size).to(torch.float32)
+            score_coarse[0] = (
+                einsum(b_q.clamp(max=0), b_k_min, "h d, kt h d -> h kt")
+                + einsum(b_q.clamp(min=0), b_k_max, "h d, kt h d -> h kt")
+            ).to(q.dtype)
+        score_coarse_avg = None
+        if k_avg is not None:
+            score_coarse_avg = torch.full((1, H, kt_cap), float("-inf"),
+                                          dtype=q.dtype, device=dev)
+            try:
+                score_coarse_avg[0] = self._fast_score_fine(
+                    k_avg, b_q, q.dtype)
+            except Exception:
+                b_k_avg = repeat(k_avg, "t h d -> t (h g) d", g=group_size).to(torch.float32)
+                score_coarse_avg[0] = einsum(
+                    b_q, b_k_avg, "h d, kt h d -> h kt").to(q.dtype)
+        # GQA 聚合到 Hkv（共享口径，与 eager rearrange+mean 同数学）
+        sc = score_coarse.view(1, Hkv, group_size, kt_cap).mean(dim=2)     # [1,Hkv,kt_cap]
+        sc = sc.unsqueeze(1)
+        if score_coarse_avg is not None:
+            sc_avg = score_coarse_avg.view(1, Hkv, group_size, kt_cap).mean(dim=2)
+            sc_avg = sc_avg.unsqueeze(1)
+        else:
+            sc_avg = None
+        # ---- 4. L1 双池 topk（固定 k；池外 where -inf，keep 门控剔除垃圾）----
+        far_src = sc_avg if (self.far_method == "avg" and sc_avg is not None) else sc
+        near_src = sc if (self.near_method == "minmax" or sc_avg is None) else sc_avg
+        fp_mask = far_pool_mask.view(1, 1, 1, -1).expand(1, 1, Hkv, kt_cap)
+        np_mask = near_pool_mask.view(1, 1, 1, -1).expand(1, 1, Hkv, kt_cap)
+        far_scored = torch.where(fp_mask, far_src,
+                                 torch.full_like(far_src, float("-inf")))
+        near_scored = torch.where(np_mask, near_src,
+                                  torch.full_like(near_src, float("-inf")))
+        i_f = torch.topk(far_scored, nb_far, dim=-1).indices   # [1,1,Hkv,nb_far]
+        i_n = torch.topk(near_scored, nb_near, dim=-1).indices  # [1,1,Hkv,nb_near]
+        far_ok = fp_mask.gather(-1, i_f)                        # 池内判定（剔除垃圾）
+        near_ok = np_mask.gather(-1, i_n)
+        # ---- 5. 候选集构建（L1 块 ∪ bypass 页，固定 R_cap = K1*bs + 2*bs）----
+        blks = torch.cat([i_f, i_n], dim=-1)                   # [1,1,Hkv,K1]
+        in_pool = torch.cat([far_ok, near_ok], dim=-1)         # [1,1,Hkv,K1]
+        l1_tok = (blks.unsqueeze(-1) * bs
+                  + ar_bs.view(1, 1, 1, 1, -1))                # [1,1,Hkv,K1,bs]
+        l1_keep = (l1_tok < S_real.view(1, 1, 1, 1, 1)) & in_pool.unsqueeze(-1)
+        # bypass 槽：slot0 = sink 跨界（静态，cond 门控）、slot1 = swa 跨界（动态）
+        slot0 = torch.where(
+            _cst[1]["sink_cross"], _cst[1]["far_lo"], zero_l)
+        slot1 = swa_byp_blk
+        byp_blk2 = torch.stack([slot0, slot1.view(-1)[0]]).view(1, 1, 1, 2, 1)
+        byp_tok = (byp_blk2 * bs + ar_bs.view(1, 1, 1, 1, -1))  # [1,1,1,2,bs]
+        byp_keep = byp_tok < S_real.view(1, 1, 1, 1, 1)
+        byp_keep = byp_keep & torch.stack([
+            _cst[1]["sink_cross"],
+            swa_byp_cond]).view(1, 1, 1, 2, 1)   # 两者均 0-dim（S_real 0-dim 级联）
+        byp_tok = byp_tok.expand(1, 1, Hkv, 2, bs)
+        byp_keep = byp_keep.expand(1, 1, Hkv, 2, bs)
+        R_cap = K1 * bs + 2 * bs
+        cand_idx = torch.cat([
+            l1_tok.reshape(1, 1, Hkv, K1 * bs),
+            byp_tok.reshape(1, 1, Hkv, 2 * bs)], dim=-1)        # [1,1,Hkv,R_cap]
+        keep = torch.cat([
+            l1_keep.reshape(1, 1, Hkv, K1 * bs),
+            byp_keep.reshape(1, 1, Hkv, 2 * bs)], dim=-1)       # bool
+        cand_idx2 = cand_idx[0, 0]                             # [Hkv,R_cap]
+        keep2 = keep[0, 0]                                     # [Hkv,R_cap]
+        # 【2c-2 修复】候选紧凑化重排：_score_fine_cand_kernel 的 cand_len
+        # 门控语义 = 「前 cand_len 个位置有效」（offs_r < CLEN[kv]）。原布局
+        # cand_idx = [far 96 槽(垃圾), near 32 槽(有效), byp 2 槽(有效)]——
+        # 有效候选落在第 K1_far*bs 之后的槽位，kernel 只保留前 cand_len
+        # （= 有效数）位置 → 保留下来的全是 far 垃圾，near/byp 有效候选
+        # 全被 -inf（→ sf_full mid 区全 -inf → p mid 区 0，G8 对拍全崩）。
+        # 用 stable argsort(~keep) 把有效候选（keep=True）稳定提到前
+        # cand_len 个位置、垃圾后置（scatter 哨兵排除），R_cap 固定形状
+        # 与 eager 归约集合（L1∪bypass）逐位一致。
+        _srt2 = torch.argsort(~keep2, dim=-1, stable=True)    # keep=True(0) 在前
+        cand_idx2 = cand_idx2.gather(-1, _srt2)
+        keep2 = keep2.gather(-1, _srt2)
+        cand_len = keep2.sum(-1).to(torch.long)                # [Hkv]
+        # ---- 6. fine 打分（Triton 候选 kernel，与 eager 同 kernel 逐位）----
+        try:
+            if self._triton_ok and _HAS_TRITON and k_qat.dim() == 4 \
+                    and k_qat.is_cuda:
+                sfc = self._fast_score_fine_cand(
+                    k_qat[0], b_q_fine, cand_idx2, cand_len, R_cap, q.dtype)
+            else:
+                raise RuntimeError("triton 候选 kernel 不可用")
+        except Exception:
+            _kv_id = torch.arange(Hkv, device=dev).view(-1, 1)
+            _kqc = k_qat[0][cand_idx2, _kv_id, :]              # [Hkv,R,d]
+            _bkqc = repeat(_kqc, "kv r d -> (kv g) r d", g=group_size).to(torch.float32)
+            sfc = einsum(b_q_fine, _bkqc, "h d, h r d -> h r").to(q.dtype)
+        keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)  # [H,R_cap]
+        sfc = torch.where(keep_h, sfc,
+                          torch.full_like(sfc, float("-inf")))
+        # ---- 7. 全宽 scatter + softmax（归约集合 = L1∪bypass 前缀，逐位 eager）----
+        sf_full = torch.full((1, 1, H, S_cap), float("-inf"),
+                             dtype=q.dtype, device=dev)
+        cand_idx_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)
+        # keep=False 的候选（池外垃圾 / 超界 pad）scatter 到 S_cap−1 哨兵（pad
+        # 恒 -inf；满容量无垃圾时 keep 全 True 不触发）→ 不污染他 head 合法候选
+        cand_safe = torch.where(keep_h, cand_idx_h,
+                                torch.full_like(cand_idx_h, S_cap - 1))
+        # src 用 sfc 二维 [H,R_cap]（与 index cand_safe 同维；原 view(1,H,R_cap)
+        # 三维与二维 index 不匹配——scatter_ 要求 src 与 index 同维数）
+        sf_full[0, 0].scatter_(1, cand_safe, sfc)
+        # 有效区外 pad 保险（graph 不依赖 base.prepare_mask 清 pad）
+        sf_full[0, 0] = torch.where(ar_tok >= S_real.view(-1),
+                                    inf_t.view(-1), sf_full[0, 0])
+        p = F.softmax(sf_full, dim=-1).nan_to_num(nan=0)       # [1,1,H,S_cap]
+        p = p.view(1, 1, Hkv, group_size, S_cap).mean(dim=3)   # [1,1,Hkv,S_cap]
+        # SWA 强制 p=1.0（eager L2727 同款，真实 S 尾）
+        swa_force = (ar_tok >= swa_lo_tok.view(-1)) & (ar_tok < S_real.view(-1))
+        p = torch.where(swa_force.view(1, 1, 1, -1),
+                        torch.ones_like(p), p)
+        # ---- 8. L2 自由竞争（γ=None，固定 k topk + rank 截断）----
+        far_tok_lo = far_lo_blk * bs
+        mid_mask = (ar_tok >= far_tok_lo) & (ar_tok < swa_lo_tok.view(-1))
+        k2_mid = torch.clamp(K2 - sink_tok - (S_real - swa_lo_tok), min=0)
+        mid_scored = torch.where(mid_mask.view(1, 1, 1, -1),
+                                 p, torch.full_like(p, float("-inf")))
+        K2_static = min(S_cap, K2)
+        v_top, i_top = torch.topk(mid_scored, K2_static, dim=-1)
+        rank_keep = (torch.arange(K2_static, device=dev)
+                     .view(1, 1, 1, -1) < k2_mid.view(1, 1, 1, -1))
+        # 截断后多余的 topk 结果替换成 S_cap−1 哨兵（恒在 swa 区，mid_mask 排除）
+        i_eff = torch.where(rank_keep, i_top,
+                            torch.full_like(i_top, S_cap - 1))
+        sel = torch.zeros((1, 1, Hkv, S_cap), dtype=torch.bool, device=dev)
+        sel.scatter_(-1, i_eff, True)
+        sel = sel & mid_mask.view(1, 1, 1, -1)
+        # 正交强制区（必选，计入 K2 预算）：sink 头部 + swa 尾部
+        sel[..., :sink_tok] = True
+        sel = sel | swa_force.view(1, 1, 1, -1)
+        # pad 区恒 False（graph 自清，等效 base.prepare_mask 末尾）
+        sel = sel & (ar_tok < S_real.view(-1)).view(1, 1, 1, -1)
+        # 【阶段 2c-3】metrics budget 采集对齐 eager base.prepare_mask L94
+        # （budget = 每行每步平均选中 token 数）。capture 期跳过：graph
+        # capture 只记录 kernel 不执行，此时记录的 s 张量内容未定义
+        # （回读 .item() 会得到脏值）；warmup 两步在真实 eager 下执行，
+        # 已按 capture 时的 seq_lens 记录足量样本（生产几何下 budget 跨步
+        # 恒定 → 均值与 staged 逐位相同）。
+        if not torch.cuda.is_current_stream_capturing():
+            self.metrics.add_select_result(valid_len - 1, sel, 1)
+        return sel
+
     # ---------------- 【E156 精筛候选化】L1 块选择单源 helper ----------------
     # compute_score（候选化）与 compute_mask（消费端）共用同一 L1 块级选择
     # 实现，杜绝两份口径漂移。逻辑逐字抽取自 compute_mask 原 L1 选择段
     # （e64 双池 / 单池 / skip / E155b bypass / _sink_pool_lo_blk），原地写
     # score_coarse（skip far 置位 + 当前块强制 inf，与原行为逐字一致）。
 
-    def _select_l1_blocks(self, score_coarse, score_coarse_avg, S_real):
+    def _select_l1_blocks(self, score_coarse, score_coarse_avg, S_real,
+                          sc_mean=None, sc_avg_mean=None):
         """L1 块级选择单源实现（compute_score 候选化 / compute_mask 共用）。
 
         输入 score_coarse [1,1,Hkv,kt]（共享口径）或 [1,1,H,kt]（per_q_head）、
         score_coarse_avg 可选（同前）；S_real = 真实序列长（valid_length 口径）。
+        【AKO iter-21】sc_mean/sc_avg_mean = 粗筛 kernel 同趟写出的 GQA 组
+        均值 [1,Hkv,kt]（kv 空间，形态守卫不齐一律回退 torch mean 逐位不变
+        ——均值与 score_coarse 的对应关系由生产单调用链保证）。
         返回 dict：topk_mask_block（块级选中 bool mask，同输入聚合后形状）、
         bypass_blks（E155b 保送页块列表）、几何上下文（compute_mask L2 分支
         消费：kt/bs/t/e64_partition/sink_tok/swa_tok/mid_len/near_len_dyn/
@@ -3073,10 +4318,28 @@ class TLIIndexer(TIAIndexer):
             score_coarse = score_coarse.unsqueeze(0)
             if score_coarse_avg is not None and score_coarse_avg.ndim == 3:
                 score_coarse_avg = score_coarse_avg.unsqueeze(0)
+            if sc_mean is not None and sc_mean.ndim == 3:
+                sc_mean = sc_mean.unsqueeze(0)
+            if sc_avg_mean is not None and sc_avg_mean.ndim == 3:
+                sc_avg_mean = sc_avg_mean.unsqueeze(0)
+        _mean_fused = False
         if not per_q_head:
-            score_coarse = rearrange(
-                score_coarse, "b qt (h g) kt -> b qt h g kt", g=self.group_size
-            ).mean(dim=-2)  # [1,1,Hkv,kt]
+            # 【AKO iter-21】kernel 同趟 GQA 组均值直用（消 torch mean
+            # reduce launch）；形态守卫（形状/dtype/连续）不齐 → 回退 torch
+            # mean 逐位不变。探针纪律（坑⑦）：返回 dict 附 mean_fused
+            # 标记，对拍探针必须断言 fused 路径真生效。
+            _kt_m = score_coarse.shape[-1]
+            _hkv_m = score_coarse.shape[2] // self.group_size
+            if (sc_mean is not None
+                    and tuple(sc_mean.shape) == (1, 1, _hkv_m, _kt_m)
+                    and sc_mean.dtype == score_coarse.dtype
+                    and sc_mean.is_contiguous()):
+                score_coarse = sc_mean
+                _mean_fused = True
+            else:
+                score_coarse = rearrange(
+                    score_coarse, "b qt (h g) kt -> b qt h g kt", g=self.group_size
+                ).mean(dim=-2)  # [1,1,Hkv,kt]
         kt = score_coarse.shape[-1]
         bs = self.args.tia_block_size
         t = kt * bs - 1  # 当前序列长度（pad 后）近似
@@ -3109,12 +4372,24 @@ class TLIIndexer(TIAIndexer):
         score_coarse[..., -1] = float("inf")  # TIA 语义：当前块强制
         k1 = self.args.tia_level1_topk
         # E109a：avg 分数源提取提前到分支外（与 compute_mask 原逻辑一致）
+        # 【AKO iter-21】kernel 同趟均值直用（守卫同上）
         if score_coarse_avg is not None and not per_q_head:
-            score_coarse_avg = rearrange(
-                score_coarse_avg, "b qt (h g) kt -> b qt h g kt", g=self.group_size
-            ).mean(dim=-2)
+            _kt_a = score_coarse_avg.shape[-1]
+            _hkv_a = score_coarse_avg.shape[2] // self.group_size
+            if (sc_avg_mean is not None
+                    and tuple(sc_avg_mean.shape) == (1, 1, _hkv_a, _kt_a)
+                    and sc_avg_mean.dtype == score_coarse_avg.dtype
+                    and sc_avg_mean.is_contiguous()):
+                score_coarse_avg = sc_avg_mean
+            else:
+                score_coarse_avg = rearrange(
+                    score_coarse_avg, "b qt (h g) kt -> b qt h g kt", g=self.group_size
+                ).mean(dim=-2)
         # ---- L1 双池 / 单池 topk + E155b bypass（逐字抽取自 compute_mask）----
         bypass_blks = ()
+        # 【AKO iter-6】L1 块级索引透传初始化：非 e64 臂不产出（消费端
+        # compute_mask 复用门/内联段均以 None 表示无块索引，口径一致）。
+        i_f = i_n = None
         far_pool_lo, far_pool_hi = far_lo_blk, far_hi_blk
         near_pool_lo, near_pool_hi = near_blks, swa_lo_blk
         nb_near = 0
@@ -3170,7 +4445,8 @@ class TLIIndexer(TIAIndexer):
                 sc_near = score_coarse[..., near_pool_lo:near_pool_hi]
             else:
                 sc_near = score_coarse_avg[..., near_pool_lo:near_pool_hi]
-            sc_near = sc_near.clone()
+            # 【AKO iter-19】sc_near 后续仅 topk 消费（无 in-place 变异），
+            # 旧 clone 为逐字抽取时代残留 → 删除（值不变，-1 launch）。
             if sc_near.shape[-1] > 0:
                 i_n = torch.topk(
                     sc_near, min(nb_near, sc_near.shape[-1]), dim=-1
@@ -3178,13 +4454,9 @@ class TLIIndexer(TIAIndexer):
             else:
                 i_n = i_f[..., :0]  # near 池空（mid 不足一块）→ 不选
             indices = torch.cat([i_f, i_n], dim=-1)
-            topk_mask = torch.zeros_like(
-                score_coarse, dtype=torch.bool
-            ).scatter_(
-                -1, indices, torch.ones_like(indices, dtype=torch.bool)
-            )
-            for _b in bypass_blks:
-                topk_mask[..., _b] = True
+            # 【AKO iter-19】topk_mask 装配融合（5 launch → 1）
+            topk_mask = self._build_topk_mask(indices, bypass_blks,
+                                              score_coarse)
         else:
             sc_pool = score_coarse
             if self.far_method == "avg" and score_coarse_avg is not None:
@@ -3198,11 +4470,8 @@ class TLIIndexer(TIAIndexer):
             values, indices = torch.topk(
                 sc_pool, min(sc_pool.shape[-1], k1), dim=-1
             )
-            topk_mask = torch.zeros_like(
-                score_coarse, dtype=torch.bool
-            ).scatter_(
-                -1, indices, torch.ones_like(values, dtype=torch.bool)
-            )
+            # 【AKO iter-19】topk_mask 装配融合（3 launch → 1）；非 e64 无 bypass
+            topk_mask = self._build_topk_mask(indices, (), score_coarse)
         return {
             "topk_mask_block": topk_mask,
             "bypass_blks": bypass_blks,
@@ -3215,6 +4484,20 @@ class TLIIndexer(TIAIndexer):
             "far_pool_lo": far_pool_lo, "far_pool_hi": far_pool_hi,
             "near_pool_lo": near_pool_lo, "near_pool_hi": near_pool_hi,
             "use_partition": use_partition,
+            # 【AKO iter-6】L1 块级索引 + 生产侧 S_real 透传：e64 臂 i_f/i_n
+            # 为偏移后绝对块号（与 compute_mask 内联段捕获口径同源）；非
+            # e64 臂恒 None。l1_s_real = 本函数收到的 S_real（valid_length
+            # 口径）——compute_mask 复用门逐项一致性校验用。
+            "i_f": i_f, "i_n": i_n,
+            "l1_s_real": S_real,
+            # 【AKO iter-16】L1 块索引单键透传：e64 = cat(i_f,i_n)（局部
+            # indices 即此值）；非 e64 = 单池 topk indices。与 topk_mask True
+            # 集恒等（topk 位置互异；e64 bypass 恒在池端点、E155b 收缩后
+            # 与 i_f/i_n 不相交）→ _gather_fine_cand 免 nonzero 同步构建。
+            "i_all": indices,
+            # 【AKO iter-21】粗筛 GQA 均值 fused 生效标记（探针断言用，
+            # 坑⑦防假 PASS）
+            "mean_fused": _mean_fused,
         }
 
     def clear(self):
@@ -3261,6 +4544,20 @@ class TLIIndexer(TIAIndexer):
         # 前调用，残留会把上一请求的 k_min/k_max/k_avg/k_qat 前缀带入新
         # 请求（k append-only 契约跨请求不成立），新请求首步必须全量重建。
         self._inc = None
+        # 【E152v4】graph 持久 buffer 同门失效：clear() 是请求边界标记
+        #（prefill 前每层调用）——新请求首步 decode 必须全量重建容量宽
+        # 常量 buffer。graph 步进路径（_tl_decode_batched_graph）不再每步
+        # clear（见 patch），否则 _ginc 每步失效退化为全量重建。
+        # 【E152v4-修复·根因】置 None 会让 dict 连同 k_min/k_max/k_avg/k_qat
+        # 最后一组 Python 引用死亡 → allocator 回收 → 已 capture 的图 kernel
+        # 仍持有旧指针（cross-repeat 复用图场景），后续大分配（新请求
+        # prefill 的 dyn cache）复用并覆写该内存 → replay 静默读写垃圾
+        #（e152v4 探针：repeat0 全对、repeat1 从中间层起 mask/KV 全错）。
+        # 改为软失效：保留 buffer 引用 + stale 标记；_prepare_index_graph
+        # 冷建分支对同形状旧 buffer 做 in-place 全量刷新（图地址稳定）。
+        _ginc = getattr(self, "_ginc", None)
+        if _ginc is not None:
+            _ginc["stale"] = True
 
     def get_block_size(self):
         return 1
@@ -3277,42 +4574,68 @@ if _HAS_TRITON:
 
     @triton.jit
     def _score_fine_kernel(
-        KQ, Q, OUT,   # KQ [T,Hkv,D] bf16；Q [H,D] fp32；OUT [H,T] out_dtype
+        KQ, Q, OUT, MOUT,
+        # KQ [T,Hkv,D] bf16；Q [H,D] fp32；OUT [H,T] out_dtype；
+        # MOUT [Hkv,T] out_dtype（GQA 组均值；HAS_MEAN=False 时传 OUT 占位不写）
         T, stride_kt, stride_kh, stride_qh, stride_oh, stride_ot,
+        stride_mh, stride_mt,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
+        HAS_MEAN: tl.constexpr,
     ):
         """GQA K 复用 score_fine：每 program 处理 (token 块 × 1 个 kv 头)，
-        K 块 [BT, D] 载入寄存器后循环 g 个 q 头逐头点积，K 读带宽 /g。"""
+        K 块 [BT, D] 载入寄存器后循环 g 个 q 头逐头点积，K 读带宽 /g。
+        【AKO iter-21】HAS_MEAN=true 时同趟写 GQA 组均值 [Hkv,T]：均值
+        必须按**落盘舍入值**（OUT 存的 out_dtype 位形）累加——消费端 torch
+        mean(dim) 读的就是这些位；升序 j=0..G-1 fp32 累加 + /G（pow2 精确除）
+        + RNE 收尾，与 PyTorch MeanOps 逐线程顺序归约同序（iter-11 /
+        E133c-A4 50 轮探针实证同口径，iter-21 探针按本 kernel 位形复验）。
+        NaN 语义 = torch mean 原样传播（不做 nan_to_num——与 softmax 输出
+        域的 _ako_gqa_mean_kernel 不同，本 kernel 分数域无 NaN 清洗）。"""
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
         offs_t = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_t = offs_t < T
+        if HAS_MEAN:
+            macc = tl.zeros((BT,), dtype=tl.float32)
         k = tl.load(KQ + offs_t[:, None] * stride_kt + pid_h * stride_kh + offs_d[None, :],
                     mask=mask_t[:, None], other=0.0).to(tl.float32)
         for j in tl.static_range(G):
             h = pid_h * G + j
             q = tl.load(Q + h * stride_qh + offs_d)      # [D] fp32（已乘 scale）
             s = tl.sum(k * q[None, :], axis=1)            # [BT] fp32
+            s_o = s.to(OUT.dtype.element_ty)
             tl.store(OUT + h * stride_oh + offs_t * stride_ot,
-                     s.to(OUT.dtype.element_ty), mask=mask_t)
+                     s_o, mask=mask_t)
+            if HAS_MEAN:
+                macc += s_o.to(tl.float32)
+        if HAS_MEAN:
+            tl.store(MOUT + pid_h * stride_mh + offs_t * stride_mt,
+                     (macc / G).to(MOUT.dtype.element_ty), mask=mask_t)
 
     @triton.jit
     def _score_coarse_kernel(
-        KMIN, KMAX, Q, OUT,   # KMIN/KMAX [T,Hkv,D] bf16；Q [H,D] fp32；OUT [H,T]
+        KMIN, KMAX, Q, OUT, MOUT,
+        # KMIN/KMAX [T,Hkv,D] bf16；Q [H,D] fp32；OUT [H,T]；
+        # MOUT [Hkv,T]（GQA 组均值；HAS_MEAN=False 时传 OUT 占位不写）
         T, stride_kt, stride_kh, stride_kt2, stride_kh2,
-        stride_qh, stride_oh, stride_ot,
+        stride_qh, stride_oh, stride_ot, stride_mh, stride_mt,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
+        HAS_MEAN: tl.constexpr,
     ):
         """【iter8】GQA K 复用 coarse minmax 上界分（min/max 两份 K 独立
         stride）：s[h,t] = Σ_d min(q,0)·k_min + Σ_d max(q,0)·k_max（负部配
         k_min、正部配 k_max，与原版 clamp 双 einsum 数学等价）。K 块
-        [BT,D] 寄存器复用服务 g 个 q 头（读带宽 /g，免 repeat 物化）。"""
+        [BT,D] 寄存器复用服务 g 个 q 头（读带宽 /g，免 repeat 物化）。
+        【AKO iter-21】HAS_MEAN=true 同趟写 GQA 组均值——按落盘舍入值累加
+        （等价性口径同 _score_fine_kernel 注释，iter-21 探针复验）。"""
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
         offs_t = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_t = offs_t < T
+        if HAS_MEAN:
+            macc = tl.zeros((BT,), dtype=tl.float32)
         kmin = tl.load(KMIN + offs_t[:, None] * stride_kt + pid_h * stride_kh
                        + offs_d[None, :],
                        mask=mask_t[:, None], other=0.0).to(tl.float32)   # [BT, D]
@@ -3325,8 +4648,14 @@ if _HAS_TRITON:
             q_low = tl.minimum(q, 0.0)                   # clamp(max=0)：负部 → k_min
             q_high = tl.maximum(q, 0.0)                  # clamp(min=0)：正部 → k_max
             s = tl.sum(kmin * q_low[None, :], axis=1) + tl.sum(kmax * q_high[None, :], axis=1)
+            s_o = s.to(OUT.dtype.element_ty)
             tl.store(OUT + h * stride_oh + offs_t * stride_ot,
-                     s.to(OUT.dtype.element_ty), mask=mask_t)
+                     s_o, mask=mask_t)
+            if HAS_MEAN:
+                macc += s_o.to(tl.float32)
+        if HAS_MEAN:
+            tl.store(MOUT + pid_h * stride_mh + offs_t * stride_mt,
+                     (macc / G).to(MOUT.dtype.element_ty), mask=mask_t)
 
     @triton.jit
     def _score_fine_cand_kernel(
@@ -3490,3 +4819,348 @@ if _HAS_TRITON:
         tl.store(OUT + (lo + offs_t)[:, None] * stride_ot + h * stride_oh
                  + offs_d[None, :], out.to(tl.bfloat16),
                  mask=mask_t[:, None])
+
+    @triton.jit
+    def _ako_rebuild_scatter_kernel(
+        CAND, SF, BLK, CLEN, OUT, DUMMY,
+        # CAND [Hkv,R] int64（候选 token 绝对位，kv 空间组内行恒同）；
+        # SF [H,R] bf16（候选分，q-head 空间）；
+        # BLK [Hkv,kt] bool（L1 块掩码快照）；CLEN [Hkv] int64（行实长）；
+        # OUT [H,W] bf16（-inf 预填充连续重建目标，iter-8 哨兵列退役）；
+        # DUMMY [H,1] bf16（无效槽牺牲位，内容永不读）
+        R, total, W, S_real, bs_c, kt_c, g,
+        stride_sfh, stride_sfr, stride_ch, stride_cr,
+        stride_blh, stride_blk,
+        BLOCK: tl.constexpr,
+    ):
+        """【AKO iter-5】fused 哨兵重建融合 kernel：单 launch 内完成
+        keep 链（r<cand_len & 块掩码查表 & token<S_real）+ 无效槽路由 +
+        候选分 scatter。纯整数/布尔/拷贝语义，无浮点归约参与，与 iter-4
+        的 arange+compare+and+div+clamp+index_select+gather+where+
+        scatter_ 九 kernel 链逐位等价（重复索引同值幂等）。
+        【AKO iter-8】哨兵列（[W+1] 尾列路由+切片）退役：keep 槽直写
+        [H,W] 连续目标（同值同址），无效槽写牺牲位 DUMMY[h]（重复地址
+        竞写、内容丢弃，可见域零影响）→ 重建输出逐位同旧且连续，
+        softmax 免 strided 切片触发的 contiguous clone。"""
+        pid = tl.program_id(0)
+        offs = pid * BLOCK + tl.arange(0, BLOCK)
+        m = offs < total
+        h = offs // R
+        r = offs - h * R
+        # 【AKO iter-20】CAND/CLEN 为 kv-head 空间（组内行恒同）→ 行
+        # 地址 h//g 折叠；BLK 查表同折叠，三者一致免 q-head 物化。
+        kv = h // g
+        idx = tl.load(CAND + kv * stride_ch + r * stride_cr, mask=m, other=0)
+        cl = tl.load(CLEN + kv, mask=m, other=0)
+        keep = (r < cl) & (idx < S_real)
+        bid = tl.minimum(idx // bs_c, kt_c - 1)
+        bkeep = tl.load(BLK + (h // g) * stride_blh + bid * stride_blk,
+                        mask=m, other=0)
+        keep = keep & (bkeep != 0)
+        val = tl.load(SF + h * stride_sfh + r * stride_sfr,
+                      mask=m, other=float("-inf"))
+        tl.store(OUT + h * W + idx, val, mask=m & keep)
+        tl.store(DUMMY + h, val, mask=m & (~keep))
+
+    @triton.jit
+    def _ako_l1_sort_kernel(
+        BLK, OUT,
+        # BLK [R_l,nb] int64（L1 块号，topk 产出互异整数）；
+        # OUT [R_l,nb] int64（升序排序输出）
+        nb, stride_b, stride_o,
+        NB_POW2: tl.constexpr,
+    ):
+        """【AKO iter-9】L1 块号行内升序排序：块号互异整数 → 升序唯一
+        → tl.sort 与 torch.sort 逐位恒等（互异值排序无 tie，探针 200/200
+        验证含哨兵 pad）。nb 非 2 幂时哨兵 1<<30（> 任何真实块号）pad 排
+        尾，store 只写前 nb 个实块。每行一个 program，纯整数排序无浮点。"""
+        r = tl.program_id(0)
+        o = tl.arange(0, NB_POW2)
+        v = tl.load(BLK + r * stride_b + o, mask=o < nb, other=1 << 30)
+        tl.store(OUT + r * stride_o + o, tl.sort(v), mask=o < nb)
+
+    @triton.jit
+    def _ako_cand_sort_kernel(
+        IALL, SCR, CNT,
+        # IALL [Hkv,n_l1] int64（L1 topk 块号互异）；SCR [Hkv,NB_POW2]
+        # int64（升序输出）；CNT [Hkv] int64（每 head 有效 L1 token 数）
+        # 【AKO iter-22】bypass 块号 b0/b1 标量化（n_bp ≤ 2 wrapper 门禁），
+        # 消 bp as_tensor H2D；-1 哨兵臂 mask 恒假不进 v。
+        n_l1, n_bp, b0, b1, s_r, bs,
+        stride_ia, stride_sc,
+        NB_POW2: tl.constexpr,
+    ):
+        """【AKO iter-17 K1】候选构建 per-head 排序 + cnt 归约（消
+        torch.sort ~26us + bypass cat + clamp.sum 3 处 aten 调用）。
+        行内 L1 ∪ bypass 合并升序排序：哨兵 1<<30 pad 尾（互异块号无
+        tie → tl.sort 与 torch.sort 逐位恒等，iter-9 同构）；cnt =
+        Σ_b clamp(s_r−b·bs, 0, bs)，哨兵项恒 0（s_r−(1<<30)·bs ≪ 0）。
+        纯整数域无浮点 → 与 iter-16 torch 链逐位恒等。"""
+        h = tl.program_id(0)
+        o = tl.arange(0, NB_POW2)
+        BIG = 1 << 30
+        v1 = tl.load(IALL + h * stride_ia + o, mask=o < n_l1, other=BIG)
+        # bypass 段标量直选（iter-22）：o==n_l1 → b0、o==n_l1+1 → b1，
+        # n_bp 门（o < n_l1+n_bp）外一律哨兵——与旧 BP 指针 masked load
+        # 逐位同值（bypass 块号 < kt ≪ BIG）
+        v2 = tl.where(o < n_l1 + n_bp,
+                      tl.where(o == n_l1, b0, b1), BIG)
+        v = tl.where(o < n_l1, v1, v2)
+        vs = tl.sort(v)
+        nb = n_l1 + n_bp
+        tl.store(SCR + h * stride_sc + o, vs, mask=o < nb)
+        contrib = tl.minimum(tl.maximum(s_r - vs * bs, 0), bs)
+        tl.store(CNT + h, tl.sum(contrib))
+
+    @triton.jit
+    def _ako_cand_build_kernel(
+        SCR, CNT, CAND,
+        # SCR [Hkv,NB_POW2] int64（K1 升序块号）；CNT [Hkv] int64；
+        # CAND [Hkv,R_max] int64（输出候选行）
+        # 【AKO iter-22】共享段下沉：SH [M] 指针 → 4 段 (lo,w) 标量
+        # （bypass×2 + sink + swa，段序 = 旧 torch cat 程序序），段内
+        # token = lo + (k−段前缀宽)，全 host 已知宽度，免 arange×4 +
+        # cat + as_tensor H2D。逐位恒等：标量段算术 ≡ arange(lo,lo+w)
+        # 连接（纯整数域）。
+        nb, bs, M, R_max,
+        lo0, w0, lo1, w1, lo2, w2, lo3, w3,
+        stride_sc, stride_cd,
+        BLOCK: tl.constexpr,
+    ):
+        """【AKO iter-17 K2】候选行装配单趟化（消 arange(bs) 展开 + 直填
+        copy + shared index_put_ + zeros fill ≈ 10 launch）。列语义与
+        iter-16 torch 链程序序恒等：
+          j < cnt                → L1 token（升序前缀）
+          cnt ≤ j < cnt+M        → 共享段 token（覆盖 L1 pad 尾段，同旧
+                                  index_put 列区间）
+          其余 j < nb·bs         → L1 token（截断块尾值原样保留，旧直填
+                                  语义；cand_len 门控下不可见）
+          其余                   → 0（旧 new_zeros 语义）
+        单列单写无同址序问题；2D grid (Hkv, cdiv(R_max,BLOCK)) 消 8 CTA
+        低占用（iter-14 教训）。"""
+        h = tl.program_id(0)
+        c = tl.program_id(1)
+        j = c * BLOCK + tl.arange(0, BLOCK)
+        m_j = j < R_max
+        cnt = tl.load(CNT + h)
+        nbbs = nb * bs
+        in_l1 = j < nbbs
+        b = j // bs
+        blkv = tl.load(SCR + h * stride_sc + b, mask=in_l1, other=0)
+        l1t = blkv * bs + (j - b * bs)
+        in_sh = (j >= cnt) & (j < cnt + M)
+        k = j - cnt
+        c0 = w0
+        c1 = c0 + w1
+        c2 = c1 + w2
+        sht = tl.where(k < c0, lo0 + k,
+                       tl.where(k < c1, lo1 + (k - c0),
+                                tl.where(k < c2, lo2 + (k - c1),
+                                         lo3 + (k - c2))))
+        val = tl.where(in_sh, sht, tl.where(in_l1, l1t, 0))
+        tl.store(CAND + h * stride_cd + j, val, mask=m_j)
+
+    @triton.jit
+    def _ako_topk_mask_kernel(
+        IND, OUT,
+        # IND [.., heads, K] int64（topk 块索引）；OUT [heads, kt] bool
+        K, kt, b0, b1,
+        stride_ind_h, stride_ind_k, stride_out_h,
+        BLOCK: tl.constexpr,
+    ):
+        """【AKO iter-19】topk_mask 装配单趟化：zeros_like fill + scatter_
+        + ones_like fill + bypass setitem ×2 ≈ 5 launch → 1。纯 bool/整数
+        域，与 torch 装配程序序恒等：全 False 基座 + 索引/bypass 位置置
+        True（topk 索引互异、bypass 与池收缩后索引不相交 → 无位置竞争；
+        barrier 保证基座 False 先于 True 可见——_ako_l2_mask_kernel
+        iter-14 同款已验证模式）。K ≤ 128（bypass ≤ 2，-1 哨兵）由
+        wrapper 门禁，超界回退 torch 装配链。"""
+        h = tl.program_id(0)
+        c = tl.program_id(1)
+        o = c * BLOCK + tl.arange(0, BLOCK)
+        tl.store(OUT + h * stride_out_h + o,
+                 tl.zeros([BLOCK], dtype=tl.int1), mask=o < kt)
+        tl.debug_barrier()
+        j = tl.arange(0, 128)
+        m_j = j < K
+        idx = tl.load(IND + h * stride_ind_h + j * stride_ind_k,
+                      mask=m_j, other=-1)
+        pos = idx - c * BLOCK
+        hit = m_j & (pos >= 0) & (pos < BLOCK)
+        # 地址用绝对列 idx（hit 保证 idx 落在本 CTA 列区间 c*BLOCK+pos）
+        tl.store(OUT + h * stride_out_h + idx, tl.full([128], 1, tl.int1),
+                 mask=hit)
+        # bypass 块：条件折叠进 mask（-1 哨兵恒假），免 scalar-if 控制流
+        tl.store(OUT + h * stride_out_h + o, tl.full([BLOCK], 1, tl.int1),
+                 mask=(b0 >= 0) & (o == b0))
+        tl.store(OUT + h * stride_out_h + o, tl.full([BLOCK], 1, tl.int1),
+                 mask=(b1 >= 0) & (o == b1))
+
+    @triton.jit
+    def _ako_l2_mask_kernel(
+        CIF, SELF, CIN, SELN, OUT,
+        # CIF/CIN [R,R_cand] int64（候选 token 绝对位，连续）；
+        # SELF/SELN [R,kf]/[R,kn] int64（cand_p topk 的行内选择位）；
+        # OUT [R,W] bool（全宽 L2 mask）
+        kf, kn, scf, scn, W, sink, swa_lo, s_real,
+        KF_POW2: tl.constexpr, KN_POW2: tl.constexpr,
+        BLOCK: tl.constexpr,
+    ):
+        """【AKO iter-10】L2 mask 装配尾部单趟化：back-gather（cand_idx
+        .gather(sel)×2）+ zeros 填充 + 2× scatter_ + sink/swa 强制区
+        5+2 kernel → 1 launch。纯整数/幂等 bool 置位语义（同址重复写
+        同值 True）→ 与旧 torch 链逐位恒等；哨兵 t=W 落界外由 store
+        mask 截断。探针 4 形状（含 kn=0 / sink=0 / 非 2 幂 W）对拍全 PASS。
+        【AKO iter-14】2D grid (R, cdiv(W, BLOCK)) 化——旧 1D grid (R,)
+        每行一 program 串行扫 W/BLOCK 个切片，R=8 行时仅 8 CTA 低占用；
+        2D 化后每 program：① 写本切片基座（w<sink | swa_lo≤w<s_real →
+        True），切片不相交覆盖全 w<W；② tl.debug_barrier()（__syncthreads
+        CTA 内全局写序：base 写先于 scatter 写可见）；③ far/near 散置
+        scatter 的 store mask 加 (t≥lo_s)&(t<lo_s+BLOCK) 只写落本切片
+        的目标 → 每地址恰被一个 program 写 base、同 program barrier 后
+        写 scatter True → 与旧单 program「先 base 后 scatter」程序序逐位
+        恒等，零跨 CTA 同址写。探针 5 形状 ×3 重复对拍全 PASS。"""
+        h = tl.program_id(0)
+        c = tl.program_id(1)
+        w = c * BLOCK + tl.arange(0, BLOCK)
+        v = (w < sink) | ((w >= swa_lo) & (w < s_real))
+        tl.store(OUT + h * W + w, v, mask=w < W)
+        tl.debug_barrier()
+        lo_s = c * BLOCK
+        o = tl.arange(0, KF_POW2)
+        mk = o < kf
+        s = tl.load(SELF + h * kf + o, mask=mk, other=0)
+        t = tl.load(CIF + h * scf + s, mask=mk, other=W)
+        in_f = mk & (t < W) & (t >= lo_s) & (t < lo_s + BLOCK)
+        tl.store(OUT + h * W + t, True, mask=in_f)
+        o2 = tl.arange(0, KN_POW2)
+        mn = o2 < kn
+        s2 = tl.load(SELN + h * kn + o2, mask=mn, other=0)
+        t2 = tl.load(CIN + h * scn + s2, mask=mn, other=W)
+        in_n = mn & (t2 < W) & (t2 >= lo_s) & (t2 < lo_s + BLOCK)
+        tl.store(OUT + h * W + t2, True, mask=in_n)
+
+    @triton.jit
+    def _ako_gqa_mean_kernel(
+        IN, OUT,
+        # IN [R*G, W] bf16 连续（softmax 输出）；OUT [R, W] bf16（GQA 组均值）
+        W,
+        swa_lo, s_real,
+        G: tl.constexpr, BLOCK: tl.constexpr,
+    ):
+        """【AKO iter-11】softmax 输出 nan_to_num + GQA 组 mean 单趟融合
+        （2 kernel + strided reduce ~12us → 1 kernel）。等价性：v!=v → 0
+        与 nan_to_num(nan=0) 同（softmax 输出域 [0,1]∪{NaN}，无 ±inf 支路）；
+        bf16→fp32 精确，g 维 fp32 顺序累加（g=0..G-1 内存序）与 PyTorch
+        MeanOps 逐线程顺序归约同序；G 为 2 的幂 → 1/G 精确（除法无舍入）；
+        fp32→bf16 RNE 收尾同。per_q_head / G 非 2 幂 / 非连续回退 torch 链
+        逐位不变。
+        【AKO iter-13】swa 强制区折叠：swa_lo≤w<s_real 位直写 1.0（旧
+        路径为 mean 后独立 setitem fill 覆写 [max(0,S_real-swa_tok),
+        S_real)=1.0 → 强制区位恒 1.0 与 fill 值逐位同（bf16(1.0) 精确）；
+        padding 段 w≥s_real 两路均为 mean（fill 从未触及）→ 逐位恒等）。
+        非 host int 几何由调用方传 (0,0)（forced 恒空）+ 保留旧 fill 行
+        fail-closed。"""
+        h = tl.program_id(0)
+        w = tl.program_id(1) * BLOCK + tl.arange(0, BLOCK)
+        m = w < W
+        acc = tl.zeros((BLOCK,), dtype=tl.float32)
+        for g in range(G):
+            v = tl.load(IN + (h * G + g) * W + w, mask=m, other=0.0).to(tl.float32)
+            v = tl.where(v != v, 0.0, v)
+            acc += v
+        val = (acc / G).to(tl.bfloat16)
+        forced = (w >= swa_lo) & (w < s_real)
+        val = tl.where(forced, 1.0, val)
+        tl.store(OUT + h * W + w, val, mask=m)
+
+    @triton.jit
+    def _ako_cand_expand_kernel(
+        BLK, P, IDX, OUT,
+        # BLK [R_l,nb] int64（升序排序后的 L1 块号）；P [R_l,S_w]（softmax
+        # 概率行）；IDX/OUT [R_l,R_cand]（候选 token 绝对位 / 对应 p 值）
+        R_cand, nb, S_w,
+        ba_lo, ba_hi, bb_lo, bb_hi,
+        stride_b, stride_p, stride_i, stride_o,
+        BS: tl.constexpr, BLOCK: tl.constexpr,
+    ):
+        """【AKO iter-7】候选域展开融合 kernel：单 launch 完成块升序展开
+        （tok = BLK[j]·BS + o）× bypass 段拼接（≤2 段、宿主序=旧 cat 序、
+        段内升序）× p.gather。纯整数/拷贝语义、无浮点参与，与 mul+add+
+        arange+cat+gather 五 kernel 链逐位等价（输出布局逐位一致 →
+        cand_p 逐位一致 → 下游 topk tie-break 逐位不变）。"""
+        r = tl.program_id(0)
+        c = tl.program_id(1)
+        offs = c * BLOCK + tl.arange(0, BLOCK)
+        m = offs < R_cand
+        nbb = nb * BS
+        is_byp = offs >= nbb
+        in_exp = m & ~is_byp
+        # ---- 展开区：j = offs // BS, o = offs % BS ----
+        j = offs // BS
+        o = offs - j * BS
+        blk = tl.load(BLK + r * stride_b + j, mask=in_exp, other=0)
+        tok = blk * BS + o
+        # ---- bypass 区：段 a→b（宿主序），段内升序 ----
+        rb = offs - nbb
+        len_a = ba_hi - ba_lo
+        len_ab = len_a + (bb_hi - bb_lo)
+        in_byp = m & is_byp & (rb < len_ab)
+        tok_byp = tl.where(rb < len_a, ba_lo + rb,
+                           bb_lo + rb - len_a).to(tl.int64)
+        tok = tl.where(is_byp, tok_byp, tok)
+        # ---- 界内统一 load/store（展开 tok/ bypass tok 均构造性 < S_w）----
+        mm = in_exp | in_byp
+        v = tl.load(P + r * stride_p + tok, mask=mm, other=0)
+        tl.store(IDX + r * stride_i + offs, tok, mask=mm)
+        tl.store(OUT + r * stride_o + offs, v, mask=mm)
+
+    @triton.jit
+    def _ako_cand_expand_sort_kernel(
+        BLK, P, IDX, OUT,
+        # BLK [R_l,nb] int64（未排序 L1 块号，互异）；P [R_l,S_w]；
+        # IDX/OUT [R_l,R_cand]（候选 token 绝对位 / 对应 p 值）
+        R_cand, nb, S_w,
+        ba_lo, ba_hi, bb_lo, bb_hi,
+        stride_p,
+        BS: tl.constexpr, NB_POW2: tl.constexpr, BLOCK: tl.constexpr,
+    ):
+        """【AKO iter-15】iter-9 `_ako_l1_sort_kernel` + iter-7
+        `_ako_cand_expand_kernel` 融合（每池 2 launch → 1）：每列切片
+        program 冗余 load 本行未排序块号（mask 补哨兵 1<<30 pad NB_POW2）
+        → tl.sort 升序（互异块号升序唯一 → 与独立 kernel 写回的
+        sorted blk 逐位恒等）→ tl.gather 寄存器动态取 BLK[j]（j =
+        offs//BS 先 clamp nb-1：in_exp lane 构造性 j≤nb-1 不受影响；
+        bypass lane j≥nb 的 gather 越界防 → 该 lane blk 值被 tok_byp
+        覆写不可见）→ 展开/bypass 拼接/p.gather 与 iter-7 kernel 逐字
+        同构。纯整数/拷贝语义零浮点参与。NB_POW2<2 退化（nb=1）不进
+        本 kernel（调用方守卫，tl.sort 单元素编译 bug 回避）。冗余排序
+        为纯寄存器 bitonic（NB_POW2≤256），列切片间并行吸收。"""
+        r = tl.program_id(0)
+        c = tl.program_id(1)
+        # ---- 冗余排序段：本行升序块号进寄存器 ----
+        ob = tl.arange(0, NB_POW2)
+        row = tl.load(BLK + r * nb + ob, mask=ob < nb, other=1 << 30)
+        row = tl.sort(row)
+        # ---- 展开段（iter-7 同构）----
+        offs = c * BLOCK + tl.arange(0, BLOCK)
+        m = offs < R_cand
+        nbb = nb * BS
+        is_byp = offs >= nbb
+        in_exp = m & ~is_byp
+        j = offs // BS
+        j = tl.minimum(j, nb - 1)
+        o = offs - j * BS
+        blk = tl.gather(row, j, 0)
+        tok = blk * BS + o
+        rb = offs - nbb
+        len_a = ba_hi - ba_lo
+        len_ab = len_a + (bb_hi - bb_lo)
+        in_byp = m & is_byp & (rb < len_ab)
+        tok_byp = tl.where(rb < len_a, ba_lo + rb,
+                           bb_lo + rb - len_a).to(tl.int64)
+        tok = tl.where(is_byp, tok_byp, tok)
+        mm = in_exp | in_byp
+        v = tl.load(P + r * stride_p + tok, mask=mm, other=0)
+        tl.store(IDX + r * R_cand + offs, tok, mask=mm)
+        tl.store(OUT + r * R_cand + offs, v, mask=mm)

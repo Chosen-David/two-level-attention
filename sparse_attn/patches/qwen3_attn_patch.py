@@ -63,41 +63,152 @@ def _can_drop_static_mask(cache, mask, length, *, prefill):
     return valid
 
 
+# 【阶段 2c-5】capture 期常量张量缓存：torch.tensor([...], device=) 是
+# host→device 拷贝，CUDA Graph capture 内禁止（"operation not permitted
+# when stream is capturing"）→ 首调（warmup，capture 之外）构建后复用。
+# key 只用 Python 值（device 字符串/S_cap），避免任何 tensor 读回同步。
+_GRAPH_CONST_CACHE = {}
+
+
+def _graph_const(key, build):
+    t = _GRAPH_CONST_CACHE.get(key)
+    if t is None:
+        t = build()
+        _GRAPH_CONST_CACHE[key] = t
+    return t
+
+
+def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
+    """【阶段 2c-4】graph 数据通路版 batch decode（全 tensor、无 host 分支）。
+
+    与 staged 路径（`_tl_decode_batched`）的唯一区别在「动态几何如何取」：
+      - staged：mask 由 prepare_mask(valid_length=L_b) 产生，L_b 是 Python
+        int（capture 时会被烘焙 → replay 陈旧，不可图化）；
+      - graph：mask 由 compute_mask_graph 从 valid_len tensor 派生（每行
+        prepare_index 容量宽一次 → 全部块统计/k_qat 就绪），attn gather
+        不传 valid_length（只消费 mask）。
+
+    于是整步 forward 里所有步间变化量（KV 内容 / valid_len）均由 tensor
+    内容承载 → 可 capture 一次 + replay 循环 copy_ 注入（2c-5）。
+
+    逐位一致性：mask ≡ staged prepare_mask 的有效区（G8 门禁 tail/full×
+    8 几何逐位）；attn 归约集合 ≡（gather 路径 valid_length 不参与，
+    T≥16K 走 Triton / T<16K 走 dense，pad 列由 mask False 排除）。
+    """
+    B = q.shape[0]
+    dev = q.device
+    S_cap = k.shape[1]
+    vl = gs.valid_len_buf
+    if vl is None or vl.numel() != B:
+        vl = torch.zeros(B, dtype=torch.long, device=dev)
+        gs.valid_len_buf = vl
+    cu = _graph_const(("cu_cap", str(dev), S_cap),
+                      lambda: torch.tensor([0, S_cap], device=dev,
+                                           dtype=torch.int32))
+    masks = []
+    for b in range(B):
+        # 【E152v4】不再每步 clear()：clear 是请求边界标记（prefill 前每层
+        # 调用，失效 _inc/_ginc → 新请求首步全量重建）。graph 步进下每步
+        # clear 会把 _ginc 持久容量宽 buffer 一起失效 → 退化回每步
+        # _prepare_index_base 容量宽全量重建（with_stack 归因 ~15ms/步
+        # 36 层 index 税）。prepare_index 内部在 cuda_graph_state 模式下
+        # 分发到 pos_buf 驱动的增量更新（单块统计 + 单行 k_qat，固定形状
+        # 纯张量 op，capture 安全）；不兼容配置自动回退全量路径（fail-
+        # closed，行为逐位不变）。
+        idx_dict = indexer.prepare_index(k[b:b + 1], cu)
+        masks.append(indexer.compute_mask_graph(
+            q[b:b + 1], idx_dict, self.scaling, vl[b:b + 1]))
+    m_b = torch.cat(masks, dim=0)              # [B,1,Hkv,S_cap] bool
+    cu_b = torch.arange(B + 1, device=dev, dtype=torch.int32) * S_cap
+    # valid_length=None：mask 已排除 pad 列（prepare_mask 末尾清 False 的
+    # graph 等价物是 compute_mask_graph 的 `sel & (ar_tok < S_real)`）。
+    return eager_decoding_attn(
+        q, k, v, m_b, 1, cu_b, softmax_scale=self.scaling, valid_length=None)
+
+
 def _tl_decode_batched(self, indexer, query_states, key_states,
                        value_states, ctx):
-    """【阶段 1】TLI batch>1 稀疏 decode（deepseek 轨，正确性优先版）。
+    """【阶段 2a】TLI batch>1 固定宽度稀疏 decode（有效在前 left-pad KV 布局）。
 
-    right-pad KV 布局（pred_ruler_batch left-pad 协议）：cache 行 b 的
-    有效 KV 占尾部 ctx.seq_lens[b] 列、pad 前缀在前。逐行切有效列后
-    完全复用单序列 TLI 核心（prepare_mask + eager_decoding_attn），
-    共享 indexer clear + 全量重建——无跨行增量状态，行间互不污染。
-    全量 vs 单序列增量逐位一致（E133c：块统计/量化确定性归纳），故
-    B=1 batch 模式与旧单序列入口逐位一致（gate_bs1_equiv 依据）。
+    阶段 1 消费 DynamicCache 变长 KV（有效占尾、`-L_b:` 尾部切片）；阶段
+    2a 切换 TLIStaticCache 固定容量 S_cap（pred_ruler_batch 构建）：行 b
+    有效 KV 占 [0, L_b)、[L_b, S_cap) 为未写 pad 区（零）。逐行 b：
+      - k_b/v_b = k[b:b+1] 全宽 [1, S_cap, Hkv, D]（不再变长尾部切片）；
+      - cu = [0, S_cap]（固定）；pos = [L_b-1]（该 query 行内绝对位置）；
+      - prepare_mask(..., valid_length=L_b) → mask [1,1,Hkv,S_cap]，有效区
+        [0, L_b) 与变长路径逐位一致、pad 区全 False（E155e fixed_width
+        探针已证）；
+      - eager_decoding_attn：gather 路径只选中有效区（pad False 不选）、
+        cu 契约 [0,S_cap] 成立 → 输出与变长路径逐位一致（同 token 集、
+        同 q·k，归约顺序同）。固定 S_cap 形状 = CUDA Graph 前置。
+    全量 vs 单序列增量逐位一致（E133c 归纳）保持，B=1 batch 模式与旧
+    单序列入口逐位一致（gate_bs1_equiv 依据）。
 
-    形状流：query_states [B,H,1,D]（cache.update 后 head-first）→
-    q [B,1,H,D]；key/value_states [B,Hkv,S_total,D] → k/v
-    [B,S_total,Hkv,D]；逐行 b：q_b [1,1,H,D]、k_b/v_b [1,L_b,Hkv,D]、
-    cu=[0,L_b]、pos=[L_b-1]（该 query 行内绝对位置）。返回 [B,1,H,D]。
+    形状流：query_states [B,H,1,D] → q [B,1,H,D]；key/value_states
+    [B,Hkv,S_cap,D] → k/v [B,S_cap,Hkv,D]。返回 [B,1,H,D]。
+
+    【阶段 2b 批量张量化】B>1 且 block_size==1（TLI 生产 token 级 mask）时
+    走批量路径：逐行 prepare_mask（indexer 状态逐行，mask 内容与逐行路径
+    逐位相同）→ cat 成 [B,1,Hkv,S_cap] → 一次批量 eager_decoding_attn
+    （Triton 批量 kernel A/B 逐 (b,r) program 独立归约、仅 batch 维寻址，
+    与逐行单 query kernel 逐位一致——dbg_batch_kernel.py nd=0 硬证）。批量
+    eager 不传 valid_length：mask 已在 prepare_mask 统一清 pad 区
+    （base.prepare_mask L67 `mask[..., valid_length:]=False`），gather 只选
+    有效区，与逐行口径一致。cu_b = arange(B+1)*S_cap（固定全宽契约，kernel
+    A 逐行校验 cu[b]==b*T）。B==1 / block_size>1 保持逐行路径零扰动
+    （gate_bs1_equiv 铁律：batch=1 与旧单序列入口逐位一致）。
     """
     B = query_states.shape[0]
     q = query_states.transpose(1, 2)   # [B, 1, H, D]
-    k = key_states.transpose(1, 2)     # [B, S_total, Hkv, D]
-    v = value_states.transpose(1, 2)   # [B, S_total, Hkv, D]
+    k = key_states.transpose(1, 2)     # [B, S_cap, Hkv, D]
+    v = value_states.transpose(1, 2)   # [B, S_cap, Hkv, D]
     dev = q.device
-    outs = []
+    S_cap = k.shape[1]
+    # 【阶段 2c-4】graph 模式（pred_ruler_batch capture 窗口内）：动态几何
+    # 全走 tensor（valid_len_buf），无 Python int 烘焙。配置不支持
+    # compute_mask_graph（非生产主配置）时 fail-closed 关 graph + 回 staged
+    # 路径（capture 前的 warmup 阶段触发，之后两臂一致）。
+    from ..ops.cuda_graph_state import graph_state  # noqa: E402
+    _gs = graph_state()
+    if _gs.enabled:
+        try:
+            return _tl_decode_batched_graph(self, indexer, q, k, v, _gs)
+        except NotImplementedError:
+            _gs.enabled = False
+            print("[2c] compute_mask_graph 不支持当前配置 → 关闭 CUDA Graph，"
+                  "回退 staged 逐行路径", flush=True)
+    # 逐行 mask 准备（indexer 状态逐行，B>1 与 B==1 共用同一循环）——
+    # 阶段 2b 把 mask 收集起来，B>1 且 token 级时一次批量 eager。
+    masks = []
+    bs0 = None
     for b in range(B):
         L_b = ctx.seq_lens[b]
         q_b = q[b:b + 1]                    # [1, 1, H, D]
-        k_b = k[b:b + 1, -L_b:]             # [1, L_b, Hkv, D]
-        v_b = v[b:b + 1, -L_b:]             # [1, L_b, Hkv, D]
-        cu = torch.tensor([0, L_b], device=dev, dtype=torch.int32)
+        k_b = k[b:b + 1]                    # [1, S_cap, Hkv, D]（全宽，有效在前）
+        v_b = v[b:b + 1]                    # [1, S_cap, Hkv, D]
+        cu = torch.tensor([0, S_cap], device=dev, dtype=torch.int32)
         pos = torch.tensor([L_b - 1], device=dev, dtype=torch.long)
         indexer.clear()
         mask, block_size = indexer.prepare_mask(
-            q_b, pos, k_b, cu, softmax_scale=self.scaling)
+            q_b, pos, k_b, cu, softmax_scale=self.scaling, valid_length=L_b)
+        masks.append(mask)
+        bs0 = block_size
+    if B > 1 and bs0 == 1:
+        m_b = torch.cat(masks, dim=0)       # [B, 1, Hkv, S_cap]
+        cu_b = torch.arange(B + 1, device=dev, dtype=torch.int32) * S_cap
+        # valid_length 传逐行真实长 list（Triton 批量只消费 mask 忽略之；
+        # torch 批量回退的 dense 段逐行裁剪归约域 [0,L_b) → 与变长路径
+        # 逐位一致，防 pad 0 项参与归约树致 ULP 翻硬币）
+        return eager_decoding_attn(
+            q, k, v, m_b, bs0, cu_b, softmax_scale=self.scaling,
+            valid_length=ctx.seq_lens)
+    # B==1（gate_bs1_equiv 铁律）/ block_size>1 兜底：逐行单 query 路径
+    outs = []
+    for b in range(B):
+        cu = torch.tensor([0, S_cap], device=dev, dtype=torch.int32)
         outs.append(eager_decoding_attn(
-            q_b, k_b, v_b, mask, block_size, cu,
-            softmax_scale=self.scaling))
+            q[b:b + 1], k[b:b + 1], v[b:b + 1], masks[b], bs0, cu,
+            softmax_scale=self.scaling, valid_length=ctx.seq_lens[b]))
     return torch.cat(outs, dim=0)            # [B, 1, H, D]
 
 
@@ -136,26 +247,38 @@ def qwen3_attn_forward(
         capacity = past_key_values.get_max_cache_shape()
         is_static_cache = capacity is not None and capacity > 0
         if is_static_cache:
-            if (self.layer_idx == 0
-                    or getattr(past_key_values, "_tli_seq_len", None) is None):
-                if cache_position is not None:
-                    past_key_values._tli_seq_len = int(cache_position[-1]) + 1
-                else:
-                    past_key_values._tli_seq_len = past_key_values.get_seq_length(self.layer_idx)
-            _S = past_key_values._tli_seq_len
-            key_states = key_states[:, :, :_S, :]
-            value_states = value_states[:, :, :_S, :]
-            # 【E134-pre】prefill（q_len>1）期 contiguous 一次拷贝（每层
-            # ~69MB×2，~7ms 总量）：切片是静态缓冲的 strided view
-            # （head stride=cap·D≠S·D），pre 走 flash+enable_gqa 时 strided
-            # 布局属后端接受性灰区，规整化一次买确定性（真慢源是 mask 旁
-            # 路，见下方 _tli_pmask_ok 注释）。decode（q_len=1）不走 SDPA
-            # （eager_decoding_attn 自家 Triton kernel 吃 strided），
-            # 不拷贝零扰动。
-            if input_shape[1] > 1 and not key_states.is_contiguous():
-                key_states = key_states.contiguous()
-                value_states = value_states.contiguous()
-            cur_len = _S
+            # 【阶段 2a】batch decode（TLIStaticCache 固定容量、有效在前）：
+            # 全宽 [B, Hkv, S_cap, D] 直接透传不切片——_tl_decode_batched 用
+            # valid_length 区分有效区。cur_len 取 S_cap（恒 ≠1 → 正确落 decode
+            # 分支；L177 的 prefill 判定 `cur_len == input_shape[1]` 不误触发）。
+            # 单序列/非 batch 走下方原 E134-pre 变长切片（铁律零扰动）。
+            _ctx = batch_decode_ctx()
+            if _ctx is not None and input_shape[1] == 1:
+                if not key_states.is_contiguous():
+                    key_states = key_states.contiguous()
+                    value_states = value_states.contiguous()
+                cur_len = key_states.shape[-2]
+            else:
+                if (self.layer_idx == 0
+                        or getattr(past_key_values, "_tli_seq_len", None) is None):
+                    if cache_position is not None:
+                        past_key_values._tli_seq_len = int(cache_position[-1]) + 1
+                    else:
+                        past_key_values._tli_seq_len = past_key_values.get_seq_length(self.layer_idx)
+                _S = past_key_values._tli_seq_len
+                key_states = key_states[:, :, :_S, :]
+                value_states = value_states[:, :, :_S, :]
+                # 【E134-pre】prefill（q_len>1）期 contiguous 一次拷贝（每层
+                # ~69MB×2，~7ms 总量）：切片是静态缓冲的 strided view
+                # （head stride=cap·D≠S·D），pre 走 flash+enable_gqa 时 strided
+                # 布局属后端接受性灰区，规整化一次买确定性（真慢源是 mask 旁
+                # 路，见 _can_drop_static_mask 注释）。decode（q_len=1）不走
+                # SDPA（eager_decoding_attn 自家 Triton kernel 吃 strided），
+                # 不拷贝零扰动。
+                if input_shape[1] > 1 and not key_states.is_contiguous():
+                    key_states = key_states.contiguous()
+                    value_states = value_states.contiguous()
+                cur_len = _S
         else:
             cur_len = past_key_values.get_seq_length(self.layer_idx)
 

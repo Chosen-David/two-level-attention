@@ -424,6 +424,13 @@ def resolve_treatment_snapshot(args):
             elif isinstance(v, str) and v.strip().lower() == "off":
                 v = None
         manifest[f] = v
+    # 【E155e 回退（主 AI 审计 2026-10-21）】tli_indexer.py __init__ 无
+    # 隐式注入分支（缺省主路径 = legacy 单池，α/β/γ 归一 0/0/1）——
+    # manifest 侧的镜像注入若保留会记 nb32/ntoff/nl4096 而实际跑单池
+    # （文件名声称冠军几何、行为是单池，E155c 同型身份失配）。已删；
+    # manifest 记 _TREATMENT_FIELD_DEFAULTS 缺省 None/None/None，与
+    # 运行时逐位一致。若未来恢复隐式注入，必须 indexer/arguments/info
+    # 三处同改同测。
     # ---- E155e：vendor 参数按 method 条件入 manifest ----
     # tli/none/tia/twi/quest 不进本分支 → manifest 逐位不变（E155d 在飞
     # 网格与全部 tli hash 锚点稳定）。vendor 方法登记 method 键 + 该
