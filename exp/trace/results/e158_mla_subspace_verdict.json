@@ -93,5 +93,13 @@
   "4_best_96d_arm": "rope64+nope32(rope64_nope32hi)=0.905 vs full192=0.939 — 96/192 维保持 96.4% 检索质量",
   "5_vs_rope64_only": "rope64=0.861 -> +nope32=0.905: nope32 补齐 rope 单独的深层缺口(L12 0.822->0.945)"
  },
- "design_conclusion": "MLA 子空间设计 = rope 全 64 维(低频主导) + nope 任选 32 维(冗余, 前/后/random 均可)。96 维达 full192 的 95%+ 检索质量, 相比 rope-only(E142a 生产口径 96.7%/93.8% 保留) 是免费增益, 在 L12/L16 深层显著补强。数学设计文档(e158_math_design.md)未产出, 结论由实证 trace 直接支撑。"
+ "design_conclusion": "MLA 子空间设计 = rope 全 64 维（低频主导）+ nope 任选 32 维（冗余, 前/后/random 均可）。96 维达 full192 的 96.4% 检索质量, 相比 rope-only（E142a 生产口径 e2e 保留 96.7%/93.8%）是免费增益方向, 在 L12/L16 深层显著补强（L12 worst query .371→.761 翻倍）。最低 32 维预算时 rope_lowfreq32 是唯一可行单臂；64 维组合（lowfreq32+nope32）未测, 列 next。数学设计见 exp/trace/e158_math_design.md。e2e 兑现验证 = E158b（对齐 E142a 协议）。",
+ "math_design_doc": "exp/trace/e158_math_design.md（频率->维度映射从 pinned 源码推导 + 数据回写）",
+ "probe": "agent_doc/guide/paper_figs/trace/e158_mla_subspace_probe.py（E141b caliber 逐项不变，扩 11 臂；单元测试 mix≡full、rope_sub≡rope 等代数恒等式 max|Δ|=0 全过）",
+ "key_numbers": {
+  "rope_lowfreq32_vs_rope64": "100.5%（.8650 vs .8605 页召回持平）— rope 选择信号几乎全部住在低频半段",
+  "L12_worst_query": "混合臂 .761 vs rope64 .371 — 内容主导层上混合设计把最差 query 保留质量翻倍",
+  "highfreq_vs_lowfreq": "高频臂 .258 vs 低频臂 .865 — 3.4 倍频谱分离, 块级 avg 池化 sinc 衰减理论直接实证"
+ },
+ "honest_disclosure": "E158 锚臂相对 E141b 绝对值系统性 +.03~+.09（15 格全同向）, 但 P 分布逐位复现（sink 质量四层全同至 4 位小数）且相对序 100% 保持 — 偏移源于 E141b 实跑探针版本（源码未存档）的口径差异, 跨代码态绝对值不混用；本判决全部基于单次运行内部 11 臂同 caliber 对比, 不受影响。"
 }
