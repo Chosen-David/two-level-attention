@@ -31,6 +31,11 @@ def make_index(mode):
 
 class PrefillSigmaCapacityTest(unittest.TestCase):
     def setUp(self):
+        # These fixtures allocate CPU tensors only. CPU-only Torch cannot
+        # query CUDA stream capture; indexing/scoring/masks remain real.
+        capture = patch('torch.cuda.is_current_stream_capturing', return_value=False)
+        capture.start()
+        self.addCleanup(capture.stop)
         self.addCleanup(torch.set_num_threads, torch.get_num_threads())
         torch.set_num_threads(1)
 
@@ -105,3 +110,4 @@ class PrefillSigmaCapacityTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

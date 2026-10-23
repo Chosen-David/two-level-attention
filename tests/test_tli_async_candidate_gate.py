@@ -22,7 +22,7 @@ class AsyncCandidateGateTests(unittest.TestCase):
     def invoke(self, *, valid_length=13, **options):
         calls = []
 
-        def select(_coarse, _average, length):
+        def select(_coarse, _average, length, *, sc_mean=None, sc_avg_mean=None):
             calls.append(length)
             raise RuntimeError('probe stops before tensor operations')
 
@@ -36,7 +36,7 @@ class AsyncCandidateGateTests(unittest.TestCase):
         result = production_helper()(indexer, object(), None,
                                      SimpleNamespace(shape=(1, 16, 2, 4)),
                                      object(), valid_length)
-        self.assertEqual(result, (None, None, None))
+        self.assertEqual(result, (None, None, None, None))
         self.assertIs(indexer.prev_mask, previous)
         return calls
 
@@ -60,3 +60,4 @@ class AsyncCandidateGateTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
