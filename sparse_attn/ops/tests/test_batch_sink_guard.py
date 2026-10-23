@@ -31,6 +31,13 @@ def gate_index(sink):
 
 
 class BatchSinkGuardTest(unittest.TestCase):
+    def setUp(self):
+        # These fixtures allocate CPU tensors only. CPU-only Torch cannot
+        # query CUDA stream capture; indexing/scoring/masks remain real.
+        capture = patch('torch.cuda.is_current_stream_capturing', return_value=False)
+        capture.start()
+        self.addCleanup(capture.stop)
+
     def test_zero_sink_is_not_a_protected_scatter_sentinel(self):
         self.assertFalse(batch._gate_ok(gate_index(0), CudaMetadata(), CudaMetadata()))
 
@@ -90,3 +97,4 @@ class BatchSinkGuardTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
