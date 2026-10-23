@@ -1,0 +1,64 @@
+{
+  "experiment": "E160",
+  "title": "Qwen3-32B decode e2e 延迟 bench：TLI+CUDA Graph vs dense（跨规模加速比表 32B 行）",
+  "date": "2026-10-23",
+  "model": "Qwen3-32B (bf16, 权重 ~62GiB)",
+  "machine": {
+    "host": "pc32 (10.245.84.251)",
+    "gpu": "GPU0, NVIDIA H20-3e 139.72 GiB（GPU1 被 DeepSeek 批占，全程未触碰）",
+    "python": "/home/fluentllmenv/bin/python3 (torch 2.8.0+cu128, transformers 4.56.2)",
+    "repo_commit": "ecfbd4f43a954d4cc4d0ee6ec2323ec4c883e6e8"
+  },
+  "protocol": {
+    "baseline_8b": "本机 Qwen3-8B 同款协议（E152v4 graph-vs-eager 修复后：TLI-graph TPOT 24.75ms vs dense 26.0ms @32K）",
+    "shadow_pkg": "TLI_SHADOW_PKG=~/tli_ako/solution（sparse_attn 整包，indexer/tli_indexer.py md5 e1c55d2705e5ec12e9b9d7776ac27a03，含 E152v4 graph 内存生命周期修复 + AKO iter-22 优化）",
+    "arms": "ABBA：A=e152v4_graph_latency.py TLI+整步 CUDA Graph（repeats 2 ×2 次）×2；B=e152_e2e_latency.py dense method=none（repeats 3 ×2 次）×2；eager 对拍臂=gen bit-exact 门禁（repeats 1）",
+    "champion_flags": "--method tli --tli_far_method minmax --tli_near_method avg --tli_near_pages 32 --tli_near_tokens off --tli_near_len 4096 --tli_enable_kmeans false --tli_enable_layer_skip false --tli_subspace tail --tia_level2_cmp_ratio 4 --tli_sink_tokens 4 --tli_swa_size 128 --tia_level1_topk 128 --tia_level2_topk 1024",
+    "fixed": "bs=1, max_gen=128, S_cap=L+136, TLIStaticCache, prefill 两臂原生 SDPA dense（TLI_SPARSE_PREFILL=0），TPOT=decode wall/fill 后起算/（max_gen-1），greedy argmax，per-step-device-synchronized 口径",
+    "retry": "每任务 ×3 attempts + GPU0 空闲门 poll 15s（<2000MiB）抢窗；DeepSeek 续批一次抢占 GPU0 约 38 分钟，我方门正确阻塞后自动接管，无互撞 OOM",
+    "abba_schedule_32k": "A1 11:27, eager-gate 11:30, B1 12:12, B2 12:15, A2 12:18（B 段延后由 DeepSeek 抢占窗口造成，A/B 段内各臂紧邻）",
+    "abba_schedule_64k": "A1 12:21, eager-gate 12:26, B1 12:30, B2 12:37, A2 12:43"
+  },
+  "results": {
+    "L32768": {
+      "tli_graph_tpot_ms": 54.70,
+      "tli_graph_spread_ms": 0.01,
+      "tli_graph_tpot_list": [54.70, 54.71, 54.70, 54.68],
+      "dense_tpot_ms": 55.50,
+      "dense_spread_ms": 0.18,
+      "dense_tpot_list": [55.31, 55.28, 55.44, 55.67, 55.63, 55.65],
+      "speedup_dense_over_tli": 1.015,
+      "improvement_pct": 1.5,
+      "bitexact_gate": "PASS（graph vs eager gen_tokens 128 token 逐位一致；graph 跨 repeat 内部一致；eager 对拍臂 TPOT 1176.2ms 反证 graph 化必要性）",
+      "gpu_peak_nvidia_smi_mib": {"tli_graph": 99776, "tli_eager": 132601, "dense": 89788},
+      "torch_peak_delta_gib": 18.1,
+      "prefill_ms_median": {"tli_graph": 29953, "dense": 29854}
+    },
+    "L65536": {
+      "tli_graph_tpot_ms": 59.93,
+      "tli_graph_spread_ms": 0.01,
+      "tli_graph_tpot_list": [59.91, 59.92, 59.94, 59.93],
+      "dense_tpot_ms": 80.21,
+      "dense_spread_ms": 0.07,
+      "dense_tpot_list": [80.17, 80.12, 80.15, 80.26, 80.27, 80.27],
+      "speedup_dense_over_tli": 1.338,
+      "improvement_pct": 33.8,
+      "bitexact_gate": "PASS（同 32K 口径）",
+      "gpu_peak_nvidia_smi_mib": {"tli_graph": 136260, "tli_eager": 132782, "dense": 116546},
+      "torch_peak_delta_gib": 36.2,
+      "prefill_ms_median": {"tli_graph": 85894, "dense": 85907}
+    },
+    "L131072": {
+      "skipped": true,
+      "skip_reason": "A 臂 3 attempts 全部 OOM：prefill 阶段（Qwen3 MLP down_proj forward，Tried to allocate 6.44 GiB）撑爆 139.72 GiB——dyn KV cache 34.4GiB + 进程级 TLIStaticCache 34.4GiB + 权重 62GiB 三者共存；GPU 峰值爬至 142140 MiB。三次失败时刻 12:54/12:59/13:05，形态一致（非偶发）。32B@128K 单卡延迟口径不可容纳，128K 全档跳过",
+      "evidence": "exp/trace/results/e160_32b/pc32_e160_logs/tli_graph_L131072_a1.att1.{log,gpu} + att3.log"
+    }
+  },
+  "cross_scale_narrative": {
+    "tli_graph_tpots": {"qwen3_8b_32k": 24.75, "qwen3_32b_32k": 54.70, "qwen3_32b_64k": 59.93},
+    "dense_tpots": {"qwen3_8b_32k": 26.0, "qwen3_32b_32k": 55.50, "qwen3_32b_64k": 80.21},
+    "speedups": {"qwen3_8b_32k": 1.051, "qwen3_32b_32k": 1.015, "qwen3_32b_64k": 1.338},
+    "note": "32B@32K 加速比缩至 1.015x（权重带宽主导，62GiB/token 全读下 attention 占比小）；但 L 32K→64K 时 dense TPOT +44.6%（55.5→80.2ms）而 TLI-graph 仅 +9.5%（54.7→59.9ms）——TLI 把 context 增长导致的 TPOT 退化从 +44.6% 压缩到 +9.5%，64K 加速比放大到 1.338x。跨规模叙事：模型越大、L 越长，稀疏化收益随 attention KV 项占比而转移"
+  },
+  "verdict": "E160 正式收官：32B 行数据补齐（32K/64K 两档，128K 单卡不可容纳跳过）。两档 bit-exact 门禁全 PASS、两臂散布 ≤0.18ms、ABBA 无漂移。TLI+CUDA Graph 在 32B 上：32K 1.015x（attention 占比小，收益被权重带宽淹没）、64K 1.338x（context 翻倍后稀疏红利放大）。跨规模加速比表 32B 行数据齐备：dense 55.50/80.21ms vs TLI-graph 54.70/59.93ms。所有数字来自实测 JSON（exp/trace/results/e160_32b/）。"
+}

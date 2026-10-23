@@ -1,0 +1,63 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/17 [00:00<?, ?it/s]Loading checkpoint shards:   6%|▌         | 1/17 [00:00<00:12,  1.33it/s]Loading checkpoint shards:  12%|█▏        | 2/17 [00:01<00:11,  1.36it/s]Loading checkpoint shards:  18%|█▊        | 3/17 [00:02<00:10,  1.36it/s]Loading checkpoint shards:  24%|██▎       | 4/17 [00:02<00:09,  1.38it/s]Loading checkpoint shards:  29%|██▉       | 5/17 [00:03<00:08,  1.38it/s]Loading checkpoint shards:  35%|███▌      | 6/17 [00:04<00:07,  1.38it/s]Loading checkpoint shards:  41%|████      | 7/17 [00:05<00:07,  1.38it/s]Loading checkpoint shards:  47%|████▋     | 8/17 [00:05<00:06,  1.40it/s]Loading checkpoint shards:  53%|█████▎    | 9/17 [00:06<00:05,  1.41it/s]Loading checkpoint shards:  59%|█████▉    | 10/17 [00:07<00:04,  1.41it/s]Loading checkpoint shards:  65%|██████▍   | 11/17 [00:07<00:04,  1.40it/s]Loading checkpoint shards:  71%|███████   | 12/17 [00:08<00:03,  1.40it/s]Loading checkpoint shards:  76%|███████▋  | 13/17 [00:09<00:02,  1.40it/s]Loading checkpoint shards:  82%|████████▏ | 14/17 [00:10<00:02,  1.40it/s]Loading checkpoint shards:  88%|████████▊ | 15/17 [00:10<00:01,  1.39it/s]Loading checkpoint shards:  94%|█████████▍| 16/17 [00:11<00:00,  1.38it/s]Loading checkpoint shards: 100%|██████████| 17/17 [00:12<00:00,  1.47it/s]Loading checkpoint shards: 100%|██████████| 17/17 [00:12<00:00,  1.41it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (134923 > 131072). Running this sequence through the model will result in indexing errors
+register qwen3 attn: [model.layers.0.self_attn]
+[E152v4] method=tli L=131072 mode=graph run=0 prefill=277387.9ms fill=74.6ms tpot=70.26ms decodewall=8922.5ms peakΔ=72.44GiB first_tok=151667
+Traceback (most recent call last):
+  File "/home/wangyuanshuo02/two-level-attention/exp/bench/e152v4_graph_latency.py", line 465, in <module>
+    main()
+  File "/home/wangyuanshuo02/two-level-attention/exp/bench/e152v4_graph_latency.py", line 383, in main
+    rec = timed_request(model, runner, ids, args.max_gen, dev,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wangyuanshuo02/two-level-attention/exp/bench/e152v4_graph_latency.py", line 224, in timed_request
+    out = model(input_ids=input_ids, use_cache=True)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/utils/generic.py", line 940, in wrapper
+    output = func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 480, in forward
+    outputs: BaseModelOutputWithPast = self.model(
+                                       ^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/utils/generic.py", line 1064, in wrapper
+    outputs = func(self, *args, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 410, in forward
+    hidden_states = decoder_layer(
+                    ^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/modeling_layers.py", line 94, in __call__
+    return super().__call__(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/utils/deprecation.py", line 172, in wrapped_func
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 275, in forward
+    hidden_states = self.mlp(hidden_states)
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 82, in forward
+    down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 6.44 GiB. GPU 0 has a total capacity of 139.72 GiB of which 3.41 GiB is free. Process 2990217 has 136.29 GiB memory in use. Of the allocated memory 119.18 GiB is allocated by PyTorch, with 81.71 MiB allocated in private pools (e.g., CUDA Graphs), and 16.48 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
