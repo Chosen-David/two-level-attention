@@ -1,0 +1,255 @@
+{
+ "experiment": "E159",
+ "title": "Llama-3.1-8B-Instruct decode e2e 延迟（dense vs TLI 冠军几何）：eager 与 CUDA Graph 双口径，跨模型加速比表 Llama 列",
+ "date": "2026-10-23",
+ "caliber": {
+  "model": "Meta-Llama-3.1-8B-Instruct bf16 sdpa, greedy, max_gen=128（config 原生 llama3 rope_scaling factor 8.0, MPE=131072, 全程无 yarn 覆盖）",
+  "hosts": "pc40 (10.238.139.251, 2×H20-3e) 主数据源 + pc31 (10.245.58.57, 2×H20-3e) 独立复验；两机同 transformers 4.56.2 / torch 2.8.0+cu128",
+  "repo": "pc40 @404feb1 / pc31 @ecfbd4f；sparse_attn 均为影子包 ~/tli_ako/solution 遮蔽（tli_indexer.py md5 e1c55d2705e5ec12e9b9d7776ac27a03, E152v4 graph 生命周期修复 + AKO iter-22）",
+  "llama_patch": "llama3_attn_patch.py 本次升级为 qwen3_attn_forward 同构移植版（md5 a79dbfa4d2989dce515575f9b7d21650）：补 batch_decode_ctx/TLIStaticCache/4D-mask graph 数据通路；旧版只吃 2D bool mask 无法图化。dynamic-cache 单序列路径与旧版逐位等价（champion 配置下 observe/freeze/calibrate 均 no-op）",
+  "collectors": "eager 口径 exp/bench/e159_llama_e2e_latency.py（e152 v2 协议 Llama 适配）；graph 口径 exp/bench/e159v4_graph_latency.py（e152v4 协议 Llama 适配：apply_chat_template + yarn 仅 Qwen3 + prompt 收敛迭代）",
+  "tli_config": "T6 Llama RULER 33/33 冠军几何：minmax/avg, near_pages=32, near_tokens=off, near_len=4096, kmeans=off, layer_skip=off, tail, cmp_ratio=4, sink=4, swa=128, K1=128, K2=1024",
+  "protocol": "ABBA（A=dense, B=TLI）× L∈{32768,65536,131072}，warmup=1 + repeats=3 measured，每臂独立进程，per-step-device-synchronized；graph 口径为整步 capture+replay（两臂同 graph 机器 TLIStaticCache，fill_static 排除出 TPOT）",
+  "prompt": "确定性 needle prompt，迭代 overhead 收敛 n_input≤L（修复 Llama decode→re-encode round-trip ~3% 膨胀：131072 标称曾采到 134950 超 MPE）",
+  "n_input_tokens": {
+   "L32768": 32732,
+   "L65536": 65472,
+   "L131072": 130952
+  },
+  "input_ids_sha256_16": {
+   "L32768": "7eaed2edbb8784b1",
+   "L65536": "9b9aeb05c04981e4",
+   "L131072": "6ccc8dcee6a6d281"
+  }
+ },
+ "results": {
+  "eager": {
+   "L32768": {
+    "pc40": {
+     "dense": {
+      "tpot_ms_mean": 21.43,
+      "tpot_ms_stdev": 0.029,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 76.05,
+      "tpot_ms_stdev": 0.464,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 0.28
+    },
+    "pc31": {
+     "dense": {
+      "tpot_ms_mean": 21.13,
+      "tpot_ms_stdev": 0.033,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 70.79,
+      "tpot_ms_stdev": 0.259,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 0.3
+    }
+   },
+   "L65536": {
+    "pc40": {
+     "dense": {
+      "tpot_ms_mean": 33.1,
+      "tpot_ms_stdev": 0.016,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 84.65,
+      "tpot_ms_stdev": 0.587,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 0.39
+    },
+    "pc31": {
+     "dense": {
+      "tpot_ms_mean": 33.22,
+      "tpot_ms_stdev": 0.15,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 79.28,
+      "tpot_ms_stdev": 0.386,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 0.42
+    }
+   },
+   "L131072": {
+    "pc40": {
+     "dense": {
+      "tpot_ms_mean": 56.86,
+      "tpot_ms_stdev": 0.09,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 101.3,
+      "tpot_ms_stdev": 0.444,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 0.56
+    },
+    "pc31": {
+     "dense": {
+      "tpot_ms_mean": 56.91,
+      "tpot_ms_stdev": 0.027,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 96.18,
+      "tpot_ms_stdev": 0.399,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 0.59
+    }
+   }
+  },
+  "graph": {
+   "L32768": {
+    "pc40": {
+     "dense": {
+      "tpot_ms_mean": 105.04,
+      "tpot_ms_stdev": 0.201,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 21.12,
+      "tpot_ms_stdev": 0.019,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 4.97
+    },
+    "pc31": {
+     "dense": {
+      "tpot_ms_mean": 105.34,
+      "tpot_ms_stdev": 0.021,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 21.06,
+      "tpot_ms_stdev": 0.016,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 5.0
+    }
+   },
+   "L65536": {
+    "pc40": {
+     "dense": {
+      "tpot_ms_mean": 202.68,
+      "tpot_ms_stdev": 0.025,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 23.47,
+      "tpot_ms_stdev": 0.13,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 8.64
+    },
+    "pc31": {
+     "dense": {
+      "tpot_ms_mean": 203.62,
+      "tpot_ms_stdev": 0.028,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 23.41,
+      "tpot_ms_stdev": 0.013,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 8.7
+    }
+   },
+   "L131072": {
+    "pc40": {
+     "dense": {
+      "tpot_ms_mean": 414.0,
+      "tpot_ms_stdev": 0.035,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 29.0,
+      "tpot_ms_stdev": 0.012,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 14.28
+    },
+    "pc31": {
+     "dense": {
+      "tpot_ms_mean": 415.46,
+      "tpot_ms_stdev": 0.435,
+      "n_measured": 6
+     },
+     "tli": {
+      "tpot_ms_mean": 28.97,
+      "tpot_ms_stdev": 0.023,
+      "n_measured": 6
+     },
+     "speedup_tli_vs_dense": 14.34
+    }
+   }
+  }
+ },
+ "cross_host_consistency_pct_dev": {
+  "eager_L32768_dense": 1.41,
+  "eager_L32768_tli": 7.16,
+  "eager_L65536_dense": 0.36,
+  "eager_L65536_tli": 6.55,
+  "eager_L131072_dense": 0.09,
+  "eager_L131072_tli": 5.19,
+  "graph_L32768_dense": 0.29,
+  "graph_L32768_tli": 0.28,
+  "graph_L65536_dense": 0.46,
+  "graph_L65536_tli": 0.26,
+  "graph_L131072_dense": 0.35,
+  "graph_L131072_tli": 0.1
+ },
+ "graph_gate": {
+  "protocol": "graph 模式 capture 后 vs eager staged 参照臂（同 TLIStaticCache）gen_tokens 逐位对拍，L=16384, max_gen=128",
+  "pc40": {
+   "n_tokens": 128,
+   "all_runs_pairwise_bitwise_equal": true
+  },
+  "pc31": {
+   "n_tokens": 128,
+   "all_runs_pairwise_bitwise_equal": true
+  },
+  "verdict": "PASS（两机均 128/128 逐位全等，含 warmup+measured 全 runs 成对相等）"
+ },
+ "attribution": {
+  "eager_caliber": "TLI 无 graph 裸跑 launch/Python 链主导：0.28×-0.59×（dense 21.4→56.9ms vs TLI 76.1→101.3ms @32K→128K，L 增大相对劣势收窄）——与 e152v3 Qwen 判决同构，论文不做 eager 口径加速主张",
+  "graph_caliber": "graph-vs-graph 公平口径下 TLI 稀疏省算 + 图化消 launch 双红利：32K 5.0× / 64K 8.7× / 128K 14.3×；TLI-graph TPOT 近常数（21.1→23.4→29.0ms）vs dense-graph O(L) 线性暴涨（105→203→415ms，整步 capture 下 SDPA 4D additive mask 慢路径）——dense graph-unfriendly / TLI graph-friendly 在 Llama 完整复刻",
+  "128k_oom": "128K graph 无 OOM（静态 KV 34.3GB + dyn prefill 34.2GB + 权重 16GB，峰值 ~95GB < 143.7GB），无需 64K 降级"
+ },
+ "superseded_data_note": "pc31 e159_phase1_pc31_superseded.json 为修复前口径（prompt 膨胀至 134950>131072 超 MPE + 11:44 起他方容器进程共居污染），仅 32K/64K 段读数可用作参考、全部不进本表；v2 两机数据为最终口径",
+ "verdict": "E159 兑现：Llama-3.1-8B-Instruct 列补齐。graph 口径 TLI 冠军几何 decode TPOT 32K/64K/128K = 21.1/23.4/29.0ms（pc40 主源），vs dense-graph 105.0/202.7/414.0ms，加速 4.97×/8.64×/14.28×；pc31 独立复验偏差 <1%。eager 口径如实报告 TLI 反慢（launch 主导，系统层瓶颈）。graph 逐位门禁双机 PASS。论文跨模型加速比表 Llama 列用 graph 口径数据。",
+ "status": "DONE 2026-10-23（两机 × 两口径 × 3L × ABBA 全满格 + 双机 graph 门禁 PASS）",
+ "cross_caliber_primary_table": {
+  "caliber": "TLI-graph vs dense-eager（E152v4 Qwen 同口径；dense eager dynamic 是其最自然实现，graph 化反而走 SDPA 4D additive mask 慢路径降级基线）",
+  "pc40": {
+   "L32768": {
+    "dense_eager_ms": 21.43,
+    "tli_graph_ms": 21.12,
+    "speedup_tli_graph_vs_dense_eager": 1.015
+   },
+   "L65536": {
+    "dense_eager_ms": 33.1,
+    "tli_graph_ms": 23.47,
+    "speedup_tli_graph_vs_dense_eager": 1.41
+   },
+   "L131072": {
+    "dense_eager_ms": 56.86,
+    "tli_graph_ms": 29.0,
+    "speedup_tli_graph_vs_dense_eager": 1.961
+   }
+  },
+  "consistency_with_qwen_e152v4": "Qwen 1.064/1.448/2.067 vs Llama 1.015/1.41/1.961 —— 跨模型族形态一致",
+  "paper_guidance": "论文主表用本表（graph vs eager-dense）；graph-vs-graph 4.97/8.64/14.28x 单列为 dense graph-unfriendly 叙事点 （TLI 稀疏省算+图化消 launch 双红利只有 TLI 吃得到），不与主表混排以免基线口径混淆。"
+ }
+}
