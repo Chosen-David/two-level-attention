@@ -19,6 +19,6 @@ E152v4当前归档支持混合执行口径的TPOT比值，不支持graph-vs-grap
 404feb17运行身份与a7bcdddf审查源码须分别记录，宿主未记录行为保持未知。
 本方案的统计容差是待冻结提案，不是已有非劣判决；质量smoke/mass/CPU测试不能替代确认集。
 
-设计PR：待创建后补精确链接。此前PR #4通用Graph设计继续有效，本PR只补AsyncTLS比较契约。
+设计PR：[Draft PR #5](https://github.com/Chosen-David/two-level-attention/pull/5)。此前PR #4通用Graph设计继续有效，本PR只补AsyncTLS比较契约。
 本建议不启动作业、不改变权限、不请求Claude、不修改人类指南；prepare_mask门禁候选另行保全。
 
