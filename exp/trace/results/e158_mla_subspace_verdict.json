@@ -1,0 +1,97 @@
+{
+ "schema": "e158-mla-subspace-verdict-v1",
+ "meta": {
+  "schema": "e158-observation-v1",
+  "model_source_sha256": "5128aab02d0dc38d5146de4ba72fda7999b39d4197de5e917b0de32578a99ed4",
+  "producer_sha256": "64d238a1786b9e9dfd3b37b5aad5096ad1c23654dee6dae4324de30a8c6077dd"
+ },
+ "caliber": "DeepSeek-V2-Lite-Chat, hotpotqa+musique 2样本, 16K, 层{4,8,12,16,20}, bs=64 query, K1=128 K2=768, metric=selected_mass_over_reference_topk_mass (越高越好)",
+ "per_layer": {
+  "4": {
+   "full192": 0.886,
+   "nope128": 0.505,
+   "rope64": 0.839,
+   "nope_first32": 0.479,
+   "nope_last32": 0.462,
+   "nope32r": 0.47,
+   "nope32hi": 0.429,
+   "rope_lowfreq32": 0.877,
+   "rope_highfreq32": 0.292,
+   "rope64_nope32f": 0.856,
+   "rope64_nope32hi": 0.854
+  },
+  "8": {
+   "full192": 0.954,
+   "nope128": 0.571,
+   "rope64": 0.931,
+   "nope_first32": 0.507,
+   "nope_last32": 0.516,
+   "nope32r": 0.508,
+   "nope32hi": 0.524,
+   "rope_lowfreq32": 0.918,
+   "rope_highfreq32": 0.269,
+   "rope64_nope32f": 0.94,
+   "rope64_nope32hi": 0.941
+  },
+  "12": {
+   "full192": 0.986,
+   "nope128": 0.888,
+   "rope64": 0.822,
+   "nope_first32": 0.841,
+   "nope_last32": 0.858,
+   "nope32r": 0.853,
+   "nope32hi": 0.854,
+   "rope_lowfreq32": 0.833,
+   "rope_highfreq32": 0.219,
+   "rope64_nope32f": 0.93,
+   "rope64_nope32hi": 0.945
+  },
+  "16": {
+   "full192": 0.974,
+   "nope128": 0.784,
+   "rope64": 0.889,
+   "nope_first32": 0.748,
+   "nope_last32": 0.718,
+   "nope32r": 0.738,
+   "nope32hi": 0.731,
+   "rope_lowfreq32": 0.883,
+   "rope_highfreq32": 0.215,
+   "rope64_nope32f": 0.933,
+   "rope64_nope32hi": 0.935
+  },
+  "20": {
+   "full192": 0.892,
+   "nope128": 0.612,
+   "rope64": 0.821,
+   "nope_first32": 0.57,
+   "nope_last32": 0.503,
+   "nope32r": 0.526,
+   "nope32hi": 0.569,
+   "rope_lowfreq32": 0.814,
+   "rope_highfreq32": 0.295,
+   "rope64_nope32f": 0.846,
+   "rope64_nope32hi": 0.849
+  }
+ },
+ "all_layers_mean": {
+  "full192": 0.939,
+  "nope128": 0.672,
+  "rope64": 0.861,
+  "nope_first32": 0.629,
+  "nope_last32": 0.612,
+  "nope32r": 0.619,
+  "nope32hi": 0.621,
+  "rope_lowfreq32": 0.865,
+  "rope_highfreq32": 0.258,
+  "rope64_nope32f": 0.901,
+  "rope64_nope32hi": 0.905
+ },
+ "findings": {
+  "1_rope_lowfreq_dominates": "rope_lowfreq32=0.865 vs rope_highfreq32=0.258 — 检索信号集中在 rope 低频维",
+  "2_nope_weak_early_reversal_l12": "nope128 早期层弱(L4=0.505), L12 反转强(0.888) — 与 E141b L12 反转一致",
+  "3_nope32_redundant_directions": "nope_first32=0.629 / nope_last32=0.612 / nope32r=0.619 / nope32hi=0.621 彼此接近 — nope 维内部冗余, 任选 32 维即可",
+  "4_best_96d_arm": "rope64+nope32(rope64_nope32hi)=0.905 vs full192=0.939 — 96/192 维保持 96.4% 检索质量",
+  "5_vs_rope64_only": "rope64=0.861 -> +nope32=0.905: nope32 补齐 rope 单独的深层缺口(L12 0.822->0.945)"
+ },
+ "design_conclusion": "MLA 子空间设计 = rope 全 64 维(低频主导) + nope 任选 32 维(冗余, 前/后/random 均可)。96 维达 full192 的 95%+ 检索质量, 相比 rope-only(E142a 生产口径 96.7%/93.8% 保留) 是免费增益, 在 L12/L16 深层显著补强。数学设计文档(e158_math_design.md)未产出, 结论由实证 trace 直接支撑。"
+}

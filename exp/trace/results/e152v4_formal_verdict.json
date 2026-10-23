@@ -1,0 +1,225 @@
+{
+ "schema": "e152v4-formal-verdict",
+ "protocol": "ABBA interleaved, max_gen=128, Qwen3-8B bf16, TPOT per-step-device-synced, 2 procs/arm; TLI champion geometry (nb32/nl4096/ntoff/minmax+avg/sink4/swa128/K1=128/K2=1024, tail32 subspace)",
+ "bitexact_gate": "graph gen_tokens == eager gen_tokens per L",
+ "arms": {
+  "pc40": {
+   "tag": "pc40-clean-arm (primary)",
+   "L": {
+    "32768": {
+     "dense_ms": {
+      "mean": 26.282,
+      "min": 26.019,
+      "max": 26.974,
+      "n": 6
+     },
+     "tli_graph_ms": {
+      "mean": 24.702,
+      "min": 24.687,
+      "max": 24.717,
+      "n": 4
+     },
+     "tli_eager_ms": {
+      "mean": 99.025,
+      "n": 1
+     },
+     "speedup_graph_vs_dense": 1.064,
+     "bitexact_gate": [
+      {
+       "a1": [
+        true,
+        true
+       ]
+      },
+      {
+       "a2": [
+        true,
+        true
+       ]
+      }
+     ]
+    },
+    "65536": {
+     "dense_ms": {
+      "mean": 39.67,
+      "min": 39.646,
+      "max": 39.739,
+      "n": 6
+     },
+     "tli_graph_ms": {
+      "mean": 27.398,
+      "min": 27.369,
+      "max": 27.408,
+      "n": 4
+     },
+     "tli_eager_ms": {
+      "mean": 99.893,
+      "n": 1
+     },
+     "speedup_graph_vs_dense": 1.448,
+     "bitexact_gate": [
+      {
+       "a1": [
+        true,
+        true
+       ]
+      },
+      {
+       "a2": [
+        true,
+        true
+       ]
+      }
+     ]
+    },
+    "131072": {
+     "dense_ms": {
+      "mean": 67.035,
+      "min": 67.002,
+      "max": 67.074,
+      "n": 6
+     },
+     "tli_graph_ms": {
+      "mean": 32.425,
+      "min": 32.419,
+      "max": 32.434,
+      "n": 4
+     },
+     "tli_eager_ms": {
+      "mean": 134.063,
+      "n": 1
+     },
+     "speedup_graph_vs_dense": 2.067,
+     "bitexact_gate": [
+      {
+       "a1": [
+        true,
+        true
+       ]
+      },
+      {
+       "a2": [
+        true,
+        true
+       ]
+      }
+     ]
+    }
+   }
+  },
+  "local_gpu1_polluted": {
+   "tag": "local-GPU1 (co-tenant-polluted replica)",
+   "L": {
+    "32768": {
+     "dense_ms": {
+      "mean": 39.338,
+      "min": 25.946,
+      "max": 51.386,
+      "n": 6
+     },
+     "tli_graph_ms": {
+      "mean": 47.605,
+      "min": 26.976,
+      "max": 64.928,
+      "n": 4
+     },
+     "tli_eager_ms": {
+      "mean": 207.543,
+      "n": 1
+     },
+     "speedup_graph_vs_dense": 0.826,
+     "bitexact_gate": [
+      {
+       "a1": [
+        true,
+        true
+       ]
+      },
+      {
+       "a2": [
+        true,
+        true
+       ]
+      }
+     ]
+    },
+    "65536": {
+     "dense_ms": {
+      "mean": 59.25,
+      "min": 39.918,
+      "max": 87.108,
+      "n": 6
+     },
+     "tli_graph_ms": {
+      "mean": 51.572,
+      "min": 34.857,
+      "max": 72.258,
+      "n": 4
+     },
+     "tli_eager_ms": {
+      "mean": 208.901,
+      "n": 1
+     },
+     "speedup_graph_vs_dense": 1.149,
+     "bitexact_gate": [
+      {
+       "a1": [
+        true,
+        true
+       ]
+      },
+      {
+       "a2": [
+        true,
+        true
+       ]
+      }
+     ]
+    },
+    "131072": {
+     "dense_ms": {
+      "mean": 77.831,
+      "min": 67.175,
+      "max": 115.326,
+      "n": 6
+     },
+     "tli_graph_ms": {
+      "mean": 66.513,
+      "min": 49.48,
+      "max": 82.055,
+      "n": 4
+     },
+     "tli_eager_ms": {
+      "mean": 311.617,
+      "n": 1
+     },
+     "speedup_graph_vs_dense": 1.17,
+     "bitexact_gate": [
+      {
+       "a1": [
+        true,
+        true
+       ]
+      },
+      {
+       "a2": [
+        true,
+        true
+       ]
+      }
+     ]
+    }
+   }
+  }
+ },
+ "paper_summary": {
+  "speedup_by_context_length (TPOT, TLI-graph vs dense, pc40 clean arm)": {
+   "32K": "1.064x (dense 26.282ms vs tli_graph 24.702ms)",
+   "64K": "1.448x (dense 39.67ms vs tli_graph 27.398ms)",
+   "128K": "2.067x (dense 67.035ms vs tli_graph 32.425ms)"
+  },
+  "trend": "加速比随上下文长度单调增长 1.06x -> 1.45x -> 2.07x；32K 近打平（decode 稳态 launch-bound，两臂基线都贴 ~24-26ms 下限），128K 兑现 2.07x",
+  "bitexact_gate": "PASS 3/3 (graph vs eager gen_tokens 逐位一致, pc40 与本机复刻臂均过)",
+  "caliber_note": "max_gen=128, ABBA 交错, 每臂 2 进程 × (2-3 repeats), per-step-device-synced TPOT; local GPU1 复刻臂共居污染 （dense 26->39ms 抬升实锤）仅作一致性参考，判决主源=pc40"
+ }
+}
