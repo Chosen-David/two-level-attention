@@ -1,0 +1,87 @@
+{
+  "schema": "e158b-mla-rope-nope32-e2e-verdict-v1",
+  "experiment": "E158b MLA 96 维子空间（rope64+nope[0:32]）e2e 质量兑现验证——E158 trace 判决设计的 LongBench 三臂对拍",
+  "date": "2026-10-23",
+  "machine_note": "计划主机 pc40 双卡在启动窗口被 E159 Llama 延迟 agent（e159_llama_e2e_latency + e159v4_graph_latency，各 50-58GB 且 graph 臂内存增长）占满；共居试跑 fullkv 16K needle 在 softmax 15.5GiB 分配处 OOM（e159 graph 臂 57.8GB + 我方 70.9GB 贴爆 139.7GB），且共居 OOM 会威胁 E159 正式链——不杀他方进程，切换到本机（2×H20-3e 双卡全空 1MiB，E142a 当年的原始执行机）。fullkv 锚在本机重跑与 E142a 产物逐位复现（23.91/11.48），证明 pred.py 02423d1→a7bcddd 的 DSV2 generate 分支字节相同、无版本偏移。",
+  "pipeline": {
+    "base": "本机主树 sparse_attn（commit a7bcddd，8f7a1db 超集：E152v4 graph 修复 + AKO iter-1~22，与 pc40 ~/tli_ako/solution 同构）+ 影子包 3 文件编辑（~/e158b_pkg，cp 主树 sparse_attn 后覆写）",
+    "edit_files_sha256": {
+      "sparse_attn/indexer/tli_indexer.py": "788fde7a1da337fbf90705bef7fd01f8f39fb5fc3631bb456996f30807b68a7f",
+      "sparse_attn/arguments.py": "f1e943e42082ab7285a16b51881ecab04caa02b7fa6bf050e96a4085dbf9b9d5",
+      "sparse_attn/info.py": "0d49fdfea09917a533a9916d4b023da826961bf1276bf490d9e03cf9639818a9"
+    },
+    "edit_summary": "6 落点新增 mla_rope_nope32：__init__ 枚举/enable 元组（tli_indexer L108/L113）、_subspace_indices 两段拼接 list(range(0,32))+list(range(128,192))（d_sub=96，与 tail 两段拼接结构同款）、prepare_index 维度门 expected_dim in (mla_rope, mla_rope_nope32)=192、arguments.py choices、info.py eff_subspace 元组（treatment hash 自动分离：mla_rope=h365b07ad27 / mla_rope_nope32=h459148e968，md5 级验证与 pc40 一致）",
+    "runner": "benchmark.LongBench.pred（本机主树 HEAD a7bcddd 干净版，DSV2 model.generate 路径与 02423d1 字节相同）+ benchmark.LongBench.eval（F1）",
+    "runner_sha256": {
+      "e158b_run_cells.sh": "2057bfcc286c59f39e6905a82bbe7f536d14e22de941544a43a107195d8efe53",
+      "e158b_smoke.py": "f82cd79ddccc29a32366a0fd8af2b6480821724b88d3b62b971223bb91433e53",
+      "e158b_paired.py": "3d8825b16aab990747c7a917d4b9f27dca7548e128ef28c4e6ff1740bdf18134"
+    }
+  },
+  "config": "K1=64 / K2=1024 / bs64 / mavg(.25,.125,.625) / far=minmax / near=avg / kmeans off / layer_skip off / tia_level2_cmp_ratio 4（E129 坑显式传）——与 E142a 逐项相同，唯一变量 = tli_subspace",
+  "model": "DeepSeek-V2-Lite-Chat bf16（nope128+rope64=192，kv_lora_rank 512，16 head MQA 共享单索引，27 层 MoE，yarn40）",
+  "context": "cap_effective 16384（eager L² 显存实现约束；protocol 锚 31500 保留，cap_comparability_key 7923154369 与 E142a 一致）",
+  "caliber": "LongBench hotpotqa/musique 各 200 样本；三臂同批同数据同机器；eval strict runcap 6/6 全过；三臂 per-task input_ids ordered sha 逐位相同（actual_input_ids_ordered_sha256 网内一致）——配对比较有效性已验证",
+  "smoke_gates": {
+    "math_random_data": "mla_rope / mla_rope_nope32 × S{2048,20480} × seed{1,2} 共 8 cell 全 PASS（生产路径 vs 手工 gather 参考 max|Δ| ≤ 7.6e-04 < 1e-2 门）",
+    "short_prompt": "fullkv vs sparse 8/8 token 逐位一致（两稀疏臂各 8/8）",
+    "needle_16k": "16137 tok needle（yarn40 外推，E142a 同款 ALPHA-7741-CUB）：fullkv / mla_rope / mla_rope_nope32 三臂全部答出密钥",
+    "regression": "mla_rope（E142a 口径）在新树全部门复绿"
+  },
+  "results": {
+    "table": {
+      "hotpotqa": {"fullkv": 23.91, "tli_mla_rope_64d": 23.43, "tli_mla_rope_nope32_96d": 24.20},
+      "musique": {"fullkv": 11.48, "tli_mla_rope_64d": 10.80, "tli_mla_rope_nope32_96d": 10.63}
+    },
+    "retention_vs_fullkv": {
+      "tli_mla_rope_nope32_96d": {"hotpotqa": 1.01, "musique": 0.93, "avg": 0.97},
+      "tli_mla_rope_64d": {"hotpotqa": 0.98, "musique": 0.94, "avg": 0.96},
+      "exact": {
+        "nope32_hotpotqa": "24.20/23.91 = 101.2%", "nope32_musique": "10.63/11.48 = 92.6%", "nope32_avg": "96.9%",
+        "rope_hotpotqa": "23.43/23.91 = 98.0%", "rope_musique": "10.80/11.48 = 94.1%", "rope_avg": "96.0%"
+      }
+    },
+    "paired_analysis_bootstrap10k": {
+      "hotpotqa": {
+        "nope32-rope": {"mean_diff_f1": 0.008, "ci95": [-0.007, 0.022], "win_loss_tie": "28/23/149"},
+        "nope32-fullkv": {"mean_diff_f1": 0.003, "ci95": [-0.006, 0.013], "win_loss_tie": "20/24/156"},
+        "rope-fullkv": {"mean_diff_f1": -0.005, "ci95": [-0.018, 0.009], "win_loss_tie": "29/38/133"}
+      },
+      "musique": {
+        "nope32-rope": {"mean_diff_f1": -0.002, "ci95": [-0.016, 0.012], "win_loss_tie": "28/32/140"},
+        "nope32-fullkv": {"mean_diff_f1": -0.008, "ci95": [-0.022, 0.003], "win_loss_tie": "22/28/150"},
+        "rope-fullkv": {"mean_diff_f1": -0.007, "ci95": [-0.02, 0.006], "win_loss_tie": "31/38/131"}
+      },
+      "note": "全部配对差 95% CI 跨零——三臂在两任务上统计不可区分"
+    },
+    "e142a_cross_ref": {
+      "fullkv_anchor": "23.91/11.48 与 E142a 逐位复现（确定性锚）",
+      "rope_arm_drift": "本批 rope 23.43/10.80 vs E142a 23.11/10.77——树演进（E152v4+AKO 紧凑布局 ULP 级漂移）在噪声带内；E142a 保留率 96.7%/93.8% vs 本批 98.0%/94.1%，结论带一致"
+    }
+  },
+  "verdict": {
+    "primary": "E158 trace 设计（rope64+nope32 = 96 维）e2e 兑现为『统计持平、点估计略优』：96d 臂保留率 101.2%/92.6%（均值 96.9%）vs rope-only 98.0%/94.1%（均值 96.0%），但 nope32-rope 配对差 CI 双任务跨零（hotpotqa +0.008 [-0.007,+0.022] / musique -0.002 [-0.016,+0.012]）——trace 层 96d 的检索质量增益（0.901 vs 0.861 mass，L12 0.822→0.930）没有在 K2=1024 e2e 质量上兑现为显著差异",
+    "gate": "任务判决门『96d 臂保留率 ≤ rope-only 则假设否决』未触发（均值 96.9% > 96.0%）；但 per-task musique 92.6% < rope 94.1%，非全面占优——按混合结果如实落盘",
+    "engineering_conclusion": "K2=1024 预算下 e2e 质量对索引子空间维度选择不敏感（64d 与 96d 统计不可区分）——rope-only 64d 仍是最佳索引经济点（3× 降维）；96d 臂 +50% 索引维度买不到显著 e2e 增益。E158 trace 的深层 L12/L16 补强在 e2e 被两级预算（K1=64 粗筛 + K2=1024 细筛）的整体冗余吸收",
+    "narrative_boundary": "『trace 检索质量→e2e 任务质量』映射在本区间是饱和的（trace mass 0.86→0.94 区间内 e2e F1 不动）；96d 设计不损失质量（hotpotqa 甚至反超锚 +0.3），可作为需要更高 trace 保真场景（更小 K2 预算 / 更长上下文）的候选设计——但当前口径下无免费午餐叙事不成立，论文 MLA 段维持 E142a rope-only 为主表，96d 降级为消融臂",
+    "negative_result_scope": "本判决仅覆盖 16K cap / 200 样本×2 任务 / K2=1024；trace 层差异在更小细筛预算（K2<512）或 64K+ 上下文是否兑现为 e2e 差异未测，列 next"
+  },
+  "trace_cross_reference": {
+    "source": "exp/trace/results/e158_mla_subspace_verdict.json（E158 trace 判决）",
+    "design": "本 e2e 臂 = rope64_nope32f（nope[0:32]）——trace mass 0.901 vs hi32 变体 0.905（nope 维内部冗余，差在噪声带）；对比 rope64-only 0.861 / full192 0.939",
+    "trace_to_e2e": "trace 相对增益 +0.040（0.901-0.861）→ e2e 配对增益 +0.008（hotpotqa）/ -0.002（musique），CI 跨零——幅度压缩 ~5×且方向不一，trace→e2e 传递率低是本判决的核心 finding"
+  },
+  "provenance": {
+    "tag": "10231243",
+    "products": "~/e158b_run/exp/results_longbench/DeepSeek-V2-Lite-Chat/pred/（6×200 行全 rc=0，含 .runcap.json / .tli_manifest.json / runcap_gate.lock）+ result.json + paired_analysis.json",
+    "treatment_hash": {"mla_rope": "h365b07ad27", "mla_rope_nope32": "h459148e968"},
+    "runcap": "strict_validated 6/6, legacy 0, cap_effective 16384, cap_comparability_key 7923154369",
+    "logs": "~/e158b_run/logs/（driver + 6 cell log）",
+    "smoke_log": "/tmp/e158b_smoke_local.log"
+  },
+  "next": [
+    "96d 臂在 K2<512 预算 / 64K 上下文的 e2e 敏感度（trace 差异是否在紧预算下兑现）",
+    "64 维组合臂 rope_lowfreq32+nope32（E158 列 next 未测）",
+    "TG 提交边界后 mla_rope_nope32 代码晋升主树（6 落点编辑已固化于 ~/e158b_pkg 与本判决 sha）"
+  ]
+}
