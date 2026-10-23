@@ -9,10 +9,14 @@
   .187 GPU4 独立复验 ±1%）。dense SDPA vs 融合态 graph（Step1）vs Step2 候选列化。
   口径：合成单层 prefill attention + 选择链，K2=1024，BATCH+FUSED+GRAPH 全开；
   L∈{8K,16K,32K,64K}，短档净负、~33K 交叉、64K 1.64x 均如实保留（spec：负收益不裁）。
-面板 (c)：完整请求 decode TPOT vs L（e152v2_e2e_latency_verdict.json，v2 连续 wall
-  口径 ABBA×3 中位）。dense vs TLI（dynamic）vs TLI+StaticCache（E134-pre 系统层
-  消 72-cat/步）。如实呈现 e2e 现状：TPOT tli/dense = 3.4×/2.5×/1.8× @32/64/128K，
-  kernel 级加速不 translate（launch-bound 归因链在判决 JSON）；负收益不裁（spec）。
+面板 (c)：完整请求 decode TPOT vs L——graph 时代三模型判决（2026-10-23 重设计，
+  取代 e152v2 旧口径「TLI 慢 3.4×/2.5×/1.8×」）。整步 CUDA Graph 后 TLI 全档快于
+  dense：Qwen3-8B 1.064/1.448/2.067×（e152v4 pc40 干净臂）、Qwen3-32B
+  1.015/1.338/1.841×（e160 + e160b 128K 救援臂）、Llama-3.1-8B 1.015/1.41/1.961×
+  （e159 graph-vs-dense-eager 主表口径）；三模型 gen tokens 与 eager 逐位一致
+  （bit-exact 门禁），E160R pc31 跨机复刻偏差 <0.3%。eager 无 graph 臂如实画出
+  （8B 99.0/99.9/134.1ms，launch 主导）——graph replay 是符号翻转的必要条件，
+  同一数学从 0.3× 变 2×，系统层杠杆不是算法层。
 
 kernel 设计创新点（decode-only 转向后 E2 的设计贡献叙事，全部以同机对照数字入图）：
   (i) E127 融合两级选择 kernel 链（粗筛上界 + 精筛融合 decode kernel）——5.47× GPU
@@ -23,9 +27,9 @@ kernel 设计创新点（decode-only 转向后 E2 的设计贡献叙事，全部
       4×、mask 逐位一致（注记入面板 a）；
   (iii) E139 Step2 prefill 候选列化 + 选择链 CUDA graph capture——64K 1.64× vs dense
       （面板 b Step2 曲线）；
-  (iv) E134-pre StaticCache 集成——消 HF DynamicCache 72 cat 拷贝/步共付开销，
-      TPOT 87.9→82.0ms @32K（面板 c StaticCache 工作点）。
-  e2e 缺口诚实归因：launch-bound（host 侧主导），E134 整步 graph capture 为下一杠杆。
+  (iv) E134-pre StaticCache + E152v4 整步 graph capture——消 HF DynamicCache 72 cat
+      拷贝/步与 host launch 链，e2e TPOT 从 87.9ms（e152v2 dynamic）压到 24.7ms
+      @32K（面板 c 蓝线），符号翻转为正并随 L 单调放大。
 
 数据全部从判决 JSON 程序化读取，无手工键入；输出 PDF+PNG+SVG + figure_data.tsv。
 """
@@ -44,27 +48,32 @@ from figure_lint import lint_figure  # noqa: E402
 
 REPO = "/home/wangyuanshuo02/two-level-attention"
 WT = "/tmp/wt_e138_ablation"
+R = os.path.join(REPO, "exp/trace/results/")
 OUT = os.path.join(REPO, "agent_doc", "guide", "paper_figs", "figs")
 os.makedirs(OUT, exist_ok=True)
 
 pal = apply_style("ocean")
 # 本机无 Arial/Liberation：显式回退 DejaVu Sans（外观接近，避免 findfont 警告）
 matplotlib.rcParams["font.family"] = "DejaVu Sans"
+# Type42 嵌入（字形门友好；Type3 CJK bbox 膨胀教训见 ruler32k_comparison/draw.py）
+matplotlib.rcParams["pdf.fonttype"] = matplotlib.rcParams["ps.fonttype"] = 42
 C_DENSE = pal["neutral"]        # dense 基线 = 灰
 C_STEP1 = pal["tertiary"]       # Step1 = 浅蓝
 C_STEP2 = pal["primary"]        # Step2 = 深蓝（主方法）
 C_BASE = pal["neutral"]
 C_TLI = pal["primary"]
 C_HL = pal["highlight"]         # 强调橙
+C_EAGER = pal["secondary"]      # eager 无 graph 臂 = 青（诚实边界）
 
-# ---------------- 数据读取 ----------------
-e128 = json.load(open(os.path.join(REPO, "exp/trace/results/e128_tradeoff.json")))
+# ---------------- 数据读取：面板 (a) 阶段分解 ----------------
+e128 = json.load(open(os.path.join(R, "e128_tradeoff.json")))
 h = e128["e127_headline_64k_normal"]
 stages = ["prepare_index", "compute_score", "compute_mask", "metrics", "eager_decoding"]
 base_ms = [h["stage_gpu_baseline"][s] for s in stages] + [h["baseline_gpu_ms"]]
 tli_ms = [h["stage_gpu_iter8"][s] for s in stages] + [h["iter8_gpu_ms"]]
 stage_labels = ["prep", "score", "mask", "metric", "attn", "total"]
 
+# ---------------- 数据读取：面板 (b) prefill wall ----------------
 e139 = json.load(open(os.path.join(WT, "exp/trace/results/e139_step2_cand_verdict.json")))
 wl = e139["results"]["wall_lsweep"]
 Ls = [8192, 16384, 32768, 65536]
@@ -75,12 +84,36 @@ for L in Ls:
     step1_ms.append(float(s.split("Step1 graph ")[1].split(" /")[0]))
     step2_ms.append(float(s.split("Step2 graph ")[1].split("ms")[0]))
 
-e152v2 = json.load(open(os.path.join(REPO, "exp/trace/results/e152v2_e2e_latency_verdict.json")))
-rm = e152v2["results_median"]
 # E133c 同机 A/B 稳态百分比（跨机绝对值不与 E127 混用，只取同机对照 delta）
-e133c = json.load(open(os.path.join(REPO, "exp/trace/results/e133c_subspace_speedup_verdict.json")))
+e133c = json.load(open(os.path.join(R, "e133c_subspace_speedup_verdict.json")))
 e133c_e2e_pct = e133c["steady_gpu_ms"]["mavg_e2e"]["delta_pct"]   # 生产口径 -12.3%
 e133c_tail_pct = e133c["steady_gpu_ms"]["mavg_tail"]["delta_pct"]  # tail 臂 -14.6%
+
+# ---------------- 数据读取：面板 (c) e2e decode TPOT（三模型 graph 判决）----------------
+# Qwen3-8B：E152v4 pc40 干净臂（ABBA、per-step-device-synced、bit-exact 门禁）
+e152v4 = json.load(open(os.path.join(R, "e152v4_formal_verdict.json")))
+pc40 = e152v4["arms"]["pc40"]["L"]
+q8b_dense = [pc40[str(L)]["dense_ms"]["mean"] for L in (32768, 65536, 131072)]
+q8b_tli = [pc40[str(L)]["tli_graph_ms"]["mean"] for L in (32768, 65536, 131072)]
+q8b_eager = [pc40[str(L)]["tli_eager_ms"]["mean"] for L in (32768, 65536, 131072)]
+# Qwen3-32B：E160 32K/64K + E160b 128K 救援臂（expandable_segments、单 run/进程）
+e160 = json.load(open(os.path.join(R, "e160_32b_e2e_latency_verdict.json")))
+e160b = json.load(open(os.path.join(R, "e160b_128k_expandable_verdict.json")))
+q32b_dense = [e160["results"]["L32768"]["dense_tpot_ms"],
+              e160["results"]["L65536"]["dense_tpot_ms"],
+              e160b["results"]["L131072"]["dense_tpot_ms"]]
+q32b_tli = [e160["results"]["L32768"]["tli_graph_tpot_ms"],
+            e160["results"]["L65536"]["tli_graph_tpot_ms"],
+            e160b["results"]["L131072"]["tli_graph_tpot_ms"]]
+# Llama-3.1-8B：E159 graph-vs-dense-eager 主表口径（pc40 主源）
+e159 = json.load(open(os.path.join(R, "e159_llama_e2e_latency_verdict.json")))
+llama_tbl = e159["cross_caliber_primary_table"]["pc40"]
+llama_dense = [llama_tbl[f"L{L}"]["dense_eager_ms"] for L in (32768, 65536, 131072)]
+llama_tli = [llama_tbl[f"L{L}"]["tli_graph_ms"] for L in (32768, 65536, 131072)]
+# 跨机一致性（E160R pc31 复刻臂，仅注记用）
+e160r = json.load(open(os.path.join(R, "e160r_32b_replication_verdict.json")))
+repl_dev_max = max(e160r["deviation_vs_original"][k]["speedup_dev_pct"]
+                   for k in ("L32768", "L65536"))
 
 # ---------------- 画布 ----------------
 fig, (ax_a, ax_b, ax_c) = plt.subplots(1, 3, figsize=(27, 9),
@@ -92,7 +125,7 @@ w = 0.38
 ax_a.bar([i - w / 2 for i in x], base_ms, width=w, color=C_BASE,
          label="dense FullKV", edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
 ax_a.bar([i + w / 2 for i in x], tli_ms, width=w, color=C_TLI,
-         label="TLI (K1=128, K2=1024)", edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
+         label="LoDA-SA (K1=128, K2=1024)", edgecolor="black", linewidth=LINE_WIDTHS["marker_edge"] * 0.6)
 ax_a.set_yscale("log")
 ax_a.set_ylim(3e-3, 50)
 ax_a.set_yticks([1e-2, 1e-1, 1, 10])
@@ -100,7 +133,7 @@ ax_a.set_xticks(list(x))
 ax_a.set_xticklabels(stage_labels)
 ax_a.set_ylabel("per-step GPU time (ms, log scale)")
 ax_a.set_title("Decode steady state: 5.47x @64K", pad=14)
-ax_a.legend(loc="upper left")
+ax_a.legend(loc="upper left", fontsize=FONT_SIZES["legend"] - 3)
 # 仅 total 条标注数值（分项数值进 tsv，避免 log 轴低矮条标签互叠）
 ax_a.text(5 - w / 2, h["baseline_gpu_ms"] * 1.15, f"{h['baseline_gpu_ms']:.2f}",
           ha="center", fontsize=FONT_SIZES["annotation"] - 2)
@@ -153,41 +186,80 @@ ax_b.text(0.02, 0.02, "single-layer synthetic prefill;\nshort lengths remain net
           transform=ax_b.transAxes, fontsize=FONT_SIZES["annotation"] - 4,
           style="italic", color=pal["neutral"], va="bottom")
 
-# ---- 面板 (c)：完整请求 TPOT vs L（E152v2 v2 连续 wall 口径）----
+# ---- 面板 (c)：完整请求 TPOT vs L（三模型 graph 时代，取代 e152v2 旧口径）----
 Lk_c = [32, 64, 128]
-dense_tp = [rm[f"L{L}"]["dense_dynamic"]["tpot_ms"] for L in (32768, 65536, 131072)]
-tli_tp = [rm[f"L{L}"]["tli_dynamic"]["tpot_ms"] for L in (32768, 65536, 131072)]
-tli_st = [rm["L32768"]["tli_static"]["tpot_ms"]]  # 仅 32K 已采（E134-pre）
-ax_c.plot(Lk_c, dense_tp, "-o", color=C_DENSE, label="dense (FullKV, HF pipeline)",
-          markersize=14, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
-ax_c.plot(Lk_c, tli_tp, "-^", color=C_TLI, label="TLI (dynamic cache)",
-          markersize=14, markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
-ax_c.plot([32], tli_st, "D", color=C_HL, markersize=12,
-          markeredgecolor="black", markeredgewidth=LINE_WIDTHS["marker_edge"] * 0.6,
-          label="TLI + StaticCache (E134-pre)")
+models = [
+    ("Qwen3-8B", q8b_dense, q8b_tli, "o"),
+    ("Qwen3-32B", q32b_dense, q32b_tli, "s"),
+    ("Llama-3.1-8B", llama_dense, llama_tli, "^"),
+]
+for name, dd, tt, mk in models:
+    ax_c.plot(Lk_c, dd, "--", color=C_DENSE, marker=mk, markersize=13,
+              markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"],
+              linewidth=LINE_WIDTHS["data"] * 0.8)
+    ax_c.plot(Lk_c, tt, "-", color=C_TLI, marker=mk, markersize=13,
+              markeredgecolor="white", markeredgewidth=LINE_WIDTHS["marker_edge"])
+# eager 无 graph 臂（仅 8B 有连续序列，诚实画出符号翻转的系统杠杆）
+ax_c.plot(Lk_c, q8b_eager, ":", color=C_EAGER, marker="o", markersize=9,
+          markerfacecolor="none", markeredgecolor=C_EAGER,
+          linewidth=LINE_WIDTHS["data"] * 0.6)
 ax_c.set_xscale("log", base=2)
 ax_c.set_yscale("log")
+ax_c.set_xlim(27, 330)
+ax_c.set_ylim(18, 220)
 ax_c.set_xticks(Lk_c)
 ax_c.set_xticklabels([f"{l}K" for l in Lk_c])
-ax_c.set_yticks([20, 30, 50, 100, 150])
+ax_c.set_yticks([20, 30, 50, 100, 200])
 ax_c.get_yaxis().set_minor_formatter(matplotlib.ticker.NullFormatter())
 ax_c.set_xlabel("input length L (tokens)")
 ax_c.set_ylabel("decode TPOT (ms/token, log scale)")
-ax_c.set_title("Full-request decode: 36 layers, HF pipeline", pad=14)
-ax_c.legend(loc="upper left", fontsize=FONT_SIZES["annotation"] - 2)
-for lk, d, t in zip(Lk_c, dense_tp, tli_tp):
-    ax_c.annotate(f"{d:.0f}", (lk, d), textcoords="offset points", xytext=(0, 10),
-                  ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_DENSE)
-    ax_c.annotate(f"{t:.0f}", (lk, t), textcoords="offset points", xytext=(0, -18),
-                  ha="center", fontsize=FONT_SIZES["annotation"] - 3, color=C_TLI)
-ax_c.annotate(f"{tli_st[0]:.0f}", (32, tli_st[0]), textcoords="offset points",
-              xytext=(14, 6), ha="left", fontsize=FONT_SIZES["annotation"] - 3, color=C_HL)
-ax_c.text(0.98, 0.42, "kernel-level gains (A) do not reach e2e:\nhost/launch chain dominates — 72 KV-cache\ncat-copies/step + Python indexer;\nStaticCache closes part (87.9 -> 82.0 ms)",
-          transform=ax_c.transAxes, fontsize=FONT_SIZES["annotation"] - 3,
-          style="italic", color=pal["neutral"], ha="right")
-ax_c.text(0.02, 0.02, "v2 continuous-wall protocol, ABBA x3,\nmax_gen=128, greedy; per-step sync diagnostic mode",
+ax_c.set_title("E2E decode: LoDA-SA+graph vs dense (bit-exact)", pad=14, loc="left")
+# 图例（线型语义；模型由右侧括号标注区分）
+from matplotlib.lines import Line2D  # noqa: E402
+handles = [
+    Line2D([0], [0], ls="--", color=C_DENSE, marker="o", markersize=11,
+           markeredgecolor="white", label="dense FullKV (eager)"),
+    Line2D([0], [0], ls="-", color=C_TLI, marker="o", markersize=11,
+           markeredgecolor="white", label="LoDA-SA + CUDA graph"),
+]
+ax_c.legend(handles=handles, loc="upper left", fontsize=FONT_SIZES["legend"] - 6)
+# 数值标注：32K 密集对（持平属故事本身）TLI 值右置；64K 上/下置；128K 并入括号文本
+for name, dd, tt, mk in models:
+    for i, (lk, d, t) in enumerate(zip(Lk_c, dd, tt)):
+        if i == 0:
+            ax_c.annotate(f"{d:.0f}", (lk, d), textcoords="offset points",
+                          xytext=(0, 10), ha="center", va="bottom",
+                          fontsize=FONT_SIZES["annotation"] - 4, color=C_DENSE)
+            ax_c.annotate(f"{t:.1f}", (lk, t), textcoords="offset points",
+                          xytext=(13, -4), ha="left", va="center",
+                          fontsize=FONT_SIZES["annotation"] - 4, color=C_TLI)
+        elif i == 1:
+            ax_c.annotate(f"{d:.0f}", (lk, d), textcoords="offset points",
+                          xytext=(0, 10), ha="center", va="bottom",
+                          fontsize=FONT_SIZES["annotation"] - 4, color=C_DENSE)
+            ax_c.annotate(f"{t:.1f}", (lk, t), textcoords="offset points",
+                          xytext=(0, -10), ha="center", va="top",
+                          fontsize=FONT_SIZES["annotation"] - 4, color=C_TLI)
+# 128K 加速比括号 + 模型名 + 端点值（右侧直标，Quest 风格图内结论；y 手工错开防互叠）
+bracket_y = {"Qwen3-8B": 58.0, "Qwen3-32B": 100.0, "Llama-3.1-8B": 36.0}
+for name, dd, tt, mk in models:
+    sp = dd[-1] / tt[-1]
+    ax_c.annotate("", xy=(128, tt[-1]), xytext=(128, dd[-1]),
+                  arrowprops=dict(arrowstyle="<->", color=C_HL,
+                                  lw=LINE_WIDTHS["reference"] * 0.8, shrinkA=2, shrinkB=2))
+    ax_c.text(134, bracket_y[name], f"{name}\n{dd[-1]:.0f} -> {tt[-1]:.1f} ms\n{sp:.2f}x",
+              fontsize=FONT_SIZES["annotation"] - 2, color=C_HL,
+              fontweight="bold", va="center", ha="left")
+# eager 臂行内直标（诚实边界：无 graph 时 launch 主导；线上方居左）
+ax_c.text(40, 110, "LoDA-SA eager: 99-134 ms",
+          fontsize=FONT_SIZES["annotation"] - 4, color=C_EAGER,
+          ha="left", va="bottom", style="italic")
+ax_c.text(0.98, 0.86,
+          "gen bit-exact, 3 models\n"
+          "H20-3e: pc40/pc32 arms\n"
+          f"cross-machine dev <{repl_dev_max:.1f}%",
           transform=ax_c.transAxes, fontsize=FONT_SIZES["annotation"] - 4,
-          style="italic", color=pal["neutral"], va="bottom")
+          style="italic", color=pal["neutral"], va="top", ha="right")
 
 # 面板字母
 for ax, letter in ((ax_a, "A"), (ax_b, "B"), (ax_c, "C")):
@@ -225,14 +297,30 @@ for L, d, s1, s2 in zip(Ls, dense_ms, step1_ms, step2_ms):
     rows.append(f"E2\tb@L{L}\tdense\twall_ms\tms\t{d:.1f}\t{src139}\tL_{L}")
     rows.append(f"E2\tb@L{L}\tstep1_graph\twall_ms\tms\t{s1:.1f}\t{src139}\tL_{L}")
     rows.append(f"E2\tb@L{L}\tstep2_graph\twall_ms\tms\t{s2:.1f}\t{src139}\tL_{L}")
-src152 = "e152v2_e2e_latency_verdict.json:results_median"
-for L, d, t in zip((32768, 65536, 131072), dense_tp, tli_tp):
-    rows.append(f"E2\tc@L{L}\tdense_dynamic\ttpot_ms\tms\t{d:.1f}\t{src152}\tL{L}.dense_dynamic.tpot_ms")
-    rows.append(f"E2\tc@L{L}\ttli_dynamic\ttpot_ms\tms\t{t:.1f}\t{src152}\tL{L}.tli_dynamic.tpot_ms")
-rows.append(f"E2\tc@L32768\ttli_static\ttpot_ms\tms\t{tli_st[0]:.1f}\t{src152}\tL32768.tli_static.tpot_ms")
 src133c = "e133c_subspace_speedup_verdict.json:steady_gpu_ms"
 rows.append(f"E2\ta\ttli_e133c_delta\tsteady_gpu_delta_pct\tpct\t{e133c_e2e_pct:.1f}\t{src133c}\tmavg_e2e.delta_pct")
 rows.append(f"E2\ta\ttli_e133c_delta_tail\tsteady_gpu_delta_pct\tpct\t{e133c_tail_pct:.1f}\t{src133c}\tmavg_tail.delta_pct")
+# 面板 (c)：三模型 e2e TPOT（graph 时代口径）
+c_src = {
+    "Qwen3-8B": ("e152v4_formal_verdict.json:arms.pc40.L", q8b_dense, q8b_tli, q8b_eager),
+    "Qwen3-32B": ("e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results",
+                  q32b_dense, q32b_tli, None),
+    "Llama-3.1-8B": ("e159_llama_e2e_latency_verdict.json:cross_caliber_primary_table.pc40",
+                     llama_dense, llama_tli, None),
+}
+for name, (src, dd, tt, ee) in c_src.items():
+    for L, d, t in zip((32768, 65536, 131072), dd, tt):
+        rows.append(f"E2\tc@L{L}\t{name}_dense\ttpot_ms\tms\t{d:.2f}\t{src}\tdense")
+        rows.append(f"E2\tc@L{L}\t{name}_tli_graph\ttpot_ms\tms\t{t:.2f}\t{src}\ttli_graph")
+        rows.append(f"E2\tc@L{L}\t{name}_speedup\tratio\tx\t{d / t:.3f}\t{src}\tdense/tli_graph")
+    if ee is not None:
+        for L, e in zip((32768, 65536, 131072), ee):
+            rows.append(f"E2\tc@L{L}\t{name}_tli_eager\ttpot_ms\tms\t{e:.2f}\t{src}\ttli_eager")
+rows.append(f"E2\tc\tcross_machine_dev_max\tpct\t{repl_dev_max:.2f}\t"
+            "e160r_32b_replication_verdict.json:deviation_vs_original\tspeedup_dev_pct")
+rows.append("E2\tc\tsuperseded\tnote\t-\t"
+            "panel (c) replaced e152v2 dynamic-cache caliber (TLI 3.4x/2.5x/1.8x SLOWER) "
+            "with E152v4/E160/E160b/E159 whole-step-CUDA-graph caliber on 2026-10-23")
 with open(os.path.join(OUT, "E2_latency_figure_data.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 print("exported E2_latency_figure_data.tsv")

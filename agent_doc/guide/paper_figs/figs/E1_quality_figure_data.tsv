@@ -47,21 +47,36 @@ E1	a	trec	tli_mavg	score	71.50			e116b_full_lbv1.json
 E1	a	triviaqa	paired_delta	points	-1.22			e116b_full_lbv1.json:arms.*.per_task.triviaqa
 E1	a	triviaqa	fullkv	score	90.71			e116b_full_lbv1.json
 E1	a	triviaqa	tli_mavg	score	89.49			e116b_full_lbv1.json
-E1	b	lbv1_16	fullkv	score	48.11			e116b_full_lbv1.json/e116b_ruler128k
-E1	b	lbv1_16	tli_mavg	score	48.90			e116b_full_lbv1.json/e116b_ruler128k
-E1	b	lbv1_16	quest	score	41.35			main_table_quest_vs_tli_draft.md §1/§2 + e119_ruler128k_formal_quest_vendor.json
+E1	b	lbv1_16	fullkv	score	48.11			e116b_full_lbv1.json
+E1	b	lbv1_16	tli_mavg	score	48.90			e116b_full_lbv1.json
+E1	b	lbv1_16	quest	score	41.35			main_table_quest_vs_tli_draft.md §1/§2
 E1	b	lbv1_16	fasa	score	33.31			exp/trace/results/fasa_lb_16.json + exp/results_longbench_fasa/Qwen3-8B/pred_fasa_1024_lbv2/pred/result.json
-E1	b	lbv1_16	clusterkv	score				pending
-E1	b	lbv2_503	fullkv	score	32.21			e116b_full_lbv1.json/e116b_ruler128k
-E1	b	lbv2_503	tli_mavg	score	32.21			e116b_full_lbv1.json/e116b_ruler128k
-E1	b	lbv2_503	quest	score	30.22			main_table_quest_vs_tli_draft.md §1/§2 + e119_ruler128k_formal_quest_vendor.json
+E1	b	lbv2_503	fullkv	score	32.21			e116b_full_lbv1.json
+E1	b	lbv2_503	tli_mavg	score	32.21			e116b_full_lbv1.json
+E1	b	lbv2_503	quest	score	30.22			main_table_quest_vs_tli_draft.md §1/§2
 E1	b	lbv2_503	fasa	score	11.93			exp/trace/results/fasa_lb_16.json + exp/results_longbench_fasa/Qwen3-8B/pred_fasa_1024_lbv2/pred/result.json
-E1	b	lbv2_503	clusterkv	score				pending
-E1	b	ruler_128k	fullkv	score	46.43			e146_ruler128k_verdict.json (E146 formal)
-E1	b	ruler_128k	tli_mavg	score	23.98			e146_ruler128k_verdict.json (E146 formal)
-E1	b	ruler_128k	quest	score	19.33			main_table_quest_vs_tli_draft.md §1/§2 + e119_ruler128k_formal_quest_vendor.json
-E1	b	ruler_128k	fasa	score				exp/trace/results/fasa_lb_16.json + exp/results_longbench_fasa/Qwen3-8B/pred_fasa_1024_lbv2/pred/result.json
-E1	b	ruler_128k	clusterkv	score				pending
-E1_note	e116b_tli_128k_invalid	note	-	niah_single 100/100/99 = FullKV-shaped, sparse path not effective; superseded by E146 formal 23.98
-E1_note	fasa_ruler128k_missing	note	-	FASA RULER 128K untested (method limits: only RULER 32K 6/11 tasks with s1=0); not extrapolated
+E1	b	note	superseded	-	old RULER-128K bar group retired 2026-10-23: E146 beta.125 collapse arm (23.98) superseded by T6 champion curve in panel (c); FASA RULER now measured (18.64/1.72/1.40), untested note retired
 E1	b	tail32_avg5	score	47.59	-0.51	-0.10	e133_subspace_verdict.json
+E1	c@L32768	fullkv	avg11	score	59.38			e116e_ruler32_formal_fullkv.json + e146_ruler64k_formal.json + e119_ruler128k_formal_fullkv.json
+E1	c@L65536	fullkv	avg11	score	48.54			e116e_ruler32_formal_fullkv.json + e146_ruler64k_formal.json + e119_ruler128k_formal_fullkv.json
+E1	c@L131072	fullkv	avg11	score	46.43			e116e_ruler32_formal_fullkv.json + e146_ruler64k_formal.json + e119_ruler128k_formal_fullkv.json
+E1	c@L32768	tli_champ	avg11	score	59.02			t6_ruler_q8b_L{32768,65536,131072}_champ.json
+E1	c@L65536	tli_champ	avg11	score	47.80			t6_ruler_q8b_L{32768,65536,131072}_champ.json
+E1	c@L131072	tli_champ	avg11	score	46.82			t6_ruler_q8b_L{32768,65536,131072}_champ.json
+E1	c@L32768	quest	avg11	score	42.85			e119_ruler{32k,64k,128k}_formal_quest_vendor.json
+E1	c@L65536	quest	avg11	score	26.25			e119_ruler{32k,64k,128k}_formal_quest_vendor.json
+E1	c@L131072	quest	avg11	score	19.33			e119_ruler{32k,64k,128k}_formal_quest_vendor.json
+E1	c@L32768	asynctls	avg11	score	48.33			e119_ruler{32768,65536,131072}_formal_asynctls_vendor_fix.json
+E1	c@L65536	asynctls	avg11	score	33.88			e119_ruler{32768,65536,131072}_formal_asynctls_vendor_fix.json
+E1	c@L131072	asynctls	avg11	score	37.47			e119_ruler{32768,65536,131072}_formal_asynctls_vendor_fix.json
+E1	c@L32768	fasa	avg11	score	18.64			e119_ruler32768_formal_fasa_20261021.json + e119_ruler65536_formal_fasa_vendor.json + e119_ruler131072_formal_fasa_vendor.json
+E1	c@L65536	fasa	avg11	score	1.72			e119_ruler32768_formal_fasa_20261021.json + e119_ruler65536_formal_fasa_vendor.json + e119_ruler131072_formal_fasa_vendor.json
+E1	c@L131072	fasa	avg11	score	1.40			e119_ruler32768_formal_fasa_20261021.json + e119_ruler65536_formal_fasa_vendor.json + e119_ruler131072_formal_fasa_vendor.json
+E1	c@L32768	tli_retention	ratio	%	99.4			t6_ruler_q8b champ / separate-run fullkv anchor
+E1	c@L65536	tli_retention	ratio	%	98.5			t6_ruler_q8b champ / separate-run fullkv anchor
+E1	c@L131072	tli_retention	ratio	%	100.8			t6_ruler_q8b champ / separate-run fullkv anchor
+E1	c@L32768	ClusterKV_vendor32k	avg11	score	60.60			e119_ruler32768_formal_clusterkv_vendor.json
+E1	c@L32768	SparQ_vendor32k	avg11	score	60.45			e119_ruler32768_formal_sparq_vendor.json
+E1	c@L32768	HISA_vendor32k	avg11	score	59.69			e119_ruler32768_formal_hisa_vendor.json
+E1	c@L32768	JSSA_vendor32k	avg11	score	58.70			jssa_r32k_formal.json (dual-record adjudication: newer formal 58.7 over e119 unified batch 59.13)
+E1	c	note	vendor32k_scope	-	32K-only arms have no 64K/128K formal batches; not extrapolated; all within +/-2.2 of the 32K anchor column
