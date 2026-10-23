@@ -6,29 +6,44 @@
 第四轮重构：nt 降格后旧 (b) far 保底配额面板退役；叙事统一到 E155d 绝对
 配额 nb/nl 口径，α/β/γ 比例语言全部移除）：
 
-  (a) 分区+异构打分创新点（token strip，真实数据，四条带）：一条 14K 真实 query
-      （musique s1 layer24 q=14212，固定示例披露：far 份额 0.494 = 128 query
-      第 55 百分位，非规则产出；同等代表性候选中稀释机理最清晰）的逐
-      64-token bin 质量条带（顶，非选集）+ mass-rank 整页参考 / avg / minmax
-      三个选择带，对称四态编码（蓝=参考内选中、红斜线=参考漏页、橙点=参考外
-      入选、灰=未选；斜线/点纹保证灰度可辨）。near/far 区域底色贯穿全高
-      （far 淡高亮色 / near 淡主色），avg/minmax 各自漏掉的参考页落在哪个
-      区域一眼可辨——avg 漏的页偏 far、minmax 漏的页偏 near。
-      数据源追加 e140b_pooling_anatomy.json（同口径 import 复用 v2 采集器，
-      页边界与 bin 逐一对齐断言）。
-  (b) 区域互补漏失面板（2026-10-21 新，替代旧 far 保底配额曲线）：128 query
-      均值的漏失参考质量按 near/far 区域堆叠分解，block-avg 与 minmax 两柱
-      互补镜像——avg 漏失 2/3 集中在 far（0.170 vs 近端 0.084），minmax 漏失
-      2/3 集中在 near（0.079 vs 远端 0.042）；near 区两者平手（0.084≈0.079，
-      用廉价的 block-avg 无质量代价），far 区 minmax 4× 收益（0.170→0.042）
-      → near-avg + far-minmax 异构打分的量化动机。预算分配（近区页数
-      nb·64 vs 近区长 nl）是设计轴，由 E155d 网格判决（半覆盖律
-      nb·64=nl/2，A6 图），不在本诊断平面内模拟（mass≠e2e）。
-  (c) 子空间创新点（不变）：同 32/128 维预算 tail32 0.84 vs random32 0.51
-      vs high32 0.24（v2 主指标 selected_mass_over_reference_topk_mass）。
-  (d) D' gate 创新点：E6 逐层 far mass 热图（16 样本 × 36 层，log 色标，
-      单一来源 e6b_far_profiles.json）——24/36 层逐样本中位 <0.01；同一
-      热图逐 prompt 计数有 12–32 层 <0.01 → 逐层 far gate。
+  (a) 分区+异构打分创新点（token strip，真实数据，三条带）：一条真实 query
+      （hotpotqa s0 layer24 q=8672，固定示例披露：far 份额 0.703 = 128 query
+      第 87 百分位、中位 0.456；在 128 条观测中按双口径——页数与漏失质量
+      同时——互补性最极端的 3/1 候选之一，非规则产出）的 mass-rank 整页
+      参考 / avg / minmax 三个选择带，纯色四态编码（蓝=参考内选中、红=
+      参考漏页、橙=参考外入选、灰=未选；黑边标漏/入选页）。near/far 区域
+      洗色覆盖条带（far 淡高亮色 / near 淡主色，叠于四态矩形之上），加
+      near_lo 虚线分界与区域标注——avg 漏的红页聚在 far 侧、minmax 漏的
+      聚在 near 侧一眼可读。数据源 e140b_pooling_anatomy.json（同口径
+      import 复用 v2 采集器，页边界与 bin 逐一对齐断言）。
+      2026-10-23 第七轮（用户裁决）：顶带 attn mass 删除（四带→三带，
+      选择带相对高度 1→4/3 更粗）；斜线/点纹 hatch 全部退役（64 token 页
+      印刷宽度 ~1.4pt，hatch 物理不可辨），改纯色四态；代表 query 从
+      musique s1 q14212（互补性 65/61% 均值级）换成 hotpotqa s0 q8672
+      （互补极端例：avg 漏 8 页载 86.5% 参考质量且 3/4 在远端、minmax 漏
+      9 页但仅 4.7% 且 4/5 在近端；尖峰页@832 单 token 99.85% 页质量，
+      oracle 选中→avg 稀释落选→minmax 救回，机理链完整保留）。
+      2026-10-23 第八轮（用户裁决「留一个选的图，远近区双柱状图直接删掉」）：
+      (b') 区域互补堆叠柱列整体退役，1×4→1×3 网格，面板重排号为 (a)(b)(c)；
+      互补统计数字（near/far 漏失份额、65%/61% 区域聚类、漏页数）保留在
+      Intro P2 与 S6 文本（可复现 build_region_miss_stats.py），不随图丢失；
+      (a) 条带列宽由删列释放的宽度扩大（页矩形更宽更可辨）。
+  (b) 子空间创新点（第八轮前编号称 (c)）：同 32/128 维预算 tail32 0.84 vs
+      random32 0.51 vs high32 0.24（v2 主指标
+      selected_mass_over_reference_topk_mass）。
+  (c) D' gate 创新点（第八轮前编号称 (d)）：E6 逐层 far mass 热图
+      （16 样本 × 36 层，log 色标，单一来源 e6b_far_profiles.json）——
+      24/36 层逐样本中位 <0.01；同一热图逐 prompt 计数有 12–32 层 <0.01
+      → 逐层 far gate。
+  (b'-retired) 区域互补漏失堆叠柱（2026-10-21 新，2026-10-23 第八轮退役）：
+      128 query 均值的漏失参考质量按 near/far 区域堆叠分解，block-avg 与
+      minmax 两柱互补镜像——avg 漏失 2/3 集中在 far（0.170 vs 近端 0.084），
+      minmax 漏失 2/3 集中在 near（0.079 vs 远端 0.042）；near 区两者平手
+      （0.084≈0.079，用廉价的 block-avg 无质量代价），far 区 minmax 4× 收益
+      （0.170→0.042）→ near-avg + far-minmax 异构打分的量化动机。数字保留在
+      Intro P2/S6 文本。预算分配（近区页数 nb·64 vs 近区长 nl）是设计轴，
+      由 E155d 网格判决（半覆盖律 nb·64=nl/2，A6 图），不在本诊断平面内
+      模拟（mass≠e2e）。
 
 2026-10-16 第三轮迭代（用户指示「继续迭代你的」源图线，手稿侧归 GPT）：
   6) panel (a) 从三条带（质量/oracle/avg+✓）改为四条带对称呈现——顶带逐页
@@ -137,9 +152,10 @@ cells = d["cells"]
 db = json.load(open(SRCB))
 
 # ================= (a) 代表 query 的 token strip =================
-# repr query 固定为 musique s1 L24 q=14212（披露：固定示例，非规则产出——
-# far 份额 0.494 = 128 query 第 55 百分位、中位 0.456，区域质量分段有代表性；
-# 同等代表性候选中其 avg 稀释机理最清晰。身份与手稿 caption 一致）
+# repr query 固定为 hotpotqa s0 L24 q=8672（披露：固定示例，非规则产出——
+# far 份额 0.703 = 128 query 第 87 百分位、中位 0.456；双口径互补性最极端
+# 候选：avg 漏 8/32 页载 86.5% 参考质量（far .651/near .214），minmax 漏
+# 9 页但仅 4.7%（near .037/far .0095）。身份与手稿 caption 一致）
 BUDGET_TOK = 2048  # 单池预算（mid token）
 
 
@@ -165,9 +181,9 @@ def far_share(o):
 
 share_med = float(np.median([far_share(o) for c in cells for o in c["o1"]]))
 share_all = np.array([far_share(o) for c in cells for o in c["o1"]])
-c_a = next(c for c in cells if c["task"] == "musique" and c["sample"] == 1
+c_a = next(c for c in cells if c["task"] == "hotpotqa" and c["sample"] == 0
            and c["layer"] == 24)
-o_a = next(o for o in c_a["o1"] if o["q_pos"] == 14212)
+o_a = next(o for o in c_a["o1"] if o["q_pos"] == 8672)
 share_a = far_share(o_a)
 share_pct = float((share_all < share_a).mean() * 100)
 rb = o_a["region_bounds"]
@@ -358,88 +374,101 @@ skip_rng = (M < 0.01).sum(axis=1)  # 逐 prompt <0.01 层数（同源重算）
 # 标题字号 T 15→13 且收短（旧 (a)/(c) 标题宽于所在列互叠）；色标竖排 + shrink
 # 锚定底部（旧顶部横排标签与 inset 标题相撞）；尖峰 ▼ 移入 ylim(0,4.35) 头部
 # （旧 4.12 越轴顶压图例）。
-fig = plt.figure(figsize=(10.2, 3.9))
+fig = plt.figure(figsize=(10.2, 3.9))  # 第七轮保持 3.9：曾试 3.6 回收 en 页预算，但 (d)
+# 16 序列双行 ytick 行距闭合（15 处硬碰撞）；页预算改由正文/结论文字压缩回收
+# 第八轮：删 (b') 统计柱列，1×3 网格；删列宽度并入 (a) 条带
 gs = fig.add_gridspec(
-    1, 4, width_ratios=[1.85, 0.50, 0.78, 0.76],
-    wspace=0.56,
+    1, 3, width_ratios=[1.85, 0.78, 0.76],
+    wspace=0.46,
     left=0.105, right=0.90, top=0.85, bottom=0.22)
 ax_a = fig.add_subplot(gs[0, 0])
-ax_b = fig.add_subplot(gs[0, 1])   # (b') 统计柱：真实子列
-ax_c = fig.add_subplot(gs[0, 2])
-ax_d = fig.add_subplot(gs[0, 3])
+ax_c = fig.add_subplot(gs[0, 1])
+ax_d = fig.add_subplot(gs[0, 2])
 
 
-# ---- (a) token strip：质量带 + 三个选择带（对称四态编码，灰度可辨） ----
+# ---- (a) token strip：三个选择带（纯色四态编码，第七轮） ----
 cmap_mass = mcolors.LinearSegmentedColormap.from_list("mass", ["#ffffff", C_MAIN])
-norm_mass = mcolors.LogNorm(vmin=2e-4, vmax=2e-2)
 X0, X1 = float(min(pos_c)), float(max(pos_c))
 n_pg = len(mass_a)
 w_pg = (X1 - X0) / n_pg  # bin 等宽近似（bins 非连续覆盖，见上文注释）
 C_MISS = "#d62728"
-C_EXTRA = "#e08214"
-# 顶带：逐 bin 质量（log 色标，是统计量不是选集）
-ax_a.imshow(mass_a[None, :], aspect="auto", cmap=cmap_mass, norm=norm_mass,
-            extent=[X0, X1, 3.0, 4.0], interpolation="nearest")
-# 三个选择带：mass-rank 整页参考 / avg / minmax。每页四态：
-# 蓝 = 参考内选中，红+斜线 = 参考漏页，橙+点纹 = 参考外入选，灰 = 未选。
-# （吸收手稿侧 GPT 7d8c397/d1d0d6e 的对称与灰度设计回源图）
+C_EXTRA = "#9467bd"  # 紫（第七轮：旧橙 #e08214 与远区洗色 C_HL #FF6B35
+             # 同亮度同色系不可辨，改紫与蓝/红/橙/灰四向分离）
+# 三个选择带：mass-rank 整页参考 / avg / minmax。每页四态纯色：
+# 蓝 = 参考内选中，红 = 参考漏页，紫 = 参考外入选，灰 = 未选；
+# 红/紫加黑边（第七轮：hatch 在 ~1.4pt 页宽下物理不可辨，退役）
+# 第九轮美化：带高 1.0→0.88、带间留 0.12 间隙（三带无缝堆叠读作整块）；
+# 保护区/区域洗色仍贯通全高，间隙处恰好显出区域底色
 for sel, y0 in ((sel_o, 2.0), (sel_avg, 1.0), (sel_mm, 0.0)):
     for i in range(n_pg):
         in_ref, in_x = i in sel_o, i in sel
         if in_ref and in_x:
-            fc_i, ht_i = C_MAIN, None
+            fc_i, ec_i, lw_i = C_MAIN, "none", 0.0
         elif in_ref:
-            fc_i, ht_i = C_MISS, "///"
+            fc_i, ec_i, lw_i = C_MISS, "black", 0.5
         elif in_x:
-            fc_i, ht_i = C_EXTRA, ".."
+            fc_i, ec_i, lw_i = C_EXTRA, "black", 0.5
         else:
-            fc_i, ht_i = "#e9e9e9", None
+            fc_i, ec_i, lw_i = "#e9e9e9", "none", 0.0
         ax_a.add_patch(Rectangle(
-            (X0 + i * w_pg, y0), w_pg, 1.0, facecolor=fc_i, hatch=ht_i,
-            edgecolor="black" if ht_i else "none",
-            lw=0.5 if ht_i else 0.0, zorder=3))
+            (X0 + i * w_pg, y0 + 0.06), w_pg, 0.88, facecolor=fc_i,
+            edgecolor=ec_i, lw=lw_i, zorder=3))
 # sink / swa 保护区（不在 mid bins 内；区域太窄无法内嵌文字）
 ax_a.axvspan(0, rb["sink_hi"], color=C_NEU, alpha=0.35, lw=0)
 ax_a.axvspan(rb["swa_lo"], q_a + 1, color=C_NEU, alpha=0.35, lw=0)
-# near/far 区域底色贯穿全高（2026-10-21：漏页区域归属可视化——
-# avg 漏的红斜线页偏右（far 底色带）、minmax 漏的偏左（near 底色带）；
-# 与 (b) 面板堆叠配色一致：far=C_HL、near=C_MAIN；alpha 0.12 为像素
-# 采样实测的一眼可辨强度，四态矩形 zorder=3 不受影响）
-ax_a.axvspan(rb["sink_hi"], rb["near_lo"], color=C_HL, alpha=0.12,
-             lw=0, zorder=2.5)
-ax_a.axvspan(rb["near_lo"], rb["swa_lo"], color=C_MAIN, alpha=0.12,
-             lw=0, zorder=2.5)
-# near/far 区域标注（置于顶带中部）
+# near/far 区域洗色：叠于四态矩形之上（第七轮——旧 zorder2.5 底色被
+# 不透明矩形完全遮盖，区域归属实际不可见，即用户「看不出漏失区域」的
+# 根因之一）；第九轮 alpha 0.15→0.20（印刷缩放后几乎不可读的残留因素），
+# 与退役 (b') 堆叠配色一致（far=C_HL、near=C_MAIN），
+# 配 near_lo 虚线分界 + 头部区域标注
+ax_a.axvspan(rb["sink_hi"], rb["near_lo"], color=C_HL, alpha=0.20,
+             lw=0, zorder=3.5)
+ax_a.axvspan(rb["near_lo"], rb["swa_lo"], color=C_MAIN, alpha=0.20,
+             lw=0, zorder=3.5)
+# near/far 区域标注（头部空带 y≈3.65，图例带之下——图例实测横跨全宽，
+# 须纵向分层避让；far 中心约 near_lo/2，
+# near 中心 (near_lo+swa_lo)/2——版式铁律：区域占比数字进 caption/TSV）
 _tagbox = dict(boxstyle="round,pad=0.2", facecolor="white",
                edgecolor="none", alpha=0.85)
-# near/far 区域标注（顶带；far 标签置于图例右缘与 near 标签之间的空窗，
-# 中心 x10500；far token 占比数字进 caption/TSV——版式铁律）
-ax_a.text(9700, 3.5, "远区" if ZH else "far", ha="center",
+ax_a.text((rb["sink_hi"] + rb["near_lo"]) / 2, 3.50,
+          "远区" if ZH else "far", ha="center",
           va="center", fontsize=AN - 2, color=C_HL, fontweight="bold",
           bbox=_tagbox)
-ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 3.5, "近区" if ZH else "near",
+ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 3.50, "近区" if ZH else "near",
           ha="center", fontsize=AN, color=C_MAIN, fontweight="bold", bbox=_tagbox)
 ax_a.axvline(rb["near_lo"], color=C_HL, lw=1.6, linestyle="--")
-# 尖峰页标记（▼，页 @spike.pos_lo：单 token 占页质量 99.8%，被 avg 稀释落选，
-# minmax 救回；说明在 caption）
+# 尖峰页标记（▼，页 @spike.pos_lo=832：单 token 占页质量 99.85%，oracle
+# 选中→avg 稀释落选→minmax 救回；说明在 caption）
 i_sp = bin_lo.index(spike["pos_lo"])
-# ▼ 置于 ylim(0,4.35) 头部（图例带之下、顶带之上）；旧 4.12+clip_on=False
-# 越轴顶与图例 bbox 相撞（字形级门只测文字，此处防视觉压叠）
-ax_a.plot([pos_c[i_sp]], [4.18], marker="v", color=C_MISS, markersize=7,
+# ▼ 置于区域标注(3.65)与条带顶(2.94)之间的空档 y≈3.35（第九轮图例移
+# 右上角后 ▼ 与图例不再横向重叠，但仍保持纵向分层清晰）
+ax_a.plot([pos_c[i_sp]], [3.35], marker="v", color=C_MISS, markersize=7,
           zorder=6)
 # 紧凑图例（用户 2026-10-16：图内不堆文字，数字解释并入 caption；
-# 2026-10-21 标签缩短——ncol=2 长标签组占满顶带左 60% 致 far 区标注无处安放）
-leg_a = [Patch(fc=C_MAIN, label="参考内选中" if ZH else "in ref, selected"),
-         Patch(fc=C_MISS, hatch="///", ec="black", lw=0.5,
-               label="参考漏页" if ZH else "ref missed"),
-         Patch(fc=C_EXTRA, hatch="..", ec="black", lw=0.5,
-               label="参考外入选" if ZH else "outside ref"),
+# 第七轮纯色无 hatch，图例柄同步简化；第九轮左上→右上：旧左上横排
+# 占满全宽迫使图例/标注/▼三层纵向避让（头部死区 32%），右上角与
+# near 标注(居中 x≈7472)、far 标注(≈3264)横向错开，释放一整层）
+leg_a = [Patch(fc=C_MAIN, label="参考内" if ZH else "in ref"),
+         Patch(fc=C_MISS, ec="black", lw=0.5,
+               label="漏页" if ZH else "missed"),
+         Patch(fc=C_EXTRA, ec="black", lw=0.5,
+               label="参考外" if ZH else "outside"),
          Patch(fc="#e9e9e9", ec="0.6",
                label="未选" if ZH else "unselected")]
-ax_a.legend(handles=leg_a, loc="upper left", bbox_to_anchor=(0.005, 1.02),
+ax_a.legend(handles=leg_a, loc="upper right", bbox_to_anchor=(0.995, 1.005),
             fontsize=LG - 4, framealpha=0.92, handlelength=1.0,
             borderpad=0.30, labelspacing=0.9, ncol=4, columnspacing=0.55)
-if os.environ.get("O_DEBUG_BB"):  # 量 legend/tag 数据坐标盒（布局调试用）
+ax_a.set_xlim(0, q_a + 1)
+ax_a.set_xticks(range(0, 11000, 2000))  # 第九轮：旧刻度止于 8000，轴到 ~11700 不对称
+ax_a.set_ylim(0, 4.15)  # 第九轮 4.4→4.15：图例移右上后三层纵向避让松绑；条带占 71%
+for _sp in ("top", "right", "left"):   # 第九轮：条带图去脊线杂讯
+    ax_a.spines[_sp].set_visible(False)
+ax_a.set_yticks([0.5, 1.5, 2.5])
+ax_a.set_yticklabels(["极值" if ZH else "minmax", "均值" if ZH else "avg",
+                      "质量参考" if ZH else "mass ref"],
+                     fontsize=TK - 1.5)
+if os.environ.get("O_DEBUG_BB"):  # 量 legend/tag 数据坐标盒（须在 set_ylim 后，
+    # 否则 transData 用自动缩放坐标，测量值与最终渲染错位——第七轮修正）
     fig.canvas.draw()
     _r = fig.canvas.get_renderer()
     _inv = ax_a.transData.inverted()
@@ -447,14 +476,6 @@ if os.environ.get("O_DEBUG_BB"):  # 量 legend/tag 数据坐标盒（布局调�
         _bb = _art.get_window_extent(_r).transformed(_inv)
         print(f"[bb] {str(_art)[:40]} x:[{_bb.x0:.0f},{_bb.x1:.0f}] "
               f"y:[{_bb.y0:.2f},{_bb.y1:.2f}]")
-ax_a.set_xlim(0, q_a + 1)
-ax_a.set_xticks(range(0, 15000, 3000))
-ax_a.set_ylim(0, 4.35)   # 头部 0.35 给 ▼ 标记（第六轮）
-ax_a.set_yticks([0.5, 1.5, 2.5, 3.5])
-ax_a.set_yticklabels(["极值" if ZH else "minmax", "均值" if ZH else "avg",
-                      "质量参考" if ZH else "mass ref",
-                      "注意力质量" if ZH else "attn mass"],
-                     fontsize=TK - 1.5)
 ax_a.set_xlabel("key 位置（词元）；query 在右端" if ZH
                 else "key position (tokens); query at right end",
                 fontsize=L, labelpad=12)
@@ -462,44 +483,13 @@ ax_a.set_title("(a) 均值漏远端尖峰；极值漏近端" if ZH
                else "(a) Avg misses far; minmax near",
                loc="left", pad=10, fontsize=T, fontweight="bold")
 ax_a.tick_params(axis="x", labelsize=TK)
-sm = plt.cm.ScalarMappable(cmap=cmap_mass, norm=norm_mass)
-# 色标：竖排标签 + shrink 0.72 锚定底部（第六轮——旧顶部横排标签压 inset
-# 标题/图例；锚底后标签位于柱区中部，与 (b') ytick 横向分离 >20pt）
-cb = fig.colorbar(sm, ax=ax_a, fraction=0.028, pad=0.045,
-                  shrink=0.72, anchor=(0.0, 0.0))
-# 标签横排放色标顶右上（列间空带；竖排左右两侧分别压 (a) 条带边与 (b') ytick）
-cb.ax.text(1.05, 1.02, "log 质量" if ZH else "log mass",
-           transform=cb.ax.transAxes, ha="left", va="bottom",
-           fontsize=AN - 2)
-cb.ax.tick_params(labelsize=TK - 3)
+# 第七轮：顶带 attn mass 删除后其 log 色标一并退役（(d) 热图自带色标；
+# 释放的列宽直接扩大 (a) 条带，页矩形更宽更可辨）
 
-# ---- (b') 区域互补漏失堆叠柱（(a) 右侧真实网格列，128 query 均值）----
-# 设计：两根柱 = block-avg / minmax 打分器，各自漏失的参考质量按区域堆叠
-# （底段 near=C_MAIN、顶段 far=C_HL，与 (a) 区域底色/标注配色一致）。
-# 第六轮：inset_axes → 网格列；ylabel「missed ref mass」退役进 caption
-# （左旋 ylabel 会与 (a) 色标标签同带相撞，yticks 0/.1/.2 已表量纲）。
-xb = np.arange(2)
-near_vals = [avg_near_m, mm_near_m]
-far_vals = [avg_far_m, mm_far_m]
-ax_b.bar(xb, near_vals, width=0.52, color=C_MAIN,
-         edgecolor="black", linewidth=.7, label="近区" if ZH else "near")
-ax_b.bar(xb, far_vals, width=0.52, bottom=near_vals, color=C_HL,
-         edgecolor="black", linewidth=.7, label="远区" if ZH else "far")
-ax_b.set_xticks(xb)
-ax_b.set_xticklabels(["avg", "mm"], fontsize=TK - 4)
-# ylim 头部 0.36 留给带标题的轴内左上图例（柱顶 .254 之上）
-ax_b.set_ylim(0, 0.36)
-ax_b.set_yticks([0.0, 0.1, 0.2])
-ax_b.tick_params(axis="y", labelsize=TK - 4)
-# 「N = 128」并入图例标题（样本量记法；旧 "128 queries" 在窄列探入 (c) ylabel）
-leg_b = ax_b.legend(loc="upper left", fontsize=LG - 4.5, framealpha=0.92,
-                    labelspacing=1.2, handlelength=1.0,
-                    title="N = 128")
-leg_b.get_title().set_fontsize(AN - 3)
-leg_b.get_title().set_fontweight("bold")
-leg_b._legend_box.align = "left"
+# ---- (b') 区域互补漏失堆叠柱：第八轮整列退役（用户裁决），数字保留
+# 在 Intro P2 / S6 文本，可复现 build_region_miss_stats.py ----
 
-# ---- (c) O3 三臂 ----
+# ---- (b) O3 三臂（第八轮前编号 (c)） ----
 colors3 = [C_MAIN, C_NEU, C_SEC]
 for i, (a, col) in enumerate(zip(arms, colors3)):
     ax_c.bar([i], [arm_rm[a]], width=0.58, color=col, edgecolor="black",
@@ -512,12 +502,16 @@ ax_c.set_ylabel("选中 / 参考质量" if ZH else "selected / reference mass",
                 fontsize=L)
 ax_c.set_ylim(0, 1.0)
 ax_c.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
-ax_c.set_title("(c) 选哪 32 维" if ZH else "(c) Which 32 dims",
+for _sp in ("top", "right"):   # 第九轮：柱状图去上/右脊线 + 浅横向网格
+    ax_c.spines[_sp].set_visible(False)
+ax_c.grid(axis="y", color="#d5d5d5", linewidth=0.5)
+ax_c.set_axisbelow(True)
+ax_c.set_title("(b) 选哪 32 维" if ZH else "(b) Which 32 dims",
                loc="left", pad=10, fontsize=T,
                fontweight="bold")
 ax_c.tick_params(labelsize=TK)
 
-# ---- (d) E6 逐层 far mass 热图 ----
+# ---- (c) E6 逐层 far mass 热图（第八轮前编号 (d)） ----
 norm6 = mcolors.LogNorm(vmin=1e-7, vmax=1.0)
 im = ax_d.imshow(M, aspect="auto", cmap=cmap_mass, norm=norm6,
                  interpolation="nearest")
@@ -525,7 +519,7 @@ ax_d.set_xticks([0, 8, 16, 24, 32])
 ax_d.set_yticks(range(len(ROW_ORDER)))
 ax_d.set_yticklabels([ROW_LAB[k] for k in ROW_ORDER], fontsize=TK - 5.3)
 ax_d.set_xlabel("层" if ZH else "layer", fontsize=L, labelpad=12)
-ax_d.set_title("(d) 逐层远区质量" if ZH else "(d) Far mass by layer",
+ax_d.set_title("(c) 逐层远区质量" if ZH else "(c) Far mass by layer",
                loc="left", pad=10,
                fontsize=T, fontweight="bold")
 ax_d.tick_params(axis="x", labelsize=TK)
@@ -553,7 +547,7 @@ export(fig, "O_observation_zh" if ZH else "O_observation")
 # ---------------- figure_data.tsv ----------------
 rows = ["figure_id\tpanel_id\tarm_id\tmetric_id\tunit\testimate\tsource_run_id\tsource_field"]
 src = os.path.basename(SRC)
-rows.append(f"O\ta\trepr_query\tidentity\t-\t{c_a['task']}:s{c_a['sample']}:L{c_a['layer']}:q{q_a}\t{src}\tfixed illustrative example (not rule-derived): far share {share_a:.4f} = pct{share_pct:.0f} of 128 queries, median {share_med:.4f}; clearest dilution anatomy among comparably representative candidates")
+rows.append(f"O\ta\trepr_query\tidentity\t-\t{c_a['task']}:s{c_a['sample']}:L{c_a['layer']}:q{q_a}\t{src}\tfixed illustrative example (not rule-derived): far share {share_a:.4f} = pct{share_pct:.0f} of 128 queries, median {share_med:.4f}; one of 3/128 queries extreme on BOTH page-count and missed-mass complementarity (avg misses far, minmax near)")
 rows.append(f"O\ta\trepr_query\tfar_share\tfrac\t{share_a:.4f}\t{src}\tbins, absolute-position region attribution")
 rows.append(f"O\ta\tall_queries\tfar_share_median\tfrac\t{share_med:.4f}\t{src}\tbins, absolute-position region attribution")
 rows.append(f"O\ta\trepr_query\tfar_tok_frac\tfrac\t{far_tok_frac:.4f}\t{src}\tbins")
@@ -575,22 +569,23 @@ if spike:
 rows.append(f"O\ta\tall_queries\tfar_top5pct_bin_concentration\tfrac\t{conc_mean:.4f}\t{src}\tbins")
 for x, msv, s in zip(pos_c, mass_a, sel_mask):
     rows.append(f"O\ta\trepr_strip\tbin_mass\tfrac\t{msv:.4e}\t{src}\tpos={x:.0f},sel={int(s)}")
+rows.append(f"O\tb-retired\tall\tregion_miss_panel\t-\t-\t-\t2026-10-23 eighth revision: near/far region-miss stacked-bar column withdrawn (user verdict, keep one selection panel); stats below retained as text-cited data (Intro P2 / S6), reproducible via dac_manuscript/sources/build_region_miss_stats.py")
 for rid, am, mm, nref in reg_all:
-    rows.append(f"O\tb\t{rid}\tmiss_mass_by_region\tfrac\tavg_near {am[0]:.4f},avg_far {am[1]:.4f},mm_near {mm[0]:.4f},mm_far {mm[1]:.4f}\t{srcb}\tn_ref={nref},n_miss_avg_near {am[2]},n_miss_avg_far {am[3]},n_miss_mm_near {mm[2]},n_miss_mm_far {mm[3]}")
-rows.append(f"O\tb\tall\tmiss_mass_block_avg\tnear,far\t{avg_near_m:.4f},{avg_far_m:.4f}\t{srcb}\tmean over {len(reg_all)} queries; region attribution = aligned-bin absolute interval [q-d_hi, q-d_lo+1) vs region_bounds.near_lo")
-rows.append(f"O\tb\tall\tmiss_mass_minmax\tnear,far\t{mm_near_m:.4f},{mm_far_m:.4f}\t{srcb}\tsame caliber; avg misses far (2/3 of its miss), minmax misses near (2/3 of its miss): complementary")
-rows.append(f"O\tb\tall\tmiss_mass_totals\tavg,mm\t{ams_mean:.4f},{mms_mean:.4f}\t{srcb}\tmean over {len(ams_all)} queries (region-unresolved included)")
-rows.append(f"O\tb\tall\tmiss_pages_block_avg\tnear,far\t{avg_near_p:.2f},{avg_far_p:.2f}\t{srcb}\tmean missed pages; page-count criterion differs from mass criterion")
-rows.append(f"O\tb\tall\tmiss_pages_minmax\tnear,far\t{mm_near_p:.2f},{mm_far_p:.2f}\t{srcb}\tmean missed pages")
-rows.append(f"O\tb\tretired\tquota_floor_panel\t-\t-\t-\t2026-10-21 fourth revision: old far-quota paired-arm panel withdrawn (nt demoted; nb/nl absolute-quota caliber). Hybrid near-budget scan (offline, diagnostic plane; reproducible via dac_manuscript/sources/build_region_miss_stats.py): best 0.1345@near-budget-1408 still above global minmax 0.1208; budget split is the E155d grid axis (task-accuracy caliber), not simulated here (mass != e2e)")
+    rows.append(f"O\tb-retired\t{rid}\tmiss_mass_by_region\tfrac\tavg_near {am[0]:.4f},avg_far {am[1]:.4f},mm_near {mm[0]:.4f},mm_far {mm[1]:.4f}\t{srcb}\tn_ref={nref},n_miss_avg_near {am[2]},n_miss_avg_far {am[3]},n_miss_mm_near {mm[2]},n_miss_mm_far {mm[3]}")
+rows.append(f"O\tb-retired\tall\tmiss_mass_block_avg\tnear,far\t{avg_near_m:.4f},{avg_far_m:.4f}\t{srcb}\tmean over {len(reg_all)} queries; region attribution = aligned-bin absolute interval [q-d_hi, q-d_lo+1) vs region_bounds.near_lo")
+rows.append(f"O\tb-retired\tall\tmiss_mass_minmax\tnear,far\t{mm_near_m:.4f},{mm_far_m:.4f}\t{srcb}\tsame caliber; avg misses far (2/3 of its miss), minmax misses near (2/3 of its miss): complementary")
+rows.append(f"O\tb-retired\tall\tmiss_mass_totals\tavg,mm\t{ams_mean:.4f},{mms_mean:.4f}\t{srcb}\tmean over {len(ams_all)} queries (region-unresolved included)")
+rows.append(f"O\tb-retired\tall\tmiss_pages_block_avg\tnear,far\t{avg_near_p:.2f},{avg_far_p:.2f}\t{srcb}\tmean missed pages; page-count criterion differs from mass criterion")
+rows.append(f"O\tb-retired\tall\tmiss_pages_minmax\tnear,far\t{mm_near_p:.2f},{mm_far_p:.2f}\t{srcb}\tmean missed pages")
+rows.append(f"O\tb-retired\tretired\tquota_floor_panel\t-\t-\t-\t2026-10-21 fourth revision: old far-quota paired-arm panel withdrawn (nt demoted; nb/nl absolute-quota caliber). Hybrid near-budget scan (offline, diagnostic plane; reproducible via dac_manuscript/sources/build_region_miss_stats.py): best 0.1345@near-budget-1408 still above global minmax 0.1208; budget split is the E155d grid axis (task-accuracy caliber), not simulated here (mass != e2e)")
 for a in arms:
     for mm, v in zip(mets_all, arm_val[a]):
-        rows.append(f"O\tc\t{a}\t{mm}\tfrac\t{v:.4f}\t{src}\to3.{a}.{mm}.mean")
+        rows.append(f"O\tb\t{a}\t{mm}\tfrac\t{v:.4f}\t{src}\to3.{a}.{mm}.mean")
 for k, row in zip(ROW_ORDER, M):
     for li, v in enumerate(row):
-        rows.append(f"O\td\t{k}\tfar_mass\tfrac\t{v:.4e}\te6b_far_profiles.json\tlayer={li}")
-rows.append(f"O\td\tall\tlayers_median_lt_0.01\tcount\t{n_light}\te6b_far_profiles.json\t-")
-rows.append(f"O\td\tall\tlayers_lt_0.01_per_prompt\trange\t{int(skip_rng.min())}-{int(skip_rng.max())}\te6b_far_profiles.json\trecomputed per-row from the same 16x36 heatmap (single source; GPT-review fix: e6_layer_skip.json 10-prompt summary withdrawn)")
+        rows.append(f"O\tc\t{k}\tfar_mass\tfrac\t{v:.4e}\te6b_far_profiles.json\tlayer={li}")
+rows.append(f"O\tc\tall\tlayers_median_lt_0.01\tcount\t{n_light}\te6b_far_profiles.json\t-")
+rows.append(f"O\tc\tall\tlayers_lt_0.01_per_prompt\trange\t{int(skip_rng.min())}-{int(skip_rng.max())}\te6b_far_profiles.json\trecomputed per-row from the same 16x36 heatmap (single source; GPT-review fix: e6_layer_skip.json 10-prompt summary withdrawn)")
 if not ZH:  # TSV 仅英文渲染时写（内容语言无关，避免双写）
     with open(os.path.join(OUT, "O_observation_figure_data.tsv"), "w") as f:
         f.write("\n".join(rows) + "\n")

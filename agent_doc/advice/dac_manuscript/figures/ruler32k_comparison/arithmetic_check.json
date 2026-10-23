@@ -1,6 +1,6 @@
 {
-  "source_revision": "b5a97b314119006dc7e1624bf60268ff2501e44d + 51b4679c52feebc5327775c660db41550b1c8782 (64K)",
-  "measurements": "author-reported aggregates; local arithmetic only",
+  "source_revision": "b5a97b314119006dc7e1624bf60268ff2501e44d + 51b4679c52feebc5327775c660db41550b1c8782 (64K) + T6 local runs (uncommitted exp/) 2026-10-23",
+  "measurements": "author-reported aggregates + this-run T6 champion runs; local arithmetic only",
   "models": {
     "8B": {
       "method_avg": 59.29090909090909,
@@ -28,22 +28,69 @@
       "beta0625_avg": 48.85,
       "beta125_avg": 48.04545454545455,
       "fullkv_anchor_avg": 48.53636363636364,
+      "t6_champ_avg": 47.8,
       "delta_beta0625_vs_beta125": 0.8045454545454547,
       "delta_beta0625_vs_fullkv": 0.3136363636363626,
-      "delta_beta125_vs_fullkv": -0.49090909090909207
+      "delta_beta125_vs_fullkv": -0.49090909090909207,
+      "delta_t6_champ_vs_fullkv": -0.7363636363636417
+    },
+    "8B-32K-T6-champ": {
+      "fullkv_anchor_avg": 59.38181818181818,
+      "quota_8_320_avg": 59.29090909090909,
+      "t6_champ_avg": 59.02090909090909,
+      "delta_t6_champ_vs_fullkv": -0.3609090909090895,
+      "delta_quota_vs_fullkv": -0.09090909090909349
+    },
+    "8B-128K": {
+      "fullkv_anchor_avg": 46.43181818181818,
+      "beta0625_avg": 45.72545454545455,
+      "beta125_avg": 46.02,
+      "t6_champ_avg": 46.81636363636363,
+      "ratio_kf0_author_reported_avg": 23.98,
+      "delta_t6_champ_vs_fullkv": 0.38454545454545297,
+      "delta_beta0625_vs_fullkv": -0.7063636363636334,
+      "delta_beta125_vs_fullkv": -0.41181818181817675,
+      "delta_ratio_vs_fullkv": -22.45181818181818
     }
   },
+  "t6_receipts": {
+    "L32768": {
+      "run_id": "20261023003349-2837950-5569",
+      "bs": 8,
+      "yarn": "off"
+    },
+    "L65536": {
+      "run_id": "20261023005422-2845695-2513",
+      "bs": 2,
+      "yarn_factor": 2.0
+    },
+    "L131072": {
+      "run_id": "20261023005422-2845702-1841",
+      "bs": 2,
+      "yarn_factor_effective": 4.0
+    }
+  },
+  "ratio_interface_128k": {
+    "avg": 23.98,
+    "provenance": "author-reported aggregate (S6): nominal 128K, YaRN factor 4, alpha=.125/beta=.375/gamma=.625, k_f=0; no per-task JSON in repo"
+  },
   "input_sha256": {
-    "e147h_r64k_formal.json": "3b51786e0bdad08ef8bb2d2491cbfad77ec5baa00f5128c66cbf637152a1dc10",
-    "e147c_r32k_formal.json.manifest.json": "69eebbc755171d420a5ed295f0dfdd05cb9dcfdb64c53e8afc5cd112806ba79a",
-    "e147c_r32k_formal.json": "3eb3780fc50d540764f976a851969be752d92378dc3b158715751e3156063754",
-    "e146c_r64k_formal.json": "41135638588a57ff9bb6257fa835096ba658e8f24652d05fcfb797dec2a54bac",
-    "e143a_r32k_tli_formal.json.manifest.json": "4398c490df4a1e2883b1cceee9296567159985eb4c14f104ddbb8a4a8bb14cfa",
-    "e143a_r32k_tli_formal.json": "39fdda7a68a2e9a9252c1955fc8f09409b64cdee9e96c8fbea7e01bd79b16136",
-    "e143a_r32k_fullkv_formal.json.manifest.json": "6ce3d8860038bc6091d7b367025a55f6e28e46e8d7107515b48a0ed6bce12fd8",
-    "e143a_r32k_fullkv_formal.json": "5476d514bf8177298c01f40bf020135ab8a77f2e03d3e9d7fb21b0cad419c879",
-    "e119_ruler64k_formal_fullkv.json": "97b8eeb397402149f320a7016b194ca5e28c10dbdcc9d7f9569d4e2c414f715b",
+    "e116e_ruler32_formal_fullkv.json": "e1dbf2691bcaa97ffc0a9c689e7f7c69869b23e49927a474d476fe6e79058d9c",
     "e116e_ruler32_formal_fullkv.json.manifest.json": "9bdb946c624d42f03c08add78a57963e5fd24dfbf6e1e1b1a3ef814b5b8394ae",
-    "e116e_ruler32_formal_fullkv.json": "e1dbf2691bcaa97ffc0a9c689e7f7c69869b23e49927a474d476fe6e79058d9c"
+    "e143a_r32k_fullkv_formal.json": "5476d514bf8177298c01f40bf020135ab8a77f2e03d3e9d7fb21b0cad419c879",
+    "e143a_r32k_fullkv_formal.json.manifest.json": "6ce3d8860038bc6091d7b367025a55f6e28e46e8d7107515b48a0ed6bce12fd8",
+    "e143a_r32k_tli_formal.json": "39fdda7a68a2e9a9252c1955fc8f09409b64cdee9e96c8fbea7e01bd79b16136",
+    "e143a_r32k_tli_formal.json.manifest.json": "4398c490df4a1e2883b1cceee9296567159985eb4c14f104ddbb8a4a8bb14cfa",
+    "e147c_r32k_formal.json": "3eb3780fc50d540764f976a851969be752d92378dc3b158715751e3156063754",
+    "e147c_r32k_formal.json.manifest.json": "69eebbc755171d420a5ed295f0dfdd05cb9dcfdb64c53e8afc5cd112806ba79a",
+    "e147h_r64k_formal.json": "3b51786e0bdad08ef8bb2d2491cbfad77ec5baa00f5128c66cbf637152a1dc10",
+    "e146c_r64k_formal.json": "41135638588a57ff9bb6257fa835096ba658e8f24652d05fcfb797dec2a54bac",
+    "e119_ruler64k_formal_fullkv.json": "97b8eeb397402149f320a7016b194ca5e28c10dbdcc9d7f9569d4e2c414f715b",
+    "t6_ruler_q8b_L32768_champ.json": "d69ddbefe2b47bcdc2ea67144d36e8f11404250104d8abf56d543496715d0ee0",
+    "t6_ruler_q8b_L65536_champ.json": "dd3334965d7a3d4e3e045baf48608bb959eb793e80945f5292b555e3d0d5e058",
+    "t6_ruler_q8b_L131072_champ.json": "e4c7e5c722e03ffa9fc2daf4345b975296ba7d27489e5483fcf986d32322c0bd",
+    "e147h_r128k_formal.json": "4f230f48e698410127ee7c24da2cb7116a1fc9a49b19615fdcbd089ca872a407",
+    "e146c_r128k_formal.json": "53ae5c55592abe06c155b6639e067d394f05e307a0ff1ed23d2ef94065de234b",
+    "e119_ruler128k_formal_fullkv.json": "67e722a546bfd982d474ee20fdaec9db64fe48f35f361d76b5fee3e77c9885c5"
   }
 }

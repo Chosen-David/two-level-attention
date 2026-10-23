@@ -1,962 +1,876 @@
 figure_id	panel_id	arm_id	metric_id	unit	estimate	source_run_id	source_field
-O	a	repr_query	identity	-	musique:s1:L24:q14212	e140_o_trace_v2.json	fixed illustrative example (not rule-derived): far share 0.4941 = pct55 of 128 queries, median 0.4564; clearest dilution anatomy among comparably representative candidates
-O	a	repr_query	far_share	frac	0.4941	e140_o_trace_v2.json	bins, absolute-position region attribution
+O	a	repr_query	identity	-	hotpotqa:s0:L24:q8672	e140_o_trace_v2.json	fixed illustrative example (not rule-derived): far share 0.7029 = pct87 of 128 queries, median 0.4564; one of 3/128 queries extreme on BOTH page-count and missed-mass complementarity (avg misses far, minmax near)
+O	a	repr_query	far_share	frac	0.7029	e140_o_trace_v2.json	bins, absolute-position region attribution
 O	a	all_queries	far_share_median	frac	0.4564	e140_o_trace_v2.json	bins, absolute-position region attribution
-O	a	repr_query	far_tok_frac	frac	0.7474	e140_o_trace_v2.json	bins
-O	a	repr_query	single_pool_near_capture	frac	0.8695	e140_o_trace_v2.json	bin mass-rank top-2048, accept-if-fits
-O	a	repr_query	single_pool_far_capture	frac	0.7358	e140_o_trace_v2.json	bin mass-rank top-2048, accept-if-fits
-O	a	repr_query	oracle_strip_tokens	count	1989	e140_o_trace_v2.json	budget 2048, accept-if-fits (GPT-review fix)
-O	a	repr_query	avg_pool_miss_pages	count	13/32	e140b_pooling_anatomy.json	single pool 2048 tok, 32-dim tail subspace avg page score
-O	a	repr_query	avg_pool_miss_mass_frac	frac	0.5965	e140b_pooling_anatomy.json	missed mass-rank-ref mass / ref mass
-O	a	repr_query	minmax_recover_pages	count	6 (far 3/4)	e140b_pooling_anatomy.json	Quest bound, mean over 32 Q-heads
-O	a	repr_query	minmax_recover_mass_frac	frac	0.4937	e140b_pooling_anatomy.json	recovered pages' mass / ref mass
-O	a	repr_query	minmax_miss_pages	count	17/32	e140b_pooling_anatomy.json	symmetric: minmax misses MORE pages than avg
-O	a	repr_query	minmax_miss_mass_frac	frac	0.2646	e140b_pooling_anatomy.json	but LESS ref mass than avg (0.5965): page-count vs mass criteria differ
-O	a	repr_query	avg_extra_pages	count	13	e140b_pooling_anatomy.json	selected outside mass-rank reference
-O	a	repr_query	minmax_extra_pages	count	17	e140b_pooling_anatomy.json	selected outside mass-rank reference
+O	a	repr_query	far_tok_frac	frac	0.7452	e140_o_trace_v2.json	bins
+O	a	repr_query	single_pool_near_capture	frac	0.9439	e140_o_trace_v2.json	bin mass-rank top-2048, accept-if-fits
+O	a	repr_query	single_pool_far_capture	frac	0.9528	e140_o_trace_v2.json	bin mass-rank top-2048, accept-if-fits
+O	a	repr_query	oracle_strip_tokens	count	2017	e140_o_trace_v2.json	budget 2048, accept-if-fits (GPT-review fix)
+O	a	repr_query	avg_pool_miss_pages	count	8/32	e140b_pooling_anatomy.json	single pool 2048 tok, 32-dim tail subspace avg page score
+O	a	repr_query	avg_pool_miss_mass_frac	frac	0.8650	e140b_pooling_anatomy.json	missed mass-rank-ref mass / ref mass
+O	a	repr_query	minmax_recover_pages	count	6 (far 5/5)	e140b_pooling_anatomy.json	Quest bound, mean over 32 Q-heads
+O	a	repr_query	minmax_recover_mass_frac	frac	0.8608	e140b_pooling_anatomy.json	recovered pages' mass / ref mass
+O	a	repr_query	minmax_miss_pages	count	9/32	e140b_pooling_anatomy.json	symmetric: minmax misses MORE pages than avg
+O	a	repr_query	minmax_miss_mass_frac	frac	0.0465	e140b_pooling_anatomy.json	but LESS ref mass than avg (0.8650): page-count vs mass criteria differ
+O	a	repr_query	avg_extra_pages	count	8	e140b_pooling_anatomy.json	selected outside mass-rank reference
+O	a	repr_query	minmax_extra_pages	count	9	e140b_pooling_anatomy.json	selected outside mass-rank reference
 O	a	all_queries	miss_mass_frac_avg_vs_minmax	frac	0.2543,0.1208	e140b_pooling_anatomy.json	mean over 128 queries; minmax misses less ref mass
-O	a	repr_query	spike_page_top1_token_share	frac	0.9984	e140b_pooling_anatomy.json	page@7936
+O	a	repr_query	spike_page_top1_token_share	frac	0.9985	e140b_pooling_anatomy.json	page@832
 O	a	all_queries	far_top5pct_bin_concentration	frac	0.4507	e140_o_trace_v2.json	bins
-O	a	repr_strip	bin_mass	frac	1.4173e-04	e140_o_trace_v2.json	pos=160,sel=0
-O	a	repr_strip	bin_mass	frac	5.1636e-05	e140_o_trace_v2.json	pos=224,sel=0
-O	a	repr_strip	bin_mass	frac	4.9204e-05	e140_o_trace_v2.json	pos=288,sel=0
-O	a	repr_strip	bin_mass	frac	1.0013e-04	e140_o_trace_v2.json	pos=352,sel=0
-O	a	repr_strip	bin_mass	frac	3.7169e-04	e140_o_trace_v2.json	pos=416,sel=0
-O	a	repr_strip	bin_mass	frac	1.4306e-04	e140_o_trace_v2.json	pos=480,sel=0
-O	a	repr_strip	bin_mass	frac	1.8485e-04	e140_o_trace_v2.json	pos=544,sel=0
-O	a	repr_strip	bin_mass	frac	5.0829e-04	e140_o_trace_v2.json	pos=608,sel=0
-O	a	repr_strip	bin_mass	frac	6.2772e-04	e140_o_trace_v2.json	pos=672,sel=0
-O	a	repr_strip	bin_mass	frac	3.6279e-05	e140_o_trace_v2.json	pos=736,sel=0
-O	a	repr_strip	bin_mass	frac	1.8579e-05	e140_o_trace_v2.json	pos=800,sel=0
-O	a	repr_strip	bin_mass	frac	3.7084e-05	e140_o_trace_v2.json	pos=864,sel=0
-O	a	repr_strip	bin_mass	frac	3.5974e-05	e140_o_trace_v2.json	pos=928,sel=0
-O	a	repr_strip	bin_mass	frac	1.1761e-04	e140_o_trace_v2.json	pos=992,sel=0
-O	a	repr_strip	bin_mass	frac	3.0075e-04	e140_o_trace_v2.json	pos=1056,sel=0
-O	a	repr_strip	bin_mass	frac	8.6777e-05	e140_o_trace_v2.json	pos=1120,sel=0
-O	a	repr_strip	bin_mass	frac	6.1753e-05	e140_o_trace_v2.json	pos=1184,sel=0
-O	a	repr_strip	bin_mass	frac	3.6490e-05	e140_o_trace_v2.json	pos=1248,sel=0
-O	a	repr_strip	bin_mass	frac	2.9286e-04	e140_o_trace_v2.json	pos=1312,sel=0
-O	a	repr_strip	bin_mass	frac	3.1680e-05	e140_o_trace_v2.json	pos=1376,sel=0
-O	a	repr_strip	bin_mass	frac	7.7668e-05	e140_o_trace_v2.json	pos=1440,sel=0
-O	a	repr_strip	bin_mass	frac	1.3763e-04	e140_o_trace_v2.json	pos=1504,sel=0
-O	a	repr_strip	bin_mass	frac	8.5621e-05	e140_o_trace_v2.json	pos=1568,sel=0
-O	a	repr_strip	bin_mass	frac	4.9068e-04	e140_o_trace_v2.json	pos=1632,sel=0
-O	a	repr_strip	bin_mass	frac	2.2724e-04	e140_o_trace_v2.json	pos=1696,sel=0
-O	a	repr_strip	bin_mass	frac	1.7128e-04	e140_o_trace_v2.json	pos=1760,sel=0
-O	a	repr_strip	bin_mass	frac	1.1965e-04	e140_o_trace_v2.json	pos=1824,sel=0
-O	a	repr_strip	bin_mass	frac	5.2664e-04	e140_o_trace_v2.json	pos=1888,sel=0
-O	a	repr_strip	bin_mass	frac	2.2010e-04	e140_o_trace_v2.json	pos=1952,sel=0
-O	a	repr_strip	bin_mass	frac	1.0375e-04	e140_o_trace_v2.json	pos=2016,sel=0
-O	a	repr_strip	bin_mass	frac	2.1055e-04	e140_o_trace_v2.json	pos=2080,sel=0
-O	a	repr_strip	bin_mass	frac	1.5008e-04	e140_o_trace_v2.json	pos=2144,sel=0
-O	a	repr_strip	bin_mass	frac	1.5742e-04	e140_o_trace_v2.json	pos=2208,sel=0
-O	a	repr_strip	bin_mass	frac	2.1198e-04	e140_o_trace_v2.json	pos=2272,sel=0
-O	a	repr_strip	bin_mass	frac	1.2240e-03	e140_o_trace_v2.json	pos=2336,sel=0
-O	a	repr_strip	bin_mass	frac	1.2165e-04	e140_o_trace_v2.json	pos=2400,sel=0
-O	a	repr_strip	bin_mass	frac	1.4737e-04	e140_o_trace_v2.json	pos=2464,sel=0
-O	a	repr_strip	bin_mass	frac	1.5254e-03	e140_o_trace_v2.json	pos=2528,sel=0
-O	a	repr_strip	bin_mass	frac	2.8533e-03	e140_o_trace_v2.json	pos=2592,sel=1
-O	a	repr_strip	bin_mass	frac	1.6267e-03	e140_o_trace_v2.json	pos=2656,sel=0
-O	a	repr_strip	bin_mass	frac	6.9057e-04	e140_o_trace_v2.json	pos=2720,sel=0
-O	a	repr_strip	bin_mass	frac	6.1639e-04	e140_o_trace_v2.json	pos=2784,sel=0
-O	a	repr_strip	bin_mass	frac	4.2190e-04	e140_o_trace_v2.json	pos=2848,sel=0
-O	a	repr_strip	bin_mass	frac	4.6181e-04	e140_o_trace_v2.json	pos=2912,sel=0
-O	a	repr_strip	bin_mass	frac	9.7741e-04	e140_o_trace_v2.json	pos=2976,sel=0
-O	a	repr_strip	bin_mass	frac	9.9693e-04	e140_o_trace_v2.json	pos=3040,sel=0
-O	a	repr_strip	bin_mass	frac	1.2204e-03	e140_o_trace_v2.json	pos=3104,sel=0
-O	a	repr_strip	bin_mass	frac	4.3483e-04	e140_o_trace_v2.json	pos=3168,sel=0
-O	a	repr_strip	bin_mass	frac	2.2137e-03	e140_o_trace_v2.json	pos=3232,sel=1
-O	a	repr_strip	bin_mass	frac	1.1767e-03	e140_o_trace_v2.json	pos=3296,sel=0
-O	a	repr_strip	bin_mass	frac	9.5619e-03	e140_o_trace_v2.json	pos=3360,sel=1
-O	a	repr_strip	bin_mass	frac	2.2693e-03	e140_o_trace_v2.json	pos=3424,sel=1
-O	a	repr_strip	bin_mass	frac	2.9335e-04	e140_o_trace_v2.json	pos=3488,sel=0
-O	a	repr_strip	bin_mass	frac	1.1046e-04	e140_o_trace_v2.json	pos=3552,sel=0
-O	a	repr_strip	bin_mass	frac	2.6191e-04	e140_o_trace_v2.json	pos=3616,sel=0
-O	a	repr_strip	bin_mass	frac	2.5332e-04	e140_o_trace_v2.json	pos=3680,sel=0
-O	a	repr_strip	bin_mass	frac	6.1335e-04	e140_o_trace_v2.json	pos=3744,sel=0
-O	a	repr_strip	bin_mass	frac	7.8067e-05	e140_o_trace_v2.json	pos=3808,sel=0
-O	a	repr_strip	bin_mass	frac	4.3317e-02	e140_o_trace_v2.json	pos=3872,sel=1
-O	a	repr_strip	bin_mass	frac	6.8597e-05	e140_o_trace_v2.json	pos=3936,sel=0
-O	a	repr_strip	bin_mass	frac	8.5988e-05	e140_o_trace_v2.json	pos=4000,sel=0
-O	a	repr_strip	bin_mass	frac	1.9689e-04	e140_o_trace_v2.json	pos=4064,sel=0
-O	a	repr_strip	bin_mass	frac	4.0754e-04	e140_o_trace_v2.json	pos=4128,sel=0
-O	a	repr_strip	bin_mass	frac	2.1571e-04	e140_o_trace_v2.json	pos=4192,sel=0
-O	a	repr_strip	bin_mass	frac	2.7950e-04	e140_o_trace_v2.json	pos=4256,sel=0
-O	a	repr_strip	bin_mass	frac	1.0061e-03	e140_o_trace_v2.json	pos=4320,sel=0
-O	a	repr_strip	bin_mass	frac	6.6156e-04	e140_o_trace_v2.json	pos=4384,sel=0
-O	a	repr_strip	bin_mass	frac	3.3967e-04	e140_o_trace_v2.json	pos=4448,sel=0
-O	a	repr_strip	bin_mass	frac	4.3380e-05	e140_o_trace_v2.json	pos=4512,sel=0
-O	a	repr_strip	bin_mass	frac	3.9618e-05	e140_o_trace_v2.json	pos=4576,sel=0
-O	a	repr_strip	bin_mass	frac	1.4125e-04	e140_o_trace_v2.json	pos=4640,sel=0
-O	a	repr_strip	bin_mass	frac	2.6841e-04	e140_o_trace_v2.json	pos=4704,sel=0
-O	a	repr_strip	bin_mass	frac	1.7943e-04	e140_o_trace_v2.json	pos=4768,sel=0
-O	a	repr_strip	bin_mass	frac	1.7936e-04	e140_o_trace_v2.json	pos=4832,sel=0
-O	a	repr_strip	bin_mass	frac	1.2799e-04	e140_o_trace_v2.json	pos=4896,sel=0
-O	a	repr_strip	bin_mass	frac	1.2531e-04	e140_o_trace_v2.json	pos=4960,sel=0
-O	a	repr_strip	bin_mass	frac	1.5650e-04	e140_o_trace_v2.json	pos=5024,sel=0
-O	a	repr_strip	bin_mass	frac	2.2949e-04	e140_o_trace_v2.json	pos=5088,sel=0
-O	a	repr_strip	bin_mass	frac	3.7399e-04	e140_o_trace_v2.json	pos=5152,sel=0
-O	a	repr_strip	bin_mass	frac	6.5199e-04	e140_o_trace_v2.json	pos=5216,sel=0
-O	a	repr_strip	bin_mass	frac	3.4988e-04	e140_o_trace_v2.json	pos=5280,sel=0
-O	a	repr_strip	bin_mass	frac	8.2666e-05	e140_o_trace_v2.json	pos=5344,sel=0
-O	a	repr_strip	bin_mass	frac	1.5847e-04	e140_o_trace_v2.json	pos=5408,sel=0
-O	a	repr_strip	bin_mass	frac	2.5943e-04	e140_o_trace_v2.json	pos=5472,sel=0
-O	a	repr_strip	bin_mass	frac	1.9913e-04	e140_o_trace_v2.json	pos=5536,sel=0
-O	a	repr_strip	bin_mass	frac	8.3735e-05	e140_o_trace_v2.json	pos=5600,sel=0
-O	a	repr_strip	bin_mass	frac	1.0264e-04	e140_o_trace_v2.json	pos=5664,sel=0
-O	a	repr_strip	bin_mass	frac	8.2696e-05	e140_o_trace_v2.json	pos=5728,sel=0
-O	a	repr_strip	bin_mass	frac	1.6339e-04	e140_o_trace_v2.json	pos=5792,sel=0
-O	a	repr_strip	bin_mass	frac	2.8752e-04	e140_o_trace_v2.json	pos=5856,sel=0
-O	a	repr_strip	bin_mass	frac	3.4668e-04	e140_o_trace_v2.json	pos=5920,sel=0
-O	a	repr_strip	bin_mass	frac	1.1243e-04	e140_o_trace_v2.json	pos=5984,sel=0
-O	a	repr_strip	bin_mass	frac	3.4272e-04	e140_o_trace_v2.json	pos=6048,sel=0
-O	a	repr_strip	bin_mass	frac	1.1868e-04	e140_o_trace_v2.json	pos=6112,sel=0
-O	a	repr_strip	bin_mass	frac	2.5813e-04	e140_o_trace_v2.json	pos=6176,sel=0
-O	a	repr_strip	bin_mass	frac	1.8928e-04	e140_o_trace_v2.json	pos=6240,sel=0
-O	a	repr_strip	bin_mass	frac	4.0048e-04	e140_o_trace_v2.json	pos=6304,sel=0
-O	a	repr_strip	bin_mass	frac	2.8931e-05	e140_o_trace_v2.json	pos=6368,sel=0
-O	a	repr_strip	bin_mass	frac	8.5527e-05	e140_o_trace_v2.json	pos=6432,sel=0
-O	a	repr_strip	bin_mass	frac	3.7925e-05	e140_o_trace_v2.json	pos=6496,sel=0
-O	a	repr_strip	bin_mass	frac	8.9224e-05	e140_o_trace_v2.json	pos=6560,sel=0
-O	a	repr_strip	bin_mass	frac	1.1732e-04	e140_o_trace_v2.json	pos=6624,sel=0
-O	a	repr_strip	bin_mass	frac	2.7694e-04	e140_o_trace_v2.json	pos=6688,sel=0
-O	a	repr_strip	bin_mass	frac	2.5622e-04	e140_o_trace_v2.json	pos=6752,sel=0
-O	a	repr_strip	bin_mass	frac	1.5330e-04	e140_o_trace_v2.json	pos=6816,sel=0
-O	a	repr_strip	bin_mass	frac	2.5024e-04	e140_o_trace_v2.json	pos=6880,sel=0
-O	a	repr_strip	bin_mass	frac	6.3835e-04	e140_o_trace_v2.json	pos=6944,sel=0
-O	a	repr_strip	bin_mass	frac	4.1995e-04	e140_o_trace_v2.json	pos=7008,sel=0
-O	a	repr_strip	bin_mass	frac	3.9886e-04	e140_o_trace_v2.json	pos=7072,sel=0
-O	a	repr_strip	bin_mass	frac	3.6317e-04	e140_o_trace_v2.json	pos=7136,sel=0
-O	a	repr_strip	bin_mass	frac	1.9872e-04	e140_o_trace_v2.json	pos=7200,sel=0
-O	a	repr_strip	bin_mass	frac	2.0834e-04	e140_o_trace_v2.json	pos=7264,sel=0
-O	a	repr_strip	bin_mass	frac	7.3121e-04	e140_o_trace_v2.json	pos=7328,sel=0
-O	a	repr_strip	bin_mass	frac	2.1588e-04	e140_o_trace_v2.json	pos=7392,sel=0
-O	a	repr_strip	bin_mass	frac	1.8250e-04	e140_o_trace_v2.json	pos=7456,sel=0
-O	a	repr_strip	bin_mass	frac	2.6976e-04	e140_o_trace_v2.json	pos=7520,sel=0
-O	a	repr_strip	bin_mass	frac	1.3792e-03	e140_o_trace_v2.json	pos=7584,sel=0
-O	a	repr_strip	bin_mass	frac	6.4227e-04	e140_o_trace_v2.json	pos=7648,sel=0
-O	a	repr_strip	bin_mass	frac	1.5604e-04	e140_o_trace_v2.json	pos=7712,sel=0
-O	a	repr_strip	bin_mass	frac	2.8758e-04	e140_o_trace_v2.json	pos=7776,sel=0
-O	a	repr_strip	bin_mass	frac	4.2625e-04	e140_o_trace_v2.json	pos=7840,sel=0
-O	a	repr_strip	bin_mass	frac	3.0625e-04	e140_o_trace_v2.json	pos=7904,sel=0
-O	a	repr_strip	bin_mass	frac	5.7775e-02	e140_o_trace_v2.json	pos=7968,sel=1
-O	a	repr_strip	bin_mass	frac	2.5453e-04	e140_o_trace_v2.json	pos=8032,sel=0
-O	a	repr_strip	bin_mass	frac	3.6209e-04	e140_o_trace_v2.json	pos=8096,sel=0
-O	a	repr_strip	bin_mass	frac	1.6437e-04	e140_o_trace_v2.json	pos=8160,sel=0
-O	a	repr_strip	bin_mass	frac	1.0937e-04	e140_o_trace_v2.json	pos=8224,sel=0
-O	a	repr_strip	bin_mass	frac	5.6503e-04	e140_o_trace_v2.json	pos=8288,sel=0
-O	a	repr_strip	bin_mass	frac	2.2718e-03	e140_o_trace_v2.json	pos=8352,sel=1
-O	a	repr_strip	bin_mass	frac	9.8578e-04	e140_o_trace_v2.json	pos=8416,sel=0
-O	a	repr_strip	bin_mass	frac	1.0165e-03	e140_o_trace_v2.json	pos=8480,sel=0
-O	a	repr_strip	bin_mass	frac	1.8282e-03	e140_o_trace_v2.json	pos=8544,sel=1
-O	a	repr_strip	bin_mass	frac	1.9581e-03	e140_o_trace_v2.json	pos=8608,sel=1
-O	a	repr_strip	bin_mass	frac	1.2212e-03	e140_o_trace_v2.json	pos=8672,sel=0
-O	a	repr_strip	bin_mass	frac	8.9957e-04	e140_o_trace_v2.json	pos=8736,sel=0
-O	a	repr_strip	bin_mass	frac	1.3256e-03	e140_o_trace_v2.json	pos=8800,sel=0
-O	a	repr_strip	bin_mass	frac	3.8221e-04	e140_o_trace_v2.json	pos=8864,sel=0
-O	a	repr_strip	bin_mass	frac	6.7306e-04	e140_o_trace_v2.json	pos=8928,sel=0
-O	a	repr_strip	bin_mass	frac	1.2266e-03	e140_o_trace_v2.json	pos=8992,sel=0
-O	a	repr_strip	bin_mass	frac	2.0526e-03	e140_o_trace_v2.json	pos=9056,sel=1
-O	a	repr_strip	bin_mass	frac	2.8566e-03	e140_o_trace_v2.json	pos=9120,sel=1
-O	a	repr_strip	bin_mass	frac	1.9558e-04	e140_o_trace_v2.json	pos=9184,sel=0
-O	a	repr_strip	bin_mass	frac	1.6108e-04	e140_o_trace_v2.json	pos=9248,sel=0
-O	a	repr_strip	bin_mass	frac	3.0363e-04	e140_o_trace_v2.json	pos=9312,sel=0
-O	a	repr_strip	bin_mass	frac	6.0429e-04	e140_o_trace_v2.json	pos=9376,sel=0
-O	a	repr_strip	bin_mass	frac	4.1060e-04	e140_o_trace_v2.json	pos=9440,sel=0
-O	a	repr_strip	bin_mass	frac	7.5639e-05	e140_o_trace_v2.json	pos=9504,sel=0
-O	a	repr_strip	bin_mass	frac	1.4001e-04	e140_o_trace_v2.json	pos=9568,sel=0
-O	a	repr_strip	bin_mass	frac	3.5655e-04	e140_o_trace_v2.json	pos=9632,sel=0
-O	a	repr_strip	bin_mass	frac	1.0479e-03	e140_o_trace_v2.json	pos=9696,sel=0
-O	a	repr_strip	bin_mass	frac	1.7104e-04	e140_o_trace_v2.json	pos=9760,sel=0
-O	a	repr_strip	bin_mass	frac	4.5458e-04	e140_o_trace_v2.json	pos=9824,sel=0
-O	a	repr_strip	bin_mass	frac	4.0943e-04	e140_o_trace_v2.json	pos=9888,sel=0
-O	a	repr_strip	bin_mass	frac	4.7046e-04	e140_o_trace_v2.json	pos=9952,sel=0
-O	a	repr_strip	bin_mass	frac	2.8510e-04	e140_o_trace_v2.json	pos=10016,sel=0
-O	a	repr_strip	bin_mass	frac	3.6684e-04	e140_o_trace_v2.json	pos=10080,sel=0
-O	a	repr_strip	bin_mass	frac	4.5852e-04	e140_o_trace_v2.json	pos=10144,sel=0
-O	a	repr_strip	bin_mass	frac	1.2641e-03	e140_o_trace_v2.json	pos=10208,sel=0
-O	a	repr_strip	bin_mass	frac	8.7292e-04	e140_o_trace_v2.json	pos=10272,sel=0
-O	a	repr_strip	bin_mass	frac	2.2598e-04	e140_o_trace_v2.json	pos=10336,sel=0
-O	a	repr_strip	bin_mass	frac	2.2160e-04	e140_o_trace_v2.json	pos=10400,sel=0
-O	a	repr_strip	bin_mass	frac	3.5911e-04	e140_o_trace_v2.json	pos=10464,sel=0
-O	a	repr_strip	bin_mass	frac	2.3831e-02	e140_o_trace_v2.json	pos=10528,sel=1
-O	a	repr_strip	bin_mass	frac	3.8723e-04	e140_o_trace_v2.json	pos=10592,sel=0
-O	a	repr_strip	bin_mass	frac	1.1258e-03	e140_o_trace_v2.json	pos=10656,sel=0
-O	a	repr_strip	bin_mass	frac	3.2778e-03	e140_o_trace_v2.json	pos=10720,sel=1
-O	a	repr_strip	bin_mass	frac	3.6791e-03	e140_o_trace_v2.json	pos=10784,sel=1
-O	a	repr_strip	bin_mass	frac	1.7621e-03	e140_o_trace_v2.json	pos=10848,sel=0
-O	a	repr_strip	bin_mass	frac	1.3024e-04	e140_o_trace_v2.json	pos=10912,sel=0
-O	a	repr_strip	bin_mass	frac	1.2897e-04	e140_o_trace_v2.json	pos=10976,sel=0
-O	a	repr_strip	bin_mass	frac	2.5091e-04	e140_o_trace_v2.json	pos=11040,sel=0
-O	a	repr_strip	bin_mass	frac	1.5373e-04	e140_o_trace_v2.json	pos=11104,sel=0
-O	a	repr_strip	bin_mass	frac	2.0189e-04	e140_o_trace_v2.json	pos=11168,sel=0
-O	a	repr_strip	bin_mass	frac	4.5374e-04	e140_o_trace_v2.json	pos=11232,sel=0
-O	a	repr_strip	bin_mass	frac	2.8477e-04	e140_o_trace_v2.json	pos=11296,sel=0
-O	a	repr_strip	bin_mass	frac	2.0541e-04	e140_o_trace_v2.json	pos=11360,sel=0
-O	a	repr_strip	bin_mass	frac	4.1530e-04	e140_o_trace_v2.json	pos=11424,sel=0
-O	a	repr_strip	bin_mass	frac	5.3872e-04	e140_o_trace_v2.json	pos=11488,sel=0
-O	a	repr_strip	bin_mass	frac	3.6082e-02	e140_o_trace_v2.json	pos=11552,sel=1
-O	a	repr_strip	bin_mass	frac	2.8763e-04	e140_o_trace_v2.json	pos=11616,sel=0
-O	a	repr_strip	bin_mass	frac	5.9386e-04	e140_o_trace_v2.json	pos=11680,sel=0
-O	a	repr_strip	bin_mass	frac	3.4504e-04	e140_o_trace_v2.json	pos=11744,sel=0
-O	a	repr_strip	bin_mass	frac	8.4273e-04	e140_o_trace_v2.json	pos=11808,sel=0
-O	a	repr_strip	bin_mass	frac	9.7374e-04	e140_o_trace_v2.json	pos=11872,sel=0
-O	a	repr_strip	bin_mass	frac	3.9222e-04	e140_o_trace_v2.json	pos=11936,sel=0
-O	a	repr_strip	bin_mass	frac	3.9751e-04	e140_o_trace_v2.json	pos=12000,sel=0
-O	a	repr_strip	bin_mass	frac	9.2636e-04	e140_o_trace_v2.json	pos=12064,sel=0
-O	a	repr_strip	bin_mass	frac	1.0131e-03	e140_o_trace_v2.json	pos=12128,sel=0
-O	a	repr_strip	bin_mass	frac	5.7722e-04	e140_o_trace_v2.json	pos=12192,sel=0
-O	a	repr_strip	bin_mass	frac	6.7903e-04	e140_o_trace_v2.json	pos=12256,sel=0
-O	a	repr_strip	bin_mass	frac	1.1025e-03	e140_o_trace_v2.json	pos=12320,sel=0
-O	a	repr_strip	bin_mass	frac	8.5493e-04	e140_o_trace_v2.json	pos=12384,sel=0
-O	a	repr_strip	bin_mass	frac	2.1714e-03	e140_o_trace_v2.json	pos=12448,sel=1
-O	a	repr_strip	bin_mass	frac	1.5128e-03	e140_o_trace_v2.json	pos=12512,sel=0
-O	a	repr_strip	bin_mass	frac	1.7038e-03	e140_o_trace_v2.json	pos=12576,sel=0
-O	a	repr_strip	bin_mass	frac	1.6274e-03	e140_o_trace_v2.json	pos=12640,sel=0
-O	a	repr_strip	bin_mass	frac	1.6462e-03	e140_o_trace_v2.json	pos=12704,sel=0
-O	a	repr_strip	bin_mass	frac	1.7687e-03	e140_o_trace_v2.json	pos=12768,sel=1
-O	a	repr_strip	bin_mass	frac	1.2505e-03	e140_o_trace_v2.json	pos=12832,sel=0
-O	a	repr_strip	bin_mass	frac	7.4380e-03	e140_o_trace_v2.json	pos=12896,sel=1
-O	a	repr_strip	bin_mass	frac	8.2320e-03	e140_o_trace_v2.json	pos=12960,sel=1
-O	a	repr_strip	bin_mass	frac	3.5381e-03	e140_o_trace_v2.json	pos=13024,sel=1
-O	a	repr_strip	bin_mass	frac	7.3960e-04	e140_o_trace_v2.json	pos=13088,sel=0
-O	a	repr_strip	bin_mass	frac	7.0295e-04	e140_o_trace_v2.json	pos=13152,sel=0
-O	a	repr_strip	bin_mass	frac	1.2079e-03	e140_o_trace_v2.json	pos=13216,sel=0
-O	a	repr_strip	bin_mass	frac	1.7693e-03	e140_o_trace_v2.json	pos=13280,sel=1
-O	a	repr_strip	bin_mass	frac	3.3917e-03	e140_o_trace_v2.json	pos=13344,sel=1
-O	a	repr_strip	bin_mass	frac	2.5331e-03	e140_o_trace_v2.json	pos=13408,sel=1
-O	a	repr_strip	bin_mass	frac	1.1974e-03	e140_o_trace_v2.json	pos=13472,sel=0
-O	a	repr_strip	bin_mass	frac	1.1297e-03	e140_o_trace_v2.json	pos=13536,sel=0
-O	a	repr_strip	bin_mass	frac	2.0368e-03	e140_o_trace_v2.json	pos=13600,sel=1
-O	a	repr_strip	bin_mass	frac	6.6229e-03	e140_o_trace_v2.json	pos=13664,sel=1
-O	a	repr_strip	bin_mass	frac	9.9115e-03	e140_o_trace_v2.json	pos=13728,sel=1
-O	a	repr_strip	bin_mass	frac	1.0567e-02	e140_o_trace_v2.json	pos=13792,sel=1
-O	a	repr_strip	bin_mass	frac	9.8716e-03	e140_o_trace_v2.json	pos=13856,sel=1
-O	a	repr_strip	bin_mass	frac	1.6436e-02	e140_o_trace_v2.json	pos=13920,sel=1
-O	a	repr_strip	bin_mass	frac	8.1974e-03	e140_o_trace_v2.json	pos=13984,sel=1
-O	a	repr_strip	bin_mass	frac	4.3607e-02	e140_o_trace_v2.json	pos=14048,sel=1
-O	a	repr_strip	bin_mass	frac	3.7539e-03	e140_o_trace_v2.json	pos=14082,sel=1
-O	b	hotpotqa:s0:L8:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	hotpotqa:s0:L8:q1253	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=16,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	hotpotqa:s0:L8:q1995	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=28,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	hotpotqa:s0:L8:q2737	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0380,mm_near 0.0000,mm_far 0.0330	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 0,n_miss_mm_far 3
-O	b	hotpotqa:s0:L8:q3479	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0659,mm_near 0.0771,mm_far 0.1263	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 2,n_miss_mm_far 6
-O	b	hotpotqa:s0:L8:q4221	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0531,mm_near 0.0072,mm_far 0.0592	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 7,n_miss_mm_near 1,n_miss_mm_far 8
-O	b	hotpotqa:s0:L8:q4963	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1149,mm_near 0.0352,mm_far 0.1561	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 5,n_miss_mm_near 1,n_miss_mm_far 6
-O	b	hotpotqa:s0:L8:q5705	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0661,mm_near 0.0137,mm_far 0.0680	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 1,n_miss_mm_far 4
-O	b	hotpotqa:s0:L8:q6446	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0563,mm_near 0.0087,mm_far 0.0732	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 7,n_miss_mm_near 1,n_miss_mm_far 8
-O	b	hotpotqa:s0:L8:q7188	miss_mass_by_region	frac	avg_near 0.0696,avg_far 0.1183,mm_near 0.1645,mm_far 0.1514	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 5,n_miss_mm_near 4,n_miss_mm_far 7
-O	b	hotpotqa:s0:L8:q7930	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0854,mm_near 0.0140,mm_far 0.0430	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 6,n_miss_mm_near 1,n_miss_mm_far 3
-O	b	hotpotqa:s0:L8:q8672	miss_mass_by_region	frac	avg_near 0.0375,avg_far 0.0000,mm_near 0.1224,mm_far 0.0399	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 2,n_miss_avg_far 0,n_miss_mm_near 4,n_miss_mm_far 2
-O	b	hotpotqa:s0:L8:q9414	miss_mass_by_region	frac	avg_near 0.0108,avg_far 0.0290,mm_near 0.0790,mm_far 0.0290	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 3,n_miss_mm_near 5,n_miss_mm_far 3
-O	b	hotpotqa:s0:L8:q10156	miss_mass_by_region	frac	avg_near 0.0515,avg_far 0.0268,mm_near 0.2004,mm_far 0.0269	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 3,n_miss_mm_near 7,n_miss_mm_far 3
-O	b	hotpotqa:s0:L8:q10898	miss_mass_by_region	frac	avg_near 0.0894,avg_far 0.1958,mm_near 0.1785,mm_far 0.1699	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 8,n_miss_mm_near 6,n_miss_mm_far 7
-O	b	hotpotqa:s0:L8:q11640	miss_mass_by_region	frac	avg_near 0.0138,avg_far 0.0374,mm_near 0.0182,mm_far 0.0316	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 6,n_miss_mm_near 2,n_miss_mm_far 5
-O	b	hotpotqa:s0:L24:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	hotpotqa:s0:L24:q1253	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=16,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	hotpotqa:s0:L24:q1995	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=28,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	hotpotqa:s0:L24:q2737	miss_mass_by_region	frac	avg_near 0.0351,avg_far 0.0000,mm_near 0.0356,mm_far 0.0125	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 2,n_miss_avg_far 0,n_miss_mm_near 2,n_miss_mm_far 1
-O	b	hotpotqa:s0:L24:q3479	miss_mass_by_region	frac	avg_near 0.0154,avg_far 0.0266,mm_near 0.0336,mm_far 0.0444	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 5,n_miss_mm_near 2,n_miss_mm_far 8
-O	b	hotpotqa:s0:L24:q4221	miss_mass_by_region	frac	avg_near 0.0254,avg_far 0.0011,mm_near 0.0241,mm_far 0.0051	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 1,n_miss_mm_near 3,n_miss_mm_far 3
-O	b	hotpotqa:s0:L24:q4963	miss_mass_by_region	frac	avg_near 0.0481,avg_far 0.0074,mm_near 0.0805,mm_far 0.0133	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 3,n_miss_mm_near 8,n_miss_mm_far 3
-O	b	hotpotqa:s0:L24:q5705	miss_mass_by_region	frac	avg_near 0.1417,avg_far 0.0000,mm_near 0.1475,mm_far 0.0145	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 10,n_miss_avg_far 0,n_miss_mm_near 10,n_miss_mm_far 2
-O	b	hotpotqa:s0:L24:q6446	miss_mass_by_region	frac	avg_near 0.2897,avg_far 0.3673,mm_near 0.0266,mm_far 0.0066	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 2,n_miss_mm_near 7,n_miss_mm_far 3
-O	b	hotpotqa:s0:L24:q7188	miss_mass_by_region	frac	avg_near 0.3345,avg_far 0.1510,mm_near 0.0936,mm_far 0.0266	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 3,n_miss_mm_near 8,n_miss_mm_far 4
-O	b	hotpotqa:s0:L24:q7930	miss_mass_by_region	frac	avg_near 0.2053,avg_far 0.2955,mm_near 0.1593,mm_far 0.0172	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 8,n_miss_avg_far 7,n_miss_mm_near 14,n_miss_mm_far 7
-O	b	hotpotqa:s0:L24:q8672	miss_mass_by_region	frac	avg_near 0.2139,avg_far 0.6511,mm_near 0.0370,mm_far 0.0095	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 5,n_miss_mm_near 6,n_miss_mm_far 3
-O	b	hotpotqa:s0:L24:q9414	miss_mass_by_region	frac	avg_near 0.1720,avg_far 0.3806,mm_near 0.0961,mm_far 0.0203	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 7,n_miss_mm_near 8,n_miss_mm_far 4
-O	b	hotpotqa:s0:L24:q10156	miss_mass_by_region	frac	avg_near 0.2090,avg_far 0.3084,mm_near 0.1462,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 12,n_miss_avg_far 5,n_miss_mm_near 12,n_miss_mm_far 0
-O	b	hotpotqa:s0:L24:q10898	miss_mass_by_region	frac	avg_near 0.1954,avg_far 0.7348,mm_near 0.0619,mm_far 0.0187	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 6,n_miss_mm_near 3,n_miss_mm_far 8
-O	b	hotpotqa:s0:L24:q11640	miss_mass_by_region	frac	avg_near 0.1747,avg_far 0.3530,mm_near 0.0685,mm_far 0.0082	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 5,n_miss_mm_near 8,n_miss_mm_far 3
-O	b	hotpotqa:s1:L8:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	hotpotqa:s1:L8:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	hotpotqa:s1:L8:q2619	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0319,mm_near 0.0000,mm_far 0.0319	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 2,n_miss_mm_near 0,n_miss_mm_far 2
-O	b	hotpotqa:s1:L8:q3673	miss_mass_by_region	frac	avg_near 0.0112,avg_far 0.0550,mm_near 0.0959,mm_far 0.0564	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 4,n_miss_mm_near 5,n_miss_mm_far 4
-O	b	hotpotqa:s1:L8:q4727	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1315,mm_near 0.0341,mm_far 0.2440	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 8,n_miss_mm_near 2,n_miss_mm_far 10
-O	b	hotpotqa:s1:L8:q5781	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0451,mm_near 0.0729,mm_far 0.0637	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 2,n_miss_mm_far 6
-O	b	hotpotqa:s1:L8:q6835	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1577,mm_near 0.0000,mm_far 0.1331	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 6,n_miss_mm_near 0,n_miss_mm_far 5
-O	b	hotpotqa:s1:L8:q7889	miss_mass_by_region	frac	avg_near 0.0131,avg_far 0.0314,mm_near 0.1331,mm_far 0.0180	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 3,n_miss_mm_near 3,n_miss_mm_far 2
-O	b	hotpotqa:s1:L8:q8942	miss_mass_by_region	frac	avg_near 0.0607,avg_far 0.2596,mm_near 0.0644,mm_far 0.2422	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 9,n_miss_mm_near 3,n_miss_mm_far 8
-O	b	hotpotqa:s1:L8:q9996	miss_mass_by_region	frac	avg_near 0.0133,avg_far 0.1819,mm_near 0.0505,mm_far 0.1620	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 10,n_miss_mm_near 3,n_miss_mm_far 9
-O	b	hotpotqa:s1:L8:q11050	miss_mass_by_region	frac	avg_near 0.0402,avg_far 0.0210,mm_near 0.0491,mm_far 0.0210	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 3,n_miss_mm_near 7,n_miss_mm_far 3
-O	b	hotpotqa:s1:L8:q12104	miss_mass_by_region	frac	avg_near 0.0180,avg_far 0.0000,mm_near 0.0558,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 0,n_miss_mm_near 6,n_miss_mm_far 0
-O	b	hotpotqa:s1:L8:q13158	miss_mass_by_region	frac	avg_near 0.1374,avg_far 0.0223,mm_near 0.1984,mm_far 0.0223	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 1,n_miss_mm_near 7,n_miss_mm_far 1
-O	b	hotpotqa:s1:L8:q14212	miss_mass_by_region	frac	avg_near 0.0547,avg_far 0.0065,mm_near 0.1386,mm_far 0.0065	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 1,n_miss_mm_near 9,n_miss_mm_far 1
-O	b	hotpotqa:s1:L8:q15266	miss_mass_by_region	frac	avg_near 0.0196,avg_far 0.0000,mm_near 0.0324,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 0,n_miss_mm_near 5,n_miss_mm_far 0
-O	b	hotpotqa:s1:L8:q16320	miss_mass_by_region	frac	avg_near 0.1851,avg_far 0.1399,mm_near 0.0759,mm_far 0.1399	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 5,n_miss_mm_near 3,n_miss_mm_far 5
-O	b	hotpotqa:s1:L24:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	hotpotqa:s1:L24:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	hotpotqa:s1:L24:q2619	miss_mass_by_region	frac	avg_near 0.0026,avg_far 0.0042,mm_near 0.0044,mm_far 0.0035	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 2,n_miss_mm_near 1,n_miss_mm_far 3
-O	b	hotpotqa:s1:L24:q3673	miss_mass_by_region	frac	avg_near 0.0727,avg_far 0.0242,mm_near 0.1182,mm_far 0.0044	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 4,n_miss_mm_near 10,n_miss_mm_far 1
-O	b	hotpotqa:s1:L24:q4727	miss_mass_by_region	frac	avg_near 0.0426,avg_far 0.3888,mm_near 0.0870,mm_far 0.0060	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 3,n_miss_mm_near 8,n_miss_mm_far 1
-O	b	hotpotqa:s1:L24:q5781	miss_mass_by_region	frac	avg_near 0.0307,avg_far 0.0342,mm_near 0.0843,mm_far 0.0501	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 8,n_miss_mm_near 6,n_miss_mm_far 11
-O	b	hotpotqa:s1:L24:q6835	miss_mass_by_region	frac	avg_near 0.3254,avg_far 0.4489,mm_near 0.0795,mm_far 0.0421	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 5,n_miss_mm_near 10,n_miss_mm_far 7
-O	b	hotpotqa:s1:L24:q7889	miss_mass_by_region	frac	avg_near 0.1287,avg_far 0.0165,mm_near 0.1741,mm_far 0.0123	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 11,n_miss_avg_far 1,n_miss_mm_near 11,n_miss_mm_far 2
-O	b	hotpotqa:s1:L24:q8942	miss_mass_by_region	frac	avg_near 0.0935,avg_far 0.4957,mm_near 0.0733,mm_far 0.1016	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 10,n_miss_avg_far 11,n_miss_mm_near 7,n_miss_mm_far 12
-O	b	hotpotqa:s1:L24:q9996	miss_mass_by_region	frac	avg_near 0.0468,avg_far 0.2393,mm_near 0.0805,mm_far 0.0146	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 2,n_miss_mm_near 10,n_miss_mm_far 3
-O	b	hotpotqa:s1:L24:q11050	miss_mass_by_region	frac	avg_near 0.1687,avg_far 0.4984,mm_near 0.0656,mm_far 0.0066	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 6,n_miss_mm_near 7,n_miss_mm_far 5
-O	b	hotpotqa:s1:L24:q12104	miss_mass_by_region	frac	avg_near 0.2659,avg_far 0.4913,mm_near 0.1543,mm_far 0.0126	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 11,n_miss_avg_far 3,n_miss_mm_near 13,n_miss_mm_far 3
-O	b	hotpotqa:s1:L24:q13158	miss_mass_by_region	frac	avg_near 0.0235,avg_far 0.9327,mm_near 0.0303,mm_far 0.0106	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 10,n_miss_avg_far 6,n_miss_mm_near 12,n_miss_mm_far 4
-O	b	hotpotqa:s1:L24:q14212	miss_mass_by_region	frac	avg_near 0.1791,avg_far 0.3653,mm_near 0.2093,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 3,n_miss_mm_near 16,n_miss_mm_far 0
-O	b	hotpotqa:s1:L24:q15266	miss_mass_by_region	frac	avg_near 0.2068,avg_far 0.4241,mm_near 0.0634,mm_far 0.0019	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 6,n_miss_mm_near 12,n_miss_mm_far 1
-O	b	hotpotqa:s1:L24:q16320	miss_mass_by_region	frac	avg_near 0.1157,avg_far 0.2808,mm_near 0.1310,mm_far 0.0065	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 12,n_miss_avg_far 2,n_miss_mm_near 14,n_miss_mm_far 2
-O	b	musique:s0:L8:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	musique:s0:L8:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	musique:s0:L8:q2619	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0456,mm_near 0.0000,mm_far 0.0453	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 0,n_miss_mm_far 3
-O	b	musique:s0:L8:q3673	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0688,mm_near 0.0616,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 3,n_miss_mm_far 0
-O	b	musique:s0:L8:q4727	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0645,mm_near 0.0000,mm_far 0.0944	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 6,n_miss_mm_near 0,n_miss_mm_far 8
-O	b	musique:s0:L8:q5781	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1448,mm_near 0.0000,mm_far 0.0545	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 9,n_miss_mm_near 0,n_miss_mm_far 5
-O	b	musique:s0:L8:q6835	miss_mass_by_region	frac	avg_near 0.0056,avg_far 0.0343,mm_near 0.0056,mm_far 0.0615	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 6,n_miss_mm_near 1,n_miss_mm_far 9
-O	b	musique:s0:L8:q7889	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0670,mm_near 0.1716,mm_far 0.0151	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 5,n_miss_mm_near 6,n_miss_mm_far 1
-O	b	musique:s0:L8:q8942	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0347,mm_near 0.0763,mm_far 0.0347	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 3,n_miss_mm_near 2,n_miss_mm_far 3
-O	b	musique:s0:L8:q9996	miss_mass_by_region	frac	avg_near 0.0160,avg_far 0.0721,mm_near 0.1081,mm_far 0.0558	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 6,n_miss_mm_near 9,n_miss_mm_far 4
-O	b	musique:s0:L8:q11050	miss_mass_by_region	frac	avg_near 0.0358,avg_far 0.0385,mm_near 0.0636,mm_far 0.0385	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 2,n_miss_avg_far 3,n_miss_mm_near 4,n_miss_mm_far 3
-O	b	musique:s0:L8:q12104	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0531,mm_near 0.1435,mm_far 0.0382	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 7,n_miss_mm_near 3,n_miss_mm_far 5
-O	b	musique:s0:L8:q13158	miss_mass_by_region	frac	avg_near 0.0234,avg_far 0.0757,mm_near 0.0900,mm_far 0.0895	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 4,n_miss_mm_near 2,n_miss_mm_far 5
-O	b	musique:s0:L8:q14212	miss_mass_by_region	frac	avg_near 0.1295,avg_far 0.0462,mm_near 0.1647,mm_far 0.0462	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 3,n_miss_mm_near 9,n_miss_mm_far 3
-O	b	musique:s0:L8:q15266	miss_mass_by_region	frac	avg_near 0.1235,avg_far 0.1243,mm_near 0.1252,mm_far 0.1243	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 8,n_miss_avg_far 8,n_miss_mm_near 9,n_miss_mm_far 8
-O	b	musique:s0:L8:q16320	miss_mass_by_region	frac	avg_near 0.0058,avg_far 0.0427,mm_near 0.0294,mm_far 0.0427	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 7,n_miss_mm_near 4,n_miss_mm_far 7
-O	b	musique:s0:L24:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	musique:s0:L24:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	musique:s0:L24:q2619	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.6583,mm_near 0.0193,mm_far 0.0029	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 3,n_miss_mm_near 2,n_miss_mm_far 2
-O	b	musique:s0:L24:q3673	miss_mass_by_region	frac	avg_near 0.0183,avg_far 0.0000,mm_near 0.0587,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 0,n_miss_mm_near 5,n_miss_mm_far 0
-O	b	musique:s0:L24:q4727	miss_mass_by_region	frac	avg_near 0.1405,avg_far 0.3281,mm_near 0.1324,mm_far 0.0107	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 4,n_miss_mm_near 4,n_miss_mm_far 6
-O	b	musique:s0:L24:q5781	miss_mass_by_region	frac	avg_near 0.0389,avg_far 0.0113,mm_near 0.0230,mm_far 0.0311	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 2,n_miss_mm_near 3,n_miss_mm_far 4
-O	b	musique:s0:L24:q6835	miss_mass_by_region	frac	avg_near 0.2941,avg_far 0.4912,mm_near 0.1167,mm_far 0.0194	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 8,n_miss_avg_far 6,n_miss_mm_near 9,n_miss_mm_far 11
-O	b	musique:s0:L24:q7889	miss_mass_by_region	frac	avg_near 0.0865,avg_far 0.2996,mm_near 0.2210,mm_far 0.0039	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 10,n_miss_avg_far 1,n_miss_mm_near 12,n_miss_mm_far 2
-O	b	musique:s0:L24:q8942	miss_mass_by_region	frac	avg_near 0.3372,avg_far 0.5735,mm_near 0.1559,mm_far 0.0066	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 12,n_miss_avg_far 5,n_miss_mm_near 12,n_miss_mm_far 5
-O	b	musique:s0:L24:q9996	miss_mass_by_region	frac	avg_near 0.2628,avg_far 0.2315,mm_near 0.0169,mm_far 0.0062	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 3,n_miss_mm_near 7,n_miss_mm_far 4
-O	b	musique:s0:L24:q11050	miss_mass_by_region	frac	avg_near 0.2981,avg_far 0.3241,mm_near 0.1744,mm_far 0.0027	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 17,n_miss_avg_far 3,n_miss_mm_near 18,n_miss_mm_far 1
-O	b	musique:s0:L24:q12104	miss_mass_by_region	frac	avg_near 0.1288,avg_far 0.2804,mm_near 0.2278,mm_far 0.0060	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 8,n_miss_mm_near 8,n_miss_mm_far 7
-O	b	musique:s0:L24:q13158	miss_mass_by_region	frac	avg_near 0.2898,avg_far 0.5822,mm_near 0.1736,mm_far 0.0038	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 17,n_miss_avg_far 3,n_miss_mm_near 19,n_miss_mm_far 1
-O	b	musique:s0:L24:q14212	miss_mass_by_region	frac	avg_near 0.2147,avg_far 0.4730,mm_near 0.2685,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 18,n_miss_avg_far 3,n_miss_mm_near 21,n_miss_mm_far 0
-O	b	musique:s0:L24:q15266	miss_mass_by_region	frac	avg_near 0.3373,avg_far 0.5702,mm_near 0.0631,mm_far 0.0333	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 11,n_miss_mm_near 4,n_miss_mm_far 12
-O	b	musique:s0:L24:q16320	miss_mass_by_region	frac	avg_near 0.2079,avg_far 0.6482,mm_near 0.1173,mm_far 0.0327	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 12,n_miss_mm_near 9,n_miss_mm_far 12
-O	b	musique:s1:L8:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	musique:s1:L8:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	musique:s1:L8:q2619	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0681,mm_near 0.0000,mm_far 0.0609	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 5,n_miss_mm_near 0,n_miss_mm_far 5
-O	b	musique:s1:L8:q3673	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.2527,mm_near 0.1036,mm_far 0.2401	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 10,n_miss_mm_near 2,n_miss_mm_far 9
-O	b	musique:s1:L8:q4727	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.2351,mm_near 0.0000,mm_far 0.2449	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 10,n_miss_mm_near 0,n_miss_mm_far 10
-O	b	musique:s1:L8:q5781	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0824,mm_near 0.0510,mm_far 0.0869	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 6,n_miss_mm_near 3,n_miss_mm_far 6
-O	b	musique:s1:L8:q6835	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1066,mm_near 0.0437,mm_far 0.0867	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 8,n_miss_mm_near 1,n_miss_mm_far 7
-O	b	musique:s1:L8:q7889	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1141,mm_near 0.1046,mm_far 0.1196	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 8,n_miss_mm_near 3,n_miss_mm_far 8
-O	b	musique:s1:L8:q8942	miss_mass_by_region	frac	avg_near 0.0227,avg_far 0.0713,mm_near 0.0700,mm_far 0.0713	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 2,n_miss_avg_far 4,n_miss_mm_near 5,n_miss_mm_far 4
-O	b	musique:s1:L8:q9996	miss_mass_by_region	frac	avg_near 0.0629,avg_far 0.0157,mm_near 0.0781,mm_far 0.0157	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 1,n_miss_mm_near 4,n_miss_mm_far 1
-O	b	musique:s1:L8:q11050	miss_mass_by_region	frac	avg_near 0.0647,avg_far 0.1487,mm_near 0.0476,mm_far 0.1487	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 8,n_miss_mm_near 3,n_miss_mm_far 8
-O	b	musique:s1:L8:q12104	miss_mass_by_region	frac	avg_near 0.1205,avg_far 0.0192,mm_near 0.2075,mm_far 0.0192	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 1,n_miss_mm_near 9,n_miss_mm_far 1
-O	b	musique:s1:L8:q13158	miss_mass_by_region	frac	avg_near 0.2380,avg_far 0.1027,mm_near 0.2653,mm_far 0.1216	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 4,n_miss_mm_near 9,n_miss_mm_far 5
-O	b	musique:s1:L8:q14212	miss_mass_by_region	frac	avg_near 0.1021,avg_far 0.0297,mm_near 0.1256,mm_far 0.0297	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 2,n_miss_mm_near 8,n_miss_mm_far 2
-O	b	musique:s1:L8:q15266	miss_mass_by_region	frac	avg_near 0.0326,avg_far 0.0000,mm_near 0.2536,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 0,n_miss_mm_near 6,n_miss_mm_far 0
-O	b	musique:s1:L8:q16320	miss_mass_by_region	frac	avg_near 0.0424,avg_far 0.2003,mm_near 0.0386,mm_far 0.2003	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 2,n_miss_avg_far 9,n_miss_mm_near 2,n_miss_mm_far 9
-O	b	musique:s1:L24:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	musique:s1:L24:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
-O	b	musique:s1:L24:q2619	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0115,mm_near 0.0188,mm_far 0.0056	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 2,n_miss_mm_near 1,n_miss_mm_far 1
-O	b	musique:s1:L24:q3673	miss_mass_by_region	frac	avg_near 0.0852,avg_far 0.0292,mm_near 0.2338,mm_far 0.0310	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 2,n_miss_mm_near 7,n_miss_mm_far 2
-O	b	musique:s1:L24:q4727	miss_mass_by_region	frac	avg_near 0.3947,avg_far 0.0000,mm_near 0.0859,mm_far 0.0379	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 0,n_miss_mm_near 5,n_miss_mm_far 4
-O	b	musique:s1:L24:q5781	miss_mass_by_region	frac	avg_near 0.0342,avg_far 0.2625,mm_near 0.1698,mm_far 0.0053	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 3,n_miss_mm_near 6,n_miss_mm_far 1
-O	b	musique:s1:L24:q6835	miss_mass_by_region	frac	avg_near 0.0081,avg_far 0.0184,mm_near 0.0498,mm_far 0.0196	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 2,n_miss_mm_near 4,n_miss_mm_far 2
-O	b	musique:s1:L24:q7889	miss_mass_by_region	frac	avg_near 0.1354,avg_far 0.4588,mm_near 0.1542,mm_far 0.0272	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 8,n_miss_avg_far 6,n_miss_mm_near 10,n_miss_mm_far 8
-O	b	musique:s1:L24:q8942	miss_mass_by_region	frac	avg_near 0.2681,avg_far 0.3115,mm_near 0.0334,mm_far 0.0176	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 6,n_miss_mm_near 6,n_miss_mm_far 3
-O	b	musique:s1:L24:q9996	miss_mass_by_region	frac	avg_near 0.4589,avg_far 0.0067,mm_near 0.1803,mm_far 0.0193	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 13,n_miss_avg_far 2,n_miss_mm_near 17,n_miss_mm_far 5
-O	b	musique:s1:L24:q11050	miss_mass_by_region	frac	avg_near 0.0611,avg_far 0.6218,mm_near 0.0838,mm_far 0.0231	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 4,n_miss_mm_near 11,n_miss_mm_far 2
-O	b	musique:s1:L24:q12104	miss_mass_by_region	frac	avg_near 0.1980,avg_far 0.5154,mm_near 0.0630,mm_far 0.0367	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 6,n_miss_mm_near 7,n_miss_mm_far 5
-O	b	musique:s1:L24:q13158	miss_mass_by_region	frac	avg_near 0.3042,avg_far 0.4822,mm_near 0.1086,mm_far 0.0460	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 11,n_miss_avg_far 6,n_miss_mm_near 10,n_miss_mm_far 4
-O	b	musique:s1:L24:q14212	miss_mass_by_region	frac	avg_near 0.2207,avg_far 0.3758,mm_near 0.2406,mm_far 0.0240	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 4,n_miss_mm_near 13,n_miss_mm_far 4
-O	b	musique:s1:L24:q15266	miss_mass_by_region	frac	avg_near 0.1989,avg_far 0.4956,mm_near 0.1294,mm_far 0.0161	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 12,n_miss_avg_far 4,n_miss_mm_near 14,n_miss_mm_far 4
-O	b	musique:s1:L24:q16320	miss_mass_by_region	frac	avg_near 0.1586,avg_far 0.4418,mm_near 0.0448,mm_far 0.1054	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 7,n_miss_mm_near 5,n_miss_mm_far 6
-O	b	all	miss_mass_block_avg	near,far	0.0843,0.1699	e140b_pooling_anatomy.json	mean over 128 queries; region attribution = aligned-bin absolute interval [q-d_hi, q-d_lo+1) vs region_bounds.near_lo
-O	b	all	miss_mass_minmax	near,far	0.0787,0.0420	e140b_pooling_anatomy.json	same caliber; avg misses far (2/3 of its miss), minmax misses near (2/3 of its miss): complementary
-O	b	all	miss_mass_totals	avg,mm	0.2543,0.1208	e140b_pooling_anatomy.json	mean over 128 queries (region-unresolved included)
-O	b	all	miss_pages_block_avg	near,far	3.98,3.89	e140b_pooling_anatomy.json	mean missed pages; page-count criterion differs from mass criterion
-O	b	all	miss_pages_minmax	near,far	5.27,3.77	e140b_pooling_anatomy.json	mean missed pages
-O	b	retired	quota_floor_panel	-	-	-	2026-10-21 fourth revision: old far-quota paired-arm panel withdrawn (nt demoted; nb/nl absolute-quota caliber). Hybrid near-budget scan (offline, diagnostic plane; reproducible via dac_manuscript/sources/build_region_miss_stats.py): best 0.1345@near-budget-1408 still above global minmax 0.1208; budget split is the E155d grid axis (task-accuracy caliber), not simulated here (mass != e2e)
-O	c	tail32	reference_token_page_coverage	frac	0.9774	e140_o_trace_v2.json	o3.tail32.reference_token_page_coverage.mean
-O	c	tail32	reference_token_overlap_recall	frac	0.6333	e140_o_trace_v2.json	o3.tail32.reference_token_overlap_recall.mean
-O	c	tail32	selected_mass_over_reference_topk_mass	frac	0.8412	e140_o_trace_v2.json	o3.tail32.selected_mass_over_reference_topk_mass.mean
-O	c	tail32	selected_full_attention_mass	frac	0.2294	e140_o_trace_v2.json	o3.tail32.selected_full_attention_mass.mean
-O	c	random32	reference_token_page_coverage	frac	0.9657	e140_o_trace_v2.json	o3.random32.reference_token_page_coverage.mean
-O	c	random32	reference_token_overlap_recall	frac	0.3831	e140_o_trace_v2.json	o3.random32.reference_token_overlap_recall.mean
-O	c	random32	selected_mass_over_reference_topk_mass	frac	0.5060	e140_o_trace_v2.json	o3.random32.selected_mass_over_reference_topk_mass.mean
-O	c	random32	selected_full_attention_mass	frac	0.1307	e140_o_trace_v2.json	o3.random32.selected_full_attention_mass.mean
-O	c	high32	reference_token_page_coverage	frac	0.8843	e140_o_trace_v2.json	o3.high32.reference_token_page_coverage.mean
-O	c	high32	reference_token_overlap_recall	frac	0.2413	e140_o_trace_v2.json	o3.high32.reference_token_overlap_recall.mean
-O	c	high32	selected_mass_over_reference_topk_mass	frac	0.2408	e140_o_trace_v2.json	o3.high32.selected_mass_over_reference_topk_mass.mean
-O	c	high32	selected_full_attention_mass	frac	0.0388	e140_o_trace_v2.json	o3.high32.selected_full_attention_mass.mean
-O	d	lb_gov_report_0	far_mass	frac	3.6342e-07	e6b_far_profiles.json	layer=0
-O	d	lb_gov_report_0	far_mass	frac	5.2159e-05	e6b_far_profiles.json	layer=1
-O	d	lb_gov_report_0	far_mass	frac	1.1972e-01	e6b_far_profiles.json	layer=2
-O	d	lb_gov_report_0	far_mass	frac	2.5380e-01	e6b_far_profiles.json	layer=3
-O	d	lb_gov_report_0	far_mass	frac	4.7786e-01	e6b_far_profiles.json	layer=4
-O	d	lb_gov_report_0	far_mass	frac	2.0569e-01	e6b_far_profiles.json	layer=5
-O	d	lb_gov_report_0	far_mass	frac	6.1351e-02	e6b_far_profiles.json	layer=6
-O	d	lb_gov_report_0	far_mass	frac	4.5827e-09	e6b_far_profiles.json	layer=7
-O	d	lb_gov_report_0	far_mass	frac	4.1131e-08	e6b_far_profiles.json	layer=8
-O	d	lb_gov_report_0	far_mass	frac	1.0583e-08	e6b_far_profiles.json	layer=9
-O	d	lb_gov_report_0	far_mass	frac	5.2056e-12	e6b_far_profiles.json	layer=10
-O	d	lb_gov_report_0	far_mass	frac	1.3558e-12	e6b_far_profiles.json	layer=11
-O	d	lb_gov_report_0	far_mass	frac	1.3949e-10	e6b_far_profiles.json	layer=12
-O	d	lb_gov_report_0	far_mass	frac	5.3911e-08	e6b_far_profiles.json	layer=13
-O	d	lb_gov_report_0	far_mass	frac	4.1073e-10	e6b_far_profiles.json	layer=14
-O	d	lb_gov_report_0	far_mass	frac	2.7442e-06	e6b_far_profiles.json	layer=15
-O	d	lb_gov_report_0	far_mass	frac	8.1726e-08	e6b_far_profiles.json	layer=16
-O	d	lb_gov_report_0	far_mass	frac	2.1489e-02	e6b_far_profiles.json	layer=17
-O	d	lb_gov_report_0	far_mass	frac	3.2412e-02	e6b_far_profiles.json	layer=18
-O	d	lb_gov_report_0	far_mass	frac	5.0337e-01	e6b_far_profiles.json	layer=19
-O	d	lb_gov_report_0	far_mass	frac	2.6592e-01	e6b_far_profiles.json	layer=20
-O	d	lb_gov_report_0	far_mass	frac	1.2289e-01	e6b_far_profiles.json	layer=21
-O	d	lb_gov_report_0	far_mass	frac	2.1770e-01	e6b_far_profiles.json	layer=22
-O	d	lb_gov_report_0	far_mass	frac	3.8456e-01	e6b_far_profiles.json	layer=23
-O	d	lb_gov_report_0	far_mass	frac	6.1047e-01	e6b_far_profiles.json	layer=24
-O	d	lb_gov_report_0	far_mass	frac	6.3835e-01	e6b_far_profiles.json	layer=25
-O	d	lb_gov_report_0	far_mass	frac	6.4321e-01	e6b_far_profiles.json	layer=26
-O	d	lb_gov_report_0	far_mass	frac	4.6560e-01	e6b_far_profiles.json	layer=27
-O	d	lb_gov_report_0	far_mass	frac	3.7631e-01	e6b_far_profiles.json	layer=28
-O	d	lb_gov_report_0	far_mass	frac	8.6753e-01	e6b_far_profiles.json	layer=29
-O	d	lb_gov_report_0	far_mass	frac	5.0481e-01	e6b_far_profiles.json	layer=30
-O	d	lb_gov_report_0	far_mass	frac	7.8291e-01	e6b_far_profiles.json	layer=31
-O	d	lb_gov_report_0	far_mass	frac	5.3638e-01	e6b_far_profiles.json	layer=32
-O	d	lb_gov_report_0	far_mass	frac	6.7304e-01	e6b_far_profiles.json	layer=33
-O	d	lb_gov_report_0	far_mass	frac	1.8302e-01	e6b_far_profiles.json	layer=34
-O	d	lb_gov_report_0	far_mass	frac	3.2903e-11	e6b_far_profiles.json	layer=35
-O	d	lb_gov_report_1	far_mass	frac	5.2806e-08	e6b_far_profiles.json	layer=0
-O	d	lb_gov_report_1	far_mass	frac	1.2467e-04	e6b_far_profiles.json	layer=1
-O	d	lb_gov_report_1	far_mass	frac	7.1187e-02	e6b_far_profiles.json	layer=2
-O	d	lb_gov_report_1	far_mass	frac	3.2875e-01	e6b_far_profiles.json	layer=3
-O	d	lb_gov_report_1	far_mass	frac	2.8385e-01	e6b_far_profiles.json	layer=4
-O	d	lb_gov_report_1	far_mass	frac	2.3356e-01	e6b_far_profiles.json	layer=5
-O	d	lb_gov_report_1	far_mass	frac	7.5222e-03	e6b_far_profiles.json	layer=6
-O	d	lb_gov_report_1	far_mass	frac	3.1075e-11	e6b_far_profiles.json	layer=7
-O	d	lb_gov_report_1	far_mass	frac	1.5282e-07	e6b_far_profiles.json	layer=8
-O	d	lb_gov_report_1	far_mass	frac	4.0598e-07	e6b_far_profiles.json	layer=9
-O	d	lb_gov_report_1	far_mass	frac	1.9842e-11	e6b_far_profiles.json	layer=10
-O	d	lb_gov_report_1	far_mass	frac	2.1472e-09	e6b_far_profiles.json	layer=11
-O	d	lb_gov_report_1	far_mass	frac	1.1505e-08	e6b_far_profiles.json	layer=12
-O	d	lb_gov_report_1	far_mass	frac	6.3744e-07	e6b_far_profiles.json	layer=13
-O	d	lb_gov_report_1	far_mass	frac	4.1881e-06	e6b_far_profiles.json	layer=14
-O	d	lb_gov_report_1	far_mass	frac	6.4919e-04	e6b_far_profiles.json	layer=15
-O	d	lb_gov_report_1	far_mass	frac	3.2500e-07	e6b_far_profiles.json	layer=16
-O	d	lb_gov_report_1	far_mass	frac	1.2424e-01	e6b_far_profiles.json	layer=17
-O	d	lb_gov_report_1	far_mass	frac	3.8209e-01	e6b_far_profiles.json	layer=18
-O	d	lb_gov_report_1	far_mass	frac	7.9697e-01	e6b_far_profiles.json	layer=19
-O	d	lb_gov_report_1	far_mass	frac	4.9549e-01	e6b_far_profiles.json	layer=20
-O	d	lb_gov_report_1	far_mass	frac	3.7856e-01	e6b_far_profiles.json	layer=21
-O	d	lb_gov_report_1	far_mass	frac	3.6540e-01	e6b_far_profiles.json	layer=22
-O	d	lb_gov_report_1	far_mass	frac	3.1808e-01	e6b_far_profiles.json	layer=23
-O	d	lb_gov_report_1	far_mass	frac	7.4013e-01	e6b_far_profiles.json	layer=24
-O	d	lb_gov_report_1	far_mass	frac	8.1089e-01	e6b_far_profiles.json	layer=25
-O	d	lb_gov_report_1	far_mass	frac	8.2433e-01	e6b_far_profiles.json	layer=26
-O	d	lb_gov_report_1	far_mass	frac	6.7021e-01	e6b_far_profiles.json	layer=27
-O	d	lb_gov_report_1	far_mass	frac	3.5404e-01	e6b_far_profiles.json	layer=28
-O	d	lb_gov_report_1	far_mass	frac	5.7627e-01	e6b_far_profiles.json	layer=29
-O	d	lb_gov_report_1	far_mass	frac	5.8347e-01	e6b_far_profiles.json	layer=30
-O	d	lb_gov_report_1	far_mass	frac	7.2052e-01	e6b_far_profiles.json	layer=31
-O	d	lb_gov_report_1	far_mass	frac	6.4966e-01	e6b_far_profiles.json	layer=32
-O	d	lb_gov_report_1	far_mass	frac	6.8757e-01	e6b_far_profiles.json	layer=33
-O	d	lb_gov_report_1	far_mass	frac	1.9164e-01	e6b_far_profiles.json	layer=34
-O	d	lb_gov_report_1	far_mass	frac	2.2267e-10	e6b_far_profiles.json	layer=35
-O	d	lb_hotpotqa_0	far_mass	frac	9.2330e-06	e6b_far_profiles.json	layer=0
-O	d	lb_hotpotqa_0	far_mass	frac	3.8433e-05	e6b_far_profiles.json	layer=1
-O	d	lb_hotpotqa_0	far_mass	frac	5.2195e-02	e6b_far_profiles.json	layer=2
-O	d	lb_hotpotqa_0	far_mass	frac	1.5462e-01	e6b_far_profiles.json	layer=3
-O	d	lb_hotpotqa_0	far_mass	frac	6.7233e-02	e6b_far_profiles.json	layer=4
-O	d	lb_hotpotqa_0	far_mass	frac	9.1606e-02	e6b_far_profiles.json	layer=5
-O	d	lb_hotpotqa_0	far_mass	frac	1.7545e-04	e6b_far_profiles.json	layer=6
-O	d	lb_hotpotqa_0	far_mass	frac	3.5829e-11	e6b_far_profiles.json	layer=7
-O	d	lb_hotpotqa_0	far_mass	frac	9.2198e-09	e6b_far_profiles.json	layer=8
-O	d	lb_hotpotqa_0	far_mass	frac	4.4310e-09	e6b_far_profiles.json	layer=9
-O	d	lb_hotpotqa_0	far_mass	frac	2.2300e-08	e6b_far_profiles.json	layer=10
-O	d	lb_hotpotqa_0	far_mass	frac	1.3584e-06	e6b_far_profiles.json	layer=11
-O	d	lb_hotpotqa_0	far_mass	frac	5.6525e-08	e6b_far_profiles.json	layer=12
-O	d	lb_hotpotqa_0	far_mass	frac	3.9067e-06	e6b_far_profiles.json	layer=13
-O	d	lb_hotpotqa_0	far_mass	frac	8.6216e-07	e6b_far_profiles.json	layer=14
-O	d	lb_hotpotqa_0	far_mass	frac	1.0318e-04	e6b_far_profiles.json	layer=15
-O	d	lb_hotpotqa_0	far_mass	frac	2.1791e-07	e6b_far_profiles.json	layer=16
-O	d	lb_hotpotqa_0	far_mass	frac	2.3199e-04	e6b_far_profiles.json	layer=17
-O	d	lb_hotpotqa_0	far_mass	frac	7.5597e-03	e6b_far_profiles.json	layer=18
-O	d	lb_hotpotqa_0	far_mass	frac	1.1524e-02	e6b_far_profiles.json	layer=19
-O	d	lb_hotpotqa_0	far_mass	frac	1.4011e-02	e6b_far_profiles.json	layer=20
-O	d	lb_hotpotqa_0	far_mass	frac	2.6473e-02	e6b_far_profiles.json	layer=21
-O	d	lb_hotpotqa_0	far_mass	frac	1.1411e-02	e6b_far_profiles.json	layer=22
-O	d	lb_hotpotqa_0	far_mass	frac	6.1622e-03	e6b_far_profiles.json	layer=23
-O	d	lb_hotpotqa_0	far_mass	frac	1.9240e-02	e6b_far_profiles.json	layer=24
-O	d	lb_hotpotqa_0	far_mass	frac	2.3698e-03	e6b_far_profiles.json	layer=25
-O	d	lb_hotpotqa_0	far_mass	frac	1.9308e-02	e6b_far_profiles.json	layer=26
-O	d	lb_hotpotqa_0	far_mass	frac	1.0857e-02	e6b_far_profiles.json	layer=27
-O	d	lb_hotpotqa_0	far_mass	frac	2.3782e-02	e6b_far_profiles.json	layer=28
-O	d	lb_hotpotqa_0	far_mass	frac	1.3716e-02	e6b_far_profiles.json	layer=29
-O	d	lb_hotpotqa_0	far_mass	frac	5.7300e-03	e6b_far_profiles.json	layer=30
-O	d	lb_hotpotqa_0	far_mass	frac	9.0026e-03	e6b_far_profiles.json	layer=31
-O	d	lb_hotpotqa_0	far_mass	frac	9.8989e-03	e6b_far_profiles.json	layer=32
-O	d	lb_hotpotqa_0	far_mass	frac	1.1720e-02	e6b_far_profiles.json	layer=33
-O	d	lb_hotpotqa_0	far_mass	frac	1.7544e-03	e6b_far_profiles.json	layer=34
-O	d	lb_hotpotqa_0	far_mass	frac	2.6477e-09	e6b_far_profiles.json	layer=35
-O	d	lb_hotpotqa_1	far_mass	frac	9.4221e-07	e6b_far_profiles.json	layer=0
-O	d	lb_hotpotqa_1	far_mass	frac	4.7017e-05	e6b_far_profiles.json	layer=1
-O	d	lb_hotpotqa_1	far_mass	frac	9.1475e-02	e6b_far_profiles.json	layer=2
-O	d	lb_hotpotqa_1	far_mass	frac	2.1028e-01	e6b_far_profiles.json	layer=3
-O	d	lb_hotpotqa_1	far_mass	frac	1.2822e-01	e6b_far_profiles.json	layer=4
-O	d	lb_hotpotqa_1	far_mass	frac	1.8345e-01	e6b_far_profiles.json	layer=5
-O	d	lb_hotpotqa_1	far_mass	frac	3.3906e-04	e6b_far_profiles.json	layer=6
-O	d	lb_hotpotqa_1	far_mass	frac	2.9936e-12	e6b_far_profiles.json	layer=7
-O	d	lb_hotpotqa_1	far_mass	frac	1.7996e-07	e6b_far_profiles.json	layer=8
-O	d	lb_hotpotqa_1	far_mass	frac	1.3743e-08	e6b_far_profiles.json	layer=9
-O	d	lb_hotpotqa_1	far_mass	frac	1.2968e-09	e6b_far_profiles.json	layer=10
-O	d	lb_hotpotqa_1	far_mass	frac	1.4098e-06	e6b_far_profiles.json	layer=11
-O	d	lb_hotpotqa_1	far_mass	frac	2.3419e-07	e6b_far_profiles.json	layer=12
-O	d	lb_hotpotqa_1	far_mass	frac	6.3018e-07	e6b_far_profiles.json	layer=13
-O	d	lb_hotpotqa_1	far_mass	frac	1.8869e-06	e6b_far_profiles.json	layer=14
-O	d	lb_hotpotqa_1	far_mass	frac	9.6774e-07	e6b_far_profiles.json	layer=15
-O	d	lb_hotpotqa_1	far_mass	frac	2.9161e-08	e6b_far_profiles.json	layer=16
-O	d	lb_hotpotqa_1	far_mass	frac	4.3775e-04	e6b_far_profiles.json	layer=17
-O	d	lb_hotpotqa_1	far_mass	frac	4.2415e-03	e6b_far_profiles.json	layer=18
-O	d	lb_hotpotqa_1	far_mass	frac	2.0075e-03	e6b_far_profiles.json	layer=19
-O	d	lb_hotpotqa_1	far_mass	frac	1.1773e-03	e6b_far_profiles.json	layer=20
-O	d	lb_hotpotqa_1	far_mass	frac	5.7380e-04	e6b_far_profiles.json	layer=21
-O	d	lb_hotpotqa_1	far_mass	frac	2.8593e-03	e6b_far_profiles.json	layer=22
-O	d	lb_hotpotqa_1	far_mass	frac	1.7798e-03	e6b_far_profiles.json	layer=23
-O	d	lb_hotpotqa_1	far_mass	frac	3.5467e-03	e6b_far_profiles.json	layer=24
-O	d	lb_hotpotqa_1	far_mass	frac	3.8599e-04	e6b_far_profiles.json	layer=25
-O	d	lb_hotpotqa_1	far_mass	frac	1.4726e-03	e6b_far_profiles.json	layer=26
-O	d	lb_hotpotqa_1	far_mass	frac	6.4552e-03	e6b_far_profiles.json	layer=27
-O	d	lb_hotpotqa_1	far_mass	frac	6.0417e-03	e6b_far_profiles.json	layer=28
-O	d	lb_hotpotqa_1	far_mass	frac	8.3841e-04	e6b_far_profiles.json	layer=29
-O	d	lb_hotpotqa_1	far_mass	frac	9.9930e-04	e6b_far_profiles.json	layer=30
-O	d	lb_hotpotqa_1	far_mass	frac	2.3466e-03	e6b_far_profiles.json	layer=31
-O	d	lb_hotpotqa_1	far_mass	frac	3.1175e-03	e6b_far_profiles.json	layer=32
-O	d	lb_hotpotqa_1	far_mass	frac	7.7553e-03	e6b_far_profiles.json	layer=33
-O	d	lb_hotpotqa_1	far_mass	frac	7.3834e-04	e6b_far_profiles.json	layer=34
-O	d	lb_hotpotqa_1	far_mass	frac	4.9569e-08	e6b_far_profiles.json	layer=35
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.4942e-07	e6b_far_profiles.json	layer=0
-O	d	lb_multifieldqa_en_0	far_mass	frac	2.8605e-05	e6b_far_profiles.json	layer=1
-O	d	lb_multifieldqa_en_0	far_mass	frac	5.2770e-02	e6b_far_profiles.json	layer=2
-O	d	lb_multifieldqa_en_0	far_mass	frac	2.5510e-01	e6b_far_profiles.json	layer=3
-O	d	lb_multifieldqa_en_0	far_mass	frac	2.0894e-01	e6b_far_profiles.json	layer=4
-O	d	lb_multifieldqa_en_0	far_mass	frac	2.1905e-01	e6b_far_profiles.json	layer=5
-O	d	lb_multifieldqa_en_0	far_mass	frac	1.2909e-04	e6b_far_profiles.json	layer=6
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.4914e-14	e6b_far_profiles.json	layer=7
-O	d	lb_multifieldqa_en_0	far_mass	frac	1.6734e-11	e6b_far_profiles.json	layer=8
-O	d	lb_multifieldqa_en_0	far_mass	frac	4.9279e-11	e6b_far_profiles.json	layer=9
-O	d	lb_multifieldqa_en_0	far_mass	frac	2.7230e-10	e6b_far_profiles.json	layer=10
-O	d	lb_multifieldqa_en_0	far_mass	frac	1.5986e-10	e6b_far_profiles.json	layer=11
-O	d	lb_multifieldqa_en_0	far_mass	frac	6.8305e-10	e6b_far_profiles.json	layer=12
-O	d	lb_multifieldqa_en_0	far_mass	frac	9.5888e-07	e6b_far_profiles.json	layer=13
-O	d	lb_multifieldqa_en_0	far_mass	frac	1.7694e-09	e6b_far_profiles.json	layer=14
-O	d	lb_multifieldqa_en_0	far_mass	frac	2.1678e-06	e6b_far_profiles.json	layer=15
-O	d	lb_multifieldqa_en_0	far_mass	frac	2.0346e-07	e6b_far_profiles.json	layer=16
-O	d	lb_multifieldqa_en_0	far_mass	frac	6.9903e-05	e6b_far_profiles.json	layer=17
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.2744e-03	e6b_far_profiles.json	layer=18
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.3967e-03	e6b_far_profiles.json	layer=19
-O	d	lb_multifieldqa_en_0	far_mass	frac	6.4880e-03	e6b_far_profiles.json	layer=20
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.2557e-02	e6b_far_profiles.json	layer=21
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.1166e-03	e6b_far_profiles.json	layer=22
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.7404e-03	e6b_far_profiles.json	layer=23
-O	d	lb_multifieldqa_en_0	far_mass	frac	2.1921e-03	e6b_far_profiles.json	layer=24
-O	d	lb_multifieldqa_en_0	far_mass	frac	1.0824e-03	e6b_far_profiles.json	layer=25
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.2155e-03	e6b_far_profiles.json	layer=26
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.0597e-03	e6b_far_profiles.json	layer=27
-O	d	lb_multifieldqa_en_0	far_mass	frac	1.0448e-02	e6b_far_profiles.json	layer=28
-O	d	lb_multifieldqa_en_0	far_mass	frac	2.6853e-02	e6b_far_profiles.json	layer=29
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.5144e-03	e6b_far_profiles.json	layer=30
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.4338e-03	e6b_far_profiles.json	layer=31
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.4164e-03	e6b_far_profiles.json	layer=32
-O	d	lb_multifieldqa_en_0	far_mass	frac	3.8949e-03	e6b_far_profiles.json	layer=33
-O	d	lb_multifieldqa_en_0	far_mass	frac	4.0763e-04	e6b_far_profiles.json	layer=34
-O	d	lb_multifieldqa_en_0	far_mass	frac	2.1306e-09	e6b_far_profiles.json	layer=35
-O	d	lb_multifieldqa_en_1	far_mass	frac	4.3922e-07	e6b_far_profiles.json	layer=0
-O	d	lb_multifieldqa_en_1	far_mass	frac	7.6356e-05	e6b_far_profiles.json	layer=1
-O	d	lb_multifieldqa_en_1	far_mass	frac	1.5952e-01	e6b_far_profiles.json	layer=2
-O	d	lb_multifieldqa_en_1	far_mass	frac	2.1295e-01	e6b_far_profiles.json	layer=3
-O	d	lb_multifieldqa_en_1	far_mass	frac	2.5217e-01	e6b_far_profiles.json	layer=4
-O	d	lb_multifieldqa_en_1	far_mass	frac	2.1555e-01	e6b_far_profiles.json	layer=5
-O	d	lb_multifieldqa_en_1	far_mass	frac	4.7072e-04	e6b_far_profiles.json	layer=6
-O	d	lb_multifieldqa_en_1	far_mass	frac	7.5314e-13	e6b_far_profiles.json	layer=7
-O	d	lb_multifieldqa_en_1	far_mass	frac	8.0753e-10	e6b_far_profiles.json	layer=8
-O	d	lb_multifieldqa_en_1	far_mass	frac	1.4525e-09	e6b_far_profiles.json	layer=9
-O	d	lb_multifieldqa_en_1	far_mass	frac	9.1360e-08	e6b_far_profiles.json	layer=10
-O	d	lb_multifieldqa_en_1	far_mass	frac	3.2493e-08	e6b_far_profiles.json	layer=11
-O	d	lb_multifieldqa_en_1	far_mass	frac	2.2797e-08	e6b_far_profiles.json	layer=12
-O	d	lb_multifieldqa_en_1	far_mass	frac	2.0115e-06	e6b_far_profiles.json	layer=13
-O	d	lb_multifieldqa_en_1	far_mass	frac	1.0675e-07	e6b_far_profiles.json	layer=14
-O	d	lb_multifieldqa_en_1	far_mass	frac	8.3452e-07	e6b_far_profiles.json	layer=15
-O	d	lb_multifieldqa_en_1	far_mass	frac	4.0455e-08	e6b_far_profiles.json	layer=16
-O	d	lb_multifieldqa_en_1	far_mass	frac	3.4267e-05	e6b_far_profiles.json	layer=17
-O	d	lb_multifieldqa_en_1	far_mass	frac	1.6153e-02	e6b_far_profiles.json	layer=18
-O	d	lb_multifieldqa_en_1	far_mass	frac	3.2270e-03	e6b_far_profiles.json	layer=19
-O	d	lb_multifieldqa_en_1	far_mass	frac	2.5999e-03	e6b_far_profiles.json	layer=20
-O	d	lb_multifieldqa_en_1	far_mass	frac	3.3811e-03	e6b_far_profiles.json	layer=21
-O	d	lb_multifieldqa_en_1	far_mass	frac	3.6351e-03	e6b_far_profiles.json	layer=22
-O	d	lb_multifieldqa_en_1	far_mass	frac	6.4325e-02	e6b_far_profiles.json	layer=23
-O	d	lb_multifieldqa_en_1	far_mass	frac	8.9984e-03	e6b_far_profiles.json	layer=24
-O	d	lb_multifieldqa_en_1	far_mass	frac	3.5275e-03	e6b_far_profiles.json	layer=25
-O	d	lb_multifieldqa_en_1	far_mass	frac	1.1828e-02	e6b_far_profiles.json	layer=26
-O	d	lb_multifieldqa_en_1	far_mass	frac	3.5669e-02	e6b_far_profiles.json	layer=27
-O	d	lb_multifieldqa_en_1	far_mass	frac	1.2405e-02	e6b_far_profiles.json	layer=28
-O	d	lb_multifieldqa_en_1	far_mass	frac	4.0841e-03	e6b_far_profiles.json	layer=29
-O	d	lb_multifieldqa_en_1	far_mass	frac	1.8261e-03	e6b_far_profiles.json	layer=30
-O	d	lb_multifieldqa_en_1	far_mass	frac	7.6938e-03	e6b_far_profiles.json	layer=31
-O	d	lb_multifieldqa_en_1	far_mass	frac	9.2332e-03	e6b_far_profiles.json	layer=32
-O	d	lb_multifieldqa_en_1	far_mass	frac	1.2155e-02	e6b_far_profiles.json	layer=33
-O	d	lb_multifieldqa_en_1	far_mass	frac	1.6832e-04	e6b_far_profiles.json	layer=34
-O	d	lb_multifieldqa_en_1	far_mass	frac	3.3921e-07	e6b_far_profiles.json	layer=35
-O	d	lb_musique_0	far_mass	frac	3.6229e-07	e6b_far_profiles.json	layer=0
-O	d	lb_musique_0	far_mass	frac	7.2492e-05	e6b_far_profiles.json	layer=1
-O	d	lb_musique_0	far_mass	frac	7.3846e-02	e6b_far_profiles.json	layer=2
-O	d	lb_musique_0	far_mass	frac	1.5344e-01	e6b_far_profiles.json	layer=3
-O	d	lb_musique_0	far_mass	frac	9.5560e-02	e6b_far_profiles.json	layer=4
-O	d	lb_musique_0	far_mass	frac	1.1903e-01	e6b_far_profiles.json	layer=5
-O	d	lb_musique_0	far_mass	frac	7.6853e-05	e6b_far_profiles.json	layer=6
-O	d	lb_musique_0	far_mass	frac	7.4381e-13	e6b_far_profiles.json	layer=7
-O	d	lb_musique_0	far_mass	frac	7.9487e-09	e6b_far_profiles.json	layer=8
-O	d	lb_musique_0	far_mass	frac	9.3921e-11	e6b_far_profiles.json	layer=9
-O	d	lb_musique_0	far_mass	frac	1.5094e-10	e6b_far_profiles.json	layer=10
-O	d	lb_musique_0	far_mass	frac	2.7338e-08	e6b_far_profiles.json	layer=11
-O	d	lb_musique_0	far_mass	frac	2.5108e-09	e6b_far_profiles.json	layer=12
-O	d	lb_musique_0	far_mass	frac	8.2087e-08	e6b_far_profiles.json	layer=13
-O	d	lb_musique_0	far_mass	frac	7.6967e-07	e6b_far_profiles.json	layer=14
-O	d	lb_musique_0	far_mass	frac	4.6309e-07	e6b_far_profiles.json	layer=15
-O	d	lb_musique_0	far_mass	frac	1.6791e-07	e6b_far_profiles.json	layer=16
-O	d	lb_musique_0	far_mass	frac	4.0370e-04	e6b_far_profiles.json	layer=17
-O	d	lb_musique_0	far_mass	frac	8.3866e-03	e6b_far_profiles.json	layer=18
-O	d	lb_musique_0	far_mass	frac	1.0039e-02	e6b_far_profiles.json	layer=19
-O	d	lb_musique_0	far_mass	frac	8.0207e-03	e6b_far_profiles.json	layer=20
-O	d	lb_musique_0	far_mass	frac	8.0509e-02	e6b_far_profiles.json	layer=21
-O	d	lb_musique_0	far_mass	frac	6.9484e-03	e6b_far_profiles.json	layer=22
-O	d	lb_musique_0	far_mass	frac	4.5446e-03	e6b_far_profiles.json	layer=23
-O	d	lb_musique_0	far_mass	frac	1.7508e-01	e6b_far_profiles.json	layer=24
-O	d	lb_musique_0	far_mass	frac	3.3804e-03	e6b_far_profiles.json	layer=25
-O	d	lb_musique_0	far_mass	frac	3.2812e-02	e6b_far_profiles.json	layer=26
-O	d	lb_musique_0	far_mass	frac	1.7585e-02	e6b_far_profiles.json	layer=27
-O	d	lb_musique_0	far_mass	frac	1.0550e-01	e6b_far_profiles.json	layer=28
-O	d	lb_musique_0	far_mass	frac	1.0180e-01	e6b_far_profiles.json	layer=29
-O	d	lb_musique_0	far_mass	frac	1.3068e-03	e6b_far_profiles.json	layer=30
-O	d	lb_musique_0	far_mass	frac	4.9312e-03	e6b_far_profiles.json	layer=31
-O	d	lb_musique_0	far_mass	frac	2.0820e-03	e6b_far_profiles.json	layer=32
-O	d	lb_musique_0	far_mass	frac	5.0118e-03	e6b_far_profiles.json	layer=33
-O	d	lb_musique_0	far_mass	frac	1.2696e-03	e6b_far_profiles.json	layer=34
-O	d	lb_musique_0	far_mass	frac	6.1505e-09	e6b_far_profiles.json	layer=35
-O	d	lb_musique_1	far_mass	frac	2.5326e-07	e6b_far_profiles.json	layer=0
-O	d	lb_musique_1	far_mass	frac	7.1686e-05	e6b_far_profiles.json	layer=1
-O	d	lb_musique_1	far_mass	frac	4.6406e-02	e6b_far_profiles.json	layer=2
-O	d	lb_musique_1	far_mass	frac	1.8691e-01	e6b_far_profiles.json	layer=3
-O	d	lb_musique_1	far_mass	frac	1.0798e-01	e6b_far_profiles.json	layer=4
-O	d	lb_musique_1	far_mass	frac	1.7283e-01	e6b_far_profiles.json	layer=5
-O	d	lb_musique_1	far_mass	frac	6.7139e-05	e6b_far_profiles.json	layer=6
-O	d	lb_musique_1	far_mass	frac	4.2801e-11	e6b_far_profiles.json	layer=7
-O	d	lb_musique_1	far_mass	frac	1.2449e-07	e6b_far_profiles.json	layer=8
-O	d	lb_musique_1	far_mass	frac	1.0288e-08	e6b_far_profiles.json	layer=9
-O	d	lb_musique_1	far_mass	frac	1.5644e-08	e6b_far_profiles.json	layer=10
-O	d	lb_musique_1	far_mass	frac	3.1176e-07	e6b_far_profiles.json	layer=11
-O	d	lb_musique_1	far_mass	frac	2.0225e-07	e6b_far_profiles.json	layer=12
-O	d	lb_musique_1	far_mass	frac	2.8142e-07	e6b_far_profiles.json	layer=13
-O	d	lb_musique_1	far_mass	frac	8.4791e-07	e6b_far_profiles.json	layer=14
-O	d	lb_musique_1	far_mass	frac	4.0465e-06	e6b_far_profiles.json	layer=15
-O	d	lb_musique_1	far_mass	frac	6.5172e-08	e6b_far_profiles.json	layer=16
-O	d	lb_musique_1	far_mass	frac	3.0141e-05	e6b_far_profiles.json	layer=17
-O	d	lb_musique_1	far_mass	frac	3.1672e-03	e6b_far_profiles.json	layer=18
-O	d	lb_musique_1	far_mass	frac	1.1850e-03	e6b_far_profiles.json	layer=19
-O	d	lb_musique_1	far_mass	frac	1.9738e-03	e6b_far_profiles.json	layer=20
-O	d	lb_musique_1	far_mass	frac	4.1133e-04	e6b_far_profiles.json	layer=21
-O	d	lb_musique_1	far_mass	frac	4.3887e-03	e6b_far_profiles.json	layer=22
-O	d	lb_musique_1	far_mass	frac	7.8102e-04	e6b_far_profiles.json	layer=23
-O	d	lb_musique_1	far_mass	frac	7.7250e-04	e6b_far_profiles.json	layer=24
-O	d	lb_musique_1	far_mass	frac	5.9565e-04	e6b_far_profiles.json	layer=25
-O	d	lb_musique_1	far_mass	frac	3.4324e-03	e6b_far_profiles.json	layer=26
-O	d	lb_musique_1	far_mass	frac	4.6843e-03	e6b_far_profiles.json	layer=27
-O	d	lb_musique_1	far_mass	frac	6.8832e-03	e6b_far_profiles.json	layer=28
-O	d	lb_musique_1	far_mass	frac	3.7915e-03	e6b_far_profiles.json	layer=29
-O	d	lb_musique_1	far_mass	frac	1.0354e-03	e6b_far_profiles.json	layer=30
-O	d	lb_musique_1	far_mass	frac	4.1140e-03	e6b_far_profiles.json	layer=31
-O	d	lb_musique_1	far_mass	frac	2.6611e-03	e6b_far_profiles.json	layer=32
-O	d	lb_musique_1	far_mass	frac	6.4787e-03	e6b_far_profiles.json	layer=33
-O	d	lb_musique_1	far_mass	frac	6.2539e-04	e6b_far_profiles.json	layer=34
-O	d	lb_musique_1	far_mass	frac	1.2323e-08	e6b_far_profiles.json	layer=35
-O	d	lb_narrativeqa_0	far_mass	frac	6.7264e-07	e6b_far_profiles.json	layer=0
-O	d	lb_narrativeqa_0	far_mass	frac	2.2601e-02	e6b_far_profiles.json	layer=1
-O	d	lb_narrativeqa_0	far_mass	frac	1.1489e-01	e6b_far_profiles.json	layer=2
-O	d	lb_narrativeqa_0	far_mass	frac	2.1268e-01	e6b_far_profiles.json	layer=3
-O	d	lb_narrativeqa_0	far_mass	frac	2.8513e-01	e6b_far_profiles.json	layer=4
-O	d	lb_narrativeqa_0	far_mass	frac	2.7806e-01	e6b_far_profiles.json	layer=5
-O	d	lb_narrativeqa_0	far_mass	frac	9.2700e-02	e6b_far_profiles.json	layer=6
-O	d	lb_narrativeqa_0	far_mass	frac	3.7349e-09	e6b_far_profiles.json	layer=7
-O	d	lb_narrativeqa_0	far_mass	frac	2.5446e-04	e6b_far_profiles.json	layer=8
-O	d	lb_narrativeqa_0	far_mass	frac	5.2027e-03	e6b_far_profiles.json	layer=9
-O	d	lb_narrativeqa_0	far_mass	frac	6.3042e-07	e6b_far_profiles.json	layer=10
-O	d	lb_narrativeqa_0	far_mass	frac	7.6701e-10	e6b_far_profiles.json	layer=11
-O	d	lb_narrativeqa_0	far_mass	frac	4.3251e-06	e6b_far_profiles.json	layer=12
-O	d	lb_narrativeqa_0	far_mass	frac	8.8822e-05	e6b_far_profiles.json	layer=13
-O	d	lb_narrativeqa_0	far_mass	frac	2.4823e-09	e6b_far_profiles.json	layer=14
-O	d	lb_narrativeqa_0	far_mass	frac	5.1168e-08	e6b_far_profiles.json	layer=15
-O	d	lb_narrativeqa_0	far_mass	frac	8.3681e-06	e6b_far_profiles.json	layer=16
-O	d	lb_narrativeqa_0	far_mass	frac	1.0098e-01	e6b_far_profiles.json	layer=17
-O	d	lb_narrativeqa_0	far_mass	frac	2.6270e-01	e6b_far_profiles.json	layer=18
-O	d	lb_narrativeqa_0	far_mass	frac	3.9305e-01	e6b_far_profiles.json	layer=19
-O	d	lb_narrativeqa_0	far_mass	frac	3.8939e-01	e6b_far_profiles.json	layer=20
-O	d	lb_narrativeqa_0	far_mass	frac	3.1003e-01	e6b_far_profiles.json	layer=21
-O	d	lb_narrativeqa_0	far_mass	frac	3.6210e-01	e6b_far_profiles.json	layer=22
-O	d	lb_narrativeqa_0	far_mass	frac	5.4104e-01	e6b_far_profiles.json	layer=23
-O	d	lb_narrativeqa_0	far_mass	frac	6.9831e-01	e6b_far_profiles.json	layer=24
-O	d	lb_narrativeqa_0	far_mass	frac	5.1995e-01	e6b_far_profiles.json	layer=25
-O	d	lb_narrativeqa_0	far_mass	frac	6.3867e-01	e6b_far_profiles.json	layer=26
-O	d	lb_narrativeqa_0	far_mass	frac	4.0860e-01	e6b_far_profiles.json	layer=27
-O	d	lb_narrativeqa_0	far_mass	frac	2.2924e-01	e6b_far_profiles.json	layer=28
-O	d	lb_narrativeqa_0	far_mass	frac	5.3687e-01	e6b_far_profiles.json	layer=29
-O	d	lb_narrativeqa_0	far_mass	frac	2.0850e-01	e6b_far_profiles.json	layer=30
-O	d	lb_narrativeqa_0	far_mass	frac	4.2399e-01	e6b_far_profiles.json	layer=31
-O	d	lb_narrativeqa_0	far_mass	frac	2.8420e-01	e6b_far_profiles.json	layer=32
-O	d	lb_narrativeqa_0	far_mass	frac	3.5294e-01	e6b_far_profiles.json	layer=33
-O	d	lb_narrativeqa_0	far_mass	frac	3.8411e-02	e6b_far_profiles.json	layer=34
-O	d	lb_narrativeqa_0	far_mass	frac	2.6136e-10	e6b_far_profiles.json	layer=35
-O	d	lb_narrativeqa_1	far_mass	frac	6.7264e-07	e6b_far_profiles.json	layer=0
-O	d	lb_narrativeqa_1	far_mass	frac	2.2601e-02	e6b_far_profiles.json	layer=1
-O	d	lb_narrativeqa_1	far_mass	frac	1.1489e-01	e6b_far_profiles.json	layer=2
-O	d	lb_narrativeqa_1	far_mass	frac	2.1268e-01	e6b_far_profiles.json	layer=3
-O	d	lb_narrativeqa_1	far_mass	frac	2.8513e-01	e6b_far_profiles.json	layer=4
-O	d	lb_narrativeqa_1	far_mass	frac	2.7806e-01	e6b_far_profiles.json	layer=5
-O	d	lb_narrativeqa_1	far_mass	frac	9.2700e-02	e6b_far_profiles.json	layer=6
-O	d	lb_narrativeqa_1	far_mass	frac	3.7349e-09	e6b_far_profiles.json	layer=7
-O	d	lb_narrativeqa_1	far_mass	frac	2.5446e-04	e6b_far_profiles.json	layer=8
-O	d	lb_narrativeqa_1	far_mass	frac	5.2027e-03	e6b_far_profiles.json	layer=9
-O	d	lb_narrativeqa_1	far_mass	frac	6.3042e-07	e6b_far_profiles.json	layer=10
-O	d	lb_narrativeqa_1	far_mass	frac	7.6701e-10	e6b_far_profiles.json	layer=11
-O	d	lb_narrativeqa_1	far_mass	frac	4.3251e-06	e6b_far_profiles.json	layer=12
-O	d	lb_narrativeqa_1	far_mass	frac	8.8822e-05	e6b_far_profiles.json	layer=13
-O	d	lb_narrativeqa_1	far_mass	frac	2.4823e-09	e6b_far_profiles.json	layer=14
-O	d	lb_narrativeqa_1	far_mass	frac	5.1168e-08	e6b_far_profiles.json	layer=15
-O	d	lb_narrativeqa_1	far_mass	frac	8.3681e-06	e6b_far_profiles.json	layer=16
-O	d	lb_narrativeqa_1	far_mass	frac	1.0098e-01	e6b_far_profiles.json	layer=17
-O	d	lb_narrativeqa_1	far_mass	frac	2.6270e-01	e6b_far_profiles.json	layer=18
-O	d	lb_narrativeqa_1	far_mass	frac	3.9305e-01	e6b_far_profiles.json	layer=19
-O	d	lb_narrativeqa_1	far_mass	frac	3.8939e-01	e6b_far_profiles.json	layer=20
-O	d	lb_narrativeqa_1	far_mass	frac	3.1003e-01	e6b_far_profiles.json	layer=21
-O	d	lb_narrativeqa_1	far_mass	frac	3.6210e-01	e6b_far_profiles.json	layer=22
-O	d	lb_narrativeqa_1	far_mass	frac	5.4104e-01	e6b_far_profiles.json	layer=23
-O	d	lb_narrativeqa_1	far_mass	frac	6.9831e-01	e6b_far_profiles.json	layer=24
-O	d	lb_narrativeqa_1	far_mass	frac	5.1995e-01	e6b_far_profiles.json	layer=25
-O	d	lb_narrativeqa_1	far_mass	frac	6.3867e-01	e6b_far_profiles.json	layer=26
-O	d	lb_narrativeqa_1	far_mass	frac	4.0860e-01	e6b_far_profiles.json	layer=27
-O	d	lb_narrativeqa_1	far_mass	frac	2.2924e-01	e6b_far_profiles.json	layer=28
-O	d	lb_narrativeqa_1	far_mass	frac	5.3687e-01	e6b_far_profiles.json	layer=29
-O	d	lb_narrativeqa_1	far_mass	frac	2.0850e-01	e6b_far_profiles.json	layer=30
-O	d	lb_narrativeqa_1	far_mass	frac	4.2399e-01	e6b_far_profiles.json	layer=31
-O	d	lb_narrativeqa_1	far_mass	frac	2.8420e-01	e6b_far_profiles.json	layer=32
-O	d	lb_narrativeqa_1	far_mass	frac	3.5294e-01	e6b_far_profiles.json	layer=33
-O	d	lb_narrativeqa_1	far_mass	frac	3.8411e-02	e6b_far_profiles.json	layer=34
-O	d	lb_narrativeqa_1	far_mass	frac	2.6136e-10	e6b_far_profiles.json	layer=35
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.1206e-05	e6b_far_profiles.json	layer=0
-O	d	lb_passage_retrieval_en_0	far_mass	frac	4.6395e-04	e6b_far_profiles.json	layer=1
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.0714e-01	e6b_far_profiles.json	layer=2
-O	d	lb_passage_retrieval_en_0	far_mass	frac	2.8707e-01	e6b_far_profiles.json	layer=3
-O	d	lb_passage_retrieval_en_0	far_mass	frac	2.1748e-01	e6b_far_profiles.json	layer=4
-O	d	lb_passage_retrieval_en_0	far_mass	frac	2.7676e-01	e6b_far_profiles.json	layer=5
-O	d	lb_passage_retrieval_en_0	far_mass	frac	4.7611e-05	e6b_far_profiles.json	layer=6
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.4622e-10	e6b_far_profiles.json	layer=7
-O	d	lb_passage_retrieval_en_0	far_mass	frac	3.5567e-09	e6b_far_profiles.json	layer=8
-O	d	lb_passage_retrieval_en_0	far_mass	frac	5.1236e-10	e6b_far_profiles.json	layer=9
-O	d	lb_passage_retrieval_en_0	far_mass	frac	6.8742e-08	e6b_far_profiles.json	layer=10
-O	d	lb_passage_retrieval_en_0	far_mass	frac	8.1154e-07	e6b_far_profiles.json	layer=11
-O	d	lb_passage_retrieval_en_0	far_mass	frac	3.4308e-08	e6b_far_profiles.json	layer=12
-O	d	lb_passage_retrieval_en_0	far_mass	frac	3.8157e-08	e6b_far_profiles.json	layer=13
-O	d	lb_passage_retrieval_en_0	far_mass	frac	2.4314e-06	e6b_far_profiles.json	layer=14
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.4880e-05	e6b_far_profiles.json	layer=15
-O	d	lb_passage_retrieval_en_0	far_mass	frac	3.0564e-07	e6b_far_profiles.json	layer=16
-O	d	lb_passage_retrieval_en_0	far_mass	frac	7.3950e-04	e6b_far_profiles.json	layer=17
-O	d	lb_passage_retrieval_en_0	far_mass	frac	2.8546e-03	e6b_far_profiles.json	layer=18
-O	d	lb_passage_retrieval_en_0	far_mass	frac	2.5544e-03	e6b_far_profiles.json	layer=19
-O	d	lb_passage_retrieval_en_0	far_mass	frac	4.0898e-04	e6b_far_profiles.json	layer=20
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.1546e-03	e6b_far_profiles.json	layer=21
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.2162e-03	e6b_far_profiles.json	layer=22
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.8820e-03	e6b_far_profiles.json	layer=23
-O	d	lb_passage_retrieval_en_0	far_mass	frac	6.4961e-02	e6b_far_profiles.json	layer=24
-O	d	lb_passage_retrieval_en_0	far_mass	frac	3.6415e-04	e6b_far_profiles.json	layer=25
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.2036e-03	e6b_far_profiles.json	layer=26
-O	d	lb_passage_retrieval_en_0	far_mass	frac	2.0309e-03	e6b_far_profiles.json	layer=27
-O	d	lb_passage_retrieval_en_0	far_mass	frac	6.2146e-03	e6b_far_profiles.json	layer=28
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.9838e-03	e6b_far_profiles.json	layer=29
-O	d	lb_passage_retrieval_en_0	far_mass	frac	3.3874e-04	e6b_far_profiles.json	layer=30
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.6900e-03	e6b_far_profiles.json	layer=31
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.9798e-03	e6b_far_profiles.json	layer=32
-O	d	lb_passage_retrieval_en_0	far_mass	frac	3.3271e-03	e6b_far_profiles.json	layer=33
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.6165e-03	e6b_far_profiles.json	layer=34
-O	d	lb_passage_retrieval_en_0	far_mass	frac	1.3189e-05	e6b_far_profiles.json	layer=35
-O	d	lb_passage_retrieval_en_1	far_mass	frac	3.3785e-07	e6b_far_profiles.json	layer=0
-O	d	lb_passage_retrieval_en_1	far_mass	frac	6.6565e-04	e6b_far_profiles.json	layer=1
-O	d	lb_passage_retrieval_en_1	far_mass	frac	9.8026e-02	e6b_far_profiles.json	layer=2
-O	d	lb_passage_retrieval_en_1	far_mass	frac	2.4582e-01	e6b_far_profiles.json	layer=3
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.7110e-01	e6b_far_profiles.json	layer=4
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.5744e-01	e6b_far_profiles.json	layer=5
-O	d	lb_passage_retrieval_en_1	far_mass	frac	3.5635e-05	e6b_far_profiles.json	layer=6
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.5359e-10	e6b_far_profiles.json	layer=7
-O	d	lb_passage_retrieval_en_1	far_mass	frac	2.4787e-09	e6b_far_profiles.json	layer=8
-O	d	lb_passage_retrieval_en_1	far_mass	frac	8.2675e-10	e6b_far_profiles.json	layer=9
-O	d	lb_passage_retrieval_en_1	far_mass	frac	2.1650e-08	e6b_far_profiles.json	layer=10
-O	d	lb_passage_retrieval_en_1	far_mass	frac	4.1380e-07	e6b_far_profiles.json	layer=11
-O	d	lb_passage_retrieval_en_1	far_mass	frac	5.3838e-08	e6b_far_profiles.json	layer=12
-O	d	lb_passage_retrieval_en_1	far_mass	frac	3.7004e-08	e6b_far_profiles.json	layer=13
-O	d	lb_passage_retrieval_en_1	far_mass	frac	3.8024e-06	e6b_far_profiles.json	layer=14
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.3914e-05	e6b_far_profiles.json	layer=15
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.3573e-07	e6b_far_profiles.json	layer=16
-O	d	lb_passage_retrieval_en_1	far_mass	frac	9.4999e-04	e6b_far_profiles.json	layer=17
-O	d	lb_passage_retrieval_en_1	far_mass	frac	8.4591e-03	e6b_far_profiles.json	layer=18
-O	d	lb_passage_retrieval_en_1	far_mass	frac	5.3224e-03	e6b_far_profiles.json	layer=19
-O	d	lb_passage_retrieval_en_1	far_mass	frac	3.1932e-04	e6b_far_profiles.json	layer=20
-O	d	lb_passage_retrieval_en_1	far_mass	frac	6.2662e-04	e6b_far_profiles.json	layer=21
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.0135e-03	e6b_far_profiles.json	layer=22
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.0625e-02	e6b_far_profiles.json	layer=23
-O	d	lb_passage_retrieval_en_1	far_mass	frac	4.0729e-02	e6b_far_profiles.json	layer=24
-O	d	lb_passage_retrieval_en_1	far_mass	frac	2.9922e-04	e6b_far_profiles.json	layer=25
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.0538e-03	e6b_far_profiles.json	layer=26
-O	d	lb_passage_retrieval_en_1	far_mass	frac	3.5925e-03	e6b_far_profiles.json	layer=27
-O	d	lb_passage_retrieval_en_1	far_mass	frac	6.0983e-03	e6b_far_profiles.json	layer=28
-O	d	lb_passage_retrieval_en_1	far_mass	frac	7.2143e-04	e6b_far_profiles.json	layer=29
-O	d	lb_passage_retrieval_en_1	far_mass	frac	2.5384e-04	e6b_far_profiles.json	layer=30
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.3151e-03	e6b_far_profiles.json	layer=31
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.2469e-03	e6b_far_profiles.json	layer=32
-O	d	lb_passage_retrieval_en_1	far_mass	frac	2.8143e-03	e6b_far_profiles.json	layer=33
-O	d	lb_passage_retrieval_en_1	far_mass	frac	7.9974e-04	e6b_far_profiles.json	layer=34
-O	d	lb_passage_retrieval_en_1	far_mass	frac	1.6783e-05	e6b_far_profiles.json	layer=35
-O	d	lb_qasper_0	far_mass	frac	3.7637e-07	e6b_far_profiles.json	layer=0
-O	d	lb_qasper_0	far_mass	frac	2.8734e-04	e6b_far_profiles.json	layer=1
-O	d	lb_qasper_0	far_mass	frac	1.1499e-01	e6b_far_profiles.json	layer=2
-O	d	lb_qasper_0	far_mass	frac	9.7901e-02	e6b_far_profiles.json	layer=3
-O	d	lb_qasper_0	far_mass	frac	2.7969e-02	e6b_far_profiles.json	layer=4
-O	d	lb_qasper_0	far_mass	frac	1.4309e-01	e6b_far_profiles.json	layer=5
-O	d	lb_qasper_0	far_mass	frac	2.1797e-04	e6b_far_profiles.json	layer=6
-O	d	lb_qasper_0	far_mass	frac	1.9831e-13	e6b_far_profiles.json	layer=7
-O	d	lb_qasper_0	far_mass	frac	8.5427e-10	e6b_far_profiles.json	layer=8
-O	d	lb_qasper_0	far_mass	frac	6.1489e-07	e6b_far_profiles.json	layer=9
-O	d	lb_qasper_0	far_mass	frac	4.7838e-07	e6b_far_profiles.json	layer=10
-O	d	lb_qasper_0	far_mass	frac	8.6466e-08	e6b_far_profiles.json	layer=11
-O	d	lb_qasper_0	far_mass	frac	3.6108e-05	e6b_far_profiles.json	layer=12
-O	d	lb_qasper_0	far_mass	frac	1.1061e-05	e6b_far_profiles.json	layer=13
-O	d	lb_qasper_0	far_mass	frac	9.9376e-07	e6b_far_profiles.json	layer=14
-O	d	lb_qasper_0	far_mass	frac	1.0652e-06	e6b_far_profiles.json	layer=15
-O	d	lb_qasper_0	far_mass	frac	3.2523e-06	e6b_far_profiles.json	layer=16
-O	d	lb_qasper_0	far_mass	frac	1.2021e-03	e6b_far_profiles.json	layer=17
-O	d	lb_qasper_0	far_mass	frac	5.2539e-03	e6b_far_profiles.json	layer=18
-O	d	lb_qasper_0	far_mass	frac	8.3785e-03	e6b_far_profiles.json	layer=19
-O	d	lb_qasper_0	far_mass	frac	1.6105e-02	e6b_far_profiles.json	layer=20
-O	d	lb_qasper_0	far_mass	frac	2.4325e-03	e6b_far_profiles.json	layer=21
-O	d	lb_qasper_0	far_mass	frac	2.9990e-03	e6b_far_profiles.json	layer=22
-O	d	lb_qasper_0	far_mass	frac	3.5145e-03	e6b_far_profiles.json	layer=23
-O	d	lb_qasper_0	far_mass	frac	9.3301e-04	e6b_far_profiles.json	layer=24
-O	d	lb_qasper_0	far_mass	frac	7.6999e-04	e6b_far_profiles.json	layer=25
-O	d	lb_qasper_0	far_mass	frac	5.4546e-03	e6b_far_profiles.json	layer=26
-O	d	lb_qasper_0	far_mass	frac	6.4845e-03	e6b_far_profiles.json	layer=27
-O	d	lb_qasper_0	far_mass	frac	1.1221e-02	e6b_far_profiles.json	layer=28
-O	d	lb_qasper_0	far_mass	frac	7.5552e-02	e6b_far_profiles.json	layer=29
-O	d	lb_qasper_0	far_mass	frac	1.1472e-03	e6b_far_profiles.json	layer=30
-O	d	lb_qasper_0	far_mass	frac	1.5653e-03	e6b_far_profiles.json	layer=31
-O	d	lb_qasper_0	far_mass	frac	4.3621e-03	e6b_far_profiles.json	layer=32
-O	d	lb_qasper_0	far_mass	frac	7.5205e-03	e6b_far_profiles.json	layer=33
-O	d	lb_qasper_0	far_mass	frac	8.4313e-04	e6b_far_profiles.json	layer=34
-O	d	lb_qasper_0	far_mass	frac	2.5283e-08	e6b_far_profiles.json	layer=35
-O	d	lb_qasper_1	far_mass	frac	1.9624e-06	e6b_far_profiles.json	layer=0
-O	d	lb_qasper_1	far_mass	frac	1.4580e-04	e6b_far_profiles.json	layer=1
-O	d	lb_qasper_1	far_mass	frac	9.8152e-02	e6b_far_profiles.json	layer=2
-O	d	lb_qasper_1	far_mass	frac	1.1630e-01	e6b_far_profiles.json	layer=3
-O	d	lb_qasper_1	far_mass	frac	3.4143e-02	e6b_far_profiles.json	layer=4
-O	d	lb_qasper_1	far_mass	frac	1.4452e-01	e6b_far_profiles.json	layer=5
-O	d	lb_qasper_1	far_mass	frac	2.7847e-04	e6b_far_profiles.json	layer=6
-O	d	lb_qasper_1	far_mass	frac	1.6838e-13	e6b_far_profiles.json	layer=7
-O	d	lb_qasper_1	far_mass	frac	4.5534e-10	e6b_far_profiles.json	layer=8
-O	d	lb_qasper_1	far_mass	frac	1.5659e-08	e6b_far_profiles.json	layer=9
-O	d	lb_qasper_1	far_mass	frac	4.2055e-08	e6b_far_profiles.json	layer=10
-O	d	lb_qasper_1	far_mass	frac	1.4550e-08	e6b_far_profiles.json	layer=11
-O	d	lb_qasper_1	far_mass	frac	2.1323e-05	e6b_far_profiles.json	layer=12
-O	d	lb_qasper_1	far_mass	frac	7.2687e-05	e6b_far_profiles.json	layer=13
-O	d	lb_qasper_1	far_mass	frac	1.4992e-05	e6b_far_profiles.json	layer=14
-O	d	lb_qasper_1	far_mass	frac	4.1645e-07	e6b_far_profiles.json	layer=15
-O	d	lb_qasper_1	far_mass	frac	2.9664e-07	e6b_far_profiles.json	layer=16
-O	d	lb_qasper_1	far_mass	frac	3.1879e-03	e6b_far_profiles.json	layer=17
-O	d	lb_qasper_1	far_mass	frac	1.5912e-02	e6b_far_profiles.json	layer=18
-O	d	lb_qasper_1	far_mass	frac	6.7759e-03	e6b_far_profiles.json	layer=19
-O	d	lb_qasper_1	far_mass	frac	1.0618e-02	e6b_far_profiles.json	layer=20
-O	d	lb_qasper_1	far_mass	frac	4.6866e-03	e6b_far_profiles.json	layer=21
-O	d	lb_qasper_1	far_mass	frac	3.7290e-03	e6b_far_profiles.json	layer=22
-O	d	lb_qasper_1	far_mass	frac	5.9594e-03	e6b_far_profiles.json	layer=23
-O	d	lb_qasper_1	far_mass	frac	2.8221e-03	e6b_far_profiles.json	layer=24
-O	d	lb_qasper_1	far_mass	frac	1.2355e-03	e6b_far_profiles.json	layer=25
-O	d	lb_qasper_1	far_mass	frac	1.5351e-02	e6b_far_profiles.json	layer=26
-O	d	lb_qasper_1	far_mass	frac	2.8441e-02	e6b_far_profiles.json	layer=27
-O	d	lb_qasper_1	far_mass	frac	1.3431e-02	e6b_far_profiles.json	layer=28
-O	d	lb_qasper_1	far_mass	frac	5.4395e-03	e6b_far_profiles.json	layer=29
-O	d	lb_qasper_1	far_mass	frac	3.5654e-03	e6b_far_profiles.json	layer=30
-O	d	lb_qasper_1	far_mass	frac	5.4671e-03	e6b_far_profiles.json	layer=31
-O	d	lb_qasper_1	far_mass	frac	1.7724e-02	e6b_far_profiles.json	layer=32
-O	d	lb_qasper_1	far_mass	frac	1.2231e-02	e6b_far_profiles.json	layer=33
-O	d	lb_qasper_1	far_mass	frac	3.8840e-03	e6b_far_profiles.json	layer=34
-O	d	lb_qasper_1	far_mass	frac	4.2167e-08	e6b_far_profiles.json	layer=35
-O	d	natural32k	far_mass	frac	1.7588e-06	e6b_far_profiles.json	layer=0
-O	d	natural32k	far_mass	frac	7.3684e-04	e6b_far_profiles.json	layer=1
-O	d	natural32k	far_mass	frac	1.3410e-01	e6b_far_profiles.json	layer=2
-O	d	natural32k	far_mass	frac	3.7528e-01	e6b_far_profiles.json	layer=3
-O	d	natural32k	far_mass	frac	3.9246e-01	e6b_far_profiles.json	layer=4
-O	d	natural32k	far_mass	frac	3.5696e-01	e6b_far_profiles.json	layer=5
-O	d	natural32k	far_mass	frac	8.5116e-02	e6b_far_profiles.json	layer=6
-O	d	natural32k	far_mass	frac	4.7278e-10	e6b_far_profiles.json	layer=7
-O	d	natural32k	far_mass	frac	4.8720e-09	e6b_far_profiles.json	layer=8
-O	d	natural32k	far_mass	frac	6.6703e-05	e6b_far_profiles.json	layer=9
-O	d	natural32k	far_mass	frac	4.2784e-07	e6b_far_profiles.json	layer=10
-O	d	natural32k	far_mass	frac	1.1040e-06	e6b_far_profiles.json	layer=11
-O	d	natural32k	far_mass	frac	2.5351e-06	e6b_far_profiles.json	layer=12
-O	d	natural32k	far_mass	frac	1.9070e-05	e6b_far_profiles.json	layer=13
-O	d	natural32k	far_mass	frac	1.6723e-06	e6b_far_profiles.json	layer=14
-O	d	natural32k	far_mass	frac	7.5929e-05	e6b_far_profiles.json	layer=15
-O	d	natural32k	far_mass	frac	1.6393e-05	e6b_far_profiles.json	layer=16
-O	d	natural32k	far_mass	frac	1.8511e-03	e6b_far_profiles.json	layer=17
-O	d	natural32k	far_mass	frac	2.5017e-03	e6b_far_profiles.json	layer=18
-O	d	natural32k	far_mass	frac	2.4692e-02	e6b_far_profiles.json	layer=19
-O	d	natural32k	far_mass	frac	4.1812e-02	e6b_far_profiles.json	layer=20
-O	d	natural32k	far_mass	frac	2.3076e-02	e6b_far_profiles.json	layer=21
-O	d	natural32k	far_mass	frac	4.3288e-02	e6b_far_profiles.json	layer=22
-O	d	natural32k	far_mass	frac	2.0987e-01	e6b_far_profiles.json	layer=23
-O	d	natural32k	far_mass	frac	1.5304e-01	e6b_far_profiles.json	layer=24
-O	d	natural32k	far_mass	frac	1.6608e-01	e6b_far_profiles.json	layer=25
-O	d	natural32k	far_mass	frac	2.2858e-01	e6b_far_profiles.json	layer=26
-O	d	natural32k	far_mass	frac	2.3020e-01	e6b_far_profiles.json	layer=27
-O	d	natural32k	far_mass	frac	6.2295e-02	e6b_far_profiles.json	layer=28
-O	d	natural32k	far_mass	frac	1.4457e-01	e6b_far_profiles.json	layer=29
-O	d	natural32k	far_mass	frac	8.8368e-02	e6b_far_profiles.json	layer=30
-O	d	natural32k	far_mass	frac	4.1143e-02	e6b_far_profiles.json	layer=31
-O	d	natural32k	far_mass	frac	9.9216e-02	e6b_far_profiles.json	layer=32
-O	d	natural32k	far_mass	frac	1.3823e-01	e6b_far_profiles.json	layer=33
-O	d	natural32k	far_mass	frac	1.1088e-02	e6b_far_profiles.json	layer=34
-O	d	natural32k	far_mass	frac	1.0547e-08	e6b_far_profiles.json	layer=35
-O	d	needle32k	far_mass	frac	3.3754e-07	e6b_far_profiles.json	layer=0
-O	d	needle32k	far_mass	frac	1.0605e-06	e6b_far_profiles.json	layer=1
-O	d	needle32k	far_mass	frac	2.4318e-08	e6b_far_profiles.json	layer=2
-O	d	needle32k	far_mass	frac	1.2712e-07	e6b_far_profiles.json	layer=3
-O	d	needle32k	far_mass	frac	9.7843e-09	e6b_far_profiles.json	layer=4
-O	d	needle32k	far_mass	frac	8.1730e-10	e6b_far_profiles.json	layer=5
-O	d	needle32k	far_mass	frac	7.3533e-09	e6b_far_profiles.json	layer=6
-O	d	needle32k	far_mass	frac	4.7584e-08	e6b_far_profiles.json	layer=7
-O	d	needle32k	far_mass	frac	1.8635e-14	e6b_far_profiles.json	layer=8
-O	d	needle32k	far_mass	frac	4.4105e-12	e6b_far_profiles.json	layer=9
-O	d	needle32k	far_mass	frac	4.3980e-09	e6b_far_profiles.json	layer=10
-O	d	needle32k	far_mass	frac	2.9315e-13	e6b_far_profiles.json	layer=11
-O	d	needle32k	far_mass	frac	4.5041e-09	e6b_far_profiles.json	layer=12
-O	d	needle32k	far_mass	frac	1.7458e-09	e6b_far_profiles.json	layer=13
-O	d	needle32k	far_mass	frac	1.1937e-10	e6b_far_profiles.json	layer=14
-O	d	needle32k	far_mass	frac	1.7617e-06	e6b_far_profiles.json	layer=15
-O	d	needle32k	far_mass	frac	8.6870e-10	e6b_far_profiles.json	layer=16
-O	d	needle32k	far_mass	frac	3.0974e-04	e6b_far_profiles.json	layer=17
-O	d	needle32k	far_mass	frac	9.7911e-03	e6b_far_profiles.json	layer=18
-O	d	needle32k	far_mass	frac	7.2772e-02	e6b_far_profiles.json	layer=19
-O	d	needle32k	far_mass	frac	2.9731e-02	e6b_far_profiles.json	layer=20
-O	d	needle32k	far_mass	frac	2.3876e-02	e6b_far_profiles.json	layer=21
-O	d	needle32k	far_mass	frac	3.9976e-02	e6b_far_profiles.json	layer=22
-O	d	needle32k	far_mass	frac	1.3798e-01	e6b_far_profiles.json	layer=23
-O	d	needle32k	far_mass	frac	5.4268e-02	e6b_far_profiles.json	layer=24
-O	d	needle32k	far_mass	frac	1.4050e-01	e6b_far_profiles.json	layer=25
-O	d	needle32k	far_mass	frac	1.2432e-01	e6b_far_profiles.json	layer=26
-O	d	needle32k	far_mass	frac	1.7423e-01	e6b_far_profiles.json	layer=27
-O	d	needle32k	far_mass	frac	2.3410e-02	e6b_far_profiles.json	layer=28
-O	d	needle32k	far_mass	frac	3.5023e-02	e6b_far_profiles.json	layer=29
-O	d	needle32k	far_mass	frac	2.1399e-02	e6b_far_profiles.json	layer=30
-O	d	needle32k	far_mass	frac	1.6357e-02	e6b_far_profiles.json	layer=31
-O	d	needle32k	far_mass	frac	9.6004e-02	e6b_far_profiles.json	layer=32
-O	d	needle32k	far_mass	frac	1.4807e-02	e6b_far_profiles.json	layer=33
-O	d	needle32k	far_mass	frac	2.9216e-03	e6b_far_profiles.json	layer=34
-O	d	needle32k	far_mass	frac	1.0625e-10	e6b_far_profiles.json	layer=35
-O	d	all	layers_median_lt_0.01	count	24	e6b_far_profiles.json	-
-O	d	all	layers_lt_0.01_per_prompt	range	12-32	e6b_far_profiles.json	recomputed per-row from the same 16x36 heatmap (single source; GPT-review fix: e6_layer_skip.json 10-prompt summary withdrawn)
+O	a	repr_strip	bin_mass	frac	2.8397e-04	e140_o_trace_v2.json	pos=160,sel=0
+O	a	repr_strip	bin_mass	frac	2.4288e-04	e140_o_trace_v2.json	pos=224,sel=0
+O	a	repr_strip	bin_mass	frac	2.6439e-04	e140_o_trace_v2.json	pos=288,sel=0
+O	a	repr_strip	bin_mass	frac	8.0213e-05	e140_o_trace_v2.json	pos=352,sel=0
+O	a	repr_strip	bin_mass	frac	1.1976e-04	e140_o_trace_v2.json	pos=416,sel=0
+O	a	repr_strip	bin_mass	frac	1.1155e-04	e140_o_trace_v2.json	pos=480,sel=0
+O	a	repr_strip	bin_mass	frac	3.4360e-04	e140_o_trace_v2.json	pos=544,sel=0
+O	a	repr_strip	bin_mass	frac	2.1214e-04	e140_o_trace_v2.json	pos=608,sel=0
+O	a	repr_strip	bin_mass	frac	4.9302e-04	e140_o_trace_v2.json	pos=672,sel=0
+O	a	repr_strip	bin_mass	frac	3.6874e-04	e140_o_trace_v2.json	pos=736,sel=0
+O	a	repr_strip	bin_mass	frac	9.8678e-04	e140_o_trace_v2.json	pos=800,sel=1
+O	a	repr_strip	bin_mass	frac	1.4802e-01	e140_o_trace_v2.json	pos=864,sel=1
+O	a	repr_strip	bin_mass	frac	3.2540e-04	e140_o_trace_v2.json	pos=928,sel=0
+O	a	repr_strip	bin_mass	frac	2.2379e-04	e140_o_trace_v2.json	pos=992,sel=0
+O	a	repr_strip	bin_mass	frac	1.0250e-04	e140_o_trace_v2.json	pos=1056,sel=0
+O	a	repr_strip	bin_mass	frac	1.8615e-04	e140_o_trace_v2.json	pos=1120,sel=0
+O	a	repr_strip	bin_mass	frac	1.3208e-04	e140_o_trace_v2.json	pos=1184,sel=0
+O	a	repr_strip	bin_mass	frac	6.6736e-05	e140_o_trace_v2.json	pos=1248,sel=0
+O	a	repr_strip	bin_mass	frac	8.3186e-05	e140_o_trace_v2.json	pos=1312,sel=0
+O	a	repr_strip	bin_mass	frac	6.0594e-05	e140_o_trace_v2.json	pos=1376,sel=0
+O	a	repr_strip	bin_mass	frac	2.9594e-05	e140_o_trace_v2.json	pos=1440,sel=0
+O	a	repr_strip	bin_mass	frac	3.0193e-04	e140_o_trace_v2.json	pos=1504,sel=0
+O	a	repr_strip	bin_mass	frac	1.1197e-04	e140_o_trace_v2.json	pos=1568,sel=0
+O	a	repr_strip	bin_mass	frac	1.9853e-05	e140_o_trace_v2.json	pos=1632,sel=0
+O	a	repr_strip	bin_mass	frac	2.9678e-05	e140_o_trace_v2.json	pos=1696,sel=0
+O	a	repr_strip	bin_mass	frac	1.3860e-05	e140_o_trace_v2.json	pos=1760,sel=0
+O	a	repr_strip	bin_mass	frac	1.0280e-04	e140_o_trace_v2.json	pos=1824,sel=0
+O	a	repr_strip	bin_mass	frac	1.1380e-03	e140_o_trace_v2.json	pos=1888,sel=1
+O	a	repr_strip	bin_mass	frac	3.8352e-05	e140_o_trace_v2.json	pos=1952,sel=0
+O	a	repr_strip	bin_mass	frac	2.6206e-04	e140_o_trace_v2.json	pos=2016,sel=0
+O	a	repr_strip	bin_mass	frac	2.0454e-04	e140_o_trace_v2.json	pos=2080,sel=0
+O	a	repr_strip	bin_mass	frac	1.2403e-04	e140_o_trace_v2.json	pos=2144,sel=0
+O	a	repr_strip	bin_mass	frac	1.6921e-04	e140_o_trace_v2.json	pos=2208,sel=0
+O	a	repr_strip	bin_mass	frac	3.3446e-04	e140_o_trace_v2.json	pos=2272,sel=0
+O	a	repr_strip	bin_mass	frac	1.9829e-04	e140_o_trace_v2.json	pos=2336,sel=0
+O	a	repr_strip	bin_mass	frac	5.2385e-05	e140_o_trace_v2.json	pos=2400,sel=0
+O	a	repr_strip	bin_mass	frac	5.3261e-05	e140_o_trace_v2.json	pos=2464,sel=0
+O	a	repr_strip	bin_mass	frac	1.1983e-04	e140_o_trace_v2.json	pos=2528,sel=0
+O	a	repr_strip	bin_mass	frac	8.7367e-05	e140_o_trace_v2.json	pos=2592,sel=0
+O	a	repr_strip	bin_mass	frac	7.6167e-05	e140_o_trace_v2.json	pos=2656,sel=0
+O	a	repr_strip	bin_mass	frac	1.7276e-04	e140_o_trace_v2.json	pos=2720,sel=0
+O	a	repr_strip	bin_mass	frac	3.2036e-04	e140_o_trace_v2.json	pos=2784,sel=0
+O	a	repr_strip	bin_mass	frac	7.3562e-04	e140_o_trace_v2.json	pos=2848,sel=0
+O	a	repr_strip	bin_mass	frac	4.3775e-04	e140_o_trace_v2.json	pos=2912,sel=0
+O	a	repr_strip	bin_mass	frac	1.1193e-03	e140_o_trace_v2.json	pos=2976,sel=1
+O	a	repr_strip	bin_mass	frac	2.7404e-04	e140_o_trace_v2.json	pos=3040,sel=0
+O	a	repr_strip	bin_mass	frac	1.0749e-03	e140_o_trace_v2.json	pos=3104,sel=1
+O	a	repr_strip	bin_mass	frac	2.8653e-03	e140_o_trace_v2.json	pos=3168,sel=1
+O	a	repr_strip	bin_mass	frac	1.0499e-03	e140_o_trace_v2.json	pos=3232,sel=1
+O	a	repr_strip	bin_mass	frac	2.7047e-03	e140_o_trace_v2.json	pos=3296,sel=1
+O	a	repr_strip	bin_mass	frac	2.2328e-03	e140_o_trace_v2.json	pos=3360,sel=1
+O	a	repr_strip	bin_mass	frac	2.5752e-03	e140_o_trace_v2.json	pos=3424,sel=1
+O	a	repr_strip	bin_mass	frac	2.4834e-03	e140_o_trace_v2.json	pos=3488,sel=1
+O	a	repr_strip	bin_mass	frac	1.8871e-03	e140_o_trace_v2.json	pos=3552,sel=1
+O	a	repr_strip	bin_mass	frac	3.4483e-03	e140_o_trace_v2.json	pos=3616,sel=1
+O	a	repr_strip	bin_mass	frac	4.7869e-04	e140_o_trace_v2.json	pos=3680,sel=0
+O	a	repr_strip	bin_mass	frac	1.7312e-04	e140_o_trace_v2.json	pos=3744,sel=0
+O	a	repr_strip	bin_mass	frac	3.0038e-04	e140_o_trace_v2.json	pos=3808,sel=0
+O	a	repr_strip	bin_mass	frac	2.4930e-04	e140_o_trace_v2.json	pos=3872,sel=0
+O	a	repr_strip	bin_mass	frac	7.3211e-05	e140_o_trace_v2.json	pos=3936,sel=0
+O	a	repr_strip	bin_mass	frac	1.4874e-04	e140_o_trace_v2.json	pos=4000,sel=0
+O	a	repr_strip	bin_mass	frac	1.1439e-04	e140_o_trace_v2.json	pos=4064,sel=0
+O	a	repr_strip	bin_mass	frac	1.4543e-04	e140_o_trace_v2.json	pos=4128,sel=0
+O	a	repr_strip	bin_mass	frac	9.1669e-04	e140_o_trace_v2.json	pos=4192,sel=1
+O	a	repr_strip	bin_mass	frac	1.9027e-04	e140_o_trace_v2.json	pos=4256,sel=0
+O	a	repr_strip	bin_mass	frac	1.1576e-04	e140_o_trace_v2.json	pos=4320,sel=0
+O	a	repr_strip	bin_mass	frac	1.1850e-04	e140_o_trace_v2.json	pos=4384,sel=0
+O	a	repr_strip	bin_mass	frac	2.1914e-04	e140_o_trace_v2.json	pos=4448,sel=0
+O	a	repr_strip	bin_mass	frac	1.0316e-04	e140_o_trace_v2.json	pos=4512,sel=0
+O	a	repr_strip	bin_mass	frac	1.1813e-04	e140_o_trace_v2.json	pos=4576,sel=0
+O	a	repr_strip	bin_mass	frac	5.9360e-05	e140_o_trace_v2.json	pos=4640,sel=0
+O	a	repr_strip	bin_mass	frac	1.5233e-04	e140_o_trace_v2.json	pos=4704,sel=0
+O	a	repr_strip	bin_mass	frac	5.3255e-05	e140_o_trace_v2.json	pos=4768,sel=0
+O	a	repr_strip	bin_mass	frac	1.0803e-04	e140_o_trace_v2.json	pos=4832,sel=0
+O	a	repr_strip	bin_mass	frac	1.4195e-04	e140_o_trace_v2.json	pos=4896,sel=0
+O	a	repr_strip	bin_mass	frac	7.3744e-02	e140_o_trace_v2.json	pos=4960,sel=1
+O	a	repr_strip	bin_mass	frac	1.8808e-04	e140_o_trace_v2.json	pos=5024,sel=0
+O	a	repr_strip	bin_mass	frac	2.4686e-04	e140_o_trace_v2.json	pos=5088,sel=0
+O	a	repr_strip	bin_mass	frac	3.1792e-04	e140_o_trace_v2.json	pos=5152,sel=0
+O	a	repr_strip	bin_mass	frac	4.9821e-04	e140_o_trace_v2.json	pos=5216,sel=0
+O	a	repr_strip	bin_mass	frac	1.0879e-03	e140_o_trace_v2.json	pos=5280,sel=1
+O	a	repr_strip	bin_mass	frac	1.2553e-03	e140_o_trace_v2.json	pos=5344,sel=1
+O	a	repr_strip	bin_mass	frac	8.0146e-04	e140_o_trace_v2.json	pos=5408,sel=1
+O	a	repr_strip	bin_mass	frac	3.1159e-04	e140_o_trace_v2.json	pos=5472,sel=0
+O	a	repr_strip	bin_mass	frac	1.8207e-04	e140_o_trace_v2.json	pos=5536,sel=0
+O	a	repr_strip	bin_mass	frac	6.9568e-04	e140_o_trace_v2.json	pos=5600,sel=0
+O	a	repr_strip	bin_mass	frac	8.2895e-02	e140_o_trace_v2.json	pos=5664,sel=1
+O	a	repr_strip	bin_mass	frac	5.5256e-04	e140_o_trace_v2.json	pos=5728,sel=0
+O	a	repr_strip	bin_mass	frac	4.2323e-04	e140_o_trace_v2.json	pos=5792,sel=0
+O	a	repr_strip	bin_mass	frac	2.2063e-04	e140_o_trace_v2.json	pos=5856,sel=0
+O	a	repr_strip	bin_mass	frac	4.3904e-04	e140_o_trace_v2.json	pos=5920,sel=0
+O	a	repr_strip	bin_mass	frac	1.8449e-04	e140_o_trace_v2.json	pos=5984,sel=0
+O	a	repr_strip	bin_mass	frac	1.8028e-04	e140_o_trace_v2.json	pos=6048,sel=0
+O	a	repr_strip	bin_mass	frac	2.2713e-04	e140_o_trace_v2.json	pos=6112,sel=0
+O	a	repr_strip	bin_mass	frac	2.9616e-04	e140_o_trace_v2.json	pos=6176,sel=0
+O	a	repr_strip	bin_mass	frac	2.9077e-04	e140_o_trace_v2.json	pos=6240,sel=0
+O	a	repr_strip	bin_mass	frac	8.7906e-05	e140_o_trace_v2.json	pos=6304,sel=0
+O	a	repr_strip	bin_mass	frac	8.7053e-05	e140_o_trace_v2.json	pos=6368,sel=0
+O	a	repr_strip	bin_mass	frac	1.2727e-04	e140_o_trace_v2.json	pos=6432,sel=0
+O	a	repr_strip	bin_mass	frac	1.5843e-04	e140_o_trace_v2.json	pos=6496,sel=0
+O	a	repr_strip	bin_mass	frac	1.3450e-04	e140_o_trace_v2.json	pos=6560,sel=0
+O	a	repr_strip	bin_mass	frac	6.6309e-05	e140_o_trace_v2.json	pos=6624,sel=0
+O	a	repr_strip	bin_mass	frac	1.0037e-04	e140_o_trace_v2.json	pos=6688,sel=0
+O	a	repr_strip	bin_mass	frac	8.5496e-05	e140_o_trace_v2.json	pos=6752,sel=0
+O	a	repr_strip	bin_mass	frac	8.9109e-05	e140_o_trace_v2.json	pos=6816,sel=0
+O	a	repr_strip	bin_mass	frac	9.8869e-02	e140_o_trace_v2.json	pos=6880,sel=1
+O	a	repr_strip	bin_mass	frac	8.0651e-05	e140_o_trace_v2.json	pos=6944,sel=0
+O	a	repr_strip	bin_mass	frac	1.4992e-04	e140_o_trace_v2.json	pos=7008,sel=0
+O	a	repr_strip	bin_mass	frac	2.9403e-04	e140_o_trace_v2.json	pos=7072,sel=0
+O	a	repr_strip	bin_mass	frac	4.6982e-04	e140_o_trace_v2.json	pos=7136,sel=0
+O	a	repr_strip	bin_mass	frac	4.7634e-04	e140_o_trace_v2.json	pos=7200,sel=0
+O	a	repr_strip	bin_mass	frac	1.4945e-03	e140_o_trace_v2.json	pos=7264,sel=1
+O	a	repr_strip	bin_mass	frac	2.3457e-03	e140_o_trace_v2.json	pos=7328,sel=1
+O	a	repr_strip	bin_mass	frac	6.7092e-04	e140_o_trace_v2.json	pos=7392,sel=0
+O	a	repr_strip	bin_mass	frac	6.9155e-04	e140_o_trace_v2.json	pos=7456,sel=0
+O	a	repr_strip	bin_mass	frac	7.9093e-04	e140_o_trace_v2.json	pos=7520,sel=0
+O	a	repr_strip	bin_mass	frac	8.8921e-04	e140_o_trace_v2.json	pos=7584,sel=1
+O	a	repr_strip	bin_mass	frac	1.6187e-03	e140_o_trace_v2.json	pos=7648,sel=1
+O	a	repr_strip	bin_mass	frac	5.9411e-04	e140_o_trace_v2.json	pos=7712,sel=0
+O	a	repr_strip	bin_mass	frac	7.2059e-04	e140_o_trace_v2.json	pos=7776,sel=0
+O	a	repr_strip	bin_mass	frac	6.9366e-04	e140_o_trace_v2.json	pos=7840,sel=0
+O	a	repr_strip	bin_mass	frac	5.6219e-04	e140_o_trace_v2.json	pos=7904,sel=0
+O	a	repr_strip	bin_mass	frac	5.2108e-04	e140_o_trace_v2.json	pos=7968,sel=0
+O	a	repr_strip	bin_mass	frac	8.9963e-04	e140_o_trace_v2.json	pos=8032,sel=1
+O	a	repr_strip	bin_mass	frac	1.0757e-03	e140_o_trace_v2.json	pos=8096,sel=1
+O	a	repr_strip	bin_mass	frac	7.8689e-04	e140_o_trace_v2.json	pos=8160,sel=0
+O	a	repr_strip	bin_mass	frac	2.7535e-03	e140_o_trace_v2.json	pos=8224,sel=1
+O	a	repr_strip	bin_mass	frac	6.7548e-03	e140_o_trace_v2.json	pos=8288,sel=1
+O	a	repr_strip	bin_mass	frac	6.9725e-03	e140_o_trace_v2.json	pos=8352,sel=1
+O	a	repr_strip	bin_mass	frac	3.8473e-03	e140_o_trace_v2.json	pos=8416,sel=1
+O	a	repr_strip	bin_mass	frac	5.4056e-03	e140_o_trace_v2.json	pos=8480,sel=1
+O	a	repr_strip	bin_mass	frac	6.1938e-03	e140_o_trace_v2.json	pos=8528,sel=1
+O	b-retired	all	region_miss_panel	-	-	-	2026-10-23 eighth revision: near/far region-miss stacked-bar column withdrawn (user verdict, keep one selection panel); stats below retained as text-cited data (Intro P2 / S6), reproducible via dac_manuscript/sources/build_region_miss_stats.py
+O	b-retired	hotpotqa:s0:L8:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	hotpotqa:s0:L8:q1253	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=16,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	hotpotqa:s0:L8:q1995	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=28,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	hotpotqa:s0:L8:q2737	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0380,mm_near 0.0000,mm_far 0.0330	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 0,n_miss_mm_far 3
+O	b-retired	hotpotqa:s0:L8:q3479	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0659,mm_near 0.0771,mm_far 0.1263	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 2,n_miss_mm_far 6
+O	b-retired	hotpotqa:s0:L8:q4221	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0531,mm_near 0.0072,mm_far 0.0592	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 7,n_miss_mm_near 1,n_miss_mm_far 8
+O	b-retired	hotpotqa:s0:L8:q4963	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1149,mm_near 0.0352,mm_far 0.1561	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 5,n_miss_mm_near 1,n_miss_mm_far 6
+O	b-retired	hotpotqa:s0:L8:q5705	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0661,mm_near 0.0137,mm_far 0.0680	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 1,n_miss_mm_far 4
+O	b-retired	hotpotqa:s0:L8:q6446	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0563,mm_near 0.0087,mm_far 0.0732	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 7,n_miss_mm_near 1,n_miss_mm_far 8
+O	b-retired	hotpotqa:s0:L8:q7188	miss_mass_by_region	frac	avg_near 0.0696,avg_far 0.1183,mm_near 0.1645,mm_far 0.1514	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 5,n_miss_mm_near 4,n_miss_mm_far 7
+O	b-retired	hotpotqa:s0:L8:q7930	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0854,mm_near 0.0140,mm_far 0.0430	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 6,n_miss_mm_near 1,n_miss_mm_far 3
+O	b-retired	hotpotqa:s0:L8:q8672	miss_mass_by_region	frac	avg_near 0.0375,avg_far 0.0000,mm_near 0.1224,mm_far 0.0399	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 2,n_miss_avg_far 0,n_miss_mm_near 4,n_miss_mm_far 2
+O	b-retired	hotpotqa:s0:L8:q9414	miss_mass_by_region	frac	avg_near 0.0108,avg_far 0.0290,mm_near 0.0790,mm_far 0.0290	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 3,n_miss_mm_near 5,n_miss_mm_far 3
+O	b-retired	hotpotqa:s0:L8:q10156	miss_mass_by_region	frac	avg_near 0.0515,avg_far 0.0268,mm_near 0.2004,mm_far 0.0269	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 3,n_miss_mm_near 7,n_miss_mm_far 3
+O	b-retired	hotpotqa:s0:L8:q10898	miss_mass_by_region	frac	avg_near 0.0894,avg_far 0.1958,mm_near 0.1785,mm_far 0.1699	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 8,n_miss_mm_near 6,n_miss_mm_far 7
+O	b-retired	hotpotqa:s0:L8:q11640	miss_mass_by_region	frac	avg_near 0.0138,avg_far 0.0374,mm_near 0.0182,mm_far 0.0316	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 6,n_miss_mm_near 2,n_miss_mm_far 5
+O	b-retired	hotpotqa:s0:L24:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	hotpotqa:s0:L24:q1253	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=16,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	hotpotqa:s0:L24:q1995	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=28,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	hotpotqa:s0:L24:q2737	miss_mass_by_region	frac	avg_near 0.0351,avg_far 0.0000,mm_near 0.0356,mm_far 0.0125	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 2,n_miss_avg_far 0,n_miss_mm_near 2,n_miss_mm_far 1
+O	b-retired	hotpotqa:s0:L24:q3479	miss_mass_by_region	frac	avg_near 0.0154,avg_far 0.0266,mm_near 0.0336,mm_far 0.0444	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 5,n_miss_mm_near 2,n_miss_mm_far 8
+O	b-retired	hotpotqa:s0:L24:q4221	miss_mass_by_region	frac	avg_near 0.0254,avg_far 0.0011,mm_near 0.0241,mm_far 0.0051	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 1,n_miss_mm_near 3,n_miss_mm_far 3
+O	b-retired	hotpotqa:s0:L24:q4963	miss_mass_by_region	frac	avg_near 0.0481,avg_far 0.0074,mm_near 0.0805,mm_far 0.0133	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 3,n_miss_mm_near 8,n_miss_mm_far 3
+O	b-retired	hotpotqa:s0:L24:q5705	miss_mass_by_region	frac	avg_near 0.1417,avg_far 0.0000,mm_near 0.1475,mm_far 0.0145	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 10,n_miss_avg_far 0,n_miss_mm_near 10,n_miss_mm_far 2
+O	b-retired	hotpotqa:s0:L24:q6446	miss_mass_by_region	frac	avg_near 0.2897,avg_far 0.3673,mm_near 0.0266,mm_far 0.0066	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 2,n_miss_mm_near 7,n_miss_mm_far 3
+O	b-retired	hotpotqa:s0:L24:q7188	miss_mass_by_region	frac	avg_near 0.3345,avg_far 0.1510,mm_near 0.0936,mm_far 0.0266	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 3,n_miss_mm_near 8,n_miss_mm_far 4
+O	b-retired	hotpotqa:s0:L24:q7930	miss_mass_by_region	frac	avg_near 0.2053,avg_far 0.2955,mm_near 0.1593,mm_far 0.0172	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 8,n_miss_avg_far 7,n_miss_mm_near 14,n_miss_mm_far 7
+O	b-retired	hotpotqa:s0:L24:q8672	miss_mass_by_region	frac	avg_near 0.2139,avg_far 0.6511,mm_near 0.0370,mm_far 0.0095	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 5,n_miss_mm_near 6,n_miss_mm_far 3
+O	b-retired	hotpotqa:s0:L24:q9414	miss_mass_by_region	frac	avg_near 0.1720,avg_far 0.3806,mm_near 0.0961,mm_far 0.0203	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 7,n_miss_mm_near 8,n_miss_mm_far 4
+O	b-retired	hotpotqa:s0:L24:q10156	miss_mass_by_region	frac	avg_near 0.2090,avg_far 0.3084,mm_near 0.1462,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 12,n_miss_avg_far 5,n_miss_mm_near 12,n_miss_mm_far 0
+O	b-retired	hotpotqa:s0:L24:q10898	miss_mass_by_region	frac	avg_near 0.1954,avg_far 0.7348,mm_near 0.0619,mm_far 0.0187	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 6,n_miss_mm_near 3,n_miss_mm_far 8
+O	b-retired	hotpotqa:s0:L24:q11640	miss_mass_by_region	frac	avg_near 0.1747,avg_far 0.3530,mm_near 0.0685,mm_far 0.0082	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 5,n_miss_mm_near 8,n_miss_mm_far 3
+O	b-retired	hotpotqa:s1:L8:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	hotpotqa:s1:L8:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	hotpotqa:s1:L8:q2619	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0319,mm_near 0.0000,mm_far 0.0319	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 2,n_miss_mm_near 0,n_miss_mm_far 2
+O	b-retired	hotpotqa:s1:L8:q3673	miss_mass_by_region	frac	avg_near 0.0112,avg_far 0.0550,mm_near 0.0959,mm_far 0.0564	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 4,n_miss_mm_near 5,n_miss_mm_far 4
+O	b-retired	hotpotqa:s1:L8:q4727	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1315,mm_near 0.0341,mm_far 0.2440	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 8,n_miss_mm_near 2,n_miss_mm_far 10
+O	b-retired	hotpotqa:s1:L8:q5781	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0451,mm_near 0.0729,mm_far 0.0637	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 2,n_miss_mm_far 6
+O	b-retired	hotpotqa:s1:L8:q6835	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1577,mm_near 0.0000,mm_far 0.1331	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 6,n_miss_mm_near 0,n_miss_mm_far 5
+O	b-retired	hotpotqa:s1:L8:q7889	miss_mass_by_region	frac	avg_near 0.0131,avg_far 0.0314,mm_near 0.1331,mm_far 0.0180	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 3,n_miss_mm_near 3,n_miss_mm_far 2
+O	b-retired	hotpotqa:s1:L8:q8942	miss_mass_by_region	frac	avg_near 0.0607,avg_far 0.2596,mm_near 0.0644,mm_far 0.2422	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 9,n_miss_mm_near 3,n_miss_mm_far 8
+O	b-retired	hotpotqa:s1:L8:q9996	miss_mass_by_region	frac	avg_near 0.0133,avg_far 0.1819,mm_near 0.0505,mm_far 0.1620	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 10,n_miss_mm_near 3,n_miss_mm_far 9
+O	b-retired	hotpotqa:s1:L8:q11050	miss_mass_by_region	frac	avg_near 0.0402,avg_far 0.0210,mm_near 0.0491,mm_far 0.0210	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 3,n_miss_mm_near 7,n_miss_mm_far 3
+O	b-retired	hotpotqa:s1:L8:q12104	miss_mass_by_region	frac	avg_near 0.0180,avg_far 0.0000,mm_near 0.0558,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 0,n_miss_mm_near 6,n_miss_mm_far 0
+O	b-retired	hotpotqa:s1:L8:q13158	miss_mass_by_region	frac	avg_near 0.1374,avg_far 0.0223,mm_near 0.1984,mm_far 0.0223	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 1,n_miss_mm_near 7,n_miss_mm_far 1
+O	b-retired	hotpotqa:s1:L8:q14212	miss_mass_by_region	frac	avg_near 0.0547,avg_far 0.0065,mm_near 0.1386,mm_far 0.0065	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 1,n_miss_mm_near 9,n_miss_mm_far 1
+O	b-retired	hotpotqa:s1:L8:q15266	miss_mass_by_region	frac	avg_near 0.0196,avg_far 0.0000,mm_near 0.0324,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 0,n_miss_mm_near 5,n_miss_mm_far 0
+O	b-retired	hotpotqa:s1:L8:q16320	miss_mass_by_region	frac	avg_near 0.1851,avg_far 0.1399,mm_near 0.0759,mm_far 0.1399	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 5,n_miss_mm_near 3,n_miss_mm_far 5
+O	b-retired	hotpotqa:s1:L24:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	hotpotqa:s1:L24:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	hotpotqa:s1:L24:q2619	miss_mass_by_region	frac	avg_near 0.0026,avg_far 0.0042,mm_near 0.0044,mm_far 0.0035	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 2,n_miss_mm_near 1,n_miss_mm_far 3
+O	b-retired	hotpotqa:s1:L24:q3673	miss_mass_by_region	frac	avg_near 0.0727,avg_far 0.0242,mm_near 0.1182,mm_far 0.0044	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 4,n_miss_mm_near 10,n_miss_mm_far 1
+O	b-retired	hotpotqa:s1:L24:q4727	miss_mass_by_region	frac	avg_near 0.0426,avg_far 0.3888,mm_near 0.0870,mm_far 0.0060	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 3,n_miss_mm_near 8,n_miss_mm_far 1
+O	b-retired	hotpotqa:s1:L24:q5781	miss_mass_by_region	frac	avg_near 0.0307,avg_far 0.0342,mm_near 0.0843,mm_far 0.0501	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 8,n_miss_mm_near 6,n_miss_mm_far 11
+O	b-retired	hotpotqa:s1:L24:q6835	miss_mass_by_region	frac	avg_near 0.3254,avg_far 0.4489,mm_near 0.0795,mm_far 0.0421	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 5,n_miss_mm_near 10,n_miss_mm_far 7
+O	b-retired	hotpotqa:s1:L24:q7889	miss_mass_by_region	frac	avg_near 0.1287,avg_far 0.0165,mm_near 0.1741,mm_far 0.0123	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 11,n_miss_avg_far 1,n_miss_mm_near 11,n_miss_mm_far 2
+O	b-retired	hotpotqa:s1:L24:q8942	miss_mass_by_region	frac	avg_near 0.0935,avg_far 0.4957,mm_near 0.0733,mm_far 0.1016	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 10,n_miss_avg_far 11,n_miss_mm_near 7,n_miss_mm_far 12
+O	b-retired	hotpotqa:s1:L24:q9996	miss_mass_by_region	frac	avg_near 0.0468,avg_far 0.2393,mm_near 0.0805,mm_far 0.0146	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 2,n_miss_mm_near 10,n_miss_mm_far 3
+O	b-retired	hotpotqa:s1:L24:q11050	miss_mass_by_region	frac	avg_near 0.1687,avg_far 0.4984,mm_near 0.0656,mm_far 0.0066	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 6,n_miss_mm_near 7,n_miss_mm_far 5
+O	b-retired	hotpotqa:s1:L24:q12104	miss_mass_by_region	frac	avg_near 0.2659,avg_far 0.4913,mm_near 0.1543,mm_far 0.0126	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 11,n_miss_avg_far 3,n_miss_mm_near 13,n_miss_mm_far 3
+O	b-retired	hotpotqa:s1:L24:q13158	miss_mass_by_region	frac	avg_near 0.0235,avg_far 0.9327,mm_near 0.0303,mm_far 0.0106	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 10,n_miss_avg_far 6,n_miss_mm_near 12,n_miss_mm_far 4
+O	b-retired	hotpotqa:s1:L24:q14212	miss_mass_by_region	frac	avg_near 0.1791,avg_far 0.3653,mm_near 0.2093,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 3,n_miss_mm_near 16,n_miss_mm_far 0
+O	b-retired	hotpotqa:s1:L24:q15266	miss_mass_by_region	frac	avg_near 0.2068,avg_far 0.4241,mm_near 0.0634,mm_far 0.0019	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 6,n_miss_mm_near 12,n_miss_mm_far 1
+O	b-retired	hotpotqa:s1:L24:q16320	miss_mass_by_region	frac	avg_near 0.1157,avg_far 0.2808,mm_near 0.1310,mm_far 0.0065	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 12,n_miss_avg_far 2,n_miss_mm_near 14,n_miss_mm_far 2
+O	b-retired	musique:s0:L8:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	musique:s0:L8:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	musique:s0:L8:q2619	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0456,mm_near 0.0000,mm_far 0.0453	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 0,n_miss_mm_far 3
+O	b-retired	musique:s0:L8:q3673	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0688,mm_near 0.0616,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 4,n_miss_mm_near 3,n_miss_mm_far 0
+O	b-retired	musique:s0:L8:q4727	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0645,mm_near 0.0000,mm_far 0.0944	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 6,n_miss_mm_near 0,n_miss_mm_far 8
+O	b-retired	musique:s0:L8:q5781	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1448,mm_near 0.0000,mm_far 0.0545	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 9,n_miss_mm_near 0,n_miss_mm_far 5
+O	b-retired	musique:s0:L8:q6835	miss_mass_by_region	frac	avg_near 0.0056,avg_far 0.0343,mm_near 0.0056,mm_far 0.0615	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 6,n_miss_mm_near 1,n_miss_mm_far 9
+O	b-retired	musique:s0:L8:q7889	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0670,mm_near 0.1716,mm_far 0.0151	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 5,n_miss_mm_near 6,n_miss_mm_far 1
+O	b-retired	musique:s0:L8:q8942	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0347,mm_near 0.0763,mm_far 0.0347	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 3,n_miss_mm_near 2,n_miss_mm_far 3
+O	b-retired	musique:s0:L8:q9996	miss_mass_by_region	frac	avg_near 0.0160,avg_far 0.0721,mm_near 0.1081,mm_far 0.0558	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 6,n_miss_mm_near 9,n_miss_mm_far 4
+O	b-retired	musique:s0:L8:q11050	miss_mass_by_region	frac	avg_near 0.0358,avg_far 0.0385,mm_near 0.0636,mm_far 0.0385	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 2,n_miss_avg_far 3,n_miss_mm_near 4,n_miss_mm_far 3
+O	b-retired	musique:s0:L8:q12104	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0531,mm_near 0.1435,mm_far 0.0382	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 7,n_miss_mm_near 3,n_miss_mm_far 5
+O	b-retired	musique:s0:L8:q13158	miss_mass_by_region	frac	avg_near 0.0234,avg_far 0.0757,mm_near 0.0900,mm_far 0.0895	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 4,n_miss_mm_near 2,n_miss_mm_far 5
+O	b-retired	musique:s0:L8:q14212	miss_mass_by_region	frac	avg_near 0.1295,avg_far 0.0462,mm_near 0.1647,mm_far 0.0462	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 3,n_miss_mm_near 9,n_miss_mm_far 3
+O	b-retired	musique:s0:L8:q15266	miss_mass_by_region	frac	avg_near 0.1235,avg_far 0.1243,mm_near 0.1252,mm_far 0.1243	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 8,n_miss_avg_far 8,n_miss_mm_near 9,n_miss_mm_far 8
+O	b-retired	musique:s0:L8:q16320	miss_mass_by_region	frac	avg_near 0.0058,avg_far 0.0427,mm_near 0.0294,mm_far 0.0427	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 7,n_miss_mm_near 4,n_miss_mm_far 7
+O	b-retired	musique:s0:L24:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	musique:s0:L24:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	musique:s0:L24:q2619	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.6583,mm_near 0.0193,mm_far 0.0029	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 3,n_miss_mm_near 2,n_miss_mm_far 2
+O	b-retired	musique:s0:L24:q3673	miss_mass_by_region	frac	avg_near 0.0183,avg_far 0.0000,mm_near 0.0587,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 0,n_miss_mm_near 5,n_miss_mm_far 0
+O	b-retired	musique:s0:L24:q4727	miss_mass_by_region	frac	avg_near 0.1405,avg_far 0.3281,mm_near 0.1324,mm_far 0.0107	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 4,n_miss_mm_near 4,n_miss_mm_far 6
+O	b-retired	musique:s0:L24:q5781	miss_mass_by_region	frac	avg_near 0.0389,avg_far 0.0113,mm_near 0.0230,mm_far 0.0311	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 2,n_miss_mm_near 3,n_miss_mm_far 4
+O	b-retired	musique:s0:L24:q6835	miss_mass_by_region	frac	avg_near 0.2941,avg_far 0.4912,mm_near 0.1167,mm_far 0.0194	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 8,n_miss_avg_far 6,n_miss_mm_near 9,n_miss_mm_far 11
+O	b-retired	musique:s0:L24:q7889	miss_mass_by_region	frac	avg_near 0.0865,avg_far 0.2996,mm_near 0.2210,mm_far 0.0039	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 10,n_miss_avg_far 1,n_miss_mm_near 12,n_miss_mm_far 2
+O	b-retired	musique:s0:L24:q8942	miss_mass_by_region	frac	avg_near 0.3372,avg_far 0.5735,mm_near 0.1559,mm_far 0.0066	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 12,n_miss_avg_far 5,n_miss_mm_near 12,n_miss_mm_far 5
+O	b-retired	musique:s0:L24:q9996	miss_mass_by_region	frac	avg_near 0.2628,avg_far 0.2315,mm_near 0.0169,mm_far 0.0062	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 3,n_miss_mm_near 7,n_miss_mm_far 4
+O	b-retired	musique:s0:L24:q11050	miss_mass_by_region	frac	avg_near 0.2981,avg_far 0.3241,mm_near 0.1744,mm_far 0.0027	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 17,n_miss_avg_far 3,n_miss_mm_near 18,n_miss_mm_far 1
+O	b-retired	musique:s0:L24:q12104	miss_mass_by_region	frac	avg_near 0.1288,avg_far 0.2804,mm_near 0.2278,mm_far 0.0060	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 8,n_miss_mm_near 8,n_miss_mm_far 7
+O	b-retired	musique:s0:L24:q13158	miss_mass_by_region	frac	avg_near 0.2898,avg_far 0.5822,mm_near 0.1736,mm_far 0.0038	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 17,n_miss_avg_far 3,n_miss_mm_near 19,n_miss_mm_far 1
+O	b-retired	musique:s0:L24:q14212	miss_mass_by_region	frac	avg_near 0.2147,avg_far 0.4730,mm_near 0.2685,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 18,n_miss_avg_far 3,n_miss_mm_near 21,n_miss_mm_far 0
+O	b-retired	musique:s0:L24:q15266	miss_mass_by_region	frac	avg_near 0.3373,avg_far 0.5702,mm_near 0.0631,mm_far 0.0333	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 11,n_miss_mm_near 4,n_miss_mm_far 12
+O	b-retired	musique:s0:L24:q16320	miss_mass_by_region	frac	avg_near 0.2079,avg_far 0.6482,mm_near 0.1173,mm_far 0.0327	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 12,n_miss_mm_near 9,n_miss_mm_far 12
+O	b-retired	musique:s1:L8:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	musique:s1:L8:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	musique:s1:L8:q2619	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0681,mm_near 0.0000,mm_far 0.0609	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 5,n_miss_mm_near 0,n_miss_mm_far 5
+O	b-retired	musique:s1:L8:q3673	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.2527,mm_near 0.1036,mm_far 0.2401	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 10,n_miss_mm_near 2,n_miss_mm_far 9
+O	b-retired	musique:s1:L8:q4727	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.2351,mm_near 0.0000,mm_far 0.2449	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 10,n_miss_mm_near 0,n_miss_mm_far 10
+O	b-retired	musique:s1:L8:q5781	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0824,mm_near 0.0510,mm_far 0.0869	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 6,n_miss_mm_near 3,n_miss_mm_far 6
+O	b-retired	musique:s1:L8:q6835	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1066,mm_near 0.0437,mm_far 0.0867	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 8,n_miss_mm_near 1,n_miss_mm_far 7
+O	b-retired	musique:s1:L8:q7889	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.1141,mm_near 0.1046,mm_far 0.1196	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 8,n_miss_mm_near 3,n_miss_mm_far 8
+O	b-retired	musique:s1:L8:q8942	miss_mass_by_region	frac	avg_near 0.0227,avg_far 0.0713,mm_near 0.0700,mm_far 0.0713	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 2,n_miss_avg_far 4,n_miss_mm_near 5,n_miss_mm_far 4
+O	b-retired	musique:s1:L8:q9996	miss_mass_by_region	frac	avg_near 0.0629,avg_far 0.0157,mm_near 0.0781,mm_far 0.0157	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 1,n_miss_mm_near 4,n_miss_mm_far 1
+O	b-retired	musique:s1:L8:q11050	miss_mass_by_region	frac	avg_near 0.0647,avg_far 0.1487,mm_near 0.0476,mm_far 0.1487	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 8,n_miss_mm_near 3,n_miss_mm_far 8
+O	b-retired	musique:s1:L8:q12104	miss_mass_by_region	frac	avg_near 0.1205,avg_far 0.0192,mm_near 0.2075,mm_far 0.0192	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 1,n_miss_mm_near 9,n_miss_mm_far 1
+O	b-retired	musique:s1:L8:q13158	miss_mass_by_region	frac	avg_near 0.2380,avg_far 0.1027,mm_near 0.2653,mm_far 0.1216	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 4,n_miss_mm_near 9,n_miss_mm_far 5
+O	b-retired	musique:s1:L8:q14212	miss_mass_by_region	frac	avg_near 0.1021,avg_far 0.0297,mm_near 0.1256,mm_far 0.0297	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 2,n_miss_mm_near 8,n_miss_mm_far 2
+O	b-retired	musique:s1:L8:q15266	miss_mass_by_region	frac	avg_near 0.0326,avg_far 0.0000,mm_near 0.2536,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 3,n_miss_avg_far 0,n_miss_mm_near 6,n_miss_mm_far 0
+O	b-retired	musique:s1:L8:q16320	miss_mass_by_region	frac	avg_near 0.0424,avg_far 0.2003,mm_near 0.0386,mm_far 0.2003	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 2,n_miss_avg_far 9,n_miss_mm_near 2,n_miss_mm_far 9
+O	b-retired	musique:s1:L24:q512	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=5,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	musique:s1:L24:q1565	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0000,mm_near 0.0000,mm_far 0.0000	e140b_pooling_anatomy.json	n_ref=21,n_miss_avg_near 0,n_miss_avg_far 0,n_miss_mm_near 0,n_miss_mm_far 0
+O	b-retired	musique:s1:L24:q2619	miss_mass_by_region	frac	avg_near 0.0000,avg_far 0.0115,mm_near 0.0188,mm_far 0.0056	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 0,n_miss_avg_far 2,n_miss_mm_near 1,n_miss_mm_far 1
+O	b-retired	musique:s1:L24:q3673	miss_mass_by_region	frac	avg_near 0.0852,avg_far 0.0292,mm_near 0.2338,mm_far 0.0310	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 2,n_miss_mm_near 7,n_miss_mm_far 2
+O	b-retired	musique:s1:L24:q4727	miss_mass_by_region	frac	avg_near 0.3947,avg_far 0.0000,mm_near 0.0859,mm_far 0.0379	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 6,n_miss_avg_far 0,n_miss_mm_near 5,n_miss_mm_far 4
+O	b-retired	musique:s1:L24:q5781	miss_mass_by_region	frac	avg_near 0.0342,avg_far 0.2625,mm_near 0.1698,mm_far 0.0053	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 3,n_miss_mm_near 6,n_miss_mm_far 1
+O	b-retired	musique:s1:L24:q6835	miss_mass_by_region	frac	avg_near 0.0081,avg_far 0.0184,mm_near 0.0498,mm_far 0.0196	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 1,n_miss_avg_far 2,n_miss_mm_near 4,n_miss_mm_far 2
+O	b-retired	musique:s1:L24:q7889	miss_mass_by_region	frac	avg_near 0.1354,avg_far 0.4588,mm_near 0.1542,mm_far 0.0272	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 8,n_miss_avg_far 6,n_miss_mm_near 10,n_miss_mm_far 8
+O	b-retired	musique:s1:L24:q8942	miss_mass_by_region	frac	avg_near 0.2681,avg_far 0.3115,mm_near 0.0334,mm_far 0.0176	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 5,n_miss_avg_far 6,n_miss_mm_near 6,n_miss_mm_far 3
+O	b-retired	musique:s1:L24:q9996	miss_mass_by_region	frac	avg_near 0.4589,avg_far 0.0067,mm_near 0.1803,mm_far 0.0193	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 13,n_miss_avg_far 2,n_miss_mm_near 17,n_miss_mm_far 5
+O	b-retired	musique:s1:L24:q11050	miss_mass_by_region	frac	avg_near 0.0611,avg_far 0.6218,mm_near 0.0838,mm_far 0.0231	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 7,n_miss_avg_far 4,n_miss_mm_near 11,n_miss_mm_far 2
+O	b-retired	musique:s1:L24:q12104	miss_mass_by_region	frac	avg_near 0.1980,avg_far 0.5154,mm_near 0.0630,mm_far 0.0367	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 6,n_miss_mm_near 7,n_miss_mm_far 5
+O	b-retired	musique:s1:L24:q13158	miss_mass_by_region	frac	avg_near 0.3042,avg_far 0.4822,mm_near 0.1086,mm_far 0.0460	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 11,n_miss_avg_far 6,n_miss_mm_near 10,n_miss_mm_far 4
+O	b-retired	musique:s1:L24:q14212	miss_mass_by_region	frac	avg_near 0.2207,avg_far 0.3758,mm_near 0.2406,mm_far 0.0240	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 9,n_miss_avg_far 4,n_miss_mm_near 13,n_miss_mm_far 4
+O	b-retired	musique:s1:L24:q15266	miss_mass_by_region	frac	avg_near 0.1989,avg_far 0.4956,mm_near 0.1294,mm_far 0.0161	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 12,n_miss_avg_far 4,n_miss_mm_near 14,n_miss_mm_far 4
+O	b-retired	musique:s1:L24:q16320	miss_mass_by_region	frac	avg_near 0.1586,avg_far 0.4418,mm_near 0.0448,mm_far 0.1054	e140b_pooling_anatomy.json	n_ref=32,n_miss_avg_near 4,n_miss_avg_far 7,n_miss_mm_near 5,n_miss_mm_far 6
+O	b-retired	all	miss_mass_block_avg	near,far	0.0843,0.1699	e140b_pooling_anatomy.json	mean over 128 queries; region attribution = aligned-bin absolute interval [q-d_hi, q-d_lo+1) vs region_bounds.near_lo
+O	b-retired	all	miss_mass_minmax	near,far	0.0787,0.0420	e140b_pooling_anatomy.json	same caliber; avg misses far (2/3 of its miss), minmax misses near (2/3 of its miss): complementary
+O	b-retired	all	miss_mass_totals	avg,mm	0.2543,0.1208	e140b_pooling_anatomy.json	mean over 128 queries (region-unresolved included)
+O	b-retired	all	miss_pages_block_avg	near,far	3.98,3.89	e140b_pooling_anatomy.json	mean missed pages; page-count criterion differs from mass criterion
+O	b-retired	all	miss_pages_minmax	near,far	5.27,3.77	e140b_pooling_anatomy.json	mean missed pages
+O	b-retired	retired	quota_floor_panel	-	-	-	2026-10-21 fourth revision: old far-quota paired-arm panel withdrawn (nt demoted; nb/nl absolute-quota caliber). Hybrid near-budget scan (offline, diagnostic plane; reproducible via dac_manuscript/sources/build_region_miss_stats.py): best 0.1345@near-budget-1408 still above global minmax 0.1208; budget split is the E155d grid axis (task-accuracy caliber), not simulated here (mass != e2e)
+O	b	tail32	reference_token_page_coverage	frac	0.9774	e140_o_trace_v2.json	o3.tail32.reference_token_page_coverage.mean
+O	b	tail32	reference_token_overlap_recall	frac	0.6333	e140_o_trace_v2.json	o3.tail32.reference_token_overlap_recall.mean
+O	b	tail32	selected_mass_over_reference_topk_mass	frac	0.8412	e140_o_trace_v2.json	o3.tail32.selected_mass_over_reference_topk_mass.mean
+O	b	tail32	selected_full_attention_mass	frac	0.2294	e140_o_trace_v2.json	o3.tail32.selected_full_attention_mass.mean
+O	b	random32	reference_token_page_coverage	frac	0.9657	e140_o_trace_v2.json	o3.random32.reference_token_page_coverage.mean
+O	b	random32	reference_token_overlap_recall	frac	0.3831	e140_o_trace_v2.json	o3.random32.reference_token_overlap_recall.mean
+O	b	random32	selected_mass_over_reference_topk_mass	frac	0.5060	e140_o_trace_v2.json	o3.random32.selected_mass_over_reference_topk_mass.mean
+O	b	random32	selected_full_attention_mass	frac	0.1307	e140_o_trace_v2.json	o3.random32.selected_full_attention_mass.mean
+O	b	high32	reference_token_page_coverage	frac	0.8843	e140_o_trace_v2.json	o3.high32.reference_token_page_coverage.mean
+O	b	high32	reference_token_overlap_recall	frac	0.2413	e140_o_trace_v2.json	o3.high32.reference_token_overlap_recall.mean
+O	b	high32	selected_mass_over_reference_topk_mass	frac	0.2408	e140_o_trace_v2.json	o3.high32.selected_mass_over_reference_topk_mass.mean
+O	b	high32	selected_full_attention_mass	frac	0.0388	e140_o_trace_v2.json	o3.high32.selected_full_attention_mass.mean
+O	c	lb_gov_report_0	far_mass	frac	3.6342e-07	e6b_far_profiles.json	layer=0
+O	c	lb_gov_report_0	far_mass	frac	5.2159e-05	e6b_far_profiles.json	layer=1
+O	c	lb_gov_report_0	far_mass	frac	1.1972e-01	e6b_far_profiles.json	layer=2
+O	c	lb_gov_report_0	far_mass	frac	2.5380e-01	e6b_far_profiles.json	layer=3
+O	c	lb_gov_report_0	far_mass	frac	4.7786e-01	e6b_far_profiles.json	layer=4
+O	c	lb_gov_report_0	far_mass	frac	2.0569e-01	e6b_far_profiles.json	layer=5
+O	c	lb_gov_report_0	far_mass	frac	6.1351e-02	e6b_far_profiles.json	layer=6
+O	c	lb_gov_report_0	far_mass	frac	4.5827e-09	e6b_far_profiles.json	layer=7
+O	c	lb_gov_report_0	far_mass	frac	4.1131e-08	e6b_far_profiles.json	layer=8
+O	c	lb_gov_report_0	far_mass	frac	1.0583e-08	e6b_far_profiles.json	layer=9
+O	c	lb_gov_report_0	far_mass	frac	5.2056e-12	e6b_far_profiles.json	layer=10
+O	c	lb_gov_report_0	far_mass	frac	1.3558e-12	e6b_far_profiles.json	layer=11
+O	c	lb_gov_report_0	far_mass	frac	1.3949e-10	e6b_far_profiles.json	layer=12
+O	c	lb_gov_report_0	far_mass	frac	5.3911e-08	e6b_far_profiles.json	layer=13
+O	c	lb_gov_report_0	far_mass	frac	4.1073e-10	e6b_far_profiles.json	layer=14
+O	c	lb_gov_report_0	far_mass	frac	2.7442e-06	e6b_far_profiles.json	layer=15
+O	c	lb_gov_report_0	far_mass	frac	8.1726e-08	e6b_far_profiles.json	layer=16
+O	c	lb_gov_report_0	far_mass	frac	2.1489e-02	e6b_far_profiles.json	layer=17
+O	c	lb_gov_report_0	far_mass	frac	3.2412e-02	e6b_far_profiles.json	layer=18
+O	c	lb_gov_report_0	far_mass	frac	5.0337e-01	e6b_far_profiles.json	layer=19
+O	c	lb_gov_report_0	far_mass	frac	2.6592e-01	e6b_far_profiles.json	layer=20
+O	c	lb_gov_report_0	far_mass	frac	1.2289e-01	e6b_far_profiles.json	layer=21
+O	c	lb_gov_report_0	far_mass	frac	2.1770e-01	e6b_far_profiles.json	layer=22
+O	c	lb_gov_report_0	far_mass	frac	3.8456e-01	e6b_far_profiles.json	layer=23
+O	c	lb_gov_report_0	far_mass	frac	6.1047e-01	e6b_far_profiles.json	layer=24
+O	c	lb_gov_report_0	far_mass	frac	6.3835e-01	e6b_far_profiles.json	layer=25
+O	c	lb_gov_report_0	far_mass	frac	6.4321e-01	e6b_far_profiles.json	layer=26
+O	c	lb_gov_report_0	far_mass	frac	4.6560e-01	e6b_far_profiles.json	layer=27
+O	c	lb_gov_report_0	far_mass	frac	3.7631e-01	e6b_far_profiles.json	layer=28
+O	c	lb_gov_report_0	far_mass	frac	8.6753e-01	e6b_far_profiles.json	layer=29
+O	c	lb_gov_report_0	far_mass	frac	5.0481e-01	e6b_far_profiles.json	layer=30
+O	c	lb_gov_report_0	far_mass	frac	7.8291e-01	e6b_far_profiles.json	layer=31
+O	c	lb_gov_report_0	far_mass	frac	5.3638e-01	e6b_far_profiles.json	layer=32
+O	c	lb_gov_report_0	far_mass	frac	6.7304e-01	e6b_far_profiles.json	layer=33
+O	c	lb_gov_report_0	far_mass	frac	1.8302e-01	e6b_far_profiles.json	layer=34
+O	c	lb_gov_report_0	far_mass	frac	3.2903e-11	e6b_far_profiles.json	layer=35
+O	c	lb_gov_report_1	far_mass	frac	5.2806e-08	e6b_far_profiles.json	layer=0
+O	c	lb_gov_report_1	far_mass	frac	1.2467e-04	e6b_far_profiles.json	layer=1
+O	c	lb_gov_report_1	far_mass	frac	7.1187e-02	e6b_far_profiles.json	layer=2
+O	c	lb_gov_report_1	far_mass	frac	3.2875e-01	e6b_far_profiles.json	layer=3
+O	c	lb_gov_report_1	far_mass	frac	2.8385e-01	e6b_far_profiles.json	layer=4
+O	c	lb_gov_report_1	far_mass	frac	2.3356e-01	e6b_far_profiles.json	layer=5
+O	c	lb_gov_report_1	far_mass	frac	7.5222e-03	e6b_far_profiles.json	layer=6
+O	c	lb_gov_report_1	far_mass	frac	3.1075e-11	e6b_far_profiles.json	layer=7
+O	c	lb_gov_report_1	far_mass	frac	1.5282e-07	e6b_far_profiles.json	layer=8
+O	c	lb_gov_report_1	far_mass	frac	4.0598e-07	e6b_far_profiles.json	layer=9
+O	c	lb_gov_report_1	far_mass	frac	1.9842e-11	e6b_far_profiles.json	layer=10
+O	c	lb_gov_report_1	far_mass	frac	2.1472e-09	e6b_far_profiles.json	layer=11
+O	c	lb_gov_report_1	far_mass	frac	1.1505e-08	e6b_far_profiles.json	layer=12
+O	c	lb_gov_report_1	far_mass	frac	6.3744e-07	e6b_far_profiles.json	layer=13
+O	c	lb_gov_report_1	far_mass	frac	4.1881e-06	e6b_far_profiles.json	layer=14
+O	c	lb_gov_report_1	far_mass	frac	6.4919e-04	e6b_far_profiles.json	layer=15
+O	c	lb_gov_report_1	far_mass	frac	3.2500e-07	e6b_far_profiles.json	layer=16
+O	c	lb_gov_report_1	far_mass	frac	1.2424e-01	e6b_far_profiles.json	layer=17
+O	c	lb_gov_report_1	far_mass	frac	3.8209e-01	e6b_far_profiles.json	layer=18
+O	c	lb_gov_report_1	far_mass	frac	7.9697e-01	e6b_far_profiles.json	layer=19
+O	c	lb_gov_report_1	far_mass	frac	4.9549e-01	e6b_far_profiles.json	layer=20
+O	c	lb_gov_report_1	far_mass	frac	3.7856e-01	e6b_far_profiles.json	layer=21
+O	c	lb_gov_report_1	far_mass	frac	3.6540e-01	e6b_far_profiles.json	layer=22
+O	c	lb_gov_report_1	far_mass	frac	3.1808e-01	e6b_far_profiles.json	layer=23
+O	c	lb_gov_report_1	far_mass	frac	7.4013e-01	e6b_far_profiles.json	layer=24
+O	c	lb_gov_report_1	far_mass	frac	8.1089e-01	e6b_far_profiles.json	layer=25
+O	c	lb_gov_report_1	far_mass	frac	8.2433e-01	e6b_far_profiles.json	layer=26
+O	c	lb_gov_report_1	far_mass	frac	6.7021e-01	e6b_far_profiles.json	layer=27
+O	c	lb_gov_report_1	far_mass	frac	3.5404e-01	e6b_far_profiles.json	layer=28
+O	c	lb_gov_report_1	far_mass	frac	5.7627e-01	e6b_far_profiles.json	layer=29
+O	c	lb_gov_report_1	far_mass	frac	5.8347e-01	e6b_far_profiles.json	layer=30
+O	c	lb_gov_report_1	far_mass	frac	7.2052e-01	e6b_far_profiles.json	layer=31
+O	c	lb_gov_report_1	far_mass	frac	6.4966e-01	e6b_far_profiles.json	layer=32
+O	c	lb_gov_report_1	far_mass	frac	6.8757e-01	e6b_far_profiles.json	layer=33
+O	c	lb_gov_report_1	far_mass	frac	1.9164e-01	e6b_far_profiles.json	layer=34
+O	c	lb_gov_report_1	far_mass	frac	2.2267e-10	e6b_far_profiles.json	layer=35
+O	c	lb_hotpotqa_0	far_mass	frac	9.2330e-06	e6b_far_profiles.json	layer=0
+O	c	lb_hotpotqa_0	far_mass	frac	3.8433e-05	e6b_far_profiles.json	layer=1
+O	c	lb_hotpotqa_0	far_mass	frac	5.2195e-02	e6b_far_profiles.json	layer=2
+O	c	lb_hotpotqa_0	far_mass	frac	1.5462e-01	e6b_far_profiles.json	layer=3
+O	c	lb_hotpotqa_0	far_mass	frac	6.7233e-02	e6b_far_profiles.json	layer=4
+O	c	lb_hotpotqa_0	far_mass	frac	9.1606e-02	e6b_far_profiles.json	layer=5
+O	c	lb_hotpotqa_0	far_mass	frac	1.7545e-04	e6b_far_profiles.json	layer=6
+O	c	lb_hotpotqa_0	far_mass	frac	3.5829e-11	e6b_far_profiles.json	layer=7
+O	c	lb_hotpotqa_0	far_mass	frac	9.2198e-09	e6b_far_profiles.json	layer=8
+O	c	lb_hotpotqa_0	far_mass	frac	4.4310e-09	e6b_far_profiles.json	layer=9
+O	c	lb_hotpotqa_0	far_mass	frac	2.2300e-08	e6b_far_profiles.json	layer=10
+O	c	lb_hotpotqa_0	far_mass	frac	1.3584e-06	e6b_far_profiles.json	layer=11
+O	c	lb_hotpotqa_0	far_mass	frac	5.6525e-08	e6b_far_profiles.json	layer=12
+O	c	lb_hotpotqa_0	far_mass	frac	3.9067e-06	e6b_far_profiles.json	layer=13
+O	c	lb_hotpotqa_0	far_mass	frac	8.6216e-07	e6b_far_profiles.json	layer=14
+O	c	lb_hotpotqa_0	far_mass	frac	1.0318e-04	e6b_far_profiles.json	layer=15
+O	c	lb_hotpotqa_0	far_mass	frac	2.1791e-07	e6b_far_profiles.json	layer=16
+O	c	lb_hotpotqa_0	far_mass	frac	2.3199e-04	e6b_far_profiles.json	layer=17
+O	c	lb_hotpotqa_0	far_mass	frac	7.5597e-03	e6b_far_profiles.json	layer=18
+O	c	lb_hotpotqa_0	far_mass	frac	1.1524e-02	e6b_far_profiles.json	layer=19
+O	c	lb_hotpotqa_0	far_mass	frac	1.4011e-02	e6b_far_profiles.json	layer=20
+O	c	lb_hotpotqa_0	far_mass	frac	2.6473e-02	e6b_far_profiles.json	layer=21
+O	c	lb_hotpotqa_0	far_mass	frac	1.1411e-02	e6b_far_profiles.json	layer=22
+O	c	lb_hotpotqa_0	far_mass	frac	6.1622e-03	e6b_far_profiles.json	layer=23
+O	c	lb_hotpotqa_0	far_mass	frac	1.9240e-02	e6b_far_profiles.json	layer=24
+O	c	lb_hotpotqa_0	far_mass	frac	2.3698e-03	e6b_far_profiles.json	layer=25
+O	c	lb_hotpotqa_0	far_mass	frac	1.9308e-02	e6b_far_profiles.json	layer=26
+O	c	lb_hotpotqa_0	far_mass	frac	1.0857e-02	e6b_far_profiles.json	layer=27
+O	c	lb_hotpotqa_0	far_mass	frac	2.3782e-02	e6b_far_profiles.json	layer=28
+O	c	lb_hotpotqa_0	far_mass	frac	1.3716e-02	e6b_far_profiles.json	layer=29
+O	c	lb_hotpotqa_0	far_mass	frac	5.7300e-03	e6b_far_profiles.json	layer=30
+O	c	lb_hotpotqa_0	far_mass	frac	9.0026e-03	e6b_far_profiles.json	layer=31
+O	c	lb_hotpotqa_0	far_mass	frac	9.8989e-03	e6b_far_profiles.json	layer=32
+O	c	lb_hotpotqa_0	far_mass	frac	1.1720e-02	e6b_far_profiles.json	layer=33
+O	c	lb_hotpotqa_0	far_mass	frac	1.7544e-03	e6b_far_profiles.json	layer=34
+O	c	lb_hotpotqa_0	far_mass	frac	2.6477e-09	e6b_far_profiles.json	layer=35
+O	c	lb_hotpotqa_1	far_mass	frac	9.4221e-07	e6b_far_profiles.json	layer=0
+O	c	lb_hotpotqa_1	far_mass	frac	4.7017e-05	e6b_far_profiles.json	layer=1
+O	c	lb_hotpotqa_1	far_mass	frac	9.1475e-02	e6b_far_profiles.json	layer=2
+O	c	lb_hotpotqa_1	far_mass	frac	2.1028e-01	e6b_far_profiles.json	layer=3
+O	c	lb_hotpotqa_1	far_mass	frac	1.2822e-01	e6b_far_profiles.json	layer=4
+O	c	lb_hotpotqa_1	far_mass	frac	1.8345e-01	e6b_far_profiles.json	layer=5
+O	c	lb_hotpotqa_1	far_mass	frac	3.3906e-04	e6b_far_profiles.json	layer=6
+O	c	lb_hotpotqa_1	far_mass	frac	2.9936e-12	e6b_far_profiles.json	layer=7
+O	c	lb_hotpotqa_1	far_mass	frac	1.7996e-07	e6b_far_profiles.json	layer=8
+O	c	lb_hotpotqa_1	far_mass	frac	1.3743e-08	e6b_far_profiles.json	layer=9
+O	c	lb_hotpotqa_1	far_mass	frac	1.2968e-09	e6b_far_profiles.json	layer=10
+O	c	lb_hotpotqa_1	far_mass	frac	1.4098e-06	e6b_far_profiles.json	layer=11
+O	c	lb_hotpotqa_1	far_mass	frac	2.3419e-07	e6b_far_profiles.json	layer=12
+O	c	lb_hotpotqa_1	far_mass	frac	6.3018e-07	e6b_far_profiles.json	layer=13
+O	c	lb_hotpotqa_1	far_mass	frac	1.8869e-06	e6b_far_profiles.json	layer=14
+O	c	lb_hotpotqa_1	far_mass	frac	9.6774e-07	e6b_far_profiles.json	layer=15
+O	c	lb_hotpotqa_1	far_mass	frac	2.9161e-08	e6b_far_profiles.json	layer=16
+O	c	lb_hotpotqa_1	far_mass	frac	4.3775e-04	e6b_far_profiles.json	layer=17
+O	c	lb_hotpotqa_1	far_mass	frac	4.2415e-03	e6b_far_profiles.json	layer=18
+O	c	lb_hotpotqa_1	far_mass	frac	2.0075e-03	e6b_far_profiles.json	layer=19
+O	c	lb_hotpotqa_1	far_mass	frac	1.1773e-03	e6b_far_profiles.json	layer=20
+O	c	lb_hotpotqa_1	far_mass	frac	5.7380e-04	e6b_far_profiles.json	layer=21
+O	c	lb_hotpotqa_1	far_mass	frac	2.8593e-03	e6b_far_profiles.json	layer=22
+O	c	lb_hotpotqa_1	far_mass	frac	1.7798e-03	e6b_far_profiles.json	layer=23
+O	c	lb_hotpotqa_1	far_mass	frac	3.5467e-03	e6b_far_profiles.json	layer=24
+O	c	lb_hotpotqa_1	far_mass	frac	3.8599e-04	e6b_far_profiles.json	layer=25
+O	c	lb_hotpotqa_1	far_mass	frac	1.4726e-03	e6b_far_profiles.json	layer=26
+O	c	lb_hotpotqa_1	far_mass	frac	6.4552e-03	e6b_far_profiles.json	layer=27
+O	c	lb_hotpotqa_1	far_mass	frac	6.0417e-03	e6b_far_profiles.json	layer=28
+O	c	lb_hotpotqa_1	far_mass	frac	8.3841e-04	e6b_far_profiles.json	layer=29
+O	c	lb_hotpotqa_1	far_mass	frac	9.9930e-04	e6b_far_profiles.json	layer=30
+O	c	lb_hotpotqa_1	far_mass	frac	2.3466e-03	e6b_far_profiles.json	layer=31
+O	c	lb_hotpotqa_1	far_mass	frac	3.1175e-03	e6b_far_profiles.json	layer=32
+O	c	lb_hotpotqa_1	far_mass	frac	7.7553e-03	e6b_far_profiles.json	layer=33
+O	c	lb_hotpotqa_1	far_mass	frac	7.3834e-04	e6b_far_profiles.json	layer=34
+O	c	lb_hotpotqa_1	far_mass	frac	4.9569e-08	e6b_far_profiles.json	layer=35
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.4942e-07	e6b_far_profiles.json	layer=0
+O	c	lb_multifieldqa_en_0	far_mass	frac	2.8605e-05	e6b_far_profiles.json	layer=1
+O	c	lb_multifieldqa_en_0	far_mass	frac	5.2770e-02	e6b_far_profiles.json	layer=2
+O	c	lb_multifieldqa_en_0	far_mass	frac	2.5510e-01	e6b_far_profiles.json	layer=3
+O	c	lb_multifieldqa_en_0	far_mass	frac	2.0894e-01	e6b_far_profiles.json	layer=4
+O	c	lb_multifieldqa_en_0	far_mass	frac	2.1905e-01	e6b_far_profiles.json	layer=5
+O	c	lb_multifieldqa_en_0	far_mass	frac	1.2909e-04	e6b_far_profiles.json	layer=6
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.4914e-14	e6b_far_profiles.json	layer=7
+O	c	lb_multifieldqa_en_0	far_mass	frac	1.6734e-11	e6b_far_profiles.json	layer=8
+O	c	lb_multifieldqa_en_0	far_mass	frac	4.9279e-11	e6b_far_profiles.json	layer=9
+O	c	lb_multifieldqa_en_0	far_mass	frac	2.7230e-10	e6b_far_profiles.json	layer=10
+O	c	lb_multifieldqa_en_0	far_mass	frac	1.5986e-10	e6b_far_profiles.json	layer=11
+O	c	lb_multifieldqa_en_0	far_mass	frac	6.8305e-10	e6b_far_profiles.json	layer=12
+O	c	lb_multifieldqa_en_0	far_mass	frac	9.5888e-07	e6b_far_profiles.json	layer=13
+O	c	lb_multifieldqa_en_0	far_mass	frac	1.7694e-09	e6b_far_profiles.json	layer=14
+O	c	lb_multifieldqa_en_0	far_mass	frac	2.1678e-06	e6b_far_profiles.json	layer=15
+O	c	lb_multifieldqa_en_0	far_mass	frac	2.0346e-07	e6b_far_profiles.json	layer=16
+O	c	lb_multifieldqa_en_0	far_mass	frac	6.9903e-05	e6b_far_profiles.json	layer=17
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.2744e-03	e6b_far_profiles.json	layer=18
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.3967e-03	e6b_far_profiles.json	layer=19
+O	c	lb_multifieldqa_en_0	far_mass	frac	6.4880e-03	e6b_far_profiles.json	layer=20
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.2557e-02	e6b_far_profiles.json	layer=21
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.1166e-03	e6b_far_profiles.json	layer=22
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.7404e-03	e6b_far_profiles.json	layer=23
+O	c	lb_multifieldqa_en_0	far_mass	frac	2.1921e-03	e6b_far_profiles.json	layer=24
+O	c	lb_multifieldqa_en_0	far_mass	frac	1.0824e-03	e6b_far_profiles.json	layer=25
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.2155e-03	e6b_far_profiles.json	layer=26
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.0597e-03	e6b_far_profiles.json	layer=27
+O	c	lb_multifieldqa_en_0	far_mass	frac	1.0448e-02	e6b_far_profiles.json	layer=28
+O	c	lb_multifieldqa_en_0	far_mass	frac	2.6853e-02	e6b_far_profiles.json	layer=29
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.5144e-03	e6b_far_profiles.json	layer=30
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.4338e-03	e6b_far_profiles.json	layer=31
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.4164e-03	e6b_far_profiles.json	layer=32
+O	c	lb_multifieldqa_en_0	far_mass	frac	3.8949e-03	e6b_far_profiles.json	layer=33
+O	c	lb_multifieldqa_en_0	far_mass	frac	4.0763e-04	e6b_far_profiles.json	layer=34
+O	c	lb_multifieldqa_en_0	far_mass	frac	2.1306e-09	e6b_far_profiles.json	layer=35
+O	c	lb_multifieldqa_en_1	far_mass	frac	4.3922e-07	e6b_far_profiles.json	layer=0
+O	c	lb_multifieldqa_en_1	far_mass	frac	7.6356e-05	e6b_far_profiles.json	layer=1
+O	c	lb_multifieldqa_en_1	far_mass	frac	1.5952e-01	e6b_far_profiles.json	layer=2
+O	c	lb_multifieldqa_en_1	far_mass	frac	2.1295e-01	e6b_far_profiles.json	layer=3
+O	c	lb_multifieldqa_en_1	far_mass	frac	2.5217e-01	e6b_far_profiles.json	layer=4
+O	c	lb_multifieldqa_en_1	far_mass	frac	2.1555e-01	e6b_far_profiles.json	layer=5
+O	c	lb_multifieldqa_en_1	far_mass	frac	4.7072e-04	e6b_far_profiles.json	layer=6
+O	c	lb_multifieldqa_en_1	far_mass	frac	7.5314e-13	e6b_far_profiles.json	layer=7
+O	c	lb_multifieldqa_en_1	far_mass	frac	8.0753e-10	e6b_far_profiles.json	layer=8
+O	c	lb_multifieldqa_en_1	far_mass	frac	1.4525e-09	e6b_far_profiles.json	layer=9
+O	c	lb_multifieldqa_en_1	far_mass	frac	9.1360e-08	e6b_far_profiles.json	layer=10
+O	c	lb_multifieldqa_en_1	far_mass	frac	3.2493e-08	e6b_far_profiles.json	layer=11
+O	c	lb_multifieldqa_en_1	far_mass	frac	2.2797e-08	e6b_far_profiles.json	layer=12
+O	c	lb_multifieldqa_en_1	far_mass	frac	2.0115e-06	e6b_far_profiles.json	layer=13
+O	c	lb_multifieldqa_en_1	far_mass	frac	1.0675e-07	e6b_far_profiles.json	layer=14
+O	c	lb_multifieldqa_en_1	far_mass	frac	8.3452e-07	e6b_far_profiles.json	layer=15
+O	c	lb_multifieldqa_en_1	far_mass	frac	4.0455e-08	e6b_far_profiles.json	layer=16
+O	c	lb_multifieldqa_en_1	far_mass	frac	3.4267e-05	e6b_far_profiles.json	layer=17
+O	c	lb_multifieldqa_en_1	far_mass	frac	1.6153e-02	e6b_far_profiles.json	layer=18
+O	c	lb_multifieldqa_en_1	far_mass	frac	3.2270e-03	e6b_far_profiles.json	layer=19
+O	c	lb_multifieldqa_en_1	far_mass	frac	2.5999e-03	e6b_far_profiles.json	layer=20
+O	c	lb_multifieldqa_en_1	far_mass	frac	3.3811e-03	e6b_far_profiles.json	layer=21
+O	c	lb_multifieldqa_en_1	far_mass	frac	3.6351e-03	e6b_far_profiles.json	layer=22
+O	c	lb_multifieldqa_en_1	far_mass	frac	6.4325e-02	e6b_far_profiles.json	layer=23
+O	c	lb_multifieldqa_en_1	far_mass	frac	8.9984e-03	e6b_far_profiles.json	layer=24
+O	c	lb_multifieldqa_en_1	far_mass	frac	3.5275e-03	e6b_far_profiles.json	layer=25
+O	c	lb_multifieldqa_en_1	far_mass	frac	1.1828e-02	e6b_far_profiles.json	layer=26
+O	c	lb_multifieldqa_en_1	far_mass	frac	3.5669e-02	e6b_far_profiles.json	layer=27
+O	c	lb_multifieldqa_en_1	far_mass	frac	1.2405e-02	e6b_far_profiles.json	layer=28
+O	c	lb_multifieldqa_en_1	far_mass	frac	4.0841e-03	e6b_far_profiles.json	layer=29
+O	c	lb_multifieldqa_en_1	far_mass	frac	1.8261e-03	e6b_far_profiles.json	layer=30
+O	c	lb_multifieldqa_en_1	far_mass	frac	7.6938e-03	e6b_far_profiles.json	layer=31
+O	c	lb_multifieldqa_en_1	far_mass	frac	9.2332e-03	e6b_far_profiles.json	layer=32
+O	c	lb_multifieldqa_en_1	far_mass	frac	1.2155e-02	e6b_far_profiles.json	layer=33
+O	c	lb_multifieldqa_en_1	far_mass	frac	1.6832e-04	e6b_far_profiles.json	layer=34
+O	c	lb_multifieldqa_en_1	far_mass	frac	3.3921e-07	e6b_far_profiles.json	layer=35
+O	c	lb_musique_0	far_mass	frac	3.6229e-07	e6b_far_profiles.json	layer=0
+O	c	lb_musique_0	far_mass	frac	7.2492e-05	e6b_far_profiles.json	layer=1
+O	c	lb_musique_0	far_mass	frac	7.3846e-02	e6b_far_profiles.json	layer=2
+O	c	lb_musique_0	far_mass	frac	1.5344e-01	e6b_far_profiles.json	layer=3
+O	c	lb_musique_0	far_mass	frac	9.5560e-02	e6b_far_profiles.json	layer=4
+O	c	lb_musique_0	far_mass	frac	1.1903e-01	e6b_far_profiles.json	layer=5
+O	c	lb_musique_0	far_mass	frac	7.6853e-05	e6b_far_profiles.json	layer=6
+O	c	lb_musique_0	far_mass	frac	7.4381e-13	e6b_far_profiles.json	layer=7
+O	c	lb_musique_0	far_mass	frac	7.9487e-09	e6b_far_profiles.json	layer=8
+O	c	lb_musique_0	far_mass	frac	9.3921e-11	e6b_far_profiles.json	layer=9
+O	c	lb_musique_0	far_mass	frac	1.5094e-10	e6b_far_profiles.json	layer=10
+O	c	lb_musique_0	far_mass	frac	2.7338e-08	e6b_far_profiles.json	layer=11
+O	c	lb_musique_0	far_mass	frac	2.5108e-09	e6b_far_profiles.json	layer=12
+O	c	lb_musique_0	far_mass	frac	8.2087e-08	e6b_far_profiles.json	layer=13
+O	c	lb_musique_0	far_mass	frac	7.6967e-07	e6b_far_profiles.json	layer=14
+O	c	lb_musique_0	far_mass	frac	4.6309e-07	e6b_far_profiles.json	layer=15
+O	c	lb_musique_0	far_mass	frac	1.6791e-07	e6b_far_profiles.json	layer=16
+O	c	lb_musique_0	far_mass	frac	4.0370e-04	e6b_far_profiles.json	layer=17
+O	c	lb_musique_0	far_mass	frac	8.3866e-03	e6b_far_profiles.json	layer=18
+O	c	lb_musique_0	far_mass	frac	1.0039e-02	e6b_far_profiles.json	layer=19
+O	c	lb_musique_0	far_mass	frac	8.0207e-03	e6b_far_profiles.json	layer=20
+O	c	lb_musique_0	far_mass	frac	8.0509e-02	e6b_far_profiles.json	layer=21
+O	c	lb_musique_0	far_mass	frac	6.9484e-03	e6b_far_profiles.json	layer=22
+O	c	lb_musique_0	far_mass	frac	4.5446e-03	e6b_far_profiles.json	layer=23
+O	c	lb_musique_0	far_mass	frac	1.7508e-01	e6b_far_profiles.json	layer=24
+O	c	lb_musique_0	far_mass	frac	3.3804e-03	e6b_far_profiles.json	layer=25
+O	c	lb_musique_0	far_mass	frac	3.2812e-02	e6b_far_profiles.json	layer=26
+O	c	lb_musique_0	far_mass	frac	1.7585e-02	e6b_far_profiles.json	layer=27
+O	c	lb_musique_0	far_mass	frac	1.0550e-01	e6b_far_profiles.json	layer=28
+O	c	lb_musique_0	far_mass	frac	1.0180e-01	e6b_far_profiles.json	layer=29
+O	c	lb_musique_0	far_mass	frac	1.3068e-03	e6b_far_profiles.json	layer=30
+O	c	lb_musique_0	far_mass	frac	4.9312e-03	e6b_far_profiles.json	layer=31
+O	c	lb_musique_0	far_mass	frac	2.0820e-03	e6b_far_profiles.json	layer=32
+O	c	lb_musique_0	far_mass	frac	5.0118e-03	e6b_far_profiles.json	layer=33
+O	c	lb_musique_0	far_mass	frac	1.2696e-03	e6b_far_profiles.json	layer=34
+O	c	lb_musique_0	far_mass	frac	6.1505e-09	e6b_far_profiles.json	layer=35
+O	c	lb_musique_1	far_mass	frac	2.5326e-07	e6b_far_profiles.json	layer=0
+O	c	lb_musique_1	far_mass	frac	7.1686e-05	e6b_far_profiles.json	layer=1
+O	c	lb_musique_1	far_mass	frac	4.6406e-02	e6b_far_profiles.json	layer=2
+O	c	lb_musique_1	far_mass	frac	1.8691e-01	e6b_far_profiles.json	layer=3
+O	c	lb_musique_1	far_mass	frac	1.0798e-01	e6b_far_profiles.json	layer=4
+O	c	lb_musique_1	far_mass	frac	1.7283e-01	e6b_far_profiles.json	layer=5
+O	c	lb_musique_1	far_mass	frac	6.7139e-05	e6b_far_profiles.json	layer=6
+O	c	lb_musique_1	far_mass	frac	4.2801e-11	e6b_far_profiles.json	layer=7
+O	c	lb_musique_1	far_mass	frac	1.2449e-07	e6b_far_profiles.json	layer=8
+O	c	lb_musique_1	far_mass	frac	1.0288e-08	e6b_far_profiles.json	layer=9
+O	c	lb_musique_1	far_mass	frac	1.5644e-08	e6b_far_profiles.json	layer=10
+O	c	lb_musique_1	far_mass	frac	3.1176e-07	e6b_far_profiles.json	layer=11
+O	c	lb_musique_1	far_mass	frac	2.0225e-07	e6b_far_profiles.json	layer=12
+O	c	lb_musique_1	far_mass	frac	2.8142e-07	e6b_far_profiles.json	layer=13
+O	c	lb_musique_1	far_mass	frac	8.4791e-07	e6b_far_profiles.json	layer=14
+O	c	lb_musique_1	far_mass	frac	4.0465e-06	e6b_far_profiles.json	layer=15
+O	c	lb_musique_1	far_mass	frac	6.5172e-08	e6b_far_profiles.json	layer=16
+O	c	lb_musique_1	far_mass	frac	3.0141e-05	e6b_far_profiles.json	layer=17
+O	c	lb_musique_1	far_mass	frac	3.1672e-03	e6b_far_profiles.json	layer=18
+O	c	lb_musique_1	far_mass	frac	1.1850e-03	e6b_far_profiles.json	layer=19
+O	c	lb_musique_1	far_mass	frac	1.9738e-03	e6b_far_profiles.json	layer=20
+O	c	lb_musique_1	far_mass	frac	4.1133e-04	e6b_far_profiles.json	layer=21
+O	c	lb_musique_1	far_mass	frac	4.3887e-03	e6b_far_profiles.json	layer=22
+O	c	lb_musique_1	far_mass	frac	7.8102e-04	e6b_far_profiles.json	layer=23
+O	c	lb_musique_1	far_mass	frac	7.7250e-04	e6b_far_profiles.json	layer=24
+O	c	lb_musique_1	far_mass	frac	5.9565e-04	e6b_far_profiles.json	layer=25
+O	c	lb_musique_1	far_mass	frac	3.4324e-03	e6b_far_profiles.json	layer=26
+O	c	lb_musique_1	far_mass	frac	4.6843e-03	e6b_far_profiles.json	layer=27
+O	c	lb_musique_1	far_mass	frac	6.8832e-03	e6b_far_profiles.json	layer=28
+O	c	lb_musique_1	far_mass	frac	3.7915e-03	e6b_far_profiles.json	layer=29
+O	c	lb_musique_1	far_mass	frac	1.0354e-03	e6b_far_profiles.json	layer=30
+O	c	lb_musique_1	far_mass	frac	4.1140e-03	e6b_far_profiles.json	layer=31
+O	c	lb_musique_1	far_mass	frac	2.6611e-03	e6b_far_profiles.json	layer=32
+O	c	lb_musique_1	far_mass	frac	6.4787e-03	e6b_far_profiles.json	layer=33
+O	c	lb_musique_1	far_mass	frac	6.2539e-04	e6b_far_profiles.json	layer=34
+O	c	lb_musique_1	far_mass	frac	1.2323e-08	e6b_far_profiles.json	layer=35
+O	c	lb_narrativeqa_0	far_mass	frac	6.7264e-07	e6b_far_profiles.json	layer=0
+O	c	lb_narrativeqa_0	far_mass	frac	2.2601e-02	e6b_far_profiles.json	layer=1
+O	c	lb_narrativeqa_0	far_mass	frac	1.1489e-01	e6b_far_profiles.json	layer=2
+O	c	lb_narrativeqa_0	far_mass	frac	2.1268e-01	e6b_far_profiles.json	layer=3
+O	c	lb_narrativeqa_0	far_mass	frac	2.8513e-01	e6b_far_profiles.json	layer=4
+O	c	lb_narrativeqa_0	far_mass	frac	2.7806e-01	e6b_far_profiles.json	layer=5
+O	c	lb_narrativeqa_0	far_mass	frac	9.2700e-02	e6b_far_profiles.json	layer=6
+O	c	lb_narrativeqa_0	far_mass	frac	3.7349e-09	e6b_far_profiles.json	layer=7
+O	c	lb_narrativeqa_0	far_mass	frac	2.5446e-04	e6b_far_profiles.json	layer=8
+O	c	lb_narrativeqa_0	far_mass	frac	5.2027e-03	e6b_far_profiles.json	layer=9
+O	c	lb_narrativeqa_0	far_mass	frac	6.3042e-07	e6b_far_profiles.json	layer=10
+O	c	lb_narrativeqa_0	far_mass	frac	7.6701e-10	e6b_far_profiles.json	layer=11
+O	c	lb_narrativeqa_0	far_mass	frac	4.3251e-06	e6b_far_profiles.json	layer=12
+O	c	lb_narrativeqa_0	far_mass	frac	8.8822e-05	e6b_far_profiles.json	layer=13
+O	c	lb_narrativeqa_0	far_mass	frac	2.4823e-09	e6b_far_profiles.json	layer=14
+O	c	lb_narrativeqa_0	far_mass	frac	5.1168e-08	e6b_far_profiles.json	layer=15
+O	c	lb_narrativeqa_0	far_mass	frac	8.3681e-06	e6b_far_profiles.json	layer=16
+O	c	lb_narrativeqa_0	far_mass	frac	1.0098e-01	e6b_far_profiles.json	layer=17
+O	c	lb_narrativeqa_0	far_mass	frac	2.6270e-01	e6b_far_profiles.json	layer=18
+O	c	lb_narrativeqa_0	far_mass	frac	3.9305e-01	e6b_far_profiles.json	layer=19
+O	c	lb_narrativeqa_0	far_mass	frac	3.8939e-01	e6b_far_profiles.json	layer=20
+O	c	lb_narrativeqa_0	far_mass	frac	3.1003e-01	e6b_far_profiles.json	layer=21
+O	c	lb_narrativeqa_0	far_mass	frac	3.6210e-01	e6b_far_profiles.json	layer=22
+O	c	lb_narrativeqa_0	far_mass	frac	5.4104e-01	e6b_far_profiles.json	layer=23
+O	c	lb_narrativeqa_0	far_mass	frac	6.9831e-01	e6b_far_profiles.json	layer=24
+O	c	lb_narrativeqa_0	far_mass	frac	5.1995e-01	e6b_far_profiles.json	layer=25
+O	c	lb_narrativeqa_0	far_mass	frac	6.3867e-01	e6b_far_profiles.json	layer=26
+O	c	lb_narrativeqa_0	far_mass	frac	4.0860e-01	e6b_far_profiles.json	layer=27
+O	c	lb_narrativeqa_0	far_mass	frac	2.2924e-01	e6b_far_profiles.json	layer=28
+O	c	lb_narrativeqa_0	far_mass	frac	5.3687e-01	e6b_far_profiles.json	layer=29
+O	c	lb_narrativeqa_0	far_mass	frac	2.0850e-01	e6b_far_profiles.json	layer=30
+O	c	lb_narrativeqa_0	far_mass	frac	4.2399e-01	e6b_far_profiles.json	layer=31
+O	c	lb_narrativeqa_0	far_mass	frac	2.8420e-01	e6b_far_profiles.json	layer=32
+O	c	lb_narrativeqa_0	far_mass	frac	3.5294e-01	e6b_far_profiles.json	layer=33
+O	c	lb_narrativeqa_0	far_mass	frac	3.8411e-02	e6b_far_profiles.json	layer=34
+O	c	lb_narrativeqa_0	far_mass	frac	2.6136e-10	e6b_far_profiles.json	layer=35
+O	c	lb_narrativeqa_1	far_mass	frac	6.7264e-07	e6b_far_profiles.json	layer=0
+O	c	lb_narrativeqa_1	far_mass	frac	2.2601e-02	e6b_far_profiles.json	layer=1
+O	c	lb_narrativeqa_1	far_mass	frac	1.1489e-01	e6b_far_profiles.json	layer=2
+O	c	lb_narrativeqa_1	far_mass	frac	2.1268e-01	e6b_far_profiles.json	layer=3
+O	c	lb_narrativeqa_1	far_mass	frac	2.8513e-01	e6b_far_profiles.json	layer=4
+O	c	lb_narrativeqa_1	far_mass	frac	2.7806e-01	e6b_far_profiles.json	layer=5
+O	c	lb_narrativeqa_1	far_mass	frac	9.2700e-02	e6b_far_profiles.json	layer=6
+O	c	lb_narrativeqa_1	far_mass	frac	3.7349e-09	e6b_far_profiles.json	layer=7
+O	c	lb_narrativeqa_1	far_mass	frac	2.5446e-04	e6b_far_profiles.json	layer=8
+O	c	lb_narrativeqa_1	far_mass	frac	5.2027e-03	e6b_far_profiles.json	layer=9
+O	c	lb_narrativeqa_1	far_mass	frac	6.3042e-07	e6b_far_profiles.json	layer=10
+O	c	lb_narrativeqa_1	far_mass	frac	7.6701e-10	e6b_far_profiles.json	layer=11
+O	c	lb_narrativeqa_1	far_mass	frac	4.3251e-06	e6b_far_profiles.json	layer=12
+O	c	lb_narrativeqa_1	far_mass	frac	8.8822e-05	e6b_far_profiles.json	layer=13
+O	c	lb_narrativeqa_1	far_mass	frac	2.4823e-09	e6b_far_profiles.json	layer=14
+O	c	lb_narrativeqa_1	far_mass	frac	5.1168e-08	e6b_far_profiles.json	layer=15
+O	c	lb_narrativeqa_1	far_mass	frac	8.3681e-06	e6b_far_profiles.json	layer=16
+O	c	lb_narrativeqa_1	far_mass	frac	1.0098e-01	e6b_far_profiles.json	layer=17
+O	c	lb_narrativeqa_1	far_mass	frac	2.6270e-01	e6b_far_profiles.json	layer=18
+O	c	lb_narrativeqa_1	far_mass	frac	3.9305e-01	e6b_far_profiles.json	layer=19
+O	c	lb_narrativeqa_1	far_mass	frac	3.8939e-01	e6b_far_profiles.json	layer=20
+O	c	lb_narrativeqa_1	far_mass	frac	3.1003e-01	e6b_far_profiles.json	layer=21
+O	c	lb_narrativeqa_1	far_mass	frac	3.6210e-01	e6b_far_profiles.json	layer=22
+O	c	lb_narrativeqa_1	far_mass	frac	5.4104e-01	e6b_far_profiles.json	layer=23
+O	c	lb_narrativeqa_1	far_mass	frac	6.9831e-01	e6b_far_profiles.json	layer=24
+O	c	lb_narrativeqa_1	far_mass	frac	5.1995e-01	e6b_far_profiles.json	layer=25
+O	c	lb_narrativeqa_1	far_mass	frac	6.3867e-01	e6b_far_profiles.json	layer=26
+O	c	lb_narrativeqa_1	far_mass	frac	4.0860e-01	e6b_far_profiles.json	layer=27
+O	c	lb_narrativeqa_1	far_mass	frac	2.2924e-01	e6b_far_profiles.json	layer=28
+O	c	lb_narrativeqa_1	far_mass	frac	5.3687e-01	e6b_far_profiles.json	layer=29
+O	c	lb_narrativeqa_1	far_mass	frac	2.0850e-01	e6b_far_profiles.json	layer=30
+O	c	lb_narrativeqa_1	far_mass	frac	4.2399e-01	e6b_far_profiles.json	layer=31
+O	c	lb_narrativeqa_1	far_mass	frac	2.8420e-01	e6b_far_profiles.json	layer=32
+O	c	lb_narrativeqa_1	far_mass	frac	3.5294e-01	e6b_far_profiles.json	layer=33
+O	c	lb_narrativeqa_1	far_mass	frac	3.8411e-02	e6b_far_profiles.json	layer=34
+O	c	lb_narrativeqa_1	far_mass	frac	2.6136e-10	e6b_far_profiles.json	layer=35
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.1206e-05	e6b_far_profiles.json	layer=0
+O	c	lb_passage_retrieval_en_0	far_mass	frac	4.6395e-04	e6b_far_profiles.json	layer=1
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.0714e-01	e6b_far_profiles.json	layer=2
+O	c	lb_passage_retrieval_en_0	far_mass	frac	2.8707e-01	e6b_far_profiles.json	layer=3
+O	c	lb_passage_retrieval_en_0	far_mass	frac	2.1748e-01	e6b_far_profiles.json	layer=4
+O	c	lb_passage_retrieval_en_0	far_mass	frac	2.7676e-01	e6b_far_profiles.json	layer=5
+O	c	lb_passage_retrieval_en_0	far_mass	frac	4.7611e-05	e6b_far_profiles.json	layer=6
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.4622e-10	e6b_far_profiles.json	layer=7
+O	c	lb_passage_retrieval_en_0	far_mass	frac	3.5567e-09	e6b_far_profiles.json	layer=8
+O	c	lb_passage_retrieval_en_0	far_mass	frac	5.1236e-10	e6b_far_profiles.json	layer=9
+O	c	lb_passage_retrieval_en_0	far_mass	frac	6.8742e-08	e6b_far_profiles.json	layer=10
+O	c	lb_passage_retrieval_en_0	far_mass	frac	8.1154e-07	e6b_far_profiles.json	layer=11
+O	c	lb_passage_retrieval_en_0	far_mass	frac	3.4308e-08	e6b_far_profiles.json	layer=12
+O	c	lb_passage_retrieval_en_0	far_mass	frac	3.8157e-08	e6b_far_profiles.json	layer=13
+O	c	lb_passage_retrieval_en_0	far_mass	frac	2.4314e-06	e6b_far_profiles.json	layer=14
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.4880e-05	e6b_far_profiles.json	layer=15
+O	c	lb_passage_retrieval_en_0	far_mass	frac	3.0564e-07	e6b_far_profiles.json	layer=16
+O	c	lb_passage_retrieval_en_0	far_mass	frac	7.3950e-04	e6b_far_profiles.json	layer=17
+O	c	lb_passage_retrieval_en_0	far_mass	frac	2.8546e-03	e6b_far_profiles.json	layer=18
+O	c	lb_passage_retrieval_en_0	far_mass	frac	2.5544e-03	e6b_far_profiles.json	layer=19
+O	c	lb_passage_retrieval_en_0	far_mass	frac	4.0898e-04	e6b_far_profiles.json	layer=20
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.1546e-03	e6b_far_profiles.json	layer=21
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.2162e-03	e6b_far_profiles.json	layer=22
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.8820e-03	e6b_far_profiles.json	layer=23
+O	c	lb_passage_retrieval_en_0	far_mass	frac	6.4961e-02	e6b_far_profiles.json	layer=24
+O	c	lb_passage_retrieval_en_0	far_mass	frac	3.6415e-04	e6b_far_profiles.json	layer=25
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.2036e-03	e6b_far_profiles.json	layer=26
+O	c	lb_passage_retrieval_en_0	far_mass	frac	2.0309e-03	e6b_far_profiles.json	layer=27
+O	c	lb_passage_retrieval_en_0	far_mass	frac	6.2146e-03	e6b_far_profiles.json	layer=28
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.9838e-03	e6b_far_profiles.json	layer=29
+O	c	lb_passage_retrieval_en_0	far_mass	frac	3.3874e-04	e6b_far_profiles.json	layer=30
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.6900e-03	e6b_far_profiles.json	layer=31
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.9798e-03	e6b_far_profiles.json	layer=32
+O	c	lb_passage_retrieval_en_0	far_mass	frac	3.3271e-03	e6b_far_profiles.json	layer=33
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.6165e-03	e6b_far_profiles.json	layer=34
+O	c	lb_passage_retrieval_en_0	far_mass	frac	1.3189e-05	e6b_far_profiles.json	layer=35
+O	c	lb_passage_retrieval_en_1	far_mass	frac	3.3785e-07	e6b_far_profiles.json	layer=0
+O	c	lb_passage_retrieval_en_1	far_mass	frac	6.6565e-04	e6b_far_profiles.json	layer=1
+O	c	lb_passage_retrieval_en_1	far_mass	frac	9.8026e-02	e6b_far_profiles.json	layer=2
+O	c	lb_passage_retrieval_en_1	far_mass	frac	2.4582e-01	e6b_far_profiles.json	layer=3
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.7110e-01	e6b_far_profiles.json	layer=4
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.5744e-01	e6b_far_profiles.json	layer=5
+O	c	lb_passage_retrieval_en_1	far_mass	frac	3.5635e-05	e6b_far_profiles.json	layer=6
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.5359e-10	e6b_far_profiles.json	layer=7
+O	c	lb_passage_retrieval_en_1	far_mass	frac	2.4787e-09	e6b_far_profiles.json	layer=8
+O	c	lb_passage_retrieval_en_1	far_mass	frac	8.2675e-10	e6b_far_profiles.json	layer=9
+O	c	lb_passage_retrieval_en_1	far_mass	frac	2.1650e-08	e6b_far_profiles.json	layer=10
+O	c	lb_passage_retrieval_en_1	far_mass	frac	4.1380e-07	e6b_far_profiles.json	layer=11
+O	c	lb_passage_retrieval_en_1	far_mass	frac	5.3838e-08	e6b_far_profiles.json	layer=12
+O	c	lb_passage_retrieval_en_1	far_mass	frac	3.7004e-08	e6b_far_profiles.json	layer=13
+O	c	lb_passage_retrieval_en_1	far_mass	frac	3.8024e-06	e6b_far_profiles.json	layer=14
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.3914e-05	e6b_far_profiles.json	layer=15
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.3573e-07	e6b_far_profiles.json	layer=16
+O	c	lb_passage_retrieval_en_1	far_mass	frac	9.4999e-04	e6b_far_profiles.json	layer=17
+O	c	lb_passage_retrieval_en_1	far_mass	frac	8.4591e-03	e6b_far_profiles.json	layer=18
+O	c	lb_passage_retrieval_en_1	far_mass	frac	5.3224e-03	e6b_far_profiles.json	layer=19
+O	c	lb_passage_retrieval_en_1	far_mass	frac	3.1932e-04	e6b_far_profiles.json	layer=20
+O	c	lb_passage_retrieval_en_1	far_mass	frac	6.2662e-04	e6b_far_profiles.json	layer=21
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.0135e-03	e6b_far_profiles.json	layer=22
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.0625e-02	e6b_far_profiles.json	layer=23
+O	c	lb_passage_retrieval_en_1	far_mass	frac	4.0729e-02	e6b_far_profiles.json	layer=24
+O	c	lb_passage_retrieval_en_1	far_mass	frac	2.9922e-04	e6b_far_profiles.json	layer=25
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.0538e-03	e6b_far_profiles.json	layer=26
+O	c	lb_passage_retrieval_en_1	far_mass	frac	3.5925e-03	e6b_far_profiles.json	layer=27
+O	c	lb_passage_retrieval_en_1	far_mass	frac	6.0983e-03	e6b_far_profiles.json	layer=28
+O	c	lb_passage_retrieval_en_1	far_mass	frac	7.2143e-04	e6b_far_profiles.json	layer=29
+O	c	lb_passage_retrieval_en_1	far_mass	frac	2.5384e-04	e6b_far_profiles.json	layer=30
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.3151e-03	e6b_far_profiles.json	layer=31
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.2469e-03	e6b_far_profiles.json	layer=32
+O	c	lb_passage_retrieval_en_1	far_mass	frac	2.8143e-03	e6b_far_profiles.json	layer=33
+O	c	lb_passage_retrieval_en_1	far_mass	frac	7.9974e-04	e6b_far_profiles.json	layer=34
+O	c	lb_passage_retrieval_en_1	far_mass	frac	1.6783e-05	e6b_far_profiles.json	layer=35
+O	c	lb_qasper_0	far_mass	frac	3.7637e-07	e6b_far_profiles.json	layer=0
+O	c	lb_qasper_0	far_mass	frac	2.8734e-04	e6b_far_profiles.json	layer=1
+O	c	lb_qasper_0	far_mass	frac	1.1499e-01	e6b_far_profiles.json	layer=2
+O	c	lb_qasper_0	far_mass	frac	9.7901e-02	e6b_far_profiles.json	layer=3
+O	c	lb_qasper_0	far_mass	frac	2.7969e-02	e6b_far_profiles.json	layer=4
+O	c	lb_qasper_0	far_mass	frac	1.4309e-01	e6b_far_profiles.json	layer=5
+O	c	lb_qasper_0	far_mass	frac	2.1797e-04	e6b_far_profiles.json	layer=6
+O	c	lb_qasper_0	far_mass	frac	1.9831e-13	e6b_far_profiles.json	layer=7
+O	c	lb_qasper_0	far_mass	frac	8.5427e-10	e6b_far_profiles.json	layer=8
+O	c	lb_qasper_0	far_mass	frac	6.1489e-07	e6b_far_profiles.json	layer=9
+O	c	lb_qasper_0	far_mass	frac	4.7838e-07	e6b_far_profiles.json	layer=10
+O	c	lb_qasper_0	far_mass	frac	8.6466e-08	e6b_far_profiles.json	layer=11
+O	c	lb_qasper_0	far_mass	frac	3.6108e-05	e6b_far_profiles.json	layer=12
+O	c	lb_qasper_0	far_mass	frac	1.1061e-05	e6b_far_profiles.json	layer=13
+O	c	lb_qasper_0	far_mass	frac	9.9376e-07	e6b_far_profiles.json	layer=14
+O	c	lb_qasper_0	far_mass	frac	1.0652e-06	e6b_far_profiles.json	layer=15
+O	c	lb_qasper_0	far_mass	frac	3.2523e-06	e6b_far_profiles.json	layer=16
+O	c	lb_qasper_0	far_mass	frac	1.2021e-03	e6b_far_profiles.json	layer=17
+O	c	lb_qasper_0	far_mass	frac	5.2539e-03	e6b_far_profiles.json	layer=18
+O	c	lb_qasper_0	far_mass	frac	8.3785e-03	e6b_far_profiles.json	layer=19
+O	c	lb_qasper_0	far_mass	frac	1.6105e-02	e6b_far_profiles.json	layer=20
+O	c	lb_qasper_0	far_mass	frac	2.4325e-03	e6b_far_profiles.json	layer=21
+O	c	lb_qasper_0	far_mass	frac	2.9990e-03	e6b_far_profiles.json	layer=22
+O	c	lb_qasper_0	far_mass	frac	3.5145e-03	e6b_far_profiles.json	layer=23
+O	c	lb_qasper_0	far_mass	frac	9.3301e-04	e6b_far_profiles.json	layer=24
+O	c	lb_qasper_0	far_mass	frac	7.6999e-04	e6b_far_profiles.json	layer=25
+O	c	lb_qasper_0	far_mass	frac	5.4546e-03	e6b_far_profiles.json	layer=26
+O	c	lb_qasper_0	far_mass	frac	6.4845e-03	e6b_far_profiles.json	layer=27
+O	c	lb_qasper_0	far_mass	frac	1.1221e-02	e6b_far_profiles.json	layer=28
+O	c	lb_qasper_0	far_mass	frac	7.5552e-02	e6b_far_profiles.json	layer=29
+O	c	lb_qasper_0	far_mass	frac	1.1472e-03	e6b_far_profiles.json	layer=30
+O	c	lb_qasper_0	far_mass	frac	1.5653e-03	e6b_far_profiles.json	layer=31
+O	c	lb_qasper_0	far_mass	frac	4.3621e-03	e6b_far_profiles.json	layer=32
+O	c	lb_qasper_0	far_mass	frac	7.5205e-03	e6b_far_profiles.json	layer=33
+O	c	lb_qasper_0	far_mass	frac	8.4313e-04	e6b_far_profiles.json	layer=34
+O	c	lb_qasper_0	far_mass	frac	2.5283e-08	e6b_far_profiles.json	layer=35
+O	c	lb_qasper_1	far_mass	frac	1.9624e-06	e6b_far_profiles.json	layer=0
+O	c	lb_qasper_1	far_mass	frac	1.4580e-04	e6b_far_profiles.json	layer=1
+O	c	lb_qasper_1	far_mass	frac	9.8152e-02	e6b_far_profiles.json	layer=2
+O	c	lb_qasper_1	far_mass	frac	1.1630e-01	e6b_far_profiles.json	layer=3
+O	c	lb_qasper_1	far_mass	frac	3.4143e-02	e6b_far_profiles.json	layer=4
+O	c	lb_qasper_1	far_mass	frac	1.4452e-01	e6b_far_profiles.json	layer=5
+O	c	lb_qasper_1	far_mass	frac	2.7847e-04	e6b_far_profiles.json	layer=6
+O	c	lb_qasper_1	far_mass	frac	1.6838e-13	e6b_far_profiles.json	layer=7
+O	c	lb_qasper_1	far_mass	frac	4.5534e-10	e6b_far_profiles.json	layer=8
+O	c	lb_qasper_1	far_mass	frac	1.5659e-08	e6b_far_profiles.json	layer=9
+O	c	lb_qasper_1	far_mass	frac	4.2055e-08	e6b_far_profiles.json	layer=10
+O	c	lb_qasper_1	far_mass	frac	1.4550e-08	e6b_far_profiles.json	layer=11
+O	c	lb_qasper_1	far_mass	frac	2.1323e-05	e6b_far_profiles.json	layer=12
+O	c	lb_qasper_1	far_mass	frac	7.2687e-05	e6b_far_profiles.json	layer=13
+O	c	lb_qasper_1	far_mass	frac	1.4992e-05	e6b_far_profiles.json	layer=14
+O	c	lb_qasper_1	far_mass	frac	4.1645e-07	e6b_far_profiles.json	layer=15
+O	c	lb_qasper_1	far_mass	frac	2.9664e-07	e6b_far_profiles.json	layer=16
+O	c	lb_qasper_1	far_mass	frac	3.1879e-03	e6b_far_profiles.json	layer=17
+O	c	lb_qasper_1	far_mass	frac	1.5912e-02	e6b_far_profiles.json	layer=18
+O	c	lb_qasper_1	far_mass	frac	6.7759e-03	e6b_far_profiles.json	layer=19
+O	c	lb_qasper_1	far_mass	frac	1.0618e-02	e6b_far_profiles.json	layer=20
+O	c	lb_qasper_1	far_mass	frac	4.6866e-03	e6b_far_profiles.json	layer=21
+O	c	lb_qasper_1	far_mass	frac	3.7290e-03	e6b_far_profiles.json	layer=22
+O	c	lb_qasper_1	far_mass	frac	5.9594e-03	e6b_far_profiles.json	layer=23
+O	c	lb_qasper_1	far_mass	frac	2.8221e-03	e6b_far_profiles.json	layer=24
+O	c	lb_qasper_1	far_mass	frac	1.2355e-03	e6b_far_profiles.json	layer=25
+O	c	lb_qasper_1	far_mass	frac	1.5351e-02	e6b_far_profiles.json	layer=26
+O	c	lb_qasper_1	far_mass	frac	2.8441e-02	e6b_far_profiles.json	layer=27
+O	c	lb_qasper_1	far_mass	frac	1.3431e-02	e6b_far_profiles.json	layer=28
+O	c	lb_qasper_1	far_mass	frac	5.4395e-03	e6b_far_profiles.json	layer=29
+O	c	lb_qasper_1	far_mass	frac	3.5654e-03	e6b_far_profiles.json	layer=30
+O	c	lb_qasper_1	far_mass	frac	5.4671e-03	e6b_far_profiles.json	layer=31
+O	c	lb_qasper_1	far_mass	frac	1.7724e-02	e6b_far_profiles.json	layer=32
+O	c	lb_qasper_1	far_mass	frac	1.2231e-02	e6b_far_profiles.json	layer=33
+O	c	lb_qasper_1	far_mass	frac	3.8840e-03	e6b_far_profiles.json	layer=34
+O	c	lb_qasper_1	far_mass	frac	4.2167e-08	e6b_far_profiles.json	layer=35
+O	c	natural32k	far_mass	frac	1.7588e-06	e6b_far_profiles.json	layer=0
+O	c	natural32k	far_mass	frac	7.3684e-04	e6b_far_profiles.json	layer=1
+O	c	natural32k	far_mass	frac	1.3410e-01	e6b_far_profiles.json	layer=2
+O	c	natural32k	far_mass	frac	3.7528e-01	e6b_far_profiles.json	layer=3
+O	c	natural32k	far_mass	frac	3.9246e-01	e6b_far_profiles.json	layer=4
+O	c	natural32k	far_mass	frac	3.5696e-01	e6b_far_profiles.json	layer=5
+O	c	natural32k	far_mass	frac	8.5116e-02	e6b_far_profiles.json	layer=6
+O	c	natural32k	far_mass	frac	4.7278e-10	e6b_far_profiles.json	layer=7
+O	c	natural32k	far_mass	frac	4.8720e-09	e6b_far_profiles.json	layer=8
+O	c	natural32k	far_mass	frac	6.6703e-05	e6b_far_profiles.json	layer=9
+O	c	natural32k	far_mass	frac	4.2784e-07	e6b_far_profiles.json	layer=10
+O	c	natural32k	far_mass	frac	1.1040e-06	e6b_far_profiles.json	layer=11
+O	c	natural32k	far_mass	frac	2.5351e-06	e6b_far_profiles.json	layer=12
+O	c	natural32k	far_mass	frac	1.9070e-05	e6b_far_profiles.json	layer=13
+O	c	natural32k	far_mass	frac	1.6723e-06	e6b_far_profiles.json	layer=14
+O	c	natural32k	far_mass	frac	7.5929e-05	e6b_far_profiles.json	layer=15
+O	c	natural32k	far_mass	frac	1.6393e-05	e6b_far_profiles.json	layer=16
+O	c	natural32k	far_mass	frac	1.8511e-03	e6b_far_profiles.json	layer=17
+O	c	natural32k	far_mass	frac	2.5017e-03	e6b_far_profiles.json	layer=18
+O	c	natural32k	far_mass	frac	2.4692e-02	e6b_far_profiles.json	layer=19
+O	c	natural32k	far_mass	frac	4.1812e-02	e6b_far_profiles.json	layer=20
+O	c	natural32k	far_mass	frac	2.3076e-02	e6b_far_profiles.json	layer=21
+O	c	natural32k	far_mass	frac	4.3288e-02	e6b_far_profiles.json	layer=22
+O	c	natural32k	far_mass	frac	2.0987e-01	e6b_far_profiles.json	layer=23
+O	c	natural32k	far_mass	frac	1.5304e-01	e6b_far_profiles.json	layer=24
+O	c	natural32k	far_mass	frac	1.6608e-01	e6b_far_profiles.json	layer=25
+O	c	natural32k	far_mass	frac	2.2858e-01	e6b_far_profiles.json	layer=26
+O	c	natural32k	far_mass	frac	2.3020e-01	e6b_far_profiles.json	layer=27
+O	c	natural32k	far_mass	frac	6.2295e-02	e6b_far_profiles.json	layer=28
+O	c	natural32k	far_mass	frac	1.4457e-01	e6b_far_profiles.json	layer=29
+O	c	natural32k	far_mass	frac	8.8368e-02	e6b_far_profiles.json	layer=30
+O	c	natural32k	far_mass	frac	4.1143e-02	e6b_far_profiles.json	layer=31
+O	c	natural32k	far_mass	frac	9.9216e-02	e6b_far_profiles.json	layer=32
+O	c	natural32k	far_mass	frac	1.3823e-01	e6b_far_profiles.json	layer=33
+O	c	natural32k	far_mass	frac	1.1088e-02	e6b_far_profiles.json	layer=34
+O	c	natural32k	far_mass	frac	1.0547e-08	e6b_far_profiles.json	layer=35
+O	c	needle32k	far_mass	frac	3.3754e-07	e6b_far_profiles.json	layer=0
+O	c	needle32k	far_mass	frac	1.0605e-06	e6b_far_profiles.json	layer=1
+O	c	needle32k	far_mass	frac	2.4318e-08	e6b_far_profiles.json	layer=2
+O	c	needle32k	far_mass	frac	1.2712e-07	e6b_far_profiles.json	layer=3
+O	c	needle32k	far_mass	frac	9.7843e-09	e6b_far_profiles.json	layer=4
+O	c	needle32k	far_mass	frac	8.1730e-10	e6b_far_profiles.json	layer=5
+O	c	needle32k	far_mass	frac	7.3533e-09	e6b_far_profiles.json	layer=6
+O	c	needle32k	far_mass	frac	4.7584e-08	e6b_far_profiles.json	layer=7
+O	c	needle32k	far_mass	frac	1.8635e-14	e6b_far_profiles.json	layer=8
+O	c	needle32k	far_mass	frac	4.4105e-12	e6b_far_profiles.json	layer=9
+O	c	needle32k	far_mass	frac	4.3980e-09	e6b_far_profiles.json	layer=10
+O	c	needle32k	far_mass	frac	2.9315e-13	e6b_far_profiles.json	layer=11
+O	c	needle32k	far_mass	frac	4.5041e-09	e6b_far_profiles.json	layer=12
+O	c	needle32k	far_mass	frac	1.7458e-09	e6b_far_profiles.json	layer=13
+O	c	needle32k	far_mass	frac	1.1937e-10	e6b_far_profiles.json	layer=14
+O	c	needle32k	far_mass	frac	1.7617e-06	e6b_far_profiles.json	layer=15
+O	c	needle32k	far_mass	frac	8.6870e-10	e6b_far_profiles.json	layer=16
+O	c	needle32k	far_mass	frac	3.0974e-04	e6b_far_profiles.json	layer=17
+O	c	needle32k	far_mass	frac	9.7911e-03	e6b_far_profiles.json	layer=18
+O	c	needle32k	far_mass	frac	7.2772e-02	e6b_far_profiles.json	layer=19
+O	c	needle32k	far_mass	frac	2.9731e-02	e6b_far_profiles.json	layer=20
+O	c	needle32k	far_mass	frac	2.3876e-02	e6b_far_profiles.json	layer=21
+O	c	needle32k	far_mass	frac	3.9976e-02	e6b_far_profiles.json	layer=22
+O	c	needle32k	far_mass	frac	1.3798e-01	e6b_far_profiles.json	layer=23
+O	c	needle32k	far_mass	frac	5.4268e-02	e6b_far_profiles.json	layer=24
+O	c	needle32k	far_mass	frac	1.4050e-01	e6b_far_profiles.json	layer=25
+O	c	needle32k	far_mass	frac	1.2432e-01	e6b_far_profiles.json	layer=26
+O	c	needle32k	far_mass	frac	1.7423e-01	e6b_far_profiles.json	layer=27
+O	c	needle32k	far_mass	frac	2.3410e-02	e6b_far_profiles.json	layer=28
+O	c	needle32k	far_mass	frac	3.5023e-02	e6b_far_profiles.json	layer=29
+O	c	needle32k	far_mass	frac	2.1399e-02	e6b_far_profiles.json	layer=30
+O	c	needle32k	far_mass	frac	1.6357e-02	e6b_far_profiles.json	layer=31
+O	c	needle32k	far_mass	frac	9.6004e-02	e6b_far_profiles.json	layer=32
+O	c	needle32k	far_mass	frac	1.4807e-02	e6b_far_profiles.json	layer=33
+O	c	needle32k	far_mass	frac	2.9216e-03	e6b_far_profiles.json	layer=34
+O	c	needle32k	far_mass	frac	1.0625e-10	e6b_far_profiles.json	layer=35
+O	c	all	layers_median_lt_0.01	count	24	e6b_far_profiles.json	-
+O	c	all	layers_lt_0.01_per_prompt	range	12-32	e6b_far_profiles.json	recomputed per-row from the same 16x36 heatmap (single source; GPT-review fix: e6_layer_skip.json 10-prompt summary withdrawn)
