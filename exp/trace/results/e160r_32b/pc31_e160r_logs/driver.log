@@ -1,0 +1,25 @@
+[10-23 13:42:49] RUN tli_graph_L32768_a1 att=1 start
+[10-23 13:45:49] DONE tli_graph_L32768_a1 att=1 gpu_peak=99776
+[10-23 13:45:49] RUN tli_eager_L32768 att=1 start
+[10-23 13:48:17] DONE tli_eager_L32768 att=1 gpu_peak=97902
+GATE-PASS L=32768 all gen_tokens bit-exact vs eager (128 tok)
+[10-23 13:48:17] RUN dense_L32768_b1 att=1 start
+[10-23 13:51:26] DONE dense_L32768_b1 att=1 gpu_peak=89788
+[10-23 13:51:26] RUN dense_L32768_b2 att=1 start
+[10-23 13:54:37] DONE dense_L32768_b2 att=1 gpu_peak=89788
+[10-23 13:54:37] RUN tli_graph_L32768_a2 att=1 start
+[10-23 13:57:10] DONE tli_graph_L32768_a2 att=1 gpu_peak=99776
+[10-23 13:57:10] ===== 32K 档完成 =====
+[10-23 13:57:10] RUN tli_graph_L65536_a1 att=1 start
+[10-23 14:02:35] DONE tli_graph_L65536_a1 att=1 gpu_peak=136260
+[10-23 14:02:35] RUN tli_eager_L65536 att=1 start
+[10-23 14:06:52] DONE tli_eager_L65536 att=1 gpu_peak=132782
+GATE-PASS L=65536 all gen_tokens bit-exact vs eager (128 tok)
+[10-23 14:06:52] RUN dense_L65536_b1 att=1 start
+[10-23 14:13:59] DONE dense_L65536_b1 att=1 gpu_peak=116546
+[10-23 14:13:59] RUN dense_L65536_b2 att=1 start
+[10-23 14:21:06] DONE dense_L65536_b2 att=1 gpu_peak=116546
+[10-23 14:21:06] RUN tli_graph_L65536_a2 att=1 start
+[10-23 14:26:30] DONE tli_graph_L65536_a2 att=1 gpu_peak=136260
+[10-23 14:26:30] ===== 64K 档完成 =====
+[10-23 14:26:30] ALL-PROTOCOL-END
