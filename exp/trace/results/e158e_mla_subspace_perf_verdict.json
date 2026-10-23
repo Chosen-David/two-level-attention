@@ -1,0 +1,664 @@
+{
+ "schema": "e158e-mla-subspace-perf-verdict-v1",
+ "experiment": "E158e：MLA 子空间维度臂性能三口径（E158/b/c/d 质量链的性能兑现）——C1 indexer per-stage microbench + C2 e2e decode TPOT eager + C3 graph 评估",
+ "date": "2026-10-23",
+ "machine": "pc40 (10.238.139.251) 2×H20-3e, torch 2.8.0+cu128, transformers 4.56.2, system python3.9",
+ "model": "DeepSeek-V2-Lite-Chat bf16（nope128+rope64=192, kv_lora_rank 512, 16 头 MLA, 27 层 MoE, yarn40）",
+ "arms": {
+  "mla_full192": "全 192 维统计/细筛（性能锚：同子空间消费路径，唯一变量维数；对应 trace full192 质量锚 0.939）",
+  "mla_rope": "rope 64 维（E142a 生产口径；trace 0.861）",
+  "mla_rope_nope32": "rope64+nope[0:32]=96 维（E158b e2e 质量判决臂；trace 0.905）",
+  "mla_lofreq_nope32": "rope 低频32({144..159}∪{176..191})+nope[0:32]=64 维（E158c 判决最优经济点 lofreq32_nope32f；trace 0.905）",
+  "none": "fullkv dense 锚（原生 attention，无 patch）"
+ },
+ "config": "E142a 生产几何逐项：K1=64/K2=1024/bs64/cmp_ratio=4/mavg(.25,.125,.625)/far=minmax/near=avg/kmeans=off/layer_skip=off/l2_quant=off(E155b)/sink128/swa128；context cap 16384（e158b cap_effective 同口径）；唯一变量 = tli_subspace",
+ "caliber1_microbench": {
+  "protocol": "单层合成 decode（B=1 q_len=1 每步 +1 token，S=16384，warmup 10 + 50 步，全臂同 seed 同数据），cuda Event 5 stage + _fast_* 方法级 coarse/fine 细分，e131 结构克隆",
+  "per_layer_steady_ms": {
+   "mla_full192": {
+    "d_sub": 192,
+    "stages": {
+     "prepare_index": 1.7075,
+     "compute_score": 0.3738,
+     "compute_mask": 0.0934,
+     "metrics": 0.0255,
+     "eager_decoding": 0.5847
+    },
+    "buckets": {
+     "coarse_minmax": null,
+     "coarse_avg": null,
+     "fine_cand": null,
+     "fine_fullwidth": null
+    },
+    "score_other_ms": 0.3738,
+    "indexer_tax_sum_ms": 2.2002,
+    "step_gpu_sum_ms": 2.7848,
+    "triton_fast_path": false,
+    "prep_dispatch": {
+     "full": 60
+    }
+   },
+   "mla_rope": {
+    "d_sub": 64,
+    "stages": {
+     "prepare_index": 1.0822,
+     "compute_score": 0.2142,
+     "compute_mask": 0.4344,
+     "metrics": 0.1085,
+     "eager_decoding": 0.6294
+    },
+    "buckets": {
+     "coarse_minmax": 0.008,
+     "coarse_avg": 0.00694,
+     "fine_cand": 0.07181,
+     "fine_fullwidth": null
+    },
+    "score_other_ms": 0.1274,
+    "indexer_tax_sum_ms": 1.8393,
+    "step_gpu_sum_ms": 2.4687,
+    "triton_fast_path": true,
+    "prep_dispatch": {
+     "full": 60
+    }
+   },
+   "mla_rope_nope32": {
+    "d_sub": 96,
+    "stages": {
+     "prepare_index": 1.2327,
+     "compute_score": 0.267,
+     "compute_mask": 0.4442,
+     "metrics": 0.1057,
+     "eager_decoding": 0.6014
+    },
+    "buckets": {
+     "coarse_minmax": null,
+     "coarse_avg": null,
+     "fine_cand": null,
+     "fine_fullwidth": null
+    },
+    "score_other_ms": 0.267,
+    "indexer_tax_sum_ms": 2.0496,
+    "step_gpu_sum_ms": 2.651,
+    "triton_fast_path": false,
+    "prep_dispatch": {
+     "full": 60
+    }
+   },
+   "mla_lofreq_nope32": {
+    "d_sub": 64,
+    "stages": {
+     "prepare_index": 1.0847,
+     "compute_score": 0.1958,
+     "compute_mask": 0.4256,
+     "metrics": 0.1058,
+     "eager_decoding": 0.6258
+    },
+    "buckets": {
+     "coarse_minmax": 0.00803,
+     "coarse_avg": 0.00714,
+     "fine_cand": 0.06861,
+     "fine_fullwidth": null
+    },
+    "score_other_ms": 0.112,
+    "indexer_tax_sum_ms": 1.8119,
+    "step_gpu_sum_ms": 2.4377,
+    "triton_fast_path": true,
+    "prep_dispatch": {
+     "full": 60
+    }
+   }
+  },
+  "table_stages_ms": {
+   "header": [
+    "prepare_index",
+    "compute_score",
+    "compute_mask",
+    "metrics",
+    "eager_decoding",
+    "indexer_tax",
+    "step_sum"
+   ],
+   "rows": {
+    "mla_full192": [
+     1.7075,
+     0.3738,
+     0.0934,
+     0.0255,
+     0.5847,
+     2.2002,
+     2.7848
+    ],
+    "mla_rope": [
+     1.0822,
+     0.2142,
+     0.4344,
+     0.1085,
+     0.6294,
+     1.8393,
+     2.4687
+    ],
+    "mla_rope_nope32": [
+     1.2327,
+     0.267,
+     0.4442,
+     0.1057,
+     0.6014,
+     2.0496,
+     2.651
+    ],
+    "mla_lofreq_nope32": [
+     1.0847,
+     0.1958,
+     0.4256,
+     0.1058,
+     0.6258,
+     1.8119,
+     2.4377
+    ]
+   }
+  }
+ },
+ "caliber2_tpot_eager": {
+  "protocol": "16K needle prompt prefill（两臂 dense：tli 臂走 patch eager 复刻，none 臂原生）+ 128 gen greedy，per-step device sync（E152 v2 诊断口径），warmup1+repeats2，DynamicCache 两臂同口径",
+  "per_arm": {
+   "none": {
+    "runs_measured": 2,
+    "tpot_ms_runs": [
+     53.72,
+     54.0
+    ],
+    "tpot_ms_median": 53.86,
+    "tpot_ms_mean": 53.86,
+    "tpot_ms_max": 54.0,
+    "prefill_ms_runs": [
+     3798.3,
+     3807.6
+    ],
+    "n_input_tokens": 16866,
+    "peak_mem_delta_gib": 47.83,
+    "per_step_n": 254,
+    "per_step_p10_p50_p90_max_ms": [
+     52.4,
+     53.4,
+     54.8,
+     74.8
+    ],
+    "per_step_discrete_jump_points": [],
+    "platform_check": "连续（无 >20% 跳变平台）",
+    "caliber": {
+     "model": "/home/wangyuanshuo02/models/huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat",
+     "gpu": "NVIDIA H20-3e",
+     "torch": "2.8.0+cu128",
+     "max_gen": 128,
+     "early_stop": false,
+     "timer_api": "time.perf_counter",
+     "sync_policy": "device sync before request, after prefill, after first argmax, before/after each decode step",
+     "instrumentation_mode": "per-step-device-synchronized",
+     "prefill_backend": "tli 臂 = patch eager dense 复刻；none 臂 = 原生 sdpa/eager（TLI_SPARSE_PREFILL=0）",
+     "cache_impl": "DynamicCache（两臂同口径）",
+     "input_ids_sha256_16": "a33bc8b46a23f6ea",
+     "n_patched": 0,
+     "treatment_manifest": null,
+     "env": {
+      "CUDA_VISIBLE_DEVICES": "0",
+      "TLI_SPARSE_PREFILL": "0"
+     },
+     "gpu_hygiene_pre": ""
+    }
+   },
+   "mla_full192": {
+    "runs_measured": 2,
+    "tpot_ms_runs": [
+     130.27,
+     130.77
+    ],
+    "tpot_ms_median": 130.52,
+    "tpot_ms_mean": 130.52,
+    "tpot_ms_max": 130.77,
+    "prefill_ms_runs": [
+     3862.6,
+     3861.4
+    ],
+    "n_input_tokens": 16866,
+    "peak_mem_delta_gib": 47.69,
+    "per_step_n": 254,
+    "per_step_p10_p50_p90_max_ms": [
+     129.6,
+     130.4,
+     131.4,
+     134.9
+    ],
+    "per_step_discrete_jump_points": [],
+    "platform_check": "连续（无 >20% 跳变平台）",
+    "caliber": {
+     "model": "/home/wangyuanshuo02/models/huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat",
+     "gpu": "NVIDIA H20-3e",
+     "torch": "2.8.0+cu128",
+     "max_gen": 128,
+     "early_stop": false,
+     "timer_api": "time.perf_counter",
+     "sync_policy": "device sync before request, after prefill, after first argmax, before/after each decode step",
+     "instrumentation_mode": "per-step-device-synchronized",
+     "prefill_backend": "tli 臂 = patch eager dense 复刻；none 臂 = 原生 sdpa/eager（TLI_SPARSE_PREFILL=0）",
+     "cache_impl": "DynamicCache（两臂同口径）",
+     "input_ids_sha256_16": "a33bc8b46a23f6ea",
+     "n_patched": 27,
+     "treatment_manifest": {
+      "tia_block_size": 64,
+      "tia_enable_async_topk": false,
+      "tia_level1_topk": 64,
+      "tia_level2_cmp_ratio": 4,
+      "tia_level2_topk": 1024,
+      "tli_alpha": 0.25,
+      "tli_beta": 0.125,
+      "tli_boundary_bypass": true,
+      "tli_decode_dense": false,
+      "tli_dyn_dgate": false,
+      "tli_dyn_dgate_eps": 0.05,
+      "tli_dyn_dgate_rows": 256,
+      "tli_enable_kmeans": false,
+      "tli_enable_layer_skip": false,
+      "tli_enable_subspace": true,
+      "tli_far_blocks": 16,
+      "tli_far_clusters": 256,
+      "tli_far_method": "minmax",
+      "tli_far_niter": 10,
+      "tli_far_select": "4bit",
+      "tli_far_tokens": 512,
+      "tli_gamma": 0.625,
+      "tli_l2_quant": false,
+      "tli_l2_subspace": "same",
+      "tli_layer_skip_path": null,
+      "tli_moba": false,
+      "tli_near_len": null,
+      "tli_near_method": "avg",
+      "tli_near_pages": null,
+      "tli_near_select": "4bit",
+      "tli_near_tokens": null,
+      "tli_per_q_head": false,
+      "tli_proj_basis": null,
+      "tli_sigma": 8.0,
+      "tli_sigma_select": "none",
+      "tli_sim": 0.9,
+      "tli_sim_dims": "subspace",
+      "tli_sink_tokens": 128,
+      "tli_sinkswa_only": false,
+      "tli_sparse_prefill": false,
+      "tli_static_pair": false,
+      "tli_subspace": "mla_full192",
+      "tli_swa_size": 128
+     },
+     "env": {
+      "CUDA_VISIBLE_DEVICES": "0",
+      "TLI_SPARSE_PREFILL": "0"
+     },
+     "gpu_hygiene_pre": ""
+    }
+   },
+   "mla_rope": {
+    "runs_measured": 2,
+    "tpot_ms_runs": [
+     127.74,
+     124.84
+    ],
+    "tpot_ms_median": 126.29,
+    "tpot_ms_mean": 126.29,
+    "tpot_ms_max": 127.74,
+    "prefill_ms_runs": [
+     3809.9,
+     3859.8
+    ],
+    "n_input_tokens": 16866,
+    "peak_mem_delta_gib": 47.79,
+    "per_step_n": 254,
+    "per_step_p10_p50_p90_max_ms": [
+     123.9,
+     124.7,
+     127.2,
+     155.2
+    ],
+    "per_step_discrete_jump_points": [],
+    "platform_check": "连续（无 >20% 跳变平台）",
+    "caliber": {
+     "model": "/home/wangyuanshuo02/models/huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat",
+     "gpu": "NVIDIA H20-3e",
+     "torch": "2.8.0+cu128",
+     "max_gen": 128,
+     "early_stop": false,
+     "timer_api": "time.perf_counter",
+     "sync_policy": "device sync before request, after prefill, after first argmax, before/after each decode step",
+     "instrumentation_mode": "per-step-device-synchronized",
+     "prefill_backend": "tli 臂 = patch eager dense 复刻；none 臂 = 原生 sdpa/eager（TLI_SPARSE_PREFILL=0）",
+     "cache_impl": "DynamicCache（两臂同口径）",
+     "input_ids_sha256_16": "a33bc8b46a23f6ea",
+     "n_patched": 27,
+     "treatment_manifest": {
+      "tia_block_size": 64,
+      "tia_enable_async_topk": false,
+      "tia_level1_topk": 64,
+      "tia_level2_cmp_ratio": 4,
+      "tia_level2_topk": 1024,
+      "tli_alpha": 0.25,
+      "tli_beta": 0.125,
+      "tli_boundary_bypass": true,
+      "tli_decode_dense": false,
+      "tli_dyn_dgate": false,
+      "tli_dyn_dgate_eps": 0.05,
+      "tli_dyn_dgate_rows": 256,
+      "tli_enable_kmeans": false,
+      "tli_enable_layer_skip": false,
+      "tli_enable_subspace": true,
+      "tli_far_blocks": 16,
+      "tli_far_clusters": 256,
+      "tli_far_method": "minmax",
+      "tli_far_niter": 10,
+      "tli_far_select": "4bit",
+      "tli_far_tokens": 512,
+      "tli_gamma": 0.625,
+      "tli_l2_quant": false,
+      "tli_l2_subspace": "same",
+      "tli_layer_skip_path": null,
+      "tli_moba": false,
+      "tli_near_len": null,
+      "tli_near_method": "avg",
+      "tli_near_pages": null,
+      "tli_near_select": "4bit",
+      "tli_near_tokens": null,
+      "tli_per_q_head": false,
+      "tli_proj_basis": null,
+      "tli_sigma": 8.0,
+      "tli_sigma_select": "none",
+      "tli_sim": 0.9,
+      "tli_sim_dims": "subspace",
+      "tli_sink_tokens": 128,
+      "tli_sinkswa_only": false,
+      "tli_sparse_prefill": false,
+      "tli_static_pair": false,
+      "tli_subspace": "mla_rope",
+      "tli_swa_size": 128
+     },
+     "env": {
+      "CUDA_VISIBLE_DEVICES": "1",
+      "TLI_SPARSE_PREFILL": "0"
+     },
+     "gpu_hygiene_pre": ""
+    }
+   },
+   "mla_rope_nope32": {
+    "runs_measured": 2,
+    "tpot_ms_runs": [
+     134.21,
+     134.16
+    ],
+    "tpot_ms_median": 134.19,
+    "tpot_ms_mean": 134.19,
+    "tpot_ms_max": 134.21,
+    "prefill_ms_runs": [
+     3807.9,
+     3807.3
+    ],
+    "n_input_tokens": 16866,
+    "peak_mem_delta_gib": 47.77,
+    "per_step_n": 254,
+    "per_step_p10_p50_p90_max_ms": [
+     133.3,
+     133.9,
+     135.0,
+     146.8
+    ],
+    "per_step_discrete_jump_points": [],
+    "platform_check": "连续（无 >20% 跳变平台）",
+    "caliber": {
+     "model": "/home/wangyuanshuo02/models/huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat",
+     "gpu": "NVIDIA H20-3e",
+     "torch": "2.8.0+cu128",
+     "max_gen": 128,
+     "early_stop": false,
+     "timer_api": "time.perf_counter",
+     "sync_policy": "device sync before request, after prefill, after first argmax, before/after each decode step",
+     "instrumentation_mode": "per-step-device-synchronized",
+     "prefill_backend": "tli 臂 = patch eager dense 复刻；none 臂 = 原生 sdpa/eager（TLI_SPARSE_PREFILL=0）",
+     "cache_impl": "DynamicCache（两臂同口径）",
+     "input_ids_sha256_16": "a33bc8b46a23f6ea",
+     "n_patched": 27,
+     "treatment_manifest": {
+      "tia_block_size": 64,
+      "tia_enable_async_topk": false,
+      "tia_level1_topk": 64,
+      "tia_level2_cmp_ratio": 4,
+      "tia_level2_topk": 1024,
+      "tli_alpha": 0.25,
+      "tli_beta": 0.125,
+      "tli_boundary_bypass": true,
+      "tli_decode_dense": false,
+      "tli_dyn_dgate": false,
+      "tli_dyn_dgate_eps": 0.05,
+      "tli_dyn_dgate_rows": 256,
+      "tli_enable_kmeans": false,
+      "tli_enable_layer_skip": false,
+      "tli_enable_subspace": true,
+      "tli_far_blocks": 16,
+      "tli_far_clusters": 256,
+      "tli_far_method": "minmax",
+      "tli_far_niter": 10,
+      "tli_far_select": "4bit",
+      "tli_far_tokens": 512,
+      "tli_gamma": 0.625,
+      "tli_l2_quant": false,
+      "tli_l2_subspace": "same",
+      "tli_layer_skip_path": null,
+      "tli_moba": false,
+      "tli_near_len": null,
+      "tli_near_method": "avg",
+      "tli_near_pages": null,
+      "tli_near_select": "4bit",
+      "tli_near_tokens": null,
+      "tli_per_q_head": false,
+      "tli_proj_basis": null,
+      "tli_sigma": 8.0,
+      "tli_sigma_select": "none",
+      "tli_sim": 0.9,
+      "tli_sim_dims": "subspace",
+      "tli_sink_tokens": 128,
+      "tli_sinkswa_only": false,
+      "tli_sparse_prefill": false,
+      "tli_static_pair": false,
+      "tli_subspace": "mla_rope_nope32",
+      "tli_swa_size": 128
+     },
+     "env": {
+      "CUDA_VISIBLE_DEVICES": "1",
+      "TLI_SPARSE_PREFILL": "0"
+     },
+     "gpu_hygiene_pre": ""
+    }
+   },
+   "mla_lofreq_nope32": {
+    "runs_measured": 2,
+    "tpot_ms_runs": [
+     123.73,
+     123.64
+    ],
+    "tpot_ms_median": 123.69,
+    "tpot_ms_mean": 123.69,
+    "tpot_ms_max": 123.73,
+    "prefill_ms_runs": [
+     3805.3,
+     3803.5
+    ],
+    "n_input_tokens": 16866,
+    "peak_mem_delta_gib": 47.79,
+    "per_step_n": 254,
+    "per_step_p10_p50_p90_max_ms": [
+     122.9,
+     123.3,
+     124.0,
+     154.9
+    ],
+    "per_step_discrete_jump_points": [],
+    "platform_check": "连续（无 >20% 跳变平台）",
+    "caliber": {
+     "model": "/home/wangyuanshuo02/models/huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat",
+     "gpu": "NVIDIA H20-3e",
+     "torch": "2.8.0+cu128",
+     "max_gen": 128,
+     "early_stop": false,
+     "timer_api": "time.perf_counter",
+     "sync_policy": "device sync before request, after prefill, after first argmax, before/after each decode step",
+     "instrumentation_mode": "per-step-device-synchronized",
+     "prefill_backend": "tli 臂 = patch eager dense 复刻；none 臂 = 原生 sdpa/eager（TLI_SPARSE_PREFILL=0）",
+     "cache_impl": "DynamicCache（两臂同口径）",
+     "input_ids_sha256_16": "a33bc8b46a23f6ea",
+     "n_patched": 27,
+     "treatment_manifest": {
+      "tia_block_size": 64,
+      "tia_enable_async_topk": false,
+      "tia_level1_topk": 64,
+      "tia_level2_cmp_ratio": 4,
+      "tia_level2_topk": 1024,
+      "tli_alpha": 0.25,
+      "tli_beta": 0.125,
+      "tli_boundary_bypass": true,
+      "tli_decode_dense": false,
+      "tli_dyn_dgate": false,
+      "tli_dyn_dgate_eps": 0.05,
+      "tli_dyn_dgate_rows": 256,
+      "tli_enable_kmeans": false,
+      "tli_enable_layer_skip": false,
+      "tli_enable_subspace": true,
+      "tli_far_blocks": 16,
+      "tli_far_clusters": 256,
+      "tli_far_method": "minmax",
+      "tli_far_niter": 10,
+      "tli_far_select": "4bit",
+      "tli_far_tokens": 512,
+      "tli_gamma": 0.625,
+      "tli_l2_quant": false,
+      "tli_l2_subspace": "same",
+      "tli_layer_skip_path": null,
+      "tli_moba": false,
+      "tli_near_len": null,
+      "tli_near_method": "avg",
+      "tli_near_pages": null,
+      "tli_near_select": "4bit",
+      "tli_near_tokens": null,
+      "tli_per_q_head": false,
+      "tli_proj_basis": null,
+      "tli_sigma": 8.0,
+      "tli_sigma_select": "none",
+      "tli_sim": 0.9,
+      "tli_sim_dims": "subspace",
+      "tli_sink_tokens": 128,
+      "tli_sinkswa_only": false,
+      "tli_sparse_prefill": false,
+      "tli_static_pair": false,
+      "tli_subspace": "mla_lofreq_nope32",
+      "tli_swa_size": 128
+     },
+     "env": {
+      "CUDA_VISIBLE_DEVICES": "1",
+      "TLI_SPARSE_PREFILL": "0"
+     },
+     "gpu_hygiene_pre": ""
+    }
+   }
+  },
+  "headline_finding": "16K eager 口径下全部稀疏臂 TPOT 都显著慢于 dense 锚（123.7-134.2 vs 53.9ms，2.3-2.5×）：MLA MQA（Hkv=16、G=1）16K dense attention 读量仅 ~100MB/层步，稀疏省算空间小；而索引税（每步每层全量重建 1.1-1.7ms × 27 层）+ CPU dispatch 开销全款照付——eager launch-bound 域稀疏为负收益。维度臂间的相对序与 C1 一致（64d < 192d），稀疏正收益的兑现路径 = graph 化 + inc 缓存（见 caliber3/follow-up）",
+  "content_variance_note": "各臂 greedy 生成文本不同 → MoE 64 专家 top-6 激活 mix 不同 → 每步 MoE 成本随内容波动：nope96 臂 e2e TPOT(133.9) 高于 full192(130.4) 与 C1 微基准序（nope96 tax 2.05 < full192 2.20）反向，属内容介导方差（±3% 量级、各臂内 per-step 极紧 ±0.5ms 佐证系统性而非噪声）；跨臂细粒度排序以 C1 合成口径为准"
+ },
+ "caliber3_graph": {
+  "status": "follow-up（工程量超本任务半天阈值，如实不硬撑）",
+  "feasibility_assessment": "DSV2 patch 升级到 TLIStaticCache/4D-mask graph 路径需要：① DSV2StaticCache（MLA 异形 k[S,16,192]/v[S,16,128]，transformers StaticCache 不适配无 num_key_value_heads 的 MLA config）；② patch decode 分支改 graph 数据通路（compute_mask_graph + cuda_graph_state pos_buf 增量 index，qwen3_attn_patch 范本 + E159 llama port 先例）；③ vendored modeling 的 rope/position_ids 从 host 标量改 tensor 驱动（kv_seq_len 从 cache 长度 host 读回，capture 不安全）。工程量 7 文件级改造 + bit-exact 门，超本任务边界",
+  "headroom_estimate": {
+   "per_arm": {
+    "mla_full192": {
+     "tpot_ms": 130.52,
+     "c1_step_gpu_sum_ms": 2.7848,
+     "gpu_floor_27l_ms": 75.2,
+     "dispatch_tax_upper_bound_ms": 55.3
+    },
+    "mla_rope": {
+     "tpot_ms": 126.29,
+     "c1_step_gpu_sum_ms": 2.4687,
+     "gpu_floor_27l_ms": 66.7,
+     "dispatch_tax_upper_bound_ms": 59.6
+    },
+    "mla_rope_nope32": {
+     "tpot_ms": 134.19,
+     "c1_step_gpu_sum_ms": 2.651,
+     "gpu_floor_27l_ms": 71.6,
+     "dispatch_tax_upper_bound_ms": 62.6
+    },
+    "mla_lofreq_nope32": {
+     "tpot_ms": 123.69,
+     "c1_step_gpu_sum_ms": 2.4377,
+     "gpu_floor_27l_ms": 65.8,
+     "dispatch_tax_upper_bound_ms": 57.9
+    }
+   },
+   "note": "TPOT − 27×单层 GPU stage 和 ≈ 每 step 的 CPU dispatch/launch/同步税上界（C1 单层口径 wall≈GPU 和故 dispatch 重叠良好；e2e 每层串行 dispatch 使税累积，50-60ms/步 = TPOT 的 40-45%）。E152v4 先例（Qwen3）：graph 化消该税 TPOT 36.85→24.75ms（−33%）。DSV2 MLA graph 化 + inc 缓存是性能链最大后续空间，预计同量级收益——sparse 反超 dense 的前提是先消 dispatch 税与全量重建税"
+  }
+ },
+ "scaling_conclusion": {
+  "c1_prepare_full_rebuild": {
+   "192d": 1.7075,
+   "96d": 1.2327,
+   "64d": 1.0847,
+   "cut_192_to_64": 0.3647
+  },
+  "c1_compute_score": {
+   "192d": 0.3738,
+   "96d": 0.267,
+   "64d": 0.1958,
+   "cut_192_to_64": 0.4762
+  },
+  "c1_indexer_tax_per_layer": {
+   "mla_full192": 2.2002,
+   "mla_rope": 1.8393,
+   "mla_rope_nope32": 2.0496,
+   "mla_lofreq_nope32": 1.8119
+  },
+  "triton_fast_path_note": "d'=2^n 幂门：64 维臂粗筛(minmax+avg 双段)与精筛候选化全走 Triton 融合 kernel（coarse 0.008+0.007ms / fine_cand ~0.07ms）；96/192 维臂落 einsum 回退（粗筛全维 repeat 物化）——64 维臂同时吃到「读量降 3×」与「融合 kernel」双红利"
+ },
+ "summary_64d_vs_full192": {
+  "c1_prepare_full_rebuild_cut": 0.3647,
+  "c1_compute_score_cut": 0.4762,
+  "c1_indexer_tax_cut": 0.1765,
+  "c1_step_sum_cut": 0.1246,
+  "c2_tpot_cut": 0.0523,
+  "one_line": "64 维（lofreq_nope32）相对 full192：K 侧索引统计/打分带宽 3× 缩减兑现为 prepare 全量重建 −36.5%、compute_score −47.6%、单层 indexer 税 −17.6%（2.20→1.81ms）、e2e TPOT −5.2%（130.5→123.7ms）；相对 rope64（同为 64 维）indexer 税持平（−1.5%，噪声内）——质量上 64 维保持 96 维臂的 0.905 retained mass（E158c），故 64 维是「质量不劣 + 成本最低」的帕累托点；但 16K eager 全口径下稀疏整体仍慢于 dense 2.3×（indexer 税+launch 税主导，见 headline_finding）"
+ },
+ "gpu_hygiene": {
+  "windows_checked": 13,
+  "window_start": "2026-10-23_17:47:08",
+  "window_end": "2026-10-23_17:53:10",
+  "foreign_compute_apps": [],
+  "max_gpu0_used_mib": 86352,
+  "max_gpu1_used_mib": 86264,
+  "conclusion": "clean：采数窗口内双卡 compute apps 全部为我方 python3 bench 进程，无他方进程挤入"
+ },
+ "honest_disclosures": [
+  "MLA D=192 下 E127 增量缓存门(k.shape[-1]==128)不满足 → 每步每层 prepare_index 全量重建（prep_dispatch 计数 4 臂全部 full=60/inc=0）——E142a/E158b 生产 eager 路径真实行为；192→64 维缩减按 维数比例削减该全量重建成本，但 inc 缓存（尾段增量）是明确的 follow-up 优化空间",
+  "C1 microbench 为单层合成口径（randn 数据），e2e 27 层 MoE 的 TPOT 见 C2；C2 per-step device sync 口径含 launch 开销与同步扰动",
+  "C2 sparse 臂 TPOT 含 indexer 全量重建税 + 每层 Python dispatch 开销（eager launch-bound），与 dense 锚的对比如实呈现",
+  "C2 prompt 实际 16866 token（body 目标 16K + chat 模板/重分词膨胀），全臂逐位相同（input_ids_sha256_16 一致）——cap 口径按实际长度披露",
+  "C2 各臂 greedy 生成内容不同 → MoE 专家激活 mix 不同，TPOT 含内容介导方差（±3% 量级，nope96 vs full192 的 e2e 反序属此类）；维度缩放的干净信号在 C1 合成口径",
+  "torch 4.56.2 兼容 shim（DynamicCache.get_usable_length backport，layer_idx 透传）在 bench 脚本内完成，未动影子包与主仓",
+  "mla_full192 为本实验新增的 indexer 化承载臂（subspace='full' 的 expected_dim 硬门 128 不能承载 D=192），走与 mla_rope 相同的子空间切片消费路径，对应 trace full192 质量锚"
+ ],
+ "identity": {
+  "pkg": "pc40:~/e158e_pkg（=~/e158b_pkg 副本 + E158e 2 新臂编辑：mla_lofreq_nope32/mla_full192，7 处编辑脚本 e158e_edit_pkg.py）",
+  "edit_files_sha256": {
+   "sparse_attn/indexer/tli_indexer.py": "6dafc1ff3d0380fde022065b95754d2116e1291a674fdd9b6441c2430de62444",
+   "sparse_attn/arguments.py": "da7e5b4de19f4f30f4300604b2a13d60064ead302219d2f2b1903bbbacd7307e",
+   "sparse_attn/info.py": "7e10c04537f2a8283ff1df8df88e529597dd09cd9e892912aba5f8ee80da215a"
+  },
+  "harnesses": [
+   "~/e158e_stage_bench.py (C1)",
+   "~/e158e_tpot_bench.py (C2)",
+   "~/e158e_driver.sh",
+   "~/e158e_hygiene.sh"
+  ],
+  "raw_products": "pc40:~/e158e/{stage_*.json, tpot_*.json, gpu_hygiene.log, logs/}"
+ }
+}
