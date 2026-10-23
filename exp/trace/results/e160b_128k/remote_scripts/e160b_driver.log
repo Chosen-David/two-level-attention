@@ -1,0 +1,8 @@
+[10-23 13:29:25] RUN tli_graph_L131072_a1 att=1 start
+[10-23 13:36:53] FAIL tli_graph_L131072_a1 att=1 rc=1 tail5:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "/home/fluentllmenv/lib/python3.11/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 82, in forward
+      down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+  torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 6.44 GiB. GPU 0 has a total capacity of 139.72 GiB of which 6.17 GiB is free. Process 3164154 has 133.54 GiB memory in use. Of the allocated memory 132.55 GiB is allocated by PyTorch, with 73.71 MiB allocated in private pools (e.g., CUDA Graphs), and 361.55 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[10-23 13:37:23] RUN tli_graph_L131072_a1 att=2 start

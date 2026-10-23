@@ -1,0 +1,68 @@
+{
+  "experiment": "E160b",
+  "title": "Qwen3-32B decode e2e 延迟 128K 档救援：expandable_segments + 单 run per process——跨规模加速比表 32B 行 128K 列救回",
+  "date": "2026-10-23",
+  "model": "Qwen3-32B (bf16, 权重 ~62GiB)",
+  "machine": {
+    "host": "pc32 (10.245.84.251)",
+    "gpu": "GPU0, NVIDIA H20-3e 139.72 GiB（GPU1 被 DeepSeek 批占，全程未触碰）",
+    "python": "/home/fluentllmenv/bin/python3 (torch 2.8.0+cu128, transformers 4.56.2)",
+    "repo_commit": "ecfbd4f43a954d4cc4d0ee6ec2323ec4c883e6e8",
+    "allocator": "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True（全臂统一，与 E160 32K/64K 行的默认分配器不同，见 deviations）"
+  },
+  "motivation_and_forensics": {
+    "e160_original_failure": "E160 128K tli_graph A1 3 attempts OOM @ prefill（MLP down_proj，Tried to allocate 6.44 GiB，16.48 GiB reserved but unallocated）——E160 判决的碎片假设",
+    "e160b_step1_result": "expandable_segments:True 原协议重跑（warmup1+repeats2）：碎片确实被消除（reserved-but-unallocated 16.48 GiB → 361.55 MiB），但仍在同一点 OOM——run=0（首 prefill+fill+capture+decode 128 token）完整成功（TPOT 70.12ms，进程峰值 142216 MiB），OOM 发生在 run=1 的第二次 prefill（free 6.17 GiB < 需求 6.44 GiB，差 0.27 GiB）",
+    "root_cause_verdict": "E160 的『分配器碎片』假设被部分否定：碎片只是表象之一，真实根因 = 同进程内第二次 prefill 的新 dyn KV（34.4 GiB）与首 run 残留（captured graph 私有池 + allocator 簿记 + 未完全归还的段）共存，峰值比单 run 高 ~0.6 GiB，恰好越过容量上限。单 run 峰值 141.7-142.2 GiB ≈ 容量 98.6-98.7%，本就贴极限",
+    "rescue_design": "A 臂改为 warmup=0 + repeats=1 × 4 个独立进程（a1..a4）：每次 prefill 都是进程首次且唯一一次 → 单 run 峰值可容纳。TPOT 口径与 E160 完全一致：measured run 的 decode wall 自 fill 完成后起算 / 127 步，decode 走 graph replay（capture 发生在同 run 的 fill 阶段、不进 TPOT——64K 参照臂 warmup run TPOT 59.91 与 measured repeats 59.91/59.92 一致佐证）；样本数 4 = E160 的 2 进程 × 2 repeats，统计权重等价，进程级 repeat 严格强于进程内 repeat（每次全新 CUDA context）"
+  },
+  "protocol": {
+    "arms": "救援 ABBA：A = tli_graph a1..a4（各 warmup0+repeats1 单 run 独立进程）；eager 对拍门禁臂 = warmup0+repeats1；B = dense b1/b2（E160 原协议 warmup1+repeats3 不变，dense 无 static cache 内存余量大——实测峰值也爬到 141672 MiB 贴满）；全部臂统一 expandable_segments:True 保证两臂环境一致公平",
+    "champion_flags": "--method tli --tli_far_method minmax --tli_near_method avg --tli_near_pages 32 --tli_near_tokens off --tli_near_len 4096 --tli_enable_kmeans false --tli_enable_layer_skip false --tli_subspace tail --tia_level2_cmp_ratio 4 --tli_sink_tokens 4 --tli_swa_size 128 --tia_level1_topk 128 --tia_level2_topk 1024（与 E160 逐 flag 一致）",
+    "fixed": "bs=1, max_gen=128, S_cap=L+136, TLIStaticCache, prefill 两臂原生 SDPA dense（TLI_SPARSE_PREFILL=0），TPOT=decode wall/fill 后起算/（max_gen-1），greedy argmax，per-step-device-synchronized 口径，shadow pkg md5 同 E160（e1c55d2705e5ec12e9b9d7776ac27a03）",
+    "schedule": "a1 13:44-13:50, eager-gate 13:50-13:55, GATE-PASS, b1 13:55-14:15, b2 14:15-14:35, a2 14:35-14:40, a3 14:40-14:46, a4 14:46-14:51, 终门禁 GATE-PASS（DeepSeek 无抢占干扰，全部 att=1 一次通过）",
+    "deviations_vs_e160": [
+      "① PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True 全臂开启（E160 32K/64K 行为默认分配器；128K 行环境注明。TPOT 散布两臂 0.04/0.23ms，与 E160 同量级，无性能型变迹象）",
+      "② A 臂结构 warmup0+repeats1 × 4 进程 替代 warmup1+repeats2 × 2 进程（128K 单卡不可容纳同进程 2 次 prefill；样本数同为 4；TPOT 口径不变）",
+      "③ eager 对拍臂 warmup0+repeats1（E160 为 warmup1+repeats1；同理不可容纳 2 次 prefill）",
+      "④ dense b1/b2 原协议不变",
+      "⑤ E160b 原协议 A1 尝试 att1 OOM 后 att2/att3 被主动短路（E160 3 attempts + E160b att1 共 4 次确定性同形态 OOM，非抢占偶发；att2 中断时 run=0 亦已完成，佐证可复现）"
+    ]
+  },
+  "results": {
+    "L131072": {
+      "rescued": true,
+      "tli_graph_tpot_ms": 70.11,
+      "tli_graph_spread_ms": 0.04,
+      "tli_graph_tpot_list": [70.09, 70.13, 70.11, 70.10],
+      "dense_tpot_ms": 129.10,
+      "dense_spread_ms": 0.23,
+      "dense_tpot_list": [128.98, 129.02, 129.01, 129.21, 129.20, 129.18],
+      "speedup_dense_over_tli": 1.841,
+      "improvement_pct": 84.1,
+      "bitexact_gate": "PASS（a1..a4 全部 4 个 graph 臂 gen_tokens 128 token 与 eager 对拍臂逐位一致；对拍臂 TPOT 238.72ms 仅为 gate 口径，再次反证 graph 化必要性）",
+      "gpu_peak_nvidia_smi_mib": {"tli_graph": 141672, "tli_eager": 141676, "dense": 141672},
+      "gpu_peak_pct_of_capacity": 98.5,
+      "prefill_ms_median": {"tli_graph": 276683, "dense": 276334},
+      "corroboration": "原协议 att1 的 run=0（同进程首 run）TPOT 70.12ms 与救援臂 70.09-70.13 一致——单 run 采样无系统偏差"
+    }
+  },
+  "memory_forensics_table": {
+    "e160_no_expandable": {"attempt_outcome": "3×OOM @ run=0 prefill（warmup 首次 prefill 即炸）", "peak_mib": 142140, "reserved_unallocated": "16.48 GiB"},
+    "e160b_expandable_original_protocol": {"attempt_outcome": "OOM @ run=1 第二次 prefill（run=0 成功 TPOT 70.12ms）", "peak_mib": 142216, "reserved_unallocated": "361.55 MiB", "gap_at_oom": "free 6.17 GiB < 需求 6.44 GiB（差 0.27 GiB）"},
+    "e160b_expandable_single_run_rescue": {"attempt_outcome": "成功（全部 7 臂任务 att=1 通过）", "peak_mib_range": [141670, 141676]}
+  },
+  "cross_scale_narrative": {
+    "tli_graph_tpots": {"qwen3_32b_32k": 54.70, "qwen3_32b_64k": 59.93, "qwen3_32b_128k": 70.11},
+    "dense_tpots": {"qwen3_32b_32k": 55.50, "qwen3_32b_64k": 80.21, "qwen3_32b_128k": 129.10},
+    "speedups": {"qwen3_32b_32k": 1.015, "qwen3_32b_64k": 1.338, "qwen3_32b_128k": 1.841},
+    "context_degradation_compression": {
+      "dense_32k_to_64k_pct": 44.6,
+      "tli_32k_to_64k_pct": 9.5,
+      "dense_64k_to_128k_pct": 60.9,
+      "tli_64k_to_128k_pct": 17.0,
+      "note": "L 翻倍 dense TPOT 退化 +44.6%/+60.9% vs TLI 仅 +9.5%/+17.0%（压缩 4.7×/3.6×）；加速比随 context 单调增长 1.015→1.338→1.841，跨规模单调形态在 32B 上完整闭合（8B Qwen 1.051/1.448/2.067、Llama-3.1-8B 1.015/1.41/1.961 同形态）"
+    }
+  },
+  "verdict": "E160b 救援成功：128K 行救回，TLI-graph TPOT 70.11±0.04ms vs dense 129.10±0.23ms = 1.841×（84.1% 加速），bit-exact 门禁 4/4 PASS，两臂散布与 E160 同量级、ABBA 无漂移。32B 跨规模加速比曲线完整闭合：1.015×（32K）→ 1.338×（64K）→ 1.841×（128K），单调增长叙事在 32B 复现并与 8B/Llama 跨模型族形态一致。技术要点：E160 的碎片假设被修正——expandable_segments 消掉 16.48 GiB 碎片后原协议仍差 0.27 GiB（同进程第二次 prefill 与首 run 残留共存），真正可行解是单 run per process（峰值 98.6% 容量贴极限通过）；dense@128K 峰值同样贴满 141.7 GiB，说明 128K 档整体处于 H20 单卡显存边界，expandable_segments 对两臂同为必要条件（环境公平）。协议偏离（A 臂 4×单 run 进程级 repeat、eager 臂单 run、expandable 全臂）已在 deviations_vs_e160 逐条披露，TPOT 口径与 E160 measured runs 逐项一致。"
+}
