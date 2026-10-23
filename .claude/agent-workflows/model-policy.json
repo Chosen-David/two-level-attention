@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "verified_on": "2026-10-22",
+  "fallback": "inherit",
+  "models": {
+    "opus": {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5"
+    },
+    "sonnet": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    },
+    "deepseek-reasoning": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro"
+    },
+    "deepseek-fast": {
+      "provider": "deepseek",
+      "model": "deepseek-flash"
+    },
+    "kimi": {
+      "provider": "moonshot",
+      "model": "kimi-k3"
+    },
+    "glm": {
+      "provider": "zai",
+      "model": "glm-5.3"
+    },
+    "kimi-thinking": {
+      "provider": "moonshot",
+      "model": "kimi-k2.6-thinking"
+    },
+    "deepseek-flash-v4": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-flash"
+    },
+    "gemini-flash": {
+      "provider": "google",
+      "model": "gemini-3.5-flash"
+    },
+    "longcat-thinking": {
+      "provider": "meituan",
+      "model": "longcat-2.0-preview-thinking"
+    },
+    "glm-flash": {
+      "provider": "zai",
+      "model": "glm-5.3-flash"
+    },
+    "qwen-coder": {
+      "provider": "alibaba",
+      "model": "qwen3-coder-fp8-meituan"
+    }
+  },
+  "roles": {
+    "planner-main": {
+      "candidates": [
+        "opus",
+        "kimi-thinking",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "复杂目标分解、跨角色协调；需要最强推理能力"
+    },
+    "review-main": {
+      "candidates": [
+        "opus",
+        "kimi-thinking",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "独立检查前提、方案与验收；独立性由上下文和宿主认证保证"
+    },
+    "research-assistant": {
+      "candidates": [
+        "opus",
+        "longcat-thinking",
+        "kimi-thinking",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "科研任务编排与证据整合"
+    },
+    "research-explore": {
+      "candidates": [
+        "deepseek-reasoning",
+        "kimi-thinking",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "假设推导与实验设计"
+    },
+    "research-implement-optimize": {
+      "candidates": [
+        "glm",
+        "qwen-coder",
+        "deepseek-reasoning"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "代码实现、终端工具与优化迭代"
+    },
+    "research-figures": {
+      "candidates": [
+        "sonnet",
+        "kimi",
+        "gemini-flash",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools",
+        "vision"
+      ],
+      "rationale": "图源生成与视觉复核"
+    },
+    "research-write": {
+      "candidates": [
+        "opus",
+        "kimi-thinking",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "论文结构、论证和修订"
+    },
+    "research-review": {
+      "candidates": [
+        "opus",
+        "kimi-thinking",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "贡献、正确性及证据审查"
+    },
+    "research-read-pdf": {
+      "candidates": [
+        "kimi",
+        "gemini-flash",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools",
+        "vision"
+      ],
+      "rationale": "逐页视觉阅读和长文理解"
+    },
+    "paper-reading-companion": {
+      "candidates": [
+        "kimi",
+        "gemini-flash",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools",
+        "vision"
+      ],
+      "rationale": "论文图文伴读"
+    },
+    "explain-research-concepts": {
+      "candidates": [
+        "deepseek-reasoning",
+        "kimi-thinking",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "数学推导与概念解释；含图输入时追加vision要求"
+    },
+    "travel-planner": {
+      "candidates": [
+        "kimi",
+        "longcat-thinking",
+        "gemini-flash"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "多来源资料整合；实时信息仍需搜索工具"
+    },
+    "research-data-visualization": {
+      "candidates": [
+        "sonnet",
+        "kimi",
+        "gemini-flash",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools",
+        "vision"
+      ],
+      "rationale": "可视化代码与图像核验"
+    },
+    "research-diagrams": {
+      "candidates": [
+        "sonnet",
+        "kimi",
+        "gemini-flash",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools",
+        "vision"
+      ],
+      "rationale": "架构图设计与视觉核验"
+    },
+    "code-reading": {
+      "candidates": [
+        "kimi",
+        "deepseek-reasoning",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "长代码上下文与调用关系理解"
+    },
+    "code-organization": {
+      "candidates": [
+        "deepseek-fast",
+        "deepseek-flash-v4",
+        "glm-flash"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "常规文件组织和结构化整理；速度优先"
+    },
+    "model-with-knowledge": {
+      "candidates": [
+        "deepseek-reasoning",
+        "kimi-thinking",
+        "longcat-thinking"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "数学建模与前提核对"
+    },
+    "gpu-experiment-dispatch": {
+      "candidates": [
+        "glm",
+        "qwen-coder",
+        "deepseek-reasoning"
+      ],
+      "requires": [
+        "tools"
+      ],
+      "rationale": "实验脚本与执行诊断；GPU由宿主提供"
+    }
+  }
+}

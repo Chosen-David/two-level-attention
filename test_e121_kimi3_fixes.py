@@ -67,8 +67,11 @@ torch.set_num_threads(1)
 # 根路径：默认本文件所在树（worktree 检出即测 worktree 代码）；TLI_E121_ROOT
 # 可指主树做红态复跑（只读，不写主树）。
 ROOT = os.environ.get("TLI_E121_ROOT", os.path.dirname(os.path.abspath(__file__)))
-SG_ROOT = os.environ.get("TLI_E121_SG_ROOT",
-                         os.path.normpath(os.path.join(ROOT, "..", "python")))
+# sglang 仓库可能在 ../python（同仓 sibling）或 ../sglang/python（独立克隆）
+_default_sg = os.path.normpath(os.path.join(ROOT, "..", "python"))
+if not os.path.isdir(os.path.join(_default_sg, "sglang", "srt")):
+    _default_sg = os.path.normpath(os.path.join(ROOT, "..", "sglang", "python"))
+SG_ROOT = os.environ.get("TLI_E121_SG_ROOT", _default_sg)
 
 # 状态显式化：全部用显式条件检查（非 assert——python -O 会剥 assert，
 # 门禁退化为恒过；本套件 -O 双跑是验收硬指标）。

@@ -169,7 +169,7 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
                 model="Qwen3-8B", output_dir=str(tmp / "out"), t="test")
             module.parse_args = lambda: args
             module._pack_rows = lambda *args: (object(), object(), object(), [1])
-            module._decode_batch_chunk = lambda *args: [[1]]
+            module._decode_batch_chunk = lambda *args, **kwargs: [[1]]
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", ResourceWarning)

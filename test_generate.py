@@ -6,7 +6,7 @@ from sparse_attn.patches import register_patch
 from sparse_attn.metrics import get_metrics
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-model_name = "hf_models/downloads/Qwen/Qwen3-8B" # meta-llama/Meta-Llama-3.1-8B-Instruct
+model_name = "Qwen/Qwen3-8B"  # HF Hub repo_id（本地缓存 fallback 自动生效）
 
 print("model_name: {}".format(model_name))
 

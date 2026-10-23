@@ -2,6 +2,7 @@
 
 import os
 import re
+import sys
 from datasets import load_dataset
 import torch
 import json
@@ -888,6 +889,17 @@ if __name__ == "__main__":
     cap_gate_info = enforce_context_capability_gate(
         model_name, model2path, max_length, config_path
     )
+    # OOM-GUARD：加载模型前检查 GPU 空闲显存，不足则 fail-fast。
+    if torch.cuda.is_available():
+        free_mem, total_mem = torch.cuda.mem_get_info()
+        free_mb = free_mem / 1024 / 1024
+        required_mb = 20000  # 8B 模型至少需 ~20GB 空闲
+        if free_mb < required_mb:
+            print(f"[OOM-GUARD] GPU 空闲 {free_mb:.0f} MiB < "
+                  f"{required_mb} MiB，放弃。", file=sys.stderr)
+            os._exit(2)
+        print(f"[GPU] 空闲显存 {free_mb:.0f} / {total_mem/1024/1024:.0f} MiB")
+
     model, tokenizer = load_model_and_tokenizer(
         model2path, model_name, device, args, snapshot
     )
@@ -1101,3 +1113,7 @@ if __name__ == "__main__":
         budgets = [pred["budget"] for pred in preds if pred["budget"] is not None]
         ave_budget = sum(budgets) / len(budgets) if len(budgets) > 0 else None
         print(f"ave_budget: {ave_budget}")
+
+    # OOM 防护：显式强制退出，不依赖 Python 自然退出（可能因 PyTorch
+    # CUDA 上下文 / atexit handler 残留而 hang）。
+    os._exit(0)
