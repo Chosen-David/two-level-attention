@@ -101,3 +101,26 @@ def test_full_width_and_retain_do_not_allocate_fine_side_cache():
     fixed = FarSkipGraphWorkspace(cfg, ring.layout, 2, full, full)
     fixed.initialize(ring.keys.transpose(1, 2), 49)
     assert fixed.fine_cache is None
+
+
+@pytest.mark.parametrize('quant', [False, True])
+@torch.inference_mode()
+def test_all_candidates_fit_skips_fine_projection_quantization_and_softmax(quant):
+    cfg = FarSkipConfig(4, 20, 1, 30, 3, 4, quantize=quant)
+    cache = DynamicCache()
+    cache.update(torch.randn(1, 2, 49, 12), torch.randn(1, 2, 49, 12), 0)
+    ring = evict_far(cache, 0, cfg)
+    dims, q = torch.arange(8), torch.randn(1, 1, 6, 12)
+    k = ring.keys.transpose(1, 2)
+    eager = FarSkipWorkspace()
+    expected = select_far_skip(q, k, 49, cfg, dims, dims, layout=ring.layout, workspace=eager)
+    assert not hasattr(eager, '_fine_cache')
+    fixed = FarSkipGraphWorkspace(cfg, ring.layout, 2, dims, dims)
+    fixed.initialize(k, 49)
+    assert fixed.fine_cache is None
+    length = torch.tensor([49])
+    with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU]) as p:
+        pos, valid = fixed.select(q, k, length, 12**-.5)
+    for h in range(2):
+        assert torch.equal(pos[h, valid[h]], expected.positions[h])
+    assert not any(e.key in ('aten::softmax', 'aten::round') for e in p.key_averages())

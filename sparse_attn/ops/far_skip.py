@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 
 from .far_skip_workspace import FarSkipWorkspace, stable_topk_positions
-from .far_skip_subspace import fine_cache_for, quantize_keys as _quantize
+from .far_skip_subspace import fine_cache_for, quantize_keys as _quantize, same_dimensions
 
 
 @dataclass(frozen=True)
@@ -143,9 +143,21 @@ def select_far_skip(q, k, length, cfg, coarse_dims, fine_dims, *,
     pages = ws.interval(first, stop, dev)
     n_pages = min(cfg.near_pages, pages.numel())
     offsets = ws.ids(bs, dev)
-    gather = lambda pos, dims: _keys_at(k, pos, length=length, cfg=cfg,
-                                       tail_start=tail_start, layout=layout,
-                                       dims=dims, workspace=ws)
+    shared_dims = same_dimensions(coarse_dims, fine_dims)
+    # Do not build a projection cache just for L1 when even the maximum
+    # candidate pool fits K2. In that case L2 already has an eager fast path.
+    may_prune = (0 < cfg.token_budget-cfg.sink_tokens-cfg.window_tokens
+                 < n_pages*bs+2*(bs-1))
+    qg = None
+    def gather(pos, dims):
+        if (may_prune and shared_dims and not cfg.quantize and layout is not None
+                and fine_dims.numel() < k.shape[-1] and same_dimensions(dims, fine_dims)):
+            fine = fine_cache_for(ws, k, length, cfg, fine_dims, layout)
+            if pos.ndim == 1:
+                return fine.gather(pos.expand(Hkv, -1)).transpose(0, 1)
+            return fine.gather(pos)
+        return _keys_at(k, pos, length=length, cfg=cfg, tail_start=tail_start,
+                        layout=layout, dims=dims, workspace=ws)
     if n_pages:
         if n_pages == pages.numel():
             chosen = pages.expand(Hkv, -1)
@@ -190,7 +202,8 @@ def select_far_skip(q, k, length, cfg, coarse_dims, fine_dims, *,
             keys = gather(pool, fine_dims)
             if cfg.quantize:
                 keys = _quantize(keys)
-        qfine = (q[0, 0].index_select(-1, fine_dims).float() * scale).reshape(Hkv, G, -1)
+        qfine = (qg if shared_dims and qg is not None else
+                 (q[0, 0].index_select(-1, fine_dims).float() * scale).reshape(Hkv, G, -1))
         logits = torch.einsum("hgd,hnd->hgn", qfine, keys.float()).to(q.dtype)
         probabilities = logits.softmax(-1).mean(1)[:, :candidates.shape[-1]]
         rank = stable_topk_positions(probabilities, keep, ws)

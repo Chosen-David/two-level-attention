@@ -7,6 +7,12 @@ selector's rounding. V and final-attention K remain original-width/original dtyp
 import torch
 
 
+def same_dimensions(a, b):
+    """Metadata-only identity check, safe during capture (no device readback)."""
+    return (a.device == b.device and a.dtype == b.dtype and a.shape == b.shape
+            and a.stride() == b.stride() and a.data_ptr() == b.data_ptr())
+
+
 def quantize_keys(x):
     lo = x.amin(dim=-1, keepdim=True)
     scale = (x.amax(dim=-1, keepdim=True) - lo).clamp(min=1e-9) / 15
@@ -62,7 +68,8 @@ class FarSkipFineCache:
 
 
 def fine_cache_for(workspace, k, length, cfg, dims, layout):
-    signature = (cfg, layout, k.device, k.dtype, k.shape[2:], k.data_ptr(), dims.data_ptr())
+    signature = (cfg, layout, k.device, k.dtype, k.shape, k.stride(), k.data_ptr(),
+                 dims.shape, dims.stride(), dims.dtype, dims.device, dims.data_ptr())
     if getattr(workspace, '_fine_cache_signature', None) != signature:
         workspace._fine_cache_signature = signature
         workspace._fine_cache = FarSkipFineCache(cfg, layout, dims)

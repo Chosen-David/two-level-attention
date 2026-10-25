@@ -215,3 +215,51 @@ fixed paths; add `--device cuda --capture` for real capture/replay. Without a
 baseline root it compares fixed shapes against current dynamic eager (this mode
 deliberately rejects `--capture`). CPU fixed-shape timing does **not** measure
 CUDA Graph performance.
+
+## Subspace reuse (two additional iterations)
+
+Subspace selection reduces L1/L2 arithmetic; it does not reduce the original-D
+final attention, the retained full-D K/V, selection/ranking, or dispatch costs.
+Thus reducing D=128 to d=32 does not imply fourfold whole-step acceleration.
+The d=32 and d=128 methods can also select different tokens; their latency
+comparison is not a same-quality comparison.
+
+For evicted layers that need L2 pruning, `FarSkipFineCache` keeps the fine K
+projection in head-major cyclic storage. It initializes only live sink/tail
+slots, then projects each new token once. If QDQ is enabled, its original-dtype,
+token-local result is cached once as well; this preserves its rounding. Selected
+K/V used by final attention remain untouched. No projection of far history is
+retained. Full-width fine selection and the `retain` ablation do not allocate
+this side cache.
+
+Coarse/fine dimensions sharing the exact same immutable tensor view reuse the
+scaled query projection. Unquantized fine projections can also feed coarse page
+statistics; quantized projections never feed L1. If the entire fixed candidate
+bound fits K2, the graph selector bypasses L2 projection, QDQ, softmax and ranking
+and does not allocate a fine-key cache. Dynamic eager keeps its all-selected
+fast path and avoids building a side cache solely for L1 in this case.
+
+The side-cache cost is `capacity * Hkv * d * element_size` bytes, approximately
+`d/(2*D)` of the bounded original K/V allocation (12.5% for d32/D128). It can
+increase cold setup/first-step latency; it is not a free memory reduction.
+Benchmark receipts report `fine_key_cache_bytes` separately, and eager
+`workspace_bytes` includes it. Request reset/refill invalidates it along with
+the page summaries; dimensions and historical keys must stay immutable.
+
+Source-bound results, including small regressions and full-width controls, are
+in `agent_doc/results/far_skip_subspace_20261025/`. Final CPU d32/n4096/S8192
+medians versus the preceding three-round checkpoint were 3.840→2.815 ms eager
+and 5.538→4.559 ms fixed; all 1,920 final same-width comparisons had identical
+selected IDs and outputs. These are CPU results, not GPU launch/bandwidth or
+CUDA Graph speedup evidence. Full-width controls were approximately unchanged;
+some eager all-selected holdouts regressed by roughly 1–3%.
+
+```bash
+git worktree add --detach /tmp/far-round3 f3b0347fd5b52fd6145a8db1dde407c9157a0b8b
+python -m exp.bench.far_skip_subspace_compare --baseline-root /tmp/far-round3 \
+  --device cpu --widths 32 128
+# Target-device replay validation/timing, when CUDA is available:
+python -m exp.bench.far_skip_subspace_compare --baseline-root /tmp/far-round3 \
+  --device cuda --dtype bfloat16 --modes fixed --capture --widths 32
+python -m pytest -q tests/test_far_skip_subspace.py tests/test_far_skip_graph.py
+```

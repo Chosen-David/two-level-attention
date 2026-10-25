@@ -122,6 +122,8 @@ def run(opts, cls, *, profile=False):
     receipt = dict(setup_ms=setup_ms, capture_ms=capture_ms, wall_ms=samples,
                    median_ms=statistics.median(samples), kv_bytes=sum(t.untyped_storage().nbytes()
                      for t in (ring.keys, ring.values)))
+    fine = getattr(ws, 'fine_cache', getattr(ws, '_fine_cache', None))
+    receipt['fine_key_cache_bytes'] = fine.keys.untyped_storage().nbytes() if fine is not None else 0
     if profile:
         receipt.update(cpu_ops=events, positive_self_cpu_allocation_bytes=allocations)
     return receipt, outputs, decisions

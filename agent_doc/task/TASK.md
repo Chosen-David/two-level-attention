@@ -245,3 +245,5 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 
 
 - [x] [TL-FAR-SKIP-THREE-ROUNDS-20261025] 三轮 eager/固定形状 Graph 实现与 CPU 验证完成；CUDA 实测未执行 ([详情](task_details/TL-FAR-SKIP-THREE-ROUNDS-20261025.md))
+
+- [x] [TL-FAR-SKIP-SUBSPACE-20261025] 子空间两轮复用/布局优化及 CPU 对拍完成；额外缓存与冷启动代价已记录，CUDA 实测待资源 ([详情](task_details/TL-FAR-SKIP-SUBSPACE-20261025.md))

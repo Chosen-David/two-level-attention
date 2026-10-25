@@ -11,18 +11,21 @@ import torch.nn.functional as F
 
 from .far_skip import _quantize
 from .far_skip_workspace import FarSkipWorkspace, stable_topk_positions
-from .far_skip_subspace import FarSkipFineCache
+from .far_skip_subspace import FarSkipFineCache, same_dimensions
 
 
 class FarSkipGraphWorkspace:
     def __init__(self, cfg, layout, heads, coarse_dims, fine_dims):
         self.cfg, self.layout, self.heads = cfg, layout, heads
+        self.shared_dims = same_dimensions(coarse_dims, fine_dims)
         self.coarse, self.fine = coarse_dims.clone(), fine_dims.clone()
         self.ws = FarSkipWorkspace()
         self.device = coarse_dims.device
         self.page_capacity = (max(cfg.near_length, cfg.block_size) + cfg.block_size - 1) // cfg.block_size
         self.page_count = min(cfg.near_pages, self.page_capacity)
         self.candidate_capacity = self.page_count*cfg.block_size + 2*(cfg.block_size-1)
+        self.needs_fine = (0 < cfg.token_budget-cfg.sink_tokens-cfg.window_tokens
+                           < self.candidate_capacity)
         # Force all constant ranges to exist before graph capture.
         self.ws.ids(max(layout.capacity, cfg.token_budget, self.page_capacity,
                         self.candidate_capacity+cfg.sink_tokens+cfg.window_tokens), self.device)
@@ -38,7 +41,7 @@ class FarSkipGraphWorkspace:
         per token. Arbitrary forward jumps/rewinds require a new workspace.
         """
         cfg, bs = self.cfg, self.cfg.block_size
-        if self.fine.numel() < k.shape[-1]:
+        if self.needs_fine and self.fine.numel() < k.shape[-1]:
             self.fine_cache = FarSkipFineCache(cfg, self.layout, self.fine)
             self.fine_cache.initialize(k, length)
         if not 0 < self.page_count < self.page_capacity:
@@ -57,8 +60,12 @@ class FarSkipGraphWorkspace:
                 target.index_copy_(0, pages.remainder(slots), source)
 
     def _reduce_pages(self, k, positions, valid, count):
-        keys = self.gather(k, positions, valid, self.coarse).reshape(
-            count, self.cfg.block_size, self.heads, -1)
+        if self.shared_dims and not self.cfg.quantize and self.fine_cache is not None:
+            keys = self.fine_cache.gather(positions.expand(self.heads, -1),
+                                         valid.expand(self.heads, -1)).transpose(0, 1)
+        else:
+            keys = self.gather(k, positions, valid, self.coarse)
+        keys = keys.reshape(count, self.cfg.block_size, self.heads, -1)
         return ([keys.mean(1)] if self.cfg.near_method == 'avg'
                 else [keys.amin(1), keys.amax(1)])
 
@@ -104,6 +111,7 @@ class FarSkipGraphWorkspace:
         stop = torch.maximum(first, swa // bs)
         pages = first + self.ids(self.page_capacity)
         page_valid = pages < stop
+        qg = None
         if self.page_count:
             if self.page_count == self.page_capacity:
                 chosen_pages = pages.expand(h, -1)
@@ -139,7 +147,7 @@ class FarSkipGraphWorkspace:
         protected = self.ws.cat('graph_protected', [sink, window])
         protected_valid = self.ws.cat('graph_protected_valid', [sink < prefix, window < length])
         keep = min(cfg.token_budget - cfg.sink_tokens - cfg.window_tokens, candidates.shape[-1])
-        if keep:
+        if 0 < keep < candidates.shape[-1]:
             pool = self.ws.cat('graph_pool', [candidates, protected])
             pool_valid = self.ws.cat('graph_pool_valid', [valid, protected_valid])
             if self.fine_cache is not None:
@@ -148,14 +156,15 @@ class FarSkipGraphWorkspace:
                 keys = self.gather(k, pool, pool_valid, self.fine)
                 if cfg.quantize:
                     keys = _quantize(keys)
-            qg = (q[0, 0].index_select(-1, self.fine).float() * scale).reshape(h, g, -1)
-            logits = torch.einsum('hgd,hnd->hgn', qg, keys.float()).to(q.dtype)
+            qfine = (qg if self.shared_dims and qg is not None else
+                     (q[0, 0].index_select(-1, self.fine).float() * scale).reshape(h, g, -1))
+            logits = torch.einsum('hgd,hnd->hgn', qfine, keys.float()).to(q.dtype)
             logits = logits.masked_fill(~pool_valid[:, None], -torch.inf)
             probabilities = logits.softmax(-1).mean(1)[:, :candidates.shape[-1]]
             chosen = stable_topk_positions(probabilities, keep, self.ws, valid=valid)
             candidates = candidates.gather(1, chosen)
             valid = valid.gather(1, chosen)
-        else:
+        elif keep == 0:
             candidates, valid = candidates[:, :0], valid[:, :0]
         positions = self.ws.cat('graph_positions', [sink, candidates, window])
         mask = self.ws.cat('graph_valid', [sink < prefix, valid, window < length])

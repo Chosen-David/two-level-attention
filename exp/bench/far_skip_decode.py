@@ -86,10 +86,13 @@ def run(options, length, mode, *, runtime=try_far_skip_decode, collect_outputs=F
         result["live_retained_tokens"] = min(idx.sink_tokens, cache.get_seq_length()) + cache.get_seq_length() - layer.tail_start
     ws = getattr(idx, "_far_skip_workspace", None)
     if ws is not None:
+        fine = getattr(ws, '_fine_cache', None)
+        result['fine_key_cache_bytes'] = (fine.keys.untyped_storage().nbytes() if fine is not None else 0)
         result["summary_pages_rebuilt"] = ws.pages_rebuilt
         result["workspace_bytes"] = sum(t.untyped_storage().nbytes() for t in
             list(ws._ranges.values()) + list(ws._buffers.values()) + (ws.summaries or [])
-            + ([ws.full_dims] if hasattr(ws, "full_dims") else []))
+            + ([ws.full_dims] if hasattr(ws, "full_dims") else [])
+            + ([fine.keys] if fine is not None else []))
     if dev.type == "cuda":
         result["cuda_peak_allocated_bytes_including_initial_cache"] = torch.cuda.max_memory_allocated()
     return (result, outputs) if collect_outputs else result
