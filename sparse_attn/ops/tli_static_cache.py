@@ -155,7 +155,7 @@ class TLIStaticCache(Cache):
         # property setter → AttributeError: no setter）。
 
 
-def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens):
+def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, *, model=None):
     """把 prefill 后的 DynamicCache（有效占尾）搬进 TLIStaticCache（有效在前）。
 
     dyn.layers[l].keys/values：[B, Hkv, S_max, D]，行 b 有效列 =
@@ -176,7 +176,13 @@ def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens):
         raise RuntimeError(
             f"DynamicCache 层数 {len(dyn.layers)} != TLIStaticCache 层数 "
             f"{n_layers}")
+    far_layers = set()
+    if model is not None:
+        from .far_skip_static import prepare_far_skip_static
+        far_layers = prepare_far_skip_static(cache, dyn, seq_lens, model)
     for l in range(n_layers):
+        if l in far_layers:
+            continue
         k = dyn.layers[l].keys
         v = dyn.layers[l].values
         layer = cache.layers[l]
@@ -192,3 +198,4 @@ def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens):
             if L:
                 layer.keys[b, :, :L].copy_(k[b, :, S_max - L:])
                 layer.values[b, :, :L].copy_(v[b, :, S_max - L:])
+

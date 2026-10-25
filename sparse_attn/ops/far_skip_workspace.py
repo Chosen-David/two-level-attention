@@ -75,7 +75,7 @@ class FarSkipWorkspace:
         return [t.index_select(0, indices).float() for t in self.summaries]
 
 
-def stable_topk_positions(scores, count, workspace):
+def stable_topk_positions(scores, count, workspace, *, valid=None):
     """Exact lexicographic (score descending, input position ascending) top-k.
 
     IEEE fp32 order plus a unique position suffix fits signed int64 for N<2^31.
@@ -89,7 +89,11 @@ def stable_topk_positions(scores, count, workspace):
     if count == 0:
         return ids[:0].expand(*scores.shape[:-1], 0)
     if scores.dtype == torch.float64 or n >= 2**31:
-        return scores.argsort(dim=-1, descending=True, stable=True)[..., :count].sort(-1).values
+        order = scores.argsort(dim=-1, descending=True, stable=True)
+        if valid is not None:
+            validity = valid.gather(-1, order).to(torch.int8)
+            order = order.gather(-1, validity.argsort(-1, descending=True, stable=True))
+        return order[..., :count].sort(-1).values
     # +0 canonicalizes -0, which must tie with +0 under numerical sorting.
     normalized = scores.float() + 0.0
     bits = normalized.contiguous().view(torch.int32).to(torch.int64)
@@ -97,5 +101,7 @@ def stable_topk_positions(scores, count, workspace):
     # PyTorch descending argsort places all NaNs before +inf, stably.
     ordered = torch.where(normalized.isnan(), 0x7fffffff, ordered)
     keys = ordered * n + (n - 1 - ids)
+    if valid is not None:
+        keys = keys.masked_fill(~valid, torch.iinfo(torch.int64).min)
     chosen = keys.topk(count, dim=-1, sorted=False).indices
     return chosen.sort(-1).values
