@@ -839,6 +839,11 @@ class TLIIndexer(TIAIndexer):
         if (
             inc is not None
             and S_now > inc["S"]
+            # Reusing old buffers across metadata changes can broadcast a
+            # single KV head or cast the tail into the previous dtype/device.
+            # Shape/device/dtype are host metadata: no device synchronization.
+            and inc.get("input_signature") == (
+                k.device, k.dtype, k.shape[2], k.shape[3], self.args.tia_block_size)
             and self._basis is None
             and self._basis_all is None
             and not self.moba_gate
@@ -884,6 +889,8 @@ class TLIIndexer(TIAIndexer):
             k_avg_buf = d["k_avg"].clone() if d.get("k_avg") is not None else None
         self._inc = {
             "S": k.shape[1],
+            "input_signature": (
+                k.device, k.dtype, k.shape[2], k.shape[3], self.args.tia_block_size),
             "k_min": d["k_min"],
             "k_max": d["k_max"],
             "k_avg": d.get("k_avg"),
@@ -1109,7 +1116,9 @@ class TLIIndexer(TIAIndexer):
         self._resolve_skip()   # 与原版头部同构（幂等；影响 _maybe_build_kmeans 条件）
         bs = self.args.tia_block_size
         S_prev, S_now = inc["S"], k.shape[1]
-        fb = (S_prev - 1) // bs        # 第一个可能变更的块（含新 token 的块）
+        # Append-only input: complete prefix pages cannot change. At an exact
+        # page boundary start at the new page, not the previous complete page.
+        fb = S_prev // bs              # partial previous page, or first new page
         lo = fb * bs                   # 复用前缀 = token [0, lo)（块 [0, fb)）
         idx_sub = self._subspace_indices(k.device) if self.enable_subspace else None
 
@@ -1134,14 +1143,16 @@ class TLIIndexer(TIAIndexer):
         if k_min_buf is not None and T_blk > inc["stat_blk_cap"]:
             # 扩容（翻倍摊销；只搬前缀 [0, fb)——尾段本步全量重写）
             new_cap = max(2 * inc["stat_blk_cap"], T_blk)
-            _nb = k_min_buf.new_zeros((1, new_cap) + k_min_buf.shape[2:])
+            # Only [:T_blk] is exposed: prefix copy plus tail writes initialize
+            # every live row. Spare capacity is never read, so do not zero it.
+            _nb = k_min_buf.new_empty((1, new_cap) + k_min_buf.shape[2:])
             _nb[:, :fb] = k_min_buf[:, :fb]
             k_min_buf = _nb
-            _nb = k_max_buf.new_zeros((1, new_cap) + k_max_buf.shape[2:])
+            _nb = k_max_buf.new_empty((1, new_cap) + k_max_buf.shape[2:])
             _nb[:, :fb] = k_max_buf[:, :fb]
             k_max_buf = _nb
             if k_avg_buf is not None:
-                _nb = k_avg_buf.new_zeros((1, new_cap) + k_avg_buf.shape[2:])
+                _nb = k_avg_buf.new_empty((1, new_cap) + k_avg_buf.shape[2:])
                 _nb[:, :fb] = k_avg_buf[:, :fb]
                 k_avg_buf = _nb
             inc["stat_blk_cap"] = new_cap
@@ -1207,7 +1218,9 @@ class TLIIndexer(TIAIndexer):
         buf, cap = inc["k_qat_buf"], inc["k_qat_cap"]
         if S_now > cap:   # 扩容（翻倍摊销）
             new_cap = max(2 * cap, S_now)
-            new_buf = buf.new_zeros((new_cap,) + buf.shape[1:])
+            # [:S_prev] and [lo:S_now] cover all exposed tokens (lo <= S_prev).
+            # Future tokens are initialized before their views are returned.
+            new_buf = buf.new_empty((new_cap,) + buf.shape[1:])
             new_buf[:S_prev] = buf[:S_prev]
             inc["k_qat_buf"], inc["k_qat_cap"] = new_buf, new_cap
             buf = new_buf
