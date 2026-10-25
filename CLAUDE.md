@@ -13,3 +13,12 @@ agent_doc/advice/ 必须核验并记录 adopt/adapt/reject/defer 与理由，不
 角色模型/路由见 model-policy.json、model-routing.json；源码 scripts/run_role.py 仅使用可信宿主适配器，缺候选继承默认模型，执行失败不自动换模型重跑。
 交付核对实际修改、必要检查和剩余事项；仓库文件存在不证明后台进程运行或模型已遵循规则。
 <!-- chosen-david-agent:end -->
+
+## 当前叙事锚点
+
+- **仓库叙事/主表数字/生产口径的唯一现行依据 =
+  [`agent_doc/CURRENT_NARRATIVE.md`](agent_doc/CURRENT_NARRATIVE.md)**；
+  `agent_doc/advice/archive/` 与 `exp/trace_archives/` 内的报告已过时或被推翻，不得引用。
+- 新判决落库时必须同步更新 CURRENT_NARRATIVE.md 第 5 节索引（收官流程一部分）。
+- 生产口径 = TLI 冠军几何显式 flags（见锚点第 1 节），`--tli_subspace tail`
+  与 `--tia_level2_cmp_ratio 4` 必须显式传参。

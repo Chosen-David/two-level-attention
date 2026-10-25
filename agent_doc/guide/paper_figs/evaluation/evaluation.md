@@ -8,7 +8,7 @@
 
 ### E0.1 当前研究对象及适用范围
 
-- 论文目标配置为静态 `best_mavg(α=.25, β=.125, γ=.625)`、同层同 KV-head 的 L1/L2 tail32 完整 RoPE 对、最终原始全维 Q/K/V attention；默认不启用动态 far gate。gate 是单独候选与消融，不把 gate 功能关闭和某层 far 被关闭混为一谈。
+- 论文目标配置为静态 `best_mavg(α=.25, β=.125, γ=.625)`、同层同 KV-head 的 L1/L2 tail32 完整 RoPE 对、最终原始全维 Q/K/V attention；默认不启用动态 far gate。gate 是单独候选与消融，不把 gate 功能关闭和某层 far 被关闭混为一谈。**E155d nl/nt/nb 固定配额几何对照**：nl-only 是论文 backward-compat 表述（α/β/γ 比例口径），nl/nt/nb 是 sglang 移植的绝对配额新口径（env 禁与 α/β/γ 同传，fail-closed）。Champion_E155d (Qwen3-8B)：`nb=32` (NEAR_PAGES), `nt=off` (NEAR_TOKENS=off ≡ γ-off 自由竞争), `nl=4096` (NEAR_LEN), `sink=4, swa=128, K2=1024, K1=128`。映射：nb=max(1,round(k1·β)), nl=max(bs,α·mid_len), nt=off≡γ-off。派单应使用 nl/nt/nb env 显式；α/β/γ 仅作口头/论文表述回退用。
 - Qwen3-8B 的已核目标几何是 32 Q-head、8 KV-head、每组4个 Q-head、head dimension 128。不能直接把这些维度套到 Qwen3-32B、Llama 或 MLA。
 - 标准长序列目标预算为 page size 64、L1 非保护候选页上限128、最终总 token 上限1024，包含 sink128 和 SWA128；保护区去重，middle 名义余量768。短序列、部分页、区域不足及实际候选不足均记录实际占用，不能只报配置上限。
 - 标准分区下 near L1 名义16页、far112页；near L2 名义640、far128，再加保护区256。此算术只用于核对标准长序列，不替代每步实际 ID/预算回执。
@@ -23,7 +23,7 @@
 |---|---|
 | 数据 | dataset revision、任务名称清单、source document/seq ID、split、输入文本与最终 input_ids 的 SHA-256、筛选/校准/确认集合及交集检查 |
 | 模型 | checkpoint 与 revision、tokenizer revision、chat template、thinking 模式、BOS/EOS、截断方式、最大上下文与 RoPE/YaRN 配置 |
-| 方法 | method、L1/L2 表示与实际坐标 ID/哈希、量化及累加 dtype、scale、GQA 聚合、page size、K1/K2、保护区、α/β/γ、gate/refill、dense layers、实际后端/回退 |
+| 方法 | method、L1/L2 表示与实际坐标 ID/哈希、量化及累加 dtype、scale、GQA 聚合、page size、K1/K2、保护区、nl/nt/nb（E155d 绝对配额）或 α/β/γ（论文 backward-compat 表述；两口径不可混用，fail-closed）、gate/refill、dense layers、实际后端/回退 |
 | 执行 | 生成代码 commit、dirty diff/相关文件哈希、CLI/env 的有效值、producer 版本、软件/驱动/GPU、batch、prefill chunk、输出上限与停止条件 |
 | 验收 | 逐任务及总体质量容忍值 `δ`、值得投入的请求时间改善门槛 `η`、置信水平、重采样/重复方案、tie 与数值容差、失败处理 |
 | 身份 | run_id、作者/执行负责人、产物清单、采集与评分时间、独立 verifier、可用范围及未通过项 |
@@ -78,8 +78,8 @@
 
 **decode-only 转向数据口径（2026-10-16 用户指令，E146b/E145b 在飞）：**
 - 论文叙事定稿为 **decode-only 稀疏（prefill 维持 dense）**——prefill 稀疏精度五面闭合驳回（E148 几何 + E149 e2e + E148b mass + E151b 剂量 + E151c oracle）。E1 主质量表的 TLI 臂一律按 decode-only 口径声明，prefill dense 差异在表注披露。
-- **β 口径披露（far=0 erratum 后强制）**：历史主表臂存在两代口径——E98BEST LBv1 13 任务与 E104 RULER 32K 主臂为 α0.125/β0.375（far_budget 公式级归零，退化配置）；e109 LBv1 重评 / E117b LBv2 / e116b RULER 三档 / E119 / E146b 重派为 α0.25/β0.125（far=128 论文 E0 口径）。E1 图与主表**只能使用 β0.125 干净口径数字**；若某格只有 β0.375 存量（如 E98BEST per-task），须显式标注 legacy-far0 不与新口径混表。RULER 32K/64K/128K 主臂以 E146b formal 打分（在飞）为准，替换图内 E146 far=0 旧值（23.98@128K）。
-- **E145b 中文重验在飞**：E145 TLI 臂同为 β0.375（far=0，pr_zh -76 崩溃同模式），「中英通用」主张待 β0.125 重验数据（pred_E145b_zh）落地后判；中文 8 任务若恢复则 E1 数据范围扩 21 任务口径，若仍崩则边界如实写。
+- **β 口径披露（far=0 erratum 后强制；对照 nl/nt/nb 见下）**：历史主表臂存在两代口径——E98BEST LBv1 13 任务与 E104 RULER 32K 主臂为 α0.125/β0.375（far_budget 公式级归零，退化配置）；e109 LBv1 重评 / E117b LBv2 / e116b RULER 三档 / E119 / E146b 重派为 α0.25/β0.125（far=128 论文 E0 口径）。E1 图与主表**只能使用 β0.125 干净口径数字**；若某格只有 β0.375 存量（如 E98BEST per-task），须显式标注 legacy-far0 不与新口径混表。RULER 32K/64K/128K 主臂以 E146b formal 打分（在飞）为准，替换图内 E146 far=0 旧值（23.98@128K）。**E155d nl/nt/nb 对照**：β=0.0625 champion → nb=32 (NEAR_PAGES=32 = max(1,round(K1·β))=max(1,round(128·0.0625))=8 但 champion 显式 32 页优先)；β=0.125 → max(1,round(128·0.125))=16 页（论文旧部署档）。派单统一走 nl/nt/nb env；α/β/γ 仅作论文回退对比用。
+- **E145b 中文重验在飞**：E145 TLI 臂同为 β0.375 / nb_legacy（far=0，pr_zh -76 崩溃同模式），「中英通用」主张待 β0.125 / nb=16 重验数据（pred_E145b_zh）落地后判；中文 8 任务若恢复则 E1 数据范围扩 21 任务口径，若仍崩则边界如实写。E155d nl/nt/nb 对照：β0.125→nb=max(1,round(128·0.125))=16；β0.0625→champion 显式 nb=32。
 - **E146b-32K 已落地（2026-10-16 15:40，`e146b_r32k_formal.json` 四件套）**：β0.125 主臂 **57.63**（producer receipt 11/11 闭合，yarn=False native 证实）。对照 FullKV 59.38（-1.75）/ E104 β0.375 far=0 58.63 / e116b 同配置先验 59.65。**同配置复制差 -2.02 集中在 cwe(-12.5)/niah_multikey_2(-12)**：RULER 32K 宏平均跨机复制噪声约 2 分（cwe 跨同配置臂摆动 58.8-83.5）；FullKV greedy 跨机确定复现而 TLI 臂 top-k tie 跨机分歧——主表引用任一 32K 值时必须披露复制噪声，e116b「+0.27 超 FullKV」不可单独作主张。64K/128K 打分监督已挂（17:53 / 次晨 08:37）。
 
 **支持或否定：**可支持声明范围内的质量—成本取舍；不能证明全局最优或跨模型普适。若有任务超过 `δ`，保留并说明适用边界，不能只展示总体平均。
