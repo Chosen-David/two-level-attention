@@ -54,7 +54,7 @@ for lang in ['en','zh']:
  for r in range(4):s.grid(189,123+r*6,1,8,'purple',cw=4,ch=4,gap=1)
  s.t(184,154,'Separate Q heads','独立 Q 头',size=8,c='purple')
  s.save('subspace')
- s=S(252,228,lang);s.title('b','Regional pages, one token pool','区域选页，单一词元池')
+ s=S(252,228,lang);s.title('','Regional pages, one token pool','区域选页，单一词元池')
  # Two equal, aligned region cards. Page glyphs instead of anonymous grids.
  for x,c,en,zh,quota in [(0,'far','Far · extrema','远区 · 极值',96),(130,'near','Near · mean key','近区 · 均值键',32)]:
   s.r(x,25,122,62,'fl' if c=='far' else 'nl',None,4)
