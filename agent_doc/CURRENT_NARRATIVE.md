@@ -79,6 +79,20 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   `e166a/b/e/d2_verdict.json`。**iter3@K1=128 TPOT 18.675/18.888/19.388ms，
   加速比 1.407/2.100/3.458×**（e2e bitexact 三长度 + pc02 跨机 ≤0.17% +
   RULER 质量门 md5 逐字节一致三版同源闭合）。
+- **【已收官 2026-10-25】E170 创新点收益独立验证**（exp/trace/results/e170_innovation_verification/）：
+  代码是否吃到收益的独立答案 = **是**。
+  (a) 子空间（tail32）：microbench 隔离 L1 amin/amax **3.38×**，紧凑 buffer
+  **4× 节省**（64 MB / layer @ 128K），decode K2 候选消除 **15.6×** 全宽工作量，
+  decode step KV traffic 仅 full 的 **25%**；
+  (b) far skip（D' gate）：选中 KV 流量仅 dense 的 **4%**（128K），紧凑显存
+  dense 的 **4%**，far 段占选中流量 **19.5%**（三长度恒定，e163 一致）；
+  (c) op 归因：kernel count 与 e166g 完全对齐（launch=15132、memset=1314），
+  elementwise 弥散群无单一热点；
+  (d) bitexact：三长度 md5 一致（d8c8649...）+ TPOT 平坦化 18.73/19.06/19.39ms；
+  (e) GPT runtime-review 补丁：`input_signature` 门控 + `fb` 修正 + 4×
+  `new_zeros→new_empty` → 已全部在代码面（可追溯至 iter2 合入前的 e160+ 构建）。
+  verdict 文件：e170{bitexact,microbench,farskip,opattr}_*.json；
+  报告：agent_doc/advice/e170_subspace-farskip-verification/。
 - **【已收官 2026-10-25】E168/E169：K1=64 iter22 代码面双模型族判决**：
   Qwen3-8B `e168_k64_e2e_verdict.json`（1.050/1.467/2.084×，K1=128 复验格
   24.697ms 逐位复现，bitexact 2/3——64K step-55 bf16 tie-break 单点分歧披露）；
