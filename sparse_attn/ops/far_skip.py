@@ -11,6 +11,7 @@ import torch
 import torch.nn.functional as F
 
 from .far_skip_workspace import FarSkipWorkspace, stable_topk_positions
+from .far_skip_subspace import fine_cache_for, quantize_keys as _quantize
 
 
 @dataclass(frozen=True)
@@ -106,12 +107,6 @@ def _keys_at(k, positions, *, length, cfg, tail_start=None, layout=None,
     return k[0][physical[..., None], heads[:, None, None], dims[None, None, :]]
 
 
-def _quantize(x):
-    lo = x.amin(dim=-1, keepdim=True)
-    scale = (x.amax(dim=-1, keepdim=True) - lo).clamp(min=1e-9) / 15
-    return ((x - lo) / scale).round().clamp(0, 15) * scale + lo
-
-
 def select_far_skip(q, k, length, cfg, coarse_dims, fine_dims, *,
                     scale=None, tail_start=None, layout=None, workspace=None):
     """Select absolute IDs without building full-history summaries or masks.
@@ -189,9 +184,12 @@ def select_far_skip(q, k, length, cfg, coarse_dims, fine_dims, *,
         candidates = candidates[:, :0]
     elif keep < candidates.shape[-1]:
         pool = ws.cat("pool", [candidates, protected.expand(Hkv, -1)])
-        keys = gather(pool, fine_dims)
-        if cfg.quantize:
-            keys = _quantize(keys)
+        if layout is not None and fine_dims.numel() < k.shape[-1]:
+            keys = fine_cache_for(ws, k, length, cfg, fine_dims, layout).gather(pool)
+        else:
+            keys = gather(pool, fine_dims)
+            if cfg.quantize:
+                keys = _quantize(keys)
         qfine = (q[0, 0].index_select(-1, fine_dims).float() * scale).reshape(Hkv, G, -1)
         logits = torch.einsum("hgd,hnd->hgn", qfine, keys.float()).to(q.dtype)
         probabilities = logits.softmax(-1).mean(1)[:, :candidates.shape[-1]]

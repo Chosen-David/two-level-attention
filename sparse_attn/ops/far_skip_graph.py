@@ -11,6 +11,7 @@ import torch.nn.functional as F
 
 from .far_skip import _quantize
 from .far_skip_workspace import FarSkipWorkspace, stable_topk_positions
+from .far_skip_subspace import FarSkipFineCache
 
 
 class FarSkipGraphWorkspace:
@@ -27,6 +28,7 @@ class FarSkipGraphWorkspace:
                         self.candidate_capacity+cfg.sink_tokens+cfg.window_tokens), self.device)
         self.head_ids = self.ws.ids(heads, self.device)
         self.summaries = None
+        self.fine_cache = None
 
     def initialize(self, k, length):
         """Seed only complete near pages from prefill, outside capture.
@@ -36,6 +38,9 @@ class FarSkipGraphWorkspace:
         per token. Arbitrary forward jumps/rewinds require a new workspace.
         """
         cfg, bs = self.cfg, self.cfg.block_size
+        if self.fine.numel() < k.shape[-1]:
+            self.fine_cache = FarSkipFineCache(cfg, self.layout, self.fine)
+            self.fine_cache.initialize(k, length)
         if not 0 < self.page_count < self.page_capacity:
             return
         slots = self.page_capacity+1
@@ -87,6 +92,8 @@ class FarSkipGraphWorkspace:
 
     def select(self, q, k, length, scale):
         cfg, bs, h = self.cfg, self.cfg.block_size, self.heads
+        if self.fine_cache is not None:
+            self.fine_cache.update_tensor(k, length-1)
         g = q.shape[2] // h
         prefix = torch.clamp(length, max=cfg.sink_tokens)
         swa = torch.clamp(length - cfg.window_tokens, min=0)
@@ -135,9 +142,12 @@ class FarSkipGraphWorkspace:
         if keep:
             pool = self.ws.cat('graph_pool', [candidates, protected])
             pool_valid = self.ws.cat('graph_pool_valid', [valid, protected_valid])
-            keys = self.gather(k, pool, pool_valid, self.fine)
-            if cfg.quantize:
-                keys = _quantize(keys)
+            if self.fine_cache is not None:
+                keys = self.fine_cache.gather(pool, pool_valid)
+            else:
+                keys = self.gather(k, pool, pool_valid, self.fine)
+                if cfg.quantize:
+                    keys = _quantize(keys)
             qg = (q[0, 0].index_select(-1, self.fine).float() * scale).reshape(h, g, -1)
             logits = torch.einsum('hgd,hnd->hgn', qg, keys.float()).to(q.dtype)
             logits = logits.masked_fill(~pool_valid[:, None], -torch.inf)
