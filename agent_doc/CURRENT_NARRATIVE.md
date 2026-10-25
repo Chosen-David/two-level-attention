@@ -167,7 +167,55 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   平直 + other 唯一增长（+0.70ms@4×），与 K1=128 口径结构完全同型；
   K1=64 额外收益 = other 类一致降 ~0.95ms（L1 块数减半）；busy 与
   E172 TPOT 18.46ms@128K 自洽（99.6%）。主表切 K1=64 后平坦化主张
-  证据链无缝衔接。
+  证据链无缝衔接。**e168f Qwen3-8B K1=64 批档包络**
+  （`e168f_qwen_k64_bs_verdict.json`，pc40 GPU1）：B1 1.470/2.206/
+  3.644×（与 E172 主表 + e168e census 三口径闭合）；交叉点 32K:B≈2 →
+  64K:B≈4 → 128K:不交叉，与 Llama e168d 三点完全对齐——旧口径
+  （e167）下 Qwen 32K B∈(1,4) 与 Llama B≈2 的模型族差异随口径统一
+  消失，批档交叉点形态双模型族统一为『随长度单调右移』；行串行
+  +14%→+50%→+120% 跨口径跨模型同形态；128K B4 双臂 OOM。论文批档
+  叙事建议统一用新口径双模型族数据（e168f+e168d）。
+  **e168i Llama-3.1-8B K1=64 census 平坦化**
+  （`e168i_llama_k64_census_verdict.json`，pc40 GPU1，worktree@7bc1788
+  与 e175 工作分支隔离）：busy 15.022/15.223/15.795ms（+5.1%@4×），
+  三类平直 + other 唯一增长（+0.59ms@4×），逐类同型于 e168b（K1=128）
+  与 e168e（Qwen K1=64）；K1=64 额外收益 = other 类降 0.67-0.85ms
+  （L1 减半）；first_tok/gen5 与 e168b 逐 token 一致；busy@128K 与
+  E173 TPOT 15.590ms 自洽（CUPTI 微膨胀 ≤1.5%）。**新口径平坦化
+  证据链双模型族闭合（e168e + e168i）**。注：首轮 GPU0 采集被并行
+  e175 任务抢占污染（gemm 非单调）已废弃，正式数字为 GPU1 独占重跑。
+  **e168j Qwen3-32B K1=64 census 平坦化**
+  （`e168j_32b_k64_census_verdict.json`，pc02 GPU1，iter3 shadow +
+  expandable_segments + 单 run 单进程）：busy 41.637/41.980/42.862ms
+  （+2.9%@4×），gemm 17.31/17.30/17.37、attn 1.42×3、copy 12.0×3 三类
+  平直，other 10.86→12.03 唯一增长（+1.17ms@4×）；与 E174 TPOT
+  41.295/41.774/42.670ms 双口径闭合（CUPTI ≤0.8%）；跨模型结构：gemm
+  随参数量 ≈4×（vs 8B）、other 随层数近线性。**新口径平坦化证据链
+  三模型族闭合（e168e + e168i + e168j），论文平坦化主张可升级为
+  三模型族口径**。
+  **e168g Qwen3-32B K1=64 批档包络**
+  （`e168g_32b_bs_verdict.json`，pc02，repo@7bc1788，B∈{1,2}×
+  三长度）：B1 1.340/1.925/3.023×（与 E174 主表 <0.3% 闭合）；32K
+  交叉点 B≈2（0.969×，与 8B 双模型族 0.985/0.956 三点对齐）、64K
+  B2 tli 领先 1.205×、128K B2 双臂 OOM（2×68.7GB KV 物理上限）。
+  32B 特有：可行批档包络随 L 收缩。行串行 32K −0.5%/64K +26.9%
+  （形态与 8B 一致）。**批档叙事三模型族口径收官（e168f+e168d+
+  e168g）**。协议披露：①e167 采集器 tli 臂 prefill 漏 logits_to_keep=1
+  （E167 坑只修 dense），32B B2×64K 19GB logits OOM——补丁已同步
+  pc02+本地仓库（bit-neutral）；②tli 128K B1 复现 E160b 根因（同进程
+  二次 prefill+graph 池残留），单 run 单进程 ×3 = 42.56/42.57/42.57ms；
+  ③dense 128K B1 同进程 4 runs PASS（DynamicCache 无池残留）。
+- **【已合入 perf/gpt-kv-eviction·未合 main 2026-10-25】E175：codex far-skip-kv-eviction
+  物理蒸发 + cyclic compact cache 评测**：ring buffer 几何区宽恒定
+  （sink4+near4096+window128+block64−1=4551），evict 触发后每层物理 KV
+  恒 ~8.62 MB（与序列长度解耦）；单层 synthetic bench 8K→128K 节省
+  46.6/86.6/93.3/96.8%（`far_skip_decode_single_layer.json`）；全模型
+  eager 13/36 层静态 sk4 mask → footprint 32K −1.01 / 64K −2.24 / 128K
+  −4.70 GiB = 3.4/5.1/6.5%（`e175_m1_footprint_verdict.json`）。**不合
+  main**：eager-only（CUDA Graph capturing 显式 raise）/ B=1 / 非 4bit
+  bitwise 等价 / RULER 质量门 M2 未跑。定位 supplement S8 implementation
+  ablation。报告+LaTeX 段：`agent_doc/advice/e175_gpt_far_skip_eviction/`。
+  代码 324073d 合入 `perf/gpt-kv-eviction` 作实验记录（分支保留）。
 
 ## 3. 对比口径（vendor 基线）
 
@@ -222,7 +270,7 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 | prefill 稀疏可提速（FS/prefill sparse e2e） | `e149_sink4_verdict.json`（FS 质量 -5.18% → decode-only 叙事）；prefill 性能详见 `e139_prefill_profile_verdict.json` / `e140a_prefill_k1up_verdict.json` |
 | K1 越大越好 | `e140b_k1_downscan_verdict.json` + `e140h_k64sweet_verdict.json`（倒 U 峰 K1=64）+ `e168_k64_e2e_verdict.json` / `e169_k64_llama_verdict.json`（K1=64 双模型族 e2e 成立，2026-10-25 生产口径切换 K1=64） |
 | 32B@128K OOM 根因 = 显存碎片 | `e160b_128k_expandable_verdict.json`（半否定——真根因 = 进程内二次 prefill 与 graph 私有池残留共存；可行解 = 单 run per process） |
-| layer_skip（D′ 静态门）/ dyn_dgate（E137 动态门）作为**延迟加速**主张 | 延迟视角已被 `e161_farskip_verdict.json` 否决（subspace 维度 decode 增益 ≈0，far-skip 臂 +2.1~+11.2ms/步）——**但 2026-10-25 用户指令叙事转向 KV cache 节省视角**：被跳层驻留退化为 sink4+near4096+swa128=4228 token 滚动缓冲（128K 下 3.2%），eps=0.05 实测层集 {L7,L8,L10,L11,L35}（5/36 层）→ KV 节省 ~13%；质量不可分实测见 `e137_dyn_dgate_verdict.json`（AVG5 Δ-0.03 CI 含 0）。接口**保留**，K1=64 口径复验在飞（E171） |
+| layer_skip（D′ 静态门）/ dyn_dgate（E137 动态门）作为**延迟加速**主张 | 延迟视角已被 `e161_farskip_verdict.json` 否决（subspace 维度 decode 增益 ≈0，far-skip 臂 +2.1~+11.2ms/步）——**但 2026-10-25 用户指令叙事转向 KV cache 节省视角**：被跳层驻留退化为 sink4+near4096+swa128=4228 token 滚动缓冲（128K 下 3.2%），eps=0.05 实测层集 {L7,L8,L10,L11,L35}（5/36 层）→ KV 节省 ~13%；质量不可分实测见 `e137_dyn_dgate_verdict.json`（AVG5 Δ-0.03 CI 含 0）。接口**保留**，K1=64 口径复验在飞（E171）。**【E175 物理蒸发已合 perf/gpt-kv-eviction·未合 main】**codex far-skip-kv-eviction 实现物理 ring buffer 蒸发 + cyclic compact cache：几何区宽恒定（ring_capacity = sink+near+window+block−1 = 4551）与序列长度解耦；单层 evict KV 恒 ~8.62 MB（8K→128K 全长节省 46.6/86.6/93.3/96.8%）；全模型 13/36 层静态 sk4 mask 触发 → footprint 节省 32K −1.01 / 64K −2.24 / 128K −4.70 GiB（3.4/5.1/6.5%），verdict 见 `e175_m1_footprint_verdict.json` + `far_skip_decode_single_layer.json`。**显式约束**：(a) eager-only，CUDA Graph capturing 显式 raise（与 TLIStaticCache 路线正交）；(b) batch 必须 = 1，不支持 beam/offload/chunked prefill；(c) selector 非 bitwise 等价 4bit 生产 TLI（sink-boundary 排除 + tie-breaking 差异）；(d) **RULER 质量门 M2 未跑**，不得在质量未实测条件下声明"质量保持"；(e) 代码路径与 iter3 主树互斥（不合 main，留 `perf/gpt-kv-eviction` 作实验记录）。作为论文 supplement S8「implementation-level ablation」有价值，review + LaTeX 段见 `agent_doc/advice/e175_gpt_far_skip_eviction/`。补测 M3（同口径 TPOT — baseline 也跑 dyn_dgate 消除 skip 混淆）在进行 |
 | kmeans/ccluster/sim_greedy 簇代表选择 | E4c negative result（严格预算下无一致优势，E4b 有整簇超选 bug）→ E110 系列保留作消融 → **已删除** |
 | α/β/γ 比例化几何口径（E64 帕累托点叙事） | E155d 参数退役（用户 2026-10-19 拍板转向 nb/nt/nl 显式几何）；比例口径的全部历史数字仅作 E64-E155 谱系档案（`exp/trace_archives/probe_e5b_e98/`） |
 | e152v2 dynamic-cache 性能口径（TLI 3.4×/2.5×/1.8× slower） | 已被 `e152v4_formal_verdict.json` 整步 graph 口径取代（论文图 E2 已 in-place 重写，commit e5071cb） |
