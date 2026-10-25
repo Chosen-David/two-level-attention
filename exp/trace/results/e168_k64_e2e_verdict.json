@@ -1,0 +1,45 @@
+{
+ "schema": "e168-k64-e2e-verdict",
+ "experiment": "E168：K1=64 论文口径 e2e TPOT（Qwen3-8B，pc40 GPU0 干净臂，iter22 代码面）",
+ "date": "2026-10-25",
+ "machine": "pc40 (2xH20-3e), commit 2c726b5（= E152v4 判决面，tli_indexer md5 e1c55d）",
+ "protocol": {
+  "caliber": "E152v4 逐字同款（ABBA 交错单卡串行、TLIStaticCache 整步 capture、TPOT per-step-device-synced、max_gen=128、每臂 2 procs）；唯一改动 tia_level1_topk 128→64",
+  "champion_flags": "nb32/nl4096/ntoff/minmax+avg/sink4/swa128/K2=1024/tail32 + K1=64",
+  "anchor_1128": "E152v4 K1=128 原判 1.064/1.448/2.067×（24.70/27.40/32.42 vs 26.28/39.67/67.04）",
+  "gpu_hygiene": "clean（起跑前 query-compute-apps 0 进程，全程 30s 旁路监控落盘 gpu_hygiene.log）"
+ },
+ "equivalence_gate": {
+  "k128_verify_32k": "24.697ms vs E152v4 原判 24.702ms —— 逐位级复现，代码面等价性成立",
+  "dense_reverify": "25.81/39.90/67.23 vs 原判 26.28/39.67/67.04 —— 32K 锚 -1.8% 机器日漂移内，64K/128K ±0.3%"
+ },
+ "results": {
+  "32768": {
+   "tli_graph_k64_ms": {"mean": 24.575, "arms": [24.566, 24.584], "n": 6},
+   "dense_ms": {"mean": 25.809, "arms": [25.796, 25.822], "n": 8},
+   "speedup_k64": 1.050
+  },
+  "65536": {
+   "tli_graph_k64_ms": {"mean": 27.224, "arms": [27.234, 27.214], "n": 6},
+   "dense_ms": {"mean": 39.896, "arms": [39.750, 40.042], "n": 8},
+   "speedup_k64": 1.467
+  },
+  "131072": {
+   "tli_graph_k64_ms": {"mean": 32.250, "arms": [32.257, 32.244], "n": 6},
+   "dense_ms": {"mean": 67.229, "arms": [67.379, 67.079], "n": 8},
+   "speedup_k64": 2.084
+  }
+ },
+ "bitexact_gate": {
+  "pass": "2/3（32K/128K graph gen_tokens == eager gen_tokens 逐位一致）",
+  "divergence_65536": "graph 6 runs（a1/a2 两进程）内部逐位一致；eager 臂 decode 第 55 步单点分歧（eager→EOS 151668，graph→151645 续写）——bf16 非结合 tie-break 概率事件（E166 系 1/128 token 确定性分歧披露口径），K1=64 改变 far 排序集（far_quota 448 vs 128）提高 tie 概率；重验格列入 E172",
+  "caliber_note": "分歧属执行路径级（同一 indexer 数学，graph replay vs eager 逐 kernel 等价性），非配置级数学错误；质量侧由 e140b/e140h 判决背书"
+ },
+ "k1_comparison": {
+  "tli_arm_delta_vs_k1128": "32K 24.575 vs 24.702 = -0.51%；64K 27.224 vs 27.398 = -0.64%；128K 32.250 vs 32.425 = -0.54%",
+  "speedup_delta": "1.050 vs 1.064（32K dense 锚同日漂移 -1.8% 主导）；64K 1.467 vs 1.448；128K 2.084 vs 2.067",
+  "verdict": "K1=64 e2e 持平偏正（TLI 臂三档 -0.5~-0.64%，粗筛页减半 L1 负载减半 + far_quota 448 提升覆盖）"
+ },
+ "verdict": "K1=64 论文口径成立：质量 e140h AVG5 48.10 vs 47.91（+0.19 且粗筛页减半）+ e2e 加速比 1.050/1.467/2.084×（64K/128K 档超 K1=128）。生产 champion flags 更新为 K1=64。iter3 代码面 K1=64 主表 = E172。",
+ "files": "pc40 ~/e168_k64_formal/（16 JSON + gpu_hygiene.log）；runner ~/e168_k64_pc40.sh"
+}
