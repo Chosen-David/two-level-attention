@@ -62,7 +62,8 @@ from sparse_attn.patches import register_patch  # noqa: E402
 from sparse_attn.info import resolve_treatment_snapshot  # noqa: E402
 from sparse_attn.baseline_runtime import BatchCtx, batch_decode_scope  # noqa: E402
 from sparse_attn.ops.tli_static_cache import (  # noqa: E402
-    TLIStaticCache, fill_static_from_dynamic)
+    TLIStaticCache, fill_static_from_dynamic,
+    e175_layer_caps, e175_ring_geometry)
 from sparse_attn.ops.cuda_graph_state import (  # noqa: E402
     enable_graph, disable_graph, graph_state)
 
@@ -278,6 +279,9 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture):
 
     decode_wall_ms = (last_output - decode_t0) * 1e3
     peak_delta_gib = (torch.cuda.max_memory_allocated() - base_mem) / 2**30
+    # E175：绝对峰值显存（进程级，含进程级 TLIStaticCache 静态池——
+    # delta 口径不含 cache，KV 节省必须用绝对值对比两臂）
+    max_mem_gib = torch.cuda.max_memory_allocated() / 2**30
     return {
         "prefill_ms": prefill_ms,
         "fill_static_ms": fill_ms,
@@ -288,6 +292,7 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture):
         "tpot_ms": decode_wall_ms / len(step_ms) if step_ms else None,
         "step_ms": step_ms,
         "peak_mem_delta_gib": peak_delta_gib,
+        "max_mem_gib": max_mem_gib,
         "n_input_tokens": L,
         "n_generated": max_gen,
         "gen_tokens": gen,
@@ -368,7 +373,14 @@ def main():
 
     # 进程级静态 cache + runner；graph 模式全程 enable_graph（capture 前
     # 绑定 pos/vl buffer，TLIStaticCache.update 走 scatter_ 张量索引）。
-    static_cache = TLIStaticCache(model.config, S_cap, 1)
+    # 【E175 W1】--tli_skip_layer_ids 非空 → skip 层构造 ring 压缩层
+    # （cap = sink+ring，pred_ruler_batch 同款接线，e175_layer_caps 保证
+    # 恒等式）；空集 = layer_caps=None，生产口径逐位零回归。
+    _caps = e175_layer_caps(args, S_cap, model.config.num_hidden_layers)
+    _rsink = e175_ring_geometry(args)[0] if _caps is not None else 4
+    static_cache = TLIStaticCache(model.config, S_cap, 1,
+                                  layer_caps=_caps, ring_sink=_rsink)
+    alloc_after_cache_gib = torch.cuda.memory_allocated() / 2**30
     runner = GraphRunner(model, static_cache, neg_inf, S_cap, pad_id, dev)
     if args.graph_mode == "graph":
         enable_graph(1)
@@ -453,6 +465,9 @@ def main():
                                        .tobytes())[:16],
             "kv_theory_gib": round(kv_gib, 2),
             "cache_impl": f"TLIStaticCache(S_cap={S_cap})",
+            "alloc_after_cache_gib": round(alloc_after_cache_gib, 3),
+            "skip_layer_ids": (str(getattr(args, "tli_skip_layer_ids", "")
+                                   or "").strip() or None),
             "label": args.label,
         },
         "runs": runs,
