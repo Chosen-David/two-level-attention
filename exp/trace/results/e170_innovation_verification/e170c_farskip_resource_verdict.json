@@ -1,0 +1,81 @@
+{
+  "experiment": "e170c_farskip_resource",
+  "layers": 36,
+  "kvh": 8,
+  "hd": 128,
+  "champion": {
+    "near_len": 4096,
+    "sink": 4,
+    "swa": 128,
+    "K1": 128,
+    "K2": 1024,
+    "D": 128
+  },
+  "byte_ledger": {
+    "32768": {
+      "far_B": 150994944,
+      "near_B": 623443968,
+      "sel_B": 774438912,
+      "dense_B": 4831838208,
+      "far_share": 0.195,
+      "sel_pct": 16.03,
+      "dense_GiB": 4.5,
+      "compact_GiB": 0.7213,
+      "compact_ratio": 0.1603,
+      "skip5_GiB": 0.7017,
+      "skip5_saving_pct": 84.4,
+      "skip12_GiB": 0.6744,
+      "skip12_saving_pct": 85.0,
+      "skip24_GiB": 0.6275,
+      "skip24_saving_pct": 86.1,
+      "skip36_GiB": 0.5806,
+      "skip36_saving_pct": 87.1
+    },
+    "65536": {
+      "far_B": 150994944,
+      "near_B": 623443968,
+      "sel_B": 774438912,
+      "dense_B": 9663676416,
+      "far_share": 0.195,
+      "sel_pct": 8.01,
+      "dense_GiB": 9.0,
+      "compact_GiB": 0.7213,
+      "compact_ratio": 0.0801,
+      "skip5_GiB": 0.7017,
+      "skip5_saving_pct": 92.2,
+      "skip12_GiB": 0.6744,
+      "skip12_saving_pct": 92.5,
+      "skip24_GiB": 0.6275,
+      "skip24_saving_pct": 93.0,
+      "skip36_GiB": 0.5806,
+      "skip36_saving_pct": 93.5
+    },
+    "131072": {
+      "far_B": 150994944,
+      "near_B": 623443968,
+      "sel_B": 774438912,
+      "dense_B": 19327352832,
+      "far_share": 0.195,
+      "sel_pct": 4.01,
+      "dense_GiB": 18.0,
+      "compact_GiB": 0.7213,
+      "compact_ratio": 0.0401,
+      "skip5_GiB": 0.7017,
+      "skip5_saving_pct": 96.1,
+      "skip12_GiB": 0.6744,
+      "skip12_saving_pct": 96.3,
+      "skip24_GiB": 0.6275,
+      "skip24_saving_pct": 96.5,
+      "skip36_GiB": 0.5806,
+      "skip36_saving_pct": 96.8
+    }
+  },
+  "dgate": {
+    "error": "CUDA error: invalid device ordinal\nCUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.\nFor debugging consider passing CUDA_LAUNCH_BLOCKING=1\nCompile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.\n"
+  },
+  "summary": {
+    "far_share_128K": 0.195,
+    "sel_pct_128K": 4.01,
+    "compact_ratio_128K": 0.0401
+  }
+}
