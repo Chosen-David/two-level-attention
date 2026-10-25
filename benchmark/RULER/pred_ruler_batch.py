@@ -288,7 +288,7 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
 
 def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                         mask2d, lens, eos_ids, keep_logits,
-                        fixed_cache=False):
+                        fixed_cache=False, args=None):
     """一个 left-pad chunk 的 prefill + 多步 decode，返回逐行 (pred, gen)。
 
     语义对齐 pred_ruler.py 生成循环（首位 EOS 不停 ≈ min_length、
@@ -326,9 +326,21 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
         pred_list = []
         if fixed_cache:
             from sparse_attn.ops.tli_static_cache import (  # noqa: E402
-                TLIStaticCache)
+                TLIStaticCache, e175_layer_caps, e175_ring_geometry,
+                fill_row_from_tail)
             S_cap = S_max + MAX_GEN
-            static_cache = TLIStaticCache(model.config, S_cap, B)
+            # 【E175 W1】skip 层 ring 压缩：CLI 静态层集非空时 skip 层
+            # 容量收缩 cap=sink+ring（champion 4+4224=4228），层集空
+            # → layer_caps=None（生产不变，逐位零回归）。ring_sink 与
+            # indexer 侧 _ring_sink 同源（e175_ring_geometry 单一事实源）。
+            _caps = (e175_layer_caps(args, S_cap,
+                                     len(model.config.layer_types)
+                                     if getattr(model.config, "layer_types", None)
+                                     else model.config.num_hidden_layers)
+                     if args is not None else None)
+            _rsink = e175_ring_geometry(args)[0] if _caps is not None else 4
+            static_cache = TLIStaticCache(model.config, S_cap, B,
+                                          layer_caps=_caps, ring_sink=_rsink)
             inited = [False] * len(static_cache.layers)
             for b in range(B):
                 base = S_max - lens[b]
@@ -349,9 +361,10 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                         d[0:1] = k
                         stat_l.lazy_initialization(d)
                         inited[l] = True
-                    Lb = lens[b]
-                    stat_l.keys[b, :, :Lb, :].copy_(k[0, :, :Lb, :])
-                    stat_l.values[b, :, :Lb, :].copy_(v[0, :, :Lb, :])
+                    # 【E175 W1】搬移统一走 fill_row_from_tail：非 ring 层
+                    # 与旧直拷逐位一致；ring 层 sink 头 + 尾部 ring 段环绕
+                    # scatter（与 fill_static_from_dynamic 单一事实源）。
+                    fill_row_from_tail(stat_l, b, k[0], v[0], int(lens[b]))
                 del out, dyn
             past = static_cache
         else:
@@ -584,7 +597,7 @@ def main():
                     gen = _decode_batch_chunk(
                         model, tokenizer, chunk, input_ids, position_ids,
                         mask2d, lens, eos_ids, keep_logits,
-                        fixed_cache=(args.method == "tli"))
+                        fixed_cache=(args.method == "tli"), args=args)
             budget = None if baseline_receipt else metrics.get_select_tokens()
             for (row, g) in zip(chunk, gen):
                 pred = tokenizer.decode(g, skip_special_tokens=True)

@@ -244,6 +244,32 @@ def _parse_dgate_eps(x):
     return v
 
 
+def _parse_skip_layer_ids(x):
+    """E175 W1：--tli_skip_layer_ids 边界校验（fail-closed）。
+
+    静态冻结 skip 层集，逗号分隔非负整数（允许空串/纯空白 = 不启用）。
+    非法 token（负数 / 小数 / 非数字 / 重复 id）一律 ArgumentTypeError
+    （argparse 转 exit 2）——ring 压缩的层集身份错误会让层 KV 静默
+    全宽驻留或错层驱逐，宁可拒跑。重复 id 拒绝：层集是集合语义，
+    重复写法几乎必然是脚本拼接事故。返回排序去重后的规范串。"""
+    s = str(x).strip()
+    if not s:
+        return ""
+    parts = [p.strip() for p in s.split(",")]
+    ids = []
+    for p in parts:
+        if not p.isdigit():
+            raise argparse.ArgumentTypeError(
+                f"--tli_skip_layer_ids 须为逗号分隔非负整数层 id，"
+                f"收到非法 token {p!r}（整体 {x!r}）")
+        ids.append(int(p))
+    if len(set(ids)) != len(ids):
+        raise argparse.ArgumentTypeError(
+            f"--tli_skip_layer_ids 含重复层 id（收到 {x!r}）——层集是集合"
+            "语义，重复写法大概率是脚本拼接事故")
+    return ",".join(str(i) for i in sorted(ids))
+
+
 def _add_tli_args(parser: argparse.ArgumentParser):
     group = parser.add_argument_group(title='TLI (Two-Level Indexer)')
     group.add_argument('--tli_enable_subspace', type=lambda x: str(x).lower() != 'false', default=True)
@@ -378,6 +404,18 @@ def _add_tli_args(parser: argparse.ArgumentParser):
                             '质量-速度旋钮，e2e 双臂判决）')
     group.add_argument('--tli_dyn_dgate_rows', type=_parse_dgate_rows, default=256,
                        help='标定用 prefill q 尾行数（与 observe_prefill_q E85f 同口径，必须 >= 1）')
+    # ---- E175 W1：skip 层 ring 物理 KV 压缩（静态冻结层集）----
+    #   E137 判决层集（eps=0.05 → Qwen3-8B {7,8,10,11,35}）静态化 CLI：
+    #   集内层 skip_far（E111 省算链全复用）+ TLIStaticCache ring 驱逐
+    #   （cap = sink + near_len + swa = champion 几何 4+4096+128 = 4228）。
+    #   默认空串 = 不启用（生产不变，E127 逐位零回归）。
+    #   与 --tli_dyn_dgate 组合 fail-closed 拒绝（_resolve_skip 静态覆盖
+    #   动态冻结语义未定义，与 enable_layer_skip × dyn_dgate 守卫同款）。
+    group.add_argument('--tli_skip_layer_ids', type=_parse_skip_layer_ids, default='',
+                       help='E175 W1 静态 skip 层集（逗号分隔层 id，如 "7,8,10,11,35"）：'
+                            '集内层 decode 期 skip_far + ring 物理 KV 压缩（驻留 = sink 头 '
+                            '+ 最近 near_len+swa token，槽位 = 4+((p-4) mod 4224)）；'
+                            '默认空 = 不启用。须与 --tli_enable_layer_skip false 同传')
     return parser
 
 def parse_args():

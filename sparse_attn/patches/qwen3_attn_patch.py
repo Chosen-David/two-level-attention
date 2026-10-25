@@ -198,17 +198,23 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
         cu_b = torch.arange(B + 1, device=dev, dtype=torch.int32) * S_cap
         # valid_length 传逐行真实长 list（Triton 批量只消费 mask 忽略之；
         # torch 批量回退的 dense 段逐行裁剪归约域 [0,L_b) → 与变长路径
-        # 逐位一致，防 pad 0 项参与归约树致 ULP 翻硬币）
+        # 逐位一致，防 pad 0 项参与归约树致 ULP 翻硬币）。
+        # 【E175 W1】ring 压缩层（S_cap=cap < 绝对长）取 min(L_b, S_cap)：
+        # 非 ring 层 L_b <= S_cap 恒成立 → min 无变化（逐位零扰动）；
+        # ring 层把归约域裁到驻留槽位宽 [0, cap)（未写 pad 区排除出
+        # 归约树，与全宽路径同款 ULP 卫生）。
+        vl_row = [min(int(l), S_cap) for l in ctx.seq_lens]
         return eager_decoding_attn(
             q, k, v, m_b, bs0, cu_b, softmax_scale=self.scaling,
-            valid_length=ctx.seq_lens)
+            valid_length=vl_row)
     # B==1（gate_bs1_equiv 铁律）/ block_size>1 兜底：逐行单 query 路径
     outs = []
     for b in range(B):
         cu = torch.tensor([0, S_cap], device=dev, dtype=torch.int32)
         outs.append(eager_decoding_attn(
             q[b:b + 1], k[b:b + 1], v[b:b + 1], masks[b], bs0, cu,
-            softmax_scale=self.scaling, valid_length=ctx.seq_lens[b]))
+            softmax_scale=self.scaling,
+            valid_length=min(int(ctx.seq_lens[b]), S_cap)))
     return torch.cat(outs, dim=0)            # [B, 1, H, D]
 
 

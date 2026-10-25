@@ -354,6 +354,61 @@ class TLIIndexer(TIAIndexer):
                 except (OSError, KeyError, ValueError):
                     print(f"[TLI] 警告: 层掩码 {mask_path} 不可读, D' 关闭")
                     self._skip_ids = None
+        # ---- E175 W1：CLI 静态冻结 skip 层集（ring 物理 KV 压缩）----
+        #   第三来源（snapshot 掩码文件 / 旧路径文件 / CLI）：集内层
+        #   skip_far（_resolve_skip 同一消费链）+ cache 侧 ring 驱逐
+        #   （cap=sink+ring，TLIStaticCache layer_caps）+ 本 indexer 的
+        #   prepare_mask ring 分支（虚拟位置序 gather，见下）。与两个
+        #   既有来源 fail-closed 互斥：
+        #   * enable_layer_skip true：文件层集与 CLI 层集并存 = _skip_ids
+        #     双重身份，静默互相覆盖——拒绝（生产动态臂本就显式
+        #     --tli_enable_layer_skip false）；
+        #   * dyn_dgate：_resolve_skip 静态覆盖动态冻结（E137 A6 守卫
+        #     同款），拒绝。
+        #   _skip_ids_ring 标志 = 本实例层集来自 CLI（→ ring 几何生效）；
+        #   文件来源（E137 旧臂）不带 ring——cache 仍全宽，行为逐位不变。
+        self._skip_ids_ring = False
+        self._ring_sink = None
+        self._ring_size = None
+        _e175_raw = str(getattr(args, "tli_skip_layer_ids", "") or "").strip()
+        if _e175_raw:
+            if self.enable_layer_skip:
+                raise ValueError(
+                    "--tli_skip_layer_ids 与 --tli_enable_layer_skip true "
+                    "互斥：CLI 层集与掩码文件层集并存 = _skip_ids 双重"
+                    "身份（静默互覆），E175 臂请显式传 "
+                    "--tli_enable_layer_skip false")
+            if self.dyn_dgate:
+                raise ValueError(
+                    "--tli_skip_layer_ids 与 --tli_dyn_dgate 互斥：静态"
+                    "层集会被 _resolve_skip 覆盖动态冻结的 skip_far"
+                    "（E137 A6 守卫同款），组合语义未定义")
+            if self._skip_ids is not None:
+                # snapshot/旧路径在 enable_layer_skip=false 下恒 None；
+                # 到达此处即状态异常，fail-closed。
+                raise RuntimeError(
+                    "E175 内部状态异常：enable_layer_skip=false 但 "
+                    "_skip_ids 已被文件来源填充")
+            # ring 几何单一事实源（与 cache 侧 e175_ring_geometry 同式；
+            # 此处内联重算避免循环 import：ops.tli_static_cache imports
+            # baseline_runtime——indexer 侧 import cache 无环，但保持
+            # 本文件零新 import 面，几何两行内联 + 门禁 cell A 穷举
+            # 对拍双实现防漂移）
+            _nl = getattr(args, "tli_near_len", None)
+            if _nl is None:
+                raise ValueError(
+                    "--tli_skip_layer_ids 要求 --tli_near_len 显式传入"
+                    "（E155 固定几何）：legacy α 比例口径下 near 宽随 "
+                    "L 漂移，恒容量 ring 无定义")
+            self._ring_sink = int(self.sink_tokens)
+            self._ring_size = int(_nl) + int(self.sliding_window_size)
+            self._skip_ids = {int(p) for p in _e175_raw.split(",")}
+            self._skip_ids_ring = True
+            if (os.environ.get("TLI_DEBUG", "").strip().lower()
+                    not in ("", "0", "false") and self.layer_idx is not None):
+                print(f"[E175] L{self.layer_idx} ring_geo sink="
+                      f"{self._ring_sink} ring={self._ring_size} "
+                      f"skip_ids={sorted(self._skip_ids)}", flush=True)
         # B 的聚类缓存（prefill 后一次；decode 期 far 区不变）
         self._km_centroids = None    # [Hkv, K_c, d']
         self._km_token_assign = None  # [Hkv, Tfar]
@@ -627,6 +682,25 @@ class TLIIndexer(TIAIndexer):
         死区，弃用）。"""
         return max(0, self.sink_tokens // self.args.tia_block_size)
 
+    # ---------------- E175 W1：skip 层 ring 环绕态判定（单一事实源） ---------------- #
+
+    def _e175_wrap_skip(self, S_real, sink_tok, swa_tok) -> bool:
+        """【E175 W1】skip 层 ring 环绕步判定——compute_mask 与
+        _select_l1_blocks 两处 L1 几何收紧共用（bypass_blks /
+        near_pool_lo 均是 AKO iter-6 L1 复用内门的逐项比较项，两侧
+        必须同步收紧，否则内门几何漂移 → 复用臂落回补跑路径）。
+
+        语义：skip_far（E137/E175 层集语义）+ E155 显式 near 几何
+        （nt_near_len 非 None）且 S_real 越过 ring 容量 cap =
+        sink + near_len + swa（与 ops.tli_static_cache.e175_ring_geometry
+        同式）→ ring 物理 KV 已发生驱逐（驻留集 = [0,sink)∪[S−ring,S)，
+        ring = near_len + swa），块 floor 对齐的候选/池几何中越出驻留
+        集的部分（骑墙块、sink 跨界保送页的非驻留 token）必须收紧。
+        未满步（S≤cap，驻留 = 全序列）与非 skip 层恒 False，逐位不变。
+        """
+        return (self.skip_far and self.nt_near_len is not None
+                and S_real > sink_tok + int(self.nt_near_len) + swa_tok)
+
     # ---------------- E85f：prefill q 统计 → per-layer 静态 pair ---------------- #
 
     def observe_prefill_q(self, q):
@@ -858,6 +932,119 @@ class TLIIndexer(TIAIndexer):
         if valid_length is not None:
             d["valid_length"] = valid_length
         return d
+
+    def prepare_mask(self, q, q_ids, k, cu_seqlens_k, softmax_scale=None,
+                     valid_length=None):
+        """【E175 W1】prepare_mask ring 分支（skip 层槽位布局 → 虚拟位置序）。
+
+        数据流：ring 压缩层（--tli_skip_layer_ids 集内层）的 TLIStaticCache
+        KV 是槽位布局 [sink(4) | ring(4224)]（环绕轮转覆盖，见
+        ops.tli_static_cache.pos_to_slot）。本 override 把槽位轴重排成
+        「宽 L 虚拟位置轴」k' 再喂给基类几何——虚拟轴 vp∈[0, L)：
+          vp ∈ [0, sink)       → 位置 vp（sink 段，槽位恒等）真值；
+          vp ∈ [sink, L-ring)  → 驱逐区零填充（mask 恒 False——由 E175
+                                 骑墙块收紧保证选中集 ⊆ 驻留）；
+          vp ∈ [L-ring, L)     → 位置 vp（驻留尾部窗口，槽位环绕）真值。
+        基类全部几何（sink/swa/near 池端点、far -inf 区、K2 预算）按
+        vl=L 在虚拟轴上**原样跑零改动**——块网格锚 0 与全宽层一致、
+        骑墙块排除同步（compute_mask 的 E175 收紧两臂同码路径）→ 与
+        全宽层 skip_far mask **任意 L 逐位同构**（不再要求块对齐；门禁
+        cell D 全步逐位断言）。输出前把 mask 沿 token 轴逆映射回槽位域
+        （setitem by pos_to_slot，双射无冲突）→ 消费端 eager gather 按
+        槽位索引导航 ring buffer。
+
+        三段分支（均先经 super，非 ring 层零扰动铁律）：
+          1. 非 CLI 层集 / 集外层 / skip_far 未生效 → super 原样；
+          2. 集内层且 L <= cap：槽位 == 位置（未满恒等映射）→ super
+             原样（仅 valid_length 传 min(L, cap) 截断未写 pad 区）；
+          3. 集内层且 L > cap：环绕激活 → 宽 L 虚拟位置轴 + 逆映射。
+             性能注：k_vp 宽 L 每步分配+两段 copy（~0.1ms 级，
+             H20 实测量级评估见验收报告）——W2 候选优化点：只 gather
+             候选域（L1 池块）替代全宽物化。
+
+        注意：graph 模式（compute_mask_graph）guard 排除 skip_far（现状
+        E137 静态层集臂即 staged 路径），本 override 只服务 staged
+        prepare_mask 入口——host 侧 L（valid_length）为 Python int，无
+        capture 烦恼；copy/setitem 均纯张量算子。
+        """
+        if not self._skip_ids_ring:
+            return super().prepare_mask(
+                q, q_ids, k, cu_seqlens_k, softmax_scale, valid_length)
+        # 静态层集每步 resolve（与 prepare_index 头部同构，幂等）——
+        # skip_far 的时效语义与 E137 静态臂一致（clear() 不复位静态集）。
+        self._resolve_skip()
+        if not self.skip_far:
+            # 集外层（或构造期尚未 resolve）：零扰动
+            return super().prepare_mask(
+                q, q_ids, k, cu_seqlens_k, softmax_scale, valid_length)
+        sink = self._ring_sink
+        ring = self._ring_size
+        cap = sink + ring
+        if k.shape[1] != cap:
+            # ring 层集已启用但本层 k 宽 ≠ cap：cache 侧 layer_caps 未配
+            # （或错层配比）——indexer 几何与物理布局失配，fail-closed
+            # 拒跑（静默错几何比崩更糟）。
+            raise RuntimeError(
+                f"E175 ring 层契约破损：skip 层 k 宽 {k.shape[1]} != "
+                f"cap {cap}（sink={sink}+ring={ring}）——TLIStaticCache "
+                "layer_caps 与 --tli_skip_layer_ids 失配（cache 侧未按 "
+                "e175_layer_caps 构造？）")
+        if valid_length is None:
+            raise RuntimeError(
+                "E175 ring 层 prepare_mask 需要显式 valid_length（绝对"
+                "位置长 L，staged batch decode 契约恒传）；None 语义在"
+                "环绕几何下无定义（fail-closed）")
+        L = int(valid_length)
+        vl = min(L, cap)
+        cu_cap = torch.tensor(
+            [0, cap], dtype=cu_seqlens_k.dtype, device=cu_seqlens_k.device)
+        if L <= cap:
+            # 未满：槽位 == 位置（pos_to_slot 在 p < sink+ring 时恒等），
+            # 基类几何原样成立，零额外算子；vl==L 逐位同全宽 skip_far。
+            return super().prepare_mask(
+                q, q_ids, k, cu_cap, softmax_scale, valid_length=vl)
+        # ---- 环绕激活：宽 L 虚拟位置轴 ----
+        # 【门禁 cell D 首跑修正】cap 宽虚拟轴方案（虚拟轴=驻留重排，块
+        # 网格锚 0+Δ 平移）与全宽层（网格锚 0）仅在对齐 L 下同构、且
+        # near 段 floor 恒丢驻留头 bs−sink token——改宽 L 虚拟位置轴：
+        #   [0, sink)         ← 槽位 [0,sink) 真值（sink 恒等）；
+        #   [sink, L−ring)    ← 驱逐区零填充（mask 恒 False——选中集 ⊆
+        #                        驻留由 E175 骑墙块收紧保证：驱逐 token
+        #                        全落 far 段，skip_far k2_far=0 不可选）；
+        #   [L−ring, L)       ← 槽位 [sink, cap) 驻留尾部真值。
+        # 基类几何按 vl=L 全宽跑：kt/near 池/far −inf 区/K2 预算与全宽
+        # skip_far 层**任意 L 逐位同构**（不再要求块对齐）；L1 块统计的
+        # 驱逐段零值无消费者（骑墙块已被 near_pool_lo 排除，其余块全
+        # 驻留真值）。
+        k_vp = k.new_zeros((k.shape[0], L, k.shape[2], k.shape[3]))
+        k_vp[:, :sink] = k[:, :sink]        # sink 段槽位恒等直拷
+        # 尾段按位置序 gather：虚拟位置 p ∈ [L−ring, L) ← 槽位
+        # pos_to_slot(p)（环绕后槽位升序 ≠ 位置升序，必须乱序 gather；
+        # p 连续 → gather 源宽恰 ring，目标段 [L−ring, L) 连续）。
+        p_tail = torch.arange(L - ring, L, device=k.device)
+        slot_tail = torch.where(
+            p_tail < sink, p_tail, sink + (p_tail - sink) % ring)
+        _idx = slot_tail.view(1, -1, 1, 1).expand(
+            1, ring, k.shape[2], k.shape[3])
+        k_vp[:, L - ring:] = k.gather(1, _idx)
+        cu_L = torch.tensor(
+            [0, L], dtype=cu_seqlens_k.dtype, device=k.device)
+        # metrics.add_select_result 记到的是虚拟轴 mask——选中计数与
+        # 槽位域逐位同值（双射），仅监控语义，不进数值链。
+        m_vp, block_size = super().prepare_mask(
+            q, q_ids, k_vp, cu_L, softmax_scale, valid_length=L)
+        # 驻留位置集 dom = [0,sink) ∪ [L−ring, L)（位置升序）；
+        # pos_to_slot 在 dom 上是到 [0,cap) 的双射（门禁 cell A）→
+        # 高级 setitem 逐元素落位无冲突；驱逐区 m_vp 恒 False 直接
+        # 丢弃（槽位域宽 cap 全驻留，无 pad 段）。
+        dom = torch.cat([
+            torch.arange(0, sink, device=k.device),
+            torch.arange(L - ring, L, device=k.device)])
+        slot = torch.where(
+            dom < sink, dom, sink + (dom - sink) % ring)
+        m_slot = m_vp.new_zeros(m_vp.shape[:-1] + (cap,))
+        m_slot[..., slot] = m_vp[..., dom]
+        return m_slot, block_size
 
     def _sub_key(self):
         """子空间一致性 key：跨步 idx_sub 不变才可增量（static_pair 的
@@ -3206,10 +3393,38 @@ class TLIIndexer(TIAIndexer):
             bypass_blks = ()
             far_pool_lo, far_pool_hi = far_lo_blk, far_hi_blk
             near_pool_lo, near_pool_hi = near_blks, swa_lo_blk
+            # 【E175 W1 骑墙块排除】与下方 L2 段 far_tok_hi 收紧同条件：
+            # skip 层骑墙块（near 池最左块，含被 ring 驱逐的 floor 余量
+            # token）退出 L1 near 池——其 L2 token 已被 far_tok_hi 上界
+            # 划入 far 段（k2_far=0 不可选），若仍在 L1 池会白白占用
+            # nb_near 配额挤掉有效 near 块 → 全宽层与 ring 虚拟轴层
+            # （虚拟轴无此块）L1 入选块集不同构。非 skip / legacy α
+            # 口径不触发，逐位不变。
+            if (self.skip_far and self.nt_near_len is not None
+                    and near_blks * bs < max(
+                        0, S_real - swa_tok - int(self.nt_near_len))):
+                near_pool_lo = near_blks + 1
             if self.boundary_bypass:
                 _bp = []
                 if sink_tok % bs != 0:
-                    _bp.append(far_lo_blk)
+                    # 【E175 W1 门禁 cell D 二跑修复】skip 层环绕步（S>cap，
+                    # ring 已驱逐非驻留 token）：sink 跨界保送页（页
+                    # far_lo_blk，含骑墙 token [sink, min(bs, S−ring))——
+                    # E122 γ=off 单池（生产默认 L2 路径）下 mid 全段一体
+                    # 竞争，bypass 保送是骑墙 token 进 L2 候选的唯一残余
+                    # 通道（near_pool_lo 收紧只堵了 L1 池通道））整体剔除：
+                    # 全宽层选真值骑墙 token 越出驻留集（驱逐不再无损），
+                    # ring 虚拟轴层同位置是零填充不选 → 两臂选择集分叉
+                    # （探针实证：L≥4278 起臂A 独有 = [4,64) 骑墙、
+                    # nd≈318-388）。sink token [0,sink) 由 L2 强制区直接
+                    # 置位保底，不依赖保送；页驻留子段 ≤ bs−sink token/
+                    # 层退出候选（E137 层集 far 质量极低层，披露）。
+                    # 未满步（S≤cap 驻留=全序列）与非 skip 层不触发，
+                    # 逐位不变。与 _select_l1_blocks 同款同步（见上方
+                    # _e175_wrap_skip docstring——bypass_blks 是内门
+                    # 比较项，单侧改会破复用恒等式）。
+                    if not self._e175_wrap_skip(S_real, sink_tok, swa_tok):
+                        _bp.append(far_lo_blk)
                 _swa_lo_tok = max(0, S_real - swa_tok)
                 if _swa_lo_tok % bs != 0:
                     _cb = _swa_lo_tok // bs
@@ -3265,10 +3480,23 @@ class TLIIndexer(TIAIndexer):
                     # 几何逐项恒一致，仅未来几何漂移可入）：补跑被免的 mean +
                     # skip_far 区间写，张量状态与旧路径该点逐位一致（mean 新
                     # 张量，dict 原张量两路均零变异）。
+                    # 【E175 W1 门禁 cell D 崩溃修复】补跑还必须包含
+                    # score_coarse_avg 的 GQA mean（外门 L3333 处被免项）：
+                    # near_method="avg"（生产默认）下 sc_near 消费
+                    # score_coarse_avg——漏补时 sc_near 保持 mean 前
+                    # [1,1,H,kt] 32 头形态，与 mean 后 sc_far（Hkv=8）
+                    # torch.cat 形状崩（探针实证 L=4289 首崩：E175 骑墙
+                    # 收紧使内门几何漂移首次可达此路径；_sc_mean_skipped
+                    # 蕴含 not per_q_head，mean 条件仅余 avg 非 None）。
                     score_coarse = rearrange(
                         score_coarse, "b qt (h g) kt -> b qt h g kt",
                         g=self.group_size
                     ).mean(dim=-2)  # [1,1,Hkv,kt]
+                    if score_coarse_avg is not None:
+                        score_coarse_avg = rearrange(
+                            score_coarse_avg, "b qt (h g) kt -> b qt h g kt",
+                            g=self.group_size
+                        ).mean(dim=-2)  # [1,1,Hkv,kt]
                     if self.skip_far:
                         score_coarse[..., far_lo_blk:far_hi_blk] = float("-inf")
                     _sc_mean_skipped = False
@@ -3627,6 +3855,34 @@ class TLIIndexer(TIAIndexer):
                 far_tok_hi = min(self._km_far_hi_cached, p.shape[-1])
             else:
                 far_tok_hi = min(near_blks * bs, p.shape[-1])
+            # 【E175 W1 骑墙块收紧】skip 层（skip_far + E155 显式 near 几何）
+            # 的 near 段起点按块 floor 对齐：near_blks·bs 比驻留起点
+            # ring_lo = S_real − swa − near_len 早 0~(bs−1) token——这段
+            # 「骑墙 token」在 ring 物理 KV（驻留 = sink + 最近 ring 个）中
+            # 已被驱逐，但落在 near L2 段内仍可竞争选中 → 选中集越出驻留
+            # 集（ring 驱逐不再无损）。收紧：骑墙非空（near_blks·bs <
+            # ring_lo）时 far_tok_hi 上调到骑墙块上界 (near_blks+1)·bs
+            # ——骑墙 token 整体划入 far 段（skip_far 时 k2_far=0 结构性
+            # 不可选），near 段起点与 L1 near 池（near_pool_lo 同步 +1，
+            # 见下方 L1 段）在块上界对齐 → 全宽 skip_far 层与 ring 虚拟
+            # 轴层（prepare_mask 环绕分支，虚拟位置序宽 L、vl=L）的
+            # 选择链逐位同构（任意 L，不再要求块对齐）。
+            # 触发面仅 skip_far（E137 判决层集/D' gate）——非 skip 层与
+            # legacy α 比例口径（nt_near_len=None，ring 几何无定义）逐位
+            # 不变。骑墙块整块（≤bs token，含驻留段头几个 token）退出
+            # near 竞争：语义变更 ≤ bs token/层，near 区最远端骑墙块，
+            # E137 eps=0.05 层集本就是 far 质量极低层——验收报告披露。
+            # E175 同款驻留起点（与 ops.tli_static_cache.e175_ring_geometry
+            # 单一事实源同公式：ring_lo = S − swa − near_len；未满/负截 0）
+            # 【E127 回归修复】驻留起点计算内联进短路条件——原独立计算行
+            # 在 nt_near_len=None（legacy α 口径，E127 门禁几何）时
+            # int(None) 崩（首跑 E127 实证）；and 短路后 None 恒不触算。
+            if (self.skip_far and self.nt_near_len is not None
+                    and near_blks * bs < max(
+                        0, S_real - self.sliding_window_size
+                        - int(self.nt_near_len))):
+                far_tok_hi = min((near_blks + 1) * bs,
+                                 S_real - self.sliding_window_size)
             # 严格口径（2026-09-29 用户最终澄清）：sink/swa 保护 token 必选且
             # 自动从预算排除——mid 预算 K2_mid = K2 − sink_tok − swa_tok；
             # 固定区 token 不进任何 topk 池，最终 mask 直接置位
@@ -4625,6 +4881,18 @@ class TLIIndexer(TIAIndexer):
         i_f = i_n = None
         far_pool_lo, far_pool_hi = far_lo_blk, far_hi_blk
         near_pool_lo, near_pool_hi = near_blks, swa_lo_blk
+        # 【E175 W1 骑墙块排除——与 compute_mask L1 段同步】skip 层环绕步
+        # 的骑墙块（near 池最左块，[near_blks·bs, S−swa−near_len) 段
+        # token 已被 ring 驱逐）退出 near 池——本函数是 compute_score 侧
+        # L1（快照源），compute_mask 复用内门逐项比较 far_pool_lo/
+        # near_pool_lo/bypass_blks：单侧收紧会破「同调用内几何恒一致」
+        # 恒等式 → 复用臂落补跑路径（其 score_coarse_avg mean 缺陷曾致
+        # cat 形状崩，探针 L=4289 实证）。两侧同步后内门恒过，复用
+        # 路径与全宽/虚拟轴同构语义一致。
+        if (self.skip_far and self.nt_near_len is not None
+                and near_blks * bs < max(
+                    0, S_real - swa_tok - int(self.nt_near_len))):
+            near_pool_lo = near_blks + 1
         nb_near = 0
         nb_far = 0
         if e64_partition:
@@ -4639,7 +4907,11 @@ class TLIIndexer(TIAIndexer):
             if self.boundary_bypass:
                 _bp = []
                 if sink_tok % bs != 0:
-                    _bp.append(far_lo_blk)
+                    # 【E175 W1】sink 跨界保送页剔除——与 compute_mask
+                    # bypass 段同步（_e175_wrap_skip 单一事实源；此处注释
+                    # 从简，完整根因见 compute_mask 侧）。
+                    if not self._e175_wrap_skip(S_real, sink_tok, swa_tok):
+                        _bp.append(far_lo_blk)
                 _swa_lo_tok = max(0, S_real - swa_tok)
                 if _swa_lo_tok % bs != 0:
                     _cb = _swa_lo_tok // bs

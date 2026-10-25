@@ -133,6 +133,12 @@ _TREATMENT_FIELD_DEFAULTS = {
     "tli_dyn_dgate": False,
     "tli_dyn_dgate_eps": 0.05,
     "tli_dyn_dgate_rows": 256,
+    # E175 W1：静态冻结 skip 层集（ring 物理 KV 压缩）。改变层内驻留
+    # 集与 mask 几何（skip 层 ring 槽位域），必须进 treatment 身份——
+    # 异层集同 hash 互覆是 B09 族事故形态。默认空串 = 不启用零扰动
+    # （manifest 扩字段使全部 treatment hash 移位一轮，E134/E135/E138
+    # 先例，既有锚点文件名不重算不受影响）。
+    "tli_skip_layer_ids": "",
     # E155/E155b：固定配额几何三参数 + 新口径双开关（GPT 审计 2026-10-19
     # 阻塞级修复：不入 manifest 则 nb/nt/near_L 不同的格子共享同一
     # treatment hash——pred_postfix 目录隔离之外的任何路径（复用格/重跑/
@@ -1178,6 +1184,13 @@ def get_method_name_with_info(args, snapshot=None):
             e155 += "_bb0"
         if getattr(args, "tli_l2_quant", False):
             e155 += "_lq4"
+        # E175 W1：静态 skip 层集（ring 压缩）标记进可读名——默认空串
+        # 不加后缀，在跑链文件名逐位不变；启用时 _ringskip<层集> 使
+        # 异层集臂文件名可分。身份单射由 manifest/hash 恒承载（可读段
+        # 仅防御性冗余，同 E137 ddg 后缀先例）。
+        _rs = getattr(args, "tli_skip_layer_ids", "")
+        if _rs:
+            e155 += f"_ringskip{_rs}"
         # 076（TL-E121-OUTPUT-ID）：可读段逐位不动（B09 口径），追加
         # canonical treatment hash 尾段 _h<hash10>——全部输出相关参数
         # （far/near method/select、subspace 具体值、投影基、per_q_head、
