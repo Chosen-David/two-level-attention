@@ -118,7 +118,7 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   B=1 复现主表 2.12×（偏差 <1%）；机制=dense 批摊销被 KV 流量稀释
   vs tli 每行成本平坦（平坦化机制的批维度红利）；tli 行串行代价随 L
   增大（每行 +19%→+66%→+114%），跨行融合工程动机数据。
-- **【branch 待合入·跨模型族】E168 Llama iter3 复制**
+- **【iter3 已合入·跨模型族】E168 Llama iter3 复制**
   （`e168_llama_iter3_verdict.json`，pc02 四卡三臂）：iter3 融合链在
   Llama-3.1-8B 完整复现——bitexact 三长度 PASS、TPOT 增益
   −25.2/−31.4/−43.3%（vs Qwen3 −24.3/−31.1/−40.2%）、加速比
@@ -129,7 +129,12 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   Llama iter3 busy 15.874/16.069/16.463ms（+3.7%@4×），gemm 4.36-4.39/
   attn 0.735/copy 5.2-5.3 三类平直，other 5.48→6.06 唯一增长——与
   Qwen3 e166i/j/h 四类结构逐类同型，平坦化机制证据升至 kernel 类级
-  双模型族口径。
+  双模型族口径。**e168c Llama RULER 质量门 PASS**
+  （`e168c_llama_quality_gate_ruler.json`）：120 样本 × 3 任务
+  （niah_single_1/niah_multikey_1/vt）orig vs iter3 双臂输出 md5 逐字节
+  一致——Llama 证据链三件齐（e2e bitexact + census + 质量门）。口径注：
+  本系列为 K1=128（历史主表口径）；K1=64 生产口径由 e171/e172-e174
+  系列另行闭合。
 
 ## 3. 对比口径（vendor 基线）
 

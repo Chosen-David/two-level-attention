@@ -39,7 +39,11 @@ def save(fig,name):
  if shutil.which('inkscape'):
   subprocess.run(['inkscape',str(OUT/(name+'.svg')),'--export-type=pdf','--export-filename='+str(OUT/(name+'.pdf'))],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
  else:
-  import cairosvg;cairosvg.svg2pdf(url=str(OUT/(name+'.svg')),write_to=str(OUT/(name+'.pdf')))
+  try:
+   import cairosvg;cairosvg.svg2pdf(url=str(OUT/(name+'.svg')),write_to=str(OUT/(name+'.pdf')))
+  except ImportError:
+   # 本机无 inkscape/cairosvg：matplotlib 直出 PDF（字体嵌入 Type42，已全局设置）
+   fig.savefig(OUT/(name+'.pdf'))
  plt.close(fig)
 # Figure1 uses the remote four-panel design, maintained in a single renderer.
 if ONLY == 'all':
