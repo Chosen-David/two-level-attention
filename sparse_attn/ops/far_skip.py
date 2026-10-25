@@ -10,6 +10,8 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 
+from .far_skip_workspace import FarSkipWorkspace, stable_topk_positions
+
 
 @dataclass(frozen=True)
 class FarSkipConfig:
@@ -45,6 +47,23 @@ class FarSkipConfig:
         return min(length, max(self.sink_tokens, self.near_start(length)))
 
 
+@dataclass(frozen=True)
+class FarSkipLayout:
+    sink: int
+    tail_capacity: int
+
+    @property
+    def capacity(self):
+        return self.sink + self.tail_capacity
+
+    def slot(self, position):
+        return position if position < self.sink else self.sink + (position-self.sink) % self.tail_capacity
+
+    def map(self, positions):
+        return torch.where(positions < self.sink, positions,
+                           self.sink + (positions-self.sink).remainder(self.tail_capacity))
+
+
 @dataclass
 class FarSkipSelection:
     # Absolute positions, equal-width rows per KV head; no padding or duplicates.
@@ -64,15 +83,27 @@ def _physical_positions(positions, *, length, physical_length, sink, tail_start)
     return torch.where(positions < prefix, positions, positions - tail_start + prefix)
 
 
-def _keys_at(k, positions, *, length, cfg, tail_start):
-    physical = _physical_positions(positions, length=length,
-                                   physical_length=k.shape[1],
-                                   sink=cfg.sink_tokens, tail_start=tail_start)
-    # Positions are constructed from permitted intervals before indexing K.
+def _keys_at(k, positions, *, length, cfg, tail_start=None, layout=None,
+             dims=None, workspace=None):
+    if layout is not None:
+        if k.shape[1] != layout.capacity or layout.sink != cfg.sink_tokens:
+            raise ValueError("ring KV shape disagrees with layout")
+        physical = layout.map(positions)
+    else:
+        physical = _physical_positions(positions, length=length,
+                                       physical_length=k.shape[1],
+                                       sink=cfg.sink_tokens, tail_start=tail_start)
+    ws = workspace if workspace is not None else FarSkipWorkspace()
+    heads = ws.ids(k.shape[2], k.device)
+    if dims is None:
+        if positions.dim() == 1:
+            return k[0].index_select(0, physical)
+        return k[0][physical, heads[:, None]]
+    # One advanced-index operation reads only requested token/dimension pairs.
+    # No full-D intermediate is materialized before the subspace slice.
     if positions.dim() == 1:
-        return k[0].index_select(0, physical)
-    heads = torch.arange(k.shape[2], device=k.device)[:, None]
-    return k[0][physical, heads]
+        return k[0][physical[:, None, None], heads[None, :, None], dims[None, None, :]]
+    return k[0][physical[..., None], heads[:, None, None], dims[None, None, :]]
 
 
 def _quantize(x):
@@ -82,11 +113,14 @@ def _quantize(x):
 
 
 def select_far_skip(q, k, length, cfg, coarse_dims, fine_dims, *,
-                    scale=None, tail_start=None):
+                    scale=None, tail_start=None, layout=None, workspace=None):
     """Select absolute IDs without building full-history summaries or masks.
 
     q=[1,1,H,D], k=[1,Sphysical,Hkv,D]. `tail_start` describes packed
-    [0,sink) + [tail_start,length) storage; None means an uncompressed cache.
+    [0,sink) + [tail_start,length) storage. `layout` instead describes cyclic
+    storage. With neither supplied, K contains the full logical sequence.
+    `workspace` is request-local, append-only, single-stream inference state;
+    returned positions borrow its scratch storage until the next selection.
     Protected tokens participate in per-head normalization, but do not compete
     for the middle budget. Ties use ascending absolute token/page positions.
     """
@@ -95,8 +129,9 @@ def select_far_skip(q, k, length, cfg, coarse_dims, fine_dims, *,
             or q.shape[2] % k.shape[2] or q.device != k.device
             or q.dtype != k.dtype):
         raise ValueError("far skip requires one decode query and compatible GQA KV")
+    ws = workspace if workspace is not None else FarSkipWorkspace()
     start = cfg.near_start(length)
-    if tail_start is not None and tail_start != cfg.tail_start(length):
+    if layout is None and tail_start is not None and tail_start != cfg.tail_start(length):
         raise ValueError("packed cache geometry differs from selector geometry")
     Hkv, G = k.shape[2], q.shape[2] // k.shape[2]
     bs, dev = cfg.block_size, k.device
@@ -109,68 +144,77 @@ def select_far_skip(q, k, length, cfg, coarse_dims, fine_dims, *,
     # their unprotected near tokens still compete in L2.
     first = (middle_lo + bs - 1) // bs
     stop = swa_lo // bs
-    pages = torch.arange(first, max(first, stop), device=dev)
+    stop = max(first, stop)
+    pages = ws.interval(first, stop, dev)
     n_pages = min(cfg.near_pages, pages.numel())
-    q_coarse = q[0, 0].index_select(-1, coarse_dims).float() * scale
+    offsets = ws.ids(bs, dev)
+    gather = lambda pos, dims: _keys_at(k, pos, length=length, cfg=cfg,
+                                       tail_start=tail_start, layout=layout,
+                                       dims=dims, workspace=ws)
     if n_pages:
-        positions = (pages[:, None] * bs + torch.arange(bs, device=dev)).flatten()
-        keys = _keys_at(k, positions, length=length, cfg=cfg,
-                        tail_start=tail_start).index_select(-1, coarse_dims)
-        keys = keys.reshape(-1, bs, Hkv, coarse_dims.numel())
-        if cfg.near_method == "avg":
-            summary = keys.mean(1).float()
-            scores = torch.einsum("hgd,phd->hgp", q_coarse.reshape(Hkv, G, -1), summary)
+        if n_pages == pages.numel():
+            chosen = pages.expand(Hkv, -1)
         else:
+            summaries = ws.page_summary(k, length, cfg, coarse_dims, first, stop, gather)
+            q_coarse = q[0, 0].index_select(-1, coarse_dims).float() * scale
             qg = q_coarse.reshape(Hkv, G, -1)
-            scores = (torch.einsum("hgd,phd->hgp", qg.clamp(min=0), keys.amax(1).float())
-                      + torch.einsum("hgd,phd->hgp", qg.clamp(max=0), keys.amin(1).float()))
-        scores = scores.to(q.dtype).mean(1)
-        picked = torch.argsort(scores, dim=-1, descending=True, stable=True)[:, :n_pages]
-        chosen = pages[picked].sort(-1).values
-        candidates = (chosen[..., None] * bs + torch.arange(bs, device=dev)).reshape(Hkv, -1)
+            if cfg.near_method == "avg":
+                scores = torch.einsum("hgd,phd->hgp", qg, summaries[0])
+            else:
+                scores = (torch.einsum("hgd,phd->hgp", qg.clamp(min=0), summaries[1])
+                          + torch.einsum("hgd,phd->hgp", qg.clamp(max=0), summaries[0]))
+            scores = scores.to(q.dtype).mean(1)
+            chosen = pages[stable_topk_positions(scores, n_pages, ws)]
+        candidates = (chosen[..., None] * bs + offsets).reshape(Hkv, -1)
     else:
-        candidates = torch.empty((Hkv, 0), dtype=torch.long, device=dev)
+        candidates = ws.ids(0, dev).expand(Hkv, -1)
 
-    edges = []
+    # Construct in absolute order, avoiding whole-candidate/whole-output sorts.
+    parts = [candidates]
     if middle_lo < swa_lo:
         left_end = middle_lo
         if middle_lo % bs:
             left_end = min(swa_lo, (middle_lo // bs + 1) * bs)
-            edges.append(torch.arange(middle_lo, left_end, device=dev))
+            parts.insert(0, ws.interval(middle_lo, left_end, dev).expand(Hkv, -1))
         right_lo = max(left_end, (swa_lo // bs) * bs)
         if swa_lo % bs and right_lo < swa_lo:
-            edges.append(torch.arange(right_lo, swa_lo, device=dev))
-    if edges:
-        candidates = torch.cat((candidates, torch.cat(edges).expand(Hkv, -1)), -1)
-    candidates = candidates.sort(-1).values
-    protected = torch.cat((torch.arange(prefix, device=dev),
-                           torch.arange(max(prefix, swa_lo), length, device=dev)))
+            parts.append(ws.interval(right_lo, swa_lo, dev).expand(Hkv, -1))
+    candidates = ws.cat("candidates", parts)
+    prefix_ids = ws.ids(prefix, dev)
+    window_ids = ws.interval(max(prefix, swa_lo), length, dev)
+    protected = ws.cat("protected", [prefix_ids, window_ids])
     remaining = cfg.token_budget - protected.numel()
     keep = min(remaining, candidates.shape[-1])
-    if keep < candidates.shape[-1]:
-        pool = torch.cat((candidates, protected.expand(Hkv, -1)), -1)
-        keys = _keys_at(k, pool, length=length, cfg=cfg,
-                        tail_start=tail_start).index_select(-1, fine_dims)
+    if keep == 0:
+        candidates = candidates[:, :0]
+    elif keep < candidates.shape[-1]:
+        pool = ws.cat("pool", [candidates, protected.expand(Hkv, -1)])
+        keys = gather(pool, fine_dims)
         if cfg.quantize:
             keys = _quantize(keys)
         qfine = (q[0, 0].index_select(-1, fine_dims).float() * scale).reshape(Hkv, G, -1)
         logits = torch.einsum("hgd,hnd->hgn", qfine, keys.float()).to(q.dtype)
         probabilities = logits.softmax(-1).mean(1)[:, :candidates.shape[-1]]
-        rank = torch.argsort(probabilities, dim=-1, descending=True, stable=True)[:, :keep]
+        rank = stable_topk_positions(probabilities, keep, ws)
         candidates = candidates.gather(-1, rank)
-    positions = torch.cat((protected.expand(Hkv, -1), candidates), -1).sort(-1).values
+    positions = ws.cat("positions", [prefix_ids.expand(Hkv, -1), candidates,
+                                     window_ids.expand(Hkv, -1)])
+
     return FarSkipSelection(positions, start, length)
 
 
-def attend_far_skip(q, k, v, selection, cfg, *, scale=None, tail_start=None):
+def attend_far_skip(q, k, v, selection, cfg, *, scale=None, tail_start=None,
+                    layout=None, workspace=None):
     """Original-width attention reads only selected protected/near KV."""
     if (v.shape[:3] != k.shape[:3] or v.device != k.device or v.dtype != k.dtype):
         raise ValueError("incompatible value cache")
     positions = selection.positions
     if positions.shape[-1] == 0:
         raise ValueError("far-off selection is empty")
-    kk = _keys_at(k, positions, length=selection.length, cfg=cfg, tail_start=tail_start)
-    vv = _keys_at(v, positions, length=selection.length, cfg=cfg, tail_start=tail_start)
+    kk = _keys_at(k, positions, length=selection.length, cfg=cfg, tail_start=tail_start,
+                  layout=layout, workspace=workspace)
+    vv = _keys_at(v, positions, length=selection.length, cfg=cfg, tail_start=tail_start,
+                  layout=layout, workspace=workspace)
     Hkv, G = k.shape[2], q.shape[2] // k.shape[2]
     qg = q[0, 0].reshape(Hkv, G, 1, q.shape[-1])
     scale = q.shape[-1] ** -0.5 if scale is None else scale

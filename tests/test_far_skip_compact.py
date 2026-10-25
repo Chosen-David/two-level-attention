@@ -134,6 +134,7 @@ def test_cache_rollover_real_storage_and_logical_positions(sink, window):
     full_k, full_v = torch.randn(2, 1, 2, 3, 8)
     cache.update(full_k, full_v, 0)
     layer = evict_far(cache, 0, cfg)
+    addresses = (layer.keys.data_ptr(), layer.values.data_ptr())
     for length in range(4, 138):
         nk, nv = torch.randn(2, 1, 2, 1, 8)
         full_k, full_v = torch.cat((full_k, nk), -2), torch.cat((full_v, nv), -2)
@@ -142,18 +143,21 @@ def test_cache_rollover_real_storage_and_logical_positions(sink, window):
         pos = list(range(min(sink, length))) + list(range(tail, length))
         assert cache.get_seq_length() == length
         assert cache.get_mask_sizes(torch.tensor([length]), 0) == (length + 1, 0)
-        torch.testing.assert_close(k, full_k[..., pos, :])
-        torch.testing.assert_close(v, full_v[..., pos, :])
+        capacity = 16 + window + 3
+        physical = [t if t < sink else sink + (t-sink) % capacity for t in pos]
+        torch.testing.assert_close(k[..., physical, :], full_k[..., pos, :])
+        torch.testing.assert_close(v[..., physical, :], full_v[..., pos, :])
+        assert (k.data_ptr(), v.data_ptr()) == addresses
         for tensor in (k, v):
             assert tensor.untyped_storage().nbytes() == tensor.numel() * tensor.element_size()
         assert k.shape[-2] <= sink + window + 16 + 3
         q = torch.randn(1, 1, 4, 8)
         dims = torch.arange(8)
         retained = select_far_skip(q, full_k.transpose(1, 2), length, cfg, dims, dims)
-        packed = select_far_skip(q, k.transpose(1, 2), length, cfg, dims, dims, tail_start=tail)
+        packed = select_far_skip(q, k.transpose(1, 2), length, cfg, dims, dims, layout=layer.layout)
         assert torch.equal(retained.positions, packed.positions)
         if packed.positions.shape[-1]:
-            actual = attend_far_skip(q, k.transpose(1, 2), v.transpose(1, 2), packed, cfg, tail_start=tail)
+            actual = attend_far_skip(q, k.transpose(1, 2), v.transpose(1, 2), packed, cfg, layout=layer.layout)
             expected = dense_selected_reference(q, full_k.transpose(1, 2), full_v.transpose(1, 2), retained.positions)
             torch.testing.assert_close(actual, expected)
     assert layer.keys.untyped_storage().nbytes() < full_k.untyped_storage().nbytes()

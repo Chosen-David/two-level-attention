@@ -6,6 +6,7 @@ from transformers.cache_utils import DynamicCache, DynamicLayer
 
 from .far_skip import FarSkipConfig, select_far_skip, attend_far_skip
 from .far_skip_cache import FarSkipLayer, evict_far
+from .far_skip_workspace import FarSkipWorkspace
 
 
 def configure_far_skip(indexer):
@@ -25,7 +26,8 @@ def configure_far_skip(indexer):
             or indexer.per_q_head or indexer.enable_async
             or indexer._basis_all is not None or indexer.moba_gate
             or indexer.sigma_select != "none" or indexer.sinkswa_only
-            or indexer.near_select != "4bit" or indexer.far_select != "4bit"):
+            or indexer.near_select != "4bit" or indexer.far_select != "4bit"
+            or indexer.subspace == "mla_rope"):
         raise ValueError("compact far skip requires fixed near_len/pages, near_tokens=off, "
                          "boundary bypass and ordinary shared-head two-level selection")
     if indexer.nt_near_len < args.tia_block_size:
@@ -57,6 +59,7 @@ def try_far_skip_decode(module, q, k, v, cache, mask, cache_position, batch_ctx)
     li = module.layer_idx
     length = cache.get_seq_length(li)
     if not length:
+        idx._far_skip_workspace = None
         return None  # full prefill and gate calibration still use the original path
     if q.shape[-2] != 1 or mask is not None:
         raise ValueError("compact far skip requires one decode token and attention_mask=None")
@@ -74,7 +77,12 @@ def try_far_skip_decode(module, q, k, v, cache, mask, cache_position, batch_ctx)
     if packed and (idx.far_skip_cache != "evict" or layer.config != cfg):
         raise ValueError("cannot change cache mode/geometry after eviction")
     # Reject incompatible head dimensions before evicting anything.
-    full = torch.arange(q.shape[-1], device=q.device)
+    ws = getattr(idx, "_far_skip_workspace", None)
+    if ws is None:
+        ws = idx._far_skip_workspace = FarSkipWorkspace()
+    full = getattr(ws, "full_dims", None)
+    if full is None:
+        full = ws.full_dims = torch.arange(q.shape[-1], device=q.device)
     coarse = idx._subspace_indices(q.device) if idx.enable_subspace else full
     fine = (full if idx.l2_subspace == "full" else
             coarse if idx.enable_subspace else idx._qat_indices(q.device))
@@ -83,9 +91,9 @@ def try_far_skip_decode(module, q, k, v, cache, mask, cache_position, batch_ctx)
     if idx.far_skip_cache == "evict":
         layer = evict_far(cache, li, cfg)
     k, v = cache.update(k, v, li, {"cache_position": cache_position})
-    tail = layer.tail_start if isinstance(layer, FarSkipLayer) else None
+    layout = layer.layout if isinstance(layer, FarSkipLayer) else None
     q, k, v = (x.transpose(1, 2) for x in (q, k, v))
     selection = select_far_skip(q, k, length + 1, cfg, coarse, fine,
-                               scale=module.scaling, tail_start=tail)
+                               scale=module.scaling, layout=layout, workspace=ws)
     return attend_far_skip(q, k, v, selection, cfg,
-                           scale=module.scaling, tail_start=tail)
+                           scale=module.scaling, layout=layout, workspace=ws)

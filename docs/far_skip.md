@@ -63,18 +63,41 @@ are excluded here. Stable tie-breaking and arithmetic ordering also differ.
 Existing dynamic calibration is unchanged; its unaligned far endpoint can
 conservatively include up to `b-1` tokens in the aligned near region.
 
-After the gate freezes, each evicted layer owns independent contiguous tensors
-for `[0, min(s,S))` plus `[max(s, near_start), S)` (clipped for short contexts).
-Subsequent appends discard tokens as they cross that moving near boundary.
-Physical cache length is bounded by `s + n + w + b - 1`; it is independent of
-the far-history length. `get_seq_length()` still returns logical `S`, so HF
-generation and RoPE keep absolute positions. Keys are not re-rotated.
+After the gate freezes, each evicted layer owns fixed-address K/V buffers of
+`s + n + w + b - 1` slots: a fixed sink prefix plus a cyclic suffix. Absolute
+position `t >= s` maps to `s + (t-s) % (n+w+b-1)`. Only live near/window positions
+are read, including when the tail wraps. Unused/expired slots are not keys for
+attention. `get_seq_length()` still returns logical `S`, so HF generation and
+RoPE keep absolute positions. Keys are not re-rotated.
 
-The first eviction reads/copies the retained intervals and releases the old
-cache reference; later updates copy only bounded storage. This saves active
-decode KV memory, **not the prefill peak**. CUDA reserved allocator memory need
-not fall. External references to old KV or autograd graphs would prevent its
-release; the runtime requires inference and rejects differentiable cached KV.
+The first eviction copies the retained intervals and releases the old cache
+reference. Subsequent appends write exactly one K token and one V token in
+place; they neither allocate nor copy old KV. This saves long-context active
+decode KV memory, **not the prefill peak**. Fixed reservation can use more space
+than a short full cache when a static gate activates before far exists. CUDA
+reserved allocator memory need not fall. External references to old KV or
+autograd graphs would prevent release; the runtime requires inference and
+rejects differentiable cached KV.
+
+The optimized eager selector also:
+
+- caches immutable complete-page statistics in bounded cyclic slots; each new
+  complete near page is reduced once, while query-dependent scores are always
+  recomputed;
+- gathers token and subspace indices in one operation, with no full-D temporary;
+- uses exact score/position integer keys for stable top-k (FP16/BF16/FP32), then
+  sorts only selected indices. FP64 retains the general stable-sort path;
+- constructs candidates in absolute order and reuses range/cat buffers, removing
+  candidate/output full sorts and repeated metadata allocation. All-selected
+  pages and zero middle-token budgets bypass unnecessary scoring.
+
+`FarSkipWorkspace` is per-request, append-only, sequential, single-stream state.
+It must not be shared between requests or used after modifying existing K or
+dimension indices. The model bridge resets it at prefill and `indexer.clear()`.
+Selections returned with an explicit workspace borrow its position buffer until
+the next selection; clone IDs if they must outlive that call. This eager version
+still has multiple framework kernels: it does not claim a fused L2 kernel or
+zero temporary allocations, and CUDA Graph remains unsupported.
 
 Eviction is irreversible within a request. Changing the gate back to far-on,
 changing geometry/cache mode, cropping/rewinding, beams/batching, offload, and
@@ -88,7 +111,7 @@ are outside this implementation and fail explicitly.
 ## Validate and measure
 
 ```bash
-python -m pytest -q tests/test_far_skip_compact.py
+python -m pytest -q tests/test_far_skip_compact.py tests/test_far_skip_optimized.py
 python -m exp.bench.far_skip_decode --device cuda --legacy \
   --lengths 8192 32768 65536 --warmup 8 --steps 64
 ```
@@ -107,8 +130,24 @@ request gate isolation, real random-weight Qwen3 prefill/decode and HF
 `generate()` parity between `retain` and `evict`. The CUDA BF16 integration test
 is skipped explicitly when CUDA is unavailable.
 
-Recorded CPU smoke: `agent_doc/results/far_skip_20261025/cpu_smoke.json`.
+The original v1 CPU smoke is preserved at
+`agent_doc/results/far_skip_20261025/cpu_smoke.json`.
 With prompt 8192, near 1024, sink/window 128/128 and 10 appended tokens, logical
 length is 8202 in both modes; physical KV length is 8202 vs 1290. Actual FP32 KV
 storage is 33,595,392 vs 5,283,840 bytes (84.27% lower for this one layer).
-CPU timings in that receipt must not be used as GPU speedup evidence.
+That receipt describes v1's variable-sized cache, not the current ring capacity.
+The optimized implementation's paired timings, memory tradeoffs, source hashes
+and operator profile are in `agent_doc/results/far_skip_optimized_20261025/`.
+CPU timings must not be used as GPU speedup evidence.
+
+To compare with v1 using identical inputs and check every output:
+
+```bash
+git worktree add --detach /tmp/far-v1 3c95ea167d66b462e2c64840adcc7c532a5115bd
+python -m exp.bench.far_skip_compare --baseline-root /tmp/far-v1 --device cuda
+```
+
+Alternating paired runs include cache update, selection and attention; first
+decode is reported separately from steady state. Use `--device cpu` only for
+CPU results. `far_skip_profile` provides CPU operator/allocation accounting;
+its event counts are not GPU launch counts.

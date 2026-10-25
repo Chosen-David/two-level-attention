@@ -21,7 +21,7 @@ from sparse_attn.ops.eager_decoding import eager_decoding_attn
 
 
 @torch.inference_mode()
-def run(options, length, mode):
+def run(options, length, mode, *, runtime=try_far_skip_decode, collect_outputs=False):
     torch.manual_seed(20261025)
     dev = torch.device(options.device)
     dtype = torch.bfloat16 if dev.type == "cuda" else torch.float32
@@ -44,7 +44,7 @@ def run(options, length, mode):
     if dev.type == "cuda":
         torch.cuda.synchronize()
         torch.cuda.reset_peak_memory_stats()
-    wall, gpu = [], []
+    wall, gpu, outputs = [], [], []
     first_ms = None
     for step in range(options.warmup + options.steps):
         q = torch.randn(1, 16, 1, 128, device=dev, dtype=dtype)
@@ -55,7 +55,7 @@ def run(options, length, mode):
             start.record()
         begin = time.perf_counter()
         if mode != "legacy":
-            out = try_far_skip_decode(module, q, k, v, cache, None, None, None)
+            out = runtime(module, q, k, v, cache, None, None, None)
         else:
             k, v = cache.update(k, v, 0)
             q, k, v = (x.transpose(1, 2) for x in (q, k, v))
@@ -73,6 +73,8 @@ def run(options, length, mode):
             wall.append(elapsed)
             if dev.type == "cuda":
                 gpu.append(start.elapsed_time(end))
+        if collect_outputs:
+            outputs.append(out.detach().cpu().clone())
         del q, k, v
     layer = cache.layers[0]
     result = dict(mode=mode, prompt_length=length, logical_length=cache.get_seq_length(),
@@ -80,9 +82,17 @@ def run(options, length, mode):
                   kv_storage_bytes=sum(x.untyped_storage().nbytes() for x in (layer.keys, layer.values)),
                   first_decode_wall_ms=first_ms, wall_ms=wall, cuda_event_ms=gpu,
                   median_wall_ms=statistics.median(wall), output_sum=float(out.float().sum()))
+    if mode == "evict":
+        result["live_retained_tokens"] = min(idx.sink_tokens, cache.get_seq_length()) + cache.get_seq_length() - layer.tail_start
+    ws = getattr(idx, "_far_skip_workspace", None)
+    if ws is not None:
+        result["summary_pages_rebuilt"] = ws.pages_rebuilt
+        result["workspace_bytes"] = sum(t.untyped_storage().nbytes() for t in
+            list(ws._ranges.values()) + list(ws._buffers.values()) + (ws.summaries or [])
+            + ([ws.full_dims] if hasattr(ws, "full_dims") else []))
     if dev.type == "cuda":
         result["cuda_peak_allocated_bytes_including_initial_cache"] = torch.cuda.max_memory_allocated()
-    return result
+    return (result, outputs) if collect_outputs else result
 
 
 def main():

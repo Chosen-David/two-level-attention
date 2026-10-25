@@ -4507,6 +4507,7 @@ class TLIIndexer(TIAIndexer):
         }
 
     def clear(self):
+        self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None
         self._km_token_assign = None

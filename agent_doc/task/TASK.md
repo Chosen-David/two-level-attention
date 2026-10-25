@@ -2,6 +2,8 @@
 
 ## 2026-10-25
 
+- [x] [TL-FAR-SKIP-EAGER-OPT-20261025] 完成 far-off eager 五项优化：环形 KV 原位写入、增量页统计、直接子空间 gather、稳定 top-k、有界 scratch 复用；CPU 配对/正确性证据已归档，GPU/Graph 未验；继续通过 PR #7 交付。([详情](task_details/TL-FAR-SKIP-EAGER-OPT-20261025.md))
+
 - [x] [TL-FAR-SKIP-COMPACT-20261025] 实现 opt-in Qwen3 far-off 的 near-only 选择/attention 与真实 KV 淘汰；CPU 真 Torch/HF 正确性通过，GPU/质量/速度待验；按用户要求通过 PR 交付。([详情](task_details/TL-FAR-SKIP-COMPACT-20261025.md))
 
 ## 2026-10-21

@@ -6,6 +6,8 @@ positions never change when storage is compacted. No view retains the full KV.
 import torch
 from transformers.cache_utils import DynamicCache, DynamicLayer
 
+from .far_skip import FarSkipLayout
+
 
 def _reject_legacy_export():
     raise ValueError("legacy KV tuples cannot represent evicted absolute positions")
@@ -17,6 +19,7 @@ class FarSkipLayer(DynamicLayer):
         self.config = None
         self.logical_length = 0
         self.tail_start = None
+        self.layout = None
 
     @classmethod
     def from_layer(cls, layer, config):
@@ -33,11 +36,22 @@ class FarSkipLayer(DynamicLayer):
         result.dtype, result.device = layer.keys.dtype, layer.keys.device
         result.tail_start = config.tail_start(result.logical_length)
         prefix = min(config.sink_tokens, result.logical_length)
-        # cat allocates independent storage even when the tail is a view.
-        result.keys = torch.cat((layer.keys[..., :prefix, :],
-                                 layer.keys[..., result.tail_start:, :]), dim=-2)
-        result.values = torch.cat((layer.values[..., :prefix, :],
-                                   layer.values[..., result.tail_start:, :]), dim=-2)
+        result.layout = FarSkipLayout(config.sink_tokens,
+                                      max(config.near_length, config.block_size) + config.window_tokens + config.block_size - 1)
+        shape = (*layer.keys.shape[:-2], result.layout.capacity, layer.keys.shape[-1])
+        result.keys = layer.keys.new_empty(shape)
+        result.values = layer.values.new_empty((*shape[:-1], layer.values.shape[-1]))
+        result.keys[..., :prefix, :].copy_(layer.keys[..., :prefix, :])
+        result.values[..., :prefix, :].copy_(layer.values[..., :prefix, :])
+        # Copy the chronological tail in at most two runs into the cyclic suffix.
+        count = result.logical_length - result.tail_start
+        slot = result.layout.slot(result.tail_start)
+        first = min(count, result.layout.capacity - slot)
+        for dst, src, width in ((slot, result.tail_start, first),
+                                (config.sink_tokens, result.tail_start + first, count - first)):
+            if width:
+                result.keys[..., dst:dst+width, :].copy_(layer.keys[..., src:src+width, :])
+                result.values[..., dst:dst+width, :].copy_(layer.values[..., src:src+width, :])
         return result
 
     def update(self, key_states, value_states, cache_kwargs=None):
@@ -47,18 +61,18 @@ class FarSkipLayer(DynamicLayer):
             raise ValueError("evicted cache supports only single-token, batch-one decode")
         if key_states.requires_grad or value_states.requires_grad:
             raise ValueError("far-evicted cache requires detached inference KV")
-        length = self.logical_length + 1
-        new_tail = self.config.tail_start(length)
-        prefix = min(self.config.sink_tokens, self.logical_length)
-        # Once full, sink stays fixed; before then, all old tokens are prefix.
-        offset = prefix + new_tail - self.tail_start
-        if length <= self.config.sink_tokens:
-            offset = prefix
-        self.keys = torch.cat((self.keys[..., :prefix, :],
-                               self.keys[..., offset:, :], key_states), dim=-2)
-        self.values = torch.cat((self.values[..., :prefix, :],
-                                 self.values[..., offset:, :], value_states), dim=-2)
-        self.logical_length, self.tail_start = length, new_tail
+        for incoming, storage in ((key_states, self.keys), (value_states, self.values)):
+            expected = (*storage.shape[:-2], 1, storage.shape[-1])
+            if (incoming.shape != expected or incoming.dtype != storage.dtype
+                    or incoming.device != storage.device):
+                raise ValueError("new KV must match ring batch, heads, width, dtype and device")
+        position = self.logical_length
+        slot = self.layout.slot(position)
+        # Fixed addresses: no allocation or copy of old KV in steady decode.
+        self.keys[..., slot:slot+1, :].copy_(key_states)
+        self.values[..., slot:slot+1, :].copy_(value_states)
+        self.logical_length += 1
+        self.tail_start = self.config.tail_start(self.logical_length)
         return self.keys, self.values
 
     def get_seq_length(self):
@@ -71,6 +85,7 @@ class FarSkipLayer(DynamicLayer):
         self.config = None
         self.logical_length = 0
         self.tail_start = None
+        self.layout = None
 
     def crop(self, max_length):
         if self.config is not None:
