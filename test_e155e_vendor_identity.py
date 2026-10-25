@@ -78,15 +78,18 @@ def t1_tli_manifest_unchanged():
                f"{sorted(set(m) - set(INFO._TREATMENT_FIELD_DEFAULTS))} / 缺 "
                f"{sorted(set(INFO._TREATMENT_FIELD_DEFAULTS) - set(m))}")
         # e119 锚点配置的 tli hash 不移位（跨构造路径单射的既有锚）。
-        # 锚值 = 当前主线实测 h68aa19d58f——e119 测试文件自身的 h175d1bcba6
-        # 在主线已陈旧（E135+ 字段扩集后未同步重算，与本门禁无关）；
-        # 本门禁断言的是 E155e 改动前后该 hash 逐位不变（git stash 对照已核）。
+        # 【开源净化 2026-10-23】a{α}_b{β}_g{γ} 可读段随 αβγ 比例 CLI 退役
+        # 删除（tli_alpha/beta/gamma 三键仍恒记 0.0/0.0/1.0 缺省入 manifest，
+        # 内部载体保留）；manifest 删除 kmeans/layer_skip/σ/moba/proj_basis/
+        # dyn_dgate 等 18 个实验键 → 全部 tli hash 整体移位一轮（079/081/
+        # E155c/E155d 先例同纪律同步更新锚值）。本门禁断言净化后该 hash
+        # 逐位稳定（E155e vendor 条件登记不污染 tli manifest 的本质不变）。
         ns2 = _ns("tli", tia_block_size=64, tia_level1_topk=128,
                   tia_level2_topk=2048, tia_level2_cmp_ratio=4,
                   tli_alpha=0.25, tli_beta=0.125, tli_gamma=0.625,
                   tli_enable_kmeans=False, tli_enable_layer_skip=False)
         _check(INFO.get_method_name_with_info(ns2)
-               == "tli_64_128_2048_c4_a0.25_b0.125_g0.625_h68aa19d58f",
+               == "tli_64_128_2048_c4__hd19bb694a9",
                "e119 tli 锚点 hash 移位（tli manifest 被污染）")
         # 无 method 属性（程序化 namespace）也不触发 vendor 登记
         ns3 = types.SimpleNamespace()

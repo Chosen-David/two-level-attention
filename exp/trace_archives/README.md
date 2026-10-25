@@ -26,3 +26,22 @@
 **跳过未归档**（理由见 MANIFEST.md）：/tmp/e105_full、/tmp/e105_cavg_remote（实验在跑仍在增殖）、/tmp/e107_pool_baseline（等 E105 接力）、/tmp/papers 与 /tmp/two_level 与 /tmp/ruler_official（外部 clone 可再生）、/tmp/ruler_32k_data 与 /tmp/ruler_32k_raw（RULER 合成数据，可由 ruler_gen_32k.sh + ruler_official 再生）。
 
 **纪律**：本归档只拷贝不删除，/tmp 原文件保留，删除永远留给用户。
+
+---
+
+# 2026-10-23 开源净化归档增补
+
+以下子目录为 2026-10-23 净化动作新归档（全部 git mv，历史可追）：
+
+- `probe_e5b_e98/`：exp/trace 中**零引用**的 137 个早期探针/分析脚本 +
+  run_scripts/scripts 子目录 + 早期 launcher shell（E5b-E155 谱系）。
+  保留在 exp/trace/ 的仅 14 个仍被判决 JSON script 字段或 exp/bench 引用
+  的脚本 + results/ + logs/ + testdata/ + e158_math_design.md。
+- `old_figures/`：exp/figures 整目录（fig1-fig11 旧版论文图 + e64/e65/e72
+  网格图 + PPT 生成脚本）。现行论文图 = `agent_doc/guide/paper_figs/`
+  （E1/E2/A/O 系，LoDA-SA 命名，graph 时代口径）。
+- `proto_tls_attn/`：早期原型包 tls_attn/（sparse_attn 前身，6766 行）+
+  main.py 早期 e2e 入口 + keep_gpu.py + benchmark_mha_kernel.py
+  （其唯一消费方）。
+- `superseded_bench/`：消费已删除接口（dyn_dgate/greedy/αβγ）的
+  exp/bench 历史脚本。

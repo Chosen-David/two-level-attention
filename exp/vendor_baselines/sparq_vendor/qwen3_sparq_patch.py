@@ -48,6 +48,13 @@ def _qwen3_sparq_wrapper(
     **kwargs,
 ) -> Tuple[torch.Tensor, None]:
     """Qwen3Attention forward：prefill 走原生；decode 走官方 SparQ 稀疏路径。"""
+    # 【契约恢复 2026-10-23】B 轨重写（44a9868 RunningVMean 生命周期修复）
+    # 时丢了 0fd6cac 集成版的计数/守卫契约——baseline_request receipt
+    # 静默空壳（无 routes/identity，sparse-only 拒绝臂失效）。恢复：
+    # batch=1 守卫 + native/sparq 路由计数 + decode 无掩码守卫。
+    _bsz, _qlen_chk, _ = hidden_states.shape
+    if _bsz != 1 or _qlen_chk < 1:
+        raise ValueError('SparQ candidate supports batch=1 only')
     q_len = hidden_states.shape[1]
 
     if q_len > 1:
@@ -57,10 +64,24 @@ def _qwen3_sparq_wrapper(
         self._sparq_mean_cache = None
         self._sparq_mean_length = None
         # prefill：原生 dense（与 fullkv 锚点一致；官方 SparQ prefill 也是 SDPA dense）
+        _stats = getattr(self, '_sparq_stats', None)
+        if _stats is not None:
+            _stats['native_prefill_calls'] = _stats.get('native_prefill_calls', 0) + 1
         return self.flash_forward(
             hidden_states, position_embeddings, attention_mask,
             past_key_values, cache_position, **kwargs,
         )
+
+    # decode 侧守卫（0fd6cac 契约）：无掩码单序列 + use_cache 必真——
+    # padding/自定义掩码下稀疏选择语义不成立，fail closed。仅 cache 非 None
+    # 时生效：cache=None 是 B 轨文档化的 V-mean 重建路径（无历史可选，
+    # 单 token 重建，见 test_sparq_request_lifecycle），不属误用。
+    if past_key_values is not None:
+        from sparse_attn.baseline_runtime import require_unmasked_decode
+        require_unmasked_decode(
+            hidden_states, attention_mask, past_key_values, cache_position)
+        if kwargs.get('use_cache', True) is not True:
+            raise ValueError('SparQ decode requires use_cache=True')
 
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
@@ -135,6 +156,9 @@ def _qwen3_sparq_wrapper(
     attn_output = attn_weights.transpose(1, 2).contiguous()
     attn_output = attn_output.reshape(*input_shape, -1)
     attn_output = self.o_proj(attn_output)
+    _stats = getattr(self, '_sparq_stats', None)
+    if _stats is not None:
+        _stats['sparq_decode_calls'] = _stats.get('sparq_decode_calls', 0) + 1
     return attn_output, None
 
 
@@ -147,10 +171,23 @@ def enable_sparq(
 
     r/k 主表口径：k 固定（默认 1024）；r = round(head_dim/ratio)，
     ratio = context_length/(2*k)（官方 get_r_k_for_compression_ratio 反推）。
+
+    【契约恢复 2026-10-23】入参守卫 + 路由计数 + treatment 身份
+    （0fd6cac 集成版契约，B 轨重写时丢失，本文件恢复）。
     """
+    # 入参守卫：k/context_length 须正整数（type() 严格判 → bool 拒绝，
+    # float 截断风险拒绝——与 _quota_integer 同 fail-closed 口径）
+    if type(k) is not int or k <= 0 or type(context_length) is not int \
+            or context_length <= 0:
+        raise ValueError('SparQ k/context_length must be positive integers')
+    if any(hasattr(m, 'flash_forward') for m in model.modules()
+           if isinstance(m, Qwen3Attention)):
+        raise ValueError('SparQ already installed')
     n_patched = 0
     layer_id = 0
     _ratio = context_length / (2 * k)
+    # 路由计数共享 dict（全部层同一对象；baseline_request diff 消费）
+    stats = {}
 
     def _patch_recursive(container):
         nonlocal n_patched, layer_id
@@ -172,9 +209,24 @@ def enable_sparq(
                 module.sparq_vmean.to(module.q_proj.weight.device)
                 module.flash_forward = module.forward
                 module.forward = types.MethodType(_qwen3_sparq_wrapper, module)
+                module._sparq_stats = stats
                 n_patched += 1
             elif len(list(module._modules.items())) > 0:
                 _patch_recursive(module)
 
     _patch_recursive(model)
+    if n_patched == 0 or n_patched != model.config.num_hidden_layers:
+        raise ValueError('SparQ adapter supports complete Qwen3 attention models only')
+    # treatment 身份 + 路由计数登记（baseline_request receipt 契约）
+    model._baseline_stats = stats
+    import hashlib
+    from pathlib import Path as _P
+    model._baseline_identity = dict(
+        method='sparq_vendor',
+        adapter_sha256=hashlib.sha256(
+            _P(__file__).read_bytes()).hexdigest(),
+        upstream='official sparq_attention_official.py (md5 522a085c)',
+        k=k, context_length=context_length,
+        selection='per-query-head; running-V-mean compensation; full resident KV',
+        gpu_quality_validated=False)
     return n_patched
