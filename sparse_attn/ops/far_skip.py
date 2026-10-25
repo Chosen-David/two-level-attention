@@ -216,11 +216,12 @@ def attend_far_skip(q, k, v, selection, cfg, *, scale=None, tail_start=None,
     vv = _keys_at(v, positions, length=selection.length, cfg=cfg, tail_start=tail_start,
                   layout=layout, workspace=workspace)
     Hkv, G = k.shape[2], q.shape[2] // k.shape[2]
-    qg = q[0, 0].reshape(Hkv, G, 1, q.shape[-1])
+    qg = q[0, 0].reshape(Hkv, 1, G, q.shape[-1])
     scale = q.shape[-1] ** -0.5 if scale is None else scale
-    # Treat each KV group as a batch: eligible CUDA inputs can use fused SDPA.
-    # Even a math-backend fallback sees only gathered KV, never far history.
+    # G independent queries share one K/V head. Put G on the query-length axis
+    # (noncausal, dropout=0), so even the math backend never repeats K/V for
+    # GQA. This also exposes ordinary equal-head SDPA to fused backends.
     out = F.scaled_dot_product_attention(
         qg, kk[:, None], vv[:, None], dropout_p=0.0,
-        is_causal=False, scale=scale, enable_gqa=True)
+        is_causal=False, scale=scale)
     return out.reshape(1, 1, q.shape[2], v.shape[-1])
