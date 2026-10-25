@@ -39,15 +39,15 @@ E2	c@L131072	Qwen3-8B_speedup	ratio	x	3.636	e172_iter3_k64_qwen_verdict.json:res
 E2	c@L32768	Qwen3-8B_tli_eager	tpot_ms	ms	100.90	e172_iter3_k64_qwen_verdict.json:results	tli_eager
 E2	c@L65536	Qwen3-8B_tli_eager	tpot_ms	ms	103.20	e172_iter3_k64_qwen_verdict.json:results	tli_eager
 E2	c@L131072	Qwen3-8B_tli_eager	tpot_ms	ms	133.90	e172_iter3_k64_qwen_verdict.json:results	tli_eager
-E2	c@L32768	Qwen3-32B_dense	tpot_ms	ms	55.50	e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results	dense
-E2	c@L32768	Qwen3-32B_tli_graph	tpot_ms	ms	54.70	e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results	tli_graph
-E2	c@L32768	Qwen3-32B_speedup	ratio	x	1.015	e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results	dense/tli_graph
-E2	c@L65536	Qwen3-32B_dense	tpot_ms	ms	80.21	e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results	dense
-E2	c@L65536	Qwen3-32B_tli_graph	tpot_ms	ms	59.93	e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results	tli_graph
-E2	c@L65536	Qwen3-32B_speedup	ratio	x	1.338	e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results	dense/tli_graph
-E2	c@L131072	Qwen3-32B_dense	tpot_ms	ms	129.10	e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results	dense
-E2	c@L131072	Qwen3-32B_tli_graph	tpot_ms	ms	70.11	e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results	tli_graph
-E2	c@L131072	Qwen3-32B_speedup	ratio	x	1.841	e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results	dense/tli_graph
+E2	c@L32768	Qwen3-32B_dense	tpot_ms	ms	55.27	e174_iter3_k64_32b_verdict.json:results	dense
+E2	c@L32768	Qwen3-32B_tli_graph	tpot_ms	ms	41.30	e174_iter3_k64_32b_verdict.json:results	tli_graph
+E2	c@L32768	Qwen3-32B_speedup	ratio	x	1.338	e174_iter3_k64_32b_verdict.json:results	dense/tli_graph
+E2	c@L65536	Qwen3-32B_dense	tpot_ms	ms	80.36	e174_iter3_k64_32b_verdict.json:results	dense
+E2	c@L65536	Qwen3-32B_tli_graph	tpot_ms	ms	41.77	e174_iter3_k64_32b_verdict.json:results	tli_graph
+E2	c@L65536	Qwen3-32B_speedup	ratio	x	1.924	e174_iter3_k64_32b_verdict.json:results	dense/tli_graph
+E2	c@L131072	Qwen3-32B_dense	tpot_ms	ms	128.67	e174_iter3_k64_32b_verdict.json:results	dense
+E2	c@L131072	Qwen3-32B_tli_graph	tpot_ms	ms	42.67	e174_iter3_k64_32b_verdict.json:results	tli_graph
+E2	c@L131072	Qwen3-32B_speedup	ratio	x	3.015	e174_iter3_k64_32b_verdict.json:results	dense/tli_graph
 E2	c@L32768	Llama-3.1-8B_dense	tpot_ms	ms	21.39	e173_iter3_k64_llama_verdict.json:results	dense
 E2	c@L32768	Llama-3.1-8B_tli_graph	tpot_ms	ms	14.97	e173_iter3_k64_llama_verdict.json:results	tli_graph
 E2	c@L32768	Llama-3.1-8B_speedup	ratio	x	1.428	e173_iter3_k64_llama_verdict.json:results	dense/tli_graph
@@ -57,5 +57,4 @@ E2	c@L65536	Llama-3.1-8B_speedup	ratio	x	2.192	e173_iter3_k64_llama_verdict.json
 E2	c@L131072	Llama-3.1-8B_dense	tpot_ms	ms	56.80	e173_iter3_k64_llama_verdict.json:results	dense
 E2	c@L131072	Llama-3.1-8B_tli_graph	tpot_ms	ms	15.59	e173_iter3_k64_llama_verdict.json:results	tli_graph
 E2	c@L131072	Llama-3.1-8B_speedup	ratio	x	3.643	e173_iter3_k64_llama_verdict.json:results	dense/tli_graph
-E2	c	cross_machine_dev_max	pct	0.22	e160r_32b_replication_verdict.json:deviation_vs_original	speedup_dev_pct
-E2	c	superseded	note	-	panel (c) replaced the iter22 caliber (e152v4/e159, Qwen 1.064/1.448/2.067x, Llama 1.015/1.41/1.961x) with the iter3+K1=64 caliber (E172/E173, 2026-10-25); Qwen3-32B remains iter22 (e160/e160b) until E174
+E2	c	superseded	note	-	panel (c) replaced the iter22 caliber (e152v4/e159/e160/e160b: Qwen-8B 1.064/1.448/2.067x, Llama 1.015/1.41/1.961x, 32B 1.015/1.338/1.841x) with the iter3+K1=64 caliber (E172/E173/E174, 2026-10-25)

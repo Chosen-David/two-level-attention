@@ -1,0 +1,117 @@
+{
+ "experiment": "E174",
+ "title": "Qwen3-32B iter3 fused + K1=64 e2e decode TPOT (rescue protocol)",
+ "protocol": {
+  "machine": "pc02 GPU0 (10.238.122.187), single GPU, Qwen3-32B bf16",
+  "python": "/home/fluentllmenv/bin/python3, torch 2.8.0+cu128",
+  "geometry": "K1=64 (nb32 near+32 far), K2=1024, sink4/swa128, tail32, free-pool L2, six fused Triton kernels iter3, whole-step CUDA Graph",
+  "gen": "128 tokens greedy, prefill on DynamicCache then fill_static",
+  "32k_64k_arms": "TLI graph a1/a2 (2 runs each) + dense b1/b2 (2 runs each) + eager gate arm",
+  "128k_arms": "TLI graph a1-a4 (single-run-per-process, E160b rescue protocol: expandable_segments + warmup=0+repeats=1) + dense b1/b2 + eager + k128 verify",
+  "gpu_hygiene": "clean (lock-gated, pre-run query-compute-apps check)"
+ },
+ "results": {
+  "32768": {
+   "tli_graph_k64_ms": {
+    "mean": 41.295,
+    "all": [
+     41.293,
+     41.288,
+     41.304,
+     41.295
+    ],
+    "n": 4
+   },
+   "dense_ms": {
+    "mean": 55.265,
+    "all": [
+     55.251,
+     55.252,
+     55.237,
+     55.289,
+     55.279,
+     55.281
+    ],
+    "n": 6
+   },
+   "speedup": 1.338,
+   "tli_eager_ms": 177.664,
+   "k128_verify_ms": 43.279
+  },
+  "65536": {
+   "tli_graph_k64_ms": {
+    "mean": 41.774,
+    "all": [
+     41.767,
+     41.769,
+     41.766,
+     41.795
+    ],
+    "n": 4
+   },
+   "dense_ms": {
+    "mean": 80.356,
+    "all": [
+     80.334,
+     80.312,
+     80.298,
+     80.385,
+     80.433,
+     80.375
+    ],
+    "n": 6
+   },
+   "speedup": 1.924,
+   "tli_eager_ms": 179.449
+  },
+  "131072": {
+   "tli_graph_k64_ms": {
+    "mean": 42.67,
+    "all": [
+     42.673,
+     42.666,
+     42.672,
+     42.67
+    ],
+    "n": 4
+   },
+   "dense_ms": {
+    "mean": 128.67,
+    "all": [
+     128.739,
+     128.754,
+     128.753,
+     128.597,
+     128.575,
+     128.6
+    ],
+    "n": 6
+   },
+   "speedup": 3.015,
+   "tli_eager_ms": 245.714,
+   "k128_verify_ms": 44.577
+  }
+ },
+ "token_identity_gates": {
+  "L32768_a1_vs_a2": "bit-exact",
+  "L32768_graph_vs_eager": "bit-exact",
+  "L65536_a1_vs_a2": "bit-exact",
+  "L65536_graph_vs_eager": "bit-exact",
+  "L131072_a1_vs_a2": "bit-exact",
+  "L131072_a2_vs_a3": "bit-exact",
+  "L131072_a3_vs_a4": "bit-exact",
+  "L131072_graph_vs_eager": "bit-exact",
+  "L131072_k128verify_vs_k64": "bit-exact",
+  "L32768_k128verify_vs_k64": "bit-exact"
+ },
+ "anchors_superseded": {
+  "e160_iter22_k128": {
+   "L32768": "1.015x (54.70 vs 55.50)",
+   "L65536": "1.338x (59.93 vs 80.21)"
+  },
+  "e160b_iter22_k128_128k": "1.841x (70.11 vs 129.10)",
+  "note": "E174 以 iter3 六融合 kernel + K1=64 取代 iter22 K1=128 口径的 32B 行"
+ },
+ "cross_model_symmetry": "与 E172 (Qwen3-8B) / E173 (Llama-3.1-8B) 同构：加速比随长度单调增长",
+ "sources_dir": "pc02:~/e174_iter3_k64_formal/ (逐臂 JSON + harvest_summary.json)"
+}

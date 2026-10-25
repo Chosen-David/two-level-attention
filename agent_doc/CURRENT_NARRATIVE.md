@@ -79,16 +79,37 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   `e166a/b/e/d2_verdict.json`。**iter3@K1=128 TPOT 18.675/18.888/19.388ms，
   加速比 1.407/2.100/3.458×**（e2e bitexact 三长度 + pc02 跨机 ≤0.17% +
   RULER 质量门 md5 逐字节一致三版同源闭合）。
+- **【已收官 2026-10-25】E170 创新点收益独立验证**（exp/trace/results/e170_innovation_verification/）：
+  代码是否吃到收益的独立答案 = **是**。
+  (a) 子空间（tail32）：microbench 隔离 L1 amin/amax **3.38×**，紧凑 buffer
+  **4× 节省**（64 MB / layer @ 128K），decode K2 候选消除 **15.6×** 全宽工作量，
+  decode step KV traffic 仅 full 的 **25%**；
+  (b) far skip（D' gate）：选中 KV 流量仅 dense 的 **4%**（128K），紧凑显存
+  dense 的 **4%**，far 段占选中流量 **19.5%**（三长度恒定，e163 一致）；
+  (c) op 归因：kernel count 与 e166g 完全对齐（launch=15132、memset=1314），
+  elementwise 弥散群无单一热点；
+  (d) bitexact：三长度 md5 一致（d8c8649...）+ TPOT 平坦化 18.73/19.06/19.39ms；
+  (e) GPT runtime-review 补丁：`input_signature` 门控 + `fb` 修正 + 4×
+  `new_zeros→new_empty` → 已全部在代码面（可追溯至 iter2 合入前的 e160+ 构建）。
+  verdict 文件：e170{bitexact,microbench,farskip,opattr}_*.json；
+  报告：agent_doc/advice/e170_subspace-farskip-verification/。
 - **【已收官 2026-10-25】E168/E169：K1=64 iter22 代码面双模型族判决**：
   Qwen3-8B `e168_k64_e2e_verdict.json`（1.050/1.467/2.084×，K1=128 复验格
   24.697ms 逐位复现，bitexact 2/3——64K step-55 bf16 tie-break 单点分歧披露）；
   Llama-3.1-8B `e169_k64_llama_verdict.json`（1.011/1.431/1.968×，bitexact 3/3）。
   双模型族 TLI 臂 -0.45~-1.08% vs K1=128，K1=64 口径与 e140b/e140h 质量判决闭合。
-  **【在飞 E172/E173/E174】iter3+K1=64 主表口径跑批**（论文最终主表）：
-  E172 Qwen3-8B（pc40 GPU0，K1=128 复验格 18.668ms 逐位复现 iter3 18.675ms；
-  32K/64K 已出 1.451×/2.216×）、E173 Llama（pc40 GPU1，iter3 Llama 首点
-  K1=128 15.795ms，32K/64K 已出 1.429×/2.192×）、E174 Qwen3-32B（pc02 GPU0，
-  E160/E160b 协议 + iter3 + K1=64）。出数后写 `e172_iter3_k64_*_verdict.json` 族。
+  **【已收官 2026-10-25】iter3+K1=64 主表三模型族判决全齐**（论文最终主表）：
+  **E172 Qwen3-8B**（`e172_iter3_k64_qwen_verdict.json`，pc40 GPU0）=
+  **1.451/2.216/3.636×**（17.715/17.957/18.464 vs dense 25.712/39.797/
+  67.139ms）；K1=128 复验格 18.668ms 逐位复现 iter3 18.675ms。**E173
+  Llama-3.1-8B**（`e173_iter3_k64_llama_verdict.json`，pc40 GPU1）=
+  **1.428/2.192/3.643×**（14.971/15.188/15.590 vs 21.385/33.287/56.801ms），
+  跨模型族对称 ≤0.024/档。**E174 Qwen3-32B**（`e174_iter3_k64_32b_verdict.json`，
+  pc02 GPU0，128K 行走 E160b 同款单 run/进程救援协议）= **1.338/1.924/3.015×**
+  （41.295/41.774/42.670 vs dense 55.265/80.356/128.670ms），**十项词元身份门
+  全部 bit-exact**（含 k128 复验臂逐位）；k128 复验臂 32K 43.28 / 128K 44.58
+  均慢于 K1=64 → K1 减半三模型一致正向。取代 iter22 口径（8B 1.064/1.448/
+  2.067×、Llama 1.015/1.41/1.961×、32B 1.015/1.338/1.841×）。
 - **iter3 机制判决链**（构成：掩码装配融合 `e166a_iter3a_verdict.json` +
   候选压缩融合 `e166b_iter3b_verdict.json` + compact launch 调优
   `e166e_compact_cfg_verdict.json` + 摘要维护/L1 双池打分/候选装配三
@@ -134,7 +155,19 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   （niah_single_1/niah_multikey_1/vt）orig vs iter3 双臂输出 md5 逐字节
   一致——Llama 证据链三件齐（e2e bitexact + census + 质量门）。口径注：
   本系列为 K1=128（历史主表口径）；K1=64 生产口径由 e171/e172-e174
-  系列另行闭合。
+  系列另行闭合。**e168d Llama 批档包络（K1=64 生产口径）**
+  （`e168d_llama_bs_verdict.json`）：交叉点随长度单调右移跨模型成立
+  （Llama 32K:B≈2 → 64K:B≈4 → 128K:不交叉；与 Qwen 形态同构）；
+  B1 1.461/2.234/3.741×、平坦化 +4.3%@4× 保持；行串行代价随 L 增大
+  （每行 +17%→+55%→+131%）同 Qwen 形态；128K B4 双臂 OOM 同 Qwen。
+  批维度『长度轴是分离轴』双模型族口径；Llama 32K B2 即反超（比
+  Qwen 早），论文口径 tli 领先区间 Llama = 128K×B≤2、64K×B≤2。
+  **e168e Qwen3-8B K1=64 census 平坦化**（`e168e_qwen_k64_census_verdict.json`，
+  pc40 主树 7bc1788）：busy 17.719/17.939/18.380ms（+3.7%@4×），三类
+  平直 + other 唯一增长（+0.70ms@4×），与 K1=128 口径结构完全同型；
+  K1=64 额外收益 = other 类一致降 ~0.95ms（L1 块数减半）；busy 与
+  E172 TPOT 18.46ms@128K 自洽（99.6%）。主表切 K1=64 后平坦化主张
+  证据链无缝衔接。
 
 ## 3. 对比口径（vendor 基线）
 
