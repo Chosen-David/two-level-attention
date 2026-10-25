@@ -1,208 +1,107 @@
-"""Bilingual LoDA-SA architecture figure (fig2_domains).
-
-cairosvg misplaces baseline-shift tspan pen positions (subscript runs land on
-neighbour labels), so subscripts are emitted as separately measured <text>
-runs: a probe SVG rendered through the same cairosvg+font stack yields exact
-per-run widths, then each run is placed at a cumulative anchor-start x.
-Glyph-level acceptance: exp/trace/check_glyph_overlap.py (45% ratio) plus the
-pt^2-area recheck must both report zero collisions for en and zh.
+"""Canonical selected-configuration diagram. Old PPT/boundary scenes are archives.
+Run from the pinned manuscript font environment; requires cairosvg.
+SVG millimetre coordinates fix physical text sizes; outputs share one scene.
 """
 from pathlib import Path
 from xml.sax.saxutils import escape
+import argparse, hashlib, json, subprocess
 import cairosvg
-import pymupdf
+P=argparse.ArgumentParser();P.add_argument('--language',choices=('en','zh','both'),default='both');A=P.parse_args()
+R=Path(__file__).resolve().parent
+C={'white':'#FFFFFF','ink':'#263442','muted':'#63717C','border':'#CAD3DA','view':'#6557A8','near':'#247D8A','far':'#B86C35','protect':'#A77A12'}
+for lang in (('en','zh') if A.language=='both' else (A.language,)):
+ z=lang=='zh';s=[]
+ def t(x,y,en,zh='',pt=8.5,c='ink',bold=False,anchor='middle'):
+  s.append(dict(kind='text',x=x,y=y,text=zh if z and zh else en,pt=pt,c=c,bold=bold,anchor=anchor))
+ def box(x,y,w,h,fill='white',c='border',radius=.7):s.append(dict(kind='rect',x=x,y=y,w=w,h=h,fill=fill,c=c,r=radius))
+ def line(pts,c='ink',dash=False,arrow=True):s.append(dict(kind='line',points=pts,c=c,dash=dash,arrow=arrow))
+ def page(x,y,c):
+  box(x,y,3.8,5,'white',c,.3)
+  for j in range(3):line([(x+.7,y+1.1+j*1.25),(x+3.1,y+1.1+j*1.25)],c,arrow=False)
+ for x,w,a,b,za,zb in [(0,30,'Shared view','','共享坐标',''),(34,47,'L1 · Page admission','','L1 · 区域选页',''),(85,57,'L2 · Token competition','','L2 · 词元竞争',''),(146,34,'Original-width','attention','原始维度','注意力')]:
+  t(x+w/2,4.6,a,za,pt=9.5,bold=True)
+  if b:t(x+w/2,9,b,zb,pt=9.5,bold=True)
+  line([(x,11),(x+w,11)],'border',arrow=False)
+ # One paired post-RoPE scoring view, V excluded.
+ t(15,22,'Q, K · 128D','Q、K · 128维',bold=True)
+ t(15,28,'post-RoPE','旋转后',pt=8,c='muted')
+ for y in (34,40):
+  for i in range(16):box(1+i*1.75,y,1.25,3,'#6557A8','white',.1)
+ for i in range(16):line([(1.625+i*1.75,37),(1.625+i*1.75,40)],'view',arrow=False)
+ t(15,50,'32D shared view','32维共享视图',pt=9,bold=True,c='view')
+ t(15,56,'16 complete','16个完整',pt=8)
+ t(15,60,'low-frequency','低频',pt=8)
+ t(15,64,'RoPE pairs','RoPE旋转对',pt=8)
+ # Shared view feeds L1 and L2 directly, not through L1 shortlisting.
+ line([(29,47),(32,47),(32,15),(113.5,15),(113.5,19)],'view')
+ line([(32,47),(32,18),(45,18),(45,21)],'view')
+ line([(45,18),(69,18),(69,21)],'view')
+ for x,c,fill,name,zh,num,score,score2,zs,zs2 in [(35,'near','#F0F7F8','Near','近区','32','Mean-key','scores','均值键','评分'),(59,'far','#FBF4EF','Far','远区','96','Sign-aware','extrema','符号感知','极值')]:
+  box(x,21,22,41,fill,c)
+  t(x+11,25,name,zh,pt=8.5,bold=True,c=c)
+  for j in range(3):page(x+3+j*5.5,28,c)
+  t(x+11,37,score,zs,pt=8)
+  t(x+11,41,score2,zs2,pt=8)
+  t(x+11,46,'Mean scores','均值评分',pt=7.5)
+  t(x+11,50,'in KV group','KV组内',pt=7.5)
+  t(x+11,55,'Top pages','页TopK',pt=8,bold=True)
+  t(x+11,60,num+' pages',num+' 页',pt=9,bold=True,c=c)
+ line([(46,62),(46,66),(83,66),(83,32),(88,32)],'muted',dash=True)
+ line([(70,62),(70,66)],'muted',dash=True,arrow=False)
+ # Separate page eligibility bypass.
+ page(36,72,'muted')
+ t(61,74,'Boundary pages','边界页',pt=8)
+ t(60,78,'outside page quotas','页配额之外',pt=7.5,c='muted')
+ line([(80,75),(83,75),(83,66)],'muted',dash=True,arrow=False)
+ # Full-history logits -> mask -> per-query probabilities -> group mean -> pooled slots.
+ box(88,19,51,56,'#F8F6FB')
+ t(113.5,24,'Full-history logits · 32D','全历史logits · 32维',pt=8.5,bold=True)
+ line([(113.5,25.5),(113.5,28.5)],'view')
+ t(113.5,33,'Page mask','页掩码',pt=8.5)
+ line([(113.5,35),(113.5,38)],'view')
+ t(113.5,42,'Softmax per query','逐查询softmax',pt=8.5)
+ line([(113.5,44),(113.5,47)],'view')
+ t(113.5,51,'Mean probabilities','概率均值',pt=8.5)
+ t(113.5,55,'within KV group','KV组内',pt=8)
+ line([(113.5,57),(113.5,60)],'view')
+ t(113.5,65,'One pooled TopK','单池TopK',pt=9,bold=True,c='view')
+ t(113.5,69,'892 nominal slots','892个名义槽位',pt=8)
+ for i in range(16):box(93+i*2.6,71,2,1.7,C['near' if i%3 else 'far'],'white',.1)
+ # Token protection bypasses L2 and merges only with pooled winners.
+ box(0,72,30,10,'#FCF8EB','protect')
+ t(15,76,'Protected tokens','保护词元',pt=8,c='protect',bold=True)
+ t(15,80,'sink 4 · recent 128','前缀4 · 最近128',pt=7.5,c='protect')
+ line([(30,79),(32,79),(32,83),(144,83),(144,29),(147,29)],'protect',dash=True)
+ line([(139,64),(142,64),(142,23),(147,23)],'muted',dash=True)
+ box(147,19,32,20,'#F3F6F8')
+ t(163,24,'Union + deduplicate','合并 + 去重',pt=8,bold=True)
+ t(163,34,'≤1024 tokens','≤1024词元',pt=9,bold=True)
+ line([(163,39),(163,49)],'muted',dash=True)
+ t(168,45,'IDs','ID',pt=7.5,c='muted',anchor='start')
+ box(147,49,32,20,'#F1F5F8','ink')
+ t(163,54,'Attention on support','支持集上注意力',pt=8,bold=True)
+ t(163,60,'Original Q, K, V','原始 Q、K、V',pt=8)
+ t(163,65,'128D','128维',pt=8.5,bold=True)
+ line([(163,69),(163,73)],'ink');t(163,78,'o',pt=9)
+ # Low-emphasis raw-width lane enters attention, never the scoring probability path.
+ t(1,87,'Original 128D Q / K / V','原始128维 Q / K / V',pt=7.5,anchor='start')
+ line([(43,87),(179.8,87),(179.8,63),(179,63)],'ink')
+ t(62,91,'Solid: tensors','实线：数值张量',pt=7.5,c='muted')
+ t(121,91,'Dashed: masks / IDs','虚线：掩码／ID',pt=7.5,c='muted')
+ # Physical millimetre scene preserves all declared point sizes.
+ H=92
+ family='Noto Sans CJK SC' if z else 'Liberation Sans'
+ defs='<defs>'+''.join(f'<marker id="{k}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="3" markerHeight="3" orient="auto"><path d="M0,0L8,4L0,8Z" fill="{v}"/></marker>' for k,v in C.items())+'</defs>'
+ out=[f'<svg xmlns="http://www.w3.org/2000/svg" width="180mm" height="{H}mm" viewBox="0 0 180 {H}"><rect width="180" height="{H}" fill="white"/>{defs}<g font-family="{family}">']
+ for o in s:
+  if o['kind']=='text':out.append(f'<text x="{o["x"]}" y="{o["y"]}" font-size="{o["pt"]*25.4/72}" text-anchor="{o["anchor"]}" fill="{C[o["c"]]}" font-weight="{700 if o["bold"] else 400}">{escape(o["text"])}</text>')
+  elif o['kind']=='rect':out.append(f'<rect x="{o["x"]}" y="{o["y"]}" width="{o["w"]}" height="{o["h"]}" rx="{o["r"]}" fill="{o["fill"]}" stroke="{C[o["c"]]}" stroke-width=".22"/>')
+  else:out.append('<polyline points="'+' '.join(f'{x},{y}' for x,y in o['points'])+f'" fill="none" stroke="{C[o["c"]]}" stroke-width="{.28 if not o["dash"] else .24}"'+(' stroke-dasharray="1.2 .9"' if o['dash'] else '')+(f' marker-end="url(#{o["c"]})"' if o['arrow'] else '')+'/>')
+ out.append('</g></svg>');p=R/f'fig2_domains_{lang}.svg';p.write_text(''.join(out))
+ (R/f'architecture_scene_{lang}.json').write_text(json.dumps({'width_mm':180,'height_mm':H,'font':family,'objects':s},ensure_ascii=False,indent=2)+'\n')
+ cairosvg.svg2pdf(url=str(p),write_to=str(p.with_suffix('.pdf')))
+ cairosvg.svg2png(url=str(p),write_to=str(p.with_suffix('.png')),output_width=1800)
 
-R = Path(__file__).resolve().parent; O = R; O.mkdir(exist_ok=True)
-FAMILY = {'en': 'Liberation Sans', 'zh': 'Noto Sans CJK SC'}
-SUB = 11  # subscript font size (SVG px), matches the retired tspan size
-
-# Subscript-bearing labels. Runs: (text, is_sub, gap_before_px).
-SUB_LABELS = [
-    # (key, x, y, size, weight) + per-lang runs
-    (462, 121, 15, 'bold', 'near',
-     [('Near · n', 0, 0), ('b', 1, 1), ('pages', 0, 5)],
-     [('近区 · n', 0, 0), ('b', 1, 1), ('页', 0, 5)]),
-    (662, 121, 15, 'bold', 'far',
-     [('Far · K', 0, 0), ('1', 1, 1), ('−n', 0, 1), ('b', 1, 1), ('pages', 0, 5)],
-     [('远区 · K', 0, 0), ('1', 1, 1), ('−n', 0, 1), ('b', 1, 1), ('页', 0, 5)]),
-    (470, 218, 14, 'normal', 'topk_n',
-     [('group mean → TopK(P', 0, 0), ('n', 1, 1), (')', 0, 1)],
-     [('组均值 → TopK(P', 0, 0), ('n', 1, 1), (')', 0, 1)]),
-    (668, 218, 14, 'normal', 'topk_f',
-     [('group mean → TopK(P', 0, 0), ('f', 1, 1), (')', 0, 1)],
-     [('组均值 → TopK(P', 0, 0), ('f', 1, 1), (')', 0, 1)]),
-    (559, 358, 16, 'normal', 'pool',
-     [('Single-pool TopK · K', 0, 0), ('mid', 1, 1), ('slots', 0, 5)],
-     [('单池 TopK · K', 0, 0), ('mid', 1, 1), ('槽位', 0, 5)]),
-]
-
-
-def probe_widths(lang):
-    """Render every atomic run through cairosvg and measure its ink width (SVG px)."""
-    specs = []
-    for _, _, size, weight, _, en_runs, zh_runs in SUB_LABELS:
-        for t, sub, _ in (zh_runs if lang == 'zh' else en_runs):
-            spec = (t, SUB if sub else size, weight)
-            if spec not in specs:
-                specs.append(spec)
-    height = 40 + 26 * len(specs)
-    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="700" height="{height}">'
-             f'<g font-family="{FAMILY[lang]}">']
-    for i, (t, sz, w) in enumerate(specs):
-        parts.append(f'<text x="350" y="{50 + 26 * i}" font-size="{sz}" '
-                     f'font-weight="{w}" text-anchor="middle">{escape(t)}</text>')
-    parts.append('</g></svg>')
-    pdf = cairosvg.svg2pdf(bytestring=''.join(parts).encode())
-    doc = pymupdf.open(stream=pdf, filetype='pdf')
-    rows = []
-    for b in doc[0].get_text('rawdict')['blocks']:
-        for l in b.get('lines', []):
-            for sp in l.get('spans', []):
-                txt = ''.join(c['c'] for c in sp.get('chars', []))
-                if txt.strip():
-                    rows.append((sp['bbox'][1], (sp['bbox'][2] - sp['bbox'][0]) / 0.75))
-    doc.close()
-    rows.sort()
-    if len(rows) != len(specs):
-        raise ValueError(f'probe span count {len(rows)} != spec count {len(specs)}')
-    return {spec: w for spec, (_, w) in zip(specs, rows)}
-
-
-for lang in ('en', 'zh'):
-    z = lang == 'zh'
-    W = probe_widths(lang)
-    s = []
-
-    def text(x, y, a, b='', size=16, anchor='middle', color='#202529', weight='normal'):
-        s.append(f'<text x="{x}" y="{y}" font-size="{size}" text-anchor="{anchor}" '
-                 f'fill="{color}" font-weight="{weight}">{escape(b if z and b else a)}</text>')
-
-    def mtext(x, y, size, weight, runs):
-        """Emit a centered multi-run label with measured cumulative pen positions."""
-        widths = [W[(t, SUB if sub else size, weight)] for t, sub, _ in runs]
-        total = sum(widths) + sum(g for _, _, g in runs)
-        cx = x - total / 2
-        for (t, sub, gap), w in zip(runs, widths):
-            cx += gap
-            sz = SUB if sub else size
-            yy = y + (3 if sub else 0)
-            s.append(f'<text x="{cx:.1f}" y="{yy}" font-size="{sz}" text-anchor="start" '
-                     f'fill="#202529" font-weight="{weight}">{escape(t)}</text>')
-            cx += w
-
-    def rect(x, y, w, h, fill='white', stroke='#424a50', sw=1):
-        s.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{fill}" '
-                 f'stroke="{stroke}" stroke-width="{sw}"/>')
-
-    def line(ps, arrow=True, dash=False, width=1.3, color='#424a50'):
-        s.append('<polyline points="' + ' '.join(f'{x},{y}' for x, y in ps) +
-                 f'" fill="none" stroke="{color}" stroke-width="{width}"' +
-                 (' stroke-dasharray="4 3"' if dash else '') +
-                 (' marker-end="url(#a)"' if arrow else '') + '/>')
-
-    def grid(x, y, rows, cols, cw=12, ch=12, kept=(), fill='#edf0f2'):
-        for r in range(rows):
-            for c in range(cols):
-                rect(x + c * cw, y + r * ch, cw, ch,
-                     '#668398' if r in kept else fill, '#58656e', .65)
-
-    def page(x, y, keep=False):
-        rect(x, y, 28, 42, '#668398' if keep else 'white')
-        for j in (10, 20, 30):
-            line([(x + 4, y + j), (x + 24, y + j)], False, width=.55,
-                 color='#d9e0e5' if keep else '#c2c8cc')
-
-    # Three claim-bearing domains, one per design decision.
-    text(91, 23, 'Unmodified KV cache', '原维KV缓存', 17, weight='normal')
-    text(495, 23, 'One 32-coordinate view serves both stages', '同一32坐标视图服务两级', 17, weight='normal')
-    text(911, 23, 'Single pool, original width', '单池 · 原维注意力', 17, weight='normal')
-    rect(218, 68, 562, 330, '#fafbfc', '#aeb9c0', 1)
-    text(23, 54, 'Q', 'Q', 18)
-    line([(39, 49), (998, 49), (998, 322), (975, 322), (975, 338)], width=2)
-    text(907, 45, 'original 128D', '原始128维', 14)
-    # Raw storage, pages grouped in rows.
-    text(8, 153, 'K', 'K', 17); text(124, 94, 'V', 'V', 17)
-    grid(20, 101, 8, 5, 12, 13); grid(94, 101, 8, 5, 12, 13)
-    text(87, 224, 'tokens × 128D', 'token × 128维', 14)
-    text(87, 247, 'Unmodified cache', '缓存保持原维', 14)
-    # The shared coordinate view is shown as a tied two-half selection.
-    line([(50, 101), (50, 73), (173, 73), (173, 120), (239, 120)], width=1.4)
-    line([(197, 49), (197, 98), (239, 98)])
-    text(310, 92, 'Shared 32-coordinate view', '共享32坐标表示', 16)
-    for y in (105, 126):
-        for i in range(8):
-            rect(252 + i * 13, y, 11, 10, '#668398' if i >= 6 else 'white', '#58656e', .8)
-    for i in (6, 7):
-        line([(257 + i * 13, 115), (257 + i * 13, 126)], False, width=.8)
-    text(310, 154, '16 complete RoPE pairs', '16对完整RoPE坐标', 13)
-    text(510, 94, 'L1 · page budgets', 'L1 · 页预算', 16)
-    # Two regional lanes represented with memory pages and selected supports.
-    mtext(462, 121, 15, 'bold', SUB_LABELS[0][6 if z else 5])
-    mtext(662, 121, 15, 'bold', SUB_LABELS[1][6 if z else 5])
-    line([(364, 115), (397, 115), (397, 151), (414, 151)])
-    line([(397, 115), (397, 102), (596, 102), (596, 151), (611, 151)])
-    for i in range(4):
-        page(414 + i * 29, 134, i in (0, 2))
-    for i in range(4):
-        page(611 + i * 29, 134, i in (1, 3))
-    text(470, 197, 'mean-key scores', '均值键打分', 14)
-    text(668, 197, 'sign-aware min/max', '符号感知极值', 14)
-    mtext(470, 218, 14, 'normal', SUB_LABELS[2][6 if z else 5])
-    mtext(668, 218, 14, 'normal', SUB_LABELS[3][6 if z else 5])
-    # Shared mask gathers the two regional supports (no separate probability normalization).
-    line([(470, 226), (470, 245), (532, 245)])
-    line([(668, 226), (668, 245), (595, 245)])
-    for i in range(8):
-        rect(532 + i * 8, 237, 7, 15, '#668398' if i in (0, 2, 5, 7) else 'white', '#58656e', .7)
-    text(563, 273, 'shared page mask · boundary pages bypass quotas', '共享页掩码 · 边界保送页在配额外', 13)
-    text(563, 292, 'filled = kept', '实色 = 保留', 12)
-    # L2 shares representation but full-history scoring precedes application of the mask.
-    line([(310, 161), (310, 292)])
-    text(310, 309, 'L2 · full-history logits', 'L2 · 全历史logits', 15)
-    text(310, 329, 'float QDQ · 1/√128', '浮点QDQ · 1/√128', 13)
-    line([(395, 309), (425, 309)])
-    text(559, 313, 'mask → softmax/Q → KV-group mean', '掩码 → 逐Q softmax → KV组均值', 14)
-    line([(563, 253), (563, 258), (430, 258), (430, 299)])
-    line([(559, 321), (559, 341)])
-    mtext(559, 358, 16, 'normal', SUB_LABELS[4][6 if z else 5])
-    text(310, 374, 'prefix ∪ recent IDs', '前缀 ∪ 滑窗ID', 14)
-    line([(397, 370), (455, 370), (455, 384), (698, 384), (698, 367)])
-    line([(678, 351), (693, 351)])
-    text(730, 356, '∪ / dedup', '合并去重', 14)
-    text(730, 377, '|IDs| ≤ K', '|IDs| ≤ K', 13)
-    # Thin ID route and thick original KV route meet only at gather.
-    line([(779, 351), (807, 351), (807, 207), (838, 207)])
-    text(815, 193, 'IDs', 'ID', 13)
-    rect(838, 190, 149, 105, 'white', '#88949d', 1)
-    text(908, 212, 'Retained K/V', '所选K/V支持集', 15)
-    grid(850, 229, 3, 5, 11, 10); grid(913, 229, 3, 5, 11, 10)
-    text(877, 279, 'K', 'K', 16); text(940, 279, 'V', 'V', 16)
-    line([(87, 255), (87, 422), (821, 422), (821, 275), (838, 275)], width=2)
-    text(451, 441, 'Original K/V · 128D', '原始K/V · 128维', 14)
-    line([(877, 295), (877, 320), (898, 320), (898, 338)], width=2)
-    line([(940, 295), (940, 320), (898, 320)], False, width=2)
-    rect(838, 338, 149, 56, '#edf2f5', '#424a50', 1.2)
-    text(912, 360, 'QKᵀ → softmax → V', 'QKᵀ → softmax → V', 14)
-    text(912, 381, 'original 128D', '原始128维', 14)
-    line([(987, 365), (1005, 365)], width=2); text(996, 408, 'o', 'o', 18)
-    # Optional far gate strip: disabled by default, mirrors observation panel (d).
-    rect(0, 459, 1008, 27, '#faf0e5', '#ae6b2d', 1)
-    text(504, 477, 'Optional far gate: prefill-calibrated, frozen at decode · disabled in this reference',
-         '可选远区门控：预填充标定 · 解码冻结 · 本参考配置不启用', 13, color='#ae6b2d')
-
-    defs = ('<defs><marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" '
-            'markerHeight="5" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#424a50"/>'
-            '</marker></defs>')
-    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="7in" height="3.47in" '
-           f'viewBox="0 0 1008 490">{defs}<g font-family="{FAMILY[lang]}">' +
-           ''.join(s) + '</g></svg>')
-    p = O / f'fig2_domains_{lang}.svg'
-    p.write_text(svg)
-    cairosvg.svg2pdf(url=str(p), write_to=str(O / f'fig2_domains_{lang}.pdf'))
-    cairosvg.svg2png(url=str(p), write_to=str(O / f'fig2_domains_{lang}.png'), output_width=1600)
-
-# The editable optional-control inset is retained as a separately scoped source.
-for lang in ('en', 'zh'):
-    p = O / f'fig2_gate_{lang}.svg'
-    cairosvg.svg2pdf(url=str(p), write_to=str(O / f'fig2_gate_{lang}.pdf'))
-    cairosvg.svg2png(url=str(p), write_to=str(O / f'fig2_gate_{lang}.png'), output_width=1600)
+files=[p for p in R.glob('fig2_domains_*.*') if p.suffix in ('.svg','.pdf','.png')] + list(R.glob('architecture_scene_*.json')) + [Path(__file__).resolve()]
+manifest={'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=R,text=True).strip(),'generator':'build_figure.py','dimensions_mm':[180,92],'fonts':{'en':'Liberation Sans','zh':'Noto Sans CJK SC'},'declared_text_pt':{'titles':9.5,'body':[8,9],'secondary':7.5},'archive_note':'Old boundary_scene and PPT objects are archived; not synchronized to this selected-configuration scene.','sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}}
+(R/'architecture_manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')

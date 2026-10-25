@@ -5,7 +5,9 @@ One scene creates SVG/PDF and native PowerPoint objects.
 from pathlib import Path
 import json, subprocess
 from xml.sax.saxutils import escape
-R=Path(__file__).resolve().parent
+# Historical boundary illustration must not overwrite the manuscript architecture.
+R=Path(__file__).resolve().parent / 'boundary_archive'
+R.mkdir(exist_ok=True)
 W,H=1100,600
 FAR,NEAR,PROT='#F4DDD0','#DCECF5','#F1D478'
 for lang in ('en','zh'):
@@ -69,4 +71,5 @@ for lang in ('en','zh'):
   subprocess.run(['inkscape',str(p),f'--export-type={ext}','--export-width=1800',f'--export-filename={R/f"fig2_domains_{lang}.{ext}"}'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
  # Gate inset remains a separately scoped, editable SVG authority.
  gate=R/f'fig2_gate_{lang}.svg'
- subprocess.run(['inkscape',str(gate),'--export-type=pdf',f'--export-filename={gate.with_suffix(".pdf")}'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+ if gate.exists():
+  subprocess.run(['inkscape',str(gate),'--export-type=pdf',f'--export-filename={gate.with_suffix(".pdf")}'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)

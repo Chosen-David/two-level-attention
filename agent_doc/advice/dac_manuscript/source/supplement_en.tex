@@ -35,23 +35,69 @@ For sufficient history and disjoint protection, far and near L1 intervals before
 
 
 \section*{Supplementary Note S4: Current-configuration evidence}
-\textbf{Pooled-quality records (T6).} At revision \texttt{a7bcdddf}\allowbreak\texttt{727aa991}\allowbreak\texttt{96d925b9}\allowbreak\texttt{f106d785}\allowbreak\texttt{ce9273d4}, the manuscript input archive contains three T6 result JSONs, one for each length (32768, 65536 and 131072); their filenames use the prefix \texttt{t6\_ruler\_q8b\_L} and suffix \texttt{\_champ.json}. Their 11-task arithmetic means are 59.0209, 47.8000 and 46.8164; differences from the existing dense anchors are $-0.3609$, $-0.7364$ and $+0.3845$ points. Every task records $n=100$, with no incomplete cells. The source-defined labels bind $B=64$, $K_1=128$, $K=1024$, compression ratio 4, 4/128 protection and $(n_b,n_l)=(32,4096)$ with token quotas off. Provenance notes batch sizes 8/2/2 and YaRN off/2/4 across lengths. The snapshots store prediction-file hashes, not matching scorer, source-input or full effective-configuration manifests; those hashes cannot establish paired data or execution identity. The exact reported configuration string is \texttt{tli\_64\_128\_1024\_c4\_\allowbreak Aa0\_b0\_g1\_\allowbreak sk4\_sw128\_\allowbreak np32\_ntoff\_nl4096}. The three result JSONs are available in the versioned manuscript directory \texttt{figures/ruler32k\_comparison/inputs/}. Each result binds task scores, counts and prediction-file SHA-256 values. Separate receipts binding producer script, seed and generation identity have not been recovered in this inspected tree; those fields are not certified here. The following table retains all 11 task scores, with columns explicitly denoting lengths. No paired uncertainty or dense execution matching follows from these result records.
-\begin{center}\small
+\textbf{Pooled-quality records (T6).} At revision \texttt{a7bcdddf}\allowbreak\texttt{727aa991}\allowbreak\texttt{96d925b9}\allowbreak\texttt{f106d785}\allowbreak\texttt{ce9273d4}, the manuscript input archive contains three T6 result JSONs, one for each length (32768, 65536 and 131072); their filenames use the prefix \texttt{t6\_ruler\_q8b\_L} and suffix \texttt{\_champ.json}. Their 11-task arithmetic means are 59.0209, 47.8000 and 46.8164; differences from the existing dense anchors are $-0.3609$, $-0.7364$ and $+0.3845$ points. Every task records $n=100$, with no incomplete cells. The source-defined labels bind $B=64$, $K_1=128$, $K=1024$, compression ratio 4, 4/128 protection and $(n_b,n_l)=(32,4096)$ with token quotas off. Provenance notes batch sizes 8/2/2 and YaRN off/2/4 across lengths. The snapshots store prediction-file hashes, not matching scorer, source-input or full effective-configuration manifests; those hashes cannot establish paired data or execution identity. The exact reported configuration string is \texttt{tli\_64\_128\_1024\_c4\_\allowbreak Aa0\_b0\_g1\_\allowbreak sk4\_sw128\_\allowbreak np32\_ntoff\_nl4096}. The three result JSONs are available in the versioned manuscript directory \texttt{figures/ruler32k\_comparison/inputs/}. Each result binds task scores, counts and prediction-file SHA-256 values. Separate receipts binding producer script, seed and generation identity have not been recovered in this inspected tree; those fields are not certified here. The following three tables map all 33 plotted differences to task names, dense scores and pooled scores. No paired uncertainty or dense execution matching follows from these result records.
+\par\medskip\noindent\begin{minipage}{\textwidth}
+\subsubsection*{32K task scores}
+\noindent Each reported task has 100 examples per arm. Differences are pooled minus dense, computed before rounding.
+\begin{center}
 \begin{tabular}{lrrr}\hline
-Task & 32K & 64K & 128K \\ \hline
-niah\_single\_1 & 100.00 & 94.00 & 97.00 \\
-niah\_single\_2 & 100.00 & 100.00 & 100.00 \\
-niah\_single\_3 & 100.00 & 100.00 & 99.00 \\
-niah\_multikey\_1 & 98.00 & 99.00 & 99.00 \\
-niah\_multikey\_2 & 71.00 & 39.00 & 39.00 \\
-niah\_multikey\_3 & 7.00 & 0.00 & 0.00 \\
-niah\_multiquery & 24.50 & 22.50 & 17.00 \\
-niah\_multivalue & 28.50 & 36.00 & 3.75 \\
-cwe & 74.10 & 0.30 & 0.70 \\
-fwe & 15.33 & 5.00 & 37.33 \\
-vt & 30.80 & 30.00 & 22.20 \\
+Task & Dense & Pooled & Difference \\ \hline
+niah\_single\_1 & 100.00 & 100.00 & +0.00 \\
+niah\_single\_2 & 100.00 & 100.00 & +0.00 \\
+niah\_single\_3 & 100.00 & 100.00 & +0.00 \\
+niah\_multikey\_1 & 99.00 & 98.00 & -1.00 \\
+niah\_multikey\_2 & 76.00 & 71.00 & -5.00 \\
+niah\_multikey\_3 & 4.00 & 7.00 & +3.00 \\
+niah\_multiquery & 24.50 & 24.50 & +0.00 \\
+niah\_multivalue & 25.00 & 28.50 & +3.50 \\
+cwe & 83.50 & 74.10 & -9.40 \\
+fwe & 7.00 & 15.33 & +8.33 \\
+vt & 34.20 & 30.80 & -3.40 \\
 \hline\end{tabular}
 \end{center}
+\end{minipage}\par\medskip
+
+\par\medskip\noindent\begin{minipage}{\textwidth}
+\subsubsection*{64K task scores}
+\noindent Each reported task has 100 examples per arm. Differences are pooled minus dense, computed before rounding.
+\begin{center}
+\begin{tabular}{lrrr}\hline
+Task & Dense & Pooled & Difference \\ \hline
+niah\_single\_1 & 100.00 & 94.00 & -6.00 \\
+niah\_single\_2 & 100.00 & 100.00 & +0.00 \\
+niah\_single\_3 & 100.00 & 100.00 & +0.00 \\
+niah\_multikey\_1 & 100.00 & 99.00 & -1.00 \\
+niah\_multikey\_2 & 50.00 & 39.00 & -11.00 \\
+niah\_multikey\_3 & 0.00 & 0.00 & +0.00 \\
+niah\_multiquery & 20.25 & 22.50 & +2.25 \\
+niah\_multivalue & 26.25 & 36.00 & +9.75 \\
+cwe & 0.60 & 0.30 & -0.30 \\
+fwe & 4.00 & 5.00 & +1.00 \\
+vt & 32.80 & 30.00 & -2.80 \\
+\hline\end{tabular}
+\end{center}
+\end{minipage}\par\medskip
+
+\par\medskip\noindent\begin{minipage}{\textwidth}
+\subsubsection*{128K task scores}
+\noindent Each reported task has 100 examples per arm. Differences are pooled minus dense, computed before rounding.
+\begin{center}
+\begin{tabular}{lrrr}\hline
+Task & Dense & Pooled & Difference \\ \hline
+niah\_single\_1 & 100.00 & 97.00 & -3.00 \\
+niah\_single\_2 & 100.00 & 100.00 & +0.00 \\
+niah\_single\_3 & 100.00 & 99.00 & -1.00 \\
+niah\_multikey\_1 & 99.00 & 99.00 & +0.00 \\
+niah\_multikey\_2 & 57.00 & 39.00 & -18.00 \\
+niah\_multikey\_3 & 1.00 & 0.00 & -1.00 \\
+niah\_multiquery & 12.25 & 17.00 & +4.75 \\
+niah\_multivalue & 2.50 & 3.75 & +1.25 \\
+cwe & 3.40 & 0.70 & -2.70 \\
+fwe & 13.00 & 37.33 & +24.33 \\
+vt & 22.60 & 22.20 & -0.40 \\
+\hline\end{tabular}
+\end{center}
+\end{minipage}\par\medskip
 
 
 \textbf{Graph execution records (E152v4).} The same revision archives \texttt{exp/trace/results/}\allowbreak\texttt{e152v4\_formal\_pc40/} and its verdict. Recomputed dense/TLI Graph mean TPOTs are 26.282/24.702, 39.670/27.398 and 67.035/32.425 ms at nominal 32K/64K/128K. For example, the 128K timing record contains 134923 input tokens after prompt construction. The protocol reports Qwen3-8B BF16 on H20-3e, batch one, ABBA process ordering, two processes per arm and fixed 128-token output; dense has six measured repeats and Graph four per length. Per-step synchronization and argmax are included. Graph TPOT divides the post-cache-fill decode wall by 127, excluding static-cache filling and warmup capture. It does not report a preparation-inclusive request wall. The six dense files instead use the E152 v2 schema, DynamicCache and post-first-output timing; their records do not establish Graph execution. Although the later Graph script supports both arms, that capability cannot relabel these saved dense runs. Both arms mark backend verification false, and the declared runtime checkout does not supply the archived producer script, so exact runtime producer identity remains unresolved. The published v2 script calls model forward in a loop, not \texttt{generate}; this is inspected code, not complete runtime verification. Graph/eager token agreement is reported on the timing prompt, not benchmark-wide equivalence or equality to FullKV. The Graph treatment agrees with the T6 labels on the explicit budgets above, but T6 lacks a full frozen manifest and uses different batches. Neither the quality/timing records nor their speed ratios define a matched quality--cost frontier.
