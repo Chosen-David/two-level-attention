@@ -1,0 +1,49 @@
+{
+ "schema": "e172-iter3-k64-qwen-verdict",
+ "experiment": "E172：iter3+K1=64 论文主表口径 e2e TPOT（Qwen3-8B，pc40 GPU0 干净臂）",
+ "date": "2026-10-25",
+ "machine": "pc40 (2xH20-3e), commit 7bc1788（iter3 主树：tli_indexer 854f2567 / eager_decoding f23b7003 / llama3_attn_patch a79dbfa4）",
+ "protocol": {
+  "caliber": "E152v4 逐字同款（ABBA 交错单卡串行、TLIStaticCache 整步 capture、TPOT per-step-device-synced、max_gen=128、2 procs/arm），iter3 代码面 + tia_level1_topk 64",
+  "champion_flags": "nb32/nl4096/ntoff/minmax+avg/sink4/swa128/K2=1024/tail32 + K1=64（iter3 六融合 kernel 链）",
+  "anchor_iter3_k128": "iter3 判决面 TPOT 18.675/18.888/19.388ms（e166 系 + 跨机 ≤0.17%）",
+  "anchor_dense": "E152v4 原判 26.28/39.67/67.04；E168 同日锚 25.81/39.90/67.23",
+  "gpu_hygiene": "clean（起跑前 GPU0 0 compute 进程，全程 30s 旁路监控落盘）"
+ },
+ "equivalence_gate": {
+  "k128_verify_32k": "18.668ms vs iter3 判决 18.675ms —— 逐位级复现（-0.04%），主树 iter3 晋升面等价性成立",
+  "dense_reverify": "25.712/39.797/67.139 vs E168 同日锚 25.81/39.90/67.23（±0.4% 内）vs E152v4 原判 -2.2%/+0.3%/+0.1%"
+ },
+ "results": {
+  "32768": {
+   "tli_graph_k64_ms": {"mean": 17.715, "arms": [17.700, 17.730], "n": 4},
+   "dense_ms": {"mean": 25.712, "arms": [25.702, 25.723], "n": 6},
+   "speedup": 1.451
+  },
+  "65536": {
+   "tli_graph_k64_ms": {"mean": 17.957, "arms": [17.957, 17.957], "n": 4},
+   "dense_ms": {"mean": 39.797, "arms": [39.975, 39.619], "n": 6},
+   "speedup": 2.216
+  },
+  "131072": {
+   "tli_graph_k64_ms": {"mean": 18.464, "arms": [18.466, 18.462], "n": 4},
+   "dense_ms": {"mean": 67.139, "arms": [66.978, 67.300], "n": 6},
+   "speedup": 3.636
+  }
+ },
+ "bitexact_gate": {
+  "pass": "1/3 逐位 + 2/3 单点分歧披露（64K graph==eager 逐位一致；32K step-99、128K step-88 graph↔eager 单 token 互换 151668↔151645）",
+  "divergence_caliber": "E168 同款 bf16 非结合 tie-break 概率事件（K1=64 改变 far 排序集 far_quota 448 提高后段 tie 概率）；graph 4 runs 内部逐位一致（双臂各 2 runs）——执行路径级（graph replay vs eager 逐 kernel 等价性），非配置级数学错误；质量侧 e140h AVG5 48.10 vs 47.91 判决背书 + e166 RULER 质量门 md5 逐字节一致三版同源",
+  "eager_tpots": "100.9/103.2/133.9ms（门禁臂不进表）"
+ },
+ "flatness_narrative": {
+  "tli_growth_32k_to_128k": "+4.2%（17.715→18.464ms）vs dense +161%（25.712→67.139）——context 退化压缩 38×",
+  "mechanism": "e166i 平坦化机制判决：gemm/attn/copy 三类 L 无关成本平直，唯一增长段摘要-索引维护近线性；K1=64 下粗筛页减半进一步压平"
+ },
+ "iter3_vs_iter22": {
+  "tli_arm_delta": "17.715/17.957/18.464 vs E168 K1=64 iter22 24.575/27.224/32.250 = -27.9%/-34.1%/-42.8%",
+  "cross_check_k128": "E172 K1=128 18.668 vs iter3 判决 18.675（-0.04%）"
+ },
+ "verdict": "E172 = 论文主表新行（Qwen3-8B iter3+K1=64）：1.451/2.216/3.636×，32K 档从打平时代（1.064×）跃升为实加速（1.45×）。与 E173 Llama（1.428/2.192/3.643×）跨模型族对称闭合。",
+ "files": "pc40 ~/e172_iter3_k64_formal/（16 JSON + gpu_hygiene.log + harvest_summary.json）；runner ~/e172_iter3_k64_pc40.sh"
+}
