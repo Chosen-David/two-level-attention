@@ -151,7 +151,13 @@ def main():
     # 超过原生 40960 的档位必须显式 --yarn（防误用原生 RoPE 跑超限位置）；
     # 原生档位默认关闭（既有 4K-32K 路径零扰动），显式开也允许（消融用）。
     use_yarn = args.yarn
-    if args.context_length > QWEN3_NATIVE_MPE and not use_yarn:
+    # llama 豁免（champ 树 33cac0 原语义，2026-10-22 恢复）：本门禁按
+    # Qwen3-8B 原生 40960 硬编码，不适用于 Llama-3.1（原生
+    # max_position_embeddings=131072，64K/128K 档无需 YaRN，yarn=0 是
+    # Llama 派单正确口径）。10-22 pc40 全 Llama 任务（yarn=0）在此门禁
+    # 速死实证——误删豁免 = 部署污染源。
+    if ("llama" not in args.model.lower()
+            and args.context_length > QWEN3_NATIVE_MPE and not use_yarn):
         raise SystemExit(
             f"[yarn] context_length={args.context_length} 超出 Qwen3-8B 原生 "
             f"{QWEN3_NATIVE_MPE}，必须加 --yarn（run_ruler_e109.sh 已自动）")
@@ -514,6 +520,17 @@ def main():
 
     try:
         for row in tqdm(rows):
+            # 【2026-10-22 修复·跨行 KV 泄漏 v2】行结束后 past/output/out
+            # 三个名字都可能持有 DynamicCache 引用——尤其 decode 循环的
+            # `out`（末次 decode 输出，out.past_key_values 即整条 KV cache）。
+            # 任一引用存活则 empty_cache() 无法回收旧 dyn KV——row2 prefill
+            # 时旧 dyn(34.4G@32B/128K) + 新 dyn 增长 + 权重 65G 实测
+            # 133.79G + MLP 激活 6.25G > 139.7G 物理 OOM（pc32 128K 六任务
+            # ×3 attempts 全灭实锤；v1 只清 past/output 漏 out 仍死；8B/Llama
+            # KV 小无感）。
+            past = None
+            output = None
+            out = None
             torch.cuda.empty_cache()
             input_ids = tokenizer(row["input"], truncation=False,
                                   return_tensors="pt").input_ids.to("cuda")
@@ -627,5 +644,22 @@ def main():
         release_output_lock(lock_fd)
 
 
+def _gpu_memory_guard(required_free_mb=2000):
+    """启动前检查 GPU 空闲显存，不足则 fail-fast 不加载模型。
+    防止在显存已被占用的机器上启动后 OOM 崩溃。"""
+    if not torch.cuda.is_available():
+        return
+    free_mem, total_mem = torch.cuda.mem_get_info()
+    free_mb = free_mem / 1024 / 1024
+    if free_mb < required_free_mb:
+        print(f"[OOM-GUARD] GPU 空闲显存 {free_mb:.0f} MiB < "
+              f"阈值 {required_free_mb} MiB，放弃启动。",
+              file=sys.stderr)
+        os._exit(2)
+    print(f"[GPU] 空闲显存 {free_mb:.0f} / {total_mem/1024/1024:.0f} MiB")
+
+
 if __name__ == "__main__":
+    _gpu_memory_guard()
     main()
+    os._exit(0)

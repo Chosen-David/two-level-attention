@@ -9,14 +9,17 @@
   .187 GPU4 独立复验 ±1%）。dense SDPA vs 融合态 graph（Step1）vs Step2 候选列化。
   口径：合成单层 prefill attention + 选择链，K2=1024，BATCH+FUSED+GRAPH 全开；
   L∈{8K,16K,32K,64K}，短档净负、~33K 交叉、64K 1.64x 均如实保留（spec：负收益不裁）。
-面板 (c)：完整请求 decode TPOT vs L——graph 时代三模型判决（2026-10-23 重设计，
-  取代 e152v2 旧口径「TLI 慢 3.4×/2.5×/1.8×」）。整步 CUDA Graph 后 TLI 全档快于
-  dense：Qwen3-8B 1.064/1.448/2.067×（e152v4 pc40 干净臂）、Qwen3-32B
-  1.015/1.338/1.841×（e160 + e160b 128K 救援臂）、Llama-3.1-8B 1.015/1.41/1.961×
-  （e159 graph-vs-dense-eager 主表口径）；三模型 gen tokens 与 eager 逐位一致
-  （bit-exact 门禁），E160R pc31 跨机复刻偏差 <0.3%。eager 无 graph 臂如实画出
-  （8B 99.0/99.9/134.1ms，launch 主导）——graph replay 是符号翻转的必要条件，
-  同一数学从 0.3× 变 2×，系统层杠杆不是算法层。
+面板 (c)：完整请求 decode TPOT vs L——iter3+K1=64 主表口径三模型判决
+  （2026-10-25 更新，取代 e152v4/e159 iter22 口径）。整步 CUDA Graph + 六融合
+  kernel 链 + K1=64 后 TLI 全档快于 dense：Qwen3-8B 1.451/2.216/3.636×
+  （e172 pc40 干净臂）、Llama-3.1-8B 1.428/2.192/3.643×（e173，跨模型族对称
+  ≤0.024/档）、Qwen3-32B 1.338/1.924/3.015×（e174 pc02；128K 行走 E160b
+  同款单 run/进程救援协议；取代 e160/e160b iter22 口径 1.015/1.338/1.841×）；
+  graph 内部逐位一致；8B graph vs eager 64K 逐位、32K/128K 各一单词元 bf16 平局
+  分歧（K1=64 扩大 far 排序集），32B 全部 10 项 token 门逐位（e174 判决
+  token_identity_gates）；e166 RULER 质量门 md5 三版同源背书。eager 无 graph 臂
+  如实画出（8B 100.9/103.2/133.9ms，launch 主导）——graph replay 是符号翻转
+  的必要条件。
 
 kernel 设计创新点（decode-only 转向后 E2 的设计贡献叙事，全部以同机对照数字入图）：
   (i) E127 融合两级选择 kernel 链（粗筛上界 + 精筛融合 decode kernel）——5.47× GPU
@@ -47,7 +50,6 @@ from style_config import apply_style, FONT_SIZES, LINE_WIDTHS  # noqa: E402
 from figure_lint import lint_figure  # noqa: E402
 
 REPO = "/home/wangyuanshuo02/two-level-attention"
-WT = "/tmp/wt_e138_ablation"
 R = os.path.join(REPO, "exp/trace/results/")
 OUT = os.path.join(REPO, "agent_doc", "guide", "paper_figs", "figs")
 os.makedirs(OUT, exist_ok=True)
@@ -74,7 +76,7 @@ tli_ms = [h["stage_gpu_iter8"][s] for s in stages] + [h["iter8_gpu_ms"]]
 stage_labels = ["prep", "score", "mask", "metric", "attn", "total"]
 
 # ---------------- 数据读取：面板 (b) prefill wall ----------------
-e139 = json.load(open(os.path.join(WT, "exp/trace/results/e139_step2_cand_verdict.json")))
+e139 = json.load(open(os.path.join(R, "e139_step2_cand_verdict.json")))
 wl = e139["results"]["wall_lsweep"]
 Ls = [8192, 16384, 32768, 65536]
 dense_ms, step1_ms, step2_ms = [], [], []
@@ -89,31 +91,25 @@ e133c = json.load(open(os.path.join(R, "e133c_subspace_speedup_verdict.json")))
 e133c_e2e_pct = e133c["steady_gpu_ms"]["mavg_e2e"]["delta_pct"]   # 生产口径 -12.3%
 e133c_tail_pct = e133c["steady_gpu_ms"]["mavg_tail"]["delta_pct"]  # tail 臂 -14.6%
 
-# ---------------- 数据读取：面板 (c) e2e decode TPOT（三模型 graph 判决）----------------
-# Qwen3-8B：E152v4 pc40 干净臂（ABBA、per-step-device-synced、bit-exact 门禁）
-e152v4 = json.load(open(os.path.join(R, "e152v4_formal_verdict.json")))
-pc40 = e152v4["arms"]["pc40"]["L"]
-q8b_dense = [pc40[str(L)]["dense_ms"]["mean"] for L in (32768, 65536, 131072)]
-q8b_tli = [pc40[str(L)]["tli_graph_ms"]["mean"] for L in (32768, 65536, 131072)]
-q8b_eager = [pc40[str(L)]["tli_eager_ms"]["mean"] for L in (32768, 65536, 131072)]
-# Qwen3-32B：E160 32K/64K + E160b 128K 救援臂（expandable_segments、单 run/进程）
-e160 = json.load(open(os.path.join(R, "e160_32b_e2e_latency_verdict.json")))
-e160b = json.load(open(os.path.join(R, "e160b_128k_expandable_verdict.json")))
-q32b_dense = [e160["results"]["L32768"]["dense_tpot_ms"],
-              e160["results"]["L65536"]["dense_tpot_ms"],
-              e160b["results"]["L131072"]["dense_tpot_ms"]]
-q32b_tli = [e160["results"]["L32768"]["tli_graph_tpot_ms"],
-            e160["results"]["L65536"]["tli_graph_tpot_ms"],
-            e160b["results"]["L131072"]["tli_graph_tpot_ms"]]
-# Llama-3.1-8B：E159 graph-vs-dense-eager 主表口径（pc40 主源）
-e159 = json.load(open(os.path.join(R, "e159_llama_e2e_latency_verdict.json")))
-llama_tbl = e159["cross_caliber_primary_table"]["pc40"]
-llama_dense = [llama_tbl[f"L{L}"]["dense_eager_ms"] for L in (32768, 65536, 131072)]
-llama_tli = [llama_tbl[f"L{L}"]["tli_graph_ms"] for L in (32768, 65536, 131072)]
-# 跨机一致性（E160R pc31 复刻臂，仅注记用）
-e160r = json.load(open(os.path.join(R, "e160r_32b_replication_verdict.json")))
-repl_dev_max = max(e160r["deviation_vs_original"][k]["speedup_dev_pct"]
-                   for k in ("L32768", "L65536"))
+# ---------------- 数据读取：面板 (c) e2e decode TPOT（三模型 iter3+K1=64 判决）----------------
+# Qwen3-8B：E172 pc40 干净臂（iter3 六融合 kernel 链 + K1=64，ABBA、bit-exact 门禁）
+e172 = json.load(open(os.path.join(R, "e172_iter3_k64_qwen_verdict.json")))
+q8b_dense = [e172["results"][str(L)]["dense_ms"]["mean"] for L in (32768, 65536, 131072)]
+q8b_tli = [e172["results"][str(L)]["tli_graph_k64_ms"]["mean"] for L in (32768, 65536, 131072)]
+import re as _re
+q8b_eager = [float(x) for x in
+             _re.findall(r"[\d.]+", e172["bitexact_gate"]["eager_tpots"])[:3]]
+# 判决字符串尾部含「（门禁臂不进表）」中文注记，用数值正则取前三个数
+# Qwen3-32B：E174 iter3+K1=64（pc02 GPU0；128K 行走 E160b 同款单 run/进程救援协议）
+e174 = json.load(open(os.path.join(R, "e174_iter3_k64_32b_verdict.json")))
+q32b_dense = [e174["results"][str(L)]["dense_ms"]["mean"] for L in (32768, 65536, 131072)]
+q32b_tli = [e174["results"][str(L)]["tli_graph_k64_ms"]["mean"] for L in (32768, 65536, 131072)]
+# Llama-3.1-8B：E173 iter3+K1=64 主表口径（pc40 GPU1 干净臂，与 E172 对称闭合）
+e173 = json.load(open(os.path.join(R, "e173_iter3_k64_llama_verdict.json")))
+llama_dense = [e173["results"][str(L)]["dense_ms"]["mean"] for L in (32768, 65536, 131072)]
+llama_tli = [e173["results"][str(L)]["tli_graph_k64_ms"]["mean"] for L in (32768, 65536, 131072)]
+# 跨机一致性注记：E160R pc31 复刻属 iter22 K1=128 旧口径，E174 后不再入图/TSV；
+# 32B iter3+K1=64 行为单机（pc02）单轮，无跨机复刻。
 
 # ---------------- 画布 ----------------
 fig, (ax_a, ax_b, ax_c) = plt.subplots(1, 3, figsize=(27, 9),
@@ -206,21 +202,21 @@ ax_c.plot(Lk_c, q8b_eager, ":", color=C_EAGER, marker="o", markersize=9,
 ax_c.set_xscale("log", base=2)
 ax_c.set_yscale("log")
 ax_c.set_xlim(27, 330)
-ax_c.set_ylim(18, 220)
+ax_c.set_ylim(13, 230)
 ax_c.set_xticks(Lk_c)
 ax_c.set_xticklabels([f"{l}K" for l in Lk_c])
 ax_c.set_yticks([20, 30, 50, 100, 200])
 ax_c.get_yaxis().set_minor_formatter(matplotlib.ticker.NullFormatter())
 ax_c.set_xlabel("input length L (tokens)")
 ax_c.set_ylabel("decode TPOT (ms/token, log scale)")
-ax_c.set_title("E2E decode: LoDA-SA+graph vs dense (bit-exact)", pad=14, loc="left")
+ax_c.set_title("E2E decode: fused LoDA-SA vs dense (K1=64)", pad=14, loc="left")
 # 图例（线型语义；模型由右侧括号标注区分）
 from matplotlib.lines import Line2D  # noqa: E402
 handles = [
     Line2D([0], [0], ls="--", color=C_DENSE, marker="o", markersize=11,
-           markeredgecolor="white", label="dense FullKV (eager)"),
+           markeredgecolor="white", label="dense FullKV"),
     Line2D([0], [0], ls="-", color=C_TLI, marker="o", markersize=11,
-           markeredgecolor="white", label="LoDA-SA + CUDA graph"),
+           markeredgecolor="white", label="LoDA-SA + graph"),
 ]
 ax_c.legend(handles=handles, loc="upper left", fontsize=FONT_SIZES["legend"] - 6)
 # 数值标注：32K 密集对（持平属故事本身）TLI 值右置；64K 上/下置；128K 并入括号文本
@@ -237,11 +233,18 @@ for name, dd, tt, mk in models:
             ax_c.annotate(f"{d:.0f}", (lk, d), textcoords="offset points",
                           xytext=(0, 10), ha="center", va="bottom",
                           fontsize=FONT_SIZES["annotation"] - 4, color=C_DENSE)
-            ax_c.annotate(f"{t:.1f}", (lk, t), textcoords="offset points",
-                          xytext=(0, -10), ha="center", va="top",
-                          fontsize=FONT_SIZES["annotation"] - 4, color=C_TLI)
+            # 32B tli@64K=41.8 与 Qwen-8B dense@64K=39.8 点位贴邻（上下左右均
+            # 有标签/线）→ 移到右下空区（Qwen dense 线下方、Llama"33"右侧）
+            if name == "Qwen3-32B":
+                ax_c.annotate(f"{t:.1f}", (lk, t), textcoords="offset points",
+                              xytext=(28, -14), ha="left", va="top",
+                              fontsize=FONT_SIZES["annotation"] - 4, color=C_TLI)
+            else:
+                ax_c.annotate(f"{t:.1f}", (lk, t), textcoords="offset points",
+                              xytext=(0, -10), ha="center", va="top",
+                              fontsize=FONT_SIZES["annotation"] - 4, color=C_TLI)
 # 128K 加速比括号 + 模型名 + 端点值（右侧直标，Quest 风格图内结论；y 手工错开防互叠）
-bracket_y = {"Qwen3-8B": 58.0, "Qwen3-32B": 100.0, "Llama-3.1-8B": 36.0}
+bracket_y = {"Qwen3-8B": 40.0, "Qwen3-32B": 100.0, "Llama-3.1-8B": 24.0}
 for name, dd, tt, mk in models:
     sp = dd[-1] / tt[-1]
     ax_c.annotate("", xy=(128, tt[-1]), xytext=(128, dd[-1]),
@@ -250,14 +253,16 @@ for name, dd, tt, mk in models:
     ax_c.text(134, bracket_y[name], f"{name}\n{dd[-1]:.0f} -> {tt[-1]:.1f} ms\n{sp:.2f}x",
               fontsize=FONT_SIZES["annotation"] - 2, color=C_HL,
               fontweight="bold", va="center", ha="left")
-# eager 臂行内直标（诚实边界：无 graph 时 launch 主导；线上方居左）
-ax_c.text(40, 110, "LoDA-SA eager: 99-134 ms",
+# eager 臂行内直标（诚实边界：无 graph 时 launch 主导；置于 eager 线下方空区）
+ax_c.text(30, 95, "LoDA-SA eager\n(no graph)\n101-134 ms",
           fontsize=FONT_SIZES["annotation"] - 4, color=C_EAGER,
-          ha="left", va="bottom", style="italic")
-ax_c.text(0.98, 0.86,
-          "gen bit-exact, 3 models\n"
-          "H20-3e: pc40/pc32 arms\n"
-          f"cross-machine dev <{repl_dev_max:.1f}%",
+          ha="left", va="top", style="italic")
+ax_c.text(0.98, 1.0,
+          "graph replays bit-identical\n"
+          "8B graph-eager: 64K bit-exact;\n"
+          "32K/128K one-token bf16 ties\n"
+          "32B arms bit-exact\n"
+          "pc40/pc02; iter3+K1=64",
           transform=ax_c.transAxes, fontsize=FONT_SIZES["annotation"] - 4,
           style="italic", color=pal["neutral"], va="top", ha="right")
 
@@ -300,12 +305,12 @@ for L, d, s1, s2 in zip(Ls, dense_ms, step1_ms, step2_ms):
 src133c = "e133c_subspace_speedup_verdict.json:steady_gpu_ms"
 rows.append(f"E2\ta\ttli_e133c_delta\tsteady_gpu_delta_pct\tpct\t{e133c_e2e_pct:.1f}\t{src133c}\tmavg_e2e.delta_pct")
 rows.append(f"E2\ta\ttli_e133c_delta_tail\tsteady_gpu_delta_pct\tpct\t{e133c_tail_pct:.1f}\t{src133c}\tmavg_tail.delta_pct")
-# 面板 (c)：三模型 e2e TPOT（graph 时代口径）
+# 面板 (c)：三模型 e2e TPOT（iter3+K1=64 口径，三行判决全齐）
 c_src = {
-    "Qwen3-8B": ("e152v4_formal_verdict.json:arms.pc40.L", q8b_dense, q8b_tli, q8b_eager),
-    "Qwen3-32B": ("e160_32b_e2e_latency_verdict.json+e160b_128k_expandable_verdict.json:results",
+    "Qwen3-8B": ("e172_iter3_k64_qwen_verdict.json:results", q8b_dense, q8b_tli, q8b_eager),
+    "Qwen3-32B": ("e174_iter3_k64_32b_verdict.json:results",
                   q32b_dense, q32b_tli, None),
-    "Llama-3.1-8B": ("e159_llama_e2e_latency_verdict.json:cross_caliber_primary_table.pc40",
+    "Llama-3.1-8B": ("e173_iter3_k64_llama_verdict.json:results",
                      llama_dense, llama_tli, None),
 }
 for name, (src, dd, tt, ee) in c_src.items():
@@ -316,11 +321,10 @@ for name, (src, dd, tt, ee) in c_src.items():
     if ee is not None:
         for L, e in zip((32768, 65536, 131072), ee):
             rows.append(f"E2\tc@L{L}\t{name}_tli_eager\ttpot_ms\tms\t{e:.2f}\t{src}\ttli_eager")
-rows.append(f"E2\tc\tcross_machine_dev_max\tpct\t{repl_dev_max:.2f}\t"
-            "e160r_32b_replication_verdict.json:deviation_vs_original\tspeedup_dev_pct")
 rows.append("E2\tc\tsuperseded\tnote\t-\t"
-            "panel (c) replaced e152v2 dynamic-cache caliber (TLI 3.4x/2.5x/1.8x SLOWER) "
-            "with E152v4/E160/E160b/E159 whole-step-CUDA-graph caliber on 2026-10-23")
+            "panel (c) replaced the iter22 caliber (e152v4/e159/e160/e160b: Qwen-8B "
+            "1.064/1.448/2.067x, Llama 1.015/1.41/1.961x, 32B 1.015/1.338/1.841x) "
+            "with the iter3+K1=64 caliber (E172/E173/E174, 2026-10-25)")
 with open(os.path.join(OUT, "E2_latency_figure_data.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 print("exported E2_latency_figure_data.tsv")

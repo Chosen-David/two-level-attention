@@ -1,52 +1,46 @@
 {
   "provenance": {
-    "source_path": "exp/trace/results/e152v2_e2e_latency_verdict.json",
-    "source_sha256": "cbae41ef66aeab661ccf64b5548cc683cd596f7dedb1948df556e6e3c250bbc3",
-    "source_commit": "4067e6c25d5110322ffcf48f3beb77f50b82778a",
-    "transformation": "Retain only three dynamic-cache lengths and dense/sparse TPOT values; transcribe relevant model/hardware/software fields from caliber; omit static points, attribution prose and all host/network/user paths."
+    "source_path": "exp/trace/results/e172_iter3_k64_qwen_verdict.json",
+    "source_sha256": "f18918f20157e26e0769a0ffa1d05070bc0e284a9f074f01c3c206636d9b199c",
+    "source_commit": "0584b536e476ec420cdb16c20f0af9aed82987a7",
+    "transformation": "Retain the pc40 clean arm's measured-phase mean TPOT per length for dense, sparse whole-step-CUDA-Graph and sparse eager-no-graph runs (dense 6 repetitions, graph 4, eager gate arm; warmup runs omitted); transcribe caliber fields from the run JSONs; omit per-step arrays, host/model paths and provenance prose."
   },
   "measurement": {
     "model": "Qwen3-8B",
     "dtype": "bf16",
-    "attention_backend_declared": "sdpa",
-    "hardware": "NVIDIA H20",
-    "transformers": "4.56.2",
-    "torch": "2.8.0",
-    "generation": "greedy, fixed128 output tokens",
+    "hardware": "NVIDIA H20-3e (pc40 clean arm)",
+    "torch": "2.8.0+cu128",
+    "generation": "greedy, fixed 128 output tokens",
     "tpot_denominator": "127 after-first output intervals",
-    "instrumentation": "per-step device synchronized; runtime route not independently verified",
-    "cache": "dynamic",
-    "alpha": 0.125,
-    "beta": 0.375,
-    "gamma": 0.625,
-    "K1": 128,
-    "K": 1024,
-    "protection": "not explicitly bound"
+    "instrumentation": "per-step device synchronized; includes sync and greedy argmax",
+    "interleaving": "ABBA, 2 processes per arm",
+    "sparse_geometry": "tli champion iter3: nb32/nl4096/ntoff, minmax+avg, sink4/swa128, K1=64/K2=1024, tail32 subspace, TLIStaticCache, six fused Triton kernels",
+    "dense_path": "native eager dense decode (SDPA), DynamicCache, no CUDA Graph",
+    "sparse_paths": "whole-step CUDA Graph replay (graph arm); eager staged decode without graph (reference arm, gate caliber)",
+    "bitexact_gate": "graph arms internally bitwise identical (2 procs x 2 runs per length); graph vs eager bitwise identical at 64K; 32K and 128K each show one single-token divergence (steps 99 and 88, one token pair swapped), calibered as bf16 non-associative tie-breaks in the enlarged far candidate sort (K1=64); no configuration-level error",
+    "k128_verify_cell": "K1=128 iter3 arm re-run in the same batch reproduces the prior iter3 judgment at 18.668 vs 18.675 ms (32K), bit-level",
+    "backend_verified": false
   },
-  "results_median": {
+  "results_mean_tpot_ms": {
     "L32768": {
-      "dense_dynamic": {
-        "tpot_ms": 26.0
-      },
-      "tli_dynamic": {
-        "tpot_ms": 87.9
-      }
+      "dense": 25.712,
+      "tli_graph": 17.715,
+      "tli_eager": 100.9
     },
     "L65536": {
-      "dense_dynamic": {
-        "tpot_ms": 39.7
-      },
-      "tli_dynamic": {
-        "tpot_ms": 97.6
-      }
+      "dense": 39.797,
+      "tli_graph": 17.957,
+      "tli_eager": 103.2
     },
     "L131072": {
-      "dense_dynamic": {
-        "tpot_ms": 67.3
-      },
-      "tli_dynamic": {
-        "tpot_ms": 119.9
-      }
+      "dense": 67.139,
+      "tli_graph": 18.464,
+      "tli_eager": 133.9
     }
+  },
+  "speedup_graph_vs_dense": {
+    "L32768": 1.451,
+    "L65536": 2.216,
+    "L131072": 3.636
   }
 }

@@ -39,6 +39,7 @@ import json
 import os
 import random
 import sys
+import time
 from datetime import datetime
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(
@@ -144,52 +145,289 @@ def _pack_rows(tokenizer, rows, pad_id):
     return input_ids, position_ids, mask, lens
 
 
-def _decode_4d_mask(past_len, seq_lens, neg_inf, dtype, device):
+def _decode_4d_mask(past_len, seq_lens, neg_inf, dtype, device,
+                    left_pad_kv=False):
     """构造本步 decode 的 4D additive mask [B, 1, 1, kv_len]。
 
-    kv_len = past_len（本步 forward 时 KV 总列数，含本步 append 前已
-    存在的列；注意调用方需按「cache 更新后」口径传 past_len）。行 b
-    尾部 seq_lens[b] 列可见（0），其余 pad 列屏蔽（-inf）。dtype 与
-    hidden_states 一致（attn_weights + mask 同 dtype 加法）。
+    kv_len = past_len（本步 forward 时 KV 总列数；调用方需按「cache 更新
+    后」口径传）。行 b 的 seq_lens[b] 个有效 KV 列可见（0）、其余 pad 列
+    屏蔽（-inf）。dtype 与 hidden_states 一致（attn_weights + mask 同
+    dtype 加法）。
+
+    【阶段 2a】left_pad_kv=True（TLI TLIStaticCache）：有效 KV 在前
+    [0, seq_lens[b])、pad 在尾 → 可见列取头部 :L；False（默认，fasa/none
+    DynamicCache 有效占尾）→ 可见列取尾部 kv_len-L:。dense/skip 层消费
+    本 mask 与 KV 布局必须一致，否则会看零 KV（head 布局错位）。
     """
     B = len(seq_lens)
     kv_len = past_len
     mask = torch.full((B, 1, 1, kv_len), neg_inf, dtype=dtype, device=device)
     for b, L in enumerate(seq_lens):
-        mask[b, 0, 0, kv_len - L:] = 0
+        if left_pad_kv:
+            mask[b, 0, 0, :L] = 0
+        else:
+            mask[b, 0, 0, kv_len - L:] = 0
     return mask
 
 
+def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
+                        neg_inf, dtype, device, B, S_cap):
+    """【阶段 2c-5】TLI fixed_cache decode 整步 capture 一次 + replay 循环。
+
+    图内不变量（capture 时烘焙）：KV 形状恒 [B,Hkv,S_cap,D]、
+    4D additive mask 恒 [B,1,1,S_cap]、TLI index 容量宽、TLI mask
+    [B,1,Hkv,S_cap]。步间变化量全部由预分配 buffer 的 copy_ 注入：
+      - nxt_buf [B,1]：本步喂入 token（alive 行 = 上一 token，dead = pad）
+      - pid_buf [B,1]：RoPE position_ids（lens[b] + step，dead 行同式）
+      - pos_buf [B]：KV 写列（= seq_lens[b]-1，TLIStaticCache.update 消费）
+      - vl_buf  [B]：有效长（compute_mask_graph 的 valid_len 输入）
+      - m4_buf：dense/skip 层 additive mask（可见列 [0, seq_lens[b])）
+
+    失败 fail-closed：返回 None，调用方走 staged 逐行路径（零扰动）。
+    前提：T=S_cap ≥ 16384（Triton gather 批量路径；更短档的 torch dense
+    回退含 host 同步，不可 capture）。
+    """
+    if S_cap < 16384:
+        print(f"[2c] S_cap={S_cap} < 16384（torch dense 回退含 host 同步，"
+              f"不可 capture）→ 跳过 CUDA Graph，走 staged 路径", flush=True)
+        return None
+    from sparse_attn.ops.cuda_graph_state import (  # noqa: E402
+        enable_graph, disable_graph, graph_state)
+    gs = graph_state()
+    nxt_buf = torch.full((B, 1), pad_id, dtype=torch.long, device=device)
+    pid_buf = torch.zeros((B, 1), dtype=torch.long, device=device)
+    pos_buf = torch.zeros(B, dtype=torch.long, device=device)
+    vl_buf = torch.zeros(B, dtype=torch.long, device=device)
+    m4_buf = torch.full((B, 1, 1, S_cap), neg_inf, dtype=dtype, device=device)
+    compact = getattr(past, "_far_skip_prepared", False)
+    if compact:
+        past._far_skip_attention_mask = m4_buf
+    position_kwargs = {"cache_position": pos_buf} if compact else {}
+    visible = 0
+    snap_seq, snap_gen = list(ctx.seq_lens), list(ctx.gen_lens)
+
+    def _inject(step):
+        """host → buffer 注入（每步一次；与 staged 循环同序：先取 token，
+        再 seq_lens+1，再构造 position/mask）。"""
+        nonlocal visible
+        if compact:
+            # Compact mode is B=1: fill persistent buffers without temporary
+            # CUDA tensors, and update only the changed causal-mask interval.
+            nxt_buf.fill_(gen[0][-1] if ctx.alive[0] else pad_id)
+            if ctx.alive[0]:
+                ctx.seq_lens[0] += 1
+                ctx.gen_lens[0] += 1
+            length = ctx.seq_lens[0]
+            if not 1 <= length <= S_cap:
+                raise ValueError("decode position exceeds static cache capacity")
+            pid_buf.fill_(lens[0] + step)
+            pos_buf.fill_(length - 1)
+            vl_buf.fill_(length)
+            if length >= visible:
+                m4_buf[..., visible:length] = 0
+            else:
+                m4_buf[..., length:visible] = neg_inf
+            visible = length
+            return
+        nxt = [gen[b][-1] if ctx.alive[b] else pad_id for b in range(B)]
+        nxt_buf.copy_(torch.tensor(nxt, dtype=torch.long,
+                                   device=device).view(B, 1))
+        for b in range(B):
+            if ctx.alive[b]:
+                ctx.seq_lens[b] += 1
+                ctx.gen_lens[b] += 1
+        pid_buf.copy_(torch.tensor([lens[b] + step for b in range(B)],
+                                   dtype=torch.long, device=device).view(B, 1))
+        pos_buf.copy_(torch.tensor([ctx.seq_lens[b] - 1 for b in range(B)],
+                                   dtype=torch.long, device=device))
+        vl_buf.copy_(torch.tensor(ctx.seq_lens, dtype=torch.long,
+                                  device=device))
+        m4_buf.fill_(neg_inf)
+        for b in range(B):
+            m4_buf[b, 0, 0, :ctx.seq_lens[b]] = 0
+
+    try:
+        enable_graph(B)
+        gs.pos_buf = pos_buf
+        gs.valid_len_buf = vl_buf
+        _inject(0)
+        # warmup（主 stream，2 步）：HF 惰性分配 / kernel 选择 / Triton
+        # autotune 必须发生在 capture 之外；写列重复覆盖（replay 首步同
+        # 位置同 token 重写，无污染）。主 stream 执行（非 side stream）：
+        # _tl_decode_batched 在 graph 不支持配置时会 disable graph → 此
+        # 时 staged 路径在主 stream 跑 warmup；温跑后检查 graph 状态，若
+        # 已被 disable 则 fail-closed 回 staged（避免 capture 时非图
+        # 兼容 staged 代码入图炸）。
+        def warmup():
+            for _ in range(2):
+                model(input_ids=nxt_buf, position_ids=pid_buf,
+                      attention_mask=m4_buf, past_key_values=past,
+                      use_cache=True, **position_kwargs)
+        if compact:
+            stream = torch.cuda.Stream()
+            stream.wait_stream(torch.cuda.current_stream())
+            with torch.cuda.stream(stream):
+                warmup()
+            torch.cuda.current_stream().wait_stream(stream)
+        else:
+            warmup()
+        if not gs.enabled:
+            print(f"[2c] compute_mask_graph 不支持当前配置 → 关闭 CUDA Graph，"
+                  f"回退 staged 逐行路径", flush=True)
+            disable_graph()
+            ctx.seq_lens[:] = snap_seq
+            ctx.gen_lens[:] = snap_gen
+            return None
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            out = model(input_ids=nxt_buf, position_ids=pid_buf,
+                        attention_mask=m4_buf, past_key_values=past,
+                        use_cache=True, **position_kwargs)
+        print(f"[2c] CUDA Graph capture 成功：B={B} S_cap={S_cap} "
+              f"（capture 后 replay 循环 {MAX_GEN - 1} 步上限）", flush=True)
+    except Exception as e:  # fail-closed：任何 capture 失败回 staged 路径
+        import traceback
+        print(f"[2c] CUDA Graph capture 失败（{type(e).__name__}: {e}）"
+              f"→ 回退 staged 路径", flush=True)
+        if os.environ.get("TLI_CUDA_GRAPH_DEBUG", "0") == "1":
+            traceback.print_exc()
+        disable_graph()
+        ctx.seq_lens[:] = snap_seq
+        ctx.gen_lens[:] = snap_gen
+        return None
+    # warmup/capture 期 _inject(0) 已把 seq_lens +1 → 恢复到 capture 前快照，
+    # 让正式步（step=0）重新走一次同样的 +1。
+    ctx.seq_lens[:] = snap_seq
+    ctx.gen_lens[:] = snap_gen
+    _t0, _nstep = time.time(), 0
+    for step in range(MAX_GEN - 1):
+        if not any(ctx.alive):
+            break
+        _inject(step)
+        graph.replay()
+        pred = out.logits[:, -1, :].argmax(dim=-1).tolist()   # 每步一次同步
+        _nstep += 1
+        for b in range(B):
+            if not ctx.alive[b]:
+                continue
+            gen[b].append(pred[b])
+            if pred[b] in eos_ids and len(gen[b]) > 1:
+                ctx.alive[b] = False
+    _dt = time.time() - _t0
+    print(f"[2c-wall] graph decode: steps={_nstep} wall={_dt:.3f}s "
+          f"({1000 * _dt / max(1, _nstep):.2f} ms/step, B={B})", flush=True)
+    disable_graph()
+    return gen
+
+
 def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
-                        mask2d, lens, eos_ids, keep_logits):
+                        mask2d, lens, eos_ids, keep_logits,
+                        fixed_cache=False):
     """一个 left-pad chunk 的 prefill + 多步 decode，返回逐行 (pred, gen)。
 
     语义对齐 pred_ruler.py 生成循环（首位 EOS 不停 ≈ min_length、
     `len(gen)>1` 才断）；dead 行喂 pad_id filler 吃计算、由 4D mask 排除。
+
+    fixed_cache=True（TLI 阶段 2a）：prefill 走 DynamicCache（现状零改动），
+    prefill 后 fill_static_from_dynamic 逐层搬移到 TLIStaticCache（固定容量
+    S_cap、有效在前 left-pad 布局）→ decode 每步 KV 形状恒 [B,Hkv,S_cap,D]
+    （CUDA Graph 前置）。decode 4D mask 列数恒 S_cap、可见列取头部
+    [0, seq_lens[b])（left_pad_kv=True）。
     """
     B = len(rows)
+    compact = any(getattr(getattr(m, "indexer", None), "far_skip_backend", "legacy")
+                  == "compact" for m in model.modules())
+    if compact and (B != 1 or not fixed_cache):
+        raise ValueError("RULER compact far skip requires fixed_cache and batch_size=1")
     pad_id = getattr(tokenizer, "pad_token_id", None) or tokenizer.eos_token_id
     input_ids = input_ids.to("cuda")
     position_ids = position_ids.to("cuda")
-    mask2d = mask2d.to("cuda")
+    mask2d = None if fixed_cache else mask2d.to("cuda")
     device = input_ids.device
     neg_inf = torch.finfo(next(model.parameters()).dtype).min
     dtype = next(model.parameters()).dtype
+    S_max = input_ids.shape[1]
 
     ctx = BatchCtx(
         batch=B, seq_lens=list(lens), gen_lens=[0] * B,
         alive=[True] * B, pad_id=pad_id)
     with batch_decode_scope(ctx):
-        # prefill：显式 position_ids + 2D mask（create_causal_mask 内部转 4D，
-        # pad 前缀由 mask 0 屏蔽）。logits 超 32K 档取末 token（省显存）。
-        output = model(input_ids=input_ids, position_ids=position_ids,
-                       attention_mask=mask2d, past_key_values=None,
-                       use_cache=True,
-                       **({"logits_to_keep": 1} if keep_logits else {}))
-        past = output.past_key_values
-        pred = output.logits[:, -1, :].argmax(dim=-1)  # [B]
-        gen = [[p] for p in pred.tolist()]             # 每行一个 gen 列表
 
+        # prefill row-by-row（避免 B>1 触发 HF SDPA 构造
+        # [B*n_heads, S, S] bool mask OOM：B=8/32K ≈ 256 GB > 140 GB H20）：
+        # 每行 B=1 走普通 SDPA（[1*n_heads, S_row, S_row] ≈ 32 GB 单行可容），
+        # 直接把 KV 拷进 static cache（有效在前 left-pad 布局），逐行释放 DynamicCache。
+        # 生成 token = 每行末 position logits argmax（与旧 batch prefill 语义一致：
+        # prefill 后立即预测第一 decode token）。
+        # 非 TLI（fixed_cache=False）：同样逐行 B=1 prefill，
+        # 后接 staged row-by-row decode（batch>1 无 graph 提速，逐行回退零额外开销）。
+        pred_list = []
+        if fixed_cache:
+            from sparse_attn.ops.tli_static_cache import (  # noqa: E402
+                TLIStaticCache)
+            from sparse_attn.ops.tli_static_cache import fill_static_from_dynamic
+            S_cap = S_max + MAX_GEN
+            static_cache = TLIStaticCache(model.config, S_cap, B)
+            inited = [False] * len(static_cache.layers)
+            for b in range(B):
+                base = S_max - lens[b]
+                row_input = input_ids[b:b+1, base:]   # [1, L_b]
+                row_pos = position_ids[b:b+1, base:]   # [1, L_b]
+                out = model(input_ids=row_input, position_ids=row_pos,
+                            use_cache=True)
+                pred_list.append(out.logits[0, -1, :].argmax(dim=-1))
+                dyn = out.past_key_values
+                if compact:
+                    fill_static_from_dynamic(static_cache, dyn, lens, model=model)
+                    del out, dyn
+                    continue
+                for l in range(len(static_cache.layers)):
+                    stat_l = static_cache.layers[l]
+                    k = dyn.layers[l].keys            # [1, Hkv, L_b, D]
+                    v = dyn.layers[l].values
+                    if not inited[l]:
+                        # lazy_initialization 要求 shape[0]==B；构造全 B
+                        # zero 占位、第 0 行填真实 K，宽高 = 本行实际长 L_b
+                        d = k.new_zeros(B, k.shape[1], k.shape[2], k.shape[3])
+                        d[0:1] = k
+                        stat_l.lazy_initialization(d)
+                        inited[l] = True
+                    Lb = lens[b]
+                    stat_l.keys[b, :, :Lb, :].copy_(k[0, :, :Lb, :])
+                    stat_l.values[b, :, :Lb, :].copy_(v[0, :, :Lb, :])
+                del out, dyn
+            past = static_cache
+        else:
+            # 非 TLI：逐行 B=1 prefill → 独立 DynamicCache → row-by-row staged
+            # decode；每行 forward 间 del 释放 DynamicCache 控峰值。
+            row_caches = []
+            for b in range(B):
+                base = S_max - lens[b]
+                row_input = input_ids[b:b+1, base:]
+                row_pos = position_ids[b:b+1, base:]
+                out = model(input_ids=row_input, position_ids=row_pos,
+                            use_cache=True)
+                pred_list.append(out.logits[0, -1, :].argmax(dim=-1))
+                row_caches.append(out.past_key_values)
+                del out
+            # Multi-row DynamicCache 组装为 left-pad 全宽（有效占尾），
+            # row-by-row staged decode 使用此 per-row cache；
+            # 下面 staged 循环改为逐行独立 cache、mask2d 逐行。
+            past = row_caches
+        pred = torch.tensor(pred_list, dtype=torch.long, device=device)
+        gen = [[p] for p in pred.tolist()]            # 每行一个 gen 列表
+
+        # 【阶段 2c-5】CUDA Graph decode（env TLI_CUDA_GRAPH=1；仅 TLI
+        # fixed_cache、S_cap≥16384 且生产主配置——不满足时 helper 返回
+        # None → 落下方 staged 逐行路径，行为零扰动）。
+        if (fixed_cache and os.environ.get("TLI_CUDA_GRAPH", "0") == "1"):
+            gen_g = _decode_batch_graph(
+                model, ctx, past, gen, lens, eos_ids, pad_id, neg_inf,
+                dtype, device, B, S_cap)
+            if gen_g is not None:
+                return gen_g
+
+        _t_stage, _n_stage = time.time(), 0
         for step in range(MAX_GEN - 1):
             if not any(ctx.alive):
                 break
@@ -209,20 +447,53 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                 if ctx.alive[b]:
                     ctx.seq_lens[b] += 1
                     ctx.gen_lens[b] += 1
-            # mask 列数 = cache 更新后总列 = S_max + step + 1；行 b 可见长 =
-            # 更新后的 seq_lens[b]（= lens[b] + step + 1，含本步新 token）。
-            m4 = _decode_4d_mask(len(input_ids[0]) + step + 1, ctx.seq_lens,
-                                 neg_inf, dtype, device)
-            out = model(input_ids=nxt_ids, position_ids=pos,
-                        attention_mask=m4, past_key_values=past, use_cache=True)
-            past = out.past_key_values
-            pred = out.logits[:, -1, :].argmax(dim=-1)  # [B]
+            # mask 列数：fixed_cache = 恒 S_cap（TLIStaticCache 固定容量、有效在
+            # 前 → left_pad_kv 可见列取头部 [0, seq_lens[b])）；否则 = S_max +
+            # step + 1（变长 DynamicCache 有效占尾 → 可见列取尾部）。行 b 可见
+            # 长 = 更新后的 seq_lens[b]（= lens[b] + step + 1，含本步新 token）。
+            if fixed_cache:
+                kv_len = S_cap
+                m4 = _decode_4d_mask(kv_len, ctx.seq_lens, neg_inf, dtype,
+                                     device, left_pad_kv=True)
+                position_kwargs = {}
+                if compact:
+                    past._far_skip_attention_mask = m4
+                    position_kwargs["cache_position"] = pos.reshape(-1)
+                out = model(input_ids=nxt_ids, position_ids=pos,
+                            attention_mask=m4, past_key_values=past,
+                            use_cache=True, **position_kwargs)
+                pred = out.logits[:, -1, :].argmax(dim=-1)  # [B]
+            else:
+                # 非 TLI：逐行独立 B=1 decode（DynamicCache 各行长不同，
+                # 无法 batch → 逐行 forward + per-row 4D mask）。
+                pred = torch.zeros(B, dtype=torch.long, device=device)
+                for b in range(B):
+                    if not ctx.alive[b]:
+                        continue
+                    base = S_max - lens[b]
+                    kv_len_b = lens[b] + step + 1
+                    m4b = _decode_4d_mask(
+                        kv_len_b, [ctx.seq_lens[b]], neg_inf, dtype, device,
+                        left_pad_kv=False)
+                    out_b = model(input_ids=nxt_ids[b:b+1],
+                                  position_ids=pos[b:b+1],
+                                  attention_mask=m4b,
+                                  past_key_values=past[b],
+                                  use_cache=True)
+                    past[b] = out_b.past_key_values
+                    pred[b] = out_b.logits[0, -1, :].argmax(dim=-1)
+                    del out_b
+            _n_stage += 1
             for b in range(B):
                 if not ctx.alive[b]:
                     continue
                 gen[b].append(pred[b].item())
                 if pred[b].item() in eos_ids and len(gen[b]) > 1:
                     ctx.alive[b] = False
+        if fixed_cache and _n_stage:
+            _dt = time.time() - _t_stage
+            print(f"[2c-wall] staged decode: steps={_n_stage} wall={_dt:.3f}s "
+                  f"({1000 * _dt / _n_stage:.2f} ms/step, B={B})", flush=True)
         return gen
 
 
@@ -359,7 +630,8 @@ def main():
                 with torch.no_grad():
                     gen = _decode_batch_chunk(
                         model, tokenizer, chunk, input_ids, position_ids,
-                        mask2d, lens, eos_ids, keep_logits)
+                        mask2d, lens, eos_ids, keep_logits,
+                        fixed_cache=(args.method == "tli"))
             budget = None if baseline_receipt else metrics.get_select_tokens()
             for (row, g) in zip(chunk, gen):
                 pred = tokenizer.decode(g, skip_special_tokens=True)
@@ -417,3 +689,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

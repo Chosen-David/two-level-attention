@@ -148,6 +148,15 @@ The driver writes only changed mask intervals and fills persistent scalar/token
 buffers, rather than constructing four device tensors and rewriting S_cap every
 step. Far-on layers still incur their historical full-width work.
 
+The `benchmark/RULER/pred_ruler_batch.py` entry also prepares compact static
+storage after its row prefill, passes explicit positions, and registers its
+causal mask for both staged eager and graph decode. Compact mode requires
+`fixed_cache=True`, B=1 and eviction; unsupported batches fail before prefill.
+Its existing short-context/unsupported-graph fallback runs the same compact
+static selector in staged mode. The RULER staged entry has a CPU small-Qwen
+generation/cache-lifetime regression; actual CUDA capture and performance of
+this entry remain unverified in this environment.
+
 Example (existing target-GPU model installation required):
 
 ```bash

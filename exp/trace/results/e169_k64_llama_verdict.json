@@ -1,0 +1,44 @@
+{
+ "schema": "e169-k64-llama-verdict",
+ "experiment": "E169：K1=64 论文口径 e2e TPOT（Llama-3.1-8B，pc40 GPU1 干净臂，iter22 代码面）",
+ "date": "2026-10-25",
+ "machine": "pc40 (2xH20-3e), commit 2c726b5（E159 判决面）+ e159_shadow_pkg（llama3_attn_patch a79dbfa4）",
+ "protocol": {
+  "caliber": "E159 逐字同款（ABBA 交错单卡串行、TLIStaticCache 整步 capture、TPOT per-step-device-synced、max_gen=128、n=6/臂 TLI = 2 procs × 3 repeats、dense n=6/臂）唯一改动 tia_level1_topk 128→64",
+  "champion_flags": "nb32/nl4096/ntoff/minmax+avg/sink4/swa128/K2=1024/tail32 + K1=64",
+  "anchor_e159": "E159 K1=128 原判 1.015/1.410/1.961×（tli 21.11/23.48/29.00 vs dense 21.43/33.10/56.86）",
+  "gpu_hygiene": "clean（起跑前 GPU1 query-compute-apps 0 进程，全程 30s 旁路监控落盘 gpu_hygiene.log，末格单我方进程 619204）"
+ },
+ "equivalence_gate": {
+  "k128_verify_32k": "21.098ms vs E159 原判 21.12ms —— 逐位级复现（-0.1%），代码面等价性成立",
+  "dense_reverify": "21.24/33.25/56.81 vs 原判 21.43/33.10/56.86 —— 32K -0.9% / 64K +0.5% / 128K -0.1%，机器日漂移带内"
+ },
+ "results": {
+  "32768": {
+   "tli_graph_k64_ms": {"mean": 20.995, "arms": [20.998, 20.992], "n": 6},
+   "dense_ms": {"mean": 21.235, "arms": [21.207, 21.263], "n": 12},
+   "speedup_k64": 1.011
+  },
+  "65536": {
+   "tli_graph_k64_ms": {"mean": 23.226, "arms": [23.208, 23.243], "n": 6},
+   "dense_ms": {"mean": 33.249, "arms": [33.328, 33.170], "n": 6},
+   "speedup_k64": 1.431
+  },
+  "131072": {
+   "tli_graph_k64_ms": {"mean": 28.869, "arms": [28.872, 28.865], "n": 6},
+   "dense_ms": {"mean": 56.807, "arms": [56.823, 56.791], "n": 6},
+   "speedup_k64": 1.968
+  }
+ },
+ "bitexact_gate": {
+  "pass": "3/3（三档 graph gen_tokens == eager gen_tokens 逐位一致；graph 6 runs 内部逐位一致）——比 E168（Qwen 2/3）干净，Llama 无 bf16 tie-break 分歧",
+  "eager_tpots": "84.9/83.9/113.3ms（三档 eager 对拍臂，仅门禁不进表）"
+ },
+ "k1_comparison": {
+  "tli_arm_delta_vs_k1128": "32K 20.995 vs 21.11 = -0.55%；64K 23.226 vs 23.48 = -1.08%；128K 28.869 vs 29.00 = -0.45%",
+  "speedup_delta": "1.011 vs 1.015（32K dense 锚同日 -0.9% 漂移主导）；64K 1.431 vs 1.410；128K 1.968 vs 1.961",
+  "verdict": "K1=64 Llama e2e 持平偏正（TLI 臂三档 -0.45~-1.08%），与 Qwen E168 形态一致；64K/128K 档加速比超 K1=128"
+ },
+ "verdict": "K1=64 Llama 论文口径成立：bitexact 3/3 + 加速比 1.011/1.431/1.968×。与 E168（Qwen）跨模型族互证 K1=64 甜点（e140b 倒 U + e140h 质量），生产 champion flags K1=64 获双模型族 e2e 背书。Llama 侧 iter3+K1=64 主表口径 = E173（与 E172 Qwen 同批）。",
+ "files": "pc40 ~/e169_k64_formal/（16 JSON + gpu_hygiene.log + harvest_summary.json）；runner ~/e169_k64_llama_pc40.sh"
+}
