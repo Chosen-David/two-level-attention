@@ -1,0 +1,23 @@
+{
+  "schema": "e168d-llama-batch-envelope-verdict",
+  "date": "2026-10-25",
+  "machine": "pc02 GPU1(dense)/GPU2(tli) (H20-3e)，Llama-3.1-8B-Instruct bf16，repo@906d812，采集器 exp/bench/e168d_bs_llama.py（e167_bs_latency.py Llama 适配：is_qwen3 yarn 守卫 + 默认模型路径），tli 臂 TLI_SHADOW_PKG=solution_iter3，**K1=64 生产口径 champion flags**（tia_level1_topk 64），max_gen=64，TPOT 中位数 3 runs",
+  "question": "批档交叉点随长度的单调右移（Qwen e167/e167b 三点闭合）是否在 Llama-3.1-8B 上跨模型复现（K1=64 生产口径）",
+  "results": {
+    "tpot_ms_median": {
+      "32768": {"B1": {"dense": 21.817, "tli": 14.931, "sp": 1.461}, "B2": {"dense": 33.421, "tli": 34.953, "sp": 0.956}, "B4": {"dense": 57.606, "tli": 73.380, "sp": 0.785}},
+      "65536": {"B1": {"dense": 33.880, "tli": 15.165, "sp": 2.234}, "B2": {"dense": 57.599, "tli": 46.987, "sp": 1.226}, "B4": {"dense": 105.383, "tli": 107.037, "sp": 0.985}},
+      "131072": {"B1": {"dense": 58.282, "tli": 15.578, "sp": 3.741}, "B2": {"dense": 105.582, "tli": 71.903, "sp": 1.468}, "B4": "双臂 OOM（141GB 显存耗尽，同 Qwen）"}
+    },
+    "crossover_series": {
+      "32768": "交叉点 B≈2（B2 0.956×，dense 反超）",
+      "65536": "交叉点 B≈4（B4 0.985×，过渡带，同 Qwen 64K 0.96×）",
+      "131072": "可行区间（B≤2）内 tli 始终领先（1.468×@B2）；B4 物理不可达"
+    },
+    "mechanism": "交叉点随长度单调右移（Llama: 32K:B≈2 → 64K:B≈4 → 128K:不交叉）——与 Qwen（32K:B∈(1,4) → 64K:B≈4 → 128K:不交叉）同构。dense 批摊销收益被随 L 增长的 KV 流量稀释（dense 单行 21.8→33.9→58.3ms），tli 单行成本近平坦（14.9→15.2→15.6ms，+4.3%@4×，K1=64 口径平坦化保持）；tli 行串行代价随 L 增大（每行 B2：32K 17.5ms +17% → 64K 23.5ms +55% → 128K 36.0ms +131%，同 Qwen +19%→+66%→+114% 形态）",
+    "b1_main_table_consistency": "K1=64 B1 加速比 1.461/2.234/3.741×（dense-eager 锚 21.8/33.9/58.3ms 与 e159/e168 densemain 口径一致）；与 pc40 E173（同口径）数值同量级，跨机偏差由两机独立采集器口径差异（max_gen=64 vs 128）解释",
+    "llama_qwen_delta": "Llama 32K 交叉点（B≈2）早于 Qwen 32K（B∈(1,4)）：Llama dense B2 已达 0.956×；两模型族 64K 均为 B≈4 过渡带、128K 均不交叉——『长度是分离轴』的批维度形态跨模型成立，32K 位置随模型族略移"
+  },
+  "verdict": "Llama 批档交叉点三点闭合：交叉点随上下文长度单调右移在第二模型族成立（32K:B≈2 → 64K:B≈4 → 128K:可行区间内不交叉）。『dense 批摊销被 KV 流量稀释 vs tli 每行成本平坦』机制与行串行代价随 L 增长的形态均与 Qwen 同构。K1=64 生产口径下 B1 加速比 1.461/2.234/3.741×，平坦化保持（+4.3%@4×ctx）。批维度『长度轴是分离轴』叙事升级为双模型族口径。论文口径建议：tli 领先区间 Llama = 128K×B≤2、64K×B≤2；32K B2 即反超，如实披露（比 Qwen 更早）。",
+  "artifacts": "pc02 ~/e165_run/results/e168d_b{1,2,4}_L{32768,65536,131072}_{dense,tli}.json（16 件，128K B4 OOM 不落盘）+ logs + driver ~/e165_run/e168d_driver.sh；采集器 repo exp/bench/e168d_bs_llama.py；/tmp/e168d_summary.json"
+}
