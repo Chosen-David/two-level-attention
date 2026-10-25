@@ -588,6 +588,12 @@ class TLIIndexer(TIAIndexer):
                 )
             self.enable_subspace = True
 
+        self.far_skip_backend = getattr(args, "tli_far_skip_backend", "legacy")
+        self.far_skip_cache = getattr(args, "tli_far_skip_cache", "retain")
+        if self.far_skip_backend != "legacy" or self.far_skip_cache != "retain":
+            from ..ops.far_skip_runtime import configure_far_skip
+            configure_far_skip(self)
+
     # ---------------- E135：sink/swa 参数化的单一事实源 ---------------- #
 
     @property
@@ -5164,3 +5170,4 @@ if _HAS_TRITON:
         v = tl.load(P + r * stride_p + tok, mask=mm, other=0)
         tl.store(IDX + r * R_cand + offs, tok, mask=mm)
         tl.store(OUT + r * R_cand + offs, v, mask=mm)
+
