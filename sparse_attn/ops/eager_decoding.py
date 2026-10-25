@@ -147,6 +147,10 @@ def eager_decoding_request_guard(device=None):
 # ---------------------------------------------------------------------------
 _EAGER_TRITON_OK = {"ok": True}
 
+# 【E165 iter2c】span 并行 expand 可用性标志（fail-closed：异常后永久
+# 回退原单 program kernel，值域不变仅性能回退）。
+_SPAN_OK = {"ok": True}
+
 if _HAS_TRITON:
 
     @triton.jit
@@ -178,6 +182,70 @@ if _HAS_TRITON:
         tl.store(COUNT + r, base)
         f = tl.maximum(f, tl.where(base == 0, 1, 0))
         tl.atomic_max(FLAG, f)
+
+    # 【E165 iter2c】span 并行两段式 expand（grid (R,)→(R, NS)）。
+    # 原 kernel 每行单 program 串行扫全宽 T（Triton cumsum 计算主导，
+    # 8 CTA 欠载 132 SM：128K 时 126us/层）。span 版把行切成 NS 个
+    # span 并行：kernel A 只计数写 PARTIAL [R, NS]；kernel B 各 span
+    # 从 PARTIAL 行前缀取基址（≤NS 个 int 局部求和，零 torch 胶水），
+    # span 内 cumsum → 全局 pos 与原 kernel 输出逐位同（升序/去重语义
+    # 不变量，IDX/COUNT/FLAG 三输出 bitexact by construction）。
+    # B7=1 / W 溢出=2 / cu 破坏=3 三契约校验逐码保留（A 管 cu，B 管
+    # 计数与溢出；COUNT 由 B 的 s==0 program 从 PARTIAL 行总和写出）。
+    @triton.jit
+    def _eager_expand_span_count(
+        MASK, PARTIAL, FLAG, CUK,       # PARTIAL [R, NS] int32
+        T, stride_mr,
+        SP: tl.constexpr, TP: tl.constexpr,
+    ):
+        r = tl.program_id(0)
+        s = tl.program_id(1)
+        cu0 = tl.load(CUK)
+        cu1 = tl.load(CUK + 1)
+        if (cu0 != 0) | ((cu1 - cu0) != T):
+            tl.atomic_max(FLAG, 3)
+        s0 = s * SP
+        cnt = tl.zeros((), tl.int32)
+        for c0 in range(0, SP, TP):
+            offs = s0 + c0 + tl.arange(0, TP)
+            tm = offs < T
+            sel = tl.load(MASK + r * stride_mr + offs, mask=tm, other=0).to(tl.int32)
+            cnt += tl.sum(sel, axis=0)
+        tl.store(PARTIAL + r * tl.num_programs(1) + s, cnt)
+
+    @triton.jit
+    def _eager_expand_span_scatter(
+        MASK, IDX, COUNT, FLAG, PARTIAL,  # PARTIAL [R, NS] int32（A 已写）
+        T, stride_mr, NS,
+        W: tl.constexpr, NSC: tl.constexpr,
+        SP: tl.constexpr, TP: tl.constexpr,
+    ):
+        r = tl.program_id(0)
+        s = tl.program_id(1)
+        ns_offs = tl.arange(0, NSC)
+        ns_m = ns_offs < NS
+        prow = tl.load(PARTIAL + r * NS + ns_offs, mask=ns_m, other=0)
+        row_total = tl.sum(prow, axis=0)
+        base = tl.sum(tl.where(ns_offs < s, prow, 0), axis=0)   # span 前缀（排他）
+        f = tl.where(row_total == 0, 1, 0)
+        if s == 0:
+            tl.store(COUNT + r, row_total)
+        s0 = s * SP
+        lbase = tl.zeros((), tl.int32)   # span 内跨 chunk 累计（与原 kernel base 同义）
+        for c0 in range(0, SP, TP):
+            offs = s0 + c0 + tl.arange(0, TP)
+            tm = offs < T
+            sel = tl.load(MASK + r * stride_mr + offs, mask=tm, other=0).to(tl.int32)
+            csum = tl.cumsum(sel, axis=0)
+            pos = base + lbase + csum - sel
+            w = (sel != 0) & tm & (pos < W)
+            tl.store(IDX + r * W + tl.where(w, pos, 0), tl.where(w, offs, 0),
+                     mask=w)
+            over = (sel != 0) & tm & (pos >= W)
+            f = tl.maximum(f, tl.where(tl.sum(over, axis=0) > 0, 2, 0))
+            lbase += tl.sum(sel, axis=0)
+        if f != 0:
+            tl.atomic_max(FLAG, f)
 
     @triton.jit
     def _eager_attn_kernel(
@@ -557,10 +625,37 @@ def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
     idx = torch.full((R, W_upper), -1, device=dev, dtype=torch.int32)
     cnt = torch.empty(R, device=dev, dtype=torch.int32)
     flag = _err_flag(dev)
-    _eager_expand_kernel[(R,)](
-        m0, idx, cnt, flag, cu_seqlens_k,
-        T, m0.stride(0),
-        W=W_upper, TP=1024, num_warps=8)
+    # 【E165 iter2c】大 T 走 span 并行两段式（输出与单 program 版逐位同，
+    # 见 kernel 注释）；小 T 保持原单 kernel（span 额外 launch 不偿失）。
+    # fail-closed：span 编译/启动异常 → 本次及以后回退原 kernel（IDX 仍
+    # 全 -1 初值，原 kernel 完整重写 → 值域不变）。
+    if T >= 16384 and _SPAN_OK["ok"]:
+        try:
+            _SP, _TP = 8192, 1024
+            _NS = (_SP + T - 1) // _SP
+            _NSC = 1
+            while _NSC < _NS:
+                _NSC *= 2
+            partial = torch.empty((R, _NS), device=dev, dtype=torch.int32)
+            _eager_expand_span_count[(R, _NS)](
+                m0, partial, flag, cu_seqlens_k,
+                T, m0.stride(0),
+                SP=_SP, TP=_TP, num_warps=8)
+            _eager_expand_span_scatter[(R, _NS)](
+                m0, idx, cnt, flag, partial,
+                T, m0.stride(0), _NS,
+                W=W_upper, NSC=_NSC, SP=_SP, TP=_TP, num_warps=8)
+        except Exception:
+            _SPAN_OK["ok"] = False
+            _eager_expand_kernel[(R,)](
+                m0, idx, cnt, flag, cu_seqlens_k,
+                T, m0.stride(0),
+                W=W_upper, TP=1024, num_warps=8)
+    else:
+        _eager_expand_kernel[(R,)](
+            m0, idx, cnt, flag, cu_seqlens_k,
+            T, m0.stride(0),
+            W=W_upper, TP=1024, num_warps=8)
     # q*scale 后转 fp32（与 torch 路径的 b_q 同口径：bf16 乘 scale 舍入
     # 后升精度——数值与原型逐位同）
     qs = (q[0] * softmax_scale).to(torch.float32)   # [H, D]

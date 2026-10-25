@@ -5,8 +5,8 @@
   "bundled_files": [
     {
       "path": "sources/data/decode_tpot_plot_input.json",
-      "bytes": 1475,
-      "sha256": "7601816598ae1c96d315706b2098e8dac318cb2ecf0c4233460853cad0d78ca9"
+      "bytes": 1948,
+      "sha256": "6017be0d35ce1afee15c96ecf20eeef32f630c43ac73714a1c7bc09d7356611d"
     },
     {
       "path": "sources/data/e146_r128k_formal.json",
@@ -25,8 +25,8 @@
     },
     {
       "path": "sources/build_evidence_figures.py",
-      "bytes": 5723,
-      "sha256": "ec5d59f32b42e8ff24ceab4149c8fc7900a2e65ad72716ed0f47d0605076d8aa"
+      "bytes": 7287,
+      "sha256": "de1ab2fbc86b6a5d5ef9d4a0094db95eedcf7b234edeb7626606453d050948c8"
     },
     {
       "path": "sources/observation_bins.py",
@@ -122,6 +122,17 @@
       "git_blob": "9be5b43c5db209fe3acf493b60e4bf793fc5634b"
     },
     {
+      "path": "exp/trace/results/e152v4_formal_verdict.json",
+      "sha256": "dca25f87ab3ab48bce6b2119edda3811edcf4f7d4538edc7a16dafea97e80572",
+      "bytes": 4297,
+      "git_blob": "75cd224d593cd2029cdd524c8dbd2cbe9abeaa01"
+    },
+    {
+      "path": "exp/trace/results/e152v4_formal_pc40/",
+      "sha256": "directory of 15 run JSONs (dense 6, graph 4, eager 3 across 3 lengths)",
+      "git_blob": "tracked at commit acfd213"
+    },
+    {
       "path": "exp/bench/e152_e2e_latency.py",
       "sha256": "f1d1f966284c6574a86bbb5baf0aa1b1e8c74bbb714df2d93f071f7117a89571",
       "bytes": 15456,
@@ -193,7 +204,7 @@
   "aggregation": {
     "O1": "per-query-head causal softmax; within-KV-group then equal across8 KV groups; disjoint-bin mass/token; same <=2048 global whole-bin selection with separate regional capture denominators; 128 correlated observations/4 sequences; adoptedFig1b additionally compares independent far/near1024/1024 quotas with no refill",
     "O3": "equal8cell means, unpaired random, reference midTopK mass denominator",
-    "E152": "author-reported medians,127 after-first intervals, synchronized, runtime route unverified; dynamic only",
+    "E152": "E152v4 pc40 clean arm: measured-phase mean TPOT per length; dense native-eager 6 reps, sparse whole-step CUDA Graph 4 reps, sparse eager no-graph 1 rep; per-step device-synced including argmax; bitexact gate graph-vs-eager PASS 3/3; co-tenant-polluted local replica excluded; warmups excluded",
     "E146": "macro mean11tasks per arm;100examples/cell reported; hashes but no raw predictions recovered",
     "E6b": "Historical proxy only: last sampled query, sum logits withinGQAgroup then softmax, far[64,t−2048); complete16x36matrix only"
   },
@@ -1486,5 +1497,21 @@
     "ci_scope": "GridJSON top3numericquota comparisons excludeoff; laterT4 intervals authorreported, rawreplay anddocument-clusterprotocol not independently verified",
     "halfcoverage": "e155d_half_coverage_anatomy.json statistic .933 covers all storedmiddlepages includingfar, notvalidatednearregion; notmechanismevidence",
     "claim_limit": "No causal axis isolation, no no-effect/equivalence finding, no currentcompact matched quality-cost validation"
+  },
+  "e152v4_tpot_revision_20261023": {
+    "baseline_commit": "20751f54b2ebbf9fde698d4761939476f72cecfb",
+    "source": {
+      "verdict": "exp/trace/results/e152v4_formal_verdict.json",
+      "sha256": "dca25f87ab3ab48bce6b2119edda3811edcf4f7d4538edc7a16dafea97e80572",
+      "runs_dir": "exp/trace/results/e152v4_formal_pc40/"
+    },
+    "change": "Main-text Q3 decode-TPOT judgment flipped from archived e152v2 eager medians (87.9/97.6/119.9 vs dense 26.0/39.7/67.3) to measured e152v4 pc40 graph-era means (sparse graph 24.702/27.398/32.425 vs dense 26.282/39.670/67.035; speedups 1.064/1.448/2.067); eager no-graph arm 99.025/99.893/134.063 disclosed in figure and S6; bitexact gate PASS 3/3; abstract/intro/caption/Q3/conclusion synchronized in en+zh; supplements timing-provenance rewritten with e152v2 retained as superseded record",
+    "scope": "TPOT caliber only: per-step-device-synced, includes sync+argmax, whole-step graph replay; dense arm native eager path without CUDA Graph; NOT preparation-inclusive complete-request E2E; no e2e speedup claim",
+    "limits": [
+      "eager reference arm single repetition per length",
+      "dense arm runs without CUDA Graph",
+      "backend routes author-reported not independently verified",
+      "local replica co-tenant-polluted and excluded"
+    ]
   }
 }

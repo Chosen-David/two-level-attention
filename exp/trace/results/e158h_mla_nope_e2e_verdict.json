@@ -1,0 +1,31 @@
+{
+ "schema": "e158h-mla-nope-e2e-verdict",
+ "experiment": "E158h：MLA 子空间四臂补全 e2e（nope64/nope32 新跑臂 + fullkv/rope64/lowfreq32 复用锚）",
+ "date": "2026-10-25",
+ "machine": "pc33 本机双卡 H20-3e，DeepSeek-V2-Lite-Chat，影子包 ~/e158g_run -> ~/e158g_pkg",
+ "protocol": {
+  "caliber": "LongBench hotpotqa/musique 各 200 样本，cap 16K treatment（runcap strict 10/10 validated），input identity v2 全臂一致（source/template/input_ids sha 逐臂同值），K1=64/K2=1024/cmp4/mavg(.25,.125,.625)",
+  "arms": "fullkv(none) / rope64(h365b07ad27) / lowfreq32(h6b32ad3284) / nope64(h5bd185aaba) / nope32(hb28a916375)",
+  "stat": "E158b 同款配对 bootstrap：同 _id 配对逐样本 f1 差，10k 重采样，双侧 p，seed 20261025",
+  "rope32_note": "rope32（mla_lowfreq32）即本表 lowfreq32 臂（E158g 已测 22.47/10.53，复用）；rope+nope32 96 维复用 E158b e2e 判决"
+ },
+ "scores": {
+  "hotpotqa": {"fullkv": 23.91, "rope64": 23.43, "lowfreq32": 22.47, "nope64": 24.53, "nope32": 24.93},
+  "musique": {"fullkv": 11.48, "rope64": 10.80, "lowfreq32": 10.53, "nope64": 12.46, "nope32": 12.28}
+ },
+ "bootstrap_pooled_400": {
+  "rope64": {"diff_vs_fullkv": -0.579, "ci95": [-1.522, 0.374], "p": 0.229, "sig05": false},
+  "lowfreq32": {"diff_vs_fullkv": -1.195, "ci95": [-2.310, -0.128], "p": 0.027, "sig05": true},
+  "nope64": {"diff_vs_fullkv": 0.803, "ci95": [-0.033, 1.715], "p": 0.060, "sig05": false},
+  "nope32": {"diff_vs_fullkv": 0.909, "ci95": [0.004, 1.887], "p": 0.049, "sig05": "nominal（下界 +0.004 触线）"}
+ },
+ "findings": {
+  "nope_only_e2e_surprise": "nope64/nope32 单任务 vs fullkv 全不显著（p 0.10-0.50），池化口径 nope32 名义 +0.91（p=0.049）/nope64 边缘 +0.80（p=0.060）——E158 trace 层『仅 nope 不行（mass 0.672）』在 e2e 不成立，饱和映射论断（E158b）再加强：两级预算 K1=64/K2=1024 把 trace 层索引质量差异吸收",
+  "multiple_comparison_honesty": "10 检验（5 臂 × hotpotqa/musique/pooled 3 层）中 2 个名义显著（lowfreq32 负、nope32 正）；Bonferroni α=0.005 后零显著——总判决口径 = 全臂与 fullkv 统计不可分，方向性披露 lowfreq32 偏负 / nope 臂偏正",
+  "lowfreq32_confirmed_short": "lowfreq32 池化 -1.20 显著掉分（单任务不显著但双任务同向）——E158g『生产维持 rope64』结论获得显著性背书，32 维 rope 低频-only 确认不足",
+  "paper_implication": "MLA 消融表更新：nope-only（64/32 维）e2e 与 fullkv 不可分——索引子空间经济下限比 trace 层暗示的更低；生产口径维持 rope64（e142a/e158b 判决不变，rope64 vs fullkv 亦不可分 -0.58 CI 跨零），nope64/nope32 入消融臂作为饱和映射证据"
+ },
+ "verdict": "E158h 收官：MLA 四臂 e2e 全落袋。生产口径 rope64 维持（与 fullkv 不可分）；lowfreq32 显著不足（升格 e158g 结论）；nope64/nope32 反超 fullkv 但多重比较校正后不可分——与 E158b 共同构成『trace→e2e 饱和映射』三证据链（96 维 / 64 维 nope / 32 维 nope）。",
+ "files": "本机 ~/e158g_run/exp/results_longbench/DeepSeek-V2-Lite-Chat/pred/result.json + e158h_scores.json + e158h_bootstrap.py（判决面）；pred jsonl 200 样本×5 臂×2 任务留影子包",
+ "task_close": "#10 E158h 收官"
+}

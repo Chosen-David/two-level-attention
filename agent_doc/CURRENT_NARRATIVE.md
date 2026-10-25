@@ -1,0 +1,210 @@
+# CURRENT_NARRATIVE — 当前叙事锚点（防误读单一事实源）
+
+> **本文件是仓库叙事的唯一现行锚点**（2026-10-23 建立）。所有结论只允许引用
+> `exp/trace/results/` 下的判决 JSON 文件名，不复制过时报告的数字。
+> `agent_doc/advice/archive/` 内的报告已被后续判决推翻或已被吸收，**不得引用**。
+> 每次新判决落库时更新第 5 节索引（写入收官流程）。
+
+## 1. 生产口径（champion geometry）与参数陷阱
+
+主方法 = TLI（论文显示名 LoDA-SA）两级索引 decode 稀疏注意力。生产口径的
+**全部显式 flags**（任何主表/判决/复现脚本必须逐字传齐）：
+
+```
+--method tli
+--tli_far_method minmax --tli_near_method avg
+--tli_near_pages 32 --tli_near_tokens off --tli_near_len 4096
+--tli_subspace tail --tia_level2_cmp_ratio 4
+--tli_sink_tokens 4 --tli_swa_size 128
+--tia_level1_topk 64 --tia_level2_topk 1024
+```
+
+几何口径 = **nb32 / nt-off（L2 自由竞争）/ nl4096**，tail32 子空间，
+minmax+avg 粗筛，sink4+swa128 正交强制区，K1=64 块 / K2=1024 token。
+依据判决：`e155d_grid_verdict.json`（网格选举，冠军 nb32ntoffnl4096）+
+`e152v4_formal_verdict.json`（K1=128 时代主表）+ `e140b_k1_downscan_verdict.json`
++ `e140h_k64sweet_verdict.json`（K1=64 甜点）+ `e168_k64_e2e_verdict.json` /
+`e169_k64_llama_verdict.json`（K1=64 双模型族 e2e；2026-10-25 起生产口径
+champion flags = K1=64）。
+
+**参数陷阱表**（历史教训，2026-10-23 开源净化手术已结构性消除大部分）：
+
+| 陷阱 | 历史行为 | 现状 |
+|---|---|---|
+| `--tli_enable_layer_skip` 默认 true | 漏传 = 静默跑成 D′ gate 口径（E129 起协议强制显式传） | **接口保留**（2026-10-25 用户指令：far-skip 转向 KV cache 节省叙事线，见第 5 节）；主表口径仍显式 false |
+| `--tli_subspace` 默认 full | 生产必须显式 tail | 默认仍 full，**必须显式传 tail** |
+| `--tia_level2_cmp_ratio` 默认 2 | 生产口径 4 | **必须显式传 4** |
+| α/β/γ 比例接口（E64 时代） | 与显式几何混配事故面 | **CLI 接口已删除**（冠军几何运行时内部状态 α=β=1.0、γ=None，由 nb/nt/nl 归一推导） |
+| kmeans/ccluster/sim_greedy 分支（E110） | `--tli_enable_kmeans` 默认 true | **已删除**（冠军口径 4bit 细筛，E4c 判决无一致优势） |
+
+不传任何几何 flags 的 legacy 缺省 = 单池老逻辑（非主表口径），仅作向后
+兼容保留；主表/论文数字一律以冠军 flags 口径为准。
+
+## 2. 主表数字（e2e decode 加速比，TLI-graph vs dense-eager）
+
+统一口径：整步 CUDA graph 化 TLI decode vs dense eager decode，
+TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
+
+| 模型 | 32K | 64K | 128K | 判决文件 |
+|---|---|---|---|---|
+| Qwen3-8B | 1.064× | 1.448× | 2.067× | `e152v4_formal_verdict.json` |
+| Llama-3.1-8B | 1.015× | 1.410× | 1.961× | `e159_llama_e2e_latency_verdict.json` |
+| Qwen3-32B | 1.015× | 1.338× | 1.841× | `e160_32b_e2e_latency_verdict.json` + `e160b_128k_expandable_verdict.json`（128K 行） |
+
+- **加速比随上下文单调增长**是核心跨模型族/跨规模形态（三家一致）；
+  32K 打平 = decode 稳态 launch-bound 双臂贴物理下限。
+- **context 退化压缩**叙事：dense 64K→128K TPOT +45-61% vs TLI 仅
+  +9-17%（Qwen3-8B `e152v4_formal_verdict.json`；32B 见
+  `e160_32b_e2e_latency_verdict.json`）。
+- 32B@128K 行协议披露（见 `e160b_128k_expandable_verdict.json`）：
+  ①环境 expandable_segments:True（32/64K 行为默认分配器）；②A 臂
+  4×单 run 进程级 repeat（graph 私有显存池跨 run 残留，显存贴满时
+  同进程多 prefill 不可行）；峰值 141.7G = 容量 98.6%。
+- 32B 行跨机复现：`e160r_32b_replication_verdict.json`（pc31 复刻，
+  加速比 dev +0.10%/+0.22%）。
+- **graph-vs-graph 口径警告**（`e159_llama_e2e_latency_verdict.json`
+  附注）：整步 capture 下 dense SDPA 走 4D additive-mask 慢路径，
+  graph-vs-graph 数字（如 Llama 4.97/8.64/14.28×）是「graph 降级
+  dense 基线」口径，只能作 graph-friendly 叙事点，**不得进主表**；
+  主表一律 TLI-graph vs dense-eager。
+- 质量主表：RULER 32K T6 champion 59.02 vs FullKV 59.38（保留率
+  99.4%）等长度梯度见 `e147c_series_verdict.json` /
+  `e147h_*_verdict.json` 族；LongBench 数字见 `e145d_lbv2_verdict.json`
+  / `e145c_*_verdict.json` 族。
+- **【已合入 2026-10-25】iter2+iter3 优化链晋升主树**（3 文件 delta：
+  `indexer/tli_indexer.py` md5 854f2567 / `ops/eager_decoding.py` f23b7003 /
+  `patches/llama3_attn_patch.py` a79dbfa4，源自 pc40 `~/tli_ako/solution_iter3`
+  影子包，与 e165-e167b 系判决逐位同源；晋升后 E127 门禁 15/15 PASS）。
+  判决链：`e165_kernel_census_verdict.json` + `iter2a/2b/2c_verdict.json` +
+  `e166a/b/e/d2_verdict.json`。**iter3@K1=128 TPOT 18.675/18.888/19.388ms，
+  加速比 1.407/2.100/3.458×**（e2e bitexact 三长度 + pc02 跨机 ≤0.17% +
+  RULER 质量门 md5 逐字节一致三版同源闭合）。
+- **【已收官 2026-10-25】E168/E169：K1=64 iter22 代码面双模型族判决**：
+  Qwen3-8B `e168_k64_e2e_verdict.json`（1.050/1.467/2.084×，K1=128 复验格
+  24.697ms 逐位复现，bitexact 2/3——64K step-55 bf16 tie-break 单点分歧披露）；
+  Llama-3.1-8B `e169_k64_llama_verdict.json`（1.011/1.431/1.968×，bitexact 3/3）。
+  双模型族 TLI 臂 -0.45~-1.08% vs K1=128，K1=64 口径与 e140b/e140h 质量判决闭合。
+  **【在飞 E172/E173/E174】iter3+K1=64 主表口径跑批**（论文最终主表）：
+  E172 Qwen3-8B（pc40 GPU0，K1=128 复验格 18.668ms 逐位复现 iter3 18.675ms；
+  32K/64K 已出 1.451×/2.216×）、E173 Llama（pc40 GPU1，iter3 Llama 首点
+  K1=128 15.795ms，32K/64K 已出 1.429×/2.192×）、E174 Qwen3-32B（pc02 GPU0，
+  E160/E160b 协议 + iter3 + K1=64）。出数后写 `e172_iter3_k64_*_verdict.json` 族。
+- **iter3 机制判决链**（构成：掩码装配融合 `e166a_iter3a_verdict.json` +
+  候选压缩融合 `e166b_iter3b_verdict.json` + compact launch 调优
+  `e166e_compact_cfg_verdict.json` + 摘要维护/L1 双池打分/候选装配三
+  kernel `e166d2_iter3d_verdict.json`，关键坑：生产 KV 为 head-major
+  置换视图，门控须查 stride(2)==1）：
+  双口径闭合 `e166h_census_iter3d_verdict.json` busy 22.27→19.34ms
+  （copy −1.74/other −1.19/gemm 贴地板不动），busy/TPOT=99.7%；
+  op 级差分 `e166g_opattr_verdict.json`（sort 全家含 6 cub RadixSort
+  整体消失，launch −5004）。残余 = topk 家族 ~3.3ms（质量门口径留
+  用户）+ copy/elementwise 弥散群；**bitexact 兼容杠杆已收割完毕**。
+  **长度平坦化机制曲线三点闭合**
+  （`e166i_census_32k_flatness_verdict.json` + `e166j_census_64k_flatness_verdict.json`
+  + `e166h`）：32/64/128K busy 18.674/18.866/19.340ms，gemm/attn/copy
+  三类 L 无关成本三点全平直，唯一增长段摘要-索引维护近线性
+  （+0.7ms@4×）；e2e-census 双口径逐段闭合（busy/TPOT
+  99.9/99.9/99.7%）。topk 内部 sort 三长度恒定（~0.85ms，与被消除的
+  候选域 cub sort 家族不同）。**批档包络**（`e167_bs_scaling_verdict.json`，
+  exp/bench/e167_bs_latency.py，2026-10-25）：B=1 复现主表口径（1.40×/
+  3.48×，偏差 <1%）；128K 批档 tli 领先至可行上限 B=2（82.6 vs
+  120.8ms=1.46×，dense 被 KV 流量主导批摊销失效）；32K B≥4 dense 反超
+  （GEMM 批摊销 1.31-1.49×）；TLI 批路径=行串行（吞吐不增 53.8→44.5
+  tok/s，跨行融合列后续工程）；显存包络 tli 静态池宽于 dense（B=16@32K
+  tli 可跑 vs dense OOM）；bs=32 全长度不可行。serving 叙事限定 bs=1
+  decode 与长上下文批档，32K 批档如实披露。**64K 补点三点闭合**
+  （`e167b_bs_64k_crossover_verdict.json`）：交叉点随长度单调右移
+  （32K:B∈(1,4) → 64K:B≈4 过渡带 0.96× → 128K:可行区间内不交叉）；
+  B=1 复现主表 2.12×（偏差 <1%）；机制=dense 批摊销被 KV 流量稀释
+  vs tli 每行成本平坦（平坦化机制的批维度红利）；tli 行串行代价随 L
+  增大（每行 +19%→+66%→+114%），跨行融合工程动机数据。
+- **【iter3 已合入·跨模型族】E168 Llama iter3 复制**
+  （`e168_llama_iter3_verdict.json`，pc02 四卡三臂）：iter3 融合链在
+  Llama-3.1-8B 完整复现——bitexact 三长度 PASS、TPOT 增益
+  −25.2/−31.4/−43.3%（vs Qwen3 −24.3/−31.1/−40.2%）、加速比
+  1.353/2.073/3.456×（vs Qwen3 1.407/2.100/3.458×）、长度平坦化
+  +4.0%@4×ctx（vs Qwen3 +3.8%）；e159 主表口径跨机复现偏差 <0.5%。
+  融合链与平坦化机制获跨模型族（Qwen3/Llama3）泛化证据。
+  **e168b 补 census 机制分解**（`e168b_llama_census_verdict.json`）：
+  Llama iter3 busy 15.874/16.069/16.463ms（+3.7%@4×），gemm 4.36-4.39/
+  attn 0.735/copy 5.2-5.3 三类平直，other 5.48→6.06 唯一增长——与
+  Qwen3 e166i/j/h 四类结构逐类同型，平坦化机制证据升至 kernel 类级
+  双模型族口径。**e168c Llama RULER 质量门 PASS**
+  （`e168c_llama_quality_gate_ruler.json`）：120 样本 × 3 任务
+  （niah_single_1/niah_multikey_1/vt）orig vs iter3 双臂输出 md5 逐字节
+  一致——Llama 证据链三件齐（e2e bitexact + census + 质量门）。口径注：
+  本系列为 K1=128（历史主表口径）；K1=64 生产口径由 e171/e172-e174
+  系列另行闭合。
+
+## 3. 对比口径（vendor 基线）
+
+- 对比基线（Quest/MInference/SparQ/MoBA/ClusterKV/AsyncTLS/HISA/JSSA/
+  FASA）全部经 `sparse_attn/patches/` + `exp/vendor_baselines/` 统一
+  harness 跑批，数字只与判决 JSON 对齐，**不引用 advice 报告**。
+- **AsyncTLS 三口径拆解**（无官方开源仓库，C 轨语义复现，实现头注见
+  `exp/vendor_baselines/asynctls_vendor/`）：kernel 级 1.7-6.2× /
+  e2e 2.3×@96K / offload-throughput 1.84×/4.70×（各自论文口径下）。
+  复现锚点：`asynctls_r32k_reverify_verdict.json`。
+- 主表口径下 vendor 对齐原则：token 预算统一 K2=1024（quest/sparq/
+  fasa/moba/jssa budget-normalized，见 `benchmark/` 各 runner 头注）。
+- FASA RULER 复现的崩溃诊断与口径（11 任务 × n=100）见
+  `e119_ruler32768_formal_fasa_20261021.json` 族（重跑判决落库后更新）。
+
+## 4. MLA 线（DeepSeek-V2-Lite，子空间消融链）
+
+叙事链五判决，全部在库：
+
+1. `e158_mla_subspace_verdict.json`（trace）：rope 低频主导
+   （lowfreq32 0.865 ≫ highfreq32 0.258）；仅 nope 不行（0.672）；
+   最优 = rope64+nope32（96 维）0.905，保持 full192 的 96.4%。
+2. `e158b_mla_rope_nope32_e2e_verdict.json`（96 维 e2e 兑现）：
+   三臂统计不可分（配对 bootstrap CI 跨零）——**trace→e2e 饱和映射**：
+   两级预算 K1=64/K2=1024 冗余吸收子空间增益。
+3. `e158c_64dim_combo_verdict.json`（64 维 trace）：lofreq32+nope32
+   0.905-0.908 与 96 维持平 = 免费降维。
+4. `e158e_mla_subspace_perf_verdict.json`（性能三口径）：64 维
+   indexer 税 -17.6%（vs full192）；但 eager 下稀疏臂全线慢于 dense
+   2.3-2.5×（CPU dispatch 税 50-60ms/步 = TPOT 40-45%）——**MLA 性能
+   主张必须靠 graph 化**，DSV2 graph port（DSV2StaticCache + vendored
+   rope 张量化 7 文件级改造）列 follow-up。
+
+**结论：MLA 生产口径 = rope-only 64 维**（`e142a_mla_e2e_verdict.json`：
+rope-only 与 full192 e2e 持平）；96/64 维组合降级为消融臂。
+MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
+（inc=0），系生产 eager 路径真实行为。
+
+5. **E158h 四臂补全收官**（`e158h_mla_nope_e2e_verdict.json`，2026-10-25）：
+   nope64（24.53/12.46）/nope32（24.93/12.28）名义反超 fullkv 锚
+   （23.91/11.48），但多重比较校正后全臂与 fullkv 统计不可分
+   （nope32 池化 p=0.049 名义显著 / lowfreq32 池化 -1.20 p=0.027 显著
+   不足）——E158 trace 层「仅 nope 不行（0.672）」在 e2e 不成立，
+   **饱和映射三证据链闭合**（96 维 E158b / 64 维 nope / 32 维 nope）；
+   lowfreq32 显著掉分背书 E158g「生产维持 rope64」。
+
+## 5. 已被推翻叙事索引（防误读核心——旧结论 → 推翻它的判决）
+
+| 过时结论（出现在 archived 报告/早期叙事中） | 推翻/修正判决 |
+|---|---|
+| 保护带（boundary bypass 前的 sink/swa 保护带几何）假设最优 | `e148_sinkswa_verdict.json`（否决） |
+| prefill 稀疏可提速（FS/prefill sparse e2e） | `e149_sink4_verdict.json`（FS 质量 -5.18% → decode-only 叙事）；prefill 性能详见 `e139_prefill_profile_verdict.json` / `e140a_prefill_k1up_verdict.json` |
+| K1 越大越好 | `e140b_k1_downscan_verdict.json` + `e140h_k64sweet_verdict.json`（倒 U 峰 K1=64）+ `e168_k64_e2e_verdict.json` / `e169_k64_llama_verdict.json`（K1=64 双模型族 e2e 成立，2026-10-25 生产口径切换 K1=64） |
+| 32B@128K OOM 根因 = 显存碎片 | `e160b_128k_expandable_verdict.json`（半否定——真根因 = 进程内二次 prefill 与 graph 私有池残留共存；可行解 = 单 run per process） |
+| layer_skip（D′ 静态门）/ dyn_dgate（E137 动态门）作为**延迟加速**主张 | 延迟视角已被 `e161_farskip_verdict.json` 否决（subspace 维度 decode 增益 ≈0，far-skip 臂 +2.1~+11.2ms/步）——**但 2026-10-25 用户指令叙事转向 KV cache 节省视角**：被跳层驻留退化为 sink4+near4096+swa128=4228 token 滚动缓冲（128K 下 3.2%），eps=0.05 实测层集 {L7,L8,L10,L11,L35}（5/36 层）→ KV 节省 ~13%；质量不可分实测见 `e137_dyn_dgate_verdict.json`（AVG5 Δ-0.03 CI 含 0）。接口**保留**，K1=64 口径复验在飞（E171） |
+| kmeans/ccluster/sim_greedy 簇代表选择 | E4c negative result（严格预算下无一致优势，E4b 有整簇超选 bug）→ E110 系列保留作消融 → **已删除** |
+| α/β/γ 比例化几何口径（E64 帕累托点叙事） | E155d 参数退役（用户 2026-10-19 拍板转向 nb/nt/nl 显式几何）；比例口径的全部历史数字仅作 E64-E155 谱系档案（`exp/trace_archives/probe_e5b_e98/`） |
+| e152v2 dynamic-cache 性能口径（TLI 3.4×/2.5×/1.8× slower） | 已被 `e152v4_formal_verdict.json` 整步 graph 口径取代（论文图 E2 已 in-place 重写，commit e5071cb） |
+| MLA 子空间增益可线性兑现到 e2e | `e158b_mla_rope_nope32_e2e_verdict.json` 饱和映射边界披露 |
+| γ-off 自由竞争需 CLI `--tli_gamma off` | 显式几何等价物 `--tli_near_tokens off`（E155d；γ 接口已删除） |
+
+## 6. 仓库结构速览（净化后）
+
+- `sparse_attn/` — 主方法开源面：indexer（TLI/TIA/Quest）、patches
+  （Qwen3/Llama3/DSV2 三族注册）、ops（eager decode、graph 链、
+  sparse prefill）、info（treatment 身份）。
+- `exp/trace/results/` — **判决 + 论文数据双归档，一个不删**。
+- `exp/trace/` — 只保留被判决 script 字段引用的 14 个分析脚本。
+- `exp/trace_archives/` — 全部历史归档（早期探针、旧图、tls_attn
+  原型包、被淘汰 bench）；`agent_doc/advice/archive/` — 被推翻的
+  advice 报告与 superseded research 文档。
+- 对拍铁律：`exp/bench/test_e127_gates.py`（微逻辑回归门）+
+  `exp/bench/test_tli_batch_gates.py` 每次改动后必须全绿。

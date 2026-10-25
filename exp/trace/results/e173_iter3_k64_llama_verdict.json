@@ -1,0 +1,48 @@
+{
+ "schema": "e173-iter3-k64-llama-verdict",
+ "experiment": "E173：iter3+K1=64 论文主表口径 e2e TPOT（Llama-3.1-8B，pc40 GPU1 干净臂）",
+ "date": "2026-10-25",
+ "machine": "pc40 (2xH20-3e), commit 7bc1788（iter3 主树，llama3_attn_patch a79dbfa4 4D-mask graph 路已在主树，无 shadow pkg）",
+ "protocol": {
+  "caliber": "E159 逐字同款（ABBA 交错单卡串行、TLIStaticCache 整步 capture、max_gen=128、n=6/臂 TLI = 2 procs × 3 repeats、dense n=6），iter3 代码面 + K1=64",
+  "champion_flags": "同 E172（tail32/nb32/nl4096/sink4/swa128/K2=1024 + K1=64，iter3 六融合 kernel 链）",
+  "anchor_e159_iter22": "E159 K1=128 iter22 tli 21.11/23.48/29.00，dense 21.43/33.10/56.86",
+  "anchor_e169_iter22_k64": "E169 K1=64 iter22 20.995/23.226/28.869",
+  "gpu_hygiene": "clean（GPU1 0 compute 进程起跑，30s 旁路监控）"
+ },
+ "equivalence_gate": {
+  "k128_verify_32k": "15.795ms —— iter3 代码面 Llama 首个 e2e 数据点（vs E159 iter22 21.10 = -25.2%，iter3 对 Llama 增益与 Qwen 同量级）",
+  "dense_reverify": "21.385/33.287/56.801 vs E169 同日锚 21.235/33.249/56.807（±0.7% 内）vs E159 原判 21.43/33.10/56.86"
+ },
+ "results": {
+  "32768": {
+   "tli_graph_k64_ms": {"mean": 14.971, "arms": [14.955, 14.988], "n": 6},
+   "dense_ms": {"mean": 21.385, "arms": [21.565, 21.205], "n": 6},
+   "speedup": 1.428
+  },
+  "65536": {
+   "tli_graph_k64_ms": {"mean": 15.188, "arms": [15.185, 15.190], "n": 6},
+   "dense_ms": {"mean": 33.287, "arms": [33.278, 33.295], "n": 6},
+   "speedup": 2.192
+  },
+  "131072": {
+   "tli_graph_k64_ms": {"mean": 15.590, "arms": [15.594, 15.586], "n": 6},
+   "dense_ms": {"mean": 56.801, "arms": [56.802, 56.800], "n": 6},
+   "speedup": 3.643
+  }
+ },
+ "bitexact_gate": {
+  "pass": "2/3 逐位（32K/128K graph==eager）+ 64K step-17 单点分歧（graph 13 vs eager 382）",
+  "divergence_caliber": "同 E168/E172 bf16 tie-break 概率事件口径；graph 6 runs 内部逐位一致；质量侧 e140h 判决背书（Llama 与 Qwen 同 tail32 子空间/同几何）",
+  "eager_tpots": "85.0/85.1/115.0ms（门禁臂不进表）"
+ },
+ "flatness_narrative": {
+  "tli_growth_32k_to_128k": "+4.1%（14.971→15.590ms）vs dense +165.5%（21.385→56.801）——context 退化压缩 40×"
+ },
+ "cross_model_symmetry": {
+  "speedups": "Llama 1.428/2.192/3.643× vs Qwen E172 1.451/2.216/3.636× —— 三档逐档对称（差 ≤0.024），跨模型族形态完全一致",
+  "k128_first_point": "iter3 K1=128 Llama 32K 15.795ms（本跑 verify 格）——iter3 复制主张的 Llama 侧 e2e 锚点"
+ },
+ "verdict": "E173 = 论文主表新行（Llama-3.1-8B iter3+K1=64）：1.428/2.192/3.643×。与 E172 对称闭合，iter3+K1=64 主表口径跨模型族成立。",
+ "files": "pc40 ~/e173_iter3_k64_formal/（16 JSON + gpu_hygiene.log + harvest_summary.json）；runner ~/e173_iter3_k64_llama_pc40.sh"
+}
