@@ -19,11 +19,55 @@ class FarSkipGraphWorkspace:
         self.coarse, self.fine = coarse_dims.clone(), fine_dims.clone()
         self.ws = FarSkipWorkspace()
         self.device = coarse_dims.device
-        self.page_capacity = (cfg.near_length + cfg.block_size - 1) // cfg.block_size + 1
+        self.page_capacity = (max(cfg.near_length, cfg.block_size) + cfg.block_size - 1) // cfg.block_size
         self.page_count = min(cfg.near_pages, self.page_capacity)
+        self.candidate_capacity = self.page_count*cfg.block_size + 2*(cfg.block_size-1)
         # Force all constant ranges to exist before graph capture.
-        self.ws.ids(max(layout.capacity, cfg.token_budget, self.page_capacity), self.device)
+        self.ws.ids(max(layout.capacity, cfg.token_budget, self.page_capacity,
+                        self.candidate_capacity+cfg.sink_tokens+cfg.window_tokens), self.device)
         self.head_ids = self.ws.ids(heads, self.device)
+        self.summaries = None
+
+    def initialize(self, k, length):
+        """Seed only complete near pages from prefill, outside capture.
+
+        Thereafter each step (including capture warmup at the same position)
+        refreshes only the newest complete page. At most one can become eligible
+        per token. Arbitrary forward jumps/rewinds require a new workspace.
+        """
+        cfg, bs = self.cfg, self.cfg.block_size
+        if not 0 < self.page_count < self.page_capacity:
+            return
+        slots = self.page_capacity+1
+        shape = (slots, self.heads, self.coarse.numel())
+        self.summaries = [k.new_zeros(shape) for _ in range(1 if cfg.near_method == 'avg' else 2)]
+        middle = max(min(length, cfg.sink_tokens), cfg.near_start(length))
+        first = (middle+bs-1)//bs
+        stop = max(first, max(0, length-cfg.window_tokens)//bs)
+        if stop > first:
+            pages = self.ids(stop-first)+first
+            pos = (pages[:, None]*bs+self.ids(bs)).flatten()
+            values = self._reduce_pages(k, pos, torch.ones_like(pos, dtype=torch.bool), stop-first)
+            for target, source in zip(self.summaries, values):
+                target.index_copy_(0, pages.remainder(slots), source)
+
+    def _reduce_pages(self, k, positions, valid, count):
+        keys = self.gather(k, positions, valid, self.coarse).reshape(
+            count, self.cfg.block_size, self.heads, -1)
+        return ([keys.mean(1)] if self.cfg.near_method == 'avg'
+                else [keys.amin(1), keys.amax(1)])
+
+    def _summaries(self, k, pages, valid, first, stop):
+        if self.summaries is None:
+            raise ValueError('initialize graph page summaries before decode/capture')
+        last = (stop-1).clamp(min=0)
+        pos = last*self.cfg.block_size+self.ids(self.cfg.block_size)
+        values = self._reduce_pages(k, pos, (stop>first).expand_as(pos), 1)
+        slots = self.page_capacity+1
+        for target, source in zip(self.summaries, values):
+            target.index_copy_(0, last.remainder(slots), source)
+        return [t.index_select(0, pages.remainder(slots)).masked_fill(~valid[:, None, None], 0).float()
+                for t in self.summaries]
 
     def ids(self, n):
         return self.ws.ids(n, self.device)
@@ -54,42 +98,43 @@ class FarSkipGraphWorkspace:
         pages = first + self.ids(self.page_capacity)
         page_valid = pages < stop
         if self.page_count:
-            page_pos = (pages[:, None] * bs + self.ids(bs)).flatten()
-            page_mask = page_valid[:, None].expand(-1, bs).flatten()
-            page_keys = self.gather(k, page_pos, page_mask, self.coarse).reshape(
-                self.page_capacity, bs, h, -1)
-            qg = (q[0, 0].index_select(-1, self.coarse).float() * scale).reshape(h, g, -1)
-            if cfg.near_method == 'avg':
-                scores = torch.einsum('hgd,phd->hgp', qg, page_keys.mean(1).float())
+            if self.page_count == self.page_capacity:
+                chosen_pages = pages.expand(h, -1)
+                chosen_valid = page_valid.expand(h, -1)
             else:
-                scores = (torch.einsum('hgd,phd->hgp', qg.clamp(min=0), page_keys.amax(1).float())
-                          + torch.einsum('hgd,phd->hgp', qg.clamp(max=0), page_keys.amin(1).float()))
-            scores = scores.to(q.dtype).mean(1)
-            chosen = stable_topk_positions(scores, self.page_count, self.ws,
-                                          valid=page_valid.expand(h, -1))
-            chosen_pages = pages.expand(h, -1).gather(1, chosen)
-            chosen_valid = page_valid.expand(h, -1).gather(1, chosen)
+                summaries = self._summaries(k, pages, page_valid, first, stop)
+                qg = (q[0, 0].index_select(-1, self.coarse).float() * scale).reshape(h, g, -1)
+                if cfg.near_method == 'avg':
+                    scores = torch.einsum('hgd,phd->hgp', qg, summaries[0])
+                else:
+                    scores = (torch.einsum('hgd,phd->hgp', qg.clamp(min=0), summaries[1])
+                              + torch.einsum('hgd,phd->hgp', qg.clamp(max=0), summaries[0]))
+                scores = scores.to(q.dtype).mean(1)
+                chosen = stable_topk_positions(scores, self.page_count, self.ws,
+                                              valid=page_valid.expand(h, -1))
+                chosen_pages = pages.expand(h, -1).gather(1, chosen)
+                chosen_valid = page_valid.expand(h, -1).gather(1, chosen)
         else:
             chosen_pages = self.ids(0).expand(h, -1)
             chosen_valid = chosen_pages.bool()
 
-        # Initial fixed-path baseline: score the bounded near tail, masking
-        # unchosen full pages. Round 3 can compact this pool without changing
-        # page or token decisions.
-        candidates = (middle + self.ids(max(bs, cfg.near_length) + bs - 1)).expand(h, -1)
-        candidate_page = candidates // bs
-        full = (candidate_page >= first) & (candidate_page < stop)
-        chosen_mask = ((candidate_page[..., None] == chosen_pages[:, None, :])
-                       & chosen_valid[:, None, :]).any(-1)
-        valid = (candidates < swa) & (~full | chosen_mask)
+        # Only selected full pages and the two partial boundary fragments enter
+        # L2. Padding is bounded by 2*(bs-1), independent of history/near length.
+        left = (middle+self.ids(bs-1)).expand(h, -1)
+        full = (chosen_pages[..., None]*bs+self.ids(bs)).reshape(h, -1)
+        right = (stop*bs+self.ids(bs-1)).expand(h, -1)
+        candidates = self.ws.cat('graph_candidates', [left, full, right])
+        valid = self.ws.cat('graph_candidate_valid', [
+            (left < first*bs) & (left < swa),
+            chosen_valid[..., None].expand(-1, -1, bs).reshape(h, -1), right < swa])
         sink = self.ids(cfg.sink_tokens).expand(h, -1)
         window = (torch.maximum(prefix, swa) + self.ids(cfg.window_tokens)).expand(h, -1)
-        protected = torch.cat([sink, window], -1)
-        protected_valid = torch.cat([sink < prefix, window < length], -1)
+        protected = self.ws.cat('graph_protected', [sink, window])
+        protected_valid = self.ws.cat('graph_protected_valid', [sink < prefix, window < length])
         keep = min(cfg.token_budget - cfg.sink_tokens - cfg.window_tokens, candidates.shape[-1])
         if keep:
-            pool = torch.cat([candidates, protected], -1)
-            pool_valid = torch.cat([valid, protected_valid], -1)
+            pool = self.ws.cat('graph_pool', [candidates, protected])
+            pool_valid = self.ws.cat('graph_pool_valid', [valid, protected_valid])
             keys = self.gather(k, pool, pool_valid, self.fine)
             if cfg.quantize:
                 keys = _quantize(keys)
@@ -102,8 +147,8 @@ class FarSkipGraphWorkspace:
             valid = valid.gather(1, chosen)
         else:
             candidates, valid = candidates[:, :0], valid[:, :0]
-        positions = torch.cat([sink, candidates, window], -1)
-        mask = torch.cat([sink < prefix, valid, window < length], -1)
+        positions = self.ws.cat('graph_positions', [sink, candidates, window])
+        mask = self.ws.cat('graph_valid', [sink < prefix, valid, window < length])
         return positions, mask
 
     def attend(self, q, k, v, positions, valid, scale):

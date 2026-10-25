@@ -238,7 +238,9 @@ def qwen3_attn_forward(
             attention_mask, cache_position, batch_decode_ctx())
         if compact_output is not None:
             compact_output = self.o_proj(compact_output.reshape(*input_shape, -1))
-            _paper_route(self.layer_idx, "sparse-decode-far-compact")
+            _paper_route(self.layer_idx, "sparse-decode-far-compact-static"
+                         if getattr(past_key_values, '_far_skip_prepared', False)
+                         else "sparse-decode-far-compact")
             return compact_output, None
 
     cur_len = 0

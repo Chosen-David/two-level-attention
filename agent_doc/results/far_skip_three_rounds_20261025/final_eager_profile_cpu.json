@@ -1,0 +1,421 @@
+{
+  "scope": "one warm CPU decode at S=8201; counts are not GPU launches",
+  "v1": {
+    "operator_counts": {
+      "aten::slice": 34,
+      "aten::as_strided": 98,
+      "aten::copy_": 18,
+      "aten::transpose": 4,
+      "[memory]": 105,
+      "aten::add": 12,
+      "aten::remainder": 6,
+      "aten::index_select": 3,
+      "aten::empty": 14,
+      "aten::select": 11,
+      "aten::to": 23,
+      "aten::mul": 7,
+      "aten::_to_copy": 10,
+      "aten::empty_strided": 10,
+      "aten::reshape": 21,
+      "aten::view": 25,
+      "aten::einsum": 2,
+      "aten::unsqueeze": 16,
+      "aten::permute": 10,
+      "aten::_reshape_alias": 8,
+      "aten::bmm": 4,
+      "aten::resolve_conj": 8,
+      "aten::mean": 2,
+      "aten::sum": 2,
+      "aten::fill_": 3,
+      "aten::div_": 2,
+      "aten::__rshift__": 2,
+      "aten::bitwise_and": 3,
+      "aten::bitwise_xor": 2,
+      "aten::isnan": 2,
+      "aten::ne": 2,
+      "aten::where": 8,
+      "aten::scalar_tensor": 3,
+      "aten::rsub": 2,
+      "aten::sub": 5,
+      "aten::topk": 2,
+      "aten::sort": 2,
+      "aten::arange": 4,
+      "aten::resize_": 2,
+      "aten::index": 4,
+      "aten::expand": 15,
+      "aten::cat": 4,
+      "aten::narrow": 7,
+      "aten::lt": 3,
+      "aten::softmax": 2,
+      "aten::_softmax": 2,
+      "aten::gather": 1,
+      "aten::scaled_dot_product_attention": 1,
+      "aten::_scaled_dot_product_attention_math": 1,
+      "aten::repeat_interleave": 2,
+      "aten::clone": 2,
+      "aten::empty_like": 2,
+      "aten::flatten": 2,
+      "aten::matmul": 2,
+      "aten::_unsafe_view": 2,
+      "aten::_safe_softmax": 1,
+      "aten::isneginf": 1,
+      "aten::all": 1
+    },
+    "positive_self_cpu_allocated_bytes": 33693908,
+    "copy_shapes": [
+      [
+        [
+          1,
+          4,
+          1,
+          128
+        ],
+        [
+          1,
+          4,
+          1,
+          128
+        ],
+        []
+      ],
+      [
+        [
+          1,
+          4,
+          1,
+          128
+        ],
+        [
+          1,
+          4,
+          1,
+          128
+        ],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [
+          4,
+          64
+        ],
+        [
+          4,
+          64
+        ],
+        []
+      ],
+      [
+        [
+          4,
+          32
+        ],
+        [
+          4,
+          32
+        ],
+        []
+      ],
+      [
+        [
+          4,
+          32
+        ],
+        [
+          1,
+          32
+        ],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [
+          4,
+          2057
+        ],
+        [
+          4,
+          2057
+        ],
+        []
+      ],
+      [
+        [
+          4,
+          768
+        ],
+        [
+          4,
+          768
+        ],
+        []
+      ],
+      [
+        [
+          4,
+          768
+        ],
+        [
+          1,
+          768
+        ],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [
+          4,
+          1,
+          4,
+          1024,
+          128
+        ],
+        [
+          4,
+          1,
+          4,
+          1024,
+          128
+        ],
+        []
+      ],
+      [
+        [
+          4,
+          1,
+          4,
+          1024,
+          128
+        ],
+        [
+          4,
+          1,
+          4,
+          1024,
+          128
+        ],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ]
+    ]
+  },
+  "optimized": {
+    "operator_counts": {
+      "aten::slice": 34,
+      "aten::as_strided": 95,
+      "aten::copy_": 14,
+      "aten::transpose": 9,
+      "[memory]": 104,
+      "aten::add": 12,
+      "aten::remainder": 4,
+      "aten::index_select": 3,
+      "aten::empty": 15,
+      "aten::select": 11,
+      "aten::to": 19,
+      "aten::mul": 5,
+      "aten::_to_copy": 8,
+      "aten::empty_strided": 9,
+      "aten::reshape": 17,
+      "aten::view": 20,
+      "aten::einsum": 2,
+      "aten::unsqueeze": 14,
+      "aten::permute": 10,
+      "aten::_reshape_alias": 7,
+      "aten::bmm": 2,
+      "aten::resolve_conj": 4,
+      "aten::mean": 2,
+      "aten::sum": 2,
+      "aten::fill_": 2,
+      "aten::div_": 2,
+      "aten::__rshift__": 2,
+      "aten::bitwise_and": 3,
+      "aten::bitwise_xor": 2,
+      "aten::isnan": 2,
+      "aten::ne": 2,
+      "aten::where": 7,
+      "aten::scalar_tensor": 2,
+      "aten::rsub": 2,
+      "aten::sub": 5,
+      "aten::topk": 2,
+      "aten::sort": 2,
+      "aten::arange": 4,
+      "aten::resize_": 2,
+      "aten::index": 4,
+      "aten::expand": 9,
+      "aten::cat": 4,
+      "aten::narrow": 7,
+      "aten::lt": 3,
+      "aten::softmax": 1,
+      "aten::_softmax": 1,
+      "aten::gather": 1,
+      "aten::scaled_dot_product_attention": 1,
+      "aten::_scaled_dot_product_flash_attention_for_cpu": 1,
+      "aten::empty_like": 1
+    },
+    "positive_self_cpu_allocated_bytes": 8382780,
+    "copy_shapes": [
+      [
+        [
+          1,
+          4,
+          1,
+          128
+        ],
+        [
+          1,
+          4,
+          1,
+          128
+        ],
+        []
+      ],
+      [
+        [
+          1,
+          4,
+          1,
+          128
+        ],
+        [
+          1,
+          4,
+          1,
+          128
+        ],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [
+          4,
+          64
+        ],
+        [
+          4,
+          64
+        ],
+        []
+      ],
+      [
+        [
+          4,
+          32
+        ],
+        [
+          4,
+          32
+        ],
+        []
+      ],
+      [
+        [
+          4,
+          32
+        ],
+        [
+          1,
+          32
+        ],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [],
+        [],
+        []
+      ],
+      [
+        [
+          4,
+          2057
+        ],
+        [
+          4,
+          2057
+        ],
+        []
+      ],
+      [
+        [
+          4,
+          768
+        ],
+        [
+          4,
+          768
+        ],
+        []
+      ],
+      [
+        [
+          4,
+          768
+        ],
+        [
+          1,
+          768
+        ],
+        []
+      ]
+    ]
+  }
+}

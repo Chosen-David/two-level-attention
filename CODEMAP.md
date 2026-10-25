@@ -45,3 +45,5 @@
 |---|---|---|---|
 | TL-FAR-SKIP-COMPACT-20261025 | `sparse_attn/ops/far_skip*.py`、`tests/test_far_skip_compact.py`、`exp/bench/far_skip_decode.py` | `agent_doc/results/far_skip_20261025/`、`docs/far_skip.md` | Qwen3 B=1 eager decode；实际淘汰 far KV；CPU 正确性/存储，GPU 性能与质量未验 |
 | TL-FAR-SKIP-EAGER-OPT-20261025 | `far_skip_workspace.py`、环形 `FarSkipLayer`、`tests/test_far_skip_optimized.py`、`exp/bench/far_skip_compare.py` | `agent_doc/results/far_skip_optimized_20261025/` | eager 五项优化；CPU 配对/原始算子证据，CUDA/Graph 与质量未验 |
+
+| Far-off fixed-shape decode | `sparse_attn/ops/far_skip_graph.py`, `far_skip_static.py` | Tensor-position bounded selector and cache bridge; Qwen/TLIStaticCache entry, CPU verified, actual CUDA gate pending |

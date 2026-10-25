@@ -243,3 +243,5 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 - [ ] [TL-E155D-T7-20261021] 性能浪费点修复（E133c A1-A4/A6 已入库；剩余 .187 独占窗口稳态 bench 同机对照 + 判决 JSON） ([详情](task_details/TL-E155D-T7-20261021.md))
 - [ ] [TL-E155D-T8-20261021] 推送远端 main（全部判决/论文/代码提交后 origin push，含历史挂账） ([详情](task_details/TL-E155D-T8-20261021.md))
 
+
+- [x] [TL-FAR-SKIP-THREE-ROUNDS-20261025] 三轮 eager/固定形状 Graph 实现与 CPU 验证完成；CUDA 实测未执行 ([详情](task_details/TL-FAR-SKIP-THREE-ROUNDS-20261025.md))

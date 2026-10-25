@@ -7,6 +7,8 @@ their unpadded causal decode mask by identity in cache._far_skip_attention_mask.
 That mask's contents are caller-owned input: arbitrary padding/masking is not
 supported. The shipped GraphRunner constructs it from the same position buffer.
 """
+import os
+
 import torch
 from transformers.cache_utils import DynamicCache
 
@@ -25,6 +27,7 @@ class FarSkipStaticLayer(TLIStaticLayer):
         self.config, self.layout = cfg, ring.layout
         self.cumulative_length = ring.logical_length
         self.workspace = FarSkipGraphWorkspace(cfg, ring.layout, self.num_heads, coarse, fine)
+        self.workspace.initialize(self.keys.transpose(1, 2), ring.logical_length)
 
     def update(self, key_states, value_states, cache_kwargs=None):
         for x, storage in ((key_states, self.keys), (value_states, self.values)):
@@ -56,7 +59,9 @@ def prepare_far_skip_static(cache, dyn, seq_lens, model):
     if not modules:
         return set()
     if (cache.batch_size != 1 or len(seq_lens) != 1 or type(dyn) is not DynamicCache
-            or getattr(dyn, 'offloading', False) or model.training or torch.is_grad_enabled()):
+            or getattr(dyn, 'offloading', False) or model.training or torch.is_grad_enabled()
+            or os.environ.get('TLI_DECODE_DENSE', '0') == '1'
+            or os.environ.get('TLI_SPARSE_PREFILL', '0') == '1'):
         raise ValueError('static compact far skip needs eval, no_grad, B=1 and ordinary prefill')
     planned = {}
     for li, module in modules.items():
@@ -69,6 +74,8 @@ def prepare_far_skip_static(cache, dyn, seq_lens, model):
         idx.freeze_dyn_dgate()
         idx._resolve_skip()
         if idx.skip_far:
+            if idx.far_skip_config.near_pages == 0 and idx.sink_tokens+idx.sliding_window_size == 0:
+                raise ValueError('static far selection needs a nonempty protected or page budget')
             full = torch.arange(128, device=source.keys.device)
             coarse = idx._subspace_indices(source.keys.device) if idx.enable_subspace else full
             fine = (full if idx.l2_subspace == 'full' else
@@ -91,7 +98,9 @@ def try_far_skip_static(module, q, k, v, cache, mask, batch_ctx):
     if not getattr(cache, '_far_skip_prepared', False):
         raise ValueError('prepare compact static cache with fill_static_from_dynamic(..., model=model)')
     if (module.training or torch.is_grad_enabled() or q.shape[:1] != (1,)
-            or q.shape[-2] != 1 or batch_ctx is None or batch_ctx.batch != 1):
+            or q.shape[-2] != 1 or batch_ctx is None or batch_ctx.batch != 1
+            or os.environ.get('TLI_DECODE_DENSE', '0') == '1'
+            or os.environ.get('TLI_SPARSE_PREFILL', '0') == '1'):
         raise ValueError('static far skip requires eval, no_grad, single-token B=1 BatchCtx')
     li, idx = module.layer_idx, module.indexer
     layer = cache.layers[li]
@@ -99,7 +108,7 @@ def try_far_skip_static(module, q, k, v, cache, mask, batch_ctx):
         if idx.skip_far:
             raise ValueError('far gate changed: refill static cache and recapture')
         return None
-    if not idx.skip_far or layer.config != idx.far_skip_config:
+    if not idx.skip_far or layer.config != idx.far_skip_config or idx.far_skip_cache != 'evict':
         raise ValueError('far gate/geometry changed: refill static cache and recapture')
     if mask is not None and mask is not getattr(cache, '_far_skip_attention_mask', None):
         raise ValueError('static far skip requires the registered unpadded decode mask')
@@ -108,6 +117,8 @@ def try_far_skip_static(module, q, k, v, cache, mask, batch_ctx):
     if gs.enabled:
         pos = gs.pos_buf
     else:
+        if not 1 <= batch_ctx.seq_lens[0] <= layer.max_cache_len:
+            raise ValueError('decode position exceeds static cache capacity')
         pos = torch.tensor([batch_ctx.seq_lens[0]-1], dtype=torch.long, device=q.device)
     k, v = layer.update(k, v, {'cache_position': pos})
     q, k, v = (t.transpose(1, 2) for t in (q, k, v))

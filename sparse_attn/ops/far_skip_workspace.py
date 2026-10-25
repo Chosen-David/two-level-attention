@@ -92,7 +92,7 @@ def stable_topk_positions(scores, count, workspace, *, valid=None):
         order = scores.argsort(dim=-1, descending=True, stable=True)
         if valid is not None:
             validity = valid.gather(-1, order).to(torch.int8)
-            order = order.gather(-1, validity.argsort(-1, descending=True, stable=True))
+            order = order.gather(-1, validity.argsort(dim=-1, descending=True, stable=True))
         return order[..., :count].sort(-1).values
     # +0 canonicalizes -0, which must tie with +0 under numerical sorting.
     normalized = scores.float() + 0.0
