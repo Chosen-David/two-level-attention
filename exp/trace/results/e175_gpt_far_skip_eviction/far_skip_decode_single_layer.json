@@ -1,0 +1,45 @@
+{
+  "description": "far_skip_decode single-layer synthetic benchmark (pc40 GPU1 H20-3e, BF16, Qwen3 head_dim=128). Source: codex branch bench. This isolates the far-skip module, NOT model throughput or quality.",
+  "config": {
+    "bench_script": "exp/bench/far_skip_decode.py --device cuda --legacy --near-len 4096 --near-pages 32 --budget 1024 --warmup 8 --lengths 8192 32768 65536 131072 --steps 64",
+    "ring_capacity": "sink(4) + near_len(4096) + window(128) + block_size(64) - 1 = 4551 theoretical; observed physical_tokens = 4415 (config/BF16 detail)",
+    "geometric_constant": "evict physical_tokens (~4415) and kv_storage_bytes (~8.62 MB) are CONSEQUENCES of near_len/pages/budget/sink/window, INDEPENDENT of sequence length"
+  },
+  "measurements": [
+    {"mode": "retain", "prompt_length": 8192,  "logical_length": 8264,  "physical_tokens": 8264,  "kv_storage_MB": 16.14, "first_decode_ms": 270.0, "median_wall_ms": 1.015},
+    {"mode": "evict",  "prompt_length": 8192,  "logical_length": 8264,  "physical_tokens": 4415,  "kv_storage_MB": 8.62,  "first_decode_ms": 7.82,   "median_wall_ms": 1.114},
+    {"mode": "retain", "prompt_length": 32768, "logical_length": 32840, "physical_tokens": 32840, "kv_storage_MB": 64.14, "first_decode_ms": 1.63,   "median_wall_ms": 0.975},
+    {"mode": "evict",  "prompt_length": 32768, "logical_length": 32840, "physical_tokens": 4415,  "kv_storage_MB": 8.62,  "first_decode_ms": 1.65,   "median_wall_ms": 1.116},
+    {"mode": "retain", "prompt_length": 65536, "logical_length": 65608, "physical_tokens": 65608, "kv_storage_MB": 128.14,"first_decode_ms": 1.67,   "median_wall_ms": 0.985},
+    {"mode": "evict",  "prompt_length": 65536, "logical_length": 65608, "physical_tokens": 4415,  "kv_storage_MB": 8.62,  "first_decode_ms": 1.64,   "median_wall_ms": 1.122},
+    {"mode": "retain", "prompt_length": 131072,"logical_length": 131144,"physical_tokens": 131144,"kv_storage_MB": 268.58,"first_decode_ms": 24.4,   "median_wall_ms": 0.967},
+    {"mode": "evict",  "prompt_length": 131072,"logical_length": 131144,"physical_tokens": 4415,  "kv_storage_MB": 8.62,  "first_decode_ms": 1.58,   "median_wall_ms": 1.113}
+  ],
+  "key_observations": {
+    "kv_independence_from_length": "evict ring capacity (~8.62 MB/layer) is geometrically CONSTANT across 8K→128K — ring size depends only on sink+near_len+window+block-1, never on sequence length.",
+    "kv_savings_vs_full_cache": {
+      "8K":  {"full_MB": 16.14, "evict_MB": 8.62, "saving_pct": 46.6},
+      "32K": {"full_MB": 64.14, "evict_MB": 8.62, "saving_pct": 86.6},
+      "64K": {"full_MB": 128.14,"evict_MB": 8.62, "saving_pct": 93.3},
+      "128K":{"full_MB": 268.58,"evict_MB": 8.62, "saving_pct": 96.8}
+    },
+    "compact_selector_vs_legacy": {
+      "8K":  {"retain_ms": 1.02, "note": "~2x faster than legacy path page-stat first-decode cost"},
+      "32K": {"retain_ms": 0.98},
+      "64K": {"retain_ms": 0.98},
+      "128K":{"retain_ms": 0.97, "note": "constant — compact selector scans bounded near pages, not full history"}
+    },
+    "evict_vs_retain_decode_ms": "evict adds only ~0.12 ms/step vs retain (ring slot mapping overhead), negligible relative to KV savings."
+  },
+  "comparative_context": {
+    "E170c_theoretical": "E170c prev analysis projected ~96% far KV elimination for budget K2 at long ctx (flow-based upper bound). This bench physically achieves 93-97% via finite ring.",
+    "capacity_overhead_ring_vs_dynamic": "Ring reserves ~4551 positions = sink(4) + near_len(4096) + window(128) + block_size(64) - 1 = 4551, slightly EVCEEDING dynamic far_evict cap (1536 + 128 + 64 = 1728). This is a latency-for-simplicity trade-off." },
+  "caveats": [
+    "Single-layer synthetic decode; not full-model throughput or quality.",
+    "NOT bitwise-equivalent to 4bit production TLI (different selector, different boundaries).",
+    "First-decode ms differs dramatically between runs due to cold page-summary build (retain=270ms @8K).",
+    "legacy arm was disabled in 128K run by bench config; 8K/32K/64K legacy data was obtained from separate earlier run.",
+    "eager-only; CUDA Graph capture is explicitly rejected by far_skip_runtime.",
+    "Batch size must be 1; beam/batching/offload unsupported."
+  ]
+}
