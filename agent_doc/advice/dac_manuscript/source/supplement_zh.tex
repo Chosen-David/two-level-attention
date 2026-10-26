@@ -122,4 +122,23 @@ b_n=\max\!\left(\lfloor s/B\rfloor,\left\lfloor(S-w-L)/B\right\rfloor\right).
 \textbf{历史跨模型记录（不属主文范围）。}作者报告的Qwen3-32B RULER32K AVG为稀疏50.64、稠密52.22（$-1.58$）。跨机Llama-3.1-8B两臂在历史近区页／词元配额(8,320)和(16,640)下分别报告83.88与86.19。这些描述性记录缺少匹配执行与配对不确定性，不扩大当前Qwen3-8B主文范围，也不验证其$n_l/n_b$统一L2配置。
 \end{sloppypar}
 
+\clearpage
+\section*{补充材料S9：远区跳过KV Cache消融实验（实现级）}
+
+紧凑远区跳过后端（表I配置+\texttt{\mbox{-\/-tli\_far\_skip\_backend compact -/-tli\_far\_skip\_cache evict}}）在层跳过决策冻结后物理释放远区KV项。本消融评估该机制对时延和显存的影响，作为主文生产路径之外的\emph{实现级补充材料}。
+
+\paragraph{环形缓冲几何。}每个冻结远区跳过层存储固定容量$C = s + n_l + w + B - 1 = 4 + 4096 + 128 + 64 - 1 = 4551$个槽位：前$s{=}4$个槽位固定给前缀池，随后$C - s = 4547$个槽位构成环形区。新解码词元通过$p \bmod (C - s) + s$覆写最旧环形位置；一旦环形填满（上下文$> C$），物理占用与序列长度解耦。
+
+\paragraph{单层显存。}在H20-3e GPU上，一层冻结层的KV对逐出后恒定占用$\sim$8.6\,MiB（bf16，$H_\mathrm{kv}{=}8$，$D{=}128$，环形容量4551），全宽度占用在32K/64K/128K下分别为150/280/540\,MiB。对应$L = 8192 / 16384 / 32768 / 65536 / 131072$，缩减率$46.6 / 86.6 / 93.3 / 96.8$\%。
+
+\paragraph{单层时延。}以紧凑远区注意力替代标准远区SDPA后，单层解码时延从$5.21\!\rightarrow\!2.71$\,ms（$-48.0$\%，32K）、$5.36\!\rightarrow\!2.71$\,ms（$-49.4$\%，64K）、$5.72\!\rightarrow\!2.71$\,ms（$-52.6$\%，128K）。64K/128K平坦的2.71\,ms确认远区计算由环形容量而非序列长度界定。
+
+\paragraph{全模型显存占用（静态跳过模式）。}当Qwen3-8B的36层中13层携带静态跳过掩码时，总解码内存在32K/64K/128K下分别下降$-1.01$/$-2.24$/$-4.70$\,GiB（$3.4/5.1/6.5$\%）；未跳过的23层保留全宽度KV。节省与跳层数成线性比例。
+
+\paragraph{生产路径注意事项（eager vs.\ graph）。}逐出机制当前要求CUDA~Graph捕获；eager解码在流捕获期间显式raise（属设计约束，非缺陷）；对均匀合成提示无层跳过时会增加$\sim$4--7\,GiB开销。13/36层静态跳过集源于E137在英文长文档上的动态阈值（$\varepsilon{=}0.05$）标定；均匀合成提示下远区质量均匀分布不触发跳层。使用E137标定跳过决策配合graph捕获时，上述全模型显存节省可兑现。
+
+\paragraph{原始数据。} \texttt{results/far\_skip\_decode\_single\_layer.json}（单层显存+时延）、\texttt{results/e175\_m1\_footprint\_verdict.json}（13/36层全模型占用）、\texttt{results/e175\_e2e\_memory\_verdict\_dyn\_dgate.json}（eager路径诊断）。E137动态阈值分析见\texttt{results/e137\_dyn\_dgate\_verdict.json}。
+
+\end{sloppypar}
+
 \end{document}

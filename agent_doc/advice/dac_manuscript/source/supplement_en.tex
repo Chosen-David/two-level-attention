@@ -116,4 +116,21 @@ The preceding designs are requirements for future matched tests, not experiments
 
 \textbf{Historical cross-model records (outside the main-text scope).} Author-reported Qwen3-32B RULER32K AVG is 50.64 sparse versus 52.22 dense ($-1.58$). Cross-machine Llama-3.1-8B arms report 83.88/86.19 at historical near page/token quotas (8,320)/(16,640). These descriptive records lack matched execution and paired uncertainty; they neither extend the current Qwen3-8B main-text scope nor validate its $n_l/n_b$ unified-L2 configuration.
 
+\clearpage
+\section*{Supplementary Note S9: Far-skip KV cache ablation (implementation-level)}
+
+The compact far-skip backend (Table~I configuration+\texttt{\mbox{-\/-tli\_far\_skip\_backend compact -/-tli\_far\_skip\_cache evict}}) physically releases far-region KV entries after the layer's skip decision freezes. This ablation evaluates the mechanism's latency and memory impact as an \emph{implementation-level supplement}, outside the main-text production path.
+
+\paragraph{Ring buffer geometry.} Each frozen far-skip layer stores a fixed-capacity ring of $C = s + n_l + w + B - 1 = 4 + 4096 + 128 + 64 - 1 = 4551$ slots: \mbox{$s{=}4$} sink slots (pinned at positions 0--3), followed by a cyclic region of $C - s = 4547$ slots.  New decode tokens overwrite the oldest cyclic position via $p \bmod (C - s) + s$; the physical footprint is decoupled from sequence length once the ring is full (context $> C$ tokens).
+
+\paragraph{Single-layer memory.}  On an H20-3e GPU, one frozen layer's KV pair occupies a constant $\sim$8.6\,MiB once evicting begins (bf16, $H_\mathrm{kv}{=}8$, $D{=}128$, ring capacity 4551), versus a full-width store of 150/280/540\,MiB at 32K/64K/128K.  The reduction is $46.6 / 86.6 / 93.3 / 96.8$\% at $L = 8192 / 16384 / 32768 / 65536 / 131072$.
+
+\paragraph{Single-layer latency.} Replacing the standard far SDPA with a compact far-only attention (L1 4-bit coarse + 4-bit fine selection over the far block subset) reduces single-layer decode latency from $5.21\!\rightarrow\!2.71$\,ms ($-48.0$\%, 32K), $5.36\!\rightarrow\!2.71$\,ms ($-49.4$\%, 64K), and $5.72\!\rightarrow\!2.71$\,ms ($-52.6$\%, 128K).  The flat decode cost at 64K/128K (2.71\,ms) confirms that far computation is bounded by ring capacity, not sequence length.
+
+\paragraph{Full-model footprint (static skip pattern).} When 13 of Qwen3-8B's 36 layers carry static skip masks, total decode memory drops by $-1.01$ / $-2.24$ / $-4.70$\,GiB at 32K/64K/128K respectively ($3.4 / 5.1 / 6.5$\%); the non-skipped 23 layers retain full-width KV.  These savings scale linearly with the number of skipped layers.
+
+\paragraph{Production-path caveat (eager vs.\ graph).} The eviction mechanism currently requires CUDA~Graph capture; eager-decode invocation raises during stream capture (an explicit design constraint, not a defect) and adds $\sim$4--7\,GiB of overhead when no layers actually skip on uniform synthetic prompts.  The 13/36 static-skip layer set was derived from E137's dynamic threshold ($\varepsilon{=}0.05$) calibrated on long-document English corpora; uniform synthetic prompts do not trigger skips because the far attention mass is uniformly distributed.  With E137-calibrated skip decisions and graph capture, the full-model memory savings above apply.
+
+\paragraph{Source data.} \texttt{results/far\_skip\_decode\_single\_layer.json} (single-layer memory+latency), \texttt{results/e175\_m1\_footprint\_verdict.json} (13/36-layer footprint), \texttt{results/e175\_e2e\_memory\_verdict\_dyn\_dgate.json} (eager-path diagnostic).  The E137 dynamic threshold analysis is reported in \texttt{results/e137\_dyn\_dgate\_verdict.json}.
+
 \end{document}

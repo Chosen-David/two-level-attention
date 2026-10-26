@@ -1,0 +1,60 @@
+{
+  "exp": "E175 e2e full-model far-skip evict 显存实测（dyn_dgate=true, real production flags, eager decode）",
+  "date": "2026-10-26",
+  "schema": "e175-e2e-memory-dyndgate",
+  "protocol": {
+    "arms": "champion K1=64 flags + dyn_dgate (store_true, eps=0.05, rows=256); arm_baseline=compact backend off (legacy), arm_evict=compact+evict",
+    "note": "uniform synthetic prompt (token_id=3), Qwen3-8B, pc33 GPU0 clean (1MiB pre-run)",
+    "prefill": "dense decode (TLI_SPARSE_PREFILL=0); D' gate prefill calibrates r_l per layer",
+    "decode_steps": "warmup=3 + measured=5, cursor-driven single-token decode",
+    "measurement": "torch.cuda.max_memory_allocated() post-prefill reset"
+  },
+  "results": {
+    "L32768": {
+      "baseline_tpot_ms": 80.27,
+      "evict_tpot_ms": 80.75,
+      "delta_tpot_pct": +0.6,
+      "baseline_mem_gib": 29.758,
+      "evict_mem_gib": 33.722,
+      "delta_mem_gib": +3.964,
+      "delta_mem_pct": +13.3,
+      "n_skip_layers": 0,
+      "note": "uniform prompt: all 36 layers have r_l > eps=0.05; no skip triggered"
+    },
+    "L65536": {
+      "baseline_tpot_ms": 89.84,
+      "evict_tpot_ms": 94.20,
+      "delta_tpot_pct": +4.9,
+      "baseline_mem_gib": 44.222,
+      "evict_mem_gib": 49.337,
+      "delta_mem_gib": +5.115,
+      "delta_mem_pct": +11.6,
+      "n_skip_layers": 0
+    },
+    "L131072": {
+      "baseline_tpot_ms": 121.84,
+      "evict_tpot_ms": 120.90,
+      "delta_tpot_pct": -0.8,
+      "baseline_mem_gib": 83.403,
+      "evict_mem_gib": 90.829,
+      "delta_mem_gib": +7.426,
+      "delta_mem_pct": +8.9,
+      "n_skip_layers": 0
+    }
+  },
+  "verdict": {
+    "summary": "uniform-prompt + eager decode 下 D' 门控 0 层 skip；compact bridge 纯开销（+4-7 GiB）；全模型显存节省需要 graph capture + real-text D' 触发 skip 层",
+    "memory_e2e_real": "无法测量（当前 D' 门控在 synthetic prompt 下不触发 skip）",
+    "memory_single_layer_theoretical": "e175_m1_footprint_verdict.json: 单层 evict 后恒 ~8.62 MB（vs 全宽度 8K→128K 节省 46/87/93/97%）；全模型静态 13 层 skip → -1.01/-2.24/-4.70 GiB",
+    "memory_e2e_graph_path": "未测；graph capture + evict 路径（prepare_far_skip_static）是 codex 原设计，需要 future work",
+    "perf_decode_tpot": "evict 模式在 eager 路径上额外开销 +1~5%（compact bridge：select + attend 替代标准 path）；graph 路径预期持平或微降（skip 层少一个 SDPA）"
+  },
+  "related": {
+    "e175_m1_footprint": "exp/trace/results/e175_m1_footprint_verdict.json",
+    "e175_single_layer": "exp/trace/results/far_skip_decode_single_layer.json",
+    "e137_dyn_dgate": "exp/trace/results/e137_dyn_dgate_verdict.json",
+    "e176_memory_evict_v2_invalid": "exp/trace/results/e176_memory_evict_v2.json (CPU tensor error, invalid)"
+  },
+  "gpu_hygiene": "clean",
+  "machine": "pc33 GPU0 H20-3e"
+}
