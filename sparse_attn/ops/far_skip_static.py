@@ -12,39 +12,12 @@ import os
 import torch
 from transformers.cache_utils import DynamicCache
 
-from .far_skip_cache import FarSkipLayer
-from .far_skip_graph import FarSkipGraphWorkspace
-from .tli_static_cache import TLIStaticLayer
+from .hybrid_cache import HybridLayer, FarSkipHybridLayer
 
 
-class FarSkipStaticLayer(TLIStaticLayer):
-    def __init__(self, source, cfg, max_cache_len, coarse, fine):
-        super().__init__(max_cache_len, 1)
-        ring = FarSkipLayer.from_layer(source, cfg)
-        self.keys, self.values = ring.keys, ring.values
-        self.dtype, self.device = ring.dtype, ring.device
-        self.num_heads, self.head_dim = self.keys.shape[1], self.keys.shape[-1]
-        self.config, self.layout = cfg, ring.layout
-        self.cumulative_length = ring.logical_length
-        self.workspace = FarSkipGraphWorkspace(cfg, ring.layout, self.num_heads, coarse, fine)
-        self.workspace.initialize(self.keys.transpose(1, 2), ring.logical_length)
-
-    def update(self, key_states, value_states, cache_kwargs=None):
-        for x, storage in ((key_states, self.keys), (value_states, self.values)):
-            if (x.shape != (*storage.shape[:2], 1, storage.shape[-1])
-                    or x.dtype != storage.dtype or x.device != storage.device
-                    or x.requires_grad):
-                raise ValueError('static far KV must match detached single-token storage')
-        pos = (cache_kwargs or {}).get('cache_position')
-        if pos is None or pos.shape != (1,) or pos.dtype != torch.long or pos.device != self.device:
-            raise ValueError('static far KV needs one device int64 cache position')
-        slot = self.layout.map(pos)
-        self.keys.index_copy_(2, slot, key_states)
-        self.values.index_copy_(2, slot, value_states)
-        return self.keys, self.values
-
-    def reset(self):
-        raise ValueError('refill far static cache from a fresh prefill and recapture')
+class FarSkipStaticLayer(FarSkipHybridLayer):
+    """向后兼容别名。FarSkipHybridLayer 已实现全部功能。"""
+    pass
 
 
 def prepare_far_skip_static(cache, dyn, seq_lens, model):
@@ -88,7 +61,7 @@ def prepare_far_skip_static(cache, dyn, seq_lens, model):
         if li in new_layers:
             cache.layers[li] = new_layers[li]
         elif isinstance(old, FarSkipStaticLayer):
-            cache.layers[li] = TLIStaticLayer(old.max_cache_len, 1)
+            cache.layers[li] = HybridLayer(old.max_cache_len, 1)
     cache._far_skip_prepared = True
     cache._far_skip_attention_mask = None
     return set(new_layers)
@@ -121,5 +94,4 @@ def try_far_skip_static(module, q, k, v, cache, mask, batch_ctx):
             raise ValueError('decode position exceeds static cache capacity')
         pos = torch.tensor([batch_ctx.seq_lens[0]-1], dtype=torch.long, device=q.device)
     k, v = layer.update(k, v, {'cache_position': pos})
-    q, k, v = (t.transpose(1, 2) for t in (q, k, v))
-    return layer.workspace(q, k, v, pos+1, module.scaling)
+    return layer.select_and_attend(q, k, v, pos + 1, module.scaling)

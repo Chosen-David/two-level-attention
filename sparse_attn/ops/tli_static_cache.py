@@ -25,111 +25,23 @@ import torch
 from transformers.cache_utils import Cache
 
 from ..baseline_runtime import batch_decode_ctx
+from .hybrid_cache import HybridLayer
 
 
-class TLIStaticLayer:
-    """固定容量 KV 层。buffer [B, Hkv, S_cap, D]，有效在前。
+class TLIStaticLayer(HybridLayer):
+    """固定容量 KV 层（向后兼容别名，strategy='linear'）。
 
     对齐 StaticLayer 的 CacheLayerMixin 契约（is_compileable / max_batch_size
     / max_cache_len / get_seq_length / get_mask_sizes / get_max_cache_shape
     / lazy_initialization / update / reset / crop / reorder_cache）。
     """
 
-    is_compileable = True
-    is_sliding = False
-
     def __init__(self, max_cache_len: int, max_batch_size: int):
-        if max_cache_len < 1 or max_batch_size < 1:
-            raise ValueError("TLIStaticLayer 需要 max_cache_len>=1 且 max_batch_size>=1")
-        self.max_cache_len = int(max_cache_len)
-        self.max_batch_size = int(max_batch_size)
-        self.keys = None
-        self.values = None
-        self.num_heads = None
-        self.head_dim = None
-        # 单调递增累计写长（供 get_seq_length；batch decode 下 cache_position
-        # 不影响正确性——RoPE 用显式 position_ids、create_causal_mask 4D 早退、
-        # TLI patch 全宽分支不切片）。
-        self.cumulative_length = 0
+        super().__init__(max_cache_len, max_batch_size)
+        self.strategy = "linear"  # TLIStaticLayer 始终 linear
 
-    def lazy_initialization(self, key_states: torch.Tensor):
-        """按首层首个 decode 步（或搬移时）的 [B, Hkv, S, D] 形状预分配全宽 buffer。"""
-        if key_states.ndim != 4:
-            raise ValueError(f"TLIStaticLayer 期望 4D key_states，got {key_states.ndim}D")
-        self.num_heads = key_states.shape[1]
-        self.head_dim = key_states.shape[-1]
-        self.dtype, self.device = key_states.dtype, key_states.device
-        if key_states.shape[0] != self.max_batch_size:
-            raise ValueError(
-                f"TLIStaticLayer batch {key_states.shape[0]} != 构造 batch "
-                f"{self.max_batch_size}")
-        shape = (self.max_batch_size, self.num_heads, self.max_cache_len,
-                 self.head_dim)
-        self.keys = torch.zeros(shape, dtype=self.dtype, device=self.device)
-        self.values = torch.zeros(shape, dtype=self.dtype, device=self.device)
-
-    def update(self, key_states, value_states, cache_kwargs=None):
-        """decode-only：新 token [B, Hkv, 1, D] → buffer[b, :, seq_lens[b]-1]。
-
-        alive 行写新位置；dead 行跳过（不覆盖其已冻结的有效 KV）。
-        返回全宽 buffer [B, Hkv, S_cap, D]（固定形状）。
-        """
-        if key_states.ndim != 4 or key_states.shape[-2] != 1:
-            raise RuntimeError(
-                "TLIStaticCache 仅支持 decode（q_len==1）；prefill 须走 "
-                "DynamicCache + fill_static_from_dynamic 搬移。当前 "
-                f"key_states shape={tuple(key_states.shape)}")
-        if self.keys is None:
-            self.lazy_initialization(key_states)
-        ctx = batch_decode_ctx()
-        if ctx is None:
-            raise RuntimeError(
-                "TLIStaticCache.update 需要 batch decode ctx（batch_decode_ctx "
-                "为 None）；本 cache 仅供 pred_ruler_batch batch 模式")
-        if ctx.batch != self.max_batch_size:
-            raise RuntimeError(
-                f"TLIStaticCache ctx.batch={ctx.batch} != 构造 batch "
-                f"{self.max_batch_size}")
-        # 【阶段 2c CUDA Graph 前置】KV 写入位置张量化：scatter_ 单 kernel
-        # 沿 dim2（S_cap 维）每行写 pos[b] 一列。pos 为 tensor 索引 →
-        # replay 时 pos_buf 更新 → 写新列（CUDA Graph 兼容）。
-        # dead 行 seq_lens 冻结（不递增）→ pos 不变 → 重复写同列（被
-        # mask 排除，无污染）。非 graph 模式（pos_buf=None）回退 Python
-        # 构造，语义与旧逐行 copy_ 逐位一致（纯内存拷贝，无算术）。
-        from .cuda_graph_state import graph_state  # noqa: E402
-        _gs = graph_state()
-        if _gs.enabled and _gs.pos_buf is not None:
-            pos = _gs.pos_buf
-        else:
-            pos = torch.tensor(
-                [ctx.seq_lens[b] - 1 for b in range(self.max_batch_size)],
-                dtype=torch.long, device=self.keys.device)
-        pos = torch.clamp(pos, 0, self.max_cache_len - 1)
-        # scatter_ 沿 dim2（S_cap 维）每行写 pos[b] 一列：index 与 src
-        # 同 shape [B,Hkv,1,D]、元素值为 pos[b] → self[b,h,pos[b],d] =
-        # src[b,h,0,d]（单 kernel，graph 兼容）。dead 行 pos 冻结 →
-        # 重复写同列（被 mask 排除，无污染）。
-        idx = pos.view(-1, 1, 1, 1).expand(
-            self.max_batch_size, self.num_heads, 1, self.head_dim)
-        self.keys.scatter_(2, idx, key_states)
-        self.values.scatter_(2, idx, value_states)
-        self.cumulative_length += 1
-        return self.keys, self.values
-
-    def get_seq_length(self) -> int:
-        return self.cumulative_length
-
-    def get_mask_sizes(self, cache_position):
-        return self.max_cache_len, 0
-
-    def get_max_cache_shape(self) -> int:
-        return self.max_cache_len
-
-    def reset(self):
-        if self.keys is not None:
-            self.keys.zero_()
-            self.values.zero_()
-        self.cumulative_length = 0
+    # lazy_initialization / update / _update_linear / get_seq_length /
+    # get_mask_sizes / get_max_cache_shape / reset 全部继承自 HybridLayer。
 
     def crop(self, max_length):
         raise RuntimeError("TLIStaticLayer 不支持 crop（固定容量 decode-only）")
@@ -139,13 +51,13 @@ class TLIStaticLayer:
 
 
 class TLIStaticCache(Cache):
-    """decode 用固定容量 KV cache（每层一个 TLIStaticLayer 全宽缓冲）。"""
+    """decode 用固定容量 KV cache（每层一个 HybridLayer 全宽缓冲）。"""
 
     def __init__(self, config, max_cache_len: int, batch_size: int):
         layer_types = getattr(config, "layer_types", None)
         if layer_types is None:
             layer_types = ["full_attention" for _ in range(config.num_hidden_layers)]
-        layers = [TLIStaticLayer(max_cache_len, batch_size) for _ in layer_types]
+        layers = [HybridLayer(max_cache_len, batch_size) for _ in layer_types]
         super().__init__(layers=layers)
         self.batch_size = int(batch_size)
         # max_cache_len 由 Cache 基类只读 property 从 layers 推导
@@ -195,6 +107,10 @@ def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, model=None):
             if L:
                 layer.keys[b, :, :L].copy_(k[b, :, S_max - L:])
                 layer.values[b, :, :L].copy_(v[b, :, S_max - L:])
+
+    # 冻结线性策略（非 far-skip 层）
+    for layer in cache.layers:
+        layer.set_strategy("linear")
 
     # Far-skip: prefill 结束后一次性截断死 far KV → 物理节省
     if model is not None:
