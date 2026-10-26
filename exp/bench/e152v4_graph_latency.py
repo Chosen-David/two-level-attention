@@ -443,6 +443,7 @@ def main():
             "max_gen": args.max_gen,
             "early_stop": False,
             "graph_mode": args.graph_mode,
+            "far_skip_kernels": os.environ.get("TLI_FAR_SKIP_KERNELS", "torch"),
             "S_cap": S_cap,
             "timer_api": "time.perf_counter (timestamps in seconds)",
             "wall_boundary": ("after input H2D+sync, prompt forward -> "

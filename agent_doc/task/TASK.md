@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-26
+
+- [ ] [TL-FAR-SKIP-GPU-REVISION-20261026] 已升级 PR #7：拆开 staged eager/Graph 路径，增加三类可选 Triton 融合内核及配对验收工具；CPU/解释器/离线编译已验，目标 GPU eager 回退是否修复仍待实测。([详情](task_details/TL-FAR-SKIP-GPU-REVISION-20261026.md))
+
 ## 2026-10-25
 
 - [x] [TL-FAR-SKIP-EAGER-OPT-20261025] 完成 far-off eager 五项优化：环形 KV 原位写入、增量页统计、直接子空间 gather、稳定 top-k、有界 scratch 复用；CPU 配对/正确性证据已归档，GPU/Graph 未验；继续通过 PR #7 交付。([详情](task_details/TL-FAR-SKIP-EAGER-OPT-20261025.md))

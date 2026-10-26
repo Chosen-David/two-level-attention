@@ -69,8 +69,12 @@ class FarSkipLayer(DynamicLayer):
         position = self.logical_length
         slot = self.layout.slot(position)
         # Fixed addresses: no allocation or copy of old KV in steady decode.
-        self.keys[..., slot:slot+1, :].copy_(key_states)
-        self.values[..., slot:slot+1, :].copy_(value_states)
+        from .far_skip_accel import enabled, write_pair
+        if enabled(self.keys) and self.keys.shape == self.values.shape:
+            write_pair(self.keys, self.values, key_states, value_states, position, self.layout)
+        else:
+            self.keys[..., slot:slot+1, :].copy_(key_states)
+            self.values[..., slot:slot+1, :].copy_(value_states)
         self.logical_length += 1
         self.tail_start = self.config.tail_start(self.logical_length)
         return self.keys, self.values

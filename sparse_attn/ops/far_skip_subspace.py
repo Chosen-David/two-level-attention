@@ -60,6 +60,13 @@ class FarSkipFineCache:
         self.keys.index_copy_(1, physical, self._encode(values))
 
     def gather(self, positions, valid=None):
+        from .far_skip_accel import enabled, gather
+        if enabled(self.keys):
+            from .far_skip_workspace import FarSkipWorkspace
+            if not hasattr(self, '_gather_workspace'):
+                self._gather_workspace = FarSkipWorkspace()
+            return gather(self.keys.transpose(0, 1)[None], positions, self.layout,
+                          self._gather_workspace, valid=valid)
         if valid is not None:
             positions = torch.where(valid, positions, 0)
         physical = self.layout.map(positions)

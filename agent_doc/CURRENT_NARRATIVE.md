@@ -168,6 +168,28 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   K1=64 额外收益 = other 类一致降 ~0.95ms（L1 块数减半）；busy 与
   E172 TPOT 18.46ms@128K 自洽（99.6%）。主表切 K1=64 后平坦化主张
   证据链无缝衔接。
+- **【已收官 2026-10-25】新口径三模型族证据链（e168f/g/i/j/k，五判决）**：
+  ①**e168f Qwen K1=64 批档**（`e168f_qwen_k64_bs_verdict.json`）：
+  B1 1.470/2.206/3.644× 三口径闭合；交叉点 32K:B≈2→64K:B≈4→
+  128K:不交叉，与 Llama e168d 完全对齐（旧口径模型族差异消失）；
+  ②**e168i Llama K1=64 census**（`e168i_llama_k64_census_verdict.json`，
+  pc40 worktree@7bc1788）：busy 15.022/15.223/15.795ms（+5.1%@4×）
+  三类平直 + other 唯一增长，逐类同型 e168b/e168e；K1=64 收益 =
+  other 降 0.67-0.85ms；首轮 GPU0 被并行 e175 任务抢占污染已废弃；
+  ③**e168j 32B K1=64 census**（`e168j_32b_k64_census_verdict.json`，
+  pc02）：busy 41.637/41.980/42.862ms（+2.9%@4×）三类平直 + other
+  10.86→12.03 唯一增长，与 E174 TPOT 双口径闭合（≤0.8%）——
+  **平坦化证据链三模型族闭合（e168e+e168i+e168j）**；④**e168g 32B
+  K1=64 批档**（`e168g_32b_bs_verdict.json`，pc02 repo@7bc1788）：
+  B1 1.340/1.925/3.023×（与 E174 <0.3% 闭合）；32K 交叉 B≈2（0.969×
+  与 8B 双模型族 0.985/0.956 三点对齐）、64K B2 1.205×、128K B2 双臂
+  OOM（物理上限，32B 包络随 L 收缩）——**批档叙事三模型族收官
+  （e168f+e168d+e168g）**；协议披露：e167 采集器 tli 臂 prefill 漏
+  logits_to_keep=1（已补丁 pc02+本地，bit-neutral）、tli 128K B1 复现
+  E160b 根因（单 run 单进程 ×3 = 42.56/42.57/42.57ms）；⑤**e168k
+  Llama K1=64 RULER 质量门**（`e168k_llama_k64_ruler_gate.json`）：
+  三任务 K1=64 100.00/100.00/63.50 vs K1=128 100.00/97.50/62.50——
+  全任务持平或更高（n=40，delta 在噪声带内，主张限定『无回退』）。
 
 ## 3. 对比口径（vendor 基线）
 

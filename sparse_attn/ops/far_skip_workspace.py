@@ -16,6 +16,18 @@ class FarSkipWorkspace:
         self.summaries = None
         self.pages_rebuilt = 0
 
+    def scratch(self, name, shape, like, *, dtype=None):
+        dtype = like.dtype if dtype is None else dtype
+        size = 1
+        for n in shape:
+            size *= n
+        key = (name, like.device, dtype)
+        buf = self._buffers.get(key)
+        if buf is None or buf.numel() < size:
+            buf = torch.empty(max(1, 1 << (size-1).bit_length()), device=like.device, dtype=dtype)
+            self._buffers[key] = buf
+        return buf[:size].view(shape)
+
     def ids(self, count, device):
         key = torch.device(device)
         buf = self._ranges.get(key)
@@ -94,6 +106,10 @@ def stable_topk_positions(scores, count, workspace, *, valid=None):
             validity = valid.gather(-1, order).to(torch.int8)
             order = order.gather(-1, validity.argsort(dim=-1, descending=True, stable=True))
         return order[..., :count].sort(-1).values
+    from .far_skip_accel import enabled, order_keys
+    if enabled(scores):
+        keys = order_keys(scores, valid, workspace)
+        return keys.topk(count, dim=-1, sorted=False).indices.sort(-1).values
     # +0 canonicalizes -0, which must tie with +0 under numerical sorting.
     normalized = scores.float() + 0.0
     bits = normalized.contiguous().view(torch.int32).to(torch.int64)

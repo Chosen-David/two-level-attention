@@ -1,5 +1,10 @@
 # Compact far skipping and KV eviction
 
+GPU regression follow-up: [kernel changes and target-GPU acceptance](far_skip_gpu_validation.md).
+`TLI_FAR_SKIP_KERNELS=triton` selects experimental fused movement/order kernels;
+Torch remains the default until target-GPU validation. Staged eager now uses
+its host-length selector instead of executing the fixed Graph selector eagerly.
+
 This opt-in Qwen3 decode path omits far keys from **page statistics, L1 scoring,
 L2 scoring, and final attention**. It bypasses the full-history index/mask path
 and the dense fallback in `eager_decoding_attn`. It provides a dynamic eager
@@ -132,6 +137,15 @@ This static adapter's host `get_seq_length()` is a setup hint, not a replay
 counter: pass explicit `position_ids` and `cache_position`, as GraphRunner does.
 The single-stream caller must supply the same position for warmup/capture or
 advance by exactly one token. Jumps, rewinds and speculative decode require refill.
+
+Staged eager now uses the host `BatchCtx.seq_lens` and the variable-size eager
+selector. It writes a scalar-selected ring slot and does not construct a device
+position per layer, padded candidates or a Graph workspace. Repeated/skipped
+staged positions are rejected before cache mutation. Graph workspace creation
+is deferred to the first graph warmup, outside capture; graph replay still uses
+device positions. Refill before resuming eager after graph replay has advanced
+beyond the host-tracked sequence. Graph warmup failure before replay can fall
+back to the same first eager position.
 
 The fixed selector seeds bounded complete-page summaries during setup, then
 refreshes only the newest complete page each step. It gathers selected full

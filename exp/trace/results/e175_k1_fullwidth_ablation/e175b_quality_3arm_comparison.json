@@ -1,0 +1,83 @@
+{
+  "schema": "e175b-quality-3arm-comparison",
+  "experiment": "E175b：K1=64 三臂质量对比（champion K2=1024 / fullwidth K2=4096 / dense）",
+  "date": "2026-10-26",
+  "machine": "pc40 GPU0 (H20-3e), Qwen3-8B bf16, commit 320097b",
+  "n_samples": 30,
+  "tasks": ["hotpotqa", "musique", "gov_report", "qasper", "repobench-p"],
+  "metrics": {"hotpotqa": "qa_f1", "musique": "qa_f1", "gov_report": "rouge-l-F", "qasper": "qa_f1", "repobench-p": "code_sim (difflib)"},
+  "arms": {
+    "champion_K1024": {
+      "flags": "--tia_level1_topk 64 --tia_level2_topk 1024",
+      "K1": 64, "K2": 1024, "K2_mid": 960, "far_quota": 448,
+      "description": "L2 精选：K1 选中 64 page 后经 fine scoring topk K2=1024"
+    },
+    "fullwidth_K4096": {
+      "flags": "--tia_level1_topk 64 --tia_level2_topk 4096",
+      "K1": 64, "K2": 4096, "K2_mid": 3964, "far_quota": 0,
+      "description": "全宽：K1 选中 64 page 后全量 attention（K2 覆盖 96.8% R_cap），省掉 L2 fine scoring+topk+gather",
+      "note": "TLI_E127_W_UPPER=4096 才能在 32K 走 gather 路径（4096*8=32768=T）"
+    },
+    "dense_baseline": {
+      "flags": "--method none",
+      "description": "Full dense attention baseline"
+    }
+  },
+  "quality": {
+    "champion_K1024": {
+      "hotpotqa": {"n": 30, "avg": 57.42},
+      "musique": {"n": 30, "avg": 36.27},
+      "gov_report": {"n": 30, "avg": 33.09},
+      "qasper": {"n": 30, "avg": 54.29},
+      "repobench": {"n": 30, "avg": 66.38},
+      "avg": 49.49
+    },
+    "fullwidth_K4096": {
+      "hotpotqa": {"n": 30, "avg": 53.91},
+      "musique": {"n": 30, "avg": 33.22},
+      "gov_report": {"n": 30, "avg": 33.93},
+      "qasper": {"n": 30, "avg": 55.40},
+      "repobench": {"n": 30, "avg": 66.11},
+      "avg": 48.51
+    },
+    "dense_baseline": {
+      "hotpotqa": {"n": 30, "avg": 50.32},
+      "musique": {"n": 30, "avg": 35.34},
+      "gov_report": {"n": 30, "avg": 33.07},
+      "qasper": {"n": 30, "avg": 54.04},
+      "repobench": {"n": 30, "avg": 65.39},
+      "avg": 47.63
+    }
+  },
+  "delta_vs_champion": {
+    "fullwidth_K4096": {
+      "hotpotqa": -3.51,
+      "musique": -3.05,
+      "gov_report": 0.84,
+      "qasper": 1.11,
+      "repobench": -0.27,
+      "avg": -0.98
+    },
+    "dense_baseline": {
+      "hotpotqa": -7.10,
+      "musique": -0.93,
+      "gov_report": -0.02,
+      "qasper": -0.25,
+      "repobench": -0.99,
+      "avg": -1.86
+    }
+  },
+  "analysis": {
+    "fullwidth_vs_champion": "全宽 K4096 vs 冠军 K1024：hotpotqa -3.51 / musique -3.05 / gov_report +0.84 / qasper +1.11 / repobench -0.27；宏平均 -0.98pt（<1pt 属边际水平）。多跳问答（hotpotqa、musique）全宽掉分最高，这两类恰是 far quota 敏感型任务（E140b 已证实 K1=256 时 far 归零→质量崩塌；K1=64 时 far_quota=448 是甜点，全宽 K2=4096 实际上把可用 far token 也全选了但仍不如 L2 精选精确）。",
+    "routing_efficiency": "L2 选择把 4096 候选压缩到 1024：多跳任务（最高推理难度）受益最大，说明 fine scoring 在远端 candidate pool 中的鉴别力是有效的。",
+    "per_task_detail": {
+      "hotpotqa": "champion 57.42 > fullwidth 53.91 > dense 50.32 — L2 精选在三臂中最优，全宽稍差但仍优于 dense",
+      "musique": "champion 36.27 > fullwidth 33.22 > dense 35.34 — dense 反超全宽（35.34 vs 33.22），musique 全宽严重退化",
+      "gov_report": "fullwidth 33.93 > champion 33.09 > dense 33.07 — 摘要任务对 L2 精选不敏感，全宽略优",
+      "qasper": "fullwidth 55.40 > champion 54.29 > dense 54.04 — 单文档 QA 全宽略优",
+      "repobench": "champion 66.38 > fullwidth 66.11 > dense 65.39 — 代码补全三臂紧密"
+    }
+  },
+  "verdict": "K1=64 全宽 attention（K2=4096，跳过 L2 精选）质量边际下降 -0.98pt 宏平均。在多跳 QA（hotpotqa/musique）退化 3-3.5pt，gov_report/qasper 微升。净结论：L2 精选不可跳过——以 +2.4ms/步的代价换取多跳任务 3pt+ 质量保持是划算的。",
+  "artifacts": "pc40 /tmp/e175_20261025-214658/q/pred/{task}-*e175_*.jsonl"
+}

@@ -221,6 +221,27 @@ def test_static_setup_mixed_gates_masks_and_mutation_guards():
     torch.testing.assert_close(static.layers[0].keys[..., :79, :], dyn.layers[0].keys)
 
 
+@torch.inference_mode()
+def test_staged_position_reuse_rejected_before_mutation():
+    from test_far_skip_compact import make_model
+    from sparse_attn.ops.far_skip_runtime import try_far_skip_decode
+    model = make_model('evict', dynamic=False)
+    dyn = DynamicCache()
+    model(input_ids=torch.arange(79)[None] % 32, past_key_values=dyn)
+    static = TLIStaticCache(model.config, 256, 1)
+    fill_static_from_dynamic(static, dyn, [79], model=model)
+    module = model.model.layers[0].self_attn
+    q, k, v = torch.randn(1, 2, 1, 128), *torch.randn(2, 1, 1, 1, 128)
+    ctx = BatchCtx(1, [80], [1], [True], 0)
+    try_far_skip_decode(module, q, k, v, static, None, None, ctx)
+    before = static.layers[0].keys.clone()
+    for length in (80, 79, 82):
+        ctx.seq_lens[0] = length
+        with pytest.raises(ValueError, match='next position'):
+            try_far_skip_decode(module, q, k+1, v, static, None, None, ctx)
+        torch.testing.assert_close(before, static.layers[0].keys)
+
+
 @pytest.mark.parametrize('dtype', [torch.float16, torch.bfloat16, torch.float32, torch.float64])
 def test_invalid_topk_lanes_rank_after_valid_negative_infinity(dtype):
     scores = torch.tensor([[float('nan'), -torch.inf, -torch.inf, torch.inf]], dtype=dtype)

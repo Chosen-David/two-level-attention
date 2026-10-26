@@ -1,0 +1,52 @@
+{
+  "schema": "e175c-perf-3arm-tpot",
+  "experiment": "E175c：K1=64 三臂 decode TPOT 对比（e152v4 graph-mode 协议）",
+  "date": "2026-10-26",
+  "machine": "pc40 GPU0 (H20-3e), Qwen3-8B bf16, commit 320097b",
+  "benchmarker": "exp/bench/e152v4_graph_latency.py",
+  "protocol": "CUDA Graph whole-step capture+replay, per-step device-synced TPOT, warmup=1 + measured=3, max_gen=8",
+  "arms": {
+    "champion_K1024": {"tia_level1_topk": 64, "tia_level2_topk": 1024},
+    "fullwidth_K4096": {"tia_level1_topk": 64, "tia_level2_topk": 4096, "TLI_E127_W_UPPER": 4096},
+    "dense_baseline": {"method": "none"}
+  },
+  "perf": {
+    "champion_K1024": {
+      "32768": {"median_tpot_ms": 17.701, "measured_runs": [17.697, 17.701, 17.710], "n": 3},
+      "65536": {"median_tpot_ms": 17.995, "measured_runs": [17.982, 17.995, 17.996], "n": 3},
+      "131072": {"median_tpot_ms": 18.429, "measured_runs": [18.423, 18.429, 18.429], "n": 3},
+      "flatness_32k_128k": "+3.6% (17.701 -> 18.429ms)"
+    },
+    "fullwidth_K4096": {
+      "32768": {"median_tpot_ms": 20.093, "measured_runs": [20.089, 20.093, 20.097], "n": 3},
+      "65536": {"median_tpot_ms": 20.431, "measured_runs": [20.398, 20.431, 20.443], "n": 3},
+      "131072": {"median_tpot_ms": 20.812, "measured_runs": [20.807, 20.812, 20.825], "n": 3},
+      "flatness_32k_128k": "+3.6% (20.093 -> 20.812ms)"
+    },
+    "dense_baseline": {
+      "32768": {"median_tpot_ms": 122.195, "measured_runs": [122.144, 122.195, 122.201], "n": 3},
+      "65536": {"median_tpot_ms": 236.094, "measured_runs": [236.001, 236.094, 236.095], "n": 3},
+      "131072": {"median_tpot_ms": 481.954, "measured_runs": [481.641, 481.954, 482.007], "n": 3},
+      "note": "dense 在 e152v4 graph 口径下约 120-480ms（含 graph launch 开销），仅用于参考，不可与 champion/fullwidth TPOT 直接对比 speedup（E172 裸 dense TPOT = 25.7/39.8/67.1ms）"
+    }
+  },
+  "delta": {
+    "fullwidth_vs_champion_ms": {
+      "32768": "+2.392 (20.093 - 17.701)",
+      "65536": "+2.436 (20.431 - 17.995)",
+      "131072": "+2.383 (20.812 - 18.429)"
+    },
+    "fullwidth_vs_champion_pct": {
+      "32768": "+13.5%",
+      "65536": "+13.5%",
+      "131072": "+12.9%"
+    },
+    "mechanism": "全宽 K2=4096 每步比冠军 K2=1024 慢 ~2.4ms：GEMM 宽度从 1024 增到 4096（4x），省掉的 L2 fine scoring+topk（~3.3ms）不足以抵消，因为 gather kernel 随 W 线性增宽。净效果：全宽净慢 2.4ms/步。"
+  },
+  "cross_reference": {
+    "E172_champion_same_flags": "E172 K1=64 champion K2=1024 TPOT = 17.715/17.957/18.464ms — E175 champion 17.701/17.995/18.429ms 逐位复现（偏差 <0.15%），两实验口径完全一致",
+    "E172_dense_for_speedup": "E172 裸 dense TPOT = 25.712/39.797/67.139ms — champion 加速比 = 1.451/2.216/3.636x"
+  },
+  "verdict": "全宽 attention 每步慢 ~2.4ms/12.9-13.5%（三长度一致）。省掉的 L2 选择（~3.3ms）被更宽的 gather+GEMM（4096 vs 1024 = 4x 宽度）抵消并有余。L2 选择是 net positive：省 2.4ms/步 + 在多跳任务质量 +3pt。",
+  "artifacts": "pc40 /tmp/e175_20261025-214658/p/{A,B,D}_L{32768,65536,131072}.json"
+}

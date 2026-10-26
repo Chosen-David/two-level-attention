@@ -1,0 +1,43 @@
+{
+  "schema": "e175-final-verdict",
+  "experiment": "E175 K1=64 全宽 attention 消融——L2 选择必要性判决",
+  "date": "2026-10-26",
+  "machine": "pc40 GPU0 (H20-3e), Qwen3-8B bf16, commit 320097b",
+  "principal_question": "K1=64 时，跳过 L2 token 级精选、对 K1 选中的全部 64 page×4096 token 做全量 attention（K2=4096），是否质量不变甚至更优 + 性能更优？",
+  "hypothesis_rejected": true,
+  "verdict": "REJECTED — 全宽 attention 在 K1=64 下全面不如 L2 精选方案（双输）",
+  "reasons": [
+    "质量降：全宽 K2=4096 宏平均 48.51pt vs 冠军 K2=1024 的 49.49pt，差 -0.98pt。多跳 QA（hotpotqa -3.51pt、musique -3.05pt）退化最严重",
+    "性能降：全宽 median TPOT 20.093/20.431/20.812ms vs 冠军 17.701/17.995/18.429ms，三长度均慢 ~2.4ms (+13%)。省掉的 L2 选择开销（~3.3ms）被 4x 更宽 gather+GEMM 完全抵消",
+    "无 trade-off 空间：全宽既没换来质量提升也没换来速度提升——双输"
+  ],
+  "quality_summary": {
+    "champion_avg": 49.49,
+    "fullwidth_avg": 48.51,
+    "delta_avg": -0.98,
+    "worst_hit": "hotpotqa -3.51 / musique -3.05 (多跳推理)",
+    "robust": "gov_report +0.84 / qasper +1.11 (摘要类)"
+  },
+  "perf_summary": {
+    "champion_ms": "17.701/17.995/18.429 (32K/64K/128K)",
+    "fullwidth_ms": "20.093/20.431/20.812",
+    "delta_ms": "+2.392/+2.436/+2.383",
+    "delta_pct": "+13.5%/+13.5%/+12.9%",
+    "mechanism": "L2 fine+topk ~3.3ms cost < 4x wider GEMM ~5.7ms overhead；L2 net save ~2.4ms/步"
+  },
+  "mechanism_explanation": "L2 精选（K2=1024）相比全宽（K2=4096）：每步 GEMM 宽度仅 1/4 → ~2.4ms 节省；fine scoring+topk+gather ~3.3ms 成本；净省 ~0.9ms + 多跳质量 +3pt。全宽 attention 等价于关闭 L2 鉴别机制，在 far quota 敏感的离散推理任务上退化显著。",
+  "cross_experiment_consistency": {
+    "E140b": "K1=256（far=0 右臂崩塌）→ hotpotqa -13.9pt, musique -12.3pt",
+    "E140h": "K1=64 vs K1=128 AVG5：hotpotqa/musique 对 K1 敏感，gov/qasper/repobench 不敏感",
+    "E172": "K1=64 champion K2=1024 TPOT 17.701/17.995/18.429ms 三长度逐位复现（偏差 <0.15%）"
+  },
+  "citations_for_paper": {
+    "table_entry": "K1=64 Full-width ablation: K2=4096 degrades quality -0.98pt AVG and slows +13% vs L2-selection champion K2=1024",
+    "mechanism_callout": "L2 selection (fine scoring + topk + gather, ~3.3ms/step) is net positive: saves 2.4ms/step in GEMM (4x narrower) while preserving +3pt on multi-hop QA"
+  },
+  "sub_verdicts": {
+    "e175a": "exp/trace/results/e175_k1_fullwidth_ablation/e175a_k1_degrade_datasets.json",
+    "e175b": "exp/trace/results/e175_k1_fullwidth_ablation/e175b_quality_3arm_comparison.json",
+    "e175c": "exp/trace/results/e175_k1_fullwidth_ablation/e175c_perf_3arm_tpot.json"
+  }
+}

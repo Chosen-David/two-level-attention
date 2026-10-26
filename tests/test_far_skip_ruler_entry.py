@@ -55,6 +55,7 @@ def test_ruler_staged_compact_matches_dynamic_and_bounds_cache(monkeypatch):
                 assert cache._far_skip_attention_mask is kwargs['attention_mask']
                 assert kwargs['cache_position'].shape == (1,)
                 assert all(isinstance(layer, FarSkipStaticLayer) for layer in cache.layers)
+                assert all(layer.workspace is None for layer in cache.layers)
                 assert all(layer.keys.shape[2] < 79 for layer in cache.layers)
                 seen.append(tuple(layer.keys.data_ptr() for layer in cache.layers))
 
