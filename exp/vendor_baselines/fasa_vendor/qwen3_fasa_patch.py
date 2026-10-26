@@ -47,7 +47,12 @@ def _qwen3_decode_eager(query, key, value, attention_mask, scaling, sel_idx=None
                 index=sel_idx.unsqueeze(2).expand(B, H, 1, -1))  # [B, H, 1, k]
         else:
             causal_mask = attention_mask[:, :, :, : key.shape[-2]]
-        attn_weights = attn_weights + causal_mask
+        if causal_mask.dtype == torch.bool:
+            # The decode guard accepts True=visible boolean masks. Adding
+            # booleans only biases logits and leaves padded keys attendable.
+            attn_weights = attn_weights.masked_fill(~causal_mask, float("-inf"))
+        else:
+            attn_weights = attn_weights + causal_mask
     attn_weights = nn.functional.softmax(
         attn_weights, dim=-1, dtype=torch.float32).to(query.dtype)
     attn_output = torch.matmul(attn_weights, value)
@@ -60,7 +65,8 @@ def _fasa_batch_core(query_states, key_states, value_states, layer_idx,
 
     官方函数（fasa_utils.py:101-138）bs 维贯穿本身 batch 通用，唯一 batch 差异
     是稠密 KV 含 left-pad 的 pad 列：本函数在 attn_weights 对 pad 列置 -inf
-    再 topk，天然排除 pad（官方 batch=1 无 pad，此步恒等）。valid_mask:
+    再 topk；若 budget 超过某行有效长度，仍会选中 pad，最终 attention mask
+    必须将这些列概率清零（官方 batch=1 无 pad，此步恒等）。valid_mask:
     [B, 1, S] bool（True=真实 token）。额外返回 sel_idx [B, H, k]（每行每
     head 选中 token 的稠密 KV 列位置，供 _qwen3_decode_eager 按选中列 gather
     attention_mask）。bs=1 且无 pad 时与官方输出逐位一致（-inf 加法零影响）。
@@ -85,7 +91,7 @@ def _fasa_batch_core(query_states, key_states, value_states, layer_idx,
     key_selected = torch.where(selection_masks_expanded_key, key_selected, 0)
     attn_weights = torch.matmul(query_selected, key_selected.transpose(2, 3))
     if valid_mask is not None:
-        # batch：pad 列 -inf 排除（官方 batch=1 无 pad，此步恒等）
+        # 降低 pad 排名；短行仍可能选中 pad，最终 attention 必须再次屏蔽。
         neg_inf = torch.finfo(attn_weights.dtype).min
         pad_mask = ~valid_mask  # [B, 1, S]
         attn_weights = attn_weights + (
