@@ -4739,7 +4739,14 @@ class TLIIndexer(TIAIndexer):
             "mean_fused": _mean_fused,
         }
 
+    def prepare_mask_batched(self, q, k, valid_lengths, softmax_scale=None):
+        """Opt-in full-batch fixed-capacity decode; see docs/tli_batch_indexer.md."""
+        from .tli_batch import prepare_mask_batched
+        scale = q.shape[-1] ** -0.5 if softmax_scale is None else softmax_scale
+        return prepare_mask_batched(self, q, k, valid_lengths, scale)
+
     def clear(self):
+        self._batch_tli = None
         self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None
