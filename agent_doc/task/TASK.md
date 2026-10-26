@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-26
+
+- [ ] [TL-HYBRID-CACHE-20261026] 独立分支实现按层直接分配、Qwen3 ring 消费路径和请求间 Graph 失效；66 项 CPU 回归及 178 子用例通过，CUDA 项跳过，真实 GPU/质量/性能验收待完成。([详情](task_details/TL-HYBRID-CACHE-20261026.md))
+
 ## 2026-10-25
 
 - [x] [TL-FAR-SKIP-EAGER-OPT-20261025] 完成 far-off eager 五项优化：环形 KV 原位写入、增量页统计、直接子空间 gather、稳定 top-k、有界 scratch 复用；CPU 配对/正确性证据已归档，GPU/Graph 未验；继续通过 PR #7 交付。([详情](task_details/TL-FAR-SKIP-EAGER-OPT-20261025.md))

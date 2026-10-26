@@ -171,15 +171,33 @@ def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, model=None):
     改为 layers[l].keys/values（DynamicLayer 直接字段）；旧属性访问
     AttributeError（GPU 单测未覆盖 e2e 形态，4.56.2 跑批现形）。
 
-    model: 若提供，搬移后调用 prepare_far_skip_static 对 far-skip 层做一次
-    prefill-end 截断/重分配到 ring buffer 容量（物理节省 dead far KV）。
+    model: compact 模式先冻结 gate 并直接分配 ring；其他层才分配线性
+    buffer。重填 compact cache 必须提供 model，并重新 capture 外层 graph。
     """
     n_layers = len(cache.layers)
     if len(dyn.layers) != n_layers:
         raise RuntimeError(
             f"DynamicCache 层数 {len(dyn.layers)} != TLIStaticCache 层数 "
             f"{n_layers}")
+    # Validate all source lengths before replacing any request's storage.
+    if len(seq_lens) != cache.batch_size:
+        raise ValueError("seq_lens must match the static cache batch")
     for l in range(n_layers):
+        k, v = dyn.layers[l].keys, dyn.layers[l].values
+        if (k is None or v is None or k.ndim != 4 or v.shape != k.shape
+                or k.shape[0] != cache.batch_size):
+            raise ValueError("prefill KV must match the static cache batch and shape")
+        if any(type(L) is not int or L < 0 or L > k.shape[-2]
+               or L > cache.layers[l].max_cache_len for L in seq_lens):
+            raise ValueError("prefill length exceeds source or static cache capacity")
+    from .far_skip_static import FarSkipStaticLayer, prepare_far_skip_static
+    if model is None and any(isinstance(layer, FarSkipStaticLayer) for layer in cache.layers):
+        raise ValueError("refilling compact cache requires model and graph recapture")
+    compact_layers = (prepare_far_skip_static(cache, dyn, seq_lens, model)
+                      if model is not None else set())
+    for l in range(n_layers):
+        if l in compact_layers:
+            continue  # Already seeded directly from prefill into bounded storage.
         k = dyn.layers[l].keys
         v = dyn.layers[l].values
         layer = cache.layers[l]
@@ -188,15 +206,7 @@ def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, model=None):
         S_max = k.shape[-2]
         for b in range(cache.batch_size):
             L = seq_lens[b]
-            if L < 0 or L > S_max or L > layer.max_cache_len:
-                raise RuntimeError(
-                    f"搬移越界：b={b} L={L} S_max={S_max} "
-                    f"cap={layer.max_cache_len}")
             if L:
                 layer.keys[b, :, :L].copy_(k[b, :, S_max - L:])
                 layer.values[b, :, :L].copy_(v[b, :, S_max - L:])
-
-    # Far-skip: prefill 结束后一次性截断死 far KV → 物理节省
-    if model is not None:
-        from .far_skip_static import prepare_far_skip_static
-        prepare_far_skip_static(cache, dyn, seq_lens, model)
+        layer.cumulative_length = max(seq_lens, default=0)

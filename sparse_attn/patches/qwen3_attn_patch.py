@@ -271,15 +271,18 @@ def qwen3_attn_forward(
     cos, sin = position_embeddings
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
-    if getattr(self.indexer, "far_skip_backend", "legacy") == "compact":
+    # Compact consumers own both the KV write and absolute-to-ring addressing.
+    # Dispatch before the generic update, which would otherwise append twice.
+    if (past_key_values is not None
+            and getattr(self.indexer, "far_skip_backend", "legacy") == "compact"):
         from ..ops.far_skip_runtime import try_far_skip_decode
-        compact_output = try_far_skip_decode(
+        compact = try_far_skip_decode(
             self, query_states, key_states, value_states, past_key_values,
             attention_mask, cache_position, batch_decode_ctx())
-        if compact_output is not None:
-            compact_output = self.o_proj(compact_output.reshape(*input_shape, -1))
-            _paper_route(self.layer_idx, "sparse-decode-far-compact")
-            return compact_output, None
+        if compact is not None:
+            attn_output = self.o_proj(compact.reshape(*input_shape, -1).contiguous())
+            _paper_route(self.layer_idx, "far-skip-decode")
+            return attn_output, None
 
     cur_len = 0
     is_static_cache = False
@@ -494,11 +497,8 @@ def qwen3_attn_forward(
         # 缺陷；dense prefill（默认路径）逐位不变。非 dyn_dgate 实例 no-op。
         if hasattr(indexer, "freeze_dyn_dgate"):
             indexer.freeze_dyn_dgate()
-        # Far-skip eager path：skip_far 通过 indexer.prepare_mask 将 far 区
-        # 掩码为 -inf，eager_decoding_attn 自然跳过 far 区（计算等价于
-        # 不读取 far KV）。物理显存释放由 graph 路径的 prepare_far_skip_static
-        # 在 prefill 结束时一次性完成（ring buffer 截断）。eager 路径不走
-        # ring buffer decode（try_far_skip_decode 仅适用于 static graph）。
+        # Legacy far skip retains full storage. Compact decode returned before
+        # the generic cache update above; never feed ring KV to this selector.
         query_states, key_states, value_states = (x.transpose(1, 2) for x in (query_states, key_states, value_states))
         if attention_mask is not None:
             cu_seqlens_k = prepare_cu_seqlens_from_mask(attention_mask)
