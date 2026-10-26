@@ -126,7 +126,7 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
         if gs.valid_len_buf is None:
             raise ValueError("parallel graph requires live valid_len_buf")
         mask, bs = prepare_mask_batched(indexer, q, k, vl, self.scaling)
-        _paper_route(self, "tli_batch_indexer_parallel_graph")
+        _paper_route(getattr(self, "layer_idx", None), "tli_batch_indexer_parallel_graph")
         return eager_decoding_attn(q, k, v, mask, bs, indexer._batch_tli.cu,
                                    softmax_scale=self.scaling, valid_length=None)
     cu = _graph_const(("cu_cap", str(dev), S_cap),
@@ -216,7 +216,7 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
         # lengths above. No per-row clear/rebuild here.
         lengths = _batch_device_lengths(ctx, dev)
         mask, bs = prepare_mask_batched(indexer, q, k, lengths, self.scaling)
-        _paper_route(self, "tli_batch_indexer_parallel_eager")
+        _paper_route(getattr(self, "layer_idx", None), "tli_batch_indexer_parallel_eager")
         return eager_decoding_attn(q, k, v, mask, bs, indexer._batch_tli.cu,
                                    softmax_scale=self.scaling,
                                    valid_length=ctx.seq_lens if B > 1 else ctx.seq_lens[0])

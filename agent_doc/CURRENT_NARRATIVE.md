@@ -218,6 +218,15 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   ablation。报告+LaTeX 段：`agent_doc/advice/e175_gpt_far_skip_eviction/`。
   代码 324073d 合入 `perf/gpt-kv-eviction` 作实验记录（分支保留）。
 
+- **E176 batch indexer 并行化评测（eager 路径，128K）**：legacy vs
+  `TLI_BATCH_INDEXER=parallel` 对比——B=1 125.33 vs 125.38ms
+  (+0.04%)，B=2 196.15 vs 195.93ms (−0.11%)，B=4 371.35 vs 370.98ms
+  (−0.10%) → **全部在噪声带内，零收益**。根因：eager 路径 indexer 开销
+  (~3.3ms topk + ~8.5ms copy) 在总 decode 125ms 中占比已小，batch
+  Triton kernel 并行优势被 Python 逐行循环开销淹没。代码已合入 main
+  （opt-in `TLI_BATCH_INDEXER` env 开关），但**不推荐作为性能优化手段**。
+  载体：`sparse_attn/indexer/tli_batch*.py` + `qwen3_attn_patch.py` 路由。
+
 ## 3. 对比口径（vendor 基线）
 
 - 对比基线（Quest/MInference/SparQ/MoBA/ClusterKV/AsyncTLS/HISA/JSSA/
@@ -264,6 +273,8 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
    lowfreq32 显著掉分背书 E158g「生产维持 rope64」。
 
 ## 5. 已被推翻叙事索引（防误读核心——旧结论 → 推翻它的判决）
+
+2026-10-26 路由复核（main 55c38d8）：长度缓存不更新、parallel 提前返回绕过 Graph、路由记录传模块而非层号，4 个 host 反例已复现；PR #10 保留正确生命周期并修复记录。上文 E176 数字保留为远端报告，当前树未找到 E176 原始脚本/回执，不能据此确认实际 parallel/Triton 命中或将零收益归因于 Python 循环。需以候选提交、完整 flags、路由和 profiler 重新配对验收；详见 agent_doc/results/parallel-route-20261026/validation.md。
 
 2026-10-26 整合更新：main `2289900` 已包含旧版 compact 实现；整合分支把 PR #7 的融合路径与 PR #9 的逐请求×层混合缓存接通。多 batch/EOS/新请求重建已有 CPU 回归，混合 attention/index 仍逐行；不能声称全 batch 融合或新 GPU 提速/显存降幅。当前边界与远端验收见 `docs/unified_far_skip.md`，下列 E175/旧 PR 限制是历史版本记录。
 

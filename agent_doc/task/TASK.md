@@ -2,6 +2,8 @@
 
 ## 2026-10-26
 
+- [ ] [TL-PARALLEL-ROUTE-20261026] 对齐 main 55c38d8，复现 stale length/Graph 旁路/层号记录错误，沿用 PR #10 生命周期并修复记录；62 passed、13 CUDA skipped，E176 实际路由/性能待重验。([详情](task_details/TL-PARALLEL-ROUTE-20261026.md))
+
 - [ ] [TL-UNIFIED-FAR-SKIP-20261026] 整合最新 main、PR #7 融合与 PR #9 多请求混合缓存，修复初始化/重复分流冲突；本地回归已执行，远端 CUDA/性能/质量待验。([详情](task_details/TL-UNIFIED-FAR-SKIP-20261026.md))
 
 - [ ] [TL-HYBRID-CACHE-20261026] PR #9 升级：按请求×层混合 ring/linear、BS=1/2/8/32、不等长/动态 gate/EOS、RULER batch 和 CUDA Graph runner；85 项回归及 178 子用例通过，7 个 CUDA 项跳过，GPU/质量/性能验收待完成。([详情](task_details/TL-HYBRID-CACHE-20261026.md))
