@@ -160,3 +160,11 @@ Design references checked 2026-10-26 (mechanism references, not measured baselin
 
 - [Triton fused softmax](https://triton-lang.org/main/getting-started/tutorials/02-fused-softmax.html): keep intermediates on chip, inspect registers/occupancy, account for approximate exponentials before changing selection.
 - [NVIDIA CUDA Best Practices](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/): coalesced access and register/occupancy tradeoffs must be evaluated with measurements. No external kernel source was copied.
+
+## Subsequent skip/non-skip and residency revision
+
+See [`tli_skip_noskip_fusion.md`](tli_skip_noskip_fusion.md). It adds region-aware
+L1/GQA/mask fusion, B=1 fixed-capacity dispatch and frozen-gate admission, tests
+both skip states, and audits physical cache release separately. Earlier counts
+and limitations above describe commit 80e151e; current evidence is in the new
+revision result directory.

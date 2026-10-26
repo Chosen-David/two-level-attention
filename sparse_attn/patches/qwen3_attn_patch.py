@@ -92,7 +92,7 @@ def _parallel_batch_enabled(batch):
     mode = os.environ.get("TLI_BATCH_INDEXER", "legacy")
     if mode not in ("legacy", "parallel"):
         raise ValueError("TLI_BATCH_INDEXER must be legacy or parallel")
-    return batch > 1 and mode == "parallel"
+    return batch >= 1 and mode == "parallel"
 
 
 def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
@@ -191,6 +191,12 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     v = value_states.transpose(1, 2)   # [B, S_cap, Hkv, D]
     dev = q.device
     S_cap = k.shape[1]
+    if _parallel_batch_enabled(B) and indexer.dyn_dgate:
+        if B != 1:
+            raise ValueError("parallel dynamic gates need one request; per-row gate dispatch is not implemented")
+        if q.is_cuda and torch.cuda.is_current_stream_capturing() and not indexer._dyn_frozen:
+            raise ValueError("freeze the per-prompt gate before capture")
+        indexer.freeze_dyn_dgate()
     # 【阶段 2c-4】graph 模式（pred_ruler_batch capture 窗口内）：动态几何
     # 全走 tensor（valid_len_buf），无 Python int 烘焙。配置不支持
     # compute_mask_graph（非生产主配置）时 fail-closed 关 graph + 回 staged
@@ -213,7 +219,7 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
         _paper_route(self, "tli_batch_indexer_parallel_eager")
         return eager_decoding_attn(q, k, v, mask, bs, indexer._batch_tli.cu,
                                    softmax_scale=self.scaling,
-                                   valid_length=ctx.seq_lens)
+                                   valid_length=ctx.seq_lens if B > 1 else ctx.seq_lens[0])
     # 逐行 mask 准备（indexer 状态逐行，B>1 与 B==1 共用同一循环）——
     # 阶段 2b 把 mask 收集起来，B>1 且 token 级时一次批量 eager。
     masks = []
@@ -238,7 +244,7 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
         # 逐位一致，防 pad 0 项参与归约树致 ULP 翻硬币）
         return eager_decoding_attn(
             q, k, v, m_b, bs0, cu_b, softmax_scale=self.scaling,
-            valid_length=ctx.seq_lens)
+            valid_length=ctx.seq_lens if B > 1 else ctx.seq_lens[0])
     # B==1（gate_bs1_equiv 铁律）/ block_size>1 兜底：逐行单 query 路径
     outs = []
     for b in range(B):

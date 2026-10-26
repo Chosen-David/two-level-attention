@@ -251,6 +251,7 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 | e152v2 dynamic-cache 性能口径（TLI 3.4×/2.5×/1.8× slower） | 已被 `e152v4_formal_verdict.json` 整步 graph 口径取代（论文图 E2 已 in-place 重写，commit e5071cb） |
 | MLA 子空间增益可线性兑现到 e2e | `e158b_mla_rope_nope32_e2e_verdict.json` 饱和映射边界披露 |
 | kernel fusion 已经消除 batch indexer 的所有 copy，融合越大越快 | `docs/tli_gpu_pipeline.md`：新增四类真实 Triton producer/consumer 融合，整行扫描曾占 255 registers/thread，分块后编译峰值 60；仍有 topk/softmax/full-mask/attention 流量。188 个 offline build 与解释器检查均不是实际 GPU 提速，远端与模型验收待执行。 |
+| far mask 的13%账本已经等于GPU显存实省；当前ring每步搬迁全部历史 | `docs/tli_skip_noskip_fusion.md` 区分 main 默认全驻留与 PR compact：后者一次性压缩、每步单 token 写入，容量4291含页对齐。CPU底层存储/引用释放已检查；GPU allocator、严格截断质量及13%整模叙事仍待验。用户直接提供的 Kimi 意见已逐项审查。 |
 | γ-off 自由竞争需 CLI `--tli_gamma off` | 显式几何等价物 `--tli_near_tokens off`（E155d；γ 接口已删除） |
 
 ## 6. 仓库结构速览（净化后）

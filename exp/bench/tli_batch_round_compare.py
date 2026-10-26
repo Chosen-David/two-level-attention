@@ -41,6 +41,7 @@ def main():
     p.add_argument('--candidate-root',default='sparse_attn/indexer')
     p.add_argument('--device',default='cpu');p.add_argument('--dtype',default='float32',choices=['float32','float16','bfloat16'])
     p.add_argument('--score',default='torch',choices=['torch','triton'])
+    p.add_argument('--skip-far',action='store_true')
     p.add_argument('--method',default='mixed',choices=['avg','minmax','mixed'])
     p.add_argument('--batch',type=int,default=4);p.add_argument('--length',type=int,default=4096)
     p.add_argument('--steps',type=int,default=16);p.add_argument('--repeats',type=int,default=4)
@@ -71,7 +72,7 @@ def main():
              tli_far_method='minmax' if a.method=='mixed' else a.method,
              tli_near_method='avg' if a.method=='mixed' else a.method)
     def make():
-        idx=TLIIndexer(SimpleNamespace(**cfg));idx.metrics=Metrics();return idx
+        idx=TLIIndexer(SimpleNamespace(**cfg));idx.skip_far=a.skip_far;idx.metrics=Metrics();return idx
     def sync():
         if cuda:torch.cuda.synchronize()
     result=dict(args=vars(a),config=cfg,torch=torch.__version__,cuda_executed=cuda,
@@ -135,7 +136,7 @@ def main():
                 def attend(m):
                     return torch.nn.functional.scaled_dot_product_attention(q.transpose(1,2),k.transpose(1,2),v.transpose(1,2),attn_mask=m[:,0].repeat_interleave(4,dim=1)[:,:,None],enable_gqa=True)
                 result['attention_max_abs']=max(result['attention_max_abs'],(attend(out[0])-attend(out[1])).abs().max().item())
-            result['repeats'].append(dict(cold_ms=cold,wall_ms=samples,cuda_event_ms=events,side_cache_storage_bytes=[storage_bytes(i._batch_tli) for i in idxs],fusion_active=[getattr(i._batch_tli,'triton_ops',None) is not None for i in idxs],pipeline_active=[getattr(i._batch_tli,'gpu_pipeline',None) is not None for i in idxs],peak_extra_allocated_bytes=peak_extra))
+            result['repeats'].append(dict(cold_ms=cold,wall_ms=samples,cuda_event_ms=events,side_cache_storage_bytes=[storage_bytes(i._batch_tli) for i in idxs],fusion_active=[getattr(i._batch_tli,'triton_ops',None) is not None for i in idxs],pipeline_active=[getattr(i._batch_tli,'gpu_pipeline',None) is not None for i in idxs],skip_far=[i.skip_far for i in idxs],peak_extra_allocated_bytes=peak_extra))
             if a.profile and rep==0:
                 acts=[torch.profiler.ProfilerActivity.CPU]
                 if cuda:acts.append(torch.profiler.ProfilerActivity.CUDA)

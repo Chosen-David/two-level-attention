@@ -28,6 +28,7 @@ def load_functions():
     tree.body = [ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)] + [
         n for n in tree.body if isinstance(n, ast.FunctionDef)]
     ns = dict(torch=torch, os=os, sys=sys, weakref=weakref,
+              batch_decode_ctx=lambda: None,
               apply_rotary_pos_emb=apply_rotary_pos_emb,
               eager_attention_forward=eager_attention_forward,
               ALL_ATTENTION_FUNCTIONS={'sdpa': sdpa_attention_forward})
@@ -167,3 +168,4 @@ class StaticMask(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

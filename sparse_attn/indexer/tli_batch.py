@@ -14,8 +14,14 @@ def capturing(device):
     return device.type == 'cuda' and torch.cuda.is_current_stream_capturing()
 
 
-def validate_config(indexer):
+def validate_config(indexer, batch_size):
     indexer._resolve_skip()
+    frozen_gate = (not indexer.dyn_dgate or
+                   (batch_size == 1 and getattr(indexer, '_dyn_frozen', False)))
+    # Compact skipped layers return before this indexer. Non-skipped B=1
+    # layers still own ordinary full KV and may share the fused pipeline.
+    backend = getattr(indexer, 'far_skip_backend', 'legacy')
+    full_kv = backend == 'legacy' or (backend == 'compact' and batch_size == 1 and not indexer.skip_far)
     if not (indexer.alpha > 0 and indexer.beta > 0
             and indexer.gamma is None and indexer.nt_near_pages is not None
             and indexer.nt_near_len is not None and indexer.boundary_bypass
@@ -23,11 +29,10 @@ def validate_config(indexer):
             and indexer.far_select == indexer.near_select == '4bit'
             and not indexer.moba_gate and indexer.sigma_select == 'none'
             and not indexer.enable_async and not indexer.sinkswa_only
-            and not indexer.dyn_dgate and not indexer.static_pair
-            and getattr(indexer, 'far_skip_backend', 'legacy') == 'legacy'):
+            and frozen_gate and not indexer.static_pair and full_kv):
         raise ValueError('parallel batch indexer requires fixed near pages/length, '
-                         'free K2, boundary bypass, static subspace, legacy KV; '
-                         'projection, dynamic gate, compact eviction and ablations unsupported')
+                         'free K2, boundary bypass, static subspace and full KV; '
+                         'dynamic gates require frozen B=1; evicted KV uses the compact runtime')
 
 
 def compact_candidates(ids, keep, rank):
@@ -48,7 +53,7 @@ class BatchedTLI:
     new instance and graph recapture, including if the underlying pointer stays.
     """
     def __init__(self, indexer, k, lengths):
-        validate_config(indexer)
+        validate_config(indexer, k.shape[0])
         if capturing(k.device):
             raise RuntimeError('warm up parallel batch indexer before capture')
         self.score_backend = os.environ.get('TLI_BATCH_SCORE', 'torch')
@@ -83,6 +88,7 @@ class BatchedTLI:
             methods.add(indexer.far_method)
         self.need_minmax = 'minmax' in methods
         self.need_avg = 'avg' in methods
+        self.skip_far = bool(indexer.skip_far)
         self.indexer = indexer
         self.signature = (k.shape, k.stride(), k.dtype, k.device, k.data_ptr())
         self.B, self.S, self.H, self.D = k.shape
@@ -131,6 +137,8 @@ class BatchedTLI:
         return self.indexer.min_max_per_token_quant(x) if self.indexer.l2_quant else x
 
     def update(self, k, lengths):
+        if bool(self.indexer.skip_far) != self.skip_far:
+            raise ValueError('skip mode changed; clear batch state and recapture')
         if self.signature != (k.shape, k.stride(), k.dtype, k.device, k.data_ptr()):
             raise ValueError('parallel indexer KV storage changed; clear and recapture')
         torch._assert_async(((lengths >= self.previous)
@@ -192,39 +200,42 @@ class BatchedTLI:
         idx, B, H, S, bs = self.indexer, self.B, self.H, self.S, self.bs
         G = q.shape[2] // H
         qc, qf = self._queries(q, scale)
-        def dot(x, qq):
-            return torch.einsum('bhgd,bthd->bhgt', qq, x.float())
-        if self.triton_score is not None:
-            sc = (self.triton_score(self.kmin,qc,q.dtype,kmax=self.kmax).mean(2)
-                  if self.need_minmax else None)
-            avg = (self.triton_score(self.kavg,qc,q.dtype).mean(2)
-                   if self.kavg is not None else None)
-        else:
-            sc = ((dot(self.kmin, qc.clamp(max=0))
-                   + dot(self.kmax, qc.clamp(min=0))).to(q.dtype).mean(2)
-                  if self.need_minmax else None)
-            avg = dot(self.kavg, qc).to(q.dtype).mean(2) if self.kavg is not None else None
         sink, swa = idx.sink_tokens, idx.sliding_window_size
         lo = idx._sink_pool_lo_blk
         swalo = (lengths-swa).clamp(min=0)
-        near = ((lengths-swa-max(bs, int(idx.nt_near_len)))//bs).clamp(min=lo)
-        swablock = torch.maximum(near, (lengths+bs-1)//bs-max(1, swa//bs))
-        bypage = swalo//bs
-        byok = (swalo % bs != 0) & (bypage >= lo)
-        fp = (self.pages[None] >= lo) & (self.pages[None] < near[:, None])
-        np = (self.pages[None] >= near[:, None]) & (self.pages[None] < swablock[:, None])
-        if sink % bs:
-            fp &= self.pages[None] != lo
-            np &= self.pages[None] != lo
-        np &= ~((self.pages[None] == bypage[:, None]) & byok[:, None])
-        nf = 0 if idx.skip_far else idx.args.tia_level1_topk-int(idx.nt_near_pages)
+        nf = 0 if self.skip_far else idx.args.tia_level1_topk-int(idx.nt_near_pages)
         nn = int(idx.nt_near_pages)
-        far_src = avg if idx.far_method == 'avg' else sc
-        if nf == 0:
-            far_src = avg if avg is not None else sc
-        near_src = avg if idx.near_method == 'avg' else sc
-        fi = far_src.masked_fill(~fp[:, None], -torch.inf).topk(min(nf,self.P), -1).indices
-        ni = near_src.masked_fill(~np[:, None], -torch.inf).topk(min(nn,self.P), -1).indices
+        if self.gpu_pipeline is not None:
+            fi, ni = self.gpu_pipeline.coarse_indices(self,qc,lengths,q.dtype,nf,nn)
+        else:
+            def dot(x, qq):
+                return torch.einsum('bhgd,bthd->bhgt', qq, x.float())
+            if self.triton_score is not None:
+                sc = (self.triton_score(self.kmin,qc,q.dtype,kmax=self.kmax).mean(2)
+                      if self.need_minmax else None)
+                avg = (self.triton_score(self.kavg,qc,q.dtype).mean(2)
+                       if self.kavg is not None else None)
+            else:
+                sc = ((dot(self.kmin, qc.clamp(max=0))
+                       + dot(self.kmax, qc.clamp(min=0))).to(q.dtype).mean(2)
+                      if self.need_minmax else None)
+                avg = dot(self.kavg, qc).to(q.dtype).mean(2) if self.kavg is not None else None
+            near = ((lengths-swa-max(bs, int(idx.nt_near_len)))//bs).clamp(min=lo)
+            swablock = torch.maximum(near, (lengths+bs-1)//bs-max(1, swa//bs))
+            bypage = swalo//bs
+            byok = (swalo % bs != 0) & (bypage >= lo)
+            fp = (self.pages[None] >= lo) & (self.pages[None] < near[:, None])
+            np = (self.pages[None] >= near[:, None]) & (self.pages[None] < swablock[:, None])
+            if sink % bs:
+                fp &= self.pages[None] != lo
+                np &= self.pages[None] != lo
+            np &= ~((self.pages[None] == bypage[:, None]) & byok[:, None])
+            far_src = avg if idx.far_method == 'avg' else sc
+            if nf == 0:
+                far_src = avg if avg is not None else sc
+            near_src = avg if idx.near_method == 'avg' else sc
+            fi = far_src.masked_fill(~fp[:, None], -torch.inf).topk(min(nf,self.P), -1).indices
+            ni = near_src.masked_fill(~np[:, None], -torch.inf).topk(min(nn,self.P), -1).indices
         if self.gpu_pipeline is not None:
             ids, keep = self.gpu_pipeline.candidates(fi, ni, lengths, bs, lo, sink, swa, idx.nt_near_len)
         else:
@@ -280,7 +291,7 @@ class BatchedTLI:
 
 def prepare_mask_batched(indexer, q, k, lengths, scale):
     """Explicit batch API. All lengths are device-side; no scalar reads on CUDA."""
-    validate_config(indexer)
+    validate_config(indexer, k.shape[0])
     if (q.ndim != 4 or k.ndim != 4 or q.shape[0] != k.shape[0]
             or q.shape[0] < 1 or q.shape[2] < 1
             or q.dtype not in (torch.float16, torch.bfloat16, torch.float32)

@@ -10,6 +10,73 @@ import triton.language as tl
 from .tli_batch_kernels import _mask_base
 
 
+@triton.jit(do_not_specialize=['P'])
+def _pool_score(K, KMAX, Q, LENGTHS, OUT, P,
+                H: tl.constexpr, G: tl.constexpr, D: tl.constexpr,
+                BS: tl.constexpr, LO: tl.constexpr, SINK: tl.constexpr,
+                SWA: tl.constexpr, NEAR: tl.constexpr,
+                REGION: tl.constexpr, MINMAX: tl.constexpr, TILE: tl.constexpr):
+    row = tl.program_id(1)
+    b,h = row//H,row%H
+    n = tl.program_id(0)*TILE+tl.arange(0,TILE)
+    d = tl.arange(0,D)
+    length = tl.load(LENGTHS+b)
+    swalo = tl.maximum(length-SWA,0)
+    near = tl.maximum((length-SWA-NEAR)//BS,LO)
+    if REGION == 0:
+        live = (n>=LO) & (n<near)
+    else:
+        end = tl.maximum(near,(length+BS-1)//BS-max(1,SWA//BS))
+        bypage = swalo//BS
+        byok = (swalo%BS != 0) & (bypage>=LO)
+        live = (n>=near) & (n<end) & ~((n==bypage) & byok)
+    if SINK%BS:
+        live &= n != LO
+    live &= n<P
+    result = tl.full((TILE,),float('-inf'),tl.float32)
+    # Entire out-of-region tiles do no Q/K loads or dot products. Partial
+    # tiles mask feature loads. Full-P output preserves the old top-k domain.
+    if tl.sum(live.to(tl.int32),0)>0:
+        offsets = ((b*P+n[:,None])*H+h)*D+d[None,:]
+        x = tl.load(K+offsets,live[:,None],other=0).to(tl.float32)
+        if MINMAX:
+            high = tl.load(KMAX+offsets,live[:,None],other=0).to(tl.float32)
+        acc = tl.full((TILE,),0,tl.float32)
+        for g in range(G):
+            q = tl.load(Q+(row*G+g)*D+d)
+            if MINMAX:
+                s = tl.sum(x*tl.minimum(q[None,:],0),1)+tl.sum(high*tl.maximum(q[None,:],0),1)
+            else:
+                s = tl.sum(x*q[None,:],1)
+            # The old score buffer rounded each Q-head score before mean.
+            acc += s.to(OUT.dtype.element_ty).to(tl.float32)
+        result = tl.where(live,acc/G,float('-inf'))
+    tl.store(OUT+row*P+n,result,n<P)
+
+
+def coarse_indices(state, q, lengths, dtype, nf, nn):
+    """Pool-restricted score + dtype-rounding + GQA mean + geometry mask.
+
+    A zero quota has no score allocation, no kernel launch, and no top-k.
+    Keep full-P top-k inputs so compaction/tie domains do not shrink.
+    """
+    idx=state.indexer
+    def select(method, region, quota):
+        if quota == 0:
+            return torch.empty((state.B,state.H,0),device=q.device,dtype=torch.long)
+        minmax = method == 'minmax'
+        k = state.kmin if minmax else state.kavg
+        out = torch.empty((state.B,state.H,state.P),device=q.device,dtype=dtype)
+        tile = 8 if q.shape[-1]>64 else 32
+        _pool_score[(triton.cdiv(state.P,tile),state.B*state.H)](
+            k,state.kmax if minmax else k,q,lengths,out,state.P,
+            state.H,q.shape[2],q.shape[-1],state.bs,idx._sink_pool_lo_blk,
+            idx.sink_tokens,idx.sliding_window_size,max(state.bs,int(idx.nt_near_len)),
+            region,minmax,tile,num_warps=4,enable_fp_fusion=False)
+        return out.topk(min(quota,state.P),-1).indices
+    return select(idx.far_method,0,nf),select(idx.near_method,1,nn)
+
+
 @triton.jit
 def _update_cache(K, LENGTHS, CDIMS, FDIMS, KMIN, KMAX, KAVG, KFINE, PREV,
                   KB: tl.constexpr, KT: tl.constexpr, KH: tl.constexpr,

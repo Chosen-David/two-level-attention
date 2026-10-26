@@ -20,6 +20,29 @@ def make_indexer(**kwargs):
     return idx
 
 
+def test_merged_full_statistics_uses_local_subspace_coordinates(monkeypatch):
+    """The upstream full-stat kernel receives already-gathered tail features."""
+    import sparse_attn.indexer.tli_indexer as module
+    idx = make_indexer()
+    assert idx._inc is None and idx._triton_ok
+    assert idx._km_centroids is None and idx._km_dims is None
+    k = torch.arange(128., dtype=torch.float32).expand(1,32,2,128).clone()
+    seen = []
+    def stats(features, dims, need_avg):
+        seen.append((features.shape, dims))
+        assert dims is None, 'original channel indices cannot index compact features'
+        assert torch.equal(features[0,0,0], torch.cat((torch.arange(48.,64.), torch.arange(112.,128.))))
+        blocks = features.reshape(1,2,16,2,32)
+        return blocks.amin(2), blocks.amax(2), blocks.mean(2) if need_avg else None
+    monkeypatch.setattr(module, '_HAS_TRITON', True)
+    monkeypatch.setattr(torch.Tensor, 'is_cuda', property(lambda self: True))
+    monkeypatch.setattr(idx, '_fast_stat_full', stats)
+    with patch('torch.cuda.is_current_stream_capturing', return_value=False):
+        result = idx._prepare_index_base(k, torch.tensor([0,32], dtype=torch.int32))
+    assert seen == [(torch.Size([1,32,2,32]), None)]
+    assert torch.equal(result['k_min'], result['k_max'])
+
+
 @pytest.fixture(autouse=True)
 def one_thread(monkeypatch):
     n = torch.get_num_threads()
@@ -137,15 +160,17 @@ def test_real_capture_replay(monkeypatch,backend,dtype,fusions):
         assert torch.equal(out,ref)
 
 @pytest.mark.parametrize('graph',[False,True])
+@pytest.mark.parametrize('batch',[1,3])
+@pytest.mark.parametrize('skip',[False,True])
 @torch.no_grad()
-def test_qwen_routes_whole_batch_once(monkeypatch,graph):
+def test_qwen_routes_whole_batch_once(monkeypatch,graph,batch,skip):
     from sparse_attn.patches.qwen3_attn_patch import _tl_decode_batched
     from sparse_attn.ops.cuda_graph_state import graph_state,disable_graph
     from sparse_attn.baseline_runtime import BatchCtx
     monkeypatch.setenv('TLI_BATCH_INDEXER','parallel')
-    idx=make_indexer(); q=torch.randn(3,8,1,128)
-    k=torch.randn(3,2,512,128); v=torch.randn_like(k)
-    ctx=BatchCtx(batch=3,seq_lens=[289,319,400],gen_lens=[0]*3,alive=[True]*3,pad_id=0)
+    idx=make_indexer(); idx.skip_far=skip; q=torch.randn(batch,8,1,128)
+    k=torch.randn(batch,2,512,128); v=torch.randn_like(k)
+    ctx=BatchCtx(batch=batch,seq_lens=[289,319,400][:batch],gen_lens=[0]*batch,alive=[True]*batch,pad_id=0)
     gs=graph_state(); gs.enabled=graph; gs.valid_len_buf=torch.tensor(ctx.seq_lens)
     calls=[]
     def attention(q,k,v,mask,bs,cu,**kwargs):
@@ -155,7 +180,8 @@ def test_qwen_routes_whole_batch_once(monkeypatch,graph):
         with patch.object(idx,'prepare_mask',side_effect=AssertionError('serial indexer called')), \
              patch('sparse_attn.patches.qwen3_attn_patch.eager_decoding_attn',side_effect=attention):
             _tl_decode_batched(SimpleNamespace(scaling=128**-.5),idx,q,k,v,ctx)
-        expected,_=prepare_mask_batched(make_indexer(),q.transpose(1,2),k.transpose(1,2),torch.tensor(ctx.seq_lens),128**-.5)
+        reference=make_indexer();reference.skip_far=skip
+        expected,_=prepare_mask_batched(reference,q.transpose(1,2),k.transpose(1,2),torch.tensor(ctx.seq_lens),128**-.5)
         assert len(calls)==1 and torch.equal(calls[0],expected)
     finally:
         disable_graph()

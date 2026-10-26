@@ -45,6 +45,15 @@ def main():
                 const=dict(QB=32*128,QH=128,QD=1,HQ=32,DC=dc,DF=df,HAS_C=dc!=128,
                            HAS_F=df!=128,SAME=dc==df,BLOCK=max(dc,df))
                 compile_one(k._queries,arch,sig,const)
+        for dtype in ('fp32','fp16','bf16'):
+            for d in (32,128):
+                for g in (1,4):
+                    for region in (0,1):
+                        for minmax in (False,True):
+                            compile_one(k._pool_score,arch,
+                                dict(K='*'+dtype,KMAX='*'+dtype,Q='*fp32',LENGTHS='*i64',OUT='*'+dtype,P='i32'),
+                                dict(H=8,G=g,D=d,BS=64,LO=0,SINK=4,SWA=128,NEAR=4096,
+                                     REGION=region,MINMAX=minmax,TILE=8 if d>64 else 32))
         for nf,nn,bs in ((0,0,16),(0,32,64),(32,32,64)):
             for sink in (0,4,64):
                 compile_one(k._candidates,arch,

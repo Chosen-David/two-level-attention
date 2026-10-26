@@ -24,6 +24,7 @@ def main():
     p.add_argument('--layouts',nargs='+',choices=['head','token'],default=['head'])
     p.add_argument('--l2-subspaces',nargs='+',choices=['same','full'],default=['same'])
     p.add_argument('--methods',nargs='+',choices=['mixed','avg','minmax'],default=['mixed'])
+    p.add_argument('--skip-modes',nargs='+',choices=['on','off'],default=['off','on'])
     p.add_argument('--dtype',choices=['float32','float16','bfloat16'],default='bfloat16')
     p.add_argument('--steps',type=int,default=128)
     p.add_argument('--repeats',type=int,default=6)
@@ -70,7 +71,7 @@ def main():
     gates=[('e127',[sys.executable,'exp/bench/test_e127_gates.py']),
            ('batch-gates',[sys.executable,'exp/bench/test_tli_batch_gates.py']),
            ('pipeline-gates',[sys.executable,'-m','pytest','-q','tests/test_tli_gpu_pipeline.py',
-                              'tests/test_tli_batch_parallel.py','tests/test_tli_batch_fusion_kernels.py','--tb=short'])]
+                              'tests/test_tli_batch_parallel.py','tests/test_tli_batch_fusion_kernels.py','tests/test_far_skip_residency.py','--tb=short'])]
     if a.sanitizer:
         gates.append(('memcheck',['compute-sanitizer','--tool','memcheck','--error-exitcode','86',
             sys.executable,'-m','pytest','-q','tests/test_tli_gpu_pipeline.py','--tb=short']))
@@ -79,15 +80,16 @@ def main():
             manifest['status']='gate_failed';save();raise SystemExit('gate failed; logs retained')
     failed=False
     matrix=itertools.product(a.batches,a.lengths,a.layouts,a.l2_subspaces,a.methods,
-                             (False,True),('score','movement'))
-    for b,length,layout,subspace,method,capture,baseline in matrix:
-        label=f'b{b}-s{length}-{layout}-{subspace}-{method}-'+('graph' if capture else 'eager')+'-'+baseline
+                             (False,True),('score','movement'),a.skip_modes)
+    for b,length,layout,subspace,method,capture,baseline,skip_mode in matrix:
+        label=f'b{b}-s{length}-{layout}-{subspace}-{method}-'+('graph' if capture else 'eager')+'-'+baseline+'-skip-'+skip_mode
         receipt=out/(label+'.json')
         cmd=[sys.executable,'-m','exp.bench.tli_batch_round_compare',
              '--baseline-root','sparse_attn/indexer','--device','cuda','--dtype',a.dtype,
              '--score','triton','--fusions','--gpu-pipeline','--method',method,
              '--batch',str(b),'--length',str(length),'--layout',layout,'--l2-subspace',subspace,
              '--steps',str(a.steps),'--repeats',str(a.repeats),'--out',str(receipt)]
+        if skip_mode=='on':cmd.append('--skip-far')
         if baseline=='movement':cmd.append('--baseline-fusions')
         if capture:cmd.append('--capture')
         if a.profile:cmd.append('--profile')

@@ -1,17 +1,10 @@
-"""TLI (Two-Level Indexer)：TIA 下一代，组合三个实测 Go 的创新点。
+"""TLI (Two-Level Indexer): tail-subspace L1 + far/near L2 partition + layer pruning.
 
-创新点（全部有 2026-09-23 真实 trace 实测支撑，见 exp/trace/results/）：
-  A  position-stable subspace L1：块 min/max 只在低频尾维 d'=32 上算
-     （E3：d'=32 mass recall 0.729 ≈ 全维 0.732；random/highfreq 崩溃）
-  B  far/near 分区 L2 预算：远端与近端独立 top-K2 池，防远端被近端高分挤出；
-     远端用 TIA 4bit token 级精筛（E4c：≈oracle，L03 0.999）。原「远端 kmeans
-     聚类代表」方案为 E4c negative result（E4b 有整簇超选 bug 虚高 4-10×，
-     严格预算下 km_blk 0.09-0.39 / km_tok 0.45-0.79 均无一致优势），
-     cluster 模式保留作消融（--tli_far_select cluster）
-  D' 层自适应跳过：离线校准的静态层掩码，far 质量低的层把远端块从 L1 剔除
-     （E6：precision 0.92-1.00，far 质量损失 <0.3%；在线信号版已否定）
+  A  tail-32 subspace block min-max/avg coarse scoring
+  B  far 4-bit token-level fine scoring + cluster alternatives + sink/swa + nb/nt/nl geometry
+  D' static / dynamic far-skip layer pruning
 
-继承 TIAIndexer，复用其 L2（4bit 部分维 token 精筛 + 滑窗强制）语义。
+Extends TIAIndexer, reusing its L2 4-bit quantized token-level fine scoring semantics.
 """
 import json
 import math
@@ -25,49 +18,25 @@ from einops import rearrange, repeat, einsum
 from .tia_indexer import TIAIndexer
 from ..info import DEFAULT_LAYER_SKIP_MASK_PATH
 
-# 【E152v4】graph 共享状态（ops 包独立模块，无循环导入风险）。导入失败 =
-# 环境裁剪 → graph 增量 prepare 路径整体禁用（回退全量重建，fail-closed）。
+# Graph state (shared across 36 per-layer indexers); fallback to full rebuild if unavailable.
 try:
     from ..ops.cuda_graph_state import graph_state as _graph_state_fn
 except Exception:
     _graph_state_fn = None
 
-# 【E127 inplace 合并（用户 2026-10-12 指令）】原 TLIIndexerFast 子类
-# （tli_indexer_fast.py）语义并入基类：Triton 依赖惰性导入——CPU 环境
-# （无 GPU / 无 triton）不破模块导入，_HAS_TRITON=False 时三处 fast
-# 分支守卫短路，全部走原版 repeat+einsum 表达式（值逐位同原版）。
+# Triton fast path (graceful fallback when unavailable)
 try:
     import triton
     import triton.language as tl
     _HAS_TRITON = True
-    # 【AKO iter-9】tl.sort 能力探测（Triton ≥3.x；缺则 _compact_topk
-    # 排序内联化守卫短路回退 torch.sort，逐位不变）
     _TL_HAS_SORT = hasattr(tl, "sort")
-    # 【AKO iter-15】tl.gather 能力探测（寄存器张量动态索引；缺则
-    # _compact_topk 排序内联融合守卫短路回退 iter-9 两 kernel 路径）
     _TL_HAS_GATHER = hasattr(tl, "gather")
-except Exception:   # triton 缺失或导入异常：fast path 整体退役
-    triton = None
-    tl = None
-    _HAS_TRITON = False
-    _TL_HAS_SORT = False
-    _TL_HAS_GATHER = False
+except Exception:
+    triton = None; tl = None
+    _HAS_TRITON = False; _TL_HAS_SORT = False; _TL_HAS_GATHER = False
 
-# 081（TL-E121-OUTPUT-SNAPSHOT-081）：默认 D′ 掩码路径定义上移到
-# sparse_attn/info.py（DEFAULT_LAYER_SKIP_MASK_PATH，单一事实源）——
-# manifest 侧（resolve_treatment_snapshot）与运行时侧展开的必须是同
-# 一个文件，此前 info 侧无从得知该路径 → 默认配置 manifest 恒 null
-# 而可读名含 D（081 身份缺口 ①）。本别名保留旧引用名（既有代码/
-# exp 脚本零改动），realpath 与旧定义逐位一致。
 DEFAULT_MASK = DEFAULT_LAYER_SKIP_MASK_PATH
-
-# ---- E113b：Triton 贪心 kernel（sim_greedy 臂的 Python 循环 → GPU kernel）----
-#   开关：SGLANG_TLI_GREEDY_KERNEL（默认 1 = 用 kernel；0 = 回退 Python 循环，
-#   供对拍/回退）。kernel 本体在 sparse_attn/indexer/greedy_triton.py（与
-#   exp/trace/e113_greedy_triton.py 单一事实源），两路径语义逐位一致
-#   （exp/trace/test_e113_greedy_triton.py T1-T5 对拍 + E110/E109a 回归零差异）。
-#   惰性加载：非 sim_greedy 臂不 import triton（对正在跑的扫描臂零影响）。
-_GREEDY_TRITON_FN = None   # None=未尝试；False=不可用（回退）；其余=greedy_pass_triton
+_GREEDY_TRITON_FN = None  # Triton lazy import for sim_greedy kernel
 
 
 def _load_greedy_triton():
@@ -83,13 +52,7 @@ def _load_greedy_triton():
     return _GREEDY_TRITON_FN if _GREEDY_TRITON_FN else None
 
 
-# 【E165 iter2a】步级几何共享缓存（模块级：36 个 per-layer indexer 实例
-# 共享同一份动态几何张量）。条目 = (valid_len 行视图引用（pin 存储防
-# data_ptr 复用误命中）, 建缓存时 _version, 几何键, geo dict)。命中条件
-# = data_ptr 相同 + _version 相同 + 几何键相同。warmup/eager 步 inject
-# 的 vl.copy_() 使版本递增 → 每步首层重建；capture 单步内版本恒定 →
-# 36 层命中一次（几何 kernel 只记录一次，replay 期从 live vl 重算）。
-_GRAPH_GEO_CACHE = {}
+_GRAPH_GEO_CACHE = {}  # step-level geometry cache (shared by 36 per-layer indexers)
 
 
 def _graph_geo_lookup(valid_len, geo_key):
@@ -113,13 +76,7 @@ class TLIIndexer(TIAIndexer):
     """A+B+D' 全开为 method='tli'；参数可单独关闭做消融。"""
 
     def __init__(self, args, snapshot=None) -> None:
-        # 081（TL-E121-OUTPUT-SNAPSHOT-081）：snapshot = 生产入口在模型
-        # 加载前冻结的 TreatmentSnapshot（sparse_attn.info.
-        # resolve_treatment_snapshot 产出）。提供时 D′ 段直接消费
-        # snapshot.skip_ids、投影基段直接消费 snapshot.basis_tensor——
-        # 不再 open/torch.load 任何路径（旧路径 = patch.py 对每个
-        # attention 层各建一个实例、每实例各读一次文件，单模型跨层
-        # 混代可达：patch 中途换文件 → 层间 skip 集合/基不一致）。
+        # snapshot = 生产入口注入的冻结 TreatmentSnapshot
         # snapshot=None 保留旧路径读取行为（既有非 benchmark 入口不破），
         # 但生产入口（benchmark pred.py / pred_ruler.py）必须注入。
         super().__init__(args)
@@ -128,9 +85,7 @@ class TLIIndexer(TIAIndexer):
         #   full = 全 128 维（默认）；rope = 前 64 旋转维；nope = 后 64 非旋转维；
         #   tail = 旧口径低频尾维 32（E71/B7/C0 主表口径，向后兼容保留）
         self.subspace = getattr(args, "tli_subspace", "full")
-        # 【E142a】mla_rope：DeepSeek-V2 MLA 布局（nope 128 + rope 64 = 192，
-        # rope 在尾段、MQA 共享）。E141 trace 判决：rope-only 64d 选择与
-        # full 192d 持平（≤.02）——GQA tail 子空间结论的跨架构对应臂。
+        # mla_rope: DeepSeek-V2 MLA 布局（rope 64d 在尾段）
         if self.subspace not in ("full", "rope", "nope", "tail", "random", "highfreq", "mla_rope"):
             raise ValueError(f"tli_subspace 非法取值: {self.subspace}")
         self.enable_subspace = getattr(args, "tli_enable_subspace", True)
@@ -138,9 +93,7 @@ class TLIIndexer(TIAIndexer):
             self.enable_subspace = False      # 全维（用户默认）
         elif self.subspace in ("rope", "nope", "mla_rope"):
             self.enable_subspace = True       # 显式子空间段
-        # ---- E134：L2 细筛子空间独立开关（子空间矩阵第三臂 sub+full）----
-        #   same = L2 与 L1 同一子空间（现状，E85f 口径：粗筛+细筛同特征）
-        #   full = L2 细筛 k_qat 全 128 维量化（L1 仍由 tli_subspace 决定）
+        # L2 细筛子空间：same=与 L1 一致 / full=全 128 维量化
         self.l2_subspace = getattr(args, "tli_l2_subspace", "same")
         if self.l2_subspace not in ("same", "full"):
             raise ValueError(f"tli_l2_subspace 非法取值: {self.l2_subspace}")
@@ -182,16 +135,9 @@ class TLIIndexer(TIAIndexer):
                 parsed.append(int(round(number)))
             self._e151c_quota = parsed
         self.near_len = 2048                                      # 近端窗（D'/B 共用）
-        # ---- E64j method 组合参数化（用户命名: mminmax/cavg/aavg 等）----
         self.far_method = getattr(args, "tli_far_method", "minmax")
         self.near_method = getattr(args, "tli_near_method", "avg")
-        # ---- E110：ccluster / sim_greedy（用户 2026-10-07 定义，TASK.md「关于cluster的方法」节）----
-        #   far_select/near_select 独立选择 L2 侧「簇代表打分」选择方式：
-        #     ccluster     = (far=cluster,    near=cluster)
-        #     cavg_sim     = (far=sim_greedy, near=4bit)  —— 与 cavg 只差聚类方式
-        #     ccluster_sim = (far=sim_greedy, near=sim_greedy)
-        #   默认双双 '4bit'（现状，回归保护：不开新 flag 行为逐位不变）。
-        #   注意：cluster/sim_greedy 臂须 --tli_enable_kmeans true（沿用 cavg 惯例）。
+        # far_select/near_select: 4bit / cluster / sim_greedy
         self.near_select = getattr(args, "tli_near_select", "4bit")
         if self.near_select not in ("4bit", "cluster", "sim_greedy"):
             raise ValueError(f"tli_near_select 非法取值: {self.near_select}")
@@ -199,54 +145,28 @@ class TLIIndexer(TIAIndexer):
         self.sim_dims = getattr(args, "tli_sim_dims", "subspace")
         if self.sim_dims not in ("subspace", "nope", "tail", "full"):
             raise ValueError(f"tli_sim_dims 非法取值: {self.sim_dims}")
-        # ---- E87：top-σ 选择（far/near/mid 侧不做两级，细筛分 ≥ sink max − σ 即选中）----
+        # top-σ 选择
         self.sigma_select = getattr(args, "tli_sigma_select", "none")
         self.moba_gate = getattr(args, "tli_moba", False)
         self.sigma = getattr(args, "tli_sigma", 8.0)
-        self.sink_blocks = 2                                      # sink = 前 2 块（128 tok）——E135 起仅作历史锚，池左界/强制区宽统一由 sink_tokens 推导
-        # ---- E135：sink/swa 正交强制区参数化 + sinkswa_only 归因臂（用户 2026-10-13 批准）----
-        #   sink_tokens/swa 默认 128/128 与历史硬编码（sink_blocks=2×64 / sliding_
-        #   window=128）逐位一致；非默认值只改变正交强制区宽度与池左界
-        #   （floor(sink_tokens/bs) 块对齐——子块 sink 时 sink 所在块参与
-        #   L1/L2 池竞争，mask 并集语义无 token 结构性丢失）。
+        self.sink_blocks = 2                                      # 历史兼容锚点；实际由 sink_tokens 推导
         self.sink_tokens = int(getattr(args, "tli_sink_tokens", 128))
-        # A2（TL-E135-OPTIMIZED-GATE-144）：边界守卫从 assert 改显式 raise——
-        # assert 在 python -O 下被剥除，参数门禁必须不随解释器优化等级漂移。
         if self.sink_tokens < 0:
             raise ValueError("tli_sink_tokens 必须 >= 0")
         if self.sliding_window_size < 1:
             raise ValueError("tli_swa_size 必须 >= 1")
-        # A3（TL-E135-PROTECTED-BUDGET-143）：「保护区计入 K2 总预算」契约的
-        # fail-closed 校验。swa 必须块对齐：非对齐 swa 让边界块 mid token
-        # 结构性不可选。sink 自 E143 起允许子块（用户 2026-10-15 批准，
-        # 对齐 StreamingLLM sink=4 文献惯例）：池左界 floor(sink/bs)，sink
-        # 所在块参与池竞争（无死区）；代价是 sink 所在块被池选中时
-        # [pool_lo_blk·bs, sink) 段与强制区重叠，K2_mid 最多虚耗
-        # sink%bs ≤ 63 tok 名额（unique 保留数 ≤ K2，保守方向，论文披露）。
-        # E135 扩展网格（e135_sink_ext.json）：sink 128→4 trace mass 仅
-        # -0.0021，拐点在 4（StreamingLLM "4 suffices" 在 Qwen3-8B 复现）。
+        # swa 必须块对齐（sink 可子块对齐，StreamingLLM sink=4 兼容）
         _bs = self.args.tia_block_size
         if self.sliding_window_size % _bs != 0:
             raise ValueError(
                 f"tli_swa_size={self.sliding_window_size} 必须是 "
                 f"tia_block_size={_bs} 的整数倍（非对齐 swa 让边界块 mid "
-                "token 结构性不可选）。sink 自 E143 起允许子块值（如 4）"
-            )
-        #   E135a 归因臂：mask 只含 sink 头 + swa 尾（mid 全丢），两级索引
-        #   分数照算但绝不进 mask——与 σ/MoBA/per-q-head 组合无定义，fail loudly。
-        self.sinkswa_only = bool(getattr(args, "tli_sinkswa_only", False))
-        # ---- E137：D' gate prefill 动态标定（用户 2026-10-13 指令）----
-        #   r_l < eps 的层 prefill 期末标定 skip_far=True，decode 期消费链
-        #   全复用 E111 dgate_short（_resolve_skip 不动——静态 _skip_ids 与
-        #   动态标定独立共存：静态优先，动态只在非静态 skip 层上叠加）。
+                "token 结构性不可选）。sink 允许子块值（如 4）")
+        self.sinkswa_only = bool(getattr(args, "tli_sinkswa_only", False))  # 归因臂：sink+swa 强制，mid 全丢
+        # D' gate 动态标定：prefill 尾行观测 far 质量 < eps 的层 skip far
         self.dyn_dgate = bool(getattr(args, "tli_dyn_dgate", False))
         self.dyn_dgate_eps = float(getattr(args, "tli_dyn_dgate_eps", 0.05))
         self.dyn_dgate_rows = int(getattr(args, "tli_dyn_dgate_rows", 256))
-        # A4（TL-E137-PARAM-VALIDATION-147）：rows/eps 边界双处校验之一
-        # （另一处在 arguments.py 的 type 校验函数）。此处覆盖 getattr
-        # 兜底路径（非 CLI 入口直接传 namespace 同样拒绝），保证任何
-        # tensor/GPU 分配前 fail-closed。eps 是 far 区概率质量损失上界
-        # 阈值，必须有限且 ∈[0,1]；rows 是标定用 prefill 尾行数，>=1。
         if not math.isfinite(self.dyn_dgate_eps) \
                 or not (0.0 <= self.dyn_dgate_eps <= 1.0):
             raise ValueError(
@@ -256,19 +176,12 @@ class TLIIndexer(TIAIndexer):
             raise ValueError(
                 f"tli_dyn_dgate_rows={self.dyn_dgate_rows} 非法：必须 >= 1"
                 "（标定用 prefill q 尾行数）")
-        # A6（TL-E137-PREFILL-GATE-145）：decode-frozen 生命周期分离状态。
-        # prefill 期 calibrate_dyn_dgate 只写 _dyn_skip_pending（标定决策
-        # 挂起）；decode 首步由 freeze_dyn_dgate 一次性冻结进 skip_far。
-        # 此前 calibrate 直接写 skip_far，TLI_SPARSE_PREFILL=1 时稀疏
-        # prefill chunk 的 prepare_mask 会消费完整 prompt 标定的决策——
-        # 完整 prompt 的未来后缀影响较早 chunk 路由，非因果。
+        # decode-frozen 生命周期：prefill 期末暂存，decode 首步冻结进 skip_far
         self._dyn_skip_pending = False
         self._dyn_frozen = False
         if self.dyn_dgate and self.sinkswa_only:
-            raise AssertionError("--tli_dyn_dgate 与 --tli_sinkswa_only 互斥（归因臂测的是 indexer 全旁路）")
+            raise ValueError("--tli_dyn_dgate 与 --tli_sinkswa_only 互斥")
         if self.sinkswa_only:
-            # A2（TL-E135-OPTIMIZED-GATE-144）：E135a 归因臂的互斥守卫同批
-            # 从 assert 改显式 raise（-O 剥除问题与 sink/swa 边界同源）。
             if self.sigma_select != "none":
                 raise ValueError("--tli_sinkswa_only 与 --tli_sigma_select 互斥（归因臂不做 σ 选择）")
             if self.moba_gate:
@@ -276,26 +189,13 @@ class TLIIndexer(TIAIndexer):
             if getattr(args, "tli_per_q_head", False):
                 raise ValueError("--tli_sinkswa_only 与 --tli_per_q_head 互斥（归因臂用共享 kv-head mask）")
         if self.near_select != "4bit":
-            # E110：near 侧簇分路径与 σ/MoBA 均绕过/改写两级选择语义，显式互斥
-            # 150（TL-TLI-OPTIMIZED-CONFIG-GATE，GPT 审计 8b56bbd）：组合
-            # 契约门从 assert 改显式 raise（A2/E135 同款）——assert 在
-            # python -O 下被剥除，CLI 可解析的未定义组合（单 flag 值全部
-            # 合法、仅组合无定义）会进入 Hq/Hkv 不兼容路径。
             if self.sigma_select != "none":
                 raise ValueError(
                     "--tli_near_select 与 --tli_sigma_select 互斥"
                     "（σ 路径绕过两级选择）")
             if self.moba_gate:
                 raise ValueError("--tli_near_select 与 --tli_moba 互斥")
-        # ---- E103：kv-head 共享消融（审稿 MAJOR）----
-        #   论文 §2.2 口径：L1/L2 分数先在 GQA 组内 mean 聚合到 kv-head 级再 topk
-        #   （32 q-head → 8 kv-head，索引量省 4 倍）。本开关打开时旁路全部聚合点，
-        #   per-q-head 分数直接进 topk（topk 沿最后一维，H 维天然独立），
-        #   mask 从 [1,1,Hkv,T] 变 [1,1,H,T]（消费端 eager_decoding 按组拆回）。
-        #   互斥守卫：cluster/moba/σ 路径的簇分数与 gate 均为 kv-head 级语义，
-        #   与 per-q-head 组合无定义，显式禁止（E103 臂不经过这些路径）。
-        #   150（TL-TLI-OPTIMIZED-CONFIG-GATE，GPT 审计 8b56bbd）：组合契约
-        #   门从 assert 改显式 raise（-O 剥除问题与 A2/E135 同源）。
+        # per-q-head：旁路 GQA 组内聚合，逐 q-head 独立选择（与 cluster/moba/σ 互斥）
         self.per_q_head = getattr(args, "tli_per_q_head", False)
         if self.per_q_head:
             if self.moba_gate:
@@ -312,40 +212,23 @@ class TLIIndexer(TIAIndexer):
                     "互斥（簇分数是 kv-head 级语义）")
             if self.sigma_select != "none":
                 raise ValueError(
-                    "--tli_per_q_head 与 --tli_sigma_select 互斥"
-                    "（E103 臂不经过 σ 路径）")
-        # ---- D'：静态层掩码 ----
+                    "--tli_per_q_head 与 --tli_sigma_select 互斥")
         self.enable_layer_skip = getattr(args, "tli_enable_layer_skip", True)
-        # A6（TL-E137-PREFILL-GATE-145）：静态 D'（层掩码）× 动态 D'
-        # （E137 标定）组合语义未定义 fail-closed——_resolve_skip 每步用
-        # 静态 _skip_ids 覆盖 skip_far，会把 decode 首步冻结的动态决策
-        # 静默冲掉。当前生产全用 --tli_enable_layer_skip false 显式关
-        # 静态，无既有数据受影响。
+        # 动态 D' gate 与静态层掩码互斥（静态会覆盖动态冻结的 skip_far）
         if self.dyn_dgate and self.enable_layer_skip:
             raise ValueError(
                 "--tli_dyn_dgate 与 --tli_enable_layer_skip true 互斥："
-                "静态层掩码与 E137 动态标定组合语义未定义（_resolve_skip "
-                "会用静态 _skip_ids 覆盖动态冻结的 skip_far），生产动态 "
-                "gate 臂请显式传 --tli_enable_layer_skip false")
+                "静态层掩码会覆盖动态冻结的 skip_far")
         self.skip_far = False
         self._skip_ids: set[int] | None = None
         if snapshot is not None:
-            # 081：注入已解析对象——掩码内容已在 resolve 阶段单次 open
-            # 解析（同一批 bytes 出 sha256 + skip 集合），此处零文件 IO。
             if self.enable_layer_skip:
                 if snapshot.skip_ids is None:
-                    # resolve 阶段对不可读掩码已 fail closed（[GATE-FAIL]
-                    # 079 SystemExit），到达此处即 snapshot 与 args 失配
-                    # ——不允许静默关 D'（079 静默退化口径在注入路径同样
-                    # 不放行）。
                     raise SystemExit(
-                        "[GATE-FAIL] 081: snapshot.skip_ids 为 None 但 "
-                        "tli_enable_layer_skip=True——注入的快照与 args "
-                        "失配（掩码不可用应在 resolve_treatment_snapshot "
-                        "阶段 fail closed 退出），拒绝运行")
+                        "[GATE-FAIL] snapshot.skip_ids=None 但 "
+                        "tli_enable_layer_skip=True")
                 self._skip_ids = set(snapshot.skip_ids)
         else:
-            # 旧路径（非 benchmark 入口兼容）：每实例各 open 一次。
             mask_path = getattr(args, "tli_layer_skip_path", None) or DEFAULT_MASK
             if self.enable_layer_skip:
                 try:
@@ -354,44 +237,27 @@ class TLIIndexer(TIAIndexer):
                 except (OSError, KeyError, ValueError):
                     print(f"[TLI] 警告: 层掩码 {mask_path} 不可读, D' 关闭")
                     self._skip_ids = None
-        # B 的聚类缓存（prefill 后一次；decode 期 far 区不变）
-        self._km_centroids = None    # [Hkv, K_c, d']
-        self._km_token_assign = None  # [Hkv, Tfar]
-        self._km_far_lo = None       # far 区起点（token idx）
-        self._km_far_blk_lo = None   # far 区块起点
-        self._km_blk_ids = None      # [Hkv, Tfar] 每个 far token 的块 id
-        self._km_dims = None         # E110：far 侧建簇时实际用的维度索引（打分端对齐用）
-        # E110：near 侧聚类缓存（ccluster；near 区左右缘 decode 期都会动 → 按 key 全量重建）
-        self._km_near_centroids = None   # [Hkv, K_c, d']
-        self._km_near_assign = None      # [Hkv, Tn]（相对 _km_near_lo 的 token 偏移）
-        self._km_near_lo = -1            # near 簇覆盖区起点（token idx，块对齐）
-        self._km_near_hi = -1            # near 簇覆盖区终点（token idx，块对齐）
-        self._km_near_key = None         # (far_hi, near_hi) 重建 key
-        self._km_near_dims = None        # near 侧建簇维度索引
-        # E110：far 侧 sim_greedy 增量状态（贪心是时序过程，可对新增段精确续跑）
+        # 聚类缓存（prefill 一次；decode 期 far 区不变）
+        self._km_centroids = None
+        self._km_token_assign = None
+        self._km_far_lo = None
+        self._km_far_blk_lo = None
+        self._km_blk_ids = None
+        self._km_dims = None
+        self._inc = None
+        self._triton_ok = True
+        self._km_near_centroids = None; self._km_near_assign = None
+        self._km_near_lo = -1; self._km_near_hi = -1
+        self._km_near_key = None; self._km_near_dims = None
         self._km_greedy_sums = None      # [Hkv, Kcap, d']  簇成员和（簇心 = sums/cnt）
         self._km_greedy_cnt = None       # [Hkv, Kcap]
         self._km_greedy_sq = None        # [Hkv, Kcap]  ||sums||^2 增量维护（免每步全量 norm）
         self._km_greedy_klive = None     # [Hkv] 活簇数
-        # 【E127 inplace 合并（用户 2026-10-12 指令）】原 TLIIndexerFast
-        # 子类语义并入基类：decode 增量缓存状态 + Triton fast path 健康标志
-        # （异常置 False 后本实例永久回退原版表达式，fail-closed）+
-        # quant indices 缓存。_inc=None 表示无缓存（首步全量建）。
-        self._inc = None
-        self._triton_ok = True
-        # 【E133c-A4/A5】尾段统计/量化融合 kernel 健康门（异常置 False 后
-        # 本实例永久回退 PyTorch 原版路径，fail-closed，与 _triton_ok 同口径）
+        # 增量缓存 + Triton fast path 健康标志（异常后 permanent fail-closed 回退）
         self._stat_ok = True
         self._quant_ok = True
         self._qat_idx_cache = None
-        # ---- E64 框架参数化：α/β/γ 分区 + sup_wsvd 投影基（B 配置帕累托点）----
-        # 【E155d 参数退役（用户 2026-10-19 拍板：全面转向 nl/nb/nt）】
-        # α/β/γ 降级为 legacy 比例口径：argparse 缺省翻转为 None=未传，
-        # 此处归一回旧缺省（0.0/0.0/1.0）——纯比例派单逐位不变；显式
-        # 几何（nb/nt/nl 任一传入，含 nt=off 哨兵）与 α/β/γ 任意显式
-        # 同传一律构造期拒绝（fail-closed 互斥——比例/绝对两口径混配
-        # 即歧义配置，ctrl_singlepool 型「单池意图 + 几何参数」事故从此
-        # 结构上不可达）。
+        # α/β/γ legacy 比例口径（与 nb/nt/nl 显式几何互斥）
         _a_raw = getattr(args, "tli_alpha", None)
         _b_raw = getattr(args, "tli_beta", None)
         self.alpha = 0.0 if _a_raw is None else float(_a_raw)
@@ -401,9 +267,7 @@ class TLIIndexer(TIAIndexer):
         for name, value in (("tli_alpha", self.alpha), ("tli_beta", self.beta)):
             if not math.isfinite(value) or not 0.0 <= value <= 1.0:
                 raise ValueError(f"{name} 必须是 [0, 1] 内的有限比例，收到 {value!r}")
-        # γ 三态：None=未传（几何归一或 legacy 缺省 1.0）；"off"=自由竞争
-        # （E122 语义，运行时 γ=None）；数值=配额折扣。self.gamma=None
-        # 的消费端为 compute_mask 的自由竞争分支（L2370 同源）。
+        # γ 三态：数值=配额折扣；None=legacy 默认；"off"=自由竞争
         _g_raw = getattr(args, "tli_gamma", None)
         if isinstance(_g_raw, str) and _g_raw.strip().lower() == "off":
             self.gamma = None
@@ -411,15 +275,7 @@ class TLIIndexer(TIAIndexer):
             self.gamma = 1.0 if _g_raw is None else float(_g_raw)
         _abg_explicit = (_a_raw is not None or _b_raw is not None
                          or _g_raw is not None)
-        # ---- E155/E155d 固定配额几何（用户 2026-10-19 拍板：全面转向 nt/nb 绝对配额）----
-        # 语义映射（K1/K2 固定部署口径）：
-        #   nb_near = tli_near_pages        （legacy = max(1, round(K1·β))）
-        #   nt_near = tli_near_tokens       （legacy = min(nb_near·bs·γ, K2_mid)）
-        #   near_L  = tli_near_len          （legacy = max(bs, int(α·mid_len))）
-        #   nt=off  = 自由竞争哨兵（≡ γ-off 的显式几何等价物）：L1 双池
-        #            照旧（nb 生效）、L2 取消 near/far 配额分割单池竞争。
-        #            与数值 nt=K2_mid（near 独吞 far=0 退化臂）语义严格分开。
-        # far 侧均为减法：nb_far = K1 − nb_near；far_budget = K2_mid − nt_near。
+        # nb/nt/nl 固定配额几何（far 侧 = K1/K2 减法推出）
         _nt_raw = getattr(args, "tli_near_tokens", None)
         _nt_off = isinstance(_nt_raw, str) and str(_nt_raw).strip().lower() == "off"
         def _quota_integer(name, value):
@@ -444,21 +300,13 @@ class TLIIndexer(TIAIndexer):
         _geo = (self.nt_near_pages is not None or _nt_raw is not None
                 or self.nt_near_len is not None)
         if _geo:
-            # fail-closed 互斥（用户 2026-10-19）：α/β/γ 任意显式与显式
-            # 几何同传 → 构造期拒绝（含 α0β0 单池意图 + 几何的混配事故面）。
             if _abg_explicit:
                 raise ValueError(
-                    "tli_near_pages/tokens/len（固定配额几何）与 tli_alpha/beta/gamma"
-                    "（legacy 比例口径）不可同传——两口径混配即歧义配置"
-                    "（E155d 参数退役，fail-closed；单池派法 = 只传 α0β0、"
-                    "不传任何几何参数）"
+                    "tli_near_pages/tokens/len 与 tli_alpha/beta/gamma 不可同传"
                 )
-            # 几何齐备性：nb 必传；nt 传数值或 off；nl 必传（几何下 α/β/γ
-            # 禁传 → near_L 无比例回退）。
             if self.nt_near_pages is None:
                 raise ValueError(
-                    "固定配额几何须显式传 tli_near_pages（配 tli_near_tokens "
-                    "数值或 off；tli_near_len 亦须显式——几何下无比例回退）")
+                    "固定配额几何须显式传 tli_near_pages / tli_near_tokens / tli_near_len")
             if self.nt_near_tokens is None and not _nt_off:
                 raise ValueError(
                     "tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——"
@@ -530,23 +378,12 @@ class TLIIndexer(TIAIndexer):
                         f"网格约束破坏：far = K2−sink−swa−nt = {_far_c} < 0"
                         f"（K2={_k2_c}, sink={self.sink_tokens}, "
                         f"swa={self.sliding_window_size}, nt={_nt_c}）")
-        # ---- E155b 新口径双开关（用户 2026-10-19 拍板）----
-        # ① 边界页保送：sink 所在页 + swa 跨界页移出 L1 竞争池直通 L2 候选
-        #   （不占 K1 配额；页统计不再混保护/竞争 token）。false 逐位回旧口径。
-        # ② L2 细筛去量化：min_max_per_token_quant 是量化-反量化 round-trip
-        #   （k_qat 存 bf16 反量化值，无压缩收益），关掉 = 细筛用原始子空间
-        #   切片（质量 +0.03 E140 罚回收 + 每步省 ~10 个 quant 小 launch）。
-        #   false(=不量化) 为新默认；true 逐位回旧口径。两开关只影响分区
-        #   主管线（e64 L1 双池 + k_qat 构造），单池/簇路径不受保送影响。
+        # 边界页保送（不占 K1 配额）+ L2 细筛去量化
         self.boundary_bypass = getattr(args, "tli_boundary_bypass", True)
         self.l2_quant = getattr(args, "tli_l2_quant", False)
-        # 【E156 精筛候选化】score_fine 只对 L1 候选 token + 强制区打分
-        # （消除全宽 [1,H,T] einsum）。默认开；env TLI_FINE_GATHER=0 关
-        # （对拍/回退臂）。投影/per_q_head/moba 由 compute_score 条件守卫
-        # 自动回退全宽，不受本标志影响。
+        # 精筛候选化：仅对 L1 候选 + 强制区打分（消除全宽 einsum）
         self._fine_gather = (
             os.environ.get("TLI_FINE_GATHER", "1").strip() != "0")
-        # 【AKO iter-19】topk_mask 融合装配独立永久门（异常回退 torch 链）
         self._tmask_ok = True
         # E151c is implemented only in the E64 split-budget top-k branches.
         # Other selection modes return before those branches or use a different
@@ -1347,9 +1184,28 @@ class TLIIndexer(TIAIndexer):
         if self._basis is not None:
             # 投影路径（E64f 协议）：粗筛+细筛都在 d 维投影特征上
             kp = torch.einsum("bshd,hde->bshe", k_for_coarse.float(), self._basis)
-            k_coarse = rearrange(kp, "b (t bs) h d -> b t bs h d", bs=self.args.tia_block_size)
-            k_min = k_coarse.amin(dim=2)
-            k_max = k_coarse.amax(dim=2)
+            # 【E176】全量块统计融合（投影路径）：kp 投影后特征，
+            # amin+amax+mean 一次读数据。
+            _proj_need_avg = self._need_avg_score()
+            _proj_use_fused = (_HAS_TRITON and self._triton_ok
+                               and self._stat_ok and kp.is_cuda
+                               and kp.stride(-1) == 1
+                               and (self.args.tia_block_size & (self.args.tia_block_size - 1)) == 0)
+            if _proj_use_fused:
+                try:
+                    k_min, k_max, k_avg_proj = self._fast_stat_full(
+                        kp, None, _proj_need_avg)
+                except Exception:
+                    if not self._stat_ok:
+                        _proj_use_fused = False
+                    else:
+                        raise
+            if not _proj_use_fused:
+                k_coarse = rearrange(kp,
+                    "b (t bs) h d -> b t bs h d", bs=self.args.tia_block_size)
+                k_min = k_coarse.amin(dim=2)
+                k_max = k_coarse.amax(dim=2)
+                k_avg_proj = k_coarse.mean(dim=2) if _proj_need_avg else None
             cu_seqlens_k_coarse = pad_cu_seqlens_k // self.args.tia_block_size
             # L2 4bit 精筛：投影特征逐 token 量化（任意 last-dim 通用）
             # 【E155b 去量化】l2_quant=False 直接用原始投影特征（同 dtype 视图语义）
@@ -1367,23 +1223,38 @@ class TLIIndexer(TIAIndexer):
                 # near/far 边界与 SWA 强制区落在真实域。
                 "valid_length": k.shape[1],
             }
-            if self._need_avg_score():
+            if _proj_need_avg:
                 # near/far 粗筛 avg 分数（E64f：near=avg / far=minmax；far=avg 单池也需）
-                index_dict["k_avg"] = k_coarse.mean(dim=2)
+                # 【E176】k_avg_proj 已由 _fast_stat_full 或 fallback 产出
+                index_dict["k_avg"] = k_avg_proj
             # ---- B：远端/近端聚类（cluster/sim_greedy 消融模式构建；默认 4bit 分区无需聚类）----
             if (self.enable_kmeans and not self.skip_far
                     and (self.far_select != "4bit" or self.near_select != "4bit")):
                 self._maybe_build_kmeans(k, index_dict)
             return index_dict
-        k_coarse = rearrange(
-            k_for_coarse, "b (t bs) h d -> b t bs h d", bs=self.args.tia_block_size
-        )
-        k_min = k_coarse.amin(dim=2)
-        k_max = k_coarse.amax(dim=2)
-        if self._need_avg_score():
-            k_avg = k_coarse.mean(dim=2)
-        else:
-            k_avg = None
+        # 【E176】全量块统计融合：amin + amax + mean 一次读数据
+        # （替代 rearrange + amin + amax + mean 四次读）。Triton 异常
+        # 时 _fast_stat_full 置 _stat_ok=False 并 raise，except 走原版链。
+        need_avg = self._need_avg_score()
+        _use_fused = (_HAS_TRITON and self._triton_ok and self._stat_ok
+                      and k_for_coarse.is_cuda
+                      and (self.args.tia_block_size & (self.args.tia_block_size - 1)) == 0
+                      and k_for_coarse.stride(-1) == 1)
+        if _use_fused:
+            try:
+                k_min, k_max, k_avg = self._fast_stat_full(
+                    k_for_coarse, None, need_avg)  # already gathered above; do not index twice
+            except Exception:
+                if not self._stat_ok:
+                    _use_fused = False  # 永久回退原版链
+                else:
+                    raise
+        if not _use_fused:
+            k_coarse = rearrange(k_for_coarse,
+                "b (t bs) h d -> b t bs h d", bs=self.args.tia_block_size)
+            k_min = k_coarse.amin(dim=2)
+            k_max = k_coarse.amax(dim=2)
+            k_avg = k_coarse.mean(dim=2) if need_avg else None
         # E89 MoBA 臂：全维 chunk-mean（gate 分数用完整 128 维 pad_k，严格 MoBA 口径）
         k_avg_full = None
         if self.moba_gate:
@@ -2691,6 +2562,55 @@ class TLIIndexer(TIAIndexer):
                 HAS_SUB=idx_sub is not None,
                 HAS_AVG=k_avg_buf is not None,
                 num_warps=max(1, DD // 32))
+        except Exception:
+            self._stat_ok = False
+            raise
+
+    def _fast_stat_full(self, k_for_coarse, idx_sub, need_avg):
+        """【E176】全量块统计融合 wrapper —— 替代 rearrange + amin +
+        amax + mean（4 次读同一块数据）。1 个 Triton kernel 读一次
+        [BS, DD]，同时算 min/max/mean，fp32 顺序累加与 PyTorch
+        mean(dim=2) 逐位一致（累加序同 _coarse_stat_kernel）。
+
+        参数：
+          k_for_coarse: [1, S_pad, Hkv, DD] bf16（已 pad 到 P*BS）
+          idx_sub: [DD] int64 或 None（None = full 模式全维直读）
+          need_avg: bool（是否需要 k_avg 输出）
+
+        返回 (k_min, k_max, k_avg_or_None)，形状 [1, P, Hkv, DD]。
+        fail-closed：异常置 _stat_ok=False 并 raise（调用方 except 回退
+        PyTorch rearrange+amin+amax+mean 链，值不变）。"""
+        try:
+            Hkv = k_for_coarse.shape[2]
+            S_pad = k_for_coarse.shape[1]
+            P = S_pad // self.args.tia_block_size
+            if idx_sub is not None:
+                DD = idx_sub.numel()
+                sub_t = idx_sub
+            else:
+                DD = k_for_coarse.shape[3]
+                sub_t = torch.empty(0, dtype=torch.int64,
+                                     device=k_for_coarse.device)
+            dev = k_for_coarse.device
+            k_min = torch.empty((1, P, Hkv, DD), dtype=k_for_coarse.dtype,
+                                device=dev)
+            k_max = torch.empty_like(k_min)
+            k_avg = torch.empty_like(k_min) if need_avg else k_min
+            _stat_full_kernel[(P, Hkv)](
+                k_for_coarse.squeeze(0), sub_t,
+                k_min.squeeze(0), k_max.squeeze(0), k_avg.squeeze(0),
+                S_pad, P, Hkv,
+                k_for_coarse.squeeze(0).stride(0),
+                k_for_coarse.squeeze(0).stride(1),
+                k_min.squeeze(0).stride(0),
+                k_min.squeeze(0).stride(1),
+                BS=self.args.tia_block_size,
+                DD=DD,
+                HAS_SUB=idx_sub is not None,
+                HAS_AVG=need_avg,
+                num_warps=max(1, DD // 32))
+            k_avg_out = k_avg if need_avg else None
+            return k_min, k_max, k_avg_out
         except Exception:
             self._stat_ok = False
             raise
@@ -5025,6 +4945,50 @@ if _HAS_TRITON:
         if HAS_AVG:
             tl.store(OAVG + (fb + pid_b) * stride_ot + h * stride_oh
                      + offs_d,
+                     (s * (1.0 / BS)).to(OAVG.dtype.element_ty))
+
+    @triton.jit
+    def _stat_full_kernel(
+        K, IDXSUB, OMIN, OMAX, OAVG,
+        # K [1,S,D] bf16（k_for_coarse，已 pad 到 P*BS）；
+        # OMIN/OMAX/OAVG [1,P,Hkv,DD] bf16; IDXSUB [DD] int64
+        # （HAS_SUB=False 时占位不读）
+        S, P, Hkv_idx,
+        stride_kt, stride_kh,
+        stride_ot, stride_oh,
+        BS: tl.constexpr, DD: tl.constexpr,
+        HAS_SUB: tl.constexpr, HAS_AVG: tl.constexpr,
+    ):
+        """【E176 全量块统计融合】每 program 处理 1 个（块 × kv 头），
+        一次读取内同时算 min/max/mean —— 替代 rearrange + amin + amax
+        + mean 四次读数据。只读一次 [BS, DD] 块数据，fp32 顺序累加，
+        与 PyTorch mean(dim=2) 逐位一致（累加序同 _coarse_stat_kernel）。"""
+        pid_b = tl.program_id(0)
+        h = tl.program_id(1)
+        offs_d = tl.arange(0, DD)
+        if HAS_SUB:
+            sub = tl.load(IDXSUB + offs_d)
+        mn = tl.full((DD,), float("inf"), tl.float32)
+        mx = tl.full((DD,), float("-inf"), tl.float32)
+        s = tl.zeros((DD,), tl.float32)
+        for i in tl.static_range(BS):
+            tok = pid_b * BS + i
+            msk = tok < S
+            if HAS_SUB:
+                x = tl.load(K + tok * stride_kt + h * stride_kh + sub,
+                            mask=msk, other=0.0).to(tl.float32)
+            else:
+                x = tl.load(K + tok * stride_kt + h * stride_kh + offs_d,
+                            mask=msk, other=0.0).to(tl.float32)
+            mn = tl.minimum(mn, x)
+            mx = tl.maximum(mx, x)
+            s = s + x
+        tl.store(OMIN + pid_b * stride_ot + h * stride_oh + offs_d,
+                 mn.to(OMIN.dtype.element_ty))
+        tl.store(OMAX + pid_b * stride_ot + h * stride_oh + offs_d,
+                 mx.to(OMAX.dtype.element_ty))
+        if HAS_AVG:
+            tl.store(OAVG + pid_b * stride_ot + h * stride_oh + offs_d,
                      (s * (1.0 / BS)).to(OAVG.dtype.element_ty))
 
     @triton.jit

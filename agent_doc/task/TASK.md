@@ -2,6 +2,8 @@
 
 ## 2026-10-26
 
+- [ ] [TL-SKIP-NOSKIP-FUSION-20261026] skip/non-skip 共用区域打分融合；支持固定容量 B=1 冻结 gate 与混合 ring/full 路由；审查用户转述 Kimi 意见并补充真实存储/恒定写入门禁，GPU 性能及质量待验。([详情](task_details/TL-SKIP-NOSKIP-FUSION-20261026.md))
+
 - [ ] [TL-GPU-PIPELINE-FUSION-20261026] 新增直接写缓存、Q 投影缩放、候选展开压实、top-k 直写 mask 四类 GPU 融合；交付 eager/Graph 远端门禁与压力矩阵，实际 GPU 性能/质量待验。([详情](task_details/TL-GPU-PIPELINE-FUSION-20261026.md))
 
 - [ ] [TL-BATCH-FIVE-ROUNDS-20261026] 完成五轮 batch indexer 实现与本地验证：按需摘要、Q 投影复用、稳定候选线性分区、mask 装配、末尾页读取；保留无收益的 Torch 试验记录，GPU 性能/质量验收仍待。([详情](task_details/TL-BATCH-FIVE-ROUNDS-20261026.md))
