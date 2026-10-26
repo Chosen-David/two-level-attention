@@ -377,6 +377,11 @@ class TLIIndexer(TIAIndexer):
         self._fine_gather = (
             os.environ.get("TLI_FINE_GATHER", "1").strip() != "0")
         self._tmask_ok = True
+        # 【E127 inplace 合并】Triton fast path + 尾段统计/量化融合
+        # kernel 健康门（异常置 False 后本实例永久回退原版表达式）。
+        self._triton_ok = True
+        self._stat_ok = True
+        self._quant_ok = True
         # E151c is implemented only in the E64 split-budget top-k branches.
         # Other selection modes return before those branches or use a different
         # budget contract; accepting the table there would silently ignore it.
