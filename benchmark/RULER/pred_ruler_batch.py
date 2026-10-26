@@ -105,8 +105,8 @@ def parse_args():
     parser.add_argument("--max-num", type=int, default=500,
                         help="每任务样本数（0=全量）")
     parser.add_argument("--batch-size", type=int, default=1,
-                        help="decode batch（left-pad 打包；Phase 1 仅"
-                             "fasa_vendor/none 支持 >1）")
+                        help="decode batch（支持 none/fasa_vendor/tli；"
+                             "compact TLI 支持按请求混合 ring/linear cache）")
     parser.add_argument("--yarn", action="store_true",
                         help="启用 YaRN 位置扩展（65536/131072 档必开）")
     parser.add_argument("--yarn_factor", type=float, default=None)
@@ -198,6 +198,7 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
     pid_buf = torch.zeros((B, 1), dtype=torch.long, device=device)
     pos_buf = torch.zeros(B, dtype=torch.long, device=device)
     vl_buf = torch.zeros(B, dtype=torch.long, device=device)
+    alive_buf = torch.ones(B, dtype=torch.bool, device=device)
     m4_buf = torch.full((B, 1, 1, S_cap), neg_inf, dtype=dtype, device=device)
     snap_seq, snap_gen = list(ctx.seq_lens), list(ctx.gen_lens)
 
@@ -217,6 +218,7 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
                                    dtype=torch.long, device=device))
         vl_buf.copy_(torch.tensor(ctx.seq_lens, dtype=torch.long,
                                   device=device))
+        alive_buf.copy_(torch.tensor(ctx.alive, dtype=torch.bool, device=device))
         m4_buf.fill_(neg_inf)
         for b in range(B):
             m4_buf[b, 0, 0, :ctx.seq_lens[b]] = 0
@@ -225,6 +227,7 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
         enable_graph(B)
         gs.pos_buf = pos_buf
         gs.valid_len_buf = vl_buf
+        gs.alive_buf = alive_buf
         _inject(0)
         # warmup（主 stream，2 步）：HF 惰性分配 / kernel 选择 / Triton
         # autotune 必须发生在 capture 之外；写列重复覆盖（replay 首步同
@@ -286,6 +289,50 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
     return gen
 
 
+def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids):
+    """Compact TLI: per-request prefill/gates, batched model decode, optional graph."""
+    from sparse_attn.ops.hybrid_batch_cache import HybridBatchCacheBuilder
+    from sparse_attn.ops.hybrid_batch_runner import HybridBatchRunner
+
+    device = next(model.parameters()).device
+    input_ids, position_ids = input_ids.to(device), position_ids.to(device)
+    pad_id = tokenizer.pad_token_id
+    if pad_id is None:
+        pad_id = tokenizer.eos_token_id
+    batch, width = input_ids.shape
+    builder = HybridBatchCacheBuilder(model, max(lens)+MAX_GEN, batch)
+    generated = []
+    # Do not expose the outer B-row BatchCtx to a B=1 unpadded prefill.
+    with batch_decode_scope(None):
+        for b, length in enumerate(lens):
+            output = model(input_ids=input_ids[b:b+1, width-length:],
+                           position_ids=position_ids[b:b+1, width-length:], use_cache=True)
+            generated.append([output.logits[0, -1].argmax().item()])
+            builder.add(output.past_key_values, length)
+            del output  # Release full prefill KV before the next request.
+    runner = HybridBatchRunner(model, builder.finish(), pad_id)
+    use_graph = os.environ.get('TLI_CUDA_GRAPH', '0') == '1'
+    alive, lengths = [True]*batch, list(lens)
+    for step in range(MAX_GEN-1):
+        if not any(alive):
+            break
+        tokens = [row[-1] if active else pad_id for row, active in zip(generated, alive)]
+        lengths = [length+int(active) for length, active in zip(lengths, alive)]
+        runner.inject(tokens, lengths, alive)
+        if use_graph and step == 0:
+            # This path supports short contexts too; capture failures are visible.
+            runner.capture()
+        predicted = runner.run().logits[:, -1].argmax(-1).tolist()
+        for b, token in enumerate(predicted):
+            if alive[b]:
+                generated[b].append(token)
+                if token in eos_ids and len(generated[b]) > 1:
+                    alive[b] = False
+    print(f'[hybrid-batch] B={batch} graph={runner.graph is not None} '
+          f'kv_storage_bytes={runner.kv_storage_bytes()}', flush=True)
+    return generated
+
+
 def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                         mask2d, lens, eos_ids, keep_logits,
                         fixed_cache=False):
@@ -300,6 +347,12 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
     （CUDA Graph 前置）。decode 4D mask 列数恒 S_cap、可见列取头部
     [0, seq_lens[b])（left_pad_kv=True）。
     """
+    compact = any(getattr(getattr(m, 'indexer', None), 'far_skip_backend', '') == 'compact'
+                  for m in model.modules())
+    if compact:
+        if not fixed_cache:
+            raise ValueError('compact batched decode requires fixed_cache=True')
+        return _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids)
     B = len(rows)
     pad_id = getattr(tokenizer, "pad_token_id", None) or tokenizer.eos_token_id
     input_ids = input_ids.to("cuda")
