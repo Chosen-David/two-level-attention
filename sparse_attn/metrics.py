@@ -63,6 +63,19 @@ class Metrics:
                 num_select_tokens = b_mask.sum().item() * block_size / b_mask.shape[0]
                 self.select_tokens.append(num_select_tokens)
 
+    def add_select_result_batch(self,
+        lengths: torch.Tensor,
+        mask: torch.Tensor,
+        block_size: int,
+    ):
+        """批量版 add_select_result（parallel batch indexer 调用）。
+
+        数值契约：逐样本等价于 add_select_result(lengths[b:b+1]-1, mask[b:b+1], bs)。
+        lengths: [B] int64（绝对序列长），mask: [B, 1, H, S]。
+        """
+        for b in range(lengths.shape[0]):
+            self.add_select_result(lengths[b:b + 1] - 1, mask[b:b + 1], block_size)
+
     def get_select_tokens(self):
         if len(self.select_tokens) > 0:
             # E127 iter1：惰性条目 = (tensor, bs, H) 三元组；旧条目 = float。

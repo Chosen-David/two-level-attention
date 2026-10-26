@@ -217,6 +217,15 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   ablation。报告+LaTeX 段：`agent_doc/advice/e175_gpt_far_skip_eviction/`。
   代码 324073d 合入 `perf/gpt-kv-eviction` 作实验记录（分支保留）。
 
+- **E176 batch indexer 并行化评测（eager 路径，128K）**：legacy vs
+  `TLI_BATCH_INDEXER=parallel` 对比——B=1 125.33 vs 125.38ms
+  (+0.04%)，B=2 196.15 vs 195.93ms (−0.11%)，B=4 371.35 vs 370.98ms
+  (−0.10%) → **全部在噪声带内，零收益**。根因：eager 路径 indexer 开销
+  (~3.3ms topk + ~8.5ms copy) 在总 decode 125ms 中占比已小，batch
+  Triton kernel 并行优势被 Python 逐行循环开销淹没。代码已合入 main
+  （opt-in `TLI_BATCH_INDEXER` env 开关），但**不推荐作为性能优化手段**。
+  载体：`sparse_attn/indexer/tli_batch*.py` + `qwen3_attn_patch.py` 路由。
+
 ## 3. 对比口径（vendor 基线）
 
 - 对比基线（Quest/MInference/SparQ/MoBA/ClusterKV/AsyncTLS/HISA/JSSA/
