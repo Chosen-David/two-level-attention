@@ -17,8 +17,8 @@ update 只依赖 batch_decode_ctx + pos_buf，与 attention 方法无关）。
     → fill_static_from_dynamic 搬入进程级 TLIStaticCache（有效在前，
     S_cap = len(ids)+max_gen+8；fill 是一次性 setup，单独计时
     fill_static_ms，不进 TTFT/TPOT——serving 中静态池同口径）；
-  - decode 整步 capture 一次（首个 warmup repeat 内：2 步主 stream 热跑
-    后 capture，pred_ruler 同款），之后所有 repeat 逐步 replay；
+  - 线性 cache 首轮 capture 后复用；compact cache 每请求重建布局与
+    workspace，释放旧 graph 后重新 capture，capture 成本单独记录；
   - 步进注入：nxt/pid/pos/vl/m4 五 buffer copy_（graph_state 模式）；
     decode 步 s 喂 gen[s]（首 token 来自 prefill argmax），写列 L+s，
     seq_lens = L+s+1；
@@ -161,7 +161,7 @@ class GraphRunner:
         self.pos_buf = torch.zeros(1, dtype=torch.long, device=dev)
         self.vl_buf = torch.zeros(1, dtype=torch.long, device=dev)
         self.m4_buf = torch.full((1, 1, 1, S_cap), neg_inf,
-                                 dtype=torch.bfloat16, device=dev)
+                                 dtype=next(model.parameters()).dtype, device=dev)
         self.graph = None
         self.out = None
 
@@ -181,8 +181,21 @@ class GraphRunner:
 
     def forward(self):
         return self.model(input_ids=self.nxt_buf, position_ids=self.pid_buf,
+                          cache_position=self.pos_buf,
                           attention_mask=self.m4_buf, past_key_values=self.cache,
                           use_cache=True)
+
+    def fill(self, dyn, length):
+        """Refill one request; compact gates/workspace/pointers require recapture."""
+        compact = getattr(self.cache, '_far_skip_prepared', False) or any(
+            getattr(getattr(m, 'indexer', None), 'far_skip_backend', 'legacy') == 'compact'
+            for m in self.model.modules())
+        if compact:
+            self.graph = self.out = None
+        fill_static_from_dynamic(self.cache, dyn, [length], model=self.model)
+        if getattr(self.cache, '_far_skip_prepared', False):
+            # This caller owns the unpadded mask and updates it with position.
+            self.cache._far_skip_attention_mask = self.m4_buf
 
     def warmup_and_capture(self, token, seq_len_after_inc):
         """2 步主 stream 热跑（惰性分配/autotune 出图外）+ 1 步 capture。
@@ -231,12 +244,16 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture):
         del out
 
         t_fill = time.perf_counter()
-        fill_static_from_dynamic(runner.cache, dyn, [L], model=model)
+        runner.fill(dyn, L)
         torch.cuda.synchronize()
         fill_ms = (time.perf_counter() - t_fill) * 1e3
         del dyn
+        decode_cache_allocated_gib = torch.cuda.memory_allocated() / 2**30
+        kv_storage_bytes = sum(
+            t.numel() * t.element_size() for layer in runner.cache.layers
+            for t in (layer.keys, layer.values))
 
-        if do_capture:
+        if do_capture or (graph_state().enabled and runner.graph is None):
             # enable_graph 在 main 里于进程启动时已开（graph 模式）；
             # buffer 绑定在 main 里完成。
             capture_ms = runner.warmup_and_capture(first_token, L + 1)
@@ -288,6 +305,8 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture):
         "tpot_ms": decode_wall_ms / len(step_ms) if step_ms else None,
         "step_ms": step_ms,
         "peak_mem_delta_gib": peak_delta_gib,
+        "decode_cache_allocated_gib": decode_cache_allocated_gib,
+        "kv_storage_bytes": kv_storage_bytes,
         "n_input_tokens": L,
         "n_generated": max_gen,
         "gen_tokens": gen,

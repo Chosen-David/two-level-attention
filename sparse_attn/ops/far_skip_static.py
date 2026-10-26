@@ -57,6 +57,11 @@ def prepare_far_skip_static(cache, dyn, seq_lens, model):
     modules = {m.layer_idx: m for m in model.modules()
                if getattr(getattr(m, 'indexer', None), 'far_skip_backend', 'legacy') == 'compact'}
     if not modules:
+        for li, old in enumerate(cache.layers):
+            if isinstance(old, FarSkipStaticLayer):
+                cache.layers[li] = TLIStaticLayer(old.max_cache_len, cache.batch_size)
+        cache._far_skip_prepared = False
+        cache._far_skip_attention_mask = None
         return set()
     if (cache.batch_size != 1 or len(seq_lens) != 1 or type(dyn) is not DynamicCache
             or getattr(dyn, 'offloading', False) or model.training or torch.is_grad_enabled()
