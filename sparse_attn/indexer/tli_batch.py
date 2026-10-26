@@ -59,6 +59,12 @@ class BatchedTLI:
             raise ValueError('TLI_BATCH_FUSIONS must be 0 or 1')
         if fusion_flag == '1' and self.score_backend != 'triton':
             raise ValueError('TLI_BATCH_FUSIONS=1 requires TLI_BATCH_SCORE=triton')
+        pipeline_flag = os.environ.get('TLI_BATCH_GPU_PIPELINE', '0')
+        if pipeline_flag not in ('0', '1'):
+            raise ValueError('TLI_BATCH_GPU_PIPELINE must be 0 or 1')
+        if pipeline_flag == '1' and (fusion_flag != '1' or indexer.l2_quant):
+            raise ValueError('TLI_BATCH_GPU_PIPELINE=1 requires TLI_BATCH_FUSIONS=1 and l2_quant=False')
+        self.gpu_pipeline = None
         self.triton_score = None
         self.triton_ops = None
         if self.score_backend == 'triton':
@@ -67,6 +73,9 @@ class BatchedTLI:
             from . import tli_batch_kernels
             self.triton_ops = tli_batch_kernels if fusion_flag == '1' else None
             self.triton_score = tli_batch_kernels.score
+            if pipeline_flag == '1':
+                from . import tli_batch_pipeline
+                self.gpu_pipeline = tli_batch_pipeline
         # Only active L1 pools need a score source. Keep an AVG/minmax source
         # even with zero quotas, to provide correctly shaped empty top-k inputs.
         methods = {indexer.near_method}
@@ -84,6 +93,14 @@ class BatchedTLI:
         self.fine_dims = (None if indexer.l2_subspace == 'full' else
                           self.coarse_dims if self.coarse_dims is not None
                           else indexer._qat_indices(k.device))
+        # Normalize dimension lists once, preserving shared-subspace identity.
+        shared_dims = self.coarse_dims is self.fine_dims
+        if self.coarse_dims is not None:
+            self.coarse_dims = self.coarse_dims.contiguous()
+        if shared_dims:
+            self.fine_dims = self.coarse_dims
+        elif self.fine_dims is not None:
+            self.fine_dims = self.fine_dims.contiguous()
         self.rows = torch.arange(self.B, device=k.device)
         self.heads = torch.arange(self.H, device=k.device)
         self.tokens = torch.arange(self.S, device=k.device)
@@ -119,6 +136,9 @@ class BatchedTLI:
         torch._assert_async(((lengths >= self.previous)
                              & (lengths <= self.previous+1)).all(),
                             'parallel indexer needs append-only lengths; clear at refill')
+        if self.gpu_pipeline is not None:
+            self.gpu_pipeline.update_cache(self, k, lengths)
+            return
         pos = lengths - 1
         page = pos // self.bs
         if self.triton_ops is not None:
@@ -150,6 +170,8 @@ class BatchedTLI:
         self.previous.copy_(lengths)
 
     def _queries(self, q, scale):
+        if self.gpu_pipeline is not None:
+            return self.gpu_pipeline.queries(q, scale, self.coarse_dims, self.fine_dims, self.H)
         # Projection commutes with elementwise scale/cast. Shared subspaces
         # need one narrow projection, not two full-width scaled intermediates.
         B, _, Hq, _ = q.shape
@@ -203,24 +225,27 @@ class BatchedTLI:
         near_src = avg if idx.near_method == 'avg' else sc
         fi = far_src.masked_fill(~fp[:, None], -torch.inf).topk(min(nf,self.P), -1).indices
         ni = near_src.masked_fill(~np[:, None], -torch.inf).topk(min(nn,self.P), -1).indices
-        blocks = torch.cat((fi, ni), -1)
-        ok = torch.cat((fp[:, None].expand(-1,H,-1).gather(-1,fi),
-                        np[:, None].expand(-1,H,-1).gather(-1,ni)), -1)
-        ids = (blocks[..., None]*bs+self.offsets).flatten(-2)
-        keep = (ok[..., None].expand(-1,-1,-1,bs).flatten(-2)
-                & (ids < lengths[:, None, None]))
-        byblocks = torch.stack((torch.full_like(bypage,lo if sink%bs else 0), bypage), -1)
-        byids = (byblocks[..., None]*bs+self.offsets).flatten(-2)
-        bykeep = torch.stack((torch.full_like(byok,bool(sink%bs)),byok), -1)
-        bykeep = bykeep[..., None].expand(-1,-1,bs).flatten(-2) & (byids < lengths[:,None])
-        # When the sink and SWA cross the same page, include it only once.
-        bykeep[:, bs:] &= ~((bypage == lo) & bool(sink%bs))[:,None]
-        ids = torch.cat((ids, byids[:,None].expand(-1,H,-1)), -1)
-        keep = torch.cat((keep, bykeep[:,None].expand(-1,H,-1)), -1)
-        if self.triton_ops is not None:
-            ids, keep = self.triton_ops.compact(ids, keep)
+        if self.gpu_pipeline is not None:
+            ids, keep = self.gpu_pipeline.candidates(fi, ni, lengths, bs, lo, sink, swa, idx.nt_near_len)
         else:
-            ids, keep = compact_candidates(ids, keep, self.candidate_rank)
+            blocks = torch.cat((fi, ni), -1)
+            ok = torch.cat((fp[:, None].expand(-1,H,-1).gather(-1,fi),
+                            np[:, None].expand(-1,H,-1).gather(-1,ni)), -1)
+            ids = (blocks[..., None]*bs+self.offsets).flatten(-2)
+            keep = (ok[..., None].expand(-1,-1,-1,bs).flatten(-2)
+                    & (ids < lengths[:, None, None]))
+            byblocks = torch.stack((torch.full_like(bypage,lo if sink%bs else 0), bypage), -1)
+            byids = (byblocks[..., None]*bs+self.offsets).flatten(-2)
+            bykeep = torch.stack((torch.full_like(byok,bool(sink%bs)),byok), -1)
+            bykeep = bykeep[..., None].expand(-1,-1,bs).flatten(-2) & (byids < lengths[:,None])
+            # When the sink and SWA cross the same page, include it only once.
+            bykeep[:, bs:] &= ~((bypage == lo) & bool(sink%bs))[:,None]
+            ids = torch.cat((ids, byids[:,None].expand(-1,H,-1)), -1)
+            keep = torch.cat((keep, bykeep[:,None].expand(-1,H,-1)), -1)
+            if self.triton_ops is not None:
+                ids, keep = self.triton_ops.compact(ids, keep)
+            else:
+                ids, keep = compact_candidates(ids, keep, self.candidate_rank)
         # No [B,Hq,S,D] repeat; only [B,Hkv,R,d] candidate features.
         if self.triton_score is not None:
             sf = self.triton_score(self.kfine,qf,q.dtype,ids=ids,keep=keep)
@@ -233,6 +258,10 @@ class BatchedTLI:
         mid = keep & (ids >= lo*bs) & (ids < swalo[:,None,None])
         ntop = min(idx.args.tia_level2_topk, ids.shape[-1])
         top = p.masked_fill(~mid, -torch.inf).topk(ntop, -1).indices
+        if self.gpu_pipeline is not None:
+            mask = self.gpu_pipeline.mask_from_top(top, ids, keep, lengths, S, lo*bs,
+                                                  sink, swa, idx.args.tia_level2_topk)
+            return mask[:,None]
         selected = ids.gather(-1, top)
         midbudget = (idx.args.tia_level2_topk-sink-(lengths-swalo)).clamp(min=0)
         valid = mid.gather(-1,top) & (torch.arange(ntop,device=q.device)[None,None] < midbudget[:,None,None])

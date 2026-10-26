@@ -97,3 +97,6 @@ Remaining costs to profile on GPU:
   than D128 reduces logical feature elements, not a measured 4× HBM speedup.
 - End-to-end GPU speed, memory peak, generated-token parity, RULER, repository
   E127 and batch CUDA gates remain unverified in this CPU-only environment.
+
+Further GPU producer/consumer fusion and the remote stress entry are documented in
+[`tli_gpu_pipeline.md`](tli_gpu_pipeline.md); GPU validation remains pending.

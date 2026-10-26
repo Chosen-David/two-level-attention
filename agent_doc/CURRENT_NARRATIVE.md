@@ -250,6 +250,7 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 | α/β/γ 比例化几何口径（E64 帕累托点叙事） | E155d 参数退役（用户 2026-10-19 拍板转向 nb/nt/nl 显式几何）；比例口径的全部历史数字仅作 E64-E155 谱系档案（`exp/trace_archives/probe_e5b_e98/`） |
 | e152v2 dynamic-cache 性能口径（TLI 3.4×/2.5×/1.8× slower） | 已被 `e152v4_formal_verdict.json` 整步 graph 口径取代（论文图 E2 已 in-place 重写，commit e5071cb） |
 | MLA 子空间增益可线性兑现到 e2e | `e158b_mla_rope_nope32_e2e_verdict.json` 饱和映射边界披露 |
+| kernel fusion 已经消除 batch indexer 的所有 copy，融合越大越快 | `docs/tli_gpu_pipeline.md`：新增四类真实 Triton producer/consumer 融合，整行扫描曾占 255 registers/thread，分块后编译峰值 60；仍有 topk/softmax/full-mask/attention 流量。188 个 offline build 与解释器检查均不是实际 GPU 提速，远端与模型验收待执行。 |
 | γ-off 自由竞争需 CLI `--tli_gamma off` | 显式几何等价物 `--tli_near_tokens off`（E155d；γ 接口已删除） |
 
 ## 6. 仓库结构速览（净化后）
