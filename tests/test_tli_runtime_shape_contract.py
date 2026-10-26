@@ -19,7 +19,7 @@ def load_harness(method_name, base_source="class Base:\n    pass\n"):
         node for node in cls.body
         if isinstance(node, ast.FunctionDef) and node.name == method_name
     )
-    namespace = {}
+    namespace = {"_graph_state_fn": None}  # This harness tests non-Graph dispatch.
     source = base_source + "\nclass Harness(Base):\n"
     source += "\n".join("    " + line for line in ast.unparse(method).splitlines())
     exec(compile(source, str(SOURCE), "exec"), namespace)
@@ -40,8 +40,9 @@ class TliRuntimeShapeContractTests(unittest.TestCase):
         harness.subspace = "full"
         harness._need_avg_score = lambda: False
         harness._sub_key = lambda: ("full", 1)
-        harness._prepare_index_inc = lambda *_args: "incremental"
-        harness._prepare_index_full = lambda *_args: "full"
+        harness._prepare_index_inc = lambda *_args: {"route": "incremental"}
+        harness._prepare_index_full = lambda *_args, **kwargs: {
+            "route": "full", "valid_length": kwargs["valid_length"]}
         return harness
 
     def test_incremental_entry_rejects_extra_batch_instead_of_ignoring_it(self):
@@ -60,17 +61,25 @@ class TliRuntimeShapeContractTests(unittest.TestCase):
         harness = self._prepare_harness()
         self.assertEqual(
             harness.prepare_index(SimpleNamespace(shape=(1, 8, 4, 128)), object()),
-            "incremental",
+            {"route": "incremental"},
         )
         self.assertEqual(
             harness.prepare_index(SimpleNamespace(shape=(1, 4, 4, 128)), object()),
-            "full",
+            {"route": "full", "valid_length": None},
         )
         harness.subspace = "mla_rope"
         self.assertEqual(
             harness.prepare_index(SimpleNamespace(shape=(1, 8, 4, 192)), object()),
-            "full",
+            {"route": "full", "valid_length": None},
         )
+
+    def test_explicit_length_reaches_full_and_incremental_results(self):
+        harness = self._prepare_harness()
+        for length, route in ((4, "full"), (8, "incremental")):
+            with self.subTest(route=route):
+                self.assertEqual(harness.prepare_index(
+                    SimpleNamespace(shape=(1, length, 4, 128)), object(),
+                    valid_length=3), {"route": route, "valid_length": 3})
 
     def test_score_entry_rejects_multi_query_even_on_parent_shortcut(self):
         base = """class Base:
@@ -123,3 +132,4 @@ class TliRuntimeShapeContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

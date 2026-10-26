@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-23
+
+- [ ] [TL-VALID-LENGTH-20261023] prepare_mask 固定容量有效长度入口校验；真实 CPU 相邻回归普通/-O 各142项通过，原基线守卫反例保留。独立复核通过；仅 draft PR，完整仓库/GPU/Graph/性能未验。([详情](task_details/TL-VALID-LENGTH-20261023.md))
+
 ## 2026-10-21
 
 - [x] [TL-ASYNC-CANDIDATE-20261021] 候选L2拒绝async组合并回退既有全宽路由，避免当前候选丢掉上一轮L1掩码所需分数；修前2失败，修后普通/-O各16项host回归通过。实际Torch/GPU、质量、性能与显存未验。([详情](task_details/TL-ASYNC-CANDIDATE-20261021.md))

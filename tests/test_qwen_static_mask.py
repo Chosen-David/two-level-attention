@@ -15,6 +15,7 @@ from unittest.mock import patch
 import weakref
 
 import torch
+from sparse_attn.baseline_runtime import batch_decode_ctx
 from transformers.cache_utils import DynamicCache, StaticCache
 from transformers.integrations.sdpa_attention import sdpa_attention_forward
 from transformers.models.qwen3.modeling_qwen3 import (
@@ -28,6 +29,7 @@ def load_functions():
     tree.body = [ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)] + [
         n for n in tree.body if isinstance(n, ast.FunctionDef)]
     ns = dict(torch=torch, os=os, sys=sys, weakref=weakref,
+              batch_decode_ctx=batch_decode_ctx,
               apply_rotary_pos_emb=apply_rotary_pos_emb,
               eager_attention_forward=eager_attention_forward,
               ALL_ATTENTION_FUNCTIONS={'sdpa': sdpa_attention_forward})
@@ -167,3 +169,4 @@ class StaticMask(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
