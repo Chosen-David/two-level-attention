@@ -231,7 +231,7 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture):
         del out
 
         t_fill = time.perf_counter()
-        fill_static_from_dynamic(runner.cache, dyn, [L])
+        fill_static_from_dynamic(runner.cache, dyn, [L], model=model)
         torch.cuda.synchronize()
         fill_ms = (time.perf_counter() - t_fill) * 1e3
         del dyn

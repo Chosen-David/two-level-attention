@@ -155,7 +155,7 @@ class TLIStaticCache(Cache):
         # property setter → AttributeError: no setter）。
 
 
-def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens):
+def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, model=None):
     """把 prefill 后的 DynamicCache（有效占尾）搬进 TLIStaticCache（有效在前）。
 
     dyn.layers[l].keys/values：[B, Hkv, S_max, D]，行 b 有效列 =
@@ -170,6 +170,9 @@ def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens):
     【TF 4.56 适配】4.56 移除 DynamicCache.key_cache/value_cache 属性，
     改为 layers[l].keys/values（DynamicLayer 直接字段）；旧属性访问
     AttributeError（GPU 单测未覆盖 e2e 形态，4.56.2 跑批现形）。
+
+    model: 若提供，搬移后调用 prepare_far_skip_static 对 far-skip 层做一次
+    prefill-end 截断/重分配到 ring buffer 容量（物理节省 dead far KV）。
     """
     n_layers = len(cache.layers)
     if len(dyn.layers) != n_layers:
@@ -192,3 +195,8 @@ def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens):
             if L:
                 layer.keys[b, :, :L].copy_(k[b, :, S_max - L:])
                 layer.values[b, :, :L].copy_(v[b, :, S_max - L:])
+
+    # Far-skip: prefill 结束后一次性截断死 far KV → 物理节省
+    if model is not None:
+        from .far_skip_static import prepare_far_skip_static
+        prepare_far_skip_static(cache, dyn, seq_lens, model)

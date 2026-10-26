@@ -443,6 +443,13 @@ class TLIIndexer(TIAIndexer):
                 )
             self.enable_subspace = True
 
+        # ---- far-skip compact 配置（必须在 nt_near_len/nt_near_pages 之后）----
+        self.far_skip_backend = getattr(args, "tli_far_skip_backend", "legacy")
+        self.far_skip_cache = getattr(args, "tli_far_skip_cache", "retain")
+        if self.far_skip_backend != "legacy" or self.far_skip_cache != "retain":
+            from ..ops.far_skip_runtime import configure_far_skip
+            configure_far_skip(self)
+
     # ---------------- E135：sink/swa 参数化的单一事实源 ---------------- #
 
     @property
@@ -1228,8 +1235,12 @@ class TLIIndexer(TIAIndexer):
                       and k_for_coarse.stride(-1) == 1)
         if _use_fused:
             try:
+                # 注意：k_for_coarse 在此处已是子空间切片后的 tensor
+                # （L1169: pad_k[..., idx_sub] if idx_sub is not None），
+                # 不能再传 idx_sub 给 kernel 做二次 gather（越界）。
+                # _fast_stat_full 内部会根据 stride(-1) 与 shape(-1) 判断是否需 sub。
                 k_min, k_max, k_avg = self._fast_stat_full(
-                    k_for_coarse, idx_sub, need_avg)
+                    k_for_coarse, None, need_avg)
             except Exception:
                 if not self._stat_ok:
                     _use_fused = False  # 永久回退原版链
