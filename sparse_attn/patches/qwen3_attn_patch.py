@@ -231,6 +231,16 @@ def qwen3_attn_forward(
     cos, sin = position_embeddings
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
+    if getattr(self.indexer, "far_skip_backend", "legacy") == "compact":
+        from ..ops.far_skip_runtime import try_far_skip_decode
+        compact_output = try_far_skip_decode(
+            self, query_states, key_states, value_states, past_key_values,
+            attention_mask, cache_position, batch_decode_ctx())
+        if compact_output is not None:
+            compact_output = self.o_proj(compact_output.reshape(*input_shape, -1))
+            _paper_route(self.layer_idx, "sparse-decode-far-compact")
+            return compact_output, None
+
     cur_len = 0
     is_static_cache = False
     if past_key_values is not None:
@@ -480,3 +490,4 @@ def qwen3_attn_forward(
     attn_output = attn_output.reshape(*input_shape, -1).contiguous()
     attn_output = self.o_proj(attn_output)
     return attn_output, attn_weights
+

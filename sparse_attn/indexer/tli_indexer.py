@@ -433,6 +433,14 @@ class TLIIndexer(TIAIndexer):
             self.enable_subspace = True  # 投影基定义在子空间内，强制开启
             print(f"[TLI] 投影基已加载 {bp_path} shape={list(self._basis_all.shape)}")
         self._basis = None   # 当前层子空间基 [Hkv, 32, r]（惰性提取于 prepare_index）
+
+        # ---- far-skip KV eviction codex 接入 ----
+        self.far_skip_backend = getattr(args, "tli_far_skip_backend", "legacy")
+        self.far_skip_cache = getattr(args, "tli_far_skip_cache", "retain")
+        if self.far_skip_backend != "legacy" or self.far_skip_cache != "retain":
+            from ..ops.far_skip_runtime import configure_far_skip
+            configure_far_skip(self)
+
         # ---- E85f：per-layer 静态 pair 选取（e2e 判决）----
         #   E85e 重放：prefill 尾 256 q 平均 |q| 的 pair 幅值 |q̄_j|+|q̄_{j+64}|
         #   top-16 完整对，层固定、可索引化，recall 0.849 vs tail32 0.811。
@@ -4662,6 +4670,7 @@ class TLIIndexer(TIAIndexer):
         }
 
     def clear(self):
+        self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None
         self._km_token_assign = None

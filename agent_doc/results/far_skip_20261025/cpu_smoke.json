@@ -1,0 +1,63 @@
+{
+  "scope": "single-layer synthetic decode; not model throughput or quality",
+  "config": {
+    "device": "cpu",
+    "lengths": [
+      8192
+    ],
+    "steps": 8,
+    "warmup": 2,
+    "near_len": 1024,
+    "near_pages": 8,
+    "budget": 1024,
+    "legacy": false
+  },
+  "python": "3.12.14",
+  "torch": "2.8.0+cpu",
+  "transformers": "4.56.2",
+  "gpu": null,
+  "measurements": [
+    {
+      "mode": "retain",
+      "prompt_length": 8192,
+      "logical_length": 8202,
+      "physical_tokens": 8202,
+      "kv_storage_bytes": 33595392,
+      "first_decode_wall_ms": 19.836404999296064,
+      "wall_ms": [
+        14.557600999978604,
+        10.315000001355656,
+        18.204656000307295,
+        13.266967000163277,
+        10.326898000130313,
+        18.46844400097325,
+        13.785158000246156,
+        10.227889000816504
+      ],
+      "cuda_event_ms": [],
+      "median_wall_ms": 13.526062500204716,
+      "output_sum": -1.7570470571517944
+    },
+    {
+      "mode": "evict",
+      "prompt_length": 8192,
+      "logical_length": 8202,
+      "physical_tokens": 1290,
+      "kv_storage_bytes": 5283840,
+      "first_decode_wall_ms": 10.639909000019543,
+      "wall_ms": [
+        4.396784001073684,
+        4.883036999672186,
+        4.434209999089944,
+        4.723797001133789,
+        4.59042500006035,
+        4.9691759995766915,
+        4.557606000162195,
+        4.834803999983706
+      ],
+      "cuda_event_ms": [],
+      "median_wall_ms": 4.6571110005970695,
+      "output_sum": -1.7570470571517944
+    }
+  ]
+}

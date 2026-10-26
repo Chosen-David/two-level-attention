@@ -1,0 +1,49 @@
+{
+  "base_commit": "2c726b54ad084ddb8f4a061954c6352afffb2da5",
+  "scope": "CPU implementation correctness and single-layer KV storage; no GPU/model-quality claim",
+  "independent_review": false,
+  "source_sha256": {
+    "sparse_attn/arguments.py": "ea98703ae349fb47a48c4df59b95a2f453ed728bbb76b70307b9533ddc2e1bb5",
+    "sparse_attn/info.py": "8b2282c3fd568b06a85ce9a494f36eb74565c8e5f151cb2b740ed18f4c151701",
+    "sparse_attn/indexer/tli_indexer.py": "8ef955e4f79066f3c7e0e98cf00f005e59b57bd99f9196fbb422b8ecb621d206",
+    "sparse_attn/patches/patch.py": "b6aaae15cf2b805a97fbcb3313f3391b0d582314b1aaf1643aaef9371a585a29",
+    "sparse_attn/patches/qwen3_attn_patch.py": "6e3c18ac978ad27189b32bad86d0fe47c68663a720d472dab448306f6f4e23cf",
+    "sparse_attn/ops/far_skip.py": "ee6efb981a36cd30f128ab3af2ef18d318632f7330e1ee0b71798d60359efa85",
+    "sparse_attn/ops/far_skip_cache.py": "93cf74b14018710198e8ef4dc7b29356bfca75098ed3f0b9112063897fdcea68",
+    "sparse_attn/ops/far_skip_runtime.py": "e5878c24d5df7be3e36894b3f1ea8f9177ca97c60001d10d6b49605903dd0277",
+    "tests/test_far_skip_compact.py": "07a0c3aac963a8373d1fa073db31139f781b2a9729dcb33170cbf56977a39ac5",
+    "exp/bench/far_skip_decode.py": "75cfcdf4a1812c0d374a131d6aa70df7839aad30bf37cf940b5e8d72767cb2aa"
+  },
+  "tests": {
+    "command": "python -m pytest -q tests/test_far_skip_compact.py tests/test_explicit_free_budget.py tests/test_explicit_near_page_budget.py tests/test_explicit_quota_modes.py --tb=short",
+    "passed": 50,
+    "subtests_passed": 205,
+    "skipped": 1,
+    "skip_reason": "CUDA unavailable",
+    "raw": "tests.txt"
+  },
+  "cpu_smoke": {
+    "command": "python -m exp.bench.far_skip_decode --device cpu --lengths 8192 --near-len 1024 --near-pages 8 --steps 8 --warmup 2",
+    "raw": "cpu_smoke.json"
+  },
+  "known_baseline_failures": {
+    "suites": [
+      "test_tli_runtime_shape_contract.py",
+      "test_qwen_static_mask.py",
+      "test_tli_async_candidate_gate.py"
+    ],
+    "base_failed_including_subtests": 15,
+    "base_passed": 15,
+    "same_on_changed_sources": true,
+    "causes": [
+      "AST harness missing _graph_state_fn",
+      "AST harness missing batch_decode_ctx",
+      "stale 3-value return expectation; current source returns 4"
+    ]
+  },
+  "limitations": [
+    "Python 3.12 host differs from project Python 3.11",
+    "No CUDA BF16 execution",
+    "No pretrained quality or full-model GPU memory/latency validation"
+  ]
+}

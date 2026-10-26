@@ -130,6 +130,8 @@ _TREATMENT_FIELD_DEFAULTS = {
     "tli_swa_size": 128,
     "tli_sinkswa_only": False,
     # E137：D' gate 动态标定（默认关零扰动；eps/rows 非默认值才进可读名）
+    "tli_far_skip_backend": "legacy",
+    "tli_far_skip_cache": "retain",
     "tli_dyn_dgate": False,
     "tli_dyn_dgate_eps": 0.05,
     "tli_dyn_dgate_rows": 256,
@@ -410,6 +412,9 @@ def resolve_treatment_snapshot(args):
         if f in _FILE_IDENTITY_FIELDS:
             continue
         v = getattr(args, f, d)
+        # Preserve historical identities when the opt-in path is unused.
+        if f in ("tli_far_skip_backend", "tli_far_skip_cache") and v == d:
+            continue
         # 【E155d 参数退役归一】α/β/γ argparse 缺省翻转为 None=未传，
         # manifest 归一回 legacy 数值缺省（0.0/0.0/1.0）；γ CLI "off"
         # 哨兵字符串归一为 None（JSON null，E122 既有口径）——既有
@@ -1193,3 +1198,4 @@ def get_method_name_with_info(args, snapshot=None):
         return "none"
     else:
         raise ValueError
+

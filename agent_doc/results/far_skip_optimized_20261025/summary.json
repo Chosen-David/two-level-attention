@@ -1,0 +1,90 @@
+{
+  "scope": "CPU single-layer synthetic eager; not GPU or full-model speedup",
+  "excluded": [
+    "*_initial.json",
+    "*_pre_validation_guard.json",
+    "paired_cpu_holdout_contended.json"
+  ],
+  "comparisons": [
+    {
+      "source": "paired_cpu.json",
+      "length": 8192,
+      "near_len": 4096,
+      "median_wall_ms": {
+        "v1": 20.375891001094715,
+        "optimized": 10.494871999981115
+      },
+      "cpu_only_speed_ratio": 1.9415092438603712,
+      "median_first_decode_ms": {
+        "v1": 27.264637999905972,
+        "optimized": 27.672361000441015
+      },
+      "kv_storage_bytes": {
+        "v1": 17858560,
+        "optimized": 18083840
+      },
+      "outputs_checked": 216,
+      "max_abs_output_error": 0.0
+    },
+    {
+      "source": "paired_cpu.json",
+      "length": 32768,
+      "near_len": 4096,
+      "median_wall_ms": {
+        "v1": 19.478191999951378,
+        "optimized": 10.969977502099937
+      },
+      "cpu_only_speed_ratio": 1.7755908793999577,
+      "median_first_decode_ms": {
+        "v1": 24.400860998866847,
+        "optimized": 29.548188002081588
+      },
+      "kv_storage_bytes": {
+        "v1": 17858560,
+        "optimized": 18083840
+      },
+      "outputs_checked": 216,
+      "max_abs_output_error": 0.0
+    },
+    {
+      "source": "paired_cpu_holdout.json",
+      "length": 64,
+      "near_len": 1024,
+      "median_wall_ms": {
+        "v1": 0.44042349873052444,
+        "optimized": 0.39239050056494307
+      },
+      "cpu_only_speed_ratio": 1.1224112156039099,
+      "median_first_decode_ms": {
+        "v1": 0.745362998713972,
+        "optimized": 0.8952290008892305
+      },
+      "kv_storage_bytes": {
+        "v1": 425984,
+        "optimized": 5500928
+      },
+      "outputs_checked": 120,
+      "max_abs_output_error": 0.0
+    },
+    {
+      "source": "paired_cpu_holdout.json",
+      "length": 8192,
+      "near_len": 1024,
+      "median_wall_ms": {
+        "v1": 5.471010999826831,
+        "optimized": 3.425084500122466
+      },
+      "cpu_only_speed_ratio": 1.5973360656156692,
+      "median_first_decode_ms": {
+        "v1": 11.787135001213755,
+        "optimized": 12.081418000889244
+      },
+      "kv_storage_bytes": {
+        "v1": 5406720,
+        "optimized": 5500928
+      },
+      "outputs_checked": 120,
+      "max_abs_output_error": 0.0
+    }
+  ]
+}

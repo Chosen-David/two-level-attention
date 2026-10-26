@@ -1,0 +1,28 @@
+{
+  "schema": "e175-m1-footprint",
+  "description": "Post-prefill GPU memory footprint comparison: baseline (no far-skip) vs evict (compact+evict ring). Measured after 1 decode step triggers eviction of skip_far=True layers (static mask: 13/36 layers).",
+  "config": {
+    "device": "NVIDIA H20-3e (pc40 GPU1)",
+    "model": "Qwen3-8B BF16",
+    "layer_skip": "static mask sk4: [0,1,7,8,9,10,11,12,13,14,15,16,35] (13/36 skip_far)",
+    "evict_geom": "near_len=4096, near_pages=32, sink=4, window=128, block=64 → ring_capacity = 4551",
+    "baseline_shadow": "~/tli_ako/solution_iter3",
+    "evict_shadow": "~/tli_ako/solution_iter3_farskip",
+    "measurement_point": "torch.cuda.memory_allocated() after 1 decode step (eviction trigger point)"
+  },
+  "measurements": [
+    {"arm": "legacy", "L": 32768,  "mem_after_prefill_gib": 29.063, "mem_after_decode1_gib": 29.680, "delta_gib":  0.617},
+    {"arm": "evict",  "L": 32768,  "mem_after_prefill_gib": 29.063, "mem_after_decode1_gib": 28.053, "delta_gib": -1.010},
+    {"arm": "legacy", "L": 65536,  "mem_after_prefill_gib": 42.837, "mem_after_decode1_gib": 44.069, "delta_gib":  1.232},
+    {"arm": "evict",  "L": 65536,  "mem_after_prefill_gib": 42.837, "mem_after_decode1_gib": 40.595, "delta_gib": -2.242},
+    {"arm": "legacy", "L": 131072, "mem_after_prefill_gib": 70.384, "mem_after_decode1_gib": 72.850, "delta_gib":  2.465},
+    {"arm": "evict",  "L": 131072, "mem_after_prefill_gib": 70.384, "mem_after_decode1_gib": 65.681, "delta_gib": -4.703}
+  ],
+  "savings": {
+    "32K":  {"baseline_gib": 29.68, "evict_gib": 28.05, "saved_gib":  1.01, "saved_pct":  3.4},
+    "64K":  {"baseline_gib": 44.07, "evict_gib": 40.60, "saved_gib":  2.24, "saved_pct":  5.1},
+    "128K": {"baseline_gib": 72.85, "evict_gib": 65.68, "saved_gib":  4.70, "saved_pct":  6.5}
+  },
+  "interpretation": "Each of the 13 skip_far layers frees (L - sink) far-KV storage at eviction time; steady-state decode-step growth is small vs the one-time release. Savings scale with context length because prefill full KV grows linearly while ring stays constant.",
+  "cross_check": "Single-layer bench kv_storage savings (87% @ 32K, 93% @ 64K, 97% @ 128K) are per-layer figures. Full-model savings are smaller (~3-6%) because only 13/36 layers are evicted and model weights dominate the footprint."
+}
