@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/workspace/scratch/7d83fead945d/repo/exp/bench/compile_tli_gpu_pipeline.py", line 63, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/scratch/7d83fead945d/repo/exp/bench/compile_tli_gpu_pipeline.py", line 41, in main
+    compile_one(k._update_cache,arch,sig,const)
+  File "/workspace/scratch/7d83fead945d/repo/exp/bench/compile_tli_gpu_pipeline.py", line 23, in compile_one
+    proc=subprocess.run([str(ptxas),'-v','--gpu-name=sm_'+str(arch),
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/workspace/scratch/7d83fead945d/triton-runtime/triton/backends/nvidia/bin/ptxas', '-v', '--gpu-name=sm_90', '/tmp/tmp8staon5i/kernel.ptx', '-o', '/tmp/tmp8staon5i/kernel.cubin']' returned non-zero exit status 255.

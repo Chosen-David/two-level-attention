@@ -56,19 +56,27 @@ _GRAPH_GEO_CACHE = {}  # step-level geometry cache (shared by 36 per-layer index
 
 
 def _graph_geo_lookup(valid_len, geo_key):
+    try:
+        version = valid_len._version
+    except RuntimeError:  # inference_mode tensors have no mutation counter
+        return None
     ent = _GRAPH_GEO_CACHE.get(valid_len.data_ptr())
     if (ent is not None
-            and ent[1] == getattr(valid_len, "_version", -1)
+            and ent[1] == version
             and ent[2] == geo_key):
         return ent[3]
     return None
 
 
 def _graph_geo_store(valid_len, geo_key, geo):
+    try:
+        version = valid_len._version
+    except RuntimeError:
+        return geo  # Never reuse geometry without a reliable mutation version.
     if len(_GRAPH_GEO_CACHE) > 8:   # 上限清理（B>1 行缓存 + 防无界增长）
         _GRAPH_GEO_CACHE.clear()
     _GRAPH_GEO_CACHE[valid_len.data_ptr()] = (
-        valid_len, getattr(valid_len, "_version", -1), geo_key, geo)
+        valid_len, version, geo_key, geo)
     return geo
 
 
@@ -238,6 +246,14 @@ class TLIIndexer(TIAIndexer):
                     print(f"[TLI] 警告: 层掩码 {mask_path} 不可读, D' 关闭")
                     self._skip_ids = None
         # 聚类缓存（prefill 一次；decode 期 far 区不变）
+        self._km_centroids = None
+        self._km_token_assign = None
+        self._km_far_lo = None
+        self._km_far_blk_lo = None
+        self._km_blk_ids = None
+        self._km_dims = None
+        self._inc = None
+        self._triton_ok = True
         self._km_near_centroids = None; self._km_near_assign = None
         self._km_near_lo = -1; self._km_near_hi = -1
         self._km_near_key = None; self._km_near_dims = None
@@ -434,13 +450,6 @@ class TLIIndexer(TIAIndexer):
             print(f"[TLI] 投影基已加载 {bp_path} shape={list(self._basis_all.shape)}")
         self._basis = None   # 当前层子空间基 [Hkv, 32, r]（惰性提取于 prepare_index）
 
-        # ---- far-skip KV eviction codex 接入 ----
-        self.far_skip_backend = getattr(args, "tli_far_skip_backend", "legacy")
-        self.far_skip_cache = getattr(args, "tli_far_skip_cache", "retain")
-        if self.far_skip_backend != "legacy" or self.far_skip_cache != "retain":
-            from ..ops.far_skip_runtime import configure_far_skip
-            configure_far_skip(self)
-
         # ---- E85f：per-layer 静态 pair 选取（e2e 判决）----
         #   E85e 重放：prefill 尾 256 q 平均 |q| 的 pair 幅值 |q̄_j|+|q̄_{j+64}|
         #   top-16 完整对，层固定、可索引化，recall 0.849 vs tail32 0.811。
@@ -456,7 +465,6 @@ class TLIIndexer(TIAIndexer):
                 )
             self.enable_subspace = True
 
-        # ---- far-skip compact 配置（必须在 nt_near_len/nt_near_pages 之后）----
         self.far_skip_backend = getattr(args, "tli_far_skip_backend", "legacy")
         self.far_skip_cache = getattr(args, "tli_far_skip_cache", "retain")
         if self.far_skip_backend != "legacy" or self.far_skip_cache != "retain":
@@ -1168,7 +1176,7 @@ class TLIIndexer(TIAIndexer):
         # 逐元素迭代与 pad_tensor 的 bool 掩码散射都需要 host 侧元素个数
         # 同步（capture 期非法）。单行（k_stat.shape[0]==1，本函数断言）且
         # pad_mask 恒为前缀 True 布局 → 静态 total + 切片写入，值逐位相同。
-        if torch.cuda.is_current_stream_capturing():
+        if k.is_cuda and torch.cuda.is_current_stream_capturing():
             _pbs = self.args.tia_block_size
             _total = (k_stat.shape[1] + _pbs - 1) // _pbs * _pbs
             pad_mask, pad_cu_seqlens_k = prepare_pad_mask(_pbs, cu_stat,
@@ -1253,7 +1261,7 @@ class TLIIndexer(TIAIndexer):
                 # 不能再传 idx_sub 给 kernel 做二次 gather（越界）。
                 # _fast_stat_full 内部会根据 stride(-1) 与 shape(-1) 判断是否需 sub。
                 k_min, k_max, k_avg = self._fast_stat_full(
-                    k_for_coarse, None, need_avg)
+                    k_for_coarse, None, need_avg)  # already gathered above; do not index twice
             except Exception:
                 if not self._stat_ok:
                     _use_fused = False  # 永久回退原版链
@@ -4060,6 +4068,11 @@ class TLIIndexer(TIAIndexer):
         swa_byp_blk = swa_lo_tok // bs
         swa_byp_cond = (swa_lo_tok % bs != 0) & (
             swa_byp_blk >= sink_pool_lo)                    # 0-dim bool
+        # Short prompts can put sink and SWA boundaries in the same page.
+        # Eager uses a set of bypass pages; graph slots must not double-count
+        # that page in softmax/GQA aggregation either.
+        if sink_tok % bs != 0:
+            swa_byp_cond = swa_byp_cond & (swa_byp_blk != sink_pool_lo)
         # ---- 原 段2. 池掩码（tensor 区间，固定形状 kt_cap）----
         far_lo_blk = sink_pool_lo
         far_pool_mask = (ar_blk >= far_lo_blk) & (ar_blk < near_blks)
@@ -4077,7 +4090,7 @@ class TLIIndexer(TIAIndexer):
         mid_mask = (ar_tok >= far_tok_lo) & (ar_tok < swa_lo_tok.view(-1))
         mid_mask_inv = ~mid_mask
         swa_force = (ar_tok >= swa_lo_tok.view(-1)) & (ar_tok < S_real.view(-1))
-        k2_mid = torch.clamp(K2 - sink_tok - (S_real - swa_lo_tok), min=0)
+        k2_mid = torch.clamp(S_real.clamp(max=K2) - sink_tok - (S_real - swa_lo_tok), min=0)
         # ---- 原 段5 bypass 槽（slot0 静态 / slot1 = swa 跨界页）----
         slot0 = torch.where(_cst["sink_cross"], _cst["far_lo"], zero_l)
         slot1 = swa_byp_blk
@@ -4145,6 +4158,10 @@ class TLIIndexer(TIAIndexer):
             k_avg = k_avg.squeeze(0)
         kt_cap = k_min.shape[0]
         S_cap = k_qat.shape[1]
+        # A short cache may contain fewer pages than the configured L1 quota.
+        # Clip static slot counts exactly as eager clips each pool's topk.
+        nb_far, nb_near = min(nb_far, kt_cap), min(nb_near, kt_cap)
+        K1 = nb_far + nb_near
         # 静态常量（capture 安全）：torch.tensor(..., device=) 是 host→device
         # 拷贝，CUDA Graph capture 期禁止（cudaMemcpyAsync from pageable）→
         # 实例级缓存（首调 = warmup，在 capture 之外构建；key 含形状/dtype
@@ -4183,7 +4200,7 @@ class TLIIndexer(TIAIndexer):
         # replay 读陈旧几何。capturing 时一律重建（录 kernel 一次），
         # 层 1-35 再按版本命中。
         geo = None
-        if not torch.cuda.is_current_stream_capturing():
+        if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
             geo = _graph_geo_lookup(valid_len, _geo_key)
         if geo is None:
             geo = _graph_geo_store(
@@ -4336,6 +4353,9 @@ class TLIIndexer(TIAIndexer):
                 byp_keep.reshape(1, 1, Hkv, 2 * bs)], dim=-1)   # bool
             cand_idx2 = cand_idx[0, 0]                         # [Hkv,R_cap]
             keep2 = keep[0, 0]                                 # [Hkv,R_cap]
+        # A non-page-aligned capacity can leave out-of-range positions in
+        # inactive slots. Redirect before either torch or Triton gathers them.
+        cand_idx2 = torch.where(keep2, cand_idx2, S_cap - 1)
         # 【2c-2 修复】候选紧凑化重排：_score_fine_cand_kernel 的 cand_len
         # 门控语义 = 「前 cand_len 个位置有效」（offs_r < CLEN[kv]）。原布局
         # cand_idx = [far 96 槽(垃圾), near 32 槽(有效), byp 2 槽(有效)]——
@@ -4405,14 +4425,27 @@ class TLIIndexer(TIAIndexer):
         # mid 判定 gather 到槽域；topk K2 在 8448 槽而非 32800 全宽
         # （候选分恰集中于槽内，kept 集相同：p>0 的候选值同集合，
         # k2_mid ≤ 生产几何 mid 候选数 2048）。
-        mid_slot = (_mid_slot3 if _mid_slot3 is not None
-                    else mid_mask.view(-1)[cand_idx2])          # [Hkv,R_cap]
-        mid_scored = p.masked_fill(~mid_slot, float("-inf"))
-        K2_static = min(R_cap, K2)
-        v_top, i_slot = torch.topk(mid_scored, K2_static, dim=-1)
+        if K2 - sink_tok - swa_tok > nb_near * bs:
+            # An oversized L2 quota can exhaust the scored candidates before
+            # far pages exist. Eager fills the remaining quota from zero-score
+            # mid tokens. Reconstruct that domain rather than selecting padded
+            # candidate slots (which can duplicate tokens or lose quota).
+            # Equal-score topk ties need not pick the same tokens as a shorter
+            # eager tensor; both staged and captured hybrid decode use this path.
+            full_p = p.new_zeros((Hkv, S_cap))
+            full_p.scatter_add_(-1, cand_idx2, p.masked_fill(~keep2, 0))
+            mid_scored = full_p.masked_fill(mid_mask_inv, float('-inf'))
+            K2_static = min(S_cap, K2)
+            tok_top = torch.topk(mid_scored, K2_static, dim=-1).indices
+        else:
+            mid_slot = (_mid_slot3 if _mid_slot3 is not None
+                        else mid_mask.view(-1)[cand_idx2])          # [Hkv,R_cap]
+            mid_scored = p.masked_fill(~mid_slot | ~keep2, float("-inf"))
+            K2_static = min(R_cap, K2)
+            v_top, i_slot = torch.topk(mid_scored, K2_static, dim=-1)
+            tok_top = cand_idx2.gather(-1, i_slot)                # [Hkv,K2]
         rank_keep = (torch.arange(K2_static, device=dev)
                      .view(1, -1) < k2_mid.view(1, 1))
-        tok_top = cand_idx2.gather(-1, i_slot)                # [Hkv,K2]
         # 【E166 iter3a】终掩码装配融合：i_eff where + full_like + zeros/
         # scatter + and + slice fill + or 六段（~6 kernel/层，[Hkv,S_cap]
         # 全宽 3 遍读写 ≈7.5MB/层@128K）换 2 个 Triton kernel（A 基底
@@ -4455,7 +4488,8 @@ class TLIIndexer(TIAIndexer):
         # （回读 .item() 会得到脏值）；warmup 两步在真实 eager 下执行，
         # 已按 capture 时的 seq_lens 记录足量样本（生产几何下 budget 跨步
         # 恒定 → 均值与 staged 逐位相同）。
-        if not torch.cuda.is_current_stream_capturing():
+        sel = sel & (ar_tok < S_real).view(1, 1, 1, -1)
+        if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
             self.metrics.add_select_result(valid_len - 1, sel, 1)
         return sel
 
@@ -4669,7 +4703,14 @@ class TLIIndexer(TIAIndexer):
             "mean_fused": _mean_fused,
         }
 
+    def prepare_mask_batched(self, q, k, valid_lengths, softmax_scale=None):
+        """Opt-in full-batch fixed-capacity decode; see docs/tli_batch_indexer.md."""
+        from .tli_batch import prepare_mask_batched
+        scale = q.shape[-1] ** -0.5 if softmax_scale is None else softmax_scale
+        return prepare_mask_batched(self, q, k, valid_lengths, scale)
+
     def clear(self):
+        self._batch_tli = None
         self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None

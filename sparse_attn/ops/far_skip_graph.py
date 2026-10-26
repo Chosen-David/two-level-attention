@@ -1,4 +1,4 @@
-"""Fixed-shape far-off selection for staged eager and whole-model CUDA Graph.
+"""Fixed-shape far-off selection for tensor-position CUDA Graph execution.
 
 All changing geometry comes from a device int64 length, never Python counters.
 The workspace is bound to one append-only request, one stream, immutable dims
@@ -85,6 +85,12 @@ class FarSkipGraphWorkspace:
         return self.ws.ids(n, self.device)
 
     def gather(self, data, positions, valid, dims=None):
+        from .far_skip_accel import enabled, gather
+        if enabled(data):
+            rows = positions.expand(self.heads, -1) if positions.ndim == 1 else positions
+            mask = valid.expand(self.heads, -1) if valid.ndim == 1 else valid
+            out = gather(data, rows, self.layout, self.ws, dims=dims, valid=mask)
+            return out.transpose(0, 1) if positions.ndim == 1 else out
         safe = torch.where(valid, positions, 0)
         physical = self.layout.map(safe)
         if dims is None:
@@ -171,7 +177,11 @@ class FarSkipGraphWorkspace:
         return positions, mask
 
     def attend(self, q, k, v, positions, valid, scale):
-        kk, vv = self.gather(k, positions, valid), self.gather(v, positions, valid)
+        from .far_skip_accel import enabled, gather
+        if enabled(k):
+            kk, vv = gather(k, positions, self.layout, self.ws, other=v, valid=valid)
+        else:
+            kk, vv = self.gather(k, positions, valid), self.gather(v, positions, valid)
         g = q.shape[2] // self.heads
         out = F.scaled_dot_product_attention(
             q[0, 0].reshape(self.heads, 1, g, q.shape[-1]),

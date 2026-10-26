@@ -1,0 +1,64 @@
+...Fs                                                                    [100%]
+=================================== FAILURES ===================================
+________________ test_qwen_mixed_ring_and_parallel_full_kv[cpu] ________________
+tests/test_far_skip_residency.py:107: in test_qwen_mixed_ring_and_parallel_full_kv
+    output=model(input_ids=torch.tensor([[3]],device=device),position_ids=pos[None],
+/root/.local/lib/python3.12/site-packages/torch/nn/modules/module.py:1773: in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/torch/nn/modules/module.py:1784: in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/transformers/utils/generic.py:940: in wrapper
+    output = func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/transformers/models/qwen3/modeling_qwen3.py:480: in forward
+    outputs: BaseModelOutputWithPast = self.model(
+/root/.local/lib/python3.12/site-packages/torch/nn/modules/module.py:1773: in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/torch/nn/modules/module.py:1784: in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/transformers/utils/generic.py:1064: in wrapper
+    outputs = func(self, *args, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/transformers/models/qwen3/modeling_qwen3.py:410: in forward
+    hidden_states = decoder_layer(
+/root/.local/lib/python3.12/site-packages/transformers/modeling_layers.py:94: in __call__
+    return super().__call__(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/torch/nn/modules/module.py:1773: in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/torch/nn/modules/module.py:1784: in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/transformers/utils/deprecation.py:172: in wrapped_func
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/transformers/models/qwen3/modeling_qwen3.py:260: in forward
+    hidden_states, _ = self.self_attn(
+/root/.local/lib/python3.12/site-packages/torch/nn/modules/module.py:1773: in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.local/lib/python3.12/site-packages/torch/nn/modules/module.py:1784: in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sparse_attn/patches/qwen3_attn_patch.py:429: in qwen3_attn_forward
+    attn_output = _tl_decode_batched(
+sparse_attn/patches/qwen3_attn_patch.py:220: in _tl_decode_batched
+    return eager_decoding_attn(q, k, v, mask, bs, indexer._batch_tli.cu,
+sparse_attn/ops/eager_decoding.py:762: in eager_decoding_attn
+    return _eager_decoding_attn_gather(
+sparse_attn/ops/eager_decoding.py:1047: in _eager_decoding_attn_gather
+    return _eager_decoding_attn_dense(
+sparse_attn/ops/eager_decoding.py:931: in _eager_decoding_attn_dense
+    if valid_length is not None and valid_length < b_s.shape[-1]:
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: '<' not supported between instances of 'list' and 'int'
+----------------------------- Captured stdout call -----------------------------
+register qwen3 attn: [model.layers.0.self_attn]
+=========================== short test summary info ============================
+FAILED tests/test_far_skip_residency.py::test_qwen_mixed_ring_and_parallel_full_kv[cpu]
+1 failed, 3 passed, 1 skipped in 4.36s

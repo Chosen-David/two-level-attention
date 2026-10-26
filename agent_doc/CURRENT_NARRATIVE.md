@@ -30,7 +30,8 @@ champion flags = K1=64）。
 **参数陷阱表**（历史教训，2026-10-23 开源净化手术已结构性消除大部分）：
 
 | 陷阱 | 历史行为 | 现状 |
-|---|---|---|
+|---|---|
+| TLI 的 batch 能力只在 attention 消费端，indexer 必须逐行执行 | PR #7 的 `TL-BATCH-INDEXER-PARALLEL-20261026` 增加完整 batch 候选实现；`docs/tli_batch_indexer.md` 与 `agent_doc/results/tli_batch_parallel_20261026/` 记录 CPU/解释器/离线编译，目标 GPU、旧 Graph 对照和完整模型质量仍待验，默认仍走 legacy。此项不修改历史 GPU 主表，也不代表 compact KV 淘汰已支持 B>1。 后续五轮见 `docs/tli_batch_five_rounds.md`，包含按需摘要、Q 复用及可选 movement 融合；本地证据不构成 GPU 提速判决。 |---|
 | `--tli_enable_layer_skip` 默认 true | 漏传 = 静默跑成 D′ gate 口径（E129 起协议强制显式传） | **接口保留**（2026-10-25 用户指令：far-skip 转向 KV cache 节省叙事线，见第 5 节）；主表口径仍显式 false |
 | `--tli_subspace` 默认 full | 生产必须显式 tail | 默认仍 full，**必须显式传 tail** |
 | `--tia_level2_cmp_ratio` 默认 2 | 生产口径 4 | **必须显式传 4** |
@@ -264,6 +265,8 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 ## 5. 已被推翻叙事索引（防误读核心——旧结论 → 推翻它的判决）
 
+2026-10-26 整合更新：main `2289900` 已包含旧版 compact 实现；整合分支把 PR #7 的融合路径与 PR #9 的逐请求×层混合缓存接通。多 batch/EOS/新请求重建已有 CPU 回归，混合 attention/index 仍逐行；不能声称全 batch 融合或新 GPU 提速/显存降幅。当前边界与远端验收见 `docs/unified_far_skip.md`，下列 E175/旧 PR 限制是历史版本记录。
+
 | 过时结论（出现在 archived 报告/早期叙事中） | 推翻/修正判决 |
 |---|---|
 | 保护带（boundary bypass 前的 sink/swa 保护带几何）假设最优 | `e148_sinkswa_verdict.json`（否决） |
@@ -275,6 +278,8 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 | α/β/γ 比例化几何口径（E64 帕累托点叙事） | E155d 参数退役（用户 2026-10-19 拍板转向 nb/nt/nl 显式几何）；比例口径的全部历史数字仅作 E64-E155 谱系档案（`exp/trace_archives/probe_e5b_e98/`） |
 | e152v2 dynamic-cache 性能口径（TLI 3.4×/2.5×/1.8× slower） | 已被 `e152v4_formal_verdict.json` 整步 graph 口径取代（论文图 E2 已 in-place 重写，commit e5071cb） |
 | MLA 子空间增益可线性兑现到 e2e | `e158b_mla_rope_nope32_e2e_verdict.json` 饱和映射边界披露 |
+| kernel fusion 已经消除 batch indexer 的所有 copy，融合越大越快 | `docs/tli_gpu_pipeline.md`：新增四类真实 Triton producer/consumer 融合，整行扫描曾占 255 registers/thread，分块后编译峰值 60；仍有 topk/softmax/full-mask/attention 流量。188 个 offline build 与解释器检查均不是实际 GPU 提速，远端与模型验收待执行。 |
+| far mask 的13%账本已经等于GPU显存实省；当前ring每步搬迁全部历史 | `docs/tli_skip_noskip_fusion.md` 区分 main 默认全驻留与 PR compact：后者一次性压缩、每步单 token 写入，容量4291含页对齐。CPU底层存储/引用释放已检查；GPU allocator、严格截断质量及13%整模叙事仍待验。用户直接提供的 Kimi 意见已逐项审查。 |
 | γ-off 自由竞争需 CLI `--tli_gamma off` | 显式几何等价物 `--tli_near_tokens off`（E155d；γ 接口已删除） |
 
 ## 6. 仓库结构速览（净化后）

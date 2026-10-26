@@ -1,0 +1,344 @@
+{
+  "scope": "paired same-width single-layer CPU; fixed shapes are not CUDA Graph timings",
+  "baseline_round3": "f3b0347fd5b52fd6145a8db1dde407c9157a0b8b",
+  "subspace_round1": "b5d724fa540e835f47bea164fea58f8f1dac0140",
+  "cuda_executed": false,
+  "pretrained_quality_evaluated": false,
+  "independent_review": false,
+  "final_vs_round3_cpu.json": [
+    {
+      "width": 32,
+      "mode": "eager",
+      "ms": {
+        "baseline": 3.839704000711208,
+        "candidate": 2.814580997437588
+      },
+      "ratio": 1.3642186898180932,
+      "setup_ms": {
+        "baseline": 2.0777600002475083,
+        "candidate": 1.935807002155343
+      },
+      "setup_plus_first_ms": {
+        "baseline": 12.279571001272416,
+        "candidate": 10.75657600449631
+      },
+      "fine_key_cache_bytes": 2260480,
+      "kv_bytes": 18083840
+    },
+    {
+      "width": 32,
+      "mode": "fixed",
+      "ms": {
+        "baseline": 5.538123501537484,
+        "candidate": 4.559198998322245
+      },
+      "ratio": 1.2147141424569265,
+      "setup_ms": {
+        "baseline": 8.268356999906246,
+        "candidate": 8.751364999625366
+      },
+      "setup_plus_first_ms": {
+        "baseline": 14.684833997307578,
+        "candidate": 14.272201999119716
+      },
+      "fine_key_cache_bytes": 2260480,
+      "kv_bytes": 18083840
+    },
+    {
+      "width": 128,
+      "mode": "eager",
+      "ms": {
+        "baseline": 8.544102500309236,
+        "candidate": 8.609496000644867
+      },
+      "ratio": 0.9924044914672435,
+      "setup_ms": {
+        "baseline": 2.266936000523856,
+        "candidate": 2.3143770013120957
+      },
+      "setup_plus_first_ms": {
+        "baseline": 24.107240002194885,
+        "candidate": 24.380392002058215
+      },
+      "fine_key_cache_bytes": 0,
+      "kv_bytes": 18083840
+    },
+    {
+      "width": 128,
+      "mode": "fixed",
+      "ms": {
+        "baseline": 11.663495000902913,
+        "candidate": 11.594195000725449
+      },
+      "ratio": 1.0059771290868513,
+      "setup_ms": {
+        "baseline": 19.39447999757249,
+        "candidate": 19.239096000092104
+      },
+      "setup_plus_first_ms": {
+        "baseline": 31.456411994440714,
+        "candidate": 31.0796890007623
+      },
+      "fine_key_cache_bytes": 0,
+      "kv_bytes": 18083840
+    }
+  ],
+  "final_quantized_cpu.json": [
+    {
+      "width": 32,
+      "mode": "eager",
+      "ms": {
+        "baseline": 4.373294499600888,
+        "candidate": 2.843028498318745
+      },
+      "ratio": 1.5382520794944836,
+      "setup_ms": {
+        "baseline": 2.385374998993939,
+        "candidate": 2.2125030009192415
+      },
+      "setup_plus_first_ms": {
+        "baseline": 13.35939799901098,
+        "candidate": 15.004897999460809
+      },
+      "fine_key_cache_bytes": 2260480,
+      "kv_bytes": 18083840
+    },
+    {
+      "width": 32,
+      "mode": "fixed",
+      "ms": {
+        "baseline": 6.2134119998518145,
+        "candidate": 5.123199500303599
+      },
+      "ratio": 1.212799150117736,
+      "setup_ms": {
+        "baseline": 8.40460299878032,
+        "candidate": 14.605162999941967
+      },
+      "setup_plus_first_ms": {
+        "baseline": 15.86827899882337,
+        "candidate": 19.67436399718281
+      },
+      "fine_key_cache_bytes": 2260480,
+      "kv_bytes": 18083840
+    }
+  ],
+  "final_holdout_cpu.json": [
+    {
+      "width": 16,
+      "mode": "eager",
+      "ms": {
+        "baseline": 1.0545240002102219,
+        "candidate": 1.078675000826479
+      },
+      "ratio": 0.9776104938023477,
+      "setup_ms": {
+        "baseline": 3.0155919994285796,
+        "candidate": 4.023391000373522
+      },
+      "setup_plus_first_ms": {
+        "baseline": 5.306482999003492,
+        "candidate": 6.805763001466403
+      },
+      "fine_key_cache_bytes": 0,
+      "kv_bytes": 5500928
+    },
+    {
+      "width": 16,
+      "mode": "fixed",
+      "ms": {
+        "baseline": 4.16075350040046,
+        "candidate": 2.625075499963714
+      },
+      "ratio": 1.5850033648395918,
+      "setup_ms": {
+        "baseline": 4.291535002266755,
+        "candidate": 4.756976002681768
+      },
+      "setup_plus_first_ms": {
+        "baseline": 9.603389000403695,
+        "candidate": 8.887500000128057
+      },
+      "fine_key_cache_bytes": 0,
+      "kv_bytes": 5500928
+    },
+    {
+      "width": 64,
+      "mode": "eager",
+      "ms": {
+        "baseline": 1.0118944992427714,
+        "candidate": 1.0394659984740429
+      },
+      "ratio": 0.9734753236067876,
+      "setup_ms": {
+        "baseline": 3.373732997715706,
+        "candidate": 3.7863950019527692
+      },
+      "setup_plus_first_ms": {
+        "baseline": 7.180508000601549,
+        "candidate": 7.098753001628211
+      },
+      "fine_key_cache_bytes": 0,
+      "kv_bytes": 5500928
+    },
+    {
+      "width": 64,
+      "mode": "fixed",
+      "ms": {
+        "baseline": 3.851948500596336,
+        "candidate": 2.204811500632786
+      },
+      "ratio": 1.7470647715193872,
+      "setup_ms": {
+        "baseline": 6.084546999773011,
+        "candidate": 5.995872998028062
+      },
+      "setup_plus_first_ms": {
+        "baseline": 11.403830001654569,
+        "candidate": 9.473481997702038
+      },
+      "fine_key_cache_bytes": 0,
+      "kv_bytes": 5500928
+    }
+  ],
+  "final_short_cpu.json": [
+    {
+      "width": 32,
+      "mode": "eager",
+      "ms": {
+        "baseline": 0.20514900279522408,
+        "candidate": 0.20787799985555466
+      },
+      "ratio": 0.9868721218107407,
+      "setup_ms": {
+        "baseline": 0.1230750021932181,
+        "candidate": 0.11231900134589523
+      },
+      "setup_plus_first_ms": {
+        "baseline": 0.3872230008710176,
+        "candidate": 0.3877240014844574
+      },
+      "fine_key_cache_bytes": 0,
+      "kv_bytes": 5500928
+    },
+    {
+      "width": 32,
+      "mode": "fixed",
+      "ms": {
+        "baseline": 4.782645000886987,
+        "candidate": 3.84659000155807
+      },
+      "ratio": 1.2433467042106816,
+      "setup_ms": {
+        "baseline": 0.15854799858061597,
+        "candidate": 0.13645600120071322
+      },
+      "setup_plus_first_ms": {
+        "baseline": 5.440335997263901,
+        "candidate": 4.510245002165902
+      },
+      "fine_key_cache_bytes": 0,
+      "kv_bytes": 5500928
+    }
+  ],
+  "final_bfloat16_cpu.json": [
+    {
+      "width": 32,
+      "mode": "eager",
+      "ms": {
+        "baseline": 3.859249000015552,
+        "candidate": 2.875938000215683
+      },
+      "ratio": 1.341909665551248,
+      "setup_ms": {
+        "baseline": 1.2007289988105185,
+        "candidate": 1.2048349999531638
+      },
+      "setup_plus_first_ms": {
+        "baseline": 10.11336599913193,
+        "candidate": 9.504207999270875
+      },
+      "fine_key_cache_bytes": 1130240,
+      "kv_bytes": 9041920
+    },
+    {
+      "width": 32,
+      "mode": "fixed",
+      "ms": {
+        "baseline": 5.707423000785639,
+        "candidate": 4.598518000420881
+      },
+      "ratio": 1.2411439947094398,
+      "setup_ms": {
+        "baseline": 5.921821000811178,
+        "candidate": 8.531823001248995
+      },
+      "setup_plus_first_ms": {
+        "baseline": 12.293679999856977,
+        "candidate": 14.888018002238823
+      },
+      "fine_key_cache_bytes": 1130240,
+      "kv_bytes": 9041920
+    }
+  ],
+  "s2_all_fit_vs_s1_cpu.json": [
+    {
+      "width": 32,
+      "mode": "eager",
+      "ms": {
+        "baseline": 1.2653514986595837,
+        "candidate": 1.2724120024358854
+      },
+      "ratio": 0.9944510867841665,
+      "setup_ms": {
+        "baseline": 4.10731699957978,
+        "candidate": 3.628926999226678
+      },
+      "setup_plus_first_ms": {
+        "baseline": 8.829540998704033,
+        "candidate": 7.642403001227649
+      },
+      "fine_key_cache_bytes": 0,
+      "kv_bytes": 5500928
+    },
+    {
+      "width": 32,
+      "mode": "fixed",
+      "ms": {
+        "baseline": 4.085869501068373,
+        "candidate": 2.8214300000399817
+      },
+      "ratio": 1.448155545595841,
+      "setup_ms": {
+        "baseline": 6.770639000023948,
+        "candidate": 6.086969999159919
+      },
+      "setup_plus_first_ms": {
+        "baseline": 14.75444799871184,
+        "candidate": 9.853494000708451
+      },
+      "fine_key_cache_bytes": 0,
+      "kv_bytes": 5500928
+    }
+  ],
+  "outputs_and_decisions_checked": 1920,
+  "max_absolute_error": 0.0,
+  "all_compared_decisions_equal": true,
+  "tests": {
+    "passed": 129,
+    "skipped_cuda": 5,
+    "subtests_passed": 205
+  },
+  "profile_allocation_bytes": [
+    {
+      "mode": "eager",
+      "baseline": 7083756,
+      "candidate": 7081688
+    },
+    {
+      "mode": "fixed",
+      "baseline": 13184714,
+      "candidate": 13189351
+    }
+  ]
+}

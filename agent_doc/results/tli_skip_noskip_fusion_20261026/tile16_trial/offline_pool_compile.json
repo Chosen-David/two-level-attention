@@ -1,0 +1,2792 @@
+{
+  "status": "offline compilation only; runtime pending",
+  "triton": "3.4.0",
+  "source_sha256": "9664859b66f41b06d1f7b2dcdafedc0ee8eff0bd1e0c53d963535a4080e5f2c6",
+  "harness_sha256": "73a6997841e83a0ba5e963785710e7b0a744a03568caab193cdc14448acb6698",
+  "cases": [
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 13.090 ms\n",
+      "ptx_sha256": "4678a1b86f4c13e6f4350e25a1336ab9ad0d08d913ae61196687396373ba483c",
+      "cubin_bytes": 21344
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 21.210 ms\n",
+      "ptx_sha256": "b204f3aee8cc8b2134da7d5b04f32c344fe4aaf9574be59d5ce65fae4ba3b66a",
+      "cubin_bytes": 28896
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 13.759 ms\n",
+      "ptx_sha256": "734710c232d404b8dbb7258f6ea0eed26a7114447898306851f51d25df63f9ed",
+      "cubin_bytes": 24544
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 22.434 ms\n",
+      "ptx_sha256": "8c0bae1439e8f81ddee36bfdd943c7eb03f86691a7a627e3fb10fb7fad71825e",
+      "cubin_bytes": 32480
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 15.366 ms\n",
+      "ptx_sha256": "ac79e81be87070356cdc0d2f75abd9c5796d87ac0e31e710680268a0b3bb1848",
+      "cubin_bytes": 22112
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 21.571 ms\n",
+      "ptx_sha256": "1a8e0b7218c0f0c77f87819a038989038f622f44a85d7fb9ebe433431e6215c7",
+      "cubin_bytes": 29920
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 16.891 ms\n",
+      "ptx_sha256": "53820104e8f67ea1e64a7b9bcf4a95ae6083670a1a720e314960d8a611b1e664",
+      "cubin_bytes": 25184
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 26.032 ms\n",
+      "ptx_sha256": "2d4a2e44d200435b8b6cea6c685da07390b02affbad9bff89ab604796d5fec57",
+      "cubin_bytes": 33120
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 30.492 ms\n",
+      "ptx_sha256": "c3242742f8da5d9893eabc86e0e2e7d68602b5562223496161ae9c2705e54616",
+      "cubin_bytes": 49248
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 72 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 57.700 ms\n",
+      "ptx_sha256": "ebc92c42fe3a0069e627a7a6692f15e6963a18739c23660c85c146246ea41b20",
+      "cubin_bytes": 68192
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 35.412 ms\n",
+      "ptx_sha256": "ee75d1b181f8575cb636f2a7d1efb03a156bd760e33807bda1f95affb8e61258",
+      "cubin_bytes": 55264
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 72 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 60.676 ms\n",
+      "ptx_sha256": "767c1f0049480471661b1bc8bb741613ef1629585c0295f2a72073f1869c7354",
+      "cubin_bytes": 74464
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 80 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 36.716 ms\n",
+      "ptx_sha256": "7cef720d45a2c5cb26f0683f3d53bfa950c479b99b0b6ca6f3ade2c6d3cbe137",
+      "cubin_bytes": 50912
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 128 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 64.967 ms\n",
+      "ptx_sha256": "51c0a8de82591b98f0b9841d9a572e00c0af994957a62613247492f097ac9233",
+      "cubin_bytes": 68320
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 80 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 40.464 ms\n",
+      "ptx_sha256": "5c9b07ebf5684e3120007346a8c59b837d59db6747a55b98fe4094e8841e4675",
+      "cubin_bytes": 56800
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 128 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 82.380 ms\n",
+      "ptx_sha256": "69d750d5f5c3eb6dbe071d465720e7c48f8eba40b8bce06747a70c51b0954659",
+      "cubin_bytes": 74208
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 11.104 ms\n",
+      "ptx_sha256": "a62e8d653f8a3503a49823a38e384ef5375cbd7a7909be0213c322e0940bed50",
+      "cubin_bytes": 20320
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 19.421 ms\n",
+      "ptx_sha256": "da3ec4536161893e54f853e0ca65de840ffbed81d10a9b644776f6f1682d9aab",
+      "cubin_bytes": 28768
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 37 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 12.387 ms\n",
+      "ptx_sha256": "347ac0a0c9d93498b3825f708edb1766cd6277a076999f4a0fd1b10689dff09d",
+      "cubin_bytes": 23136
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 39 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 21.708 ms\n",
+      "ptx_sha256": "2f2e36fc995a48acd4f6f812b6f4d72ca24b4e1567f5e064f185408e6d13adb0",
+      "cubin_bytes": 31712
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 15.541 ms\n",
+      "ptx_sha256": "8bc7f84fdfb8fe7ce5f1ce65bdfcde8ab173decb33a24cfe33fce87f1f703486",
+      "cubin_bytes": 23904
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 56 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 26.452 ms\n",
+      "ptx_sha256": "6c7018700dc3fd43106d0843af5d6068576b8b8e4684ad63f97b6d81a06f23c7",
+      "cubin_bytes": 32480
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 16.536 ms\n",
+      "ptx_sha256": "9a7570c3ddb2135326a0a4c5e005733dac08d16d5ff5f94955a1a14da9a96215",
+      "cubin_bytes": 26848
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 56 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 28.310 ms\n",
+      "ptx_sha256": "b4b4cdcf15e5892bcb4e60c3e7a50aa5853e822977793b378c7e301b03ff8d72",
+      "cubin_bytes": 35552
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 28.765 ms\n",
+      "ptx_sha256": "f70239af9ba8c0a17c957619d5ae267bb8d7ce4576c654208c29f2858f39e1f0",
+      "cubin_bytes": 46304
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 61.784 ms\n",
+      "ptx_sha256": "6c6c5697ed1c6cc4eb8ad3d80de33cdeac60ad6a4e5fb80094a38abaad457f17",
+      "cubin_bytes": 66400
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 34.063 ms\n",
+      "ptx_sha256": "95c5dea03fdf0f7fdb884deea8fd83076c7e8561c1094e5f9621b630d1403b83",
+      "cubin_bytes": 51552
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 57.703 ms\n",
+      "ptx_sha256": "24b0ea1cf4fc02cf185a30912ce658a7e36ad4b9dc97b0a44a4688e5be90591b",
+      "cubin_bytes": 71648
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 80 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 42.792 ms\n",
+      "ptx_sha256": "72cadd7c7df84c126e2d380b16c7c2a19bf9147987259d806c92fe7784eaf388",
+      "cubin_bytes": 53856
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 127 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 71.184 ms\n",
+      "ptx_sha256": "872b10ab2518a63bc35bfb74ce5b2838f747583ac97e5bcfefb95692fccf516a",
+      "cubin_bytes": 72288
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 80 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 41.046 ms\n",
+      "ptx_sha256": "bf8c9949f67b9740595aa71f5070671f30fec746f732a228824a74758b952d70",
+      "cubin_bytes": 59744
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 127 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 77.756 ms\n",
+      "ptx_sha256": "25ff882067521f79e5e07be608dbe660302a2ac3ce31fae0cbb1260fd0a6faed",
+      "cubin_bytes": 78176
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 10.931 ms\n",
+      "ptx_sha256": "ef6efcd245f842c4ccbe7e3dc5ffe4e037803e985ccecb053cd443d6a0c58d33",
+      "cubin_bytes": 20448
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 18.794 ms\n",
+      "ptx_sha256": "072fda65d66132d0c27d13a9fa6aadbc7d4fd4b5d306e46501ab867af7eac131",
+      "cubin_bytes": 29152
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 37 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 12.438 ms\n",
+      "ptx_sha256": "1bc8dcf206e9f8e335e52488d982cf04a0c59ae2932f67ecd1c49eddb267b2e4",
+      "cubin_bytes": 23264
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 39 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 20.664 ms\n",
+      "ptx_sha256": "147d6a5b728aa142ee062a672612528638f37ae64b09343d296825ec48b22ff8",
+      "cubin_bytes": 31840
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 14.093 ms\n",
+      "ptx_sha256": "c1651a65f899c060395330155c94bd7b6f00491df264e2d604bd50f911a4be89",
+      "cubin_bytes": 24160
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 23.466 ms\n",
+      "ptx_sha256": "fd6e8ab13298ede614a435fe30717da2f05fff24343951bc35d3a39387365500",
+      "cubin_bytes": 32224
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 18.245 ms\n",
+      "ptx_sha256": "c8f1d89f3c47265f21098c5158e254dd11d1a28e92fef63269dff60645c8e4d9",
+      "cubin_bytes": 27232
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 24.010 ms\n",
+      "ptx_sha256": "dcb9d2bf5db3e5cfbff0ddf0f8616bff7bfc4b07afce1b31fad45fd132294428",
+      "cubin_bytes": 35424
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 29.468 ms\n",
+      "ptx_sha256": "4eaf2276fedde6c03e3ef32bf81dd4663e01317b61818b85b5c3a34cea9524b7",
+      "cubin_bytes": 46432
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 57.710 ms\n",
+      "ptx_sha256": "56fec991da124acead73c2a14bf65f41c6453bebcdfa170b6ac26f0928706b0e",
+      "cubin_bytes": 66528
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 35.504 ms\n",
+      "ptx_sha256": "845aaee7f1b3107bc5c5146132255275cd5ef1b95ebec5f066441d6b78599374",
+      "cubin_bytes": 51552
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 57.919 ms\n",
+      "ptx_sha256": "b1bbd1aff4374fd43e83848e03cf15248fb826a951cfd2a9e66fc2a12002dab4",
+      "cubin_bytes": 71648
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 80 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 41.864 ms\n",
+      "ptx_sha256": "77d46c0b7213f2e7784c57bbd6419873a46a10c9e4229a2374d8ba190871fffe",
+      "cubin_bytes": 53984
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 127 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 68.777 ms\n",
+      "ptx_sha256": "ca75ba67f5d6bdd015ea021dd65a8f209b74546ca5a6df2c69415fe74b33aec7",
+      "cubin_bytes": 72544
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 80 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 41.714 ms\n",
+      "ptx_sha256": "0b2c1715f0052a4b212b75118f3b3252d1d8cf725d825f4cab0805c30a275c4d",
+      "cubin_bytes": 59872
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 80,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_80'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 127 registers, used 1 barriers, 408 bytes cmem[0]\nptxas info    : Compile time = 85.821 ms\n",
+      "ptx_sha256": "0e24cf6b01907359d7e2f506b8176eab6c511d2f80d40e4e0162a4e591caa9dd",
+      "cubin_bytes": 78304
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 12.611 ms\n",
+      "ptx_sha256": "aba605e9eefed56c31219cfdd8ad3456f61b0c5ce4e1c6e94debee93584a59be",
+      "cubin_bytes": 22304
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 14.049 ms\n",
+      "ptx_sha256": "5a766e416a19d63ceebef86e41095dc7e01136b436600658932d582dbb35607b",
+      "cubin_bytes": 29984
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 12.189 ms\n",
+      "ptx_sha256": "ce161706cdeca777dd6fb2d08fabbad17708dca0dc1f1ee3167f4c1047239b26",
+      "cubin_bytes": 25760
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 23.833 ms\n",
+      "ptx_sha256": "b4ff57329a539e66d9d92b939911d73aa76221d908eefe169e8e6a633298e81a",
+      "cubin_bytes": 33440
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 16.480 ms\n",
+      "ptx_sha256": "54a4fa78fca1014d157e18dd392cf16751f0b05ce7b67a9c404c3ab9e2235270",
+      "cubin_bytes": 23200
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers\nptxas info    : Compile time = 19.357 ms\n",
+      "ptx_sha256": "4b45035ca912ba405c5fab6ecb1c1b834f3176183bca4a983483c9a6ef6b8cfa",
+      "cubin_bytes": 31008
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 19.727 ms\n",
+      "ptx_sha256": "953c865a698d38079ad8451ee87b4e97e00ee64f5448ee0a67db26d0d0b55121",
+      "cubin_bytes": 26272
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 128,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers\nptxas info    : Compile time = 26.332 ms\n",
+      "ptx_sha256": "1a122455f5e72fa006bc84f7b7925d5ece4f49b30d2410b62c77cce9dca9b38a",
+      "cubin_bytes": 33952
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers\nptxas info    : Compile time = 30.507 ms\n",
+      "ptx_sha256": "093cb74bdc8c340d9b3395f9883ccfd2bbd5e2806a63d90a1c6dd1b663674634",
+      "cubin_bytes": 50336
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    8 bytes stack frame, 8 bytes spill stores, 8 bytes spill loads\nptxas info    : Used 64 registers, used 1 barriers, 8 bytes cumulative stack size\nptxas info    : Compile time = 41.207 ms\n",
+      "ptx_sha256": "14478ffe1462578a530d41b4c78fd89741cfab9b34821ede7f64b95d37ceef00",
+      "cubin_bytes": 68512
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers\nptxas info    : Compile time = 30.433 ms\n",
+      "ptx_sha256": "4e11843d68e54c88c454c70b3b4b3aeac4ed1dc54e8fd36b3f2d447d4b6f2bc1",
+      "cubin_bytes": 56224
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 64 registers, used 1 barriers\nptxas info    : Compile time = 48.391 ms\n",
+      "ptx_sha256": "19f26793c9c7c4d10306bec2fd908b2ebf4cd70db7472dba3c7a642c2ada61fe",
+      "cubin_bytes": 74912
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 64 registers, used 1 barriers\nptxas info    : Compile time = 23.411 ms\n",
+      "ptx_sha256": "4d1c4f4dec55a2bf795de3fbb2d1c9923d5d387914008129774ffb8a8e4acec1",
+      "cubin_bytes": 40736
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 133 registers, used 1 barriers\nptxas info    : Compile time = 38.073 ms\n",
+      "ptx_sha256": "3ea9495ae3661fb9e649735932d62c9550e95aad1ca7bf2ca07dfdb880047938",
+      "cubin_bytes": 57888
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 64 registers, used 1 barriers\nptxas info    : Compile time = 25.013 ms\n",
+      "ptx_sha256": "b26f1dc82966a3f384f1abfee5f18b1dfda90d57b7312ee92b6c31f700a9db2a",
+      "cubin_bytes": 46496
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp32",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 133 registers, used 1 barriers\nptxas info    : Compile time = 43.238 ms\n",
+      "ptx_sha256": "3f9368c917e731205d09ecea786e33dff82841dda5a6246e731c3457aedb2620",
+      "cubin_bytes": 64032
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 9.685 ms\n",
+      "ptx_sha256": "15c22fade2af87774e9b2a7ad6c2d3f922c3a1a773185f465f46393a220145a5",
+      "cubin_bytes": 21280
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 14.590 ms\n",
+      "ptx_sha256": "0bc5ff619630f58fa52632560430ced300b3dfb1c7aa02b3620fecf6ba83eddb",
+      "cubin_bytes": 29728
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 38 registers, used 1 barriers\nptxas info    : Compile time = 13.488 ms\n",
+      "ptx_sha256": "de81192e36c8962399e7ce9c2601a203b63824cf08e1055ff3fe9f38c8da9658",
+      "cubin_bytes": 24224
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 37 registers, used 1 barriers\nptxas info    : Compile time = 19.759 ms\n",
+      "ptx_sha256": "cc68f651f054ae4ac4960b4286b17054723b55114f6f8e5ff888f32736a106ee",
+      "cubin_bytes": 32928
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 18.786 ms\n",
+      "ptx_sha256": "067070706475d79fe0875afddcf24ae4d084e3875fefb372a662de226b5cc076",
+      "cubin_bytes": 24864
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers\nptxas info    : Compile time = 18.895 ms\n",
+      "ptx_sha256": "f156bab142d5d6e6be6785ee0439677a4578068b7bd64e2a03d3efc0edf3ef2c",
+      "cubin_bytes": 33184
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 14.200 ms\n",
+      "ptx_sha256": "40373750e92499c47eb260ae15029d47beb80c62b5ada0fed65efba5372956a7",
+      "cubin_bytes": 27936
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers\nptxas info    : Compile time = 30.569 ms\n",
+      "ptx_sha256": "f9a1a7e9fd9f5247564d6a804baa88cef27602c69897059a0d702edf6b29cc17",
+      "cubin_bytes": 36256
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 26.693 ms\n",
+      "ptx_sha256": "8b6e6dccba31c1c0b076873ac3d17a4c3cb9dc4aba954cd73c39b5b19515f936",
+      "cubin_bytes": 48288
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers\nptxas info    : Compile time = 37.556 ms\n",
+      "ptx_sha256": "972fa1d83bf4818389e5697194490c1e1f814d286a2277ccb018b2b58eb7eb52",
+      "cubin_bytes": 67872
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 28.460 ms\n",
+      "ptx_sha256": "b7d1fd22c0b499f66ca04c949f529178934ad9b84a6fa9214b577b5aa13c7476",
+      "cubin_bytes": 53024
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers\nptxas info    : Compile time = 39.360 ms\n",
+      "ptx_sha256": "331ba8ecb96ac86baa7a74eb31b71ee00af0d8fa6fd8bbdc524bd00d07a70e64",
+      "cubin_bytes": 73376
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 64 registers, used 1 barriers\nptxas info    : Compile time = 23.917 ms\n",
+      "ptx_sha256": "2bfe5fdc4a19de52aef8f43ff9aa926f4e236445ad0738e5a87de8c47146db39",
+      "cubin_bytes": 43424
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 133 registers, used 1 barriers\nptxas info    : Compile time = 36.522 ms\n",
+      "ptx_sha256": "e373561634cd2b74e8f82d1862a0fe37e4a468a8f1dab5c0eb27ea910926d0c8",
+      "cubin_bytes": 61728
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 64 registers, used 1 barriers\nptxas info    : Compile time = 26.908 ms\n",
+      "ptx_sha256": "cda1da72b410a0b5aa45ebb6f23d6b9c4381929dfdc10f79e8a57d02815efc6b",
+      "cubin_bytes": 49312
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*fp16",
+        "KMAX": "*fp16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*fp16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 133 registers, used 1 barriers\nptxas info    : Compile time = 43.211 ms\n",
+      "ptx_sha256": "389c8cc1af718c18f5f1403b8a3a7090f19368220762b908cd809b3e5cd638ff",
+      "cubin_bytes": 68000
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 9.864 ms\n",
+      "ptx_sha256": "768abc02d4d8d5ef476efca13e914bd08c67d0c03af6c17592cd778a0c6658c9",
+      "cubin_bytes": 21280
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 13.069 ms\n",
+      "ptx_sha256": "e2bcc83e6e73f438179b845aec1b6c18167e9b9cfd0b94cc04c76b34c707e456",
+      "cubin_bytes": 29728
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 38 registers, used 1 barriers\nptxas info    : Compile time = 12.171 ms\n",
+      "ptx_sha256": "70ddc30813fcded721933176c99bbcd6d087fb2ceff65e835afc8e7ca2653faf",
+      "cubin_bytes": 24224
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 37 registers, used 1 barriers\nptxas info    : Compile time = 17.065 ms\n",
+      "ptx_sha256": "b72c444ec28a5ae5e06250a93da1e67deebe35303cb0af0a21fd22e97fae00f7",
+      "cubin_bytes": 32928
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 12.458 ms\n",
+      "ptx_sha256": "24de495aa112531f084df6340ddf0be21f2c21b1cfebc48d08cbbefd317c0959",
+      "cubin_bytes": 24864
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers\nptxas info    : Compile time = 23.813 ms\n",
+      "ptx_sha256": "c60b211b8ee9511463af6fdaf31520133bd596c9ec8a8165934c4a8c06a20666",
+      "cubin_bytes": 33312
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 14.759 ms\n",
+      "ptx_sha256": "33fcfe7341dd71384383bdd9dc7d08112993bcac498c12416e9dfbfcd9570336",
+      "cubin_bytes": 27936
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 32
+      },
+      "shared_bytes": 64,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 1 barriers\nptxas info    : Compile time = 17.769 ms\n",
+      "ptx_sha256": "91a39c6ec43f18d4d707badcf1cf457f823c8f4337881d267fb6cbc7d313da6f",
+      "cubin_bytes": 36256
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 25.002 ms\n",
+      "ptx_sha256": "a85f5683b57937aedc44447ea1aefa4a6204fa1ab1ff5e9509bafc2b0d7c1376",
+      "cubin_bytes": 48416
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers\nptxas info    : Compile time = 35.037 ms\n",
+      "ptx_sha256": "762c5973c32fa862987b5278a46859caec4bb430b0b985d8efa4b816bd9a48a0",
+      "cubin_bytes": 67872
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 32 registers, used 1 barriers\nptxas info    : Compile time = 29.291 ms\n",
+      "ptx_sha256": "8be23a9789a405d078aaa215f177b861cc2ed416d7df6479268283d896dabd65",
+      "cubin_bytes": 53024
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 1,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 48 registers, used 1 barriers\nptxas info    : Compile time = 39.273 ms\n",
+      "ptx_sha256": "fce650a415e05a8c889845a5523325ea771ebca0c60bc063dc0c77556daf02bd",
+      "cubin_bytes": 73376
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 64 registers, used 1 barriers\nptxas info    : Compile time = 23.536 ms\n",
+      "ptx_sha256": "ad35c8b910c28b986bf3ad3c2738bb29f163668c77437d02d344634a41d2ebd1",
+      "cubin_bytes": 43680
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 0,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 131 registers, used 1 barriers\nptxas info    : Compile time = 39.944 ms\n",
+      "ptx_sha256": "103874ea5cdc1045345c8597e4a3e305472646b3c5adabd311d92405a35c48fa",
+      "cubin_bytes": 61984
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": false,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 64 registers, used 1 barriers\nptxas info    : Compile time = 28.599 ms\n",
+      "ptx_sha256": "363c2effbd9752ac2b244ef6ffc6becc8a81eb115261fd46cac22258ffeda77c",
+      "cubin_bytes": 49568
+    },
+    {
+      "kernel": "_pool_score",
+      "arch": 90,
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "LENGTHS": "*i64",
+        "OUT": "*bf16",
+        "P": "i32"
+      },
+      "constants": {
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "BS": 64,
+        "LO": 0,
+        "SINK": 4,
+        "SWA": 128,
+        "NEAR": 4096,
+        "REGION": 1,
+        "MINMAX": true,
+        "TILE": 16
+      },
+      "shared_bytes": 256,
+      "ptxas": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_pool_score' for 'sm_90a'\nptxas info    : Function properties for _pool_score\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 131 registers, used 1 barriers\nptxas info    : Compile time = 41.515 ms\n",
+      "ptx_sha256": "ec57656fb4c5842d6f574134e341335c7cc7965b8f97bd2a25213d101a44af98",
+      "cubin_bytes": 68256
+    }
+  ]
+}

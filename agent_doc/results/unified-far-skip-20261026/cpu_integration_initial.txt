@@ -1,0 +1,458 @@
+FF.....F..F........................... [  6%]
+.................................................................sssssssssssssss [ 20%]
+sssssssssssssssssssssssssssssssssssssssssssssssss....................... [ 33%]
+.............sF...........ssFFFFFFFFFFFF.FFs......................s....s [ 45%]
+FFF..........FFFFFFFFFFFFssssss................................ [ 56%]
+..............................ssssssssssssssssssssssssssssssssssssssssss [ 69%]
+sssssssssssssssssssssssssssssss................ssssss........F......ssss [ 82%]
+ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss.... [ 94%]
+ssssssssssssssssssssssss......                                           [100%]
+=================================== FAILURES ===================================
+__________________ BaselineTests.test_clock_and_ruler_limits ___________________
+tests/test_baseline_integration.py:148: in test_clock_and_ruler_limits
+    with self.assertRaises(ValueError):baseline_preflight(types.SimpleNamespace(
+sparse_attn/baseline_runtime.py:65: in baseline_preflight
+    verified_vendor(method)
+sparse_attn/baseline_runtime.py:41: in verified_vendor
+    manifest = json.loads((root / 'UPSTREAM.json').read_text())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py:1027: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py:1013: in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/workspace/scratch/7d83fead945d/integration/exp/vendor_baselines/ffd_vendor/UPSTREAM.json'
+_____________________ BaselineTests.test_entrypoint_wiring _____________________
+tests/test_baseline_integration.py:227: in test_entrypoint_wiring
+    text=(ROOT/path).read_text()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py:1027: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py:1013: in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/workspace/scratch/7d83fead945d/integration/benchmark/LongBench/pred.py'
+___________________ BaselineTests.test_integrity_and_options ___________________
+tests/test_baseline_integration.py:57: in test_integrity_and_options
+    for name in ('ffd_vendor', 'sparq_vendor'): self.assertTrue(verified_vendor(name).is_dir())
+                                                                ^^^^^^^^^^^^^^^^^^^^^
+sparse_attn/baseline_runtime.py:41: in verified_vendor
+    manifest = json.loads((root / 'UPSTREAM.json').read_text())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py:1027: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py:1013: in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/workspace/scratch/7d83fead945d/integration/exp/vendor_baselines/ffd_vendor/UPSTREAM.json'
+_____ BaselineTests.test_quest_real_hf_full_budget_and_position_rejection ______
+tests/test_baseline_integration.py:182: in test_quest_real_hf_full_budget_and_position_rejection
+    from qwen3_quest_patch import enable_quest
+E   ModuleNotFoundError: No module named 'qwen3_quest_patch'
+____ test_graph_runner_injection_preserves_mask_on_growth_repeat_and_rewind ____
+tests/test_far_skip_graph.py:170: in test_graph_runner_injection_preserves_mask_on_growth_repeat_and_rewind
+    runner = GraphRunner(None, None, torch.finfo(torch.bfloat16).min, 256, 0, 'cpu')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exp/bench/e152v4_graph_latency.py:164: in __init__
+    dtype=next(model.parameters()).dtype, device=dev)
+               ^^^^^^^^^^^^^^^^
+E   AttributeError: 'NoneType' object has no attribute 'parameters'
+_______ test_direct_allocation_never_creates_full_buffer_for_skip_layer ________
+tests/test_far_skip_hybrid_cache.py:82: in test_direct_allocation_never_creates_full_buffer_for_skip_layer
+    def test_direct_allocation_never_creates_full_buffer_for_skip_layer():
+                ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+___________ test_refill_gate_changes_restore_linear_and_rebuild_ring ___________
+tests/test_far_skip_hybrid_cache.py:105: in test_refill_gate_changes_restore_linear_and_rebuild_ring
+    def test_refill_gate_changes_restore_linear_and_rebuild_ring():
+                ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_________________ test_refill_preflight_and_model_requirement __________________
+tests/test_far_skip_hybrid_cache.py:129: in test_refill_preflight_and_model_requirement
+    def test_refill_preflight_and_model_requirement():
+                ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_______ test_eager_eviction_matches_retained_history_and_writes_once[10] _______
+tests/test_far_skip_hybrid_cache.py:144: in test_eager_eviction_matches_retained_history_and_writes_once
+    def test_eager_eviction_matches_retained_history_and_writes_once(budget):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_______ test_eager_eviction_matches_retained_history_and_writes_once[32] _______
+tests/test_far_skip_hybrid_cache.py:144: in test_eager_eviction_matches_retained_history_and_writes_once
+    def test_eager_eviction_matches_retained_history_and_writes_once(budget):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+________ test_static_model_matches_retained_history_across_wraps[1-10] _________
+tests/test_far_skip_hybrid_cache.py:170: in test_static_model_matches_retained_history_across_wraps
+    def test_static_model_matches_retained_history_across_wraps(budget, length):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+________ test_static_model_matches_retained_history_across_wraps[1-32] _________
+tests/test_far_skip_hybrid_cache.py:170: in test_static_model_matches_retained_history_across_wraps
+    def test_static_model_matches_retained_history_across_wraps(budget, length):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+________ test_static_model_matches_retained_history_across_wraps[7-10] _________
+tests/test_far_skip_hybrid_cache.py:170: in test_static_model_matches_retained_history_across_wraps
+    def test_static_model_matches_retained_history_across_wraps(budget, length):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+________ test_static_model_matches_retained_history_across_wraps[7-32] _________
+tests/test_far_skip_hybrid_cache.py:170: in test_static_model_matches_retained_history_across_wraps
+    def test_static_model_matches_retained_history_across_wraps(budget, length):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+________ test_static_model_matches_retained_history_across_wraps[23-10] ________
+tests/test_far_skip_hybrid_cache.py:170: in test_static_model_matches_retained_history_across_wraps
+    def test_static_model_matches_retained_history_across_wraps(budget, length):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+________ test_static_model_matches_retained_history_across_wraps[23-32] ________
+tests/test_far_skip_hybrid_cache.py:170: in test_static_model_matches_retained_history_across_wraps
+    def test_static_model_matches_retained_history_across_wraps(budget, length):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+______ test_runner_discards_old_graph_and_registers_mask_on_every_refill _______
+tests/test_far_skip_hybrid_cache.py:194: in test_runner_discards_old_graph_and_registers_mask_on_every_refill
+    def test_runner_discards_old_graph_and_registers_mask_on_every_refill():
+                ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+______ test_compact_rejects_unimplemented_model_consumer_before_patching _______
+tests/test_far_skip_hybrid_cache.py:218: in test_compact_rejects_unimplemented_model_consumer_before_patching
+    model = LlamaForCausalLM(cfg).eval()
+           ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_________ test_unregistered_mask_and_changed_gate_reject_before_write __________
+tests/test_far_skip_hybrid_cache.py:225: in test_unregistered_mask_and_changed_gate_reject_before_write
+    def test_unregistered_mask_and_changed_gate_reject_before_write():
+                ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+__________ test_ruler_staged_compact_matches_dynamic_and_bounds_cache __________
+tests/test_far_skip_ruler_entry.py:63: in test_ruler_staged_compact_matches_dynamic_and_bounds_cache
+    assert all(row.workspace is not None for row in rings)
+benchmark/RULER/pred_ruler_batch.py:389: in _decode_batch_chunk
+    return _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   NameError: name '_decode_hybrid_batch_chunk' is not defined
+----------------------------- Captured stdout call -----------------------------
+register qwen3 attn: [model.layers.0.self_attn]
+register qwen3 attn: [model.layers.0.self_attn]
+________ test_ruler_rejects_unsupported_compact_before_prefill[2-True] _________
+tests/test_far_skip_ruler_entry.py:77: in test_ruler_rejects_unsupported_compact_before_prefill
+    ???
+benchmark/RULER/pred_ruler_batch.py:389: in _decode_batch_chunk
+    return _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   NameError: name '_decode_hybrid_batch_chunk' is not defined
+----------------------------- Captured stdout call -----------------------------
+register qwen3 attn: [model.layers.0.self_attn]
+________ test_ruler_rejects_unsupported_compact_before_prefill[1-False] ________
+tests/test_far_skip_ruler_entry.py:76: in test_ruler_rejects_unsupported_compact_before_prefill
+    torch.set_num_threads(previous)
+E   AssertionError: Regex pattern did not match.
+E     Expected regex: 'fixed_cache and batch_size=1'
+E     Actual message: 'compact batched decode requires fixed_cache=True'
+----------------------------- Captured stdout call -----------------------------
+register qwen3 attn: [model.layers.0.self_attn]
+__________ test_ragged_batch_matches_independent_retained_requests[1] __________
+tests/test_hybrid_batch_cache.py:50: in test_ragged_batch_matches_independent_retained_requests
+    model = make_model()
+            ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+__________ test_ragged_batch_matches_independent_retained_requests[2] __________
+tests/test_hybrid_batch_cache.py:50: in test_ragged_batch_matches_independent_retained_requests
+    model = make_model()
+            ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+__________ test_ragged_batch_matches_independent_retained_requests[8] __________
+tests/test_hybrid_batch_cache.py:50: in test_ragged_batch_matches_independent_retained_requests
+    model = make_model()
+            ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_________ test_ragged_batch_matches_independent_retained_requests[32] __________
+tests/test_hybrid_batch_cache.py:50: in test_ragged_batch_matches_independent_retained_requests
+    model = make_model()
+            ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+___________ test_short_non_page_aligned_capacity_with_large_l1_quota ___________
+tests/test_hybrid_batch_cache.py:78: in test_short_non_page_aligned_capacity_with_large_l1_quota
+    model = make_model()
+            ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_______ test_oversized_l2_fills_quota_without_duplicate_or_padding_slots _______
+tests/test_hybrid_batch_cache.py:97: in test_oversized_l2_fills_quota_without_duplicate_or_padding_slots
+    model = make_model(budget=32)
+            ^^^^^^^^^^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_______________ test_all_patched_layers_keep_request_local_state _______________
+tests/test_hybrid_batch_cache.py:130: in test_all_patched_layers_keep_request_local_state
+    model = make_model()
+            ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_________ test_storage_is_row_specific_and_prefill_history_is_released _________
+tests/test_hybrid_batch_cache.py:157: in test_storage_is_row_specific_and_prefill_history_is_released
+    model = make_model()
+            ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_________ test_eos_freezes_both_ring_and_linear_and_native_dense_rows __________
+tests/test_hybrid_batch_cache.py:182: in test_eos_freezes_both_ring_and_linear_and_native_dense_rows
+    model = make_model()
+            ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_______ test_runner_rejects_invalid_step_before_mutating_inputs_or_cache _______
+tests/test_hybrid_batch_cache.py:201: in test_runner_rejects_invalid_step_before_mutating_inputs_or_cache
+    runner = build(make_model(), [7, 23], [True, False], capacity=32)
+                   ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_______ test_inference_mode_geometry_updates_and_scope_restores_on_error _______
+tests/test_hybrid_batch_cache.py:215: in test_inference_mode_geometry_updates_and_scope_restores_on_error
+    runner = build(make_model(), [7, 23], [True, False])
+                   ^^^^^^^^^^^^
+tests/test_far_skip_hybrid_cache.py:58: in make_model
+    attn = model.model.layers[0].self_attn
+                   ^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:319: in __init__
+    raise ValueError(
+E   ValueError: tli_near_tokens 须传非负整数或 'off'（自由竞争哨兵）——只传 tli_near_pages 而缺 nt 属歧义配置
+----------------------------- Captured stdout call -----------------------------
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/integration/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+_______________ test_production_batch_entry_and_repeated_batches _______________
+tests/test_hybrid_batch_cache.py:228: in test_production_batch_entry_and_repeated_batches
+    import benchmark.RULER.pred_ruler_batch as production
+benchmark/RULER/pred_ruler_batch.py:56: in <module>
+    from benchmark.RULER.yarn_receipt import (  # noqa: E402
+E   ModuleNotFoundError: No module named 'benchmark.RULER.yarn_receipt'
+_____________________ test_actual_eager_attention_consumer _____________________
+tests/test_tli_batch_parallel.py:200: in test_actual_eager_attention_consumer
+    outputs.append(_tl_decode_batched(SimpleNamespace(scaling=128**-.5),make_indexer(),q,k,v,ctx))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sparse_attn/patches/qwen3_attn_patch.py:235: in _tl_decode_batched
+    mask, block_size = indexer.prepare_mask(
+sparse_attn/indexer/base.py:74: in prepare_mask
+    mask = self.compute_mask(q_ids, score_dict)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_indexer.py:3373: in compute_mask
+    _ako_rebuild_scatter_kernel[(
+/tmp/tli-venv/lib/python3.12/site-packages/triton/runtime/jit.py:390: in <lambda>
+    return lambda *args, **kwargs: self.run(grid=grid, warmup=False, *args, **kwargs)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/tli-venv/lib/python3.12/site-packages/triton/runtime/jit.py:551: in run
+    device = driver.active.get_current_device()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/tli-venv/lib/python3.12/site-packages/triton/runtime/driver.py:30: in __getattr__
+    return getattr(self._initialize_obj(), name)
+                   ^^^^^^^^^^^^^^^^^^^^^^
+/tmp/tli-venv/lib/python3.12/site-packages/triton/runtime/driver.py:26: in _initialize_obj
+    self._obj = self._init_fn()
+                ^^^^^^^^^^^^^^^
+/tmp/tli-venv/lib/python3.12/site-packages/triton/runtime/driver.py:11: in _create_driver
+    raise RuntimeError(f"{len(active_drivers)} active drivers ({active_drivers}). There should only be one.")
+E   RuntimeError: 0 active drivers ([]). There should only be one.
+=========================== short test summary info ============================
+FAILED tests/test_baseline_integration.py::BaselineTests::test_clock_and_ruler_limits
+FAILED tests/test_baseline_integration.py::BaselineTests::test_entrypoint_wiring
+FAILED tests/test_baseline_integration.py::BaselineTests::test_integrity_and_options
+FAILED tests/test_baseline_integration.py::BaselineTests::test_quest_real_hf_full_budget_and_position_rejection
+FAILED tests/test_far_skip_graph.py::test_graph_runner_injection_preserves_mask_on_growth_repeat_and_rewind
+FAILED tests/test_far_skip_hybrid_cache.py::test_direct_allocation_never_creates_full_buffer_for_skip_layer
+FAILED tests/test_far_skip_hybrid_cache.py::test_refill_gate_changes_restore_linear_and_rebuild_ring
+FAILED tests/test_far_skip_hybrid_cache.py::test_refill_preflight_and_model_requirement
+FAILED tests/test_far_skip_hybrid_cache.py::test_eager_eviction_matches_retained_history_and_writes_once[10]
+FAILED tests/test_far_skip_hybrid_cache.py::test_eager_eviction_matches_retained_history_and_writes_once[32]
+FAILED tests/test_far_skip_hybrid_cache.py::test_static_model_matches_retained_history_across_wraps[1-10]
+FAILED tests/test_far_skip_hybrid_cache.py::test_static_model_matches_retained_history_across_wraps[1-32]
+FAILED tests/test_far_skip_hybrid_cache.py::test_static_model_matches_retained_history_across_wraps[7-10]
+FAILED tests/test_far_skip_hybrid_cache.py::test_static_model_matches_retained_history_across_wraps[7-32]
+FAILED tests/test_far_skip_hybrid_cache.py::test_static_model_matches_retained_history_across_wraps[23-10]
+FAILED tests/test_far_skip_hybrid_cache.py::test_static_model_matches_retained_history_across_wraps[23-32]
+FAILED tests/test_far_skip_hybrid_cache.py::test_runner_discards_old_graph_and_registers_mask_on_every_refill
+FAILED tests/test_far_skip_hybrid_cache.py::test_compact_rejects_unimplemented_model_consumer_before_patching
+FAILED tests/test_far_skip_hybrid_cache.py::test_unregistered_mask_and_changed_gate_reject_before_write
+FAILED tests/test_far_skip_ruler_entry.py::test_ruler_staged_compact_matches_dynamic_and_bounds_cache
+FAILED tests/test_far_skip_ruler_entry.py::test_ruler_rejects_unsupported_compact_before_prefill[2-True]
+FAILED tests/test_far_skip_ruler_entry.py::test_ruler_rejects_unsupported_compact_before_prefill[1-False]
+FAILED tests/test_hybrid_batch_cache.py::test_ragged_batch_matches_independent_retained_requests[1]
+FAILED tests/test_hybrid_batch_cache.py::test_ragged_batch_matches_independent_retained_requests[2]
+FAILED tests/test_hybrid_batch_cache.py::test_ragged_batch_matches_independent_retained_requests[8]
+FAILED tests/test_hybrid_batch_cache.py::test_ragged_batch_matches_independent_retained_requests[32]
+FAILED tests/test_hybrid_batch_cache.py::test_short_non_page_aligned_capacity_with_large_l1_quota
+FAILED tests/test_hybrid_batch_cache.py::test_oversized_l2_fills_quota_without_duplicate_or_padding_slots
+FAILED tests/test_hybrid_batch_cache.py::test_all_patched_layers_keep_request_local_state
+FAILED tests/test_hybrid_batch_cache.py::test_storage_is_row_specific_and_prefill_history_is_released
+FAILED tests/test_hybrid_batch_cache.py::test_eos_freezes_both_ring_and_linear_and_native_dense_rows
+FAILED tests/test_hybrid_batch_cache.py::test_runner_rejects_invalid_step_before_mutating_inputs_or_cache
+FAILED tests/test_hybrid_batch_cache.py::test_inference_mode_geometry_updates_and_scope_restores_on_error
+FAILED tests/test_hybrid_batch_cache.py::test_production_batch_entry_and_repeated_batches
+FAILED tests/test_tli_batch_parallel.py::test_actual_eager_attention_consumer
+35 failed, 285 passed, 251 skipped, 395 subtests passed in 90.17s (0:01:30)

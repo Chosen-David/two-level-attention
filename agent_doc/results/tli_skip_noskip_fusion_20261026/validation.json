@@ -1,0 +1,152 @@
+{
+  "parent_commit": "80e151e5354e356db254f76ccb34255e7711a2ad",
+  "merged_main": "262517bd9f04b65860723e9e90447f298ed4d4a8",
+  "status": "ready_for_remote_validation_not_gpu_accepted",
+  "environment": {
+    "python": "3.12.14",
+    "torch": "2.8.0+cpu",
+    "cuda_available": false,
+    "triton": "3.4.0 isolated runtime"
+  },
+  "source_sha256": {
+    "sparse_attn/arguments.py": "003ccfe7cfbb356e10c950b2665ed6d2d1535c209fd18f8bdc810d4fefcbba84",
+    "sparse_attn/indexer/tli_indexer.py": "d25b256329c8a31359049a903734e5fe32aec165c5e0604ef58ed94186a0d3e2",
+    "sparse_attn/indexer/tli_batch.py": "1afa0ba58f771e26009ec7db3aaf59f4300d73a2e35d1e3b06cc0cb3bf9f8a3a",
+    "sparse_attn/indexer/tli_batch_pipeline.py": "d7286d2f66ac4f8bf6ea7a65075df90e9e565b10b53f9545c664897ee118aa5d",
+    "sparse_attn/patches/qwen3_attn_patch.py": "3e0768e2face28fa7cc11ed9eca98188261ca73e6d589721c45b5744fb913729",
+    "tests/test_tli_gpu_pipeline.py": "f9e8f0dd4138873d3dacff1a9485f5790d2acfe89b1d1314a47b974bfa274545",
+    "tests/test_tli_batch_parallel.py": "5c7abdd65e94bc4b3b922ddd2b77b885b685c1d04e6403e289be720d62324a5c",
+    "tests/test_far_skip_residency.py": "dce945aaee8970c06deaa1f969b0f4a00c07fb72388c9d38b4e9f868a311df59",
+    "tests/test_qwen_static_mask.py": "254c319c9d020e1eb2646d2ee18212caed22aa3a8312708d2473c5000fb6a2d4",
+    "tests/test_tli_runtime_shape_contract.py": "e8892f39acf4f515b1b0841f18b0952a9503aabd63785ea76e19949df7027fa7",
+    "tests/test_tli_async_candidate_gate.py": "416dfcc932be70d99d233cb34b5762eea2e5951f15652791ab5639b1b21cfaa3",
+    "exp/bench/compile_tli_gpu_pipeline.py": "d2d246e3bad795802d2241e36e35335a4c6778866ac151a16f5f8fe0dbc0f02e",
+    "exp/bench/run_tli_gpu_pipeline.py": "5a8774db9b95c35db151cb5dd8cdb05bf997f004ce53978178132057467a3b16",
+    "exp/bench/tli_batch_round_compare.py": "c25ead8c85988341eda7f0c17a8188f1eeb161ef4ac1900ddac916a08aa0d7e5",
+    "exp/bench/far_skip_residency.py": "c001bfa8070c20ec06550ca5ba4a6daefceed07309e778e84e0033fd83a4f08d"
+  },
+  "checks": {
+    "cpu": {
+      "command": "python -m pytest -q tests",
+      "scope": "locally downloaded test subset; not every repository test",
+      "test_files": [
+        "tests/test_e155d_snapshot.py",
+        "tests/test_explicit_free_budget.py",
+        "tests/test_explicit_near_page_budget.py",
+        "tests/test_explicit_quota_modes.py",
+        "tests/test_far_skip_compact.py",
+        "tests/test_far_skip_gpu_kernels.py",
+        "tests/test_far_skip_graph.py",
+        "tests/test_far_skip_optimized.py",
+        "tests/test_far_skip_residency.py",
+        "tests/test_far_skip_ruler_entry.py",
+        "tests/test_far_skip_subspace.py",
+        "tests/test_qwen_static_mask.py",
+        "tests/test_ruler_batch_treatment_snapshot.py",
+        "tests/test_tli_async_candidate_gate.py",
+        "tests/test_tli_batch_five_rounds.py",
+        "tests/test_tli_batch_fusion_kernels.py",
+        "tests/test_tli_batch_kernels.py",
+        "tests/test_tli_batch_parallel.py",
+        "tests/test_tli_gpu_pipeline.py",
+        "tests/test_tli_runtime_shape_contract.py"
+      ],
+      "passed": 254,
+      "skipped": 182,
+      "subtests": 217,
+      "log": "cpu_tests_merged.txt"
+    },
+    "interpreter": {
+      "command": "PYTHONPATH=/workspace/scratch/7d83fead945d/triton-runtime TRITON_INTERPRET=1 python -m pytest -q tests/test_tli_gpu_pipeline.py tests/test_tli_batch_fusion_kernels.py",
+      "passed": 99,
+      "skipped": 38,
+      "log": "interpreter_merged.txt",
+      "scope": "CPU logic only; no CUDA capture/runtime/BF16 acceptance"
+    },
+    "offline_compile": {
+      "cases": 284,
+      "architectures": [
+        80,
+        90
+      ],
+      "receipt": "offline_compile.json",
+      "resources": {
+        "_candidates": {
+          "cases": 18,
+          "registers": [
+            18,
+            60
+          ],
+          "spill_cases": 0
+        },
+        "_mask_top": {
+          "cases": 2,
+          "registers": [
+            24,
+            24
+          ],
+          "spill_cases": 0
+        },
+        "_pool_score": {
+          "cases": 96,
+          "registers": [
+            31,
+            64
+          ],
+          "spill_cases": 0
+        },
+        "_queries": {
+          "cases": 24,
+          "registers": [
+            10,
+            18
+          ],
+          "spill_cases": 0
+        },
+        "_update_cache": {
+          "cases": 144,
+          "registers": [
+            32,
+            96
+          ],
+          "spill_cases": 0
+        }
+      }
+    },
+    "cpu_residency": {
+      "receipt": "residency_cpu.json",
+      "before_bytes": 134217728,
+      "after_bytes": 102301696,
+      "old_refs_released": true,
+      "cuda_executed": false
+    },
+    "cpu_harness_smokes": {
+      "skip_harness_smoke_merged.json": {
+        "cuda_executed": false,
+        "mask_mismatch_bits": 0,
+        "attention_max_abs": 0.0
+      },
+      "noskip_harness_smoke_merged.json": {
+        "cuda_executed": false,
+        "mask_mismatch_bits": 0,
+        "attention_max_abs": 0.0
+      }
+    }
+  },
+  "diagnostic_only": [
+    "cpu_tests.txt and interpreter_final.txt precede main integration (218/123 passes respectively)",
+    "cpu_initial_harness_failures.txt records stale AST harness failures corrected in final tests",
+    "residency_initial_failure.txt records the corrected B1 valid_length bug",
+    "interpreter_initial.txt and route_cpu_tests.txt are intermediate results",
+    "skip_harness_smoke.json and noskip_harness_smoke.json precede main integration",
+    "wide_tile_trial and tile16_trial are rejected spilling resource candidates"
+  ],
+  "unverified": [
+    "actual CUDA numerical masks/attention incl BF16",
+    "actual CUDA Graph capture/replay correctness",
+    "matched eager and graph GPU latency/profiles",
+    "per-prompt full-model gate calibration and quality after strict eviction",
+    "GPU allocated/reserved/peak residency deltas",
+    "full-model request cost including setup; no 13% measured GPU claim"
+  ]
+}

@@ -20,6 +20,7 @@ from transformers.integrations.sdpa_attention import sdpa_attention_forward
 from transformers.models.qwen3 import modeling_qwen3 as qwen
 from transformers.models.llama import modeling_llama as llama
 from sparse_attn.ops.eager_decoding import eager_decoding_attn
+from sparse_attn.baseline_runtime import batch_decode_ctx
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -33,12 +34,14 @@ def functions(path, ns):
 
 def load_forward(family):
     model = qwen if family == 'qwen3' else llama
-    ns = dict(torch=torch, os=os, sys=sys, weakref=weakref,
+    ns = dict(torch=torch, os=os, sys=sys, weakref=weakref, batch_decode_ctx=batch_decode_ctx,
               apply_rotary_pos_emb=model.apply_rotary_pos_emb,
               eager_attention_forward=model.eager_attention_forward,
               ALL_ATTENTION_FUNCTIONS={'sdpa': sdpa_attention_forward},
               eager_decoding_attn=eager_decoding_attn)
     functions(ROOT / 'sparse_attn/patches/utils.py', ns)
+    # Llama imports shared mask/route helpers from Qwen; retain those in the AST harness.
+    functions(ROOT / 'sparse_attn/patches/qwen3_attn_patch.py', ns)
     functions(ROOT / f'sparse_attn/patches/{family}_attn_patch.py', ns)
     return ns[f'{family}_attn_forward']
 

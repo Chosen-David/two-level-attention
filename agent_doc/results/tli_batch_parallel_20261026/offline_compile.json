@@ -1,0 +1,727 @@
+{
+  "triton": "3.4.0",
+  "status": "offline compile only",
+  "source_sha256": "356bfd70fd938a4ad2ef8939571196e963cccfba4f49520264f13ad97ff10971",
+  "cases": [
+    {
+      "arch": 80,
+      "d": 32,
+      "mode": 0,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 0,
+        "TILE": 32
+      },
+      "ptx_sha256": "ce9e860ba7b8b14bae4f95273b2ce67f3b125c3e5cb446290f56f4cbd268557f",
+      "cubin_bytes": 39520
+    },
+    {
+      "arch": 80,
+      "d": 32,
+      "mode": 0,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 0,
+        "TILE": 32
+      },
+      "ptx_sha256": "7d52ffe907c4449c9c62b16a02b932d9950d0d5c5bf141c6d45fe9b42b953c30",
+      "cubin_bytes": 41824
+    },
+    {
+      "arch": 80,
+      "d": 32,
+      "mode": 1,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 1,
+        "TILE": 32
+      },
+      "ptx_sha256": "c8a7fd07ab4d4a6846d454d39a0b93eb8599e4cea510baeccb8d6c733a835455",
+      "cubin_bytes": 68064
+    },
+    {
+      "arch": 80,
+      "d": 32,
+      "mode": 1,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 1,
+        "TILE": 32
+      },
+      "ptx_sha256": "148d7c4eb560eae6024f25c89ebfab26637b79097175b7c642bf9e45afdc00e9",
+      "cubin_bytes": 70624
+    },
+    {
+      "arch": 80,
+      "d": 32,
+      "mode": 2,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 2,
+        "TILE": 32
+      },
+      "ptx_sha256": "4e62e9773b3e644476a2840328cfed0fea1686a9c7cee28881012a42299ff104",
+      "cubin_bytes": 42592
+    },
+    {
+      "arch": 80,
+      "d": 32,
+      "mode": 2,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 2,
+        "TILE": 32
+      },
+      "ptx_sha256": "a35cda787a26029ed97f8de65822700b80b32359096a5a5a5f28ccba22c9e364",
+      "cubin_bytes": 45280
+    },
+    {
+      "arch": 80,
+      "d": 128,
+      "mode": 0,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 0,
+        "TILE": 32
+      },
+      "ptx_sha256": "9afa6a7f6ab9c54be08167df8d77ce7df448eca090c57b3e58d58148468978d6",
+      "cubin_bytes": 159328
+    },
+    {
+      "arch": 80,
+      "d": 128,
+      "mode": 0,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 0,
+        "TILE": 32
+      },
+      "ptx_sha256": "fe576fb8f610848a9d9e1a97234bdfb708ecd695acaee50678d43ce42dab2ec3",
+      "cubin_bytes": 171744
+    },
+    {
+      "arch": 80,
+      "d": 128,
+      "mode": 1,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 1,
+        "TILE": 32
+      },
+      "ptx_sha256": "93db41bf895167f6a83749facaa99fecfccc1373aef2881927b635b057021b38",
+      "cubin_bytes": 289376
+    },
+    {
+      "arch": 80,
+      "d": 128,
+      "mode": 1,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 1,
+        "TILE": 32
+      },
+      "ptx_sha256": "d1a60eba42727a6edf9bd31898041068a7a3f32ecd3ed739d637cf3e80fb4ef1",
+      "cubin_bytes": 306016
+    },
+    {
+      "arch": 80,
+      "d": 128,
+      "mode": 2,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 2,
+        "TILE": 32
+      },
+      "ptx_sha256": "9e61da39e24c06b89c22e27bcbff12979140272356c98b84539c7eff5ae20b43",
+      "cubin_bytes": 168800
+    },
+    {
+      "arch": 80,
+      "d": 128,
+      "mode": 2,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 2,
+        "TILE": 32
+      },
+      "ptx_sha256": "06797f542e0e5141f59eb6d6da47d0c12cadd9c0d34f83be830054ae5ebe9e45",
+      "cubin_bytes": 184032
+    },
+    {
+      "arch": 90,
+      "d": 32,
+      "mode": 0,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 0,
+        "TILE": 32
+      },
+      "ptx_sha256": "65574e861d283ea4aee8237ae41328023cec6d65fd7acc39e3bd6316d849af1b",
+      "cubin_bytes": 40488
+    },
+    {
+      "arch": 90,
+      "d": 32,
+      "mode": 0,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 0,
+        "TILE": 32
+      },
+      "ptx_sha256": "169a3fcf6166bdd44b4fb07c0b3045efe793af7e4340be457966b4da68fb937a",
+      "cubin_bytes": 43048
+    },
+    {
+      "arch": 90,
+      "d": 32,
+      "mode": 1,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 1,
+        "TILE": 32
+      },
+      "ptx_sha256": "a97798d2c813837a365a56c6ad6218cc93df9cc2a02971ea3b9aa3f3b2dae736",
+      "cubin_bytes": 69032
+    },
+    {
+      "arch": 90,
+      "d": 32,
+      "mode": 1,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 1,
+        "TILE": 32
+      },
+      "ptx_sha256": "97ab78aac9cd86251a906a28f3c3af1a0643a5510c6992521f1206365ce7c209",
+      "cubin_bytes": 71848
+    },
+    {
+      "arch": 90,
+      "d": 32,
+      "mode": 2,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 2,
+        "TILE": 32
+      },
+      "ptx_sha256": "9f696ad39dfad7bb98f08c736aa00710cb55173a0b683dc750c392ed07797cf3",
+      "cubin_bytes": 43560
+    },
+    {
+      "arch": 90,
+      "d": 32,
+      "mode": 2,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 8388608,
+        "KT": 256,
+        "KH": 32,
+        "QB": 1024,
+        "QH": 128,
+        "QG": 32,
+        "H": 8,
+        "G": 4,
+        "D": 32,
+        "MODE": 2,
+        "TILE": 32
+      },
+      "ptx_sha256": "8d054ef38d303feda4be79e57cce7f6544960da5c26b2099951d66a44bde185c",
+      "cubin_bytes": 46120
+    },
+    {
+      "arch": 90,
+      "d": 128,
+      "mode": 0,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 0,
+        "TILE": 32
+      },
+      "ptx_sha256": "91a150d244f8cac65e3a3e27757255f79c4828de9de06bfd4a5779885fbb4462",
+      "cubin_bytes": 160552
+    },
+    {
+      "arch": 90,
+      "d": 128,
+      "mode": 0,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 0,
+        "TILE": 32
+      },
+      "ptx_sha256": "fbb96a533b376560e3181ef124e22ba57a1a815bf47fce39c3ab922f1107c9be",
+      "cubin_bytes": 171304
+    },
+    {
+      "arch": 90,
+      "d": 128,
+      "mode": 1,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 1,
+        "TILE": 32
+      },
+      "ptx_sha256": "a574871344e94519a593ea06d4bd393fc7073c6cab3809076681e946d92abcfc",
+      "cubin_bytes": 287912
+    },
+    {
+      "arch": 90,
+      "d": 128,
+      "mode": 1,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 1,
+        "TILE": 32
+      },
+      "ptx_sha256": "2c16d3878e81af22b8d7262a6f6e119e7cfba9d459f8b4d07b611d2589a5d0e5",
+      "cubin_bytes": 304808
+    },
+    {
+      "arch": 90,
+      "d": 128,
+      "mode": 2,
+      "dtype": "fp32",
+      "signature": {
+        "K": "*fp32",
+        "KMAX": "*fp32",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*fp32",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 2,
+        "TILE": 32
+      },
+      "ptx_sha256": "5935180ed30e7cf903a3288fd4b6c86327a4c49f897980ffaaa152385a27abe7",
+      "cubin_bytes": 169256
+    },
+    {
+      "arch": 90,
+      "d": 128,
+      "mode": 2,
+      "dtype": "bf16",
+      "signature": {
+        "K": "*bf16",
+        "KMAX": "*bf16",
+        "Q": "*fp32",
+        "IDS": "*i64",
+        "KEEP": "*i1",
+        "OUT": "*bf16",
+        "N": "i32"
+      },
+      "constants": {
+        "KB": 33554432,
+        "KT": 1024,
+        "KH": 128,
+        "QB": 4096,
+        "QH": 512,
+        "QG": 128,
+        "H": 8,
+        "G": 4,
+        "D": 128,
+        "MODE": 2,
+        "TILE": 32
+      },
+      "ptx_sha256": "284ba8dc6b74773a97fc41082065d887a7cf98b85494af7cbd66a1feafa9cd55",
+      "cubin_bytes": 184616
+    }
+  ]
+}

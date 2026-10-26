@@ -86,6 +86,16 @@ def _physical_positions(positions, *, length, physical_length, sink, tail_start)
 
 def _keys_at(k, positions, *, length, cfg, tail_start=None, layout=None,
              dims=None, workspace=None):
+    from .far_skip_accel import enabled, gather
+    ws = workspace if workspace is not None else FarSkipWorkspace()
+    if enabled(k) and (layout is not None or tail_start is None):
+        if layout is None and k.shape[1] != length:
+            raise ValueError('retained KV must contain exactly the logical sequence')
+        if layout is not None and layout.sink != cfg.sink_tokens:
+            raise ValueError('ring KV shape disagrees with layout')
+        rows = positions.expand(k.shape[2], -1) if positions.ndim == 1 else positions
+        out = gather(k, rows, layout, ws, dims=dims)
+        return out.transpose(0, 1) if positions.ndim == 1 else out
     if layout is not None:
         if k.shape[1] != layout.capacity or layout.sink != cfg.sink_tokens:
             raise ValueError("ring KV shape disagrees with layout")
@@ -94,7 +104,6 @@ def _keys_at(k, positions, *, length, cfg, tail_start=None, layout=None,
         physical = _physical_positions(positions, length=length,
                                        physical_length=k.shape[1],
                                        sink=cfg.sink_tokens, tail_start=tail_start)
-    ws = workspace if workspace is not None else FarSkipWorkspace()
     heads = ws.ids(k.shape[2], k.device)
     if dims is None:
         if positions.dim() == 1:
@@ -222,10 +231,19 @@ def attend_far_skip(q, k, v, selection, cfg, *, scale=None, tail_start=None,
     positions = selection.positions
     if positions.shape[-1] == 0:
         raise ValueError("far-off selection is empty")
-    kk = _keys_at(k, positions, length=selection.length, cfg=cfg, tail_start=tail_start,
-                  layout=layout, workspace=workspace)
-    vv = _keys_at(v, positions, length=selection.length, cfg=cfg, tail_start=tail_start,
-                  layout=layout, workspace=workspace)
+    from .far_skip_accel import enabled, gather
+    if enabled(k) and (layout is not None or tail_start is None):
+        if layout is None and k.shape[1] != selection.length:
+            raise ValueError('retained KV must contain exactly the logical sequence')
+        if layout is not None and layout.sink != cfg.sink_tokens:
+            raise ValueError('ring KV shape disagrees with layout')
+        ws = workspace if workspace is not None else FarSkipWorkspace()
+        kk, vv = gather(k, positions, layout, ws, other=v)
+    else:
+        kk = _keys_at(k, positions, length=selection.length, cfg=cfg, tail_start=tail_start,
+                      layout=layout, workspace=workspace)
+        vv = _keys_at(v, positions, length=selection.length, cfg=cfg, tail_start=tail_start,
+                      layout=layout, workspace=workspace)
     Hkv, G = k.shape[2], q.shape[2] // k.shape[2]
     qg = q[0, 0].reshape(Hkv, 1, G, q.shape[-1])
     scale = q.shape[-1] ** -0.5 if scale is None else scale

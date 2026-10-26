@@ -23,6 +23,7 @@ class _GraphState:
         self.enabled = False       # graph 模式开关（decode 循环 capture/replay）
         self.pos_buf = None        # [B] long：本步 KV 写入列（capture 外每步 copy_）
         self.valid_len_buf = None  # [B] long：本步每行有效长（prepare_mask valid_length）
+        self.alive_buf = None      # [B] bool：EOS 后保持该行 KV 不变
         self.bs = None             # 当前 batch（buffer 形状校验用）
 
 
@@ -44,4 +45,6 @@ def disable_graph():
     st.enabled = False
     st.pos_buf = None
     st.valid_len_buf = None
+    st.alive_buf = None
     st.bs = None
+

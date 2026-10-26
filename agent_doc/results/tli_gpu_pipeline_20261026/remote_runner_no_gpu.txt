@@ -1,0 +1,19 @@
+usage: Real-GPU validation/stress entry; fail closed on CPU or interpreter.
+
+Runs existing repository gates, new CUDA correctness/capture tests, then paired
+indexer measurements. Full-model quality/TPOT is a separate acceptance gate.
+Each case gets a fresh process so graph pools/JIT history cannot cross cases.
+
+       [-h] --outdir OUTDIR [--batches BATCHES [BATCHES ...]]
+       [--lengths LENGTHS [LENGTHS ...]]
+       [--layouts {head,token} [{head,token} ...]]
+       [--l2-subspaces {same,full} [{same,full} ...]]
+       [--methods {mixed,avg,minmax} [{mixed,avg,minmax} ...]]
+       [--dtype {float32,float16,bfloat16}] [--steps STEPS]
+       [--repeats REPEATS] [--profile] [--sanitizer]
+Real-GPU validation/stress entry; fail closed on CPU or interpreter.
+
+Runs existing repository gates, new CUDA correctness/capture tests, then paired
+indexer measurements. Full-model quality/TPOT is a separate acceptance gate.
+Each case gets a fresh process so graph pools/JIT history cannot cross cases.
+: error: real CUDA required; CPU/interpreter runs cannot produce GPU receipts
