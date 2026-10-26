@@ -5,6 +5,8 @@ This revision addresses **indexer serialization**, separately from the B=1
 compact far-eviction path. Default behavior remains `TLI_BATCH_INDEXER=legacy`.
 It is not a claim that the previous GPU eager regression is resolved.
 
+Further iterations: [five-round evidence and fusion switch](tli_batch_five_rounds.md).
+
 ## What was serialized
 
 `qwen3_attn_patch._tl_decode_batched` cleared the indexer and called
@@ -31,6 +33,8 @@ reduction. Operations retain batch as a tensor dimension. In Qwen integration:
 ```bash
 export TLI_BATCH_INDEXER=parallel
 export TLI_BATCH_SCORE=triton  # optional GPU scorer; torch is the default oracle
+# Optional new data-movement fusion bundle; default off until GPU validation:
+export TLI_BATCH_FUSIONS=1
 ```
 
 The same API is wired to staged eager and Graph for B>1. B=1 retains the old

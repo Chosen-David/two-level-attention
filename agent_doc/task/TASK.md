@@ -2,6 +2,8 @@
 
 ## 2026-10-26
 
+- [ ] [TL-BATCH-FIVE-ROUNDS-20261026] 完成五轮 batch indexer 实现与本地验证：按需摘要、Q 投影复用、稳定候选线性分区、mask 装配、末尾页读取；保留无收益的 Torch 试验记录，GPU 性能/质量验收仍待。([详情](task_details/TL-BATCH-FIVE-ROUNDS-20261026.md))
+
 - [ ] [TL-BATCH-INDEXER-PARALLEL-20261026] 新增完整 batch 索引器、增量页维护与可选 Triton 批量打分，接入 Qwen eager/Graph；CPU/解释器/离线编译已验，目标 GPU 性能、原 Graph 对照和完整模型质量待验。([详情](task_details/TL-BATCH-INDEXER-PARALLEL-20261026.md))
 
 - [ ] [TL-FAR-SKIP-GPU-REVISION-20261026] 已升级 PR #7：拆开 staged eager/Graph 路径，增加三类可选 Triton 融合内核及配对验收工具；CPU/解释器/离线编译已验，目标 GPU eager 回退是否修复仍待实测。([详情](task_details/TL-FAR-SKIP-GPU-REVISION-20261026.md))

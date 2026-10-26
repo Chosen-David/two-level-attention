@@ -31,7 +31,7 @@ champion flags = K1=64）。
 
 | 陷阱 | 历史行为 | 现状 |
 |---|---|
-| TLI 的 batch 能力只在 attention 消费端，indexer 必须逐行执行 | PR #7 的 `TL-BATCH-INDEXER-PARALLEL-20261026` 增加完整 batch 候选实现；`docs/tli_batch_indexer.md` 与 `agent_doc/results/tli_batch_parallel_20261026/` 记录 CPU/解释器/离线编译，目标 GPU、旧 Graph 对照和完整模型质量仍待验，默认仍走 legacy。此项不修改历史 GPU 主表，也不代表 compact KV 淘汰已支持 B>1。 |---|
+| TLI 的 batch 能力只在 attention 消费端，indexer 必须逐行执行 | PR #7 的 `TL-BATCH-INDEXER-PARALLEL-20261026` 增加完整 batch 候选实现；`docs/tli_batch_indexer.md` 与 `agent_doc/results/tli_batch_parallel_20261026/` 记录 CPU/解释器/离线编译，目标 GPU、旧 Graph 对照和完整模型质量仍待验，默认仍走 legacy。此项不修改历史 GPU 主表，也不代表 compact KV 淘汰已支持 B>1。 后续五轮见 `docs/tli_batch_five_rounds.md`，包含按需摘要、Q 复用及可选 movement 融合；本地证据不构成 GPU 提速判决。 |---|
 | `--tli_enable_layer_skip` 默认 true | 漏传 = 静默跑成 D′ gate 口径（E129 起协议强制显式传） | **接口保留**（2026-10-25 用户指令：far-skip 转向 KV cache 节省叙事线，见第 5 节）；主表口径仍显式 false |
 | `--tli_subspace` 默认 full | 生产必须显式 tail | 默认仍 full，**必须显式传 tail** |
 | `--tia_level2_cmp_ratio` 默认 2 | 生产口径 4 | **必须显式传 4** |

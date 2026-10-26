@@ -25,6 +25,7 @@ def one_thread(monkeypatch):
     n = torch.get_num_threads()
     torch.set_num_threads(1)
     monkeypatch.setenv('TLI_BATCH_SCORE', 'torch')
+    monkeypatch.setenv('TLI_BATCH_FUSIONS', '0')
     yield
     torch.set_num_threads(n)
 
@@ -111,12 +112,13 @@ def test_metadata_rejections_and_metrics():
     assert metrics.get_select_tokens()==ref.get_select_tokens()
 
 
-@pytest.mark.parametrize('backend',['torch','triton'])
+@pytest.mark.parametrize('backend,fusions',[('torch',False),('triton',False),('triton',True)])
 @pytest.mark.parametrize('dtype',[torch.float32,torch.bfloat16])
 @pytest.mark.skipif(not torch.cuda.is_available(),reason='requires real CUDA capture')
 @torch.no_grad()
-def test_real_capture_replay(monkeypatch,backend,dtype):
+def test_real_capture_replay(monkeypatch,backend,dtype,fusions):
     monkeypatch.setenv('TLI_BATCH_SCORE',backend)
+    monkeypatch.setenv('TLI_BATCH_FUSIONS','1' if fusions else '0')
     idx=make_indexer(); k=torch.randn(4,512,2,128,device='cuda',dtype=dtype)
     q=torch.randn(4,1,8,128,device='cuda',dtype=dtype); lengths=torch.tensor([290,315,380,400],device='cuda')
     stream=torch.cuda.Stream()
