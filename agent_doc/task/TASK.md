@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-23
+
+- [ ] [TL-ASYNCTLS-COMPARISON-20261023] AsyncTLS resident三方、paper-style/规范化保护预算、eager/Graph公平与配对质量测试设计；入口依赖及官方来源仍待闭合，零GPU执行，独立draft PR供审核。([详情](task_details/TL-ASYNCTLS-COMPARISON-20261023.md))
+
 ## 2026-10-21
 
 - [x] [TL-ASYNC-CANDIDATE-20261021] 候选L2拒绝async组合并回退既有全宽路由，避免当前候选丢掉上一轮L1掩码所需分数；修前2失败，修后普通/-O各16项host回归通过。实际Torch/GPU、质量、性能与显存未验。([详情](task_details/TL-ASYNC-CANDIDATE-20261021.md))
@@ -236,3 +240,4 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 - [ ] [TL-E155D-T6-20261021] 主方法敲定 + 全量测试（用户改序暂缓：等 TG 提速确证；六机派单已预置未启动，零进程零清理） ([详情](task_details/TL-E155D-T6-20261021.md))
 - [ ] [TL-E155D-T7-20261021] 性能浪费点修复（E133c A1-A4/A6 已入库；剩余 .187 独占窗口稳态 bench 同机对照 + 判决 JSON） ([详情](task_details/TL-E155D-T7-20261021.md))
 - [ ] [TL-E155D-T8-20261021] 推送远端 main（全部判决/论文/代码提交后 origin push，含历史挂账） ([详情](task_details/TL-E155D-T8-20261021.md))
+
