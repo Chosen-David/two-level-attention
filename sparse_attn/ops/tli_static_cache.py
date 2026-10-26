@@ -93,8 +93,8 @@ class TLIStaticLayer:
         # 【阶段 2c CUDA Graph 前置】KV 写入位置张量化：scatter_ 单 kernel
         # 沿 dim2（S_cap 维）每行写 pos[b] 一列。pos 为 tensor 索引 →
         # replay 时 pos_buf 更新 → 写新列（CUDA Graph 兼容）。
-        # dead 行 seq_lens 冻结（不递增）→ pos 不变 → 重复写同列（被
-        # mask 排除，无污染）。非 graph 模式（pos_buf=None）回退 Python
+        # dead 行 seq_lens 冻结（不递增）；用 alive 张量保留旧值。
+        # 非 graph 模式（pos_buf=None）回退 Python
         # 构造，语义与旧逐行 copy_ 逐位一致（纯内存拷贝，无算术）。
         from .cuda_graph_state import graph_state  # noqa: E402
         _gs = graph_state()
@@ -107,12 +107,17 @@ class TLIStaticLayer:
         pos = torch.clamp(pos, 0, self.max_cache_len - 1)
         # scatter_ 沿 dim2（S_cap 维）每行写 pos[b] 一列：index 与 src
         # 同 shape [B,Hkv,1,D]、元素值为 pos[b] → self[b,h,pos[b],d] =
-        # src[b,h,0,d]（单 kernel，graph 兼容）。dead 行 pos 冻结 →
-        # 重复写同列（被 mask 排除，无污染）。
+        # src[b,h,0,d]（graph 兼容）。dead 行保留被冻结的最后一列。
         idx = pos.view(-1, 1, 1, 1).expand(
             self.max_batch_size, self.num_heads, 1, self.head_dim)
-        self.keys.scatter_(2, idx, key_states)
-        self.values.scatter_(2, idx, value_states)
+        if _gs.enabled:
+            alive = (_gs.alive_buf if _gs.alive_buf is not None else
+                     torch.ones(self.max_batch_size, dtype=torch.bool, device=self.keys.device))
+        else:
+            alive = torch.tensor(ctx.alive, dtype=torch.bool, device=self.keys.device)
+        active = alive.view(-1, 1, 1, 1)
+        self.keys.scatter_(2, idx, torch.where(active, key_states, self.keys.gather(2, idx)))
+        self.values.scatter_(2, idx, torch.where(active, value_states, self.values.gather(2, idx)))
         self.cumulative_length += 1
         return self.keys, self.values
 

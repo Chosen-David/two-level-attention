@@ -281,7 +281,8 @@ def qwen3_attn_forward(
             attention_mask, cache_position, batch_decode_ctx())
         if compact is not None:
             attn_output = self.o_proj(compact.reshape(*input_shape, -1).contiguous())
-            _paper_route(self.layer_idx, "far-skip-decode")
+            _paper_route(self.layer_idx, "hybrid-batch-decode"
+                         if getattr(past_key_values, '_hybrid_batch', False) else "far-skip-decode")
             return attn_output, None
 
     cur_len = 0

@@ -2,7 +2,7 @@
 
 ## 2026-10-26
 
-- [ ] [TL-HYBRID-CACHE-20261026] 独立分支实现按层直接分配、Qwen3 ring 消费路径和请求间 Graph 失效；66 项 CPU 回归及 178 子用例通过，CUDA 项跳过，真实 GPU/质量/性能验收待完成。([详情](task_details/TL-HYBRID-CACHE-20261026.md))
+- [ ] [TL-HYBRID-CACHE-20261026] PR #9 升级：按请求×层混合 ring/linear、BS=1/2/8/32、不等长/动态 gate/EOS、RULER batch 和 CUDA Graph runner；85 项回归及 178 子用例通过，7 个 CUDA 项跳过，GPU/质量/性能验收待完成。([详情](task_details/TL-HYBRID-CACHE-20261026.md))
 
 ## 2026-10-25
 
