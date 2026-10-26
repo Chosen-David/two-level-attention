@@ -68,9 +68,7 @@ def run_one(arm, L, warmup_steps, max_gen, model_path):
     ids = torch.full((1, L), 3, dtype=torch.long, device="cuda:0")
 
     from sparse_attn.patches.patch import register_patch
-    register_patch(model, args, snapshot=None, step_fn=None,
-                   layer_skip=True, layer_skip_thr=0.0,
-                   inject_snapshot_into_indexer=False)
+    register_patch(model, args, snapshot=None)
 
     with torch.inference_mode():
         # Prefill
