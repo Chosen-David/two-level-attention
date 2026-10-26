@@ -78,6 +78,23 @@ def _graph_const(key, build):
     return t
 
 
+def _batch_device_lengths(ctx, device):
+    """Upload once per step/device and share across layers in this request."""
+    key = (tuple(ctx.seq_lens), device)
+    cached = getattr(ctx, '_tli_lengths_cache', None)
+    if cached is None or cached[0] != key:
+        cached = (key, torch.tensor(ctx.seq_lens, dtype=torch.long, device=device))
+        ctx._tli_lengths_cache = cached
+    return cached[1]
+
+
+def _parallel_batch_enabled(batch):
+    mode = os.environ.get("TLI_BATCH_INDEXER", "legacy")
+    if mode not in ("legacy", "parallel"):
+        raise ValueError("TLI_BATCH_INDEXER must be legacy or parallel")
+    return batch >= 1 and mode == "parallel"
+
+
 def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
     """【阶段 2c-4】graph 数据通路版 batch decode（全 tensor、无 host 分支）。
 
@@ -100,8 +117,18 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
     S_cap = k.shape[1]
     vl = gs.valid_len_buf
     if vl is None or vl.numel() != B:
+        if _parallel_batch_enabled(B):
+            raise ValueError("parallel graph requires valid_len_buf[B]")
         vl = torch.zeros(B, dtype=torch.long, device=dev)
         gs.valid_len_buf = vl
+    if _parallel_batch_enabled(B):
+        from ..indexer.tli_batch import prepare_mask_batched
+        if gs.valid_len_buf is None:
+            raise ValueError("parallel graph requires live valid_len_buf")
+        mask, bs = prepare_mask_batched(indexer, q, k, vl, self.scaling)
+        _paper_route(self, "tli_batch_indexer_parallel_graph")
+        return eager_decoding_attn(q, k, v, mask, bs, indexer._batch_tli.cu,
+                                   softmax_scale=self.scaling, valid_length=None)
     cu = _graph_const(("cu_cap", str(dev), S_cap),
                       lambda: torch.tensor([0, S_cap], device=dev,
                                            dtype=torch.int32))
@@ -164,6 +191,12 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     v = value_states.transpose(1, 2)   # [B, S_cap, Hkv, D]
     dev = q.device
     S_cap = k.shape[1]
+    if _parallel_batch_enabled(B) and indexer.dyn_dgate:
+        if B != 1:
+            raise ValueError("parallel dynamic gates need one request; per-row gate dispatch is not implemented")
+        if q.is_cuda and torch.cuda.is_current_stream_capturing() and not indexer._dyn_frozen:
+            raise ValueError("freeze the per-prompt gate before capture")
+        indexer.freeze_dyn_dgate()
     # 【阶段 2c-4】graph 模式（pred_ruler_batch capture 窗口内）：动态几何
     # 全走 tensor（valid_len_buf），无 Python int 烘焙。配置不支持
     # compute_mask_graph（非生产主配置）时 fail-closed 关 graph + 回 staged
@@ -177,6 +210,16 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
             _gs.enabled = False
             print("[2c] compute_mask_graph 不支持当前配置 → 关闭 CUDA Graph，"
                   "回退 staged 逐行路径", flush=True)
+    if _parallel_batch_enabled(B):
+        from ..indexer.tli_batch import prepare_mask_batched
+        # One shared upload per step/device. Graph consumes caller-owned live
+        # lengths above. No per-row clear/rebuild here.
+        lengths = _batch_device_lengths(ctx, dev)
+        mask, bs = prepare_mask_batched(indexer, q, k, lengths, self.scaling)
+        _paper_route(self, "tli_batch_indexer_parallel_eager")
+        return eager_decoding_attn(q, k, v, mask, bs, indexer._batch_tli.cu,
+                                   softmax_scale=self.scaling,
+                                   valid_length=ctx.seq_lens if B > 1 else ctx.seq_lens[0])
     # 逐行 mask 准备（indexer 状态逐行，B>1 与 B==1 共用同一循环）——
     # 阶段 2b 把 mask 收集起来，B>1 且 token 级时一次批量 eager。
     masks = []
@@ -201,7 +244,7 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
         # 逐位一致，防 pad 0 项参与归约树致 ULP 翻硬币）
         return eager_decoding_attn(
             q, k, v, m_b, bs0, cu_b, softmax_scale=self.scaling,
-            valid_length=ctx.seq_lens)
+            valid_length=ctx.seq_lens if B > 1 else ctx.seq_lens[0])
     # B==1（gate_bs1_equiv 铁律）/ block_size>1 兜底：逐行单 query 路径
     outs = []
     for b in range(B):
@@ -230,6 +273,18 @@ def qwen3_attn_forward(
 
     cos, sin = position_embeddings
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+
+    if getattr(self.indexer, "far_skip_backend", "legacy") == "compact":
+        from ..ops.far_skip_runtime import try_far_skip_decode
+        compact_output = try_far_skip_decode(
+            self, query_states, key_states, value_states, past_key_values,
+            attention_mask, cache_position, batch_decode_ctx())
+        if compact_output is not None:
+            compact_output = self.o_proj(compact_output.reshape(*input_shape, -1))
+            _paper_route(self.layer_idx, "sparse-decode-far-compact-static"
+                         if getattr(past_key_values, '_far_skip_prepared', False)
+                         else "sparse-decode-far-compact")
+            return compact_output, None
 
     cur_len = 0
     is_static_cache = False
@@ -475,3 +530,4 @@ def qwen3_attn_forward(
     attn_output = attn_output.reshape(*input_shape, -1).contiguous()
     attn_output = self.o_proj(attn_output)
     return attn_output, attn_weights
+

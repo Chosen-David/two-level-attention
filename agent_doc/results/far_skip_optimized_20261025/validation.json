@@ -1,0 +1,54 @@
+{
+  "parent_commit": "3c95ea167d66b462e2c64840adcc7c532a5115bd",
+  "scope": "CPU correctness and paired single-layer eager timings; not GPU/model throughput",
+  "independent_review": false,
+  "source_sha256": {
+    "sparse_attn/ops/far_skip.py": "1718e3204d5eb40eb417d43f624dc903bb6b27b91d094028da53c347f3d54fdc",
+    "sparse_attn/ops/far_skip_cache.py": "51a56db1077bb693e71d04417748e938b2733a5146f8bf2a3c7e40cfbfdc53cb",
+    "sparse_attn/ops/far_skip_runtime.py": "37e9aedcd5dd7f090142c1ba93116a74f0125e906be4cacc1593de43c923d1fe",
+    "sparse_attn/ops/far_skip_workspace.py": "dc289d25f8a073029568b3c7608e7a80d203049ebaa34d7bbe2a9a6571159727",
+    "sparse_attn/indexer/tli_indexer.py": "7e035d6f212514cc25583a25e573b5cf848e494c361adcd6f255d5ca668046ec",
+    "tests/test_far_skip_compact.py": "b291629090557406b448fa1188d7c7a2be5e70a686c583ec330a31e8543dae90",
+    "tests/test_far_skip_optimized.py": "dfbc8a3ecb5310dacf584ffa54a2253a5f1fba87c1aab7811b7633676e3aecf8",
+    "exp/bench/far_skip_compare.py": "6ef4ced68dd6ef25f62aa014a12236bc4eca95332cf7ec26c9b585b0550c02e7",
+    "exp/bench/far_skip_decode.py": "8b12bd723e90fe620847c31bdf18e64d2079310003d99a42f5720083f8b4322f",
+    "exp/bench/far_skip_profile.py": "5cbedd78ccfcb2fbdd0249a4fa367d2b5054f279d80d0e1504b25bc1318c8126",
+    "exp/bench/summarize_far_skip_compare.py": "855f9078de69238591f22dd4a173e611b5ddac8ed34d1a7b3fd501c52dd75cbf"
+  },
+  "tests": {
+    "passed": 72,
+    "subtests_passed": 205,
+    "skipped": 2,
+    "skip_reason": "CUDA hardware unavailable",
+    "raw": "tests.txt",
+    "command": "python -m pytest -q tests/test_far_skip_compact.py tests/test_far_skip_optimized.py tests/test_explicit_free_budget.py tests/test_explicit_near_page_budget.py tests/test_explicit_quota_modes.py --tb=short"
+  },
+  "comparison": {
+    "outputs_checked": 672,
+    "max_abs_error": 0.0,
+    "source_hashes_match_final": true,
+    "summary": "summary.json",
+    "raw": [
+      "paired_cpu.json",
+      "paired_cpu_holdout.json"
+    ],
+    "commands": [
+      "python -m exp.bench.far_skip_compare --baseline-root /tmp/far-v1 --device cpu --lengths 8192 32768 --near-len 4096 --near-pages 32 --steps 64 --warmup 8 --repeats 3",
+      "python -m exp.bench.far_skip_compare --baseline-root /tmp/far-v1 --device cpu --lengths 64 8192 --near-len 1024 --near-pages 8 --steps 32 --warmup 8 --repeats 3"
+    ]
+  },
+  "operator_profile": {
+    "raw": "operator_profile_cpu.json",
+    "command": "python -m exp.bench.far_skip_profile --baseline-root /tmp/far-v1",
+    "scope": "CPU operators and positive self allocation traffic, not GPU launches or net/peak memory",
+    "warning": "Pre-existing buffer deallocations are not counted by profiler"
+  },
+  "limitations": [
+    "No GPU performance or CUDA correctness execution",
+    "No CUDA Graph or batch support",
+    "No full-model or pretrained quality measurements",
+    "CPU Python 3.12 differs from target Python 3.11",
+    "First-decode and short-cache memory regressions retained in raw/summary",
+    "Unrelated old AST harness failures documented in v1 task"
+  ]
+}

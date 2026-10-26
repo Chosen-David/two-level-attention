@@ -52,6 +52,14 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
     其他 indexer 类型忽略 snapshot（其无文件型配置）。
     """
     IndexerType = indexer_type_dict.get(args.method, None)
+    if getattr(args, "tli_far_skip_backend", "legacy") == "compact":
+        targets = [m for m in model.modules()
+                   if isinstance(m, (Qwen3Attention, LlamaAttention)) or _is_deepseek_attn(m)]
+        if args.method != "tli" or not targets or any(
+                not isinstance(m, Qwen3Attention) or m.head_dim != 128
+                or m.sliding_window is not None for m in targets):
+            raise ValueError("compact far skip currently supports only TLI Qwen3, "
+                             "head_dim=128, without native sliding-window layers")
     if args.method != 'none' and IndexerType is None:
         raise ValueError(f"not support {args.method}")
     # 082（TL-E121-LLM-EVAL-SNAPSHOT-082）：tli 臂不带 snapshot 走
@@ -140,3 +148,4 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
             f"或改 --method none。模块类型样本: {mod_types[:8]}"
         )
     return n_patched
+

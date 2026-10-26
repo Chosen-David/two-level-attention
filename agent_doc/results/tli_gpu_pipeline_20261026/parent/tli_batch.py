@@ -1,0 +1,272 @@
+"""Opt-in fixed-capacity batched TLI decode, without a Python request loop.
+
+This is a numerical candidate, not a bitwise replacement for the sliced eager
+selector: fixed-slot softmax/topk can change rounding and tie selection. Its
+algorithm follows compute_mask_graph's compact candidate domain. All live
+lengths are device tensors, so the same entry point supports eager and capture.
+"""
+import os
+import torch
+import torch.nn.functional as F
+
+
+def capturing(device):
+    return device.type == 'cuda' and torch.cuda.is_current_stream_capturing()
+
+
+def validate_config(indexer):
+    indexer._resolve_skip()
+    if not (indexer.alpha > 0 and indexer.beta > 0
+            and indexer.gamma is None and indexer.nt_near_pages is not None
+            and indexer.nt_near_len is not None and indexer.boundary_bypass
+            and not indexer.per_q_head and indexer._basis_all is None
+            and indexer.far_select == indexer.near_select == '4bit'
+            and not indexer.moba_gate and indexer.sigma_select == 'none'
+            and not indexer.enable_async and not indexer.sinkswa_only
+            and not indexer.dyn_dgate and not indexer.static_pair
+            and getattr(indexer, 'far_skip_backend', 'legacy') == 'legacy'):
+        raise ValueError('parallel batch indexer requires fixed near pages/length, '
+                         'free K2, boundary bypass, static subspace, legacy KV; '
+                         'projection, dynamic gate, compact eviction and ablations unsupported')
+
+
+def compact_candidates(ids, keep, rank):
+    """Stable binary partition in O(R), preserving both halves' exact order."""
+    prefix = keep.cumsum(-1)
+    total = prefix[..., -1:]
+    dest = torch.where(keep, prefix-1, total+rank-prefix)
+    out = torch.empty_like(ids).scatter_(-1, dest, ids)
+    return out, rank < total
+
+
+class BatchedTLI:
+    """One append-only request batch, one attention layer. clear() at refill.
+
+    Input K is [B,S,Hkv,D], Q [B,1,Hq,D], lengths [B] (valid prefix).
+    Warm up before capture. During decode lengths may stay unchanged (finished
+    rows or capture warmup) or advance by one. Refill/reorder/rewind requires a
+    new instance and graph recapture, including if the underlying pointer stays.
+    """
+    def __init__(self, indexer, k, lengths):
+        validate_config(indexer)
+        if capturing(k.device):
+            raise RuntimeError('warm up parallel batch indexer before capture')
+        self.score_backend = os.environ.get('TLI_BATCH_SCORE', 'torch')
+        if self.score_backend not in ('torch', 'triton'):
+            raise ValueError('TLI_BATCH_SCORE must be torch or triton')
+        fusion_flag = os.environ.get('TLI_BATCH_FUSIONS', '0')
+        if fusion_flag not in ('0', '1'):
+            raise ValueError('TLI_BATCH_FUSIONS must be 0 or 1')
+        if fusion_flag == '1' and self.score_backend != 'triton':
+            raise ValueError('TLI_BATCH_FUSIONS=1 requires TLI_BATCH_SCORE=triton')
+        self.triton_score = None
+        self.triton_ops = None
+        if self.score_backend == 'triton':
+            if not k.is_cuda:
+                raise ValueError('Triton batch scoring requires CUDA')
+            from . import tli_batch_kernels
+            self.triton_ops = tli_batch_kernels if fusion_flag == '1' else None
+            self.triton_score = tli_batch_kernels.score
+        # Only active L1 pools need a score source. Keep an AVG/minmax source
+        # even with zero quotas, to provide correctly shaped empty top-k inputs.
+        methods = {indexer.near_method}
+        if not indexer.skip_far and indexer.args.tia_level1_topk > indexer.nt_near_pages:
+            methods.add(indexer.far_method)
+        self.need_minmax = 'minmax' in methods
+        self.need_avg = 'avg' in methods
+        self.indexer = indexer
+        self.signature = (k.shape, k.stride(), k.dtype, k.device, k.data_ptr())
+        self.B, self.S, self.H, self.D = k.shape
+        self.bs = indexer.args.tia_block_size
+        self.P = (self.S + self.bs - 1) // self.bs
+        self.coarse_dims = (indexer._subspace_indices(k.device)
+                            if indexer.enable_subspace else None)
+        self.fine_dims = (None if indexer.l2_subspace == 'full' else
+                          self.coarse_dims if self.coarse_dims is not None
+                          else indexer._qat_indices(k.device))
+        self.rows = torch.arange(self.B, device=k.device)
+        self.heads = torch.arange(self.H, device=k.device)
+        self.tokens = torch.arange(self.S, device=k.device)
+        self.pages = torch.arange(self.P, device=k.device)
+        self.offsets = torch.arange(self.bs, device=k.device)
+        nf = 0 if indexer.skip_far else indexer.args.tia_level1_topk-indexer.nt_near_pages
+        slots = (min(nf,self.P)+min(indexer.nt_near_pages,self.P)+2)*self.bs
+        self.candidate_rank = torch.arange(slots,device=k.device)
+        self.previous = lengths.clone()
+        x = k if self.coarse_dims is None else k.index_select(-1, self.coarse_dims)
+        # Poisoned/unwritten padding must not affect block stats. Legacy uses
+        # zero padding inside the last block, including for min/max and mean.
+        x = x.masked_fill((self.tokens[None] >= lengths[:, None])[..., None, None], 0)
+        x = F.pad(x, (0, 0, 0, 0, 0, self.P*self.bs-self.S))
+        pages = x.reshape(self.B, self.P, self.bs, self.H, x.shape[-1])
+        self.kmin = pages.amin(2) if self.need_minmax else None
+        self.kmax = pages.amax(2) if self.need_minmax else None
+        self.kavg = pages.mean(2) if self.need_avg else None
+        fine = self._fine(k)
+        # Only the full-width/no-quant branch aliases source K. Projected or
+        # quantized features already own storage; avoid a second cold copy.
+        self.kfine = fine.clone() if fine is k else fine
+        self.kfine.masked_fill_((self.tokens[None] >= lengths[:, None])[..., None, None], 0)
+        self.cu = torch.arange(self.B+1, dtype=torch.int32, device=k.device)*self.S
+
+    def _fine(self, x):
+        x = x if self.fine_dims is None else x.index_select(-1, self.fine_dims)
+        return self.indexer.min_max_per_token_quant(x) if self.indexer.l2_quant else x
+
+    def update(self, k, lengths):
+        if self.signature != (k.shape, k.stride(), k.dtype, k.device, k.data_ptr()):
+            raise ValueError('parallel indexer KV storage changed; clear and recapture')
+        torch._assert_async(((lengths >= self.previous)
+                             & (lengths <= self.previous+1)).all(),
+                            'parallel indexer needs append-only lengths; clear at refill')
+        pos = lengths - 1
+        page = pos // self.bs
+        if self.triton_ops is not None:
+            x, fine = self.triton_ops.gather_update(
+                k,lengths,self.coarse_dims,self.fine_dims,self.bs)
+        else:
+            ids = page[:, None]*self.bs + self.offsets[None]
+            safe = ids.clamp(max=self.S-1)
+            # Keep Torch's simpler gather: multi-axis indexing added CPU
+            # dispatch without a measured win. Direct narrow reads are fused
+            # only in the separately enabled Triton candidate above.
+            x = k[self.rows[:,None],safe]
+            if self.coarse_dims is not None:
+                x = x.index_select(-1,self.coarse_dims)
+            x = x.masked_fill((ids >= lengths[:, None])[..., None, None], 0)
+            if self.coarse_dims is self.fine_dims:
+                fine = x[self.rows,pos % self.bs]
+            else:
+                fine = k[self.rows,pos]
+                if self.fine_dims is not None:
+                    fine = fine.index_select(-1,self.fine_dims)
+        if self.need_minmax:
+            self.kmin[self.rows, page] = x.amin(1)
+            self.kmax[self.rows, page] = x.amax(1)
+        if self.kavg is not None:
+            self.kavg[self.rows, page] = x.mean(1)
+        self.kfine[self.rows, pos] = (self.indexer.min_max_per_token_quant(fine)
+                                      if self.indexer.l2_quant else fine)
+        self.previous.copy_(lengths)
+
+    def _queries(self, q, scale):
+        # Projection commutes with elementwise scale/cast. Shared subspaces
+        # need one narrow projection, not two full-width scaled intermediates.
+        B, _, Hq, _ = q.shape
+        G = Hq // self.H
+        if self.coarse_dims is self.fine_dims:
+            x = q[:, 0]
+            if self.coarse_dims is not None:
+                x = x.index_select(-1, self.coarse_dims)
+            x = (x * scale).float().reshape(B, self.H, G, -1)
+            return x, x
+        full = (q[:, 0] * scale).float().reshape(B, self.H, G, self.D)
+        qc = full if self.coarse_dims is None else full.index_select(-1, self.coarse_dims)
+        qf = full if self.fine_dims is None else full.index_select(-1, self.fine_dims)
+        return qc, qf
+
+    def mask(self, q, k, lengths, scale):
+        self.update(k, lengths)
+        idx, B, H, S, bs = self.indexer, self.B, self.H, self.S, self.bs
+        G = q.shape[2] // H
+        qc, qf = self._queries(q, scale)
+        def dot(x, qq):
+            return torch.einsum('bhgd,bthd->bhgt', qq, x.float())
+        if self.triton_score is not None:
+            sc = (self.triton_score(self.kmin,qc,q.dtype,kmax=self.kmax).mean(2)
+                  if self.need_minmax else None)
+            avg = (self.triton_score(self.kavg,qc,q.dtype).mean(2)
+                   if self.kavg is not None else None)
+        else:
+            sc = ((dot(self.kmin, qc.clamp(max=0))
+                   + dot(self.kmax, qc.clamp(min=0))).to(q.dtype).mean(2)
+                  if self.need_minmax else None)
+            avg = dot(self.kavg, qc).to(q.dtype).mean(2) if self.kavg is not None else None
+        sink, swa = idx.sink_tokens, idx.sliding_window_size
+        lo = idx._sink_pool_lo_blk
+        swalo = (lengths-swa).clamp(min=0)
+        near = ((lengths-swa-max(bs, int(idx.nt_near_len)))//bs).clamp(min=lo)
+        swablock = torch.maximum(near, (lengths+bs-1)//bs-max(1, swa//bs))
+        bypage = swalo//bs
+        byok = (swalo % bs != 0) & (bypage >= lo)
+        fp = (self.pages[None] >= lo) & (self.pages[None] < near[:, None])
+        np = (self.pages[None] >= near[:, None]) & (self.pages[None] < swablock[:, None])
+        if sink % bs:
+            fp &= self.pages[None] != lo
+            np &= self.pages[None] != lo
+        np &= ~((self.pages[None] == bypage[:, None]) & byok[:, None])
+        nf = 0 if idx.skip_far else idx.args.tia_level1_topk-int(idx.nt_near_pages)
+        nn = int(idx.nt_near_pages)
+        far_src = avg if idx.far_method == 'avg' else sc
+        if nf == 0:
+            far_src = avg if avg is not None else sc
+        near_src = avg if idx.near_method == 'avg' else sc
+        fi = far_src.masked_fill(~fp[:, None], -torch.inf).topk(min(nf,self.P), -1).indices
+        ni = near_src.masked_fill(~np[:, None], -torch.inf).topk(min(nn,self.P), -1).indices
+        blocks = torch.cat((fi, ni), -1)
+        ok = torch.cat((fp[:, None].expand(-1,H,-1).gather(-1,fi),
+                        np[:, None].expand(-1,H,-1).gather(-1,ni)), -1)
+        ids = (blocks[..., None]*bs+self.offsets).flatten(-2)
+        keep = (ok[..., None].expand(-1,-1,-1,bs).flatten(-2)
+                & (ids < lengths[:, None, None]))
+        byblocks = torch.stack((torch.full_like(bypage,lo if sink%bs else 0), bypage), -1)
+        byids = (byblocks[..., None]*bs+self.offsets).flatten(-2)
+        bykeep = torch.stack((torch.full_like(byok,bool(sink%bs)),byok), -1)
+        bykeep = bykeep[..., None].expand(-1,-1,bs).flatten(-2) & (byids < lengths[:,None])
+        # When the sink and SWA cross the same page, include it only once.
+        bykeep[:, bs:] &= ~((bypage == lo) & bool(sink%bs))[:,None]
+        ids = torch.cat((ids, byids[:,None].expand(-1,H,-1)), -1)
+        keep = torch.cat((keep, bykeep[:,None].expand(-1,H,-1)), -1)
+        if self.triton_ops is not None:
+            ids, keep = self.triton_ops.compact(ids, keep)
+        else:
+            ids, keep = compact_candidates(ids, keep, self.candidate_rank)
+        # No [B,Hq,S,D] repeat; only [B,Hkv,R,d] candidate features.
+        if self.triton_score is not None:
+            sf = self.triton_score(self.kfine,qf,q.dtype,ids=ids,keep=keep)
+        else:
+            safe = torch.where(keep, ids, 0)
+            kc = self.kfine[self.rows[:,None,None], safe, self.heads[None,:,None]]
+            sf = torch.einsum('bhgd,bhrd->bhgr', qf, kc.float()).to(q.dtype)
+            sf.masked_fill_(~keep[:,:,None], -torch.inf)
+        p = sf.softmax(-1).nan_to_num(nan=0).mean(2)
+        mid = keep & (ids >= lo*bs) & (ids < swalo[:,None,None])
+        ntop = min(idx.args.tia_level2_topk, ids.shape[-1])
+        top = p.masked_fill(~mid, -torch.inf).topk(ntop, -1).indices
+        selected = ids.gather(-1, top)
+        midbudget = (idx.args.tia_level2_topk-sink-(lengths-swalo)).clamp(min=0)
+        valid = mid.gather(-1,top) & (torch.arange(ntop,device=q.device)[None,None] < midbudget[:,None,None])
+        if self.triton_ops is not None:
+            mask = self.triton_ops.assemble_mask(selected,valid,lengths,S,sink,swa)
+        else:
+            # Invalid slots target the already-forced last token, never token
+            # zero or an extra column. Build the final base once, then scatter.
+            force = (((self.tokens[None] < sink) | (self.tokens[None] >= swalo[:,None]))
+                     & (self.tokens[None] < lengths[:,None]))
+            mask = force[:,None].expand(B,H,S).clone()
+            selected = torch.where(valid,selected,(lengths-1)[:,None,None])
+            mask.scatter_(-1,selected,True)
+        return mask[:,None]
+
+
+def prepare_mask_batched(indexer, q, k, lengths, scale):
+    """Explicit batch API. All lengths are device-side; no scalar reads on CUDA."""
+    validate_config(indexer)
+    if (q.ndim != 4 or k.ndim != 4 or q.shape[0] != k.shape[0]
+            or q.shape[0] < 1 or q.shape[2] < 1
+            or q.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+            or q.shape[1] != 1 or k.shape[1] < 1 or k.shape[2] < 1
+            or q.shape[2] % k.shape[2] or q.shape[-1] != k.shape[-1]
+            or k.shape[-1] != 128 or q.dtype != k.dtype or q.device != k.device
+            or lengths.shape != (q.shape[0],) or lengths.device != k.device
+            or lengths.dtype != torch.long or q.requires_grad or k.requires_grad):
+        raise ValueError('parallel indexer expects decode Q[B,1,Hq,128], K[B,S,Hkv,128], int64 lengths[B]')
+    torch._assert_async(((lengths >= 1) & (lengths <= k.shape[1])).all(), 'invalid batch lengths')
+    state = getattr(indexer, '_batch_tli', None)
+    if state is None:
+        state = BatchedTLI(indexer, k, lengths)
+        indexer._batch_tli = state
+    mask = state.mask(q, k, lengths, scale)
+    if not capturing(q.device):
+        indexer.metrics.add_select_result_batch(lengths, mask, 1)
+    return mask, 1

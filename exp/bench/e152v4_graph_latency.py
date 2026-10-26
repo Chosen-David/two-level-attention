@@ -164,25 +164,29 @@ class GraphRunner:
                                  dtype=torch.bfloat16, device=dev)
         self.graph = None
         self.out = None
+        self._mask_length = 0
 
     def inject(self, token, seq_len_after_inc):
         """步进注入：token = 本步喂入 token；seq_len_after_inc = 含本步
         新 token 的有效长（= 写列 pos+1 = 可见列数）。"""
-        self.nxt_buf.copy_(torch.tensor([[token]], dtype=torch.long,
-                                        device=self.dev))
-        self.pid_buf.copy_(torch.tensor([[seq_len_after_inc - 1]],
-                                         dtype=torch.long, device=self.dev))
-        self.pos_buf.copy_(torch.tensor([seq_len_after_inc - 1], dtype=torch.long,
-                                        device=self.dev))
-        self.vl_buf.copy_(torch.tensor([seq_len_after_inc], dtype=torch.long,
-                                       device=self.dev))
-        self.m4_buf.fill_(self.neg_inf)
-        self.m4_buf[0, 0, 0, :seq_len_after_inc] = 0
+        if not 1 <= seq_len_after_inc <= self.S_cap:
+            raise ValueError('decode length exceeds static cache capacity')
+        self.nxt_buf.fill_(token)
+        self.pid_buf.fill_(seq_len_after_inc - 1)
+        self.pos_buf.fill_(seq_len_after_inc - 1)
+        self.vl_buf.fill_(seq_len_after_inc)
+        # Host length is already known to the decode loop. Only the changed
+        # mask interval needs writing; handle request rewind as well as growth.
+        if seq_len_after_inc > self._mask_length:
+            self.m4_buf[..., self._mask_length:seq_len_after_inc] = 0
+        elif seq_len_after_inc < self._mask_length:
+            self.m4_buf[..., seq_len_after_inc:self._mask_length] = self.neg_inf
+        self._mask_length = seq_len_after_inc
 
     def forward(self):
         return self.model(input_ids=self.nxt_buf, position_ids=self.pid_buf,
                           attention_mask=self.m4_buf, past_key_values=self.cache,
-                          use_cache=True)
+                          cache_position=self.pos_buf, use_cache=True)
 
     def warmup_and_capture(self, token, seq_len_after_inc):
         """2 步主 stream 热跑（惰性分配/autotune 出图外）+ 1 步 capture。
@@ -191,8 +195,12 @@ class GraphRunner:
         （pred_ruler 同款论证）。返回 capture wall ms。"""
         t0 = time.perf_counter()
         self.inject(token, seq_len_after_inc)
-        for _ in range(2):
-            self.forward()
+        stream = torch.cuda.Stream()
+        stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(stream):
+            for _ in range(2):
+                self.forward()
+        torch.cuda.current_stream().wait_stream(stream)
         gs = graph_state()
         if not gs.enabled:
             raise RuntimeError(
@@ -231,7 +239,15 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture):
         del out
 
         t_fill = time.perf_counter()
-        fill_static_from_dynamic(runner.cache, dyn, [L])
+        compact = any(getattr(getattr(m, 'indexer', None), 'far_skip_backend', 'legacy') == 'compact'
+                      for m in model.modules())
+        if compact:
+            # Gates/pointers are request-local. Never replay a previous request's
+            # capture after replacing its ring or page-summary buffers.
+            runner.graph = runner.out = None
+            do_capture = graph_state().enabled
+        fill_static_from_dynamic(runner.cache, dyn, [L], model=model)
+        runner.cache._far_skip_attention_mask = runner.m4_buf
         torch.cuda.synchronize()
         fill_ms = (time.perf_counter() - t_fill) * 1e3
         del dyn
@@ -427,6 +443,7 @@ def main():
             "max_gen": args.max_gen,
             "early_stop": False,
             "graph_mode": args.graph_mode,
+            "far_skip_kernels": os.environ.get("TLI_FAR_SKIP_KERNELS", "torch"),
             "S_cap": S_cap,
             "timer_api": "time.perf_counter (timestamps in seconds)",
             "wall_boundary": ("after input H2D+sync, prompt forward -> "
@@ -463,3 +480,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -1,0 +1,671 @@
+........... [  2%]
+.......................................s................................ [ 19%]
+....s............ss......................s....s................FFF.F.... [ 36%]
+...F..............................................sssssssssssss [ 51%]
+ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss............ [ 69%]
+...ssssss...............ssssssssssssssssssssssssssssssssssssssssssssssss [ 86%]
+ssssssssssssssssssssssss....ssssssssssssssssssssssss....F.               [100%]
+=================================== FAILURES ===================================
+___________ StaticMask.test_forward_canonical_static_matches_dynamic ___________
+
+self = <test_qwen_static_mask.StaticMask testMethod=test_forward_canonical_static_matches_dynamic>
+
+    def test_forward_canonical_static_matches_dynamic(self):
+>       static, seen, _, attn = self.forward(causal())
+                                ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_qwen_static_mask.py:84: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_qwen_static_mask.py:67: in forward
+    out, _ = self.ns['qwen3_attn_forward'](
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Qwen3Attention(
+  (q_proj): Linear(in_features=16, out_features=16, bias=False)
+  (k_proj): Linear(in_features=16, out...=16, out_features=16, bias=False)
+  (q_norm): Qwen3RMSNorm((4,), eps=1e-06)
+  (k_norm): Qwen3RMSNorm((4,), eps=1e-06)
+)
+hidden_states = tensor([[[0.0000, 0.0208, 0.0417, 0.0625, 0.0833, 0.1042, 0.1250, 0.1458,
+          0.1667, 0.1875, 0.2083, 0.2292, 0....3, 0.7292, 0.7500, 0.7708, 0.7917, 0.8125,
+          0.8333, 0.8542, 0.8750, 0.8958, 0.9167, 0.9375, 0.9583, 0.9792]]])
+position_embeddings = (tensor([[[1., 1., 1., 1.],
+         [1., 1., 1., 1.],
+         [1., 1., 1., 1.]]]), tensor([[[0., 0., 0., 0.],
+         [0., 0., 0., 0.],
+         [0., 0., 0., 0.]]]))
+attention_mask = tensor([[[[ True, False, False, False, False],
+          [ True,  True, False, False, False],
+          [ True,  True,  True, False, False]]]])
+past_key_values = StaticCache(layers=[StaticLayer, StaticLayer])
+cache_position = tensor([0, 1, 2]), kwargs = {}
+
+    def qwen3_attn_forward(
+        self,
+        hidden_states: torch.Tensor,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        attention_mask: Optional[torch.Tensor],
+        past_key_values: Optional[Cache] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        **kwargs: Unpack[FlashAttentionKwargs],
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[tuple[torch.Tensor]]]:
+        input_shape = hidden_states.shape[:-1]
+        hidden_shape = (*input_shape, -1, self.head_dim)
+    
+        query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+        key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+        value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
+    
+        cos, sin = position_embeddings
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+    
+        if getattr(self.indexer, "far_skip_backend", "legacy") == "compact":
+            from ..ops.far_skip_runtime import try_far_skip_decode
+            compact_output = try_far_skip_decode(
+                self, query_states, key_states, value_states, past_key_values,
+                attention_mask, cache_position, batch_decode_ctx())
+            if compact_output is not None:
+                compact_output = self.o_proj(compact_output.reshape(*input_shape, -1))
+                _paper_route(self.layer_idx, "sparse-decode-far-compact-static"
+                             if getattr(past_key_values, '_far_skip_prepared', False)
+                             else "sparse-decode-far-compact")
+                return compact_output, None
+    
+        cur_len = 0
+        is_static_cache = False
+        if past_key_values is not None:
+            # sin and cos are specific to RoPE models; cache_position needed for the static cache
+            cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+            key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
+            # 【E134-pre】StaticCache 支持（opt-in）：update 返回全容量缓冲
+            # （index_copy_ 就地写、零拷贝 append），下游统一切到当前序列长。
+            # 判别用正的 get_max_cache_shape()（HF 4.56.2 DynamicCache 返回
+            # -1；兼容无上限返回 None 的接口）。长度提示在 layer 0 每步刷新
+            # 一次（cache_position[-1]+1，一次 .item 同步；StaticLayer.
+            # get_seq_length 是 GPU any() 归约，逐层调用会引入 36 次隐式同步）。
+            # HF 4.56.2 DynamicCache uses -1, not None, for unbounded capacity.
+            capacity = past_key_values.get_max_cache_shape()
+            is_static_cache = capacity is not None and capacity > 0
+            if is_static_cache:
+                # 【阶段 2a】batch decode（TLIStaticCache 固定容量、有效在前）：
+                # 全宽 [B, Hkv, S_cap, D] 直接透传不切片——_tl_decode_batched 用
+                # valid_length 区分有效区。cur_len 取 S_cap（恒 ≠1 → 正确落 decode
+                # 分支；L177 的 prefill 判定 `cur_len == input_shape[1]` 不误触发）。
+                # 单序列/非 batch 走下方原 E134-pre 变长切片（铁律零扰动）。
+>               _ctx = batch_decode_ctx()
+                       ^^^^^^^^^^^^^^^^
+E               NameError: name 'batch_decode_ctx' is not defined
+
+sparse_attn/patches/qwen3_attn_patch.py:310: NameError
+____________ StaticMask.test_forward_changed_layer_mask_not_reused _____________
+
+self = <test_qwen_static_mask.StaticMask testMethod=test_forward_changed_layer_mask_not_reused>
+
+    def test_forward_changed_layer_mask_not_reused(self):
+>       _, _, cache, _ = self.forward(causal())
+                         ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_qwen_static_mask.py:90: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_qwen_static_mask.py:67: in forward
+    out, _ = self.ns['qwen3_attn_forward'](
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Qwen3Attention(
+  (q_proj): Linear(in_features=16, out_features=16, bias=False)
+  (k_proj): Linear(in_features=16, out...=16, out_features=16, bias=False)
+  (q_norm): Qwen3RMSNorm((4,), eps=1e-06)
+  (k_norm): Qwen3RMSNorm((4,), eps=1e-06)
+)
+hidden_states = tensor([[[0.0000, 0.0208, 0.0417, 0.0625, 0.0833, 0.1042, 0.1250, 0.1458,
+          0.1667, 0.1875, 0.2083, 0.2292, 0....3, 0.7292, 0.7500, 0.7708, 0.7917, 0.8125,
+          0.8333, 0.8542, 0.8750, 0.8958, 0.9167, 0.9375, 0.9583, 0.9792]]])
+position_embeddings = (tensor([[[1., 1., 1., 1.],
+         [1., 1., 1., 1.],
+         [1., 1., 1., 1.]]]), tensor([[[0., 0., 0., 0.],
+         [0., 0., 0., 0.],
+         [0., 0., 0., 0.]]]))
+attention_mask = tensor([[[[ True, False, False, False, False],
+          [ True,  True, False, False, False],
+          [ True,  True,  True, False, False]]]])
+past_key_values = StaticCache(layers=[StaticLayer, StaticLayer])
+cache_position = tensor([0, 1, 2]), kwargs = {}
+
+    def qwen3_attn_forward(
+        self,
+        hidden_states: torch.Tensor,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        attention_mask: Optional[torch.Tensor],
+        past_key_values: Optional[Cache] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        **kwargs: Unpack[FlashAttentionKwargs],
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[tuple[torch.Tensor]]]:
+        input_shape = hidden_states.shape[:-1]
+        hidden_shape = (*input_shape, -1, self.head_dim)
+    
+        query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+        key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+        value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
+    
+        cos, sin = position_embeddings
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+    
+        if getattr(self.indexer, "far_skip_backend", "legacy") == "compact":
+            from ..ops.far_skip_runtime import try_far_skip_decode
+            compact_output = try_far_skip_decode(
+                self, query_states, key_states, value_states, past_key_values,
+                attention_mask, cache_position, batch_decode_ctx())
+            if compact_output is not None:
+                compact_output = self.o_proj(compact_output.reshape(*input_shape, -1))
+                _paper_route(self.layer_idx, "sparse-decode-far-compact-static"
+                             if getattr(past_key_values, '_far_skip_prepared', False)
+                             else "sparse-decode-far-compact")
+                return compact_output, None
+    
+        cur_len = 0
+        is_static_cache = False
+        if past_key_values is not None:
+            # sin and cos are specific to RoPE models; cache_position needed for the static cache
+            cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+            key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
+            # 【E134-pre】StaticCache 支持（opt-in）：update 返回全容量缓冲
+            # （index_copy_ 就地写、零拷贝 append），下游统一切到当前序列长。
+            # 判别用正的 get_max_cache_shape()（HF 4.56.2 DynamicCache 返回
+            # -1；兼容无上限返回 None 的接口）。长度提示在 layer 0 每步刷新
+            # 一次（cache_position[-1]+1，一次 .item 同步；StaticLayer.
+            # get_seq_length 是 GPU any() 归约，逐层调用会引入 36 次隐式同步）。
+            # HF 4.56.2 DynamicCache uses -1, not None, for unbounded capacity.
+            capacity = past_key_values.get_max_cache_shape()
+            is_static_cache = capacity is not None and capacity > 0
+            if is_static_cache:
+                # 【阶段 2a】batch decode（TLIStaticCache 固定容量、有效在前）：
+                # 全宽 [B, Hkv, S_cap, D] 直接透传不切片——_tl_decode_batched 用
+                # valid_length 区分有效区。cur_len 取 S_cap（恒 ≠1 → 正确落 decode
+                # 分支；L177 的 prefill 判定 `cur_len == input_shape[1]` 不误触发）。
+                # 单序列/非 batch 走下方原 E134-pre 变长切片（铁律零扰动）。
+>               _ctx = batch_decode_ctx()
+                       ^^^^^^^^^^^^^^^^
+E               NameError: name 'batch_decode_ctx' is not defined
+
+sparse_attn/patches/qwen3_attn_patch.py:310: NameError
+__________ StaticMask.test_forward_decode_does_not_discard_float_bias __________
+
+self = <test_qwen_static_mask.StaticMask testMethod=test_forward_decode_does_not_discard_float_bias>
+
+    def test_forward_decode_does_not_discard_float_bias(self):
+>       _, _, cache, attn = self.forward(causal())
+                            ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_qwen_static_mask.py:97: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_qwen_static_mask.py:67: in forward
+    out, _ = self.ns['qwen3_attn_forward'](
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Qwen3Attention(
+  (q_proj): Linear(in_features=16, out_features=16, bias=False)
+  (k_proj): Linear(in_features=16, out...=16, out_features=16, bias=False)
+  (q_norm): Qwen3RMSNorm((4,), eps=1e-06)
+  (k_norm): Qwen3RMSNorm((4,), eps=1e-06)
+)
+hidden_states = tensor([[[0.0000, 0.0208, 0.0417, 0.0625, 0.0833, 0.1042, 0.1250, 0.1458,
+          0.1667, 0.1875, 0.2083, 0.2292, 0....3, 0.7292, 0.7500, 0.7708, 0.7917, 0.8125,
+          0.8333, 0.8542, 0.8750, 0.8958, 0.9167, 0.9375, 0.9583, 0.9792]]])
+position_embeddings = (tensor([[[1., 1., 1., 1.],
+         [1., 1., 1., 1.],
+         [1., 1., 1., 1.]]]), tensor([[[0., 0., 0., 0.],
+         [0., 0., 0., 0.],
+         [0., 0., 0., 0.]]]))
+attention_mask = tensor([[[[ True, False, False, False, False],
+          [ True,  True, False, False, False],
+          [ True,  True,  True, False, False]]]])
+past_key_values = StaticCache(layers=[StaticLayer, StaticLayer])
+cache_position = tensor([0, 1, 2]), kwargs = {}
+
+    def qwen3_attn_forward(
+        self,
+        hidden_states: torch.Tensor,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        attention_mask: Optional[torch.Tensor],
+        past_key_values: Optional[Cache] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        **kwargs: Unpack[FlashAttentionKwargs],
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[tuple[torch.Tensor]]]:
+        input_shape = hidden_states.shape[:-1]
+        hidden_shape = (*input_shape, -1, self.head_dim)
+    
+        query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+        key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+        value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
+    
+        cos, sin = position_embeddings
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+    
+        if getattr(self.indexer, "far_skip_backend", "legacy") == "compact":
+            from ..ops.far_skip_runtime import try_far_skip_decode
+            compact_output = try_far_skip_decode(
+                self, query_states, key_states, value_states, past_key_values,
+                attention_mask, cache_position, batch_decode_ctx())
+            if compact_output is not None:
+                compact_output = self.o_proj(compact_output.reshape(*input_shape, -1))
+                _paper_route(self.layer_idx, "sparse-decode-far-compact-static"
+                             if getattr(past_key_values, '_far_skip_prepared', False)
+                             else "sparse-decode-far-compact")
+                return compact_output, None
+    
+        cur_len = 0
+        is_static_cache = False
+        if past_key_values is not None:
+            # sin and cos are specific to RoPE models; cache_position needed for the static cache
+            cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+            key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
+            # 【E134-pre】StaticCache 支持（opt-in）：update 返回全容量缓冲
+            # （index_copy_ 就地写、零拷贝 append），下游统一切到当前序列长。
+            # 判别用正的 get_max_cache_shape()（HF 4.56.2 DynamicCache 返回
+            # -1；兼容无上限返回 None 的接口）。长度提示在 layer 0 每步刷新
+            # 一次（cache_position[-1]+1，一次 .item 同步；StaticLayer.
+            # get_seq_length 是 GPU any() 归约，逐层调用会引入 36 次隐式同步）。
+            # HF 4.56.2 DynamicCache uses -1, not None, for unbounded capacity.
+            capacity = past_key_values.get_max_cache_shape()
+            is_static_cache = capacity is not None and capacity > 0
+            if is_static_cache:
+                # 【阶段 2a】batch decode（TLIStaticCache 固定容量、有效在前）：
+                # 全宽 [B, Hkv, S_cap, D] 直接透传不切片——_tl_decode_batched 用
+                # valid_length 区分有效区。cur_len 取 S_cap（恒 ≠1 → 正确落 decode
+                # 分支；L177 的 prefill 判定 `cur_len == input_shape[1]` 不误触发）。
+                # 单序列/非 batch 走下方原 E134-pre 变长切片（铁律零扰动）。
+>               _ctx = batch_decode_ctx()
+                       ^^^^^^^^^^^^^^^^
+E               NameError: name 'batch_decode_ctx' is not defined
+
+sparse_attn/patches/qwen3_attn_patch.py:310: NameError
+_____________ StaticMask.test_forward_preserves_fully_blocked_rows _____________
+
+self = <test_qwen_static_mask.StaticMask testMethod=test_forward_preserves_fully_blocked_rows>
+
+    def test_forward_preserves_fully_blocked_rows(self):
+        mask = torch.zeros(1, 1, 3, 5, dtype=torch.bool)
+>       out, seen, _, _ = self.forward(mask)
+                          ^^^^^^^^^^^^^^^^^^
+
+tests/test_qwen_static_mask.py:74: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_qwen_static_mask.py:67: in forward
+    out, _ = self.ns['qwen3_attn_forward'](
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Qwen3Attention(
+  (q_proj): Linear(in_features=16, out_features=16, bias=False)
+  (k_proj): Linear(in_features=16, out...=16, out_features=16, bias=False)
+  (q_norm): Qwen3RMSNorm((4,), eps=1e-06)
+  (k_norm): Qwen3RMSNorm((4,), eps=1e-06)
+)
+hidden_states = tensor([[[0.0000, 0.0208, 0.0417, 0.0625, 0.0833, 0.1042, 0.1250, 0.1458,
+          0.1667, 0.1875, 0.2083, 0.2292, 0....3, 0.7292, 0.7500, 0.7708, 0.7917, 0.8125,
+          0.8333, 0.8542, 0.8750, 0.8958, 0.9167, 0.9375, 0.9583, 0.9792]]])
+position_embeddings = (tensor([[[1., 1., 1., 1.],
+         [1., 1., 1., 1.],
+         [1., 1., 1., 1.]]]), tensor([[[0., 0., 0., 0.],
+         [0., 0., 0., 0.],
+         [0., 0., 0., 0.]]]))
+attention_mask = tensor([[[[False, False, False, False, False],
+          [False, False, False, False, False],
+          [False, False, False, False, False]]]])
+past_key_values = StaticCache(layers=[StaticLayer, StaticLayer])
+cache_position = tensor([0, 1, 2]), kwargs = {}
+
+    def qwen3_attn_forward(
+        self,
+        hidden_states: torch.Tensor,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        attention_mask: Optional[torch.Tensor],
+        past_key_values: Optional[Cache] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        **kwargs: Unpack[FlashAttentionKwargs],
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[tuple[torch.Tensor]]]:
+        input_shape = hidden_states.shape[:-1]
+        hidden_shape = (*input_shape, -1, self.head_dim)
+    
+        query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+        key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+        value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
+    
+        cos, sin = position_embeddings
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+    
+        if getattr(self.indexer, "far_skip_backend", "legacy") == "compact":
+            from ..ops.far_skip_runtime import try_far_skip_decode
+            compact_output = try_far_skip_decode(
+                self, query_states, key_states, value_states, past_key_values,
+                attention_mask, cache_position, batch_decode_ctx())
+            if compact_output is not None:
+                compact_output = self.o_proj(compact_output.reshape(*input_shape, -1))
+                _paper_route(self.layer_idx, "sparse-decode-far-compact-static"
+                             if getattr(past_key_values, '_far_skip_prepared', False)
+                             else "sparse-decode-far-compact")
+                return compact_output, None
+    
+        cur_len = 0
+        is_static_cache = False
+        if past_key_values is not None:
+            # sin and cos are specific to RoPE models; cache_position needed for the static cache
+            cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+            key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
+            # 【E134-pre】StaticCache 支持（opt-in）：update 返回全容量缓冲
+            # （index_copy_ 就地写、零拷贝 append），下游统一切到当前序列长。
+            # 判别用正的 get_max_cache_shape()（HF 4.56.2 DynamicCache 返回
+            # -1；兼容无上限返回 None 的接口）。长度提示在 layer 0 每步刷新
+            # 一次（cache_position[-1]+1，一次 .item 同步；StaticLayer.
+            # get_seq_length 是 GPU any() 归约，逐层调用会引入 36 次隐式同步）。
+            # HF 4.56.2 DynamicCache uses -1, not None, for unbounded capacity.
+            capacity = past_key_values.get_max_cache_shape()
+            is_static_cache = capacity is not None and capacity > 0
+            if is_static_cache:
+                # 【阶段 2a】batch decode（TLIStaticCache 固定容量、有效在前）：
+                # 全宽 [B, Hkv, S_cap, D] 直接透传不切片——_tl_decode_batched 用
+                # valid_length 区分有效区。cur_len 取 S_cap（恒 ≠1 → 正确落 decode
+                # 分支；L177 的 prefill 判定 `cur_len == input_shape[1]` 不误触发）。
+                # 单序列/非 batch 走下方原 E134-pre 变长切片（铁律零扰动）。
+>               _ctx = batch_decode_ctx()
+                       ^^^^^^^^^^^^^^^^
+E               NameError: name 'batch_decode_ctx' is not defined
+
+sparse_attn/patches/qwen3_attn_patch.py:310: NameError
+_ AsyncCandidateGateTests.test_async_first_and_later_steps_bypass_current_candidate_selection (first_step=True) _
+
+self = <test_tli_async_candidate_gate.AsyncCandidateGateTests testMethod=test_async_first_and_later_steps_bypass_current_candidate_selection>
+
+    def test_async_first_and_later_steps_bypass_current_candidate_selection(self):
+        for previous in (None, object()):
+            with self.subTest(first_step=previous is None):
+>               self.assertEqual(self.invoke(enable_async=True, prev_mask=previous), [])
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_tli_async_candidate_gate.py:46: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tli_async_candidate_gate.py:39: in invoke
+    self.assertEqual(result, (None, None, None))
+E   AssertionError: Tuples differ: (None, None, None, None) != (None, None, None)
+E   
+E   First tuple contains 1 additional elements.
+E   First extra element 3:
+E   None
+E   
+E   - (None, None, None, None)
+E   ?              ------
+E   
+E   + (None, None, None)
+_ AsyncCandidateGateTests.test_async_first_and_later_steps_bypass_current_candidate_selection (first_step=False) _
+
+self = <test_tli_async_candidate_gate.AsyncCandidateGateTests testMethod=test_async_first_and_later_steps_bypass_current_candidate_selection>
+
+    def test_async_first_and_later_steps_bypass_current_candidate_selection(self):
+        for previous in (None, object()):
+            with self.subTest(first_step=previous is None):
+>               self.assertEqual(self.invoke(enable_async=True, prev_mask=previous), [])
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_tli_async_candidate_gate.py:46: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tli_async_candidate_gate.py:39: in invoke
+    self.assertEqual(result, (None, None, None))
+E   AssertionError: Tuples differ: (None, None, None, None) != (None, None, None)
+E   
+E   First tuple contains 1 additional elements.
+E   First extra element 3:
+E   None
+E   
+E   - (None, None, None, None)
+E   ?              ------
+E   
+E   + (None, None, None)
+_ AsyncCandidateGateTests.test_existing_unsupported_modes_still_bypass_candidates (options={'_fine_gather': False}) _
+
+self = <test_tli_async_candidate_gate.AsyncCandidateGateTests testMethod=test_existing_unsupported_modes_still_bypass_candidates>
+
+    def test_existing_unsupported_modes_still_bypass_candidates(self):
+        for options in (dict(_fine_gather=False), dict(_basis=object()),
+                        dict(moba_gate=True), dict(per_q_head=True),
+                        dict(sigma_select='mass'), dict(far_select='cluster'),
+                        dict(near_select='sim_greedy')):
+            with self.subTest(options=options):
+>               self.assertEqual(self.invoke(**options), [])
+                                 ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_tli_async_candidate_gate.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tli_async_candidate_gate.py:39: in invoke
+    self.assertEqual(result, (None, None, None))
+E   AssertionError: Tuples differ: (None, None, None, None) != (None, None, None)
+E   
+E   First tuple contains 1 additional elements.
+E   First extra element 3:
+E   None
+E   
+E   - (None, None, None, None)
+E   ?              ------
+E   
+E   + (None, None, None)
+_ AsyncCandidateGateTests.test_existing_unsupported_modes_still_bypass_candidates (options={'_basis': <object object at 0x7f31248baba0>}) _
+
+self = <test_tli_async_candidate_gate.AsyncCandidateGateTests testMethod=test_existing_unsupported_modes_still_bypass_candidates>
+
+    def test_existing_unsupported_modes_still_bypass_candidates(self):
+        for options in (dict(_fine_gather=False), dict(_basis=object()),
+                        dict(moba_gate=True), dict(per_q_head=True),
+                        dict(sigma_select='mass'), dict(far_select='cluster'),
+                        dict(near_select='sim_greedy')):
+            with self.subTest(options=options):
+>               self.assertEqual(self.invoke(**options), [])
+                                 ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_tli_async_candidate_gate.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tli_async_candidate_gate.py:39: in invoke
+    self.assertEqual(result, (None, None, None))
+E   AssertionError: Tuples differ: (None, None, None, None) != (None, None, None)
+E   
+E   First tuple contains 1 additional elements.
+E   First extra element 3:
+E   None
+E   
+E   - (None, None, None, None)
+E   ?              ------
+E   
+E   + (None, None, None)
+_ AsyncCandidateGateTests.test_existing_unsupported_modes_still_bypass_candidates (options={'moba_gate': True}) _
+
+self = <test_tli_async_candidate_gate.AsyncCandidateGateTests testMethod=test_existing_unsupported_modes_still_bypass_candidates>
+
+    def test_existing_unsupported_modes_still_bypass_candidates(self):
+        for options in (dict(_fine_gather=False), dict(_basis=object()),
+                        dict(moba_gate=True), dict(per_q_head=True),
+                        dict(sigma_select='mass'), dict(far_select='cluster'),
+                        dict(near_select='sim_greedy')):
+            with self.subTest(options=options):
+>               self.assertEqual(self.invoke(**options), [])
+                                 ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_tli_async_candidate_gate.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tli_async_candidate_gate.py:39: in invoke
+    self.assertEqual(result, (None, None, None))
+E   AssertionError: Tuples differ: (None, None, None, None) != (None, None, None)
+E   
+E   First tuple contains 1 additional elements.
+E   First extra element 3:
+E   None
+E   
+E   - (None, None, None, None)
+E   ?              ------
+E   
+E   + (None, None, None)
+_ AsyncCandidateGateTests.test_existing_unsupported_modes_still_bypass_candidates (options={'per_q_head': True}) _
+
+self = <test_tli_async_candidate_gate.AsyncCandidateGateTests testMethod=test_existing_unsupported_modes_still_bypass_candidates>
+
+    def test_existing_unsupported_modes_still_bypass_candidates(self):
+        for options in (dict(_fine_gather=False), dict(_basis=object()),
+                        dict(moba_gate=True), dict(per_q_head=True),
+                        dict(sigma_select='mass'), dict(far_select='cluster'),
+                        dict(near_select='sim_greedy')):
+            with self.subTest(options=options):
+>               self.assertEqual(self.invoke(**options), [])
+                                 ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_tli_async_candidate_gate.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tli_async_candidate_gate.py:39: in invoke
+    self.assertEqual(result, (None, None, None))
+E   AssertionError: Tuples differ: (None, None, None, None) != (None, None, None)
+E   
+E   First tuple contains 1 additional elements.
+E   First extra element 3:
+E   None
+E   
+E   - (None, None, None, None)
+E   ?              ------
+E   
+E   + (None, None, None)
+_ AsyncCandidateGateTests.test_existing_unsupported_modes_still_bypass_candidates (options={'sigma_select': 'mass'}) _
+
+self = <test_tli_async_candidate_gate.AsyncCandidateGateTests testMethod=test_existing_unsupported_modes_still_bypass_candidates>
+
+    def test_existing_unsupported_modes_still_bypass_candidates(self):
+        for options in (dict(_fine_gather=False), dict(_basis=object()),
+                        dict(moba_gate=True), dict(per_q_head=True),
+                        dict(sigma_select='mass'), dict(far_select='cluster'),
+                        dict(near_select='sim_greedy')):
+            with self.subTest(options=options):
+>               self.assertEqual(self.invoke(**options), [])
+                                 ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_tli_async_candidate_gate.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tli_async_candidate_gate.py:39: in invoke
+    self.assertEqual(result, (None, None, None))
+E   AssertionError: Tuples differ: (None, None, None, None) != (None, None, None)
+E   
+E   First tuple contains 1 additional elements.
+E   First extra element 3:
+E   None
+E   
+E   - (None, None, None, None)
+E   ?              ------
+E   
+E   + (None, None, None)
+_ AsyncCandidateGateTests.test_existing_unsupported_modes_still_bypass_candidates (options={'far_select': 'cluster'}) _
+
+self = <test_tli_async_candidate_gate.AsyncCandidateGateTests testMethod=test_existing_unsupported_modes_still_bypass_candidates>
+
+    def test_existing_unsupported_modes_still_bypass_candidates(self):
+        for options in (dict(_fine_gather=False), dict(_basis=object()),
+                        dict(moba_gate=True), dict(per_q_head=True),
+                        dict(sigma_select='mass'), dict(far_select='cluster'),
+                        dict(near_select='sim_greedy')):
+            with self.subTest(options=options):
+>               self.assertEqual(self.invoke(**options), [])
+                                 ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_tli_async_candidate_gate.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tli_async_candidate_gate.py:39: in invoke
+    self.assertEqual(result, (None, None, None))
+E   AssertionError: Tuples differ: (None, None, None, None) != (None, None, None)
+E   
+E   First tuple contains 1 additional elements.
+E   First extra element 3:
+E   None
+E   
+E   - (None, None, None, None)
+E   ?              ------
+E   
+E   + (None, None, None)
+_ AsyncCandidateGateTests.test_existing_unsupported_modes_still_bypass_candidates (options={'near_select': 'sim_greedy'}) _
+
+self = <test_tli_async_candidate_gate.AsyncCandidateGateTests testMethod=test_existing_unsupported_modes_still_bypass_candidates>
+
+    def test_existing_unsupported_modes_still_bypass_candidates(self):
+        for options in (dict(_fine_gather=False), dict(_basis=object()),
+                        dict(moba_gate=True), dict(per_q_head=True),
+                        dict(sigma_select='mass'), dict(far_select='cluster'),
+                        dict(near_select='sim_greedy')):
+            with self.subTest(options=options):
+>               self.assertEqual(self.invoke(**options), [])
+                                 ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_tli_async_candidate_gate.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tli_async_candidate_gate.py:39: in invoke
+    self.assertEqual(result, (None, None, None))
+E   AssertionError: Tuples differ: (None, None, None, None) != (None, None, None)
+E   
+E   First tuple contains 1 additional elements.
+E   First extra element 3:
+E   None
+E   
+E   - (None, None, None, None)
+E   ?              ------
+E   
+E   + (None, None, None)
+___ AsyncCandidateGateTests.test_sync_candidate_path_still_reaches_selection ___
+
+self = <test_tli_async_candidate_gate.AsyncCandidateGateTests testMethod=test_sync_candidate_path_still_reaches_selection>
+
+    def test_sync_candidate_path_still_reaches_selection(self):
+>       self.assertEqual(self.invoke(), [13])
+                         ^^^^^^^^^^^^^
+
+tests/test_tli_async_candidate_gate.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tli_async_candidate_gate.py:39: in invoke
+    self.assertEqual(result, (None, None, None))
+E   AssertionError: Tuples differ: (None, None, None, None) != (None, None, None)
+E   
+E   First tuple contains 1 additional elements.
+E   First extra element 3:
+E   None
+E   
+E   - (None, None, None, None)
+E   ?              ------
+E   
+E   + (None, None, None)
+_ TliRuntimeShapeContractTests.test_valid_key_contract_preserves_incremental_and_full_dispatch _
+
+self = <test_tli_runtime_shape_contract.TliRuntimeShapeContractTests testMethod=test_valid_key_contract_preserves_incremental_and_full_dispatch>
+
+    def test_valid_key_contract_preserves_incremental_and_full_dispatch(self):
+        harness = self._prepare_harness()
+        self.assertEqual(
+>           harness.prepare_index(SimpleNamespace(shape=(1, 8, 4, 128)), object()),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            "incremental",
+        )
+
+tests/test_tli_runtime_shape_contract.py:62: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Harness object at 0x7f3126869340>, k = namespace(shape=(1, 8, 4, 128))
+cu_seqlens_k = <object object at 0x7f3146f2fa10>, valid_length = None
+
+>   ???
+E   NameError: name '_graph_state_fn' is not defined
+
+sparse_attn/indexer/tli_indexer.py:26: NameError
+=========================== short test summary info ============================
+FAILED tests/test_qwen_static_mask.py::StaticMask::test_forward_canonical_static_matches_dynamic
+FAILED tests/test_qwen_static_mask.py::StaticMask::test_forward_changed_layer_mask_not_reused
+FAILED tests/test_qwen_static_mask.py::StaticMask::test_forward_decode_does_not_discard_float_bias
+FAILED tests/test_qwen_static_mask.py::StaticMask::test_forward_preserves_fully_blocked_rows
+SUBFAILED(first_step=True) tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_async_first_and_later_steps_bypass_current_candidate_selection
+SUBFAILED(first_step=False) tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_async_first_and_later_steps_bypass_current_candidate_selection
+SUBFAILED(options={'_fine_gather': False}) tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_existing_unsupported_modes_still_bypass_candidates
+SUBFAILED(options={'_basis': <object object at 0x7f31248baba0>}) tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_existing_unsupported_modes_still_bypass_candidates
+SUBFAILED(options={'moba_gate': True}) tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_existing_unsupported_modes_still_bypass_candidates
+SUBFAILED(options={'per_q_head': True}) tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_existing_unsupported_modes_still_bypass_candidates
+SUBFAILED(options={'sigma_select': 'mass'}) tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_existing_unsupported_modes_still_bypass_candidates
+SUBFAILED(options={'far_select': 'cluster'}) tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_existing_unsupported_modes_still_bypass_candidates
+SUBFAILED(options={'near_select': 'sim_greedy'}) tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_existing_unsupported_modes_still_bypass_candidates
+FAILED tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_sync_candidate_path_still_reaches_selection
+FAILED tests/test_tli_runtime_shape_contract.py::TliRuntimeShapeContractTests::test_valid_key_contract_preserves_incremental_and_full_dispatch
+15 failed, 233 passed, 182 skipped, 205 subtests passed in 15.93s

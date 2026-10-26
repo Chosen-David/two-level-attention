@@ -1,5 +1,23 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-26
+
+- [ ] [TL-SKIP-NOSKIP-FUSION-20261026] skip/non-skip 共用区域打分融合；支持固定容量 B=1 冻结 gate 与混合 ring/full 路由；审查用户转述 Kimi 意见并补充真实存储/恒定写入门禁，GPU 性能及质量待验。([详情](task_details/TL-SKIP-NOSKIP-FUSION-20261026.md))
+
+- [ ] [TL-GPU-PIPELINE-FUSION-20261026] 新增直接写缓存、Q 投影缩放、候选展开压实、top-k 直写 mask 四类 GPU 融合；交付 eager/Graph 远端门禁与压力矩阵，实际 GPU 性能/质量待验。([详情](task_details/TL-GPU-PIPELINE-FUSION-20261026.md))
+
+- [ ] [TL-BATCH-FIVE-ROUNDS-20261026] 完成五轮 batch indexer 实现与本地验证：按需摘要、Q 投影复用、稳定候选线性分区、mask 装配、末尾页读取；保留无收益的 Torch 试验记录，GPU 性能/质量验收仍待。([详情](task_details/TL-BATCH-FIVE-ROUNDS-20261026.md))
+
+- [ ] [TL-BATCH-INDEXER-PARALLEL-20261026] 新增完整 batch 索引器、增量页维护与可选 Triton 批量打分，接入 Qwen eager/Graph；CPU/解释器/离线编译已验，目标 GPU 性能、原 Graph 对照和完整模型质量待验。([详情](task_details/TL-BATCH-INDEXER-PARALLEL-20261026.md))
+
+- [ ] [TL-FAR-SKIP-GPU-REVISION-20261026] 已升级 PR #7：拆开 staged eager/Graph 路径，增加三类可选 Triton 融合内核及配对验收工具；CPU/解释器/离线编译已验，目标 GPU eager 回退是否修复仍待实测。([详情](task_details/TL-FAR-SKIP-GPU-REVISION-20261026.md))
+
+## 2026-10-25
+
+- [x] [TL-FAR-SKIP-EAGER-OPT-20261025] 完成 far-off eager 五项优化：环形 KV 原位写入、增量页统计、直接子空间 gather、稳定 top-k、有界 scratch 复用；CPU 配对/正确性证据已归档，GPU/Graph 未验；继续通过 PR #7 交付。([详情](task_details/TL-FAR-SKIP-EAGER-OPT-20261025.md))
+
+- [x] [TL-FAR-SKIP-COMPACT-20261025] 实现 opt-in Qwen3 far-off 的 near-only 选择/attention 与真实 KV 淘汰；CPU 真 Torch/HF 正确性通过，GPU/质量/速度待验；按用户要求通过 PR 交付。([详情](task_details/TL-FAR-SKIP-COMPACT-20261025.md))
+
 ## 2026-10-21
 
 - [x] [TL-ASYNC-CANDIDATE-20261021] 候选L2拒绝async组合并回退既有全宽路由，避免当前候选丢掉上一轮L1掩码所需分数；修前2失败，修后普通/-O各16项host回归通过。实际Torch/GPU、质量、性能与显存未验。([详情](task_details/TL-ASYNC-CANDIDATE-20261021.md))
@@ -236,3 +254,8 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 - [ ] [TL-E155D-T6-20261021] 主方法敲定 + 全量测试（用户改序暂缓：等 TG 提速确证；六机派单已预置未启动，零进程零清理） ([详情](task_details/TL-E155D-T6-20261021.md))
 - [ ] [TL-E155D-T7-20261021] 性能浪费点修复（E133c A1-A4/A6 已入库；剩余 .187 独占窗口稳态 bench 同机对照 + 判决 JSON） ([详情](task_details/TL-E155D-T7-20261021.md))
 - [ ] [TL-E155D-T8-20261021] 推送远端 main（全部判决/论文/代码提交后 origin push，含历史挂账） ([详情](task_details/TL-E155D-T8-20261021.md))
+
+
+- [x] [TL-FAR-SKIP-THREE-ROUNDS-20261025] 三轮 eager/固定形状 Graph 实现与 CPU 验证完成；CUDA 实测未执行 ([详情](task_details/TL-FAR-SKIP-THREE-ROUNDS-20261025.md))
+
+- [x] [TL-FAR-SKIP-SUBSPACE-20261025] 子空间两轮复用/布局优化及 CPU 对拍完成；额外缓存与冷启动代价已记录，CUDA 实测待资源 ([详情](task_details/TL-FAR-SKIP-SUBSPACE-20261025.md))

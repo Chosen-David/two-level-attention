@@ -238,6 +238,14 @@ class TLIIndexer(TIAIndexer):
                     print(f"[TLI] 警告: 层掩码 {mask_path} 不可读, D' 关闭")
                     self._skip_ids = None
         # 聚类缓存（prefill 一次；decode 期 far 区不变）
+        self._km_centroids = None
+        self._km_token_assign = None
+        self._km_far_lo = None
+        self._km_far_blk_lo = None
+        self._km_blk_ids = None
+        self._km_dims = None
+        self._inc = None
+        self._triton_ok = True
         self._km_near_centroids = None; self._km_near_assign = None
         self._km_near_lo = -1; self._km_near_hi = -1
         self._km_near_key = None; self._km_near_dims = None
@@ -442,6 +450,12 @@ class TLIIndexer(TIAIndexer):
                     "静态 pair 是 tail32 的同宽度替换，非独立子空间段"
                 )
             self.enable_subspace = True
+
+        self.far_skip_backend = getattr(args, "tli_far_skip_backend", "legacy")
+        self.far_skip_cache = getattr(args, "tli_far_skip_cache", "retain")
+        if self.far_skip_backend != "legacy" or self.far_skip_cache != "retain":
+            from ..ops.far_skip_runtime import configure_far_skip
+            configure_far_skip(self)
 
     # ---------------- E135：sink/swa 参数化的单一事实源 ---------------- #
 
@@ -1229,7 +1243,7 @@ class TLIIndexer(TIAIndexer):
         if _use_fused:
             try:
                 k_min, k_max, k_avg = self._fast_stat_full(
-                    k_for_coarse, idx_sub, need_avg)
+                    k_for_coarse, None, need_avg)  # already gathered above; do not index twice
             except Exception:
                 if not self._stat_ok:
                     _use_fused = False  # 永久回退原版链
@@ -4645,7 +4659,15 @@ class TLIIndexer(TIAIndexer):
             "mean_fused": _mean_fused,
         }
 
+    def prepare_mask_batched(self, q, k, valid_lengths, softmax_scale=None):
+        """Opt-in full-batch fixed-capacity decode; see docs/tli_batch_indexer.md."""
+        from .tli_batch import prepare_mask_batched
+        scale = q.shape[-1] ** -0.5 if softmax_scale is None else softmax_scale
+        return prepare_mask_batched(self, q, k, valid_lengths, scale)
+
     def clear(self):
+        self._batch_tli = None
+        self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None
         self._km_token_assign = None
@@ -5621,3 +5643,4 @@ def _iter3_compact(cand_idx2, keep2, mid_mask, R_cap, Hkv, dev):
         ci_out, kp_out, mid_out, clen,
         R_cap, BLOCK=2048, num_warps=8)
     return ci_out, kp_out, mid_out, clen
+

@@ -1,0 +1,32 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/workspace/scratch/7d83fead945d/repo/exp/bench/compile_tli_gpu_pipeline.py", line 64, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/scratch/7d83fead945d/repo/exp/bench/compile_tli_gpu_pipeline.py", line 50, in main
+    compile_one(k._candidates,arch,
+  File "/workspace/scratch/7d83fead945d/repo/exp/bench/compile_tli_gpu_pipeline.py", line 20, in compile_one
+    obj=triton.compile(ASTSource(fn,sig,constexprs=const),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/7d83fead945d/triton-runtime/triton/compiler/compiler.py", line 339, in compile
+    module = src.make_ir(options, codegen_fns, module_map, context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/7d83fead945d/triton-runtime/triton/compiler/compiler.py", line 83, in make_ir
+    return ast_to_ttir(self.fn, self, context=context, options=options, codegen_fns=codegen_fns,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+triton.compiler.errors.CompilationError: at 16:4:
+                PAGE_BLOCK: tl.constexpr):
+    row = tl.program_id(0)
+    length = tl.load(LENGTHS+row//H)
+    slots = tl.arange(0, PAGE_BLOCK)
+    pages, valid = _candidate_pages(FI,NI,row,length,slots,NF,NN,BS,LO,SINK,SWA,NEAR,PAGE_BLOCK)
+    counts = tl.minimum(tl.maximum(length-pages*BS,0),BS)
+    total = tl.sum(tl.where(valid & (slots<NF+NN+2),counts,0),0).to(tl.int32)
+    R: tl.constexpr = (NF+NN+2)*BS
+    before = tl.full((),0,tl.int32)
+    ar = tl.arange(0,BLOCK)
+    # Only one token chunk is live. Avoid the 255-register full-row scan at R=4224.
+    for chunk in range(tl.cdiv(R,BLOCK)):
+    ^
+AssertionError("Loop-carried variable valid has initial type <['2'], int1> but is re-assigned to <['256'], int1> in loop! Please make sure that the type stays consistent.")

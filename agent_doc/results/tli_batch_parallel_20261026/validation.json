@@ -1,0 +1,53 @@
+{
+  "parent_commit": "9dbc6e9c8dada0abedee99a96ce79967dec0dd9f",
+  "status": "local_checks_passed_gpu_acceptance_pending",
+  "source_sha256": {
+    "sparse_attn/indexer/tli_batch.py": "6b28b7c010d419295f3bb09f4c62008dec792d8cb899f76b0ef8daa5b8162132",
+    "sparse_attn/indexer/tli_batch_kernels.py": "356bfd70fd938a4ad2ef8939571196e963cccfba4f49520264f13ad97ff10971",
+    "sparse_attn/indexer/tli_indexer.py": "851486e57e6a7943c6fa6f2c6cc19be192d2606f2ed8fdda3b6425dbd1d32ca7",
+    "sparse_attn/patches/qwen3_attn_patch.py": "b7966d092cf9d560d153047cfaab9e42cdf91babc9c22a97437b2e251563e5dc",
+    "sparse_attn/metrics.py": "d7bb653b84fb248af271a606bee4d5dc3d31ca799e984d92c349d2225733950b",
+    "tests/test_tli_batch_parallel.py": "4b679b81cb6cc0e3b56ef9a34e72265d13e007494757bdc032ec20af848e0923",
+    "tests/test_tli_batch_kernels.py": "078d34f237dcfd98aa451c1ca07b53a6f1fd41228dc3480033d68a325aac77ef",
+    "exp/bench/tli_batch_indexer_compare.py": "223ac941e698734699359c389a0c9bf9fe2b0926ab5a48eb6b18253cd25faa20",
+    "exp/bench/compile_tli_batch_kernels.py": "95984eaa04df8903723218ed41562273438623ee0b375a39c3e0e10f38335676"
+  },
+  "environment": {
+    "torch": "2.8.0+cpu",
+    "triton": "3.4.0",
+    "gpu_available": false
+  },
+  "cpu_tests": {
+    "passed": 158,
+    "skipped": 45,
+    "subtests": 205
+  },
+  "interpreter": {
+    "passed": 24,
+    "skipped": 12
+  },
+  "offline_cuda_compile_cases": 24,
+  "paired_comparisons": {
+    "old_eager": "paired_old_eager_cpu.json",
+    "batch_isolation": "paired_isolation_cpu.json",
+    "rows_per_comparison": 96,
+    "mask_mismatch_bits": 0,
+    "attention_max_abs": 0
+  },
+  "independent_reviewer": false,
+  "pending": [
+    "real CUDA scoring and capture/replay correctness",
+    "repository E127 and TLI batch CUDA gates",
+    "old optimized Graph vs new Graph benchmark",
+    "full-model eager/Graph TPOT and throughput",
+    "RULER and generated-token quality",
+    "allocated/reserved/peak memory",
+    "batch compact far KV eviction remains unsupported"
+  ],
+  "tools": [
+    "research-implement-optimize skill (same project pinned workflow)",
+    "GitHub connector",
+    "PyTorch CPU",
+    "Triton interpreter/offline compiler"
+  ]
+}

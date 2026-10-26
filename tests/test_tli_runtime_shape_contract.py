@@ -19,7 +19,7 @@ def load_harness(method_name, base_source="class Base:\n    pass\n"):
         node for node in cls.body
         if isinstance(node, ast.FunctionDef) and node.name == method_name
     )
-    namespace = {}
+    namespace = {'_graph_state_fn': None}
     source = base_source + "\nclass Harness(Base):\n"
     source += "\n".join("    " + line for line in ast.unparse(method).splitlines())
     exec(compile(source, str(SOURCE), "exec"), namespace)
@@ -33,7 +33,9 @@ class TliRuntimeShapeContractTests(unittest.TestCase):
             "S": 4,
             "sub_key": ("full", 1),
             "k_avg": None,
+            "input_signature": ('cpu', 'float32', 4, 128, 64),
         }
+        harness.args = SimpleNamespace(tia_block_size=64)
         harness._basis = None
         harness._basis_all = None
         harness.moba_gate = False
@@ -41,7 +43,7 @@ class TliRuntimeShapeContractTests(unittest.TestCase):
         harness._need_avg_score = lambda: False
         harness._sub_key = lambda: ("full", 1)
         harness._prepare_index_inc = lambda *_args: "incremental"
-        harness._prepare_index_full = lambda *_args: "full"
+        harness._prepare_index_full = lambda *_args, **_kwargs: "full"
         return harness
 
     def test_incremental_entry_rejects_extra_batch_instead_of_ignoring_it(self):
@@ -59,7 +61,7 @@ class TliRuntimeShapeContractTests(unittest.TestCase):
     def test_valid_key_contract_preserves_incremental_and_full_dispatch(self):
         harness = self._prepare_harness()
         self.assertEqual(
-            harness.prepare_index(SimpleNamespace(shape=(1, 8, 4, 128)), object()),
+            harness.prepare_index(SimpleNamespace(shape=(1, 8, 4, 128), device='cpu', dtype='float32'), object()),
             "incremental",
         )
         self.assertEqual(
@@ -68,7 +70,7 @@ class TliRuntimeShapeContractTests(unittest.TestCase):
         )
         harness.subspace = "mla_rope"
         self.assertEqual(
-            harness.prepare_index(SimpleNamespace(shape=(1, 8, 4, 192)), object()),
+            harness.prepare_index(SimpleNamespace(shape=(1, 8, 4, 192), device='cpu', dtype='float32'), object()),
             "full",
         )
 
@@ -123,3 +125,4 @@ class TliRuntimeShapeContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
