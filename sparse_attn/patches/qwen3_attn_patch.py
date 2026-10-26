@@ -444,21 +444,11 @@ def qwen3_attn_forward(
         # 缺陷；dense prefill（默认路径）逐位不变。非 dyn_dgate 实例 no-op。
         if hasattr(indexer, "freeze_dyn_dgate"):
             indexer.freeze_dyn_dgate()
-        # Far-skip compact decode bridge（DynamicCache eager path）：
-        # skip_far=true 层走紧凑 far 注意力（sink+near+swa 滚动缓冲），
-        # 在位 fuse_near_late 替代 -inf 掩码 → far 区永不读但物理已释放
-        # （evict 模式 prefill-end 一次截断）。跳过标准 prepare_mask +
-        # eager_decoding_attn 全宽路径（省 far KV 回读带宽）。
-        if getattr(indexer, "far_skip_backend", "legacy") != "legacy":
-            from ..ops.far_skip_runtime import try_far_skip_decode
-            _fs_out = try_far_skip_decode(
-                self, query_states, key_states, value_states,
-                past_key_values, attention_mask, cache_position, _ctx)
-            if _fs_out is not None:
-                attn_output = _fs_out.reshape(*input_shape, -1).contiguous()
-                attn_output = self.o_proj(attn_output)
-                _paper_route(self.layer_idx, "far-skip-decode")
-                return attn_output, None
+        # Far-skip eager path：skip_far 通过 indexer.prepare_mask 将 far 区
+        # 掩码为 -inf，eager_decoding_attn 自然跳过 far 区（计算等价于
+        # 不读取 far KV）。物理显存释放由 graph 路径的 prepare_far_skip_static
+        # 在 prefill 结束时一次性完成（ring buffer 截断）。eager 路径不走
+        # ring buffer decode（try_far_skip_decode 仅适用于 static graph）。
         query_states, key_states, value_states = (x.transpose(1, 2) for x in (query_states, key_states, value_states))
         if attention_mask is not None:
             cu_seqlens_k = prepare_cu_seqlens_from_mask(attention_mask)
