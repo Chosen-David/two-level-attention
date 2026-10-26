@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-26
+
+- [ ] [TL-HYBRID-CACHE-20261026] PR #9 升级：按请求×层混合 ring/linear、BS=1/2/8/32、不等长/动态 gate/EOS、RULER batch 和 CUDA Graph runner；85 项回归及 178 子用例通过，7 个 CUDA 项跳过，GPU/质量/性能验收待完成。([详情](task_details/TL-HYBRID-CACHE-20261026.md))
+
 ## 2026-10-21
 
 - [x] [TL-ASYNC-CANDIDATE-20261021] 候选L2拒绝async组合并回退既有全宽路由，避免当前候选丢掉上一轮L1掩码所需分数；修前2失败，修后普通/-O各16项host回归通过。实际Torch/GPU、质量、性能与显存未验。([详情](task_details/TL-ASYNC-CANDIDATE-20261021.md))

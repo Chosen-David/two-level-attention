@@ -93,8 +93,8 @@ class TLIStaticLayer:
         # 【阶段 2c CUDA Graph 前置】KV 写入位置张量化：scatter_ 单 kernel
         # 沿 dim2（S_cap 维）每行写 pos[b] 一列。pos 为 tensor 索引 →
         # replay 时 pos_buf 更新 → 写新列（CUDA Graph 兼容）。
-        # dead 行 seq_lens 冻结（不递增）→ pos 不变 → 重复写同列（被
-        # mask 排除，无污染）。非 graph 模式（pos_buf=None）回退 Python
+        # dead 行 seq_lens 冻结（不递增）；用 alive 张量保留旧值。
+        # 非 graph 模式（pos_buf=None）回退 Python
         # 构造，语义与旧逐行 copy_ 逐位一致（纯内存拷贝，无算术）。
         from .cuda_graph_state import graph_state  # noqa: E402
         _gs = graph_state()
@@ -107,12 +107,17 @@ class TLIStaticLayer:
         pos = torch.clamp(pos, 0, self.max_cache_len - 1)
         # scatter_ 沿 dim2（S_cap 维）每行写 pos[b] 一列：index 与 src
         # 同 shape [B,Hkv,1,D]、元素值为 pos[b] → self[b,h,pos[b],d] =
-        # src[b,h,0,d]（单 kernel，graph 兼容）。dead 行 pos 冻结 →
-        # 重复写同列（被 mask 排除，无污染）。
+        # src[b,h,0,d]（graph 兼容）。dead 行保留被冻结的最后一列。
         idx = pos.view(-1, 1, 1, 1).expand(
             self.max_batch_size, self.num_heads, 1, self.head_dim)
-        self.keys.scatter_(2, idx, key_states)
-        self.values.scatter_(2, idx, value_states)
+        if _gs.enabled:
+            alive = (_gs.alive_buf if _gs.alive_buf is not None else
+                     torch.ones(self.max_batch_size, dtype=torch.bool, device=self.keys.device))
+        else:
+            alive = torch.tensor(ctx.alive, dtype=torch.bool, device=self.keys.device)
+        active = alive.view(-1, 1, 1, 1)
+        self.keys.scatter_(2, idx, torch.where(active, key_states, self.keys.gather(2, idx)))
+        self.values.scatter_(2, idx, torch.where(active, value_states, self.values.gather(2, idx)))
         self.cumulative_length += 1
         return self.keys, self.values
 
@@ -171,15 +176,33 @@ def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, model=None):
     改为 layers[l].keys/values（DynamicLayer 直接字段）；旧属性访问
     AttributeError（GPU 单测未覆盖 e2e 形态，4.56.2 跑批现形）。
 
-    model: 若提供，搬移后调用 prepare_far_skip_static 对 far-skip 层做一次
-    prefill-end 截断/重分配到 ring buffer 容量（物理节省 dead far KV）。
+    model: compact 模式先冻结 gate 并直接分配 ring；其他层才分配线性
+    buffer。重填 compact cache 必须提供 model，并重新 capture 外层 graph。
     """
     n_layers = len(cache.layers)
     if len(dyn.layers) != n_layers:
         raise RuntimeError(
             f"DynamicCache 层数 {len(dyn.layers)} != TLIStaticCache 层数 "
             f"{n_layers}")
+    # Validate all source lengths before replacing any request's storage.
+    if len(seq_lens) != cache.batch_size:
+        raise ValueError("seq_lens must match the static cache batch")
     for l in range(n_layers):
+        k, v = dyn.layers[l].keys, dyn.layers[l].values
+        if (k is None or v is None or k.ndim != 4 or v.shape != k.shape
+                or k.shape[0] != cache.batch_size):
+            raise ValueError("prefill KV must match the static cache batch and shape")
+        if any(type(L) is not int or L < 0 or L > k.shape[-2]
+               or L > cache.layers[l].max_cache_len for L in seq_lens):
+            raise ValueError("prefill length exceeds source or static cache capacity")
+    from .far_skip_static import FarSkipStaticLayer, prepare_far_skip_static
+    if model is None and any(isinstance(layer, FarSkipStaticLayer) for layer in cache.layers):
+        raise ValueError("refilling compact cache requires model and graph recapture")
+    compact_layers = (prepare_far_skip_static(cache, dyn, seq_lens, model)
+                      if model is not None else set())
+    for l in range(n_layers):
+        if l in compact_layers:
+            continue  # Already seeded directly from prefill into bounded storage.
         k = dyn.layers[l].keys
         v = dyn.layers[l].values
         layer = cache.layers[l]
@@ -188,15 +211,7 @@ def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, model=None):
         S_max = k.shape[-2]
         for b in range(cache.batch_size):
             L = seq_lens[b]
-            if L < 0 or L > S_max or L > layer.max_cache_len:
-                raise RuntimeError(
-                    f"搬移越界：b={b} L={L} S_max={S_max} "
-                    f"cap={layer.max_cache_len}")
             if L:
                 layer.keys[b, :, :L].copy_(k[b, :, S_max - L:])
                 layer.values[b, :, :L].copy_(v[b, :, S_max - L:])
-
-    # Far-skip: prefill 结束后一次性截断死 far KV → 物理节省
-    if model is not None:
-        from .far_skip_static import prepare_far_skip_static
-        prepare_far_skip_static(cache, dyn, seq_lens, model)
+        layer.cumulative_length = max(seq_lens, default=0)
