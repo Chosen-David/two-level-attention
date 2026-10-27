@@ -4122,6 +4122,7 @@ class TLIIndexer(TIAIndexer):
         if not (self.alpha > 0 and self.beta > 0 and self.gamma is None
                 and self.nt_near_pages is not None
                 and self.nt_near_len is not None
+                and self.boundary_bypass
                 and not self.per_q_head and self._basis is None
                 and self.far_select not in ("cluster", "sim_greedy")
                 and self.near_select not in ("cluster", "sim_greedy")

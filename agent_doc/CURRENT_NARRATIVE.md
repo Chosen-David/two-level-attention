@@ -291,6 +291,13 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 ## 5. 已被推翻叙事索引（防误读核心——旧结论 → 推翻它的判决）
 
+**2026-10-27 实现审查补充（非质量/性能新判决）**：
+[五轮运行链路审查](results/runtime-audit-20261027/README.md) 修复 batch
+live length、请求状态/错误回执与长 prompt logits 问题，并将 LongBench
+完整 prompt prefill 与历史 split 协议显式隔离。新协议、compact/evict
+与 legacy 的选择范围差异均需独立质量复验；本次 CPU 回归不继承旧表结论，
+CUDA 必跑门禁仍待有 GPU 环境验收。
+
 | 过时结论（出现在 archived 报告/早期叙事中） | 推翻/修正判决 |
 |---|---|
 | 保护带（boundary bypass 前的 sink/swa 保护带几何）假设最优 | `e148_sinkswa_verdict.json`（否决） |
