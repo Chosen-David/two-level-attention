@@ -4110,7 +4110,7 @@ class TLIIndexer(TIAIndexer):
             "byp_tok": byp_tok, "byp_keep": byp_keep,
         }
 
-    def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len):
+    def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len, *, return_selection=False):
         """graph 专用全张量 compute_mask（生产主配置，逐位对齐 eager）。
 
         输入：q [1,1,H,D]（replay 注入）、index_dict（容量宽：k_min/k_max/
@@ -4187,25 +4187,19 @@ class TLIIndexer(TIAIndexer):
         inf_t = _cst[1]["inf_t"]
         zero_l = _cst[1]["zero_l"]
         # ---- 1+2. 动态几何 + 池掩码【E165 iter2a：步级共享缓存】----
-        # 几何/池掩码/bypass 槽/mid_mask/swa_force/k2_mid 只依赖 valid_len
-        # 与配置常量，与层无关（原实现每层重算 ~50 个小 kernel）。缓存键
-        # = (data_ptr, _version, 几何键)：warmup/eager 步 inject 的 vl.copy_()
-        # 使版本递增 → 每步首层重建；capture 单步内版本恒定 → 36 层命中
-        # （几何 kernel 只记录一次，replay 期从 live vl 现值重算 → 跨步
-        # 正确）。条目 pin valid_len 视图（强引用）防 data_ptr 复用误命中。
+        # Scope-local entries are recorded once per model invocation, including
+        # capture. Without a scope retain the conservative capture fallback.
+        from ..ops.decode_geometry import scoped_geometry
         _geo_key = (S_cap, kt_cap, bs, sink_pool_lo, sink_tok,
                     swa_tok, nl, K2, str(dev))
-        # capture 期层 0 强制重建（fail-safe）：若 warmup 与 capture 间 vl
-        # 版本未递增，命中 warmup 期条目会使几何 kernel 不被录入图 →
-        # replay 读陈旧几何。capturing 时一律重建（录 kernel 一次），
-        # 层 1-35 再按版本命中。
-        geo = None
-        if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
-            geo = _graph_geo_lookup(valid_len, _geo_key)
+        geo = scoped_geometry(valid_len, _geo_key, lambda:
+            self._build_graph_geometry(valid_len, S_cap, kt_cap, _cst[1]))
         if geo is None:
-            geo = _graph_geo_store(
-                valid_len, _geo_key,
-                self._build_graph_geometry(valid_len, S_cap, kt_cap, _cst[1]))
+            if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
+                geo = _graph_geo_lookup(valid_len, _geo_key)
+            if geo is None:
+                geo = _graph_geo_store(valid_len, _geo_key,
+                    self._build_graph_geometry(valid_len, S_cap, kt_cap, _cst[1]))
         S_real = geo["S_real"]
         swa_lo_tok = geo["swa_lo_tok"]
         near_blks = geo["near_blks"]
@@ -4259,7 +4253,12 @@ class TLIIndexer(TIAIndexer):
                 + einsum(b_q.clamp(min=0), b_k_max, "h d, kt h d -> h kt")
             ).to(q.dtype)
         score_coarse_avg = None
-        if k_avg is not None:
+        regional_avg = None
+        if k_avg is not None and self.near_method == "avg" and self.far_method == "minmax":
+            from ..ops.regional_score import near_page_scores
+            regional_avg = near_page_scores(self, k_avg, b_q, q.dtype,
+                near_blks, near_pool_mask, nl, bs, Hkv, group_size)
+        elif k_avg is not None:
             score_coarse_avg = torch.full((1, H, kt_cap), float("-inf"),
                                           dtype=q.dtype, device=dev)
             try:
@@ -4272,7 +4271,9 @@ class TLIIndexer(TIAIndexer):
         # GQA 聚合到 Hkv（共享口径，与 eager rearrange+mean 同数学）
         sc = score_coarse.view(1, Hkv, group_size, kt_cap).mean(dim=2)     # [1,Hkv,kt_cap]
         sc = sc.unsqueeze(1)
-        if score_coarse_avg is not None:
+        if regional_avg is not None:
+            sc_avg = regional_avg
+        elif score_coarse_avg is not None:
             sc_avg = score_coarse_avg.view(1, Hkv, group_size, kt_cap).mean(dim=2)
             sc_avg = sc_avg.unsqueeze(1)
         else:
@@ -4444,6 +4445,17 @@ class TLIIndexer(TIAIndexer):
             K2_static = min(R_cap, K2)
             v_top, i_slot = torch.topk(mid_scored, K2_static, dim=-1)
             tok_top = cand_idx2.gather(-1, i_slot)                # [Hkv,K2]
+        if return_selection:
+            from ..ops.token_selection import graph_selection
+            selected = graph_selection(tok_top, k2_mid, mid_mask, S_real,
+                                       sink_tok, swa_tok, K2, S_cap)
+            if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
+                # Counts carry the same metric without materializing S_cap.
+                cond = S_real >= self.metrics.threshold
+                total = selected.counts.sum()
+                self.metrics.select_tokens.append((
+                    torch.where(cond, total, total.new_full((), -1)), 1, Hkv))
+            return selected
         rank_keep = (torch.arange(K2_static, device=dev)
                      .view(1, -1) < k2_mid.view(1, 1))
         # 【E166 iter3a】终掩码装配融合：i_eff where + full_like + zeros/
@@ -4704,6 +4716,7 @@ class TLIIndexer(TIAIndexer):
         }
 
     def clear(self):
+        self._decode_rows = None
         self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None

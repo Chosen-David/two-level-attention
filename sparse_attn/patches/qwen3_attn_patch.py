@@ -96,6 +96,21 @@ def _parallel_batch_enabled(batch):
     return batch >= 1 and mode == "parallel"
 
 
+def _batch_row_indexers(indexer, k):
+    if k.shape[0] == 1:
+        return [indexer]
+    from ..ops.hybrid_batch_cache import _snapshot_indexer
+    ctx = batch_decode_ctx()
+    key = (k.data_ptr(), tuple(k.shape), tuple(k.stride()), k.dtype, k.device, id(ctx))
+    cached = getattr(indexer, "_decode_rows", None)
+    if cached is None or cached[0] != key:
+        # Pin both identities until clear(): allocator/Python id reuse must
+        # not make a different request look like an append to this one.
+        cached = (key, [_snapshot_indexer(indexer) for _ in range(k.shape[0])], k, ctx)
+        indexer._decode_rows = cached
+    return cached[1]
+
+
 def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
     """【阶段 2c-4】graph 数据通路版 batch decode（全 tensor、无 host 分支）。
 
@@ -134,25 +149,19 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
     cu = _graph_const(("cu_cap", str(dev), S_cap),
                       lambda: torch.tensor([0, S_cap], device=dev,
                                            dtype=torch.int32))
+    from ..ops.hybrid_batch_cache import row_graph_state
     masks = []
-    for b in range(B):
-        # 【E152v4】不再每步 clear()：clear 是请求边界标记（prefill 前每层
-        # 调用，失效 _inc/_ginc → 新请求首步全量重建）。graph 步进下每步
-        # clear 会把 _ginc 持久容量宽 buffer 一起失效 → 退化回每步
-        # _prepare_index_base 容量宽全量重建（with_stack 归因 ~15ms/步
-        # 36 层 index 税）。prepare_index 内部在 cuda_graph_state 模式下
-        # 分发到 pos_buf 驱动的增量更新（单块统计 + 单行 k_qat，固定形状
-        # 纯张量 op，capture 安全）；不兼容配置自动回退全量路径（fail-
-        # closed，行为逐位不变）。
-        idx_dict = indexer.prepare_index(k[b:b + 1], cu)
-        masks.append(indexer.compute_mask_graph(
-            q[b:b + 1], idx_dict, self.scaling, vl[b:b + 1]))
-    m_b = torch.cat(masks, dim=0)              # [B,1,Hkv,S_cap] bool
-    cu_b = torch.arange(B + 1, device=dev, dtype=torch.int32) * S_cap
-    # valid_length=None：mask 已排除 pad 列（prepare_mask 末尾清 False 的
-    # graph 等价物是 compute_mask_graph 的 `sel & (ar_tok < S_real)`）。
-    return eager_decoding_attn(
-        q, k, v, m_b, 1, cu_b, softmax_scale=self.scaling, valid_length=None)
+    for b, row_idx in enumerate(_batch_row_indexers(indexer, k)):
+        # Each row owns its incremental buffers and sees only its own position.
+        alive = gs.alive_buf[b:b+1] if gs.alive_buf is not None else None
+        with row_graph_state(gs.pos_buf[b:b+1], vl[b:b+1], alive):
+            idx_dict = row_idx.prepare_index(k[b:b+1], cu)
+            masks.append(row_idx.compute_mask_graph(q[b:b+1], idx_dict,
+                self.scaling, vl[b:b+1], return_selection=True))
+    from ..ops.token_selection import TokenSelection, selected_attention
+    selected = TokenSelection(torch.cat([m.indices for m in masks]),
+                              torch.cat([m.counts for m in masks]))
+    return selected_attention(q, k, v, selected, self.scaling)
 
 
 def _tl_decode_batched(self, indexer, query_states, key_states,
@@ -221,17 +230,15 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     # 阶段 2b 把 mask 收集起来，B>1 且 token 级时一次批量 eager。
     masks = []
     bs0 = None
-    for b in range(B):
-        L_b = ctx.seq_lens[b]
-        q_b = q[b:b + 1]                    # [1, 1, H, D]
-        k_b = k[b:b + 1]                    # [1, S_cap, Hkv, D]（全宽，有效在前）
-        v_b = v[b:b + 1]                    # [1, S_cap, Hkv, D]
-        cu = torch.tensor([0, S_cap], device=dev, dtype=torch.int32)
-        pos = torch.tensor([L_b - 1], device=dev, dtype=torch.long)
-        indexer.clear()
-        mask, block_size = indexer.prepare_mask(
-            q_b, pos, k_b, cu, softmax_scale=self.scaling, valid_length=L_b)
-        masks.append(mask)
+    for b, row_idx in enumerate(_batch_row_indexers(indexer, k)):
+        length = ctx.seq_lens[b]
+        cu = torch.tensor([0, length], device=dev, dtype=torch.int32)
+        pos = torch.tensor([length-1], device=dev, dtype=torch.long)
+        # Growing views permit append-only incremental preparation. Passing
+        # S_cap and clear() every step rebuilt the entire index for every row.
+        mask, block_size = row_idx.prepare_mask(q[b:b+1], pos, k[b:b+1, :length],
+            cu, softmax_scale=self.scaling, valid_length=length)
+        masks.append(torch.nn.functional.pad(mask, (0, S_cap-mask.shape[-1])))
         bs0 = block_size
     if B > 1 and bs0 == 1:
         m_b = torch.cat(masks, dim=0)       # [B, 1, Hkv, S_cap]

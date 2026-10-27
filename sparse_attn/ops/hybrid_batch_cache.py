@@ -16,7 +16,6 @@ import os
 from contextlib import contextmanager
 
 import torch
-import torch.nn.functional as F
 from transformers.cache_utils import DynamicCache
 
 from .cuda_graph_state import graph_state
@@ -158,22 +157,6 @@ class HybridBatchCacheBuilder:
         return self.cache
 
 
-def _attend_linear(q, k, v, mask, budget, scale):
-    """Fixed-size gather/SDPA, including short contexts; no nonzero/item sync."""
-    h, length, d = k.shape[2], k.shape[1], k.shape[-1]
-    count = min(length, budget)
-    valid, positions = mask[0, 0].to(torch.int32).topk(count, dim=-1, sorted=False)
-    valid = valid.bool()
-    heads = torch.arange(h, device=k.device)[:, None]
-    kk = k[0][positions, heads].masked_fill(~valid[..., None], 0)
-    vv = v[0][positions, heads].masked_fill(~valid[..., None], 0)
-    groups = q.shape[2] // h
-    out = F.scaled_dot_product_attention(
-        q[0, 0].reshape(h, 1, groups, d), kk[:, None], vv[:, None],
-        attn_mask=valid[:, None, None], scale=scale, dropout_p=0.0)
-    return out.reshape(1, 1, q.shape[2], v.shape[-1])
-
-
 def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
     if (module.training or torch.is_grad_enabled() or ctx is None
             or q.shape[0] != cache.batch_size or ctx.batch != cache.batch_size
@@ -187,8 +170,11 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
     gs = graph_state()
     if not gs.enabled or any(t is None for t in (gs.pos_buf, gs.valid_len_buf, gs.alive_buf)):
         raise ValueError('hybrid batch requires HybridBatchRunner device inputs')
+    backend = os.environ.get('TLI_HYBRID_ATTN', 'sdpa')
+    if backend not in ('sdpa', 'triton'):
+        raise ValueError('TLI_HYBRID_ATTN must be sdpa or triton')
     pos, lengths, alive = gs.pos_buf, gs.valid_len_buf, gs.alive_buf
-    outputs = []
+    selections = []
     for b, (row, idx) in enumerate(zip(layer.rows, layer.indexers)):
         p, vl, active = pos[b:b+1], lengths[b:b+1], alive[b:b+1]
         slot = row.layout.map(p) if isinstance(row, FarSkipStaticLayer) else p
@@ -199,12 +185,19 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
             storage.index_copy_(2, slot, torch.where(active.view(1, 1, 1, 1), incoming[b:b+1], old))
         qq, kk, vv = q[b:b+1].transpose(1, 2), row.keys.transpose(1, 2), row.values.transpose(1, 2)
         if isinstance(row, FarSkipStaticLayer):
-            out = row.workspace(qq, kk, vv, vl, module.scaling)
+            ids, valid = row.workspace.select(qq, kk, vl, module.scaling)
+            selections.append((ids, valid))
         else:
             with row_graph_state(p, vl, active):
                 index = idx.prepare_index(kk, layer.cu)
-                selection = idx.compute_mask_graph(qq, index, module.scaling, vl)
-            budget = idx.args.tia_level2_topk + idx.sink_tokens + idx.sliding_window_size
-            out = _attend_linear(qq, kk, vv, selection, budget, module.scaling)
-        outputs.append(out)
-    return torch.cat(outputs, dim=0)
+                selection = idx.compute_mask_graph(qq, index, module.scaling, vl, return_selection=True)
+            selections.append((selection.indices[0].long(), selection.valid()[0]))
+    if backend == 'triton':
+        from .hybrid_attention_triton import RaggedAttentionPlan
+        if getattr(layer, '_attention_plan', None) is None:
+            if q.is_cuda and torch.cuda.is_current_stream_capturing():
+                raise ValueError('warm up ragged attention before capture')
+            layer._attention_plan = RaggedAttentionPlan(layer.rows)
+        return layer._attention_plan(q.transpose(1, 2), layer.rows, selections, module.scaling, alive)
+    from .hybrid_attention import attend_rows
+    return attend_rows(q.transpose(1, 2), layer.rows, selections, module.scaling)

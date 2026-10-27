@@ -44,6 +44,7 @@ import sys
 import time
 
 import torch
+from sparse_attn.ops.decode_geometry import decode_geometry_scope
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if REPO not in sys.path:
@@ -211,7 +212,7 @@ class GraphRunner:
             raise RuntimeError(
                 "warmup 期间 compute_mask_graph 关闭了 graph（配置不受支持）")
         self.graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(self.graph):
+        with decode_geometry_scope(), torch.cuda.graph(self.graph):
             self.out = self.forward()
         return (time.perf_counter() - t0) * 1e3
 

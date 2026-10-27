@@ -248,7 +248,8 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
             ctx.gen_lens[:] = snap_gen
             return None
         graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(graph):
+        from sparse_attn.ops.decode_geometry import decode_geometry_scope
+        with decode_geometry_scope(), torch.cuda.graph(graph):
             out = model(input_ids=nxt_buf, position_ids=pid_buf,
                         attention_mask=m4_buf, past_key_values=past,
                         use_cache=True)
@@ -301,34 +302,21 @@ def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, 
         pad_id = tokenizer.eos_token_id
     batch, width = input_ids.shape
     builder = HybridBatchCacheBuilder(model, max(lens)+MAX_GEN, batch)
-    generated = []
+    first_tokens = []
     # Do not expose the outer B-row BatchCtx to a B=1 unpadded prefill.
     with batch_decode_scope(None):
         for b, length in enumerate(lens):
             output = model(input_ids=input_ids[b:b+1, width-length:],
-                           position_ids=position_ids[b:b+1, width-length:], use_cache=True)
-            generated.append([output.logits[0, -1].argmax().item()])
+                           position_ids=position_ids[b:b+1, width-length:],
+                           use_cache=True, logits_to_keep=1)
+            first_tokens.append(output.logits[0, -1].argmax())
             builder.add(output.past_key_values, length)
             del output  # Release full prefill KV before the next request.
     runner = HybridBatchRunner(model, builder.finish(), pad_id)
     use_graph = os.environ.get('TLI_CUDA_GRAPH', '0') == '1'
-    alive, lengths = [True]*batch, list(lens)
-    for step in range(MAX_GEN-1):
-        if not any(alive):
-            break
-        tokens = [row[-1] if active else pad_id for row, active in zip(generated, alive)]
-        lengths = [length+int(active) for length, active in zip(lengths, alive)]
-        runner.inject(tokens, lengths, alive)
-        if use_graph and step == 0:
-            # This path supports short contexts too; capture failures are visible.
-            runner.capture()
-        predicted = runner.run().logits[:, -1].argmax(-1).tolist()
-        for b, token in enumerate(predicted):
-            if alive[b]:
-                generated[b].append(token)
-                if token in eos_ids and len(generated[b]) > 1:
-                    alive[b] = False
-    print(f'[hybrid-batch] B={batch} graph={runner.graph is not None} '
+    generated = runner.generate(torch.stack(first_tokens), MAX_GEN, eos_ids,
+                                use_graph=use_graph)
+    print(f'[hybrid-batch] B={batch} graph={runner.generation_graph is not None} '
           f'kv_storage_bytes={runner.kv_storage_bytes()}', flush=True)
     return generated
 
