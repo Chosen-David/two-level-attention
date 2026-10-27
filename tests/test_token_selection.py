@@ -1,4 +1,5 @@
 import argparse
+import os
 import pytest
 import torch
 from sparse_attn.arguments import add_sparse_attn_args
@@ -60,3 +61,29 @@ def test_attention_matches_independent_dense_mask(device):
     expected = torch.nn.functional.scaled_dot_product_attention(
         q.transpose(1,2),dense_k,dense_v,attn_mask=mask).transpose(1,2)
     torch.testing.assert_close(actual,expected,rtol=2e-5,atol=2e-6)
+
+
+@pytest.mark.parametrize('dim', [16, 128])
+def test_direct_existing_kernel_matches_dense_oracle(dim):
+    interpreter = os.environ.get('TRITON_INTERPRET') == '1'
+    if not interpreter and not torch.cuda.is_available():
+        pytest.skip('CUDA required (or explicit Triton CPU interpreter)')
+    pytest.importorskip('triton')
+    from sparse_attn.ops.eager_decoding import _eager_attn_kernel_b
+    from sparse_attn.ops.token_selection import TokenSelection
+    dev = 'cpu' if interpreter else 'cuda'
+    torch.manual_seed(319)
+    q = torch.randn(2, 4, dim, device=dev)
+    k, v = [torch.randn(2, 301, 2, dim, device=dev) for _ in range(2)]
+    ids = torch.arange(277, dtype=torch.int32, device=dev).expand(2,2,-1).contiguous()
+    counts = torch.tensor([[0,277], [17,265]], device=dev, dtype=torch.int32)
+    selection = TokenSelection(ids, counts)
+    out = torch.empty_like(q)
+    qs = (q*dim**-.5).float().contiguous()
+    _eager_attn_kernel_b[(8,)](ids,counts,qs,k,v,out,2,
+        qs.stride(0),k.stride(0),k.stride(1),k.stride(2),qs.stride(1),out.stride(0),
+        G=2,D=dim,PER_QH=False,BW=256,W=277,num_warps=4)
+    expected = torch.nn.functional.scaled_dot_product_attention(
+        q.reshape(2,2,2,dim), k.transpose(1,2), v.transpose(1,2),
+        attn_mask=selection.to_mask(301)[:,0,:,None]).reshape_as(q)
+    torch.testing.assert_close(out,expected,rtol=3e-5,atol=3e-6)

@@ -4445,8 +4445,6 @@ class TLIIndexer(TIAIndexer):
             K2_static = min(R_cap, K2)
             v_top, i_slot = torch.topk(mid_scored, K2_static, dim=-1)
             tok_top = cand_idx2.gather(-1, i_slot)                # [Hkv,K2]
-        rank_keep = (torch.arange(K2_static, device=dev)
-                     .view(1, -1) < k2_mid.view(1, 1))
         if return_selection:
             from ..ops.token_selection import graph_selection
             selected = graph_selection(tok_top, k2_mid, mid_mask, S_real,
@@ -4458,6 +4456,8 @@ class TLIIndexer(TIAIndexer):
                 self.metrics.select_tokens.append((
                     torch.where(cond, total, total.new_full((), -1)), 1, Hkv))
             return selected
+        rank_keep = (torch.arange(K2_static, device=dev)
+                     .view(1, -1) < k2_mid.view(1, 1))
         # 【E166 iter3a】终掩码装配融合：i_eff where + full_like + zeros/
         # scatter + and + slice fill + or 六段（~6 kernel/层，[Hkv,S_cap]
         # 全宽 3 遍读写 ≈7.5MB/层@128K）换 2 个 Triton kernel（A 基底

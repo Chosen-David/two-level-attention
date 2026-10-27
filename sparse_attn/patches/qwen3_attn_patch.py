@@ -100,11 +100,13 @@ def _batch_row_indexers(indexer, k):
     if k.shape[0] == 1:
         return [indexer]
     from ..ops.hybrid_batch_cache import _snapshot_indexer
-    key = (k.data_ptr(), tuple(k.shape), tuple(k.stride()), k.dtype, k.device,
-           id(batch_decode_ctx()))
+    ctx = batch_decode_ctx()
+    key = (k.data_ptr(), tuple(k.shape), tuple(k.stride()), k.dtype, k.device, id(ctx))
     cached = getattr(indexer, "_decode_rows", None)
     if cached is None or cached[0] != key:
-        cached = (key, [_snapshot_indexer(indexer) for _ in range(k.shape[0])])
+        # Pin both identities until clear(): allocator/Python id reuse must
+        # not make a different request look like an append to this one.
+        cached = (key, [_snapshot_indexer(indexer) for _ in range(k.shape[0])], k, ctx)
         indexer._decode_rows = cached
     return cached[1]
 

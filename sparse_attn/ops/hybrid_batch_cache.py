@@ -16,7 +16,6 @@ import os
 from contextlib import contextmanager
 
 import torch
-import torch.nn.functional as F
 from transformers.cache_utils import DynamicCache
 
 from .cuda_graph_state import graph_state
@@ -158,22 +157,6 @@ class HybridBatchCacheBuilder:
         return self.cache
 
 
-def _attend_linear(q, k, v, mask, budget, scale):
-    """Fixed-size gather/SDPA, including short contexts; no nonzero/item sync."""
-    h, length, d = k.shape[2], k.shape[1], k.shape[-1]
-    count = min(length, budget)
-    valid, positions = mask[0, 0].to(torch.int32).topk(count, dim=-1, sorted=False)
-    valid = valid.bool()
-    heads = torch.arange(h, device=k.device)[:, None]
-    kk = k[0][positions, heads].masked_fill(~valid[..., None], 0)
-    vv = v[0][positions, heads].masked_fill(~valid[..., None], 0)
-    groups = q.shape[2] // h
-    out = F.scaled_dot_product_attention(
-        q[0, 0].reshape(h, 1, groups, d), kk[:, None], vv[:, None],
-        attn_mask=valid[:, None, None], scale=scale, dropout_p=0.0)
-    return out.reshape(1, 1, q.shape[2], v.shape[-1])
-
-
 def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
     if (module.training or torch.is_grad_enabled() or ctx is None
             or q.shape[0] != cache.batch_size or ctx.batch != cache.batch_size
@@ -187,6 +170,9 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
     gs = graph_state()
     if not gs.enabled or any(t is None for t in (gs.pos_buf, gs.valid_len_buf, gs.alive_buf)):
         raise ValueError('hybrid batch requires HybridBatchRunner device inputs')
+    backend = os.environ.get('TLI_HYBRID_ATTN', 'sdpa')
+    if backend not in ('sdpa', 'triton'):
+        raise ValueError('TLI_HYBRID_ATTN must be sdpa or triton')
     pos, lengths, alive = gs.pos_buf, gs.valid_len_buf, gs.alive_buf
     selections = []
     for b, (row, idx) in enumerate(zip(layer.rows, layer.indexers)):
@@ -206,9 +192,6 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
                 index = idx.prepare_index(kk, layer.cu)
                 selection = idx.compute_mask_graph(qq, index, module.scaling, vl, return_selection=True)
             selections.append((selection.indices[0].long(), selection.valid()[0]))
-    backend = os.environ.get('TLI_HYBRID_ATTN', 'sdpa')
-    if backend not in ('sdpa', 'triton'):
-        raise ValueError('TLI_HYBRID_ATTN must be sdpa or triton')
     if backend == 'triton':
         from .hybrid_attention_triton import RaggedAttentionPlan
         if getattr(layer, '_attention_plan', None) is None:
