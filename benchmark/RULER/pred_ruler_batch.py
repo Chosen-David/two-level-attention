@@ -248,7 +248,8 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
             ctx.gen_lens[:] = snap_gen
             return None
         graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(graph):
+        from sparse_attn.ops.decode_geometry import decode_geometry_scope
+        with decode_geometry_scope(), torch.cuda.graph(graph):
             out = model(input_ids=nxt_buf, position_ids=pid_buf,
                         attention_mask=m4_buf, past_key_values=past,
                         use_cache=True)
@@ -306,7 +307,8 @@ def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, 
     with batch_decode_scope(None):
         for b, length in enumerate(lens):
             output = model(input_ids=input_ids[b:b+1, width-length:],
-                           position_ids=position_ids[b:b+1, width-length:], use_cache=True)
+                           position_ids=position_ids[b:b+1, width-length:],
+                           use_cache=True, logits_to_keep=1)
             generated.append([output.logits[0, -1].argmax().item()])
             builder.add(output.past_key_values, length)
             del output  # Release full prefill KV before the next request.

@@ -7,6 +7,7 @@ a new runner, workspaces and graph (including when its shape matches the old).
 from contextlib import contextmanager
 
 import torch
+from sparse_attn.ops.decode_geometry import decode_geometry_scope
 
 from ..baseline_runtime import BatchCtx, batch_decode_scope
 from .cuda_graph_state import graph_state
@@ -74,7 +75,7 @@ class HybridBatchRunner:
     def forward(self):
         if not self.injected:
             raise ValueError('inject the first decode step before forward/capture')
-        with self.scope():
+        with self.scope(), decode_geometry_scope():
             return self.model(input_ids=self.tokens, position_ids=self.pos[:, None],
                               cache_position=self.pos[:1], attention_mask=self.mask,
                               past_key_values=self.cache, use_cache=True)
@@ -91,7 +92,7 @@ class HybridBatchRunner:
                 self.forward()
         torch.cuda.current_stream(self.tokens.device).wait_stream(stream)
         graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(graph):
+        with decode_geometry_scope(), torch.cuda.graph(graph):
             output = self.forward()
         self.graph, self.output = graph, output
 
