@@ -2,6 +2,8 @@
 
 ## 2026-10-27
 
+- [ ] [TL-INCREMENTAL-MASK-20261027] main hybrid inject 全宽 mask 重建改为首步初始化+逐行单槽更新；19 CPU通过，12 CUDA跳过，GPU收益待验。([详情](task_details/TL-INCREMENTAL-MASK-20261027.md))
+
 - [ ] [TL-PROJECTION-WRITE-20261027] main17e56e8 compact 子空间投影直写融合，eager/Graph 共用原缓存；44 CPU/12 解释器用例通过，48 CUDA 专化离线编译，GPU 性能待验。([详情](task_details/TL-PROJECTION-WRITE-20261027.md))
 
 - [ ] [TL-LINEAR-GATHER-20261027] main17e56e8 linear attention 复用双路 gather GPU kernel，保留 mask/topk/SDPA 顺序；CPU/解释器通过，GPU 与端到端待验。([详情](task_details/TL-LINEAR-GATHER-20261027.md))
