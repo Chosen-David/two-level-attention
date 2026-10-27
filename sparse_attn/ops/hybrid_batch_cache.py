@@ -203,8 +203,8 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
         else:
             with row_graph_state(p, vl, active):
                 index = idx.prepare_index(kk, layer.cu)
-                selection = idx.compute_mask_graph(qq, index, module.scaling, vl)
-            budget = idx.args.tia_level2_topk + idx.sink_tokens + idx.sliding_window_size
-            out = _attend_linear(qq, kk, vv, selection, budget, module.scaling)
+                selection = idx.compute_mask_graph(qq, index, module.scaling, vl, return_selection=True)
+            from .token_selection import selected_attention
+            out = selected_attention(qq, kk, vv, selection, module.scaling)
         outputs.append(out)
     return torch.cat(outputs, dim=0)

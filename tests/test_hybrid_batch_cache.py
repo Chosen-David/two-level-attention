@@ -108,7 +108,7 @@ def test_oversized_l2_fills_quota_without_duplicate_or_padding_slots():
     masks = []
     def observe(*args, **kwargs):
         mask = original(*args, **kwargs)
-        masks.append(mask.clone())
+        masks.append(mask.to_mask(65) if hasattr(mask, "to_mask") else mask.clone())
         return mask
     idx.compute_mask_graph = observe
     for length in range(8, 43):

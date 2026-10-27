@@ -4110,7 +4110,7 @@ class TLIIndexer(TIAIndexer):
             "byp_tok": byp_tok, "byp_keep": byp_keep,
         }
 
-    def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len):
+    def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len, *, return_selection=False):
         """graph 专用全张量 compute_mask（生产主配置，逐位对齐 eager）。
 
         输入：q [1,1,H,D]（replay 注入）、index_dict（容量宽：k_min/k_max/
@@ -4440,6 +4440,17 @@ class TLIIndexer(TIAIndexer):
             tok_top = cand_idx2.gather(-1, i_slot)                # [Hkv,K2]
         rank_keep = (torch.arange(K2_static, device=dev)
                      .view(1, -1) < k2_mid.view(1, 1))
+        if return_selection:
+            from ..ops.token_selection import graph_selection
+            selected = graph_selection(tok_top, k2_mid, mid_mask, S_real,
+                                       sink_tok, swa_tok, K2, S_cap)
+            if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
+                # Counts carry the same metric without materializing S_cap.
+                cond = S_real >= self.metrics.threshold
+                total = selected.counts.sum()
+                self.metrics.select_tokens.append((
+                    torch.where(cond, total, total.new_full((), -1)), 1, Hkv))
+            return selected
         # 【E166 iter3a】终掩码装配融合：i_eff where + full_like + zeros/
         # scatter + and + slice fill + or 六段（~6 kernel/层，[Hkv,S_cap]
         # 全宽 3 遍读写 ≈7.5MB/层@128K）换 2 个 Triton kernel（A 基底
