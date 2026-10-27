@@ -4716,6 +4716,7 @@ class TLIIndexer(TIAIndexer):
         }
 
     def clear(self):
+        self._decode_rows = None
         self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None
