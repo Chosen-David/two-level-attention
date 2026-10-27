@@ -2,6 +2,8 @@
 
 ## 2026-10-27
 
+- [ ] [TL-SUBSPACE-PAD-20261027] 子空间先选维再padding，保留packed边界/MoBA；201 CPU通过、24 CUDA跳过，30解释器对拍；GPU收益待验。([详情](task_details/TL-SUBSPACE-PAD-20261027.md))
+
 - [ ] [TL-GEOMETRY-CACHE-20261027] 修复 B>=10 几何缓存逐层抖动，改为请求所有、容量匹配 batch；56 CPU通过/15 CUDA跳过，GPU收益待验。([详情](task_details/TL-GEOMETRY-CACHE-20261027.md))
 
 - [ ] [TL-SINGLE-OUTPUT-20261027] B1 hybrid attention 输出免singleton cat；16 CPU通过、8 CUDA跳过，GPU收益待验。([详情](task_details/TL-SINGLE-OUTPUT-20261027.md))

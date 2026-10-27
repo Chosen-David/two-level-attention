@@ -292,6 +292,12 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 ## 5. 已被推翻叙事索引（防误读核心——旧结论 → 推翻它的判决）
 
+**2026-10-27 子空间 padding 实现补充（待 GPU 验证）**：
+[证据](results/subspace-pad-20261027/validation.md)：先选维再按原边界补零，
+消除统计前的全维 padding 临时量；MoBA 保留全维路径。201 CPU通过、
+24 CUDA跳过、30解释器对拍。CPU容量/128K公式不代表 GPU峰值或 KV节省；
+Qwen为初始化收益候选，MLA eager仍每步全量重建，实际收益待配对。
+
 2026-10-27 几何共享复核：main/PR10 原九条目全局缓存导致 B>=10 hybrid eager 跨层复用失效；PR10 改为请求级有界缓存，B32 两层实际构建64→32次/步，56 CPU通过/15 CUDA跳过、配对logits逐位一致。保留更多大batch几何条目是内存/重算取舍；capture仍逐层构建，不能宣称Graph或GPU实测加速。见 `agent_doc/results/geometry-cache-20261027/validation.md`。
 
 2026-10-27 输出组装复核：B1 hybrid decode 的唯一attention输出仍经cat复制；PR #10 直接复用输出，B>1保持原路径。16 CPU通过/8 CUDA跳过，未测GPU速度；EOS行selector/attention仍执行。见 `agent_doc/results/single-output-20261027/validation.md`。

@@ -1190,29 +1190,37 @@ class TLIIndexer(TIAIndexer):
             cu_stat = torch.tensor([0, valid_length],
                                    dtype=cu_seqlens_k.dtype,
                                    device=cu_seqlens_k.device)
+        # Select before padding: padding full-D K wastes a full-history copy
+        # when both statistics and projection only consume the subspace. Keep
+        # full-D padding for MoBA, whose independent mean explicitly needs it.
+        # pad_tensor retains packed-cu boundaries; no prefix-layout assumption.
+        subspace_before_pad = idx_sub is not None and not self.moba_gate
+        pad_input = k_stat[..., idx_sub] if subspace_before_pad else k_stat
         # 【阶段 2c-5】CUDA Graph capture 纯张量路径：prepare_pad_mask 的
         # 逐元素迭代与 pad_tensor 的 bool 掩码散射都需要 host 侧元素个数
-        # 同步（capture 期非法）。单行（k_stat.shape[0]==1，本函数断言）且
+        # 同步（capture 期非法）。单行（pad_input.shape[0]==1，本函数断言）且
         # pad_mask 恒为前缀 True 布局 → 静态 total + 切片写入，值逐位相同。
         if k.is_cuda and torch.cuda.is_current_stream_capturing():
             _pbs = self.args.tia_block_size
-            _total = (k_stat.shape[1] + _pbs - 1) // _pbs * _pbs
+            _total = (pad_input.shape[1] + _pbs - 1) // _pbs * _pbs
             pad_mask, pad_cu_seqlens_k = prepare_pad_mask(_pbs, cu_stat,
                                                           total=_total)
-            pad_k = k_stat.new_zeros((k_stat.shape[0], _total)
-                                     + tuple(k_stat.shape[2:]))
-            pad_k[:, :k_stat.shape[1]] = k_stat
+            pad_k = pad_input.new_zeros((pad_input.shape[0], _total)
+                                     + tuple(pad_input.shape[2:]))
+            pad_k[:, :pad_input.shape[1]] = pad_input
         else:
             pad_mask, pad_cu_seqlens_k = prepare_pad_mask(
                 self.args.tia_block_size, cu_stat)
-            pad_k = pad_tensor(k_stat, pad_mask)
+            pad_k = pad_tensor(pad_input, pad_mask)
         # ---- 投影基惰性提取（每层一次）：full-D [128,r] → 子空间 [32,r] ----
         if self._basis_all is not None and self._basis is None and self.layer_idx is not None:
             li = min(self.layer_idx, self._basis_all.shape[0] - 1)
             # 校准时 W[:, D2I, :] = B_sub，故 [:, idx_sub, :] 精确还原子空间基
             idx_cpu = idx_sub.cpu() if idx_sub is not None else slice(None)
             self._basis = self._basis_all[li][:, idx_cpu, :].to(k.device)  # [Hkv, 32, r]
-        k_for_coarse = pad_k[..., idx_sub] if idx_sub is not None else pad_k
+        k_for_coarse = (pad_k[..., idx_sub]
+                        if idx_sub is not None and not subspace_before_pad
+                        else pad_k)
         if self._basis is not None:
             # 投影路径（E64f 协议）：粗筛+细筛都在 d 维投影特征上
             kp = torch.einsum("bshd,hde->bshe", k_for_coarse.float(), self._basis)
@@ -1274,10 +1282,9 @@ class TLIIndexer(TIAIndexer):
                       and k_for_coarse.stride(-1) == 1)
         if _use_fused:
             try:
-                # 注意：k_for_coarse 在此处已是子空间切片后的 tensor
-                # （L1169: pad_k[..., idx_sub] if idx_sub is not None），
-                # 不能再传 idx_sub 给 kernel 做二次 gather（越界）。
-                # _fast_stat_full 内部会根据 stride(-1) 与 shape(-1) 判断是否需 sub。
+                # Already selected before padding (after padding for MoBA).
+                # Do not pass idx_sub again: that would index the compact
+                # last dimension with original full-D offsets.
                 k_min, k_max, k_avg = self._fast_stat_full(
                     k_for_coarse, None, need_avg)  # already gathered above; do not index twice
             except Exception:
