@@ -50,7 +50,8 @@ def make_model(cache_mode='evict', device='cpu', budget=10):
     add_sparse_attn_args(parser)
     args = parser.parse_args([
         '--method', 'tli', '--tia_block_size', '4', '--tli_near_len', '8',
-        '--tli_near_pages', '1', '--tli_sink_tokens', '2', '--tli_swa_size', '4',
+        '--tli_near_pages', '1', '--tli_near_tokens', 'off',
+        '--tli_near_len', '8', '--tli_sink_tokens', '2', '--tli_swa_size', '4',
         '--tia_level1_topk', '4', '--tia_level2_topk', str(budget),
         '--tli_subspace', 'tail', '--tia_level2_cmp_ratio', '4',
         '--tli_far_skip_backend', 'compact', '--tli_far_skip_cache', cache_mode])
@@ -216,7 +217,7 @@ def test_compact_rejects_unimplemented_model_consumer_before_patching():
                       num_hidden_layers=1, num_attention_heads=2, num_key_value_heads=1)
     model = LlamaForCausalLM(cfg).eval()
     args = make_model().model.layers[0].self_attn.indexer.args
-    with pytest.raises(ValueError, match='Qwen3 consumer'):
+    with pytest.raises(ValueError, match='Qwen3|compact far skip currently supports only'):
         register_patch(model, args)
     assert not hasattr(model.model.layers[0].self_attn, 'indexer')
 
