@@ -8,21 +8,25 @@ import triton.language as tl
 
 
 @triton.jit(do_not_specialize=['Position'])
-def write_pair(K, V, NewK, NewV, Position, H: tl.constexpr, D: tl.constexpr,
+def write_pair(K, V, NewK, NewV, Position, Alive, H: tl.constexpr, D: tl.constexpr,
                K_H: tl.constexpr, K_S: tl.constexpr, K_D: tl.constexpr,
                V_H: tl.constexpr, V_S: tl.constexpr, V_D: tl.constexpr,
                NK_H: tl.constexpr, NK_D: tl.constexpr,
                NV_H: tl.constexpr, NV_D: tl.constexpr,
                SINK: tl.constexpr, TAIL: tl.constexpr,
-               TENSOR_POSITION: tl.constexpr, BLOCK: tl.constexpr):
+               TENSOR_POSITION: tl.constexpr, HAS_ALIVE: tl.constexpr, BLOCK: tl.constexpr):
     position = tl.load(Position) if TENSOR_POSITION else Position
-    slot = tl.where(position < SINK, position, SINK + tl.maximum(position-SINK, 0) % TAIL)
+    active = tl.load(Alive) if HAS_ALIVE else True
+    slot = position
+    if TAIL > 0:
+        slot = tl.where(position < SINK, position, SINK + tl.maximum(position-SINK, 0) % TAIL)
     x = tl.program_id(0)*BLOCK + tl.arange(0, BLOCK)
     h, d = x // D, x % D
-    k = tl.load(NewK + h*NK_H + d*NK_D, h < H, 0)
-    v = tl.load(NewV + h*NV_H + d*NV_D, h < H, 0)
-    tl.store(K + h*K_H + slot*K_S + d*K_D, k, h < H)
-    tl.store(V + h*V_H + slot*V_S + d*V_D, v, h < H)
+    keep = (h < H) & active
+    k = tl.load(NewK + h*NK_H + d*NK_D, keep, 0)
+    v = tl.load(NewV + h*NV_H + d*NV_D, keep, 0)
+    tl.store(K + h*K_H + slot*K_S + d*K_D, k, keep)
+    tl.store(V + h*V_H + slot*V_S + d*V_D, v, keep)
 
 
 @triton.jit(do_not_specialize=['N', 'S0', 'S1', 'V0', 'V1'])

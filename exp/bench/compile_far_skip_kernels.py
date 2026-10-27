@@ -20,13 +20,15 @@ def main():
     for arch in opts.arch:
         cases = []
         for position_type in ('i32', 'i64', '*i64'):
-            cases.append((kernels.write_pair,
-                {'K': '*bf16', 'V': '*bf16', 'NewK': '*bf16', 'NewV': '*bf16',
-                 'Position': position_type},
-                dict(H=8, D=128, K_H=4291*128, K_S=128, K_D=1,
-                     V_H=4291*128, V_S=128, V_D=1, NK_H=128, NK_D=1,
-                     NV_H=128, NV_D=1, SINK=4, TAIL=4287,
-                     TENSOR_POSITION=position_type.startswith('*'), BLOCK=256)))
+            for ring, masked in ((True, False), (True, True), (False, True)):
+                cases.append((kernels.write_pair,
+                    {'K': '*bf16', 'V': '*bf16', 'NewK': '*bf16', 'NewV': '*bf16',
+                     'Position': position_type, 'Alive': '*i1' if masked else '*bf16'},
+                    dict(H=8, D=128, K_H=4291*128, K_S=128, K_D=1,
+                         V_H=4291*128, V_S=128, V_D=1, NK_H=128, NK_D=1,
+                         NV_H=128, NV_D=1, SINK=4 if ring else 0,
+                         TAIL=4287 if ring else 0, HAS_ALIVE=masked,
+                         TENSOR_POSITION=position_type.startswith('*'), BLOCK=256)))
         for dtype in ('fp32', 'bf16'):
             cases.append((kernels.order_keys,
                           {'Scores': '*'+dtype, 'Valid': '*i1', 'Keys': '*i64'},

@@ -185,12 +185,7 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
     outputs = []
     for b, (row, idx) in enumerate(zip(layer.rows, layer.indexers)):
         p, vl, active = pos[b:b+1], lengths[b:b+1], alive[b:b+1]
-        slot = row.layout.map(p) if isinstance(row, FarSkipStaticLayer) else p
-        # Dead rows keep their last valid KV exactly. Avoid a Python branch on
-        # alive: EOS changes during graph replay while kernel shapes stay fixed.
-        for storage, incoming in ((row.keys, k), (row.values, v)):
-            old = storage.index_select(2, slot)
-            storage.index_copy_(2, slot, torch.where(active.view(1, 1, 1, 1), incoming[b:b+1], old))
+        write_hybrid_row(row, k[b:b+1], v[b:b+1], p, active)
         qq, kk, vv = q[b:b+1].transpose(1, 2), row.keys.transpose(1, 2), row.values.transpose(1, 2)
         if isinstance(row, FarSkipStaticLayer):
             out = row.workspace(qq, kk, vv, vl, module.scaling)
@@ -202,3 +197,18 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
             out = _attend_linear(qq, kk, vv, selection, budget, module.scaling)
         outputs.append(out)
     return torch.cat(outputs, dim=0)
+
+
+def write_hybrid_row(row, k, v, position, alive):
+    """Same write contract for staged eager and Graph, ring and linear rows."""
+    from .far_skip_accel import enabled, write_pair
+    layout = row.layout if isinstance(row, FarSkipStaticLayer) else None
+    if enabled(row.keys):
+        # One launch replaces two old-slot reads, two where temporaries and
+        # two writes (plus ring mapping ops). No historical KV is read.
+        write_pair(row.keys, row.values, k, v, position, layout, alive=alive)
+        return
+    slot = layout.map(position) if layout is not None else position
+    for storage, incoming in ((row.keys, k), (row.values, v)):
+        old = storage.index_select(2, slot)
+        storage.index_copy_(2, slot, torch.where(alive.view(1, 1, 1, 1), incoming, old))

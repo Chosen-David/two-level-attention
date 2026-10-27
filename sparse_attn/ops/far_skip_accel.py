@@ -39,14 +39,21 @@ def order_keys(scores, valid, workspace):
     return out
 
 
-def write_pair(k, v, new_k, new_v, position, layout):
-    """Validated HF [1,H,S,D] single-token update; one launch, no old-KV copy."""
+def write_pair(k, v, new_k, new_v, position, layout, *, alive=None):
+    """HF [1,H,S,D] update; layout=None is linear, dead rows do not load/store KV.
+
+    Callers validate storage/input geometry before capture. Alive is a one-row
+    device bool view, so EOS can change during replay without a host branch.
+    """
     tensor_position = isinstance(position, torch.Tensor)
     h, d = k.shape[1], k.shape[-1]
     kernels().write_pair[((h*d+255)//256,)](
-        k, v, new_k, new_v, position, h, d, *k.stride()[1:], *v.stride()[1:],
+        k, v, new_k, new_v, position, alive if alive is not None else k,
+        h, d, *k.stride()[1:], *v.stride()[1:],
         new_k.stride(1), new_k.stride(3), new_v.stride(1), new_v.stride(3),
-        layout.sink, layout.tail_capacity, tensor_position, 256, num_warps=4)
+        layout.sink if layout is not None else 0,
+        layout.tail_capacity if layout is not None else 0,
+        tensor_position, alive is not None, 256, num_warps=4)
 
 
 def gather(data, positions, layout, workspace, *, dims=None, valid=None, other=None):

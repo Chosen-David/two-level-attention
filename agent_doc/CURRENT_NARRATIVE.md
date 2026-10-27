@@ -274,6 +274,9 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 ## 5. 已被推翻叙事索引（防误读核心——旧结论 → 推翻它的判决）
 
+2026-10-27 main b0a378c 实质复核：hybrid index/attention 仍逐行；PR #10 补充可选 GPU KV 写入融合，保留逐请求冻结 gate/EOS。E177 脚本仅计算容量公式，67.2% 基于假设 25/36 层 ring，不是 CUDA allocator/真实 gate/质量实测。ring 几何为 4291 槽；旧 TPOT 数据不代表本 hybrid 实现已验收。当前写入回归和未完成候选见 `agent_doc/results/hybrid-write-20261027/validation.md`；无新增 GPU 提速或显存实测判决。
+
+
 2026-10-26 路由复核（main 55c38d8）：长度缓存不更新、parallel 提前返回绕过 Graph、路由记录传模块而非层号，4 个 host 反例已复现；PR #10 保留正确生命周期并修复记录。上文 E176 数字保留为远端报告，当前树未找到 E176 原始脚本/回执，不能据此确认实际 parallel/Triton 命中或将零收益归因于 Python 循环。需以候选提交、完整 flags、路由和 profiler 重新配对验收；详见 agent_doc/results/parallel-route-20261026/validation.md。
 
 2026-10-26 整合更新：main `2289900` 已包含旧版 compact 实现；整合分支把 PR #7 的融合路径与 PR #9 的逐请求×层混合缓存接通。多 batch/EOS/新请求重建已有 CPU 回归，混合 attention/index 仍逐行；不能声称全 batch 融合或新 GPU 提速/显存降幅。当前边界与远端验收见 `docs/unified_far_skip.md`，下列 E175/旧 PR 限制是历史版本记录。

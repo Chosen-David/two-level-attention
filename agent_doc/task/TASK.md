@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-27
+
+- [ ] [TL-HYBRID-WRITE-20261027] 实质分析 main b0a378c；复用 GPU kernel 融合混合 ring/linear 的 EOS 安全 KV 写入，更新 PR #10 并标清 E177 容量估算。CPU/解释器及离线编译通过，GPU/e2e 待验。([详情](task_details/TL-HYBRID-WRITE-20261027.md))
+
 ## 2026-10-26
 
 - [ ] [TL-PARALLEL-ROUTE-20261026] 对齐 main 55c38d8，复现 stale length/Graph 旁路/层号记录错误，沿用 PR #10 生命周期并修复记录；62 passed、13 CUDA skipped，E176 实际路由/性能待重验。([详情](task_details/TL-PARALLEL-ROUTE-20261026.md))
