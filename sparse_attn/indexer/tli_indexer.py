@@ -2831,6 +2831,13 @@ class TLIIndexer(TIAIndexer):
         return m
 
     def compute_mask(self, q_ids, score_dict):
+        # 【E178】fail-closed：TLI_L2_BYPASS 旁路仅在 compute_mask_graph
+        # 实现。eager 路径混跑该 env 会静默跑成细筛口径（实验臂数字
+        # 口径错配）→ 显式拒绝执行。
+        if os.environ.get("TLI_L2_BYPASS", "").strip() == "1":
+            raise NotImplementedError(
+                "TLI_L2_BYPASS=1 仅支持 graph 路径（compute_mask_graph）；"
+                "eager compute_mask 未实现细筛旁路，fail-closed 拒绝执行")
         oracle_far_budget = None
         if self._e151c_quota is not None and self._e151c_on:
             # layer_idx is injected after construction. Never silently use
@@ -4138,6 +4145,8 @@ class TLIIndexer(TIAIndexer):
         swa_tok = self.sliding_window_size
         K1 = self.args.tia_level1_topk
         K2 = self.args.tia_level2_topk
+        # 【E178】L2 细筛旁路实验臂 env 门（默认关，仅 graph 路径支持）
+        _l2_bypass = os.environ.get("TLI_L2_BYPASS", "").strip() == "1"
         nb_near = max(0, int(self.nt_near_pages))
         nb_far = max(0, K1 - nb_near)
         nl = max(bs, int(self.nt_near_len))
@@ -4317,7 +4326,7 @@ class TLIIndexer(TIAIndexer):
                 and i_f.is_contiguous() and i_n.is_contiguous()
                 and far_pool_mask.is_contiguous()
                 and near_pool_mask.is_contiguous()
-                and (K1 & (K1 - 1)) == 0 and (bs & (bs - 1)) == 0
+                and K1 >= 1 and K1 <= 2048 and (bs & (bs - 1)) == 0
                 and geo["byp_tok"].is_contiguous()
                 and geo["byp_keep"].is_contiguous()
                 and i_f.dtype == torch.long
@@ -4356,6 +4365,27 @@ class TLIIndexer(TIAIndexer):
         # A non-page-aligned capacity can leave out-of-range positions in
         # inactive slots. Redirect before either torch or Triton gathers them.
         cand_idx2 = torch.where(keep2, cand_idx2, S_cap - 1)
+        # ---- 【E178】L2 细筛旁路实验臂（TLI_L2_BYPASS=1，默认关）----
+        # 用户 2026-10-27 指令：K1 选中块 + bypass 页的全部候选 token
+        # 直接进主注意力（跳过细筛打分/紧凑 softmax/L2 topk/候选压缩
+        # 全链），对比 K1=128+K2 细筛的质量与性能。语义 = 把
+        # 「tok_top=cand_idx2、k2_mid=K2_static=R_cap（rank_keep 全
+        # True）」代入下方旧 torch 装配链：垃圾槽已重定向 S_cap-1 哨兵
+        # （落 swa 区）→ & mid_mask 排除；bypass 跨界页中落 sink/swa
+        # 强制区的 token 由强制区覆盖；pad 清零/metrics 与主链同式。
+        # 纯整数/布尔域 → bitexact by construction。候选 token 量 =
+        # R_cap（K1=64 → 4224）+ sink + swa，远超 K2=1024 预算——
+        # attention/gather 成本随选中量放大的代价由实验实测裁决。
+        if _l2_bypass:
+            sel = torch.zeros((1, 1, Hkv, S_cap), dtype=torch.bool, device=dev)
+            sel.scatter_(-1, cand_idx2.view(1, 1, Hkv, R_cap), True)
+            sel = sel & mid_mask.view(1, 1, 1, -1)
+            sel[..., :sink_tok] = True
+            sel = sel | swa_force.view(1, 1, 1, -1)
+            sel = sel & (ar_tok < S_real).view(1, 1, 1, -1)
+            if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
+                self.metrics.add_select_result(valid_len - 1, sel, 1)
+            return sel
         # 【2c-2 修复】候选紧凑化重排：_score_fine_cand_kernel 的 cand_len
         # 门控语义 = 「前 cand_len 个位置有效」（offs_r < CLEN[kv]）。原布局
         # cand_idx = [far 96 槽(垃圾), near 32 槽(有效), byp 2 槽(有效)]——
@@ -4405,22 +4435,28 @@ class TLIIndexer(TIAIndexer):
             _kqc = k_qat[0][cand_idx2, _kv_id, :]              # [Hkv,R,d]
             _bkqc = repeat(_kqc, "kv r d -> (kv g) r d", g=group_size).to(torch.float32)
             sfc = einsum(b_q_fine, _bkqc, "h d, h r d -> h r").to(q.dtype)
-        keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)  # [H,R_cap]
-        sfc = torch.where(keep_h, sfc,
-                          torch.full_like(sfc, float("-inf")))
-        # ---- 7.【E165 iter2b】紧凑域 softmax + GQA mean（槽域 [H,R_cap]）----
-        # 原全宽链（sf_full fill/scatter → softmax → mean → masked_fill，
-        # 4-5 个 [H,S_cap] 级 op/层）：sf_full 的非 -inf 恰为候选槽集合 →
-        # softmax 分母与逐值在两域数学等价（fp 归约顺序不同：全宽含
-        # ~24k 零 padding 项参与 tree reduction 的配对，紧凑仅垃圾槽零项
-        # → ulp 级差异可能，gen_tokens 一致性由 e152v4 A/B 实测裁决）。
-        # GQA mean：组内 4 head 共享 cand_idx2 候选集 → 槽域 mean 与
-        # 全宽 token 域 mean 逐 token 同值（mean 的 4 个操作数相同）。
-        # 垃圾槽语义对齐：sfc 已 where(keep_h) 置 -inf → softmax 后 p=0，
-        # 与全宽「垃圾 token 位未写 → p=0」同值（原 scatter 把垃圾槽 -inf
-        # 写到 S_cap−1 哨兵，sentinel 在 swa 区恒被 mid 排除）。
-        p = F.softmax(sfc, dim=-1).nan_to_num(nan=0)          # [H,R_cap]
-        p = p.view(Hkv, group_size, R_cap).mean(dim=1)        # [Hkv,R_cap]
+        # ---- 7.【iter3e】fine 门控 + softmax + GQA mean 融合 ----
+        # 原链 keep_h=repeat+where+full_like（2 kernel 物化 [H,R_cap]）
+        # + F.softmax.nan_to_num（1 kernel）+ view.mean（1 kernel）
+        # → 单 Triton kernel 直出 p [Hkv,R_cap]（fp32）。
+        # 形态守卫（连续性/维度/triton 可用）不齐 → fail-closed 回退旧链。
+        _fused_p = None
+        if (_HAS_TRITON and sfc.is_contiguous() and keep2.is_contiguous()
+                and sfc.shape[0] == Hkv * group_size):
+            try:
+                _fused_p = _iter3_fused_softmax(
+                    sfc, keep2, R_cap, group_size, Hkv)
+            except Exception:
+                _fused_p = None
+        if _fused_p is not None:
+            p = _fused_p
+        else:
+            keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)  # [H,R_cap]
+            sfc = torch.where(keep_h, sfc,
+                              torch.full_like(sfc, float("-inf")))
+            # 【E165 iter2b】紧凑域 softmax + GQA mean（槽域 [H,R_cap]）
+            p = F.softmax(sfc, dim=-1).nan_to_num(nan=0)          # [H,R_cap]
+            p = p.view(Hkv, group_size, R_cap).mean(dim=1)        # [Hkv,R_cap]
         # ---- 8.【E165 iter2b】紧凑域 L2 自由竞争（topk 在 R_cap 槽上）----
         # mid 判定 gather 到槽域；topk K2 在 8448 槽而非 32800 全宽
         # （候选分恰集中于槽内，kept 集相同：p>0 的候选值同集合，
@@ -5497,6 +5533,57 @@ if _HAS_TRITON:
             gcarry += tl.sum(1 - k, axis=0)
         tl.store(CLEN + r, total.to(tl.int64))
 
+    # ---------------- 【iter3e】fine 门控 + softmax + GQA mean 融合 kernel ----------------
+    @triton.jit
+    def _iter3_fused_softmax_kernel(SFC, KEEP2, OUT_P,
+                                    R_CAP: tl.constexpr,
+                                    GROUP_SIZE: tl.constexpr,
+                                    BLOCK: tl.constexpr):
+        """iter3e：fine 门控 + softmax + GQA mean 四合一。
+
+        输入 SFC [Hkv*group_size, R_CAP]、KEEP2 [Hkv, R_CAP]（head 共享），
+        输出 OUT_P [Hkv, R_CAP] = mean_over_group(softmax(gated_sfc))。
+
+        原链 ~4 kernel/层（keep_h repeat + where + full_like + softmax +
+        nan_to_num + view + mean），其中 where + full_like 物化
+        [H,R_cap] = 32×8320×2B = 520KiB/层（bf16）。
+        栅格 (Hkv, triton.cdiv(R_CAP,BLOCK))：每 program 负责一
+        kv_head 的一列 tile，串行 3 pass 完成。
+
+        等价性：逐 q-head softmax 后 mean；门控 False → -inf 分母不
+        参与；归约序与 PyTorch tree 不同 → ulp 级差异（iter2b A/B
+        容忍）；全 -inf kv_head 行 → max_val=-inf → p 输出 0。"""
+        kv = tl.program_id(0)
+        col = tl.program_id(1)
+        ninf = float("-inf")
+        offs = col * BLOCK + tl.arange(0, BLOCK)
+        m = offs < R_CAP
+        base_keep = kv * R_CAP
+        k_row = tl.load(KEEP2 + base_keep + offs, mask=m, other=0) != 0
+        # pass1: 跨 group_size 行求全局 max
+        gmax = ninf
+        for g in range(GROUP_SIZE):
+            h = kv * GROUP_SIZE + g
+            s = tl.load(SFC + h * R_CAP + offs, mask=m, other=ninf).to(tl.float32)
+            s_g = tl.where(k_row, s, ninf)
+            gmax = tl.maximum(gmax, tl.max(s_g, axis=0))
+        if gmax == ninf:
+            tl.store(OUT_P + kv * R_CAP + offs,
+                     tl.zeros((BLOCK,), dtype=tl.float32), mask=m)
+            return
+        # pass2: 每行独立 softmax + 累积 mean（每行归一化分母 =
+        # 该行 gate=True 槽的 exp 和；cross-row 不耦合）
+        mean_acc = tl.zeros((BLOCK,), dtype=tl.float32)
+        for g in range(GROUP_SIZE):
+            h = kv * GROUP_SIZE + g
+            s = tl.load(SFC + h * R_CAP + offs, mask=m, other=ninf).to(tl.float32)
+            s_g = tl.where(k_row, s, ninf)
+            e_g = tl.where(k_row, tl.exp(s_g - gmax), 0.0)
+            row_sum = tl.sum(e_g, axis=0)
+            p_norm = tl.where(row_sum > 0, e_g / row_sum, 0.0)
+            mean_acc += p_norm
+        mean_acc /= GROUP_SIZE
+        tl.store(OUT_P + kv * R_CAP + offs, mean_acc, mask=m)
 
     # ---------------- 【E166 iter3d】摘要维护融合 kernel ----------------
     @triton.jit
@@ -5561,30 +5648,42 @@ if _HAS_TRITON:
     def _iter3_l1_cand_kernel(IF, IN_, FPM, NPM, BYT, BYK, SREAL,
                               CIDX, KEEP,
                               nb_far, nb_near, R_cap,
-                              K1: tl.constexpr, BS: tl.constexpr):
+                              K1: tl.constexpr, K1P: tl.constexpr,
+                              BS: tl.constexpr):
         """iter3d：候选集装配单核融合。原链 cat(blks)+cat(in_pool)+
         l1_tok 乘加+l1_keep lt&and+cat(cand)+cat(keep)（~8 kernel/层）
         → 单核直出 cand_idx2/keep2 [Hkv,R_cap]。槽布局复刻：
         l1 区 slot=k*bs+t、byp 区 slot=K1*bs+s*bs+t。纯整数/布尔域 →
-        bitexact by construction。"""
+        bitexact by construction。【E172q 修复】tl.arange 要求 2 的幂
+        → offs_k 取 K1P=next_pow2(K1)，越界 lane（offs_k≥K1）全部
+        load/store 加 mask；K1 本身为 2 的幂时 K1P==K1、mask 全真，
+        kernel 行为与原版逐位一致。"""
         h = tl.program_id(0)
-        offs_k = tl.arange(0, K1)
+        offs_k = tl.arange(0, K1P)
+        kv_ = offs_k < K1
         offs_t = tl.arange(0, BS)
         isf = offs_k < nb_far
         fb_ = tl.load(IF + h * nb_far + offs_k, mask=isf, other=0)
         nb_ = tl.load(IN_ + h * nb_near + (offs_k - nb_far),
-                      mask=(~isf) & (offs_k < K1), other=0)
+                      mask=(~isf) & kv_, other=0)
         blk = tl.where(isf, fb_, nb_)
         okf = tl.load(FPM + blk, mask=isf, other=0) != 0
-        okn = tl.load(NPM + blk, mask=(~isf) & (offs_k < K1), other=0) != 0
+        okn = tl.load(NPM + blk, mask=(~isf) & kv_, other=0) != 0
         ok = tl.where(isf, okf, okn)
         sreal = tl.load(SREAL).to(tl.int64)
         tok = blk[:, None] * BS + offs_t.to(tl.int64)[None, :]
         kp = (tok < sreal) & ok[:, None]
         base = h * R_cap
         slot = offs_k.to(tl.int64)[:, None] * BS + offs_t.to(tl.int64)[None, :]
-        tl.store(CIDX + base + slot, tok)
-        tl.store(KEEP + base + slot, kp)
+        # 【E180b】pow2 K1（K1P==K1）走原版无 mask store——谓词化 store
+        # 实测 +15us/层（Triton 不折叠 constexpr 比较，E180 A/B k64
+        # +0.55ms 回归）；非幂次才需越界 lane mask。
+        if K1P == K1:
+            tl.store(CIDX + base + slot, tok)
+            tl.store(KEEP + base + slot, kp)
+        else:
+            tl.store(CIDX + base + slot, tok, mask=kv_[:, None])
+            tl.store(KEEP + base + slot, kp, mask=kv_[:, None])
         offs_b = tl.arange(0, 2 * BS)
         bt = tl.load(BYT + offs_b)
         bk = tl.load(BYK + offs_b) != 0
@@ -5632,11 +5731,14 @@ def _iter3_l1_cand(i_f, i_n, far_pool_mask, near_pool_mask,
     nb_near = K1 - nb_far
     cidx = torch.empty((Hkv, R_cap), dtype=torch.long, device=dev)
     keep = torch.empty((Hkv, R_cap), dtype=torch.bool, device=dev)
+    # 【E172q 修复】K1P = next_pow2(K1)：K1 为 2 的幂时 ==K1（原行为），
+    # 非幂次（如 96）填充到 128，越界 lane 由 kernel 内 mask 排除。
+    K1P = 1 << (K1 - 1).bit_length()
     _iter3_l1_cand_kernel[(Hkv,)](
         i_f, i_n, far_pool_mask, near_pool_mask, byp_tok, byp_keep,
         S_real, cidx, keep,
         nb_far, nb_near, R_cap,
-        K1=K1, BS=bs, num_warps=4)
+        K1=K1, K1P=K1P, BS=bs, num_warps=4)
     return cidx, keep
 
 def _iter3_assemble_mask(tok_top, k2_mid, mid_mask, swa_force,
@@ -5680,3 +5782,27 @@ def _iter3_compact(cand_idx2, keep2, mid_mask, R_cap, Hkv, dev):
         ci_out, kp_out, mid_out, clen,
         R_cap, BLOCK=2048, num_warps=8)
     return ci_out, kp_out, mid_out, clen
+
+
+def _iter3_fused_softmax(sfc, keep2, R_cap, group_size, Hkv):
+    """【iter3e】fine 门控 + softmax + GQA mean 融合 wrapper。
+
+    输入 sfc [Hkv*group_size, R_cap]（fine 打分，fp16/bf16/fp32）、
+    keep2 [Hkv, R_cap]（head 共享候选 bool）。
+    输出 p [Hkv, R_cap] fp32 = mean_over_group(softmax(gated_sfc))。
+
+    形态守卫（连续性/维度）不齐 → 返回 None，调用方 fail-closed
+    回退旧 4 kernel 链。"""
+    if not (sfc.is_contiguous() and keep2.is_contiguous()
+            and sfc.shape[0] == Hkv * group_size
+            and sfc.shape[1] == R_cap
+            and keep2.shape[0] == Hkv and keep2.shape[1] == R_cap):
+        return None
+    out_p = torch.empty((Hkv, R_cap), dtype=torch.float32, device=sfc.device)
+    BLOCK = 1024
+    grid = (Hkv, triton.cdiv(R_cap, BLOCK))
+    _iter3_fused_softmax_kernel[grid](
+        sfc, keep2, out_p,
+        R_CAP=R_cap, GROUP_SIZE=group_size,
+        BLOCK=BLOCK, num_warps=8)
+    return out_p
