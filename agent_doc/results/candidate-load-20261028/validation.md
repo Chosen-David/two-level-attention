@@ -1,5 +1,7 @@
 # Candidate-prefix loads — 2026-10-28
 
+Follow-up: the initial probe below used BT64/4 warps even for D32; it did not cover D32's production BT16/1 warp. [Production-wrapper/codegen follow-up](production-validation.md) adds 216 exact interpreter pairs through the actual wrapper and 72 offline compilations. Use its alternating-order, occupancy-aware CUDA command for acceptance. No GPU timing has been measured.
+
 Main8f213e4, parent PR10 3404da6. Root CLAUDE83dbec28, TASK/current narrative and prior coverage reviewed. All12 PR heads and concurrent branches unchanged. No nested rules in unchanged main. Kernel unchanged in PR12 and concurrent L2 branch; their downstream softmax work is not imported. Isolated local branch codex/candidate-valid-load-20261028; only allowlisted delta published.
 
 Main _gather_fine_cand and compute_mask_graph both invoke _fast_score_fine_cand. CLEN already defines the valid per-head prefix: eager builder places L1+shared tokens there; graph uses stable compaction. Old kernel read CAND and K for all R lanes, then overwrote invalid scores with -inf. Move CLEN load earlier and predicate both loads with r<R && r<CLEN. Keep output stores, query loads, reduction order, dtype, launch geometry and all fallback/mask/softmax/topk code unchanged. Scope includes eligible eager and CUDA Graph indexer paths, including skip/non-skip when routed here; compact ring workspace has a different scorer and is not changed.
