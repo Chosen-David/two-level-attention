@@ -4253,7 +4253,12 @@ class TLIIndexer(TIAIndexer):
                 + einsum(b_q.clamp(min=0), b_k_max, "h d, kt h d -> h kt")
             ).to(q.dtype)
         score_coarse_avg = None
-        if k_avg is not None:
+        regional_avg = None
+        if k_avg is not None and self.near_method == "avg" and self.far_method == "minmax":
+            from ..ops.regional_score import near_page_scores
+            regional_avg = near_page_scores(self, k_avg, b_q, q.dtype,
+                near_blks, near_pool_mask, nl, bs, Hkv, group_size)
+        elif k_avg is not None:
             score_coarse_avg = torch.full((1, H, kt_cap), float("-inf"),
                                           dtype=q.dtype, device=dev)
             try:
@@ -4266,7 +4271,9 @@ class TLIIndexer(TIAIndexer):
         # GQA 聚合到 Hkv（共享口径，与 eager rearrange+mean 同数学）
         sc = score_coarse.view(1, Hkv, group_size, kt_cap).mean(dim=2)     # [1,Hkv,kt_cap]
         sc = sc.unsqueeze(1)
-        if score_coarse_avg is not None:
+        if regional_avg is not None:
+            sc_avg = regional_avg
+        elif score_coarse_avg is not None:
             sc_avg = score_coarse_avg.view(1, Hkv, group_size, kt_cap).mean(dim=2)
             sc_avg = sc_avg.unsqueeze(1)
         else:
