@@ -79,13 +79,18 @@ def _graph_const(key, build):
 
 
 def _batch_device_lengths(ctx, dev):
-    """缓存 BatchCtx 的 seq_lens 为 device tensor（避免每步 host→device）。"""
+    """Refresh once per host length change, reusing storage across layers."""
+    lengths = tuple(ctx.seq_lens)
+    dev = torch.device(dev)
     cached = getattr(ctx, '_tli_lengths_cache', None)
-    if cached is not None and cached[0] is ctx:
-        return cached[1]
-    cached = (ctx, torch.tensor(ctx.seq_lens, dtype=torch.long, device=dev))
-    ctx._tli_lengths_cache = cached
-    return cached[1]
+    if cached is None or cached[0].device != dev or cached[0].numel() != len(lengths):
+        value = torch.tensor(lengths, dtype=torch.long, device=dev)
+    else:
+        value, previous = cached
+        if previous != lengths:
+            value.copy_(torch.tensor(lengths, dtype=torch.long, device=dev))
+    ctx._tli_lengths_cache = (value, lengths)
+    return value
 
 
 def _parallel_batch_enabled(batch):
@@ -127,7 +132,7 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
         if gs.valid_len_buf is None:
             raise ValueError("parallel graph requires live valid_len_buf")
         mask, bs = prepare_mask_batched(indexer, q, k, vl, self.scaling)
-        _paper_route(self, "tli_batch_indexer_parallel_graph")
+        _paper_route(self.layer_idx, "tli_batch_indexer_parallel_graph")
         return eager_decoding_attn(
             q, k, v, mask, bs, indexer._batch_tli.cu,
             softmax_scale=self.scaling, valid_length=None)
@@ -187,19 +192,29 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     A 逐行校验 cu[b]==b*T）。B==1 / block_size>1 保持逐行路径零扰动
     （gate_bs1_equiv 铁律：batch=1 与旧单序列入口逐位一致）。
     """
+    if getattr(indexer, 'dyn_dgate', False) or getattr(indexer, 'static_pair', False):
+        raise ValueError(
+            'legacy batch decode cannot retain request-local prefill gate/pair state; '
+            'use compact/evict HybridBatchRunner or single-request non-batch decode')
     B = query_states.shape[0]
     q = query_states.transpose(1, 2)   # [B, 1, H, D]
     k = key_states.transpose(1, 2)     # [B, S_cap, Hkv, D]
     v = value_states.transpose(1, 2)   # [B, S_cap, Hkv, D]
     dev = q.device
     S_cap = k.shape[1]
+    from ..ops.cuda_graph_state import graph_state
+    _gs = graph_state()
+    if _gs.enabled and _parallel_batch_enabled(B):
+        # Capture must consume the runner's live device lengths, never a
+        # tensor materialized from the Python BatchCtx at warmup time.
+        return _tl_decode_batched_graph(self, indexer, q, k, v, _gs)
     # 【batch indexer 并行化】TLI_BATCH_INDEXER=parallel 时走批量 kernel
     # 路径（Triton batch scoring + topk），替代逐行循环。
     if _parallel_batch_enabled(B):
         from ..indexer.tli_batch import prepare_mask_batched
         lengths = _batch_device_lengths(ctx, dev)
         mask, bs = prepare_mask_batched(indexer, q, k, lengths, self.scaling)
-        _paper_route(self, "tli_batch_indexer_parallel_eager")
+        _paper_route(self.layer_idx, "tli_batch_indexer_parallel_eager")
         return eager_decoding_attn(
             q, k, v, mask, bs, indexer._batch_tli.cu,
             softmax_scale=self.scaling,
@@ -208,8 +223,6 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     # 全走 tensor（valid_len_buf），无 Python int 烘焙。配置不支持
     # compute_mask_graph（非生产主配置）时 fail-closed 关 graph + 回 staged
     # 路径（capture 前的 warmup 阶段触发，之后两臂一致）。
-    from ..ops.cuda_graph_state import graph_state  # noqa: E402
-    _gs = graph_state()
     if _gs.enabled:
         try:
             return _tl_decode_batched_graph(self, indexer, q, k, v, _gs)

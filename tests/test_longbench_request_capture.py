@@ -15,7 +15,7 @@ from exp.paper import receipt
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=ROOT/'benchmark/LongBench/pred.py'
 tree=ast.parse(SOURCE.read_text())
-functions=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in ('get_pred','_manual_generate','_paper_capture_request')]
+functions=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in ('get_pred','_manual_generate','_paper_capture_request','_split_prompt_question','_drop_leading_bos')]
 ns={'torch':torch,'tqdm':lambda x:x,'post_process':lambda x,name:x,'build_chat':lambda t,p,m:p,
     'get_metrics':lambda:SimpleNamespace(get_select_tokens=lambda:0,clear=lambda:None)}
 exec(compile(ast.Module(body=functions,type_ignores=[]),str(SOURCE),'exec'),ns)
@@ -45,6 +45,9 @@ class Model:
 class Batch:
     def __init__(self,ids):self.input_ids=torch.tensor([ids],dtype=torch.long)
     def to(self,*a):return self
+    def __setitem__(self,key,value):
+        if key!='input_ids':raise KeyError(key)
+        self.input_ids=value
 
 class Tokenizer:
     eos_token_id=9;bos_token_id=None
@@ -52,6 +55,26 @@ class Tokenizer:
     def decode(self,ids,**kwargs):return ','.join(map(str,ids))
 
 class Capture(unittest.TestCase):
+    def test_llama_chat_template_does_not_add_second_bos(self):
+        class BosTokenizer(Tokenizer):
+            bos_token_id=1
+            def __call__(self,text,**kwargs):
+                ids=([1,2] if text.startswith('<bos>') else [2]) if text else []
+                if kwargs.get('add_special_tokens',True):ids=[1]+ids
+                return Batch(ids)
+        clock=Clock();model=Model(clock,tokens=[3])
+        with patch.dict(ns,eager_decoding_request_guard=self.guard(clock),
+                        build_chat=lambda t,p,m:'<bos>'+p),patch.object(torch.cuda,'empty_cache'):
+            ns['get_pred'](model,BosTokenizer(),[{'text':'abcd','answers':[],'all_classes':[],'length':4}],64,1,'{text}','hotpotqa','cpu','Llama-3.1-8B')
+        self.assertEqual(model.inputs,[[1,2]])
+
+    def test_full_prompt_is_one_prefill_and_split_is_explicit(self):
+        for mode, widths in [('full', [4, 1]), ('split', [1, 1, 1, 1, 1])]:
+            clock=Clock();model=Model(clock,tokens=[3]*10)
+            with patch.dict(ns,eager_decoding_request_guard=self.guard(clock)),patch.object(torch.cuda,'empty_cache'):
+                rows=ns['get_pred'](model,Tokenizer(),[{'text':'abcd','answers':[],'all_classes':[],'length':4}],64,2,'{text}','trec','cpu','Qwen3-8B',prompt_mode=mode)
+            self.assertEqual(list(map(len,model.inputs)),widths)
+            self.assertEqual(rows[0]['prompt_mode'],mode)
     def guard(self,clock,fail=False):
         @contextmanager
         def run():

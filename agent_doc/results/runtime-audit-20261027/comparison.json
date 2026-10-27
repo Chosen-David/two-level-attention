@@ -1,0 +1,45 @@
+{
+  "base_commit": "8f213e48926431ea2d56cf3e7bc1a667d1105c74",
+  "new_failing_nodes": [],
+  "base_only_failing_nodes": [
+    "tests/test_longbench_request_capture.py::Capture::test_get_pred_guard_failure_cannot_append_record",
+    "tests/test_longbench_request_capture.py::Capture::test_get_pred_real_record_path_opt_in_and_default_disabled"
+  ],
+  "shared_failing_nodes": [
+    "sparse_attn/ops/tests/test_eager_decode_input_contract.py::DecodeInputContractTest::test_all_entry_points_reject_before_dispatch_or_allocation",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_cache_crop_rebuilds_mean",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_continuation_uses_running_update_without_tensor_item",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_failed_prefill_invalidates_previous_mean",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_interleaved_caches_rebuild_mean",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_nonweakref_cache_uses_safe_rebuild",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_normal_request_matches_official_incremental_reference",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_owner_does_not_keep_cache_alive",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_same_cache_refill_invalidates_length_collision",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_scalar_guard_catches_injected_running_mean_read",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_scalar_guard_with_cpu_compiler_boundary",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_second_request_dtypes_and_strided_input",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_second_request_matches_fresh_adapter",
+    "sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_single_token_new_request_reinitializes",
+    "tests/test_e140_asset_provenance.py::AssetProvenance::test_current_assets_carry_diagnostic_warning",
+    "tests/test_e140_asset_provenance.py::AssetProvenance::test_default_renderer_fails_closed",
+    "tests/test_e140_asset_provenance.py::AssetProvenance::test_manifest_preserves_legacy_hashes_and_exact_git_sources",
+    "tests/test_e140_asset_provenance.py::AssetProvenance::test_opt_in_warning_helper_exports_visible_text",
+    "tests/test_e140_asset_provenance.py::AssetProvenance::test_repeat_annotation_is_rejected_without_writes",
+    "tests/test_e140_asset_provenance.py::AssetProvenance::test_tampered_asset_or_promoted_status_fails",
+    "tests/test_e140_asset_provenance.py::AssetProvenance::test_v2_source_bytes_pinned",
+    "tests/test_e141_verifier_finite.py::FiniteGate::test_finite_native_surrogate_still_passes",
+    "tests/test_e141_verifier_finite.py::FiniteGate::test_nonfinite_got_and_ref_exit_one",
+    "tests/test_observation_bins.py::BinArithmetic::test_renderer_rejects_bad_o3_and_duplicate_ids",
+    "tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_async_first_and_later_steps_bypass_current_candidate_selection",
+    "tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_existing_unsupported_modes_still_bypass_candidates",
+    "tests/test_tli_async_candidate_gate.py::AsyncCandidateGateTests::test_sync_candidate_path_still_reaches_selection"
+  ],
+  "logs_sha256": {
+    "baseline-regression.log": "a6cbc6c037f1ab107af230d7e19ae2434141ab36b0ecefaa126460c1d4e09598",
+    "batch-gates.log": "fe4fe0fb2fa80874bed5dd1a92046232eb9de912d1f9c3173587bdcdbfe92c70",
+    "cpu-regression.log": "dc50acc97f426e01083a177a2f57436d88c2f2f36e71581ccbbc4b51256bba29",
+    "e127-gates.log": "32f0a444b90c0a13076e63f4fbf77e71d459c7a75102bb3f58f715e189d97a6c",
+    "round5-before.log": "cb6c5ca73b2f1522353f244869fca198b6dbe135876f0d74fc27f69a7abe9fc3",
+    "targeted-final.log": "3b248654e99415cce1b6492bebad2e720169a832d78d40b667243830c2c00472"
+  }
+}

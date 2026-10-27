@@ -21,6 +21,12 @@ def meta(dataset="qasper", source="v2-" + "a" * 64,
 
 
 class Lbv1InputUniformityTests(unittest.TestCase):
+    def test_prompt_protocols_cannot_be_aggregated(self):
+        for other in ('split', None):
+            with self.assertRaisesRegex(SystemExit, 'prompt_mode'):
+                validate_input_identity_uniformity({
+                    'full': dict(meta(), prompt_mode='full'),
+                    'other': dict(meta(), prompt_mode=other)})
     def test_eval_wires_gate_before_result_publication(self):
         source = (Path(__file__).resolve().parents[1]
                   / "benchmark" / "LongBench" / "eval.py")

@@ -2,7 +2,7 @@
 
 两级索引稀疏注意力（Two-Level Indexer Sparse Attention，论文显示名 LoDA-SA）：
 training-free 的长上下文 decode 稀疏方法——L1 块级粗筛（minmax 上界 + 近端均值双池）
-+ L2 token 级 4bit 细筛 + sink/swa 正交强制区，配 CUDA graph 化 e2e 部署。
++ L2 token 级共享子空间细筛 + sink/swa 正交强制区，配 CUDA graph 化 e2e 部署。
 
 **当前叙事与全部主表数字的唯一锚点：[`agent_doc/CURRENT_NARRATIVE.md`](agent_doc/CURRENT_NARRATIVE.md)**
 （生产口径 champion flags、跨模型族/跨规模加速比表、对比基线口径、
@@ -29,8 +29,18 @@ python -m benchmark.RULER.pred_ruler --method tli \
   --tli_near_pages 32 --tli_near_tokens off --tli_near_len 4096 \
   --tli_subspace tail --tia_level2_cmp_ratio 4 \
   --tli_sink_tokens 4 --tli_swa_size 128 \
-  --tia_level1_topk 128 --tia_level2_topk 1024
+  --tia_level1_topk 64 --tia_level2_topk 1024 \
+  --tli_enable_layer_skip false
 ```
 
 注意：`--tli_subspace`（默认 full）与 `--tia_level2_cmp_ratio`（默认 2）
 必须按上面显式传参，缺省会跑成非主表口径。
+
+LongBench 默认 `--prompt-mode full`：完整 prompt 一次 prefill，随后生成。
+复现历史逐 token 问题阶段用 `--prompt-mode split`。两者写入独立
+`_prompt_full` / `_prompt_split` 目录，manifest 绑定协议，评分器拒绝混合。
+新协议的任务质量需要重新测量，不能继承旧表。
+
+`4bit` 是旧 selector 分支名；当前默认 `--tli_l2_quant false`，不是 INT4 存储。
+`compact/evict` 混合缓存支持 Qwen3；其严格 far-off 支持集与 legacy gate
+不同，需要独立质量验证。旧 batch 路径不支持请求局部的动态 gate/static pair。
