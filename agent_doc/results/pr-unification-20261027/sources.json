@@ -1,0 +1,90 @@
+{
+  "main": "8f213e48926431ea2d56cf3e7bc1a667d1105c74",
+  "parent": "06e59d483b1a595cfad628d34c9b22fdc5449eee",
+  "prs": [
+    {
+      "number": 12,
+      "head": "5f6ab6776633868b3115e07d7f4f72ddf98034e8",
+      "title": "perf: five-round decode optimization with compact selections and batched hybrid attention",
+      "review_count": 0,
+      "disposition": "prefill logits objective covered by PR11; remaining geometry/selection/attention/generation integration deferred due overlapping cache lifetimes, token order and fused-path conflicts"
+    },
+    {
+      "number": 11,
+      "head": "dc5acb835f720a7704d4096807759a7943751d6d",
+      "title": "fix: batch state, prompt semantics and long-context logits (five-round audit)",
+      "review_count": 0,
+      "disposition": "integrated/adapted runtime and producer fixes; LongBench full/split identity change explicit"
+    },
+    {
+      "number": 10,
+      "head": "06e59d483b1a595cfad628d34c9b22fdc5449eee",
+      "title": "整合 far-skip GPU 融合与多 batch 混合 KV cache（替代 #7/#9）",
+      "review_count": 0,
+      "disposition": "integration target; all prior 06e59d4 work preserved"
+    },
+    {
+      "number": 9,
+      "head": "7e10bafd2eb5a4b91b7a5e10536084161e025158",
+      "title": "Support hybrid KV allocation, ragged batches and CUDA Graph decode",
+      "review_count": 0,
+      "disposition": "main already includes hybrid implementation; PR10 preserves later fused enhancements"
+    },
+    {
+      "number": 8,
+      "head": "9b17440e54b91774046e8e86f5f706a27bbc41c7",
+      "title": "Align manuscript with the selected pooled configuration and current evidence",
+      "review_count": 0,
+      "disposition": "deferred manuscript/figures: execution/quality identities and hybrid residency narrative require current evidence reconciliation"
+    },
+    {
+      "number": 7,
+      "head": "fc242e45070b71afe56c4d9521ef978f28020bfb",
+      "title": "perf: skip/non-skip GPU fusion, physical KV residency, eager/Graph paths",
+      "review_count": 0,
+      "disposition": "already integrated/superseded by PR10 follow-ups"
+    },
+    {
+      "number": 6,
+      "head": "962707d07b0e0682b2b0172c216b7c209b7cf596",
+      "title": "Reject invalid valid_length before index preparation",
+      "review_count": 0,
+      "disposition": "integrated valid_length rejection and compatible test fixtures"
+    },
+    {
+      "number": 5,
+      "head": "04c6e644518af98ac5cb7abe4fd371bb707fd977",
+      "title": "Design: make AsyncTLS comparisons reproducible and Graph-fair",
+      "review_count": 0,
+      "disposition": "historical comparison design retained, not implemented/validated experiment"
+    },
+    {
+      "number": 4,
+      "head": "a792f6926bc7ac47f15aee4395e643fa86f772eb",
+      "title": "Design: preserve prefill support and prioritize decode CUDA Graph + batching",
+      "review_count": 0,
+      "disposition": "historical design retained with explicit non-current banner; obsolete TG progress not overwritten"
+    },
+    {
+      "number": 3,
+      "head": "16afa58c2c436a74cea719da488127203f28f913",
+      "title": "Guard the active SparQ adapter and connect request route receipts",
+      "review_count": 0,
+      "disposition": "adapted missing install/context/identity guards; preserve main no-cache rebuild semantics"
+    },
+    {
+      "number": 2,
+      "head": "cbcb776dd1e922a91d8e4a6d7bd2012ac584ed4a",
+      "title": "Fix FASA batch mask lengths and exclude boolean-masked padding",
+      "review_count": 0,
+      "disposition": "integrated boolean FASA masking and flat batch length extraction"
+    },
+    {
+      "number": 1,
+      "head": "217d99bb5d9f3ed3340bbe63a6aa11c1cfd72d7f",
+      "title": "Guard TLI incremental caches and remove redundant preparation work",
+      "review_count": 0,
+      "disposition": "main already contains production fixes; retain/add regression coverage"
+    }
+  ]
+}

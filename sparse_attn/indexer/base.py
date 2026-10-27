@@ -1,4 +1,5 @@
 import torch
+from numbers import Integral
 from typing import Tuple, Dict, Any
 from .utils import prepare_pad_mask, pad_tensor
 from ..metrics import get_metrics
@@ -41,6 +42,14 @@ class Indexer:
         softmax_scale: float = None,
         valid_length: int = None,
     ) -> torch.Tensor:
+        # Fixed-capacity decode uses a host length for one nonempty request.
+        # Reject malformed metadata before slicing K or mutating index state.
+        if valid_length is not None:
+            if isinstance(valid_length, bool) or not isinstance(valid_length, Integral):
+                raise TypeError("valid_length must be an integer or None")
+            if not 1 <= valid_length <= k.shape[1]:
+                raise ValueError("valid_length must be within [1, K capacity]")
+            valid_length = int(valid_length)
         if softmax_scale is None:
             softmax_scale = q.shape[-1] ** -0.5
         # 【阶段 2a 固定宽度】valid_length：真实序列长（固定全宽 KV 下
@@ -96,3 +105,4 @@ class Indexer:
 
     def clear(self):
         pass
+

@@ -78,14 +78,19 @@ def _graph_const(key, build):
     return t
 
 
-def _batch_device_lengths(ctx, device):
-    """Upload once per step/device and share across layers in this request."""
-    key = (tuple(ctx.seq_lens), device)
+def _batch_device_lengths(ctx, dev):
+    """Refresh host lengths in place and share across layers of this request."""
+    lengths = tuple(ctx.seq_lens)
+    dev = torch.device(dev)
     cached = getattr(ctx, '_tli_lengths_cache', None)
-    if cached is None or cached[0] != key:
-        cached = (key, torch.tensor(ctx.seq_lens, dtype=torch.long, device=device))
-        ctx._tli_lengths_cache = cached
-    return cached[1]
+    if cached is None or cached[0].device != dev or cached[0].numel() != len(lengths):
+        value = torch.tensor(lengths, dtype=torch.long, device=dev)
+    else:
+        value, previous = cached
+        if previous != lengths:
+            value.copy_(torch.tensor(lengths, dtype=torch.long, device=dev))
+    ctx._tli_lengths_cache = (value, lengths)
+    return value
 
 
 def _parallel_batch_enabled(batch):
@@ -185,6 +190,13 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     A 逐行校验 cu[b]==b*T）。B==1 / block_size>1 保持逐行路径零扰动
     （gate_bs1_equiv 铁律：batch=1 与旧单序列入口逐位一致）。
     """
+    if (getattr(indexer, 'dyn_dgate', False) or getattr(indexer, 'static_pair', False)) and (
+            query_states.shape[0] != 1 or not _parallel_batch_enabled(1)):
+        raise ValueError(
+            'legacy batch decode cannot retain request-local prefill gate/pair state; '
+            'use compact/evict HybridBatchRunner or single-request non-batch decode')
+    from ..ops.cuda_graph_state import graph_state
+    _gs = graph_state()
     B = query_states.shape[0]
     q = query_states.transpose(1, 2)   # [B, 1, H, D]
     k = key_states.transpose(1, 2)     # [B, S_cap, Hkv, D]
@@ -201,8 +213,6 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     # 全走 tensor（valid_len_buf），无 Python int 烘焙。配置不支持
     # compute_mask_graph（非生产主配置）时 fail-closed 关 graph + 回 staged
     # 路径（capture 前的 warmup 阶段触发，之后两臂一致）。
-    from ..ops.cuda_graph_state import graph_state  # noqa: E402
-    _gs = graph_state()
     if _gs.enabled:
         try:
             return _tl_decode_batched_graph(self, indexer, q, k, v, _gs)

@@ -115,7 +115,7 @@ class SparQRequestLifecycle(unittest.TestCase):
         self.forward = load_wrapper()
 
     def call(self, attention, values, cache):
-        return self.forward(attention, values, (None, None), past_key_values=cache)[0]
+        return self.forward(attention, values, (None, None), past_key_values=cache, cache_position=torch.tensor([0]))[0]
 
     def values(self, length, offset):
         return torch.arange(length * 4, dtype=torch.float32).reshape(1, length, 4) / 16 + offset
@@ -200,13 +200,20 @@ class SparQRequestLifecycle(unittest.TestCase):
                 with NoHostScalar():
                     self.call(attn, self.values(1, 3), cache)
 
-    def test_no_cache_calls_rebuild_independent_values(self):
-        attn = Attention()
-        for offset in (10, -3, 2):
+    def test_no_cache_decode_rebuilds_instead_of_reusing_previous_mean(self):
+        attn, cache = Attention(), Cache()
+        self.call(attn, self.values(5, 20), cache)
+        self.call(attn, self.values(1, 21), cache)
+        for offset in (10, -5):
             values = self.values(1, offset)
-            self.call(attn, values, None)
-            torch.testing.assert_close(attn.sparq_vmean.V_mean, values.unsqueeze(1))
+            actual = self.call(attn, values, None)
+            fresh = Attention()
+            expected = self.call(fresh, values, None)
+            torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+            torch.testing.assert_close(attn.sparq_vmean.V_mean,
+                                       fresh.sparq_vmean.V_mean, rtol=0, atol=0)
             self.assertEqual(attn.sparq_vmean.n.item(), 1)
+        self.assertEqual(cache.v.shape[-2], 6)
 
     def test_owner_does_not_keep_cache_alive(self):
         attn, cache = Attention(), Cache()

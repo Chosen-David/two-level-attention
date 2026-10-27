@@ -153,7 +153,7 @@ def batch_valid_len_from_mask(mask):
         raise ValueError('batch_valid_len_from_mask expects a 4D mask')
     if mask.shape[1] != 1 or mask.shape[2] != 1:
         raise ValueError('batch_valid_len_from_mask expects q_len==1 mask')
-    row = mask[..., 0, :]  # [B, S]
+    row = mask[:, 0, 0, :]  # [B, S]; remove both singleton head/query axes
     if mask.dtype == torch.bool:
         return row.sum(dim=-1).tolist()
     # Additive attention masks use 0 for visible columns and a negative value

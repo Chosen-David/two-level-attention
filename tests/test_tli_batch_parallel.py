@@ -218,7 +218,8 @@ def test_length_upload_shared_across_layers_and_steps():
     assert _batch_device_lengths(ctx,torch.device('cpu')) is old
     ctx.seq_lens[0]+=1
     new=_batch_device_lengths(ctx,torch.device('cpu'))
-    assert new is not old and new.tolist()==[18,31] and old.tolist()==[17,31]
+    # PR11 refreshes the shared allocation in place, including existing aliases.
+    assert new is old and new.tolist()==[18,31]
 
 @pytest.mark.parametrize('subspace,l2',[('full','same'),('tail','full'),('rope','same'),('nope','full')])
 @torch.no_grad()

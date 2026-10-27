@@ -97,6 +97,8 @@ def parse_args(args=None):
         help="Algorithm config path",
     )
     parser.add_argument('--pred_postfix', type=str, default="")
+    parser.add_argument('--prompt-mode', choices=('full', 'split'), default='full',
+                        help='full: prefill the complete prompt; split: historical tokenwise question protocol')
     # 稀疏 prefill（用户 2026-10-08 指令，MoBA/NSA/DSA 口径）：设
     # TLI_SPARSE_PREFILL=1 环境变量（须在模型加载/patch 挂载前；patch 层
     # 逐 forward 读 env，此处 parse 后立即设置即可）。默认不传 = 0 =
@@ -217,11 +219,19 @@ def _drop_leading_bos(input_ids, bos_token_id):
 def _manual_generate(
     model, material_ids, question_ids, max_gen, eos_token_id, capture=None
 ):
-    """Existing LongBench greedy loop, instrumented only when capture is enabled."""
+    """Greedy decode with only the last-position logits when supported."""
+    import inspect
+    parameters = inspect.signature(getattr(model, 'forward', model)).parameters
+    logit_kwargs = {}
+    for name in ('logits_to_keep', 'num_logits_to_keep'):
+        if name in parameters:
+            logit_kwargs[name] = 1
+            break
     if type(max_gen) is not int or max_gen<1:raise ValueError('max_gen must be positive')
     if capture is not None:
         capture.generation_policy=dict(max_new_tokens=max_gen,eos_token_id=eos_token_id,decoding='greedy')
     def invoke(phase,**kwargs):
+        kwargs.update(logit_kwargs)
         return model(**kwargs) if capture is None else capture.call(phase,model,**kwargs)
     with torch.no_grad():
         if material_ids.shape[-1] > 0:
@@ -281,8 +291,11 @@ def get_pred(
     data_fp="",
     run_stats=None,  # 096：每样本实际输入 token 数 / 截断标记（run-cap manifest）
     paper_capture_mode="off",
+    prompt_mode="full",
 ):
     from sparse_attn.baseline_runtime import baseline_request
+    if prompt_mode not in ('full', 'split'):
+        raise ValueError('prompt_mode must be full or split')
     preds = []
 
     # DeepSeek-V2 兼容修复（S-T023 2026-10-12）：官方 modeling_deepseek.py
@@ -334,10 +347,12 @@ def get_pred(
             prompt = build_chat(tokenizer, prompt, model_name)
             chat_template_applied = True
 
-        # Split the prompt and question (simulate decoding in the question
-        # stage).  The helper also handles empty/short prompts without Python's
-        # negative-index fallback silently turning the question into one char.
-        prompt, question = _split_prompt_question(prompt, dataset)
+        # The historical split protocol simulates decoding in the question
+        # stage; the default prefills the complete prompt.
+        if prompt_mode == 'split':
+            prompt, question = _split_prompt_question(prompt, dataset)
+        else:
+            question = ''  # tokenize the full prompt once; no artificial BPE boundary
 
         if "chatglm3" in model_name:
             # input = prompt.to(device)
@@ -350,8 +365,8 @@ def get_pred(
             # 偏离官方单 BOS prompt。对 DeepSeek 模板渲染路径显式
             # add_special_tokens=False（与官方 apply_chat_template(tokenize=True)
             # 内部口径一致）；非模板路径（trec 等 5 任务）仍走默认调用保持单
-            # BOS；Qwen3 等其他模型（模板为无 BOS 的 f-string）逐位不变。
-            if chat_template_applied and IS_DSV2:
+            # BOS；Llama-3.1 手写模板同样自带 BOS。Qwen3 模板没有 BOS。
+            if chat_template_applied and (IS_DSV2 or 'Llama-3.1' in model_name):
                 input = tokenizer(
                     prompt, truncation=False, return_tensors="pt",
                     add_special_tokens=False,
@@ -476,6 +491,7 @@ def get_pred(
         metrics.clear()
 
         record = {
+            "prompt_mode": prompt_mode,
             "pred": pred,
             "answers": json_obj["answers"],
             "all_classes": json_obj["all_classes"],
@@ -837,6 +853,7 @@ if __name__ == "__main__":
         raise SystemExit(0)
     if args.paper_capture=='timing' and (not args.model or 'qwen3' not in args.model.lower() or args.task=='samsum'):
         raise ValueError('paper timing supports only Qwen3 manual path; rejected before model loading')
+    args.pred_postfix += f'_prompt_{args.prompt_mode}'
     seed_everything(42)
     # 稀疏 prefill 门控：在模型加载/patch 挂载前设置环境变量
     # （qwen3_attn_patch 逐 forward 读取；默认不设 = dense 逐位不变）
@@ -1022,6 +1039,7 @@ if __name__ == "__main__":
             max_new_tokens=max_gen,
             producer=resolve_producer_identity(__file__),
             input_identity=input_identity,
+            prompt_mode=args.prompt_mode,
         )
         # 103（TL-E096-CAP-GATE-TOCTOU-103，GPT 审计 2026-10-12_0739）：
         # gate 与发布间的跨进程独占锁（fcntl.flock，锁文件 = 输出目录下
@@ -1056,6 +1074,7 @@ if __name__ == "__main__":
                 data_fp=data_fp,
                 run_stats=run_stats,
                 paper_capture_mode=args.paper_capture,
+                prompt_mode=args.prompt_mode,
             )
             # 096：method_name/out_fn/out_path 计算块已上移至 get_pred 之前
             # （run-cap 写门早期 CAP-CLASH 检测，

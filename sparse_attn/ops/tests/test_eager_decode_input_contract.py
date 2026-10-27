@@ -39,7 +39,13 @@ class DecodeInputContractTest(unittest.TestCase):
             for args in invalid:
                 with self.subTest(fn=fn.__name__, shapes=[a.shape for a in args[:4]]):
                     with patch.object(torch, 'empty', side_effect=AssertionError('allocation')):
-                        with self.assertRaisesRegex(ValueError, 'single-query'):
+                        # The public dispatcher supports B>1 now. This case
+                        # has Q batch=2 but K/V batch=1, so the batch validator
+                        # must reject it; private B=1 consumers still reject
+                        # the single-query shape contract. Keep all inputs.
+                        message = ('batch decode' if fn is ed.eager_decoding_attn
+                                   and args[0].shape[0] != 1 else 'single-query')
+                        with self.assertRaisesRegex(ValueError, message):
                             fn(*args)
 
     def test_valid_shared_and_per_query_head_masks_preserved(self):
@@ -50,6 +56,20 @@ class DecodeInputContractTest(unittest.TestCase):
                 with self.subTest(fast=fast, rows=rows), patch.dict(
                         os.environ, {'TLI_E127_FAST': fast}):
                     torch.testing.assert_close(ed.eager_decoding_attn(*args), args[0])
+
+    def test_valid_batch_dispatch_matches_single_request_reference(self):
+        gen = torch.Generator().manual_seed(230610)
+        args = [torch.randn(2, 1, 2, 4, generator=gen),
+                torch.randn(2, 3, 1, 4, generator=gen),
+                torch.randn(2, 3, 1, 4, generator=gen),
+                torch.tensor([[[[True, False, True]]],
+                              [[[False, True, True]]]]),
+                1, torch.tensor([0, 3, 6])]
+        actual = ed.eager_decoding_attn(*args)
+        reference = torch.cat([ed.eager_decoding_attn(
+            *[x[b:b+1] for x in args[:4]], args[4], torch.tensor([0, 3]))
+            for b in range(2)])
+        torch.testing.assert_close(actual, reference, rtol=0, atol=0)
 
     def test_qk_width_mismatch_never_reaches_fused_launch(self):
         for width in (32, 128):
@@ -69,3 +89,4 @@ class DecodeInputContractTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

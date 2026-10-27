@@ -1,0 +1,49 @@
+.............................................................. [ 18%]
+......F.F...........................F......................................ssssss..................................... [ 52%]
+........................................................................ [ 74%]
+...........................ssssssssssss............................sssss [ 95%]
+s..........F....                                                         [100%]
+=================================== FAILURES ===================================
+___________ BaselineTests.test_sparq_invalid_installation_is_atomic ____________
+tests/test_baseline_integration.py:210: in test_sparq_invalid_installation_is_atomic
+    with self.assertRaises(ValueError):enable_sparq(model,**kwargs)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ValueError not raised
+_ BaselineTests.test_sparq_rejects_unsupported_decode_before_mutation (changes=('past_key_values',)) _
+tests/test_baseline_integration.py:196: in test_sparq_rejects_unsupported_decode_before_mutation
+    with self.assertRaises(ValueError):attn(**dict(base,**changes))
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ValueError not raised
+_ BaselineTests.test_sparq_rejects_unsupported_decode_before_mutation (changes=('use_cache',)) _
+tests/test_baseline_integration.py:198: in test_sparq_rejects_unsupported_decode_before_mutation
+    self.assertEqual(getattr(model,'_baseline_stats',{}),stats)
+E   AssertionError: {'native_prefill_calls': 2, 'sparq_decode_calls': 1} != {'native_prefill_calls': 2}
+E   - {'native_prefill_calls': 2, 'sparq_decode_calls': 1}
+E   + {'native_prefill_calls': 2}
+_____ BaselineTests.test_sparq_rejects_unsupported_decode_before_mutation ______
+ValueError: batch vendor sparse decode requires a 4D attention mask
+
+During handling of the above exception, another exception occurred:
+tests/test_baseline_integration.py:200: in test_sparq_rejects_unsupported_decode_before_mutation
+    with self.assertRaisesRegex(ValueError,'batched decode contexts'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: "batched decode contexts" does not match "batch vendor sparse decode requires a 4D attention mask"
+----------------------------- Captured stdout call -----------------------------
+uuuuuu
+_ SparQRequestLifecycle.test_no_cache_decode_is_rejected_without_mean_mutation _
+sparse_attn/ops/tests/test_sparq_request_lifecycle.py:206: in test_no_cache_decode_is_rejected_without_mean_mutation
+    with self.assertRaises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ValueError not raised
+______________ test_length_upload_shared_across_layers_and_steps _______________
+../candidate-geometry-cache-20261027/tests/test_tli_batch_parallel.py:221: in test_length_upload_shared_across_layers_and_steps
+    assert new is not old and new.tolist()==[18,31] and old.tolist()==[17,31]
+E   assert (tensor([18, 31]) is not tensor([18, 31]))
+=========================== short test summary info ============================
+FAILED tests/test_baseline_integration.py::BaselineTests::test_sparq_invalid_installation_is_atomic
+SUBFAILED(changes=('past_key_values',)) tests/test_baseline_integration.py::BaselineTests::test_sparq_rejects_unsupported_decode_before_mutation
+SUBFAILED(changes=('use_cache',)) tests/test_baseline_integration.py::BaselineTests::test_sparq_rejects_unsupported_decode_before_mutation
+FAILED tests/test_baseline_integration.py::BaselineTests::test_sparq_rejects_unsupported_decode_before_mutation
+FAILED sparse_attn/ops/tests/test_sparq_request_lifecycle.py::SparQRequestLifecycle::test_no_cache_decode_is_rejected_without_mean_mutation
+FAILED tests/test_tli_batch_parallel.py::test_length_upload_shared_across_layers_and_steps
+6 failed, 312 passed, 24 skipped, 178 subtests passed in 35.82s

@@ -141,6 +141,7 @@ def validate_runcap_sidecar(jsonl_path, legacy_allowed,
         if isinstance(input_identity.get("actual_input_ids"), dict) else {}
     return {
         "dataset": manifest["dataset"],
+        "prompt_mode": manifest.get('prompt_mode'),
         "cap_effective": manifest["effective_cap"],
         "cap_protocol": manifest["protocol_cap"],
         "cap_identity_hash": manifest["cap_identity"]["hash"],

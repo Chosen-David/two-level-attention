@@ -292,6 +292,15 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 ## 5. 已被推翻叙事索引（防误读核心——旧结论 → 推翻它的判决）
 
+**2026-10-27 统一审查入口**：[12 PR来源与冲突清单](results/pr-unification-20261027/validation.md)。保留main与既有融合；#8稿件/#12耦合运行时未强行覆盖。LongBench full/split明确分离，旧质量不可直接继承；无新增GPU收益结论。
+**2026-10-27 实现审查补充（非质量/性能新判决）**：
+[五轮运行链路审查](results/runtime-audit-20261027/README.md) 修复 batch
+live length、请求状态/错误回执与长 prompt logits 问题，并将 LongBench
+完整 prompt prefill 与历史 split 协议显式隔离。新协议、compact/evict
+与 legacy 的选择范围差异均需独立质量复验；本次 CPU 回归不继承旧表结论，
+CUDA 必跑门禁仍待有 GPU 环境验收。
+
+
 **2026-10-27 子空间 padding 实现补充（待 GPU 验证）**：
 [证据](results/subspace-pad-20261027/validation.md)：先选维再按原边界补零，
 消除统计前的全维 padding 临时量；MoBA 保留全维路径。201 CPU通过、

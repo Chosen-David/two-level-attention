@@ -72,6 +72,10 @@ def _qwen3_sparq_wrapper(
             past_key_values, cache_position, **kwargs,
         )
 
+    from sparse_attn.baseline_runtime import batch_decode_ctx
+    if batch_decode_ctx() is not None:
+        raise ValueError('SparQ adapter does not support batched decode contexts')
+
     # decode 侧守卫（0fd6cac 契约）：无掩码单序列 + use_cache 必真——
     # padding/自定义掩码下稀疏选择语义不成立，fail closed。仅 cache 非 None
     # 时生效：cache=None 是 B 轨文档化的 V-mean 重建路径（无历史可选，
@@ -180,8 +184,13 @@ def enable_sparq(
     if type(k) is not int or k <= 0 or type(context_length) is not int \
             or context_length <= 0:
         raise ValueError('SparQ k/context_length must be positive integers')
-    if any(hasattr(m, 'flash_forward') for m in model.modules()
-           if isinstance(m, Qwen3Attention)):
+    layers = [m for m in model.modules() if isinstance(m, Qwen3Attention)]
+    if not layers or len(layers) != model.config.num_hidden_layers:
+        raise ValueError('SparQ adapter supports complete Qwen3 attention models only')
+    ratio = context_length / (2 * k)
+    if any(max(1, round(m.head_dim / ratio)) > m.head_dim for m in layers):
+        raise ValueError('SparQ derived r exceeds head_dim; invalid k/context_length')
+    if any(hasattr(m, 'flash_forward') or hasattr(m, 'sparq_config') for m in layers):
         raise ValueError('SparQ already installed')
     n_patched = 0
     layer_id = 0
@@ -197,6 +206,7 @@ def enable_sparq(
                 layer_id += 1
                 module.sparq_r = max(1, round(module.head_dim / _ratio))
                 module.sparq_k = k
+                module._sparq_stats = stats
                 module.sparq_config = SparQArgs()
                 module.sparq_vmean = RunningVMean(
                     max_batch_size=1,
@@ -227,6 +237,8 @@ def enable_sparq(
             _P(__file__).read_bytes()).hexdigest(),
         upstream='official sparq_attention_official.py (md5 522a085c)',
         k=k, context_length=context_length,
+        r_by_head_dim={str(m.head_dim): m.sparq_r for m in layers},
+        comparison='Qwen3 adapter; cross-head union K unobserved',
         selection='per-query-head; running-V-mean compensation; full resident KV',
         gpu_quality_validated=False)
     return n_patched
