@@ -52,7 +52,20 @@ def _load_greedy_triton():
     return _GREEDY_TRITON_FN if _GREEDY_TRITON_FN else None
 
 
-_GRAPH_GEO_CACHE = {}  # step-level geometry cache (shared by 36 per-layer indexers)
+_GRAPH_GEO_CACHE = {}  # bounded fallback for callers without a BatchCtx
+
+
+def _graph_geo_cache():
+    from ..baseline_runtime import batch_decode_ctx
+    ctx = batch_decode_ctx()
+    if ctx is None:
+        return _GRAPH_GEO_CACHE, 9
+    cache = getattr(ctx, '_tli_graph_geo_cache', None)
+    if cache is None:
+        cache = ctx._tli_graph_geo_cache = {}
+    # Every row needs a slot until subsequent layers have consumed its geometry.
+    # Keeping these tensors on the request also releases them with its runner.
+    return cache, max(9, ctx.batch)
 
 
 def _graph_geo_lookup(valid_len, geo_key):
@@ -60,7 +73,8 @@ def _graph_geo_lookup(valid_len, geo_key):
         version = valid_len._version
     except RuntimeError:  # inference_mode tensors have no mutation counter
         return None
-    ent = _GRAPH_GEO_CACHE.get(valid_len.data_ptr())
+    cache, _ = _graph_geo_cache()
+    ent = cache.get(valid_len.data_ptr())
     if (ent is not None
             and ent[1] == version
             and ent[2] == geo_key):
@@ -73,9 +87,11 @@ def _graph_geo_store(valid_len, geo_key, geo):
         version = valid_len._version
     except RuntimeError:
         return geo  # Never reuse geometry without a reliable mutation version.
-    if len(_GRAPH_GEO_CACHE) > 8:   # 上限清理（B>1 行缓存 + 防无界增长）
-        _GRAPH_GEO_CACHE.clear()
-    _GRAPH_GEO_CACHE[valid_len.data_ptr()] = (
+    cache, capacity = _graph_geo_cache()
+    key = valid_len.data_ptr()
+    if key not in cache and len(cache) >= capacity:
+        cache.clear()
+    cache[key] = (
         valid_len, version, geo_key, geo)
     return geo
 
@@ -4043,7 +4059,7 @@ class TLIIndexer(TIAIndexer):
         内容 = 原 compute_mask_graph 段 1/2（动态几何/池掩码）+ 段 5 的
         bypass 槽构建 + 段 7/8 的 mid_mask/swa_force/k2_mid 逐字抽取。
         这些量是 valid_len 内容与配置常量的纯函数，与层无关 → 36 层共享
-        （模块级 _GRAPH_GEO_CACHE）。逐位一致性：kernel 序列与值逐字
+        （BatchCtx 请求缓存，无 context 时使用有界全局缓存）。逐位一致性：kernel 序列与值逐字
         未动，仅执行次数从 36 次/步降为 1 次/步（约 50 个小 kernel/层，
         E165 census：graph 8422 launches/步、均值 2.92us，launch 数受限）。
         """

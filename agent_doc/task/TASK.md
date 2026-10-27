@@ -2,6 +2,8 @@
 
 ## 2026-10-27
 
+- [ ] [TL-GEOMETRY-CACHE-20261027] 修复 B>=10 几何缓存逐层抖动，改为请求所有、容量匹配 batch；56 CPU通过/15 CUDA跳过，GPU收益待验。([详情](task_details/TL-GEOMETRY-CACHE-20261027.md))
+
 - [ ] [TL-SINGLE-OUTPUT-20261027] B1 hybrid attention 输出免singleton cat；16 CPU通过、8 CUDA跳过，GPU收益待验。([详情](task_details/TL-SINGLE-OUTPUT-20261027.md))
 
 - [ ] [TL-PREFILL-PAIR-TAIL-20261027] 静态子空间选维先取尾256行再转FP32；61 CPU通过、30 CUDA跳过，仅prefill可选路径，GPU收益待验。([详情](task_details/TL-PREFILL-PAIR-TAIL-20261027.md))
