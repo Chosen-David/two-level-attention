@@ -4918,12 +4918,13 @@ if _HAS_TRITON:
         offs_r = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_r = offs_r < R
+        cl = tl.load(CLEN + kv)
+        valid_r = mask_r & (offs_r < cl)
         cand = tl.load(CAND + kv * stride_ch + offs_r * stride_cr,
-                       mask=mask_r, other=0)                     # [BT] int64
+                       mask=valid_r, other=0)                    # [BT] int64
         k = tl.load(KQ + cand[:, None] * stride_kt + kv * stride_kh
                     + offs_d[None, :],
-                    mask=mask_r[:, None], other=0.0).to(tl.float32)   # [BT, D]
-        cl = tl.load(CLEN + kv)
+                    mask=valid_r[:, None], other=0.0).to(tl.float32)  # [BT, D]
         for j in tl.static_range(G):
             h = kv * G + j
             q = tl.load(Q + h * stride_qh + offs_d)              # [D] fp32

@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-28
+
+- [ ] [TL-CAND-LOAD-20261028] 候选打分跳过无效前缀尾部 CAND/K 读取；48 解释器逐位对拍、49 CPU通过，GPU验收待办。([详情](task_details/TL-CAND-LOAD-20261028.md))
+
 ## 2026-10-27
 
 - [ ] [TL-PR-UNIFY-20261027] 12个开放PR逐项核对；整合安全运行时修复，#8/#12明确待协调，GPU验收待办。([详情](task_details/TL-PR-UNIFY-20261027.md))

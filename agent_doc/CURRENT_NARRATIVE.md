@@ -355,3 +355,8 @@ Qwen为初始化收益候选，MLA eager仍每步全量重建，实际收益待�
   advice 报告与 superseded research 文档。
 - 对拍铁律：`exp/bench/test_e127_gates.py`（微逻辑回归门）+
   `exp/bench/test_tli_batch_gates.py` 每次改动后必须全绿。
+
+
+### 2026-10-28 候选无效槽访存待验
+
+PR10 后续候选仅收紧既有 fine kernel 的 CAND/K 读取 mask，保持 CLEN 输出语义；48 解释器逐位对拍、49 CPU通过，不是 GPU 加速或显存证据。详见 `agent_doc/results/candidate-load-20261028/validation.md`；远端 GPU 门禁待验，不更新论文性能数字。
