@@ -5,6 +5,11 @@ and indexer state belong to that request, not to the last prefilled batch row.
 The finished cache and its runner are immutable in layout: start a new builder
 and capture a new graph for a new batch. No rectangular full-history allocation
 is made for compact layers; each row owns either a ring or a linear buffer.
+
+add() consumes the caller's DynamicCache: once a layer's KV is copied into its
+destination storage the source tensors are dropped, so the build-time peak
+tracks max(source, destination) per layer instead of their sum. Callers must
+not reuse the prefill cache after add().
 """
 import copy
 import os
@@ -135,6 +140,10 @@ class HybridBatchCacheBuilder:
                         cache.batch_size, -1, -1, -1))
                 layer.keys[b:b+1, :, :length].copy_(source.keys)
                 layer.values[b:b+1, :, :length].copy_(source.values)
+            # The destination now owns this layer's history: drop the prefill
+            # source immediately so build peak is per-layer max(src, dst),
+            # not their sum (validation already ran on every layer above).
+            source.keys, source.values = None, None
             layer.cumulative_length = max(layer.cumulative_length, length)
         self.lengths.append(length)
 
