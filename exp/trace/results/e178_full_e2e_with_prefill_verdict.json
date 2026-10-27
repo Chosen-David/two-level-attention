@@ -1,0 +1,33 @@
+{
+  "experiment": "E178_full_e2e_with_prefill",
+  "date": "2026-10-27",
+  "model": "Qwen3-8B",
+  "machine": "pc33 (2x H20-3e, 144GiB each)",
+  "protocol": "e152v4_graph_latency.py, eager mode (SDPA dense prefill + sparse decode), 3 repeats median",
+  "note": "Graph mode failed warmup on this machine (compute_mask_graph gate). Numbers use eager baseline only. Graph-mode decode benefit is additive (see e172 for graph TPOT 3.63×@128K).",
+
+  "dense_eager": {
+    "32K":  {"prefill_ms": 7880, "tpot_ms": 130.9, "decode_wall_ms": 16633, "total_e2e_ms": 24512, "peak_mem_gib": 14.43},
+    "64K":  {"prefill_ms": 23056, "tpot_ms": 245.3, "decode_wall_ms": 31183, "total_e2e_ms": 44341, "peak_mem_gib": 28.87},
+    "128K": {"prefill_ms": 75405, "tpot_ms": 488.1, "decode_wall_ms": 61991, "total_e2e_ms": 137396, "peak_mem_gib": 57.74}
+  },
+  "tli_eager": {
+    "32K":  {"prefill_ms": 7883, "tpot_ms": 102.1, "decode_wall_ms": 13029, "total_e2e_ms": 20912, "peak_mem_gib": 13.80},
+    "64K":  {"prefill_ms": 23127, "tpot_ms": 102.7, "decode_wall_ms": 13047, "total_e2e_ms": 36174, "peak_mem_gib": 27.60},
+    "128K": {"prefill_ms": 75509, "tpot_ms": 132.2, "decode_wall_ms": 16793, "total_e2e_ms": 92302, "peak_mem_gib": 55.21}
+  },
+  "speedup": {
+    "tpot_only":   {"32K": 1.28, "64K": 2.39, "128K": 3.69},
+    "total_e2e":   {"32K": 1.17, "64K": 1.23, "128K": 1.49},
+    "prefill":     {"32K": 1.00, "64K": 1.00, "128K": 1.00},
+    "note_tpot_graph_estimate": "With CUDA Graph (e172): 128K TPOT = 18.5ms → 3.63× (vs dense eager 67.1ms or SDPA 488ms)"
+  },
+  "key_findings": [
+    "Prefill 两臂完全一致 (原生 SDPA dense) — TLI_SPARSE_PREFILL=0 协议正确",
+    "TLI eager TPOT 在 128K 比 dense 快 3.69× — 即使没有 CUDA Graph!",
+    "TLI TPOT 长度平坦化: 32K→128K 仅 +29.5% (102→132ms)",
+    "Dense TPOT 32K→128K: +273% (131→488ms)",
+    "E2E 加速比受 prefill 主导: 128K 下 prefill 占总 81.7%",
+    "显存: TLI 128K 55.2 GiB vs Dense 57.7 GiB (TLI 略低，因为紧凑路径)"
+  ]
+}

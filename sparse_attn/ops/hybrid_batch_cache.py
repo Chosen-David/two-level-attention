@@ -126,6 +126,8 @@ class HybridBatchCacheBuilder:
                     row.keys[..., :length, :].copy_(source.keys)
                     row.values[..., :length, :].copy_(source.values)
                     row.cumulative_length = length
+                    from .far_skip_workspace import FarSkipWorkspace
+                    row._linear_attention_workspace = FarSkipWorkspace()
                 layer.rows.append(row)
                 layer.indexers.append(row_idx)
                 if layer.cu is None:
@@ -152,15 +154,19 @@ class HybridBatchCacheBuilder:
         return self.cache
 
 
-def _attend_linear(q, k, v, mask, budget, scale):
+def _attend_linear(q, k, v, mask, budget, scale, workspace=None):
     """Fixed-size gather/SDPA, including short contexts; no nonzero/item sync."""
     h, length, d = k.shape[2], k.shape[1], k.shape[-1]
     count = min(length, budget)
     valid, positions = mask[0, 0].to(torch.int32).topk(count, dim=-1, sorted=False)
     valid = valid.bool()
-    heads = torch.arange(h, device=k.device)[:, None]
-    kk = k[0][positions, heads].masked_fill(~valid[..., None], 0)
-    vv = v[0][positions, heads].masked_fill(~valid[..., None], 0)
+    from .far_skip_accel import enabled, gather
+    if workspace is not None and enabled(k):
+        kk, vv = gather(k, positions, None, workspace, other=v, valid=valid)
+    else:
+        heads = torch.arange(h, device=k.device)[:, None]
+        kk = k[0][positions, heads].masked_fill(~valid[..., None], 0)
+        vv = v[0][positions, heads].masked_fill(~valid[..., None], 0)
     groups = q.shape[2] // h
     out = F.scaled_dot_product_attention(
         q[0, 0].reshape(h, 1, groups, d), kk[:, None], vv[:, None],
@@ -194,7 +200,8 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
                 index = idx.prepare_index(kk, layer.cu)
                 selection = idx.compute_mask_graph(qq, index, module.scaling, vl)
             budget = idx.args.tia_level2_topk + idx.sink_tokens + idx.sliding_window_size
-            out = _attend_linear(qq, kk, vv, selection, budget, module.scaling)
+            out = _attend_linear(qq, kk, vv, selection, budget, module.scaling,
+                                 row._linear_attention_workspace)
         outputs.append(out)
     return torch.cat(outputs, dim=0)
 
