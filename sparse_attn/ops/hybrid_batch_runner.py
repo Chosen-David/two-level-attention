@@ -1,7 +1,8 @@
 """Fixed-address eager/CUDA Graph driver for one immutable hybrid batch.
 
-Python controls EOS and validates append-only lengths before launching a step;
-all changing model inputs are device tensors. A new request batch always gets
+The manual inject/run API validates append-only lengths on the host. generate()
+keeps greedy tokens, EOS and mask updates on the device between polling points.
+A new request batch always gets
 a new runner, workspaces and graph (including when its shape matches the old).
 """
 from contextlib import contextmanager
@@ -33,6 +34,7 @@ class HybridBatchRunner:
         self.positions = torch.arange(self.capacity, device=device)
         cache._far_skip_attention_mask = self.mask
         self.graph = self.output = None
+        self.generation_graph = None
         self.injected = False
 
     @contextmanager
@@ -101,6 +103,90 @@ class HybridBatchRunner:
             return self.forward()
         self.graph.replay()
         return self.output
+
+    def generate(self, first_tokens, max_new_tokens, eos_ids=(), *, use_graph=False,
+                 poll_interval=16):
+        """Greedy continuation, including the prefill's first token in the result.
+
+        Owns this runner for one generation. Capture includes argmax, EOS and
+        next-step bookkeeping; replay never copies tokens through the CPU.
+        As in the RULER driver, EOS is honored from the second generated token.
+        """
+        if self.injected:
+            raise ValueError('generate requires a fresh runner')
+        if (type(max_new_tokens) is not int or max_new_tokens < 1
+                or type(poll_interval) is not int or poll_interval < 1):
+            raise ValueError('generation length and poll interval must be positive integers')
+        if max(self.ctx.seq_lens)+max_new_tokens-1 > self.capacity:
+            raise ValueError('generation exceeds cache capacity')
+        if use_graph and self.tokens.device.type != 'cuda':
+            raise ValueError('CUDA Graph capture requires a CUDA device')
+        first = torch.as_tensor(first_tokens, device=self.tokens.device, dtype=torch.long)
+        if first.shape != (self.batch,):
+            raise ValueError('one first token is required per batch row')
+        if max_new_tokens == 1:
+            return first[:, None].tolist()
+        self.inject(first, [length+1 for length in self.ctx.seq_lens])
+        generated = torch.full((self.batch, max_new_tokens), self.ctx.pad_id,
+                               dtype=torch.long, device=self.tokens.device)
+        generated[:, 0].copy_(first)
+        counts = torch.ones_like(self.lengths)
+        step = torch.ones(1, dtype=torch.long, device=self.tokens.device)
+        eos = torch.tensor(tuple(eos_ids), dtype=torch.long, device=self.tokens.device)
+
+        def advance():
+            predicted = self.forward().logits[:, -1].argmax(-1)
+            generated.index_copy_(1, step, torch.where(
+                self.alive, predicted, self.ctx.pad_id)[:, None])
+            counts.add_(self.alive)
+            continuing = self.alive & ~(predicted[:, None] == eos).any(-1)
+            # No next input is needed after the last output. In particular,
+            # never scatter a mask column beyond an exactly filled cache.
+            append = continuing & (step[0]+1 < max_new_tokens)
+            self.tokens.copy_(torch.where(continuing, predicted, self.ctx.pad_id)[:, None])
+            self.lengths.add_(append)
+            self.pos.copy_(self.lengths-1)
+            self.mask.scatter_(-1, self.pos[:, None, None, None], 0)
+            self.alive.copy_(continuing)
+            step.add_(1)
+
+        if use_graph:
+            stream = torch.cuda.Stream(device=self.tokens.device)
+            stream.wait_stream(torch.cuda.current_stream(self.tokens.device))
+            with torch.cuda.stream(stream):
+                # Warm up at the same input position: never advance ring KV
+                # into future slots and then rewind only the scalar lengths.
+                for _ in range(2):
+                    self.forward()
+            torch.cuda.current_stream(self.tokens.device).wait_stream(stream)
+            inputs = (self.tokens, self.lengths, self.pos, self.alive, self.mask)
+            saved = [value.clone() for value in inputs]
+            graph = torch.cuda.CUDAGraph()
+            with decode_geometry_scope(), torch.cuda.graph(graph):
+                advance()
+            for value, initial in zip(inputs, saved):
+                value.copy_(initial)
+            generated.fill_(self.ctx.pad_id)
+            generated[:, 0].copy_(first)
+            counts.fill_(1)
+            step.fill_(1)
+            self.generation_graph = graph
+        for n in range(max_new_tokens-1):
+            if self.generation_graph is None:
+                advance()
+            else:
+                self.generation_graph.replay()
+            if (n+1) % poll_interval == 0 and not bool(self.alive.any()):
+                break
+        # Keep tensors referenced for captured-address lifetime, even after
+        # returning Python results. No host conversion occurs per token.
+        self._generation_buffers = (generated, counts, step, eos)
+        result, sizes = generated.tolist(), counts.tolist()
+        self.ctx.seq_lens[:] = self.lengths.tolist()
+        self.ctx.gen_lens[:] = [length-prompt for length, prompt in
+                               zip(self.ctx.seq_lens, self.cache._hybrid_lengths)]
+        self.ctx.alive[:] = self.alive.tolist()
+        return [row[:size] for row, size in zip(result, sizes)]
 
     def kv_storage_bytes(self):
         return sum(t.numel()*t.element_size()
