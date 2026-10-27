@@ -212,7 +212,7 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
             out = _attend_linear(qq, kk, vv, selection, budget, module.scaling,
                                  row._linear_attention_workspace)
         outputs.append(out)
-    return torch.cat(outputs, dim=0)
+    return outputs[0] if len(outputs) == 1 else torch.cat(outputs, dim=0)
 
 
 def write_hybrid_row(row, k, v, position, alive):

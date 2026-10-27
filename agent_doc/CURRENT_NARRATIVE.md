@@ -292,6 +292,8 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 ## 5. 已被推翻叙事索引（防误读核心——旧结论 → 推翻它的判决）
 
+2026-10-27 输出组装复核：B1 hybrid decode 的唯一attention输出仍经cat复制；PR #10 直接复用输出，B>1保持原路径。16 CPU通过/8 CUDA跳过，未测GPU速度；EOS行selector/attention仍执行。见 `agent_doc/results/single-output-20261027/validation.md`。
+
 2026-10-27 prefill 选维复核：static_pair 可选路径此前将全长 Q 转FP32后只用尾256行；PR #10 改为先切片再转换，精确选维及请求重置CPU通过。61 CPU/30 CUDA跳过；仅消除标定临时转换，不代表decode加速或KV节省，动态gate展开尚未优化。见 `agent_doc/results/prefill-tail-20261027/validation.md`。
 
 2026-10-27 workspace 容量复核：此前 linear gather 的4.52MiB是有效数据量，几何扩容后的底层缓冲实际8MiB；PR #10 对固定形状 cat/scratch 改为按需分配，CPU存储配对8→4.515625MiB，GPU allocator/峰值/速度未测。见 `agent_doc/results/workspace-capacity-20261027/validation.md`。
