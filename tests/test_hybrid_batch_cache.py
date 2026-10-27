@@ -162,6 +162,11 @@ def test_storage_is_row_specific_and_prefill_history_is_released():
         dyn = prefill(model, length)
         sources.extend(weakref.ref(layer.keys) for layer in dyn.layers)
         builder.add(dyn, length)
+        # add() itself consumes the source: each layer's prefill KV must be
+        # dropped as soon as it is copied, before the caller releases dyn.
+        gc.collect()
+        assert all(source() is None for source in sources), (
+            'add() must release consumed prefill KV layer by layer')
         del dyn
     runner = HybridBatchRunner(model, builder.finish())
     gc.collect()

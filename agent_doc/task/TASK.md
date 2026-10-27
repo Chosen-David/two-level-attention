@@ -2,6 +2,8 @@
 
 ## 2026-10-27
 
+- [ ] [TL-PREFILL-PAIR-TAIL-20261027] 静态子空间选维先取尾256行再转FP32；61 CPU通过、30 CUDA跳过，仅prefill可选路径，GPU收益待验。([详情](task_details/TL-PREFILL-PAIR-TAIL-20261027.md))
+
 - [ ] [TL-WORKSPACE-CAPACITY-20261027] 固定形状 workspace 按需分配，纠正 payload/底层容量混淆；64 CPU通过、9 CUDA跳过，GPU显存/性能待验。([详情](task_details/TL-WORKSPACE-CAPACITY-20261027.md))
 
 - [ ] [TL-INCREMENTAL-MASK-20261027] main hybrid inject 全宽 mask 重建改为首步初始化+逐行单槽更新；19 CPU通过，12 CUDA跳过，GPU收益待验。([详情](task_details/TL-INCREMENTAL-MASK-20261027.md))

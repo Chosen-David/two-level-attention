@@ -70,3 +70,23 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest \
 ```
 
 大 BS 功能支持不等于吞吐验证：当前 attention/index 操作仍逐行，graph 批量记录；没有 GPU latency、显存峰值、真实模型质量的新结论。GPU 上应先跑新 CUDA 测试和硬门，再用相同 RULER 参数对拍 `TLI_CUDA_GRAPH=0/1`，覆盖 BS=1/2/8/32 与 32K/64K/128K。
+
+## GPU 验收补记（2026-10-27，pc31 H20-3e）
+
+本节补齐上文欠账的两项 GPU 硬门与 CUDA 用例。载体：**精确推送物**
+（17e56e8 + 当日 in-place 修复 add() 逐层释放源 KV，隔离 worktree），
+tar 部署于 pc02 `~/wt_hybrid_gpu`（H20-3e），未触碰宿主仓库与 shadow 包；
+双卡空闲窗口执行，无并发污染。同套用例另在 pc31 先行复跑一轮，结果一致。
+
+- hybrid 全套测试（含 CUDA 用例 BS=2/8/32 × float32/float16、整模型 capture、
+  38 步 replay、EOS 冻结、固定地址、第二 batch 重新 capture、graph/eager 对拍）：
+  **34/34 PASS**。
+- E127 优化门禁（含 `tli_layer_skip_mask.json` 完整 079 门控）：**15/15 PASS**。
+- tli_batch 门禁：**59/59 PASS**。
+- 同日修复：`HybridBatchCacheBuilder.add()` 逐层消费源 DynamicCache（拷入即释放），
+  构建期峰值从 `Σ源+Σ目的` 压到逐层 `max(源,目的)`；`test_storage_is_row_specific_
+  and_prefill_history_is_released` 加严为 add() 返回即释放断言。
+
+仍未闭合（如实声明）：真实大模型 TPOT / 显存峰值实测；70% skip 比率的 RULER
+质量门（三方：dense / 70% hybrid / 全层紧凑）；每批重 capture 成本。闭合前
+"稳态 KV 节省"不得引用为峰值显存降幅或质量无损结论。

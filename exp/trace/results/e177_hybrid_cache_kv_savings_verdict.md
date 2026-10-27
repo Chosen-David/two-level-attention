@@ -8,6 +8,15 @@
 > 不作为显存实测。70% 是人为输入，`int(36*0.7)=25` 层，非 per-prompt gate 观测。
 > 公式不含 prefill/cache/output 引用、子空间摘要、Graph workspace/pool 与 decode 预留；
 > 模型质量及真实 gate 分布必须另验。历史 TPOT 也不是本 hybrid 实现的配对结果。
+>
+> 【2026-10-27 口径限定（审计补记）】本判决 §1 为**公式核算**（按 ring 容量
+> 公式推 bytes），非设备实测；数值是**decode 稳态 KV 存储占用**口径——
+> prefill 期完整 dense DynamicCache 峰值需求仍在，"节省 67%"**不可当作
+> 总显存峰值降幅引用**。线性（非 skip）层按 capacity 全宽分配，实际节省
+> 随 capacity 与请求长度的差值缩水。**70% skip 比率无任何 RULER 质量门
+> 支撑**：skip 层 far 历史不可逆驱逐，质量边界未知——对外引用前必须先补
+> 三方质量门（dense / 70% hybrid / 全层紧凑）。§2/§3 主表与加速数字为
+> 独立口径（iter3 链 + E172-E174），与本节 HybridCache 无耦合。
 
 ## 1. KV Cache 容量估算（非 CUDA 显存实测）
 
@@ -79,13 +88,40 @@
 ## 4. 论文视角一句话总结
 
 > LoDA-SA（TLI）在 128K decode 上实现 **3.0-3.6× e2e 加速**（vs dense），
-> 算子级优化贡献 24-40% TPOT 下降，HybridCache 在假设 25/36 层 skip 下预计减少 **67% KV 容量**（未测 CUDA allocator），
-> 且 decode 成本与上下文长度解耦（4× 上下文仅 +3-4% 成本）。
+> 算子级优化贡献 24-40% TPOT 下降，HybridCache 在 decode 稳态节省 **至多
+> 67% KV 存储**（公式口径，假设25/36层skip、质量门未测），且 decode 成本与
+> 上下文长度解耦（4× 上下文仅 +3-4% 成本）。
+> 【引用纪律】"67% 稳态 KV 节省"带三个限定：稳态非峰值 / 公式非实测 /
+> 无质量门。三者任一未闭合前不得进论文正文。
 
-## 5. 合入状态
+## 5. 合入状态与后续修复记录
 
-- ✅ `codex/far-skip-hybrid-cache-20261026` cherry-pick 到 `perf/hybrid-cache-merge`
+- ✅ `codex/far-skip-hybrid-cache-20261026` cherry-pick 到 `perf/hybrid-cache-merge`，
+  已随 `6c559c1` + `b0a378c` 合入 main
 - ✅ 新增 `hybrid_batch_cache.py` + `hybrid_batch_runner.py`
 - ✅ 测试 34/34 全过（18 hybrid_batch + 16 far_skip_hybrid）
 - ✅ 回归测试 18/18 全过
-- ⏳ 待 merge 到 main + 更新 CURRENT_NARRATIVE
+
+### 5.1 2026-10-27 in-place 修复（本判决同日审计后落地）
+
+- **构建期峰值显存**：`HybridBatchCacheBuilder.add()` 现逐层消费源
+  DynamicCache（每层拷入目的地后立即置空源 KV），构建峰值从
+  `Σ源+Σ目的` 压到逐层 `max(源,目的)`；新增测试断言 add() 返回时
+  源 KV 已释放（不等调用方 del）。CPU 34/34 + 回归 58/178 subtests
+  全绿；行为对拍无扰动。
+- **GPU 验收欠账闭合（原 validation.md 未闭合项，本日补齐）**：
+  验证基座 = **本修复的精确推送物**（17e56e8 + 本修复，隔离 worktree，
+  tar 部署 pc02 `~/wt_hybrid_gpu`，双卡空闲窗口，不触碰宿主仓库/shadow；
+  另在 pc31 上以同套用例先行复跑过一轮，结果一致）：
+  - hybrid 全套含 CUDA 用例：**34/34 PASS**（含 batch∈{2,8,32}×
+    fp32/fp16 真实整模型 capture、38 步 replay、EOS 冻结、第二请求
+    重新 capture、graph/eager 逐 token 对拍 rtol≤3e-3）
+  - E127 硬门（含 tli_layer_skip_mask.json 完整 079 门控）：
+    **15/15 PASS**
+  - tli_batch 硬门：**59/59 PASS**
+  仍未闭合（如实声明）：真机大模型 TPOT/显存峰值实测、RULER 质量
+  门——见下条。
+- **已知未修（留用户/后续实验）**：①70% skip 比率质量门（最高优先，
+  三方 RULER：dense/70%/全紧凑）；②批 decode 行串行（TPOT∝B，跨行
+  融合=独立实验系列）；③每批重 capture 成本未测量；④70% 与 100%
+  （e163 全紧凑 25×）之间的显存-质量边界未标定。

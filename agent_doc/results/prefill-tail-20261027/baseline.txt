@@ -1,0 +1,12 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_ test_exact_selection_copy_scope_and_request_reset[shape_layout5-dtype1-cpu] __
+tests/test_prefill_pair_tail.py:74: in test_exact_selection_copy_scope_and_request_reset
+    assert cast.shapes == [(b, 4, min(s, 256), 128)]
+E   assert [(1, 4, 4097, 128)] == [(1, 4, 256, 128)]
+E     
+E     At index 0 diff: (1, 4, 4097, 128) != (1, 4, 256, 128)
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/test_prefill_pair_tail.py::test_exact_selection_copy_scope_and_request_reset[shape_layout5-dtype1-cpu]
+1 failed, 35 deselected in 0.12s

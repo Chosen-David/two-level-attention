@@ -493,7 +493,9 @@ class TLIIndexer(TIAIndexer):
         """
         if self._pair_idx is not None or not self.static_pair:
             return
-        qm = q.detach().float()[:, :, -256:].reshape(-1, q.shape[-1]).abs().mean(0)  # [128]
+        # Slice before casting: only the tail participates in pair selection.
+        # Avoid an O(B*H*S*D) FP32 copy of the discarded prompt prefix.
+        qm = q.detach()[:, :, -256:].float().reshape(-1, q.shape[-1]).abs().mean(0)  # [128]
         pair_mag = qm[:64] + qm[64:]                     # [64]（频率 j）
         top_pairs = torch.topk(pair_mag, 16).indices     # 频率 j
         self._pair_idx = torch.cat([top_pairs, top_pairs + 64]).sort().values.to(q.device)
