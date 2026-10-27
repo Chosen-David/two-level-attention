@@ -56,6 +56,20 @@ def write_pair(k, v, new_k, new_v, position, layout, *, alive=None):
         tensor_position, alive is not None, 256, num_warps=4)
 
 
+def project_token(k, out, dims, position, layout):
+    """Unquantized [1,S,H,D] -> existing [H,S,d] ring; no temporary storage.
+
+    Shapes/dimensions belong to a setup-validated FarSkipFineCache. Position may
+    be a host integer (staged eager) or one device int64 (capture/replay).
+    """
+    h, _, d = out.shape
+    if h and d:
+        kernels().project_token[((h*d+255)//256,)](
+            k, out, dims, position, h, d, *k.stride()[1:], *out.stride(),
+            dims.stride(0), layout.sink, layout.tail_capacity,
+            isinstance(position, torch.Tensor), 256, num_warps=4)
+
+
 def gather(data, positions, layout, workspace, *, dims=None, valid=None, other=None):
     """Read [1,S,H,D] into [H,N,d], optionally K and V in one launch.
 

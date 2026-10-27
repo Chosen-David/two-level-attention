@@ -47,6 +47,11 @@ class FarSkipFineCache:
         if self.last_length != length-1:
             self.initialize(k, length)
             return
+        from .far_skip_accel import enabled, project_token
+        if not self.cfg.quantize and enabled(k):
+            project_token(k, self.keys, self.dims, length-1, self.layout)
+            self.last_length = length
+            return
         slot = self.layout.slot(length-1)
         values = k[0, slot].index_select(-1, self.dims)
         self.keys[:, slot].copy_(self._encode(values))
@@ -55,6 +60,10 @@ class FarSkipFineCache:
     def update_tensor(self, k, position):
         # Graph warmup/capture may overwrite the same current token. Refresh
         # that projection on every execution; no Python length state is used.
+        from .far_skip_accel import enabled, project_token
+        if not self.cfg.quantize and enabled(k):
+            project_token(k, self.keys, self.dims, position, self.layout)
+            return
         physical = self.layout.map(position)
         values = k[0][physical[None, :, None], self.heads[:, None, None], self.dims]
         self.keys.index_copy_(1, physical, self._encode(values))

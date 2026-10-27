@@ -19,6 +19,15 @@ def main():
     rows = []
     for arch in opts.arch:
         cases = []
+        for dtype in ('fp32', 'fp16', 'bf16'):
+            for position_type in ('i32', 'i64', '*i64'):
+                cases.append((kernels.project_token,
+                    {'K': '*'+dtype, 'Out': '*'+dtype, 'Dims': '*i64',
+                     'Position': position_type},
+                    dict(H=8, D=32, K_S=128, K_H=4291*128, K_D=1,
+                         O_H=4291*32, O_S=32, O_D=1, DIM_STRIDE=1,
+                         SINK=4, TAIL=4287,
+                         TENSOR_POSITION=position_type.startswith('*'), BLOCK=256)))
         for position_type in ('i32', 'i64', '*i64'):
             for ring, masked in ((True, False), (True, True), (False, True)):
                 cases.append((kernels.write_pair,

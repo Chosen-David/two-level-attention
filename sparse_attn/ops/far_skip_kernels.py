@@ -8,6 +8,25 @@ import triton.language as tl
 
 
 @triton.jit(do_not_specialize=['Position'])
+def project_token(K, Out, Dims, Position,
+                  H: tl.constexpr, D: tl.constexpr,
+                  K_S: tl.constexpr, K_H: tl.constexpr, K_D: tl.constexpr,
+                  O_H: tl.constexpr, O_S: tl.constexpr, O_D: tl.constexpr,
+                  DIM_STRIDE: tl.constexpr, SINK: tl.constexpr, TAIL: tl.constexpr,
+                  TENSOR_POSITION: tl.constexpr, BLOCK: tl.constexpr):
+    """Copy one token's selected dimensions directly to its projected ring slot."""
+    position = tl.load(Position) if TENSOR_POSITION else Position
+    slot = tl.where(position < SINK, position,
+                    SINK + tl.maximum(position-SINK, 0) % TAIL)
+    x = tl.program_id(0)*BLOCK + tl.arange(0, BLOCK)
+    h, d = x // D, x % D
+    keep = h < H
+    dim = tl.load(Dims + d*DIM_STRIDE, keep, 0)
+    value = tl.load(K + slot*K_S + h*K_H + dim*K_D, keep, 0)
+    tl.store(Out + h*O_H + slot*O_S + d*O_D, value, keep)
+
+
+@triton.jit(do_not_specialize=['Position'])
 def write_pair(K, V, NewK, NewV, Position, Alive, H: tl.constexpr, D: tl.constexpr,
                K_H: tl.constexpr, K_S: tl.constexpr, K_D: tl.constexpr,
                V_H: tl.constexpr, V_S: tl.constexpr, V_D: tl.constexpr,

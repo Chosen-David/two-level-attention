@@ -2,6 +2,8 @@
 
 ## 2026-10-27
 
+- [ ] [TL-PROJECTION-WRITE-20261027] main17e56e8 compact 子空间投影直写融合，eager/Graph 共用原缓存；44 CPU/12 解释器用例通过，48 CUDA 专化离线编译，GPU 性能待验。([详情](task_details/TL-PROJECTION-WRITE-20261027.md))
+
 - [ ] [TL-LINEAR-GATHER-20261027] main17e56e8 linear attention 复用双路 gather GPU kernel，保留 mask/topk/SDPA 顺序；CPU/解释器通过，GPU 与端到端待验。([详情](task_details/TL-LINEAR-GATHER-20261027.md))
 
 - [ ] [TL-HYBRID-WRITE-20261027] 实质分析 main b0a378c；复用 GPU kernel 融合混合 ring/linear 的 EOS 安全 KV 写入，更新 PR #10 并标清 E177 容量估算。CPU/解释器及离线编译通过，GPU/e2e 待验。([详情](task_details/TL-HYBRID-WRITE-20261027.md))
