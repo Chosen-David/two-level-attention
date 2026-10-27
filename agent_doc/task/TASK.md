@@ -2,6 +2,8 @@
 
 ## 2026-10-27
 
+- [ ] [TL-WORKSPACE-CAPACITY-20261027] 固定形状 workspace 按需分配，纠正 payload/底层容量混淆；64 CPU通过、9 CUDA跳过，GPU显存/性能待验。([详情](task_details/TL-WORKSPACE-CAPACITY-20261027.md))
+
 - [ ] [TL-INCREMENTAL-MASK-20261027] main hybrid inject 全宽 mask 重建改为首步初始化+逐行单槽更新；19 CPU通过，12 CUDA跳过，GPU收益待验。([详情](task_details/TL-INCREMENTAL-MASK-20261027.md))
 
 - [ ] [TL-PROJECTION-WRITE-20261027] main17e56e8 compact 子空间投影直写融合，eager/Graph 共用原缓存；44 CPU/12 解释器用例通过，48 CUDA 专化离线编译，GPU 性能待验。([详情](task_details/TL-PROJECTION-WRITE-20261027.md))

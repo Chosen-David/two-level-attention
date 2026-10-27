@@ -27,7 +27,7 @@ def main():
         mask=torch.zeros(1,1,8,length,device='cuda',dtype=torch.bool)
         mask[..., :min(1024,length)]=True
         for execution in ('eager','graph'):
-            ws=FarSkipWorkspace(); graphs={}; funcs={}
+            ws=FarSkipWorkspace(fixed_shapes=True); graphs={}; funcs={}
             def call(mode): return _attend_linear(q,k,v,mask,1156,128**-.5,ws if mode=='fused' else None)
             torch.testing.assert_close(call('fused'),call('torch'),rtol=0,atol=0)
             for mode in ('torch','fused'):

@@ -28,7 +28,7 @@ def test_linear_gather_matches_original_order_padding_and_strides(device, length
     k = torch.randn(1, 2, length, 16, device=device, dtype=dtype).transpose(1, 2)
     v = torch.randn(1, length, 2, 32, device=device, dtype=dtype)[..., ::2]
     mask = torch.zeros(1, 1, 2, length, device=device, dtype=torch.bool)
-    workspace = FarSkipWorkspace()
+    workspace = FarSkipWorkspace(fixed_shapes=True)
     monkeypatch.setattr(accel, 'enabled', lambda _: True)
     pointers = None
     for count in (0, 1, min(4, length), length):
@@ -56,7 +56,7 @@ def test_cuda_linear_capture_reuses_buffers_and_changes_mask(monkeypatch):
         q = torch.randn(1, 1, 4, 128, device='cuda', dtype=torch.bfloat16)
         k, v = [torch.randn(1, length, 2, 128, device='cuda', dtype=torch.bfloat16) for _ in range(2)]
         mask = torch.ones(1, 1, 2, length, device='cuda', dtype=torch.bool)
-        workspace = FarSkipWorkspace()
+        workspace = FarSkipWorkspace(fixed_shapes=True)
         def run():
             return _attend_linear(q, k, v, mask, 33, 128**-.5, workspace)
         stream = torch.cuda.Stream(); stream.wait_stream(torch.cuda.current_stream())

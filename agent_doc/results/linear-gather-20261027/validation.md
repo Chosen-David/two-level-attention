@@ -1,3 +1,5 @@
+> Correction 2026-10-27: the 4,734,976-byte figure below is payload, not the old backing-storage bound. Geometric rounding allocated 8,388,608 bytes. Fixed-shape allocation now removes that slack; see ../workspace-capacity-20261027/validation.md. No GPU allocator measurement is implied.
+
 # Linear gather audit — 2026-10-27
 
 Main 17e56e8fe30cf8037caf3ce7b38040e754f0521e; prior PR10 b2463d4.

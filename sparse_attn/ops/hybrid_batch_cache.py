@@ -127,7 +127,7 @@ class HybridBatchCacheBuilder:
                     row.values[..., :length, :].copy_(source.values)
                     row.cumulative_length = length
                     from .far_skip_workspace import FarSkipWorkspace
-                    row._linear_attention_workspace = FarSkipWorkspace()
+                    row._linear_attention_workspace = FarSkipWorkspace(fixed_shapes=True)
                 layer.rows.append(row)
                 layer.indexers.append(row_idx)
                 if layer.cu is None:

@@ -292,6 +292,8 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 ## 5. 已被推翻叙事索引（防误读核心——旧结论 → 推翻它的判决）
 
+2026-10-27 workspace 容量复核：此前 linear gather 的4.52MiB是有效数据量，几何扩容后的底层缓冲实际8MiB；PR #10 对固定形状 cat/scratch 改为按需分配，CPU存储配对8→4.515625MiB，GPU allocator/峰值/速度未测。见 `agent_doc/results/workspace-capacity-20261027/validation.md`。
+
 2026-10-27 runner 输入维护复核：main hybrid inject 在 Graph 外每步重建全宽 causal mask；PR #10 根据既有 append-only/EOS 约束改为首步完整初始化、后续每行单槽更新，保留 dense 层所需形状和地址。19 CPU通过、12 CUDA跳过；无 GPU 提速结论。见 `agent_doc/results/incremental-mask-20261027/validation.md`。
 
 2026-10-27 子空间维护复核：main17e56e8 compact ring 的未量化投影仍先 gather 再 copy；PR #10 增加可选 GPU 直写原投影缓存，覆盖 eager/Graph，不增 scratch。量化分支和 linear iter3 不变；CPU/解释器及离线编译通过，无 GPU 加速、显存或质量判决。见 `agent_doc/results/projection-write-20261027/validation.md`。

@@ -19,7 +19,7 @@ class FarSkipGraphWorkspace:
         self.cfg, self.layout, self.heads = cfg, layout, heads
         self.shared_dims = same_dimensions(coarse_dims, fine_dims)
         self.coarse, self.fine = coarse_dims.clone(), fine_dims.clone()
-        self.ws = FarSkipWorkspace()
+        self.ws = FarSkipWorkspace(fixed_shapes=True)
         self.device = coarse_dims.device
         self.page_capacity = (max(cfg.near_length, cfg.block_size) + cfg.block_size - 1) // cfg.block_size
         self.page_count = min(cfg.near_pages, self.page_capacity)
