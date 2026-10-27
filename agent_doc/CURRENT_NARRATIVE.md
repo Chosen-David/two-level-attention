@@ -45,17 +45,21 @@ champion flags = K1=64）。
 统一口径：整步 CUDA graph 化 TLI decode vs dense eager decode，
 TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
 
+> **【2026-10-27 刷新】下表已从 K1=128/iter2 口径切换为 K1=64/iter3 口径**
+>（E172/E173/E174 三模型族判决）。iter22 旧口径段落保留在文档下方作历史参考。
+
 | 模型 | 32K | 64K | 128K | 判决文件 |
 |---|---|---|---|---|
-| Qwen3-8B | 1.064× | 1.448× | 2.067× | `e152v4_formal_verdict.json` |
-| Llama-3.1-8B | 1.015× | 1.410× | 1.961× | `e159_llama_e2e_latency_verdict.json` |
-| Qwen3-32B | 1.015× | 1.338× | 1.841× | `e160_32b_e2e_latency_verdict.json` + `e160b_128k_expandable_verdict.json`（128K 行） |
+| Qwen3-8B | **1.451×** | **2.216×** | **3.636×** | `e172_iter3_k64_qwen_verdict.json` |
+| Llama-3.1-8B | **1.428×** | **2.192×** | **3.643×** | `e173_iter3_k64_llama_verdict.json` |
+| Qwen3-32B | **1.338×** | **1.924×** | **3.015×** | `e174_iter3_k64_32b_verdict.json` |
 
-- **加速比随上下文单调增长**是核心跨模型族/跨规模形态（三家一致）；
-  32K 打平 = decode 稳态 launch-bound 双臂贴物理下限。
-- **context 退化压缩**叙事：dense 64K→128K TPOT +45-61% vs TLI 仅
-  +9-17%（Qwen3-8B `e152v4_formal_verdict.json`；32B 见
-  `e160_32b_e2e_latency_verdict.json`）。
+- **加速比随上下文单调增长**：三档 1.34-1.45× / 1.92-2.22× / 3.02-3.64×。
+- **context 退化压缩**：dense 32K→128K +161~165% vs TLI +3.3~4.2%。
+- **iter3 vs iter22 增量**：K1=64（~3-5%）+ iter3 融合链（~24-40% TPOT 下降）。
+- **完整 e2e（含 prefill）**（`e178_full_e2e_with_prefill_verdict.json`）：
+  TPOT 1.28/2.39/3.69× + E2E（含 prefill）1.17/1.23/1.49×（32/64/128K）；
+  prefill 两臂一致（原生 SDPA dense）。
 - 32B@128K 行协议披露（见 `e160b_128k_expandable_verdict.json`）：
   ①环境 expandable_segments:True（32/64K 行为默认分配器）；②A 臂
   4×单 run 进程级 repeat（graph 私有显存池跨 run 残留，显存贴满时
@@ -225,6 +229,20 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   Triton kernel 并行优势被 Python 逐行循环开销淹没。代码已合入 main
   （opt-in `TLI_BATCH_INDEXER` env 开关），但**不推荐作为性能优化手段**。
   载体：`sparse_attn/indexer/tli_batch*.py` + `qwen3_attn_patch.py` 路由。
+
+- **【已合入 2026-10-27】E177：HybridCache request-local hybrid batch**
+  （`codex/far-skip-hybrid-cache-20261026` cherry-pick 2 commits + test
+  修复，fast-forward merge main b0a378c）：
+  `hybrid_batch_cache.py` + `hybrid_batch_runner.py` 提供按请求×层
+  ring/linear 混合策略，紧凑层不做全宽分配。
+  **KV 节省**（`e177_hybrid_cache_kv_savings_verdict.json`）：128K 70%
+  skip 层 **67.2% 节省**（18→5.9 GiB），三模型族闭合（8B/Llama/32B ≈67%）。
+
+- **【已落库 2026-10-27】E178：完整 e2e（prefill+decode）性能**
+  （`e178_full_e2e_with_prefill_verdict.json`，pc33 双卡 Qwen3-8B）：
+  TPOT 加速 1.28/2.39/3.69×（32/64/128K）；E2E 加速（含 prefill）
+  1.17/1.23/1.49×；prefill 两臂一致（原生 SDPA dense）。
+  TLI decode 长度平坦化: +29.5%@4×ctx vs dense +273%。
 
 ## 3. 对比口径（vendor 基线）
 
