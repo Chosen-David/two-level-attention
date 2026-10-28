@@ -63,18 +63,11 @@ class Metrics:
                 num_select_tokens = b_mask.sum().item() * block_size / b_mask.shape[0]
                 self.select_tokens.append(num_select_tokens)
 
-    def add_select_result_batch(self,
-        lengths: torch.Tensor,
-        mask: torch.Tensor,
-        block_size: int,
-    ):
-        """批量版 add_select_result（parallel batch indexer 调用）。
-
-        数值契约：逐样本等价于 add_select_result(lengths[b:b+1]-1, mask[b:b+1], bs)。
-        lengths: [B] int64（绝对序列长），mask: [B, 1, H, S]。
-        """
-        for b in range(lengths.shape[0]):
-            self.add_select_result(lengths[b:b + 1] - 1, mask[b:b + 1], block_size)
+    def add_select_result_batch(self, lengths, mask, block_size):
+        """One reduction for [B,1,H,S], with deferred host accounting."""
+        counts = mask.sum(dim=(1, 2, 3))
+        counts = torch.where(lengths >= self.threshold, counts, -1)
+        self.select_tokens.append((counts, block_size, mask.shape[2]))
 
     def get_select_tokens(self):
         if len(self.select_tokens) > 0:
@@ -85,6 +78,12 @@ class Metrics:
             for e in self.select_tokens:
                 if isinstance(e, tuple):
                     s, bs, h = e
+                    if s.ndim:
+                        for count in s.tolist():
+                            if count >= 0:
+                                total += count * bs / h
+                                cnt += 1
+                        continue
                     s = int(s.item())          # 读取端唯一同步点（逐条）
                     if s < 0:                  # -1 哨兵 = 记录时阈值不满足
                         continue
@@ -130,3 +129,4 @@ GLOBAL_METRICS = Metrics()
 
 def get_metrics():
     return GLOBAL_METRICS
+

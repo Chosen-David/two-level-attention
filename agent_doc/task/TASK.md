@@ -1,8 +1,50 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-28
+
+- [ ] [TL-MAIN-FUSION-FIX-20261028] 同步main fb335e5；禁用错误分块softmax，修复compact读前哨兵与L2 bypass过滤。62 CPU通过，48解释器对拍，GPU待验。([详情](task_details/TL-MAIN-FUSION-FIX-20261028.md))
+
+- [ ] [TL-CAND-LOAD-20261028] 候选打分跳过无效前缀尾部 CAND/K 读取；补齐生产tile的216组wrapper解释器对拍与72项离线编译；历史49 CPU通过，GPU验收待办。([详情](task_details/TL-CAND-LOAD-20261028.md))
+
+## 2026-10-27
+
+- [ ] [TL-PR-UNIFY-20261027] 12个开放PR逐项核对；整合安全运行时修复，#8/#12明确待协调，GPU验收待办。([详情](task_details/TL-PR-UNIFY-20261027.md))
+
+- [ ] [TL-SUBSPACE-PAD-20261027] 子空间先选维再padding，保留packed边界/MoBA；201 CPU通过、24 CUDA跳过，30解释器对拍；GPU收益待验。([详情](task_details/TL-SUBSPACE-PAD-20261027.md))
+
+- [ ] [TL-GEOMETRY-CACHE-20261027] 修复 B>=10 几何缓存逐层抖动，改为请求所有、容量匹配 batch；56 CPU通过/15 CUDA跳过，GPU收益待验。([详情](task_details/TL-GEOMETRY-CACHE-20261027.md))
+
+- [ ] [TL-SINGLE-OUTPUT-20261027] B1 hybrid attention 输出免singleton cat；16 CPU通过、8 CUDA跳过，GPU收益待验。([详情](task_details/TL-SINGLE-OUTPUT-20261027.md))
+
+- [ ] [TL-PREFILL-PAIR-TAIL-20261027] 静态子空间选维先取尾256行再转FP32；61 CPU通过、30 CUDA跳过，仅prefill可选路径，GPU收益待验。([详情](task_details/TL-PREFILL-PAIR-TAIL-20261027.md))
+
+- [ ] [TL-WORKSPACE-CAPACITY-20261027] 固定形状 workspace 按需分配，纠正 payload/底层容量混淆；64 CPU通过、9 CUDA跳过，GPU显存/性能待验。([详情](task_details/TL-WORKSPACE-CAPACITY-20261027.md))
+
+- [ ] [TL-INCREMENTAL-MASK-20261027] main hybrid inject 全宽 mask 重建改为首步初始化+逐行单槽更新；19 CPU通过，12 CUDA跳过，GPU收益待验。([详情](task_details/TL-INCREMENTAL-MASK-20261027.md))
+
+- [ ] [TL-PROJECTION-WRITE-20261027] main17e56e8 compact 子空间投影直写融合，eager/Graph 共用原缓存；44 CPU/12 解释器用例通过，48 CUDA 专化离线编译，GPU 性能待验。([详情](task_details/TL-PROJECTION-WRITE-20261027.md))
+
+- [ ] [TL-LINEAR-GATHER-20261027] main17e56e8 linear attention 复用双路 gather GPU kernel，保留 mask/topk/SDPA 顺序；CPU/解释器通过，GPU 与端到端待验。([详情](task_details/TL-LINEAR-GATHER-20261027.md))
+
+- [ ] [TL-HYBRID-WRITE-20261027] 实质分析 main b0a378c；复用 GPU kernel 融合混合 ring/linear 的 EOS 安全 KV 写入，更新 PR #10 并标清 E177 容量估算。CPU/解释器及离线编译通过，GPU/e2e 待验。([详情](task_details/TL-HYBRID-WRITE-20261027.md))
+
 ## 2026-10-26
 
+- [ ] [TL-PARALLEL-ROUTE-20261026] 对齐 main 55c38d8，复现 stale length/Graph 旁路/层号记录错误，沿用 PR #10 生命周期并修复记录；62 passed、13 CUDA skipped，E176 实际路由/性能待重验。([详情](task_details/TL-PARALLEL-ROUTE-20261026.md))
+
+- [ ] [TL-UNIFIED-FAR-SKIP-20261026] 整合最新 main、PR #7 融合与 PR #9 多请求混合缓存，修复初始化/重复分流冲突；本地回归已执行，远端 CUDA/性能/质量待验。([详情](task_details/TL-UNIFIED-FAR-SKIP-20261026.md))
+
 - [ ] [TL-HYBRID-CACHE-20261026] PR #9 升级：按请求×层混合 ring/linear、BS=1/2/8/32、不等长/动态 gate/EOS、RULER batch 和 CUDA Graph runner；85 项回归及 178 子用例通过，7 个 CUDA 项跳过，GPU/质量/性能验收待完成。([详情](task_details/TL-HYBRID-CACHE-20261026.md))
+
+- [ ] [TL-SKIP-NOSKIP-FUSION-20261026] skip/non-skip 共用区域打分融合；支持固定容量 B=1 冻结 gate 与混合 ring/full 路由；审查用户转述 Kimi 意见并补充真实存储/恒定写入门禁，GPU 性能及质量待验。([详情](task_details/TL-SKIP-NOSKIP-FUSION-20261026.md))
+
+- [ ] [TL-GPU-PIPELINE-FUSION-20261026] 新增直接写缓存、Q 投影缩放、候选展开压实、top-k 直写 mask 四类 GPU 融合；交付 eager/Graph 远端门禁与压力矩阵，实际 GPU 性能/质量待验。([详情](task_details/TL-GPU-PIPELINE-FUSION-20261026.md))
+
+- [ ] [TL-BATCH-FIVE-ROUNDS-20261026] 完成五轮 batch indexer 实现与本地验证：按需摘要、Q 投影复用、稳定候选线性分区、mask 装配、末尾页读取；保留无收益的 Torch 试验记录，GPU 性能/质量验收仍待。([详情](task_details/TL-BATCH-FIVE-ROUNDS-20261026.md))
+
+- [ ] [TL-BATCH-INDEXER-PARALLEL-20261026] 新增完整 batch 索引器、增量页维护与可选 Triton 批量打分，接入 Qwen eager/Graph；CPU/解释器/离线编译已验，目标 GPU 性能、原 Graph 对照和完整模型质量待验。([详情](task_details/TL-BATCH-INDEXER-PARALLEL-20261026.md))
+
+- [ ] [TL-FAR-SKIP-GPU-REVISION-20261026] 已升级 PR #7：拆开 staged eager/Graph 路径，增加三类可选 Triton 融合内核及配对验收工具；CPU/解释器/离线编译已验，目标 GPU eager 回退是否修复仍待实测。([详情](task_details/TL-FAR-SKIP-GPU-REVISION-20261026.md))
 
 ## 2026-10-25
 
@@ -247,3 +289,7 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 - [ ] [TL-E155D-T7-20261021] 性能浪费点修复（E133c A1-A4/A6 已入库；剩余 .187 独占窗口稳态 bench 同机对照 + 判决 JSON） ([详情](task_details/TL-E155D-T7-20261021.md))
 - [ ] [TL-E155D-T8-20261021] 推送远端 main（全部判决/论文/代码提交后 origin push，含历史挂账） ([详情](task_details/TL-E155D-T8-20261021.md))
 
+
+- [x] [TL-FAR-SKIP-THREE-ROUNDS-20261025] 三轮 eager/固定形状 Graph 实现与 CPU 验证完成；CUDA 实测未执行 ([详情](task_details/TL-FAR-SKIP-THREE-ROUNDS-20261025.md))
+
+- [x] [TL-FAR-SKIP-SUBSPACE-20261025] 子空间两轮复用/布局优化及 CPU 对拍完成；额外缓存与冷启动代价已记录，CUDA 实测待资源 ([详情](task_details/TL-FAR-SKIP-SUBSPACE-20261025.md))

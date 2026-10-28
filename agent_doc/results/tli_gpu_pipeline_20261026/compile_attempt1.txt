@@ -1,0 +1,32 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/workspace/scratch/7d83fead945d/repo/exp/bench/compile_tli_gpu_pipeline.py", line 63, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/scratch/7d83fead945d/repo/exp/bench/compile_tli_gpu_pipeline.py", line 49, in main
+    compile_one(k._candidates,arch,
+  File "/workspace/scratch/7d83fead945d/repo/exp/bench/compile_tli_gpu_pipeline.py", line 19, in compile_one
+    obj=triton.compile(ASTSource(fn,sig,constexprs=const),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/7d83fead945d/triton-runtime/triton/compiler/compiler.py", line 339, in compile
+    module = src.make_ir(options, codegen_fns, module_map, context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/7d83fead945d/triton-runtime/triton/compiler/compiler.py", line 83, in make_ir
+    return ast_to_ttir(self.fn, self, context=context, options=options, codegen_fns=codegen_fns,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+triton.compiler.errors.CompilationError: at 32:29:
+        page = tl.where(slot<NF, fp, page)
+        valid = (slot<NF) & fvalid
+    if NN:
+        np = tl.load(NI+row*NN+slot-NF, (slot>=NF) & (slot<NF+NN), other=0)
+        nvalid = (np>=near) & (np<swablock) & ~((np==bypage) & byok)
+        if SINK%BS:
+            nvalid &= np != LO
+        page = tl.where((slot>=NF) & (slot<NF+NN), np, page)
+        valid |= (slot>=NF) & (slot<NF+NN) & nvalid
+    page = tl.where(slot==NF+NN, LO if SINK%BS else 0, page)
+    page = tl.where(slot==NF+NN+1, bypage, page)
+    valid |= (slot==NF+NN) & bool(SINK%BS)
+                             ^
+NameError('bool is not defined')

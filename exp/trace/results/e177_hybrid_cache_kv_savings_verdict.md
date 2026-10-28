@@ -2,6 +2,13 @@
 
 > 日期：2026-10-27 | 载体：exp/bench/e177_hybrid_cache_kv_savings.py
 > 口径：Qwen3-8B 默认几何（36层, Hkv=8, D=128, bf16）
+>
+> 2026-10-27 源码复核：载体脚本只执行整数容量公式，没有创建 HybridCache、
+> 分配 CUDA 张量或读取 memory_allocated/reserved/peak。以下保留原始估算数字，
+> 不作为显存实测。70% 是人为输入，`int(36*0.7)=25` 层，非 per-prompt gate 观测。
+> 公式不含 prefill/cache/output 引用、子空间摘要、Graph workspace/pool 与 decode 预留；
+> 模型质量及真实 gate 分布必须另验。历史 TPOT 也不是本 hybrid 实现的配对结果。
+>
 > 【2026-10-27 口径限定（审计补记）】本判决 §1 为**公式核算**（按 ring 容量
 > 公式推 bytes），非设备实测；数值是**decode 稳态 KV 存储占用**口径——
 > prefill 期完整 dense DynamicCache 峰值需求仍在，"节省 67%"**不可当作
@@ -11,7 +18,7 @@
 > 三方质量门（dense / 70% hybrid / 全层紧凑）。§2/§3 主表与加速数字为
 > 独立口径（iter3 链 + E172-E174），与本节 HybridCache 无耦合。
 
-## 1. KV Cache 物理占用（HybridCache 节省）
+## 1. KV Cache 容量估算（非 CUDA 显存实测）
 
 ### 1.1 定义
 
@@ -19,7 +26,7 @@
 |------|---------|---------|
 | Dense | 全宽 linear | L_max tokens |
 | TLI-linear | 全宽 linear（far-skip 但不蒸发） | L_max tokens |
-| TLI-hybrid(70%) | 70% 层 ring + 30% 层 linear | ring: sink+near+window+block-1 ≈ 4288 tokens |
+| TLI-hybrid(70%) | 70% 层 ring + 30% 层 linear | ring: sink+near+window+block-1 = 4291 tokens |
 
 ### 1.2 Qwen3-8B 全模型 KV 占用（GiB, bs=1）
 
@@ -42,7 +49,7 @@
 | 70% | 5.909 | **67.2%** |
 | 90% | 2.524 | **86.0%** |
 
-**核心结论**：HybridCache 在 128K 下节省 67.2% KV 物理占用（70% skip 层），
+**容量模型结论**：假设 25/36 层固定使用 ring，128K 下理论 KV 容量减少 67.2%，
 且节省率随长度单调增长（饱和趋势，因 linear 层占比固定 30%）。
 
 ## 2. 算子级加速（iter3 优化链分解）
@@ -82,7 +89,7 @@
 
 > LoDA-SA（TLI）在 128K decode 上实现 **3.0-3.6× e2e 加速**（vs dense），
 > 算子级优化贡献 24-40% TPOT 下降，HybridCache 在 decode 稳态节省 **至多
-> 67% KV 存储**（公式口径，70% skip 层、质量门未测），且 decode 成本与
+> 67% KV 存储**（公式口径，假设25/36层skip、质量门未测），且 decode 成本与
 > 上下文长度解耦（4× 上下文仅 +3-4% 成本）。
 > 【引用纪律】"67% 稳态 KV 节省"带三个限定：稳态非峰值 / 公式非实测 /
 > 无质量门。三者任一未闭合前不得进论文正文。

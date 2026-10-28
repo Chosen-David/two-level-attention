@@ -15,6 +15,7 @@ from unittest.mock import patch
 import weakref
 
 import torch
+from sparse_attn.baseline_runtime import batch_decode_ctx
 from transformers.cache_utils import DynamicCache, StaticCache
 from transformers.integrations.sdpa_attention import sdpa_attention_forward
 from transformers.models.qwen3.modeling_qwen3 import (
@@ -168,3 +169,4 @@ class StaticMask(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

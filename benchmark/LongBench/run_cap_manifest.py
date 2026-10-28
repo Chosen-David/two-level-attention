@@ -186,6 +186,9 @@ def _ordered_digest_hash(values):
 
 def validate_input_identity_uniformity(runcap_metas):
     """Reject unfair same-dataset method aggregates before publication."""
+    modes = {meta.get('prompt_mode') for meta in runcap_metas.values() if meta is not None}
+    if len(modes) > 1:
+        raise SystemExit('[RUNCAP-FAIL] mixed prompt_mode protocols; refuse aggregation')
     grouped = {}
     for filename, meta in runcap_metas.items():
         if meta is not None:
@@ -300,7 +303,7 @@ def summarize_cap_gate(cap_gate_info, effective_cap):
 def cap_identity_payload(model_name, dataset, dataset_fingerprint, method,
                          run_timestamp, effective_cap, protocol_cap,
                          cap_treatment_type, max_new_tokens,
-                         input_identity=None):
+                         input_identity=None, prompt_mode=None):
     """cap_identity hash 的输入子集（cap 进输出身份的核心）。
 
     刻意只含「run 口径」字段（模型/数据/method/时间戳/cap 三方/生成预算）
@@ -322,6 +325,10 @@ def cap_identity_payload(model_name, dataset, dataset_fingerprint, method,
         "max_new_tokens": max_new_tokens,
     }
     identity_contract = _input_identity_contract(input_identity)
+    if prompt_mode is not None:
+        if prompt_mode not in ('full', 'split'):
+            raise ValueError('prompt_mode must be full or split')
+        payload['prompt_mode'] = prompt_mode
     if identity_contract is not None:
         payload["input_identity"] = identity_contract
     return payload
@@ -380,7 +387,7 @@ def cap_comparability_key(effective_cap, protocol_cap,
 def build_run_cap_core(model_name, model_path, method, dataset,
                        dataset_fingerprint, run_timestamp, effective_cap,
                        cap_gate_info, max_new_tokens, producer,
-                       treatment_type_hint=None, input_identity=None):
+                       treatment_type_hint=None, input_identity=None, prompt_mode=None):
     """run 级 manifest 核心字段（生成前可算——写门早期 CAP-CLASH 检测
     不必等整轮生成烧完 GPU 才发现口径冲突）。
 
@@ -402,7 +409,7 @@ def build_run_cap_core(model_name, model_path, method, dataset,
         run_timestamp=run_timestamp, effective_cap=effective_cap,
         protocol_cap=summ["protocol_cap"],
         cap_treatment_type=summ["cap_treatment"]["type"],
-        max_new_tokens=max_new_tokens, input_identity=input_identity)
+        max_new_tokens=max_new_tokens, input_identity=input_identity, prompt_mode=prompt_mode)
     core = {
         "schema": RUN_CAP_SCHEMA,
         "provenance": "inline",
@@ -431,6 +438,8 @@ def build_run_cap_core(model_name, model_path, method, dataset,
     }
     if input_identity is not None:
         core["input_identity"] = _input_identity_contract(input_identity)
+    if prompt_mode is not None:
+        core['prompt_mode'] = prompt_mode
     return core
 
 
@@ -567,6 +576,9 @@ def validate_run_cap_manifest(manifest):
               f"cap_treatment.type="
               f"{manifest['cap_treatment'].get('type')!r}（115 fail-closed）")
     payload_identity = payload.get("input_identity")
+    if (payload.get('prompt_mode') != manifest.get('prompt_mode')
+            or manifest.get('prompt_mode') not in (None, 'full', 'split')):
+        _fail('prompt_mode invalid or not bound to cap identity')
     manifest_identity = manifest.get("input_identity")
     if (payload_identity is None) != (manifest_identity is None):
         _fail("input_identity 在 cap payload 与外层 manifest 间仅单侧存在")

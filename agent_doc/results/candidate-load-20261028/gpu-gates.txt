@@ -1,0 +1,18 @@
+[TLI] 警告: 层掩码 /workspace/scratch/7d83fead945d/candidate-cand-load-20261028/exp/trace/results/tli_layer_skip_mask.json 不可读, D' 关闭
+Traceback (most recent call last):
+  File "/workspace/scratch/7d83fead945d/candidate-cand-load-20261028/exp/bench/test_e127_gates.py", line 674, in <module>
+    test_indexer_inc()
+  File "/workspace/scratch/7d83fead945d/candidate-cand-load-20261028/exp/bench/test_e127_gates.py", line 248, in test_indexer_inc
+    da, ma = run(False, layer_idx, 4093, 12, 20261014)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/7d83fead945d/candidate-cand-load-20261028/exp/bench/test_e127_gates.py", line 226, in run
+    k = T.randn(1, S0, Hkv, D, device=dev, dtype=T.bfloat16)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/tli-venv/lib/python3.12/site-packages/torch/cuda/__init__.py", line 403, in _lazy_init
+    raise AssertionError("Torch not compiled with CUDA enabled")
+AssertionError: Torch not compiled with CUDA enabled
+Traceback (most recent call last):
+  File "/workspace/scratch/7d83fead945d/candidate-cand-load-20261028/exp/bench/test_tli_batch_gates.py", line 415, in <module>
+    assert torch.cuda.is_available(), "需要 GPU（Triton/eager 消费端）"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 需要 GPU（Triton/eager 消费端）

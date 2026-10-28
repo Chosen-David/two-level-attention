@@ -160,7 +160,7 @@ class TLIStaticCache(Cache):
         # property setter → AttributeError: no setter）。
 
 
-def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, model=None):
+def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, *, model=None):
     """把 prefill 后的 DynamicCache（有效占尾）搬进 TLIStaticCache（有效在前）。
 
     dyn.layers[l].keys/values：[B, Hkv, S_max, D]，行 b 有效列 =

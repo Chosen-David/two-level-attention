@@ -1,4 +1,4 @@
-"""E177: HybridCache KV 节省测量。
+"""E177: HybridCache KV 容量估算（不分配缓存，不测 CUDA allocator）。
 
 对比三种配置的每层 KV cache 存储量（GiB）：
 1. dense（全宽线性，无 far-skip）
@@ -66,7 +66,7 @@ def main():
     parser.add_argument('--skip_ratios', nargs='+', type=float, default=[0.0, 0.3, 0.5, 0.7, 0.9])
     args = parser.parse_args()
 
-    print(f"=== E177 HybridCache KV 节省测量 ===")
+    print(f"=== E177 HybridCache KV 容量估算（非显存实测） ===")
     print(f"模型: {args.model_name}, bs={args.bs}")
 
     # 本地构建 config（避免联网）
@@ -126,7 +126,7 @@ def main():
 
     # 论文视角汇总表
     print(f"\n\n{'='*60}")
-    print(f"论文汇总表：KV Cache 物理占用 vs 序列长度")
+    print(f"容量估算表：KV Cache 理论字节数 vs 序列长度")
     print(f"{'='*60}")
     print(f"\n{'长度':<10} {'Dense (GiB)':<15} {'TLI-linear':<15} {'TLI-hybrid(70%)':<18} {'节省':<10}")
     print(f"{'-'*68}")

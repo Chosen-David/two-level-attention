@@ -45,3 +45,11 @@
 |---|---|---|---|
 | TL-FAR-SKIP-COMPACT-20261025 | `sparse_attn/ops/far_skip*.py`、`tests/test_far_skip_compact.py`、`exp/bench/far_skip_decode.py` | `agent_doc/results/far_skip_20261025/`、`docs/far_skip.md` | Qwen3 B=1 eager decode；实际淘汰 far KV；CPU 正确性/存储，GPU 性能与质量未验 |
 | TL-FAR-SKIP-EAGER-OPT-20261025 | `far_skip_workspace.py`、环形 `FarSkipLayer`、`tests/test_far_skip_optimized.py`、`exp/bench/far_skip_compare.py` | `agent_doc/results/far_skip_optimized_20261025/` | eager 五项优化；CPU 配对/原始算子证据，CUDA/Graph 与质量未验 |
+
+| Far-off fixed-shape decode | `sparse_attn/ops/far_skip_graph.py`, `far_skip_static.py` | Tensor-position bounded selector and cache bridge; Qwen/TLIStaticCache entry, CPU verified, actual CUDA gate pending |
+
+| Far-off subspace reuse | `sparse_attn/ops/far_skip_subspace.py` | Bounded head-major fine K, original-dtype QDQ memoization; explicit auxiliary-memory cost |
+
+## 2026-10-26 unified far-skip integration
+
+- main 2289900 + PR #7 fc242e4 + PR #9 7e10baf: `docs/unified_far_skip.md`; request-local hybrid workspace setup and shared static helper; `tests/test_unified_far_skip.py`; evidence `agent_doc/results/unified-far-skip-20261026/validation.md`. GPU/quality acceptance remains pending.

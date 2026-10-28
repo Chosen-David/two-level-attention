@@ -26,6 +26,10 @@ def load_harness(method_name, base_source="class Base:\n    pass\n"):
     return namespace["Harness"]
 
 
+def key_metadata(shape=(1, 8, 4, 128), dtype="bf16", device="cpu"):
+    return SimpleNamespace(shape=shape, dtype=dtype, device=device)
+
+
 class TliRuntimeShapeContractTests(unittest.TestCase):
     def _prepare_harness(self):
         harness = load_harness("prepare_index")()
@@ -127,3 +131,4 @@ class TliRuntimeShapeContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

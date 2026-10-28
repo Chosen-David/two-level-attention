@@ -143,6 +143,15 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
             "tqdm": tqdm,
             "numpy": numpy,
         }
+        guard_module = types.ModuleType('sparse_attn.ops.eager_decoding')
+        @contextlib.contextmanager
+        def guard():
+            yield
+            events.append('guard_exit')
+            if captured.get('inject_kernel_error'):
+                raise RuntimeError('deferred kernel error')
+        guard_module.eager_decoding_request_guard = guard
+        injected['sparse_attn.ops.eager_decoding'] = guard_module
         with patch.dict(sys.modules, injected):
             spec.loader.exec_module(module)
         return module
@@ -182,6 +191,28 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
             self.assertEqual(
                 captured["receipt"]["treatment_manifest_json"],
                 '{"frozen":true}')
+            self.assertIn('guard_exit', events)
+
+    def test_deferred_kernel_error_prevents_publication(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            data = tmp / 'data' / '4096'
+            data.mkdir(parents=True)
+            (data / 'niah_single_1.jsonl').write_text(json.dumps(
+                dict(input='x', outputs=['a'], length=1, index=0))+'\n')
+            captured = {'inject_kernel_error': True}
+            module = self._load_entry(tmp, [], captured, object())
+            module.parse_args = lambda: types.SimpleNamespace(
+                batch_size=1, method='tli', pred_postfix='', yarn=False,
+                context_length=4096, yarn_factor=None, data_root=str(tmp/'data'),
+                task='niah_single_1', max_num=1, model_path=str(tmp/'model'),
+                model='Qwen3-8B', output_dir=str(tmp/'out'), t='test')
+            module._pack_rows = lambda *a: (None, None, None, [1])
+            module._decode_batch_chunk = lambda *a, **kw: [[1]]
+            with self.assertRaisesRegex(RuntimeError, 'deferred kernel'):
+                module.main()
+            self.assertNotIn('receipt', captured)
+            self.assertTrue(all(p.stat().st_size == 0 for p in (tmp/'out').rglob('*.tmp')))
 
 
 if __name__ == "__main__":

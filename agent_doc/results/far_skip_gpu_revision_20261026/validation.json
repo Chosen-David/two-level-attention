@@ -1,0 +1,75 @@
+{
+  "parent": "b2c79badf0a1b000ea130c1b46f596bfaa189eb3",
+  "scope": "CPU Torch timings, CPU Triton interpreter logic, offline CUDA compilation only",
+  "gpu_execution": false,
+  "torch": "2.8.0+cpu",
+  "triton": "3.4.0",
+  "paired_cpu": {
+    "staged": {
+      "baseline": 10.017756998422556,
+      "candidate": 5.988279495795723,
+      "candidate_over_baseline": 0.5977664957074389,
+      "outputs_checked": 160,
+      "max_abs_error": 0.0
+    },
+    "eager": {
+      "baseline": 8.455343493551482,
+      "candidate": 7.9927609986043535,
+      "candidate_over_baseline": 0.9452911055239898,
+      "outputs_checked": 160,
+      "max_abs_error": 0.0
+    }
+  },
+  "paired_bindings_match": {
+    "sparse_attn/ops/far_skip_kernels.py": true,
+    "sparse_attn/ops/far_skip_workspace.py": true,
+    "sparse_attn/ops/far_skip_accel.py": true,
+    "sparse_attn/ops/far_skip_subspace.py": true,
+    "sparse_attn/ops/far_skip.py": true,
+    "sparse_attn/ops/far_skip_static.py": true,
+    "sparse_attn/ops/far_skip_runtime.py": true,
+    "sparse_attn/ops/far_skip_cache.py": true,
+    "sparse_attn/ops/far_skip_graph.py": true,
+    "harness": true
+  },
+  "offline_cuda_specializations": 18,
+  "cpu_tests": {
+    "passed": 134,
+    "skipped_cuda": 5,
+    "subtests": 205
+  },
+  "interpreter_tests": {
+    "passed": 20,
+    "skipped": 43,
+    "skip_reason": "real CUDA and BF16 interpreter unsupported"
+  },
+  "gpu_required_gates": {
+    "E127": "not run: requires CUDA",
+    "batch": "not run: requires CUDA",
+    "far_skip_cuda_correctness": "not run: requires CUDA",
+    "GPU_speedup": "unverified",
+    "RULER_quality": "unverified"
+  },
+  "decision": "Keep Torch as default. GPU fusion explicitly opt-in pending target-GPU correctness/performance. Dynamic eager CPU latency is inconclusive across exploratory runs (earlier slower, final modestly faster); do not claim GPU or Dynamic eager speedup.",
+  "source_sha256": {
+    "sparse_attn/ops/far_skip_kernels.py": "7a677d979bfb16ddf806b7aca00d5a5418afea766b3a018fd659e2b4ba655398",
+    "sparse_attn/ops/far_skip_workspace.py": "a75537b35027024fd0e527c05a674b92e2af3addb4bdc8a708c6a9631c9e1d51",
+    "sparse_attn/ops/far_skip_accel.py": "bd37dfd412ac552757e148ed9ebef73871c9666cafa04eb06ae8e8afe92b91a6",
+    "sparse_attn/ops/far_skip_subspace.py": "8e08bde669895c05b416b57c3570667d5d166a01a5a973ff9b07941907d930b5",
+    "sparse_attn/ops/far_skip.py": "f7593394e7cb325d3c99a766d06f331a98ca4a91d0e8ca31d506e05f65793867",
+    "sparse_attn/ops/far_skip_static.py": "69421a0fbc51eccf58b839ef25a5a4443738cfccf14f2b4b1292aa55e58da3fd",
+    "sparse_attn/ops/far_skip_runtime.py": "d639ae3c2f6b44ee54165655eec8a72788a9730336a77d10cc70400a04141c73",
+    "sparse_attn/ops/far_skip_cache.py": "71a9e00f5d3a7086b26ae475a13024283c56bd29ffd3b75a4c5c1175111ba2cf",
+    "sparse_attn/ops/far_skip_graph.py": "62ea4a8dd772f4864b77ef43a06105da7a4c8072a60001923e428c43de1a429d",
+    "exp/bench/far_skip_subspace_compare.py": "4c5ef23888abdc122763b3b163b44b6073222726218d4bb167dc11bde146c06c",
+    "exp/bench/compile_far_skip_kernels.py": "5efbe0a86115d66f5f7d32007f3ac9dd1d15836b39d0632cd455957fe4096cf4",
+    "exp/bench/e152v4_graph_latency.py": "136c2503f35ee6c3fcbfa361821f12f67b2d7e3fc0d0f13cb1e90790f9dbb170",
+    "tests/test_far_skip_gpu_kernels.py": "f29f7e4d154d21dfd6354b9c0b8b75dfbdea34fd222751cc547b26ad794654db",
+    "tests/test_far_skip_graph.py": "446321b207f3be161150a72615380941fba70998ff3c36eaa768c2827e4685dd",
+    "tests/test_far_skip_ruler_entry.py": "afb92cb5cbed5e3cfe093f0792ef21ef164428379128332a1eb101acf350ab74"
+  },
+  "profile_scope": "Separate CPU operation-count diagnostic. Timing samples from this profiled run are not used for the performance verdict.",
+  "merged_main": "9058345e6a32aa4dac9cd07a465ae6aad5375777 (only documentation/results changed since parent main)",
+  "exploratory_scope": "exploratory_cpu_not_verdict.json is an earlier harness/source snapshot, potentially contended; retained to avoid hiding a negative CPU run. Not pooled with final timing.",
+  "final_artifact_bindings": "paired/profile/compile source hashes verified; CPU test receipts verified"
+}

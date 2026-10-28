@@ -1,0 +1,311 @@
+..s..s..s..s..s..s..s..s..s..s..s..s........................ssssssssssss [ 52%]
+......s..s..s..s..s..s..s..sFFFFFFFFFFFF.................ssssssFF        [100%]
+=================================== FAILURES ===================================
+_________________________ test_fused_compact[none-33] __________________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+_________________________ test_fused_compact[none-257] _________________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+________________________ test_fused_compact[none-4224] _________________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+__________________________ test_fused_compact[all-33] __________________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+_________________________ test_fused_compact[all-257] __________________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+_________________________ test_fused_compact[all-4224] _________________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+________________________ test_fused_compact[random-33] _________________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+________________________ test_fused_compact[random-257] ________________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+_______________________ test_fused_compact[random-4224] ________________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+______________________ test_fused_compact[alternating-33] ______________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+_____________________ test_fused_compact[alternating-257] ______________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+_____________________ test_fused_compact[alternating-4224] _____________________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:22: in test_fused_compact
+    actual,valid=compact(ids,keep)
+                 ^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+_____________ test_fused_pipeline_mask_and_incremental_state[avg] ______________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:91: in test_fused_pipeline_mask_and_incremental_state
+    actual,_=prepare_mask_batched(candidate,q,k,lengths,128**-.5)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch.py:309: in prepare_mask_batched
+    mask = state.mask(q, k, lengths, scale)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch.py:257: in mask
+    ids, keep = self.triton_ops.compact(ids, keep)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+____________ test_fused_pipeline_mask_and_incremental_state[minmax] ____________
+../triton-runtime/triton/runtime/interpreter.py:1275: in __call__
+    self.fn(**args)
+sparse_attn/indexer/tli_batch_kernels.py:64: in _compact
+    for chunk in range(tl.cdiv(R,BLOCK)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+../triton-runtime/triton/runtime/interpreter.py:810: in <lambda>
+    tensor.__index__ = lambda self: int(self.handle.data)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+tests/test_tli_batch_fusion_kernels.py:91: in test_fused_pipeline_mask_and_incremental_state
+    actual,_=prepare_mask_batched(candidate,q,k,lengths,128**-.5)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch.py:309: in prepare_mask_batched
+    mask = state.mask(q, k, lengths, scale)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch.py:257: in mask
+    ids, keep = self.triton_ops.compact(ids, keep)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sparse_attn/indexer/tli_batch_kernels.py:84: in compact
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+../triton-runtime/triton/runtime/interpreter.py:1279: in __call__
+    raise InterpreterError(repr(e)) from e
+E   triton.runtime.errors.InterpreterError: TypeError('only 0-dimensional arrays can be converted to Python scalars')
+=========================== short test summary info ============================
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[none-33] - ...
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[none-257]
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[none-4224]
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[all-33] - t...
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[all-257] - ...
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[all-4224]
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[random-33]
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[random-257]
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[random-4224]
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[alternating-33]
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[alternating-257]
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_compact[alternating-4224]
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_pipeline_mask_and_incremental_state[avg]
+FAILED tests/test_tli_batch_fusion_kernels.py::test_fused_pipeline_mask_and_incremental_state[minmax]
+14 failed, 85 passed, 38 skipped in 56.40s

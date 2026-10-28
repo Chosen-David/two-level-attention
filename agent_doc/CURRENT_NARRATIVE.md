@@ -30,7 +30,8 @@ champion flags = K1=64）。
 **参数陷阱表**（历史教训，2026-10-23 开源净化手术已结构性消除大部分）：
 
 | 陷阱 | 历史行为 | 现状 |
-|---|---|---|
+|---|---|
+| TLI 的 batch 能力只在 attention 消费端，indexer 必须逐行执行 | PR #7 的 `TL-BATCH-INDEXER-PARALLEL-20261026` 增加完整 batch 候选实现；`docs/tli_batch_indexer.md` 与 `agent_doc/results/tli_batch_parallel_20261026/` 记录 CPU/解释器/离线编译，目标 GPU、旧 Graph 对照和完整模型质量仍待验，默认仍走 legacy。此项不修改历史 GPU 主表，也不代表 compact KV 淘汰已支持 B>1。 后续五轮见 `docs/tli_batch_five_rounds.md`，包含按需摘要、Q 复用及可选 movement 融合；本地证据不构成 GPU 提速判决。 |---|
 | `--tli_enable_layer_skip` 默认 true | 漏传 = 静默跑成 D′ gate 口径（E129 起协议强制显式传） | **接口保留**（2026-10-25 用户指令：far-skip 转向 KV cache 节省叙事线，见第 5 节）；主表口径仍显式 false |
 | `--tli_subspace` 默认 full | 生产必须显式 tail | 默认仍 full，**必须显式传 tail** |
 | `--tia_level2_cmp_ratio` 默认 2 | 生产口径 4 | **必须显式传 4** |
@@ -291,6 +292,42 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 ## 5. 已被推翻叙事索引（防误读核心——旧结论 → 推翻它的判决）
 
+**2026-10-27 统一审查入口**：[12 PR来源与冲突清单](results/pr-unification-20261027/validation.md)。保留main与既有融合；#8稿件/#12耦合运行时未强行覆盖。LongBench full/split明确分离，旧质量不可直接继承；无新增GPU收益结论。
+**2026-10-27 实现审查补充（非质量/性能新判决）**：
+[五轮运行链路审查](results/runtime-audit-20261027/README.md) 修复 batch
+live length、请求状态/错误回执与长 prompt logits 问题，并将 LongBench
+完整 prompt prefill 与历史 split 协议显式隔离。新协议、compact/evict
+与 legacy 的选择范围差异均需独立质量复验；本次 CPU 回归不继承旧表结论，
+CUDA 必跑门禁仍待有 GPU 环境验收。
+
+
+**2026-10-27 子空间 padding 实现补充（待 GPU 验证）**：
+[证据](results/subspace-pad-20261027/validation.md)：先选维再按原边界补零，
+消除统计前的全维 padding 临时量；MoBA 保留全维路径。201 CPU通过、
+24 CUDA跳过、30解释器对拍。CPU容量/128K公式不代表 GPU峰值或 KV节省；
+Qwen为初始化收益候选，MLA eager仍每步全量重建，实际收益待配对。
+
+2026-10-27 几何共享复核：main/PR10 原九条目全局缓存导致 B>=10 hybrid eager 跨层复用失效；PR10 改为请求级有界缓存，B32 两层实际构建64→32次/步，56 CPU通过/15 CUDA跳过、配对logits逐位一致。保留更多大batch几何条目是内存/重算取舍；capture仍逐层构建，不能宣称Graph或GPU实测加速。见 `agent_doc/results/geometry-cache-20261027/validation.md`。
+
+2026-10-27 输出组装复核：B1 hybrid decode 的唯一attention输出仍经cat复制；PR #10 直接复用输出，B>1保持原路径。16 CPU通过/8 CUDA跳过，未测GPU速度；EOS行selector/attention仍执行。见 `agent_doc/results/single-output-20261027/validation.md`。
+
+2026-10-27 prefill 选维复核：static_pair 可选路径此前将全长 Q 转FP32后只用尾256行；PR #10 改为先切片再转换，精确选维及请求重置CPU通过。61 CPU/30 CUDA跳过；仅消除标定临时转换，不代表decode加速或KV节省，动态gate展开尚未优化。见 `agent_doc/results/prefill-tail-20261027/validation.md`。
+
+2026-10-27 workspace 容量复核：此前 linear gather 的4.52MiB是有效数据量，几何扩容后的底层缓冲实际8MiB；PR #10 对固定形状 cat/scratch 改为按需分配，CPU存储配对8→4.515625MiB，GPU allocator/峰值/速度未测。见 `agent_doc/results/workspace-capacity-20261027/validation.md`。
+
+2026-10-27 runner 输入维护复核：main hybrid inject 在 Graph 外每步重建全宽 causal mask；PR #10 根据既有 append-only/EOS 约束改为首步完整初始化、后续每行单槽更新，保留 dense 层所需形状和地址。19 CPU通过、12 CUDA跳过；无 GPU 提速结论。见 `agent_doc/results/incremental-mask-20261027/validation.md`。
+
+2026-10-27 子空间维护复核：main17e56e8 compact ring 的未量化投影仍先 gather 再 copy；PR #10 增加可选 GPU 直写原投影缓存，覆盖 eager/Graph，不增 scratch。量化分支和 linear iter3 不变；CPU/解释器及离线编译通过，无 GPU 加速、显存或质量判决。见 `agent_doc/results/projection-write-20261027/validation.md`。
+
+2026-10-27 linear gather 复核：hybrid linear 消费端仍把全宽 bool mask 转 int32/topk，暂不改选集协议；PR #10 复用现有 GPU pair-gather 合并 K/V 读取与无效槽清零，保持原顺序。CPU/解释器已验，无新增 GPU 加速/显存判决；逐行 scratch 驻留成本须计入。见 `agent_doc/results/linear-gather-20261027/validation.md`。
+
+2026-10-27 main b0a378c 实质复核：hybrid index/attention 仍逐行；PR #10 补充可选 GPU KV 写入融合，保留逐请求冻结 gate/EOS。E177 脚本仅计算容量公式，67.2% 基于假设 25/36 层 ring，不是 CUDA allocator/真实 gate/质量实测。ring 几何为 4291 槽；旧 TPOT 数据不代表本 hybrid 实现已验收。当前写入回归和未完成候选见 `agent_doc/results/hybrid-write-20261027/validation.md`；无新增 GPU 提速或显存实测判决。
+
+
+2026-10-26 路由复核（main 55c38d8）：长度缓存不更新、parallel 提前返回绕过 Graph、路由记录传模块而非层号，4 个 host 反例已复现；PR #10 保留正确生命周期并修复记录。上文 E176 数字保留为远端报告，当前树未找到 E176 原始脚本/回执，不能据此确认实际 parallel/Triton 命中或将零收益归因于 Python 循环。需以候选提交、完整 flags、路由和 profiler 重新配对验收；详见 agent_doc/results/parallel-route-20261026/validation.md。
+
+2026-10-26 整合更新：main `2289900` 已包含旧版 compact 实现；整合分支把 PR #7 的融合路径与 PR #9 的逐请求×层混合缓存接通。多 batch/EOS/新请求重建已有 CPU 回归，混合 attention/index 仍逐行；不能声称全 batch 融合或新 GPU 提速/显存降幅。当前边界与远端验收见 `docs/unified_far_skip.md`，下列 E175/旧 PR 限制是历史版本记录。
+
 | 过时结论（出现在 archived 报告/早期叙事中） | 推翻/修正判决 |
 |---|---|
 | 保护带（boundary bypass 前的 sink/swa 保护带几何）假设最优 | `e148_sinkswa_verdict.json`（否决） |
@@ -302,6 +339,8 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 | α/β/γ 比例化几何口径（E64 帕累托点叙事） | E155d 参数退役（用户 2026-10-19 拍板转向 nb/nt/nl 显式几何）；比例口径的全部历史数字仅作 E64-E155 谱系档案（`exp/trace_archives/probe_e5b_e98/`） |
 | e152v2 dynamic-cache 性能口径（TLI 3.4×/2.5×/1.8× slower） | 已被 `e152v4_formal_verdict.json` 整步 graph 口径取代（论文图 E2 已 in-place 重写，commit e5071cb） |
 | MLA 子空间增益可线性兑现到 e2e | `e158b_mla_rope_nope32_e2e_verdict.json` 饱和映射边界披露 |
+| kernel fusion 已经消除 batch indexer 的所有 copy，融合越大越快 | `docs/tli_gpu_pipeline.md`：新增四类真实 Triton producer/consumer 融合，整行扫描曾占 255 registers/thread，分块后编译峰值 60；仍有 topk/softmax/full-mask/attention 流量。188 个 offline build 与解释器检查均不是实际 GPU 提速，远端与模型验收待执行。 |
+| far mask 的13%账本已经等于GPU显存实省；当前ring每步搬迁全部历史 | `docs/tli_skip_noskip_fusion.md` 区分 main 默认全驻留与 PR compact：后者一次性压缩、每步单 token 写入，容量4291含页对齐。CPU底层存储/引用释放已检查；GPU allocator、严格截断质量及13%整模叙事仍待验。用户直接提供的 Kimi 意见已逐项审查。 |
 | γ-off 自由竞争需 CLI `--tli_gamma off` | 显式几何等价物 `--tli_near_tokens off`（E155d；γ 接口已删除） |
 
 ## 6. 仓库结构速览（净化后）
@@ -316,3 +355,8 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
   advice 报告与 superseded research 文档。
 - 对拍铁律：`exp/bench/test_e127_gates.py`（微逻辑回归门）+
   `exp/bench/test_tli_batch_gates.py` 每次改动后必须全绿。
+
+
+### 2026-10-28 候选无效槽访存待验
+
+PR10 后续候选仅收紧既有 fine kernel 的 CAND/K 读取 mask，保持 CLEN 输出语义；48 解释器逐位对拍、49 CPU通过，不是 GPU 加速或显存证据。详见 `agent_doc/results/candidate-load-20261028/validation.md`；远端 GPU 门禁待验，不更新论文性能数字。

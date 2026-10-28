@@ -1,0 +1,127 @@
+{
+  "parent_commit": "2e21174b6bd41c6712f92c3ff0b5f41661bf7fdf",
+  "status": "keep_for_gpu_validation_not_gpu_accepted",
+  "environment": {
+    "python": "3.12.14",
+    "torch": "2.8.0+cpu",
+    "cuda_available": false,
+    "triton": "3.4.0 isolated runtime"
+  },
+  "source_sha256": {
+    "sparse_attn/indexer/tli_batch.py": "923ab33e512971dbbace0645ef52e2d5150417d5cf4d2e57302bb6b4550a978a",
+    "sparse_attn/indexer/tli_batch_kernels.py": "de5924c090f80335c052cd10d6843e57d2cefe1c651bccc90e53dfea372e3673",
+    "sparse_attn/indexer/tli_batch_pipeline.py": "3e2f31f808f5638fc40ccb7f9afb19d5026cceb8a5b7ab373427a90ad494ab86",
+    "sparse_attn/indexer/tli_indexer.py": "851486e57e6a7943c6fa6f2c6cc19be192d2606f2ed8fdda3b6425dbd1d32ca7",
+    "sparse_attn/metrics.py": "d7bb653b84fb248af271a606bee4d5dc3d31ca799e984d92c349d2225733950b",
+    "tests/test_tli_gpu_pipeline.py": "65f2b784efcffb84d292d30fcee652a9b53f441019f354df9ba13fe4db0eee9c",
+    "exp/bench/tli_batch_round_compare.py": "95c03566cdd04500889311caef0824b803b4744bb650bc26dec6b22213ddf077",
+    "exp/bench/run_tli_gpu_pipeline.py": "dcb2c8a52534b88e50f56201dc9658adf77ec354172a08e833fc1f9ed609050f",
+    "exp/bench/compile_tli_gpu_pipeline.py": "e4def07b564f8e76fdbf0fe593a2836a432aa3228c84bf509d681b0a61e44d73"
+  },
+  "checks": {
+    "cpu": {
+      "passed": 205,
+      "skipped": 138,
+      "subtests": 205,
+      "log": "cpu_tests.txt"
+    },
+    "interpreter": {
+      "passed": 95,
+      "skipped_bf16": 33,
+      "warnings": 144,
+      "log": "interpreter_final.txt"
+    },
+    "offline_compile": {
+      "cases": 188,
+      "architectures": [
+        80,
+        90
+      ],
+      "receipt": "offline_compile.json",
+      "resources": {
+        "_candidates": {
+          "cases": 18,
+          "registers_per_thread": [
+            18,
+            60
+          ],
+          "spill_cases": 0
+        },
+        "_mask_top": {
+          "cases": 2,
+          "registers_per_thread": [
+            24,
+            24
+          ],
+          "spill_cases": 0
+        },
+        "_queries": {
+          "cases": 24,
+          "registers_per_thread": [
+            10,
+            18
+          ],
+          "spill_cases": 0
+        },
+        "_update_cache": {
+          "cases": 144,
+          "registers_per_thread": [
+            32,
+            96
+          ],
+          "spill_cases": 0
+        }
+      }
+    },
+    "cpu_harness_smoke": {
+      "purpose": "packaging/default-off only; not performance evidence",
+      "mask_mismatch_bits": 0,
+      "attention_max_abs": 0,
+      "receipt": "cpu_harness_smoke.json"
+    },
+    "gpu_runner_no_gpu": {
+      "exit_code": 2,
+      "log": "remote_runner_no_gpu.txt"
+    }
+  },
+  "diagnostic_only": [
+    "interpreter.txt is an initial non-source-bound diagnostic; use interpreter_final.txt",
+    "compile_attempt1/2/3.txt contain fixed compiler failures, not accepted builds"
+  ],
+  "trials": [
+    {
+      "name": "full_scan_trial",
+      "status": "replaced for register pressure; GPU latency unmeasured",
+      "peak_candidate_registers": 255,
+      "final_peak_candidate_registers": 60
+    }
+  ],
+  "unverified": [
+    "actual CUDA correctness",
+    "eager/Graph GPU latency and memory",
+    "E127/batch GPU gates",
+    "compute-sanitizer",
+    "Nsight traffic/occupancy/stalls",
+    "full-model old/new eager and Graph TPOT/throughput",
+    "quality/RULER",
+    "independent acceptance"
+  ],
+  "evidence_sha256": {
+    "compile_attempt1.txt": "fab6cf36bb902fdd48553ae4a598ce3fd911a9c217a8a2007bf54666296e49c7",
+    "cpu_harness_smoke.json": "788ae433e2eec0e333e624a150a31cb57964e1808d0d9f2c2278a49d06bb1d4a",
+    "offline_compile.json": "9d7a8fbe1457c00795aa459370445a7f037b989cace9a11d5a4e7e4bd755dcbc",
+    "cpu_tests.txt": "087f75341f62abbbdf940dce4c107c59ebc959cee46a3940c0e3682d8231f3eb",
+    "compile_attempt2.txt": "a044562976c157519a2ede89aaafa98ba52194a9ad4a47f8521f9f6c649f8eb9",
+    "remote_runner_no_gpu.txt": "d549ff92e2e68a578d810b5b4ab3fb08d609de0e55d5617d8d95f169542484b0",
+    "interpreter_final.txt": "3b10cf421e7b014ef2b772b2e31fd3b64fac48edf7de6bddb3c27758d5efa4e6",
+    "compile.txt": "fba8c217a5eb504383477fa6f0c6ba02dcfb5980d75776afa16a0b66a580eabb",
+    "compile_attempt3.txt": "4272f45fb2387276bced9d5eb93b4ade68ab47565df934df864130aa27e0a31d",
+    "cpu_harness_smoke.txt": "b6685c2f70aa517c3499135ff273af5205af7f4e271c50fc288f4759a2d43658",
+    "interpreter.txt": "59ea4c1019ae2a7340bdf1cdef95518148b58c73f3a9f1a1bab629eda010c5b1",
+    "full_scan_trial/compile_tli_gpu_pipeline.py": "0450131e19dbb634c7dddb16f7705fd05c52fe7d211107261854c01f17f459cc",
+    "full_scan_trial/tli_batch_pipeline.py": "b1cc8e6df06f4c545608f7854a4f531cce9e378c318be0ea5fbd6c85f017708f",
+    "full_scan_trial/offline_compile.json": "8923f0bd80595a398c37c7679a340efbd05b69cda7cd043855d3ac911b5d8e83",
+    "parent/tli_batch_kernels.py": "de5924c090f80335c052cd10d6843e57d2cefe1c651bccc90e53dfea372e3673",
+    "parent/tli_batch.py": "f5ca5f20f87b5072437b3a65844cd88ce01ea14b395d7a122596b16a61083511"
+  }
+}

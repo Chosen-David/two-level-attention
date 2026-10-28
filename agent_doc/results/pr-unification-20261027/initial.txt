@@ -1,0 +1,13 @@
+F............................................                     [100%]
+=================================== FAILURES ===================================
+________________ test_host_lengths_refresh_without_reallocating ________________
+tests/test_batch_live_inputs.py:20: in test_host_lengths_refresh_without_reallocating
+    assert first.data_ptr() == second.data_ptr()
+E   assert 209320000 == 209337984
+E    +  where 209320000 = <built-in method data_ptr of Tensor object at 0x7f3c3207e260>()
+E    +    where <built-in method data_ptr of Tensor object at 0x7f3c3207e260> = tensor([10, 20]).data_ptr
+E    +  and   209337984 = <built-in method data_ptr of Tensor object at 0x7f3c3207e300>()
+E    +    where <built-in method data_ptr of Tensor object at 0x7f3c3207e300> = tensor([11, 20]).data_ptr
+=========================== short test summary info ============================
+FAILED tests/test_batch_live_inputs.py::test_host_lengths_refresh_without_reallocating
+1 failed, 44 passed, 79 subtests passed in 3.53s

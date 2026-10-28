@@ -1,0 +1,6 @@
+        slot = row.layout.map(p) if isinstance(row, FarSkipStaticLayer) else p
+        # Dead rows keep their last valid KV exactly. Avoid a Python branch on
+        # alive: EOS changes during graph replay while kernel shapes stay fixed.
+        for storage, incoming in ((row.keys, k), (row.values, v)):
+            old = storage.index_select(2, slot)
+            storage.index_copy_(2, slot, torch.where(active.view(1, 1, 1, 1), incoming[b:b+1], old))

@@ -72,6 +72,7 @@ from sparse_attn.patches import register_patch  # noqa: E402
 # 【阶段 1】budget 采集对齐 pred_ruler.py L549-551（同步义务：read 端
 # get_select_tokens + write 端 "budget" 字段逐字节一致）。
 from sparse_attn.metrics import get_metrics  # noqa: E402
+from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 RULER_TASKS = [
     "niah_single_1", "niah_single_2", "niah_single_3",
@@ -289,7 +290,8 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
     return gen
 
 
-def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids):
+def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids,
+                               keep_logits=False):
     """Compact TLI: per-request prefill/gates, batched model decode, optional graph."""
     from sparse_attn.ops.hybrid_batch_cache import HybridBatchCacheBuilder
     from sparse_attn.ops.hybrid_batch_runner import HybridBatchRunner
@@ -306,7 +308,8 @@ def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, 
     with batch_decode_scope(None):
         for b, length in enumerate(lens):
             output = model(input_ids=input_ids[b:b+1, width-length:],
-                           position_ids=position_ids[b:b+1, width-length:], use_cache=True)
+                           position_ids=position_ids[b:b+1, width-length:], use_cache=True,
+                           **({'logits_to_keep': 1} if keep_logits else {}))
             generated.append([output.logits[0, -1].argmax().item()])
             builder.add(output.past_key_values, length)
             del output  # Release full prefill KV before the next request.
@@ -352,7 +355,8 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
     if compact:
         if not fixed_cache:
             raise ValueError('compact batched decode requires fixed_cache=True')
-        return _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids)
+        return _decode_hybrid_batch_chunk(
+            model, tokenizer, input_ids, position_ids, lens, eos_ids, keep_logits)
     B = len(rows)
     pad_id = getattr(tokenizer, "pad_token_id", None) or tokenizer.eos_token_id
     input_ids = input_ids.to("cuda")
@@ -388,7 +392,8 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                 row_input = input_ids[b:b+1, base:]   # [1, L_b]
                 row_pos = position_ids[b:b+1, base:]   # [1, L_b]
                 out = model(input_ids=row_input, position_ids=row_pos,
-                            use_cache=True)
+                            use_cache=True,
+                            **({'logits_to_keep': 1} if keep_logits else {}))
                 pred_list.append(out.logits[0, -1, :].argmax(dim=-1))
                 dyn = out.past_key_values
                 for l in range(len(static_cache.layers)):
@@ -396,10 +401,9 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                     k = dyn.layers[l].keys            # [1, Hkv, L_b, D]
                     v = dyn.layers[l].values
                     if not inited[l]:
-                        # lazy_initialization 要求 shape[0]==B；构造全 B
-                        # zero 占位、第 0 行填真实 K，宽高 = 本行实际长 L_b
-                        d = k.new_zeros(B, k.shape[1], k.shape[2], k.shape[3])
-                        d[0:1] = k
+                        # Initialization only reads shape/device/dtype. A view
+                        # avoids another B x L_b temporary allocation.
+                        d = k[..., :1, :].expand(B, -1, -1, -1)
                         stat_l.lazy_initialization(d)
                         inited[l] = True
                     Lb = lens[b]
@@ -416,7 +420,8 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                 row_input = input_ids[b:b+1, base:]
                 row_pos = position_ids[b:b+1, base:]
                 out = model(input_ids=row_input, position_ids=row_pos,
-                            use_cache=True)
+                            use_cache=True,
+                            **({'logits_to_keep': 1} if keep_logits else {}))
                 pred_list.append(out.logits[0, -1, :].argmax(dim=-1))
                 row_caches.append(out.past_key_values)
                 del out
@@ -632,7 +637,7 @@ def main():
             # batch>1 时取该 chunk 全部行×步的 select_tokens 均值（聚合口径）。
             metrics = get_metrics()
             metrics.clear()
-            with baseline_request(model) as baseline_receipt:
+            with baseline_request(model) as baseline_receipt, eager_decoding_request_guard():
                 with torch.no_grad():
                     gen = _decode_batch_chunk(
                         model, tokenizer, chunk, input_ids, position_ids,

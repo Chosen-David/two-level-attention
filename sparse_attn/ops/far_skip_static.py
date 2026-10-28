@@ -14,6 +14,9 @@ from transformers.cache_utils import DynamicCache
 
 from .far_skip_cache import FarSkipLayer
 from .far_skip_graph import FarSkipGraphWorkspace
+from .far_skip import select_far_skip, attend_far_skip
+from .far_skip_workspace import FarSkipWorkspace
+from .far_skip_subspace import same_dimensions
 from .tli_static_cache import TLIStaticLayer
 
 
@@ -26,22 +29,43 @@ class FarSkipStaticLayer(TLIStaticLayer):
         self.num_heads, self.head_dim = self.keys.shape[1], self.keys.shape[-1]
         self.config, self.layout = cfg, ring.layout
         self.cumulative_length = ring.logical_length
-        self.workspace = FarSkipGraphWorkspace(cfg, ring.layout, self.num_heads, coarse, fine)
-        self.workspace.initialize(self.keys.transpose(1, 2), ring.logical_length)
+        self.coarse = coarse.clone()
+        self.fine = self.coarse if same_dimensions(coarse, fine) else fine.clone()
+        self.workspace = None
+        self.eager_workspace = None
+        self.logical_length = ring.logical_length
+
+    def prepare_graph_workspace(self):
+        """Seed once before capture; eager-only callers retain lazy allocation."""
+        if self.workspace is None:
+            if self.keys.is_cuda and torch.cuda.is_current_stream_capturing():
+                raise ValueError('warm up compact graph workspace before capture')
+            self.workspace = FarSkipGraphWorkspace(
+                self.config, self.layout, self.num_heads, self.coarse, self.fine)
+            self.workspace.initialize(self.keys.transpose(1, 2), self.logical_length)
+            self.eager_workspace = None
+        return self.workspace
 
     def update(self, key_states, value_states, cache_kwargs=None):
+        self.validate_update(key_states, value_states)
+        pos = (cache_kwargs or {}).get('cache_position')
+        if pos is None or pos.shape != (1,) or pos.dtype != torch.long or pos.device != self.device:
+            raise ValueError('static far KV needs one device int64 cache position')
+        from .far_skip_accel import enabled, write_pair
+        if enabled(self.keys):
+            write_pair(self.keys, self.values, key_states, value_states, pos, self.layout)
+        else:
+            slot = self.layout.map(pos)
+            self.keys.index_copy_(2, slot, key_states)
+            self.values.index_copy_(2, slot, value_states)
+        return self.keys, self.values
+
+    def validate_update(self, key_states, value_states):
         for x, storage in ((key_states, self.keys), (value_states, self.values)):
             if (x.shape != (*storage.shape[:2], 1, storage.shape[-1])
                     or x.dtype != storage.dtype or x.device != storage.device
                     or x.requires_grad):
                 raise ValueError('static far KV must match detached single-token storage')
-        pos = (cache_kwargs or {}).get('cache_position')
-        if pos is None or pos.shape != (1,) or pos.dtype != torch.long or pos.device != self.device:
-            raise ValueError('static far KV needs one device int64 cache position')
-        slot = self.layout.map(pos)
-        self.keys.index_copy_(2, slot, key_states)
-        self.values.index_copy_(2, slot, value_states)
-        return self.keys, self.values
 
     def reset(self):
         raise ValueError('refill far static cache from a fresh prefill and recapture')
@@ -120,11 +144,36 @@ def try_far_skip_static(module, q, k, v, cache, mask, batch_ctx):
     from .cuda_graph_state import graph_state
     gs = graph_state()
     if gs.enabled:
+        layer.prepare_graph_workspace()
         pos = gs.pos_buf
     else:
-        if not 1 <= batch_ctx.seq_lens[0] <= layer.max_cache_len:
+        length = batch_ctx.seq_lens[0]
+        if not 1 <= length <= layer.max_cache_len:
             raise ValueError('decode position exceeds static cache capacity')
-        pos = torch.tensor([batch_ctx.seq_lens[0]-1], dtype=torch.long, device=q.device)
+        if length != layer.logical_length + 1:
+            raise ValueError('staged compact decode requires the next position; refill after replay or rewind')
+        if q.is_cuda and torch.cuda.is_current_stream_capturing():
+            raise ValueError('enable graph state before compact CUDA capture')
+        layer.validate_update(k, v)
+        # Host length is already known in staged decode. Do not pay for device
+        # boundary arithmetic, padded candidates or per-layer H2D positions.
+        slot = layer.layout.slot(length-1)
+        from .far_skip_accel import enabled, write_pair
+        if enabled(layer.keys):
+            write_pair(layer.keys, layer.values, k, v, length-1, layer.layout)
+        else:
+            layer.keys[:, :, slot:slot+1].copy_(k)
+            layer.values[:, :, slot:slot+1].copy_(v)
+        layer.logical_length = length
+        layer.workspace = None
+        if layer.eager_workspace is None:
+            layer.eager_workspace = FarSkipWorkspace()
+        q, k, v = q.transpose(1, 2), layer.keys.transpose(1, 2), layer.values.transpose(1, 2)
+        selection = select_far_skip(q, k, length, layer.config, layer.coarse, layer.fine,
+                                    scale=module.scaling, layout=layer.layout,
+                                    workspace=layer.eager_workspace)
+        return attend_far_skip(q, k, v, selection, layer.config, scale=module.scaling,
+                               layout=layer.layout, workspace=layer.eager_workspace)
     k, v = layer.update(k, v, {'cache_position': pos})
     q, k, v = (t.transpose(1, 2) for t in (q, k, v))
     return layer.workspace(q, k, v, pos+1, module.scaling)

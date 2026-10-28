@@ -1,0 +1,47 @@
+{
+  "args": {
+    "device": "cpu",
+    "length": 8192,
+    "layers": 2,
+    "skip_layers": [
+      1
+    ],
+    "steps": 4,
+    "out": "agent_doc/results/tli_skip_noskip_fusion_20261026/residency_cpu.json"
+  },
+  "cuda_executed": false,
+  "torch": "2.8.0+cpu",
+  "gpu": null,
+  "gate_source": "synthetic per-prompt pending decisions; freeze_dyn_dgate executed; no quality claim",
+  "memory_before_prefill": null,
+  "memory_after_prefill": null,
+  "memory_after_setup_before_releasing_source": null,
+  "memory_after_release": null,
+  "source_references_released": true,
+  "kv_storage_before_bytes": 134217728,
+  "kv_storage_after_bytes": 102301696,
+  "layers": [
+    {
+      "layer": 0,
+      "skip": false,
+      "capacity": 8197,
+      "kv_storage_bytes": 67149824
+    },
+    {
+      "layer": 1,
+      "skip": true,
+      "capacity": 4291,
+      "kv_storage_bytes": 35151872
+    }
+  ],
+  "setup_ms": 61.22491700807586,
+  "ring_append_wall_ms": null,
+  "timing_scope": "setup separately; append-only loop across skipped layers; no attention/indexer",
+  "source_sha256": {
+    "/workspace/scratch/7d83fead945d/repo/exp/bench/far_skip_residency.py": "c001bfa8070c20ec06550ca5ba4a6daefceed07309e778e84e0033fd83a4f08d",
+    "sparse_attn/ops/far_skip_cache.py": "71a9e00f5d3a7086b26ae475a13024283c56bd29ffd3b75a4c5c1175111ba2cf",
+    "sparse_attn/ops/far_skip_static.py": "69421a0fbc51eccf58b839ef25a5a4443738cfccf14f2b4b1292aa55e58da3fd",
+    "sparse_attn/ops/tli_static_cache.py": "f666751c656d7843e9fcde297b18f4a4c3b50eaa3f82d46ad1bf48abe10f6a48",
+    "sparse_attn/indexer/tli_indexer.py": "d25b256329c8a31359049a903734e5fe32aec165c5e0604ef58ed94186a0d3e2"
+  }
+}

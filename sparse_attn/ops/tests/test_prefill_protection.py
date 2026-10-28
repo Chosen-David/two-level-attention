@@ -4,6 +4,7 @@ Run: python -m unittest discover -s sparse_attn/ops/tests -v
 The deterministic selector isolates adapter semantics from ranking/quantization.
 """
 import unittest
+from unittest.mock import patch
 from types import SimpleNamespace
 
 import torch
@@ -32,6 +33,13 @@ class ProtectionIndexer:
 
 
 class PrefillProtectionTest(unittest.TestCase):
+    def setUp(self):
+        # These fixtures allocate CPU tensors only. CPU-only Torch cannot
+        # query CUDA stream capture; indexing/scoring/masks remain real.
+        capture = patch('torch.cuda.is_current_stream_capturing', return_value=False)
+        capture.start()
+        self.addCleanup(capture.stop)
+
     def test_real_indexer_sinkswa_only_does_not_restore_disabled_sink(self):
         from sparse_attn.indexer import TLIIndexer
 
@@ -104,3 +112,4 @@ class PrefillProtectionTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

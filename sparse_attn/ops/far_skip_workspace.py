@@ -7,7 +7,8 @@ import torch
 
 
 class FarSkipWorkspace:
-    def __init__(self):
+    def __init__(self, *, fixed_shapes=False):
+        self.fixed_shapes = fixed_shapes
         self._ranges = {}
         self._buffers = {}
         self._signature = None
@@ -15,6 +16,20 @@ class FarSkipWorkspace:
         self.first = self.stop = 0
         self.summaries = None
         self.pages_rebuilt = 0
+
+    # Fixed-shape callers allocate during setup/warmup and never shrink buffers.
+    # Variable eager callers retain geometric growth to amortize reallocations.
+    def scratch(self, name, shape, like, *, dtype=None):
+        dtype = like.dtype if dtype is None else dtype
+        size = 1
+        for n in shape:
+            size *= n
+        key = (name, like.device, dtype)
+        buf = self._buffers.get(key)
+        if buf is None or buf.numel() < size:
+            buf = torch.empty(max(1, size if self.fixed_shapes else 1 << (size-1).bit_length()), device=like.device, dtype=dtype)
+            self._buffers[key] = buf
+        return buf[:size].view(shape)
 
     def ids(self, count, device):
         key = torch.device(device)
@@ -40,7 +55,7 @@ class FarSkipWorkspace:
         key = (name, parts[0].device, parts[0].dtype)
         buf = self._buffers.get(key)
         if buf is None or buf.numel() < size:
-            buf = parts[0].new_empty(max(1, 1 << (size - 1).bit_length()))
+            buf = parts[0].new_empty(max(1, size if self.fixed_shapes else 1 << (size - 1).bit_length()))
             self._buffers[key] = buf
         out = buf[:size].view(shape)
         return torch.cat(parts, dim=dim, out=out)
@@ -94,6 +109,10 @@ def stable_topk_positions(scores, count, workspace, *, valid=None):
             validity = valid.gather(-1, order).to(torch.int8)
             order = order.gather(-1, validity.argsort(dim=-1, descending=True, stable=True))
         return order[..., :count].sort(-1).values
+    from .far_skip_accel import enabled, order_keys
+    if enabled(scores):
+        keys = order_keys(scores, valid, workspace)
+        return keys.topk(count, dim=-1, sorted=False).indices.sort(-1).values
     # +0 canonicalizes -0, which must tie with +0 under numerical sorting.
     normalized = scores.float() + 0.0
     bits = normalized.contiguous().view(torch.int32).to(torch.int64)

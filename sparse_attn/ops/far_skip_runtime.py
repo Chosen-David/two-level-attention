@@ -54,6 +54,8 @@ def try_far_skip_decode(module, q, k, v, cache, mask, cache_position, batch_ctx)
             return try_hybrid_batch_decode(module, q, k, v, cache, mask, batch_ctx)
         from .far_skip_static import try_far_skip_static
         return try_far_skip_static(module, q, k, v, cache, mask, batch_ctx)
+    # B=1 unpadded prefill is also used by the static/graph entry. Decode on
+    # DynamicCache still uses the original single-request eager contract.
     prefill = (type(cache) is DynamicCache and cache.get_seq_length(module.layer_idx) == 0)
     if (module.training or torch.is_grad_enabled()
             or module.sliding_window is not None or (batch_ctx is not None and not (

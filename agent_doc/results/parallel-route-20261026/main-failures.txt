@@ -1,0 +1,38 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+__________________ test_lengths_refresh_and_share_within_step __________________
+tests/test_parallel_route_lifecycle.py:36: in test_lengths_refresh_and_share_within_step
+    assert new.tolist() == [8, 13]
+E   assert [7, 13] == [8, 13]
+E     
+E     At index 0 diff: 7 != 8
+E     Use -v to get more diff
+__________________ test_parallel_graph_uses_live_graph_route ___________________
+tests/test_parallel_route_lifecycle.py:52: in test_parallel_graph_uses_live_graph_route
+    result = route['_tl_decode_batched'](
+/tmp/tli-main-55c38d8-qwen.py:201: in _tl_decode_batched
+    mask, bs = prepare_mask_batched(indexer, q, k, lengths, self.scaling)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_parallel_route_lifecycle.py:43: in forbidden
+    pytest.fail('graph entered host-length eager selector')
+E   Failed: graph entered host-length eager selector
+________________ test_parallel_receipt_records_layer_number[1] _________________
+tests/test_parallel_route_lifecycle.py:70: in test_parallel_receipt_records_layer_number
+    assert recorded == [(4, 'tli_batch_indexer_parallel_eager')]
+E   AssertionError: assert [(namespace(s...allel_eager')] == [(4, 'tli_bat...allel_eager')]
+E     
+E     At index 0 diff: (namespace(scaling=1.0, layer_idx=4), 'tli_batch_indexer_parallel_eager') != (4, 'tli_batch_indexer_parallel_eager')
+E     Use -v to get more diff
+________________ test_parallel_receipt_records_layer_number[2] _________________
+tests/test_parallel_route_lifecycle.py:70: in test_parallel_receipt_records_layer_number
+    assert recorded == [(4, 'tli_batch_indexer_parallel_eager')]
+E   AssertionError: assert [(namespace(s...allel_eager')] == [(4, 'tli_bat...allel_eager')]
+E     
+E     At index 0 diff: (namespace(scaling=1.0, layer_idx=4), 'tli_batch_indexer_parallel_eager') != (4, 'tli_batch_indexer_parallel_eager')
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/test_parallel_route_lifecycle.py::test_lengths_refresh_and_share_within_step
+FAILED tests/test_parallel_route_lifecycle.py::test_parallel_graph_uses_live_graph_route
+FAILED tests/test_parallel_route_lifecycle.py::test_parallel_receipt_records_layer_number[1]
+FAILED tests/test_parallel_route_lifecycle.py::test_parallel_receipt_records_layer_number[2]
+4 failed in 6.16s

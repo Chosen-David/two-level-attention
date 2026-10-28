@@ -1,0 +1,1034 @@
+{
+  "scope": "same-width CPU/real CUDA only; no across-width quality parity claim",
+  "config": {
+    "baseline_root": "../iter-round3",
+    "device": "cpu",
+    "dtype": "float32",
+    "widths": [
+      32
+    ],
+    "modes": [
+      "eager",
+      "fixed"
+    ],
+    "quantize": false,
+    "capture": false,
+    "profile": true,
+    "length": 8192,
+    "near_len": 4096,
+    "near_pages": 32,
+    "steps": 2,
+    "warmup": 8,
+    "repeats": 1,
+    "seed": 20261028
+  },
+  "torch": "2.8.0+cpu",
+  "source_sha256": {
+    "baseline": {
+      "sparse_attn/ops/far_skip_workspace.py": "5013412bb3890a26b2c39e71f364685d5d50980807b7c4ccd9ecc1a9a8bfb71f",
+      "sparse_attn/ops/far_skip.py": "20d30c7e1a1de4afa7eae079236cb37b0ff8704022a6383d0b6b4857ebbabd5a",
+      "sparse_attn/ops/far_skip_static.py": "69977fcb32a48554782dc401da8834843f5b7f0a091a0328536083fbd7cc57f3",
+      "sparse_attn/ops/far_skip_runtime.py": "d639ae3c2f6b44ee54165655eec8a72788a9730336a77d10cc70400a04141c73",
+      "sparse_attn/ops/far_skip_cache.py": "51a56db1077bb693e71d04417748e938b2733a5146f8bf2a3c7e40cfbfdc53cb",
+      "sparse_attn/ops/far_skip_graph.py": "2de3ba2399026461190fab9e056d1b4f59e776ad1420e6a67e5cd94cee708ca4"
+    },
+    "candidate": {
+      "sparse_attn/ops/far_skip_workspace.py": "5013412bb3890a26b2c39e71f364685d5d50980807b7c4ccd9ecc1a9a8bfb71f",
+      "sparse_attn/ops/far_skip_subspace.py": "5f0a045cc8e17629945db376365ac585b6b88b5036aa06ed9e588d3c43f3b475",
+      "sparse_attn/ops/far_skip.py": "396c48fdfd726bad3fd6636552ac2f572bdadf612a9dead6457cc309ee076fb3",
+      "sparse_attn/ops/far_skip_static.py": "69977fcb32a48554782dc401da8834843f5b7f0a091a0328536083fbd7cc57f3",
+      "sparse_attn/ops/far_skip_runtime.py": "d639ae3c2f6b44ee54165655eec8a72788a9730336a77d10cc70400a04141c73",
+      "sparse_attn/ops/far_skip_cache.py": "51a56db1077bb693e71d04417748e938b2733a5146f8bf2a3c7e40cfbfdc53cb",
+      "sparse_attn/ops/far_skip_graph.py": "0dceddcbd6c4c7cd685a45bac736d81232dd5b725456f74fb658b8f9603ca2ce"
+    },
+    "harness": "851a00a174bc9b6772b54f63e9f22042724f8063ca1101b2290675ebc2be5e47"
+  },
+  "measurements": [
+    {
+      "width": 32,
+      "mode": "eager",
+      "repeat": 0,
+      "outputs_checked": 10,
+      "max_abs_error": 0.0,
+      "baseline": {
+        "setup_ms": 6.080729999666801,
+        "first_step_ms": 14.134873003058601,
+        "capture_ms": null,
+        "wall_ms": [
+          8.607085997937247,
+          7.9496759972244035
+        ],
+        "median_ms": 8.278380997580825,
+        "fine_key_cache_bytes": 0,
+        "kv_bytes": 18083840,
+        "profile": {
+          "ops": {
+            "aten::slice": {
+              "count": 34,
+              "self_cpu_us": 106.92000000000203
+            },
+            "aten::as_strided": {
+              "count": 92,
+              "self_cpu_us": 60.447999999999894
+            },
+            "aten::copy_": {
+              "count": 14,
+              "self_cpu_us": 42.284999999998774
+            },
+            "[memory]": {
+              "count": 101,
+              "self_cpu_us": 0.0
+            },
+            "aten::add": {
+              "count": 12,
+              "self_cpu_us": 50.17600000000033
+            },
+            "aten::remainder": {
+              "count": 5,
+              "self_cpu_us": 138.5999999999998
+            },
+            "aten::index_select": {
+              "count": 3,
+              "self_cpu_us": 40.29199999999946
+            },
+            "aten::empty": {
+              "count": 15,
+              "self_cpu_us": 21.052999999999315
+            },
+            "aten::select": {
+              "count": 11,
+              "self_cpu_us": 31.285999999999262
+            },
+            "aten::to": {
+              "count": 19,
+              "self_cpu_us": 7.9920000000004165
+            },
+            "aten::mul": {
+              "count": 5,
+              "self_cpu_us": 26.500999999999863
+            },
+            "aten::_to_copy": {
+              "count": 8,
+              "self_cpu_us": 19.03900000000135
+            },
+            "aten::empty_strided": {
+              "count": 9,
+              "self_cpu_us": 17.326000000000136
+            },
+            "aten::reshape": {
+              "count": 17,
+              "self_cpu_us": 57.92599999999868
+            },
+            "aten::view": {
+              "count": 20,
+              "self_cpu_us": 19.57000000000005
+            },
+            "aten::einsum": {
+              "count": 2,
+              "self_cpu_us": 40.54300000000046
+            },
+            "aten::unsqueeze": {
+              "count": 14,
+              "self_cpu_us": 18.641000000000417
+            },
+            "aten::permute": {
+              "count": 10,
+              "self_cpu_us": 15.657000000000721
+            },
+            "aten::_reshape_alias": {
+              "count": 7,
+              "self_cpu_us": 3.9749999999993406
+            },
+            "aten::bmm": {
+              "count": 2,
+              "self_cpu_us": 153.77200000000084
+            },
+            "aten::resolve_conj": {
+              "count": 4,
+              "self_cpu_us": 0.8809999999994034
+            },
+            "aten::mean": {
+              "count": 2,
+              "self_cpu_us": 16.37599999999884
+            },
+            "aten::sum": {
+              "count": 2,
+              "self_cpu_us": 24.67599999999925
+            },
+            "aten::fill_": {
+              "count": 2,
+              "self_cpu_us": 7.451000000000818
+            },
+            "aten::div_": {
+              "count": 2,
+              "self_cpu_us": 17.51699999999971
+            },
+            "aten::__rshift__": {
+              "count": 2,
+              "self_cpu_us": 10.734000000000151
+            },
+            "aten::bitwise_and": {
+              "count": 2,
+              "self_cpu_us": 16.01400000000058
+            },
+            "aten::bitwise_xor": {
+              "count": 2,
+              "self_cpu_us": 7.099999999999682
+            },
+            "aten::isnan": {
+              "count": 2,
+              "self_cpu_us": 3.3339999999996053
+            },
+            "aten::ne": {
+              "count": 2,
+              "self_cpu_us": 13.491000000000213
+            },
+            "aten::where": {
+              "count": 7,
+              "self_cpu_us": 48.3530000000012
+            },
+            "aten::scalar_tensor": {
+              "count": 2,
+              "self_cpu_us": 4.557999999999993
+            },
+            "aten::rsub": {
+              "count": 2,
+              "self_cpu_us": 6.289000000000442
+            },
+            "aten::sub": {
+              "count": 5,
+              "self_cpu_us": 42.88600000000042
+            },
+            "aten::topk": {
+              "count": 2,
+              "self_cpu_us": 72.49899999999934
+            },
+            "aten::sort": {
+              "count": 2,
+              "self_cpu_us": 112.06799999999953
+            },
+            "aten::arange": {
+              "count": 4,
+              "self_cpu_us": 16.835000000000036
+            },
+            "aten::resize_": {
+              "count": 2,
+              "self_cpu_us": 1.3520000000003165
+            },
+            "aten::index": {
+              "count": 4,
+              "self_cpu_us": 5662.2300000000005
+            },
+            "aten::expand": {
+              "count": 9,
+              "self_cpu_us": 13.300999999999704
+            },
+            "aten::cat": {
+              "count": 4,
+              "self_cpu_us": 36.44200000000046
+            },
+            "aten::narrow": {
+              "count": 7,
+              "self_cpu_us": 7.993999999999005
+            },
+            "aten::lt": {
+              "count": 3,
+              "self_cpu_us": 28.702999999999747
+            },
+            "aten::softmax": {
+              "count": 1,
+              "self_cpu_us": 2.8739999999997963
+            },
+            "aten::_softmax": {
+              "count": 1,
+              "self_cpu_us": 30.176000000000386
+            },
+            "aten::gather": {
+              "count": 1,
+              "self_cpu_us": 10.256000000000313
+            },
+            "aten::scaled_dot_product_attention": {
+              "count": 1,
+              "self_cpu_us": 8.303000000000793
+            },
+            "aten::_scaled_dot_product_flash_attention_for_cpu": {
+              "count": 1,
+              "self_cpu_us": 482.3669999999993
+            },
+            "aten::empty_like": {
+              "count": 1,
+              "self_cpu_us": 2.923999999999978
+            },
+            "aten::transpose": {
+              "count": 6,
+              "self_cpu_us": 9.494000000000597
+            }
+          },
+          "positive_self_allocation_bytes": 7083756
+        }
+      },
+      "candidate": {
+        "setup_ms": 2.2953279985813424,
+        "first_step_ms": 10.015709001891082,
+        "capture_ms": null,
+        "wall_ms": [
+          3.6728730010509025,
+          3.285220001998823
+        ],
+        "median_ms": 3.479046501524863,
+        "fine_key_cache_bytes": 2260480,
+        "kv_bytes": 18083840,
+        "profile": {
+          "ops": {
+            "aten::slice": {
+              "count": 32,
+              "self_cpu_us": 40.51200000000006
+            },
+            "aten::as_strided": {
+              "count": 83,
+              "self_cpu_us": 33.12199999999886
+            },
+            "aten::copy_": {
+              "count": 15,
+              "self_cpu_us": 22.86499999999981
+            },
+            "[memory]": {
+              "count": 97,
+              "self_cpu_us": 0.0
+            },
+            "aten::add": {
+              "count": 12,
+              "self_cpu_us": 33.32099999999997
+            },
+            "aten::remainder": {
+              "count": 4,
+              "self_cpu_us": 45.678000000000225
+            },
+            "aten::index_select": {
+              "count": 3,
+              "self_cpu_us": 16.15600000000012
+            },
+            "aten::empty": {
+              "count": 16,
+              "self_cpu_us": 11.846999999999525
+            },
+            "aten::select": {
+              "count": 11,
+              "self_cpu_us": 13.15900000000039
+            },
+            "aten::to": {
+              "count": 18,
+              "self_cpu_us": 5.659999999999684
+            },
+            "aten::mul": {
+              "count": 4,
+              "self_cpu_us": 12.717000000000098
+            },
+            "aten::_to_copy": {
+              "count": 7,
+              "self_cpu_us": 11.828000000000827
+            },
+            "aten::empty_strided": {
+              "count": 8,
+              "self_cpu_us": 8.961999999999534
+            },
+            "aten::reshape": {
+              "count": 13,
+              "self_cpu_us": 20.607999999999834
+            },
+            "aten::view": {
+              "count": 19,
+              "self_cpu_us": 12.53899999999993
+            },
+            "aten::einsum": {
+              "count": 2,
+              "self_cpu_us": 25.71699999999953
+            },
+            "aten::unsqueeze": {
+              "count": 10,
+              "self_cpu_us": 9.224000000000729
+            },
+            "aten::permute": {
+              "count": 10,
+              "self_cpu_us": 8.973000000000297
+            },
+            "aten::_reshape_alias": {
+              "count": 4,
+              "self_cpu_us": 2.303999999999917
+            },
+            "aten::bmm": {
+              "count": 2,
+              "self_cpu_us": 153.5330000000003
+            },
+            "aten::resolve_conj": {
+              "count": 4,
+              "self_cpu_us": 0.3199999999998795
+            },
+            "aten::mean": {
+              "count": 2,
+              "self_cpu_us": 7.511000000000081
+            },
+            "aten::sum": {
+              "count": 2,
+              "self_cpu_us": 37.21600000000012
+            },
+            "aten::fill_": {
+              "count": 2,
+              "self_cpu_us": 3.144999999999868
+            },
+            "aten::div_": {
+              "count": 2,
+              "self_cpu_us": 14.051999999999907
+            },
+            "aten::__rshift__": {
+              "count": 2,
+              "self_cpu_us": 8.393000000000143
+            },
+            "aten::bitwise_and": {
+              "count": 2,
+              "self_cpu_us": 9.443999999999903
+            },
+            "aten::bitwise_xor": {
+              "count": 2,
+              "self_cpu_us": 5.878999999999849
+            },
+            "aten::isnan": {
+              "count": 2,
+              "self_cpu_us": 1.3719999999999004
+            },
+            "aten::ne": {
+              "count": 2,
+              "self_cpu_us": 8.333000000000027
+            },
+            "aten::where": {
+              "count": 7,
+              "self_cpu_us": 36.567000000000064
+            },
+            "aten::scalar_tensor": {
+              "count": 2,
+              "self_cpu_us": 2.2329999999999472
+            },
+            "aten::rsub": {
+              "count": 2,
+              "self_cpu_us": 2.6619999999999777
+            },
+            "aten::sub": {
+              "count": 5,
+              "self_cpu_us": 14.081999999999823
+            },
+            "aten::topk": {
+              "count": 2,
+              "self_cpu_us": 68.12299999999993
+            },
+            "aten::sort": {
+              "count": 2,
+              "self_cpu_us": 103.45400000000001
+            },
+            "aten::arange": {
+              "count": 4,
+              "self_cpu_us": 56.36600000000004
+            },
+            "aten::resize_": {
+              "count": 2,
+              "self_cpu_us": 1.6520000000001573
+            },
+            "aten::index": {
+              "count": 3,
+              "self_cpu_us": 1210.9330000000002
+            },
+            "aten::expand": {
+              "count": 7,
+              "self_cpu_us": 5.827999999999747
+            },
+            "aten::cat": {
+              "count": 4,
+              "self_cpu_us": 20.410999999999945
+            },
+            "aten::narrow": {
+              "count": 7,
+              "self_cpu_us": 5.057999999999879
+            },
+            "aten::contiguous": {
+              "count": 1,
+              "self_cpu_us": 1.2520000000000664
+            },
+            "aten::clone": {
+              "count": 1,
+              "self_cpu_us": 1.7229999999998427
+            },
+            "aten::empty_like": {
+              "count": 2,
+              "self_cpu_us": 3.1550000000002
+            },
+            "aten::lt": {
+              "count": 3,
+              "self_cpu_us": 18.378000000000043
+            },
+            "aten::gather": {
+              "count": 2,
+              "self_cpu_us": 506.674
+            },
+            "aten::softmax": {
+              "count": 1,
+              "self_cpu_us": 1.5329999999999018
+            },
+            "aten::_softmax": {
+              "count": 1,
+              "self_cpu_us": 26.278999999999996
+            },
+            "aten::scaled_dot_product_attention": {
+              "count": 1,
+              "self_cpu_us": 8.842999999999847
+            },
+            "aten::_scaled_dot_product_flash_attention_for_cpu": {
+              "count": 1,
+              "self_cpu_us": 305.52200000000084
+            },
+            "aten::transpose": {
+              "count": 6,
+              "self_cpu_us": 195.31299999999965
+            }
+          },
+          "positive_self_allocation_bytes": 7081688
+        }
+      }
+    },
+    {
+      "width": 32,
+      "mode": "fixed",
+      "repeat": 0,
+      "outputs_checked": 10,
+      "max_abs_error": 0.0,
+      "baseline": {
+        "setup_ms": 8.560976999433478,
+        "first_step_ms": 6.435776002035709,
+        "capture_ms": null,
+        "wall_ms": [
+          7.243893000122625,
+          7.46168100158684
+        ],
+        "median_ms": 7.3527870008547325,
+        "fine_key_cache_bytes": 0,
+        "kv_bytes": 18083840,
+        "profile": {
+          "ops": {
+            "aten::fill_": {
+              "count": 4,
+              "self_cpu_us": 4.856000000000122
+            },
+            "aten::copy_": {
+              "count": 25,
+              "self_cpu_us": 250.9559999999998
+            },
+            "aten::lt": {
+              "count": 13,
+              "self_cpu_us": 40.75799999999981
+            },
+            "[memory]": {
+              "count": 200,
+              "self_cpu_us": 0.0
+            },
+            "aten::sub": {
+              "count": 12,
+              "self_cpu_us": 26.1470000000009
+            },
+            "aten::remainder": {
+              "count": 7,
+              "self_cpu_us": 55.39400000000009
+            },
+            "aten::add": {
+              "count": 17,
+              "self_cpu_us": 38.66799999999955
+            },
+            "aten::where": {
+              "count": 19,
+              "self_cpu_us": 95.67300000000023
+            },
+            "aten::empty": {
+              "count": 34,
+              "self_cpu_us": 23.564999999998435
+            },
+            "aten::index_copy_": {
+              "count": 3,
+              "self_cpu_us": 45.182000000000016
+            },
+            "aten::as_strided": {
+              "count": 151,
+              "self_cpu_us": 51.132000000000204
+            },
+            "aten::clamp": {
+              "count": 4,
+              "self_cpu_us": 8.380999999999887
+            },
+            "aten::to": {
+              "count": 32,
+              "self_cpu_us": 8.115999999999673
+            },
+            "aten::floor_divide": {
+              "count": 3,
+              "self_cpu_us": 4.546000000000049
+            },
+            "aten::mul": {
+              "count": 9,
+              "self_cpu_us": 20.85200000000026
+            },
+            "aten::maximum": {
+              "count": 3,
+              "self_cpu_us": 5.378000000000043
+            },
+            "aten::slice": {
+              "count": 49,
+              "self_cpu_us": 41.658999999998514
+            },
+            "aten::gt": {
+              "count": 1,
+              "self_cpu_us": 3.033999999999992
+            },
+            "aten::expand_as": {
+              "count": 1,
+              "self_cpu_us": 1.72199999999998
+            },
+            "aten::expand": {
+              "count": 30,
+              "self_cpu_us": 43.103000000001884
+            },
+            "aten::scalar_tensor": {
+              "count": 8,
+              "self_cpu_us": 11.498000000000104
+            },
+            "aten::select": {
+              "count": 12,
+              "self_cpu_us": 22.502999999998167
+            },
+            "aten::unsqueeze": {
+              "count": 29,
+              "self_cpu_us": 25.996999999999275
+            },
+            "aten::index": {
+              "count": 4,
+              "self_cpu_us": 3288.1150000000016
+            },
+            "aten::reshape": {
+              "count": 21,
+              "self_cpu_us": 29.554999999999154
+            },
+            "aten::_reshape_alias": {
+              "count": 10,
+              "self_cpu_us": 3.935000000000059
+            },
+            "aten::bitwise_not": {
+              "count": 8,
+              "self_cpu_us": 20.539999999999566
+            },
+            "aten::masked_fill": {
+              "count": 8,
+              "self_cpu_us": 26.19399999999831
+            },
+            "aten::clone": {
+              "count": 9,
+              "self_cpu_us": 13.381000000001052
+            },
+            "aten::empty_like": {
+              "count": 10,
+              "self_cpu_us": 10.616000000000668
+            },
+            "aten::masked_fill_": {
+              "count": 8,
+              "self_cpu_us": 1287.9889999999996
+            },
+            "aten::view": {
+              "count": 25,
+              "self_cpu_us": 14.18199999999922
+            },
+            "aten::mean": {
+              "count": 3,
+              "self_cpu_us": 10.596999999999753
+            },
+            "aten::sum": {
+              "count": 3,
+              "self_cpu_us": 18.156999999999584
+            },
+            "aten::div_": {
+              "count": 3,
+              "self_cpu_us": 15.473000000000184
+            },
+            "aten::_to_copy": {
+              "count": 9,
+              "self_cpu_us": 13.990000000000691
+            },
+            "aten::empty_strided": {
+              "count": 10,
+              "self_cpu_us": 9.402999999998656
+            },
+            "aten::index_select": {
+              "count": 3,
+              "self_cpu_us": 83.01500000000044
+            },
+            "aten::einsum": {
+              "count": 2,
+              "self_cpu_us": 26.98899999999992
+            },
+            "aten::permute": {
+              "count": 10,
+              "self_cpu_us": 9.333999999999946
+            },
+            "aten::bmm": {
+              "count": 2,
+              "self_cpu_us": 86.18999999999983
+            },
+            "aten::resolve_conj": {
+              "count": 4,
+              "self_cpu_us": 0.32100000000014006
+            },
+            "aten::__rshift__": {
+              "count": 2,
+              "self_cpu_us": 7.780999999999835
+            },
+            "aten::bitwise_and": {
+              "count": 4,
+              "self_cpu_us": 13.04899999999975
+            },
+            "aten::bitwise_xor": {
+              "count": 2,
+              "self_cpu_us": 5.307999999999993
+            },
+            "aten::isnan": {
+              "count": 2,
+              "self_cpu_us": 2.14400000000046
+            },
+            "aten::ne": {
+              "count": 2,
+              "self_cpu_us": 8.732999999999606
+            },
+            "aten::rsub": {
+              "count": 2,
+              "self_cpu_us": 3.035999999999831
+            },
+            "aten::topk": {
+              "count": 2,
+              "self_cpu_us": 70.476
+            },
+            "aten::sort": {
+              "count": 2,
+              "self_cpu_us": 102.90400000000034
+            },
+            "aten::arange": {
+              "count": 4,
+              "self_cpu_us": 10.656999999999925
+            },
+            "aten::resize_": {
+              "count": 2,
+              "self_cpu_us": 1.3320000000001073
+            },
+            "aten::gather": {
+              "count": 4,
+              "self_cpu_us": 16.273999999999887
+            },
+            "aten::cat": {
+              "count": 8,
+              "self_cpu_us": 88.73399999999958
+            },
+            "aten::narrow": {
+              "count": 18,
+              "self_cpu_us": 10.736000000000558
+            },
+            "aten::__and__": {
+              "count": 1,
+              "self_cpu_us": 0.7210000000000036
+            },
+            "aten::_unsafe_view": {
+              "count": 1,
+              "self_cpu_us": 0.6710000000000491
+            },
+            "aten::softmax": {
+              "count": 1,
+              "self_cpu_us": 2.1130000000002838
+            },
+            "aten::_softmax": {
+              "count": 1,
+              "self_cpu_us": 26.7199999999998
+            },
+            "aten::scaled_dot_product_attention": {
+              "count": 1,
+              "self_cpu_us": 10.355999999999767
+            },
+            "aten::_scaled_dot_product_flash_attention_for_cpu": {
+              "count": 1,
+              "self_cpu_us": 362.9070000000029
+            },
+            "aten::transpose": {
+              "count": 6,
+              "self_cpu_us": 6.181999999999789
+            }
+          },
+          "positive_self_allocation_bytes": 13184714
+        }
+      },
+      "candidate": {
+        "setup_ms": 8.251912000559969,
+        "first_step_ms": 4.8825449994183145,
+        "capture_ms": null,
+        "wall_ms": [
+          5.64280099933967,
+          5.45954499830259
+        ],
+        "median_ms": 5.55117299882113,
+        "fine_key_cache_bytes": 2260480,
+        "kv_bytes": 18083840,
+        "profile": {
+          "ops": {
+            "aten::fill_": {
+              "count": 4,
+              "self_cpu_us": 4.8880000000000905
+            },
+            "aten::copy_": {
+              "count": 24,
+              "self_cpu_us": 203.74600000000004
+            },
+            "aten::lt": {
+              "count": 14,
+              "self_cpu_us": 44.049000000000234
+            },
+            "[memory]": {
+              "count": 215,
+              "self_cpu_us": 0.0
+            },
+            "aten::sub": {
+              "count": 14,
+              "self_cpu_us": 27.10099999999933
+            },
+            "aten::remainder": {
+              "count": 9,
+              "self_cpu_us": 56.7770000000001
+            },
+            "aten::add": {
+              "count": 18,
+              "self_cpu_us": 41.992999999999824
+            },
+            "aten::where": {
+              "count": 20,
+              "self_cpu_us": 135.98399999999972
+            },
+            "aten::empty": {
+              "count": 34,
+              "self_cpu_us": 23.14300000000108
+            },
+            "aten::index_copy_": {
+              "count": 4,
+              "self_cpu_us": 23.395999999999958
+            },
+            "aten::as_strided": {
+              "count": 144,
+              "self_cpu_us": 55.53300000000036
+            },
+            "aten::select": {
+              "count": 9,
+              "self_cpu_us": 18.379999999997466
+            },
+            "aten::unsqueeze": {
+              "count": 25,
+              "self_cpu_us": 26.459000000000373
+            },
+            "aten::slice": {
+              "count": 46,
+              "self_cpu_us": 41.81100000000026
+            },
+            "aten::index": {
+              "count": 3,
+              "self_cpu_us": 1235.8989999999992
+            },
+            "aten::expand": {
+              "count": 31,
+              "self_cpu_us": 29.19499999999894
+            },
+            "aten::reshape": {
+              "count": 17,
+              "self_cpu_us": 26.89500000000072
+            },
+            "aten::_reshape_alias": {
+              "count": 8,
+              "self_cpu_us": 3.2830000000006407
+            },
+            "aten::clamp": {
+              "count": 4,
+              "self_cpu_us": 7.752000000000123
+            },
+            "aten::to": {
+              "count": 32,
+              "self_cpu_us": 7.4509999999993966
+            },
+            "aten::floor_divide": {
+              "count": 3,
+              "self_cpu_us": 4.157000000000039
+            },
+            "aten::mul": {
+              "count": 8,
+              "self_cpu_us": 49.346000000000174
+            },
+            "aten::maximum": {
+              "count": 3,
+              "self_cpu_us": 5.688000000000045
+            },
+            "aten::gt": {
+              "count": 1,
+              "self_cpu_us": 1.9530000000000314
+            },
+            "aten::expand_as": {
+              "count": 1,
+              "self_cpu_us": 0.6410000000000196
+            },
+            "aten::scalar_tensor": {
+              "count": 8,
+              "self_cpu_us": 9.125999999999351
+            },
+            "aten::gather": {
+              "count": 6,
+              "self_cpu_us": 644.6690000000004
+            },
+            "aten::bitwise_not": {
+              "count": 8,
+              "self_cpu_us": 18.929000000000656
+            },
+            "aten::masked_fill": {
+              "count": 8,
+              "self_cpu_us": 24.534000000000276
+            },
+            "aten::clone": {
+              "count": 9,
+              "self_cpu_us": 12.326000000000874
+            },
+            "aten::empty_like": {
+              "count": 10,
+              "self_cpu_us": 10.68599999999924
+            },
+            "aten::masked_fill_": {
+              "count": 8,
+              "self_cpu_us": 1147.278
+            },
+            "aten::transpose": {
+              "count": 7,
+              "self_cpu_us": 7.219999999999743
+            },
+            "aten::mean": {
+              "count": 3,
+              "self_cpu_us": 10.156999999999698
+            },
+            "aten::sum": {
+              "count": 3,
+              "self_cpu_us": 16.684000000000083
+            },
+            "aten::div_": {
+              "count": 4,
+              "self_cpu_us": 14.391999999999598
+            },
+            "aten::_to_copy": {
+              "count": 8,
+              "self_cpu_us": 12.199000000000126
+            },
+            "aten::empty_strided": {
+              "count": 9,
+              "self_cpu_us": 8.79300000000012
+            },
+            "aten::index_select": {
+              "count": 2,
+              "self_cpu_us": 8.68400000000014
+            },
+            "aten::view": {
+              "count": 23,
+              "self_cpu_us": 13.55799999999897
+            },
+            "aten::einsum": {
+              "count": 2,
+              "self_cpu_us": 24.468999999999824
+            },
+            "aten::permute": {
+              "count": 10,
+              "self_cpu_us": 10.755999999999403
+            },
+            "aten::bmm": {
+              "count": 2,
+              "self_cpu_us": 81.72399999999959
+            },
+            "aten::resolve_conj": {
+              "count": 4,
+              "self_cpu_us": 0.3700000000003456
+            },
+            "aten::__rshift__": {
+              "count": 2,
+              "self_cpu_us": 7.182000000000016
+            },
+            "aten::bitwise_and": {
+              "count": 4,
+              "self_cpu_us": 10.4050000000002
+            },
+            "aten::bitwise_xor": {
+              "count": 2,
+              "self_cpu_us": 5.218000000000075
+            },
+            "aten::isnan": {
+              "count": 2,
+              "self_cpu_us": 1.552000000000021
+            },
+            "aten::ne": {
+              "count": 2,
+              "self_cpu_us": 8.833999999999719
+            },
+            "aten::rsub": {
+              "count": 2,
+              "self_cpu_us": 3.0540000000000873
+            },
+            "aten::topk": {
+              "count": 2,
+              "self_cpu_us": 70.72600000000034
+            },
+            "aten::sort": {
+              "count": 2,
+              "self_cpu_us": 109.14499999999975
+            },
+            "aten::arange": {
+              "count": 4,
+              "self_cpu_us": 9.384999999999422
+            },
+            "aten::resize_": {
+              "count": 2,
+              "self_cpu_us": 1.4710000000001173
+            },
+            "aten::cat": {
+              "count": 8,
+              "self_cpu_us": 43.03399999999931
+            },
+            "aten::narrow": {
+              "count": 18,
+              "self_cpu_us": 11.43700000000024
+            },
+            "aten::__and__": {
+              "count": 1,
+              "self_cpu_us": 0.9009999999999536
+            },
+            "aten::_unsafe_view": {
+              "count": 1,
+              "self_cpu_us": 0.7119999999999891
+            },
+            "aten::softmax": {
+              "count": 1,
+              "self_cpu_us": 1.8030000000003383
+            },
+            "aten::_softmax": {
+              "count": 1,
+              "self_cpu_us": 27.260999999999967
+            },
+            "aten::scaled_dot_product_attention": {
+              "count": 1,
+              "self_cpu_us": 8.182000000000698
+            },
+            "aten::_scaled_dot_product_flash_attention_for_cpu": {
+              "count": 1,
+              "self_cpu_us": 250.46700000000055
+            }
+          },
+          "positive_self_allocation_bytes": 13189351
+        }
+      }
+    }
+  ]
+}

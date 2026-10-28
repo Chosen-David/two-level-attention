@@ -122,12 +122,17 @@ class HybridBatchCacheBuilder:
                             if row_idx.enable_subspace else row_idx._qat_indices(source.keys.device))
                     row = FarSkipStaticLayer(source, row_idx.far_skip_config,
                                              layer.max_cache_len, coarse, fine)
+                    # Hybrid staged/replay both use device lengths. Seed from
+                    # prefill once, before any decode write or graph capture.
+                    row.prepare_graph_workspace()
                 else:
                     row = TLIStaticLayer(layer.max_cache_len, 1)
                     row.lazy_initialization(source.keys)
                     row.keys[..., :length, :].copy_(source.keys)
                     row.values[..., :length, :].copy_(source.values)
                     row.cumulative_length = length
+                    from .far_skip_workspace import FarSkipWorkspace
+                    row._linear_attention_workspace = FarSkipWorkspace(fixed_shapes=True)
                 layer.rows.append(row)
                 layer.indexers.append(row_idx)
                 if layer.cu is None:
@@ -158,15 +163,19 @@ class HybridBatchCacheBuilder:
         return self.cache
 
 
-def _attend_linear(q, k, v, mask, budget, scale):
+def _attend_linear(q, k, v, mask, budget, scale, workspace=None):
     """Fixed-size gather/SDPA, including short contexts; no nonzero/item sync."""
     h, length, d = k.shape[2], k.shape[1], k.shape[-1]
     count = min(length, budget)
     valid, positions = mask[0, 0].to(torch.int32).topk(count, dim=-1, sorted=False)
     valid = valid.bool()
-    heads = torch.arange(h, device=k.device)[:, None]
-    kk = k[0][positions, heads].masked_fill(~valid[..., None], 0)
-    vv = v[0][positions, heads].masked_fill(~valid[..., None], 0)
+    from .far_skip_accel import enabled, gather
+    if workspace is not None and enabled(k):
+        kk, vv = gather(k, positions, None, workspace, other=v, valid=valid)
+    else:
+        heads = torch.arange(h, device=k.device)[:, None]
+        kk = k[0][positions, heads].masked_fill(~valid[..., None], 0)
+        vv = v[0][positions, heads].masked_fill(~valid[..., None], 0)
     groups = q.shape[2] // h
     out = F.scaled_dot_product_attention(
         q[0, 0].reshape(h, 1, groups, d), kk[:, None], vv[:, None],
@@ -191,12 +200,7 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
     outputs = []
     for b, (row, idx) in enumerate(zip(layer.rows, layer.indexers)):
         p, vl, active = pos[b:b+1], lengths[b:b+1], alive[b:b+1]
-        slot = row.layout.map(p) if isinstance(row, FarSkipStaticLayer) else p
-        # Dead rows keep their last valid KV exactly. Avoid a Python branch on
-        # alive: EOS changes during graph replay while kernel shapes stay fixed.
-        for storage, incoming in ((row.keys, k), (row.values, v)):
-            old = storage.index_select(2, slot)
-            storage.index_copy_(2, slot, torch.where(active.view(1, 1, 1, 1), incoming[b:b+1], old))
+        write_hybrid_row(row, k[b:b+1], v[b:b+1], p, active)
         qq, kk, vv = q[b:b+1].transpose(1, 2), row.keys.transpose(1, 2), row.values.transpose(1, 2)
         if isinstance(row, FarSkipStaticLayer):
             out = row.workspace(qq, kk, vv, vl, module.scaling)
@@ -205,6 +209,22 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
                 index = idx.prepare_index(kk, layer.cu)
                 selection = idx.compute_mask_graph(qq, index, module.scaling, vl)
             budget = idx.args.tia_level2_topk + idx.sink_tokens + idx.sliding_window_size
-            out = _attend_linear(qq, kk, vv, selection, budget, module.scaling)
+            out = _attend_linear(qq, kk, vv, selection, budget, module.scaling,
+                                 row._linear_attention_workspace)
         outputs.append(out)
-    return torch.cat(outputs, dim=0)
+    return outputs[0] if len(outputs) == 1 else torch.cat(outputs, dim=0)
+
+
+def write_hybrid_row(row, k, v, position, alive):
+    """Same write contract for staged eager and Graph, ring and linear rows."""
+    from .far_skip_accel import enabled, write_pair
+    layout = row.layout if isinstance(row, FarSkipStaticLayer) else None
+    if enabled(row.keys):
+        # One launch replaces two old-slot reads, two where temporaries and
+        # two writes (plus ring mapping ops). No historical KV is read.
+        write_pair(row.keys, row.values, k, v, position, layout, alive=alive)
+        return
+    slot = layout.map(position) if layout is not None else position
+    for storage, incoming in ((row.keys, k), (row.values, v)):
+        old = storage.index_select(2, slot)
+        storage.index_copy_(2, slot, torch.where(alive.view(1, 1, 1, 1), incoming, old))

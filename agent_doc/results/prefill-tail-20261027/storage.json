@@ -1,0 +1,30 @@
+{
+  "torch": "2.8.0+cpu",
+  "cuda_available": false,
+  "scope": "CPU backing storage of FP32 cast only; no CUDA allocator or latency",
+  "main": "17e56e8fe30cf8037caf3ce7b38040e754f0521e",
+  "candidate_source_sha256": "3ecfae38d97634322df506d1b683d7ca1941aac2e14af75b06103392c8b8c2f6",
+  "baseline": [
+    {
+      "shape": [
+        2,
+        4,
+        4097,
+        128
+      ],
+      "backing_bytes": 16781312
+    }
+  ],
+  "candidate": [
+    {
+      "shape": [
+        2,
+        4,
+        256,
+        128
+      ],
+      "backing_bytes": 1048576
+    }
+  ],
+  "pair_indices_equal": true
+}

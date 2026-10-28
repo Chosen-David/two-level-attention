@@ -63,9 +63,15 @@ class HybridBatchRunner:
         self.lengths.copy_(torch.tensor(lengths, dtype=torch.long, device=device))
         self.pos.copy_(self.lengths-1)
         self.alive.copy_(torch.tensor(alive, dtype=torch.bool, device=device))
-        self.mask.zero_().masked_fill_(
-            self.positions.view(1, 1, 1, -1) >= self.lengths.view(-1, 1, 1, 1),
-            torch.finfo(self.mask.dtype).min)
+        if not self.injected:
+            self.mask.zero_().masked_fill_(
+                self.positions.view(1, 1, 1, -1) >= self.lengths.view(-1, 1, 1, 1),
+                torch.finfo(self.mask.dtype).min)
+        else:
+            # Append-only validation above guarantees at most one new valid
+            # slot per row. EOS rows rewrite their already-valid last slot.
+            # Keep the same mask address for native dense layers and replay.
+            self.mask[:, 0, 0].scatter_(1, self.pos[:, None], 0)
         self.ctx.seq_lens[:] = lengths
         self.ctx.gen_lens[:] = [n+int(a) for n, a in zip(self.ctx.gen_lens, alive)]
         self.ctx.alive[:] = alive
