@@ -150,12 +150,10 @@ class FarSkipGraphWorkspace:
             chosen_valid[..., None].expand(-1, -1, bs).reshape(h, -1), right < swa])
         sink = self.ids(cfg.sink_tokens).expand(h, -1)
         window = (torch.maximum(prefix, swa) + self.ids(cfg.window_tokens)).expand(h, -1)
-        protected = self.ws.cat('graph_protected', [sink, window])
-        protected_valid = self.ws.cat('graph_protected_valid', [sink < prefix, window < length])
         keep = min(cfg.token_budget - cfg.sink_tokens - cfg.window_tokens, candidates.shape[-1])
         if 0 < keep < candidates.shape[-1]:
-            pool = self.ws.cat('graph_pool', [candidates, protected])
-            pool_valid = self.ws.cat('graph_pool_valid', [valid, protected_valid])
+            pool = self.ws.cat('graph_pool', [candidates, sink, window])
+            pool_valid = self.ws.cat('graph_pool_valid', [valid, sink < prefix, window < length])
             if self.fine_cache is not None:
                 keys = self.fine_cache.gather(pool, pool_valid)
             else:
