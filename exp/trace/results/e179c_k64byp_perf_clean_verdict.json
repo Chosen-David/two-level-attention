@@ -1,0 +1,28 @@
+{
+  "schema": "e179c-k64byp-perf-clean-verdict",
+  "date": "2026-10-27",
+  "machine": "pc40 GPU0（H20-3e），Qwen3-8B，干净载体 tli_indexer md5 d38fc5a3（pristine 7bc1788 + bypass + K1P 融合修复）",
+  "question": "载体污染事故后重跑：K1=64 + L2 细筛旁路（选中块直连主注意力）vs K1=64+细筛 vs K1=128+细筛 的 decode TPOT",
+  "results": {
+    "bypass_tpot_ms": {
+      "L65536": 18.03,
+      "L131072": 18.71
+    },
+    "speedup_vs_dense": {
+      "L65536": 2.207,
+      "L131072": 3.588
+    },
+    "vs_k64_fine": {
+      "L65536": "+0.4% slower",
+      "L131072": "+1.3% slower"
+    },
+    "vs_k128_fine": {
+      "L65536": "-4.5% faster",
+      "L131072": "-3.5% faster"
+    },
+    "L32768": "架构性不可行（W_upper > T/8 @ 32K → graph capture 失败）"
+  },
+  "verdict": "干净载体实测下 bypass 劣于 K64+细筛 +0.4-1.3%：细筛链 ~0.07-0.24ms/步开销换来 attention 域 4× 缩减，净正收益。污染版 v2『bypass 更快』假象推翻",
+  "artifacts": "pc40 ~/e179c_perf/tli_graph_k64byp_clean_L{65536,131072}_a{1,2}.json + ~/e179c_perf.sh/.log",
+  "restoration_note": "原文件 2026-10-28 第二次丢失事故中从磁盘消失（.gitignore exp/ 无 git 保护）；本文件从 supervisor 报告 2026-10-27_2000.md §2.2 与 e179_k1_bypass_total_verdict.json 交叉核对重建，数字与两源逐项一致"
+}

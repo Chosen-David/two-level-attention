@@ -1,0 +1,27 @@
+{
+  "schema": "e179d-k128byp-verdict",
+  "date": "2026-10-27",
+  "machine": "pc02 GPU0/2/3（H20-3e）质量探针 + pc31 GPU0/1（性能臂与细筛同机锚），Qwen3-8B，干净载体 ~/two-level-attention@7bc1788+bypass+K1P（tli_indexer md5 d38fc5a3，queue.log idx 逐臂确认），RULER 128K 三 multikey 探针任务 n=100 bs=2（pred_ruler_batch.py，TLI_CUDA_GRAPH=1 + TLI_L2_BYPASS=1 + TLI_E127_W_UPPER=8704，--yarn），champion flags 单变量 tia_level1_topk 128",
+  "question": "用户 2026-10-27 17:00 指令：K1=128+直接注意力（L2 细筛旁路）vs K1=128+K2 细筛——细筛本身丢不丢精度、旁路值不值（旁路选择集 ⊇ 细筛集，G9a 语义）",
+  "results": {
+    "quality_128k_n100": {
+      "niah_multikey_1": 98.0,
+      "niah_multikey_2": 40.0,
+      "niah_multiquery": 14.0
+    },
+    "quality_vs_k128_fine": {
+      "K1_128_fine_T6_e147h": {"mk_1": 99.0, "mk_2": 39.0, "multiquery": 17.5},
+      "K1_128_bypass_E179d": {"mk_1": 98.0, "mk_2": 40.0, "multiquery": 14.0},
+      "delta": {"mk_1": -1.0, "mk_2": +1.0, "multiquery": -3.5},
+      "interpretation": "mk_1/mk_2 在 n=100 噪声带内持平；multiquery 名义 -3.5（该档 K1 不敏感、bypass/细筛 64→128 变化 2-4 分量级），旁路超集优势未兑现为质量增益——K2 细筛按预算裁 token 不丢针，细筛质量成本≈0"
+    },
+    "perf_128k_pc31": {
+      "K1_128_bypass_2runs_tpot_ms": [21.76, 21.78],
+      "K1_128_fine_anchor_2runs_tpot_ms": [19.40, 19.36],
+      "bypass_vs_fine": "+12.3%",
+      "feasibility": "64K/32K 架构性不可行（W_upper=8704，W×8=69632 > 65536 > 32768，Triton gather 容量门 T/8）；64K 细筛锚 18.91/18.92ms"
+    }
+  },
+  "verdict": "E179d 收官：K1=128+旁路质量 = K1=128+细筛水平（98/40/14 vs 99/39/17.5，噪声带内），性能慢 12.3%（128K 唯一可行档）——**细筛链在 K1=128 是免费午餐（不丢精度、换掉 12% TPOT）**，旁路无价值。合并 E179c（K1=64+旁路慢 0.4-1.3% 且质量 = K1=64 水平）：旁路第四选项全谱系判死——K1 越大旁路越不实用（W 门随 K1 收紧），K1=64 时旁路恢复 <4%。两级索引的 L2 细筛是成本有效设计（论文 Design 段机制证据）",
+  "artifacts": "pc02 ~/e179d_ruler/exp/results_ruler/Qwen3-8B/L131072/pred_bs2_k128byp/（3 任务 gen 目录 n=100 rc=0）+ queue.log + ~/e179d_k128byp_probe.sh；评分 /tmp/e179d_scored.txt（string_match_all 同码）；性能 pc31 ~/e179d_perf.log + ~/e179d_anchor.log（wt_e179d tar 管道部署，git init f29d288）；对照 T6 t6_ruler_q8b_L131072_champ.json + e147h_r128k_formal.json"
+}

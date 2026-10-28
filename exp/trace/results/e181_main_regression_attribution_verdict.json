@@ -1,0 +1,26 @@
+{
+  "schema": "e181-main-regression-attribution-verdict",
+  "date": "2026-10-27",
+  "machine": "pc33 GPU0 (H20-3e)，Qwen3-8B bf16，载体 /tmp/wt_c1@7bc1788 基座逐版替换 tli_indexer.py（唯一变量），E172 同款协议（e152v4_graph_latency.py 32K K1=64 champion flags，repeats2+warmup1，graph-mode graph）",
+  "question": "main 树（6c559c1，E175+E177 合入后）默认 decode 路径 +0.55ms/步 vs 7bc1788 生产口径的回归，由哪些 hunk 引入？（用户裁决 main 清理所需的 hunk 级归因）",
+  "method": "git diff 7bc1788..HEAD tli_indexer.py 共 36 hunk（871 行，大部分为注释删减）；GPT 子代理逐 hunk 语义分析排除构造期/冷路径/prefill 路径，锁定 compute_mask_graph 主体 3 处嫌疑；同机 A/B：main HEAD 版（9c069b9b）baseline → 单 hunk 回退 ×3 → 三 hunk 全回退，另跑 pristine 锚（E180c k64ref 同机 17.728ms）",
+  "results": {
+    "tpot_ms_32k_k64": {
+      "main_HEAD_9c069b9b": 18.26,
+      "rev14_only_去sel&ar_tok<S_real": 18.08,
+      "rev13_only_去masked_fill加|~keep2": 18.16,
+      "rev12_only_去哨兵where": 18.15,
+      "rev3_三hunk全回退": 17.90,
+      "pristine_854f2567_同机锚": 17.728
+    },
+    "attribution": {
+      "hunk14_sel_pad_AND": {"lines": "main L4491 sel = sel & (ar_tok < S_real).view(1,1,1,-1)", "cost_ms": 0.18, "nature": "pad 区清零守卫：生产几何下 pad 区不被候选选中 → 值不变纯成本，全宽域 [1,1,8,~135k] bool AND + 比较 ×36 层录进 graph"},
+      "hunk13_masked_fill_keep2": {"lines": "main L4443 p.masked_fill(~mid_slot | ~keep2, -inf)", "cost_ms": 0.10, "nature": "槽域 [8,8320] 净增 2 kernel/层（~keep2 + |）：垃圾槽本已被 mid_slot 掩掉 → 值不变纯成本"},
+      "hunk12_sentinel_where": {"lines": "main L4358 cand_idx2 = torch.where(keep2, cand_idx2, S_cap-1)", "cost_ms": 0.11, "nature": "槽域 int64 where ×36 层：非页对齐容量才需要的哨兵重定向，生产稳态 far/near/byp 槽全有效 → 值不变纯成本"},
+      "residual_other": {"cost_ms": 0.17, "nature": "三 hunk 之外残余（≈单 hunk 之和 0.39 与 rev3 实测 0.36 基本吻合后仍差 pristine 0.17），候选 = swa_byp_cond 追加条件 2×0-dim kernel + 其他微 op；未逐项归因"}
+    },
+    "bitexact": "main baseline vs rev3 gen_tokens 逐位一致（e2e 32K K1=64）——三守卫在生产几何下值中立（防御性纯成本），回退不改变任何输出 token"
+  },
+  "verdict": "E181 归因收官：main 树 +0.53ms/步（18.26 vs 17.728 同机）中 ~0.39ms（74%）来自 E175/E177 合入的三处 compute_mask_graph 防御性守卫（#14 pad AND 0.18 / #12 哨兵 where 0.11 / #13 masked_fill 0.10），残余 0.17ms 未逐项归因。三守卫生产几何下值中立（bitexact 证实）——正确修法不是删除而是 host 侧条件门控（仅非页对齐/pad 越界/垃圾槽场景激活）。主表安全（E172/E173/E174 全部 pristine 7bc1788 口径）；该回归只影响 6c559c1 后 main HEAD 的 decode 性能。清理决策留用户",
+  "artifacts": "本机 /tmp/e181_ab/{main_baseline,main_rev14,main_rev13,main_rev12,main_revert3}_32k.json（5 格）+ diff 分析 /tmp/main_diff.txt + 变体 /tmp/main_{rev12,rev13,rev14,revert3}_indexer.py；pristine 锚 = e180c_k64ref（同机同日）；回归首次实证 = e179 污染事故 pristine A/B（17.70 vs 18.25，pc40）"
+}

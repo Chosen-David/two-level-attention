@@ -1,0 +1,643 @@
+{
+  "description": "TLI 论文全 baseline 分数汇总（标准化格式）",
+  "date": "2026-10-28",
+  "schema": "Unified format: {method, benchmark, context_length, model, AVG, tasks, source_file}",
+  "results": {
+    "RULER_32K/FFD_delta5": {
+      "AVG": 87.91,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 98.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 100.0,
+        "niah_multikey_3": 95.0,
+        "niah_multiquery": 100.0,
+        "niah_multivalue": 100.0,
+        "cwe": 66.0,
+        "fwe": 100.0,
+        "vt": 9.0
+      },
+      "model": "Llama-3.1-8B",
+      "file": "llama31_8b_ruler32k_ffd_delta5.json"
+    },
+    "RULER_32K/FFD_delta7": {
+      "AVG": 88.73,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 98.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 100.0,
+        "niah_multikey_3": 98.0,
+        "niah_multiquery": 100.0,
+        "niah_multivalue": 100.0,
+        "cwe": 69.0,
+        "fwe": 100.0,
+        "vt": 12.0
+      },
+      "model": "Llama-3.1-8B",
+      "file": "llama31_8b_ruler32k_ffd_delta7.json"
+    },
+    "RULER_32K/FullKV_Llama": {
+      "AVG": 95.36,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 98.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 100.0,
+        "niah_multikey_3": 100.0,
+        "niah_multiquery": 100.0,
+        "niah_multivalue": 100.0,
+        "cwe": 52.0,
+        "fwe": 100.0,
+        "vt": 100.0
+      },
+      "model": "Llama-3.1-8B",
+      "file": "llama31_8b_ruler32k_fullkv_llama.json"
+    },
+    "LB/AsyncTLS": {
+      "AVG": 45.13,
+      "tasks": {
+        "2wikimqa": 39.3,
+        "gov_report": 32.63,
+        "hotpotqa": 48.23,
+        "lcc": 67.61,
+        "multi_news": 24.67,
+        "multifieldqa_en": 50.85,
+        "musique": 21.62,
+        "narrativeqa": 18.74,
+        "passage_count": 0.5,
+        "passage_retrieval_en": 97.25,
+        "qasper": 45.32,
+        "qmsum": 23.17,
+        "repobench": 58.24,
+        "samsum": 43.36,
+        "trec": 69.5,
+        "triviaqa": 81.14
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_longbench_asynctls.json"
+    },
+    "LB/FASA": {
+      "AVG": 35.15,
+      "tasks": {
+        "2wikimqa": 28.57,
+        "gov_report": 32.07,
+        "hotpotqa": 14.75,
+        "lcc": 62.66,
+        "multi_news": 25.39,
+        "multifieldqa_en": 42.03,
+        "musique": 5.77,
+        "narrativeqa": 3.19,
+        "passage_count": 1.93,
+        "passage_retrieval_en": 77.96,
+        "qasper": 37.33,
+        "qmsum": 20.82,
+        "repobench": 40.82,
+        "samsum": 43.81,
+        "trec": 57.5,
+        "triviaqa": 67.84
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_longbench_fasa.json"
+    },
+    "LB/FullKV": {
+      "AVG": 49.39,
+      "tasks": {
+        "2wikimqa": 43.29,
+        "gov_report": 33.36,
+        "hotpotqa": 59.07,
+        "lcc": 68.1,
+        "multi_news": 24.78,
+        "multifieldqa_en": 53.19,
+        "musique": 35.44,
+        "narrativeqa": 27.59,
+        "passage_count": 2.0,
+        "passage_retrieval_en": 100.0,
+        "qasper": 47.47,
+        "qmsum": 23.92,
+        "repobench": 64.74,
+        "samsum": 44.62,
+        "trec": 71.5,
+        "triviaqa": 91.11
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_longbench_fullkv.json"
+    },
+    "LB/JSSA": {
+      "AVG": 49.28,
+      "tasks": {
+        "2wikimqa": 42.34,
+        "gov_report": 33.58,
+        "hotpotqa": 60.2,
+        "lcc": 68.37,
+        "multi_news": 24.64,
+        "multifieldqa_en": 53.83,
+        "musique": 34.25,
+        "narrativeqa": 26.47,
+        "passage_count": 0.5,
+        "passage_retrieval_en": 100.0,
+        "qasper": 48.16,
+        "qmsum": 24.24,
+        "repobench": 65.54,
+        "samsum": 44.53,
+        "trec": 72.0,
+        "triviaqa": 89.82
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_longbench_jssa.json"
+    },
+    "LB/Quest": {
+      "AVG": 40.51,
+      "tasks": {
+        "2wikimqa": 30.78,
+        "gov_report": 30.18,
+        "hotpotqa": 45.09,
+        "lcc": 60.23,
+        "multi_news": 25.46,
+        "multifieldqa_en": 47.86,
+        "musique": 23.12,
+        "narrativeqa": 18.85,
+        "passage_count": 1.0,
+        "passage_retrieval_en": 88.25,
+        "qasper": 36.43,
+        "qmsum": 23.2,
+        "repobench": 42.23,
+        "samsum": 43.71,
+        "trec": 59.0,
+        "triviaqa": 72.73
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_longbench_quest.json"
+    },
+    "LB/TLI": {
+      "AVG": 49.27,
+      "tasks": {
+        "2wikimqa": 42.22,
+        "gov_report": 33.51,
+        "hotpotqa": 59.62,
+        "lcc": 68.33,
+        "multi_news": 24.65,
+        "multifieldqa_en": 53.43,
+        "musique": 34.81,
+        "narrativeqa": 27.53,
+        "passage_count": 0.75,
+        "passage_retrieval_en": 98.5,
+        "qasper": 47.83,
+        "qmsum": 24.06,
+        "repobench": 65.55,
+        "samsum": 44.64,
+        "trec": 73.5,
+        "triviaqa": 89.42
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_longbench_tli.json"
+    },
+    "RULER_128K/AsyncTLS": {
+      "AVG": 37.47,
+      "tasks": {
+        "niah_single_1": 99.0,
+        "niah_single_2": 95.0,
+        "niah_single_3": 18.0,
+        "niah_multikey_1": 92.0,
+        "niah_multikey_2": 16.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 20.0,
+        "niah_multivalue": 8.75,
+        "cwe": 0.7,
+        "fwe": 31.33,
+        "vt": 31.4
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler128K_asynctls.json"
+    },
+    "RULER_128K/FASA": {
+      "AVG": 1.4,
+      "tasks": {
+        "niah_single_1": 4.0,
+        "niah_single_2": 0.0,
+        "niah_single_3": 0.0,
+        "niah_multikey_1": 0.0,
+        "niah_multikey_2": 0.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 0.0,
+        "niah_multivalue": 0.0,
+        "cwe": 0.1,
+        "fwe": 7.67,
+        "vt": 3.6
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler128K_fasa.json"
+    },
+    "RULER_128K/FullKV": {
+      "AVG": 46.43,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 57.0,
+        "niah_multikey_3": 1.0,
+        "niah_multiquery": 12.25,
+        "niah_multivalue": 2.5,
+        "cwe": 3.4,
+        "fwe": 13.0,
+        "vt": 22.6
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler128K_fullkv.json"
+    },
+    "RULER_128K/MInference": {
+      "AVG": 49.53,
+      "tasks": {
+        "niah_single_1": 19.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 86.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 79.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 25.0,
+        "niah_multivalue": 39.0,
+        "cwe": 3.4,
+        "fwe": 36.67,
+        "vt": 57.8
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler128K_minference.json"
+    },
+    "RULER_128K/Quest": {
+      "AVG": 19.33,
+      "tasks": {
+        "niah_single_1": 85.0,
+        "niah_single_2": 46.0,
+        "niah_single_3": 0.0,
+        "niah_multikey_1": 36.0,
+        "niah_multikey_2": 1.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 6.75,
+        "niah_multivalue": 3.5,
+        "cwe": 0.6,
+        "fwe": 9.33,
+        "vt": 24.4
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler128K_quest.json"
+    },
+    "RULER_128K/TLI": {
+      "AVG": 47.49,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 99.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 50.0,
+        "niah_multikey_3": 1.0,
+        "niah_multiquery": 21.25,
+        "niah_multivalue": 2.0,
+        "cwe": 0.7,
+        "fwe": 26.67,
+        "vt": 22.8
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler128K_tli.json"
+    },
+    "RULER_128K/JSSA": {
+      "AVG": 48.31,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 99.0,
+        "niah_multikey_1": 98.0,
+        "niah_multikey_2": 76.0,
+        "niah_multikey_3": 1.0,
+        "niah_multiquery": 13.0,
+        "niah_multivalue": 4.0,
+        "cwe": 1.6,
+        "fwe": 17.0,
+        "vt": 21.8
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler128k_jssa.json"
+    },
+    "RULER_32K/AsyncTLS": {
+      "AVG": 50.09,
+      "tasks": {
+        "niah_single_1": 94.0,
+        "niah_single_2": 89.0,
+        "niah_single_3": 58.0,
+        "niah_multikey_1": 95.0,
+        "niah_multikey_2": 43.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 38.25,
+        "niah_multivalue": 47.5,
+        "cwe": 30.2,
+        "fwe": 15.67,
+        "vt": 40.4
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler32K_asynctls.json"
+    },
+    "RULER_32K/ClusterKV": {
+      "AVG": 60.6,
+      "tasks": {
+        "niah_single_1": 93.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 68.0,
+        "niah_multikey_3": 2.0,
+        "niah_multiquery": 24.5,
+        "niah_multivalue": 55.5,
+        "cwe": 84.8,
+        "fwe": 9.0,
+        "vt": 30.8
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler32K_clusterkv.json"
+    },
+    "RULER_32K/FASA": {
+      "AVG": 18.64,
+      "tasks": {
+        "niah_single_1": 10.0,
+        "niah_single_2": 73.0,
+        "niah_single_3": 10.0,
+        "niah_multikey_1": 50.0,
+        "niah_multikey_2": 2.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 19.75,
+        "niah_multivalue": 23.5,
+        "cwe": 8.4,
+        "fwe": 3.0,
+        "vt": 5.4
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler32K_fasa.json"
+    },
+    "RULER_32K/FullKV": {
+      "AVG": 59.38,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 76.0,
+        "niah_multikey_3": 4.0,
+        "niah_multiquery": 24.5,
+        "niah_multivalue": 25.0,
+        "cwe": 83.5,
+        "fwe": 7.0,
+        "vt": 34.2
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler32K_fullkv.json"
+    },
+    "RULER_32K/HISA": {
+      "AVG": 59.69,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 89.0,
+        "niah_single_3": 97.0,
+        "niah_multikey_1": 94.0,
+        "niah_multikey_2": 68.0,
+        "niah_multikey_3": 1.0,
+        "niah_multiquery": 25.0,
+        "niah_multivalue": 47.25,
+        "cwe": 69.1,
+        "fwe": 27.67,
+        "vt": 38.6
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler32K_hisa.json"
+    },
+    "RULER_32K/JSSA": {
+      "AVG": 59.13,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 76.0,
+        "niah_multikey_3": 2.0,
+        "niah_multiquery": 24.5,
+        "niah_multivalue": 25.75,
+        "cwe": 85.5,
+        "fwe": 2.67,
+        "vt": 35.0
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler32K_jssa.json"
+    },
+    "RULER_32K/MInference": {
+      "AVG": 49.94,
+      "tasks": {
+        "niah_single_1": 42.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 78.0,
+        "niah_multikey_3": 1.0,
+        "niah_multiquery": 18.0,
+        "niah_multivalue": 25.0,
+        "cwe": 16.1,
+        "fwe": 45.0,
+        "vt": 25.2
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler32K_minference.json"
+    },
+    "RULER_32K/Quest": {
+      "AVG": 42.85,
+      "tasks": {
+        "niah_single_1": 41.0,
+        "niah_single_2": 96.0,
+        "niah_single_3": 36.0,
+        "niah_multikey_1": 87.0,
+        "niah_multikey_2": 44.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 20.0,
+        "niah_multivalue": 32.0,
+        "cwe": 44.6,
+        "fwe": 18.0,
+        "vt": 52.8
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler32K_quest.json"
+    },
+    "RULER_32K/SparQ": {
+      "AVG": 60.45,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 74.0,
+        "niah_multikey_3": 10.0,
+        "niah_multiquery": 27.5,
+        "niah_multivalue": 33.0,
+        "cwe": 77.3,
+        "fwe": 10.0,
+        "vt": 34.2
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler32K_sparq.json"
+    },
+    "RULER_32K/TLI": {
+      "AVG": 59.65,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 98.0,
+        "niah_multikey_1": 98.0,
+        "niah_multikey_2": 84.0,
+        "niah_multikey_3": 8.0,
+        "niah_multiquery": 24.5,
+        "niah_multivalue": 28.5,
+        "cwe": 71.3,
+        "fwe": 11.67,
+        "vt": 32.2
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler32K_tli.json"
+    },
+    "RULER_64K/AsyncTLS": {
+      "AVG": 34.11,
+      "tasks": {
+        "niah_single_1": 82.0,
+        "niah_single_2": 87.0,
+        "niah_single_3": 9.0,
+        "niah_multikey_1": 79.0,
+        "niah_multikey_2": 12.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 22.5,
+        "niah_multivalue": 19.25,
+        "cwe": 0.3,
+        "fwe": 18.33,
+        "vt": 45.8
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler64K_asynctls.json"
+    },
+    "RULER_64K/FASA": {
+      "AVG": 1.72,
+      "tasks": {
+        "niah_single_1": 5.0,
+        "niah_single_2": 6.0,
+        "niah_single_3": 0.0,
+        "niah_multikey_1": 2.0,
+        "niah_multikey_2": 0.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 0.25,
+        "niah_multivalue": 0.5,
+        "cwe": 0.0,
+        "fwe": 4.0,
+        "vt": 1.2
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler64K_fasa.json"
+    },
+    "RULER_64K/FullKV": {
+      "AVG": 48.54,
+      "tasks": {
+        "niah_single_1": 100.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 100.0,
+        "niah_multikey_2": 50.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 20.25,
+        "niah_multivalue": 26.25,
+        "cwe": 0.6,
+        "fwe": 4.0,
+        "vt": 32.8
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler64K_fullkv.json"
+    },
+    "RULER_64K/JSSA": {
+      "AVG": 48.4,
+      "tasks": {
+        "niah_single_1": 99.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 100.0,
+        "niah_multikey_2": 49.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 21.0,
+        "niah_multivalue": 31.0,
+        "cwe": 0.3,
+        "fwe": 3.33,
+        "vt": 28.8
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler64K_jssa.json"
+    },
+    "RULER_64K/MInference": {
+      "AVG": 50.29,
+      "tasks": {
+        "niah_single_1": 75.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 100.0,
+        "niah_multikey_2": 52.0,
+        "niah_multikey_3": 1.0,
+        "niah_multiquery": 25.75,
+        "niah_multivalue": 27.5,
+        "cwe": 7.7,
+        "fwe": 9.67,
+        "vt": 54.6
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler64K_minference.json"
+    },
+    "RULER_64K/Quest": {
+      "AVG": 26.25,
+      "tasks": {
+        "niah_single_1": 59.0,
+        "niah_single_2": 79.0,
+        "niah_single_3": 4.0,
+        "niah_multikey_1": 71.0,
+        "niah_multikey_2": 6.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 14.0,
+        "niah_multivalue": 16.25,
+        "cwe": 0.8,
+        "fwe": 9.67,
+        "vt": 29.0
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler64K_quest.json"
+    },
+    "RULER_64K/TLI": {
+      "AVG": 49.42,
+      "tasks": {
+        "niah_single_1": 86.0,
+        "niah_single_2": 100.0,
+        "niah_single_3": 100.0,
+        "niah_multikey_1": 99.0,
+        "niah_multikey_2": 54.0,
+        "niah_multikey_3": 0.0,
+        "niah_multiquery": 28.5,
+        "niah_multivalue": 31.5,
+        "cwe": 0.3,
+        "fwe": 12.33,
+        "vt": 32.0
+      },
+      "model": "Qwen3-8B",
+      "file": "qwen3_8b_ruler64K_tli.json"
+    }
+  },
+  "missing": {
+    "LongBench/MInference": "No local pred data（论文 fig1 数据来自远程打分，未同步本地）",
+    "LongBench/SparQ": "No local pred data（论文 fig1 数据来自远程打分，未同步本地）",
+    "LongBench/HISA": "HISA 仅 RULER 32K 有数据",
+    "LongBench/ClusterKV": "ClusterKV 仅 RULER 32K 有数据",
+    "RULER_64K/HISA": "HISA 仅 32K 出数",
+    "RULER_64K/ClusterKV": "ClusterKV 仅 32K 出数",
+    "RULER_64K/SparQ": "SparQ 仅 32K 出数",
+    "RULER_128K/HISA": "HISA 仅 32K 出数",
+    "RULER_128K/ClusterKV": "ClusterKV 仅 32K 出数",
+    "RULER_128K/SparQ": "SparQ 仅 32K 出数"
+  }
+}

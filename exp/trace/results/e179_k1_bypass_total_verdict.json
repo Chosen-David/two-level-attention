@@ -1,0 +1,36 @@
+{
+  "schema": "e179-k1-bypass-total-verdict",
+  "date": "2026-10-27",
+  "machine": "E179c/E179d 合并（Qwen pc02/pc31/pc33 + Llama pc40，全部干净载体 tli_indexer md5 d38fc5a3 = pristine 7bc1788 + bypass + K1P 融合修复）",
+  "question": "L2 细筛旁路（选中块直连主注意力）第四选项的总判决 + K1 裁决四方完整画像（质量×性能）",
+  "results": {
+    "bypass_quality_dualmodel_128k": {
+      "qwen_K1_64": {"fine_E168l": [61, 12, 15.25], "bypass_E179c": [63, 13, 13.25]},
+      "llama_K1_64": {"fine_E168p": [80, 43, 48.75], "bypass_E179": [83, 51, 51]},
+      "qwen_K1_128": {"fine_T6_e147h": [99, 39, 17.5], "bypass_E179d": [98, 40, 14]}
+    },
+    "bypass_perf": {
+      "K1_64": "比同 K1 细筛慢 0.4-1.3%（64K/128K），32K 架构性不可行",
+      "K1_128": "比细筛慢 12.3%（128K 唯一可行档，W×8>T 门）"
+    },
+    "mechanism": "旁路选择集 ⊇ 细筛集（G9a 单元证实），但质量增益不兑现：Qwen K1=64 恢复 <4%、K1=128 持平；Llama K1=64 +3/+8/+2（同向超集语义）。两级瓶颈在 L1 块选择——块没进 top-K1，L2 全放也找不回针；细筛按预算裁 token 不丢块内信息",
+    "k1_arbitration_fourway_128k": {
+      "qwen": {
+        "K1_64_fine": {"mk_1": 61, "mk_2": 12, "mq": 15.25, "tpot_ms": "E172 基线 17.7/17.96/18.46"},
+        "K1_96_fine": {"mk_1": 98, "mk_2": 22, "mq": 18.25, "tpot_ms": "18.18/18.43/18.96（E180c），比 K64 慢 2.5-2.6%、比 K128 快 2.2-2.6%"},
+        "K1_128_fine": {"mk_1": 99, "mk_2": 39, "mq": 17.5, "tpot_ms": "18.66/18.88/19.39（iter3 锚）"},
+        "K1_128_bypass": {"mk_1": 98, "mk_2": 40, "mq": 14, "tpot_ms": "21.77（+12.3% vs fine）"}
+      },
+      "llama": {
+        "K1_64_fine": {"mk_1": 80, "mk_2": 43, "mq": 48.75},
+        "K1_96_fine": {"mk_1": 94, "mk_2": 62, "mq": 63.25},
+        "K1_128_fine": {"mk_1": 97, "mk_2": 72, "mq": 75.25},
+        "K1_64_bypass": {"mk_1": 83, "mk_2": 51, "mq": 51}
+      },
+      "k96_recovery_gradient_qwen": "32K: mk_1 100%/mk_2 89%/mq 100%；64K: 75%/61%/67%；128K: 97%/37%/超调——短上下文恢复近乎完整，长上下文深针档恢复不完全（E168q/E180d）",
+      "llama_128k_caveat": "K1=128 自身 vs FullKV 在 Llama 128K 有 -10.58 AVG multikey 退化（E168mno，模型族差异；Qwen 无）——K1=128 也不是 Llama 128K 的完美答案"
+    }
+  },
+  "verdict": "【第四选项（L2 细筛旁路）双模型族判死】质量不升（超集增益不兑现、L1 是瓶颈）、性能不省（K1=64 慢 0.4-1.3%、K1=128 慢 12.3% 且仅 128K 可行）——L2 细筛是免费午餐：不丢精度、成本远低于替代方案。论文 Design 段可主张『两级预算中 L2 细筛成本有效』（E179c/E179d/E179 三判决链）。【K1 三选项终裁表】(A) K1=128：质量天花板但性能最慢 + Llama 128K 自身仍有退化；(B) K1=96：质量介于 A/C（Qwen mk_1 全长度 75-100% 恢复、mk_2 37-89% 长度梯度；Llama 53-70%），性能严格优于 A 2.2-2.6%（K1P 修复后）、慢于 C 2.5-2.6%；(C) K1=64：性能最优但质量退化双模型族成立（Qwen -2.4~-5.8 AVG、Llama -6.9~-9.2）。裁决留用户",
+  "artifacts": "e179c_k64byp_perf_clean_verdict.json + e179c_qwen_byp_quality_verdict.json + e179d_k128byp_verdict.json（本链三件）+ 对照 e168l/e168mno/e168p/e168q/e180c/e180d/E172/e147h/T6 判决族；评分脚本 pc40 ~/e179_score_probe.py（string_match_all 同码口径）"
+}

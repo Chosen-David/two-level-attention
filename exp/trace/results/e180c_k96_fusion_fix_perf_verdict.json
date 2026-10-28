@@ -1,0 +1,28 @@
+{
+  "schema": "e180c-k96-fusion-fix-perf-verdict",
+  "date": "2026-10-27",
+  "machine": "pc33 GPU0/GPU1 (H20-3e)，Qwen3-8B bf16，干净载体 /tmp/wt_c1@7bc1788 + E180 K1P 融合修复（tli_indexer md5 d38fc5a3，vs pristine 854f2567 仅 K1P+bypass delta；bypass env 默认关不参与本实验），E172 同款协议（e152v4_graph_latency.py，repeats2+warmup1，max_gen=128，graph-mode graph），champion flags 单变量 tia_level1_topk 96（GPU0）；同机同卡对照臂 K1=64（GPU1）",
+  "supersedes": "e172q_k96_perf_verdict.json 的绝对数字——其载体（commit 320097b / indexer 6d9cf1f8）含未提交 E175/E177 并行会话语义改动且无融合修复（守卫失败回退 cat 链），k96 慢于 K1=128 的结论被本判决推翻；其『非幂次 K1 破坏 _iter3_l1_cand 融合守卫』的机制根因定位仍成立（守卫代码面独立可证 + 污染载体 A/B fused 18.71 vs fallback 18.84）",
+  "fix": "E180 K1P 融合修复：_iter3_l1_cand_kernel 加 K1P=next_pow2(K1) constexpr + 越界 lane kv_ mask（pow2 K1 走原版无 mask store 分支=E180b 行为不变），守卫 (K1&(K1-1))==0 → K1∈[1,2048]。单元门禁 exp/bench/e180_nonpow2_k1_unittest.py：G10a 融合 vs torch 回退链逐位一致（K1∈{1,3,64,96,100,128}×nb_far×3 种子）+ G10b pow2 bitexact 回归，33/33 PASS（本机+污染载体双跑）",
+  "results": {
+    "K1_96_E180c": {
+      "tpot_ms_median": {"L32768": 18.184, "L65536": 18.429, "L131072": 18.955},
+      "speedup_vs_dense_eager": {"L32768": 1.414, "L65536": 2.159, "L131072": 3.542}
+    },
+    "K1_64_ref_E180c": {
+      "tpot_ms_median": {"L32768": 17.728, "L65536": 17.959, "L131072": 18.486},
+      "speedup_vs_dense_eager": {"L32768": 1.450, "L65536": 2.215, "L131072": 3.632}
+    },
+    "cross_machine_validation": "k64ref vs E172 主表（pc40 pristine 同口径）：17.728/17.959/18.486 vs 17.715/17.957/18.464ms——三长度偏差 +0.07/+0.01/+0.12%，跨机复现成立 → 本机 k96 可直接与 E172/iter3 pc40 锚比较",
+    "k96_vs_k64_penalty_pct": {"L32768": 2.6, "L65536": 2.6, "L131072": 2.5},
+    "k96_vs_k128_delta_pct": {"L32768": -2.6, "L65536": -2.4, "L131072": -2.2},
+    "threeway": {
+      "K1_64_E172": [17.715, 17.957, 18.464],
+      "K1_96_E180c": [18.184, 18.429, 18.955],
+      "K1_128_iter3": [18.675, 18.888, 19.388]
+    },
+    "length_flatness": "18.184→18.955ms（+4.2%@4×ctx），与 K1=64（+4.2%）/K1=128（+3.8%）形态一致"
+  },
+  "verdict": "E180c 收官：K1P 融合修复使 K1=96 恢复单调定位——加速比 1.414/2.159/3.542×，比 K1=64 慢 2.5-2.6%、比 K1=128 快 2.2-2.6%（三长度一致；污染版 e172q『比 K1=128 慢 0.8%』系载体+无修复双重假象）。对 K1 仲裁选项 B 的刷新：质量面 mk_1 恢复 97%（Qwen）/53-70%（Llama）、mk_2 恢复 37%（Qwen）/~60%（Llama）；性能面修复后严格优于选项 A（K1=128）——『质量部分恢复 + 速度优于 K1=128』的组合成立，选项 B 从『性能劣于 A』升级为『性能优于 A、质量介于 A/C』。裁决仍留用户（mk_2 深针档 Qwen 侧恢复不完全是 B 的主要弱点）",
+  "artifacts": "本机 /tmp/e180c_k96/tli_graph_k96_L{32768,65536,131072}_{a1,a2}.json（6 格全齐）+ /tmp/e180c_k64ref/ 同构 6 格 + run.log×2 + 载体 /tmp/wt_c1（d38fc5a3，已同步 pc40 ~/wt_e180 与 pc02 ~/two-level-attention）；单元门禁 exp/bench/e180_nonpow2_k1_unittest.py；对照 e172q（已加污染披露）/ E172 / e166d2；质量侧 E168p（Llama）/E168q（Qwen）"
+}

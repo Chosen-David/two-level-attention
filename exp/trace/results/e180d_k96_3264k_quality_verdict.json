@@ -1,0 +1,28 @@
+{
+  "schema": "e180d-k96-quality-3264k-verdict",
+  "date": "2026-10-27",
+  "machine": "pc02 GPU1（32K 重跑，原 pc40 GPU0 臂被并行任务挤 OOM 废弃）+ pc02 GPU0（64K），Qwen3-8B，干净载体 ~/two-level-attention@7bc1788+K1P 融合修复（tli_indexer md5 d38fc5a3），RULER 三 multikey 探针任务 n=100 bs=2（pred_ruler_batch.py，TLI_CUDA_GRAPH=1，64K --yarn），champion flags 单变量 tia_level1_topk 96",
+  "question": "K1=96（裁决选项 B）在 32K/64K multikey 探针上相对 K1=64 恢复多少差距？（128K 已收官 = E168q：mk_1 恢复 97%/mk_2 恢复 37%）；与 E180c 性能判决（K1P 融合修复后比 K1=128 快 2.2-2.6%）合并构成选项 B 完整画像",
+  "results": {
+    "L32768_n100": {"niah_multikey_1": 98.0, "niah_multikey_2": 69.0, "niah_multiquery": 24.5},
+    "L65536_n100": {"niah_multikey_1": 98.0, "niah_multikey_2": 30.0, "niah_multiquery": 20.5},
+    "threeway_32k": {
+      "K1_64_E168l": {"mk_1": 97.0, "mk_2": 53.0},
+      "K1_96_E180d": {"mk_1": 98.0, "mk_2": 69.0},
+      "K1_128_T6": {"mk_1": 98.0, "mk_2": 71.0}
+    },
+    "threeway_64k": {
+      "K1_64_E168l": {"mk_1": 95.0, "mk_2": 16.0},
+      "K1_96_E180d": {"mk_1": 98.0, "mk_2": 30.0},
+      "K1_128_T6": {"mk_1": 99.0, "mk_2": 39.0}
+    },
+    "gap_recovery_pct": {
+      "L32768": {"mk_1": 100.0, "mk_2": 88.9},
+      "L65536": {"mk_1": 75.0, "mk_2": 60.9},
+      "L131072_E168q": {"mk_1": 97.4, "mk_2": 37.0}
+    },
+    "multiquery_note": "multiquery 对 K1 不敏感（E168q 128K: 64/96/128 = 15.25/18.25/17.5）；K96 32K 24.5 / 64K 20.5 名义偏高，K1=64/128 的 32K/64K multiquery 对照格未跑（家族一致不敏感，不作恢复率主张）"
+  },
+  "verdict": "E180d 收官：K1=96 质量恢复梯度 = 32K 深针档近乎闭合（mk_1 100%/mk_2 89%）、64K 部分恢复（75%/61%）、128K 浅档闭合深档不完全（97%/37%）——短上下文恢复更完整，与 E168l 退化随长度放大的机制（K1 减半漏块在长上下文更致命）互为镜像。合并 E168q/E168p/E180c：选项 B 完整画像 = mk_1 三长度恢复 75-100%、mk_2 恢复 37-89%（长度梯度）、multiquery 不敏感 + 性能比 K1=128 快 2.2-2.6% 三长度一致（K1P 融合修复后）。裁决留用户",
+  "artifacts": "pc02 ~/e180d_ruler/exp/results_ruler/Qwen3-8B/L{32768,65536}/pred_k96_bs2/（6 任务格全齐 rc=0）+ queue.log + ~/e180d_ruler_k96_{32k,64k}.sh；评分 ~/e179_score_probe.py（string_match_all 同码）；对照 E168l（K1=64 per-task 表）+ T6/e147h（K1=128）；性能侧 e180c_k96_fusion_fix_perf_verdict.json + e168q/e168p（128K 质量探针）"
+}

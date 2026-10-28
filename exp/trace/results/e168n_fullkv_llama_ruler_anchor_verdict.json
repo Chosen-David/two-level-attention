@@ -1,0 +1,33 @@
+{
+ "schema": "e168n-fullkv-llama-ruler-anchor-verdict",
+ "date": "2026-10-27",
+ "machine": "pc02 四卡（H20-3e）+ pc40 GPU0 跨机 helper（已弃用，见 protocol），Llama-3.1-8B-Instruct bf16，repo~/two-level-attention@7bc1788（含 llama yarn 豁免 sed 补丁），RULER 11 任务 × 3 长度 × n=100，T=10211745，bs 32K=8/64K=2/128K=2，--method none（dense 不挂 patch，FullKV 锚臂），Llama 侧无 yarn",
+ "question": "Llama-3.1-8B RULER 质量三方对照的 FullKV 锚（此前 Llama 侧仅有 e168c/e168k 子集口径，无全表锚；K1=128 对照与 K1=64 生产口径均需同数据同协议锚定）",
+ "results": {
+  "avg_series": {
+   "FullKV_e168n": {
+    "L32768": 85.53,
+    "L65536": 77.67,
+    "L131072": 71.63
+   }
+  },
+  "per_task_128k": {
+   "niah_single_1": 25.0,
+   "niah_single_2": 99.0,
+   "niah_single_3": 100.0,
+   "niah_multikey_1": 98.0,
+   "niah_multikey_2": 99.0,
+   "niah_multikey_3": 98.0,
+   "niah_multiquery": 99.5,
+   "niah_multivalue": 81.0,
+   "cwe": 1.8,
+   "fwe": 65.0,
+   "vt": 21.6
+  },
+  "single_1_128k_anomaly": "FullKV single_1@128K=25 反常低（32K/64K 为 96/100；K1=128/64 侧为 58/70——稀疏臂反而更高）。formal 门禁 n=100 与回执校验全过、同 run 其余任务正常（mk 族 98-99），判定为 FullKV 在原生 131072 边界的注意力稀释现象（重复噪声 haystack），非数据损坏；论文口径如实披露，且该任务对稀疏臂 AVG 有 +~3 分有利偏置",
+  "cross_model_note": "mk_3 在 Llama FullKV 三长度 88/99/98（Qwen 侧为任务崩溃 0-7，e168l 已注）——Llama 侧 mk_3 是有效区分任务，稀疏臂 128K 退化 −76 须计入（Qwen 表该格双方崩溃不计）",
+  "protocol_disclosures": "①pc40 GPU0 helper 产物（fwe/vt）因 060 跨格配置漂移门被拒（model_path 字符串两机不同：~/models/huggingface.co/... vs ~/models/llama31）——pc02 GPU1/GPU2 按统一路径 ~/models/llama31 重跑两格（08:30/08:40 收官），pc40 旧 gen 目录保留作档案；②128K 段 11/11 格，formal 评分门两次 fail-closed 正确生效（060 漂移 + 首评缺格）"
+ },
+ "verdict": "Llama FullKV 锚全表收官：85.53/77.67/71.63。single_1@128K=25 反常披露（FullKV 原生边界稀释，稀疏臂反而 58-70）；mk_3 Llama 侧有效（vs Qwen 崩溃）。锚表与 E168o（K1=128）/E168m（K1=64）同数据同协议，三方对照见 e168mno_llama_k1_threeway_verdict.json。",
+ "artifacts": "pc02 /tmp/e168n_L{32768,65536,131072}.json（md5 f2a674ce/7442b25d/bd14e704）+ 预测 ~/e168n_ruler/exp/results_ruler/Llama-3.1-8B/L*/pred_fullkv_bs2/ + queue/log；060 failure receipt /tmp/e168n_L131072.json.failure-20261027055844 保留"
+}

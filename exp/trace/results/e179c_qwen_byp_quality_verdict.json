@@ -1,0 +1,25 @@
+{
+  "schema": "e179c-qwen-byp-quality-verdict",
+  "date": "2026-10-27",
+  "machine": "pc02 GPU1/2/3 (H20-3e)，Qwen3-8B，干净载体 ~/two-level-attention@7bc1788+bypass+K1P（tli_indexer md5 d38fc5a3），RULER 128K 三 multikey 探针任务 n=100 bs=2（pred_ruler_batch.py，TLI_CUDA_GRAPH=1 + TLI_L2_BYPASS=1 + TLI_E127_W_UPPER=4608），champion flags K1=64",
+  "question": "K1=64 选中块直连主注意力（L2 细筛旁路）在 128K multikey 探针上相对 K1=64+细筛与 K1=128+细筛的质量（用户 2026-10-27 指令：质量不掉才有第四选项价值）",
+  "results": {
+    "scores_128k_n100": {
+      "niah_multikey_1": 63.0,
+      "niah_multikey_2": 13.0,
+      "niah_multiquery": 13.25
+    },
+    "threeway": {
+      "K1_64_fine_E168l": {"mk_1": 61.0, "mk_2": 12.0, "multiquery": 15.25},
+      "K64_bypass_E179c": {"mk_1": 63.0, "mk_2": 13.0, "multiquery": 13.25},
+      "K1_128_fine_T6": {"mk_1": 99.0, "mk_2": 39.0, "multiquery": 17.5}
+    },
+    "gap_recovery_pct_vs_k64_to_k128": {
+      "niah_multikey_1": 3.4,
+      "niah_multikey_2": 3.6,
+      "niah_multiquery": "n/a（K1 不敏感档，bypass 13.25 略低于 K1=64 细筛 15.25，噪声带）"
+    }
+  },
+  "verdict": "E179 Qwen 质量面收官（干净载体）：旁路质量 = K1=64+细筛水平（63/13/13.25 vs 61/12/15.25），对 K1=64→K1=128 差距的恢复 <4%（三任务）。机制证实：旁路保留同一 K1=64 L1 块选择、跳过的只是 L2 细筛（细筛不丢块内信息，只按预算裁 token），无法找回未进 top 块的针——L1 层退化不可由 L2 旁路修复。结合性能面（e179c_k64byp_perf_clean_verdict.json：劣于 K1=64+细筛 0.4-1.3%、32K 架构性不可行），【第四选项（旁路）Qwen 侧判定为死】。Llama 侧探针在飞（pc40 GPU1，~19:50 收官）作双模型族确认，预期同向（同一 L1 机制）",
+  "artifacts": "pc02 ~/e179c_ruler_q/exp/results_ruler/Qwen3-8B/L131072/pred_bs2_k64byp/（3 任务 n=100 全齐，queue.log DONE rc=0×3）+ 评分 ~/e179_score_probe.py（string_match_all 同码口径）；对照 E168l（K1=64）/ e147h_r128k_formal.json（K1=128 multiquery）；E179 总判决待 Llama 侧收官后落库"
+}

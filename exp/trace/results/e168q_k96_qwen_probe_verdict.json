@@ -1,0 +1,21 @@
+{
+  "schema": "e168q-k96-qwen-probe-verdict",
+  "date": "2026-10-27",
+  "machine": "pc02 GPU0（H20-3e），Qwen3-8B，RULER 128K 三 multikey 探针任务",
+  "question": "K1=96 Qwen 侧 128K 质量探针：K1 64→96→128 恢复梯度画像（K1 仲裁选项 B 数据面）",
+  "results": {
+    "k96_128k": {
+      "niah_multikey_1": 98.0,
+      "niah_multikey_2": 22.0,
+      "niah_multiquery": 18.25
+    },
+    "k1_gradient": {
+      "mk_1": "K1 64/96/128 = 61 / 98 / 99 → 96 恢复 97%",
+      "mk_2": "K1 64/96/128 = 12 / 22 / 39 → 96 恢复 37%",
+      "multiquery": "K1 64/96/128 = 15.25 / 18.25 / 17.5 → 对 K1 不敏感（该档 K1 非瓶颈）"
+    }
+  },
+  "verdict": "Qwen 侧 mk_1 恢复近乎完整（97%）但 mk_2 深针档恢复不完全（37%，Llama 侧 E168p 为 53-70%）——K1=96 画像 = 质量介于 K1=64/K1=128 之间且深针档偏弱",
+  "artifacts": "pc02 ~/e168q_*（原始 gen 目录）；对照 e168l（K1=64）/ e147h_r128k_formal（K1=128）",
+  "restoration_note": "原文件 2026-10-28 第二次丢失事故中从磁盘消失；本文件从 supervisor 报告 2026-10-27_1800.md §2.1 三方表 + e179_k1_bypass_total_verdict.json k96_recovery_gradient 交叉核对重建"
+}

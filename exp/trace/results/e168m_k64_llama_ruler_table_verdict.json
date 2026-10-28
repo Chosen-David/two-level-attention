@@ -1,0 +1,31 @@
+{
+ "schema": "e168m-k64-llama-ruler-table-verdict",
+ "date": "2026-10-27",
+ "machine": "pc40 GPU1 (H20-3e)，Llama-3.1-8B-Instruct bf16，repo~/wt_e168i@7bc1788（含 llama yarn 豁免 sed 补丁），RULER 11 任务 × 3 长度 × n=100，T=10211745，bs 32K=8/64K=2/128K=2，Llama 侧无 yarn（原生 131072），batch+graph（pred_ruler_batch.py，TLI_CUDA_GRAPH=1），champion flags 单变量 K1 128→64（tia_level1_topk 64，arm=tli_64_64_1024_..._he2ad3ee904）；评分 = score_ruler_formal.py 同码（Llama 侧 CLI 不得传 --yarn，见 verdict 附注）",
+ "question": "Llama-3.1-8B 生产口径 K1=64 的 RULER 全表质量（E168l 已证 Qwen 侧三长度全超噪声带；Llama 侧需全表 11 任务实证，e168k 3 任务子集门不充分）",
+ "results": {
+  "avg_series": {
+   "K1_64_e168m": {
+    "L32768": 79.22,
+    "L65536": 67.25,
+    "L131072": 51.83
+   }
+  },
+  "per_task_128k": {
+   "niah_single_1": 70.0,
+   "niah_single_2": 88.0,
+   "niah_single_3": 98.0,
+   "niah_multikey_1": 80.0,
+   "niah_multikey_2": 43.0,
+   "niah_multikey_3": 15.0,
+   "niah_multiquery": 48.75,
+   "niah_multivalue": 33.25,
+   "cwe": 0.1,
+   "fwe": 73.0,
+   "vt": 21.0
+  },
+  "task_family_structure": "退化集中于 multikey 检索族且随长度单调放大：mk_1 100/99/80、mk_2 64/72/43、multiquery 95.5/87.75/48.75、multivalue 89.5/72.75/33.25——与 Qwen 侧 E168l 形态同型（L1 块选择漏针机制自洽）；single 族基本不受影响（single_3 三长度 99/100/98）"
+ },
+ "verdict": "Llama K1=64 全表收官。三长度 AVG 79.22/67.25/51.83；multikey 族退化跨模型族成立且 Llama 幅度更大（对 K1=128 的 Δ 见 e168mno 三方总判决）。本表与 e168k 3 任务子集门的『无回退』结论矛盾再证：子集评测（single/mk_1/vt）掩盖 multikey_2/3 与 multiquery/multivalue 退化，全表 11 任务是生产口径质量门的必要口径。",
+ "artifacts": "pc40 /tmp/e168m_L{32768,65536,131072}.json（md5 616ad2e8/f3a37f26/83a4fe7b）+ 预测 ~/e168m_ruler/exp/results_ruler/Llama-3.1-8B/L*/pred_k64_bs2/（指针协议 gen 目录）+ queue/log 全档；首评 GATE-FAIL（--yarn 误传，见 e168mno 总判决附注）failure receipt 保留"
+}

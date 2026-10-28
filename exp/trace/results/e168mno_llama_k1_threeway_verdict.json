@@ -1,0 +1,85 @@
+{
+ "schema": "e168mno-llama-k1-threeway-master-verdict",
+ "date": "2026-10-27",
+ "machine": "E168m（pc40 GPU1，K1=64）+ E168n（pc02 四卡+重跑，FullKV 锚）+ E168o（pc02 四卡，K1=128），Llama-3.1-8B-Instruct bf16，repo@7bc1788 两机（均含 llama yarn 豁免 sed 补丁），RULER 11 任务 × 3 长度 × n=100 同数据同 T 同评分器",
+ "question": "champion flags K1 质量侧裁决的 Llama 全表三方证据链（与 Qwen 侧 E168l 构成双模型族总证据；K1=64 生产口径 vs K1=128 原口径 vs FullKV 锚）",
+ "results": {
+  "threeway_avg": {
+   "L32768": {
+    "FullKV": 85.53,
+    "K1_128": 86.08,
+    "K1_64": 79.22
+   },
+   "L65536": {
+    "FullKV": 77.67,
+    "K1_128": 76.16,
+    "K1_64": 67.25
+   },
+   "L131072": {
+    "FullKV": 71.63,
+    "K1_128": 61.05,
+    "K1_64": 51.83
+   }
+  },
+  "delta_K64_minus_K128": {
+   "L32768": -6.86,
+   "L65536": -8.91,
+   "L131072": -9.22
+  },
+  "delta_K128_minus_FullKV": {
+   "L32768": 0.55,
+   "L65536": -1.51,
+   "L131072": -10.58
+  },
+  "dualmodel_synthesis": {
+   "qwen_e168l": {
+    "delta_K64_minus_K128": [
+     -4.06,
+     -2.39,
+     -5.8
+    ],
+    "K128_vs_FullKV_retention": [
+     99.4,
+     98.5,
+     100.8
+    ]
+   },
+   "llama_e168mno": {
+    "delta_K64_minus_K128": [
+     -6.86,
+     -8.91,
+     -9.22
+    ],
+    "K128_vs_FullKV_AVG_delta": [
+     0.55,
+     -1.51,
+     -10.58
+    ]
+   },
+   "cross_model_conclusion": "①K1=64 质量退化双模型族成立且 Llama 幅度更大（−6.9~−9.2 vs Qwen −2.4~−5.8），退化集中于 multikey 检索族随长度放大——L1 块预算减半漏针机制自洽；②K1=128 与 FullKV 在 32K/64K 双模型族持平，但 Llama 128K 档 K1=128 自身有真实 multikey 退化（AVG −10.58；mk_3 −76/mk_2 −27/multiquery −24/multivalue −24；剔除 single_1 异常格保留率 80.4%）——Qwen 侧无此现象（100.8%），系模型族差异（Llama 侧 L1 语义分辨力或对块预算更敏感）"
+  },
+  "k96_probe_preview": "E168p（Llama K1=96，128K 3 任务探针，quick-score 同 string_match_all 语义）：mk_1 94.0（K1=64 80 / K1=128 97，恢复 70%）、mk_2 62.0（43/72，恢复 53%）——中间点形状成立，K1 质量曲线随块预算单调回升且 96 偏 128 侧；multiquery 在飞。E168q（Qwen K1=96 同型探针）在飞。正式判决待三格齐 + formal 快评",
+  "single_1_fullkv_anomaly": "FullKV single_1@128K=25（32/64K 为 96/100；稀疏臂 58-70 反而更高）= 原生 131072 边界注意力稀释现象，对稀疏臂 AVG 有 +~3 分有利偏置，论文如实披露",
+  "protocol_gates_summary": "E168m/o 11/11×3 格全收官 + E168n 11/11×3；formal fail-closed 门累计四次正确拦截（E168m --yarn 冲突 / E168o 64K staging 未建 / E168n 128K 缺格 + 060 跨机 model_path 漂移）——门禁体系在真实故障下全数生效",
+  "yarn_calibration_note": "Llama 侧评分 CLI 不得传 --yarn（生产者 receipt yarn_enabled=False，Llama 走豁免路径；误传触发 057 门 GATE-FAIL）；Qwen 侧 64K/128K 评分必须 --yarn。两模型族评分口径不同属协议事实，非门禁缺陷",
+  "score_artifacts_md5": {
+   "e168m": [
+    "616ad2e83a7e9262764440a1a4550f7d",
+    "f3a37f264ca8031a7a6b06252ab4169c",
+    "83a4fe7b6e5ec2e1bf9c335b7b0b1d12"
+   ],
+   "e168n": [
+    "f2a674cec2cc3924e11b7502b466f500",
+    "7442b25daa1b0c75109d6d0bc8f0b475",
+    "bd14e704cc55030c4297cecb8f465e83"
+   ],
+   "e168o": [
+    "a38fff370a7ae01df98e84f7a1ddd284",
+    "501685f97e868af82039b5738f8b2644",
+    "c4f203a2fc8aca46e7fe95daa5deaf69"
+   ]
+  }
+ },
+ "verdict": "Llama 三方全表证据链闭合，K1 裁决升级为双模型族口径。三个选项的实证形状：(A) K1=128——Qwen 全长度保持（保留率 ≥99%），Llama 32K/64K 持平但 128K 有 multikey 退化（AVG −10.6 须披露；性能代价 vs K1=64 约 3-5%）；(B) K1=96——中间点探针恢复 64→128 差距的 53-70%（Llama mk_1/mk_2），性能代价约 2%，双模型探针在飞（E168p/E168q），若采此选项须全表重跑两模型族；(C) K1=64——性能最优（当前生产 flags/E172-E174 主表口径），质量双模型族全长度超噪声带（Qwen −2.4~−5.8 / Llama −6.9~−9.2），multikey 族退化机制清晰须如实报告。**建议用户裁决**：默认推荐 (A) 回退 K1=128（质量叙事最稳：Qwen 主表数字不变 59.02/47.80/46.82，Llama 表新增 86.08/76.16/61.05 并披露 128K multikey 格）；若 128K multikey 披露不可接受，(B) K1=96 为待验证折中。质量主表口径与生产性能口径同 flags 原则——裁决后 E172-E174 性能主表须随选 K1 重跑（K1=128 口径已有 iter3@K1=128 1.407/2.100/3.458× 判决链可直接复用）。",
+ "artifacts": "判决链：e168m_k64_llama_ruler_table_verdict.json + e168n_fullkv_llama_ruler_anchor_verdict.json + e168o_k128_llama_ruler_table_verdict.json + 本总判决 + Qwen 侧 e168l_k64_ruler_table_verdict.json + e168p/e168q（K1=96 探针，在飞）；评分产物 pc40 /tmp/e168m_L*.json + pc02 /tmp/e168{n,o}_L*.json（md5 见 score_artifacts_md5）"
+}

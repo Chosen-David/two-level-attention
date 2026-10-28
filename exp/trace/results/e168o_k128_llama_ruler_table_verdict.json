@@ -1,0 +1,36 @@
+{
+ "schema": "e168o-k128-llama-ruler-table-verdict",
+ "date": "2026-10-27",
+ "machine": "pc02 四卡（H20-3e；GPU0 串行 24 格 + 2026-10-27 00:11 起 GPU1/GPU2 helper + GPU0 接管三路分流收官 128K 段 9 格），Llama-3.1-8B-Instruct bf16，repo~/two-level-attention@7bc1788（含 llama yarn 豁免 sed 补丁），RULER 11 任务 × 3 长度 × n=100，T=10211745，bs 32K=8/64K=2/128K=2，champion flags 原口径 K1=128（tia_level1_topk 128，arm=tli_64_128_1024_c4_..._h3e3cc83bcb），Llama 侧无 yarn，batch+graph",
+ "question": "Llama-3.1-8B K1=128 口径 RULER 全表（三方对照的中坚臂：若用户裁决回退 K1=128 则本表直接成为 Llama 生产口径质量表；同时是与 K1=64 退化幅度、FullKV 保留率的定量依据）",
+ "results": {
+  "avg_series": {
+   "K1_128_e168o": {
+    "L32768": 86.08,
+    "L65536": 76.16,
+    "L131072": 61.05
+   }
+  },
+  "per_task_128k": {
+   "niah_single_1": 58.0,
+   "niah_single_2": 100.0,
+   "niah_single_3": 100.0,
+   "niah_multikey_1": 97.0,
+   "niah_multikey_2": 72.0,
+   "niah_multikey_3": 22.0,
+   "niah_multiquery": 75.25,
+   "niah_multivalue": 57.0,
+   "cwe": 0.2,
+   "fwe": 68.67,
+   "vt": 21.4
+  },
+  "vs_fullkv": {
+   "L32768": "+0.55（噪声带内）",
+   "L65536": "-1.51（噪声带内）",
+   "L131072": "-10.58（超噪声带）"
+  },
+  "k128_128k_degradation_structure": "128K 档 K1=128 vs FullKV 退化集中于 multikey 检索族：mk_3 98→22（−76）、mk_2 99→72（−27）、multiquery 99.5→75.25（−24）、multivalue 81→57（−24）；single_1 反向 +33（25→58，FullKV 稀释异常）。剔除 single_1 异常格后 10 任务 AVG FullKV 76.29 vs K128 61.36（保留率 80.4%）"
+ },
+ "verdict": "K1=128 Llama 全表收官：86.08/76.16/61.05。32K/64K 与 FullKV 持平（+0.55/−1.51），但 **128K 档 K1=128 自身出现真实 multikey 族退化 vs FullKV（AVG −10.58）**——与 Qwen 侧（T6 128K 保留率 100.8%）形态不同。若用户裁决回退 K1=128，Llama 128K 档须如实披露 multikey 退化（或按模型族分别报告保留率）；Qwen 表不受影响。",
+ "artifacts": "pc02 /tmp/e168o_L{32768,65536,131072}.json（md5 a38fff37/501685f9/c4f203a2）+ 预测 ~/e168o_ruler/exp/results_ruler/Llama-3.1-8B/L*/pred_k128_bs2/ + queue/log；64K 首评 GATE-FAIL（staging 目录未建）failure receipt 保留；128K 段三路分流队列见 queue.log（G1h/G2h/G0t 标记）"
+}

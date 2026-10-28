@@ -1,0 +1,26 @@
+{
+  "schema": "e172q-k96-e2e-perf-verdict",
+  "date": "2026-10-27",
+  "machine": "pc40 GPU0 (H20-3e)，Qwen3-8B bf16，repo~/two-level-attention@7bc1788（iter3 已晋升主树），E172 同款协议（e152v4_graph_latency.py per-step-device-synced TPOT，repeats2+warmup1，max_gen=128，graph-mode graph），champion flags 单变量 tia_level1_topk 96（arm=tli_64_96_1024），dense 锚复用 E172 判决同机同日（25.712/39.797/67.139ms）",
+  "question": "K1=96 中间点（裁决选项 B）的 e2e TPOT 性能代价：介于 E172 K1=64（17.715/17.957/18.464ms）与 iter3 K1=128（18.675/18.888/19.388ms）之间？",
+  "results": {
+    "tpot_ms_median": {"L32768": 18.83, "L65536": 19.04, "L131072": 19.54},
+    "tpot_ms_runs": {
+      "L32768": [18.856, 18.865, 18.838, 18.828, 18.816, 18.820],
+      "L65536": [19.049, 19.038, 19.033, 19.052, 19.038, 19.037],
+      "L131072": [19.549, 19.543, 19.546, 19.542, 19.542, 19.537]
+    },
+    "speedup_vs_dense_eager": {"L32768": 1.365, "L65536": 2.092, "L131072": 3.436},
+    "threeway_comparison": {
+      "K1_64_E172": {"tpot": [17.715, 17.957, 18.464], "speedup": [1.451, 2.216, 3.636]},
+      "K1_96_E172q": {"tpot": [18.83, 19.04, 19.54], "speedup": [1.365, 2.092, 3.436]},
+      "K1_128_iter3": {"tpot": [18.675, 18.888, 19.388], "speedup": [1.407, 2.100, 3.458]},
+      "k96_vs_k64_penalty_pct": [6.3, 6.0, 5.8],
+      "k96_vs_k128_delta_pct": [0.83, 0.81, 0.78]
+    },
+    "mechanism_nonmonotonic": "K1=96 在三长度全部慢于 K1=128（TPOT +0.8%），K1 单调性破坏。根因（代码面定位）：iter3d 候选装配融合 kernel _iter3_l1_cand 的形态守卫要求 (K1 & (K1-1)) == 0（tli_indexer.py 候选构建段，L4320 附近）——K1=96 非 2 的幂 → 守卫失败 → 回退旧 cat 链（cat×2 + l1_tok 乘加 + l1_keep lt&and + cat×2 ≈8 kernel/层，正是 iter3d 融合所消除的 op 群）。性能代价 = 融合失效回归，非 K1 本身的计算量效应",
+    "length_flatness": "18.83→19.54ms（+3.8%@4×ctx），与 K1=64（+4.2%）/K1=128（+3.8%）平坦化形态一致"
+  },
+  "verdict": "K1=96 e2e 性能臂收官：加速比 1.365/2.092/3.436×，比 K1=64 慢 5.8-6.3%、比 K1=128 慢 0.8%（三长度一致）。非幂次 K1 破坏 iter3d 候选装配融合是可定位的机制根因（可工程修复：融合 kernel 放开非幂次 K1 支持）。对裁决选项 B 的影响：K1=96 的质量恢复（E168p Llama 53-70%）当前须付出『比 K1=128 更慢』的性能代价，除非修复非幂次融合；修复后预期回落至 K1=64 与 128 之间（~17.9-19.0ms 量级）。若不做融合修复，选项 B 性能面劣于选项 A（K1=128）",
+  "artifacts": "pc40 ~/e172q_k96_perf/tli_graph_k96_L{32768,65536,131072}_{a1,a2}.json（6 格全齐）+ ~/e172q_k96_perf.log + ~/e172q_k96_perf.sh；对照 E172（e172_iter3_k64_qwen_verdict.json）与 iter3 K1=128（e166d2_iter3d_verdict.json 三长度）；质量侧 E168p（Llama）/E168q（Qwen，在飞）"
+}

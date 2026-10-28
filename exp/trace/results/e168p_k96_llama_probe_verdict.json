@@ -1,0 +1,17 @@
+{
+  "schema": "e168p-k96-llama-probe-verdict",
+  "date": "2026-10-27",
+  "machine": "pc40 GPU1 (H20-3e)，Llama-3.1-8B-Instruct bf16，repo~/wt_e168i@7bc1788（含 llama yarn 豁免 sed 补丁），RULER 3 任务（multikey_1/multikey_2/multiquery——三方表中 K1 敏感度最高的退化族）× 128K × n=100，T=10211745，bs=2，champion flags 单变量 tia_level1_topk 96（arm=tli_64_96_1024_..._h97821f067c），batch+graph",
+  "question": "K1=96 中间点的质量形状（K1 裁决选项 B 的实证依据：64→128 退化是否可被 96 恢复大半）",
+  "results": {
+    "threeway_128k": {
+      "niah_multikey_1": {"K1_64": 80.0, "K1_96": 94.0, "K1_128": 97.0, "recovery": "70%（+14/+17）"},
+      "niah_multikey_2": {"K1_64": 43.0, "K1_96": 62.0, "K1_128": 72.0, "recovery": "53%（+19/+29）"},
+      "niah_multiquery": {"K1_64": 48.75, "K1_96": 63.25, "K1_128": 75.25, "recovery": "54%（+14.5/+12）"}
+    },
+    "scoring_note": "quick-score = string_match_all 同语义（逐目标大小写不敏感子串命中/目标数，样本均值×100），与 formal 评分器同语义；三格 producer receipt 完整、n=100/格。探针定位（3 任务子集）故不走全表 formal 评分器——若裁决采 K1=96，全表 11 任务 × 双模型族须正式重跑",
+    "shape_conclusion": "三任务 K1 质量曲线均随块预算单调回升，96 一致落在 64 与 128 之间偏 128 侧（恢复 53-70% 差距）——中间点形状成立，无平台/悬崖效应；配合 E168o 揭示的 Llama 128K 档 K1=128 自身仍有 −10.6 AVG 退化，96 与 128 的 128K 档质量差距（mk_1 −3/mk_2 −10/multiquery −12）明显小于 128 与 FullKV 的差距（mk_1 −1/mk_2 −27/multiquery −24）"
+  },
+  "verdict": "K1=96 Llama 中间点探针收官：恢复 K1=64→128 退化的 53-70%（三 multikey 任务一致），单调回升无悬崖。作为裁决选项 B 的形状依据成立；性能代价（vs K1=64）预期 ~1-2%（介于 E172 K1=64 与 iter3@K1=128 之间）未实测。若采选项 B：须补 (a) 全表 11 任务 × 双模型族重跑、(b) e2e 性能主表 K1=96 臂（E172/E173 三长度）。",
+  "artifacts": "pc40 ~/e168p_ruler/exp/results_ruler/Llama-3.1-8B/L131072/pred_k96_bs2/（指针协议 gen 目录 ×3）+ logs + queue.log + ~/e168p_k96_probe.sh；Qwen 侧同型探针 E168q 在飞（e168q_worker.sh，pc02）"
+}
