@@ -984,6 +984,13 @@ def _eager_decoding_attn_gather(
             q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),
             mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale,
             allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
+    # Decide from host metadata before constructing a token mask/head map
+    # that the dense fallback immediately discards. Keep its inputs unchanged.
+    if full_len < 16384:
+        return _eager_decoding_attn_dense(
+            q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),
+            mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale,
+            allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
     m0 = mask[0]
     # 101：per_qh 判定显式化（与 _dense 同口径——validator 保证 R∈{Hkv,H}
     # 下与旧推断「R != Hkv」布尔等价，合法路径逐位不变）。
@@ -1040,14 +1047,6 @@ def _eager_decoding_attn_gather(
         head_of_row = None                              # 行号即 kv-head 号
 
     T = bm2.shape[-1]
-    # 小序列路由：gather 的固定开销（topk + ~15 个小 op）在 T < 16K 时
-    # 得不偿失（S=8K 实测 gather 0.48ms > dense 0.28ms），且 T 是 host
-    # 已知量——本分支零同步直接回退，8K 档与 baseline 逐位同路径。
-    if T < 16384:
-        return _eager_decoding_attn_dense(
-            q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),
-            mask.unsqueeze(0), block_size, cu_seqlens_k, softmax_scale,
-            allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
     counts = bm2.sum(dim=-1)                            # [R]（GPU int64，无同步）
 
     # 【iter3】零同步化：W 用 host 已知的契约上界（indexer 契约：每行选中

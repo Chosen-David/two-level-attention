@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-29
+
+- [ ] [TL-EARLY-DENSE-20261029] 提前短序列 dense 分流，避免无用 mask/head-map 准备；192 host 分流配对通过，Torch/CUDA/性能待验。([详情](task_details/TL-EARLY-DENSE-20261029.md))
+
 ## 2026-10-28
 
 - [ ] [TL-MAIN-FUSION-FIX-20261028] 同步main fb335e5；禁用错误分块softmax，修复compact读前哨兵与L2 bypass过滤。62 CPU通过，48解释器对拍，GPU待验。([详情](task_details/TL-MAIN-FUSION-FIX-20261028.md))
