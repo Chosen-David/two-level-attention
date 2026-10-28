@@ -4380,6 +4380,9 @@ class TLIIndexer(TIAIndexer):
         # R_cap（K1=64 → 4224）+ sink + swa，远超 K2=1024 预算——
         # attention/gather 成本随选中量放大的代价由实验实测裁决。
         if _l2_bypass:
+            # Inactive page slots can contain arbitrary/out-of-range IDs.
+            # Sanitize before scatter, not after filtering the resulting mask.
+            cand_idx2 = torch.where(keep2, cand_idx2, S_cap - 1)
             sel = torch.zeros((1, 1, Hkv, S_cap), dtype=torch.bool, device=dev)
             sel.scatter_(-1, cand_idx2.view(1, 1, Hkv, R_cap), True)
             sel = sel & mid_mask.view(1, 1, 1, -1)
@@ -5542,6 +5545,9 @@ if _HAS_TRITON:
             m = offs < R_cap
             k = tl.load(KEEP + base + offs, mask=m, other=0).to(tl.int32)
             idx = tl.load(CIDX + base + offs, mask=m, other=0)
+            # Redirect inactive IDs BEFORE any indirect read. Preserve the
+            # sentinel's MID value as in the stable argsort reference chain.
+            idx = tl.where(k != 0, idx, S_CAP_M1)
             mid = tl.load(MIDM + idx, mask=m, other=0)
             ksum = tl.cumsum(k, axis=0)
             gsum = tl.cumsum(1 - k, axis=0)
@@ -5820,25 +5826,12 @@ def _iter3_compact(cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev):
 
 
 def _iter3_fused_softmax(sfc, keep2, mid_slot, R_cap, group_size, Hkv):
-    """【iter3e+iter3f-4】fine 门控 + softmax + GQA mean + mid 门控融合 wrapper。
+    """Disable tile-local normalization; callers use the reference Torch chain.
 
-    输入 sfc [Hkv*group_size, R_cap]、keep2 [Hkv, R_cap]、
-    mid_slot [Hkv, R_cap]。
-    输出 p [Hkv, R_cap] fp32：mid=True → softmax prob；mid=False → -inf。
-
-    形态守卫（连续性/维度）不齐 → 返回 None，调用方 fail-closed。"""
-    if not (sfc.is_contiguous() and keep2.is_contiguous()
-            and mid_slot is not None and mid_slot.is_contiguous()
-            and sfc.shape[0] == Hkv * group_size
-            and sfc.shape[1] == R_cap
-            and keep2.shape[0] == Hkv and keep2.shape[1] == R_cap
-            and mid_slot.shape[0] == Hkv and mid_slot.shape[1] == R_cap):
-        return None
-    out_p = torch.empty((Hkv, R_cap), dtype=torch.float32, device=sfc.device)
-    BLOCK = 1024
-    grid = (Hkv, triton.cdiv(R_cap, BLOCK))
-    _iter3_fused_softmax_kernel[grid](
-        sfc, keep2, mid_slot, out_p,
-        R_CAP=R_cap, GROUP_SIZE=group_size,
-        BLOCK=BLOCK, num_warps=8)
-    return out_p
+    A 1024-slot CTA cannot normalize a larger candidate domain independently.
+    The old kernel also changes dtype rounding relative to per-query softmax
+    followed by GQA mean. Keep it disabled for ALL shapes until a replacement
+    validates global per-query statistics, empty rows, rounding and selection.
+    Returning None preserves both eager/capture caller fallback semantics.
+    """
+    return None
