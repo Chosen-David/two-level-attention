@@ -2,6 +2,8 @@
 
 ## 2026-10-28
 
+- [ ] [TL-MAIN-FUSION-FIX-20261028] 同步main fb335e5；禁用错误分块softmax，修复compact读前哨兵与L2 bypass过滤。62 CPU通过，48解释器对拍，GPU待验。([详情](task_details/TL-MAIN-FUSION-FIX-20261028.md))
+
 - [ ] [TL-CAND-LOAD-20261028] 候选打分跳过无效前缀尾部 CAND/K 读取；补齐生产tile的216组wrapper解释器对拍与72项离线编译；历史49 CPU通过，GPU验收待办。([详情](task_details/TL-CAND-LOAD-20261028.md))
 
 ## 2026-10-27
