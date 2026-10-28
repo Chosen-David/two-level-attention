@@ -4382,9 +4382,12 @@ class TLIIndexer(TIAIndexer):
         if _l2_bypass:
             # Inactive page slots can contain arbitrary/out-of-range IDs.
             # Sanitize before scatter, not after filtering the resulting mask.
-            cand_idx2 = torch.where(keep2, cand_idx2, S_cap - 1)
-            sel = torch.zeros((1, 1, Hkv, S_cap), dtype=torch.bool, device=dev)
+            cand_idx2 = torch.where(keep2, cand_idx2, S_cap)
+            sel = torch.zeros((1, 1, Hkv, S_cap + 1), dtype=torch.bool, device=dev)
             sel.scatter_(-1, cand_idx2.view(1, 1, Hkv, R_cap), True)
+            # A dedicated extra slot also works when SWA is disabled: the
+            # last real token must never act as an inactive-slot sentinel.
+            sel = sel[..., :S_cap]
             sel = sel & mid_mask.view(1, 1, 1, -1)
             sel[..., :sink_tok] = True
             sel = sel | swa_force.view(1, 1, 1, -1)

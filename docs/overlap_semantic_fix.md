@@ -30,8 +30,12 @@ selection in eager and captured execution. CPU tests establish dispatch and
 selection behavior, not CUDA kernel correctness or end-to-end model quality.
 
 Local validation (2026-10-28): Python 3.12.14 / Torch 2.8.0+cpu;
-73 passed, 10 CUDA skipped using the script. An additional 48 compact-kernel
+77 passed, 10 CUDA skipped using the script. An additional 48 compact-kernel
 CPU Triton 3.4 interpreter cases matched stable argsort exactly (empty/mixed/
 full/tail activity, R=17/2049/4224, H=1/8, capacity=65/129). The interpreter
 used a test-only NumPy scalar-index compatibility shim. No GPU performance,
 native CUDA memory-safety or model-quality acceptance is claimed.
+
+Follow-up zero-window guard: bypass uses a dedicated extra scatter slot, then
+slices it away. When SWA=0 the last real token is not a valid sentinel. Four
+new cases reproduced the unwanted token before the repair and pass afterward.

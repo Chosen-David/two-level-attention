@@ -27,12 +27,15 @@ def bypass_function(source):
 
 @pytest.mark.parametrize('capacity',[65,129])
 @pytest.mark.parametrize('bad_id',[9,999])
-def test_bypass_filters_inactive_candidates(capacity,bad_id):
+@pytest.mark.parametrize('window',[0,4])
+def test_bypass_filters_inactive_candidates(capacity,bad_id,window):
     f=bypass_function(Path(mod.__file__).read_text())
     ids=torch.tensor([[4,5,bad_id]])
     keep=torch.tensor([[True,True,False]])
-    mid=torch.ones(capacity,dtype=torch.bool);mid[:2]=False;mid[-4:]=False
-    swa=torch.zeros_like(mid);swa[-4:]=True
+    mid=torch.ones(capacity,dtype=torch.bool);mid[:2]=False
+    swa=torch.zeros_like(mid)
+    if window:
+        mid[-window:]=False;swa[-window:]=True
     metrics=SimpleNamespace(add_select_result=lambda *args:None)
     got=f(ids,keep,capacity,1,3,'cpu',mid,2,swa,torch.arange(capacity),torch.tensor(capacity),torch.empty(1),SimpleNamespace(metrics=metrics),capacity)
     expected=swa.clone();expected[:2]=True;expected[4:6]=True
