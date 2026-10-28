@@ -26,23 +26,31 @@ class FarSkipLayer(DynamicLayer):
         if type(layer) is not DynamicLayer and not (
                 isinstance(layer, cls) and layer.config is None):
             raise ValueError("far eviction requires an ordinary DynamicLayer")
+        if layer.get_seq_length() < 1 or layer.keys.shape[0] != 1:
+            raise ValueError("far eviction requires a nonempty single-request cache")
+        return cls.from_prefill(layer.keys, layer.values, config)
+
+    @classmethod
+    def from_prefill(cls, keys, values, config):
+        """Allocate bounded storage and write one complete unpadded prefill."""
+        if (keys.ndim != 4 or values.shape != keys.shape or keys.shape[0] != 1
+                or keys.shape[-2] < 1):
+            raise ValueError("far eviction requires a nonempty single-request cache")
+        if keys.requires_grad or values.requires_grad:
+            raise ValueError("far eviction cannot retain an autograd graph; use inference_mode")
         result = cls()
         result.config = config
-        result.logical_length = layer.get_seq_length()
-        if result.logical_length < 1 or layer.keys.shape[0] != 1:
-            raise ValueError("far eviction requires a nonempty single-request cache")
-        if layer.keys.requires_grad or layer.values.requires_grad:
-            raise ValueError("far eviction cannot retain an autograd graph; use inference_mode")
-        result.dtype, result.device = layer.keys.dtype, layer.keys.device
+        result.logical_length = keys.shape[-2]
+        result.dtype, result.device = keys.dtype, keys.device
         result.tail_start = config.tail_start(result.logical_length)
         prefix = min(config.sink_tokens, result.logical_length)
         result.layout = FarSkipLayout(config.sink_tokens,
                                       max(config.near_length, config.block_size) + config.window_tokens + config.block_size - 1)
-        shape = (*layer.keys.shape[:-2], result.layout.capacity, layer.keys.shape[-1])
-        result.keys = layer.keys.new_empty(shape)
-        result.values = layer.values.new_empty((*shape[:-1], layer.values.shape[-1]))
-        result.keys[..., :prefix, :].copy_(layer.keys[..., :prefix, :])
-        result.values[..., :prefix, :].copy_(layer.values[..., :prefix, :])
+        shape = (*keys.shape[:-2], result.layout.capacity, keys.shape[-1])
+        result.keys = keys.new_empty(shape)
+        result.values = values.new_empty((*shape[:-1], values.shape[-1]))
+        result.keys[..., :prefix, :].copy_(keys[..., :prefix, :])
+        result.values[..., :prefix, :].copy_(values[..., :prefix, :])
         # Copy the chronological tail in at most two runs into the cyclic suffix.
         count = result.logical_length - result.tail_start
         slot = result.layout.slot(result.tail_start)
@@ -50,8 +58,8 @@ class FarSkipLayer(DynamicLayer):
         for dst, src, width in ((slot, result.tail_start, first),
                                 (config.sink_tokens, result.tail_start + first, count - first)):
             if width:
-                result.keys[..., dst:dst+width, :].copy_(layer.keys[..., src:src+width, :])
-                result.values[..., dst:dst+width, :].copy_(layer.values[..., src:src+width, :])
+                result.keys[..., dst:dst+width, :].copy_(keys[..., src:src+width, :])
+                result.values[..., dst:dst+width, :].copy_(values[..., src:src+width, :])
         return result
 
     def update(self, key_states, value_states, cache_kwargs=None):

@@ -382,6 +382,9 @@ def resolve_treatment_snapshot(args):
     gate_output_treatment_identity（经 manifest_json）三者共用同一
     snapshot 时，输出与逐字段重新解析逐位一致（manifest 构造只有本
     函数一条路径，无第二套字段子集逻辑）。"""
+    if any(getattr(args, name, None) == "auto" for name in
+           ("tli_far_skip_backend", "tli_far_skip_cache")):
+        raise ValueError("resolve auto far skip modes from model/config before treatment snapshot")
     manifest = {}
     skip_ids = None
     basis_tensor = None

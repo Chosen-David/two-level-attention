@@ -1,0 +1,271 @@
+{
+  "schema": "e182-direct-prefill-verdict",
+  "date": "2026-10-28",
+  "verdict": "pass_with_scoped_limits",
+  "base_commit": "fb335e5ceb742b31d83206c670a10286c7fba182",
+  "hardware": {
+    "e2e": "pc02 NVIDIA H20-3e, Qwen3-8B bf16",
+    "core_cpu_cuda_tests": "pc33 NVIDIA H20-3e; CPU tests use the same source tree"
+  },
+  "production_caliber": {
+    "method": "tli",
+    "K1": 64,
+    "K2": 1024,
+    "near_len": 4096,
+    "near_pages": 32,
+    "near_tokens": "off",
+    "kmeans": false,
+    "subspace": "tail",
+    "level2_cmp_ratio": 4,
+    "sink_tokens": 4,
+    "swa_size": 128,
+    "far_skip_backend": "compact",
+    "far_skip_cache": "evict",
+    "no_skip_arm": "tli_enable_layer_skip=false",
+    "static_skip_arm": "13/36 layers from exp/trace/results/tli_layer_skip_mask.json"
+  },
+  "implementation": {
+    "auto_resolution": "compact/evict only for supported TLI Qwen3 with fixed near geometry and compact-compatible ordinary shared-head two-level selection; otherwise auto resolves to legacy/retain. Explicit compact remains fail-closed.",
+    "direct_lifecycle": "prepare_direct_prefill -> one-shot B=1 unpadded dense prefill -> finalize_direct_prefill -> capture/decode",
+    "dense_prefill_semantics": "staging update writes linear/ring partitions and returns the original complete K/V to dense attention",
+    "skip_finalize": "13 skip layers retain fixed sink plus cyclic Near/SWA ring and release linear Sink/Far staging",
+    "non_skip_finalize": "23 non-skip layers retain full linear storage for existing L1/L2 and gather kernels",
+    "known_non_skip_optimization": "ring elision avoids the previously measured 0.592 GiB redundant staging peak"
+  },
+  "correctness": {
+    "core_tests": {
+      "command": "pytest test_far_skip_compact/test_far_skip_optimized/test_far_skip_hybrid_cache/test_hybrid_batch_cache/test_qwen_static_mask/test_backfill_identity_format/test_e152_request_timing/test_ruler_batch_treatment_snapshot",
+      "result": "141 passed, 22 subtests passed",
+      "note": "The nine CUDA tests skipped by the earlier CPU-only run executed in this final run.",
+      "evidence": "exp/trace/results/direct_prefill_20261028/raw/cpu_core_gates.log"
+    },
+    "gpu_functional_gates": {
+      "E127": "15 PASS / 0 FAIL",
+      "tli_batch": "59 PASS / 0 FAIL",
+      "evidence": "exp/trace/results/direct_prefill_20261028/raw/gpu_functional_gates.log",
+      "environment_note": "The trailing pc02 pytest invocation failed because neither remote Python had pytest; it is not counted as a test pass. The small-model CUDA tests passed in the pc33 core run."
+    },
+    "no_skip_direct_vs_conversion": {
+      "lengths": [32768, 65536, 131072],
+      "requests_per_arm": 2,
+      "tokens_per_request": 128,
+      "token_mismatches": 0,
+      "treatment_manifests_equal": true
+    },
+    "static_skip_direct_vs_conversion": {
+      "lengths": [32768, 65536, 131072],
+      "skip_layers": 13,
+      "non_skip_layers": 23,
+      "token_mismatches": 0
+    },
+    "eager_cross_check": {
+      "direct_eager_vs_conversion_eager_token_mismatches": {
+        "32768": 0,
+        "65536": 0,
+        "131072": 0
+      },
+      "direct_graph_vs_direct_eager": {
+        "65536": "128/128 tokens equal",
+        "32768": "2/128 tokens differ at steps 55 and 110",
+        "131072": "2/128 tokens differ at steps 88 and 99"
+      },
+      "attribution": "The identical 32K/128K graph-vs-eager differences occur in the conversion arm too, while direct-eager and conversion-eager are exactly equal. This is a shared decode numerical-path limitation, not a direct-prefill regression; strict cross-mode bit-exactness is therefore not claimed."
+    },
+    "hybrid": {
+      "graph_batches": [1, 2, 8, 32],
+      "eager_batch": 2,
+      "direct_vs_conversion_generated_rows_equal": true,
+      "B2_graph_vs_eager_generated_rows_equal": true,
+      "ragged_lengths": "B2 uses 16384/20000; B8 uses 16384..23552 in 1024-token steps; B32 uses 32 rows of 16384"
+    },
+    "ruler_small_sample": {
+      "context_length": 32768,
+      "batch_size": 1,
+      "tasks": ["niah_single_1", "niah_multikey_1"],
+      "samples_per_task_per_arm": 8,
+      "direct_vs_conversion_records_equal": true,
+      "jsonl_sha256": {
+        "niah_single_1": "197ac1429f487eda0e417d6cb5cd2b3caec3bb1683ecfe1e01b4625fb92eaca3",
+        "niah_multikey_1": "68b2c769306eb36ff340e12113adc450b9c52f26acdae6e43c62b42ad1045ca3"
+      },
+      "scope": "Byte-identical direct/conversion outputs on these 16 examples only; not a full RULER quality claim."
+    }
+  },
+  "memory_no_skip_gib": {
+    "measurement": "torch.cuda.memory_allocated/max_memory_allocated and per-layer numel*element_size; capacity formulas and reserved memory are not substitutes",
+    "rows": [
+      {
+        "length": 32768,
+        "main_kv_direct": 4.650650,
+        "main_kv_conversion": 4.650650,
+        "prefill_peak_direct_runs": [29.7456, 30.3949],
+        "prefill_peak_conversion_runs": [29.7285, 35.0258],
+        "second_request_peak_saving": 4.6309,
+        "after_finalize_direct_runs": [19.9425, 20.5921],
+        "after_finalize_conversion_runs": [19.9410, 20.5904]
+      },
+      {
+        "length": 65536,
+        "main_kv_direct": 9.282761,
+        "main_kv_conversion": 9.282761,
+        "prefill_peak_direct_runs": [44.1814, 45.4512],
+        "prefill_peak_conversion_runs": [44.1645, 54.7120],
+        "second_request_peak_saving": 9.2608,
+        "after_finalize_direct_runs": [24.5740, 25.8447],
+        "after_finalize_conversion_runs": [24.5730, 25.8408]
+      },
+      {
+        "length": 131072,
+        "main_kv_direct": 18.547531,
+        "main_kv_conversion": 18.547531,
+        "prefill_peak_direct_runs": [73.0557, 75.5516],
+        "prefill_peak_conversion_runs": [73.0327, 94.0800],
+        "second_request_peak_saving": 18.5284,
+        "after_finalize_direct_runs": [33.8428, 36.3386],
+        "after_finalize_conversion_runs": [33.8399, 36.3369]
+      }
+    ],
+    "interpretation": "Direct prefill does not reduce steady main KV when every layer is non-skip. Its measured peak benefit is avoiding the old DynamicCache duplicate on subsequent requests; first-request peaks differ by only about 0.02 GiB."
+  },
+  "memory_static_skip": {
+    "skip_layers": 13,
+    "non_skip_layers": 23,
+    "ring_bytes_all_skip_layers": 228487168,
+    "rows": [
+      {
+        "length": 32768,
+        "full_linear_main_kv_gib": 4.650650,
+        "skip_main_kv_gib": 3.184044,
+        "saving_gib": 1.466606,
+        "saving_percent": 31.5355,
+        "direct_conversion_final_storage_equal": true,
+        "after_finalize_direct_gib": 18.502934,
+        "after_finalize_conversion_gib": 18.503144,
+        "first_prefill_peak_direct_gib": 29.958395,
+        "first_prefill_peak_conversion_gib": 29.728525
+      },
+      {
+        "length": 65536,
+        "full_linear_main_kv_gib": 9.282761,
+        "skip_main_kv_gib": 6.143448,
+        "saving_gib": 3.139313,
+        "saving_percent": 33.8187,
+        "direct_conversion_final_storage_equal": true,
+        "after_finalize_direct_gib": 21.462950,
+        "after_finalize_conversion_gib": 21.463416,
+        "first_prefill_peak_direct_gib": 44.395613,
+        "first_prefill_peak_conversion_gib": 44.164469
+      },
+      {
+        "length": 131072,
+        "full_linear_main_kv_gib": 18.547531,
+        "skip_main_kv_gib": 12.062607,
+        "saving_gib": 6.484924,
+        "saving_percent": 34.9638,
+        "direct_conversion_final_storage_equal": true,
+        "after_finalize_direct_gib": 27.384572,
+        "after_finalize_conversion_gib": 27.383412,
+        "first_prefill_peak_direct_gib": 73.269006,
+        "first_prefill_peak_conversion_gib": 73.032743
+      }
+    ],
+    "first_peak_attribution": "The skip arm's first-request direct peak is 0.21-0.24 GiB higher. The independent 13-layer ring account is 228487168 bytes = 0.212776 GiB; this is the live Near/SWA ring staging required before skip finalize. It is not misreported as a steady-state saving or hidden by allocator reserved memory.",
+    "second_request_32k": {
+      "direct_prefill_peak_gib": 30.3840,
+      "conversion_prefill_peak_gib": 33.3760,
+      "direct_peak_saving_gib": 2.9920
+    },
+    "interpretation": "Steady savings come from evicting Far on the 13 gated layers, not from direct prefill itself. Direct and conversion have identical final physical storage."
+  },
+  "hybrid_memory_and_latency": {
+    "rows": [
+      {
+        "batch": 1,
+        "main_kv_gib_direct": 2.3191,
+        "main_kv_gib_conversion": 2.3191,
+        "prefill_peak_delta_gib_direct": 4.0395,
+        "prefill_peak_delta_gib_conversion": 4.0361,
+        "after_finalize_gib_direct": 17.6133,
+        "after_finalize_gib_conversion": 17.6128,
+        "graph_tpot_ms_direct": 26.1642,
+        "graph_tpot_ms_conversion": 26.1578
+      },
+      {
+        "batch": 2,
+        "main_kv_gib_direct": 5.6604,
+        "main_kv_gib_conversion": 5.6604,
+        "prefill_peak_delta_gib_direct": 7.7444,
+        "prefill_peak_delta_gib_conversion": 7.7419,
+        "after_finalize_gib_direct": 20.9503,
+        "after_finalize_gib_conversion": 20.9511,
+        "graph_tpot_ms_direct": 41.1004,
+        "graph_tpot_ms_conversion": 41.1004
+      },
+      {
+        "batch": 8,
+        "main_kv_gib_direct": 26.6583,
+        "main_kv_gib_conversion": 26.6583,
+        "prefill_peak_delta_gib_direct": 29.1060,
+        "prefill_peak_delta_gib_conversion": 29.1033,
+        "after_finalize_gib_direct": 41.9485,
+        "after_finalize_gib_conversion": 41.9485,
+        "graph_tpot_ms_direct": 137.6805,
+        "graph_tpot_ms_conversion": 137.6959
+      },
+      {
+        "batch": 32,
+        "main_kv_gib_direct": 74.2104,
+        "main_kv_gib_conversion": 74.2104,
+        "prefill_peak_delta_gib_direct": 76.0576,
+        "prefill_peak_delta_gib_conversion": 76.0399,
+        "after_finalize_gib_direct": 89.6333,
+        "after_finalize_gib_conversion": 89.6199,
+        "graph_tpot_ms_direct": 560.8106,
+        "graph_tpot_ms_conversion": 560.5098
+      }
+    ],
+    "scope": "All rows use no-skip full-linear storage. The small allocated differences are process-level measurements, not main-KV savings."
+  },
+  "latency_ms": {
+    "no_skip_graph": [
+      {
+        "length": 32768,
+        "prefill_direct_runs": [8270.61, 7953.37],
+        "prefill_conversion_runs": [8287.70, 7953.97],
+        "tpot_direct_runs": [18.3419, 18.3349],
+        "tpot_conversion_runs": [18.3191, 18.3016]
+      },
+      {
+        "length": 65536,
+        "prefill_direct_runs": [23835.53, 23251.39],
+        "prefill_conversion_runs": [23489.61, 23257.17],
+        "tpot_direct_runs": [18.5516, 18.5978],
+        "tpot_conversion_runs": [18.5416, 18.5651]
+      },
+      {
+        "length": 131072,
+        "prefill_direct_runs": [76328.23, 85752.28],
+        "prefill_conversion_runs": [75894.13, 75477.17],
+        "tpot_direct_runs": [19.0400, 19.0410],
+        "tpot_conversion_runs": [19.0210, 19.0636],
+        "direct_rerun_prefill_runs": [75920.04, 75459.87],
+        "direct_rerun_tpot_runs": [19.0407, 19.0320],
+        "direct_rerun_token_mismatches": 0
+      }
+    ],
+    "interpretation": "No prefill or TPOT speedup is claimed. The original 128K second-request 85.75s direct prefill outlier is retained; an independent rerun returned to 75.46s with unchanged tokens."
+  },
+  "raw_evidence": {
+    "directory": "exp/trace/results/direct_prefill_20261028/raw",
+    "no_skip": "champion_{32768,65536,131072}_{direct,conversion}_production.json and graph/eager variants",
+    "skip": "skip13_32k_{direct,conversion}.json; skip13_{65536,131072}_{direct,conversion}.json",
+    "hybrid": "hybrid_{b1,b2,b2e,b8,b32}_{direct,conversion}_production.json",
+    "quality": "exp/trace/results/direct_prefill_20261028/quality/{direct,conversion}"
+  },
+  "remaining_limits": [
+    "Strict graph-vs-eager bit-exactness is not universal in the shared decode path: 32K and 128K each have two token differences in both prefill arms. Direct-eager exactly matches conversion-eager, so this does not localize to direct prefill.",
+    "The RULER gate is a 16-example direct/conversion equivalence check, not a full quality benchmark and not evidence for arbitrary skip masks.",
+    "Chunked/padded/beam/offload/grad prefill, cache geometry changes after finalize, crop/rewind, cache sharing and speculative decoding remain fail-closed or unsupported.",
+    "The first-request skip-arm ring staging overhead and all prefill outliers are reported separately from steady-state Far-eviction savings."
+  ]
+}

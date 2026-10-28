@@ -110,6 +110,22 @@ class StaticMask(unittest.TestCase):
             accepted += result
         self.assertEqual(accepted, 1)
 
+    def test_prefill_validation_uses_bounded_chunks(self):
+        m = causal(5, 7)
+        original = torch.ones_like
+        sizes = []
+        def observe(x, *args, **kwargs):
+            sizes.append(x.numel())
+            return original(x, *args, **kwargs)
+        with patch.object(torch, 'ones_like', side_effect=observe):
+            self.assertTrue(self.ns['_can_drop_static_mask'](
+                self.cache, m, 5, prefill=True, _chunk_elements=12))
+        self.assertEqual(len(sizes), 3)
+        self.assertLessEqual(max(sizes), 12)
+        m[0, 0, 4, 0] = False
+        self.assertFalse(self.ns['_can_drop_static_mask'](
+            self.cache, m, 5, prefill=True, _chunk_elements=12))
+
     def test_decode_only_identity_bool(self):
         for dtype in (torch.bool, torch.float32, torch.float16, torch.bfloat16):
             for prefix in ([1, 1, 1], [1, 0, 1], [1, -1, -2]):

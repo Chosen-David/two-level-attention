@@ -22,7 +22,10 @@ from sparse_attn.ops.cuda_graph_state import disable_graph, enable_graph, graph_
 from sparse_attn.ops.far_skip_cache import FarSkipLayer
 from sparse_attn.ops.far_skip import FarSkipConfig
 from sparse_attn.ops.far_skip_static import FarSkipStaticLayer
-from sparse_attn.ops.tli_static_cache import TLIStaticCache, TLIStaticLayer, fill_static_from_dynamic
+from sparse_attn.ops.tli_static_cache import (
+    TLIStaticCache, TLIStaticLayer, fill_static_from_dynamic,
+    finalize_direct_prefill, prepare_direct_prefill,
+)
 from sparse_attn.patches.qwen3_attn_patch import qwen3_attn_forward
 
 
@@ -100,6 +103,138 @@ def test_direct_allocation_never_creates_full_buffer_for_skip_layer():
     del source, dyn
     gc.collect()
     assert old_ref() is None
+
+
+@pytest.mark.parametrize('length', [1, 7, 23, 33])
+def test_direct_prefill_dense_semantics_layout_and_skip_finalize(length):
+    model = make_model()
+    reference = copy.deepcopy(model)
+    ids = torch.arange(length)[None] % 32
+    expected = reference(input_ids=ids, use_cache=True)
+    cache = TLIStaticCache(model.config, 128, 1)
+    staging = prepare_direct_prefill(cache, model, length)
+    assert not cache.is_compileable
+    assert cache.get_mask_sizes(torch.arange(length), 0) == (length, 0)
+    actual = model(input_ids=ids, past_key_values=cache, use_cache=True)
+    torch.testing.assert_close(actual.logits, expected.logits, rtol=2e-5, atol=2e-6)
+
+    state = staging.states[0]
+    source = expected.past_key_values.layers[0]
+    cfg = state.config
+    start = cfg.tail_start(length)
+    torch.testing.assert_close(state.linear.keys[..., :start, :],
+                               source.keys[..., :start, :], rtol=0, atol=0)
+    torch.testing.assert_close(state.linear.values[..., :start, :],
+                               source.values[..., :start, :], rtol=0, atol=0)
+    live = torch.cat((torch.arange(min(cfg.sink_tokens, length)),
+                      torch.arange(start, length)))
+    for name in ('keys', 'values'):
+        torch.testing.assert_close(
+            getattr(state.ring, name).index_select(2, state.ring.layout.map(live)),
+            getattr(source, name).index_select(2, live), rtol=0, atol=0)
+    torch.testing.assert_close(staging.states[1].linear.keys[..., :length, :],
+                               expected.past_key_values.layers[1].keys, rtol=0, atol=0)
+    abandoned = weakref.ref(state.linear.keys)
+
+    finalize_direct_prefill(cache, model, length)
+    assert isinstance(cache.layers[0], FarSkipStaticLayer)
+    assert type(cache.layers[1]) is TLIStaticLayer
+    assert cache._direct_prefill is None and cache._far_skip_prepared
+    assert cache.is_compileable
+    assert cache.get_mask_sizes(torch.tensor([length]), 0) == (128, 0)
+    assert cache.layers[0].cumulative_length == length
+    assert cache.layers[1].cumulative_length == length
+    assert state.linear is None and state.ring is None
+    gc.collect()
+    assert abandoned() is None
+    for name in ('keys', 'values'):
+        torch.testing.assert_close(
+            getattr(cache.layers[0], name).index_select(2, cache.layers[0].layout.map(live)),
+            getattr(source, name).index_select(2, live), rtol=0, atol=0)
+    with pytest.raises(ValueError, match='matching completed direct prefill'):
+        finalize_direct_prefill(cache, model, length)
+
+
+def test_direct_prefill_non_skip_assembles_full_linear_and_releases_ring():
+    model = make_model()
+    idx = model.model.layers[0].self_attn.indexer
+    idx.enable_layer_skip = False
+    idx.dyn_dgate = True
+    idx._skip_ids = None
+    idx._dyn_skip_pending = False
+    reference = copy.deepcopy(model)
+    length = 65
+    ids = torch.arange(length)[None] % 32
+    expected = reference(input_ids=ids, use_cache=True)
+    cache = TLIStaticCache(model.config, 128, 1)
+    staging = prepare_direct_prefill(cache, model, length)
+    assert not cache.is_compileable
+    assert cache.get_mask_sizes(torch.arange(length), 0) == (length, 0)
+    actual = model(input_ids=ids, past_key_values=cache, use_cache=True)
+    torch.testing.assert_close(actual.logits, expected.logits, rtol=2e-5, atol=2e-6)
+    abandoned = weakref.ref(staging.states[0].ring.keys)
+    idx._dyn_skip_pending = False
+    finalize_direct_prefill(cache, model, length)
+    assert type(cache.layers[0]) is TLIStaticLayer
+    for li in range(2):
+        for name in ('keys', 'values'):
+            torch.testing.assert_close(
+                getattr(cache.layers[li], name)[..., :length, :],
+                getattr(expected.past_key_values.layers[li], name), rtol=0, atol=0)
+    gc.collect()
+    assert abandoned() is None
+
+
+@pytest.mark.parametrize('gate_mode', ['disabled', 'static_non_skip'])
+def test_direct_prefill_known_non_skip_elides_redundant_staging_ring(gate_mode):
+    model = make_model()
+    idx = model.model.layers[0].self_attn.indexer
+    idx.enable_layer_skip = gate_mode == 'static_non_skip'
+    idx.dyn_dgate = False
+    idx._skip_ids = set() if gate_mode == 'static_non_skip' else None
+    reference = copy.deepcopy(model)
+    length = 23
+    ids = torch.arange(length)[None] % 32
+    expected = reference(input_ids=ids, use_cache=True)
+    cache = TLIStaticCache(model.config, 128, 1)
+    staging = prepare_direct_prefill(cache, model, length)
+    assert not staging.states[0].needs_ring
+    actual = model(input_ids=ids, past_key_values=cache, use_cache=True)
+    torch.testing.assert_close(actual.logits, expected.logits, rtol=2e-5, atol=2e-6)
+    assert staging.states[0].ring is None
+    torch.testing.assert_close(staging.states[0].linear.keys[..., :length, :],
+                               expected.past_key_values.layers[0].keys, rtol=0, atol=0)
+    finalize_direct_prefill(cache, model, length)
+    assert type(cache.layers[0]) is TLIStaticLayer
+    torch.testing.assert_close(cache.layers[0].keys[..., :length, :],
+                               expected.past_key_values.layers[0].keys, rtol=0, atol=0)
+
+
+def test_direct_prefill_rejects_explicit_mask_before_writing():
+    model = make_model()
+    cache = TLIStaticCache(model.config, 128, 1)
+    staging = prepare_direct_prefill(cache, model, 7)
+    ids = torch.arange(7)[None] % 32
+    mask = torch.ones(1, 1, 7, 7, dtype=torch.bool)
+    with pytest.raises(ValueError, match='unpadded mask-free'):
+        model(input_ids=ids, past_key_values=cache, use_cache=True,
+              attention_mask=mask)
+    assert not staging.states[0].written
+    assert cache.layers[0].keys is None
+
+
+def test_direct_prefill_requires_finalize_before_decode():
+    model = make_model()
+    cache = TLIStaticCache(model.config, 128, 1)
+    staging = prepare_direct_prefill(cache, model, 23)
+    model(input_ids=torch.arange(23)[None] % 32, past_key_values=cache, use_cache=True)
+    before = staging.states[0].ring.keys.clone()
+    with pytest.raises(ValueError, match='finalize direct prefill before decode'):
+        model(input_ids=torch.zeros(1, 1, dtype=torch.long),
+              position_ids=torch.tensor([[23]]), cache_position=torch.tensor([23]),
+              past_key_values=cache, use_cache=True)
+    torch.testing.assert_close(staging.states[0].ring.keys, before, rtol=0, atol=0)
+    assert cache.layers[0] is staging.states[0].linear
 
 
 def test_refill_gate_changes_restore_linear_and_rebuild_ring():
@@ -189,6 +324,38 @@ def test_static_model_matches_retained_history_across_wraps(budget, length):
                 actual = runner.forward().logits
             torch.testing.assert_close(actual, expected, rtol=2e-5, atol=2e-6)
     assert pointers == [t.data_ptr() for l in runner.cache.layers for t in (l.keys, l.values)]
+
+
+def test_direct_graph_runner_prefill_decode_and_second_request():
+    model = make_model()
+    reference = copy.deepcopy(model)
+    reference.model.layers[0].self_attn.indexer.far_skip_cache = 'retain'
+    runner = make_runner(model)
+    with patch('sparse_attn.patches.qwen3_attn_patch.eager_decoding_attn',
+               side_effect=AssertionError('ring reached legacy reader')):
+        for length, offset in ((23, 0), (31, 7)):
+            ids = (torch.arange(length) + offset)[None] % 32
+            expected = reference(input_ids=ids, use_cache=True)
+            full = expected.past_key_values
+            runner.graph, runner.out = object(), object()
+            runner.prepare_prefill(length)
+            assert runner.graph is None and runner.out is None
+            actual = model(input_ids=ids, past_key_values=runner.cache, use_cache=True)
+            torch.testing.assert_close(actual.logits, expected.logits, rtol=2e-5, atol=2e-6)
+            runner.finalize_prefill(length)
+            assert runner.cache._far_skip_attention_mask is runner.m4_buf
+            ctx = context(length)
+            for pos in range(length, length + 18):
+                token = (pos + offset) % 32
+                expected_token = reference(input_ids=torch.tensor([[token]]),
+                                           position_ids=torch.tensor([[pos]]),
+                                           cache_position=torch.tensor([pos]),
+                                           past_key_values=full, use_cache=True).logits
+                ctx.seq_lens[0] = pos + 1
+                with batch_decode_scope(ctx):
+                    runner.inject(token, pos + 1)
+                    actual_token = runner.forward().logits
+                torch.testing.assert_close(actual_token, expected_token, rtol=2e-5, atol=2e-6)
 
 
 def test_runner_discards_old_graph_and_registers_mask_on_every_refill():

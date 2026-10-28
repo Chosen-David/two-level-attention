@@ -244,6 +244,23 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   1.17/1.23/1.49×；prefill 两臂一致（原生 SDPA dense）。
   TLI decode 长度平坦化: +29.5%@4×ctx vs dense +273%。
 
+- **【已落库 2026-10-28】E182：direct partitioned prefill + 默认 compact/evict**
+  （`e182_direct_prefill_verdict.json`，基线 fb335e5）：受支持的 TLI Qwen3
+  且固定 near 几何/选择器兼容时 `auto→compact/evict`，其余自动回退；
+  one-shot B=1 dense prefill 直接写 linear/ring，原完整 K/V 仍返回 SDPA。
+  三长度 direct/conversion 两请求各 128 token 全一致；13/36 静态 skip 层
+  finalize 后摘除 Far 并释放 linear staging，主 KV 节约
+  **1.466606/3.139313/6.484924 GiB（31.54/33.82/34.96%）**；non-skip 层为
+  兼容 L1/L2/gather 保留 full-linear，默认全 non-skip 时稳态主 KV 无节约。
+  后续请求 direct 避免旧 DynamicCache 重复驻留，prefill 峰值少
+  **4.6309/9.2608/18.5284 GiB**；首请求峰值基本持平，不宣称 prefill/TPOT
+  加速。Hybrid B=1/2/8/32 graph 与 B=2 eager 双臂序列一致；核心门
+  141 passed + 22 subtests、E127 15/15、tli_batch 59/59。32K/128K 的
+  graph/eager 各 2 个共同 token 分歧也存在于 conversion，direct-eager 与
+  conversion-eager 全一致；RULER 仅为两任务共 16 样本双臂逐字节等价门，
+  不外推完整质量或任意 skip mask。128K 原始 prefill 慢离群及复测、skip
+  首请求 0.21–0.24 GiB ring staging 开销均保留在判决中。
+
 ## 3. 对比口径（vendor 基线）
 
 - 对比基线（Quest/MInference/SparQ/MoBA/ClusterKV/AsyncTLS/HISA/JSSA/
@@ -303,6 +320,7 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 | e152v2 dynamic-cache 性能口径（TLI 3.4×/2.5×/1.8× slower） | 已被 `e152v4_formal_verdict.json` 整步 graph 口径取代（论文图 E2 已 in-place 重写，commit e5071cb） |
 | MLA 子空间增益可线性兑现到 e2e | `e158b_mla_rope_nope32_e2e_verdict.json` 饱和映射边界披露 |
 | γ-off 自由竞争需 CLI `--tli_gamma off` | 显式几何等价物 `--tli_near_tokens off`（E155d；γ 接口已删除） |
+| compact far-skip 只能 eager，或静态 decode 必须先保留完整 DynamicCache prefill 再转换 | `e182_direct_prefill_verdict.json`：受支持配置默认解析 compact/evict；one-shot dense prefill 直接分区写 linear/ring，finalize 后 skip 层释放 Far staging，并接入 GraphRunner 与 row-local hybrid。仅限 B=1 unpadded no-grad direct prefill；graph/eager 共同数值差异、小样本质量范围及首请求 ring staging 开销按判决限定 |
 
 ## 6. 仓库结构速览（净化后）
 

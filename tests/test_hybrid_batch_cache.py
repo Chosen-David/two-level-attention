@@ -31,12 +31,18 @@ def set_gate(model, skip):
     idx.dyn_dgate_eps = 2.0 if skip else -1.0
 
 
-def build(model, lengths, skips, capacity=128):
+def build(model, lengths, skips, capacity=128, direct=False):
     builder = HybridBatchCacheBuilder(model, capacity, len(lengths))
     for b, (length, skip) in enumerate(zip(lengths, skips)):
         set_gate(model, skip)
-        dyn = prefill(model, length, offset=b)
-        builder.add(dyn, length)
+        if direct:
+            row_cache = builder.prepare_row(length)
+            ids = (torch.arange(length) + b) % 32
+            model(input_ids=ids[None], past_key_values=row_cache, use_cache=True)
+            builder.finalize_row(row_cache, length)
+        else:
+            dyn = prefill(model, length, offset=b)
+            builder.add(dyn, length)
     return HybridBatchRunner(model, builder.finish())
 
 
@@ -72,6 +78,23 @@ def test_ragged_batch_matches_independent_retained_requests(batch):
             torch.testing.assert_close(actual[b:b+1], expected, rtol=3e-5, atol=3e-6, msg=f'batch={batch}, row={b}, step={step}')
     assert pointers == [x.data_ptr() for x in buffers(runner)]
     assert not graph_state().enabled
+
+
+def test_direct_rows_match_conversion_storage_and_decode():
+    direct_model = make_model()
+    conversion_model = copy.deepcopy(direct_model)
+    lengths, skips = [1, 23, 31], [True, False, True]
+    direct = build(direct_model, lengths, skips, direct=True)
+    conversion = build(conversion_model, lengths, skips)
+    for actual, expected in zip(buffers(direct), buffers(conversion)):
+        torch.testing.assert_close(actual, expected, rtol=0, atol=0, equal_nan=True)
+    for step in range(35):
+        tokens = [(b+step+3) % 32 for b in range(3)]
+        current = [length+step+1 for length in lengths]
+        direct.inject(tokens, current)
+        conversion.inject(tokens, current)
+        torch.testing.assert_close(direct.run().logits, conversion.run().logits,
+                                   rtol=0, atol=0)
 
 
 def test_short_non_page_aligned_capacity_with_large_l1_quota():

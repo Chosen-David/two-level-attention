@@ -31,7 +31,8 @@ def _paper_route(layer,route):
     if observer is not None:observer.record_qwen_route(layer,route)
 
 
-def _can_drop_static_mask(cache, mask, length, *, prefill):
+def _can_drop_static_mask(cache, mask, length, *, prefill,
+                          _chunk_elements=1 << 26):
     """Only an exact, unpadded bool causal mask can be replaced by None.
 
     Cross-layer reuse is tied to the same live tensor and mutation version.
@@ -54,7 +55,16 @@ def _can_drop_static_mask(cache, mask, length, *, prefill):
         return previous[2]
     prefix = mask[..., :length]
     if prefill:
-        valid = torch.equal(prefix, torch.ones_like(prefix).tril_())
+        # torch.tril_ is incorrect on some CUDA builds once the matrix exceeds
+        # 2**32 elements. Bounded chunks also avoid a second quadratic mask.
+        rows = max(1, min(length, _chunk_elements // length))
+        valid = True
+        for start in range(0, length, rows):
+            stop = min(length, start + rows)
+            chunk = prefix[..., start:stop, :]
+            if not torch.equal(chunk, torch.ones_like(chunk).tril_(diagonal=start)):
+                valid = False
+                break
     else:
         valid = bool(prefix.all())
     valid = valid and not bool(mask[..., length:].any())

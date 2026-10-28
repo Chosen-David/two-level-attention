@@ -51,6 +51,8 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
     patch 中途换文件 → 跨层混代可达）。仅 TLIIndexer 接受注入，
     其他 indexer 类型忽略 snapshot（其无文件型配置）。
     """
+    from ..ops.far_skip_runtime import resolve_far_skip_modes
+    resolve_far_skip_modes(args, model=model)
     IndexerType = indexer_type_dict.get(args.method, None)
     if getattr(args, "tli_far_skip_backend", "legacy") == "compact":
         targets = [m for m in model.modules()

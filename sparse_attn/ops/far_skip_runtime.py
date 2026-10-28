@@ -9,25 +9,109 @@ from .far_skip_cache import FarSkipLayer, evict_far
 from .far_skip_workspace import FarSkipWorkspace
 
 
+def _config_supports_compact(config):
+    if config is None or getattr(config, "model_type", None) != "qwen3":
+        return False
+    head_dim = getattr(config, "head_dim", None)
+    if head_dim is None:
+        heads = getattr(config, "num_attention_heads", 0)
+        head_dim = (getattr(config, "hidden_size", 0) // heads) if heads else None
+    layer_types = getattr(config, "layer_types", None) or ()
+    native_swa = (getattr(config, "use_sliding_window", False)
+                  or getattr(config, "sliding_window", None) is not None
+                  or "sliding_attention" in layer_types)
+    return head_dim == 128 and not native_swa
+
+
+def _model_supports_compact(model):
+    from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention
+    from transformers.models.llama.modeling_llama import LlamaAttention
+
+    targets = []
+    for module in model.modules():
+        is_mla = all(hasattr(module, name) for name in (
+            "kv_a_proj_with_mqa", "q_head_dim", "qk_rope_head_dim", "rotary_emb"))
+        if isinstance(module, (Qwen3Attention, LlamaAttention)) or is_mla:
+            targets.append(module)
+    return (bool(targets) and _config_supports_compact(getattr(model, "config", None))
+            and all(isinstance(module, Qwen3Attention)
+                    and module.head_dim == 128 and module.sliding_window is None
+                    for module in targets))
+
+
+def _args_support_compact(args):
+    near_tokens = getattr(args, "tli_near_tokens", None)
+    near_len = getattr(args, "tli_near_len", None)
+    try:
+        near_len_ok = near_len is not None and int(near_len) >= int(
+            getattr(args, "tia_block_size", 64))
+    except (TypeError, ValueError, OverflowError):
+        near_len_ok = False
+    return (near_len_ok
+            and getattr(args, "tli_near_pages", None) is not None
+            and isinstance(near_tokens, str)
+            and near_tokens.strip().lower() == "off"
+            and getattr(args, "tli_boundary_bypass", True)
+            and not getattr(args, "tli_per_q_head", False)
+            and not getattr(args, "tia_enable_async_topk", False)
+            and not getattr(args, "tli_proj_basis", None)
+            and not getattr(args, "tli_moba", False)
+            and getattr(args, "tli_sigma_select", "none") == "none"
+            and not getattr(args, "tli_sinkswa_only", False)
+            and getattr(args, "tli_near_select", "4bit") == "4bit"
+            and getattr(args, "tli_far_select", "4bit") == "4bit"
+            and getattr(args, "tli_subspace", "full") != "mla_rope")
+
+
+def resolve_far_skip_modes(args, *, model=None, config=None):
+    """Resolve ``auto`` once from the actual model/config and write it back.
+
+    Missing fields retain the historical explicit legacy/retain semantics.
+    Explicit compact/evict never silently degrades on an unsupported model.
+    """
+    backend = getattr(args, "tli_far_skip_backend", "legacy")
+    cache_mode = getattr(args, "tli_far_skip_cache", "retain")
+    if backend not in ("auto", "legacy", "compact") or cache_mode not in ("auto", "retain", "evict"):
+        raise ValueError("invalid far skip backend/cache mode")
+    if model is None and config is None and (backend == "auto" or cache_mode == "auto"):
+        raise ValueError("auto far skip modes require model/config before snapshot")
+    model_supported = (getattr(args, "method", None) == "tli"
+                       and (_model_supports_compact(model) if model is not None
+                            else _config_supports_compact(config)))
+    supported = model_supported and _args_support_compact(args)
+    requested_backend = backend
+    if backend == "auto":
+        backend = "compact" if supported else "legacy"
+    if cache_mode == "auto":
+        cache_mode = "evict" if backend == "compact" else "retain"
+    if ((backend == "compact" or (requested_backend == "auto" and cache_mode == "evict"))
+            and not supported):
+        if not model_supported:
+            raise ValueError("compact far skip currently supports only TLI Qwen3, "
+                             "head_dim=128, without native sliding-window layers")
+        raise ValueError("compact far skip requires fixed near_len/pages, near_tokens=off, "
+                         "boundary bypass and ordinary shared-head two-level selection")
+    if cache_mode == "evict" and backend != "compact":
+        raise ValueError("far KV eviction requires compact far skipping")
+    args.tli_far_skip_backend = backend
+    args.tli_far_skip_cache = cache_mode
+    return backend, cache_mode
+
+
 def configure_far_skip(indexer):
     args = indexer.args
     backend = getattr(args, "tli_far_skip_backend", "legacy")
     cache_mode = getattr(args, "tli_far_skip_cache", "retain")
     if backend not in ("legacy", "compact") or cache_mode not in ("retain", "evict"):
-        raise ValueError("invalid far skip backend/cache mode")
+        raise ValueError("unresolved or invalid far skip backend/cache mode")
     if cache_mode == "evict" and backend != "compact":
         raise ValueError("far KV eviction requires compact far skipping")
     indexer.far_skip_backend, indexer.far_skip_cache = backend, cache_mode
     indexer.far_skip_config = None
     if backend == "legacy":
         return
-    if (indexer.nt_near_len is None or indexer.nt_near_pages is None
-            or indexer.gamma is not None or not indexer.boundary_bypass
-            or indexer.per_q_head or indexer.enable_async
-            or indexer._basis_all is not None or indexer.moba_gate
-            or indexer.sigma_select != "none" or indexer.sinkswa_only
-            or indexer.near_select != "4bit" or indexer.far_select != "4bit"
-            or indexer.subspace == "mla_rope"):
+    if (not _args_support_compact(args) or indexer.gamma is not None
+            or indexer._basis_all is not None):
         raise ValueError("compact far skip requires fixed near_len/pages, near_tokens=off, "
                          "boundary bypass and ordinary shared-head two-level selection")
     if indexer.nt_near_len < args.tia_block_size:
@@ -49,6 +133,14 @@ def try_far_skip_decode(module, q, k, v, cache, mask, cache_position, batch_ctx)
         return None
     from .tli_static_cache import TLIStaticCache
     if type(cache) is TLIStaticCache:
+        staging = getattr(cache, "_direct_prefill", None)
+        if staging is not None:
+            state = staging.states[module.layer_idx]
+            if not state.written and q.shape[-2] == staging.length:
+                if mask is not None:
+                    raise ValueError("direct prefill requires an unpadded mask-free SDPA forward")
+                return None  # Dense prefill continues into DirectPrefillStaging.update().
+            raise ValueError("finalize direct prefill before decode or another forward")
         if getattr(cache, '_hybrid_batch', False):
             from .hybrid_batch_cache import try_hybrid_batch_decode
             return try_hybrid_batch_decode(module, q, k, v, cache, mask, batch_ctx)

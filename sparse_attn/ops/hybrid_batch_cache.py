@@ -21,7 +21,10 @@ from transformers.cache_utils import DynamicCache
 
 from .cuda_graph_state import graph_state
 from .far_skip_static import FarSkipStaticLayer
-from .tli_static_cache import TLIStaticCache, TLIStaticLayer
+from .tli_static_cache import (
+    TLIStaticCache, TLIStaticLayer,
+    finalize_direct_prefill, prepare_direct_prefill,
+)
 
 
 @contextmanager
@@ -85,15 +88,60 @@ class HybridBatchCacheBuilder:
         self.cache = TLIStaticCache(model.config, capacity, batch_size)
         self.lengths = []
         self.finished = False
+        self._active_row = None
         for li, module in self.modules.items():
             if module.indexer.far_skip_cache != 'evict' or module.sliding_window is not None:
                 raise ValueError('hybrid batch requires evict and no native sliding window')
             self.cache.layers[li] = HybridBatchLayer(capacity, batch_size)
 
+    def prepare_row(self, length):
+        """Create the B=1 direct-prefill cache consumed by the next model call."""
+        if (self.finished or self._active_row is not None
+                or len(self.lengths) >= self.cache.batch_size):
+            raise ValueError('hybrid batch already filled or has an active row')
+        row_cache = TLIStaticCache(self.model.config, self.cache.max_cache_len, 1)
+        prepare_direct_prefill(row_cache, self.model, length)
+        self._active_row = row_cache
+        return row_cache
+
+    def finalize_row(self, row_cache, length):
+        """Finalize gates, snapshot them, and transfer row ownership to the batch."""
+        if row_cache is not self._active_row:
+            raise ValueError('hybrid row must come from prepare_row exactly once')
+        b, cache = len(self.lengths), self.cache
+        finalize_direct_prefill(row_cache, self.model, length)
+        for li, layer in enumerate(cache.layers):
+            source = row_cache.layers[li]
+            if (source.keys is None or source.values is None
+                    or source.cumulative_length != length):
+                raise ValueError('hybrid direct row has incomplete storage')
+        for li, layer in enumerate(cache.layers):
+            source = row_cache.layers[li]
+            if isinstance(layer, HybridBatchLayer):
+                row_idx = _snapshot_indexer(self.modules[li].indexer)
+                if row_idx.skip_far != isinstance(source, FarSkipStaticLayer):
+                    raise ValueError('hybrid row gate and finalized storage disagree')
+                layer.rows.append(source)
+                layer.indexers.append(row_idx)
+                if layer.cu is None:
+                    layer.cu = torch.tensor([0, layer.max_cache_len], dtype=torch.int32,
+                                            device=source.keys.device)
+            else:
+                if layer.keys is None:
+                    layer.lazy_initialization(source.keys[..., :1, :].expand(
+                        cache.batch_size, -1, -1, -1))
+                layer.keys[b:b+1, :, :length].copy_(source.keys[..., :length, :])
+                layer.values[b:b+1, :, :length].copy_(source.values[..., :length, :])
+            layer.cumulative_length = max(layer.cumulative_length, length)
+        row_cache.layers = []
+        row_cache._hybrid_row_consumed = True
+        self._active_row = None
+        self.lengths.append(length)
+
     def add(self, dyn, length):
         b, cache = len(self.lengths), self.cache
-        if self.finished or b >= cache.batch_size:
-            raise ValueError('hybrid batch already filled')
+        if self.finished or self._active_row is not None or b >= cache.batch_size:
+            raise ValueError('hybrid batch already filled or has an active row')
         if (type(dyn) is not DynamicCache or getattr(dyn, 'offloading', False)
                 or len(dyn.layers) != len(cache.layers) or type(length) is not int
                 or not 1 <= length < cache.max_cache_len):

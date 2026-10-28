@@ -21,6 +21,8 @@ fill_static_from_dynamic() 逐层把每行有效列搬进本 cache 的 [0, L_b)
 """
 from __future__ import annotations
 
+import os
+
 import torch
 from transformers.cache_utils import Cache
 
@@ -125,6 +127,10 @@ class TLIStaticLayer:
         return self.cumulative_length
 
     def get_mask_sizes(self, cache_position):
+        if getattr(self, "_direct_prefill_mask", False):
+            # One-shot direct prefill has no past or padding. Let HF use SDPA's
+            # is_causal path instead of materializing a quadratic static mask.
+            return cache_position.shape[0], 0
         return self.max_cache_len, 0
 
     def get_max_cache_shape(self) -> int:
@@ -143,6 +149,53 @@ class TLIStaticLayer:
         raise RuntimeError("TLIStaticLayer 不支持 reorder（greedy decode-only）")
 
 
+class _DirectPrefillLayer:
+    def __init__(self, linear, config=None, needs_ring=True):
+        self.linear = linear
+        self.config = config
+        self.needs_ring = needs_ring
+        self.ring = None
+        self.written = False
+
+
+class DirectPrefillStaging:
+    """One-shot B=1 dense-prefill writer; never used for steady decode."""
+
+    def __init__(self, cache, length, states):
+        self.cache = cache
+        self.length = length
+        self.states = states
+
+    def update(self, layer_idx, key_states, value_states, cache_kwargs):
+        if layer_idx < 0 or layer_idx >= len(self.states):
+            raise ValueError("direct prefill layer index out of range")
+        state = self.states[layer_idx]
+        L = self.length
+        position = (cache_kwargs or {}).get("cache_position")
+        if (state.written or key_states.ndim != 4 or value_states.shape != key_states.shape
+                or key_states.shape[0] != 1 or key_states.shape[-2] != L
+                or key_states.requires_grad or value_states.requires_grad
+                or position is None or position.shape != (L,)
+                or position.dtype != torch.long or position.device != key_states.device
+                or not torch.equal(position, torch.arange(L, device=position.device))):
+            raise ValueError("direct prefill requires one detached, unpadded B=1 one-shot update")
+        if state.config is not None and key_states.shape[-1] != 128:
+            raise ValueError("direct compact prefill requires head_dim=128")
+        linear = state.linear
+        linear.lazy_initialization(key_states)
+        prefix = L if state.config is None or not state.needs_ring else state.config.tail_start(L)
+        if prefix:
+            linear.keys[..., :prefix, :].copy_(key_states[..., :prefix, :])
+            linear.values[..., :prefix, :].copy_(value_states[..., :prefix, :])
+        if state.needs_ring:
+            from .far_skip_cache import FarSkipLayer
+            state.ring = FarSkipLayer.from_prefill(key_states, value_states, state.config)
+        state.written = True
+        # Dense prefill must consume the original full-history tensors, not a
+        # static/ring view. Returning the incoming objects also preserves layout.
+        return key_states, value_states
+
+
 class TLIStaticCache(Cache):
     """decode 用固定容量 KV cache（每层一个 TLIStaticLayer 全宽缓冲）。"""
 
@@ -158,6 +211,146 @@ class TLIStaticCache(Cache):
         # layers[layer_idx]——TF 4.56.2 基类契约如此，此处不自行赋值
         # （旧行 `self.max_cache_len = int(max_cache_len)` 会触发只读
         # property setter → AttributeError: no setter）。
+
+    def update(self, key_states, value_states, layer_idx, cache_kwargs=None):
+        staging = getattr(self, "_direct_prefill", None)
+        if staging is not None:
+            return staging.update(layer_idx, key_states, value_states, cache_kwargs)
+        return super().update(key_states, value_states, layer_idx, cache_kwargs)
+
+
+def prepare_direct_prefill(cache: TLIStaticCache, model, length: int):
+    """Prepare direct partitioned storage for one dense compact+evict prefill."""
+    if (type(cache) is not TLIStaticCache or cache.batch_size != 1
+            or getattr(cache, "_hybrid_batch", False)
+            or getattr(cache, "_direct_prefill", None) is not None
+            or type(length) is not int or not 1 <= length < cache.max_cache_len
+            or model.training or torch.is_grad_enabled()
+            or os.environ.get("TLI_DECODE_DENSE", "0") == "1"
+            or os.environ.get("TLI_SPARSE_PREFILL", "0") == "1"):
+        raise ValueError("direct prefill requires fresh compact static cache, eval/no_grad and B=1 capacity")
+    modules = {m.layer_idx: m for m in model.modules()
+               if getattr(getattr(m, "indexer", None), "far_skip_backend", "legacy") == "compact"}
+    if not modules:
+        raise ValueError("direct prefill requires compact Qwen3 attention")
+    states = []
+    for li, old in enumerate(cache.layers):
+        module = modules.get(li)
+        config = None
+        if module is not None:
+            idx = module.indexer
+            if (idx.far_skip_cache != "evict" or module.sliding_window is not None
+                    or module.head_dim != 128 or idx.far_skip_config is None):
+                raise ValueError("direct prefill requires compact+evict, head_dim=128 and no native SWA")
+            config = idx.far_skip_config
+        # A ring is useful only when this layer can actually evict far. Static
+        # skip sets are known before prefill; dynamic/unknown gates keep both arms.
+        needs_ring = config is not None and (
+            idx.dyn_dgate or (idx.enable_layer_skip and (
+                idx._skip_ids is None or li in idx._skip_ids)))
+        states.append(_DirectPrefillLayer(
+            TLIStaticLayer(old.max_cache_len, 1), config, needs_ring))
+    staging = DirectPrefillStaging(cache, length, states)
+    cache.layers = [state.linear for state in states]
+    for layer in cache.layers:
+        layer.is_compileable = False
+        layer._direct_prefill_mask = True
+    cache._direct_prefill = staging
+    cache._far_skip_prepared = False
+    cache._far_skip_attention_mask = None
+    cache._tli_seq_len = 0
+    return staging
+
+
+def finalize_direct_prefill(cache: TLIStaticCache, model, length: int):
+    """Install request-local storage after dense prefill and gate calibration."""
+    staging = getattr(cache, "_direct_prefill", None)
+    if (type(cache) is not TLIStaticCache or staging is None
+            or type(length) is not int or length != staging.length
+            or len(staging.states) != len(cache.layers)
+            or model.training or torch.is_grad_enabled()):
+        raise ValueError("finalize requires the matching completed direct prefill")
+    modules = {m.layer_idx: m for m in model.modules()
+               if getattr(getattr(m, "indexer", None), "far_skip_backend", "legacy") == "compact"}
+    if not modules:
+        raise ValueError("direct prefill compact modules disappeared before finalize")
+
+    # Validate every layer before gate resolution or storage replacement.
+    for li, state in enumerate(staging.states):
+        linear = state.linear
+        if (state.linear is not cache.layers[li] or not state.written
+                or linear.keys is None or linear.values is None
+                or linear.keys.shape[0] != 1 or linear.keys.shape[-2] < length
+                or linear.values.shape != linear.keys.shape):
+            raise ValueError("direct prefill has incomplete or replaced linear storage")
+        module = modules.get(li)
+        if module is None:
+            if state.config is not None or state.ring is not None:
+                raise ValueError("direct prefill compact geometry changed before finalize")
+            continue
+        idx = module.indexer
+        ring = state.ring
+        if (state.config is None or idx.far_skip_config != state.config
+                or idx.far_skip_cache != "evict" or module.sliding_window is not None
+                or (state.needs_ring and (
+                    ring is None or ring.config != state.config
+                    or ring.logical_length != length
+                    or ring.keys.shape[-2] != ring.layout.capacity
+                    or ring.values.shape != ring.keys.shape))
+                or (not state.needs_ring and ring is not None)):
+            raise ValueError("direct prefill compact storage or geometry changed")
+
+    from .far_skip_static import FarSkipStaticLayer
+    replacements = {}
+    tails = {}
+    for li, state in enumerate(staging.states):
+        module = modules.get(li)
+        if module is None:
+            continue
+        idx = module.indexer
+        idx.freeze_dyn_dgate()
+        idx._resolve_skip()
+        if not idx.skip_far:
+            if state.ring is not None:
+                tails[li] = state.config.tail_start(length)
+            continue
+        if not state.needs_ring:
+            raise ValueError("direct prefill gate changed after ring elision")
+        cfg = state.config
+        if cfg.near_pages == 0 and idx.sink_tokens + idx.sliding_window_size == 0:
+            raise ValueError("static far selection needs a nonempty protected or page budget")
+        full = torch.arange(128, device=state.ring.keys.device)
+        coarse = idx._subspace_indices(state.ring.keys.device) if idx.enable_subspace else full
+        fine = (full if idx.l2_subspace == "full" else
+                coarse if idx.enable_subspace else idx._qat_indices(state.ring.keys.device))
+        replacements[li] = FarSkipStaticLayer.from_ring(
+            state.ring, state.linear.max_cache_len, coarse, fine)
+
+    # Commit only after all gates and skip workspaces have been constructed.
+    for li, state in enumerate(staging.states):
+        linear = state.linear
+        if li in tails:
+            ring = state.ring
+            start = tails[li]
+            count = length - start
+            slot = ring.layout.slot(start)
+            first = min(count, ring.layout.capacity - slot)
+            for src, dst, width in ((slot, start, first),
+                                    (state.config.sink_tokens, start + first, count - first)):
+                if width:
+                    linear.keys[..., dst:dst+width, :].copy_(ring.keys[..., src:src+width, :])
+                    linear.values[..., dst:dst+width, :].copy_(ring.values[..., src:src+width, :])
+        linear.cumulative_length = length
+        linear.is_compileable = True
+        linear._direct_prefill_mask = False
+        cache.layers[li] = replacements.get(li, linear)
+        # A caller may retain the staging handle; do not let it retain evicted storage.
+        state.linear = None
+        state.ring = None
+    cache._direct_prefill = None
+    cache._far_skip_prepared = True
+    cache._far_skip_attention_mask = None
+    cache._tli_seq_len = length
 
 
 def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, model=None):
@@ -179,6 +372,8 @@ def fill_static_from_dynamic(cache: TLIStaticCache, dyn, seq_lens, model=None):
     model: compact 模式先冻结 gate 并直接分配 ring；其他层才分配线性
     buffer。重填 compact cache 必须提供 model，并重新 capture 外层 graph。
     """
+    if getattr(cache, "_direct_prefill", None) is not None:
+        raise ValueError("finalize direct prefill before conversion or decode")
     n_layers = len(cache.layers)
     if len(dyn.layers) != n_layers:
         raise RuntimeError(

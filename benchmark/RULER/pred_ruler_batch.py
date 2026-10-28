@@ -302,14 +302,22 @@ def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, 
     batch, width = input_ids.shape
     builder = HybridBatchCacheBuilder(model, max(lens)+MAX_GEN, batch)
     generated = []
+    prefill_mode = os.environ.get('TLI_HYBRID_PREFILL', 'auto')
+    if prefill_mode not in ('auto', 'direct', 'conversion'):
+        raise ValueError('TLI_HYBRID_PREFILL must be auto, direct or conversion')
     # Do not expose the outer B-row BatchCtx to a B=1 unpadded prefill.
     with batch_decode_scope(None):
         for b, length in enumerate(lens):
+            row_cache = builder.prepare_row(length) if prefill_mode != 'conversion' else None
             output = model(input_ids=input_ids[b:b+1, width-length:],
-                           position_ids=position_ids[b:b+1, width-length:], use_cache=True)
+                           position_ids=position_ids[b:b+1, width-length:],
+                           past_key_values=row_cache, use_cache=True)
             generated.append([output.logits[0, -1].argmax().item()])
-            builder.add(output.past_key_values, length)
-            del output  # Release full prefill KV before the next request.
+            if row_cache is None:
+                builder.add(output.past_key_values, length)
+            else:
+                builder.finalize_row(row_cache, length)
+            del output  # Release prefill logits before the next request.
     runner = HybridBatchRunner(model, builder.finish(), pad_id)
     use_graph = os.environ.get('TLI_CUDA_GRAPH', '0') == '1'
     alive, lengths = [True]*batch, list(lens)
@@ -540,21 +548,15 @@ def main():
     print(f"[ruler-batch] task={args.task} L={args.context_length} "
           f"n={len(rows)} method={args.method} batch={args.batch_size}")
 
-    # 081 treatment 闭包须与单样本入口一致：TLI 在模型加载/patch 前只
-    # 解析一次文件型配置，runtime、输出名和完成回执随后共享同一快照。
-    # 旧批量入口在模型加载后才冻结 runtime 快照，命名时又传 None 重读，
-    # 回执还固定不写 manifest；生成窗口内替换 D' mask/投影基即可造成
-    # runtime A / basename B / receipt 无身份的混装，消费侧因 legacy
-    # 兼容无法检出。非 TLI 臂保持 snapshot=None 的既有行为。
-    snapshot = (resolve_treatment_snapshot(args)
-                if args.method == "tli" else None)
-
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_path, trust_remote_code=True)
     config = AutoConfig.from_pretrained(args.model_path,
                                         trust_remote_code=True)
     if use_yarn:
         config.rope_scaling = rope_scaling
+    from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
+    resolve_far_skip_modes(args, config=config)
+    snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
     # 【同步义务】加载路径与 pred_ruler.py 一致（device_map="auto"，
     # 调度须设 CUDA_VISIBLE_DEVICES）。
     model = AutoModelForCausalLM.from_pretrained(

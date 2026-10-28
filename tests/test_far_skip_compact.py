@@ -12,7 +12,7 @@ from sparse_attn.indexer.tli_indexer import TLIIndexer
 from sparse_attn.ops.far_skip import FarSkipConfig, select_far_skip, attend_far_skip
 from sparse_attn.ops.far_skip_cache import FarSkipLayer, evict_far
 from sparse_attn.patches.patch import register_patch
-from sparse_attn.ops.far_skip_runtime import try_far_skip_decode
+from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes, try_far_skip_decode
 from sparse_attn.info import get_treatment_manifest_json, resolve_treatment_snapshot
 
 
@@ -239,6 +239,60 @@ def test_config_rejects_unsupported_geometry():
     args.tli_far_skip_backend = "legacy"
     with pytest.raises(ValueError, match="requires compact"):
         TLIIndexer(args)
+
+
+def test_auto_resolution_and_unresolved_snapshot_guard():
+    parser = _add_tli_args(_add_tia_args(argparse.ArgumentParser()))
+    args = parser.parse_args([])
+    args.method = "tli"
+    assert (args.tli_far_skip_backend, args.tli_far_skip_cache) == ("auto", "auto")
+    with pytest.raises(ValueError, match="before treatment snapshot"):
+        resolve_treatment_snapshot(args)
+    qwen = Qwen3Config(hidden_size=256, num_attention_heads=2, head_dim=128,
+                       num_hidden_layers=1, num_key_value_heads=1)
+    assert resolve_far_skip_modes(args, config=qwen) == ("legacy", "retain")
+    manifest = get_treatment_manifest_json(args)
+    assert 'tli_far_skip_backend' not in manifest
+    assert 'tli_far_skip_cache' not in manifest
+
+    compact_args = parser.parse_args([
+        "--tli_near_len", "4096", "--tli_near_pages", "32",
+        "--tli_near_tokens", "off",
+    ])
+    compact_args.method = "tli"
+    assert resolve_far_skip_modes(compact_args, config=qwen) == ("compact", "evict")
+    manifest = get_treatment_manifest_json(compact_args)
+    assert '"tli_far_skip_backend": "compact"' in manifest
+    assert '"tli_far_skip_cache": "evict"' in manifest
+    assert "auto" not in manifest
+
+    legacy_selection_args = parser.parse_args([
+        "--tli_near_len", "4096", "--tli_near_pages", "32",
+        "--tli_near_tokens", "off", "--tli_per_q_head", "true",
+    ])
+    legacy_selection_args.method = "tli"
+    assert resolve_far_skip_modes(legacy_selection_args, config=qwen) == ("legacy", "retain")
+
+    explicit_args = parser.parse_args([])
+    explicit_args.method = "tli"
+    explicit_args.tli_far_skip_backend = "compact"
+    with pytest.raises(ValueError, match="fixed near_len/pages"):
+        resolve_far_skip_modes(explicit_args, config=qwen)
+
+    from transformers import LlamaConfig
+    llama_args = parser.parse_args([])
+    llama_args.method = "tli"
+    llama = LlamaConfig(hidden_size=256, num_attention_heads=2, num_hidden_layers=1)
+    assert resolve_far_skip_modes(llama_args, config=llama) == ("legacy", "retain")
+    legacy = get_treatment_manifest_json(llama_args)
+    assert 'tli_far_skip_backend' not in legacy and 'tli_far_skip_cache' not in legacy
+    llama_args.tli_far_skip_backend = "compact"
+    with pytest.raises(ValueError, match="only TLI Qwen3"):
+        resolve_far_skip_modes(llama_args, config=llama)
+    llama_args.tli_far_skip_backend = "auto"
+    llama_args.tli_far_skip_cache = "evict"
+    with pytest.raises(ValueError, match="only TLI Qwen3"):
+        resolve_far_skip_modes(llama_args, config=llama)
 
 
 def test_treatment_identity_default_compatibility_and_modes():

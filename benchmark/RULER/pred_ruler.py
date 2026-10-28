@@ -84,6 +84,7 @@ from sparse_attn.metrics import get_metrics  # noqa: E402
 # docstring）——RULER 生成的逐行生成段接线。
 from sparse_attn.ops.eager_decoding import (  # noqa: E402
     eager_decoding_request_guard)
+from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes  # noqa: E402
 from sparse_attn.info import (  # noqa: E402
     get_method_name_with_info, get_treatment_manifest_json,
     resolve_treatment_snapshot)
@@ -180,18 +181,6 @@ def main():
     print(f"[ruler] task={args.task} L={args.context_length} "
           f"n={len(rows)} method={args.method}")
 
-    # 081（TL-E121-OUTPUT-SNAPSHOT-081）：tli 臂在模型加载（文件被任何
-    # attention 层消费）之前冻结一次解析的 treatment snapshot——D′ 掩码/
-    # 投影基每个文件只 open 一次；后续 method_name/out_path（190 行）、
-    # register_patch（175 行）、receipt 的 treatment_manifest_json
-    #（297 行）全部消费同一冻结对象。修复前：每层各读一次 + 190 行与
-    # 297 行各重读一遍 → 生成窗口内文件被替换时 runtime A / 文件名 B /
-    # receipt C 三方混装可达。非 tli 臂零改动（snapshot=None）。
-    if args.method == "tli":
-        snapshot = resolve_treatment_snapshot(args)
-    else:
-        snapshot = None
-
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_path, trust_remote_code=True)
     # YaRN：在模型加载前把 rope_scaling 写进 config（transformers 从
@@ -200,6 +189,8 @@ def main():
                                         trust_remote_code=True)
     if use_yarn:
         config.rope_scaling = rope_scaling
+    resolve_far_skip_modes(args, config=config)
+    snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
     if args.method == 'ffd_vendor':
         if use_yarn:
             raise ValueError('FFD Llama cannot use Qwen3-specific YaRN defaults')

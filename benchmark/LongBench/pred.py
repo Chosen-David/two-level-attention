@@ -54,6 +54,7 @@ from sparse_attn.info import freeze_minference_pattern_sha8
 # 三类契约违规延迟到 GPU 端错误标志，须由本入口在每样本生成段边界消费
 # ——guard 退出校验 raise 必须先于 record 构造/append 与任何落盘。
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
+from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
 
 
 def parse_args(args=None):
@@ -870,6 +871,8 @@ if __name__ == "__main__":
     # sidecar 写门（501）全部消费同一冻结对象。修复前：每层各读一次 +
     # 生成后再读 → 生成窗口内文件被替换时 runtime A / 文件名 B /
     # sidecar C 三方混装可达。非 tli 臂零改动（snapshot=None）。
+    model_config = AutoConfig.from_pretrained(model2path, trust_remote_code=True)
+    resolve_far_skip_modes(args, config=model_config)
     if args.method == "tli":
         snapshot = resolve_treatment_snapshot(args)
     else:

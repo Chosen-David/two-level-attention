@@ -19,14 +19,25 @@ from .tli_static_cache import TLIStaticLayer
 
 class FarSkipStaticLayer(TLIStaticLayer):
     def __init__(self, source, cfg, max_cache_len, coarse, fine):
-        super().__init__(max_cache_len, 1)
         ring = FarSkipLayer.from_layer(source, cfg)
+        self._adopt_ring(ring, max_cache_len, coarse, fine)
+
+    @classmethod
+    def from_ring(cls, ring, max_cache_len, coarse, fine):
+        if not isinstance(ring, FarSkipLayer) or ring.config is None:
+            raise ValueError("from_ring requires initialized far-skip staging storage")
+        self = cls.__new__(cls)
+        self._adopt_ring(ring, max_cache_len, coarse, fine)
+        return self
+
+    def _adopt_ring(self, ring, max_cache_len, coarse, fine):
+        super().__init__(max_cache_len, 1)
         self.keys, self.values = ring.keys, ring.values
         self.dtype, self.device = ring.dtype, ring.device
         self.num_heads, self.head_dim = self.keys.shape[1], self.keys.shape[-1]
-        self.config, self.layout = cfg, ring.layout
+        self.config, self.layout = ring.config, ring.layout
         self.cumulative_length = ring.logical_length
-        self.workspace = FarSkipGraphWorkspace(cfg, ring.layout, self.num_heads, coarse, fine)
+        self.workspace = FarSkipGraphWorkspace(self.config, ring.layout, self.num_heads, coarse, fine)
         self.workspace.initialize(self.keys.transpose(1, 2), ring.logical_length)
 
     def update(self, key_states, value_states, cache_kwargs=None):

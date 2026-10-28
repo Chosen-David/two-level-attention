@@ -15,6 +15,7 @@ from sparse_attn.metrics import get_metrics
 # 的请求级消费点——lm_eval 生成段（simple_evaluate）边界接线，guard 退出
 # 校验 raise 必须先于 save_results 任何结果落盘。
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
+from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
 from sparse_attn.info import (
     get_method_name_with_info,
     resolve_treatment_snapshot,
@@ -69,24 +70,9 @@ def main():
     args = parse_args()
     print("model: {}".format(args.model))
 
-    # 082（TL-E121-LLM-EVAL-SNAPSHOT-082）：tli 臂在首次求 method name
-    # 之前一次冻结 treatment snapshot（081 同款契约）——本入口此前在
-    # 无 snapshot 状态下先固化名称、后逐层 patch，配置文件在窗口内
-    # 替换可形成「名 A / 运行时 B」乃至跨层混代。name / register_patch /
-    # 结果落盘 manifest 全程消费同一 snapshot。非 tli 臂零改动。
-    snapshot = (
-        resolve_treatment_snapshot(args) if args.method == "tli" else None)
-    method_name = get_method_name_with_info(args, snapshot)
-    
     # 创建输出目录
     os.makedirs(args.output_dir, exist_ok=True)
-    
-    # 生成时间戳用于文件名
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # 【106】cap + 任务集摘要进文件名身份（见 build_result_filename）
-    result_filename = build_result_filename(
-        method_name, args.max_length, args.tasks, timestamp)
-    
+
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -96,6 +82,14 @@ def main():
         device_map="cuda",
         trust_remote_code=True,
     ).eval()
+
+    # auto 依赖真实模型；解析后再冻结 snapshot、名称和结果文件身份。
+    resolve_far_skip_modes(args, model=model)
+    snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
+    method_name = get_method_name_with_info(args, snapshot)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    result_filename = build_result_filename(
+        method_name, args.max_length, args.tasks, timestamp)
 
     prompts = [
         [

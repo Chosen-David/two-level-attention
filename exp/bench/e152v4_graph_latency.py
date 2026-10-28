@@ -62,9 +62,11 @@ from sparse_attn.patches import register_patch  # noqa: E402
 from sparse_attn.info import resolve_treatment_snapshot  # noqa: E402
 from sparse_attn.baseline_runtime import BatchCtx, batch_decode_scope  # noqa: E402
 from sparse_attn.ops.tli_static_cache import (  # noqa: E402
-    TLIStaticCache, fill_static_from_dynamic)
+    TLIStaticCache, fill_static_from_dynamic,
+    finalize_direct_prefill, prepare_direct_prefill)
 from sparse_attn.ops.cuda_graph_state import (  # noqa: E402
     enable_graph, disable_graph, graph_state)
+from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes  # noqa: E402
 
 QWEN3_NATIVE_MPE = 40960
 YARN_AUTO = {65536: 2.0, 131072: 4.0}
@@ -103,6 +105,98 @@ def build_prompt_tokens(tokenizer, L, q_frac=0.02):
 
 def sha(b):
     return hashlib.sha256(b).hexdigest()
+
+
+def _memory_snapshot():
+    """Absolute process/device counters; no reserved-as-savings substitution."""
+    torch.cuda.synchronize()
+    process_mib = None
+    try:
+        lines = subprocess.check_output([
+            "nvidia-smi", "--query-compute-apps=pid,used_memory",
+            "--format=csv,noheader,nounits"], text=True).splitlines()
+        process_mib = sum(int(line.split(",")[1]) for line in lines
+                          if int(line.split(",")[0]) == os.getpid())
+        if process_mib == 0:
+            process_mib = None  # Some virtualized drivers hide per-process usage.
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+        pass
+    free_bytes, total_bytes = torch.cuda.mem_get_info()
+    return {
+        "allocated_bytes": torch.cuda.memory_allocated(),
+        "reserved_bytes": torch.cuda.memory_reserved(),
+        "peak_allocated_bytes": torch.cuda.max_memory_allocated(),
+        "process_used_mib": process_mib,
+        "device_free_bytes": free_bytes,
+        "device_total_bytes": total_bytes,
+    }
+
+
+def _storage_snapshot(cache, model):
+    """Per-layer/row physical KV ownership, including direct-prefill staging."""
+    modules = {m.layer_idx: m for m in model.modules()
+               if getattr(m, "indexer", None) is not None}
+    staging = getattr(cache, "_direct_prefill", None)
+    entries = []
+    for li, layer in enumerate(cache.layers):
+        idx = getattr(modules.get(li), "indexer", None)
+        if staging is not None:
+            state = staging.states[li]
+            logical_length = staging.length if state.written else 0
+            owners = (("staging_linear", state.linear, None, idx.skip_far),
+                      ("staging_ring", state.ring, None, idx.skip_far))
+        elif getattr(layer, "rows", None) is not None:
+            owners = tuple(
+                ("ring" if type(row).__name__ == "FarSkipStaticLayer" else "linear",
+                 row, ri, layer.indexers[ri].skip_far)
+                for ri, row in enumerate(layer.rows))
+        else:
+            role = "ring" if type(layer).__name__ == "FarSkipStaticLayer" else "linear"
+            owners = ((role, layer, None, getattr(idx, "skip_far", None)),)
+        for role, owner, row, skip_far in owners:
+            if owner is None or owner.keys is None:
+                continue
+            logical_length = (cache._hybrid_lengths[row] if row is not None
+                              else sum(cache._hybrid_lengths)
+                              if getattr(cache, "_hybrid_batch", False)
+                              else staging.length if staging is not None
+                              else layer.cumulative_length)
+            entries.append({
+                "layer": li,
+                "row": row,
+                "role": role,
+                "skip_far": skip_far,
+                "logical_tokens": logical_length,
+                "physical_tokens_per_row": owner.keys.shape[-2],
+                "keys_bytes": owner.keys.numel() * owner.keys.element_size(),
+                "values_bytes": owner.values.numel() * owner.values.element_size(),
+            })
+    totals = {}
+    for entry in entries:
+        totals[entry["role"]] = totals.get(entry["role"], 0) + entry["keys_bytes"] + entry["values_bytes"]
+    logical = {(entry["layer"], entry["row"]): entry["logical_tokens"] for entry in entries}
+    gates = {(entry["layer"], entry["row"]): entry["skip_far"] for entry in entries}
+    return {
+        "total_bytes": sum(totals.values()),
+        "bytes_by_role": totals,
+        "logical_tokens": sum(logical.values()),
+        "n_skip_layers": sum(value is True for value in gates.values()),
+        "n_non_skip_layers": sum(value is False for value in gates.values()),
+        "layers": entries,
+    }
+
+
+def _dynamic_storage_snapshot(dyn):
+    if dyn is None:
+        return None
+    entries = [{"layer": li,
+                "logical_tokens": layer.keys.shape[-2],
+                "physical_tokens_per_row": layer.keys.shape[-2],
+                "keys_bytes": layer.keys.numel() * layer.keys.element_size(),
+                "values_bytes": layer.values.numel() * layer.values.element_size()}
+               for li, layer in enumerate(dyn.layers)]
+    return {"total_bytes": sum(e["keys_bytes"] + e["values_bytes"] for e in entries),
+            "layers": entries}
 
 
 def _append_record(path, record):
@@ -197,6 +291,15 @@ class GraphRunner:
             # This caller owns the unpadded mask and updates it with position.
             self.cache._far_skip_attention_mask = self.m4_buf
 
+    def prepare_prefill(self, length):
+        """Start direct partitioned prefill and invalidate request-local graphs."""
+        self.graph = self.out = None
+        return prepare_direct_prefill(self.cache, self.model, length)
+
+    def finalize_prefill(self, length):
+        finalize_direct_prefill(self.cache, self.model, length)
+        self.cache._far_skip_attention_mask = self.m4_buf
+
     def warmup_and_capture(self, token, seq_len_after_inc):
         """2 步主 stream 热跑（惰性分配/autotune 出图外）+ 1 步 capture。
 
@@ -216,15 +319,19 @@ class GraphRunner:
         return (time.perf_counter() - t0) * 1e3
 
 
-def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture):
-    """一个 repeat：prefill(DynamicCache) → fill_static → [capture] →
-    decode（replay 或 eager staged）。
-
-    decode 步 s∈[0, max_gen-2]：喂 gen[s]，写列 L+s，seq_lens = L+s+1。
-    decode wall 从 fill 完成后起算（fill 是 setup，serving 中静态池同
-    口径，不进 TPOT）。"""
+def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture,
+                  prefill_mode="conversion"):
+    """一个 repeat：direct 或 DynamicCache conversion → [capture] → decode。"""
+    if prefill_mode not in ("auto", "conversion", "direct"):
+        raise ValueError("invalid prefill mode")
+    compact = any(getattr(getattr(m, "indexer", None), "far_skip_backend", "legacy") == "compact"
+                  for m in model.modules())
+    direct = prefill_mode == "direct" or (prefill_mode == "auto" and compact)
+    if prefill_mode == "direct" and not compact:
+        raise ValueError("direct prefill requires compact Qwen3 attention")
     torch.cuda.reset_peak_memory_stats()
     base_mem = torch.cuda.memory_allocated()
+    memory_before = _memory_snapshot()
     L = len(ids)
     input_ids = torch.tensor([ids], dtype=torch.long, device=dev)
     ctx = BatchCtx(batch=1, seq_lens=[L], gen_lens=[0], alive=[True],
@@ -232,31 +339,44 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture):
     capture_ms = None
 
     with torch.no_grad(), batch_decode_scope(ctx):
+        if direct:
+            runner.prepare_prefill(L)
         torch.cuda.synchronize()
         t0 = time.perf_counter()
-        out = model(input_ids=input_ids, use_cache=True)
-        dyn = out.past_key_values
+        out = model(input_ids=input_ids, use_cache=True,
+                    past_key_values=runner.cache if direct else None)
+        dyn = None if direct else out.past_key_values
         torch.cuda.synchronize()
         prefill_ms = (time.perf_counter() - t0) * 1e3
         first_token = int(out.logits[0, -1, :].argmax(dim=-1).item())
         torch.cuda.synchronize()
         first_output = time.perf_counter()
         del out
+        prefill_memory = _memory_snapshot()
+        prefill_storage = {
+            "static": _storage_snapshot(runner.cache, model),
+            "dynamic_source": _dynamic_storage_snapshot(dyn),
+        }
 
         t_fill = time.perf_counter()
-        runner.fill(dyn, L)
+        if direct:
+            runner.finalize_prefill(L)
+        else:
+            runner.fill(dyn, L)
         torch.cuda.synchronize()
         fill_ms = (time.perf_counter() - t_fill) * 1e3
+        finalize_ms = fill_ms if direct else None
         del dyn
-        decode_cache_allocated_gib = torch.cuda.memory_allocated() / 2**30
-        kv_storage_bytes = sum(
-            t.numel() * t.element_size() for layer in runner.cache.layers
-            for t in (layer.keys, layer.values))
+        post_finalize_memory = _memory_snapshot()
+        decode_cache_allocated_gib = post_finalize_memory["allocated_bytes"] / 2**30
+        kv_storage = _storage_snapshot(runner.cache, model)
+        kv_storage_bytes = kv_storage["total_bytes"]
 
         if do_capture or (graph_state().enabled and runner.graph is None):
             # enable_graph 在 main 里于进程启动时已开（graph 模式）；
             # buffer 绑定在 main 里完成。
             capture_ms = runner.warmup_and_capture(first_token, L + 1)
+        post_capture_memory = _memory_snapshot()
 
         gen = [first_token]
         step_ms = []
@@ -294,10 +414,13 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture):
         last_output = time.perf_counter()
 
     decode_wall_ms = (last_output - decode_t0) * 1e3
-    peak_delta_gib = (torch.cuda.max_memory_allocated() - base_mem) / 2**30
+    steady_decode_memory = _memory_snapshot()
+    peak_delta_gib = (steady_decode_memory["peak_allocated_bytes"] - base_mem) / 2**30
     return {
         "prefill_ms": prefill_ms,
+        "prefill_mode": "direct" if direct else "conversion",
         "fill_static_ms": fill_ms,
+        "finalize_ms": finalize_ms,
         "capture_ms": capture_ms,
         "decode_ms": sum(step_ms),
         "ttft_ms": (first_output - t0) * 1e3,
@@ -305,8 +428,19 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture):
         "tpot_ms": decode_wall_ms / len(step_ms) if step_ms else None,
         "step_ms": step_ms,
         "peak_mem_delta_gib": peak_delta_gib,
+        "prefill_peak_allocated_gib": prefill_memory["peak_allocated_bytes"] / 2**30,
+        "prefill_peak_delta_gib": (prefill_memory["peak_allocated_bytes"] - base_mem) / 2**30,
         "decode_cache_allocated_gib": decode_cache_allocated_gib,
         "kv_storage_bytes": kv_storage_bytes,
+        "kv_storage": kv_storage,
+        "prefill_storage": prefill_storage,
+        "memory": {
+            "before_prefill": memory_before,
+            "after_prefill": prefill_memory,
+            "after_finalize_or_fill": post_finalize_memory,
+            "after_capture": post_capture_memory,
+            "steady_decode": steady_decode_memory,
+        },
         "n_input_tokens": L,
         "n_generated": max_gen,
         "gen_tokens": gen,
@@ -339,6 +473,9 @@ def main():
                         default="graph",
                         help="graph=整步 capture+replay 计时臂；eager=同 "
                              "TLIStaticCache 上的 staged 参照臂（仅对拍）")
+    parser.add_argument("--prefill-mode", choices=["auto", "conversion", "direct"],
+                        default="auto",
+                        help="auto=compact 用 direct，其余用 DynamicCache conversion")
     add_sparse_attn_args(parser)
     args = parser.parse_args()
 
@@ -364,6 +501,7 @@ def main():
         args.model_path, config=config, trust_remote_code=True,
         torch_dtype=torch.bfloat16, device_map="cuda:0").eval()
 
+    resolve_far_skip_modes(args, model=model)
     snapshot = None
     if args.method == "tli":
         snapshot = resolve_treatment_snapshot(args)
@@ -400,7 +538,7 @@ def main():
         do_capture = (args.graph_mode == "graph" and runner.graph is None)
         try:
             rec = timed_request(model, runner, ids, args.max_gen, dev,
-                                pad_id, do_capture)
+                                pad_id, do_capture, args.prefill_mode)
         except SystemExit:
             raise
         except Exception as e:
