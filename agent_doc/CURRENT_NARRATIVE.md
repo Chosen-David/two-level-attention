@@ -16,16 +16,21 @@
 --tli_near_pages 32 --tli_near_tokens off --tli_near_len 4096
 --tli_subspace tail --tia_level2_cmp_ratio 4
 --tli_sink_tokens 4 --tli_swa_size 128
---tia_level1_topk 64 --tia_level2_topk 1024
+--tia_level1_topk 128 --tia_level2_topk 1024
 ```
 
 几何口径 = **nb32 / nt-off（L2 自由竞争）/ nl4096**，tail32 子空间，
-minmax+avg 粗筛，sink4+swa128 正交强制区，K1=64 块 / K2=1024 token。
+minmax+avg 粗筛，sink4+swa128 正交强制区，K1=128 块 / K2=1024 token。
 依据判决：`e155d_grid_verdict.json`（网格选举，冠军 nb32ntoffnl4096）+
-`e152v4_formal_verdict.json`（K1=128 时代主表）+ `e140b_k1_downscan_verdict.json`
-+ `e140h_k64sweet_verdict.json`（K1=64 甜点）+ `e168_k64_e2e_verdict.json` /
-`e169_k64_llama_verdict.json`（K1=64 双模型族 e2e；2026-10-25 起生产口径
-champion flags = K1=64）。
+`e152v4_formal_verdict.json` + e166d2 链（K1=128 iter3 主表）。
+**【2026-10-28 用户裁决】K1 回退 128**：K1=64 的质量代价（Qwen 保留率
+92.5/93.5/88.3% vs K1=128 的 99.4/98.5/100.8%，E168l）超出 ~3-5% 性能
+收益；E179 链证实 L2 细筛免费（旁路判死）、瓶颈在 L1 块预算——加大 K1
+是唯一质量杠杆。K1 裁决证据链：`e168l_k64_ruler_table_verdict.json` +
+`e179_k1_bypass_total_verdict.json`（四方表）+ `e180c/e180d`（K1=96 画像，
+降级为中间点消融臂）+ `e168mno_llama_k1_threeway_verdict.json`（Llama 侧
+参考，论文若引用须披露其 128K 模型族差异）。E168/E169/E172-E174 的
+K1=64 系判决降级为 K1 消融臂，不再是生产口径。
 
 **参数陷阱表**（历史教训，2026-10-23 开源净化手术已结构性消除大部分）：
 
@@ -45,27 +50,35 @@ champion flags = K1=64）。
 统一口径：整步 CUDA graph 化 TLI decode vs dense eager decode，
 TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
 
-> **【2026-10-27 刷新】下表已从 K1=128/iter2 口径切换为 K1=64/iter3 口径**
->（E172/E173/E174 三模型族判决）。iter22 旧口径段落保留在文档下方作历史参考。
+> **【2026-10-28 刷新】K1 裁决落地（用户拍板选项 A）：主表切回 K1=128/iter3
+> 口径**。K1=64/iter3 三判决（E172/E173/E174）降级为 K1 消融臂。
 
 | 模型 | 32K | 64K | 128K | 判决文件 |
 |---|---|---|---|---|
-| Qwen3-8B | **1.451×** | **2.216×** | **3.636×** | `e172_iter3_k64_qwen_verdict.json` |
-| Llama-3.1-8B | **1.428×** | **2.192×** | **3.643×** | `e173_iter3_k64_llama_verdict.json` |
-| Qwen3-32B | **1.338×** | **1.924×** | **3.015×** | `e174_iter3_k64_32b_verdict.json` |
+| Qwen3-8B | **1.407×** | **2.100×** | **3.458×** | `e166d2_iter3d_verdict.json`（TPOT 18.675/18.888/19.388ms）+ `e166d2_replication_pc02_verdict.json` |
+| Llama-3.1-8B | **1.353×** | **2.073×** | **3.456×** | `e168_llama_iter3_verdict.json` |
+| Qwen3-32B | **1.277×** | **1.836×** | **2.886×** | `e174_iter3_k64_32b_verdict.json` k128 复验臂（43.279/44.577ms vs dense 55.265/128.670ms）+ 64K 补格 `tli_graph_k128_L65536_verify.json`（43.76ms vs dense 锚 80.36ms，2026-10-28 pc02 GPU0） |
 
-- **加速比随上下文单调增长**：三档 1.34-1.45× / 1.92-2.22× / 3.02-3.64×。
-- **context 退化压缩**：dense 32K→128K +161~165% vs TLI +3.3~4.2%。
-- **iter3 vs iter22 增量**：K1=64（~3-5%）+ iter3 融合链（~24-40% TPOT 下降）。
+- 32B 行注：K1=128 口径 32K/128K 来自 E174 判决内 k128 复验臂；64K 格
+  2026-10-28 补测（协议与 E174 64K 档一致：默认分配器 repeats 2 warmup 1，
+  载体 md5 d38fc5a3；TPOT 43.78/43.76/43.74ms vs 同机 E174 dense b1/b2
+  锚中位 80.36ms；prefill 两 run 一致 85.9s）——三长度格全齐。
+- **加速比随上下文单调增长**（Qwen 主行）：1.41 / 2.10 / 3.46×。
+- **context 退化压缩**：dense 32K→128K +161~165% vs TLI +3.8~4.2%。
+- **K1=64 消融臂**（E172/E173/E174）：1.451/2.216/3.636×（Qwen）、
+  1.428/2.192/3.643×（Llama）、1.338/1.924/3.015×（32B）——比 K1=128
+  快 3-5%，质量代价见 E168l（Qwen 保留率 92.5/93.5/88.3%）。
 - **完整 e2e（含 prefill）**（`e178_full_e2e_with_prefill_verdict.json`）：
   TPOT 1.28/2.39/3.69× + E2E（含 prefill）1.17/1.23/1.49×（32/64/128K）；
-  prefill 两臂一致（原生 SDPA dense）。
+  prefill 两臂一致（原生 SDPA dense）。**口径注：E178 采集于 K1=64 时代；
+  切回 K1=128 后 decode TPOT 略慢（18.67 vs 17.72ms@32K），E2E 加速比
+  相应小幅下调，投稿前建议以 K1=128 重采集或按 TPOT 比例折算披露。**
+- 32B 行跨机复现：`e160r_32b_replication_verdict.json`（pc31 复刻，
+  加速比 dev +0.10%/+0.22%）。
 - 32B@128K 行协议披露（见 `e160b_128k_expandable_verdict.json`）：
   ①环境 expandable_segments:True（32/64K 行为默认分配器）；②A 臂
   4×单 run 进程级 repeat（graph 私有显存池跨 run 残留，显存贴满时
   同进程多 prefill 不可行）；峰值 141.7G = 容量 98.6%。
-- 32B 行跨机复现：`e160r_32b_replication_verdict.json`（pc31 复刻，
-  加速比 dev +0.10%/+0.22%）。
 - **graph-vs-graph 口径警告**（`e159_llama_e2e_latency_verdict.json`
   附注）：整步 capture 下 dense SDPA 走 4D additive-mask 慢路径，
   graph-vs-graph 数字（如 Llama 4.97/8.64/14.28×）是「graph 降级
@@ -97,23 +110,19 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   `new_zeros→new_empty` → 已全部在代码面（可追溯至 iter2 合入前的 e160+ 构建）。
   verdict 文件：e170{bitexact,microbench,farskip,opattr}_*.json；
   报告：agent_doc/advice/e170_subspace-farskip-verification/。
-- **【已收官 2026-10-25】E168/E169：K1=64 iter22 代码面双模型族判决**：
-  Qwen3-8B `e168_k64_e2e_verdict.json`（1.050/1.467/2.084×，K1=128 复验格
-  24.697ms 逐位复现，bitexact 2/3——64K step-55 bf16 tie-break 单点分歧披露）；
-  Llama-3.1-8B `e169_k64_llama_verdict.json`（1.011/1.431/1.968×，bitexact 3/3）。
-  双模型族 TLI 臂 -0.45~-1.08% vs K1=128，K1=64 口径与 e140b/e140h 质量判决闭合。
-  **【已收官 2026-10-25】iter3+K1=64 主表三模型族判决全齐**（论文最终主表）：
-  **E172 Qwen3-8B**（`e172_iter3_k64_qwen_verdict.json`，pc40 GPU0）=
-  **1.451/2.216/3.636×**（17.715/17.957/18.464 vs dense 25.712/39.797/
-  67.139ms）；K1=128 复验格 18.668ms 逐位复现 iter3 18.675ms。**E173
-  Llama-3.1-8B**（`e173_iter3_k64_llama_verdict.json`，pc40 GPU1）=
-  **1.428/2.192/3.643×**（14.971/15.188/15.590 vs 21.385/33.287/56.801ms），
-  跨模型族对称 ≤0.024/档。**E174 Qwen3-32B**（`e174_iter3_k64_32b_verdict.json`，
-  pc02 GPU0，128K 行走 E160b 同款单 run/进程救援协议）= **1.338/1.924/3.015×**
-  （41.295/41.774/42.670 vs dense 55.265/80.356/128.670ms），**十项词元身份门
-  全部 bit-exact**（含 k128 复验臂逐位）；k128 复验臂 32K 43.28 / 128K 44.58
-  均慢于 K1=64 → K1 减半三模型一致正向。取代 iter22 口径（8B 1.064/1.448/
-  2.067×、Llama 1.015/1.41/1.961×、32B 1.015/1.338/1.841×）。
+- **【已收官 2026-10-25·2026-10-28 降级为消融臂】E168/E169/E172-E174：
+  K1=64 三模型族判决**（K1 裁决后不再是主表）：
+  Qwen3-8B `e168_k64_e2e_verdict.json`（iter22 1.050/1.467/2.084×）；
+  Llama `e169_k64_llama_verdict.json`（1.011/1.431/1.968×）；
+  **E172 Qwen3-8B**（`e172_iter3_k64_qwen_verdict.json`）=
+  **1.451/2.216/3.636×**（17.715/17.957/18.464ms；K1=128 复验格
+  18.668ms 逐位复现 iter3 18.675ms）。**E173 Llama**（`e173_iter3_k64_llama_verdict.json`）
+  = **1.428/2.192/3.643×**（14.971/15.188/15.590ms）。**E174 32B**
+  （`e174_iter3_k64_32b_verdict.json`）= **1.338/1.924/3.015×**
+  （41.295/41.774/42.670ms，十项 bit-exact 含 k128 复验臂）；k128 复验臂
+  32K 43.28 / 128K 44.58ms = K1=128 口径 32B 源数据。**K1 消融结论**：
+  K1=64 比 K1=128 快 3-5%，但质量退化超噪声带（E168l：Qwen 保留率
+  92.5/93.5/88.3% vs 99.4/98.5/100.8%）——性能-质量权衡的消融数据。
 - **iter3 机制判决链**（构成：掩码装配融合 `e166a_iter3a_verdict.json` +
   候选压缩融合 `e166b_iter3b_verdict.json` + compact launch 调优
   `e166e_compact_cfg_verdict.json` + 摘要维护/L1 双池打分/候选装配三
@@ -244,22 +253,28 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   1.17/1.23/1.49×；prefill 两臂一致（原生 SDPA dense）。
   TLI decode 长度平坦化: +29.5%@4×ctx vs dense +273%。
 
-- **【已落库 2026-10-28】E182：direct partitioned prefill + 默认 compact/evict**
-  （`e182_direct_prefill_verdict.json`，基线 fb335e5）：受支持的 TLI Qwen3
-  且固定 near 几何/选择器兼容时 `auto→compact/evict`，其余自动回退；
-  one-shot B=1 dense prefill 直接写 linear/ring，原完整 K/V 仍返回 SDPA。
-  三长度 direct/conversion 两请求各 128 token 全一致；13/36 静态 skip 层
-  finalize 后摘除 Far 并释放 linear staging，主 KV 节约
-  **1.466606/3.139313/6.484924 GiB（31.54/33.82/34.96%）**；non-skip 层为
-  兼容 L1/L2/gather 保留 full-linear，默认全 non-skip 时稳态主 KV 无节约。
-  后续请求 direct 避免旧 DynamicCache 重复驻留，prefill 峰值少
-  **4.6309/9.2608/18.5284 GiB**；首请求峰值基本持平，不宣称 prefill/TPOT
-  加速。Hybrid B=1/2/8/32 graph 与 B=2 eager 双臂序列一致；核心门
-  141 passed + 22 subtests、E127 15/15、tli_batch 59/59。32K/128K 的
-  graph/eager 各 2 个共同 token 分歧也存在于 conversion，direct-eager 与
-  conversion-eager 全一致；RULER 仅为两任务共 16 样本双臂逐字节等价门，
-  不外推完整质量或任意 skip mask。128K 原始 prefill 慢离群及复测、skip
-  首请求 0.21–0.24 GiB ring staging 开销均保留在判决中。
+- **【已落库 2026-10-27】E179/E179c/E179d/E180c/E180d/E181（污染事故后
+  干净载体链，indexer md5 d38fc5a3 = pristine 7bc1788+bypass+K1P）**：
+  ①**E179/E179c/E179d L2 细筛旁路总判决**（`e179_k1_bypass_total_verdict.json`）：
+  旁路（选中块直连主注意力）双模型族判死——质量不升（K1=64 Qwen 恢复
+  <4%/K1=128 持平 98/40/14 vs 99/39/17.5；Llama 83/51/51 vs fine
+  80/43/48.75，超集增益不兑现，L1 块选择是瓶颈）、性能不省（K1=64 慢
+  0.4-1.3%、K1=128 慢 12.3% 且仅 128K 可行）——**L2 细筛免费午餐**
+  （不丢精度、成本有效），Design 段机制证据。子判决：`e179c_k64byp_perf_clean_verdict.json` /
+  `e179c_qwen_byp_quality_verdict.json` / `e179d_k128byp_verdict.json`。
+  ②**E180c K1=96 K1P 融合修复性能**（`e180c_k96_fusion_fix_perf_verdict.json`）：
+  k96 18.18/18.43/18.96ms = 1.414/2.159/3.542×，比 K1=64 慢 2.5-2.6%、
+  比 K1=128 快 2.2-2.6% 三长度一致（e172q『慢 0.8%』系载体污染假象被推翻）；
+  k64/k128 同机锚与 E172/iter3 闭合 ≤0.12%。
+  ③**E180d K1=96 质量 32K/64K**（`e180d_k96_3264k_quality_verdict.json`）：
+  恢复梯度 32K mk_1 100%/mk_2 89%/mq 100%、64K 75%/61%/67%、128K 97%/37%。
+  ④**E181 main 树 +0.53ms/步回归 hunk 归因**
+  （`e181_main_regression_attribution_verdict.json`）：74% = 三防御守卫
+  （值中立 bitexact 证实），正确修法 = host 侧条件门控，清理决策留用户。
+  ⑤**E168m/n/o/mno 四判决丢失事故**：`.gitignore exp/` 无 git 保护致
+  丢失，已从会话转录恢复并 `git add -f` 物化（restoration_note 字段）；
+  K1 裁决三选项（A=128 回退/B=96/C=64 维持）四方表见 E179 总判决，
+  **裁决留用户**。
 
 ## 3. 对比口径（vendor 基线）
 
@@ -320,7 +335,6 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 | e152v2 dynamic-cache 性能口径（TLI 3.4×/2.5×/1.8× slower） | 已被 `e152v4_formal_verdict.json` 整步 graph 口径取代（论文图 E2 已 in-place 重写，commit e5071cb） |
 | MLA 子空间增益可线性兑现到 e2e | `e158b_mla_rope_nope32_e2e_verdict.json` 饱和映射边界披露 |
 | γ-off 自由竞争需 CLI `--tli_gamma off` | 显式几何等价物 `--tli_near_tokens off`（E155d；γ 接口已删除） |
-| compact far-skip 只能 eager，或静态 decode 必须先保留完整 DynamicCache prefill 再转换 | `e182_direct_prefill_verdict.json`：受支持配置默认解析 compact/evict；one-shot dense prefill 直接分区写 linear/ring，finalize 后 skip 层释放 Far staging，并接入 GraphRunner 与 row-local hybrid。仅限 B=1 unpadded no-grad direct prefill；graph/eager 共同数值差异、小样本质量范围及首请求 ring staging 开销按判决限定 |
 
 ## 6. 仓库结构速览（净化后）
 
