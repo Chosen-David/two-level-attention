@@ -56,6 +56,8 @@ _GRAPH_GEO_CACHE = {}  # step-level geometry cache (shared by 36 per-layer index
 
 
 def _graph_geo_lookup(valid_len, geo_key):
+    if valid_len.is_cuda and torch.cuda.is_current_stream_capturing():
+        return None
     try:
         version = valid_len._version
     except RuntimeError:  # inference_mode tensors have no mutation counter
@@ -69,6 +71,8 @@ def _graph_geo_lookup(valid_len, geo_key):
 
 
 def _graph_geo_store(valid_len, geo_key, geo):
+    if valid_len.is_cuda and torch.cuda.is_current_stream_capturing():
+        return geo
     try:
         version = valid_len._version
     except RuntimeError:
@@ -4117,7 +4121,12 @@ class TLIIndexer(TIAIndexer):
             "byp_tok": byp_tok, "byp_keep": byp_keep,
         }
 
-    def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len):
+    def compute_selection_graph(self, q, index_dict, softmax_scale, valid_len):
+        """Same selector policy; return middle IDs instead of a full-width mask."""
+        return self.compute_mask_graph(q, index_dict, softmax_scale, valid_len,
+                                       return_selection=True)
+
+    def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len, *, return_selection=False):
         """graph 专用全张量 compute_mask（生产主配置，逐位对齐 eager）。
 
         输入：q [1,1,H,D]（replay 注入）、index_dict（容量宽：k_min/k_max/
@@ -4380,6 +4389,10 @@ class TLIIndexer(TIAIndexer):
         # R_cap（K1=64 → 4224）+ sink + swa，远超 K2=1024 预算——
         # attention/gather 成本随选中量放大的代价由实验实测裁决。
         if _l2_bypass:
+            if return_selection:
+                from ..ops.token_selection import graph_middle_selection
+                safe = torch.where(keep2, cand_idx2, S_cap)
+                return graph_middle_selection(safe, R_cap, mid_mask, S_real, S_cap, sink_tok, swa_tok)
             # Inactive page slots can contain arbitrary/out-of-range IDs.
             # Sanitize before scatter, not after filtering the resulting mask.
             cand_idx2 = torch.where(keep2, cand_idx2, S_cap)
@@ -4508,6 +4521,9 @@ class TLIIndexer(TIAIndexer):
                 K2_static = min(R_cap, K2)
                 v_top, i_slot = torch.topk(mid_scored, K2_static, dim=-1)
             tok_top = cand_idx2.gather(-1, i_slot)                # [Hkv,K2]
+        if return_selection:
+            from ..ops.token_selection import graph_middle_selection
+            return graph_middle_selection(tok_top, k2_mid, mid_mask, S_real, S_cap, sink_tok, swa_tok)
         # 【E166 iter3a】终掩码装配融合：i_eff where + full_like + zeros/
         # scatter + and + slice fill + or 六段（~6 kernel/层，[Hkv,S_cap]
         # 全宽 3 遍读写 ≈7.5MB/层@128K）换 2 个 Triton kernel（A 基底
@@ -4765,6 +4781,7 @@ class TLIIndexer(TIAIndexer):
         }
 
     def clear(self):
+        self._operator_plan = None
         self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None
@@ -4945,7 +4962,8 @@ if _HAS_TRITON:
         kv = pid_h
         offs_r = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
-        mask_r = offs_r < R
+        cl = tl.load(CLEN + kv)
+        mask_r = (offs_r < R) & (offs_r < cl)
         cand = tl.load(CAND + kv * stride_ch + offs_r * stride_cr,
                        mask=mask_r, other=0)                     # [BT] int64
         k = tl.load(KQ + cand[:, None] * stride_kt + kv * stride_kh
@@ -4958,7 +4976,7 @@ if _HAS_TRITON:
             s = tl.sum(k * q[None, :], axis=1)                   # [BT] fp32
             res = tl.where(offs_r < cl, s, float("-inf"))
             tl.store(OUT + h * stride_oh + offs_r * stride_or,
-                     res.to(OUT.dtype.element_ty), mask=mask_r)
+                     res.to(OUT.dtype.element_ty), mask=offs_r < R)
 
     @triton.jit
     def _tok_score_kernel(

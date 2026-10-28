@@ -132,6 +132,15 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
             raise ValueError("parallel graph requires valid_len_buf[B]")
         vl = torch.zeros(B, dtype=torch.long, device=dev)
         gs.valid_len_buf = vl
+    from ..ops.operator_pipeline import operator_mode, decode_indexed
+    if operator_mode() != 'off':
+        if _parallel_batch_enabled(B):
+            raise ValueError('operator pipeline currently requires TLI_BATCH_INDEXER=legacy')
+        if B != 1:
+            raise ValueError('use HybridBatchRunner for multi-request operator decode')
+        cu = _graph_const(("cu_cap", str(dev), S_cap),
+                          lambda: torch.tensor([0, S_cap], device=dev, dtype=torch.int32))
+        return decode_indexed(indexer, indexer, q, k, v, cu, vl, self.scaling)
     if _parallel_batch_enabled(B):
         from ..indexer.tli_batch import prepare_mask_batched
         if gs.valid_len_buf is None:
@@ -541,4 +550,5 @@ def qwen3_attn_forward(
     attn_output = attn_output.reshape(*input_shape, -1).contiguous()
     attn_output = self.o_proj(attn_output)
     return attn_output, attn_weights
+
 

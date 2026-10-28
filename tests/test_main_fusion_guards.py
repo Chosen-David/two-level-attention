@@ -21,7 +21,7 @@ def bypass_function(source):
     # Execute the actual full bypass body, including its metrics conditional.
     f=ast.parse('def run(cand_idx2, keep2, S_cap, Hkv, R_cap, dev, mid_mask, sink_tok, swa_force, ar_tok, S_real, q, self, valid_len):\n pass').body[0]
     f.body=node.body
-    ns={'torch':torch}
+    ns={'torch':torch, 'return_selection':False}
     exec(compile(ast.fix_missing_locations(ast.Module(body=[f],type_ignores=[])),'bypass','exec'),ns)
     return ns['run']
 
