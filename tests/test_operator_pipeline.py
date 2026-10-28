@@ -107,6 +107,30 @@ def test_graph_selector_same_selected_set(length,bypass,monkeypatch):
     assert not bool((full&protected).any())
 
 
+def test_tiny_model_mixed_gates_ring_wrap(monkeypatch):
+    from test_hybrid_batch_cache import build
+    from test_far_skip_hybrid_cache import make_model, isolated_runtime  # noqa: F401
+    torch.set_num_threads(1)
+    monkeypatch.setenv('TLI_OPERATOR_MODE','off')
+    with torch.no_grad():
+        model=make_model()
+        baseline=build(model,[7,23],[True,False])
+        # Separate model/cache state, identical weights and frozen gates.
+        import copy
+        candidate=build(copy.deepcopy(model),[7,23],[True,False])
+        for step in range(34):
+            lengths=[8+step,24+step]
+            baseline.inject([3,4],lengths);candidate.inject([3,4],lengths)
+            monkeypatch.setenv('TLI_OPERATOR_MODE','off')
+            expected=baseline.run().logits.clone()
+            monkeypatch.setenv('TLI_OPERATOR_MODE','serial')
+            monkeypatch.setenv('TLI_OPERATOR_BACKEND','torch')
+            actual=candidate.run().logits
+            for row in candidate.cache.layers[0].rows:
+                owner = getattr(row, 'workspace', row)
+                assert getattr(owner, '_operator_plan', None) is not None
+            torch.testing.assert_close(actual,expected,atol=2e-5,rtol=2e-4)
+
 
 CUDA = pytest.mark.skipif(not torch.cuda.is_available(), reason='native CUDA required')
 
@@ -140,3 +164,19 @@ def test_cuda_kernels_and_multistream_graph(backend,ring,group,dq,dv):
         torch.testing.assert_close(out,oracle(q,full,sel,lens),atol=.025,rtol=.025)
 
 
+@CUDA
+def test_cuda_tiny_model_capture_updates_geometry(monkeypatch):
+    from test_hybrid_batch_cache import build
+    from test_far_skip_hybrid_cache import make_model
+    monkeypatch.setenv('TLI_OPERATOR_MODE','overlap')
+    monkeypatch.setenv('TLI_OPERATOR_BACKEND','simt')
+    with torch.no_grad():
+        runner=build(make_model(device='cuda'),[7,23],[True,False])
+        runner.inject([3,4],[8,24])
+        runner.capture()
+        for step in range(12):
+            runner.inject([3,4],[8+step,24+step])
+            got=runner.run().logits.clone()
+            # Warmup/recapture geometry must be recomputed from device lengths.
+            expected=runner.forward().logits
+            torch.testing.assert_close(got,expected,atol=2e-5,rtol=2e-4)
