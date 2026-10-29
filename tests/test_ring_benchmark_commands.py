@@ -13,6 +13,7 @@ bench=importlib.util.module_from_spec(spec);spec.loader.exec_module(bench)
 @pytest.mark.parametrize('arms,modes,backends',[
     (['graph_ring_legacy','graph_ring_simt'],['off','serial'],['simt','simt']),
     (['graph_ring_simt','graph_ring_tc'],['serial','serial'],['simt','tc']),
+    (['graph_ring_simt','graph_ring_tc3'],['serial','serial'],['simt','tc']),
     (['graph_ring_simt','graph_ring_overlap'],['serial','overlap'],['simt','simt']),
 ])
 def test_ring_pairs_freeze_mask_and_construct_graph_commands(monkeypatch,tmp_path,arms,modes,backends):
@@ -36,6 +37,7 @@ def test_ring_pairs_freeze_mask_and_construct_graph_commands(monkeypatch,tmp_pat
         assert env['TLI_OPERATOR_MODE']==modes[arm_idx]
         assert env['TLI_OPERATOR_BACKEND']==backends[arm_idx]
         assert env['TLI_BENCH_REQUIRE_RING']=='1'
+        assert env['TLI_OPERATOR_SELECTED_STAGES']==('3' if arms[arm_idx]=='graph_ring_tc3' else '1')
         for flag,value in [('--tli_enable_layer_skip','true'),('--tli_far_skip_backend','compact'),('--tli_far_skip_cache','evict')]:
             assert cmd.count(flag)==1 and cmd[cmd.index(flag)+1]==value
         frozen=Path(cmd[cmd.index('--tli_layer_skip_path')+1])

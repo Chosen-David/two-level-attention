@@ -13,7 +13,7 @@ import sys
 import time
 
 
-RING_ARMS = ('graph_ring_legacy', 'graph_ring_simt', 'graph_ring_tc', 'graph_ring_overlap')
+RING_ARMS = ('graph_ring_legacy', 'graph_ring_simt', 'graph_ring_tc', 'graph_ring_tc3', 'graph_ring_overlap')
 
 
 UUID = 'GPU-a9292656-54e2-7d03-d327-b307c5381cc1'
@@ -104,8 +104,9 @@ def main():
                        TLI_COMPACT_NORMALIZATION='1' if arm == 'graph_compact' else '0',
                        TLI_SPARSE_SELECTION='1' if arm == 'graph_sparse' else '0')
             if arm in RING_ARMS:
-                env.update(TLI_OPERATOR_MODE={'graph_ring_legacy':'off', 'graph_ring_simt':'serial', 'graph_ring_tc':'serial', 'graph_ring_overlap':'overlap'}[arm],
-                           TLI_OPERATOR_BACKEND='tc' if arm == 'graph_ring_tc' else 'simt',
+                env.update(TLI_OPERATOR_MODE={'graph_ring_legacy':'off', 'graph_ring_simt':'serial', 'graph_ring_tc':'serial', 'graph_ring_tc3':'serial', 'graph_ring_overlap':'overlap'}[arm],
+                           TLI_OPERATOR_BACKEND='tc' if arm in ('graph_ring_tc','graph_ring_tc3') else 'simt',
+                           TLI_OPERATOR_SELECTED_STAGES='3' if arm == 'graph_ring_tc3' else '1',
                            TLI_BENCH_REQUIRE_RING='1')
             command = [sys.executable, str(root / ('exp/bench/e152v4_graph_latency.py' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', *RING_ARMS) else 'exp/bench/operator_model_latency.py')),
                        '--method', 'none' if arm == 'fa2' else 'tli',
