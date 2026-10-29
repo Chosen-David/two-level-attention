@@ -3,6 +3,7 @@ import pytest
 import torch
 from sparse_attn.ops.sparse_normalization import candidate_probabilities,candidate_probabilities_batched
 from sparse_attn.ops.unique_ranking import rank_unique,rank_unique_batched
+from test_sparse_selection_cuda import dense_reference
 
 @pytest.mark.parametrize('group',[0,3,1.5])
 def test_invalid_group_rejected(group):
@@ -19,16 +20,20 @@ def test_batch_normalization_exact_rows(batch):
     keep=torch.rand(batch,h,r,device='cuda')>.2
     raw=torch.randn(batch,h*g,c,device='cuda',dtype=torch.bfloat16)
     scores=raw.gather(-1,ids.repeat_interleave(g,1)).contiguous()
-    p,u=candidate_probabilities_batched(scores,ids,keep,c,g,return_unique=True)
+    def run():return candidate_probabilities_batched(scores,ids,keep,c,g,return_unique=True)
+    run();torch.cuda.synchronize();graph=torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):p,u=run()
+    for b in range(batch):
+        if b%4==1:keep[b].zero_()
+        if b%4==2:scores[b].fill_(torch.nan)
+        if b%4==3:scores[b].fill_(torch.inf)
+    graph.replay()
     for b in range(batch):
         expected,unique=candidate_probabilities(scores[b],ids[b],keep[b],c,g,return_unique=True)
         assert torch.equal(p[b],expected) and torch.equal(u[b],unique)
-        # Dense native CUDA softmax reference, with duplicate scores identical.
-        dense=torch.full((h*g,c+1),-torch.inf,device='cuda',dtype=scores.dtype)
-        expanded=ids[b].repeat_interleave(g,0)
-        active=keep[b].repeat_interleave(g,0)
-        dense.scatter_(1,torch.where(active,expanded,c),torch.where(active,scores[b],-torch.inf))
-        mean=dense[:,:c].softmax(-1).reshape(h,g,c).mean(1)
+        # Native full-width softmax + original sequential GQA mean, including
+        # the established NaN-to-zero policy. Duplicate scores are identical.
+        mean=dense_reference(scores[b],ids[b],keep[b],c,g)
         gathered=mean.gather(1,ids[b]).masked_fill(~keep[b],0)
         assert torch.equal(p[b],gathered)
 
@@ -57,3 +62,13 @@ def test_batch_ranking_mutable_bounds(batch,kind):
             reference=rank_unique(ids[b],p[b],valid[b],lower[b],upper[b],quota[b],capacity=c,width=1024,sink=4)
             assert torch.equal(actual.indices[b],reference.indices[0])
             assert torch.equal(actual.counts[b],reference.counts[0])
+
+
+@pytest.mark.parametrize('shape,group', [((8192,8,1),1),((2,2,2**29),4)])
+def test_batch_normalization_geometry_limits_without_allocation(shape,group):
+    b,h,r=shape
+    ids=torch.empty(shape,device='meta',dtype=torch.int64)
+    keep=torch.empty(shape,device='meta',dtype=torch.bool)
+    scores=torch.empty((b,h*group,r),device='meta',dtype=torch.bfloat16)
+    with pytest.raises(ValueError,match='head geometry'):
+        candidate_probabilities_batched(scores,ids,keep,32768,group)

@@ -128,7 +128,8 @@ def candidate_probabilities_batched(scores,ids,keep,capacity,group,*,return_uniq
     if ids.ndim!=3 or scores.ndim!=3 or keep.shape!=ids.shape:
         raise ValueError('batched candidate tensors must be rank three')
     b,h,r=ids.shape
-    if b<1 or h<1 or scores.shape!=(b,h*group,r):
+    if (b<1 or h<1 or scores.shape!=(b,h*group,r) or b*h*group>65535
+            or b*h*r>=2**31-1 or b*h*group*r>=2**31-1):
         raise ValueError('invalid batched candidate head geometry')
     if not all(x.is_contiguous() for x in (scores,ids,keep)):
         raise ValueError('contiguous batched candidates required')
