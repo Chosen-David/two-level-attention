@@ -4213,16 +4213,21 @@ class TLIIndexer(TIAIndexer):
             k_avg = k_avg.squeeze(0)
         kt_cap = k_min.shape[0]
         S_cap = k_qat.shape[1]
-        _sparse_selection = False
-        if (not _l2_bypass and sink_pool_lo * bs <= S_cap
-                and min(S_cap, K2) == 1024
-                and os.environ.get("TLI_SPARSE_SELECTION", "0") == "1"):
-            from ..ops.sparse_normalization import supported_geometry
-            _sparse_selection = supported_geometry(q.dtype, dev, S_cap, group_size, Hkv)
+        # A later request may choose another route on the same indexer.
+        # Never report stats inherited from a previous sparse capture.
+        self._graph_normalization_stats_route = None
+        from ..ops.sparse_policy import selection_fallback
+        sparse_reason = selection_fallback(
+            q.dtype, dev, S_cap, group_size, Hkv, l2_bypass=_l2_bypass,
+            protected_end=sink_pool_lo * bs, topk=K2)
+        _sparse_selection = sparse_reason is None
+        # Retain the coarse receipt for existing consumers; detail distinguishes
+        # unsupported budgets from dtype/geometry and invalid policy settings.
+        self._graph_sparse_selection_fallback_detail = sparse_reason
         self._graph_sparse_selection_fallback = (
             None if _sparse_selection else
-            ("disabled" if os.environ.get("TLI_SPARSE_SELECTION", "0") != "1" else
-             "unsupported_static_geometry"))
+            'disabled' if sparse_reason in ('disabled', 'selection_policy')
+            else 'unsupported_static_geometry')
         # A short cache may contain fewer pages than the configured L1 quota.
         # Clip static slot counts exactly as eager clips each pool's topk.
         nb_far, nb_near = min(nb_far, kt_cap), min(nb_near, kt_cap)

@@ -37,10 +37,12 @@ def test_real_sparse_selector_graph(monkeypatch,capacity,same_instance,domain_pa
     if capacity==16401 and os.environ.get('TLI_SPARSE_STATS','sorted') != 'owner':
         assert idx._graph_const_cache[1]['ar_tok'] is not None
         assert idx._graph_sparse_selection_fallback=='unsupported_static_geometry'
+        assert idx._graph_sparse_selection_fallback_detail=='unaligned_requires_owner'
         assert idx._graph_ranking_route=='full_width_native'
     else:
         assert idx._graph_const_cache[1]['ar_tok'] is None,'sparse path fell back to dense geometry'
         assert idx._graph_sparse_selection_fallback is None
+        assert idx._graph_sparse_selection_fallback_detail is None
         assert idx._graph_normalization_route=='sparse_candidate_domain'
         assert idx._graph_ranking_route=='candidate_domain_native_1024'
     torch.cuda.synchronize();graph=torch.cuda.CUDAGraph()
@@ -49,6 +51,7 @@ def test_real_sparse_selector_graph(monkeypatch,capacity,same_instance,domain_pa
         vl.fill_(length);q.normal_();graph.replay()
         monkeypatch.setenv('TLI_SPARSE_SELECTION','0')
         expected=getattr(reference,method)(q,index,128**-.5,vl)
+        assert reference._graph_normalization_stats_route is None
         if output_kind=='mask':
             assert torch.equal(actual,expected),(capacity,length,'mask')
         else:

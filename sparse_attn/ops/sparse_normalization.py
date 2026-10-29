@@ -152,12 +152,5 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
 
 
 def supported_geometry(dtype, device, capacity, group, heads):
-    owner_stats=os.environ.get('TLI_SPARSE_STATS','sorted') == 'owner'
-    if (torch.__version__.split('+')[0] != '2.8.0' or dtype != torch.bfloat16
-            or device.type != 'cuda' or not 9216 < capacity < 2**31-1
-            or (capacity % 8 and not owner_stats)
-            or (owner_stats and heads*capacity >= 2**31)
-            or group < 1 or group & (group-1)
-            or not 1 <= heads*group <= 65535):
-        return False
-    return True
+    from .sparse_policy import geometry_fallback
+    return geometry_fallback(dtype, device, capacity, group, heads) is None
