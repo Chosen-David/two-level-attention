@@ -19,7 +19,8 @@ def single_thread():
 def expected_positions(length, prompt, g, near, far):
     sink, initial_far, _ = g.bounds(prompt)
     if near:
-        return list(range(min(g.sink, length))) + ([] if far else list(range(sink, initial_far))) + list(range(max(g.sink, length-g.window), length))
+        far_hi = min(g.sink,length) if far else g.bounds(length)[1]
+        return list(range(far_hi)) + list(range(max(g.sink, length-g.window), length))
     current_far = g.bounds(length)[1]
     return list(range(length)) if not far else list(range(min(g.sink, length)))+list(range(current_far, length))
 
@@ -35,10 +36,13 @@ def test_physical_node_deletion_and_multiple_ring_wraps(near, far):
     assert all(n.keys.untyped_storage().data_ptr()!=initial.untyped_storage().data_ptr() for n in layer.nodes.values())
     refs = {name: weakref.ref(layer.nodes[name].keys) for name in ['near','far']}
     before = sum(n.resident_bytes() for n in layer.nodes.values())
-    deleted = sum(layer.nodes[name].resident_bytes() for name, drop in [('near',near),('far',far)] if drop)
+    deleted = sum(layer.nodes[name].resident_bytes() for name, drop in [('near',near and far),('far',far)] if drop)
     layer.freeze(skip_near=near,skip_far=far);gc.collect()
     assert ('near' not in layer.nodes)==near and ('far' not in layer.nodes)==far
-    if near: assert refs['near']() is None
+    if near and far: assert refs['near']() is None
+    elif near:
+        assert refs['near']() is layer.nodes['near_staging'].keys
+        assert not layer.nodes['near_staging'].attention_visible
     if far: assert refs['far']() is None
     assert sum(n.resident_bytes() for n in layer.nodes.values())==before-deleted
     for t in range(17, 49):
@@ -51,6 +55,27 @@ def test_physical_node_deletion_and_multiple_ring_wraps(near, far):
         assert v.flatten().tolist()==[2.*p for p in expected]
         assert layer.get_seq_length()==t+1
         assert layer.nodes['swa'].keys.shape[-2]==3
+        if near and not far:
+            assert layer.permanently_dropped==0
+            assert layer.report()['stored_tokens']==t+1
+            assert layer.report()['attention_tokens']<t+1
+
+
+@torch.inference_mode()
+def test_near_staging_reappears_in_far_after_aging_without_kv_savings():
+    g=RegionGeometry(sink=2,near=6,window=3,page=4,max_new_tokens=40)
+    layer=RegionCacheLayer(g);initial=torch.arange(17.).reshape(1,1,17,1)
+    layer.update(initial,initial)
+    before=sum(n.resident_bytes() for n in layer.nodes.values())
+    layer.freeze(skip_near=True,skip_far=False)
+    assert sum(n.resident_bytes() for n in layer.nodes.values())==before
+    assert layer.report()['linked_order']==['sink','far','near_staging','swa']
+    assert layer.report()['attention_order']==['sink','far','swa']
+    assert 8 not in layer.gather()[2]  # Token8 starts in near and is not attended.
+    for t in range(17,21):
+        new=torch.tensor([[[[float(t)]]]]);layer.update(new,new)
+    assert 8 in layer.gather()[2]  # It is now far and must become visible again.
+    assert layer.nodes['far'].read()[2]==list(range(2,g.bounds(21)[1]))
 
 
 @torch.inference_mode()

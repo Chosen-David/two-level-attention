@@ -17,7 +17,7 @@ from benchmark.LongBench.prefill_frozen_skip import atomic_json
 
 def main():
     ap=argparse.ArgumentParser(__doc__)
-    ap.add_argument('--out',default='agent_doc/results/frozen_near_far_20261029')
+    ap.add_argument('--out',default='agent_doc/results/frozen_near_far_staging_20261029')
     ap.add_argument('--samples',type=int,default=20)
     ap.add_argument('--thresholds',default='0.10,0.15')
     ap.add_argument('--context-cap',type=int,default=31500)

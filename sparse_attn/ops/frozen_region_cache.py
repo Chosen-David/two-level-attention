@@ -1,8 +1,9 @@
 """Request-local physical sink -> far -> near -> SWA cache for eager Qwen3.
 
-Deleted nodes are permanently evicted. In particular, deleting near also drops
-future SWA overflow: those values cannot subsequently reappear in far. No hidden
-full-history cache is retained. This exploration does not implement TLI selection,
+Far-skip and both-skip physically evict their unused nodes. Near-only skip keeps
+an explicit, attention-invisible staging node; its KV ages normally into far.
+Near-only skip saves attention work, not resident KV. No hidden full-history
+backup is retained. This exploration does not implement TLI selection,
 CUDA graphs, batching, offload, rewind, or beam search.
 """
 from dataclasses import dataclass
@@ -41,6 +42,7 @@ class KVNode:
         self.positions = [None]*capacity
         self.head = self.size = 0
         self.next = None
+        self.attention_visible = True
 
     def append(self, keys, values, positions):
         n = keys.shape[-2]
@@ -104,7 +106,7 @@ class RegionCacheLayer(CacheLayerMixin):
         pass  # Shape and length are both needed; initialization occurs in update.
 
     def _relink(self):
-        live = [self.nodes[name] for name in ('sink', 'far', 'near', 'swa') if name in self.nodes]
+        live = [self.nodes[name] for name in ('sink', 'far', 'near', 'near_staging', 'swa') if name in self.nodes]
         for i, node in enumerate(live):
             node.next = live[i+1] if i+1 < len(live) else None
         self.head = live[0] if live else None
@@ -116,11 +118,16 @@ class RegionCacheLayer(CacheLayerMixin):
             return
         if not self.logical_length:
             raise ValueError('prefill required before freeze')
-        for name, skip in (('near', skip_near), ('far', skip_far)):
-            if skip:
+        for name, evict in (('near', skip_near and skip_far), ('far', skip_far)):
+            if evict:
                 node = self.nodes.pop(name)
                 self.permanently_dropped += node.size
                 node.next = None
+        if skip_near and not skip_far:
+            node = self.nodes.pop('near')
+            node.name = 'near_staging'
+            node.attention_visible = False
+            self.nodes['near_staging'] = node
         self.skip_near, self.skip_far = bool(skip_near), bool(skip_far)
         self.frozen = True
         self._relink()
@@ -158,7 +165,8 @@ class RegionCacheLayer(CacheLayerMixin):
         position = self.logical_length
         new_length = position+1
         _, new_far_hi, _ = self.geometry.bounds(new_length)
-        near, far = self.nodes.get('near'), self.nodes.get('far')
+        near = self.nodes.get('near') or self.nodes.get('near_staging')
+        far = self.nodes.get('far')
         if near is not None:
             while near.size and near.peek()[2] < new_far_hi:
                 old_k, old_v, old_pos = near.peek()
@@ -187,7 +195,7 @@ class RegionCacheLayer(CacheLayerMixin):
         keys, values, positions = [], [], []
         node = self.head
         while node is not None:
-            if node.size:
+            if node.size and node.attention_visible:
                 k, v, pos = node.read()
                 keys.append(k); values.append(v); positions.extend(pos)
             node = node.next
@@ -209,9 +217,19 @@ class RegionCacheLayer(CacheLayerMixin):
         raise ValueError('construct a new request cache instead of resetting')
 
     def report(self):
+        order = []
+        node = self.head
+        while node is not None:
+            order.append(node.name)
+            node = node.next
         return dict(logical_length=self.logical_length, skip_near=self.skip_near, skip_far=self.skip_far,
-                    nodes={name: dict(tokens=node.size, capacity=node.capacity, kv_bytes=node.resident_bytes())
-                           for name, node in self.nodes.items()}, permanently_dropped=self.permanently_dropped)
+                    nodes={name: dict(tokens=node.size, capacity=node.capacity, kv_bytes=node.resident_bytes(),
+                                      attention_visible=node.attention_visible) for name, node in self.nodes.items()},
+                    stored_tokens=sum(node.size for node in self.nodes.values()),
+                    attention_tokens=sum(node.size for node in self.nodes.values() if node.attention_visible),
+                    linked_order=order,
+                    attention_order=[name for name in order if self.nodes[name].attention_visible],
+                    permanently_dropped=self.permanently_dropped)
 
 
 class FrozenRegionCache(Cache):

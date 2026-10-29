@@ -6,10 +6,12 @@ User-authorized branch: `explore/prefill-frozen-near-far-skip`, isolated worktre
 `/home/wangyuanshuo02/two-level-attention-near-far-skip`, base c4dfb08.
 
 Implement sink -> far -> near -> SWA ring, independent node tensors. Freeze
-request-local near/far profiling after dense prefill; physically delete selected
-nodes, preserve logical absolute RoPE positions. User explicitly confirms
-permanent eviction. Near-skip implies surviving prefill far only: deleted near
-and future SWA overflow never reappear after aging. No shadow full cache.
+request-local near/far profiling after dense prefill. Revised user semantics:
+Near-only keeps an attention-invisible staging FIFO, including SWA overflow,
+and migrates its KV into visible Far after aging. It saves attention work, not
+KV memory. Far-only physically evicts Far; both-skip physically evicts both and
+retains sink/SWA. Absolute RoPE positions continue increasing. No hidden full
+backup exists; explicit staging is included in resident-byte accounting.
 
 Screen the existing five tasks only: qasper/hotpotqa/musique/gov_report/repobench-p.
 First exploration: seeded random20 per task, 100 paired requests, full/far0.10/
@@ -39,8 +41,21 @@ after2h stalled. No automatic parameter changes. Aggregate on completion.
 - Real Qwen3-8B smoke: qasper/gov_report one request each, context8192, all5 arms.
   Full node-cache generation matched native DynamicCache on qasper. Real near,
   far and both-node deletion activated. Smoke is not an accuracy verdict.
-- Formal exploratory run scheduled under `agent_doc/results/frozen_near_far_20261029/`;
+- Formal exploratory run scheduled under `agent_doc/results/frozen_near_far_staging_20261029/`;
   source/data/config identities and atomic per-request-arm checkpoints enforced.
 
 Results remain preliminary/pending independent verification. No external
 independent agent review has been represented as completed.
+
+- Policy revision: user clarified Near-only is compute-only staging, not permanent
+  deletion. Stopped old supervisor4045407/workers4045669,4045670, preserving63
+  completed old-policy requests and STOPPED.json. New schema/output separates
+  staging results; no old-policy reuse.
+- Added explicit aging regression: a token invisible in Near staging becomes
+  visible after migrating into Far, with unchanged resident bytes. Native tiny
+  Qwen reference now uses complete dynamic Far; total correctness tests13.
+
+- Staging-policy real Qwen3 smoke passed: all5 arms on qasper/gov_report;
+  native full-cache output parity retained. In GovReport near-only layers
+  L23/25/28/30, Far live tokens grew3132->3644 via Near staging, while each
+  layer resident KV ratio stayed exactly1.0. Both-skip and far-only also activated.

@@ -2,7 +2,7 @@
 
 ## 2026-10-29
 
-- [ ] [TL-FROZEN-NEAR-FAR-20261029] 新分支探索 prefill 冻结 near/far 双 gate 与真实永久KV节点驱逐；5个既有LongBench海选任务各20条配对，100请求×5臂；12项CPU回归及真实Qwen3冒烟通过，小时监督与精度实验进行中。([详情](task_details/TL-FROZEN-NEAR-FAR-20261029.md))
+- [ ] [TL-FROZEN-NEAR-FAR-20261029] 新分支探索 prefill 冻结 near/far 双 gate、Far/双路真实驱逐与Near-only暂存迁移；5个既有LongBench海选任务各20条配对，100请求×5臂；13项CPU回归与新Near暂存实模冒烟通过；新口径E2E及小时监督重启中，小时监督与精度实验进行中。([详情](task_details/TL-FROZEN-NEAR-FAR-20261029.md))
 
 ## 2026-10-28
 

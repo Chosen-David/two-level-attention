@@ -19,6 +19,7 @@ def analyze(outdir):
     identities={m['identity'] for m in manifests}
     if len(identities)!=1: raise ValueError('mixed experiment identities')
     protocol=manifests[0]['protocol'];identity=manifests[0]['identity']
+    staging_policy = protocol.get('schema')=='frozen-near-far-screen-v2-near-staging'
     expected={(ds,i) for ds,ids in protocol['selected_rows'].items() for i in ids}
     records=[];partial=0
     for p in outdir.glob('requests/*/*.json'):
@@ -33,6 +34,7 @@ def analyze(outdir):
     result=dict(identity=identity,status='complete' if len(records)==len(expected) else 'running',
                 completed_requests=len(records),expected_requests=len(expected),partial_requests=partial,
                 protocol=protocol,arms={},comparisons={})
+    if (outdir/'STOPPED.json').exists(): result['status']='superseded'
     rng=np.random.default_rng(42)
     for arm in arm_names:
         scores={ds:float(np.mean([r['arms'][arm]['score'] for r in records if r['dataset']==ds])*100)
@@ -41,10 +43,17 @@ def analyze(outdir):
         near_active=sum(any(d['skip_near'] for d in r['arms'][arm]['decisions'].values()) for r in records)
         far_active=sum(any(d['skip_far'] for d in r['arms'][arm]['decisions'].values()) for r in records)
         ratios=[r['arms'][arm]['frozen_kv']['kv_bytes']/r['arms'][arm]['prefill_full_kv']['kv_bytes'] for r in records]
+        work_ratios=[]
+        for r in records:
+            frozen=r['arms'][arm]['frozen_kv'].get('layers',[])
+            full=r['arms'][arm]['prefill_full_kv'].get('layers',[])
+            if frozen and full and all('attention_tokens' in layer for layer in frozen+full):
+                work_ratios.append(sum(layer['attention_tokens'] for layer in frozen)/sum(layer['attention_tokens'] for layer in full))
         result['arms'][arm]=dict(per_task=scores,avg5=float(np.mean(list(scores.values()))) if len(scores)==5 else None,
             gate_counts=counts,near_active_requests=near_active,far_active_requests=far_active,
             exact_full_generation=sum(r['arms'][arm]['generated_ids']==r['arms']['full']['generated_ids'] for r in records),
-            frozen_kv_ratio_mean=float(np.mean(ratios)) if ratios else None)
+            frozen_kv_ratio_mean=float(np.mean(ratios)) if ratios else None,
+            frozen_attention_token_ratio_mean=float(np.mean(work_ratios)) if work_ratios else None)
     pairs=[(arm,'full') for arm in arm_names if arm!='full']+[(f'dual_{eps:g}',f'far_{eps:g}') for eps in protocol['thresholds']]
     for arm,base in pairs:
         tasks={};groups=[]
@@ -60,7 +69,8 @@ def analyze(outdir):
             resampled=np.stack([g[rng.integers(0,len(g),(5000,len(g)))].mean(1) for g in groups]).mean(0)
             avg=dict(delta_pp=float(np.mean([g.mean() for g in groups])),ci95_pp=[float(x) for x in np.quantile(resampled,[.025,.975])])
         result['comparisons'][arm+'-vs-'+base]=dict(per_task=tasks,avg5=avg)
-    result['scope']='Exploratory paired request bootstrap, 5000 repeats, task-stratified macro AVG5; CI containing zero is not proof of equivalence. Physical eager node deletion, not TLI champion selection or performance claim.'
+    policy = 'Near-only retains staging KV and skips attention work only; far-only/both physically evict nodes.' if staging_policy else 'Superseded v1: near-only permanently evicted KV and did not migrate it into far.'
+    result['scope']='Exploratory paired request bootstrap, 5000 repeats, task-stratified macro AVG5; CI containing zero is not proof of equivalence. '+policy+' No TLI champion selection or performance claim.'
     atomic_json(outdir/'summary.json',result)
     lines=['# Frozen near/far cache exploration','',f"Status: {result['status']}; paired requests {len(records)}/{len(expected)}.",'',
            '| arm | AVG5 | near active | far active | frozen KV / full |','|---|---:|---:|---:|---:|']
@@ -71,7 +81,7 @@ def analyze(outdir):
     lines+=['','Paired differences (percentage points):','']
     for pair,c in result['comparisons'].items():
         if c['avg5']:lines.append(f"- {pair}: {c['avg5']['delta_pp']:+.4f}; bootstrap 95% CI {c['avg5']['ci95_pp']}")
-    lines+=['',result['scope'],'','Nodes deleted permanently. Near-skip discards SWA overflow forever; it cannot later recover missing KV into far.']
+    lines+=['',result['scope']]
     (outdir/'REPORT.md').write_text('\n'.join(lines)+'\n')
     return result
 

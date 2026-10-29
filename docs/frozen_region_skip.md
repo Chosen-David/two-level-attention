@@ -1,4 +1,4 @@
-# Prefill-frozen near/far node deletion exploration
+# Prefill-frozen region skip with explicit Near staging
 
 Branch: `explore/prefill-frozen-near-far-skip`, isolated from the concurrent main
 worktree. This first implementation isolates physical KV eviction with native
@@ -19,8 +19,10 @@ both regions qualify but their calibrated sum exceeds epsilon, only the lower
 mass region is evicted; otherwise both may be deleted. This is a joint calibrated
 budget, not a guarantee about future attention or accuracy.
 
-Each deleted node releases its owned tensors; slices into full-history K/V are
-never retained. Attention gathers only nodes remaining in the linked chain.
+Far-skip and both-skip release the evicted nodes' owned tensors; slices into a
+full-history backup are never retained. Near-only skip instead renames Near to
+an explicit attention-invisible staging node. Attention gathers only visible
+nodes; staging is still counted in resident KV bytes.
 SWA is a fixed-address ring; the near node also uses a bounded FIFO internally.
 Absolute RoPE positions and logical sequence length continue increasing.
 
@@ -30,21 +32,28 @@ Absolute RoPE positions and logical sequence length continue increasing.
 |---|---|---|
 | keep | sink, far, near, SWA | SWA -> near -> far |
 | far skip | sink, near, SWA | SWA -> near; matured near KV discarded |
-| near skip | sink, far, SWA | SWA overflow discarded permanently |
+| near skip | sink, far, Near staging, SWA | SWA -> staging -> far; staging excluded from attention |
 | both | sink, SWA | SWA overflow discarded permanently |
 
-For **near skip**, far remains the live prefill prefix. Deleted near tokens do
-not reappear when their absolute distance would put them in far, and subsequent
-SWA overflow does not populate far. Thus this is **surviving-history far**, not
-complete moving-distance far. Near-low observations before a token ages into far
-cannot alone justify permanent eviction; actual autoregressive accuracy is the
-test. Keeping every moving far token would require retaining/recomputing the
-near values, which is outside the requested permanent-deletion semantics.
+For **near-only skip**, Far remains complete and updates as the distance boundary
+moves. Near KV remains in a bounded staging FIFO; it does not participate in
+attention while near, and becomes attention-visible when it ages into Far.
+Consequently this case saves attention work, **not resident KV capacity**.
+SWA overflow is staged normally. The physical chain is
+`sink -> far -> near_staging -> SWA`, whereas attention reads only sink/far/SWA.
+
+Far-only still evicts far; near overflow into the absent far node is discarded.
+Both-skip permanently evicts both regions and drops SWA overflow. The earlier
+Near permanent-deletion implementation at commit486a406 was superseded by the
+user's staging decision. Its run `frozen_near_far_20261029` was stopped with63
+completed requests; those raw results remain isolated and are not reused.
+Current protocol schema is `frozen-near-far-screen-v2-near-staging` and output
+is `agent_doc/results/frozen_near_far_staging_20261029/`.
 
 Supported: Qwen3 full attention, B=1, unpadded, inference, one-shot dense prefill,
 single-token eager decode, request-local cache. Beam/reorder, rewind, chunked or
 batched prefill, offload, gradients and CUDA graphs are rejected/unsupported.
-No shadow near or full-history backup exists. Runtime concatenation temporaries
+Near staging is explicit; no additional full-history backup exists. Runtime concatenation temporaries
 are excluded from the resident-node byte counts; no allocator or throughput
 claim follows from those counts.
 
@@ -62,14 +71,14 @@ DynamicCache on the first request of each worker.
 
 Arms: full, far-only epsilon0.10, dual epsilon0.10, far-only epsilon0.15,
 dual epsilon0.15. Report actual near/far/both activation, per-task scores,
-AVG5, paired task-stratified request bootstrap (5000 repeats), physical node KV
-ratio, and exact output agreement. A CI containing zero does not prove
+AVG5, paired task-stratified request bootstrap (5000 repeats), physical node KV and attention-token
+ratios (Near-only never counts as KV saving), and exact output agreement. A CI containing zero does not prove
 equivalence. Activation-free requests do not validate skipped-path quality.
 
 ```sh
 python -m pytest -q tests/test_frozen_region_cache.py
 python scripts/supervise_frozen_skip.py --devices 0,1 --interval 3600
-python -m benchmark.LongBench.analyze_frozen_skip agent_doc/results/frozen_near_far_20261029
+python -m benchmark.LongBench.analyze_frozen_skip agent_doc/results/frozen_near_far_staging_20261029
 ```
 
 The **local** supervisor checks hourly, records PIDs/heartbeats/GPU state, resumes

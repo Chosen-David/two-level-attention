@@ -1,4 +1,4 @@
-"""Paired LongBench screen for physical, prefill-frozen near/far node deletion."""
+"""Paired screen: far eviction, near staging, and prefill-frozen region gates."""
 import argparse
 from contextlib import contextmanager
 import hashlib
@@ -94,6 +94,15 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
                      present_far=cache.layers[li].nodes['far'].size>0) for li,p in profiles.items()}
         cache.freeze(decisions)
         after = cache.report()
+        for li, decision in decisions.items():
+            if decision['skip_near'] and not decision['skip_far']:
+                nodes = after['layers'][li]['nodes']
+                if 'near_staging' not in nodes or nodes['near_staging']['attention_visible']:
+                    raise ValueError('near-only must retain invisible staging KV')
+                before_bytes = sum(n['kv_bytes'] for n in before['layers'][li]['nodes'].values())
+                after_bytes = sum(n['kv_bytes'] for n in nodes.values())
+                if before_bytes != after_bytes:
+                    raise ValueError('near-only must not claim a resident KV reduction')
         generated = []
         for _ in range(max_new_tokens):
             token = out.logits[:, -1].argmax(-1, keepdim=True)
@@ -133,7 +142,7 @@ def main():
     ap = argparse.ArgumentParser(__doc__)
     ap.add_argument('--model', default='/home/wangyuanshuo02/Qwen3-8B')
     ap.add_argument('--data', default='/home/wangyuanshuo02/datasets/LongBench/data')
-    ap.add_argument('--out', default='agent_doc/results/frozen_near_far_20261029')
+    ap.add_argument('--out', default='agent_doc/results/frozen_near_far_staging_20261029')
     ap.add_argument('--samples', type=int, default=20)
     ap.add_argument('--seed', type=int, default=42)
     ap.add_argument('--context-cap', type=int, default=31500)
@@ -164,7 +173,7 @@ def main():
         indices = np.random.default_rng(args.seed).permutation(len(rows))[:args.samples].tolist()
         selected[ds] = indices
         inputs.extend((ds,i,rows[i]) for i in indices)
-    protocol = dict(schema='frozen-near-far-screen-v1',model=args.model,context_cap=args.context_cap,
+    protocol = dict(schema='frozen-near-far-screen-v2-near-staging',model=args.model,context_cap=args.context_cap,
         samples_per_task=args.samples,seed=args.seed,statistic=args.statistic,thresholds=thresholds,
         datasets=tasks,selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
         source_sha256={name:sha_file(ROOT/name) for name in SOURCES},
@@ -173,7 +182,7 @@ def main():
         tokenizer_config_sha256=sha_file(Path(args.model)/'tokenizer_config.json'),
         torch=torch.__version__,transformers=transformers.__version__,dtype='bfloat16',world_size=args.world_size,
         git_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
-        eviction='permanent; missing near discards all future SWA overflow; far never reconstructs missing KV',
+        eviction='far-only: evict far; near-only: keep attention-invisible near staging and migrate to far; both: sink+SWA only',
         calibration='query-relative page boundaries, last256 rows; head means; joint near+far dropped-mass budget')
     identity = hashlib.sha256(json.dumps(protocol,sort_keys=True).encode()).hexdigest()
     outdir = Path(args.out); outdir.mkdir(parents=True,exist_ok=True)
