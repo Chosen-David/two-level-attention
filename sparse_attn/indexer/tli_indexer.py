@@ -5007,6 +5007,7 @@ if _HAS_TRITON:
         R, stride_kt, stride_kh, stride_qh, stride_ch, stride_cr,
         stride_oh, stride_or,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
+        BATCHED: tl.constexpr = False, STRIDE_KB: tl.constexpr = 0, CAP: tl.constexpr = 0,
     ):
         """【E156c】候选 fine 打分融合 kernel：每 program 处理 (候选列块 × 1
         kv 头)，cand_idx gather k 行 [BT,D] 载入寄存器后循环 g 个 q 头逐头
@@ -5020,17 +5021,26 @@ if _HAS_TRITON:
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
         kv = pid_h
+        if BATCHED:
+            batch = (pid_h // Hkv).to(tl.int64)
+            kv = pid_h % Hkv
+            KQ += batch * STRIDE_KB
         offs_r = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_r = offs_r < R
-        cand = tl.load(CAND + kv * stride_ch + offs_r * stride_cr,
-                       mask=mask_r, other=0)                     # [BT] int64
+        cl = tl.load(CLEN + pid_h)
+        read_r = mask_r
+        if BATCHED:
+            read_r = mask_r & (offs_r < cl)
+        cand = tl.load(CAND + pid_h * stride_ch + offs_r * stride_cr,
+                       mask=read_r, other=0)                     # [BT] int64
+        if BATCHED:
+            read_r = read_r & (cand >= 0) & (cand < CAP)
         k = tl.load(KQ + cand[:, None] * stride_kt + kv * stride_kh
                     + offs_d[None, :],
-                    mask=mask_r[:, None], other=0.0).to(tl.float32)   # [BT, D]
-        cl = tl.load(CLEN + kv)
+                    mask=read_r[:, None], other=0.0).to(tl.float32)   # [BT, D]
         for j in tl.static_range(G):
-            h = kv * G + j
+            h = pid_h * G + j
             q = tl.load(Q + h * stride_qh + offs_d)              # [D] fp32
             s = tl.sum(k * q[None, :], axis=1)                   # [BT] fp32
             res = tl.where(offs_r < cl, s, float("-inf"))
