@@ -170,7 +170,10 @@ def decode_selected(q, k, v, lengths, softmax_scale, *, cfg, layout, select, ord
                 tensor.record_stream(side)
     positions, valid = select(q, k, lengths, softmax_scale)
     # Ring positions are absolute: physical capacity is not an ID bound.
-    if ordered_unique:
+    ordered_flag = os.environ.get('TLI_OPERATOR_ORDERED_SELECTION', '1')
+    if ordered_flag not in ('0', '1'):
+        raise ValueError('TLI_OPERATOR_ORDERED_SELECTION must be 0 or 1')
+    if ordered_unique and ordered_flag == '1':
         from .ordered_selection import ordered_middle_selection
         selection = ordered_middle_selection(positions[None], valid[None], lengths,
             cfg.sink_tokens, cfg.window_tokens, torch.iinfo(torch.int32).max)

@@ -13,7 +13,7 @@ import sys
 import time
 
 
-RING_ARMS = ('graph_ring_legacy', 'graph_ring_simt', 'graph_ring_tc', 'graph_ring_tc3', 'graph_ring_tc3_overlap', 'graph_ring_overlap')
+RING_ARMS = ('graph_ring_legacy', 'graph_ring_simt', 'graph_ring_simt_canonical', 'graph_ring_tc', 'graph_ring_tc3', 'graph_ring_tc3_overlap', 'graph_ring_overlap')
 
 
 UUID = 'GPU-a9292656-54e2-7d03-d327-b307c5381cc1'
@@ -47,11 +47,12 @@ def main():
     parser.add_argument('--arms', nargs=2, choices=['fa2', 'legacy', 'serial', 'overlap', 'graph_serial', 'graph_compact', 'graph_sparse', *RING_ARMS],
                         default=['fa2', 'serial'])
     parser.add_argument('--cycles', type=int, default=2)
+    parser.add_argument('--warmup', type=int, default=3)
     parser.add_argument('--max-gen', type=int, default=64)
     parser.add_argument('--repeats', type=int, default=3)
     parser.add_argument('--ring-mask', help='Explicit frozen skip mask; required for paired ring arms')
     args = parser.parse_args()
-    if min(args.cycles, args.max_gen, args.repeats) < 1:
+    if min(args.cycles, args.max_gen, args.repeats, args.warmup) < 1:
         parser.error('positive cycles, max-gen and repeats required')
     ring = any(arm in RING_ARMS for arm in args.arms)
     if ring and (not all(arm in RING_ARMS for arm in args.arms) or not args.ring_mask):
@@ -104,14 +105,15 @@ def main():
                        TLI_COMPACT_NORMALIZATION='1' if arm == 'graph_compact' else '0',
                        TLI_SPARSE_SELECTION='1' if arm == 'graph_sparse' else '0')
             if arm in RING_ARMS:
-                env.update(TLI_OPERATOR_MODE={'graph_ring_legacy':'off', 'graph_ring_simt':'serial', 'graph_ring_tc':'serial', 'graph_ring_tc3':'serial', 'graph_ring_tc3_overlap':'overlap', 'graph_ring_overlap':'overlap'}[arm],
+                env.update(TLI_OPERATOR_MODE={'graph_ring_legacy':'off', 'graph_ring_simt':'serial', 'graph_ring_simt_canonical':'serial', 'graph_ring_tc':'serial', 'graph_ring_tc3':'serial', 'graph_ring_tc3_overlap':'overlap', 'graph_ring_overlap':'overlap'}[arm],
                            TLI_OPERATOR_BACKEND='tc' if arm in ('graph_ring_tc','graph_ring_tc3','graph_ring_tc3_overlap') else 'simt',
                            TLI_OPERATOR_SELECTED_STAGES='3' if arm in ('graph_ring_tc3','graph_ring_tc3_overlap') else '1',
+                           TLI_OPERATOR_ORDERED_SELECTION='0' if arm == 'graph_ring_simt_canonical' else '1',
                            TLI_BENCH_REQUIRE_RING='1')
             command = [sys.executable, str(root / ('exp/bench/e152v4_graph_latency.py' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', *RING_ARMS) else 'exp/bench/operator_model_latency.py')),
                        '--method', 'none' if arm == 'fa2' else 'tli',
                        '--attention-backend', 'flash_attention_2', '--context-length', '32768',
-                       '--warmup', '3', '--repeats', str(args.repeats), '--max-gen', str(args.max_gen),
+                       '--warmup', str(args.warmup), '--repeats', str(args.repeats), '--max-gen', str(args.max_gen),
                        '--out', str(args.out_dir / 'samples.json'), '--label', f'{index:02d}-{arm}',
                        '--tli_subspace', 'tail', '--tia_level2_cmp_ratio', '4',
                        '--tli_enable_kmeans', 'false', '--tli_enable_layer_skip', 'true' if ring else 'false',
