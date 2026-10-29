@@ -244,7 +244,11 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                         replay_events[step][1].record()
                     record["replay_steps"] += 1
                 else:
+                    if step == 0:
+                        _clear_capture_routes(model)
                     output = forward()
+                    if step == 0:
+                        record["eager_layers"] = _capture_routes(model)
                 next_tokens = output.logits[:, -1].argmax(-1).tolist()
                 for b, token in enumerate(next_tokens):
                     if ctx.alive[b]:

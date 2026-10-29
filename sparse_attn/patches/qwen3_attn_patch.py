@@ -273,9 +273,11 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
         # valid_length 传逐行真实长 list（Triton 批量只消费 mask 忽略之；
         # torch 批量回退的 dense 段逐行裁剪归约域 [0,L_b) → 与变长路径
         # 逐位一致，防 pad 0 项参与归约树致 ULP 翻硬币）
-        return eager_decoding_attn(
+        output = eager_decoding_attn(
             q, k, v, m_b, bs0, cu_b, softmax_scale=self.scaling,
             valid_length=ctx.seq_lens)
+        indexer._graph_attention_route = 'batch_eager_tli'
+        return output
     # B==1（gate_bs1_equiv 铁律）/ block_size>1 兜底：逐行单 query 路径
     outs = []
     for b in range(B):

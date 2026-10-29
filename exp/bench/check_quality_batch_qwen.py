@@ -100,6 +100,9 @@ def run(cli):
             if eager_reference:
                 assert execution['actual']=='staged_static' and execution['captures']==0
                 assert execution['replay_steps']==0 and execution['fallback_reason'] is None
+                if batch>1:
+                    assert len(execution['eager_layers'])==model.config.num_hidden_layers
+                    assert all(r['attention_route']=='batch_eager_tli' for r in execution['eager_layers'])
             else:
                 assert execution['actual']=='graph' and execution['captures']==1
                 assert execution['replay_steps']==cli.max_gen-1 and execution['fallback_reason'] is None
