@@ -103,6 +103,48 @@ def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
                           dtype=q.dtype, backend='simt')
 
 
-def decode_ring(*args, **kwargs):
-    raise NotImplementedError(
-        "decode_ring is not available when TLI_OPERATOR_MODE != 'overlap'")
+def decode_ring(workspace, q, k, v, lengths, softmax_scale):
+    """Consume far-skip logical IDs directly from ring KV, without KV gather."""
+    from .partial_attention import partial_attention, merge_partials
+    from .token_selection import middle_selection
+    if q.shape[0] != 1:
+        raise ValueError('ring workspace owns a single request')
+    backend = os.environ.get('TLI_OPERATOR_BACKEND', 'simt')
+    stages = int(os.environ.get('TLI_OPERATOR_SELECTED_STAGES', '1'))
+    if backend not in ('simt', 'tc') or stages not in (1, 2, 3):
+        raise ValueError('invalid operator backend or selected stages')
+    overlap = operator_mode() == 'overlap'
+    if overlap and not q.is_cuda:
+        raise RuntimeError('overlap requires CUDA')
+    torch._assert_async(((lengths >= 1) & (lengths < torch.iinfo(torch.int32).max)).all(),
+                        'ring logical lengths must fit positive int32 IDs')
+    cfg = workspace.cfg
+    def protected():
+        ids = torch.empty((1, k.shape[2], 0), dtype=torch.int32, device=q.device)
+        counts = torch.empty((1, k.shape[2]), dtype=torch.int32, device=q.device)
+        return partial_attention(q, k, v, (ids, counts), lengths,
+            sink=cfg.sink_tokens, swa=cfg.window_tokens, scale=softmax_scale,
+            protected=True, splits=4, backend=backend, layout=workspace.layout)
+    if overlap:
+        current = torch.cuda.current_stream(q.device)
+        side = _protected_stream(q.device)
+        side.wait_stream(current)
+        with torch.cuda.stream(side):
+            pstate = protected()
+            for tensor in (q, k, v, lengths):
+                tensor.record_stream(side)
+    positions, valid = workspace.select(q, k, lengths, softmax_scale)
+    # Ring positions are absolute: physical capacity is not an ID bound.
+    selection = middle_selection(positions[None], valid[None], lengths,
+        cfg.sink_tokens, cfg.window_tokens, torch.iinfo(torch.int32).max)
+    if not overlap:
+        pstate = protected()
+    sstate = partial_attention(q, k, v, selection, lengths,
+        sink=cfg.sink_tokens, swa=cfg.window_tokens, scale=softmax_scale,
+        protected=False, splits=4, backend=backend, layout=workspace.layout,
+        pipeline_stages=stages)
+    if overlap:
+        current.wait_stream(side)
+        for tensor in pstate:
+            tensor.record_stream(current)
+    return merge_partials(pstate, sstate, q.dtype)
