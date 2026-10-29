@@ -41,7 +41,7 @@ def require_lease():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out-dir', type=Path, required=True)
-    parser.add_argument('--arms', nargs=2, choices=['fa2', 'legacy', 'serial', 'overlap', 'graph_serial', 'graph_compact'],
+    parser.add_argument('--arms', nargs=2, choices=['fa2', 'legacy', 'serial', 'overlap', 'graph_serial', 'graph_compact', 'graph_sparse'],
                         default=['fa2', 'serial'])
     parser.add_argument('--cycles', type=int, default=2)
     parser.add_argument('--max-gen', type=int, default=64)
@@ -79,10 +79,11 @@ def main():
                     raise RuntimeError('GPU1 did not settle to stable idle')
                 time.sleep(1)
             env = {k: v for k, v in os.environ.items() if not k.startswith('TLI_')}
-            env.update(CUDA_VISIBLE_DEVICES='1', TLI_OPERATOR_MODE='off' if arm in ['fa2', 'legacy'] else ('serial' if arm in ('graph_serial', 'graph_compact') else arm),
+            env.update(CUDA_VISIBLE_DEVICES='1', TLI_OPERATOR_MODE='off' if arm in ['fa2', 'legacy'] else ('serial' if arm in ('graph_serial', 'graph_compact', 'graph_sparse') else arm),
                        TLI_OPERATOR_FUSED_SELECTION='0', TLI_SPARSE_PREFILL='0',
-                       TLI_COMPACT_NORMALIZATION='1' if arm == 'graph_compact' else '0')
-            command = [sys.executable, str(root / ('exp/bench/e152v4_graph_latency.py' if arm in ('graph_serial', 'graph_compact') else 'exp/bench/operator_model_latency.py')),
+                       TLI_COMPACT_NORMALIZATION='1' if arm == 'graph_compact' else '0',
+                       TLI_SPARSE_SELECTION='1' if arm == 'graph_sparse' else '0')
+            command = [sys.executable, str(root / ('exp/bench/e152v4_graph_latency.py' if arm in ('graph_serial', 'graph_compact', 'graph_sparse') else 'exp/bench/operator_model_latency.py')),
                        '--method', 'none' if arm == 'fa2' else 'tli',
                        '--attention-backend', 'flash_attention_2', '--context-length', '32768',
                        '--warmup', '3', '--repeats', str(args.repeats), '--max-gen', str(args.max_gen),
