@@ -108,7 +108,9 @@ def run(cli):
                 assert execution['replay_steps']==cli.max_gen-1 and execution['fallback_reason'] is None
                 assert len(execution['capture_layers'])==model.config.num_hidden_layers
                 if batch_mode=='exact':
-                    expected_route='linear_batch_reference_simt' if row_reference else 'exact_batch_simt'
+                    expected_route=('linear_batch_reference_simt' if row_reference else
+                        'exact_batch_ordered_eager' if os.environ.get('TLI_EXACT_ATTENTION','split')=='ordered'
+                        else 'exact_batch_simt')
                     assert all(r['attention_route']==expected_route for r in execution['capture_layers'])
         del cache
         return tokens

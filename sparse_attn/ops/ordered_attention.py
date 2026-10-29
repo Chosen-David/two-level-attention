@@ -44,7 +44,8 @@ def ordered_attention(q,k,v,selection,lengths,*,sink,swa,scale):
             or q.shape[-1]!=128 or k.shape[-1]!=128 or k.shape[2]<1
             or q.shape[2]<1 or q.shape[2]%k.shape[2] or q.dtype not in (torch.bfloat16,torch.float16)
             or k.dtype!=q.dtype or v.dtype!=q.dtype or not q.is_cuda
-            or not _triton_kv_layout_compatible(k,v) or q.stride(-1)!=1
+            or not _triton_kv_layout_compatible(k,v) or k.stride(0)!=v.stride(0)
+            or k.numel()>torch.iinfo(torch.int32).max or q.stride(-1)!=1
             or k.stride(-1)!=1 or not 1<=q.shape[0]<=8
             or any(t.requires_grad for t in (q,k,v)) or not 16384<=k.shape[1]<65536):
         raise ValueError('ordered attention requires supported fixed BF16/FP16 D128 B1..8 CUDA geometry')
