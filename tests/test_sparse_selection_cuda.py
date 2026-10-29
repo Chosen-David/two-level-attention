@@ -20,7 +20,7 @@ def dense_reference(scores,ids,keep,capacity,group):
 
 
 @pytest.mark.parametrize('shared_dedup',[False,True])
-@pytest.mark.parametrize('capacity',[32768,32832,32840,131072])
+@pytest.mark.parametrize('capacity',[9224,16384,16400,24568,24576,32768,32832,32840,131072])
 @pytest.mark.parametrize('group',[1,4])
 @pytest.mark.parametrize('hk',[3,8])
 def test_sparse_native_reduction_and_ranking(capacity,group,hk,shared_dedup):

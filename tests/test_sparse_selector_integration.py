@@ -6,7 +6,7 @@ import torch
 
 pytestmark=pytest.mark.skipif(not torch.cuda.is_available(),reason='requires CUDA')
 
-@pytest.mark.parametrize('capacity',[16400,32768,32840])
+@pytest.mark.parametrize('capacity',[16400,16401,32768,32840])
 @pytest.mark.parametrize('same_instance',[False,True])
 @pytest.mark.parametrize('domain_pack',['fused','torch'])
 @pytest.mark.parametrize('skip_far',[False,True])
@@ -31,7 +31,7 @@ def test_real_sparse_selector_graph(monkeypatch,capacity,same_instance,domain_pa
     monkeypatch.setenv('TLI_SPARSE_SELECTION','1')
     run()
     assert idx._graph_candidate_domain_route==domain_pack
-    if capacity==16400:
+    if capacity==16401:
         assert idx._graph_const_cache[1]['ar_tok'] is not None
         assert idx._graph_sparse_selection_fallback=='unsupported_static_geometry'
         assert idx._graph_ranking_route=='full_width_native'

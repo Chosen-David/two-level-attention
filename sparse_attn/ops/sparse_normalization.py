@@ -1,4 +1,4 @@
-"""Undispatched prototype: candidate-only storage with native reduction order.
+"""Opt-in candidate-only storage with native reduction order.
 
 The token domain is virtual: missing -inf scores contribute zero exponentials.
 Map each present token to its pinned native thread and traversal ordinal, then
@@ -32,12 +32,14 @@ def _mean(CP,KEEP,OUT,R:tl.constexpr,G:tl.constexpr,BLOCK:tl.constexpr):
 
 
 @triton.jit
-def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr):
+def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,SHARED:tl.constexpr,BLOCK:tl.constexpr):
     h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
     token=tl.load(IDS+h*R+r,r<R,other=0)
     valid=(r<R)&tl.load(KEEP+h*R+r,r<R,other=0)&(token>=0)&(token<S)
     token=tl.where(valid,token,0)
-    end:tl.constexpr=(S//8192)*8192
+    # Shared softmax keeps vector traversal in the last partial CTA; generic
+    # softmax visits that tail as scalars. Both use the same 1024-thread reduce.
+    end:tl.constexpr=S if SHARED else (S//8192)*8192
     worker=tl.where(token<end,(token//8)%1024,(token-end)%1024)
     ordinal=tl.where(token<end,(token//8192)*8+token%8,end//1024+(token-end)//1024)
     key=tl.where(valid,worker*S+ordinal,1024*S)
@@ -83,8 +85,8 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
         result=scores.new_empty((hk,0))
         return (result,keep) if return_unique else result
     prop=torch.cuda.get_device_properties(scores.device)
-    if capacity%8 or capacity<(prop.shared_memory_per_block-128)//2 or capacity<=9216:
-        raise ValueError('only aligned generic BF16 softmax supported')
+    if capacity%8 or capacity<=9216:
+        raise ValueError('only aligned BF16 softmax above 9216 supported')
     with torch.cuda.device(scores.device):
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize==0:
             raise RuntimeError('warm up sparse normalization before capture')
@@ -92,7 +94,7 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
     key_dtype=torch.int32 if 1024*capacity<2**31 else torch.int64
     keys=torch.empty_like(ids,dtype=key_dtype)
     valid=torch.empty_like(keep)
-    _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,BLOCK=256)
+    _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,SHARED=capacity<(prop.shared_memory_per_block-128)//2,BLOCK=256)
     keys,perm=keys.sort(dim=-1,stable=True)
     long_keys=torch.empty_like(ids)
     unique=torch.empty_like(keep)
@@ -113,5 +115,4 @@ def supported_geometry(dtype, device, capacity, group, heads):
             or capacity % 8 or group < 1 or group & (group-1)
             or not 1 <= heads*group <= 65535):
         return False
-    prop = torch.cuda.get_device_properties(device)
-    return capacity >= (prop.shared_memory_per_block-128)//2
+    return True

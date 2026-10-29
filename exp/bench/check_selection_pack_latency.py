@@ -17,8 +17,8 @@ from sparse_attn.ops import selection_pack
 def main():
     output = Path(sys.argv[1])
     component = sys.argv[2] if len(sys.argv) > 2 else 'selection'
-    if component not in ('selection', 'domain', 'mean', 'normalization', 'ranking'):
-        raise ValueError('component must be selection, domain, mean, normalization or ranking')
+    if component not in ('selection', 'domain', 'mean', 'normalization', 'ranking', 'sparse'):
+        raise ValueError('component must be selection, domain, mean, normalization, ranking or sparse')
     observations = []
     stop = threading.Event()
     uuid = 'GPU-05a75a00-5bfc-a167-09e9-8bbf429846c9'
@@ -83,7 +83,10 @@ def main():
     idx.clear()
     index = idx.prepare_index(k, cu)
     graphs, outputs, calls = {}, {}, {}
-    if component == 'ranking':
+    if component == 'sparse':
+        from sparse_attn.ops import sparse_normalization
+        target, attribute = sparse_normalization, 'supported_geometry'
+    elif component == 'ranking':
         from sparse_attn.ops import compact_ranking
         target, attribute = compact_ranking, 'compact_topk'
     elif component == 'normalization':
@@ -111,13 +114,14 @@ def main():
             calls[mode]['fused'] += int(result is not None and (component != 'mean' or mode == 'fused'))
             return result
 
-        with patch.dict(os.environ, {'TLI_COMPACT_NORMALIZATION': '1' if component in ('mean', 'normalization', 'ranking') else '0', 'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' or component == 'ranking' else '0', 'TLI_COMPACT_RANKING': '1' if component == 'ranking' else '0', 'TLI_COMPACT_KTH': 'histogram', 'TLI_COMPACT_GATHER': 'blocked'}), patch.object(target, attribute, dispatch):
+        with patch.dict(os.environ, {'TLI_COMPACT_NORMALIZATION': '1' if component in ('mean', 'normalization', 'ranking', 'sparse') else '0', 'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' or component in ('ranking', 'sparse') else '0', 'TLI_COMPACT_RANKING': '1' if component in ('ranking', 'sparse') else '0', 'TLI_SPARSE_SELECTION': '1' if component == 'sparse' else '0', 'TLI_COMPACT_KTH': 'histogram', 'TLI_COMPACT_GATHER': 'blocked'}), patch.object(target, attribute, dispatch):
             for _ in range(3):
                 idx.compute_selection_graph(q, index, 128**-.5, length)
             torch.cuda.synchronize()
             graphs[mode] = torch.cuda.CUDAGraph()
             with torch.cuda.graph(graphs[mode]):
                 outputs[mode] = idx.compute_selection_graph(q, index, 128**-.5, length)
+            calls[mode]['sparse_selection_fallback'] = idx._graph_sparse_selection_fallback
             calls[mode]['normalization_capture_route'] = idx._graph_normalization_route
             calls[mode]['ranking_capture_route'] = idx._graph_ranking_route
             calls[mode]['kth_capture_route'] = idx._graph_ranking_kth_route
@@ -127,6 +131,11 @@ def main():
     assert torch.equal(outputs['torch'].indices, outputs['fused'].indices)
     assert torch.equal(outputs['torch'].counts, outputs['fused'].counts)
     assert calls['fused']['fused'] > 0
+    if component == 'sparse':
+        assert calls['fused']['normalization_capture_route'] == 'sparse_candidate_domain'
+        assert calls['fused']['ranking_capture_route'] == 'candidate_domain_native_1024'
+        assert calls['fused']['sparse_selection_fallback'] is None
+        assert calls['torch']['normalization_capture_route'] == 'compact_fused_mean'
     samples = []
     for pair in range(30):
         for mode in (('torch', 'fused') if pair % 2 == 0 else ('fused', 'torch')):
