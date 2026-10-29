@@ -18,11 +18,11 @@ def test_cpu_rejected_before_launch():
 @pytest.mark.parametrize('batch', [1, 2, 4, 8])
 @pytest.mark.parametrize('dtype', [torch.bfloat16, torch.float16])
 @pytest.mark.parametrize('dim,group,mean', [(32, 3, False), (128, 4, True)])
-def test_primary_kernel_exact_and_live_graph(batch, dtype, dim, group, mean):
+def test_primary_kernel_exact_and_live_graph(batch, dtype, dim, group, mean, tokens=131):
     from sparse_attn.indexer.tli_indexer import TLIIndexer, _score_coarse_kernel
     import triton
     torch.manual_seed(8726)
-    tokens, heads = 131, 2
+    heads = 2
     # Separate, noncontiguous min/max storage strides exercise both batch bases.
     lo = torch.randn(batch, tokens * 2, heads, dim, device='cuda', dtype=dtype)[:, ::2]
     hi = torch.randn(batch, tokens * 3, heads, dim, device='cuda', dtype=dtype)[:, ::3]
@@ -51,3 +51,23 @@ def test_primary_kernel_exact_and_live_graph(batch, dtype, dim, group, mean):
             assert torch.equal(scores[row], expected)
             if mean:
                 assert torch.equal(means[row], expected_mean)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA required')
+def test_long_token_address_domain():
+    test_primary_kernel_exact_and_live_graph(2, torch.bfloat16, 32, 3, False, tokens=32769)
+
+
+@pytest.mark.parametrize('bad', ['max_shape', 'max_dtype', 'feature_stride', 'query_stride', 'heads', 'empty_tokens'])
+def test_metadata_guard(bad):
+    lo = torch.empty(2, 17, 2, 32, dtype=torch.bfloat16)
+    hi = torch.empty_like(lo)
+    q = torch.empty(2, 8, 32)
+    if bad == 'max_shape': hi = hi[:, :-1]
+    if bad == 'max_dtype': hi = hi.float()
+    if bad == 'feature_stride': lo = torch.empty(2, 17, 2, 64, dtype=lo.dtype)[..., ::2]
+    if bad == 'query_stride': q = torch.empty(2, 8, 64)[..., ::2]
+    if bad == 'heads': q = torch.empty(2, 7, 32)
+    if bad == 'empty_tokens': lo, hi = lo[:, :0], hi[:, :0]
+    with pytest.raises(ValueError, match='shape/dtype/stride'):
+        score_coarse_batched(lo, hi, q, out_dtype=lo.dtype)
