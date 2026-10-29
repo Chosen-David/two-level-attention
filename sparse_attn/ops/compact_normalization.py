@@ -44,7 +44,12 @@ def _compact_gqa_mean(CP,OWNER,OUT,S:tl.constexpr,R:tl.constexpr,G:tl.constexpr,
 def build():
     if torch.__version__.split('+')[0]!='2.8.0':raise RuntimeError('requires pinned torch2.8.0 generic softmax')
     os.environ.setdefault('MAX_JOBS','1');root=Path(__file__).resolve().parent/'csrc'
-    return load(name='tli_virtual_softmax_compact_v6',sources=[str(root/'binding.cpp'),str(root/'virtual_softmax_compact.cu')],
+    # Concurrent worktrees must not share a binary while their CUDA contracts
+    # differ (scalar live width versus per-request lengths, for example).
+    import hashlib
+    sources=[root/'binding.cpp',root/'virtual_softmax_compact.cu']
+    revision=hashlib.sha256(b''.join(path.read_bytes() for path in sources)).hexdigest()[:16]
+    return load(name='tli_virtual_softmax_compact_'+revision,sources=list(map(str,sources)),
                 extra_cflags=['-O3'],extra_cuda_cflags=['-O3','-std=c++17'],verbose=True)
 
 def probabilities(extension,scores,ids,keep,capacity,group,excluded=None,valid_length=None):
