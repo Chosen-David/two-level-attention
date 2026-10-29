@@ -117,9 +117,14 @@ class TLIStaticLayer:
                      torch.ones(self.max_batch_size, dtype=torch.bool, device=self.keys.device))
         else:
             alive = torch.tensor(ctx.alive, dtype=torch.bool, device=self.keys.device)
-        active = alive.view(-1, 1, 1, 1)
-        self.keys.scatter_(2, idx, torch.where(active, key_states, self.keys.gather(2, idx)))
-        self.values.scatter_(2, idx, torch.where(active, value_states, self.values.gather(2, idx)))
+        from .operator_pipeline import operator_mode
+        if operator_mode() != 'off':
+            from .kv_row_update import append_kv_batch
+            append_kv_batch(self.keys, self.values, key_states, value_states, pos, alive)
+        else:
+            active = alive.view(-1, 1, 1, 1)
+            self.keys.scatter_(2, idx, torch.where(active, key_states, self.keys.gather(2, idx)))
+            self.values.scatter_(2, idx, torch.where(active, value_states, self.values.gather(2, idx)))
         self.cumulative_length += 1
         return self.keys, self.values
 
