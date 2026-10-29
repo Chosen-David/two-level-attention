@@ -4214,7 +4214,7 @@ class TLIIndexer(TIAIndexer):
         kt_cap = k_min.shape[0]
         S_cap = k_qat.shape[1]
         _sparse_selection = False
-        if (return_selection and not _l2_bypass and sink_pool_lo * bs <= S_cap
+        if (not _l2_bypass and sink_pool_lo * bs <= S_cap
                 and min(S_cap, K2) == 1024
                 and os.environ.get("TLI_SPARSE_SELECTION", "0") == "1"):
             from ..ops.sparse_normalization import supported_geometry
@@ -4222,7 +4222,7 @@ class TLIIndexer(TIAIndexer):
         self._graph_sparse_selection_fallback = (
             None if _sparse_selection else
             ("disabled" if os.environ.get("TLI_SPARSE_SELECTION", "0") != "1" else
-             "requires_token_selection" if not return_selection else "unsupported_static_geometry"))
+             "unsupported_static_geometry"))
         # A short cache may contain fewer pages than the configured L1 quota.
         # Clip static slot counts exactly as eager clips each pool's topk.
         nb_far, nb_near = min(nb_far, kt_cap), min(nb_near, kt_cap)
@@ -4553,7 +4553,19 @@ class TLIIndexer(TIAIndexer):
             self._graph_ranking_kth_route = None
             self._graph_ranking_gather_route = None
             self._graph_ranking_fallback = None
-            return selection
+            if return_selection:
+                return selection
+            # Legacy attention consumes a bool mask. Keep probability and
+            # ranking candidate-only, then adapt just the final IDs. Protected
+            # tokens are outside TokenSelection and must be restored exactly.
+            token = torch.arange(S_cap, device=dev)
+            selected = selection.to_mask(S_cap).unsqueeze(1)
+            protected = (token < sink_tok) | (token >= swa_lo_tok)
+            selected = (selected | protected.view(1, 1, 1, -1)) & (
+                token < S_real).view(1, 1, 1, -1)
+            if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
+                self.metrics.add_select_result(valid_len - 1, selected, 1)
+            return selected
         # ---- 7. 完整候选散回 + 全宽 softmax + GQA mean（与 eager 同归约域）----
         # Both eager and Graph normalize L1/bypass union complete sink/SWA.
         # Protected IDs were deduplicated above. The optional compact kernel

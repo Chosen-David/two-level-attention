@@ -10,7 +10,8 @@ pytestmark=pytest.mark.skipif(not torch.cuda.is_available(),reason='requires CUD
 @pytest.mark.parametrize('same_instance',[False,True])
 @pytest.mark.parametrize('domain_pack',['fused','torch'])
 @pytest.mark.parametrize('skip_far',[False,True])
-def test_real_sparse_selector_graph(monkeypatch,capacity,same_instance,domain_pack,skip_far):
+@pytest.mark.parametrize('output_kind',['selection','mask'])
+def test_real_sparse_selector_graph(monkeypatch,capacity,same_instance,domain_pack,skip_far,output_kind):
     from sparse_attn.indexer.tli_indexer import TLIIndexer
     if domain_pack == "torch":
         from sparse_attn.indexer import candidate_domain_triton
@@ -27,7 +28,8 @@ def test_real_sparse_selector_graph(monkeypatch,capacity,same_instance,domain_pa
     reference=idx if same_instance else TLIIndexer(mod._make_prod_args())
     reference.layer_idx=2
     reference.skip_far=skip_far;reference._dyn_frozen=True
-    run=lambda:idx.compute_selection_graph(q,index,128**-.5,vl)
+    method='compute_selection_graph' if output_kind=='selection' else 'compute_mask_graph'
+    run=lambda:getattr(idx,method)(q,index,128**-.5,vl)
     monkeypatch.setenv('TLI_SPARSE_SELECTION','1')
     run()
     assert idx._graph_candidate_domain_route==domain_pack
@@ -45,6 +47,9 @@ def test_real_sparse_selector_graph(monkeypatch,capacity,same_instance,domain_pa
     for length in (132,4097,min(32768,capacity),capacity,512,capacity):
         vl.fill_(length);q.normal_();graph.replay()
         monkeypatch.setenv('TLI_SPARSE_SELECTION','0')
-        expected=reference.compute_selection_graph(q,index,128**-.5,vl)
-        assert torch.equal(actual.indices,expected.indices),(capacity,length,'IDs')
-        assert torch.equal(actual.counts,expected.counts),(capacity,length,'counts')
+        expected=getattr(reference,method)(q,index,128**-.5,vl)
+        if output_kind=='mask':
+            assert torch.equal(actual,expected),(capacity,length,'mask')
+        else:
+            assert torch.equal(actual.indices,expected.indices),(capacity,length,'IDs')
+            assert torch.equal(actual.counts,expected.counts),(capacity,length,'counts')
