@@ -5553,59 +5553,6 @@ if _HAS_TRITON:
             gcarry += tl.sum(1 - k, axis=0)
         tl.store(CLEN + r, total.to(tl.int64))
 
-    # ---------------- 【iter3e+iter3f-4】fine 门控 + softmax + GQA mean + mid 门控融合 kernel ----------------
-    @triton.jit
-    def _iter3_fused_softmax_kernel(SFC, KEEP2, MID_SLOT, OUT_P,
-                                    R_CAP: tl.constexpr,
-                                    GROUP_SIZE: tl.constexpr,
-                                    BLOCK: tl.constexpr):
-        """iter3e+iter3f-4：fine 门控 + softmax + GQA mean + mid 门控五合一。
-
-        输入 SFC [Hkv*group_size, R_CAP]、KEEP2 [Hkv, R_CAP]（head 共享）、
-        MID_SLOT [Hkv, R_CAP]（mid 域布尔），
-        输出 OUT_P [Hkv, R_CAP] = mid_slot ? mean_over_group(softmax(gated_sfc)) : -inf。
-
-        【iter3f-4】mid 门控内联：~mid_slot | ~keep2 → masked_fill(-inf)
-        由 kernel 在写输出前逐元素应用。全 -inf kv_head 行 → max_val=-inf
-        → 输出全 -inf；mid=True 行正常输出 softmax prob。
-        节省 3 kernel/层（mid_slot 计算 | ~mid_slot|~keep2 | masked_fill）。"""
-        kv = tl.program_id(0)
-        col = tl.program_id(1)
-        ninf = float("-inf")
-        offs = col * BLOCK + tl.arange(0, BLOCK)
-        m = offs < R_CAP
-        base_keep = kv * R_CAP
-        k_row = tl.load(KEEP2 + base_keep + offs, mask=m, other=0) != 0
-        # 【iter3f-4】读 mid_slot 行
-        mid_row = tl.load(MID_SLOT + base_keep + offs, mask=m, other=0) != 0
-        # pass1: 跨 group_size 行求全局 max（keep=True 行参与）
-        gmax = ninf
-        for g in range(GROUP_SIZE):
-            h = kv * GROUP_SIZE + g
-            s = tl.load(SFC + h * R_CAP + offs, mask=m, other=ninf).to(tl.float32)
-            s_g = tl.where(k_row, s, ninf)
-            gmax = tl.maximum(gmax, tl.max(s_g, axis=0))
-        if gmax == ninf:
-            # 全 keep=False 行 → 输出全 -inf（mid 门控语义：无候选）
-            tl.store(OUT_P + kv * R_CAP + offs,
-                     tl.full((BLOCK,), ninf, dtype=tl.float32), mask=m)
-            return
-        # pass2: 每行独立 softmax + 累积 mean（每行归一化分母 =
-        # 该行 gate=True 槽的 exp 和；cross-row 不耦合）
-        mean_acc = tl.zeros((BLOCK,), dtype=tl.float32)
-        for g in range(GROUP_SIZE):
-            h = kv * GROUP_SIZE + g
-            s = tl.load(SFC + h * R_CAP + offs, mask=m, other=ninf).to(tl.float32)
-            s_g = tl.where(k_row, s, ninf)
-            e_g = tl.where(k_row, tl.exp(s_g - gmax), 0.0)
-            row_sum = tl.sum(e_g, axis=0)
-            p_norm = tl.where(row_sum > 0, e_g / row_sum, 0.0)
-            mean_acc += p_norm
-        mean_acc /= GROUP_SIZE
-        # 【iter3f-4】mid 门控：非 mid 槽输出 -inf（topk 不选）
-        mean_acc = tl.where(mid_row, mean_acc, ninf)
-        tl.store(OUT_P + kv * R_CAP + offs, mean_acc, mask=m)
-
     # ---------------- 【E166 iter3d】摘要维护融合 kernel ----------------
     @triton.jit
     def _iter3_maint_kernel(K, POS, IDXSUB, KMIN, KMAX, KAVG, KQAT,
@@ -5797,6 +5744,8 @@ def _iter3_assemble_mask(tok_top, k2_mid, mid_mask, swa_force,
             K2_static, stride_k, tok_top.stride(0), S_cap,
             BK=BK, num_warps=4)
     return sel
+
+
 def _iter3_compact(cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev):
     """【E166 iter3b】候选压缩 wrapper。返回 (cand_idx2c, keep2c,
     mid_slotc, cand_len)——与旧 argsort 链+mid gather 逐位一致。
@@ -5812,15 +5761,3 @@ def _iter3_compact(cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev):
         ci_out, kp_out, mid_out, clen,
         R_cap, S_CAP_M1=S_cap - 1, BLOCK=2048, num_warps=8)
     return ci_out, kp_out, mid_out, clen
-
-
-def _iter3_fused_softmax(sfc, keep2, mid_slot, R_cap, group_size, Hkv):
-    """Disable tile-local normalization; callers use the reference Torch chain.
-
-    A 1024-slot CTA cannot normalize a larger candidate domain independently.
-    The old kernel also changes dtype rounding relative to per-query softmax
-    followed by GQA mean. Keep it disabled for ALL shapes until a replacement
-    validates global per-query statistics, empty rows, rounding and selection.
-    Returning None preserves both eager/capture caller fallback semantics.
-    """
-    return None

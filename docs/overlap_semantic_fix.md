@@ -2,12 +2,13 @@
 
 Input: main `1c942ad2ce8d5134ee005673baf126819db8f2f2`.
 
-This repair disables `_iter3_fused_softmax`: its independent 1024-slot
-normalizers change scores and Top-K for multi-tile candidate domains. Both
-callers retain the existing Torch per-query softmax/nan_to_num/dtype-rounded
-GQA mean chain. It can be slower than the invalid fusion; no speedup is claimed.
-Do not re-enable the dormant kernel even for short rows without checking its
-cross-head shift and dtype rounding against that reference.
+The invalid fused-softmax kernel and its disabled wrapper have been removed:
+their independent 1024-slot normalizers changed scores and Top-K for multi-tile
+candidate domains. Production uses the existing Torch per-query
+softmax/nan_to_num/dtype-rounded GQA mean chain. It can be slower than the
+invalid fusion; no speedup is claimed. Do not reintroduce tile-local
+normalization; any replacement must validate global per-query statistics,
+empty rows, dtype rounding and final selection against that reference.
 
 The compact kernel now sanitizes inactive IDs before reading MIDM, and the
 experimental L2 bypass sanitizes them before scatter. The bypass still changes

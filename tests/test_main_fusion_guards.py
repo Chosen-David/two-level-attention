@@ -6,14 +6,6 @@ import pytest
 import torch
 from sparse_attn.indexer import tli_indexer as mod
 
-@pytest.mark.parametrize('r',[17,1024,2048,4224])
-@pytest.mark.parametrize('dtype',[torch.float32,torch.float16,torch.bfloat16])
-def test_invalid_softmax_kernel_is_not_dispatched(r,dtype):
-    scores=torch.randn(4,r,dtype=dtype)
-    keep=torch.ones(1,r,dtype=torch.bool)
-    assert mod._iter3_fused_softmax(scores,keep,keep,r,4,1) is None
-
-
 def bypass_function(source):
     tree=ast.parse(source)
     method=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='compute_mask_graph')
