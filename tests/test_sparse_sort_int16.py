@@ -28,7 +28,7 @@ def test_native_packed_keys_offsets_and_unique(capacity,r):
         valid=torch.empty_like(keep);long=torch.empty_like(ids);unique=torch.empty_like(keep)
         offsets=torch.empty(hk,1025,device='cuda',dtype=torch.int64)
         _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,256,PACKED=packed)
-        keys,perm=keys.sort(-1,stable=True)
+        keys,perm=keys.sort(dim=-1,stable=True)
         _offsets_and_keys[(hk,triton.cdiv(max(r,1025),256))](keys,perm,long,offsets,unique,r,capacity,256,PACKED=packed)
         return long,perm,offsets,unique,valid
     for kind in ['random','empty','last','signed_minus_one']:
