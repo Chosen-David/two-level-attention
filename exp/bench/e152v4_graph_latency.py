@@ -563,6 +563,15 @@ def main():
         gs.pos_buf = runner.pos_buf
         gs.valid_len_buf = runner.vl_buf
 
+    geometry_calls = {'capture': 0, 'eager': 0}
+    if os.environ.get('TLI_BENCH_GEOMETRY_COUNTS', '0') == '1':
+        from sparse_attn.indexer.tli_indexer import TLIIndexer
+        original_geometry = TLIIndexer._build_graph_geometry
+        def observed_geometry(self, *a, **kw):
+            key = 'capture' if torch.cuda.is_current_stream_capturing() else 'eager'
+            geometry_calls[key] += 1
+            return original_geometry(self, *a, **kw)
+        TLIIndexer._build_graph_geometry = observed_geometry
     ring_calls = {'capture': 0, 'eager': 0}
     ordered_calls = {'capture': 0, 'eager': 0}
     require_ring = os.environ.get('TLI_BENCH_REQUIRE_RING', '0') == '1'
@@ -588,6 +597,7 @@ def main():
         operator_pipeline.decode_ring = observed_decode_ring
     runs = []
     for r in range(args.warmup + args.repeats):
+        before_geometry_calls = geometry_calls.copy()
         before_ring_calls = ring_calls.copy()
         before_ordered_calls = ordered_calls.copy()
         ring_capture_storage.clear()
@@ -622,6 +632,11 @@ def main():
                 backend=os.environ.get('TLI_OPERATOR_BACKEND','simt'), ring_layers=len(ring_layers),
                 expected_ring_ids=sorted(expected_ring_ids), captured_kv_storage=sorted(ring_capture_storage),
                 count_scope='Python calls during capture/warmup; not replay invocation counts')
+        rec['geometry_builds'] = {
+            key: geometry_calls[key] - before_geometry_calls[key] for key in geometry_calls}
+        rec['geometry_reuse_enabled'] = os.environ.get('TLI_GRAPH_GEOMETRY_SHARED', '1') == '1'
+        rec['geometry_counts_enabled'] = os.environ.get('TLI_BENCH_GEOMETRY_COUNTS', '0') == '1'
+        # These are host submissions while building a graph, not replay counts.
         selector_routes = []
         for name, module in model.named_modules():
             idx = getattr(module, "indexer", None)

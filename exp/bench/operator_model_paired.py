@@ -44,7 +44,7 @@ def require_lease():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out-dir', type=Path, required=True)
-    parser.add_argument('--arms', nargs=2, choices=['fa2', 'legacy', 'serial', 'overlap', 'graph_serial', 'graph_compact', 'graph_sparse', *RING_ARMS],
+    parser.add_argument('--arms', nargs=2, choices=['fa2', 'legacy', 'serial', 'overlap', 'graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off', *RING_ARMS],
                         default=['fa2', 'serial'])
     parser.add_argument('--cycles', type=int, default=2)
     parser.add_argument('--warmup', type=int, default=3)
@@ -100,17 +100,19 @@ def main():
                     raise RuntimeError('GPU1 did not settle to stable idle')
                 time.sleep(1)
             env = {k: v for k, v in os.environ.items() if not k.startswith('TLI_')}
-            env.update(CUDA_VISIBLE_DEVICES='1', TLI_OPERATOR_MODE='off' if arm in ['fa2', 'legacy'] else ('serial' if arm in ('graph_serial', 'graph_compact', 'graph_sparse') else arm),
+            env.update(CUDA_VISIBLE_DEVICES='1', TLI_OPERATOR_MODE='off' if arm in ['fa2', 'legacy'] else ('serial' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off') else arm),
                        TLI_OPERATOR_FUSED_SELECTION='0', TLI_SPARSE_PREFILL='0',
                        TLI_COMPACT_NORMALIZATION='1' if arm == 'graph_compact' else '0',
-                       TLI_SPARSE_SELECTION='1' if arm == 'graph_sparse' else '0')
+                       TLI_SPARSE_SELECTION='1' if arm in ('graph_sparse', 'graph_sparse_geometry_off') else '0')
+            env['TLI_GRAPH_GEOMETRY_SHARED'] = '0' if arm == 'graph_sparse_geometry_off' else '1'
+            env['TLI_BENCH_GEOMETRY_COUNTS'] = '1'
             if arm in RING_ARMS:
                 env.update(TLI_OPERATOR_MODE={'graph_ring_legacy':'off', 'graph_ring_simt':'serial', 'graph_ring_simt_canonical':'serial', 'graph_ring_tc':'serial', 'graph_ring_tc3':'serial', 'graph_ring_tc3_overlap':'overlap', 'graph_ring_overlap':'overlap'}[arm],
                            TLI_OPERATOR_BACKEND='tc' if arm in ('graph_ring_tc','graph_ring_tc3','graph_ring_tc3_overlap') else 'simt',
                            TLI_OPERATOR_SELECTED_STAGES='3' if arm in ('graph_ring_tc3','graph_ring_tc3_overlap') else '1',
                            TLI_OPERATOR_ORDERED_SELECTION='0' if arm == 'graph_ring_simt_canonical' else '1',
                            TLI_BENCH_REQUIRE_RING='1')
-            command = [sys.executable, str(root / ('exp/bench/e152v4_graph_latency.py' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', *RING_ARMS) else 'exp/bench/operator_model_latency.py')),
+            command = [sys.executable, str(root / ('exp/bench/e152v4_graph_latency.py' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off', *RING_ARMS) else 'exp/bench/operator_model_latency.py')),
                        '--method', 'none' if arm == 'fa2' else 'tli',
                        '--attention-backend', 'flash_attention_2', '--context-length', '32768',
                        '--warmup', str(args.warmup), '--repeats', str(args.repeats), '--max-gen', str(args.max_gen),
