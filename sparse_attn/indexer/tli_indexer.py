@@ -4134,13 +4134,27 @@ class TLIIndexer(TIAIndexer):
             "byp_tok": byp_tok, "byp_keep": byp_keep,
         }
 
-    def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len):
+    def compute_selection_graph(self, q, index_dict, softmax_scale, valid_len):
+        """与 compute_mask_graph 相同的选择策略，直出紧凑 TokenSelection。
+
+        返回 TokenSelection（indices [1,Hkv,K2_static] int32 + counts
+        [1,Hkv] int32），替代 full-width bool mask。operator pipeline
+        → partial_attention 直接消费紧凑表示，免全宽 scatter/mask 开销。
+        语义等效：to_mask(S_cap) == compute_mask_graph(...)（单元测试逐位对拍）。
+        """
+        return self.compute_mask_graph(q, index_dict, softmax_scale, valid_len,
+                                       return_selection=True)
+
+    def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len, *,
+                           return_selection=False):
         """graph 专用全张量 compute_mask（生产主配置，逐位对齐 eager）。
 
         输入：q [1,1,H,D]（replay 注入）、index_dict（容量宽：k_min/k_max/
         k_avg/k_qat 全宽块统计，capture 前烘焙为常量）、softmax_scale、
         valid_len [1] long（replay 注入，decode 当前行有效长）。
-        输出：mask [1,1,Hkv,S_cap] bool（固定全宽，消费端 eager 批量路径）。
+        return_selection：True → 返回 TokenSelection 紧凑格式（Phase 1 新路径）；
+                          False → 返回 [1,1,Hkv,S_cap] bool mask（默认，兼容旧消费端）。
+        输出：mask 或 TokenSelection（见 return_selection）。
         """
         # ---- 0. 生产主配置守卫（fail-closed 回 eager 逐行路径）----
         if not (self.alpha > 0 and self.beta > 0 and self.gamma is None
@@ -4409,6 +4423,15 @@ class TLIIndexer(TIAIndexer):
             sel[..., :sink_tok] = True
             sel = sel | swa_force.view(1, 1, 1, -1)
             sel = sel & (ar_tok < S_real).view(1, 1, 1, -1)
+            # 【Phase 1】紧凑 Selection 路径：return_selection=True 时
+            # 不走全宽 mask，直接返回 compact TokenSelection。
+            # 用 getattr(locals(),...) 保护 AST exec 测试上下文（无此变量）。
+            _do_selection = locals().get('return_selection', False)
+            if _do_selection:
+                from ..ops.token_selection import graph_middle_selection
+                safe = torch.where(keep2, cand_idx2, S_cap)
+                return graph_middle_selection(
+                    safe, R_cap, mid_mask, S_real, S_cap, sink_tok, swa_tok)
             if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
                 self.metrics.add_select_result(valid_len - 1, sel, 1)
             return sel
@@ -4536,6 +4559,10 @@ class TLIIndexer(TIAIndexer):
             sel = sel | swa_force.view(1, 1, 1, -1)
             # 回退分支仍需 host 侧 AND（kernel 未内联）
             sel = sel & _valid_mask.view(1, 1, 1, -1)
+        if return_selection:
+            from ..ops.token_selection import graph_middle_selection
+            return graph_middle_selection(
+                tok_top, k2_mid, mid_mask, S_real, S_cap, sink_tok, swa_tok)
         if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
             self.metrics.add_select_result(valid_len - 1, sel, 1)
         return sel
