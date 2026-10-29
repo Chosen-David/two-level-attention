@@ -118,3 +118,29 @@ Its receipt is `linear_batch_reference_simt`. The mode is part of the storage
 configuration signature, so changing it requires clear and recapture. Agreement
 with this control cannot by itself resolve a difference from independent B1 model
 requests; model batch shape also changes other arithmetic paths.
+
+The explicit `TLI_EXACT_ATTENTION=ordered` consumer forms the sorted unique
+union of selected, sink and SWA IDs and invokes the original eager attention
+reduction (BW256, four warps, unchanged BF16 multiplication rounding). Its
+receipt is `exact_batch_ordered_eager`. The split consumer remains the current
+low-level default pending the full acceptance gate; its observed B4 token
+drift is recorded in run 0750 and must not be treated as a quality reference.
+Run 0790 accepts the ordered repair only for its four inputs and 16 tokens.
+
+The real batch harness supports `--eager-batch-reference` for same-shape
+correctness, and `--legacy-batch-reference` for native Graph versus fused Graph
+comparisons. `--cycles` alternates reference/candidate execution order and
+records each pair's request indices. B1 uses the native Graph with no batch
+fusion. Timing includes prefill, cache conversion and capture in total request
+time; the first pair may contain compilation/setup costs and must be reported
+separately from later pairs, with all raw measurements retained.
+
+For sequential unpadded prefills, the harness retains only completed B1 caches
+until all rows finish. `consume_prefill_rows` then allocates each static layer,
+copies every row and releases that source layer before allocating the next.
+It preserves KV values and zero padding and consumes the input caches. It is
+an inference, same-stream transfer; sources cannot be reused afterward, and
+an allocation failure propagates instead of returning a partial cache. This
+avoids an entire batch allocation beside subsequent prefill activations. It
+does not guarantee B8 fits: the original B8 run 0850 failed in prefill, and the
+revised real-model capacity check remains pending.
