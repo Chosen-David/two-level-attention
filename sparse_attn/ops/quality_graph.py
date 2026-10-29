@@ -272,6 +272,14 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
             return gen
     finally:
         disable_graph()
+        # This entry owns a one-shot Graph and never returns it. Low-level
+        # exact owners deliberately retain KV for same-storage recapture, but
+        # retaining them here pins the completed request through the next
+        # prefill. Any still-live local Graph continues to own its state.
+        for module in model.modules():
+            idx = getattr(module, "indexer", None)
+            if idx is not None and getattr(idx, "_exact_linear_batch", None) is not None:
+                idx._exact_linear_batch = None
         cache._quality_decode_ctx = cache._quality_decode_mask = None
         if getattr(cache, "_far_skip_prepared", False):
             cache._far_skip_attention_mask = None

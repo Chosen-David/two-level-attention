@@ -160,3 +160,45 @@ def test_capture_oom_auto_recovers_on_static_cache_and_strict_aborts(monkeypatch
             assert model._quality_graph_execution['replay_steps']==4
     del model,ids
     torch.cuda.empty_cache()
+
+
+@pytest.mark.parametrize('row_reference', ['0','1'])
+@pytest.mark.parametrize('fail_replay', [False,True])
+def test_one_shot_batch_request_releases_exact_owners(monkeypatch,row_reference,fail_replay):
+    import gc
+    import weakref
+    from sparse_attn.ops import exact_linear_batch as exact
+    for key,value in dict(TLI_CUDA_GRAPH='on',TLI_BATCH_INDEXER='exact',
+            TLI_OPERATOR_MODE='serial',TLI_OPERATOR_BACKEND='simt',
+            TLI_OPERATOR_SELECTED_STAGES='1',TLI_SPARSE_SELECTION='1',
+            TLI_GRAPH_INC='1',TLI_LIVE_NORMALIZATION='1',TLI_SPARSE_STATS='owner',
+            TLI_EXACT_BATCH_REFERENCE=row_reference).items():monkeypatch.setenv(key,value)
+    model=model_for('qwen',False)
+    states=[]
+    original=exact.ExactLinearBatch.__init__
+    def observe(self,*args,**kwargs):
+        original(self,*args,**kwargs);states.append(weakref.ref(self))
+    monkeypatch.setattr(exact.ExactLinearBatch,'__init__',observe)
+    if fail_replay:
+        def failed(*args,**kwargs):raise RuntimeError('injected replay failure')
+        monkeypatch.setattr(torch.cuda.CUDAGraph,'replay',failed)
+    for request in range(2):
+        cache=TLIStaticCache(model.config,16448,2)
+        with torch.inference_mode(),eager_decoding_request_guard():
+            for layer in cache.layers:
+                layer.lazy_initialization(torch.zeros(2,2,1,128,device='cuda',dtype=torch.bfloat16))
+                layer.cumulative_length=16384
+            kv=[weakref.ref(layer.keys) for layer in cache.layers]
+            ctx=BatchCtx(2,[16384,16380],[0,0],[True,True],0)
+            if fail_replay:
+                with pytest.raises(RuntimeError,match='injected replay failure'):
+                    static_decode(model,cache,[[1],[2]],[16384,16380],set(),3,ctx)
+            else:
+                result=static_decode(model,cache,[[1],[2]],[16384,16380],set(),3,ctx)
+                assert all(len(row)==3 for row in result)
+                assert model._quality_graph_execution['captures']==1
+            assert all(m.indexer._exact_linear_batch is None for m in model.modules() if hasattr(m,'indexer'))
+        del layer,cache
+        gc.collect();torch.cuda.synchronize()
+        assert states and all(ref() is None for ref in states)
+        assert all(ref() is None for ref in kv)
