@@ -248,7 +248,8 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
             ctx.gen_lens[:] = snap_gen
             return None
         graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(graph):
+        from sparse_attn.ops.cuda_graph_state import capture_graph
+        with capture_graph(graph):
             out = model(input_ids=nxt_buf, position_ids=pid_buf,
                         attention_mask=m4_buf, past_key_values=past,
                         use_cache=True)

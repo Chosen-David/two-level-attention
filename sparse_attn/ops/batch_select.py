@@ -145,7 +145,8 @@ def _graph_cached_run(key, body_fn, inputs):
                 body_fn(**statics)
         torch.cuda.current_stream().wait_stream(s)
         g = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(g):
+        from sparse_attn.ops.cuda_graph_state import capture_graph
+        with capture_graph(g):
             out = body_fn(**statics)
         # capture 只 record 不执行——replay 一次产出首层真实结果
         g.replay()
