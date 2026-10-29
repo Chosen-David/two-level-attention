@@ -76,3 +76,64 @@ def test_two_graphs_replay_live_geometry_and_raw_capture():
         for graph,results in zip(graphs,outputs):
             graph.replay()
             assert [int(x.item()) for x in results]==[value*2+i for i in range(3)]
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA required')
+@pytest.mark.parametrize('sparse', ['0', '1'])
+def test_real_selector_cross_graph_geometry(monkeypatch, sparse):
+    """Real selectors share only equal geometry and replay independent live inputs."""
+    import importlib.util
+    from sparse_attn.indexer.tli_indexer import TLIIndexer
+    spec = importlib.util.spec_from_file_location(
+        'geometry_prod_args', source.parents[2] / 'exp/bench/test_tli_graph_gates.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setenv('TLI_SPARSE_SELECTION', sparse)
+    torch.manual_seed(827)
+    capacity = 32840
+    k = torch.randn(1, capacity, 8, 128, device='cuda', dtype=torch.bfloat16)
+    q = torch.randn(1, 1, 32, 128, device='cuda', dtype=k.dtype)
+    length = torch.tensor([capacity], device='cuda')
+    cu = torch.tensor([0, capacity], device='cuda', dtype=torch.int32)
+    selectors = []
+    for swa in (128, 128, 192, 128):
+        args = module._make_prod_args()
+        args.tli_swa_size = swa
+        idx = TLIIndexer(args)
+        idx.layer_idx = 2
+        idx.clear()
+        selectors.append((idx, idx.prepare_index(k, cu)))
+
+    builds = [0]
+    original = TLIIndexer._build_graph_geometry
+    def counted(self, *args, **kwargs):
+        builds[0] += 1
+        return original(self, *args, **kwargs)
+    monkeypatch.setattr(TLIIndexer, '_build_graph_geometry', counted)
+    def run():
+        return [idx.compute_selection_graph(q, index, 128 ** -.5, length)
+                for idx, index in selectors]
+
+    # Compile before capture; leave eager cache populated to test isolation.
+    run()
+    torch.cuda.synchronize()
+    graphs, results = [], []
+    for scoped in (True, True, False):
+        graph = torch.cuda.CUDAGraph()
+        builds[0] = 0
+        with capture_graph(graph) if scoped else torch.cuda.graph(graph):
+            output = run()
+        # Equal adjacent layers share; different geometry evicts this pointer's
+        # single cache entry. The final layer must rebuild its original geometry.
+        assert builds[0] == (3 if scoped else 4)
+        graphs.append(graph)
+        results.append(output)
+    for valid in (132, 4097, capacity, 512, 32768, capacity):
+        length.fill_(valid)
+        q.normal_()
+        # Alternate replay order, so no graph may depend on another's last run.
+        for i in (1, 0, 2, 0):
+            graphs[i].replay()
+            expected = run()
+            for actual, reference in zip(results[i], expected):
+                assert torch.equal(actual.indices, reference.indices), (sparse, valid, i, 'IDs')
+                assert torch.equal(actual.counts, reference.counts), (sparse, valid, i, 'counts')
