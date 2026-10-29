@@ -56,7 +56,9 @@ def run(cli):
         lengths=lengths,eos_policy='empty EOS diagnostic; fixed generation count',
         scope='explicit no-gate Qwen; unchanged 64/128/1024 budget, not ring-gate or GLM B>1'),indent=2))
 
-    def request(which, batch_mode, row_reference=False):
+    def request(which, batch_mode, row_reference=False, eager_reference=False):
+        os.environ['TLI_CUDA_GRAPH']='off' if eager_reference else 'auto'
+        os.environ['TLI_OPERATOR_MODE']='off' if eager_reference else 'serial'
         os.environ['TLI_EXACT_BATCH_REFERENCE']='1' if row_reference else '0'
         os.environ['TLI_BATCH_INDEXER']=batch_mode
         batch=len(which); lens=[lengths[b] for b in which]
@@ -95,21 +97,26 @@ def run(cli):
                     peak_reserved_bytes=torch.cuda.max_memory_reserved())
             records.append(rec)
             output.write_text(json.dumps(dict(status='pending',records=records),indent=2))
-            assert execution['actual']=='graph' and execution['captures']==1
-            assert execution['replay_steps']==cli.max_gen-1 and execution['fallback_reason'] is None
-            assert len(execution['capture_layers'])==model.config.num_hidden_layers
-            if batch_mode=='exact':
-                expected_route='linear_batch_reference_simt' if row_reference else 'exact_batch_simt'
-                assert all(r['attention_route']==expected_route for r in execution['capture_layers'])
+            if eager_reference:
+                assert execution['actual']=='staged_static' and execution['captures']==0
+                assert execution['replay_steps']==0 and execution['fallback_reason'] is None
+            else:
+                assert execution['actual']=='graph' and execution['captures']==1
+                assert execution['replay_steps']==cli.max_gen-1 and execution['fallback_reason'] is None
+                assert len(execution['capture_layers'])==model.config.num_hidden_layers
+                if batch_mode=='exact':
+                    expected_route='linear_batch_reference_simt' if row_reference else 'exact_batch_simt'
+                    assert all(r['attention_route']==expected_route for r in execution['capture_layers'])
         del cache
         return tokens
 
-    reference=(request(list(range(cli.batch)),'exact',True) if cli.same_batch_reference
+    reference=(request(list(range(cli.batch)),'legacy',eager_reference=True) if cli.eager_batch_reference
+               else request(list(range(cli.batch)),'exact',True) if cli.same_batch_reference
                else [request([b],'legacy')[0] for b in range(cli.batch)])
     actual=request(list(range(cli.batch)),'exact' if cli.batch>1 else 'legacy')
     equal=actual==reference
     output.write_text(json.dumps(dict(status='pending_independent_verification',
-        tokens_equal=equal,comparison='same_batch_rows' if cli.same_batch_reference else 'independent_B1',records=records),indent=2))
+        tokens_equal=equal,comparison='same_batch_eager' if cli.eager_batch_reference else 'same_batch_rows' if cli.same_batch_reference else 'independent_B1',records=records),indent=2))
     assert equal,'real batch tokens differ from independent single-row Graph reference'
 
 
@@ -118,7 +125,9 @@ if __name__=='__main__':
     p.add_argument('--input',required=True);p.add_argument('--output',required=True)
     p.add_argument('--batch',type=int,choices=[1,2,4,8],required=True)
     p.add_argument('--max-gen',type=int,default=16);p.add_argument('--measure',action='store_true')
-    p.add_argument('--same-batch-reference',action='store_true')
+    ref=p.add_mutually_exclusive_group()
+    ref.add_argument('--same-batch-reference',action='store_true')
+    ref.add_argument('--eager-batch-reference',action='store_true')
     cli=p.parse_args()
     if cli.same_batch_reference and cli.batch<2:p.error('same-batch reference needs B>=2')
     if cli.max_gen<2:p.error('max-gen must be >=2')
