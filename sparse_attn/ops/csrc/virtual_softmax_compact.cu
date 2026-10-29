@@ -38,9 +38,11 @@ template<typename T> __device__ T gather_score(const T* scores,const int* owners
 }
 
 template<bool EXP,typename T,int ILP,bool VECTOR_TAIL>
-__device__ float thread_reduce(const T* scores,const int* owners,int h,int R,int S,int G,float maximum,int N) {
+__device__ float thread_reduce(const T* scores,const int* owners,int h,int R,int S,int G,float maximum,int N,int reference_row=-1) {
   // Preserve native per-thread token order, including row alignment handling.
-  int shift=(static_cast<int64_t>(h)*N)%ILP;
+  // Dense reference logits are separately contiguous for each request.
+  int row=reference_row<0 ? h : reference_row;
+  int shift=(static_cast<int64_t>(row)*N)%ILP;
   int size=N,base=0,offset=threadIdx.x;
   float value=EXP?0.f:-FLT_MAX;
   auto consume=[&](int token) {
@@ -91,14 +93,15 @@ __global__ void normalize_stats_live(const T* scores,const int* owners,float* st
   int64_t logical_width=length[blockIdx.x / heads_per_request];
   CUDA_KERNEL_ASSERT(logical_width>9216 && logical_width<=S);
   int h=blockIdx.x,N=static_cast<int>(logical_width);
+  int reference_row=h%heads_per_request;
   bool vector_tail=N<smem_limit && N%ILP==0;
   float local_max=vector_tail
-      ? thread_reduce<false,T,ILP,true>(scores,owners,h,R,S,G,0.f,N)
-      : thread_reduce<false,T,ILP,false>(scores,owners,h,R,S,G,0.f,N);
+      ? thread_reduce<false,T,ILP,true>(scores,owners,h,R,S,G,0.f,N,reference_row)
+      : thread_reduce<false,T,ILP,false>(scores,owners,h,R,S,G,0.f,N,reference_row);
   float maximum=block_reduce<Max>(local_max,shared,-FLT_MAX);
   float local_sum=vector_tail
-      ? thread_reduce<true,T,ILP,true>(scores,owners,h,R,S,G,maximum,N)
-      : thread_reduce<true,T,ILP,false>(scores,owners,h,R,S,G,maximum,N);
+      ? thread_reduce<true,T,ILP,true>(scores,owners,h,R,S,G,maximum,N,reference_row)
+      : thread_reduce<true,T,ILP,false>(scores,owners,h,R,S,G,maximum,N,reference_row);
   float sum=block_reduce<Add>(local_sum,shared,0.f);
   if(threadIdx.x==0) {stats[2*h]=maximum;stats[2*h+1]=sum;}
 }

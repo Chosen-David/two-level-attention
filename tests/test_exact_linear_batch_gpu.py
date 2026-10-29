@@ -233,7 +233,7 @@ def test_same_storage_clear_warmup_old_and_new_graphs(monkeypatch):
         case.source.clear()
         assert not bool(state.ready.cpu()) and state.needs_warmup
         for ref in case.refs:ref.clear()
-        case.refill([8191,12287])  # Same pointers, different request prefixes.
+        case.refill([10239,12287])  # Same pointers, different request prefixes.
         for _ in range(3):out=case.run()
         torch.cuda.synchronize()
         assert case.source._exact_linear_batch is state and state.feature_arena is arena
