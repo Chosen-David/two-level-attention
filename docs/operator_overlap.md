@@ -27,3 +27,9 @@ a discarded sentinel-score mask and SWA fill overwritten by the subsequent
 middle-region mask. Dtype dispatch CPU checks and native G=1 eager/captured
 checks pass for FP16/BF16/FP32; 22 targeted native regression cases pass.
 These checks do not establish full-model quality or a selector speedup.
+
+Experimental model entry routing: TLI_OPERATOR_BACKEND=simt|tc selects both
+partial attention backends; TC requires fp16/bf16. TLI_OPERATOR_SELECTED_STAGES
+accepts 1/2/3 for selected attention only. Defaults remain simt/1. Four native
+SIMT/TC x stage1/3 fork/join graph replay tests pass; these options are not an
+automatic tuning policy and do not establish model speedups.

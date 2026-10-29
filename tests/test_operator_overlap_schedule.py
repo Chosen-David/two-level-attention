@@ -50,3 +50,10 @@ def test_protected_starts_before_index_and_join_follows_selected(monkeypatch):
     assert events.index('select') < events.index('selected')
     assert events.index('selected') < events.index(('main', 'wait', 'side'))
     assert events.index(('main', 'wait', 'side')) < events.index('merge')
+
+
+def test_invalid_operator_backend_fails_before_dispatch(monkeypatch):
+    import pytest
+    monkeypatch.setenv('TLI_OPERATOR_BACKEND', 'unknown')
+    with pytest.raises(ValueError, match='BACKEND'):
+        pipeline.decode_indexed(None, None, None, None, None, None, None, 1.)

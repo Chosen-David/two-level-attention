@@ -13,7 +13,7 @@ update 只依赖 batch_decode_ctx + pos_buf，与 attention 方法无关）。
 协议（e152 v2 契约 + v4 扩展）：
   - 每进程一臂 × 一 L × (warmup+repeats)；同一 prompt 逐位相同（确定性
     needle，input_ids sha256 落盘）；
-  - prefill 两臂均原生 SDPA dense（TLI_SPARSE_PREFILL=0），DynamicCache
+  - prefill 两臂均指定后端的原生 dense（默认 FlashAttention2）（TLI_SPARSE_PREFILL=0），DynamicCache
     → fill_static_from_dynamic 搬入进程级 TLIStaticCache（有效在前，
     S_cap = len(ids)+max_gen+8；fill 是一次性 setup，单独计时
     fill_static_ms，不进 TTFT/TPOT——serving 中静态池同口径）；
@@ -82,24 +82,21 @@ QUESTION = ("What is the special magic number for the hidden vault mentioned "
 
 
 def build_prompt_tokens(tokenizer, L, q_frac=0.02):
-    """确定性构造 ~L token 的 needle prompt（与 e152 逐位一致）。"""
-    q_ids = tokenizer(QUESTION, add_special_tokens=False)["input_ids"]
-    body_target = L - len(q_ids) - 8
-    n_ids = tokenizer(NEEDLE, add_special_tokens=False)["input_ids"]
-    fill_ids = tokenizer(" ".join(FILLER_WORDS), add_special_tokens=False)["input_ids"]
-    body = []
-    half = (body_target - len(n_ids)) // 2
-    while len(body) < half:
-        body.extend(fill_ids)
-    body = body[:half]
-    body.extend(n_ids)
-    while len(body) < body_target:
-        body.extend(fill_ids)
-    body = body[:body_target]
-    raw = tokenizer.decode(body + q_ids)
-    prompt = ("<|im_start|>user\n" + raw +
-              "<|im_end|>\n<|im_start|>assistant\n\n\n\n")
-    ids = tokenizer(prompt, add_special_tokens=False)["input_ids"]
+    """Build exactly L deterministic token IDs without decode/re-tokenize drift."""
+    prefix = tokenizer("<|im_start|>user\n", add_special_tokens=False)["input_ids"]
+    suffix = tokenizer("<|im_end|>\n<|im_start|>assistant\n\n\n\n",
+                       add_special_tokens=False)["input_ids"]
+    question = tokenizer(QUESTION, add_special_tokens=False)["input_ids"]
+    needle = tokenizer(NEEDLE, add_special_tokens=False)["input_ids"]
+    filler = tokenizer(" ".join(FILLER_WORDS), add_special_tokens=False)["input_ids"]
+    remaining = L - len(prefix) - len(suffix) - len(question) - len(needle)
+    if remaining < 0 or not filler:
+        raise ValueError("context length cannot contain the fixed chat/needle/question tokens")
+    fill = (filler * ((remaining + len(filler) - 1) // len(filler)))[:remaining]
+    midpoint = remaining // 2
+    ids = prefix + fill[:midpoint] + needle + fill[midpoint:] + question + suffix
+    if len(ids) != L:
+        raise RuntimeError("exact context length invariant failed")
     return ids
 
 
@@ -468,6 +465,7 @@ def main():
     parser.add_argument("--model-path", type=str,
                         default=os.path.expanduser("~/Qwen3-8B"))
     parser.add_argument("--out", type=str, required=True)
+    parser.add_argument("--attention-backend", choices=["flash_attention_2", "sdpa"], default="flash_attention_2")
     parser.add_argument("--label", type=str, default="")
     parser.add_argument("--graph-mode", choices=["graph", "eager"],
                         default="graph",
@@ -499,7 +497,7 @@ def main():
                                               trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path, config=config, trust_remote_code=True,
-        torch_dtype=torch.bfloat16, device_map="cuda:0").eval()
+        torch_dtype=torch.bfloat16, device_map="cuda:0", attn_implementation=args.attention_backend).eval()
 
     resolve_far_skip_modes(args, model=model)
     snapshot = None
@@ -597,7 +595,7 @@ def main():
             "instrumentation_mode": ("per-step-device-synchronized "
                                      "(graph: inject+replay+argmax+item)"),
             "backend_verified": False,
-            "prefill_backend": "native SDPA dense (both arms)",
+            "prefill_backend": args.attention_backend,
             "decode_backend": (
                 "TLI sparse, whole-step CUDA Graph" if
                 (args.method == "tli" and args.graph_mode == "graph") else

@@ -6,7 +6,11 @@ from sparse_attn.ops.operator_pipeline import decode_indexed
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')
-def test_overlap_graph_replay_matches_serial(monkeypatch):
+@pytest.mark.parametrize('operator_backend', ['simt', 'tc'])
+@pytest.mark.parametrize('selected_stages', [1, 3])
+def test_overlap_graph_replay_matches_serial(monkeypatch, operator_backend, selected_stages):
+    monkeypatch.setenv('TLI_OPERATOR_BACKEND', operator_backend)
+    monkeypatch.setenv('TLI_OPERATOR_SELECTED_STAGES', str(selected_stages))
     torch.manual_seed(42)
     q = torch.randn(1, 1, 8, 32, device='cuda', dtype=torch.float16)
     k = torch.randn(1, 1024, 2, 32, device='cuda', dtype=q.dtype)

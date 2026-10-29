@@ -44,6 +44,16 @@ def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
     """
     from ..ops.partial_attention import partial_attention, merge_partials
 
+    # Explicit experimental routing; keep the accepted default unchanged.
+    backend = os.environ.get('TLI_OPERATOR_BACKEND', 'simt')
+    stages = int(os.environ.get('TLI_OPERATOR_SELECTED_STAGES', '1'))
+    if backend not in ('simt', 'tc'):
+        raise ValueError('TLI_OPERATOR_BACKEND must be simt or tc')
+    if stages not in (1, 2, 3):
+        raise ValueError('TLI_OPERATOR_SELECTED_STAGES must be 1, 2 or 3')
+    if backend == 'tc' and q.dtype not in (torch.float16, torch.bfloat16):
+        raise ValueError('TC operator decode requires fp16/bf16')
+
     # Fork before index preparation: protected positions depend only on lengths.
     overlap = operator_mode() == 'overlap'
     if overlap and not q.is_cuda:
@@ -61,7 +71,7 @@ def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
             protected_state = partial_attention(
                 q, k, v, (empty_ids, empty_counts), vl,
                 sink=indexer.sink_tokens, swa=indexer.sliding_window_size,
-                scale=softmax_scale, protected=True, splits=4, backend='simt')
+                scale=softmax_scale, protected=True, splits=4, backend=backend)
             # Inputs may be freed by the caller before the side stream finishes.
             for tensor in (q, k, v, vl):
                 tensor.record_stream(side)
@@ -73,13 +83,14 @@ def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
         protected_state = partial_attention(
             q, k, v, ids_counts, vl,
             sink=indexer.sink_tokens, swa=indexer.sliding_window_size,
-            scale=softmax_scale, protected=True, splits=4, backend='simt')
+            scale=softmax_scale, protected=True, splits=4, backend=backend)
 
     # 4. selected attention（中段紧凑候选）
     selected_state = partial_attention(
         q, k, v, ids_counts, vl,
         sink=indexer.sink_tokens, swa=indexer.sliding_window_size,
-        scale=softmax_scale, protected=False, splits=4, backend='simt')
+        scale=softmax_scale, protected=False, splits=4, backend=backend,
+        pipeline_stages=stages)
 
     # Join only after selected attention has been submitted on the main stream.
     if overlap:

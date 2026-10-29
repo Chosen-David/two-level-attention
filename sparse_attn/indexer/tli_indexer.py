@@ -4522,7 +4522,7 @@ class TLIIndexer(TIAIndexer):
         if return_selection:
             from ..ops.token_selection import graph_middle_selection
             return graph_middle_selection(
-                tok_top, k2_mid, mid_mask, S_real, S_cap, sink_tok, swa_tok)
+                tok_top, k2_mid, mid_mask, S_real, S_cap, sink_tok, swa_tok, unique_top=True)
         # 【E166 iter3a】终掩码装配融合：i_eff where + full_like + zeros/
         # scatter + and + slice fill + or 六段（~6 kernel/层，[Hkv,S_cap]
         # 全宽 3 遍读写 ≈7.5MB/层@128K）换 2 个 Triton kernel（A 基底

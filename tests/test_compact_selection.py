@@ -145,3 +145,15 @@ def test_graph_middle_selection_scalar_quota_matches_per_head(quota):
     per_head = graph_middle_selection(top, torch.full((2,), quota), mid, 16, 16, 2, 2)
     assert torch.equal(scalar.indices, per_head.indices)
     assert torch.equal(scalar.counts, per_head.counts)
+
+@pytest.mark.parametrize('quota', [0, 1, 17, 64])
+def test_unique_top_fast_path_matches_generic(quota):
+    from sparse_attn.ops.token_selection import graph_middle_selection
+    torch.manual_seed(39)
+    top = torch.stack([torch.randperm(64) for _ in range(3)])
+    mid = torch.arange(64).remainder(3) != 0
+    args = (top, torch.tensor(quota), mid, torch.tensor(57), 64, 4, 8)
+    ref = graph_middle_selection(*args)
+    out = graph_middle_selection(*args, unique_top=True)
+    torch.testing.assert_close(out.indices, ref.indices)
+    torch.testing.assert_close(out.counts, ref.counts)

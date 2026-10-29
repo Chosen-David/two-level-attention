@@ -90,7 +90,7 @@ def middle_selection(ids, valid, lengths, sink, swa, capacity, width=None):
     return canonical_selection(ids, keep, capacity, width)
 
 
-def graph_middle_selection(top, k2_mid, mid_mask, length, capacity, sink, swa):
+def graph_middle_selection(top, k2_mid, mid_mask, length, capacity, sink, swa, *, unique_top=False):
     """compute_mask_graph 路径专用：从 topk 输出直建紧凑 selection。
 
     复刻旧链：topk → rank gate → mid_mask & length 过滤 → middle_selection。
@@ -110,5 +110,14 @@ def graph_middle_selection(top, k2_mid, mid_mask, length, capacity, sink, swa):
     in_range = (top >= 0) & (top < capacity)
     safe = top.clamp(0, capacity - 1)
     keep = (ranks[None] < (k2_mid.reshape(-1, 1) if torch.is_tensor(k2_mid) else k2_mid)) & in_range & mid_mask[safe] & (top < length)
+    if unique_top:
+        # torch.topk returns distinct positions; only mask/sort is needed.
+        prefix = length.clamp(max=sink)
+        start = torch.maximum(prefix, length - swa)
+        keep = keep & (top >= prefix) & (top < start)
+        packed = torch.where(keep, top, capacity).sort(-1).values
+        valid = packed < capacity
+        return TokenSelection(torch.where(valid, packed, 0)[None].to(torch.int32),
+                              valid.sum(-1, dtype=torch.int32)[None])
     return middle_selection(top[None], keep[None], length.reshape(1),
                             sink, swa, capacity)
