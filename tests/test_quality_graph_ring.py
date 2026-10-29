@@ -8,10 +8,11 @@ from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='native CUDA required')
+@pytest.mark.parametrize('policy', ['1', 'auto'])
 @pytest.mark.parametrize('mode', ['off', 'serial', 'overlap'])
 @pytest.mark.parametrize('backend', ['simt', 'tc'])
 @torch.inference_mode()
-def test_quality_ring_capture_and_fresh_request(monkeypatch, mode, backend):
+def test_quality_ring_capture_and_fresh_request(monkeypatch, mode, backend, policy):
     monkeypatch.setenv('TLI_OPERATOR_MODE', mode)
     monkeypatch.setenv('TLI_OPERATOR_BACKEND', backend)
     model = make_model(device='cuda').to(torch.bfloat16)
@@ -31,7 +32,7 @@ def test_quality_ring_capture_and_fresh_request(monkeypatch, mode, backend):
                                 past_key_values=past, use_cache=True, logits_to_keep=1)
                 expected.append(out.logits[:, -1].argmax(-1).item())
             del out, past
-            monkeypatch.setenv('TLI_CUDA_GRAPH', '1')
+            monkeypatch.setenv('TLI_CUDA_GRAPH', policy)
             out = model(input_ids=ids, use_cache=True, logits_to_keep=1)
             past = out.past_key_values
             first = out.logits[:, -1].argmax(-1).item()
@@ -87,3 +88,55 @@ def test_static_layer_hf_attention_contract():
     assert layer.is_initialized
     layer._direct_prefill_mask = True
     assert layer.get_mask_sizes(3) == layer.get_mask_sizes(torch.arange(3)) == (3, 0)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='native CUDA required')
+@pytest.mark.parametrize('mode', ['serial', 'overlap'])
+@pytest.mark.parametrize('failure_stage', ['allocation', 'receipt'])
+@torch.inference_mode()
+def test_ring_capture_failure_recovery(monkeypatch, mode, failure_stage):
+    from sparse_attn.ops.cuda_graph_state import graph_state
+    import sparse_attn.ops.tli_static_cache as storage
+    monkeypatch.setenv('TLI_OPERATOR_MODE', mode)
+    model = make_model(device='cuda').to(torch.bfloat16)
+    ids = (torch.arange(16384, device='cuda') % 32)[None]
+    caches = []
+    original = storage.fill_static_from_dynamic
+    def observed(cache, *args, **kwargs):
+        original(cache, *args, **kwargs)
+        caches.append(cache)
+    monkeypatch.setattr(storage, 'fill_static_from_dynamic', observed)
+    def fail(*args):
+        raise torch.cuda.OutOfMemoryError('injected ring capture failure')
+    outputs = []
+    for policy, inject in [('auto', True), ('1', True), ('1', False)]:
+        monkeypatch.setenv('TLI_CUDA_GRAPH', policy)
+        with eager_decoding_request_guard():
+            out = model(input_ids=ids, use_cache=True, logits_to_keep=1)
+            past = out.past_key_values
+            first = out.logits[:, -1].argmax(-1).item()
+            del out
+            with monkeypatch.context() as patch:
+                if inject:
+                    if failure_stage == 'allocation':
+                        patch.setattr(torch.cuda, 'CUDAGraph', fail)
+                    else:
+                        patch.setattr('sparse_attn.ops.quality_graph._capture_routes', fail)
+                if inject and policy == '1':
+                    with pytest.raises(torch.cuda.OutOfMemoryError):
+                        from_dynamic(model, past, first, 5, set())
+                else:
+                    outputs.append(from_dynamic(model, past, first, 5, set()))
+                    receipt = model._quality_graph_execution
+                    if inject:
+                        assert receipt['actual'] == 'staged_static'
+                        assert receipt['captures'] == receipt['replay_steps'] == 0
+                        assert 'capture_layers' not in receipt
+                        assert 'capture_failed:OutOfMemoryError' in receipt['fallback_reason']
+                    else:
+                        assert receipt['actual'] == 'graph' and receipt['replay_steps'] == 4
+            assert not graph_state().enabled
+            assert caches[-1]._far_skip_attention_mask is None
+            assert caches[-1]._quality_decode_mask is None
+            assert not past.layers
+    assert outputs[0] == outputs[1]
