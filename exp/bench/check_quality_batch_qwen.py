@@ -174,6 +174,8 @@ if __name__=='__main__':
     if cli.cycles<1:p.error('cycles must be >=1')
     if cli.max_gen<2:p.error('max-gen must be >=2')
     with GPU0Monitor(Path(cli.output).with_suffix('.gpu.json')):
+        Path(cli.output).with_suffix('.allocator_start.json').write_text(
+            json.dumps(observe_allocator(),indent=2))
         if cli.trace_dir:
             from batch_decode_trace import record_batch_decode_trace
             with record_batch_decode_trace(cli.trace_dir):run(cli)
