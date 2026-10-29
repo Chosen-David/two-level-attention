@@ -115,3 +115,26 @@ def supported_geometry(dtype, device, capacity, group, heads):
         return False
     prop = torch.cuda.get_device_properties(device)
     return capacity >= (prop.shared_memory_per_block-128)//2
+
+
+def candidate_probabilities_batched(scores,ids,keep,capacity,group,*,return_unique=False):
+    """Exact per-head candidate normalization over independent flattened requests.
+
+    scores [B,Hq,R], ids/keep [B,Hkv,R]. Keeps every query-head denominator
+    and model-dtype rounding; uses the same pinned native-reduction kernel.
+    """
+    if type(group) is not int or group<1 or group&(group-1):
+        raise ValueError('GQA group must be a positive power of two')
+    if ids.ndim!=3 or scores.ndim!=3 or keep.shape!=ids.shape:
+        raise ValueError('batched candidate tensors must be rank three')
+    b,h,r=ids.shape
+    if b<1 or h<1 or scores.shape!=(b,h*group,r):
+        raise ValueError('invalid batched candidate head geometry')
+    if not all(x.is_contiguous() for x in (scores,ids,keep)):
+        raise ValueError('contiguous batched candidates required')
+    result=candidate_probabilities(scores.view(b*h*group,r),ids.view(b*h,r),
+        keep.view(b*h,r),capacity,group,return_unique=return_unique)
+    if return_unique:
+        p,unique=result
+        return p.view(b,h,r),unique.view(b,h,r)
+    return result.view(b,h,r)
