@@ -38,10 +38,10 @@ template<typename T> __device__ T gather_score(const T* scores,const int* owners
 }
 
 template<bool EXP,typename T,int ILP,bool VECTOR_TAIL>
-__device__ float thread_reduce(const T* scores,const int* owners,int h,int R,int S,int G,float maximum) {
+__device__ float thread_reduce(const T* scores,const int* owners,int h,int R,int S,int G,float maximum,int N) {
   // Preserve native per-thread token order, including row alignment handling.
-  int shift=(static_cast<int64_t>(h)*S)%ILP;
-  int size=S,base=0,offset=threadIdx.x;
+  int shift=(static_cast<int64_t>(h)*N)%ILP;
+  int size=N,base=0,offset=threadIdx.x;
   float value=EXP?0.f:-FLT_MAX;
   auto consume=[&](int token) {
     float x=static_cast<float>(gather_score(scores,owners,h,token,R,S,G));
@@ -51,7 +51,7 @@ __device__ float thread_reduce(const T* scores,const int* owners,int h,int R,int
   // Native shared softmax visits every aligned vector, including the final
   // partial CTA. Generic softmax instead visits that tail in scalar order.
   if constexpr (VECTOR_TAIL) {
-    for(int vector=threadIdx.x;vector*ILP<S;vector+=blockDim.x) {
+    for(int vector=threadIdx.x;vector*ILP<N;vector+=blockDim.x) {
       #pragma unroll
       for(int j=0;j<ILP;++j) consume(vector*ILP+j);
     }
@@ -77,8 +77,28 @@ template<typename T,int ILP,bool VECTOR_TAIL=false>
 __global__ void normalize_stats(const T* scores,const int* owners,float* stats,int R,int S,int G) {
   __shared__ float shared[32];
   int h=blockIdx.x;
-  float maximum=block_reduce<Max>(thread_reduce<false,T,ILP,VECTOR_TAIL>(scores,owners,h,R,S,G,0.f),shared,-FLT_MAX);
-  float sum=block_reduce<Add>(thread_reduce<true,T,ILP,VECTOR_TAIL>(scores,owners,h,R,S,G,maximum),shared,0.f);
+  float maximum=block_reduce<Max>(thread_reduce<false,T,ILP,VECTOR_TAIL>(scores,owners,h,R,S,G,0.f,S),shared,-FLT_MAX);
+  float sum=block_reduce<Add>(thread_reduce<true,T,ILP,VECTOR_TAIL>(scores,owners,h,R,S,G,maximum,S),shared,0.f);
+  if(threadIdx.x==0) {stats[2*h]=maximum;stats[2*h+1]=sum;}
+}
+
+// Logical width controls PyTorch's row alignment and reduction order. Owner
+// addresses still use fixed capacity; the live width never reaches the host.
+template<typename T,int ILP>
+__global__ void normalize_stats_live(const T* scores,const int* owners,float* stats,
+                                    const int64_t* length,int R,int S,int G,int smem_limit) {
+  __shared__ float shared[32];
+  int h=blockIdx.x,N=static_cast<int>(*length);
+  CUDA_KERNEL_ASSERT(N>9216 && N<=S);
+  bool vector_tail=N<smem_limit && N%ILP==0;
+  float local_max=vector_tail
+      ? thread_reduce<false,T,ILP,true>(scores,owners,h,R,S,G,0.f,N)
+      : thread_reduce<false,T,ILP,false>(scores,owners,h,R,S,G,0.f,N);
+  float maximum=block_reduce<Max>(local_max,shared,-FLT_MAX);
+  float local_sum=vector_tail
+      ? thread_reduce<true,T,ILP,true>(scores,owners,h,R,S,G,maximum,N)
+      : thread_reduce<true,T,ILP,false>(scores,owners,h,R,S,G,maximum,N);
+  float sum=block_reduce<Add>(local_sum,shared,0.f);
   if(threadIdx.x==0) {stats[2*h]=maximum;stats[2*h+1]=sum;}
 }
 
@@ -128,7 +148,7 @@ __global__ void fused_probability_mean(const T* scores,const int* owners,
   out[(int64_t)kv*S+token]=static_cast<T>(sum/G);
 }
 
-at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S,int64_t G,bool fused_mean,at::Tensor excluded) {
+at::Tensor virtual_compact_softmax_impl(at::Tensor scores,at::Tensor owners,int64_t S,int64_t G,bool fused_mean,at::Tensor excluded,at::Tensor length) {
   TORCH_CHECK(scores.is_cuda() && owners.is_cuda() && scores.device()==owners.device(),"same CUDA device required");
   TORCH_CHECK(scores.is_contiguous() && owners.is_contiguous(),"contiguous inputs required");
   TORCH_CHECK(scores.dim()==2 && owners.dim()==2 && owners.scalar_type()==at::kInt,"matrix scores/int32 owners required");
@@ -138,6 +158,10 @@ at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S
   TORCH_CHECK(owners.numel()<INT_MAX,"owner indexing exceeds int32 prototype scope");
   TORCH_CHECK(excluded.is_cuda() && excluded.device()==scores.device() && excluded.scalar_type()==at::kBool && excluded.is_contiguous(),"contiguous same-device bool exclusion mask required");
   TORCH_CHECK(excluded.numel()==0 || (excluded.dim()==1 && excluded.numel()==S),"exclusion mask must be empty or token-domain vector");
+  if(length.defined()) {
+    TORCH_CHECK(length.is_cuda() && length.device()==scores.device() && length.scalar_type()==at::kLong
+                && length.numel()==1 && length.is_contiguous(),"live width must be one same-device int64 value");
+  }
   c10::cuda::CUDAGuard device_guard(scores.device());
   auto prop=at::cuda::getCurrentDeviceProperties();
   int bytes=scores.element_size(),ilp=16/bytes;
@@ -150,7 +174,9 @@ at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S
   auto stream=at::cuda::getCurrentCUDAStream();
   AT_DISPATCH_FLOATING_TYPES_AND2(at::kHalf,at::kBFloat16,scores.scalar_type(),"virtual_softmax",[&] {
     constexpr int ILP=16/sizeof(scalar_t);
-    if(native_smem)
+    if(length.defined())
+    normalize_stats_live<scalar_t,ILP><<<scores.size(0),1024,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),length.data_ptr<int64_t>(),scores.size(1),S,G,(prop->sharedMemPerBlock-128)/bytes);
+    else if(native_smem)
     normalize_stats<scalar_t,ILP,true><<<scores.size(0),1024,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),scores.size(1),S,G);
     else
     normalize_stats<scalar_t,ILP><<<scores.size(0),1024,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),scores.size(1),S,G);
@@ -159,4 +185,11 @@ at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S
   });
   C10_CUDA_KERNEL_LAUNCH_CHECK();
   return out;
+}
+
+at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S,int64_t G,bool fused_mean,at::Tensor excluded) {
+  return virtual_compact_softmax_impl(scores,owners,S,G,fused_mean,excluded,at::Tensor());
+}
+at::Tensor virtual_compact_softmax_live(at::Tensor scores,at::Tensor owners,int64_t S,int64_t G,bool fused_mean,at::Tensor excluded,at::Tensor length) {
+  return virtual_compact_softmax_impl(scores,owners,S,G,fused_mean,excluded,length);
 }
