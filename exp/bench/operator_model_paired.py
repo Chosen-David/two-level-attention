@@ -65,7 +65,7 @@ def main():
     if ring:
         mask_bytes = Path(args.ring_mask).read_bytes()
         skip = json.loads(mask_bytes).get('skip')
-        if not isinstance(skip, list) or not skip or any(type(x) is not int or x < 0 for x in skip):
+        if not isinstance(skip, list) or not skip or any(type(x) is not int or x < 0 for x in skip) or len(set(skip)) != len(skip):
             parser.error('ring mask must contain a nonempty list of nonnegative skip layer IDs')
         frozen_mask = args.out_dir / 'skip-mask.json'
         frozen_mask.write_bytes(mask_bytes)
