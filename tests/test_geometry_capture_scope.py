@@ -137,3 +137,20 @@ def test_real_selector_cross_graph_geometry(monkeypatch, sparse):
             for actual, reference in zip(results[i], expected):
                 assert torch.equal(actual.indices, reference.indices), (sparse, valid, i, 'IDs')
                 assert torch.equal(actual.counts, reference.counts), (sparse, valid, i, 'counts')
+
+
+def test_capture_ablation_and_invalid_flag(monkeypatch):
+    entered = []
+    def graph(*args, **kwargs):
+        entered.append(True)
+        return nullcontext()
+    monkeypatch.setattr(torch.cuda, 'graph', graph)
+    monkeypatch.setenv('TLI_GRAPH_GEOMETRY_SHARED', '0')
+    with capture_graph(object()):
+        assert geometry_cache_key(('geometry',), capturing=True, stream=11) is None
+    assert len(entered) == 1
+    monkeypatch.setenv('TLI_GRAPH_GEOMETRY_SHARED', 'invalid')
+    with pytest.raises(ValueError, match='TLI_GRAPH_GEOMETRY_SHARED'):
+        with capture_graph(object()):
+            pass
+    assert len(entered) == 1  # Invalid configuration rejected before capture.
