@@ -32,10 +32,13 @@ def _config_signature(idx):
         'enable_async', 'moba_gate', 'sigma_select', 'static_pair', 'dyn_dgate',
         'skip_far', 'far_skip_backend', '_triton_ok')) + tuple(getattr(idx.args, key) for key in (
             'tia_block_size', 'tia_level1_topk', 'tia_level2_topk')) + (
-                os.environ.get('TLI_EXACT_BATCH_REFERENCE', '0'),)
+                os.environ.get('TLI_EXACT_BATCH_REFERENCE', '0'),
+                os.environ.get('TLI_EXACT_ATTENTION', 'split'),)
 
 
 def _validate_metadata(idx, q, k, v, gs):
+    if os.environ.get('TLI_EXACT_ATTENTION', 'split') not in ('split', 'ordered'):
+        raise ValueError('TLI_EXACT_ATTENTION must be split or ordered')
     if os.environ.get('TLI_EXACT_BATCH_REFERENCE', '0') not in ('0', '1'):
         raise ValueError('TLI_EXACT_BATCH_REFERENCE must be 0 or 1')
     if os.environ.get('TLI_LIVE_NORMALIZATION', '1') != '1':
@@ -266,6 +269,10 @@ def _consume_batched(inputs,q,k,v,lengths,scale):
                                             inputs.group_size,return_unique=True,valid_lengths=lengths)
     selection=rank_unique_batched(inputs.ids,p,unique,inputs.lower,inputs.upper,inputs.quota,
         capacity=inputs.capacity,width=1024,sink=inputs.sink)
+    if os.environ.get('TLI_EXACT_ATTENTION', 'split') == 'ordered':
+        from .ordered_attention import ordered_attention
+        return ordered_attention(q,k,v,(selection.indices,selection.counts),lengths,
+                                 sink=inputs.sink,swa=inputs.swa,scale=scale)
     kw=dict(sink=inputs.sink,swa=inputs.swa,scale=scale,splits=4,backend='simt')
     packed=selection.indices,selection.counts
     protected=partial_attention(q,k,v,packed,lengths,protected=True,**kw)
@@ -337,7 +344,8 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
     indexer._exact_batch_maintenance_route=state.maintenance_route
     indexer._exact_batch_maintenance_calls=state.maintenance_calls
     output = _consume_batched(candidates,q,k,v,gs.valid_len_buf,scale)
-    indexer._graph_attention_route = 'exact_batch_simt'
+    indexer._graph_attention_route = ('exact_batch_ordered_eager'
+        if os.environ.get('TLI_EXACT_ATTENTION', 'split') == 'ordered' else 'exact_batch_simt')
     indexer._graph_batch_index_route = state.maintenance_route
     indexer._graph_candidate_domain_route = 'batch_full_protected'
     indexer._graph_normalization_route = 'batch_candidate_probabilities'

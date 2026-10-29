@@ -64,6 +64,8 @@ def eager_decoding_check_errors(device=None, clear: bool = True):
 
 
 def _raise_for_code(code: int):
+    if code == 4:
+        raise RuntimeError("ordered attention: invalid selected token IDs, counts or live lengths; request rejected")
     if code == 1:
         raise RuntimeError(
             "eager_decoding_attn: 选择 mask 存在全 False 行——softmax 将"
