@@ -120,5 +120,17 @@
     "invalid_arm": "a2",
     "reason": "11:37:24 起出现第二个计算进程并持续至该臂结束，TPOT 出现离散平台跳变至约 28.6 ms",
     "disposition": "polluted-rerun；未用于最终判决"
+  },
+  "latest_main_recheck": {
+    "date": "2026-10-30",
+    "main_commit": "309519ac011f64e3c996020ae45131b139fa6129",
+    "patch_apply_check": "clean",
+    "patch_diff_stat_unchanged": "2 files changed, 11 insertions(+), 13 deletions(-)",
+    "far_skip_tests_passed": 72,
+    "known_unrelated_failure": "exp/bench/test_e127_gates.py::test_fine_gather 仍在测试自身以 [8,4160] mask 索引 [32,4160] 张量处报 IndexError；此前未修改 main 已复现，PR10 不触及该 indexer/test 路径",
+    "operator_mode_default": "off",
+    "reachability_unchanged": true,
+    "new_gpu_sampling_required": false,
+    "note_zh": "新 main 仅在 FarSkipGraphWorkspace.__call__ 增加 TLI_OPERATOR_MODE 非 off 的实验路由，默认 off，故原生产路径不变。e152 runner 的 prompt 构造和默认 prefill backend 已变化，不跨 runner 版本比较绝对 TPOT；本轮只复核补丁集成和可达性，不重用于性能采数。"
   }
 }
