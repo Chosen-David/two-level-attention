@@ -186,6 +186,11 @@ class FarSkipGraphWorkspace:
     def __call__(self, q, k, v, length, scale):
         from .operator_pipeline import operator_mode, decode_ring
         if operator_mode() != 'off':
-            return decode_ring(self, q, k, v, length, scale)
+            import os
+            output = decode_ring(self, q, k, v, length, scale)
+            self.attention_route = f"ring_{operator_mode()}_{os.environ.get('TLI_OPERATOR_BACKEND', 'simt')}"
+            return output
         positions, valid = self.select(q, k, length, scale)
-        return self.attend(q, k, v, positions, valid, scale)
+        output = self.attend(q, k, v, positions, valid, scale)
+        self.attention_route = "ring_sdpa"
+        return output

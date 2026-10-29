@@ -147,4 +147,8 @@ def try_far_skip_static(module, q, k, v, cache, mask, batch_ctx):
     validate_operator_inputs(q, k, v)
     k, v = layer.update(k, v, {'cache_position': pos})
     q, k, v = (t.transpose(1, 2) for t in (q, k, v))
-    return layer.workspace(q, k, v, pos+1, module.scaling)
+    output = layer.workspace(q, k, v, pos+1, module.scaling)
+    # Receipt is written only after the selected consumer actually dispatches.
+    idx._graph_attention_route = layer.workspace.attention_route
+    idx._graph_ring_capacity = layer.layout.capacity
+    return output

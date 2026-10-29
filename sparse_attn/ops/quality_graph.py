@@ -61,6 +61,7 @@ def _reset_indexes(model):
 
 
 _CAPTURE_ROUTE_FIELDS = (
+    "attention_route", "ring_capacity",
     "candidate_domain_route", "normalization_route", "normalization_stats_route", "normalization_width_route",
     "ranking_route", "ranking_kth_route", "ranking_gather_route",
     "ranking_fallback", "sparse_selection_fallback", "sparse_selection_fallback_detail",
@@ -143,6 +144,8 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
     alive = torch.ones(batch, device=device, dtype=torch.bool)
     mask = torch.empty(batch, 1, 1, capacity, device=device, dtype=dtype)
     cache._quality_decode_ctx, cache._quality_decode_mask = ctx, mask
+    if getattr(cache, "_far_skip_prepared", False):
+        cache._far_skip_attention_mask = mask
     snapshots = (list(ctx.seq_lens), list(ctx.gen_lens), list(ctx.alive))
 
     def restore():
@@ -270,6 +273,8 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
     finally:
         disable_graph()
         cache._quality_decode_ctx = cache._quality_decode_mask = None
+        if getattr(cache, "_far_skip_prepared", False):
+            cache._far_skip_attention_mask = None
 
 
 def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2):
@@ -288,8 +293,13 @@ def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2
         reason = "method_has_no_supported_tli_indexer"
     elif getattr(model.config, "model_type", None) not in ("qwen3", "glm4_moe_lite"):
         reason = "model_not_in_quality_graph_allowlist"
-    elif any(getattr(idx, "far_skip_backend", "legacy") != "legacy" for idx in indexes):
-        reason = "single_request_graph_requires_legacy_cache"
+    elif any(getattr(idx, "far_skip_backend", "legacy") not in ("legacy", "compact")
+             for idx in indexes):
+        reason = "unsupported_far_skip_backend"
+    elif any(getattr(idx, "far_skip_backend", "legacy") == "compact" and (
+            model.config.model_type != "qwen3" or getattr(idx, "far_skip_cache", None) != "evict")
+            for idx in indexes):
+        reason = "single_request_compact_graph_requires_qwen_eviction"
     elif len({p.device for p in model.parameters()}) != 1:
         reason = "model_spans_devices"
     elif next(model.parameters()).device.type != "cuda":
@@ -301,7 +311,7 @@ def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2
     if reason:
         unsupported(model, reason)
         return None
-    from .tli_static_cache import TLIStaticCache
+    from .tli_static_cache import TLIStaticCache, fill_static_from_dynamic
     length = int(past.get_seq_length())
     capacity = length + max_gen
     # Admission only covers the additional static KV allocation, not an
@@ -318,11 +328,10 @@ def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2
         torch.cuda.synchronize(next(model.parameters()).device)
         conversion_start = time.perf_counter()
     cache = TLIStaticCache(model.config, capacity, 1)
-    for target, source in zip(cache.layers, past.layers):
-        target.lazy_initialization(source.keys)
-        target.keys[:, :, :length].copy_(source.keys)
-        target.values[:, :, :length].copy_(source.values)
-        target.cumulative_length = length
+    # The caller's explicit compact configuration owns eviction; ordinary
+    # quality requests continue to allocate linear storage. Freeze the gate
+    # and seed request-local ring summaries before capture or source release.
+    fill_static_from_dynamic(cache, past, [length], model=model)
     # Transfer is now complete. Release dynamic KV before capture; failures
     # after ownership transfer stay on this static cache or abort the request.
     past.layers.clear()
