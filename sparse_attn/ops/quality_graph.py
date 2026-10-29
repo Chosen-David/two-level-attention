@@ -96,6 +96,15 @@ def _capture_routes(model):
     return rows
 
 
+def _live_width_fallback(prompt_lengths):
+    # The first decode appends one token. Check host-known lengths before
+    # allocation/capture; capacity alone does not imply a supported row width.
+    if (os.environ.get("TLI_LIVE_NORMALIZATION", "0") == "1"
+            and any(int(length) + 1 <= 9216 for length in prompt_lengths)):
+        return "live_normalization_length_below_9217"
+    return None
+
+
 def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tokens=2):
     """Finish generation from prefill's first tokens using fixed-address KV."""
     policy = graph_policy()
@@ -118,7 +127,8 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
         return gen
     reason = ("model_spans_devices" if len(devices) != 1 else
               "non_cuda_device" if device.type != "cuda" else
-              "capacity_below_16384" if capacity < 16384 else None)
+              "capacity_below_16384" if capacity < 16384 else
+              _live_width_fallback(lens))
     if policy == "on" and reason:
         raise RuntimeError("CUDA Graph required but unavailable: " + reason)
     if reason and policy != "off":
@@ -283,6 +293,8 @@ def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2
         reason = "non_cuda_device"
     elif past.get_seq_length() + max_gen < 16384:
         reason = "capacity_below_16384"
+    else:
+        reason = _live_width_fallback([past.get_seq_length()])
     if reason:
         unsupported(model, reason)
         return None
