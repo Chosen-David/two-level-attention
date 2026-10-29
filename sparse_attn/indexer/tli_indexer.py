@@ -4967,6 +4967,8 @@ if _HAS_TRITON:
         stride_qh, stride_oh, stride_ot, stride_mh, stride_mt,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
         HAS_MEAN: tl.constexpr,
+        BATCHED: tl.constexpr = False,
+        STRIDE_KB: tl.constexpr = 0, STRIDE_KB2: tl.constexpr = 0,
     ):
         """【iter8】GQA K 复用 coarse minmax 上界分（min/max 两份 K 独立
         stride）：s[h,t] = Σ_d min(q,0)·k_min + Σ_d max(q,0)·k_max（负部配
@@ -4976,15 +4978,24 @@ if _HAS_TRITON:
         （等价性口径同 _score_fine_kernel 注释，iter-21 探针复验）。"""
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
+        kv = pid_h
+        if BATCHED:
+            # Widen before stride products, including flattened output heads.
+            pid_t = pid_t.to(tl.int64)
+            pid_h = pid_h.to(tl.int64)
+            batch = pid_h // Hkv
+            kv = pid_h % Hkv
+            KMIN += batch * STRIDE_KB
+            KMAX += batch * STRIDE_KB2
         offs_t = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_t = offs_t < T
         if HAS_MEAN:
             macc = tl.zeros((BT,), dtype=tl.float32)
-        kmin = tl.load(KMIN + offs_t[:, None] * stride_kt + pid_h * stride_kh
+        kmin = tl.load(KMIN + offs_t[:, None] * stride_kt + kv * stride_kh
                        + offs_d[None, :],
                        mask=mask_t[:, None], other=0.0).to(tl.float32)   # [BT, D]
-        kmax = tl.load(KMAX + offs_t[:, None] * stride_kt2 + pid_h * stride_kh2
+        kmax = tl.load(KMAX + offs_t[:, None] * stride_kt2 + kv * stride_kh2
                        + offs_d[None, :],
                        mask=mask_t[:, None], other=0.0).to(tl.float32)
         for j in tl.static_range(G):
