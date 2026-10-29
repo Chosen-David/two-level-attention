@@ -46,6 +46,7 @@ def _snapshot_indexer(idx):
     result = copy.copy(idx)
     result.args = copy.deepcopy(idx.args)
     result._ginc = None
+    result._exact_linear_batch = None
     result.clear()
     result._skip_ids = None if idx._skip_ids is None else frozenset(idx._skip_ids)
     result.skip_far = idx.skip_far
@@ -223,6 +224,8 @@ def _attend_linear(q, k, v, mask, budget, scale):
 
 
 def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
+    if os.environ.get('TLI_BATCH_INDEXER', 'legacy') == 'exact':
+        raise ValueError('exact batch requires shared linear storage; mixed ring is unsupported')
     if (module.training or torch.is_grad_enabled() or ctx is None
             or q.shape[0] != cache.batch_size or ctx.batch != cache.batch_size
             or q.shape[-2] != 1):

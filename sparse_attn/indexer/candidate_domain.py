@@ -10,12 +10,16 @@ def complete_protected_candidates(ids, keep, length, sink, swa, capacity):
     on configuration/capacity, so changing length does not require recapture.
     Invalid IDs are never used for a load before downstream compaction.
     """
+    if ids.ndim == 3:
+        if length.ndim != 1 or length.shape[0] != ids.shape[0]:
+            raise ValueError('batched protected domain requires one length per request')
+        length = length[:, None, None]
     lo = (length - swa).clamp(min=0)
     keep = keep & (ids >= sink) & (ids < lo) & (ids >= 0)
-    head = torch.arange(min(sink, capacity), device=ids.device)
-    tail = lo + torch.arange(min(swa, capacity), device=ids.device)
-    protected = torch.cat((head, tail))
-    valid = torch.cat((head < length, (tail < length) & (tail >= sink)))
     shape = (*ids.shape[:-1], -1)
+    head = torch.arange(min(sink, capacity), device=ids.device).expand(shape)
+    tail = (lo + torch.arange(min(swa, capacity), device=ids.device)).expand(shape)
+    protected = torch.cat((head, tail), -1)
+    valid = torch.cat((head < length, (tail < length) & (tail >= sink)), -1)
     return (torch.cat((ids, protected.expand(shape)), -1),
             torch.cat((keep, valid.expand(shape)), -1))

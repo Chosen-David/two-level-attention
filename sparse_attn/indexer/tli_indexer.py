@@ -4160,8 +4160,22 @@ class TLIIndexer(TIAIndexer):
         return self.compute_mask_graph(q, index_dict, softmax_scale, valid_len,
                                        return_selection=True)
 
+    def compute_candidate_inputs_graph(self, q, index_dict, softmax_scale, valid_len):
+        """Produce one request's exact L1/bypass candidates, stopping before L2.
+
+        This does not implement batch indexing. Later consumers may batch fine
+        scoring/normalization/ranking after validating compatible feature storage
+        and geometry. Existing selector denominator candidates/order are retained.
+        """
+        if q.ndim != 4 or q.shape[0] != 1 or q.shape[1] != 1:
+            raise ValueError('candidate producer requires one decode request')
+        if valid_len.shape != (1,) or valid_len.dtype != torch.int64:
+            raise ValueError('candidate producer requires int64 valid_len[1]')
+        return self.compute_mask_graph(q, index_dict, softmax_scale, valid_len,
+                                       return_selection=True, return_candidates=True)
+
     def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len, *,
-                           return_selection=False):
+                           return_selection=False, return_candidates=False):
         """graph 专用全张量 compute_mask（生产主配置，逐位对齐 eager）。
 
         输入：q [1,1,H,D]（replay 注入）、index_dict（容量宽：k_min/k_max/
@@ -4169,7 +4183,8 @@ class TLIIndexer(TIAIndexer):
         valid_len [1] long（replay 注入，decode 当前行有效长）。
         return_selection：True → 返回 TokenSelection 紧凑格式（Phase 1 新路径）；
                           False → 返回 [1,1,Hkv,S_cap] bool mask（默认，兼容旧消费端）。
-        输出：mask 或 TokenSelection（见 return_selection）。
+        return_candidates：内部候选生产接口；True 时在 fine score 前返回 CandidateInputs。
+        输出：默认 mask，或显式请求的 TokenSelection/CandidateInputs。
         """
         # ---- 0. 生产主配置守卫（fail-closed 回 eager 逐行路径）----
         if not (self.alpha > 0 and self.beta > 0 and self.gamma is None
@@ -4193,6 +4208,8 @@ class TLIIndexer(TIAIndexer):
         K2 = self.args.tia_level2_topk
         # 【E178】L2 细筛旁路实验臂 env 门（默认关，仅 graph 路径支持）
         _l2_bypass = os.environ.get("TLI_L2_BYPASS", "").strip() == "1"
+        if return_candidates and _l2_bypass:
+            raise NotImplementedError('candidate producer excludes L2 bypass')
         nb_near = max(0, int(self.nt_near_pages))
         nb_far = max(0, K1 - nb_near)
         nl = max(bs, int(self.nt_near_len))
@@ -4535,6 +4552,15 @@ class TLIIndexer(TIAIndexer):
                 cand_idx2 = cand_idx2.gather(-1, _srt2)
                 keep2 = keep2.gather(-1, _srt2)
                 cand_len = keep2.sum(-1).to(torch.long)
+        if return_candidates:
+            from ..ops.candidate_inputs import candidate_inputs
+            lower = torch.full_like(S_real, far_tok_lo)
+            upper = torch.maximum(lower, swa_lo_tok)
+            return candidate_inputs(
+                k_qat, b_q_fine, cand_idx2, keep2, cand_len, S_real,
+                lower, upper, k2_mid, capacity=S_cap, group_size=group_size,
+                output_dtype=q.dtype, rank_width=min(S_cap, K2),
+                sink=sink_tok, swa=swa_tok)
         # ---- 6. fine 打分（Triton 候选 kernel，与 eager 同 kernel 逐位）----
         try:
             if self._triton_ok and _HAS_TRITON and k_qat.dim() == 4 \
@@ -4899,6 +4925,9 @@ class TLIIndexer(TIAIndexer):
         }
 
     def clear(self):
+        exact_batch = getattr(self, '_exact_linear_batch', None)
+        if exact_batch is not None:
+            exact_batch.invalidate()
         self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None
@@ -4980,6 +5009,7 @@ if _HAS_TRITON:
         stride_mh, stride_mt,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
         HAS_MEAN: tl.constexpr,
+        BATCHED: tl.constexpr = False, STRIDE_KB: tl.constexpr = 0,
     ):
         """GQA K 复用 score_fine：每 program 处理 (token 块 × 1 个 kv 头)，
         K 块 [BT, D] 载入寄存器后循环 g 个 q 头逐头点积，K 读带宽 /g。
@@ -4992,12 +5022,19 @@ if _HAS_TRITON:
         域的 _ako_gqa_mean_kernel 不同，本 kernel 分数域无 NaN 清洗）。"""
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
+        kv = pid_h
+        if BATCHED:
+            pid_t = pid_t.to(tl.int64)
+            pid_h = pid_h.to(tl.int64)
+            batch = pid_h // Hkv
+            kv = pid_h % Hkv
+            KQ += batch * STRIDE_KB
         offs_t = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_t = offs_t < T
         if HAS_MEAN:
             macc = tl.zeros((BT,), dtype=tl.float32)
-        k = tl.load(KQ + offs_t[:, None] * stride_kt + pid_h * stride_kh + offs_d[None, :],
+        k = tl.load(KQ + offs_t[:, None] * stride_kt + kv * stride_kh + offs_d[None, :],
                     mask=mask_t[:, None], other=0.0).to(tl.float32)
         for j in tl.static_range(G):
             h = pid_h * G + j
@@ -5021,6 +5058,8 @@ if _HAS_TRITON:
         stride_qh, stride_oh, stride_ot, stride_mh, stride_mt,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
         HAS_MEAN: tl.constexpr,
+        BATCHED: tl.constexpr = False,
+        STRIDE_KB: tl.constexpr = 0, STRIDE_KB2: tl.constexpr = 0,
     ):
         """【iter8】GQA K 复用 coarse minmax 上界分（min/max 两份 K 独立
         stride）：s[h,t] = Σ_d min(q,0)·k_min + Σ_d max(q,0)·k_max（负部配
@@ -5030,15 +5069,24 @@ if _HAS_TRITON:
         （等价性口径同 _score_fine_kernel 注释，iter-21 探针复验）。"""
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
+        kv = pid_h
+        if BATCHED:
+            # Widen before stride products, including flattened output heads.
+            pid_t = pid_t.to(tl.int64)
+            pid_h = pid_h.to(tl.int64)
+            batch = pid_h // Hkv
+            kv = pid_h % Hkv
+            KMIN += batch * STRIDE_KB
+            KMAX += batch * STRIDE_KB2
         offs_t = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_t = offs_t < T
         if HAS_MEAN:
             macc = tl.zeros((BT,), dtype=tl.float32)
-        kmin = tl.load(KMIN + offs_t[:, None] * stride_kt + pid_h * stride_kh
+        kmin = tl.load(KMIN + offs_t[:, None] * stride_kt + kv * stride_kh
                        + offs_d[None, :],
                        mask=mask_t[:, None], other=0.0).to(tl.float32)   # [BT, D]
-        kmax = tl.load(KMAX + offs_t[:, None] * stride_kt2 + pid_h * stride_kh2
+        kmax = tl.load(KMAX + offs_t[:, None] * stride_kt2 + kv * stride_kh2
                        + offs_d[None, :],
                        mask=mask_t[:, None], other=0.0).to(tl.float32)
         for j in tl.static_range(G):
@@ -5064,6 +5112,7 @@ if _HAS_TRITON:
         R, stride_kt, stride_kh, stride_qh, stride_ch, stride_cr,
         stride_oh, stride_or,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
+        BATCHED: tl.constexpr = False, STRIDE_KB: tl.constexpr = 0, CAP: tl.constexpr = 0,
     ):
         """【E156c】候选 fine 打分融合 kernel：每 program 处理 (候选列块 × 1
         kv 头)，cand_idx gather k 行 [BT,D] 载入寄存器后循环 g 个 q 头逐头
@@ -5076,18 +5125,30 @@ if _HAS_TRITON:
         """
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
+        if BATCHED:
+            pid_h = pid_h.to(tl.int64)
+            pid_t = pid_t.to(tl.int64)
         kv = pid_h
+        if BATCHED:
+            batch = (pid_h // Hkv).to(tl.int64)
+            kv = pid_h % Hkv
+            KQ += batch * STRIDE_KB
         offs_r = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_r = offs_r < R
-        cand = tl.load(CAND + kv * stride_ch + offs_r * stride_cr,
-                       mask=mask_r, other=0)                     # [BT] int64
+        cl = tl.load(CLEN + pid_h)
+        read_r = mask_r
+        if BATCHED:
+            read_r = mask_r & (offs_r < cl)
+        cand = tl.load(CAND + pid_h * stride_ch + offs_r * stride_cr,
+                       mask=read_r, other=0)                     # [BT] int64
+        if BATCHED:
+            read_r = read_r & (cand >= 0) & (cand < CAP)
         k = tl.load(KQ + cand[:, None] * stride_kt + kv * stride_kh
                     + offs_d[None, :],
-                    mask=mask_r[:, None], other=0.0).to(tl.float32)   # [BT, D]
-        cl = tl.load(CLEN + kv)
+                    mask=read_r[:, None], other=0.0).to(tl.float32)   # [BT, D]
         for j in tl.static_range(G):
-            h = kv * G + j
+            h = pid_h * G + j
             q = tl.load(Q + h * stride_qh + offs_d)              # [D] fp32
             s = tl.sum(k * q[None, :], axis=1)                   # [BT] fp32
             res = tl.where(offs_r < cl, s, float("-inf"))
@@ -5709,7 +5770,13 @@ if _HAS_TRITON:
     def _iter3_maint_kernel(K, POS, IDXSUB, KMIN, KMAX, KAVG, KQAT,
                             S_cap, sk_t, sk_h, sm_t, sm_h, sq_t, sq_h,
                             NEED_AVG: tl.constexpr, BS: tl.constexpr,
-                            DSUB: tl.constexpr):
+                            DSUB: tl.constexpr, BATCHED: tl.constexpr = False,
+                            ALIVE=None, Hkv: tl.constexpr = 0,
+                            STRIDE_KB: tl.constexpr = 0,
+                            STRIDE_MINB: tl.constexpr = 0,
+                            STRIDE_MAXB: tl.constexpr = 0,
+                            STRIDE_AVGB: tl.constexpr = 0,
+                            STRIDE_QB: tl.constexpr = 0):
         """iter3d：增量步摘要维护单核融合。每 program 一 kv head：
         加载新 token 所在块 [BS,DSUB] 子空间 tile（越界 +0 垫，与原
         where(zero_k) 同），min/max 序无关逐位一致，mean fp32 累加
@@ -5717,8 +5784,21 @@ if _HAS_TRITON:
         k_min/k_max/k_avg 行直写（替代三 reduce+三 index_copy_）、
         k_qat 当前行直写（tile 外独立行载）。值域=纯拷贝+序无关归约
         +常量垫零。"""
-        h = tl.program_id(0)
-        pos = tl.load(POS).to(tl.int64)
+        if BATCHED:
+            pid = tl.program_id(0).to(tl.int64)
+            b, h = pid // Hkv, pid % Hkv
+            pos = tl.load(POS + b).to(tl.int64)
+            active = tl.load(ALIVE + b) & (pos >= 0) & (pos < S_cap)
+            # Widen the program ID before all batch/head stride products.
+            K = K + b * STRIDE_KB
+            KMIN = KMIN + b * STRIDE_MINB
+            KMAX = KMAX + b * STRIDE_MAXB
+            KAVG = KAVG + b * STRIDE_AVGB
+            KQAT = KQAT + b * STRIDE_QB
+        else:
+            h = tl.program_id(0)
+            pos = tl.load(POS).to(tl.int64)
+            active = True
         fb = pos // BS
         offs_t = tl.arange(0, BS)
         offs_d = tl.arange(0, DSUB)
@@ -5726,18 +5806,18 @@ if _HAS_TRITON:
         tok = fb * BS + offs_t.to(tl.int64)
         mt = tok < S_cap
         ptr = K + tok[:, None] * sk_t + h * sk_h + isub[None, :]
-        v = tl.load(ptr, mask=mt[:, None], other=0.0)
+        v = tl.load(ptr, mask=mt[:, None] & active, other=0.0)
         tl.store(KMIN + fb * sm_t + h * sm_h + offs_d,
-                 tl.min(v, axis=0))
+                 tl.min(v, axis=0), mask=active)
         tl.store(KMAX + fb * sm_t + h * sm_h + offs_d,
-                 tl.max(v, axis=0))
+                 tl.max(v, axis=0), mask=active)
         if NEED_AVG:
             acc = tl.sum(v.to(tl.float32), axis=0) / BS
             tl.store(KAVG + fb * sm_t + h * sm_h + offs_d,
-                     acc.to(v.dtype))
+                     acc.to(v.dtype), mask=active)
         rp = K + pos * sk_t + h * sk_h + isub
-        rv = tl.load(rp)
-        tl.store(KQAT + pos * sq_t + h * sq_h + offs_d, rv)
+        rv = tl.load(rp, mask=active, other=0.0)
+        tl.store(KQAT + pos * sq_t + h * sq_h + offs_d, rv, mask=active)
 
 
     # ---------------- 【E166 iter3d】L1 双池 scored 融合 kernel ----------------

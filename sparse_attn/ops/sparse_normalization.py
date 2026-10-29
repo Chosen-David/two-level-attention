@@ -157,3 +157,31 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
 def supported_geometry(dtype, device, capacity, group, heads):
     from .sparse_policy import geometry_fallback
     return geometry_fallback(dtype, device, capacity, group, heads) is None
+
+
+def candidate_probabilities_batched(scores,ids,keep,capacity,group,*,return_unique=False,valid_lengths=None):
+    """Exact per-head candidate normalization over independent flattened requests.
+
+    scores [B,Hq,R], ids/keep [B,Hkv,R]. Keeps every query-head denominator
+    and model-dtype rounding; uses the same pinned native-reduction kernel.
+    """
+    if type(group) is not int or group<1 or group&(group-1):
+        raise ValueError('GQA group must be a positive power of two')
+    if ids.ndim!=3 or scores.ndim!=3 or keep.shape!=ids.shape:
+        raise ValueError('batched candidate tensors must be rank three')
+    b,h,r=ids.shape
+    if (b<1 or h<1 or scores.shape!=(b,h*group,r) or b*h*group>65535
+            or b*h*r>=2**31-1 or b*h*group*r>=2**31-1):
+        raise ValueError('invalid batched candidate head geometry')
+    if not all(x.is_contiguous() for x in (scores,ids,keep)):
+        raise ValueError('contiguous batched candidates required')
+    if valid_lengths is not None and (
+            valid_lengths.shape != (b,) or valid_lengths.dtype != torch.int64
+            or valid_lengths.device != scores.device or not valid_lengths.is_contiguous()):
+        raise ValueError('live batch normalization requires same-device int64 lengths[B]')
+    result=candidate_probabilities(scores.view(b*h*group,r),ids.view(b*h,r),
+        keep.view(b*h,r),capacity,group,return_unique=return_unique,valid_length=valid_lengths)
+    if return_unique:
+        p,unique=result
+        return p.view(b,h,r),unique.view(b,h,r)
+    return result.view(b,h,r)

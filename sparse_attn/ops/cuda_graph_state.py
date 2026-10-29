@@ -58,22 +58,47 @@ def disable_graph():
 # Host-local identity for one actual capture, never reused across graph objects.
 # Raw torch.cuda.graph callers have no token and keep conservative recomputation.
 _GEOMETRY_CAPTURE = ContextVar('tli_geometry_capture', default=None)
+_CURRENT_CAPTURE_GRAPH = ContextVar('tli_current_capture_graph', default=None)
+
+
+def current_capture_graph():
+    """Graph owning addresses captured in the current managed scope, or None."""
+    return _CURRENT_CAPTURE_GRAPH.get()
+
+
+def retain_capture_state(state):
+    """Pin address owners on the graph, never the graph on an owner."""
+    graph = current_capture_graph()
+    if graph is None:
+        raise RuntimeError('exact batch capture requires capture_graph() owner scope')
+    states = getattr(graph, '_tli_address_owners', None)
+    if states is None:
+        states = []
+        graph._tli_address_owners = states
+    if not any(owner is state for owner in states):
+        states.append(state)
 
 
 @contextmanager
 def capture_graph(graph, **kwargs):
-    """Capture with a fresh geometry-cache namespace, reset even on failure."""
+    """Capture with geometry namespace and Graph owner, reset even on failure.
+
+    Address-owning exact-batch states attach to the Graph itself, so they stay
+    alive through replay but are collectible when the Graph is discarded.
+    """
     import os
     import torch
     enabled = os.environ.get("TLI_GRAPH_GEOMETRY_SHARED", "1")
     if enabled not in ("0", "1"):
         raise ValueError("TLI_GRAPH_GEOMETRY_SHARED must be 0 or 1")
     with torch.cuda.graph(graph, **kwargs) as capture:
+        owner_reset = _CURRENT_CAPTURE_GRAPH.set(graph)
         reset = _GEOMETRY_CAPTURE.set(object() if enabled == "1" else None)
         try:
             yield capture
         finally:
             _GEOMETRY_CAPTURE.reset(reset)
+            _CURRENT_CAPTURE_GRAPH.reset(owner_reset)
 
 
 def geometry_cache_key(key, *, capturing, stream=None):

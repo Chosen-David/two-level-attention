@@ -86,9 +86,9 @@ __global__ void normalize_stats(const T* scores,const int* owners,float* stats,i
 // addresses still use fixed capacity; the live width never reaches the host.
 template<typename T,int ILP>
 __global__ void normalize_stats_live(const T* scores,const int* owners,float* stats,
-                                    const int64_t* length,int R,int S,int G,int smem_limit) {
+                                    const int64_t* length,int R,int S,int G,int smem_limit,int heads_per_request) {
   __shared__ float shared[32];
-  int64_t logical_width=*length;
+  int64_t logical_width=length[blockIdx.x / heads_per_request];
   CUDA_KERNEL_ASSERT(logical_width>9216 && logical_width<=S);
   int h=blockIdx.x,N=static_cast<int>(logical_width);
   bool vector_tail=N<smem_limit && N%ILP==0;
@@ -161,7 +161,8 @@ at::Tensor virtual_compact_softmax_impl(at::Tensor scores,at::Tensor owners,int6
   TORCH_CHECK(excluded.numel()==0 || (excluded.dim()==1 && excluded.numel()==S),"exclusion mask must be empty or token-domain vector");
   if(length.defined()) {
     TORCH_CHECK(length.is_cuda() && length.device()==scores.device() && length.scalar_type()==at::kLong
-                && length.numel()==1 && length.is_contiguous(),"live width must be one same-device int64 value");
+                && length.dim()<=1 && length.numel()>0 && owners.size(0)%length.numel()==0
+                && length.is_contiguous(),"live widths must be same-device int64 values dividing KV heads");
   }
   c10::cuda::CUDAGuard device_guard(scores.device());
   auto prop=at::cuda::getCurrentDeviceProperties();
@@ -176,7 +177,7 @@ at::Tensor virtual_compact_softmax_impl(at::Tensor scores,at::Tensor owners,int6
   AT_DISPATCH_FLOATING_TYPES_AND2(at::kHalf,at::kBFloat16,scores.scalar_type(),"virtual_softmax",[&] {
     constexpr int ILP=16/sizeof(scalar_t);
     if(length.defined())
-    normalize_stats_live<scalar_t,ILP><<<scores.size(0),1024,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),length.data_ptr<int64_t>(),scores.size(1),S,G,(prop->sharedMemPerBlock-128)/bytes);
+    normalize_stats_live<scalar_t,ILP><<<scores.size(0),1024,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),length.data_ptr<int64_t>(),scores.size(1),S,G,(prop->sharedMemPerBlock-128)/bytes,scores.size(0)/length.numel());
     else if(native_smem)
     normalize_stats<scalar_t,ILP,true><<<scores.size(0),1024,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),scores.size(1),S,G);
     else

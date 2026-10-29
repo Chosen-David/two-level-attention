@@ -101,8 +101,8 @@ def _batch_device_lengths(ctx, dev):
 def _parallel_batch_enabled(batch):
     """TLI_BATCH_INDEXER=parallel 开关（legacy=默认逐行路径）。"""
     mode = os.environ.get("TLI_BATCH_INDEXER", "legacy")
-    if mode not in ("legacy", "parallel"):
-        raise ValueError("TLI_BATCH_INDEXER must be legacy or parallel")
+    if mode not in ("legacy", "parallel", "exact"):
+        raise ValueError("TLI_BATCH_INDEXER must be legacy, parallel or exact")
     return batch >= 1 and mode == "parallel"
 
 
@@ -123,6 +123,9 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
     8 几何逐位）；attn 归约集合 ≡（gather 路径 valid_length 不参与，
     T≥16K 走 Triton / T<16K 走 dense，pad 列由 mask False 排除）。
     """
+    if os.environ.get('TLI_BATCH_INDEXER', 'legacy') == 'exact':
+        from ..ops.exact_linear_batch import exact_linear_batch_decode
+        return exact_linear_batch_decode(indexer,q,k,v,gs,self.scaling)
     B = q.shape[0]
     dev = q.device
     S_cap = k.shape[1]
@@ -234,6 +237,10 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     # 路径（capture 前的 warmup 阶段触发，之后两臂一致）。
     from ..ops.cuda_graph_state import graph_state  # noqa: E402
     _gs = graph_state()
+    if os.environ.get('TLI_BATCH_INDEXER', 'legacy') == 'exact':
+        if not _gs.enabled:
+            raise ValueError('exact batch requires the fixed-address graph-state route')
+        return _tl_decode_batched_graph(self,indexer,q,k,v,_gs)
     if _gs.enabled:
         try:
             return _tl_decode_batched_graph(self, indexer, q, k, v, _gs)

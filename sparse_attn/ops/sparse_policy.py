@@ -13,12 +13,12 @@ def quality_defaults():
 
 
 def live_normalization_enabled(*, quality_request=False):
-    default = '1' if quality_request or quality_defaults() else '0'
+    default = '1' if quality_request or quality_defaults() or os.environ.get('TLI_BATCH_INDEXER') == 'exact' else '0'
     return os.environ.get('TLI_LIVE_NORMALIZATION', default) == '1'
 
 
 def stats_policy():
-    return os.environ.get('TLI_SPARSE_STATS', 'owner' if quality_defaults() else 'sorted')
+    return os.environ.get('TLI_SPARSE_STATS', 'owner' if quality_defaults() or os.environ.get('TLI_BATCH_INDEXER') == 'exact' else 'sorted')
 
 
 def geometry_fallback(dtype, device, capacity, group, heads):
