@@ -91,9 +91,9 @@ def test_short_prefill_and_lifecycle_guards():
     with pytest.raises(ValueError):layer.update(x,x,dict(cache_position=torch.tensor([0])))
 
 
-def test_joint_gate_budget_and_absent_regions():
+def test_independent_gates_and_absent_regions():
     profile={'near':{'mean':.07},'far':{'mean':.08}}
-    assert decide_regions(profile,GateConfig())==dict(skip_near=True,skip_far=False)
+    assert decide_regions(profile,GateConfig())==dict(skip_near=True,skip_far=True)
     profile={'near':{'mean':.03},'far':{'mean':.04}}
     assert decide_regions(profile,GateConfig())==dict(skip_near=True,skip_far=True)
     assert decide_regions(profile,GateConfig(),False,False)==dict(skip_near=False,skip_far=False)
@@ -147,3 +147,19 @@ def test_tiny_qwen_logits_match_explicit_full_cache_gather_reference(near,far):
             out=model(tokens[:,i:i+1],past_key_values=cache,attention_mask={'full_attention':None},use_cache=True)
             torch.testing.assert_close(out.logits,logits[i],atol=1e-6,rtol=1e-5)
     finally:ALL_ATTENTION_FUNCTIONS['sdpa']=original
+
+
+@pytest.mark.parametrize('n,f,expected',[(.03,.04,(True,True)),(.03,.06,(True,False)),(.06,.04,(False,True)),(.06,.07,(False,False)),(.05,.05,(False,False))])
+def test_independent_mass_gates_four_states_and_threshold(n,f,expected):
+    profile={'near':{'mean':n},'far':{'mean':f}}
+    config=GateConfig(epsilon=.05)
+    decision=decide_regions(profile,config)
+    assert (decision['skip_near'],decision['skip_far'])==expected
+    assert decision['skip_far']==decide_regions(profile,GateConfig(epsilon=.05,mode='far'))['skip_far']
+    assert decision['skip_near']==decide_regions(profile,GateConfig(epsilon=.05,mode='near'))['skip_near']
+
+
+def test_gate_other_region_mass_does_not_override_decision():
+    for other in [0.,.03,.049,.05,.9]:
+        assert decide_regions({'near':{'p95':.04},'far':{'p95':other}},GateConfig(epsilon=.05,statistic='p95'))['skip_near']
+        assert decide_regions({'near':{'p95':other},'far':{'p95':.04}},GateConfig(epsilon=.05,statistic='p95'))['skip_far']

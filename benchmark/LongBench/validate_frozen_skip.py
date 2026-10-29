@@ -33,7 +33,7 @@ def validate(outdir,allow_partial=False):
     manifests=[json.loads(p.read_text()) for p in sorted(outdir.glob('manifest_rank*.json'))]
     if not manifests:raise ValueError('no manifests')
     protocol=manifests[0]['protocol'];identity=manifests[0]['identity']
-    assert protocol['schema']=='frozen-near-far-screen-v2-near-staging'
+    assert protocol['schema'] in ('frozen-near-far-screen-v2-near-staging','frozen-near-far-screen-v3-independent-gates')
     assert hashlib.sha256(json.dumps(protocol,sort_keys=True).encode()).hexdigest()==identity
     assert len(manifests)==protocol['world_size']
     assert all(m['protocol']==protocol and m['identity']==identity for m in manifests)
@@ -117,7 +117,7 @@ def validate(outdir,allow_partial=False):
                 n=profile['near'][protocol['statistic']];f=profile['far'][protocol['statistic']]
                 sn=mode=='dual' and n<eps and before['nodes']['near']['tokens']>0
                 sf=mode in ['far','dual'] and f<eps and before['nodes']['far']['tokens']>0
-                if sn and sf and n+f>eps:sn,sf=(n<=f,f<n)
+                if protocol['schema']=='frozen-near-far-screen-v2-near-staging' and sn and sf and n+f>eps:sn,sf=(n<=f,f<n)
                 assert decision==dict(skip_near=sn,skip_far=sf)
                 counted['both' if sn and sf else 'near' if sn else 'far' if sf else 'keep']+=1
                 names=['sink']+([] if sf else ['far'])+([] if sn and sf else ['near_staging' if sn else 'near'])+['swa']

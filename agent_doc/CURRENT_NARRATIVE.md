@@ -325,6 +325,7 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 | 过时结论（出现在 archived 报告/早期叙事中） | 推翻/修正判决 |
 |---|---|
+| 双gate需要联合mass预算或二选一 | 2026-10-29用户明确Near/Far按各自mass独立标定并冻结；两者分别满足即可同时skip。v3移除联合预算，旧v2结果仅保留历史口径，不可作为新版独立双门的质量证据。 |
 | 既有Near/Far探索已验证TLI子空间无损 | 旧500组结果是原生SDPA消融；2026-10-29新增真实TLI tail32/L1/L2与分段缓存参考适配器，25回归及GPU候选对拍通过，配对质量重测待完成。见`agent_doc/task/task_details/TL-FROZEN-NEAR-FAR-20261029.md`。 |
 | Near-only可直接永久删除KV并同时保留完整滑动Far | 2026-10-29双门探索改为Near-only显式暂存、老化后迁Far，不计Near-only的KV节省；Far-only/双skip仍物理驱逐。见`agent_doc/results/frozen_near_far_staging_20261029/REPORT.md`（独立实验分支）。 |
 | 双门标定低质量即普遍无损，AVG5可替代多跳单任务验证 | 同分支5任务×20条探索：dual0.10 AVG5 +.176但GovReport下降；dual0.15 AVG5 −.502且Qasper/HotpotQA/GovReport下降。Musique/HotpotQA子集已分别报告；非全量、非生产TLI质量门，不改变冠军默认。 |

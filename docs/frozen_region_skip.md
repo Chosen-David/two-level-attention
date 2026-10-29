@@ -13,11 +13,14 @@ sink -> far -> near -> SWA ring
 Dense one-shot prefill returns the original complete K/V to attention. Its last
 256 queries are profiled using their own causal, page-aligned near/far boundaries,
 sink4, near4096, SWA128, page64. Scores are head means, summarized by mean or P95
-over query rows. Near and far get independent signals. Decisions freeze before
-the first decode update. Default exploration tests epsilon 0.10 and 0.15. When
-both regions qualify but their calibrated sum exceeds epsilon, only the lower
-mass region is evicted; otherwise both may be deleted. This is a joint calibrated
-budget, not a guarantee about future attention or accuracy.
+over query rows. Near and Far are independent decisions:
+`skip_near = near_present and near_mass < epsilon`,
+`skip_far = far_present and far_mass < epsilon`. Each also respects its enabled
+mode. Decisions freeze before the first decode update. If both qualify, both
+skip, even when the sum exceeds epsilon; no joint budget or winner selection
+is applied. Equality at epsilon keeps the region. Threshold selection is a
+separate mass-evidence decision; the earlier 0.10/0.15 run is historical only.
+Low prefill mass is not a guarantee about future attention or accuracy.
 
 Far-skip and both-skip release the evicted nodes' owned tensors; slices into a
 full-history backup are never retained. Near-only skip instead renames Near to
@@ -47,7 +50,7 @@ Both-skip permanently evicts both regions and drops SWA overflow. The earlier
 Near permanent-deletion implementation at commit486a406 was superseded by the
 user's staging decision. Its run `frozen_near_far_20261029` was stopped with63
 completed requests; those raw results remain isolated and are not reused.
-Current protocol schema is `frozen-near-far-screen-v2-near-staging` and output
+Current protocol schema is `frozen-near-far-screen-v3-independent-gates` and output
 is `agent_doc/results/frozen_near_far_staging_20261029/`.
 
 Supported: Qwen3 full attention, B=1, unpadded, inference, one-shot dense prefill,

@@ -191,7 +191,7 @@ def main():
         indices = np.random.default_rng(args.seed).permutation(len(rows))[:args.samples].tolist()
         selected[ds] = indices
         inputs.extend((ds,i,rows[i]) for i in indices)
-    protocol = dict(schema='frozen-near-far-screen-v2-near-staging',model=args.model,context_cap=args.context_cap,
+    protocol = dict(schema='frozen-near-far-screen-v3-independent-gates',model=args.model,context_cap=args.context_cap,
         samples_per_task=args.samples,seed=args.seed,statistic=args.statistic,thresholds=thresholds,
         datasets=tasks,selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
         source_sha256={name:sha_file(ROOT/name) for name in SOURCES},
@@ -201,7 +201,7 @@ def main():
         torch=torch.__version__,transformers=transformers.__version__,dtype='bfloat16',world_size=args.world_size,
         git_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         eviction='far-only: evict far; near-only: keep attention-invisible near staging and migrate to far; both: sink+SWA only',
-        calibration='query-relative page boundaries, last256 rows; head means; joint near+far dropped-mass budget')
+        calibration='query-relative page boundaries, last256 rows; head means; independent near/far mass comparisons, no joint budget')
     if args.attention == 'tli':
         from sparse_attn.ops.frozen_region_tli import tli_args
         protocol['attention'] = 'tli-tail32-frozen-regions-reference'

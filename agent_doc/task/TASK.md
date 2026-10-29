@@ -2,7 +2,7 @@
 
 ## 2026-10-29
 
-- [ ] [TL-FROZEN-NEAR-FAR-TLI-20261029] 接入真实TLI tail32/L1/L2与分段缓存；25回归和GPU候选对拍通过，实模冒烟后启动同批5海选配对重测；无损结论待定。([详情](task_details/TL-FROZEN-NEAR-FAR-20261029.md))
+- [ ] [TL-FROZEN-NEAR-FAR-TLI-20261029] 接入真实TLI tail32/L1/L2与分段缓存；按用户纠正改为Near/Far独立mass门，31回归通过；旧联合门测试停止，新版精度待验证。([详情](task_details/TL-FROZEN-NEAR-FAR-20261029.md))
 - [x] [TL-FROZEN-NEAR-FAR-20261029] 独立分支完成Near暂存/Far驱逐双门探索：5海选×20条×5臂=500结果；双向0.10 AVG5 +0.176、0.15 −0.502；14回归及500组评分/缓存核验通过。仅探索子集，不宣称全量无损或改动生产默认。([详情](task_details/TL-FROZEN-NEAR-FAR-20261029.md))
 
 ## 2026-10-28

@@ -19,7 +19,8 @@ def analyze(outdir):
     identities={m['identity'] for m in manifests}
     if len(identities)!=1: raise ValueError('mixed experiment identities')
     protocol=manifests[0]['protocol'];identity=manifests[0]['identity']
-    staging_policy = protocol.get('schema')=='frozen-near-far-screen-v2-near-staging'
+    independent = protocol.get('schema')=='frozen-near-far-screen-v3-independent-gates'
+    staging_policy = independent or protocol.get('schema')=='frozen-near-far-screen-v2-near-staging'
     expected={(ds,i) for ds,ids in protocol['selected_rows'].items() for i in ids}
     records=[];partial=0;seen=set()
     for p in outdir.glob('requests/*/*.json'):
@@ -119,7 +120,7 @@ def analyze(outdir):
         if c['avg5']:lines.append(f"- {pair}: {c['avg5']['delta_pp']:+.4f}; bootstrap 95% CI {c['avg5']['ci95_pp']}")
     lines+=['', 'Attention baseline: '+protocol.get('attention','native SDPA full retained KV')+'. Arm full means both region gates off.', '',result['scope'],'',
             'KV ratios measure allocated cache-node capacity, relative to the same full-node cache; they exclude model weights, gather temporaries and allocator behavior. Attention-token ratios are a pre-decode work proxy, not measured speedups.',
-            'Dual gates share a combined calibrated mass budget: adding near gating may replace an eligible far decision. Dual-vs-far is a policy comparison, not a pure near-only ablation.',
+            ('Near and Far gates compare their own mass independently; adding Near gating does not change Far decisions.' if independent else 'Historical dual gates share a combined calibrated mass budget; adding Near gating may replace Far decisions.'),
             'Near-active and far-active request counts include both-skip states.']
     (outdir/'REPORT.md').write_text('\n'.join(lines)+'\n')
     return result

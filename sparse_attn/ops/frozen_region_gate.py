@@ -51,7 +51,4 @@ def decide_regions(profile, config, present_near=True, present_far=True):
     n, f = (profile[name][config.statistic] for name in ('near', 'far'))
     near = present_near and config.mode in ('near', 'dual') and n < config.epsilon
     far = present_far and config.mode in ('far', 'dual') and f < config.epsilon
-    # Bound total calibrated dropped mass when both are individually eligible.
-    if near and far and n+f > config.epsilon:
-        near, far = (True, False) if n <= f else (False, True)
     return dict(skip_near=bool(near), skip_far=bool(far))

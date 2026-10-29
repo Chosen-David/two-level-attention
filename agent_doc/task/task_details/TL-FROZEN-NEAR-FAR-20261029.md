@@ -108,3 +108,31 @@ original TLI at 4231/8193/24001/31520 tokens with zero differences. HotpotQA
 activated. GovReport 8192/512-token smoke pending. LongBench100-request paired
 TLI screen and hourly supervision will follow smoke acceptance. Full score,
 multi-hop regression and any no-loss conclusion remain pending.
+
+TLI screen launched 2026-10-29 14:13 Asia/Shanghai, generation commit27d4464;
+identity b9597b507f0baa9a9d526d4ba9086dcf17997c0b820db89a87a983968e22e5c0.
+Output agent_doc/results/frozen_near_far_tli_20261029/. Supervisor PID84807,
+workers85029/85030 on GPU0/1, hourly checks, next15:13. Source hashes bind72
+files; no generation-source changes permitted during the run. Both workers
+passed native TLI greedy-output parity. First5 complete requests/25 arms/900
+layer states mechanically validated, including6 Near-only states. At14:15,
+6/100 complete; all still Qasper, so no AVG5 or multi-hop conclusion yet.
+Automatic completion performs validation and compact export. This launch is
+not completion of the TLI quality task.
+
+
+## User correction — independent gates, 2026-10-29
+
+Near and Far each compare only their own mass; delete the joint sum budget and
+lower-mass winner rule. Both passing means both skip. Mode/presence/strict
+threshold comparison remain unchanged. The old joint-budget TLI run is stopped
+and marked superseded, with raw checkpoints preserved. No new threshold or GPU
+experiment is selected in this code-only correction. New protocol schema:
+frozen-near-far-screen-v3-independent-gates. Validator retains explicit v2
+historical rule handling; v3 validates independent decisions. Reports identify
+the policy by schema, so v2 output cannot be described as independent gates.
+
+Validation:31 local regressions passed, including both individually qualifying
+with combined mass above epsilon, all four states, exact threshold boundaries,
+mode/presence guards, independence from the other region, and existing TLI/cache
+logit/migration checks. No GPU experiment used for this code correction.
