@@ -315,3 +315,43 @@ def test_same_batch_row_reference_capture(monkeypatch, batch):
             case.inject_metadata();case.q.normal_()
             graph.replay();torch.cuda.synchronize()
             torch.testing.assert_close(out,case.reference(),rtol=0,atol=0)
+
+
+@NATIVE
+@pytest.mark.parametrize('batch', [2, 4, 8])
+def test_ordered_batch_live_replay_matches_full_mask_eager(monkeypatch, batch):
+    """Integrated ordered consumer, ragged live widths and frozen EOS rows."""
+    from sparse_attn.ops.eager_decoding import eager_decoding_attn, eager_decoding_check_errors
+    for key,value in CONFIG.items():monkeypatch.setenv(key,value)
+    monkeypatch.setenv('TLI_EXACT_ATTENTION','ordered')
+    monkeypatch.setenv('TLI_EXACT_BATCH_REFERENCE','0')
+    torch.manual_seed(320304)
+    with torch.no_grad(), _case(batch) as case:
+        def reference():
+            masks=[]
+            for b, idx in enumerate(case.refs):
+                with exact._row_scope(case.gs,b):
+                    index=idx.prepare_index(case.k[b:b+1],case.cu)
+                    masks.append(idx.compute_mask_graph(case.q[b:b+1],index,
+                        case.scale,case.gs.valid_len_buf))
+            cu=torch.arange(batch+1,device=case.q.device,dtype=torch.int32)*case.capacity
+            return eager_decoding_attn(case.q,case.k,case.v,torch.cat(masks),1,cu,
+                                       softmax_scale=case.scale,valid_length=None)
+        front_calls=_install_front_checks(monkeypatch,batch)
+        for _ in range(3):out=case.run()
+        torch.testing.assert_close(out,reference(),rtol=0,atol=0)
+        graph,out=case.capture()
+        assert case.source._graph_attention_route=='exact_batch_ordered_eager'
+        for step in range(5):
+            if step==1:case.alive[-1]=False
+            case.lengths=[n+int(live) for n,live in zip(case.lengths,case.alive)]
+            case.inject_metadata();case.q.normal_();case.new_k.normal_();case.new_v.normal_()
+            before_k=case.k[-1].clone();before_v=case.v[-1].clone()
+            calls=len(front_calls)
+            graph.replay();torch.cuda.synchronize()
+            assert len(front_calls)==calls, 'replay must not run the Python producer'
+            if not case.alive[-1]:
+                torch.testing.assert_close(case.k[-1],before_k,rtol=0,atol=0)
+                torch.testing.assert_close(case.v[-1],before_v,rtol=0,atol=0)
+            torch.testing.assert_close(out,reference(),rtol=0,atol=0)
+        eager_decoding_check_errors()
