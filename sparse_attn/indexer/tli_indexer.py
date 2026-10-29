@@ -4488,7 +4488,6 @@ class TLIIndexer(TIAIndexer):
                 G=group_size, BLOCK=1024, num_warps=4)
         else:
             p = sm.nan_to_num(nan=0).view(Hkv, group_size, S_cap).mean(dim=1)
-        p.masked_fill_(swa_force.view(1, -1), 1.0)
         # ---- 8. mid 全域 L2 自由竞争 ----
         # 固定 K2_static 保持 capture 形状；k2_mid 在终掩码装配处动态截断。
         # mid 外全为 -inf，前 k2_mid 名与 eager 的 mid 段 top-k 同集。
