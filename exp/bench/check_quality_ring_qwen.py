@@ -35,6 +35,10 @@ def run(cli):
     resolve_far_skip_modes(args, config=model.config)
     patched = register_patch(model, args, resolve_treatment_snapshot(args))
     assert patched == model.config.num_hidden_layers
+    Path(cli.output).with_suffix('.configuration.json').write_text(json.dumps(dict(
+        resolved_args=vars(args), patched_layers=patched,
+        inherited_tli_environment={k: v for k, v in os.environ.items() if k.startswith('TLI_')},
+        eos_policy='empty EOS set: fixed-length consumer parity diagnostic'), indent=2, default=str))
     row = json.loads(Path(cli.input).read_text().splitlines()[0])
     ids = tokenizer(row['input'], truncation=False, return_tensors='pt').input_ids.to('cuda')
     records = []
@@ -57,7 +61,8 @@ def run(cli):
                 generated = from_dynamic(model, past, first, cli.max_gen, set())
                 execution = dict(model._quality_graph_execution)
                 record = dict(cycle=cycle, mode=mode, input_index=row['index'],
-                              input_tokens=ids.shape[-1], tokens=generated, execution=execution)
+                              input_tokens=ids.shape[-1], tokens=generated, execution=execution,
+                              tli_environment={k: v for k, v in os.environ.items() if k.startswith('TLI_')})
                 if cli.measure:
                     torch.cuda.synchronize(); total_ms = (time.perf_counter()-start)*1000
                     record['request_timing'] = dict(prefill_wall_ms=prefill_ms,
