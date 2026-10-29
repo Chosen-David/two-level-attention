@@ -4259,8 +4259,9 @@ class TLIIndexer(TIAIndexer):
         # share the first layer's device computation. Uninstrumented captures
         # keep rebuilding; mutation-version-less tensors also never reuse.
         from ..ops.cuda_graph_state import geometry_cache_key
-        cache_key = geometry_cache_key(_geo_key,
-            capturing=q.is_cuda and torch.cuda.is_current_stream_capturing())
+        capturing = q.is_cuda and torch.cuda.is_current_stream_capturing()
+        cache_key = geometry_cache_key(_geo_key, capturing=capturing,
+            stream=torch.cuda.current_stream(q.device).cuda_stream if capturing else None)
         geo = None if cache_key is None else _graph_geo_lookup(valid_len, cache_key)
         if geo is None:
             geo = _graph_geo_store(

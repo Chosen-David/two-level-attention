@@ -69,8 +69,10 @@ def capture_graph(graph, **kwargs):
             _GEOMETRY_CAPTURE.reset(reset)
 
 
-def geometry_cache_key(key, *, capturing):
+def geometry_cache_key(key, *, capturing, stream=None):
     if not capturing:
         return key
     token = _GEOMETRY_CAPTURE.get()
-    return None if token is None else (token, key)
+    # Reuse only on the producing stream: captured cross-stream consumers
+    # otherwise need dependencies that a Python cache hit cannot insert.
+    return None if token is None or stream is None else (token, stream, key)

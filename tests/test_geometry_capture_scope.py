@@ -18,21 +18,23 @@ def test_capture_namespace_and_mutation_invalidation(monkeypatch):
     ns['_GRAPH_GEO_CACHE'].clear();length=torch.tensor([31]);key=('geometry',)
     eager={'value':length*2};store(length,key,eager)
     assert geometry_cache_key(key,capturing=False)==key
-    assert geometry_cache_key(key,capturing=True) is None
+    assert geometry_cache_key(key,capturing=True,stream=11) is None
     with capture_graph(object()):
-        first=geometry_cache_key(key,capturing=True)
+        first=geometry_cache_key(key,capturing=True,stream=11)
         assert lookup(length,first) is None
+        assert geometry_cache_key(key,capturing=True,stream=12)!=first
+        assert geometry_cache_key(key,capturing=True) is None
         value={'value':length*3};store(length,first,value)
-        assert lookup(length.view(1),geometry_cache_key(key,capturing=True)) is value
+        assert lookup(length.view(1),geometry_cache_key(key,capturing=True,stream=11)) is value
         with ThreadPoolExecutor(1) as pool:
-            assert pool.submit(geometry_cache_key,key,capturing=True).result() is None
+            assert pool.submit(geometry_cache_key,key,capturing=True,stream=11).result() is None
         length.add_(1)
         assert lookup(length,first) is None
         store(length,first,value)
     with capture_graph(object()):
-        second=geometry_cache_key(key,capturing=True)
+        second=geometry_cache_key(key,capturing=True,stream=11)
         assert second!=first and lookup(length,second) is None
-    assert geometry_cache_key(key,capturing=True) is None
+    assert geometry_cache_key(key,capturing=True,stream=11) is None
     assert lookup(length,key) is None
 
 
@@ -54,13 +56,15 @@ def test_two_graphs_replay_live_geometry_and_raw_capture():
     counts=[];graphs=[];outputs=[]
     # Eager cache from unchanged length must not leak into either capture.
     store(length,key,{'x':length*999})
+    _=length*2+1
+    torch.cuda.synchronize()
     for scoped in (True,True,False):
         built=[0];graph=torch.cuda.CUDAGraph()
         context=capture_graph(graph) if scoped else torch.cuda.graph(graph)
         with context:
             out=[]
             for layer in range(3):
-                cache_key=geometry_cache_key(key,capturing=True)
+                cache_key=geometry_cache_key(key,capturing=True,stream=torch.cuda.current_stream().cuda_stream)
                 value=None if cache_key is None else lookup(length,cache_key)
                 if value is None:
                     value=store(length,cache_key,{'x':length*2});built[0]+=1
