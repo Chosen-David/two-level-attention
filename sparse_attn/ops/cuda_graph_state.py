@@ -25,6 +25,7 @@ class _GraphState:
         self.valid_len_buf = None  # [B] long：本步每行有效长（prepare_mask valid_length）
         self.alive_buf = None      # [B] bool：EOS 后保持该行 KV 不变
         self.bs = None             # 当前 batch（buffer 形状校验用）
+        self.quality_defaults = False  # request-scoped selector defaults
 
 
 _GRAPH_STATE = _GraphState()
@@ -34,10 +35,11 @@ def graph_state():
     return _GRAPH_STATE
 
 
-def enable_graph(bs):
+def enable_graph(bs, *, quality_defaults=False):
     st = _GRAPH_STATE
     st.enabled = True
     st.bs = bs
+    st.quality_defaults = quality_defaults
 
 
 def disable_graph():
@@ -47,3 +49,4 @@ def disable_graph():
     st.valid_len_buf = None
     st.alive_buf = None
     st.bs = None
+    st.quality_defaults = False

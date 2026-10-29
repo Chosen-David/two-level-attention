@@ -4213,7 +4213,8 @@ class TLIIndexer(TIAIndexer):
             k_avg = k_avg.squeeze(0)
         kt_cap = k_min.shape[0]
         S_cap = k_qat.shape[1]
-        live_normalization = os.environ.get("TLI_LIVE_NORMALIZATION", "0") == "1"
+        from ..ops.sparse_policy import live_normalization_enabled, stats_policy
+        live_normalization = live_normalization_enabled()
         self._graph_normalization_width_route = None
         # A later request may choose another route on the same indexer.
         # Never report stats inherited from a previous sparse capture.
@@ -4560,7 +4561,7 @@ class TLIIndexer(TIAIndexer):
             self._graph_normalization_route = "sparse_candidate_domain"
             self._graph_normalization_stats_route = (
                 "live_length_owner" if live_normalization else
-                "capacity_owner" if os.environ.get("TLI_SPARSE_STATS", "sorted") == "owner"
+                "capacity_owner" if stats_policy() == "owner"
                 else "sorted_candidates")
             self._graph_ranking_route = "candidate_domain_native_1024"
             self._graph_ranking_kth_route = None

@@ -99,7 +99,8 @@ def _capture_routes(model):
 def _live_width_fallback(prompt_lengths, dtype=None):
     # The first decode appends one token. Check host-known lengths before
     # allocation/capture; capacity alone does not imply a supported row width.
-    if os.environ.get("TLI_LIVE_NORMALIZATION", "0") == "1":
+    from .sparse_policy import live_normalization_enabled
+    if live_normalization_enabled(quality_request=True):
         if dtype is not None and dtype != torch.bfloat16:
             return "live_normalization_requires_bfloat16"
         if any(int(length) + 1 <= 9216 for length in prompt_lengths):
@@ -178,7 +179,7 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
         with batch_decode_scope(ctx):
             if policy != "off" and reason is None:
                 try:
-                    enable_graph(batch)
+                    enable_graph(batch, quality_defaults=True)
                     gs.pos_buf, gs.valid_len_buf, gs.alive_buf = pos, lengths, alive
                     inject(0)
                     stream = torch.cuda.Stream(device=device)

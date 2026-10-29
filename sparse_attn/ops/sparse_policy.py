@@ -1,10 +1,24 @@
 """Static sparse-selector eligibility; no CUDA initialization or allocations.
 
-Keep the opt-in default until the model quality gate is complete. These reasons
+Quality requests opt into the validated selector defaults within Graph state. These reasons
 are capture-time decisions, not evidence that a captured graph was replayed.
 """
 import os
 import torch
+
+
+def quality_defaults():
+    from .cuda_graph_state import graph_state
+    return graph_state().quality_defaults
+
+
+def live_normalization_enabled(*, quality_request=False):
+    default = '1' if quality_request or quality_defaults() else '0'
+    return os.environ.get('TLI_LIVE_NORMALIZATION', default) == '1'
+
+
+def stats_policy():
+    return os.environ.get('TLI_SPARSE_STATS', 'owner' if quality_defaults() else 'sorted')
 
 
 def geometry_fallback(dtype, device, capacity, group, heads):
@@ -16,7 +30,7 @@ def geometry_fallback(dtype, device, capacity, group, heads):
         return 'device'
     if not 9216 < capacity < 2**31 - 1:
         return 'capacity'
-    stats = os.environ.get('TLI_SPARSE_STATS', 'sorted')
+    stats = stats_policy()
     if stats not in ('sorted', 'owner'):
         return 'stats_policy'
     if capacity % 8 and stats != 'owner':
@@ -32,7 +46,7 @@ def geometry_fallback(dtype, device, capacity, group, heads):
 
 def selection_fallback(dtype, device, capacity, group, heads, *,
                        l2_bypass, protected_end, topk):
-    policy = os.environ.get('TLI_SPARSE_SELECTION', '0')
+    policy = os.environ.get('TLI_SPARSE_SELECTION', '1' if quality_defaults() else '0')
     if policy != '1':
         return 'disabled' if policy == '0' else 'selection_policy'
     if l2_bypass:

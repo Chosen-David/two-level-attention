@@ -120,7 +120,8 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
         result=scores.new_empty((hk,0))
         return (result,keep) if return_unique else result
     prop=torch.cuda.get_device_properties(scores.device)
-    owner_stats=valid_length is not None or os.environ.get('TLI_SPARSE_STATS','sorted') == 'owner'
+    from .sparse_policy import stats_policy
+    owner_stats=valid_length is not None or stats_policy() == 'owner'
     if capacity<=9216 or (capacity%8 and not owner_stats):
         raise ValueError('unaligned softmax requires owner stats; capacity must exceed 9216')
     if owner_stats:

@@ -49,6 +49,8 @@ def model_for(kind,gate=False):
 
 @pytest.mark.parametrize('kind,gate',[('qwen',False),('qwen',True),('glm',False),('glm',True)])
 def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,gate):
+    for key in ('TLI_LIVE_NORMALIZATION', 'TLI_SPARSE_SELECTION', 'TLI_SPARSE_STATS'):
+        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv('TLI_QUALITY_TIMING', '1')
     torch.manual_seed(123)
     model=model_for(kind,gate)
@@ -69,6 +71,9 @@ def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,ga
                     layers = model._quality_graph_execution['capture_layers']
                     assert len(layers) == 2
                     for receipt, layer in zip(layers, model.model.layers):
+                        assert receipt['normalization_width_route'] == 'live_length'
+                        assert receipt['normalization_stats_route'] == 'live_length_owner'
+                        assert receipt['ranking_route'] == 'candidate_domain_native_1024'
                         assert receipt['normalization_route'] == layer.self_attn.indexer._graph_normalization_route
                         assert receipt['skip_far'] == layer.self_attn.indexer.skip_far
                         if gate:
@@ -95,6 +100,8 @@ def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,ga
             if gate:
                 assert all(layer.self_attn.indexer.skip_far for layer in model.model.layers)
     assert results[0]==results[1]
+    from sparse_attn.ops.cuda_graph_state import graph_state
+    assert not graph_state().quality_defaults
     del model,ids
     torch.cuda.empty_cache()
 
