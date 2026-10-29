@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-29
+
+- [x] [TL-TEST-ENV-20261029] 提供远端 pytest 初始化/检查脚本，复用指定 GPU Python 或 .venv；本地真实安装及四项退出检查通过，远端 CUDA 验收待执行。([详情](task_details/TL-TEST-ENV-20261029.md))
+
 ## 2026-10-28
 
 - [x] [TL-LB-BUDGET-RUNNER-20261028] 新增 LongBench13 有界远端编排：显式 Qwen3-8B/32B、固定 K1 扫 nominal K2，UUID 协作锁与稳定空卡复查，严格身份/预测/评分完成后才跳过；18 项 CPU 回归普通/-O与独审通过，既有 28 项相邻 CPU 回归通过。真实 GPU/质量与缺失适配器验收未完成，RULER10不在此实现。([详情](task_details/TL-LB-BUDGET-RUNNER-20261028.md))
