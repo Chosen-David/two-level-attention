@@ -87,7 +87,7 @@ def run(cli):
             tokens=static_decode(model,cache,[[x] for x in first],lens,set(),cli.max_gen,ctx)
             torch.cuda.synchronize();total_ms=(time.perf_counter()-start)*1000
             execution=dict(model._quality_graph_execution)
-            rec=dict(rows=which,batch=batch,batch_indexer=batch_mode,tokens=tokens,
+            rec=dict(cycle=cycle,arm=current_arm,rows=which,batch=batch,batch_indexer=batch_mode,tokens=tokens,
                      execution=execution,environment={k:v for k,v in os.environ.items() if k.startswith('TLI_')})
             if cli.measure:
                 rec['request_timing']=dict(total_wall_ms=total_ms,prefill_wall_ms=prefill_ms,
@@ -117,16 +117,40 @@ def run(cli):
         del cache
         return tokens
 
-    reference=(request(list(range(cli.batch)),'legacy',eager_reference=True) if cli.eager_batch_reference
-               else request(list(range(cli.batch)),'exact',True) if cli.same_batch_reference
-               else [request([b],'legacy')[0] for b in range(cli.batch)])
-    actual=request(list(range(cli.batch)),
-        'legacy' if cli.legacy_graph_candidate else 'exact' if cli.batch>1 else 'legacy',
-        legacy_graph=cli.legacy_graph_candidate)
-    equal=actual==reference
-    output.write_text(json.dumps(dict(status='pending_independent_verification',
-        tokens_equal=equal,candidate='legacy_graph' if cli.legacy_graph_candidate else 'exact_batch',comparison='same_batch_eager' if cli.eager_batch_reference else 'same_batch_rows' if cli.same_batch_reference else 'independent_B1',records=records),indent=2))
-    assert equal,'real batch tokens differ from the recorded reference control'
+    def run_reference():
+        if cli.eager_batch_reference:
+            return request(list(range(cli.batch)), 'legacy', eager_reference=True)
+        if cli.legacy_batch_reference:
+            return request(list(range(cli.batch)), 'legacy', legacy_graph=True)
+        if cli.same_batch_reference:
+            return request(list(range(cli.batch)), 'exact', True)
+        return [request([b], 'legacy')[0] for b in range(cli.batch)]
+
+    pairs=[]
+    comparison=('same_batch_eager' if cli.eager_batch_reference else
+                'same_batch_legacy_graph' if cli.legacy_batch_reference else
+                'same_batch_rows' if cli.same_batch_reference else 'independent_B1')
+    for cycle in range(cli.cycles):
+        pair={'cycle':cycle, 'order':(['reference','candidate'] if cycle%2==0
+                                    else ['candidate','reference'])}
+        values={}
+        for current_arm in pair['order']:
+            start_record=len(records)
+            if current_arm=='reference':
+                values[current_arm]=run_reference()
+            else:
+                native=cli.legacy_graph_candidate or cli.batch==1
+                values[current_arm]=request(list(range(cli.batch)),
+                    'legacy' if native else 'exact', legacy_graph=native)
+            pair[current_arm+'_records']=list(range(start_record,len(records)))
+        pair['tokens_equal']=values['reference']==values['candidate']
+        pairs.append(pair)
+        output.write_text(json.dumps(dict(status='pending_independent_verification',
+            tokens_equal=all(p['tokens_equal'] for p in pairs),pairs=pairs,
+            candidate='legacy_graph' if cli.legacy_graph_candidate or cli.batch==1 else 'exact_batch',
+            comparison=comparison,records=records),indent=2))
+        assert pair['tokens_equal'],'real batch tokens differ from the recorded reference control'
+
 
 
 if __name__=='__main__':
@@ -137,6 +161,9 @@ if __name__=='__main__':
     ref=p.add_mutually_exclusive_group()
     ref.add_argument('--same-batch-reference',action='store_true')
     ref.add_argument('--eager-batch-reference',action='store_true')
+    ref.add_argument('--legacy-batch-reference',action='store_true',
+        help='Same-batch operator-off native Graph reference for fused Graph comparison')
+    p.add_argument('--cycles',type=int,default=1,help='Paired cycles with alternating arm order')
     p.add_argument('--legacy-graph-candidate',action='store_true',
         help='Compare operator-off legacy Graph against same-batch eager, checking per-layer receipts')
     p.add_argument('--trace-dir')
@@ -146,6 +173,7 @@ if __name__=='__main__':
     if cli.trace_dir and (cli.measure or not cli.eager_batch_reference):
         p.error('trace requires eager-batch-reference and forbids timing')
     if cli.same_batch_reference and cli.batch<2:p.error('same-batch reference needs B>=2')
+    if cli.cycles<1:p.error('cycles must be >=1')
     if cli.max_gen<2:p.error('max-gen must be >=2')
     with GPU0Monitor(Path(cli.output).with_suffix('.gpu.json')):
         if cli.trace_dir:

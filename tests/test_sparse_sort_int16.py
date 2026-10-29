@@ -17,7 +17,7 @@ def test_all_tokens_signed_encoding_order(capacity):
     assert torch.equal((raw//64)*capacity+raw%64,original)
 
 @pytest.mark.skipif(not torch.cuda.is_available(),reason='queued CUDA gate')
-@pytest.mark.parametrize('capacity',[32768,32840,65528])
+@pytest.mark.parametrize('capacity',[16400,32768,32840,65528])
 @pytest.mark.parametrize('r',[1,129,8448])
 def test_native_packed_keys_offsets_and_unique(capacity,r):
     torch.manual_seed(7030);hk=3
@@ -41,7 +41,7 @@ def test_native_packed_keys_offsets_and_unique(capacity,r):
         for a,b in zip(old,new):assert torch.equal(a,b),(capacity,r,kind)
 
 @pytest.mark.skipif(not torch.cuda.is_available(),reason='queued CUDA gate')
-@pytest.mark.parametrize('capacity',[32768,32840,65528])
+@pytest.mark.parametrize('capacity',[16400,32768,32840,65528])
 def test_native_graph_probability_and_unique(monkeypatch,capacity):
     torch.manual_seed(309);h,g,r=3,4,8448
     ids=torch.randint(capacity,(h,r),device='cuda');keep=torch.ones_like(ids,dtype=torch.bool)
