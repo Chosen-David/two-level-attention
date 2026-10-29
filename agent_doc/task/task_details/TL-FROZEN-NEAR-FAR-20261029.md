@@ -88,3 +88,23 @@ independent agent review has been represented as completed.
   provenance live in agent_doc/results/frozen_near_far_staging_20261029/.
   Local executable verification is complete; no independent third-party review
   has been claimed. No production defaults or TLI L1/L2 integration changed.
+
+## TLI integration — in progress, 2026-10-29
+
+User approved continuing on this branch with operator mode off. The earlier
+completed scores are native SDPA region ablations and do not answer the TLI
+quality question. Implemented real register_patch + frozen treatment snapshot,
+pre-update segmented-cache dispatch, compact logical tail32 scratch, existing
+TLI compute_score/compute_mask reuse, visible-position mapping and decode
+receipts. No core TLI scorer or selector changes. Fixed K1=128/K2=1024,
+nb32/ntoff/nl4096, sink4/SWA128, minmax/avg, tail32; default no L2 quantization.
+TLI_FINE_GATHER=0 is explicitly recorded: correctness reference, no latency or
+peak-memory claim. Near staging is not read until it migrates into Far.
+
+Validation so far: 25 CPU regressions, including patched Qwen logits in all four
+states against a logical full-cache reference. GPU BF16 32Q/8KV masks match
+original TLI at 4231/8193/24001/31520 tokens with zero differences. HotpotQA
+8192 smoke completed5 arms, native TLI output parity passed, Far-only and both
+activated. GovReport 8192/512-token smoke pending. LongBench100-request paired
+TLI screen and hourly supervision will follow smoke acceptance. Full score,
+multi-hop regression and any no-loss conclusion remain pending.

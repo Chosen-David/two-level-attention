@@ -94,6 +94,19 @@ def validate(outdir,allow_partial=False):
             score=sample_score('repobench' if ds=='repobench-p' else ds,trial['prediction'],row['answers'],row.get('all_classes',[]))
             assert abs(score-trial['score'])<1e-12
             if trial.get('native_full_parity'):native_checks+=1
+            if protocol.get('attention','sdpa').startswith('tli') and len(generated)>1:
+                assert protocol['tli_environment']['TLI_OPERATOR_MODE']=='off'
+                receipts=trial['tli_receipts'];assert len(receipts)==layers
+                for li,receipt in receipts.items():
+                    assert receipt['scorer']=='TLIIndexer.compute_score'
+                    assert receipt['selector']=='TLIIndexer.compute_mask'
+                    assert receipt['dimensions']==list(range(48,64))+list(range(112,128))
+                    assert max(receipt['selected_per_kv_head'])<=1024
+                    assert min(receipt['selected_per_kv_head'])>0
+                    state=trial['final_kv']['layers'][int(li)]
+                    assert receipt['logical_tokens']==state['logical_length']
+                    assert receipt['visible_tokens']==state['attention_tokens']
+                    for name in ['skip_near','skip_far']:assert receipt[name]==state[name]
             assert len(trial['profiles'])==len(trial['decisions'])==layers
             counted={k:0 for k in ['keep','near','far','both']}
             mode,eps=('full',0.) if arm=='full' else (arm.split('_')[0],float(arm.split('_')[1]))

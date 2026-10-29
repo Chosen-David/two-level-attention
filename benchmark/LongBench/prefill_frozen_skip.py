@@ -82,6 +82,11 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
     cache = FrozenRegionCache(model.config.num_hidden_layers, geometry)
     eos = model.generation_config.eos_token_id
     eos = eos if isinstance(eos, list) else [eos]
+    if getattr(model, '_frozen_tli', False):
+        cache.tli_regions = True
+        for module in model.model.layers:
+            module.self_attn.indexer.clear()
+            module.self_attn.indexer.skip_far = False
     start = time.time()
     with torch.inference_mode():
         with capture_profiles(cache, geometry, config) as profiles:
@@ -112,12 +117,15 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
             out = model(token, past_key_values=cache, attention_mask={'full_attention':None},
                         use_cache=True, logits_to_keep=1)
         final = cache.report()
+        receipts = {i: getattr(layer, 'tli_receipt', None) for i,layer in enumerate(cache.layers)}
+        if getattr(model, '_frozen_tli', False) and len(generated)>1 and not all(receipts.values()):
+            raise ValueError('missing real TLI decode receipts')
     counts = {name:0 for name in ('keep','near','far','both')}
     for d in decisions.values():
         counts['both' if d['skip_near'] and d['skip_far'] else 'near' if d['skip_near'] else 'far' if d['skip_far'] else 'keep'] += 1
     result = dict(generated_ids=generated, prediction=tokenizer.decode(generated, skip_special_tokens=True),
         generated_tokens=len(generated), wall_seconds=time.time()-start, profiles=profiles,
-        decisions=decisions, gate_counts=counts, prefill_full_kv=before,
+        decisions=decisions, gate_counts=counts, tli_receipts=receipts, prefill_full_kv=before,
         frozen_kv=after, final_kv=final,
         measured_scope='physical node KV storage; eager gather temporaries excluded, no latency claim')
     del out, cache
@@ -127,6 +135,10 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
 @torch.inference_mode()
 def generate_native(model, ids, max_new_tokens, device):
     cache = DynamicCache(config=model.config)
+    if getattr(model, '_frozen_tli', False):
+        for layer in model.model.layers:
+            layer.self_attn.indexer.clear()
+            layer.self_attn.indexer.skip_far = False
     out = model(torch.tensor([ids], device=device), past_key_values=cache, use_cache=True, logits_to_keep=1)
     eos = model.generation_config.eos_token_id
     eos = eos if isinstance(eos,list) else [eos]
@@ -153,7 +165,13 @@ def main():
     ap.add_argument('--world-size', type=int, default=1)
     ap.add_argument('--device', default='cuda:0')
     ap.add_argument('--verify-native-full', action='store_true')
+    ap.add_argument('--attention', choices=['sdpa','tli'], default='sdpa')
     args = ap.parse_args()
+    if args.attention == 'tli':
+        os.environ['TLI_OPERATOR_MODE'] = 'off'
+        os.environ['TLI_FINE_GATHER'] = '0'
+        os.environ['TLI_SPARSE_PREFILL'] = '0'
+        os.environ['TLI_DECODE_DENSE'] = '0'
     tasks = args.datasets.split(',')
     if not set(tasks)<=set(SCREEN_TASKS) or len(set(tasks)) != len(tasks):
         raise ValueError('only the five existing LongBench screen tasks are allowed')
@@ -184,6 +202,14 @@ def main():
         git_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         eviction='far-only: evict far; near-only: keep attention-invisible near staging and migrate to far; both: sink+SWA only',
         calibration='query-relative page boundaries, last256 rows; head means; joint near+far dropped-mass budget')
+    if args.attention == 'tli':
+        from sparse_attn.ops.frozen_region_tli import tli_args
+        protocol['attention'] = 'tli-tail32-frozen-regions-reference'
+        protocol['tli_args'] = vars(tli_args())
+        protocol['tli_environment'] = {name:os.environ[name] for name in
+            ('TLI_OPERATOR_MODE','TLI_FINE_GATHER','TLI_SPARSE_PREFILL','TLI_DECODE_DENSE')}
+        for path in sorted((ROOT/'sparse_attn').rglob('*.py')):
+            protocol['source_sha256'][str(path.relative_to(ROOT))] = sha_file(path)
     identity = hashlib.sha256(json.dumps(protocol,sort_keys=True).encode()).hexdigest()
     outdir = Path(args.out); outdir.mkdir(parents=True,exist_ok=True)
     import fcntl
@@ -201,6 +227,13 @@ def main():
             device_map=args.device,attn_implementation='sdpa').eval()
     if model.config.model_type != 'qwen3' or any(getattr(m.self_attn,'sliding_window',None) is not None for m in model.model.layers):
         raise ValueError('only full-attention Qwen3 supported in this exploration')
+    if args.attention == 'tli':
+        from sparse_attn.patches import register_patch
+        from sparse_attn.info import resolve_treatment_snapshot
+        treatment = tli_args()
+        if register_patch(model,treatment,resolve_treatment_snapshot(treatment)) != model.config.num_hidden_layers:
+            raise ValueError('incomplete TLI patch registration')
+        model._frozen_tli = True
     verified = False
     for index,(ds,row_index,row) in enumerate(inputs):
         if index % args.world_size != args.rank: continue

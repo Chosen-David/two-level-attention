@@ -105,3 +105,42 @@ are versioned. `raw_requests.tar.gz` restores complete per-layer traces under
 source/data identities are in the manifests/provenance. All500 scores and18000
 request-layer states passed mechanical validation;14 unit/integration tests
 passed. Hourly supervision automatically completed and is no longer running.
+
+## TLI integration phase (2026-10-29)
+
+`prefill_frozen_skip --attention tli` now registers the real Qwen3 TLI patch
+with a frozen treatment snapshot. The segmented-cache dispatch runs before
+ordinary cache update. `frozen_region_tli.region_mask` constructs only a
+logical-position tail32 key scratch from **visible** nodes, then calls the
+existing `TLIIndexer.compute_score` and `TLIIndexer.compute_mask` unchanged.
+Original-width attention consumes the mapped visible keys and selected mask.
+Deleted Far and Near staging are not read by scoring or attention. The staging
+FIFO still migrates into Far as before. L1=128, L2=1024, near pages=32,
+near tokens=off, near length=4096, sink=4, SWA=128, far=minmax, near=avg.
+Default `l2_quant=False` is retained; the historical `4bit` selector name does
+not mean that key quantization is enabled in this production configuration.
+
+Operator mode is pinned off; sparse prefill/dense decode overrides are off.
+`TLI_FINE_GATHER=0` uses the existing full-score reference route, allowing
+absent logical positions to be masked before the shared L2 selector. The
+adapter creates transient projected scratch and is an eager quality reference,
+not a throughput/peak-memory implementation. Near-only saves original-width
+attention reads, not resident KV; no measured speed claim is made. `full` in
+this run means **TLI with both region gates off**, not Dense FullKV.
+
+No old SDPA results are reused as TLI measurements. New runs record all
+`sparse_attn/**/*.py` source hashes, selected IDs, full TLI args and pinned
+environment, plus per-layer decode receipts. The first request on each worker
+checks greedy output equality against ordinary TLI with DynamicCache.
+25 CPU regressions pass, including four-state Qwen logits versus logical
+full-cache reference. GPU bfloat16 GQA masks match ordinary TLI at lengths
+4231, 8193, 24001 and 31520 (zero differences).
+
+```sh
+python scripts/supervise_frozen_skip.py --attention tli --devices 0,1 \
+  --interval 3600 --out agent_doc/results/frozen_near_far_tli_20261029
+```
+
+This phase is pending end-to-end quality results; it supersedes no existing
+method conclusion. The supervisor validates source/input/score/cache/receipt
+invariants and exports compact tables on completion.

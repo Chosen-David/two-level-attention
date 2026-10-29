@@ -76,7 +76,7 @@ def export(outdir,plot=False):
     explanation+=['','平均分没有下降也不能声称逐任务无损或总体等价；各任务和逐条变化必须分别审阅。CI包含0不证明等价。',
         'Near-only 的 KV 暂存继续向 Far 迁移，所有 Near-only 层的驻留 KV 比例为 1；其收益仅体现在 attention 读取量。表中的 KV/attention 比例是节点容量与 key 数量口径，不是整体 GPU 显存或实测速率。',
         '双向策略按层选择 Near/Far/两者/都保留，不是所有层都丢 Near+Far；共同质量预算也会改变部分 Far 决策，因此 dual-vs-far 不是纯粹的 Near 增量消融。',
-        '结果来自独立 eager 分区缓存，不包含生产 TLI L1/L2 选择器。已完成本地可执行复核，未表示独立第三方审阅或论文主表验收完成。','',marker,'']
+        ('结果复用真实 TLI tail32 + L1/L2 选择器；full 代表 TLI 双 gate 关闭，非 Dense FullKV。当前为 eager 精度参考适配器，不作速度或总显存结论。' if summary['protocol'].get('attention','').startswith('tli') else '结果来自独立 eager 分区缓存，不包含生产 TLI L1/L2 选择器。')+'已完成本地可执行复核，未表示独立第三方审阅或论文主表验收完成。','',marker,'']
     hopping=[]
     for threshold in ['0.1','0.15']:
         name='dual_'+threshold

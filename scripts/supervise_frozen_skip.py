@@ -22,6 +22,7 @@ def main():
     ap.add_argument('--thresholds',default='0.10,0.15')
     ap.add_argument('--context-cap',type=int,default=31500)
     ap.add_argument('--interval',type=int,default=3600)
+    ap.add_argument('--attention',choices=['sdpa','tli'],default='sdpa')
     ap.add_argument('--devices',default='0,1')
     ap.add_argument('--max-restarts',type=int,default=3)
     args=ap.parse_args()
@@ -34,7 +35,7 @@ def main():
     devices=args.devices.split(',');workers={};started={};attempts={rank:0 for rank in range(len(devices))}
     base=[sys.executable,'-m','benchmark.LongBench.prefill_frozen_skip','--samples',str(args.samples),
         '--thresholds',args.thresholds,'--context-cap',str(args.context_cap),'--world-size',str(len(devices)),
-        '--out',str(out),'--verify-native-full']
+        '--out',str(out),'--verify-native-full','--attention',args.attention]
     atomic_json(out/'supervisor_config.json',dict(pid=os.getpid(),interval_seconds=args.interval,worktree=str(ROOT),
         devices=devices,worker_command_base=base,max_restarts=args.max_restarts,
         policy='Only resume this run; no unrelated process termination; no automatic treatment changes.'))
@@ -42,6 +43,10 @@ def main():
         now=datetime.now(timezone.utc);events=[]
         summary=analyze(out)
         if summary and summary['status']=='complete':
+            from benchmark.LongBench.validate_frozen_skip import validate
+            from benchmark.LongBench.export_frozen_skip import export
+            validate(out)
+            export(out,plot=False)
             atomic_json(out/'supervisor_status.json',dict(pid=os.getpid(),status='complete',checked_at=now.isoformat(),
                 completed_requests=summary['completed_requests'],expected_requests=summary['expected_requests']))
             print('COMPLETE: paired screen and final summary saved',flush=True)
