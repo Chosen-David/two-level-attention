@@ -16,8 +16,11 @@ from request_gpu_monitor import GPU0Monitor
 from sparse_attn.indexer.tli_indexer import TLIIndexer
 
 
-def main(output):
+def main(output, mask_dir=None):
     output = Path(output)
+    if mask_dir is not None:
+        mask_dir = Path(mask_dir)
+        mask_dir.mkdir(parents=True, exist_ok=True)
     args = runpy.run_path(str(Path(__file__).with_name('test_tli_graph_gates.py')))['_make_prod_args']
     results = []
     with GPU0Monitor(output.with_suffix('.gpu.json')):
@@ -60,8 +63,14 @@ def main(output):
                         torch.cuda.synchronize()
                         masks.append(mask.clone())
                     full_mask, sparse_mask = masks
+                    mask_file = None
+                    if mask_dir is not None:
+                        mask_file = mask_dir / f'{seed}_{length}_{int(skip_far)}.pt'
+                        torch.save(dict(eager=expected.cpu(), full=full_mask.cpu(),
+                                        sparse=sparse_mask.cpu()), mask_file)
                     results.append(dict(seed=seed, length=length, capacity=capacity,
                         skip_far=skip_far,
+                        mask_file=None if mask_file is None else str(mask_file),
                         eager_full_diff=int((expected != full_mask[..., :length]).sum()),
                         eager_sparse_diff=int((expected != sparse_mask[..., :length]).sum()),
                         full_sparse_diff=int((full_mask != sparse_mask).sum()),
@@ -74,4 +83,4 @@ def main(output):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
