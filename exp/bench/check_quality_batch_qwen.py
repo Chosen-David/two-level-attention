@@ -56,9 +56,9 @@ def run(cli):
         lengths=lengths,eos_policy='empty EOS diagnostic; fixed generation count',
         scope='explicit no-gate Qwen; unchanged 64/128/1024 budget, not ring-gate or GLM B>1'),indent=2))
 
-    def request(which, batch_mode, row_reference=False, eager_reference=False):
+    def request(which, batch_mode, row_reference=False, eager_reference=False, legacy_graph=False):
         os.environ['TLI_CUDA_GRAPH']='off' if eager_reference else 'auto'
-        os.environ['TLI_OPERATOR_MODE']='off' if eager_reference else 'serial'
+        os.environ['TLI_OPERATOR_MODE']='off' if (eager_reference or legacy_graph) else 'serial'
         os.environ['TLI_EXACT_BATCH_REFERENCE']='1' if row_reference else '0'
         os.environ['TLI_BATCH_INDEXER']=batch_mode
         batch=len(which); lens=[lengths[b] for b in which]
@@ -107,6 +107,8 @@ def run(cli):
                 assert execution['actual']=='graph' and execution['captures']==1
                 assert execution['replay_steps']==cli.max_gen-1 and execution['fallback_reason'] is None
                 assert len(execution['capture_layers'])==model.config.num_hidden_layers
+                if legacy_graph:
+                    assert all(r['attention_route']=='legacy_graph_eager_tli' for r in execution['capture_layers'])
                 if batch_mode=='exact':
                     expected_route=('linear_batch_reference_simt' if row_reference else
                         'exact_batch_ordered_eager' if os.environ.get('TLI_EXACT_ATTENTION','split')=='ordered'
@@ -118,10 +120,12 @@ def run(cli):
     reference=(request(list(range(cli.batch)),'legacy',eager_reference=True) if cli.eager_batch_reference
                else request(list(range(cli.batch)),'exact',True) if cli.same_batch_reference
                else [request([b],'legacy')[0] for b in range(cli.batch)])
-    actual=request(list(range(cli.batch)),'exact' if cli.batch>1 else 'legacy')
+    actual=request(list(range(cli.batch)),
+        'legacy' if cli.legacy_graph_candidate else 'exact' if cli.batch>1 else 'legacy',
+        legacy_graph=cli.legacy_graph_candidate)
     equal=actual==reference
     output.write_text(json.dumps(dict(status='pending_independent_verification',
-        tokens_equal=equal,comparison='same_batch_eager' if cli.eager_batch_reference else 'same_batch_rows' if cli.same_batch_reference else 'independent_B1',records=records),indent=2))
+        tokens_equal=equal,candidate='legacy_graph' if cli.legacy_graph_candidate else 'exact_batch',comparison='same_batch_eager' if cli.eager_batch_reference else 'same_batch_rows' if cli.same_batch_reference else 'independent_B1',records=records),indent=2))
     assert equal,'real batch tokens differ from the recorded reference control'
 
 
@@ -133,8 +137,12 @@ if __name__=='__main__':
     ref=p.add_mutually_exclusive_group()
     ref.add_argument('--same-batch-reference',action='store_true')
     ref.add_argument('--eager-batch-reference',action='store_true')
+    p.add_argument('--legacy-graph-candidate',action='store_true',
+        help='Compare operator-off legacy Graph against same-batch eager, checking per-layer receipts')
     p.add_argument('--trace-dir')
     cli=p.parse_args()
+    if cli.legacy_graph_candidate and (not cli.eager_batch_reference or cli.batch<2):
+        p.error('legacy Graph candidate requires same-batch eager reference and B>=2')
     if cli.trace_dir and (cli.measure or not cli.eager_batch_reference):
         p.error('trace requires eager-batch-reference and forbids timing')
     if cli.same_batch_reference and cli.batch<2:p.error('same-batch reference needs B>=2')

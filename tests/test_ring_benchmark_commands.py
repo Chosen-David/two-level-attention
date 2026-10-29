@@ -42,7 +42,7 @@ def test_ring_pairs_freeze_mask_and_construct_graph_commands(monkeypatch,tmp_pat
         assert env['TLI_OPERATOR_ORDERED_SELECTION']==('0' if arms[arm_idx]=='graph_ring_simt_canonical' else '1')
         assert cmd[cmd.index('--warmup')+1]=='3'
         assert env['TLI_OPERATOR_SELECTED_STAGES']==('3' if arms[arm_idx] in ('graph_ring_tc3','graph_ring_tc3_overlap') else '1')
-        for flag,value in [('--tli_enable_layer_skip','true'),('--tli_far_skip_backend','compact'),('--tli_far_skip_cache','evict')]:
+        for flag,value in [('--method','tli'),('--tli_enable_layer_skip','true'),('--tli_far_skip_backend','compact'),('--tli_far_skip_cache','evict')]:
             assert cmd.count(flag)==1 and cmd[cmd.index(flag)+1]==value
         frozen=Path(cmd[cmd.index('--tli_layer_skip_path')+1])
         assert frozen.is_absolute() and json.loads(frozen.read_text())=={'skip':[0,2]}
