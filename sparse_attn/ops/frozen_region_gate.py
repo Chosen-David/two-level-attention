@@ -7,7 +7,7 @@ from .frozen_region_cache import RegionGeometry
 
 @dataclass(frozen=True)
 class GateConfig:
-    epsilon: float = .1
+    epsilon: float = .05
     rows: int = 256
     statistic: str = 'mean'
     mode: str = 'dual'

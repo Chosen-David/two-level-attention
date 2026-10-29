@@ -92,7 +92,8 @@ def test_short_prefill_and_lifecycle_guards():
 
 
 def test_independent_gates_and_absent_regions():
-    profile={'near':{'mean':.07},'far':{'mean':.08}}
+    profile={'near':{'mean':.035},'far':{'mean':.04}}
+    assert GateConfig().epsilon == .05
     assert decide_regions(profile,GateConfig())==dict(skip_near=True,skip_far=True)
     profile={'near':{'mean':.03},'far':{'mean':.04}}
     assert decide_regions(profile,GateConfig())==dict(skip_near=True,skip_far=True)

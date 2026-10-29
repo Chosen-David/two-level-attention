@@ -158,7 +158,7 @@ def main():
     ap.add_argument('--samples', type=int, default=20)
     ap.add_argument('--seed', type=int, default=42)
     ap.add_argument('--context-cap', type=int, default=31500)
-    ap.add_argument('--thresholds', default='0.10,0.15')
+    ap.add_argument('--thresholds', default='0.05')
     ap.add_argument('--statistic', choices=['mean','p95'], default='mean')
     ap.add_argument('--datasets', default=','.join(SCREEN_TASKS))
     ap.add_argument('--rank', type=int, default=0)

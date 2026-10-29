@@ -136,3 +136,16 @@ Validation:31 local regressions passed, including both individually qualifying
 with combined mass above epsilon, all four states, exact threshold boundaries,
 mode/presence guards, independence from the other region, and existing TLI/cache
 logit/migration checks. No GPU experiment used for this code correction.
+
+
+## Authorized independent 0.05 AVG5 run
+
+User explicitly selected epsilon0.05 and requested actual AVG5 validation;
+operator optimization remains off. GateConfig, runner and supervisor defaults
+now0.05. New v3 run uses the same seeded20 rows per task (100 paired requests),
+three arms: TLI gates-off, far0.05, dual0.05. Near/Far decisions independent;
+prefill last256 head/query mean; decode-only gating. GPU0 only, serialized two
+logical shards, hourly supervisor. Old joint-budget data cannot answer this
+question and are not reused as new-policy quality measurements. Export now
+reads threshold list from protocol. Final quality and independent verification
+remain pending; local executable checks alone are not independent admission.

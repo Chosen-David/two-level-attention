@@ -70,7 +70,7 @@ def export(outdir,plot=False):
     marker='<!-- frozen-summary:end -->'
     if marker in report:report=report.split(marker,1)[1].lstrip()
     explanation=[f"本轮已完成：{len(tasks)} 个海选任务各 {summary['protocol']['samples_per_task']} 条、{summary['completed_requests']} 条配对请求、{len(row_scores)} 组生成；这不是每任务 200/500 条的全量海选。",'']
-    for threshold in ['0.1','0.15']:
+    for threshold in [f'{eps:g}' for eps in summary['protocol']['thresholds']]:
         arm='dual_'+threshold;a=summary['arms'][arm];c=summary['comparisons'][arm+'-vs-full']['avg5']
         explanation.append(f"- 双向 skip，阈值 {threshold}：AVG5 {a['avg5']:.4f}，相对 Full {c['delta_pp']:+.4f} pp；95% bootstrap CI [{c['ci95_pp'][0]:+.4f}, {c['ci95_pp'][1]:+.4f}]。Near 在 {a['near_active_requests']}/{summary['completed_requests']} 条请求中触发；层状态为 Near-only {a['gate_counts']['near']}、Far-only {a['gate_counts']['far']}、双 skip {a['gate_counts']['both']}。")
     explanation+=['','平均分没有下降也不能声称逐任务无损或总体等价；各任务和逐条变化必须分别审阅。CI包含0不证明等价。',
@@ -78,7 +78,7 @@ def export(outdir,plot=False):
         ('Near/Far gate独立比较各自mass；同阈值下加入Near gate不会改变Far gate判定。' if summary['protocol'].get('schema')=='frozen-near-far-screen-v3-independent-gates' else '历史联合预算策略会因Near门改变Far判定，不能作为独立双门的证据。'),
         ('结果复用真实 TLI tail32 + L1/L2 选择器；full 代表 TLI 双 gate 关闭，非 Dense FullKV。当前为 eager 精度参考适配器，不作速度或总显存结论。' if summary['protocol'].get('attention','').startswith('tli') else '结果来自独立 eager 分区缓存，不包含生产 TLI L1/L2 选择器。')+'已完成本地可执行复核，未表示独立第三方审阅或论文主表验收完成。','',marker,'']
     hopping=[]
-    for threshold in ['0.1','0.15']:
+    for threshold in [f'{eps:g}' for eps in summary['protocol']['thresholds']]:
         name='dual_'+threshold
         for ds in ['musique','hotpotqa']:
             pair=summary['comparisons'][name+'-vs-full']['per_task'][ds]
