@@ -30,6 +30,32 @@ def operator_mode() -> str:
     return os.environ.get("TLI_OPERATOR_MODE", "off")
 
 
+def validate_operator_inputs(q, k, v):
+    """Reject unsupported HF-format decode inputs before any KV mutation."""
+    mode = operator_mode()
+    if mode == 'off':
+        return
+    backend = os.environ.get('TLI_OPERATOR_BACKEND', 'simt')
+    stages = int(os.environ.get('TLI_OPERATOR_SELECTED_STAGES', '1'))
+    if mode not in ('serial', 'overlap') or backend not in ('simt', 'tc') or stages not in (1, 2, 3):
+        raise ValueError('invalid operator mode/backend/stages')
+    if (q.ndim != 4 or k.ndim != 4 or v.ndim != 4
+            or q.shape[0] != k.shape[0] or k.shape[:3] != v.shape[:3]
+            or q.shape[2] != 1 or k.shape[2] != 1 or k.shape[1] < 1
+            or q.shape[1] % k.shape[1] or q.shape[-1] != k.shape[-1]
+            or min(q.shape[-1], v.shape[-1]) < 1):
+        raise ValueError('incompatible operator decode dimensions')
+    if (q.dtype not in (torch.float32, torch.float16, torch.bfloat16)
+            or any(t.dtype != q.dtype or t.device != q.device or t.stride(-1) != 1
+                   for t in (q, k, v))):
+        raise ValueError('operator requires matching floating Q/K/V and unit feature stride')
+    if backend == 'tc' and q.dtype not in (torch.float16, torch.bfloat16):
+        raise ValueError('TC backend requires fp16/bf16')
+    from .partial_attention import triton
+    if triton is None or not q.is_cuda:
+        raise RuntimeError('GPU partial attention requires CUDA and Triton; no implicit fallback')
+
+
 def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
     """Compact decode, optionally forking protected attention before indexing.
 

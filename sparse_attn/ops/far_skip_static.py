@@ -143,6 +143,8 @@ def try_far_skip_static(module, q, k, v, cache, mask, batch_ctx):
         if not 1 <= batch_ctx.seq_lens[0] <= layer.max_cache_len:
             raise ValueError('decode position exceeds static cache capacity')
         pos = torch.tensor([batch_ctx.seq_lens[0]-1], dtype=torch.long, device=q.device)
+    from .operator_pipeline import validate_operator_inputs
+    validate_operator_inputs(q, k, v)
     k, v = layer.update(k, v, {'cache_position': pos})
     q, k, v = (t.transpose(1, 2) for t in (q, k, v))
     return layer.workspace(q, k, v, pos+1, module.scaling)

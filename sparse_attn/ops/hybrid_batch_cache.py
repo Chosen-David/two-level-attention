@@ -236,6 +236,8 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
     if not gs.enabled or any(t is None for t in (gs.pos_buf, gs.valid_len_buf, gs.alive_buf)):
         raise ValueError('hybrid batch requires HybridBatchRunner device inputs')
     pos, lengths, alive = gs.pos_buf, gs.valid_len_buf, gs.alive_buf
+    from .operator_pipeline import validate_operator_inputs
+    validate_operator_inputs(q, k, v)
     outputs = []
     for b, (row, idx) in enumerate(zip(layer.rows, layer.indexers)):
         p, vl, active = pos[b:b+1], lengths[b:b+1], alive[b:b+1]
