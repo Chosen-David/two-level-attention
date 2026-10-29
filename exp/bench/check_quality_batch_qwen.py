@@ -120,7 +120,7 @@ def run(cli):
     equal=actual==reference
     output.write_text(json.dumps(dict(status='pending_independent_verification',
         tokens_equal=equal,comparison='same_batch_eager' if cli.eager_batch_reference else 'same_batch_rows' if cli.same_batch_reference else 'independent_B1',records=records),indent=2))
-    assert equal,'real batch tokens differ from independent single-row Graph reference'
+    assert equal,'real batch tokens differ from the recorded reference control'
 
 
 if __name__=='__main__':
@@ -131,7 +131,14 @@ if __name__=='__main__':
     ref=p.add_mutually_exclusive_group()
     ref.add_argument('--same-batch-reference',action='store_true')
     ref.add_argument('--eager-batch-reference',action='store_true')
+    p.add_argument('--trace-dir')
     cli=p.parse_args()
+    if cli.trace_dir and (cli.measure or not cli.eager_batch_reference):
+        p.error('trace requires eager-batch-reference and forbids timing')
     if cli.same_batch_reference and cli.batch<2:p.error('same-batch reference needs B>=2')
     if cli.max_gen<2:p.error('max-gen must be >=2')
-    with GPU0Monitor(Path(cli.output).with_suffix('.gpu.json')):run(cli)
+    with GPU0Monitor(Path(cli.output).with_suffix('.gpu.json')):
+        if cli.trace_dir:
+            from batch_decode_trace import record_batch_decode_trace
+            with record_batch_decode_trace(cli.trace_dir):run(cli)
+        else:run(cli)
