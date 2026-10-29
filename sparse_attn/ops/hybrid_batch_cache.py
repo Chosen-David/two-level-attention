@@ -47,7 +47,6 @@ def _snapshot_indexer(idx):
     result.args = copy.deepcopy(idx.args)
     result._ginc = None
     result._exact_linear_batch = None
-    result._retired_exact_linear_batches = []
     result.clear()
     result._skip_ids = None if idx._skip_ids is None else frozenset(idx._skip_ids)
     result.skip_far = idx.skip_far

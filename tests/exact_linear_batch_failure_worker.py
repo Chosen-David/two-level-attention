@@ -15,7 +15,8 @@ def main():
         for _ in range(3):case.run()
         torch.cuda.synchronize()
         assert case.source._exact_linear_batch is not old
-        assert any(item is old for item in case.source._retired_exact_linear_batches)
+        assert any(item is old for item in graph._tli_address_owners)
+        assert not hasattr(case.source,'_retired_exact_linear_batches')
         assert not bool(old.ready.cpu())
         print('EXPECT_OLD_READY_FAILURE',flush=True)
         graph.replay();torch.cuda.synchronize()

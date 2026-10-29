@@ -259,3 +259,27 @@ def test_changed_storage_old_graph_ready_failure_isolated():
     assert 'EXPECT_OLD_READY_FAILURE' in combined, combined
     assert proc.returncode != 0, combined
     assert ('exact batch was cleared' in combined or 'device-side assert' in combined),combined
+
+
+@NATIVE
+def test_changed_storage_graph_gc_releases_retired_state_and_kv(monkeypatch):
+    import gc
+    import weakref
+    for key,value in CONFIG.items():monkeypatch.setenv(key,value)
+    with torch.no_grad(),_case(2) as case:
+        for _ in range(3):case.run()
+        torch.cuda.synchronize();graph,out=case.capture()
+        old=case.source._exact_linear_batch
+        refs=[weakref.ref(t) for t in (old,case.k,case.v,old.feature_arena,old.summary_arenas['k_min'])]
+        assert graph._tli_address_owners==[old]
+        case.source.clear();case.k=case.k.clone();case.v=case.v.clone()
+        for _ in range(3):case.run()
+        torch.cuda.synchronize()
+        assert case.source._exact_linear_batch is not old and not bool(old.ready.cpu())
+        del old;gc.collect()
+        assert all(ref() is not None for ref in refs)
+        del graph,out;gc.collect();torch.cuda.synchronize()
+        assert all(ref() is None for ref in refs)
+        # The source and replacement remain alive and usable after collection.
+        out=case.run();torch.cuda.synchronize()
+        torch.testing.assert_close(out,case.reference(),rtol=0,atol=0)

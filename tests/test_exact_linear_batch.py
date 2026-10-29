@@ -205,10 +205,12 @@ def test_actual_entry_warmup_binds_arena_and_reuses_row_state(setup,monkeypatch)
     idx.clear()
     batch.exact_linear_batch_decode(idx,q,k.clone(),v,gs,0.5)
     assert idx._exact_linear_batch is not state
-    assert state in idx._retired_exact_linear_batches and not bool(state.ready)
+    assert not hasattr(idx,'_retired_exact_linear_batches') and not bool(state.ready)
 
 
 def test_uncaptured_state_cannot_initialize_inside_capture(setup,monkeypatch):
+    from sparse_attn.ops import cuda_graph_state as cgs
+    monkeypatch.setattr(cgs,'current_capture_graph',lambda:object())
     idx,q,k,v,gs=setup
     monkeypatch.setattr(batch,'_validate_supported',lambda *args:None)
     monkeypatch.setattr(torch.cuda,'is_current_stream_capturing',lambda:True)

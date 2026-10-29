@@ -34,7 +34,7 @@ writes for dead rows. The min/max/FP32 mean reduction and final storage-block
 zero padding remain the primary kernel's operations. Bulk query projection, scores and candidate
 geometry feed a BatchedCandidateInputs directly to the consumers, with no
 unpack/restack of candidate outputs or full-history tensors. Raw K/V and graph input buffers are retained against allocator
-address reuse. Static KV writes use the accepted `append_kv_batch` primitive.
+address reuse by the current state and each captured Graph using that state. Static KV writes use the accepted `append_kv_batch` primitive.
 
 Lifecycle:
 
@@ -49,8 +49,8 @@ Lifecycle:
   permanently invalidate every old graph in this same-storage case.
 * Storage/config replacement requires clear, warmup and recapture. Old state is
   retained with a false ready flag, so its stale graph cannot silently consume
-  replacement storage. Retired states must remain alive while graphs reference
-  them. This initial prototype retains them for the source indexer's lifetime.
+  replacement storage. Each captured Graph retains its address-owning state;
+  obsolete states and KV can be released when their last Graph is deleted.
 * Cache reorder is unsupported, matching TLIStaticLayer. Raw external in-place
   permutations are outside the fixed-owner API and must not bypass its lifecycle.
 
@@ -78,3 +78,12 @@ uses 64-bit batch/head address products. Immutable feature indices are checked
 at warmup; the exact owner checks dynamic positions before maintenance. Native
 maintenance and full-entry tests are pending execution for this revision; CPU
 structure/schema tests do not establish precision or performance.
+
+Exact capture must use `capture_graph()` from `ops.cuda_graph_state`; raw
+`torch.cuda.graph` is rejected for this route. The managed scope pins each
+address-owning state on the Graph itself. Replacing storage after clear leaves
+an old live Graph holding its old false ready flag and KV/feature/summary
+buffers. Deleting that Graph releases the obsolete state; the indexer keeps no
+permanent retired-state list. Same-storage clear/warmup still reuses the same
+state, so the old Graph remains valid after successful warmup. CPU weakref/GC
+contracts verify ownership and release; native lifecycle coverage remains queued.

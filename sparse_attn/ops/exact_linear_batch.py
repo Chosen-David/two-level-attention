@@ -106,7 +106,6 @@ def _clone_owner(source):
     owner.args = copy.deepcopy(source.args)
     # Reset before clear so a shallow copy cannot invalidate the source owner.
     owner._exact_linear_batch = None
-    owner._retired_exact_linear_batches = []
     owner._ginc = None
     owner.clear()
     owner._graph_const_cache = None
@@ -275,16 +274,18 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
     _validate_metadata(indexer,q,k,v,gs)
     _validate_supported(q,k)
     capturing = torch.cuda.is_current_stream_capturing()
+    if capturing:
+        from .cuda_graph_state import current_capture_graph, retain_capture_state
+        if current_capture_graph() is None:
+            raise RuntimeError('exact batch capture requires capture_graph() owner scope')
     state = getattr(indexer,'_exact_linear_batch',None)
     signature = _storage_signature(q,k,v,gs)
     config = _config_signature(indexer)
     if state is not None and (state.signature != signature or state.config != config):
         if not state.needs_warmup or capturing:
             raise ValueError('exact batch storage/config changed; clear and recapture')
-        # Poisoned old captures retain their own false ready flag and buffers.
-        retired = getattr(indexer,'_retired_exact_linear_batches',[])
-        retired.append(state)
-        indexer._retired_exact_linear_batches = retired
+        # Each live Graph pins its own poisoned state and raw addresses.
+        # Dropping that Graph releases obsolete KV instead of retiring forever.
         state = None
     if state is None:
         if capturing:
@@ -295,6 +296,8 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
         if capturing:
             raise RuntimeError('cleared exact batch requires warmup before capture')
         state.warmup(k,gs)
+    if capturing:
+        retain_capture_state(state)
     candidates = state.produce(q,k,gs,scale)
     indexer._exact_batch_maintenance_route=state.maintenance_route
     indexer._exact_batch_maintenance_calls=state.maintenance_calls
