@@ -30,11 +30,19 @@ def operator_mode() -> str:
     return os.environ.get("TLI_OPERATOR_MODE", "off")
 
 
+
+def _ordered_selection_enabled():
+    value = os.environ.get('TLI_OPERATOR_ORDERED_SELECTION', '1')
+    if value not in ('0', '1'):
+        raise ValueError('TLI_OPERATOR_ORDERED_SELECTION must be 0 or 1')
+    return value == '1'
+
 def validate_operator_inputs(q, k, v):
     """Reject unsupported HF-format decode inputs before any KV mutation."""
     mode = operator_mode()
     if mode == 'off':
         return
+    _ordered_selection_enabled()
     backend = os.environ.get('TLI_OPERATOR_BACKEND', 'simt')
     stages = int(os.environ.get('TLI_OPERATOR_SELECTED_STAGES', '1'))
     if mode not in ('serial', 'overlap') or backend not in ('simt', 'tc') or stages not in (1, 2, 3):
@@ -142,6 +150,7 @@ def decode_selected(q, k, v, lengths, softmax_scale, *, cfg, layout, select, ord
     """Shared split attention consumer for graph and eager compact selectors."""
     from .partial_attention import partial_attention, merge_partials
     from .token_selection import middle_selection
+    ordered_enabled = _ordered_selection_enabled()
     if q.shape[0] != 1:
         raise ValueError('ring workspace owns a single request')
     backend = os.environ.get('TLI_OPERATOR_BACKEND', 'simt')
@@ -170,10 +179,7 @@ def decode_selected(q, k, v, lengths, softmax_scale, *, cfg, layout, select, ord
                 tensor.record_stream(side)
     positions, valid = select(q, k, lengths, softmax_scale)
     # Ring positions are absolute: physical capacity is not an ID bound.
-    ordered_flag = os.environ.get('TLI_OPERATOR_ORDERED_SELECTION', '1')
-    if ordered_flag not in ('0', '1'):
-        raise ValueError('TLI_OPERATOR_ORDERED_SELECTION must be 0 or 1')
-    if ordered_unique and ordered_flag == '1':
+    if ordered_unique and ordered_enabled:
         from .ordered_selection import ordered_middle_selection
         selection = ordered_middle_selection(positions[None], valid[None], lengths,
             cfg.sink_tokens, cfg.window_tokens, torch.iinfo(torch.int32).max)

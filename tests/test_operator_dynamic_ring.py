@@ -97,3 +97,9 @@ def test_cuda_dynamic_operator_real_model(monkeypatch,dtype,backend,mode,cache_m
         assert actual_cache.get_seq_length(0)==pos+1
         torch.testing.assert_close(actual,expected,atol=2e-3 if dtype==torch.bfloat16 else 3e-4,rtol=2e-2,
                                    msg=f"position={pos}, backend={backend}, dtype={dtype}")
+
+
+@pytest.mark.parametrize('invalid',['bad','2'])
+def test_invalid_ordered_flag_preserves_cache(monkeypatch,invalid):
+    monkeypatch.setenv('TLI_OPERATOR_ORDERED_SELECTION',invalid)
+    test_unsupported_operator_preserves_cache(monkeypatch,'simt','TLI_OPERATOR_ORDERED_SELECTION')
