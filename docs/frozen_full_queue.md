@@ -53,3 +53,31 @@ nohup bash SOURCE/scripts/run_remote_frozen_queue.sh PYTHON SOURCE PLAN HOST_KEY
 
 Re-running this command is safe: the existing host daemon holds its lock. No
 wildcard process killing or deletion of partial results is needed for recovery.
+
+
+## Verified full-run outcome (2026-10-30)
+
+Task `TL-FROZEN-FULL5-QUEUE-20261029` completed all 64 shards, 1300 paired
+requests and 3900 generations. The fixed result entry is
+`/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029`.
+`FINAL_REPORT_ZH.md` is the final report;
+`ai_supervision/round_20261029T161704/VERIFICATION_INDEX.md` links the two actual
+independent CPU review sessions, their reports and hashed evidence.
+
+Relative to TLI gates-off (not dense attention), Far-only AVG5 changed by
+-0.082408 pp and independent Near+Far by -0.085406 pp. Both reduced Qasper by
+0.683604 pp, with paired bootstrap intervals below zero. Musique had no scored
+regressions in its 200 samples; its sole tiny F1 increase still gave a wrong
+answer. No predeclared equivalence margin exists, so this is not a no-loss claim.
+Near-only occurred in 33/46800 layer-requests (19/1300 requests), Both in 2/46800
+(2/1300). The threshold and generation protocol were not changed.
+
+The independent reviews bind the same 1300 request files, digest
+`fd595e95527362034fe2bf859061d93060c378cf3b179ce38ed21b98de8fa431`.
+The expanded 1533-file binding digest is
+`901e031bbf6110667ebcdabacad7c03447e3750cea84910deddb84206b5471f5`.
+Acceptance covers recorded inputs, predictions, scoring, bootstrap, exports and
+logged gate/cache invariants. It does not certify independent GPU regeneration,
+unrecorded per-step GPU tensors, historical full-weight hashes, speedups or total
+GPU-memory savings. The frozen production HEAD remains
+`3e4a6885604ac3e719ee92a4906f87b532535314`; this entry changes documentation only.
