@@ -340,7 +340,9 @@ def test_ordered_batch_live_replay_matches_full_mask_eager(monkeypatch, batch):
         front_calls=_install_front_checks(monkeypatch,batch)
         for _ in range(3):out=case.run()
         torch.testing.assert_close(out,reference(),rtol=0,atol=0)
+        capture_start=len(front_calls)
         graph,out=case.capture()
+        assert front_calls[capture_start:]==['maintenance','coarse','average','compact']
         assert case.source._graph_attention_route=='exact_batch_ordered_eager'
         for step in range(5):
             if step==1:case.alive[-1]=False
@@ -350,6 +352,11 @@ def test_ordered_batch_live_replay_matches_full_mask_eager(monkeypatch, batch):
             calls=len(front_calls)
             graph.replay();torch.cuda.synchronize()
             assert len(front_calls)==calls, 'replay must not run the Python producer'
+            for b, live in enumerate(case.alive):
+                if live:
+                    position=case.lengths[b]-1
+                    torch.testing.assert_close(case.k[b,position],case.new_k[b,:,0],rtol=0,atol=0)
+                    torch.testing.assert_close(case.v[b,position],case.new_v[b,:,0],rtol=0,atol=0)
             if not case.alive[-1]:
                 torch.testing.assert_close(case.k[-1],before_k,rtol=0,atol=0)
                 torch.testing.assert_close(case.v[-1],before_v,rtol=0,atol=0)
