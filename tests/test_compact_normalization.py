@@ -6,10 +6,11 @@ import torch
 
 pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')
 
+@pytest.mark.parametrize('masked', [False, True])
 @pytest.mark.parametrize('fused_mean', ['0', '1'])
 @pytest.mark.parametrize('capacity', [32768, 32769, 33729])
 @pytest.mark.parametrize('group', [1, 4, 8])
-def test_compact_probability_replay(capacity, group, fused_mean, monkeypatch):
+def test_compact_probability_replay(capacity, group, fused_mean, masked, monkeypatch):
     monkeypatch.setenv("TLI_COMPACT_FUSED_MEAN", fused_mean)
     from sparse_attn.ops.compact_normalization import compact_probabilities
     from sparse_attn.indexer.tli_indexer import _ako_gqa_mean_kernel
@@ -20,8 +21,9 @@ def test_compact_probability_replay(capacity, group, fused_mean, monkeypatch):
     keep = torch.ones_like(ids, dtype=torch.bool)
     token = torch.randn(hk*group, capacity, device='cuda', dtype=torch.bfloat16)
     scores = token.gather(1, ids.repeat_interleave(group, 0))
+    excluded = torch.zeros(capacity, device="cuda", dtype=torch.bool) if masked else None
     def run():
-        return compact_probabilities(scores, ids, keep, capacity, group)
+        return compact_probabilities(scores, ids, keep, capacity, group, excluded)
     run(); torch.cuda.synchronize()
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):
@@ -35,6 +37,8 @@ def test_compact_probability_replay(capacity, group, fused_mean, monkeypatch):
         if kind == 'nan': token[0].fill_(float('nan'))
         if kind == 'underflow': token.mul_(100)
         scores.copy_(token.gather(1, ids.repeat_interleave(group, 0)))
+        if masked:
+            excluded.random_(2)
         graph.replay()
         full = torch.full((hk*group, capacity+1), -torch.inf, device='cuda', dtype=scores.dtype)
         safe = torch.where(keep, ids, capacity).repeat_interleave(group, 0)
@@ -42,6 +46,8 @@ def test_compact_probability_replay(capacity, group, fused_mean, monkeypatch):
         sm = full[:, :capacity].softmax(-1)
         expected = torch.empty((hk, capacity), device='cuda', dtype=scores.dtype)
         _ako_gqa_mean_kernel[(hk, triton.cdiv(capacity, 1024))](sm, expected, capacity, 0, 0, G=group, BLOCK=1024, num_warps=4)
+        if masked:
+            expected.masked_fill_(excluded, -torch.inf)
         assert torch.equal(actual, expected), kind
         assert torch.equal(actual.topk(32).indices, expected.topk(32).indices), kind
 

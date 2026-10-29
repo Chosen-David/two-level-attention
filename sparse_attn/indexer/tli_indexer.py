@@ -4530,7 +4530,7 @@ class TLIIndexer(TIAIndexer):
             "compact_fused_mean" if os.environ.get("TLI_COMPACT_FUSED_MEAN", "1") == "1"
             else "compact_separate_mean") if _compact_norm else "full_width_reference"
         if _compact_norm:
-            p = compact_probabilities(sfc, cand_idx2, keep2, S_cap, group_size)
+            p = compact_probabilities(sfc, cand_idx2, keep2, S_cap, group_size, mid_mask_inv)
         else:
             keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)
             cand_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)
@@ -4552,7 +4552,7 @@ class TLIIndexer(TIAIndexer):
         # ---- 8. mid 全域 L2 自由竞争 ----
         # 固定 K2_static 保持 capture 形状；k2_mid 在终掩码装配处动态截断。
         # mid 外全为 -inf，前 k2_mid 名与 eager 的 mid 段 top-k 同集。
-        mid_scored = p.masked_fill(mid_mask_inv, float("-inf"))
+        mid_scored = p if _compact_norm else p.masked_fill(mid_mask_inv, float("-inf"))
         K2_static = min(S_cap, K2)
         tok_top = torch.topk(mid_scored, K2_static, dim=-1).indices
         if return_selection:

@@ -74,7 +74,7 @@ __global__ void normalize_stats(const T* scores,const int* owners,float* stats,i
 }
 
 template<typename T>
-__global__ void materialize_probability(const T* scores,const int* owners,const float* stats,T* out,int R,int S,int G) {
+__global__ void materialize_probability(const T* scores,const int* owners,const float* stats,T* out,const bool* excluded,int R,int S,int G) {
   int h=blockIdx.y;
   int token=blockIdx.x*blockDim.x+threadIdx.x;
   if(token<S) {
@@ -98,9 +98,13 @@ __global__ void compact_probability(const T* scores,const float* stats,T* out,in
 // probability intermediate. The full token output preserves native TopK ties.
 template<typename T>
 __global__ void fused_probability_mean(const T* scores,const int* owners,
-                                      const float* stats,T* out,int R,int S,int G) {
+                                      const float* stats,T* out,const bool* excluded,int R,int S,int G) {
   int kv=blockIdx.y,token=blockIdx.x*blockDim.x+threadIdx.x;
   if(token>=S) return;
+  if(excluded && excluded[token]) {
+    out[(int64_t)kv*S+token]=static_cast<T>(-INFINITY);
+    return;
+  }
   int r=owners[kv*S+token];
   float sum=0.f;
   if(r>=0) {
@@ -115,7 +119,7 @@ __global__ void fused_probability_mean(const T* scores,const int* owners,
   out[(int64_t)kv*S+token]=static_cast<T>(sum/G);
 }
 
-at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S,int64_t G,bool fused_mean) {
+at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S,int64_t G,bool fused_mean,at::Tensor excluded) {
   TORCH_CHECK(scores.is_cuda() && owners.is_cuda() && scores.device()==owners.device(),"same CUDA device required");
   TORCH_CHECK(scores.is_contiguous() && owners.is_contiguous(),"contiguous inputs required");
   TORCH_CHECK(scores.dim()==2 && owners.dim()==2 && owners.scalar_type()==at::kInt,"matrix scores/int32 owners required");
@@ -123,6 +127,8 @@ at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S
   TORCH_CHECK(S>2048 && S<INT_MAX && scores.size(1)<INT_MAX,"unsupported size");
   TORCH_CHECK(scores.scalar_type()==at::kHalf || scores.scalar_type()==at::kBFloat16 || scores.scalar_type()==at::kFloat,"fp16/bf16/fp32 required");
   TORCH_CHECK(owners.numel()<INT_MAX,"owner indexing exceeds int32 prototype scope");
+  TORCH_CHECK(excluded.is_cuda() && excluded.device()==scores.device() && excluded.scalar_type()==at::kBool && excluded.is_contiguous(),"contiguous same-device bool exclusion mask required");
+  TORCH_CHECK(excluded.numel()==0 || (excluded.dim()==1 && excluded.numel()==S),"exclusion mask must be empty or token-domain vector");
   c10::cuda::CUDAGuard device_guard(scores.device());
   auto prop=at::cuda::getCurrentDeviceProperties();
   int bytes=scores.element_size(),ilp=16/bytes;
@@ -136,7 +142,7 @@ at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S
   AT_DISPATCH_FLOATING_TYPES_AND2(at::kHalf,at::kBFloat16,scores.scalar_type(),"virtual_softmax",[&] {
     constexpr int ILP=16/sizeof(scalar_t);
     normalize_stats<scalar_t,ILP><<<scores.size(0),1024,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),scores.size(1),S,G);
-    if(fused_mean) fused_probability_mean<scalar_t><<<dim3((S+255)/256,owners.size(0)),256,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),out.data_ptr<scalar_t>(),scores.size(1),S,G);
+    if(fused_mean) fused_probability_mean<scalar_t><<<dim3((S+255)/256,owners.size(0)),256,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),out.data_ptr<scalar_t>(),excluded.numel()?excluded.data_ptr<bool>():nullptr,scores.size(1),S,G);
     else if(scores.size(1)>0) compact_probability<scalar_t><<<dim3((scores.size(1)+255)/256,scores.size(0)),256,0,stream>>>(scores.data_ptr<scalar_t>(),stats.data_ptr<float>(),out.data_ptr<scalar_t>(),scores.size(1));
   });
   C10_CUDA_KERNEL_LAUNCH_CHECK();
