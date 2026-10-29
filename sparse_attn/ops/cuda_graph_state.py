@@ -17,6 +17,9 @@ TLIStaticCache）整步 capture 时，decode 步间变化的数据必须经
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 
 class _GraphState:
     def __init__(self):
@@ -47,3 +50,27 @@ def disable_graph():
     st.valid_len_buf = None
     st.alive_buf = None
     st.bs = None
+
+
+# Host-local identity for one actual capture, never reused across graph objects.
+# Raw torch.cuda.graph callers have no token and keep conservative recomputation.
+_GEOMETRY_CAPTURE = ContextVar('tli_geometry_capture', default=None)
+
+
+@contextmanager
+def capture_graph(graph, **kwargs):
+    """Capture with a fresh geometry-cache namespace, reset even on failure."""
+    import torch
+    with torch.cuda.graph(graph, **kwargs) as capture:
+        reset = _GEOMETRY_CAPTURE.set(object())
+        try:
+            yield capture
+        finally:
+            _GEOMETRY_CAPTURE.reset(reset)
+
+
+def geometry_cache_key(key, *, capturing):
+    if not capturing:
+        return key
+    token = _GEOMETRY_CAPTURE.get()
+    return None if token is None else (token, key)

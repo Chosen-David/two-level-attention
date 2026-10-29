@@ -4254,16 +4254,17 @@ class TLIIndexer(TIAIndexer):
         # 正确）。条目 pin valid_len 视图（强引用）防 data_ptr 复用误命中。
         _geo_key = (S_cap, kt_cap, bs, sink_pool_lo, sink_tok,
                     swa_tok, nl, K2, str(dev), _sparse_selection)
-        # capture 期层 0 强制重建（fail-safe）：若 warmup 与 capture 间 vl
-        # 版本未递增，命中 warmup 期条目会使几何 kernel 不被录入图 →
-        # replay 读陈旧几何。capturing 时一律重建（录 kernel 一次），
-        # 层 1-35 再按版本命中。
-        geo = None
-        if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
-            geo = _graph_geo_lookup(valid_len, _geo_key)
+        # A capture-scoped identity prevents reuse of warmup or another graph's
+        # geometry. Within the same capture, matching pointer/version/config can
+        # share the first layer's device computation. Uninstrumented captures
+        # keep rebuilding; mutation-version-less tensors also never reuse.
+        from ..ops.cuda_graph_state import geometry_cache_key
+        cache_key = geometry_cache_key(_geo_key,
+            capturing=q.is_cuda and torch.cuda.is_current_stream_capturing())
+        geo = None if cache_key is None else _graph_geo_lookup(valid_len, cache_key)
         if geo is None:
             geo = _graph_geo_store(
-                valid_len, _geo_key,
+                valid_len, cache_key,
                 self._build_graph_geometry(valid_len, S_cap, kt_cap, _cst[1],
                                            compact_only=_sparse_selection))
         S_real = geo["S_real"]
