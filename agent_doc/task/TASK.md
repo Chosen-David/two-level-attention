@@ -2,7 +2,7 @@
 
 ## 2026-10-29
 
-- [ ] [TL-FROZEN-NEAR-FAR-20261029] 新分支探索 prefill 冻结 near/far 双 gate、Far/双路真实驱逐与Near-only暂存迁移；5个既有LongBench海选任务各20条配对，100请求×5臂；13项CPU回归与新Near暂存实模冒烟通过；新口径E2E及小时监督重启中，小时监督与精度实验进行中。([详情](task_details/TL-FROZEN-NEAR-FAR-20261029.md))
+- [x] [TL-FROZEN-NEAR-FAR-20261029] 独立分支完成Near暂存/Far驱逐双门探索：5海选×20条×5臂=500结果；双向0.10 AVG5 +0.176、0.15 −0.502；14回归及500组评分/缓存核验通过。仅探索子集，不宣称全量无损或改动生产默认。([详情](task_details/TL-FROZEN-NEAR-FAR-20261029.md))
 
 ## 2026-10-28
 

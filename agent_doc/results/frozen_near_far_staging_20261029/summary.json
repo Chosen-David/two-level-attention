@@ -1,0 +1,833 @@
+{
+  "identity": "54fb76f1ea02b2b007e1a2e82b7c05d467be0af78cf8e03eda5e7c9095212b48",
+  "status": "complete",
+  "completed_requests": 100,
+  "expected_requests": 100,
+  "partial_requests": 0,
+  "protocol": {
+    "schema": "frozen-near-far-screen-v2-near-staging",
+    "model": "/home/wangyuanshuo02/Qwen3-8B",
+    "context_cap": 31500,
+    "samples_per_task": 20,
+    "seed": 42,
+    "statistic": "mean",
+    "thresholds": [
+      0.1,
+      0.15
+    ],
+    "datasets": [
+      "qasper",
+      "hotpotqa",
+      "musique",
+      "gov_report",
+      "repobench-p"
+    ],
+    "selected_rows": {
+      "qasper": [
+        152,
+        26,
+        115,
+        46,
+        38,
+        7,
+        79,
+        171,
+        148,
+        56,
+        20,
+        178,
+        106,
+        24,
+        144,
+        197,
+        190,
+        37,
+        138,
+        50
+      ],
+      "hotpotqa": [
+        152,
+        26,
+        115,
+        46,
+        38,
+        7,
+        79,
+        171,
+        148,
+        56,
+        20,
+        178,
+        106,
+        24,
+        144,
+        197,
+        190,
+        37,
+        138,
+        50
+      ],
+      "musique": [
+        152,
+        26,
+        115,
+        46,
+        38,
+        7,
+        79,
+        171,
+        148,
+        56,
+        20,
+        178,
+        106,
+        24,
+        144,
+        197,
+        190,
+        37,
+        138,
+        50
+      ],
+      "gov_report": [
+        152,
+        26,
+        115,
+        46,
+        38,
+        7,
+        79,
+        171,
+        148,
+        56,
+        20,
+        178,
+        106,
+        24,
+        144,
+        197,
+        190,
+        37,
+        138,
+        50
+      ],
+      "repobench-p": [
+        473,
+        132,
+        472,
+        46,
+        40,
+        232,
+        45,
+        428,
+        326,
+        159,
+        291,
+        235,
+        453,
+        107,
+        367,
+        115,
+        280,
+        357,
+        185,
+        327
+      ]
+    },
+    "max_new_tokens": {
+      "qasper": 128,
+      "hotpotqa": 32,
+      "musique": 32,
+      "gov_report": 512,
+      "repobench-p": 64
+    },
+    "source_sha256": {
+      "sparse_attn/ops/frozen_region_cache.py": "1d5c46c25d29a907b6e584247b57256347af34cfa4f49d2c1125875c0692daa9",
+      "sparse_attn/ops/frozen_region_gate.py": "548107f8079b2fb6b3f410305a89d809e110aa7683721f00b7cae52e237b5178",
+      "benchmark/LongBench/prefill_frozen_skip.py": "cf869e580be2c90df8f2c6a4129de0bd380d4b7fc2d0aef8046220609e0d158c",
+      "benchmark/LongBench/metrics.py": "29a325fa4b4cb81660b1b560bc102d4682fdb39414b75eaa28ad19a2cffe04a0",
+      "benchmark/LongBench/eval.py": "dd945b78e93c0f267efa9099e4834b2081fd32268fe554f763f5372a0124f325",
+      "benchmark/LongBench/config/dataset2prompt.json": "ac8056e8542bf4ad42b549d9ba450ef18819b6b2987f65973e20e7eeff6bbd1a",
+      "benchmark/LongBench/config/dataset2maxlen.json": "77e621d722647fc8d5293202cea5fbf0d06568848fac86de2b45cab122455391"
+    },
+    "dataset_sha256": {
+      "qasper": "29aa07d2a63f36f4fb8e8cd200a3428ee3126d750bde6af1c8f9bc41c2366854",
+      "hotpotqa": "a0005ab2a1bc2ac3a70352dccbf96cccc4e0aac6bb677f6a55180fa51b92ef6f",
+      "musique": "4ac69b91281c4ec6b21316cb7282e83fb6b4dda04fc68480bb8d8ed1e19ff7bd",
+      "gov_report": "d28112beb3a9b41d80aa390837fa1a31c9e3da84a5262009c97585cc49f597c4",
+      "repobench-p": "919a4439e2a84ebb25bacc39ac3b3269a7641af6e02ae205ed78d8c53dfe3568"
+    },
+    "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+    "tokenizer_config_sha256": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+    "torch": "2.8.0+cu128",
+    "transformers": "4.56.2",
+    "dtype": "bfloat16",
+    "world_size": 2,
+    "git_head": "62f6fb4c55bda6fe5b8d3a3cfc6c3ab6bb2ca8e4",
+    "eviction": "far-only: evict far; near-only: keep attention-invisible near staging and migrate to far; both: sink+SWA only",
+    "calibration": "query-relative page boundaries, last256 rows; head means; joint near+far dropped-mass budget"
+  },
+  "arms": {
+    "full": {
+      "per_task": {
+        "qasper": 53.23811726927893,
+        "hotpotqa": 65.52380952380952,
+        "musique": 45.083333333333336,
+        "gov_report": 35.24936080981583,
+        "repobench-p": 70.3
+      },
+      "per_task_activation": {
+        "qasper": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 0,
+          "exact_full_generation": 20
+        },
+        "hotpotqa": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 0,
+          "exact_full_generation": 20
+        },
+        "musique": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 0,
+          "exact_full_generation": 20
+        },
+        "gov_report": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 0,
+          "exact_full_generation": 20
+        },
+        "repobench-p": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 0,
+          "exact_full_generation": 20
+        }
+      },
+      "avg5": 53.87892418724753,
+      "gate_counts": {
+        "keep": 3600,
+        "near": 0,
+        "far": 0,
+        "both": 0
+      },
+      "near_active_requests": 0,
+      "far_active_requests": 0,
+      "exact_full_generation": 100,
+      "frozen_kv_ratio_mean": 1.0,
+      "frozen_attention_token_ratio_mean": 1.0,
+      "near_only_layer_count": 0,
+      "near_only_layer_kv_ratio_mean": null,
+      "near_only_layer_attention_ratio_mean": null,
+      "far_decisions_differ_from_far_only": 0
+    },
+    "far_0.1": {
+      "per_task": {
+        "qasper": 53.513551512455116,
+        "hotpotqa": 65.52380952380952,
+        "musique": 45.083333333333336,
+        "gov_report": 34.471008776648766,
+        "repobench-p": 71.55
+      },
+      "per_task_activation": {
+        "qasper": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 11,
+          "exact_full_generation": 18
+        },
+        "hotpotqa": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 19,
+          "exact_full_generation": 19
+        },
+        "musique": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 20,
+          "exact_full_generation": 19
+        },
+        "gov_report": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 17,
+          "exact_full_generation": 3
+        },
+        "repobench-p": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 17,
+          "exact_full_generation": 9
+        }
+      },
+      "avg5": 54.02834062924935,
+      "gate_counts": {
+        "keep": 2787,
+        "near": 0,
+        "far": 813,
+        "both": 0
+      },
+      "near_active_requests": 0,
+      "far_active_requests": 84,
+      "exact_full_generation": 68,
+      "frozen_kv_ratio_mean": 0.8841683032515149,
+      "frozen_attention_token_ratio_mean": 0.8870428292340591,
+      "near_only_layer_count": 0,
+      "near_only_layer_kv_ratio_mean": null,
+      "near_only_layer_attention_ratio_mean": null,
+      "far_decisions_differ_from_far_only": 0
+    },
+    "dual_0.1": {
+      "per_task": {
+        "qasper": 53.513551512455116,
+        "hotpotqa": 65.52380952380952,
+        "musique": 45.083333333333336,
+        "gov_report": 34.60351304952326,
+        "repobench-p": 71.55
+      },
+      "per_task_activation": {
+        "qasper": {
+          "n": 20,
+          "near_active": 1,
+          "far_active": 11,
+          "exact_full_generation": 18
+        },
+        "hotpotqa": {
+          "n": 20,
+          "near_active": 4,
+          "far_active": 19,
+          "exact_full_generation": 19
+        },
+        "musique": {
+          "n": 20,
+          "near_active": 9,
+          "far_active": 20,
+          "exact_full_generation": 19
+        },
+        "gov_report": {
+          "n": 20,
+          "near_active": 6,
+          "far_active": 17,
+          "exact_full_generation": 1
+        },
+        "repobench-p": {
+          "n": 20,
+          "near_active": 3,
+          "far_active": 17,
+          "exact_full_generation": 9
+        }
+      },
+      "avg5": 54.05484148382425,
+      "gate_counts": {
+        "keep": 2709,
+        "near": 92,
+        "far": 795,
+        "both": 4
+      },
+      "near_active_requests": 23,
+      "far_active_requests": 84,
+      "exact_full_generation": 66,
+      "frozen_kv_ratio_mean": 0.8864977900827274,
+      "frozen_attention_token_ratio_mean": 0.8815027945765885,
+      "near_only_layer_count": 92,
+      "near_only_layer_kv_ratio_mean": 1.0,
+      "near_only_layer_attention_ratio_mean": 0.6933230991043895,
+      "far_decisions_differ_from_far_only": 14
+    },
+    "far_0.15": {
+      "per_task": {
+        "qasper": 53.38697911286694,
+        "hotpotqa": 65.52380952380952,
+        "musique": 45.483333333333334,
+        "gov_report": 34.28176016509049,
+        "repobench-p": 73.10000000000001
+      },
+      "per_task_activation": {
+        "qasper": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 11,
+          "exact_full_generation": 17
+        },
+        "hotpotqa": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 19,
+          "exact_full_generation": 19
+        },
+        "musique": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 20,
+          "exact_full_generation": 19
+        },
+        "gov_report": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 17,
+          "exact_full_generation": 3
+        },
+        "repobench-p": {
+          "n": 20,
+          "near_active": 0,
+          "far_active": 17,
+          "exact_full_generation": 9
+        }
+      },
+      "avg5": 54.355176427020055,
+      "gate_counts": {
+        "keep": 2382,
+        "near": 0,
+        "far": 1218,
+        "both": 0
+      },
+      "near_active_requests": 0,
+      "far_active_requests": 84,
+      "exact_full_generation": 67,
+      "frozen_kv_ratio_mean": 0.8208119481656818,
+      "frozen_attention_token_ratio_mean": 0.8249944032465522,
+      "near_only_layer_count": 0,
+      "near_only_layer_kv_ratio_mean": null,
+      "near_only_layer_attention_ratio_mean": null,
+      "far_decisions_differ_from_far_only": 0
+    },
+    "dual_0.15": {
+      "per_task": {
+        "qasper": 49.9214959820694,
+        "hotpotqa": 64.52380952380952,
+        "musique": 47.583333333333336,
+        "gov_report": 33.15386444930234,
+        "repobench-p": 71.7
+      },
+      "per_task_activation": {
+        "qasper": {
+          "n": 20,
+          "near_active": 20,
+          "far_active": 11,
+          "exact_full_generation": 11
+        },
+        "hotpotqa": {
+          "n": 20,
+          "near_active": 20,
+          "far_active": 19,
+          "exact_full_generation": 18
+        },
+        "musique": {
+          "n": 20,
+          "near_active": 19,
+          "far_active": 20,
+          "exact_full_generation": 18
+        },
+        "gov_report": {
+          "n": 20,
+          "near_active": 17,
+          "far_active": 17,
+          "exact_full_generation": 0
+        },
+        "repobench-p": {
+          "n": 20,
+          "near_active": 17,
+          "far_active": 17,
+          "exact_full_generation": 8
+        }
+      },
+      "avg5": 53.37650065770292,
+      "gate_counts": {
+        "keep": 2056,
+        "near": 378,
+        "far": 1033,
+        "both": 133
+      },
+      "near_active_requests": 93,
+      "far_active_requests": 84,
+      "exact_full_generation": 55,
+      "frozen_kv_ratio_mean": 0.8163501740055675,
+      "frozen_attention_token_ratio_mean": 0.7799374905179813,
+      "near_only_layer_count": 378,
+      "near_only_layer_kv_ratio_mean": 1.0,
+      "near_only_layer_attention_ratio_mean": 0.6169814578522821,
+      "far_decisions_differ_from_far_only": 52
+    }
+  },
+  "comparisons": {
+    "far_0.1-vs-full": {
+      "per_task": {
+        "qasper": {
+          "n": 20,
+          "delta_pp": 0.2754342431761784,
+          "ci95_pp": [
+            -0.5769230769230773,
+            1.4032258064516125
+          ],
+          "degraded": 1,
+          "improved": 1
+        },
+        "hotpotqa": {
+          "n": 20,
+          "delta_pp": 0.0,
+          "ci95_pp": [
+            0.0,
+            0.0
+          ],
+          "degraded": 0,
+          "improved": 0
+        },
+        "musique": {
+          "n": 20,
+          "delta_pp": 0.0,
+          "ci95_pp": [
+            0.0,
+            0.0
+          ],
+          "degraded": 0,
+          "improved": 0
+        },
+        "gov_report": {
+          "n": 20,
+          "delta_pp": -0.7783520331670631,
+          "ci95_pp": [
+            -1.8614608590374155,
+            0.2449955130581652
+          ],
+          "degraded": 12,
+          "improved": 5
+        },
+        "repobench-p": {
+          "n": 20,
+          "delta_pp": 1.25,
+          "ci95_pp": [
+            0.0,
+            3.25
+          ],
+          "degraded": 0,
+          "improved": 2
+        }
+      },
+      "avg5": {
+        "delta_pp": 0.14941644200182305,
+        "ci95_pp": [
+          -0.25498600852840336,
+          0.6426625120610266
+        ]
+      }
+    },
+    "dual_0.1-vs-full": {
+      "per_task": {
+        "qasper": {
+          "n": 20,
+          "delta_pp": 0.2754342431761784,
+          "ci95_pp": [
+            -0.5769230769230773,
+            1.4032258064516125
+          ],
+          "degraded": 1,
+          "improved": 1
+        },
+        "hotpotqa": {
+          "n": 20,
+          "delta_pp": 0.0,
+          "ci95_pp": [
+            0.0,
+            0.0
+          ],
+          "degraded": 0,
+          "improved": 0
+        },
+        "musique": {
+          "n": 20,
+          "delta_pp": 0.0,
+          "ci95_pp": [
+            0.0,
+            0.0
+          ],
+          "degraded": 0,
+          "improved": 0
+        },
+        "gov_report": {
+          "n": 20,
+          "delta_pp": -0.6458477602925833,
+          "ci95_pp": [
+            -1.824329482575238,
+            0.5056758107415975
+          ],
+          "degraded": 13,
+          "improved": 6
+        },
+        "repobench-p": {
+          "n": 20,
+          "delta_pp": 1.25,
+          "ci95_pp": [
+            0.0,
+            3.0000000000000004
+          ],
+          "degraded": 0,
+          "improved": 2
+        }
+      },
+      "avg5": {
+        "delta_pp": 0.175917296576719,
+        "ci95_pp": [
+          -0.23802125091472612,
+          0.6534001593515305
+        ]
+      }
+    },
+    "far_0.15-vs-full": {
+      "per_task": {
+        "qasper": {
+          "n": 20,
+          "delta_pp": 0.14886184358801052,
+          "ci95_pp": [
+            -1.3333333333333315,
+            1.6640748253324325
+          ],
+          "degraded": 1,
+          "improved": 2
+        },
+        "hotpotqa": {
+          "n": 20,
+          "delta_pp": 0.0,
+          "ci95_pp": [
+            0.0,
+            0.0
+          ],
+          "degraded": 0,
+          "improved": 0
+        },
+        "musique": {
+          "n": 20,
+          "delta_pp": 0.4,
+          "ci95_pp": [
+            0.0,
+            1.2
+          ],
+          "degraded": 0,
+          "improved": 1
+        },
+        "gov_report": {
+          "n": 20,
+          "delta_pp": -0.9676006447253451,
+          "ci95_pp": [
+            -3.0407849797392874,
+            0.9203296305886431
+          ],
+          "degraded": 10,
+          "improved": 7
+        },
+        "repobench-p": {
+          "n": 20,
+          "delta_pp": 2.8,
+          "ci95_pp": [
+            0.0,
+            6.6
+          ],
+          "degraded": 0,
+          "improved": 3
+        }
+      },
+      "avg5": {
+        "delta_pp": 0.47625223977253306,
+        "ci95_pp": [
+          -0.3067285665853365,
+          1.3919100377080886
+        ]
+      }
+    },
+    "dual_0.15-vs-full": {
+      "per_task": {
+        "qasper": {
+          "n": 20,
+          "delta_pp": -3.3166212872095215,
+          "ci95_pp": [
+            -10.863082505729563,
+            4.22192513368984
+          ],
+          "degraded": 5,
+          "improved": 3
+        },
+        "hotpotqa": {
+          "n": 20,
+          "delta_pp": -0.9999999999999998,
+          "ci95_pp": [
+            -2.999999999999999,
+            0.0
+          ],
+          "degraded": 1,
+          "improved": 0
+        },
+        "musique": {
+          "n": 20,
+          "delta_pp": 2.5,
+          "ci95_pp": [
+            0.0,
+            7.5
+          ],
+          "degraded": 0,
+          "improved": 1
+        },
+        "gov_report": {
+          "n": 20,
+          "delta_pp": -2.0954963605134873,
+          "ci95_pp": [
+            -3.963628363923869,
+            -0.43329852761539334
+          ],
+          "degraded": 13,
+          "improved": 7
+        },
+        "repobench-p": {
+          "n": 20,
+          "delta_pp": 1.4,
+          "ci95_pp": [
+            0.0,
+            3.25
+          ],
+          "degraded": 0,
+          "improved": 3
+        }
+      },
+      "avg5": {
+        "delta_pp": -0.5024235295446018,
+        "ci95_pp": [
+          -2.46230475626965,
+          1.4752271649095376
+        ]
+      }
+    },
+    "dual_0.1-vs-far_0.1": {
+      "per_task": {
+        "qasper": {
+          "n": 20,
+          "delta_pp": 0.0,
+          "ci95_pp": [
+            0.0,
+            0.0
+          ],
+          "degraded": 0,
+          "improved": 0
+        },
+        "hotpotqa": {
+          "n": 20,
+          "delta_pp": 0.0,
+          "ci95_pp": [
+            0.0,
+            0.0
+          ],
+          "degraded": 0,
+          "improved": 0
+        },
+        "musique": {
+          "n": 20,
+          "delta_pp": 0.0,
+          "ci95_pp": [
+            0.0,
+            0.0
+          ],
+          "degraded": 0,
+          "improved": 0
+        },
+        "gov_report": {
+          "n": 20,
+          "delta_pp": 0.1325042728744799,
+          "ci95_pp": [
+            -0.18477432613383518,
+            0.46028532981529535
+          ],
+          "degraded": 2,
+          "improved": 4
+        },
+        "repobench-p": {
+          "n": 20,
+          "delta_pp": 0.0,
+          "ci95_pp": [
+            0.0,
+            0.0
+          ],
+          "degraded": 0,
+          "improved": 0
+        }
+      },
+      "avg5": {
+        "delta_pp": 0.026500854574895982,
+        "ci95_pp": [
+          -0.03696811219982862,
+          0.09264855777079198
+        ]
+      }
+    },
+    "dual_0.15-vs-far_0.15": {
+      "per_task": {
+        "qasper": {
+          "n": 20,
+          "delta_pp": -3.4654831307975322,
+          "ci95_pp": [
+            -11.52101973415361,
+            4.0657501558617115
+          ],
+          "degraded": 5,
+          "improved": 1
+        },
+        "hotpotqa": {
+          "n": 20,
+          "delta_pp": -0.9999999999999998,
+          "ci95_pp": [
+            -2.999999999999999,
+            0.0
+          ],
+          "degraded": 1,
+          "improved": 0
+        },
+        "musique": {
+          "n": 20,
+          "delta_pp": 2.1,
+          "ci95_pp": [
+            0.0,
+            6.3
+          ],
+          "degraded": 0,
+          "improved": 1
+        },
+        "gov_report": {
+          "n": 20,
+          "delta_pp": -1.127895715788142,
+          "ci95_pp": [
+            -2.2192086836393323,
+            0.012686262974081134
+          ],
+          "degraded": 11,
+          "improved": 6
+        },
+        "repobench-p": {
+          "n": 20,
+          "delta_pp": -1.4,
+          "ci95_pp": [
+            -4.199999999999999,
+            0.0
+          ],
+          "degraded": 1,
+          "improved": 0
+        }
+      },
+      "avg5": {
+        "delta_pp": -0.9786757693171346,
+        "ci95_pp": [
+          -2.8614597082401345,
+          0.891600178161849
+        ]
+      }
+    }
+  },
+  "completed_per_task": {
+    "qasper": 20,
+    "hotpotqa": 20,
+    "musique": 20,
+    "gov_report": 20,
+    "repobench-p": 20
+  },
+  "scope": "Exploratory paired request bootstrap, 5000 repeats, task-stratified macro AVG5; CI containing zero is not proof of equivalence. Near-only retains staging KV and skips attention work only; far-only/both physically evict nodes. No TLI champion selection or performance claim."
+}

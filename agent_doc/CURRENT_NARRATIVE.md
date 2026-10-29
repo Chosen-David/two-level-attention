@@ -325,6 +325,8 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 | 过时结论（出现在 archived 报告/早期叙事中） | 推翻/修正判决 |
 |---|---|
+| Near-only可直接永久删除KV并同时保留完整滑动Far | 2026-10-29双门探索改为Near-only显式暂存、老化后迁Far，不计Near-only的KV节省；Far-only/双skip仍物理驱逐。见`agent_doc/results/frozen_near_far_staging_20261029/REPORT.md`（独立实验分支）。 |
+| 双门标定低质量即普遍无损，AVG5可替代多跳单任务验证 | 同分支5任务×20条探索：dual0.10 AVG5 +.176但GovReport下降；dual0.15 AVG5 −.502且Qasper/HotpotQA/GovReport下降。Musique/HotpotQA子集已分别报告；非全量、非生产TLI质量门，不改变冠军默认。 |
 | 保护带（boundary bypass 前的 sink/swa 保护带几何）假设最优 | `e148_sinkswa_verdict.json`（否决） |
 | prefill 稀疏可提速（FS/prefill sparse e2e） | `e149_sink4_verdict.json`（FS 质量 -5.18% → decode-only 叙事）；prefill 性能详见 `e139_prefill_profile_verdict.json` / `e140a_prefill_k1up_verdict.json` |
 | K1 越大越好 | `e140b_k1_downscan_verdict.json` + `e140h_k64sweet_verdict.json`（倒 U 峰 K1=64）+ `e168_k64_e2e_verdict.json` / `e169_k64_llama_verdict.json`（K1=64 双模型族 e2e 成立，2026-10-25 生产口径切换 K1=64） |

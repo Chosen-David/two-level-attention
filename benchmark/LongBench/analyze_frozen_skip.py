@@ -21,19 +21,26 @@ def analyze(outdir):
     protocol=manifests[0]['protocol'];identity=manifests[0]['identity']
     staging_policy = protocol.get('schema')=='frozen-near-far-screen-v2-near-staging'
     expected={(ds,i) for ds,ids in protocol['selected_rows'].items() for i in ids}
-    records=[];partial=0
+    records=[];partial=0;seen=set()
     for p in outdir.glob('requests/*/*.json'):
         r=json.loads(p.read_text())
         if r['identity']!=identity: raise ValueError('result identity mismatch')
         if (r['dataset'],r['row_index']) not in expected:raise ValueError('unexpected row')
+        key=(r['dataset'],r['row_index'])
+        if key in seen:raise ValueError('duplicate request identity')
+        seen.add(key)
+        if r['status'] not in ('complete','running'):raise ValueError('unknown request status')
         if r['status']=='complete':records.append(r)
         else:partial+=1
+    task_order={ds:i for i,ds in enumerate(protocol['datasets'])}
+    records.sort(key=lambda r:(task_order[r['dataset']],r['row_index']))
     arm_names=['full']+[f'{mode}_{eps:g}' for eps in protocol['thresholds'] for mode in ['far','dual']]
     for r in records:
         if set(r['arms'])!=set(arm_names):raise ValueError('completed row has incomplete arms')
     result=dict(identity=identity,status='complete' if len(records)==len(expected) else 'running',
                 completed_requests=len(records),expected_requests=len(expected),partial_requests=partial,
                 protocol=protocol,arms={},comparisons={})
+    result['completed_per_task']={ds:sum(r['dataset']==ds for r in records) for ds in protocol['datasets']}
     if (outdir/'STOPPED.json').exists(): result['status']='superseded'
     rng=np.random.default_rng(42)
     for arm in arm_names:
@@ -42,18 +49,40 @@ def analyze(outdir):
         counts={name:sum(r['arms'][arm]['gate_counts'][name] for r in records) for name in ['keep','near','far','both']}
         near_active=sum(any(d['skip_near'] for d in r['arms'][arm]['decisions'].values()) for r in records)
         far_active=sum(any(d['skip_far'] for d in r['arms'][arm]['decisions'].values()) for r in records)
+        task_activation={}
+        for ds in protocol['datasets']:
+            group=[r for r in records if r['dataset']==ds]
+            task_activation[ds]=dict(n=len(group),
+                near_active=sum(any(d['skip_near'] for d in r['arms'][arm]['decisions'].values()) for r in group),
+                far_active=sum(any(d['skip_far'] for d in r['arms'][arm]['decisions'].values()) for r in group),
+                exact_full_generation=sum(r['arms'][arm]['generated_ids']==r['arms']['full']['generated_ids'] for r in group))
         ratios=[r['arms'][arm]['frozen_kv']['kv_bytes']/r['arms'][arm]['prefill_full_kv']['kv_bytes'] for r in records]
         work_ratios=[]
+        near_only_kv_ratios=[]
+        near_only_work_ratios=[]
+        far_choices_changed=0
         for r in records:
             frozen=r['arms'][arm]['frozen_kv'].get('layers',[])
             full=r['arms'][arm]['prefill_full_kv'].get('layers',[])
             if frozen and full and all('attention_tokens' in layer for layer in frozen+full):
                 work_ratios.append(sum(layer['attention_tokens'] for layer in frozen)/sum(layer['attention_tokens'] for layer in full))
-        result['arms'][arm]=dict(per_task=scores,avg5=float(np.mean(list(scores.values()))) if len(scores)==5 else None,
+                for li,d in r['arms'][arm]['decisions'].items():
+                    if d['skip_near'] and not d['skip_far']:
+                        before,after=full[int(li)],frozen[int(li)]
+                        near_only_kv_ratios.append(sum(n['kv_bytes'] for n in after['nodes'].values())/sum(n['kv_bytes'] for n in before['nodes'].values()))
+                        near_only_work_ratios.append(after['attention_tokens']/before['attention_tokens'])
+            if arm.startswith('dual_'):
+                counterpart='far_'+arm.split('_',1)[1]
+                far_choices_changed+=sum(d['skip_far']!=r['arms'][counterpart]['decisions'][li]['skip_far'] for li,d in r['arms'][arm]['decisions'].items())
+        result['arms'][arm]=dict(per_task=scores,per_task_activation=task_activation,avg5=float(np.mean(list(scores.values()))) if len(scores)==5 else None,
             gate_counts=counts,near_active_requests=near_active,far_active_requests=far_active,
             exact_full_generation=sum(r['arms'][arm]['generated_ids']==r['arms']['full']['generated_ids'] for r in records),
             frozen_kv_ratio_mean=float(np.mean(ratios)) if ratios else None,
-            frozen_attention_token_ratio_mean=float(np.mean(work_ratios)) if work_ratios else None)
+            frozen_attention_token_ratio_mean=float(np.mean(work_ratios)) if work_ratios else None,
+            near_only_layer_count=len(near_only_kv_ratios),
+            near_only_layer_kv_ratio_mean=float(np.mean(near_only_kv_ratios)) if near_only_kv_ratios else None,
+            near_only_layer_attention_ratio_mean=float(np.mean(near_only_work_ratios)) if near_only_work_ratios else None,
+            far_decisions_differ_from_far_only=far_choices_changed)
     pairs=[(arm,'full') for arm in arm_names if arm!='full']+[(f'dual_{eps:g}',f'far_{eps:g}') for eps in protocol['thresholds']]
     for arm,base in pairs:
         tasks={};groups=[]
@@ -73,15 +102,25 @@ def analyze(outdir):
     result['scope']='Exploratory paired request bootstrap, 5000 repeats, task-stratified macro AVG5; CI containing zero is not proof of equivalence. '+policy+' No TLI champion selection or performance claim.'
     atomic_json(outdir/'summary.json',result)
     lines=['# Frozen near/far cache exploration','',f"Status: {result['status']}; paired requests {len(records)}/{len(expected)}.",'',
-           '| arm | AVG5 | near active | far active | frozen KV / full |','|---|---:|---:|---:|---:|']
+           '| arm | AVG5 | near-active requests | far-active requests | frozen KV / full-node KV | attention tokens / full |',
+           '|---|---:|---:|---:|---:|---:|']
     for arm,a in result['arms'].items():
         avg='pending' if a['avg5'] is None else f"{a['avg5']:.4f}"
         ratio='pending' if a['frozen_kv_ratio_mean'] is None else f"{a['frozen_kv_ratio_mean']:.4f}"
-        lines.append(f"| {arm} | {avg} | {a['near_active_requests']} | {a['far_active_requests']} | {ratio} |")
+        work='pending' if a['frozen_attention_token_ratio_mean'] is None else f"{a['frozen_attention_token_ratio_mean']:.4f}"
+        lines.append(f"| {arm} | {avg} | {a['near_active_requests']} | {a['far_active_requests']} | {ratio} | {work} |")
+    lines+=['','Per-task scores (0–100):','',
+            '| arm | '+' | '.join(protocol['datasets'])+' |',
+            '|---|'+'---:|'*len(protocol['datasets'])]
+    for arm,a in result['arms'].items():
+        lines.append('| '+arm+' | '+' | '.join(f"{a['per_task'][ds]:.4f}" if ds in a['per_task'] else 'pending' for ds in protocol['datasets'])+' |')
     lines+=['','Paired differences (percentage points):','']
     for pair,c in result['comparisons'].items():
         if c['avg5']:lines.append(f"- {pair}: {c['avg5']['delta_pp']:+.4f}; bootstrap 95% CI {c['avg5']['ci95_pp']}")
-    lines+=['',result['scope']]
+    lines+=['',result['scope'],'',
+            'KV ratios measure allocated cache-node capacity, relative to the same full-node cache; they exclude model weights, gather temporaries and allocator behavior. Attention-token ratios are a pre-decode work proxy, not measured speedups.',
+            'Dual gates share a combined calibrated mass budget: adding near gating may replace an eligible far decision. Dual-vs-far is a policy comparison, not a pure near-only ablation.',
+            'Near-active and far-active request counts include both-skip states.']
     (outdir/'REPORT.md').write_text('\n'.join(lines)+'\n')
     return result
 

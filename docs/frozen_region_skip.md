@@ -88,3 +88,20 @@ It does not change algorithms or kill unrelated processes. After completion it
 writes the paired report and exits. Its lock prevents a second supervisor for
 the same run; rank locks prevent duplicate workers. Source/input identities
 prevent incompatible result reuse.
+
+## Completed exploratory result
+
+Run `agent_doc/results/frozen_near_far_staging_20261029/` contains100 paired
+requests (20/task),500 generated outputs, all five screening tasks including
+Musique and HotpotQA. Full AVG5=53.8789; dual0.10=54.0548 (+.1759 pp;
+95% CI [−.2380,+.6534]); dual0.15=53.3765 (−.5024 pp). Mean non-regression
+in the small0.10 screen is not an equivalence result, and GovReport drops.
+The0.15 policy has larger per-task regressions. No production recommendation
+or TLI-champion integration follows from this prototype.
+
+`REPORT.md`, scores/paired-difference/activation TSVs and compact predictions
+are versioned. `raw_requests.tar.gz` restores complete per-layer traces under
+`requests/`; `raw_index.json` pins each trace. Generation commit62f6fb4 and
+source/data identities are in the manifests/provenance. All500 scores and18000
+request-layer states passed mechanical validation;14 unit/integration tests
+passed. Hourly supervision automatically completed and is no longer running.

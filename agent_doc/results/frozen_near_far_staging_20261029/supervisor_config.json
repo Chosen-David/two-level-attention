@@ -1,0 +1,27 @@
+{
+  "pid": 4092009,
+  "interval_seconds": 3600,
+  "worktree": "/home/wangyuanshuo02/two-level-attention-near-far-skip",
+  "devices": [
+    "0",
+    "1"
+  ],
+  "worker_command_base": [
+    "/home/wangyuanshuo02/two-level-attention/.venv/bin/python",
+    "-m",
+    "benchmark.LongBench.prefill_frozen_skip",
+    "--samples",
+    "20",
+    "--thresholds",
+    "0.10,0.15",
+    "--context-cap",
+    "31500",
+    "--world-size",
+    "2",
+    "--out",
+    "/home/wangyuanshuo02/two-level-attention-near-far-skip/agent_doc/results/frozen_near_far_staging_20261029",
+    "--verify-native-full"
+  ],
+  "max_restarts": 3,
+  "policy": "Only resume this run; no unrelated process termination; no automatic treatment changes."
+}

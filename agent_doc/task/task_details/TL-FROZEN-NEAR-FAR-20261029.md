@@ -59,3 +59,32 @@ independent agent review has been represented as completed.
   native full-cache output parity retained. In GovReport near-only layers
   L23/25/28/30, Far live tokens grew3132->3644 via Near staging, while each
   layer resident KV ratio stayed exactly1.0. Both-skip and far-only also activated.
+
+## Completion — 2026-10-29
+
+- Current staging-policy run completed100/100 paired requests and500/500
+  generated results, exactly20 per screening dataset. Workers completed at
+  12:07:44/12:11:10 Asia/Shanghai; hourly supervisor's log records automatic
+  completion at12:41. Supervisor is now closed.
+- Generation source commit62f6fb4; identity
+  54fb76f1ea02b2b007e1a2e82b7c05d467be0af78cf8e03eda5e7c9095212b48.
+- Full AVG5 53.8789; far0.10 54.0283; dual0.10 54.0548; far0.15 54.3552;
+  dual0.15 53.3765. Dual0.10−full +.1759 pp, 95% paired bootstrap
+  [−.2380,+.6534]; dual0.15−full −.5024 pp, CI [−2.4623,+1.4752].
+- Dual0.10 has near activated23/100 requests,92 near-only layer cases and4
+  both-skip cases. Dual0.15 has near activated93/100,378 near-only and133 both.
+  Near-only resident-node KV ratio is exactly1.0; no near KV saving claimed.
+- All500 scores re-evaluated with repository difflib scorer; all18000
+  request-layer cache records checked for geometry, token conservation, linked
+  visibility, full Far migration and source/input identities.470 near-only
+  layer cases,90 with observed Far growth; two native FullKV generation
+  checks; all arm prefill profiles identical.14 regression tests pass.
+- Multi-hop scope: Musique and HotpotQA are included. At0.10, all20 per-task
+  scores match FullKV (near active9/20 and4/20 respectively); this is not full
+  200-row coverage. At0.15, Musique +2.5 pp comes from one improvement;
+  HotpotQA has one degradation (−1.0 pp task average). Qasper and GovReport
+  also decline under dual0.15. AVG5 must not mask those regressions.
+- Final report, TSVs, compact predictions, raw trace archive, validation and
+  provenance live in agent_doc/results/frozen_near_far_staging_20261029/.
+  Local executable verification is complete; no independent third-party review
+  has been claimed. No production defaults or TLI L1/L2 integration changed.
