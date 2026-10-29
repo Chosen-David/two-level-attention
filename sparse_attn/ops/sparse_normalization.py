@@ -82,7 +82,18 @@ def _offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.con
     tl.store(OFFSETS+h*1025+r,lo,valid)
 
 
+def _packed_sort_enabled(capacity):
+    value=os.environ.get('TLI_SPARSE_SORT_INT16','0')
+    if value not in ('0','1'):
+        raise ValueError('TLI_SPARSE_SORT_INT16 must be 0 or 1')
+    if value=='1' and (type(capacity) is not int or not 0<capacity<65536):
+        raise ValueError('packed sparse sort requires integer capacity <65536')
+    return value=='1'
+
+
 def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False):
+    # Fail before extension build/capture or an empty-candidate early return.
+    packed=_packed_sort_enabled(capacity)
     if torch.__version__.split('+')[0]!='2.8.0' or scores.dtype!=torch.bfloat16:
         raise ValueError('pinned torch2.8.0 BF16 prototype only')
     if not all(t.is_cuda and t.is_contiguous() and t.device==scores.device for t in (scores,ids,keep)):
@@ -104,9 +115,6 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize==0:
             raise RuntimeError('warm up sparse normalization before capture')
         extension = build()
-    packed=os.environ.get('TLI_SPARSE_SORT_INT16','0')=='1'
-    if packed and not 0<capacity<65536:
-        raise ValueError('packed sparse sort requires capacity <65536')
     key_dtype=torch.int16 if packed else (torch.int32 if 1024*capacity<2**31 else torch.int64)
     keys=torch.empty_like(ids,dtype=key_dtype)
     valid=torch.empty_like(keep)

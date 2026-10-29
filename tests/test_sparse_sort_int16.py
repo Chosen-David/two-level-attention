@@ -62,3 +62,17 @@ def test_native_graph_probability_and_unique(monkeypatch,capacity):
         scores.copy_(token.gather(1,ids.repeat_interleave(g,0)))
         graph.replay();ref=run(0)
         for a,b in zip(actual,ref):assert torch.equal(a,b),(capacity,kind)
+
+@pytest.mark.parametrize('value',['','true','2','-1'])
+def test_packed_flag_is_explicit(monkeypatch,value):
+    from sparse_attn.ops.sparse_normalization import _packed_sort_enabled
+    monkeypatch.setenv('TLI_SPARSE_SORT_INT16',value)
+    with pytest.raises(ValueError,match='must be 0 or 1'):_packed_sort_enabled(32840)
+
+@pytest.mark.parametrize('capacity',[0,65536,131072,True,32768.0])
+def test_packed_capacity_guard(monkeypatch,capacity):
+    from sparse_attn.ops.sparse_normalization import _packed_sort_enabled
+    monkeypatch.setenv('TLI_SPARSE_SORT_INT16','1')
+    with pytest.raises(ValueError,match='integer capacity'):_packed_sort_enabled(capacity)
+    monkeypatch.setenv('TLI_SPARSE_SORT_INT16','0')
+    assert not _packed_sort_enabled(capacity)
