@@ -1,6 +1,19 @@
 """Strict per-request parity checks; decoded text alone can hide EOS changes."""
 
 
+def require_graph_capacity(prompt_lengths, max_gen, minimum=16384):
+    """Preflight actual tokenized lengths, never the dataset's nominal length."""
+    if type(max_gen) is not int or max_gen < 2:
+        raise ValueError('parity run requires at least two generated tokens')
+    if not prompt_lengths:
+        raise ValueError('no prompt lengths')
+    for length in prompt_lengths:
+        if type(length) is not int or length <= 0:
+            raise ValueError('invalid tokenized prompt length')
+        if length + max_gen < minimum:
+            raise ValueError(f'capacity_below_{minimum}: {length} + {max_gen}')
+
+
 def compare_predictions(reference, candidate):
     def index(rows):
         result = {}

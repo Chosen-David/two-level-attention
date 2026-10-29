@@ -1,6 +1,19 @@
 import pytest
 
-from exp.bench.quality_pairing import compare_predictions
+from exp.bench.quality_pairing import compare_predictions, require_graph_capacity
+
+
+def test_actual_token_capacity_boundary():
+    require_graph_capacity([16320, 32700], 64)
+    with pytest.raises(ValueError, match='capacity_below'):
+        require_graph_capacity([16319], 64)
+
+
+@pytest.mark.parametrize('lengths,max_gen', [([], 64), ([0], 64),
+                         ([True], 64), ([16384], 1), ([16384], True)])
+def test_invalid_preflight_inputs(lengths, max_gen):
+    with pytest.raises(ValueError):
+        require_graph_capacity(lengths, max_gen)
 
 
 def row(key='a', tokens=None):
