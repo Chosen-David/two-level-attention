@@ -1,7 +1,7 @@
 """Experimental exact BF16 normalization; full-domain ranking unchanged.
 
 Repeated IDs must have identical scores, as produced by the TLI fine scorer.
-Pinned to PyTorch 2.8 generic CUDA softmax; warm up before graph capture.
+Pinned to PyTorch 2.8 generic/shared CUDA softmax; warm up before graph capture.
 """
 import os
 from pathlib import Path
@@ -44,7 +44,7 @@ def _compact_gqa_mean(CP,OWNER,OUT,S:tl.constexpr,R:tl.constexpr,G:tl.constexpr,
 def build():
     if torch.__version__.split('+')[0]!='2.8.0':raise RuntimeError('requires pinned torch2.8.0 generic softmax')
     os.environ.setdefault('MAX_JOBS','1');root=Path(__file__).resolve().parent/'csrc'
-    return load(name='tli_virtual_softmax_compact_v4',sources=[str(root/'binding.cpp'),str(root/'virtual_softmax_compact.cu')],
+    return load(name='tli_virtual_softmax_compact_v5',sources=[str(root/'binding.cpp'),str(root/'virtual_softmax_compact.cu')],
                 extra_cflags=['-O3'],extra_cuda_cflags=['-O3','-std=c++17'],verbose=True)
 
 def probabilities(extension,scores,ids,keep,capacity,group,excluded=None):
@@ -72,7 +72,7 @@ def probabilities(extension,scores,ids,keep,capacity,group,excluded=None):
 
 
 def supported(scores, ids, keep, capacity, group):
-    """Only the pinned generic-softmax geometry preserves reference rounding."""
+    """Pinned generic/shared softmax geometry preserves reference rounding."""
     if torch.__version__.split('+')[0] != '2.8.0' or scores.dtype != torch.bfloat16:
         return False
     if scores.device != ids.device or scores.device != keep.device:
@@ -87,8 +87,7 @@ def supported(scores, ids, keep, capacity, group):
         return False
     if ids.shape[0]*capacity >= 2**31 or ids.shape[1] >= 2**31:
         return False
-    prop = torch.cuda.get_device_properties(scores.device)
-    return not (capacity < (prop.shared_memory_per_block - 128)//2 and capacity % 8 == 0)
+    return True
 
 
 def compact_probabilities(scores, ids, keep, capacity, group, excluded=None):

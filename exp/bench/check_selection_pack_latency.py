@@ -70,7 +70,9 @@ def main():
     watcher = threading.Thread(target=monitor, daemon=True)
     watcher.start()
     torch.manual_seed(729)
-    capacity = 32832
+    capacity = int(sys.argv[3]) if len(sys.argv) > 3 else 32832
+    if capacity <= 9216:
+        raise ValueError("normalization diagnostic requires capacity > 9216")
     q = torch.randn(1, 1, 32, 128, device='cuda', dtype=torch.bfloat16)
     k = torch.randn(1, capacity, 8, 128, device='cuda', dtype=q.dtype)
     length = torch.tensor([capacity], device='cuda')
