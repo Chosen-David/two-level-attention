@@ -72,6 +72,11 @@ def glm4_moe_lite_attn_forward(
     cur_len = 0
     is_static_cache = False
     if past_key_values is not None:
+        if (cache_position is not None and int(cache_position[0]) != 0
+                and past_key_values.get_seq_length(self.layer_idx) == 0):
+            raise RuntimeError(
+                "GLM TLI 非零 cache_position 需要已有 KV 历史；"
+                "空 cache 不得伪装成新请求 dense prefill")
         key_states, value_states = past_key_values.update(
             key_states, value_states, self.layer_idx)
         capacity = past_key_values.get_max_cache_shape()
@@ -116,6 +121,7 @@ def glm4_moe_lite_attn_forward(
                 and _can_drop_static_mask(
                     past_key_values, attention_mask, cur_len, prefill=True)):
             attention_mask = None
+        indexer.calibrate_dyn_dgate(query_states, key_states)
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -128,6 +134,7 @@ def glm4_moe_lite_attn_forward(
         )
         _paper_route(self.layer_idx, "dense-prefill")
     else:
+        self.indexer.freeze_dyn_dgate()
         ctx = batch_decode_ctx()
         if ctx is not None:
             attn_output = _tl_decode_batched(
