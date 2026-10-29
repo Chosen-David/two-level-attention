@@ -3444,6 +3444,7 @@ class TLIIndexer(TIAIndexer):
         _G_ = self.group_size
         _sm = F.softmax(score_fine, dim=-1)
         if (not self.per_q_head and _HAS_TRITON and _sm.is_contiguous()
+                and _sm.dtype == torch.bfloat16
                 and isinstance(_G_, int) and _G_ > 0
                 and (_G_ & (_G_ - 1)) == 0
                 and _sm.shape[2] % _G_ == 0):
@@ -4494,14 +4495,13 @@ class TLIIndexer(TIAIndexer):
         # 完整归约语义；S_cap+1 哨兵列避免无效槽覆盖真实末 token。
         keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)
         cand_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)
-        sfc = torch.where(keep_h, sfc, torch.full_like(sfc, float("-inf")))
         sf_full = torch.full(
             (H, S_cap + 1), float("-inf"), dtype=sfc.dtype, device=dev)
         safe_idx = torch.where(keep_h, cand_h, S_cap)
         sf_full.scatter_(1, safe_idx, sfc)
         score_full = sf_full[:, :S_cap]
         sm = F.softmax(score_full, dim=-1)
-        if (_HAS_TRITON and sm.is_contiguous()
+        if (_HAS_TRITON and sm.is_contiguous() and sm.dtype == torch.bfloat16
                 and (group_size & (group_size - 1)) == 0):
             p = torch.empty((Hkv, S_cap), dtype=sm.dtype, device=dev)
             # SWA 由下方动态 mask 置位；这里传空强制区，mid 值与 eager 相同。
@@ -4510,7 +4510,6 @@ class TLIIndexer(TIAIndexer):
                 G=group_size, BLOCK=1024, num_warps=4)
         else:
             p = sm.nan_to_num(nan=0).view(Hkv, group_size, S_cap).mean(dim=1)
-        p.masked_fill_(swa_force.view(1, -1), 1.0)
         # ---- 8. mid 全域 L2 自由竞争 ----
         # 固定 K2_static 保持 capture 形状；k2_mid 在终掩码装配处动态截断。
         # mid 外全为 -inf，前 k2_mid 名与 eager 的 mid 段 top-k 同集。

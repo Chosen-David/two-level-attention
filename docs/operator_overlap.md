@@ -20,3 +20,10 @@ then PYTHON=/same/python bash scripts/test_tli_operator.sh --cuda.
 
 Integration validation: 124 regression tests passed on the isolated main-based
 checkout; native compute-sanitizer memcheck: 63 passed, zero reported errors.
+
+Selector follow-up: BF16-specific GQA mean fusion now requires BF16 at both
+call sites. FP16/FP32 use the existing dtype-preserving reference chain. Removed
+a discarded sentinel-score mask and SWA fill overwritten by the subsequent
+middle-region mask. Dtype dispatch CPU checks and native G=1 eager/captured
+checks pass for FP16/BF16/FP32; 22 targeted native regression cases pass.
+These checks do not establish full-model quality or a selector speedup.
