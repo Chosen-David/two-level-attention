@@ -35,7 +35,7 @@ SIMT/TC x stage1/3 fork/join graph replay tests pass; these options are not an
 automatic tuning policy and do not establish model speedups.
 
 Opt-in exact normalization: `TLI_COMPACT_NORMALIZATION=1` removes dense
-query-head score/probability buffers for pinned Torch 2.8.0 BF16 generic CUDA
+query-head score/probability buffers for pinned Torch 2.8.0 BF16 generic/shared CUDA
 softmax geometry. Unsupported shapes retain the reference path. Warm up before
 Graph capture; the extension requires a CUDA compiler. Per-KV-head owner and
 ranking buffers remain full width; this is not yet fully candidate-domain Top-K.
@@ -53,12 +53,33 @@ was excluded by warmup, but per-request cache fill is included in request wall.
 This is not an FA2/overlap/quality claim. Evidence: project-local
 `agent_doc/results/operator_compact_integrated_20261029/paired-confirmed-domain`.
 
-Opt-in candidate-domain selection: set `TLI_OPERATOR_MODE=serial` and
-`TLI_SPARSE_SELECTION=1`. On the supported Torch 2.8.0 BF16 CUDA geometry
-(aligned capacity, native generic softmax, power-of-two GQA group, K2=1024),
-this removes the capacity-wide normalization, owner, ranking and middle-mask
-buffers after candidate scoring. Other geometries retain the existing selector.
-The flag stays off by default; overlap remains experimental.
+Opt-in candidate-domain selection: set `TLI_SPARSE_SELECTION=1`. On the
+supported Torch 2.8.0 BF16 CUDA geometry (aligned capacity above 9216,
+native generic/shared softmax, power-of-two GQA group, K2=1024), this removes
+capacity-wide normalization, owner and ranking buffers after candidate scoring.
+Serial/overlap consumers receive token IDs directly. The default mask consumer
+now also uses this selector when explicitly enabled, then reconstructs only its
+final bool mask with complete Sink/SWA and valid-length protection. Unsupported
+geometry falls back explicitly. The flag stays off by default; overlap remains
+experimental. Inspect `_graph_normalization_route`, `_graph_ranking_route` and
+`_graph_sparse_selection_fallback` on the actual capturing indexer.
+
+Normalization keys encode (native worker, traversal ordinal); sufficiently small
+geometries use shifted signed16 keys with the sentinel in range. Setting
+`TLI_SPARSE_NARROW_KEYS=0` uses wider keys with the same compact stride. It does
+not restore the historical capacity-stride implementation. New-source GPU and
+independent correctness evidence is in the main project's
+`graph_g1_sparse_shared_20261030_0080`, `graph_g1_sparse_mask_20261030_0100`,
+`graph_g1_sparse_narrow_20261030_0140` and `graph_g1_sparse_key_boundary_20261030_0141`
+result directories. These gates do not establish whole-benchmark accuracy.
+
+Current full-protection selector comparisons must not reuse the historical
+model speedups below. The 0090/0110 paired runs found sparse selection slower
+than the local compact normalization plus histogram/blocked-ranking baseline at
+both 16K and 32K. The 0150 same-stride key-width comparison independently measured
+5.99% lower selector replay latency for signed16 versus int32, but that increment
+alone does not establish sparse selection as the fastest route. These are B1
+synthetic selector diagnostics, not model TPOT or total-request conclusions.
 
 The implementation preserves each query head's native reduction order and
 BF16 rounding over unique L1/bypass and complete protected tokens. Normalization returns a canonical
