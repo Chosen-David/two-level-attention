@@ -5,10 +5,10 @@ import torch
 from sparse_attn.ops.partial_attention import partial_attention,merge_partials
 
 @pytest.mark.skipif(not torch.cuda.is_available(),reason='CUDA required')
-@pytest.mark.parametrize('stages',[1,2,3])
+@pytest.mark.parametrize('stages,protected_stages',[(1,1),(2,2),(3,3),(3,1)])
 @pytest.mark.parametrize('splits',[1,4])
 @pytest.mark.parametrize('round_query',[False,True])
-def test_multitile_pipeline_error_budget(stages,splits,round_query):
+def test_multitile_pipeline_error_budget(stages,protected_stages,splits,round_query):
     torch.manual_seed(32032)
     # Non-power-of-two GQA group exercises padded TC query rows.
     dtype=torch.bfloat16;g,h,d,n=3,2,128,1536
@@ -22,7 +22,7 @@ def test_multitile_pipeline_error_budget(stages,splits,round_query):
     def run():
         kw=dict(sink=4,swa=128,scale=scale,backend='tc',splits=splits,
                 pipeline_stages=stages,round_scaled_query=round_query)
-        a=partial_attention(q,k,v,(ids,counts),lengths,protected=True,**kw)
+        a=partial_attention(q,k,v,(ids,counts),lengths,protected=True,**(kw | dict(pipeline_stages=protected_stages)))
         b=partial_attention(q,k,v,(ids,counts),lengths,protected=False,**kw)
         return merge_partials(a,b,dtype)
     run();torch.cuda.synchronize();graph=torch.cuda.CUDAGraph()
@@ -54,7 +54,7 @@ def test_multitile_pipeline_error_budget(stages,splits,round_query):
             error=(actual[0,0,head*g:(head+1)*g].double()-truth).abs()
             max_ratio=max(max_ratio,(error/(budget+1e-12)).max().item())
             max_abs=max(max_abs,error.max().item())
-            assert bool((error<=budget+1e-12).all()),dict(stages=stages,splits=splits,
+            assert bool((error<=budget+1e-12).all()),dict(stages=stages,protected_stages=protected_stages,splits=splits,
                 round_query=round_query,count=count,max_budget_ratio=(error/(budget+1e-12)).max().item())
-    print(json.dumps(dict(stages=stages,splits=splits,round_query=round_query,
+    print(json.dumps(dict(stages=stages,protected_stages=protected_stages,splits=splits,round_query=round_query,
                           max_budget_ratio=max_ratio,max_absolute_error=max_abs)))
