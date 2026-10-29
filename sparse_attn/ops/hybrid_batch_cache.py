@@ -100,7 +100,10 @@ class HybridBatchCacheBuilder:
                 or len(self.lengths) >= self.cache.batch_size):
             raise ValueError('hybrid batch already filled or has an active row')
         row_cache = TLIStaticCache(self.model.config, self.cache.max_cache_len, 1)
-        prepare_direct_prefill(row_cache, self.model, length)
+        b = len(self.lengths)
+        targets = {li: (layer, b) for li, layer in enumerate(self.cache.layers)
+                   if not isinstance(layer, HybridBatchLayer)}
+        prepare_direct_prefill(row_cache, self.model, length, _linear_targets=targets)
         self._active_row = row_cache
         return row_cache
 
@@ -115,6 +118,18 @@ class HybridBatchCacheBuilder:
             if (source.keys is None or source.values is None
                     or source.cumulative_length != length):
                 raise ValueError('hybrid direct row has incomplete storage')
+            if not isinstance(layer, HybridBatchLayer):
+                if layer.keys is None or layer.values is None:
+                    raise ValueError('hybrid native direct row was not written into its batch target')
+                for source_tensor, batch_tensor in ((source.keys, layer.keys),
+                                                    (source.values, layer.values)):
+                    expected = batch_tensor[b:b+1]
+                    if (source_tensor.shape != expected.shape
+                            or source_tensor.stride() != expected.stride()
+                            or source_tensor.data_ptr() != expected.data_ptr()
+                            or source_tensor.untyped_storage().data_ptr()
+                            != expected.untyped_storage().data_ptr()):
+                        raise ValueError('hybrid native direct row does not own its final batch view')
         for li, layer in enumerate(cache.layers):
             source = row_cache.layers[li]
             if isinstance(layer, HybridBatchLayer):
@@ -127,11 +142,9 @@ class HybridBatchCacheBuilder:
                     layer.cu = torch.tensor([0, layer.max_cache_len], dtype=torch.int32,
                                             device=source.keys.device)
             else:
-                if layer.keys is None:
-                    layer.lazy_initialization(source.keys[..., :1, :].expand(
-                        cache.batch_size, -1, -1, -1))
-                layer.keys[b:b+1, :, :length].copy_(source.keys[..., :length, :])
-                layer.values[b:b+1, :, :length].copy_(source.values[..., :length, :])
+                # Direct staging wrote this native-dense row in place. Ownership
+                # stays with the batch buffer; only the B=1 proxy is discarded.
+                pass
             layer.cumulative_length = max(layer.cumulative_length, length)
         row_cache.layers = []
         row_cache._hybrid_row_consumed = True

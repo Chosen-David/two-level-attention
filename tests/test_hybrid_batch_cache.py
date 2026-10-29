@@ -80,21 +80,79 @@ def test_ragged_batch_matches_independent_retained_requests(batch):
     assert not graph_state().enabled
 
 
-def test_direct_rows_match_conversion_storage_and_decode():
+@pytest.mark.parametrize('batch', [1, 2, 8, 32])
+def test_direct_rows_match_conversion_storage_and_decode(batch):
     direct_model = make_model()
     conversion_model = copy.deepcopy(direct_model)
-    lengths, skips = [1, 23, 31], [True, False, True]
+    lengths = [[1, 7, 23, 31][b % 4] for b in range(batch)]
+    skips = [b % 2 == 0 for b in range(batch)]
     direct = build(direct_model, lengths, skips, direct=True)
     conversion = build(conversion_model, lengths, skips)
-    for actual, expected in zip(buffers(direct), buffers(conversion)):
-        torch.testing.assert_close(actual, expected, rtol=0, atol=0, equal_nan=True)
+    for actual_layer, expected_layer in zip(direct.cache.layers, conversion.cache.layers):
+        for b, length in enumerate(lengths):
+            actual_row = actual_layer.rows[b] if hasattr(actual_layer, 'rows') else actual_layer
+            expected_row = expected_layer.rows[b] if hasattr(expected_layer, 'rows') else expected_layer
+            assert type(actual_row) is type(expected_row)
+            for name in ('keys', 'values'):
+                actual = getattr(actual_row, name)
+                expected = getattr(expected_row, name)
+                if not hasattr(actual_layer, 'rows'):
+                    actual, expected = actual[b:b+1], expected[b:b+1]
+                if isinstance(actual_row, FarSkipStaticLayer):
+                    live = torch.cat((torch.arange(min(actual_row.config.sink_tokens, length)),
+                                      torch.arange(actual_row.config.tail_start(length), length)))
+                    actual = actual.index_select(2, actual_row.layout.map(live))
+                    expected = expected.index_select(2, expected_row.layout.map(live))
+                else:
+                    actual, expected = actual[..., :length, :], expected[..., :length, :]
+                torch.testing.assert_close(actual, expected, rtol=0, atol=0, equal_nan=True)
     for step in range(35):
-        tokens = [(b+step+3) % 32 for b in range(3)]
+        tokens = [(b+step+3) % 32 for b in range(batch)]
         current = [length+step+1 for length in lengths]
         direct.inject(tokens, current)
         conversion.inject(tokens, current)
         torch.testing.assert_close(direct.run().logits, conversion.run().logits,
                                    rtol=0, atol=0)
+
+
+def test_direct_native_row_is_final_batch_view_without_staging_owner():
+    model = make_model()
+    builder = HybridBatchCacheBuilder(model, 128, 2)
+    for b, (length, skip) in enumerate(((23, True), (31, False))):
+        set_gate(model, skip)
+        row_cache = builder.prepare_row(length)
+        model(input_ids=(torch.arange(length)[None] + b) % 32,
+              past_key_values=row_cache, use_cache=True)
+        staging = row_cache._direct_prefill
+        proxy = staging.states[1].linear
+        target = builder.cache.layers[1]
+        for name in ('keys', 'values'):
+            source = getattr(proxy, name)
+            batch = getattr(target, name)
+            assert source.data_ptr() == batch[b:b+1].data_ptr()
+            assert source.untyped_storage().data_ptr() == batch.untyped_storage().data_ptr()
+            assert source.untyped_storage().nbytes() == batch.untyped_storage().nbytes()
+        batch_ptrs = (target.keys.data_ptr(), target.values.data_ptr())
+        builder.finalize_row(row_cache, length)
+        assert batch_ptrs == (target.keys.data_ptr(), target.values.data_ptr())
+        assert row_cache._direct_prefill is None and row_cache.layers == []
+        assert all(state.linear_target is None for state in staging.states)
+    runner = HybridBatchRunner(model, builder.finish())
+    assert runner.kv_storage_bytes() == (17 + 128 + 2*128)*128*2*4
+
+
+def test_direct_native_wrong_target_fails_closed_and_builder_cannot_finish():
+    model = make_model()
+    builder = HybridBatchCacheBuilder(model, 128, 1)
+    row_cache = builder.prepare_row(23)
+    builder.cache.layers[1].max_cache_len = 64
+    with pytest.raises(ValueError, match='invalid native batch-row target'):
+        model(input_ids=torch.arange(23)[None] % 32,
+              past_key_values=row_cache, use_cache=True)
+    with pytest.raises(ValueError, match='active row'):
+        builder.prepare_row(23)
+    with pytest.raises(ValueError, match='fill every hybrid batch row'):
+        builder.finish()
 
 
 def test_short_non_page_aligned_capacity_with_large_l1_quota():

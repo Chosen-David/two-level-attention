@@ -335,6 +335,7 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 | e152v2 dynamic-cache 性能口径（TLI 3.4×/2.5×/1.8× slower） | 已被 `e152v4_formal_verdict.json` 整步 graph 口径取代（论文图 E2 已 in-place 重写，commit e5071cb） |
 | MLA 子空间增益可线性兑现到 e2e | `e158b_mla_rope_nope32_e2e_verdict.json` 饱和映射边界披露 |
 | γ-off 自由竞争需 CLI `--tli_gamma off` | 显式几何等价物 `--tli_near_tokens off`（E155d；γ 接口已删除） |
+| E182 direct prefill 的静态 skip linear+ring 双写、动态 non-skip ring→linear tail 回填、hybrid native B=1→batch 回拷是必要开销 | `e183_zero_copy_verdict.json`（三态 final-storage 消除三项额外工作；动态 skip 仅保留一次 provisional linear→ring 压实。最终 KV ownership 不变，首请求/graph pool/B32 共享机计时波动等边界按判决披露） |
 
 ## 6. 仓库结构速览（净化后）
 

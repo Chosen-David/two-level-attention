@@ -150,10 +150,13 @@ class TLIStaticLayer:
 
 
 class _DirectPrefillLayer:
-    def __init__(self, linear, config=None, needs_ring=True):
+    def __init__(self, linear, config=None, mode="LINEAR_PROVISIONAL", linear_target=None):
+        if mode not in ("RING_FINAL", "LINEAR_FINAL", "LINEAR_PROVISIONAL"):
+            raise ValueError(f"unknown direct prefill storage plan: {mode}")
         self.linear = linear
         self.config = config
-        self.needs_ring = needs_ring
+        self.mode = mode
+        self.linear_target = linear_target
         self.ring = None
         self.written = False
 
@@ -182,14 +185,37 @@ class DirectPrefillStaging:
         if state.config is not None and key_states.shape[-1] != 128:
             raise ValueError("direct compact prefill requires head_dim=128")
         linear = state.linear
-        linear.lazy_initialization(key_states)
-        prefix = L if state.config is None or not state.needs_ring else state.config.tail_start(L)
-        if prefix:
-            linear.keys[..., :prefix, :].copy_(key_states[..., :prefix, :])
-            linear.values[..., :prefix, :].copy_(value_states[..., :prefix, :])
-        if state.needs_ring:
+        if state.mode == "RING_FINAL":
             from .far_skip_cache import FarSkipLayer
             state.ring = FarSkipLayer.from_prefill(key_states, value_states, state.config)
+        else:
+            target = state.linear_target
+            if target is None:
+                linear.lazy_initialization(key_states)
+            else:
+                batch_layer, row = target
+                if (type(batch_layer) is not TLIStaticLayer or type(row) is not int
+                        or not 0 <= row < batch_layer.max_batch_size
+                        or batch_layer.max_cache_len != linear.max_cache_len):
+                    raise ValueError("direct prefill received an invalid native batch-row target")
+                if batch_layer.keys is None:
+                    batch_layer.lazy_initialization(key_states[..., :1, :].expand(
+                        batch_layer.max_batch_size, -1, -1, -1))
+                expected = (batch_layer.max_batch_size, key_states.shape[1],
+                            linear.max_cache_len, key_states.shape[-1])
+                if (batch_layer.keys.shape != expected
+                        or batch_layer.values.shape != expected
+                        or batch_layer.keys.dtype != key_states.dtype
+                        or batch_layer.values.dtype != value_states.dtype
+                        or batch_layer.keys.device != key_states.device
+                        or batch_layer.values.device != value_states.device):
+                    raise ValueError("direct prefill native batch-row target changed shape or dtype")
+                linear.keys = batch_layer.keys[row:row+1]
+                linear.values = batch_layer.values[row:row+1]
+                linear.num_heads, linear.head_dim = key_states.shape[1], key_states.shape[-1]
+                linear.dtype, linear.device = key_states.dtype, key_states.device
+            linear.keys[..., :L, :].copy_(key_states)
+            linear.values[..., :L, :].copy_(value_states)
         state.written = True
         # Dense prefill must consume the original full-history tensors, not a
         # static/ring view. Returning the incoming objects also preserves layout.
@@ -219,8 +245,12 @@ class TLIStaticCache(Cache):
         return super().update(key_states, value_states, layer_idx, cache_kwargs)
 
 
-def prepare_direct_prefill(cache: TLIStaticCache, model, length: int):
-    """Prepare direct partitioned storage for one dense compact+evict prefill."""
+def prepare_direct_prefill(cache: TLIStaticCache, model, length: int, _linear_targets=None):
+    """Prepare direct partitioned storage for one dense compact+evict prefill.
+
+    ``_linear_targets`` is internal to HybridBatchCacheBuilder: native-dense
+    layers bind their B=1 metadata proxy to the final batch row on first write.
+    """
     if (type(cache) is not TLIStaticCache or cache.batch_size != 1
             or getattr(cache, "_hybrid_batch", False)
             or getattr(cache, "_direct_prefill", None) is not None
@@ -233,6 +263,9 @@ def prepare_direct_prefill(cache: TLIStaticCache, model, length: int):
                if getattr(getattr(m, "indexer", None), "far_skip_backend", "legacy") == "compact"}
     if not modules:
         raise ValueError("direct prefill requires compact Qwen3 attention")
+    targets = {} if _linear_targets is None else dict(_linear_targets)
+    if any(type(li) is not int or not 0 <= li < len(cache.layers) for li in targets):
+        raise ValueError("direct prefill linear-target layer index out of range")
     states = []
     for li, old in enumerate(cache.layers):
         module = modules.get(li)
@@ -243,13 +276,21 @@ def prepare_direct_prefill(cache: TLIStaticCache, model, length: int):
                     or module.head_dim != 128 or idx.far_skip_config is None):
                 raise ValueError("direct prefill requires compact+evict, head_dim=128 and no native SWA")
             config = idx.far_skip_config
-        # A ring is useful only when this layer can actually evict far. Static
-        # skip sets are known before prefill; dynamic/unknown gates keep both arms.
-        needs_ring = config is not None and (
-            idx.dyn_dgate or (idx.enable_layer_skip and (
-                idx._skip_ids is None or li in idx._skip_ids)))
+            if li in targets:
+                raise ValueError("compact rows must transfer independent storage, not a batch-row target")
+            if not idx.dyn_dgate and idx.enable_layer_skip and idx._skip_ids is not None and li in idx._skip_ids:
+                mode = "RING_FINAL"
+            elif not idx.dyn_dgate and (not idx.enable_layer_skip or idx._skip_ids is not None):
+                mode = "LINEAR_FINAL"
+            else:
+                mode = "LINEAR_PROVISIONAL"
+        else:
+            mode = "LINEAR_FINAL"
+        target = targets.get(li)
+        if target is not None and mode != "LINEAR_FINAL":
+            raise ValueError("only final linear storage can bind a native batch-row target")
         states.append(_DirectPrefillLayer(
-            TLIStaticLayer(old.max_cache_len, 1), config, needs_ring))
+            TLIStaticLayer(old.max_cache_len, 1), config, mode, target))
     staging = DirectPrefillStaging(cache, length, states)
     cache.layers = [state.linear for state in states]
     for layer in cache.layers:
@@ -279,30 +320,44 @@ def finalize_direct_prefill(cache: TLIStaticCache, model, length: int):
     for li, state in enumerate(staging.states):
         linear = state.linear
         if (state.linear is not cache.layers[li] or not state.written
-                or linear.keys is None or linear.values is None
-                or linear.keys.shape[0] != 1 or linear.keys.shape[-2] < length
-                or linear.values.shape != linear.keys.shape):
-            raise ValueError("direct prefill has incomplete or replaced linear storage")
+                or state.mode not in ("RING_FINAL", "LINEAR_FINAL", "LINEAR_PROVISIONAL")):
+            raise ValueError("direct prefill has incomplete or replaced storage")
+        if state.mode == "RING_FINAL":
+            ring = state.ring
+            if (linear.keys is not None or linear.values is not None or ring is None
+                    or ring.config != state.config or ring.logical_length != length
+                    or ring.keys.shape[-2] != ring.layout.capacity
+                    or ring.values.shape != ring.keys.shape):
+                raise ValueError("direct prefill has incomplete or replaced ring storage")
+        else:
+            if (linear.keys is None or linear.values is None or state.ring is not None
+                    or linear.keys.shape[0] != 1 or linear.keys.shape[-2] < length
+                    or linear.values.shape != linear.keys.shape):
+                raise ValueError("direct prefill has incomplete or replaced linear storage")
+        target = state.linear_target
+        if target is not None:
+            batch_layer, row = target
+            if (type(batch_layer) is not TLIStaticLayer
+                    or batch_layer.keys is None or batch_layer.values is None):
+                raise ValueError("direct prefill native batch-row target is not initialized")
+            for source, batch in ((linear.keys, batch_layer.keys),
+                                  (linear.values, batch_layer.values)):
+                expected = batch[row:row+1]
+                if (source.shape != expected.shape or source.stride() != expected.stride()
+                        or source.data_ptr() != expected.data_ptr()
+                        or source.untyped_storage().data_ptr() != expected.untyped_storage().data_ptr()):
+                    raise ValueError("direct prefill source no longer matches its native batch-row target")
         module = modules.get(li)
         if module is None:
-            if state.config is not None or state.ring is not None:
+            if state.config is not None or state.mode != "LINEAR_FINAL":
                 raise ValueError("direct prefill compact geometry changed before finalize")
             continue
         idx = module.indexer
-        ring = state.ring
         if (state.config is None or idx.far_skip_config != state.config
-                or idx.far_skip_cache != "evict" or module.sliding_window is not None
-                or (state.needs_ring and (
-                    ring is None or ring.config != state.config
-                    or ring.logical_length != length
-                    or ring.keys.shape[-2] != ring.layout.capacity
-                    or ring.values.shape != ring.keys.shape))
-                or (not state.needs_ring and ring is not None)):
+                or idx.far_skip_cache != "evict" or module.sliding_window is not None):
             raise ValueError("direct prefill compact storage or geometry changed")
 
-    from .far_skip_static import FarSkipStaticLayer
-    replacements = {}
-    tails = {}
+    # Resolve every gate before allocating a provisional-skip ring or workspace.
     for li, state in enumerate(staging.states):
         module = modules.get(li)
         if module is None:
@@ -310,43 +365,48 @@ def finalize_direct_prefill(cache: TLIStaticCache, model, length: int):
         idx = module.indexer
         idx.freeze_dyn_dgate()
         idx._resolve_skip()
-        if not idx.skip_far:
-            if state.ring is not None:
-                tails[li] = state.config.tail_start(length)
+        if ((state.mode == "RING_FINAL" and not idx.skip_far)
+                or (state.mode == "LINEAR_FINAL" and idx.skip_far)):
+            raise ValueError("direct prefill gate changed after final storage was selected")
+
+    from .far_skip_cache import FarSkipLayer
+    from .far_skip_static import FarSkipStaticLayer
+    replacements = {}
+    for li, state in enumerate(staging.states):
+        module = modules.get(li)
+        if module is None or not module.indexer.skip_far:
             continue
-        if not state.needs_ring:
-            raise ValueError("direct prefill gate changed after ring elision")
+        idx = module.indexer
         cfg = state.config
         if cfg.near_pages == 0 and idx.sink_tokens + idx.sliding_window_size == 0:
             raise ValueError("static far selection needs a nonempty protected or page budget")
-        full = torch.arange(128, device=state.ring.keys.device)
-        coarse = idx._subspace_indices(state.ring.keys.device) if idx.enable_subspace else full
+        if state.mode == "RING_FINAL":
+            ring = state.ring
+        else:
+            # Dynamic/unknown skip pays one disclosed linear->ring compaction;
+            # this is the only finalize KV copy in the three storage plans.
+            ring = FarSkipLayer.from_prefill(
+                state.linear.keys[..., :length, :],
+                state.linear.values[..., :length, :], cfg)
+        full = torch.arange(128, device=ring.keys.device)
+        coarse = idx._subspace_indices(ring.keys.device) if idx.enable_subspace else full
         fine = (full if idx.l2_subspace == "full" else
-                coarse if idx.enable_subspace else idx._qat_indices(state.ring.keys.device))
+                coarse if idx.enable_subspace else idx._qat_indices(ring.keys.device))
         replacements[li] = FarSkipStaticLayer.from_ring(
-            state.ring, state.linear.max_cache_len, coarse, fine)
+            ring, state.linear.max_cache_len, coarse, fine)
 
     # Commit only after all gates and skip workspaces have been constructed.
     for li, state in enumerate(staging.states):
         linear = state.linear
-        if li in tails:
-            ring = state.ring
-            start = tails[li]
-            count = length - start
-            slot = ring.layout.slot(start)
-            first = min(count, ring.layout.capacity - slot)
-            for src, dst, width in ((slot, start, first),
-                                    (state.config.sink_tokens, start + first, count - first)):
-                if width:
-                    linear.keys[..., dst:dst+width, :].copy_(ring.keys[..., src:src+width, :])
-                    linear.values[..., dst:dst+width, :].copy_(ring.values[..., src:src+width, :])
         linear.cumulative_length = length
         linear.is_compileable = True
         linear._direct_prefill_mask = False
         cache.layers[li] = replacements.get(li, linear)
-        # A caller may retain the staging handle; do not let it retain evicted storage.
+        # A caller may retain the staging handle; do not let it retain evicted storage
+        # or a view that keeps an obsolete batch allocation alive.
         state.linear = None
         state.ring = None
+        state.linear_target = None
     cache._direct_prefill = None
     cache._far_skip_prepared = True
     cache._far_skip_attention_mask = None

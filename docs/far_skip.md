@@ -67,23 +67,29 @@ unpadded SDPA 的 `is_causal` 路径，避免构造二次方 static mask；final
 旧 `DynamicCache → fill_static_from_dynamic()` conversion 路径保留用于 legacy、
 兼容调用和 direct-vs-conversion 对拍。
 
-### Sink/Far/Near-SWA 所有权
+### 三态存储计划与 finalize 所有权
 
-设当前 prompt 逻辑长度为 `L`，`tail_start` 为 Near/SWA 起点：
+prefill 前按 request-local gate 为每层选择唯一的物理写入计划：
 
-- staging linear 独立持有 `[0, tail_start)`，即 Sink/Far 前缀；
-- staging ring 独立持有固定地址 sink 前缀及 `[tail_start, L)` 的 chronological
-  Near/SWA tail；
-- `skip_far=True`：finalize 直接从 ring 构造 `FarSkipStaticLayer`，释放整份
-  linear Sink/Far staging。decode 只继续写 ring，不再保留或复制 far；
-- `skip_far=False`：保留完整 linear 历史。若 staging 因动态/未知 gate 建了
-  ring，则把 chronological tail 装入 linear `[tail_start:L)` 后释放 ring；
-  已确定 non-skip 的层在 prefill 前直接省掉冗余 ring。
+| 模式 | 适用条件 | prefill 写入 | finalize |
+|---|---|---|---|
+| `RING_FINAL` | 已知静态 skip | 只写固定 sink + cyclic Near/SWA ring，不分配 full linear | `FarSkipStaticLayer.from_ring()` 直接接管，数据指针不变 |
+| `LINEAR_FINAL` | 已知 non-skip 或非 compact | 只写完整 linear `[0,L)`，不创建 staging ring | 只提交元数据，数据指针不变 |
+| `LINEAR_PROVISIONAL` | 动态或未知 gate | 只写一份完整 provisional linear，不双写 ring | non-skip 直接保留；skip 做唯一一次 linear→ring 压实后释放 linear |
 
-因此，skip 层实现了“摘除 Far 节点并释放其独立存储”；ring 内另有固定 sink
-副本，不依赖被释放的 linear。non-skip 层为兼容现有 L1/L2、gather 和 CUDA
-Graph kernel，最终仍是一块完整 linear，而不是字面意义上的三个独立链表节点。
-GPU kernel 消费固定地址段描述符，不逐节点遍历 Python 链表。
+动态 gate 必须消费 dense prefill 的原始完整 K/V 才能冻结，因此“动态 skip 从不
+分配 full linear”和“动态 non-skip 零回拷”不能同时成立。这里选择单份
+provisional linear，并显式披露动态 skip 的 finalize 压实；不恢复双写来制造表面
+零拷贝。三种路径的 finalize/所有权移交都不再把 ring tail 回填到 linear。
+
+Hybrid batch 的 compact 行仍直接转移各自独立的 ring/linear 与 indexer snapshot。
+native-dense 行则在 `prepare_row()` 时把 B=1 proxy 预绑定到最终
+`batch.keys[b:b+1]` / `values[b:b+1]`；prefill 直接写该视图，finalize 校验 shape、
+stride、数据指针和 storage 后只丢弃 proxy，不再回拷整行。
+
+因此，skip 层最终只拥有固定 ring，non-skip 层最终只拥有完整 linear。这里的
+“零拷贝”指 finalize/所有权移交零 KV 回拷，不指取消原始 K/V 到最终存储的首次
+持久化。GPU kernel 消费固定地址段描述符，不逐节点遍历 Python 链表。
 
 ## Selection 与 ring 契约
 
@@ -144,7 +150,7 @@ B=1 GraphRunner direct/conversion 对拍：
 python exp/bench/e152v4_graph_latency.py \
   -L 65536 --repeats 2 --warmup 0 --max-gen 128 \
   --method tli --graph-mode graph --prefill-mode direct \
-  --tia_level1_topk 64 --tia_level2_topk 1024 \
+  --tia_level1_topk 128 --tia_level2_topk 1024 \
   --tli_near_len 4096 --tli_near_pages 32 --tli_near_tokens off \
   --tli_subspace tail --tia_level2_cmp_ratio 4 \
   --tli_sink_tokens 4 --tli_swa_size 128 \
@@ -154,16 +160,29 @@ python exp/bench/e152v4_graph_latency.py \
 
 将 `--prefill-mode` 改为 `conversion` 得到对拍臂；将 `--graph-mode` 改为
 `eager` 得到同静态 cache 的 eager 参照。Hybrid row-local direct/conversion
-采集器为 `exp/bench/e182_hybrid_direct_prefill.py`。
+三口径采集器为 `exp/bench/e183_hybrid_zero_copy.py`（E182 采集器与 K1=64
+历史判决保留作基线）。
 
 两臂都必须记录并分别报告：
 
-1. 稳态主 KV：逐层 `numel * element_size`、linear/ring/staging bytes、skip 与
-   non-skip 层数；
-2. finalize/fill 后 `torch.cuda.memory_allocated()`；
-3. prefill 全过程 `max_memory_allocated()`，并注明首请求与后续请求、绝对值和
-   相对模型加载后的 delta。
+1. 稳态主 KV ownership：按 `(device, untyped_storage().data_ptr())` 去重物理
+   storage，区分 view bytes 与 physical owner bytes，并报告 linear/ring 和
+   skip/non-skip 层数；
+2. 临时 staging/finalize 拷贝：静态 skip linear ownership、non-skip staging ring、
+   hybrid native 独立 B=1 staging 均应为 0；动态 skip 压实单独报告；
+3. 过程显存：逐行 prefill、finalize 前后、capture 后与 steady decode 的
+   `memory_allocated/max_memory_allocated`，注明首请求与后续请求、绝对值和相对
+   模型加载后的 delta；reserved 与 `mem_get_info` 只作辅助；
+4. prefill、finalize/build、capture 和 TPOT 分开计时，正式比较至少三次取中位数。
 
 不能用容量公式或 `memory_reserved()` 代替 allocated，也不能把 non-skip 层的
 完整 linear 计入 far 驱逐节约。质量与真实模型吞吐必须由目标 GPU 上的
 RULER/LongBench 和 e2e 对拍另行闭合；CPU 结果不能当作 GPU 性能证据。
+
+E183 的 K1=128 实测已覆盖 B=1 四种 gate × 三长度 × graph/eager，以及 hybrid
+B=1/2/8/32 的 direct/conversion 对拍；生成 token、最终 KV ownership 一致，KV
+地址在 finalize/capture/steady 间稳定。同机 E182 static-32K 对照中，staging
+linear 减少 1,798,131,712 bytes，后续请求 graph prefill 峰值下降 1.675 GiB；
+首请求、graph 池和 eager 后续请求口径分别保留。动态 skip 的单次压实及 B32
+共享机计时波动不作隐藏，完整三口径数据见
+`exp/trace/results/e183_zero_copy_verdict.json`。
