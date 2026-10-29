@@ -149,3 +149,51 @@ logical shards, hourly supervisor. Old joint-budget data cannot answer this
 question and are not reused as new-policy quality measurements. Export now
 reads threshold list from protocol. Final quality and independent verification
 remain pending; local executable checks alone are not independent admission.
+
+
+## Eight-GPU redistribution (user authorized)
+
+E184 paused temporarily by explicit user instruction; pc02 residual3 shell
+chains and3 Python children stopped precisely, pc40/pc31 already clear. Raw
+outputs preserved; PAUSED_BY_USER.json prevents mistaken automatic resumption.
+The first independent0.05 run was superseded after independent review found a
+missing deferred CUDA error guard. Request guard now covers both generation
+entrypoints;45 local regressions passed. Old raw records retained, not reused.
+
+New run: frozen_near_far_independent005_pool_20261029 (local result symlink to
+shared storage), source a3959678ed37d82ac04573245587fbcf2ac32e88.
+Eight deterministic shards: pc02 GPUs0–3 ranks0–3; pc40 GPUs0–1 ranks4–5;
+pc31 GPUs0–1 ranks6–7. Local GPU1 remains reserved for operator optimization.
+All8 workers passed process/GPU/log ignition checks;8 manifests have1 identity.
+Pool supervisor PID313967 checks every3600seconds. pc31 uses a user-owned
+Python wrapper with pinned jieba0.42.1/rouge1.0.1 from shared scoring modules.
+Code snapshot, model configs and dataset hashes verified across all3 hosts.
+Independent verification assigned to /root/verify_pool_initial; quality results
+remain pending until full-data admission. Supervisor reports production complete
+separately from independent result acceptance.
+
+
+2026-10-29 17:28 recovery: prior8-card run stopped after28 complete requests;
+all workers hit inference-tensor cleanup outside inference_mode. User ETA query
+triggered immediate inspection and repair. generate now has outer inference_mode;
+53 regressions pass, independent source review accepted the scope fix. GPU
+HotpotQA152 full/far0.05/dual0.05 smoke passed incl native TLI generation parity.
+New immutable source a1cdb2f4edd2447495175d90f75fa13b880d4afd, fresh run
+frozen_near_far_independent005_pool_v2_20261029; supervisor413350, same8 remote
+GPUs, hourly checks. Earlier28 raw records preserved, not merged into new data.
+Quality conclusions await full run and independent acceptance.
+
+
+## Autonomous full5 follow-on
+
+User explicitly requested a resident script on each remote host, polling local
+idle GPUs and pulling queued work without assistant supervision. Scope remains
+all1300 rows across the5 screening datasets,3 arms=3900 generations. Implemented
+--samples0,64 disjoint logical shards, shared queue locking, durable ownership,
+restart/orphan recovery, max4 worker attempts and exact own-PID stall handling.
+Each host has a detached shell watchdog and daemon. Per-GPU predecessor done
+marker plus GPU memory≤64MiB/util≤5% required. Poll300seconds; audit hourly.
+Result entry is under the original main worktree agent_doc/results as requested,
+linked to shared durable output. Completion automatically validates/recomputes
+scores and exports artifacts, while independent scientific acceptance stays
+pending. Queue code independently reviewed; PID-publication failure fixed.

@@ -14,6 +14,18 @@ def write_tsv(path,columns,rows):
         writer=csv.writer(stream,delimiter='\t');writer.writerow(columns);writer.writerows(rows)
 
 
+def coverage_text(protocol, completed_requests, generated_results):
+    tasks = protocol['datasets']
+    if protocol.get('full_dataset', False):
+        counts = protocol['dataset_counts']
+        coverage = '、'.join(f'{ds} {counts[ds]} 条' for ds in tasks)
+        return (f'本轮已完成 {len(tasks)} 个任务的全量数据：{coverage}；'
+                f'共 {completed_requests} 条配对请求、{generated_results} 组生成。')
+    return (f"本轮已完成：{len(tasks)} 个海选任务各 {protocol['samples_per_task']} 条、"
+            f'{completed_requests} 条配对请求、{generated_results} 组生成；'
+            '这不是每任务 200/500 条的全量海选。')
+
+
 def export(outdir,plot=False):
     outdir=Path(outdir);summary=json.loads((outdir/'summary.json').read_text())
     validation=json.loads((outdir/'validation.json').read_text())
@@ -69,7 +81,7 @@ def export(outdir,plot=False):
     report=report_path.read_text()
     marker='<!-- frozen-summary:end -->'
     if marker in report:report=report.split(marker,1)[1].lstrip()
-    explanation=[f"本轮已完成：{len(tasks)} 个海选任务各 {summary['protocol']['samples_per_task']} 条、{summary['completed_requests']} 条配对请求、{len(row_scores)} 组生成；这不是每任务 200/500 条的全量海选。",'']
+    explanation=[coverage_text(summary['protocol'],summary['completed_requests'],len(row_scores)),'']
     for threshold in [f'{eps:g}' for eps in summary['protocol']['thresholds']]:
         arm='dual_'+threshold;a=summary['arms'][arm];c=summary['comparisons'][arm+'-vs-full']['avg5']
         explanation.append(f"- 双向 skip，阈值 {threshold}：AVG5 {a['avg5']:.4f}，相对 Full {c['delta_pp']:+.4f} pp；95% bootstrap CI [{c['ci95_pp'][0]:+.4f}, {c['ci95_pp'][1]:+.4f}]。Near 在 {a['near_active_requests']}/{summary['completed_requests']} 条请求中触发；层状态为 Near-only {a['gate_counts']['near']}、Far-only {a['gate_counts']['far']}、双 skip {a['gate_counts']['both']}。")
@@ -84,7 +96,10 @@ def export(outdir,plot=False):
             pair=summary['comparisons'][name+'-vs-full']['per_task'][ds]
             active=summary['arms'][name]['per_task_activation'][ds]['near_active']
             hopping.append(f"多跳单独核查，{ds} ε={threshold}：n={pair['n']}，均分变化 {pair['delta_pp']:+.4f} pp，逐条下降 {pair['degraded']}、改善 {pair['improved']}，Near实际触发 {active} 条。")
-    explanation[-2:-2]=hopping+['小样本不推翻此前大样本中可能掉点的观察。','']
+    limitation = ('本轮覆盖所列任务的全部样本；结论仍限于本模型、数据集与生成配置。'
+                  if summary['protocol'].get('full_dataset',False) else
+                  '小样本不推翻此前大样本中可能掉点的观察。')
+    explanation[-2:-2]=hopping+[limitation,'']
     report_path.write_text('\n'.join(explanation)+report)
     if plot:
         import matplotlib

@@ -154,12 +154,37 @@ def generate_native(model, ids, max_new_tokens, device):
     return generated
 
 
+def select_row_indices(row_count, samples, seed):
+    """Zero selects the entire dataset; positive counts keep legacy ordering."""
+    if samples < 0 or row_count < 0:
+        raise ValueError('row count and samples must be nonnegative')
+    permutation = np.random.default_rng(seed).permutation(row_count)
+    return (permutation if samples == 0 else permutation[:samples]).tolist()
+
+
+def sampling_metadata(samples, dataset_counts):
+    if samples == 0:
+        return dict(samples_per_task=None, full_dataset=True,
+                    dataset_counts=dict(dataset_counts),
+                    selected_counts=dict(dataset_counts))
+    # Keep positive-sample protocol fields identical to historical runs.
+    return dict(samples_per_task=samples)
+
+
+def shard_inputs(inputs, rank, world_size):
+    if not 0 <= rank < world_size:
+        raise ValueError('invalid shard')
+    for index, item in enumerate(inputs):
+        if index % world_size == rank:
+            yield item
+
+
 def main():
     ap = argparse.ArgumentParser(__doc__)
     ap.add_argument('--model', default='/home/wangyuanshuo02/Qwen3-8B')
     ap.add_argument('--data', default='/home/wangyuanshuo02/datasets/LongBench/data')
     ap.add_argument('--out', default='agent_doc/results/frozen_near_far_staging_20261029')
-    ap.add_argument('--samples', type=int, default=20)
+    ap.add_argument('--samples', type=int, default=20, help='rows per task; 0 selects every row')
     ap.add_argument('--seed', type=int, default=42)
     ap.add_argument('--context-cap', type=int, default=31500)
     ap.add_argument('--thresholds', default='0.05')
@@ -179,7 +204,7 @@ def main():
     tasks = args.datasets.split(',')
     if not set(tasks)<=set(SCREEN_TASKS) or len(set(tasks)) != len(tasks):
         raise ValueError('only the five existing LongBench screen tasks are allowed')
-    if not 0 <= args.rank < args.world_size or args.samples < 1:
+    if not 0 <= args.rank < args.world_size or args.samples < 0:
         raise ValueError('invalid shard/samples')
     thresholds = [float(x) for x in args.thresholds.split(',')]
     arms = [('full', GateConfig(mode='full', statistic=args.statistic))]
@@ -189,14 +214,16 @@ def main():
             arms.append((f'{mode}_{eps:g}', config))
     prompts = json.loads((ROOT/'benchmark/LongBench/config/dataset2prompt.json').read_text())
     lengths = json.loads((ROOT/'benchmark/LongBench/config/dataset2maxlen.json').read_text())
-    selected, inputs = {}, []
+    selected, inputs, dataset_counts = {}, [], {}
     for ds in tasks:
         rows = [json.loads(line) for line in (Path(args.data)/(ds+'.jsonl')).read_text().splitlines()]
-        indices = np.random.default_rng(args.seed).permutation(len(rows))[:args.samples].tolist()
+        dataset_counts[ds] = len(rows)
+        indices = select_row_indices(len(rows), args.samples, args.seed)
         selected[ds] = indices
         inputs.extend((ds,i,rows[i]) for i in indices)
     protocol = dict(schema='frozen-near-far-screen-v3-independent-gates',model=args.model,context_cap=args.context_cap,
-        samples_per_task=args.samples,seed=args.seed,statistic=args.statistic,thresholds=thresholds,
+        **sampling_metadata(args.samples, dataset_counts),
+        seed=args.seed,statistic=args.statistic,thresholds=thresholds,
         datasets=tasks,selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
         source_sha256={name:sha_file(ROOT/name) for name in SOURCES},
         dataset_sha256={ds:sha_file(Path(args.data)/(ds+'.jsonl')) for ds in tasks},
@@ -239,8 +266,7 @@ def main():
             raise ValueError('incomplete TLI patch registration')
         model._frozen_tli = True
     verified = False
-    for index,(ds,row_index,row) in enumerate(inputs):
-        if index % args.world_size != args.rank: continue
+    for ds,row_index,row in shard_inputs(inputs, args.rank, args.world_size):
         path = outdir/'requests'/ds/f'{row_index:04d}.json'
         ids, input_info = prepare_ids(tokenizer,row,ds,prompts[ds],args.context_cap)
         if len(ids)+lengths[ds] > model.config.max_position_embeddings:
