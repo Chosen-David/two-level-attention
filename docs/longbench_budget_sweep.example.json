@@ -1,0 +1,36 @@
+{
+  "model_path": "/absolute/local/Qwen3-8B",
+  "dataset_path": "/absolute/local/LongBench",
+  "config_path": "benchmark/LongBench/config",
+  "tasks": [
+    "narrativeqa",
+    "qasper",
+    "multifieldqa_en",
+    "hotpotqa",
+    "2wikimqa",
+    "musique",
+    "gov_report",
+    "qmsum",
+    "multi_news",
+    "triviaqa",
+    "passage_retrieval_en",
+    "lcc",
+    "repobench-p"
+  ],
+  "methods": [
+    "Full",
+    "LoDA",
+    "Quest",
+    "JSSA",
+    "AsyncTLS"
+  ],
+  "k1": 128,
+  "k2": [
+    512,
+    1024,
+    2048
+  ],
+  "jssa_basis_path": "/absolute/local/qwen3_8b_basis.pt",
+  "asynctls_channel_file": "/absolute/local/qwen3_8b_channels.json",
+  "model": "Qwen3-8B"
+}

@@ -13,7 +13,7 @@ update 只依赖 batch_decode_ctx + pos_buf，与 attention 方法无关）。
 协议（e152 v2 契约 + v4 扩展）：
   - 每进程一臂 × 一 L × (warmup+repeats)；同一 prompt 逐位相同（确定性
     needle，input_ids sha256 落盘）；
-  - prefill 两臂均原生 SDPA dense（TLI_SPARSE_PREFILL=0），DynamicCache
+  - prefill 两臂均指定后端的原生 dense（默认 FlashAttention2）（TLI_SPARSE_PREFILL=0），DynamicCache
     → fill_static_from_dynamic 搬入进程级 TLIStaticCache（有效在前，
     S_cap = len(ids)+max_gen+8；fill 是一次性 setup，单独计时
     fill_static_ms，不进 TTFT/TPOT——serving 中静态池同口径）；
@@ -42,6 +42,7 @@ import os
 import subprocess
 import sys
 import time
+from contextlib import nullcontext
 
 import torch
 
@@ -82,24 +83,21 @@ QUESTION = ("What is the special magic number for the hidden vault mentioned "
 
 
 def build_prompt_tokens(tokenizer, L, q_frac=0.02):
-    """确定性构造 ~L token 的 needle prompt（与 e152 逐位一致）。"""
-    q_ids = tokenizer(QUESTION, add_special_tokens=False)["input_ids"]
-    body_target = L - len(q_ids) - 8
-    n_ids = tokenizer(NEEDLE, add_special_tokens=False)["input_ids"]
-    fill_ids = tokenizer(" ".join(FILLER_WORDS), add_special_tokens=False)["input_ids"]
-    body = []
-    half = (body_target - len(n_ids)) // 2
-    while len(body) < half:
-        body.extend(fill_ids)
-    body = body[:half]
-    body.extend(n_ids)
-    while len(body) < body_target:
-        body.extend(fill_ids)
-    body = body[:body_target]
-    raw = tokenizer.decode(body + q_ids)
-    prompt = ("<|im_start|>user\n" + raw +
-              "<|im_end|>\n<|im_start|>assistant\n\n\n\n")
-    ids = tokenizer(prompt, add_special_tokens=False)["input_ids"]
+    """Build exactly L deterministic token IDs without decode/re-tokenize drift."""
+    prefix = tokenizer("<|im_start|>user\n", add_special_tokens=False)["input_ids"]
+    suffix = tokenizer("<|im_end|>\n<|im_start|>assistant\n\n\n\n",
+                       add_special_tokens=False)["input_ids"]
+    question = tokenizer(QUESTION, add_special_tokens=False)["input_ids"]
+    needle = tokenizer(NEEDLE, add_special_tokens=False)["input_ids"]
+    filler = tokenizer(" ".join(FILLER_WORDS), add_special_tokens=False)["input_ids"]
+    remaining = L - len(prefix) - len(suffix) - len(question) - len(needle)
+    if remaining < 0 or not filler:
+        raise ValueError("context length cannot contain the fixed chat/needle/question tokens")
+    fill = (filler * ((remaining + len(filler) - 1) // len(filler)))[:remaining]
+    midpoint = remaining // 2
+    ids = prefix + fill[:midpoint] + needle + fill[midpoint:] + question + suffix
+    if len(ids) != L:
+        raise RuntimeError("exact context length invariant failed")
     return ids
 
 
@@ -246,6 +244,7 @@ class GraphRunner:
 
     def __init__(self, model, static_cache, neg_inf, S_cap, pad_id, dev):
         self.model = model
+        self.fa2_adapter = None
         self.cache = static_cache
         self.S_cap = S_cap
         self.dev = dev
@@ -274,10 +273,12 @@ class GraphRunner:
         self.m4_buf[0, 0, 0, :seq_len_after_inc] = 0
 
     def forward(self):
-        return self.model(input_ids=self.nxt_buf, position_ids=self.pid_buf,
-                          cache_position=self.pos_buf,
-                          attention_mask=self.m4_buf, past_key_values=self.cache,
-                          use_cache=True)
+        context = self.fa2_adapter.activate(self.vl_buf) if self.fa2_adapter is not None else nullcontext()
+        with context:
+            return self.model(input_ids=self.nxt_buf, position_ids=self.pid_buf,
+                              cache_position=self.pos_buf,
+                              attention_mask=self.m4_buf, past_key_values=self.cache,
+                              use_cache=True)
 
     def fill(self, dyn, length):
         """Refill one request; compact gates/workspace/pointers require recapture."""
@@ -314,7 +315,8 @@ class GraphRunner:
             raise RuntimeError(
                 "warmup 期间 compute_mask_graph 关闭了 graph（配置不受支持）")
         self.graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(self.graph):
+        from sparse_attn.ops.cuda_graph_state import capture_graph
+        with capture_graph(self.graph):
             self.out = self.forward()
         return (time.perf_counter() - t0) * 1e3
 
@@ -425,6 +427,7 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture,
         "decode_ms": sum(step_ms),
         "ttft_ms": (first_output - t0) * 1e3,
         "decode_after_fill_wall_ms": decode_wall_ms,
+        "request_wall_ms": (last_output - t0) * 1e3,
         "tpot_ms": decode_wall_ms / len(step_ms) if step_ms else None,
         "step_ms": step_ms,
         "peak_mem_delta_gib": peak_delta_gib,
@@ -448,6 +451,10 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture,
 
 
 def _validate_protocol(args):
+    if getattr(args, 'fa2_static_decode', False) and (
+            args.method != 'none' or args.attention_backend != 'flash_attention_2'
+            or args.graph_mode != 'graph'):
+        raise ValueError('FA2 static decode requires dense FA2 graph mode')
     if args.method not in ("none", "tli"):
         raise ValueError("E152v4 requires --method none or tli")
     for name, minimum in (("context_length", 16384), ("max_gen", 4),
@@ -468,6 +475,8 @@ def main():
     parser.add_argument("--model-path", type=str,
                         default=os.path.expanduser("~/Qwen3-8B"))
     parser.add_argument("--out", type=str, required=True)
+    parser.add_argument("--attention-backend", choices=["flash_attention_2", "sdpa"], default="flash_attention_2")
+    parser.add_argument("--fa2-static-decode", action="store_true")
     parser.add_argument("--label", type=str, default="")
     parser.add_argument("--graph-mode", choices=["graph", "eager"],
                         default="graph",
@@ -499,7 +508,7 @@ def main():
                                               trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path, config=config, trust_remote_code=True,
-        torch_dtype=torch.bfloat16, device_map="cuda:0").eval()
+        torch_dtype=torch.bfloat16, device_map="cuda:0", attn_implementation=args.attention_backend).eval()
 
     resolve_far_skip_modes(args, model=model)
     snapshot = None
@@ -533,8 +542,27 @@ def main():
         gs.pos_buf = runner.pos_buf
         gs.valid_len_buf = runner.vl_buf
 
+    if args.fa2_static_decode:
+        from exp.bench.graph_fa2 import GraphFA2
+        runner.fa2_adapter = GraphFA2(model, runner.m4_buf, runner.vl_buf)
+    geometry_calls = {'capture': 0, 'eager': 0}
+    if os.environ.get('TLI_BENCH_GEOMETRY_COUNTS', '0') == '1':
+        from sparse_attn.indexer.tli_indexer import TLIIndexer
+        original_geometry = TLIIndexer._build_graph_geometry
+        def observed_geometry(self, *a, **kw):
+            key = 'capture' if torch.cuda.is_current_stream_capturing() else 'eager'
+            geometry_calls[key] += 1
+            return original_geometry(self, *a, **kw)
+        TLIIndexer._build_graph_geometry = observed_geometry
+    from sparse_attn.ops.selector_options import validate_selector_options
+    from exp.bench.selector_route_observer import install, checked_delta
+    packed_sort,tiled_scan=validate_selector_options(S_cap)
+    optimization_calls=install(packed_sort,tiled_scan,torch.cuda.is_current_stream_capturing)
     runs = []
     for r in range(args.warmup + args.repeats):
+        before_optimization={name:counts.copy() for name,counts in optimization_calls.items()}
+        before_geometry_calls = geometry_calls.copy()
+        before_fa2 = runner.fa2_adapter.calls.copy() if runner.fa2_adapter is not None else None
         do_capture = (args.graph_mode == "graph" and runner.graph is None)
         try:
             rec = timed_request(model, runner, ids, args.max_gen, dev,
@@ -549,6 +577,33 @@ def main():
                 raise SystemExit(f"[E152v4 GATE-FAIL] graph 臂 capture/decode "
                                  f"失败（{type(e).__name__}: {e}）")
             raise
+        if runner.fa2_adapter is not None:
+            counts = {key:runner.fa2_adapter.calls[key]-before_fa2[key] for key in before_fa2}
+            layers = len(runner.fa2_adapter.targets)
+            if counts['capture'] != (layers if do_capture else 0):
+                raise RuntimeError('FA2 cache graph route count mismatch')
+            rec['fa2_static_routes'] = dict(counts, layers=layers,
+                api='flash_attn_with_kvcache', count_scope='host submissions, not replay invocations')
+        rec['geometry_builds'] = {
+            key: geometry_calls[key] - before_geometry_calls[key] for key in geometry_calls}
+        rec['geometry_reuse_enabled'] = os.environ.get('TLI_GRAPH_GEOMETRY_SHARED', '1') == '1'
+        rec['geometry_counts_enabled'] = os.environ.get('TLI_BENCH_GEOMETRY_COUNTS', '0') == '1'
+        # These are host capture/warmup submissions, not replay counts.
+        selector_routes = []
+        for name, module in model.named_modules():
+            idx = getattr(module, "indexer", None)
+            constants = getattr(idx, "_graph_const_cache", None)
+            if constants is not None:
+                selector_routes.append({"module": name,
+                    "sparse_selection": constants[0][-1] is True})
+        if os.environ.get("TLI_SPARSE_SELECTION", "0") == "1":
+            if len(selector_routes) != n_patched or not all(x["sparse_selection"] for x in selector_routes):
+                raise RuntimeError("sparse benchmark fell back to a dense selector")
+        rec["selector_routes"] = selector_routes
+        rec['selector_optimization_submissions']=checked_delta(
+            optimization_calls,before_optimization,n_patched if do_capture else 0)
+        rec['selector_optimization_count_scope']='actual host kernel submissions during warmup/capture, not replay'
+        rec["n_patched_attention_layers"] = n_patched
         rec.update({
             "run": r, "phase": "warmup" if r < args.warmup else "measured",
             "method": args.method, "L": args.context_length,
@@ -597,8 +652,9 @@ def main():
             "instrumentation_mode": ("per-step-device-synchronized "
                                      "(graph: inject+replay+argmax+item)"),
             "backend_verified": False,
-            "prefill_backend": "native SDPA dense (both arms)",
+            "prefill_backend": args.attention_backend,
             "decode_backend": (
+                "FlashAttention2 KV-cache, whole-step CUDA Graph" if args.fa2_static_decode else
                 "TLI sparse, whole-step CUDA Graph" if
                 (args.method == "tli" and args.graph_mode == "graph") else
                 "native dense, whole-step CUDA Graph" if

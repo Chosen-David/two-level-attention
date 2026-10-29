@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-28
+
+- [x] [TL-LB-BUDGET-RUNNER-20261028] 新增 LongBench13 有界远端编排：显式 Qwen3-8B/32B、固定 K1 扫 nominal K2，UUID 协作锁与稳定空卡复查，严格身份/预测/评分完成后才跳过；18 项 CPU 回归普通/-O与独审通过，既有 28 项相邻 CPU 回归通过。真实 GPU/质量与缺失适配器验收未完成，RULER10不在此实现。([详情](task_details/TL-LB-BUDGET-RUNNER-20261028.md))
+
 ## 2026-10-26
 
 - [ ] [TL-HYBRID-CACHE-20261026] PR #9 升级：按请求×层混合 ring/linear、BS=1/2/8/32、不等长/动态 gate/EOS、RULER batch 和 CUDA Graph runner；85 项回归及 178 子用例通过，7 个 CUDA 项跳过，GPU/质量/性能验收待完成。([详情](task_details/TL-HYBRID-CACHE-20261026.md))

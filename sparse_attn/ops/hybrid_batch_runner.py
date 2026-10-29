@@ -91,7 +91,8 @@ class HybridBatchRunner:
                 self.forward()
         torch.cuda.current_stream(self.tokens.device).wait_stream(stream)
         graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(graph):
+        from sparse_attn.ops.cuda_graph_state import capture_graph
+        with capture_graph(graph):
             output = self.forward()
         self.graph, self.output = graph, output
 

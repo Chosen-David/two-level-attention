@@ -132,6 +132,15 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
             raise ValueError("parallel graph requires valid_len_buf[B]")
         vl = torch.zeros(B, dtype=torch.long, device=dev)
         gs.valid_len_buf = vl
+    from ..ops.operator_pipeline import operator_mode, decode_indexed
+    if operator_mode() != 'off':
+        if _parallel_batch_enabled(B):
+            raise ValueError('operator pipeline currently requires TLI_BATCH_INDEXER=legacy')
+        if B != 1:
+            raise ValueError('use HybridBatchRunner for multi-request operator decode')
+        cu = _graph_const(("cu_cap", str(dev), S_cap),
+                          lambda: torch.tensor([0, S_cap], device=dev, dtype=torch.int32))
+        return decode_indexed(indexer, indexer, q, k, v, cu, vl, self.scaling)
     if _parallel_batch_enabled(B):
         from ..indexer.tli_batch import prepare_mask_batched
         if gs.valid_len_buf is None:
@@ -198,6 +207,11 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     （gate_bs1_equiv 铁律：batch=1 与旧单序列入口逐位一致）。
     """
     B = query_states.shape[0]
+    dyn_state = None
+    if getattr(indexer, "dyn_dgate", False):
+        indexer.freeze_dyn_dgate()
+        dyn_state = (indexer.skip_far, indexer._dyn_skip_pending,
+                     indexer._dyn_frozen)
     q = query_states.transpose(1, 2)   # [B, 1, H, D]
     k = key_states.transpose(1, 2)     # [B, S_cap, Hkv, D]
     v = value_states.transpose(1, 2)   # [B, S_cap, Hkv, D]
@@ -239,6 +253,9 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
         cu = torch.tensor([0, S_cap], device=dev, dtype=torch.int32)
         pos = torch.tensor([L_b - 1], device=dev, dtype=torch.long)
         indexer.clear()
+        if dyn_state is not None:
+            (indexer.skip_far, indexer._dyn_skip_pending,
+             indexer._dyn_frozen) = dyn_state
         mask, block_size = indexer.prepare_mask(
             q_b, pos, k_b, cu, softmax_scale=self.scaling, valid_length=L_b)
         masks.append(mask)
@@ -271,6 +288,10 @@ def qwen3_attn_forward(
     cache_position: Optional[torch.LongTensor] = None,
     **kwargs: Unpack[FlashAttentionKwargs],
 ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[tuple[torch.Tensor]]]:
+    # Validate experimental selector routing before projections or any KV write.
+    from ..ops.selector_options import validate_selector_options
+    capacity = past_key_values.get_max_cache_shape() if past_key_values is not None else None
+    validate_selector_options(capacity if isinstance(capacity, int) and capacity > 0 else None)
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
 
@@ -283,7 +304,12 @@ def qwen3_attn_forward(
 
     # Compact consumers own both the KV write and absolute-to-ring addressing.
     # Dispatch before the generic update, which would otherwise append twice.
-    if (past_key_values is not None
+    # 【Phase 4】serial 模式走标准 linear KV + decode_indexed，跳过 compact
+    # far-skip 路径（其内部用 decode_ring → overlap only）。
+    from ..ops.operator_pipeline import operator_mode as _op_mode_fn
+    _tli_op_mode = _op_mode_fn()
+    if (_tli_op_mode != 'serial'
+            and past_key_values is not None
             and getattr(self.indexer, "far_skip_backend", "legacy") == "compact"):
         from ..ops.far_skip_runtime import try_far_skip_decode
         compact = try_far_skip_decode(
@@ -501,6 +527,33 @@ def qwen3_attn_forward(
                 f"mask，按 2D 假设处理不正确），拒绝执行。"
             )
         indexer: Indexer = self.indexer
+        # 【Phase 4】Serial graph 路由：TLI_OPERATOR_MODE=serial 时走
+        # decode_indexed（compact selection → partial attention），跳过
+        # legacy prepare_mask + eager_decoding_attn full-width mask 路径。
+        from ..ops.operator_pipeline import operator_mode, decode_indexed
+        _op_mode = operator_mode()
+        if _op_mode in ('serial', 'overlap'):
+            # 单序列口径：B=1 post-RoPE → transpose → [1,1,Hkv,S_cap]
+            qs_t = query_states.transpose(1, 2)   # [1,1,Hkv,D]
+            ks_t = key_states.transpose(1, 2)     # [1,S_cap,Hkv,D]
+            vs_t = value_states.transpose(1, 2)
+            dev = qs_t.device
+            S_cap = ks_t.shape[1]
+            vl = torch.tensor([ks_t.shape[1]], dtype=torch.int64, device=dev)
+            # 实际有效长度从 cache 获取；单序列 decode 全宽 S_cap=cur_len
+            if is_static_cache:
+                vl = torch.tensor([cur_len], dtype=torch.int64, device=dev)
+            cu = _graph_const(("cu_cap", str(dev), S_cap),
+                              lambda: torch.tensor([0, S_cap], device=dev,
+                                                   dtype=torch.int32))
+            attn_output = decode_indexed(indexer, indexer,
+                                         qs_t, ks_t, vs_t, cu, vl,
+                                         self.scaling)
+            _paper_route(self.layer_idx, f"{_op_mode}-decode")
+            attn_weights = None
+            attn_output = attn_output.reshape(*input_shape, -1).contiguous()
+            attn_output = self.o_proj(attn_output)
+            return attn_output, attn_weights
         # A6（TL-E137-PREFILL-GATE-145）：decode 首步冻结 E137 动态标定决策。
         # prefill 期 calibrate_dyn_dgate 只写 _dyn_skip_pending（决策挂起），
         # 此处一次性落 skip_far（_dyn_frozen 哨兵防重复，clear() 复位两状态）
@@ -541,4 +594,3 @@ def qwen3_attn_forward(
     attn_output = attn_output.reshape(*input_shape, -1).contiguous()
     attn_output = self.o_proj(attn_output)
     return attn_output, attn_weights
-

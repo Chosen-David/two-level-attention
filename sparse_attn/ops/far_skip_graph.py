@@ -180,5 +180,8 @@ class FarSkipGraphWorkspace:
         return out.reshape(1, 1, q.shape[2], v.shape[-1])
 
     def __call__(self, q, k, v, length, scale):
+        from .operator_pipeline import operator_mode, decode_ring
+        if operator_mode() != 'off':
+            return decode_ring(self, q, k, v, length, scale)
         positions, valid = self.select(q, k, length, scale)
         return self.attend(q, k, v, positions, valid, scale)

@@ -248,7 +248,8 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
             ctx.gen_lens[:] = snap_gen
             return None
         graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(graph):
+        from sparse_attn.ops.cuda_graph_state import capture_graph
+        with capture_graph(graph):
             out = model(input_ids=nxt_buf, position_ids=pid_buf,
                         attention_mask=m4_buf, past_key_values=past,
                         use_cache=True)
@@ -529,14 +530,28 @@ def main():
     baseline_preflight(args)
     seed_everything()
 
+    config = AutoConfig.from_pretrained(args.model_path, trust_remote_code=True)
+    is_glm = getattr(config, "model_type", None) == "glm4_moe_lite"
+    native_mpe = (getattr(config, "max_position_embeddings", None)
+                  if is_glm else QWEN3_NATIVE_MPE)
     use_yarn = args.yarn
-    if args.context_length > QWEN3_NATIVE_MPE and not use_yarn:
+    if is_glm:
+        if args.method == "tli" and getattr(args, "tli_dyn_dgate", False):
+            raise SystemExit(
+                "[glm] dynamic far-skip 当前仅支持 pred_ruler.py 单请求无 padding 入口；"
+                "batch 入口尚未实现逐行 gate/有效长度标定")
+        if native_mpe != 202752:
+            raise SystemExit(f"[glm] 原生 MPE 应为 202752，实际 {native_mpe!r}")
+        if args.yarn or args.yarn_factor is not None:
+            raise SystemExit("[glm] GLM-4.7-Flash 原生覆盖 32K/64K/128K，禁止 --yarn/--yarn_factor")
+        use_yarn = False
+    if not is_glm and args.context_length > QWEN3_NATIVE_MPE and not use_yarn:
         raise SystemExit(
             f"[yarn] context_length={args.context_length} 超出 Qwen3-8B 原生 "
             f"{QWEN3_NATIVE_MPE}，必须加 --yarn")
     factor, rope_scaling = resolve_yarn_config(
         use_yarn, args.yarn_factor, args.context_length,
-        YARN_FACTOR_AUTO, QWEN3_NATIVE_MPE)
+        YARN_FACTOR_AUTO, native_mpe)
     if use_yarn:
         print(f"[yarn] enabled: factor={factor}")
 
@@ -550,8 +565,6 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_path, trust_remote_code=True)
-    config = AutoConfig.from_pretrained(args.model_path,
-                                        trust_remote_code=True)
     if use_yarn:
         config.rope_scaling = rope_scaling
     from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
@@ -673,7 +686,7 @@ def main():
             model_config_sha256=(
                 _file_sha256(model_cfg_path)
                 if os.path.isfile(model_cfg_path) else None),
-            native_mpe=QWEN3_NATIVE_MPE,
+            native_mpe=native_mpe,
             generation_params={
                 "max_gen": MAX_GEN, "max_num": args.max_num, "seed": SEED,
                 "method": args.method, "pred_postfix": args.pred_postfix,
