@@ -49,9 +49,10 @@ def _append_batch(K,V,NK,NV,SLOT,ALIVE,CAP:tl.constexpr,H:tl.constexpr,
                   VB:tl.constexpr,VH:tl.constexpr,VT:tl.constexpr,
                   NB:tl.constexpr,NH:tl.constexpr,NVB:tl.constexpr,NVH:tl.constexpr,
                   BLOCK:tl.constexpr):
-    b,h=tl.program_id(0),tl.program_id(1)
+    # Widen before stride multiplication: batched KV can exceed 2**31 elements.
+    b,h=tl.program_id(0).to(tl.int64),tl.program_id(1).to(tl.int64)
     d=tl.arange(0,BLOCK)
-    slot=tl.load(SLOT+b)
+    slot=tl.load(SLOT+b).to(tl.int64)
     live=tl.load(ALIVE+b)&(slot>=0)&(slot<CAP)
     kval=tl.load(NK+b*NB+h*NH+d,live&(d<D),other=0)
     vval=tl.load(NV+b*NVB+h*NVH+d,live&(d<D),other=0)
