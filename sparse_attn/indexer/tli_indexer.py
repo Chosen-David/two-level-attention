@@ -4152,8 +4152,22 @@ class TLIIndexer(TIAIndexer):
         return self.compute_mask_graph(q, index_dict, softmax_scale, valid_len,
                                        return_selection=True)
 
+    def compute_candidate_inputs_graph(self, q, index_dict, softmax_scale, valid_len):
+        """Produce one request's exact L1/bypass candidates, stopping before L2.
+
+        This does not implement batch indexing. Later consumers may batch fine
+        scoring/normalization/ranking after validating compatible feature storage
+        and geometry. Existing selector denominator candidates/order are retained.
+        """
+        if q.ndim != 4 or q.shape[0] != 1 or q.shape[1] != 1:
+            raise ValueError('candidate producer requires one decode request')
+        if valid_len.shape != (1,) or valid_len.dtype != torch.int64:
+            raise ValueError('candidate producer requires int64 valid_len[1]')
+        return self.compute_mask_graph(q, index_dict, softmax_scale, valid_len,
+                                       return_selection=True, return_candidates=True)
+
     def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len, *,
-                           return_selection=False):
+                           return_selection=False, return_candidates=False):
         """graph 专用全张量 compute_mask（生产主配置，逐位对齐 eager）。
 
         输入：q [1,1,H,D]（replay 注入）、index_dict（容量宽：k_min/k_max/
@@ -4161,7 +4175,8 @@ class TLIIndexer(TIAIndexer):
         valid_len [1] long（replay 注入，decode 当前行有效长）。
         return_selection：True → 返回 TokenSelection 紧凑格式（Phase 1 新路径）；
                           False → 返回 [1,1,Hkv,S_cap] bool mask（默认，兼容旧消费端）。
-        输出：mask 或 TokenSelection（见 return_selection）。
+        return_candidates：内部候选生产接口；True 时在 fine score 前返回 CandidateInputs。
+        输出：默认 mask，或显式请求的 TokenSelection/CandidateInputs。
         """
         # ---- 0. 生产主配置守卫（fail-closed 回 eager 逐行路径）----
         if not (self.alpha > 0 and self.beta > 0 and self.gamma is None
@@ -4185,6 +4200,8 @@ class TLIIndexer(TIAIndexer):
         K2 = self.args.tia_level2_topk
         # 【E178】L2 细筛旁路实验臂 env 门（默认关，仅 graph 路径支持）
         _l2_bypass = os.environ.get("TLI_L2_BYPASS", "").strip() == "1"
+        if return_candidates and _l2_bypass:
+            raise NotImplementedError('candidate producer excludes L2 bypass')
         nb_near = max(0, int(self.nt_near_pages))
         nb_far = max(0, K1 - nb_near)
         nl = max(bs, int(self.nt_near_len))
@@ -4495,6 +4512,15 @@ class TLIIndexer(TIAIndexer):
             cand_idx2 = cand_idx2.gather(-1, _srt2)
             keep2 = keep2.gather(-1, _srt2)
             cand_len = keep2.sum(-1).to(torch.long)
+        if return_candidates:
+            from ..ops.candidate_inputs import candidate_inputs
+            lower = torch.full_like(S_real, far_tok_lo)
+            upper = torch.maximum(lower, swa_lo_tok)
+            return candidate_inputs(
+                k_qat, b_q_fine, cand_idx2, keep2, cand_len, S_real,
+                lower, upper, k2_mid, capacity=S_cap, group_size=group_size,
+                output_dtype=q.dtype, rank_width=min(S_cap, K2),
+                sink=sink_tok, swa=swa_tok)
         # ---- 6. fine 打分（Triton 候选 kernel，与 eager 同 kernel 逐位）----
         try:
             if self._triton_ok and _HAS_TRITON and k_qat.dim() == 4 \
