@@ -4450,51 +4450,61 @@ class TLIIndexer(TIAIndexer):
             if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
                 self.metrics.add_select_result(valid_len - 1, sel, 1)
             return sel
-        # Complete the same normalization domain as eager. Move protected
-        # tokens out of L1/bypass slots into a single disjoint sink/SWA segment;
-        # short requests and overlapping protected intervals must count once.
-        from .candidate_domain import complete_protected_candidates
-        cand_idx2, keep2 = complete_protected_candidates(
-            cand_idx2, keep2, S_real, sink_tok, swa_tok, S_cap)
-        R_cap = cand_idx2.shape[-1]
-        # 【2c-2 修复】候选紧凑化重排：_score_fine_cand_kernel 的 cand_len
-        # 门控语义 = 「前 cand_len 个位置有效」（offs_r < CLEN[kv]）。原布局
-        # cand_idx = [far 96 槽(垃圾), near 32 槽(有效), byp 2 槽(有效)]——
-        # 有效候选落在第 K1_far*bs 之后的槽位，kernel 只保留前 cand_len
-        # （= 有效数）位置 → 保留下来的全是 far 垃圾，near/byp 有效候选
-        # 全被 -inf（→ sf_full mid 区全 -inf → p mid 区 0，G8 对拍全崩）。
-        # 用 stable argsort(~keep) 把有效候选（keep=True）稳定提到前
-        # cand_len 个位置、垃圾后置（scatter 哨兵排除），R_cap 固定形状
-        # 与 eager 归约集合（L1∪bypass）逐位一致。
-        # 【E166 iter3b】候选压缩链融合：argsort(~keep2) stable + 2×gather
-        # + sum + （下游 mid_slot gather）≈5 kernel/层（R_cap=8448 恒定
-        # 长度无关 ≈1.3ms/步）换单 Triton 扫描压缩 kernel。逐位等价：
-        # stable argsort(~keep) = keep=True 按原序前置 + False 按原序后置
-        # ——扫描压缩的 keep 目的位 = 前缀计数、garbage 目的位 = total+序数
-        # （含 garbage 区内容保序复刻：旧 gather 把原始 idx/False/mid 值
-        # 置换到尾部，下游 topk 边缘语义依赖该内容）；cand_len = total。
-        # 纯整数/布尔域无浮点 → bitexact by construction；形态守卫不齐
-        # → 旧链 fail-closed 逐位不变。
-        _mid_slot3 = None
-        if (_HAS_TRITON and cand_idx2.is_contiguous()
-                and keep2.is_contiguous()
-                and mid_mask.is_contiguous()):
-            try:
-                cand_idx2, keep2, _mid_slot3, cand_len = _iter3_compact(
-                    cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev)
-            except Exception:
-                _mid_slot3 = None
+        _domain_pack = None
+        if _HAS_TRITON and q.is_cuda:
+            from .candidate_domain_triton import complete_and_pack
+            _domain_pack = complete_and_pack(
+                cand_idx2, keep2, S_real, sink_tok, swa_tok, S_cap)
+        self._graph_candidate_domain_route = "fused" if _domain_pack is not None else "torch"
+        if _domain_pack is not None:
+            cand_idx2, keep2, cand_len = _domain_pack
+            R_cap = cand_idx2.shape[-1]
+        else:
+            # Complete the same normalization domain as eager. Move protected
+            # tokens out of L1/bypass slots into a single disjoint sink/SWA segment;
+            # short requests and overlapping protected intervals must count once.
+            from .candidate_domain import complete_protected_candidates
+            cand_idx2, keep2 = complete_protected_candidates(
+                cand_idx2, keep2, S_real, sink_tok, swa_tok, S_cap)
+            R_cap = cand_idx2.shape[-1]
+            # 【2c-2 修复】候选紧凑化重排：_score_fine_cand_kernel 的 cand_len
+            # 门控语义 = 「前 cand_len 个位置有效」（offs_r < CLEN[kv]）。原布局
+            # cand_idx = [far 96 槽(垃圾), near 32 槽(有效), byp 2 槽(有效)]——
+            # 有效候选落在第 K1_far*bs 之后的槽位，kernel 只保留前 cand_len
+            # （= 有效数）位置 → 保留下来的全是 far 垃圾，near/byp 有效候选
+            # 全被 -inf（→ sf_full mid 区全 -inf → p mid 区 0，G8 对拍全崩）。
+            # 用 stable argsort(~keep) 把有效候选（keep=True）稳定提到前
+            # cand_len 个位置、垃圾后置（scatter 哨兵排除），R_cap 固定形状
+            # 与 eager 归约集合（L1∪bypass）逐位一致。
+            # 【E166 iter3b】候选压缩链融合：argsort(~keep2) stable + 2×gather
+            # + sum + （下游 mid_slot gather）≈5 kernel/层（R_cap=8448 恒定
+            # 长度无关 ≈1.3ms/步）换单 Triton 扫描压缩 kernel。逐位等价：
+            # stable argsort(~keep) = keep=True 按原序前置 + False 按原序后置
+            # ——扫描压缩的 keep 目的位 = 前缀计数、garbage 目的位 = total+序数
+            # （含 garbage 区内容保序复刻：旧 gather 把原始 idx/False/mid 值
+            # 置换到尾部，下游 topk 边缘语义依赖该内容）；cand_len = total。
+            # 纯整数/布尔域无浮点 → bitexact by construction；形态守卫不齐
+            # → 旧链 fail-closed 逐位不变。
+            _mid_slot3 = None
+            if (_HAS_TRITON and cand_idx2.is_contiguous()
+                    and keep2.is_contiguous()
+                    and mid_mask.is_contiguous()):
+                try:
+                    cand_idx2, keep2, _mid_slot3, cand_len = _iter3_compact(
+                        cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev)
+                except Exception:
+                    _mid_slot3 = None
+                    cand_idx2 = torch.where(keep2, cand_idx2, S_cap - 1)  # fallback 哨兵
+                    _srt2 = torch.argsort(~keep2, dim=-1, stable=True)
+                    cand_idx2 = cand_idx2.gather(-1, _srt2)
+                    keep2 = keep2.gather(-1, _srt2)
+                    cand_len = keep2.sum(-1).to(torch.long)
+            else:
                 cand_idx2 = torch.where(keep2, cand_idx2, S_cap - 1)  # fallback 哨兵
                 _srt2 = torch.argsort(~keep2, dim=-1, stable=True)
                 cand_idx2 = cand_idx2.gather(-1, _srt2)
                 keep2 = keep2.gather(-1, _srt2)
                 cand_len = keep2.sum(-1).to(torch.long)
-        else:
-            cand_idx2 = torch.where(keep2, cand_idx2, S_cap - 1)  # fallback 哨兵
-            _srt2 = torch.argsort(~keep2, dim=-1, stable=True)
-            cand_idx2 = cand_idx2.gather(-1, _srt2)
-            keep2 = keep2.gather(-1, _srt2)
-            cand_len = keep2.sum(-1).to(torch.long)
         # ---- 6. fine 打分（Triton 候选 kernel，与 eager 同 kernel 逐位）----
         try:
             if self._triton_ok and _HAS_TRITON and k_qat.dim() == 4 \
