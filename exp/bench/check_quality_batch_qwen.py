@@ -18,6 +18,7 @@ from request_gpu_monitor import GPU0Monitor
 
 
 def run(cli):
+    inherited_env={k:v for k,v in os.environ.items() if k.startswith("TLI_")}
     torch.manual_seed(42)
     parser = argparse.ArgumentParser(); add_sparse_attn_args(parser)
     args = parser.parse_args([
@@ -48,7 +49,7 @@ def run(cli):
     records=[]
     output=Path(cli.output)
     output.with_suffix('.configuration.json').write_text(json.dumps(dict(
-        resolved_args=vars(args),model=model_path,input_indices=[r['index'] for r in rows],
+        resolved_args=vars(args),inherited_tli_environment=inherited_env,model=model_path,input_indices=[r['index'] for r in rows],
         lengths=lengths,eos_policy='empty EOS diagnostic; fixed generation count',
         scope='explicit no-gate Qwen; unchanged 64/128/1024 budget, not ring-gate or GLM B>1'),indent=2))
 
@@ -74,6 +75,8 @@ def run(cli):
                     dest.values[slot,:,:lens[slot]].copy_(src.values[0])
                 del out,dyn
                 torch.cuda.synchronize();conversion_ms+=(time.perf_counter()-t)*1000
+            for layer in cache.layers:
+                layer.cumulative_length=max(lens)
             ctx=BatchCtx(batch,list(lens),[0]*batch,[True]*batch,0)
             tokens=static_decode(model,cache,[[x] for x in first],lens,set(),cli.max_gen,ctx)
             torch.cuda.synchronize();total_ms=(time.perf_counter()-start)*1000
