@@ -106,6 +106,11 @@ def graph_middle_selection(top, k2_mid, mid_mask, length, capacity, sink, swa, *
     """
     if isinstance(length, (int, float)):
         length = torch.tensor(length, dtype=torch.int64, device=top.device)
+    if unique_top and top.is_cuda:
+        from .selection_pack import pack_unique_top
+        packed = pack_unique_top(top, k2_mid, mid_mask, length, capacity, sink, swa)
+        if packed is not None:
+            return TokenSelection(*packed)
     ranks = torch.arange(top.shape[-1], device=top.device)
     in_range = (top >= 0) & (top < capacity)
     safe = top.clamp(0, capacity - 1)
