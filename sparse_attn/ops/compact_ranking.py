@@ -4,7 +4,7 @@ Experimental: compact threshold search followed by token-order gathering and
 native small-sort. Input IDs must be unique where keep=True; outside those IDs
 p must be +0 (or -inf outside mid). Signed -0 and NaN are unsupported;
 probabilities are rounded upstream and NaNs removed, producing +0.
-This still scans full p once; it does not claim fully compact normalization.
+This still scans full p; it does not claim fully compact normalization.
 """
 import os
 from functools import lru_cache
@@ -15,6 +15,7 @@ import triton.language as tl
 from torch.utils.cpp_extension import load
 
 _last_kth_route = None
+_last_gather_route = None
 
 
 @lru_cache(maxsize=1)
@@ -67,7 +68,7 @@ def compact_topk(p, ids, keep, mid, k):
             or not all(t.is_cuda and t.is_contiguous() and t.device==p.device
                        for t in (p,ids,keep,mid))):
         return None
-    global _last_kth_route
+    global _last_kth_route, _last_gather_route
     with torch.cuda.device(p.device):
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize==0:
             raise RuntimeError('warm up compact ranking before graph capture')
@@ -86,7 +87,13 @@ def compact_topk(p, ids, keep, mid, k):
             _last_kth_route="bf16_radix_histogram"
         values=torch.empty((h,k),device=p.device,dtype=p.dtype)
         result=torch.empty((h,k),device=p.device,dtype=torch.int64)
-        _canonical_gather[(h,)](p,threshold,mid,values,result,s,k,stride,
-                               BLOCK=triton.next_power_of_2(s),num_warps=8)
+        if os.environ.get('TLI_COMPACT_GATHER', 'blocked') == 'single':
+            _canonical_gather[(h,)](p,threshold,mid,values,result,s,k,stride,
+                                   BLOCK=triton.next_power_of_2(s),num_warps=8)
+            _last_gather_route="single_cta_prefix"
+        else:
+            from .compact_rank_gather import canonical_gather
+            canonical_gather(p,threshold,mid,values,result,stride)
+            _last_gather_route="blocked_prefix"
         extension.sort_rank(values,result)
         return result

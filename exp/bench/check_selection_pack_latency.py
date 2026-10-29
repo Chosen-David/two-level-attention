@@ -111,7 +111,7 @@ def main():
             calls[mode]['fused'] += int(result is not None and (component != 'mean' or mode == 'fused'))
             return result
 
-        with patch.dict(os.environ, {'TLI_COMPACT_NORMALIZATION': '1' if component in ('mean', 'normalization', 'ranking') else '0', 'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' or component == 'ranking' else '0', 'TLI_COMPACT_RANKING': '1' if component == 'ranking' else '0', 'TLI_COMPACT_KTH': 'histogram'}), patch.object(target, attribute, dispatch):
+        with patch.dict(os.environ, {'TLI_COMPACT_NORMALIZATION': '1' if component in ('mean', 'normalization', 'ranking') else '0', 'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' or component == 'ranking' else '0', 'TLI_COMPACT_RANKING': '1' if component == 'ranking' else '0', 'TLI_COMPACT_KTH': 'histogram', 'TLI_COMPACT_GATHER': 'blocked'}), patch.object(target, attribute, dispatch):
             for _ in range(3):
                 idx.compute_selection_graph(q, index, 128**-.5, length)
             torch.cuda.synchronize()
@@ -121,6 +121,7 @@ def main():
             calls[mode]['normalization_capture_route'] = idx._graph_normalization_route
             calls[mode]['ranking_capture_route'] = idx._graph_ranking_route
             calls[mode]['kth_capture_route'] = idx._graph_ranking_kth_route
+            calls[mode]['gather_capture_route'] = idx._graph_ranking_gather_route
         graphs[mode].replay()
     torch.cuda.synchronize()
     assert torch.equal(outputs['torch'].indices, outputs['fused'].indices)

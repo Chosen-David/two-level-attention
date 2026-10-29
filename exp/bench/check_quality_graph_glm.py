@@ -70,6 +70,9 @@ def run(args_cli):
             records.append(dict(request_index=request_index,pair=request_index//2,policy=policy,tokens=generated,
                 execution=dict(model._quality_graph_execution),
                 normalization_capture_routes=[getattr(x.self_attn.indexer, "_graph_normalization_route", None) for x in model.model.layers],
+                ranking_capture_routes=[getattr(x.self_attn.indexer, "_graph_ranking_route", None) for x in model.model.layers],
+                ranking_kth_capture_routes=[getattr(x.self_attn.indexer, "_graph_ranking_kth_route", None) for x in model.model.layers],
+                ranking_gather_capture_routes=[getattr(x.self_attn.indexer, "_graph_ranking_gather_route", None) for x in model.model.layers],
                 frozen=[x.self_attn.indexer._dyn_frozen for x in model.model.layers],
                 skip_far=[x.self_attn.indexer.skip_far for x in model.model.layers]))
         if args_cli.measure:

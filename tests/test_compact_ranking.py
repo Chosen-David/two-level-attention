@@ -17,7 +17,7 @@ def test_native_tie_prefix_replay(capacity,k,heads):
     compact_topk(p,ids,keep,mid,k)
     graph=torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):actual=compact_topk(p,ids,keep,mid,k)
-    for kind in ('random','ties','zero','underflow','partial','short','empty'):
+    for kind in ('random','ties','zero','underflow','partial','short','holes_equal','holes_short','empty'):
         ids.copy_(torch.stack([torch.randperm(capacity,device="cuda")[:r] for _ in range(heads)]))
         p.zero_();keep.fill_(True);mid.fill_(True)
         scores=torch.rand((heads,r),device='cuda',dtype=p.dtype)
@@ -27,6 +27,9 @@ def test_native_tie_prefix_replay(capacity,k,heads):
         if kind=='partial':
             keep.random_(2);scores.masked_fill_(~keep,0.)
         if kind=='short':mid[k//2:]=False
+        if kind.startswith('holes_'):
+            mid.fill_(False)
+            mid[torch.randperm(capacity,device='cuda')[:k-int(kind=='holes_short')]]=True
         if kind=='empty':mid.fill_(False)
         p.scatter_(1,ids,scores);p.masked_fill_(~mid,-torch.inf)
         graph.replay()
@@ -63,6 +66,7 @@ def test_production_rank_replay(capacity,monkeypatch):
     with torch.cuda.graph(graph):actual=run()
     assert idx._graph_ranking_route=='compact_threshold_native_order'
     assert idx._graph_ranking_kth_route=='bf16_radix_histogram'
+    assert idx._graph_ranking_gather_route=='blocked_prefix'
     for n in (132,4097,capacity,512,capacity-1):
         length.fill_(n);q.normal_();graph.replay()
         monkeypatch.setenv('TLI_COMPACT_RANKING','0');expected=run()

@@ -4557,6 +4557,7 @@ class TLIIndexer(TIAIndexer):
         tok_top = None
         self._graph_ranking_route = "full_width_native"
         self._graph_ranking_kth_route = None
+        self._graph_ranking_gather_route = None
         self._graph_ranking_fallback = "disabled"
         if os.environ.get("TLI_COMPACT_RANKING", "0") == "1":
             from ..ops.compact_ranking import compact_topk
@@ -4566,6 +4567,7 @@ class TLIIndexer(TIAIndexer):
                 self._graph_ranking_route = "compact_threshold_native_order"
                 from ..ops import compact_ranking
                 self._graph_ranking_kth_route = compact_ranking._last_kth_route
+                self._graph_ranking_gather_route = compact_ranking._last_gather_route
         if tok_top is None:
             tok_top = torch.topk(mid_scored, K2_static, dim=-1).indices
         if return_selection:
