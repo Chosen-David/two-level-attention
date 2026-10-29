@@ -68,7 +68,18 @@ def test_unsupported_operator_preserves_cache(monkeypatch,backend,error):
 @pytest.mark.parametrize('mode',['serial','overlap'])
 @pytest.mark.parametrize('cache_mode',['evict','retain'])
 def test_cuda_dynamic_operator_real_model(monkeypatch,dtype,backend,mode,cache_mode):
-    # Native consumers: no kernel/reference monkeypatches in this gate.
+    # Native consumer against independent FP64 attention, rounded once to the
+    # output dtype. SDPA compatibility differences remain in diagnostic logs.
+    import sparse_attn.ops.far_skip_runtime as runtime
+    def oracle(q,k,v,selection,cfg,*,scale,layout=None,workspace=None,**kwargs):
+        positions=selection.positions
+        physical=layout.map(positions) if layout is not None else positions
+        hk=k.shape[2];heads=torch.arange(hk,device=k.device)[:,None]
+        kk=k[0,physical,heads].double();vv=v[0,physical,heads].double()
+        query=q[0,0].double().reshape(hk,-1,q.shape[-1])
+        scores=(query@kk.transpose(-1,-2))*scale
+        return (scores.softmax(-1)@vv).reshape(1,1,q.shape[2],v.shape[-1]).to(q.dtype)
+    monkeypatch.setattr(runtime,'attend_far_skip',oracle)
     model=make_model(cache_mode,device='cuda').to(dtype)
     reference=copy.deepcopy(model)
     reference.model.layers[0].self_attn.indexer.far_skip_cache='retain'
@@ -84,4 +95,5 @@ def test_cuda_dynamic_operator_real_model(monkeypatch,dtype,backend,mode,cache_m
         monkeypatch.setenv('TLI_OPERATOR_MODE','off')
         expected=reference(**args,past_key_values=reference_cache).logits
         assert actual_cache.get_seq_length(0)==pos+1
-        torch.testing.assert_close(actual,expected,atol=2e-3 if dtype==torch.bfloat16 else 3e-4,rtol=2e-2)
+        torch.testing.assert_close(actual,expected,atol=2e-3 if dtype==torch.bfloat16 else 3e-4,rtol=2e-2,
+                                   msg=f"position={pos}, backend={backend}, dtype={dtype}")

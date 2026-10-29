@@ -85,14 +85,17 @@ if triton is not None:
                       PROTECTED: tl.constexpr, SINK: tl.constexpr, SWA: tl.constexpr,
                       RING_SINK: tl.constexpr, RING_TAIL: tl.constexpr,
                       TILE: tl.constexpr, PIPELINE_STAGES: tl.constexpr,
-                      SCALE: tl.constexpr):
+                      SCALE: tl.constexpr, ROUND_SCALED_QUERY: tl.constexpr):
         """SIMT partial attention kernel：每 (query_head, split) 一个 program。"""
         row, split = tl.program_id(0), tl.program_id(1)
         b, qh = row // HQ, row % HQ
         kv = qh // (HQ // HK)
         dq, dv = tl.arange(0, DQB), tl.arange(0, DVB)
         q_raw = tl.load(Q + b * QSB + qh * QSH + dq, dq < DQ, 0)
-        q = (q_raw.to(tl.float32) * SCALE).to(q_raw.dtype).to(tl.float32)
+        if ROUND_SCALED_QUERY:
+            q = (q_raw.to(tl.float32) * SCALE).to(q_raw.dtype).to(tl.float32)
+        else:
+            q = q_raw.to(tl.float32)
         m, l = float('-inf'), 0.0
         acc = tl.zeros((DVB,), tl.float32)
         # Bound work by device metadata: padded selection capacity can be much
@@ -112,7 +115,10 @@ if triton is not None:
                          valid[:, None] & (dq[None, :] < DQ), 0).to(tl.float32)
             vv = tl.load(V + b * VSB + tok[:, None] * VST + kv * VSH + dv[None, :],
                          valid[:, None] & (dv[None, :] < DV), 0).to(tl.float32)
-            scores = tl.where(valid, tl.sum(kk * q[None, :], 1), float('-inf'))
+            logits = tl.sum(kk * q[None, :], 1)
+            if not ROUND_SCALED_QUERY:
+                logits = logits * SCALE
+            scores = tl.where(valid, logits, float('-inf'))
             new_m = tl.maximum(m, tl.max(scores, 0))
             safe_m = tl.where(new_m == float('-inf'), 0., new_m)
             alpha = tl.exp(m - safe_m)
@@ -136,7 +142,7 @@ if triton is not None:
                     PROTECTED: tl.constexpr, SINK: tl.constexpr, SWA: tl.constexpr,
                     RING_SINK: tl.constexpr, RING_TAIL: tl.constexpr,
                     TILE: tl.constexpr, GROUP_BLOCK: tl.constexpr,
-                    PIPELINE_STAGES: tl.constexpr, SCALE: tl.constexpr):
+                    PIPELINE_STAGES: tl.constexpr, SCALE: tl.constexpr, ROUND_SCALED_QUERY: tl.constexpr):
         """TC partial attention kernel：GQA 组内共享 K/V，每 (kv_head, split) 一个 program。"""
         row, split = tl.program_id(0), tl.program_id(1)
         b, kv = row // HK, row % HK
@@ -145,7 +151,8 @@ if triton is not None:
         qh = kv * (HQ // HK) + g
         q = tl.load(Q + b * QSB + qh[:, None] * QSH + dq[None, :],
                     (g[:, None] < HQ // HK) & (dq[None, :] < DQ), 0)
-        q = (q.to(tl.float32) * SCALE).to(q.dtype)
+        if ROUND_SCALED_QUERY:
+            q = (q.to(tl.float32) * SCALE).to(q.dtype)
         m = tl.full((GROUP_BLOCK,), float('-inf'), tl.float32)
         l = tl.zeros((GROUP_BLOCK,), tl.float32)
         acc = tl.zeros((GROUP_BLOCK, DVB), tl.float32)
@@ -166,7 +173,10 @@ if triton is not None:
                          valid[:, None] & (dq[None, :] < DQ), 0)
             vv = tl.load(V + b * VSB + tok[:, None] * VST + kv * VSH + dv[None, :],
                          valid[:, None] & (dv[None, :] < DV), 0)
-            scores = tl.where(valid[None, :], tl.dot(q, tl.trans(kk)), float('-inf'))
+            logits = tl.dot(q, tl.trans(kk))
+            if not ROUND_SCALED_QUERY:
+                logits = logits * SCALE
+            scores = tl.where(valid[None, :], logits, float('-inf'))
             new_m = tl.maximum(m, tl.max(scores, 1))
             safe_m = tl.where(new_m == float('-inf'), 0., new_m)
             alpha = tl.exp(m - safe_m)
@@ -240,13 +250,17 @@ def _validate(q, k, v, ids, counts, lengths, sink, swa, splits, layout):
 
 def partial_attention(q, k, v, selection, lengths, *, sink, swa, scale,
                       protected=False, splits=4, backend='simt', layout=None,
-                      pipeline_stages=1):
+                      pipeline_stages=1, round_scaled_query=True):
     """分片在线注意力（split-KV partial attention）。
 
     selection: (ids [B,Hkv,K] int32, counts [B,Hkv] int32) — 紧凑候选集。
     protected=True 时忽略 selection，仅在 sink+swa 保护集上执行。
     返回 PartialState(m, l, acc)，需由 merge_partials 合并。
+    round_scaled_query=True preserves the linear path's model-dtype Q scaling.
+    False scales FP32 QK logits, matching the ring SDPA mathematical contract.
     """
+    if type(round_scaled_query) is not bool:
+        raise ValueError('round_scaled_query must be bool')
     if type(pipeline_stages) is not int or pipeline_stages not in (1, 2, 3):
         raise ValueError('pipeline_stages must be 1, 2 or 3')
     ids, counts = selection
@@ -255,7 +269,7 @@ def partial_attention(q, k, v, selection, lengths, *, sink, swa, scale,
         raise ValueError('backend must be torch, simt or tc')
     if backend == 'torch':
         return _torch_partial(q, k, v, selection, lengths, sink, swa,
-                              scale, protected, splits, layout)
+                              scale, protected, splits, layout, round_scaled_query)
     if triton is None or not q.is_cuda:
         raise RuntimeError(
             'GPU partial attention requires CUDA and Triton; no implicit fallback')
@@ -284,7 +298,7 @@ def partial_attention(q, k, v, selection, lengths, *, sink, swa, scale,
                   PROTECTED=protected, SINK=sink, SWA=swa,
                   RING_SINK=0 if layout is None else layout.sink,
                   RING_TAIL=0 if layout is None else layout.tail_capacity,
-                  TILE=tile, PIPELINE_STAGES=pipeline_stages, SCALE=scale)
+                  TILE=tile, PIPELINE_STAGES=pipeline_stages, SCALE=scale, ROUND_SCALED_QUERY=round_scaled_query)
     kernel, grid = _partial_simt, (b * h, splits)
     if backend == 'tc':
         kernel, grid = _partial_tc, (b * hk, splits)
@@ -296,7 +310,7 @@ def partial_attention(q, k, v, selection, lengths, *, sink, swa, scale,
 
 
 def _torch_partial(q, k, v, selection, lengths, sink, swa, scale,
-                   protected, splits, layout):
+                   protected, splits, layout, round_scaled_query):
     """CPU 参考实现：物化 gather 张量，非快速路径。"""
     ids, counts = selection
     b, _, h, _ = q.shape
@@ -325,9 +339,11 @@ def _torch_partial(q, k, v, selection, lengths, sink, swa, scale,
     heads = torch.arange(hk, device=q.device)[None, :, None]
     kk = k[rows, physical, heads].float().masked_fill(~valid[..., None], 0)
     vv = v[rows, physical, heads].float().masked_fill(~valid[..., None], 0)
-    qg = (q[:, 0] * scale).float().reshape(b, hk, h // hk, -1)
-    scores = torch.einsum('bhgd,bhnd->bhgn', qg, kk).masked_fill(
-        ~valid[:, :, None], -torch.inf)
+    qg = ((q[:, 0] * scale).float() if round_scaled_query else q[:, 0].float()).reshape(b, hk, h // hk, -1)
+    scores = torch.einsum('bhgd,bhnd->bhgn', qg, kk)
+    if not round_scaled_query:
+        scores = scores * scale
+    scores = scores.masked_fill(~valid[:, :, None], -torch.inf)
     # scores 最后一维 = 候选 token 数（width = K 或 sink+swa）
     width = scores.shape[-1]
     span = max(1, (width + splits - 1) // splits)

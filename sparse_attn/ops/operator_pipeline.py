@@ -157,7 +157,8 @@ def decode_selected(q, k, v, lengths, softmax_scale, *, cfg, layout, select):
         counts = torch.empty((1, k.shape[2]), dtype=torch.int32, device=q.device)
         return partial_attention(q, k, v, (ids, counts), lengths,
             sink=cfg.sink_tokens, swa=cfg.window_tokens, scale=softmax_scale,
-            protected=True, splits=4, backend=backend, layout=layout)
+            protected=True, splits=4, backend=backend, layout=layout,
+            round_scaled_query=False)
     if overlap:
         current = torch.cuda.current_stream(q.device)
         side = _protected_stream(q.device)
@@ -175,7 +176,7 @@ def decode_selected(q, k, v, lengths, softmax_scale, *, cfg, layout, select):
     sstate = partial_attention(q, k, v, selection, lengths,
         sink=cfg.sink_tokens, swa=cfg.window_tokens, scale=softmax_scale,
         protected=False, splits=4, backend=backend, layout=layout,
-        pipeline_stages=stages)
+        pipeline_stages=stages, round_scaled_query=False)
     if overlap:
         current.wait_stream(side)
         for tensor in pstate:
