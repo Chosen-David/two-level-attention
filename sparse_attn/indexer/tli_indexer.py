@@ -4472,7 +4472,6 @@ class TLIIndexer(TIAIndexer):
         # 完整归约语义；S_cap+1 哨兵列避免无效槽覆盖真实末 token。
         keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)
         cand_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)
-        sfc = torch.where(keep_h, sfc, torch.full_like(sfc, float("-inf")))
         sf_full = torch.full(
             (H, S_cap + 1), float("-inf"), dtype=sfc.dtype, device=dev)
         safe_idx = torch.where(keep_h, cand_h, S_cap)
