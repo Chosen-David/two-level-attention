@@ -3356,8 +3356,8 @@ class TLIIndexer(TIAIndexer):
         _sf_w = score_fine.shape[-1]
         if _fused_rebuild:
             # 【AKO iter-5】keep 链 + 哨兵 scatter 融合为单 Triton kernel
-            # （_ako_rebuild_scatter_kernel）：iter-4 的块掩码查表 L1 门
-            # （E2a）语义不变，仅把 arange+compare+and+div+clamp+
+            # （_ako_rebuild_scatter_kernel）：L1 块与完整保护区取并集；
+            # 保护区必须进入 GQA softmax 分母。融合 arange+compare+and+div+clamp+
             # index_select+gather+where+scatter_ 九个小 kernel 的逐元素
             # 链单趟化。纯整数/布尔/拷贝语义、无浮点归约参与 → 逐位
             # 等价（重复索引同值幂等；idx<S_real 门无条件施加——
@@ -3395,6 +3395,7 @@ class TLIIndexer(TIAIndexer):
                     cand_idx, _sf2, _blk2, _cand_len, sf_full[0, 0],
                     _dummy,
                     _R, _n, S_width, S_real, bs, kt, self.group_size,
+                    self.sink_tokens, swa_tok,
                     _sf2.stride(0), _sf2.stride(1),
                     cand_idx.stride(0), cand_idx.stride(1),
                     _blk2.stride(0), _blk2.stride(1),
@@ -3426,7 +3427,9 @@ class TLIIndexer(TIAIndexer):
                     0, _hkv).gather(-1, _bid)
                 _rmask2 = (torch.arange(_R, device=cand_idx.device
                                         ).view(1, _R) < _cand_len.view(-1, 1))
-                _keep = _keep & _rmask2
+                _protected = ((cand_idx < self.sink_tokens)
+                              | (cand_idx >= max(0, S_real - swa_tok)))
+                _keep = (_keep | _protected) & _rmask2
                 if S_real < S_width:
                     _keep = _keep & (cand_idx < S_real)
                 _safe = torch.where(
@@ -3443,7 +3446,12 @@ class TLIIndexer(TIAIndexer):
                 # 仍 -inf，softmax 不归约，逐位等价变长路径）。
                 topk_mask = F.pad(topk_mask,
                                   (0, _sf_w - topk_mask.shape[-1]), value=False)
-            score_fine = torch.where(topk_mask, score_fine, float("-inf"))
+            # The normalization domain includes every protected token, even
+            # when its page was not selected by L1 (including full-width fallback).
+            _tokens = torch.arange(_sf_w, device=score_fine.device)
+            _protected = ((_tokens < self.sink_tokens)
+                          | (_tokens >= max(0, S_real - swa_tok))) & (_tokens < S_real)
+            score_fine = torch.where(topk_mask | _protected, score_fine, float("-inf"))
         _G_ = self.group_size
         _sm = F.softmax(score_fine, dim=-1)
         if (not self.per_q_head and _HAS_TRITON and _sm.is_contiguous()
@@ -4442,6 +4450,13 @@ class TLIIndexer(TIAIndexer):
             if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
                 self.metrics.add_select_result(valid_len - 1, sel, 1)
             return sel
+        # Complete the same normalization domain as eager. Move protected
+        # tokens out of L1/bypass slots into a single disjoint sink/SWA segment;
+        # short requests and overlapping protected intervals must count once.
+        from .candidate_domain import complete_protected_candidates
+        cand_idx2, keep2 = complete_protected_candidates(
+            cand_idx2, keep2, S_real, sink_tok, swa_tok, S_cap)
+        R_cap = cand_idx2.shape[-1]
         # 【2c-2 修复】候选紧凑化重排：_score_fine_cand_kernel 的 cand_len
         # 门控语义 = 「前 cand_len 个位置有效」（offs_r < CLEN[kv]）。原布局
         # cand_idx = [far 96 槽(垃圾), near 32 槽(有效), byp 2 槽(有效)]——
@@ -4494,11 +4509,9 @@ class TLIIndexer(TIAIndexer):
             _bkqc = repeat(_kqc, "kv r d -> (kv g) r d", g=group_size).to(torch.float32)
             sfc = einsum(b_q_fine, _bkqc, "h d, h r d -> h r").to(q.dtype)
         # ---- 7. 完整候选散回 + 全宽 softmax + GQA mean（与 eager 同归约域）----
-        # Reconstruct the same L1/bypass-filtered token domain as eager.
-        # Protected tokens are forced in the final selection. Eager's rebuild
-        # also gates their logits by the L1 block mask; adding all protected
-        # logits here alone changes GQA normalization. Keep that semantic
-        # correction separate and validate both implementations together.
+        # Full-width reference reduction over L1/bypass union sink/SWA.
+        # Keep this reduction layout until compact rounding and tie behavior
+        # has passed independent acceptance against this corrected reference.
         keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)
         cand_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)
         sf_full = torch.full(
@@ -5155,13 +5168,13 @@ if _HAS_TRITON:
         # BLK [Hkv,kt] bool（L1 块掩码快照）；CLEN [Hkv] int64（行实长）；
         # OUT [H,W] bf16（-inf 预填充连续重建目标，iter-8 哨兵列退役）；
         # DUMMY [H,1] bf16（无效槽牺牲位，内容永不读）
-        R, total, W, S_real, bs_c, kt_c, g,
+        R, total, W, S_real, bs_c, kt_c, g, sink, swa,
         stride_sfh, stride_sfr, stride_ch, stride_cr,
         stride_blh, stride_blk,
         BLOCK: tl.constexpr,
     ):
         """【AKO iter-5】fused 哨兵重建融合 kernel：单 launch 内完成
-        keep 链（r<cand_len & 块掩码查表 & token<S_real）+ 无效槽路由 +
+        keep 链（r<cand_len & (L1 块或保护区) & token<S_real）+ 无效槽路由 +
         候选分 scatter。纯整数/布尔/拷贝语义，无浮点归约参与，与 iter-4
         的 arange+compare+and+div+clamp+index_select+gather+where+
         scatter_ 九 kernel 链逐位等价（重复索引同值幂等）。
@@ -5183,7 +5196,8 @@ if _HAS_TRITON:
         bid = tl.minimum(idx // bs_c, kt_c - 1)
         bkeep = tl.load(BLK + (h // g) * stride_blh + bid * stride_blk,
                         mask=m, other=0)
-        keep = keep & (bkeep != 0)
+        protected = (idx < sink) | (idx >= tl.maximum(0, S_real - swa))
+        keep = keep & ((bkeep != 0) | protected)
         val = tl.load(SF + h * stride_sfh + r * stride_sfr,
                       mask=m, other=float("-inf"))
         tl.store(OUT + h * W + idx, val, mask=m & keep)
