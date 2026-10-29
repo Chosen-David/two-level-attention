@@ -134,10 +134,11 @@ def decode_ring(workspace, q, k, v, lengths, softmax_scale):
     torch._assert_async(((lengths >= 1) & (lengths < torch.iinfo(torch.int32).max)).all(),
                         "ring logical lengths must fit positive int32 IDs")
     return decode_selected(q, k, v, lengths, softmax_scale, cfg=workspace.cfg,
-                           layout=workspace.layout, select=workspace.select)
+                           layout=workspace.layout, select=workspace.select,
+                           ordered_unique=getattr(workspace, 'ordered_unique_selection', False))
 
 
-def decode_selected(q, k, v, lengths, softmax_scale, *, cfg, layout, select):
+def decode_selected(q, k, v, lengths, softmax_scale, *, cfg, layout, select, ordered_unique=False):
     """Shared split attention consumer for graph and eager compact selectors."""
     from .partial_attention import partial_attention, merge_partials
     from .token_selection import middle_selection
@@ -169,8 +170,13 @@ def decode_selected(q, k, v, lengths, softmax_scale, *, cfg, layout, select):
                 tensor.record_stream(side)
     positions, valid = select(q, k, lengths, softmax_scale)
     # Ring positions are absolute: physical capacity is not an ID bound.
-    selection = middle_selection(positions[None], valid[None], lengths,
-        cfg.sink_tokens, cfg.window_tokens, torch.iinfo(torch.int32).max)
+    if ordered_unique:
+        from .ordered_selection import ordered_middle_selection
+        selection = ordered_middle_selection(positions[None], valid[None], lengths,
+            cfg.sink_tokens, cfg.window_tokens, torch.iinfo(torch.int32).max)
+    else:
+        selection = middle_selection(positions[None], valid[None], lengths,
+            cfg.sink_tokens, cfg.window_tokens, torch.iinfo(torch.int32).max)
     if not overlap:
         pstate = protected()
     sstate = partial_attention(q, k, v, selection, lengths,
