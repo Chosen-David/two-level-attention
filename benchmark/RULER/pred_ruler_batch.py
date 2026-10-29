@@ -172,125 +172,13 @@ def _decode_4d_mask(past_len, seq_lens, neg_inf, dtype, device,
 
 def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
                         neg_inf, dtype, device, B, S_cap):
-    """【阶段 2c-5】TLI fixed_cache decode 整步 capture 一次 + replay 循环。
-
-    图内不变量（capture 时烘焙）：KV 形状恒 [B,Hkv,S_cap,D]、
-    4D additive mask 恒 [B,1,1,S_cap]、TLI index 容量宽、TLI mask
-    [B,1,Hkv,S_cap]。步间变化量全部由预分配 buffer 的 copy_ 注入：
-      - nxt_buf [B,1]：本步喂入 token（alive 行 = 上一 token，dead = pad）
-      - pid_buf [B,1]：RoPE position_ids（lens[b] + step，dead 行同式）
-      - pos_buf [B]：KV 写列（= seq_lens[b]-1，TLIStaticCache.update 消费）
-      - vl_buf  [B]：有效长（compute_mask_graph 的 valid_len 输入）
-      - m4_buf：dense/skip 层 additive mask（可见列 [0, seq_lens[b])）
-
-    失败 fail-closed：返回 None，调用方走 staged 逐行路径（零扰动）。
-    前提：T=S_cap ≥ 16384（Triton gather 批量路径；更短档的 torch dense
-    回退含 host 同步，不可 capture）。
-    """
-    if S_cap < 16384:
-        print(f"[2c] S_cap={S_cap} < 16384（torch dense 回退含 host 同步，"
-              f"不可 capture）→ 跳过 CUDA Graph，走 staged 路径", flush=True)
-        return None
-    from sparse_attn.ops.cuda_graph_state import (  # noqa: E402
-        enable_graph, disable_graph, graph_state)
-    gs = graph_state()
-    nxt_buf = torch.full((B, 1), pad_id, dtype=torch.long, device=device)
-    pid_buf = torch.zeros((B, 1), dtype=torch.long, device=device)
-    pos_buf = torch.zeros(B, dtype=torch.long, device=device)
-    vl_buf = torch.zeros(B, dtype=torch.long, device=device)
-    alive_buf = torch.ones(B, dtype=torch.bool, device=device)
-    m4_buf = torch.full((B, 1, 1, S_cap), neg_inf, dtype=dtype, device=device)
-    snap_seq, snap_gen = list(ctx.seq_lens), list(ctx.gen_lens)
-
-    def _inject(step):
-        """host → buffer 注入（每步一次；与 staged 循环同序：先取 token，
-        再 seq_lens+1，再构造 position/mask）。"""
-        nxt = [gen[b][-1] if ctx.alive[b] else pad_id for b in range(B)]
-        nxt_buf.copy_(torch.tensor(nxt, dtype=torch.long,
-                                   device=device).view(B, 1))
-        for b in range(B):
-            if ctx.alive[b]:
-                ctx.seq_lens[b] += 1
-                ctx.gen_lens[b] += 1
-        pid_buf.copy_(torch.tensor([lens[b] + step for b in range(B)],
-                                   dtype=torch.long, device=device).view(B, 1))
-        pos_buf.copy_(torch.tensor([ctx.seq_lens[b] - 1 for b in range(B)],
-                                   dtype=torch.long, device=device))
-        vl_buf.copy_(torch.tensor(ctx.seq_lens, dtype=torch.long,
-                                  device=device))
-        alive_buf.copy_(torch.tensor(ctx.alive, dtype=torch.bool, device=device))
-        m4_buf.fill_(neg_inf)
-        for b in range(B):
-            m4_buf[b, 0, 0, :ctx.seq_lens[b]] = 0
-
-    try:
-        enable_graph(B)
-        gs.pos_buf = pos_buf
-        gs.valid_len_buf = vl_buf
-        gs.alive_buf = alive_buf
-        _inject(0)
-        # warmup（主 stream，2 步）：HF 惰性分配 / kernel 选择 / Triton
-        # autotune 必须发生在 capture 之外；写列重复覆盖（replay 首步同
-        # 位置同 token 重写，无污染）。主 stream 执行（非 side stream）：
-        # _tl_decode_batched 在 graph 不支持配置时会 disable graph → 此
-        # 时 staged 路径在主 stream 跑 warmup；温跑后检查 graph 状态，若
-        # 已被 disable 则 fail-closed 回 staged（避免 capture 时非图
-        # 兼容 staged 代码入图炸）。
-        for _ in range(2):
-            model(input_ids=nxt_buf, position_ids=pid_buf,
-                  attention_mask=m4_buf, past_key_values=past,
-                  use_cache=True)
-        if not gs.enabled:
-            print(f"[2c] compute_mask_graph 不支持当前配置 → 关闭 CUDA Graph，"
-                  f"回退 staged 逐行路径", flush=True)
-            disable_graph()
-            ctx.seq_lens[:] = snap_seq
-            ctx.gen_lens[:] = snap_gen
-            return None
-        graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(graph):
-            out = model(input_ids=nxt_buf, position_ids=pid_buf,
-                        attention_mask=m4_buf, past_key_values=past,
-                        use_cache=True)
-        print(f"[2c] CUDA Graph capture 成功：B={B} S_cap={S_cap} "
-              f"（capture 后 replay 循环 {MAX_GEN - 1} 步上限）", flush=True)
-    except Exception as e:  # fail-closed：任何 capture 失败回 staged 路径
-        import traceback
-        print(f"[2c] CUDA Graph capture 失败（{type(e).__name__}: {e}）"
-              f"→ 回退 staged 路径", flush=True)
-        if os.environ.get("TLI_CUDA_GRAPH_DEBUG", "0") == "1":
-            traceback.print_exc()
-        disable_graph()
-        ctx.seq_lens[:] = snap_seq
-        ctx.gen_lens[:] = snap_gen
-        return None
-    # warmup/capture 期 _inject(0) 已把 seq_lens +1 → 恢复到 capture 前快照，
-    # 让正式步（step=0）重新走一次同样的 +1。
-    ctx.seq_lens[:] = snap_seq
-    ctx.gen_lens[:] = snap_gen
-    _t0, _nstep = time.time(), 0
-    for step in range(MAX_GEN - 1):
-        if not any(ctx.alive):
-            break
-        _inject(step)
-        graph.replay()
-        pred = out.logits[:, -1, :].argmax(dim=-1).tolist()   # 每步一次同步
-        _nstep += 1
-        for b in range(B):
-            if not ctx.alive[b]:
-                continue
-            gen[b].append(pred[b])
-            if pred[b] in eos_ids and len(gen[b]) > 1:
-                ctx.alive[b] = False
-    _dt = time.time() - _t0
-    print(f"[2c-wall] graph decode: steps={_nstep} wall={_dt:.3f}s "
-          f"({1000 * _dt / max(1, _nstep):.2f} ms/step, B={B})", flush=True)
-    disable_graph()
-    return gen
+    from sparse_attn.ops.quality_graph import static_decode
+    return static_decode(model, past, gen, lens, eos_ids, MAX_GEN, ctx)
 
 
 def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids):
     """Compact TLI: per-request prefill/gates, batched model decode, optional graph."""
+    from sparse_attn.ops.quality_graph import graph_policy, execution
     from sparse_attn.ops.hybrid_batch_cache import HybridBatchCacheBuilder
     from sparse_attn.ops.hybrid_batch_runner import HybridBatchRunner
 
@@ -319,7 +207,12 @@ def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, 
                 builder.finalize_row(row_cache, length)
             del output  # Release prefill logits before the next request.
     runner = HybridBatchRunner(model, builder.finish(), pad_id)
-    use_graph = os.environ.get('TLI_CUDA_GRAPH', '0') == '1'
+    # Compact capture recovery has a distinct cache lifecycle; keep auto on
+    # its validated staged path until that recovery is independently checked.
+    use_graph = graph_policy() == 'on'
+    record = execution(model,'staged_hybrid',
+                       'hybrid_auto_capture_not_validated' if graph_policy()=='auto' else None,
+                       batch_size=batch)
     alive, lengths = [True]*batch, list(lens)
     for step in range(MAX_GEN-1):
         if not any(alive):
@@ -330,6 +223,9 @@ def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, 
         if use_graph and step == 0:
             # This path supports short contexts too; capture failures are visible.
             runner.capture()
+            record.update(actual="graph_hybrid",captures=1)
+        if runner.graph is not None:
+            record["replay_steps"] += 1
         predicted = runner.run().logits[:, -1].argmax(-1).tolist()
         for b, token in enumerate(predicted):
             if alive[b]:
@@ -355,12 +251,15 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
     （CUDA Graph 前置）。decode 4D mask 列数恒 S_cap、可见列取头部
     [0, seq_lens[b])（left_pad_kv=True）。
     """
+    from sparse_attn.ops.quality_graph import unsupported
     compact = any(getattr(getattr(m, 'indexer', None), 'far_skip_backend', '') == 'compact'
                   for m in model.modules())
     if compact:
         if not fixed_cache:
             raise ValueError('compact batched decode requires fixed_cache=True')
         return _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids)
+    if not fixed_cache:
+        unsupported(model, "method_has_no_fixed_cache_graph")
     B = len(rows)
     pad_id = getattr(tokenizer, "pad_token_id", None) or tokenizer.eos_token_id
     input_ids = input_ids.to("cuda")
@@ -438,7 +337,7 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
         # 【阶段 2c-5】CUDA Graph decode（env TLI_CUDA_GRAPH=1；仅 TLI
         # fixed_cache、S_cap≥16384 且生产主配置——不满足时 helper 返回
         # None → 落下方 staged 逐行路径，行为零扰动）。
-        if (fixed_cache and os.environ.get("TLI_CUDA_GRAPH", "0") == "1"):
+        if fixed_cache:
             gen_g = _decode_batch_graph(
                 model, ctx, past, gen, lens, eos_ids, pad_id, neg_inf,
                 dtype, device, B, S_cap)
@@ -512,6 +411,8 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
 
 
 def main():
+    from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
+    from sparse_attn.ops.quality_graph import graph_policy
     args = parse_args()
     if args.batch_size < 1:
         raise SystemExit("--batch-size 必须 >= 1")
@@ -535,10 +436,11 @@ def main():
                   if is_glm else QWEN3_NATIVE_MPE)
     use_yarn = args.yarn
     if is_glm:
-        if args.method == "tli" and getattr(args, "tli_dyn_dgate", False):
+        if (args.method == "tli" and getattr(args, "tli_dyn_dgate", False)
+                and args.batch_size > 1):
             raise SystemExit(
-                "[glm] dynamic far-skip 当前仅支持 pred_ruler.py 单请求无 padding 入口；"
-                "batch 入口尚未实现逐行 gate/有效长度标定")
+                "[glm] dynamic far-skip 当前仅支持单请求入口；"
+                "batch_size>1 尚未实现逐行 gate/有效长度标定")
         if native_mpe != 202752:
             raise SystemExit(f"[glm] 原生 MPE 应为 202752，实际 {native_mpe!r}")
         if args.yarn or args.yarn_factor is not None:
@@ -646,13 +548,13 @@ def main():
             # batch>1 时取该 chunk 全部行×步的 select_tokens 均值（聚合口径）。
             metrics = get_metrics()
             metrics.clear()
-            with baseline_request(model) as baseline_receipt:
+            with baseline_request(model) as baseline_receipt, eager_decoding_request_guard():
                 with torch.no_grad():
                     gen = _decode_batch_chunk(
                         model, tokenizer, chunk, input_ids, position_ids,
                         mask2d, lens, eos_ids, keep_logits,
                         fixed_cache=(args.method == "tli"))
-            budget = None if baseline_receipt else metrics.get_select_tokens()
+            budget = None if (baseline_receipt or getattr(model, "_quality_graph_execution", {}).get("actual", "").startswith("graph")) else metrics.get_select_tokens()
             for (row, g) in zip(chunk, gen):
                 pred = tokenizer.decode(g, skip_special_tokens=True)
                 fout.write(json.dumps({
@@ -660,6 +562,7 @@ def main():
                        if baseline_receipt else {}),
                     "pred": pred, "answers": row["outputs"],
                     "length": row["length"], "budget": budget,
+                    "execution": getattr(model, "_quality_graph_execution", {}),
                     "_id": f"{args.task}:{row['index']}",
                     "_answers_sha": hashlib.sha256(json.dumps(
                         row["outputs"], ensure_ascii=False, sort_keys=True)
@@ -690,6 +593,8 @@ def main():
                 "max_gen": MAX_GEN, "max_num": args.max_num, "seed": SEED,
                 "method": args.method, "pred_postfix": args.pred_postfix,
                 "t": args.t, "batch_size": args.batch_size,
+                "graph_policy": graph_policy(),
+                "operator_mode": os.environ.get("TLI_OPERATOR_MODE", "off"),
             },
             producer_script_path="benchmark/RULER/pred_ruler_batch.py",
             producer_script_sha256=_file_sha256(os.path.abspath(__file__)),

@@ -84,6 +84,7 @@ from sparse_attn.metrics import get_metrics  # noqa: E402
 # docstring）——RULER 生成的逐行生成段接线。
 from sparse_attn.ops.eager_decoding import (  # noqa: E402
     eager_decoding_request_guard)
+from sparse_attn.ops.quality_graph import from_dynamic, graph_policy
 from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes  # noqa: E402
 from sparse_attn.info import (  # noqa: E402
     get_method_name_with_info, get_treatment_manifest_json,
@@ -597,20 +598,25 @@ def main():
                     past = output.past_key_values
                     pred_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
                     gen = [pred_idx.item()]
-                    for _ in range(MAX_GEN - 1):
-                        # min_length 语义：禁止在 context 结束前停（RULER 官方口径）
-                        if len(gen) < 2 and pred_idx.item() in eos_ids:
-                            pass  # 首位不许停（近似 min_length=context+1）
-                        out = model(input_ids=pred_idx, past_key_values=past,
-                                    use_cache=True)
-                        past = out.past_key_values
-                        pred_idx = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
-                        gen.append(pred_idx.item())
-                        if pred_idx.item() in eos_ids and len(gen) > 1:
-                            break
+                    del output
+                    graphed = from_dynamic(model, past, gen[0], MAX_GEN, eos_ids)
+                    if graphed is not None:
+                        gen = graphed
+                    else:
+                        for _ in range(MAX_GEN - 1):
+                            # min_length 语义：禁止在 context 结束前停（RULER 官方口径）
+                            if len(gen) < 2 and pred_idx.item() in eos_ids:
+                                pass  # 首位不许停（近似 min_length=context+1）
+                            out = model(input_ids=pred_idx, past_key_values=past,
+                                        use_cache=True)
+                            past = out.past_key_values
+                            pred_idx = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
+                            gen.append(pred_idx.item())
+                            if pred_idx.item() in eos_ids and len(gen) > 1:
+                                break
             pred = tokenizer.decode(gen, skip_special_tokens=True)
             metrics = get_metrics()
-            budget = None if baseline_receipt else metrics.get_select_tokens()
+            budget = None if (baseline_receipt or getattr(model, "_quality_graph_execution", {}).get("actual", "").startswith("graph")) else metrics.get_select_tokens()
             metrics.clear()
             # E116c（GPT 0826 审计 TL-RULER-SAMPLE-GATE-026）：样本身份绑定源行
             # index（RULER 源 jsonl 自带 0..99 int，比 LB v1 的 data_fp 指纹更直接）
@@ -620,6 +626,7 @@ def main():
                 **({"baseline_receipt": baseline_receipt} if baseline_receipt else {}),
                 "pred": pred, "answers": row["outputs"],
                 "length": row["length"], "budget": budget,
+                "execution": getattr(model, "_quality_graph_execution", {}),
                 "_id": f"{args.task}:{row['index']}",
                 "_answers_sha": hashlib.sha256(json.dumps(
                     row["outputs"], ensure_ascii=False, sort_keys=True)
@@ -665,7 +672,8 @@ def main():
             generation_params={
                 "max_gen": MAX_GEN, "max_num": args.max_num, "seed": SEED,
                 "method": args.method, "pred_postfix": args.pred_postfix,
-                "t": args.t,
+                "t": args.t, "graph_policy": graph_policy(),
+                "operator_mode": os.environ.get("TLI_OPERATOR_MODE", "off"),
             },
             producer_script_path="benchmark/RULER/pred_ruler.py",
             producer_script_sha256=_file_sha256(os.path.abspath(__file__)),

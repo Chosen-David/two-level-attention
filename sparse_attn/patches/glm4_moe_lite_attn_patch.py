@@ -13,6 +13,7 @@ from transformers.models.glm4_moe_lite.modeling_glm4_moe_lite import (
 
 from ..indexer import Indexer
 from ..ops.eager_decoding import eager_decoding_attn
+from ..ops.quality_graph import owned_decode_mask
 from ..baseline_runtime import batch_decode_ctx
 from .qwen3_attn_patch import _tl_decode_batched, _can_drop_static_mask, _paper_route
 from .utils import (
@@ -48,7 +49,8 @@ def glm4_moe_lite_attn_forward(
         if batch_size != 1 or (ctx is not None and ctx.batch != 1):
             raise RuntimeError(
                 "GLM dynamic far-skip 仅支持单请求；批量请求需要逐行独立 gate 状态")
-        if attention_mask is not None:
+        if (attention_mask is not None and not (
+                seq_length == 1 and owned_decode_mask(past_key_values, attention_mask, ctx))):
             raise RuntimeError(
                 "GLM dynamic far-skip 尚不支持显式 attention_mask/padding；"
                 "标定必须只覆盖本请求有效 token")
@@ -83,7 +85,8 @@ def glm4_moe_lite_attn_forward(
     cur_len = 0
     is_static_cache = False
     if past_key_values is not None:
-        if (cache_position is not None and int(cache_position[0]) != 0
+        if (batch_decode_ctx() is None and cache_position is not None
+                and int(cache_position[0]) != 0
                 and past_key_values.get_seq_length(self.layer_idx) == 0):
             raise RuntimeError(
                 "GLM TLI 非零 cache_position 需要已有 KV 历史；"

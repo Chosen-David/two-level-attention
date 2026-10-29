@@ -4168,11 +4168,11 @@ class TLIIndexer(TIAIndexer):
                 and self.far_select not in ("cluster", "sim_greedy")
                 and self.near_select not in ("cluster", "sim_greedy")
                 and not self.moba_gate and self.sigma_select == "none"
-                and not self.enable_async and not self.skip_far):
+                and not self.enable_async):
             raise NotImplementedError(
                 "compute_mask_graph 仅支持生产主配置（e64 固定几何 + γ=None "
                 "自由竞争 + boundary_bypass + 非投影 + 非 per_q_head + 非簇分/"
-                "moba/sigma/async + 非 skip_far）；其余配置调用方应回退 eager "
+                "moba/sigma/async）；其余配置调用方应回退 eager "
                 "逐行路径（行为不变）")
         dev = q.device
         bs = self.args.tia_block_size
@@ -4205,6 +4205,9 @@ class TLIIndexer(TIAIndexer):
         # A short cache may contain fewer pages than the configured L1 quota.
         # Clip static slot counts exactly as eager clips each pool's topk.
         nb_far, nb_near = min(nb_far, kt_cap), min(nb_near, kt_cap)
+        # The decode-frozen gate removes all far slots, as eager L1 does.
+        if self.skip_far:
+            nb_far = 0
         K1 = nb_far + nb_near
         # 静态常量（capture 安全）：torch.tensor(..., device=) 是 host→device
         # 拷贝，CUDA Graph capture 期禁止（cudaMemcpyAsync from pageable）→
@@ -4491,11 +4494,11 @@ class TLIIndexer(TIAIndexer):
             _bkqc = repeat(_kqc, "kv r d -> (kv g) r d", g=group_size).to(torch.float32)
             sfc = einsum(b_q_fine, _bkqc, "h d, h r d -> h r").to(q.dtype)
         # ---- 7. 完整候选散回 + 全宽 softmax + GQA mean（与 eager 同归约域）----
-        # eager 的候选不仅含 L1/bypass，还含完整 sink/SWA；随后散回 token 域，
-        # 重复候选幂等合并后才做 softmax。旧 graph 直接在 L1/bypass 槽域做
-        # softmax，漏掉未重叠的 SWA 候选，改变分母与 GQA 组间相对权重，导致
-        # graph/eager L2 选集漂移（D=128/D=256 均可复现）。这里恢复 eager 的
-        # 完整归约语义；S_cap+1 哨兵列避免无效槽覆盖真实末 token。
+        # Reconstruct the same L1/bypass-filtered token domain as eager.
+        # Protected tokens are forced in the final selection. Eager's rebuild
+        # also gates their logits by the L1 block mask; adding all protected
+        # logits here alone changes GQA normalization. Keep that semantic
+        # correction separate and validate both implementations together.
         keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)
         cand_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)
         sf_full = torch.full(

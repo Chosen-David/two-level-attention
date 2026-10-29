@@ -55,6 +55,7 @@ from sparse_attn.info import freeze_minference_pattern_sha8
 # ——guard 退出校验 raise 必须先于 record 构造/append 与任何落盘。
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
+from sparse_attn.ops.quality_graph import from_dynamic, execution, unsupported
 
 
 def parse_args(args=None):
@@ -219,6 +220,7 @@ def _manual_generate(
     model, material_ids, question_ids, max_gen, eos_token_id, capture=None
 ):
     """Existing LongBench greedy loop, instrumented only when capture is enabled."""
+    from sparse_attn.ops.quality_graph import from_dynamic, unsupported
     if type(max_gen) is not int or max_gen<1:raise ValueError('max_gen must be positive')
     if capture is not None:
         capture.generation_policy=dict(max_new_tokens=max_gen,eos_token_id=eos_token_id,decoding='greedy')
@@ -245,6 +247,15 @@ def _manual_generate(
             cache=output.past_key_values
         token=output.logits[:,-1,:].argmax(dim=-1).unsqueeze(1)
         generated=[token.item()]
+        del output
+        if capture is None:
+            graphed = from_dynamic(model,cache,generated[0],max_gen,
+                                   set() if eos_token_id is None else {eos_token_id},
+                                   min_new_tokens=1)
+            if graphed is not None:
+                return graphed
+        else:
+            unsupported(model,"instrumented_request_requires_eager")
         if capture is not None:capture.token_ready(generated[-1])
         if eos_token_id is None or generated[-1]!=eos_token_id:
             for _ in range(max_gen-1):
@@ -407,6 +418,7 @@ def get_pred(
         # 内）与任何落盘（out_path 写入在 get_pred 返回后，raise 传播即
         # 整次任务输出作废）。进入时清旧 flag：上一样本未消费的违规不
         # 误杀本样本（guard 语义/并发限制见其 docstring）。
+        execution(model,"eager","generate_path_not_graphed")
         capture_context,capture = _paper_capture_request(
             paper_capture_mode,model,input.input_ids,q_input.input_ids,dataset,model_name)
         with baseline_request(model) as baseline_receipt, capture_context, eager_decoding_request_guard():
@@ -417,6 +429,7 @@ def get_pred(
                 # ① q_input 切出的 question 没接回，只喂了 prefix；② output 赋值后
                 # generated_content 从未赋值，下方共用 decode 必 UnboundLocalError。
                 # 修法：拼接完整输入（与 else 分支同协议），generate 后取新增 token。
+                unsupported(model,"generate_path_not_graphed")
                 full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
                 output = model.generate(
                     input_ids=full_ids,
@@ -442,6 +455,7 @@ def get_pred(
                 # ValueError。改用 model.generate 路径（与 samsum 分支同协议：full_ids
                 # 一次 prefill + 贪心生成），cache_position/cache 全权交给 transformers
                 # 管理，生成语义与手动 argmax 循环严格等价。
+                unsupported(model,"generate_path_not_graphed")
                 full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
                 output = model.generate(
                     input_ids=full_ids,
@@ -473,11 +487,12 @@ def get_pred(
         # avg_B0 = budget_info.get_total_avg_budget_B0()
 
         metrics = get_metrics()
-        budget = None if baseline_receipt else metrics.get_select_tokens()
+        budget = None if (baseline_receipt or getattr(model,"_quality_graph_execution",{}).get("actual","").startswith("graph")) else metrics.get_select_tokens()
         metrics.clear()
 
         record = {
             "pred": pred,
+            "execution": getattr(model,"_quality_graph_execution",{}),
             "answers": json_obj["answers"],
             "all_classes": json_obj["all_classes"],
             "length": json_obj["length"],
