@@ -4213,6 +4213,8 @@ class TLIIndexer(TIAIndexer):
             k_avg = k_avg.squeeze(0)
         kt_cap = k_min.shape[0]
         S_cap = k_qat.shape[1]
+        live_normalization = os.environ.get("TLI_LIVE_NORMALIZATION", "0") == "1"
+        self._graph_normalization_width_route = "live_length" if live_normalization else "capacity"
         # A later request may choose another route on the same indexer.
         # Never report stats inherited from a previous sparse capture.
         self._graph_normalization_stats_route = None
@@ -4547,7 +4549,8 @@ class TLIIndexer(TIAIndexer):
             from ..ops.sparse_normalization import candidate_probabilities
             from ..ops.candidate_ranking import rank_candidates
             probability, unique = candidate_probabilities(
-                sfc, cand_idx2, keep2, S_cap, group_size, return_unique=True)
+                sfc, cand_idx2, keep2, S_cap, group_size, return_unique=True,
+                valid_length=valid_len if live_normalization else None)
             lower = torch.full_like(S_real, far_tok_lo)
             upper = torch.maximum(lower, swa_lo_tok)
             selection = rank_candidates(cand_idx2, probability, unique, lower, upper,
@@ -4555,6 +4558,7 @@ class TLIIndexer(TIAIndexer):
                                         deduplicated=True)
             self._graph_normalization_route = "sparse_candidate_domain"
             self._graph_normalization_stats_route = (
+                "live_length_owner" if live_normalization else
                 "capacity_owner" if os.environ.get("TLI_SPARSE_STATS", "sorted") == "owner"
                 else "sorted_candidates")
             self._graph_ranking_route = "candidate_domain_native_1024"
@@ -4579,14 +4583,17 @@ class TLIIndexer(TIAIndexer):
         # Protected IDs were deduplicated above. The optional compact kernel
         # retains token-position reduction order and full-domain Top-K ties.
         _compact_norm = False
-        if os.environ.get("TLI_COMPACT_NORMALIZATION", "0") == "1":
+        if live_normalization or os.environ.get("TLI_COMPACT_NORMALIZATION", "0") == "1":
             from ..ops.compact_normalization import supported, compact_probabilities
             _compact_norm = supported(sfc, cand_idx2, keep2, S_cap, group_size)
+        if live_normalization and not _compact_norm:
+            raise NotImplementedError("live-length normalization requires supported BF16 owner geometry")
         self._graph_normalization_route = (
             "compact_fused_mean" if os.environ.get("TLI_COMPACT_FUSED_MEAN", "1") == "1"
             else "compact_separate_mean") if _compact_norm else "full_width_reference"
         if _compact_norm:
-            p = compact_probabilities(sfc, cand_idx2, keep2, S_cap, group_size, mid_mask_inv)
+            p = compact_probabilities(sfc, cand_idx2, keep2, S_cap, group_size, mid_mask_inv,
+                                      valid_length=valid_len if live_normalization else None)
         else:
             keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)
             cand_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)

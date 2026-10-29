@@ -47,7 +47,7 @@ def build():
     return load(name='tli_virtual_softmax_compact_v6',sources=[str(root/'binding.cpp'),str(root/'virtual_softmax_compact.cu')],
                 extra_cflags=['-O3'],extra_cuda_cflags=['-O3','-std=c++17'],verbose=True)
 
-def probabilities(extension,scores,ids,keep,capacity,group,excluded=None):
+def probabilities(extension,scores,ids,keep,capacity,group,excluded=None,valid_length=None):
     if scores.device != ids.device or scores.device != keep.device:
         raise ValueError('same CUDA device required')
     if scores.dtype!=torch.bfloat16:raise ValueError('compact mean mirrors BF16-only native mean; other dtypes keep accepted fallback')
@@ -63,9 +63,13 @@ def probabilities(extension,scores,ids,keep,capacity,group,excluded=None):
     mask = torch.empty(0, device=scores.device, dtype=torch.bool) if excluded is None else excluded
     owner=torch.full((hk,capacity),-1,device=scores.device,dtype=torch.int32)
     _candidate_owners[(hk,triton.cdiv(r,256))](ids,keep,owner,r,capacity,BLOCK=256)
+    def normalize(fused):
+        if valid_length is not None:
+            return extension.virtual_compact_softmax_live(scores,owner,capacity,group,fused,mask,valid_length)
+        return extension.virtual_compact_softmax(scores,owner,capacity,group,fused,mask)
     if os.environ.get('TLI_COMPACT_FUSED_MEAN', '1') == '1':
-        return extension.virtual_compact_softmax(scores,owner,capacity,group,True,mask)
-    compact=extension.virtual_compact_softmax(scores,owner,capacity,group,False,mask)
+        return normalize(True)
+    compact=normalize(False)
     p=torch.empty((hk,capacity),device=scores.device,dtype=scores.dtype)
     _compact_gqa_mean[(hk,triton.cdiv(capacity,1024))](compact,owner,p,capacity,r,group,BLOCK=1024,num_warps=4)
     return p if excluded is None else p.masked_fill(excluded, -torch.inf)
@@ -90,10 +94,10 @@ def supported(scores, ids, keep, capacity, group):
     return True
 
 
-def compact_probabilities(scores, ids, keep, capacity, group, excluded=None):
+def compact_probabilities(scores, ids, keep, capacity, group, excluded=None,valid_length=None):
     if not supported(scores, ids, keep, capacity, group):
         raise ValueError('unsupported exact compact normalization geometry')
     with torch.cuda.device(scores.device):
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize == 0:
             raise RuntimeError('warm up compact normalization before CUDA Graph capture')
-        return probabilities(build(), scores, ids, keep, capacity, group, excluded)
+        return probabilities(build(), scores, ids, keep, capacity, group, excluded,valid_length)
