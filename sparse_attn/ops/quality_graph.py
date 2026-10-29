@@ -6,6 +6,7 @@ input buffers and frozen gate; a different request never reuses an old graph.
 """
 import gc
 import os
+import time
 
 import torch
 
@@ -65,6 +66,15 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
     parameter = next(model.parameters())
     device, dtype = parameter.device, parameter.dtype
     batch, capacity = len(gen), cache.get_max_cache_shape()
+    measure = os.environ.get("TLI_QUALITY_TIMING", "0") == "1"
+    def synchronize():
+        if device.type == "cuda":
+            torch.cuda.synchronize(device)
+    if measure:
+        synchronize()
+        setup_start = time.perf_counter()
+    step_ms, replay_events = [], []
+    initial_tokens = sum(map(len, gen))
     devices = {p.device for p in model.parameters()}
     record = execution(model, "staged_static", batch_size=batch, capacity=capacity)
     if max_gen <= 1 or not any(ctx.alive):
@@ -151,12 +161,31 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     gc.collect()
                     torch.cuda.empty_cache()
                 restore()
+            if measure:
+                synchronize()
+                setup_ms = (time.perf_counter() - setup_start) * 1000
+                # Allocate/initialize events outside each measured decode step.
+                if graph is not None:
+                    replay_events = [(torch.cuda.Event(enable_timing=True),
+                                      torch.cuda.Event(enable_timing=True))
+                                     for _ in range(max_gen - 1)]
+                    for begin, end in replay_events:
+                        begin.record()
+                        end.record()
+                    synchronize()
+                decode_start = time.perf_counter()
             for step in range(max_gen - 1):
                 if not any(ctx.alive):
                     break
+                if measure:
+                    step_start = time.perf_counter()
                 inject(step)
                 if graph is not None:
+                    if measure:
+                        replay_events[step][0].record()
                     graph.replay()
+                    if measure:
+                        replay_events[step][1].record()
                     record["replay_steps"] += 1
                 else:
                     output = forward()
@@ -166,7 +195,23 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                         gen[b].append(token)
                         if token in eos_ids and len(gen[b]) >= min_new_tokens:
                             ctx.alive[b] = False
+                if measure:
+                    step_ms.append((time.perf_counter() - step_start) * 1000)
             eager_decoding_check_errors()
+            if measure:
+                synchronize()
+                decode_ms = (time.perf_counter() - decode_start) * 1000
+                replay_ms = [begin.elapsed_time(end) for begin, end in
+                             replay_events[:record["replay_steps"]]]
+                record["timing"] = dict(
+                    scope="static decode; excludes prefill and cache conversion",
+                    instrumentation="CUDA events around replay; host clock includes inject, argmax, readback, EOS; final error check included in decode_wall_ms",
+                    setup_wall_ms=setup_ms, decode_wall_ms=decode_ms,
+                    step_wall_ms=step_ms, replay_gpu_ms=replay_ms,
+                    decode_steps=len(step_ms),
+                    generated_decode_tokens=sum(map(len, gen)) - initial_tokens,
+                    tpot_wall_ms=sum(step_ms) / len(step_ms) if step_ms else None,
+                    replay_gpu_mean_ms=sum(replay_ms) / len(replay_ms) if replay_ms else None)
             print(f"[quality-graph] {record}", flush=True)
             return gen
     finally:
@@ -213,6 +258,10 @@ def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2
         unsupported(model, "insufficient_memory_for_static_kv")
         return None
     eager_decoding_check_errors()
+    measure = os.environ.get("TLI_QUALITY_TIMING", "0") == "1"
+    if measure:
+        torch.cuda.synchronize(next(model.parameters()).device)
+        conversion_start = time.perf_counter()
     cache = TLIStaticCache(model.config, capacity, 1)
     for target, source in zip(cache.layers, past.layers):
         target.lazy_initialization(source.keys)
@@ -223,5 +272,11 @@ def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2
     # after ownership transfer stay on this static cache or abort the request.
     past.layers.clear()
     ctx = BatchCtx(1, [length], [0], [True], 0)
-    return static_decode(model, cache, [[first_token]], [length], set(eos_ids),
-                         max_gen, ctx, min_new_tokens=min_new_tokens)[0]
+    if measure:
+        torch.cuda.synchronize(next(model.parameters()).device)
+        conversion_ms = (time.perf_counter() - conversion_start) * 1000
+    result = static_decode(model, cache, [[first_token]], [length], set(eos_ids),
+                           max_gen, ctx, min_new_tokens=min_new_tokens)[0]
+    if measure and "timing" in model._quality_graph_execution:
+        model._quality_graph_execution["timing"]["cache_conversion_wall_ms"] = conversion_ms
+    return result

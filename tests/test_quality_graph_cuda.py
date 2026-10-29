@@ -49,6 +49,7 @@ def model_for(kind,gate=False):
 
 @pytest.mark.parametrize('kind,gate',[('qwen',False),('qwen',True),('glm',False),('glm',True)])
 def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,gate):
+    monkeypatch.setenv('TLI_QUALITY_TIMING', '1')
     torch.manual_seed(123)
     model=model_for(kind,gate)
     ids=torch.randint(0,128,(1,16384),device='cuda')
@@ -65,6 +66,12 @@ def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,ga
                     result=from_dynamic(model,past,first,5,set())
                     assert model._quality_graph_execution['captures']==1
                     assert model._quality_graph_execution['replay_steps']==4
+                    timing = model._quality_graph_execution['timing']
+                    assert timing['decode_steps'] == timing['generated_decode_tokens'] == 4
+                    assert len(timing['replay_gpu_ms']) == 4
+                    assert all(x > 0 for x in timing['replay_gpu_ms'])
+                    assert timing['cache_conversion_wall_ms'] > 0
+                    assert timing['decode_wall_ms'] >= sum(timing['step_wall_ms']) > 0
                     assert not past.layers
                 else:
                     cache=TLIStaticCache(model.config,16389,1)

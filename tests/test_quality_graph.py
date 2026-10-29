@@ -110,3 +110,26 @@ def test_error_flag_rejects_output_before_commit_and_next_request_recovers(tmp_p
     finally:
         if before is None:_ERR_FLAG.pop(key,None)
         else:_ERR_FLAG[key]=before
+
+
+@pytest.mark.parametrize("timing", ["0", "1"])
+def test_timing_preserves_ragged_eos_and_counts_only_live_tokens(monkeypatch, timing):
+    monkeypatch.setenv("TLI_CUDA_GRAPH", "0")
+    monkeypatch.setenv("TLI_QUALITY_TIMING", timing)
+    model = Toy()
+    cache = TLIStaticCache(model.config, 16, 2)
+    cache.layers[0].lazy_initialization(torch.zeros(2, 1, 1, 4))
+    ctx = BatchCtx(2, [2, 5], [0, 0], [True, True], 0)
+    assert static_decode(model, cache, [[1], [3]], [2, 5], {2}, 5, ctx) == [
+        [1, 2], [3, 4, 5, 6, 7]]
+    record = model._quality_graph_execution
+    if timing == "0":
+        assert "timing" not in record
+    else:
+        measured = record["timing"]
+        assert measured["decode_steps"] == 4
+        assert measured["generated_decode_tokens"] == 5
+        assert measured["replay_gpu_ms"] == []
+        assert measured["replay_gpu_mean_ms"] is None
+        assert measured["decode_wall_ms"] >= sum(measured["step_wall_ms"]) > 0
+        assert measured["tpot_wall_ms"] == sum(measured["step_wall_ms"]) / 4
