@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-29
+
+- [ ] [TL-GQA-DTYPE-20261029] eager/Graph GQA mean 限制 BF16 融合，FP16/FP32 保留原 dtype 回退；192 host 分流检查通过，原生 GPU 待验。([详情](task_details/TL-GQA-DTYPE-20261029.md))
+
 ## 2026-10-28
 
 - [x] [TL-LB-BUDGET-RUNNER-20261028] 新增 LongBench13 有界远端编排：显式 Qwen3-8B/32B、固定 K1 扫 nominal K2，UUID 协作锁与稳定空卡复查，严格身份/预测/评分完成后才跳过；18 项 CPU 回归普通/-O与独审通过，既有 28 项相邻 CPU 回归通过。真实 GPU/质量与缺失适配器验收未完成，RULER10不在此实现。([详情](task_details/TL-LB-BUDGET-RUNNER-20261028.md))

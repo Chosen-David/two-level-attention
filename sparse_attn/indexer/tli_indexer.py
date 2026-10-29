@@ -3444,6 +3444,7 @@ class TLIIndexer(TIAIndexer):
         _G_ = self.group_size
         _sm = F.softmax(score_fine, dim=-1)
         if (not self.per_q_head and _HAS_TRITON and _sm.is_contiguous()
+                and _sm.dtype == torch.bfloat16
                 and isinstance(_G_, int) and _G_ > 0
                 and (_G_ & (_G_ - 1)) == 0
                 and _sm.shape[2] % _G_ == 0):
@@ -4478,7 +4479,7 @@ class TLIIndexer(TIAIndexer):
         sf_full.scatter_(1, safe_idx, sfc)
         score_full = sf_full[:, :S_cap]
         sm = F.softmax(score_full, dim=-1)
-        if (_HAS_TRITON and sm.is_contiguous()
+        if (_HAS_TRITON and sm.is_contiguous() and sm.dtype == torch.bfloat16
                 and (group_size & (group_size - 1)) == 0):
             p = torch.empty((Hkv, S_cap), dtype=sm.dtype, device=dev)
             # SWA 由下方动态 mask 置位；这里传空强制区，mid 值与 eager 相同。
