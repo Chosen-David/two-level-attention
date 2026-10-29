@@ -133,8 +133,10 @@ def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
             tensor.record_stream(current)
 
     # 5. merge
-    return merge_partials(protected_state, selected_state,
-                          dtype=q.dtype, backend='simt')
+    output = merge_partials(protected_state, selected_state,
+                            dtype=q.dtype, backend='simt')
+    indexer._graph_attention_route = f"linear_{'overlap' if overlap else 'serial'}_{backend}"
+    return output
 
 
 def decode_ring(workspace, q, k, v, lengths, softmax_scale):
