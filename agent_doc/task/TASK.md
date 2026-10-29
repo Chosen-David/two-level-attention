@@ -2,6 +2,8 @@
 
 ## 2026-10-29
 
+- [ ] [TL-BATCH-CU-20261029] 复用 fallback 批量行边界张量；100 host wrapper 配对通过，原生 Torch/CUDA/Graph/性能待验。([详情](task_details/TL-BATCH-CU-20261029.md))
+
 - [ ] [TL-EARLY-DENSE-20261029] 提前短序列 dense 分流，避免无用 mask/head-map 准备；192 host 分流配对通过，Torch/CUDA/性能待验。([详情](task_details/TL-EARLY-DENSE-20261029.md))
 
 ## 2026-10-28

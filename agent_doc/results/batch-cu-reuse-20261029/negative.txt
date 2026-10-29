@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/7d83fead945d/two-level-attention/agent_doc/results/batch-cu-reuse-20261029/probe.py", line 43, in <module>
+    try:out=ns[name](*args);error=None
+            ^^^^^^^^^^^^^^^
+  File "two-level-attention/agent_doc/results/batch-cu-reuse-20261029/negative.py", line 858, in _eager_decoding_attn_gather_batch
+    outs.append(_eager_decoding_attn_gather(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/7d83fead945d/two-level-attention/agent_doc/results/batch-cu-reuse-20261029/probe.py", line 38, in gather
+    if cu.x.tolist()!=[0,t] or kw['allow_kv_hetero'] is not False:raise RuntimeError('bounds/contract changed')
+                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: bounds/contract changed

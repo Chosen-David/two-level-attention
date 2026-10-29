@@ -851,8 +851,9 @@ def _eager_decoding_attn_gather_batch(
     per_row = isinstance(valid_length, (list, tuple)) or (
         torch.is_tensor(valid_length) and valid_length.numel() > 1)
     outs = []
+    # Every row uses the same read-only bounds; keep ownership local to this call.
+    cu_row = torch.tensor([0, T], device=q.device, dtype=torch.int32) if B else None
     for b in range(B):
-        cu_row = torch.tensor([0, T], device=q.device, dtype=torch.int32)
         vl = valid_length[b] if per_row else valid_length
         outs.append(_eager_decoding_attn_gather(
             q[b:b + 1], k[b:b + 1], v[b:b + 1], mask[b:b + 1], block_size,
