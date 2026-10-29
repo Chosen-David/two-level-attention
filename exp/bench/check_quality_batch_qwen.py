@@ -56,7 +56,8 @@ def run(cli):
         lengths=lengths,eos_policy='empty EOS diagnostic; fixed generation count',
         scope='explicit no-gate Qwen; unchanged 64/128/1024 budget, not ring-gate or GLM B>1'),indent=2))
 
-    def request(which, batch_mode):
+    def request(which, batch_mode, row_reference=False):
+        os.environ['TLI_EXACT_BATCH_REFERENCE']='1' if row_reference else '0'
         os.environ['TLI_BATCH_INDEXER']=batch_mode
         batch=len(which); lens=[lengths[b] for b in which]
         capacity=max(lens)+cli.max_gen
@@ -98,15 +99,17 @@ def run(cli):
             assert execution['replay_steps']==cli.max_gen-1 and execution['fallback_reason'] is None
             assert len(execution['capture_layers'])==model.config.num_hidden_layers
             if batch_mode=='exact':
-                assert all(r['attention_route']=='exact_batch_simt' for r in execution['capture_layers'])
+                expected_route='linear_batch_reference_simt' if row_reference else 'exact_batch_simt'
+                assert all(r['attention_route']==expected_route for r in execution['capture_layers'])
         del cache
         return tokens
 
-    reference=[request([b],'legacy')[0] for b in range(cli.batch)]
+    reference=(request(list(range(cli.batch)),'exact',True) if cli.same_batch_reference
+               else [request([b],'legacy')[0] for b in range(cli.batch)])
     actual=request(list(range(cli.batch)),'exact' if cli.batch>1 else 'legacy')
     equal=actual==reference
     output.write_text(json.dumps(dict(status='pending_independent_verification',
-        tokens_equal=equal,records=records),indent=2))
+        tokens_equal=equal,comparison='same_batch_rows' if cli.same_batch_reference else 'independent_B1',records=records),indent=2))
     assert equal,'real batch tokens differ from independent single-row Graph reference'
 
 
@@ -115,6 +118,8 @@ if __name__=='__main__':
     p.add_argument('--input',required=True);p.add_argument('--output',required=True)
     p.add_argument('--batch',type=int,choices=[1,2,4,8],required=True)
     p.add_argument('--max-gen',type=int,default=16);p.add_argument('--measure',action='store_true')
+    p.add_argument('--same-batch-reference',action='store_true')
     cli=p.parse_args()
+    if cli.same_batch_reference and cli.batch<2:p.error('same-batch reference needs B>=2')
     if cli.max_gen<2:p.error('max-gen must be >=2')
     with GPU0Monitor(Path(cli.output).with_suffix('.gpu.json')):run(cli)

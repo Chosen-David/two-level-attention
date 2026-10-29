@@ -295,3 +295,23 @@ def test_short_initial_live_row_rejected_without_poisoning_cuda(monkeypatch):
             exact.exact_linear_batch_decode(case.source,case.q,case.k,case.v,case.gs,case.scale)
         assert getattr(case.source,'_exact_linear_batch',None) is None
         assert (torch.ones(1,device='cuda')+1).item()==2
+
+
+@NATIVE
+@pytest.mark.parametrize('batch', [2, 4, 8])
+def test_same_batch_row_reference_capture(monkeypatch, batch):
+    for key,value in CONFIG.items():monkeypatch.setenv(key,value)
+    monkeypatch.setenv('TLI_EXACT_BATCH_REFERENCE','1')
+    with torch.no_grad(),_case(batch) as case:
+        for _ in range(3):case.run()
+        torch.cuda.synchronize()
+        graph,out=case.capture()
+        assert case.source._graph_attention_route=='linear_batch_reference_simt'
+        assert case.source._graph_batch_index_route=='independent_rows_reference'
+        assert graph._tli_address_owners==[case.source._exact_linear_batch]
+        for step in range(3):
+            case.alive[-1]=False
+            case.lengths=[n+int(alive) for n,alive in zip(case.lengths,case.alive)]
+            case.inject_metadata();case.q.normal_()
+            graph.replay();torch.cuda.synchronize()
+            torch.testing.assert_close(out,case.reference(),rtol=0,atol=0)

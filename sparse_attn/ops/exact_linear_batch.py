@@ -31,10 +31,13 @@ def _config_signature(idx):
         'far_select', 'near_select', 'boundary_bypass', 'per_q_head',
         'enable_async', 'moba_gate', 'sigma_select', 'static_pair', 'dyn_dgate',
         'skip_far', 'far_skip_backend', '_triton_ok')) + tuple(getattr(idx.args, key) for key in (
-            'tia_block_size', 'tia_level1_topk', 'tia_level2_topk'))
+            'tia_block_size', 'tia_level1_topk', 'tia_level2_topk')) + (
+                os.environ.get('TLI_EXACT_BATCH_REFERENCE', '0'),)
 
 
 def _validate_metadata(idx, q, k, v, gs):
+    if os.environ.get('TLI_EXACT_BATCH_REFERENCE', '0') not in ('0', '1'):
+        raise ValueError('TLI_EXACT_BATCH_REFERENCE must be 0 or 1')
     if os.environ.get('TLI_LIVE_NORMALIZATION', '1') != '1':
         raise ValueError('exact batch requires live-length normalization')
     if os.environ.get('TLI_SPARSE_STATS', 'owner') != 'owner':
@@ -196,7 +199,7 @@ class ExactLinearBatch:
         self.ready.fill_(True)
         self.needs_warmup = False
 
-    def produce(self, q, k, gs, scale):
+    def validate_step(self, k, gs):
         torch._assert_async(self.ready, 'exact batch was cleared; warm up before replay')
         lengths, alive = gs.valid_len_buf, gs.alive_buf
         torch._assert_async(((lengths >= 1) & (lengths <= k.shape[1])
@@ -205,6 +208,9 @@ class ExactLinearBatch:
                              | (lengths == self.previous_lengths+alive.to(torch.int64)))
                             & (~alive | self.previous_alive)).all(),
                             'exact batch refill/reorder requires clear and warmup')
+    def produce(self, q, k, gs, scale):
+        self.validate_step(k,gs)
+        lengths, alive = gs.valid_len_buf, gs.alive_buf
         route=self.maintenance_route
         self.maintenance_calls[route]=self.maintenance_calls.get(route,0)+1
         if route=='batched_tail32':
@@ -307,6 +313,26 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
         state.warmup(k,gs)
     if capturing:
         retain_capture_state(state)
+    if os.environ.get('TLI_EXACT_BATCH_REFERENCE', '0') == '1':
+        # Diagnostic control: retain the same model batch/GEMM shapes, while
+        # executing the established single-row selector and attention kernels.
+        from .operator_pipeline import decode_indexed
+        state.validate_step(k,gs)
+        outputs=[]
+        for b,row in enumerate(state.rows):
+            with _row_scope(gs,b):
+                outputs.append(decode_indexed(row,row,q[b:b+1],k[b:b+1],v[b:b+1],
+                    state.cu,gs.valid_len_buf,scale))
+        state.previous_lengths.copy_(gs.valid_len_buf)
+        state.previous_alive.copy_(gs.alive_buf)
+        for field in ('candidate_domain_route','normalization_route',
+                      'normalization_width_route','normalization_stats_route',
+                      'ranking_route','ranking_kth_route','ranking_gather_route',
+                      'ranking_fallback','sparse_selection_fallback'):
+            setattr(indexer,'_graph_'+field,getattr(state.rows[0],'_graph_'+field,None))
+        indexer._graph_attention_route='linear_batch_reference_simt'
+        indexer._graph_batch_index_route='independent_rows_reference'
+        return torch.cat(outputs,dim=0)
     candidates = state.produce(q,k,gs,scale)
     indexer._exact_batch_maintenance_route=state.maintenance_route
     indexer._exact_batch_maintenance_calls=state.maintenance_calls
