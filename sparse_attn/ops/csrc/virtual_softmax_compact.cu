@@ -88,8 +88,9 @@ template<typename T,int ILP>
 __global__ void normalize_stats_live(const T* scores,const int* owners,float* stats,
                                     const int64_t* length,int R,int S,int G,int smem_limit) {
   __shared__ float shared[32];
-  int h=blockIdx.x,N=static_cast<int>(*length);
-  CUDA_KERNEL_ASSERT(N>9216 && N<=S);
+  int64_t logical_width=*length;
+  CUDA_KERNEL_ASSERT(logical_width>9216 && logical_width<=S);
+  int h=blockIdx.x,N=static_cast<int>(logical_width);
   bool vector_tail=N<smem_limit && N%ILP==0;
   float local_max=vector_tail
       ? thread_reduce<false,T,ILP,true>(scores,owners,h,R,S,G,0.f,N)

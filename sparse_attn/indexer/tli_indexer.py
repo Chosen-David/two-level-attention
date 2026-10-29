@@ -4214,7 +4214,7 @@ class TLIIndexer(TIAIndexer):
         kt_cap = k_min.shape[0]
         S_cap = k_qat.shape[1]
         live_normalization = os.environ.get("TLI_LIVE_NORMALIZATION", "0") == "1"
-        self._graph_normalization_width_route = "live_length" if live_normalization else "capacity"
+        self._graph_normalization_width_route = None
         # A later request may choose another route on the same indexer.
         # Never report stats inherited from a previous sparse capture.
         self._graph_normalization_stats_route = None
@@ -4551,6 +4551,7 @@ class TLIIndexer(TIAIndexer):
             probability, unique = candidate_probabilities(
                 sfc, cand_idx2, keep2, S_cap, group_size, return_unique=True,
                 valid_length=valid_len if live_normalization else None)
+            self._graph_normalization_width_route = "live_length" if live_normalization else "capacity"
             lower = torch.full_like(S_real, far_tok_lo)
             upper = torch.maximum(lower, swa_lo_tok)
             selection = rank_candidates(cand_idx2, probability, unique, lower, upper,
@@ -4612,6 +4613,7 @@ class TLIIndexer(TIAIndexer):
                     G=group_size, BLOCK=1024, num_warps=4)
             else:
                 p = sm.nan_to_num(nan=0).view(Hkv, group_size, S_cap).mean(dim=1)
+        self._graph_normalization_width_route = "live_length" if live_normalization else "capacity"
         # ---- 8. mid 全域 L2 自由竞争 ----
         # 固定 K2_static 保持 capture 形状；k2_mid 在终掩码装配处动态截断。
         # mid 外全为 -inf，前 k2_mid 名与 eager 的 mid 段 top-k 同集。

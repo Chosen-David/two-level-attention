@@ -25,3 +25,19 @@ def test_live_width_capture_replay_exact_probabilities(capacity,lengths):
         live.fill_(length);graph.replay()
         expected=scores[:,:length].contiguous().softmax(-1)
         assert torch.equal(output[:,:length],expected), (length,int((output[:,:length]!=expected).sum()))
+
+
+def test_bypass_does_not_claim_normalization(monkeypatch):
+    import runpy
+    from pathlib import Path
+    from sparse_attn.indexer.tli_indexer import TLIIndexer
+    args=runpy.run_path(str(Path(__file__).parents[1]/'exp/bench/test_tli_graph_gates.py'))['_make_prod_args']
+    idx=TLIIndexer(args());idx.layer_idx=14;idx.clear()
+    k=torch.randn(1,16384,2,128,device='cuda',dtype=torch.bfloat16)
+    q=torch.randn(1,1,8,128,device='cuda',dtype=k.dtype)
+    index=idx.prepare_index(k,torch.tensor([0,16384],device='cuda',dtype=torch.int32))
+    monkeypatch.setenv('TLI_LIVE_NORMALIZATION','1')
+    monkeypatch.setenv('TLI_L2_BYPASS','1')
+    idx._graph_normalization_width_route='live_length'
+    idx.compute_mask_graph(q,index,128**-.5,torch.tensor([16384],device='cuda'))
+    assert idx._graph_normalization_width_route is None
