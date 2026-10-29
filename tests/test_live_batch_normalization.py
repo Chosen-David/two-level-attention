@@ -49,3 +49,21 @@ def test_live_extension_rejects_lengths_splitting_gqa_groups():
         build().virtual_compact_softmax_live(scores, owners, 16384, 2, False,
                                             torch.empty(0, device='cuda', dtype=torch.bool), lengths)
     assert (torch.ones(1, device='cuda') + 1).item() == 2
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA required')
+@pytest.mark.parametrize('dtype', [torch.float32, torch.bfloat16])
+def test_live_request_base_alignment_is_independent(dtype):
+    from sparse_attn.ops.compact_normalization import build
+    torch.manual_seed(907)
+    # Hq=1 exposes an alignment offset hidden by production Hq divisible by8.
+    # FP32 output also exposes changes otherwise hidden by BF16 final rounding.
+    capacity = 16448
+    scores = torch.randn(2, capacity, device='cuda', dtype=dtype) * 4
+    owners = torch.arange(capacity, device='cuda', dtype=torch.int32)[None].repeat(2, 1)
+    lengths = torch.tensor([9217, 9219], device='cuda', dtype=torch.int64)
+    actual = build().virtual_compact_softmax_live(scores, owners, capacity, 1, False,
+                torch.empty(0, device='cuda', dtype=torch.bool), lengths)
+    for row, length in enumerate([9217, 9219]):
+        expected = scores[row:row+1, :length].contiguous().softmax(-1)
+        assert torch.equal(actual[row:row+1, :length], expected)
