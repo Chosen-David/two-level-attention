@@ -532,8 +532,19 @@ def main():
         gs.pos_buf = runner.pos_buf
         gs.valid_len_buf = runner.vl_buf
 
+    ring_calls = {'capture': 0, 'eager': 0}
+    require_ring = os.environ.get('TLI_BENCH_REQUIRE_RING', '0') == '1'
+    if require_ring:
+        from sparse_attn.ops import operator_pipeline
+        original_decode_ring = operator_pipeline.decode_ring
+        def observed_decode_ring(*a, **kw):
+            key = 'capture' if torch.cuda.is_current_stream_capturing() else 'eager'
+            ring_calls[key] += 1
+            return original_decode_ring(*a, **kw)
+        operator_pipeline.decode_ring = observed_decode_ring
     runs = []
     for r in range(args.warmup + args.repeats):
+        before_ring_calls = ring_calls.copy()
         do_capture = (args.graph_mode == "graph" and runner.graph is None)
         try:
             rec = timed_request(model, runner, ids, args.max_gen, dev,
@@ -548,6 +559,19 @@ def main():
                 raise SystemExit(f"[E152v4 GATE-FAIL] graph 臂 capture/decode "
                                  f"失败（{type(e).__name__}: {e}）")
             raise
+        if require_ring:
+            ring_layers = [x for x in rec['kv_storage']['layers'] if x['role'] == 'ring']
+            if not ring_layers or any(x['physical_tokens_per_row'] >= x['logical_tokens'] for x in ring_layers):
+                raise RuntimeError('ring benchmark did not use physically bounded ring KV')
+            calls = {key:ring_calls[key]-before_ring_calls[key] for key in ring_calls}
+            enabled = os.environ.get('TLI_OPERATOR_MODE', 'off') != 'off'
+            if enabled and calls['capture'] < len(ring_layers):
+                raise RuntimeError('ring operator was not captured for every ring layer')
+            if not enabled and any(calls.values()):
+                raise RuntimeError('legacy ring arm unexpectedly called the new operator')
+            rec['ring_operator_routes'] = dict(calls, operator_enabled=enabled,
+                backend=os.environ.get('TLI_OPERATOR_BACKEND','simt'), ring_layers=len(ring_layers),
+                count_scope='Python calls during capture/warmup; not replay invocation counts')
         selector_routes = []
         for name, module in model.named_modules():
             idx = getattr(module, "indexer", None)
