@@ -105,6 +105,9 @@ class TLIIndexer(TIAIndexer):
         self.l2_subspace = getattr(args, "tli_l2_subspace", "same")
         if self.l2_subspace not in ("same", "full"):
             raise ValueError(f"tli_l2_subspace 非法取值: {self.l2_subspace}")
+        # 模型注册入口可覆写为 GLM 的 256；未注入时保持 Qwen/Llama 128、
+        # DeepSeek mla_rope 192 的既有语义。
+        self.head_dim = 192 if self.subspace == "mla_rope" else 128
         # ---- B：远端 kmeans（far_select='cluster' 时才构建，默认 4bit 分区）----
         self.enable_kmeans = getattr(args, "tli_enable_kmeans", True)
         self.far_select = getattr(args, "tli_far_select", "4bit")
@@ -605,6 +608,15 @@ class TLIIndexer(TIAIndexer):
 
     # ---------------- A：子空间 L1 ---------------- #
 
+    def _tail_indices(self, device):
+        """L1/L2 共用的 tail 映射；GLM 仅取 RoPE 末 32 维。"""
+        if self.head_dim == 256:
+            return torch.arange(224, 256, device=device)
+        delta = 64 // self.cmp_ratio
+        return torch.tensor(
+            list(range(64 - delta, 64)) + list(range(128 - delta, 128)),
+            device=device)
+
     def _subspace_indices(self, device):
         # 子空间选择（用户指令参数化）：rope=前 64 旋转维 / nope=后 64 非旋转维 /
         # tail=低频尾维（旧口径，cmp_ratio 控制宽度）/ full 不进此函数
@@ -616,8 +628,9 @@ class TLIIndexer(TIAIndexer):
         # pageable H2D（~20-40µs/步 × 2-3 次）——是 tail 臂实测 +5.7% 稳态
         # 回归的主因。子空间配置是实例常量 → 按 device 缓存零构造零拷贝。
         # clear() 不失效（与 _qat_idx_cache 同口径：配置级常量非请求态）。
+        cache_key = (self.head_dim, device)
         cache = getattr(self, "_idx_sub_cache", None)
-        if cache is not None and cache[0] == device:
+        if cache is not None and cache[0] == cache_key:
             return cache[1]
         if self.subspace == "rope":
             out = torch.arange(0, 64, device=device)
@@ -637,11 +650,8 @@ class TLIIndexer(TIAIndexer):
             out = torch.tensor(
                 list(range(0, delta)) + list(range(64, 64 + delta)), device=device)
         else:
-            delta = 64 // self.cmp_ratio
-            out = torch.tensor(
-                list(range(64 - delta, 64)) + list(range(128 - delta, 128)),
-                device=device)
-        self._idx_sub_cache = (device, out)
+            out = self._tail_indices(device)
+        self._idx_sub_cache = (cache_key, out)
         return out
 
     # 声明支持外部 valid_length 覆盖（base.prepare_mask 据此决定是否传
@@ -671,11 +681,20 @@ class TLIIndexer(TIAIndexer):
         if k.shape[0] != 1:
             raise ValueError(
                 f"TLIIndexer prepare_index requires batch=1, got batch={k.shape[0]}")
-        expected_dim = 192 if self.subspace == "mla_rope" else 128
+        expected_dim = getattr(
+            self, "head_dim", 192 if self.subspace == "mla_rope" else 128)
         if k.shape[-1] != expected_dim:
             raise ValueError(
                 f"tli_subspace={self.subspace} 需要的 k 末维 = {expected_dim}，"
                 f"实际 {k.shape[-1]}")
+        if expected_dim == 256 and (
+                self.subspace != "tail" or self.l2_subspace != "same"
+                or self.cmp_ratio != 4 or self.l2_quant
+                or self.static_pair or self._basis is not None
+                or self._basis_all is not None):
+            raise ValueError(
+                "D=256 TLI 仅支持 tail + l2_subspace=same + cmp_ratio=4 "
+                "+ l2_quant=False，且禁用 static_pair/投影基；当前组合未验证，拒绝执行")
         # 【E152v4】graph 增量优先：cuda_graph_state 模式（decode 整步
         # capture/replay）下走 pos_buf 驱动的容量宽持久 buffer 增量更新
         # （_prepare_index_graph；每步仅重算 pos 所在块统计 + k_qat[pos]
@@ -704,7 +723,7 @@ class TLIIndexer(TIAIndexer):
             and self._basis is None
             and self._basis_all is None
             and not self.moba_gate
-            and k.shape[-1] == 128
+            and k.shape[-1] in (128, 256)
             and inc["sub_key"] == self._sub_key()
             and (not self._need_avg_score() or inc["k_avg"] is not None)
         ):
@@ -720,10 +739,10 @@ class TLIIndexer(TIAIndexer):
         """子空间一致性 key：跨步 idx_sub 不变才可增量（static_pair 的
         _pair_idx 在 prefill 后冻结；rope/nope/tail 为常量分支）。"""
         if not self.enable_subspace:
-            return ("off", 0)
+            return ("off", 0, self.head_dim)
         if self.static_pair and self._pair_idx is not None:
-            return ("pair", int(self._pair_idx.numel()))
-        return (self.subspace, self.cmp_ratio)
+            return ("pair", int(self._pair_idx.numel()), self.head_dim)
+        return (self.subspace, self.cmp_ratio, self.head_dim)
 
     def _prepare_index_full(self, k, cu_seqlens_k, valid_length=None):
         d = self._prepare_index_base(k, cu_seqlens_k, valid_length=valid_length)
@@ -731,7 +750,7 @@ class TLIIndexer(TIAIndexer):
         # 全维量化特征，散布语义不同；_basis 非 None 时 can_inc 已挡，
         # 此处再防御一次）
         k_qat_buf = None
-        if self._basis is None and not self.moba_gate and k.shape[-1] == 128:
+        if self._basis is None and not self.moba_gate and k.shape[-1] in (128, 256):
             k_qat_buf = d["k_qat"].squeeze(0).clone() if d["k_qat"].dim() == 4 \
                 else None
         # 【E133c-A1】k_min/k_max/k_avg 预分配块统计 buffer（与 k_qat_buf
@@ -789,7 +808,7 @@ class TLIIndexer(TIAIndexer):
 
         前置门（host 侧，仅 capture 外评估；不满足返回 None → 调用方
         回退全量路径，fail-closed）：graph_state.enabled 且 pos_buf 就
-        绪、B=1 容量宽、非投影/非 moba/D=128、非 kmeans 消费臂。
+        绪、B=1 容量宽、非投影/非 moba/D∈{128,256}、非 kmeans 消费臂。
         """
         if _graph_state_fn is None:
             return None
@@ -798,7 +817,7 @@ class TLIIndexer(TIAIndexer):
             return None
         if (self._basis is not None or self._basis_all is not None
                 or self.moba_gate or k.dim() != 4 or k.shape[0] != 1
-                or not k.is_cuda or k.shape[-1] != 128):
+                or not k.is_cuda or k.shape[-1] not in (128, 256)):
             return None
         if (self.enable_kmeans
                 and (self.far_select != "4bit" or self.near_select != "4bit")):
@@ -1141,13 +1160,11 @@ class TLIIndexer(TIAIndexer):
         pageable H2D 构造；cmp_ratio 为实例级常量 → 命中后零构造零拷贝）。
         GPU 端 arange 构造（纯 kernel 零 H2D，int64 与原 torch.tensor(list)
         同 dtype，值逐位同）。"""
-        key = (self.cmp_ratio, device)
+        key = (self.head_dim, self.cmp_ratio, device)
         cache = getattr(self, "_qat_idx_cache", None)
         if cache is not None and cache[0] == key:
             return cache[1]
-        delta = 64 // self.cmp_ratio
-        idx = torch.cat([torch.arange(64 - delta, 64, device=device),
-                         torch.arange(128 - delta, 128, device=device)])
+        idx = self._tail_indices(device)
         self._qat_idx_cache = (key, idx)
         return idx
 
@@ -4446,68 +4463,37 @@ class TLIIndexer(TIAIndexer):
             _kqc = k_qat[0][cand_idx2, _kv_id, :]              # [Hkv,R,d]
             _bkqc = repeat(_kqc, "kv r d -> (kv g) r d", g=group_size).to(torch.float32)
             sfc = einsum(b_q_fine, _bkqc, "h d, h r d -> h r").to(q.dtype)
-        # 【iter3f-4】mid_slot 提前计算（依赖 cand_idx2 + mid_mask，
-        # sfc 计算与 mid_slot 无依赖 → 可并行调度）。
-        _mid_slot_for_fuse = (_mid_slot3 if _mid_slot3 is not None
-                              else mid_mask.view(-1)[cand_idx2])    # [Hkv,R_cap]
-        # ---- 7.【iter3e+iter3f-4】fine 门控 + softmax + GQA mean + mid 门控融合 ----
-        # 原链 4 kernel（keep_h + where + full_like + softmax + view.mean）
-        # + step8 的 3 kernel（mid 计算 + ~mid|~keep2 + masked_fill）
-        # → 单 Triton kernel 直出 mid_gated [Hkv,R_cap]（fp32）。
-        # mid=False 槽输出 -inf → topk 自动不选。
-        # 形态守卫不齐 → fail-closed 回退旧链。
-        _fused_p = None
-        if (_HAS_TRITON and sfc.is_contiguous() and keep2.is_contiguous()
-                and _mid_slot_for_fuse.is_contiguous()
-                and sfc.shape[0] == Hkv * group_size):
-            try:
-                _fused_p = _iter3_fused_softmax(
-                    sfc, keep2, _mid_slot_for_fuse, R_cap, group_size, Hkv)
-            except Exception:
-                _fused_p = None
-        if _fused_p is not None:
-            mid_gated = _fused_p                   # [Hkv,R_cap]，mid=False → -inf
-            p = None                               # 融合路径无独立 p
+        # ---- 7. 完整候选散回 + 全宽 softmax + GQA mean（与 eager 同归约域）----
+        # eager 的候选不仅含 L1/bypass，还含完整 sink/SWA；随后散回 token 域，
+        # 重复候选幂等合并后才做 softmax。旧 graph 直接在 L1/bypass 槽域做
+        # softmax，漏掉未重叠的 SWA 候选，改变分母与 GQA 组间相对权重，导致
+        # graph/eager L2 选集漂移（D=128/D=256 均可复现）。这里恢复 eager 的
+        # 完整归约语义；S_cap+1 哨兵列避免无效槽覆盖真实末 token。
+        keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)
+        cand_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)
+        sfc = torch.where(keep_h, sfc, torch.full_like(sfc, float("-inf")))
+        sf_full = torch.full(
+            (H, S_cap + 1), float("-inf"), dtype=sfc.dtype, device=dev)
+        safe_idx = torch.where(keep_h, cand_h, S_cap)
+        sf_full.scatter_(1, safe_idx, sfc)
+        score_full = sf_full[:, :S_cap]
+        sm = F.softmax(score_full, dim=-1)
+        if (_HAS_TRITON and sm.is_contiguous()
+                and (group_size & (group_size - 1)) == 0):
+            p = torch.empty((Hkv, S_cap), dtype=sm.dtype, device=dev)
+            # SWA 由下方动态 mask 置位；这里传空强制区，mid 值与 eager 相同。
+            _ako_gqa_mean_kernel[(Hkv, triton.cdiv(S_cap, 1024))](
+                sm, p, S_cap, 0, 0,
+                G=group_size, BLOCK=1024, num_warps=4)
         else:
-            keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)  # [H,R_cap]
-            sfc = torch.where(keep_h, sfc,
-                              torch.full_like(sfc, float("-inf")))
-            # 【E165 iter2b】紧凑域 softmax + GQA mean（槽域 [Hkv,R_cap]）
-            p = F.softmax(sfc, dim=-1).nan_to_num(nan=0)          # [H,R_cap]
-            p = p.view(Hkv, group_size, R_cap).mean(dim=1)        # [Hkv,R_cap]
-            mid_gated = None                       # 融合未命中
-        # ---- 8.【E165 iter2b】紧凑域 L2 自由竞争（topk 在 R_cap 槽上）----
-        # mid 判定 gather 到槽域；topk K2 在 8448 槽而非 32800 全宽
-        # （候选分恰集中于槽内，kept 集相同：p>0 的候选值同集合，
-        # k2_mid ≤ 生产几何 mid 候选数 2048）。
-        if K2 - sink_tok - swa_tok > nb_near * bs:
-            # An oversized L2 quota can exhaust the scored candidates before
-            # far pages exist. Eager fills the remaining quota from zero-score
-            # mid tokens. Reconstruct that domain rather than selecting padded
-            # candidate slots (which can duplicate tokens or lose quota).
-            # 融合路径：mid_scored 与 p 语义不同（无 mid 门控）→ 用
-            # mid_gated 近似（mid=False=-inf 已排除，此处仅需正确 topk）。
-            # 该 oversized 分支生产几何不触发（K2=1024 ≤ nb_near*bs=2560），
-            # 但保留正确性：mid_gated 在此等价于 p 加 mid 门控+全宽 scatter。
-            full_p = (mid_gated if mid_gated is not None
-                      else p).new_zeros((Hkv, S_cap))
-            _p_src = mid_gated if mid_gated is not None else p
-            full_p.scatter_add_(-1, cand_idx2, _p_src.masked_fill(~keep2, 0))
-            mid_scored = full_p.masked_fill(mid_mask_inv, float('-inf'))
-            K2_static = min(S_cap, K2)
-            tok_top = torch.topk(mid_scored, K2_static, dim=-1).indices
-        else:
-            if mid_gated is not None:
-                # 【iter3f-4】融合路径 mid_gated 已含 mid 门控 → 直接 topk
-                K2_static = min(R_cap, K2)
-                v_top, i_slot = torch.topk(mid_gated, K2_static, dim=-1)
-            else:
-                # 融合未命中 → 回退旧 mid 门控链
-                mid_scored = p.masked_fill(~_mid_slot_for_fuse | ~keep2,
-                                           float("-inf"))
-                K2_static = min(R_cap, K2)
-                v_top, i_slot = torch.topk(mid_scored, K2_static, dim=-1)
-            tok_top = cand_idx2.gather(-1, i_slot)                # [Hkv,K2]
+            p = sm.nan_to_num(nan=0).view(Hkv, group_size, S_cap).mean(dim=1)
+        p.masked_fill_(swa_force.view(1, -1), 1.0)
+        # ---- 8. mid 全域 L2 自由竞争 ----
+        # 固定 K2_static 保持 capture 形状；k2_mid 在终掩码装配处动态截断。
+        # mid 外全为 -inf，前 k2_mid 名与 eager 的 mid 段 top-k 同集。
+        mid_scored = p.masked_fill(mid_mask_inv, float("-inf"))
+        K2_static = min(S_cap, K2)
+        tok_top = torch.topk(mid_scored, K2_static, dim=-1).indices
         # 【E166 iter3a】终掩码装配融合：i_eff where + full_like + zeros/
         # scatter + and + slice fill + or 六段（~6 kernel/层，[Hkv,S_cap]
         # 全宽 3 遍读写 ≈7.5MB/层@128K）换 2 个 Triton kernel（A 基底
