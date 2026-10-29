@@ -32,7 +32,7 @@ def _mean(CP,KEEP,OUT,R:tl.constexpr,G:tl.constexpr,BLOCK:tl.constexpr):
 
 
 @triton.jit
-def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,SHARED:tl.constexpr,BLOCK:tl.constexpr):
+def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,SHARED:tl.constexpr,STRIDE:tl.constexpr,SHIFT:tl.constexpr,BLOCK:tl.constexpr):
     h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
     token=tl.load(IDS+h*R+r,r<R,other=0)
     valid=(r<R)&tl.load(KEEP+h*R+r,r<R,other=0)&(token>=0)&(token<S)
@@ -42,17 +42,18 @@ def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,SHARED:tl.co
     end:tl.constexpr=S if SHARED else (S//8192)*8192
     worker=tl.where(token<end,(token//8)%1024,(token-end)%1024)
     ordinal=tl.where(token<end,(token//8192)*8+token%8,end//1024+(token-end)//1024)
-    key=tl.where(valid,worker*S+ordinal,1024*S)
+    key=tl.where(valid,worker*STRIDE+ordinal,1024*STRIDE)-SHIFT
     tl.store(KEYS+h*R+r,key,r<R)
     tl.store(VALID+h*R+r,valid,r<R)
 
 
 @triton.jit
-def _offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr):
+def _offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.constexpr,SHIFT:tl.constexpr,BLOCK:tl.constexpr):
     h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
-    key=tl.load(KEYS+h*R+r,r<R,other=0)
+    key=tl.load(KEYS+h*R+r,r<R,other=0).to(tl.int64)+SHIFT
     tl.store(LONG_KEYS+h*R+r,key.to(tl.int64),r<R)
-    previous=tl.load(KEYS+h*R+r-1,(r>0)&(r<R),other=-1)
+    previous=tl.load(KEYS+h*R+r-1,(r>0)&(r<R),other=0).to(tl.int64)+SHIFT
+    previous=tl.where(r>0,previous,-1)
     original=tl.load(PERM+h*R+r,r<R,other=0)
     tl.store(UNIQUE+h*R+original,(key<1024*S)&(key!=previous),r<R)
     valid=r<1025
@@ -62,7 +63,7 @@ def _offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.con
     while tl.sum((valid&(lo<hi)).to(tl.int32),0)>0:
         active=valid&(lo<hi)
         mid=lo+(hi-lo)//2
-        value=tl.load(KEYS+h*R+mid,active,other=0)
+        value=tl.load(KEYS+h*R+mid,active,other=0).to(tl.int64)+SHIFT
         smaller=value<target
         lo=tl.where(active&smaller,mid+1,lo)
         hi=tl.where(active&~smaller,mid,hi)
@@ -91,16 +92,22 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize==0:
             raise RuntimeError('warm up sparse normalization before capture')
         extension = build()
-    key_dtype=torch.int32 if 1024*capacity<2**31 else torch.int64
+    # Only the traversal ordinal needs to fit between worker keys. Using the
+    # token capacity wastes key bits and extra radix passes. Signed int16
+    # shifts preserve total order when the sentinel also fits in 16 bits.
+    stride=triton.cdiv(capacity,8192)*8
+    narrow=os.environ.get('TLI_SPARSE_NARROW_KEYS','1')=='1'
+    shift=32768 if narrow and 1024*stride<65536 else 0
+    key_dtype=torch.int16 if shift else (torch.int32 if 1024*stride<2**31 else torch.int64)
     keys=torch.empty_like(ids,dtype=key_dtype)
     valid=torch.empty_like(keep)
-    _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,SHARED=capacity<(prop.shared_memory_per_block-128)//2,BLOCK=256)
+    _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,SHARED=capacity<(prop.shared_memory_per_block-128)//2,STRIDE=stride,SHIFT=shift,BLOCK=256)
     keys,perm=keys.sort(dim=-1,stable=True)
     long_keys=torch.empty_like(ids)
     unique=torch.empty_like(keep)
     offsets=torch.empty((hk,1025),device=ids.device,dtype=torch.int64)
     _offsets_and_keys[(hk,triton.cdiv(max(r,1025),256))](
-        keys,perm,long_keys,offsets,unique,r,capacity,BLOCK=256)
+        keys,perm,long_keys,offsets,unique,r,stride,shift,BLOCK=256)
     keys=long_keys
     with torch.cuda.device(scores.device):
         cp=extension.sparse_softmax(scores,perm,keys,offsets,group)
