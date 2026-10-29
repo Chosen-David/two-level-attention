@@ -72,7 +72,7 @@ if triton is not None:
         else:
             physical = logical
         valid = valid & (physical >= 0) & (physical < CAP)
-        return tl.where(valid, physical, 0), valid
+        return tl.where(valid, physical, 0).to(tl.int64), valid
 
     @triton.jit
     def _partial_simt(Q, K, V, IDS, COUNT, LEN, M, L, A,
@@ -87,7 +87,8 @@ if triton is not None:
                       TILE: tl.constexpr, PIPELINE_STAGES: tl.constexpr,
                       SCALE: tl.constexpr):
         """SIMT partial attention kernel：每 (query_head, split) 一个 program。"""
-        row, split = tl.program_id(0), tl.program_id(1)
+        # Promote before batch/head/token stride products, not after overflow.
+        row, split = tl.program_id(0).to(tl.int64), tl.program_id(1)
         b, qh = row // HQ, row % HQ
         kv = qh // (HQ // HK)
         dq, dv = tl.arange(0, DQB), tl.arange(0, DVB)
@@ -138,7 +139,8 @@ if triton is not None:
                     TILE: tl.constexpr, GROUP_BLOCK: tl.constexpr,
                     PIPELINE_STAGES: tl.constexpr, SCALE: tl.constexpr):
         """TC partial attention kernel：GQA 组内共享 K/V，每 (kv_head, split) 一个 program。"""
-        row, split = tl.program_id(0), tl.program_id(1)
+        # Promote before batch/head/token stride products, not after overflow.
+        row, split = tl.program_id(0).to(tl.int64), tl.program_id(1)
         b, kv = row // HK, row % HK
         g = tl.arange(0, GROUP_BLOCK)
         dq, dv = tl.arange(0, DQB), tl.arange(0, DVB)
@@ -184,7 +186,7 @@ if triton is not None:
     def _merge(MP, LP, AP, MS, LS, AS, OUT, P: tl.constexpr, S: tl.constexpr,
                DV: tl.constexpr, DB: tl.constexpr, NB: tl.constexpr):
         """Merge kernel：合并 protected + selected 两路 partial 状态。"""
-        row = tl.program_id(0)
+        row = tl.program_id(0).to(tl.int64)
         n, d = tl.arange(0, NB), tl.arange(0, DB)
         mp = tl.load(MP + row * P + n, n < P, float('-inf'))
         ms = tl.load(MS + row * S + n - P, (n >= P) & (n < P + S), float('-inf'))
