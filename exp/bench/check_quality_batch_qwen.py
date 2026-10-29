@@ -27,7 +27,8 @@ def run(cli):
         '--tia_level2_topk','1024','--tia_level2_cmp_ratio','4',
         '--tli_near_pages','32','--tli_near_tokens','off','--tli_near_len','4096',
         '--tli_subspace','tail','--tli_sink_tokens','4','--tli_swa_size','128',
-        '--tli_enable_layer_skip','false','--tli_enable_kmeans','false'])
+        '--tli_enable_layer_skip','false','--tli_enable_kmeans','false',
+        '--tli_far_skip_backend','legacy','--tli_far_skip_cache','retain'])
     os.environ.update(TLI_OPERATOR_MODE='serial',TLI_OPERATOR_BACKEND='simt',
         TLI_OPERATOR_SELECTED_STAGES='1',TLI_SPARSE_SELECTION='1',
         TLI_LIVE_NORMALIZATION='1',TLI_SPARSE_STATS='owner',TLI_GRAPH_INC='1',
@@ -95,6 +96,7 @@ def run(cli):
             output.write_text(json.dumps(dict(status='pending',records=records),indent=2))
             assert execution['actual']=='graph' and execution['captures']==1
             assert execution['replay_steps']==cli.max_gen-1 and execution['fallback_reason'] is None
+            assert len(execution['capture_layers'])==model.config.num_hidden_layers
             if batch_mode=='exact':
                 assert all(r['attention_route']=='exact_batch_simt' for r in execution['capture_layers'])
         del cache
