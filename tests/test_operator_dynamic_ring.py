@@ -60,3 +60,28 @@ def test_unsupported_operator_preserves_cache(monkeypatch,backend,error):
         assert (layer.keys.data_ptr(),layer.values.data_ptr())==saved[:2]
         torch.testing.assert_close(layer.keys,saved[2],rtol=0,atol=0)
         torch.testing.assert_close(layer.values,saved[3],rtol=0,atol=0)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(),reason='CUDA required')
+@pytest.mark.parametrize('dtype',[torch.float16,torch.bfloat16])
+@pytest.mark.parametrize('backend',['simt','tc'])
+@pytest.mark.parametrize('mode',['serial','overlap'])
+@pytest.mark.parametrize('cache_mode',['evict','retain'])
+def test_cuda_dynamic_operator_real_model(monkeypatch,dtype,backend,mode,cache_mode):
+    # Native consumers: no kernel/reference monkeypatches in this gate.
+    model=make_model(cache_mode,device='cuda').to(dtype)
+    reference=copy.deepcopy(model)
+    reference.model.layers[0].self_attn.indexer.far_skip_cache='retain'
+    monkeypatch.setenv('TLI_OPERATOR_MODE','off')
+    monkeypatch.setenv('TLI_OPERATOR_BACKEND',backend)
+    actual_cache=prefill(model,23);reference_cache=prefill(reference,23)
+    for pos in range(23,55):
+        args=dict(input_ids=torch.tensor([[pos%32]],device='cuda'),
+                  position_ids=torch.tensor([[pos]],device='cuda'),
+                  cache_position=torch.tensor([pos],device='cuda'),use_cache=True)
+        monkeypatch.setenv('TLI_OPERATOR_MODE',mode)
+        actual=model(**args,past_key_values=actual_cache).logits
+        monkeypatch.setenv('TLI_OPERATOR_MODE','off')
+        expected=reference(**args,past_key_values=reference_cache).logits
+        assert actual_cache.get_seq_length(0)==pos+1
+        torch.testing.assert_close(actual,expected,atol=2e-3 if dtype==torch.bfloat16 else 3e-4,rtol=2e-2)
