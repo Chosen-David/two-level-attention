@@ -17,6 +17,9 @@ TLIStaticCache）整步 capture 时，decode 步间变化的数据必须经
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 
 class _GraphState:
     def __init__(self):
@@ -50,3 +53,33 @@ def disable_graph():
     st.alive_buf = None
     st.bs = None
     st.quality_defaults = False
+
+
+# Host-local identity for one actual capture, never reused across graph objects.
+# Raw torch.cuda.graph callers have no token and keep conservative recomputation.
+_GEOMETRY_CAPTURE = ContextVar('tli_geometry_capture', default=None)
+
+
+@contextmanager
+def capture_graph(graph, **kwargs):
+    """Capture with a fresh geometry-cache namespace, reset even on failure."""
+    import os
+    import torch
+    enabled = os.environ.get("TLI_GRAPH_GEOMETRY_SHARED", "1")
+    if enabled not in ("0", "1"):
+        raise ValueError("TLI_GRAPH_GEOMETRY_SHARED must be 0 or 1")
+    with torch.cuda.graph(graph, **kwargs) as capture:
+        reset = _GEOMETRY_CAPTURE.set(object() if enabled == "1" else None)
+        try:
+            yield capture
+        finally:
+            _GEOMETRY_CAPTURE.reset(reset)
+
+
+def geometry_cache_key(key, *, capturing, stream=None):
+    if not capturing:
+        return key
+    token = _GEOMETRY_CAPTURE.get()
+    # Reuse only on the producing stream: captured cross-stream consumers
+    # otherwise need dependencies that a Python cache hit cannot insert.
+    return None if token is None or stream is None else (token, stream, key)

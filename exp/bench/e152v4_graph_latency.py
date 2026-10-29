@@ -311,7 +311,8 @@ class GraphRunner:
             raise RuntimeError(
                 "warmup 期间 compute_mask_graph 关闭了 graph（配置不受支持）")
         self.graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(self.graph):
+        from sparse_attn.ops.cuda_graph_state import capture_graph
+        with capture_graph(self.graph):
             self.out = self.forward()
         return (time.perf_counter() - t0) * 1e3
 
@@ -532,8 +533,18 @@ def main():
         gs.pos_buf = runner.pos_buf
         gs.valid_len_buf = runner.vl_buf
 
+    geometry_calls = {'capture': 0, 'eager': 0}
+    if os.environ.get('TLI_BENCH_GEOMETRY_COUNTS', '0') == '1':
+        from sparse_attn.indexer.tli_indexer import TLIIndexer
+        original_geometry = TLIIndexer._build_graph_geometry
+        def observed_geometry(self, *a, **kw):
+            key = 'capture' if torch.cuda.is_current_stream_capturing() else 'eager'
+            geometry_calls[key] += 1
+            return original_geometry(self, *a, **kw)
+        TLIIndexer._build_graph_geometry = observed_geometry
     runs = []
     for r in range(args.warmup + args.repeats):
+        before_geometry_calls = geometry_calls.copy()
         do_capture = (args.graph_mode == "graph" and runner.graph is None)
         try:
             rec = timed_request(model, runner, ids, args.max_gen, dev,
@@ -548,6 +559,11 @@ def main():
                 raise SystemExit(f"[E152v4 GATE-FAIL] graph 臂 capture/decode "
                                  f"失败（{type(e).__name__}: {e}）")
             raise
+        rec['geometry_builds'] = {
+            key: geometry_calls[key] - before_geometry_calls[key] for key in geometry_calls}
+        rec['geometry_reuse_enabled'] = os.environ.get('TLI_GRAPH_GEOMETRY_SHARED', '1') == '1'
+        rec['geometry_counts_enabled'] = os.environ.get('TLI_BENCH_GEOMETRY_COUNTS', '0') == '1'
+        # These are host capture/warmup submissions, not replay counts.
         selector_routes = []
         for name, module in model.named_modules():
             idx = getattr(module, "indexer", None)

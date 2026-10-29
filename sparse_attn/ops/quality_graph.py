@@ -11,7 +11,7 @@ import time
 import torch
 
 from ..baseline_runtime import BatchCtx, batch_decode_scope
-from .cuda_graph_state import graph_state, enable_graph, disable_graph
+from .cuda_graph_state import graph_state, enable_graph, disable_graph, capture_graph
 from .eager_decoding import eager_decoding_check_errors
 
 
@@ -193,7 +193,7 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                         raise NotImplementedError("selector disabled Graph during warmup")
                     graph = torch.cuda.CUDAGraph()
                     _clear_capture_routes(model)
-                    with torch.cuda.graph(graph):
+                    with capture_graph(graph):
                         output = forward()
                     capture_layers = _capture_routes(model)
                     record.update(actual="graph", captures=1,
