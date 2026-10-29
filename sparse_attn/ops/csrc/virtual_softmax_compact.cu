@@ -94,7 +94,28 @@ __global__ void compact_probability(const T* scores,const float* stats,T* out,in
   }
 }
 
-at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S,int64_t G) {
+// Fuse per-head probability rounding and GQA reduction without a [H,R]
+// probability intermediate. The full token output preserves native TopK ties.
+template<typename T>
+__global__ void fused_probability_mean(const T* scores,const int* owners,
+                                      const float* stats,T* out,int R,int S,int G) {
+  int kv=blockIdx.y,token=blockIdx.x*blockDim.x+threadIdx.x;
+  if(token>=S) return;
+  int r=owners[kv*S+token];
+  float sum=0.f;
+  if(r>=0) {
+    for(int g=0;g<G;++g) {
+      int h=kv*G+g;
+      float x=static_cast<float>(scores[(int64_t)h*R+r]);
+      T rounded=static_cast<T>(std::exp(x-stats[2*h])/stats[2*h+1]);
+      float probability=static_cast<float>(rounded);
+      sum+=std::isnan(probability)?0.f:probability;
+    }
+  }
+  out[(int64_t)kv*S+token]=static_cast<T>(sum/G);
+}
+
+at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S,int64_t G,bool fused_mean) {
   TORCH_CHECK(scores.is_cuda() && owners.is_cuda() && scores.device()==owners.device(),"same CUDA device required");
   TORCH_CHECK(scores.is_contiguous() && owners.is_contiguous(),"contiguous inputs required");
   TORCH_CHECK(scores.dim()==2 && owners.dim()==2 && owners.scalar_type()==at::kInt,"matrix scores/int32 owners required");
@@ -109,12 +130,14 @@ at::Tensor virtual_compact_softmax(at::Tensor scores,at::Tensor owners,int64_t S
   bool native_smem=S<(prop->sharedMemPerBlock-128)/bytes && S%ilp==0;
   TORCH_CHECK(!native_smem,"native reference would use shared softmax; fallback required");
   auto stats=at::empty({scores.size(0),2},scores.options().dtype(at::kFloat));
-  auto out=at::empty({scores.size(0),scores.size(1)},scores.options());
+  auto out=fused_mean ? at::empty({owners.size(0),S},scores.options())
+                      : at::empty({scores.size(0),scores.size(1)},scores.options());
   auto stream=at::cuda::getCurrentCUDAStream();
   AT_DISPATCH_FLOATING_TYPES_AND2(at::kHalf,at::kBFloat16,scores.scalar_type(),"virtual_softmax",[&] {
     constexpr int ILP=16/sizeof(scalar_t);
     normalize_stats<scalar_t,ILP><<<scores.size(0),1024,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),scores.size(1),S,G);
-    if(scores.size(1)>0) compact_probability<scalar_t><<<dim3((scores.size(1)+255)/256,scores.size(0)),256,0,stream>>>(scores.data_ptr<scalar_t>(),stats.data_ptr<float>(),out.data_ptr<scalar_t>(),scores.size(1));
+    if(fused_mean) fused_probability_mean<scalar_t><<<dim3((S+255)/256,owners.size(0)),256,0,stream>>>(scores.data_ptr<scalar_t>(),owners.data_ptr<int>(),stats.data_ptr<float>(),out.data_ptr<scalar_t>(),scores.size(1),S,G);
+    else if(scores.size(1)>0) compact_probability<scalar_t><<<dim3((scores.size(1)+255)/256,scores.size(0)),256,0,stream>>>(scores.data_ptr<scalar_t>(),stats.data_ptr<float>(),out.data_ptr<scalar_t>(),scores.size(1));
   });
   C10_CUDA_KERNEL_LAUNCH_CHECK();
   return out;

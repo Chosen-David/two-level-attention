@@ -44,7 +44,7 @@ def _compact_gqa_mean(CP,OWNER,OUT,S:tl.constexpr,R:tl.constexpr,G:tl.constexpr,
 def build():
     if torch.__version__.split('+')[0]!='2.8.0':raise RuntimeError('requires pinned torch2.8.0 generic softmax')
     os.environ.setdefault('MAX_JOBS','1');root=Path(__file__).resolve().parent/'csrc'
-    return load(name='tli_virtual_softmax_compact_v2',sources=[str(root/'binding.cpp'),str(root/'virtual_softmax_compact.cu')],
+    return load(name='tli_virtual_softmax_compact_v3',sources=[str(root/'binding.cpp'),str(root/'virtual_softmax_compact.cu')],
                 extra_cflags=['-O3'],extra_cuda_cflags=['-O3','-std=c++17'],verbose=True)
 
 def probabilities(extension,scores,ids,keep,capacity,group):
@@ -57,7 +57,9 @@ def probabilities(extension,scores,ids,keep,capacity,group):
     if r==0:return torch.zeros((hk,capacity),device=scores.device,dtype=scores.dtype)
     owner=torch.full((hk,capacity),-1,device=scores.device,dtype=torch.int32)
     _candidate_owners[(hk,triton.cdiv(r,256))](ids,keep,owner,r,capacity,BLOCK=256)
-    compact=extension.virtual_compact_softmax(scores,owner,capacity,group)
+    if os.environ.get('TLI_COMPACT_FUSED_MEAN', '1') == '1':
+        return extension.virtual_compact_softmax(scores,owner,capacity,group,True)
+    compact=extension.virtual_compact_softmax(scores,owner,capacity,group,False)
     p=torch.empty((hk,capacity),device=scores.device,dtype=scores.dtype)
     _compact_gqa_mean[(hk,triton.cdiv(capacity,1024))](compact,owner,p,capacity,r,group,BLOCK=1024,num_warps=4)
     return p

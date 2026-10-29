@@ -4526,6 +4526,9 @@ class TLIIndexer(TIAIndexer):
         if os.environ.get("TLI_COMPACT_NORMALIZATION", "0") == "1":
             from ..ops.compact_normalization import supported, compact_probabilities
             _compact_norm = supported(sfc, cand_idx2, keep2, S_cap, group_size)
+        self._graph_normalization_route = (
+            "compact_fused_mean" if os.environ.get("TLI_COMPACT_FUSED_MEAN", "1") == "1"
+            else "compact_separate_mean") if _compact_norm else "full_width_reference"
         if _compact_norm:
             p = compact_probabilities(sfc, cand_idx2, keep2, S_cap, group_size)
         else:

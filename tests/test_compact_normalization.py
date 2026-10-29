@@ -6,9 +6,11 @@ import torch
 
 pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')
 
+@pytest.mark.parametrize('fused_mean', ['0', '1'])
 @pytest.mark.parametrize('capacity', [32768, 32769, 33729])
 @pytest.mark.parametrize('group', [1, 4, 8])
-def test_compact_probability_replay(capacity, group):
+def test_compact_probability_replay(capacity, group, fused_mean, monkeypatch):
+    monkeypatch.setenv("TLI_COMPACT_FUSED_MEAN", fused_mean)
     from sparse_attn.ops.compact_normalization import compact_probabilities
     from sparse_attn.indexer.tli_indexer import _ako_gqa_mean_kernel
     import triton
