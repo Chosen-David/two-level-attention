@@ -1,4 +1,5 @@
 """Multi-tile BF16 TC pipeline output vs independent FP64 attention."""
+import json
 import pytest
 import torch
 from sparse_attn.ops.partial_attention import partial_attention,merge_partials
@@ -29,6 +30,7 @@ def test_multitile_pipeline_error_budget(stages,splits,round_query):
     eps=torch.finfo(torch.float32).eps;unit=torch.finfo(dtype).eps/2
     eta=torch.finfo(dtype).tiny*torch.finfo(dtype).eps/2
     gamma_d=d*eps/(1-d*eps)
+    max_ratio,max_abs=0.,0.
     for count in (0,37,700,1024,0):
         active_counts=[count,max(0,count-9)]
         counts.copy_(torch.tensor([active_counts],device='cuda',dtype=torch.int32))
@@ -50,5 +52,9 @@ def test_multitile_pipeline_error_budget(stages,splits,round_query):
             pre=pre+eta*vv.abs().sum(0)[None]
             budget=pre+unit*(truth.abs()+pre)+eta
             error=(actual[0,0,head*g:(head+1)*g].double()-truth).abs()
+            max_ratio=max(max_ratio,(error/(budget+1e-12)).max().item())
+            max_abs=max(max_abs,error.max().item())
             assert bool((error<=budget+1e-12).all()),dict(stages=stages,splits=splits,
                 round_query=round_query,count=count,max_budget_ratio=(error/(budget+1e-12)).max().item())
+    print(json.dumps(dict(stages=stages,splits=splits,round_query=round_query,
+                          max_budget_ratio=max_ratio,max_absolute_error=max_abs)))
