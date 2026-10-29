@@ -16,6 +16,7 @@ from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
 from sparse_attn.ops.tli_static_cache import TLIStaticCache
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 from request_gpu_monitor import GPU0Monitor
+from allocator_observation import observe_allocator
 
 
 def run(cli):
@@ -85,7 +86,7 @@ def run(cli):
             torch.cuda.synchronize();total_ms=(time.perf_counter()-start)*1000
             execution=dict(model._quality_graph_execution)
             rec=dict(cycle=cycle,arm=current_arm,rows=which,batch=batch,batch_indexer=batch_mode,tokens=tokens,
-                     execution=execution,environment={k:v for k,v in os.environ.items() if k.startswith('TLI_')})
+                     execution=execution,allocator=observe_allocator(),environment={k:v for k,v in os.environ.items() if k.startswith('TLI_')})
             if cli.measure:
                 rec['request_timing']=dict(total_wall_ms=total_ms,prefill_wall_ms=prefill_ms,
                     cache_conversion_wall_ms=conversion_ms,
@@ -176,4 +177,10 @@ if __name__=='__main__':
         if cli.trace_dir:
             from batch_decode_trace import record_batch_decode_trace
             with record_batch_decode_trace(cli.trace_dir):run(cli)
-        else:run(cli)
+        else:
+            try:
+                run(cli)
+            except Exception as exc:
+                Path(cli.output).with_suffix('.failure.json').write_text(json.dumps(dict(
+                    error=f'{type(exc).__name__}: {exc}',allocator=observe_allocator()),indent=2))
+                raise
