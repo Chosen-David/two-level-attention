@@ -16,7 +16,7 @@ from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
 from sparse_attn.ops.tli_static_cache import TLIStaticCache
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 from request_gpu_monitor import GPU0Monitor
-from allocator_observation import observe_allocator
+from allocator_observation import observe_allocator, write_failure_diagnostic
 
 
 def run(cli):
@@ -175,7 +175,7 @@ if __name__=='__main__':
     if cli.max_gen<2:p.error('max-gen must be >=2')
     with GPU0Monitor(Path(cli.output).with_suffix('.gpu.json')):
         Path(cli.output).with_suffix('.allocator_start.json').write_text(
-            json.dumps(observe_allocator(),indent=2))
+            json.dumps(observe_allocator('startup'),indent=2))
         if cli.trace_dir:
             from batch_decode_trace import record_batch_decode_trace
             with record_batch_decode_trace(cli.trace_dir):run(cli)
@@ -183,6 +183,5 @@ if __name__=='__main__':
             try:
                 run(cli)
             except Exception as exc:
-                Path(cli.output).with_suffix('.failure.json').write_text(json.dumps(dict(
-                    error=f'{type(exc).__name__}: {exc}',allocator=observe_allocator()),indent=2))
+                write_failure_diagnostic(Path(cli.output).with_suffix('.failure.json'),exc)
                 raise

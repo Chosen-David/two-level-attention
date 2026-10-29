@@ -1,11 +1,13 @@
 """Read-only allocator evidence, collected outside request timing boundaries."""
 import os
+import json
+import sys
 import torch
 
 
-def observe_allocator():
+def observe_allocator(phase='request_complete'):
     result = {'requested': os.environ.get('PYTORCH_CUDA_ALLOC_CONF'),
-              'scope': 'post-request or failure observation; not timed'}
+              'scope': phase + ' observation; outside request timing'}
     try:
         snapshot = torch.cuda.memory._snapshot()  # Pinned torch 2.8 diagnostic API.
         segments = snapshot['segments']
@@ -23,3 +25,11 @@ def observe_allocator():
         # A diagnostic failure must not hide the original OOM/CUDA exception.
         result['observation_error'] = f'{type(exc).__name__}: {exc}'
     return result
+
+
+def write_failure_diagnostic(path, error):
+    try:
+        path.write_text(json.dumps(dict(error=f'{type(error).__name__}: {error}',
+                                       allocator=observe_allocator('failure')), indent=2))
+    except Exception as diagnostic_error:
+        print(f'Could not write allocator failure diagnostic: {diagnostic_error}', file=sys.stderr)
