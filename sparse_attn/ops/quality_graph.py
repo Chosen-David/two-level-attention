@@ -60,6 +60,42 @@ def _reset_indexes(model):
             idx.skip_far, idx._dyn_skip_pending, idx._dyn_frozen = state
 
 
+_CAPTURE_ROUTE_FIELDS = (
+    "candidate_domain_route", "normalization_route", "normalization_stats_route",
+    "ranking_route", "ranking_kth_route", "ranking_gather_route",
+    "ranking_fallback", "sparse_selection_fallback", "sparse_selection_fallback_detail",
+)
+
+
+def _clear_capture_routes(model):
+    # Clear after warmup too: a receipt must describe the captured forward,
+    # rather than an earlier request or a warmup-only branch.
+    for module in model.modules():
+        idx = getattr(module, "indexer", None)
+        if idx is not None:
+            for field in _CAPTURE_ROUTE_FIELDS:
+                setattr(idx, "_graph_" + field, None)
+
+
+def _capture_routes(model):
+    """Snapshot Python dispatch metadata; never read device tensors here."""
+    rows = []
+    for name, module in model.named_modules():
+        idx = getattr(module, "indexer", None)
+        if idx is None:
+            continue
+        row = {"module": name}
+        for field in _CAPTURE_ROUTE_FIELDS:
+            value = getattr(idx, "_graph_" + field, None)
+            row[field] = value if isinstance(value, (str, bool, int, float)) else None
+        for field, attr in (("dynamic_gate", "dyn_dgate"),
+                            ("gate_frozen", "_dyn_frozen"), ("skip_far", "skip_far")):
+            value = getattr(idx, attr, None)
+            row[field] = value if isinstance(value, bool) else None
+        rows.append(row)
+    return rows
+
+
 def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tokens=2):
     """Finish generation from prefill's first tokens using fixed-address KV."""
     policy = graph_policy()
@@ -143,9 +179,13 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     if not gs.enabled:
                         raise NotImplementedError("selector disabled Graph during warmup")
                     graph = torch.cuda.CUDAGraph()
+                    _clear_capture_routes(model)
                     with torch.cuda.graph(graph):
                         output = forward()
-                    record.update(actual="graph", captures=1, budget_scope="not_measured_during_replay")
+                    capture_layers = _capture_routes(model)
+                    record.update(actual="graph", captures=1,
+                                  budget_scope="not_measured_during_replay",
+                                  capture_layers=capture_layers)
                 except Exception as exc:
                     disable_graph()
                     graph, output = None, None

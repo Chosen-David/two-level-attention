@@ -79,6 +79,28 @@ def test_owned_mask_requires_exact_buffer_and_context():
     assert not owned_decode_mask(cache,mask,BatchCtx(1,[2],[0],[True],0))
 
 
+def test_capture_receipts_clear_old_routes_and_snapshot_without_tensor_readback():
+    from sparse_attn.ops.quality_graph import _clear_capture_routes, _capture_routes, execution
+    model = Toy()
+    model.indexer = SimpleNamespace(
+        dyn_dgate=True, _dyn_frozen=True, skip_far=False,
+        _graph_normalization_route="old_request",
+        _graph_normalization_stats_route="capacity_owner")
+    _clear_capture_routes(model)
+    model.indexer._graph_normalization_route = "full_width_reference"
+    # Unexpected device metadata must not trigger bool()/item() synchronization.
+    model.indexer._graph_ranking_route = torch.ones(2)
+    rows = _capture_routes(model)
+    assert rows[0]["normalization_route"] == "full_width_reference"
+    assert rows[0]["normalization_stats_route"] is None
+    assert rows[0]["ranking_route"] is None
+    assert rows[0]["gate_frozen"] is True and rows[0]["skip_far"] is False
+    model.indexer.skip_far = True
+    assert rows[0]["skip_far"] is False
+    execution(model, "graph", capture_layers=rows)
+    assert "capture_layers" not in execution(model, "eager", "capture_failed")
+
+
 def test_batch_generation_guard_exits_before_any_prediction_write():
     path=Path(__file__).parents[1]/'benchmark/RULER/pred_ruler_batch.py'
     tree=ast.parse(path.read_text())
