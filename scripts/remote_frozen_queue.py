@@ -19,12 +19,73 @@ def atomic(path,value):
     temporary.write_text(json.dumps(value,indent=2)+'\n');temporary.replace(path)
 
 
+def _lock_target(path):
+    """Only accept this lock's uniquely named, sibling owner records."""
+    target=Path(os.readlink(path))
+    if target.parent!=path.parent or not target.name.startswith(path.name+'.owner.'):
+        raise ValueError('unexpected shared-lock owner target')
+    return target
+
+
+def _recover_dead_lock(path,host):
+    # Only this host may reap its PID. Serialize its reapers locally and reread
+    # the current owner under that lock, preventing stale-owner ABA deletion.
+    digest=hashlib.sha256(str(path).encode()).hexdigest()
+    local=Path('/tmp')/('frozen-lock-recovery-'+digest+'.lock')
+    with local.open('a') as recovery:
+        fcntl.flock(recovery,fcntl.LOCK_EX)
+        try:
+            target=_lock_target(path)
+            owner=json.loads(target.read_text())
+            if owner['host']!=host:return False
+            try:os.kill(owner['pid'],0)
+            except ProcessLookupError:pass
+            else:return False
+            if _lock_target(path)!=target:return False
+            path.unlink()
+            target.unlink(missing_ok=True)
+            return True
+        except (FileNotFoundError,ValueError,KeyError,PermissionError):
+            return False
+
+
+@contextmanager
+def shared_lock(path, blocking=True):
+    """Atomically publish a symlink to a fully written unique owner record.
+
+    A crash before publication leaves an unused file, never an ownerless lock.
+    Recovery never steals another host's lock based on elapsed time.
+    """
+    path=Path(str(path)+'.d').absolute();host=os.uname().nodename
+    owner=path.with_name(path.name+'.owner.'+uuid.uuid4().hex+'.json')
+    atomic(owner,dict(host=host,pid=os.getpid()))
+    deadline=time.monotonic()+30
+    acquired=False
+    try:
+        while True:
+            try:os.symlink(str(owner),path)
+            except FileExistsError:
+                if _recover_dead_lock(path,host):continue
+                if not blocking or time.monotonic()>deadline:
+                    raise BlockingIOError(str(path))
+                time.sleep(.1);continue
+            acquired=True
+            break
+        yield
+    finally:
+        if acquired:
+            # Do not remove a successor if an external operator replaced us.
+            try:
+                if _lock_target(path)==owner:path.unlink()
+            except FileNotFoundError:pass
+        owner.unlink(missing_ok=True)
+
+
 @contextmanager
 def transaction(out,config):
     out=Path(out);out.mkdir(parents=True,exist_ok=True)
     identity=hashlib.sha256(json.dumps(config,sort_keys=True).encode()).hexdigest()
-    with (out/'queue.lock').open('a') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX)
+    with shared_lock(out/'queue.lock'):
         path=out/'queue.json'
         state=json.loads(path.read_text()) if path.exists() else dict(identity=identity,
             jobs=[dict(rank=r,status='pending',attempts=0) for r in range(config['shards'])])
@@ -163,9 +224,7 @@ def tick(config,host):
 
 def finalize(config):
     out=Path(config['out'])
-    with (out/'finalize.lock').open('a') as lock:
-        try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except BlockingIOError:return False
+    with shared_lock(out/'finalize.lock'):
         if (out/'FINISHED.json').exists():return True
         sys.path.insert(0,config['source'])
         from benchmark.LongBench.validate_frozen_skip import validate

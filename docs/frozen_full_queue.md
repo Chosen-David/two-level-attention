@@ -20,7 +20,7 @@ are required before taking that card. Polling is every300seconds; audit records
 are hourly and on launch. The predecessor and any other GPU workload are not
 terminated to make room.
 
-Shared `queue.lock` protects claims; host lock prevents duplicate daemons. A
+An atomic symlink to a fully written owner record protects shared queue claims (cross-host `flock` is unreliable on this mount); a host lock prevents duplicate daemons. Dead-owner recovery is restricted to the same host and serialized locally. A
 published lease survives daemon restart, and an orphan launched before PID
 publication is recovered by exact run/rank command matching. Up to4 attempts
 per shard; a failed shard does not block remaining work. Only an exactly matched

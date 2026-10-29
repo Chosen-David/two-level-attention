@@ -97,3 +97,67 @@ def test_pid_publication_failure_keeps_live_worker_lease(tmp_path,monkeypatch):
     with original(tmp_path,config) as state:
         assert state['jobs'][0]['status']=='running'
         assert state['jobs'][0]['pid']==123
+
+
+def _die_holding_symlink(path):
+    import os
+    from scripts.remote_frozen_queue import shared_lock
+    with shared_lock(path):os._exit(0)
+
+
+def test_shared_lock_dead_owner_recovery_and_live_contention(tmp_path):
+    from scripts.remote_frozen_queue import shared_lock
+    path=tmp_path/'shared'
+    ctx=multiprocessing.get_context('fork');child=ctx.Process(target=_die_holding_symlink,args=(path,))
+    child.start();child.join(timeout=10);assert child.exitcode==0
+    assert Path(str(path)+'.d').is_symlink()
+    with shared_lock(path,blocking=False):
+        with pytest.raises(BlockingIOError):
+            with shared_lock(path,blocking=False):pass
+    assert not Path(str(path)+'.d').exists()
+    assert not list(tmp_path.glob('*.owner.*'))
+
+
+def test_owner_record_is_written_before_publication(tmp_path,monkeypatch):
+    import json,os
+    from scripts import remote_frozen_queue as queue
+    original=os.symlink;seen=[]
+    def inspect(target,path):
+        data=json.loads(Path(target).read_text())
+        assert data['pid']==os.getpid()
+        seen.append(target)
+        return original(target,path)
+    monkeypatch.setattr(queue.os,'symlink',inspect)
+    with queue.shared_lock(tmp_path/'shared'):pass
+    assert len(seen)==1
+
+
+def test_aborted_publication_does_not_leave_a_lock(tmp_path,monkeypatch):
+    from scripts import remote_frozen_queue as queue
+    def fail(*args):raise OSError('publication failed')
+    monkeypatch.setattr(queue.os,'symlink',fail)
+    with pytest.raises(OSError,match='publication'):
+        with queue.shared_lock(tmp_path/'shared'):pass
+    assert not list(tmp_path.iterdir())
+
+
+def test_foreign_host_lock_is_never_reaped(tmp_path):
+    import json,os
+    from scripts.remote_frozen_queue import shared_lock
+    path=tmp_path/'shared.d';owner=tmp_path/'shared.d.owner.foreign.json'
+    owner.write_text(json.dumps(dict(host='another-host',pid=999999999)))
+    path.symlink_to(owner)
+    with pytest.raises(BlockingIOError):
+        with shared_lock(tmp_path/'shared',blocking=False):pass
+    assert path.is_symlink() and owner.exists()
+
+
+def test_release_preserves_replacement_owner(tmp_path):
+    import json,os
+    from scripts.remote_frozen_queue import shared_lock
+    path=tmp_path/'shared.d';replacement=tmp_path/'shared.d.owner.replacement.json'
+    replacement.write_text(json.dumps(dict(host=os.uname().nodename,pid=os.getpid())))
+    with shared_lock(tmp_path/'shared'):
+        path.unlink();path.symlink_to(replacement)
+    assert path.is_symlink() and path.resolve()==replacement
+    path.unlink();replacement.unlink()
