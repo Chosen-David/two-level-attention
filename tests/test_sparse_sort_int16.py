@@ -27,7 +27,7 @@ def test_native_packed_keys_offsets_and_unique(capacity,r):
         keys=torch.empty_like(ids,dtype=torch.int16 if packed else torch.int32)
         valid=torch.empty_like(keep);long=torch.empty_like(ids);unique=torch.empty_like(keep)
         offsets=torch.empty(hk,1025,device='cuda',dtype=torch.int64)
-        _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,256,PACKED=packed)
+        _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,256,PACKED=packed,SHARED=capacity==16400)
         keys,perm=keys.sort(dim=-1,stable=True)
         _offsets_and_keys[(hk,triton.cdiv(max(r,1025),256))](keys,perm,long,offsets,unique,r,capacity,256,PACKED=packed)
         return long,perm,offsets,unique,valid
@@ -43,6 +43,22 @@ def test_native_packed_keys_offsets_and_unique(capacity,r):
 @pytest.mark.skipif(not torch.cuda.is_available(),reason='queued CUDA gate')
 @pytest.mark.parametrize('capacity',[16400,32768,32840,65528])
 def test_native_graph_probability_and_unique(monkeypatch,capacity):
+    import sparse_attn.ops.sparse_normalization as normalization
+    monkeypatch.setenv('TLI_SPARSE_STATS','sorted')
+    shared=capacity<(torch.cuda.get_device_properties('cuda').shared_memory_per_block-128)//2
+    if capacity==16400 and not shared:
+        pytest.skip('16400 shared-tail gate requires sufficient native shared memory')
+    launches=[]
+    class ObservedKernel:
+        def __init__(self,kernel,name):self.kernel,self.name=kernel,name
+        def __getitem__(self,grid):
+            launch=self.kernel[grid]
+            def observed(*args,**kwargs):
+                launches.append((self.name,dict(kwargs)))
+                return launch(*args,**kwargs)
+            return observed
+    for name in ('_prepare_keys','_prepare_narrow_keys'):
+        monkeypatch.setattr(normalization,name,ObservedKernel(getattr(normalization,name),name))
     torch.manual_seed(309);h,g,r=3,4,8448
     ids=torch.randint(capacity,(h,r),device='cuda');keep=torch.ones_like(ids,dtype=torch.bool)
     token=torch.randn(h*g,capacity,device='cuda',dtype=torch.bfloat16)
@@ -62,6 +78,11 @@ def test_native_graph_probability_and_unique(monkeypatch,capacity):
         scores.copy_(token.gather(1,ids.repeat_interleave(g,0)))
         graph.replay();ref=run(0)
         for a,b in zip(actual,ref):assert torch.equal(a,b),(capacity,kind)
+    packed=[kw for name,kw in launches if name=='_prepare_keys']
+    narrow=[kw for name,kw in launches if name=='_prepare_narrow_keys']
+    assert packed and narrow, 'both real sorting routes must execute'
+    assert all(kw['PACKED'] is True and kw['SHARED']==shared for kw in packed)
+    assert all(kw['SHARED']==shared for kw in narrow)
 
 @pytest.mark.parametrize('value',['','true','2','-1'])
 def test_packed_flag_is_explicit(monkeypatch,value):
