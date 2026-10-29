@@ -42,6 +42,7 @@ import os
 import subprocess
 import sys
 import time
+from contextlib import nullcontext
 
 import torch
 
@@ -245,6 +246,7 @@ class GraphRunner:
 
     def __init__(self, model, static_cache, neg_inf, S_cap, pad_id, dev):
         self.model = model
+        self.fa2_adapter = None
         self.cache = static_cache
         self.S_cap = S_cap
         self.dev = dev
@@ -273,10 +275,12 @@ class GraphRunner:
         self.m4_buf[0, 0, 0, :seq_len_after_inc] = 0
 
     def forward(self):
-        return self.model(input_ids=self.nxt_buf, position_ids=self.pid_buf,
-                          cache_position=self.pos_buf,
-                          attention_mask=self.m4_buf, past_key_values=self.cache,
-                          use_cache=True)
+        context = self.fa2_adapter.activate(self.vl_buf) if self.fa2_adapter is not None else nullcontext()
+        with context:
+            return self.model(input_ids=self.nxt_buf, position_ids=self.pid_buf,
+                              cache_position=self.pos_buf,
+                              attention_mask=self.m4_buf, past_key_values=self.cache,
+                              use_cache=True)
 
     def fill(self, dyn, length):
         """Refill one request; compact gates/workspace/pointers require recapture."""
@@ -449,6 +453,10 @@ def timed_request(model, runner, ids, max_gen, dev, pad_id, do_capture,
 
 
 def _validate_protocol(args):
+    if getattr(args, 'fa2_static_decode', False) and (
+            args.method != 'none' or args.attention_backend != 'flash_attention_2'
+            or args.graph_mode != 'graph'):
+        raise ValueError('FA2 static decode requires dense FA2 graph mode')
     if args.method not in ("none", "tli"):
         raise ValueError("E152v4 requires --method none or tli")
     for name, minimum in (("context_length", 16384), ("max_gen", 4),
@@ -498,6 +506,7 @@ def main():
                         default=os.path.expanduser("~/Qwen3-8B"))
     parser.add_argument("--out", type=str, required=True)
     parser.add_argument("--attention-backend", choices=["flash_attention_2", "sdpa"], default="flash_attention_2")
+    parser.add_argument("--fa2-static-decode", action="store_true")
     parser.add_argument("--label", type=str, default="")
     parser.add_argument("--graph-mode", choices=["graph", "eager"],
                         default="graph",
@@ -563,6 +572,9 @@ def main():
         gs.pos_buf = runner.pos_buf
         gs.valid_len_buf = runner.vl_buf
 
+    if args.fa2_static_decode:
+        from exp.bench.graph_fa2 import GraphFA2
+        runner.fa2_adapter = GraphFA2(model, runner.m4_buf, runner.vl_buf)
     geometry_calls = {'capture': 0, 'eager': 0}
     if os.environ.get('TLI_BENCH_GEOMETRY_COUNTS', '0') == '1':
         from sparse_attn.indexer.tli_indexer import TLIIndexer
@@ -595,12 +607,18 @@ def main():
                 ring_capture_storage.add((a[2].data_ptr(), a[3].data_ptr()))
             return original_decode_ring(*a, **kw)
         operator_pipeline.decode_ring = observed_decode_ring
+    from sparse_attn.ops.selector_options import validate_selector_options
+    from exp.bench.selector_route_observer import install, checked_delta
+    packed_sort,tiled_scan=validate_selector_options(S_cap)
+    optimization_calls=install(packed_sort,tiled_scan,torch.cuda.is_current_stream_capturing)
     runs = []
     for r in range(args.warmup + args.repeats):
+        before_optimization={name:counts.copy() for name,counts in optimization_calls.items()}
         before_geometry_calls = geometry_calls.copy()
         before_ring_calls = ring_calls.copy()
         before_ordered_calls = ordered_calls.copy()
         ring_capture_storage.clear()
+        before_fa2 = runner.fa2_adapter.calls.copy() if runner.fa2_adapter is not None else None
         do_capture = (args.graph_mode == "graph" and runner.graph is None)
         try:
             rec = timed_request(model, runner, ids, args.max_gen, dev,
@@ -615,6 +633,13 @@ def main():
                 raise SystemExit(f"[E152v4 GATE-FAIL] graph 臂 capture/decode "
                                  f"失败（{type(e).__name__}: {e}）")
             raise
+        if runner.fa2_adapter is not None:
+            counts = {key:runner.fa2_adapter.calls[key]-before_fa2[key] for key in before_fa2}
+            layers = len(runner.fa2_adapter.targets)
+            if counts['capture'] != (layers if do_capture else 0):
+                raise RuntimeError('FA2 cache graph route count mismatch')
+            rec['fa2_static_routes'] = dict(counts, layers=layers,
+                api='flash_attn_with_kvcache', count_scope='host submissions, not replay invocations')
         rec['geometry_builds'] = {
             key: geometry_calls[key] - before_geometry_calls[key] for key in geometry_calls}
         rec['geometry_reuse_enabled'] = os.environ.get('TLI_GRAPH_GEOMETRY_SHARED', '1') == '1'
@@ -653,6 +678,9 @@ def main():
             if len(selector_routes) != n_patched or not all(x["sparse_selection"] for x in selector_routes):
                 raise RuntimeError("sparse benchmark fell back to a dense selector")
         rec["selector_routes"] = selector_routes
+        rec['selector_optimization_submissions']=checked_delta(
+            optimization_calls,before_optimization,n_patched if do_capture else 0)
+        rec['selector_optimization_count_scope']='actual host kernel submissions during warmup/capture, not replay'
         rec["n_patched_attention_layers"] = n_patched
         rec.update({
             "run": r, "phase": "warmup" if r < args.warmup else "measured",
@@ -704,6 +732,7 @@ def main():
             "backend_verified": False,
             "prefill_backend": args.attention_backend,
             "decode_backend": (
+                "FlashAttention2 KV-cache, whole-step CUDA Graph" if args.fa2_static_decode else
                 "TLI sparse, whole-step CUDA Graph" if
                 (args.method == "tli" and args.graph_mode == "graph") else
                 "native dense, whole-step CUDA Graph" if

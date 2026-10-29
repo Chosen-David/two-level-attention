@@ -303,6 +303,10 @@ def qwen3_attn_forward(
     cache_position: Optional[torch.LongTensor] = None,
     **kwargs: Unpack[FlashAttentionKwargs],
 ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[tuple[torch.Tensor]]]:
+    # Validate experimental selector routing before projections or any KV write.
+    from ..ops.selector_options import validate_selector_options
+    capacity = past_key_values.get_max_cache_shape() if past_key_values is not None else None
+    validate_selector_options(capacity if isinstance(capacity, int) and capacity > 0 else None)
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
 

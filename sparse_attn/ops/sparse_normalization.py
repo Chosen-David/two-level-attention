@@ -66,7 +66,7 @@ def _owner_probabilities(scores,ids,keep,capacity,group,return_unique,valid_leng
 
 
 @triton.jit
-def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,SHARED:tl.constexpr,STRIDE:tl.constexpr,SHIFT:tl.constexpr,BLOCK:tl.constexpr):
+def _prepare_narrow_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,SHARED:tl.constexpr,STRIDE:tl.constexpr,SHIFT:tl.constexpr,BLOCK:tl.constexpr):
     h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
     token=tl.load(IDS+h*R+r,r<R,other=0)
     valid=(r<R)&tl.load(KEEP+h*R+r,r<R,other=0)&(token>=0)&(token<S)
@@ -82,7 +82,7 @@ def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,SHARED:tl.co
 
 
 @triton.jit
-def _offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.constexpr,SHIFT:tl.constexpr,BLOCK:tl.constexpr):
+def _narrow_offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.constexpr,SHIFT:tl.constexpr,BLOCK:tl.constexpr):
     h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
     key=tl.load(KEYS+h*R+r,r<R,other=0).to(tl.int64)+SHIFT
     tl.store(LONG_KEYS+h*R+r,key.to(tl.int64),r<R)
@@ -104,7 +104,68 @@ def _offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.con
     tl.store(OFFSETS+h*1025+r,lo,valid)
 
 
+@triton.jit
+def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr,PACKED:tl.constexpr=False,SHARED:tl.constexpr=False):
+    h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
+    token=tl.load(IDS+h*R+r,r<R,other=0)
+    valid=(r<R)&tl.load(KEEP+h*R+r,r<R,other=0)&(token>=0)&(token<S)
+    token=tl.where(valid,token,0)
+    end:tl.constexpr=S if SHARED else (S//8192)*8192
+    worker=tl.where(token<end,(token//8)%1024,(token-end)%1024)
+    ordinal=tl.where(token<end,(token//8192)*8+token%8,end//1024+(token-end)//1024)
+    if PACKED:
+        # Signed int16 order matches (worker, ordinal). The unused final slot
+        # (worker1023, ordinal63) corresponds to token65535, outside S<65536.
+        key=tl.where(valid,worker*64+ordinal-32768,32767)
+    else:
+        key=tl.where(valid,worker*S+ordinal,1024*S)
+    tl.store(KEYS+h*R+r,key,r<R)
+    tl.store(VALID+h*R+r,valid,r<R)
+
+
+@triton.jit
+def _offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr,PACKED:tl.constexpr=False):
+    h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
+    key=tl.load(KEYS+h*R+r,r<R,other=0)
+    if PACKED:
+        bits=key.to(tl.int32)+32768
+        logical=tl.where(key<32767,(bits//64)*S+bits%64,1024*S)
+    else:
+        logical=key
+    tl.store(LONG_KEYS+h*R+r,logical.to(tl.int64),r<R)
+    previous=tl.load(KEYS+h*R+r-1,(r>0)&(r<R),other=-1)
+    original=tl.load(PERM+h*R+r,r<R,other=0)
+    sentinel:tl.constexpr=32767 if PACKED else 1024*S
+    # r==0 must be unique even when its signed packed key equals -1.
+    tl.store(UNIQUE+h*R+original,(key<sentinel)&((r==0)|(key!=previous)),r<R)
+    valid=r<1025
+    if PACKED:
+        target=tl.minimum(r.to(tl.int32)*64-32768,32767)
+    else:
+        target=r.to(tl.int64)*S
+    lo=tl.zeros((BLOCK,),tl.int32)
+    hi=tl.full((BLOCK,),R,tl.int32)
+    while tl.sum((valid&(lo<hi)).to(tl.int32),0)>0:
+        active=valid&(lo<hi)
+        mid=lo+(hi-lo)//2
+        value=tl.load(KEYS+h*R+mid,active,other=0)
+        smaller=value<target
+        lo=tl.where(active&smaller,mid+1,lo)
+        hi=tl.where(active&~smaller,mid,hi)
+    tl.store(OFFSETS+h*1025+r,lo,valid)
+
+
+def _packed_sort_enabled(capacity):
+    value=os.environ.get('TLI_SPARSE_SORT_INT16','0')
+    if value not in ('0','1'):
+        raise ValueError('TLI_SPARSE_SORT_INT16 must be 0 or 1')
+    if value=='1' and (type(capacity) is not int or not 0<capacity<65536):
+        raise ValueError('packed sparse sort requires integer capacity <65536')
+    return value=='1'
+
+
 def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False,valid_length=None):
+    packed=_packed_sort_enabled(capacity)
     if torch.__version__.split('+')[0]!='2.8.0' or scores.dtype!=torch.bfloat16:
         raise ValueError('pinned torch2.8.0 BF16 prototype only')
     if not all(t.is_cuda and t.is_contiguous() and t.device==scores.device for t in (scores,ids,keep)):
@@ -136,16 +197,22 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
     stride=triton.cdiv(capacity,8192)*8
     narrow=os.environ.get('TLI_SPARSE_NARROW_KEYS','1')=='1'
     shift=32768 if narrow and 1024*stride<65536 else 0
-    key_dtype=torch.int16 if shift else (torch.int32 if 1024*stride<2**31 else torch.int64)
+    key_dtype=torch.int16 if (shift or packed) else (torch.int32 if 1024*stride<2**31 else torch.int64)
     keys=torch.empty_like(ids,dtype=key_dtype)
     valid=torch.empty_like(keep)
-    _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,SHARED=capacity<(prop.shared_memory_per_block-128)//2,STRIDE=stride,SHIFT=shift,BLOCK=256)
+    if packed:
+        _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,BLOCK=256,PACKED=True,SHARED=capacity<(prop.shared_memory_per_block-128)//2)
+    else:
+        _prepare_narrow_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,SHARED=capacity<(prop.shared_memory_per_block-128)//2,STRIDE=stride,SHIFT=shift,BLOCK=256)
     keys,perm=keys.sort(dim=-1,stable=True)
     long_keys=torch.empty_like(ids)
     unique=torch.empty_like(keep)
     offsets=torch.empty((hk,1025),device=ids.device,dtype=torch.int64)
-    _offsets_and_keys[(hk,triton.cdiv(max(r,1025),256))](
-        keys,perm,long_keys,offsets,unique,r,stride,shift,BLOCK=256)
+    if packed:
+        _offsets_and_keys[(hk,triton.cdiv(max(r,1025),256))](keys,perm,long_keys,offsets,unique,r,capacity,BLOCK=256,PACKED=True)
+    else:
+        _narrow_offsets_and_keys[(hk,triton.cdiv(max(r,1025),256))](
+            keys,perm,long_keys,offsets,unique,r,stride,shift,BLOCK=256)
     keys=long_keys
     with torch.cuda.device(scores.device):
         cp=extension.sparse_softmax(scores,perm,keys,offsets,group)

@@ -5981,6 +5981,14 @@ def _iter3_compact(cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev):
     """【E166 iter3b】候选压缩 wrapper。返回 (cand_idx2c, keep2c,
     mid_slotc, cand_len)——与旧 argsort 链+mid gather 逐位一致。
     【iter3f-3】S_cap 用于哨兵重定向 S_CAP_M1（替代 host 侧 where）。"""
+    mode=os.environ.get('TLI_COMPACT_SCAN_TILED','0')
+    if mode not in ('0','1'):
+        raise ValueError('TLI_COMPACT_SCAN_TILED must be 0 or 1')
+    if mode=='1':
+        if cand_idx2.shape!=(Hkv,R_cap) or cand_idx2.device!=dev:
+            raise ValueError('compact metadata mismatch')
+        from ..ops.tiled_compact import compact_tiled
+        return compact_tiled(cand_idx2,keep2,mid_mask,S_cap)
     ci_out = torch.empty_like(cand_idx2)
     kp_out = torch.empty_like(keep2)
     mid_out = torch.empty_like(keep2) if mid_mask is not None else None
