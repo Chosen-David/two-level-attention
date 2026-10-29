@@ -32,7 +32,7 @@ def _mean(CP,KEEP,OUT,R:tl.constexpr,G:tl.constexpr,BLOCK:tl.constexpr):
 
 
 @triton.jit
-def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr):
+def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr,PACKED:tl.constexpr=False):
     h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
     token=tl.load(IDS+h*R+r,r<R,other=0)
     valid=(r<R)&tl.load(KEEP+h*R+r,r<R,other=0)&(token>=0)&(token<S)
@@ -40,21 +40,36 @@ def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.con
     end:tl.constexpr=(S//8192)*8192
     worker=tl.where(token<end,(token//8)%1024,(token-end)%1024)
     ordinal=tl.where(token<end,(token//8192)*8+token%8,end//1024+(token-end)//1024)
-    key=tl.where(valid,worker*S+ordinal,1024*S)
+    if PACKED:
+        # Signed int16 order matches (worker, ordinal). The unused final slot
+        # (worker1023, ordinal63) corresponds to token65535, outside S<65536.
+        key=tl.where(valid,worker*64+ordinal-32768,32767)
+    else:
+        key=tl.where(valid,worker*S+ordinal,1024*S)
     tl.store(KEYS+h*R+r,key,r<R)
     tl.store(VALID+h*R+r,valid,r<R)
 
 
 @triton.jit
-def _offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr):
+def _offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr,PACKED:tl.constexpr=False):
     h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
     key=tl.load(KEYS+h*R+r,r<R,other=0)
-    tl.store(LONG_KEYS+h*R+r,key.to(tl.int64),r<R)
+    if PACKED:
+        bits=key.to(tl.int32)+32768
+        logical=tl.where(key<32767,(bits//64)*S+bits%64,1024*S)
+    else:
+        logical=key
+    tl.store(LONG_KEYS+h*R+r,logical.to(tl.int64),r<R)
     previous=tl.load(KEYS+h*R+r-1,(r>0)&(r<R),other=-1)
     original=tl.load(PERM+h*R+r,r<R,other=0)
-    tl.store(UNIQUE+h*R+original,(key<1024*S)&(key!=previous),r<R)
+    sentinel:tl.constexpr=32767 if PACKED else 1024*S
+    # r==0 must be unique even when its signed packed key equals -1.
+    tl.store(UNIQUE+h*R+original,(key<sentinel)&((r==0)|(key!=previous)),r<R)
     valid=r<1025
-    target=r.to(tl.int64)*S
+    if PACKED:
+        target=tl.minimum(r.to(tl.int32)*64-32768,32767)
+    else:
+        target=r.to(tl.int64)*S
     lo=tl.zeros((BLOCK,),tl.int32)
     hi=tl.full((BLOCK,),R,tl.int32)
     while tl.sum((valid&(lo<hi)).to(tl.int32),0)>0:
@@ -89,16 +104,19 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize==0:
             raise RuntimeError('warm up sparse normalization before capture')
         extension = build()
-    key_dtype=torch.int32 if 1024*capacity<2**31 else torch.int64
+    packed=os.environ.get('TLI_SPARSE_SORT_INT16','0')=='1'
+    if packed and not 0<capacity<65536:
+        raise ValueError('packed sparse sort requires capacity <65536')
+    key_dtype=torch.int16 if packed else (torch.int32 if 1024*capacity<2**31 else torch.int64)
     keys=torch.empty_like(ids,dtype=key_dtype)
     valid=torch.empty_like(keep)
-    _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,BLOCK=256)
+    _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,BLOCK=256,PACKED=packed)
     keys,perm=keys.sort(dim=-1,stable=True)
     long_keys=torch.empty_like(ids)
     unique=torch.empty_like(keep)
     offsets=torch.empty((hk,1025),device=ids.device,dtype=torch.int64)
     _offsets_and_keys[(hk,triton.cdiv(max(r,1025),256))](
-        keys,perm,long_keys,offsets,unique,r,capacity,BLOCK=256)
+        keys,perm,long_keys,offsets,unique,r,capacity,BLOCK=256,PACKED=packed)
     keys=long_keys
     with torch.cuda.device(scores.device):
         cp=extension.sparse_softmax(scores,perm,keys,offsets,group)
