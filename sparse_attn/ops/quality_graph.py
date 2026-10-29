@@ -78,7 +78,7 @@ def _clear_capture_routes(model):
                 setattr(idx, "_graph_" + field, None)
 
 
-def _capture_routes(model):
+def _layer_routes(model):
     """Snapshot Python dispatch metadata; never read device tensors here."""
     rows = []
     for name, module in model.named_modules():
@@ -95,6 +95,11 @@ def _capture_routes(model):
             row[field] = value if isinstance(value, bool) else None
         rows.append(row)
     return rows
+
+
+def _capture_routes(model):
+    """Capture-specific receipt boundary; eager execution uses its own phase."""
+    return _layer_routes(model)
 
 
 def _live_width_fallback(prompt_lengths, dtype=None):
@@ -248,7 +253,7 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                         _clear_capture_routes(model)
                     output = forward()
                     if step == 0:
-                        record["eager_layers"] = _capture_routes(model)
+                        record["eager_layers"] = _layer_routes(model)
                 next_tokens = output.logits[:, -1].argmax(-1).tolist()
                 for b, token in enumerate(next_tokens):
                     if ctx.alive[b]:
