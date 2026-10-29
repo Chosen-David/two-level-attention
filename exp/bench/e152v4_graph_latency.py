@@ -548,6 +548,18 @@ def main():
                 raise SystemExit(f"[E152v4 GATE-FAIL] graph 臂 capture/decode "
                                  f"失败（{type(e).__name__}: {e}）")
             raise
+        selector_routes = []
+        for name, module in model.named_modules():
+            idx = getattr(module, "indexer", None)
+            constants = getattr(idx, "_graph_const_cache", None)
+            if constants is not None:
+                selector_routes.append({"module": name,
+                    "sparse_selection": constants[0][-1] is True})
+        if os.environ.get("TLI_SPARSE_SELECTION", "0") == "1":
+            if len(selector_routes) != n_patched or not all(x["sparse_selection"] for x in selector_routes):
+                raise RuntimeError("sparse benchmark fell back to a dense selector")
+        rec["selector_routes"] = selector_routes
+        rec["n_patched_attention_layers"] = n_patched
         rec.update({
             "run": r, "phase": "warmup" if r < args.warmup else "measured",
             "method": args.method, "L": args.context_length,
