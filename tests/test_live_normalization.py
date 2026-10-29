@@ -41,3 +41,43 @@ def test_bypass_does_not_claim_normalization(monkeypatch):
     idx._graph_normalization_width_route='live_length'
     idx.compute_mask_graph(q,index,128**-.5,torch.tensor([16384],device='cuda'))
     assert idx._graph_normalization_width_route is None
+
+
+@pytest.mark.parametrize('group', [1, 2, 4, 8])
+@pytest.mark.parametrize('length', [9217, 16384, 16385])
+def test_live_candidate_dedup_gqa_matches_native(group, length):
+    from sparse_attn.ops.compact_normalization import compact_probabilities
+    torch.manual_seed(904)
+    capacity = 16448
+    # Repeated protected IDs and sparse holes exercise owner reduction rather
+    # than a dense identity map. Duplicate fine logits are identical by contract.
+    ids = torch.cat((torch.arange(0, capacity, 3), torch.arange(4),
+                     torch.arange(length - 128, length))).cuda().int()[None]
+    keep = ids < length
+    dense = torch.randn(group, capacity, device='cuda', dtype=torch.bfloat16) * 3
+    scores = dense[:, ids[0].long()].contiguous()
+    excluded = torch.arange(capacity, device='cuda') >= length - 128
+    excluded[:4] = True
+    live = torch.tensor([length], device='cuda', dtype=torch.int64)
+    actual = compact_probabilities(scores, ids, keep, capacity, group, excluded, live)
+    domain = torch.zeros(capacity, device='cuda', dtype=torch.bool)
+    domain[ids[keep].long()] = True
+    probs = dense[:, :length].masked_fill(~domain[:length], -torch.inf).contiguous().softmax(-1)
+    # Eager BF16 GQA rounds each probability before sequential FP32 sum.
+    expected = torch.zeros(length, device='cuda', dtype=torch.float32)
+    for row in probs:
+        expected += row.float()
+    expected = (expected / group).bfloat16().masked_fill(excluded[:length], -torch.inf)
+    assert torch.equal(actual[0, :length], expected)
+
+
+@pytest.mark.parametrize('dtype', [torch.float16, torch.float32])
+def test_live_wrapper_rejects_non_bf16_before_launch(dtype):
+    from sparse_attn.ops.compact_normalization import compact_probabilities, supported
+    scores = torch.ones(2, 4, device='cuda', dtype=dtype)
+    ids = torch.arange(4, device='cuda', dtype=torch.int32)[None]
+    keep = torch.ones_like(ids, dtype=torch.bool)
+    assert not supported(scores, ids, keep, 16448, 2)
+    with pytest.raises(ValueError, match='unsupported exact compact'):
+        compact_probabilities(scores, ids, keep, 16448, 2,
+                              valid_length=torch.tensor([16384], device='cuda'))

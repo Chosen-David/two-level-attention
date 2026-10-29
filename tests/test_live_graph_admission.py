@@ -51,3 +51,23 @@ def test_dynamic_cache_admission_precedes_conversion(monkeypatch,policy):
         expected=None if policy=='0' else 'live_normalization_length_below_9217'
         assert model._quality_graph_execution['actual']=='eager'
         assert model._quality_graph_execution['fallback_reason']==expected
+
+
+@pytest.mark.parametrize('dtype', [torch.float16, torch.float32])
+@pytest.mark.parametrize('policy', ['auto', '1', '0'])
+def test_non_bf16_live_admission_precedes_conversion(monkeypatch, dtype, policy):
+    monkeypatch.setenv('TLI_CUDA_GRAPH', policy)
+    monkeypatch.setenv('TLI_LIVE_NORMALIZATION', '1')
+    model = fake_model()
+    model.parameters = lambda: iter([SimpleNamespace(device=torch.device('cuda'), dtype=dtype)])
+    model.modules = lambda: [SimpleNamespace(indexer=type('TLIIndexer', (), {})())]
+    model.config = SimpleNamespace(model_type='qwen3')
+    past = SimpleNamespace(get_seq_length=lambda: 16384)
+    if policy == '1':
+        with pytest.raises(RuntimeError, match='live_normalization_requires_bfloat16'):
+            quality.from_dynamic(model, past, 1, 64, set())
+    else:
+        assert quality.from_dynamic(model, past, 1, 64, set()) is None
+        assert model._quality_graph_execution['actual'] == 'eager'
+        assert model._quality_graph_execution['fallback_reason'] == (
+            None if policy == '0' else 'live_normalization_requires_bfloat16')
