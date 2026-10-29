@@ -556,9 +556,14 @@ def test_fine_gather():
     n_cand_path = 0
 
     def _cand_ulp_ok(full, cand, cand_idx, cand_len):
-        # 【E156b】per-head 候选：cand_idx [H,R_max]，cand_len [H] 门控实长
-        # 前缀（pad sentinel 不参与）。全宽 score_fine 候选位 vs 候选化
-        # score_fine（形状不同，按实长掩码抽）。
+        # 【E156b】score_fine 在 q-head 空间 [H,R]，cand_idx/cand_len 在
+        # kv-head 空间 [Hkv,R]/[Hkv]；GQA 组内共享候选，比较前展开到 q-head。
+        if (full.shape[:3] != cand.shape[:3]
+                or full.shape[2] % cand_idx.shape[0] != 0):
+            return -1, float("inf"), False
+        group = full.shape[2] // cand_idx.shape[0]
+        cand_idx = cand_idx.repeat_interleave(group, dim=0)
+        cand_len = cand_len.repeat_interleave(group)
         _h_idx = torch.arange(cand_idx.shape[0], device=cand.device
                               ).view(-1, 1).expand_as(cand_idx)
         _r_mask = (torch.arange(cand_idx.shape[1], device=cand.device
