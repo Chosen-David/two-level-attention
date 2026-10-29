@@ -554,8 +554,13 @@ def main():
             geometry_calls[key] += 1
             return original_geometry(self, *a, **kw)
         TLIIndexer._build_graph_geometry = observed_geometry
+    from sparse_attn.ops.selector_options import validate_selector_options
+    from exp.bench.selector_route_observer import install, checked_delta
+    packed_sort,tiled_scan=validate_selector_options(S_cap)
+    optimization_calls=install(packed_sort,tiled_scan,torch.cuda.is_current_stream_capturing)
     runs = []
     for r in range(args.warmup + args.repeats):
+        before_optimization={name:counts.copy() for name,counts in optimization_calls.items()}
         before_geometry_calls = geometry_calls.copy()
         before_fa2 = runner.fa2_adapter.calls.copy() if runner.fa2_adapter is not None else None
         do_capture = (args.graph_mode == "graph" and runner.graph is None)
@@ -595,6 +600,9 @@ def main():
             if len(selector_routes) != n_patched or not all(x["sparse_selection"] for x in selector_routes):
                 raise RuntimeError("sparse benchmark fell back to a dense selector")
         rec["selector_routes"] = selector_routes
+        rec['selector_optimization_submissions']=checked_delta(
+            optimization_calls,before_optimization,n_patched if do_capture else 0)
+        rec['selector_optimization_count_scope']='actual host kernel submissions during warmup/capture, not replay'
         rec["n_patched_attention_layers"] = n_patched
         rec.update({
             "run": r, "phase": "warmup" if r < args.warmup else "measured",
