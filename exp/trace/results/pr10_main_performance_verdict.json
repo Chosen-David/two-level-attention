@@ -1,0 +1,124 @@
+{
+  "schema": "pr10-main-performance-verdict-v1",
+  "date": "2026-10-29",
+  "pr_head": "2449f56983d7e97c5fe1c4df300c2b50b0c16b81",
+  "main_commit": "a2e7b67b4e5c131cfa169283f7c66d6fb8892b00",
+  "evaluated_changes": [
+    "78ba041: pool assembly 从四次 cat 降为两次",
+    "cf8eb15: 短序列 dense 路由提前",
+    "2449f56: batch Torch fallback 的只读 cu_row 移出逐行循环"
+  ],
+  "decision": "path_specific_gains_confirmed_but_no_32k_main_table_tpot_speedup",
+  "recommendation_zh": "不应以主表加速为由整包合并 PR10。三项小补丁在各自可达路径有真实收益；当前 32K B=1 whole-step Graph 且 n_skip_layers=0 的生产路径不触发它们。若需要优化短序列或 B>1 fallback，可独立摘取对应补丁；pool 补丁仅对实际存在 compact far-skip 层的配置有意义。",
+  "native_microbench": {
+    "scope": "native wrapper/assembly microbench; not end-to-end",
+    "machine": "pc33",
+    "gpu": "NVIDIA H20-3e",
+    "physical_gpu": 1,
+    "gpu_hygiene": "clean",
+    "exact_output_cases": 18,
+    "exact_output_passed": 18,
+    "early_dense_event_speedup_range": [
+      1.0406077031919763,
+      1.1854452332668253
+    ],
+    "pool_eager_event_speedup_range": [
+      1.6458998701175729,
+      1.6476492529924518
+    ],
+    "pool_graph_replay_event_speedup_range": [
+      1.0380348318884811,
+      1.098283954590396
+    ],
+    "batch_fallback_event_speedup_range": [
+      1.0318,
+      1.1248
+    ],
+    "raw_logs": [
+      "/tmp/tli-pr10-native-results/latest_native.pc33.log",
+      "/tmp/tli-pr10-native-results/batch_native.pc33.log",
+      "/tmp/tli-pr10-native-results/hygiene.pc33.log"
+    ]
+  },
+  "integration": {
+    "candidate_worktree": "/tmp/tli-pr10-main-e2e",
+    "changed_files": [
+      "sparse_attn/ops/eager_decoding.py",
+      "sparse_attn/ops/far_skip_graph.py"
+    ],
+    "diff_stat": "2 files changed, 11 insertions(+), 13 deletions(-)",
+    "tests_passed": 107,
+    "tests_failed": 1,
+    "failure_classification": "test_fine_gather 在未修改 main baseline 同样失败，属于既有问题，非 PR10 回归",
+    "committed": false,
+    "pushed": false
+  },
+  "e2e_32k_abba": {
+    "scope": "Qwen3-8B production-flags whole-step CUDA Graph decode TPOT",
+    "machine": "pc33",
+    "gpu": "NVIDIA H20-3e",
+    "physical_gpu": 0,
+    "run_directory": "/tmp/tli-pr10-e2e-results/20261029-120746-gpu0-rerun",
+    "order": [
+      "a1",
+      "b1",
+      "b2",
+      "a2"
+    ],
+    "length": 32768,
+    "max_gen": 128,
+    "warmup_per_arm": 1,
+    "measured_per_arm": 2,
+    "batch_size": 1,
+    "K1": 128,
+    "K2": 1024,
+    "gpu_hygiene": "clean",
+    "hygiene_evidence": "起跑前 4 MiB 且无计算 PID；每个活跃臂监控样本均只有本臂一个计算 PID；臂间及结束无计算 PID；无双 PID 共居样本",
+    "input_ids_sha256_16": "21dc178dc8df3fe3",
+    "all_runs_generated_tokens_exact": true,
+    "all_runs_n_skip_layers": 0,
+    "all_runs_n_non_skip_layers": 36,
+    "arms": {
+      "a1": [
+        20.152921458,
+        20.141383970
+      ],
+      "b1": [
+        20.147349656,
+        20.158087644
+      ],
+      "b2": [
+        20.155140265,
+        20.159617477
+      ],
+      "a2": [
+        20.160342413,
+        20.154646825
+      ]
+    },
+    "baseline_mean_ms": 20.152323667,
+    "candidate_mean_ms": 20.155048760,
+    "baseline_median_ms": 20.153784142,
+    "candidate_median_ms": 20.156613954,
+    "candidate_minus_baseline_ms": 0.002725094,
+    "candidate_delta_pct": 0.013522480,
+    "mean_speedup_baseline_over_candidate": 0.999864793,
+    "median_speedup_baseline_over_candidate": 0.999859609,
+    "abba_block_candidate_minus_baseline_ms": [
+      0.005565936,
+      -0.000115748
+    ],
+    "interpretation_zh": "candidate 平均仅慢 0.002725 ms（0.0135%），两个 ABBA block 的差值方向相反，属于测量噪声；32K 主表 TPOT 无可辨识收益。"
+  },
+  "reachability": {
+    "early_dense": "未触发：优化只覆盖 full_len<16384，本实验为 32768",
+    "pool_assembly": "未触发：所有臂 n_skip_layers=0，未进入 compact far-off layer 的 Graph pool 路径",
+    "batch_cu_row": "未触发：主路径为 B=1 whole-step CUDA Graph，不是 B>1 Torch fallback"
+  },
+  "invalid_previous_attempt": {
+    "run_directory": "/tmp/tli-pr10-e2e-results/20261029-113421-gpu0",
+    "invalid_arm": "a2",
+    "reason": "11:37:24 起出现第二个计算进程并持续至该臂结束，TPOT 出现离散平台跳变至约 28.6 ms",
+    "disposition": "polluted-rerun；未用于最终判决"
+  }
+}
