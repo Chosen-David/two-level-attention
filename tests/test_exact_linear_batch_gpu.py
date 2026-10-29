@@ -15,6 +15,7 @@ import pytest
 import torch
 
 from sparse_attn.ops import exact_linear_batch as exact
+from sparse_attn.ops import batch_candidate_producer as front
 from sparse_attn.ops.cuda_graph_state import graph_state, capture_graph
 from sparse_attn.ops.kv_row_update import append_kv_batch
 from sparse_attn.ops.operator_pipeline import decode_indexed
@@ -142,8 +143,23 @@ def _install_stage_checks(monkeypatch, batch, capacity):
         for value in values:
             assert not (value.ndim==4 and value.shape[1]==capacity), 'full-history feature stack'
             assert not (value.ndim==3 and value.shape[0]==capacity), 'squeezed full-history stack'
+            if torch.cuda.is_current_stream_capturing():
+                assert not (value.ndim==4 and value.shape[1]==(capacity+63)//64), 'summary stack during capture'
         return stack(values,*args,**kw)
     monkeypatch.setattr(torch,'stack',checked_stack)
+    return calls
+
+
+def _install_front_checks(monkeypatch,batch):
+    calls=[]
+    for name,label in [('score_coarse_batched','coarse'),('score_average_batched','average'),
+                       ('compact_candidates_exact','compact')]:
+        original=getattr(front,name)
+        def wrap(*args,_fn=original,_label=label,**kw):
+            assert args[0].shape[0]==batch
+            calls.append(_label)
+            return _fn(*args,**kw)
+        monkeypatch.setattr(front,name,wrap)
     return calls
 
 
@@ -154,10 +170,12 @@ def test_exact_batch_native_replay_append_and_eos(monkeypatch,batch):
     torch.manual_seed(320301)
     with torch.no_grad(), _case(batch) as case:
         calls=_install_stage_checks(monkeypatch,batch,case.capacity)
+        front_calls=_install_front_checks(monkeypatch,batch)
         expected_stages=['score','norm','rank','protected','selected','merge']
         for _ in range(3):
-            start=len(calls);out=case.run()
+            start=len(calls);front_start=len(front_calls);out=case.run()
             assert calls[start:]==expected_stages
+            assert front_calls[front_start:]==['coarse','average','compact']
         torch.cuda.synchronize()
         torch.testing.assert_close(out,case.reference(),rtol=0,atol=0)
         state=case.source._exact_linear_batch
@@ -165,8 +183,9 @@ def test_exact_batch_native_replay_append_and_eos(monkeypatch,batch):
         arena=state.feature_arena
         for b,row in enumerate(state.rows):
             assert row._ginc['k_qat'].data_ptr()==arena[b:b+1].data_ptr()
-        start=len(calls);graph,out=case.capture()
+        start=len(calls);front_start=len(front_calls);graph,out=case.capture()
         assert calls[start:]==expected_stages
+        assert front_calls[front_start:]==['coarse','average','compact']
         first_page=(case.lengths[0]-1)//64
         dead_length=None
         for step in range(5):
@@ -177,9 +196,10 @@ def test_exact_batch_native_replay_append_and_eos(monkeypatch,batch):
             case.inject_metadata();case.q.normal_();case.new_k.normal_();case.new_v.normal_()
             dead_before={b:(case.k[b].clone(),case.v[b].clone())
                          for b,live in enumerate(case.alive) if not live}
-            start=len(calls);graph.replay()
+            start=len(calls);front_start=len(front_calls);graph.replay()
             torch.cuda.synchronize()
             assert len(calls)==start  # Replay must execute GPU graph, not Python row consumers.
+            assert len(front_calls)==front_start
             for b,(key,value) in dead_before.items():
                 torch.testing.assert_close(case.k[b],key,rtol=0,atol=0)
                 torch.testing.assert_close(case.v[b],value,rtol=0,atol=0)

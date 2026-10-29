@@ -150,7 +150,10 @@ def test_actual_entry_warmup_binds_arena_and_reuses_row_state(setup,monkeypatch)
             if self._ginc is not None:self._ginc['stale']=True
         def prepare_index(self,key,cu):
             if self._ginc is None:
-                self._ginc={'k_qat':key[...,:16].contiguous().clone()};self.full+=1
+                self._ginc={'k_qat':key[...,:16].contiguous().clone()}
+                for name in ('k_min','k_max','k_avg'):
+                    self._ginc[name]=torch.zeros(1,key.shape[1]//64,1,16,dtype=key.dtype)
+                self.full+=1
             elif self._ginc.pop('stale',False):
                 self._ginc['k_qat'].copy_(key[...,:16]);self.full+=1
             else:
@@ -158,25 +161,34 @@ def test_actual_entry_warmup_binds_arena_and_reuses_row_state(setup,monkeypatch)
                 pos=int(gs.pos_buf[0])
                 self._ginc['k_qat'][:,pos].copy_(key[:,pos,...,:16])
             return self._ginc
-        def compute_candidate_inputs_graph(self,query,index,scale,lengths):
-            return candidate_inputs(index['k_qat'],(query[0,0,:,:16]*scale).float(),
-                torch.arange(1024)[None],torch.ones(1,1024,dtype=torch.bool),torch.tensor([1024]),
-                lengths[0],torch.tensor(0),lengths[0]-128,torch.tensor(892),
-                capacity=32768,group_size=4,output_dtype=query.dtype,rank_width=1024,sink=4,swa=128)
+        def compute_candidate_inputs_graph(self,*args):
+            raise AssertionError('row L1/candidate production must not execute')
     def clone(source):
         row=Row();owners.append(row);return row
+    class Front:
+        def __init__(self,*args):pass
+        def __call__(self,query,arena,summaries,lengths,scale):
+            b=query.shape[0]
+            return batch.BatchedCandidateInputs(arena,(query[:,0,:,:16]*scale).float(),
+                torch.arange(1024)[None,None].expand(b,1,-1).contiguous(),
+                torch.ones(b,1,1024,dtype=torch.bool),torch.full((b,1),1024),lengths,
+                torch.zeros(b,dtype=torch.int64),lengths-128,torch.full((b,),892),
+                32768,4,query.dtype,1024,4,128)
+    monkeypatch.setattr(batch,'BatchedCandidateProducer',Front)
     monkeypatch.setattr(batch,'_clone_owner',clone)
     monkeypatch.setattr(batch,'_validate_supported',lambda *args:None)
     monkeypatch.setattr(torch.cuda,'is_current_stream_capturing',lambda:False)
     consumed=[]
-    def consume(candidates,arena,*args):
-        assert len(candidates)==2
-        assert all(c.k_fine.data_ptr()==arena[b:b+1].data_ptr() for b,c in enumerate(candidates))
-        consumed.append(arena);return q
-    monkeypatch.setattr(batch,'_consume',consume)
+    def consume(inputs,*args):
+        assert inputs.ids.shape==(2,1,1024)
+        consumed.append(inputs.k_fine);return q
+    monkeypatch.setattr(batch,'_consume_batched',consume)
     assert batch.exact_linear_batch_decode(idx,q,k,v,gs,0.5) is q
     state=idx._exact_linear_batch;arena=state.feature_arena
     assert len(owners)==2 and owners[0] is not owners[1]
+    summaries=state.summary_arenas.copy()
+    for b,row in enumerate(owners):
+        assert all(row._ginc[name].data_ptr()==arena[b:b+1].data_ptr() for name,arena in summaries.items())
     assert all(row.full==1 for row in owners)
     gs.valid_len_buf.add_(gs.alive_buf.long());gs.pos_buf.copy_(gs.valid_len_buf-1)
     batch.exact_linear_batch_decode(idx,q,k,v,gs,0.5)
@@ -185,6 +197,7 @@ def test_actual_entry_warmup_binds_arena_and_reuses_row_state(setup,monkeypatch)
     idx.clear();assert not bool(state.ready) and state.needs_warmup
     batch.exact_linear_batch_decode(idx,q,k,v,gs,0.5)
     assert state.feature_arena is arena and all(row.full==2 for row in owners)
+    assert all(state.summary_arenas[name] is value for name,value in summaries.items())
     assert bool(state.ready)
     # Metadata-compatible replacement storage must be explicit, not silent reuse.
     with pytest.raises(ValueError,match='storage/config changed'):

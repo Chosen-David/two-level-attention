@@ -1,8 +1,8 @@
 """Opt-in linear batch consumer with exact per-row candidate producers.
 
-L1/index maintenance still loops over request owners. Fine scoring, candidate
+Index maintenance still loops over request owners. L1 and candidate production, fine scoring, candidate
 normalization/ranking, protected/selected attention and merge each consume the
-whole batch once. Only warmup copies full feature storage into the arena.
+whole batch once. Only warmup copies full feature/summary storage into arenas.
 
 Scope: immutable greedy no-skip BF16 batch, pinned sparse normalization/ranking
 geometry, serial graph-state route. Refill requires indexer.clear() and warmup;
@@ -18,6 +18,7 @@ from .batch_candidate_score import score_candidates_batched
 from .sparse_normalization import candidate_probabilities_batched, supported_geometry
 from .unique_ranking import rank_unique_batched
 from .partial_attention import partial_attention, merge_partials
+from .batch_candidate_producer import BatchedCandidateProducer, BatchedCandidateInputs
 
 
 def _config_signature(idx):
@@ -121,6 +122,8 @@ class ExactLinearBatch:
         self.config = _config_signature(source)
         self.rows = [_clone_owner(source) for _ in range(q.shape[0])]
         self.feature_arena = None
+        self.summary_arenas = {}
+        self.producer = BatchedCandidateProducer(source,k)
         self.cu = torch.tensor([0,k.shape[1]],device=k.device,dtype=torch.int32)
         self.ready = torch.zeros((),device=k.device,dtype=torch.bool)
         self.previous_lengths = torch.empty_like(gs.valid_len_buf)
@@ -153,6 +156,21 @@ class ExactLinearBatch:
             if fine.data_ptr() != target.data_ptr():
                 target.copy_(fine)  # Full feature copy occurs only outside capture.
             row._ginc['k_qat'] = target
+            # Summary storage is also bound once, not stacked each step.
+            for name in ('k_min','k_max','k_avg'):
+                summary=index.get(name)
+                if name not in self.summary_arenas:
+                    self.summary_arenas[name]=(None if summary is None else torch.empty(
+                        (len(self.rows),*summary.shape[1:]),device=summary.device,dtype=summary.dtype))
+                arena=self.summary_arenas[name]
+                if summary is None:
+                    if arena is not None:raise RuntimeError('inconsistent exact batch summary presence')
+                    continue
+                if arena is None or summary.shape!=arena[b:b+1].shape:
+                    raise RuntimeError('exact batch summary geometry changed; recapture required')
+                view=arena[b:b+1]
+                if summary.data_ptr()!=view.data_ptr():view.copy_(summary)
+                row._ginc[name]=view
         self.previous_lengths.copy_(gs.valid_len_buf)
         self.previous_alive.copy_(gs.alive_buf)
         self.ready.fill_(True)
@@ -167,14 +185,16 @@ class ExactLinearBatch:
                              | (lengths == self.previous_lengths+alive.to(torch.int64)))
                             & (~alive | self.previous_alive)).all(),
                             'exact batch refill/reorder requires clear and warmup')
-        produced = []
         for b, row in enumerate(self.rows):
             with _row_scope(gs,b):
                 index = row.prepare_index(k[b:b+1], self.cu)
                 if index['k_qat'].data_ptr() != self.feature_arena[b:b+1].data_ptr():
                     raise RuntimeError('exact batch feature arena binding lost')
-                produced.append(row.compute_candidate_inputs_graph(
-                    q[b:b+1], index, scale, gs.valid_len_buf))
+                for name,arena in self.summary_arenas.items():
+                    if arena is not None and index[name].data_ptr()!=arena[b:b+1].data_ptr():
+                        raise RuntimeError('exact batch summary arena binding lost')
+        # The remaining row loop maintains private append-only index state only.
+        produced=self.producer(q,self.feature_arena,self.summary_arenas,lengths,scale)
         self.previous_lengths.copy_(lengths)
         self.previous_alive.copy_(alive)
         return produced
@@ -196,16 +216,27 @@ def _consume(candidates, arena, q, k, v, lengths, scale):
     keep = torch.stack([c.keep for c in candidates])
     counts = torch.stack([c.counts for c in candidates])
     query = torch.stack([c.q_fine for c in candidates])
-    scores = score_candidates_batched(arena,query,ids,counts,out_dtype=first.output_dtype)
-    p, unique = candidate_probabilities_batched(scores,ids,keep,first.capacity,
-                                               first.group_size,return_unique=True)
-    selection = rank_unique_batched(ids,p,unique,
-        torch.stack([c.lower for c in candidates]), torch.stack([c.upper for c in candidates]),
-        torch.stack([c.quota for c in candidates]),capacity=first.capacity,width=1024,sink=first.sink)
-    kw = dict(sink=first.sink,swa=first.swa,scale=scale,splits=4,backend='simt')
-    packed = selection.indices,selection.counts
-    protected = partial_attention(q,k,v,packed,lengths,protected=True,**kw)
-    selected = partial_attention(q,k,v,packed,lengths,protected=False,**kw)
+    inputs=BatchedCandidateInputs(arena,query,ids,keep,counts,lengths,
+        torch.stack([c.lower for c in candidates]),torch.stack([c.upper for c in candidates]),
+        torch.stack([c.quota for c in candidates]),first.capacity,first.group_size,
+        first.output_dtype,first.rank_width,first.sink,first.swa)
+    return _consume_batched(inputs,q,k,v,lengths,scale)
+
+
+def _consume_batched(inputs,q,k,v,lengths,scale):
+    if (inputs.k_fine.shape[0]!=q.shape[0] or inputs.ids.shape[0]!=q.shape[0]
+            or inputs.rank_width!=1024 or inputs.ids.shape[-1]<1024):
+        raise ValueError('incompatible batched exact producer output')
+    scores=score_candidates_batched(inputs.k_fine,inputs.q_fine,inputs.ids,inputs.counts,
+                                    out_dtype=inputs.output_dtype)
+    p,unique=candidate_probabilities_batched(scores,inputs.ids,inputs.keep,inputs.capacity,
+                                            inputs.group_size,return_unique=True)
+    selection=rank_unique_batched(inputs.ids,p,unique,inputs.lower,inputs.upper,inputs.quota,
+        capacity=inputs.capacity,width=1024,sink=inputs.sink)
+    kw=dict(sink=inputs.sink,swa=inputs.swa,scale=scale,splits=4,backend='simt')
+    packed=selection.indices,selection.counts
+    protected=partial_attention(q,k,v,packed,lengths,protected=True,**kw)
+    selected=partial_attention(q,k,v,packed,lengths,protected=False,**kw)
     return merge_partials(protected,selected,q.dtype,backend='simt')
 
 
@@ -241,4 +272,4 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
             raise RuntimeError('cleared exact batch requires warmup before capture')
         state.warmup(k,gs)
     candidates = state.produce(q,k,gs,scale)
-    return _consume(candidates,state.feature_arena,q,k,v,gs.valid_len_buf,scale)
+    return _consume_batched(candidates,q,k,v,gs.valid_len_buf,scale)
