@@ -78,6 +78,7 @@ def capture_profiles(cache, geometry, config):
         ALL_ATTENTION_FUNCTIONS['sdpa'] = original
 
 
+@torch.inference_mode()
 @eager_decoding_request_guard()
 def generate(model, tokenizer, ids, max_new_tokens, config, device):
     geometry = RegionGeometry(max_new_tokens=max_new_tokens)

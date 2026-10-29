@@ -76,3 +76,22 @@ def test_prefill_exception_restores_profile_hook_and_clears_stale_flag(guarded_r
     assert flag.item() == 0
     assert ALL_ATTENTION_FUNCTIONS['sdpa'] is original_sdpa
     run(kind)
+
+
+@pytest.mark.parametrize('kind', ['segmented','native'])
+@pytest.mark.parametrize('code', [0,1,2,3])
+def test_real_inference_tensor_flag_at_request_boundary(guarded_request,kind,code):
+    model,_,run=guarded_request
+    def inject(module,args,output):
+        # Match production: flag allocation occurs during an inference forward.
+        flag=torch.tensor([code],dtype=torch.int32)
+        assert torch.is_inference(flag)
+        eager_decoding._ERR_FLAG[torch.device('cpu')]=flag
+    hook=model.register_forward_hook(inject)
+    try:
+        if code:
+            with pytest.raises(RuntimeError,match='eager_decoding_attn'):run(kind)
+        else:run(kind)
+    finally:hook.remove()
+    assert eager_decoding._ERR_FLAG[torch.device('cpu')].item()==0
+    run(kind)  # Entry clearing must also handle a surviving inference tensor.
