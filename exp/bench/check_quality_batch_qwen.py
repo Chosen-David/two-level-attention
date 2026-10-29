@@ -12,6 +12,7 @@ from sparse_attn.info import resolve_treatment_snapshot
 from sparse_attn.patches import register_patch
 from sparse_attn.baseline_runtime import BatchCtx
 from sparse_attn.ops.quality_graph import static_decode
+from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
 from sparse_attn.ops.tli_static_cache import TLIStaticCache
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 from request_gpu_monitor import GPU0Monitor
@@ -36,6 +37,7 @@ def run(cli):
     tokenizer=AutoTokenizer.from_pretrained(model_path)
     model=AutoModelForCausalLM.from_pretrained(model_path,dtype=torch.bfloat16,
         device_map={'':'cuda:0'},attn_implementation='sdpa').eval()
+    resolve_far_skip_modes(args,config=model.config)
     patched=register_patch(model,args,resolve_treatment_snapshot(args))
     assert patched==model.config.num_hidden_layers
     assert all(not m.indexer.dyn_dgate for m in model.modules() if hasattr(m,'indexer'))
