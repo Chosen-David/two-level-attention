@@ -17,7 +17,10 @@ def run(cli):
     k = torch.randn(1, layout.capacity, 8, 128, device='cuda', dtype=q.dtype)
     v = torch.randn_like(k)
     length = torch.tensor([32613], device='cuda', dtype=torch.int64)
-    dims = torch.arange(96, 128, device='cuda')
+    # Post-RoPE paired tail32: same production TLIIndexer._tail_indices.
+    from types import SimpleNamespace
+    from sparse_attn.indexer.tli_indexer import TLIIndexer
+    dims = TLIIndexer._tail_indices(SimpleNamespace(head_dim=128, cmp_ratio=4), q.device)
     arms = [('off', 'off', 'simt'), ('serial', 'serial', 'simt'),
             ('overlap', 'overlap', 'simt'), ('tc', 'serial', 'tc')]
     captures, workspaces = {}, {}
@@ -65,7 +68,7 @@ def run(cli):
                 pairs.append(dict(pair=pair, candidate=candidate, order=order, gpu_ms=values))
         result = dict(status='pending_independent_verification', seed=884,
             scope='synthetic B1 fixed-shape ring selector+attention GPU replay only; no model TPOT/quality claim',
-            geometry=dict(length=32613, capacity=layout.capacity, hq=64, hkv=8, d=128, fine=32),
+            geometry=dict(length=32613, capacity=layout.capacity, hq=64, hkv=8, d=128, fine=32, dimensions=dims.tolist()),
             pairs=pairs, replays_per_observation=cli.replays, correctness=checks,
             routes={name: ws.attention_route for name, ws in workspaces.items()})
         Path(cli.output).write_text(json.dumps(result, indent=2))
