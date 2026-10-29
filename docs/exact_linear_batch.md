@@ -87,3 +87,25 @@ buffers. Deleting that Graph releases the obsolete state; the indexer keeps no
 permanent retired-state list. Same-storage clear/warmup still reuses the same
 state, so the old Graph remains valid after successful warmup. CPU weakref/GC
 contracts verify ownership and release; native lifecycle coverage remains queued.
+
+Graph-quality integration preserves the complete denominator domain: selected
+L1/bypass candidates first remove protected duplicates, then append every live
+sink/SWA token before stable compaction and fine scoring. This matches both the
+single-row Graph producer and eager reference; adding protection only at final
+attention is insufficient.
+
+Normalization uses each request's device live length, including its native
+softmax alignment/reduction order. Query-head blocks map back to their request;
+flattening B*H never shares denominators or GQA groups. Initial live lengths
+must all be at least 9217 and no greater than capacity; admission checks these
+outside capture before allocating index arenas. Replay retains the existing
+monotonic lengths/dead-row constraints. Explicit disabled live normalization or
+non-owner statistics are rejected. Exact mode enables live/owner defaults for
+its single-row references too; other low-level legacy defaults are unchanged.
+
+This remains explicit no-skip Qwen batch configuration, not the dynamic-gate
+configuration used by the ring experiment. It does not change the paper budget
+or claim dynamic GLM B>1 support. Capture receipts identify actual batch
+maintenance, complete domain, live owner normalization, ranking and attention.
+New native validation is required for this integration; previous branch results
+are not evidence for this revised normalization domain.

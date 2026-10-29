@@ -283,3 +283,15 @@ def test_changed_storage_graph_gc_releases_retired_state_and_kv(monkeypatch):
         # The source and replacement remain alive and usable after collection.
         out=case.run();torch.cuda.synchronize()
         torch.testing.assert_close(out,case.reference(),rtol=0,atol=0)
+
+
+@NATIVE
+def test_short_initial_live_row_rejected_without_poisoning_cuda(monkeypatch):
+    for key,value in CONFIG.items():monkeypatch.setenv(key,value)
+    with _case(2) as case:
+        case.gs.valid_len_buf[1] = 9216
+        case.gs.pos_buf[1] = 9215
+        with pytest.raises(ValueError, match='initial live length'):
+            exact.exact_linear_batch_decode(case.source,case.q,case.k,case.v,case.gs,case.scale)
+        assert getattr(case.source,'_exact_linear_batch',None) is None
+        assert (torch.ones(1,device='cuda')+1).item()==2

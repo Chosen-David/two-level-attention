@@ -61,7 +61,7 @@ def _reset_indexes(model):
 
 
 _CAPTURE_ROUTE_FIELDS = (
-    "attention_route", "ring_capacity",
+    "attention_route", "ring_capacity", "batch_index_route",
     "candidate_domain_route", "normalization_route", "normalization_stats_route", "normalization_width_route",
     "ranking_route", "ranking_kth_route", "ranking_gather_route",
     "ranking_fallback", "sparse_selection_fallback", "sparse_selection_fallback_detail",

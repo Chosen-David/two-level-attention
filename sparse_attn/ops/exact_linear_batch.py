@@ -35,9 +35,10 @@ def _config_signature(idx):
 
 
 def _validate_metadata(idx, q, k, v, gs):
-    from .sparse_policy import live_normalization_enabled
-    if not live_normalization_enabled():
+    if os.environ.get('TLI_LIVE_NORMALIZATION', '1') != '1':
         raise ValueError('exact batch requires live-length normalization')
+    if os.environ.get('TLI_SPARSE_STATS', 'owner') != 'owner':
+        raise ValueError('exact batch requires live owner statistics')
     if (q.ndim != 4 or k.ndim != 4 or v.shape != k.shape or q.shape[0] < 2
             or q.shape[1] != 1 or q.shape[0] != k.shape[0]
             or q.shape[-1] != 128 or k.shape[-1] != 128 or k.shape[2] < 1
@@ -309,4 +310,12 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
     candidates = state.produce(q,k,gs,scale)
     indexer._exact_batch_maintenance_route=state.maintenance_route
     indexer._exact_batch_maintenance_calls=state.maintenance_calls
-    return _consume_batched(candidates,q,k,v,gs.valid_len_buf,scale)
+    output = _consume_batched(candidates,q,k,v,gs.valid_len_buf,scale)
+    indexer._graph_attention_route = 'exact_batch_simt'
+    indexer._graph_batch_index_route = state.maintenance_route
+    indexer._graph_candidate_domain_route = 'batch_full_protected'
+    indexer._graph_normalization_route = 'batch_candidate_probabilities'
+    indexer._graph_normalization_width_route = 'live_length'
+    indexer._graph_normalization_stats_route = 'live_length_owner'
+    indexer._graph_ranking_route = 'batch_candidate_domain_native_1024'
+    return output
