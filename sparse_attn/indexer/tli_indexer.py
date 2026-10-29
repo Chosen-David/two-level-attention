@@ -5020,6 +5020,9 @@ if _HAS_TRITON:
         """
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
+        if BATCHED:
+            pid_h = pid_h.to(tl.int64)
+            pid_t = pid_t.to(tl.int64)
         kv = pid_h
         if BATCHED:
             batch = (pid_h // Hkv).to(tl.int64)
