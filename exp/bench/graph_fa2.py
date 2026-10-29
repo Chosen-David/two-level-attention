@@ -18,6 +18,7 @@ class GraphFA2:
         if (not targets or any(m.training or m.head_dim != 128 or m.sliding_window is not None
                                or m.config._attn_implementation != 'flash_attention_2' for m in targets)
                 or mask.ndim != 4 or mask.shape[:3] != (1,1,1)
+                or not 0 < mask.shape[-1] <= torch.iinfo(torch.int32).max
                 or lengths.shape != (1,) or lengths.dtype != torch.int64
                 or lengths.device != mask.device):
             raise ValueError('GraphFA2 requires eval Qwen3 D128, B1 unpadded static cache')
@@ -60,6 +61,10 @@ class GraphFA2:
         from transformers.modeling_utils import AttentionInterface
         if lengths.shape != (1,) or lengths.dtype != torch.int64 or lengths.device != self.lengths.device:
             raise ValueError("GraphFA2 requires same-device int64 lengths[1]")
+        # Validate in int64 before casting, preventing wraparound and an
+        # out-of-bounds cache read. This guard is captured and re-evaluated.
+        torch._assert_async(((lengths >= 1) & (lengths <= self.mask.shape[-1])).all(),
+                            'GraphFA2 length outside cache capacity')
         self.lengths.copy_(lengths)
         old = self.module.ALL_ATTENTION_FUNCTIONS
         interface = AttentionInterface()

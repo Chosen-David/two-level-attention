@@ -72,3 +72,15 @@ def test_native_graph_live_lengths_matches_dense_fa2():
                            v[:,:,:valid].transpose(1,2),causal=True,softmax_scale=128**-.5)
         torch.testing.assert_close(actual,ref,atol=5e-3,rtol=5e-3)
     assert a.calls['capture']==1
+
+
+@pytest.mark.parametrize('length', [0, -1, 258, 2**40])
+def test_invalid_length_rejected_before_cast_or_registry_change(length):
+    model,a,_,q,k,v=setup(kernel=lambda *args,**kwargs:None)
+    old=a.module.ALL_ATTENTION_FUNCTIONS
+    a.lengths.fill_(123)
+    with pytest.raises(RuntimeError,match='outside cache capacity'):
+        with a.activate(torch.tensor([length])):
+            raise AssertionError('invalid length reached attention')
+    assert a.module.ALL_ATTENTION_FUNCTIONS is old
+    assert a.lengths.item()==123
