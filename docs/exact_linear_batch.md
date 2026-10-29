@@ -109,3 +109,12 @@ or claim dynamic GLM B>1 support. Capture receipts identify actual batch
 maintenance, complete domain, live owner normalization, ranking and attention.
 New native validation is required for this integration; previous branch results
 are not evidence for this revised normalization domain.
+
+For attribution diagnostics only, `TLI_EXACT_BATCH_REFERENCE=1` keeps the model
+batch shape but calls the established single-row indexer and attention within
+independent row scopes. It shares admission and Graph address ownership with the
+exact route, but does not execute the batched candidate/scoring/maintenance path.
+Its receipt is `linear_batch_reference_simt`. The mode is part of the storage
+configuration signature, so changing it requires clear and recapture. Agreement
+with this control cannot by itself resolve a difference from independent B1 model
+requests; model batch shape also changes other arithmetic paths.

@@ -258,7 +258,8 @@ def test_production_maintenance_dispatch_has_no_steady_row_preparation(setup,mon
         def __call__(self,*args):
             assert args[1] is arena and args[2] is summaries
             calls.append('producer');return result
-    state=SimpleNamespace(ready=torch.tensor(True),previous_lengths=gs.valid_len_buf.clone(),
+    state=object.__new__(batch.ExactLinearBatch)
+    state.__dict__.update(ready=torch.tensor(True),previous_lengths=gs.valid_len_buf.clone(),
         previous_alive=gs.alive_buf.clone(),maintenance_route='batched_tail32',maintenance_calls={},
         rows=[ForbiddenRow(),ForbiddenRow()],feature_arena=arena,summary_arenas=summaries,producer=Producer())
     def maintenance(*args,**kw):
