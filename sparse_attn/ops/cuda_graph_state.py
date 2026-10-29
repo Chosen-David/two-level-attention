@@ -60,9 +60,13 @@ _GEOMETRY_CAPTURE = ContextVar('tli_geometry_capture', default=None)
 @contextmanager
 def capture_graph(graph, **kwargs):
     """Capture with a fresh geometry-cache namespace, reset even on failure."""
+    import os
     import torch
+    enabled = os.environ.get("TLI_GRAPH_GEOMETRY_SHARED", "1")
+    if enabled not in ("0", "1"):
+        raise ValueError("TLI_GRAPH_GEOMETRY_SHARED must be 0 or 1")
     with torch.cuda.graph(graph, **kwargs) as capture:
-        reset = _GEOMETRY_CAPTURE.set(object())
+        reset = _GEOMETRY_CAPTURE.set(object() if enabled == "1" else None)
         try:
             yield capture
         finally:
