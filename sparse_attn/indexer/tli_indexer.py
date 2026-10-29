@@ -4509,26 +4509,33 @@ class TLIIndexer(TIAIndexer):
             _bkqc = repeat(_kqc, "kv r d -> (kv g) r d", g=group_size).to(torch.float32)
             sfc = einsum(b_q_fine, _bkqc, "h d, h r d -> h r").to(q.dtype)
         # ---- 7. 完整候选散回 + 全宽 softmax + GQA mean（与 eager 同归约域）----
-        # Full-width reference reduction over L1/bypass union sink/SWA.
-        # Keep this reduction layout until compact rounding and tie behavior
-        # has passed independent acceptance against this corrected reference.
-        keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)
-        cand_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)
-        sf_full = torch.full(
-            (H, S_cap + 1), float("-inf"), dtype=sfc.dtype, device=dev)
-        safe_idx = torch.where(keep_h, cand_h, S_cap)
-        sf_full.scatter_(1, safe_idx, sfc)
-        score_full = sf_full[:, :S_cap]
-        sm = F.softmax(score_full, dim=-1)
-        if (_HAS_TRITON and sm.is_contiguous() and sm.dtype == torch.bfloat16
-                and (group_size & (group_size - 1)) == 0):
-            p = torch.empty((Hkv, S_cap), dtype=sm.dtype, device=dev)
-            # SWA 由下方动态 mask 置位；这里传空强制区，mid 值与 eager 相同。
-            _ako_gqa_mean_kernel[(Hkv, triton.cdiv(S_cap, 1024))](
-                sm, p, S_cap, 0, 0,
-                G=group_size, BLOCK=1024, num_warps=4)
+        # Both eager and Graph normalize L1/bypass union complete sink/SWA.
+        # Protected IDs were deduplicated above. The optional compact kernel
+        # retains token-position reduction order and full-domain Top-K ties.
+        _compact_norm = False
+        if os.environ.get("TLI_COMPACT_NORMALIZATION", "0") == "1":
+            from ..ops.compact_normalization import supported, compact_probabilities
+            _compact_norm = supported(sfc, cand_idx2, keep2, S_cap, group_size)
+        if _compact_norm:
+            p = compact_probabilities(sfc, cand_idx2, keep2, S_cap, group_size)
         else:
-            p = sm.nan_to_num(nan=0).view(Hkv, group_size, S_cap).mean(dim=1)
+            keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)
+            cand_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)
+            sf_full = torch.full(
+                (H, S_cap + 1), float("-inf"), dtype=sfc.dtype, device=dev)
+            safe_idx = torch.where(keep_h, cand_h, S_cap)
+            sf_full.scatter_(1, safe_idx, sfc)
+            score_full = sf_full[:, :S_cap]
+            sm = F.softmax(score_full, dim=-1)
+            if (_HAS_TRITON and sm.is_contiguous() and sm.dtype == torch.bfloat16
+                    and (group_size & (group_size - 1)) == 0):
+                p = torch.empty((Hkv, S_cap), dtype=sm.dtype, device=dev)
+                # SWA 由下方动态 mask 置位；这里传空强制区，mid 值与 eager 相同。
+                _ako_gqa_mean_kernel[(Hkv, triton.cdiv(S_cap, 1024))](
+                    sm, p, S_cap, 0, 0,
+                    G=group_size, BLOCK=1024, num_warps=4)
+            else:
+                p = sm.nan_to_num(nan=0).view(Hkv, group_size, S_cap).mean(dim=1)
         # ---- 8. mid 全域 L2 自由竞争 ----
         # 固定 K2_static 保持 capture 形状；k2_mid 在终掩码装配处动态截断。
         # mid 外全为 -inf，前 k2_mid 名与 eager 的 mid 段 top-k 同集。
