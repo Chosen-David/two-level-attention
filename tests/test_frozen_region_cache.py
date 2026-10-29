@@ -1,0 +1,124 @@
+import gc
+import weakref
+import pytest
+import torch
+from transformers import Qwen3Config, Qwen3ForCausalLM
+from transformers.cache_utils import DynamicCache
+from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
+from sparse_attn.ops.frozen_region_cache import FrozenRegionCache, RegionCacheLayer, RegionGeometry
+from sparse_attn.ops.frozen_region_gate import GateConfig, decide_regions, profile_regions
+
+
+@pytest.fixture(autouse=True)
+def single_thread():
+    old = torch.get_num_threads(); torch.set_num_threads(1)
+    yield
+    torch.set_num_threads(old)
+
+
+def expected_positions(length, prompt, g, near, far):
+    sink, initial_far, _ = g.bounds(prompt)
+    if near:
+        return list(range(min(g.sink, length))) + ([] if far else list(range(sink, initial_far))) + list(range(max(g.sink, length-g.window), length))
+    current_far = g.bounds(length)[1]
+    return list(range(length)) if not far else list(range(min(g.sink, length)))+list(range(current_far, length))
+
+
+@pytest.mark.parametrize('near,far', [(False,False),(False,True),(True,False),(True,True)])
+@torch.inference_mode()
+def test_physical_node_deletion_and_multiple_ring_wraps(near, far):
+    g = RegionGeometry(sink=2, near=6, window=3, page=4, max_new_tokens=40)
+    layer = RegionCacheLayer(g)
+    initial = torch.arange(17.).reshape(1,1,17,1)
+    k,v = layer.update(initial, initial*2)
+    assert k.data_ptr() == initial.data_ptr()
+    assert all(n.keys.untyped_storage().data_ptr()!=initial.untyped_storage().data_ptr() for n in layer.nodes.values())
+    refs = {name: weakref.ref(layer.nodes[name].keys) for name in ['near','far']}
+    before = sum(n.resident_bytes() for n in layer.nodes.values())
+    deleted = sum(layer.nodes[name].resident_bytes() for name, drop in [('near',near),('far',far)] if drop)
+    layer.freeze(skip_near=near,skip_far=far);gc.collect()
+    assert ('near' not in layer.nodes)==near and ('far' not in layer.nodes)==far
+    if near: assert refs['near']() is None
+    if far: assert refs['far']() is None
+    assert sum(n.resident_bytes() for n in layer.nodes.values())==before-deleted
+    for t in range(17, 49):
+        new=torch.tensor([[[[float(t)]]]])
+        layer.update(new,new*2,dict(cache_position=torch.tensor([t])))
+        k,v,positions=layer.gather()
+        expected=expected_positions(t+1,17,g,near,far)
+        assert positions==expected
+        assert k.flatten().tolist()==[float(p) for p in expected]
+        assert v.flatten().tolist()==[2.*p for p in expected]
+        assert layer.get_seq_length()==t+1
+        assert layer.nodes['swa'].keys.shape[-2]==3
+
+
+@torch.inference_mode()
+def test_short_prefill_and_lifecycle_guards():
+    g=RegionGeometry(sink=4,near=6,window=3,page=4,max_new_tokens=12)
+    layer=RegionCacheLayer(g);x=torch.zeros(1,1,1,2)
+    layer.update(x,x)
+    with pytest.raises(ValueError):layer.update(x,x)
+    layer.freeze()
+    for _ in range(10):layer.update(x,x)
+    assert layer.gather()[2]==list(range(11))
+    with pytest.raises(ValueError):layer.freeze(skip_near=True)
+    with pytest.raises(ValueError):layer.update(x,x,dict(cache_position=torch.tensor([0])))
+
+
+def test_joint_gate_budget_and_absent_regions():
+    profile={'near':{'mean':.07},'far':{'mean':.08}}
+    assert decide_regions(profile,GateConfig())==dict(skip_near=True,skip_far=False)
+    profile={'near':{'mean':.03},'far':{'mean':.04}}
+    assert decide_regions(profile,GateConfig())==dict(skip_near=True,skip_far=True)
+    assert decide_regions(profile,GateConfig(),False,False)==dict(skip_near=False,skip_far=False)
+    assert decide_regions(profile,GateConfig(mode='full'))==dict(skip_near=False,skip_far=False)
+
+
+def test_profile_matches_each_query_own_regions():
+    torch.manual_seed(7)
+    g=RegionGeometry(sink=2,near=6,window=3,page=4)
+    q=torch.randn(1,4,20,8);k=torch.randn(1,2,20,8)
+    actual=profile_regions(q,k,g,rows=8,chunk=3)
+    values={'near':[],'far':[]}
+    for pos in range(12,20):
+        scores=q[:,:,pos:pos+1]@k[:,:,:pos+1].repeat_interleave(2,1).transpose(-1,-2)/8**.5
+        p=scores.softmax(-1);sink,hi,nearhi=g.bounds(pos+1)
+        values['near'].append(float(p[...,hi:nearhi].sum(-1).mean()))
+        values['far'].append(float(p[...,sink:hi].sum(-1).mean()))
+    for region in values:
+        assert actual[region]['mean']==pytest.approx(sum(values[region])/8,abs=1e-6)
+
+
+@pytest.mark.parametrize('near,far', [(False,False),(False,True),(True,False),(True,True)])
+@torch.inference_mode()
+def test_tiny_qwen_logits_match_explicit_full_cache_gather_reference(near,far):
+    torch.manual_seed(11)
+    config=Qwen3Config(vocab_size=37,hidden_size=32,intermediate_size=48,num_hidden_layers=2,
+        num_attention_heads=4,num_key_value_heads=2,head_dim=8,max_position_embeddings=256,
+        attention_dropout=0.,attn_implementation='sdpa')
+    model=Qwen3ForCausalLM(config).eval()
+    g=RegionGeometry(sink=2,near=6,window=3,page=4,max_new_tokens=40)
+    prompt=torch.randint(0,37,(1,17));tokens=torch.randint(0,37,(1,25))
+    node_cache=FrozenRegionCache(2,g)
+    out=model(prompt,past_key_values=node_cache,use_cache=True)
+    prefill=out.logits.clone();node_cache.freeze({i:dict(skip_near=near,skip_far=far) for i in range(2)})
+    logits=[]
+    for i in range(25):
+        out=model(tokens[:,i:i+1],past_key_values=node_cache,attention_mask={'full_attention':None},use_cache=True)
+        logits.append(out.logits)
+    original=ALL_ATTENTION_FUNCTIONS['sdpa']
+    def reference(module,q,k,v,attention_mask,**kwargs):
+        if q.shape[2]==1:
+            positions=expected_positions(k.shape[2],17,g,near,far)
+            k,v=k[:,:,positions],v[:,:,positions]
+            attention_mask=None;kwargs['is_causal']=False
+        return original(module,q,k,v,attention_mask,**kwargs)
+    ALL_ATTENTION_FUNCTIONS['sdpa']=reference
+    try:
+        cache=DynamicCache(config=config);out=model(prompt,past_key_values=cache,use_cache=True)
+        torch.testing.assert_close(out.logits,prefill,atol=1e-6,rtol=1e-5)
+        for i in range(25):
+            out=model(tokens[:,i:i+1],past_key_values=cache,attention_mask={'full_attention':None},use_cache=True)
+            torch.testing.assert_close(out.logits,logits[i],atol=1e-6,rtol=1e-5)
+    finally:ALL_ATTENTION_FUNCTIONS['sdpa']=original

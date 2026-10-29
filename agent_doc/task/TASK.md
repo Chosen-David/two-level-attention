@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-29
+
+- [ ] [TL-FROZEN-NEAR-FAR-20261029] 新分支探索 prefill 冻结 near/far 双 gate 与真实永久KV节点驱逐；5个既有LongBench海选任务各20条配对，100请求×5臂；12项CPU回归及真实Qwen3冒烟通过，小时监督与精度实验进行中。([详情](task_details/TL-FROZEN-NEAR-FAR-20261029.md))
+
 ## 2026-10-28
 
 - [x] [TL-LB-BUDGET-RUNNER-20261028] 新增 LongBench13 有界远端编排：显式 Qwen3-8B/32B、固定 K1 扫 nominal K2，UUID 协作锁与稳定空卡复查，严格身份/预测/评分完成后才跳过；18 项 CPU 回归普通/-O与独审通过，既有 28 项相邻 CPU 回归通过。真实 GPU/质量与缺失适配器验收未完成，RULER10不在此实现。([详情](task_details/TL-LB-BUDGET-RUNNER-20261028.md))

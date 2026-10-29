@@ -1,0 +1,24 @@
+import json
+from benchmark.LongBench.analyze_frozen_skip import analyze
+
+
+def test_task_macro_pairing_and_bootstrap_known_constant_drop(tmp_path):
+    tasks=['qasper','hotpotqa','musique','gov_report','repobench-p']
+    protocol=dict(selected_rows={t:[0,1] for t in tasks},datasets=tasks,thresholds=[.1])
+    (tmp_path/'manifest_rank0.json').write_text(json.dumps(dict(identity='fixture',protocol=protocol)))
+    for task in tasks:
+        directory=tmp_path/'requests'/task;directory.mkdir(parents=True)
+        for i in [0,1]:
+            arms={}
+            for name,score in [('full',1.),('far_0.1',1.),('dual_0.1',.5)]:
+                arms[name]=dict(score=score,gate_counts=dict(keep=36,near=0,far=0,both=0),
+                    decisions={'0':dict(skip_near=False,skip_far=False)},
+                    frozen_kv=dict(kv_bytes=100),prefill_full_kv=dict(kv_bytes=100),generated_ids=[int(score*10)])
+            (directory/f'{i}.json').write_text(json.dumps(dict(identity='fixture',dataset=task,row_index=i,
+                status='complete',arms=arms)))
+    report=analyze(tmp_path)
+    assert report['status']=='complete' and report['completed_requests']==10
+    assert report['arms']['full']['avg5']==100
+    assert report['arms']['dual_0.1']['avg5']==50
+    comparison=report['comparisons']['dual_0.1-vs-far_0.1']['avg5']
+    assert comparison['delta_pp']==-50 and comparison['ci95_pp']==[-50,-50]
