@@ -4842,6 +4842,9 @@ class TLIIndexer(TIAIndexer):
         }
 
     def clear(self):
+        exact_batch = getattr(self, '_exact_linear_batch', None)
+        if exact_batch is not None:
+            exact_batch.invalidate()
         self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None
