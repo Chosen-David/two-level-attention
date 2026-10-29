@@ -38,6 +38,13 @@ def _union(SELECTED,COUNTS,LENGTH,IDS,OUT_COUNTS,FLAG,
     tl.store(OUT_COUNTS+row,total)
 
 
+def _int32_addressable(t):
+    # Kernel B multiplies program/token IDs by strides in int32. numel alone
+    # cannot bound a strided view's relative addresses (storage holes count).
+    return (all(s>=0 for s in t.stride()) and
+            sum((n-1)*s for n,s in zip(t.shape,t.stride()))<=torch.iinfo(torch.int32).max)
+
+
 def ordered_attention(q,k,v,selection,lengths,*,sink,swa,scale):
     ids,counts=selection
     if (q.ndim!=4 or q.shape[1]!=1 or k.ndim!=4 or q.shape[0]!=k.shape[0]
@@ -45,7 +52,8 @@ def ordered_attention(q,k,v,selection,lengths,*,sink,swa,scale):
             or q.shape[2]<1 or q.shape[2]%k.shape[2] or q.dtype not in (torch.bfloat16,torch.float16)
             or k.dtype!=q.dtype or v.dtype!=q.dtype or not q.is_cuda
             or not _triton_kv_layout_compatible(k,v) or k.stride(0)!=v.stride(0)
-            or k.numel()>torch.iinfo(torch.int32).max or q.stride(-1)!=1
+            or not _int32_addressable(k) or q.numel()>torch.iinfo(torch.int32).max
+            or q.stride(-1)!=1
             or k.stride(-1)!=1 or not 1<=q.shape[0]<=8
             or any(t.requires_grad for t in (q,k,v)) or not 16384<=k.shape[1]<65536):
         raise ValueError('ordered attention requires supported fixed BF16/FP16 D128 B1..8 CUDA geometry')

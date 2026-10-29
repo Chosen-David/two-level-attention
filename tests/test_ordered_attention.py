@@ -68,3 +68,17 @@ def test_deferred_contract_failure_and_recovery(monkeypatch,bad):
 
 def test_invalid_selection_code_is_not_silently_accepted():
     with pytest.raises(RuntimeError,match='invalid selected'):_raise_for_code(4)
+
+
+@pytest.mark.parametrize('strides',[(2**31,128,128,1),(16384*128,2**31,128,1)])
+def test_storage_holes_are_included_in_address_bound(strides):
+    from sparse_attn.ops.ordered_attention import _int32_addressable
+    value=torch.empty_strided((2,16384,1,128),strides,device='meta',dtype=torch.bfloat16)
+    assert value.numel()<torch.iinfo(torch.int32).max
+    assert not _int32_addressable(value)
+
+
+def test_head_major_static_view_fits_address_bound():
+    from sparse_attn.ops.ordered_attention import _int32_addressable
+    value=torch.empty(8,8,32768,128,device='meta',dtype=torch.bfloat16).transpose(1,2)
+    assert _int32_addressable(value)
