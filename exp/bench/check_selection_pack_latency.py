@@ -17,8 +17,8 @@ from sparse_attn.ops import selection_pack
 def main():
     output = Path(sys.argv[1])
     component = sys.argv[2] if len(sys.argv) > 2 else 'selection'
-    if component not in ('selection', 'domain', 'mean', 'normalization'):
-        raise ValueError('component must be selection, domain, mean or normalization')
+    if component not in ('selection', 'domain', 'mean', 'normalization', 'ranking'):
+        raise ValueError('component must be selection, domain, mean, normalization or ranking')
     observations = []
     stop = threading.Event()
     uuid = 'GPU-05a75a00-5bfc-a167-09e9-8bbf429846c9'
@@ -83,7 +83,10 @@ def main():
     idx.clear()
     index = idx.prepare_index(k, cu)
     graphs, outputs, calls = {}, {}, {}
-    if component == 'normalization':
+    if component == 'ranking':
+        from sparse_attn.ops import compact_ranking
+        target, attribute = compact_ranking, 'compact_topk'
+    elif component == 'normalization':
         from sparse_attn.ops import compact_normalization
         target, attribute = compact_normalization, 'supported'
     elif component == 'mean':
@@ -108,7 +111,7 @@ def main():
             calls[mode]['fused'] += int(result is not None and (component != 'mean' or mode == 'fused'))
             return result
 
-        with patch.dict(os.environ, {'TLI_COMPACT_NORMALIZATION': '1' if component in ('mean', 'normalization') else '0', 'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' else '0'}), patch.object(target, attribute, dispatch):
+        with patch.dict(os.environ, {'TLI_COMPACT_NORMALIZATION': '1' if component in ('mean', 'normalization', 'ranking') else '0', 'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' or component == 'ranking' else '0', 'TLI_COMPACT_RANKING': '1' if component == 'ranking' else '0'}), patch.object(target, attribute, dispatch):
             for _ in range(3):
                 idx.compute_selection_graph(q, index, 128**-.5, length)
             torch.cuda.synchronize()
@@ -116,6 +119,7 @@ def main():
             with torch.cuda.graph(graphs[mode]):
                 outputs[mode] = idx.compute_selection_graph(q, index, 128**-.5, length)
             calls[mode]['normalization_capture_route'] = idx._graph_normalization_route
+            calls[mode]['ranking_capture_route'] = idx._graph_ranking_route
         graphs[mode].replay()
     torch.cuda.synchronize()
     assert torch.equal(outputs['torch'].indices, outputs['fused'].indices)

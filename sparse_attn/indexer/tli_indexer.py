@@ -4554,7 +4554,17 @@ class TLIIndexer(TIAIndexer):
         # mid 外全为 -inf，前 k2_mid 名与 eager 的 mid 段 top-k 同集。
         mid_scored = p if _compact_norm else p.masked_fill(mid_mask_inv, float("-inf"))
         K2_static = min(S_cap, K2)
-        tok_top = torch.topk(mid_scored, K2_static, dim=-1).indices
+        tok_top = None
+        self._graph_ranking_route = "full_width_native"
+        self._graph_ranking_fallback = "disabled"
+        if os.environ.get("TLI_COMPACT_RANKING", "0") == "1":
+            from ..ops.compact_ranking import compact_topk
+            tok_top = compact_topk(mid_scored, cand_idx2, keep2, mid_mask, K2_static)
+            self._graph_ranking_fallback = "unsupported_static_geometry" if tok_top is None else None
+            if tok_top is not None:
+                self._graph_ranking_route = "compact_threshold_native_order"
+        if tok_top is None:
+            tok_top = torch.topk(mid_scored, K2_static, dim=-1).indices
         if return_selection:
             from ..ops.token_selection import graph_middle_selection
             return graph_middle_selection(
