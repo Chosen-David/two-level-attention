@@ -64,6 +64,17 @@ geometry falls back explicitly. The flag stays off by default; overlap remains
 experimental. Inspect `_graph_normalization_route`, `_graph_ranking_route` and
 `_graph_sparse_selection_fallback` on the actual capturing indexer.
 
+`TLI_SPARSE_STATS=owner` selects an alternative normalization implementation:
+integer token ownership followed by native-order statistics and candidate-only
+probabilities/GQA. It avoids the normalization traversal sort but retains an
+O(Hkv * capacity) int32 owner buffer; the no-capacity-buffer claim above applies
+only to the default `sorted` stats implementation. Inspect
+`_graph_normalization_stats_route` for `capacity_owner` or `sorted_candidates`.
+Duplicate slots must contain identical token scores in both implementations.
+The owner implementation also handles unaligned capacities above 9216 through
+the native generic row-shift schedule, and remains opt-in alongside sparse
+selection.
+
 Normalization keys encode (native worker, traversal ordinal); sufficiently small
 geometries use shifted signed16 keys with the sentinel in range. Setting
 `TLI_SPARSE_NARROW_KEYS=0` uses wider keys with the same compact stride. It does
@@ -80,6 +91,17 @@ both 16K and 32K. The 0150 same-stride key-width comparison independently measur
 5.99% lower selector replay latency for signed16 versus int32, but that increment
 alone does not establish sparse selection as the fastest route. These are B1
 synthetic selector diagnostics, not model TPOT or total-request conclusions.
+
+For checkpoint 4d004eb, independently checked runs 0170/0180/0190 test the owner
+alternative. At B1 capacity 32840 its selector replay median was 0.197932 ms
+versus 0.255792 ms for sorted stats in the same run (22.62% lower). A separate
+same-source comparison against compact normalization plus histogram/blocked
+ranking measured 0.198499 versus 0.211855 ms (6.30% lower). Each comparison has
+30 alternating pairs, 20 replays per sample, and observed GPU0 ownership.
+These short diagnostics do not establish steady-state or model speedups; the
+two percentages must not be combined. Evidence lives under the main project's
+`graph_g1_owner_stats_20261030_0170`, `graph_g1_owner_perf_20261030_0180` and
+`graph_g1_owner_total_perf_20261030_0190` result directories.
 
 The implementation preserves each query head's native reduction order and
 BF16 rounding over unique L1/bypass and complete protected tokens. Normalization returns a canonical

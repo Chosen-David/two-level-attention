@@ -118,9 +118,10 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
         result=scores.new_empty((hk,0))
         return (result,keep) if return_unique else result
     prop=torch.cuda.get_device_properties(scores.device)
-    if capacity%8 or capacity<=9216:
-        raise ValueError('only aligned BF16 softmax above 9216 supported')
-    if os.environ.get('TLI_SPARSE_STATS','sorted') == 'owner':
+    owner_stats=os.environ.get('TLI_SPARSE_STATS','sorted') == 'owner'
+    if capacity<=9216 or (capacity%8 and not owner_stats):
+        raise ValueError('unaligned softmax requires owner stats; capacity must exceed 9216')
+    if owner_stats:
         return _owner_probabilities(scores,ids,keep,capacity,group,return_unique)
     with torch.cuda.device(scores.device):
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize==0:
@@ -151,9 +152,12 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
 
 
 def supported_geometry(dtype, device, capacity, group, heads):
+    owner_stats=os.environ.get('TLI_SPARSE_STATS','sorted') == 'owner'
     if (torch.__version__.split('+')[0] != '2.8.0' or dtype != torch.bfloat16
             or device.type != 'cuda' or not 9216 < capacity < 2**31-1
-            or capacity % 8 or group < 1 or group & (group-1)
+            or (capacity % 8 and not owner_stats)
+            or (owner_stats and heads*capacity >= 2**31)
+            or group < 1 or group & (group-1)
             or not 1 <= heads*group <= 65535):
         return False
     return True

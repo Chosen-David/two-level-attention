@@ -1,5 +1,6 @@
 """Production selector equivalence with no dense post-scoring normalization."""
 import importlib.util
+import os
 from pathlib import Path
 import pytest
 import torch
@@ -33,7 +34,7 @@ def test_real_sparse_selector_graph(monkeypatch,capacity,same_instance,domain_pa
     monkeypatch.setenv('TLI_SPARSE_SELECTION','1')
     run()
     assert idx._graph_candidate_domain_route==domain_pack
-    if capacity==16401:
+    if capacity==16401 and os.environ.get('TLI_SPARSE_STATS','sorted') != 'owner':
         assert idx._graph_const_cache[1]['ar_tok'] is not None
         assert idx._graph_sparse_selection_fallback=='unsupported_static_geometry'
         assert idx._graph_ranking_route=='full_width_native'
