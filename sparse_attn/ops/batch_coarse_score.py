@@ -35,3 +35,33 @@ def score_coarse_batched(kmin, kmax, query, *, out_dtype, return_mean=False):
         Hkv=heads, G=group, D=dim, BT=tile, HAS_MEAN=return_mean,
         BATCHED=True, STRIDE_KB=kmin.stride(0), STRIDE_KB2=kmax.stride(0), num_warps=warps)
     return (out, mean) if return_mean else out
+
+
+def score_average_batched(kavg, query, *, out_dtype, return_mean=False):
+    """Primary average-summary score with exact per-head rounding before mean."""
+    if (kavg.ndim != 4 or query.ndim != 3 or min(kavg.shape[:3]) < 1
+            or kavg.shape[-1] not in (16, 32, 64, 128, 256)
+            or query.shape[0] != kavg.shape[0] or query.shape[-1] != kavg.shape[-1]
+            or query.shape[1] < 1 or query.shape[1] % kavg.shape[2]
+            or kavg.shape[0] * kavg.shape[2] > 65535
+            or kavg.dtype not in (torch.bfloat16, torch.float16)
+            or out_dtype not in (torch.bfloat16, torch.float16) or query.dtype != torch.float32
+            or query.device != kavg.device or kavg.stride(-1) != 1 or not query.is_contiguous()):
+        raise ValueError('unsupported batched average score shape/dtype/stride')
+    batch, tokens, heads, dim = kavg.shape
+    group = query.shape[1] // heads
+    if return_mean and group & (group - 1):
+        raise ValueError('fused average mean requires power-of-two GQA group')
+    if not kavg.is_cuda:
+        raise ValueError('batched average scoring requires CUDA')
+    import triton
+    from sparse_attn.indexer.tli_indexer import TLIIndexer, _score_fine_kernel
+    out = torch.empty((batch, query.shape[1], tokens), device=kavg.device, dtype=out_dtype)
+    mean = torch.empty((batch, heads, tokens), device=kavg.device, dtype=out_dtype) if return_mean else out
+    tile, warps = TLIIndexer._TILE_FINE.get(dim, (64, 4))
+    _score_fine_kernel[(triton.cdiv(tokens, tile), batch * heads)](
+        kavg, query, out, mean, tokens, kavg.stride(1), kavg.stride(2),
+        query.stride(1), out.stride(1), out.stride(2), mean.stride(1), mean.stride(2),
+        Hkv=heads, G=group, D=dim, BT=tile, HAS_MEAN=return_mean,
+        BATCHED=True, STRIDE_KB=kavg.stride(0), num_warps=warps)
+    return (out, mean) if return_mean else out

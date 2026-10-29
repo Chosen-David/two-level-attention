@@ -4926,6 +4926,7 @@ if _HAS_TRITON:
         stride_mh, stride_mt,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
         HAS_MEAN: tl.constexpr,
+        BATCHED: tl.constexpr = False, STRIDE_KB: tl.constexpr = 0,
     ):
         """GQA K 复用 score_fine：每 program 处理 (token 块 × 1 个 kv 头)，
         K 块 [BT, D] 载入寄存器后循环 g 个 q 头逐头点积，K 读带宽 /g。
@@ -4938,12 +4939,19 @@ if _HAS_TRITON:
         域的 _ako_gqa_mean_kernel 不同，本 kernel 分数域无 NaN 清洗）。"""
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
+        kv = pid_h
+        if BATCHED:
+            pid_t = pid_t.to(tl.int64)
+            pid_h = pid_h.to(tl.int64)
+            batch = pid_h // Hkv
+            kv = pid_h % Hkv
+            KQ += batch * STRIDE_KB
         offs_t = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_t = offs_t < T
         if HAS_MEAN:
             macc = tl.zeros((BT,), dtype=tl.float32)
-        k = tl.load(KQ + offs_t[:, None] * stride_kt + pid_h * stride_kh + offs_d[None, :],
+        k = tl.load(KQ + offs_t[:, None] * stride_kt + kv * stride_kh + offs_d[None, :],
                     mask=mask_t[:, None], other=0.0).to(tl.float32)
         for j in tl.static_range(G):
             h = pid_h * G + j
