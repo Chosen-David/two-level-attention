@@ -249,10 +249,14 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
         if isinstance(row, FarSkipStaticLayer):
             out = row.workspace(qq, kk, vv, vl, module.scaling)
         else:
+            from .operator_pipeline import operator_mode, decode_indexed
             with row_graph_state(p, vl, active):
-                index = idx.prepare_index(kk, layer.cu)
-                selection = idx.compute_mask_graph(qq, index, module.scaling, vl)
-            budget = idx.args.tia_level2_topk + idx.sink_tokens + idx.sliding_window_size
-            out = _attend_linear(qq, kk, vv, selection, budget, module.scaling)
+                if operator_mode() != 'off':
+                    out = decode_indexed(idx, idx, qq, kk, vv, layer.cu, vl, module.scaling)
+                else:
+                    index = idx.prepare_index(kk, layer.cu)
+                    selection = idx.compute_mask_graph(qq, index, module.scaling, vl)
+                    budget = idx.args.tia_level2_topk + idx.sink_tokens + idx.sliding_window_size
+                    out = _attend_linear(qq, kk, vv, selection, budget, module.scaling)
         outputs.append(out)
     return torch.cat(outputs, dim=0)

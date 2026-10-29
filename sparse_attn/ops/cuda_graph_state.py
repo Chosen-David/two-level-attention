@@ -31,6 +31,12 @@ _GRAPH_STATE = _GraphState()
 
 
 def graph_state():
+    # 【Phase 4】serial 模式走 compact selection → partial_attention，不兼容
+    # CUDA Graph capture（prepare_index 增量更新要变长位置 + 动态几何）。
+    # 此时永远禁用 graph → 退 staged eager 路径。
+    import os
+    if os.environ.get("TLI_OPERATOR_MODE", "off") == 'serial':
+        return _GraphState()  # 返回 disabled 临时实例（不影响全局状态）
     return _GRAPH_STATE
 
 
