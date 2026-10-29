@@ -473,6 +473,20 @@ def _check_ring_routes(entries, expected_ids, captured_storage, enabled):
     return ring
 
 
+
+class _CountedKernel:
+    """Count actual Python kernel submissions, including during Graph capture."""
+    def __init__(self, kernel, counts, is_capturing):
+        self.kernel, self.counts, self.is_capturing = kernel, counts, is_capturing
+
+    def __getitem__(self, grid):
+        launch = self.kernel[grid]
+        def counted(*args, **kwargs):
+            key = 'capture' if self.is_capturing() else 'eager'
+            self.counts[key] += 1
+            return launch(*args, **kwargs)
+        return counted
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-L", "--context-length", type=int, required=True)
@@ -549,9 +563,13 @@ def main():
         gs.valid_len_buf = runner.vl_buf
 
     ring_calls = {'capture': 0, 'eager': 0}
+    ordered_calls = {'capture': 0, 'eager': 0}
     require_ring = os.environ.get('TLI_BENCH_REQUIRE_RING', '0') == '1'
     ring_capture_storage = set()
     if require_ring:
+        from sparse_attn.ops import ordered_selection
+        ordered_selection._compact = _CountedKernel(ordered_selection._compact, ordered_calls,
+                                                    torch.cuda.is_current_stream_capturing)
         skip_ids = json.loads(open(args.tli_layer_skip_path).read())['skip']
         if (len(set(skip_ids)) != len(skip_ids) or
                 any(type(x) is not int or not 0 <= x < model.config.num_hidden_layers for x in skip_ids)):
@@ -570,6 +588,7 @@ def main():
     runs = []
     for r in range(args.warmup + args.repeats):
         before_ring_calls = ring_calls.copy()
+        before_ordered_calls = ordered_calls.copy()
         ring_capture_storage.clear()
         do_capture = (args.graph_mode == "graph" and runner.graph is None)
         try:
@@ -592,7 +611,13 @@ def main():
                                              ring_capture_storage, enabled)
             if not enabled and any(calls.values()):
                 raise RuntimeError('legacy ring arm unexpectedly called the new operator')
+            scan_calls = {key:ordered_calls[key]-before_ordered_calls[key] for key in ordered_calls}
+            ordered_enabled = enabled and os.environ.get('TLI_OPERATOR_ORDERED_SELECTION','1') == '1'
+            expected_scan_capture = len(ring_layers) if ordered_enabled and args.graph_mode == 'graph' else 0
+            if scan_calls['capture'] != expected_scan_capture:
+                raise RuntimeError('ordered ring compaction kernel capture route mismatch')
             rec['ring_operator_routes'] = dict(calls, operator_enabled=enabled,
+                ordered_selection_enabled=ordered_enabled, ordered_scan_calls=scan_calls,
                 backend=os.environ.get('TLI_OPERATOR_BACKEND','simt'), ring_layers=len(ring_layers),
                 expected_ring_ids=sorted(expected_ring_ids), captured_kv_storage=sorted(ring_capture_storage),
                 count_scope='Python calls during capture/warmup; not replay invocation counts')
