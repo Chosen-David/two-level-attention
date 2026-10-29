@@ -132,6 +132,15 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
             raise ValueError("parallel graph requires valid_len_buf[B]")
         vl = torch.zeros(B, dtype=torch.long, device=dev)
         gs.valid_len_buf = vl
+    from ..ops.operator_pipeline import operator_mode, decode_indexed
+    if operator_mode() != 'off':
+        if _parallel_batch_enabled(B):
+            raise ValueError('operator pipeline currently requires TLI_BATCH_INDEXER=legacy')
+        if B != 1:
+            raise ValueError('use HybridBatchRunner for multi-request operator decode')
+        cu = _graph_const(("cu_cap", str(dev), S_cap),
+                          lambda: torch.tensor([0, S_cap], device=dev, dtype=torch.int32))
+        return decode_indexed(indexer, indexer, q, k, v, cu, vl, self.scaling)
     if _parallel_batch_enabled(B):
         from ..indexer.tli_batch import prepare_mask_batched
         if gs.valid_len_buf is None:
@@ -198,9 +207,6 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     （gate_bs1_equiv 铁律：batch=1 与旧单序列入口逐位一致）。
     """
     B = query_states.shape[0]
-    indexer.freeze_dyn_dgate()
-    dyn_state = (indexer.skip_far, indexer._dyn_skip_pending,
-                 indexer._dyn_frozen) if indexer.dyn_dgate else None
     q = query_states.transpose(1, 2)   # [B, 1, H, D]
     k = key_states.transpose(1, 2)     # [B, S_cap, Hkv, D]
     v = value_states.transpose(1, 2)   # [B, S_cap, Hkv, D]
@@ -242,9 +248,6 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
         cu = torch.tensor([0, S_cap], device=dev, dtype=torch.int32)
         pos = torch.tensor([L_b - 1], device=dev, dtype=torch.long)
         indexer.clear()
-        if dyn_state is not None:
-            (indexer.skip_far, indexer._dyn_skip_pending,
-             indexer._dyn_frozen) = dyn_state
         mask, block_size = indexer.prepare_mask(
             q_b, pos, k_b, cu, softmax_scale=self.scaling, valid_length=L_b)
         masks.append(mask)
@@ -547,4 +550,5 @@ def qwen3_attn_forward(
     attn_output = attn_output.reshape(*input_shape, -1).contiguous()
     attn_output = self.o_proj(attn_output)
     return attn_output, attn_weights
+
 
