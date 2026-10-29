@@ -166,15 +166,21 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
         # 分发到 pos_buf 驱动的增量更新（单块统计 + 单行 k_qat，固定形状
         # 纯张量 op，capture 安全）；不兼容配置自动回退全量路径（fail-
         # closed，行为逐位不变）。
-        idx_dict = indexer.prepare_index(k[b:b + 1], cu)
-        masks.append(indexer.compute_mask_graph(
-            q[b:b + 1], idx_dict, self.scaling, vl[b:b + 1]))
+        # Incremental preparation consumes shared graph metadata too. Without
+        # slicing it, the last cached row can update with row zero's position.
+        from ..ops.exact_linear_batch import _row_scope
+        with _row_scope(gs, b):
+            idx_dict = indexer.prepare_index(k[b:b + 1], cu)
+            masks.append(indexer.compute_mask_graph(
+                q[b:b + 1], idx_dict, self.scaling, vl[b:b + 1]))
     m_b = torch.cat(masks, dim=0)              # [B,1,Hkv,S_cap] bool
     cu_b = torch.arange(B + 1, device=dev, dtype=torch.int32) * S_cap
     # valid_length=None：mask 已排除 pad 列（prepare_mask 末尾清 False 的
     # graph 等价物是 compute_mask_graph 的 `sel & (ar_tok < S_real)`）。
-    return eager_decoding_attn(
+    output = eager_decoding_attn(
         q, k, v, m_b, 1, cu_b, softmax_scale=self.scaling, valid_length=None)
+    indexer._graph_attention_route = 'legacy_graph_eager_tli'
+    return output
 
 
 def _tl_decode_batched(self, indexer, query_states, key_states,

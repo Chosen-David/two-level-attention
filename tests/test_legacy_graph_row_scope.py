@@ -49,3 +49,20 @@ def test_legacy_graph_ragged_and_dead_rows_use_their_own_positions(monkeypatch,b
             torch.testing.assert_close(out,case.reference(),rtol=.02,atol=.003)
         assert case.gs.bs==batch and case.gs.pos_buf is positions
         assert case.gs.valid_len_buf is lengths and case.gs.alive_buf is alive
+
+
+
+def test_row_scope_keeps_optional_buffers_and_restores_on_exception():
+    from sparse_attn.ops.cuda_graph_state import graph_state
+    gs=graph_state();saved=vars(gs).copy()
+    try:
+        gs.enabled=True;gs.bs=2;gs.pos_buf=None;gs.alive_buf=None
+        lengths=torch.tensor([10,20]);gs.valid_len_buf=lengths
+        with pytest.raises(RuntimeError,match='scope exit'):
+            with _row_scope(gs,1):
+                assert gs.bs==1 and gs.pos_buf is None and gs.alive_buf is None
+                assert gs.valid_len_buf.shape==(1,) and gs.valid_len_buf.item()==20
+                raise RuntimeError('scope exit')
+        assert gs.bs==2 and gs.valid_len_buf is lengths
+        assert gs.pos_buf is None and gs.alive_buf is None
+    finally:gs.__dict__.clear();gs.__dict__.update(saved)

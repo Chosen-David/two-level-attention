@@ -104,7 +104,7 @@ def _storage_signature(q, k, v, gs):
 def _row_scope(gs, b):
     saved = gs.enabled, gs.bs, gs.pos_buf, gs.valid_len_buf, gs.alive_buf
     gs.enabled, gs.bs = True, 1
-    gs.pos_buf, gs.valid_len_buf, gs.alive_buf = (t[b:b+1] for t in saved[2:])
+    gs.pos_buf, gs.valid_len_buf, gs.alive_buf = (None if t is None else t[b:b+1] for t in saved[2:])
     try:
         yield
     finally:
