@@ -189,11 +189,30 @@ def try_far_skip_decode(module, q, k, v, cache, mask, cache_position, batch_ctx)
             coarse if idx.enable_subspace else idx._qat_indices(q.device))
     if q.shape[-1] != 128:
         raise ValueError("compact TLI Qwen3 bridge currently requires head_dim=128")
+    from .operator_pipeline import operator_mode
+    mode = operator_mode()
+    if mode != 'off':
+        if not 0 < length + 1 < torch.iinfo(torch.int32).max:
+            raise ValueError('operator logical lengths must fit positive int32 IDs')
+        if (os.environ.get('TLI_OPERATOR_BACKEND', 'simt') not in ('simt', 'tc')
+                or int(os.environ.get('TLI_OPERATOR_SELECTED_STAGES', '1')) not in (1, 2, 3)):
+            raise ValueError('invalid operator backend or selected stages')
+        if mode == 'overlap' and not q.is_cuda:
+            raise RuntimeError('overlap requires CUDA')
     if idx.far_skip_cache == "evict":
         layer = evict_far(cache, li, cfg)
     k, v = cache.update(k, v, li, {"cache_position": cache_position})
     layout = layer.layout if isinstance(layer, FarSkipLayer) else None
     q, k, v = (x.transpose(1, 2) for x in (q, k, v))
+    if mode != 'off':
+        from .operator_pipeline import decode_selected
+        lengths = torch.tensor([length + 1], device=q.device, dtype=torch.int64)
+        def select(query, keys, lengths, scale):
+            selection = select_far_skip(query, keys, length + 1, cfg, coarse, fine,
+                                        scale=scale, layout=layout, workspace=ws)
+            return selection.positions, torch.ones_like(selection.positions, dtype=torch.bool)
+        return decode_selected(q, k, v, lengths, module.scaling,
+                               cfg=cfg, layout=layout, select=select)
     selection = select_far_skip(q, k, length + 1, cfg, coarse, fine,
                                scale=module.scaling, layout=layout, workspace=ws)
     return attend_far_skip(q, k, v, selection, cfg,

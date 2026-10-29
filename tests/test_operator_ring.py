@@ -27,8 +27,11 @@ def test_ring_cpu_reference(monkeypatch, length, budget):
     dims = torch.arange(32)
     ws = FarSkipGraphWorkspace(cfg, layout, 2, dims, dims)
     ws.initialize(k, length)
-    positions, valid = ws.select(q, k, vl, 32**-.5)
-    expected = ws.attend(q, k, v, positions, valid, 32**-.5)
+    reference = FarSkipGraphWorkspace(cfg, layout, 2, dims.clone(), dims.clone())
+    rk, rv = k.clone(), v.clone()
+    reference.initialize(rk, length)
+    positions, valid = reference.select(q, rk, vl, 32**-.5)
+    expected = reference.attend(q, rk, rv, positions, valid, 32**-.5)
     actual = decode_ring(ws, q, k, v, vl, 32**-.5)
     torch.testing.assert_close(actual, expected, atol=2e-6, rtol=2e-5)
 
@@ -49,6 +52,9 @@ def test_ring_cuda_graph(monkeypatch, backend, mode, dtype):
     dims = torch.arange(32, device='cuda')
     ws = FarSkipGraphWorkspace(cfg, layout, 2, dims, dims)
     ws.initialize(k, 31)
+    reference = FarSkipGraphWorkspace(cfg, layout, 2, dims.clone(), dims.clone())
+    rk, rv = k.clone(), v.clone()
+    reference.initialize(rk, 31)
     run = lambda: decode_ring(ws, q, k, v, vl, 32**-.5)
     run(); torch.cuda.synchronize()
     graph = torch.cuda.CUDAGraph()
@@ -58,9 +64,10 @@ def test_ring_cuda_graph(monkeypatch, backend, mode, dtype):
         # Simulate one append at its mapped slot, preserving all other KV.
         slot = layout.slot(length-1)
         k[:, slot].normal_(); v[:, slot].normal_()
+        rk[:, slot].copy_(k[:, slot]); rv[:, slot].copy_(v[:, slot])
         graph.replay()
-        positions, valid = ws.select(q, k, vl, 32**-.5)
-        expected = ws.attend(q, k, v, positions, valid, 32**-.5)
+        positions, valid = reference.select(q, rk, vl, 32**-.5)
+        expected = reference.attend(q, rk, rv, positions, valid, 32**-.5)
         torch.testing.assert_close(actual, expected, atol=1e-2 if dtype==torch.bfloat16 else 2e-3, rtol=1e-2)
 
 

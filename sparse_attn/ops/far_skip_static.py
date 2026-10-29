@@ -37,6 +37,7 @@ class FarSkipStaticLayer(TLIStaticLayer):
         self.num_heads, self.head_dim = self.keys.shape[1], self.keys.shape[-1]
         self.config, self.layout = ring.config, ring.layout
         self.cumulative_length = ring.logical_length
+        self._operator_alive = torch.ones((), device=self.device, dtype=torch.bool)
         self.workspace = FarSkipGraphWorkspace(self.config, ring.layout, self.num_heads, coarse, fine)
         self.workspace.initialize(self.keys.transpose(1, 2), ring.logical_length)
 
@@ -50,8 +51,14 @@ class FarSkipStaticLayer(TLIStaticLayer):
         if pos is None or pos.shape != (1,) or pos.dtype != torch.long or pos.device != self.device:
             raise ValueError('static far KV needs one device int64 cache position')
         slot = self.layout.map(pos)
-        self.keys.index_copy_(2, slot, key_states)
-        self.values.index_copy_(2, slot, value_states)
+        from .operator_pipeline import operator_mode
+        if operator_mode() != 'off':
+            from .kv_row_update import append_kv_row
+            append_kv_row(self.keys, self.values, key_states, value_states,
+                          slot, self._operator_alive)
+        else:
+            self.keys.index_copy_(2, slot, key_states)
+            self.values.index_copy_(2, slot, value_states)
         return self.keys, self.values
 
     def reset(self):

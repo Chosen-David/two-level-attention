@@ -105,6 +105,14 @@ def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
 
 def decode_ring(workspace, q, k, v, lengths, softmax_scale):
     """Consume far-skip logical IDs directly from ring KV, without KV gather."""
+    torch._assert_async(((lengths >= 1) & (lengths < torch.iinfo(torch.int32).max)).all(),
+                        "ring logical lengths must fit positive int32 IDs")
+    return decode_selected(q, k, v, lengths, softmax_scale, cfg=workspace.cfg,
+                           layout=workspace.layout, select=workspace.select)
+
+
+def decode_selected(q, k, v, lengths, softmax_scale, *, cfg, layout, select):
+    """Shared split attention consumer for graph and eager compact selectors."""
     from .partial_attention import partial_attention, merge_partials
     from .token_selection import middle_selection
     if q.shape[0] != 1:
@@ -118,13 +126,12 @@ def decode_ring(workspace, q, k, v, lengths, softmax_scale):
         raise RuntimeError('overlap requires CUDA')
     torch._assert_async(((lengths >= 1) & (lengths < torch.iinfo(torch.int32).max)).all(),
                         'ring logical lengths must fit positive int32 IDs')
-    cfg = workspace.cfg
     def protected():
         ids = torch.empty((1, k.shape[2], 0), dtype=torch.int32, device=q.device)
         counts = torch.empty((1, k.shape[2]), dtype=torch.int32, device=q.device)
         return partial_attention(q, k, v, (ids, counts), lengths,
             sink=cfg.sink_tokens, swa=cfg.window_tokens, scale=softmax_scale,
-            protected=True, splits=4, backend=backend, layout=workspace.layout)
+            protected=True, splits=4, backend=backend, layout=layout)
     if overlap:
         current = torch.cuda.current_stream(q.device)
         side = _protected_stream(q.device)
@@ -133,7 +140,7 @@ def decode_ring(workspace, q, k, v, lengths, softmax_scale):
             pstate = protected()
             for tensor in (q, k, v, lengths):
                 tensor.record_stream(side)
-    positions, valid = workspace.select(q, k, lengths, softmax_scale)
+    positions, valid = select(q, k, lengths, softmax_scale)
     # Ring positions are absolute: physical capacity is not an ID bound.
     selection = middle_selection(positions[None], valid[None], lengths,
         cfg.sink_tokens, cfg.window_tokens, torch.iinfo(torch.int32).max)
@@ -141,7 +148,7 @@ def decode_ring(workspace, q, k, v, lengths, softmax_scale):
         pstate = protected()
     sstate = partial_attention(q, k, v, selection, lengths,
         sink=cfg.sink_tokens, swa=cfg.window_tokens, scale=softmax_scale,
-        protected=False, splits=4, backend=backend, layout=workspace.layout,
+        protected=False, splits=4, backend=backend, layout=layout,
         pipeline_stages=stages)
     if overlap:
         current.wait_stream(side)
