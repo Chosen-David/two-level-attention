@@ -166,7 +166,7 @@ def test_actual_entry_warmup_binds_arena_and_reuses_row_state(setup,monkeypatch)
     def clone(source):
         row=Row();owners.append(row);return row
     class Front:
-        def __init__(self,*args):pass
+        def __init__(self,*args):self.coarse_dims=torch.arange(32)
         def __call__(self,query,arena,summaries,lengths,scale):
             b=query.shape[0]
             return batch.BatchedCandidateInputs(arena,(query[:,0,:,:16]*scale).float(),
@@ -240,3 +240,30 @@ def test_device_lifecycle_guards_reject_invalid_step_on_cpu(setup,kind):
     elif kind=='wrong_slot':gs.pos_buf[0]=0
     with pytest.raises(RuntimeError,match='exact batch'):
         state.produce(q,k,gs,0.5)
+
+
+def test_production_maintenance_dispatch_has_no_steady_row_preparation(setup,monkeypatch):
+    _,q,k,_,gs=setup
+    calls=[]
+    class ForbiddenRow:
+        def prepare_index(self,*args):
+            raise AssertionError('production steady maintenance must be batched')
+    arena=object();summaries={name:object() for name in ('k_min','k_max','k_avg')}
+    dims=torch.arange(32)
+    result=object()
+    class Producer:
+        coarse_dims=dims
+        def __call__(self,*args):
+            assert args[1] is arena and args[2] is summaries
+            calls.append('producer');return result
+    state=SimpleNamespace(ready=torch.tensor(True),previous_lengths=gs.valid_len_buf.clone(),
+        previous_alive=gs.alive_buf.clone(),maintenance_route='batched_tail32',maintenance_calls={},
+        rows=[ForbiddenRow(),ForbiddenRow()],feature_arena=arena,summary_arenas=summaries,producer=Producer())
+    def maintenance(*args,**kw):
+        assert args[0] is k and args[1] is gs.pos_buf and args[2] is gs.alive_buf
+        assert args[3] is dims and args[-1] is arena and kw=={'check_values':False}
+        calls.append('maintenance')
+    monkeypatch.setattr(batch,'maintain_batched',maintenance)
+    assert batch.ExactLinearBatch.produce(state,q,k,gs,0.5) is result
+    assert calls==['maintenance','producer']
+    assert state.maintenance_calls=={'batched_tail32':1}

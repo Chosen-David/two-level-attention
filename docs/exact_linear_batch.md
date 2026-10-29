@@ -1,11 +1,12 @@
 # Experimental exact linear batch route
 
-This integration keeps per-request incremental index-feature maintenance, then
-calls batched minmax/average coarse scoring, native rounded GQA mean, two L1 pool
+This integration calls batched production tail32 incremental feature/summary
+maintenance, then batched minmax/average coarse scoring, native rounded GQA mean, two L1 pool
 TopKs, candidate expansion and stable compaction across B*H, fine score, exact
 candidate normalization/ranking, protected/selected attention and merge. It does
-not call the old slot-softmax parallel path. Row-owned incremental maintenance
-still loops; this is not fully parallel cache/index maintenance.
+not call the old slot-softmax parallel path. Production BF16 D128, tail32, block64, same-subspace/no-quant maintenance uses
+one B*H kernel. Other previously allowed maintenance configurations keep an
+explicit row fallback. Initialization and refill still use row-owned host loops.
 
 Explicit configuration:
 
@@ -27,8 +28,10 @@ fallback labelled exact. Hybrid ring storage and overlap are rejected.
 Each source indexer owns independent row indexers. Outside capture, one warmup
 binds their persistent `_ginc['k_qat']` to views of a `[B,S,Hkv,Dfine]` arena.
 Warmup also binds k_min/k_max/k_avg to persistent summary arenas. Only
-initialization/refill copies full fine/summary storage. Each step's remaining row
-loop updates these views in place. Bulk query projection, scores and candidate
+initialization/refill copies full fine/summary storage. Warmup canonicalizes each current block with the primary single-row kernel;
+steady production steps update these views with one batched kernel and skip all
+writes for dead rows. The min/max/FP32 mean reduction and final storage-block
+zero padding remain the primary kernel's operations. Bulk query projection, scores and candidate
 geometry feed a BatchedCandidateInputs directly to the consumers, with no
 unpack/restack of candidate outputs or full-history tensors. Raw K/V and graph input buffers are retained against allocator
 address reuse. Static KV writes use the accepted `append_kv_batch` primitive.
@@ -67,3 +70,11 @@ must compare each row with the single-request reference, cross page boundaries,
 EOS/dead rows, same-storage clear+warmup with old/new graphs and changed-storage
 retirement. Negative device-assert tests need isolated processes. No speedup or
 full-batch completion is claimed until native/model tests and independent review.
+
+The source indexer exposes `_exact_batch_maintenance_route` (`batched_tail32` or
+`row_fallback:*`) and `_exact_batch_maintenance_calls`. Counters record Python
+invocations, including capture, rather than CUDA Graph replays. The batch kernel
+uses 64-bit batch/head address products. Immutable feature indices are checked
+at warmup; the exact owner checks dynamic positions before maintenance. Native
+maintenance and full-entry tests are pending execution for this revision; CPU
+structure/schema tests do not establish precision or performance.

@@ -5686,7 +5686,13 @@ if _HAS_TRITON:
     def _iter3_maint_kernel(K, POS, IDXSUB, KMIN, KMAX, KAVG, KQAT,
                             S_cap, sk_t, sk_h, sm_t, sm_h, sq_t, sq_h,
                             NEED_AVG: tl.constexpr, BS: tl.constexpr,
-                            DSUB: tl.constexpr):
+                            DSUB: tl.constexpr, BATCHED: tl.constexpr = False,
+                            ALIVE=None, Hkv: tl.constexpr = 0,
+                            STRIDE_KB: tl.constexpr = 0,
+                            STRIDE_MINB: tl.constexpr = 0,
+                            STRIDE_MAXB: tl.constexpr = 0,
+                            STRIDE_AVGB: tl.constexpr = 0,
+                            STRIDE_QB: tl.constexpr = 0):
         """iter3d：增量步摘要维护单核融合。每 program 一 kv head：
         加载新 token 所在块 [BS,DSUB] 子空间 tile（越界 +0 垫，与原
         where(zero_k) 同），min/max 序无关逐位一致，mean fp32 累加
@@ -5694,8 +5700,21 @@ if _HAS_TRITON:
         k_min/k_max/k_avg 行直写（替代三 reduce+三 index_copy_）、
         k_qat 当前行直写（tile 外独立行载）。值域=纯拷贝+序无关归约
         +常量垫零。"""
-        h = tl.program_id(0)
-        pos = tl.load(POS).to(tl.int64)
+        if BATCHED:
+            pid = tl.program_id(0).to(tl.int64)
+            b, h = pid // Hkv, pid % Hkv
+            pos = tl.load(POS + b).to(tl.int64)
+            active = tl.load(ALIVE + b) & (pos >= 0) & (pos < S_cap)
+            # Widen the program ID before all batch/head stride products.
+            K = K + b * STRIDE_KB
+            KMIN = KMIN + b * STRIDE_MINB
+            KMAX = KMAX + b * STRIDE_MAXB
+            KAVG = KAVG + b * STRIDE_AVGB
+            KQAT = KQAT + b * STRIDE_QB
+        else:
+            h = tl.program_id(0)
+            pos = tl.load(POS).to(tl.int64)
+            active = True
         fb = pos // BS
         offs_t = tl.arange(0, BS)
         offs_d = tl.arange(0, DSUB)
@@ -5703,18 +5722,18 @@ if _HAS_TRITON:
         tok = fb * BS + offs_t.to(tl.int64)
         mt = tok < S_cap
         ptr = K + tok[:, None] * sk_t + h * sk_h + isub[None, :]
-        v = tl.load(ptr, mask=mt[:, None], other=0.0)
+        v = tl.load(ptr, mask=mt[:, None] & active, other=0.0)
         tl.store(KMIN + fb * sm_t + h * sm_h + offs_d,
-                 tl.min(v, axis=0))
+                 tl.min(v, axis=0), mask=active)
         tl.store(KMAX + fb * sm_t + h * sm_h + offs_d,
-                 tl.max(v, axis=0))
+                 tl.max(v, axis=0), mask=active)
         if NEED_AVG:
             acc = tl.sum(v.to(tl.float32), axis=0) / BS
             tl.store(KAVG + fb * sm_t + h * sm_h + offs_d,
-                     acc.to(v.dtype))
+                     acc.to(v.dtype), mask=active)
         rp = K + pos * sk_t + h * sk_h + isub
-        rv = tl.load(rp)
-        tl.store(KQAT + pos * sq_t + h * sq_h + offs_d, rv)
+        rv = tl.load(rp, mask=active, other=0.0)
+        tl.store(KQAT + pos * sq_t + h * sq_h + offs_d, rv, mask=active)
 
 
     # ---------------- 【E166 iter3d】L1 双池 scored 融合 kernel ----------------

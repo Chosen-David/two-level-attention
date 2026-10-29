@@ -152,6 +152,12 @@ def _install_stage_checks(monkeypatch, batch, capacity):
 
 def _install_front_checks(monkeypatch,batch):
     calls=[]
+    maintenance=exact.maintain_batched
+    def maintain(*args,**kw):
+        assert args[0].shape[0]==batch and kw.get('check_values') is False
+        calls.append('maintenance')
+        return maintenance(*args,**kw)
+    monkeypatch.setattr(exact,'maintain_batched',maintain)
     for name,label in [('score_coarse_batched','coarse'),('score_average_batched','average'),
                        ('compact_candidates_exact','compact')]:
         original=getattr(front,name)
@@ -175,17 +181,19 @@ def test_exact_batch_native_replay_append_and_eos(monkeypatch,batch):
         for _ in range(3):
             start=len(calls);front_start=len(front_calls);out=case.run()
             assert calls[start:]==expected_stages
-            assert front_calls[front_start:]==['coarse','average','compact']
+            assert front_calls[front_start:]==['maintenance','coarse','average','compact']
         torch.cuda.synchronize()
         torch.testing.assert_close(out,case.reference(),rtol=0,atol=0)
         state=case.source._exact_linear_batch
         assert len({id(row) for row in state.rows})==batch
+        assert state.maintenance_route=='batched_tail32'
+        assert case.source._exact_batch_maintenance_route=='batched_tail32'
         arena=state.feature_arena
         for b,row in enumerate(state.rows):
             assert row._ginc['k_qat'].data_ptr()==arena[b:b+1].data_ptr()
         start=len(calls);front_start=len(front_calls);graph,out=case.capture()
         assert calls[start:]==expected_stages
-        assert front_calls[front_start:]==['coarse','average','compact']
+        assert front_calls[front_start:]==['maintenance','coarse','average','compact']
         first_page=(case.lengths[0]-1)//64
         dead_length=None
         for step in range(5):

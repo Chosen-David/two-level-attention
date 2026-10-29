@@ -1,8 +1,9 @@
 """Opt-in linear batch consumer with exact per-row candidate producers.
 
-Index maintenance still loops over request owners. L1 and candidate production, fine scoring, candidate
+Production tail32 maintenance and L1/candidate production, fine scoring, candidate
 normalization/ranking, protected/selected attention and merge each consume the
-whole batch once. Only warmup copies full feature/summary storage into arenas.
+whole batch once. Other maintenance geometries keep an explicit row fallback.
+Only warmup copies full feature/summary storage into arenas.
 
 Scope: immutable greedy no-skip BF16 batch, pinned sparse normalization/ranking
 geometry, serial graph-state route. Refill requires indexer.clear() and warmup;
@@ -19,6 +20,7 @@ from .sparse_normalization import candidate_probabilities_batched, supported_geo
 from .unique_ranking import rank_unique_batched
 from .partial_attention import partial_attention, merge_partials
 from .batch_candidate_producer import BatchedCandidateProducer, BatchedCandidateInputs
+from .batch_index_maintenance import maintain_batched, maintenance_route
 
 
 def _config_signature(idx):
@@ -28,7 +30,7 @@ def _config_signature(idx):
         'cmp_ratio', 'l2_subspace', 'l2_quant', 'far_method', 'near_method',
         'far_select', 'near_select', 'boundary_bypass', 'per_q_head',
         'enable_async', 'moba_gate', 'sigma_select', 'static_pair', 'dyn_dgate',
-        'skip_far', 'far_skip_backend')) + tuple(getattr(idx.args, key) for key in (
+        'skip_far', 'far_skip_backend', '_triton_ok')) + tuple(getattr(idx.args, key) for key in (
             'tia_block_size', 'tia_level1_topk', 'tia_level2_topk'))
 
 
@@ -120,6 +122,8 @@ class ExactLinearBatch:
         # Keep raw-address inputs alive even if the caller drops a cache object.
         self.storage = k,v,gs.pos_buf,gs.valid_len_buf,gs.alive_buf
         self.config = _config_signature(source)
+        self.maintenance_route = "uninitialized"
+        self.maintenance_calls = {}
         self.rows = [_clone_owner(source) for _ in range(q.shape[0])]
         self.feature_arena = None
         self.summary_arenas = {}
@@ -171,6 +175,19 @@ class ExactLinearBatch:
                 view=arena[b:b+1]
                 if summary.data_ptr()!=view.data_ptr():view.copy_(summary)
                 row._ginc[name]=view
+        if any(not getattr(row,'_triton_ok',False) for row in self.rows):
+            self.maintenance_route='row_fallback:owner_kernel'
+        else:
+            self.maintenance_route=maintenance_route(self.rows[0],k,gs.pos_buf,gs.alive_buf,
+                self.producer.coarse_dims,self.summary_arenas,self.feature_arena)
+        if self.maintenance_route=='batched_tail32':
+            indices=self.producer.coarse_dims
+            torch._assert_async(((indices>=0)&(indices<128)).all(), 'maintenance feature index out of bounds')
+            # The old producer maintained the current block even for initially
+            # dead rows. Canonicalize once with that same row path before the
+            # batched steady path skips dead rows; preserve reduction semantics.
+            for b,row in enumerate(self.rows):
+                with _row_scope(gs,b):row.prepare_index(k[b:b+1],self.cu)
         self.previous_lengths.copy_(gs.valid_len_buf)
         self.previous_alive.copy_(gs.alive_buf)
         self.ready.fill_(True)
@@ -185,15 +202,22 @@ class ExactLinearBatch:
                              | (lengths == self.previous_lengths+alive.to(torch.int64)))
                             & (~alive | self.previous_alive)).all(),
                             'exact batch refill/reorder requires clear and warmup')
-        for b, row in enumerate(self.rows):
-            with _row_scope(gs,b):
-                index = row.prepare_index(k[b:b+1], self.cu)
-                if index['k_qat'].data_ptr() != self.feature_arena[b:b+1].data_ptr():
-                    raise RuntimeError('exact batch feature arena binding lost')
-                for name,arena in self.summary_arenas.items():
-                    if arena is not None and index[name].data_ptr()!=arena[b:b+1].data_ptr():
-                        raise RuntimeError('exact batch summary arena binding lost')
-        # The remaining row loop maintains private append-only index state only.
+        route=self.maintenance_route
+        self.maintenance_calls[route]=self.maintenance_calls.get(route,0)+1
+        if route=='batched_tail32':
+            maintain_batched(k,gs.pos_buf,alive,self.producer.coarse_dims,
+                self.summary_arenas['k_min'],self.summary_arenas['k_max'],
+                self.summary_arenas.get('k_avg'),self.feature_arena,check_values=False)
+        else:
+            for b, row in enumerate(self.rows):
+                with _row_scope(gs,b):
+                    index = row.prepare_index(k[b:b+1], self.cu)
+                    if index['k_qat'].data_ptr() != self.feature_arena[b:b+1].data_ptr():
+                        raise RuntimeError('exact batch feature arena binding lost')
+                    for name,arena in self.summary_arenas.items():
+                        if arena is not None and index[name].data_ptr()!=arena[b:b+1].data_ptr():
+                            raise RuntimeError('exact batch summary arena binding lost')
+        # Only explicitly unsupported maintenance geometries keep a row loop.
         produced=self.producer(q,self.feature_arena,self.summary_arenas,lengths,scale)
         self.previous_lengths.copy_(lengths)
         self.previous_alive.copy_(alive)
@@ -272,4 +296,6 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
             raise RuntimeError('cleared exact batch requires warmup before capture')
         state.warmup(k,gs)
     candidates = state.produce(q,k,gs,scale)
+    indexer._exact_batch_maintenance_route=state.maintenance_route
+    indexer._exact_batch_maintenance_calls=state.maintenance_calls
     return _consume_batched(candidates,q,k,v,gs.valid_len_buf,scale)
