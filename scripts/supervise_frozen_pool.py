@@ -30,7 +30,7 @@ if (out/f'worker_done_rank{rank}.json').exists():
  print(json.dumps(dict(rank=rank,status='done')));raise SystemExit
 pid=state.get('pid');cmdpath=Path(f'/proc/{pid}/cmdline')
 if pid and cmdpath.exists():
- args=cmdpath.read_bytes().decode().split('\0')
+ args=cmdpath.read_bytes().decode().split(chr(0))
  if 'benchmark.LongBench.prefill_frozen_skip' in args and str(out) in args and args[args.index('--rank')+1]==str(rank):
   print(json.dumps(dict(rank=rank,status='alive',pid=pid)));raise SystemExit
 if state['attempts']>=4:
