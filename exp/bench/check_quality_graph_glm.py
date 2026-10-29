@@ -47,6 +47,7 @@ def main():
                     past=out.past_key_values;del out
             records.append(dict(policy=policy,tokens=generated,
                 execution=dict(model._quality_graph_execution),
+                normalization_capture_routes=[getattr(x.self_attn.indexer, "_graph_normalization_route", None) for x in model.model.layers],
                 frozen=[x.self_attn.indexer._dyn_frozen for x in model.model.layers],
                 skip_far=[x.self_attn.indexer.skip_far for x in model.model.layers]))
         del past

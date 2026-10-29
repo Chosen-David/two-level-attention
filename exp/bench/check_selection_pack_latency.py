@@ -17,8 +17,8 @@ from sparse_attn.ops import selection_pack
 def main():
     output = Path(sys.argv[1])
     component = sys.argv[2] if len(sys.argv) > 2 else 'selection'
-    if component not in ('selection', 'domain', 'mean'):
-        raise ValueError('component must be selection, domain or mean')
+    if component not in ('selection', 'domain', 'mean', 'normalization'):
+        raise ValueError('component must be selection, domain, mean or normalization')
     observations = []
     stop = threading.Event()
     uuid = 'GPU-05a75a00-5bfc-a167-09e9-8bbf429846c9'
@@ -81,7 +81,10 @@ def main():
     idx.clear()
     index = idx.prepare_index(k, cu)
     graphs, outputs, calls = {}, {}, {}
-    if component == 'mean':
+    if component == 'normalization':
+        from sparse_attn.ops import compact_normalization
+        target, attribute = compact_normalization, 'supported'
+    elif component == 'mean':
         from sparse_attn.ops import compact_normalization
         target, attribute = compact_normalization, 'compact_probabilities'
     elif component == 'domain':
@@ -103,7 +106,7 @@ def main():
             calls[mode]['fused'] += int(result is not None and (component != 'mean' or mode == 'fused'))
             return result
 
-        with patch.dict(os.environ, {'TLI_COMPACT_NORMALIZATION': '1' if component == 'mean' else '0', 'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' else '0'}), patch.object(target, attribute, dispatch):
+        with patch.dict(os.environ, {'TLI_COMPACT_NORMALIZATION': '1' if component in ('mean', 'normalization') else '0', 'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' else '0'}), patch.object(target, attribute, dispatch):
             for _ in range(3):
                 idx.compute_selection_graph(q, index, 128**-.5, length)
             torch.cuda.synchronize()
