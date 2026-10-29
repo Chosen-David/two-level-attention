@@ -82,3 +82,13 @@ def test_head_major_static_view_fits_address_bound():
     from sparse_attn.ops.ordered_attention import _int32_addressable
     value=torch.empty(8,8,32768,128,device='meta',dtype=torch.bfloat16).transpose(1,2)
     assert _int32_addressable(value)
+
+
+@pytest.mark.parametrize('selected_width,packed_width',[(1024,1),(1,2048)])
+def test_broadcast_kv_cannot_hide_oversized_index_tables(selected_width,packed_width):
+    from sparse_attn.ops.ordered_attention import _int32_addressable,_int32_index_extents
+    batch,heads=8,262144
+    k=torch.empty_strided((batch,16384,heads,128),(0,128,0,1),device='meta')
+    assert _int32_addressable(k)
+    assert batch*heads*128<torch.iinfo(torch.int32).max
+    assert not _int32_index_extents(batch,heads,selected_width,packed_width)

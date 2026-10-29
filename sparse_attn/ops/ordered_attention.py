@@ -45,6 +45,11 @@ def _int32_addressable(t):
             sum((n-1)*s for n,s in zip(t.shape,t.stride()))<=torch.iinfo(torch.int32).max)
 
 
+def _int32_index_extents(batch,heads,selected_width,packed_width):
+    limit=torch.iinfo(torch.int32).max
+    return batch*heads*selected_width<=limit and batch*heads*packed_width<=limit
+
+
 def ordered_attention(q,k,v,selection,lengths,*,sink,swa,scale):
     ids,counts=selection
     if (q.ndim!=4 or q.shape[1]!=1 or k.ndim!=4 or q.shape[0]!=k.shape[0]
@@ -68,6 +73,8 @@ def ordered_attention(q,k,v,selection,lengths,*,sink,swa,scale):
         raise ValueError('invalid ordered selection metadata')
     width=min(int(os.environ.get('TLI_E127_W_UPPER','2048')),k.shape[1])
     if width<1:raise ValueError('positive attention width required')
+    if not _int32_index_extents(b,h,ids.shape[-1],width):
+        raise ValueError('ordered index tables exceed native int32 addressing')
     packed=torch.empty((b,h,width),device=q.device,dtype=torch.int32)
     packed_counts=torch.empty_like(counts)
     _union[(b*h,)](ids,counts,lengths,packed,packed_counts,_err_flag(q.device),
