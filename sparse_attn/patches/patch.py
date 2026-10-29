@@ -92,8 +92,6 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
                 "GLM D=256 仅支持 tail + l2_subspace=same + cmp_ratio=4 "
                 "+ l2_quant=False，且禁用 static_pair/投影基")
         unsupported = []
-        if getattr(args, "tli_dyn_dgate", False):
-            unsupported.append("dynamic-gate")
         if (getattr(args, "tli_far_skip_backend", "legacy") != "legacy"
                 or getattr(args, "tli_far_skip_cache", "retain") != "retain"):
             unsupported.append("far-skip/compact")

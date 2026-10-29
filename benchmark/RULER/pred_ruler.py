@@ -143,21 +143,76 @@ def seed_everything(seed=SEED):   # 057：默认值单源化（receipt 身份字
     torch.backends.cudnn.deterministic = True
 
 
+def _extended_receipt_identity(args, data_file):
+    """可选的 run 级身份闭包；未设置环境变量时保持既有 RULER 路径。"""
+    config_path = os.environ.get("TLI_RECEIPT_RUN_CONFIG")
+    if not config_path:
+        return {}
+    with open(config_path, encoding="utf-8") as f:
+        config = json.load(f)
+
+    def checked_files(root, expected, label):
+        if not isinstance(expected, dict) or not expected:
+            raise SystemExit(f"[receipt] {label} 缺少冻结文件 SHA 清单")
+        actual = {}
+        for rel, expected_sha in sorted(expected.items()):
+            if os.path.isabs(rel) or ".." in rel.split("/"):
+                raise SystemExit(f"[receipt] {label} 含非法相对路径: {rel!r}")
+            path = os.path.join(root, rel)
+            actual_sha = _file_sha256(path)
+            if actual_sha != expected_sha:
+                raise SystemExit(
+                    f"[receipt] {label}/{rel} 当前 SHA={actual_sha}，"
+                    f"冻结 SHA={expected_sha}，拒绝生成混代结果")
+            actual[rel] = actual_sha
+        return actual
+
+    source_files = checked_files(
+        REPO, config.get("source", {}).get("files"), "source.files")
+    weight_files = checked_files(
+        args.model_path, config.get("model", {}).get("weight_files_sha256"),
+        "model.weight_files_sha256")
+    source_rel = f"{args.context_length}/{args.task}.jsonl"
+    input_sha = _file_sha256(data_file)
+    expected_input = config.get("inputs_sha256", {}).get(source_rel)
+    if input_sha != expected_input:
+        raise SystemExit(
+            f"[receipt] 输入 {source_rel} 当前 SHA={input_sha}，"
+            f"冻结 SHA={expected_input}，拒绝生成")
+    return {
+        "run_config_sha256": _file_sha256(config_path),
+        "input_data": {"relative_path": source_rel, "sha256": input_sha},
+        "source_files_sha256": source_files,
+        "model_weight_files_sha256": weight_files,
+    }
+
+
 def main():
     args = parse_args()
     baseline_preflight(args)
     seed_everything()
 
+    # 身份来自真实 config，GLM 不复用 Qwen 的 40960/YaRN 口径。
+    config = AutoConfig.from_pretrained(args.model_path, trust_remote_code=True)
+    is_glm = getattr(config, "model_type", None) == "glm4_moe_lite"
+    native_mpe = (getattr(config, "max_position_embeddings", None)
+                  if is_glm else QWEN3_NATIVE_MPE)
     # ---- YaRN 校验与配置（E109 三件套 #3 + 057 effective 单点解析）----
     # 超过原生 40960 的档位必须显式 --yarn（防误用原生 RoPE 跑超限位置）；
     # 原生档位默认关闭（既有 4K-32K 路径零扰动），显式开也允许（消融用）。
     use_yarn = args.yarn
+    if is_glm:
+        if native_mpe != 202752:
+            raise SystemExit(f"[glm] 原生 MPE 应为 202752，实际 {native_mpe!r}")
+        if args.yarn or args.yarn_factor is not None:
+            raise SystemExit("[glm] GLM-4.7-Flash 原生覆盖 32K/64K/128K，禁止 --yarn/--yarn_factor")
+        use_yarn = False
     # llama 豁免（champ 树 33cac0 原语义，2026-10-22 恢复）：本门禁按
     # Qwen3-8B 原生 40960 硬编码，不适用于 Llama-3.1（原生
     # max_position_embeddings=131072，64K/128K 档无需 YaRN，yarn=0 是
     # Llama 派单正确口径）。10-22 pc40 全 Llama 任务（yarn=0）在此门禁
     # 速死实证——误删豁免 = 部署污染源。
-    if ("llama" not in args.model.lower()
+    if (not is_glm and "llama" not in args.model.lower()
             and args.context_length > QWEN3_NATIVE_MPE and not use_yarn):
         raise SystemExit(
             f"[yarn] context_length={args.context_length} 超出 Qwen3-8B 原生 "
@@ -168,13 +223,14 @@ def main():
     # 「实际生效值」从此有生产者原生证据。
     factor, rope_scaling = resolve_yarn_config(
         use_yarn, args.yarn_factor, args.context_length,
-        YARN_FACTOR_AUTO, QWEN3_NATIVE_MPE)
+        YARN_FACTOR_AUTO, native_mpe)
     if use_yarn:
         print(f"[yarn] enabled: factor={factor} "
               f"(effective context = {int(QWEN3_NATIVE_MPE * factor)})")
 
     data_file = os.path.join(args.data_root, str(args.context_length),
                              f"{args.task}.jsonl")
+    receipt_identity = _extended_receipt_identity(args, data_file)
     rows = [json.loads(l) for l in open(data_file)]
     if args.max_num and len(rows) > args.max_num:
         rows = rows[:args.max_num]  # topk 口径（确定性）
@@ -185,8 +241,6 @@ def main():
         args.model_path, trust_remote_code=True)
     # YaRN：在模型加载前把 rope_scaling 写进 config（transformers 从
     # config 构造 YarnRotaryEmbedding；同时写 rope_type/type 兼容新旧字段）
-    config = AutoConfig.from_pretrained(args.model_path,
-                                        trust_remote_code=True)
     if use_yarn:
         config.rope_scaling = rope_scaling
     resolve_far_skip_modes(args, config=config)
@@ -199,6 +253,7 @@ def main():
         model = AutoModelForCausalLM.from_pretrained(
             args.model_path, config=config, trust_remote_code=True,
             torch_dtype=torch.bfloat16, device_map="auto").eval()
+        print(f"[device-map] {getattr(model, 'hf_device_map', None)}")
     # ---- Quest vendor（B 轨官方源码复用，主表口径）----
     # 不走 register_patch 的 indexer_type_dict（A 轨 quest_indexer 是语义
     # 复现），改为绑定官方 Quest forward 到 Qwen3Attention——与 LongBench
@@ -606,7 +661,7 @@ def main():
             model_config_sha256=(
                 _file_sha256(model_cfg_path)
                 if os.path.isfile(model_cfg_path) else None),
-            native_mpe=QWEN3_NATIVE_MPE,
+            native_mpe=native_mpe,
             generation_params={
                 "max_gen": MAX_GEN, "max_num": args.max_num, "seed": SEED,
                 "method": args.method, "pred_postfix": args.pred_postfix,
@@ -619,6 +674,7 @@ def main():
             prediction_sha256=pred_sha,
             prediction_lines=pred_lines,
             treatment_manifest_json=treatment_manifest_json)
+        yarn_receipt.update(receipt_identity)
         tmp_rcp = stage_yarn_receipt(out_path, yarn_receipt, attempt_id)
         commit_yarn_generation(tmp_pred, tmp_rcp, out_path)
         print(f"[yarn-receipt] effective config + 同代绑定 -> {tmp_rcp}"

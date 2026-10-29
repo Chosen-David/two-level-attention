@@ -609,9 +609,12 @@ class TLIIndexer(TIAIndexer):
     # ---------------- A：子空间 L1 ---------------- #
 
     def _tail_indices(self, device):
-        """L1/L2 共用的 tail 映射；GLM 仅取 RoPE 末 32 维。"""
+        """L1/L2 共用的低频配对维；索引对应 post-RoPE 布局。"""
         if self.head_dim == 256:
-            return torch.arange(224, 256, device=device)
+            # GLM 的 apply_rotary_pos_emb_interleave 输出 cat(real, imag)，
+            # RoPE64 位于 192:256，每半区 32 维；低频16对分别在两半区尾部。
+            return torch.cat((torch.arange(208, 224, device=device),
+                              torch.arange(240, 256, device=device)))
         delta = 64 // self.cmp_ratio
         return torch.tensor(
             list(range(64 - delta, 64)) + list(range(128 - delta, 128)),

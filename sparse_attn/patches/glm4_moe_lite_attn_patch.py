@@ -41,6 +41,17 @@ def glm4_moe_lite_attn_forward(
         raise RuntimeError("GLM TLI 不支持 dense decode 消融，拒绝 dense 结果标 TLI")
 
     batch_size, seq_length = hidden_states.shape[:-1]
+    if self.indexer.dyn_dgate:
+        ctx = batch_decode_ctx()
+        # Batch runners prefill each row with B=1 inside the outer B>1
+        # context. Reject before clearing/calibrating/updating any request.
+        if batch_size != 1 or (ctx is not None and ctx.batch != 1):
+            raise RuntimeError(
+                "GLM dynamic far-skip 仅支持单请求；批量请求需要逐行独立 gate 状态")
+        if attention_mask is not None:
+            raise RuntimeError(
+                "GLM dynamic far-skip 尚不支持显式 attention_mask/padding；"
+                "标定必须只覆盖本请求有效 token")
     query_shape = (batch_size, seq_length, -1, self.qk_head_dim)
     key_shape = (batch_size, seq_length, -1, self.qk_nope_head_dim + self.v_head_dim)
 
@@ -72,6 +83,11 @@ def glm4_moe_lite_attn_forward(
     cur_len = 0
     is_static_cache = False
     if past_key_values is not None:
+        if (cache_position is not None and int(cache_position[0]) != 0
+                and past_key_values.get_seq_length(self.layer_idx) == 0):
+            raise RuntimeError(
+                "GLM TLI 非零 cache_position 需要已有 KV 历史；"
+                "空 cache 不得伪装成新请求 dense prefill")
         key_states, value_states = past_key_values.update(
             key_states, value_states, self.layer_idx)
         capacity = past_key_values.get_max_cache_shape()
@@ -116,6 +132,7 @@ def glm4_moe_lite_attn_forward(
                 and _can_drop_static_mask(
                     past_key_values, attention_mask, cur_len, prefill=True)):
             attention_mask = None
+        indexer.calibrate_dyn_dgate(query_states, key_states)
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -128,6 +145,7 @@ def glm4_moe_lite_attn_forward(
         )
         _paper_route(self.layer_idx, "dense-prefill")
     else:
+        self.indexer.freeze_dyn_dgate()
         ctx = batch_decode_ctx()
         if ctx is not None:
             attn_output = _tl_decode_batched(
@@ -171,7 +189,8 @@ def glm4_moe_lite_attn_forward(
         # 与 ATen 必须落在同一设备流，否则候选索引写入可被 gather 提前消费。
         with torch.cuda.device(key_states.device):
             mask, block_size = indexer.prepare_mask(
-                query_states, query_position_ids, key_states, cu_seqlens_k)
+                query_states, query_position_ids, key_states, cu_seqlens_k,
+                softmax_scale=self.scaling)
             attn_output = eager_decoding_attn(
                 query_states,
                 key_states,

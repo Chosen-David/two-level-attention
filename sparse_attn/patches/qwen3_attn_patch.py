@@ -207,6 +207,11 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     （gate_bs1_equiv 铁律：batch=1 与旧单序列入口逐位一致）。
     """
     B = query_states.shape[0]
+    dyn_state = None
+    if getattr(indexer, "dyn_dgate", False):
+        indexer.freeze_dyn_dgate()
+        dyn_state = (indexer.skip_far, indexer._dyn_skip_pending,
+                     indexer._dyn_frozen)
     q = query_states.transpose(1, 2)   # [B, 1, H, D]
     k = key_states.transpose(1, 2)     # [B, S_cap, Hkv, D]
     v = value_states.transpose(1, 2)   # [B, S_cap, Hkv, D]
@@ -248,6 +253,9 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
         cu = torch.tensor([0, S_cap], device=dev, dtype=torch.int32)
         pos = torch.tensor([L_b - 1], device=dev, dtype=torch.long)
         indexer.clear()
+        if dyn_state is not None:
+            (indexer.skip_far, indexer._dyn_skip_pending,
+             indexer._dyn_frozen) = dyn_state
         mask, block_size = indexer.prepare_mask(
             q_b, pos, k_b, cu, softmax_scale=self.scaling, valid_length=L_b)
         masks.append(mask)
