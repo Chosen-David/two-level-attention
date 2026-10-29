@@ -65,7 +65,7 @@ def run(cli):
         capacity=max(lens)+cli.max_gen
         gc.collect();torch.cuda.empty_cache();torch.cuda.synchronize()
         torch.cuda.reset_peak_memory_stats();start=time.perf_counter()
-        cache=TLIStaticCache(model.config,capacity,batch);first=[]
+        cache=TLIStaticCache(model.config,capacity,batch);first=[];prefilled=[]
         prefill_ms=conversion_ms=0.0
         with torch.inference_mode(),eager_decoding_request_guard():
             for slot,b in enumerate(which):
@@ -73,16 +73,13 @@ def run(cli):
                 out=model(input_ids=ids[b],use_cache=True,logits_to_keep=1)
                 first.append(int(out.logits[0,-1].argmax()))
                 torch.cuda.synchronize();prefill_ms+=(time.perf_counter()-t)*1000
-                t=time.perf_counter();dyn=out.past_key_values
-                for dest,src in zip(cache.layers,dyn.layers):
-                    if not dest.is_initialized:
-                        dest.lazy_initialization(src.keys.expand(batch,-1,-1,-1))
-                    dest.keys[slot,:,:lens[slot]].copy_(src.keys[0])
-                    dest.values[slot,:,:lens[slot]].copy_(src.values[0])
-                del out,dyn
-                torch.cuda.synchronize();conversion_ms+=(time.perf_counter()-t)*1000
-            for layer in cache.layers:
-                layer.cumulative_length=max(lens)
+                prefilled.append(out.past_key_values)
+                del out
+            from sparse_attn.ops.static_batch_prefill import consume_prefill_rows
+            torch.cuda.synchronize();t=time.perf_counter()
+            consume_prefill_rows(cache,prefilled,lens)
+            prefilled.clear()
+            torch.cuda.synchronize();conversion_ms=(time.perf_counter()-t)*1000
             ctx=BatchCtx(batch,list(lens),[0]*batch,[True]*batch,0)
             tokens=static_decode(model,cache,[[x] for x in first],lens,set(),cli.max_gen,ctx)
             torch.cuda.synchronize();total_ms=(time.perf_counter()-start)*1000
