@@ -479,6 +479,25 @@ def main():
     add_sparse_attn_args(parser)
     args = parser.parse_args()
 
+    # 【Phase 1.4】compute_mask_graph gate 需要显式 nb/nl（SUPPRESS 缺省时
+    # attribute 不存在 → gate 失败 → 静默回退 eager）。TLI 模式下若未传
+    # nb/nt/nl，自动补冠军几何默认值（保持显式语义，不修改 argparse 本身）。
+    if args.method == "tli":
+        if not hasattr(args, "tli_near_pages"):
+            args.tli_near_pages = 32
+        if not hasattr(args, "tli_near_tokens"):
+            args.tli_near_tokens = "off"
+        if not hasattr(args, "tli_near_len"):
+            args.tli_near_len = 4096
+        if not hasattr(args, "tli_sink_tokens"):
+            args.tli_sink_tokens = 4
+        if not hasattr(args, "tli_swa_size"):
+            args.tli_swa_size = 128
+        if not hasattr(args, "tli_far_method"):
+            args.tli_far_method = "minmax"
+        if not hasattr(args, "tli_near_method"):
+            args.tli_near_method = "avg"
+
     try:
         _validate_protocol(args)
     except ValueError as exc:
