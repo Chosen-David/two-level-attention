@@ -18,6 +18,7 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 from benchmark.LongBench.eval import sample_score
 from sparse_attn.ops.frozen_region_cache import FrozenRegionCache, RegionGeometry
 from sparse_attn.ops.frozen_region_gate import GateConfig, decide_regions, profile_regions
+from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 ROOT = Path(__file__).resolve().parents[2]
 SCREEN_TASKS = ('qasper', 'hotpotqa', 'musique', 'gov_report', 'repobench-p')
@@ -77,6 +78,7 @@ def capture_profiles(cache, geometry, config):
         ALL_ATTENTION_FUNCTIONS['sdpa'] = original
 
 
+@eager_decoding_request_guard()
 def generate(model, tokenizer, ids, max_new_tokens, config, device):
     geometry = RegionGeometry(max_new_tokens=max_new_tokens)
     cache = FrozenRegionCache(model.config.num_hidden_layers, geometry)
@@ -133,6 +135,7 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
 
 
 @torch.inference_mode()
+@eager_decoding_request_guard()
 def generate_native(model, ids, max_new_tokens, device):
     cache = DynamicCache(config=model.config)
     if getattr(model, '_frozen_tli', False):
