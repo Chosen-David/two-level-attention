@@ -24,12 +24,12 @@ from __future__ import annotations
 import os
 
 import torch
-from transformers.cache_utils import Cache
+from transformers.cache_utils import Cache, CacheLayerMixin
 
 from ..baseline_runtime import batch_decode_ctx
 
 
-class TLIStaticLayer:
+class TLIStaticLayer(CacheLayerMixin):
     """固定容量 KV 层。buffer [B, Hkv, S_cap, D]，有效在前。
 
     对齐 StaticLayer 的 CacheLayerMixin 契约（is_compileable / max_batch_size
@@ -41,6 +41,7 @@ class TLIStaticLayer:
     is_sliding = False
 
     def __init__(self, max_cache_len: int, max_batch_size: int):
+        super().__init__()
         if max_cache_len < 1 or max_batch_size < 1:
             raise ValueError("TLIStaticLayer 需要 max_cache_len>=1 且 max_batch_size>=1")
         self.max_cache_len = int(max_cache_len)
@@ -54,10 +55,14 @@ class TLIStaticLayer:
         # TLI patch 全宽分支不切片）。
         self.cumulative_length = 0
 
-    def lazy_initialization(self, key_states: torch.Tensor):
+    def lazy_initialization(self, key_states: torch.Tensor, value_states=None):
         """按首层首个 decode 步（或搬移时）的 [B, Hkv, S, D] 形状预分配全宽 buffer。"""
         if key_states.ndim != 4:
             raise ValueError(f"TLIStaticLayer 期望 4D key_states，got {key_states.ndim}D")
+        if value_states is not None and (
+                value_states.shape != key_states.shape or value_states.dtype != key_states.dtype
+                or value_states.device != key_states.device):
+            raise ValueError("static KV initialization requires matching key/value tensors")
         self.num_heads = key_states.shape[1]
         self.head_dim = key_states.shape[-1]
         self.dtype, self.device = key_states.dtype, key_states.device
@@ -69,6 +74,7 @@ class TLIStaticLayer:
                  self.head_dim)
         self.keys = torch.zeros(shape, dtype=self.dtype, device=self.device)
         self.values = torch.zeros(shape, dtype=self.dtype, device=self.device)
+        self.is_initialized = True
 
     def update(self, key_states, value_states, cache_kwargs=None):
         """decode-only：新 token [B, Hkv, 1, D] → buffer[b, :, seq_lens[b]-1]。
@@ -130,7 +136,9 @@ class TLIStaticLayer:
         if getattr(self, "_direct_prefill_mask", False):
             # One-shot direct prefill has no past or padding. Let HF use SDPA's
             # is_causal path instead of materializing a quadratic static mask.
-            return cache_position.shape[0], 0
+            # HF 4.x passed cache positions; HF 5.x passes query length.
+            return (cache_position if isinstance(cache_position, int)
+                    else cache_position.shape[0]), 0
         return self.max_cache_len, 0
 
     def get_max_cache_shape(self) -> int:
@@ -172,6 +180,12 @@ class DirectPrefillStaging:
         state = self.states[layer_idx]
         L = self.length
         position = (cache_kwargs or {}).get("cache_position")
+        # New HF attention no longer forwards cache_position. This staging
+        # capability permits exactly one full B1 prefill of the prepared host
+        # length, so its storage positions are fixed independently of RoPE IDs.
+        # Explicit positions still undergo the exact validation below.
+        if position is None:
+            position = torch.arange(L, device=key_states.device)
         if (state.written or key_states.ndim != 4 or value_states.shape != key_states.shape
                 or key_states.shape[0] != 1 or key_states.shape[-2] != L
                 or key_states.requires_grad or value_states.requires_grad
@@ -190,6 +204,9 @@ class DirectPrefillStaging:
         if state.needs_ring:
             from .far_skip_cache import FarSkipLayer
             state.ring = FarSkipLayer.from_prefill(key_states, value_states, state.config)
+        # HF 5.x may omit cache_position. Report the completed logical prefill
+        # length so the attention bridge does not slice its returned KV to zero.
+        linear.cumulative_length = L
         state.written = True
         # Dense prefill must consume the original full-history tensors, not a
         # static/ring view. Returning the incoming objects also preserves layout.

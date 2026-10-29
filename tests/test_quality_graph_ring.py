@@ -48,3 +48,42 @@ def test_quality_ring_capture_and_fresh_request(monkeypatch, mode, backend):
             assert rows[0]['attention_route'] == ('ring_sdpa' if mode == 'off'
                                                   else f'ring_{mode}_{backend}')
             assert rows[0]['ring_capacity'] < 16384
+
+
+@pytest.mark.parametrize('position', [None, torch.arange(3), torch.arange(4)+1])
+@torch.inference_mode()
+def test_direct_prefill_position_contract(position):
+    from sparse_attn.ops.tli_static_cache import TLIStaticLayer, _DirectPrefillLayer, DirectPrefillStaging
+    layer = TLIStaticLayer(8, 1)
+    state = _DirectPrefillLayer(layer, needs_ring=False)
+    staging = DirectPrefillStaging(None, 4, [state])
+    k = torch.randn(1, 2, 4, 8)
+    v = torch.randn_like(k)
+    if position is not None:
+        with pytest.raises(ValueError, match='one-shot'):
+            staging.update(0, k, v, {'cache_position': position})
+        assert not state.written and layer.keys is None
+    else:
+        with pytest.raises(ValueError, match='one-shot'):
+            staging.update(0, k[:, :, :3], v[:, :, :3], {})
+        assert not state.written and layer.keys is None
+        staging.update(0, k, v, {})
+        assert layer.is_initialized and layer.get_seq_length() == 4
+        torch.testing.assert_close(layer.keys[:, :, :4], k, atol=0, rtol=0)
+        with pytest.raises(ValueError, match='one-shot'):
+            staging.update(0, k, v, {})
+
+
+def test_static_layer_hf_attention_contract():
+    from transformers.cache_utils import CacheLayerMixin
+    from sparse_attn.ops.tli_static_cache import TLIStaticLayer
+    layer = TLIStaticLayer(8, 1)
+    assert isinstance(layer, CacheLayerMixin) and not layer.is_initialized
+    k = torch.zeros(1, 2, 3, 8)
+    with pytest.raises(ValueError, match='matching'):
+        layer.lazy_initialization(k, k.double())
+    assert layer.keys is None and not layer.is_initialized
+    layer.lazy_initialization(k, k)
+    assert layer.is_initialized
+    layer._direct_prefill_mask = True
+    assert layer.get_mask_sizes(3) == layer.get_mask_sizes(torch.arange(3)) == (3, 0)

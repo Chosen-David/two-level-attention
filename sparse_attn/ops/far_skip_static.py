@@ -33,6 +33,7 @@ class FarSkipStaticLayer(TLIStaticLayer):
     def _adopt_ring(self, ring, max_cache_len, coarse, fine):
         super().__init__(max_cache_len, 1)
         self.keys, self.values = ring.keys, ring.values
+        self.is_initialized = True
         self.dtype, self.device = ring.dtype, ring.device
         self.num_heads, self.head_dim = self.keys.shape[1], self.keys.shape[-1]
         self.config, self.layout = ring.config, ring.layout
