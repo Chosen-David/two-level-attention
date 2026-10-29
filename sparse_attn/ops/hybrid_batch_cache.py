@@ -236,15 +236,22 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
     if not gs.enabled or any(t is None for t in (gs.pos_buf, gs.valid_len_buf, gs.alive_buf)):
         raise ValueError('hybrid batch requires HybridBatchRunner device inputs')
     pos, lengths, alive = gs.pos_buf, gs.valid_len_buf, gs.alive_buf
+    from .operator_pipeline import validate_operator_inputs
+    validate_operator_inputs(q, k, v)
     outputs = []
     for b, (row, idx) in enumerate(zip(layer.rows, layer.indexers)):
         p, vl, active = pos[b:b+1], lengths[b:b+1], alive[b:b+1]
         slot = row.layout.map(p) if isinstance(row, FarSkipStaticLayer) else p
         # Dead rows keep their last valid KV exactly. Avoid a Python branch on
         # alive: EOS changes during graph replay while kernel shapes stay fixed.
-        for storage, incoming in ((row.keys, k), (row.values, v)):
-            old = storage.index_select(2, slot)
-            storage.index_copy_(2, slot, torch.where(active.view(1, 1, 1, 1), incoming[b:b+1], old))
+        from .operator_pipeline import operator_mode
+        if operator_mode() != 'off':
+            from .kv_row_update import append_kv_row
+            append_kv_row(row.keys, row.values, k[b:b+1], v[b:b+1], slot, active)
+        else:
+            for storage, incoming in ((row.keys, k), (row.values, v)):
+                old = storage.index_select(2, slot)
+                storage.index_copy_(2, slot, torch.where(active.view(1, 1, 1, 1), incoming[b:b+1], old))
         qq, kk, vv = q[b:b+1].transpose(1, 2), row.keys.transpose(1, 2), row.values.transpose(1, 2)
         if isinstance(row, FarSkipStaticLayer):
             out = row.workspace(qq, kk, vv, vl, module.scaling)

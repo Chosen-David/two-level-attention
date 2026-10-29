@@ -300,12 +300,7 @@ def qwen3_attn_forward(
 
     # Compact consumers own both the KV write and absolute-to-ring addressing.
     # Dispatch before the generic update, which would otherwise append twice.
-    # 【Phase 4】serial 模式走标准 linear KV + decode_indexed，跳过 compact
-    # far-skip 路径（其内部用 decode_ring → overlap only）。
-    from ..ops.operator_pipeline import operator_mode as _op_mode_fn
-    _tli_op_mode = _op_mode_fn()
-    if (_tli_op_mode != 'serial'
-            and past_key_values is not None
+    if (past_key_values is not None
             and getattr(self.indexer, "far_skip_backend", "legacy") == "compact"):
         from ..ops.far_skip_runtime import try_far_skip_decode
         compact = try_far_skip_decode(

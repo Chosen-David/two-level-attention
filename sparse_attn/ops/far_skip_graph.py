@@ -15,6 +15,10 @@ from .far_skip_subspace import FarSkipFineCache, same_dimensions
 
 
 class FarSkipGraphWorkspace:
+    # Left fragment, sorted full pages, right fragment are disjoint and ordered;
+    # stable_topk_positions preserves their order. Invalid padding is ignored.
+    ordered_unique_selection = True
+
     def __init__(self, cfg, layout, heads, coarse_dims, fine_dims):
         self.cfg, self.layout, self.heads = cfg, layout, heads
         self.shared_dims = same_dimensions(coarse_dims, fine_dims)
