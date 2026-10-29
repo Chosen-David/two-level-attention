@@ -1,0 +1,33 @@
+"""Strict per-request parity checks; decoded text alone can hide EOS changes."""
+
+
+def compare_predictions(reference, candidate):
+    def index(rows):
+        result = {}
+        for row in rows:
+            key = row['_id']
+            if key in result:
+                raise ValueError(f'duplicate request: {key}')
+            tokens = row.get('generated_token_ids')
+            if (not isinstance(tokens, list) or not tokens
+                    or any(type(t) is not int or t < 0 for t in tokens)):
+                raise ValueError(f'missing or invalid token evidence: {key}')
+            result[key] = row
+        if not result:
+            raise ValueError('empty prediction set')
+        return result
+
+    left, right = index(reference), index(candidate)
+    if left.keys() != right.keys():
+        raise ValueError('request sets differ')
+    checks = []
+    for key, ref in left.items():
+        got = right[key]
+        if ref['answers'] != got['answers']:
+            raise ValueError(f'answer binding differs: {key}')
+        checks.append(dict(
+            request_id=key,
+            tokens_equal=ref['generated_token_ids'] == got['generated_token_ids'],
+            text_equal=ref['pred'] == got['pred'],
+        ))
+    return checks

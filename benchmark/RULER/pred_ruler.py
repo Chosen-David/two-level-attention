@@ -625,6 +625,8 @@ def main():
             fout.write(json.dumps({
                 **({"baseline_receipt": baseline_receipt} if baseline_receipt else {}),
                 "pred": pred, "answers": row["outputs"],
+                # Decoding drops special tokens; retain EOS for exact parity.
+                "generated_token_ids": gen,
                 "length": row["length"], "budget": budget,
                 "execution": getattr(model, "_quality_graph_execution", {}),
                 "_id": f"{args.task}:{row['index']}",
