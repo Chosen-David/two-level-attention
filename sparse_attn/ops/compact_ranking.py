@@ -14,6 +14,8 @@ import triton
 import triton.language as tl
 from torch.utils.cpp_extension import load
 
+_last_kth_route = None
+
 
 @lru_cache(maxsize=1)
 def build():
@@ -39,11 +41,11 @@ def _gather_candidates(P, IDS, KEEP, C, S:tl.constexpr, R:tl.constexpr,
 
 @triton.jit
 def _canonical_gather(P, THRESHOLD, MID, VALUES, IDS, S:tl.constexpr,
-                      K:tl.constexpr, BLOCK:tl.constexpr):
+                      K:tl.constexpr, STRIDE:tl.constexpr, BLOCK:tl.constexpr):
     h=tl.program_id(0);t=tl.arange(0,BLOCK)
     v=tl.load(P+h*S+t,t<S,other=-float('inf'))
     eligible=tl.load(MID+t,t<S,other=0)
-    kth=tl.load(THRESHOLD+h*K+K-1)
+    kth=tl.load(THRESHOLD+h*STRIDE+STRIDE-1)
     kth=tl.where(tl.sum(eligible.to(tl.int32),0)<K,-float('inf'),kth)
     greater=(t<S)&(v>kth);equal=(t<S)&(v==kth)
     ng=tl.sum(greater.to(tl.int32),0)
@@ -65,17 +67,26 @@ def compact_topk(p, ids, keep, mid, k):
             or not all(t.is_cuda and t.is_contiguous() and t.device==p.device
                        for t in (p,ids,keep,mid))):
         return None
+    global _last_kth_route
     with torch.cuda.device(p.device):
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize==0:
             raise RuntimeError('warm up compact ranking before graph capture')
         extension=build()
         h,s=p.shape;r=ids.shape[1];w=r+k
-        compact=torch.empty((h,w),device=p.device,dtype=p.dtype)
-        _gather_candidates[(h,triton.cdiv(w,256))](p,ids,keep,compact,s,r,w,BLOCK=256)
-        threshold=compact.topk(k,dim=-1).values
+        if os.environ.get('TLI_COMPACT_KTH', 'histogram') == 'topk':
+            compact=torch.empty((h,w),device=p.device,dtype=p.dtype)
+            _gather_candidates[(h,triton.cdiv(w,256))](p,ids,keep,compact,s,r,w,BLOCK=256)
+            threshold=compact.topk(k,dim=-1).values
+            stride=k
+            _last_kth_route="compact_torch_topk"
+        else:
+            from .compact_rank_threshold import bf16_kth
+            threshold=bf16_kth(p,ids,keep,k)
+            stride=1
+            _last_kth_route="bf16_radix_histogram"
         values=torch.empty((h,k),device=p.device,dtype=p.dtype)
         result=torch.empty((h,k),device=p.device,dtype=torch.int64)
-        _canonical_gather[(h,)](p,threshold,mid,values,result,s,k,
+        _canonical_gather[(h,)](p,threshold,mid,values,result,s,k,stride,
                                BLOCK=triton.next_power_of_2(s),num_warps=8)
         extension.sort_rank(values,result)
         return result

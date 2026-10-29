@@ -62,6 +62,7 @@ def test_production_rank_replay(capacity,monkeypatch):
     run();graph=torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):actual=run()
     assert idx._graph_ranking_route=='compact_threshold_native_order'
+    assert idx._graph_ranking_kth_route=='bf16_radix_histogram'
     for n in (132,4097,capacity,512,capacity-1):
         length.fill_(n);q.normal_();graph.replay()
         monkeypatch.setenv('TLI_COMPACT_RANKING','0');expected=run()
@@ -86,3 +87,19 @@ def test_unsupported_static_geometry():
     assert compact_topk(p,ids,keep,mid,4097) is None
     assert compact_topk(p.float(),ids,keep,mid,32) is None
     assert compact_topk(p[:0],ids[:0],keep[:0],mid,32) is None
+
+@pytest.mark.parametrize('k',[1,2,3,9,12,32])
+def test_histogram_bit_boundaries(k):
+    from sparse_attn.ops.compact_rank_threshold import bf16_kth
+    codes=torch.tensor([1,127,128,255,256,257,0x3eff,0x3f00,0x3f7f,0x3f80,0,1],
+                       device='cuda',dtype=torch.int16)
+    scores=codes.view(torch.bfloat16).expand(3,-1)
+    ids=torch.arange(codes.numel(),device='cuda').expand(3,-1).contiguous()
+    keep=torch.ones_like(ids,dtype=torch.bool)
+    p=torch.zeros((3,128),device='cuda',dtype=torch.bfloat16)
+    for masked in (False,True):
+        if masked:keep[:,::2]=False
+        p.zero_();p[:,:codes.numel()]=scores.masked_fill(~keep,0.)
+        actual=bf16_kth(p,ids,keep,k)
+        expected=p.topk(k).values[:,-1]
+        assert torch.equal(actual,expected),(k,masked)
