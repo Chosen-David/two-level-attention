@@ -41,7 +41,7 @@ def require_lease():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out-dir', type=Path, required=True)
-    parser.add_argument('--arms', nargs=2, choices=['fa2', 'legacy', 'serial', 'overlap', 'graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off'],
+    parser.add_argument('--arms', nargs=2, choices=['fa2', 'legacy', 'serial', 'overlap', 'graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off', 'graph_fa2'],
                         default=['fa2', 'serial'])
     parser.add_argument('--cycles', type=int, default=2)
     parser.add_argument('--warmup', type=int, default=3)
@@ -54,7 +54,7 @@ def main():
     args.out_dir.mkdir(parents=True, exist_ok=False)
     require_lease()
     files = [p for p in (root / 'sparse_attn').rglob('*') if p.is_file() and p.suffix in ('.py', '.cpp', '.cu', '.cuh')]
-    files += [Path(__file__).resolve(), root / 'exp/bench/operator_model_latency.py', root / 'exp/bench/e152v4_graph_latency.py']
+    files += [Path(__file__).resolve(), root / 'exp/bench/operator_model_latency.py', root / 'exp/bench/e152v4_graph_latency.py', root / 'exp/bench/graph_fa2.py']
     receipt = dict(status='pending', pid_identity='inferred from idle-to-single-stable NVML host PID; container PID differs', root=str(root), args=vars(args) | {'out_dir': str(args.out_dir)},
                    commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip(),
                    hashes={str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files})
@@ -80,14 +80,14 @@ def main():
                     raise RuntimeError('GPU1 did not settle to stable idle')
                 time.sleep(1)
             env = {k: v for k, v in os.environ.items() if not k.startswith('TLI_')}
-            env.update(CUDA_VISIBLE_DEVICES='1', TLI_OPERATOR_MODE='off' if arm in ['fa2', 'legacy'] else ('serial' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off') else arm),
+            env.update(CUDA_VISIBLE_DEVICES='1', TLI_OPERATOR_MODE='off' if arm in ['fa2', 'legacy', 'graph_fa2'] else ('serial' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off') else arm),
                        TLI_OPERATOR_FUSED_SELECTION='0', TLI_SPARSE_PREFILL='0',
                        TLI_COMPACT_NORMALIZATION='1' if arm == 'graph_compact' else '0',
                        TLI_SPARSE_SELECTION='1' if arm in ('graph_sparse', 'graph_sparse_geometry_off') else '0')
             env['TLI_GRAPH_GEOMETRY_SHARED'] = '0' if arm == 'graph_sparse_geometry_off' else '1'
             env['TLI_BENCH_GEOMETRY_COUNTS'] = '1'
-            command = [sys.executable, str(root / ('exp/bench/e152v4_graph_latency.py' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off') else 'exp/bench/operator_model_latency.py')),
-                       '--method', 'none' if arm == 'fa2' else 'tli',
+            command = [sys.executable, str(root / ('exp/bench/e152v4_graph_latency.py' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off', 'graph_fa2') else 'exp/bench/operator_model_latency.py')),
+                       '--method', 'none' if arm in ('fa2', 'graph_fa2') else 'tli',
                        '--attention-backend', 'flash_attention_2', '--context-length', '32768',
                        '--warmup', str(args.warmup), '--repeats', str(args.repeats), '--max-gen', str(args.max_gen),
                        '--out', str(args.out_dir / 'samples.json'), '--label', f'{index:02d}-{arm}',
@@ -96,6 +96,8 @@ def main():
                        '--tli_near_pages', '32', '--tli_near_tokens', 'off', '--tli_near_len', '4096',
                        '--tli_sink_tokens', '4', '--tli_swa_size', '128',
                        '--tli_far_skip_backend', 'legacy', '--tli_far_skip_cache', 'retain']
+            if arm == 'graph_fa2':
+                command += ['--fa2-static-decode']
             with (args.out_dir / 'commands.jsonl').open('a') as commands:
                 commands.write(json.dumps(dict(command=command, cwd=str(root),
                     environment={k: v for k, v in env.items() if k.startswith('TLI_') or k == 'CUDA_VISIBLE_DEVICES'})) + '\n')

@@ -37,13 +37,15 @@ class GraphFA2:
                 or key.ndim != 4 or key.shape != value.shape
                 or key.shape[0] != 1 or key.shape[2] != self.mask.shape[-1]
                 or query.shape[-1] != 128 or key.shape[-1] != 128
-                or query.shape[1] % key.shape[1]
+                or key.shape[1] < 1 or query.shape[1] < 1 or query.shape[1] % key.shape[1]
                 or any(t.dtype != torch.bfloat16 or t.device != self.mask.device
                        or t.stride(-1) != 1 for t in (query,key,value))
                 or attention_mask is None or attention_mask.shape != self.mask.shape
                 or attention_mask.data_ptr() != self.mask.data_ptr()
                 or dropout != 0. or sliding_window is not None
                 or kwargs.get('output_attentions', False)
+                or kwargs.get('softcap', 0.) not in (None, 0.)
+                or kwargs.get('alibi_slopes') is not None
                 or kwargs.get('is_causal', True) is False):
             raise ValueError('unsupported GraphFA2 decode or untrusted mask')
         name = 'capture' if query.is_cuda and torch.cuda.is_current_stream_capturing() else 'eager'
@@ -56,6 +58,8 @@ class GraphFA2:
     @contextmanager
     def activate(self, lengths):
         from transformers.modeling_utils import AttentionInterface
+        if lengths.shape != (1,) or lengths.dtype != torch.int64 or lengths.device != self.lengths.device:
+            raise ValueError("GraphFA2 requires same-device int64 lengths[1]")
         self.lengths.copy_(lengths)
         old = self.module.ALL_ATTENTION_FUNCTIONS
         interface = AttentionInterface()
