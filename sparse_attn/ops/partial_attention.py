@@ -181,7 +181,15 @@ if triton is not None:
             safe_m = tl.where(new_m == float('-inf'), 0., new_m)
             alpha = tl.exp(m - safe_m)
             p = tl.where(valid[None, :], tl.exp(scores - safe_m[:, None]), 0.)
-            acc = acc * alpha[:, None] + tl.dot(p.to(vv.dtype), vv)
+            p_hi = p.to(vv.dtype)
+            update = tl.dot(p_hi, vv)
+            # BF16 probability rounding otherwise perturbs the numerator while
+            # the normalization denominator remains FP32. Accumulate the
+            # representable residual separately to retain TC execution.
+            if vv.dtype == tl.bfloat16:
+                p_lo = (p - p_hi.to(tl.float32)).to(vv.dtype)
+                update += tl.dot(p_lo, vv)
+            acc = acc * alpha[:, None] + update
             l = l * alpha + tl.sum(p, 1)
             m = new_m
         ix = (b * HQ + qh) * SPLITS + split
