@@ -17,7 +17,7 @@ from sparse_attn.ops import selection_pack
 def main():
     output = Path(sys.argv[1])
     component = sys.argv[2] if len(sys.argv) > 2 else 'selection'
-    if component not in ('selection', 'domain', 'mean', 'normalization', 'ranking', 'sparse', 'narrow'):
+    if component not in ('selection', 'domain', 'mean', 'normalization', 'ranking', 'sparse', 'narrow', 'owner', 'owner_total'):
         raise ValueError('component must be selection, domain, mean, normalization, ranking, sparse or narrow')
     observations = []
     stop = threading.Event()
@@ -83,7 +83,7 @@ def main():
     idx.clear()
     index = idx.prepare_index(k, cu)
     graphs, outputs, calls = {}, {}, {}
-    if component in ('sparse', 'narrow'):
+    if component in ('sparse', 'narrow', 'owner', 'owner_total'):
         from sparse_attn.ops import sparse_normalization
         target, attribute = sparse_normalization, 'supported_geometry'
     elif component == 'ranking':
@@ -110,7 +110,7 @@ def main():
                 with patch.dict(os.environ, {'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' else '0'}):
                     result = native(*args)
             else:
-                result = native(*args) if mode == 'fused' or component == 'narrow' else None
+                result = native(*args) if mode == 'fused' or component in ('narrow', 'owner') else None
             calls[mode]['fused'] += int(result is not None and (component != 'mean' or mode == 'fused'))
             return result
 
@@ -119,7 +119,7 @@ def main():
             calls[mode].setdefault('sort_input_dtypes', []).append(str(tensor.dtype))
             return native_sort(tensor, *args, **kwargs)
 
-        with patch.dict(os.environ, {'TLI_COMPACT_NORMALIZATION': '1' if component in ('mean', 'normalization', 'ranking', 'sparse', 'narrow') else '0', 'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' or component in ('ranking', 'sparse', 'narrow') else '0', 'TLI_COMPACT_RANKING': '1' if component in ('ranking', 'sparse', 'narrow') else '0', 'TLI_SPARSE_SELECTION': '1' if component in ('sparse', 'narrow') else '0', 'TLI_SPARSE_NARROW_KEYS': '0' if component == 'narrow' and mode == 'torch' else '1', 'TLI_COMPACT_KTH': 'histogram', 'TLI_COMPACT_GATHER': 'blocked'}), patch.object(target, attribute, dispatch), patch.object(torch.Tensor, 'sort', observed_sort):
+        with patch.dict(os.environ, {'TLI_COMPACT_NORMALIZATION': '1' if component in ('mean', 'normalization', 'ranking', 'sparse', 'narrow', 'owner', 'owner_total') else '0', 'TLI_COMPACT_FUSED_MEAN': '1' if mode == 'fused' or component in ('ranking', 'sparse', 'narrow', 'owner', 'owner_total') else '0', 'TLI_COMPACT_RANKING': '1' if component in ('ranking', 'sparse', 'narrow', 'owner', 'owner_total') else '0', 'TLI_SPARSE_SELECTION': '1' if component in ('sparse', 'narrow', 'owner', 'owner_total') else '0', 'TLI_SPARSE_NARROW_KEYS': '0' if component == 'narrow' and mode == 'torch' else '1', 'TLI_SPARSE_STATS': 'owner' if component == 'owner_total' or (component == 'owner' and mode == 'fused') else 'sorted', 'TLI_COMPACT_KTH': 'histogram', 'TLI_COMPACT_GATHER': 'blocked'}), patch.object(target, attribute, dispatch), patch.object(torch.Tensor, 'sort', observed_sort):
             for _ in range(3):
                 idx.compute_selection_graph(q, index, 128**-.5, length)
             torch.cuda.synchronize()
@@ -129,6 +129,7 @@ def main():
             calls[mode]['sparse_selection_fallback'] = idx._graph_sparse_selection_fallback
             calls[mode]['normalization_capture_route'] = idx._graph_normalization_route
             calls[mode]['ranking_capture_route'] = idx._graph_ranking_route
+            calls[mode]['stats_capture_route'] = getattr(idx, '_graph_normalization_stats_route', None)
             calls[mode]['kth_capture_route'] = idx._graph_ranking_kth_route
             calls[mode]['gather_capture_route'] = idx._graph_ranking_gather_route
         graphs[mode].replay()
@@ -136,7 +137,7 @@ def main():
     assert torch.equal(outputs['torch'].indices, outputs['fused'].indices)
     assert torch.equal(outputs['torch'].counts, outputs['fused'].counts)
     assert calls['fused']['fused'] > 0
-    if component == 'sparse':
+    if component in ('sparse', 'owner_total'):
         assert calls['fused']['normalization_capture_route'] == 'sparse_candidate_domain'
         assert calls['fused']['ranking_capture_route'] == 'candidate_domain_native_1024'
         assert calls['fused']['sparse_selection_fallback'] is None
@@ -157,6 +158,10 @@ def main():
             assert calls[mode]['ranking_capture_route'] == 'candidate_domain_native_1024'
         assert 'torch.int16' in calls['fused']['sort_input_dtypes']
         assert 'torch.int16' not in calls['torch']['sort_input_dtypes']
+    if component in ('owner', 'owner_total'):
+        assert calls['fused']['stats_capture_route'] == 'capacity_owner'
+        if component == 'owner':
+            assert calls['torch']['stats_capture_route'] == 'sorted_candidates'
     samples = []
     for pair in range(30):
         for mode in (('torch', 'fused') if pair % 2 == 0 else ('fused', 'torch')):

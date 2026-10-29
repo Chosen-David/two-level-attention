@@ -32,6 +32,38 @@ def _mean(CP,KEEP,OUT,R:tl.constexpr,G:tl.constexpr,BLOCK:tl.constexpr):
 
 
 @triton.jit
+def _owner_validity(IDS, KEEP, OWNER, VALID, UNIQUE,
+                    R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr):
+    h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
+    token=tl.load(IDS+h*R+r,r<R,other=0)
+    valid=(r<R)&tl.load(KEEP+h*R+r,r<R,other=0)&(token>=0)&(token<S)
+    owner=tl.load(OWNER+h*S+token,valid,other=-1)
+    tl.store(VALID+h*R+r,valid,r<R)
+    tl.store(UNIQUE+h*R+r,valid&(owner==r),r<R)
+
+
+def _owner_probabilities(scores,ids,keep,capacity,group,return_unique):
+    """Reuse native-order stats; O(Hkv*capacity) integer ownership remains."""
+    from .compact_normalization import build as owner_build, _candidate_owners
+    hk,r=ids.shape
+    if hk*capacity >= 2**31:
+        raise ValueError('owner indexing exceeds int32 scope')
+    with torch.cuda.device(scores.device):
+        if torch.cuda.is_current_stream_capturing() and owner_build.cache_info().currsize==0:
+            raise RuntimeError('warm up owner normalization before capture')
+        extension=owner_build()
+        owner=torch.full((hk,capacity),-1,device=scores.device,dtype=torch.int32)
+        _candidate_owners[(hk,triton.cdiv(r,256))](ids,keep,owner,r,capacity,BLOCK=256)
+        valid=torch.empty_like(keep);unique=torch.empty_like(keep)
+        _owner_validity[(hk,triton.cdiv(r,256))](ids,keep,owner,valid,unique,r,capacity,BLOCK=256)
+        cp=extension.virtual_compact_softmax(scores,owner,capacity,group,False,
+                                             torch.empty(0,device=scores.device,dtype=torch.bool))
+        result=torch.empty((hk,r),device=scores.device,dtype=scores.dtype)
+        _mean[(hk,triton.cdiv(r,256))](cp,valid,result,r,group,BLOCK=256)
+    return (result,unique) if return_unique else result
+
+
+@triton.jit
 def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,SHARED:tl.constexpr,STRIDE:tl.constexpr,SHIFT:tl.constexpr,BLOCK:tl.constexpr):
     h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
     token=tl.load(IDS+h*R+r,r<R,other=0)
@@ -88,6 +120,8 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
     prop=torch.cuda.get_device_properties(scores.device)
     if capacity%8 or capacity<=9216:
         raise ValueError('only aligned BF16 softmax above 9216 supported')
+    if os.environ.get('TLI_SPARSE_STATS','sorted') == 'owner':
+        return _owner_probabilities(scores,ids,keep,capacity,group,return_unique)
     with torch.cuda.device(scores.device):
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize==0:
             raise RuntimeError('warm up sparse normalization before capture')

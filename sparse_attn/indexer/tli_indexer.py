@@ -4549,6 +4549,9 @@ class TLIIndexer(TIAIndexer):
                                         k2_mid, capacity=S_cap, width=1024, sink=sink_tok,
                                         deduplicated=True)
             self._graph_normalization_route = "sparse_candidate_domain"
+            self._graph_normalization_stats_route = (
+                "capacity_owner" if os.environ.get("TLI_SPARSE_STATS", "sorted") == "owner"
+                else "sorted_candidates")
             self._graph_ranking_route = "candidate_domain_native_1024"
             self._graph_ranking_kth_route = None
             self._graph_ranking_gather_route = None
