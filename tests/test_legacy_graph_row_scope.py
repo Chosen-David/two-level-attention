@@ -10,6 +10,7 @@ NATIVE=pytest.mark.skipif(not torch.cuda.is_available(),reason='queued native GP
 @NATIVE
 @pytest.mark.parametrize('batch',[2,4])
 def test_legacy_graph_ragged_and_dead_rows_use_their_own_positions(monkeypatch,batch):
+    torch.manual_seed(8801)
     for key,value in CONFIG.items():monkeypatch.setenv(key,value)
     for key,value in dict(TLI_BATCH_INDEXER='legacy',TLI_OPERATOR_MODE='off',
                           TLI_LIVE_NORMALIZATION='1',TLI_SPARSE_STATS='owner').items():
