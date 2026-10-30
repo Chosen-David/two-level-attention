@@ -112,6 +112,23 @@ This entry is a correctness/production-quality route, not a CUDA Graph or TPOT
 claim. Real Qwen3 BF16 GPU parity and paired memory/work/latency measurements are
 still required before reporting performance benefits.
 
+The paired GPU harness is `exp/bench/check_qwen_frozen_eager.py`; its one-click
+wrapper checks the empty-GPU gate and records a 30-second sideband monitor:
+
+```sh
+bash exp/bench/run_frozen_eager_pair.sh \
+  /path/to/Qwen3-8B /path/to/KVCache-Factory/data/RULER \
+  exp/trace/results/frozen_eager_pair_RUN_ID 0 8192,32768,65536,131072 16 1
+```
+
+At 8K it teacher-forces all four frozen states and compares decode-layer outputs,
+logits and generated IDs against the legacy logical-mask oracle. Longer lengths
+use the independent dual gate. Performance uses reference/physical ABBA plus a
+gates-off arm, reports prefill/frozen/final cache receipts, actual selected-KV and
+L1/L2 counts, allocated/reserved peaks and decode TPOT. Profiler traces are separate
+from timing runs. A report is evidence, not an automatic equivalence or speedup
+verdict; inspect generation parity and the GPU hygiene log first.
+
 ## Accepted evidence and limits
 
 Historical full evaluation: source `3e4a6885604ac3e719ee92a4906f87b532535314`,
