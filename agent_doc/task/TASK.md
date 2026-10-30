@@ -2,6 +2,8 @@
 
 ## 2026-10-30
 
+- [ ] [TL-DEVICE-REVISION-VIEWS-20261030] 修复 eager 设备长度切片丢失修订号导致的几何缓存失效遗漏；host 回归通过，原生 Torch/CUDA 待验。([详情](task_details/TL-DEVICE-REVISION-VIEWS-20261030.md))
+
 - [ ] [TL-DUO-ASSETS-20261030] 固定官方DuoAttention源码、用户提供v1 PDF已归档；独立Python3.10+Torch2.4/cu121+legacy FlashInfer/FlashAttention已实装、CPU import/pattern与pip check通过，完整哈希锁可复建；BlockSparse/NVCC和GPU/实模验收仍待完成。([详情](task_details/TL-DUO-ASSETS-20261030.md))
 
 - [x] [TL-FROZEN-MAIN-20261030] Integrate accepted independent Near/Far0.05 eager cache reference;84 tests +14 subtests passed. ([details](task_details/TL-FROZEN-MAIN-20261030.md))

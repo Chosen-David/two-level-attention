@@ -59,8 +59,11 @@ def _graph_geo_lookup(valid_len, geo_key):
     try:
         # DeviceDecodeInputs 的 Triton 写入不推进 PyTorch version counter，
         # 额外消费其逐步调用的显式修订号，避免 eager 跨步复用旧 S_real。
+        # Row views do not inherit Python attributes from their base tensor.
         version = (valid_len._version,
-                   getattr(valid_len, '_tli_device_revision', 0))
+                   getattr(valid_len, '_tli_device_revision', 0),
+                   getattr(getattr(valid_len, '_base', None),
+                           '_tli_device_revision', 0))
     except RuntimeError:  # inference_mode tensors have no mutation counter
         return None
     ent = _GRAPH_GEO_CACHE.get(valid_len.data_ptr())
@@ -73,8 +76,11 @@ def _graph_geo_lookup(valid_len, geo_key):
 
 def _graph_geo_store(valid_len, geo_key, geo):
     try:
+        # Row views do not inherit Python attributes from their base tensor.
         version = (valid_len._version,
-                   getattr(valid_len, '_tli_device_revision', 0))
+                   getattr(valid_len, '_tli_device_revision', 0),
+                   getattr(getattr(valid_len, '_base', None),
+                           '_tli_device_revision', 0))
     except RuntimeError:
         return geo  # Never reuse geometry without a reliable mutation version.
     if len(_GRAPH_GEO_CACHE) > 8:   # 上限清理（B>1 行缓存 + 防无界增长）
@@ -6010,3 +6016,4 @@ def _iter3_compact(cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev):
         ci_out, kp_out, mid_out if mid_out is not None else kp_out, clen,
         R_cap, S_CAP_M1=S_cap - 1, BLOCK=2048, WITH_MID=mid_mask is not None, num_warps=8)
     return ci_out, kp_out, mid_out, clen
+
