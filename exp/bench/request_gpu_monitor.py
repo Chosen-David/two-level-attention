@@ -17,7 +17,18 @@ import torch
 class GPU0Monitor:
     def __init__(self, path):
         self.path = Path(path)
-        self.uuid = 'GPU-05a75a00-5bfc-a167-09e9-8bbf429846c9'
+        # 逻辑 cuda:0 对应的物理 UUID 必须在建立本进程 CUDA context 前解析；
+        # 不能写死某台机器的 UUID，否则远端锁卡监控会在起跑前失败。
+        visible = os.environ.get('CUDA_VISIBLE_DEVICES')
+        selector = '0' if visible is None else visible.split(',')[0].strip()
+        if not selector:
+            raise RuntimeError('GPU0Monitor requires a visible CUDA device')
+        raw = subprocess.check_output([
+            'nvidia-smi', '-i', selector, '--query-gpu=uuid',
+            '--format=csv,noheader'], text=True).strip()
+        if not raw or '\n' in raw:
+            raise RuntimeError(f'cannot resolve one GPU UUID from {selector!r}: {raw!r}')
+        self.uuid = raw
         self.observations = []
         self.stop = threading.Event()
         self.ownership = None
