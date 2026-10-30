@@ -1,6 +1,9 @@
 {
   "schema": "frozen-eager-8k-four-state-attention-alignment-v1",
-  "code_commit": "308709ca573a94f0c4258cab8dd82af2809369d0",
+  "code_commits": {
+    "near": "308709ca573a94f0c4258cab8dd82af2809369d0",
+    "keep_far_both": "b62c5b8ea59228892a2a77992456a8e0c7491da8"
+  },
   "verdict": "PASS_8K_FOUR_STATE_SELECTED_ID_AND_OUTPUT_PARITY_UNDER_ALIGNED_ATTENTION",
   "protocol": {
     "model": "Qwen3-8B BF16",
@@ -19,6 +22,7 @@
   },
   "evidence": {
     "near": {
+      "code_commit": "308709ca573a94f0c4258cab8dd82af2809369d0",
       "report": "/tmp/frozen-eager-308709c-trace-8k-near-aligned-attention/report.json",
       "report_sha256": "cb0082fb2d1fefb32b8f2e1b7261e56bcb8aa71d37d9cc1c61786d1a3bb5d149",
       "aligned_reference_attention_calls": 252,
@@ -32,6 +36,7 @@
       "physical_selected_kv_total": 293836
     },
     "keep_far_both": {
+      "code_commit": "b62c5b8ea59228892a2a77992456a8e0c7491da8",
       "report": "/tmp/frozen-eager-308709c-trace-8k-other-states-aligned-attention/report.json",
       "report_sha256": "a494f24f4be0294660ff74fef4b53de1a5b20a72fd1ed5723954a569b1b8320a",
       "aligned_reference_attention_calls": 756,
