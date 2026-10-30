@@ -226,7 +226,7 @@ def _formal(root, out, data_root=None, min_samples=2, extra=(),
             postfix="_fx", optimized=False):
     argv = [sys.executable] + (["-O"] if optimized else []) + \
         ["-u", "-m", "benchmark.RULER.score_ruler_formal",
-         "--root", root, "--pred-postfix", postfix,
+         "--rope-policy", "legacy", "--root", root, "--pred-postfix", postfix,
          "--data-root", data_root or os.path.join(TESTDATA, "data_root"),
          "--out", out, "--min-samples", str(min_samples)]
     argv += list(extra)

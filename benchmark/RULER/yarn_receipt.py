@@ -207,14 +207,16 @@ def resolve_yarn_config(use_yarn, yarn_factor, context_length, auto_map,
     语义与修复前 pred_ruler.py 两处内联逻辑逐位一致：
         factor = yarn_factor or auto_map.get(context_length, 4.0)
     （显式 0/None 同样回退自动档——保持既有 `or` 语义零行为变更）。
-    返回 (factor, rope_scaling)；use_yarn=False → (None, None)。"""
+    返回 (factor, rope_scaling)；use_yarn=False → (None, None)。
+    native_mpe is retained for API compatibility, not used as YaRN original.
+    Qwen main policy uses original32768 independently of snapshot capacity."""
     if not use_yarn:
         return None, None
     factor = yarn_factor or auto_map.get(context_length, 4.0)
     rope_scaling = {
         "rope_type": "yarn", "type": "yarn",
         "factor": factor,
-        "original_max_position_embeddings": native_mpe,
+        "original_max_position_embeddings": 32768,
         "beta_fast": 32, "beta_slow": 1,
     }
     return factor, rope_scaling
@@ -281,6 +283,10 @@ def build_yarn_receipt(*, yarn_enabled, effective_factor, yarn_factor_cli,
         "producer_script": {"path": producer_script_path,
                             "sha256": producer_script_sha256},
     }
+    # Explicitly separate the training RoPE length from snapshot position capacity.
+    # Old receipts without this field retain their historical validation rule.
+    receipt["rope_original_max_position_embeddings"] = (
+        rope_scaling["original_max_position_embeddings"] if yarn_enabled else None)
     # 079（TL-E121-OUTPUT-ID-079）：resolved treatment manifest 入回执——
     # 与 method hash / LongBench sidecar 共用 sparse_attn/info.py 的同一
     # 份 resolved manifest（单一事实源，pred_ruler.py 不再各自维护治疗
@@ -670,7 +676,7 @@ def _validate_common_schema(receipt, pred_path):
 
     必需键集合、类型、64 位十六进制 hash、rope_scaling 完整规范
     （rope_type/type=yarn、factor>0、original_max_position_embeddings
-    正 int 且等于 native_mpe、beta_fast=32、beta_slow=1——与
+    正 int 且等于显式 rope_original 字段（旧记录回退 native_mpe）、beta_fast=32、beta_slow=1——与
     resolve_yarn_config 产出的 Qwen3 官方配方逐位一致）、
     yarn_factor_source 枚举且与开关自洽、generation_params 必需键
     （seed 正 int、max_gen 正 int、max_num 非负 int、method/t 非空
@@ -799,6 +805,11 @@ def _validate_common_schema(receipt, pred_path):
                     f"h{tm['sha256'][:10]} 不一致——回执内 manifest 与"
                     f"产物文件名异源（同名混装/回执张冠李戴），"
                     f"fail closed（081）")
+    if "rope_policy" in receipt and not isinstance(receipt["rope_policy"], dict):
+        return f"{pred_path}: malformed rope_policy"
+    if receipt.get("rope_policy", {}).get("model_type") == "qwen3" and enabled:
+        error = validate_corrected_rope_policy(receipt)
+        if error: return f"{pred_path}: {error}"
     # 057 核心不变量 + 060 rope_scaling 完整规范
     eff = receipt["effective_yarn_factor"]
     if enabled:
@@ -819,10 +830,10 @@ def _validate_common_schema(receipt, pred_path):
                     f"（receipt 自相矛盾——057 核心不变量）——fail closed")
         mpe = rs.get("original_max_position_embeddings")
         if not _is_pos_int(mpe) or \
-                mpe != receipt["native_max_position_embeddings"]:
+                mpe != receipt.get("rope_original_max_position_embeddings", receipt["native_max_position_embeddings"]):
             return (f"{pred_path}: rope_scaling.original_max_position_"
                     f"embeddings={mpe!r} 非正整数或与 native_mpe="
-                    f"{receipt['native_max_position_embeddings']!r} 不一致"
+                    f"{receipt.get('rope_original_max_position_embeddings', receipt['native_max_position_embeddings'])!r} 不一致"
                     f"——fail closed（060）")
         # beta_fast=32 / beta_slow=1：Qwen3 官方 YaRN 配方（与
         # resolve_yarn_config 逐位一致）——改 999 等假值在此拒收
@@ -1033,6 +1044,14 @@ def effective_config_sha256(receipt):
         "producer_script_path": ps.get("path"),
         "producer_script_sha256": ps.get("sha256"),
     }
+    if "rope_policy" in receipt or "runtime_rope_verification" in receipt:
+        canon["rope_policy"] = receipt.get("rope_policy")
+        runtime = receipt.get("runtime_rope_verification") or {}
+        canon["runtime_rope_verification"] = {k: runtime.get(k) for k in (
+            "policy", "status", "transformers", "runtime_max_position_embeddings",
+            "original_max_position_embeddings", "requested_factor", "attention_scaling",
+            "inv_freq_sha256", "verification_source_sha256", "framework_rope_source_sha256",
+            "rotary_dim", "rope_theta")}
     return hashlib.sha256(json.dumps(
         canon, ensure_ascii=False, sort_keys=True).encode("utf-8")
     ).hexdigest()
@@ -1210,3 +1229,51 @@ def resolve_manifest_yarn_identity(manifest_path):
         },
         "manifest_run_identity_yarn_factor": declared,
     }
+
+
+def validate_corrected_rope_policy(receipt):
+    """Main-table admission, separate from reading historical self-consistent receipts.
+
+    No torch dependency: recompute static Qwen128-D YaRN frequencies from policy.
+    Returns an error string or None. Only applies to explicit Qwen YaRN records.
+    """
+    import math
+    import struct
+    policy=receipt.get('rope_policy') or {}
+    evidence=receipt.get('runtime_rope_verification') or {}
+    if not isinstance(policy,dict) or not isinstance(evidence,dict):return 'malformed runtime policy evidence'
+    if policy.get('policy')!='near-far-rope-32768-v1' or policy.get('model_type')!='qwen3':
+        return 'missing corrected Qwen RoPE policy; old data remain historical'
+    context=receipt.get('context_length')
+    factor={65536:2.,131072:4.}.get(context)
+    rope=receipt.get('rope_scaling') or {}
+    if factor is None or rope.get('original_max_position_embeddings')!=32768 or rope.get('factor')!=factor:
+        return 'requires64K/128K factor2/4 original32768'
+    if evidence.get('status')!='verified' or evidence.get('policy')!=policy['policy']:
+        return 'missing runtime rotary verification'
+    if evidence.get('original_max_position_embeddings')!=32768 or evidence.get('requested_factor')!=factor:
+        return 'runtime and requested RoPE differ'
+    required=context+receipt.get('generation_params',{}).get('max_gen',64)
+    if policy.get('runtime_max_position_embeddings',0)<required or evidence.get('runtime_max_position_embeddings')!=policy.get('runtime_max_position_embeddings'):
+        return 'runtime capacity lacks input/output reservation'
+    for key in ['verification_source_sha256','framework_rope_source_sha256','inv_freq_sha256']:
+        val=evidence.get(key)
+        if not isinstance(val,str) or len(val)!=64 or any(c not in '0123456789abcdef' for c in val):return 'missing valid '+key
+    if evidence.get('rotary_dim')!=128 or evidence.get('rope_theta')!=1e6:return 'main policy supports Qwen8B/32B128-D theta1e6 only'
+    for key,tolerance in [('max_cos_error',5e-4),('max_sin_error',5e-4),('max_inv_freq_error',1e-7)]:
+        error=evidence.get(key)
+        if not isinstance(error,(int,float)) or not math.isfinite(error) or not 0<=error<=tolerance:return 'invalid rotation verification '+key
+    inv=evidence.get('inv_freq')
+    if not isinstance(inv,list) or len(inv)!=64 or any(not isinstance(x,(int,float)) or not math.isfinite(x) for x in inv):
+        return 'invalid Qwen128-D runtime frequencies'
+    if hashlib.sha256(struct.pack('<64f',*inv)).hexdigest()!=evidence['inv_freq_sha256']:
+        return 'frequency hash mismatch'
+    low=max(math.floor(128*math.log(32768/(32*2*math.pi))/(2*math.log(1e6))),0)
+    high=min(math.ceil(128*math.log(32768/(2*math.pi))/(2*math.log(1e6))),127)
+    for i,value in enumerate(inv):
+        ramp=max(0.,min(1.,(i-low)/(high-low)))
+        expected=1e6**(-2*i/128)*((1-ramp)+ramp/factor)
+        if not math.isclose(value,expected,rel_tol=3e-6,abs_tol=1e-10):return 'runtime frequencies violate explicit static YaRN'
+    scale=1+.1*math.log(factor)
+    if not math.isclose(evidence.get('attention_scaling',0),scale,rel_tol=1e-7):return 'runtime attention scale differs'
+    return None

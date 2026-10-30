@@ -127,7 +127,7 @@ def install_stubs(pred_tag):
                                                          _Tok())),
         AutoConfig=types.SimpleNamespace(from_pretrained=
                                           staticmethod(lambda *a, **k:
-                                                       types.SimpleNamespace())),
+                                                       types.SimpleNamespace(model_type="receipt_test_stub", max_position_embeddings=40960))),
         AutoModelForCausalLM=types.SimpleNamespace(from_pretrained=
                                                    staticmethod(
                                                        lambda *a, **k:
@@ -147,7 +147,7 @@ def install_stubs(pred_tag):
     except Exception:
         sys.modules["transformers"] = fake_transformers
         sys.modules["sparse_attn.patches"] = types.SimpleNamespace(
-            register_patch=lambda model, args: None)
+            register_patch=lambda model, args, snapshot=None: None)
 
     # GPU 桩：.to("cuda") 就地返回（无卡环境可跑）；其余 .to 语义不变
     _orig_to = torch.Tensor.to
@@ -167,10 +167,12 @@ def install_stubs(pred_tag):
     pred_ruler = importlib.import_module("benchmark.RULER.pred_ruler")
 
     # sparse_attn 旁路桩（与生成/提交协议无关）
-    pred_ruler.register_patch = lambda model, args: None
+    pred_ruler.get_treatment_manifest_json = lambda args, snapshot=None: None
+    pred_ruler.resolve_treatment_snapshot = lambda args: None  # receipt-only stub, not a TLI treatment
+    pred_ruler.register_patch = lambda model, args, snapshot=None: None
     pred_ruler.get_metrics = lambda: types.SimpleNamespace(
         get_select_tokens=lambda: 0, clear=lambda: None)
-    pred_ruler.get_method_name_with_info = lambda args: "stubm"
+    pred_ruler.get_method_name_with_info = lambda args, snapshot=None: "stubm"
     return pred_ruler
 
 
