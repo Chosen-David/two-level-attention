@@ -30,12 +30,12 @@ def run(cli):
         '--tli_subspace','tail','--tli_sink_tokens','4','--tli_swa_size','128',
         '--tli_enable_layer_skip','false','--tli_enable_kmeans','false',
         '--tli_far_skip_backend','legacy','--tli_far_skip_cache','retain'])
-    os.environ.update(TLI_OPERATOR_MODE='serial',TLI_OPERATOR_BACKEND='simt',
+    os.environ.update(TLI_OPERATOR_MODE=cli.operator_mode,TLI_OPERATOR_BACKEND='simt',
         TLI_OPERATOR_SELECTED_STAGES='1',TLI_SPARSE_SELECTION='1',
         TLI_LIVE_NORMALIZATION='1',TLI_SPARSE_STATS='owner',TLI_GRAPH_INC='1',
         TLI_L2_BYPASS='0',TLI_CUDA_GRAPH='auto',
         TLI_QUALITY_TIMING='1' if cli.measure else '0')
-    model_path='/home/wangyuanshuo02/models/huggingface.co/Qwen/Qwen3-32B'
+    model_path=cli.model_path
     tokenizer=AutoTokenizer.from_pretrained(model_path)
     model=AutoModelForCausalLM.from_pretrained(model_path,dtype=torch.bfloat16,
         device_map={'':'cuda:0'},attn_implementation='sdpa').eval()
@@ -48,13 +48,15 @@ def run(cli):
     rows=rows[:cli.batch]
     ids=[tokenizer(row['input'],return_tensors='pt').input_ids.to('cuda') for row in rows]
     lengths=[x.shape[-1] for x in ids]
-    if min(lengths)<9217 or max(lengths)+cli.max_gen>=65536:
-        raise ValueError('unsupported live-length/capacity geometry')
+    if min(lengths)<9217:
+        raise ValueError('live normalization requires prompt lengths >= 9217')
     records=[]
     output=Path(cli.output)
     output.with_suffix('.configuration.json').write_text(json.dumps(dict(
         resolved_args=vars(args),inherited_tli_environment=inherited_env,model=model_path,input_indices=[r['index'] for r in rows],
-        lengths=lengths,eos_policy='empty EOS diagnostic; fixed generation count',
+        lengths=lengths,eos_policy=('offline fixed steps; EOS disabled and final token readback'
+                                    if cli.offline_fixed else
+                                    'online EOS diagnostic with empty EOS and per-step token readback'),
         scope='explicit no-gate Qwen; unchanged 64/128/1024 budget, not ring-gate or GLM B>1'),indent=2))
 
     def request(which, batch_mode, row_reference=False, eager_reference=False, legacy_graph=False):
@@ -65,7 +67,7 @@ def run(cli):
             os.environ['TLI_DEVICE_DECODE_INPUTS']=value
             os.environ['TLI_REUSE_WARMUP_STREAM']=value
         os.environ['TLI_CUDA_GRAPH']='off' if eager_reference else 'auto'
-        os.environ['TLI_OPERATOR_MODE']='off' if (eager_reference or legacy_graph) else 'serial'
+        os.environ['TLI_OPERATOR_MODE']='off' if (eager_reference or legacy_graph) else cli.operator_mode
         os.environ['TLI_EXACT_BATCH_REFERENCE']='1' if row_reference else '0'
         os.environ['TLI_BATCH_INDEXER']=batch_mode
         batch=len(which); lens=[lengths[b] for b in which]
@@ -94,9 +96,12 @@ def run(cli):
                 prefilled.clear()
                 torch.cuda.synchronize();conversion_ms=(time.perf_counter()-t)*1000
                 ctx=BatchCtx(batch,list(lens),[0]*batch,[True]*batch,0)
-                tokens=static_decode(model,cache,[[x] for x in first],lens,set(),cli.max_gen,ctx)
+                tokens=static_decode(model,cache,[[x] for x in first],lens,set(),cli.max_gen,ctx,
+                                     online_eos=not cli.offline_fixed)
             torch.cuda.synchronize();total_ms=(time.perf_counter()-start)*1000
             execution=dict(model._quality_graph_execution)
+            assert execution['generation_mode']==('fixed_steps' if cli.offline_fixed else 'online_eos')
+            assert execution['token_readback']==('final' if cli.offline_fixed else 'per_step')
             if cli.device_input_reference:
                 expected='device_row_fused' if current_arm=='candidate' else 'host_reference'
                 assert execution['input_update_route']==expected
@@ -115,9 +120,10 @@ def run(cli):
             if eager_reference:
                 assert execution['actual']=='staged_static' and execution['captures']==0
                 assert execution['replay_steps']==0 and execution['fallback_reason'] is None
+                assert execution['decode_index_route']=='request_row_incremental'
                 if batch>1:
                     assert len(execution['eager_layers'])==model.config.num_hidden_layers
-                    assert all(r['attention_route']=='batch_eager_tli' for r in execution['eager_layers'])
+                    assert all(r['attention_route']=='legacy_graph_eager_tli' for r in execution['eager_layers'])
             else:
                 assert execution['actual']=='graph' and execution['captures']==1
                 assert execution['replay_steps']==cli.max_gen-1 and execution['fallback_reason'] is None
@@ -175,8 +181,13 @@ def run(cli):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--input',required=True);p.add_argument('--output',required=True)
+    p.add_argument('--model-path',default='/home/wangyuanshuo02/models/huggingface.co/Qwen/Qwen3-32B')
     p.add_argument('--batch',type=int,choices=[1,2,4,8],required=True)
     p.add_argument('--max-gen',type=int,default=16);p.add_argument('--measure',action='store_true')
+    p.add_argument('--offline-fixed',action='store_true',
+        help='固定步数 decode：禁用 EOS，逐步采样留在设备上，最后统一读回；与在线逐步读回分开计时')
+    p.add_argument('--operator-mode',choices=['off','serial','overlap'],default='off',
+        help='实验算子默认不参与核心 eager/Graph 对比；serial/overlap 仅在显式选择时启用')
     ref=p.add_mutually_exclusive_group()
     ref.add_argument('--same-batch-reference',action='store_true')
     ref.add_argument('--eager-batch-reference',action='store_true')
