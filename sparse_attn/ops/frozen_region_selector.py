@@ -1,9 +1,9 @@
-"""Physical-arena TLI selection without full-length projected/fine-score tensors.
+"""Physical-arena TLI selection with candidate-only fine-score computation.
 
-L1 reuses ``TLIIndexer._select_l1_blocks``. Fine scores cover only each KV
-head's L1/bypass/protected candidates. Probabilities are restored to absolute
-logical positions before the original free-competition top-k so zero-probability
-fillers and torch's tie behavior remain unchanged.
+L1 reuses ``TLIIndexer._select_l1_blocks``. Fine scores are computed only for
+each KV head's L1/bypass/protected candidates, then scattered to a full-width
+buffer for reference-layout normalization and the original free-competition
+top-k so reduction and tie behavior remain unchanged.
 """
 import torch
 from einops import einsum as reference_einsum
@@ -189,12 +189,17 @@ def region_mask_physical(indexer, q, layer, scale, intermediates=None):
             bq = bq.reshape(kv_heads,group,-1)
             fine = torch.einsum('hgd,hrd->hgr',bq,keys).to(q.dtype)
     fine = fine.masked_fill(~cand_valid[:,None],float('-inf'))
-    probability = fine.softmax(-1).nan_to_num(nan=0).mean(1)
-    probability = probability.masked_fill(
-        cand_valid & (cand_ids >= max(0,length-swa)),1.0)
-    padded = probability.new_zeros((kv_heads,length+1))
-    padded.scatter_(1,torch.where(cand_valid,cand_ids,length),probability)
-    p = padded[:,:length]
+    # reference 在 full-width、先 mask 的 score 上做 softmax；compact 候选维
+    # 的归约布局会改变 BF16 概率的同值边界。只 scatter 已算候选分，不重算全量 fine。
+    q_cand_ids = cand_ids.repeat_interleave(group,dim=0)
+    q_cand_valid = cand_valid.repeat_interleave(group,dim=0)
+    full_fine = fine.new_full((heads,length+1),float('-inf'))
+    full_fine.scatter_(1,torch.where(q_cand_valid,q_cand_ids,length),
+                       fine.reshape(heads,-1))
+    probability = full_fine[:,:length].softmax(-1).nan_to_num(nan=0)
+    probability = probability.reshape(kv_heads,group,length).mean(1)
+    probability[:,max(0,length-swa):length] = 1.0
+    p = probability
 
     k2 = min(length,idx.args.tia_level2_topk)
     far_tok_lo = far_lo*bs

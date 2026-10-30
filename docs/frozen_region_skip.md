@@ -42,9 +42,11 @@ L1=128, L2=1024, Far=minmax, Near=avg, Near pages=32, Near tokens=off.
 
 The legacy logical-mask path remains available as a test oracle via
 `TLI_FROZEN_EAGER_REFERENCE=1` outside the RULER production entry. The physical
-selector still materializes a logical-length probability tensor and performs the
-original-width mid top-k to preserve filler and tie behavior; L2 is therefore not
-fully compact. CPU/tiny-Qwen tests establish cache, selection and attention parity,
+selector still materializes a Q-head full-width score buffer for reference-layout
+masked softmax, plus a logical-length probability tensor and original-width mid
+top-k, to preserve reduction, filler and tie behavior; L2 normalization and
+selection are therefore not fully compact. CPU/tiny-Qwen tests establish cache,
+selection and attention parity,
 but do not establish GPU latency, traffic or peak-memory improvements. Beam search,
 chunked prefill, batches, gradients and CUDA Graphs are unsupported.
 
