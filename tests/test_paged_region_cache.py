@@ -80,3 +80,20 @@ def test_ring_arithmetic_bfloat16_rounding(near,far):
     probs=scores.masked_fill(~fullmask,float('-inf')).softmax(-1).bfloat16()
     expected=(probs@v.repeat_interleave(3,1)).transpose(1,2)
     torch.testing.assert_close(actual,expected,atol=.002,rtol=.002)
+
+@pytest.mark.parametrize('length,width,vwidth,fast,upper,healthy,cuda,expected',[
+    (16383,128,128,'1','2048',True,True,True),
+    (16384,128,128,'1','2048',True,True,False),
+    (16384,128,128,'0','2048',True,True,True),
+    (16384,128,128,'1','4096',True,True,True),
+    (32768,192,128,'1','2048',True,True,True),
+    (32768,128,128,'1','2048',False,True,True),
+    (32768,128,128,'1','2048',True,False,True),
+])
+def test_ring_probability_rounding_tracks_fallbacks(monkeypatch,length,width,vwidth,fast,upper,healthy,cuda,expected):
+    from sparse_attn.ops import eager_decoding as eager
+    from sparse_attn.ops.paged_region_kernels import ring_rounds_probabilities
+    monkeypatch.setenv('TLI_E127_FAST',fast);monkeypatch.setenv('TLI_E127_W_UPPER',upper)
+    monkeypatch.setattr(eager,'_HAS_TRITON',True)
+    monkeypatch.setitem(eager._EAGER_TRITON_OK,'ok',healthy)
+    assert ring_rounds_probabilities(length,width,vwidth,cuda=cuda)==expected

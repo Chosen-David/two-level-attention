@@ -4,6 +4,7 @@ CPU uses a pagewise two-pass softmax oracle. CUDA reads full K/V directly throug
 page pointer tables. Only scalar selection indices and low-dimensional index
 scratch are materialized. This eager implementation does not support Graphs.
 """
+import os
 import torch
 try:
     import triton
@@ -88,6 +89,22 @@ def project_visible(layer,dims,block_size):
     return out
 
 
+def ring_rounds_probabilities(visible_tokens,qk_width,v_width,*,cuda):
+    """Arithmetic of the current compact-ring eager route, before kernel launch.
+
+    The torch dense AND gather fallbacks round probabilities. Only the admitted
+    Triton gather branch keeps them FP32; sequence length alone is insufficient.
+    The reference's global failure flag is respected on subsequent calls.
+    """
+    from . import eager_decoding as eager
+    upper=min(int(os.environ.get('TLI_E127_W_UPPER','2048')),visible_tokens)
+    fused=(os.environ.get('TLI_E127_FAST','1')!='0' and cuda
+           and visible_tokens>=16384 and upper*8<=visible_tokens
+           and eager._HAS_TRITON and eager._EAGER_TRITON_OK['ok']
+           and qk_width==v_width and qk_width>0 and qk_width&(qk_width-1)==0)
+    return not fused
+
+
 def paged_attention(layer,q,mask,scale,*,ring_arithmetic=False):
     """q[B,Hq,1,D], mask[1,1,Hkv,L]; output[B,1,Hq,Dv]."""
     _,k,v=next(iter(layer.pages.values()))
@@ -105,7 +122,8 @@ def paged_attention(layer,q,mask,scale,*,ring_arithmetic=False):
     if torch.any(counts==0):raise ValueError('empty attention row')
     # Ring eager always rounds scaled Q to activation dtype. Its small-context
     # dense branch also rounds normalized probabilities; mirror both explicitly.
-    round_prob=ring_arithmetic and sum(b-a for a,b in layer.intervals())<16384
+    round_prob=ring_arithmetic and ring_rounds_probabilities(
+        sum(b-a for a,b in layer.intervals()),k.shape[-1],v.shape[-1],cuda=q.is_cuda)
     if ring_arithmetic:
         q=q*scale
         scale=1.
