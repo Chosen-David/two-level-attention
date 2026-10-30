@@ -134,6 +134,81 @@ def test_error_flag_rejects_output_before_commit_and_next_request_recovers(tmp_p
         else:_ERR_FLAG[key]=before
 
 
+def test_fixed_steps_disable_eos_and_use_final_readback(monkeypatch):
+    monkeypatch.setenv('TLI_CUDA_GRAPH', '0')
+    monkeypatch.setenv('TLI_QUALITY_TIMING', '1')
+    model = Toy()
+    cache = TLIStaticCache(model.config, 16, 2)
+    cache.layers[0].lazy_initialization(torch.zeros(2, 1, 1, 4))
+    ctx = BatchCtx(2, [2, 5], [0, 0], [True, True], 0)
+    result = static_decode(model, cache, [[1], [3]], [2, 5], {2}, 5, ctx,
+                           online_eos=False)
+    assert result == [[1, 2, 3, 4, 5], [3, 4, 5, 6, 7]]
+    assert ctx.seq_lens == [6, 9] and ctx.gen_lens == [4, 4]
+    record = model._quality_graph_execution
+    assert record['generation_mode'] == 'fixed_steps'
+    assert record['token_readback'] == 'final'
+    assert record['timing']['decode_steps'] == 4
+    assert record['timing']['step_timing_scope'] == 'host_submit_only'
+    assert record['timing']['output_readback_wall_ms'] >= 0
+
+
+def test_batch_row_incremental_states_are_independent_and_request_scoped(monkeypatch):
+    from sparse_attn.baseline_runtime import batch_decode_scope
+    from sparse_attn.ops.cuda_graph_state import graph_state
+    from sparse_attn.patches import qwen3_attn_patch as patch
+
+    class RowIndexer:
+        def __init__(self):
+            self._ginc = None
+            self.full = 0
+            self.incremental = 0
+
+        def prepare_index(self, key, cu):
+            ptr = key.data_ptr()
+            if self._ginc is None or self._ginc['ptr'] != ptr:
+                self.full += 1
+                self._ginc = {'ptr': ptr}
+            else:
+                self.incremental += 1
+            return self._ginc
+
+        def compute_mask_graph(self, q, index, scale, valid):
+            return torch.ones(1, 1, key.shape[2], key.shape[1], dtype=torch.bool)
+
+    monkeypatch.setenv('TLI_BATCH_INDEXER', 'legacy')
+    monkeypatch.setenv('TLI_OPERATOR_MODE', 'off')
+    monkeypatch.setattr(patch, 'eager_decoding_attn', lambda q, *args, **kwargs: q)
+    gs = graph_state()
+    gs.enabled = True
+    gs.bs = 2
+    key = torch.zeros(2, 32, 2, 4)
+    gs.pos_buf = torch.tensor([8, 12])
+    gs.valid_len_buf = torch.tensor([9, 13])
+    gs.alive_buf = torch.ones(2, dtype=torch.bool)
+    q = torch.zeros(2, 1, 2, 4)
+    value = torch.zeros_like(key)
+    idx = RowIndexer()
+    layer = SimpleNamespace(scaling=0.5)
+    try:
+        for request in range(2):
+            ctx = BatchCtx(2, [9, 13], [0, 0], [True, True], 0)
+            ctx._tli_row_index_pools = {}
+            with batch_decode_scope(ctx):
+                for _ in range(2):
+                    patch._tl_decode_batched_graph(layer, idx, q, key, value, gs)
+            if request == 0:
+                assert idx.full == 2 and idx.incremental == 2
+                assert set(ctx._tli_row_index_pools[id(idx)]) == {0, 1}
+            else:
+                # 新 BatchCtx 不得继承上一请求的 row 摘要。
+                assert idx.full == 4 and idx.incremental == 4
+    finally:
+        gs.enabled = False
+        gs.pos_buf = gs.valid_len_buf = gs.alive_buf = None
+        gs.bs = None
+
+
 @pytest.mark.parametrize("timing", ["0", "1"])
 def test_timing_preserves_ragged_eos_and_counts_only_live_tokens(monkeypatch, timing):
     monkeypatch.setenv("TLI_CUDA_GRAPH", "0")

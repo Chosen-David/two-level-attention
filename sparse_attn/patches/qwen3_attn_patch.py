@@ -157,7 +157,19 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
                       lambda: torch.tensor([0, S_cap], device=dev,
                                            dtype=torch.int32))
     masks = []
+    # 同一层 indexer 会被 batch 内所有 row 依次调用。单个 _ginc 在不同
+    # KV 地址间来回切换会每行全量重建；请求上下文内的 per-row 池让 eager
+    # 与 Graph 都复用各自持久摘要。池随 BatchCtx 销毁，绝不跨请求共享。
+    ctx = batch_decode_ctx()
+    row_pool = None
+    if ctx is not None:
+        pools = getattr(ctx, '_tli_row_index_pools', None)
+        if pools is None:
+            pools = ctx._tli_row_index_pools = {}
+        row_pool = pools.setdefault(id(indexer), {})
     for b in range(B):
+        if row_pool is not None:
+            indexer._ginc = row_pool.get(b)
         # 【E152v4】不再每步 clear()：clear 是请求边界标记（prefill 前每层
         # 调用，失效 _inc/_ginc → 新请求首步全量重建）。graph 步进下每步
         # clear 会把 _ginc 持久容量宽 buffer 一起失效 → 退化回每步
@@ -171,6 +183,8 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
         from ..ops.exact_linear_batch import _row_scope
         with _row_scope(gs, b):
             idx_dict = indexer.prepare_index(k[b:b + 1], cu)
+            if row_pool is not None:
+                row_pool[b] = indexer._ginc
             masks.append(indexer.compute_mask_graph(
                 q[b:b + 1], idx_dict, self.scaling, vl[b:b + 1]))
     m_b = torch.cat(masks, dim=0)              # [B,1,Hkv,S_cap] bool

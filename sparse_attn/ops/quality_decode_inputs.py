@@ -1,8 +1,9 @@
 """Device-side input preparation outside the model's captured forward.
 
-One CTA owns each row, including its mutable lengths and output mask. Keeping
-all mask tiles in that CTA prevents a metadata-store/read race across CTAs.
-Sampling is still torch.argmax and the caller still reads every output step.
+一个 row×tile CTA 独立从旧元数据推导本步长度；tile 0 写元数据，所有 tile
+只写自己的 mask 区间，因此不存在元数据 store/read 竞争，也不再受单个
+Triton block 最大 65536 元素限制。采样仍是 torch.argmax；在线 EOS 的逐步
+读回与离线固定步数的最终读回由调用方分别处理。
 """
 import torch
 import triton
@@ -11,10 +12,11 @@ import triton.language as tl
 
 @triton.jit
 def _inject(Seed, Previous, Counts, Tokens, Positions, Pos, Lengths, Alive, Mask,
-            B: tl.constexpr, CAP: tl.constexpr, WIDTH: tl.constexpr,
+            B: tl.constexpr, CAP: tl.constexpr, BLOCK: tl.constexpr,
             FIRST: tl.constexpr, PAD: tl.constexpr, EOS: tl.constexpr,
             MIN_NEW: tl.constexpr, NEG: tl.constexpr):
     row = tl.program_id(0)
+    tile = tl.program_id(1)
     token = tl.load(Previous + row)
     if FIRST:
         position = tl.load(Seed + B + row)
@@ -32,13 +34,15 @@ def _inject(Seed, Previous, Counts, Tokens, Positions, Pos, Lengths, Alive, Mask
         live = live & ~(stop & (count >= MIN_NEW))
     length += live.to(tl.int64)
     count += live.to(tl.int64)
-    tl.store(Tokens + row, tl.where(live, token, PAD))
-    tl.store(Positions + row, position)
-    tl.store(Pos + row, length - 1)
-    tl.store(Lengths + row, length)
-    tl.store(Alive + row, live)
-    tl.store(Counts + row, count)
-    cols = tl.arange(0, WIDTH)
+    # 所有 tile 从同一份旧值推导，只有 tile 0 更新共享元数据。
+    if tile == 0:
+        tl.store(Tokens + row, tl.where(live, token, PAD))
+        tl.store(Positions + row, position)
+        tl.store(Pos + row, length - 1)
+        tl.store(Lengths + row, length)
+        tl.store(Alive + row, live)
+        tl.store(Counts + row, count)
+    cols = tile * BLOCK + tl.arange(0, BLOCK)
     tl.store(Mask + row * CAP + cols, tl.where(cols < length, 0., NEG), cols < CAP)
 
 
@@ -55,9 +59,12 @@ class DeviceDecodeInputs:
         self.counts = torch.empty_like(lengths)
         self.pad, self.eos, self.minimum = pad_id, tuple(sorted(eos_ids)), min_new_tokens
 
-    def inject(self, step, previous):
-        _inject[(self.batch,)](
+    def inject(self, step, previous, *, block=1024):
+        if block < 1 or block & (block - 1):
+            raise ValueError('device input block must be a positive power of two')
+        grid = (self.batch, triton.cdiv(self.capacity, block))
+        _inject[grid](
             self.seed, previous, self.counts, *self.buffers,
-            B=self.batch, CAP=self.capacity, WIDTH=triton.next_power_of_2(self.capacity),
+            B=self.batch, CAP=self.capacity, BLOCK=block,
             FIRST=step == 0, PAD=self.pad, EOS=self.eos, MIN_NEW=self.minimum,
-            NEG=torch.finfo(self.buffers[-1].dtype).min, num_warps=8)
+            NEG=torch.finfo(self.buffers[-1].dtype).min, num_warps=4)
