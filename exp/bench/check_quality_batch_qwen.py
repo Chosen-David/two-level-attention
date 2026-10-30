@@ -58,6 +58,12 @@ def run(cli):
         scope='explicit no-gate Qwen; unchanged 64/128/1024 budget, not ring-gate or GLM B>1'),indent=2))
 
     def request(which, batch_mode, row_reference=False, eager_reference=False, legacy_graph=False):
+        if cli.device_input_reference:
+            # Same attention/selection route in both arms; only G4 setup and
+            # outside-Graph input preparation differ. Receipts verify dispatch.
+            value='1' if current_arm=='candidate' else '0'
+            os.environ['TLI_DEVICE_DECODE_INPUTS']=value
+            os.environ['TLI_REUSE_WARMUP_STREAM']=value
         os.environ['TLI_CUDA_GRAPH']='off' if eager_reference else 'auto'
         os.environ['TLI_OPERATOR_MODE']='off' if (eager_reference or legacy_graph) else 'serial'
         os.environ['TLI_EXACT_BATCH_REFERENCE']='1' if row_reference else '0'
@@ -91,6 +97,10 @@ def run(cli):
                 tokens=static_decode(model,cache,[[x] for x in first],lens,set(),cli.max_gen,ctx)
             torch.cuda.synchronize();total_ms=(time.perf_counter()-start)*1000
             execution=dict(model._quality_graph_execution)
+            if cli.device_input_reference:
+                expected='device_row_fused' if current_arm=='candidate' else 'host_reference'
+                assert execution['input_update_route']==expected
+                assert execution['input_update_fallback'] is None
             rec=dict(cycle=cycle,arm=current_arm,rows=which,batch=batch,batch_indexer=batch_mode,tokens=tokens,
                      entry='ruler_production_chunk' if production_entry else 'batch_probe',
                      execution=execution,allocator=observe_allocator(),environment={k:v for k,v in os.environ.items() if k.startswith('TLI_')})
@@ -123,6 +133,9 @@ def run(cli):
         return tokens
 
     def run_reference():
+        if cli.device_input_reference:
+            return request(list(range(cli.batch)), 'legacy' if cli.batch==1 else 'exact',
+                           legacy_graph=cli.batch==1)
         if cli.eager_batch_reference:
             return request(list(range(cli.batch)), 'legacy', eager_reference=True)
         if cli.legacy_batch_reference:
@@ -132,7 +145,8 @@ def run(cli):
         return [request([b], 'legacy')[0] for b in range(cli.batch)]
 
     pairs=[]
-    comparison=('same_batch_eager' if cli.eager_batch_reference else
+    comparison=('same_graph_host_inputs' if cli.device_input_reference else
+                'same_batch_eager' if cli.eager_batch_reference else
                 'same_batch_legacy_graph' if cli.legacy_batch_reference else
                 'same_batch_rows' if cli.same_batch_reference else 'independent_B1')
     for cycle in range(cli.cycles):
@@ -168,6 +182,8 @@ if __name__=='__main__':
     ref.add_argument('--eager-batch-reference',action='store_true')
     ref.add_argument('--legacy-batch-reference',action='store_true',
         help='Same-batch operator-off native Graph reference for fused Graph comparison')
+    ref.add_argument('--device-input-reference',action='store_true',
+        help='Same Graph route: host inputs/fresh stream versus device inputs/reused stream')
     p.add_argument('--cycles',type=int,default=1,help='Paired cycles with alternating arm order')
     p.add_argument('--legacy-graph-candidate',action='store_true',
         help='Compare operator-off legacy Graph against same-batch eager, checking per-layer receipts')
