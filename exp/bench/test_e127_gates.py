@@ -629,6 +629,26 @@ def test_fine_gather():
           f"maxrel={maxrel:.2e}")
 
 
+def test_fine_gather_skips_poisoned_padding():
+    """候选 pad 只负责输出 -inf，不得作为 K 地址参与 gather。"""
+    import torch as T
+    from exp.bench.e127_stage_bench import make_args
+    from sparse_attn.indexer.tli_indexer import TLIIndexer
+
+    dev = T.device('cuda:0')
+    idx = TLIIndexer(make_args(0.25, 0.125, 0.625))
+    kq = T.randn(8, 1, 128, device=dev, dtype=T.bfloat16)
+    q = T.randn(4, 128, device=dev, dtype=T.float32)
+    cand = T.tensor([[0, 1 << 30, -(1 << 30), 1 << 40]],
+                    device=dev, dtype=T.int64)
+    cand_len = T.tensor([1], device=dev, dtype=T.int64)
+    out = idx._fast_score_fine_cand(kq, q, cand, cand_len, 4, kq.dtype)
+    T.cuda.synchronize()
+    expected = (q * kq[0, 0].float()).sum(dim=-1).to(kq.dtype)
+    T.testing.assert_close(out[:, 0], expected, rtol=1e-2, atol=1e-2)
+    assert T.isneginf(out[:, 1:]).all()
+
+
 def test_pipeline_zero_sync():
     """iter5：prepare_index → compute_score → compute_mask 全管线零 host 同步
     （sync_debug_mode=error，20 步 × normal/skip 层；含 rep 扩容步）。"""

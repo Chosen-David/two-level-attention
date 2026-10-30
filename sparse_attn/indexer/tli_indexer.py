@@ -5137,9 +5137,7 @@ if _HAS_TRITON:
         offs_d = tl.arange(0, D)
         mask_r = offs_r < R
         cl = tl.load(CLEN + pid_h)
-        read_r = mask_r
-        if BATCHED:
-            read_r = mask_r & (offs_r < cl)
+        read_r = mask_r & (offs_r < cl)
         cand = tl.load(CAND + pid_h * stride_ch + offs_r * stride_cr,
                        mask=read_r, other=0)                     # [BT] int64
         if BATCHED:
