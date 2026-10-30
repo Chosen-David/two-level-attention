@@ -1,0 +1,163 @@
+"""Durable scheduler tests require no GPU, SSH, or real worker processes."""
+import multiprocessing
+from pathlib import Path
+import pytest
+from scripts.remote_frozen_queue import transaction,claim,finish,idle,command,stop_owned
+
+
+def consume(out,config,host,result):
+    ranks=[]
+    while True:
+        with transaction(out,config) as state:
+            job=claim(state,host,0,10.)
+            if job is None:break
+            ranks.append(job['rank'])
+            finish(state,job['rank'],job['token'],True,4)
+    result.put(ranks)
+
+
+def test_shared_queue_has_no_duplicate_claims_across_processes(tmp_path):
+    config={'shards':64,'head':'immutable'}
+    ctx=multiprocessing.get_context('fork');result=ctx.Queue()
+    procs=[ctx.Process(target=consume,args=(str(tmp_path),config,str(i),result)) for i in range(3)]
+    for p in procs:p.start()
+    lists=[result.get(timeout=15) for _ in procs]
+    for p in procs:p.join(timeout=15);assert p.exitcode==0
+    all_ranks=[r for group in lists for r in group]
+    assert sorted(all_ranks)==list(range(64))
+    with transaction(tmp_path,config) as state:assert all(j['status']=='done' for j in state['jobs'])
+
+
+def test_durable_slot_lease_retry_limit_and_stale_owner(tmp_path):
+    config={'shards':2}
+    with transaction(tmp_path,config) as state:
+        first=claim(state,'pc02',0,1.)
+        assert claim(state,'pc02',0,2.) is None
+        assert claim(state,'pc02',1,2.)['rank']==1
+    # Re-open on disk as after daemon restart; a live lease is still occupied.
+    with transaction(tmp_path,config) as state:
+        assert claim(state,'pc02',0,3.) is None
+        finish(state,0,first['token'],False,2,'synthetic failure')
+        second=claim(state,'pc31',0,4.)
+        assert second['rank']==0 and second['attempts']==2
+        with pytest.raises(ValueError,match='stale'):finish(state,0,first['token'],True,2)
+        finish(state,0,second['token'],False,2,'synthetic failure')
+        assert state['jobs'][0]['status']=='failed'
+        assert claim(state,'pc40',0,5.) is None
+    with pytest.raises(ValueError,match='identity'):
+        with transaction(tmp_path,{'shards':3}):pass
+
+
+def test_busy_card_is_never_considered_idle():
+    config={'idle_memory_mib':64,'idle_utilization':5}
+    assert idle({'memory_mib':4,'utilization':0},config)
+    assert not idle({'memory_mib':18000,'utilization':0},config)
+    assert not idle({'memory_mib':4,'utilization':30},config)
+
+
+def test_full_worker_command_preserves_protocol_and_explicit_gpu():
+    config={'datasets':['qasper','hotpotqa','musique','gov_report','repobench-p'],
+            'shards':64,'context_cap':31500,'out':'/shared/run'}
+    cmd=command(config,{'python':'/user/python'},{'rank':12,'gpu':3})
+    for flag,value in {'--samples':'0','--thresholds':'0.05','--world-size':'64','--rank':'12','--device':'cuda:3'}.items():
+        assert cmd[cmd.index(flag)+1]==value
+    assert '--verify-native-full' in cmd
+
+
+def test_stop_refuses_unrelated_process(monkeypatch):
+    monkeypatch.setattr('scripts.remote_frozen_queue.matches',lambda *args:False)
+    with pytest.raises(ValueError,match='unrelated'):stop_owned(123,'/out',0)
+
+
+def test_pid_publication_failure_keeps_live_worker_lease(tmp_path,monkeypatch):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from scripts import remote_frozen_queue as queue
+    config=dict(out=str(tmp_path),source='/source',shards=1,max_attempts=4,stall_seconds=7200,
+        idle_memory_mib=64,idle_utilization=5,context_cap=31500,datasets=['qasper'],
+        hosts={'pc02':{'python':'python','gpus':[0]}})
+    original=queue.transaction;calls=0
+    @contextmanager
+    def fail_publication(out,cfg):
+        nonlocal calls
+        calls+=1
+        if calls==3:raise OSError('synthetic PID publication failure')
+        with original(out,cfg) as state:yield state
+    monkeypatch.setattr(queue,'transaction',fail_publication)
+    monkeypatch.setattr(queue,'gpu_inventory',lambda:{0:dict(memory_mib=4,utilization=0)})
+    monkeypatch.setattr(queue.subprocess,'Popen',lambda *a,**kw:SimpleNamespace(pid=123))
+    with pytest.raises(OSError,match='publication'):queue.tick(config,'pc02')
+    with original(tmp_path,config) as state:
+        assert state['jobs'][0]['status']=='claiming'
+        assert state['jobs'][0]['attempts']==1
+        assert queue.claim(state,'pc31',0,100.) is None
+    monkeypatch.setattr(queue,'transaction',original)
+    monkeypatch.setattr(queue,'find_worker',lambda *a:123)
+    queue.reconcile(config,'pc02')
+    with original(tmp_path,config) as state:
+        assert state['jobs'][0]['status']=='running'
+        assert state['jobs'][0]['pid']==123
+
+
+def _die_holding_symlink(path):
+    import os
+    from scripts.remote_frozen_queue import shared_lock
+    with shared_lock(path):os._exit(0)
+
+
+def test_shared_lock_dead_owner_recovery_and_live_contention(tmp_path):
+    from scripts.remote_frozen_queue import shared_lock
+    path=tmp_path/'shared'
+    ctx=multiprocessing.get_context('fork');child=ctx.Process(target=_die_holding_symlink,args=(path,))
+    child.start();child.join(timeout=10);assert child.exitcode==0
+    assert Path(str(path)+'.d').is_symlink()
+    with shared_lock(path,blocking=False):
+        with pytest.raises(BlockingIOError):
+            with shared_lock(path,blocking=False):pass
+    assert not Path(str(path)+'.d').exists()
+    assert not list(tmp_path.glob('*.owner.*'))
+
+
+def test_owner_record_is_written_before_publication(tmp_path,monkeypatch):
+    import json,os
+    from scripts import remote_frozen_queue as queue
+    original=os.symlink;seen=[]
+    def inspect(target,path):
+        data=json.loads(Path(target).read_text())
+        assert data['pid']==os.getpid()
+        seen.append(target)
+        return original(target,path)
+    monkeypatch.setattr(queue.os,'symlink',inspect)
+    with queue.shared_lock(tmp_path/'shared'):pass
+    assert len(seen)==1
+
+
+def test_aborted_publication_does_not_leave_a_lock(tmp_path,monkeypatch):
+    from scripts import remote_frozen_queue as queue
+    def fail(*args):raise OSError('publication failed')
+    monkeypatch.setattr(queue.os,'symlink',fail)
+    with pytest.raises(OSError,match='publication'):
+        with queue.shared_lock(tmp_path/'shared'):pass
+    assert not list(tmp_path.iterdir())
+
+
+def test_foreign_host_lock_is_never_reaped(tmp_path):
+    import json,os
+    from scripts.remote_frozen_queue import shared_lock
+    path=tmp_path/'shared.d';owner=tmp_path/'shared.d.owner.foreign.json'
+    owner.write_text(json.dumps(dict(host='another-host',pid=999999999)))
+    path.symlink_to(owner)
+    with pytest.raises(BlockingIOError):
+        with shared_lock(tmp_path/'shared',blocking=False):pass
+    assert path.is_symlink() and owner.exists()
+
+
+def test_release_preserves_replacement_owner(tmp_path):
+    import json,os
+    from scripts.remote_frozen_queue import shared_lock
+    path=tmp_path/'shared.d';replacement=tmp_path/'shared.d.owner.replacement.json'
+    replacement.write_text(json.dumps(dict(host=os.uname().nodename,pid=os.getpid())))
+    with shared_lock(tmp_path/'shared'):
+        path.unlink();path.symlink_to(replacement)
+    assert path.is_symlink() and path.resolve()==replacement
+    path.unlink();replacement.unlink()

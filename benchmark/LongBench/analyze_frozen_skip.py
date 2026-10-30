@@ -19,7 +19,8 @@ def analyze(outdir):
     identities={m['identity'] for m in manifests}
     if len(identities)!=1: raise ValueError('mixed experiment identities')
     protocol=manifests[0]['protocol'];identity=manifests[0]['identity']
-    independent = protocol.get('schema')=='frozen-near-far-screen-v3-independent-gates'
+    macro_key='avg'+str(len(protocol['datasets']));macro_label=macro_key.upper()
+    independent = protocol.get('schema') in ('frozen-near-far-screen-v3-independent-gates','frozen-near-far-v1-v4-independent-gates')
     staging_policy = independent or protocol.get('schema')=='frozen-near-far-screen-v2-near-staging'
     expected={(ds,i) for ds,ids in protocol['selected_rows'].items() for i in ids}
     records=[];partial=0;seen=set()
@@ -75,7 +76,7 @@ def analyze(outdir):
             if arm.startswith('dual_'):
                 counterpart='far_'+arm.split('_',1)[1]
                 far_choices_changed+=sum(d['skip_far']!=r['arms'][counterpart]['decisions'][li]['skip_far'] for li,d in r['arms'][arm]['decisions'].items())
-        result['arms'][arm]=dict(per_task=scores,per_task_activation=task_activation,avg5=float(np.mean(list(scores.values()))) if len(scores)==5 else None,
+        result['arms'][arm]=dict(per_task=scores,per_task_activation=task_activation,**{macro_key:float(np.mean(list(scores.values()))) if len(scores)==len(protocol['datasets']) else None},
             gate_counts=counts,near_active_requests=near_active,far_active_requests=far_active,
             exact_full_generation=sum(r['arms'][arm]['generated_ids']==r['arms']['full']['generated_ids'] for r in records),
             frozen_kv_ratio_mean=float(np.mean(ratios)) if ratios else None,
@@ -95,18 +96,18 @@ def analyze(outdir):
                 degraded=sum(x<0 for x in values),improved=sum(x>0 for x in values))
             groups.append(np.array(values))
         avg=None
-        if len(groups)==5:
+        if len(groups)==len(protocol['datasets']):
             resampled=np.stack([g[rng.integers(0,len(g),(5000,len(g)))].mean(1) for g in groups]).mean(0)
             avg=dict(delta_pp=float(np.mean([g.mean() for g in groups])),ci95_pp=[float(x) for x in np.quantile(resampled,[.025,.975])])
-        result['comparisons'][arm+'-vs-'+base]=dict(per_task=tasks,avg5=avg)
+        result['comparisons'][arm+'-vs-'+base]=dict(per_task=tasks,**{macro_key:avg})
     policy = 'Near-only retains staging KV and skips attention work only; far-only/both physically evict nodes.' if staging_policy else 'Superseded v1: near-only permanently evicted KV and did not migrate it into far.'
-    result['scope']='Exploratory paired request bootstrap, 5000 repeats, task-stratified macro AVG5; CI containing zero is not proof of equivalence. '+policy+(' TLI tail32 L1/L2 reference adapter; full denotes gates off, not dense attention. No performance claim.' if protocol.get('attention','').startswith('tli') else ' No TLI champion selection or performance claim.')
+    result['scope']=f'Exploratory paired request bootstrap, 5000 repeats, task-stratified macro {macro_label}; CI containing zero is not proof of equivalence. '+policy+(' TLI tail32 L1/L2 reference adapter; full denotes gates off, not dense attention. No performance claim.' if protocol.get('attention','').startswith('tli') else ' No TLI champion selection or performance claim.')
     atomic_json(outdir/'summary.json',result)
     lines=['# Frozen near/far cache exploration','',f"Status: {result['status']}; paired requests {len(records)}/{len(expected)}.",'',
-           '| arm | AVG5 | near-active requests | far-active requests | frozen KV / full-node KV | attention tokens / full |',
+           f'| arm | {macro_label} | near-active requests | far-active requests | frozen KV / full-node KV | attention tokens / full |',
            '|---|---:|---:|---:|---:|---:|']
     for arm,a in result['arms'].items():
-        avg='pending' if a['avg5'] is None else f"{a['avg5']:.4f}"
+        avg='pending' if a[macro_key] is None else f"{a[macro_key]:.4f}"
         ratio='pending' if a['frozen_kv_ratio_mean'] is None else f"{a['frozen_kv_ratio_mean']:.4f}"
         work='pending' if a['frozen_attention_token_ratio_mean'] is None else f"{a['frozen_attention_token_ratio_mean']:.4f}"
         lines.append(f"| {arm} | {avg} | {a['near_active_requests']} | {a['far_active_requests']} | {ratio} | {work} |")
@@ -117,7 +118,7 @@ def analyze(outdir):
         lines.append('| '+arm+' | '+' | '.join(f"{a['per_task'][ds]:.4f}" if ds in a['per_task'] else 'pending' for ds in protocol['datasets'])+' |')
     lines+=['','Paired differences (percentage points):','']
     for pair,c in result['comparisons'].items():
-        if c['avg5']:lines.append(f"- {pair}: {c['avg5']['delta_pp']:+.4f}; bootstrap 95% CI {c['avg5']['ci95_pp']}")
+        if c[macro_key]:lines.append(f"- {pair}: {c[macro_key]['delta_pp']:+.4f}; bootstrap 95% CI {c[macro_key]['ci95_pp']}")
     lines+=['', 'Attention baseline: '+protocol.get('attention','native SDPA full retained KV')+'. Arm full means both region gates off.', '',result['scope'],'',
             'KV ratios measure allocated cache-node capacity, relative to the same full-node cache; they exclude model weights, gather temporaries and allocator behavior. Attention-token ratios are a pre-decode work proxy, not measured speedups.',
             ('Near and Far gates compare their own mass independently; adding Near gating does not change Far decisions.' if independent else 'Historical dual gates share a combined calibrated mass budget; adding Near gating may replace Far decisions.'),

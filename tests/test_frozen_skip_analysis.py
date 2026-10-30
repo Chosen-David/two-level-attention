@@ -3,8 +3,8 @@ import pytest
 from benchmark.LongBench.analyze_frozen_skip import analyze
 
 
-def build_run(tmp_path):
-    tasks=['qasper','hotpotqa','musique','gov_report','repobench-p']
+def build_run(tmp_path, tasks=None):
+    tasks=tasks or ['qasper','hotpotqa','musique','gov_report','repobench-p']
     protocol=dict(selected_rows={t:[0,1] for t in tasks},datasets=tasks,thresholds=[.1])
     (tmp_path/'manifest_rank0.json').write_text(json.dumps(dict(identity='fixture',protocol=protocol)))
     for task in tasks:
@@ -35,3 +35,15 @@ def test_duplicate_rows_cannot_inflate_completion(tmp_path):
     original.with_name('duplicate.json').write_text(original.read_text())
     with pytest.raises(ValueError,match='duplicate request identity'):
         analyze(tmp_path)
+
+
+def test_sixteen_task_macro_is_not_mislabeled_avg5(tmp_path):
+    from benchmark.LongBench.prefill_frozen_skip import V1_TASKS
+    build_run(tmp_path, V1_TASKS)
+    result=analyze(tmp_path)
+    assert result['completed_requests']==32
+    assert result['arms']['full']['avg16']==100
+    assert result['arms']['dual_0.1']['avg16']==50
+    assert 'avg5' not in result['arms']['full']
+    assert result['comparisons']['dual_0.1-vs-full']['avg16']['ci95_pp']==[-50,-50]
+    assert 'AVG16' in (tmp_path/'REPORT.md').read_text()

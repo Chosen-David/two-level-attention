@@ -33,7 +33,7 @@ def validate(outdir,allow_partial=False):
     manifests=[json.loads(p.read_text()) for p in sorted(outdir.glob('manifest_rank*.json'))]
     if not manifests:raise ValueError('no manifests')
     protocol=manifests[0]['protocol'];identity=manifests[0]['identity']
-    assert protocol['schema'] in ('frozen-near-far-screen-v2-near-staging','frozen-near-far-screen-v3-independent-gates')
+    assert protocol['schema'] in ('frozen-near-far-screen-v2-near-staging','frozen-near-far-screen-v3-independent-gates','frozen-near-far-v1-v4-independent-gates')
     assert hashlib.sha256(json.dumps(protocol,sort_keys=True).encode()).hexdigest()==identity
     assert len(manifests)==protocol['world_size']
     assert all(m['protocol']==protocol and m['identity']==identity for m in manifests)
@@ -75,7 +75,7 @@ def validate(outdir,allow_partial=False):
         if rawlen>protocol['context_cap']:
             n=protocol['context_cap']//2
             text=tokenizer.decode(ids[:n],skip_special_tokens=True)+tokenizer.decode(ids[-(protocol['context_cap']-n):],skip_special_tokens=True)
-        if ds!='repobench-p':text=tokenizer.apply_chat_template([dict(role='user',content=text)],tokenize=False,add_generation_prompt=True,enable_thinking=False)
+        if ds not in (('trec','triviaqa','samsum','lcc','repobench-p') if protocol['schema']=='frozen-near-far-v1-v4-independent-gates' else ('repobench-p',)):text=tokenizer.apply_chat_template([dict(role='user',content=text)],tokenize=False,add_generation_prompt=True,enable_thinking=False)
         ids=tokenizer(text,add_special_tokens=False).input_ids
         assert len(ids)==record['input']['input_tokens']
         assert rawlen==record['input']['raw_tokens']
@@ -86,9 +86,11 @@ def validate(outdir,allow_partial=False):
         for arm,trial in record['arms'].items():
             checked_arms+=1
             generated=trial['generated_ids'];limit=protocol['max_new_tokens'][ds]
+            stop_ids=([tokenizer.eos_token_id,tokenizer.encode('\n',add_special_tokens=False)[-1]] if ds=='samsum' and protocol['schema']=='frozen-near-far-v1-v4-independent-gates' else eos)
+            if ds=='samsum' and protocol['schema']=='frozen-near-far-v1-v4-independent-gates':assert generated[0] not in stop_ids
             assert 0<len(generated)<=limit and len(generated)==trial['generated_tokens']
-            assert not any(t in eos for t in generated[:-1])
-            assert generated[-1] in eos or len(generated)==limit
+            assert not any(t in stop_ids for t in generated[:-1])
+            assert generated[-1] in stop_ids or len(generated)==limit
             assert generated[0]==full['generated_ids'][0]
             assert tokenizer.decode(generated,skip_special_tokens=True)==trial['prediction']
             score=sample_score('repobench' if ds=='repobench-p' else ds,trial['prediction'],row['answers'],row.get('all_classes',[]))

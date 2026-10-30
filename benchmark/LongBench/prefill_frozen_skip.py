@@ -22,10 +22,29 @@ from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 ROOT = Path(__file__).resolve().parents[2]
 SCREEN_TASKS = ('qasper', 'hotpotqa', 'musique', 'gov_report', 'repobench-p')
+V1_TASKS = tuple('narrativeqa qasper multifieldqa_en hotpotqa 2wikimqa musique gov_report qmsum multi_news trec triviaqa samsum passage_count passage_retrieval_en lcc repobench-p'.split())
+NO_CHAT_TASKS = frozenset(('trec','triviaqa','samsum','lcc','repobench-p'))
 SOURCES = ('sparse_attn/ops/frozen_region_cache.py', 'sparse_attn/ops/frozen_region_gate.py',
            'benchmark/LongBench/prefill_frozen_skip.py', 'benchmark/LongBench/metrics.py',
-           'benchmark/LongBench/eval.py', 'benchmark/LongBench/config/dataset2prompt.json',
+           'benchmark/LongBench/eval.py', 'benchmark/LongBench/analyze_frozen_skip.py',
+           'benchmark/LongBench/export_frozen_skip.py', 'benchmark/LongBench/validate_frozen_skip.py',
+           'benchmark/LongBench/config/dataset2prompt.json',
            'benchmark/LongBench/config/dataset2maxlen.json')
+
+
+def greedy_token(logits, generated_count, eos, min_new_tokens=0):
+    if generated_count < min_new_tokens:
+        logits = logits.clone()
+        logits[:, eos] = -torch.inf
+    return logits.argmax(-1, keepdim=True)
+
+
+def stopping_policy(model, tokenizer, dataset):
+    eos = model.generation_config.eos_token_id
+    eos = list(eos) if isinstance(eos, list) else [eos]
+    if dataset == 'samsum':
+        return list(dict.fromkeys([tokenizer.eos_token_id, tokenizer.encode('\n', add_special_tokens=False)[-1]])), 1
+    return eos, 0
 
 
 def sha_file(path):
@@ -50,7 +69,7 @@ def prepare_ids(tokenizer, row, dataset, prompt, context_cap):
     if original_length > context_cap:
         half = context_cap//2
         text = tokenizer.decode(ids[:half], skip_special_tokens=True)+tokenizer.decode(ids[-(context_cap-half):], skip_special_tokens=True)
-    if dataset != 'repobench-p':
+    if dataset not in NO_CHAT_TASKS:
         text = tokenizer.apply_chat_template([dict(role='user', content=text)], tokenize=False,
                     add_generation_prompt=True, enable_thinking=False)
     ids = tokenizer(text, add_special_tokens=False).input_ids
@@ -80,10 +99,10 @@ def capture_profiles(cache, geometry, config):
 
 @torch.inference_mode()
 @eager_decoding_request_guard()
-def generate(model, tokenizer, ids, max_new_tokens, config, device):
+def generate(model, tokenizer, ids, max_new_tokens, config, device, stop_ids=None, min_new_tokens=0):
     geometry = RegionGeometry(max_new_tokens=max_new_tokens)
     cache = FrozenRegionCache(model.config.num_hidden_layers, geometry)
-    eos = model.generation_config.eos_token_id
+    eos = model.generation_config.eos_token_id if stop_ids is None else stop_ids
     eos = eos if isinstance(eos, list) else [eos]
     if getattr(model, '_frozen_tli', False):
         cache.tli_regions = True
@@ -113,7 +132,7 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
                     raise ValueError('near-only must not claim a resident KV reduction')
         generated = []
         for _ in range(max_new_tokens):
-            token = out.logits[:, -1].argmax(-1, keepdim=True)
+            token = greedy_token(out.logits[:, -1], len(generated), eos, min_new_tokens)
             generated.append(int(token))
             if int(token) in eos or len(generated) == max_new_tokens:
                 break
@@ -137,18 +156,18 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
 
 @torch.inference_mode()
 @eager_decoding_request_guard()
-def generate_native(model, ids, max_new_tokens, device):
+def generate_native(model, ids, max_new_tokens, device, stop_ids=None, min_new_tokens=0):
     cache = DynamicCache(config=model.config)
     if getattr(model, '_frozen_tli', False):
         for layer in model.model.layers:
             layer.self_attn.indexer.clear()
             layer.self_attn.indexer.skip_far = False
     out = model(torch.tensor([ids], device=device), past_key_values=cache, use_cache=True, logits_to_keep=1)
-    eos = model.generation_config.eos_token_id
+    eos = model.generation_config.eos_token_id if stop_ids is None else stop_ids
     eos = eos if isinstance(eos,list) else [eos]
     generated = []
     for _ in range(max_new_tokens):
-        token = out.logits[:, -1].argmax(-1, keepdim=True); generated.append(int(token))
+        token = greedy_token(out.logits[:, -1], len(generated), eos, min_new_tokens); generated.append(int(token))
         if int(token) in eos or len(generated) == max_new_tokens: break
         out = model(token, past_key_values=cache, use_cache=True, logits_to_keep=1)
     return generated
@@ -202,8 +221,8 @@ def main():
         os.environ['TLI_SPARSE_PREFILL'] = '0'
         os.environ['TLI_DECODE_DENSE'] = '0'
     tasks = args.datasets.split(',')
-    if not set(tasks)<=set(SCREEN_TASKS) or len(set(tasks)) != len(tasks):
-        raise ValueError('only the five existing LongBench screen tasks are allowed')
+    if not set(tasks)<=set(V1_TASKS) or len(set(tasks)) != len(tasks):
+        raise ValueError('only the sixteen English/code LongBench V1 tasks are allowed')
     if not 0 <= args.rank < args.world_size or args.samples < 0:
         raise ValueError('invalid shard/samples')
     thresholds = [float(x) for x in args.thresholds.split(',')]
@@ -221,10 +240,10 @@ def main():
         indices = select_row_indices(len(rows), args.samples, args.seed)
         selected[ds] = indices
         inputs.extend((ds,i,rows[i]) for i in indices)
-    protocol = dict(schema='frozen-near-far-screen-v3-independent-gates',model=args.model,context_cap=args.context_cap,
+    protocol = dict(schema='frozen-near-far-v1-v4-independent-gates',model=args.model,context_cap=args.context_cap,
         **sampling_metadata(args.samples, dataset_counts),
         seed=args.seed,statistic=args.statistic,thresholds=thresholds,
-        datasets=tasks,selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
+        datasets=tasks,prompt_protocol='one-shot-full-prompt; v1 no-chat for trec/triviaqa/samsum/lcc/repobench-p; samsum EOS+newline min1',selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
         source_sha256={name:sha_file(ROOT/name) for name in SOURCES},
         dataset_sha256={ds:sha_file(Path(args.data)/(ds+'.jsonl')) for ds in tasks},
         model_config_sha256=sha_file(Path(args.model)/'config.json'),
@@ -267,6 +286,7 @@ def main():
         model._frozen_tli = True
     verified = False
     for ds,row_index,row in shard_inputs(inputs, args.rank, args.world_size):
+        stop_ids,min_new_tokens = stopping_policy(model,tokenizer,ds)
         path = outdir/'requests'/ds/f'{row_index:04d}.json'
         ids, input_info = prepare_ids(tokenizer,row,ds,prompts[ds],args.context_cap)
         if len(ids)+lengths[ds] > model.config.max_position_embeddings:
@@ -281,11 +301,11 @@ def main():
         for arm, config in arms:
             if arm in record['arms']: continue
             atomic_json(outdir/f'heartbeat_rank{args.rank}.json',dict(pid=os.getpid(),time=time.time(),dataset=ds,row=row_index,arm=arm))
-            result = generate(model,tokenizer,ids,lengths[ds],config,args.device)
+            result = generate(model,tokenizer,ids,lengths[ds],config,args.device,stop_ids,min_new_tokens)
             metric_ds = 'repobench' if ds == 'repobench-p' else ds
             result['score'] = sample_score(metric_ds,result['prediction'],row['answers'],row.get('all_classes',[]))
             if arm == 'full' and args.verify_native_full and not verified:
-                native = generate_native(model,ids,lengths[ds],args.device)
+                native = generate_native(model,ids,lengths[ds],args.device,stop_ids,min_new_tokens)
                 if native != result['generated_ids']:
                     raise ValueError('full node-cache generation differs from native DynamicCache')
                 result['native_full_parity'] = True
