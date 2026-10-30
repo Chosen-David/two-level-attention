@@ -173,7 +173,10 @@ class BatchedCandidateProducer:
         # Elementwise scale is rounded to the model dtype BEFORE FP32 projection.
         full=(q[:,0]*scale).to(torch.float32)
         qc=full if self.coarse_dims is None else full[...,self.coarse_dims]
-        qf=full if self.fine_dims is None else full[...,self.fine_dims]
+        # The default L2 subspace reuses the exact L1 index object. Both
+        # scoring stages only read Q; sharing avoids a second advanced gather.
+        qf=(qc if self.fine_dims is self.coarse_dims else
+            full if self.fine_dims is None else full[...,self.fine_dims])
         # Use the same separate native Torch mean as primary graph selection,
         # not the optional sequential-mean output of the coarse primitives.
         raw=score_coarse_batched(summaries['k_min'],summaries['k_max'],qc.contiguous(),out_dtype=q.dtype)
