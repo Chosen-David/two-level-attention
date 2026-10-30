@@ -48,8 +48,8 @@ def run(cli):
     rows=rows[:cli.batch]
     ids=[tokenizer(row['input'],return_tensors='pt').input_ids.to('cuda') for row in rows]
     lengths=[x.shape[-1] for x in ids]
-    if min(lengths)<9217 or max(lengths)+cli.max_gen>=65536:
-        raise ValueError('unsupported live-length/capacity geometry')
+    if min(lengths)<9217:
+        raise ValueError('live normalization requires prompt lengths >= 9217')
     records=[]
     output=Path(cli.output)
     output.with_suffix('.configuration.json').write_text(json.dumps(dict(
