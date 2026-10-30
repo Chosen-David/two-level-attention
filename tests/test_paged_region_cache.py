@@ -54,3 +54,12 @@ def test_page_tables_reused_until_page_lifecycle_changes():
     assert a is b
     with pytest.raises(ValueError):layer.freeze(False,False)
     with pytest.raises(ValueError):layer.update(x[:,:,:2],x[:,:,:2])
+
+@torch.inference_mode()
+def test_cross_request_dtype_rejected_before_aging_or_new_page():
+    layer=PagedRegionLayer(RegionGeometry(near=4,window=1,page=4))
+    x=torch.randn(1,1,4,8);layer.update(x,x);layer.freeze(False,False)
+    before=layer.report()
+    with pytest.raises(ValueError,match='dtype/device changed'):
+        layer.update(x[:,:,:1].bfloat16(),x[:,:,:1].bfloat16())
+    assert layer.report()==before

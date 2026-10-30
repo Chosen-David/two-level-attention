@@ -27,6 +27,14 @@ class PagedRegionLayer(CacheLayerMixin):
         self.write_bytes = 0
         self._tables = None
         self.tli_receipt = None
+        self._stream_id = None
+
+    def _check_stream(self, device):
+        if device.type == "cuda":
+            stream = torch.cuda.current_stream(device).cuda_stream
+            if self._stream_id is not None and stream != self._stream_id:
+                raise ValueError("paged request must stay on its owning CUDA stream")
+            self._stream_id = stream
 
     def lazy_initialization(self, key_states):
         pass
@@ -59,6 +67,7 @@ class PagedRegionLayer(CacheLayerMixin):
                 raise ValueError('cannot change frozen gates')
             return
         if not self.logical_length: raise ValueError('prefill before freeze')
+        self._check_stream(next(iter(self.pages.values()))[1].device)
         self.skip_near,self.skip_far=bool(skip_near),bool(skip_far)
         self.frozen=True
         self._reclaim()
@@ -80,6 +89,7 @@ class PagedRegionLayer(CacheLayerMixin):
         if keys.device!=values.device or keys.dtype!=values.dtype or keys.shape[-1]<1 or values.shape[-1]<1:
             raise ValueError('invalid KV dtype/device/width')
         if keys.requires_grad or values.requires_grad: raise ValueError('inference-only cache')
+        self._check_stream(keys.device)
         n=keys.shape[-2]
         if n<=0: raise ValueError('empty update')
         positions=(cache_kwargs or {}).get('cache_position')
@@ -91,6 +101,8 @@ class PagedRegionLayer(CacheLayerMixin):
             if self.logical_length-self.prompt_length>=self.geometry.max_new_tokens:
                 raise ValueError('generation capacity exceeded')
             _,samplek,samplev=next(iter(self.pages.values()))
+            if keys.dtype!=samplek.dtype or values.dtype!=samplev.dtype or keys.device!=samplek.device or values.device!=samplev.device:
+                raise ValueError('KV dtype/device changed across request')
             if keys.shape[1:]!=(samplek.shape[1],1,samplek.shape[-1]) or values.shape[-1]!=samplev.shape[-1]:
                 raise ValueError('KV shape changed across request')
         p=self.geometry.page
@@ -115,6 +127,7 @@ class PagedRegionLayer(CacheLayerMixin):
         return keys,values
 
     def pointer_tables(self):
+        self._check_stream(next(iter(self.pages.values()))[1].device)
         n=(self.logical_length+self.geometry.page-1)//self.geometry.page
         if self._tables is None or self._tables[0].numel()!=n:
             device=next(iter(self.pages.values()))[1].device
