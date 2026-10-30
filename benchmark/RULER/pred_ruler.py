@@ -15,11 +15,9 @@
 #     --tia_level2_topk 1024 --tia_level2_cmp_ratio 4 --pred_postfix _1024 \
 #     --max-num 500
 # ---- E109 三件套 #3：YaRN 长上下文扩展（2026-10-09）----
-# Qwen3-8B 原生 max_position_embeddings=40960，65536/131072 档须 YaRN。
-# 配方按 Qwen3 官方 model card：rope_scaling={yarn, factor, original 40960,
-# beta_fast 32, beta_slow 1}；128K 档 factor=4.0（官方原配方，effective
-# 163840），64K 档取半档 factor=2.0（effective 81920，留 25% 余量；与官方
-# 整档倍率风格一致，且 ramp 插值更平缓、近程精度损失更小）。
+# Qwen snapshot runtime capacity40960 is distinct from YaRN original32768.
+# 64K/128K use explicit factor2/4; runtime capacity includes output reserve.
+# Actual installed-framework frequencies are verified before inference.
 # 设计文档口径（逐层参数求解器 §10.4）：dense 与所有稀疏方法同一位置缩放/
 # tokenizer/最大输出；先报告 dense 长度能力再看稀疏退化。
 # YaRN 对 TLI 索引透明：indexer 消费的是 post-RoPE 的 K（qwen3_attn_patch
@@ -196,11 +194,10 @@ def main():
     # 身份来自真实 config，GLM 不复用 Qwen 的 40960/YaRN 口径。
     config = AutoConfig.from_pretrained(args.model_path, trust_remote_code=True)
     is_glm = getattr(config, "model_type", None) == "glm4_moe_lite"
-    native_mpe = (getattr(config, "max_position_embeddings", None)
-                  if is_glm else QWEN3_NATIVE_MPE)
+    native_mpe = config.max_position_embeddings
     # ---- YaRN 校验与配置（E109 三件套 #3 + 057 effective 单点解析）----
     # 超过原生 40960 的档位必须显式 --yarn（防误用原生 RoPE 跑超限位置）；
-    # 原生档位默认关闭（既有 4K-32K 路径零扰动），显式开也允许（消融用）。
+    # 原生档位关闭；共享主协议进一步拒绝32K额外YaRN和错误倍率。
     use_yarn = args.yarn
     if is_glm:
         if native_mpe != 202752:
@@ -227,7 +224,7 @@ def main():
         YARN_FACTOR_AUTO, native_mpe)
     if use_yarn:
         print(f"[yarn] enabled: factor={factor} "
-              f"(effective context = {int(QWEN3_NATIVE_MPE * factor)})")
+              f"(YaRN original context = 32768; factor = {factor})")
 
     data_file = os.path.join(args.data_root, str(args.context_length),
                              f"{args.task}.jsonl")
@@ -244,6 +241,14 @@ def main():
     # config 构造 YarnRotaryEmbedding；同时写 rope_type/type 兼容新旧字段）
     if use_yarn:
         config.rope_scaling = rope_scaling
+    from benchmark.rope_policy import configure_rope, verify_runtime_rope
+    rope_policy_record = None
+    if config.model_type in ('qwen3', 'glm4_moe_lite'):
+        rope_policy_record = configure_rope(config, args.context_length, MAX_GEN,
+                                           yarn=use_yarn, factor=args.yarn_factor)
+        # This constructs the installed framework's rotary module on CPU and
+        # checks actual frequencies, scaling and rotation before loading weights.
+        rope_preflight = verify_runtime_rope(config)
     resolve_far_skip_modes(args, config=config)
     snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
     if args.method == 'ffd_vendor':
@@ -255,6 +260,7 @@ def main():
             args.model_path, config=config, trust_remote_code=True,
             torch_dtype=torch.bfloat16, device_map="auto").eval()
         print(f"[device-map] {getattr(model, 'hf_device_map', None)}")
+    runtime_rope = verify_runtime_rope(model) if rope_policy_record is not None else None
     # ---- Quest vendor（B 轨官方源码复用，主表口径）----
     # 不走 register_patch 的 indexer_type_dict（A 轨 quest_indexer 是语义
     # 复现），改为绑定官方 Quest forward 到 Qwen3Attention——与 LongBench
@@ -582,6 +588,8 @@ def main():
             input_ids = tokenizer(row["input"], truncation=False,
                                   return_tensors="pt").input_ids.to("cuda")
             context_length = input_ids.shape[-1]
+            if rope_policy_record is not None and context_length + MAX_GEN > config.max_position_embeddings:
+                raise ValueError("actual input plus output exceeds verified runtime position capacity")
             # 【095 修复（GPT 审计 2026-10-12_0527，2026-10-12）】请求级
             # fail-closed guard：TLI_E127_FAST=1 的 gather 路径把三类契约
             # 违规（空 mask 行/W 超上界/cu 破坏）延迟到 GPU 端错误标志，
@@ -685,6 +693,9 @@ def main():
             prediction_lines=pred_lines,
             treatment_manifest_json=treatment_manifest_json)
         yarn_receipt.update(receipt_identity)
+        if rope_policy_record is not None:
+            yarn_receipt["rope_policy"] = rope_policy_record
+            yarn_receipt["runtime_rope_verification"] = runtime_rope
         tmp_rcp = stage_yarn_receipt(out_path, yarn_receipt, attempt_id)
         commit_yarn_generation(tmp_pred, tmp_rcp, out_path)
         print(f"[yarn-receipt] effective config + 同代绑定 -> {tmp_rcp}"

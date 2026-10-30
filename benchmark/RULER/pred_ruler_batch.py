@@ -422,8 +422,7 @@ def main():
 
     config = AutoConfig.from_pretrained(args.model_path, trust_remote_code=True)
     is_glm = getattr(config, "model_type", None) == "glm4_moe_lite"
-    native_mpe = (getattr(config, "max_position_embeddings", None)
-                  if is_glm else QWEN3_NATIVE_MPE)
+    native_mpe = config.max_position_embeddings
     use_yarn = args.yarn
     if is_glm:
         if (args.method == "tli" and getattr(args, "tli_dyn_dgate", False)
@@ -458,6 +457,14 @@ def main():
         args.model_path, trust_remote_code=True)
     if use_yarn:
         config.rope_scaling = rope_scaling
+    from benchmark.rope_policy import configure_rope, verify_runtime_rope
+    rope_policy_record = None
+    if config.model_type in ('qwen3', 'glm4_moe_lite'):
+        rope_policy_record = configure_rope(config, args.context_length, MAX_GEN,
+                                           yarn=use_yarn, factor=args.yarn_factor)
+        # This constructs the installed framework's rotary module on CPU and
+        # checks actual frequencies, scaling and rotation before loading weights.
+        rope_preflight = verify_runtime_rope(config)
     from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
     resolve_far_skip_modes(args, config=config)
     snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
@@ -467,6 +474,7 @@ def main():
         args.model_path, config=config, trust_remote_code=True,
         torch_dtype=torch.bfloat16, device_map="auto").eval()
 
+    runtime_rope = verify_runtime_rope(model) if rope_policy_record is not None else None
     # 【同步义务】以下 dispatch 分支内联自 pred_ruler.py 对应分支；Phase 1
     # 仅保留 none + fasa_vendor（其余方法由 parse 阶段白名单拒绝）。
     if args.method == "fasa_vendor":
@@ -530,6 +538,8 @@ def main():
             torch.cuda.empty_cache()
             input_ids, position_ids, mask2d, lens = _pack_rows(
                 tokenizer, chunk, pad_id)
+            if rope_policy_record is not None and max(lens) + MAX_GEN > config.max_position_embeddings:
+                raise ValueError("actual batch input plus output exceeds verified runtime position capacity")
             # 【阶段 1】budget 采集对齐 pred_ruler.py（L549-551 同步义务）：
             # chunk 前 clear 全局 metrics、baseline_request 解包 receipt
             # （tli 无 _baseline_identity → receipt 空 dict falsy → budget 取
@@ -593,6 +603,9 @@ def main():
             prediction_sha256=pred_sha,
             prediction_lines=pred_lines,
             treatment_manifest_json=treatment_manifest_json)
+        if rope_policy_record is not None:
+            yarn_receipt["rope_policy"] = rope_policy_record
+            yarn_receipt["runtime_rope_verification"] = runtime_rope
         tmp_rcp = stage_yarn_receipt(out_path, yarn_receipt, attempt_id)
         commit_yarn_generation(tmp_pred, tmp_rcp, out_path)
         print(f"[pred-batch] 提交：指针 {generation_pointer_path(out_path)} -> "
