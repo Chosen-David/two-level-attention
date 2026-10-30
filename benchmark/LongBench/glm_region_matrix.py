@@ -131,6 +131,9 @@ def main():
                 atomic_json(out/f'heartbeat_rank{args.rank}.json',dict(pid=os.getpid(),time=time.time(),task=task,row=row,arm=arm,status='running'))
                 for layer,forward in zip(model.model.layers,native if arm=='dense' else patched):layer.self_attn.forward=forward
                 model._frozen_tli=arm!='dense'
+                # Release the previous sparse request's index scratch before dense.
+                for layer in model.model.layers:
+                    layer.self_attn.indexer.clear()
                 torch.manual_seed(42);gc.collect();torch.cuda.empty_cache()
                 if arm=='dense':
                     tokens=generate_native(model,ids,max_new,'cuda:0',min_new_tokens=min_new)
