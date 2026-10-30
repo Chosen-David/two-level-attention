@@ -235,6 +235,7 @@ def main():
     parser.add_argument('--row', type=int, default=0)
     parser.add_argument('--max-new', type=int, default=8)
     parser.add_argument('--states', default='keep,far,near,both')
+    parser.add_argument('--performance-state', choices=['dual', *STATES], default='dual')
     parser.add_argument('--mode', choices=['correctness', 'performance', 'all'], default='all')
     parser.add_argument('--reps', type=int, default=1)
     parser.add_argument('--profile', action='store_true')
@@ -273,6 +274,7 @@ def main():
     protocol = dict(model=args.model, task=args.task, row=args.row,
                     context_length=args.context_length, input_tokens=ids.shape[-1],
                     max_new=args.max_new, dtype='bfloat16', device=str(device),
+                    performance_state=args.performance_state,
                     rope_scaling=rope_scaling,
                     rope_original_max_position_embeddings=(
                         rope_scaling['original_max_position_embeddings'] if rope_scaling else None),
@@ -307,7 +309,8 @@ def main():
         runs = []
         for rep in range(args.reps):
             for arm in ('reference', 'physical', 'physical', 'reference'):
-                result = run_request(model, ids, args.max_new, arm, 'dual', device)
+                result = run_request(
+                    model, ids, args.max_new, arm, args.performance_state, device)
                 runs.append(result)
                 report['performance'].append(_public_result(result))
                 (outdir/'report.json').write_text(json.dumps(report, indent=2)+'\n')
@@ -316,7 +319,7 @@ def main():
                 del result
             if args.profile:
                 profiled = run_request(
-                    model, ids, args.max_new, 'physical', 'dual', device,
+                    model, ids, args.max_new, 'physical', args.performance_state, device,
                     profile_path=outdir/f'profile_rep{rep}.json')
                 report['profile'] = _public_result(profiled)
                 report['profile']['profiler'] = profiled['profiler']
