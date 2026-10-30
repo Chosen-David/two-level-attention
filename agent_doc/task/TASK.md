@@ -2,6 +2,8 @@
 
 ## 2026-10-30
 
+- [ ] [TL-DUO-ASSETS-20261030] 固定官方DuoAttention源码、用户提供v1 PDF已归档；独立Python3.10+Torch2.4/cu121+legacy FlashInfer/FlashAttention已实装、CPU import/pattern与pip check通过，完整哈希锁可复建；BlockSparse/NVCC和GPU/实模验收仍待完成。([详情](task_details/TL-DUO-ASSETS-20261030.md))
+
 - [x] [TL-FROZEN-MAIN-20261030] Integrate accepted independent Near/Far0.05 eager cache reference;84 tests +14 subtests passed. ([details](task_details/TL-FROZEN-MAIN-20261030.md))
 
 
@@ -256,3 +258,7 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 - [ ] [TL-E155D-T7-20261021] 性能浪费点修复（E133c A1-A4/A6 已入库；剩余 .187 独占窗口稳态 bench 同机对照 + 判决 JSON） ([详情](task_details/TL-E155D-T7-20261021.md))
 - [ ] [TL-E155D-T8-20261021] 推送远端 main（全部判决/论文/代码提交后 origin push，含历史挂账） ([详情](task_details/TL-E155D-T8-20261021.md))
 
+
+## 2026-10-30 GLM frozen-region integration
+
+- TL-GLM-FROZEN-20261030：eager B1独立near/far接入及独立验收完成；[详情](task_details/TL-GLM-FROZEN-20261030.md)。

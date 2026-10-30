@@ -1,0 +1,23 @@
+{
+  "tested_base": "ca72828b84698fd16ea21c60a4786a69acb6fe4a",
+  "date_utc": "2026-10-30",
+  "source_git_blob_hashes": "62/62 match fixed official tree",
+  "source_sha256_inventory": "passed",
+  "python_ast": "passed; source not imported",
+  "bash_syntax": "passed",
+  "pdf_local_inspection": "pdfinfo succeeded; SHA-256 in PAPER.json",
+  "download_contract_tests": "4 passed normal; 4 passed python -O; mocked network",
+  "python_version_rejection": "Python 3.12 rejected with PYTHONOPTIMIZE=0 and 1; no .venv created",
+  "not_run": [
+    "Python 3.10 venv creation",
+    "dependency resolution/install",
+    "CUDA extension build",
+    "model imports/inference",
+    "GPU tests",
+    "quality/performance",
+    "whole-repository regressions"
+  ],
+  "reason_full_regressions_not_run": "Delivery-only files; no existing runtime or adapter changed. No compatible model/CUDA dependencies available.",
+  "venv_existing_directory_guard": "passed with CPU shell stub; existing sentinel preserved",
+  "whitespace": "upstream has pre-existing trailing whitespace, preserved for byte identity; authored-file diff check passed"
+}

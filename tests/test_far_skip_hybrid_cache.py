@@ -158,6 +158,25 @@ def test_direct_prefill_dense_semantics_layout_and_skip_finalize(length):
         finalize_direct_prefill(cache, model, length)
 
 
+def test_direct_prefill_hf5_missing_cache_position_preserves_storage_plans():
+    model = make_model()
+    length = 7
+    source = prefill(model, length)
+    cache = TLIStaticCache(model.config, 128, 1)
+    staging = prepare_direct_prefill(cache, model, length)
+    for li, source_layer in enumerate(source.layers):
+        keys, values = source_layer.keys, source_layer.values
+        returned = staging.update(li, keys, values, None)
+        assert returned[0] is keys and returned[1] is values
+        state = staging.states[li]
+        assert state.linear.cumulative_length == length
+    assert staging.states[0].mode == 'RING_FINAL'
+    assert staging.states[0].linear.keys is None
+    assert staging.states[1].linear.is_initialized
+    torch.testing.assert_close(staging.states[1].linear.keys[..., :length, :],
+                               source.layers[1].keys, rtol=0, atol=0)
+
+
 def test_direct_prefill_dynamic_non_skip_keeps_full_linear_without_ring():
     model = make_model()
     idx = model.model.layers[0].self_attn.indexer

@@ -20,7 +20,7 @@ def dense_reference(scores,ids,keep,capacity,group):
 
 
 @pytest.mark.parametrize('shared_dedup',[False,True])
-@pytest.mark.parametrize('capacity',[32768,32832,32840,131072])
+@pytest.mark.parametrize('capacity',[9224,16384,16400,24568,24576,32768,32832,32840,131072])
 @pytest.mark.parametrize('group',[1,4])
 @pytest.mark.parametrize('hk',[3,8])
 def test_sparse_native_reduction_and_ranking(capacity,group,hk,shared_dedup):
@@ -55,3 +55,27 @@ def test_sparse_native_reduction_and_ranking(capacity,group,hk,shared_dedup):
         for h in range(hk):
             expected=top[h][top[h]>=4].sort().values.to(torch.int32)
             assert torch.equal(sel.indices[0,h,:sel.counts[0,h]],expected),(capacity,group,kind,'ranking')
+
+
+@pytest.mark.parametrize('capacity',[57344,57352])
+@pytest.mark.parametrize('narrow',[False,True])
+def test_sparse_key_width_boundary(monkeypatch,capacity,narrow):
+    """Observe the actual sort dtype across the signed-key sentinel boundary."""
+    monkeypatch.setenv('TLI_SPARSE_NARROW_KEYS','1' if narrow else '0')
+    observed=[]
+    native=torch.Tensor.sort
+    def tracked(tensor,*args,**kwargs):
+        observed.append(tensor.dtype)
+        return native(tensor,*args,**kwargs)
+    monkeypatch.setattr(torch.Tensor,'sort',tracked)
+    torch.manual_seed(888)
+    ids=torch.randint(capacity,(2,2048),device='cuda')
+    ids[:,-32:]=ids[:,:32]
+    keep=torch.rand(ids.shape,device='cuda')>0.2
+    token=torch.randn(8,capacity,device='cuda',dtype=torch.bfloat16)
+    scores=token.gather(1,ids.repeat_interleave(4,0))
+    actual=candidate_probabilities(scores,ids,keep,capacity,4)
+    expected=dense_reference(scores,ids,keep,capacity,4).gather(-1,ids).masked_fill(~keep,0)
+    assert torch.equal(actual,expected)
+    expected_dtype=torch.int16 if narrow and capacity==57344 else torch.int32
+    assert observed==[expected_dtype]

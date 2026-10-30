@@ -1,4 +1,4 @@
-"""Undispatched prototype: candidate-only storage with native reduction order.
+"""Opt-in candidate-only storage with native reduction order.
 
 The token domain is virtual: missing -inf scores contribute zero exponentials.
 Map each present token to its pinned native thread and traversal ordinal, then
@@ -32,12 +32,85 @@ def _mean(CP,KEEP,OUT,R:tl.constexpr,G:tl.constexpr,BLOCK:tl.constexpr):
 
 
 @triton.jit
-def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr,PACKED:tl.constexpr=False):
+def _owner_validity(IDS, KEEP, OWNER, VALID, UNIQUE,
+                    R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr):
+    h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
+    token=tl.load(IDS+h*R+r,r<R,other=0)
+    valid=(r<R)&tl.load(KEEP+h*R+r,r<R,other=0)&(token>=0)&(token<S)
+    owner=tl.load(OWNER+h*S+token,valid,other=-1)
+    tl.store(VALID+h*R+r,valid,r<R)
+    tl.store(UNIQUE+h*R+r,valid&(owner==r),r<R)
+
+
+def _owner_probabilities(scores,ids,keep,capacity,group,return_unique,valid_length=None):
+    """Reuse native-order stats; O(Hkv*capacity) integer ownership remains."""
+    from .compact_normalization import build as owner_build, _candidate_owners
+    hk,r=ids.shape
+    if hk*capacity >= 2**31:
+        raise ValueError('owner indexing exceeds int32 scope')
+    with torch.cuda.device(scores.device):
+        if torch.cuda.is_current_stream_capturing() and owner_build.cache_info().currsize==0:
+            raise RuntimeError('warm up owner normalization before capture')
+        extension=owner_build()
+        owner=torch.full((hk,capacity),-1,device=scores.device,dtype=torch.int32)
+        _candidate_owners[(hk,triton.cdiv(r,256))](ids,keep,owner,r,capacity,BLOCK=256)
+        valid=torch.empty_like(keep);unique=torch.empty_like(keep)
+        _owner_validity[(hk,triton.cdiv(r,256))](ids,keep,owner,valid,unique,r,capacity,BLOCK=256)
+        empty=torch.empty(0,device=scores.device,dtype=torch.bool)
+        cp=(extension.virtual_compact_softmax_live(scores,owner,capacity,group,False,empty,valid_length)
+            if valid_length is not None else
+            extension.virtual_compact_softmax(scores,owner,capacity,group,False,empty))
+        result=torch.empty((hk,r),device=scores.device,dtype=scores.dtype)
+        _mean[(hk,triton.cdiv(r,256))](cp,valid,result,r,group,BLOCK=256)
+    return (result,unique) if return_unique else result
+
+
+@triton.jit
+def _prepare_narrow_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,SHARED:tl.constexpr,STRIDE:tl.constexpr,SHIFT:tl.constexpr,BLOCK:tl.constexpr):
     h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
     token=tl.load(IDS+h*R+r,r<R,other=0)
     valid=(r<R)&tl.load(KEEP+h*R+r,r<R,other=0)&(token>=0)&(token<S)
     token=tl.where(valid,token,0)
-    end:tl.constexpr=(S//8192)*8192
+    # Shared softmax keeps vector traversal in the last partial CTA; generic
+    # softmax visits that tail as scalars. Both use the same 1024-thread reduce.
+    end:tl.constexpr=S if SHARED else (S//8192)*8192
+    worker=tl.where(token<end,(token//8)%1024,(token-end)%1024)
+    ordinal=tl.where(token<end,(token//8192)*8+token%8,end//1024+(token-end)//1024)
+    key=tl.where(valid,worker*STRIDE+ordinal,1024*STRIDE)-SHIFT
+    tl.store(KEYS+h*R+r,key,r<R)
+    tl.store(VALID+h*R+r,valid,r<R)
+
+
+@triton.jit
+def _narrow_offsets_and_keys(KEYS,PERM,LONG_KEYS,OFFSETS,UNIQUE,R:tl.constexpr,S:tl.constexpr,SHIFT:tl.constexpr,BLOCK:tl.constexpr):
+    h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
+    key=tl.load(KEYS+h*R+r,r<R,other=0).to(tl.int64)+SHIFT
+    tl.store(LONG_KEYS+h*R+r,key.to(tl.int64),r<R)
+    previous=tl.load(KEYS+h*R+r-1,(r>0)&(r<R),other=0).to(tl.int64)+SHIFT
+    previous=tl.where(r>0,previous,-1)
+    original=tl.load(PERM+h*R+r,r<R,other=0)
+    tl.store(UNIQUE+h*R+original,(key<1024*S)&(key!=previous),r<R)
+    valid=r<1025
+    target=r.to(tl.int64)*S
+    lo=tl.zeros((BLOCK,),tl.int32)
+    hi=tl.full((BLOCK,),R,tl.int32)
+    while tl.sum((valid&(lo<hi)).to(tl.int32),0)>0:
+        active=valid&(lo<hi)
+        mid=lo+(hi-lo)//2
+        value=tl.load(KEYS+h*R+mid,active,other=0).to(tl.int64)+SHIFT
+        smaller=value<target
+        lo=tl.where(active&smaller,mid+1,lo)
+        hi=tl.where(active&~smaller,mid,hi)
+    tl.store(OFFSETS+h*1025+r,lo,valid)
+
+
+@triton.jit
+def _prepare_keys(IDS,KEEP,KEYS,VALID,R:tl.constexpr,S:tl.constexpr,BLOCK:tl.constexpr,PACKED:tl.constexpr=False,SHARED:tl.constexpr=False):
+    h=tl.program_id(0);r=tl.program_id(1)*BLOCK+tl.arange(0,BLOCK)
+    token=tl.load(IDS+h*R+r,r<R,other=0)
+    valid=(r<R)&tl.load(KEEP+h*R+r,r<R,other=0)&(token>=0)&(token<S)
+    token=tl.where(valid,token,0)
+    end:tl.constexpr=S if SHARED else (S//8192)*8192
     worker=tl.where(token<end,(token//8)%1024,(token-end)%1024)
     ordinal=tl.where(token<end,(token//8192)*8+token%8,end//1024+(token-end)//1024)
     if PACKED:
@@ -91,8 +164,7 @@ def _packed_sort_enabled(capacity):
     return value=='1'
 
 
-def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False):
-    # Fail before extension build/capture or an empty-candidate early return.
+def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False,valid_length=None):
     packed=_packed_sort_enabled(capacity)
     if torch.__version__.split('+')[0]!='2.8.0' or scores.dtype!=torch.bfloat16:
         raise ValueError('pinned torch2.8.0 BF16 prototype only')
@@ -109,22 +181,38 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
         result=scores.new_empty((hk,0))
         return (result,keep) if return_unique else result
     prop=torch.cuda.get_device_properties(scores.device)
-    if capacity%8 or capacity<(prop.shared_memory_per_block-128)//2 or capacity<=9216:
-        raise ValueError('only aligned generic BF16 softmax supported')
+    from .sparse_policy import stats_policy
+    owner_stats=valid_length is not None or stats_policy() == 'owner'
+    if capacity<=9216 or (capacity%8 and not owner_stats):
+        raise ValueError('unaligned softmax requires owner stats; capacity must exceed 9216')
+    if owner_stats:
+        return _owner_probabilities(scores,ids,keep,capacity,group,return_unique,valid_length)
     with torch.cuda.device(scores.device):
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize==0:
             raise RuntimeError('warm up sparse normalization before capture')
         extension = build()
-    key_dtype=torch.int16 if packed else (torch.int32 if 1024*capacity<2**31 else torch.int64)
+    # Only the traversal ordinal needs to fit between worker keys. Using the
+    # token capacity wastes key bits and extra radix passes. Signed int16
+    # shifts preserve total order when the sentinel also fits in 16 bits.
+    stride=triton.cdiv(capacity,8192)*8
+    narrow=os.environ.get('TLI_SPARSE_NARROW_KEYS','1')=='1'
+    shift=32768 if narrow and 1024*stride<65536 else 0
+    key_dtype=torch.int16 if (shift or packed) else (torch.int32 if 1024*stride<2**31 else torch.int64)
     keys=torch.empty_like(ids,dtype=key_dtype)
     valid=torch.empty_like(keep)
-    _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,BLOCK=256,PACKED=packed)
+    if packed:
+        _prepare_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,BLOCK=256,PACKED=True,SHARED=capacity<(prop.shared_memory_per_block-128)//2)
+    else:
+        _prepare_narrow_keys[(hk,triton.cdiv(r,256))](ids,keep,keys,valid,r,capacity,SHARED=capacity<(prop.shared_memory_per_block-128)//2,STRIDE=stride,SHIFT=shift,BLOCK=256)
     keys,perm=keys.sort(dim=-1,stable=True)
     long_keys=torch.empty_like(ids)
     unique=torch.empty_like(keep)
     offsets=torch.empty((hk,1025),device=ids.device,dtype=torch.int64)
-    _offsets_and_keys[(hk,triton.cdiv(max(r,1025),256))](
-        keys,perm,long_keys,offsets,unique,r,capacity,BLOCK=256,PACKED=packed)
+    if packed:
+        _offsets_and_keys[(hk,triton.cdiv(max(r,1025),256))](keys,perm,long_keys,offsets,unique,r,capacity,BLOCK=256,PACKED=True)
+    else:
+        _narrow_offsets_and_keys[(hk,triton.cdiv(max(r,1025),256))](
+            keys,perm,long_keys,offsets,unique,r,stride,shift,BLOCK=256)
     keys=long_keys
     with torch.cuda.device(scores.device):
         cp=extension.sparse_softmax(scores,perm,keys,offsets,group)
@@ -134,10 +222,33 @@ def candidate_probabilities(scores,ids,keep,capacity,group,*,return_unique=False
 
 
 def supported_geometry(dtype, device, capacity, group, heads):
-    if (torch.__version__.split('+')[0] != '2.8.0' or dtype != torch.bfloat16
-            or device.type != 'cuda' or not 9216 < capacity < 2**31-1
-            or capacity % 8 or group < 1 or group & (group-1)
-            or not 1 <= heads*group <= 65535):
-        return False
-    prop = torch.cuda.get_device_properties(device)
-    return capacity >= (prop.shared_memory_per_block-128)//2
+    from .sparse_policy import geometry_fallback
+    return geometry_fallback(dtype, device, capacity, group, heads) is None
+
+
+def candidate_probabilities_batched(scores,ids,keep,capacity,group,*,return_unique=False,valid_lengths=None):
+    """Exact per-head candidate normalization over independent flattened requests.
+
+    scores [B,Hq,R], ids/keep [B,Hkv,R]. Keeps every query-head denominator
+    and model-dtype rounding; uses the same pinned native-reduction kernel.
+    """
+    if type(group) is not int or group<1 or group&(group-1):
+        raise ValueError('GQA group must be a positive power of two')
+    if ids.ndim!=3 or scores.ndim!=3 or keep.shape!=ids.shape:
+        raise ValueError('batched candidate tensors must be rank three')
+    b,h,r=ids.shape
+    if (b<1 or h<1 or scores.shape!=(b,h*group,r) or b*h*group>65535
+            or b*h*r>=2**31-1 or b*h*group*r>=2**31-1):
+        raise ValueError('invalid batched candidate head geometry')
+    if not all(x.is_contiguous() for x in (scores,ids,keep)):
+        raise ValueError('contiguous batched candidates required')
+    if valid_lengths is not None and (
+            valid_lengths.shape != (b,) or valid_lengths.dtype != torch.int64
+            or valid_lengths.device != scores.device or not valid_lengths.is_contiguous()):
+        raise ValueError('live batch normalization requires same-device int64 lengths[B]')
+    result=candidate_probabilities(scores.view(b*h*group,r),ids.view(b*h,r),
+        keep.view(b*h,r),capacity,group,return_unique=return_unique,valid_length=valid_lengths)
+    if return_unique:
+        p,unique=result
+        return p.view(b,h,r),unique.view(b,h,r)
+    return result.view(b,h,r)

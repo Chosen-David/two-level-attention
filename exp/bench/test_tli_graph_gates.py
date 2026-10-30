@@ -43,15 +43,12 @@ def check(name, cond, detail=""):
         print(f"[FAIL] {name} {detail}")
 
 
-def _ref_layer_update(layer, key_states, value_states, seq_lens):
-    """参考实现：旧逐行 copy_ 语义（pos[b]=seq_lens[b]-1，dead 行冻结）。
-
-    与张量化 index_copy_ 的逐位等价依据：纯内存拷贝、无算术，每行
-    写 pos[b] 一列；dead 行 seq_lens 冻结 → pos 不变 → 重复写同列
-    （被下游 mask 排除，无污染）。clamp 保险同 update 内实现。
-    """
+def _ref_layer_update(layer, key_states, value_states, seq_lens, alive):
+    """Independent scalar reference: finished rows preserve their KV bytes."""
     keys, values = layer.keys, layer.values
     for b in range(layer.max_batch_size):
+        if not alive[b]:
+            continue
         p = max(0, min(seq_lens[b] - 1, layer.max_cache_len - 1))
         keys[b, :, p] = key_states[b, :, 0]
         values[b, :, p] = value_states[b, :, 0]
@@ -116,7 +113,7 @@ def test_kv_update_tensor():
                 cache_b.layers[l].lazy_initialization(key_states)
                 ref_inited[l] = True
             _ref_layer_update(cache_b.layers[l], key_states, value_states,
-                              seq_lens)
+                              seq_lens, alive)
         for l in range(len(cache_a.layers)):
             ka, va = cache_a.layers[l].keys, cache_a.layers[l].values
             kb, vb = cache_b.layers[l].keys, cache_b.layers[l].values
@@ -161,6 +158,7 @@ def test_kv_update_graph():
             pos_buf = torch.zeros(B, dtype=torch.long, device=dev)
             enable_graph(B)
             graph_state().pos_buf = pos_buf
+            graph_state().alive_buf = torch.ones(B, dtype=torch.bool, device=dev)
         for step in range(4):
             seq_lens = _step_seq_lens(seq_lens, alive)
             key_states, value_states = _kv_step(g, B, Hkv, D, dev)
@@ -170,6 +168,7 @@ def test_kv_update_graph():
                            gen_lens=[0] * B, alive=list(alive), pad_id=0)
             set_batch_decode_ctx(ctx)
             if graph_on:
+                graph_state().alive_buf.copy_(torch.tensor(alive, device=dev))
                 graph_state().pos_buf.copy_(torch.tensor(
                     [seq_lens[b] - 1 for b in range(B)],
                     dtype=torch.long, device=dev))

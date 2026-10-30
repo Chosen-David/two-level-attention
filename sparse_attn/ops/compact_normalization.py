@@ -1,7 +1,7 @@
 """Experimental exact BF16 normalization; full-domain ranking unchanged.
 
 Repeated IDs must have identical scores, as produced by the TLI fine scorer.
-Pinned to PyTorch 2.8 generic CUDA softmax; warm up before graph capture.
+Pinned to PyTorch 2.8 generic/shared CUDA softmax; warm up before graph capture.
 """
 import os
 from pathlib import Path
@@ -44,27 +44,44 @@ def _compact_gqa_mean(CP,OWNER,OUT,S:tl.constexpr,R:tl.constexpr,G:tl.constexpr,
 def build():
     if torch.__version__.split('+')[0]!='2.8.0':raise RuntimeError('requires pinned torch2.8.0 generic softmax')
     os.environ.setdefault('MAX_JOBS','1');root=Path(__file__).resolve().parent/'csrc'
-    return load(name='tli_virtual_softmax_compact_v2',sources=[str(root/'binding.cpp'),str(root/'virtual_softmax_compact.cu')],
+    # Concurrent worktrees must not share a binary while their CUDA contracts
+    # differ (scalar live width versus per-request lengths, for example).
+    import hashlib
+    sources=[root/'binding.cpp',root/'virtual_softmax_compact.cu']
+    revision=hashlib.sha256(b''.join(path.read_bytes() for path in sources)).hexdigest()[:16]
+    return load(name='tli_virtual_softmax_compact_'+revision,sources=list(map(str,sources)),
                 extra_cflags=['-O3'],extra_cuda_cflags=['-O3','-std=c++17'],verbose=True)
 
-def probabilities(extension,scores,ids,keep,capacity,group):
+def probabilities(extension,scores,ids,keep,capacity,group,excluded=None,valid_length=None):
     if scores.device != ids.device or scores.device != keep.device:
         raise ValueError('same CUDA device required')
     if scores.dtype!=torch.bfloat16:raise ValueError('compact mean mirrors BF16-only native mean; other dtypes keep accepted fallback')
     if not all(t.is_cuda and t.is_contiguous() for t in (scores,ids,keep)):raise ValueError('contiguous CUDA tensors required')
     hk,r=ids.shape
     if group<1 or group&(group-1) or scores.shape!=(hk*group,r) or keep.shape!=ids.shape:raise ValueError('GQA candidate shapes invalid')
-    if r==0:return torch.zeros((hk,capacity),device=scores.device,dtype=scores.dtype)
+    if excluded is not None and (excluded.device != scores.device or excluded.dtype != torch.bool
+            or not excluded.is_contiguous() or excluded.shape != (capacity,)):
+        raise ValueError('contiguous same-device token-domain bool exclusion mask required')
+    if r==0:
+        p = torch.zeros((hk,capacity),device=scores.device,dtype=scores.dtype)
+        return p if excluded is None else p.masked_fill(excluded, -torch.inf)
+    mask = torch.empty(0, device=scores.device, dtype=torch.bool) if excluded is None else excluded
     owner=torch.full((hk,capacity),-1,device=scores.device,dtype=torch.int32)
     _candidate_owners[(hk,triton.cdiv(r,256))](ids,keep,owner,r,capacity,BLOCK=256)
-    compact=extension.virtual_compact_softmax(scores,owner,capacity,group)
+    def normalize(fused):
+        if valid_length is not None:
+            return extension.virtual_compact_softmax_live(scores,owner,capacity,group,fused,mask,valid_length)
+        return extension.virtual_compact_softmax(scores,owner,capacity,group,fused,mask)
+    if os.environ.get('TLI_COMPACT_FUSED_MEAN', '1') == '1':
+        return normalize(True)
+    compact=normalize(False)
     p=torch.empty((hk,capacity),device=scores.device,dtype=scores.dtype)
     _compact_gqa_mean[(hk,triton.cdiv(capacity,1024))](compact,owner,p,capacity,r,group,BLOCK=1024,num_warps=4)
-    return p
+    return p if excluded is None else p.masked_fill(excluded, -torch.inf)
 
 
 def supported(scores, ids, keep, capacity, group):
-    """Only the pinned generic-softmax geometry preserves reference rounding."""
+    """Pinned generic/shared softmax geometry preserves reference rounding."""
     if torch.__version__.split('+')[0] != '2.8.0' or scores.dtype != torch.bfloat16:
         return False
     if scores.device != ids.device or scores.device != keep.device:
@@ -79,14 +96,13 @@ def supported(scores, ids, keep, capacity, group):
         return False
     if ids.shape[0]*capacity >= 2**31 or ids.shape[1] >= 2**31:
         return False
-    prop = torch.cuda.get_device_properties(scores.device)
-    return not (capacity < (prop.shared_memory_per_block - 128)//2 and capacity % 8 == 0)
+    return True
 
 
-def compact_probabilities(scores, ids, keep, capacity, group):
+def compact_probabilities(scores, ids, keep, capacity, group, excluded=None,valid_length=None):
     if not supported(scores, ids, keep, capacity, group):
         raise ValueError('unsupported exact compact normalization geometry')
     with torch.cuda.device(scores.device):
         if torch.cuda.is_current_stream_capturing() and build.cache_info().currsize == 0:
             raise RuntimeError('warm up compact normalization before CUDA Graph capture')
-        return probabilities(build(), scores, ids, keep, capacity, group)
+        return probabilities(build(), scores, ids, keep, capacity, group, excluded,valid_length)

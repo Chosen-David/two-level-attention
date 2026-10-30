@@ -33,10 +33,12 @@ class FarSkipStaticLayer(TLIStaticLayer):
     def _adopt_ring(self, ring, max_cache_len, coarse, fine):
         super().__init__(max_cache_len, 1)
         self.keys, self.values = ring.keys, ring.values
+        self.is_initialized = True
         self.dtype, self.device = ring.dtype, ring.device
         self.num_heads, self.head_dim = self.keys.shape[1], self.keys.shape[-1]
         self.config, self.layout = ring.config, ring.layout
         self.cumulative_length = ring.logical_length
+        self._operator_alive = torch.ones((), device=self.device, dtype=torch.bool)
         self.workspace = FarSkipGraphWorkspace(self.config, ring.layout, self.num_heads, coarse, fine)
         self.workspace.initialize(self.keys.transpose(1, 2), ring.logical_length)
 
@@ -50,8 +52,14 @@ class FarSkipStaticLayer(TLIStaticLayer):
         if pos is None or pos.shape != (1,) or pos.dtype != torch.long or pos.device != self.device:
             raise ValueError('static far KV needs one device int64 cache position')
         slot = self.layout.map(pos)
-        self.keys.index_copy_(2, slot, key_states)
-        self.values.index_copy_(2, slot, value_states)
+        from .operator_pipeline import operator_mode
+        if operator_mode() != 'off':
+            from .kv_row_update import append_kv_row
+            append_kv_row(self.keys, self.values, key_states, value_states,
+                          slot, self._operator_alive)
+        else:
+            self.keys.index_copy_(2, slot, key_states)
+            self.values.index_copy_(2, slot, value_states)
         return self.keys, self.values
 
     def reset(self):
@@ -136,6 +144,12 @@ def try_far_skip_static(module, q, k, v, cache, mask, batch_ctx):
         if not 1 <= batch_ctx.seq_lens[0] <= layer.max_cache_len:
             raise ValueError('decode position exceeds static cache capacity')
         pos = torch.tensor([batch_ctx.seq_lens[0]-1], dtype=torch.long, device=q.device)
+    from .operator_pipeline import validate_operator_inputs
+    validate_operator_inputs(q, k, v)
     k, v = layer.update(k, v, {'cache_position': pos})
     q, k, v = (t.transpose(1, 2) for t in (q, k, v))
-    return layer.workspace(q, k, v, pos+1, module.scaling)
+    output = layer.workspace(q, k, v, pos+1, module.scaling)
+    # Receipt is written only after the selected consumer actually dispatches.
+    idx._graph_attention_route = layer.workspace.attention_route
+    idx._graph_ring_capacity = layer.layout.capacity
+    return output

@@ -103,7 +103,7 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
             unsupported.append("parallel-batch-indexer")
         if unsupported:
             raise ValueError("GLM TLI 不支持配置: " + ", ".join(unsupported))
-        if os.environ.get("TLI_CUDA_GRAPH", "0") == "1":
+        if os.environ.get("TLI_CUDA_GRAPH", "auto").lower() in ("1", "on"):
             devices = {
                 str(device) for device in getattr(model, "hf_device_map", {}).values()
                 if isinstance(device, (int, str)) and str(device) not in ("cpu", "disk")

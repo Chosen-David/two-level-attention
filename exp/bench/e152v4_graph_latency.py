@@ -168,6 +168,8 @@ def _storage_snapshot(cache, model):
                 "physical_tokens_per_row": owner.keys.shape[-2],
                 "keys_bytes": owner.keys.numel() * owner.keys.element_size(),
                 "values_bytes": owner.values.numel() * owner.values.element_size(),
+                "keys_ptr": owner.keys.data_ptr(),
+                "values_ptr": owner.values.data_ptr(),
             })
     totals = {}
     for entry in entries:
@@ -466,6 +468,34 @@ def _validate_protocol(args):
         raise ValueError("E152v4 是 decode-only 口径：TLI_SPARSE_PREFILL 必须为 0")
 
 
+def _check_ring_routes(entries, expected_ids, captured_storage, enabled):
+    ring = [x for x in entries if x['role'] == 'ring']
+    if not ring or any(x['physical_tokens_per_row'] >= x['logical_tokens'] for x in ring):
+        raise RuntimeError('ring benchmark did not use physically bounded ring KV')
+    if {x['layer'] for x in ring} != expected_ids:
+        raise RuntimeError('actual ring layers differ from the frozen mask on patched layers')
+    expected_storage = {(x['keys_ptr'], x['values_ptr']) for x in ring}
+    if enabled and captured_storage != expected_storage:
+        raise RuntimeError('ring operator was not captured for every ring layer')
+    if not enabled and captured_storage:
+        raise RuntimeError('legacy ring arm unexpectedly captured the new operator')
+    return ring
+
+
+
+class _CountedKernel:
+    """Count actual Python kernel submissions, including during Graph capture."""
+    def __init__(self, kernel, counts, is_capturing):
+        self.kernel, self.counts, self.is_capturing = kernel, counts, is_capturing
+
+    def __getitem__(self, grid):
+        launch = self.kernel[grid]
+        def counted(*args, **kwargs):
+            key = 'capture' if self.is_capturing() else 'eager'
+            self.counts[key] += 1
+            return launch(*args, **kwargs)
+        return counted
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-L", "--context-length", type=int, required=True)
@@ -554,6 +584,29 @@ def main():
             geometry_calls[key] += 1
             return original_geometry(self, *a, **kw)
         TLIIndexer._build_graph_geometry = observed_geometry
+    ring_calls = {'capture': 0, 'eager': 0}
+    ordered_calls = {'capture': 0, 'eager': 0}
+    require_ring = os.environ.get('TLI_BENCH_REQUIRE_RING', '0') == '1'
+    ring_capture_storage = set()
+    if require_ring:
+        from sparse_attn.ops import ordered_selection
+        ordered_selection._compact = _CountedKernel(ordered_selection._compact, ordered_calls,
+                                                    torch.cuda.is_current_stream_capturing)
+        skip_ids = json.loads(open(args.tli_layer_skip_path).read())['skip']
+        if (len(set(skip_ids)) != len(skip_ids) or
+                any(type(x) is not int or not 0 <= x < model.config.num_hidden_layers for x in skip_ids)):
+            raise ValueError('ring mask contains duplicate or out-of-range layer IDs')
+        patched_ids = {m.layer_idx for m in model.modules() if getattr(m,'indexer',None) is not None}
+        expected_ring_ids = set(skip_ids) & patched_ids
+        from sparse_attn.ops import operator_pipeline
+        original_decode_ring = operator_pipeline.decode_ring
+        def observed_decode_ring(*a, **kw):
+            key = 'capture' if torch.cuda.is_current_stream_capturing() else 'eager'
+            ring_calls[key] += 1
+            if key == 'capture':
+                ring_capture_storage.add((a[2].data_ptr(), a[3].data_ptr()))
+            return original_decode_ring(*a, **kw)
+        operator_pipeline.decode_ring = observed_decode_ring
     from sparse_attn.ops.selector_options import validate_selector_options
     from exp.bench.selector_route_observer import install, checked_delta
     packed_sort,tiled_scan=validate_selector_options(S_cap)
@@ -562,6 +615,9 @@ def main():
     for r in range(args.warmup + args.repeats):
         before_optimization={name:counts.copy() for name,counts in optimization_calls.items()}
         before_geometry_calls = geometry_calls.copy()
+        before_ring_calls = ring_calls.copy()
+        before_ordered_calls = ordered_calls.copy()
+        ring_capture_storage.clear()
         before_fa2 = runner.fa2_adapter.calls.copy() if runner.fa2_adapter is not None else None
         do_capture = (args.graph_mode == "graph" and runner.graph is None)
         try:
@@ -589,6 +645,28 @@ def main():
         rec['geometry_reuse_enabled'] = os.environ.get('TLI_GRAPH_GEOMETRY_SHARED', '1') == '1'
         rec['geometry_counts_enabled'] = os.environ.get('TLI_BENCH_GEOMETRY_COUNTS', '0') == '1'
         # These are host capture/warmup submissions, not replay counts.
+        if require_ring:
+            calls = {key:ring_calls[key]-before_ring_calls[key] for key in ring_calls}
+            enabled = os.environ.get('TLI_OPERATOR_MODE', 'off') != 'off'
+            ring_layers = _check_ring_routes(rec['kv_storage']['layers'], expected_ring_ids,
+                                             ring_capture_storage, enabled)
+            if not enabled and any(calls.values()):
+                raise RuntimeError('legacy ring arm unexpectedly called the new operator')
+            scan_calls = {key:ordered_calls[key]-before_ordered_calls[key] for key in ordered_calls}
+            ordered_enabled = enabled and os.environ.get('TLI_OPERATOR_ORDERED_SELECTION','1') == '1'
+            expected_scan_capture = len(ring_layers) if ordered_enabled and args.graph_mode == 'graph' else 0
+            if scan_calls['capture'] != expected_scan_capture:
+                raise RuntimeError('ordered ring compaction kernel capture route mismatch')
+            rec['ring_operator_routes'] = dict(calls, operator_enabled=enabled,
+                ordered_selection_enabled=ordered_enabled, ordered_scan_calls=scan_calls,
+                backend=os.environ.get('TLI_OPERATOR_BACKEND','simt'), ring_layers=len(ring_layers),
+                expected_ring_ids=sorted(expected_ring_ids), captured_kv_storage=sorted(ring_capture_storage),
+                count_scope='Python calls during capture/warmup; not replay invocation counts')
+        rec['geometry_builds'] = {
+            key: geometry_calls[key] - before_geometry_calls[key] for key in geometry_calls}
+        rec['geometry_reuse_enabled'] = os.environ.get('TLI_GRAPH_GEOMETRY_SHARED', '1') == '1'
+        rec['geometry_counts_enabled'] = os.environ.get('TLI_BENCH_GEOMETRY_COUNTS', '0') == '1'
+        # These are host submissions while building a graph, not replay counts.
         selector_routes = []
         for name, module in model.named_modules():
             idx = getattr(module, "indexer", None)

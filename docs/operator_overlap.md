@@ -35,13 +35,14 @@ SIMT/TC x stage1/3 fork/join graph replay tests pass; these options are not an
 automatic tuning policy and do not establish model speedups.
 
 Opt-in exact normalization: `TLI_COMPACT_NORMALIZATION=1` removes dense
-query-head score/probability buffers for pinned Torch 2.8.0 BF16 generic CUDA
+query-head score/probability buffers for pinned Torch 2.8.0 BF16 generic/shared CUDA
 softmax geometry. Unsupported shapes retain the reference path. Warm up before
 Graph capture; the extension requires a CUDA compiler. Per-KV-head owner and
 ranking buffers remain full width; this is not yet fully candidate-domain Top-K.
-Normalization follows the actual L1/bypass token domain; final Sink/SWA attention
-protection is separate. Fine-scoring a protected superset does not imply those
-tokens survive the eager reconstruction mask before softmax.
+Normalization now uses the unique L1/bypass union with complete Sink/SWA tokens
+in both eager and Graph paths. Final protected attention remains a separate
+operation. Measurements below used their stated earlier snapshots; see the
+integration note for the normalization-domain change.
 
 Local H20/Qwen3-8B BF16, exact 32768 input/64 generated, B=1, two ABBA cycles,
 three full warmups and three measured requests per process: serial Graph TPOT
@@ -52,15 +53,58 @@ was excluded by warmup, but per-request cache fill is included in request wall.
 This is not an FA2/overlap/quality claim. Evidence: project-local
 `agent_doc/results/operator_compact_integrated_20261029/paired-confirmed-domain`.
 
-Opt-in candidate-domain selection: set `TLI_OPERATOR_MODE=serial` and
-`TLI_SPARSE_SELECTION=1`. On the supported Torch 2.8.0 BF16 CUDA geometry
-(aligned capacity, native generic softmax, power-of-two GQA group, K2=1024),
-this removes the capacity-wide normalization, owner, ranking and middle-mask
-buffers after candidate scoring. Other geometries retain the existing selector.
-The flag stays off by default; overlap remains experimental.
+Opt-in candidate-domain selection: set `TLI_SPARSE_SELECTION=1`. On the
+supported Torch 2.8.0 BF16 CUDA geometry (aligned capacity above 9216,
+native generic/shared softmax, power-of-two GQA group, K2=1024), this removes
+capacity-wide normalization, owner and ranking buffers after candidate scoring.
+Serial/overlap consumers receive token IDs directly. The default mask consumer
+now also uses this selector when explicitly enabled, then reconstructs only its
+final bool mask with complete Sink/SWA and valid-length protection. Unsupported
+geometry falls back explicitly. The flag stays off by default; overlap remains
+experimental. Inspect `_graph_normalization_route`, `_graph_ranking_route` and
+`_graph_sparse_selection_fallback` on the actual capturing indexer.
+
+`TLI_SPARSE_STATS=owner` selects an alternative normalization implementation:
+integer token ownership followed by native-order statistics and candidate-only
+probabilities/GQA. It avoids the normalization traversal sort but retains an
+O(Hkv * capacity) int32 owner buffer; the no-capacity-buffer claim above applies
+only to the default `sorted` stats implementation. Inspect
+`_graph_normalization_stats_route` for `capacity_owner` or `sorted_candidates`.
+Duplicate slots must contain identical token scores in both implementations.
+The owner implementation also handles unaligned capacities above 9216 through
+the native generic row-shift schedule, and remains opt-in alongside sparse
+selection.
+
+Normalization keys encode (native worker, traversal ordinal); sufficiently small
+geometries use shifted signed16 keys with the sentinel in range. Setting
+`TLI_SPARSE_NARROW_KEYS=0` uses wider keys with the same compact stride. It does
+not restore the historical capacity-stride implementation. New-source GPU and
+independent correctness evidence is in the main project's
+`graph_g1_sparse_shared_20261030_0080`, `graph_g1_sparse_mask_20261030_0100`,
+`graph_g1_sparse_narrow_20261030_0140` and `graph_g1_sparse_key_boundary_20261030_0141`
+result directories. These gates do not establish whole-benchmark accuracy.
+
+Current full-protection selector comparisons must not reuse the historical
+model speedups below. The 0090/0110 paired runs found sparse selection slower
+than the local compact normalization plus histogram/blocked-ranking baseline at
+both 16K and 32K. The 0150 same-stride key-width comparison independently measured
+5.99% lower selector replay latency for signed16 versus int32, but that increment
+alone does not establish sparse selection as the fastest route. These are B1
+synthetic selector diagnostics, not model TPOT or total-request conclusions.
+
+For checkpoint 4d004eb, independently checked runs 0170/0180/0190 test the owner
+alternative. At B1 capacity 32840 its selector replay median was 0.197932 ms
+versus 0.255792 ms for sorted stats in the same run (22.62% lower). A separate
+same-source comparison against compact normalization plus histogram/blocked
+ranking measured 0.198499 versus 0.211855 ms (6.30% lower). Each comparison has
+30 alternating pairs, 20 replays per sample, and observed GPU0 ownership.
+These short diagnostics do not establish steady-state or model speedups; the
+two percentages must not be combined. Evidence lives under the main project's
+`graph_g1_owner_stats_20261030_0170`, `graph_g1_owner_perf_20261030_0180` and
+`graph_g1_owner_total_perf_20261030_0190` result directories.
 
 The implementation preserves each query head's native reduction order and
-BF16 rounding over unique L1/bypass tokens. Normalization returns a canonical
+BF16 rounding over unique L1/bypass and complete protected tokens. Normalization returns a canonical
 slot per token; ranking reuses it and includes implicit zero-score tokens from
 the entire eligible interval. For capacities below 65536, exact packed 32-bit
 keys use tiled sorting and a top-1024 merge tree; other supported capacities
@@ -106,3 +150,12 @@ and 36 combine kernels (4536 of each total), confirming FA2 decode execution
 in that audit. This does not retroactively turn the paired runs into profiled
 runs or remove their Graph/cache differences. Audit artifacts are under
 `operator_sparse_model32k_20261029/backend-audit`.
+
+Graph-quality integration note (2026-10-29): the graph-quality branch now
+normalizes the unique L1/bypass union with the **complete sink/SWA protected
+domain**, consistently in eager and Graph. Candidate-only selection consumes
+that completed domain as well. The numerical/timing records above were produced
+on their named pre-integration snapshots; do not reuse their speed or quality
+conclusions for this changed normalization domain. New integration regression
+evidence lives under the main project's `graph_g1_main_integration_20261030_0070`;
+performance and broader model-quality validation remain separate requirements.

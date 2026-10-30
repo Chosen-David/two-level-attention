@@ -31,7 +31,9 @@ _ERR_FLAG = {}  # device -> [1] int32 GPU 缓冲（0=ok / 1=B7 空行 / 2=W 超�
 def _err_flag(device: torch.device) -> torch.Tensor:
     buf = _ERR_FLAG.get(device)
     if buf is None:
-        buf = torch.zeros(1, dtype=torch.int32, device=device)
+        # The persistent flag outlives inference_mode requests.
+        with torch.inference_mode(False):
+            buf = torch.zeros(1, dtype=torch.int32, device=device)
         _ERR_FLAG[device] = buf
     return buf
 
@@ -62,6 +64,8 @@ def eager_decoding_check_errors(device=None, clear: bool = True):
 
 
 def _raise_for_code(code: int):
+    if code == 4:
+        raise RuntimeError("ordered attention: invalid selected token IDs, counts or live lengths; request rejected")
     if code == 1:
         raise RuntimeError(
             "eager_decoding_attn: 选择 mask 存在全 False 行——softmax 将"

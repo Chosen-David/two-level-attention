@@ -450,3 +450,21 @@ def test_cuda_fused_scale_preserves_model_rounding(backend, dtype, scale, pipeli
                                     (ids, counts), lengths, scale=1., **kwargs)
     for actual, expected in zip(fused, materialized):
         torch.testing.assert_close(actual, expected, atol=0, rtol=0)
+
+
+@pytest.mark.parametrize('backend',['torch','simt','tc'])
+def test_postscale_zero_keeps_padding_masked(backend):
+    if backend!='torch' and not torch.cuda.is_available():
+        pytest.skip('CUDA required')
+    device='cpu' if backend=='torch' else 'cuda'
+    q=torch.ones(1,1,1,32,device=device,dtype=torch.bfloat16)
+    k=torch.ones(1,4,1,32,device=device,dtype=q.dtype)
+    v=torch.arange(128,device=device,dtype=torch.float32).reshape_as(k).to(q.dtype)
+    ids=torch.tensor([[[1,0,0,0]]],device=device,dtype=torch.int32)
+    counts=torch.tensor([[1]],device=device,dtype=torch.int32)
+    lengths=torch.tensor([4],device=device,dtype=torch.int64)
+    state=partial_attention(q,k,v,(ids,counts),lengths,sink=0,swa=0,
+                            scale=0.,splits=1,backend=backend,round_scaled_query=False)
+    assert torch.isfinite(state.acc).all()
+    torch.testing.assert_close(state.acc[0,0,0],v[0,1,0].float(),rtol=0,atol=0)
+    torch.testing.assert_close(state.l,torch.ones_like(state.l),rtol=0,atol=0)

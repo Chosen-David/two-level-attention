@@ -101,8 +101,8 @@ def _batch_device_lengths(ctx, dev):
 def _parallel_batch_enabled(batch):
     """TLI_BATCH_INDEXER=parallel 开关（legacy=默认逐行路径）。"""
     mode = os.environ.get("TLI_BATCH_INDEXER", "legacy")
-    if mode not in ("legacy", "parallel"):
-        raise ValueError("TLI_BATCH_INDEXER must be legacy or parallel")
+    if mode not in ("legacy", "parallel", "exact"):
+        raise ValueError("TLI_BATCH_INDEXER must be legacy, parallel or exact")
     return batch >= 1 and mode == "parallel"
 
 
@@ -123,6 +123,9 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
     8 几何逐位）；attn 归约集合 ≡（gather 路径 valid_length 不参与，
     T≥16K 走 Triton / T<16K 走 dense，pad 列由 mask False 排除）。
     """
+    if os.environ.get('TLI_BATCH_INDEXER', 'legacy') == 'exact':
+        from ..ops.exact_linear_batch import exact_linear_batch_decode
+        return exact_linear_batch_decode(indexer,q,k,v,gs,self.scaling)
     B = q.shape[0]
     dev = q.device
     S_cap = k.shape[1]
@@ -163,15 +166,21 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
         # 分发到 pos_buf 驱动的增量更新（单块统计 + 单行 k_qat，固定形状
         # 纯张量 op，capture 安全）；不兼容配置自动回退全量路径（fail-
         # closed，行为逐位不变）。
-        idx_dict = indexer.prepare_index(k[b:b + 1], cu)
-        masks.append(indexer.compute_mask_graph(
-            q[b:b + 1], idx_dict, self.scaling, vl[b:b + 1]))
+        # Incremental preparation consumes shared graph metadata too. Without
+        # slicing it, the last cached row can update with row zero's position.
+        from ..ops.exact_linear_batch import _row_scope
+        with _row_scope(gs, b):
+            idx_dict = indexer.prepare_index(k[b:b + 1], cu)
+            masks.append(indexer.compute_mask_graph(
+                q[b:b + 1], idx_dict, self.scaling, vl[b:b + 1]))
     m_b = torch.cat(masks, dim=0)              # [B,1,Hkv,S_cap] bool
     cu_b = torch.arange(B + 1, device=dev, dtype=torch.int32) * S_cap
     # valid_length=None：mask 已排除 pad 列（prepare_mask 末尾清 False 的
     # graph 等价物是 compute_mask_graph 的 `sel & (ar_tok < S_real)`）。
-    return eager_decoding_attn(
+    output = eager_decoding_attn(
         q, k, v, m_b, 1, cu_b, softmax_scale=self.scaling, valid_length=None)
+    indexer._graph_attention_route = 'legacy_graph_eager_tli'
+    return output
 
 
 def _tl_decode_batched(self, indexer, query_states, key_states,
@@ -234,6 +243,10 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
     # 路径（capture 前的 warmup 阶段触发，之后两臂一致）。
     from ..ops.cuda_graph_state import graph_state  # noqa: E402
     _gs = graph_state()
+    if os.environ.get('TLI_BATCH_INDEXER', 'legacy') == 'exact':
+        if not _gs.enabled:
+            raise ValueError('exact batch requires the fixed-address graph-state route')
+        return _tl_decode_batched_graph(self,indexer,q,k,v,_gs)
     if _gs.enabled:
         try:
             return _tl_decode_batched_graph(self, indexer, q, k, v, _gs)
@@ -266,9 +279,11 @@ def _tl_decode_batched(self, indexer, query_states, key_states,
         # valid_length 传逐行真实长 list（Triton 批量只消费 mask 忽略之；
         # torch 批量回退的 dense 段逐行裁剪归约域 [0,L_b) → 与变长路径
         # 逐位一致，防 pad 0 项参与归约树致 ULP 翻硬币）
-        return eager_decoding_attn(
+        output = eager_decoding_attn(
             q, k, v, m_b, bs0, cu_b, softmax_scale=self.scaling,
             valid_length=ctx.seq_lens)
+        indexer._graph_attention_route = 'batch_eager_tli'
+        return output
     # B==1（gate_bs1_equiv 铁律）/ block_size>1 兜底：逐行单 query 路径
     outs = []
     for b in range(B):
@@ -313,12 +328,7 @@ def qwen3_attn_forward(
 
     # Compact consumers own both the KV write and absolute-to-ring addressing.
     # Dispatch before the generic update, which would otherwise append twice.
-    # 【Phase 4】serial 模式走标准 linear KV + decode_indexed，跳过 compact
-    # far-skip 路径（其内部用 decode_ring → overlap only）。
-    from ..ops.operator_pipeline import operator_mode as _op_mode_fn
-    _tli_op_mode = _op_mode_fn()
-    if (_tli_op_mode != 'serial'
-            and past_key_values is not None
+    if (past_key_values is not None
             and getattr(self.indexer, "far_skip_backend", "legacy") == "compact"):
         from ..ops.far_skip_runtime import try_far_skip_decode
         compact = try_far_skip_decode(
@@ -419,6 +429,11 @@ def qwen3_attn_forward(
                 and is_static_cache
                 and _can_drop_static_mask(past_key_values, attention_mask, cur_len, prefill=True)):
             attention_mask = None
+        elif (attention_mask is not None and is_static_cache
+              and attention_mask.shape[-1] > key_states.shape[-2]):
+            # KV above was trimmed to the live prefix. HF 5 SDPA no longer
+            # trims a capacity-wide mask for us; retain every live mask value.
+            attention_mask = attention_mask[..., :key_states.shape[-2]]
         # E85f：prefill 走 dense，但旁路采集 post-RoPE q 统计供 per-layer 静态
         # pair 选取（decode 侧 _subspace_indices 消费；非静态 pair 模式为 no-op）
         if hasattr(indexer, "observe_prefill_q"):

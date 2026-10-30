@@ -30,6 +30,40 @@ def operator_mode() -> str:
     return os.environ.get("TLI_OPERATOR_MODE", "off")
 
 
+
+def _ordered_selection_enabled():
+    value = os.environ.get('TLI_OPERATOR_ORDERED_SELECTION', '1')
+    if value not in ('0', '1'):
+        raise ValueError('TLI_OPERATOR_ORDERED_SELECTION must be 0 or 1')
+    return value == '1'
+
+def validate_operator_inputs(q, k, v):
+    """Reject unsupported HF-format decode inputs before any KV mutation."""
+    mode = operator_mode()
+    if mode == 'off':
+        return
+    _ordered_selection_enabled()
+    backend = os.environ.get('TLI_OPERATOR_BACKEND', 'simt')
+    stages = int(os.environ.get('TLI_OPERATOR_SELECTED_STAGES', '1'))
+    if mode not in ('serial', 'overlap') or backend not in ('simt', 'tc') or stages not in (1, 2, 3):
+        raise ValueError('invalid operator mode/backend/stages')
+    if (q.ndim != 4 or k.ndim != 4 or v.ndim != 4
+            or q.shape[0] != k.shape[0] or k.shape[:3] != v.shape[:3]
+            or q.shape[2] != 1 or k.shape[2] != 1 or k.shape[1] < 1
+            or q.shape[1] % k.shape[1] or q.shape[-1] != k.shape[-1]
+            or min(q.shape[-1], v.shape[-1]) < 1):
+        raise ValueError('incompatible operator decode dimensions')
+    if (q.dtype not in (torch.float32, torch.float16, torch.bfloat16)
+            or any(t.dtype != q.dtype or t.device != q.device or t.stride(-1) != 1
+                   for t in (q, k, v))):
+        raise ValueError('operator requires matching floating Q/K/V and unit feature stride')
+    if backend == 'tc' and q.dtype not in (torch.float16, torch.bfloat16):
+        raise ValueError('TC backend requires fp16/bf16')
+    from .partial_attention import triton
+    if triton is None or not q.is_cuda:
+        raise RuntimeError('GPU partial attention requires CUDA and Triton; no implicit fallback')
+
+
 def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
     """Compact decode, optionally forking protected attention before indexing.
 
@@ -99,10 +133,69 @@ def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
             tensor.record_stream(current)
 
     # 5. merge
-    return merge_partials(protected_state, selected_state,
-                          dtype=q.dtype, backend='simt')
+    output = merge_partials(protected_state, selected_state,
+                            dtype=q.dtype, backend='simt')
+    indexer._graph_attention_route = f"linear_{'overlap' if overlap else 'serial'}_{backend}"
+    return output
 
 
-def decode_ring(*args, **kwargs):
-    raise NotImplementedError(
-        "decode_ring is not available when TLI_OPERATOR_MODE != 'overlap'")
+def decode_ring(workspace, q, k, v, lengths, softmax_scale):
+    """Consume far-skip logical IDs directly from ring KV, without KV gather."""
+    torch._assert_async(((lengths >= 1) & (lengths < torch.iinfo(torch.int32).max)).all(),
+                        "ring logical lengths must fit positive int32 IDs")
+    return decode_selected(q, k, v, lengths, softmax_scale, cfg=workspace.cfg,
+                           layout=workspace.layout, select=workspace.select,
+                           ordered_unique=getattr(workspace, 'ordered_unique_selection', False))
+
+
+def decode_selected(q, k, v, lengths, softmax_scale, *, cfg, layout, select, ordered_unique=False):
+    """Shared split attention consumer for graph and eager compact selectors."""
+    from .partial_attention import partial_attention, merge_partials
+    from .token_selection import middle_selection
+    ordered_enabled = _ordered_selection_enabled()
+    if q.shape[0] != 1:
+        raise ValueError('ring workspace owns a single request')
+    backend = os.environ.get('TLI_OPERATOR_BACKEND', 'simt')
+    stages = int(os.environ.get('TLI_OPERATOR_SELECTED_STAGES', '1'))
+    if backend not in ('simt', 'tc') or stages not in (1, 2, 3):
+        raise ValueError('invalid operator backend or selected stages')
+    overlap = operator_mode() == 'overlap'
+    if overlap and not q.is_cuda:
+        raise RuntimeError('overlap requires CUDA')
+    torch._assert_async(((lengths >= 1) & (lengths < torch.iinfo(torch.int32).max)).all(),
+                        'ring logical lengths must fit positive int32 IDs')
+    def protected():
+        ids = torch.empty((1, k.shape[2], 0), dtype=torch.int32, device=q.device)
+        counts = torch.empty((1, k.shape[2]), dtype=torch.int32, device=q.device)
+        return partial_attention(q, k, v, (ids, counts), lengths,
+            sink=cfg.sink_tokens, swa=cfg.window_tokens, scale=softmax_scale,
+            protected=True, splits=4, backend=backend, layout=layout,
+            round_scaled_query=False)
+    if overlap:
+        current = torch.cuda.current_stream(q.device)
+        side = _protected_stream(q.device)
+        side.wait_stream(current)
+        with torch.cuda.stream(side):
+            pstate = protected()
+            for tensor in (q, k, v, lengths):
+                tensor.record_stream(side)
+    positions, valid = select(q, k, lengths, softmax_scale)
+    # Ring positions are absolute: physical capacity is not an ID bound.
+    if ordered_unique and ordered_enabled:
+        from .ordered_selection import ordered_middle_selection
+        selection = ordered_middle_selection(positions[None], valid[None], lengths,
+            cfg.sink_tokens, cfg.window_tokens, torch.iinfo(torch.int32).max)
+    else:
+        selection = middle_selection(positions[None], valid[None], lengths,
+            cfg.sink_tokens, cfg.window_tokens, torch.iinfo(torch.int32).max)
+    if not overlap:
+        pstate = protected()
+    sstate = partial_attention(q, k, v, selection, lengths,
+        sink=cfg.sink_tokens, swa=cfg.window_tokens, scale=softmax_scale,
+        protected=False, splits=4, backend=backend, layout=layout,
+        pipeline_stages=stages, round_scaled_query=False)
+    if overlap:
+        current.wait_stream(side)
+        for tensor in pstate:
+            tensor.record_stream(current)
+    return merge_partials(pstate, sstate, q.dtype)

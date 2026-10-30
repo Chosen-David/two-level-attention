@@ -11,12 +11,13 @@ import unittest
 from unittest.mock import patch
 import torch
 from exp.paper import receipt
+from sparse_attn.ops.quality_graph import execution,unsupported
 
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=ROOT/'benchmark/LongBench/pred.py'
 tree=ast.parse(SOURCE.read_text())
-functions=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in ('get_pred','_manual_generate','_paper_capture_request')]
-ns={'torch':torch,'tqdm':lambda x:x,'post_process':lambda x,name:x,'build_chat':lambda t,p,m:p,
+functions=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in ('get_pred','_manual_generate','_paper_capture_request','_split_prompt_question','_drop_leading_bos')]
+ns={'execution':execution,'unsupported':unsupported,'torch':torch,'tqdm':lambda x:x,'post_process':lambda x,name:x,'build_chat':lambda t,p,m:p,
     'get_metrics':lambda:SimpleNamespace(get_select_tokens=lambda:0,clear=lambda:None)}
 exec(compile(ast.Module(body=functions,type_ignores=[]),str(SOURCE),'exec'),ns)
 
@@ -45,6 +46,7 @@ class Model:
 class Batch:
     def __init__(self,ids):self.input_ids=torch.tensor([ids],dtype=torch.long)
     def to(self,*a):return self
+    def __setitem__(self,key,value):setattr(self,key,value)
 
 class Tokenizer:
     eos_token_id=9;bos_token_id=None
@@ -132,22 +134,22 @@ class Capture(unittest.TestCase):
                 with capture,self.guard(clock)():ns['_manual_generate'](model,a,b,1,9,capture)
             self.assertIsNone(capture.receipt)
     def test_get_pred_guard_failure_cannot_append_record(self):
-        original=receipt.QwenRequestCapture;clock=Clock();model=Model(clock,tokens=[3,4,5,6]);captures=[]
+        original=receipt.QwenRequestCapture;clock=Clock();model=Model(clock,tokens=[3]*20);captures=[]
         def factory(*args,**kw):
             c=original(*args,**kw,sync=clock.sync,clock=clock);captures.append(c);return c
         with patch.dict(ns,eager_decoding_request_guard=self.guard(clock,fail=True)),patch.object(torch.cuda,'empty_cache'),patch.object(receipt,'QwenRequestCapture',side_effect=factory):
             with self.assertRaises(RuntimeError):
-                ns['get_pred'](model,Tokenizer(),[{'text':'abcd','answers':[],'all_classes':[],'length':4}],64,2,'{text}','trec','cpu','Qwen3-8B',paper_capture_mode='timing')
+                ns['get_pred'](model,Tokenizer(),[{'text':'abcdQuestion:','answers':[],'all_classes':[],'length':13}],64,2,'{text}','qasper','cpu','Qwen3-8B',paper_capture_mode='timing')
         self.assertIsNone(captures[0].receipt)
     def test_get_pred_real_record_path_opt_in_and_default_disabled(self):
         original=receipt.QwenRequestCapture
         for enabled in (False,True):
-            clock=Clock();model=Model(clock,tokens=[3,4,5,6])
+            clock=Clock();model=Model(clock,tokens=[3]*20)
             def factory(*args,**kw):return original(*args,**kw,sync=clock.sync,clock=clock)
             with patch.dict(ns,eager_decoding_request_guard=self.guard(clock)),patch.object(torch.cuda,'empty_cache'),patch.object(receipt,'QwenRequestCapture',side_effect=factory):
-                records=ns['get_pred'](model,Tokenizer(),[{'text':'abcd','answers':[],'all_classes':[],'length':4}],64,2,'{text}','trec','cpu','Qwen3-8B',data_fp='hash',paper_capture_mode='timing' if enabled else 'off')
+                records=ns['get_pred'](model,Tokenizer(),[{'text':'abcdQuestion:','answers':[],'all_classes':[],'length':13}],64,2,'{text}','qasper','cpu','Qwen3-8B',data_fp='hash',paper_capture_mode='timing' if enabled else 'off')
             self.assertEqual(len(records),1);self.assertEqual('paper_request_capture' in records[0],enabled)
-            if enabled:self.assertEqual(records[0]['paper_request_capture']['actual_input_tokens'],4)
+            if enabled:self.assertEqual(records[0]['paper_request_capture']['actual_input_tokens'],13)
     def test_plan_branch_precedes_seed_or_model_load(self):
         main=next(n for n in tree.body if isinstance(n,ast.If) and ast.unparse(n.test)=="__name__ == '__main__'")
         prefix=ast.Module(body=main.body[:2],type_ignores=[])

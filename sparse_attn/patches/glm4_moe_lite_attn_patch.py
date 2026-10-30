@@ -13,6 +13,7 @@ from transformers.models.glm4_moe_lite.modeling_glm4_moe_lite import (
 
 from ..indexer import Indexer
 from ..ops.eager_decoding import eager_decoding_attn
+from ..ops.quality_graph import owned_decode_mask
 from ..baseline_runtime import batch_decode_ctx
 from .qwen3_attn_patch import _tl_decode_batched, _can_drop_static_mask, _paper_route
 from .utils import (
@@ -48,10 +49,23 @@ def glm4_moe_lite_attn_forward(
         if batch_size != 1 or (ctx is not None and ctx.batch != 1):
             raise RuntimeError(
                 "GLM dynamic far-skip 仅支持单请求；批量请求需要逐行独立 gate 状态")
-        if attention_mask is not None:
+        if (attention_mask is not None and not (
+                seq_length == 1 and owned_decode_mask(past_key_values, attention_mask, ctx))):
             raise RuntimeError(
                 "GLM dynamic far-skip 尚不支持显式 attention_mask/padding；"
                 "标定必须只覆盖本请求有效 token")
+    region_cache = getattr(past_key_values, "tli_regions", False)
+    if region_cache:
+        from ..ops.cuda_graph_state import graph_state
+        ctx = batch_decode_ctx()
+        if ((ctx is not None and ctx.batch != 1) or graph_state().enabled
+                or os.environ.get("TLI_OPERATOR_MODE", "off") != "off"):
+            raise ValueError("GLM frozen regions require eager B1 with operator mode off")
+        if batch_size != 1 or attention_mask is not None or self.indexer.dyn_dgate:
+            raise ValueError("GLM frozen regions require unpadded B1 and independent region gates")
+        layer = past_key_values.layers[self.layer_idx]
+        if layer.logical_length and (seq_length != 1 or not layer.frozen):
+            raise ValueError("GLM frozen regions require frozen single-token decode")
     query_shape = (batch_size, seq_length, -1, self.qk_head_dim)
     key_shape = (batch_size, seq_length, -1, self.qk_nope_head_dim + self.v_head_dim)
 
@@ -80,10 +94,19 @@ def glm4_moe_lite_attn_forward(
     query_states = torch.cat((q_pass, q_rot), dim=-1)
     key_states = torch.cat((k_pass, k_rot), dim=-1)
 
+    # Dispatch after native MLA projections/RoPE, before the generic KV write.
+    # Region decode owns the single write and absolute-to-physical mapping.
+    if region_cache and layer.logical_length:
+        from ..ops.frozen_region_tli import decode as region_decode
+        result = region_decode(self, query_states, key_states, value_states,
+                               past_key_values, cache_position)
+        return self.o_proj(result.reshape(batch_size, seq_length, -1).contiguous()), None
+
     cur_len = 0
     is_static_cache = False
     if past_key_values is not None:
-        if (cache_position is not None and int(cache_position[0]) != 0
+        if (batch_decode_ctx() is None and cache_position is not None
+                and int(cache_position[0]) != 0
                 and past_key_values.get_seq_length(self.layer_idx) == 0):
             raise RuntimeError(
                 "GLM TLI 非零 cache_position 需要已有 KV 历史；"

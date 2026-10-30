@@ -46,6 +46,7 @@ def _snapshot_indexer(idx):
     result = copy.copy(idx)
     result.args = copy.deepcopy(idx.args)
     result._ginc = None
+    result._exact_linear_batch = None
     result.clear()
     result._skip_ids = None if idx._skip_ids is None else frozenset(idx._skip_ids)
     result.skip_far = idx.skip_far
@@ -236,6 +237,8 @@ def _attend_linear(q, k, v, mask, budget, scale):
 
 
 def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
+    if os.environ.get('TLI_BATCH_INDEXER', 'legacy') == 'exact':
+        raise ValueError('exact batch requires shared linear storage; mixed ring is unsupported')
     if (module.training or torch.is_grad_enabled() or ctx is None
             or q.shape[0] != cache.batch_size or ctx.batch != cache.batch_size
             or q.shape[-2] != 1):
@@ -249,15 +252,22 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
     if not gs.enabled or any(t is None for t in (gs.pos_buf, gs.valid_len_buf, gs.alive_buf)):
         raise ValueError('hybrid batch requires HybridBatchRunner device inputs')
     pos, lengths, alive = gs.pos_buf, gs.valid_len_buf, gs.alive_buf
+    from .operator_pipeline import validate_operator_inputs
+    validate_operator_inputs(q, k, v)
     outputs = []
     for b, (row, idx) in enumerate(zip(layer.rows, layer.indexers)):
         p, vl, active = pos[b:b+1], lengths[b:b+1], alive[b:b+1]
         slot = row.layout.map(p) if isinstance(row, FarSkipStaticLayer) else p
         # Dead rows keep their last valid KV exactly. Avoid a Python branch on
         # alive: EOS changes during graph replay while kernel shapes stay fixed.
-        for storage, incoming in ((row.keys, k), (row.values, v)):
-            old = storage.index_select(2, slot)
-            storage.index_copy_(2, slot, torch.where(active.view(1, 1, 1, 1), incoming[b:b+1], old))
+        from .operator_pipeline import operator_mode
+        if operator_mode() != 'off':
+            from .kv_row_update import append_kv_row
+            append_kv_row(row.keys, row.values, k[b:b+1], v[b:b+1], slot, active)
+        else:
+            for storage, incoming in ((row.keys, k), (row.values, v)):
+                old = storage.index_select(2, slot)
+                storage.index_copy_(2, slot, torch.where(active.view(1, 1, 1, 1), incoming[b:b+1], old))
         qq, kk, vv = q[b:b+1].transpose(1, 2), row.keys.transpose(1, 2), row.values.transpose(1, 2)
         if isinstance(row, FarSkipStaticLayer):
             out = row.workspace(qq, kk, vv, vl, module.scaling)

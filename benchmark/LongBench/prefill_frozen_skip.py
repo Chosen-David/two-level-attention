@@ -22,7 +22,9 @@ from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 ROOT = Path(__file__).resolve().parents[2]
 SCREEN_TASKS = ('qasper', 'hotpotqa', 'musique', 'gov_report', 'repobench-p')
-SOURCES = ('sparse_attn/ops/frozen_region_cache.py', 'sparse_attn/ops/frozen_region_gate.py',
+SOURCES = ('sparse_attn/patches/glm4_moe_lite_attn_patch.py',
+           'sparse_attn/patches/qwen3_attn_patch.py', 'sparse_attn/ops/frozen_region_tli.py',
+           'sparse_attn/indexer/tli_indexer.py', 'sparse_attn/ops/frozen_region_cache.py', 'sparse_attn/ops/frozen_region_gate.py',
            'benchmark/LongBench/prefill_frozen_skip.py', 'benchmark/LongBench/metrics.py',
            'benchmark/LongBench/eval.py', 'benchmark/LongBench/config/dataset2prompt.json',
            'benchmark/LongBench/config/dataset2maxlen.json')
@@ -69,7 +71,8 @@ def capture_profiles(cache, geometry, config):
         if not cache.layers[li].frozen:
             if li in profiles:
                 raise ValueError('multiple prefill chunks unsupported')
-            profiles[li] = profile_regions(query, key, geometry, rows=config.rows)
+            profiles[li] = profile_regions(query, key, geometry, rows=config.rows,
+                                             scale=kwargs.get("scaling", module.scaling))
         return original(module, query, key, value, *args, **kwargs)
     ALL_ATTENTION_FUNCTIONS['sdpa'] = profiled
     try:
@@ -117,7 +120,9 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
             generated.append(int(token))
             if int(token) in eos or len(generated) == max_new_tokens:
                 break
-            out = model(token, past_key_values=cache, attention_mask={'full_attention':None},
+            out = model(token, past_key_values=cache,
+                        attention_mask=(None if model.config.model_type == 'glm4_moe_lite'
+                                        else {'full_attention':None}),
                         use_cache=True, logits_to_keep=1)
         final = cache.report()
         receipts = {i: getattr(layer, 'tli_receipt', None) for i,layer in enumerate(cache.layers)}
@@ -256,8 +261,10 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = AutoModelForCausalLM.from_pretrained(args.model,dtype=torch.bfloat16,
             device_map=args.device,attn_implementation='sdpa').eval()
-    if model.config.model_type != 'qwen3' or any(getattr(m.self_attn,'sliding_window',None) is not None for m in model.model.layers):
-        raise ValueError('only full-attention Qwen3 supported in this exploration')
+    if model.config.model_type not in ('qwen3', 'glm4_moe_lite') or any(getattr(m.self_attn,'sliding_window',None) is not None for m in model.model.layers):
+        raise ValueError('only full-attention Qwen3 or GLM-4.7-Flash supported')
+    if model.config.model_type == 'glm4_moe_lite' and args.attention != 'tli':
+        raise ValueError('GLM frozen regions currently require the TLI adapter')
     if args.attention == 'tli':
         from sparse_attn.patches import register_patch
         from sparse_attn.info import resolve_treatment_snapshot

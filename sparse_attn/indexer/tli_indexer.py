@@ -3356,8 +3356,8 @@ class TLIIndexer(TIAIndexer):
         _sf_w = score_fine.shape[-1]
         if _fused_rebuild:
             # 【AKO iter-5】keep 链 + 哨兵 scatter 融合为单 Triton kernel
-            # （_ako_rebuild_scatter_kernel）：iter-4 的块掩码查表 L1 门
-            # （E2a）语义不变，仅把 arange+compare+and+div+clamp+
+            # （_ako_rebuild_scatter_kernel）：L1 块与完整保护区取并集；
+            # 保护区必须进入 GQA softmax 分母。融合 arange+compare+and+div+clamp+
             # index_select+gather+where+scatter_ 九个小 kernel 的逐元素
             # 链单趟化。纯整数/布尔/拷贝语义、无浮点归约参与 → 逐位
             # 等价（重复索引同值幂等；idx<S_real 门无条件施加——
@@ -3395,6 +3395,7 @@ class TLIIndexer(TIAIndexer):
                     cand_idx, _sf2, _blk2, _cand_len, sf_full[0, 0],
                     _dummy,
                     _R, _n, S_width, S_real, bs, kt, self.group_size,
+                    self.sink_tokens, swa_tok,
                     _sf2.stride(0), _sf2.stride(1),
                     cand_idx.stride(0), cand_idx.stride(1),
                     _blk2.stride(0), _blk2.stride(1),
@@ -3426,7 +3427,9 @@ class TLIIndexer(TIAIndexer):
                     0, _hkv).gather(-1, _bid)
                 _rmask2 = (torch.arange(_R, device=cand_idx.device
                                         ).view(1, _R) < _cand_len.view(-1, 1))
-                _keep = _keep & _rmask2
+                _protected = ((cand_idx < self.sink_tokens)
+                              | (cand_idx >= max(0, S_real - swa_tok)))
+                _keep = (_keep | _protected) & _rmask2
                 if S_real < S_width:
                     _keep = _keep & (cand_idx < S_real)
                 _safe = torch.where(
@@ -3443,7 +3446,12 @@ class TLIIndexer(TIAIndexer):
                 # 仍 -inf，softmax 不归约，逐位等价变长路径）。
                 topk_mask = F.pad(topk_mask,
                                   (0, _sf_w - topk_mask.shape[-1]), value=False)
-            score_fine = torch.where(topk_mask, score_fine, float("-inf"))
+            # The normalization domain includes every protected token, even
+            # when its page was not selected by L1 (including full-width fallback).
+            _tokens = torch.arange(_sf_w, device=score_fine.device)
+            _protected = ((_tokens < self.sink_tokens)
+                          | (_tokens >= max(0, S_real - swa_tok))) & (_tokens < S_real)
+            score_fine = torch.where(topk_mask | _protected, score_fine, float("-inf"))
         _G_ = self.group_size
         _sm = F.softmax(score_fine, dim=-1)
         if (not self.per_q_head and _HAS_TRITON and _sm.is_contiguous()
@@ -4152,8 +4160,22 @@ class TLIIndexer(TIAIndexer):
         return self.compute_mask_graph(q, index_dict, softmax_scale, valid_len,
                                        return_selection=True)
 
+    def compute_candidate_inputs_graph(self, q, index_dict, softmax_scale, valid_len):
+        """Produce one request's exact L1/bypass candidates, stopping before L2.
+
+        This does not implement batch indexing. Later consumers may batch fine
+        scoring/normalization/ranking after validating compatible feature storage
+        and geometry. Existing selector denominator candidates/order are retained.
+        """
+        if q.ndim != 4 or q.shape[0] != 1 or q.shape[1] != 1:
+            raise ValueError('candidate producer requires one decode request')
+        if valid_len.shape != (1,) or valid_len.dtype != torch.int64:
+            raise ValueError('candidate producer requires int64 valid_len[1]')
+        return self.compute_mask_graph(q, index_dict, softmax_scale, valid_len,
+                                       return_selection=True, return_candidates=True)
+
     def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len, *,
-                           return_selection=False):
+                           return_selection=False, return_candidates=False):
         """graph 专用全张量 compute_mask（生产主配置，逐位对齐 eager）。
 
         输入：q [1,1,H,D]（replay 注入）、index_dict（容量宽：k_min/k_max/
@@ -4161,7 +4183,8 @@ class TLIIndexer(TIAIndexer):
         valid_len [1] long（replay 注入，decode 当前行有效长）。
         return_selection：True → 返回 TokenSelection 紧凑格式（Phase 1 新路径）；
                           False → 返回 [1,1,Hkv,S_cap] bool mask（默认，兼容旧消费端）。
-        输出：mask 或 TokenSelection（见 return_selection）。
+        return_candidates：内部候选生产接口；True 时在 fine score 前返回 CandidateInputs。
+        输出：默认 mask，或显式请求的 TokenSelection/CandidateInputs。
         """
         # ---- 0. 生产主配置守卫（fail-closed 回 eager 逐行路径）----
         if not (self.alpha > 0 and self.beta > 0 and self.gamma is None
@@ -4171,11 +4194,11 @@ class TLIIndexer(TIAIndexer):
                 and self.far_select not in ("cluster", "sim_greedy")
                 and self.near_select not in ("cluster", "sim_greedy")
                 and not self.moba_gate and self.sigma_select == "none"
-                and not self.enable_async and not self.skip_far):
+                and not self.enable_async):
             raise NotImplementedError(
                 "compute_mask_graph 仅支持生产主配置（e64 固定几何 + γ=None "
                 "自由竞争 + boundary_bypass + 非投影 + 非 per_q_head + 非簇分/"
-                "moba/sigma/async + 非 skip_far）；其余配置调用方应回退 eager "
+                "moba/sigma/async）；其余配置调用方应回退 eager "
                 "逐行路径（行为不变）")
         dev = q.device
         bs = self.args.tia_block_size
@@ -4185,6 +4208,8 @@ class TLIIndexer(TIAIndexer):
         K2 = self.args.tia_level2_topk
         # 【E178】L2 细筛旁路实验臂 env 门（默认关，仅 graph 路径支持）
         _l2_bypass = os.environ.get("TLI_L2_BYPASS", "").strip() == "1"
+        if return_candidates and _l2_bypass:
+            raise NotImplementedError('candidate producer excludes L2 bypass')
         nb_near = max(0, int(self.nt_near_pages))
         nb_far = max(0, K1 - nb_near)
         nl = max(bs, int(self.nt_near_len))
@@ -4205,15 +4230,30 @@ class TLIIndexer(TIAIndexer):
             k_avg = k_avg.squeeze(0)
         kt_cap = k_min.shape[0]
         S_cap = k_qat.shape[1]
-        _sparse_selection = False
-        if (return_selection and not _l2_bypass and sink_pool_lo * bs <= S_cap
-                and min(S_cap, K2) == 1024
-                and os.environ.get("TLI_SPARSE_SELECTION", "0") == "1"):
-            from ..ops.sparse_normalization import supported_geometry
-            _sparse_selection = supported_geometry(q.dtype, dev, S_cap, group_size, Hkv)
+        from ..ops.sparse_policy import live_normalization_enabled, stats_policy
+        live_normalization = live_normalization_enabled()
+        self._graph_normalization_width_route = None
+        # A later request may choose another route on the same indexer.
+        # Never report stats inherited from a previous sparse capture.
+        self._graph_normalization_stats_route = None
+        from ..ops.sparse_policy import selection_fallback
+        sparse_reason = selection_fallback(
+            q.dtype, dev, S_cap, group_size, Hkv, l2_bypass=_l2_bypass,
+            protected_end=sink_pool_lo * bs, topk=K2)
+        _sparse_selection = sparse_reason is None
+        # Retain the coarse receipt for existing consumers; detail distinguishes
+        # unsupported budgets from dtype/geometry and invalid policy settings.
+        self._graph_sparse_selection_fallback_detail = sparse_reason
+        self._graph_sparse_selection_fallback = (
+            None if _sparse_selection else
+            'disabled' if sparse_reason in ('disabled', 'selection_policy')
+            else 'unsupported_static_geometry')
         # A short cache may contain fewer pages than the configured L1 quota.
         # Clip static slot counts exactly as eager clips each pool's topk.
         nb_far, nb_near = min(nb_far, kt_cap), min(nb_near, kt_cap)
+        # The decode-frozen gate removes all far slots, as eager L1 does.
+        if self.skip_far:
+            nb_far = 0
         K1 = nb_far + nb_near
         # 静态常量（capture 安全）：torch.tensor(..., device=) 是 host→device
         # 拷贝，CUDA Graph capture 期禁止（cudaMemcpyAsync from pageable）→
@@ -4457,44 +4497,70 @@ class TLIIndexer(TIAIndexer):
             if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
                 self.metrics.add_select_result(valid_len - 1, sel, 1)
             return sel
-        # 【2c-2 修复】候选紧凑化重排：_score_fine_cand_kernel 的 cand_len
-        # 门控语义 = 「前 cand_len 个位置有效」（offs_r < CLEN[kv]）。原布局
-        # cand_idx = [far 96 槽(垃圾), near 32 槽(有效), byp 2 槽(有效)]——
-        # 有效候选落在第 K1_far*bs 之后的槽位，kernel 只保留前 cand_len
-        # （= 有效数）位置 → 保留下来的全是 far 垃圾，near/byp 有效候选
-        # 全被 -inf（→ sf_full mid 区全 -inf → p mid 区 0，G8 对拍全崩）。
-        # 用 stable argsort(~keep) 把有效候选（keep=True）稳定提到前
-        # cand_len 个位置、垃圾后置（scatter 哨兵排除），R_cap 固定形状
-        # 与 eager 归约集合（L1∪bypass）逐位一致。
-        # 【E166 iter3b】候选压缩链融合：argsort(~keep2) stable + 2×gather
-        # + sum + （下游 mid_slot gather）≈5 kernel/层（R_cap=8448 恒定
-        # 长度无关 ≈1.3ms/步）换单 Triton 扫描压缩 kernel。逐位等价：
-        # stable argsort(~keep) = keep=True 按原序前置 + False 按原序后置
-        # ——扫描压缩的 keep 目的位 = 前缀计数、garbage 目的位 = total+序数
-        # （含 garbage 区内容保序复刻：旧 gather 把原始 idx/False/mid 值
-        # 置换到尾部，下游 topk 边缘语义依赖该内容）；cand_len = total。
-        # 纯整数/布尔域无浮点 → bitexact by construction；形态守卫不齐
-        # → 旧链 fail-closed 逐位不变。
-        _mid_slot3 = None
-        if (_HAS_TRITON and cand_idx2.is_contiguous()
-                and keep2.is_contiguous()
-                and (mid_mask is None or mid_mask.is_contiguous())):
-            try:
-                cand_idx2, keep2, _mid_slot3, cand_len = _iter3_compact(
-                    cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev)
-            except Exception:
-                _mid_slot3 = None
+        _domain_pack = None
+        if _HAS_TRITON and q.is_cuda:
+            from .candidate_domain_triton import complete_and_pack
+            _domain_pack = complete_and_pack(
+                cand_idx2, keep2, S_real, sink_tok, swa_tok, S_cap)
+        self._graph_candidate_domain_route = "fused" if _domain_pack is not None else "torch"
+        if _domain_pack is not None:
+            cand_idx2, keep2, cand_len = _domain_pack
+            R_cap = cand_idx2.shape[-1]
+        else:
+            # Complete the same normalization domain as eager. Move protected
+            # tokens out of L1/bypass slots into a single disjoint sink/SWA segment;
+            # short requests and overlapping protected intervals must count once.
+            from .candidate_domain import complete_protected_candidates
+            cand_idx2, keep2 = complete_protected_candidates(
+                cand_idx2, keep2, S_real, sink_tok, swa_tok, S_cap)
+            R_cap = cand_idx2.shape[-1]
+            # 【2c-2 修复】候选紧凑化重排：_score_fine_cand_kernel 的 cand_len
+            # 门控语义 = 「前 cand_len 个位置有效」（offs_r < CLEN[kv]）。原布局
+            # cand_idx = [far 96 槽(垃圾), near 32 槽(有效), byp 2 槽(有效)]——
+            # 有效候选落在第 K1_far*bs 之后的槽位，kernel 只保留前 cand_len
+            # （= 有效数）位置 → 保留下来的全是 far 垃圾，near/byp 有效候选
+            # 全被 -inf（→ sf_full mid 区全 -inf → p mid 区 0，G8 对拍全崩）。
+            # 用 stable argsort(~keep) 把有效候选（keep=True）稳定提到前
+            # cand_len 个位置、垃圾后置（scatter 哨兵排除），R_cap 固定形状
+            # 与 eager 归约集合（L1∪bypass）逐位一致。
+            # 【E166 iter3b】候选压缩链融合：argsort(~keep2) stable + 2×gather
+            # + sum + （下游 mid_slot gather）≈5 kernel/层（R_cap=8448 恒定
+            # 长度无关 ≈1.3ms/步）换单 Triton 扫描压缩 kernel。逐位等价：
+            # stable argsort(~keep) = keep=True 按原序前置 + False 按原序后置
+            # ——扫描压缩的 keep 目的位 = 前缀计数、garbage 目的位 = total+序数
+            # （含 garbage 区内容保序复刻：旧 gather 把原始 idx/False/mid 值
+            # 置换到尾部，下游 topk 边缘语义依赖该内容）；cand_len = total。
+            # 纯整数/布尔域无浮点 → bitexact by construction；形态守卫不齐
+            # → 旧链 fail-closed 逐位不变。
+            _mid_slot3 = None
+            if (_HAS_TRITON and cand_idx2.is_contiguous()
+                    and keep2.is_contiguous()
+                    and (mid_mask is None or mid_mask.is_contiguous())):
+                try:
+                    cand_idx2, keep2, _mid_slot3, cand_len = _iter3_compact(
+                        cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev)
+                except Exception:
+                    _mid_slot3 = None
+                    cand_idx2 = torch.where(keep2, cand_idx2, S_cap - 1)  # fallback 哨兵
+                    _srt2 = torch.argsort(~keep2, dim=-1, stable=True)
+                    cand_idx2 = cand_idx2.gather(-1, _srt2)
+                    keep2 = keep2.gather(-1, _srt2)
+                    cand_len = keep2.sum(-1).to(torch.long)
+            else:
                 cand_idx2 = torch.where(keep2, cand_idx2, S_cap - 1)  # fallback 哨兵
                 _srt2 = torch.argsort(~keep2, dim=-1, stable=True)
                 cand_idx2 = cand_idx2.gather(-1, _srt2)
                 keep2 = keep2.gather(-1, _srt2)
                 cand_len = keep2.sum(-1).to(torch.long)
-        else:
-            cand_idx2 = torch.where(keep2, cand_idx2, S_cap - 1)  # fallback 哨兵
-            _srt2 = torch.argsort(~keep2, dim=-1, stable=True)
-            cand_idx2 = cand_idx2.gather(-1, _srt2)
-            keep2 = keep2.gather(-1, _srt2)
-            cand_len = keep2.sum(-1).to(torch.long)
+        if return_candidates:
+            from ..ops.candidate_inputs import candidate_inputs
+            lower = torch.full_like(S_real, far_tok_lo)
+            upper = torch.maximum(lower, swa_lo_tok)
+            return candidate_inputs(
+                k_qat, b_q_fine, cand_idx2, keep2, cand_len, S_real,
+                lower, upper, k2_mid, capacity=S_cap, group_size=group_size,
+                output_dtype=q.dtype, rank_width=min(S_cap, K2),
+                sink=sink_tok, swa=swa_tok)
         # ---- 6. fine 打分（Triton 候选 kernel，与 eager 同 kernel 逐位）----
         try:
             if self._triton_ok and _HAS_TRITON and k_qat.dim() == 4 \
@@ -4512,25 +4578,52 @@ class TLIIndexer(TIAIndexer):
             from ..ops.sparse_normalization import candidate_probabilities
             from ..ops.candidate_ranking import rank_candidates
             probability, unique = candidate_probabilities(
-                sfc, cand_idx2, keep2, S_cap, group_size, return_unique=True)
+                sfc, cand_idx2, keep2, S_cap, group_size, return_unique=True,
+                valid_length=valid_len if live_normalization else None)
+            self._graph_normalization_width_route = "live_length" if live_normalization else "capacity"
             lower = torch.full_like(S_real, far_tok_lo)
             upper = torch.maximum(lower, swa_lo_tok)
-            return rank_candidates(cand_idx2, probability, unique, lower, upper,
-                                   k2_mid, capacity=S_cap, width=1024, sink=sink_tok,
-                                   deduplicated=True)
+            selection = rank_candidates(cand_idx2, probability, unique, lower, upper,
+                                        k2_mid, capacity=S_cap, width=1024, sink=sink_tok,
+                                        deduplicated=True)
+            self._graph_normalization_route = "sparse_candidate_domain"
+            self._graph_normalization_stats_route = (
+                "live_length_owner" if live_normalization else
+                "capacity_owner" if stats_policy() == "owner"
+                else "sorted_candidates")
+            self._graph_ranking_route = "candidate_domain_native_1024"
+            self._graph_ranking_kth_route = None
+            self._graph_ranking_gather_route = None
+            self._graph_ranking_fallback = None
+            if return_selection:
+                return selection
+            # Legacy attention consumes a bool mask. Keep probability and
+            # ranking candidate-only, then adapt just the final IDs. Protected
+            # tokens are outside TokenSelection and must be restored exactly.
+            token = torch.arange(S_cap, device=dev)
+            selected = selection.to_mask(S_cap).unsqueeze(1)
+            protected = (token < sink_tok) | (token >= swa_lo_tok)
+            selected = (selected | protected.view(1, 1, 1, -1)) & (
+                token < S_real).view(1, 1, 1, -1)
+            if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
+                self.metrics.add_select_result(valid_len - 1, selected, 1)
+            return selected
         # ---- 7. 完整候选散回 + 全宽 softmax + GQA mean（与 eager 同归约域）----
-        # Eager fine scoring includes a protected-token superset, but its
-        # reconstruction filters again by L1/bypass pages before softmax.
-        # Match that actual token domain here, merging duplicate IDs. Final
-        # attention protection is separate from the selector denominator.
-        # Keep full-position reduction/ranking to preserve dtype rounding and
-        # Top-K ties; S_cap+1 isolates invalid slots from the last real token.
+        # Both eager and Graph normalize L1/bypass union complete sink/SWA.
+        # Protected IDs were deduplicated above. The optional compact kernel
+        # retains token-position reduction order and full-domain Top-K ties.
         _compact_norm = False
-        if os.environ.get("TLI_COMPACT_NORMALIZATION", "0") == "1":
+        if live_normalization or os.environ.get("TLI_COMPACT_NORMALIZATION", "0") == "1":
             from ..ops.compact_normalization import supported, compact_probabilities
             _compact_norm = supported(sfc, cand_idx2, keep2, S_cap, group_size)
+        if live_normalization and not _compact_norm:
+            raise NotImplementedError("live-length normalization requires supported BF16 owner geometry")
+        self._graph_normalization_route = (
+            "compact_fused_mean" if os.environ.get("TLI_COMPACT_FUSED_MEAN", "1") == "1"
+            else "compact_separate_mean") if _compact_norm else "full_width_reference"
         if _compact_norm:
-            p = compact_probabilities(sfc, cand_idx2, keep2, S_cap, group_size)
+            p = compact_probabilities(sfc, cand_idx2, keep2, S_cap, group_size, mid_mask_inv,
+                                      valid_length=valid_len if live_normalization else None)
         else:
             keep_h = repeat(keep2, "kv r -> (kv g) r", g=group_size)
             cand_h = repeat(cand_idx2, "kv r -> (kv g) r", g=group_size)
@@ -4549,12 +4642,28 @@ class TLIIndexer(TIAIndexer):
                     G=group_size, BLOCK=1024, num_warps=4)
             else:
                 p = sm.nan_to_num(nan=0).view(Hkv, group_size, S_cap).mean(dim=1)
+        self._graph_normalization_width_route = "live_length" if live_normalization else "capacity"
         # ---- 8. mid 全域 L2 自由竞争 ----
         # 固定 K2_static 保持 capture 形状；k2_mid 在终掩码装配处动态截断。
         # mid 外全为 -inf，前 k2_mid 名与 eager 的 mid 段 top-k 同集。
-        mid_scored = p.masked_fill(mid_mask_inv, float("-inf"))
+        mid_scored = p if _compact_norm else p.masked_fill(mid_mask_inv, float("-inf"))
         K2_static = min(S_cap, K2)
-        tok_top = torch.topk(mid_scored, K2_static, dim=-1).indices
+        tok_top = None
+        self._graph_ranking_route = "full_width_native"
+        self._graph_ranking_kth_route = None
+        self._graph_ranking_gather_route = None
+        self._graph_ranking_fallback = "disabled"
+        if os.environ.get("TLI_COMPACT_RANKING", "0") == "1":
+            from ..ops.compact_ranking import compact_topk
+            tok_top = compact_topk(mid_scored, cand_idx2, keep2, mid_mask, K2_static)
+            self._graph_ranking_fallback = "unsupported_static_geometry" if tok_top is None else None
+            if tok_top is not None:
+                self._graph_ranking_route = "compact_threshold_native_order"
+                from ..ops import compact_ranking
+                self._graph_ranking_kth_route = compact_ranking._last_kth_route
+                self._graph_ranking_gather_route = compact_ranking._last_gather_route
+        if tok_top is None:
+            tok_top = torch.topk(mid_scored, K2_static, dim=-1).indices
         if return_selection:
             from ..ops.token_selection import graph_middle_selection
             return graph_middle_selection(
@@ -4816,6 +4925,9 @@ class TLIIndexer(TIAIndexer):
         }
 
     def clear(self):
+        exact_batch = getattr(self, '_exact_linear_batch', None)
+        if exact_batch is not None:
+            exact_batch.invalidate()
         self._far_skip_workspace = None
         super().clear()
         self._km_centroids = None
@@ -4897,6 +5009,7 @@ if _HAS_TRITON:
         stride_mh, stride_mt,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
         HAS_MEAN: tl.constexpr,
+        BATCHED: tl.constexpr = False, STRIDE_KB: tl.constexpr = 0,
     ):
         """GQA K 复用 score_fine：每 program 处理 (token 块 × 1 个 kv 头)，
         K 块 [BT, D] 载入寄存器后循环 g 个 q 头逐头点积，K 读带宽 /g。
@@ -4909,12 +5022,19 @@ if _HAS_TRITON:
         域的 _ako_gqa_mean_kernel 不同，本 kernel 分数域无 NaN 清洗）。"""
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
+        kv = pid_h
+        if BATCHED:
+            pid_t = pid_t.to(tl.int64)
+            pid_h = pid_h.to(tl.int64)
+            batch = pid_h // Hkv
+            kv = pid_h % Hkv
+            KQ += batch * STRIDE_KB
         offs_t = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_t = offs_t < T
         if HAS_MEAN:
             macc = tl.zeros((BT,), dtype=tl.float32)
-        k = tl.load(KQ + offs_t[:, None] * stride_kt + pid_h * stride_kh + offs_d[None, :],
+        k = tl.load(KQ + offs_t[:, None] * stride_kt + kv * stride_kh + offs_d[None, :],
                     mask=mask_t[:, None], other=0.0).to(tl.float32)
         for j in tl.static_range(G):
             h = pid_h * G + j
@@ -4938,6 +5058,8 @@ if _HAS_TRITON:
         stride_qh, stride_oh, stride_ot, stride_mh, stride_mt,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
         HAS_MEAN: tl.constexpr,
+        BATCHED: tl.constexpr = False,
+        STRIDE_KB: tl.constexpr = 0, STRIDE_KB2: tl.constexpr = 0,
     ):
         """【iter8】GQA K 复用 coarse minmax 上界分（min/max 两份 K 独立
         stride）：s[h,t] = Σ_d min(q,0)·k_min + Σ_d max(q,0)·k_max（负部配
@@ -4947,15 +5069,24 @@ if _HAS_TRITON:
         （等价性口径同 _score_fine_kernel 注释，iter-21 探针复验）。"""
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
+        kv = pid_h
+        if BATCHED:
+            # Widen before stride products, including flattened output heads.
+            pid_t = pid_t.to(tl.int64)
+            pid_h = pid_h.to(tl.int64)
+            batch = pid_h // Hkv
+            kv = pid_h % Hkv
+            KMIN += batch * STRIDE_KB
+            KMAX += batch * STRIDE_KB2
         offs_t = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_t = offs_t < T
         if HAS_MEAN:
             macc = tl.zeros((BT,), dtype=tl.float32)
-        kmin = tl.load(KMIN + offs_t[:, None] * stride_kt + pid_h * stride_kh
+        kmin = tl.load(KMIN + offs_t[:, None] * stride_kt + kv * stride_kh
                        + offs_d[None, :],
                        mask=mask_t[:, None], other=0.0).to(tl.float32)   # [BT, D]
-        kmax = tl.load(KMAX + offs_t[:, None] * stride_kt2 + pid_h * stride_kh2
+        kmax = tl.load(KMAX + offs_t[:, None] * stride_kt2 + kv * stride_kh2
                        + offs_d[None, :],
                        mask=mask_t[:, None], other=0.0).to(tl.float32)
         for j in tl.static_range(G):
@@ -4981,6 +5112,7 @@ if _HAS_TRITON:
         R, stride_kt, stride_kh, stride_qh, stride_ch, stride_cr,
         stride_oh, stride_or,
         Hkv: tl.constexpr, G: tl.constexpr, D: tl.constexpr, BT: tl.constexpr,
+        BATCHED: tl.constexpr = False, STRIDE_KB: tl.constexpr = 0, CAP: tl.constexpr = 0,
     ):
         """【E156c】候选 fine 打分融合 kernel：每 program 处理 (候选列块 × 1
         kv 头)，cand_idx gather k 行 [BT,D] 载入寄存器后循环 g 个 q 头逐头
@@ -4993,18 +5125,30 @@ if _HAS_TRITON:
         """
         pid_t = tl.program_id(0)
         pid_h = tl.program_id(1)
+        if BATCHED:
+            pid_h = pid_h.to(tl.int64)
+            pid_t = pid_t.to(tl.int64)
         kv = pid_h
+        if BATCHED:
+            batch = (pid_h // Hkv).to(tl.int64)
+            kv = pid_h % Hkv
+            KQ += batch * STRIDE_KB
         offs_r = pid_t * BT + tl.arange(0, BT)
         offs_d = tl.arange(0, D)
         mask_r = offs_r < R
-        cand = tl.load(CAND + kv * stride_ch + offs_r * stride_cr,
-                       mask=mask_r, other=0)                     # [BT] int64
+        cl = tl.load(CLEN + pid_h)
+        read_r = mask_r
+        if BATCHED:
+            read_r = mask_r & (offs_r < cl)
+        cand = tl.load(CAND + pid_h * stride_ch + offs_r * stride_cr,
+                       mask=read_r, other=0)                     # [BT] int64
+        if BATCHED:
+            read_r = read_r & (cand >= 0) & (cand < CAP)
         k = tl.load(KQ + cand[:, None] * stride_kt + kv * stride_kh
                     + offs_d[None, :],
-                    mask=mask_r[:, None], other=0.0).to(tl.float32)   # [BT, D]
-        cl = tl.load(CLEN + kv)
+                    mask=read_r[:, None], other=0.0).to(tl.float32)   # [BT, D]
         for j in tl.static_range(G):
-            h = kv * G + j
+            h = pid_h * G + j
             q = tl.load(Q + h * stride_qh + offs_d)              # [D] fp32
             s = tl.sum(k * q[None, :], axis=1)                   # [BT] fp32
             res = tl.where(offs_r < cl, s, float("-inf"))
@@ -5188,13 +5332,13 @@ if _HAS_TRITON:
         # BLK [Hkv,kt] bool（L1 块掩码快照）；CLEN [Hkv] int64（行实长）；
         # OUT [H,W] bf16（-inf 预填充连续重建目标，iter-8 哨兵列退役）；
         # DUMMY [H,1] bf16（无效槽牺牲位，内容永不读）
-        R, total, W, S_real, bs_c, kt_c, g,
+        R, total, W, S_real, bs_c, kt_c, g, sink, swa,
         stride_sfh, stride_sfr, stride_ch, stride_cr,
         stride_blh, stride_blk,
         BLOCK: tl.constexpr,
     ):
         """【AKO iter-5】fused 哨兵重建融合 kernel：单 launch 内完成
-        keep 链（r<cand_len & 块掩码查表 & token<S_real）+ 无效槽路由 +
+        keep 链（r<cand_len & (L1 块或保护区) & token<S_real）+ 无效槽路由 +
         候选分 scatter。纯整数/布尔/拷贝语义，无浮点归约参与，与 iter-4
         的 arange+compare+and+div+clamp+index_select+gather+where+
         scatter_ 九 kernel 链逐位等价（重复索引同值幂等）。
@@ -5216,7 +5360,8 @@ if _HAS_TRITON:
         bid = tl.minimum(idx // bs_c, kt_c - 1)
         bkeep = tl.load(BLK + (h // g) * stride_blh + bid * stride_blk,
                         mask=m, other=0)
-        keep = keep & (bkeep != 0)
+        protected = (idx < sink) | (idx >= tl.maximum(0, S_real - swa))
+        keep = keep & ((bkeep != 0) | protected)
         val = tl.load(SF + h * stride_sfh + r * stride_sfr,
                       mask=m, other=float("-inf"))
         tl.store(OUT + h * W + idx, val, mask=m & keep)
@@ -5625,7 +5770,13 @@ if _HAS_TRITON:
     def _iter3_maint_kernel(K, POS, IDXSUB, KMIN, KMAX, KAVG, KQAT,
                             S_cap, sk_t, sk_h, sm_t, sm_h, sq_t, sq_h,
                             NEED_AVG: tl.constexpr, BS: tl.constexpr,
-                            DSUB: tl.constexpr):
+                            DSUB: tl.constexpr, BATCHED: tl.constexpr = False,
+                            ALIVE=None, Hkv: tl.constexpr = 0,
+                            STRIDE_KB: tl.constexpr = 0,
+                            STRIDE_MINB: tl.constexpr = 0,
+                            STRIDE_MAXB: tl.constexpr = 0,
+                            STRIDE_AVGB: tl.constexpr = 0,
+                            STRIDE_QB: tl.constexpr = 0):
         """iter3d：增量步摘要维护单核融合。每 program 一 kv head：
         加载新 token 所在块 [BS,DSUB] 子空间 tile（越界 +0 垫，与原
         where(zero_k) 同），min/max 序无关逐位一致，mean fp32 累加
@@ -5633,8 +5784,21 @@ if _HAS_TRITON:
         k_min/k_max/k_avg 行直写（替代三 reduce+三 index_copy_）、
         k_qat 当前行直写（tile 外独立行载）。值域=纯拷贝+序无关归约
         +常量垫零。"""
-        h = tl.program_id(0)
-        pos = tl.load(POS).to(tl.int64)
+        if BATCHED:
+            pid = tl.program_id(0).to(tl.int64)
+            b, h = pid // Hkv, pid % Hkv
+            pos = tl.load(POS + b).to(tl.int64)
+            active = tl.load(ALIVE + b) & (pos >= 0) & (pos < S_cap)
+            # Widen the program ID before all batch/head stride products.
+            K = K + b * STRIDE_KB
+            KMIN = KMIN + b * STRIDE_MINB
+            KMAX = KMAX + b * STRIDE_MAXB
+            KAVG = KAVG + b * STRIDE_AVGB
+            KQAT = KQAT + b * STRIDE_QB
+        else:
+            h = tl.program_id(0)
+            pos = tl.load(POS).to(tl.int64)
+            active = True
         fb = pos // BS
         offs_t = tl.arange(0, BS)
         offs_d = tl.arange(0, DSUB)
@@ -5642,18 +5806,18 @@ if _HAS_TRITON:
         tok = fb * BS + offs_t.to(tl.int64)
         mt = tok < S_cap
         ptr = K + tok[:, None] * sk_t + h * sk_h + isub[None, :]
-        v = tl.load(ptr, mask=mt[:, None], other=0.0)
+        v = tl.load(ptr, mask=mt[:, None] & active, other=0.0)
         tl.store(KMIN + fb * sm_t + h * sm_h + offs_d,
-                 tl.min(v, axis=0))
+                 tl.min(v, axis=0), mask=active)
         tl.store(KMAX + fb * sm_t + h * sm_h + offs_d,
-                 tl.max(v, axis=0))
+                 tl.max(v, axis=0), mask=active)
         if NEED_AVG:
             acc = tl.sum(v.to(tl.float32), axis=0) / BS
             tl.store(KAVG + fb * sm_t + h * sm_h + offs_d,
-                     acc.to(v.dtype))
+                     acc.to(v.dtype), mask=active)
         rp = K + pos * sk_t + h * sk_h + isub
-        rv = tl.load(rp)
-        tl.store(KQAT + pos * sq_t + h * sq_h + offs_d, rv)
+        rv = tl.load(rp, mask=active, other=0.0)
+        tl.store(KQAT + pos * sq_t + h * sq_h + offs_d, rv, mask=active)
 
 
     # ---------------- 【E166 iter3d】L1 双池 scored 融合 kernel ----------------

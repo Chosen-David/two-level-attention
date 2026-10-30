@@ -15,6 +15,10 @@ from .far_skip_subspace import FarSkipFineCache, same_dimensions
 
 
 class FarSkipGraphWorkspace:
+    # Left fragment, sorted full pages, right fragment are disjoint and ordered;
+    # stable_topk_positions preserves their order. Invalid padding is ignored.
+    ordered_unique_selection = True
+
     def __init__(self, cfg, layout, heads, coarse_dims, fine_dims):
         self.cfg, self.layout, self.heads = cfg, layout, heads
         self.shared_dims = same_dimensions(coarse_dims, fine_dims)
@@ -182,6 +186,11 @@ class FarSkipGraphWorkspace:
     def __call__(self, q, k, v, length, scale):
         from .operator_pipeline import operator_mode, decode_ring
         if operator_mode() != 'off':
-            return decode_ring(self, q, k, v, length, scale)
+            import os
+            output = decode_ring(self, q, k, v, length, scale)
+            self.attention_route = f"ring_{operator_mode()}_{os.environ.get('TLI_OPERATOR_BACKEND', 'simt')}"
+            return output
         positions, valid = self.select(q, k, length, scale)
-        return self.attend(q, k, v, positions, valid, scale)
+        output = self.attend(q, k, v, positions, valid, scale)
+        self.attention_route = "ring_sdpa"
+        return output
