@@ -1,0 +1,49 @@
+{
+  "schema": "e178-attention-scope-audit-v1",
+  "date": "2026-10-31",
+  "audit_base": "55ccfb39fafd2096ee83992d8e667f9d2c11729a",
+  "verdict": "HISTORICAL_FULL_OPERATOR_SPEEDUP_CLAIM_INVALIDATED_BY_TIMING_SCOPE",
+  "scope": "只读源码与既有原始结果审计；未重新运行 GPU，未产生替代加速比。",
+  "historical_claim": {
+    "file": "exp/trace/results/e178_attn/e178_attn_speedup_verdict.json",
+    "sha256": "3636852d5760731095692b147a4b98d907db2300e957ca34aa52d13bda54f385",
+    "claimed_scope": "FA2_attn_ms / TLI_total_ms，宣称 TLI_total 包含 L1+L2 selection + K2 attention。",
+    "claimed_speedup": "5-93x complete decode-attention operator speedup"
+  },
+  "source_findings": [
+    {
+      "file": "exp/bench/e178_fa2_attn_microbench.py",
+      "lines": "53-67",
+      "finding": "time_ms 只计时传入的 fn()。"
+    },
+    {
+      "file": "exp/bench/e178_fa2_attn_microbench.py",
+      "lines": "110-123",
+      "finding": "L1 block scoring/top-k、L2 token scoring/top-k 均在 closure 外预先执行，不在 fn() 内。"
+    },
+    {
+      "file": "exp/bench/e178_fa2_attn_microbench.py",
+      "lines": "134-139",
+      "finding": "实际 fn() 仅执行预选中 K/V 的 gather 与 1024-token SDPA；因此历史 TLI_total_ms 命名和完整算子解释不成立。"
+    },
+    {
+      "file": "exp/bench/e178_fa2_attn_microbench.py",
+      "lines": "34-39,95-139",
+      "finding": "SINK=4、SWA=128 虽被声明，但未并入实际 attended 集；L1 使用 amax 代理，不是生产选择器的完整语义。"
+    }
+  ],
+  "provenance": {
+    "bench_introducing_commit": "0fb943de0b29b3faa63e3407c365f2ecfcc91a71",
+    "bench_current_and_committed_blob_sha256": "ae5e393ec3f79668077e0f081f3c8809dbb821db7828de820082dbe224f8264e",
+    "raw_example": "exp/trace/results/e178_attn/tli_b1_L32k.json",
+    "raw_example_sha256": "13baeb4ddac9e71cb0d6b6ee7c190c868dcce8b91706c51f181f8fcc4053a881",
+    "note": "当前脚本与引入提交版本逐字节一致，排除后续未提交修改造成口径偏差。"
+  },
+  "allowed_interpretation": "既有 5-93x 数字仅保留为 post-selection gather + 1024-token SDPA 对照 dense SDPA 的历史 proxy；不得作为完整 TLI attention operator、包含选择成本的算子加速或生产 TPOT 证据。原始数字不删除、不改写。",
+  "required_next_validation": [
+    "将生产语义的 L1/L2、强制 sink/SWA、去重与最终 attention 全部放入同一计时区间，并记录实际 valid unique attended-K。",
+    "分别报告 selection、gather、attention 和总时间，保持 FA2 对照语义及输入几何一致。",
+    "按空卡门、CUDA_VISIBLE_DEVICES 锁卡和全程旁路监控重新实测；不得用理论加上选择耗时拼接新加速比。",
+    "修正引用旧 verdict 的论文或报告叙事；在新结果产生前撤回完整算子加速主张。"
+  ]
+}
