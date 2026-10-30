@@ -2,6 +2,8 @@
 
 ## 2026-10-30
 
+- [ ] [TL-DUO-ASSETS-20261030] 按用户要求归档固定官方 DuoAttention 源码与独立环境准备；62文件身份及4项下载回归普通/-O通过。PDF再分发许可未确立、Python3.10/legacy FlashInfer/CUDA构建仍待完成，不称可运行baseline。([详情](task_details/TL-DUO-ASSETS-20261030.md))
+
 - [x] [TL-FROZEN-MAIN-20261030] Integrate accepted independent Near/Far0.05 eager cache reference;84 tests +14 subtests passed. ([details](task_details/TL-FROZEN-MAIN-20261030.md))
 
 
