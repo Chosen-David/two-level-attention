@@ -135,12 +135,18 @@ fusion. Timing includes prefill, cache conversion and capture in total request
 time; the first pair may contain compilation/setup costs and must be reported
 separately from later pairs, with all raw measurements retained.
 
-For sequential unpadded prefills, the harness retains only completed B1 caches
+For sequential unpadded prefills, the harness and RULER fixed-cache batch entry
+retain only completed B1 caches
 until all rows finish. `consume_prefill_rows` then allocates each static layer,
 copies every row and releases that source layer before allocating the next.
 It preserves KV values and zero padding and consumes the input caches. It is
 an inference, same-stream transfer; sources cannot be reused afterward, and
 an allocation failure propagates instead of returning a partial cache. This
 avoids an entire batch allocation beside subsequent prefill activations. It
-does not guarantee B8 fits: the original B8 run 0850 failed in prefill, and the
-revised real-model capacity check remains pending.
+does not guarantee B8 fits: run 0850 failed in prefill and run 0900 failed
+during conversion under the default allocator. Run 0970 independently accepts
+the original eight Qwen inputs with native `expandable_segments:True`: same-B
+eager and ordered Graph produced identical 128 tokens. That scoped allocator
+configuration is required for the current B8 matrix; it is not a general memory
+guarantee or a full benchmark quality result. The RULER entry integration has
+CPU call-path coverage; its native GPU integration check remains pending.
