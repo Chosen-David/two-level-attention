@@ -111,13 +111,30 @@ def region_mask_physical(indexer, q, layer, scale, intermediates=None):
         keys = torch.where(valid[...,None,None],keys,0)
         k_min,k_max,k_avg = keys.amin(1),keys.amax(1),keys.mean(1)
         bq = (q[0,0]*scale).to(torch.float32).index_select(-1,dims)
-        bq = bq.reshape(kv_heads,group,-1)
-        mn,mx,av = (x.permute(1,0,2).to(torch.float32) for x in (k_min,k_max,k_avg))
-        coarse = (torch.einsum('hgd,hpd->hgp',bq.clamp(max=0),mn) +
-                  torch.einsum('hgd,hpd->hgp',bq.clamp(min=0),mx))
-        avg = torch.einsum('hgd,hpd->hgp',bq,av)
-        score_coarse[0].index_copy_(-1,pages,coarse.reshape(heads,-1).to(q.dtype))
-        score_avg[0].index_copy_(-1,pages,avg.reshape(heads,-1).to(q.dtype))
+        # 保持 reference 的 BF16 块统计 dtype 与连续 [page,KV-head,D] 布局；
+        # 即使数值相同，FP32 输入也会让 Triton 产生不同的 BF16 舍入边界。
+        mn,mx,av = (x.contiguous() for x in (k_min,k_max,k_avg))
+        coarse = avg = None
+        if not layer.skip_far and q.is_cuda and getattr(idx,'_triton_ok',False):
+            try:
+                # keep/near 的 reference 粗筛与 avg 均走全宽 Triton。
+                coarse = idx._fast_score_coarse(mn,mx,bq,q.dtype)
+                avg = idx._fast_score_fine(av,bq,q.dtype)
+            except Exception:
+                coarse = avg = None
+        if coarse is None:
+            # far 及 Triton 回退的 reference 都使用展开 GQA 的 einops；
+            # 紧凑 torch.einsum 的归约布局不同，可能改变 L1 并列顺序。
+            mn32 = mn.repeat_interleave(group,dim=1).to(torch.float32)
+            mx32 = mx.repeat_interleave(group,dim=1).to(torch.float32)
+            av32 = av.repeat_interleave(group,dim=1).to(torch.float32)
+            coarse = (reference_einsum(
+                bq.clamp(max=0),mn32,'h d, kt h d -> h kt') +
+                      reference_einsum(
+                bq.clamp(min=0),mx32,'h d, kt h d -> h kt'))
+            avg = reference_einsum(bq,av32,'h d, kt h d -> h kt')
+        score_coarse[0].index_copy_(-1,pages,coarse.to(q.dtype))
+        score_avg[0].index_copy_(-1,pages,avg.to(q.dtype))
     if layer.skip_far:
         score_coarse[...,far_lo:near_blks] = float('-inf')
         score_avg[...,far_lo:near_blks] = float('-inf')
