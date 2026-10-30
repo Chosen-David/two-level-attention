@@ -28,7 +28,7 @@ def load_functions():
     tree = ast.parse(SOURCE.read_text())
     tree.body = [ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)] + [
         n for n in tree.body if isinstance(n, ast.FunctionDef)]
-    ns = dict(torch=torch, os=os, sys=sys, weakref=weakref, batch_decode_ctx=batch_decode_ctx,
+    ns = dict(__name__='sparse_attn.patches.qwen3_attn_patch', __package__='sparse_attn.patches', torch=torch, os=os, sys=sys, weakref=weakref, batch_decode_ctx=batch_decode_ctx,
               apply_rotary_pos_emb=apply_rotary_pos_emb,
               eager_attention_forward=eager_attention_forward,
               ALL_ATTENTION_FUNCTIONS={'sdpa': sdpa_attention_forward})

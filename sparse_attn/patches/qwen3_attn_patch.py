@@ -302,6 +302,15 @@ def qwen3_attn_forward(
     cos, sin = position_embeddings
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
+    # Request-local segmented cache owns logical/physical position mapping.
+    if getattr(past_key_values, "tli_regions", False):
+        layer = past_key_values.layers[self.layer_idx]
+        if layer.logical_length:
+            from ..ops.frozen_region_tli import decode as region_decode
+            result = region_decode(self, query_states, key_states, value_states,
+                                   past_key_values, cache_position)
+            return self.o_proj(result.reshape(*input_shape, -1).contiguous()), None
+
     # Compact consumers own both the KV write and absolute-to-ring addressing.
     # Dispatch before the generic update, which would otherwise append twice.
     # 【Phase 4】serial 模式走标准 linear KV + decode_indexed，跳过 compact
