@@ -45,6 +45,7 @@ def main():
     ap.add_argument('--dataset',choices=['hotpotqa','gov_report'],required=True)
     ap.add_argument('--start',type=int,default=0);ap.add_argument('--end',type=int,default=200)
     ap.add_argument('--context-cap',type=int,default=31500)
+    ap.add_argument('--selection-protocol',choices=['production','strict'],default='production')
     ap.add_argument('--smoke-output-limit',type=int,default=0)
     args=ap.parse_args()
     for key,value in dict(TLI_OPERATOR_MODE='off',TLI_FINE_GATHER='0',TLI_SPARSE_PREFILL='0',TLI_DECODE_DENSE='0').items():os.environ[key]=value
@@ -58,7 +59,7 @@ def main():
     prompts=json.loads(prompt_path.read_text());lengths=json.loads(maxlen_path.read_text())
     max_new=args.smoke_output_limit or lengths[args.dataset]
     sources={str(p.relative_to(ROOT)):sha_file(p) for folder in ('sparse_attn','benchmark/LongBench','exp/ablation') for p in sorted((ROOT/folder).rglob('*.py'))}
-    protocol=dict(schema='nfa-ablation-quality-v1',cell=cell,dataset=args.dataset,
+    protocol=dict(schema='nfa-ablation-quality-v1',cell=cell,dataset=args.dataset,selection_protocol=args.selection_protocol,
         dataset_sha256=sha_file(dataset),model_config=sha_file(Path(args.model)/'config.json'),
         tokenizer_config=sha_file(Path(args.model)/'tokenizer_config.json'),
         git_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),sources=sources,
@@ -82,8 +83,9 @@ def main():
     if model.config.model_type!='qwen3':raise ValueError('this ablation round is Qwen3 only')
     sparse=treatment(spec)
     assert register_patch(model,sparse,resolve_treatment_snapshot(sparse))==model.config.num_hidden_layers
-    for layer in model.model.layers:
-        layer.self_attn.indexer.ablation_spec=dict(spec,measure_mass='B_selection' in cell['groups'])
+    if args.selection_protocol == 'strict':
+        for layer in model.model.layers:
+            layer.self_attn.indexer.ablation_spec=dict(spec,measure_mass='B_selection' in cell['groups'])
     model._frozen_tli=True
     geometry=RegionGeometry(sink=spec['sink'],window=spec['swa'],near=spec['near'],max_new_tokens=max_new)
     gate=GateConfig(epsilon=spec['epsilon'],mode=spec['mode'])
