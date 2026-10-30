@@ -254,8 +254,11 @@ def main():
     rope_scaling = None
     if args.context_length > 40960:
         _, rope_scaling = resolve_yarn_config(
-            True, None, args.context_length, {65536: 2., 131072: 4.}, 40960)
+            True, None, args.context_length, {65536: 2., 131072: 4.}, 32768)
         config.rope_scaling = rope_scaling
+    # runtime 容量与 YaRN 的 original=32768 是两个独立口径，均需覆盖答案余量。
+    config.max_position_embeddings = max(
+        config.max_position_embeddings, args.context_length+args.max_new)
     model = AutoModelForCausalLM.from_pretrained(
         args.model, config=config, dtype=torch.bfloat16, device_map=device,
         attn_implementation='sdpa').eval()
@@ -271,6 +274,9 @@ def main():
                     context_length=args.context_length, input_tokens=ids.shape[-1],
                     max_new=args.max_new, dtype='bfloat16', device=str(device),
                     rope_scaling=rope_scaling,
+                    rope_original_max_position_embeddings=(
+                        rope_scaling['original_max_position_embeddings'] if rope_scaling else None),
+                    runtime_max_position_embeddings=config.max_position_embeddings,
                     torch=torch.__version__, tli_args=vars(tli))
     (outdir/'protocol.json').write_text(json.dumps(protocol, indent=2, default=str)+'\n')
     report = dict(protocol=protocol, correctness=[], performance=[])
