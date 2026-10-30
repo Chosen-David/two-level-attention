@@ -556,15 +556,31 @@ def test_fine_gather():
     n_cand_path = 0
 
     def _cand_ulp_ok(full, cand, cand_idx, cand_len):
-        # 【E156b】per-head 候选：cand_idx [H,R_max]，cand_len [H] 门控实长
-        # 前缀（pad sentinel 不参与）。全宽 score_fine 候选位 vs 候选化
-        # score_fine（形状不同，按实长掩码抽）。
-        _h_idx = torch.arange(cand_idx.shape[0], device=cand.device
-                              ).view(-1, 1).expand_as(cand_idx)
-        _r_mask = (torch.arange(cand_idx.shape[1], device=cand.device
-                                ).view(1, -1) < cand_len.view(-1, 1))
-        fa = full[0, 0][_h_idx[_r_mask], cand_idx[_r_mask]]  # [N]
-        fb = cand[0, 0][_r_mask]                              # [N]
+        # 【E156b】per-head 候选：cand_idx [Hkv,R_max]（kv-head 空间，GQA
+        # 组内共享），cand_len [Hkv]。full/cand score_fine 在 q-head 空间
+        # [H=32, *]。需把 kv-head 索引展开到 q-head：kv-head h 服务 q-head
+        # [h*G:(h+1)*G]，G=H//Hkv。展开后 _h_q [H, R_max]、_r_mask [H, R_max]。
+        _Hkv, _R = cand_idx.shape
+        _H = cand.shape[-2]   # q-head 数
+        _G = _H // _Hkv
+        # kv-head → q-head 展开（每组 G 个 q-head 共享同一 kv-head 候选）
+        _h_q = torch.arange(_H, device=cand_idx.device).view(-1, 1).expand(_H, _R)
+        _h_kv = _h_q // _G                           # 所属 kv-head
+        # cand_len 展开到 q-head 空间
+        _cand_len_q = cand_len[_h_kv[:, 0]]           # [H]
+        _r_mask = (torch.arange(_R, device=cand_idx.device).view(1, -1)
+                   < _cand_len_q.view(-1, 1))          # [H, R]
+        # cand_idx 在 kv-head 空间 [Hkv,R]；GQA 组内所有 q-head 共享同一
+        # 候选集。直接用 _rs(行号)//G 得 kv-head，_cs(列号)定位 R 维。
+        # fa = full[q_h, cand_idx[q_h//G, r]]，fb = cand[q_h, r]；两者逐位等价
+        # （候选化解：q·k_qat[q_h//G, cand_token]，与全宽同 token 位置同值）。
+        _rs, _cs = torch.where(_r_mask)               # 各 [N]（valid prefix）
+        _h_kv_rs = _rs // _G                          # kv-head 索引
+        _ci_sel = cand_idx[_h_kv_rs, _cs].to(torch.int64)  # [N] token 位置
+        _T = full.shape[-1]
+        _flat = full[0, 0].reshape(-1)                # [H*T]
+        fa = _flat[_rs * _T + _ci_sel]                # [N]
+        fb = cand[0, 0][_rs, _cs].to(fa.dtype)        # [N]
         if fa.shape != fb.shape:
             return -1, float("inf"), False
         nd = int((fa != fb).sum().item())
