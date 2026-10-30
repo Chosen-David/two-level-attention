@@ -130,13 +130,20 @@ def test_real_hf_batch_eager_graph_share_row_incremental_states(monkeypatch, bat
     lens = [16384 - 3 * b for b in range(batch)]
     ids = torch.randint(0, 128, (batch, max(lens)), device='cuda')
     original = TLIIndexer._prepare_index_base
+    original_geometry = TLIIndexer._build_graph_geometry
     calls = []
+    geometry_calls = []
 
     def counted(self, key, cu, **kwargs):
         calls.append((id(self), key.data_ptr()))
         return original(self, key, cu, **kwargs)
 
+    def counted_geometry(self, *args, **kwargs):
+        geometry_calls.append(id(self))
+        return original_geometry(self, *args, **kwargs)
+
     monkeypatch.setattr(TLIIndexer, '_prepare_index_base', counted)
+    monkeypatch.setattr(TLIIndexer, '_build_graph_geometry', counted_geometry)
     outputs = []
     with torch.inference_mode(), eager_decoding_request_guard():
         for policy in ('0', '1'):
@@ -152,6 +159,7 @@ def test_real_hf_batch_eager_graph_share_row_incremental_states(monkeypatch, bat
             consume_prefill_rows(cache, rows, lens)
             ctx = BatchCtx(batch, list(lens), [0] * batch, [True] * batch, 0)
             calls.clear()
+            geometry_calls.clear()
             result = static_decode(model, cache, [[token] for token in first], lens,
                                    set(), 6, ctx)
             receipt = model._quality_graph_execution
@@ -164,6 +172,9 @@ def test_real_hf_batch_eager_graph_share_row_incremental_states(monkeypatch, bat
                                if owner == id(layer.self_attn.indexer)]
                 assert sorted(layer_calls) == [1] * batch
                 assert len(ctx._tli_row_index_pools[id(layer.self_attn.indexer)]) == batch
+            if policy == '0':
+                # 每行每步仅首层构建几何，其余层命中显式设备修订号缓存。
+                assert len(geometry_calls) == batch * receipt['timing']['decode_steps']
             outputs.append(result)
             del cache, ctx
     assert outputs[0] == outputs[1]

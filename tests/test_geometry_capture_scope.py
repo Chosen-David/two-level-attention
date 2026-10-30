@@ -8,7 +8,7 @@ import torch
 from sparse_attn.ops.cuda_graph_state import capture_graph, geometry_cache_key
 
 source=Path(__file__).resolve().parents[1]/'sparse_attn/indexer/tli_indexer.py'
-functions=[n for n in ast.parse(source.read_text()).body if isinstance(n,ast.FunctionDef) and n.name in ('_graph_geo_lookup','_graph_geo_store')]
+functions=[n for n in ast.parse(source.read_text()).body if isinstance(n,ast.FunctionDef) and n.name in ('_graph_geo_version','_graph_geo_lookup','_graph_geo_store')]
 ns={'_GRAPH_GEO_CACHE':{}};exec(compile(ast.Module(body=functions,type_ignores=[]),str(source),'exec'),ns)
 lookup,store=ns['_graph_geo_lookup'],ns['_graph_geo_store']
 
@@ -48,6 +48,40 @@ def test_capture_exception_and_inference_tensor(monkeypatch):
     value={'x':1}
     assert store(length,('test',),value) is value
     assert lookup(length,('test',)) is None and not ns['_GRAPH_GEO_CACHE']
+
+
+def test_inference_device_revision_and_managed_capture(monkeypatch):
+    monkeypatch.setattr(torch.cuda,'graph',lambda *a,**kw:nullcontext())
+    ns['_GRAPH_GEO_CACHE'].clear()
+    with torch.inference_mode():
+        length=torch.tensor([31,32])
+        value={'value':length*2}
+        # 无显式修订号的 eager inference tensor 仍禁止缓存。
+        store(length,('device',),value)
+        assert lookup(length,('device',)) is None
+        length._tli_device_revision=1
+        store(length,('device',),value)
+        assert lookup(length,('device',)) is value
+        length._tli_device_revision=2
+        assert lookup(length,('device',)) is None
+        # inference 视图没有 _base，调用方必须显式传播修订号。
+        row=length[:1]
+        row._tli_device_revision=2
+        store(row,('device',),value)
+        assert lookup(row,('device',)) is value
+        length._tli_device_revision=3
+        row._tli_device_revision=3
+        assert lookup(row,('device',)) is None
+        unversioned=torch.tensor([9])
+        with capture_graph(object()):
+            key=geometry_cache_key(('capture',),capturing=True,stream=11)
+            store(unversioned,key,value,allow_unversioned=True)
+            assert lookup(unversioned,key,allow_unversioned=True) is value
+        assert lookup(unversioned,('capture',)) is None
+        with capture_graph(object()):
+            other=geometry_cache_key(('capture',),capturing=True,stream=11)
+            assert lookup(unversioned,other,allow_unversioned=True) is None
+
 
 @pytest.mark.skipif(not torch.cuda.is_available(),reason='CUDA required')
 def test_two_graphs_replay_live_geometry_and_raw_capture():
