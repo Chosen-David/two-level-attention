@@ -48,9 +48,13 @@ def model_for(kind,gate=False):
 
 
 @pytest.mark.parametrize('kind,gate',[('qwen',False),('qwen',True),('glm',False),('glm',True)])
-@pytest.mark.parametrize('input_mode',['0','1'])
+@pytest.mark.parametrize('input_mode',['0','1',None])
 def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,gate,input_mode):
-    monkeypatch.setenv('TLI_DEVICE_DECODE_INPUTS',input_mode)
+    if input_mode is None:
+        monkeypatch.delenv('TLI_DEVICE_DECODE_INPUTS', raising=False)
+        monkeypatch.delenv('TLI_REUSE_WARMUP_STREAM', raising=False)
+    else:
+        monkeypatch.setenv('TLI_DEVICE_DECODE_INPUTS',input_mode)
     for key in ('TLI_LIVE_NORMALIZATION', 'TLI_SPARSE_SELECTION', 'TLI_SPARSE_STATS'):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv('TLI_QUALITY_TIMING', '1')
@@ -71,7 +75,7 @@ def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,ga
                     assert model._quality_graph_execution['captures']==1
                     assert model._quality_graph_execution['replay_steps']==4
                     assert model._quality_graph_execution['input_update_route']==(
-                        'device_row_fused' if input_mode=='1' else 'host_reference')
+                        'host_reference' if input_mode=='0' else 'device_row_fused')
                     layers = model._quality_graph_execution['capture_layers']
                     assert len(layers) == 2
                     for receipt, layer in zip(layers, model.model.layers):

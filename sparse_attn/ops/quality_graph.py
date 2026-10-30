@@ -20,7 +20,7 @@ _warmup_streams = threading.local()
 
 
 def _request_warmup_stream(device):
-    reuse = os.environ.get('TLI_REUSE_WARMUP_STREAM', '0')
+    reuse = os.environ.get('TLI_REUSE_WARMUP_STREAM', '1')
     if reuse not in ('0', '1'):
         raise ValueError('TLI_REUSE_WARMUP_STREAM must be 0 or 1')
     if reuse == '0':
@@ -250,7 +250,7 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     gc.collect()
                     torch.cuda.empty_cache()
                 restore()
-            input_mode = os.environ.get('TLI_DEVICE_DECODE_INPUTS', '0')
+            input_mode = os.environ.get('TLI_DEVICE_DECODE_INPUTS', '1')
             if input_mode not in ('0', '1'):
                 raise ValueError('TLI_DEVICE_DECODE_INPUTS must be 0 or 1')
             record.update(input_update_requested=input_mode,

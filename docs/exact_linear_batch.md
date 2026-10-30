@@ -59,7 +59,8 @@ sentinel redirection and stable prefix/tail order. It uses the primary Torch mea
 of model-rounded per-query scores, not the optional fused sequential mean from
 coarse kernels. Batch geometry uses mutation-version/capture-token/stream keys
 with a separate namespace, never full token-domain masks. GPU TopK tie equivalence
-and complete new-producer capture behavior remain native validation gates.
+and complete producer capture behavior have scoped native coverage in runs
+0640 and 0830; these are not whole-benchmark quality results.
 
 CPU tests cover tensor geometry/selection vs individual primary producers,
 random/tie/nonfinite score pools, source-method combinations, empty/short pools,
@@ -68,16 +69,16 @@ reuse/clear/replacement and one-call-per-batch consumer scheduling. They do not
 establish native numerical equivalence, capture safety or performance. GPU tests
 must compare each row with the single-request reference, cross page boundaries,
 EOS/dead rows, same-storage clear+warmup with old/new graphs and changed-storage
-retirement. Negative device-assert tests need isolated processes. No speedup or
-full-batch completion is claimed until native/model tests and independent review.
+retirement. Negative device-assert tests need isolated processes. Scope-limited
+native and model reviews are recorded below; CPU tests alone establish no speedup.
 
 The source indexer exposes `_exact_batch_maintenance_route` (`batched_tail32` or
 `row_fallback:*`) and `_exact_batch_maintenance_calls`. Counters record Python
 invocations, including capture, rather than CUDA Graph replays. The batch kernel
 uses 64-bit batch/head address products. Immutable feature indices are checked
 at warmup; the exact owner checks dynamic positions before maintenance. Native
-maintenance and full-entry tests are pending execution for this revision; CPU
-structure/schema tests do not establish precision or performance.
+maintenance and full-entry tests have independent reviews in runs 0640/0830;
+CPU structure/schema tests alone do not establish precision or performance.
 
 Exact capture must use `capture_graph()` from `ops.cuda_graph_state`; raw
 `torch.cuda.graph` is rejected for this route. The managed scope pins each
@@ -86,7 +87,8 @@ an old live Graph holding its old false ready flag and KV/feature/summary
 buffers. Deleting that Graph releases the obsolete state; the indexer keeps no
 permanent retired-state list. Same-storage clear/warmup still reuses the same
 state, so the old Graph remains valid after successful warmup. CPU weakref/GC
-contracts verify ownership and release; native lifecycle coverage remains queued.
+contracts verify ownership and release; native stale-Graph coverage is recorded
+in run 0650. Review limits remain attached to each source snapshot.
 
 Graph-quality integration preserves the complete denominator domain: selected
 L1/bypass candidates first remove protected duplicates, then append every live
@@ -107,8 +109,8 @@ This remains explicit no-skip Qwen batch configuration, not the dynamic-gate
 configuration used by the ring experiment. It does not change the paper budget
 or claim dynamic GLM B>1 support. Capture receipts identify actual batch
 maintenance, complete domain, live owner normalization, ranking and attention.
-New native validation is required for this integration; previous branch results
-are not evidence for this revised normalization domain.
+Native validation of this normalization domain is recorded in 0640/0830;
+earlier branch results are not evidence for the revised domain.
 
 For attribution diagnostics only, `TLI_EXACT_BATCH_REFERENCE=1` keeps the model
 batch shape but calls the established single-row indexer and attention within
@@ -151,5 +153,6 @@ during conversion under the default allocator. Run 0970 independently accepts
 the original eight Qwen inputs with native `expandable_segments:True`: same-B
 eager and ordered Graph produced identical 128 tokens. That scoped allocator
 configuration is required for the current B8 matrix; it is not a general memory
-guarantee or a full benchmark quality result. The RULER entry integration has
-CPU call-path coverage; its native GPU integration check remains pending.
+guarantee or a full benchmark quality result. Run 1040 independently validates
+the actual RULER chunk entry against same-B native Graph and the accepted B4
+token reference. It does not exercise the complete CLI or whole benchmark.

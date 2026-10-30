@@ -108,3 +108,41 @@ def test_static_decode_device_and_original_host_match(monkeypatch,minimum,eos):
             if len(streams)==2:
                 assert streams[0]==streams[1]
                 assert receipt['warmup_stream_reused'] is True
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='requires reserved GPU0')
+@pytest.mark.parametrize('capacity', [65536, 65537])
+def test_default_device_input_capacity_boundary(monkeypatch, capacity):
+    from sparse_attn.baseline_runtime import BatchCtx
+    from sparse_attn.ops.quality_graph import static_decode
+    from sparse_attn.ops.tli_static_cache import TLIStaticCache
+
+    class Toy(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight = torch.nn.Parameter(torch.zeros(1, device='cuda', dtype=torch.bfloat16))
+            self.config = SimpleNamespace(num_hidden_layers=1, model_type='toy')
+
+        def forward(self, input_ids, past_key_values, **kwargs):
+            state = input_ids.to(torch.bfloat16).view(1, 1, 1, 1).expand(1, 1, 1, 4)
+            past_key_values.update(state, state, 0)
+            return SimpleNamespace(logits=torch.nn.functional.one_hot((input_ids + 1) % 8, 8).float())
+
+    monkeypatch.setenv('TLI_CUDA_GRAPH', '1')
+    monkeypatch.delenv('TLI_DEVICE_DECODE_INPUTS', raising=False)
+    monkeypatch.delenv('TLI_REUSE_WARMUP_STREAM', raising=False)
+    streams = []
+    for _ in range(2):
+        model = Toy()
+        cache = TLIStaticCache(model.config, capacity, 1)
+        cache.layers[0].lazy_initialization(torch.zeros(1, 1, 1, 4, device='cuda', dtype=torch.bfloat16))
+        ctx = BatchCtx(1, [10000], [0], [True], 0)
+        with torch.inference_mode():
+            assert static_decode(model, cache, [[1]], [10000], set(), 3, ctx) == [[1, 2, 3]]
+        receipt = model._quality_graph_execution
+        assert receipt['input_update_requested'] == '1'
+        assert receipt['input_update_route'] == ('device_row_fused' if capacity == 65536 else 'host_reference')
+        assert receipt['input_update_fallback'] == (None if capacity == 65536 else 'capacity_above_65536')
+        streams.append(receipt['warmup_stream'])
+        if len(streams) == 2:
+            assert streams[0] == streams[1] and receipt['warmup_stream_reused']
