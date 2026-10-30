@@ -1,6 +1,6 @@
 # Prefill-frozen Near/Far skip
 
-Opt-in Qwen3 eager inference reference. This does not change the default TLI
+Opt-in Qwen3 and GLM-4.7-Flash TLI eager inference reference. This does not change the default TLI
 path or enable operator/graph optimizations. Supports unpadded batch size 1,
 one-shot dense prefill and single-token decode.
 
@@ -26,7 +26,7 @@ attention never read staging until it ages into Far. Far and both skip
 physically reclaim the corresponding cache nodes.
 
 `FrozenRegionCache` owns node lifetimes; `GateConfig`/`profile_regions`/
-`decide_regions` calibrate the gates. The Qwen3 patch recognizes the explicit
+`decide_regions` calibrate the gates. The Qwen3 and GLM patches recognize the explicit
 `tli_regions` cache marker before generic KV update. The benchmark installs
 the patch, captures prefill profiles, freezes the cache and scopes eager
 request guards inside inference mode. Other callers must perform the same
@@ -83,3 +83,23 @@ These historical quality figures belong to that frozen source, not a fresh
 full evaluation of later main changes. Main integration checks cover the
 four-state cache lifecycle, TLI selection parity, patched Qwen logits and
 benchmark request guard/data coverage. No latency or whole-device memory claim.
+
+## GLM-4.7-Flash
+
+Use the same entry point with `--attention tli --model /path/to/GLM-4.7-Flash`.
+The GLM adapter preserves native MLA projections and interleaved RoPE, then
+routes the post-RoPE Q/K and full V to the region consumer before any generic
+cache write. Prefill profiling uses the model attention scale, including any
+configured scaling adjustment, rather than assuming `1/sqrt(head_dim)`.
+The selector retains GLM's tail pairs `[208:224] + [240:256]`.
+
+Only unpadded B1, one-shot prefill and single-token eager decode are supported.
+GLM rejects active graph state, operator mode, outer batch contexts and external
+masks before projection/cache mutation. Its ordinary dynamic far gate must be
+disabled: the independent near/far gate owns the request decision. The generic
+`--attention sdpa` segmented-cache reference remains Qwen-only. Transformers 5
+integer query-length mask requests and the older tensor API are both accepted.
+
+Qwen historical scores above do not establish GLM quality. Four-state routing,
+cache lifetime and gates-off parity are integration checks; GLM task accuracy
+requires a separately recorded evaluation.

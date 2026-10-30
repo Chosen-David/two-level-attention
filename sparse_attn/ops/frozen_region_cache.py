@@ -202,7 +202,8 @@ class RegionCacheLayer(CacheLayerMixin):
         return torch.cat(keys, -2), torch.cat(values, -2), positions
 
     def get_mask_sizes(self, cache_position):
-        return self.logical_length+cache_position.shape[0], 0
+        return self.logical_length + (cache_position if isinstance(cache_position, int)
+                                      else cache_position.shape[0]), 0
 
     def get_seq_length(self):
         return self.logical_length
