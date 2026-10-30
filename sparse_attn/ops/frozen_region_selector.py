@@ -6,6 +6,7 @@ logical positions before the original free-competition top-k so zero-probability
 fillers and torch's tie behavior remain unchanged.
 """
 import torch
+from einops import einsum as reference_einsum
 
 from .eager_decoding import _eager_expand_kernel, _err_flag
 
@@ -144,10 +145,32 @@ def region_mask_physical(indexer, q, layer, scale, intermediates=None):
     safe = cand_ids.clamp(0,length-1)
     physical = layer.physical_positions(safe)
     head_ids = torch.arange(kv_heads,device=q.device)[:,None]
-    keys = layer.arena_k[physical,head_ids].index_select(-1,dims).to(torch.float32)
     bq = (q[0,0]*scale).to(torch.float32).index_select(-1,dims)
-    bq = bq.reshape(kv_heads,group,-1)
-    fine = torch.einsum('hgd,hrd->hgr',bq,keys).to(q.dtype)
+    fine = None
+    if layer.skip_far:
+        # far reference 使用展开 GQA 的 einops；紧凑归约或 Triton 的累加
+        # 布局不同，在 32K top-k 边界会改变选中集合。
+        keys = layer.arena_k[physical,head_ids].index_select(-1,dims).to(torch.float32)
+        keys = keys.repeat_interleave(group,dim=0).permute(1,0,2).contiguous()
+        fine = reference_einsum(
+            bq,keys,'h d, kt h d -> h kt').to(q.dtype)
+        fine = fine.reshape(kv_heads,group,-1)
+    else:
+        if q.is_cuda and getattr(idx,'_triton_ok',False):
+            try:
+                # keep/near 与 reference 全宽 scorer 共用 Triton 归约；
+                # 异常时沿用原 torch 路径。
+                kq = layer.arena_k.index_select(-1,dims)
+                cand_len = cand_valid.sum(1).to(torch.int32)
+                fine = idx._fast_score_fine_cand(
+                    kq,bq,physical,cand_len,cand_ids.shape[1],q.dtype)
+                fine = fine.reshape(kv_heads,group,-1)
+            except Exception:
+                fine = None
+        if fine is None:
+            keys = layer.arena_k[physical,head_ids].index_select(-1,dims).to(torch.float32)
+            bq = bq.reshape(kv_heads,group,-1)
+            fine = torch.einsum('hgd,hrd->hgr',bq,keys).to(q.dtype)
     fine = fine.masked_fill(~cand_valid[:,None],float('-inf'))
     probability = fine.softmax(-1).nan_to_num(nan=0).mean(1)
     probability = probability.masked_fill(
