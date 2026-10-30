@@ -1,6 +1,7 @@
 """RULER frozen-region opt-in, identity, EOS, and commit-boundary tests."""
 import json
 import os
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -67,6 +68,31 @@ def test_valid_configuration_is_resolved_before_patch_registration(monkeypatch):
     assert os.environ['TLI_CUDA_GRAPH'] == 'off'
     assert args._frozen_region_gate is gate
     assert args._frozen_region_geometry is geometry
+
+
+def test_real_cli_accepts_environment_only_sparse_flags(monkeypatch):
+    for name in ('TLI_OPERATOR_MODE', 'TLI_FINE_GATHER', 'TLI_SPARSE_PREFILL',
+                 'TLI_DECODE_DENSE', 'TLI_FROZEN_EAGER_REFERENCE', 'TLI_CUDA_GRAPH'):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(sys, 'argv', [
+        'pred_ruler', '--model', 'Qwen3-8B', '--model_path', '/unused/model',
+        '--task', 'niah_single_1', '--context_length', '65536',
+        '--data-root', '/unused/data', '--output-dir', '/unused/out',
+        '--method', 'tli', '--yarn', '--tli_prefill_frozen_regions',
+        '--tli_far_method', 'minmax', '--tli_near_method', 'avg',
+        '--tli_near_pages', '32', '--tli_near_tokens', 'off',
+        '--tli_near_len', '4096', '--tli_subspace', 'tail',
+        '--tia_level2_cmp_ratio', '4', '--tli_sink_tokens', '4',
+        '--tli_swa_size', '128', '--tia_level1_topk', '128',
+        '--tia_level2_topk', '1024', '--tli_enable_layer_skip', 'false',
+        '--tli_far_skip_backend', 'legacy', '--tli_far_skip_cache', 'retain',
+    ])
+    args = pred_ruler.parse_args()
+    assert not hasattr(args, 'tli_sparse_prefill')
+    assert not hasattr(args, 'tli_decode_dense')
+    pred_ruler._configure_frozen_regions(args, _config())
+    assert os.environ['TLI_SPARSE_PREFILL'] == '0'
+    assert os.environ['TLI_DECODE_DENSE'] == '0'
 
 
 @pytest.mark.parametrize('field,value', [

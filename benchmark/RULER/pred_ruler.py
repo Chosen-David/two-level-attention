@@ -177,6 +177,10 @@ def _configure_frozen_regions(args, config):
         for name, value in expected.items()
         if getattr(args, name, None) != value
     }
+    # 这两项由环境变量固定，真实 CLI 不创建同名属性；显式注入 True 仍须拒绝。
+    for name in ('tli_sparse_prefill', 'tli_decode_dense'):
+        if getattr(args, name, None) is None:
+            mismatches.pop(name, None)
     if mismatches:
         raise ValueError(f'frozen regions require the validated TLI geometry: {mismatches}')
     gate = GateConfig(epsilon=args.tli_frozen_region_epsilon,
