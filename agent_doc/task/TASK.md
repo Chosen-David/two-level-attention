@@ -2,6 +2,8 @@
 
 ## 2026-10-30
 
+- [ ] [TL-PAGED-RECLAIM-20261030] eager paged far-kept 回收空扫描短路；198 host 子用例普通/-O及2016次追加配对通过，仅CPU元数据计时，原生/GPU待验。([详情](task_details/TL-PAGED-RECLAIM-20261030.md))
+
 - [ ] [TL-DUO-ASSETS-20261030] 固定官方DuoAttention源码、用户提供v1 PDF已归档；独立Python3.10+Torch2.4/cu121+legacy FlashInfer/FlashAttention已实装、CPU import/pattern与pip check通过，完整哈希锁可复建；BlockSparse/NVCC和GPU/实模验收仍待完成。([详情](task_details/TL-DUO-ASSETS-20261030.md))
 
 - [x] [TL-FROZEN-MAIN-20261030] Integrate accepted independent Near/Far0.05 eager cache reference;84 tests +14 subtests passed. ([details](task_details/TL-FROZEN-MAIN-20261030.md))
@@ -262,3 +264,4 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 ## 2026-10-30 GLM frozen-region integration
 
 - TL-GLM-FROZEN-20261030：eager B1独立near/far接入及独立验收完成；[详情](task_details/TL-GLM-FROZEN-20261030.md)。
+

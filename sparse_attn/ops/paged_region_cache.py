@@ -51,6 +51,10 @@ class PagedRegionLayer(CacheLayerMixin):
         return [p for a,b in self.intervals() for p in range(a,b)]
 
     def _reclaim(self):
+        # Keeping far also keeps near-only staging: every logical page is
+        # resident, so there can be no reclaimable page to scan for.
+        if not self.skip_far:
+            return
         spans = self.intervals(resident=True)
         size = self.geometry.page
         for lp in list(self.pages):
@@ -214,3 +218,4 @@ class PagedRegionCache(Cache):
         layers=[x.report() for x in self.layers]
         return dict(layers=layers,kv_bytes=sum(x['kv_bytes'] for x in layers),
                     device_page_table_bytes=sum(x['device_page_table_bytes'] for x in layers))
+
