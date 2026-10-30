@@ -74,10 +74,10 @@ def main():
             if not torch.isfinite(output.logits).all():raise RuntimeError('nonfinite prefill logits')
             decisions={i:dict(skip_near=mode in ['near','both'],skip_far=mode in ['far','both']) for i in range(model.config.num_hidden_layers)}
             rc.freeze(decisions);pc.freeze(decisions)
-            for token in tokens:
+            for step,token in enumerate(tokens,1):
                 output=model(torch.tensor([[token]],device='cuda'),past_key_values=rc,attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
                 finite=bool(torch.isfinite(output.logits).all())
-                result.setdefault('model_logits_finite',[]).append(dict(mode=mode,step=len(result.get('model_logits_finite',[])),finite=finite))
+                result.setdefault('model_logits_finite',[]).append(dict(mode=mode,step=step,finite=finite))
                 (destination/'raw.json').write_text(json.dumps(result,indent=2)+'\n')
                 if not finite:raise RuntimeError('nonfinite model logits')
         result.setdefault('cache_reports',{})[mode]=dict(ring=rc.report(),paged=pc.report())
