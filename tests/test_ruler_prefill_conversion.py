@@ -1,6 +1,4 @@
 """Execute the real RULER chunk entry without importing its CLI program."""
-import ast
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -8,13 +6,11 @@ import torch
 
 from sparse_attn.baseline_runtime import BatchCtx, batch_decode_scope
 from sparse_attn.ops.tli_static_cache import TLIStaticLayer
+from exp.bench.ruler_chunk_entry import load_ruler_chunk
 
 
 @pytest.mark.parametrize('batch',[1,2,4,8])
 def test_ruler_preserves_unpadded_inputs_logits_and_defers_static_allocation(monkeypatch,batch):
-    source=Path(__file__).parents[1]/'benchmark/RULER/pred_ruler_batch.py'
-    node=next(n for n in ast.parse(source.read_text()).body
-              if isinstance(n,ast.FunctionDef) and n.name=='_decode_batch_chunk')
     lengths=[5+b for b in range(batch)];width=max(lengths)
     ids=torch.zeros(batch,width,dtype=torch.long);positions=ids.clone()
     for b,n in enumerate(lengths):
@@ -58,10 +54,9 @@ def test_ruler_preserves_unpadded_inputs_logits_and_defers_static_allocation(mon
                 assert torch.count_nonzero(layer.keys[b,0,n:])==0
         assert all(layer.keys is None and layer.values is None for row in sources for layer in row.layers)
         return gen
-    namespace=dict(torch=torch,BatchCtx=BatchCtx,batch_decode_scope=batch_decode_scope,
-                   MAX_GEN=16,_decode_batch_graph=decode)
-    exec(compile(ast.Module(body=[node],type_ignores=[]),str(source),'exec'),namespace)
+    chunk=load_ruler_chunk(16)
+    chunk.__globals__['_decode_batch_graph']=decode
     with torch.no_grad():
-        result=namespace['_decode_batch_chunk'](Model(),SimpleNamespace(pad_token_id=0,eos_token_id=31),
+        result=chunk(Model(),SimpleNamespace(pad_token_id=0,eos_token_id=31),
             [None]*batch,ids,positions,None,lengths,set(),False,fixed_cache=True)
     assert result==[[b+1] for b in range(batch)]

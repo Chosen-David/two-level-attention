@@ -69,23 +69,30 @@ def run(cli):
         cache=TLIStaticCache(model.config,capacity,batch);first=[];prefilled=[]
         prefill_ms=conversion_ms=0.0
         with torch.inference_mode(),eager_decoding_request_guard():
-            for slot,b in enumerate(which):
+            production_entry = cli.ruler_entry_candidate and current_arm == 'candidate'
+            if production_entry:
+                from ruler_chunk_entry import run_ruler_chunk
+                tokens=run_ruler_chunk(model,tokenizer,[ids[b] for b in which],
+                                       [rows[b] for b in which],cli.max_gen)
+            else:
+                for slot,b in enumerate(which):
+                    torch.cuda.synchronize();t=time.perf_counter()
+                    out=model(input_ids=ids[b],use_cache=True,logits_to_keep=1)
+                    first.append(int(out.logits[0,-1].argmax()))
+                    torch.cuda.synchronize();prefill_ms+=(time.perf_counter()-t)*1000
+                    prefilled.append(out.past_key_values)
+                    del out
+                from sparse_attn.ops.static_batch_prefill import consume_prefill_rows
                 torch.cuda.synchronize();t=time.perf_counter()
-                out=model(input_ids=ids[b],use_cache=True,logits_to_keep=1)
-                first.append(int(out.logits[0,-1].argmax()))
-                torch.cuda.synchronize();prefill_ms+=(time.perf_counter()-t)*1000
-                prefilled.append(out.past_key_values)
-                del out
-            from sparse_attn.ops.static_batch_prefill import consume_prefill_rows
-            torch.cuda.synchronize();t=time.perf_counter()
-            consume_prefill_rows(cache,prefilled,lens)
-            prefilled.clear()
-            torch.cuda.synchronize();conversion_ms=(time.perf_counter()-t)*1000
-            ctx=BatchCtx(batch,list(lens),[0]*batch,[True]*batch,0)
-            tokens=static_decode(model,cache,[[x] for x in first],lens,set(),cli.max_gen,ctx)
+                consume_prefill_rows(cache,prefilled,lens)
+                prefilled.clear()
+                torch.cuda.synchronize();conversion_ms=(time.perf_counter()-t)*1000
+                ctx=BatchCtx(batch,list(lens),[0]*batch,[True]*batch,0)
+                tokens=static_decode(model,cache,[[x] for x in first],lens,set(),cli.max_gen,ctx)
             torch.cuda.synchronize();total_ms=(time.perf_counter()-start)*1000
             execution=dict(model._quality_graph_execution)
             rec=dict(cycle=cycle,arm=current_arm,rows=which,batch=batch,batch_indexer=batch_mode,tokens=tokens,
+                     entry='ruler_production_chunk' if production_entry else 'batch_probe',
                      execution=execution,allocator=observe_allocator(),environment={k:v for k,v in os.environ.items() if k.startswith('TLI_')})
             if cli.measure:
                 rec['request_timing']=dict(total_wall_ms=total_ms,prefill_wall_ms=prefill_ms,
@@ -164,8 +171,12 @@ if __name__=='__main__':
     p.add_argument('--cycles',type=int,default=1,help='Paired cycles with alternating arm order')
     p.add_argument('--legacy-graph-candidate',action='store_true',
         help='Compare operator-off legacy Graph against same-batch eager, checking per-layer receipts')
+    p.add_argument('--ruler-entry-candidate',action='store_true',
+        help='Run unchanged production RULER chunk functions for candidate correctness')
     p.add_argument('--trace-dir')
     cli=p.parse_args()
+    if cli.ruler_entry_candidate and (cli.measure or not cli.legacy_batch_reference):
+        p.error('RULER entry check requires legacy-batch-reference and forbids timing')
     if cli.legacy_graph_candidate and (not cli.eager_batch_reference or cli.batch<2):
         p.error('legacy Graph candidate requires same-batch eager reference and B>=2')
     if cli.trace_dir and (cli.measure or not cli.eager_batch_reference):
