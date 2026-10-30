@@ -26,18 +26,27 @@ attention never read staging until it ages into Far. Far and both skip
 physically reclaim the corresponding cache nodes.
 
 `FrozenRegionCache` owns node lifetimes; `GateConfig`/`profile_regions`/
-`decide_regions` calibrate the gates. The Qwen3 and GLM patches recognize the explicit
-`tli_regions` cache marker before generic KV update. The benchmark installs
-the patch, captures prefill profiles, freezes the cache and scopes eager
-request guards inside inference mode. Other callers must perform the same
-lifecycle; passing ordinary DynamicCache does not activate these gates.
+`decide_regions` calibrate the gates. `frozen_region_runtime.py` is the shared
+prefill/profile/freeze/receipt lifecycle used by LongBench and RULER. The Qwen3
+and GLM patches recognize the explicit `tli_regions` cache marker before generic
+KV update. Passing ordinary DynamicCache does not activate these gates.
 
-The adapter calls the existing TLI compute_score/compute_mask on tail32 key
-scratch and projects its selection onto visible positions. Final attention
-uses full-width K/V. L1=128, L2=1024, Far=minmax, Near=avg, Near pages=32,
-Near tokens=off. Projected scratch is temporary logical-length storage: this
-is an accuracy reference, not a measured peak-memory or speed optimization.
-Beam search, chunked prefill, batches, gradients and CUDA Graphs are unsupported.
+For Qwen3 TLI, the default frozen eager path builds one physical K/V arena after
+freezing. Decode appends and ages nodes without gathering all visible KV. L1 reads
+only live-page tail32 statistics and reuses the original `_select_l1_blocks`;
+L2 scores only L1/bypass/protected candidates, then preserves the original
+absolute-position free-competition top-k semantics. Both-skip returns before L1,
+L2 and top-k. Final attention consumes sorted physical slot IDs and device counts,
+so it does not gather the full visible KV or use the sub-16K dense masked fallback.
+L1=128, L2=1024, Far=minmax, Near=avg, Near pages=32, Near tokens=off.
+
+The legacy logical-mask path remains available as a test oracle via
+`TLI_FROZEN_EAGER_REFERENCE=1` outside the RULER production entry. The physical
+selector still materializes a logical-length probability tensor and performs the
+original-width mid top-k to preserve filler and tie behavior; L2 is therefore not
+fully compact. CPU/tiny-Qwen tests establish cache, selection and attention parity,
+but do not establish GPU latency, traffic or peak-memory improvements. Beam search,
+chunked prefill, batches, gradients and CUDA Graphs are unsupported.
 
 ## Run the validated comparison
 
@@ -64,6 +73,44 @@ python -m benchmark.LongBench.validate_frozen_skip agent_doc/results/frozen_regi
 python -m benchmark.LongBench.analyze_frozen_skip agent_doc/results/frozen_region_skip_RUN_ID
 python -m benchmark.LongBench.export_frozen_skip agent_doc/results/frozen_region_skip_RUN_ID
 ```
+
+## RULER B=1 eager production entry
+
+Frozen regions are disabled by default. Opt in explicitly with the validated TLI
+geometry (the ordinary RULER path and its treatment hash are unchanged when the
+flag is absent):
+
+```sh
+python -u -m benchmark.RULER.pred_ruler \
+  --model Qwen3-8B --model_path /path/to/Qwen3-8B \
+  --task niah_single_1 --context_length 8192 --method tli --t RUN_ID \
+  --data-root /path/to/KVCache-Factory/data/RULER \
+  --output-dir exp/results_ruler/Qwen3-8B --max-num 1 \
+  --tli_far_method minmax --tli_near_method avg \
+  --tli_near_pages 32 --tli_near_tokens off --tli_near_len 4096 \
+  --tli_subspace tail --tia_level2_cmp_ratio 4 \
+  --tli_sink_tokens 4 --tli_swa_size 128 \
+  --tia_level1_topk 128 --tia_level2_topk 1024 \
+  --tli_enable_layer_skip false \
+  --tli_far_skip_backend legacy --tli_far_skip_cache retain \
+  --tli_prefill_frozen_regions --tli_frozen_region_mode dual \
+  --tli_frozen_region_epsilon 0.05 \
+  --tli_frozen_region_statistic mean --tli_frozen_region_rows 256
+```
+
+The entry rejects non-Qwen3 models, unvalidated geometry, sparse prefill, dense
+decode and active CUDA Graph configuration before indexer construction. It fixes
+the eager physical execution environment, creates a fresh cache per request and
+keeps RULER greedy decoding, first-token EOS handling, newline stopping and
+MAX_GEN unchanged. Each JSONL row contains `_frozen_region` with profiles,
+decisions, gate counts, prefill/frozen/final physical KV reports and real TLI
+receipts. Receipt validation completes before that row is written; a failure does
+not commit a new generation. Gate and resolved geometry join the canonical
+treatment manifest only when frozen mode is enabled.
+
+This entry is a correctness/production-quality route, not a CUDA Graph or TPOT
+claim. Real Qwen3 BF16 GPU parity and paired memory/work/latency measurements are
+still required before reporting performance benefits.
 
 ## Accepted evidence and limits
 

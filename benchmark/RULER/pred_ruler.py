@@ -84,6 +84,10 @@ from sparse_attn.metrics import get_metrics  # noqa: E402
 # docstring）——RULER 生成的逐行生成段接线。
 from sparse_attn.ops.eager_decoding import (  # noqa: E402
     eager_decoding_request_guard)
+from sparse_attn.ops.frozen_region_cache import RegionGeometry
+from sparse_attn.ops.frozen_region_gate import GateConfig
+from sparse_attn.ops.frozen_region_runtime import (
+    complete_frozen_request, prefill_frozen_request)
 from sparse_attn.ops.quality_graph import from_dynamic, graph_policy
 from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes  # noqa: E402
 from sparse_attn.info import (  # noqa: E402
@@ -131,8 +135,83 @@ def parse_args():
     parser.add_argument("--yarn_factor", type=float, default=None,
                         help="YaRN factor（默认按档位自动：65536→2.0、"
                              "131072→4.0；显式传入可覆盖做消融）")
+    parser.add_argument("--tli_prefill_frozen_regions", action="store_true",
+                        help="启用 B1 eager prefill-frozen near/far gates")
+    parser.add_argument("--tli_frozen_region_mode",
+                        choices=["full", "far", "near", "dual"], default="dual")
+    parser.add_argument("--tli_frozen_region_epsilon", type=float, default=0.05)
+    parser.add_argument("--tli_frozen_region_statistic",
+                        choices=["mean", "p95"], default="mean")
+    parser.add_argument("--tli_frozen_region_rows", type=int, default=256)
     add_sparse_attn_args(parser)
     return parser.parse_args()
+
+
+def _configure_frozen_regions(args, config):
+    """Fail closed before model/indexer construction; return the request geometry."""
+    if not args.tli_prefill_frozen_regions:
+        return None
+    if args.method != 'tli' or getattr(config, 'model_type', None) != 'qwen3':
+        raise ValueError('frozen regions require full-attention Qwen3 with method=tli')
+    if getattr(config, 'head_dim', None) != 128:
+        raise ValueError('frozen regions require Qwen3 head_dim=128')
+    expected = {
+        'tia_block_size': 64, 'tia_level1_topk': 128,
+        'tia_level2_topk': 1024, 'tia_level2_cmp_ratio': 4,
+        'tli_subspace': 'tail', 'tli_l2_subspace': 'same',
+        'tli_far_method': 'minmax', 'tli_near_method': 'avg',
+        'tli_far_select': '4bit', 'tli_near_select': '4bit',
+        'tli_near_pages': 32, 'tli_near_tokens': 'off',
+        'tli_near_len': 4096, 'tli_sink_tokens': 4, 'tli_swa_size': 128,
+        'tli_enable_subspace': True, 'tli_enable_layer_skip': False,
+        'tli_dyn_dgate': False, 'tli_far_skip_backend': 'legacy',
+        'tli_far_skip_cache': 'retain', 'tli_sparse_prefill': False,
+        'tli_decode_dense': False, 'tli_per_q_head': False,
+        'tia_enable_async_topk': False, 'tli_l2_quant': False,
+        'tli_sinkswa_only': False, 'tli_boundary_bypass': True,
+        'tli_static_pair': False, 'tli_proj_basis': None,
+        'tli_alpha': None, 'tli_beta': None, 'tli_gamma': None,
+    }
+    mismatches = {
+        name: (getattr(args, name, None), value)
+        for name, value in expected.items()
+        if getattr(args, name, None) != value
+    }
+    if mismatches:
+        raise ValueError(f'frozen regions require the validated TLI geometry: {mismatches}')
+    gate = GateConfig(epsilon=args.tli_frozen_region_epsilon,
+                      rows=args.tli_frozen_region_rows,
+                      statistic=args.tli_frozen_region_statistic,
+                      mode=args.tli_frozen_region_mode)
+    environment = {
+        'TLI_OPERATOR_MODE': 'off', 'TLI_FINE_GATHER': '0',
+        'TLI_SPARSE_PREFILL': '0', 'TLI_DECODE_DENSE': '0',
+        'TLI_FROZEN_EAGER_REFERENCE': '0',
+    }
+    for name, value in environment.items():
+        current = os.environ.get(name)
+        if current is not None and current.lower() != value:
+            raise ValueError(f'{name}={current!r} conflicts with frozen eager execution')
+        os.environ[name] = value
+    graph = os.environ.get('TLI_CUDA_GRAPH', 'auto').lower()
+    if graph not in ('auto', '0', 'off'):
+        raise ValueError('frozen regions support eager execution only')
+    os.environ['TLI_CUDA_GRAPH'] = 'off'
+    config._attn_implementation = 'sdpa'
+    args.tli_frozen_region_max_new_tokens = MAX_GEN
+    geometry = RegionGeometry(
+        sink=args.tli_sink_tokens, near=args.tli_near_len,
+        window=args.tli_swa_size, page=args.tia_block_size,
+        max_new_tokens=MAX_GEN)
+    args._frozen_region_gate = gate
+    args._frozen_region_geometry = geometry
+    return gate, geometry
+
+
+def _validate_frozen_model(model):
+    if any(getattr(module.self_attn, 'sliding_window', None) is not None
+           for module in model.model.layers):
+        raise ValueError('frozen regions require full-attention Qwen3 layers')
 
 
 def seed_everything(seed=SEED):   # 057：默认值单源化（receipt 身份字段）
@@ -245,6 +324,7 @@ def main():
     if use_yarn:
         config.rope_scaling = rope_scaling
     resolve_far_skip_modes(args, config=config)
+    frozen_runtime = _configure_frozen_regions(args, config)
     snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
     if args.method == 'ffd_vendor':
         if use_yarn:
@@ -495,6 +575,11 @@ def main():
         )
     else:
         n_patched = register_patch(model, args, snapshot)
+    if frozen_runtime is not None:
+        _validate_frozen_model(model)
+        if n_patched != model.config.num_hidden_layers:
+            raise ValueError('frozen regions require TLI patches on every Qwen3 layer')
+        model._frozen_tli = True
     if args.method != "none" and n_patched == 0:
         raise RuntimeError(
             f"method={args.method!r} 但成功挂载 0 个 attention 模块，模型"
@@ -591,15 +676,22 @@ def main():
             # 代可见，无任何完成外观产物被污染）。进入时清旧 flag 防跨
             # 行继承（上一行未消费的违规不误杀本行）。
             with baseline_request(model) as baseline_receipt, eager_decoding_request_guard():
+                frozen_audit = None
                 with torch.no_grad():
-                    output = model(input_ids=input_ids, past_key_values=None,
-                                   use_cache=True,
-                                   **({"logits_to_keep": 1} if keep_logits else {}))
+                    if frozen_runtime is not None:
+                        gate, geometry = frozen_runtime
+                        output, frozen_audit = prefill_frozen_request(
+                            model, input_ids, gate, geometry)
+                    else:
+                        output = model(input_ids=input_ids, past_key_values=None,
+                                       use_cache=True,
+                                       **({"logits_to_keep": 1} if keep_logits else {}))
                     past = output.past_key_values
                     pred_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
                     gen = [pred_idx.item()]
                     del output
-                    graphed = from_dynamic(model, past, gen[0], MAX_GEN, eos_ids)
+                    graphed = (None if frozen_runtime is not None else
+                               from_dynamic(model, past, gen[0], MAX_GEN, eos_ids))
                     if graphed is not None:
                         gen = graphed
                     else:
@@ -608,12 +700,17 @@ def main():
                             if len(gen) < 2 and pred_idx.item() in eos_ids:
                                 pass  # 首位不许停（近似 min_length=context+1）
                             out = model(input_ids=pred_idx, past_key_values=past,
-                                        use_cache=True)
+                                        use_cache=True,
+                                        **({'attention_mask': {'full_attention': None}}
+                                           if frozen_runtime is not None else {}))
                             past = out.past_key_values
                             pred_idx = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
                             gen.append(pred_idx.item())
                             if pred_idx.item() in eos_ids and len(gen) > 1:
                                 break
+                    if frozen_runtime is not None:
+                        frozen_audit = complete_frozen_request(
+                            model, past, len(gen), frozen_audit)
             pred = tokenizer.decode(gen, skip_special_tokens=True)
             metrics = get_metrics()
             budget = None if (baseline_receipt or getattr(model, "_quality_graph_execution", {}).get("actual", "").startswith("graph")) else metrics.get_select_tokens()
@@ -624,6 +721,7 @@ def main():
             # 评分端据此做 fail-closed 集合闭包校验；其余字段与行为零改动。
             fout.write(json.dumps({
                 **({"baseline_receipt": baseline_receipt} if baseline_receipt else {}),
+                **({"_frozen_region": frozen_audit} if frozen_audit is not None else {}),
                 "pred": pred, "answers": row["outputs"],
                 # Decoding drops special tokens; retain EOS for exact parity.
                 "generated_token_ids": gen,
