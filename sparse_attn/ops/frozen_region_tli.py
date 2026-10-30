@@ -35,7 +35,9 @@ def region_mask(indexer, q, k, positions, length, scale):
             or idx.near_select != '4bit' or idx.per_q_head or idx.enable_async):
         raise ValueError('frozen reference supports ordinary shared-head tail TLI only')
     dims = idx._subspace_indices(k.device)
-    ids = torch.tensor(positions, device=k.device, dtype=torch.long)
+    ids = (positions.to(device=k.device, dtype=torch.long)
+           if torch.is_tensor(positions) else
+           torch.tensor(positions, device=k.device, dtype=torch.long))
     bs = idx.args.tia_block_size
     padded = (length+bs-1)//bs*bs
     projected = k.new_zeros((1,padded,k.shape[2],dims.numel()))
@@ -70,13 +72,27 @@ def decode(module,q,k,v,cache,cache_position):
     layer = cache.layers[module.layer_idx]
     if q.shape[:1] != (1,) or q.shape[-2] != 1 or not layer.frozen:
         raise ValueError('frozen TLI requires frozen B1 single-token decode')
-    k,v = cache.update(k,v,module.layer_idx,dict(cache_position=cache_position))
-    positions = layer.gather()[2]
-    q,k,v = (x.transpose(1,2).contiguous() for x in (q,k,v))
     idx = module.indexer
+    geometry = layer.geometry
+    if (idx.sink_tokens != geometry.sink or idx.sliding_window_size != geometry.window
+            or idx.nt_near_len != geometry.near or idx.args.tia_block_size != geometry.page):
+        raise ValueError('frozen TLI geometry and physical cache geometry differ')
+    if layer.arena_k is None:
+        k,v = cache.update(k,v,module.layer_idx,dict(cache_position=cache_position))
+        positions = layer.gather()[2]
+        q,k,v = (x.transpose(1,2).contiguous() for x in (q,k,v))
+    else:
+        layer.append_decode(k,v)
+        positions = layer.logical_positions(q.device)
+        physical = layer.physical_positions(positions)
+        # 过渡 oracle 仍保留一次可见 KV gather；后续 indexed attention 将删除它。
+        k = layer.arena_k[physical].unsqueeze(0)
+        v = layer.arena_v[physical].unsqueeze(0)
+        q = q.transpose(1,2)
     idx.skip_far = layer.skip_far
     mask,receipt = region_mask(idx,q,k,positions,layer.logical_length,module.scaling)
-    receipt.update(skip_near=layer.skip_near,skip_far=layer.skip_far)
+    receipt.update(skip_near=layer.skip_near,skip_far=layer.skip_far,
+                   physical_arena=layer.arena_k is not None)
     layer.tli_receipt = receipt
-    cu = torch.tensor([0,len(positions)],device=k.device,dtype=torch.int32)
+    cu = torch.tensor([0,positions.numel()],device=k.device,dtype=torch.int32)
     return eager_decoding_attn(q,k,v,mask,1,cu,softmax_scale=module.scaling)

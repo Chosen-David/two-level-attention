@@ -164,3 +164,44 @@ def test_gate_other_region_mass_does_not_override_decision():
     for other in [0.,.03,.049,.05,.9]:
         assert decide_regions({'near':{'p95':.04},'far':{'p95':other}},GateConfig(epsilon=.05,statistic='p95'))['skip_near']
         assert decide_regions({'near':{'p95':other},'far':{'p95':.04}},GateConfig(epsilon=.05,statistic='p95'))['skip_far']
+
+
+@pytest.mark.parametrize('near,far', [(False,False),(False,True),(True,False),(True,True)])
+@torch.inference_mode()
+def test_tli_physical_arena_mapping_survives_ring_wraps(near, far):
+    g = RegionGeometry(sink=2, near=6, window=3, page=4, max_new_tokens=40)
+    cache = FrozenRegionCache(1, g); cache.tli_regions = True
+    layer = cache.layers[0]
+    initial = torch.arange(17.).reshape(1,1,17,1)
+    cache.update(initial, initial*2, 0)
+    old = [weakref.ref(node.keys) for node in layer.nodes.values()]
+    cache.freeze({0:dict(skip_near=near,skip_far=far)}); gc.collect()
+    assert all(ref() is None for ref in old)
+    assert layer.arena_k.shape[0] == sum(node.capacity for node in layer.nodes.values())
+    for t in range(17,49):
+        new = torch.tensor([[[[float(t)]]]])
+        layer.append_decode(new,new*2)
+        k,v,positions = layer.gather()
+        assert positions == expected_positions(t+1,17,g,near,far)
+        logical = torch.tensor(positions,dtype=torch.int64)
+        physical = layer.physical_positions(logical)
+        gathered_k = layer.arena_k[physical].permute(1,0,2).unsqueeze(0)
+        gathered_v = layer.arena_v[physical].permute(1,0,2).unsqueeze(0)
+        assert torch.equal(gathered_k,k) and torch.equal(gathered_v,v)
+        assert torch.equal(layer.logical_positions(),logical)
+
+
+@torch.inference_mode()
+def test_append_decode_never_gathers_visible_kv(monkeypatch):
+    g = RegionGeometry(sink=2,near=6,window=3,page=4,max_new_tokens=40)
+    cache = FrozenRegionCache(1,g); cache.tli_regions = True
+    initial = torch.arange(17.).reshape(1,1,17,1)
+    cache.update(initial,initial,0)
+    cache.freeze({0:dict(skip_near=False,skip_far=False)})
+    layer = cache.layers[0]
+    monkeypatch.setattr(layer,'gather',lambda:(_ for _ in ()).throw(AssertionError('gather called')))
+    for t in range(17,49):
+        new = torch.tensor([[[[float(t)]]]])
+        layer.append_decode(new,new)
+    assert layer.logical_length == 49
+    assert layer.nodes['far'].size > 0
