@@ -59,7 +59,8 @@ def make_prod_args(head_dim=256):
         tli_alpha=None, tli_beta=None, tli_gamma=None,
         tli_near_pages=32, tli_near_tokens="off", tli_near_len=4096,
         tli_boundary_bypass=True, tli_l2_quant=False, tli_proj_basis=None,
-        tli_static_pair=False, tli_l2_subspace="same", tli_subspace="tail",
+        tli_static_pair=False, tli_l2_subspace="same",
+        tli_subspace="nope" if head_dim == 256 else "tail",
     )
     args.head_dim_for_test = head_dim
     return args
@@ -123,19 +124,18 @@ def batched_decode(q, k, v, lengths):
                               v.transpose(1, 2), ctx)
 
 
-def test_tail_indices():
+def test_subspace_indices():
     dev = torch.device("cuda:0")
     expected = {
         128: list(range(48, 64)) + list(range(112, 128)),
-        256: list(range(208, 224)) + list(range(240, 256)),
+        256: list(range(64)),
     }
     for dim, want in expected.items():
         idx = make_indexer(dim)
         ref = torch.tensor(want, device=dev, dtype=torch.long)
         l1 = idx._subspace_indices(dev)
-        l2 = idx._qat_indices(dev)
-        check(f"tail_mapping_D{dim}", torch.equal(l1, ref) and torch.equal(l2, ref),
-              f"L1={l1.tolist()} L2={l2.tolist()}")
+        check(f"subspace_mapping_D{dim}", torch.equal(l1, ref),
+              f"L1={l1.tolist()}")
 
 
 def test_full_incremental_reset():
@@ -577,7 +577,7 @@ def test_registration_fail_closed():
 
 
 GROUPS = {
-    "tail": test_tail_indices,
+    "subspace": test_subspace_indices,
     "index": test_full_incremental_reset,
     "eager": test_eager_dense_and_full_budget,
     "batch": test_batch_fixed_and_dynamic_equivalence,

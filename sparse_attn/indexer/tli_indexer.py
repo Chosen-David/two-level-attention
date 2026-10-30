@@ -621,7 +621,7 @@ class TLIIndexer(TIAIndexer):
             device=device)
 
     def _subspace_indices(self, device):
-        # 子空间选择（用户指令参数化）：rope=前 64 旋转维 / nope=后 64 非旋转维 /
+        # 子空间选择（用户指令参数化）：rope/nope=模型对应的旋转/非旋转维 /
         # tail=低频尾维（旧口径，cmp_ratio 控制宽度）/ full 不进此函数
         # E85f：静态 pair 已定（prefill q 统计）→ 用 per-layer 完整旋转对替换 tail32
         if self.static_pair and self._pair_idx is not None:
@@ -638,7 +638,12 @@ class TLIIndexer(TIAIndexer):
         if self.subspace == "rope":
             out = torch.arange(0, 64, device=device)
         elif self.subspace == "nope":
-            out = torch.arange(64, 128, device=device)
+            # GLM-4.7 的 256 维布局为 [NoPE192 | RoPE64]。只取 RoPE
+            # 低频 tail 会丢掉全部 NoPE 内容特征，检索选择严重退化；
+            # 使用 NoPE 前 64 维作为 L1/L2 共用内容子空间。D=128 的
+            # [RoPE64 | NoPE64] 布局保持原映射不变。
+            out = (torch.arange(0, 64, device=device) if self.head_dim == 256
+                   else torch.arange(64, 128, device=device))
         elif self.subspace == "mla_rope":
             # 【E142a】DeepSeek-V2 MLA：k = [nope 128 | rope 64] 192 维，
             # rope 分量在尾段（与 Qwen3 rotate_half 两半布局不同）
@@ -691,13 +696,14 @@ class TLIIndexer(TIAIndexer):
                 f"tli_subspace={self.subspace} 需要的 k 末维 = {expected_dim}，"
                 f"实际 {k.shape[-1]}")
         if expected_dim == 256 and (
-                self.subspace != "tail" or self.l2_subspace != "same"
+                self.subspace != "nope" or self.l2_subspace != "same"
                 or self.cmp_ratio != 4 or self.l2_quant
                 or self.static_pair or self._basis is not None
                 or self._basis_all is not None):
             raise ValueError(
-                "D=256 TLI 仅支持 tail + l2_subspace=same + cmp_ratio=4 "
-                "+ l2_quant=False，且禁用 static_pair/投影基；当前组合未验证，拒绝执行")
+                "D=256 TLI 仅支持 nope + l2_subspace=same + cmp_ratio=4 "
+                "+ l2_quant=False，且禁用 static_pair/投影基；"
+                "RoPE-only tail32 已证实丢失 NoPE 检索内容，拒绝执行")
         # 【E152v4】graph 增量优先：cuda_graph_state 模式（decode 整步
         # capture/replay）下走 pos_buf 驱动的容量宽持久 buffer 增量更新
         # （_prepare_index_graph；每步仅重算 pos 所在块统计 + k_qat[pos]
