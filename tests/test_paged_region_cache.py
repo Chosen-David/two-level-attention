@@ -63,3 +63,20 @@ def test_cross_request_dtype_rejected_before_aging_or_new_page():
     with pytest.raises(ValueError,match='dtype/device changed'):
         layer.update(x[:,:,:1].bfloat16(),x[:,:,:1].bfloat16())
     assert layer.report()==before
+
+@pytest.mark.parametrize('near,far',[(False,False),(True,False),(False,True),(True,True)])
+@torch.inference_mode()
+def test_ring_arithmetic_bfloat16_rounding(near,far):
+    torch.manual_seed(43)
+    layer=PagedRegionLayer(RegionGeometry(near=32,window=17,page=16))
+    k=torch.randn(1,2,155,8).bfloat16();v=torch.randn(1,2,155,6).bfloat16()
+    layer.update(k,v);layer.freeze(near,far)
+    q=torch.randn(1,6,1,8).bfloat16()
+    mask=torch.zeros(1,1,2,155,dtype=torch.bool);mask[...,layer.visible_positions()]=True
+    mask[:,:,0,::3]=False;mask[:,:,1,::5]=False
+    actual=paged_attention(layer,q,mask,.17,ring_arithmetic=True)
+    scores=(q*.17).float()@k.repeat_interleave(3,1).float().transpose(-1,-2)
+    fullmask=mask.reshape(1,2,1,-1).repeat_interleave(3,1)
+    probs=scores.masked_fill(~fullmask,float('-inf')).softmax(-1).bfloat16()
+    expected=(probs@v.repeat_interleave(3,1)).transpose(1,2)
+    torch.testing.assert_close(actual,expected,atol=.002,rtol=.002)
