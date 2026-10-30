@@ -30,12 +30,12 @@ def run(cli):
         '--tli_subspace','tail','--tli_sink_tokens','4','--tli_swa_size','128',
         '--tli_enable_layer_skip','false','--tli_enable_kmeans','false',
         '--tli_far_skip_backend','legacy','--tli_far_skip_cache','retain'])
-    os.environ.update(TLI_OPERATOR_MODE='serial',TLI_OPERATOR_BACKEND='simt',
+    os.environ.update(TLI_OPERATOR_MODE=cli.operator_mode,TLI_OPERATOR_BACKEND='simt',
         TLI_OPERATOR_SELECTED_STAGES='1',TLI_SPARSE_SELECTION='1',
         TLI_LIVE_NORMALIZATION='1',TLI_SPARSE_STATS='owner',TLI_GRAPH_INC='1',
         TLI_L2_BYPASS='0',TLI_CUDA_GRAPH='auto',
         TLI_QUALITY_TIMING='1' if cli.measure else '0')
-    model_path='/home/wangyuanshuo02/models/huggingface.co/Qwen/Qwen3-32B'
+    model_path=cli.model_path
     tokenizer=AutoTokenizer.from_pretrained(model_path)
     model=AutoModelForCausalLM.from_pretrained(model_path,dtype=torch.bfloat16,
         device_map={'':'cuda:0'},attn_implementation='sdpa').eval()
@@ -67,7 +67,7 @@ def run(cli):
             os.environ['TLI_DEVICE_DECODE_INPUTS']=value
             os.environ['TLI_REUSE_WARMUP_STREAM']=value
         os.environ['TLI_CUDA_GRAPH']='off' if eager_reference else 'auto'
-        os.environ['TLI_OPERATOR_MODE']='off' if (eager_reference or legacy_graph) else 'serial'
+        os.environ['TLI_OPERATOR_MODE']='off' if (eager_reference or legacy_graph) else cli.operator_mode
         os.environ['TLI_EXACT_BATCH_REFERENCE']='1' if row_reference else '0'
         os.environ['TLI_BATCH_INDEXER']=batch_mode
         batch=len(which); lens=[lengths[b] for b in which]
@@ -181,10 +181,13 @@ def run(cli):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--input',required=True);p.add_argument('--output',required=True)
+    p.add_argument('--model-path',default='/home/wangyuanshuo02/models/huggingface.co/Qwen/Qwen3-32B')
     p.add_argument('--batch',type=int,choices=[1,2,4,8],required=True)
     p.add_argument('--max-gen',type=int,default=16);p.add_argument('--measure',action='store_true')
     p.add_argument('--offline-fixed',action='store_true',
         help='固定步数 decode：禁用 EOS，逐步采样留在设备上，最后统一读回；与在线逐步读回分开计时')
+    p.add_argument('--operator-mode',choices=['off','serial','overlap'],default='off',
+        help='实验算子默认不参与核心 eager/Graph 对比；serial/overlap 仅在显式选择时启用')
     ref=p.add_mutually_exclusive_group()
     ref.add_argument('--same-batch-reference',action='store_true')
     ref.add_argument('--eager-batch-reference',action='store_true')
