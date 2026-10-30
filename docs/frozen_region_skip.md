@@ -138,6 +138,13 @@ bit-exact 验收。
 
 ## Accepted evidence and limits
 
+2026-10-31 真实 Qwen3 8K forced-near 逐步对拍（`355a0ff`）未通过 selected-ID
+一致性：2016 个 step/layer/KV-head 组合中 1889 个集合不同，差异全部在 Far 区域；
+生成词元仍一致，物理槽位映射全部有效。旧最终聚合差 1 已定位到 layer 5、decode
+step 6、KV head 2（1022→1021）。详见
+`exp/trace/results/frozen_eager_355a0ff_trace_8k_near_verdict.json`。该结果只否定此臂的
+支持集身份 parity，不外推其他状态/长度，也不改变既有分口径 TPOT 数字。
+
 Historical full evaluation: source `3e4a6885604ac3e719ee92a4906f87b532535314`,
 1300 paired inputs / 3900 generations / 64 completed shards. Dual AVG5
 48.239706 -> 48.154300 (-0.085406 percentage points); largest task decline
