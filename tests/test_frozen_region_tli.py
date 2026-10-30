@@ -3,6 +3,7 @@ import torch
 from sparse_attn.indexer.tli_indexer import TLIIndexer
 from sparse_attn.ops.frozen_region_tli import region_mask, tli_args
 from sparse_attn.ops.frozen_region_selector import region_mask_physical
+from sparse_attn.ops.eager_decoding import eager_decoding_attn, eager_decoding_attn_physical
 from sparse_attn.ops.frozen_region_cache import RegionCacheLayer, RegionGeometry
 
 @pytest.fixture(autouse=True)
@@ -76,6 +77,43 @@ def test_physical_l1_l2_indices_match_reference_after_ring_wraps(monkeypatch,len
     visible=layer.visible_mask(candidate_ids.clamp(0,layer.logical_length-1))
     assert not (candidate_valid & ~visible).any()
 
+
+@pytest.mark.parametrize('near,far',[(False,False),(False,True),(True,False),(True,True)])
+@torch.inference_mode()
+def test_physical_attention_consumes_only_final_support_set(monkeypatch,near,far):
+    """16K 以下也必须直接消费最终物理 ID，不得回退全可见 dense attention。"""
+    import sparse_attn.ops.eager_decoding as eager_ops
+    torch.manual_seed(991)
+    layer=RegionCacheLayer(RegionGeometry(max_new_tokens=80))
+    x=torch.randn(1,2,4301,128);y=torch.randn_like(x)
+    layer.update(x,y)
+    layer.freeze(skip_near=near,skip_far=far,physical_arena=True)
+    for _ in range(65):
+        k=torch.randn(1,2,1,128);v=torch.randn_like(k)
+        layer.append_decode(k,v)
+    q=torch.randn(1,1,8,128)
+    visible_k,visible_v,positions=layer.gather()
+    reference=TLIIndexer(tli_args());reference.layer_idx=0;reference.skip_far=far
+    expected_mask,_=region_mask(reference,q,visible_k.transpose(1,2),positions,
+                                layer.logical_length,128**-.5)
+    monkeypatch.setenv('TLI_E127_FAST','0')
+    cu=torch.tensor([0,len(positions)],dtype=torch.int32)
+    expected=eager_decoding_attn(q,visible_k.transpose(1,2),visible_v.transpose(1,2),
+                                 expected_mask,1,cu,softmax_scale=128**-.5)
+    def forbidden(*args,**kwargs):
+        raise AssertionError('physical attention fell back to visible-KV/dense path')
+    monkeypatch.setattr(layer,'gather',forbidden)
+    monkeypatch.setattr(eager_ops,'_eager_decoding_attn_dense',forbidden)
+    idx=TLIIndexer(tli_args());idx.layer_idx=0;idx.skip_far=far
+    selection={}
+    actual_mask,_=region_mask_physical(idx,q,layer,128**-.5,selection)
+    assert torch.equal(actual_mask,expected_mask)
+    actual=eager_decoding_attn_physical(
+        q,layer.arena_k,layer.arena_v,selection['physical_ids'],
+        selection['physical_counts'],softmax_scale=128**-.5)
+    torch.testing.assert_close(actual,expected,atol=3e-6,rtol=1e-5)
+
+
 @pytest.mark.parametrize('near,far',[(False,True),(True,False),(True,True)])
 @torch.inference_mode()
 def test_skip_never_reads_staging_and_aged_far_is_visible(near,far):
@@ -143,4 +181,6 @@ def test_patched_qwen_segmented_logits_match_logical_reference(near,far):
         a=model(token,past_key_values=cache,attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
         b=reference(token,past_key_values=baseline,attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
         torch.testing.assert_close(a.logits,b.logits,atol=2e-6,rtol=1e-5)
-        assert cache.layers[0].tli_receipt['selector']=='TLIIndexer.compute_mask'
+        expected_selector = ('protected_only' if near and far else
+                             'physical_l1_original_free_topk')
+        assert cache.layers[0].tli_receipt['selector']==expected_selector

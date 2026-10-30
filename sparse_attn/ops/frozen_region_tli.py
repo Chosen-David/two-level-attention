@@ -9,7 +9,7 @@ import argparse
 import os
 import torch
 from sparse_attn.arguments import add_sparse_attn_args
-from .eager_decoding import eager_decoding_attn
+from .eager_decoding import eager_decoding_attn, eager_decoding_attn_physical
 
 
 def tli_args():
@@ -83,16 +83,23 @@ def decode(module,q,k,v,cache,cache_position):
         q,k,v = (x.transpose(1,2).contiguous() for x in (q,k,v))
     else:
         layer.append_decode(k,v)
-        positions = layer.logical_positions(q.device)
-        physical = layer.physical_positions(positions)
-        # 过渡 oracle 仍保留一次可见 KV gather；后续 indexed attention 将删除它。
-        k = layer.arena_k[physical].unsqueeze(0)
-        v = layer.arena_v[physical].unsqueeze(0)
         q = q.transpose(1,2)
     idx.skip_far = layer.skip_far
-    mask,receipt = region_mask(idx,q,k,positions,layer.logical_length,module.scaling)
+    if layer.arena_k is None:
+        mask,receipt = region_mask(idx,q,k,positions,layer.logical_length,module.scaling)
+    else:
+        from .frozen_region_selector import region_mask_physical
+        selection = {}
+        mask,receipt = region_mask_physical(idx,q,layer,module.scaling,selection)
+        receipt.update(skip_near=layer.skip_near,skip_far=layer.skip_far,
+                       physical_arena=True)
+        layer.tli_receipt = receipt
+        return eager_decoding_attn_physical(
+            q,layer.arena_k,layer.arena_v,
+            selection['physical_ids'],selection['physical_counts'],
+            softmax_scale=module.scaling)
     receipt.update(skip_near=layer.skip_near,skip_far=layer.skip_far,
-                   physical_arena=layer.arena_k is not None)
+                   physical_arena=False)
     layer.tli_receipt = receipt
     cu = torch.tensor([0,positions.numel()],device=k.device,dtype=torch.int32)
     return eager_decoding_attn(q,k,v,mask,1,cu,softmax_scale=module.scaling)
