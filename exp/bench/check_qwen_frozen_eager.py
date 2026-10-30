@@ -101,7 +101,7 @@ def run_request(model, ids, max_new, arm, state, device, capture=False,
     _sync(device)
     initial_memory = _memory(device)
     start = time.perf_counter()
-    decision = STATES[state]
+    decision = STATES.get(state)
     with (patch('sparse_attn.ops.frozen_region_runtime.decide_regions',
                 return_value=decision) if state != 'dual' else contextlib.nullcontext()):
         out, audit = prefill_frozen_request(
