@@ -97,7 +97,10 @@ def glm4_moe_lite_attn_forward(
     # Dispatch after native MLA projections/RoPE, before the generic KV write.
     # Region decode owns the single write and absolute-to-physical mapping.
     if region_cache and layer.logical_length:
-        from ..ops.frozen_region_tli import decode as region_decode
+        if getattr(past_key_values, "paged_regions", False):
+            from ..ops.paged_region_tli import decode as region_decode
+        else:
+            from ..ops.frozen_region_tli import decode as region_decode
         result = region_decode(self, query_states, key_states, value_states,
                                past_key_values, cache_position)
         return self.o_proj(result.reshape(batch_size, seq_length, -1).contiguous()), None

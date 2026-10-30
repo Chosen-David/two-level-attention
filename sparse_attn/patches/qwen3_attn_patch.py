@@ -321,7 +321,10 @@ def qwen3_attn_forward(
     if getattr(past_key_values, "tli_regions", False):
         layer = past_key_values.layers[self.layer_idx]
         if layer.logical_length:
-            from ..ops.frozen_region_tli import decode as region_decode
+            if getattr(past_key_values, "paged_regions", False):
+                from ..ops.paged_region_tli import decode as region_decode
+            else:
+                from ..ops.frozen_region_tli import decode as region_decode
             result = region_decode(self, query_states, key_states, value_states,
                                    past_key_values, cache_position)
             return self.o_proj(result.reshape(*input_shape, -1).contiguous()), None
