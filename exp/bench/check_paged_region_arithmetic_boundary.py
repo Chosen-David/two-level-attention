@@ -60,6 +60,7 @@ def main():
                  has_triton=eager._HAS_TRITON,tensor_file=tensor_path.name,tensor_sha256=hashlib.sha256(tensor_path.read_bytes()).hexdigest())
         rows.append(row);Path(a.out).write_text(json.dumps(dict(status='pending_independent_validation',commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),rows=rows),indent=2)+'\n')
         print(row,flush=True)
+        if not finite:raise RuntimeError('nonfinite paired output; raw preserved')
         torch.testing.assert_close(actual,reference,atol=tol,rtol=tol)
     finally:eager._EAGER_TRITON_OK['ok']=original
 if __name__=='__main__':main()
