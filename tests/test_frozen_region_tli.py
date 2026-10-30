@@ -142,8 +142,9 @@ def test_skip_never_reads_staging_and_aged_far_is_visible(near,far):
         assert layer.nodes['far'].size>g.bounds(length)[1]-s
 
 @pytest.mark.parametrize('near,far',[(False,False),(False,True),(True,False),(True,True)])
+@pytest.mark.parametrize('physical',[True,False])
 @torch.inference_mode()
-def test_patched_qwen_segmented_logits_match_logical_reference(near,far):
+def test_patched_qwen_segmented_logits_match_logical_reference(monkeypatch,near,far,physical):
     from transformers import Qwen3Config,Qwen3ForCausalLM
     from transformers.cache_utils import DynamicCache
     from sparse_attn.patches import register_patch
@@ -163,6 +164,7 @@ def test_patched_qwen_segmented_logits_match_logical_reference(near,far):
     a=model(ids,past_key_values=cache,use_cache=True,logits_to_keep=1)
     b=reference(ids,past_key_values=baseline,use_cache=True,logits_to_keep=1)
     torch.testing.assert_close(a.logits,b.logits,rtol=0,atol=0)
+    monkeypatch.setenv('TLI_FROZEN_EAGER_REFERENCE','0' if physical else '1')
     cache.freeze({0:dict(skip_near=near,skip_far=far)})
     idx=reference.model.layers[0].self_attn.indexer;idx.skip_far=far
     old=idx.compute_mask
@@ -181,6 +183,7 @@ def test_patched_qwen_segmented_logits_match_logical_reference(near,far):
         a=model(token,past_key_values=cache,attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
         b=reference(token,past_key_values=baseline,attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
         torch.testing.assert_close(a.logits,b.logits,atol=2e-6,rtol=1e-5)
-        expected_selector = ('protected_only' if near and far else
+        expected_selector = ('TLIIndexer.compute_mask' if not physical else
+                             'protected_only' if near and far else
                              'physical_l1_original_free_topk')
         assert cache.layers[0].tli_receipt['selector']==expected_selector

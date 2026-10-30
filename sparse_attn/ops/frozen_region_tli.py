@@ -101,5 +101,5 @@ def decode(module,q,k,v,cache,cache_position):
     receipt.update(skip_near=layer.skip_near,skip_far=layer.skip_far,
                    physical_arena=False)
     layer.tli_receipt = receipt
-    cu = torch.tensor([0,positions.numel()],device=k.device,dtype=torch.int32)
+    cu = torch.tensor([0,len(positions)],device=k.device,dtype=torch.int32)
     return eager_decoding_attn(q,k,v,mask,1,cu,softmax_scale=module.scaling)
