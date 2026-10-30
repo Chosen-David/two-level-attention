@@ -116,7 +116,7 @@ def run(cli):
                     assert all(r['attention_route']=='legacy_graph_eager_tli' for r in execution['capture_layers'])
                 if batch_mode=='exact':
                     expected_route=('linear_batch_reference_simt' if row_reference else
-                        'exact_batch_ordered_eager' if os.environ.get('TLI_EXACT_ATTENTION','split')=='ordered'
+                        'exact_batch_ordered_eager' if os.environ.get('TLI_EXACT_ATTENTION','ordered')=='ordered'
                         else 'exact_batch_simt')
                     assert all(r['attention_route']==expected_route for r in execution['capture_layers'])
         del cache

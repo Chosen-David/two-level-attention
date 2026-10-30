@@ -119,13 +119,16 @@ configuration signature, so changing it requires clear and recapture. Agreement
 with this control cannot by itself resolve a difference from independent B1 model
 requests; model batch shape also changes other arithmetic paths.
 
-The explicit `TLI_EXACT_ATTENTION=ordered` consumer forms the sorted unique
+The default `TLI_EXACT_ATTENTION=ordered` consumer forms the sorted unique
 union of selected, sink and SWA IDs and invokes the original eager attention
 reduction (BW256, four warps, unchanged BF16 multiplication rounding). Its
-receipt is `exact_batch_ordered_eager`. The split consumer remains the current
-low-level default pending the full acceptance gate; its observed B4 token
-drift is recorded in run 0750 and must not be treated as a quality reference.
-Run 0790 accepts the ordered repair only for its four inputs and 16 tokens.
+receipt is `exact_batch_ordered_eager`. The split consumer remains available only through explicit `TLI_EXACT_ATTENTION=split`
+for diagnostics; its observed B4 token drift in run 0750 makes it unsuitable
+as a quality reference. Ordered same-batch parity has scoped real B2/B4/B8
+evidence (0680/0790/0970); this does not establish whole-benchmark quality.
+The fused batch route itself still requires `TLI_BATCH_INDEXER=exact`, serial
+SIMT, and supported no-gate Qwen geometry. Unsupported requests raise; GLM
+dynamic gating at B>1 remains unsupported.
 
 The real batch harness supports `--eager-batch-reference` for same-shape
 correctness, and `--legacy-batch-reference` for native Graph versus fused Graph

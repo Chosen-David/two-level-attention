@@ -90,6 +90,7 @@ def test_indexer_clear_poison_retains_ready_buffer(setup):
 
 
 def test_consumer_runs_one_batched_call_per_stage_and_never_stacks_k(setup,monkeypatch):
+    monkeypatch.setenv('TLI_EXACT_ATTENTION','split')
     idx,q,k,v,gs=setup
     arena=torch.zeros(2,32768,1,16,dtype=q.dtype)
     candidates=[]
@@ -270,3 +271,13 @@ def test_production_maintenance_dispatch_has_no_steady_row_preparation(setup,mon
     assert batch.ExactLinearBatch.produce(state,q,k,gs,0.5) is result
     assert calls==['maintenance','producer']
     assert state.maintenance_calls=={'batched_tail32':1}
+
+
+def test_exact_default_preserves_ordered_configuration_identity(setup,monkeypatch):
+    idx,*_=setup
+    monkeypatch.delenv('TLI_EXACT_ATTENTION',raising=False)
+    default=batch._config_signature(idx)
+    monkeypatch.setenv('TLI_EXACT_ATTENTION','ordered')
+    assert default==batch._config_signature(idx)
+    monkeypatch.setenv('TLI_EXACT_ATTENTION','split')
+    assert default!=batch._config_signature(idx)

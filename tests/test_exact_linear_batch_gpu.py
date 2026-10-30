@@ -27,7 +27,7 @@ CONFIG = {
     'TLI_SPARSE_SELECTION':'1', 'TLI_GRAPH_INC':'1',
     'TLI_OPERATOR_BACKEND':'simt', 'TLI_OPERATOR_SELECTED_STAGES':'1',
     'TLI_L2_BYPASS':'0', 'TLI_COMPACT_NORMALIZATION':'0',
-    'TLI_GRAPH_GEOMETRY_SHARED':'1',
+    'TLI_GRAPH_GEOMETRY_SHARED':'1', 'TLI_EXACT_ATTENTION':'split',
 }
 
 
@@ -319,11 +319,15 @@ def test_same_batch_row_reference_capture(monkeypatch, batch):
 
 @NATIVE
 @pytest.mark.parametrize('batch', [2, 4, 8])
-def test_ordered_batch_live_replay_matches_full_mask_eager(monkeypatch, batch):
+@pytest.mark.parametrize('attention_env', [None, 'ordered'])
+def test_ordered_batch_live_replay_matches_full_mask_eager(monkeypatch, batch, attention_env):
     """Integrated ordered consumer, ragged live widths and frozen EOS rows."""
     from sparse_attn.ops.eager_decoding import eager_decoding_attn, eager_decoding_check_errors
     for key,value in CONFIG.items():monkeypatch.setenv(key,value)
-    monkeypatch.setenv('TLI_EXACT_ATTENTION','ordered')
+    if attention_env is None:
+        monkeypatch.delenv('TLI_EXACT_ATTENTION',raising=False)
+    else:
+        monkeypatch.setenv('TLI_EXACT_ATTENTION',attention_env)
     monkeypatch.setenv('TLI_EXACT_BATCH_REFERENCE','0')
     torch.manual_seed(320304)
     with torch.no_grad(), _case(batch) as case:
