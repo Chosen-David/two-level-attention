@@ -38,4 +38,4 @@ def decode(module,q,k,v,cache,cache_position):
     module.indexer.skip_far=layer.skip_far
     mask,receipt=region_selection(module.indexer,q,layer,module.scaling)
     layer.tli_receipt=receipt
-    return paged_attention(layer,q,mask,module.scaling)
+    return paged_attention(layer,q,mask,module.scaling,ring_arithmetic=True)

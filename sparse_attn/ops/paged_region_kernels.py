@@ -27,7 +27,7 @@ if triton is not None:
 
     @triton.jit
     def _attend(Q,KPTR,VPTR,IDS,OUT,HQ:tl.constexpr,HK:tl.constexpr,D:tl.constexpr,DV:tl.constexpr,
-                P:tl.constexpr,K:tl.constexpr,SCALE:tl.constexpr,BD:tl.constexpr,BV:tl.constexpr,BT:tl.constexpr):
+                P:tl.constexpr,K:tl.constexpr,SCALE:tl.constexpr,ROUND_PROB:tl.constexpr,BD:tl.constexpr,BV:tl.constexpr,BT:tl.constexpr):
         h=tl.program_id(0);kh=h//(HQ//HK)
         d=tl.arange(0,BD);vd=tl.arange(0,BV);t=tl.arange(0,BT)
         q=tl.load(Q+h*D+d,mask=d<D,other=0).to(tl.float32)
@@ -49,6 +49,24 @@ if triton is not None:
             vals=tl.load(vptr[:,None]+kh*P*DV+(pos%P)[:,None]*DV+vd[None,:],mask=valid[:,None]&(vd[None,:]<DV),other=0).to(tl.float32)
             acc=acc*alpha+tl.sum(vals*prob[:,None],0)
             z=z*alpha+tl.sum(prob,0);m=nm
+        if ROUND_PROB:
+            # Match eager dense reference: normalized probabilities are rounded
+            # to the activation dtype before PV. Direct second pass rereads pages.
+            acc=tl.full((BV,),0,tl.float32)
+            for start in range(tl.cdiv(K,BT)):
+                ix=start*BT+t
+                pos=tl.load(IDS+kh*K+ix,mask=ix<K,other=-1)
+                valid=pos>=0
+                kp=tl.load(KPTR+pos//P,mask=valid,other=0)
+                vp=tl.load(VPTR+pos//P,mask=valid,other=0)
+                kptr=kp.to(tl.pointer_type(Q.dtype.element_ty))
+                vptr=vp.to(tl.pointer_type(Q.dtype.element_ty))
+                keys=tl.load(kptr[:,None]+kh*P*D+(pos%P)[:,None]*D+d[None,:],mask=valid[:,None]&(d[None,:]<D),other=0).to(tl.float32)
+                score=tl.where(valid,tl.sum(keys*q[None,:],1)*SCALE,float('-inf'))
+                prob=(tl.exp(score-m)/z).to(Q.dtype.element_ty).to(tl.float32)
+                vals=tl.load(vptr[:,None]+kh*P*DV+(pos%P)[:,None]*DV+vd[None,:],mask=valid[:,None]&(vd[None,:]<DV),other=0).to(tl.float32)
+                acc+=tl.sum(vals*prob[:,None],0)
+            z=1.
         tl.store(OUT+h*DV+vd,acc/z,mask=vd<DV)
 
 
@@ -70,7 +88,7 @@ def project_visible(layer,dims,block_size):
     return out
 
 
-def paged_attention(layer,q,mask,scale):
+def paged_attention(layer,q,mask,scale,*,ring_arithmetic=False):
     """q[B,Hq,1,D], mask[1,1,Hkv,L]; output[B,1,Hq,Dv]."""
     _,k,v=next(iter(layer.pages.values()))
     hq=q.shape[1];hk=k.shape[1]
@@ -85,6 +103,12 @@ def paged_attention(layer,q,mask,scale):
     if torch.any(selected & ~visible):raise ValueError('selection references hidden/reclaimed KV')
     counts=selected.sum(-1)
     if torch.any(counts==0):raise ValueError('empty attention row')
+    # Ring eager always rounds scaled Q to activation dtype. Its small-context
+    # dense branch also rounds normalized probabilities; mirror both explicitly.
+    round_prob=ring_arithmetic and sum(b-a for a,b in layer.intervals())<16384
+    if ring_arithmetic:
+        q=q*scale
+        scale=1.
     if q.is_cuda:
         positions=torch.arange(layer.logical_length,device=q.device).expand(hk,-1)
         candidates=positions.masked_fill(~selected,-1)
@@ -93,7 +117,7 @@ def paged_attention(layer,q,mask,scale):
         out=q.new_empty((1,1,hq,v.shape[-1]))
         kp,vp=layer.pointer_tables()
         _attend[(hq,)](q.contiguous(),kp,vp,indices,out,hq,hk,k.shape[-1],v.shape[-1],layer.geometry.page,
-            count,scale,triton.next_power_of_2(k.shape[-1]),triton.next_power_of_2(v.shape[-1]),32)
+            count,scale,round_prob,triton.next_power_of_2(k.shape[-1]),triton.next_power_of_2(v.shape[-1]),32)
         return out
     # CPU independent pagewise oracle: full K/V are never concatenated.
     outputs=[]
@@ -108,5 +132,11 @@ def paged_attention(layer,q,mask,scale):
         z=q.new_zeros((),dtype=torch.float32);acc=q.new_zeros(v.shape[-1],dtype=torch.float32)
         for score,vals in pieces:
             weights=(score-m).exp();z+=weights.sum();acc+=(weights[:,None]*vals.float()).sum(0)
+        if round_prob:
+            acc.zero_()
+            for score,vals in pieces:
+                weights=((score-m).exp()/z).to(q.dtype).float()
+                acc+=(weights[:,None]*vals.float()).sum(0)
+            z=1.
         outputs.append((acc/z).to(q.dtype))
     return torch.stack(outputs).reshape(1,1,hq,v.shape[-1])

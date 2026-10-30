@@ -42,3 +42,14 @@ labels it generated-answer throughput. Both arms warm up before measured ABBA
 cycles. Compare every forced gate state, retain failures/slowdowns and do not
 replace the ring default unless evidence supports that choice. Current measurements
 remain pending independent acceptance in `agent_doc/results/nfa_paged_cache_20261030`.
+
+CUDA pages are owned by the stream that first writes them. Updates, freezing and
+pointer-table reads on another stream are rejected before state mutation; stream
+handoff and CUDA Graph lifetime management are not implemented.
+
+The TLI adapter matches the ring reference's activation-dtype Q scaling. For
+fewer than 16,384 visible tokens, it additionally rounds normalized probabilities
+to activation dtype, matching ring's dense arithmetic. This requires a second
+page-read pass; its cost is included in timing. The standalone kernel's default
+remains FP32 online softmax for comparison against SDPA. Neither setting promises
+bitwise equivalence across reduction trees.
