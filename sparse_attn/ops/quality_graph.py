@@ -7,12 +7,34 @@ input buffers and frozen gate; a different request never reuses an old graph.
 import gc
 import os
 import time
+import threading
 
 import torch
 
 from ..baseline_runtime import BatchCtx, batch_decode_scope
 from .cuda_graph_state import graph_state, enable_graph, disable_graph, capture_graph
 from .eager_decoding import eager_decoding_check_errors
+
+
+_warmup_streams = threading.local()
+
+
+def _request_warmup_stream(device):
+    reuse = os.environ.get('TLI_REUSE_WARMUP_STREAM', '0')
+    if reuse not in ('0', '1'):
+        raise ValueError('TLI_REUSE_WARMUP_STREAM must be 0 or 1')
+    if reuse == '0':
+        return torch.cuda.Stream(device=device), False
+    # cuBLAS workspaces are stream-associated. Bound the number of warmup
+    # streams per calling thread/device without retaining request KV or Graphs.
+    streams = getattr(_warmup_streams, 'by_device', None)
+    if streams is None:
+        streams = _warmup_streams.by_device = {}
+    key = device.index if device.index is not None else torch.cuda.current_device()
+    reused = key in streams
+    if not reused:
+        streams[key] = torch.cuda.Stream(device=device)
+    return streams[key], reused
 
 
 def graph_policy():
@@ -152,20 +174,24 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
     if getattr(cache, "_far_skip_prepared", False):
         cache._far_skip_attention_mask = mask
     snapshots = (list(ctx.seq_lens), list(ctx.gen_lens), list(ctx.alive))
+    device_inputs, previous_tokens = None, None
 
     def restore():
         ctx.seq_lens[:], ctx.gen_lens[:], ctx.alive[:] = snapshots
 
     def inject(step):
-        tokens.copy_(torch.tensor([row[-1] if active else ctx.pad_id
-                                 for row, active in zip(gen, ctx.alive)],
-                                 device=device, dtype=torch.long).view(batch, 1))
         for b in range(batch):
             if ctx.alive[b]:
                 ctx.seq_lens[b] += 1
                 ctx.gen_lens[b] += 1
         if max(ctx.seq_lens) > capacity:
             raise ValueError("decode exceeds fixed KV capacity")
+        if device_inputs is not None:
+            device_inputs.inject(step, previous_tokens)
+            return
+        tokens.copy_(torch.tensor([row[-1] if active else ctx.pad_id
+                                 for row, active in zip(gen, ctx.alive)],
+                                 device=device, dtype=torch.long).view(batch, 1))
         positions.copy_(torch.tensor([n + step for n in lens], device=device).view(batch, 1))
         lengths.copy_(torch.tensor(ctx.seq_lens, device=device))
         pos.copy_(lengths - 1)
@@ -190,7 +216,9 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     enable_graph(batch, quality_defaults=True)
                     gs.pos_buf, gs.valid_len_buf, gs.alive_buf = pos, lengths, alive
                     inject(0)
-                    stream = torch.cuda.Stream(device=device)
+                    stream, reused = _request_warmup_stream(device)
+                    record.update(warmup_stream=int(stream.cuda_stream),
+                                  warmup_stream_reused=reused)
                     stream.wait_stream(torch.cuda.current_stream(device))
                     with torch.cuda.stream(stream):
                         for _ in range(2):
@@ -222,6 +250,31 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     gc.collect()
                     torch.cuda.empty_cache()
                 restore()
+            input_mode = os.environ.get('TLI_DEVICE_DECODE_INPUTS', '0')
+            if input_mode not in ('0', '1'):
+                raise ValueError('TLI_DEVICE_DECODE_INPUTS must be 0 or 1')
+            record.update(input_update_requested=input_mode,
+                          input_update_route='host_reference', input_update_fallback=None)
+            if input_mode == '1':
+                if graph is None:
+                    record['input_update_fallback'] = 'graph_not_captured'
+                elif capacity > 65536:
+                    record['input_update_fallback'] = 'capacity_above_65536'
+                else:
+                    from .quality_decode_inputs import DeviceDecodeInputs
+                    device_inputs = DeviceDecodeInputs(
+                        tokens, positions, pos, lengths, alive, mask,
+                        ctx.seq_lens, lens, [len(row) for row in gen], ctx.alive,
+                        ctx.pad_id, eos_ids, min_new_tokens)
+                    previous_tokens = torch.tensor(
+                        [row[-1] if active else ctx.pad_id for row, active in zip(gen, ctx.alive)],
+                        device=device, dtype=torch.long)
+                    # Compile the two input-update variants in request setup.
+                    # No model/KV write runs here; decode step zero resets all
+                    # mutable row metadata from the immutable request seed.
+                    device_inputs.inject(0, previous_tokens)
+                    device_inputs.inject(1, previous_tokens)
+                    record['input_update_route'] = 'device_row_fused'
             if measure:
                 synchronize()
                 setup_ms = (time.perf_counter() - setup_start) * 1000
@@ -254,7 +307,8 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     output = forward()
                     if step == 0:
                         record["eager_layers"] = _layer_routes(model)
-                next_tokens = output.logits[:, -1].argmax(-1).tolist()
+                previous_tokens = output.logits[:, -1].argmax(-1)
+                next_tokens = previous_tokens.tolist()
                 for b, token in enumerate(next_tokens):
                     if ctx.alive[b]:
                         gen[b].append(token)
