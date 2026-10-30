@@ -154,3 +154,38 @@ def test_capture_ablation_and_invalid_flag(monkeypatch):
         with capture_graph(object()):
             pass
     assert len(entered) == 1  # Invalid configuration rejected before capture.
+
+
+
+@pytest.mark.parametrize("batch", [1, 2, 8])
+def test_device_revision_invalidates_fresh_row_views(batch):
+    # Triton writes keep _version unchanged; the producer tags the parent.
+    ns['_GRAPH_GEO_CACHE'].clear()
+    lengths = torch.arange(batch, dtype=torch.long) + 100
+    lengths._tli_device_revision = 1
+    for row in range(batch):
+        value = object()
+        store(lengths[row:row + 1], 'row', value)
+        assert lookup(lengths[row:row + 1], 'row') is value
+    lengths._tli_device_revision += 1
+    for row in range(batch):
+        assert lookup(lengths[row:row + 1], 'row') is None
+    # Nested views also reference the storage-owning base.
+    view = lengths[:].view(batch)
+    value = object()
+    store(view[:1], 'nested', value)
+    assert lookup(view[:1], 'nested') is value
+    lengths._tli_device_revision += 1
+    assert lookup(view[:1], 'nested') is None
+    ns['_GRAPH_GEO_CACHE'].clear()
+
+
+def test_view_local_revision_also_invalidates():
+    ns['_GRAPH_GEO_CACHE'].clear()
+    base = torch.tensor([100])
+    view = base[:]
+    value = object()
+    store(view, 'view', value)
+    view._tli_device_revision = 1
+    assert lookup(view, 'view') is None
+    ns['_GRAPH_GEO_CACHE'].clear()
