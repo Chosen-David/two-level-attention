@@ -62,8 +62,9 @@ def main():
                         same_mask_max_output_error=float((same_mask.float()-reference.float()).abs().max()),
                         reference_abs_max=float(reference.abs().max()),finite=bool(torch.isfinite(actual).all()),
                         reference_finite=bool(torch.isfinite(reference).all()),same_mask_finite=bool(torch.isfinite(same_mask).all()),receipt=receipt)
-            if logical==a.length+1 and li in [0,8,26]:
-                filename=f'{mode}_layer{li}_step1.pt'
+            worst_case={'keep':(33,2),'near':(33,4),'far':(34,4),'both':(30,3)}[mode]
+            if (logical==a.length+1 and li in [0,8,26]) or (li,logical-a.length)==worst_case:
+                filename=f'{mode}_layer{li}_step{logical-a.length}.pt'
                 torch.save(dict(q=q.cpu(),k=rk.cpu(),v=rv.cpu(),positions=positions,ring_mask=rm.cpu(),paged_mask=pm.cpu(),ring_output=reference.cpu(),paged_output=actual.cpu(),scale=module.scaling),destination/filename)
                 record['tensor_file']=filename;record['tensor_sha256']=hashlib.sha256((destination/filename).read_bytes()).hexdigest()
             result['records'].append(record)
