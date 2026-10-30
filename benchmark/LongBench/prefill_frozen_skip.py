@@ -83,10 +83,10 @@ def capture_profiles(cache, geometry, config):
 
 @torch.inference_mode()
 @eager_decoding_request_guard()
-def generate(model, tokenizer, ids, max_new_tokens, config, device):
+def generate(model, tokenizer, ids, max_new_tokens, config, device, stop_ids=None, stop_after_tokens=1):
     geometry = RegionGeometry(max_new_tokens=max_new_tokens)
     cache = FrozenRegionCache(model.config.num_hidden_layers, geometry)
-    eos = model.generation_config.eos_token_id
+    eos = model.generation_config.eos_token_id if stop_ids is None else stop_ids
     eos = eos if isinstance(eos, list) else [eos]
     if getattr(model, '_frozen_tli', False):
         cache.tli_regions = True
@@ -118,7 +118,7 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
         for _ in range(max_new_tokens):
             token = out.logits[:, -1].argmax(-1, keepdim=True)
             generated.append(int(token))
-            if int(token) in eos or len(generated) == max_new_tokens:
+            if (int(token) in eos and len(generated) >= stop_after_tokens) or len(generated) == max_new_tokens:
                 break
             out = model(token, past_key_values=cache,
                         attention_mask=(None if model.config.model_type == 'glm4_moe_lite'
@@ -142,19 +142,19 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
 
 @torch.inference_mode()
 @eager_decoding_request_guard()
-def generate_native(model, ids, max_new_tokens, device):
+def generate_native(model, ids, max_new_tokens, device, stop_ids=None, stop_after_tokens=1):
     cache = DynamicCache(config=model.config)
     if getattr(model, '_frozen_tli', False):
         for layer in model.model.layers:
             layer.self_attn.indexer.clear()
             layer.self_attn.indexer.skip_far = False
     out = model(torch.tensor([ids], device=device), past_key_values=cache, use_cache=True, logits_to_keep=1)
-    eos = model.generation_config.eos_token_id
+    eos = model.generation_config.eos_token_id if stop_ids is None else stop_ids
     eos = eos if isinstance(eos,list) else [eos]
     generated = []
     for _ in range(max_new_tokens):
         token = out.logits[:, -1].argmax(-1, keepdim=True); generated.append(int(token))
-        if int(token) in eos or len(generated) == max_new_tokens: break
+        if (int(token) in eos and len(generated) >= stop_after_tokens) or len(generated) == max_new_tokens: break
         out = model(token, past_key_values=cache, use_cache=True, logits_to_keep=1)
     return generated
 
