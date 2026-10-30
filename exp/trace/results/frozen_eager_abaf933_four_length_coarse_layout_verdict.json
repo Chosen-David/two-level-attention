@@ -1,0 +1,382 @@
+{
+  "schema": "frozen-eager-coarse-layout-four-length-v1",
+  "code_commit": "abaf9331879fd011df51f8ba97cc6dafc32a4863",
+  "validated_base_commit": "17fd4efa2d36181c6b467b13d2ee8d3b30280d39",
+  "validated_patch_sha256": "5bcee365b8efbe4a4ccdee1aafc119bf550de97a547813270a3630abcf6ca9d2",
+  "verdict": "PASS_8K_32K_64K_128K_FOUR_STATE_SELECTED_ID_AND_OUTPUT_PARITY_AFTER_COARSE_LAYOUT_FIX",
+  "protocol": {
+    "model": "Qwen3-8B BF16",
+    "task": "RULER niah_single_1 row0",
+    "context_lengths": [
+      8192,
+      32768,
+      65536,
+      131072
+    ],
+    "input_tokens": {
+      "8192": 7881,
+      "32768": 32612,
+      "65536": 65441,
+      "131072": 130981
+    },
+    "max_new_tokens": 8,
+    "decode_steps_compared_per_state": 7,
+    "states": [
+      "keep",
+      "far",
+      "near",
+      "both"
+    ],
+    "mode": "correctness-only",
+    "attention_intervention": "诊断 wrapper 仅将 reference attention 消费端替换为与 physical 相同的 compact Triton kernel；cache 逻辑不变",
+    "production_selector_fix": "keep/near coarse 与 avg 使用 reference 同布局 BF16 Triton；far 与 Triton 回退使用展开 GQA einops；fine scorer 布局沿用 46a3ab1",
+    "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+    "wrapper": "/tmp/run_frozen_coarse_score_diagnostic.py",
+    "wrapper_sha256": "aa452ff64669cc5daf0dd1cd5f92a39d804cc1f550dfc36476c401ceb592c8c6"
+  },
+  "baseline_128k_before_coarse_fix": {
+    "code_commit": "46a3ab13147228efbbbed6ed3da10f74b9277cda",
+    "report": "/tmp/frozen-eager-46a3ab1-reference-layout-ruler128k-four-state/report.json",
+    "report_sha256": "ab3dbb814f6fa4cd939673b09d7b3f5f1edec5bfbd92b886a0d8427b22069154",
+    "selected_logical_id_mismatches": {
+      "keep": 937,
+      "far": 0,
+      "near": 0,
+      "both": 0
+    },
+    "keep_layer_output_max_abs": 4.0,
+    "keep_logits_max_abs": 0.625,
+    "keep_reference_selected_kv_total": 294120,
+    "keep_physical_selected_kv_total": 294121,
+    "first_mismatch": {
+      "layer": 5,
+      "decode_step": 3,
+      "kv_head": 6
+    },
+    "physical_candidate_score_calls": 504,
+    "physical_candidate_score_successes": 504
+  },
+  "root_cause": {
+    "capture": "/tmp/frozen-eager-46a3ab1-ruler128k-keep-selector-intermediates/intermediates.pt",
+    "capture_sha256": "7e5b1415413b5dd970a38b09e92bf4b96e6f4b9ca5e40b458fe347dd01b71c94",
+    "target": {
+      "layer": 5,
+      "decode_step": 3
+    },
+    "attention_q_bitexact": true,
+    "block_avg_stat_values_bitexact": true,
+    "candidate_k_bitexact": true,
+    "compact_scored_page_differences": {
+      "coarse": 2,
+      "avg": 4
+    },
+    "mechanism": "physical 紧凑 torch.einsum 与 reference Triton 的归约布局不同；near top-k 同值边界由 block2019/2020 的顺序差开始传播。仅用 Triton 但传 FP32 块统计仍各有 1 个 BF16 输出差，必须同时匹配 BF16 输入 dtype。",
+    "native_gpu_replay": "/tmp/frozen-eager-128k-coarse-layout-replay/stdout.log",
+    "native_gpu_replay_sha256": "deb3d6b7f37b7188c057b47b76e71672cadc324538e1eb068889441b4beecffa",
+    "replay_script": "/tmp/replay_128k_coarse_layout.py",
+    "replay_script_sha256": "f47528bb8efd92939e9b749e11e2f1e84ab5cb3f260123b19b74bacdac15f013",
+    "fp32_triton_diff_elements": {
+      "coarse": 1,
+      "avg": 1
+    },
+    "bf16_triton_score_bitexact": {
+      "coarse": true,
+      "avg": true
+    },
+    "bf16_l1_bitexact": {
+      "topk_mask_block": true,
+      "i_f": true,
+      "i_n": true,
+      "i_all": true
+    }
+  },
+  "final_evidence": {
+    "8192": {
+      "report": "/tmp/frozen-eager-17fd4ef-coarse-layout-ruler-regression/8192/report.json",
+      "report_sha256": "c8c585266d8e4ae4366c5244eba5e2e9e6ffd91afbe8f145e6c686e7483db83f",
+      "input_sha256": "17f398a32d66f3494cee23760c2ff8e7f5521bfdbfbbe786ee6e97b02e0e574b",
+      "input_tokens": 7881,
+      "yarn_factor": null,
+      "yarn_original_max_position_embeddings": null,
+      "aligned_reference_attention_calls": 1008,
+      "physical_candidate_score_calls": 504,
+      "physical_candidate_score_successes": 504,
+      "physical_coarse_score_calls": 504,
+      "physical_coarse_score_successes": 504,
+      "physical_avg_score_calls": 504,
+      "physical_avg_score_successes": 504,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 293912,
+          "physical_selected_kv_total": 293912
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 293836,
+          "physical_selected_kv_total": 293836
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016
+        }
+      }
+    },
+    "32768": {
+      "report": "/tmp/frozen-eager-17fd4ef-coarse-layout-ruler-regression/32768/report.json",
+      "report_sha256": "9063264deeee0d2f97bbb3b1b9cbd81a47ea0094ed1810cb4b49dfb19e705f8f",
+      "input_sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+      "input_tokens": 32612,
+      "yarn_factor": null,
+      "yarn_original_max_position_embeddings": null,
+      "aligned_reference_attention_calls": 1008,
+      "physical_candidate_score_calls": 504,
+      "physical_candidate_score_successes": 504,
+      "physical_coarse_score_calls": 504,
+      "physical_coarse_score_successes": 504,
+      "physical_avg_score_calls": 504,
+      "physical_avg_score_successes": 504,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294118,
+          "physical_selected_kv_total": 294118
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294051,
+          "physical_selected_kv_total": 294051
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016
+        }
+      }
+    },
+    "65536": {
+      "report": "/tmp/frozen-eager-17fd4ef-coarse-layout-ruler-regression/65536/report.json",
+      "report_sha256": "a942dd1c95e7fc88a749b54cb8988232ecb179a1ee5322bfb6119e500cf4bb19",
+      "input_sha256": "32e9693f3748a920b60ecd0afefe0f9118cd71aee468a341c3ada311a1d65d2e",
+      "input_tokens": 65441,
+      "yarn_factor": 2.0,
+      "yarn_original_max_position_embeddings": 32768,
+      "aligned_reference_attention_calls": 1008,
+      "physical_candidate_score_calls": 504,
+      "physical_candidate_score_successes": 504,
+      "physical_coarse_score_calls": 504,
+      "physical_coarse_score_successes": 504,
+      "physical_avg_score_calls": 504,
+      "physical_avg_score_successes": 504,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294090,
+          "physical_selected_kv_total": 294090
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294080,
+          "physical_selected_kv_total": 294080
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016
+        }
+      }
+    },
+    "131072": {
+      "report": "/tmp/frozen-eager-17fd4ef-coarse-layout-ruler128k-four-state/report.json",
+      "report_sha256": "855da526c0522862ac18f27904a68dd6f31a781381f964484a804bcb10046a17",
+      "input_sha256": "ac79b7efd20cf65a0cf39009576fdb31969aec5c2a670ba23a529ec207d17869",
+      "input_tokens": 130981,
+      "yarn_factor": 4.0,
+      "yarn_original_max_position_embeddings": 32768,
+      "aligned_reference_attention_calls": 1008,
+      "physical_candidate_score_calls": 504,
+      "physical_candidate_score_successes": 504,
+      "physical_coarse_score_calls": 504,
+      "physical_coarse_score_successes": 504,
+      "physical_avg_score_calls": 504,
+      "physical_avg_score_successes": 504,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294120,
+          "physical_selected_kv_total": 294120
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294093,
+          "physical_selected_kv_total": 294093
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016
+        }
+      }
+    }
+  },
+  "aggregate": {
+    "lengths_passed": 4,
+    "states_passed_per_length": 4,
+    "total_kv_head_steps": 32256,
+    "total_selected_logical_id_mismatches": 0,
+    "all_physical_mappings_valid": true,
+    "all_decode_layer_outputs_bitexact": true,
+    "all_decode_logits_bitexact": true,
+    "all_generated_tokens_equal": true,
+    "all_reported_aggregate_selected_kv_totals_equal": true,
+    "all_instrumented_coarse_avg_candidate_triton_calls_succeeded": true
+  },
+  "tests": {
+    "command": "pytest test_frozen_region_tli.py test_frozen_region_runtime.py test_frozen_region_cache.py test_qwen_frozen_eager_bench.py",
+    "passed": 64,
+    "failed": 0,
+    "python_py_compile": true,
+    "git_diff_check": true
+  },
+  "gpu_hygiene": {
+    "128k_final": {
+      "status": "clean",
+      "locked_gpu": 0,
+      "unique_active_pids": [
+        2534085
+      ],
+      "monitor_gpu0_samples": 606,
+      "post_memory_mib": 1,
+      "post_compute_processes": 0
+    },
+    "8k_32k_64k_regression": {
+      "status": "clean",
+      "locked_gpu": 1,
+      "unique_active_pids": [
+        2549784,
+        2558883,
+        2576545
+      ],
+      "monitor_gpu1_samples": 405,
+      "post_memory_mib": 1,
+      "post_compute_processes": 0
+    },
+    "native_replay": {
+      "status": "clean",
+      "locked_gpu": 1,
+      "post_memory_mib": 1,
+      "post_compute_processes": 0
+    }
+  },
+  "cross_validation": {
+    "assertions_passed": 184,
+    "assertions_failed": 0
+  },
+  "scope": [
+    "PASS 仅覆盖该 Qwen3-8B 请求在 8K/32K/64K/128K、attention backend 对齐后的四态选择、物理映射和逐步输出 parity。",
+    "不宣称原始 dense-torch 与 compact-Triton 不同 attention backend 的数值等价，不外推其他请求、模型、dense 质量或完整生产验收。",
+    "本次只修改 physical selector 的 coarse/avg 归约布局与输入 dtype；不据此宣称 TPOT、显存或生产加速收益。",
+    "诊断 wrapper、捕获与原生重放脚本均在 /tmp，不属于生产 oracle；生产修复提交为 abaf933。"
+  ]
+}
