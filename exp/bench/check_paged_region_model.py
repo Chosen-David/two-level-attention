@@ -4,6 +4,8 @@ Reuses the frozen-region prefill profiler, gate policy and actual TLI selection.
 Known decode replay tokens are not reported as generated-answer throughput.
 """
 import argparse,copy,gc,hashlib,json,os,subprocess,time
+from contextlib import contextmanager
+from unittest.mock import patch
 from pathlib import Path
 import torch
 from transformers import AutoModelForCausalLM,AutoTokenizer
@@ -15,6 +17,42 @@ from sparse_attn.ops.frozen_region_gate import GateConfig,decide_regions
 from sparse_attn.ops.frozen_region_tli import tli_args
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 from benchmark.LongBench.prefill_frozen_skip import capture_profiles
+
+@contextmanager
+def component_profile(kind,enabled):
+    """Separate instrumented pass: CUDA spans include host dispatch idle gaps.
+
+    These measurements are not substituted for uninstrumented ABBA e2e latency.
+    """
+    if not enabled:
+        yield None
+        return
+    from contextlib import ExitStack
+    from sparse_attn.ops import frozen_region_tli as ring, paged_region_tli as paged
+    from sparse_attn.ops.frozen_region_cache import RegionCacheLayer
+    from sparse_attn.ops.paged_region_cache import PagedRegionLayer
+    records=[]
+    def wrap(name,fn):
+        def measured(*args,**kwargs):
+            start=torch.cuda.Event(enable_timing=True);end=torch.cuda.Event(enable_timing=True)
+            start.record();t=time.perf_counter()
+            result=fn(*args,**kwargs)
+            host_ms=(time.perf_counter()-t)*1000;end.record()
+            label=name
+            if name=='cache_update':label+=':prefill' if args[1].shape[-2]>1 else ':decode'
+            records.append((label,host_ms,start,end))
+            return result
+        return measured
+    cls=RegionCacheLayer if kind=='ring' else PagedRegionLayer
+    mod=ring if kind=='ring' else paged
+    selector='region_mask' if kind=='ring' else 'region_selection'
+    attention='eager_decoding_attn' if kind=='ring' else 'paged_attention'
+    with ExitStack() as stack:
+        for owner,attr,name in [(cls,'update','cache_update'),(cls,'freeze','cache_freeze'),
+                                (mod,selector,'selection'),(mod,attention,'attention')]:
+            stack.enter_context(patch.object(owner,attr,wrap(name,getattr(owner,attr))))
+        yield records
+
 
 @torch.inference_mode()
 @eager_decoding_request_guard()
@@ -47,7 +85,7 @@ def trial(model,ids,tokens,decisions,kind,geometry):
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--model',required=True);ap.add_argument('--out',required=True)
     ap.add_argument('--length',type=int,default=4352);ap.add_argument('--steps',type=int,default=65)
-    ap.add_argument('--modes',nargs='+',default=['keep','near','far','both']);ap.add_argument('--cycles',type=int,default=1)
+    ap.add_argument('--modes',nargs='+',default=['keep','near','far','both']);ap.add_argument('--cycles',type=int,default=1);ap.add_argument('--profile-components',action='store_true')
     args=ap.parse_args();root=Path(__file__).resolve().parents[2]
     if args.length<4352 or args.steps<1 or args.cycles<1:raise ValueError('four-state comparison needs >=4352 inputtokens, positive steps/cycles')
     os.environ.update(TLI_FINE_GATHER='0',TLI_OPERATOR_MODE='off',TLI_CUDA_GRAPH='0',TLI_BATCH_INDEXER='legacy')
@@ -80,5 +118,14 @@ def main():
                               same_argmax=bool(torch.equal(logits.argmax(-1),reference.argmax(-1))))
                 result['records'].append(record);destination.write_text(json.dumps(result,indent=2)+'\n')
                 print(mode,kind,record['max_logit_difference'],record['same_argmax'],sum(record['decode_step_ms'])/len(tokens),flush=True)
+        if args.profile_components:
+            for kind in ['ring','paged']:
+                with component_profile(kind,True) as spans:
+                    record,_=trial(model,tensor,tokens,decisions,kind,geometry)
+                record.update(mode=mode,phase='instrumented_excluded_from_ABBA',components=[
+                    dict(component=name,host_dispatch_ms=host,cuda_span_ms=start.elapsed_time(end))
+                    for name,host,start,end in spans])
+                result['records'].append(record)
+                destination.write_text(json.dumps(result,indent=2)+'\n')
     print('DONE pending independent verification',flush=True)
 if __name__=='__main__':main()
