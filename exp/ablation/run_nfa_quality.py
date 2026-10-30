@@ -82,6 +82,7 @@ def main():
     model=AutoModelForCausalLM.from_pretrained(args.model,dtype=torch.bfloat16,device_map='cuda:0',attn_implementation='sdpa').eval()
     if model.config.model_type!='qwen3':raise ValueError('this ablation round is Qwen3 only')
     sparse=treatment(spec)
+    sparse.tli_ablation_allow_zero_swa = args.selection_protocol == 'strict'
     assert register_patch(model,sparse,resolve_treatment_snapshot(sparse))==model.config.num_hidden_layers
     if args.selection_protocol == 'strict':
         for layer in model.model.layers:

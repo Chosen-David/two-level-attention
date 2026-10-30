@@ -59,3 +59,39 @@ def test_retain_and_reclaim_identical_visible_kv(near,far):
         torch.testing.assert_close(a[0],b[0],rtol=0,atol=0)
     assert sum(n.resident_bytes() for n in keep.nodes.values())>=sum(n.resident_bytes() for n in evict.nodes.values())
     if far: assert len(keep.nodes)>len(evict.nodes)
+
+@pytest.mark.parametrize('sink',[0,4,16,64])
+@pytest.mark.parametrize('swa',[0,64,128,256])
+@torch.inference_mode()
+def test_all_protection_cells_dense_equivalence_below_budget(sink,swa):
+    import copy
+    from transformers import Qwen3Config,Qwen3ForCausalLM
+    from transformers.cache_utils import DynamicCache
+    from sparse_attn.patches import register_patch
+    from sparse_attn.info import resolve_treatment_snapshot
+    from sparse_attn.ops.frozen_region_cache import FrozenRegionCache
+    torch.manual_seed(27)
+    config=Qwen3Config(vocab_size=51,hidden_size=256,intermediate_size=384,
+        num_hidden_layers=1,num_attention_heads=2,num_key_value_heads=1,
+        head_dim=128,attention_dropout=0.,max_position_embeddings=1024)
+    model=Qwen3ForCausalLM(config).eval();model.config._attn_implementation='sdpa'
+    dense=copy.deepcopy(model)
+    args=tli_args();args.tli_sink_tokens=sink;args.tli_swa_size=swa
+    args.tli_ablation_allow_zero_swa=True
+    register_patch(model,args,resolve_treatment_snapshot(args))
+    idx=model.model.layers[0].self_attn.indexer
+    idx.ablation_spec=dict(sink=sink,swa=swa,near=4096,k1=128,k2=1024,
+        near_pages=32,partition=True,far_score='minmax',near_score='avg',boundary=True)
+    cache=FrozenRegionCache(1,RegionGeometry(sink=sink,window=swa,max_new_tokens=4));cache.tli_regions=True
+    dc=DynamicCache(config=config)
+    ids=torch.randint(0,51,(1,384))
+    a=model(ids,past_key_values=cache,use_cache=True,logits_to_keep=1)
+    b=dense(ids,past_key_values=dc,use_cache=True,logits_to_keep=1)
+    torch.testing.assert_close(a.logits,b.logits,rtol=0,atol=0)
+    cache.freeze({0:dict(skip_near=False,skip_far=False)})
+    for step in range(3):
+        token=torch.tensor([[step+2]])
+        a=model(token,past_key_values=cache,attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
+        b=dense(token,past_key_values=dc,use_cache=True,logits_to_keep=1)
+        torch.testing.assert_close(a.logits,b.logits,rtol=1e-5,atol=2e-6)
+        assert cache.layers[0].tli_receipt['selected_per_kv_head']==[385+step]

@@ -164,8 +164,8 @@ class TLIIndexer(TIAIndexer):
         self.sink_tokens = int(getattr(args, "tli_sink_tokens", 128))
         if self.sink_tokens < 0:
             raise ValueError("tli_sink_tokens 必须 >= 0")
-        if self.sliding_window_size < 1:
-            raise ValueError("tli_swa_size 必须 >= 1")
+        if self.sliding_window_size < 0 or (self.sliding_window_size == 0 and not getattr(args, "tli_ablation_allow_zero_swa", False)):
+            raise ValueError("tli_swa_size 必须 >= 1 (strict ablation permits zero)")
         # swa 必须块对齐（sink 可子块对齐，StreamingLLM sink=4 兼容）
         _bs = self.args.tia_block_size
         if self.sliding_window_size % _bs != 0:
