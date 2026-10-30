@@ -2,6 +2,8 @@
 
 ## 2026-10-30
 
+- [ ] [TL-DUO-ASSETS-20261030] 按用户要求归档固定官方 DuoAttention 源码与独立环境准备；62文件身份及4项下载回归普通/-O通过。PDF再分发许可未确立、Python3.10/legacy FlashInfer/CUDA构建仍待完成，不称可运行baseline。([详情](task_details/TL-DUO-ASSETS-20261030.md))
+
 - [x] [TL-FROZEN-MAIN-20261030] Integrate accepted independent Near/Far0.05 eager cache reference;84 tests +14 subtests passed. ([details](task_details/TL-FROZEN-MAIN-20261030.md))
 
 
@@ -256,3 +258,7 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 - [ ] [TL-E155D-T7-20261021] 性能浪费点修复（E133c A1-A4/A6 已入库；剩余 .187 独占窗口稳态 bench 同机对照 + 判决 JSON） ([详情](task_details/TL-E155D-T7-20261021.md))
 - [ ] [TL-E155D-T8-20261021] 推送远端 main（全部判决/论文/代码提交后 origin push，含历史挂账） ([详情](task_details/TL-E155D-T8-20261021.md))
 
+
+## 2026-10-30 GLM frozen-region integration
+
+- TL-GLM-FROZEN-20261030：eager B1独立near/far接入及独立验收完成；[详情](task_details/TL-GLM-FROZEN-20261030.md)。

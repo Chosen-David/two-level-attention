@@ -19,9 +19,12 @@ class GateConfig:
             raise ValueError('invalid gate configuration')
 
 
-def profile_regions(q, k, geometry=RegionGeometry(), rows=256, chunk=16):
+def profile_regions(q, k, geometry=RegionGeometry(), rows=256, chunk=16, scale=None):
     if q.ndim != 4 or q.shape[0] != 1 or q.shape[2] != k.shape[2]:
         raise ValueError('one-shot unpadded B=1 prefill required')
+    scale = q.shape[-1] ** -.5 if scale is None else float(scale)
+    if not math.isfinite(scale) or scale <= 0:
+        raise ValueError("attention scale must be finite and positive")
     length = q.shape[2]
     n = min(rows, length)
     heads, dim = q.shape[1], q.shape[-1]
@@ -31,7 +34,7 @@ def profile_regions(q, k, geometry=RegionGeometry(), rows=256, chunk=16):
     for start in range(length-n, length, chunk):
         end = min(start+chunk, length)
         qe = q.detach()[:, :, start:end].float()
-        scores = qe @ kk.transpose(-1, -2) * dim**-.5
+        scores = qe @ kk.transpose(-1, -2) * scale
         qlen = torch.arange(start+1, end+1, device=q.device)[:, None]
         scores.masked_fill_(pos >= qlen, -torch.inf)
         probs = scores.softmax(-1)
