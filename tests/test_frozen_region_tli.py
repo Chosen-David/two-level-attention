@@ -2,6 +2,7 @@ import pytest
 import torch
 from sparse_attn.indexer.tli_indexer import TLIIndexer
 from sparse_attn.ops.frozen_region_tli import region_mask, tli_args
+from sparse_attn.ops.frozen_region_selector import region_mask_physical
 from sparse_attn.ops.frozen_region_cache import RegionCacheLayer, RegionGeometry
 
 @pytest.fixture(autouse=True)
@@ -25,6 +26,55 @@ def test_gate_off_matches_existing_tli_selection(length):
     actual,receipt=region_mask(idx,q,k,list(range(length)),length,128**-.5)
     assert receipt['dimensions']==list(range(48,64))+list(range(112,128))
     assert torch.equal(actual,expected), (actual!=expected).sum().item()
+
+
+@pytest.mark.parametrize('length',[127,4231,4301])
+@pytest.mark.parametrize('near,far',[(False,False),(False,True),(True,False),(True,True)])
+@torch.inference_mode()
+def test_physical_l1_l2_indices_match_reference_after_ring_wraps(monkeypatch,length,near,far):
+    torch.manual_seed(712)
+    layer=RegionCacheLayer(RegionGeometry(max_new_tokens=80))
+    x=torch.randn(1,2,length,128);layer.update(x,x)
+    layer.freeze(skip_near=near,skip_far=far,physical_arena=True)
+    for _ in range(65):
+        kv=torch.randn(1,2,1,128);layer.append_decode(kv,kv)
+    q=torch.randn(1,1,8,128)
+    k,_,positions=layer.gather()
+    reference=TLIIndexer(tli_args());reference.layer_idx=0;reference.skip_far=far
+    topk_calls=[]
+    original=torch.topk
+    def capture_topk(input,k,*args,**kwargs):
+        output=original(input,k,*args,**kwargs)
+        topk_calls.append(output.indices.detach().clone())
+        return output
+    monkeypatch.setattr(torch,'topk',capture_topk)
+    expected,_=region_mask(reference,q,k.transpose(1,2),positions,
+                           layer.logical_length,128**-.5)
+    monkeypatch.setattr(torch,'topk',original)
+    idx=TLIIndexer(tli_args());idx.layer_idx=0;idx.skip_far=far
+    intermediates={}
+    actual,receipt=region_mask_physical(idx,q,layer,128**-.5,intermediates)
+    assert torch.equal(actual,expected), (actual!=expected).sum().item()
+    if near and far:
+        assert receipt['l1_calls']==receipt['l2_topk_calls']==0
+        assert intermediates['l1'] is None
+        return
+    assert len(topk_calls) in (2,3)  # 空 near 池不调用 topk。
+    l1=intermediates['l1']
+    assert torch.equal(l1['i_f'],topk_calls[0]+l1['far_pool_lo'])
+    if len(topk_calls)==3:
+        assert torch.equal(l1['i_n'],topk_calls[1]+l1['near_pool_lo'])
+    else:
+        assert l1['i_n'].numel()==0
+    expected_l2=topk_calls[-1][0,0]+l1['far_lo_blk']*l1['bs']
+    # topk 排名次序不被 mask scatter 消费；紧凑 fine GEMM 的归约顺序
+    # 可改变近邻名次，但最终选中集合必须逐项一致。
+    assert torch.equal(intermediates['l2_indices'].sort(-1).values,
+                       expected_l2.sort(-1).values)
+    candidate_ids=intermediates['candidate_ids']
+    candidate_valid=intermediates['candidate_valid']
+    visible=layer.visible_mask(candidate_ids.clamp(0,layer.logical_length-1))
+    assert not (candidate_valid & ~visible).any()
 
 @pytest.mark.parametrize('near,far',[(False,True),(True,False),(True,True)])
 @torch.inference_mode()

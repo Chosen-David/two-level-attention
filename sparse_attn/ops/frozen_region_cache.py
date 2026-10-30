@@ -208,6 +208,17 @@ class RegionCacheLayer(CacheLayerMixin):
             node = node.next
         return torch.cat(ranges)
 
+    def visible_mask(self, positions):
+        """绝对逻辑位置是否属于当前 attention-visible 区域。"""
+        visible = torch.zeros_like(positions, dtype=torch.bool)
+        node = self.head
+        while node is not None:
+            if node.size and node.attention_visible:
+                first = node.first_position
+                visible |= (positions >= first) & (positions < first+node.size)
+            node = node.next
+        return visible
+
     def physical_positions(self, positions):
         """绝对逻辑 token ID → arena 槽位；全程 device 端整数运算。"""
         if self.arena_k is None:
