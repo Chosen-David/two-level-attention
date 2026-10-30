@@ -13,9 +13,11 @@ from sparse_attn.ops.frozen_region_cache import FrozenRegionCache,RegionGeometry
 from sparse_attn.ops.paged_region_cache import PagedRegionCache
 from sparse_attn.ops.frozen_region_gate import GateConfig,decide_regions
 from sparse_attn.ops.frozen_region_tli import tli_args
+from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 from benchmark.LongBench.prefill_frozen_skip import capture_profiles
 
 @torch.inference_mode()
+@eager_decoding_request_guard()
 def trial(model,ids,tokens,decisions,kind,geometry):
     for layer in model.model.layers:layer.self_attn.indexer.clear();layer.self_attn.indexer.skip_far=False
     cls=FrozenRegionCache if kind=='ring' else PagedRegionCache
@@ -47,6 +49,7 @@ def main():
     ap.add_argument('--length',type=int,default=4352);ap.add_argument('--steps',type=int,default=65)
     ap.add_argument('--modes',nargs='+',default=['keep','near','far','both']);ap.add_argument('--cycles',type=int,default=1)
     args=ap.parse_args();root=Path(__file__).resolve().parents[2]
+    if args.length<4352 or args.steps<1 or args.cycles<1:raise ValueError('four-state comparison needs >=4352 inputtokens, positive steps/cycles')
     os.environ.update(TLI_FINE_GATHER='0',TLI_OPERATOR_MODE='off',TLI_CUDA_GRAPH='0',TLI_BATCH_INDEXER='legacy')
     torch.manual_seed(42);torch.set_num_threads(6)
     tokenizer=AutoTokenizer.from_pretrained(args.model)
@@ -66,7 +69,7 @@ def main():
         # Full-state forcing is a diagnostic, not input-calibrated task quality.
         reference=None
         for kind in ['ring','paged']:
-            warm,_=trial(model,tensor,tokens[:min(2,len(tokens))],decisions,kind,geometry)
+            warm,_=trial(model,tensor,tokens,decisions,kind,geometry)
             warm.update(mode=mode,phase='warmup_excluded_from_comparison')
             result['records'].append(warm)
         for cycle in range(args.cycles):

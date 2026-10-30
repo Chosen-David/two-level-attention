@@ -13,8 +13,8 @@ except ImportError:
 
 if triton is not None:
     @triton.jit
-    def _project(KPTR,DIMS,OUT,L:tl.constexpr,PAD:tl.constexpr,H:tl.constexpr,D:tl.constexpr,R:tl.constexpr,P:tl.constexpr,
-                 S:tl.constexpr,F:tl.constexpr,N:tl.constexpr,SN:tl.constexpr,SF:tl.constexpr,B:tl.constexpr):
+    def _project(KPTR,DIMS,OUT,L,PAD:tl.constexpr,H:tl.constexpr,D:tl.constexpr,R:tl.constexpr,P:tl.constexpr,
+                 S,F,N,SN:tl.constexpr,SF:tl.constexpr,B:tl.constexpr):
         i=tl.program_id(0)*B+tl.arange(0,B)
         rid=i%R;head=(i//R)%H;pos=i//(R*H)
         valid=(i<PAD*H*R)&(pos<L)
