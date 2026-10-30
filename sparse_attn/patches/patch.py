@@ -49,7 +49,7 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
     dense 输出被打上稀疏方法标签（实验结论污染）。改为：
       ① 返回 patch 计数（调用方可显式校验）；
       ② method≠none 且 patched=0 时显式 raise 拒绝。
-    GLM 说明：仅真实 47 层 Glm4MoeLiteAttention + 已验证 D=256 tail32
+    GLM 说明：仅真实 47 层 Glm4MoeLiteAttention + 已验证 D=256 NoPE64
     生产子集注册；其余 GLM 架构或配置继续 fail-closed。
 
     【081（TL-E121-OUTPUT-SNAPSHOT-081）】snapshot：生产入口在模型

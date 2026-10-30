@@ -1,10 +1,11 @@
 import copy
 import pytest
 import torch
+from types import SimpleNamespace
 from sparse_attn.ops.frozen_region_cache import RegionGeometry,RegionCacheLayer,FrozenRegionCache
 from sparse_attn.ops.paged_region_cache import PagedRegionLayer,PagedRegionCache
 from sparse_attn.ops.frozen_region_tli import region_mask,tli_args
-from sparse_attn.ops.paged_region_tli import region_selection
+from sparse_attn.ops.paged_region_tli import region_selection,decode
 from sparse_attn.ops.paged_region_kernels import paged_attention
 from sparse_attn.indexer.tli_indexer import TLIIndexer
 
@@ -84,3 +85,60 @@ def test_both_skip_has_zero_selector_calls_and_attention_reads_only_protected_pa
     actual=paged_attention(layer,q,mask,128**-.5)
     assert torch.isfinite(actual).all()
     torch.testing.assert_close(actual,expected,atol=2e-6,rtol=2e-6)
+
+
+@torch.inference_mode()
+def test_both_skip_uses_cache_geometry_not_independent_indexer_geometry():
+    layer=PagedRegionLayer(RegionGeometry(sink=2,near=8,window=4,page=4,max_new_tokens=8))
+    k=torch.randn(1,2,32,128);layer.update(k,k);layer.freeze(True,True)
+    idx=TLIIndexer(tli_args());idx.layer_idx=0
+    assert (idx.sink_tokens,idx.sliding_window_size)==(4,128)
+    mask,receipt=region_selection(idx,torch.randn(1,2,1,128),layer,128**-.5)
+    expected=[0,1,28,29,30,31]
+    assert layer.visible_positions()==expected
+    assert mask.any(dim=(0,1,2)).nonzero().flatten().tolist()==expected
+    assert receipt['selected_per_kv_head']==[len(expected),len(expected)]
+    paged_attention(layer,torch.randn(1,2,1,128),mask,128**-.5)
+
+
+@torch.inference_mode()
+def test_decode_rejects_invalid_selector_before_committing_kv(monkeypatch):
+    length=32;cache=PagedRegionCache(1,RegionGeometry(max_new_tokens=8))
+    k=torch.randn(1,1,length,128);cache.update(k,k,0)
+    cache.freeze({0:dict(skip_near=False,skip_far=False)})
+    idx=TLIIndexer(tli_args());idx.layer_idx=0
+    module=SimpleNamespace(layer_idx=0,indexer=idx,scaling=128**-.5)
+    q=torch.randn(1,1,1,128);nk=torch.randn(1,1,1,128)
+    before=cache.report();monkeypatch.setenv('TLI_FINE_GATHER','1')
+    with pytest.raises(ValueError,match='TLI_FINE_GATHER=0'):
+        decode(module,q,nk,nk,cache,torch.tensor([length]))
+    assert cache.report()==before and cache.layers[0].tli_receipt is None
+    monkeypatch.setenv('TLI_FINE_GATHER','0')
+    decode(module,q,nk,nk,cache,torch.tensor([length]))
+    assert cache.layers[0].logical_length==length+1
+
+
+@pytest.mark.parametrize('route', ['operator','graph'])
+@torch.inference_mode()
+def test_qwen_paged_rejects_non_eager_routes_before_decode(monkeypatch,route):
+    from transformers import Qwen3Config,Qwen3ForCausalLM
+    from sparse_attn.patches import register_patch
+    from sparse_attn.info import resolve_treatment_snapshot
+    torch.manual_seed(91)
+    cfg=Qwen3Config(vocab_size=51,hidden_size=256,intermediate_size=384,
+        num_hidden_layers=1,num_attention_heads=2,num_key_value_heads=1,
+        head_dim=128,attention_dropout=0.,max_position_embeddings=10000)
+    model=Qwen3ForCausalLM(cfg).eval();model.config._attn_implementation='sdpa'
+    args=tli_args();register_patch(model,args,resolve_treatment_snapshot(args))
+    cache=PagedRegionCache(1)
+    model(torch.randint(0,51,(1,32)),past_key_values=cache,use_cache=True,logits_to_keep=1)
+    cache.freeze({0:dict(skip_near=True,skip_far=True)})
+    before=cache.report()
+    if route=='operator':monkeypatch.setenv('TLI_OPERATOR_MODE','serial')
+    else:
+        monkeypatch.setattr('sparse_attn.ops.cuda_graph_state.graph_state',
+                            lambda:SimpleNamespace(enabled=True))
+    with pytest.raises(ValueError,match='eager B1'):
+        model(torch.tensor([[2]]),past_key_values=cache,
+              attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
+    assert cache.report()==before

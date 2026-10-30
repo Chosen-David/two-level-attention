@@ -48,6 +48,13 @@ def run(cli):
     rows=rows[:cli.batch]
     ids=[tokenizer(row['input'],return_tensors='pt').input_ids.to('cuda') for row in rows]
     lengths=[x.shape[-1] for x in ids]
+    capacity=max(lengths)+cli.max_gen
+    if cli.batch>1 and not cli.legacy_graph_candidate and capacity>=65536:
+        # tiled DeviceDecodeInputs 已解除 B1/legacy 的 65536 mask 限制，
+        # 但默认 B>1 candidate 的 exact_linear_batch 仍明确不支持该容量。
+        # 在 prefill 前拒绝，不能让上层 runner 宣称 B2/B4 长上下文已放开。
+        raise ValueError('B>1 exact batch requires capacity < 65536; '
+                         'use B1/legacy Graph for long-context device inputs')
     if min(lengths)<9217:
         raise ValueError('live normalization requires prompt lengths >= 9217')
     records=[]

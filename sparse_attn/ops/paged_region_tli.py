@@ -4,18 +4,26 @@ import torch
 from .paged_region_kernels import paged_attention
 
 
+def _validate_indexer(idx):
+    if os.environ.get('TLI_FINE_GATHER','1')!='0':
+        raise ValueError('paged reference requires TLI_FINE_GATHER=0')
+    supported_subspace=(idx.subspace=='tail' or
+                        (idx.subspace=='nope' and idx.head_dim==256))
+    if (not supported_subspace or idx.l2_subspace!='same' or idx.gamma is not None or idx._basis_all is not None
+        or idx.far_select!='4bit' or idx.near_select!='4bit' or idx.per_q_head or idx.enable_async):
+        raise ValueError('paged reference supports shared-head tail TLI or GLM D=256 NoPE64 only')
+
+
 def region_selection(indexer,q,layer,scale):
     idx=indexer
-    if os.environ.get('TLI_FINE_GATHER','1')!='0':raise ValueError('paged reference requires TLI_FINE_GATHER=0')
-    if (idx.subspace!='tail' or idx.l2_subspace!='same' or idx.gamma is not None or idx._basis_all is not None
-        or idx.far_select!='4bit' or idx.near_select!='4bit' or idx.per_q_head or idx.enable_async):
-        raise ValueError('paged reference supports ordinary shared-head tail TLI')
+    _validate_indexer(idx)
     length=layer.logical_length
     if layer.skip_near and layer.skip_far:
-        # Near/Far 均已物理回收，唯一合法支持集是永久保护的 Sink+SWA。
+        # Near/Far 均已物理回收，唯一合法支持集就是缓存实际可见的 Sink+SWA。
+        # 直接使用缓存几何，禁止 indexer 的另一套几何重新选中已回收页面。
         # 不构造投影、不运行 L1/L2，也不通过 top-k 重新发现已删除区域。
-        logical=torch.arange(length,device=q.device)
-        protected=(logical<idx.sink_tokens)|(logical>=max(0,length-idx.sliding_window_size))
+        protected=torch.zeros(length,device=q.device,dtype=torch.bool)
+        for a,b in layer.intervals():protected[a:b]=True
         key_heads=next(iter(layer.pages.values()))[1].shape[1]
         mask=protected[None,None,None].expand(1,1,key_heads,length)
         receipt=dict(subspace=idx.subspace,dimensions=[],logical_tokens=length,
@@ -48,6 +56,14 @@ def region_selection(indexer,q,layer,scale):
 def decode(module,q,k,v,cache,cache_position):
     layer=cache.layers[module.layer_idx]
     if not layer.frozen:raise ValueError('freeze before paged decode')
+    # 所有确定性配置/形状准入必须先于 KV 提交；失败后同一 cache_position
+    # 仍可修正配置并重试，不得把请求留在已追加但未 decode 的半完成状态。
+    _validate_indexer(module.indexer)
+    if (q.ndim!=4 or k.ndim!=4 or q.shape[0]!=1 or q.shape[2]!=1
+            or k.shape[1]<1 or q.shape[1]%k.shape[1] or q.shape[-1]!=k.shape[-1]):
+        raise ValueError('paged decode requires B1 single-token GQA with matching QK width')
+    if q.dtype!=k.dtype or q.device!=k.device:
+        raise ValueError('paged decode requires matching Q/K dtype and device')
     cache.update_for_paged_decode(k,v,module.layer_idx,dict(cache_position=cache_position))
     module.indexer.skip_far=layer.skip_far
     mask,receipt=region_selection(module.indexer,q,layer,module.scaling)

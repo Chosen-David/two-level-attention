@@ -28,6 +28,23 @@ def test_warmup_streams_reuse_only_thread_device_without_request_owners(monkeypa
     assert len(created)==4
 
 
+def test_device_revision_invalidates_eager_graph_geometry_cache():
+    from sparse_attn.indexer import tli_indexer
+    valid_len=torch.zeros(1,dtype=torch.long)
+    geo=object();tli_indexer._GRAPH_GEO_CACHE.clear()
+    try:
+        assert tli_indexer._graph_geo_store(valid_len,'geometry',geo) is geo
+        assert tli_indexer._graph_geo_lookup(valid_len,'geometry') is geo
+        valid_len._tli_device_revision=1
+        assert tli_indexer._graph_geo_lookup(valid_len,'geometry') is None
+        tli_indexer._graph_geo_store(valid_len,'geometry',geo)
+        assert tli_indexer._graph_geo_lookup(valid_len,'geometry') is geo
+        valid_len._tli_device_revision=2
+        assert tli_indexer._graph_geo_lookup(valid_len,'geometry') is None
+    finally:
+        tli_indexer._GRAPH_GEO_CACHE.clear()
+
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires reserved GPU0')
 @pytest.mark.parametrize('batch,capacity', [(1,16384),(2,16400),(4,32768),(8,32785),
                                            (1,65537),(2,131072)])

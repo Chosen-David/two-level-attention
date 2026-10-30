@@ -333,8 +333,21 @@ def qwen3_attn_forward(
 
     # Request-local segmented cache owns logical/physical position mapping.
     if getattr(past_key_values, "tli_regions", False):
+        from ..ops.cuda_graph_state import graph_state
+        ctx = batch_decode_ctx()
+        if ((ctx is not None and ctx.batch != 1) or graph_state().enabled
+                or os.environ.get("TLI_OPERATOR_MODE", "off") != "off"):
+            raise ValueError("Qwen frozen regions require eager B1 with operator mode off")
+        if input_shape[0] != 1 or self.indexer.dyn_dgate:
+            raise ValueError("Qwen frozen regions require B1 and independent region gates")
         layer = past_key_values.layers[self.layer_idx]
         if layer.logical_length:
+            owned_mask = (attention_mask is None or (
+                isinstance(attention_mask, dict)
+                and set(attention_mask) == {"full_attention"}
+                and attention_mask["full_attention"] is None))
+            if input_shape[1] != 1 or not layer.frozen or not owned_mask:
+                raise ValueError("Qwen frozen regions require frozen unpadded single-token decode")
             if getattr(past_key_values, "paged_regions", False):
                 from ..ops.paged_region_tli import decode as region_decode
             else:

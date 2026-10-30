@@ -57,7 +57,10 @@ _GRAPH_GEO_CACHE = {}  # step-level geometry cache (shared by 36 per-layer index
 
 def _graph_geo_lookup(valid_len, geo_key):
     try:
-        version = valid_len._version
+        # DeviceDecodeInputs 的 Triton 写入不推进 PyTorch version counter，
+        # 额外消费其逐步调用的显式修订号，避免 eager 跨步复用旧 S_real。
+        version = (valid_len._version,
+                   getattr(valid_len, '_tli_device_revision', 0))
     except RuntimeError:  # inference_mode tensors have no mutation counter
         return None
     ent = _GRAPH_GEO_CACHE.get(valid_len.data_ptr())
@@ -70,7 +73,8 @@ def _graph_geo_lookup(valid_len, geo_key):
 
 def _graph_geo_store(valid_len, geo_key, geo):
     try:
-        version = valid_len._version
+        version = (valid_len._version,
+                   getattr(valid_len, '_tli_device_revision', 0))
     except RuntimeError:
         return geo  # Never reuse geometry without a reliable mutation version.
     if len(_GRAPH_GEO_CACHE) > 8:   # 上限清理（B>1 行缓存 + 防无界增长）
