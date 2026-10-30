@@ -129,6 +129,13 @@ L1/L2 counts, allocated/reserved peaks and decode TPOT. Profiler traces are sepa
 from timing runs. A report is evidence, not an automatic equivalence or speedup
 verdict; inspect generation parity and the GPU hygiene log first.
 
+直接调用 harness 时可加 `--trace-decode`，仅在 correctness 臂保存每一步、每一层、
+每个 KV head 的最终逻辑 selected IDs；物理臂还保存实际 attention 消费的物理槽位及
+其逻辑映射校验。配对比较会列出差异所在的 step/layer/head。该开关默认关闭，
+performance、profiler 和普通 RULER 请求不采集这些大张量，也不能用开启开关后的耗时
+替代既有 TPOT。关闭时报告结构保持原样；它补充支持集身份证据，不代表 dense 质量或
+bit-exact 验收。
+
 ## Accepted evidence and limits
 
 Historical full evaluation: source `3e4a6885604ac3e719ee92a4906f87b532535314`,

@@ -65,11 +65,55 @@ def test_device_receipt_values_are_converted_once_at_request_boundary():
         model, torch.tensor([[2, 3, 4, 5]]), GateConfig(mode='full'),
         RegionGeometry(sink=1, near=4, window=2, page=2, max_new_tokens=3))
     model._frozen_tli = True
-    for layer in output.past_key_values.layers:
+    cache = output.past_key_values
+    cache.decode_trace_enabled = True
+    for layer in cache.layers:
         layer.tli_receipt = {'selected': torch.tensor([1, 2]), 'l1_calls': 1}
-    receipt = complete_frozen_request(model, output.past_key_values, 2, audit)
+        layer.tli_decode_trace = [dict(
+            decode_step=0, selected_logical_ids=torch.tensor([[1, 2]]))]
+    receipt = complete_frozen_request(model, cache, 2, audit)
     assert receipt['tli_receipts'][0]['selected'] == [1, 2]
+    assert receipt['tli_decode_trace'][0][0]['selected_logical_ids'] == [[1, 2]]
     json.dumps(receipt)
+
+
+@torch.inference_mode()
+def test_incomplete_decode_trace_is_rejected_before_commit():
+    model = _model()
+    output, audit = prefill_frozen_request(
+        model, torch.tensor([[2, 3, 4, 5]]), GateConfig(mode='full'),
+        RegionGeometry(sink=1, near=4, window=2, page=2, max_new_tokens=3))
+    model._frozen_tli = True
+    cache = output.past_key_values
+    cache.decode_trace_enabled = True
+    for layer in cache.layers:
+        layer.tli_receipt = {'selected': torch.tensor([1]), 'l1_calls': 1}
+        layer.tli_decode_trace = []
+    with pytest.raises(ValueError, match='incomplete TLI decode trace at layer 0'):
+        complete_frozen_request(model, cache, 3, audit)
+
+
+def test_decode_trace_comparison_locates_head_and_validates_physical_mapping():
+    from exp.bench.check_qwen_frozen_eager import compare_decode_traces
+    reference = {'tli_decode_trace': {0: [
+        dict(decode_step=0, selected_logical_ids=[[1, 4, -1], [2, 5, -1]]),
+        dict(decode_step=1, selected_logical_ids=[[1, 4, 7], [2, 5, 8]])]}}
+    physical = {'tli_decode_trace': {0: [
+        dict(decode_step=0, selected_logical_ids=[[1, 4, -1], [2, 6, -1]],
+             physical_mapping_matches=True),
+        dict(decode_step=1, selected_logical_ids=[[1, 4, 7], [2, 5, 8]],
+             physical_mapping_matches=False)]}}
+    comparison = compare_decode_traces(reference, physical)
+    assert comparison['compared_steps'] == 2
+    assert comparison['compared_kv_head_steps'] == 4
+    assert not comparison['all_selected_logical_ids_equal']
+    assert not comparison['all_physical_mappings_valid']
+    assert comparison['mismatch_count'] == 1
+    assert comparison['mismatches'][0] == dict(
+        layer_idx=0, decode_step=0, kv_head=1,
+        reference_count=2, physical_count=2,
+        reference_selected_logical_ids=[2, 5, -1],
+        physical_selected_logical_ids=[2, 6, -1])
 
 
 @torch.inference_mode()

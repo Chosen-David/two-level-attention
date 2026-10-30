@@ -1,5 +1,6 @@
 import pytest
 import torch
+from types import SimpleNamespace
 from sparse_attn.indexer.tli_indexer import TLIIndexer
 from sparse_attn.ops.frozen_region_tli import region_mask, tli_args
 from sparse_attn.ops.frozen_region_selector import region_mask_physical
@@ -187,3 +188,52 @@ def test_patched_qwen_segmented_logits_match_logical_reference(monkeypatch,near,
                              'protected_only' if near and far else
                              'physical_l1_original_free_topk')
         assert cache.layers[0].tli_receipt['selector']==expected_selector
+
+
+@pytest.mark.parametrize('physical',[False,True])
+@torch.inference_mode()
+def test_decode_trace_is_opt_in_and_retains_every_step(monkeypatch,physical):
+    torch.manual_seed(527)
+    layer=RegionCacheLayer(RegionGeometry(max_new_tokens=8))
+    x=torch.randn(1,2,4301,128);layer.update(x,x)
+    layer.freeze(skip_near=False,skip_far=False,physical_arena=physical)
+    cache=SimpleNamespace(
+        layers=[layer],decode_trace_enabled=False,
+        update=lambda k,v,layer_idx,kwargs: layer.update(k,v,kwargs))
+    idx=TLIIndexer(tli_args());idx.layer_idx=0
+    module=SimpleNamespace(layer_idx=0,indexer=idx,scaling=128**-.5)
+    monkeypatch.setenv('TLI_FROZEN_EAGER_REFERENCE','0' if physical else '1')
+    monkeypatch.setattr('sparse_attn.ops.frozen_region_tli.eager_decoding_attn',
+                        lambda *args,**kwargs: None)
+    monkeypatch.setattr('sparse_attn.ops.frozen_region_tli.eager_decoding_attn_physical',
+                        lambda *args,**kwargs: None)
+    from sparse_attn.ops.frozen_region_tli import decode
+
+    def one_step(token):
+        q=torch.randn(1,8,1,128);kv=torch.randn(1,2,1,128)
+        decode(module,q,kv,kv,cache,torch.tensor([layer.logical_length]))
+
+    one_step(0)
+    assert not hasattr(layer,'tli_decode_trace')
+    cache.decode_trace_enabled=True
+    for token in range(1,4):
+        one_step(token)
+    trace=layer.tli_decode_trace
+    assert [entry['decode_step'] for entry in trace]==[1,2,3]
+    assert len(trace)==3
+    for entry in trace:
+        logical=entry['selected_logical_ids']
+        counts=torch.as_tensor(entry['selected_per_kv_head'])
+        assert torch.equal((logical>=0).sum(-1,dtype=torch.int32),counts)
+        for row,count in zip(logical,counts):
+            selected_count=int(count)
+            assert torch.equal(row[:selected_count].sort().values,row[:selected_count])
+            assert (row[selected_count:]==-1).all()
+        if physical:
+            assert entry['physical_mapping_matches'].item()
+            assert entry['selected_physical_ids'].shape==logical.shape
+        else:
+            assert 'selected_physical_ids' not in entry
+    assert torch.equal(torch.as_tensor(trace[-1]['selected_per_kv_head']),
+                       torch.as_tensor(layer.tli_receipt['selected_per_kv_head']))
+    assert trace[-1]['logical_tokens']==layer.logical_length

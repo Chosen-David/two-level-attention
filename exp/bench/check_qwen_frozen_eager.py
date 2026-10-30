@@ -91,7 +91,7 @@ def _public_result(result, include_audit=False):
 
 @torch.inference_mode()
 def run_request(model, ids, max_new, arm, state, device, capture=False,
-                forced_tokens=None, profile_path=None):
+                forced_tokens=None, profile_path=None, trace_decode=False):
     reference = arm == 'reference'
     os.environ['TLI_FROZEN_EAGER_REFERENCE'] = '1' if reference else '0'
     gc.collect()
@@ -107,6 +107,7 @@ def run_request(model, ids, max_new, arm, state, device, capture=False,
         out, audit = prefill_frozen_request(
             model, ids, GateConfig(mode='dual'), RegionGeometry(max_new_tokens=max_new))
     cache = out.past_key_values
+    cache.decode_trace_enabled = trace_decode
     _sync(device)
     prefill_done = time.perf_counter()
     prefill_memory = _memory(device)
@@ -191,10 +192,54 @@ def _max_delta(left, right):
     return max((a-b).abs().max().item() for a, b in zip(left, right))
 
 
+def compare_decode_traces(reference_audit, physical_audit):
+    """逐 step/layer/KV-head 对拍最终逻辑支持集，并检查物理槽位映射。"""
+    reference = reference_audit['tli_decode_trace']
+    physical = physical_audit['tli_decode_trace']
+    if set(reference) != set(physical):
+        raise ValueError('decode trace layer sets differ')
+    mismatches = []
+    compared_steps = compared_heads = 0
+    physical_mappings_valid = True
+    for layer_idx in sorted(reference):
+        reference_steps = reference[layer_idx]
+        physical_steps = physical[layer_idx]
+        if len(reference_steps) != len(physical_steps):
+            raise ValueError(f'decode trace length differs at layer {layer_idx}')
+        for reference_entry, physical_entry in zip(reference_steps, physical_steps):
+            if reference_entry['decode_step'] != physical_entry['decode_step']:
+                raise ValueError(f'decode trace step differs at layer {layer_idx}')
+            compared_steps += 1
+            physical_mappings_valid = (
+                physical_mappings_valid and
+                physical_entry.get('physical_mapping_matches', True))
+            reference_ids = reference_entry['selected_logical_ids']
+            physical_ids = physical_entry['selected_logical_ids']
+            if len(reference_ids) != len(physical_ids):
+                raise ValueError(f'decode trace head count differs at layer {layer_idx}')
+            for kv_head, (expected, actual) in enumerate(zip(reference_ids, physical_ids)):
+                compared_heads += 1
+                if expected != actual:
+                    mismatches.append(dict(
+                        layer_idx=layer_idx,
+                        decode_step=reference_entry['decode_step'], kv_head=kv_head,
+                        reference_count=sum(position >= 0 for position in expected),
+                        physical_count=sum(position >= 0 for position in actual),
+                        reference_selected_logical_ids=expected,
+                        physical_selected_logical_ids=actual))
+    return dict(
+        schema='frozen-decode-trace-comparison-v1',
+        compared_layers=len(reference), compared_steps=compared_steps,
+        compared_kv_head_steps=compared_heads,
+        all_selected_logical_ids_equal=not mismatches,
+        all_physical_mappings_valid=physical_mappings_valid,
+        mismatch_count=len(mismatches), mismatches=mismatches)
+
+
 def compare_pair(reference, physical):
     layer_delta = _max_delta(reference['captured_layers'], physical['captured_layers'])
     logit_delta = _max_delta(reference['captured_logits'], physical['captured_logits'])
-    return dict(
+    comparison = dict(
         decisions_equal=reference['audit']['decisions'] == physical['audit']['decisions'],
         generated_equal=reference['generated_ids'] == physical['generated_ids'],
         reference_generated=reference['generated_ids'],
@@ -203,6 +248,14 @@ def compare_pair(reference, physical):
         logits_max_abs=logit_delta,
         decode_layer_tensors=len(reference['captured_layers']),
         decode_logit_tensors=len(reference['captured_logits']))
+    reference_traced = 'tli_decode_trace' in reference['audit']
+    physical_traced = 'tli_decode_trace' in physical['audit']
+    if reference_traced != physical_traced:
+        raise ValueError('decode trace is missing from one arm')
+    if reference_traced:
+        comparison['decode_trace'] = compare_decode_traces(
+            reference['audit'], physical['audit'])
+    return comparison
 
 
 def performance_summary(runs):
@@ -239,6 +292,8 @@ def main():
     parser.add_argument('--mode', choices=['correctness', 'performance', 'all'], default='all')
     parser.add_argument('--reps', type=int, default=1)
     parser.add_argument('--profile', action='store_true')
+    parser.add_argument('--trace-decode', action='store_true',
+        help='correctness-only：保存逐步逻辑/物理支持集；performance 始终关闭')
     parser.add_argument('--out', required=True)
     args = parser.parse_args()
     if args.max_new < 2 or args.reps < 1 or args.row < 0:
@@ -280,6 +335,8 @@ def main():
                         rope_scaling['original_max_position_embeddings'] if rope_scaling else None),
                     runtime_max_position_embeddings=config.max_position_embeddings,
                     torch=torch.__version__, tli_args=vars(tli))
+    if args.trace_decode:
+        protocol['correctness_decode_trace'] = True
     (outdir/'protocol.json').write_text(json.dumps(protocol, indent=2, default=str)+'\n')
     report = dict(protocol=protocol, correctness=[], performance=[])
     states = args.states.split(',')
@@ -292,10 +349,12 @@ def main():
             else:
                 raise ValueError(f'unknown state {state}')
             reference = run_request(model, ids, args.max_new, 'reference',
-                                    decision_state, device, capture=True)
+                                    decision_state, device, capture=True,
+                                    trace_decode=args.trace_decode)
             physical = run_request(model, ids, args.max_new, 'physical',
                                    decision_state, device, capture=True,
-                                   forced_tokens=reference['generated_ids'])
+                                   forced_tokens=reference['generated_ids'],
+                                   trace_decode=args.trace_decode)
             comparison = compare_pair(reference, physical)
             comparison['state'] = state
             report['correctness'].append(dict(

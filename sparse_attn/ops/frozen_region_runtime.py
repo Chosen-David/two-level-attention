@@ -90,6 +90,19 @@ def complete_frozen_request(model, cache, generated_count, audit):
     if getattr(model, '_frozen_tli', False) and generated_count > 1:
         if not all(receipts.values()):
             raise ValueError('missing real TLI decode receipts')
+    if getattr(cache, 'decode_trace_enabled', False):
+        traces = {
+            layer_idx: getattr(layer, 'tli_decode_trace', [])
+            for layer_idx, layer in enumerate(cache.layers)
+        }
+        if getattr(model, '_frozen_tli', False):
+            expected_steps = max(0, generated_count-1)
+            for layer_idx, entries in traces.items():
+                steps = [entry.get('decode_step') for entry in entries]
+                if steps != list(range(expected_steps)):
+                    raise ValueError(
+                        f'incomplete TLI decode trace at layer {layer_idx}: {steps}')
+        audit['tli_decode_trace'] = traces
     counts = {name: 0 for name in ('keep', 'near', 'far', 'both')}
     for decision in audit['decisions'].values():
         state = ('both' if decision['skip_near'] and decision['skip_far'] else
