@@ -22,7 +22,7 @@ class RegionGeometry:
     def __post_init__(self):
         for name in ('sink', 'near', 'window', 'page', 'max_new_tokens'):
             value = getattr(self, name)
-            if isinstance(value, bool) or not isinstance(value, int) or value < (0 if name == 'sink' else 1):
+            if isinstance(value, bool) or not isinstance(value, int) or value < (0 if name in ('sink', 'window') else 1):
                 raise ValueError(f'invalid {name}: {value}')
 
     def bounds(self, length):
@@ -92,8 +92,9 @@ class RegionCacheLayer(CacheLayerMixin):
     is_compileable = False
     is_sliding = False
 
-    def __init__(self, geometry):
+    def __init__(self, geometry, reclaim=True):
         super().__init__()
+        self.reclaim = reclaim
         self.geometry = geometry
         self.nodes = {}
         self.head = None
@@ -119,11 +120,13 @@ class RegionCacheLayer(CacheLayerMixin):
         if not self.logical_length:
             raise ValueError('prefill required before freeze')
         for name, evict in (('near', skip_near and skip_far), ('far', skip_far)):
-            if evict:
+            if evict and not self.reclaim:
+                self.nodes[name].attention_visible = False
+            if evict and self.reclaim:
                 node = self.nodes.pop(name)
                 self.permanently_dropped += node.size
                 node.next = None
-        if skip_near and not skip_far:
+        if skip_near and (not skip_far or not self.reclaim):
             node = self.nodes.pop('near')
             node.name = 'near_staging'
             node.attention_visible = False
@@ -177,6 +180,11 @@ class RegionCacheLayer(CacheLayerMixin):
                 near.pop()
         if position < self.geometry.sink:
             self.nodes['sink'].append(keys, values, [position])
+        elif self.geometry.window == 0:
+            if near is not None:
+                near.append(keys, values, [position])
+            else:
+                self.permanently_dropped += 1
         else:
             swa = self.nodes['swa']
             if swa.size == swa.capacity:
@@ -235,8 +243,8 @@ class RegionCacheLayer(CacheLayerMixin):
 
 
 class FrozenRegionCache(Cache):
-    def __init__(self, n_layers, geometry=RegionGeometry()):
-        super().__init__(layers=[RegionCacheLayer(geometry) for _ in range(n_layers)])
+    def __init__(self, n_layers, geometry=RegionGeometry(), reclaim=True):
+        super().__init__(layers=[RegionCacheLayer(geometry, reclaim=reclaim) for _ in range(n_layers)])
 
     def freeze(self, decisions):
         if set(decisions) != set(range(len(self.layers))):

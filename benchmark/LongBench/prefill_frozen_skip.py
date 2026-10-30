@@ -83,9 +83,9 @@ def capture_profiles(cache, geometry, config):
 
 @torch.inference_mode()
 @eager_decoding_request_guard()
-def generate(model, tokenizer, ids, max_new_tokens, config, device):
-    geometry = RegionGeometry(max_new_tokens=max_new_tokens)
-    cache = FrozenRegionCache(model.config.num_hidden_layers, geometry)
+def generate(model, tokenizer, ids, max_new_tokens, config, device, *, geometry=None, reclaim=True):
+    geometry = geometry or RegionGeometry(max_new_tokens=max_new_tokens)
+    cache = FrozenRegionCache(model.config.num_hidden_layers, geometry, reclaim=reclaim)
     eos = model.generation_config.eos_token_id
     eos = eos if isinstance(eos, list) else [eos]
     if getattr(model, '_frozen_tli', False):
@@ -133,7 +133,9 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
         counts['both' if d['skip_near'] and d['skip_far'] else 'near' if d['skip_near'] else 'far' if d['skip_far'] else 'keep'] += 1
     result = dict(generated_ids=generated, prediction=tokenizer.decode(generated, skip_special_tokens=True),
         generated_tokens=len(generated), wall_seconds=time.time()-start, profiles=profiles,
-        decisions=decisions, gate_counts=counts, tli_receipts=receipts, prefill_full_kv=before,
+        decisions=decisions, gate_counts=counts, tli_receipts=receipts,
+        ablation_receipts={i:getattr(layer, 'ablation_receipts', []) for i,layer in enumerate(cache.layers)},
+        ablation_counts={i:getattr(layer, 'ablation_counts', {}) for i,layer in enumerate(cache.layers)}, prefill_full_kv=before,
         frozen_kv=after, final_kv=final,
         measured_scope='physical node KV storage; eager gather temporaries excluded, no latency claim')
     del out, cache

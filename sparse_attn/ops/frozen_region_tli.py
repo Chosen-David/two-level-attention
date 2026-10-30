@@ -30,11 +30,12 @@ def region_mask(indexer, q, k, positions, length, scale):
     if os.environ.get('TLI_FINE_GATHER', '1') != '0':
         raise ValueError('frozen reference requires TLI_FINE_GATHER=0')
     idx = indexer
-    if (idx.subspace != 'tail' or idx.l2_subspace != 'same' or idx.gamma is not None
+    if (idx.subspace not in ('tail', 'full', 'highfreq', 'random') or (idx.l2_subspace != 'same' and not (idx.subspace == 'full' and idx.l2_subspace == 'full')) or idx.gamma is not None
             or idx._basis_all is not None or idx.far_select != '4bit'
             or idx.near_select != '4bit' or idx.per_q_head or idx.enable_async):
-        raise ValueError('frozen reference supports ordinary shared-head tail TLI only')
-    dims = idx._subspace_indices(k.device)
+        raise ValueError('frozen reference requires ordinary shared-head coordinate TLI')
+    dims = (torch.arange(k.shape[-1], device=k.device) if idx.subspace == 'full'
+            else idx._subspace_indices(k.device))
     ids = torch.tensor(positions, device=k.device, dtype=torch.long)
     bs = idx.args.tia_block_size
     padded = (length+bs-1)//bs*bs
@@ -56,14 +57,19 @@ def region_mask(indexer, q, k, positions, length, scale):
     visible = torch.zeros(length,device=k.device,dtype=torch.bool)
     visible[ids] = True
     scores['score_fine'].masked_fill_(~visible, float('-inf'))
-    mask = idx.compute_mask(qids,scores)
+    extra = {}
+    if getattr(idx, 'ablation_spec', None) is not None:
+        from .ablation_selection import select
+        mask, extra = select(idx, scores, visible, length, q, k, ids, scale)
+    else:
+        mask = idx.compute_mask(qids,scores)
     # L1 bypass pages and zero-probability quota fillers must never restore
     # deleted/staged tokens. Project mask onto physically visible positions.
     compact_mask = mask.index_select(-1,ids)
     return compact_mask, dict(subspace=idx.subspace,dimensions=dims.tolist(),
         logical_tokens=length,visible_tokens=len(positions),
         selected_per_kv_head=compact_mask.sum(-1).flatten().tolist(),
-        scorer='TLIIndexer.compute_score',selector='TLIIndexer.compute_mask')
+        scorer='TLIIndexer.compute_score',selector=('strict_ablation_v1' if extra else 'TLIIndexer.compute_mask'), **extra)
 
 
 def decode(module,q,k,v,cache,cache_position):
@@ -75,8 +81,23 @@ def decode(module,q,k,v,cache,cache_position):
     q,k,v = (x.transpose(1,2).contiguous() for x in (q,k,v))
     idx = module.indexer
     idx.skip_far = layer.skip_far
+    if getattr(idx, 'ablation_spec', None) is not None:
+        idx.ablation_step = getattr(layer, 'ablation_steps', 0) + 1
     mask,receipt = region_mask(idx,q,k,positions,layer.logical_length,module.scaling)
     receipt.update(skip_near=layer.skip_near,skip_far=layer.skip_far)
     layer.tli_receipt = receipt
+    if getattr(idx, 'ablation_spec', None) is not None:
+        layer.ablation_steps = idx.ablation_step
+        if not hasattr(layer, 'ablation_receipts'): layer.ablation_receipts = []
+        if idx.ablation_step in (1,2,4,8,16,32,64,128,256,512):
+            layer.ablation_receipts.append(dict(step=idx.ablation_step, **receipt))
+        if not hasattr(layer, 'ablation_counts'):
+            layer.ablation_counts = dict(steps=0, selected_sum=0, selected_min=10**9, selected_max=0)
+        counts = layer.ablation_counts
+        values = receipt['selected_per_kv_head']
+        counts['steps'] += 1
+        counts['selected_sum'] += sum(values)
+        counts['selected_min'] = min(counts['selected_min'],min(values))
+        counts['selected_max'] = max(counts['selected_max'],max(values))
     cu = torch.tensor([0,len(positions)],device=k.device,dtype=torch.int32)
     return eager_decoding_attn(q,k,v,mask,1,cu,softmax_scale=module.scaling)
