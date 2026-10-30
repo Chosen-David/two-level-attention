@@ -703,6 +703,10 @@ def _load_producer_yarn_receipt(staged_pred, source_pred, task, Lnum,
              "gen_pred_sha256": _file_sha256(gen_info["pred_path"]),
              "gen_rcp_sha256": rcp_sha}
             if gen_info is not None else None),
+        "rope_policy": rcp.get("rope_policy"),
+        "runtime_rope_verification": rcp.get("runtime_rope_verification"),
+        "rope_scaling": rcp["rope_scaling"],
+        "generation_params": rcp["generation_params"],
         "yarn_enabled": rcp["yarn_enabled"],
         "effective_yarn_factor": rcp["effective_yarn_factor"],
         "yarn_factor_source": rcp["yarn_factor_source"],
@@ -1089,6 +1093,24 @@ def _resolve_yarn_identity(args, producer_yarn):
     found = producer_yarn["cells"]
     missing = producer_yarn["missing"]
     n_total = len(found) + len(missing)
+    if getattr(args,"rope_policy","legacy") == "main":
+        from benchmark.RULER.yarn_receipt import validate_corrected_rope_policy
+        # Do not let an omitted --yarn flag turn long Qwen predictions into
+        # an unscaled/unknown main-table result. Cell keys bind length tiers.
+        if any(int(key.split('/')[0].lstrip('L'))>32768 for key in missing):
+            _fail("main long-context results require producer configuration evidence; use --rope-policy legacy for historical unknowns")
+        for key,cell in found.items():
+            model_path=str(cell.get('config_fingerprint',{}).get('model_path') or getattr(args,'model_path','')).lower()
+            policy=cell.get('rope_policy') or {}
+            is_qwen=policy.get('model_type')=='qwen3' or 'qwen' in model_path
+            long_context=cell['context_length']>32768
+            if long_context and policy.get('model_type') not in (None,'qwen3','glm4_moe_lite','llama'):
+                _fail(f'{key}: unsupported model family in main RoPE policy')
+            if long_context and not policy.get('model_type') and not any(name in model_path for name in ('qwen','glm','llama')):
+                _fail(f'{key}: unknown model family for main long-context RoPE; require producer identity or explicit legacy mode')
+            if cell["yarn_enabled"] or (is_qwen and long_context):
+                error=validate_corrected_rope_policy(cell)
+                if error:_fail(f"{key}: {error}; historical scoring requires --rope-policy legacy")
     if not found:
         return {
             "yarn": bool(args.yarn),
@@ -1239,6 +1261,8 @@ def main():
                          "tia_level1_topk=1024）")
     ap.add_argument("--no-stamp-legacy-ids", action="store_true",
                     help="禁用 legacy _id 补刻（缺 _id 数据将 fail closed）")
+    ap.add_argument("--rope-policy", choices=("main","legacy"), default="main",
+                    help="main requires corrected runtime-verified Qwen YaRN; legacy explicitly scores historical configurations")
     args = ap.parse_args()
 
     # ---- 033：--out 后缀门禁 + 四路径两两不同（在任何文件创建之前）----
@@ -1301,6 +1325,7 @@ def main():
         #      冲突 fail-closed；legacy 无证据 → operator_declared；
         #      059：v1 回执 → producer_receipt_v1_partial 降级标注）----
         yarn_id = _resolve_yarn_identity(args, producer_yarn)
+        yarn_id["evaluation_rope_policy"] = args.rope_policy
         _prov = yarn_id["yarn_factor_provenance"]
         if _prov == "producer_receipt":
             pe = yarn_id["producer_evidence"]

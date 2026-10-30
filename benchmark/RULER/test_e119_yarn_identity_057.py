@@ -92,7 +92,7 @@ def _formal(root, out, data_root=None, min_samples=2, extra=(),
             postfix="_fx", optimized=False):
     argv = [sys.executable] + (["-O"] if optimized else []) + \
         ["-u", "-m", "benchmark.RULER.score_ruler_formal",
-         "--root", root, "--pred-postfix", postfix,
+         "--rope-policy", "legacy", "--root", root, "--pred-postfix", postfix,
          "--data-root", data_root or os.path.join(TESTDATA, "data_root"),
          "--out", out, "--min-samples", str(min_samples)]
     argv += list(extra)
@@ -176,7 +176,7 @@ def test_U1_auto_tier_resolution():
                            "beta_fast", "beta_slow"})
         _check(rs["rope_type"] == "yarn" and rs["type"] == "yarn" and \
             rs["factor"] == f and \
-            rs["original_max_position_embeddings"] == NATIVE_MPE and \
+            rs["original_max_position_embeddings"] == 32768 and \
             rs["beta_fast"] == 32 and rs["beta_slow"] == 1)
     # 显式覆盖持久化（自动档被覆盖）
     fx, rsx = resolve_yarn_config(True, 3.5, 131072, YARN_AUTO, NATIVE_MPE)
