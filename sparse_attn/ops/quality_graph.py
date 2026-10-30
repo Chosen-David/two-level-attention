@@ -224,6 +224,12 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                      past_key_values=cache, use_cache=True)
 
     gs = graph_state()
+    has_indexers = any(getattr(module, 'indexer', None) is not None
+                       for module in model.modules())
+    def index_route():
+        if not has_indexers:
+            return 'dense'
+        return 'request_row_incremental' if gs.enabled else 'legacy_rebuild'
     if gs.enabled:
         raise RuntimeError("nested quality graph requests are unsupported")
     graph, output = None, None
@@ -235,8 +241,7 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
             if reason is None:
                 enable_graph(batch, quality_defaults=True)
                 gs.pos_buf, gs.valid_len_buf, gs.alive_buf = pos, lengths, alive
-            record['decode_index_route'] = (
-                'request_row_incremental' if gs.enabled else 'legacy_rebuild')
+            record['decode_index_route'] = index_route()
             if policy != "off" and reason is None:
                 try:
                     inject(0)
@@ -271,8 +276,7 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     if reuse_tensor_eager:
                         enable_graph(batch, quality_defaults=True)
                         gs.pos_buf, gs.valid_len_buf, gs.alive_buf = pos, lengths, alive
-                    record['decode_index_route'] = (
-                        'request_row_incremental' if gs.enabled else 'legacy_rebuild')
+                    record['decode_index_route'] = index_route()
                     record['eager_index_fallback'] = None if gs.enabled else 'selector_disabled_tensor_route'
                     # Deferred attention failures and poisoned CUDA contexts
                     # must never be hidden by an eager retry.
@@ -340,8 +344,7 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     output = forward()
                     if step == 0:
                         record["eager_layers"] = _layer_routes(model)
-                        record['decode_index_route'] = (
-                            'request_row_incremental' if gs.enabled else 'legacy_rebuild')
+                        record['decode_index_route'] = index_route()
                         if not gs.enabled:
                             record['eager_index_fallback'] = 'selector_disabled_tensor_route'
                 steps_run += 1

@@ -24,7 +24,7 @@ def run(cli):
     torch.manual_seed(42)
     parser = argparse.ArgumentParser(); add_sparse_attn_args(parser)
     args = parser.parse_args([
-        '--method','tli','--tia_block_size','64','--tia_level1_topk','128',
+        '--method','none' if cli.dense else 'tli','--tia_block_size','64','--tia_level1_topk','128',
         '--tia_level2_topk','1024','--tia_level2_cmp_ratio','4',
         '--tli_near_pages','32','--tli_near_tokens','off','--tli_near_len','4096',
         '--tli_subspace','tail','--tli_sink_tokens','4','--tli_swa_size','128',
@@ -40,9 +40,14 @@ def run(cli):
     model=AutoModelForCausalLM.from_pretrained(model_path,dtype=torch.bfloat16,
         device_map={'':'cuda:0'},attn_implementation='sdpa').eval()
     resolve_far_skip_modes(args,config=model.config)
-    patched=register_patch(model,args,resolve_treatment_snapshot(args))
-    assert patched==model.config.num_hidden_layers
-    assert all(not m.indexer.dyn_dgate for m in model.modules() if hasattr(m,'indexer'))
+    if cli.dense:
+        # Dense 与 NFA 共用固定地址 KV、设备输入和整模型 Graph runner；
+        # 仅不安装稀疏 attention/indexer patch。
+        assert not any(hasattr(m,'indexer') for m in model.modules())
+    else:
+        patched=register_patch(model,args,resolve_treatment_snapshot(args))
+        assert patched==model.config.num_hidden_layers
+        assert all(not m.indexer.dyn_dgate for m in model.modules() if hasattr(m,'indexer'))
     rows=[json.loads(line) for line in Path(cli.input).read_text().splitlines() if line.strip()]
     if len(rows)<cli.batch: raise ValueError('input needs distinct original rows for requested batch')
     rows=rows[:cli.batch]
@@ -60,7 +65,8 @@ def run(cli):
     records=[]
     output=Path(cli.output)
     output.with_suffix('.configuration.json').write_text(json.dumps(dict(
-        resolved_args=vars(args),inherited_tli_environment=inherited_env,model=model_path,input_indices=[r['index'] for r in rows],
+        resolved_args=vars(args),inherited_tli_environment=inherited_env,model=model_path,
+        model_route='dense' if cli.dense else 'nfa',input_indices=[r['index'] for r in rows],
         lengths=lengths,eos_policy=('offline fixed steps; EOS disabled and final token readback'
                                     if cli.offline_fixed else
                                     'online EOS diagnostic with empty EOS and per-step token readback'),
@@ -113,7 +119,8 @@ def run(cli):
                 expected='device_row_fused' if current_arm=='candidate' else 'host_reference'
                 assert execution['input_update_route']==expected
                 assert execution['input_update_fallback'] is None
-            rec=dict(cycle=cycle,arm=current_arm,rows=which,batch=batch,batch_indexer=batch_mode,tokens=tokens,
+            rec=dict(cycle=cycle,arm=current_arm,rows=which,batch=batch,batch_indexer=batch_mode,
+                     model_route='dense' if cli.dense else 'nfa',tokens=tokens,
                      entry='ruler_production_chunk' if production_entry else 'batch_probe',
                      execution=execution,allocator=observe_allocator(),environment={k:v for k,v in os.environ.items() if k.startswith('TLI_')})
             if cli.measure:
@@ -127,15 +134,15 @@ def run(cli):
             if eager_reference:
                 assert execution['actual']=='staged_static' and execution['captures']==0
                 assert execution['replay_steps']==0 and execution['fallback_reason'] is None
-                assert execution['decode_index_route']=='request_row_incremental'
-                if batch>1:
+                assert execution['decode_index_route']==('dense' if cli.dense else 'request_row_incremental')
+                if batch>1 and not cli.dense:
                     assert len(execution['eager_layers'])==model.config.num_hidden_layers
                     assert all(r['attention_route']=='legacy_graph_eager_tli' for r in execution['eager_layers'])
             else:
                 assert execution['actual']=='graph' and execution['captures']==1
                 assert execution['replay_steps']==cli.max_gen-1 and execution['fallback_reason'] is None
-                assert len(execution['capture_layers'])==model.config.num_hidden_layers
-                if legacy_graph:
+                assert len(execution['capture_layers'])==(0 if cli.dense else model.config.num_hidden_layers)
+                if legacy_graph and not cli.dense:
                     assert all(r['attention_route']=='legacy_graph_eager_tli' for r in execution['capture_layers'])
                 if batch_mode=='exact':
                     expected_route=('linear_batch_reference_simt' if row_reference else
@@ -180,6 +187,7 @@ def run(cli):
         output.write_text(json.dumps(dict(status='pending_independent_verification',
             tokens_equal=all(p['tokens_equal'] for p in pairs),pairs=pairs,
             candidate='legacy_graph' if cli.legacy_graph_candidate or cli.batch==1 else 'exact_batch',
+            model_route='dense' if cli.dense else 'nfa',
             comparison=comparison,records=records),indent=2))
         assert pair['tokens_equal'],'real batch tokens differ from the recorded reference control'
 
@@ -190,6 +198,8 @@ if __name__=='__main__':
     p.add_argument('--input',required=True);p.add_argument('--output',required=True)
     p.add_argument('--model-path',default='/home/wangyuanshuo02/models/huggingface.co/Qwen/Qwen3-32B')
     p.add_argument('--batch',type=int,choices=[1,2,4,8],required=True)
+    p.add_argument('--dense',action='store_true',
+        help='不安装 NFA patch；复用同一静态 KV、DeviceDecodeInputs 与整模型 eager/Graph runner')
     p.add_argument('--max-gen',type=int,default=16);p.add_argument('--measure',action='store_true')
     p.add_argument('--offline-fixed',action='store_true',
         help='固定步数 decode：禁用 EOS，逐步采样留在设备上，最后统一读回；与在线逐步读回分开计时')
@@ -213,6 +223,8 @@ if __name__=='__main__':
         p.error('RULER entry check requires legacy-batch-reference and forbids timing')
     if cli.legacy_graph_candidate and (not cli.eager_batch_reference or cli.batch<2):
         p.error('legacy Graph candidate requires same-batch eager reference and B>=2')
+    if cli.dense and cli.batch>1 and not cli.legacy_graph_candidate:
+        p.error('dense B>1 requires --legacy-graph-candidate; exact batch is an NFA-only route')
     if cli.trace_dir and (cli.measure or not cli.eager_batch_reference):
         p.error('trace requires eager-batch-reference and forbids timing')
     if cli.same_batch_reference and cli.batch<2:p.error('same-batch reference needs B>=2')
