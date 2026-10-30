@@ -1,0 +1,82 @@
+{
+  "verdict": "B0718EA_FOUR_LENGTH_PAIR_PASS_FULL_ACCEPTANCE_STILL_OPEN",
+  "code_commit": "b0718ea",
+  "evidence_root": "/tmp/frozen-eager-b0718ea-results",
+  "protocol": {
+    "model": "Qwen3-8B BF16",
+    "task": "RULER niah_single_1 row 0",
+    "lengths": [8192, 32768, 65536, 131072],
+    "max_new": 8,
+    "reps": 1,
+    "mode": "all",
+    "profile": true,
+    "states": "keep/far/near/both at 8K; dual at longer lengths",
+    "runner": "exp/bench/run_frozen_eager_pair.sh",
+    "yarn_scope": "32K and 8K have no extra YaRN; 64K/128K reports record factor 2/4 with original_max_position_embeddings=40960. These are paired frozen-eager results, not the separate corrected-original-32768 quality retest."
+  },
+  "correctness": {
+    "all_decisions_equal": true,
+    "all_generated_tokens_equal": true,
+    "all_physical_receipts": true,
+    "8k_forced_states": {
+      "keep": {"layer_output_max_abs": 2.25, "logits_max_abs": 0.28125, "selected_kv_total_reference_physical": [293912, 293912]},
+      "far": {"layer_output_max_abs": 2.0, "logits_max_abs": 0.625, "selected_kv_total_reference_physical": [294912, 294912], "far_nodes_physically_removed": true, "permanently_dropped_tokens_per_arm": 131184},
+      "near": {"layer_output_max_abs": 2.875, "logits_max_abs": 0.25, "selected_kv_total_reference_physical": [293837, 293836], "stored_tokens_per_arm": 283968, "attention_tokens_per_arm": 135936, "permanently_dropped_tokens_per_arm": 0},
+      "both": {"layer_output_max_abs": 7.65625, "logits_max_abs": 1.0, "selected_kv_total_reference_physical": [38016, 38016], "selected_kv_min_max": [132, 132], "far_nodes_physically_removed": true, "permanently_dropped_tokens_per_arm": 279216}
+    },
+    "dual": {
+      "32k": {"layer_output_max_abs": 0.5, "logits_max_abs": 0.125, "gate_counts": {"keep": 36, "near": 0, "far": 0, "both": 0}},
+      "64k": {"layer_output_max_abs": 0.0, "logits_max_abs": 0.0, "gate_counts": {"keep": 36, "near": 0, "far": 0, "both": 0}},
+      "128k": {"layer_output_max_abs": 0.0625, "logits_max_abs": 0.0625, "gate_counts": {"keep": 33, "near": 3, "far": 0, "both": 0}, "stored_tokens": 4715568, "attention_tokens": 4703148, "permanently_dropped_tokens": 0}
+    },
+    "limitations": [
+      "Not globally bit-exact; only the 64K dual comparison recorded zero max absolute differences.",
+      "The 8K near arm differs by one in aggregate selected_kv_total; per-step per-layer selected-ID equality is not established.",
+      "The reference is the same-method legacy oracle, not a dense production baseline. No dense speedup is claimed.",
+      "Full step-by-step attended-K and selected-ID acceptance, dense quality comparison, and full production acceptance remain open."
+    ]
+  },
+  "steady_decode_tpot_ms": {
+    "8k": {"reference": 103.20646954434258, "physical": 120.98911457828112, "gates_off": 148.47300627401896, "reference_over_physical": 0.8530227690654518},
+    "32k": {"reference": 156.166282083307, "physical": 125.46499126723833, "gates_off": 152.436301112175, "reference_over_physical": 1.2447000594028292},
+    "64k": {"reference": 233.7199891252177, "physical": 127.86658800074032, "gates_off": 155.20636843783515, "reference_over_physical": 1.8278425410386683},
+    "128k": {"reference": 387.6809951450143, "physical": 125.81549371991838, "gates_off": 156.3545816711017, "reference_over_physical": 3.0813454184588944}
+  },
+  "memory": {
+    "physical_peak_gib": {"8k": 17.184243, "32k": 23.038146, "64k": 30.818972, "128k": 46.351488},
+    "reference_physical_final_allocated_gib": {
+      "8k": [16.397895, 16.396914],
+      "32k": [19.788109, 19.784065],
+      "64k": [24.295109, 24.291483],
+      "128k": [33.295979, 33.291945]
+    },
+    "scope": "Whole-process allocator peaks include model and prefill. They are not resident-KV savings measurements. Near-only keeps stored KV while reducing attention visibility; no near-only KV residency saving is claimed."
+  },
+  "work_receipts": {
+    "decode_receipts_per_profile": 36,
+    "all_physical": true,
+    "selected_kv_min_max_at_32k_64k_128k": [1020, 1024],
+    "profiler_traces_validated": true,
+    "trace_event_counts": {"8k": 812399, "32k": 835081, "64k": 835081, "128k": 830692}
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "pc02": "not used; all four GPUs were occupied by another task",
+    "pc31_pc40": "all four target GPUs started at 1 MiB with no compute apps; 30-second samples contain one PID per active GPU; post-run both GPUs on each machine returned to 1 MiB with no compute apps",
+    "limitation": "cooperative empty-GPU gate and sampled monitoring, not an OS-exclusive device guarantee"
+  },
+  "raw_evidence_sha256": {
+    "pc40_8k/report.json": "72e829bf322c208face8402fe6c842cb7ea99083b0aa03e301dbce0b32b6250d",
+    "pc31_32k/report.json": "745d6ad4ab7dffdb20358b1ec7f2398db2edbfab117afc043d0401cdfdfcc898",
+    "pc31_64k/report.json": "875d8643c873e36ab5d06671f8d4d790ef0d3918f62a6a5504eb4864ee10ab91",
+    "pc40_128k/report.json": "d517e2dfaa9c22fe9a8f5120cdf0c39d3b9e895f8422f6a7f7c02481a26f6fd1",
+    "pc40_8k/profile_rep0.json": "72a0e6f96d40581cf6d8f24a38ab0e0ffa6ca7a01c3a71f0efa8fe1dc4484ecd",
+    "pc31_32k/profile_rep0.json": "13413dd2e1639a000714dc6747bb126ce04728e56d4213ec14b16ae9d4fc9890",
+    "pc31_64k/profile_rep0.json": "86c332f4878cf2c84fe34ed1bf97c92895ad62dc86e1e6048bc65af508e4cd7a",
+    "pc40_128k/profile_rep0.json": "18ded2c31a5fa1935c7f370bb3f1d78be4dc4ad96f3e11ea4e9ae5f2a18559bd",
+    "pc40_8k/gpu_monitor_20261031_000637_1970841.log": "51d711b77181a2f7f299c8fe1b6a1146b944b1c04a3905778a13db00ff4c761a",
+    "pc31_32k/gpu_monitor_20261031_000611_1090087.log": "d9d61e0b587607653944ad373c07f461ac50472dda3da123fde8f7ba2c3ef722",
+    "pc31_64k/gpu_monitor_20261031_000611_1090088.log": "2401e424c0946ba89f4b018aada251fe56cc95cc6d44b63d506cefd348b3f50b",
+    "pc40_128k/gpu_monitor_20261031_000637_1970842.log": "2f43db7dad6b384cbb293ac95ef41b7f793ef4276e6f97a64c28acc3783eef1f"
+  }
+}
