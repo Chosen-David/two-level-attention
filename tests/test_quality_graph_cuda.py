@@ -16,7 +16,7 @@ from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 pytestmark=pytest.mark.skipif(not torch.cuda.is_available(),reason='native CUDA required')
 
 
-def model_for(kind,gate=False):
+def model_for(kind,gate=False,max_position_embeddings=None):
     from transformers import Qwen3Config,Qwen3ForCausalLM
     helpers=runpy.run_path(str(Path(__file__).parents[1]/'exp/bench/test_glm47_d256_gates.py'))
     args=helpers['make_prod_args']()
@@ -24,7 +24,7 @@ def model_for(kind,gate=False):
     if kind=='qwen':
         config=Qwen3Config(hidden_size=32,intermediate_size=64,num_hidden_layers=2,
                           num_attention_heads=4,num_key_value_heads=2,head_dim=128,
-                          vocab_size=128,max_position_embeddings=40000)
+                          vocab_size=128,max_position_embeddings=max_position_embeddings or 40000)
         model=Qwen3ForCausalLM(config)
         from sparse_attn.patches.qwen3_attn_patch import qwen3_attn_forward as forward
         dim=128
@@ -114,6 +114,103 @@ def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,ga
     torch.cuda.empty_cache()
 
 
+@pytest.mark.parametrize('batch', [1, 2, 4])
+def test_real_hf_batch_eager_graph_share_row_incremental_states(monkeypatch, batch):
+    from collections import Counter
+    from sparse_attn.indexer.tli_indexer import TLIIndexer
+    from sparse_attn.ops.static_batch_prefill import consume_prefill_rows
+
+    for key, value in dict(TLI_BATCH_INDEXER='legacy', TLI_OPERATOR_MODE='off',
+                           TLI_DEVICE_DECODE_INPUTS='1', TLI_QUALITY_TIMING='1').items():
+        monkeypatch.setenv(key, value)
+    for key in ('TLI_LIVE_NORMALIZATION', 'TLI_SPARSE_SELECTION', 'TLI_SPARSE_STATS'):
+        monkeypatch.delenv(key, raising=False)
+    torch.manual_seed(991 + batch)
+    model = model_for('qwen')
+    lens = [16384 - 3 * b for b in range(batch)]
+    ids = torch.randint(0, 128, (batch, max(lens)), device='cuda')
+    original = TLIIndexer._prepare_index_base
+    calls = []
+
+    def counted(self, key, cu, **kwargs):
+        calls.append((id(self), key.data_ptr()))
+        return original(self, key, cu, **kwargs)
+
+    monkeypatch.setattr(TLIIndexer, '_prepare_index_base', counted)
+    outputs = []
+    with torch.inference_mode(), eager_decoding_request_guard():
+        for policy in ('0', '1'):
+            monkeypatch.setenv('TLI_CUDA_GRAPH', policy)
+            rows, first = [], []
+            for b, length in enumerate(lens):
+                out = model(input_ids=ids[b:b + 1, :length], use_cache=True,
+                            logits_to_keep=1)
+                rows.append(out.past_key_values)
+                first.append(out.logits[0, -1].argmax(-1).item())
+                del out
+            cache = TLIStaticCache(model.config, max(lens) + 6, batch)
+            consume_prefill_rows(cache, rows, lens)
+            ctx = BatchCtx(batch, list(lens), [0] * batch, [True] * batch, 0)
+            calls.clear()
+            result = static_decode(model, cache, [[token] for token in first], lens,
+                                   set(), 6, ctx)
+            receipt = model._quality_graph_execution
+            assert receipt['decode_index_route'] == 'request_row_incremental'
+            assert receipt['input_update_route'] == 'device_row_fused'
+            assert receipt['captures'] == (1 if policy == '1' else 0)
+            counts = Counter(calls)
+            for layer in model.model.layers:
+                layer_calls = [count for (owner, _), count in counts.items()
+                               if owner == id(layer.self_attn.indexer)]
+                assert sorted(layer_calls) == [1] * batch
+                assert len(ctx._tli_row_index_pools[id(layer.self_attn.indexer)]) == batch
+            outputs.append(result)
+            del cache, ctx
+    assert outputs[0] == outputs[1]
+    del model, ids
+    torch.cuda.empty_cache()
+
+
+@pytest.mark.parametrize('online_eos', [True, False])
+def test_real_hf_long_context_eager_graph_keep_device_incremental_route(monkeypatch, online_eos):
+    """真实模型跨 65536 后仍走同一增量选择器与 tiled 设备输入。"""
+    from sparse_attn.ops.static_batch_prefill import consume_prefill_rows
+    for key, value in dict(TLI_BATCH_INDEXER='legacy', TLI_OPERATOR_MODE='off',
+                           TLI_DEVICE_DECODE_INPUTS='1', TLI_QUALITY_TIMING='1').items():
+        monkeypatch.setenv(key, value)
+    for key in ('TLI_LIVE_NORMALIZATION', 'TLI_SPARSE_SELECTION', 'TLI_SPARSE_STATS'):
+        monkeypatch.delenv(key, raising=False)
+    torch.manual_seed(65537 + int(online_eos))
+    model = model_for('qwen', max_position_embeddings=131072)
+    length = 65537
+    ids = torch.randint(0, 128, (1, length), device='cuda')
+    outputs = []
+    with torch.inference_mode(), eager_decoding_request_guard():
+        for policy in ('0', '1'):
+            monkeypatch.setenv('TLI_CUDA_GRAPH', policy)
+            out = model(input_ids=ids, use_cache=True, logits_to_keep=1)
+            first = out.logits[0, -1].argmax(-1).item()
+            rows = [out.past_key_values]
+            del out
+            cache = TLIStaticCache(model.config, length + 4, 1)
+            consume_prefill_rows(cache, rows, [length])
+            ctx = BatchCtx(1, [length], [0], [True], 0)
+            result = static_decode(model, cache, [[first]], [length], {2}, 4, ctx,
+                                   online_eos=online_eos)[0]
+            receipt = model._quality_graph_execution
+            assert receipt['input_update_route'] == 'device_row_fused'
+            assert receipt['input_update_fallback'] is None
+            assert receipt['decode_index_route'] == 'request_row_incremental'
+            assert receipt['captures'] == (1 if policy == '1' else 0)
+            assert receipt['generation_mode'] == ('online_eos' if online_eos else 'fixed_steps')
+            assert receipt['token_readback'] == ('per_step' if online_eos else 'final')
+            outputs.append(result)
+            del cache, ctx, rows
+    assert outputs[0] == outputs[1]
+    del model, ids
+    torch.cuda.empty_cache()
+
+
 @pytest.mark.parametrize('code',[1,2,3])
 def test_cuda_deferred_failure_prevents_publication_for_graph_and_eager(monkeypatch,tmp_path,code):
     from sparse_attn.ops.eager_decoding import _err_flag
@@ -164,9 +261,10 @@ def test_capture_oom_auto_recovers_on_static_cache_and_strict_aborts(monkeypatch
                         assert 'capture_failed:OutOfMemoryError' in model._quality_graph_execution['fallback_reason']
                         assert model._quality_graph_execution['actual']=='staged_static'
                         assert model._quality_graph_execution['captures'] == 0
-                        assert model._quality_graph_execution['input_update_route']=='host_reference'
-                        assert model._quality_graph_execution['input_update_fallback']==(
-                            None if input_mode=='0' else 'graph_not_captured')
+                        assert model._quality_graph_execution['input_update_route']==(
+                            'device_row_fused' if input_mode!='0' else 'host_reference')
+                        assert model._quality_graph_execution['input_update_fallback'] is None
+                        assert model._quality_graph_execution['decode_index_route']=='request_row_incremental'
                         assert 'capture_layers' not in model._quality_graph_execution
         monkeypatch.setenv('TLI_CUDA_GRAPH','1')
         with eager_decoding_request_guard():

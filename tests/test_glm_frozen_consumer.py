@@ -15,7 +15,7 @@ def test_glm_d256_consumer_against_selected_fp32(monkeypatch,near,far):
     cache=FrozenRegionCache(1,RegionGeometry(max_new_tokens=80));cache.tli_regions=True
     k=torch.randn(1,2,4352,256);v=torch.randn_like(k)
     cache.update(k,v,0);cache.freeze({0:dict(skip_near=near,skip_far=far)})
-    idx=TLIIndexer(tli_args());idx.layer_idx=0;idx.head_dim=256
+    idx=TLIIndexer(tli_args(subspace='nope'));idx.layer_idx=0;idx.head_dim=256
     module=SimpleNamespace(layer_idx=0,indexer=idx,scaling=.0625)
     projection=torch.randn(512,19)/512**.5
     for step in range(66):

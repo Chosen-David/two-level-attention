@@ -136,8 +136,15 @@ def _live_width_fallback(prompt_lengths, dtype=None):
     return None
 
 
-def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tokens=2):
-    """Finish generation from prefill's first tokens using fixed-address KV."""
+def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tokens=2,
+                  online_eos=True):
+    """Finish generation from prefill's first tokens using fixed-address KV.
+
+    online_eos=True 保留逐步 token 读回和提前停止；False 是离线固定步数
+    口径，不在步间同步读回，也不应用 EOS，最后一次性回收采样 token。
+    """
+    if type(online_eos) is not bool:
+        raise TypeError('online_eos must be bool')
     policy = graph_policy()
     parameter = next(model.parameters())
     device, dtype = parameter.device, parameter.dtype
@@ -152,7 +159,13 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
     step_ms, replay_events = [], []
     initial_tokens = sum(map(len, gen))
     devices = {p.device for p in model.parameters()}
-    record = execution(model, "staged_static", batch_size=batch, capacity=capacity)
+    record = execution(model, "staged_static", batch_size=batch, capacity=capacity,
+                       generation_mode='online_eos' if online_eos else 'fixed_steps',
+                       token_readback='per_step' if online_eos else 'final')
+    # static_decode 自身就是请求边界，不能依赖调用者一定先跑过 prefill。
+    # 新池只保留本请求每层/每行摘要；clear 保留旧 Graph 地址但软失效。
+    ctx._tli_row_index_pools = {}
+    _reset_indexes(model)
     if max_gen <= 1 or not any(ctx.alive):
         record["actual"] = "no_decode"
         return gen
@@ -175,6 +188,9 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
         cache._far_skip_attention_mask = mask
     snapshots = (list(ctx.seq_lens), list(ctx.gen_lens), list(ctx.alive))
     device_inputs, previous_tokens = None, None
+    fixed_samples = None if online_eos else torch.empty(
+        (max_gen - 1, batch), device=device, dtype=torch.long)
+    output_readback_ms = 0.0
 
     def restore():
         ctx.seq_lens[:], ctx.gen_lens[:], ctx.alive[:] = snapshots
@@ -189,9 +205,12 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
         if device_inputs is not None:
             device_inputs.inject(step, previous_tokens)
             return
-        tokens.copy_(torch.tensor([row[-1] if active else ctx.pad_id
-                                 for row, active in zip(gen, ctx.alive)],
-                                 device=device, dtype=torch.long).view(batch, 1))
+        if not online_eos and step > 0:
+            tokens.copy_(previous_tokens.view(batch, 1))
+        else:
+            tokens.copy_(torch.tensor([row[-1] if active else ctx.pad_id
+                                     for row, active in zip(gen, ctx.alive)],
+                                     device=device, dtype=torch.long).view(batch, 1))
         positions.copy_(torch.tensor([n + step for n in lens], device=device).view(batch, 1))
         lengths.copy_(torch.tensor(ctx.seq_lens, device=device))
         pos.copy_(lengths - 1)
@@ -211,10 +230,15 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
     try:
         eager_decoding_check_errors()
         with batch_decode_scope(ctx):
+            # Graph 与高效 eager 共用固定地址元数据、动态长度、增量索引和
+            # compute_mask_graph；policy 只决定是否 capture，不改变算法。
+            if reason is None:
+                enable_graph(batch, quality_defaults=True)
+                gs.pos_buf, gs.valid_len_buf, gs.alive_buf = pos, lengths, alive
+            record['decode_index_route'] = (
+                'request_row_incremental' if gs.enabled else 'legacy_rebuild')
             if policy != "off" and reason is None:
                 try:
-                    enable_graph(batch, quality_defaults=True)
-                    gs.pos_buf, gs.valid_len_buf, gs.alive_buf = pos, lengths, alive
                     inject(0)
                     stream, reused = _request_warmup_stream(device)
                     record.update(warmup_stream=int(stream.cuda_stream),
@@ -236,10 +260,20 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                                   budget_scope="not_measured_during_replay",
                                   capture_layers=capture_layers)
                 except Exception as exc:
+                    # OOM/capture 失败不应把 eager 静默换成另一种全量算法；
+                    # selector 自己禁用 tensor 路径时则保留明确的 legacy 回退。
+                    reuse_tensor_eager = gs.enabled
                     disable_graph()
                     graph, output = None, None
                     restore()
                     _reset_indexes(model)
+                    ctx._tli_row_index_pools = {}
+                    if reuse_tensor_eager:
+                        enable_graph(batch, quality_defaults=True)
+                        gs.pos_buf, gs.valid_len_buf, gs.alive_buf = pos, lengths, alive
+                    record['decode_index_route'] = (
+                        'request_row_incremental' if gs.enabled else 'legacy_rebuild')
+                    record['eager_index_fallback'] = None if gs.enabled else 'selector_disabled_tensor_route'
                     # Deferred attention failures and poisoned CUDA contexts
                     # must never be hidden by an eager retry.
                     fatal = any(x in str(exc).lower() for x in (
@@ -256,16 +290,14 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
             record.update(input_update_requested=input_mode,
                           input_update_route='host_reference', input_update_fallback=None)
             if input_mode == '1':
-                if graph is None:
-                    record['input_update_fallback'] = 'graph_not_captured'
-                elif capacity > 65536:
-                    record['input_update_fallback'] = 'capacity_above_65536'
+                if device.type != 'cuda':
+                    record['input_update_fallback'] = 'non_cuda_device'
                 else:
                     from .quality_decode_inputs import DeviceDecodeInputs
                     device_inputs = DeviceDecodeInputs(
                         tokens, positions, pos, lengths, alive, mask,
                         ctx.seq_lens, lens, [len(row) for row in gen], ctx.alive,
-                        ctx.pad_id, eos_ids, min_new_tokens)
+                        ctx.pad_id, eos_ids if online_eos else set(), min_new_tokens)
                     previous_tokens = torch.tensor(
                         [row[-1] if active else ctx.pad_id for row, active in zip(gen, ctx.alive)],
                         device=device, dtype=torch.long)
@@ -288,8 +320,9 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                         end.record()
                     synchronize()
                 decode_start = time.perf_counter()
+            steps_run = 0
             for step in range(max_gen - 1):
-                if not any(ctx.alive):
+                if online_eos and not any(ctx.alive):
                     break
                 if measure:
                     step_start = time.perf_counter()
@@ -307,15 +340,35 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     output = forward()
                     if step == 0:
                         record["eager_layers"] = _layer_routes(model)
+                        record['decode_index_route'] = (
+                            'request_row_incremental' if gs.enabled else 'legacy_rebuild')
+                        if not gs.enabled:
+                            record['eager_index_fallback'] = 'selector_disabled_tensor_route'
+                steps_run += 1
                 previous_tokens = output.logits[:, -1].argmax(-1)
-                next_tokens = previous_tokens.tolist()
-                for b, token in enumerate(next_tokens):
-                    if ctx.alive[b]:
-                        gen[b].append(token)
-                        if token in eos_ids and len(gen[b]) >= min_new_tokens:
-                            ctx.alive[b] = False
+                if online_eos:
+                    next_tokens = previous_tokens.tolist()
+                    for b, token in enumerate(next_tokens):
+                        if ctx.alive[b]:
+                            gen[b].append(token)
+                            if token in eos_ids and len(gen[b]) >= min_new_tokens:
+                                ctx.alive[b] = False
+                else:
+                    # 离线固定步数只保留设备端采样链，避免每步 .tolist()
+                    # 同步；最终统一读回，且明确不应用 EOS。
+                    fixed_samples[step].copy_(previous_tokens)
                 if measure:
                     step_ms.append((time.perf_counter() - step_start) * 1000)
+            if not online_eos:
+                if measure:
+                    synchronize()
+                    readback_start = time.perf_counter()
+                sampled_rows = fixed_samples[:steps_run].t().tolist()
+                for b, row in enumerate(sampled_rows):
+                    if ctx.alive[b]:
+                        gen[b].extend(row)
+                if measure:
+                    output_readback_ms = (time.perf_counter() - readback_start) * 1000
             eager_decoding_check_errors()
             if measure:
                 synchronize()
@@ -324,12 +377,17 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                              replay_events[:record["replay_steps"]]]
                 record["timing"] = dict(
                     scope="static decode; excludes prefill and cache conversion",
-                    instrumentation="CUDA events around replay; host clock includes inject, argmax, readback, EOS; final error check included in decode_wall_ms",
+                    instrumentation=("CUDA events around replay; online host clock includes inject, argmax, per-step readback and EOS; "
+                                     "fixed-step decode includes one final readback, reported separately; final error check included"),
+                    step_timing_scope=("host_submit_only" if not online_eos else
+                                       "inject_forward_argmax_readback_eos"),
                     setup_wall_ms=setup_ms, decode_wall_ms=decode_ms,
                     step_wall_ms=step_ms, replay_gpu_ms=replay_ms,
-                    decode_steps=len(step_ms),
+                    decode_steps=steps_run,
                     generated_decode_tokens=sum(map(len, gen)) - initial_tokens,
-                    tpot_wall_ms=sum(step_ms) / len(step_ms) if step_ms else None,
+                    output_readback_wall_ms=output_readback_ms,
+                    tpot_wall_ms=((sum(step_ms) / len(step_ms)) if online_eos and step_ms else
+                                  (decode_ms / steps_run if steps_run else None)),
                     replay_gpu_mean_ms=sum(replay_ms) / len(replay_ms) if replay_ms else None)
             print(f"[quality-graph] {record}", flush=True)
             return gen
@@ -348,7 +406,8 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
             cache._far_skip_attention_mask = None
 
 
-def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2):
+def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2,
+                 online_eos=True):
     """Own a B1 prefill cache and return tokens, or None before taking ownership."""
     policy = graph_policy()
     if policy == "off":
@@ -411,7 +470,8 @@ def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2
         torch.cuda.synchronize(next(model.parameters()).device)
         conversion_ms = (time.perf_counter() - conversion_start) * 1000
     result = static_decode(model, cache, [[first_token]], [length], set(eos_ids),
-                           max_gen, ctx, min_new_tokens=min_new_tokens)[0]
+                           max_gen, ctx, min_new_tokens=min_new_tokens,
+                           online_eos=online_eos)[0]
     if measure and "timing" in model._quality_graph_execution:
         model._quality_graph_execution["timing"]["cache_conversion_wall_ms"] = conversion_ms
     return result

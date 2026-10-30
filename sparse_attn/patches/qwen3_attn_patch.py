@@ -157,7 +157,19 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
                       lambda: torch.tensor([0, S_cap], device=dev,
                                            dtype=torch.int32))
     masks = []
+    # 同一层 indexer 会被 batch 内所有 row 依次调用。单个 _ginc 在不同
+    # KV 地址间来回切换会每行全量重建；请求上下文内的 per-row 池让 eager
+    # 与 Graph 都复用各自持久摘要。池随 BatchCtx 销毁，绝不跨请求共享。
+    ctx = batch_decode_ctx()
+    row_pool = None
+    if ctx is not None:
+        pools = getattr(ctx, '_tli_row_index_pools', None)
+        if pools is None:
+            pools = ctx._tli_row_index_pools = {}
+        row_pool = pools.setdefault(id(indexer), {})
     for b in range(B):
+        if row_pool is not None:
+            indexer._ginc = row_pool.get(b)
         # 【E152v4】不再每步 clear()：clear 是请求边界标记（prefill 前每层
         # 调用，失效 _inc/_ginc → 新请求首步全量重建）。graph 步进下每步
         # clear 会把 _ginc 持久容量宽 buffer 一起失效 → 退化回每步
@@ -171,6 +183,8 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
         from ..ops.exact_linear_batch import _row_scope
         with _row_scope(gs, b):
             idx_dict = indexer.prepare_index(k[b:b + 1], cu)
+            if row_pool is not None:
+                row_pool[b] = indexer._ginc
             masks.append(indexer.compute_mask_graph(
                 q[b:b + 1], idx_dict, self.scaling, vl[b:b + 1]))
     m_b = torch.cat(masks, dim=0)              # [B,1,Hkv,S_cap] bool
@@ -319,9 +333,25 @@ def qwen3_attn_forward(
 
     # Request-local segmented cache owns logical/physical position mapping.
     if getattr(past_key_values, "tli_regions", False):
+        from ..ops.cuda_graph_state import graph_state
+        ctx = batch_decode_ctx()
+        if ((ctx is not None and ctx.batch != 1) or graph_state().enabled
+                or os.environ.get("TLI_OPERATOR_MODE", "off") != "off"):
+            raise ValueError("Qwen frozen regions require eager B1 with operator mode off")
+        if input_shape[0] != 1 or self.indexer.dyn_dgate:
+            raise ValueError("Qwen frozen regions require B1 and independent region gates")
         layer = past_key_values.layers[self.layer_idx]
         if layer.logical_length:
-            from ..ops.frozen_region_tli import decode as region_decode
+            owned_mask = (attention_mask is None or (
+                isinstance(attention_mask, dict)
+                and set(attention_mask) == {"full_attention"}
+                and attention_mask["full_attention"] is None))
+            if input_shape[1] != 1 or not layer.frozen or not owned_mask:
+                raise ValueError("Qwen frozen regions require frozen unpadded single-token decode")
+            if getattr(past_key_values, "paged_regions", False):
+                from ..ops.paged_region_tli import decode as region_decode
+            else:
+                from ..ops.frozen_region_tli import decode as region_decode
             result = region_decode(self, query_states, key_states, value_states,
                                    past_key_values, cache_position)
             return self.o_proj(result.reshape(*input_shape, -1).contiguous()), None

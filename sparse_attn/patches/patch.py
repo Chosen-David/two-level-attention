@@ -49,7 +49,7 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
     dense 输出被打上稀疏方法标签（实验结论污染）。改为：
       ① 返回 patch 计数（调用方可显式校验）；
       ② method≠none 且 patched=0 时显式 raise 拒绝。
-    GLM 说明：仅真实 47 层 Glm4MoeLiteAttention + 已验证 D=256 tail32
+    GLM 说明：仅真实 47 层 Glm4MoeLiteAttention + 已验证 D=256 NoPE64
     生产子集注册；其余 GLM 架构或配置继续 fail-closed。
 
     【081（TL-E121-OUTPUT-SNAPSHOT-081）】snapshot：生产入口在模型
@@ -81,7 +81,7 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
                 or m.qk_rope_head_dim != 64 or m.v_head_dim != 256
                 for m in glm_targets):
             raise ValueError("GLM TLI 要求 20 heads 且 K=V=256=[NoPE192|RoPE64]")
-        if (getattr(args, "tli_subspace", "full") != "tail"
+        if (getattr(args, "tli_subspace", "full") != "nope"
                 or getattr(args, "tli_l2_subspace", "same") != "same"
                 or getattr(args, "tia_level2_cmp_ratio", None) != 4
                 or getattr(args, "tli_l2_quant", False)
@@ -89,8 +89,9 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
                 or getattr(args, "tli_proj_basis", None)
                 or getattr(args, "tli_proj_basis_all", None)):
             raise ValueError(
-                "GLM D=256 仅支持 tail + l2_subspace=same + cmp_ratio=4 "
-                "+ l2_quant=False，且禁用 static_pair/投影基")
+                "GLM D=256 仅支持 nope + l2_subspace=same + cmp_ratio=4 "
+                "+ l2_quant=False，且禁用 static_pair/投影基；"
+                "RoPE-only tail32 已证实丢失 NoPE 检索内容")
         unsupported = []
         if (getattr(args, "tli_far_skip_backend", "legacy") != "legacy"
                 or getattr(args, "tli_far_skip_cache", "retain") != "retain"):

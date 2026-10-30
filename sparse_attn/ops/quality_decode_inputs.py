@@ -1,8 +1,10 @@
 """Device-side input preparation outside the model's captured forward.
 
-One CTA owns each row, including its mutable lengths and output mask. Keeping
-all mask tiles in that CTA prevents a metadata-store/read race across CTAs.
-Sampling is still torch.argmax and the caller still reads every output step.
+两个有序 kernel 分工：每行一个 CTA 先推进并提交元数据，随后 row×tile CTA
+只读取已提交长度并写自己的 mask 区间。不同 tile 不再读写共享元数据，既消除
+跨 CTA store/read 竞争，也不受单个 Triton block 最大 65536 元素限制。采样
+仍是 torch.argmax；在线 EOS 的逐步读回与离线固定步数的最终读回由调用方
+分别处理。
 """
 import torch
 import triton
@@ -10,10 +12,9 @@ import triton.language as tl
 
 
 @triton.jit
-def _inject(Seed, Previous, Counts, Tokens, Positions, Pos, Lengths, Alive, Mask,
-            B: tl.constexpr, CAP: tl.constexpr, WIDTH: tl.constexpr,
-            FIRST: tl.constexpr, PAD: tl.constexpr, EOS: tl.constexpr,
-            MIN_NEW: tl.constexpr, NEG: tl.constexpr):
+def _advance(Seed, Previous, Counts, Tokens, Positions, Pos, Lengths, Alive,
+             B: tl.constexpr, FIRST: tl.constexpr, PAD: tl.constexpr,
+             EOS: tl.constexpr, MIN_NEW: tl.constexpr):
     row = tl.program_id(0)
     token = tl.load(Previous + row)
     if FIRST:
@@ -38,7 +39,15 @@ def _inject(Seed, Previous, Counts, Tokens, Positions, Pos, Lengths, Alive, Mask
     tl.store(Lengths + row, length)
     tl.store(Alive + row, live)
     tl.store(Counts + row, count)
-    cols = tl.arange(0, WIDTH)
+
+
+@triton.jit
+def _write_mask(Lengths, Mask, CAP: tl.constexpr, BLOCK: tl.constexpr,
+                NEG: tl.constexpr):
+    row = tl.program_id(0)
+    tile = tl.program_id(1)
+    length = tl.load(Lengths + row)
+    cols = tile * BLOCK + tl.arange(0, BLOCK)
     tl.store(Mask + row * CAP + cols, tl.where(cols < length, 0., NEG), cols < CAP)
 
 
@@ -55,9 +64,19 @@ class DeviceDecodeInputs:
         self.counts = torch.empty_like(lengths)
         self.pad, self.eos, self.minimum = pad_id, tuple(sorted(eos_ids)), min_new_tokens
 
-    def inject(self, step, previous):
-        _inject[(self.batch,)](
-            self.seed, previous, self.counts, *self.buffers,
-            B=self.batch, CAP=self.capacity, WIDTH=triton.next_power_of_2(self.capacity),
-            FIRST=step == 0, PAD=self.pad, EOS=self.eos, MIN_NEW=self.minimum,
-            NEG=torch.finfo(self.buffers[-1].dtype).min, num_warps=8)
+    def inject(self, step, previous, *, block=1024):
+        if block < 1 or block & (block - 1):
+            raise ValueError('device input block must be a positive power of two')
+        tokens, positions, pos, lengths, alive, mask = self.buffers
+        # 同一 CUDA stream 上先提交唯一行元数据，再让各 tile 读取新长度。
+        # 单 kernel 内 tile 0 与其他 tile 无同步，不能安全地承担这两个阶段。
+        _advance[(self.batch,)](
+            self.seed, previous, self.counts, tokens, positions, pos, lengths, alive,
+            B=self.batch, FIRST=step == 0, PAD=self.pad, EOS=self.eos,
+            MIN_NEW=self.minimum, num_warps=1)
+        _write_mask[(self.batch, triton.cdiv(self.capacity, block))](
+            lengths, mask, CAP=self.capacity, BLOCK=block,
+            NEG=torch.finfo(mask.dtype).min, num_warps=4)
+        # Triton 原地写入不会推进 PyTorch _version；为 eager 几何缓存提供
+        # 每步单调修订号，保留同一步跨层复用且禁止跨步 stale hit。
+        lengths._tli_device_revision = getattr(lengths, '_tli_device_revision', 0) + 1

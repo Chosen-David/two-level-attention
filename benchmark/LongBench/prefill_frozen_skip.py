@@ -11,7 +11,7 @@ import time
 import numpy as np
 import torch
 import transformers
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from transformers.cache_utils import DynamicCache
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
@@ -240,8 +240,13 @@ def main():
         calibration='query-relative page boundaries, last256 rows; head means; independent near/far mass comparisons, no joint budget')
     if args.attention == 'tli':
         from sparse_attn.ops.frozen_region_tli import tli_args
-        protocol['attention'] = 'tli-tail32-frozen-regions-reference'
-        protocol['tli_args'] = vars(tli_args())
+        model_type = AutoConfig.from_pretrained(args.model).model_type
+        treatment = tli_args(
+            subspace='nope' if model_type == 'glm4_moe_lite' else 'tail')
+        protocol['attention'] = ('tli-nope64-frozen-regions-reference'
+                                 if model_type == 'glm4_moe_lite' else
+                                 'tli-tail32-frozen-regions-reference')
+        protocol['tli_args'] = vars(treatment)
         protocol['tli_environment'] = {name:os.environ[name] for name in
             ('TLI_OPERATOR_MODE','TLI_FINE_GATHER','TLI_SPARSE_PREFILL','TLI_DECODE_DENSE')}
         for path in sorted((ROOT/'sparse_attn').rglob('*.py')):
@@ -268,7 +273,6 @@ def main():
     if args.attention == 'tli':
         from sparse_attn.patches import register_patch
         from sparse_attn.info import resolve_treatment_snapshot
-        treatment = tli_args()
         if register_patch(model,treatment,resolve_treatment_snapshot(treatment)) != model.config.num_hidden_layers:
             raise ValueError('incomplete TLI patch registration')
         model._frozen_tli = True

@@ -28,8 +28,26 @@ def test_warmup_streams_reuse_only_thread_device_without_request_owners(monkeypa
     assert len(created)==4
 
 
+def test_device_revision_invalidates_eager_graph_geometry_cache():
+    from sparse_attn.indexer import tli_indexer
+    valid_len=torch.zeros(1,dtype=torch.long)
+    geo=object();tli_indexer._GRAPH_GEO_CACHE.clear()
+    try:
+        assert tli_indexer._graph_geo_store(valid_len,'geometry',geo) is geo
+        assert tli_indexer._graph_geo_lookup(valid_len,'geometry') is geo
+        valid_len._tli_device_revision=1
+        assert tli_indexer._graph_geo_lookup(valid_len,'geometry') is None
+        tli_indexer._graph_geo_store(valid_len,'geometry',geo)
+        assert tli_indexer._graph_geo_lookup(valid_len,'geometry') is geo
+        valid_len._tli_device_revision=2
+        assert tli_indexer._graph_geo_lookup(valid_len,'geometry') is None
+    finally:
+        tli_indexer._GRAPH_GEO_CACHE.clear()
+
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires reserved GPU0')
-@pytest.mark.parametrize('batch,capacity', [(1,16384),(2,16400),(4,32768),(8,32785)])
+@pytest.mark.parametrize('batch,capacity', [(1,16384),(2,16400),(4,32768),(8,32785),
+                                           (1,65537),(2,131072)])
 @pytest.mark.parametrize('minimum', [1,2,4])
 def test_ragged_eos_reset_and_device_inputs(batch,capacity,minimum):
     device='cuda'
@@ -84,7 +102,7 @@ def test_static_decode_device_and_original_host_match(monkeypatch,minimum,eos):
 
     monkeypatch.setenv('TLI_REUSE_WARMUP_STREAM','1')
     results=[];streams=[]
-    for graph_mode,input_mode in [('0','0'),('1','0'),('1','1')]:
+    for graph_mode,input_mode in [('0','0'),('0','1'),('1','0'),('1','1')]:
         monkeypatch.setenv('TLI_CUDA_GRAPH',graph_mode)
         monkeypatch.setenv('TLI_DEVICE_DECODE_INPUTS',input_mode)
         model=Toy();lens=[10000,10003,10007,10011]
@@ -108,6 +126,44 @@ def test_static_decode_device_and_original_host_match(monkeypatch,minimum,eos):
             if len(streams)==2:
                 assert streams[0]==streams[1]
                 assert receipt['warmup_stream_reused'] is True
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='requires reserved GPU0')
+@pytest.mark.parametrize('graph_mode', ['0', '1'])
+@pytest.mark.parametrize('input_mode', ['0', '1'])
+def test_fixed_step_graph_eager_avoid_per_step_readback(monkeypatch, graph_mode, input_mode):
+    from sparse_attn.baseline_runtime import BatchCtx
+    from sparse_attn.ops.quality_graph import static_decode
+    from sparse_attn.ops.tli_static_cache import TLIStaticCache
+
+    class Toy(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight = torch.nn.Parameter(torch.zeros(1, device='cuda', dtype=torch.bfloat16))
+            self.config = SimpleNamespace(num_hidden_layers=1, model_type='toy')
+
+        def forward(self, input_ids, past_key_values, **kwargs):
+            state = input_ids.to(torch.bfloat16).view(1, 1, 1, 1).expand(1, 1, 1, 4)
+            past_key_values.update(state, state, 0)
+            return SimpleNamespace(logits=torch.nn.functional.one_hot((input_ids + 1) % 8, 8).float())
+
+    monkeypatch.setenv('TLI_CUDA_GRAPH', graph_mode)
+    monkeypatch.setenv('TLI_DEVICE_DECODE_INPUTS', input_mode)
+    monkeypatch.setenv('TLI_QUALITY_TIMING', '1')
+    model = Toy()
+    cache = TLIStaticCache(model.config, 16384, 1)
+    cache.layers[0].lazy_initialization(torch.zeros(1, 1, 1, 4, device='cuda', dtype=torch.bfloat16))
+    ctx = BatchCtx(1, [10000], [0], [True], 0)
+    with torch.inference_mode():
+        result = static_decode(model, cache, [[1]], [10000], {2}, 7, ctx,
+                               online_eos=False)
+    assert result == [[1, 2, 3, 4, 5, 6, 7]]
+    receipt = model._quality_graph_execution
+    assert receipt['generation_mode'] == 'fixed_steps'
+    assert receipt['token_readback'] == 'final'
+    assert receipt['timing']['decode_steps'] == 6
+    assert receipt['timing']['step_timing_scope'] == 'host_submit_only'
+    assert receipt['timing']['output_readback_wall_ms'] >= 0
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires reserved GPU0')
@@ -141,8 +197,8 @@ def test_default_device_input_capacity_boundary(monkeypatch, capacity):
             assert static_decode(model, cache, [[1]], [10000], set(), 3, ctx) == [[1, 2, 3]]
         receipt = model._quality_graph_execution
         assert receipt['input_update_requested'] == '1'
-        assert receipt['input_update_route'] == ('device_row_fused' if capacity == 65536 else 'host_reference')
-        assert receipt['input_update_fallback'] == (None if capacity == 65536 else 'capacity_above_65536')
+        assert receipt['input_update_route'] == 'device_row_fused'
+        assert receipt['input_update_fallback'] is None
         streams.append(receipt['warmup_stream'])
         if len(streams) == 2:
             assert streams[0] == streams[1] and receipt['warmup_stream_reused']
