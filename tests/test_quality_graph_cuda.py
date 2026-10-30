@@ -48,7 +48,9 @@ def model_for(kind,gate=False):
 
 
 @pytest.mark.parametrize('kind,gate',[('qwen',False),('qwen',True),('glm',False),('glm',True)])
-def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,gate):
+@pytest.mark.parametrize('input_mode',['0','1'])
+def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,gate,input_mode):
+    monkeypatch.setenv('TLI_DEVICE_DECODE_INPUTS',input_mode)
     for key in ('TLI_LIVE_NORMALIZATION', 'TLI_SPARSE_SELECTION', 'TLI_SPARSE_STATS'):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv('TLI_QUALITY_TIMING', '1')
@@ -68,6 +70,8 @@ def test_real_hf_graph_and_static_eager_generate_same_tokens(monkeypatch,kind,ga
                     result=from_dynamic(model,past,first,5,set())
                     assert model._quality_graph_execution['captures']==1
                     assert model._quality_graph_execution['replay_steps']==4
+                    assert model._quality_graph_execution['input_update_route']==(
+                        'device_row_fused' if input_mode=='1' else 'host_reference')
                     layers = model._quality_graph_execution['capture_layers']
                     assert len(layers) == 2
                     for receipt, layer in zip(layers, model.model.layers):
@@ -124,7 +128,9 @@ def test_cuda_deferred_failure_prevents_publication_for_graph_and_eager(monkeypa
 
 
 @pytest.mark.parametrize('failure_stage', ['allocation', 'receipt'])
-def test_capture_oom_auto_recovers_on_static_cache_and_strict_aborts(monkeypatch, failure_stage):
+@pytest.mark.parametrize('input_mode',['0','1'])
+def test_capture_oom_auto_recovers_on_static_cache_and_strict_aborts(monkeypatch, failure_stage,input_mode):
+    monkeypatch.setenv('TLI_DEVICE_DECODE_INPUTS',input_mode)
     torch.manual_seed(321)
     model=model_for('qwen')
     ids=torch.randint(0,128,(1,16384),device='cuda')
@@ -151,6 +157,9 @@ def test_capture_oom_auto_recovers_on_static_cache_and_strict_aborts(monkeypatch
                         assert 'capture_failed:OutOfMemoryError' in model._quality_graph_execution['fallback_reason']
                         assert model._quality_graph_execution['actual']=='staged_static'
                         assert model._quality_graph_execution['captures'] == 0
+                        assert model._quality_graph_execution['input_update_route']=='host_reference'
+                        assert model._quality_graph_execution['input_update_fallback']==(
+                            'graph_not_captured' if input_mode=='1' else None)
                         assert 'capture_layers' not in model._quality_graph_execution
         monkeypatch.setenv('TLI_CUDA_GRAPH','1')
         with eager_decoding_request_guard():

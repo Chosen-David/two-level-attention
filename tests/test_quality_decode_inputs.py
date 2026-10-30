@@ -82,7 +82,8 @@ def test_static_decode_device_and_original_host_match(monkeypatch,minimum,eos):
             logits=torch.nn.functional.one_hot((input_ids+1)%8,8).float()
             return SimpleNamespace(logits=logits)
 
-    results=[]
+    monkeypatch.setenv('TLI_REUSE_WARMUP_STREAM','1')
+    results=[];streams=[]
     for graph_mode,input_mode in [('0','0'),('1','0'),('1','1')]:
         monkeypatch.setenv('TLI_CUDA_GRAPH',graph_mode)
         monkeypatch.setenv('TLI_DEVICE_DECODE_INPUTS',input_mode)
@@ -102,3 +103,8 @@ def test_static_decode_device_and_original_host_match(monkeypatch,minimum,eos):
         receipt=model._quality_graph_execution
         assert receipt['input_update_route']==('device_row_fused' if input_mode=='1' else 'host_reference')
         assert receipt['input_update_fallback'] is None
+        if graph_mode=='1':
+            streams.append(receipt['warmup_stream'])
+            if len(streams)==2:
+                assert streams[0]==streams[1]
+                assert receipt['warmup_stream_reused'] is True
