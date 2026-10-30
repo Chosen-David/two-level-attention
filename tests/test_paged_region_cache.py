@@ -1,3 +1,6 @@
+import gc
+import weakref
+
 import pytest
 import torch
 from sparse_attn.ops.paged_region_cache import PagedRegionLayer,PagedRegionCache
@@ -97,3 +100,110 @@ def test_ring_probability_rounding_tracks_fallbacks(monkeypatch,length,width,vwi
     monkeypatch.setattr(eager,'_HAS_TRITON',True)
     monkeypatch.setitem(eager._EAGER_TRITON_OK,'ok',healthy)
     assert ring_rounds_probabilities(length,width,vwidth,cuda=cuda)==expected
+
+
+@pytest.mark.parametrize('near,far',[(False,False),(True,False),(False,True),(True,True)])
+@torch.inference_mode()
+def test_freeze_reclaims_exact_whole_pages_and_releases_tensor_references(near,far):
+    g=RegionGeometry(sink=2,near=32,window=17,page=16,max_new_tokens=32)
+    layer=PagedRegionLayer(g);k=torch.randn(1,2,133,8);v=torch.randn(1,2,133,6)
+    layer.update(k,v)
+    refs={lp:(weakref.ref(page[1]),weakref.ref(page[2])) for lp,page in layer.pages.items()}
+    before_bytes=layer.report()['kv_bytes'];before_pages=set(layer.pages)
+    sample=next(iter(layer.pages.values()))
+    page_bytes=(sample[1].numel()+sample[2].numel())*k.element_size()
+    s,f,n=g.bounds(layer.logical_length)
+    resident=set(range(s))|set(range(n,layer.logical_length))
+    if not far:resident|=set(range(s,f))
+    if not near or not far:resident|=set(range(f,n))
+    expected={lp for lp in before_pages if any(p in resident for p in range(lp*g.page,min((lp+1)*g.page,layer.logical_length)))}
+    layer.freeze(near,far);gc.collect()
+    report=layer.report()
+    assert set(layer.pages)==expected
+    assert report['reclaimed_pages']==len(before_pages-expected)
+    assert report['kv_bytes']==before_bytes-len(before_pages-expected)*page_bytes
+    assert report['resident_tokens']==len(resident)
+    assert report['inactive_retained_slots']==len(expected)*g.page-len(resident)
+    for lp in before_pages-expected:
+        assert refs[lp][0]() is None and refs[lp][1]() is None
+    for lp in expected:
+        assert refs[lp][0]() is not None and refs[lp][1]() is not None
+
+
+@torch.inference_mode()
+def test_near_only_staging_is_invisible_then_ages_into_visible_far_without_initial_savings():
+    g=RegionGeometry(sink=2,near=32,window=17,page=16,max_new_tokens=40)
+    layer=PagedRegionLayer(g);x=torch.randn(1,2,133,8)
+    layer.update(x,x);before=layer.report();_,f,n=g.bounds(layer.logical_length)
+    layer.freeze(True,False);after=layer.report()
+    assert after['kv_bytes']==before['kv_bytes']
+    assert after['live_pages']==before['live_pages']
+    assert after['resident_tokens']==layer.logical_length
+    assert after['attention_tokens']==layer.logical_length-(n-f)
+    assert f not in layer.visible_positions()
+    for step in range(g.page):
+        layer.update(x[:,:,:1],x[:,:,:1])
+    assert g.bounds(layer.logical_length)[1]>f
+    assert f in layer.visible_positions()
+    assert layer.report()['resident_tokens']==layer.logical_length
+    assert layer.aging_copy_bytes==0
+
+
+@torch.inference_mode()
+def test_interleaved_requests_keep_independent_pages_positions_and_free_lists():
+    g=RegionGeometry(sink=2,near=32,window=17,page=16,max_new_tokens=80)
+    near_only=PagedRegionLayer(g);both=PagedRegionLayer(g)
+    a=torch.randn(1,2,133,8);b=torch.randn(1,2,133,8)+1000
+    near_only.update(a,a);both.update(b,b)
+    near_only.freeze(True,False);both.freeze(True,True)
+    for step in range(48):
+        na=torch.full((1,2,1,8),float(step));nb=na+1000
+        near_only.update(na,na);both.update(nb,nb)
+        assert near_only.visible_positions()[0]==0
+        assert both.visible_positions()==list(range(2))+list(range(both.logical_length-17,both.logical_length))
+        for lp,(_,pk,_) in both.pages.items():
+            lo=lp*g.page;hi=min(lo+g.page,both.logical_length)
+            expected=torch.cat([b,torch.arange(step+1,dtype=b.dtype).reshape(1,1,-1,1).expand(1,2,-1,8)+1000],2)
+            torch.testing.assert_close(pk[:,:,:hi-lo],expected[:,:,lo:hi],rtol=0,atol=0)
+        for pa,pb in zip(near_only.pages.values(),both.pages.values()):
+            assert pa[1].untyped_storage().data_ptr()!=pb[1].untyped_storage().data_ptr()
+    assert near_only.reclaimed_pages==0
+    assert both.reclaimed_pages>0 and both.reused_page_ids>0
+
+
+@torch.inference_mode()
+def test_failed_page_copy_rolls_back_and_can_retry(monkeypatch):
+    layer=PagedRegionLayer(RegionGeometry(sink=2,near=8,window=4,page=8,max_new_tokens=8))
+    x=torch.randn(1,2,13,8);layer.update(x,x);layer.freeze(False,False)
+    before=layer.report();offset=layer.logical_length%layer.geometry.page
+    target=layer.pages[layer.logical_length//layer.geometry.page][2]
+    snapshots={lp:(page[1].clone(),page[2].clone()) for lp,page in layer.pages.items()}
+    original=torch.Tensor.copy_;failed=[False]
+    def fail_once_after_value_copy(self,src,*args,**kwargs):
+        result=original(self,src,*args,**kwargs)
+        if not failed[0] and self.data_ptr()==target[...,offset:offset+1,:].data_ptr():
+            failed[0]=True;raise RuntimeError('injected copy failure')
+        return result
+    monkeypatch.setattr(torch.Tensor,'copy_',fail_once_after_value_copy)
+    incoming=torch.randn(1,2,1,8)
+    with pytest.raises(RuntimeError,match='injected copy failure'):
+        layer.update(incoming,incoming)
+    assert failed[0] and layer.report()==before
+    for lp,page in layer.pages.items():
+        torch.testing.assert_close(page[1],snapshots[lp][0],rtol=0,atol=0)
+        torch.testing.assert_close(page[2],snapshots[lp][1],rtol=0,atol=0)
+    layer.update(incoming,incoming)
+    assert layer.logical_length==before['logical_length']+1
+
+
+@torch.inference_mode()
+def test_native_decode_cannot_silently_attend_only_incoming_kv():
+    cache=PagedRegionCache(1,RegionGeometry(near=4,window=2,page=4))
+    x=torch.randn(1,1,12,8);cache.update(x,x,0)
+    cache.freeze({0:dict(skip_near=False,skip_far=False)})
+    before=cache.report()
+    with pytest.raises(ValueError,match='patched direct-page consumer'):
+        cache.update(x[:,:,:1],x[:,:,:1],0)
+    assert cache.report()==before
+    cache.update_for_paged_decode(x[:,:,:1],x[:,:,:1],0)
+    assert cache.layers[0].logical_length==13

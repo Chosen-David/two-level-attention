@@ -1,5 +1,5 @@
 """Paired model correctness replay, without timing or performance measurement."""
-import argparse,hashlib,json,os,subprocess
+import argparse,gc,hashlib,json,os,subprocess
 from pathlib import Path
 import torch
 from transformers import AutoModelForCausalLM,AutoTokenizer
@@ -24,7 +24,9 @@ def main():
     ids=tokenizer('Remember hidden number 57291. Explain the evidence precisely. '*a.length,add_special_tokens=False).input_ids[:a.length]
     tokens=tokenizer(' evidence and context support the answer. '*a.steps,add_special_tokens=False).input_ids[:a.steps]
     result=dict(status='pending_independent_validation',scope='fixed replay correctness; not free generation quality, speed or memory performance',
-                args=vars(a),input_ids=ids,replay_ids=tokens,commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),records=[])
+                pid=os.getpid(),device=torch.cuda.get_device_name(),
+                args=vars(a),input_ids=ids,replay_ids=tokens,commit=subprocess.check_output(
+                    ['git','-C',str(Path(__file__).resolve().parents[2]),'rev-parse','HEAD'],text=True).strip(),records=[])
     for mode in ['keep','near','far','both']:
         reference=None
         for kind,cls in [('ring',FrozenRegionCache),('paged',PagedRegionCache)]:
@@ -35,7 +37,17 @@ def main():
                 out=model(torch.tensor([ids],device='cuda'),past_key_values=cache,use_cache=True,logits_to_keep=1)
                 if not torch.isfinite(out.logits).all():raise RuntimeError('nonfinite prefill')
                 decisions={i:dict(skip_near=mode in ['near','both'],skip_far=mode in ['far','both']) for i in range(model.config.num_hidden_layers)}
-                cache.freeze(decisions);record['frozen_cache']=cache.report()
+                torch.cuda.synchronize();record['active_cuda_bytes_before_freeze']=torch.cuda.memory_allocated()
+                record['prefill_cache']=cache.report()
+                cache.freeze(decisions);gc.collect();torch.cuda.synchronize()
+                record['active_cuda_bytes_after_freeze']=torch.cuda.memory_allocated()
+                record['active_cuda_bytes_reclaimed']=(record['active_cuda_bytes_before_freeze']-
+                    record['active_cuda_bytes_after_freeze'])
+                record['frozen_cache']=cache.report()
+                if kind=='paged':
+                    kv_delta=record['prefill_cache']['kv_bytes']-record['frozen_cache']['kv_bytes']
+                    # active allocation 必须与实际整页释放完全一致，而非理论 mask 字节。
+                    assert record['active_cuda_bytes_reclaimed']==kv_delta,(mode,kv_delta,record['active_cuda_bytes_reclaimed'])
                 for step,token in enumerate(tokens,1):
                     out=model(torch.tensor([[token]],device='cuda'),past_key_values=cache,attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
                     logits=out.logits[:,-1].float().cpu();finite=bool(torch.isfinite(logits).all());outputs.append(logits)
@@ -47,6 +59,10 @@ def main():
                         raise RuntimeError('nonfinite decode; outputs retained')
                 record['final_cache']=cache.report()
                 record['final_receipts']=[l.tli_receipt for l in cache.layers]
+                if kind=='paged' and mode=='both':
+                    assert all(r['scorer']=='protected_only' and r['l1_calls']==0 and
+                               r['l2_calls']==0 and r['selection_topk_calls']==0
+                               for r in record['final_receipts'])
             outputs=torch.stack(outputs);tensor_path=destination/f'{mode}_{kind}.pt';torch.save(outputs,tensor_path)
             record.update(logits_file=tensor_path.name,logits_sha256=hashlib.sha256(tensor_path.read_bytes()).hexdigest())
             if reference is None:reference=outputs

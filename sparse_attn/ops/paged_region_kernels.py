@@ -131,7 +131,8 @@ def paged_attention(layer,q,mask,scale,*,ring_arithmetic=False):
         positions=torch.arange(layer.logical_length,device=q.device).expand(hk,-1)
         candidates=positions.masked_fill(~selected,-1)
         count=int(counts.max())
-        indices=candidates.topk(count,dim=-1,sorted=True).values.flip(-1).contiguous()
+        # 这里仅压缩已选位置，不是 L2 top-k；用排序避免与选择器 top-k 混淆。
+        indices=candidates.sort(dim=-1,descending=True).values[:,:count].flip(-1).contiguous()
         out=q.new_empty((1,1,hq,v.shape[-1]))
         kp,vp=layer.pointer_tables()
         _attend[(hq,)](q.contiguous(),kp,vp,indices,out,hq,hk,k.shape[-1],v.shape[-1],layer.geometry.page,

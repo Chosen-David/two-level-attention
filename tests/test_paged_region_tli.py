@@ -5,6 +5,7 @@ from sparse_attn.ops.frozen_region_cache import RegionGeometry,RegionCacheLayer,
 from sparse_attn.ops.paged_region_cache import PagedRegionLayer,PagedRegionCache
 from sparse_attn.ops.frozen_region_tli import region_mask,tli_args
 from sparse_attn.ops.paged_region_tli import region_selection
+from sparse_attn.ops.paged_region_kernels import paged_attention
 from sparse_attn.indexer.tli_indexer import TLIIndexer
 
 @pytest.fixture(autouse=True)
@@ -48,3 +49,38 @@ def test_patched_qwen_logits_ring_vs_paged(near,far):
         a=model(token,past_key_values=ring,attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
         b=model(token,past_key_values=paged,attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
         torch.testing.assert_close(a.logits,b.logits,rtol=1e-5,atol=2e-6)
+
+
+@torch.inference_mode()
+def test_both_skip_has_zero_selector_calls_and_attention_reads_only_protected_pages(monkeypatch):
+    torch.manual_seed(818);length=4300
+    layer=PagedRegionLayer(RegionGeometry(max_new_tokens=8))
+    k=torch.randn(1,2,length,128);v=torch.randn(1,2,length,128)
+    layer.update(k,v);layer.freeze(True,True)
+    q=torch.randn(1,8,1,128);idx=TLIIndexer(tli_args());idx.layer_idx=0
+    def forbidden(*args,**kwargs):
+        raise AssertionError('both-skip invoked projection, L1/L2, top-k or KV concatenation')
+    for name in ('compute_score','compute_mask','_select_l1_blocks','_subspace_indices'):
+        monkeypatch.setattr(idx,name,forbidden)
+    monkeypatch.setattr(layer,'project_visible',forbidden)
+    monkeypatch.setattr(torch,'topk',forbidden)
+    mask,receipt=region_selection(idx,q,layer,128**-.5)
+    protected=list(range(idx.sink_tokens))+list(range(length-idx.sliding_window_size,length))
+    assert receipt['scorer']==receipt['selector']=='protected_only'
+    assert receipt['l1_calls']==receipt['l2_calls']==receipt['selection_topk_calls']==0
+    assert receipt['index_scratch_bytes']==0
+    assert mask.shape==(1,1,2,length)
+    assert mask.sum(-1).flatten().tolist()==[len(protected)]*2
+    assert mask.any(dim=(0,1,2)).nonzero().flatten().tolist()==protected
+    expected=torch.nn.functional.scaled_dot_product_attention(
+        q,k[:,:,protected].repeat_interleave(4,1),v[:,:,protected].repeat_interleave(4,1),
+        scale=128**-.5).transpose(1,2)
+    # 非支持集即使含 NaN 也不能影响输出；禁止拼接以抓住全可见 KV gather 回退。
+    for lp,(_,pk,pv) in layer.pages.items():
+        positions=torch.arange(layer.geometry.page)+lp*layer.geometry.page
+        hidden=(positions>=idx.sink_tokens)&(positions<length-idx.sliding_window_size)&(positions<length)
+        pk[:,:,hidden]=float('nan');pv[:,:,hidden]=float('nan')
+    monkeypatch.setattr(torch,'cat',forbidden)
+    actual=paged_attention(layer,q,mask,128**-.5)
+    assert torch.isfinite(actual).all()
+    torch.testing.assert_close(actual,expected,atol=2e-6,rtol=2e-6)

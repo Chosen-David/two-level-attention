@@ -107,21 +107,49 @@ class PagedRegionLayer(CacheLayerMixin):
                 raise ValueError('KV shape changed across request')
         p=self.geometry.page
         start=self.logical_length
-        # Reclaim before appending at a page boundary; protected partial pages
-        # stay allocated until their last live token leaves the protection span.
-        self.logical_length+=n
+        new_length=start+n
+        allocated=[]
+        touched={}
+        free_before=list(self.free_ids)
+        next_before=self.next_id
+        reused_before=self.reused_page_ids
+        tables_before=self._tables
+        write_before=self.write_bytes
+        try:
+            cursor=0
+            while cursor<n:
+                absolute=start+cursor;lp,offset=divmod(absolute,p)
+                count=min(p-offset,n-cursor)
+                if lp not in self.pages:
+                    self._allocate(lp,keys,values)
+                    allocated.append(lp)
+                _,k,v=self.pages[lp]
+                if lp not in allocated and lp not in touched:
+                    # 仅备份本次覆盖的尾部槽位；分配、拷贝或回收前异常均可原子回滚。
+                    touched[lp]=(offset,count,
+                        k[...,offset:offset+count,:].clone(),v[...,offset:offset+count,:].clone())
+                k[...,offset:offset+count,:].copy_(keys[...,cursor:cursor+count,:])
+                v[...,offset:offset+count,:].copy_(values[...,cursor:cursor+count,:])
+                self.write_bytes+=(k.shape[1]*k.shape[-1]+v.shape[1]*v.shape[-1])*count*k.element_size()
+                cursor+=count
+        except Exception:
+            for lp,(offset,count,old_k,old_v) in touched.items():
+                _,k,v=self.pages[lp]
+                k[...,offset:offset+count,:].copy_(old_k)
+                v[...,offset:offset+count,:].copy_(old_v)
+            for lp in allocated:
+                self.pages.pop(lp,None)
+            self.free_ids=free_before
+            heapq.heapify(self.free_ids)
+            self.next_id=next_before
+            self.reused_page_ids=reused_before
+            self._tables=tables_before
+            self.write_bytes=write_before
+            raise
+        # 只有全部页写入成功才提交逻辑边界并回收旧页，避免半追加状态。
+        self.logical_length=new_length
+        if prefill:self.prompt_length=new_length
         if self.frozen:self._reclaim()
-        cursor=0
-        while cursor<n:
-            absolute=start+cursor;lp,offset=divmod(absolute,p)
-            count=min(p-offset,n-cursor)
-            if lp not in self.pages:self._allocate(lp,keys,values)
-            _,k,v=self.pages[lp]
-            k[...,offset:offset+count,:].copy_(keys[...,cursor:cursor+count,:])
-            v[...,offset:offset+count,:].copy_(values[...,cursor:cursor+count,:])
-            self.write_bytes+=(k.shape[1]*k.shape[-1]+v.shape[1]*v.shape[-1])*count*k.element_size()
-            cursor+=count
-        if prefill:self.prompt_length=self.logical_length
         # Prefill returns original complete tensors. Decode is consumed by the
         # paged adapter, which must not interpret these as a gathered history.
         return keys,values
@@ -170,6 +198,15 @@ class PagedRegionCache(Cache):
 
     def __init__(self,n_layers,geometry=RegionGeometry()):
         super().__init__(layers=[PagedRegionLayer(geometry) for _ in range(n_layers)])
+    def update(self,key_states,value_states,layer_idx,cache_kwargs=None):
+        if self.layers[layer_idx].frozen:
+            # 通用 HF attention 会把返回值当作完整历史；只允许直接分页消费者写入。
+            raise ValueError('frozen paged decode requires the patched direct-page consumer')
+        return super().update(key_states,value_states,layer_idx,cache_kwargs)
+    def update_for_paged_decode(self,key_states,value_states,layer_idx,cache_kwargs=None):
+        if not self.layers[layer_idx].frozen:
+            raise ValueError('freeze gates before direct-page decode')
+        return super().update(key_states,value_states,layer_idx,cache_kwargs)
     def freeze(self,decisions):
         if set(decisions)!=set(range(len(self.layers))):raise ValueError('all layers need frozen decisions')
         for li,layer in enumerate(self.layers):layer.freeze(**decisions[li])

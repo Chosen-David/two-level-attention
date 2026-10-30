@@ -10,7 +10,21 @@ def region_selection(indexer,q,layer,scale):
     if (idx.subspace!='tail' or idx.l2_subspace!='same' or idx.gamma is not None or idx._basis_all is not None
         or idx.far_select!='4bit' or idx.near_select!='4bit' or idx.per_q_head or idx.enable_async):
         raise ValueError('paged reference supports ordinary shared-head tail TLI')
-    length=layer.logical_length;dims=idx._subspace_indices(q.device);bs=idx.args.tia_block_size
+    length=layer.logical_length
+    if layer.skip_near and layer.skip_far:
+        # Near/Far 均已物理回收，唯一合法支持集是永久保护的 Sink+SWA。
+        # 不构造投影、不运行 L1/L2，也不通过 top-k 重新发现已删除区域。
+        logical=torch.arange(length,device=q.device)
+        protected=(logical<idx.sink_tokens)|(logical>=max(0,length-idx.sliding_window_size))
+        key_heads=next(iter(layer.pages.values()))[1].shape[1]
+        mask=protected[None,None,None].expand(1,1,key_heads,length)
+        receipt=dict(subspace=idx.subspace,dimensions=[],logical_tokens=length,
+            visible_tokens=int(mask[0,0,0].sum()),selected_per_kv_head=mask.sum(-1).flatten().tolist(),
+            scorer='protected_only',selector='protected_only',skip_near=True,skip_far=True,
+            l1_calls=0,l2_calls=0,selection_topk_calls=0,kv_route='direct_page_table',
+            full_width_gather_bytes=0,index_scratch_bytes=0)
+        return mask,receipt
+    dims=idx._subspace_indices(q.device);bs=idx.args.tia_block_size
     projected=layer.project_visible(dims,bs);pages=projected.reshape(1,-1,bs,projected.shape[2],dims.numel())
     fine=projected[:,:length]
     if idx.l2_quant:fine=idx.min_max_per_token_quant(fine)
@@ -34,7 +48,7 @@ def region_selection(indexer,q,layer,scale):
 def decode(module,q,k,v,cache,cache_position):
     layer=cache.layers[module.layer_idx]
     if not layer.frozen:raise ValueError('freeze before paged decode')
-    cache.update(k,v,module.layer_idx,dict(cache_position=cache_position))
+    cache.update_for_paged_decode(k,v,module.layer_idx,dict(cache_position=cache_position))
     module.indexer.skip_far=layer.skip_far
     mask,receipt=region_selection(module.indexer,q,layer,module.scaling)
     layer.tli_receipt=receipt
