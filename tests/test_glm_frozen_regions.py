@@ -43,6 +43,11 @@ def test_real_glm_class_region_decode(monkeypatch,mode):
     assert result['quest_protocol']['freeze_logical_position']==4347
     assert result['quest_protocol']['suffix_logical_range']==[4347,4352]
     assert result['final_kv']['layers'][0]['logical_length']==4354
+    steps=result['attention_work']['steps']
+    assert [step['input_token_id'] for step in steps]==list(quest.suffix_ids)+result['generated_ids'][:-1]
+    assert all(step['layers'][0]['attended_per_kv_head']==step['layers'][0]['selected_per_kv_head']
+               for step in steps)
+    assert steps[-1]['layers'][0]['selected_per_kv_head']==receipt['selected_per_kv_head']
     if mode=='full':assert result['generated_ids']==generate_native(model,quest,3,'cpu')
     if mode=='near':assert not result['frozen_kv']['layers'][0]['nodes']['near_staging']['attention_visible']
 

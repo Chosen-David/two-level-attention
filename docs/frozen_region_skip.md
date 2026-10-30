@@ -2,13 +2,21 @@
 
 Opt-in Qwen3 and GLM-4.7-Flash TLI eager inference reference. This does not change the default TLI
 path or enable operator/graph optimizations. Supports unpadded batch size 1,
-one-shot dense prefill and single-token decode.
+one-shot dense material-prefix prefill and single-token suffix/answer decode.
 
-Prefill profiles the last min(256, prompt length) queries, with causal,
+The Quest input is tokenized once after rendering. A task anchor or the final
+100 characters, whichever starts later, defines the requested suffix boundary;
+a BPE token crossing that boundary belongs wholly to the suffix. The canonical
+invariant is `prefix_ids + suffix_ids == full_ids`. Only the material prefix is
+densely prefilled, profiled and frozen. The suffix is then replayed token by
+token through the frozen cache before ordinary answer generation. A full-prompt
+prefill followed by prefix recomputation is not an equivalent protocol.
+
+Prefill profiles the last min(256, material-prefix length) queries, with causal,
 query-relative page boundaries. Each layer independently compares mean Near
 and Far attention mass with **0.05**, strictly less than the threshold. Decisions
-freeze for the entire decode. Both regions may qualify independently; there
-is no combined mass budget.
+freeze for suffix replay and the entire answer decode, without recalibration.
+Both regions may qualify independently; there is no combined mass budget.
 
 The physical cache chain is `sink -> far -> near -> SWA`, with a linear Far
 buffer and bounded Near/SWA rings. Geometry: sink 4, SWA 128, Near 4096,
@@ -39,6 +47,14 @@ Near tokens=off. Projected scratch is temporary logical-length storage: this
 is an accuracy reference, not a measured peak-memory or speed optimization.
 Beam search, chunked prefill, batches, gradients and CUDA Graphs are unsupported.
 
+Each suffix and answer-decode query records `attention_work`: logical position,
+visible KV and actual unique valid attended keys per KV head and layer. TLI uses
+the real post-L1/L2 `selected_per_kv_head`; the non-TLI reference uses the visible
+cache size. K1=128 is only the coarse-candidate budget and K2=1024 only the fine
+selection budget; neither is reported as actual attended-K. These decode counts
+exclude dense prefill. The older `frozen_attention_token_ratio_mean` is only a
+freeze-time visible-KV proxy, not a decode-work measurement.
+
 ## Run the validated comparison
 
 ```sh
@@ -50,30 +66,45 @@ TLI_SCORER_BACKEND=difflib python -m benchmark.LongBench.prefill_frozen_skip \
 ```
 
 This runs gates-off (`full`), Far-only and independent Near/Far on all rows of
-Qasper, HotpotQA, Musique, GovReport and RepoBench-p. `full` means TLI gates-off,
-not dense attention. `--samples 20` selects a smaller screen. For disjoint
-workers use matching `--world-size N` and unique `--rank 0..N-1`; use a fresh
-output directory when code, input or configuration changes. Context cap=31500.
-The runner pins operator mode off, fine gather off, dense prefill and sparse
-decode. Its generic `--attention sdpa` mode is a separate reference experiment.
+the 16 English/code LongBench V1 tasks: NarrativeQA, Qasper, MultiFieldQA-en,
+HotpotQA, 2WikiMultihopQA, MuSiQue, GovReport, QMSum, MultiNews, TREC, TriviaQA,
+SAMSum, PassageCount, PassageRetrieval-en, LCC and RepoBench-p. `full` means TLI
+gates-off, not dense attention. `--samples 20` selects a smaller subset. For
+disjoint workers use matching `--world-size N` and unique `--rank 0..N-1`; use
+a fresh output directory when code, input or configuration changes.
+
+The default 31,500-token budget truncates the raw prompt before chat-template
+rendering; it is **not** a final 32,768-token input cap. TREC, TriviaQA, SAMSum,
+LCC and RepoBench-p do not use the chat template. SAMSum uses EOS/newline stop
+IDs with first-token EOS suppression. The runner pins operator mode off, fine
+gather off, dense material-prefix prefill and sparse decode. Its generic
+`--attention sdpa` mode is a separate reference experiment.
 
 After all workers complete:
 
 ```sh
-python -m benchmark.LongBench.validate_frozen_skip agent_doc/results/frozen_region_skip_RUN_ID
+python -m benchmark.LongBench.validate_frozen_skip agent_doc/results/frozen_region_skip_RUN_ID \
+  --data /path/to/LongBench/data
 python -m benchmark.LongBench.analyze_frozen_skip agent_doc/results/frozen_region_skip_RUN_ID
 python -m benchmark.LongBench.export_frozen_skip agent_doc/results/frozen_region_skip_RUN_ID
 ```
 
+The validator reconstructs the same canonical token stream and verifies prefix
+freeze, suffix replay, stop rules, per-step attended-K and cache invariants.
+Analyzer/export use a task-stratified macro average over exactly the tasks in the
+manifest (16 for the default run), not a hard-coded five-task average.
+
 ## Accepted evidence and limits
 
-Historical full evaluation: source `3e4a6885604ac3e719ee92a4906f87b532535314`,
-1300 paired inputs / 3900 generations / 64 completed shards. Dual AVG5
-48.239706 -> 48.154300 (-0.085406 percentage points); largest task decline
-Qasper -0.683604 points. Musique had no per-request score decline. User accepted
-up to 3 points of task-mean/AVG5 degradation after inspecting the results;
-this is engineering acceptance, not a pre-registered equivalence test.
-Near-only activated in 19 requests, both-skip in 2; coverage is limited.
+Historical **old one-shot full-prompt, five-task** evaluation: source
+`3e4a6885604ac3e719ee92a4906f87b532535314`, 1300 paired inputs / 3900 generations /
+64 completed shards. Dual AVG5 48.239706 -> 48.154300 (-0.085406 percentage
+points); largest task decline Qasper -0.683604 points. Musique had no per-request
+score decline. User accepted up to 3 points of task-mean/AVG5 degradation after
+inspecting the results; this is engineering acceptance, not a pre-registered
+equivalence test. Near-only activated in 19 requests, both-skip in 2; coverage
+is limited. These figures are retained as historical evidence and are not Quest
+prefix-freeze or 16-task main-protocol results.
 
 Independent review checked stored predictions, scores, input identities and
 cache/gate receipts, without independently rerunning GPU generation. Evidence

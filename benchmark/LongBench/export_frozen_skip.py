@@ -9,6 +9,10 @@ from pathlib import Path
 def digest(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def macro(entry):
+    return entry.get('macro_avg',entry.get('avg5'))
+
+
 def write_tsv(path,columns,rows):
     with path.open('w',newline='') as stream:
         writer=csv.writer(stream,delimiter='\t');writer.writerow(columns);writer.writerows(rows)
@@ -21,9 +25,9 @@ def coverage_text(protocol, completed_requests, generated_results):
         coverage = '、'.join(f'{ds} {counts[ds]} 条' for ds in tasks)
         return (f'本轮已完成 {len(tasks)} 个任务的全量数据：{coverage}；'
                 f'共 {completed_requests} 条配对请求、{generated_results} 组生成。')
-    return (f"本轮已完成：{len(tasks)} 个海选任务各 {protocol['samples_per_task']} 条、"
+    return (f"本轮已完成：{len(tasks)} 个任务各 {protocol['samples_per_task']} 条、"
             f'{completed_requests} 条配对请求、{generated_results} 组生成；'
-            '这不是每任务 200/500 条的全量海选。')
+            '这不是任务全集的全量评测。')
 
 
 def export(outdir,plot=False):
@@ -34,24 +38,26 @@ def export(outdir,plot=False):
     tasks=summary['protocol']['datasets'];arms=list(summary['arms'])
     score_rows=[]
     for arm,a in summary['arms'].items():
-        comparison=summary['comparisons'].get(arm+'-vs-full',{}).get('avg5')
-        score_rows.append([arm]+[a['per_task'][ds] for ds in tasks]+[a['avg5'],
+        comparison=macro(summary['comparisons'].get(arm+'-vs-full',{}))
+        score_rows.append([arm]+[a['per_task'][ds] for ds in tasks]+[macro(a),
             comparison['delta_pp'] if comparison else 0,
             comparison['ci95_pp'][0] if comparison else '',comparison['ci95_pp'][1] if comparison else ''])
-    write_tsv(outdir/'scores.tsv',['arm']+tasks+['AVG5','delta_vs_full_pp','ci95_low_pp','ci95_high_pp'],score_rows)
+    write_tsv(outdir/'scores.tsv',['arm']+tasks+['MACRO_AVG','delta_vs_full_pp','ci95_low_pp','ci95_high_pp'],score_rows)
     paired=[]
     for name,c in summary['comparisons'].items():
         for ds,r in c['per_task'].items():paired.append([name,ds,r['n'],r['delta_pp'],*r['ci95_pp'],r['degraded'],r['improved']])
-        r=c['avg5'];paired.append([name,'AVG5',summary['completed_requests'],r['delta_pp'],*r['ci95_pp'],'',''])
+        r=macro(c);paired.append([name,'MACRO_AVG',summary['completed_requests'],r['delta_pp'],*r['ci95_pp'],'',''])
     write_tsv(outdir/'paired_differences.tsv',['comparison','scope','n','delta_pp','ci95_low_pp','ci95_high_pp','degraded','improved'],paired)
     activation=[]
     for arm,a in summary['arms'].items():
         activation.append([arm,*[a['gate_counts'][s] for s in ['keep','near','far','both']],
             a['near_active_requests'],a['far_active_requests'],a['frozen_kv_ratio_mean'],
-            a['frozen_attention_token_ratio_mean'],a['near_only_layer_kv_ratio_mean'],
+            a['frozen_attention_token_ratio_mean'],a.get('decode_attended_kv_head_tokens_mean'),
+            a.get('decode_attended_kv_head_token_ratio_vs_full_mean'),a['near_only_layer_kv_ratio_mean'],
             a['near_only_layer_attention_ratio_mean'],a['exact_full_generation'],a['far_decisions_differ_from_far_only']])
     write_tsv(outdir/'activation_storage.tsv',['arm','keep_layers','near_only_layers','far_only_layers','both_layers',
-        'near_active_requests','far_active_requests','frozen_resident_KV_ratio','frozen_attention_token_ratio',
+        'near_active_requests','far_active_requests','frozen_resident_KV_ratio','frozen_visible_KV_ratio_proxy',
+        'decode_attended_KV_head_tokens_mean','decode_attended_K_ratio_vs_full',
         'near_only_layer_KV_ratio','near_only_layer_attention_token_ratio','exact_full_generations','changed_far_decisions_vs_far_only'],activation)
     task_activation=[]
     for arm,a in summary['arms'].items():
@@ -83,16 +89,17 @@ def export(outdir,plot=False):
     if marker in report:report=report.split(marker,1)[1].lstrip()
     explanation=[coverage_text(summary['protocol'],summary['completed_requests'],len(row_scores)),'']
     for threshold in [f'{eps:g}' for eps in summary['protocol']['thresholds']]:
-        arm='dual_'+threshold;a=summary['arms'][arm];c=summary['comparisons'][arm+'-vs-full']['avg5']
-        explanation.append(f"- 双向 skip，阈值 {threshold}：AVG5 {a['avg5']:.4f}，相对 Full {c['delta_pp']:+.4f} pp；95% bootstrap CI [{c['ci95_pp'][0]:+.4f}, {c['ci95_pp'][1]:+.4f}]。Near 在 {a['near_active_requests']}/{summary['completed_requests']} 条请求中触发；层状态为 Near-only {a['gate_counts']['near']}、Far-only {a['gate_counts']['far']}、双 skip {a['gate_counts']['both']}。")
+        arm='dual_'+threshold;a=summary['arms'][arm];c=macro(summary['comparisons'][arm+'-vs-full'])
+        explanation.append(f"- 双向 skip，阈值 {threshold}：{len(tasks)} 任务宏平均 {macro(a):.4f}，相对 Full {c['delta_pp']:+.4f} pp；95% bootstrap CI [{c['ci95_pp'][0]:+.4f}, {c['ci95_pp'][1]:+.4f}]。Near 在 {a['near_active_requests']}/{summary['completed_requests']} 条请求中触发；层状态为 Near-only {a['gate_counts']['near']}、Far-only {a['gate_counts']['far']}、双 skip {a['gate_counts']['both']}。")
     explanation+=['','平均分没有下降也不能声称逐任务无损或总体等价；各任务和逐条变化必须分别审阅。CI包含0不证明等价。',
-        'Near-only 的 KV 暂存继续向 Far 迁移，所有 Near-only 层的驻留 KV 比例为 1；其收益仅体现在 attention 读取量。表中的 KV/attention 比例是节点容量与 key 数量口径，不是整体 GPU 显存或实测速率。',
-        ('Near/Far gate独立比较各自mass；同阈值下加入Near gate不会改变Far gate判定。' if summary['protocol'].get('schema')=='frozen-near-far-screen-v3-independent-gates' else '历史联合预算策略会因Near门改变Far判定，不能作为独立双门的证据。'),
+        'Near-only 的 KV 暂存继续向 Far 迁移，所有 Near-only 层的驻留 KV 比例为 1；其收益仅体现在 attention 读取量。KV 比例是节点容量口径；decode attended-K 是 suffix/answer 每个 query 的真实唯一有效 key 数（按 KV head 求和），不含 dense prefill，均不是整体 GPU 显存或实测速率。',
+        ('Near/Far gate独立比较各自mass；同阈值下加入Near gate不会改变Far gate判定。' if summary['protocol'].get('schema') in ('frozen-near-far-v1-quest-prefix-v1','frozen-near-far-screen-v3-independent-gates') else '历史联合预算策略会因Near门改变Far判定，不能作为独立双门的证据。'),
         ('结果复用真实 TLI tail32 + L1/L2 选择器；full 代表 TLI 双 gate 关闭，非 Dense FullKV。当前为 eager 精度参考适配器，不作速度或总显存结论。' if summary['protocol'].get('attention','').startswith('tli') else '结果来自独立 eager 分区缓存，不包含生产 TLI L1/L2 选择器。')+'已完成本地可执行复核，未表示独立第三方审阅或论文主表验收完成。','',marker,'']
     hopping=[]
     for threshold in [f'{eps:g}' for eps in summary['protocol']['thresholds']]:
         name='dual_'+threshold
         for ds in ['musique','hotpotqa']:
+            if ds not in tasks:continue
             pair=summary['comparisons'][name+'-vs-full']['per_task'][ds]
             active=summary['arms'][name]['per_task_activation'][ds]['near_active']
             hopping.append(f"多跳单独核查，{ds} ε={threshold}：n={pair['n']}，均分变化 {pair['delta_pp']:+.4f} pp，逐条下降 {pair['degraded']}、改善 {pair['improved']}，Near实际触发 {active} 条。")
@@ -112,16 +119,17 @@ def export(outdir,plot=False):
         fig,(ax,bx)=plt.subplots(1,2,figsize=(8,3.3))
         y=np.arange(len(modes))
         for i,arm in enumerate(modes):
-            c=summary['comparisons'][arm+'-vs-full']['avg5'];lo,hi=c['ci95_pp'];mean=c['delta_pp']
+            c=macro(summary['comparisons'][arm+'-vs-full']);lo,hi=c['ci95_pp'];mean=c['delta_pp']
             color='#007eb5' if arm.startswith('far_') else '#ff6540'
             ax.errorbar(mean,i,xerr=[[mean-lo],[hi-mean]],fmt='o',color=color,capsize=3,linewidth=1.3)
         ax.axvline(0,color='#777777',linewidth=.8,linestyle=':')
-        ax.set_yticks(y,labels);ax.invert_yaxis();ax.set_xlabel('AVG5 change vs full (pp)')
+        ax.set_yticks(y,labels);ax.invert_yaxis();ax.set_xlabel(f'Macro AVG ({len(tasks)} tasks) change vs full (pp)')
         ax.set_title('(a) Paired quality, 95% bootstrap CI',loc='left',fontsize=10,weight='bold')
         kv=[100*(1-summary['arms'][a]['frozen_kv_ratio_mean']) for a in modes]
-        work=[100*(1-summary['arms'][a]['frozen_attention_token_ratio_mean']) for a in modes]
+        work=[100*(1-summary['arms'][a].get('decode_attended_kv_head_token_ratio_vs_full_mean',
+               summary['arms'][a]['frozen_attention_token_ratio_mean'])) for a in modes]
         bx.bar(y-.17,kv,.34,label='resident KV',color='#6c767e')
-        bx.bar(y+.17,work,.34,label='attention tokens',color='#00abc8')
+        bx.bar(y+.17,work,.34,label='decode attended-K',color='#00abc8')
         bx.set_xticks(y,[a.replace('_','\n') for a in modes]);bx.set_ylabel('reduction (%)')
         bx.set_title('(b) Cache capacity and work proxy',loc='left',fontsize=10,weight='bold')
         bx.legend(frameon=False,fontsize=8);bx.set_ylim(0,max(work+kv)*1.3)

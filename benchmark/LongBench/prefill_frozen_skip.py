@@ -55,12 +55,46 @@ def greedy_token(logits, generated_count, eos, min_new_tokens=0):
     return logits.argmax(-1, keepdim=True)
 
 
-def stopping_policy(model, tokenizer, dataset):
-    eos = model.generation_config.eos_token_id
-    eos = list(eos) if isinstance(eos, list) else [eos]
+def dataset_stopping_policy(eos_token_id, tokenizer, dataset):
+    """生成与复核共用同一停止规则，避免 SAMSum 口径漂移。"""
+    eos = list(eos_token_id) if isinstance(eos_token_id, list) else [eos_token_id]
     if dataset == 'samsum':
         return list(dict.fromkeys([tokenizer.eos_token_id, tokenizer.encode('\n', add_special_tokens=False)[-1]])), 1
     return eos, 0
+
+
+def stopping_policy(model, tokenizer, dataset):
+    return dataset_stopping_policy(model.generation_config.eos_token_id, tokenizer, dataset)
+
+
+def attention_step(cache, phase, logical_position, input_token_id, use_tli,
+                   num_key_value_heads):
+    """记录单次 query 的真实有效 key 数；K1/K2 预算不能替代该实测值。"""
+    layers = []
+    for layer in cache.layers:
+        state = layer.report()
+        if state['logical_length'] != logical_position+1:
+            raise ValueError('attention audit lost absolute cache positions')
+        if use_tli:
+            receipt = getattr(layer, 'tli_receipt', None)
+            if receipt is None or receipt['logical_tokens'] != logical_position+1:
+                raise ValueError('missing or stale per-step TLI receipt')
+            entry = dict(receipt)
+            entry['attended_per_kv_head'] = list(receipt['selected_per_kv_head'])
+        else:
+            visible = state['attention_tokens']
+            entry = dict(logical_tokens=state['logical_length'], visible_tokens=visible,
+                attended_per_kv_head=[visible]*num_key_value_heads,
+                scorer='native-dense-prefill', selector='dense-visible-cache',
+                skip_near=state['skip_near'], skip_far=state['skip_far'])
+        counts = entry['attended_per_kv_head']
+        if (len(counts) != num_key_value_heads
+                or any(not isinstance(count, int) or count < 0 or count > entry['visible_tokens']
+                       for count in counts)):
+            raise ValueError('invalid actual attended-key counts')
+        layers.append(entry)
+    return dict(phase=phase, logical_position=logical_position,
+                input_token_id=int(input_token_id), layers=layers)
 
 
 def prepare_quest_input(tokenizer, row, dataset, prompt, context_cap):
@@ -143,6 +177,9 @@ def generate(model, tokenizer, quest, max_new_tokens, config, device,
         suffix_start = cache.layers[0].get_seq_length()
         if suffix_start != len(quest.prefix_ids):
             raise ValueError('freeze position differs from canonical prefix length')
+        attention_steps = []
+        use_tli = getattr(model, '_frozen_tli', False)
+        num_kv_heads = model.config.num_key_value_heads
         for absolute_position, token_id in enumerate(quest.suffix_ids, start=suffix_start):
             out = model(torch.tensor([[token_id]], device=device), past_key_values=cache,
                         attention_mask=(None if model.config.model_type == 'glm4_moe_lite'
@@ -150,6 +187,8 @@ def generate(model, tokenizer, quest, max_new_tokens, config, device,
                         use_cache=True, logits_to_keep=1)
             if cache.layers[0].get_seq_length() != absolute_position+1:
                 raise ValueError('suffix replay lost absolute cache positions')
+            attention_steps.append(attention_step(
+                cache, 'suffix', absolute_position, token_id, use_tli, num_kv_heads))
         suffix_end = cache.layers[0].get_seq_length()
         generated = []
         for _ in range(max_new_tokens):
@@ -157,10 +196,13 @@ def generate(model, tokenizer, quest, max_new_tokens, config, device,
             generated.append(int(token))
             if int(token) in eos or len(generated) == max_new_tokens:
                 break
+            answer_position = suffix_end+len(generated)-1
             out = model(token, past_key_values=cache,
                         attention_mask=(None if model.config.model_type == 'glm4_moe_lite'
                                         else {'full_attention':None}),
                         use_cache=True, logits_to_keep=1)
+            attention_steps.append(attention_step(
+                cache, 'answer', answer_position, token, use_tli, num_kv_heads))
         final = cache.report()
         receipts = {i: getattr(layer, 'tli_receipt', None) for i,layer in enumerate(cache.layers)}
         if (getattr(model, '_frozen_tli', False)
@@ -174,9 +216,14 @@ def generate(model, tokenizer, quest, max_new_tokens, config, device,
         generated_tokens=len(generated), wall_seconds=time.time()-start, profiles=profiles,
         decisions=decisions, gate_counts=counts, tli_receipts=receipts, prefill_full_kv=before,
         frozen_kv=after, final_kv=final,
+        attention_work=dict(schema='frozen-region-attention-work-v1',
+            units='unique valid attended key tokens per KV head for each single-token query',
+            prefill='one-shot dense material-prefix attention; decode steps below exclude prefill',
+            budgets='K1 is coarse candidate budget; K2 is fine selection budget; neither is actual attended-K',
+            steps=attention_steps),
         quest_protocol=dict(freeze_logical_position=len(quest.prefix_ids),
                             suffix_logical_range=[suffix_start, suffix_end],
-                            profile_query_rows='last up to 256 prefix rows only',
+                            profile_query_rows=f'last up to {config.rows} prefix rows only',
                             suffix_replay_tokens=len(quest.suffix_ids),
                             decode_capacity=decode_capacity),
         measured_scope='physical node KV storage; eager gather temporaries excluded, no latency claim')

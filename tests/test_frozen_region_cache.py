@@ -187,4 +187,10 @@ def test_quest_prefix_freeze_replays_suffix_and_matches_native():
     assert result['quest_protocol']['suffix_logical_range']==[17,22]
     assert result['prefill_full_kv']['layers'][0]['logical_length']==17
     assert result['final_kv']['layers'][0]['logical_length']==22+len(native)-1
+    steps=result['attention_work']['steps']
+    assert [step['input_token_id'] for step in steps]==list(range(17,22))+native[:-1]
+    assert [step['logical_position'] for step in steps]==list(range(17,17+len(steps)))
+    assert all(len(step['layers'])==2 for step in steps)
+    assert all(layer['attended_per_kv_head']==[layer['visible_tokens']]*2
+               for step in steps for layer in step['layers'])
     assert len(result['profiles'])==2
