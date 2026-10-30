@@ -16,7 +16,7 @@ from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 pytestmark=pytest.mark.skipif(not torch.cuda.is_available(),reason='native CUDA required')
 
 
-def model_for(kind,gate=False,max_position_embeddings=None):
+def model_for(kind,gate=False,max_position_embeddings=None,sparse=True):
     from transformers import Qwen3Config,Qwen3ForCausalLM
     helpers=runpy.run_path(str(Path(__file__).parents[1]/'exp/bench/test_glm47_d256_gates.py'))
     args=helpers['make_prod_args']()
@@ -39,11 +39,12 @@ def model_for(kind,gate=False,max_position_embeddings=None):
         from sparse_attn.patches.glm4_moe_lite_attn_patch import glm4_moe_lite_attn_forward as forward
         dim=256
     config._attn_implementation='sdpa'
-    for i,layer in enumerate(model.model.layers):
-        attn=layer.self_attn
-        attn.indexer=helpers['make_indexer'](dim,args)
-        attn.indexer.layer_idx=i
-        attn.forward=MethodType(forward,attn)
+    if sparse:
+        for i,layer in enumerate(model.model.layers):
+            attn=layer.self_attn
+            attn.indexer=helpers['make_indexer'](dim,args)
+            attn.indexer.layer_idx=i
+            attn.forward=MethodType(forward,attn)
     return model.cuda().to(torch.bfloat16).eval()
 
 
@@ -177,6 +178,47 @@ def test_real_hf_batch_eager_graph_share_row_incremental_states(monkeypatch, bat
                 assert len(geometry_calls) == batch * receipt['timing']['decode_steps']
             outputs.append(result)
             del cache, ctx
+    assert outputs[0] == outputs[1]
+    del model, ids
+    torch.cuda.empty_cache()
+
+
+@pytest.mark.parametrize('batch', [1, 2])
+def test_real_hf_dense_eager_graph_share_device_inputs(monkeypatch, batch):
+    """未打补丁的 Dense 模型也复用同一静态 KV、设备输入与整模型 Graph。"""
+    from sparse_attn.ops.static_batch_prefill import consume_prefill_rows
+
+    for key, value in dict(TLI_BATCH_INDEXER='legacy', TLI_OPERATOR_MODE='off',
+                           TLI_DEVICE_DECODE_INPUTS='1', TLI_QUALITY_TIMING='1').items():
+        monkeypatch.setenv(key, value)
+    torch.manual_seed(1201 + batch)
+    model = model_for('qwen', sparse=False)
+    lens = [16384 - 3 * b for b in range(batch)]
+    ids = torch.randint(0, 128, (batch, max(lens)), device='cuda')
+    outputs = []
+    with torch.inference_mode(), eager_decoding_request_guard():
+        for policy in ('0', '1'):
+            monkeypatch.setenv('TLI_CUDA_GRAPH', policy)
+            rows, first = [], []
+            for b, length in enumerate(lens):
+                out = model(input_ids=ids[b:b + 1, :length], use_cache=True,
+                            logits_to_keep=1)
+                rows.append(out.past_key_values)
+                first.append(out.logits[0, -1].argmax(-1).item())
+                del out
+            cache = TLIStaticCache(model.config, max(lens) + 6, batch)
+            consume_prefill_rows(cache, rows, lens)
+            ctx = BatchCtx(batch, list(lens), [0] * batch, [True] * batch, 0)
+            result = static_decode(model, cache, [[token] for token in first], lens,
+                                   set(), 6, ctx)
+            receipt = model._quality_graph_execution
+            assert receipt['decode_index_route'] == 'dense'
+            assert receipt['input_update_route'] == 'device_row_fused'
+            assert receipt['captures'] == (1 if policy == '1' else 0)
+            route_key = 'capture_layers' if policy == '1' else 'eager_layers'
+            assert receipt[route_key] == []
+            outputs.append(result)
+            del cache, ctx, rows
     assert outputs[0] == outputs[1]
     del model, ids
     torch.cuda.empty_cache()
