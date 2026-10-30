@@ -60,21 +60,26 @@ def main():
                         mask_mismatches=int((pm!=densemask).sum()),selected_ring=rm.sum(-1).flatten().tolist(),selected_paged=pm.sum(-1).flatten().tolist(),
                         max_output_error=float((actual.float()-reference.float()).abs().max()),
                         same_mask_max_output_error=float((same_mask.float()-reference.float()).abs().max()),
-                        reference_abs_max=float(reference.abs().max()),finite=bool(torch.isfinite(actual).all()),receipt=receipt)
+                        reference_abs_max=float(reference.abs().max()),finite=bool(torch.isfinite(actual).all()),
+                        reference_finite=bool(torch.isfinite(reference).all()),same_mask_finite=bool(torch.isfinite(same_mask).all()),receipt=receipt)
             if logical==a.length+1 and li in [0,8,26]:
                 filename=f'{mode}_layer{li}_step1.pt'
                 torch.save(dict(q=q.cpu(),k=rk.cpu(),v=rv.cpu(),positions=positions,ring_mask=rm.cpu(),paged_mask=pm.cpu(),ring_output=reference.cpu(),paged_output=actual.cpu(),scale=module.scaling),destination/filename)
                 record['tensor_file']=filename;record['tensor_sha256']=hashlib.sha256((destination/filename).read_bytes()).hexdigest()
             result['records'].append(record)
-            if not record['finite']:raise RuntimeError('nonfinite paged output')
+            if not all(record[x] for x in ['finite','reference_finite','same_mask_finite']):raise RuntimeError('nonfinite attention output')
             return reference
         with eager_decoding_request_guard(),patch.object(rc,'update',dual_update),patch.object(ring,'decode',probe):
             output=model(torch.tensor([ids],device='cuda'),past_key_values=rc,use_cache=True,logits_to_keep=1)
+            if not torch.isfinite(output.logits).all():raise RuntimeError('nonfinite prefill logits')
             decisions={i:dict(skip_near=mode in ['near','both'],skip_far=mode in ['far','both']) for i in range(model.config.num_hidden_layers)}
             rc.freeze(decisions);pc.freeze(decisions)
             for token in tokens:
                 output=model(torch.tensor([[token]],device='cuda'),past_key_values=rc,attention_mask={'full_attention':None},use_cache=True,logits_to_keep=1)
+                finite=bool(torch.isfinite(output.logits).all())
+                result.setdefault('model_logits_finite',[]).append(dict(mode=mode,step=len(result.get('model_logits_finite',[])),finite=finite))
                 (destination/'raw.json').write_text(json.dumps(result,indent=2)+'\n')
+                if not finite:raise RuntimeError('nonfinite model logits')
         result.setdefault('cache_reports',{})[mode]=dict(ring=rc.report(),paged=pc.report())
         (destination/'raw.json').write_text(json.dumps(result,indent=2)+'\n')
         print(mode,'complete',flush=True)
