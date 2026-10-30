@@ -278,7 +278,8 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
         # prefill row-by-row（避免 B>1 触发 HF SDPA 构造
         # [B*n_heads, S, S] bool mask OOM：B=8/32K ≈ 256 GB > 140 GB H20）：
         # 每行 B=1 走普通 SDPA（[1*n_heads, S_row, S_row] ≈ 32 GB 单行可容），
-        # 直接把 KV 拷进 static cache（有效在前 left-pad 布局），逐行释放 DynamicCache。
+        # 先保留各行实际 KV，全部 prefill 后逐层搬入 static 并释放源层，
+        # 避免后续 prefill 与完整 static batch 同时驻留。
         # 生成 token = 每行末 position logits argmax（与旧 batch prefill 语义一致：
         # prefill 后立即预测第一 decode token）。
         # 非 TLI（fixed_cache=False）：同样逐行 B=1 prefill，
@@ -289,30 +290,19 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                 TLIStaticCache)
             S_cap = S_max + MAX_GEN
             static_cache = TLIStaticCache(model.config, S_cap, B)
-            inited = [False] * len(static_cache.layers)
+            from sparse_attn.ops.static_batch_prefill import consume_prefill_rows
+            prefilled = []
             for b in range(B):
                 base = S_max - lens[b]
-                row_input = input_ids[b:b+1, base:]   # [1, L_b]
-                row_pos = position_ids[b:b+1, base:]   # [1, L_b]
+                row_input = input_ids[b:b+1, base:]
+                row_pos = position_ids[b:b+1, base:]
                 out = model(input_ids=row_input, position_ids=row_pos,
                             use_cache=True)
                 pred_list.append(out.logits[0, -1, :].argmax(dim=-1))
-                dyn = out.past_key_values
-                for l in range(len(static_cache.layers)):
-                    stat_l = static_cache.layers[l]
-                    k = dyn.layers[l].keys            # [1, Hkv, L_b, D]
-                    v = dyn.layers[l].values
-                    if not inited[l]:
-                        # lazy_initialization 要求 shape[0]==B；构造全 B
-                        # zero 占位、第 0 行填真实 K，宽高 = 本行实际长 L_b
-                        d = k.new_zeros(B, k.shape[1], k.shape[2], k.shape[3])
-                        d[0:1] = k
-                        stat_l.lazy_initialization(d)
-                        inited[l] = True
-                    Lb = lens[b]
-                    stat_l.keys[b, :, :Lb, :].copy_(k[0, :, :Lb, :])
-                    stat_l.values[b, :, :Lb, :].copy_(v[0, :, :Lb, :])
-                del out, dyn
+                prefilled.append(out.past_key_values)
+                del out
+            consume_prefill_rows(static_cache, prefilled, lens)
+            prefilled.clear()
             past = static_cache
         else:
             # 非 TLI：逐行 B=1 prefill → 独立 DynamicCache → row-by-row staged
