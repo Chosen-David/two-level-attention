@@ -10,9 +10,10 @@ from sparse_attn.ops.frozen_region_gate import GateConfig, profile_regions
 from sparse_attn.ops.frozen_region_cache import RegionGeometry
 from benchmark.LongBench.prefill_frozen_skip import generate, generate_native
 
+@pytest.mark.parametrize('selector',['tail32','full256-reference'])
 @pytest.mark.parametrize('mode',['full','far','near','dual'])
 @torch.inference_mode()
-def test_real_glm_class_region_decode(monkeypatch,mode):
+def test_real_glm_class_region_decode(monkeypatch,mode,selector):
     torch.set_num_threads(2)
     # Generic GLM eager adapter scopes CUDA devices; CPU reference has no stream.
     monkeypatch.setattr(torch.cuda, 'device', lambda device: nullcontext())
@@ -26,7 +27,7 @@ def test_real_glm_class_region_decode(monkeypatch,mode):
     cfg._attn_implementation='sdpa'
     model=Glm4MoeLiteForCausalLM(cfg).eval()
     attn=model.model.layers[0].self_attn
-    attn.indexer=TLIIndexer(tli_args());attn.indexer.layer_idx=0
+    attn.indexer=TLIIndexer(tli_args(selector));attn.indexer.layer_idx=0
     attn.indexer.head_dim=256
     attn.forward=MethodType(glm4_moe_lite_attn_forward,attn)
     model._frozen_tli=True;model.generation_config.eos_token_id=None
@@ -37,7 +38,8 @@ def test_real_glm_class_region_decode(monkeypatch,mode):
     assert d['skip_near']==(mode in ('near','dual'))
     assert d['skip_far']==(mode in ('far','dual'))
     receipt=result['tli_receipts'][0]
-    assert receipt['dimensions']==list(range(208,224))+list(range(240,256))
+    assert receipt['dimensions']==(list(range(256)) if selector=='full256-reference'
+                                   else list(range(208,224))+list(range(240,256)))
     assert result['final_kv']['layers'][0]['logical_length']==4354
     if mode=='full':assert result['generated_ids']==generate_native(model,ids,3,'cpu')
     if mode=='near':assert not result['frozen_kv']['layers'][0]['nodes']['near_staging']['attention_visible']

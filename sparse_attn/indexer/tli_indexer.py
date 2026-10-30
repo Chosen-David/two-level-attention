@@ -690,14 +690,30 @@ class TLIIndexer(TIAIndexer):
             raise ValueError(
                 f"tli_subspace={self.subspace} 需要的 k 末维 = {expected_dim}，"
                 f"实际 {k.shape[-1]}")
+        glm_full_reference = (expected_dim == 256 and self.subspace == "full"
+                              and self.l2_subspace == "full")
         if expected_dim == 256 and (
-                self.subspace != "tail" or self.l2_subspace != "same"
+                (not glm_full_reference and (self.subspace != "tail" or self.l2_subspace != "same"))
                 or self.cmp_ratio != 4 or self.l2_quant
                 or self.static_pair or self._basis is not None
                 or self._basis_all is not None):
             raise ValueError(
-                "D=256 TLI 仅支持 tail + l2_subspace=same + cmp_ratio=4 "
+                "D=256 TLI 支持 tail/same 或显式 full/full 诊断 + cmp_ratio=4 "
                 "+ l2_quant=False，且禁用 static_pair/投影基；当前组合未验证，拒绝执行")
+        if glm_full_reference:
+            if (os.environ.get("TLI_CUDA_GRAPH", "0") == "1"
+                    or os.environ.get("TLI_OPERATOR_MODE", "off") != "off"
+                    or (_graph_state_fn is not None and _graph_state_fn().enabled)):
+                raise ValueError("GLM full/full reference requires eager operator-off")
+            # Match the audited torch-scoring diagnostic; fused full-width
+            # statistics/scorers need separate numerical admission.
+            self._triton_ok = self._stat_ok = False
+            # Diagnostic rebuild: do not retain per-layer full-width key clones.
+            self._inc = None
+            d = self._prepare_index_base(k, cu_seqlens_k, valid_length=valid_length)
+            if valid_length is not None:
+                d["valid_length"] = valid_length
+            return d
         # 【E152v4】graph 增量优先：cuda_graph_state 模式（decode 整步
         # capture/replay）下走 pos_buf 驱动的容量宽持久 buffer 增量更新
         # （_prepare_index_graph；每步仅重算 pos 所在块统计 + k_qat[pos]

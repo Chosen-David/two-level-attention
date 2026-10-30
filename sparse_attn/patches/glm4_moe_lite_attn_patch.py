@@ -41,6 +41,14 @@ def glm4_moe_lite_attn_forward(
         raise RuntimeError("GLM TLI 不支持 dense decode 消融，拒绝 dense 结果标 TLI")
 
     batch_size, seq_length = hidden_states.shape[:-1]
+    if getattr(self.indexer, "subspace", None) == "full":
+        from ..ops.cuda_graph_state import graph_state
+        ctx = batch_decode_ctx()
+        if (batch_size != 1 or (ctx is not None and ctx.batch != 1)
+                or graph_state().enabled
+                or os.environ.get("TLI_CUDA_GRAPH", "0") == "1"
+                or os.environ.get("TLI_OPERATOR_MODE", "off") != "off"):
+            raise ValueError("GLM full/full reference requires eager B1 operator-off")
     if self.indexer.dyn_dgate:
         ctx = batch_decode_ctx()
         # Batch runners prefill each row with B=1 inside the outer B>1

@@ -81,17 +81,22 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
                 or m.qk_rope_head_dim != 64 or m.v_head_dim != 256
                 for m in glm_targets):
             raise ValueError("GLM TLI 要求 20 heads 且 K=V=256=[NoPE192|RoPE64]")
-        if (getattr(args, "tli_subspace", "full") != "tail"
-                or getattr(args, "tli_l2_subspace", "same") != "same"
+        glm_full_reference = (getattr(args, "tli_subspace", "full") == "full"
+                              and getattr(args, "tli_l2_subspace", "same") == "full")
+        if ((not glm_full_reference and (getattr(args, "tli_subspace", "full") != "tail"
+                or getattr(args, "tli_l2_subspace", "same") != "same"))
                 or getattr(args, "tia_level2_cmp_ratio", None) != 4
                 or getattr(args, "tli_l2_quant", False)
                 or getattr(args, "tli_static_pair", False)
                 or getattr(args, "tli_proj_basis", None)
                 or getattr(args, "tli_proj_basis_all", None)):
             raise ValueError(
-                "GLM D=256 仅支持 tail + l2_subspace=same + cmp_ratio=4 "
+                "GLM D=256 支持 tail/same 或显式 full/full 诊断 + cmp_ratio=4 "
                 "+ l2_quant=False，且禁用 static_pair/投影基")
         unsupported = []
+        if glm_full_reference and (os.environ.get("TLI_CUDA_GRAPH", "0") == "1"
+                or os.environ.get("TLI_OPERATOR_MODE", "off") != "off"):
+            unsupported.append("full/full reference requires eager operator-off")
         if (getattr(args, "tli_far_skip_backend", "legacy") != "legacy"
                 or getattr(args, "tli_far_skip_cache", "retain") != "retain"):
             unsupported.append("far-skip/compact")

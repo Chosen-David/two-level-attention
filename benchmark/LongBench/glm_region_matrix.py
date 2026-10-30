@@ -48,6 +48,7 @@ def main():
     ap.add_argument('--rank',type=int,required=True)
     ap.add_argument('--workers',type=int,default=8)
     ap.add_argument('--limit',type=int,default=0,help='smoke only; distinct run directory')
+    ap.add_argument('--selector',choices=('tail32','full256-reference'),default='tail32')
     args=ap.parse_args()
     if not 0<=args.rank<args.workers:raise ValueError('rank outside worker range')
     for k,v in dict(TLI_OPERATOR_MODE='off',TLI_FINE_GATHER='0',TLI_SPARSE_PREFILL='0',
@@ -59,7 +60,9 @@ def main():
     jobs=build_jobs(args.data,args.ruler)
     if args.limit:jobs=jobs[:args.limit]
     source={str(p.relative_to(ROOT)):sha_file(p) for base in ('sparse_attn','benchmark/LongBench','benchmark/RULER') for p in (ROOT/base).rglob('*.py')}
-    protocol=dict(schema='glm-regions-matrix-v1',arms=ARMS,seed=42,threshold=.05,rows=256,
+    protocol=dict(schema='glm-regions-matrix-v2',selector=args.selector,
+        selector_scope='diagnostic reference; not paper-method repair' if args.selector=='full256-reference' else 'original tail32',
+        selector_backend='torch' if args.selector=='full256-reference' else 'existing',arms=ARMS,seed=42,threshold=.05,rows=256,
         method='tli',k1=128,k2=1024,near_pages=32,near_len=4096,sink=4,swa=128,
         scorer_backend='difflib',ruler_eos_policy='ignore early EOS until min_new_tokens; no logits suppression',
         graph=False,operator='off',dtype='bfloat16',longbench_context_cap=31500,
@@ -90,7 +93,7 @@ def main():
         device_map='cuda:0',attn_implementation='sdpa').eval()
     if model.config.model_type!='glm4_moe_lite':raise ValueError('GLM only')
     native=[x.self_attn.forward for x in model.model.layers]
-    treatment=tli_args()
+    treatment=tli_args(args.selector)
     assert register_patch(model,treatment,resolve_treatment_snapshot(treatment))==47
     patched=[x.self_attn.forward for x in model.model.layers]
     prompts=json.loads((ROOT/'benchmark/LongBench/config/dataset2prompt.json').read_text())
