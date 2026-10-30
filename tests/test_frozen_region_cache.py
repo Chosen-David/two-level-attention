@@ -164,3 +164,27 @@ def test_gate_other_region_mass_does_not_override_decision():
     for other in [0.,.03,.049,.05,.9]:
         assert decide_regions({'near':{'p95':.04},'far':{'p95':other}},GateConfig(epsilon=.05,statistic='p95'))['skip_near']
         assert decide_regions({'near':{'p95':other},'far':{'p95':.04}},GateConfig(epsilon=.05,statistic='p95'))['skip_far']
+
+
+@torch.inference_mode()
+def test_quest_prefix_freeze_replays_suffix_and_matches_native():
+    from benchmark.LongBench.prefill_frozen_skip import generate, generate_native
+    from benchmark.LongBench.quest_input import QuestTokenInput
+    from types import SimpleNamespace
+
+    torch.manual_seed(19)
+    config=Qwen3Config(vocab_size=37,hidden_size=32,intermediate_size=48,num_hidden_layers=2,
+        num_attention_heads=4,num_key_value_heads=2,head_dim=8,max_position_embeddings=256,
+        attention_dropout=0.,attn_implementation='sdpa')
+    model=Qwen3ForCausalLM(config).eval()
+    model.generation_config.eos_token_id=36
+    quest=QuestTokenInput(tuple(range(22)),tuple(range(17)),tuple(range(17,22)),{})
+    tokenizer=SimpleNamespace(decode=lambda ids,skip_special_tokens=True: ','.join(map(str,ids)))
+    result=generate(model,tokenizer,quest,3,GateConfig(mode='full'),'cpu')
+    native=generate_native(model,quest,3,'cpu')
+    assert result['generated_ids']==native
+    assert result['quest_protocol']['freeze_logical_position']==17
+    assert result['quest_protocol']['suffix_logical_range']==[17,22]
+    assert result['prefill_full_kv']['layers'][0]['logical_length']==17
+    assert result['final_kv']['layers'][0]['logical_length']==22+len(native)-1
+    assert len(result['profiles'])==2

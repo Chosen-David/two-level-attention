@@ -7,6 +7,7 @@ from transformers import Qwen3Config, Qwen3ForCausalLM
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
 from benchmark.LongBench.prefill_frozen_skip import generate, generate_native
+from benchmark.LongBench.quest_input import QuestTokenInput
 from sparse_attn.ops.frozen_region_gate import GateConfig
 from sparse_attn.ops import eager_decoding
 
@@ -25,10 +26,11 @@ def guarded_request(monkeypatch):
     model = Qwen3ForCausalLM(config).eval()
     model.generation_config.eos_token_id = None
     tokenizer = SimpleNamespace(decode=lambda ids, **kw: ' '.join(map(str, ids)))
+    quest = QuestTokenInput((3,4,5,6),(3,4),(5,6),{})
     def run(kind):
         if kind == 'segmented':
-            return generate(model, tokenizer, [3, 4, 5, 6], 3, GateConfig(), 'cpu')
-        return generate_native(model, [3, 4, 5, 6], 3, 'cpu')
+            return generate(model, tokenizer, quest, 3, GateConfig(), 'cpu')
+        return generate_native(model, quest, 3, 'cpu')
     yield model, flag, run
     torch.set_num_threads(old_threads)
 

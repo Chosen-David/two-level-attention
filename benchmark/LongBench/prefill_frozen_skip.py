@@ -16,16 +16,19 @@ from transformers.cache_utils import DynamicCache
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
 from benchmark.LongBench.eval import sample_score
+from benchmark.LongBench.quest_input import canonical_quest_input
 from sparse_attn.ops.frozen_region_cache import FrozenRegionCache, RegionGeometry
 from sparse_attn.ops.frozen_region_gate import GateConfig, decide_regions, profile_regions
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 ROOT = Path(__file__).resolve().parents[2]
 SCREEN_TASKS = ('qasper', 'hotpotqa', 'musique', 'gov_report', 'repobench-p')
+V1_TASKS = tuple('narrativeqa qasper multifieldqa_en hotpotqa 2wikimqa musique gov_report qmsum multi_news trec triviaqa samsum passage_count passage_retrieval_en lcc repobench-p'.split())
+NO_CHAT_TASKS = frozenset(('trec','triviaqa','samsum','lcc','repobench-p'))
 SOURCES = ('sparse_attn/patches/glm4_moe_lite_attn_patch.py',
            'sparse_attn/patches/qwen3_attn_patch.py', 'sparse_attn/ops/frozen_region_tli.py',
            'sparse_attn/indexer/tli_indexer.py', 'sparse_attn/ops/frozen_region_cache.py', 'sparse_attn/ops/frozen_region_gate.py',
-           'benchmark/LongBench/prefill_frozen_skip.py', 'benchmark/LongBench/metrics.py',
+           'benchmark/LongBench/prefill_frozen_skip.py', 'benchmark/LongBench/quest_input.py', 'benchmark/LongBench/metrics.py',
            'benchmark/LongBench/eval.py', 'benchmark/LongBench/config/dataset2prompt.json',
            'benchmark/LongBench/config/dataset2maxlen.json')
 
@@ -45,21 +48,41 @@ def atomic_json(path, value):
     temp.replace(path)
 
 
-def prepare_ids(tokenizer, row, dataset, prompt, context_cap):
+def greedy_token(logits, generated_count, eos, min_new_tokens=0):
+    if generated_count < min_new_tokens:
+        logits = logits.clone()
+        logits[:, eos] = -torch.inf
+    return logits.argmax(-1, keepdim=True)
+
+
+def stopping_policy(model, tokenizer, dataset):
+    eos = model.generation_config.eos_token_id
+    eos = list(eos) if isinstance(eos, list) else [eos]
+    if dataset == 'samsum':
+        return list(dict.fromkeys([tokenizer.eos_token_id, tokenizer.encode('\n', add_special_tokens=False)[-1]])), 1
+    return eos, 0
+
+
+def prepare_quest_input(tokenizer, row, dataset, prompt, context_cap):
+    """固定模板前截断预算，再对最终渲染文本做一次 canonical 分词。"""
     text = prompt.format(**row)
     ids = tokenizer(text, add_special_tokens=False).input_ids
     original_length = len(ids)
     if original_length > context_cap:
         half = context_cap//2
         text = tokenizer.decode(ids[:half], skip_special_tokens=True)+tokenizer.decode(ids[-(context_cap-half):], skip_special_tokens=True)
-    if dataset != 'repobench-p':
+    if dataset not in NO_CHAT_TASKS:
         text = tokenizer.apply_chat_template([dict(role='user', content=text)], tokenize=False,
                     add_generation_prompt=True, enable_thinking=False)
-    ids = tokenizer(text, add_special_tokens=False).input_ids
-    if not ids:
-        raise ValueError('empty prompt')
-    return ids, dict(raw_tokens=original_length, input_tokens=len(ids), truncated=original_length>context_cap,
-                     input_sha256=hashlib.sha256(json.dumps(ids).encode()).hexdigest())
+    quest = canonical_quest_input(tokenizer, text, dataset, add_special_tokens=False,
+                                  require_material_prefix=True)
+    info = dict(raw_tokens=original_length, input_tokens=len(quest.full_ids),
+                truncated=original_length>context_cap,
+                input_sha256=quest.metadata['full_ids_sha256'],
+                raw_context_cap=context_cap,
+                final_input_cap='not-32768; raw prompt truncation plus template/suffix',
+                quest=quest.metadata)
+    return quest, info
 
 
 @contextmanager
@@ -83,10 +106,13 @@ def capture_profiles(cache, geometry, config):
 
 @torch.inference_mode()
 @eager_decoding_request_guard()
-def generate(model, tokenizer, ids, max_new_tokens, config, device):
-    geometry = RegionGeometry(max_new_tokens=max_new_tokens)
+def generate(model, tokenizer, quest, max_new_tokens, config, device,
+             stop_ids=None, min_new_tokens=0):
+    # suffix 也逐 token 经过冻结缓存，容量必须同时覆盖重放和答案生成。
+    decode_capacity = len(quest.suffix_ids)+max_new_tokens
+    geometry = RegionGeometry(max_new_tokens=decode_capacity)
     cache = FrozenRegionCache(model.config.num_hidden_layers, geometry)
-    eos = model.generation_config.eos_token_id
+    eos = model.generation_config.eos_token_id if stop_ids is None else stop_ids
     eos = eos if isinstance(eos, list) else [eos]
     if getattr(model, '_frozen_tli', False):
         cache.tli_regions = True
@@ -96,7 +122,7 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
     start = time.time()
     with torch.inference_mode():
         with capture_profiles(cache, geometry, config) as profiles:
-            out = model(torch.tensor([ids], device=device), past_key_values=cache, use_cache=True, logits_to_keep=1)
+            out = model(torch.tensor([quest.prefix_ids], device=device), past_key_values=cache, use_cache=True, logits_to_keep=1)
         if len(profiles) != model.config.num_hidden_layers:
             raise ValueError('incomplete native layer profiling')
         before = cache.report()
@@ -114,9 +140,20 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
                 after_bytes = sum(n['kv_bytes'] for n in nodes.values())
                 if before_bytes != after_bytes:
                     raise ValueError('near-only must not claim a resident KV reduction')
+        suffix_start = cache.layers[0].get_seq_length()
+        if suffix_start != len(quest.prefix_ids):
+            raise ValueError('freeze position differs from canonical prefix length')
+        for absolute_position, token_id in enumerate(quest.suffix_ids, start=suffix_start):
+            out = model(torch.tensor([[token_id]], device=device), past_key_values=cache,
+                        attention_mask=(None if model.config.model_type == 'glm4_moe_lite'
+                                        else {'full_attention':None}),
+                        use_cache=True, logits_to_keep=1)
+            if cache.layers[0].get_seq_length() != absolute_position+1:
+                raise ValueError('suffix replay lost absolute cache positions')
+        suffix_end = cache.layers[0].get_seq_length()
         generated = []
         for _ in range(max_new_tokens):
-            token = out.logits[:, -1].argmax(-1, keepdim=True)
+            token = greedy_token(out.logits[:, -1], len(generated), eos, min_new_tokens)
             generated.append(int(token))
             if int(token) in eos or len(generated) == max_new_tokens:
                 break
@@ -126,7 +163,9 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
                         use_cache=True, logits_to_keep=1)
         final = cache.report()
         receipts = {i: getattr(layer, 'tli_receipt', None) for i,layer in enumerate(cache.layers)}
-        if getattr(model, '_frozen_tli', False) and len(generated)>1 and not all(receipts.values()):
+        if (getattr(model, '_frozen_tli', False)
+                and len(quest.suffix_ids)+max(0, len(generated)-1) > 0
+                and not all(receipts.values())):
             raise ValueError('missing real TLI decode receipts')
     counts = {name:0 for name in ('keep','near','far','both')}
     for d in decisions.values():
@@ -135,6 +174,11 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
         generated_tokens=len(generated), wall_seconds=time.time()-start, profiles=profiles,
         decisions=decisions, gate_counts=counts, tli_receipts=receipts, prefill_full_kv=before,
         frozen_kv=after, final_kv=final,
+        quest_protocol=dict(freeze_logical_position=len(quest.prefix_ids),
+                            suffix_logical_range=[suffix_start, suffix_end],
+                            profile_query_rows='last up to 256 prefix rows only',
+                            suffix_replay_tokens=len(quest.suffix_ids),
+                            decode_capacity=decode_capacity),
         measured_scope='physical node KV storage; eager gather temporaries excluded, no latency claim')
     del out, cache
     return result
@@ -142,18 +186,23 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
 
 @torch.inference_mode()
 @eager_decoding_request_guard()
-def generate_native(model, ids, max_new_tokens, device):
+def generate_native(model, quest, max_new_tokens, device, stop_ids=None, min_new_tokens=0):
     cache = DynamicCache(config=model.config)
     if getattr(model, '_frozen_tli', False):
         for layer in model.model.layers:
             layer.self_attn.indexer.clear()
             layer.self_attn.indexer.skip_far = False
-    out = model(torch.tensor([ids], device=device), past_key_values=cache, use_cache=True, logits_to_keep=1)
-    eos = model.generation_config.eos_token_id
+    out = model(torch.tensor([quest.prefix_ids], device=device), past_key_values=cache,
+                use_cache=True, logits_to_keep=1)
+    for token_id in quest.suffix_ids:
+        out = model(torch.tensor([[token_id]], device=device), past_key_values=cache,
+                    use_cache=True, logits_to_keep=1)
+    eos = model.generation_config.eos_token_id if stop_ids is None else stop_ids
     eos = eos if isinstance(eos,list) else [eos]
     generated = []
     for _ in range(max_new_tokens):
-        token = out.logits[:, -1].argmax(-1, keepdim=True); generated.append(int(token))
+        token = greedy_token(out.logits[:, -1], len(generated), eos, min_new_tokens)
+        generated.append(int(token))
         if int(token) in eos or len(generated) == max_new_tokens: break
         out = model(token, past_key_values=cache, use_cache=True, logits_to_keep=1)
     return generated
@@ -194,7 +243,7 @@ def main():
     ap.add_argument('--context-cap', type=int, default=31500)
     ap.add_argument('--thresholds', default='0.05')
     ap.add_argument('--statistic', choices=['mean','p95'], default='mean')
-    ap.add_argument('--datasets', default=','.join(SCREEN_TASKS))
+    ap.add_argument('--datasets', default=','.join(V1_TASKS))
     ap.add_argument('--rank', type=int, default=0)
     ap.add_argument('--world-size', type=int, default=1)
     ap.add_argument('--device', default='cuda:0')
@@ -207,8 +256,8 @@ def main():
         os.environ['TLI_SPARSE_PREFILL'] = '0'
         os.environ['TLI_DECODE_DENSE'] = '0'
     tasks = args.datasets.split(',')
-    if not set(tasks)<=set(SCREEN_TASKS) or len(set(tasks)) != len(tasks):
-        raise ValueError('only the five existing LongBench screen tasks are allowed')
+    if not set(tasks)<=set(V1_TASKS) or len(set(tasks)) != len(tasks):
+        raise ValueError('only the sixteen English/code LongBench V1 tasks are allowed')
     if not 0 <= args.rank < args.world_size or args.samples < 0:
         raise ValueError('invalid shard/samples')
     thresholds = [float(x) for x in args.thresholds.split(',')]
@@ -226,10 +275,12 @@ def main():
         indices = select_row_indices(len(rows), args.samples, args.seed)
         selected[ds] = indices
         inputs.extend((ds,i,rows[i]) for i in indices)
-    protocol = dict(schema='frozen-near-far-screen-v3-independent-gates',model=args.model,context_cap=args.context_cap,
+    protocol = dict(schema='frozen-near-far-v1-quest-prefix-v1',model=args.model,context_cap=args.context_cap,
         **sampling_metadata(args.samples, dataset_counts),
         seed=args.seed,statistic=args.statistic,thresholds=thresholds,
-        datasets=tasks,selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
+        datasets=tasks,prompt_protocol='canonical single tokenization; dense material-prefix prefill/profile/freeze; suffix tokenwise replay; normal answer generation; no-chat for trec/triviaqa/samsum/lcc/repobench-p; samsum EOS+newline min1',
+        context_cap_semantics=f'{args.context_cap}-token raw prompt truncation before chat template; not a final 32768-token input cap',
+        selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
         source_sha256={name:sha_file(ROOT/name) for name in SOURCES},
         dataset_sha256={ds:sha_file(Path(args.data)/(ds+'.jsonl')) for ds in tasks},
         model_config_sha256=sha_file(Path(args.model)/'config.json'),
@@ -274,9 +325,10 @@ def main():
         model._frozen_tli = True
     verified = False
     for ds,row_index,row in shard_inputs(inputs, args.rank, args.world_size):
+        stop_ids,min_new_tokens = stopping_policy(model,tokenizer,ds)
         path = outdir/'requests'/ds/f'{row_index:04d}.json'
-        ids, input_info = prepare_ids(tokenizer,row,ds,prompts[ds],args.context_cap)
-        if len(ids)+lengths[ds] > model.config.max_position_embeddings:
+        quest, input_info = prepare_quest_input(tokenizer,row,ds,prompts[ds],args.context_cap)
+        if len(quest.full_ids)+lengths[ds] > model.config.max_position_embeddings:
             raise ValueError('prompt plus generation exceeds native context')
         if path.exists():
             record = json.loads(path.read_text())
@@ -288,17 +340,17 @@ def main():
         for arm, config in arms:
             if arm in record['arms']: continue
             atomic_json(outdir/f'heartbeat_rank{args.rank}.json',dict(pid=os.getpid(),time=time.time(),dataset=ds,row=row_index,arm=arm))
-            result = generate(model,tokenizer,ids,lengths[ds],config,args.device)
+            result = generate(model,tokenizer,quest,lengths[ds],config,args.device,
+                              stop_ids,min_new_tokens)
             metric_ds = 'repobench' if ds == 'repobench-p' else ds
             result['score'] = sample_score(metric_ds,result['prediction'],row['answers'],row.get('all_classes',[]))
             if arm == 'full' and args.verify_native_full and not verified:
-                native = generate_native(model,ids,lengths[ds],args.device)
+                native = generate_native(model,quest,lengths[ds],args.device,
+                                         stop_ids,min_new_tokens)
                 if native != result['generated_ids']:
                     raise ValueError('full node-cache generation differs from native DynamicCache')
                 result['native_full_parity'] = True
                 verified = True
-            if arm != 'full' and result['generated_ids'][0] != record['arms']['full']['generated_ids'][0]:
-                raise ValueError('dense prefill first prediction changed')
             record['arms'][arm] = result
             atomic_json(path,record)
             print(f'rank={args.rank} {ds}:{row_index} {arm} score={result["score"]:.4f} gates={result["gate_counts"]}',flush=True)

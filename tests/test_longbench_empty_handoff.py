@@ -103,21 +103,8 @@ class FakeCapture:
 class LongBenchEmptyHandoffTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        drop_bos, generate = load_functions(
-            "_drop_leading_bos", "_manual_generate"
-        )
-        cls.drop_bos = staticmethod(drop_bos)
+        generate, = load_functions("_manual_generate")
         cls.generate = staticmethod(generate)
-
-    def test_empty_question_is_safe_for_bos_normalization(self):
-        empty = FakeIds([])
-        self.assertIs(self.drop_bos(empty, 1), empty)
-
-    def test_bos_normalization_preserves_non_bos_and_drops_actual_bos(self):
-        plain = FakeIds([5, 6])
-        self.assertIs(self.drop_bos(plain, 1), plain)
-        dropped = self.drop_bos(FakeIds([1, 5, 6]), 1)
-        self.assertEqual(dropped.values, [5, 6])
 
     def test_empty_material_seeds_cache_from_first_question_token(self):
         model = RejectEmptyModel()
@@ -143,17 +130,6 @@ class LongBenchEmptyHandoffTests(unittest.TestCase):
         self.generate(model, FakeIds([3, 4]), FakeIds([11]), 1, None, capture)
         self.assertEqual(model.input_widths, [2, 1])
         self.assertEqual(capture.phases, ["material", "question"])
-
-    def test_producer_uses_bos_helper_once(self):
-        tree = ast.parse(PRED.read_text(encoding="utf-8"), filename=str(PRED))
-        calls = [
-            node for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "_drop_leading_bos"
-        ]
-        self.assertEqual(len(calls), 1)
-
 
 if __name__ == "__main__":
     unittest.main()

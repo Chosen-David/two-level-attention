@@ -125,8 +125,9 @@ class _TokOut:
     input_ids——桩补 __getitem__/__setitem__ 模拟 UserDict，恢复三态测试。
     """
 
-    def __init__(self, ids):
+    def __init__(self, ids, offsets=None):
         self.input_ids = torch.tensor([ids])
+        self.offset_mapping = offsets
 
     def to(self, *a, **kw):
         return self
@@ -150,15 +151,14 @@ class FakeTokenizer:
         self.eos_token_id = eos_token_id
         self.adds_bos = adds_bos
 
-    def __call__(self, text, truncation=False, return_tensors="pt"):
+    def __call__(self, text, truncation=False, return_tensors="pt",
+                 add_special_tokens=True, return_offsets_mapping=False):
         ids = [3 + (ord(c) % 40) for c in text]
-        # 【开源净化 2026-10-23 夹具适配 2/2】真实 tokenizer 对空文本产
-        # 出零 token；d8bdef1 拆分后 material 段可为空，桩若对空文本也
-        # 加 BOS 会凭空造出「仅 BOS」的假 material（实测 material_ids
-        # =[[1]]），question seed 分支被旁路。
-        if ids and self.adds_bos and self.bos_token_id is not None:
+        offsets = [(i, i+1) for i in range(len(text))]
+        if ids and add_special_tokens and self.adds_bos and self.bos_token_id is not None:
             ids = [self.bos_token_id] + ids
-        return _TokOut(ids)
+            offsets = [(0, 0)] + offsets
+        return _TokOut(ids, offsets if return_offsets_mapping else None)
 
     def decode(self, ids, skip_special_tokens=True):
         out = []
@@ -226,7 +226,7 @@ def a1_bos_aware_slice():
         起始于 21（丢 20）；态1 BOS 保留 → 序列起始于 1。
     【绿】修复态：态1 切 BOS（[20..27]）；态2/态3 不切（同 [20..27]）。
     """
-    name = "A1(R01) BOS 感知切片三态（加BOS切/不加BOS不切/声明BOS未加不切）"
+    name = "A1(R01) canonical BOS/首 token 保留三态"
     try:
         want = [3 + (ord(c) % 40) for c in "abcdefgh"]   # [20..27]
 
@@ -238,13 +238,12 @@ def a1_bos_aware_slice():
         mdl = FakeModel(script=[5] * 12)
         run_get_pred(tok, mdl)
         toks = fed_tokens(mdl)
-        q_seg = toks[:len(want)]
-        _require(q_seg == want,
-                 f"态1 加 BOS：question 段应 {want}（BOS 已切），实际 {q_seg}"
-                 f"——R01 缺陷复现（BOS 未切/首 token 丢失）")
-        _require(1 not in toks, "态1 BOS(1) 不应进模型（R01 切片失效）")
-        _require(toks[0] == want[0],
-                 f"态1 首 call 应为真实首 token {want[0]}，实际 {toks[0]}")
+        q_seg = toks[:len(want)+1]
+        _require(q_seg == [1]+want,
+                 f"态1 加 BOS：完整输入应为 {[1]+want}，实际 {q_seg}"
+                 f"——canonical token 流不得丢失 BOS 或首 token")
+        _require(toks[0] == 1 and toks[1] == want[0],
+                 f"态1 首两次调用应为 BOS 与真实首 token，实际 {toks[:2]}")
 
         # ---- 态2：tokenizer 不加 BOS（Qwen3 系）→ 不切
         # 【红绿判别位】无条件切片口径下首 token(20) 被切 → 序列起始于 21
@@ -265,7 +264,7 @@ def a1_bos_aware_slice():
         _require(q_seg == want,
                  f"态3 声明 BOS 未加：question 段应 {want}（首 token 非 BOS "
                  f"不切），实际 {q_seg}")
-        report(name, True, "三态全过：切/不切均以「首 token 是否真为 BOS」为准")
+        report(name, True, "三态全过：canonical 完整输入保留实际 BOS 与首 token")
     except RuntimeError as e:
         report(name, False, str(e))
     except Exception as e:

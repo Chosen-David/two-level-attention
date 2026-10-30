@@ -12,6 +12,7 @@ from transformers import (
     LlamaTokenizer,
     LlamaForCausalLM,
     AutoModelForCausalLM,
+    BatchEncoding,
 )
 from tqdm import tqdm
 import numpy as np
@@ -19,6 +20,7 @@ import random
 import argparse
 
 from benchmark.LongBench.lbv2_choice import extract_choice_official
+from benchmark.LongBench.quest_input import canonical_quest_input
 from benchmark.LongBench.context_capability_gate import (
     enforce_context_capability_gate,
 )
@@ -204,24 +206,20 @@ def extract_choice_letter(text):
     return extract_choice_official(text)
 
 
-def _drop_leading_bos(input_ids, bos_token_id):
-    """Remove an actual leading BOS without indexing an empty token row."""
-    if (
-        input_ids.shape[-1] > 0
-        and bos_token_id is not None
-        and int(input_ids[0, 0].item()) == bos_token_id
-    ):
-        return input_ids[:, 1:]
-    return input_ids
-
-
 def _manual_generate(
-    model, material_ids, question_ids, max_gen, eos_token_id, capture=None
+    model, material_ids, question_ids, max_gen, eos_token_id, capture=None,
+    min_new_tokens=0,
 ):
-    """Existing LongBench greedy loop, instrumented only when capture is enabled."""
+    """Canonical Quest prefix/suffix greedy loop with task-specific stopping."""
     if type(max_gen) is not int or max_gen<1:raise ValueError('max_gen must be positive')
+    eos = eos_token_id if isinstance(eos_token_id, (list, tuple)) else [eos_token_id]
     if capture is not None:
-        capture.generation_policy=dict(max_new_tokens=max_gen,eos_token_id=eos_token_id,decoding='greedy')
+        capture.generation_policy=dict(max_new_tokens=max_gen,eos_token_id=eos,decoding='greedy',min_new_tokens=min_new_tokens)
+    def next_token(logits, generated_count):
+        if generated_count < min_new_tokens:
+            logits = logits.clone()
+            logits[:, eos] = -torch.inf
+        return logits.argmax(dim=-1).unsqueeze(1)
     def invoke(phase,**kwargs):
         return model(**kwargs) if capture is None else capture.call(phase,model,**kwargs)
     with torch.no_grad():
@@ -243,17 +241,17 @@ def _manual_generate(
         for token in question_ids[0]:
             output=invoke('question',input_ids=token.unsqueeze(0).unsqueeze(0),past_key_values=cache,use_cache=True)
             cache=output.past_key_values
-        token=output.logits[:,-1,:].argmax(dim=-1).unsqueeze(1)
+        token=next_token(output.logits[:,-1,:], 0)
         generated=[token.item()]
         if capture is not None:capture.token_ready(generated[-1])
-        if eos_token_id is None or generated[-1]!=eos_token_id:
+        if eos_token_id is None or generated[-1] not in eos:
             for _ in range(max_gen-1):
                 output=invoke('decode',input_ids=token,past_key_values=cache,use_cache=True)
                 cache=output.past_key_values
-                token=output.logits[:,-1,:].argmax(dim=-1).unsqueeze(1)
+                token=next_token(output.logits[:,-1,:], len(generated))
                 generated.append(token.item())
                 if capture is not None:capture.token_ready(generated[-1])
-                if generated[-1]==eos_token_id:break
+                if generated[-1] in eos:break
         if capture is not None:capture.generation_complete()
         return generated
 
@@ -340,53 +338,34 @@ def get_pred(
         # negative-index fallback silently turning the question into one char.
         prompt, question = _split_prompt_question(prompt, dataset)
 
+        quest_metadata = None
         if "chatglm3" in model_name:
             # input = prompt.to(device)
             input = prompt.to("cuda")
         else:
-            # TL-DSV2-DOUBLE-BOS-094 修复（GPT 审计 2026-10-12_0330，031e6b8）：
-            # DeepSeek chat template 渲染文本首部已是 BOS（模板首部
-            # {{ bos_token }}），tokenizer_config add_bos_token=true 下默认
-            # tokenizer(prompt, ...) 会再自动补一个 → [BOS,BOS,"User:",...]，
-            # 偏离官方单 BOS prompt。对 DeepSeek 模板渲染路径显式
-            # add_special_tokens=False（与官方 apply_chat_template(tokenize=True)
-            # 内部口径一致）；非模板路径（trec 等 5 任务）仍走默认调用保持单
-            # BOS；Qwen3 等其他模型（模板为无 BOS 的 f-string）逐位不变。
-            if chat_template_applied and IS_DSV2:
-                input = tokenizer(
-                    prompt, truncation=False, return_tensors="pt",
-                    add_special_tokens=False,
-                )
-            else:
-                # input = tokenizer(prompt, truncation=False, return_tensors="pt").to(device)
-                input = tokenizer(prompt, truncation=False, return_tensors="pt")
-            q_input = tokenizer(question, truncation=False, return_tensors="pt")
-            # R01 修复（kimi3 清单 2026-10-08）：原无条件 [:, 1:] 去首 token
-            # 假定 tokenizer 加 BOS，但 Qwen3 系不加 → question 被切掉真实
-            # 首 token。仅当首 token 确为 BOS 且非 None 时才切。
-            # 【LB-DEV-BS 修复（主 AI 审计 2026-10-22）】必须走 __setitem__ 写入
-            # BatchEncoding.data 字典，不能用属性赋值：BatchEncoding 是 UserDict
-            # 子类，属性赋值会创建实例属性遮蔽 data，后续 .to("cuda") 只搬
-            # self.data → 遮蔽属性留 CPU → _manual_generate 逐 token invoke
-            # 报设备不匹配（d8bdef1 把条件赋值改为无条件后每行必触发；旧代码
-            # 仅首 token 真为 BOS 才赋值，Qwen3 bos=None 从不触发故未暴露）。
-            q_input["input_ids"] = _drop_leading_bos(
-                q_input.input_ids, tokenizer.bos_token_id)
-
-            # TL-LBV1-INPUT-IDENTITY-20261020：在 CPU BatchEncoding 上冻结
-            # 模板、截断与 question split 后**实际送模**的 token ID。先 hash
-            # 再搬 CUDA，避免为 provenance 新增 device→host 同步；上面的 BOS
-            # 判定也因此不再在 GPU tensor 上调用 .item()。哈希口径由
-            # run_cap_manifest.input_ids_sha256 固定为 signed-int64 little-endian。
+            # 最终渲染文本只分词一次；offset mapping 将跨界 BPE token 整体
+            # 归入 question，禁止 prefix/question 分次分词造成 IDs 漂移。
+            quest = canonical_quest_input(
+                tokenizer, prompt+question, dataset,
+                add_special_tokens=not (chat_template_applied and IS_DSV2))
+            def segment_encoding(ids):
+                input_ids = torch.tensor([ids], dtype=torch.long)
+                return BatchEncoding(dict(input_ids=input_ids,
+                                          attention_mask=torch.ones_like(input_ids)))
+            input = segment_encoding(quest.prefix_ids)
+            q_input = segment_encoding(quest.suffix_ids)
+            # BOS 与所有特殊 token 均由完整 token 流分配到唯一分段；
+            # handoff 后必须逐位保持 canonical IDs，不做二次删除。
+            realized_ids = input.input_ids[0].tolist()+q_input.input_ids[0].tolist()
+            if realized_ids != list(quest.full_ids):
+                raise ValueError('canonical Quest token stream changed during handoff')
             if run_stats is not None:
-                realized_ids = (
-                    input.input_ids[0].tolist()
-                    + q_input.input_ids[0].tolist()
-                )
                 run_stats.setdefault("input_ids_sha256", []).append(
                     input_ids_sha256(realized_ids))
-            input = input.to("cuda")
-            q_input = q_input.to("cuda")
+                run_stats.setdefault("quest_split", []).append(quest.metadata)
+            quest_metadata = quest.metadata
+            input = input.to(device)
+            q_input = q_input.to(device)
 
         context_length = input.input_ids.shape[-1] + q_input.input_ids.shape[-1]
         # 096（TL-DSV2-CAP-PROVENANCE-096）：每样本实际输入 token 数（chat
@@ -410,29 +389,7 @@ def get_pred(
         capture_context,capture = _paper_capture_request(
             paper_capture_mode,model,input.input_ids,q_input.input_ids,dataset,model_name)
         with baseline_request(model) as baseline_receipt, capture_context, eager_decoding_request_guard():
-            if (
-                dataset == "samsum"
-            ):  # prevent illegal output on samsum (model endlessly repeat "\nDialogue"), might be a prompting issue
-                # B03 修复（GPT 审查 2026-10-08）：原版 model.generate(**input) 缺两件事——
-                # ① q_input 切出的 question 没接回，只喂了 prefix；② output 赋值后
-                # generated_content 从未赋值，下方共用 decode 必 UnboundLocalError。
-                # 修法：拼接完整输入（与 else 分支同协议），generate 后取新增 token。
-                full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
-                output = model.generate(
-                    input_ids=full_ids,
-                    attention_mask=torch.ones_like(full_ids),
-                    max_new_tokens=max_gen,
-                    num_beams=1,
-                    do_sample=False,
-                    temperature=1.0,
-                    min_length=full_ids.shape[-1] + 1,
-                    eos_token_id=[
-                        tokenizer.eos_token_id,
-                        tokenizer.encode("\n", add_special_tokens=False)[-1],
-                    ],
-                )[0]
-                generated_content = output[full_ids.shape[-1]:].tolist()
-            elif IS_DSV2:
+            if IS_DSV2:
                 # S-T023 DeepSeek fullkv 修复（2026-10-12）：官方 modeling_deepseek.py
                 # 是旧 transformers 时代代码，手动 prefill/decode 循环在 4.56.2 新
                 # DynamicCache（self.layers 结构）下会触发 legacy cache 转换陷阱——
@@ -455,8 +412,15 @@ def get_pred(
                 )[0]
                 generated_content = output[full_ids.shape[-1]:].tolist()
             else:
+                eos_token_id = tokenizer.eos_token_id
+                min_new_tokens = 0
+                if dataset == 'samsum':
+                    eos_token_id = [tokenizer.eos_token_id,
+                                    tokenizer.encode('\n', add_special_tokens=False)[-1]]
+                    min_new_tokens = 1
                 generated_content = _manual_generate(
-                    model,input.input_ids,q_input.input_ids,max_gen,tokenizer.eos_token_id,capture)
+                    model,input.input_ids,q_input.input_ids,max_gen,eos_token_id,capture,
+                    min_new_tokens=min_new_tokens)
 
         pred = tokenizer.decode(generated_content, skip_special_tokens=True)
         # pred = tokenizer.decode(output[context_length:], skip_special_tokens=True)
@@ -486,6 +450,8 @@ def get_pred(
             # "B0": avg_B0,
             # "B1": avg_budget,
         }
+        if quest_metadata is not None:
+            record['quest_input'] = quest_metadata
         if baseline_receipt:
             record['baseline_receipt'] = baseline_receipt
         if capture is not None:

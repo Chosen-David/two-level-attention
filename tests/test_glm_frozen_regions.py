@@ -9,6 +9,7 @@ from sparse_attn.patches.glm4_moe_lite_attn_patch import glm4_moe_lite_attn_forw
 from sparse_attn.ops.frozen_region_gate import GateConfig, profile_regions
 from sparse_attn.ops.frozen_region_cache import RegionGeometry
 from benchmark.LongBench.prefill_frozen_skip import generate, generate_native
+from benchmark.LongBench.quest_input import QuestTokenInput
 
 @pytest.mark.parametrize('mode',['full','far','near','dual'])
 @torch.inference_mode()
@@ -32,14 +33,17 @@ def test_real_glm_class_region_decode(monkeypatch,mode):
     model._frozen_tli=True;model.generation_config.eos_token_id=None
     ids=torch.randint(0,32,(4352,)).tolist()
     tok=SimpleNamespace(decode=lambda ids,**kw:str(ids))
-    result=generate(model,tok,ids,3,GateConfig(epsilon=1.,rows=2,mode=mode),'cpu')
+    quest=QuestTokenInput(tuple(ids),tuple(ids[:-5]),tuple(ids[-5:]),{})
+    result=generate(model,tok,quest,3,GateConfig(epsilon=1.,rows=2,mode=mode),'cpu')
     d=result['decisions'][0]
     assert d['skip_near']==(mode in ('near','dual'))
     assert d['skip_far']==(mode in ('far','dual'))
     receipt=result['tli_receipts'][0]
     assert receipt['dimensions']==list(range(208,224))+list(range(240,256))
+    assert result['quest_protocol']['freeze_logical_position']==4347
+    assert result['quest_protocol']['suffix_logical_range']==[4347,4352]
     assert result['final_kv']['layers'][0]['logical_length']==4354
-    if mode=='full':assert result['generated_ids']==generate_native(model,ids,3,'cpu')
+    if mode=='full':assert result['generated_ids']==generate_native(model,quest,3,'cpu')
     if mode=='near':assert not result['frozen_kv']['layers'][0]['nodes']['near_staging']['attention_visible']
 
 def test_profile_uses_explicit_attention_scale():
