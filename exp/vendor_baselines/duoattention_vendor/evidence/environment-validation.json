@@ -1,0 +1,29 @@
+{
+  "tested_base": "6a68fbfdde21f81473303ff814f880723a6717de",
+  "date_utc": "2026-10-30",
+  "python": "3.10.22",
+  "uv": "0.12.23",
+  "lock_sha256": "9037dcc5f9318c93fce1742cb395bf8c0ad338382c6521e9bd294ed139650940",
+  "local_environment": "delivery-workspace .venv; not user remote host",
+  "checks": [
+    "Hash-locked requirements installed; 107 installed distributions including editable duo_attn checked",
+    "pip check passed",
+    "Torch CPU arithmetic passed",
+    "Duo patch import and shipped pattern load/sparsification passed",
+    "FlashInfer legacy rmsnorm/rope signatures matched",
+    "FlashAttention extension imported",
+    "62 upstream source identities preserved",
+    "bootstrap re-entry passed",
+    "normal and -O environment check passed",
+    "unowned environment rejected, sentinel preserved",
+    "4 PDF helper tests passed normal and -O"
+  ],
+  "retained_failure": "Initial unpinned setuptools lacked pkg_resources; pinned75.1.0 resolved TP2.0.0 import. Default home caches read-only; local cache paths used.",
+  "not_run": [
+    "GPU kernels",
+    "models/quality/performance",
+    "BlockSparse build (no NVCC)",
+    "whole repository regression"
+  ],
+  "pdf_sha256": "0c121d19e509201937378f711e236ce1453728670e8184c81b237702eea825b2"
+}

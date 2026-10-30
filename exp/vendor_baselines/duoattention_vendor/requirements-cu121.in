@@ -1,0 +1,24 @@
+# Tested host target: Linux x86_64 CPython 3.10; environment preparation only.
+# Torch ABI matches official legacy FlashInfer CUDA12.1/Torch2.4 wheel index.
+torch @ https://download.pytorch.org/whl/cu121/torch-2.4.0%2Bcu121-cp310-cp310-linux_x86_64.whl
+transformers==4.45.2
+huggingface_hub==0.25.2
+tensor_parallel==2.0.0
+numpy<2
+accelerate
+sentencepiece
+datasets
+wandb
+zstandard
+matplotlib
+ninja
+packaging
+seaborn
+rouge_score
+einops
+pandas
+setuptools==75.1.0
+wheel
+
+flashinfer @ https://github.com/flashinfer-ai/flashinfer/releases/download/v0.1.6/flashinfer-0.1.6+cu121torch2.4-cp310-cp310-linux_x86_64.whl#sha256=d7605fbe3f14ef7f36e702f627c1f06e5a32495b5ebfe34313c3fb15f3e4eb06
+flash-attn @ https://github.com/Dao-AILab/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu123torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl#sha256=237ef9c6157db394e1ddde4ba609a21ebb98382377a27041edc09318801a6f24
