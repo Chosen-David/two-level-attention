@@ -16,7 +16,9 @@ import time
 from unittest.mock import patch
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+
+from benchmark.RULER.yarn_receipt import resolve_yarn_config
 
 from sparse_attn.info import resolve_treatment_snapshot
 from sparse_attn.ops.frozen_region_cache import RegionGeometry
@@ -248,8 +250,14 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     tokenizer = AutoTokenizer.from_pretrained(args.model)
+    config = AutoConfig.from_pretrained(args.model)
+    rope_scaling = None
+    if args.context_length > 40960:
+        _, rope_scaling = resolve_yarn_config(
+            True, None, args.context_length, {65536: 2., 131072: 4.}, 40960)
+        config.rope_scaling = rope_scaling
     model = AutoModelForCausalLM.from_pretrained(
-        args.model, dtype=torch.bfloat16, device_map=device,
+        args.model, config=config, dtype=torch.bfloat16, device_map=device,
         attn_implementation='sdpa').eval()
     tli = tli_args()
     if register_patch(model, tli, resolve_treatment_snapshot(tli)) != model.config.num_hidden_layers:
@@ -262,6 +270,7 @@ def main():
     protocol = dict(model=args.model, task=args.task, row=args.row,
                     context_length=args.context_length, input_tokens=ids.shape[-1],
                     max_new=args.max_new, dtype='bfloat16', device=str(device),
+                    rope_scaling=rope_scaling,
                     torch=torch.__version__, tli_args=vars(tli))
     (outdir/'protocol.json').write_text(json.dumps(protocol, indent=2, default=str)+'\n')
     report = dict(protocol=protocol, correctness=[], performance=[])
@@ -295,6 +304,7 @@ def main():
                 result = run_request(model, ids, args.max_new, arm, 'dual', device)
                 runs.append(result)
                 report['performance'].append(_public_result(result))
+                (outdir/'report.json').write_text(json.dumps(report, indent=2)+'\n')
                 print('PERFORMANCE', rep, arm, result['timings'],
                       result['audit']['gate_counts'], flush=True)
                 del result
@@ -310,6 +320,7 @@ def main():
             off['arm'] = 'gates_off'
             runs.append(off)
             report['performance'].append(_public_result(off))
+            (outdir/'report.json').write_text(json.dumps(report, indent=2)+'\n')
             del off
         report['performance_summary'] = performance_summary(runs)
         (outdir/'report.json').write_text(json.dumps(report, indent=2)+'\n')
