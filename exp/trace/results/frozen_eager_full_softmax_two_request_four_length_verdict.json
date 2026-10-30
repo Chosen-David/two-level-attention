@@ -1,0 +1,832 @@
+{
+  "schema": "frozen-eager-full-softmax-two-request-four-length-v1",
+  "code_commit": "c81e57d940bf1c510539cb49d5916301c3970cae",
+  "validated_base_commit": "3abb05c32353b17887b7d9d6e4fcd89284daf5f2",
+  "validated_selector_patch_sha256": "94783f81a112a40592ce580893382b153faa363a3c9f3b02797d00316c5068b1",
+  "verdict": "PASS_TWO_REQUEST_8K_32K_64K_128K_FOUR_STATE_SELECTED_ID_AND_OUTPUT_PARITY_AFTER_FULL_WIDTH_SOFTMAX_FIX",
+  "protocol": {
+    "model": "Qwen3-8B BF16",
+    "task": "RULER niah_single_1 rows 0 and 1",
+    "context_lengths": [
+      8192,
+      32768,
+      65536,
+      131072
+    ],
+    "input_tokens": {
+      "0": {
+        "8192": 7881,
+        "32768": 32612,
+        "65536": 65441,
+        "131072": 130981
+      },
+      "1": {
+        "8192": 7881,
+        "32768": 32608,
+        "65536": 65459,
+        "131072": 130995
+      }
+    },
+    "max_new_tokens": 8,
+    "decode_steps_compared_per_state": 7,
+    "states": [
+      "keep",
+      "far",
+      "near",
+      "both"
+    ],
+    "mode": "correctness-only",
+    "attention_intervention": "诊断 wrapper 仅将 reference attention 消费端替换为与 physical 相同的 compact Triton kernel；cache 逻辑不变",
+    "production_selector_fix": "候选 fine 仍只计算 L1/bypass/protected 支持集；scatter 到 Q-head full-width score buffer，先 mask 再 softmax+GQA mean，恢复 reference 归一化布局",
+    "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+    "wrapper": "/tmp/run_frozen_coarse_score_diagnostic.py",
+    "wrapper_sha256": "aa452ff64669cc5daf0dd1cd5f92a39d804cc1f550dfc36476c401ceb592c8c6"
+  },
+  "baseline_failures_before_full_softmax_fix": {
+    "row1/32768/near": {
+      "mismatch_count": 998,
+      "first_mismatch": {
+        "layer": 13,
+        "decode_step": 1,
+        "kv_head": 6,
+        "reference_only": [
+          27384
+        ],
+        "physical_only": [
+          24575
+        ]
+      },
+      "layer_output_max_abs": 1.75,
+      "logits_max_abs": 0.1875,
+      "generated_equal": true
+    },
+    "row1/131072/keep": {
+      "mismatch_count": 1,
+      "first_mismatch": {
+        "layer": 15,
+        "decode_step": 3,
+        "kv_head": 5,
+        "reference_only": [
+          115547
+        ],
+        "physical_only": [
+          113027
+        ]
+      },
+      "layer_output_max_abs": 0.0,
+      "logits_max_abs": 0.0,
+      "generated_equal": true
+    }
+  },
+  "root_cause": {
+    "capture": "/tmp/frozen-eager-3abb05c-ruler32k-row1-near-selector-intermediates/intermediates.pt",
+    "capture_sha256": "b95af48b881684fb512b9c0525c7894232f393223170bf34e708baabadbdfed3",
+    "target": {
+      "layer": 13,
+      "decode_step": 1,
+      "kv_head": 6
+    },
+    "mechanism": "physical 在 compact candidate 维做 softmax+GQA mean，reference 在 full-width、先 mask 的 score 上做同一归一化；归约布局差使 head6 的 8 个 BF16 概率不同，token24575 向上舍入后与27384并列并发生 top-k 替换",
+    "native_gpu_replay": "/tmp/frozen-eager-32k-row1-near-probability-replay/stdout.log",
+    "native_gpu_replay_sha256": "6e2e6193f3868864df376dabb6f205f81329bd9d2502eaec4a65f7cfa6dcd20a",
+    "replay_script": "/tmp/replay_32k_row1_near_probability.py",
+    "replay_script_sha256": "1b07c1c22d3c7dafe76e04285afcb652536a0aaaf928dcc31ecdc5a3726aab79",
+    "mid_probability_elements_bitexact": 259856,
+    "candidate_scatter_full_probability_bitexact": true,
+    "candidate_scatter_full_ordered_topk_bitexact": true,
+    "compact_replay_bitexact_to_old_physical": true,
+    "compact_vs_fixed_ordered_topk_differences": 9,
+    "probe": {
+      "24575": {
+        "captured_reference": 6.031990051269531e-05,
+        "captured_physical": 6.0558319091796875e-05,
+        "full_from_reference": 6.031990051269531e-05,
+        "full_from_candidates": 6.031990051269531e-05,
+        "compact_replay": 6.0558319091796875e-05
+      },
+      "27384": {
+        "captured_reference": 6.0558319091796875e-05,
+        "captured_physical": 6.0558319091796875e-05,
+        "full_from_reference": 6.0558319091796875e-05,
+        "full_from_candidates": 6.0558319091796875e-05,
+        "compact_replay": 6.0558319091796875e-05
+      }
+    }
+  },
+  "final_evidence": {
+    "row0/8192": {
+      "reports": [
+        {
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/8192/report.json",
+          "report_sha256": "f6157cf763029fe691772414e950d5522bfcc981b512d0982903075476c1f29e",
+          "states": [
+            "keep",
+            "far",
+            "near",
+            "both"
+          ],
+          "aligned_reference_attention_calls": 1008,
+          "physical_candidate_score_calls": 504,
+          "physical_candidate_score_successes": 504,
+          "physical_coarse_score_calls": 504,
+          "physical_coarse_score_successes": 504,
+          "physical_avg_score_calls": 504,
+          "physical_avg_score_successes": 504
+        }
+      ],
+      "baseline_report": "/tmp/frozen-eager-17fd4ef-coarse-layout-ruler-regression/8192/report.json",
+      "baseline_report_sha256": "c8c585266d8e4ae4366c5244eba5e2e9e6ffd91afbe8f145e6c686e7483db83f",
+      "input_sha256": "17f398a32d66f3494cee23760c2ff8e7f5521bfdbfbbe786ee6e97b02e0e574b",
+      "input_tokens": 7881,
+      "yarn_factor": null,
+      "yarn_original_max_position_embeddings": null,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 293912,
+          "physical_selected_kv_total": 293912,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/8192/report.json"
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/8192/report.json"
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 293836,
+          "physical_selected_kv_total": 293836,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/8192/report.json"
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/8192/report.json"
+        }
+      }
+    },
+    "row0/32768": {
+      "reports": [
+        {
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/32768/report.json",
+          "report_sha256": "6c87e4188d5d47e91ff919f72d1325a937d3ed37cb5522bed3b2e99fe900341d",
+          "states": [
+            "keep",
+            "far",
+            "near",
+            "both"
+          ],
+          "aligned_reference_attention_calls": 1008,
+          "physical_candidate_score_calls": 504,
+          "physical_candidate_score_successes": 504,
+          "physical_coarse_score_calls": 504,
+          "physical_coarse_score_successes": 504,
+          "physical_avg_score_calls": 504,
+          "physical_avg_score_successes": 504
+        }
+      ],
+      "baseline_report": "/tmp/frozen-eager-17fd4ef-coarse-layout-ruler-regression/32768/report.json",
+      "baseline_report_sha256": "9063264deeee0d2f97bbb3b1b9cbd81a47ea0094ed1810cb4b49dfb19e705f8f",
+      "input_sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+      "input_tokens": 32612,
+      "yarn_factor": null,
+      "yarn_original_max_position_embeddings": null,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294118,
+          "physical_selected_kv_total": 294118,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/32768/report.json"
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/32768/report.json"
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294051,
+          "physical_selected_kv_total": 294051,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/32768/report.json"
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/32768/report.json"
+        }
+      }
+    },
+    "row0/65536": {
+      "reports": [
+        {
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/65536/report.json",
+          "report_sha256": "a298d30a1e176463ef2d4af268057808a714e68ab186286ad26eebe1bf64a112",
+          "states": [
+            "keep",
+            "far",
+            "near",
+            "both"
+          ],
+          "aligned_reference_attention_calls": 1008,
+          "physical_candidate_score_calls": 504,
+          "physical_candidate_score_successes": 504,
+          "physical_coarse_score_calls": 504,
+          "physical_coarse_score_successes": 504,
+          "physical_avg_score_calls": 504,
+          "physical_avg_score_successes": 504
+        }
+      ],
+      "baseline_report": "/tmp/frozen-eager-17fd4ef-coarse-layout-ruler-regression/65536/report.json",
+      "baseline_report_sha256": "a942dd1c95e7fc88a749b54cb8988232ecb179a1ee5322bfb6119e500cf4bb19",
+      "input_sha256": "32e9693f3748a920b60ecd0afefe0f9118cd71aee468a341c3ada311a1d65d2e",
+      "input_tokens": 65441,
+      "yarn_factor": 2.0,
+      "yarn_original_max_position_embeddings": 32768,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294090,
+          "physical_selected_kv_total": 294090,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/65536/report.json"
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/65536/report.json"
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294080,
+          "physical_selected_kv_total": 294080,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/65536/report.json"
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016,
+          "report": "/tmp/frozen-eager-fullsoftmax-row0-regression/65536/report.json"
+        }
+      }
+    },
+    "row0/131072": {
+      "reports": [
+        {
+          "report": "/tmp/frozen-eager-fullsoftmax-128k-regression/row0/report.json",
+          "report_sha256": "17b4dff600f01c3bdef22e2b5f491bb2f885bd2f0ac1f6d53ca389f66b12ed63",
+          "states": [
+            "keep",
+            "far",
+            "near",
+            "both"
+          ],
+          "aligned_reference_attention_calls": 1008,
+          "physical_candidate_score_calls": 504,
+          "physical_candidate_score_successes": 504,
+          "physical_coarse_score_calls": 504,
+          "physical_coarse_score_successes": 504,
+          "physical_avg_score_calls": 504,
+          "physical_avg_score_successes": 504
+        }
+      ],
+      "baseline_report": "/tmp/frozen-eager-17fd4ef-coarse-layout-ruler128k-four-state/report.json",
+      "baseline_report_sha256": "855da526c0522862ac18f27904a68dd6f31a781381f964484a804bcb10046a17",
+      "input_sha256": "ac79b7efd20cf65a0cf39009576fdb31969aec5c2a670ba23a529ec207d17869",
+      "input_tokens": 130981,
+      "yarn_factor": 4.0,
+      "yarn_original_max_position_embeddings": 32768,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294120,
+          "physical_selected_kv_total": 294120,
+          "report": "/tmp/frozen-eager-fullsoftmax-128k-regression/row0/report.json"
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912,
+          "report": "/tmp/frozen-eager-fullsoftmax-128k-regression/row0/report.json"
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294093,
+          "physical_selected_kv_total": 294093,
+          "report": "/tmp/frozen-eager-fullsoftmax-128k-regression/row0/report.json"
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016,
+          "report": "/tmp/frozen-eager-fullsoftmax-128k-regression/row0/report.json"
+        }
+      }
+    },
+    "row1/8192": {
+      "reports": [
+        {
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/8192/report.json",
+          "report_sha256": "1ecfa9b2252a6b24c1c8a768ee1ce9b372c4cfd4bd40473191828b784c37fa85",
+          "states": [
+            "keep",
+            "far",
+            "near",
+            "both"
+          ],
+          "aligned_reference_attention_calls": 1008,
+          "physical_candidate_score_calls": 504,
+          "physical_candidate_score_successes": 504,
+          "physical_coarse_score_calls": 504,
+          "physical_coarse_score_successes": 504,
+          "physical_avg_score_calls": 504,
+          "physical_avg_score_successes": 504
+        }
+      ],
+      "baseline_report": "/tmp/frozen-eager-3abb05c-ruler-row1-regression/8192/report.json",
+      "baseline_report_sha256": "4a95d7f97c3aeb03d5f35b5ec698e6bc3642e4ee0f83fc20d5cb6bb27e867e93",
+      "input_sha256": "17f398a32d66f3494cee23760c2ff8e7f5521bfdbfbbe786ee6e97b02e0e574b",
+      "input_tokens": 7881,
+      "yarn_factor": null,
+      "yarn_original_max_position_embeddings": null,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 293937,
+          "physical_selected_kv_total": 293937,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/8192/report.json"
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/8192/report.json"
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 293840,
+          "physical_selected_kv_total": 293840,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/8192/report.json"
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/8192/report.json"
+        }
+      }
+    },
+    "row1/32768": {
+      "reports": [
+        {
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/32768/report.json",
+          "report_sha256": "8e95d6548172dbf5965980b7c812aa57938e0a1c4e4771c4015f01ec8beacdb7",
+          "states": [
+            "keep",
+            "far",
+            "both"
+          ],
+          "aligned_reference_attention_calls": 756,
+          "physical_candidate_score_calls": 252,
+          "physical_candidate_score_successes": 252,
+          "physical_coarse_score_calls": 252,
+          "physical_coarse_score_successes": 252,
+          "physical_avg_score_calls": 252,
+          "physical_avg_score_successes": 252
+        },
+        {
+          "report": "/tmp/frozen-eager-fullsoftmax-ruler32k-row1-near/report.json",
+          "report_sha256": "d3206bcf6d40d8e4bb57514a22e0167597fed2b84270f95ef27e0ffa9ed438e9",
+          "states": [
+            "near"
+          ],
+          "aligned_reference_attention_calls": 252,
+          "physical_candidate_score_calls": 252,
+          "physical_candidate_score_successes": 252,
+          "physical_coarse_score_calls": 252,
+          "physical_coarse_score_successes": 252,
+          "physical_avg_score_calls": 252,
+          "physical_avg_score_successes": 252
+        }
+      ],
+      "baseline_report": "/tmp/frozen-eager-3abb05c-ruler-row1-regression/32768/report.json",
+      "baseline_report_sha256": "0a8568d6c01a0eaccf080655753d11de65f1c4598fa5f86b80097d51eedbd62a",
+      "input_sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+      "input_tokens": 32608,
+      "yarn_factor": null,
+      "yarn_original_max_position_embeddings": null,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294109,
+          "physical_selected_kv_total": 294109,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/32768/report.json"
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/32768/report.json"
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/32768/report.json"
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294079,
+          "physical_selected_kv_total": 294079,
+          "report": "/tmp/frozen-eager-fullsoftmax-ruler32k-row1-near/report.json"
+        }
+      }
+    },
+    "row1/65536": {
+      "reports": [
+        {
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/65536/report.json",
+          "report_sha256": "dce2c4eb791a0c6044a9f072697ea19e9c1bdd0906388ee418cd2d8ed1052f07",
+          "states": [
+            "keep",
+            "far",
+            "near",
+            "both"
+          ],
+          "aligned_reference_attention_calls": 1008,
+          "physical_candidate_score_calls": 504,
+          "physical_candidate_score_successes": 504,
+          "physical_coarse_score_calls": 504,
+          "physical_coarse_score_successes": 504,
+          "physical_avg_score_calls": 504,
+          "physical_avg_score_successes": 504
+        }
+      ],
+      "baseline_report": "/tmp/frozen-eager-3abb05c-ruler-row1-regression/65536/report.json",
+      "baseline_report_sha256": "5816a9d700e13088475bfc6708d530177f87e6ea909984354108d0f74b939dbb",
+      "input_sha256": "32e9693f3748a920b60ecd0afefe0f9118cd71aee468a341c3ada311a1d65d2e",
+      "input_tokens": 65459,
+      "yarn_factor": 2.0,
+      "yarn_original_max_position_embeddings": 32768,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294103,
+          "physical_selected_kv_total": 294103,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/65536/report.json"
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/65536/report.json"
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294080,
+          "physical_selected_kv_total": 294080,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/65536/report.json"
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016,
+          "report": "/tmp/frozen-eager-fullsoftmax-row1-regression/65536/report.json"
+        }
+      }
+    },
+    "row1/131072": {
+      "reports": [
+        {
+          "report": "/tmp/frozen-eager-fullsoftmax-ruler128k-row1-keep/report.json",
+          "report_sha256": "6ec121b298380e34090f427049a1da8bcfb6c06703e8acd3f875f4b65a461efe",
+          "states": [
+            "keep"
+          ],
+          "aligned_reference_attention_calls": 252,
+          "physical_candidate_score_calls": 252,
+          "physical_candidate_score_successes": 252,
+          "physical_coarse_score_calls": 252,
+          "physical_coarse_score_successes": 252,
+          "physical_avg_score_calls": 252,
+          "physical_avg_score_successes": 252
+        },
+        {
+          "report": "/tmp/frozen-eager-fullsoftmax-128k-regression/row1/report.json",
+          "report_sha256": "c94b2761bc3013d322f6a980bcdaa9d1e5f5b91aef3192246420f1177b12cac5",
+          "states": [
+            "far",
+            "near",
+            "both"
+          ],
+          "aligned_reference_attention_calls": 756,
+          "physical_candidate_score_calls": 252,
+          "physical_candidate_score_successes": 252,
+          "physical_coarse_score_calls": 252,
+          "physical_coarse_score_successes": 252,
+          "physical_avg_score_calls": 252,
+          "physical_avg_score_successes": 252
+        }
+      ],
+      "baseline_report": "/tmp/frozen-eager-3abb05c-ruler128k-row1-four-state/report.json",
+      "baseline_report_sha256": "199657e70dfec16e891a841f0685bf4828f8c0ea1c01ab5ca95820daeb2dd1bd",
+      "input_sha256": "ac79b7efd20cf65a0cf39009576fdb31969aec5c2a670ba23a529ec207d17869",
+      "input_tokens": 130995,
+      "yarn_factor": 4.0,
+      "yarn_original_max_position_embeddings": 32768,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294203,
+          "physical_selected_kv_total": 294203,
+          "report": "/tmp/frozen-eager-fullsoftmax-ruler128k-row1-keep/report.json"
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912,
+          "report": "/tmp/frozen-eager-fullsoftmax-128k-regression/row1/report.json"
+        },
+        "near": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294132,
+          "physical_selected_kv_total": 294132,
+          "report": "/tmp/frozen-eager-fullsoftmax-128k-regression/row1/report.json"
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016,
+          "report": "/tmp/frozen-eager-fullsoftmax-128k-regression/row1/report.json"
+        }
+      }
+    }
+  },
+  "aggregate": {
+    "requests_passed": 2,
+    "lengths_passed_per_request": 4,
+    "states_passed_per_request_length": 4,
+    "total_kv_head_steps": 64512,
+    "total_selected_logical_id_mismatches": 0,
+    "all_physical_mappings_valid": true,
+    "all_decode_layer_outputs_bitexact": true,
+    "all_decode_logits_bitexact": true,
+    "all_generated_tokens_equal": true,
+    "all_generated_tokens_unchanged_from_pre_fix_reference": true,
+    "all_reported_aggregate_selected_kv_totals_equal": true,
+    "all_instrumented_triton_calls_succeeded": true
+  },
+  "tests": {
+    "command": "pytest test_frozen_region_tli.py test_frozen_region_runtime.py test_frozen_region_cache.py test_qwen_frozen_eager_bench.py",
+    "passed": 64,
+    "failed": 0,
+    "python_py_compile": true,
+    "git_diff_check": true
+  },
+  "gpu_hygiene": {
+    "native_replay": {
+      "status": "clean",
+      "locked_gpu": 0,
+      "unique_active_pids": [
+        2997030
+      ],
+      "monitor_samples": 4,
+      "start_memory": "1 MiB",
+      "last_monitor_memory": "21 MiB",
+      "post_memory_mib": 1
+    },
+    "row1_32k_near": {
+      "status": "clean",
+      "locked_gpu": 0,
+      "unique_active_pids": [
+        3030216
+      ],
+      "monitor_samples": 36,
+      "start_memory": "1 MiB",
+      "last_monitor_memory": "25414 MiB",
+      "post_memory_mib": 1
+    },
+    "row1_128k_keep": {
+      "status": "clean",
+      "locked_gpu": 0,
+      "unique_active_pids": [
+        3057920
+      ],
+      "monitor_samples": 161,
+      "start_memory": "1 MiB",
+      "last_monitor_memory": "53300 MiB",
+      "post_memory_mib": 1
+    },
+    "row0_8k_32k_64k": {
+      "status": "clean",
+      "locked_gpu": 1,
+      "unique_active_pids": [
+        3057721,
+        3067244,
+        3084082
+      ],
+      "monitor_samples": 403,
+      "start_memory": "1 MiB",
+      "last_monitor_memory": "34710 MiB",
+      "post_memory_mib": 1
+    },
+    "dual_row_128k": {
+      "status": "clean",
+      "locked_gpu": 0,
+      "unique_active_pids": [
+        3090949,
+        3184716
+      ],
+      "monitor_samples": 1056,
+      "start_memory": "1 MiB",
+      "last_monitor_memory": "53304 MiB",
+      "post_memory_mib": 1
+    },
+    "row1_8k_32k_64k": {
+      "status": "clean",
+      "locked_gpu": 1,
+      "unique_active_pids": [
+        3131884,
+        3142108,
+        3154116
+      ],
+      "monitor_samples": 376,
+      "start_memory": "1 MiB",
+      "last_monitor_memory": "1 MiB",
+      "post_memory_mib": 1
+    }
+  },
+  "cross_validation": {
+    "assertions_passed": 521,
+    "assertions_failed": 0
+  },
+  "scope": [
+    "PASS 仅覆盖 Qwen3-8B RULER niah_single_1 row0/row1 在 8K/32K/64K/128K、attention backend 对齐后的四态选择、物理映射和逐步输出 parity。",
+    "不宣称原始 dense-torch 与 compact-Triton 不同 attention backend 的数值等价，不外推其他请求、任务、模型、dense 质量或完整生产验收。",
+    "本次为匹配 reference 归一化新增 Q-head full-width score buffer；不据此宣称 TPOT、流量、显存或生产加速收益，旧性能数字不能自动外推到本提交。",
+    "诊断 wrapper、捕获与原生重放脚本均在 /tmp，不属于生产 oracle；生产修复提交见 code_commit。"
+  ]
+}
