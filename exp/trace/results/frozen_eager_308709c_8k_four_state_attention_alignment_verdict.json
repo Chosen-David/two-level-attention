@@ -1,0 +1,106 @@
+{
+  "schema": "frozen-eager-8k-four-state-attention-alignment-v1",
+  "code_commit": "308709ca573a94f0c4258cab8dd82af2809369d0",
+  "verdict": "PASS_8K_FOUR_STATE_SELECTED_ID_AND_OUTPUT_PARITY_UNDER_ALIGNED_ATTENTION",
+  "protocol": {
+    "model": "Qwen3-8B BF16",
+    "task": "RULER niah_single_1 row0",
+    "context_length": 8192,
+    "input_tokens": 7881,
+    "max_new_tokens": 8,
+    "decode_steps_compared_per_state": 7,
+    "states": ["keep", "far", "near", "both"],
+    "mode": "correctness-only",
+    "intervention": "仅将 reference attention 消费端替换为与 physical 相同的 compact Triton kernel；两臂 selector 与 cache 逻辑不变"
+  },
+  "wrapper": {
+    "path": "/tmp/run_frozen_aligned_attention_diagnostic.py",
+    "sha256": "7b70c394eebe11f41e276bd24e515acf71e2bff3f8585743294ba46e3549e80a"
+  },
+  "evidence": {
+    "near": {
+      "report": "/tmp/frozen-eager-308709c-trace-8k-near-aligned-attention/report.json",
+      "report_sha256": "cb0082fb2d1fefb32b8f2e1b7261e56bcb8aa71d37d9cc1c61786d1a3bb5d149",
+      "aligned_reference_attention_calls": 252,
+      "selected_logical_id_mismatches": 0,
+      "compared_kv_head_steps": 2016,
+      "all_physical_mappings_valid": true,
+      "layer_output_max_abs": 0.0,
+      "logits_max_abs": 0.0,
+      "generated_equal": true,
+      "reference_selected_kv_total": 293836,
+      "physical_selected_kv_total": 293836
+    },
+    "keep_far_both": {
+      "report": "/tmp/frozen-eager-308709c-trace-8k-other-states-aligned-attention/report.json",
+      "report_sha256": "a494f24f4be0294660ff74fef4b53de1a5b20a72fd1ed5723954a569b1b8320a",
+      "aligned_reference_attention_calls": 756,
+      "states": {
+        "keep": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 293912,
+          "physical_selected_kv_total": 293912
+        },
+        "far": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 294912,
+          "physical_selected_kv_total": 294912
+        },
+        "both": {
+          "selected_logical_id_mismatches": 0,
+          "compared_kv_head_steps": 2016,
+          "all_physical_mappings_valid": true,
+          "layer_output_max_abs": 0.0,
+          "logits_max_abs": 0.0,
+          "generated_equal": true,
+          "reference_selected_kv_total": 38016,
+          "physical_selected_kv_total": 38016
+        }
+      }
+    }
+  },
+  "aggregate": {
+    "states_passed": 4,
+    "layer_steps_per_state": 252,
+    "kv_head_steps_per_state": 2016,
+    "total_kv_head_steps": 8064,
+    "total_selected_logical_id_mismatches": 0,
+    "all_physical_mappings_valid": true,
+    "all_decode_layer_outputs_bitexact": true,
+    "all_decode_logits_bitexact": true,
+    "all_generated_tokens_equal": true,
+    "all_aggregate_selected_kv_totals_equal": true
+  },
+  "gpu_hygiene": {
+    "near": {
+      "status": "clean",
+      "locked_gpu": 0,
+      "unique_active_pids": [1414772],
+      "post_memory_mib": 1,
+      "post_compute_processes": 0
+    },
+    "keep_far_both": {
+      "status": "clean",
+      "locked_gpu": 0,
+      "unique_active_pids": [1490013],
+      "post_memory_mib": 1,
+      "post_compute_processes": 0
+    }
+  },
+  "scope": [
+    "PASS 仅指该 8K 请求在 attention backend 对齐后的四态选择、物理映射和逐步输出 parity。",
+    "不宣称原始 dense-torch 与 compact-Triton 不同 backend 的逐层数值等价；8K near 原始未对齐报告的 1889 个 mismatch 已另案归因。",
+    "不外推其他长度、模型、请求或 dense 质量，不改变既有 TPOT、显存和生产性能判决。",
+    "诊断 wrapper 未进入生产仓库，生产 selector、attention 与 cache 代码未修改。"
+  ]
+}
