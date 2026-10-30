@@ -185,8 +185,13 @@ def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
             idx_dict = indexer.prepare_index(k[b:b + 1], cu)
             if row_pool is not None:
                 row_pool[b] = indexer._ginc
+            valid_len = vl[b:b + 1]
+            # inference tensor 不保留 _base 视图链，Python 属性也不会自动
+            # 继承；显式把 DeviceDecodeInputs 的逐步修订号传到行视图。
+            valid_len._tli_device_revision = getattr(
+                vl, '_tli_device_revision', None)
             masks.append(indexer.compute_mask_graph(
-                q[b:b + 1], idx_dict, self.scaling, vl[b:b + 1]))
+                q[b:b + 1], idx_dict, self.scaling, valid_len))
     m_b = torch.cat(masks, dim=0)              # [B,1,Hkv,S_cap] bool
     cu_b = torch.arange(B + 1, device=dev, dtype=torch.int32) * S_cap
     # valid_length=None：mask 已排除 pad 列（prepare_mask 末尾清 False 的

@@ -55,13 +55,24 @@ def _load_greedy_triton():
 _GRAPH_GEO_CACHE = {}  # step-level geometry cache (shared by 36 per-layer indexers)
 
 
-def _graph_geo_lookup(valid_len, geo_key):
+def _graph_geo_version(valid_len, allow_unversioned=False):
+    revision = getattr(valid_len, '_tli_device_revision', None)
     try:
-        # DeviceDecodeInputs 的 Triton 写入不推进 PyTorch version counter，
-        # 额外消费其逐步调用的显式修订号，避免 eager 跨步复用旧 S_real。
-        version = (valid_len._version,
-                   getattr(valid_len, '_tli_device_revision', 0))
+        return valid_len._version, revision
     except RuntimeError:  # inference_mode tensors have no mutation counter
+        if allow_unversioned:
+            # managed capture 的 geo_key 含唯一 capture 身份；同一次 capture
+            # 内 valid_len 不变，可在层间共享，但不能跨 capture/eager 复用。
+            return 'capture', revision
+        if revision is not None:
+            # DeviceDecodeInputs 用显式修订号弥补 Triton 写不推进 _version。
+            return 'device', revision
+        return None
+
+
+def _graph_geo_lookup(valid_len, geo_key, allow_unversioned=False):
+    version = _graph_geo_version(valid_len, allow_unversioned)
+    if version is None:
         return None
     ent = _GRAPH_GEO_CACHE.get(valid_len.data_ptr())
     if (ent is not None
@@ -71,14 +82,13 @@ def _graph_geo_lookup(valid_len, geo_key):
     return None
 
 
-def _graph_geo_store(valid_len, geo_key, geo):
-    try:
-        version = (valid_len._version,
-                   getattr(valid_len, '_tli_device_revision', 0))
-    except RuntimeError:
+def _graph_geo_store(valid_len, geo_key, geo, allow_unversioned=False):
+    version = _graph_geo_version(valid_len, allow_unversioned)
+    if version is None:
         return geo  # Never reuse geometry without a reliable mutation version.
-    if len(_GRAPH_GEO_CACHE) > 8:   # 上限清理（B>1 行缓存 + 防无界增长）
-        _GRAPH_GEO_CACHE.clear()
+    if valid_len.data_ptr() not in _GRAPH_GEO_CACHE and len(_GRAPH_GEO_CACHE) >= 8:
+        # FIFO 逐出最旧一项；整表清空会让同一步后续行/层无谓重复构建。
+        _GRAPH_GEO_CACHE.pop(next(iter(_GRAPH_GEO_CACHE)))
     _GRAPH_GEO_CACHE[valid_len.data_ptr()] = (
         valid_len, version, geo_key, geo)
     return geo
@@ -4298,10 +4308,11 @@ class TLIIndexer(TIAIndexer):
         # ---- 1+2. 动态几何 + 池掩码【E165 iter2a：步级共享缓存】----
         # 几何/池掩码/bypass 槽/mid_mask/swa_force/k2_mid 只依赖 valid_len
         # 与配置常量，与层无关（原实现每层重算 ~50 个小 kernel）。缓存键
-        # = (data_ptr, _version, 几何键)：warmup/eager 步 inject 的 vl.copy_()
-        # 使版本递增 → 每步首层重建；capture 单步内版本恒定 → 36 层命中
-        # （几何 kernel 只记录一次，replay 期从 live vl 现值重算 → 跨步
-        # 正确）。条目 pin valid_len 视图（强引用）防 data_ptr 复用误命中。
+        # = (data_ptr, _version/显式设备修订号, 几何键)：warmup/eager 步 inject
+        # 使版本递增 → 每步首层重建；managed capture 的唯一命名空间允许
+        # inference tensor 在同一次 capture 内跨层共享（几何 kernel 只记录一次，
+        # replay 期从 live vl 现值重算 → 跨步正确）。条目 pin valid_len 视图
+        # （强引用）防 data_ptr 复用误命中。
         _geo_key = (S_cap, kt_cap, bs, sink_pool_lo, sink_tok,
                     swa_tok, nl, K2, str(dev), _sparse_selection)
         # A capture-scoped identity prevents reuse of warmup or another graph's
@@ -4312,12 +4323,15 @@ class TLIIndexer(TIAIndexer):
         capturing = q.is_cuda and torch.cuda.is_current_stream_capturing()
         cache_key = geometry_cache_key(_geo_key, capturing=capturing,
             stream=torch.cuda.current_stream(q.device).cuda_stream if capturing else None)
-        geo = None if cache_key is None else _graph_geo_lookup(valid_len, cache_key)
+        geo = None if cache_key is None else _graph_geo_lookup(
+            valid_len, cache_key,
+            allow_unversioned=capturing)
         if geo is None:
             geo = _graph_geo_store(
                 valid_len, cache_key,
                 self._build_graph_geometry(valid_len, S_cap, kt_cap, _cst[1],
-                                           compact_only=_sparse_selection))
+                                           compact_only=_sparse_selection),
+                allow_unversioned=capturing and cache_key is not None)
         S_real = geo["S_real"]
         swa_lo_tok = geo["swa_lo_tok"]
         near_blks = geo["near_blks"]

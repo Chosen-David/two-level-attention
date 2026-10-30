@@ -244,6 +244,7 @@ def try_hybrid_batch_decode(module, q, k, v, cache, mask, ctx):
     outputs = []
     for b, (row, idx) in enumerate(zip(layer.rows, layer.indexers)):
         p, vl, active = pos[b:b+1], lengths[b:b+1], alive[b:b+1]
+        vl._tli_device_revision = getattr(lengths, '_tli_device_revision', None)
         slot = row.layout.map(p) if isinstance(row, FarSkipStaticLayer) else p
         # Dead rows keep their last valid KV exactly. Avoid a Python branch on
         # alive: EOS changes during graph replay while kernel shapes stay fixed.
