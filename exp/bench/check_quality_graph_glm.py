@@ -16,6 +16,7 @@ from sparse_attn.patches import register_patch
 from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 from sparse_attn.ops.quality_graph import from_dynamic
+from exp.bench.quality_pairing import glm_request_arms
 
 
 def run(args_cli):
@@ -35,9 +36,12 @@ def run(args_cli):
     ids=tokenizer(text*3000,return_tensors='pt').input_ids[:,:16384].to('cuda')
     assert ids.shape[-1]==16384
     records=[]
-    policies = [p for pair in range(args_cli.repeats) for p in (('0','1') if pair % 2 == 0 else ('1','0'))]
-    for request_index, policy in enumerate(policies):
+    arms = glm_request_arms(args_cli.repeats, args_cli.device_input_reference)
+    for request_index, (policy, input_mode) in enumerate(arms):
         os.environ['TLI_CUDA_GRAPH']=policy
+        if input_mode is not None:
+            os.environ['TLI_DEVICE_DECODE_INPUTS'] = input_mode
+            os.environ['TLI_REUSE_WARMUP_STREAM'] = input_mode
         if args_cli.measure:
             torch.cuda.synchronize()
             torch.cuda.reset_peak_memory_stats()
@@ -67,7 +71,7 @@ def run(args_cli):
                         step_wall_ms=step_ms, replay_gpu_ms=[], replay_gpu_mean_ms=None,
                         decode_steps=len(step_ms), generated_decode_tokens=len(step_ms),
                         tpot_wall_ms=sum(step_ms)/len(step_ms) if step_ms else None)
-            records.append(dict(request_index=request_index,pair=request_index//2,policy=policy,tokens=generated,
+            records.append(dict(request_index=request_index,pair=request_index//2,policy=policy,input_mode=input_mode,tokens=generated,
                 execution=dict(model._quality_graph_execution),
                 normalization_capture_routes=[getattr(x.self_attn.indexer, "_graph_normalization_route", None) for x in model.model.layers],
                 normalization_stats_capture_routes=[getattr(x.self_attn.indexer, "_graph_normalization_stats_route", None) for x in model.model.layers],
@@ -89,6 +93,7 @@ def run(args_cli):
         del past
         gc.collect();torch.cuda.empty_cache()
     result=dict(scope='real-weight GLM B1 16384-token deterministic requests, not RULER accuracy',
+                comparison='same_graph_device_inputs' if args_cli.device_input_reference else 'eager_graph',
                 measurement_enabled=args_cli.measure, records=records,
                 tokens_equal=all(r['tokens']==records[0]['tokens'] for r in records))
     Path(args_cli.output).write_text(json.dumps(result,indent=2)+'\n')
@@ -98,7 +103,16 @@ def run(args_cli):
             assert record['execution']['replay_steps']==args_cli.max_gen-1
             assert record['execution']['captures']==1
             assert all(record['frozen'])
+        if args_cli.device_input_reference:
+            receipt = record['execution']
+            assert receipt['actual'] == 'graph' and receipt['fallback_reason'] is None
+            assert receipt['input_update_route'] == ('device_row_fused' if record['input_mode'] == '1' else 'host_reference')
+            assert receipt['input_update_fallback'] is None
         assert record['skip_far']==records[0]['skip_far']
+    if args_cli.device_input_reference:
+        candidates = [r['execution'] for r in records if r['input_mode'] == '1']
+        assert len({r['warmup_stream'] for r in candidates}) == 1
+        assert all(r['warmup_stream_reused'] for r in candidates[1:])
     print(json.dumps(result),flush=True)
 
 def main():
@@ -107,6 +121,8 @@ def main():
     parser.add_argument('--measure', action='store_true')
     parser.add_argument('--repeats', type=int, default=1)
     parser.add_argument('--max-gen', type=int, default=5)
+    parser.add_argument('--device-input-reference', action='store_true',
+                        help='Compare host/device inputs on the same strict Graph; pair stream reuse with device inputs')
     args_cli = parser.parse_args()
     if args_cli.repeats < 1 or args_cli.max_gen < 2:
         parser.error('repeats >= 1 and max-gen >= 2 required')

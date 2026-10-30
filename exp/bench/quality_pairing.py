@@ -1,6 +1,15 @@
 """Strict per-request parity checks; decoded text alone can hide EOS changes."""
 
 
+def glm_request_arms(repeats, device_input_reference=False):
+    """Alternate paired requests without conflating G4 with Graph activation."""
+    if type(repeats) is not int or repeats < 1:
+        raise ValueError('repeats must be a positive integer')
+    return [('1', arm) if device_input_reference else (arm, None)
+            for pair in range(repeats)
+            for arm in (('0', '1') if pair % 2 == 0 else ('1', '0'))]
+
+
 def require_graph_capacity(prompt_lengths, max_gen, minimum=16384):
     """Preflight actual tokenized lengths, never the dataset's nominal length."""
     if type(max_gen) is not int or max_gen < 2:

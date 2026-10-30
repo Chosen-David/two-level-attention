@@ -1,6 +1,12 @@
 import pytest
 
-from exp.bench.quality_pairing import compare_predictions, require_graph_capacity
+from exp.bench.quality_pairing import compare_predictions, require_graph_capacity, glm_request_arms
+
+
+def test_glm_same_graph_control_and_alternation():
+    assert glm_request_arms(3, True) == [('1', '0'), ('1', '1'),
+        ('1', '1'), ('1', '0'), ('1', '0'), ('1', '1')]
+    assert glm_request_arms(2) == [('0', None), ('1', None), ('1', None), ('0', None)]
 
 
 def test_actual_token_capacity_boundary():

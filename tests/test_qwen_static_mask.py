@@ -73,7 +73,7 @@ class StaticMask(unittest.TestCase):
     def test_forward_preserves_fully_blocked_rows(self):
         mask = torch.zeros(1, 1, 3, 5, dtype=torch.bool)
         out, seen, _, _ = self.forward(mask)
-        self.assertIs(seen[0], mask)
+        self.assertTrue(torch.equal(seen[0], mask[..., :3]))
         self.assertTrue(torch.equal(out, torch.zeros_like(out)))
 
     def test_forward_dynamic_cache_is_not_static(self):
@@ -91,7 +91,7 @@ class StaticMask(unittest.TestCase):
         _, _, cache, _ = self.forward(causal())
         blocked = torch.zeros(1, 1, 3, 5, dtype=torch.bool)
         out, seen, _, _ = self.forward(blocked, layer=1, cache=cache)
-        self.assertIs(seen[0], blocked)
+        self.assertTrue(torch.equal(seen[0], blocked[..., :3]))
         self.assertTrue(torch.equal(out, torch.zeros_like(out)))
 
     def test_forward_decode_does_not_discard_float_bias(self):

@@ -429,6 +429,11 @@ def qwen3_attn_forward(
                 and is_static_cache
                 and _can_drop_static_mask(past_key_values, attention_mask, cur_len, prefill=True)):
             attention_mask = None
+        elif (attention_mask is not None and is_static_cache
+              and attention_mask.shape[-1] > key_states.shape[-2]):
+            # KV above was trimmed to the live prefix. HF 5 SDPA no longer
+            # trims a capacity-wide mask for us; retain every live mask value.
+            attention_mask = attention_mask[..., :key_states.shape[-2]]
         # E85f：prefill 走 dense，但旁路采集 post-RoPE q 统计供 per-layer 静态
         # pair 选取（decode 侧 _subspace_indices 消费；非静态 pair 模式为 no-op）
         if hasattr(indexer, "observe_prefill_q"):
