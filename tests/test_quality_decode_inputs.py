@@ -29,7 +29,7 @@ def test_warmup_streams_reuse_only_thread_device_without_request_owners(monkeypa
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires reserved GPU0')
-@pytest.mark.parametrize('batch,capacity', [(1,16384),(8,32785)])
+@pytest.mark.parametrize('batch,capacity', [(1,16384),(2,16400),(4,32768),(8,32785)])
 @pytest.mark.parametrize('minimum', [1,2,4])
 def test_ragged_eos_reset_and_device_inputs(batch,capacity,minimum):
     device='cuda'
@@ -65,7 +65,7 @@ def test_ragged_eos_reset_and_device_inputs(batch,capacity,minimum):
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires reserved GPU0')
-@pytest.mark.parametrize('minimum,eos', [(1,set()),(2,{2}),(4,{2,7})])
+@pytest.mark.parametrize('minimum,eos', [(1,set()),(1,{0,2,7}),(2,{2}),(4,{2,7})])
 def test_static_decode_device_and_original_host_match(monkeypatch,minimum,eos):
     from sparse_attn.baseline_runtime import BatchCtx
     from sparse_attn.ops.quality_graph import static_decode
