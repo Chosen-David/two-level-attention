@@ -80,7 +80,8 @@ def run(cli):
             os.environ['TLI_DEVICE_DECODE_INPUTS']=value
             os.environ['TLI_REUSE_WARMUP_STREAM']=value
         os.environ['TLI_CUDA_GRAPH']='off' if eager_reference else 'auto'
-        os.environ['TLI_OPERATOR_MODE']='off' if (eager_reference or legacy_graph) else cli.operator_mode
+        os.environ['TLI_OPERATOR_MODE']=('off' if eager_reference or
+            (legacy_graph and current_arm=='reference') else cli.operator_mode)
         os.environ['TLI_EXACT_BATCH_REFERENCE']='1' if row_reference else '0'
         os.environ['TLI_BATCH_INDEXER']=batch_mode
         batch=len(which); lens=[lengths[b] for b in which]
@@ -143,7 +144,10 @@ def run(cli):
                 assert execution['replay_steps']==cli.max_gen-1 and execution['fallback_reason'] is None
                 assert len(execution['capture_layers'])==(0 if cli.dense else model.config.num_hidden_layers)
                 if legacy_graph and not cli.dense:
-                    assert all(r['attention_route']=='legacy_graph_eager_tli' for r in execution['capture_layers'])
+                    mode=os.environ['TLI_OPERATOR_MODE']
+                    expected=('legacy_graph_eager_tli' if mode=='off' else
+                              f'linear_{mode}_simt')
+                    assert all(r['attention_route']==expected for r in execution['capture_layers'])
                 if batch_mode=='exact':
                     expected_route=('linear_batch_reference_simt' if row_reference else
                         'exact_batch_ordered_eager' if os.environ.get('TLI_EXACT_ATTENTION','ordered')=='ordered'
@@ -214,7 +218,7 @@ if __name__=='__main__':
         help='Same Graph route: host inputs/fresh stream versus device inputs/reused stream')
     p.add_argument('--cycles',type=int,default=1,help='Paired cycles with alternating arm order')
     p.add_argument('--legacy-graph-candidate',action='store_true',
-        help='Compare operator-off legacy Graph against same-batch eager, checking per-layer receipts')
+        help='Compare legacy Graph against same-batch eager, checking per-layer receipts and explicit operator mode')
     p.add_argument('--ruler-entry-candidate',action='store_true',
         help='Run unchanged production RULER chunk functions for candidate correctness')
     p.add_argument('--trace-dir')
@@ -225,6 +229,8 @@ if __name__=='__main__':
         p.error('legacy Graph candidate requires same-batch eager reference and B>=2')
     if cli.dense and cli.batch>1 and not cli.legacy_graph_candidate:
         p.error('dense B>1 requires --legacy-graph-candidate; exact batch is an NFA-only route')
+    if cli.legacy_graph_candidate and cli.batch>1 and cli.operator_mode!='off':
+        p.error('B>1 legacy operator decode requires HybridBatchRunner; use B1 or exact serial')
     if cli.trace_dir and (cli.measure or not cli.eager_batch_reference):
         p.error('trace requires eager-batch-reference and forbids timing')
     if cli.same_batch_reference and cli.batch<2:p.error('same-batch reference needs B>=2')
