@@ -132,9 +132,12 @@ def test_cuda_deferred_failure_prevents_publication_for_graph_and_eager(monkeypa
 
 
 @pytest.mark.parametrize('failure_stage', ['allocation', 'receipt'])
-@pytest.mark.parametrize('input_mode',['0','1'])
+@pytest.mark.parametrize('input_mode',['0','1',None])
 def test_capture_oom_auto_recovers_on_static_cache_and_strict_aborts(monkeypatch, failure_stage,input_mode):
-    monkeypatch.setenv('TLI_DEVICE_DECODE_INPUTS',input_mode)
+    if input_mode is None:
+        monkeypatch.delenv('TLI_DEVICE_DECODE_INPUTS', raising=False)
+    else:
+        monkeypatch.setenv('TLI_DEVICE_DECODE_INPUTS',input_mode)
     torch.manual_seed(321)
     model=model_for('qwen')
     ids=torch.randint(0,128,(1,16384),device='cuda')
@@ -163,7 +166,7 @@ def test_capture_oom_auto_recovers_on_static_cache_and_strict_aborts(monkeypatch
                         assert model._quality_graph_execution['captures'] == 0
                         assert model._quality_graph_execution['input_update_route']=='host_reference'
                         assert model._quality_graph_execution['input_update_fallback']==(
-                            'graph_not_captured' if input_mode=='1' else None)
+                            None if input_mode=='0' else 'graph_not_captured')
                         assert 'capture_layers' not in model._quality_graph_execution
         monkeypatch.setenv('TLI_CUDA_GRAPH','1')
         with eager_decoding_request_guard():
