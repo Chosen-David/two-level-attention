@@ -211,3 +211,33 @@ def test_vllm_style_query_and_region_metadata():
         layer.block_tables[r0][1] * g.page + 1,
         layer.block_tables[r0][1] * g.page + 2,
         layer.block_tables[r1][2] * g.page + 1]
+
+
+@torch.inference_mode()
+def test_duplicate_active_decode_rows_rejected_before_mutation():
+    import pytest
+    for device in ('cpu', 'cuda') if torch.cuda.is_available() else ('cpu',):
+        for ids in ([0, 0], [1, 1], [0, 1, 0]):
+            layer = PagedRegionLayer(RegionGeometry(page=4, near=8, window=4))
+            for _ in range(2):
+                r = layer.add_request()
+                x = torch.randn(1, 2, 5, 8, device=device)
+                layer.write_request(r, x, x)
+                layer.freeze_request(r)
+            mapping = layer.decode_slot_mapping(ids, device=device)
+            lengths = list(layer.seq_lens)
+            written = layer.write_bytes
+            snapshots = {p: (k.clone(), v.clone()) for p, (k, v) in layer.kv_pool.items()}
+            x = torch.randn(len(ids), 2, 1, 8, device=device)
+            with pytest.raises(ValueError, match='duplicate active request_ids'):
+                layer.write_decode(ids, x, x, mapping)
+            assert layer.seq_lens == lengths and layer.write_bytes == written
+            for p, (k, v) in layer.kv_pool.items():
+                torch.testing.assert_close(k, snapshots[p][0], rtol=0, atol=0, equal_nan=True)
+                torch.testing.assert_close(v, snapshots[p][1], rtol=0, atol=0, equal_nan=True)
+            # Repeated inactive padding slots remain valid, and retry advances once.
+            retry_ids = [-1, -1, 0, 1]
+            mapping = layer.decode_slot_mapping(retry_ids, device=device)
+            x = torch.randn(4, 2, 1, 8, device=device)
+            layer.write_decode(retry_ids, x, x, mapping)
+            assert layer.seq_lens == [n + 1 for n in lengths]

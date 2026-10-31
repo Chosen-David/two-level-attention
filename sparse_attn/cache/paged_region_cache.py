@@ -407,6 +407,12 @@ class PagedRegionLayer(CacheLayerMixin):
 
     def write_decode(self, request_ids, keys, values, slot_mapping):
         request_ids = list(request_ids)
+        # Each active request owns exactly one next-token slot in this API.
+        # Duplicate rows would overwrite that slot and advance its length twice.
+        active = [r for r in request_ids
+                  if 0 <= r < len(self.active_flags) and self.active_flags[r]]
+        if len(active) != len(set(active)):
+            raise ValueError('duplicate active request_ids in batch decode')
         if keys.ndim != 4 or values.ndim != 4 or keys.shape[:3] != values.shape[:3] or keys.shape[-2] != 1:
             raise ValueError('batch decode requires matching B1-token KV')
         if keys.shape[0] != len(request_ids):
