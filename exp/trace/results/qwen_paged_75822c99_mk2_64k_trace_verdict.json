@@ -1,0 +1,169 @@
+{
+  "schema": "qwen-paged-frozen-decode-trace-verdict-v1",
+  "base_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559",
+  "fix_commit": "75822c99bdb34b89e8b8cf8d481aa5dd4ca26562",
+  "result": "PASS",
+  "protocol": {
+    "model": "Qwen3-8B",
+    "dtype": "bfloat16",
+    "task": "niah_multikey_2",
+    "row": 0,
+    "context_length": 65536,
+    "input_tokens": 65437,
+    "max_new": 8,
+    "rope_scaling": {
+      "rope_type": "yarn",
+      "type": "yarn",
+      "factor": 2.0,
+      "original_max_position_embeddings": 32768,
+      "beta_fast": 32,
+      "beta_slow": 1
+    },
+    "rope_original_max_position_embeddings": 32768,
+    "runtime_max_position_embeddings": 65544,
+    "states": [
+      "keep",
+      "far",
+      "near",
+      "both"
+    ],
+    "mode": "correctness",
+    "trace_decode": true
+  },
+  "correctness": {
+    "per_state": {
+      "keep": {
+        "generated_ids": [
+          576,
+          3281,
+          10963,
+          1372,
+          369,
+          65202,
+          291,
+          28783
+        ],
+        "compared_kv_head_steps": 2016,
+        "selected_id_mismatches": 0,
+        "layer_output_max_abs": 0.0,
+        "logits_max_abs": 0.0
+      },
+      "far": {
+        "generated_ids": [
+          576,
+          3281,
+          10963,
+          1372,
+          369,
+          65202,
+          291,
+          28783
+        ],
+        "compared_kv_head_steps": 2016,
+        "selected_id_mismatches": 0,
+        "layer_output_max_abs": 0.0,
+        "logits_max_abs": 0.0
+      },
+      "near": {
+        "generated_ids": [
+          576,
+          3281,
+          10963,
+          1372,
+          369,
+          65202,
+          291,
+          28783
+        ],
+        "compared_kv_head_steps": 2016,
+        "selected_id_mismatches": 0,
+        "layer_output_max_abs": 0.0,
+        "logits_max_abs": 0.0
+      },
+      "both": {
+        "generated_ids": [
+          576,
+          3281,
+          10963,
+          1372,
+          369,
+          65202,
+          291,
+          28783
+        ],
+        "compared_kv_head_steps": 2016,
+        "selected_id_mismatches": 0,
+        "layer_output_max_abs": 0.0,
+        "logits_max_abs": 0.0
+      }
+    },
+    "total_compared_kv_head_steps": 8064,
+    "total_audited_kv_head_steps_across_both_arms": 16128,
+    "all_generated_ids_equal": true,
+    "all_layer_outputs_bit_exact": true,
+    "all_logits_bit_exact": true,
+    "all_selected_logical_ids_equal": true,
+    "all_physical_mappings_valid": true
+  },
+  "independent_validation": {
+    "assertions_passed": 131,
+    "assertions_failed": 0,
+    "validator_sha256": "0562065552b1b1535407b97ed8fcf8742e3395a526825810601c17d0ec8ae940"
+  },
+  "regression": {
+    "passed": 92,
+    "failed": 0,
+    "log": "qwen_paged_75822c99_4k/pytest.log"
+  },
+  "gpu_hygiene": "clean",
+  "source_binding": {
+    "manifest": "qwen_paged_75822c99_mk2_64k/source_manifest.json",
+    "production_file": "sparse_attn/ops/paged_region_tli.py",
+    "production_sha256": "2e4c290016bc6ff479067f5ec7c7382aa4360445a9eed396fdcf224c52db8ac2",
+    "remote_matches_committed_worktree": true,
+    "remote_files_verified": 88
+  },
+  "raw_report": {
+    "local_path": null,
+    "remote_path": "/home/hadoop-aipnlp/tli-main-dbbba689/qwen8b_75822c99_mk2_row0_64k/report.json",
+    "bytes": 732813451,
+    "sha256": "fc0c44bd1e327b5c0e1448b4b67ff30b7ecbc7142749a91c4dfda3dfdcb204ac",
+    "committed": false,
+    "reason": "699 MiB full per-head trace retained outside git; hash and all summary checks are archived"
+  },
+  "evidence_root": "exp/trace/results/qwen_paged_75822c99_mk2_64k",
+  "evidence_files": {
+    "dispatch.log": {
+      "bytes": 15,
+      "sha256": "5c6abe824ec3f2ad6ab7721b12a0c233c81e52600c7ed56a0bb77c2210fc1ac9"
+    },
+    "hygiene.log": {
+      "bytes": 789,
+      "sha256": "7aa6debdec00d02af1625c967690eecdd274404791160648024e00f9facff1b0"
+    },
+    "independent_validation.json": {
+      "bytes": 14043,
+      "sha256": "05c95c9f4adbe964ff288d1afe937c1f3a2ba2359eae33f93908ff839de11fd1"
+    },
+    "protocol.json": {
+      "bytes": 3133,
+      "sha256": "837d900a9f2ea9a44eacd7f7efbdf4406c47f70185b8b20b7acfc9025e9ab13f"
+    },
+    "source_manifest.json": {
+      "bytes": 10227,
+      "sha256": "17b8f9aa0d58e5612418b989579fbb78460643991ef7637579f765e909f48459"
+    },
+    "stdout.log": {
+      "bytes": 3018,
+      "sha256": "3f796efb3ef6c195d1123dbd716e6e4eed973988ee26b12a0a99e1fb0b4eaf16"
+    }
+  },
+  "scope": [
+    "real Qwen3-8B BF16 RULER niah_multikey_2 row0 64K forced-state paired correctness only",
+    "not dense quality acceptance",
+    "not full RULER quality",
+    "not TPOT or speedup",
+    "not production memory acceptance",
+    "not other rows or sequence lengths"
+  ]
+}
