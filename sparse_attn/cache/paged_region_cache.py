@@ -796,6 +796,17 @@ class PagedRegionLayer(CacheLayerMixin):
     def reset(self):raise ValueError('create a fresh request cache')
     def reorder_cache(self,beam_idx):raise ValueError('beam/reorder unsupported')
 
+    def report_pool(self):
+        """Count this layer's owned physical tensors once across both APIs."""
+        kv_bytes = sum(k.numel() * k.element_size() + v.numel() * v.element_size()
+                       for k, v in self.kv_pool.values())
+        tables = list(self._tables or ())
+        tables.extend(t for t in (self._k_ptr, self._v_ptr) if t is not None)
+        return dict(live_pages=len(self.kv_pool), kv_bytes=kv_bytes,
+                    device_page_table_bytes=sum(t.numel() * t.element_size() for t in tables),
+                    metadata_scope='owned logical and physical pointer tensors; Python metadata excluded',
+                    allocator_scope='active tensor allocations; caching allocator reserved memory is separate')
+
     def report(self, request_id=None):
         if request_id is not None:
             request_id = self._batch_index(request_id)
@@ -936,9 +947,10 @@ class PagedRegionCache(Cache):
     def report(self):
         layers=[x.report() for x in self.layers]
         active_requests = [i for i, active in enumerate(self.layers[0].active_flags) if active]
-        return dict(layers=layers,active_requests=active_requests,
-                    kv_bytes=sum(x['kv_bytes'] for x in layers),
-                    device_page_table_bytes=sum(x['device_page_table_bytes'] for x in layers))
+        pools = [layer.report_pool() for layer in self.layers]
+        return dict(layers=layers, pools=pools, active_requests=active_requests,
+                    kv_bytes=sum(x['kv_bytes'] for x in pools),
+                    device_page_table_bytes=sum(x['device_page_table_bytes'] for x in pools))
 
     def report_request(self, request_id):
         layers = [layer.report(request_id) for layer in self.layers]

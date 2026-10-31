@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-10-31
+
+- [ ] [TL-PAGED-POOL-REPORT-20261031] 修复 batch paged cache 全局 KV/指针张量漏计；126项host检查修前48失败、修后普通/-O零失败；原生Torch/CUDA待验，不宣称显存实测或提速。([详情](task_details/TL-PAGED-POOL-REPORT-20261031.md))
+
 ## 2026-10-30
 
 - [x] [TL-NFA-ABLATION-20261030] 仅HotpotQA/GovReport；A/C/E限定验收保持；B 2000/2000及官方重评分、配对bootstrap独立验收通过（usable-with-scope）。F取消/全部性能暂停。([详情](task_details/TL-NFA-ABLATION-20261030.md))

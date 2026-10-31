@@ -211,3 +211,46 @@ def test_vllm_style_query_and_region_metadata():
         layer.block_tables[r0][1] * g.page + 1,
         layer.block_tables[r0][1] * g.page + 2,
         layer.block_tables[r1][2] * g.page + 1]
+
+@torch.inference_mode()
+def test_cache_report_counts_batch_pool_and_pointer_tables():
+    # Totals describe owned tensor storage, not allocator-reserved memory.
+    for device in (['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']):
+        cache = PagedRegionCache(2, RegionGeometry(sink=2, near=16, window=4, page=4))
+        r0, r1 = cache.add_request(), cache.add_request()
+        page_bytes = 4 * 2 * (8 + 6) * 4  # page * heads * (Dk+Dv) * float32
+        for li in range(2):
+            for r, n in ((r0, 5), (r1, 9)):
+                cache.write_request(li, torch.zeros(1, 2, n, 8, device=device),
+                                    torch.zeros(1, 2, n, 6, device=device), request_id=r)
+        report = cache.report()
+        assert report['kv_bytes'] == 2 * 5 * page_bytes
+        assert report['device_page_table_bytes'] == 0
+        assert report['active_requests'] == [r0, r1]
+        assert cache.report_request(r0)['kv_bytes'] == 2 * 2 * page_bytes
+        for layer in cache.layers:
+            layer.physical_pointer_tables()
+        assert cache.report()['device_page_table_bytes'] == 2 * 2 * 5 * 8
+
+        cache.remove_request(r0)
+        assert cache.report()['kv_bytes'] == 2 * 3 * page_bytes
+        assert cache.report()['device_page_table_bytes'] == 0
+        r2 = cache.add_request()
+        assert r2 == r0
+        for li in range(2):
+            cache.write_request(li, torch.zeros(1, 2, 1, 8, device=device),
+                                torch.zeros(1, 2, 1, 6, device=device), request_id=r2)
+        assert cache.report()['kv_bytes'] == 2 * 4 * page_bytes
+        cache.remove_request(r1)
+        cache.remove_request(r2)
+        assert cache.report()['kv_bytes'] == 0
+        assert cache.report()['device_page_table_bytes'] == 0
+
+        # Legacy B1 tensors are also in kv_pool: do not count both owners twice.
+        legacy = PagedRegionCache(2, RegionGeometry(page=4))
+        for layer in legacy.layers:
+            layer.update(torch.zeros(1, 2, 5, 8, device=device),
+                         torch.zeros(1, 2, 5, 6, device=device))
+            layer.pointer_tables()
+        assert legacy.report()['kv_bytes'] == 2 * 2 * page_bytes
+        assert legacy.report()['device_page_table_bytes'] == 2 * 2 * 2 * 8
