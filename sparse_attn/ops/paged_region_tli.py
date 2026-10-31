@@ -3,8 +3,7 @@ import argparse
 import os
 import torch
 from sparse_attn.arguments import add_sparse_attn_args
-from ..ops.token_selection import TokenSelection, canonical_selection
-from .paged_region_kernels import paged_attention, paged_attention_selection
+from .paged_region_kernels import paged_attention
 
 
 def tli_args(subspace='tail'):
@@ -69,80 +68,6 @@ def region_selection(indexer,q,layer,scale):
     return mask,receipt
 
 
-def _protected_compact(length, sink, swa, hk, device):
-    prefix = min(length, sink)
-    start = max(prefix, length - swa)
-    total = sink + swa
-    ids = []
-    for i in range(total):
-        if i < prefix:
-            ids.append(i)
-        elif i - prefix < length - start:
-            ids.append(start + i - prefix)
-        else:
-            ids.append(0)
-    valid = torch.tensor([i < prefix or (i - prefix) < (length - start)
-                          for i in range(total)], device=device)
-    return TokenSelection(
-        torch.tensor(ids, dtype=torch.int32, device=device).unsqueeze(0).expand(1, hk, -1).contiguous(),
-        valid.sum().to(torch.int32).unsqueeze(0).expand(1, hk).contiguous())
-
-
-def region_selection_compact(indexer, q, layer, scale):
-    """Compact paged-region selection; no full-width bool mask is produced."""
-    idx = indexer
-    _validate_indexer(idx)
-    length = layer.logical_length
-    hk = next(iter(layer.pages.values()))[1].shape[1]
-    if layer.skip_near and layer.skip_far:
-        selection = _protected_compact(length, layer.geometry.sink,
-                                       layer.geometry.window, hk, q.device)
-        receipt = dict(subspace=idx.subspace, dimensions=[], logical_tokens=length,
-                       visible_tokens=sum(b - a for a, b in layer.intervals()),
-                       selected_per_kv_head=selection.counts.flatten().tolist(),
-                       scorer='protected_only', selector='protected_only',
-                       skip_near=True, skip_far=True, l1_calls=0, l2_calls=0,
-                       selection_topk_calls=0, kv_route='direct_page_table',
-                       full_width_gather_bytes=0, index_scratch_bytes=0)
-        return selection, receipt
-    dims = idx._subspace_indices(q.device)
-    bs = idx.args.tia_block_size
-    projected = layer.project_visible(dims, bs)
-    pages = projected.reshape(1, -1, bs, projected.shape[2], dims.numel())
-    fine = projected[:, :length]
-    if idx.l2_quant:
-        fine = idx.min_max_per_token_quant(fine)
-    dictionary = dict(k_min=pages.amin(2), k_max=pages.amax(2), k_avg=pages.mean(2),
-                      k_qat=fine,
-                      cu_seqlens_k_coarse=torch.tensor([0, pages.shape[1]], device=q.device, dtype=torch.int32),
-                      cu_seqlens_k_fine=torch.tensor([0, length], device=q.device, dtype=torch.int32),
-                      valid_length=length)
-    vl = torch.tensor([length], dtype=torch.int64, device=q.device)
-    selected = idx.compute_selection_graph(q.transpose(1, 2).contiguous(),
-                                           dictionary, scale, vl)
-    visible = torch.zeros(length, device=q.device, dtype=torch.bool)
-    for a, b in layer.intervals():
-        visible[a:b] = True
-    width = selected.indices.shape[-1]
-    ranks = torch.arange(width, device=q.device)
-    valid = (ranks[None, None] < selected.counts[:, :, None])
-    safe = torch.where(valid, selected.indices.long(), 0)
-    keep = valid & (safe < length) & visible[safe]
-    selection = canonical_selection(selected.indices, keep, length)
-    total = selection.counts + _protected_compact(
-        length, layer.geometry.sink, layer.geometry.window, hk, q.device).counts
-    receipt = dict(subspace=idx.subspace, dimensions=dims.tolist(), logical_tokens=length,
-                   visible_tokens=int(visible.sum()),
-                   selected_per_kv_head=total.flatten().tolist(),
-                   scorer='TLIIndexer.compute_selection_graph',
-                   selector='TLIIndexer.compute_selection_graph',
-                   skip_near=layer.skip_near, skip_far=layer.skip_far,
-                   kv_route='direct_page_table',
-                   full_width_gather_bytes=0,
-                   index_scratch_bytes=projected.numel() * projected.element_size())
-    return selection, receipt
-
-
 def decode(module,q,k,v,cache,cache_position):
     layer=cache.layers[module.layer_idx]
     if not layer.frozen:raise ValueError('freeze before paged decode')
@@ -156,6 +81,6 @@ def decode(module,q,k,v,cache,cache_position):
         raise ValueError('paged decode requires matching Q/K dtype and device')
     cache.update_for_paged_decode(k,v,module.layer_idx,dict(cache_position=cache_position))
     module.indexer.skip_far=layer.skip_far
-    selection,receipt=region_selection_compact(module.indexer,q,layer,module.scaling)
+    mask,receipt=region_selection(module.indexer,q,layer,module.scaling)
     layer.tli_receipt=receipt
-    return paged_attention_selection(layer,q,selection,module.scaling,ring_arithmetic=True)
+    return paged_attention(layer,q,mask,module.scaling,ring_arithmetic=True)
