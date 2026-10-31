@@ -1,0 +1,2814 @@
+{
+  "schema": "paged-region-dbbba689-independent-raw-validation-v1",
+  "source_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559",
+  "scope": "synthetic CUDA correctness only; not RULER quality, real-Qwen e2e, memory acceptance, or TPOT",
+  "kernel_cells_passed": 16,
+  "arithmetic_pairs_passed": 14,
+  "tensor_sha256_verified": 14,
+  "max_kernel_dense_abs_error": 0.001953125,
+  "max_kernel_ring_abs_error": 1.52587890625e-05,
+  "max_arithmetic_abs_error": 0.00048828125,
+  "hygiene": {
+    "kernels": {
+      "status": "clean",
+      "gpu": 0,
+      "start_gpu_rows": [
+        "0, 1 MiB, 0 %"
+      ],
+      "observed_compute_pid_rows": [],
+      "final_compute_pid_rows": [],
+      "end_rc": 0,
+      "final_memory_mib": 1,
+      "note": "监控在 workload 前启动、结束后关闭；本短任务窗口内未观察到 compute PID。"
+    },
+    "arithmetic": {
+      "status": "clean",
+      "gpu": 1,
+      "start_gpu_rows": [
+        "1, 1 MiB, 0 %"
+      ],
+      "observed_compute_pid_rows": [],
+      "final_compute_pid_rows": [],
+      "end_rc": 0,
+      "final_memory_mib": 1,
+      "note": "监控在 workload 前启动、结束后关闭；本短任务窗口内未观察到 compute PID。"
+    }
+  },
+  "raw_sha256": {
+    "kernels.json": "39eee3a0ac499afff3175433ca528be0a3d47a28c99ee0fdbdff7cc41b3f5bcd",
+    "kernels.stdout.log": "f40ae4921cd80f604e324effcc277990af3450c965eb8eeea9f61e1fc6de43e5",
+    "kernels_hygiene.log": "ad8fc927298451594a7f4f8ca89fbd07d5adad5ebb8214a3ac1a5cb1a05190d5",
+    "arithmetic.json": "25a857725f789b45c217dd8a9b179e263d76ab37eb4f76ea2c47670a1fcde3cd",
+    "arithmetic.stdout.log": "d981e98697b563d52bc2ca752c2bb36d61e2c23a52d48ca2d72c384f76780daa",
+    "arithmetic_hygiene.log": "b25cf6f521b7e9c0e138d8adb0ce9e5716f3bc50d296d8f85c2c7c5a470285f8"
+  },
+  "script_sha256": {
+    "check_paged_region_kernels.py": "a54117844b4193bf92286c7b04d7fdf4ca3c35b303df8b4074dce7cdc3a6eceb",
+    "check_paged_region_arithmetic_boundary.py": "0a7c90874c3bb800db085bbfe5123112bdfc27ca8d15a374eb5fb8be0da162e3"
+  },
+  "tensor_results": [
+    {
+      "case": 0,
+      "sha256": "32d71bd71a7836f799f88b6007808741405040ddfd76206499e4c5dfbcfaeab2",
+      "max_error": 5.960464477539063e-08
+    },
+    {
+      "case": 1,
+      "sha256": "e13b23b112db09501d88d2413fc704fb170141094fa9dc13b5353131dceb22e3",
+      "max_error": 0.00048828125
+    },
+    {
+      "case": 2,
+      "sha256": "121f5401b48f0b553ef434b453e5b48df0da0d35578fe681ddd5b45bab765f93",
+      "max_error": 5.960464477539063e-08
+    },
+    {
+      "case": 3,
+      "sha256": "b03d1e299161394cefcb01dfc792ee5e967ec469ff4d707baa9de1389b605ed3",
+      "max_error": 0.0
+    },
+    {
+      "case": 4,
+      "sha256": "6670586b01024d90e3fdfc46b2a5a00c1ac95a2a5eb46b04625b1d1477e060f0",
+      "max_error": 5.21540641784668e-08
+    },
+    {
+      "case": 5,
+      "sha256": "7077d14221c5558b0a06bd54a1ba25f94c9303d2b00254c22410804b0de90498",
+      "max_error": 0.0
+    },
+    {
+      "case": 6,
+      "sha256": "d03ed5cdbb0fdc83bdb3aaefb1c0397a9af67c5726ae343990cf49b79ea96b1b",
+      "max_error": 4.470348358154297e-08
+    },
+    {
+      "case": 7,
+      "sha256": "6f85f2190fd7032c9ef1a3833c4491eb9f70ea4a2f40984d84dbe6890251908c",
+      "max_error": 6.103515625e-05
+    },
+    {
+      "case": 8,
+      "sha256": "0cba8e2db5e631384c11faa45082a35ab4dc970e0c92d4269bd62f74dec53e1e",
+      "max_error": 5.960464477539063e-08
+    },
+    {
+      "case": 9,
+      "sha256": "3421a1bc06c72d505f377fecde4062f42ffd71eff45ad0b097438f6b834f0788",
+      "max_error": 0.000244140625
+    },
+    {
+      "case": 10,
+      "sha256": "c521fce0bd744153af329977b6244f704a5be09389bcad246de656ea4fe36238",
+      "max_error": 1.1920928955078125e-07
+    },
+    {
+      "case": 11,
+      "sha256": "681e5262a09e0e3fa0bdba8e63b320eebc4df646e406b016d04a7d9d6215aaf8",
+      "max_error": 6.103515625e-05
+    },
+    {
+      "case": 12,
+      "sha256": "a86ce6684c6f0fc29656edbca98a009121b494790e54987d2bb3317ac46adbe5",
+      "max_error": 1.043081283569336e-07
+    },
+    {
+      "case": 13,
+      "sha256": "853b63ed769f3f932264742d8a81b04544a4b9855b9305ab118841b92dc85872",
+      "max_error": 0.0
+    }
+  ],
+  "assertion_summary": {
+    "passed": 167,
+    "failed": 0
+  },
+  "assertions": [
+    {
+      "name": "kernel_pending_raw_status",
+      "passed": true,
+      "evidence": "pending independent verification"
+    },
+    {
+      "name": "arithmetic_pending_raw_status",
+      "passed": true,
+      "evidence": "pending_independent_validation"
+    },
+    {
+      "name": "arithmetic_source_commit",
+      "passed": true,
+      "evidence": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "name": "kernel_device",
+      "passed": true,
+      "evidence": "NVIDIA H20-3e"
+    },
+    {
+      "name": "kernel_torch",
+      "passed": true,
+      "evidence": "2.9.0"
+    },
+    {
+      "name": "kernel_16_rows",
+      "passed": true,
+      "evidence": 16
+    },
+    {
+      "name": "kernel_case_0_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 5.960464477539063e-08,
+        "dtype": "torch.float32",
+        "d": 128,
+        "dv": 128,
+        "near": false,
+        "far": false,
+        "max_abs_error": 2.086162567138672e-07,
+        "report": {
+          "logical_length": 907,
+          "skip_near": false,
+          "skip_far": false,
+          "live_pages": 15,
+          "logical_to_physical": {
+            "0": 0,
+            "1": 1,
+            "2": 2,
+            "3": 3,
+            "4": 4,
+            "5": 5,
+            "6": 6,
+            "7": 7,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 13,
+            "14": 14
+          },
+          "resident_tokens": 907,
+          "physical_token_slots": 960,
+          "inactive_retained_slots": 53,
+          "attention_tokens": 907,
+          "kv_bytes": 1966080,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 0,
+          "reused_page_ids": 0,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 1857536,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_0_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 2.086162567138672e-07,
+        "ring": 5.960464477539063e-08,
+        "tol": 2e-06
+      }
+    },
+    {
+      "name": "kernel_case_0_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": false,
+        "skip_far": false,
+        "live_pages": 15,
+        "logical_to_physical": {
+          "0": 0,
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6,
+          "7": 7,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 13,
+          "14": 14
+        },
+        "resident_tokens": 907,
+        "physical_token_slots": 960,
+        "inactive_retained_slots": 53,
+        "attention_tokens": 907,
+        "kv_bytes": 1966080,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 0,
+        "reused_page_ids": 0,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 1857536,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_1_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 1.1920928955078125e-07,
+        "dtype": "torch.float32",
+        "d": 128,
+        "dv": 128,
+        "near": true,
+        "far": false,
+        "max_abs_error": 2.2351741790771484e-07,
+        "report": {
+          "logical_length": 907,
+          "skip_near": true,
+          "skip_far": false,
+          "live_pages": 15,
+          "logical_to_physical": {
+            "0": 0,
+            "1": 1,
+            "2": 2,
+            "3": 3,
+            "4": 4,
+            "5": 5,
+            "6": 6,
+            "7": 7,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 13,
+            "14": 14
+          },
+          "resident_tokens": 907,
+          "physical_token_slots": 960,
+          "inactive_retained_slots": 53,
+          "attention_tokens": 640,
+          "kv_bytes": 1966080,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 0,
+          "reused_page_ids": 0,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 1857536,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_1_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 2.2351741790771484e-07,
+        "ring": 1.1920928955078125e-07,
+        "tol": 2e-06
+      }
+    },
+    {
+      "name": "kernel_case_1_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": true,
+        "skip_far": false,
+        "live_pages": 15,
+        "logical_to_physical": {
+          "0": 0,
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6,
+          "7": 7,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 13,
+          "14": 14
+        },
+        "resident_tokens": 907,
+        "physical_token_slots": 960,
+        "inactive_retained_slots": 53,
+        "attention_tokens": 640,
+        "kv_bytes": 1966080,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 0,
+        "reused_page_ids": 0,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 1857536,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_2_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 1.1920928955078125e-07,
+        "dtype": "torch.float32",
+        "d": 128,
+        "dv": 128,
+        "near": false,
+        "far": true,
+        "max_abs_error": 2.8312206268310547e-07,
+        "report": {
+          "logical_length": 907,
+          "skip_near": false,
+          "skip_far": true,
+          "live_pages": 8,
+          "logical_to_physical": {
+            "0": 0,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 1,
+            "14": 2
+          },
+          "resident_tokens": 399,
+          "physical_token_slots": 512,
+          "inactive_retained_slots": 113,
+          "attention_tokens": 399,
+          "kv_bytes": 1048576,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 7,
+          "reused_page_ids": 2,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 1857536,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_2_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 2.8312206268310547e-07,
+        "ring": 1.1920928955078125e-07,
+        "tol": 2e-06
+      }
+    },
+    {
+      "name": "kernel_case_2_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": false,
+        "skip_far": true,
+        "live_pages": 8,
+        "logical_to_physical": {
+          "0": 0,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 1,
+          "14": 2
+        },
+        "resident_tokens": 399,
+        "physical_token_slots": 512,
+        "inactive_retained_slots": 113,
+        "attention_tokens": 399,
+        "kv_bytes": 1048576,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 7,
+        "reused_page_ids": 2,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 1857536,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_3_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 1.1920928955078125e-07,
+        "dtype": "torch.float32",
+        "d": 128,
+        "dv": 128,
+        "near": true,
+        "far": true,
+        "max_abs_error": 2.384185791015625e-07,
+        "report": {
+          "logical_length": 907,
+          "skip_near": true,
+          "skip_far": true,
+          "live_pages": 4,
+          "logical_to_physical": {
+            "0": 0,
+            "12": 12,
+            "13": 1,
+            "14": 2
+          },
+          "resident_tokens": 132,
+          "physical_token_slots": 256,
+          "inactive_retained_slots": 124,
+          "attention_tokens": 132,
+          "kv_bytes": 524288,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 11,
+          "reused_page_ids": 2,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 1857536,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_3_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 2.384185791015625e-07,
+        "ring": 1.1920928955078125e-07,
+        "tol": 2e-06
+      }
+    },
+    {
+      "name": "kernel_case_3_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": true,
+        "skip_far": true,
+        "live_pages": 4,
+        "logical_to_physical": {
+          "0": 0,
+          "12": 12,
+          "13": 1,
+          "14": 2
+        },
+        "resident_tokens": 132,
+        "physical_token_slots": 256,
+        "inactive_retained_slots": 124,
+        "attention_tokens": 132,
+        "kv_bytes": 524288,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 11,
+        "reused_page_ids": 2,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 1857536,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_4_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 7.450580596923828e-08,
+        "dtype": "torch.float32",
+        "d": 192,
+        "dv": 128,
+        "near": false,
+        "far": false,
+        "max_abs_error": 1.6391277313232422e-07,
+        "report": {
+          "logical_length": 907,
+          "skip_near": false,
+          "skip_far": false,
+          "live_pages": 15,
+          "logical_to_physical": {
+            "0": 0,
+            "1": 1,
+            "2": 2,
+            "3": 3,
+            "4": 4,
+            "5": 5,
+            "6": 6,
+            "7": 7,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 13,
+            "14": 14
+          },
+          "resident_tokens": 907,
+          "physical_token_slots": 960,
+          "inactive_retained_slots": 53,
+          "attention_tokens": 907,
+          "kv_bytes": 2457600,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 0,
+          "reused_page_ids": 0,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 2321920,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_4_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 1.6391277313232422e-07,
+        "ring": 7.450580596923828e-08,
+        "tol": 2e-06
+      }
+    },
+    {
+      "name": "kernel_case_4_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": false,
+        "skip_far": false,
+        "live_pages": 15,
+        "logical_to_physical": {
+          "0": 0,
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6,
+          "7": 7,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 13,
+          "14": 14
+        },
+        "resident_tokens": 907,
+        "physical_token_slots": 960,
+        "inactive_retained_slots": 53,
+        "attention_tokens": 907,
+        "kv_bytes": 2457600,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 0,
+        "reused_page_ids": 0,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 2321920,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_5_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 9.685754776000977e-08,
+        "dtype": "torch.float32",
+        "d": 192,
+        "dv": 128,
+        "near": true,
+        "far": false,
+        "max_abs_error": 2.384185791015625e-07,
+        "report": {
+          "logical_length": 907,
+          "skip_near": true,
+          "skip_far": false,
+          "live_pages": 15,
+          "logical_to_physical": {
+            "0": 0,
+            "1": 1,
+            "2": 2,
+            "3": 3,
+            "4": 4,
+            "5": 5,
+            "6": 6,
+            "7": 7,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 13,
+            "14": 14
+          },
+          "resident_tokens": 907,
+          "physical_token_slots": 960,
+          "inactive_retained_slots": 53,
+          "attention_tokens": 640,
+          "kv_bytes": 2457600,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 0,
+          "reused_page_ids": 0,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 2321920,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_5_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 2.384185791015625e-07,
+        "ring": 9.685754776000977e-08,
+        "tol": 2e-06
+      }
+    },
+    {
+      "name": "kernel_case_5_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": true,
+        "skip_far": false,
+        "live_pages": 15,
+        "logical_to_physical": {
+          "0": 0,
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6,
+          "7": 7,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 13,
+          "14": 14
+        },
+        "resident_tokens": 907,
+        "physical_token_slots": 960,
+        "inactive_retained_slots": 53,
+        "attention_tokens": 640,
+        "kv_bytes": 2457600,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 0,
+        "reused_page_ids": 0,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 2321920,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_6_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 8.195638656616211e-08,
+        "dtype": "torch.float32",
+        "d": 192,
+        "dv": 128,
+        "near": false,
+        "far": true,
+        "max_abs_error": 2.086162567138672e-07,
+        "report": {
+          "logical_length": 907,
+          "skip_near": false,
+          "skip_far": true,
+          "live_pages": 8,
+          "logical_to_physical": {
+            "0": 0,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 1,
+            "14": 2
+          },
+          "resident_tokens": 399,
+          "physical_token_slots": 512,
+          "inactive_retained_slots": 113,
+          "attention_tokens": 399,
+          "kv_bytes": 1310720,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 7,
+          "reused_page_ids": 2,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 2321920,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_6_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 2.086162567138672e-07,
+        "ring": 8.195638656616211e-08,
+        "tol": 2e-06
+      }
+    },
+    {
+      "name": "kernel_case_6_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": false,
+        "skip_far": true,
+        "live_pages": 8,
+        "logical_to_physical": {
+          "0": 0,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 1,
+          "14": 2
+        },
+        "resident_tokens": 399,
+        "physical_token_slots": 512,
+        "inactive_retained_slots": 113,
+        "attention_tokens": 399,
+        "kv_bytes": 1310720,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 7,
+        "reused_page_ids": 2,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 2321920,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_7_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 1.7881393432617188e-07,
+        "dtype": "torch.float32",
+        "d": 192,
+        "dv": 128,
+        "near": true,
+        "far": true,
+        "max_abs_error": 4.470348358154297e-07,
+        "report": {
+          "logical_length": 907,
+          "skip_near": true,
+          "skip_far": true,
+          "live_pages": 4,
+          "logical_to_physical": {
+            "0": 0,
+            "12": 12,
+            "13": 1,
+            "14": 2
+          },
+          "resident_tokens": 132,
+          "physical_token_slots": 256,
+          "inactive_retained_slots": 124,
+          "attention_tokens": 132,
+          "kv_bytes": 655360,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 11,
+          "reused_page_ids": 2,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 2321920,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_7_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 4.470348358154297e-07,
+        "ring": 1.7881393432617188e-07,
+        "tol": 2e-06
+      }
+    },
+    {
+      "name": "kernel_case_7_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": true,
+        "skip_far": true,
+        "live_pages": 4,
+        "logical_to_physical": {
+          "0": 0,
+          "12": 12,
+          "13": 1,
+          "14": 2
+        },
+        "resident_tokens": 132,
+        "physical_token_slots": 256,
+        "inactive_retained_slots": 124,
+        "attention_tokens": 132,
+        "kv_bytes": 655360,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 11,
+        "reused_page_ids": 2,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 2321920,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_8_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 0.0,
+        "dtype": "torch.bfloat16",
+        "d": 128,
+        "dv": 128,
+        "near": false,
+        "far": false,
+        "max_abs_error": 0.0009765625,
+        "report": {
+          "logical_length": 907,
+          "skip_near": false,
+          "skip_far": false,
+          "live_pages": 15,
+          "logical_to_physical": {
+            "0": 0,
+            "1": 1,
+            "2": 2,
+            "3": 3,
+            "4": 4,
+            "5": 5,
+            "6": 6,
+            "7": 7,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 13,
+            "14": 14
+          },
+          "resident_tokens": 907,
+          "physical_token_slots": 960,
+          "inactive_retained_slots": 53,
+          "attention_tokens": 907,
+          "kv_bytes": 983040,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 0,
+          "reused_page_ids": 0,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 928768,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_8_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 0.0009765625,
+        "ring": 0.0,
+        "tol": 0.003
+      }
+    },
+    {
+      "name": "kernel_case_8_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": false,
+        "skip_far": false,
+        "live_pages": 15,
+        "logical_to_physical": {
+          "0": 0,
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6,
+          "7": 7,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 13,
+          "14": 14
+        },
+        "resident_tokens": 907,
+        "physical_token_slots": 960,
+        "inactive_retained_slots": 53,
+        "attention_tokens": 907,
+        "kv_bytes": 983040,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 0,
+        "reused_page_ids": 0,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 928768,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_9_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 0.0,
+        "dtype": "torch.bfloat16",
+        "d": 128,
+        "dv": 128,
+        "near": true,
+        "far": false,
+        "max_abs_error": 0.0009765625,
+        "report": {
+          "logical_length": 907,
+          "skip_near": true,
+          "skip_far": false,
+          "live_pages": 15,
+          "logical_to_physical": {
+            "0": 0,
+            "1": 1,
+            "2": 2,
+            "3": 3,
+            "4": 4,
+            "5": 5,
+            "6": 6,
+            "7": 7,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 13,
+            "14": 14
+          },
+          "resident_tokens": 907,
+          "physical_token_slots": 960,
+          "inactive_retained_slots": 53,
+          "attention_tokens": 640,
+          "kv_bytes": 983040,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 0,
+          "reused_page_ids": 0,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 928768,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_9_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 0.0009765625,
+        "ring": 0.0,
+        "tol": 0.003
+      }
+    },
+    {
+      "name": "kernel_case_9_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": true,
+        "skip_far": false,
+        "live_pages": 15,
+        "logical_to_physical": {
+          "0": 0,
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6,
+          "7": 7,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 13,
+          "14": 14
+        },
+        "resident_tokens": 907,
+        "physical_token_slots": 960,
+        "inactive_retained_slots": 53,
+        "attention_tokens": 640,
+        "kv_bytes": 983040,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 0,
+        "reused_page_ids": 0,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 928768,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_10_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 0.0,
+        "dtype": "torch.bfloat16",
+        "d": 128,
+        "dv": 128,
+        "near": false,
+        "far": true,
+        "max_abs_error": 0.0009765625,
+        "report": {
+          "logical_length": 907,
+          "skip_near": false,
+          "skip_far": true,
+          "live_pages": 8,
+          "logical_to_physical": {
+            "0": 0,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 1,
+            "14": 2
+          },
+          "resident_tokens": 399,
+          "physical_token_slots": 512,
+          "inactive_retained_slots": 113,
+          "attention_tokens": 399,
+          "kv_bytes": 524288,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 7,
+          "reused_page_ids": 2,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 928768,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_10_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 0.0009765625,
+        "ring": 0.0,
+        "tol": 0.003
+      }
+    },
+    {
+      "name": "kernel_case_10_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": false,
+        "skip_far": true,
+        "live_pages": 8,
+        "logical_to_physical": {
+          "0": 0,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 1,
+          "14": 2
+        },
+        "resident_tokens": 399,
+        "physical_token_slots": 512,
+        "inactive_retained_slots": 113,
+        "attention_tokens": 399,
+        "kv_bytes": 524288,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 7,
+        "reused_page_ids": 2,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 928768,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_11_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 0.0,
+        "dtype": "torch.bfloat16",
+        "d": 128,
+        "dv": 128,
+        "near": true,
+        "far": true,
+        "max_abs_error": 0.001953125,
+        "report": {
+          "logical_length": 907,
+          "skip_near": true,
+          "skip_far": true,
+          "live_pages": 4,
+          "logical_to_physical": {
+            "0": 0,
+            "12": 12,
+            "13": 1,
+            "14": 2
+          },
+          "resident_tokens": 132,
+          "physical_token_slots": 256,
+          "inactive_retained_slots": 124,
+          "attention_tokens": 132,
+          "kv_bytes": 262144,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 11,
+          "reused_page_ids": 2,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 928768,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_11_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 0.001953125,
+        "ring": 0.0,
+        "tol": 0.003
+      }
+    },
+    {
+      "name": "kernel_case_11_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": true,
+        "skip_far": true,
+        "live_pages": 4,
+        "logical_to_physical": {
+          "0": 0,
+          "12": 12,
+          "13": 1,
+          "14": 2
+        },
+        "resident_tokens": 132,
+        "physical_token_slots": 256,
+        "inactive_retained_slots": 124,
+        "attention_tokens": 132,
+        "kv_bytes": 262144,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 11,
+        "reused_page_ids": 2,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 928768,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_12_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 1.52587890625e-05,
+        "dtype": "torch.bfloat16",
+        "d": 192,
+        "dv": 128,
+        "near": false,
+        "far": false,
+        "max_abs_error": 0.0009765625,
+        "report": {
+          "logical_length": 907,
+          "skip_near": false,
+          "skip_far": false,
+          "live_pages": 15,
+          "logical_to_physical": {
+            "0": 0,
+            "1": 1,
+            "2": 2,
+            "3": 3,
+            "4": 4,
+            "5": 5,
+            "6": 6,
+            "7": 7,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 13,
+            "14": 14
+          },
+          "resident_tokens": 907,
+          "physical_token_slots": 960,
+          "inactive_retained_slots": 53,
+          "attention_tokens": 907,
+          "kv_bytes": 1228800,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 0,
+          "reused_page_ids": 0,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 1160960,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_12_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 0.0009765625,
+        "ring": 1.52587890625e-05,
+        "tol": 0.003
+      }
+    },
+    {
+      "name": "kernel_case_12_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": false,
+        "skip_far": false,
+        "live_pages": 15,
+        "logical_to_physical": {
+          "0": 0,
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6,
+          "7": 7,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 13,
+          "14": 14
+        },
+        "resident_tokens": 907,
+        "physical_token_slots": 960,
+        "inactive_retained_slots": 53,
+        "attention_tokens": 907,
+        "kv_bytes": 1228800,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 0,
+        "reused_page_ids": 0,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 1160960,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_13_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 0.0,
+        "dtype": "torch.bfloat16",
+        "d": 192,
+        "dv": 128,
+        "near": true,
+        "far": false,
+        "max_abs_error": 0.0009765625,
+        "report": {
+          "logical_length": 907,
+          "skip_near": true,
+          "skip_far": false,
+          "live_pages": 15,
+          "logical_to_physical": {
+            "0": 0,
+            "1": 1,
+            "2": 2,
+            "3": 3,
+            "4": 4,
+            "5": 5,
+            "6": 6,
+            "7": 7,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 13,
+            "14": 14
+          },
+          "resident_tokens": 907,
+          "physical_token_slots": 960,
+          "inactive_retained_slots": 53,
+          "attention_tokens": 640,
+          "kv_bytes": 1228800,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 0,
+          "reused_page_ids": 0,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 1160960,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_13_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 0.0009765625,
+        "ring": 0.0,
+        "tol": 0.003
+      }
+    },
+    {
+      "name": "kernel_case_13_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": true,
+        "skip_far": false,
+        "live_pages": 15,
+        "logical_to_physical": {
+          "0": 0,
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6,
+          "7": 7,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 13,
+          "14": 14
+        },
+        "resident_tokens": 907,
+        "physical_token_slots": 960,
+        "inactive_retained_slots": 53,
+        "attention_tokens": 640,
+        "kv_bytes": 1228800,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 0,
+        "reused_page_ids": 0,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 1160960,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_14_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 0.0,
+        "dtype": "torch.bfloat16",
+        "d": 192,
+        "dv": 128,
+        "near": false,
+        "far": true,
+        "max_abs_error": 0.0009765625,
+        "report": {
+          "logical_length": 907,
+          "skip_near": false,
+          "skip_far": true,
+          "live_pages": 8,
+          "logical_to_physical": {
+            "0": 0,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 1,
+            "14": 2
+          },
+          "resident_tokens": 399,
+          "physical_token_slots": 512,
+          "inactive_retained_slots": 113,
+          "attention_tokens": 399,
+          "kv_bytes": 655360,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 7,
+          "reused_page_ids": 2,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 1160960,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_14_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 0.0009765625,
+        "ring": 0.0,
+        "tol": 0.003
+      }
+    },
+    {
+      "name": "kernel_case_14_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": false,
+        "skip_far": true,
+        "live_pages": 8,
+        "logical_to_physical": {
+          "0": 0,
+          "8": 8,
+          "9": 9,
+          "10": 10,
+          "11": 11,
+          "12": 12,
+          "13": 1,
+          "14": 2
+        },
+        "resident_tokens": 399,
+        "physical_token_slots": 512,
+        "inactive_retained_slots": 113,
+        "attention_tokens": 399,
+        "kv_bytes": 655360,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 7,
+        "reused_page_ids": 2,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 1160960,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "kernel_case_15_identity",
+      "passed": true,
+      "evidence": {
+        "ring_arithmetic_max_abs_error": 0.0,
+        "dtype": "torch.bfloat16",
+        "d": 192,
+        "dv": 128,
+        "near": true,
+        "far": true,
+        "max_abs_error": 0.001953125,
+        "report": {
+          "logical_length": 907,
+          "skip_near": true,
+          "skip_far": true,
+          "live_pages": 4,
+          "logical_to_physical": {
+            "0": 0,
+            "12": 12,
+            "13": 1,
+            "14": 2
+          },
+          "resident_tokens": 132,
+          "physical_token_slots": 256,
+          "inactive_retained_slots": 124,
+          "attention_tokens": 132,
+          "kv_bytes": 327680,
+          "device_page_table_bytes": 240,
+          "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+          "reclaimed_pages": 11,
+          "reused_page_ids": 2,
+          "aging_copy_bytes": 0,
+          "kv_write_bytes": 1160960,
+          "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+        }
+      }
+    },
+    {
+      "name": "kernel_case_15_errors",
+      "passed": true,
+      "evidence": {
+        "dense": 0.001953125,
+        "ring": 0.0,
+        "tol": 0.003
+      }
+    },
+    {
+      "name": "kernel_case_15_cache_report",
+      "passed": true,
+      "evidence": {
+        "logical_length": 907,
+        "skip_near": true,
+        "skip_far": true,
+        "live_pages": 4,
+        "logical_to_physical": {
+          "0": 0,
+          "12": 12,
+          "13": 1,
+          "14": 2
+        },
+        "resident_tokens": 132,
+        "physical_token_slots": 256,
+        "inactive_retained_slots": 124,
+        "attention_tokens": 132,
+        "kv_bytes": 327680,
+        "device_page_table_bytes": 240,
+        "metadata_scope": "GPU pointer tables exact; Python dict/list overhead excluded",
+        "reclaimed_pages": 11,
+        "reused_page_ids": 2,
+        "aging_copy_bytes": 0,
+        "kv_write_bytes": 1160960,
+        "allocator_scope": "active tensor allocations; caching allocator reserved memory is separate"
+      }
+    },
+    {
+      "name": "arithmetic_14_rows",
+      "passed": true,
+      "evidence": 14
+    },
+    {
+      "name": "arithmetic_case_0_identity",
+      "passed": true,
+      "evidence": [
+        16383,
+        128,
+        128,
+        "1",
+        "2048",
+        true,
+        true,
+        "dense",
+        "torch.float32"
+      ]
+    },
+    {
+      "name": "arithmetic_case_0_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16383,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.float32",
+        "fast": "1",
+        "upper": "2048",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": true,
+        "max_error": 5.960464477539063e-08,
+        "finite": true,
+        "tolerance": 2e-06,
+        "close_pass": true,
+        "actual_reference_route": "dense",
+        "reference_branch_calls": {
+          "_eager_decoding_attn_dense:entered": 1,
+          "_eager_decoding_attn_dense:returned": 1
+        },
+        "has_triton": true,
+        "tensor_file": "case_00.pt",
+        "tensor_sha256": "32d71bd71a7836f799f88b6007808741405040ddfd76206499e4c5dfbcfaeab2"
+      }
+    },
+    {
+      "name": "arithmetic_case_0_branch_receipt",
+      "passed": true,
+      "evidence": {
+        "_eager_decoding_attn_dense:entered": 1,
+        "_eager_decoding_attn_dense:returned": 1
+      }
+    },
+    {
+      "name": "arithmetic_case_0_tensor_name",
+      "passed": true,
+      "evidence": "case_00.pt"
+    },
+    {
+      "name": "arithmetic_case_0_tensor_sha",
+      "passed": true,
+      "evidence": "32d71bd71a7836f799f88b6007808741405040ddfd76206499e4c5dfbcfaeab2"
+    },
+    {
+      "name": "arithmetic_case_0_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float32"
+      }
+    },
+    {
+      "name": "arithmetic_case_0_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 5.960464477539063e-08,
+        "reported": 5.960464477539063e-08
+      }
+    },
+    {
+      "name": "arithmetic_case_1_identity",
+      "passed": true,
+      "evidence": [
+        16383,
+        128,
+        128,
+        "1",
+        "2048",
+        true,
+        true,
+        "dense",
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "name": "arithmetic_case_1_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16383,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.bfloat16",
+        "fast": "1",
+        "upper": "2048",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": true,
+        "max_error": 0.00048828125,
+        "finite": true,
+        "tolerance": 0.003,
+        "close_pass": true,
+        "actual_reference_route": "dense",
+        "reference_branch_calls": {
+          "_eager_decoding_attn_dense:entered": 1,
+          "_eager_decoding_attn_dense:returned": 1
+        },
+        "has_triton": true,
+        "tensor_file": "case_01.pt",
+        "tensor_sha256": "e13b23b112db09501d88d2413fc704fb170141094fa9dc13b5353131dceb22e3"
+      }
+    },
+    {
+      "name": "arithmetic_case_1_branch_receipt",
+      "passed": true,
+      "evidence": {
+        "_eager_decoding_attn_dense:entered": 1,
+        "_eager_decoding_attn_dense:returned": 1
+      }
+    },
+    {
+      "name": "arithmetic_case_1_tensor_name",
+      "passed": true,
+      "evidence": "case_01.pt"
+    },
+    {
+      "name": "arithmetic_case_1_tensor_sha",
+      "passed": true,
+      "evidence": "e13b23b112db09501d88d2413fc704fb170141094fa9dc13b5353131dceb22e3"
+    },
+    {
+      "name": "arithmetic_case_1_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16"
+      }
+    },
+    {
+      "name": "arithmetic_case_1_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 0.00048828125,
+        "reported": 0.00048828125
+      }
+    },
+    {
+      "name": "arithmetic_case_2_identity",
+      "passed": true,
+      "evidence": [
+        16384,
+        128,
+        128,
+        "1",
+        "2048",
+        true,
+        false,
+        "triton_gather",
+        "torch.float32"
+      ]
+    },
+    {
+      "name": "arithmetic_case_2_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16384,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.float32",
+        "fast": "1",
+        "upper": "2048",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": false,
+        "max_error": 5.960464477539063e-08,
+        "finite": true,
+        "tolerance": 2e-06,
+        "close_pass": true,
+        "actual_reference_route": "triton_gather",
+        "reference_branch_calls": {
+          "_eager_gather_triton:entered": 1,
+          "_eager_gather_triton:returned": 1
+        },
+        "has_triton": true,
+        "tensor_file": "case_02.pt",
+        "tensor_sha256": "121f5401b48f0b553ef434b453e5b48df0da0d35578fe681ddd5b45bab765f93"
+      }
+    },
+    {
+      "name": "arithmetic_case_2_branch_receipt",
+      "passed": true,
+      "evidence": {
+        "_eager_gather_triton:entered": 1,
+        "_eager_gather_triton:returned": 1
+      }
+    },
+    {
+      "name": "arithmetic_case_2_tensor_name",
+      "passed": true,
+      "evidence": "case_02.pt"
+    },
+    {
+      "name": "arithmetic_case_2_tensor_sha",
+      "passed": true,
+      "evidence": "121f5401b48f0b553ef434b453e5b48df0da0d35578fe681ddd5b45bab765f93"
+    },
+    {
+      "name": "arithmetic_case_2_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float32"
+      }
+    },
+    {
+      "name": "arithmetic_case_2_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 5.960464477539063e-08,
+        "reported": 5.960464477539063e-08
+      }
+    },
+    {
+      "name": "arithmetic_case_3_identity",
+      "passed": true,
+      "evidence": [
+        16384,
+        128,
+        128,
+        "1",
+        "2048",
+        true,
+        false,
+        "triton_gather",
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "name": "arithmetic_case_3_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16384,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.bfloat16",
+        "fast": "1",
+        "upper": "2048",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": false,
+        "max_error": 0.0,
+        "finite": true,
+        "tolerance": 0.003,
+        "close_pass": true,
+        "actual_reference_route": "triton_gather",
+        "reference_branch_calls": {
+          "_eager_gather_triton:entered": 1,
+          "_eager_gather_triton:returned": 1
+        },
+        "has_triton": true,
+        "tensor_file": "case_03.pt",
+        "tensor_sha256": "b03d1e299161394cefcb01dfc792ee5e967ec469ff4d707baa9de1389b605ed3"
+      }
+    },
+    {
+      "name": "arithmetic_case_3_branch_receipt",
+      "passed": true,
+      "evidence": {
+        "_eager_gather_triton:entered": 1,
+        "_eager_gather_triton:returned": 1
+      }
+    },
+    {
+      "name": "arithmetic_case_3_tensor_name",
+      "passed": true,
+      "evidence": "case_03.pt"
+    },
+    {
+      "name": "arithmetic_case_3_tensor_sha",
+      "passed": true,
+      "evidence": "b03d1e299161394cefcb01dfc792ee5e967ec469ff4d707baa9de1389b605ed3"
+    },
+    {
+      "name": "arithmetic_case_3_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16"
+      }
+    },
+    {
+      "name": "arithmetic_case_3_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 0.0,
+        "reported": 0.0
+      }
+    },
+    {
+      "name": "arithmetic_case_4_identity",
+      "passed": true,
+      "evidence": [
+        16448,
+        128,
+        128,
+        "1",
+        "2048",
+        true,
+        false,
+        "triton_gather",
+        "torch.float32"
+      ]
+    },
+    {
+      "name": "arithmetic_case_4_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16448,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.float32",
+        "fast": "1",
+        "upper": "2048",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": false,
+        "max_error": 5.21540641784668e-08,
+        "finite": true,
+        "tolerance": 2e-06,
+        "close_pass": true,
+        "actual_reference_route": "triton_gather",
+        "reference_branch_calls": {
+          "_eager_gather_triton:entered": 1,
+          "_eager_gather_triton:returned": 1
+        },
+        "has_triton": true,
+        "tensor_file": "case_04.pt",
+        "tensor_sha256": "6670586b01024d90e3fdfc46b2a5a00c1ac95a2a5eb46b04625b1d1477e060f0"
+      }
+    },
+    {
+      "name": "arithmetic_case_4_branch_receipt",
+      "passed": true,
+      "evidence": {
+        "_eager_gather_triton:entered": 1,
+        "_eager_gather_triton:returned": 1
+      }
+    },
+    {
+      "name": "arithmetic_case_4_tensor_name",
+      "passed": true,
+      "evidence": "case_04.pt"
+    },
+    {
+      "name": "arithmetic_case_4_tensor_sha",
+      "passed": true,
+      "evidence": "6670586b01024d90e3fdfc46b2a5a00c1ac95a2a5eb46b04625b1d1477e060f0"
+    },
+    {
+      "name": "arithmetic_case_4_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float32"
+      }
+    },
+    {
+      "name": "arithmetic_case_4_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 5.21540641784668e-08,
+        "reported": 5.21540641784668e-08
+      }
+    },
+    {
+      "name": "arithmetic_case_5_identity",
+      "passed": true,
+      "evidence": [
+        16448,
+        128,
+        128,
+        "1",
+        "2048",
+        true,
+        false,
+        "triton_gather",
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "name": "arithmetic_case_5_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16448,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.bfloat16",
+        "fast": "1",
+        "upper": "2048",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": false,
+        "max_error": 0.0,
+        "finite": true,
+        "tolerance": 0.003,
+        "close_pass": true,
+        "actual_reference_route": "triton_gather",
+        "reference_branch_calls": {
+          "_eager_gather_triton:entered": 1,
+          "_eager_gather_triton:returned": 1
+        },
+        "has_triton": true,
+        "tensor_file": "case_05.pt",
+        "tensor_sha256": "7077d14221c5558b0a06bd54a1ba25f94c9303d2b00254c22410804b0de90498"
+      }
+    },
+    {
+      "name": "arithmetic_case_5_branch_receipt",
+      "passed": true,
+      "evidence": {
+        "_eager_gather_triton:entered": 1,
+        "_eager_gather_triton:returned": 1
+      }
+    },
+    {
+      "name": "arithmetic_case_5_tensor_name",
+      "passed": true,
+      "evidence": "case_05.pt"
+    },
+    {
+      "name": "arithmetic_case_5_tensor_sha",
+      "passed": true,
+      "evidence": "7077d14221c5558b0a06bd54a1ba25f94c9303d2b00254c22410804b0de90498"
+    },
+    {
+      "name": "arithmetic_case_5_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16"
+      }
+    },
+    {
+      "name": "arithmetic_case_5_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 0.0,
+        "reported": 0.0
+      }
+    },
+    {
+      "name": "arithmetic_case_6_identity",
+      "passed": true,
+      "evidence": [
+        16384,
+        128,
+        128,
+        "0",
+        "2048",
+        true,
+        true,
+        "dense",
+        "torch.float32"
+      ]
+    },
+    {
+      "name": "arithmetic_case_6_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16384,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.float32",
+        "fast": "0",
+        "upper": "2048",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": true,
+        "max_error": 4.470348358154297e-08,
+        "finite": true,
+        "tolerance": 2e-06,
+        "close_pass": true,
+        "actual_reference_route": "dense",
+        "reference_branch_calls": {
+          "_eager_decoding_attn_dense:entered": 1,
+          "_eager_decoding_attn_dense:returned": 1
+        },
+        "has_triton": true,
+        "tensor_file": "case_06.pt",
+        "tensor_sha256": "d03ed5cdbb0fdc83bdb3aaefb1c0397a9af67c5726ae343990cf49b79ea96b1b"
+      }
+    },
+    {
+      "name": "arithmetic_case_6_branch_receipt",
+      "passed": true,
+      "evidence": {
+        "_eager_decoding_attn_dense:entered": 1,
+        "_eager_decoding_attn_dense:returned": 1
+      }
+    },
+    {
+      "name": "arithmetic_case_6_tensor_name",
+      "passed": true,
+      "evidence": "case_06.pt"
+    },
+    {
+      "name": "arithmetic_case_6_tensor_sha",
+      "passed": true,
+      "evidence": "d03ed5cdbb0fdc83bdb3aaefb1c0397a9af67c5726ae343990cf49b79ea96b1b"
+    },
+    {
+      "name": "arithmetic_case_6_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float32"
+      }
+    },
+    {
+      "name": "arithmetic_case_6_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 4.470348358154297e-08,
+        "reported": 4.470348358154297e-08
+      }
+    },
+    {
+      "name": "arithmetic_case_7_identity",
+      "passed": true,
+      "evidence": [
+        16384,
+        128,
+        128,
+        "0",
+        "2048",
+        true,
+        true,
+        "dense",
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "name": "arithmetic_case_7_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16384,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.bfloat16",
+        "fast": "0",
+        "upper": "2048",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": true,
+        "max_error": 6.103515625e-05,
+        "finite": true,
+        "tolerance": 0.003,
+        "close_pass": true,
+        "actual_reference_route": "dense",
+        "reference_branch_calls": {
+          "_eager_decoding_attn_dense:entered": 1,
+          "_eager_decoding_attn_dense:returned": 1
+        },
+        "has_triton": true,
+        "tensor_file": "case_07.pt",
+        "tensor_sha256": "6f85f2190fd7032c9ef1a3833c4491eb9f70ea4a2f40984d84dbe6890251908c"
+      }
+    },
+    {
+      "name": "arithmetic_case_7_branch_receipt",
+      "passed": true,
+      "evidence": {
+        "_eager_decoding_attn_dense:entered": 1,
+        "_eager_decoding_attn_dense:returned": 1
+      }
+    },
+    {
+      "name": "arithmetic_case_7_tensor_name",
+      "passed": true,
+      "evidence": "case_07.pt"
+    },
+    {
+      "name": "arithmetic_case_7_tensor_sha",
+      "passed": true,
+      "evidence": "6f85f2190fd7032c9ef1a3833c4491eb9f70ea4a2f40984d84dbe6890251908c"
+    },
+    {
+      "name": "arithmetic_case_7_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16"
+      }
+    },
+    {
+      "name": "arithmetic_case_7_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 6.103515625e-05,
+        "reported": 6.103515625e-05
+      }
+    },
+    {
+      "name": "arithmetic_case_8_identity",
+      "passed": true,
+      "evidence": [
+        16384,
+        128,
+        128,
+        "1",
+        "4096",
+        true,
+        true,
+        "dense",
+        "torch.float32"
+      ]
+    },
+    {
+      "name": "arithmetic_case_8_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16384,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.float32",
+        "fast": "1",
+        "upper": "4096",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": true,
+        "max_error": 5.960464477539063e-08,
+        "finite": true,
+        "tolerance": 2e-06,
+        "close_pass": true,
+        "actual_reference_route": "dense",
+        "reference_branch_calls": {
+          "_eager_decoding_attn_dense:entered": 1,
+          "_eager_decoding_attn_dense:returned": 1
+        },
+        "has_triton": true,
+        "tensor_file": "case_08.pt",
+        "tensor_sha256": "0cba8e2db5e631384c11faa45082a35ab4dc970e0c92d4269bd62f74dec53e1e"
+      }
+    },
+    {
+      "name": "arithmetic_case_8_branch_receipt",
+      "passed": true,
+      "evidence": {
+        "_eager_decoding_attn_dense:entered": 1,
+        "_eager_decoding_attn_dense:returned": 1
+      }
+    },
+    {
+      "name": "arithmetic_case_8_tensor_name",
+      "passed": true,
+      "evidence": "case_08.pt"
+    },
+    {
+      "name": "arithmetic_case_8_tensor_sha",
+      "passed": true,
+      "evidence": "0cba8e2db5e631384c11faa45082a35ab4dc970e0c92d4269bd62f74dec53e1e"
+    },
+    {
+      "name": "arithmetic_case_8_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float32"
+      }
+    },
+    {
+      "name": "arithmetic_case_8_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 5.960464477539063e-08,
+        "reported": 5.960464477539063e-08
+      }
+    },
+    {
+      "name": "arithmetic_case_9_identity",
+      "passed": true,
+      "evidence": [
+        16384,
+        128,
+        128,
+        "1",
+        "4096",
+        true,
+        true,
+        "dense",
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "name": "arithmetic_case_9_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16384,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.bfloat16",
+        "fast": "1",
+        "upper": "4096",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": true,
+        "max_error": 0.000244140625,
+        "finite": true,
+        "tolerance": 0.003,
+        "close_pass": true,
+        "actual_reference_route": "dense",
+        "reference_branch_calls": {
+          "_eager_decoding_attn_dense:entered": 1,
+          "_eager_decoding_attn_dense:returned": 1
+        },
+        "has_triton": true,
+        "tensor_file": "case_09.pt",
+        "tensor_sha256": "3421a1bc06c72d505f377fecde4062f42ffd71eff45ad0b097438f6b834f0788"
+      }
+    },
+    {
+      "name": "arithmetic_case_9_branch_receipt",
+      "passed": true,
+      "evidence": {
+        "_eager_decoding_attn_dense:entered": 1,
+        "_eager_decoding_attn_dense:returned": 1
+      }
+    },
+    {
+      "name": "arithmetic_case_9_tensor_name",
+      "passed": true,
+      "evidence": "case_09.pt"
+    },
+    {
+      "name": "arithmetic_case_9_tensor_sha",
+      "passed": true,
+      "evidence": "3421a1bc06c72d505f377fecde4062f42ffd71eff45ad0b097438f6b834f0788"
+    },
+    {
+      "name": "arithmetic_case_9_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16"
+      }
+    },
+    {
+      "name": "arithmetic_case_9_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 0.000244140625,
+        "reported": 0.000244140625
+      }
+    },
+    {
+      "name": "arithmetic_case_10_identity",
+      "passed": true,
+      "evidence": [
+        16384,
+        128,
+        128,
+        "1",
+        "2048",
+        false,
+        true,
+        "torch_gather",
+        "torch.float32"
+      ]
+    },
+    {
+      "name": "arithmetic_case_10_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16384,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.float32",
+        "fast": "1",
+        "upper": "2048",
+        "healthy_before": false,
+        "healthy_after": false,
+        "round_prob": true,
+        "max_error": 1.1920928955078125e-07,
+        "finite": true,
+        "tolerance": 2e-06,
+        "close_pass": true,
+        "actual_reference_route": "torch_gather",
+        "reference_branch_calls": {},
+        "has_triton": true,
+        "tensor_file": "case_10.pt",
+        "tensor_sha256": "c521fce0bd744153af329977b6244f704a5be09389bcad246de656ea4fe36238"
+      }
+    },
+    {
+      "name": "arithmetic_case_10_branch_receipt",
+      "passed": true,
+      "evidence": {}
+    },
+    {
+      "name": "arithmetic_case_10_tensor_name",
+      "passed": true,
+      "evidence": "case_10.pt"
+    },
+    {
+      "name": "arithmetic_case_10_tensor_sha",
+      "passed": true,
+      "evidence": "c521fce0bd744153af329977b6244f704a5be09389bcad246de656ea4fe36238"
+    },
+    {
+      "name": "arithmetic_case_10_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float32"
+      }
+    },
+    {
+      "name": "arithmetic_case_10_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 1.1920928955078125e-07,
+        "reported": 1.1920928955078125e-07
+      }
+    },
+    {
+      "name": "arithmetic_case_11_identity",
+      "passed": true,
+      "evidence": [
+        16384,
+        128,
+        128,
+        "1",
+        "2048",
+        false,
+        true,
+        "torch_gather",
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "name": "arithmetic_case_11_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16384,
+        "d": 128,
+        "dv": 128,
+        "dtype": "torch.bfloat16",
+        "fast": "1",
+        "upper": "2048",
+        "healthy_before": false,
+        "healthy_after": false,
+        "round_prob": true,
+        "max_error": 6.103515625e-05,
+        "finite": true,
+        "tolerance": 0.003,
+        "close_pass": true,
+        "actual_reference_route": "torch_gather",
+        "reference_branch_calls": {},
+        "has_triton": true,
+        "tensor_file": "case_11.pt",
+        "tensor_sha256": "681e5262a09e0e3fa0bdba8e63b320eebc4df646e406b016d04a7d9d6215aaf8"
+      }
+    },
+    {
+      "name": "arithmetic_case_11_branch_receipt",
+      "passed": true,
+      "evidence": {}
+    },
+    {
+      "name": "arithmetic_case_11_tensor_name",
+      "passed": true,
+      "evidence": "case_11.pt"
+    },
+    {
+      "name": "arithmetic_case_11_tensor_sha",
+      "passed": true,
+      "evidence": "681e5262a09e0e3fa0bdba8e63b320eebc4df646e406b016d04a7d9d6215aaf8"
+    },
+    {
+      "name": "arithmetic_case_11_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16"
+      }
+    },
+    {
+      "name": "arithmetic_case_11_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 6.103515625e-05,
+        "reported": 6.103515625e-05
+      }
+    },
+    {
+      "name": "arithmetic_case_12_identity",
+      "passed": true,
+      "evidence": [
+        16384,
+        192,
+        128,
+        "1",
+        "2048",
+        true,
+        true,
+        "torch_gather",
+        "torch.float32"
+      ]
+    },
+    {
+      "name": "arithmetic_case_12_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16384,
+        "d": 192,
+        "dv": 128,
+        "dtype": "torch.float32",
+        "fast": "1",
+        "upper": "2048",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": true,
+        "max_error": 1.043081283569336e-07,
+        "finite": true,
+        "tolerance": 2e-06,
+        "close_pass": true,
+        "actual_reference_route": "torch_gather",
+        "reference_branch_calls": {},
+        "has_triton": true,
+        "tensor_file": "case_12.pt",
+        "tensor_sha256": "a86ce6684c6f0fc29656edbca98a009121b494790e54987d2bb3317ac46adbe5"
+      }
+    },
+    {
+      "name": "arithmetic_case_12_branch_receipt",
+      "passed": true,
+      "evidence": {}
+    },
+    {
+      "name": "arithmetic_case_12_tensor_name",
+      "passed": true,
+      "evidence": "case_12.pt"
+    },
+    {
+      "name": "arithmetic_case_12_tensor_sha",
+      "passed": true,
+      "evidence": "a86ce6684c6f0fc29656edbca98a009121b494790e54987d2bb3317ac46adbe5"
+    },
+    {
+      "name": "arithmetic_case_12_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float32"
+      }
+    },
+    {
+      "name": "arithmetic_case_12_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 1.043081283569336e-07,
+        "reported": 1.043081283569336e-07
+      }
+    },
+    {
+      "name": "arithmetic_case_13_identity",
+      "passed": true,
+      "evidence": [
+        16384,
+        192,
+        128,
+        "1",
+        "2048",
+        true,
+        true,
+        "torch_gather",
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "name": "arithmetic_case_13_flags",
+      "passed": true,
+      "evidence": {
+        "length": 16384,
+        "d": 192,
+        "dv": 128,
+        "dtype": "torch.bfloat16",
+        "fast": "1",
+        "upper": "2048",
+        "healthy_before": true,
+        "healthy_after": true,
+        "round_prob": true,
+        "max_error": 0.0,
+        "finite": true,
+        "tolerance": 0.003,
+        "close_pass": true,
+        "actual_reference_route": "torch_gather",
+        "reference_branch_calls": {},
+        "has_triton": true,
+        "tensor_file": "case_13.pt",
+        "tensor_sha256": "853b63ed769f3f932264742d8a81b04544a4b9855b9305ab118841b92dc85872"
+      }
+    },
+    {
+      "name": "arithmetic_case_13_branch_receipt",
+      "passed": true,
+      "evidence": {}
+    },
+    {
+      "name": "arithmetic_case_13_tensor_name",
+      "passed": true,
+      "evidence": "case_13.pt"
+    },
+    {
+      "name": "arithmetic_case_13_tensor_sha",
+      "passed": true,
+      "evidence": "853b63ed769f3f932264742d8a81b04544a4b9855b9305ab118841b92dc85872"
+    },
+    {
+      "name": "arithmetic_case_13_tensor_metadata",
+      "passed": true,
+      "evidence": {
+        "shape": [
+          1,
+          1,
+          8,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16"
+      }
+    },
+    {
+      "name": "arithmetic_case_13_tensor_recompute",
+      "passed": true,
+      "evidence": {
+        "finite": true,
+        "close": true,
+        "error": 0.0,
+        "reported": 0.0
+      }
+    },
+    {
+      "name": "kernels_stdout_row_count",
+      "passed": true,
+      "evidence": 16
+    },
+    {
+      "name": "kernels_stdout_json_agreement",
+      "passed": true,
+      "evidence": "逐行关键字段一致"
+    },
+    {
+      "name": "arithmetic_stdout_row_count",
+      "passed": true,
+      "evidence": 14
+    },
+    {
+      "name": "arithmetic_stdout_json_agreement",
+      "passed": true,
+      "evidence": "逐行关键字段一致"
+    },
+    {
+      "name": "kernels_end_rc_zero",
+      "passed": true,
+      "evidence": [
+        "2026-11-01T03:31:25+08:00",
+        "0, 1 MiB, 0 %",
+        "2026-11-01T03:31:29+08:00",
+        "END_RC 0",
+        "0, 1 MiB"
+      ]
+    },
+    {
+      "name": "kernels_final_gpu_idle",
+      "passed": true,
+      "evidence": [
+        "0, 1 MiB"
+      ]
+    },
+    {
+      "name": "kernels_start_end_timestamps",
+      "passed": true,
+      "evidence": [
+        "2026-11-01T03:31:25+08:00",
+        "0, 1 MiB, 0 %",
+        "2026-11-01T03:31:29+08:00",
+        "END_RC 0",
+        "0, 1 MiB"
+      ]
+    },
+    {
+      "name": "kernels_no_observed_compute_pid",
+      "passed": true,
+      "evidence": {
+        "during": [],
+        "final": []
+      }
+    },
+    {
+      "name": "kernels_precheck_idle",
+      "passed": true,
+      "evidence": [
+        "0, 1 MiB, 0 %"
+      ]
+    },
+    {
+      "name": "arithmetic_end_rc_zero",
+      "passed": true,
+      "evidence": [
+        "2026-11-01T03:31:56+08:00",
+        "1, 1 MiB, 0 %",
+        "2026-11-01T03:32:00+08:00",
+        "END_RC 0",
+        "1, 1 MiB"
+      ]
+    },
+    {
+      "name": "arithmetic_final_gpu_idle",
+      "passed": true,
+      "evidence": [
+        "1, 1 MiB"
+      ]
+    },
+    {
+      "name": "arithmetic_start_end_timestamps",
+      "passed": true,
+      "evidence": [
+        "2026-11-01T03:31:56+08:00",
+        "1, 1 MiB, 0 %",
+        "2026-11-01T03:32:00+08:00",
+        "END_RC 0",
+        "1, 1 MiB"
+      ]
+    },
+    {
+      "name": "arithmetic_no_observed_compute_pid",
+      "passed": true,
+      "evidence": {
+        "during": [],
+        "final": []
+      }
+    },
+    {
+      "name": "arithmetic_precheck_idle",
+      "passed": true,
+      "evidence": [
+        "1, 1 MiB, 0 %"
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ from unittest.mock import patch
 from pathlib import Path
 import torch
 from sparse_attn.ops import eager_decoding as eager
-from sparse_attn.ops.paged_region_cache import PagedRegionLayer
+from sparse_attn.cache.paged_region_cache import PagedRegionLayer
 from sparse_attn.ops.region_geometry import RegionGeometry
 from sparse_attn.ops.paged_region_kernels import paged_attention,ring_rounds_probabilities
 
@@ -13,6 +13,8 @@ from sparse_attn.ops.paged_region_kernels import paged_attention,ring_rounds_pro
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--out',required=True);a=ap.parse_args()
     torch.manual_seed(81);torch.set_num_threads(4);rows=[]
+    source_commit=os.environ.get('TLI_SOURCE_COMMIT') or subprocess.check_output(
+        ['git','rev-parse','HEAD'],text=True).strip()
     destination=Path(a.out);destination.parent.mkdir(parents=True,exist_ok=True)
     cases=[(16383,128,128,'1','2048',True),(16384,128,128,'1','2048',True),
            (16448,128,128,'1','2048',True),(16384,128,128,'0','2048',True),
@@ -58,7 +60,7 @@ def main():
                  round_prob=ring_rounds_probabilities(length,d,dv,cuda=True),max_error=error,
                  finite=finite,tolerance=tol,close_pass=close_pass,actual_reference_route=actual_route,reference_branch_calls=calls,
                  has_triton=eager._HAS_TRITON,tensor_file=tensor_path.name,tensor_sha256=hashlib.sha256(tensor_path.read_bytes()).hexdigest())
-        rows.append(row);Path(a.out).write_text(json.dumps(dict(status='pending_independent_validation',commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),rows=rows),indent=2)+'\n')
+        rows.append(row);Path(a.out).write_text(json.dumps(dict(status='pending_independent_validation',commit=source_commit,rows=rows),indent=2)+'\n')
         print(row,flush=True)
         if not finite:raise RuntimeError('nonfinite paired output; raw preserved')
         torch.testing.assert_close(actual,reference,atol=tol,rtol=tol)

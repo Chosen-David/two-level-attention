@@ -1,0 +1,209 @@
+{
+  "schema": "paged-region-dbbba689-synthetic-cuda-correctness-verdict-v1",
+  "date": "2026-11-01",
+  "status": "pass",
+  "source_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559",
+  "scope_zh": "仅接受两份检查脚本修复及 dbbba689 上的 synthetic CUDA 正确性；不是 RULER 质量、真实 Qwen3 端到端、显存验收或 TPOT/加速比证据。",
+  "environment": {
+    "host": "set-tx-mlp-codelab-pc32.mt",
+    "device": "NVIDIA H20-3e",
+    "torch": "2.9.0",
+    "kernel_gpu": 0,
+    "arithmetic_gpu": 1,
+    "deployment": "git archive of dbbba689 plus the two verified script fixes; no main-worktree WIP"
+  },
+  "script_sha256": {
+    "exp/bench/check_paged_region_kernels.py": "a54117844b4193bf92286c7b04d7fdf4ca3c35b303df8b4074dce7cdc3a6eceb",
+    "exp/bench/check_paged_region_arithmetic_boundary.py": "0a7c90874c3bb800db085bbfe5123112bdfc27ca8d15a374eb5fb8be0da162e3"
+  },
+  "results": {
+    "paged_region_kernels": {
+      "passed": "16/16",
+      "coverage": "FP32/BF16 × D,Dv=128/128 or 192/128 × four near/far gate states; 130 decode appends; cross-stream rejection; projection; paged and ring attention",
+      "max_dense_abs_error": 0.001953125,
+      "max_ring_arithmetic_abs_error": 1.52587890625e-05
+    },
+    "arithmetic_boundary": {
+      "passed": "14/14",
+      "tensor_sha256_and_error_recomputed": "14/14",
+      "coverage": "16383/16384/16448; FP32/BF16; fast on/off; W_upper 2048/4096; Triton healthy/unhealthy; D=192 hetero K/V",
+      "max_abs_error": 0.00048828125,
+      "reference_route_counts": {
+        "dense": 6,
+        "triton_gather": 4,
+        "torch_gather": 4
+      }
+    }
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "kernels": {
+      "status": "clean",
+      "gpu": 0,
+      "start_gpu_rows": [
+        "0, 1 MiB, 0 %"
+      ],
+      "observed_compute_pid_rows": [],
+      "final_compute_pid_rows": [],
+      "end_rc": 0,
+      "final_memory_mib": 1,
+      "note": "监控在 workload 前启动、结束后关闭；本短任务窗口内未观察到 compute PID。"
+    },
+    "arithmetic": {
+      "status": "clean",
+      "gpu": 1,
+      "start_gpu_rows": [
+        "1, 1 MiB, 0 %"
+      ],
+      "observed_compute_pid_rows": [],
+      "final_compute_pid_rows": [],
+      "end_rc": 0,
+      "final_memory_mib": 1,
+      "note": "监控在 workload 前启动、结束后关闭；本短任务窗口内未观察到 compute PID。"
+    }
+  },
+  "evidence": {
+    "independent_validation": {
+      "path": "exp/trace/results/paged_region_dbbba689/verified/independent_validation.json",
+      "sha256": "483cfaf2a62ffc62172f08cd929f4a6ac6354017466993a5aaf6cb04a01b8cc0",
+      "assertions_passed": 167
+    },
+    "raw_sha256": {
+      "exp/trace/results/paged_region_dbbba689/verified/kernels.json": "39eee3a0ac499afff3175433ca528be0a3d47a28c99ee0fdbdff7cc41b3f5bcd",
+      "exp/trace/results/paged_region_dbbba689/verified/kernels.stdout.log": "f40ae4921cd80f604e324effcc277990af3450c965eb8eeea9f61e1fc6de43e5",
+      "exp/trace/results/paged_region_dbbba689/verified/kernels_hygiene.log": "ad8fc927298451594a7f4f8ca89fbd07d5adad5ebb8214a3ac1a5cb1a05190d5",
+      "exp/trace/results/paged_region_dbbba689/verified/arithmetic.json": "25a857725f789b45c217dd8a9b179e263d76ab37eb4f76ea2c47670a1fcde3cd",
+      "exp/trace/results/paged_region_dbbba689/verified/arithmetic.stdout.log": "d981e98697b563d52bc2ca752c2bb36d61e2c23a52d48ca2d72c384f76780daa",
+      "exp/trace/results/paged_region_dbbba689/verified/arithmetic_hygiene.log": "b25cf6f521b7e9c0e138d8adb0ce9e5716f3bc50d296d8f85c2c7c5a470285f8"
+    },
+    "tensor_files": "remote:/home/hadoop-aipnlp/tli-main-dbbba689/gpu_results_verified/case_00.pt..case_13.pt; SHA and paired errors independently verified; binaries not committed"
+  },
+  "decision": "accept_import_and_archive_commit_fix; synthetic_cuda_correctness_pass; no_quality_or_performance_claim",
+  "not_established": [
+    "RULER/LongBench quality",
+    "real-Qwen3 end-to-end correctness",
+    "TTFT/TPOT/speedup",
+    "production memory acceptance",
+    "current-main performance beyond this source commit"
+  ],
+  "assertions": [
+    {
+      "name": "source_commit",
+      "passed": true,
+      "evidence": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "name": "worktree_base_commit",
+      "passed": true,
+      "evidence": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "name": "tracked_change_scope",
+      "passed": true,
+      "evidence": [
+        "exp/bench/check_paged_region_arithmetic_boundary.py",
+        "exp/bench/check_paged_region_kernels.py"
+      ]
+    },
+    {
+      "name": "independent_assertions",
+      "passed": true,
+      "evidence": {
+        "passed": 167,
+        "failed": 0
+      }
+    },
+    {
+      "name": "all_cells_and_pairs",
+      "passed": true,
+      "evidence": {
+        "kernel_cells_passed": 16,
+        "arithmetic_pairs_passed": 14,
+        "tensor_sha256_verified": 14
+      }
+    },
+    {
+      "name": "raw_sha256_kernels.json",
+      "passed": true,
+      "evidence": "39eee3a0ac499afff3175433ca528be0a3d47a28c99ee0fdbdff7cc41b3f5bcd"
+    },
+    {
+      "name": "raw_sha256_kernels.stdout.log",
+      "passed": true,
+      "evidence": "f40ae4921cd80f604e324effcc277990af3450c965eb8eeea9f61e1fc6de43e5"
+    },
+    {
+      "name": "raw_sha256_kernels_hygiene.log",
+      "passed": true,
+      "evidence": "ad8fc927298451594a7f4f8ca89fbd07d5adad5ebb8214a3ac1a5cb1a05190d5"
+    },
+    {
+      "name": "raw_sha256_arithmetic.json",
+      "passed": true,
+      "evidence": "25a857725f789b45c217dd8a9b179e263d76ab37eb4f76ea2c47670a1fcde3cd"
+    },
+    {
+      "name": "raw_sha256_arithmetic.stdout.log",
+      "passed": true,
+      "evidence": "d981e98697b563d52bc2ca752c2bb36d61e2c23a52d48ca2d72c384f76780daa"
+    },
+    {
+      "name": "raw_sha256_arithmetic_hygiene.log",
+      "passed": true,
+      "evidence": "b25cf6f521b7e9c0e138d8adb0ce9e5716f3bc50d296d8f85c2c7c5a470285f8"
+    },
+    {
+      "name": "deployed_script_identity_check_paged_region_kernels.py",
+      "passed": true,
+      "evidence": "a54117844b4193bf92286c7b04d7fdf4ca3c35b303df8b4074dce7cdc3a6eceb"
+    },
+    {
+      "name": "deployed_script_identity_check_paged_region_arithmetic_boundary.py",
+      "passed": true,
+      "evidence": "0a7c90874c3bb800db085bbfe5123112bdfc27ca8d15a374eb5fb8be0da162e3"
+    },
+    {
+      "name": "gpu_hygiene_clean",
+      "passed": true,
+      "evidence": {
+        "kernels": {
+          "status": "clean",
+          "gpu": 0,
+          "start_gpu_rows": [
+            "0, 1 MiB, 0 %"
+          ],
+          "observed_compute_pid_rows": [],
+          "final_compute_pid_rows": [],
+          "end_rc": 0,
+          "final_memory_mib": 1,
+          "note": "监控在 workload 前启动、结束后关闭；本短任务窗口内未观察到 compute PID。"
+        },
+        "arithmetic": {
+          "status": "clean",
+          "gpu": 1,
+          "start_gpu_rows": [
+            "1, 1 MiB, 0 %"
+          ],
+          "observed_compute_pid_rows": [],
+          "final_compute_pid_rows": [],
+          "end_rc": 0,
+          "final_memory_mib": 1,
+          "note": "监控在 workload 前启动、结束后关闭；本短任务窗口内未观察到 compute PID。"
+        }
+      }
+    },
+    {
+      "name": "route_coverage",
+      "passed": true,
+      "evidence": {
+        "dense": 6,
+        "triton_gather": 4,
+        "torch_gather": 4
+      }
+    }
+  ],
+  "assertion_summary": {
+    "passed": 15,
+    "failed": 0
+  }
+}
