@@ -1,0 +1,171 @@
+{
+  "schema": "pr10-origin-main-static-reachability-v1",
+  "date": "2026-10-31",
+  "audit_type": "static_call_chain_only_no_new_gpu_sampling",
+  "pr_head": "2449f56983d7e97c5fe1c4df300c2b50b0c16b81",
+  "base_verdict": {
+    "path": "exp/trace/results/pr10_main_performance_verdict.json",
+    "sha256": "68a5311ca53c0e7f87c3b1143b33e9261e3417291e699b62900431b49d369c25",
+    "audited_main_commit": "a2e7b67b4e5c131cfa169283f7c66d6fb8892b00"
+  },
+  "local_main_addendum": {
+    "path": "exp/trace/results/pr10_current_main_reachability_addendum.json",
+    "sha256": "e03dfdfc600002c60670fc02d972e015325ba432a30cd028099e8678a021a936",
+    "audited_local_main": "39b6e80e4308f1f21e4927f08df223da2cff31a1",
+    "note_zh": "旧补记保留为 local-main 历史证据；其中 pool off-only、serial 排除和 decode_ring 未实现不适用于 origin/main 55ccfb3。"
+  },
+  "origin_main": {
+    "commit": "55ccfb39fafd2096ee83992d8e667f9d2c11729a",
+    "ref": "origin/main fetched 2026-10-31",
+    "worktree": "/home/wangyuanshuo02/tli-nfa-integration",
+    "source_files": {
+      "sparse_attn/ops/eager_decoding.py": {
+        "git_blob": "6684e7d3a072fae26c14c822495112271746221b",
+        "sha256": "edec056f612d9079c3125640b77903db12f53b9de235987e42a7e343b4179d5e"
+      },
+      "sparse_attn/ops/far_skip_graph.py": {
+        "git_blob": "cb473c14fd39f31f189399eb99b808b61dc9f83a",
+        "sha256": "1d35211d6533fa7d591337fa0b4d541537fffa8474c0f48d1d77cb1faa32b2a4"
+      },
+      "sparse_attn/ops/operator_pipeline.py": {
+        "git_blob": "12790421d410b233835a9cfef0e965edf1cf0d51",
+        "sha256": "063c5ca3f1f549542fe86b1b48396528c4cd7c52adc329bb94501e9eefd8207d"
+      },
+      "sparse_attn/ops/far_skip_runtime.py": {
+        "git_blob": "891efe202825affe2779da09d3475e2c689d83ab",
+        "sha256": "063d8bddd2291e82a9246d154e1acca17f89c340ec0b30225b57670b7d29653f"
+      },
+      "sparse_attn/ops/far_skip_static.py": {
+        "git_blob": "422ffb32eb6da547f2281d9b5c726f988d5ba142",
+        "sha256": "843970428a4110bdffc3eaf341b2e935e2d5be8e346d2e04b31debfe31da1e43"
+      },
+      "sparse_attn/patches/qwen3_attn_patch.py": {
+        "git_blob": "102a5083573c4eb1c6c53dd2adf62431dbee6652",
+        "sha256": "0f9886693698d79a9a72adf0dd7d746e946f5da0abf0aaf4d8a06dba06e2becb"
+      }
+    }
+  },
+  "prior_measurements_unchanged": {
+    "native_exact_output": "18/18",
+    "native_gpu_hygiene": "clean",
+    "e2e_measurement_main": "a2e7b67b4e5c131cfa169283f7c66d6fb8892b00",
+    "e2e_32k_abba_mean_speedup_baseline_over_candidate": 0.999864793,
+    "e2e_32k_abba_baseline_mean_ms": 20.152323667,
+    "e2e_32k_abba_candidate_mean_ms": 20.15504876,
+    "e2e_32k_abba_all_generated_tokens_exact": true,
+    "origin_main_e2e_remeasured": false,
+    "note_zh": "本轮没有重跑 native microbench 或 e2e；这些数字只描述原提交，不是 55ccfb3 的 TPOT。"
+  },
+  "reachability": {
+    "early_dense": {
+      "origin_main_status": "not_reached_by_32k_main_table",
+      "detail_zh": "PR10 仅提前 full_len<16384 的 dense 路由；32K 主表不触发。"
+    },
+    "pool_assembly": {
+      "origin_main_status": "reachable_for_compact_far_off_static_layers_in_off_serial_overlap_but_not_base_main_table",
+      "off_zh": "off 下 FarSkipGraphWorkspace.__call__ 直接 select，满足 0<keep<candidates 时执行 pool assembly。",
+      "serial_overlap_zh": "55ccfb3 已允许 serial/overlap 进入 compact bridge，decode_ring 已实现并调用 workspace.select，因此同类 compact far-off 静态层也可到达 pool；旧 off-only/unimplemented 结论失效。",
+      "dynamic_zh": "DynamicCache compact eager 仍用 select_far_skip，off/non-off 均不经过 Graph pool。非 compact generic serial/overlap 则走 decode_indexed。",
+      "main_table_zh": "原 32K ABBA 全部 n_skip_layers=0、36 层 non-skip，没有 far-off workspace，pool 仍不可达，不能据此宣称主表 TPOT 收益。"
+    },
+    "batch_cu_row": {
+      "origin_main_status": "not_reached_by_b1_graph_main_table",
+      "detail_zh": "origin/main 仍逐行构造只读 cu_row；PR10 仅影响 B>1 Torch fallback，原 B=1 Graph 主表不触发。"
+    },
+    "rebase_scope": {
+      "status": "pr_head_far_skip_graph_is_not_a_drop_in_file_replacement_for_origin_main",
+      "detail_zh": "PR-head 文件缺少 origin/main 的 ordered_unique_selection 与 decode_ring 路由；若继续评估 pool，须把局部补丁重基到 55ccfb3，并重新做 compact off/serial/overlap 正确性验证，不能整文件回退新 main。"
+    }
+  },
+  "decision": "origin_main_recheck_preserves_no_base_main_table_tpot_claim_but_expands_pool_reachability",
+  "recommendation_zh": "维持不以原 32K 主表加速为由整包合并 PR10。early-dense 与 B>1 fallback 仍按各自路径独立评估；pool 在 55ccfb3 的适用面扩大到 off/serial/overlap 的 compact far-off 静态层，但原主表仍不可达。任何 pool 后续性能实验必须基于重基后的局部补丁，区分 native assembly、目标 compact 路径 e2e 与 whole-step TPOT。",
+  "new_gpu_sampling_required": false,
+  "new_gpu_sampling_reason_zh": "静态路由复核足以判断原 32K、n_skip_layers=0、B=1 Graph 主表仍不触发三项补丁；本轮不量化新 compact 路径收益，因此无需 GPU。若未来主张该路径 TPOT，必须另行锁卡采数。",
+  "scope_limit_zh": "这是 origin/main 静态可达性补记，不是 serial/overlap 的完整功能验收，也不是 55ccfb3 的新性能、质量或显存结论。",
+  "assertions": [
+    {
+      "name": "origin_main_exact_commit",
+      "passed": true,
+      "evidence": "fetch 后 origin/main=55ccfb3；对应工作树 HEAD 相同且干净"
+    },
+    {
+      "name": "prior_native_and_abba_evidence_bound",
+      "passed": true,
+      "evidence": "原 native 18/18 clean 与 a2e7b67 32K ABBA 仅作为历史测量绑定，不冒充 55ccfb3 新测量"
+    },
+    {
+      "name": "early_dense_pr_not_in_origin_and_32k_excluded",
+      "passed": true,
+      "evidence": "origin/main 尚未提前 PR10 early-dense 路由；32K 不满足 <16384，主表不可达"
+    },
+    {
+      "name": "batch_fallback_still_per_row_on_origin",
+      "passed": true,
+      "evidence": "origin/main 仍逐行构造 cu_row；PR10 只优化该 B>1 Torch fallback"
+    },
+    {
+      "name": "base_main_table_cannot_reach_early_or_batch",
+      "passed": true,
+      "evidence": "原主表是 32K B=1 whole-step Graph，不触发短序列或 B>1 Torch fallback"
+    },
+    {
+      "name": "operator_mode_default_off",
+      "passed": true,
+      "evidence": "55ccfb3 operator_mode 默认 off"
+    },
+    {
+      "name": "origin_compact_bridge_admits_serial_and_overlap",
+      "passed": true,
+      "evidence": "qwen3 compact bridge 已移除 serial 排除；serial/overlap 均可进入 try_far_skip_decode"
+    },
+    {
+      "name": "origin_decode_ring_implemented_and_reuses_workspace_select",
+      "passed": true,
+      "evidence": "55ccfb3 decode_ring 已实现，并经 decode_selected 调用 workspace.select"
+    },
+    {
+      "name": "pool_gate_present_in_workspace_select",
+      "passed": true,
+      "evidence": "workspace.select 内仍有 PR10 pool assembly 及严格 keep gate"
+    },
+    {
+      "name": "off_and_nonoff_static_far_off_can_reach_pool",
+      "passed": true,
+      "evidence": "off 直接 select；serial/overlap 经 decode_ring→decode_selected→select，均不再受旧 off-only 限制"
+    },
+    {
+      "name": "static_far_off_calls_workspace",
+      "passed": true,
+      "evidence": "只有 compact far-off 静态层构造并调用 FarSkipGraphWorkspace"
+    },
+    {
+      "name": "dynamic_compact_never_uses_graph_pool",
+      "passed": true,
+      "evidence": "DynamicCache compact eager 在 off/non-off 都使用 select_far_skip，不是 Graph workspace pool"
+    },
+    {
+      "name": "generic_serial_overlap_decode_indexed_bypasses_pool",
+      "passed": true,
+      "evidence": "非 compact generic B=1 的 serial/overlap 走 decode_indexed，不经过 PR10 Graph pool"
+    },
+    {
+      "name": "base_32k_pool_still_unreachable",
+      "passed": true,
+      "evidence": "原 32K ABBA 全部 36 层 non-skip；即使新 main 扩展 non-off pool 路由，该主表仍无 far-off workspace"
+    },
+    {
+      "name": "pr_head_file_replacement_would_remove_origin_routes",
+      "passed": true,
+      "evidence": "PR-head far_skip_graph.py 不含 55ccfb3 的 ordered/operator 路由；整文件替换会回退新 main 功能，须按补丁重基"
+    },
+    {
+      "name": "no_origin_main_e2e_measurement_claim",
+      "passed": true,
+      "evidence": "没有 55ccfb3 ABBA/TPOT 新采数；本补记只作静态可达性判决"
+    }
+  ],
+  "assertion_summary": {
+    "passed": 16,
+    "failed": 0
+  }
+}
