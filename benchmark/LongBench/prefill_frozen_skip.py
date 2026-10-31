@@ -1,6 +1,5 @@
 """Paired screen: far eviction, near staging, and prefill-frozen region gates."""
 import argparse
-from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -13,11 +12,12 @@ import torch
 import transformers
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from transformers.cache_utils import DynamicCache
-from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
 from benchmark.LongBench.eval import sample_score
-from sparse_attn.ops.frozen_region_cache import FrozenRegionCache, RegionGeometry
-from sparse_attn.ops.frozen_region_gate import GateConfig, decide_regions, profile_regions
+from sparse_attn.ops.frozen_region_cache import RegionGeometry
+from sparse_attn.ops.frozen_region_gate import GateConfig
+from sparse_attn.ops.frozen_region_runtime import (
+    complete_frozen_request, prefill_frozen_request)
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -62,58 +62,17 @@ def prepare_ids(tokenizer, row, dataset, prompt, context_cap):
                      input_sha256=hashlib.sha256(json.dumps(ids).encode()).hexdigest())
 
 
-@contextmanager
-def capture_profiles(cache, geometry, config):
-    original = ALL_ATTENTION_FUNCTIONS['sdpa']
-    profiles = {}
-    def profiled(module, query, key, value, *args, **kwargs):
-        li = module.layer_idx
-        if not cache.layers[li].frozen:
-            if li in profiles:
-                raise ValueError('multiple prefill chunks unsupported')
-            profiles[li] = profile_regions(query, key, geometry, rows=config.rows,
-                                             scale=kwargs.get("scaling", module.scaling))
-        return original(module, query, key, value, *args, **kwargs)
-    ALL_ATTENTION_FUNCTIONS['sdpa'] = profiled
-    try:
-        yield profiles
-    finally:
-        ALL_ATTENTION_FUNCTIONS['sdpa'] = original
-
-
 @torch.inference_mode()
 @eager_decoding_request_guard()
 def generate(model, tokenizer, ids, max_new_tokens, config, device):
     geometry = RegionGeometry(max_new_tokens=max_new_tokens)
-    cache = FrozenRegionCache(model.config.num_hidden_layers, geometry)
     eos = model.generation_config.eos_token_id
     eos = eos if isinstance(eos, list) else [eos]
-    if getattr(model, '_frozen_tli', False):
-        cache.tli_regions = True
-        for module in model.model.layers:
-            module.self_attn.indexer.clear()
-            module.self_attn.indexer.skip_far = False
     start = time.time()
     with torch.inference_mode():
-        with capture_profiles(cache, geometry, config) as profiles:
-            out = model(torch.tensor([ids], device=device), past_key_values=cache, use_cache=True, logits_to_keep=1)
-        if len(profiles) != model.config.num_hidden_layers:
-            raise ValueError('incomplete native layer profiling')
-        before = cache.report()
-        decisions = {li: decide_regions(p, config,
-                     present_near=cache.layers[li].nodes['near'].size>0,
-                     present_far=cache.layers[li].nodes['far'].size>0) for li,p in profiles.items()}
-        cache.freeze(decisions)
-        after = cache.report()
-        for li, decision in decisions.items():
-            if decision['skip_near'] and not decision['skip_far']:
-                nodes = after['layers'][li]['nodes']
-                if 'near_staging' not in nodes or nodes['near_staging']['attention_visible']:
-                    raise ValueError('near-only must retain invisible staging KV')
-                before_bytes = sum(n['kv_bytes'] for n in before['layers'][li]['nodes'].values())
-                after_bytes = sum(n['kv_bytes'] for n in nodes.values())
-                if before_bytes != after_bytes:
-                    raise ValueError('near-only must not claim a resident KV reduction')
+        out, audit = prefill_frozen_request(
+            model, torch.tensor([ids], device=device), config, geometry)
+        cache = out.past_key_values
         generated = []
         for _ in range(max_new_tokens):
             token = out.logits[:, -1].argmax(-1, keepdim=True)
@@ -124,17 +83,9 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
                         attention_mask=(None if model.config.model_type == 'glm4_moe_lite'
                                         else {'full_attention':None}),
                         use_cache=True, logits_to_keep=1)
-        final = cache.report()
-        receipts = {i: getattr(layer, 'tli_receipt', None) for i,layer in enumerate(cache.layers)}
-        if getattr(model, '_frozen_tli', False) and len(generated)>1 and not all(receipts.values()):
-            raise ValueError('missing real TLI decode receipts')
-    counts = {name:0 for name in ('keep','near','far','both')}
-    for d in decisions.values():
-        counts['both' if d['skip_near'] and d['skip_far'] else 'near' if d['skip_near'] else 'far' if d['skip_far'] else 'keep'] += 1
+        audit = complete_frozen_request(model, cache, len(generated), audit)
     result = dict(generated_ids=generated, prediction=tokenizer.decode(generated, skip_special_tokens=True),
-        generated_tokens=len(generated), wall_seconds=time.time()-start, profiles=profiles,
-        decisions=decisions, gate_counts=counts, tli_receipts=receipts, prefill_full_kv=before,
-        frozen_kv=after, final_kv=final,
+        generated_tokens=len(generated), wall_seconds=time.time()-start, **audit,
         measured_scope='physical node KV storage; eager gather temporaries excluded, no latency claim')
     del out, cache
     return result

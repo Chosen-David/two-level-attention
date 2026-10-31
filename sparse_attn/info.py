@@ -477,6 +477,15 @@ def resolve_treatment_snapshot(args):
                 # 缺失如实记 null——stage_fasa_agreement 的 GATE-FAIL
                 # 在命名侧先拦截，manifest 不重复设防。
                 manifest["fasa_agreement"] = None
+    if getattr(args, "tli_prefill_frozen_regions", False):
+        gate = getattr(args, "_frozen_region_gate", None)
+        geometry = getattr(args, "_frozen_region_geometry", None)
+        if not dataclasses.is_dataclass(gate) or not dataclasses.is_dataclass(geometry):
+            raise ValueError("frozen region treatment requires resolved gate and geometry")
+        manifest["tli_prefill_frozen_regions"] = {
+            "gate": dataclasses.asdict(gate),
+            "geometry": dataclasses.asdict(geometry),
+        }
     manifest_json = json.dumps(manifest, sort_keys=True,
                               ensure_ascii=False, default=str)
     return TreatmentSnapshot(manifest=manifest, manifest_json=manifest_json,

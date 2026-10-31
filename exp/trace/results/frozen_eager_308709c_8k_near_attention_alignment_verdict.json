@@ -1,0 +1,110 @@
+{
+  "schema": "frozen-eager-8k-near-attention-alignment-v1",
+  "code_commit": "308709ca573a94f0c4258cab8dd82af2809369d0",
+  "verdict": "ROOT_CAUSE_CLOSED_ATTENTION_BACKEND_NUMERICAL_DIVERGENCE",
+  "protocol": {
+    "model": "Qwen3-8B BF16",
+    "task": "RULER niah_single_1 row0",
+    "context_length": 8192,
+    "input_tokens": 7881,
+    "max_new_tokens": 8,
+    "decode_steps_compared": 7,
+    "state": "forced-near",
+    "mode": "correctness-only"
+  },
+  "baseline_unaligned": {
+    "report": "/tmp/frozen-eager-355a0ff-trace-8k-near/report.json",
+    "report_sha256": "f8f7c831ffaf1207dcb6a0b4b5cadc8443ff2cedab18704e95bc910577bb45ad",
+    "compared_kv_head_steps": 2016,
+    "selected_logical_id_mismatches": 1889,
+    "mismatched_layers": "1-35",
+    "layer0_mismatches": 0,
+    "all_physical_mappings_valid": true,
+    "reference_selected_kv_total": 293837,
+    "physical_selected_kv_total": 293836,
+    "generated_equal": true
+  },
+  "first_divergence": {
+    "capture": "/tmp/frozen-eager-308709c-8k-near-layer0-attention/intermediates.pt",
+    "capture_sha256": "16d7cc578038b53f462b343dba3a9f7c06e39721f36ff6d7649ed5b7d5f9d027",
+    "wrapper_sha256_record": "/tmp/frozen-eager-308709c-8k-near-layer0-attention/diagnostic_wrapper.sha256",
+    "layer0_step0": {
+      "attention_q_bitexact": true,
+      "scoring_k_tail32_bitexact": true,
+      "ordered_selected_logical_ids_bitexact_all_kv_heads": true,
+      "attention_output_different_elements": 1165,
+      "attention_output_elements": 4096,
+      "attention_output_max_abs": 0.0009765625
+    },
+    "layer1_step0": {
+      "attention_q_bitexact": false,
+      "attention_q_max_abs": 0.0625,
+      "scoring_q_max_abs": 0.00390625,
+      "scoring_k_tail32_bitexact": false,
+      "ordered_selected_logical_ids_bitexact_all_kv_heads": false
+    },
+    "backend_routing": {
+      "visible_kv_tokens": 3776,
+      "reference": "eager_decoding_attn T<16384 routes to full-visible dense torch attention",
+      "physical": "eager_decoding_attn_physical routes to compact Triton online-softmax attention"
+    }
+  },
+  "count_difference_mechanism": {
+    "capture": "/tmp/frozen-eager-308709c-8k-near-intermediates-topk/intermediates.pt",
+    "capture_sha256": "30689e7efc2d50fee06cd35821c68f47fd9eea9ac9d337e0c34f2f5daa9e6cac",
+    "mechanism": "mid top-k includes sink positions 0-3 and final forced-sink union deduplicates them; different probabilities change the number of duplicated sink selections",
+    "layer5_step6_head2": {
+      "reference_sink_duplicates": 2,
+      "physical_sink_duplicates": 3,
+      "reference_count": 1022,
+      "physical_count": 1021
+    },
+    "layer26_step5_head2": {
+      "reference_sink_duplicates": 4,
+      "physical_sink_duplicates": 3,
+      "reference_count": 1020,
+      "physical_count": 1021
+    }
+  },
+  "controlled_attention_alignment": {
+    "wrapper": "/tmp/run_frozen_aligned_attention_diagnostic.py",
+    "wrapper_sha256_record": "/tmp/frozen-eager-308709c-trace-8k-near-aligned-attention/diagnostic_wrapper.sha256",
+    "report": "/tmp/frozen-eager-308709c-trace-8k-near-aligned-attention/report.json",
+    "report_sha256": "cb0082fb2d1fefb32b8f2e1b7261e56bcb8aa71d37d9cc1c61786d1a3bb5d149",
+    "intervention": "only reference attention consumption is replaced by the same compact Triton kernel; reference and physical selectors are unchanged",
+    "aligned_reference_attention_calls": 252,
+    "compared_layers": 36,
+    "compared_layer_steps": 252,
+    "compared_kv_head_steps": 2016,
+    "selected_logical_id_mismatches": 0,
+    "all_selected_logical_ids_equal": true,
+    "all_physical_mappings_valid": true,
+    "layer_output_max_abs": 0.0,
+    "logits_max_abs": 0.0,
+    "reference_selected_kv_total": 293836,
+    "physical_selected_kv_total": 293836,
+    "generated_equal": true
+  },
+  "gpu_hygiene": {
+    "first_divergence": {
+      "status": "clean",
+      "locked_gpu": 0,
+      "unique_active_pids": [1364034],
+      "post_memory_mib": 1,
+      "post_compute_processes": 0
+    },
+    "controlled_attention_alignment": {
+      "status": "clean",
+      "locked_gpu": 0,
+      "unique_active_pids": [1414772],
+      "post_memory_mib": 1,
+      "post_compute_processes": 0
+    }
+  },
+  "conclusion": "原始未对齐两臂的 selected-ID parity 仍为 FAIL，但受控实验证明差异源自 attention backend 数值分叉向上游层传播；不是 Far 索引、selected-ID 展开或 logical-to-physical 映射错误。对齐 backend 后选择、层输出、logits 和聚合计数全部 bit-exact。",
+  "scope": [
+    "仅覆盖该 Qwen3-8B 8K forced-near 请求，不外推其他长度、状态、模型或 dense 质量。",
+    "诊断 wrapper 均在 /tmp，未修改生产 selector、attention 或 cache，不构成生产修复或性能证据。",
+    "不据此宣称原始不同 backend 的全模型逐步数值 equivalence，也不改变既有 TPOT、显存或质量判决。"
+  ]
+}

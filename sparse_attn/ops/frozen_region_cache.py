@@ -7,6 +7,7 @@ backup is retained. This exploration does not implement TLI selection,
 CUDA graphs, batching, offload, rewind, or beam search.
 """
 from dataclasses import dataclass
+import os
 import torch
 from transformers.cache_utils import Cache, CacheLayerMixin
 
@@ -43,6 +44,7 @@ class KVNode:
         self.head = self.size = 0
         self.next = None
         self.attention_visible = True
+        self.arena_offset = None
 
     def append(self, keys, values, positions):
         n = keys.shape[-2]
@@ -74,6 +76,31 @@ class KVNode:
         self.head = (self.head+1) % self.capacity
         self.size -= 1
 
+    def pop_many(self, n):
+        """按时间顺序批量弹出前缀；仅在跨环边界时拼接本次弹出的 KV。"""
+        if not 0 <= n <= self.size:
+            raise ValueError('invalid prefix pop count')
+        if not n:
+            return None
+        first = min(n, self.capacity-self.head)
+        keys = self.keys[..., self.head:self.head+first, :]
+        values = self.values[..., self.head:self.head+first, :]
+        positions = self.positions[self.head:self.head+first]
+        if first < n:
+            keys = torch.cat((keys, self.keys[..., :n-first, :]), -2)
+            values = torch.cat((values, self.values[..., :n-first, :]), -2)
+            positions += self.positions[:n-first]
+        self.positions[self.head:self.head+first] = [None]*first
+        if first < n:
+            self.positions[:n-first] = [None]*(n-first)
+        self.head = (self.head+n) % self.capacity
+        self.size -= n
+        return keys, values, positions
+
+    @property
+    def first_position(self):
+        return self.positions[self.head] if self.size else None
+
     def read(self):
         if self.head+self.size <= self.capacity:
             return (self.keys[..., self.head:self.head+self.size, :],
@@ -101,6 +128,8 @@ class RegionCacheLayer(CacheLayerMixin):
         self.frozen = False
         self.skip_far = self.skip_near = False
         self.permanently_dropped = 0
+        self.arena_k = self.arena_v = None
+        self.arena_offsets = {}
 
     def lazy_initialization(self, key_states):
         pass  # Shape and length are both needed; initialization occurs in update.
@@ -111,7 +140,7 @@ class RegionCacheLayer(CacheLayerMixin):
             node.next = live[i+1] if i+1 < len(live) else None
         self.head = live[0] if live else None
 
-    def freeze(self, skip_near=False, skip_far=False):
+    def freeze(self, skip_near=False, skip_far=False, physical_arena=False):
         if self.frozen:
             if (skip_near, skip_far) != (self.skip_near, self.skip_far):
                 raise ValueError('cannot change frozen request decisions')
@@ -131,6 +160,79 @@ class RegionCacheLayer(CacheLayerMixin):
         self.skip_near, self.skip_far = bool(skip_near), bool(skip_far)
         self.frozen = True
         self._relink()
+        if physical_arena:
+            self._build_physical_arena()
+
+    def _build_physical_arena(self):
+        """freeze 边界一次性搬迁；之后所有区域共享一份定容 K/V 存储。
+
+        节点仍保留独立 FIFO 元数据，但 K/V 变为 arena 视图。逻辑位置到
+        物理槽位由 (arena_offset, head, capacity) 解析，不在 decode 中 gather。
+        """
+        nodes = []
+        node = self.head
+        while node is not None:
+            nodes.append(node)
+            node = node.next
+        total = sum(node.capacity for node in nodes)
+        template = nodes[0].keys
+        self.arena_k = torch.empty(
+            (total, template.shape[1], template.shape[-1]),
+            device=template.device, dtype=template.dtype)
+        self.arena_v = torch.empty_like(self.arena_k)
+        offset = 0
+        for node in nodes:
+            keys, values, positions = node.read()
+            size = node.size
+            node_keys = self.arena_k[offset:offset+node.capacity].permute(1, 0, 2).unsqueeze(0)
+            node_values = self.arena_v[offset:offset+node.capacity].permute(1, 0, 2).unsqueeze(0)
+            node_keys[..., :size, :].copy_(keys)
+            node_values[..., :size, :].copy_(values)
+            node.keys, node.values = node_keys, node_values
+            node.positions = positions + [None]*(node.capacity-size)
+            node.head = 0
+            node.arena_offset = offset
+            self.arena_offsets[node.name] = offset
+            offset += node.capacity
+
+    def logical_positions(self, device=None):
+        """直接在目标设备构造可见逻辑位置，避免 Python list 的 H2D 重传。"""
+        if device is None:
+            device = self.arena_k.device if self.arena_k is not None else self.nodes['sink'].keys.device
+        ranges = []
+        node = self.head
+        while node is not None:
+            if node.size and node.attention_visible:
+                first = node.first_position
+                ranges.append(torch.arange(first, first+node.size, device=device, dtype=torch.int64))
+            node = node.next
+        return torch.cat(ranges)
+
+    def visible_mask(self, positions):
+        """绝对逻辑位置是否属于当前 attention-visible 区域。"""
+        visible = torch.zeros_like(positions, dtype=torch.bool)
+        node = self.head
+        while node is not None:
+            if node.size and node.attention_visible:
+                first = node.first_position
+                visible |= (positions >= first) & (positions < first+node.size)
+            node = node.next
+        return visible
+
+    def physical_positions(self, positions):
+        """绝对逻辑 token ID → arena 槽位；全程 device 端整数运算。"""
+        if self.arena_k is None:
+            raise ValueError('physical arena is not initialized')
+        physical = torch.zeros_like(positions)
+        node = self.head
+        while node is not None:
+            if node.size and node.attention_visible:
+                first = node.first_position
+                in_node = (positions >= first) & (positions < first+node.size)
+                slots = node.arena_offset + (node.head+positions-first) % node.capacity
+                physical = torch.where(in_node, slots, physical)
+            node = node.next
+        return physical
 
     def update(self, keys, values, cache_kwargs=None):
         if keys.shape != values.shape or keys.ndim != 4 or keys.shape[0] != 1:
@@ -158,6 +260,20 @@ class RegionCacheLayer(CacheLayerMixin):
             self.logical_length = self.prompt_length = n
             self._relink()
             return keys, values  # Dense prefill sees original, complete K/V.
+        self._append_decode(keys, values, n)
+        k, v, _ = self.gather()
+        return k, v
+
+    def append_decode(self, keys, values):
+        """热路径单 token 追加：不构造可见 K/V，也不读取 GPU 位置元数据。"""
+        if (keys.shape != values.shape or keys.ndim != 4 or keys.shape[0] != 1
+                or keys.shape[-2] != 1):
+            raise ValueError('physical decode requires equal-width B1 single-token K/V')
+        if torch.is_grad_enabled() and (keys.requires_grad or values.requires_grad):
+            raise ValueError('inference-only cache')
+        self._append_decode(keys, values, 1)
+
+    def _append_decode(self, keys, values, n):
         if not self.frozen or n != 1:
             raise ValueError('freeze after one-shot prefill; decode must be one token')
         if self.logical_length-self.prompt_length >= self.geometry.max_new_tokens:
@@ -167,14 +283,14 @@ class RegionCacheLayer(CacheLayerMixin):
         _, new_far_hi, _ = self.geometry.bounds(new_length)
         near = self.nodes.get('near') or self.nodes.get('near_staging')
         far = self.nodes.get('far')
-        if near is not None:
-            while near.size and near.peek()[2] < new_far_hi:
-                old_k, old_v, old_pos = near.peek()
+        if near is not None and near.size:
+            aged = min(near.size, max(0, new_far_hi-near.first_position))
+            if aged:
+                old_k, old_v, old_positions = near.pop_many(aged)
                 if far is not None:
-                    far.append(old_k, old_v, [old_pos])
+                    far.append(old_k, old_v, old_positions)
                 else:
-                    self.permanently_dropped += 1
-                near.pop()
+                    self.permanently_dropped += aged
         if position < self.geometry.sink:
             self.nodes['sink'].append(keys, values, [position])
         else:
@@ -188,8 +304,6 @@ class RegionCacheLayer(CacheLayerMixin):
                 swa.pop()
             swa.append(keys, values, [position])
         self.logical_length = new_length
-        k, v, _ = self.gather()
-        return k, v
 
     def gather(self):
         keys, values, positions = [], [], []
@@ -237,12 +351,15 @@ class RegionCacheLayer(CacheLayerMixin):
 class FrozenRegionCache(Cache):
     def __init__(self, n_layers, geometry=RegionGeometry()):
         super().__init__(layers=[RegionCacheLayer(geometry) for _ in range(n_layers)])
+        self.tli_regions = False
 
     def freeze(self, decisions):
         if set(decisions) != set(range(len(self.layers))):
             raise ValueError('every layer must have a prefill decision')
+        physical = (self.tli_regions and
+                    os.environ.get('TLI_FROZEN_EAGER_REFERENCE', '0') != '1')
         for li, layer in enumerate(self.layers):
-            layer.freeze(**decisions[li])
+            layer.freeze(**decisions[li], physical_arena=physical)
 
     def report(self):
         reports = [layer.report() for layer in self.layers]

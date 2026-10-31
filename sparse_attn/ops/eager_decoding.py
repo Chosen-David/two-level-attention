@@ -676,6 +676,63 @@ def _eager_gather_triton(q, k, v, m0, per_qh, G, W_upper,
     return o[None, None]
 
 
+def eager_decoding_attn_physical(q, k, v, indices, counts, softmax_scale=None):
+    """按物理槽位 ID 直接执行 B1 共享选择 attention。
+
+    q 为 [1,1,H,D]，arena K/V 为 [T,Hkv,D]，indices 为 [Hkv,W]。
+    不构造可见 KV，也不经过全宽 mask expand/topk；GPU 与 CPU 回退都只
+    读取最终选中集。计数和 ID 契约错误写入既有请求级错误标志。
+    """
+    if (q.ndim != 4 or tuple(q.shape[:2]) != (1,1) or k.ndim != 3
+            or v.shape != k.shape or indices.ndim != 2 or counts.ndim != 1
+            or indices.shape[0] != k.shape[1] or counts.shape[0] != k.shape[1]
+            or q.shape[-2] % k.shape[1] or q.shape[-1] != k.shape[-1]
+            or indices.shape[-1] < 1):
+        raise ValueError('physical attention requires B1 Q, arena K/V and shared-head IDs')
+    if softmax_scale is None:
+        softmax_scale = k.shape[-1] ** -0.5
+    Hkv,W = indices.shape
+    H,D = q.shape[-2:]
+    G = H//Hkv
+    T = k.shape[0]
+    dev = q.device
+    counts = counts.to(torch.int32)
+    valid = torch.arange(W,device=dev)[None] < counts[:,None]
+    safe = indices.clamp(0,max(0,T-1)).to(torch.int32)
+    if (dev.type == 'cuda' and _HAS_TRITON and _EAGER_TRITON_OK['ok']
+            and (D & (D-1)) == 0 and k.stride(-1) == 1
+            and _triton_kv_layout_compatible(k,v)):
+        flag = _err_flag(dev)
+        code = torch.where(
+            counts.min() > 0,
+            torch.where(counts.max() <= W,flag.new_zeros(()),flag.new_full((),2)),
+            flag.new_full((),1))
+        bad_ids = (valid & ((indices < 0) | (indices >= T))).any()
+        code = torch.where(bad_ids,flag.new_full((),4),code)
+        flag.copy_(torch.maximum(flag,code))
+        qs = (q[0,0]*softmax_scale).to(torch.float32)
+        if qs.stride(-1) != 1:
+            qs = qs.contiguous()
+        o = torch.empty((H,D),device=dev,dtype=q.dtype)
+        try:
+            _eager_attn_kernel[(H,)](
+                safe,counts,qs,k,v,o,
+                k.stride(0),k.stride(1),qs.stride(0),o.stride(0),
+                G=G,D=D,PER_QH=False,BW=256,W=W,num_warps=4)
+            return o[None,None]
+        except Exception:
+            _EAGER_TRITON_OK['ok'] = False
+    head_ids = torch.arange(Hkv,device=dev)[:,None]
+    gk = k[safe.long(),head_ids]
+    gv = v[safe.long(),head_ids]
+    b_q = rearrange(q[0,0]*softmax_scale,'(h g) d -> h g d',g=G).to(torch.float32)
+    b_s = einsum(b_q,gk.to(torch.float32),'h g d, h w d -> h g w')
+    b_s = torch.where(valid[:,None],b_s,float('-inf'))
+    b_p = F.softmax(b_s,dim=-1).to(q.dtype)
+    b_o = rearrange(einsum(b_p,gv,'h g w, h w d -> h g d'),'h g d -> (h g) d')
+    return b_o[None,None]
+
+
 if _HAS_TRITON:
 
     def _eager_gather_triton_batch(q, k, v, m0, per_qh, G, W_upper,

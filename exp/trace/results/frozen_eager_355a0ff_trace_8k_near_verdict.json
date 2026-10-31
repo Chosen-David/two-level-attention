@@ -1,0 +1,66 @@
+{
+  "verdict": "8K_NEAR_SELECTED_LOGICAL_ID_PARITY_FAIL_FINAL_COUNT_DIFFERENCE_LOCALIZED",
+  "code_commit": "355a0fffff7cf453d4af09a0b27a4b60c8839740",
+  "evidence_root": "/tmp/frozen-eager-355a0ff-trace-8k-near",
+  "protocol": {
+    "model": "Qwen3-8B BF16",
+    "task": "RULER niah_single_1 row 0",
+    "context_length": 8192,
+    "input_tokens": 7881,
+    "max_new": 8,
+    "decode_steps": 7,
+    "state": "near",
+    "mode": "correctness only; no TPOT or profiler arm",
+    "trace": "per-step per-layer per-KV-head final selected logical IDs; physical arm also records consumed physical IDs and logical-to-physical mapping validation"
+  },
+  "correctness": {
+    "decisions_equal": true,
+    "generated_equal": true,
+    "generated_ids": [220, 17, 16, 21, 21, 24, 19, 16],
+    "layer_output_max_abs": 2.875,
+    "logits_max_abs": 0.25,
+    "compared_layers": 36,
+    "compared_steps": 252,
+    "compared_kv_head_steps": 2016,
+    "selected_logical_id_mismatch_count": 1889,
+    "all_selected_logical_ids_equal": false,
+    "all_physical_mappings_valid": true,
+    "differing_id_regions": {"far": 14144},
+    "count_mismatches": [
+      {"layer_idx": 5, "decode_step": 6, "kv_head": 2, "reference_count": 1022, "physical_count": 1021},
+      {"layer_idx": 26, "decode_step": 5, "kv_head": 2, "reference_count": 1020, "physical_count": 1021}
+    ],
+    "final_step_aggregate_difference": {
+      "reference_selected_kv_total": 293837,
+      "physical_selected_kv_total": 293836,
+      "difference": -1,
+      "localized_to": {"layer_idx": 5, "decode_step": 6, "kv_head": 2, "reference_count": 1022, "physical_count": 1021}
+    },
+    "interpretation": "Generated-token equality does not imply selected-support equality. The old aggregate difference of one is exactly the final-step layer-5 KV-head-2 difference. A separate nonfinal count difference occurs at layer 26 step 5. Most mismatches preserve counts but replace Far IDs, so aggregate selected-KV counts are not an identity check.",
+    "scope": "This is a decisive selected-ID parity failure for the 8K forced-near pair only. It does not by itself quantify other states or lengths, dense quality, production TPOT, or resident-KV savings."
+  },
+  "independent_validation": {
+    "pass": 10,
+    "fail": 0,
+    "checks": "36 layers and 7 steps per arm; 2016 head-step comparisons; ragged ID/count/padding consistency; all physical mappings valid; mismatch and region totals; both count differences; old final totals and generated IDs reproduced"
+  },
+  "gpu_hygiene": {
+    "status": "start_end_clean_no_active_pid_sample",
+    "gpu": "pc33 GPU0 with CUDA_VISIBLE_DEVICES=0",
+    "start": "1 MiB and no compute apps; empty-GPU gate passed",
+    "monitor": "30-second sideband loop was active, but the short run produced only the initial 1 MiB sample and no active-PID sample",
+    "post": "GPU0 returned to 1 MiB with no compute apps",
+    "limitation": "No mid-run process sample exists; do not upgrade this to the fully sampled clean status used by the longer performance runs. No timing claim is made from this correctness run."
+  },
+  "raw_evidence_sha256": {
+    "report.json": "f8f7c831ffaf1207dcb6a0b4b5cadc8443ff2cedab18704e95bc910577bb45ad",
+    "protocol.json": "ec0c5e8de820196ed6908b62f4c6cf6ef06fe906afcaf0345e1fab24d118ab16",
+    "stdout.log": "0f18bdf39480198d0d62138c6bff2684975dedee57841efdaaa1b1aa920209b0",
+    "gpu_monitor.log": "3c45302607a76344e9861667e2d5476666c1e86967cedd5c37b6291ca1880736",
+    "post_gpu.log": "04db9157fc4d0155818a0503e92076ed02bff8e61bdb02cb137b109562c521d7",
+    "code_commit.txt": "e0926acf0ff6c98e828d081554b042136fd8f00b173828847aa1e90fda647aa6",
+    "exit_code.txt": "bde294368bfed77c2cddf8cec271d398aee9cdbab3b26e1059281bd33adb0120",
+    "analysis_summary.json": "fdb10fbafd3371fc2507123855538746881452a3c7d87179545c3bda81c210e4",
+    "validation.json": "1dfa0eb89480f5fe7cd2c34129e83e43b3be90b68cdd0b728bac561592581036"
+  }
+}

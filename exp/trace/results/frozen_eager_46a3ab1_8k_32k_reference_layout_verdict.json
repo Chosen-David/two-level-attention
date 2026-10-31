@@ -1,0 +1,130 @@
+{
+  "schema": "frozen-eager-reference-layout-8k-32k-v1",
+  "code_commit": "46a3ab13147228efbbbed6ed3da10f74b9277cda",
+  "validated_base_commit": "2ee5415f93f01e23cf2041b1b22343c580ae7aee",
+  "validated_patch_sha256": "c5d492e6d3a3b05e3df874d42f30665b1d71a17f3d154ffba359ef268d6c15a2",
+  "verdict": "PASS_8K_32K_FOUR_STATE_SELECTED_ID_AND_OUTPUT_PARITY_AFTER_REFERENCE_LAYOUT_SCORER_FIX",
+  "protocol": {
+    "model": "Qwen3-8B BF16",
+    "task": "RULER niah_single_1 row0",
+    "context_lengths": [8192, 32768],
+    "input_tokens": {"8192": 7881, "32768": 32612},
+    "max_new_tokens": 8,
+    "decode_steps_compared_per_state": 7,
+    "states": ["keep", "far", "near", "both"],
+    "mode": "correctness-only",
+    "attention_intervention": "诊断 wrapper 仅将 reference attention 消费端替换为与 physical 相同的 compact Triton kernel；cache 逻辑不变",
+    "production_selector_fix": "keep/near 使用与全宽 reference 同归约的 candidate Triton scorer；far 使用与 reference 相同的展开 GQA einops 布局",
+    "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+    "wrapper": "/tmp/run_frozen_candidate_score_diagnostic.py",
+    "wrapper_sha256": "174ef8059586b514a08749ad92f07520831b88d4d6019aeaf0501e2261c9634f"
+  },
+  "baseline_32k_before_selector_fix": {
+    "code_commit": "1304470db0b5aff18596f9093c1e08356534c415",
+    "report": "/tmp/frozen-eager-308709c-trace-32k-four-state-aligned-attention/report.json",
+    "report_sha256": "979a013180c77e65da3bd126a17b75aaed66704749c418988488c11405451f82",
+    "selected_logical_id_mismatches": {"keep": 40, "far": 8, "near": 0, "both": 0},
+    "layer_output_max_abs": {"keep": 0.5, "far": 0.125, "near": 0.0, "both": 0.0},
+    "logits_max_abs": {"keep": 0.125, "far": 0.125, "near": 0.0, "both": 0.0}
+  },
+  "candidate_triton_only_iteration": {
+    "report": "/tmp/frozen-eager-2ee5415-cand-score-ruler32k-four-state-aligned-attention/report.json",
+    "report_sha256": "430e9e603ea9589473f450a818e72ed6ef8070217678682ca43932ee497b1a74",
+    "selected_logical_id_mismatches": {"keep": 0, "far": 8, "near": 0, "both": 0},
+    "conclusion": "同源 candidate Triton 闭合 keep，但 far 的 8 个 mismatch 记录与修复前完全相同，不能据此宣称四态通过。"
+  },
+  "far_root_cause": {
+    "capture": "/tmp/frozen-eager-2ee5415-cand-score-ruler32k-far-selector-intermediates/intermediates.pt",
+    "capture_sha256": "eca763019044d4d1809f0aa7aa7abde15ce025e012c6160d7e1131aeef1b6593",
+    "capture_reproduced_mismatch_count": 8,
+    "target": "layer34 decode_step5",
+    "reference_path": "einops h d, kt h d -> h kt，K 为展开 GQA 布局",
+    "physical_candidate_output_shape": [32, 2308],
+    "native_gpu_replay": "/tmp/frozen-eager-far-reference-layout-replay-v2/stdout.log",
+    "replay_script_sha256": "2ebcd5786dfc15d44b939831d09cc9bddf052daeec86e66aa67389f290e45d12",
+    "candidate_triton": {
+      "probability_bitexact": false,
+      "probability_max_abs": 0.0009765625,
+      "topk_set_symmetric_difference": 4
+    },
+    "compact_einsum": {
+      "probability_bitexact": false,
+      "probability_max_abs": 0.0009765625,
+      "topk_set_symmetric_difference": 4
+    },
+    "reference_layout_einsum": {
+      "probability_bitexact": true,
+      "probability_max_abs": 0.0,
+      "topk_ordered_bitexact": true,
+      "topk_set_symmetric_difference": 0
+    },
+    "head5_reference_only_before_fix": [31380, 31397],
+    "head5_physical_only_before_fix": [31186, 31445]
+  },
+  "final_evidence": {
+    "32768": {
+      "report": "/tmp/frozen-eager-2ee5415-reference-layout-ruler32k-four-state/report.json",
+      "report_sha256": "add772d270395378342fd484c79a761ff98c1fa95862ee9a03f0d6cf770c6b7f",
+      "input_sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+      "aligned_reference_attention_calls": 1008,
+      "physical_candidate_score_calls": 504,
+      "physical_candidate_score_successes": 504,
+      "states": {
+        "keep": {"selected_logical_id_mismatches": 0, "compared_kv_head_steps": 2016, "all_physical_mappings_valid": true, "layer_output_max_abs": 0.0, "logits_max_abs": 0.0, "generated_equal": true, "reference_selected_kv_total": 294118, "physical_selected_kv_total": 294118},
+        "far": {"selected_logical_id_mismatches": 0, "compared_kv_head_steps": 2016, "all_physical_mappings_valid": true, "layer_output_max_abs": 0.0, "logits_max_abs": 0.0, "generated_equal": true, "reference_selected_kv_total": 294912, "physical_selected_kv_total": 294912},
+        "near": {"selected_logical_id_mismatches": 0, "compared_kv_head_steps": 2016, "all_physical_mappings_valid": true, "layer_output_max_abs": 0.0, "logits_max_abs": 0.0, "generated_equal": true, "reference_selected_kv_total": 294051, "physical_selected_kv_total": 294051},
+        "both": {"selected_logical_id_mismatches": 0, "compared_kv_head_steps": 2016, "all_physical_mappings_valid": true, "layer_output_max_abs": 0.0, "logits_max_abs": 0.0, "generated_equal": true, "reference_selected_kv_total": 38016, "physical_selected_kv_total": 38016}
+      }
+    },
+    "8192": {
+      "report": "/tmp/frozen-eager-2ee5415-reference-layout-ruler8k-four-state/report.json",
+      "report_sha256": "3026c7eea7ebc538a297eaed84fe7d0dd0a32209298d0cf27caad6ca9762a971",
+      "input_sha256": "17f398a32d66f3494cee23760c2ff8e7f5521bfdbfbbe786ee6e97b02e0e574b",
+      "aligned_reference_attention_calls": 1008,
+      "physical_candidate_score_calls": 504,
+      "physical_candidate_score_successes": 504,
+      "states": {
+        "keep": {"selected_logical_id_mismatches": 0, "compared_kv_head_steps": 2016, "all_physical_mappings_valid": true, "layer_output_max_abs": 0.0, "logits_max_abs": 0.0, "generated_equal": true, "reference_selected_kv_total": 293912, "physical_selected_kv_total": 293912},
+        "far": {"selected_logical_id_mismatches": 0, "compared_kv_head_steps": 2016, "all_physical_mappings_valid": true, "layer_output_max_abs": 0.0, "logits_max_abs": 0.0, "generated_equal": true, "reference_selected_kv_total": 294912, "physical_selected_kv_total": 294912},
+        "near": {"selected_logical_id_mismatches": 0, "compared_kv_head_steps": 2016, "all_physical_mappings_valid": true, "layer_output_max_abs": 0.0, "logits_max_abs": 0.0, "generated_equal": true, "reference_selected_kv_total": 293836, "physical_selected_kv_total": 293836},
+        "both": {"selected_logical_id_mismatches": 0, "compared_kv_head_steps": 2016, "all_physical_mappings_valid": true, "layer_output_max_abs": 0.0, "logits_max_abs": 0.0, "generated_equal": true, "reference_selected_kv_total": 38016, "physical_selected_kv_total": 38016}
+      }
+    }
+  },
+  "aggregate": {
+    "lengths_passed": 2,
+    "states_passed_per_length": 4,
+    "total_kv_head_steps": 16128,
+    "total_selected_logical_id_mismatches": 0,
+    "all_physical_mappings_valid": true,
+    "all_decode_layer_outputs_bitexact": true,
+    "all_decode_logits_bitexact": true,
+    "all_generated_tokens_equal": true,
+    "all_reported_aggregate_selected_kv_totals_equal": true,
+    "all_instrumented_candidate_triton_calls_succeeded": true
+  },
+  "tests": {
+    "command": "pytest test_frozen_region_tli.py test_frozen_region_runtime.py test_frozen_region_cache.py test_qwen_frozen_eager_bench.py",
+    "passed": 64,
+    "failed": 0,
+    "python_py_compile": true,
+    "git_diff_check": true
+  },
+  "gpu_hygiene": {
+    "32k_final": {"status": "clean", "locked_gpu": 0, "unique_active_pids": [2005339], "monitor_gpu0_samples": 113, "post_memory_mib": 1, "post_compute_processes": 0},
+    "8k_final": {"status": "clean", "locked_gpu": 0, "unique_active_pids": [2042176], "monitor_gpu0_samples": 60, "post_memory_mib": 1, "post_compute_processes": 0},
+    "far_capture": {"status": "clean", "locked_gpu": 0, "unique_active_pids": [1918587], "post_memory_mib": 1, "post_compute_processes": 0}
+  },
+  "excluded_runs": [
+    {
+      "path": "/tmp/frozen-eager-2ee5415-cand-score-trace-32k-four-state-aligned-attention",
+      "reason": "误用 12-token 测试 fixture；protocol input_tokens=12，不是正式 32K 请求，已标记 INVALID，不参与任何结论。"
+    }
+  ],
+  "scope": [
+    "PASS 仅覆盖该 Qwen3-8B 请求在 8K/32K、attention backend 对齐后的四态选择、物理映射和逐步输出 parity。",
+    "不宣称原始 dense-torch 与 compact-Triton 不同 attention backend 的数值等价，不外推 64K/128K、其他请求、模型或 dense 质量。",
+    "本次只修改 physical selector 的 fine-score 归约布局；不据此宣称 TPOT、显存或生产加速收益。",
+    "诊断 wrapper 和原生重放脚本均在 /tmp，不属于生产 oracle；生产修复提交为 46a3ab1。"
+  ]
+}

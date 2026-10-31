@@ -9,7 +9,7 @@ import argparse
 import os
 import torch
 from sparse_attn.arguments import add_sparse_attn_args
-from .eager_decoding import eager_decoding_attn
+from .eager_decoding import eager_decoding_attn, eager_decoding_attn_physical
 
 
 def tli_args(subspace='tail'):
@@ -38,7 +38,9 @@ def region_mask(indexer, q, k, positions, length, scale):
         raise ValueError(
             'frozen reference supports shared-head tail TLI or GLM D=256 NoPE64 only')
     dims = idx._subspace_indices(k.device)
-    ids = torch.tensor(positions, device=k.device, dtype=torch.long)
+    ids = (positions.to(device=k.device, dtype=torch.long)
+           if torch.is_tensor(positions) else
+           torch.tensor(positions, device=k.device, dtype=torch.long))
     bs = idx.args.tia_block_size
     padded = (length+bs-1)//bs*bs
     projected = k.new_zeros((1,padded,k.shape[2],dims.numel()))
@@ -69,17 +71,72 @@ def region_mask(indexer, q, k, positions, length, scale):
         scorer='TLIIndexer.compute_score',selector='TLIIndexer.compute_mask')
 
 
+def _capture_decode_trace(cache, layer, receipt, mask, positions, width,
+                          physical_ids=None):
+    """仅在 correctness 模式保留当步实际支持集；默认路径不做额外张量运算。"""
+    if not getattr(cache, 'decode_trace_enabled', False):
+        return
+    from .frozen_region_selector import _candidate_ids
+    ids = (positions.to(device=mask.device, dtype=torch.long)
+           if torch.is_tensor(positions) else
+           torch.tensor(positions, device=mask.device, dtype=torch.long))
+    cu = torch.tensor([0,ids.numel()],device=mask.device,dtype=torch.int32)
+    offsets,valid,_ = _candidate_ids(mask[0,0].contiguous(),width,cu)
+    safe = offsets.clamp(0,max(0,ids.numel()-1))
+    logical = torch.where(valid,ids[safe],torch.full_like(ids[safe],-1))
+    entry = dict(receipt)
+    entry.update(decode_step=layer.logical_length-layer.prompt_length-1,
+                 selected_logical_ids=logical)
+    if physical_ids is not None:
+        expected = layer.physical_positions(logical.clamp(min=0))
+        mapping_valid = ((expected == physical_ids.long()) | ~valid).all()
+        entry.update(selected_physical_ids=physical_ids,
+                     physical_mapping_matches=mapping_valid)
+    entries = getattr(layer, 'tli_decode_trace', None)
+    if entries is None:
+        entries = layer.tli_decode_trace = []
+    entries.append(entry)
+
+
 def decode(module,q,k,v,cache,cache_position):
     layer = cache.layers[module.layer_idx]
     if q.shape[:1] != (1,) or q.shape[-2] != 1 or not layer.frozen:
         raise ValueError('frozen TLI requires frozen B1 single-token decode')
-    k,v = cache.update(k,v,module.layer_idx,dict(cache_position=cache_position))
-    positions = layer.gather()[2]
-    q,k,v = (x.transpose(1,2).contiguous() for x in (q,k,v))
     idx = module.indexer
+    geometry = layer.geometry
+    if (idx.sink_tokens != geometry.sink or idx.sliding_window_size != geometry.window
+            or idx.nt_near_len != geometry.near or idx.args.tia_block_size != geometry.page):
+        raise ValueError('frozen TLI geometry and physical cache geometry differ')
+    if layer.arena_k is None:
+        k,v = cache.update(k,v,module.layer_idx,dict(cache_position=cache_position))
+        positions = layer.gather()[2]
+        q,k,v = (x.transpose(1,2).contiguous() for x in (q,k,v))
+    else:
+        layer.append_decode(k,v)
+        q = q.transpose(1,2)
     idx.skip_far = layer.skip_far
-    mask,receipt = region_mask(idx,q,k,positions,layer.logical_length,module.scaling)
-    receipt.update(skip_near=layer.skip_near,skip_far=layer.skip_far)
+    if layer.arena_k is None:
+        mask,receipt = region_mask(idx,q,k,positions,layer.logical_length,module.scaling)
+    else:
+        from .frozen_region_selector import region_mask_physical
+        selection = {}
+        mask,receipt = region_mask_physical(idx,q,layer,module.scaling,selection)
+        receipt.update(skip_near=layer.skip_near,skip_far=layer.skip_far,
+                       physical_arena=True)
+        layer.tli_receipt = receipt
+        _capture_decode_trace(
+            cache,layer,receipt,mask,layer.logical_positions(q.device),
+            min(layer.logical_length,idx.args.tia_level2_topk),
+            selection['physical_ids'])
+        return eager_decoding_attn_physical(
+            q,layer.arena_k,layer.arena_v,
+            selection['physical_ids'],selection['physical_counts'],
+            softmax_scale=module.scaling)
+    receipt.update(skip_near=layer.skip_near,skip_far=layer.skip_far,
+                   physical_arena=False)
     layer.tli_receipt = receipt
+    _capture_decode_trace(
+        cache,layer,receipt,mask,positions,
+        min(layer.logical_length,idx.args.tia_level2_topk))
     cu = torch.tensor([0,len(positions)],device=k.device,dtype=torch.int32)
     return eager_decoding_attn(q,k,v,mask,1,cu,softmax_scale=module.scaling)
