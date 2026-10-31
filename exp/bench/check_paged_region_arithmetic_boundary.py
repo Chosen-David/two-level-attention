@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 from sparse_attn.ops import eager_decoding as eager
 from sparse_attn.ops.paged_region_cache import PagedRegionLayer
-from sparse_attn.ops.frozen_region_cache import RegionGeometry
+from sparse_attn.ops.region_geometry import RegionGeometry
 from sparse_attn.ops.paged_region_kernels import paged_attention,ring_rounds_probabilities
 
 @torch.inference_mode()

@@ -248,14 +248,12 @@ def inspect_treatments(plan):
     from sparse_attn.arguments import add_sparse_attn_args
     from sparse_attn.info import (get_method_name_with_info, get_treatment_manifest_json,
                                   resolve_treatment_snapshot, truncate_output_name_keep_hash)
-    from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
     output = {}
     for job in plan['jobs']:
         if job['blocked']:
             continue
         parser = add_sparse_attn_args(argparse.ArgumentParser())
         args = parser.parse_args(job['flags'])
-        resolve_far_skip_modes(args, config=SimpleNamespace(**read(Path(plan['manifest']['model_path']) / 'config.json')))
         snapshot = resolve_treatment_snapshot(args) if args.method == 'tli' else None
         method = get_method_name_with_info(args, snapshot)
         prefix = job['task'].split('-')[0]

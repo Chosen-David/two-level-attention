@@ -10,7 +10,7 @@ import torch
 
 from benchmark.RULER import pred_ruler
 from sparse_attn.info import get_treatment_manifest_json, resolve_treatment_snapshot
-from sparse_attn.ops.frozen_region_cache import RegionGeometry
+from sparse_attn.ops.region_geometry import RegionGeometry
 from sparse_attn.ops.frozen_region_gate import GateConfig
 
 
@@ -190,7 +190,6 @@ def _run_ruler_main(monkeypatch, tmp_path, complete):
     # RoPE 的频率/旋转验证由 test_rope_policy 独立覆盖；此处只测 frozen 请求边界。
     monkeypatch.setattr('benchmark.rope_policy.verify_runtime_rope',
                         lambda model_or_config: {'status': 'verified'})
-    monkeypatch.setattr(pred_ruler, 'resolve_far_skip_modes', lambda *a, **k: None)
     monkeypatch.setattr(pred_ruler, 'resolve_treatment_snapshot', lambda args: None)
     monkeypatch.setattr(pred_ruler, 'get_method_name_with_info', lambda *a: 'frozen_contract')
     monkeypatch.setattr(pred_ruler, 'get_treatment_manifest_json', lambda *a: '{}')

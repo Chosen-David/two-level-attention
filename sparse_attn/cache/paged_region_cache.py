@@ -7,7 +7,7 @@ Allocator-reserved memory is not reported as freed driver memory. Eager B1 only.
 import heapq
 import torch
 from transformers.cache_utils import Cache, CacheLayerMixin
-from .frozen_region_cache import RegionGeometry
+from ..ops.region_geometry import RegionGeometry
 
 
 class PagedRegionLayer(CacheLayerMixin):
@@ -26,6 +26,7 @@ class PagedRegionLayer(CacheLayerMixin):
         self.aging_copy_bytes = 0
         self.write_bytes = 0
         self._tables = None
+        self._reclaim_cursor = None
         self.tli_receipt = None
         self._stream_id = None
 
@@ -51,15 +52,27 @@ class PagedRegionLayer(CacheLayerMixin):
         return [p for a,b in self.intervals() for p in range(a,b)]
 
     def _reclaim(self):
-        spans = self.intervals(resident=True)
+        sink_hi, _, _ = self.geometry.bounds(self.logical_length)
         size = self.geometry.page
-        for lp in list(self.pages):
+        if self._reclaim_cursor is None:
+            self._reclaim_cursor = (sink_hi + size - 1) // size
+        spans = self.intervals(resident=True)
+        candidates = sorted(lp for lp in self.pages if lp >= self._reclaim_cursor)
+        for lp in candidates:
             lo, hi = lp*size, min((lp+1)*size,self.logical_length)
             if not any(lo < b and a < hi for a,b in spans):
                 physical, _, _ = self.pages.pop(lp)
                 heapq.heappush(self.free_ids, physical)
                 self.reclaimed_pages += 1
                 self._tables = None
+                self._reclaim_cursor = lp + 1
+                continue
+            if lo < sink_hi:
+                # Mixed/full sink pages are protected forever by the fixed sink prefix.
+                self._reclaim_cursor = lp + 1
+                continue
+            # Later pages can still age into a reclaimable gap; stop this scan.
+            break
 
     def freeze(self, skip_near=False, skip_far=False):
         if self.frozen:
@@ -162,9 +175,26 @@ class PagedRegionLayer(CacheLayerMixin):
             self._tables=tuple(torch.tensor([self.pages[i][j].data_ptr() if i in self.pages else 0 for i in range(n)],device=device,dtype=torch.int64) for j in (1,2))
         return self._tables
 
+    def gather(self):
+        """Concatenate visible full-width K/V for native SDPA consumers."""
+        keys, values = [], []
+        page = self.geometry.page
+        for a, b in self.intervals():
+            for lp in range(a // page, (b - 1) // page + 1):
+                if lp not in self.pages:
+                    continue
+                _, k, v = self.pages[lp]
+                lo = max(a, lp * page)
+                hi = min(b, (lp + 1) * page)
+                keys.append(k[..., lo - lp * page:hi - lp * page, :])
+                values.append(v[..., lo - lp * page:hi - lp * page, :])
+        if not keys:
+            raise ValueError('paged cache has no visible KV to gather')
+        return torch.cat(keys, 2), torch.cat(values, 2)
+
     def project_visible(self, dims, block_size):
         """Only low-dimensional index scratch; never a full-width KV gather."""
-        from .paged_region_kernels import project_visible
+        from ..ops.paged_region_kernels import project_visible
         return project_visible(self,dims,block_size)
 
     def get_seq_length(self):return self.logical_length
@@ -200,8 +230,11 @@ class PagedRegionCache(Cache):
         super().__init__(layers=[PagedRegionLayer(geometry) for _ in range(n_layers)])
     def update(self,key_states,value_states,layer_idx,cache_kwargs=None):
         if self.layers[layer_idx].frozen:
-            # 通用 HF attention 会把返回值当作完整历史；只允许直接分页消费者写入。
-            raise ValueError('frozen paged decode requires the patched direct-page consumer')
+            if getattr(self, 'tli_regions', False):
+                # 通用 HF attention 会把返回值当作完整历史；只允许直接分页消费者写入。
+                raise ValueError('frozen paged decode requires the patched direct-page consumer')
+            self.layers[layer_idx].update(key_states,value_states,cache_kwargs)
+            return self.layers[layer_idx].gather()
         return super().update(key_states,value_states,layer_idx,cache_kwargs)
     def update_for_paged_decode(self,key_states,value_states,layer_idx,cache_kwargs=None):
         if not self.layers[layer_idx].frozen:

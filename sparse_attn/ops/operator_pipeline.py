@@ -64,21 +64,10 @@ def validate_operator_inputs(q, k, v):
         raise RuntimeError('GPU partial attention requires CUDA and Triton; no implicit fallback')
 
 
-def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
-    """Compact decode, optionally forking protected attention before indexing.
-
-    Args:
-        indexer: TLI indexer（expose prepare_index + compute_selection_graph）
-        _: reserved（unused，与 placer 占位符对齐）
-        q [B,1,Hq,D], k/v [B,S_cap,Hkv,D]
-        cu [0, S_cap] int32, vl [B] int64 valid lengths
-        softmax_scale: 缩放因子（已含 1/sqrt(d)）
-    Returns:
-        [B,1,Hq,Dv]
-    """
+def _decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale, *, overlap):
+    """Shared compact decode implementation for serial and experimental overlap."""
     from ..ops.partial_attention import partial_attention, merge_partials
 
-    # Explicit experimental routing; keep the accepted default unchanged.
     backend = os.environ.get('TLI_OPERATOR_BACKEND', 'simt')
     stages = int(os.environ.get('TLI_OPERATOR_SELECTED_STAGES', '1'))
     if backend not in ('simt', 'tc'):
@@ -88,8 +77,6 @@ def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
     if backend == 'tc' and q.dtype not in (torch.float16, torch.bfloat16):
         raise ValueError('TC operator decode requires fp16/bf16')
 
-    # Fork before index preparation: protected positions depend only on lengths.
-    overlap = operator_mode() == 'overlap'
     if overlap and not q.is_cuda:
         raise RuntimeError('overlap requires CUDA')
     protected_state = None
@@ -106,7 +93,6 @@ def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
                 q, k, v, (empty_ids, empty_counts), vl,
                 sink=indexer.sink_tokens, swa=indexer.sliding_window_size,
                 scale=softmax_scale, protected=True, splits=4, backend=backend)
-            # Inputs may be freed by the caller before the side stream finishes.
             for tensor in (q, k, v, vl):
                 tensor.record_stream(side)
 
@@ -119,24 +105,57 @@ def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
             sink=indexer.sink_tokens, swa=indexer.sliding_window_size,
             scale=softmax_scale, protected=True, splits=4, backend=backend)
 
-    # 4. selected attention（中段紧凑候选）
     selected_state = partial_attention(
         q, k, v, ids_counts, vl,
         sink=indexer.sink_tokens, swa=indexer.sliding_window_size,
         scale=softmax_scale, protected=False, splits=4, backend=backend,
         pipeline_stages=stages)
 
-    # Join only after selected attention has been submitted on the main stream.
     if overlap:
         current.wait_stream(side)
         for tensor in protected_state:
             tensor.record_stream(current)
 
-    # 5. merge
     output = merge_partials(protected_state, selected_state,
                             dtype=q.dtype, backend='simt')
     indexer._graph_attention_route = f"linear_{'overlap' if overlap else 'serial'}_{backend}"
     return output
+
+
+def decode_compact(indexer, _, q, k, v, cu, vl, softmax_scale):
+    """Serial compact decode: fixed SIMT partial attention, no env routing."""
+    from ..ops.partial_attention import partial_attention, merge_partials
+
+    index_dict = indexer.prepare_index(k, cu)
+    selection = indexer.compute_selection_graph(q, index_dict,
+                                                softmax_scale, vl)
+    packed = (selection.indices, selection.counts)
+    kw = dict(sink=indexer.sink_tokens, swa=indexer.sliding_window_size,
+              scale=softmax_scale, splits=4, backend='simt')
+    protected_state = partial_attention(q, k, v, packed, vl,
+                                        protected=True, **kw)
+    selected_state = partial_attention(q, k, v, packed, vl,
+                                       protected=False, **kw)
+    output = merge_partials(protected_state, selected_state,
+                            dtype=q.dtype, backend='simt')
+    indexer._graph_attention_route = 'bs1_compact_simt'
+    return output
+
+
+def decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale):
+    """Legacy opt-in operator-mode wrapper; primary path uses decode_compact.
+
+    Args:
+        indexer: TLI indexer（expose prepare_index + compute_selection_graph）
+        _: reserved（unused，与 placer 占位符对齐）
+        q [B,1,Hq,D], k/v [B,S_cap,Hkv,D]
+        cu [0, S_cap] int32, vl [B] int64 valid lengths
+        softmax_scale: 缩放因子（已含 1/sqrt(d)）
+    Returns:
+        [B,1,Hq,Dv]
+    """
+    return _decode_indexed(indexer, _, q, k, v, cu, vl, softmax_scale,
+                           overlap=operator_mode() == 'overlap')
 
 
 def decode_ring(workspace, q, k, v, lengths, softmax_scale):

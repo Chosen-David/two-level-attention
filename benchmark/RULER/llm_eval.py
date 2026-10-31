@@ -15,7 +15,6 @@ from sparse_attn.metrics import get_metrics
 # 的请求级消费点——lm_eval 生成段（simple_evaluate）边界接线，guard 退出
 # 校验 raise 必须先于 save_results 任何结果落盘。
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
-from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
 from sparse_attn.info import (
     get_method_name_with_info,
     resolve_treatment_snapshot,
@@ -68,6 +67,10 @@ def parse_args():
 @torch.no_grad()
 def main():
     args = parse_args()
+    if args.method == "tli":
+        raise RuntimeError(
+            "llm_eval TLI cache path has not been migrated; use "
+            "benchmark/RULER/pred_ruler.py with PagedRegionCache")
     print("model: {}".format(args.model))
 
     # 创建输出目录
@@ -83,8 +86,6 @@ def main():
         trust_remote_code=True,
     ).eval()
 
-    # auto 依赖真实模型；解析后再冻结 snapshot、名称和结果文件身份。
-    resolve_far_skip_modes(args, model=model)
     snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
     method_name = get_method_name_with_info(args, snapshot)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

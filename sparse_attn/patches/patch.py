@@ -41,6 +41,17 @@ def _is_deepseek_attn(module) -> bool:
         and hasattr(module, "rotary_emb")
     )
 
+
+def _reject_removed_cache_args(args):
+    backend = getattr(args, "tli_far_skip_backend", "legacy")
+    cache = getattr(args, "tli_far_skip_cache", "retain")
+    if backend != "legacy" or cache != "retain":
+        raise ValueError(
+            "far-skip/static/batch cache paths have been removed; "
+            "only PagedRegionCache is supported "
+            "(tli_far_skip_backend=legacy, tli_far_skip_cache=retain)")
+
+
 def register_patch(model: nn.Module, args, snapshot=None) -> int:
     """注册稀疏 attention patch，返回成功 patch 的模块数。
 
@@ -60,8 +71,7 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
     patch 中途换文件 → 跨层混代可达）。仅 TLIIndexer 接受注入，
     其他 indexer 类型忽略 snapshot（其无文件型配置）。
     """
-    from ..ops.far_skip_runtime import resolve_far_skip_modes
-    resolve_far_skip_modes(args, model=model)
+    _reject_removed_cache_args(args)
     IndexerType = indexer_type_dict.get(args.method, None)
     glm_targets = [m for m in model.modules() if _is_glm4_moe_lite_attn(m)]
     glm_forward = None
@@ -114,20 +124,8 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
         # 仅在真实 GLM 且全部预扫通过后局部导入，保持 TF 4.56.2 可导入本模块。
         from .glm4_moe_lite_attn_patch import glm4_moe_lite_attn_forward
         glm_forward = glm4_moe_lite_attn_forward
-    if getattr(args, "tli_far_skip_backend", "legacy") == "compact":
-        targets = [m for m in model.modules()
-                   if isinstance(m, (Qwen3Attention, LlamaAttention)) or _is_deepseek_attn(m)]
-        if args.method != "tli" or not targets or any(
-                not isinstance(m, Qwen3Attention) or m.head_dim != 128
-                or m.sliding_window is not None for m in targets):
-            raise ValueError("compact far skip currently supports only TLI Qwen3, "
-                             "head_dim=128, without native sliding-window layers")
     if args.method != 'none' and IndexerType is None:
         raise ValueError(f"not support {args.method}")
-    if getattr(args, 'tli_far_skip_backend', 'legacy') == 'compact' and any(
-        isinstance(m, LlamaAttention) or _is_deepseek_attn(m) for m in model.modules()
-    ):
-        raise ValueError('compact far-skip storage currently requires the Qwen3 consumer')
     # 082（TL-E121-LLM-EVAL-SNAPSHOT-082）：tli 臂不带 snapshot 走
     # register_patch 是 081 快照契约的旁路（legacy 路径仅测试/兼容
     # 保留）——loudly 警告，防新增入口无意绕过快照。生产入口

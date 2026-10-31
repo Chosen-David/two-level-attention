@@ -4,10 +4,10 @@ import pytest
 import torch
 from transformers import Glm4MoeLiteConfig, Glm4MoeLiteForCausalLM
 from sparse_attn.indexer.tli_indexer import TLIIndexer
-from sparse_attn.ops.frozen_region_tli import tli_args
+from sparse_attn.ops.paged_region_tli import tli_args
 from sparse_attn.patches.glm4_moe_lite_attn_patch import glm4_moe_lite_attn_forward
 from sparse_attn.ops.frozen_region_gate import GateConfig, profile_regions
-from sparse_attn.ops.frozen_region_cache import RegionGeometry
+from sparse_attn.ops.region_geometry import RegionGeometry
 from benchmark.LongBench.prefill_frozen_skip import generate, generate_native
 
 @pytest.mark.parametrize('mode',['full','far','near','dual'])
@@ -41,7 +41,10 @@ def test_real_glm_class_region_decode(monkeypatch,mode):
     assert receipt['dimensions']==list(range(64))
     assert result['final_kv']['layers'][0]['logical_length']==4354
     if mode=='full':assert result['generated_ids']==generate_native(model,ids,3,'cpu')
-    if mode=='near':assert not result['frozen_kv']['layers'][0]['nodes']['near_staging']['attention_visible']
+    if mode=='near':
+        layer=result['frozen_kv']['layers'][0]
+        assert layer['resident_tokens']==layer['logical_length']
+        assert layer['attention_tokens']<layer['resident_tokens']
 
 def test_profile_uses_explicit_attention_scale():
     torch.manual_seed(2)

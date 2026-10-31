@@ -10,9 +10,9 @@ and Far attention mass with **0.05**, strictly less than the threshold. Decision
 freeze for the entire decode. Both regions may qualify independently; there
 is no combined mass budget.
 
-The physical cache chain is `sink -> far -> near -> SWA`, with a linear Far
-buffer and bounded Near/SWA rings. Geometry: sink 4, SWA 128, Near 4096,
-page 64. Absolute token positions remain independent of packed cache offsets.
+The physical cache is `PagedRegionCache`: logical pages mapped to independently
+allocated K/V tensors and page pointer tables. Geometry: sink 4, SWA 128,
+Near 4096, page 64. Absolute token positions remain independent of page offsets.
 
 | Frozen gate | Decode behavior |
 |---|---|
@@ -22,22 +22,23 @@ page 64. Absolute token positions remain independent of packed cache offsets.
 | Both skip | Keep only sink/SWA; discard SWA overflow |
 
 Near-only saves attention reads, **not resident KV capacity**. Scoring and
-attention never read staging until it ages into Far. Far and both skip
-physically reclaim the corresponding cache nodes.
+attention never read hidden Near pages until that region ages into Far. Far and
+both skip physically reclaim the corresponding logical pages.
 
-`FrozenRegionCache` owns node lifetimes; `GateConfig`/`profile_regions`/
+`PagedRegionCache` owns page lifetimes; `GateConfig`/`profile_regions`/
 `decide_regions` calibrate the gates. `frozen_region_runtime.py` is the shared
 prefill/profile/freeze/receipt lifecycle used by LongBench and RULER. The Qwen3
 and GLM patches recognize the explicit `tli_regions` cache marker before generic
 KV update. Passing ordinary DynamicCache does not activate these gates.
 
-For Qwen3 TLI, the default frozen eager path builds one physical K/V arena after
-freezing. Decode appends and ages nodes without gathering all visible KV. L1 reads
-only live-page tail32 statistics and reuses the original `_select_l1_blocks`;
-L2 scores only L1/bypass/protected candidates, then preserves the original
-absolute-position free-competition top-k semantics. Both-skip returns before L1,
-L2 and top-k. Final attention consumes sorted physical slot IDs and device counts,
-so it does not gather the full visible KV or use the sub-16K dense masked fallback.
+For Qwen3 TLI, the default frozen eager path reads selected full-dimensional K/V
+through page pointer tables after freezing. Decode appends and ages pages without
+gathering all visible KV. L1 reads only live-page tail32 statistics and reuses
+the original `_select_l1_blocks`; L2 scores only L1/bypass/protected candidates,
+then preserves the original absolute-position free-competition top-k semantics.
+Both-skip returns before L1, L2 and top-k. Final attention consumes selected
+logical token IDs and page-table physical addresses, so it does not gather the
+full visible KV or use the sub-16K dense masked fallback.
 L1=128, L2=1024, Far=minmax, Near=avg, Near pages=32, Near tokens=off.
 
 The legacy logical-mask path remains available as a test oracle via

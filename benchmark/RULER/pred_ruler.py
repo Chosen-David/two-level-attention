@@ -82,12 +82,10 @@ from sparse_attn.metrics import get_metrics  # noqa: E402
 # docstring）——RULER 生成的逐行生成段接线。
 from sparse_attn.ops.eager_decoding import (  # noqa: E402
     eager_decoding_request_guard)
-from sparse_attn.ops.frozen_region_cache import RegionGeometry
+from sparse_attn.ops.region_geometry import RegionGeometry
 from sparse_attn.ops.frozen_region_gate import GateConfig
 from sparse_attn.ops.frozen_region_runtime import (
     complete_frozen_request, prefill_frozen_request)
-from sparse_attn.ops.quality_graph import from_dynamic, graph_policy
-from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes  # noqa: E402
 from sparse_attn.info import (  # noqa: E402
     get_method_name_with_info, get_treatment_manifest_json,
     resolve_treatment_snapshot)
@@ -332,7 +330,6 @@ def main():
         # This constructs the installed framework's rotary module on CPU and
         # checks actual frequencies, scaling and rotation before loading weights.
         rope_preflight = verify_runtime_rope(config)
-    resolve_far_skip_modes(args, config=config)
     frozen_runtime = _configure_frozen_regions(args, config)
     snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
     if args.method == 'ffd_vendor':
@@ -702,8 +699,7 @@ def main():
                     pred_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
                     gen = [pred_idx.item()]
                     del output
-                    graphed = (None if frozen_runtime is not None else
-                               from_dynamic(model, past, gen[0], MAX_GEN, eos_ids))
+                    graphed = None
                     if graphed is not None:
                         gen = graphed
                     else:
@@ -784,7 +780,7 @@ def main():
             generation_params={
                 "max_gen": MAX_GEN, "max_num": args.max_num, "seed": SEED,
                 "method": args.method, "pred_postfix": args.pred_postfix,
-                "t": args.t, "graph_policy": graph_policy(),
+                "t": args.t, "graph_policy": "off",
                 "operator_mode": os.environ.get("TLI_OPERATOR_MODE", "off"),
             },
             producer_script_path="benchmark/RULER/pred_ruler.py",

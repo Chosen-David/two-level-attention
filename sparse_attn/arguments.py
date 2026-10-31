@@ -367,12 +367,12 @@ def _add_tli_args(parser: argparse.ArgumentParser):
     #   prefill 尾行观测逐层 far 概率质量 r_l，r_l < eps 的层 decode 期 skip far。
     #   核心假设已由 E60 离线验证：prefill 尾行 far mass 与 decode 尾行 far mass
     #   层间 corr 0.966~0.991（e60_prefill_dynamic_gate.json，mean/max/P95 三口径）。
-    group.add_argument('--tli_far_skip_backend', choices=['auto', 'legacy', 'compact'], default='auto',
-                       help='auto: compact on supported TLI Qwen3 with fixed near geometry, '
-                            'legacy otherwise; compact physically omits far work')
-    group.add_argument('--tli_far_skip_cache', choices=['auto', 'retain', 'evict'], default='auto',
-                       help='auto: evict with compact, retain with legacy; '
-                            'evict releases far KV after the request-local skip decision freezes')
+    group.add_argument('--tli_far_skip_backend', choices=['legacy'], default='legacy',
+                       help='removed cache path; legacy is a compatibility no-op for the '
+                            'PagedRegionCache-only interface')
+    group.add_argument('--tli_far_skip_cache', choices=['retain'], default='retain',
+                       help='removed cache path; retain is a compatibility no-op for the '
+                            'PagedRegionCache-only interface')
     group.add_argument('--tli_dyn_dgate', action='store_true', default=False,
                        help='E137 动态 D\' gate：prefill 期逐层标定 far 区概率质量 '
                             '（q 尾行全维 softmax，与 dense prefill 同源），r_l < eps 的层 '

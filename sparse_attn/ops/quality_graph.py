@@ -444,37 +444,5 @@ def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2
     if reason:
         unsupported(model, reason)
         return None
-    from .tli_static_cache import TLIStaticCache, fill_static_from_dynamic
-    length = int(past.get_seq_length())
-    capacity = length + max_gen
-    # Admission only covers the additional static KV allocation, not an
-    # unmeasured promise about graph workspace. Capture OOM may fall back.
-    needed = sum((layer.keys.numel() + layer.values.numel()) * layer.keys.element_size()
-                 for layer in past.layers) * capacity // length
-    free, _ = torch.cuda.mem_get_info(next(model.parameters()).device)
-    if needed > free * 0.9:
-        unsupported(model, "insufficient_memory_for_static_kv")
-        return None
-    eager_decoding_check_errors()
-    measure = os.environ.get("TLI_QUALITY_TIMING", "0") == "1"
-    if measure:
-        torch.cuda.synchronize(next(model.parameters()).device)
-        conversion_start = time.perf_counter()
-    cache = TLIStaticCache(model.config, capacity, 1)
-    # The caller's explicit compact configuration owns eviction; ordinary
-    # quality requests continue to allocate linear storage. Freeze the gate
-    # and seed request-local ring summaries before capture or source release.
-    fill_static_from_dynamic(cache, past, [length], model=model)
-    # Transfer is now complete. Release dynamic KV before capture; failures
-    # after ownership transfer stay on this static cache or abort the request.
-    past.layers.clear()
-    ctx = BatchCtx(1, [length], [0], [True], 0)
-    if measure:
-        torch.cuda.synchronize(next(model.parameters()).device)
-        conversion_ms = (time.perf_counter() - conversion_start) * 1000
-    result = static_decode(model, cache, [[first_token]], [length], set(eos_ids),
-                           max_gen, ctx, min_new_tokens=min_new_tokens,
-                           online_eos=online_eos)[0]
-    if measure and "timing" in model._quality_graph_execution:
-        model._quality_graph_execution["timing"]["cache_conversion_wall_ms"] = conversion_ms
-    return result
+    unsupported(model, "static_cache_removed_use_paged_region_cache")
+    return None

@@ -178,9 +178,8 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
 
 def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids):
     """Compact TLI: per-request prefill/gates, batched model decode, optional graph."""
-    from sparse_attn.ops.quality_graph import graph_policy, execution
-    from sparse_attn.ops.hybrid_batch_cache import HybridBatchCacheBuilder
-    from sparse_attn.ops.hybrid_batch_runner import HybridBatchRunner
+    raise RuntimeError(
+        "TLI hybrid batch cache path has been removed; use B1 PagedRegionCache")
 
     device = next(model.parameters()).device
     input_ids, position_ids = input_ids.to(device), position_ids.to(device)
@@ -254,6 +253,10 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
     from sparse_attn.ops.quality_graph import unsupported
     compact = any(getattr(getattr(m, 'indexer', None), 'far_skip_backend', '') == 'compact'
                   for m in model.modules())
+    if fixed_cache or compact:
+        raise RuntimeError(
+            "TLI fixed/compact batch cache path has been removed; "
+            "use B1 PagedRegionCache")
     if compact:
         if not fixed_cache:
             raise ValueError('compact batched decode requires fixed_cache=True')
@@ -286,11 +289,8 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
         # 后接 staged row-by-row decode（batch>1 无 graph 提速，逐行回退零额外开销）。
         pred_list = []
         if fixed_cache:
-            from sparse_attn.ops.tli_static_cache import (  # noqa: E402
-                TLIStaticCache)
             S_cap = S_max + MAX_GEN
-            static_cache = TLIStaticCache(model.config, S_cap, B)
-            from sparse_attn.ops.static_batch_prefill import consume_prefill_rows
+            static_cache = None
             prefilled = []
             for b in range(B):
                 base = S_max - lens[b]
@@ -404,6 +404,10 @@ def main():
     from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
     from sparse_attn.ops.quality_graph import graph_policy
     args = parse_args()
+    if args.method == "tli":
+        raise RuntimeError(
+            "TLI batch cache path has been removed; use benchmark/RULER/pred_ruler.py "
+            "with B1 PagedRegionCache")
     if args.batch_size < 1:
         raise SystemExit("--batch-size 必须 >= 1")
     if args.batch_size > 1 and args.method not in _BATCH_METHODS:
@@ -465,8 +469,6 @@ def main():
         # This constructs the installed framework's rotary module on CPU and
         # checks actual frequencies, scaling and rotation before loading weights.
         rope_preflight = verify_runtime_rope(config)
-    from sparse_attn.ops.far_skip_runtime import resolve_far_skip_modes
-    resolve_far_skip_modes(args, config=config)
     snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
     # 【同步义务】加载路径与 pred_ruler.py 一致（device_map="auto"，
     # 调度须设 CUDA_VISIBLE_DEVICES）。

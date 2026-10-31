@@ -4,7 +4,7 @@ from contextlib import contextmanager
 import torch
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
-from .frozen_region_cache import FrozenRegionCache
+from ..cache.paged_region_cache import PagedRegionCache
 from .frozen_region_gate import decide_regions, profile_regions
 
 
@@ -33,9 +33,9 @@ def capture_profiles(cache, geometry, config):
 
 def prefill_frozen_request(model, input_ids, config, geometry):
     """Run one-shot dense prefill, then freeze independent per-layer decisions."""
-    cache = FrozenRegionCache(model.config.num_hidden_layers, geometry)
-    if getattr(model, '_frozen_tli', False):
-        cache.tli_regions = True
+    cache = PagedRegionCache(model.config.num_hidden_layers, geometry)
+    cache.tli_regions = bool(getattr(model, '_frozen_tli', False))
+    if cache.tli_regions:
         for module in model.model.layers:
             module.self_attn.indexer.clear()
             module.self_attn.indexer.skip_far = False
@@ -48,25 +48,26 @@ def prefill_frozen_request(model, input_ids, config, geometry):
     decisions = {
         layer_idx: decide_regions(
             profile, config,
-            present_near=cache.layers[layer_idx].nodes['near'].size > 0,
-            present_far=cache.layers[layer_idx].nodes['far'].size > 0)
+            present_near=_region_present(cache.layers[layer_idx], geometry)[0],
+            present_far=_region_present(cache.layers[layer_idx], geometry)[1])
         for layer_idx, profile in profiles.items()
     }
     cache.freeze(decisions)
     after = cache.report()
     for layer_idx, decision in decisions.items():
         if decision['skip_near'] and not decision['skip_far']:
-            nodes = after['layers'][layer_idx]['nodes']
-            if 'near_staging' not in nodes or nodes['near_staging']['attention_visible']:
-                raise ValueError('near-only must retain invisible staging KV')
-            before_bytes = sum(
-                node['kv_bytes']
-                for node in before['layers'][layer_idx]['nodes'].values())
-            after_bytes = sum(node['kv_bytes'] for node in nodes.values())
+            before_bytes = before['layers'][layer_idx]['kv_bytes']
+            after_bytes = after['layers'][layer_idx]['kv_bytes']
             if before_bytes != after_bytes:
                 raise ValueError('near-only must not claim a resident KV reduction')
     return output, dict(profiles=profiles, decisions=decisions,
                         prefill_full_kv=before, frozen_kv=after)
+
+
+def _region_present(layer, geometry):
+    """Return (near_region_present, far_region_present) for a filled layer."""
+    sink_hi, far_hi, near_hi = geometry.bounds(layer.logical_length)
+    return near_hi > far_hi, far_hi > sink_hi
 
 
 def _json_safe(value):

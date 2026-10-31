@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 import math
 import torch
-from .frozen_region_cache import RegionGeometry
+from .region_geometry import RegionGeometry
 
 
 @dataclass(frozen=True)

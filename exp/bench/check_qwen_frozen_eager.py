@@ -21,11 +21,11 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from benchmark.RULER.yarn_receipt import resolve_yarn_config
 
 from sparse_attn.info import resolve_treatment_snapshot
-from sparse_attn.ops.frozen_region_cache import RegionGeometry
+from sparse_attn.ops.region_geometry import RegionGeometry
 from sparse_attn.ops.frozen_region_gate import GateConfig
 from sparse_attn.ops.frozen_region_runtime import (
     complete_frozen_request, prefill_frozen_request)
-from sparse_attn.ops.frozen_region_tli import tli_args
+from sparse_attn.ops.paged_region_tli import tli_args
 from sparse_attn.patches import register_patch
 
 

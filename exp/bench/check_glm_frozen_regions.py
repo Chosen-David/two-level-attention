@@ -8,7 +8,7 @@ import torch
 from transformers import AutoModelForCausalLM,AutoTokenizer
 from benchmark.LongBench.prefill_frozen_skip import generate,generate_native
 from sparse_attn.ops.frozen_region_gate import GateConfig
-from sparse_attn.ops.frozen_region_tli import tli_args
+from sparse_attn.ops.paged_region_tli import tli_args
 from sparse_attn.patches import register_patch
 from sparse_attn.info import resolve_treatment_snapshot
 

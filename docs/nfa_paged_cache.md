@@ -1,8 +1,10 @@
 # NFA paged cache reference
 
-This opt-in eager B1 implementation keeps the existing frozen ring cache as its
-correctness and performance reference. It does not change the default cache.
-No performance or accuracy improvement is implied by the data structure.
+This eager B1 implementation is now the production frozen-region cache. The
+previous `FrozenRegionCache`/region ring implementation has been removed; the
+paged cache owns one-shot prefill storage and decode. No performance or accuracy
+improvement is implied by the data structure, and independent GPU acceptance
+remains a separate requirement.
 
 `PagedRegionCache` uses request-local logical pages, each mapped to independently
 allocated K/V tensors. K and V may have different channel widths. Aging changes
@@ -39,17 +41,16 @@ The isolated correctness and ABBA model scripts are
 `exp/bench/check_paged_region_kernels.py` and `check_paged_region_model.py`.
 The model script uses identical known decode input replay for each arm and never
 labels it generated-answer throughput. Both arms warm up before measured ABBA
-cycles. Compare every forced gate state, retain failures/slowdowns and do not
-replace the ring default unless evidence supports that choice. Current measurements
+cycles. Compare every forced gate state and retain failures/slowdowns. Current measurements
 remain pending independent acceptance in `agent_doc/results/nfa_paged_cache_20261030`.
 
 CUDA pages are owned by the stream that first writes them. Updates, freezing and
 pointer-table reads on another stream are rejected before state mutation; stream
 handoff and CUDA Graph lifetime management are not implemented.
 
-The TLI adapter matches the ring reference's activation-dtype Q scaling. For
+The TLI adapter matches the prior ring reference's activation-dtype Q scaling. For
 fewer than 16,384 visible tokens, it additionally rounds normalized probabilities
-to activation dtype, matching ring's dense arithmetic. This requires a second
+to activation dtype, matching that reference's dense arithmetic. This requires a second
 page-read pass; its cost is included in timing. The standalone kernel's default
 remains FP32 online softmax for comparison against SDPA. Neither setting promises
 bitwise equivalence across reduction trees.

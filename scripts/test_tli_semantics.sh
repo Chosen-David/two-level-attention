@@ -18,4 +18,4 @@ if torch.cuda.is_available():
 else:
     print('CPU validation only: CUDA memory safety and capture/replay remain UNVERIFIED.')
 PY
-"$python_bin" -m pytest -q tests/test_main_fusion_guards.py tests/test_tli_runtime_shape_contract.py tests/test_far_skip_hybrid_cache.py tests/test_hybrid_batch_cache.py tests/test_qwen_static_mask.py
+"$python_bin" -m pytest -q tests/test_paged_region_cache.py tests/test_frozen_region_runtime.py tests/test_paged_region_tli.py

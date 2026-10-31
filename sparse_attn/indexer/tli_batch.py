@@ -8,6 +8,7 @@ lengths are device tensors, so the same entry point supports eager and capture.
 import os
 import torch
 import torch.nn.functional as F
+from ..ops.token_selection import TokenSelection, canonical_selection
 
 
 def capturing(device):
@@ -289,6 +290,86 @@ class BatchedTLI:
         return mask[:,None]
 
 
+    def selection(self, q, k, lengths, scale):
+        """Return compact TokenSelection for SIMT partial attention.
+
+        Protected sink/SWA tokens are intentionally excluded from
+        ``TokenSelection``; partial_attention(protected=True) handles them.
+        Unsupported GPU-pipeline variants raise instead of falling back.
+        """
+        self.update(k, lengths)
+        idx, B, H, S, bs = self.indexer, self.B, self.H, self.S, self.bs
+        G = q.shape[2] // H
+        qc, qf = self._queries(q, scale)
+        sink, swa = idx.sink_tokens, idx.sliding_window_size
+        lo = idx._sink_pool_lo_blk
+        swalo = (lengths-swa).clamp(min=0)
+        nf = 0 if self.skip_far else idx.args.tia_level1_topk-int(idx.nt_near_pages)
+        nn = int(idx.nt_near_pages)
+        if self.gpu_pipeline is not None:
+            raise ValueError('compact selection path does not support TLI_BATCH_GPU_PIPELINE=1')
+        def dot(x, qq):
+            return torch.einsum('bhgd,bthd->bhgt', qq, x.float())
+        if self.triton_score is not None:
+            sc = (self.triton_score(self.kmin,qc,q.dtype,kmax=self.kmax).mean(2)
+                  if self.need_minmax else None)
+            avg = (self.triton_score(self.kavg,qc,q.dtype).mean(2)
+                   if self.kavg is not None else None)
+        else:
+            sc = ((dot(self.kmin, qc.clamp(max=0))
+                   + dot(self.kmax, qc.clamp(min=0))).to(q.dtype).mean(2)
+                  if self.need_minmax else None)
+            avg = dot(self.kavg, qc).to(q.dtype).mean(2) if self.kavg is not None else None
+        near = ((lengths-swa-max(bs, int(idx.nt_near_len)))//bs).clamp(min=lo)
+        swablock = torch.maximum(near, (lengths+bs-1)//bs-max(1, swa//bs))
+        bypage = swalo//bs
+        byok = (swalo % bs != 0) & (bypage >= lo)
+        fp = (self.pages[None] >= lo) & (self.pages[None] < near[:, None])
+        np = (self.pages[None] >= near[:, None]) & (self.pages[None] < swablock[:, None])
+        if sink % bs:
+            fp &= self.pages[None] != lo
+            np &= self.pages[None] != lo
+        np &= ~((self.pages[None] == bypage[:, None]) & byok[:, None])
+        far_src = avg if idx.far_method == 'avg' else sc
+        if nf == 0:
+            far_src = avg if avg is not None else sc
+        near_src = avg if idx.near_method == 'avg' else sc
+        fi = far_src.masked_fill(~fp[:, None], -torch.inf).topk(min(nf,self.P), -1).indices
+        ni = near_src.masked_fill(~np[:, None], -torch.inf).topk(min(nn,self.P), -1).indices
+        blocks = torch.cat((fi, ni), -1)
+        ok = torch.cat((fp[:, None].expand(-1,H,-1).gather(-1,fi),
+                        np[:, None].expand(-1,H,-1).gather(-1,ni)), -1)
+        ids = (blocks[..., None]*bs+self.offsets).flatten(-2)
+        keep = (ok[..., None].expand(-1,-1,-1,bs).flatten(-2)
+                & (ids < lengths[:, None, None]))
+        byblocks = torch.stack((torch.full_like(bypage,lo if sink%bs else 0), bypage), -1)
+        byids = (byblocks[..., None]*bs+self.offsets).flatten(-2)
+        bykeep = torch.stack((torch.full_like(byok,bool(sink%bs)),byok), -1)
+        bykeep = bykeep[..., None].expand(-1,-1,bs).flatten(-2) & (byids < lengths[:,None])
+        bykeep[:, bs:] &= ~((bypage == lo) & bool(sink%bs))[:,None]
+        ids = torch.cat((ids, byids[:,None].expand(-1,H,-1)), -1)
+        keep = torch.cat((keep, bykeep[:,None].expand(-1,H,-1)), -1)
+        if self.triton_ops is not None:
+            ids, keep = self.triton_ops.compact(ids, keep)
+        else:
+            ids, keep = compact_candidates(ids, keep, self.candidate_rank)
+        if self.triton_score is not None:
+            sf = self.triton_score(self.kfine,qf,q.dtype,ids=ids,keep=keep)
+        else:
+            safe = torch.where(keep, ids, 0)
+            kc = self.kfine[self.rows[:,None,None], safe, self.heads[None,:,None]]
+            sf = torch.einsum('bhgd,bhrd->bhgr', qf, kc.float()).to(q.dtype)
+            sf.masked_fill_(~keep[:,:,None], -torch.inf)
+        p = sf.softmax(-1).nan_to_num(nan=0).mean(2)
+        mid = keep & (ids >= lo*bs) & (ids < swalo[:,None,None])
+        ntop = min(idx.args.tia_level2_topk, ids.shape[-1])
+        top = p.masked_fill(~mid, -torch.inf).topk(ntop, -1).indices
+        selected = ids.gather(-1, top)
+        midbudget = (idx.args.tia_level2_topk-sink-(lengths-swalo)).clamp(min=0)
+        valid = mid.gather(-1,top) & (torch.arange(ntop,device=q.device)[None,None] < midbudget[:,None,None])
+        return canonical_selection(selected, valid, S)
+
+
 def prepare_mask_batched(indexer, q, k, lengths, scale):
     """Explicit batch API. All lengths are device-side; no scalar reads on CUDA."""
     validate_config(indexer, k.shape[0])
@@ -310,3 +391,26 @@ def prepare_mask_batched(indexer, q, k, lengths, scale):
     if not capturing(q.device):
         indexer.metrics.add_select_result_batch(lengths, mask, 1)
     return mask, 1
+
+
+def prepare_selection_batched(indexer, q, k, lengths, scale):
+    """Explicit compact batch API; returns TokenSelection, never a full mask."""
+    validate_config(indexer, k.shape[0])
+    if (q.ndim != 4 or k.ndim != 4 or q.shape[0] != k.shape[0]
+            or q.shape[0] < 1 or q.shape[2] < 1
+            or q.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+            or q.shape[1] != 1 or k.shape[1] < 1 or k.shape[2] < 1
+            or q.shape[2] % k.shape[2] or q.shape[-1] != k.shape[-1]
+            or k.shape[-1] != 128 or q.dtype != k.dtype or q.device != k.device
+            or lengths.shape != (q.shape[0],) or lengths.device != k.device
+            or lengths.dtype != torch.long or q.requires_grad or k.requires_grad):
+        raise ValueError('compact batch selection expects decode Q[B,1,Hq,128], K[B,S,Hkv,128], int64 lengths[B]')
+    torch._assert_async(((lengths >= 1) & (lengths <= k.shape[1])).all(), 'invalid batch lengths')
+    state = getattr(indexer, '_batch_tli', None)
+    if state is None:
+        state = BatchedTLI(indexer, k, lengths)
+        indexer._batch_tli = state
+    selection = state.selection(q, k, lengths, scale)
+    if not capturing(q.device):
+        indexer.metrics.add_select_result_batch(lengths, selection.to_mask(k.shape[1]).unsqueeze(1), 1)
+    return selection

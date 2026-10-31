@@ -14,7 +14,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from transformers.cache_utils import DynamicCache
 
 from benchmark.LongBench.eval import sample_score
-from sparse_attn.ops.frozen_region_cache import RegionGeometry
+from sparse_attn.ops.region_geometry import RegionGeometry
 from sparse_attn.ops.frozen_region_gate import GateConfig
 from sparse_attn.ops.frozen_region_runtime import (
     complete_frozen_request, prefill_frozen_request)
@@ -23,8 +23,11 @@ from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 ROOT = Path(__file__).resolve().parents[2]
 SCREEN_TASKS = ('qasper', 'hotpotqa', 'musique', 'gov_report', 'repobench-p')
 SOURCES = ('sparse_attn/patches/glm4_moe_lite_attn_patch.py',
-           'sparse_attn/patches/qwen3_attn_patch.py', 'sparse_attn/ops/frozen_region_tli.py',
-           'sparse_attn/indexer/tli_indexer.py', 'sparse_attn/ops/frozen_region_cache.py', 'sparse_attn/ops/frozen_region_gate.py',
+           'sparse_attn/patches/qwen3_attn_patch.py', 'sparse_attn/ops/paged_region_tli.py',
+           'sparse_attn/cache/paged_region_cache.py', 'sparse_attn/ops/paged_region_kernels.py',
+           'sparse_attn/ops/region_geometry.py',
+           'sparse_attn/indexer/tli_indexer.py', 'sparse_attn/ops/frozen_region_gate.py',
+           'sparse_attn/ops/frozen_region_runtime.py',
            'benchmark/LongBench/prefill_frozen_skip.py', 'benchmark/LongBench/metrics.py',
            'benchmark/LongBench/eval.py', 'benchmark/LongBench/config/dataset2prompt.json',
            'benchmark/LongBench/config/dataset2maxlen.json')
@@ -190,7 +193,7 @@ def main():
         eviction='far-only: evict far; near-only: keep attention-invisible near staging and migrate to far; both: sink+SWA only',
         calibration='query-relative page boundaries, last256 rows; head means; independent near/far mass comparisons, no joint budget')
     if args.attention == 'tli':
-        from sparse_attn.ops.frozen_region_tli import tli_args
+        from sparse_attn.ops.paged_region_tli import tli_args
         model_type = AutoConfig.from_pretrained(args.model).model_type
         treatment = tli_args(
             subspace='nope' if model_type == 'glm4_moe_lite' else 'tail')

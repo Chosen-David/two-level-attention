@@ -13,7 +13,6 @@ from transformers.models.glm4_moe_lite.modeling_glm4_moe_lite import (
 
 from ..indexer import Indexer
 from ..ops.eager_decoding import eager_decoding_attn
-from ..ops.quality_graph import owned_decode_mask
 from ..baseline_runtime import batch_decode_ctx
 from .qwen3_attn_patch import _tl_decode_batched, _can_drop_static_mask, _paper_route
 from .utils import (
@@ -42,18 +41,13 @@ def glm4_moe_lite_attn_forward(
         raise RuntimeError("GLM TLI 不支持 dense decode 消融，拒绝 dense 结果标 TLI")
 
     batch_size, seq_length = hidden_states.shape[:-1]
+    if not getattr(past_key_values, "paged_regions", False):
+        raise ValueError(
+            "GLM TLI cache must be PagedRegionCache; use prefill_frozen_request")
     if self.indexer.dyn_dgate:
-        ctx = batch_decode_ctx()
-        # Batch runners prefill each row with B=1 inside the outer B>1
-        # context. Reject before clearing/calibrating/updating any request.
-        if batch_size != 1 or (ctx is not None and ctx.batch != 1):
-            raise RuntimeError(
-                "GLM dynamic far-skip 仅支持单请求；批量请求需要逐行独立 gate 状态")
-        if (attention_mask is not None and not (
-                seq_length == 1 and owned_decode_mask(past_key_values, attention_mask, ctx))):
-            raise RuntimeError(
-                "GLM dynamic far-skip 尚不支持显式 attention_mask/padding；"
-                "标定必须只覆盖本请求有效 token")
+        raise RuntimeError(
+            "GLM dynamic far-skip has been removed; PagedRegionCache "
+            "requires independent frozen region gates")
     region_cache = getattr(past_key_values, "tli_regions", False)
     if region_cache:
         from ..ops.cuda_graph_state import graph_state
@@ -97,10 +91,7 @@ def glm4_moe_lite_attn_forward(
     # Dispatch after native MLA projections/RoPE, before the generic KV write.
     # Region decode owns the single write and absolute-to-physical mapping.
     if region_cache and layer.logical_length:
-        if getattr(past_key_values, "paged_regions", False):
-            from ..ops.paged_region_tli import decode as region_decode
-        else:
-            from ..ops.frozen_region_tli import decode as region_decode
+        from ..ops.paged_region_tli import decode as region_decode
         result = region_decode(self, query_states, key_states, value_states,
                                past_key_values, cache_position)
         return self.o_proj(result.reshape(batch_size, seq_length, -1).contiguous()), None

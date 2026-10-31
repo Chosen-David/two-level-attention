@@ -14,16 +14,11 @@ from transformers.models.qwen3.modeling_qwen3 import (
 
 from typing import Optional, Callable
 from ..indexer import Indexer
-from ..ops.eager_decoding import eager_decoding_attn
+from ..ops.operator_pipeline import decode_compact
+from ..ops.partial_attention import partial_attention, merge_partials
 # 【阶段 1（deepseek 轨）】batch>1 TLI 稀疏 decode：pred_ruler_batch 批量
 # 入口在 decode 循环外层 set/clear BatchCtx（sparse_attn/baseline_runtime.py）。
 from ..baseline_runtime import batch_decode_ctx
-from .utils import (
-    prepare_seqlens,
-    prepare_cu_seqlens, 
-    prepare_cu_seqlens_from_mask, 
-    unpad_tensor
-)
 
 
 def _paper_route(layer,route):
@@ -98,219 +93,57 @@ def _batch_device_lengths(ctx, dev):
     return cached[1]
 
 
-def _parallel_batch_enabled(batch):
-    """TLI_BATCH_INDEXER=parallel 开关（legacy=默认逐行路径）。"""
-    mode = os.environ.get("TLI_BATCH_INDEXER", "legacy")
-    if mode not in ("legacy", "parallel", "exact"):
-        raise ValueError("TLI_BATCH_INDEXER must be legacy, parallel or exact")
-    return batch >= 1 and mode == "parallel"
-
-
 def _tl_decode_batched_graph(self, indexer, q, k, v, gs):
-    """【阶段 2c-4】graph 数据通路版 batch decode（全 tensor、无 host 分支）。
-
-    与 staged 路径（`_tl_decode_batched`）的唯一区别在「动态几何如何取」：
-      - staged：mask 由 prepare_mask(valid_length=L_b) 产生，L_b 是 Python
-        int（capture 时会被烘焙 → replay 陈旧，不可图化）；
-      - graph：mask 由 compute_mask_graph 从 valid_len tensor 派生（每行
-        prepare_index 容量宽一次 → 全部块统计/k_qat 就绪），attn gather
-        不传 valid_length（只消费 mask）。
-
-    于是整步 forward 里所有步间变化量（KV 内容 / valid_len）均由 tensor
-    内容承载 → 可 capture 一次 + replay 循环 copy_ 注入（2c-5）。
-
-    逐位一致性：mask ≡ staged prepare_mask 的有效区（G8 门禁 tail/full×
-    8 几何逐位）；attn 归约集合 ≡（gather 路径 valid_length 不参与，
-    T≥16K 走 Triton / T<16K 走 dense，pad 列由 mask False 排除）。
-    """
-    if os.environ.get('TLI_BATCH_INDEXER', 'legacy') == 'exact':
-        from ..ops.exact_linear_batch import exact_linear_batch_decode
-        return exact_linear_batch_decode(indexer,q,k,v,gs,self.scaling)
+    """Graph decode single path: B1 serial compact, B>1 exact compact batch."""
     B = q.shape[0]
     dev = q.device
     S_cap = k.shape[1]
     vl = gs.valid_len_buf
-    if vl is None or vl.numel() != B:
-        if _parallel_batch_enabled(B):
-            raise ValueError("parallel graph requires valid_len_buf[B]")
-        vl = torch.zeros(B, dtype=torch.long, device=dev)
-        gs.valid_len_buf = vl
-    from ..ops.operator_pipeline import operator_mode, decode_indexed
-    if operator_mode() != 'off':
-        if _parallel_batch_enabled(B):
-            raise ValueError('operator pipeline currently requires TLI_BATCH_INDEXER=legacy')
-        if B != 1:
-            raise ValueError('use HybridBatchRunner for multi-request operator decode')
+    if vl is None or vl.numel() != B or vl.dtype != torch.long:
+        raise ValueError("graph decode requires live int64 valid_len_buf[B]")
+    if B == 1:
         cu = _graph_const(("cu_cap", str(dev), S_cap),
                           lambda: torch.tensor([0, S_cap], device=dev, dtype=torch.int32))
-        return decode_indexed(indexer, indexer, q, k, v, cu, vl, self.scaling)
-    if _parallel_batch_enabled(B):
-        from ..indexer.tli_batch import prepare_mask_batched
-        if gs.valid_len_buf is None:
-            raise ValueError("parallel graph requires live valid_len_buf")
-        mask, bs = prepare_mask_batched(indexer, q, k, vl, self.scaling)
-        _paper_route(self, "tli_batch_indexer_parallel_graph")
-        return eager_decoding_attn(
-            q, k, v, mask, bs, indexer._batch_tli.cu,
-            softmax_scale=self.scaling, valid_length=None)
-    cu = _graph_const(("cu_cap", str(dev), S_cap),
-                      lambda: torch.tensor([0, S_cap], device=dev,
-                                           dtype=torch.int32))
-    masks = []
-    # 同一层 indexer 会被 batch 内所有 row 依次调用。单个 _ginc 在不同
-    # KV 地址间来回切换会每行全量重建；请求上下文内的 per-row 池让 eager
-    # 与 Graph 都复用各自持久摘要。池随 BatchCtx 销毁，绝不跨请求共享。
-    ctx = batch_decode_ctx()
-    row_pool = None
-    if ctx is not None:
-        pools = getattr(ctx, '_tli_row_index_pools', None)
-        if pools is None:
-            pools = ctx._tli_row_index_pools = {}
-        row_pool = pools.setdefault(id(indexer), {})
-    for b in range(B):
-        if row_pool is not None:
-            indexer._ginc = row_pool.get(b)
-        # 【E152v4】不再每步 clear()：clear 是请求边界标记（prefill 前每层
-        # 调用，失效 _inc/_ginc → 新请求首步全量重建）。graph 步进下每步
-        # clear 会把 _ginc 持久容量宽 buffer 一起失效 → 退化回每步
-        # _prepare_index_base 容量宽全量重建（with_stack 归因 ~15ms/步
-        # 36 层 index 税）。prepare_index 内部在 cuda_graph_state 模式下
-        # 分发到 pos_buf 驱动的增量更新（单块统计 + 单行 k_qat，固定形状
-        # 纯张量 op，capture 安全）；不兼容配置自动回退全量路径（fail-
-        # closed，行为逐位不变）。
-        # Incremental preparation consumes shared graph metadata too. Without
-        # slicing it, the last cached row can update with row zero's position.
-        from ..ops.exact_linear_batch import _row_scope
-        with _row_scope(gs, b):
-            idx_dict = indexer.prepare_index(k[b:b + 1], cu)
-            if row_pool is not None:
-                row_pool[b] = indexer._ginc
-            valid_len = vl[b:b + 1]
-            # inference tensor 不保留 _base 视图链，Python 属性也不会自动
-            # 继承；显式把 DeviceDecodeInputs 的逐步修订号传到行视图。
-            valid_len._tli_device_revision = getattr(
-                vl, '_tli_device_revision', None)
-            masks.append(indexer.compute_mask_graph(
-                q[b:b + 1], idx_dict, self.scaling, valid_len))
-    m_b = torch.cat(masks, dim=0)              # [B,1,Hkv,S_cap] bool
-    cu_b = torch.arange(B + 1, device=dev, dtype=torch.int32) * S_cap
-    # valid_length=None：mask 已排除 pad 列（prepare_mask 末尾清 False 的
-    # graph 等价物是 compute_mask_graph 的 `sel & (ar_tok < S_real)`）。
-    output = eager_decoding_attn(
-        q, k, v, m_b, 1, cu_b, softmax_scale=self.scaling, valid_length=None)
-    indexer._graph_attention_route = 'legacy_graph_eager_tli'
+        output = decode_compact(indexer, indexer, q, k, v, cu, vl, self.scaling)
+        indexer._graph_attention_route = 'graph_bs1_compact_tli'
+        return output
+    from ..ops.exact_linear_batch import exact_linear_batch_decode
+    output = exact_linear_batch_decode(indexer, q, k, v, gs, self.scaling)
+    indexer._graph_attention_route = 'graph_bsn_exact_compact_tli'
     return output
+
+
+def _decode_batch_compact(self, indexer, q, k, v, lengths):
+    """Eager batch compact path: selection and attention are both tensorized."""
+    from ..indexer.tli_batch import prepare_selection_batched
+    selection = prepare_selection_batched(indexer, q, k, lengths, self.scaling)
+    packed = (selection.indices, selection.counts)
+    kw = dict(sink=indexer.sink_tokens, swa=indexer.sliding_window_size,
+              scale=self.scaling, splits=4, backend='simt')
+    protected = partial_attention(q, k, v, packed, lengths,
+                                  protected=True, **kw)
+    selected = partial_attention(q, k, v, packed, lengths,
+                                 protected=False, **kw)
+    return merge_partials(protected, selected, q.dtype, backend='simt')
 
 
 def _tl_decode_batched(self, indexer, query_states, key_states,
                        value_states, ctx):
-    """【阶段 2a】TLI batch>1 固定宽度稀疏 decode（有效在前 left-pad KV 布局）。
-
-    阶段 1 消费 DynamicCache 变长 KV（有效占尾、`-L_b:` 尾部切片）；阶段
-    2a 切换 TLIStaticCache 固定容量 S_cap（pred_ruler_batch 构建）：行 b
-    有效 KV 占 [0, L_b)、[L_b, S_cap) 为未写 pad 区（零）。逐行 b：
-      - k_b/v_b = k[b:b+1] 全宽 [1, S_cap, Hkv, D]（不再变长尾部切片）；
-      - cu = [0, S_cap]（固定）；pos = [L_b-1]（该 query 行内绝对位置）；
-      - prepare_mask(..., valid_length=L_b) → mask [1,1,Hkv,S_cap]，有效区
-        [0, L_b) 与变长路径逐位一致、pad 区全 False（E155e fixed_width
-        探针已证）；
-      - eager_decoding_attn：gather 路径只选中有效区（pad False 不选）、
-        cu 契约 [0,S_cap] 成立 → 输出与变长路径逐位一致（同 token 集、
-        同 q·k，归约顺序同）。固定 S_cap 形状 = CUDA Graph 前置。
-    全量 vs 单序列增量逐位一致（E133c 归纳）保持，B=1 batch 模式与旧
-    单序列入口逐位一致（gate_bs1_equiv 依据）。
-
-    形状流：query_states [B,H,1,D] → q [B,1,H,D]；key/value_states
-    [B,Hkv,S_cap,D] → k/v [B,S_cap,Hkv,D]。返回 [B,1,H,D]。
-
-    【阶段 2b 批量张量化】B>1 且 block_size==1（TLI 生产 token 级 mask）时
-    走批量路径：逐行 prepare_mask（indexer 状态逐行，mask 内容与逐行路径
-    逐位相同）→ cat 成 [B,1,Hkv,S_cap] → 一次批量 eager_decoding_attn
-    （Triton 批量 kernel A/B 逐 (b,r) program 独立归约、仅 batch 维寻址，
-    与逐行单 query kernel 逐位一致——dbg_batch_kernel.py nd=0 硬证）。批量
-    eager 不传 valid_length：mask 已在 prepare_mask 统一清 pad 区
-    （base.prepare_mask L67 `mask[..., valid_length:]=False`），gather 只选
-    有效区，与逐行口径一致。cu_b = arange(B+1)*S_cap（固定全宽契约，kernel
-    A 逐行校验 cu[b]==b*T）。B==1 / block_size>1 保持逐行路径零扰动
-    （gate_bs1_equiv 铁律：batch=1 与旧单序列入口逐位一致）。
-    """
+    """Batch decode: graph uses the graph path, eager uses compact SIMT."""
     B = query_states.shape[0]
-    dyn_state = None
     if getattr(indexer, "dyn_dgate", False):
         indexer.freeze_dyn_dgate()
-        dyn_state = (indexer.skip_far, indexer._dyn_skip_pending,
-                     indexer._dyn_frozen)
     q = query_states.transpose(1, 2)   # [B, 1, H, D]
     k = key_states.transpose(1, 2)     # [B, S_cap, Hkv, D]
     v = value_states.transpose(1, 2)   # [B, S_cap, Hkv, D]
-    dev = q.device
-    S_cap = k.shape[1]
-    # 【batch indexer 并行化】TLI_BATCH_INDEXER=parallel 时走批量 kernel
-    # 路径（Triton batch scoring + topk），替代逐行循环。
-    if _parallel_batch_enabled(B):
-        from ..indexer.tli_batch import prepare_mask_batched
-        lengths = _batch_device_lengths(ctx, dev)
-        mask, bs = prepare_mask_batched(indexer, q, k, lengths, self.scaling)
-        _paper_route(self, "tli_batch_indexer_parallel_eager")
-        return eager_decoding_attn(
-            q, k, v, mask, bs, indexer._batch_tli.cu,
-            softmax_scale=self.scaling,
-            valid_length=ctx.seq_lens if B > 1 else ctx.seq_lens[0])
-    # 【阶段 2c-4】graph 模式（pred_ruler_batch capture 窗口内）：动态几何
-    # 全走 tensor（valid_len_buf），无 Python int 烘焙。配置不支持
-    # compute_mask_graph（非生产主配置）时 fail-closed 关 graph + 回 staged
-    # 路径（capture 前的 warmup 阶段触发，之后两臂一致）。
-    from ..ops.cuda_graph_state import graph_state  # noqa: E402
-    _gs = graph_state()
-    if os.environ.get('TLI_BATCH_INDEXER', 'legacy') == 'exact':
-        if not _gs.enabled:
-            raise ValueError('exact batch requires the fixed-address graph-state route')
-        return _tl_decode_batched_graph(self,indexer,q,k,v,_gs)
-    if _gs.enabled:
-        try:
-            return _tl_decode_batched_graph(self, indexer, q, k, v, _gs)
-        except NotImplementedError:
-            _gs.enabled = False
-            print("[2c] compute_mask_graph 不支持当前配置 → 关闭 CUDA Graph，"
-                  "回退 staged 逐行路径", flush=True)
-    # 逐行 mask 准备（indexer 状态逐行，B>1 与 B==1 共用同一循环）——
-    # 阶段 2b 把 mask 收集起来，B>1 且 token 级时一次批量 eager。
-    masks = []
-    bs0 = None
-    for b in range(B):
-        L_b = ctx.seq_lens[b]
-        q_b = q[b:b + 1]                    # [1, 1, H, D]
-        k_b = k[b:b + 1]                    # [1, S_cap, Hkv, D]（全宽，有效在前）
-        v_b = v[b:b + 1]                    # [1, S_cap, Hkv, D]
-        cu = torch.tensor([0, S_cap], device=dev, dtype=torch.int32)
-        pos = torch.tensor([L_b - 1], device=dev, dtype=torch.long)
-        indexer.clear()
-        if dyn_state is not None:
-            (indexer.skip_far, indexer._dyn_skip_pending,
-             indexer._dyn_frozen) = dyn_state
-        mask, block_size = indexer.prepare_mask(
-            q_b, pos, k_b, cu, softmax_scale=self.scaling, valid_length=L_b)
-        masks.append(mask)
-        bs0 = block_size
-    if B > 1 and bs0 == 1:
-        m_b = torch.cat(masks, dim=0)       # [B, 1, Hkv, S_cap]
-        cu_b = torch.arange(B + 1, device=dev, dtype=torch.int32) * S_cap
-        # valid_length 传逐行真实长 list（Triton 批量只消费 mask 忽略之；
-        # torch 批量回退的 dense 段逐行裁剪归约域 [0,L_b) → 与变长路径
-        # 逐位一致，防 pad 0 项参与归约树致 ULP 翻硬币）
-        output = eager_decoding_attn(
-            q, k, v, m_b, bs0, cu_b, softmax_scale=self.scaling,
-            valid_length=ctx.seq_lens)
-        indexer._graph_attention_route = 'batch_eager_tli'
-        return output
-    # B==1（gate_bs1_equiv 铁律）/ block_size>1 兜底：逐行单 query 路径
-    outs = []
-    for b in range(B):
-        cu = torch.tensor([0, S_cap], device=dev, dtype=torch.int32)
-        outs.append(eager_decoding_attn(
-            q[b:b + 1], k[b:b + 1], v[b:b + 1], masks[b], bs0, cu,
-            softmax_scale=self.scaling, valid_length=ctx.seq_lens[b]))
-    return torch.cat(outs, dim=0)            # [B, 1, H, D]
+    from ..ops.cuda_graph_state import graph_state
+    gs = graph_state()
+    if gs.enabled:
+        return _tl_decode_batched_graph(self, indexer, q, k, v, gs)
+    lengths = _batch_device_lengths(ctx, q.device)
+    output = _decode_batch_compact(self, indexer, q, k, v, lengths)
+    indexer._graph_attention_route = 'batch_eager_compact_tli'
+    return output
 
 
 def qwen3_attn_forward(
@@ -326,6 +159,9 @@ def qwen3_attn_forward(
     from ..ops.selector_options import validate_selector_options
     capacity = past_key_values.get_max_cache_shape() if past_key_values is not None else None
     validate_selector_options(capacity if isinstance(capacity, int) and capacity > 0 else None)
+    if hasattr(self.indexer, "far_skip_backend") and not getattr(past_key_values, "paged_regions", False):
+        raise ValueError(
+            "TLI cache must be PagedRegionCache; use prefill_frozen_request")
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
 
@@ -342,7 +178,7 @@ def qwen3_attn_forward(
         ctx = batch_decode_ctx()
         if ((ctx is not None and ctx.batch != 1) or graph_state().enabled
                 or os.environ.get("TLI_OPERATOR_MODE", "off") != "off"):
-            raise ValueError("Qwen frozen regions require eager B1 with operator mode off")
+            raise ValueError("Qwen frozen regions require eager B1")
         if input_shape[0] != 1 or self.indexer.dyn_dgate:
             raise ValueError("Qwen frozen regions require B1 and independent region gates")
         layer = past_key_values.layers[self.layer_idx]
@@ -353,27 +189,10 @@ def qwen3_attn_forward(
                 and attention_mask["full_attention"] is None))
             if input_shape[1] != 1 or not layer.frozen or not owned_mask:
                 raise ValueError("Qwen frozen regions require frozen unpadded single-token decode")
-            if getattr(past_key_values, "paged_regions", False):
-                from ..ops.paged_region_tli import decode as region_decode
-            else:
-                from ..ops.frozen_region_tli import decode as region_decode
+            from ..ops.paged_region_tli import decode as region_decode
             result = region_decode(self, query_states, key_states, value_states,
                                    past_key_values, cache_position)
             return self.o_proj(result.reshape(*input_shape, -1).contiguous()), None
-
-    # Compact consumers own both the KV write and absolute-to-ring addressing.
-    # Dispatch before the generic update, which would otherwise append twice.
-    if (past_key_values is not None
-            and getattr(self.indexer, "far_skip_backend", "legacy") == "compact"):
-        from ..ops.far_skip_runtime import try_far_skip_decode
-        compact = try_far_skip_decode(
-            self, query_states, key_states, value_states, past_key_values,
-            attention_mask, cache_position, batch_decode_ctx())
-        if compact is not None:
-            attn_output = self.o_proj(compact.reshape(*input_shape, -1).contiguous())
-            _paper_route(self.layer_idx, "hybrid-batch-decode"
-                         if getattr(past_key_values, '_hybrid_batch', False) else "far-skip-decode")
-            return attn_output, None
 
     cur_len = 0
     is_static_cache = False
@@ -509,15 +328,6 @@ def qwen3_attn_forward(
             )
             _paper_route(self.layer_idx,"dense-prefill")
     else:
-        # 【阶段 1（deepseek 轨）】TLI batch>1 稀疏 decode：pred_ruler_batch
-        # 批量入口在 decode 循环外层 set BatchCtx。ctx 非 None 时走
-        # _tl_decode_batched（逐行单序列核心 + 共享 indexer clear 全量
-        # 重建，正确性最稳）。B=1 batch 模式与旧单序列入口逐位一致
-        # （gate_bs1_equiv 依据）；非 batch 模式（ctx None）走既有路径
-        # 逐位不变（铁律）。batch 分支独立于 TLI_DECODE_DENSE 消融
-        # （消融仅单序列口径，batch 模式无意义）与 B2 守卫（B2 的
-        # batch 拒绝在此分支之前已绕开；batch 分支自身要求
-        # past_key_values 非 None，而 decode 分支进入条件已保证）。
         _ctx = batch_decode_ctx()
         if _ctx is not None:
             attn_output = _tl_decode_batched(
@@ -527,128 +337,33 @@ def qwen3_attn_forward(
             attn_output = self.o_proj(attn_output)
             _paper_route(self.layer_idx, "sparse-decode-batch")
             return attn_output, None
-        # E138 消融①（prefill-only 稀疏，2026-10-14 用户指令）：TLI_DECODE_DENSE=1
-        # 时 decode 显式回退 dense 原生前向——patch 保持挂载（prefill 稀疏
-        # 选择消费 indexer），decode 不做稀疏选择。用于分离「prefill 稀疏
-        # 的 KV 污染」与「decode 稀疏选择」两因素的贡献。默认不设 = 0 =
-        # 现状稀疏 decode 逐位不变（B2 守卫/所有下游路径零扰动）。
-        if os.environ.get("TLI_DECODE_DENSE", "0") == "1":
-            attn_output, attn_weights = attention_interface(
-                self,
-                query_states,
-                key_states,
-                value_states,
-                attention_mask,
-                dropout=0.0 if not self.training else self.attention_dropout,
-                scaling=self.scaling,
-                sliding_window=self.sliding_window,  # diff with Llama
-                **kwargs,
-            )
-            attn_output = attn_output.reshape(*input_shape, -1).contiguous()
-            attn_output = self.o_proj(attn_output)
-            _paper_route(self.layer_idx,"dense-decode")
-            return attn_output, attn_weights
-        # 【B2 修复（kimi3 清单 F2，2026-10-08）】decode 分支入口硬守卫
-        # （audit 建议口径）：use_cache=False / chunked prefill（q_len>1）/
-        # batch>1 / 4D float mask 一律显式拒绝，替代静默零输出与形状崩溃。
         if past_key_values is None:
             raise RuntimeError(
-                "TLI 稀疏 patch 需要 KV cache（use_cache=True）；当前 "
-                "past_key_values=None（use_cache=False 形态，训练/PPL/"
-                "logprob 打分不支持稀疏索引路径），拒绝执行。"
-            )
+                "TLI sparse decode requires a KV cache (use_cache=True); "
+                "past_key_values=None is unsupported")
         if input_shape[0] != 1 or input_shape[1] != 1:
             raise RuntimeError(
-                f"TLI 稀疏 decode 路径仅支持 batch=1 且 q_len=1 的逐 token "
-                f"解码；当前 batch={input_shape[0]}、q_len={input_shape[1]}"
-                f"（chunked prefill / batch>1 会静默只算首 token 或形状"
-                f"崩溃），拒绝执行。"
-            )
-        # 【E134-pre】StaticCache decode：HF 为静态缓存生成 4D bool 容量尺寸
-        # causal mask（掩盖未写区）。K/V 上方已切到当前序列长 S=cur_len，
-        # q_len=1 因果约束空转（单 query 只看 ≤ 自身位置的全部有效缓存）。
-        # 验证「bool、[:S] 全真、[S:] 全假」，只对同一 live tensor/version
-        # 复用；验证不过不吞掉，仍走下方原 B2 拒绝路径。
-        # DynamicCache（mask=None）路径零扰动。
-        if (attention_mask is not None and is_static_cache
-                and self.sliding_window is None
-                and _can_drop_static_mask(past_key_values, attention_mask, cur_len, prefill=False)):
-            attention_mask = None
-        if attention_mask is not None and (
-            attention_mask.dim() != 2 or attention_mask.dtype != torch.bool
-            or tuple(attention_mask.shape) != (1, key_states.shape[-2])
-            or not bool(attention_mask[0, -1])
-        ):
-            raise RuntimeError(
-                f"TLI 稀疏 decode 路径的 attention_mask 须为 [1, S] 2D bool "
-                f"padding mask，且当前 query（最后位置）须有效；当前 dim={attention_mask.dim()}、"
-                f"dtype={attention_mask.dtype}（HF 实际传 4D float causal "
-                f"mask，按 2D 假设处理不正确），拒绝执行。"
-            )
+                f"TLI sparse decode requires batch=1 and q_len=1; got "
+                f"batch={input_shape[0]}, q_len={input_shape[1]}")
         indexer: Indexer = self.indexer
-        # 【Phase 4】Serial graph 路由：TLI_OPERATOR_MODE=serial 时走
-        # decode_indexed（compact selection → partial attention），跳过
-        # legacy prepare_mask + eager_decoding_attn full-width mask 路径。
-        from ..ops.operator_pipeline import operator_mode, decode_indexed
-        _op_mode = operator_mode()
-        if _op_mode in ('serial', 'overlap'):
-            # 单序列口径：B=1 post-RoPE → transpose → [1,1,Hkv,S_cap]
-            qs_t = query_states.transpose(1, 2)   # [1,1,Hkv,D]
-            ks_t = key_states.transpose(1, 2)     # [1,S_cap,Hkv,D]
-            vs_t = value_states.transpose(1, 2)
-            dev = qs_t.device
-            S_cap = ks_t.shape[1]
-            vl = torch.tensor([ks_t.shape[1]], dtype=torch.int64, device=dev)
-            # 实际有效长度从 cache 获取；单序列 decode 全宽 S_cap=cur_len
-            if is_static_cache:
-                vl = torch.tensor([cur_len], dtype=torch.int64, device=dev)
-            cu = _graph_const(("cu_cap", str(dev), S_cap),
-                              lambda: torch.tensor([0, S_cap], device=dev,
-                                                   dtype=torch.int32))
-            attn_output = decode_indexed(indexer, indexer,
-                                         qs_t, ks_t, vs_t, cu, vl,
-                                         self.scaling)
-            _paper_route(self.layer_idx, f"{_op_mode}-decode")
-            attn_weights = None
-            attn_output = attn_output.reshape(*input_shape, -1).contiguous()
-            attn_output = self.o_proj(attn_output)
-            return attn_output, attn_weights
-        # A6（TL-E137-PREFILL-GATE-145）：decode 首步冻结 E137 动态标定决策。
-        # prefill 期 calibrate_dyn_dgate 只写 _dyn_skip_pending（决策挂起），
-        # 此处一次性落 skip_far（_dyn_frozen 哨兵防重复，clear() 复位两状态）
-        # ——修复「完整 prompt 标定结果被稀疏 prefill chunk 消费」的非因果
-        # 缺陷；dense prefill（默认路径）逐位不变。非 dyn_dgate 实例 no-op。
-        if hasattr(indexer, "freeze_dyn_dgate"):
+        if getattr(indexer, "dyn_dgate", False):
             indexer.freeze_dyn_dgate()
-        # Legacy far skip retains full storage. Compact decode returned before
-        # the generic cache update above; never feed ring KV to this selector.
-        query_states, key_states, value_states = (x.transpose(1, 2) for x in (query_states, key_states, value_states))
-        if attention_mask is not None:
-            cu_seqlens_k = prepare_cu_seqlens_from_mask(attention_mask)
-            # Decode has one live query but S cached keys. The KV-length mask
-            # cannot index Q; the guard above guarantees this query is valid.
-            key_states, value_states = (unpad_tensor(x, attention_mask) for x in (key_states, value_states))
-        else:
-            cu_seqlens_k = prepare_cu_seqlens(key_states)
-            query_states, key_states, value_states = (x.view(1, -1, *x.shape[-2:]) for x in (query_states, key_states, value_states))
-        query_position_ids = prepare_seqlens(cu_seqlens_k) - 1
-        mask, block_size = indexer.prepare_mask(
-            query_states, 
-            query_position_ids, 
-            key_states, 
-            cu_seqlens_k
-        )
-        attn_output = eager_decoding_attn(
-            query_states,
-            key_states,
-            value_states,
-            mask,
-            block_size,
-            cu_seqlens_k,
-            softmax_scale=self.scaling,
-        )
-        _paper_route(self.layer_idx,"sparse-decode")
+        qs_t = query_states.transpose(1, 2)   # [1,1,H,D]
+        ks_t = key_states.transpose(1, 2)     # [1,S,Hkv,D]
+        vs_t = value_states.transpose(1, 2)
+        dev = qs_t.device
+        S_cap = ks_t.shape[1]
+        vl = torch.tensor([cur_len], dtype=torch.int64, device=dev)
+        cu = _graph_const(("cu_cap", str(dev), S_cap),
+                          lambda: torch.tensor([0, S_cap], device=dev,
+                                               dtype=torch.int32))
+        attn_output = decode_compact(indexer, indexer, qs_t, ks_t, vs_t,
+                                     cu, vl, self.scaling)
+        _paper_route(self.layer_idx, "sparse-decode-compact")
         attn_weights = None
+        attn_output = attn_output.reshape(*input_shape, -1).contiguous()
+        attn_output = self.o_proj(attn_output)
+        return attn_output, attn_weights
 
     attn_output = attn_output.reshape(*input_shape, -1).contiguous()
     attn_output = self.o_proj(attn_output)

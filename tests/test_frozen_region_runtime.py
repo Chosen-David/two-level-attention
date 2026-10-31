@@ -6,7 +6,7 @@ import torch
 from transformers import Qwen3Config, Qwen3ForCausalLM
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
-from sparse_attn.ops.frozen_region_cache import RegionGeometry
+from sparse_attn.ops.region_geometry import RegionGeometry
 from sparse_attn.ops.frozen_region_gate import GateConfig
 from sparse_attn.ops.frozen_region_runtime import (
     complete_frozen_request, prefill_frozen_request)

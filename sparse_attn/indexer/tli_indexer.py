@@ -463,8 +463,9 @@ class TLIIndexer(TIAIndexer):
         self.far_skip_backend = getattr(args, "tli_far_skip_backend", "legacy")
         self.far_skip_cache = getattr(args, "tli_far_skip_cache", "retain")
         if self.far_skip_backend != "legacy" or self.far_skip_cache != "retain":
-            from ..ops.far_skip_runtime import configure_far_skip
-            configure_far_skip(self)
+            raise ValueError(
+                "far-skip/static/batch cache paths have been removed; "
+                "only PagedRegionCache is supported")
 
         # ---- E85f：per-layer 静态 pair 选取（e2e 判决）----
         #   E85e 重放：prefill 尾 256 q 平均 |q| 的 pair 幅值 |q̄_j|+|q̄_{j+64}|
@@ -485,8 +486,9 @@ class TLIIndexer(TIAIndexer):
         self.far_skip_backend = getattr(args, "tli_far_skip_backend", "legacy")
         self.far_skip_cache = getattr(args, "tli_far_skip_cache", "retain")
         if self.far_skip_backend != "legacy" or self.far_skip_cache != "retain":
-            from ..ops.far_skip_runtime import configure_far_skip
-            configure_far_skip(self)
+            raise ValueError(
+                "far-skip/static/batch cache paths have been removed; "
+                "only PagedRegionCache is supported")
 
     # ---------------- E135：sink/swa 参数化的单一事实源 ---------------- #
 

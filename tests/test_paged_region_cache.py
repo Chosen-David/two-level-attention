@@ -3,8 +3,8 @@ import weakref
 
 import pytest
 import torch
-from sparse_attn.ops.paged_region_cache import PagedRegionLayer,PagedRegionCache
-from sparse_attn.ops.frozen_region_cache import RegionGeometry,RegionCacheLayer
+from sparse_attn.cache.paged_region_cache import PagedRegionLayer,PagedRegionCache
+from sparse_attn.ops.region_geometry import RegionGeometry
 from sparse_attn.ops.paged_region_kernels import paged_attention
 
 @pytest.mark.parametrize('near,far',[(False,False),(True,False),(False,True),(True,True)])
