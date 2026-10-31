@@ -180,3 +180,34 @@ def test_page_label_visible_mask_and_resident_mask_are_separate():
     assert layer.visible_mask(2, r_near) == 0
     assert not layer.page_reclaimable(2, r_near)
     assert layer.resident_mask(r_near) & NEAR
+
+
+@torch.inference_mode()
+def test_vllm_style_query_and_region_metadata():
+    torch.manual_seed(41)
+    g = RegionGeometry(sink=2, near=16, window=4, page=4, max_new_tokens=20)
+    layer = PagedRegionLayer(g)
+    r0 = layer.add_request()
+    r1 = layer.add_request()
+    for request_id, length in ((r0, 5), (r1, 9)):
+        layer.write_request(request_id, torch.randn(1, 2, length, 8), torch.randn(1, 2, length, 6))
+        layer.freeze_request(request_id, skip_near=False, skip_far=False)
+
+    metadata = layer.region_metadata([r0, r1])
+    assert metadata['query_start_loc'].tolist() == [0, 1, 2]
+    assert metadata['seq_lens'].tolist() == [5, 9]
+    assert metadata['block_table'].shape == (2, 3)
+    assert metadata['slot_mapping'].tolist() == [
+        layer.block_tables[r0][1] * g.page + 1,
+        layer.block_tables[r1][2] * g.page + 1]
+    assert metadata['region_label_masks'].shape == (2, 3)
+    assert metadata['region_visible_masks'].shape == (2, 3)
+    assert bool(metadata['region_visible_masks'][0, 1])
+
+    start_loc = layer.query_start_loc([r0, r1], [2, 1])
+    assert start_loc.tolist() == [0, 2, 3]
+    slot_mapping = layer.slot_mapping_for_write([r0, r1], [2, 1])
+    assert slot_mapping.tolist() == [
+        layer.block_tables[r0][1] * g.page + 1,
+        layer.block_tables[r0][1] * g.page + 2,
+        layer.block_tables[r1][2] * g.page + 1]

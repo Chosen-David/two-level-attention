@@ -402,10 +402,7 @@ class PagedRegionLayer(CacheLayerMixin):
             if lp not in self.block_tables[request_id]:
                 self._allocate_decode_page(request_id, lp)
             physical = self.block_tables[request_id].get(lp)
-            if physical is None:
-                mapping.append(-1)
-            else:
-                mapping.append(physical * page + offset)
+            mapping.append(physical * page + offset if physical is not None else -1)
         return torch.tensor(mapping, dtype=torch.int64, device=device)
 
     def write_decode(self, request_ids, keys, values, slot_mapping):
@@ -476,6 +473,177 @@ class PagedRegionLayer(CacheLayerMixin):
             if lp < logical_pages:
                 table[lp] = physical
         return table
+
+    def _resolve_request_ids(self, request_ids=None):
+        if request_ids is None:
+            return list(range(self.next_slot))
+        return list(request_ids)
+
+    def _default_decode_query_lengths(self, request_ids):
+        lengths = []
+        for request_id in request_ids:
+            if request_id < 0 or request_id >= len(self.active_flags) or not self.active_flags[request_id]:
+                lengths.append(0)
+            elif not self.frozen_flags[request_id]:
+                raise ValueError('freeze all active requests before batch decode')
+            else:
+                lengths.append(1)
+        return lengths
+
+    def query_start_loc(self, request_ids=None, query_lengths=None, device=None):
+        """vLLM-style input-side cumsum for a flat multi-request query batch."""
+        request_ids = self._resolve_request_ids(request_ids)
+        if query_lengths is None:
+            query_lengths = self._default_decode_query_lengths(request_ids)
+        query_lengths = [int(x) for x in query_lengths]
+        if len(query_lengths) != len(request_ids):
+            raise ValueError('query_lengths must match request_ids')
+        if any(x < 0 for x in query_lengths):
+            raise ValueError('query_lengths must be non-negative')
+        lengths = torch.tensor(query_lengths, dtype=torch.int64)
+        loc = torch.zeros(len(lengths) + 1, dtype=torch.int32, device=device)
+        loc[1:] = lengths.cumsum(0).to(torch.int32)
+        return loc
+
+    def seq_lens_tensor(self, request_ids=None, device=None):
+        request_ids = self._resolve_request_ids(request_ids)
+        values = []
+        for request_id in request_ids:
+            if request_id < 0 or request_id >= len(self.active_flags) or not self.active_flags[request_id]:
+                values.append(0)
+            else:
+                values.append(self.seq_lens[request_id])
+        return torch.tensor(values, dtype=torch.int64, device=device)
+
+    def block_table_batch(self, request_ids=None, device=None, max_blocks=None):
+        """Pad per-request block tables to a fixed [B, max_blocks] tensor."""
+        request_ids = self._resolve_request_ids(request_ids)
+        page = self.geometry.page
+        rows = []
+        for request_id in request_ids:
+            if request_id < 0 or request_id >= len(self.active_flags) or not self.active_flags[request_id]:
+                rows.append([])
+                continue
+            logical_pages = (self.seq_lens[request_id] + page - 1) // page
+            rows.append([self.block_tables[request_id].get(lp, -1) for lp in range(logical_pages)])
+        max_blocks = max((len(row) for row in rows), default=0) if max_blocks is None else max_blocks
+        table = torch.full((len(request_ids), max_blocks), -1, dtype=torch.int64, device=device)
+        for batch, row in enumerate(rows):
+            if row:
+                table[batch, :len(row)] = torch.tensor(row, dtype=torch.int64, device=device)
+        return table
+
+    def region_label_masks(self, request_ids=None, device=None, max_blocks=None):
+        """Per-request page-level region labels, aligned with block_table_batch."""
+        request_ids = self._resolve_request_ids(request_ids)
+        page = self.geometry.page
+        rows = []
+        for request_id in request_ids:
+            if request_id < 0 or request_id >= len(self.active_flags) or not self.active_flags[request_id]:
+                rows.append([])
+                continue
+            logical_pages = (self.seq_lens[request_id] + page - 1) // page
+            rows.append([self.page_label(lp, request_id) if lp in self.block_tables[request_id] else 0
+                         for lp in range(logical_pages)])
+        max_blocks = max((len(row) for row in rows), default=0) if max_blocks is None else max_blocks
+        masks = torch.zeros((len(request_ids), max_blocks), dtype=torch.uint8, device=device)
+        for batch, row in enumerate(rows):
+            if row:
+                masks[batch, :len(row)] = torch.tensor(row, dtype=torch.uint8, device=device)
+        return masks
+
+    def region_visible_masks(self, request_ids=None, device=None, max_blocks=None):
+        """Per-request page-level visible masks, aligned with block_table_batch."""
+        request_ids = self._resolve_request_ids(request_ids)
+        page = self.geometry.page
+        rows = []
+        for request_id in request_ids:
+            if request_id < 0 or request_id >= len(self.active_flags) or not self.active_flags[request_id]:
+                rows.append([])
+                continue
+            logical_pages = (self.seq_lens[request_id] + page - 1) // page
+            rows.append([self.visible_mask(lp, request_id) if lp in self.block_tables[request_id] else 0
+                         for lp in range(logical_pages)])
+        max_blocks = max((len(row) for row in rows), default=0) if max_blocks is None else max_blocks
+        masks = torch.zeros((len(request_ids), max_blocks), dtype=torch.uint8, device=device)
+        for batch, row in enumerate(rows):
+            if row:
+                masks[batch, :len(row)] = torch.tensor(row, dtype=torch.uint8, device=device)
+        return masks
+
+    def token_visible_mask(self, request_ids=None, device=None):
+        """Token-level region visibility for each request, padded to max seq_len."""
+        request_ids = self._resolve_request_ids(request_ids)
+        max_length = 0
+        rows = []
+        for request_id in request_ids:
+            if request_id < 0 or request_id >= len(self.active_flags) or not self.active_flags[request_id]:
+                rows.append(torch.zeros(0, dtype=torch.bool, device=device))
+                continue
+            length = self.seq_lens[request_id]
+            max_length = max(max_length, length)
+            sink_hi, far_hi, near_hi = self.geometry.bounds(length)
+            skip_near = self.skip_near_flags[request_id]
+            skip_far = self.skip_far_flags[request_id]
+            pos = torch.arange(length, device=device)
+            visible = ((pos < sink_hi) | (pos >= near_hi)
+                       | ((pos >= sink_hi) & (pos < far_hi) & (not skip_far))
+                       | ((pos >= far_hi) & (pos < near_hi) & (not skip_near)))
+            rows.append(visible)
+        mask = torch.zeros((len(request_ids), max_length), dtype=torch.bool, device=device)
+        for batch, row in enumerate(rows):
+            if row.numel():
+                mask[batch, :row.numel()] = row
+        return mask
+
+    def slot_mapping_for_write(self, request_ids=None, query_lengths=None, device=None):
+        """Flat write locations for the next `query_lengths` tokens per request."""
+        request_ids = self._resolve_request_ids(request_ids)
+        if query_lengths is None:
+            query_lengths = self._default_decode_query_lengths(request_ids)
+        query_lengths = [int(x) for x in query_lengths]
+        if len(query_lengths) != len(request_ids):
+            raise ValueError('query_lengths must match request_ids')
+        if any(x < 0 for x in query_lengths):
+            raise ValueError('query_lengths must be non-negative')
+        page = self.geometry.page
+        mapping = []
+        for request_id, query_length in zip(request_ids, query_lengths):
+            if request_id < 0 or request_id >= len(self.active_flags) or not self.active_flags[request_id]:
+                if query_length != 0:
+                    raise ValueError(f'inactive request {request_id} cannot accept queries')
+                continue
+            if not self.frozen_flags[request_id]:
+                raise ValueError('freeze all active requests before batch write')
+            start = self.seq_lens[request_id]
+            if start - self.prompt_lengths[request_id] + query_length > self.geometry.max_new_tokens:
+                raise ValueError('generation capacity exceeded')
+            for token_offset in range(query_length):
+                absolute = start + token_offset
+                lp, offset = divmod(absolute, page)
+                if lp not in self.block_tables[request_id]:
+                    if not self.block_tables[request_id]:
+                        raise ValueError('new-request prefill slot mapping requires KV shape; use write_request')
+                    self._allocate_decode_page(request_id, lp)
+                physical = self.block_tables[request_id][lp]
+                mapping.append(physical * page + offset)
+        return torch.tensor(mapping, dtype=torch.int64, device=device)
+
+    def region_metadata(self, request_ids=None, query_lengths=None, device=None,
+                        include_token_mask=False):
+        request_ids = self._resolve_request_ids(request_ids)
+        query_start_loc = self.query_start_loc(request_ids, query_lengths, device=device)
+        seq_lens = self.seq_lens_tensor(request_ids, device=device)
+        block_table = self.block_table_batch(request_ids, device=device)
+        slot_mapping = self.slot_mapping_for_write(request_ids, query_lengths, device=device)
+        metadata = dict(request_ids=request_ids, query_start_loc=query_start_loc,
+                        seq_lens=seq_lens, block_table=block_table,
+                        slot_mapping=slot_mapping,
+                        region_label_masks=self.region_label_masks(request_ids, device=device),
+                        region_visible_masks=self.region_visible_masks(request_ids, device=device))
+        if include_token_mask:
+            metadata['token_visible_mask'] = self.token_visible_mask(request_ids, device=device)
+        return metadata
 
     def physical_pointer_tables(self):
         if not self.kv_pool:
@@ -715,6 +883,24 @@ class PagedRegionCache(Cache):
             raise ValueError('all layers need frozen decisions')
         for layer_idx, layer in enumerate(self.layers):
             layer.freeze_request(request_id, **decisions[layer_idx])
+
+    def query_start_loc(self, layer_idx, request_ids=None, query_lengths=None, device=None):
+        return self.layers[layer_idx].query_start_loc(request_ids, query_lengths, device=device)
+
+    def seq_lens_tensor(self, layer_idx, request_ids=None, device=None):
+        return self.layers[layer_idx].seq_lens_tensor(request_ids, device=device)
+
+    def block_table_batch(self, layer_idx, request_ids=None, device=None, max_blocks=None):
+        return self.layers[layer_idx].block_table_batch(request_ids, device=device, max_blocks=max_blocks)
+
+    def slot_mapping_for_write(self, layer_idx, request_ids=None, query_lengths=None, device=None):
+        return self.layers[layer_idx].slot_mapping_for_write(request_ids, query_lengths, device=device)
+
+    def region_metadata(self, layer_idx, request_ids=None, query_lengths=None, device=None,
+                        include_token_mask=False):
+        return self.layers[layer_idx].region_metadata(
+            request_ids, query_lengths=query_lengths, device=device,
+            include_token_mask=include_token_mask)
 
     def decode_slot_mapping(self, layer_idx, request_ids=None, device=None):
         return self.layers[layer_idx].decode_slot_mapping(request_ids, device=device)
