@@ -41,6 +41,7 @@ def _args(**overrides):
 
 def _config():
     return SimpleNamespace(model_type='qwen3', head_dim=128,
+                           max_position_embeddings=40960, rope_scaling=None,
                            num_hidden_layers=1, _attn_implementation='eager')
 
 
@@ -186,6 +187,9 @@ def _run_ruler_main(monkeypatch, tmp_path, complete):
     monkeypatch.setattr(pred_ruler.AutoConfig, 'from_pretrained', lambda *a, **k: config)
     monkeypatch.setattr(pred_ruler.AutoTokenizer, 'from_pretrained', lambda *a, **k: _Tokenizer())
     monkeypatch.setattr(pred_ruler.AutoModelForCausalLM, 'from_pretrained', lambda *a, **k: model)
+    # RoPE 的频率/旋转验证由 test_rope_policy 独立覆盖；此处只测 frozen 请求边界。
+    monkeypatch.setattr('benchmark.rope_policy.verify_runtime_rope',
+                        lambda model_or_config: {'status': 'verified'})
     monkeypatch.setattr(pred_ruler, 'resolve_far_skip_modes', lambda *a, **k: None)
     monkeypatch.setattr(pred_ruler, 'resolve_treatment_snapshot', lambda args: None)
     monkeypatch.setattr(pred_ruler, 'get_method_name_with_info', lambda *a: 'frozen_contract')

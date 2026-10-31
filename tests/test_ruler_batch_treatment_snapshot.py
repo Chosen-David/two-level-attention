@@ -50,7 +50,8 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
         class AutoConfig:
             @staticmethod
             def from_pretrained(*args, **kwargs):
-                return types.SimpleNamespace()
+                return types.SimpleNamespace(
+                    model_type="receipt_test_stub", max_position_embeddings=40960)
 
         class AutoModel:
             @staticmethod
