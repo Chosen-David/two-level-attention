@@ -2,10 +2,20 @@
 
 ## 2026-10-30
 
+- [x] [TL-NFA-ABLATION-20261030] 仅HotpotQA/GovReport；A/C/E限定验收保持；B 2000/2000及官方重评分、配对bootstrap独立验收通过（usable-with-scope）。F取消/全部性能暂停。([详情](task_details/TL-NFA-ABLATION-20261030.md))
+
+- [ ] [TL-NFA-PAGED-CACHE-20261030] 真实Qwen keep逐层576调用已捕获，CPU77逐位复算及1152 KV哈希通过；原第5步argmax失败保持，诊断六项限定独验通过/root4001绑定；未替换ring/性能暂停。([详情](task_details/TL-NFA-PAGED-CACHE-20261030.md))
+
+- [x] [TL-FROZEN-V1-16-20261030] V1 3750/11250/128done、全量独验/最终报告完成；本轮绑定复核通过，整体监督仍含新任务。([详情](task_details/TL-FROZEN-V1-16-20261030.md))
+
 - [ ] [TL-DUO-ASSETS-20261030] 固定官方DuoAttention源码、用户提供v1 PDF已归档；独立Python3.10+Torch2.4/cu121+legacy FlashInfer/FlashAttention已实装、CPU import/pattern与pip check通过，完整哈希锁可复建；BlockSparse/NVCC和GPU/实模验收仍待完成。([详情](task_details/TL-DUO-ASSETS-20261030.md))
 
 - [x] [TL-FROZEN-MAIN-20261030] Integrate accepted independent Near/Far0.05 eager cache reference;84 tests +14 subtests passed. ([details](task_details/TL-FROZEN-MAIN-20261030.md))
 
+
+## 2026-10-29
+
+- [ ] [TL-OPERATOR-COMPLETE-20261029] 持续算子优化：eager候选be62bc3已整合main55ccfb3，v3源码/16CUDA入口协议独审通过（未执行CUDA）；优先池SSH认证阻塞，8B稳定配对待验；保留20分钟监督。([详情](task_details/TL-OPERATOR-COMPLETE-20261029.md))
 
 ## 2026-10-28
 
@@ -262,3 +272,13 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 ## 2026-10-30 GLM frozen-region integration
 
 - TL-GLM-FROZEN-20261030：eager B1独立near/far接入及独立验收完成；[详情](task_details/TL-GLM-FROZEN-20261030.md)。
+
+## 2026-10-30 定向补测
+
+- [x] [TL-FROZEN-QASPER-MK2-20261030] Qasper200、corrected MK2 100/400独验及报告完成；旧40960仅显式归档映射历史消费。([详情](task_details/TL-FROZEN-QASPER-MK2-20261030.md))
+
+- **TL-GLM-AVG5-RULER-113-20261030**：row7六臂独验完成，NoPE64错误复现；普通/物理路径精确一致，selectedSDPA仍错且支持集分歧。下一步共同前缀选择器定位设计有条件通过，未启动；正式评分/论文方法未通过，禁止COMPLETE；[详情](task_details/TL-GLM-AVG5-RULER-113-20261030.md)。
+
+## 2026-10-30 评测正确性
+
+- [ ] [TL-EVAL-BLUEPRINT-20261030] Near-Far蓝图审查；优先修复YaRN实际频率及受影响结果隔离。([详情](task_details/TL-EVAL-BLUEPRINT-20261030.md))
