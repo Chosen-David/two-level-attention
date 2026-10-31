@@ -1,0 +1,491 @@
+{
+  "schema": "e182-prefill-component-cost-offline-audit-v1",
+  "date": "2026-10-31",
+  "audit_type": "offline_harvest_of_existing_e182_production_raw_no_new_gpu_sampling",
+  "verdict": "component_costs_extracted_with_scoped_limits",
+  "source_verdict": {
+    "path": "exp/trace/results/e182_direct_prefill_verdict.json",
+    "sha256": "e773f5d35b394a8851cc9ffc891dda84d44cfac60e8610f66adf73059c2bc2e5",
+    "base_commit": "fb335e5ceb742b31d83206c670a10286c7fba182",
+    "source_verdict": "pass_with_scoped_limits"
+  },
+  "protocol": {
+    "model": "Qwen3-8B BF16 on NVIDIA H20-3e",
+    "lengths": [
+      32768,
+      65536,
+      131072
+    ],
+    "runs_per_arm": 2,
+    "max_generated_tokens": 128,
+    "decode_steps_per_run": 127,
+    "arms": [
+      "direct",
+      "conversion"
+    ],
+    "K1": 64,
+    "K2": 1024,
+    "layer_skip": false,
+    "far_skip_backend": "compact",
+    "far_skip_cache": "evict",
+    "prefill": "native SDPA dense in both arms",
+    "decode": "TLI sparse whole-step CUDA Graph"
+  },
+  "metric_scope_zh": {
+    "prefill_ms": "raw 的 prompt forward 到首 token argmax+sync 边界；不是 calibration/index 单项拆分。",
+    "fill_static_ms": "conversion 臂为既有 fill_static 成本；direct 臂该字段与 finalize_ms 相同。",
+    "finalize_ms": "direct finalize 单项；conversion 为 null，不按 0 伪造。",
+    "capture_ms": "CUDA Graph capture/setup 单项。raw 没有独立 warmup 字段，不能把 capture 当作 setup+warmup 完整成本。",
+    "ttft_ms": "保留 raw 原值，不用 prefill/fill/capture 自行相加重构。",
+    "tpot_ms": "仅保留既有 Graph decode 原始口径，不据此宣称 direct/conversion 或当前 main 加速。"
+  },
+  "lengths": {
+    "32768": {
+      "input_tokens": 33729,
+      "yarn_factor": null,
+      "runs_per_arm": 2,
+      "arms": {
+        "direct": {
+          "raw_report": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_32768_direct_production.json",
+          "raw_report_sha256": "6dc2462a8bde55bdb368ef26321023baac39f55798262f1476644208ef4ba793",
+          "label": "champion-32k-direct-production",
+          "input_ids_sha256_16": "21dc178dc8df3fe3",
+          "S_cap": 33865,
+          "metrics_ms": {
+            "prefill_ms": {
+              "runs": [
+                8270.613476634026,
+                7953.37038487196
+              ],
+              "min": 7953.37038487196,
+              "median_of_2": 8111.991930752993,
+              "max": 8270.613476634026
+            },
+            "fill_static_ms": {
+              "runs": [
+                3.275163471698761,
+                1.3718530535697937
+              ],
+              "min": 1.3718530535697937,
+              "median_of_2": 2.3235082626342773,
+              "max": 3.275163471698761
+            },
+            "finalize_ms": {
+              "runs": [
+                3.275163471698761,
+                1.3718530535697937
+              ],
+              "min": 1.3718530535697937,
+              "median_of_2": 2.3235082626342773,
+              "max": 3.275163471698761
+            },
+            "capture_ms": {
+              "runs": [
+                1393.3174759149551,
+                429.8335835337639
+              ],
+              "min": 429.8335835337639,
+              "median_of_2": 911.5755297243595,
+              "max": 1393.3174759149551
+            },
+            "ttft_ms": {
+              "runs": [
+                8275.731563568115,
+                7953.677527606487
+              ],
+              "min": 7953.677527606487,
+              "median_of_2": 8114.704545587301,
+              "max": 8275.731563568115
+            },
+            "tpot_ms": {
+              "runs": [
+                18.34189639551433,
+                18.334894375068934
+              ],
+              "min": 18.334894375068934,
+              "median_of_2": 18.338395385291633,
+              "max": 18.34189639551433
+            }
+          }
+        },
+        "conversion": {
+          "raw_report": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_32768_conversion_production.json",
+          "raw_report_sha256": "419c648d829d467098bc2b4a5853336e958346d0090d723bba01f3b7635915ed",
+          "label": "champion-32k-conversion-production",
+          "input_ids_sha256_16": "21dc178dc8df3fe3",
+          "S_cap": 33865,
+          "metrics_ms": {
+            "prefill_ms": {
+              "runs": [
+                8287.69850730896,
+                7953.971445560455
+              ],
+              "min": 7953.971445560455,
+              "median_of_2": 8120.834976434708,
+              "max": 8287.69850730896
+            },
+            "fill_static_ms": {
+              "runs": [
+                13.821989297866821,
+                21.77347242832184
+              ],
+              "min": 13.821989297866821,
+              "median_of_2": 17.79773086309433,
+              "max": 21.77347242832184
+            },
+            "finalize_ms": {
+              "runs": [
+                null,
+                null
+              ],
+              "min": null,
+              "median_of_2": null,
+              "max": null
+            },
+            "capture_ms": {
+              "runs": [
+                1139.5134776830673,
+                412.8633216023445
+              ],
+              "min": 412.8633216023445,
+              "median_of_2": 776.1883996427059,
+              "max": 1139.5134776830673
+            },
+            "ttft_ms": {
+              "runs": [
+                8294.27682608366,
+                7954.6068161726
+              ],
+              "min": 7954.6068161726,
+              "median_of_2": 8124.44182112813,
+              "max": 8294.27682608366
+            },
+            "tpot_ms": {
+              "runs": [
+                18.319122141271126,
+                18.30159397575799
+              ],
+              "min": 18.30159397575799,
+              "median_of_2": 18.31035805851456,
+              "max": 18.319122141271126
+            }
+          }
+        }
+      }
+    },
+    "65536": {
+      "input_tokens": 67459,
+      "yarn_factor": 2.0,
+      "runs_per_arm": 2,
+      "arms": {
+        "direct": {
+          "raw_report": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_65536_direct_production.json",
+          "raw_report_sha256": "8f2b8d34e58ffacff5cac173dcbc2dad18f158e5f7914a83b098a61d729cfd4b",
+          "label": "champion-65536-direct-production",
+          "input_ids_sha256_16": "de2e14e456bdcf38",
+          "S_cap": 67595,
+          "metrics_ms": {
+            "prefill_ms": {
+              "runs": [
+                23835.531502962112,
+                23251.38722360134
+              ],
+              "min": 23251.38722360134,
+              "median_of_2": 23543.459363281727,
+              "max": 23835.531502962112
+            },
+            "fill_static_ms": {
+              "runs": [
+                8.085831999778748,
+                1.3783350586891174
+              ],
+              "min": 1.3783350586891174,
+              "median_of_2": 4.7320835292339325,
+              "max": 8.085831999778748
+            },
+            "finalize_ms": {
+              "runs": [
+                8.085831999778748,
+                1.3783350586891174
+              ],
+              "min": 1.3783350586891174,
+              "median_of_2": 4.7320835292339325,
+              "max": 8.085831999778748
+            },
+            "capture_ms": {
+              "runs": [
+                4499.305389821529,
+                454.7009542584419
+              ],
+              "min": 454.7009542584419,
+              "median_of_2": 2477.0031720399857,
+              "max": 4499.305389821529
+            },
+            "ttft_ms": {
+              "runs": [
+                23840.654730796814,
+                23251.61273032427
+              ],
+              "min": 23251.61273032427,
+              "median_of_2": 23546.13373056054,
+              "max": 23840.654730796814
+            },
+            "tpot_ms": {
+              "runs": [
+                18.551579317239327,
+                18.597783652816233
+              ],
+              "min": 18.551579317239327,
+              "median_of_2": 18.57468148502778,
+              "max": 18.597783652816233
+            }
+          }
+        },
+        "conversion": {
+          "raw_report": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_65536_conversion_production.json",
+          "raw_report_sha256": "27cc94615a990073982fd1065e74b30562d90706c1a2ac36feeb6442b6d51c23",
+          "label": "champion-65536-conversion-production",
+          "input_ids_sha256_16": "de2e14e456bdcf38",
+          "S_cap": 67595,
+          "metrics_ms": {
+            "prefill_ms": {
+              "runs": [
+                23489.610232412815,
+                23257.16944038868
+              ],
+              "min": 23257.16944038868,
+              "median_of_2": 23373.389836400747,
+              "max": 23489.610232412815
+            },
+            "fill_static_ms": {
+              "runs": [
+                24.159744381904602,
+                30.299246311187744
+              ],
+              "min": 24.159744381904602,
+              "median_of_2": 27.229495346546173,
+              "max": 30.299246311187744
+            },
+            "finalize_ms": {
+              "runs": [
+                null,
+                null
+              ],
+              "min": null,
+              "median_of_2": null,
+              "max": null
+            },
+            "capture_ms": {
+              "runs": [
+                1098.6345410346985,
+                438.4879916906357
+              ],
+              "min": 438.4879916906357,
+              "median_of_2": 768.5612663626671,
+              "max": 1098.6345410346985
+            },
+            "ttft_ms": {
+              "runs": [
+                23510.088570415974,
+                23257.745020091534
+              ],
+              "min": 23257.745020091534,
+              "median_of_2": 23383.916795253754,
+              "max": 23510.088570415974
+            },
+            "tpot_ms": {
+              "runs": [
+                18.54158967264055,
+                18.56505061228444
+              ],
+              "min": 18.54158967264055,
+              "median_of_2": 18.553320142462496,
+              "max": 18.56505061228444
+            }
+          }
+        }
+      }
+    },
+    "131072": {
+      "input_tokens": 134923,
+      "yarn_factor": 4.0,
+      "runs_per_arm": 2,
+      "arms": {
+        "direct": {
+          "raw_report": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_131072_direct_production.json",
+          "raw_report_sha256": "e2c26f12ea8bdd7a88b01c251c77822663ec8bd6da51d2ba1c968c62cfe5241c",
+          "label": "champion-131072-direct-production",
+          "input_ids_sha256_16": "19d7396e205102cf",
+          "S_cap": 135059,
+          "metrics_ms": {
+            "prefill_ms": {
+              "runs": [
+                76328.23146879673,
+                85752.28024274111
+              ],
+              "min": 76328.23146879673,
+              "median_of_2": 81040.25585576892,
+              "max": 85752.28024274111
+            },
+            "fill_static_ms": {
+              "runs": [
+                4.870407283306122,
+                1.3884902000427246
+              ],
+              "min": 1.3884902000427246,
+              "median_of_2": 3.129448741674423,
+              "max": 4.870407283306122
+            },
+            "finalize_ms": {
+              "runs": [
+                4.870407283306122,
+                1.3884902000427246
+              ],
+              "min": 1.3884902000427246,
+              "median_of_2": 3.129448741674423,
+              "max": 4.870407283306122
+            },
+            "capture_ms": {
+              "runs": [
+                1454.4895812869072,
+                443.26112419366837
+              ],
+              "min": 443.26112419366837,
+              "median_of_2": 948.8753527402878,
+              "max": 1454.4895812869072
+            },
+            "ttft_ms": {
+              "runs": [
+                76332.7049985528,
+                85752.59145349264
+              ],
+              "min": 76332.7049985528,
+              "median_of_2": 81042.64822602272,
+              "max": 85752.59145349264
+            },
+            "tpot_ms": {
+              "runs": [
+                19.04004947172375,
+                19.041016463219652
+              ],
+              "min": 19.04004947172375,
+              "median_of_2": 19.0405329674717,
+              "max": 19.041016463219652
+            }
+          }
+        },
+        "conversion": {
+          "raw_report": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_131072_conversion_production.json",
+          "raw_report_sha256": "e9d726fad5240eb0d42f8842b7097acb54ed2cf0d98d8562a5aa8a58563d0e07",
+          "label": "champion-131072-conversion-production",
+          "input_ids_sha256_16": "19d7396e205102cf",
+          "S_cap": 135059,
+          "metrics_ms": {
+            "prefill_ms": {
+              "runs": [
+                75894.12892609835,
+                75477.17410326004
+              ],
+              "min": 75477.17410326004,
+              "median_of_2": 75685.6515146792,
+              "max": 75894.12892609835
+            },
+            "fill_static_ms": {
+              "runs": [
+                44.68024522066116,
+                48.07139188051224
+              ],
+              "min": 44.68024522066116,
+              "median_of_2": 46.3758185505867,
+              "max": 48.07139188051224
+            },
+            "finalize_ms": {
+              "runs": [
+                null,
+                null
+              ],
+              "min": null,
+              "median_of_2": null,
+              "max": null
+            },
+            "capture_ms": {
+              "runs": [
+                1085.5116620659828,
+                425.8886054158211
+              ],
+              "min": 425.8886054158211,
+              "median_of_2": 755.700133740902,
+              "max": 1085.5116620659828
+            },
+            "ttft_ms": {
+              "runs": [
+                75906.49574249983,
+                75477.69299894571
+              ],
+              "min": 75477.69299894571,
+              "median_of_2": 75692.09437072277,
+              "max": 75906.49574249983
+            },
+            "tpot_ms": {
+              "runs": [
+                19.021022800854812,
+                19.06360451161392
+              ],
+              "min": 19.021022800854812,
+              "median_of_2": 19.042313656234366,
+              "max": 19.06360451161392
+            }
+          }
+        }
+      }
+    }
+  },
+  "production_logs_without_hygiene_receipt": [
+    {
+      "path": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_32768_direct_production.log",
+      "sha256": "ee9fa64f37a40de496babe60e05f8d97982538801e1fb34bd9960010b72473dd"
+    },
+    {
+      "path": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_32768_conversion_production.log",
+      "sha256": "4804aa42b549035c06c6d0d90fb386bc98ca8ce26652bcb942a97f9e5972bcdc"
+    },
+    {
+      "path": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_65536_direct_production.log",
+      "sha256": "b8df9269d32284c50f19fb2b09392caee93ba8c37615dde118f8cf7b20089cc9"
+    },
+    {
+      "path": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_65536_conversion_production.log",
+      "sha256": "0ca05ab75c0a160ba37596dac9479c169800176df94eab8f34e9035e71f621d8"
+    },
+    {
+      "path": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_131072_direct_production.log",
+      "sha256": "d6627c3b2dd76b20d4b701a80ac50b0a994c71e73f9840cb49bb5e8e80f309ae"
+    },
+    {
+      "path": "/home/wangyuanshuo02/wt-direct-prefill-main/exp/trace/results/direct_prefill_20261028/raw/champion_131072_conversion_production.log",
+      "sha256": "a8f3508d940a2797b4c95695a3bfe78c0d5f1cf58da9be176269b19c04e4e881"
+    }
+  ],
+  "gpu_hygiene": {
+    "status": "not_verifiable_from_available_e182_raw",
+    "new_gpu_sampling": false,
+    "note_zh": "六份可用 production.log 均无 nvidia-smi/query-compute-apps/hygiene receipt；本轮不追认 clean，也不将历史数据作为新的正式性能验收。"
+  },
+  "headline_findings_zh": [
+    "三长度 direct/conversion 各有 2 个 measured runs，prefill/fill_static/finalize/capture/ttft/tpot 原值均可离线复核；同 run direct/conversion 的 128 个生成 token 完全一致。",
+    "E182 已直接保存 cache conversion/finalize 与 Graph capture/setup 成本，不再把这些字段误报为“完全无既有证据”。",
+    "每臂仅 2 runs，capture 与 prefill 均有明显离群波动；报告保留原始值和 median_of_2，不做显著性、加速比或 warmup 归因。"
+  ],
+  "scope_limit_zh": "仅覆盖 E182 fb335e5、K1=64、no-skip、compact/evict、Qwen3-8B 的历史六份 Graph production raw。不能替代当前 main/K1=128 的同口径成本，不能外推 dense 等价、完整质量、TPOT 或显存收益。",
+  "remaining_efficiency_gaps_zh": [
+    "calibration 与 index preparation 仍未从 prefill_ms 中独立计时。",
+    "Graph warmup 没有独立字段；capture_ms 只补 setup/capture。",
+    "当前 main/K1=128 的 direct/conversion/finalize/capture 同口径复测仍未闭合。",
+    "ClusterKV/候选基线 actual unique K、完整 E178 L1+L2+sink/SWA+attention 微基准仍开放。"
+  ],
+  "validation": {
+    "passed": 147,
+    "failed": 0,
+    "check_scope_zh": "逐文件核验 SHA 可重算、源 verdict commit、K1/K2/no-skip/compact 协议、三长度输入/YaRN、每臂两次 measured runs、128 tokens/127 steps、逐 run token parity、direct/finalize 与 conversion/null 语义、无 warmup 字段及可用日志无 hygiene receipt；任一失败即中止。"
+  }
+}
