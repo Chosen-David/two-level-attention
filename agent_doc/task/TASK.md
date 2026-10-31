@@ -264,3 +264,7 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 ## 2026-10-30 GLM frozen-region integration
 
 - TL-GLM-FROZEN-20261030：eager B1独立near/far接入及独立验收完成；[详情](task_details/TL-GLM-FROZEN-20261030.md)。
+
+## 2026-10-31 paged batch admission
+
+- [ ] [TL-PAGED-DUPLICATE-20261031] 拒绝重复活跃请求，防止同槽覆盖与长度重复递增；host修前复现、修后通过，native/GPU待验。[详情](task_details/TL-PAGED-DUPLICATE-20261031.md)。
