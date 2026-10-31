@@ -1,0 +1,1242 @@
+[
+  {
+    "name": "codex/far-skip-hybrid-cache-20261026",
+    "head": "7e10bafd2eb5a4b91b7a5e10536084161e025158",
+    "status": "diverged",
+    "ahead": 2,
+    "behind": 222,
+    "merge_base": "900f79b4c714164e5e0b36a62c4e330bc739a346",
+    "unique": [
+      {
+        "sha": "94541ee0e7079474a01744fb5355963d3b9a2c49",
+        "date": "2026-10-26T07:11:07Z",
+        "message": "Fix per-layer compact KV allocation and Qwen3 decode lifecycle"
+      },
+      {
+        "sha": "7e10bafd2eb5a4b91b7a5e10536084161e025158",
+        "date": "2026-10-26T08:14:44Z",
+        "message": "Support request-local hybrid batches and whole-model CUDA Graph decode"
+      }
+    ],
+    "head_date": "2026-10-26T08:14:44Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "codex/far-skip-kv-eviction-20261025",
+    "head": "fc242e45070b71afe56c4d9521ef978f28020bfb",
+    "status": "diverged",
+    "ahead": 11,
+    "behind": 223,
+    "merge_base": "262517bd9f04b65860723e9e90447f298ed4d4a8",
+    "unique": [
+      {
+        "sha": "d7fab93f2142c07acd2cb222aa191c7de0221d14",
+        "date": "2026-10-25T11:56:46Z",
+        "message": "perf: round 1 avoid GQA KV replication with shared query rows"
+      },
+      {
+        "sha": "ed308eac7c2da6c0c2814db6cff149ab8f48189e",
+        "date": "2026-10-25T11:57:01Z",
+        "message": "feat: round 2 add tensor-driven bounded far-off static selection"
+      },
+      {
+        "sha": "f3b0347fd5b52fd6145a8db1dde407c9157a0b8b",
+        "date": "2026-10-25T12:01:40Z",
+        "message": "perf: round 3 cache graph page summaries and compact fine candidates"
+      },
+      {
+        "sha": "b5d724fa540e835f47bea164fea58f8f1dac0140",
+        "date": "2026-10-25T12:12:53Z",
+        "message": "perf: subspace round 1 cache bounded fine-key projection and token QDQ"
+      },
+      {
+        "sha": "adab6a7eb2cc7a3990fe4b5a5da444ec15c3de90",
+        "date": "2026-10-25T12:26:59Z",
+        "message": "perf: subspace round 2 share projections and bypass all-fit L2 work"
+      },
+      {
+        "sha": "b2c79badf0a1b000ea130c1b46f596bfaa189eb3",
+        "date": "2026-10-25T12:39:25Z",
+        "message": "Merge current main and wire RULER entry to compact far-skip cache\n\nPreserve upstream indexer, runtime and documentation changes. Prepare bounded\nB=1 static KV after RULER prefill, register causal masks and explicit positions\nfor staged/graph decode, and reuse graph input buffers. Add real small-Qwen\nCPU generation/cache-lifetime regression. 133 passed, 5 CUDA skips, 205\nsubtests; CUDA capture and performance remain unverified."
+      },
+      {
+        "sha": "9dbc6e9c8dada0abedee99a96ce79967dec0dd9f",
+        "date": "2026-10-26T01:04:06Z",
+        "message": "perf: separate eager geometry and add opt-in CUDA movement kernels\n\nRespond to GPU eager regression with host-length staged selection and Triton\nfusion of stable keys, ring gather and KV writes. Avoid per-token JIT\nspecialization; retain explicit Torch rollback and source-bound paired GPU\nacceptance harness. GPU correctness and speed remain unverified: 134 CPU tests,\n20 interpreter checks, and 18 offline SM80/SM90 builds are not GPU execution.\nPreserve concurrent main documentation/results updates."
+      },
+      {
+        "sha": "d31795618455b50889531092cd33c4f34c3a1171",
+        "date": "2026-10-26T01:32:13Z",
+        "message": "perf: add opt-in full-batch TLI indexer for eager and graph\n\nParallelize page maintenance, two-stage selection and mask construction over\nbatch, with optional Triton scoring over batch*KV heads. Retain the legacy\ndefault and compact eviction's B=1 contract. Add source-bound old-eager and\nbatch-isolation benchmarks, routing tests and real CUDA replay gates.\n\n158 CPU tests and 24 interpreter checks pass; 24 CUDA specializations compile\noffline. GPU execution, old Graph comparison and full-model quality remain\npending; CPU improvements are not GPU speedup evidence."
+      },
+      {
+        "sha": "2e21174b6bd41c6712f92c3ff0b5f41661bf7fdf",
+        "date": "2026-10-26T02:11:03Z",
+        "message": "perf: iterate batched TLI overhead in five source-bound rounds\n\nEliminate unused summary types and duplicate query projections, replace binary\ncandidate sorting with stable prefix partition, reduce full-width mask passes,\nand add opt-in fused narrow page gathers. Keep GPU movement fusions separately\ndisabled by default. Reject the Torch multi-axis gather trial after no measured\nlatency win and extra dispatch; retain its source and negative evidence.\n\n204 CPU tests, 55 interpreter checks and 64 offline CUDA builds pass. The final\nCPU indexer pair is 34.526 to 33.525 ms with repeat variability and exact masks/\noutputs. These are not GPU speedup or full-model acceptance results."
+      },
+      {
+        "sha": "80e151e5354e356db254f76ccb34255e7711a2ad",
+        "date": "2026-10-26T03:12:16Z",
+        "message": "perf: fuse batched GPU cache producers and index consumers\n\nAdd opt-in Triton direct cache maintenance, query projection/scale,\npage expansion with stable candidate partition, and top-k-to-mask stores.\nShare the route across eager and CUDA Graph; avoid page/fine staging,\nunpartitioned candidate arrays and selected-ID temporaries. Reject QDQ.\n\nReplace a 255-register full-row candidate scan with page counts and a\nbounded scan (60-register maximum in the compiled matrix). Preserve trial\nsource/resource evidence. Add a real-CUDA-only gate/stress runner and\nsource-bound eager/Graph ablations, route assertions, traces and receipts.\n\n205 CPU tests plus 205 subtests, 95 interpreter/logic checks, and 188\nSM80/SM90 compilations pass. No GPU runtime or speedup is claimed;\nnew GPU pipeline stays disabled by default pending remote acceptance."
+      },
+      {
+        "sha": "fc242e45070b71afe56c4d9521ef978f28020bfb",
+        "date": "2026-10-26T04:02:17Z",
+        "message": "perf: fuse skip/non-skip regional scoring and audit physical KV residency\n\nMerge main 262517b; preserve its paper/data/default updates, restore required indexer state initialization and avoid double indexing compact subspace statistics.\n\nAdmit frozen B1 gates and mixed ring/full-KV model routes, fix B1 length dispatch, and add bounded-write/storage-release checks plus GPU validation probes. CPU/interpreter/offline compilation evidence only; CUDA speed, allocator and strict-eviction quality acceptance remain pending."
+      }
+    ],
+    "head_date": "2026-10-26T04:02:17Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "codex/five-round-runtime-20261027",
+    "head": "5f6ab6776633868b3115e07d7f4f72ddf98034e8",
+    "status": "diverged",
+    "ahead": 6,
+    "behind": 207,
+    "merge_base": "8f213e48926431ea2d56cf3e7bc1a667d1105c74",
+    "unique": [
+      {
+        "sha": "5c2713a7670f80cf412987aaa229d083383a28f3",
+        "date": "2026-10-27T14:50:13Z",
+        "message": "perf: scope decode geometry per capture and limit hybrid prefill logits"
+      },
+      {
+        "sha": "97d7b9e9361c8b050e3c73912430ecde3f00a78d",
+        "date": "2026-10-27T14:50:30Z",
+        "message": "perf: pass compact selected tokens directly into decode attention"
+      },
+      {
+        "sha": "9800324ced37cb61187c5aed0dec85d7043c90e0",
+        "date": "2026-10-27T14:50:37Z",
+        "message": "perf: restrict near AVG scoring to its bounded page region"
+      },
+      {
+        "sha": "69540074953572880c221e130cbcab2faa8e7e52",
+        "date": "2026-10-27T14:50:52Z",
+        "message": "perf: batch hybrid attention and preserve per-row decode indexes"
+      },
+      {
+        "sha": "ec8912638c8f956291e1d856255bfdc4dac9e7c9",
+        "date": "2026-10-27T14:50:58Z",
+        "message": "perf: keep hybrid greedy generation and mask updates on device"
+      },
+      {
+        "sha": "5f6ab6776633868b3115e07d7f4f72ddf98034e8",
+        "date": "2026-10-27T14:51:37Z",
+        "message": "test: harden runtime lifetimes and record five-round validation"
+      }
+    ],
+    "head_date": "2026-10-27T14:51:37Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "codex/unified-far-skip-batch-fusion-20261026",
+    "head": "2449f56983d7e97c5fe1c4df300c2b50b0c16b81",
+    "status": "diverged",
+    "ahead": 31,
+    "behind": 204,
+    "merge_base": "fb335e5ceb742b31d83206c670a10286c7fba182",
+    "unique": [
+      {
+        "sha": "d7fab93f2142c07acd2cb222aa191c7de0221d14",
+        "date": "2026-10-25T11:56:46Z",
+        "message": "perf: round 1 avoid GQA KV replication with shared query rows"
+      },
+      {
+        "sha": "ed308eac7c2da6c0c2814db6cff149ab8f48189e",
+        "date": "2026-10-25T11:57:01Z",
+        "message": "feat: round 2 add tensor-driven bounded far-off static selection"
+      },
+      {
+        "sha": "f3b0347fd5b52fd6145a8db1dde407c9157a0b8b",
+        "date": "2026-10-25T12:01:40Z",
+        "message": "perf: round 3 cache graph page summaries and compact fine candidates"
+      },
+      {
+        "sha": "b5d724fa540e835f47bea164fea58f8f1dac0140",
+        "date": "2026-10-25T12:12:53Z",
+        "message": "perf: subspace round 1 cache bounded fine-key projection and token QDQ"
+      },
+      {
+        "sha": "adab6a7eb2cc7a3990fe4b5a5da444ec15c3de90",
+        "date": "2026-10-25T12:26:59Z",
+        "message": "perf: subspace round 2 share projections and bypass all-fit L2 work"
+      },
+      {
+        "sha": "b2c79badf0a1b000ea130c1b46f596bfaa189eb3",
+        "date": "2026-10-25T12:39:25Z",
+        "message": "Merge current main and wire RULER entry to compact far-skip cache\n\nPreserve upstream indexer, runtime and documentation changes. Prepare bounded\nB=1 static KV after RULER prefill, register causal masks and explicit positions\nfor staged/graph decode, and reuse graph input buffers. Add real small-Qwen\nCPU generation/cache-lifetime regression. 133 passed, 5 CUDA skips, 205\nsubtests; CUDA capture and performance remain unverified."
+      },
+      {
+        "sha": "9dbc6e9c8dada0abedee99a96ce79967dec0dd9f",
+        "date": "2026-10-26T01:04:06Z",
+        "message": "perf: separate eager geometry and add opt-in CUDA movement kernels\n\nRespond to GPU eager regression with host-length staged selection and Triton\nfusion of stable keys, ring gather and KV writes. Avoid per-token JIT\nspecialization; retain explicit Torch rollback and source-bound paired GPU\nacceptance harness. GPU correctness and speed remain unverified: 134 CPU tests,\n20 interpreter checks, and 18 offline SM80/SM90 builds are not GPU execution.\nPreserve concurrent main documentation/results updates."
+      },
+      {
+        "sha": "d31795618455b50889531092cd33c4f34c3a1171",
+        "date": "2026-10-26T01:32:13Z",
+        "message": "perf: add opt-in full-batch TLI indexer for eager and graph\n\nParallelize page maintenance, two-stage selection and mask construction over\nbatch, with optional Triton scoring over batch*KV heads. Retain the legacy\ndefault and compact eviction's B=1 contract. Add source-bound old-eager and\nbatch-isolation benchmarks, routing tests and real CUDA replay gates.\n\n158 CPU tests and 24 interpreter checks pass; 24 CUDA specializations compile\noffline. GPU execution, old Graph comparison and full-model quality remain\npending; CPU improvements are not GPU speedup evidence."
+      },
+      {
+        "sha": "2e21174b6bd41c6712f92c3ff0b5f41661bf7fdf",
+        "date": "2026-10-26T02:11:03Z",
+        "message": "perf: iterate batched TLI overhead in five source-bound rounds\n\nEliminate unused summary types and duplicate query projections, replace binary\ncandidate sorting with stable prefix partition, reduce full-width mask passes,\nand add opt-in fused narrow page gathers. Keep GPU movement fusions separately\ndisabled by default. Reject the Torch multi-axis gather trial after no measured\nlatency win and extra dispatch; retain its source and negative evidence.\n\n204 CPU tests, 55 interpreter checks and 64 offline CUDA builds pass. The final\nCPU indexer pair is 34.526 to 33.525 ms with repeat variability and exact masks/\noutputs. These are not GPU speedup or full-model acceptance results."
+      },
+      {
+        "sha": "80e151e5354e356db254f76ccb34255e7711a2ad",
+        "date": "2026-10-26T03:12:16Z",
+        "message": "perf: fuse batched GPU cache producers and index consumers\n\nAdd opt-in Triton direct cache maintenance, query projection/scale,\npage expansion with stable candidate partition, and top-k-to-mask stores.\nShare the route across eager and CUDA Graph; avoid page/fine staging,\nunpartitioned candidate arrays and selected-ID temporaries. Reject QDQ.\n\nReplace a 255-register full-row candidate scan with page counts and a\nbounded scan (60-register maximum in the compiled matrix). Preserve trial\nsource/resource evidence. Add a real-CUDA-only gate/stress runner and\nsource-bound eager/Graph ablations, route assertions, traces and receipts.\n\n205 CPU tests plus 205 subtests, 95 interpreter/logic checks, and 188\nSM80/SM90 compilations pass. No GPU runtime or speedup is claimed;\nnew GPU pipeline stays disabled by default pending remote acceptance."
+      },
+      {
+        "sha": "fc242e45070b71afe56c4d9521ef978f28020bfb",
+        "date": "2026-10-26T04:02:17Z",
+        "message": "perf: fuse skip/non-skip regional scoring and audit physical KV residency\n\nMerge main 262517b; preserve its paper/data/default updates, restore required indexer state initialization and avoid double indexing compact subspace statistics.\n\nAdmit frozen B1 gates and mixed ring/full-KV model routes, fix B1 length dispatch, and add bounded-write/storage-release checks plus GPU validation probes. CPU/interpreter/offline compilation evidence only; CUDA speed, allocator and strict-eviction quality acceptance remain pending."
+      },
+      {
+        "sha": "94541ee0e7079474a01744fb5355963d3b9a2c49",
+        "date": "2026-10-26T07:11:07Z",
+        "message": "Fix per-layer compact KV allocation and Qwen3 decode lifecycle"
+      },
+      {
+        "sha": "7e10bafd2eb5a4b91b7a5e10536084161e025158",
+        "date": "2026-10-26T08:14:44Z",
+        "message": "Support request-local hybrid batches and whole-model CUDA Graph decode"
+      },
+      {
+        "sha": "e825274eedb3f89a821193401ebac938be857993",
+        "date": "2026-10-26T10:12:14Z",
+        "message": "Integrate far-skip GPU fusion and per-request hybrid batch caches\n\nCombine latest main with PR #7 and PR #9; repair workspace initialization,\nremove superseded compact routes, and retain request-local gate/EOS semantics.\n\nCPU related suites: 323 passed, 251 skipped, 395 subtests passed.\nTriton interpreter: 99 passed, 38 skipped. GPU/quality acceptance pending."
+      },
+      {
+        "sha": "dd331cb4183fe8c2bfb6fae9607703254c234022",
+        "date": "2026-10-26T15:38:22Z",
+        "message": "Merge latest batch import and guard parallel decode route lifecycle\n\nPreserve live step lengths, Graph-first routing and deferred batch metrics.\nFix parallel receipts to record layer IDs. Keep E176 timings with attribution\nlimits pending source/flag/route-bound GPU validation.\n\nMain reproduction: 4 failing host contracts. Candidate: 62 passed, 13 skipped.\nNo new GPU performance claim."
+      },
+      {
+        "sha": "b2463d49eb8661e8a7c2e39162fb5a8803aee372",
+        "date": "2026-10-27T02:58:23Z",
+        "message": "Fuse EOS-aware ring/linear KV writes and integrate latest main\n\nReuse the optional pair-write kernel for hybrid rows; mask dead requests on device and support linear addressing. Add exact write regression, CUDA capture gates and paired eager/Graph benchmark. Preserve main hybrid work and qualify E177 as capacity arithmetic, not GPU memory measurement."
+      },
+      {
+        "sha": "01d5cd8563b1277258713558785dae2a7e4f7486",
+        "date": "2026-10-27T04:46:02Z",
+        "message": "Reuse fused KV gather in hybrid linear attention\n\nPreserve mask/topk/SDPA order while fusing pair reads and invalid-slot zeroing. Add exact parity and CUDA replay checks, paired eager/Graph benchmark, and bounded workspace residency disclosure. Integrate latest main E178 evidence without changing its source records."
+      },
+      {
+        "sha": "ddf0c4d95b049f75daccf01dfac55eb764f63a8c",
+        "date": "2026-10-27T05:42:41Z",
+        "message": "perf: write compact subspace projections directly into ring cache"
+      },
+      {
+        "sha": "045042622d3ce671b68e93c9663ef4b8e21d1ce1",
+        "date": "2026-10-27T06:46:54Z",
+        "message": "perf: increment hybrid causal masks instead of rebuilding capacity"
+      },
+      {
+        "sha": "277c46480f90c82a4baf224e94ed41a6e63bd5f7",
+        "date": "2026-10-27T08:45:28Z",
+        "message": "perf: avoid geometric over-allocation for fixed decode workspaces"
+      },
+      {
+        "sha": "ebacac00ea994795e8393ddb7ed5bf54206a961b",
+        "date": "2026-10-27T09:51:57Z",
+        "message": "perf(prefill): cast only observed query tail; integrate main KV source release\n\nPreserve main 8f213e4 source-release repair and validation records. Static pair observation now slices before FP32 conversion, retaining selection semantics. Add exact CPU/CUDA regression matrix and paired CUDA benchmark.\n\nIntegrated validation: 68 CPU passed, 55 CUDA skipped. CPU cast-storage probe is not a GPU memory or speed result. GPU acceptance remains pending."
+      },
+      {
+        "sha": "19e69bcaf7324a283e3885809785f77a237a7d1b",
+        "date": "2026-10-27T12:43:29Z",
+        "message": "perf(hybrid): avoid copying singleton attention output\n\nReuse the sole B1 SDPA result instead of concatenating a singleton list. Keep multi-row assembly unchanged. Pair old/new model outputs, EOS and lifetime checks; add pending CUDA recapture tests and assembly benchmark.\n\n16 CPU passed, 8 CUDA skipped. No GPU speed or memory result claimed."
+      },
+      {
+        "sha": "c96752e0d4c7441193a968bf94e21e4fd5bdad7e",
+        "date": "2026-10-27T14:21:20Z",
+        "message": "perf: keep hybrid geometry cache request-local and sized for batch\n\nAvoid nine-entry cache thrashing across layers for B >= 10. Retain version and geometry-key checks, inference-tensor bypass, and bounded no-context fallback. No scoring arithmetic changed.\n\n56 CPU tests passed, 15 CUDA tests skipped. Exact paired logits and B32 two-layer geometry builds 64 -> 32; GPU timing/memory and capture-sharing remain unverified."
+      },
+      {
+        "sha": "06e59d483b1a595cfad628d34c9b22fdc5449eee",
+        "date": "2026-10-27T14:55:55Z",
+        "message": "perf(indexer): select subspace before full-history padding\n\nPreserve packed sequence padding and MoBA full-dimensional means while\nreusing existing statistic kernels. Qwen cold/graph initialization and MLA\nfull-rebuild scope; no measured GPU latency or peak-memory claim.\n\n201 CPU tests passed, 24 CUDA tests skipped; 30 existing-kernel interpreter\npairs exact. Include frozen-main reference, paired CUDA benchmark and\npending GPU gates. Preserve prior PR10 and main8f213e4 work."
+      },
+      {
+        "sha": "3404da6c8cafedc20aa65491356ee189338c3fee",
+        "date": "2026-10-27T15:44:24Z",
+        "message": "integrate: reconcile open PR fixes and benchmark protocols\n\nPreserve main 8f213e4 and all PR10 optimizations through 06e59d4.\nIntegrate compatible baseline guards, live batch inputs and producer fixes;\nrecord all twelve PR heads and explicit deferral of coupled PR12 runtime\nand PR8 manuscript changes. Preserve current cache=None SparQ semantics.\n\nValidation: 322 integrated tests, 37 SparQ tests, 13 geometry tests passed;\n87 CUDA tests skipped and 179 subtests passed. GPU gates attempted but\nunavailable on CPU Torch; no new GPU speed, memory or quality claim."
+      },
+      {
+        "sha": "89aaaa7f541a5838051ce6f6a45feb594f167806",
+        "date": "2026-10-27T19:40:58Z",
+        "message": "perf(indexer): predicate inactive candidate ID and K loads\n\nUse existing CLEN prefix for both loads; preserve valid reduction and output\nshape, invalid -inf stores, launch geometry and downstream selection.\n48 exact frozen-kernel CPU interpreter pairs;49 CPU tests pass,12 CUDA skip.\nGPU gates unavailable; include frozen reference and CUDA paired benchmark.\nNo measured GPU speed or memory claim."
+      },
+      {
+        "sha": "32e68114a11053a8d867497370417194920b782b",
+        "date": "2026-10-27T20:45:02Z",
+        "message": "Validate candidate scorer with production tiles and paired GPU protocol"
+      },
+      {
+        "sha": "80eea3f94f854748ecd24b3e4414d4bc3ea1a1ea",
+        "date": "2026-10-28T01:46:14Z",
+        "message": "Merge latest main and guard invalid softmax/compact fusion paths\n\nPreserve main optimizations and prior PR10 work; restore reference softmax dispatch, sanitize MID reads and bypass candidates. CPU/interpreter evidence only; CUDA acceptance pending."
+      },
+      {
+        "sha": "78ba04164b1db7888fc1fd0ff8fe56114b812b8c",
+        "date": "2026-10-28T14:40:57Z",
+        "message": "perf: remove redundant protected-token pool concatenations"
+      },
+      {
+        "sha": "cf8eb15d34ea2e4b6e617709427543141fe04170",
+        "date": "2026-10-28T22:42:55Z",
+        "message": "perf: route short decode to dense before mask expansion"
+      },
+      {
+        "sha": "2449f56983d7e97c5fe1c4df300c2b50b0c16b81",
+        "date": "2026-10-29T00:41:57Z",
+        "message": "perf: reuse read-only batch fallback sequence bounds"
+      }
+    ],
+    "head_date": "2026-10-29T00:41:57Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "dev/pytest-env-bootstrap-20261029",
+    "head": "7dfe03c3503c0c35b44b6bf23d3290b08017cc84",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 196,
+    "merge_base": "a2e7b67b4e5c131cfa169283f7c66d6fb8892b00",
+    "unique": [
+      {
+        "sha": "7dfe03c3503c0c35b44b6bf23d3290b08017cc84",
+        "date": "2026-10-29T05:31:57Z",
+        "message": "dev: bootstrap pytest in the selected test environment"
+      }
+    ],
+    "head_date": "2026-10-29T05:31:57Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "e138-ablation",
+    "head": "2ed6a1feb78a7b5bcf3cac922b4510c3968714a5",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 758,
+    "merge_base": "2ed6a1feb78a7b5bcf3cac922b4510c3968714a5",
+    "unique": [],
+    "head_date": "2026-10-15T01:10:20Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "e175-skip-ring-kv",
+    "head": "9b6e792ef4f11d6c12395a018a2fa25ab0dba66d",
+    "status": "diverged",
+    "ahead": 3,
+    "behind": 231,
+    "merge_base": "71d2d230e3a5e7bba7e67c2fb43269658abc0ff6",
+    "unique": [
+      {
+        "sha": "551698d3ba97714788af5e3667d92311d29547f9",
+        "date": "2026-10-25T12:35:22Z",
+        "message": "E175 W1\uff1askip \u5c42\u7269\u7406 KV ring \u538b\u7f29\uff08\u6570\u5b66\u7b49\u4ef7\u53cc\u95e8\u7981 23/23 + E127 \u56de\u5f52 15/15\uff09\n\n\u56db\u9762\u5b9e\u73b0\uff1a\n- CLI\uff1a--tli_skip_layer_ids\uff08E137 \u5224\u51b3\u5c42\u96c6 {7,8,10,11,35}\uff09\uff0c\u9ed8\u8ba4\u7a7a=\u751f\u4ea7\u4e0d\u53d8\uff1b\n  \u5c42\u96c6\u4e0e enable_layer_skip/dyn_dgate \u4e92\u65a5\u3001\u7f3a near_len \u62d2\u7edd\uff08fail-closed\uff09\n- cache\uff1aTLIStaticCache per-layer \u5bb9\u91cf\u8868 + TLIStaticLayer ring \u5e03\u5c40\n  [sink(4)|ring(4224)]\uff0cpos_to_slot \u7eaf\u5f20\u91cf\u6620\u5c04\uff08CUDA Graph capture \u5b89\u5168\uff09\uff1b\n  fill_row_from_tail \u73af\u7ed5\u642c\u79fb\uff08\u9ad8\u7ea7\u7d22\u5f15\u5fc5\u987b __setitem__ \u771f\u5199 buffer\uff0c\n  .copy_ \u5199\u4e34\u65f6\u5f20\u91cf\u4e0d\u843d\u76d8\u2014\u2014cell C \u9996\u8dd1\u5168 L \u5931\u914d\u6839\u56e0\uff09\n- indexer\uff1askip \u5c42 prepare_mask \u73af\u7ed5\u5206\u652f\u5bbd L \u865a\u62df\u4f4d\u7f6e\u8f74\uff08\u4efb\u610f L \u4e0e\u5168\u5bbd\u5c42\n  \u5757\u7f51\u683c\u540c\u6784\uff0c\u4e0d\u518d\u8981\u6c42\u5757\u5bf9\u9f50\uff09\uff1bE175 \u9a91\u5899\u5757\u6536\u7d27\u4e09\u5904\uff08L2 far_tok_hi\n  \u4e0a\u8c03\u9a91\u5899\u5757\u4e0a\u754c + L1 near \u6c60\u6392\u9664\u9a91\u5899\u5757 + sink \u8de8\u754c\u4fdd\u9001\u9875\u73af\u7ed5\u6b65\u5254\u9664\uff09\uff0c\n  compute_mask \u4e0e _select_l1_blocks \u4e24\u4fa7\u540c\u6b65\uff08bypass_blks/near_pool_lo\n  \u662f AKO iter-6 L1 \u590d\u7528\u5185\u95e8\u6bd4\u8f83\u9879\uff0c\u5355\u4fa7\u6536\u7d27\u4f1a\u7834\u590d\u7528\u6052\u7b49\u5f0f\uff0c\u4e14\u4f7f\n  \u5185\u95e8\u8d25\u8865\u8dd1\u8def\u5f84\u9996\u6b21\u53ef\u8fbe\u2014\u2014\u987a\u624b\u4fee\u5176 score_coarse_avg GQA mean \u6f0f\u8865\n  \u7f3a\u9677\uff1anear_method=avg \u4e0b sc_near \u4fdd\u6301 32 \u5934\u5f62\u6001\u4e0e mean \u540e sc_far\n  cat \u5f62\u72b6\u5d29\uff0cL=4289 \u63a2\u9488\u5b9e\u8bc1\uff09\n- bench\uff1apred_ruler_batch TLIStaticCache \u5c42\u96c6\u63a5\u5165\n\n\u95e8\u7981\uff08exp/bench/test_e175_ring_equivalence.py\uff0c23 PASS/0 FAIL\uff09\uff1a\n- cell A \u6620\u5c04\u7a77\u4e3e 4/4\uff1bcell B \u540c\u9009\u4e2d\u96c6 eager \u5bf9\u62cd\uff08\u672a\u6ee1\u9010\u4f4d\u3001\u73af\u7ed5\u9010\u5143\u7d20\n  1-ULP \u523b\u753b\uff0cdense \u8def\u5f84\u9489\u6b7b TLI_E127_FAST=0 \u6392\u9664\u8de8\u8def\u5f84\u5dee\uff09\uff1bcell C\n  520 \u6b65 decode \u9a7b\u7559\u6295\u5f71\u9010\u4f4d + sink \u6c38\u9a7b + prefill \u642c\u79fb\uff1bcell D 620 \u6b65\n  \u5168\u5bbd skip_far vs ring \u865a\u62df\u8f74 mask \u9010\u4f4d\u540c\u6784\uff08\u672a\u6ee1 136 + \u73af\u7ed5 484 \u6b65\uff09\n  + \u9a71\u9010\u65e0\u635f\uff08\u9009\u4e2d\u96c6 \u2286 \u9a7b\u7559\u96c6\uff09\uff1bcell E \u5b88\u536b 9/9\n\nE127 \u95e8\u7981\u56de\u5f52 15/15 PASS\uff08skip \u5c42 score/mask \u4e00\u81f4\u6027\u542b skip \u914d\u7f6e\u5168\u7eff\uff09\u3002\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+      },
+      {
+        "sha": "7f47e668b4000a011c95270cf7ac783902b4df20",
+        "date": "2026-10-25T12:47:11Z",
+        "message": "E175 W1.5\uff1ae152v4_graph_latency bench \u63a5\u7ebf layer_caps + \u7edd\u5bf9\u663e\u5b58\u8ba1\u91cf\n\n- --tli_skip_layer_ids \u975e\u7a7a \u2192 TLIStaticCache \u6784\u9020\u8d70 e175_layer_caps\n  \uff08pred_ruler_batch \u540c\u6b3e\u63a5\u7ebf\uff1b\u7a7a\u96c6 = layer_caps=None\uff0c\u751f\u4ea7\u9010\u4f4d\u96f6\u56de\u5f52\uff09\n- \u65b0\u8ba1\u91cf\u5b57\u6bb5\uff1amax_mem_gib\uff08\u8fdb\u7a0b\u7ea7\u7edd\u5bf9\u5cf0\u503c\uff0c\u542b\u9759\u6001\u6c60\u2014\u2014KV \u8282\u7701\n  \u5fc5\u987b\u7edd\u5bf9\u503c\u5bf9\u6bd4\uff0cdelta \u53e3\u5f84\u4e0d\u542b\u8fdb\u7a0b\u7ea7 cache\uff09+ alloc_after_cache_gib\n  \uff08\u9759\u6001\u6c60\u6784\u9020\u540e\u57fa\u7ebf\uff09+ skip_layer_ids \u5934\u6ce8"
+      },
+      {
+        "sha": "9b6e792ef4f11d6c12395a018a2fa25ab0dba66d",
+        "date": "2026-10-25T12:47:36Z",
+        "message": "Merge branch 'main' into e175-skip-ring-kv"
+      }
+    ],
+    "head_date": "2026-10-25T12:47:36Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "exp/glm-avg5-ruler113-20261030",
+    "head": "0a72672f3aa3d37f12545eeb8f397bbcc4c91d0b",
+    "status": "diverged",
+    "ahead": 4,
+    "behind": 164,
+    "merge_base": "6a68fbfdde21f81473303ff814f880723a6717de",
+    "unique": [
+      {
+        "sha": "4535941b46a55769360ba03a13dc8eb6f6b4829e",
+        "date": "2026-10-30T02:47:55Z",
+        "message": "bench(glm): dispatch paired frozen-region quality matrix with per-input locks"
+      },
+      {
+        "sha": "fef12cf16f7e8a8183629f65f619f2e45fd0a5e5",
+        "date": "2026-10-30T02:49:26Z",
+        "message": "fix(bench): release sparse request scratch before dense baseline"
+      },
+      {
+        "sha": "5cafbba3e6b25e4f1682efd92ac049756bdfa9d9",
+        "date": "2026-10-30T02:54:40Z",
+        "message": "bench(glm): require complete matrix and recompute paired quality scores"
+      },
+      {
+        "sha": "0a72672f3aa3d37f12545eeb8f397bbcc4c91d0b",
+        "date": "2026-10-30T08:37:47Z",
+        "message": "Add explicit GLM full-width eager diagnostic reference"
+      }
+    ],
+    "head_date": "2026-10-30T08:37:47Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "experiment/corrected-yarn-mk2-20261030",
+    "head": "d55d7f62fd3bb2624e412040f216ed2c7465672f",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 27,
+    "merge_base": "8718c90d2c8fbd018d4a26057065f8d6261ee257",
+    "unique": [
+      {
+        "sha": "d55d7f62fd3bb2624e412040f216ed2c7465672f",
+        "date": "2026-10-30T07:02:38Z",
+        "message": "exp: rerun frozen region gates with verified Qwen YaRN"
+      }
+    ],
+    "head_date": "2026-10-30T07:02:38Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "experiment/frozen-longbench-v1-16",
+    "head": "08ce44d6027a235080e7ff4127754af6b1ae91e0",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 168,
+    "merge_base": "ca72828b84698fd16ea21c60a4786a69acb6fe4a",
+    "unique": [
+      {
+        "sha": "08ce44d6027a235080e7ff4127754af6b1ae91e0",
+        "date": "2026-10-30T01:36:02Z",
+        "message": "feat: evaluate frozen near/far gates on all 16 English LongBench V1 tasks"
+      }
+    ],
+    "head_date": "2026-10-30T01:36:02Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "experiment/frozen-mk2-64k",
+    "head": "de2a1c1670b82bebcde6c0c3aa02fb8ee1431568",
+    "status": "diverged",
+    "ahead": 2,
+    "behind": 168,
+    "merge_base": "ca72828b84698fd16ea21c60a4786a69acb6fe4a",
+    "unique": [
+      {
+        "sha": "08ce44d6027a235080e7ff4127754af6b1ae91e0",
+        "date": "2026-10-30T01:36:02Z",
+        "message": "feat: evaluate frozen near/far gates on all 16 English LongBench V1 tasks"
+      },
+      {
+        "sha": "de2a1c1670b82bebcde6c0c3aa02fb8ee1431568",
+        "date": "2026-10-30T02:25:49Z",
+        "message": "feat: add paired frozen dual and far gates RULER 64K evaluation"
+      }
+    ],
+    "head_date": "2026-10-30T02:25:49Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "experiment/nfa-ablation-20261030",
+    "head": "4dab6e8ccb84bde38cfd8b9a06d65e7f766629a6",
+    "status": "diverged",
+    "ahead": 5,
+    "behind": 27,
+    "merge_base": "8718c90d2c8fbd018d4a26057065f8d6261ee257",
+    "unique": [
+      {
+        "sha": "d06072351591021ef0c2d960f07b0c483cd60a5a",
+        "date": "2026-10-30T08:10:45Z",
+        "message": "Add explicit inclusive-budget NFA ablation reference and quality matrix"
+      },
+      {
+        "sha": "988615730192af9a8fa38c196b64d91ae3cdc777",
+        "date": "2026-10-30T08:22:45Z",
+        "message": "Audit reusable ablation predictions and paired near-length uncertainty"
+      },
+      {
+        "sha": "17aa50ba69af8208894bd11aa88aaf9483fbf48b",
+        "date": "2026-10-30T08:29:52Z",
+        "message": "Validate all protection cells through real model decode and admit zero SWA only for ablation"
+      },
+      {
+        "sha": "1673d1e458696cfdf7204610d9163deee73883e1",
+        "date": "2026-10-30T08:39:39Z",
+        "message": "Plot independently verified paired near-length sensitivity"
+      },
+      {
+        "sha": "4dab6e8ccb84bde38cfd8b9a06d65e7f766629a6",
+        "date": "2026-10-30T09:27:20Z",
+        "message": "Add provenance-bound minimal regional gate quality relay"
+      }
+    ],
+    "head_date": "2026-10-30T09:27:20Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "explore/prefill-frozen-near-far-skip",
+    "head": "f3d4d2a8dc18cc3597778b9902c58ca63717c045",
+    "status": "diverged",
+    "ahead": 18,
+    "behind": 196,
+    "merge_base": "a2e7b67b4e5c131cfa169283f7c66d6fb8892b00",
+    "unique": [
+      {
+        "sha": "59c9bc39a285f83d60e4accb5966f0089e268baa",
+        "date": "2026-10-29T01:43:13Z",
+        "message": "fix(patches): upgrade qwen3/glm4 patches on top of main fix(qwen3_attn_patch): sync with 9db9dad/0fd4051 semantic fixes; glm4 D=256 alignmentBaseline for Phase 1 operator-overlap integration."
+      },
+      {
+        "sha": "6e6e414383dfe925c6e654ad574142b666dca1ee",
+        "date": "2026-10-29T02:02:20Z",
+        "message": "feat(operator-overlap): Phase 0 baseline + PR#13 routing integration\n\n- operator_pipeline.py: stub with TLI_OPERATOR_MODE env gate (default 'off')\n- far_skip_graph.py: route to decode_ring when operator_mode != 'off'\n- hybrid_batch_cache.py: PR#13 delta applied\n- qwen3_attn_patch.py: PR#13 decode_indexed routing applied\n\nAll 11 existing fusion-guard tests pass. Phase 1 will progressively\nreplace the stub with real compact Selection + split-KV backends.\n\nTask: operator-overlap phased delivery (P0-P7)"
+      },
+      {
+        "sha": "34d3b605bcf10c54b71df2b8cf2fdd8bf110de97",
+        "date": "2026-10-29T02:22:09Z",
+        "message": "feat(operator-overlap): Phase 1 compact Selection \u63a5\u53e3\n\n- \u65b0\u589e sparse_attn/ops/tli_token_selection.py\uff1aTokenSelection NamedTuple +\n  canonical_selection / middle_selection / graph_middle_selection \u7d27\u51d1\u8868\u793a\u5de5\u5177\n- compute_mask_graph \u65b0\u589e return_selection=False kwarg\uff1aTrue \u65f6\u76f4\u51fa\n  TokenSelection\uff08indices [1,Hkv,K2] int32 + counts [1,Hkv] int32\uff09\uff0c\n  \u66ff\u4ee3 [1,1,Hkv,S_cap] \u5168\u5bbd bool mask\uff0c\u514d scatter+mask \u5f00\u9500\n- \u65b0\u589e compute_selection_graph() \u8584\u5305\u88c5\uff08\u9ed8\u8ba4 return_selection=True\uff09\n- L2 bypass \u8def\u5f84\uff08TLI_L2_BYPASS=1\uff09\u540c\u6b65\u652f\u6301 return_selection\n- 11 \u5355\u5143\u6d4b\u8bd5\uff08tests/test_compact_selection.py\uff09\uff1a\u6392\u5e8f\u53bb\u91cd/\u5bbd\u5ea6\u622a\u65ad/\n  sink-swa \u4fdd\u62a4\u96c6\u6392\u9664/to_mask roundtrip/\u7a7a\u9009\u62e9\u5168\u8986\u76d6\n- \u539f\u6709 11 \u56de\u5f52\u6d4b\u8bd5\uff08test_main_fusion_guards.py\uff09\u5168 PASS\uff08bypass AST exec\n  \u517c\u5bb9\u6027\u901a\u8fc7 locals().get \u5b89\u5168\u8bbf\u95ee return_selection\uff09\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+      },
+      {
+        "sha": "958b8bb38466559ef7f3ae5cf03582ed6bef2313",
+        "date": "2026-10-29T02:26:15Z",
+        "message": "fix(bench): e152v4 TLI \u6a21\u5f0f\u8865\u5168\u51a0\u519b\u51e0\u4f55\u9ed8\u8ba4 flags\n\ncompute_mask_graph gate \u9700\u8981 tli_near_pages/tli_near_len \u975e None\n\uff08SUPPRESS \u7f3a\u7701\u4e0b\u5c5e\u6027\u4e0d\u5b58\u5728 \u2192 gate \u5931\u8d25 \u2192 \u9759\u9ed8\u56de\u9000 eager \u9010\u884c\u8def\u5f84\uff09\u3002\nTLI \u6a21\u5f0f\u4e0b\u82e5\u672a\u663e\u5f0f\u4f20\u5165 nb/nt/nl \u5219\u81ea\u52a8\u8865\u51a0\u519b\u51e0\u4f55\u9ed8\u8ba4\u503c\n\uff08nb32/nt_off/nl4096 + sink4/swa128/minmax+avg\uff09\uff0c\u4fdd\u6301\u663e\u5f0f\n\u8bed\u4e49\u4e0d\u53d8\uff08argparse \u672c\u8eab\u4e0d\u6539\uff09\uff0c\u4ec5\u8865\u4e01\u91c7\u96c6\u5668\u5165\u53e3\u3002\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+      },
+      {
+        "sha": "c4dfb0815e8caa26848e12342b5e54fc181b0e5f",
+        "date": "2026-10-29T02:41:28Z",
+        "message": "feat(operator-overlap): Phase 2 Partial Attention \u6b63\u786e\u6027\n\n- \u65b0\u589e sparse_attn/ops/partial_attention.py\uff1a\n  + PartialState NamedTuple\uff08m/l/acc \u4e09\u4ef6\u5957\uff09\n  + partial_attention(q, k, v, selection, lengths, ...) \u2192 PartialState\n  + merge_partials(protected, selected, dtype) \u2192 [B,1,H,Dv]\n  + SIMT/TC/Triton kernel + _torch_partial CPU \u53c2\u8003\u5b9e\u73b0\n  + protected=True \u8def\u5f84\uff08sink+swa \u4fdd\u62a4\u96c6\uff09/ protected=False\uff08\u7d27\u51d1\u5019\u9009\u96c6\uff09\n  + FarSkipLayout ring cache \u7269\u7406\u6620\u5c04\u652f\u6301\n- _torch_partial \u4fee\u590d\uff1aselection.valid() \u2192 counts-based valid mask\n  \uff08selection \u662f tuple \u4e0d\u662f TokenSelection\uff09\n- 10 \u5355\u5143\u6d4b\u8bd5\uff08test_partial_attention.py\uff09\uff1a\u5168\u9009/\u4fdd\u62a4\u96c6/split \u4e00\u81f4\u6027/\n  \u5b50\u96c6\u9009\u62e9/GQA \u5206\u7ec4/\u5355 token/\u7a7a\u9009\u62e9/\u8f93\u5165\u9a8c\u8bc1\uff0c10 PASS\n- \u5168\u5c40 32/32 PASS\uff0811 fusion + 11 compact + 10 partial\uff09\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+      },
+      {
+        "sha": "486a4069ec044a3c60b5a130d434b9b1b2d51ac3",
+        "date": "2026-10-29T03:22:01Z",
+        "message": "feat: explore prefill-frozen near/far KV node eviction"
+      },
+      {
+        "sha": "62f6fb4c55bda6fe5b8d3a3cfc6c3ab6bb2ca8e4",
+        "date": "2026-10-29T03:40:31Z",
+        "message": "fix: retain near-only staging KV for later far migration"
+      },
+      {
+        "sha": "409102198051aa3e5f34660b4cd1bf494399c55e",
+        "date": "2026-10-29T05:40:55Z",
+        "message": "experiment: finish paired near/far staging quality screen and validation"
+      },
+      {
+        "sha": "27d44640968f4f10d19703c4749239626618e08e",
+        "date": "2026-10-29T06:12:50Z",
+        "message": "feat: connect frozen region nodes to real TLI tail32 decode"
+      },
+      {
+        "sha": "37ac2ed94ebd7098550897955fff1883023285d1",
+        "date": "2026-10-29T07:47:18Z",
+        "message": "fix: decide frozen near and far gates independently"
+      },
+      {
+        "sha": "35df1c9aab3dee3111e26b3c6f345e4d7dcd2db0",
+        "date": "2026-10-29T07:57:02Z",
+        "message": "fix: default independent region gates to 0.05 and schedule paired screen"
+      },
+      {
+        "sha": "ec673a79402cca913421dab4141fc1ad4cdd6716",
+        "date": "2026-10-29T08:18:15Z",
+        "message": "fix: guard decode requests and supervise eight remote screen shards"
+      },
+      {
+        "sha": "a3959678ed37d82ac04573245587fbcf2ac32e88",
+        "date": "2026-10-29T08:22:51Z",
+        "message": "fix: make remote process token parsing explicit"
+      },
+      {
+        "sha": "a1cdb2f4edd2447495175d90f75fa13b880d4afd",
+        "date": "2026-10-29T09:25:17Z",
+        "message": "fix: keep request guard cleanup inside inference mode"
+      },
+      {
+        "sha": "76e3eee6d7b9fc767cba49d9ea1ada9e69a755f0",
+        "date": "2026-10-29T10:18:55Z",
+        "message": "feat: autonomous per-host GPU queue for full five-task LongBench evaluation"
+      },
+      {
+        "sha": "3e4a6885604ac3e719ee92a4906f87b532535314",
+        "date": "2026-10-29T13:52:15Z",
+        "message": "fix: use atomic cross-host queue locks on shared storage"
+      },
+      {
+        "sha": "42b635a868d801701db27d0b7d01b52d92e1cdd0",
+        "date": "2026-10-29T14:17:04Z",
+        "message": "feat: supervise full frozen-gate run with AI every 30 minutes"
+      },
+      {
+        "sha": "f3d4d2a8dc18cc3597778b9902c58ca63717c045",
+        "date": "2026-10-29T16:34:23Z",
+        "message": "docs: record independently verified full frozen gate results"
+      }
+    ],
+    "head_date": "2026-10-29T16:34:23Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "feat/eager-graph-incremental-inputs",
+    "head": "0516c3e7c2c6881980c341205d92579a29968b8a",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 23,
+    "merge_base": "0516c3e7c2c6881980c341205d92579a29968b8a",
+    "unique": [],
+    "head_date": "2026-10-30T11:44:12Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "feat/frozen-eager-physical",
+    "head": "e55349f49902a5929e641a827d49f80868bedb9c",
+    "status": "diverged",
+    "ahead": 12,
+    "behind": 28,
+    "merge_base": "cd22430d8d2509bb414886420a5dec6945332f7c",
+    "unique": [
+      {
+        "sha": "3b72aac0e8890196975e3960ccb4acb91449231d",
+        "date": "2026-10-30T02:57:55Z",
+        "message": "feat(frozen): add physical arena decode cache\n\nConsolidate frozen regions into request-local K/V arenas and batch near-to-far aging so decode no longer performs duplicate visible-KV gathers or host position transfers. Preserve the gather implementation as an explicit reference path."
+      },
+      {
+        "sha": "73baad68999c8253595504d9cdb274b00a9c0e79",
+        "date": "2026-10-30T04:03:49Z",
+        "message": "feat(frozen): select TLI candidates from physical regions\n\nCompute L1 statistics and L2 scores only for live region candidates,\nshort-circuit dual-skip selection, and preserve the original free-topk\nsemantics with intermediate ring-wrap parity tests.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      },
+      {
+        "sha": "304e83e20b762bb5af61a1954bb4a8117a0ac052",
+        "date": "2026-10-30T04:05:03Z",
+        "message": "feat(frozen): attend directly to selected physical KV\n\nMaterialize only ordered physical slot IDs and device-resident counts,\nthen feed the existing online-softmax kernel without visible-KV gathers\nor the sub-16K dense masked fallback.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      },
+      {
+        "sha": "069c79612c714f58b26c570340e5af7bee8dc7bd",
+        "date": "2026-10-30T04:57:38Z",
+        "message": "feat(frozen): integrate RULER request lifecycle\n\nShare prefill/freeze/receipt handling with LongBench, add fail-closed\nRULER opt-in configuration, and bind gate geometry into treatment identity.\n\nCo-Authored-By: Kimi k3.1-pro <noreply@moonshot.ai>"
+      },
+      {
+        "sha": "c4096dfff55d071c3f65642af77d7f0aa3d5afec",
+        "date": "2026-10-30T05:06:47Z",
+        "message": "test(frozen): add paired Qwen GPU validation harness\n\nCompare all four gates with the legacy oracle and measure physical versus\nreference execution with ABBA timing, memory receipts, and GPU hygiene logs.\n\nCo-Authored-By: Kimi k3.1-pro <noreply@moonshot.ai>"
+      },
+      {
+        "sha": "c6273f37f3e7ee79929064caa7d88a3b0c1d34d1",
+        "date": "2026-10-30T05:10:30Z",
+        "message": "fix(frozen): preserve YaRN in long-context GPU harness\n\nUse the production RULER rope scaling at 64K/128K and checkpoint partial performance reports after every arm.\n\nCo-Authored-By: Kimi k3.1-pro <noreply@moonshot.ai>"
+      },
+      {
+        "sha": "03f19d2b8c243fb2f6b6ec524646491ef4d574a8",
+        "date": "2026-10-30T05:45:10Z",
+        "message": "fix(frozen): allow independent dual gate in GPU harness\n\nCo-Authored-By: Kimi <noreply@anthropic.com>"
+      },
+      {
+        "sha": "b0718ea890494debc0c8c6c2e8a5b0d2b31abfbc",
+        "date": "2026-10-30T05:56:01Z",
+        "message": "fix(frozen): restore legacy oracle decode positions\n\nCo-Authored-By: Kimi <noreply@anthropic.com>"
+      },
+      {
+        "sha": "ceada903ba0e24fd6c1eae40e2429a37ad48f594",
+        "date": "2026-10-30T09:09:47Z",
+        "message": "fix(frozen): align harness YaRN original context\n\nUse Qwen's published 32768-token original context while keeping runtime\nposition capacity large enough for the prompt and generated suffix.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      },
+      {
+        "sha": "53493fe070c11d7b914ae1d447ac0575e151c432",
+        "date": "2026-10-30T09:25:37Z",
+        "message": "fix(frozen): accept real RULER CLI arguments\n\nTreat absent environment-only sparse flags as disabled while preserving\nfail-closed rejection of explicitly enabled incompatible settings.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      },
+      {
+        "sha": "2f8e80d806168b3f3b5b222845d4ae75a3ae0561",
+        "date": "2026-10-30T11:05:49Z",
+        "message": "feat(frozen): support forced-state performance arms\n\nRoute the selected frozen state through ABBA and profiler runs, record it in the protocol, and cover the routing with mocked CLI tests.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      },
+      {
+        "sha": "e55349f49902a5929e641a827d49f80868bedb9c",
+        "date": "2026-10-30T11:51:36Z",
+        "message": "docs(frozen): record Qwen3 physical acceptance evidence\n\nArchive the cross-checked four-state correctness, physical KV, ABBA, profiler, and hygiene verdict while preserving non-bit-exact and missing-baseline limitations.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      }
+    ],
+    "head_date": "2026-10-30T11:51:36Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "feat/nfa-paged-cache-final",
+    "head": "1b7dbd64fbc5c87e2d622024ea3c2cbd74641957",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 10,
+    "merge_base": "1b7dbd64fbc5c87e2d622024ea3c2cbd74641957",
+    "unique": [],
+    "head_date": "2026-10-30T10:32:54Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "feat/operator-overlap-blueprint",
+    "head": "aae80aa005265e7f79e6dc0e0b80c87bd456957e",
+    "status": "diverged",
+    "ahead": 3,
+    "behind": 198,
+    "merge_base": "0fd405150557e0688ab967cf569921b0cc96cdbc",
+    "unique": [
+      {
+        "sha": "13c9b590172edc45b235b81416a2e7975abb466f",
+        "date": "2026-10-28T10:40:53Z",
+        "message": "feat: expose compact middle-token selections without terminal mask roundtrip"
+      },
+      {
+        "sha": "ee0752feb1db8f4c9011ef547a22eebc5b21a4ee",
+        "date": "2026-10-28T10:40:54Z",
+        "message": "feat: add split-KV partial attention and stable merge backends\n\nImplement SIMT and opt-in grouped Tensor Core consumers, linear/ring addressing, heterogeneous QK/V widths, and the fork-join plan. Include independent oracle tests and offline compiler/interpreter checks. Native CUDA acceptance remains pending."
+      },
+      {
+        "sha": "aae80aa005265e7f79e6dc0e0b80c87bd456957e",
+        "date": "2026-10-28T10:40:56Z",
+        "message": "feat: wire operator graph overlap into fixed-cache and far-skip decode\n\nKeep the feature opt-in. Add whole-model smoke/capture gates, executable test scripts and paired graph benchmark instructions. Final local suite: 113 passed, 27 CUDA skipped; 32 interpreter cases and 34 offline SM80/SM90 compilations passed. No native GPU speedup or quality claim."
+      }
+    ],
+    "head_date": "2026-10-28T10:40:56Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "fix/device-revision-views-20261030",
+    "head": "4b494cb84454bef6fb9377f6509ad6121f047350",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 1,
+    "merge_base": "8ff7e78574a0dd8246ac1a5b677bd625939d4dc8",
+    "unique": [
+      {
+        "sha": "4b494cb84454bef6fb9377f6509ad6121f047350",
+        "date": "2026-10-30T13:46:57Z",
+        "message": "fix(graph): invalidate row geometry on base device revision"
+      }
+    ],
+    "head_date": "2026-10-30T13:46:57Z",
+    "coverage": "overlap: main explicitly propagates row revision; do not transplant old tuple-only patch"
+  },
+  {
+    "name": "fix/e127-fine-gather-test",
+    "head": "583ccbb7a4ba95515ec0b4ae5bb6bd01185bddf6",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 169,
+    "merge_base": "0d4f93ee40ce235f8b76dc7deab6ed991e462278",
+    "unique": [
+      {
+        "sha": "583ccbb7a4ba95515ec0b4ae5bb6bd01185bddf6",
+        "date": "2026-10-29T23:19:26Z",
+        "message": "test: align fine-gather candidate heads with GQA\n\nExpand shared KV-head candidate indices and lengths before comparing q-head scores so the E127 gate exercises the intended values instead of failing on mask shape.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      }
+    ],
+    "head_date": "2026-10-29T23:19:26Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "fix/five-round-runtime-audit-20261027",
+    "head": "dc5acb835f720a7704d4096807759a7943751d6d",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 207,
+    "merge_base": "8f213e48926431ea2d56cf3e7bc1a667d1105c74",
+    "unique": [
+      {
+        "sha": "dc5acb835f720a7704d4096807759a7943751d6d",
+        "date": "2026-10-27T14:33:43Z",
+        "message": "fix: preserve batch runtime state and evaluation prompt semantics"
+      }
+    ],
+    "head_date": "2026-10-27T14:33:43Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "fix/glm47-decode-contract-20261030",
+    "head": "e5d0fd960145f11c65b61a6e1700234478222b78",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 192,
+    "merge_base": "e5d0fd960145f11c65b61a6e1700234478222b78",
+    "unique": [],
+    "head_date": "2026-10-30T11:03:23Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "fix/glm47-main-integration-20261029",
+    "head": "39b6e80e4308f1f21e4927f08df223da2cff31a1",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 193,
+    "merge_base": "39b6e80e4308f1f21e4927f08df223da2cff31a1",
+    "unique": [],
+    "head_date": "2026-10-29T08:35:12Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "fix/gqa-mean-dtype-20261029",
+    "head": "0923372f28234e49ebb03923b8e07e8d6d4f6f1b",
+    "status": "diverged",
+    "ahead": 3,
+    "behind": 196,
+    "merge_base": "a2e7b67b4e5c131cfa169283f7c66d6fb8892b00",
+    "unique": [
+      {
+        "sha": "c0f73564adf712541cbce9e869d099a842a0fe9a",
+        "date": "2026-10-29T01:59:56Z",
+        "message": "fix: restrict BF16 GQA mean fusion to BF16 inputs"
+      },
+      {
+        "sha": "c147f3c2707263135dd16181b85bfc7b29e299db",
+        "date": "2026-10-29T02:44:01Z",
+        "message": "perf: remove overwritten SWA probability fill in Graph L2"
+      },
+      {
+        "sha": "0923372f28234e49ebb03923b8e07e8d6d4f6f1b",
+        "date": "2026-10-29T06:39:21Z",
+        "message": "perf: omit discarded Graph sentinel score masking"
+      }
+    ],
+    "head_date": "2026-10-29T06:39:21Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "fix/near-far-evaluation-blueprint",
+    "head": "2e388e5b25487c45e633c44e120e78f2a84beee1",
+    "status": "diverged",
+    "ahead": 2,
+    "behind": 163,
+    "merge_base": "8a2fb380a5f767eb7635a60482cb3934d80489ae",
+    "unique": [
+      {
+        "sha": "2b562d181eb0e94549356f29d3859d309f78993a",
+        "date": "2026-10-30T04:33:04Z",
+        "message": "fix(test_e127): _cand_ulp_ok GQA q-head \u5c55\u5f00\u4fee\u590d\n\nkv-head \u7a7a\u95f4\u7684 cand_idx/cand_len \u9700\u5c55\u5f00\u5230 q-head \u7a7a\u95f4\uff08_G=4 \u500d\uff09\u540e\n\u518d\u7d22\u5f15\u5168\u5bbd score_fine\uff1b\u539f\u5b9e\u73b0\u76f4\u63a5\u7528 Hkv=8 \u7ef4\u63a9\u7801\u7d22\u5f15 H=32 \u7ef4\u5f20\u91cf\uff0c\n\u81f4 shape mismatch IndexError\u3002\u540c\u6b65\u65b0\u4e3b\u673a\u590d\u8dd1 E127 6/6 PASS\u3002\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+      },
+      {
+        "sha": "2e388e5b25487c45e633c44e120e78f2a84beee1",
+        "date": "2026-10-30T06:23:45Z",
+        "message": "fix(eval): verify Qwen YaRN against 32768 original context"
+      }
+    ],
+    "head_date": "2026-10-30T06:23:45Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "fix/near-far-prefix-protocol",
+    "head": "cc7cc804e9460f9254df796ef27d48dd3ea9e87f",
+    "status": "diverged",
+    "ahead": 4,
+    "behind": 163,
+    "merge_base": "8a2fb380a5f767eb7635a60482cb3934d80489ae",
+    "unique": [
+      {
+        "sha": "2b562d181eb0e94549356f29d3859d309f78993a",
+        "date": "2026-10-30T04:33:04Z",
+        "message": "fix(test_e127): _cand_ulp_ok GQA q-head \u5c55\u5f00\u4fee\u590d\n\nkv-head \u7a7a\u95f4\u7684 cand_idx/cand_len \u9700\u5c55\u5f00\u5230 q-head \u7a7a\u95f4\uff08_G=4 \u500d\uff09\u540e\n\u518d\u7d22\u5f15\u5168\u5bbd score_fine\uff1b\u539f\u5b9e\u73b0\u76f4\u63a5\u7528 Hkv=8 \u7ef4\u63a9\u7801\u7d22\u5f15 H=32 \u7ef4\u5f20\u91cf\uff0c\n\u81f4 shape mismatch IndexError\u3002\u540c\u6b65\u65b0\u4e3b\u673a\u590d\u8dd1 E127 6/6 PASS\u3002\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+      },
+      {
+        "sha": "5d86381390e63b493b4c9d56c7bf54ccd1c4e2a4",
+        "date": "2026-10-30T07:54:01Z",
+        "message": "fix(longbench): canonicalize Quest prefix replay\n\nTokenize the rendered request once, preserve the exact token stream across the prefix/suffix boundary, and freeze near/far decisions before suffix replay. Extend the frozen runner to the explicit 16-task LongBench V1 set and align SAMSum stopping and GLM regression coverage.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      },
+      {
+        "sha": "4fa5bbc90544812c3e26378a1d0e77361bb57b40",
+        "date": "2026-10-30T08:56:51Z",
+        "message": "fix(longbench): validate Quest attention work\n\nClose the Quest result pipeline with canonical prefix/suffix validation,\nper-step attended-K receipts, task-set macro averages, and export fixtures."
+      },
+      {
+        "sha": "cc7cc804e9460f9254df796ef27d48dd3ea9e87f",
+        "date": "2026-10-30T09:26:41Z",
+        "message": "docs(eval): classify blueprint repairs and reruns\n\nRecord protocol gaps, evidence boundaries, and immutable historical result\nreuse, rescoring, regeneration, and unknown-provenance decisions.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      }
+    ],
+    "head_date": "2026-10-30T09:26:41Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "gpt_dev/asynctls-comparison-design-20261023",
+    "head": "04c6e644518af98ac5cb7abe4fd371bb707fd977",
+    "status": "diverged",
+    "ahead": 2,
+    "behind": 251,
+    "merge_base": "a7bcdddf727aa99196d925b9f106d785ce9273d4",
+    "unique": [
+      {
+        "sha": "d821e933bdf6b437808192a109806f4e2c86b82b",
+        "date": "2026-10-23T04:29:19Z",
+        "message": "docs: specify staged AsyncTLS comparison and evidence gates"
+      },
+      {
+        "sha": "04c6e644518af98ac5cb7abe4fd371bb707fd977",
+        "date": "2026-10-23T04:30:09Z",
+        "message": "docs: link AsyncTLS advice to draft PR 5"
+      }
+    ],
+    "head_date": "2026-10-23T04:30:09Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "gpt_dev/dual-phase-cuda-graph-plan-20261022",
+    "head": "a792f6926bc7ac47f15aee4395e643fa86f772eb",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 255,
+    "merge_base": "77df85772b426db007e4c1fa7b3836db27727409",
+    "unique": [
+      {
+        "sha": "a792f6926bc7ac47f15aee4395e643fa86f772eb",
+        "date": "2026-10-22T15:19:52Z",
+        "message": "docs: plan dual-phase CUDA Graph support with decode-first TG gates"
+      }
+    ],
+    "head_date": "2026-10-22T15:19:52Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "gpt_dev/fasa-mask-review-20261021",
+    "head": "cbcb776dd1e922a91d8e4a6d7bd2012ac584ed4a",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 263,
+    "merge_base": "5964816457d016b4f74062e2b6ac43bf5685d074",
+    "unique": [
+      {
+        "sha": "cbcb776dd1e922a91d8e4a6d7bd2012ac584ed4a",
+        "date": "2026-10-21T14:10:54Z",
+        "message": "Fix batched FASA mask lengths and boolean padding exclusion"
+      }
+    ],
+    "head_date": "2026-10-21T14:10:54Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "gpt_dev/paper-aligned-runtime-20261015",
+    "head": "13cbeec87d59d9bb3dedcce5764814db7687717d",
+    "status": "diverged",
+    "ahead": 10,
+    "behind": 545,
+    "merge_base": "c7e0f3f9b8a2360f44008bafbf7dca6e896480c9",
+    "unique": [
+      {
+        "sha": "135afcd225e2f8e825fd6d6ef41591bac1281366",
+        "date": "2026-10-17T00:31:30Z",
+        "message": "docs: index AsyncTLS original and FFD source with missing PDF status"
+      },
+      {
+        "sha": "ba6873f3ee33d2138f14ef6f48416da42fbdbc4e",
+        "date": "2026-10-17T00:35:34Z",
+        "message": "feat: add calibrated AsyncTLS component candidate and harden FFD inputs"
+      },
+      {
+        "sha": "7c620884f98a49d25a209885e85dd9f95e201b76",
+        "date": "2026-10-17T00:35:35Z",
+        "message": "Merge remote-tracking branch 'origin/main' into HEAD"
+      },
+      {
+        "sha": "654e6d9c99216ec54bfba470144e09638e4a278b",
+        "date": "2026-10-17T01:16:05Z",
+        "message": "Merge remote-tracking branch 'origin/main' into HEAD"
+      },
+      {
+        "sha": "aea5e3131423714bbe6d60769fb8a5b9925c6962",
+        "date": "2026-10-17T01:34:29Z",
+        "message": "feat(baselines): add paper-derived lagged KV offload candidate"
+      },
+      {
+        "sha": "ebd7b8cf791f23312cc2b2de2f8c9cc4970ca38f",
+        "date": "2026-10-17T01:35:58Z",
+        "message": "Merge remote-tracking branch 'origin/main' into HEAD"
+      },
+      {
+        "sha": "961ed88dfc8db8f24c25150dbd4d5a6090cb2625",
+        "date": "2026-10-17T01:42:15Z",
+        "message": "fix(baselines): separate RULER and LongBench dry-run scopes"
+      },
+      {
+        "sha": "0ed12ffee059199fed9fc1ec72c20771975e3ceb",
+        "date": "2026-10-17T01:46:51Z",
+        "message": "build(baselines): archive official JSSA and safe environment recipe"
+      },
+      {
+        "sha": "e999961156fa79a1a24b5ba5b62913460e64484e",
+        "date": "2026-10-17T01:46:52Z",
+        "message": "Merge remote-tracking branch 'origin/main' into HEAD"
+      },
+      {
+        "sha": "13cbeec87d59d9bb3dedcce5764814db7687717d",
+        "date": "2026-10-17T01:50:41Z",
+        "message": "docs(jssa): clarify FA2 and calibration dispatch prerequisites"
+      }
+    ],
+    "head_date": "2026-10-17T01:50:41Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "gpt_dev/paper-data-alignment-20261025",
+    "head": "9b17440e54b91774046e8e86f5f706a27bbc41c7",
+    "status": "diverged",
+    "ahead": 3,
+    "behind": 243,
+    "merge_base": "2c726b54ad084ddb8f4a061954c6352afffb2da5",
+    "unique": [
+      {
+        "sha": "2080c113a70beead53134d24931751b911ab2e94",
+        "date": "2026-10-25T09:27:04Z",
+        "message": "Focus LoDA-SA manuscript on the selected pooled configuration\n\nReport all current RULER task results and scoped Graph execution evidence. Preserve historical experiments in the archive while removing predecessor comparisons from the manuscript. Add reproducible current-quality figure and rebuilt English PDFs."
+      },
+      {
+        "sha": "c3ef7c1df0d2581d1e86fc5c6a77d1336e665013",
+        "date": "2026-10-25T10:03:19Z",
+        "message": "Clarify selected-config architecture and complete task-score comparisons"
+      },
+      {
+        "sha": "9b17440e54b91774046e8e86f5f706a27bbc41c7",
+        "date": "2026-10-25T11:14:08Z",
+        "message": "docs: position LoDA-SA against FASA and calibrated JSSA scoring"
+      }
+    ],
+    "head_date": "2026-10-25T11:14:08Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "gpt_dev/paper-offline-environment-20261016",
+    "head": "344e089546ac6891aba8a0a502a7a7264398e1d4",
+    "status": "diverged",
+    "ahead": 5,
+    "behind": 584,
+    "merge_base": "08ccb54627e7c456fb020d75a68a3ca040f46d2d",
+    "unique": [
+      {
+        "sha": "e2307513db082a501649ad3c702899ad9bdf8013",
+        "date": "2026-10-16T10:53:07Z",
+        "message": "build: prepare locked paper wheels and baseline environment inventory"
+      },
+      {
+        "sha": "9f7a891c3653e28b8574e83d006fc66a1e114a3e",
+        "date": "2026-10-16T10:53:07Z",
+        "message": "Merge remote-tracking branch 'origin/main' into gpt_dev/paper-offline-environment-20261016"
+      },
+      {
+        "sha": "6d70147f87ba49340682dd8fd2b8cd08647fcdd7",
+        "date": "2026-10-16T10:54:53Z",
+        "message": "build: include dependency locks and verify current-main offline replay"
+      },
+      {
+        "sha": "54e343aa896c8fee3ecaad29e3b4a8e8b16e5803",
+        "date": "2026-10-16T10:56:15Z",
+        "message": "build: resume interrupted pinned source downloads safely"
+      },
+      {
+        "sha": "344e089546ac6891aba8a0a502a7a7264398e1d4",
+        "date": "2026-10-16T11:14:22Z",
+        "message": "fix: record B-track SparQ receipts and refine offline delivery evidence"
+      }
+    ],
+    "head_date": "2026-10-16T11:14:22Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "gpt_dev/runtime-review-20261021",
+    "head": "217d99bb5d9f3ed3340bbe63a6aa11c1cfd72d7f",
+    "status": "diverged",
+    "ahead": 3,
+    "behind": 263,
+    "merge_base": "5964816457d016b4f74062e2b6ac43bf5685d074",
+    "unique": [
+      {
+        "sha": "77013f058bd6bf3ac3ccad34ed39917215b6d47b",
+        "date": "2026-10-21T13:28:30Z",
+        "message": "fix: rebuild incompatible TLI incremental index buffers"
+      },
+      {
+        "sha": "51b4f023df3244393703158ee57996c62f84cc1c",
+        "date": "2026-10-21T13:36:26Z",
+        "message": "perf: skip unchanged complete pages during TLI append"
+      },
+      {
+        "sha": "217d99bb5d9f3ed3340bbe63a6aa11c1cfd72d7f",
+        "date": "2026-10-21T14:10:47Z",
+        "message": "Avoid overwritten TLI zero fills and reconcile current async guard"
+      }
+    ],
+    "head_date": "2026-10-21T14:10:47Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "gpt_dev/sparq-contract-round2-20261021",
+    "head": "16afa58c2c436a74cea719da488127203f28f913",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 263,
+    "merge_base": "5964816457d016b4f74062e2b6ac43bf5685d074",
+    "unique": [
+      {
+        "sha": "16afa58c2c436a74cea719da488127203f28f913",
+        "date": "2026-10-21T14:24:59Z",
+        "message": "Guard active SparQ decode inputs and connect route receipts"
+      }
+    ],
+    "head_date": "2026-10-21T14:24:59Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "gpt_dev/valid-length-guard-20261023",
+    "head": "962707d07b0e0682b2b0172c216b7c209b7cf596",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 247,
+    "merge_base": "fea02f0a9a49dad40f8c59494269832f50632b90",
+    "unique": [
+      {
+        "sha": "962707d07b0e0682b2b0172c216b7c209b7cf596",
+        "date": "2026-10-23T06:35:03Z",
+        "message": "Reject invalid fixed-capacity lengths before index preparation"
+      }
+    ],
+    "head_date": "2026-10-23T06:35:03Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "opt/ako-pool-score",
+    "head": "a8eb0f08fe4e6605f52a03f458156c27c7d736ef",
+    "status": "diverged",
+    "ahead": 2,
+    "behind": 214,
+    "merge_base": "55c38d8c7ce6afd4d726ce70cd1995408cc4728f",
+    "unique": [
+      {
+        "sha": "c63f0ea5dc48381836ae8c6d239d1afe93af79e4",
+        "date": "2026-10-26T10:27:25Z",
+        "message": "\u8bba\u6587\u66f4\u65b0\uff1a\u8865\u5145 E175 far-skip KV \u6d88\u878d\u5b9e\u9a8c (Supplementary Note S9)\n\n[main paper EN/ZH] \"Optional far gating\" \u8282\u5f15\u7528\u65b0\u8865\u5145\u6750\u6599 S9\n[supplement EN/ZH] \u65b0\u589e S9: far-skip compact + evict \u5b9e\u73b0\u7ea7\u6d88\u878d\n  - \u73af\u5f62\u7f13\u51b2\u51e0\u4f55\uff1a\u5bb9\u91cf 4551\uff08sink4+near4096+window128+block64-1\uff09\n  - \u5355\u5c42\u663e\u5b58\uff1a\u6052\u5b9a ~8.62 MiB\uff0c32K\u2192128K \u7f29\u51cf 47/87/93/97%\n  - \u5355\u5c42\u65f6\u5ef6\uff1a-48~53%\uff08\u7d27\u51d1\u8fdc\u533a attention \u66ff\u4ee3 SDPA\uff09\n  - \u5168\u6a21\u578b\u9759\u6001 13/36 \u5c42 skip \u2192 -1.01/-2.24/-4.70 GiB\n  - \u751f\u4ea7\u8def\u5f84\u6ce8\u610f\u4e8b\u9879\uff1aCUDA Graph-only\uff0ceager \u65e0 skip \u65f6 +4-7 GiB \u5f00\u9500\n[e175_e2e_memory_verdict_dyn_dgate.json] eager \u8bca\u65ad\u5224\u51b3\n\nCo-Authored-By: Claude Opus 4.6 <<EMAIL>>"
+      },
+      {
+        "sha": "a8eb0f08fe4e6605f52a03f458156c27c7d736ef",
+        "date": "2026-10-26T12:21:23Z",
+        "message": "feat: \u7edf\u4e00 per-layer \u81ea\u9002\u5e94 KV \u7f13\u5b58\uff08HybridLayer\uff09\n\n\u5408\u5e76 TLIStaticLayer\uff08linear \u5168\u91cf\uff09\u548c FarSkipLayer\uff08ring \u5faa\u73af\uff09\u5230\u4e00\u4e2a\nHybridLayer \u7c7b\uff0cprefill \u540e\u6309 calibrate_dyn_dgate \u7ed3\u679c\u51bb\u7ed3\u7b56\u7565\uff1a\n- linear: \u5168\u91cf [sink|near|far]\uff0cscatter_ \u5199\u5165\uff08CUDA Graph \u517c\u5bb9\uff09\n- ring: \u5faa\u73af [sink|ring_tail]\uff0c\u7269\u7406\u84b8\u53d1 far KV\uff08\u663e\u5b58\u8282\u7701\uff09\n\n\u5173\u952e\u53d8\u66f4\uff1a\n- sparse_attn/ops/hybrid_cache.py: \u65b0\u589e HybridLayer + HybridCache + FarSkipHybridLayer\n- sparse_attn/ops/tli_static_cache.py: TLIStaticLayer \u7ee7\u627f HybridLayer\uff08\u5411\u540e\u517c\u5bb9\uff09\n- sparse_attn/ops/far_skip_static.py: FarSkipStaticLayer \u2192 FarSkipHybridLayer \u522b\u540d\n- tests/test_hybrid_cache.py: 8 \u9879 CPU \u56de\u5f52\u6d4b\u8bd5\uff08linear bitexact / ring \u5faa\u73af / freeze guard \u7b49\uff09\n\n\u9a8c\u8bc1\uff1a82 passed\uff08batch/far-skip/hybrid/graph \u5168\u5957\uff09\uff0c0 \u65b0 regression\u3002\n\nCo-Authored-By: Claude Opus 4.6 <<EMAIL>>"
+      }
+    ],
+    "head_date": "2026-10-26T12:21:23Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "opt/l2-fine-topk",
+    "head": "56d503a71c3840f06f65130539fa06b50c0de811",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 206,
+    "merge_base": "56d503a71c3840f06f65130539fa06b50c0de811",
+    "unique": [],
+    "head_date": "2026-10-27T09:45:02Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "perf/exact-batch-query-reuse-20261030",
+    "head": "1bef6dec9d9dc2f6d5e646d87b1ebb38a81541f4",
+    "status": "diverged",
+    "ahead": 1,
+    "behind": 28,
+    "merge_base": "cd22430d8d2509bb414886420a5dec6945332f7c",
+    "unique": [
+      {
+        "sha": "1bef6dec9d9dc2f6d5e646d87b1ebb38a81541f4",
+        "date": "2026-10-30T05:48:35Z",
+        "message": "perf(exact): reuse shared coarse and fine query projection"
+      }
+    ],
+    "head_date": "2026-10-30T05:48:35Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  },
+  {
+    "name": "perf/gather-opt",
+    "head": "7bc1788b8ed84f4dd3f74f3df5d52b4ce9192a54",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 240,
+    "merge_base": "7bc1788b8ed84f4dd3f74f3df5d52b4ce9192a54",
+    "unique": [],
+    "head_date": "2026-10-25T09:26:50Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "perf/gpt-kv-eviction",
+    "head": "ee44158abcf10a2f6e154b29456664e5ba96912d",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 226,
+    "merge_base": "ee44158abcf10a2f6e154b29456664e5ba96912d",
+    "unique": [],
+    "head_date": "2026-10-25T14:26:56Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "perf/hybrid-cache-merge",
+    "head": "b0a378c304cebcba702a1454d0fe8bdf70033926",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 210,
+    "merge_base": "b0a378c304cebcba702a1454d0fe8bdf70033926",
+    "unique": [],
+    "head_date": "2026-10-27T02:20:31Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "perf/k1-full-attention-ablation",
+    "head": "238dfce883df7f96218ae562f972f89567e9f8e4",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 228,
+    "merge_base": "238dfce883df7f96218ae562f972f89567e9f8e4",
+    "unique": [],
+    "head_date": "2026-10-25T16:11:26Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "perf/prefill-compact-block-traversal",
+    "head": "93e4a364ea3be4897a076ef62feddb60145eccef",
+    "status": "behind",
+    "ahead": 0,
+    "behind": 758,
+    "merge_base": "93e4a364ea3be4897a076ef62feddb60145eccef",
+    "unique": [],
+    "head_date": "2026-10-14T23:13:00Z",
+    "coverage": "historical-main-ancestor"
+  },
+  {
+    "name": "results/pr10-main-performance",
+    "head": "99eadbf6e6bf630c5386734d3bb3901ca0bf9709",
+    "status": "diverged",
+    "ahead": 5,
+    "behind": 196,
+    "merge_base": "a2e7b67b4e5c131cfa169283f7c66d6fb8892b00",
+    "unique": [
+      {
+        "sha": "116648a66ebfaaa54214d854b3afac91845d5998",
+        "date": "2026-10-29T04:21:03Z",
+        "message": "bench: record PR10 path-specific performance verdict\n\nPreserve the clean native and 32K ABBA evidence so local wrapper gains are not misrepresented as production TPOT improvements.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      },
+      {
+        "sha": "e74758bb9a76082df57690b128628a613584a4d8",
+        "date": "2026-10-29T17:18:07Z",
+        "message": "bench: recheck PR10 reachability on latest main\n\nRecord clean integration on 309519a and the unchanged default production path without mixing in unrelated selector work.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      },
+      {
+        "sha": "b6f63623c0e5ddbdb66c754ae864c2bee56c6027",
+        "date": "2026-10-29T18:19:03Z",
+        "message": "bench: archive PR10 native and hygiene evidence\n\nPreserve the exact-output microbench logs and clean ABBA monitoring alongside the verdict so the performance claim remains auditable after temporary files expire.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      },
+      {
+        "sha": "2a017f2d29a9ee79750883defb7ff5bcc742417a",
+        "date": "2026-10-29T20:19:45Z",
+        "message": "bench: preserve complete PR10 ABBA raw results\n\nArchive all four arm JSON files and stdout logs, recompute the verdict from the archived copies, and record the unchanged reachability on 5fff867.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      },
+      {
+        "sha": "99eadbf6e6bf630c5386734d3bb3901ca0bf9709",
+        "date": "2026-10-30T00:16:02Z",
+        "message": "bench: link PR10 regression follow-up fix\n\nRecord the pushed GQA-aware E127 test correction and its passing validation so the archived integration report reflects the resolved failure.\n\nCo-Authored-By: Kimi <noreply@moonshot.cn>"
+      }
+    ],
+    "head_date": "2026-10-30T00:16:02Z",
+    "coverage": "unchanged-head; reuse previous actual-code evidence"
+  }
+]
