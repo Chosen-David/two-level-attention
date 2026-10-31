@@ -1,0 +1,159 @@
+{
+  "schema": "qwen-paged-frozen-decode-trace-verdict-v1",
+  "base_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559",
+  "fix_commit": "75822c99bdb34b89e8b8cf8d481aa5dd4ca26562",
+  "result": "PASS",
+  "protocol": {
+    "model": "Qwen3-8B",
+    "dtype": "bfloat16",
+    "task": "niah_single_1",
+    "row": 0,
+    "context_length": 8192,
+    "input_tokens": 7881,
+    "max_new": 8,
+    "states": [
+      "keep",
+      "far",
+      "near",
+      "both"
+    ],
+    "mode": "correctness",
+    "trace_decode": true
+  },
+  "correctness": {
+    "per_state": {
+      "keep": {
+        "generated_ids": [
+          220,
+          17,
+          16,
+          21,
+          21,
+          24,
+          19,
+          16
+        ],
+        "compared_kv_head_steps": 2016,
+        "selected_id_mismatches": 0,
+        "layer_output_max_abs": 0.0,
+        "logits_max_abs": 0.0
+      },
+      "far": {
+        "generated_ids": [
+          220,
+          17,
+          20,
+          21,
+          13,
+          4710,
+          14190,
+          11
+        ],
+        "compared_kv_head_steps": 2016,
+        "selected_id_mismatches": 0,
+        "layer_output_max_abs": 0.0,
+        "logits_max_abs": 0.0
+      },
+      "near": {
+        "generated_ids": [
+          220,
+          17,
+          16,
+          21,
+          21,
+          24,
+          19,
+          16
+        ],
+        "compared_kv_head_steps": 2016,
+        "selected_id_mismatches": 0,
+        "layer_output_max_abs": 0.0,
+        "logits_max_abs": 0.0
+      },
+      "both": {
+        "generated_ids": [
+          220,
+          19,
+          17,
+          13,
+          4710,
+          14190,
+          11,
+          1077
+        ],
+        "compared_kv_head_steps": 2016,
+        "selected_id_mismatches": 0,
+        "layer_output_max_abs": 0.0,
+        "logits_max_abs": 0.0
+      }
+    },
+    "total_compared_kv_head_steps": 8064,
+    "total_audited_kv_head_steps_across_both_arms": 16128,
+    "all_generated_ids_equal": true,
+    "all_layer_outputs_bit_exact": true,
+    "all_logits_bit_exact": true,
+    "all_selected_logical_ids_equal": true,
+    "all_physical_mappings_valid": true
+  },
+  "independent_validation": {
+    "assertions_passed": 130,
+    "assertions_failed": 0,
+    "validator_sha256": "059c2afa80a4910ca18e155c236ec678abfd2042895bbb036ec976427e7b9dbe"
+  },
+  "regression": {
+    "passed": 92,
+    "failed": 0,
+    "log": "qwen_paged_75822c99_4k/pytest.log"
+  },
+  "gpu_hygiene": "clean",
+  "source_binding": {
+    "manifest": "qwen_paged_75822c99_8k/source_manifest.json",
+    "production_file": "sparse_attn/ops/paged_region_tli.py",
+    "production_sha256": "2e4c290016bc6ff479067f5ec7c7382aa4360445a9eed396fdcf224c52db8ac2",
+    "remote_matches_committed_worktree": true,
+    "remote_files_verified": 88
+  },
+  "raw_report": {
+    "local_path": null,
+    "remote_path": "/home/hadoop-aipnlp/tli-main-dbbba689/qwen8b_75822c99_row0_8k/report.json",
+    "bytes": 674642386,
+    "sha256": "272092717734a26389183523e4e7855f926f3413cd723f3321ad5e9eebcc33d6",
+    "committed": false,
+    "reason": "643 MiB full per-head trace retained outside git; hash and all summary checks are archived"
+  },
+  "evidence_root": "exp/trace/results/qwen_paged_75822c99_8k",
+  "evidence_files": {
+    "dispatch.log": {
+      "bytes": 15,
+      "sha256": "825e53d1ffcff67350f7b246f11195f4fb7ad84034e91834d0e5018fdd6658d6"
+    },
+    "hygiene.log": {
+      "bytes": 210,
+      "sha256": "e9f03dacbdf15d502c9fca4981c9086f7fd3f1b092a97d2b8f0de58d0b872479"
+    },
+    "independent_validation.json": {
+      "bytes": 13891,
+      "sha256": "a989229913b13b5ddb925c9bbf29cfd0bdb029025b7d853f424a22201b84e9b7"
+    },
+    "protocol.json": {
+      "bytes": 2976,
+      "sha256": "a76f4d60ced88f056497aac90967b70775d5481deaecacae1d25292f7a492560"
+    },
+    "source_manifest.json": {
+      "bytes": 10227,
+      "sha256": "17b8f9aa0d58e5612418b989579fbb78460643991ef7637579f765e909f48459"
+    },
+    "stdout.log": {
+      "bytes": 2922,
+      "sha256": "27dec2b6400687796bd04a08905763529d375e79068785187db59e42686d768b"
+    }
+  },
+  "scope": [
+    "real Qwen3-8B BF16 RULER niah_single_1 row0 8K forced-state paired correctness only",
+    "not dense quality acceptance",
+    "not full RULER quality",
+    "not TPOT or speedup",
+    "not production memory acceptance",
+    "not other rows or sequence lengths"
+  ]
+}
