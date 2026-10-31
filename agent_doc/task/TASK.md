@@ -264,3 +264,7 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 ## 2026-10-30 GLM frozen-region integration
 
 - TL-GLM-FROZEN-20261030：eager B1独立near/far接入及独立验收完成；[详情](task_details/TL-GLM-FROZEN-20261030.md)。
+
+## 2026-10-31 paged validation entry repair
+
+- [ ] [TL-PAGED-BENCH-IMPORTS-20261031] 修复缓存迁移后两个 CUDA 检查脚本的失效导入；修前两项失败、修后静态模块检查两项通过，GPU 运行待验。[详情](task_details/TL-PAGED-BENCH-IMPORTS-20261031.md)。

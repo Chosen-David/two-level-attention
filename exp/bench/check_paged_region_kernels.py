@@ -2,7 +2,7 @@
 import argparse,json,os,time
 from pathlib import Path
 import torch
-from sparse_attn.ops.paged_region_cache import PagedRegionLayer
+from sparse_attn.cache.paged_region_cache import PagedRegionLayer
 from sparse_attn.ops.region_geometry import RegionGeometry
 from sparse_attn.ops.paged_region_kernels import paged_attention
 
