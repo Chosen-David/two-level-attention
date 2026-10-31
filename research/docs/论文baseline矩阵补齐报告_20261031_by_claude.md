@@ -63,7 +63,20 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | vt | 93.00 | 进行中 |
 | **AVG11** | **50.70** | **待全完成** |
 
-FullKV 在 GPU0 跑中（每任务 ~20min，11 任务 ~3.5h，预计 13:00 完成）。
+FullKV 在 GPU0 跑中（每任务 ~20min，11 任务 ~3.5h）。
+
+#### Q32B RULER FullKV 中期打分（5/11 任务完成，14:23 更新）
+
+| Task | TLI (champion, bs2) | FullKV | Δ |
+|------|-------|--------|---|
+| niah_single_1 | 92.00 | 93.00 | -1.00 |
+| niah_single_2 | 100.00 | 100.00 | 0.00 |
+| niah_single_3 | 97.00 | 97.00 | 0.00 |
+| niah_multikey_1 | 77.00 | 77.00 | 0.00 |
+| niah_multikey_2 | 48.00 | 46.00 | **+2.00** |
+| **AVG5** | **82.80** | **82.60** | **+0.20** |
+
+剩余 6 任务（multikey_3 进行中 48→73/100, multiquery/multivalue/cwe/fwe/vt pending），预计 ~16:00 全部完成。
 
 #### LongBench FullKV（**13/16 任务已打分，AVG13 = 42.31**）
 
@@ -75,15 +88,17 @@ FullKV 在 GPU0 跑中（每任务 ~20min，11 任务 ~3.5h，预计 13:00 完�
 
 **注**：缺 3 任务（passage_count、samsum、trec）全方法 pred（LongBench V1 无此子集对应数据 → 需另外 pred）。
 
-### 2.2 状态（更新 2026-10-31 14:10）
+### 2.2 状态（更新 2026-10-31 14:23）
 
 | 数据集 | 状态 |
 |--------|------|
 | RULER 32K TLI | ✅ 已完成，50.70 |
-| RULER 32K FullKV | 🔄 飞行中（GPU0），5/11 done（multikey_3 27/100, 剩余 5 任务 pending）|
+| RULER 32K FullKV | 🔄 飞行中（GPU0），5/11 done（multikey_3 73/100, 剩余 5 任务 pending）|
 | LongBench FullKV + TIA + Quest | ✅ 13/16，AVG 如上 |
-| LongBench 缺失任务 | 🔄 passage_count + trec 并行 GPU1；samsum 等其中之一完成后串行 |
+| LongBench 缺失任务 | 🔄 passage_count 串行 GPU1（85/200, ~14s/it, ETA~14:45）；完成后自动串行 trec → samsum |
 | RULER/LongBench 其他方法（FASA/JSSA/AsyncTLS/HISA）| 未派单 |
+
+**注意**：LongBench 缺失任务首次并行启动 → 3×60GB OOM。改为串行调度（/tmp/serial_lb_q32b.sh, PID 301242），GPU1 一次只跑一个。
 
 ---
 
@@ -207,4 +222,5 @@ FullKV 在 GPU0 跑中（每任务 ~20min，11 任务 ~3.5h，预计 13:00 完�
 | AVG11 | 50.70 | TBD（6/11 in progress） | — |
 
 **multikey_2 TLI 反超 FullKV（48 vs 46, +2）— 首个 TLI > FullKV 的任务**。
-其余 5 任务 FullKV = TLI 逐位一致。强论文支撑。
+**AVG5: TLI 82.80 vs FullKV 82.60 = +0.20**（TLI 反超已验证）
+其余 4 任务 FullKV = TLI 逐位一致。强论文支撑。
