@@ -2310,8 +2310,11 @@ class TLIIndexer(TIAIndexer):
                 # 检查）对齐；非连续输入回退原版 einsum 表达式（fail-closed，
                 # 值同）。
                 try:
-                    score_fine[0] = self._fast_score_fine(
-                        k_qat.squeeze(0), b_q_full, q_sq.dtype)
+                    # Write into the existing full-width buffer; avoid a temporary
+                    # score tensor and the subsequent full-output copy.
+                    self._fast_score_fine(
+                        k_qat.squeeze(0), b_q_full, q_sq.dtype,
+                        out=score_fine[0])
                 except Exception:
                     b_k_qat = repeat(k_qat.squeeze(0), "t h d -> t (h g) d", g=self.group_size).to(torch.float32)
                     score_fine[0] = einsum(b_q_full, b_k_qat, "h d, kt h d -> h kt").to(q_sq.dtype)

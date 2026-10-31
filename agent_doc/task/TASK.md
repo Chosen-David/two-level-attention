@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-01
+
+- [ ] [TL-FINE-DIRECT-OUTPUT-20261101] 全宽 fine scorer 复用既有 out 缓冲，消除临时输出与整片复制；72项主机配对/失败回退普通与-O通过，原生CUDA与收益待验。([详情](task_details/TL-FINE-DIRECT-OUTPUT-20261101.md))
+
 ## 2026-10-30
 
 - [x] [TL-NFA-ABLATION-20261030] 仅HotpotQA/GovReport；A/C/E限定验收保持；B 2000/2000及官方重评分、配对bootstrap独立验收通过（usable-with-scope）。F取消/全部性能暂停。([详情](task_details/TL-NFA-ABLATION-20261030.md))
