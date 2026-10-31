@@ -68,6 +68,37 @@ def region_selection(indexer,q,layer,scale):
     return mask,receipt
 
 
+def _capture_decode_trace(cache,layer,receipt,mask):
+    """记录实际送入分页 attention 的逻辑 IDs 及其页表物理槽位。"""
+    if not getattr(cache,'decode_trace_enabled',False):return
+    selected=mask[0,0]
+    length=layer.logical_length;page=layer.geometry.page
+    positions=torch.arange(length,device=mask.device).expand(selected.shape[0],-1)
+    candidates=positions.masked_fill(~selected,-1)
+    width=int(selected.sum(-1).max())
+    logical=candidates.sort(dim=-1,descending=True).values[:,:width].flip(-1).contiguous()
+    safe=logical.clamp(min=0);logical_pages=safe//page
+    page_ids=torch.tensor([layer.pages[i][0] if i in layer.pages else -1
+        for i in range((length+page-1)//page)],device=mask.device,dtype=torch.int64)
+    physical=(page_ids[logical_pages]*page+safe%page).masked_fill(logical<0,-1)
+    # attention 通过 pointer table 读页；逐选中页核对表项仍指向页表声明的 K/V。
+    key_ptrs=torch.tensor([layer.pages[i][1].data_ptr() if i in layer.pages else 0
+        for i in range((length+page-1)//page)],device=mask.device,dtype=torch.int64)
+    value_ptrs=torch.tensor([layer.pages[i][2].data_ptr() if i in layer.pages else 0
+        for i in range((length+page-1)//page)],device=mask.device,dtype=torch.int64)
+    actual_key_ptrs,actual_value_ptrs=layer.pointer_tables()
+    mapped=((page_ids[logical_pages]>=0)&
+        (actual_key_ptrs[logical_pages]==key_ptrs[logical_pages])&
+        (actual_value_ptrs[logical_pages]==value_ptrs[logical_pages]))
+    entry=dict(receipt)
+    entry.update(decode_step=length-layer.prompt_length-1,
+        selected_logical_ids=logical,selected_physical_ids=physical,
+        physical_mapping_matches=bool((mapped|(logical<0)).all()))
+    entries=getattr(layer,'tli_decode_trace',None)
+    if entries is None:entries=layer.tli_decode_trace=[]
+    entries.append(entry)
+
+
 def decode(module,q,k,v,cache,cache_position):
     layer=cache.layers[module.layer_idx]
     if not layer.frozen:raise ValueError('freeze before paged decode')
@@ -83,4 +114,5 @@ def decode(module,q,k,v,cache,cache_position):
     module.indexer.skip_far=layer.skip_far
     mask,receipt=region_selection(module.indexer,q,layer,module.scaling)
     layer.tli_receipt=receipt
+    _capture_decode_trace(cache,layer,receipt,mask)
     return paged_attention(layer,q,mask,module.scaling,ring_arithmetic=True)

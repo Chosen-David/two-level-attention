@@ -80,6 +80,52 @@ def test_decode_rejects_invalid_selector_before_committing_kv(monkeypatch):
     assert cache.layers[0].logical_length==length+1
 
 
+@pytest.mark.parametrize('trace_enabled',[False,True])
+@torch.inference_mode()
+def test_decode_trace_records_ordered_logical_and_physical_slots(trace_enabled):
+    length=40;cache=PagedRegionCache(1,RegionGeometry(
+        near=16,window=8,page=4,max_new_tokens=4))
+    k=torch.randn(1,1,length,128);cache.update(k,k,0)
+    cache.freeze({0:dict(skip_near=True,skip_far=True)})
+    cache.decode_trace_enabled=trace_enabled
+    idx=TLIIndexer(tli_args());idx.layer_idx=0
+    module=SimpleNamespace(layer_idx=0,indexer=idx,scaling=128**-.5)
+    for step in range(2):
+        q=torch.randn(1,1,1,128);nk=torch.randn(1,1,1,128)
+        decode(module,q,nk,nk,cache,torch.tensor([length+step]))
+    layer=cache.layers[0]
+    if not trace_enabled:
+        assert not hasattr(layer,'tli_decode_trace')
+        return
+    assert [entry['decode_step'] for entry in layer.tli_decode_trace]==[0,1]
+    for step,entry in enumerate(layer.tli_decode_trace):
+        current=length+step+1
+        expected=list(range(4))+list(range(current-8,current))
+        logical=entry['selected_logical_ids'].tolist()
+        physical=entry['selected_physical_ids'].tolist()
+        assert logical==[expected]
+        assert physical==[[layer.pages[position//4][0]*4+position%4
+                           for position in expected]]
+        assert entry['physical_mapping_matches']
+
+
+@torch.inference_mode()
+def test_decode_trace_detects_a_stale_attention_pointer_table(monkeypatch):
+    length=40;cache=PagedRegionCache(1,RegionGeometry(
+        near=16,window=8,page=4,max_new_tokens=4))
+    k=torch.randn(1,1,length,128);cache.update(k,k,0)
+    cache.freeze({0:dict(skip_near=True,skip_far=True)})
+    cache.decode_trace_enabled=True
+    layer=cache.layers[0]
+    monkeypatch.setattr(layer,'pointer_tables',lambda:(
+        torch.zeros(11,dtype=torch.int64),torch.zeros(11,dtype=torch.int64)))
+    idx=TLIIndexer(tli_args());idx.layer_idx=0
+    module=SimpleNamespace(layer_idx=0,indexer=idx,scaling=128**-.5)
+    q=torch.randn(1,1,1,128);nk=torch.randn(1,1,1,128)
+    decode(module,q,nk,nk,cache,torch.tensor([length]))
+    assert not layer.tli_decode_trace[0]['physical_mapping_matches']
+
+
 @pytest.mark.parametrize('route', ['operator','graph'])
 @torch.inference_mode()
 def test_qwen_paged_rejects_non_eager_routes_before_decode(monkeypatch,route):
