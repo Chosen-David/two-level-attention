@@ -1,0 +1,212 @@
+{
+  "schema": "pr10-origin-main-static-reachability-v2",
+  "date": "2026-11-01",
+  "audit_type": "static_call_chain_and_existing_raw_recheck_no_new_gpu_sampling",
+  "pr_head": "2449f56983d7e97c5fe1c4df300c2b50b0c16b81",
+  "origin_main": {
+    "commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559",
+    "previous_audited_commit": "55ccfb39fafd2096ee83992d8e667f9d2c11729a",
+    "source_files": {
+      "sparse_attn/ops/eager_decoding.py": {
+        "git_blob": "5afb3b1872544f2729d39bdeac7c01639ae4956a",
+        "sha256": "cbd0e4a08e49c285a0d8213a1c5c03d13660e3bc2e3bec7d1f857e194c7bac51"
+      },
+      "sparse_attn/ops/operator_pipeline.py": {
+        "git_blob": "6698fa548d9643f3bc31f838afbb51b8c095c38e",
+        "sha256": "9759c886f80bf21b4445196a876b0deeccd10914ba4329701399372ce8eb7bf7"
+      },
+      "sparse_attn/patches/qwen3_attn_patch.py": {
+        "git_blob": "92b953c096667a258dadd78ca40339edae580e89",
+        "sha256": "687468f73d1674d1596dc7669766c6865fbb1a09c48d56a775c2607e72e89649"
+      },
+      "sparse_attn/patches/llama3_attn_patch.py": {
+        "git_blob": "cb3980d284a58098b1efdb7af0e55e6a784bc692",
+        "sha256": "d536fd2c6b4c67cad2e3962987f6fa30c400297639e0f3d634adb5bae114a906"
+      },
+      "sparse_attn/patches/glm4_moe_lite_attn_patch.py": {
+        "git_blob": "2b3076e9de901dfb4f26ed79b011cc71eed8e779",
+        "sha256": "9bce7dccb53bf60e5aa6d855cfbe63517993882cbaf48d747cc29495f6c90c32"
+      },
+      "sparse_attn/patches/deepseek_v2_attn_patch.py": {
+        "git_blob": "efc374f686bd0f4b1613cbfa560ce80435db2640",
+        "sha256": "9b353f557f445793347fa811ed08e938a16ba9d31576e261e4c3700c376654f7"
+      }
+    },
+    "removed_pool_dependencies": [
+      "sparse_attn/ops/far_skip_graph.py",
+      "sparse_attn/ops/far_skip_runtime.py",
+      "sparse_attn/ops/far_skip_static.py",
+      "sparse_attn/ops/far_skip_workspace.py"
+    ]
+  },
+  "base_verdict": {
+    "path": "pr10_main_performance_verdict.json",
+    "sha256": "68a5311ca53c0e7f87c3b1143b33e9261e3417291e699b62900431b49d369c25",
+    "main_commit": "a2e7b67b4e5c131cfa169283f7c66d6fb8892b00"
+  },
+  "previous_addendum": {
+    "path": "pr10_origin_main_reachability_addendum.json",
+    "sha256": "f50de500560f2a13a453c801b3afbc82e651031e36f86589fd310b8e72b2b764",
+    "origin_main": "55ccfb39fafd2096ee83992d8e667f9d2c11729a"
+  },
+  "formal_native_raw": {
+    "latest": {
+      "path": "/tmp/tli-pr10-native-results/latest_native.pc33.log",
+      "sha256": "02def6638b06a25f8b2249882f9069ab449ef0eb26a82f48d5ce60d74097d32d"
+    },
+    "batch": {
+      "path": "/tmp/tli-pr10-native-results/batch_native.pc33.log",
+      "sha256": "e6d54d6c798ed07a1de1d311149216c296cf49c8da76f73ff1ec675c00421c0e"
+    },
+    "hygiene": {
+      "path": "/tmp/tli-pr10-native-results/hygiene.pc33.log",
+      "sha256": "87f97bf17759d1a33348193c69298946113646c3ba95fcfb76b294af26d4ef8e"
+    },
+    "dispatch": {
+      "path": "/tmp/tli-pr10-native-results/dispatch.pc33.log",
+      "sha256": "3be6bb81628bd9df77de0fc6ea842c06f95c07fe7ff82ed921f501a9d224538a"
+    },
+    "exact_output": "18/18",
+    "gpu_hygiene": "clean",
+    "scope_limit_zh": "仅历史 PR-head 原生 wrapper/assembly 微基准，不是 dbbba689 的 e2e 或 TPOT。"
+  },
+  "reachability": {
+    "early_dense": {
+      "status": "patch_absent_and_not_current_qwen_production_path",
+      "detail_zh": "补丁本身尚未合入；当前 Qwen B1 Graph/eager 都走 decode_compact。仅 Llama/GLM/DeepSeek 等仍调用 eager wrapper 的路径可能受益，必须分别做目标 e2e。"
+    },
+    "pool_assembly": {
+      "status": "production_route_removed_from_origin_main",
+      "detail_zh": "55ccfb3 的 compact far-off workspace.select 可达性结论已被后续 main 架构变化取代。dbbba689 删除 FarSkipGraphWorkspace、far_skip_graph/runtime/static/workspace，当前无生产 pool 调用链，旧局部补丁不能直接重基合并。"
+    },
+    "batch_cu_row": {
+      "status": "patch_absent_and_not_current_qwen_b1_path",
+      "detail_zh": "当前 B>1 Torch fallback 仍逐行构造 cu_row，但当前 Qwen B1 不走该 wrapper；原 B=1 Graph 主表也不可到达。"
+    }
+  },
+  "prior_measurements_unchanged": {
+    "e2e_measurement_main": "a2e7b67b4e5c131cfa169283f7c66d6fb8892b00",
+    "e2e_32k_abba_mean_speedup_baseline_over_candidate": 0.999864793,
+    "origin_main_e2e_remeasured": false,
+    "note_zh": "没有 dbbba689 的新 TPOT；旧 ABBA 与 native 数字均不得冒充当前 main 性能。"
+  },
+  "decision": "do_not_merge_pr10_as_package_on_dbbba689; pool_route_retired; no_main_table_tpot_claim",
+  "recommendation_zh": "PR10 收尾为不整包合并。pool 项在当前 main 关闭为生产路由已移除，不再投入旧 compact workspace 重基。early-dense 与 batch cu_row 若继续，只能作为独立、模型特定的局部优化，在仍调用 eager wrapper 的目标路径重新做 exact-output、e2e 和必要的 whole-step TPOT；不能用历史 18/18 或旧 32K ABBA 替代。",
+  "gpu_hygiene": {
+    "status": "not_applicable_static_negative_reachability_audit",
+    "new_gpu_sampling": false,
+    "historical_native_gpu_hygiene": "clean"
+  },
+  "scope_limit_zh": "本补记只核验 dbbba689 的已提交源码与既有正式 raw，不读取 main 工作树未提交 WIP，不宣称当前 main 新性能、质量或显存结论。",
+  "assertions": [
+    {
+      "name": "origin_main_exact_commit",
+      "passed": true,
+      "evidence": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "name": "previous_main_binding",
+      "passed": true,
+      "evidence": "55ccfb39fafd2096ee83992d8e667f9d2c11729a"
+    },
+    {
+      "name": "base_pr_and_main_binding",
+      "passed": true,
+      "evidence": "PR=2449f56983d7e97c5fe1c4df300c2b50b0c16b81, main=a2e7b67b4e5c131cfa169283f7c66d6fb8892b00"
+    },
+    {
+      "name": "historical_abba_unchanged",
+      "passed": true,
+      "evidence": "旧 32K B=1 Graph、36 层 non-skip、speedup=0.999864793，仅属于 a2e7b67"
+    },
+    {
+      "name": "formal_native_scope_not_e2e",
+      "passed": true,
+      "evidence": "两份正式原生输出都显式排除 e2e"
+    },
+    {
+      "name": "native_early_dense_exact_output",
+      "passed": true,
+      "evidence": "8/8 exact-output"
+    },
+    {
+      "name": "native_pool_assembly_exact_output",
+      "passed": true,
+      "evidence": "2/2 exact-output"
+    },
+    {
+      "name": "native_batch_cu_row_exact_output",
+      "passed": true,
+      "evidence": "8/8 exact-output"
+    },
+    {
+      "name": "native_18_cases",
+      "passed": true,
+      "evidence": "early=8, pool=2, batch=8"
+    },
+    {
+      "name": "formal_native_hygiene_clean",
+      "passed": true,
+      "evidence": "起跑/结束目标卡 1 MiB，无其他 compute PID，两个 native rc=0"
+    },
+    {
+      "name": "early_dense_patch_not_integrated",
+      "passed": true,
+      "evidence": "dbbba689 仍在 bm2 构造后以 T<16384 路由，未提前到 full_len"
+    },
+    {
+      "name": "batch_cu_row_patch_not_integrated",
+      "passed": true,
+      "evidence": "dbbba689 仍在 B>1 Torch fallback 每行构造 cu_row"
+    },
+    {
+      "name": "current_qwen_decode_bypasses_eager_wrapper",
+      "passed": true,
+      "evidence": "当前 Qwen Graph/eager B1 均直接 decode_compact，不经过 PR10 eager wrapper"
+    },
+    {
+      "name": "early_and_batch_remaining_model_scope",
+      "passed": true,
+      "evidence": "Llama/GLM/DeepSeek 旧参考补丁仍调用 eager_decoding_attn；收益只能按这些路径另测"
+    },
+    {
+      "name": "pool_dependency_removed_far_skip_graph.py",
+      "passed": true,
+      "evidence": "dbbba689e19d0d1507d2005a7a4fb4227d281559:sparse_attn/ops/far_skip_graph.py 不存在"
+    },
+    {
+      "name": "pool_dependency_removed_far_skip_runtime.py",
+      "passed": true,
+      "evidence": "dbbba689e19d0d1507d2005a7a4fb4227d281559:sparse_attn/ops/far_skip_runtime.py 不存在"
+    },
+    {
+      "name": "pool_dependency_removed_far_skip_static.py",
+      "passed": true,
+      "evidence": "dbbba689e19d0d1507d2005a7a4fb4227d281559:sparse_attn/ops/far_skip_static.py 不存在"
+    },
+    {
+      "name": "pool_dependency_removed_far_skip_workspace.py",
+      "passed": true,
+      "evidence": "dbbba689e19d0d1507d2005a7a4fb4227d281559:sparse_attn/ops/far_skip_workspace.py 不存在"
+    },
+    {
+      "name": "pool_symbols_absent_from_current_sparse_attn",
+      "passed": true,
+      "evidence": "当前 sparse_attn 无 FarSkipGraphWorkspace/graph_pool"
+    },
+    {
+      "name": "decode_ring_has_no_production_caller",
+      "passed": true,
+      "evidence": "decode_ring 仅剩兼容 helper 与旧 benchmark 观察包装，没有生产调用方"
+    },
+    {
+      "name": "pool_cannot_be_rebased_as_old_local_patch",
+      "passed": true,
+      "evidence": "旧 pool 的 workspace.select 消费链已删除；保留 decode_ring 字符串不等于生产可达"
+    }
+  ],
+  "assertion_summary": {
+    "passed": 21,
+    "failed": 0
+  }
+}
