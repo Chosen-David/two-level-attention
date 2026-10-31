@@ -1,0 +1,633 @@
+{
+  "schema": "qwen-paged-decode-trace-independent-validation-v1",
+  "evidence_root": "/home/hadoop-aipnlp/tli-main-dbbba689/qwen8b_75822c99_row0_128k",
+  "passed": true,
+  "assertions_passed": 131,
+  "assertions_failed": 0,
+  "failures": [],
+  "checks": [
+    {
+      "name": "report_protocol_matches_standalone_protocol",
+      "passed": true
+    },
+    {
+      "name": "real_qwen3_8b_model",
+      "passed": true
+    },
+    {
+      "name": "ruler_row0_identity",
+      "passed": true
+    },
+    {
+      "name": "input_length_identity",
+      "passed": true
+    },
+    {
+      "name": "corrected_yarn_and_runtime_capacity_protocol",
+      "passed": true
+    },
+    {
+      "name": "generation_and_dtype_protocol",
+      "passed": true
+    },
+    {
+      "name": "decode_trace_explicitly_enabled",
+      "passed": true
+    },
+    {
+      "name": "correctness_only_has_no_performance_claim",
+      "passed": true
+    },
+    {
+      "name": "four_states_complete_in_order",
+      "passed": true
+    },
+    {
+      "name": "keep_decisions_equal_flag",
+      "passed": true
+    },
+    {
+      "name": "keep_generated_equal_flag",
+      "passed": true
+    },
+    {
+      "name": "keep_layer_outputs_bit_exact",
+      "passed": true
+    },
+    {
+      "name": "keep_logits_bit_exact",
+      "passed": true
+    },
+    {
+      "name": "keep_all_layer_and_logit_tensors_compared",
+      "passed": true
+    },
+    {
+      "name": "keep_reference_identity",
+      "passed": true
+    },
+    {
+      "name": "keep_reference_generated_sha",
+      "passed": true
+    },
+    {
+      "name": "keep_reference_generated_length",
+      "passed": true
+    },
+    {
+      "name": "keep_reference_36_layer_traces",
+      "passed": true
+    },
+    {
+      "name": "keep_reference_steps_heads_and_decisions_valid",
+      "passed": true
+    },
+    {
+      "name": "keep_reference_ordered_padded_logical_ids_valid",
+      "passed": true
+    },
+    {
+      "name": "keep_reference_all_ids_match_region_visibility",
+      "passed": true
+    },
+    {
+      "name": "keep_reference_receipt_counts_recomputed",
+      "passed": true
+    },
+    {
+      "name": "keep_reference_physical_slot_offsets_valid",
+      "passed": true
+    },
+    {
+      "name": "keep_reference_pointer_table_mappings_valid",
+      "passed": true
+    },
+    {
+      "name": "keep_physical_identity",
+      "passed": true
+    },
+    {
+      "name": "keep_physical_generated_sha",
+      "passed": true
+    },
+    {
+      "name": "keep_physical_generated_length",
+      "passed": true
+    },
+    {
+      "name": "keep_physical_36_layer_traces",
+      "passed": true
+    },
+    {
+      "name": "keep_physical_steps_heads_and_decisions_valid",
+      "passed": true
+    },
+    {
+      "name": "keep_physical_ordered_padded_logical_ids_valid",
+      "passed": true
+    },
+    {
+      "name": "keep_physical_all_ids_match_region_visibility",
+      "passed": true
+    },
+    {
+      "name": "keep_physical_receipt_counts_recomputed",
+      "passed": true
+    },
+    {
+      "name": "keep_physical_physical_slot_offsets_valid",
+      "passed": true
+    },
+    {
+      "name": "keep_physical_pointer_table_mappings_valid",
+      "passed": true
+    },
+    {
+      "name": "keep_generated_ids_independently_equal",
+      "passed": true
+    },
+    {
+      "name": "keep_independent_trace_shape_2016_heads",
+      "passed": true
+    },
+    {
+      "name": "keep_independent_selected_ids_all_equal",
+      "passed": true
+    },
+    {
+      "name": "keep_reported_trace_summary_matches_recalculation",
+      "passed": true
+    },
+    {
+      "name": "far_decisions_equal_flag",
+      "passed": true
+    },
+    {
+      "name": "far_generated_equal_flag",
+      "passed": true
+    },
+    {
+      "name": "far_layer_outputs_bit_exact",
+      "passed": true
+    },
+    {
+      "name": "far_logits_bit_exact",
+      "passed": true
+    },
+    {
+      "name": "far_all_layer_and_logit_tensors_compared",
+      "passed": true
+    },
+    {
+      "name": "far_reference_identity",
+      "passed": true
+    },
+    {
+      "name": "far_reference_generated_sha",
+      "passed": true
+    },
+    {
+      "name": "far_reference_generated_length",
+      "passed": true
+    },
+    {
+      "name": "far_reference_36_layer_traces",
+      "passed": true
+    },
+    {
+      "name": "far_reference_steps_heads_and_decisions_valid",
+      "passed": true
+    },
+    {
+      "name": "far_reference_ordered_padded_logical_ids_valid",
+      "passed": true
+    },
+    {
+      "name": "far_reference_all_ids_match_region_visibility",
+      "passed": true
+    },
+    {
+      "name": "far_reference_receipt_counts_recomputed",
+      "passed": true
+    },
+    {
+      "name": "far_reference_physical_slot_offsets_valid",
+      "passed": true
+    },
+    {
+      "name": "far_reference_pointer_table_mappings_valid",
+      "passed": true
+    },
+    {
+      "name": "far_physical_identity",
+      "passed": true
+    },
+    {
+      "name": "far_physical_generated_sha",
+      "passed": true
+    },
+    {
+      "name": "far_physical_generated_length",
+      "passed": true
+    },
+    {
+      "name": "far_physical_36_layer_traces",
+      "passed": true
+    },
+    {
+      "name": "far_physical_steps_heads_and_decisions_valid",
+      "passed": true
+    },
+    {
+      "name": "far_physical_ordered_padded_logical_ids_valid",
+      "passed": true
+    },
+    {
+      "name": "far_physical_all_ids_match_region_visibility",
+      "passed": true
+    },
+    {
+      "name": "far_physical_receipt_counts_recomputed",
+      "passed": true
+    },
+    {
+      "name": "far_physical_physical_slot_offsets_valid",
+      "passed": true
+    },
+    {
+      "name": "far_physical_pointer_table_mappings_valid",
+      "passed": true
+    },
+    {
+      "name": "far_generated_ids_independently_equal",
+      "passed": true
+    },
+    {
+      "name": "far_independent_trace_shape_2016_heads",
+      "passed": true
+    },
+    {
+      "name": "far_independent_selected_ids_all_equal",
+      "passed": true
+    },
+    {
+      "name": "far_reported_trace_summary_matches_recalculation",
+      "passed": true
+    },
+    {
+      "name": "near_decisions_equal_flag",
+      "passed": true
+    },
+    {
+      "name": "near_generated_equal_flag",
+      "passed": true
+    },
+    {
+      "name": "near_layer_outputs_bit_exact",
+      "passed": true
+    },
+    {
+      "name": "near_logits_bit_exact",
+      "passed": true
+    },
+    {
+      "name": "near_all_layer_and_logit_tensors_compared",
+      "passed": true
+    },
+    {
+      "name": "near_reference_identity",
+      "passed": true
+    },
+    {
+      "name": "near_reference_generated_sha",
+      "passed": true
+    },
+    {
+      "name": "near_reference_generated_length",
+      "passed": true
+    },
+    {
+      "name": "near_reference_36_layer_traces",
+      "passed": true
+    },
+    {
+      "name": "near_reference_steps_heads_and_decisions_valid",
+      "passed": true
+    },
+    {
+      "name": "near_reference_ordered_padded_logical_ids_valid",
+      "passed": true
+    },
+    {
+      "name": "near_reference_all_ids_match_region_visibility",
+      "passed": true
+    },
+    {
+      "name": "near_reference_receipt_counts_recomputed",
+      "passed": true
+    },
+    {
+      "name": "near_reference_physical_slot_offsets_valid",
+      "passed": true
+    },
+    {
+      "name": "near_reference_pointer_table_mappings_valid",
+      "passed": true
+    },
+    {
+      "name": "near_physical_identity",
+      "passed": true
+    },
+    {
+      "name": "near_physical_generated_sha",
+      "passed": true
+    },
+    {
+      "name": "near_physical_generated_length",
+      "passed": true
+    },
+    {
+      "name": "near_physical_36_layer_traces",
+      "passed": true
+    },
+    {
+      "name": "near_physical_steps_heads_and_decisions_valid",
+      "passed": true
+    },
+    {
+      "name": "near_physical_ordered_padded_logical_ids_valid",
+      "passed": true
+    },
+    {
+      "name": "near_physical_all_ids_match_region_visibility",
+      "passed": true
+    },
+    {
+      "name": "near_physical_receipt_counts_recomputed",
+      "passed": true
+    },
+    {
+      "name": "near_physical_physical_slot_offsets_valid",
+      "passed": true
+    },
+    {
+      "name": "near_physical_pointer_table_mappings_valid",
+      "passed": true
+    },
+    {
+      "name": "near_generated_ids_independently_equal",
+      "passed": true
+    },
+    {
+      "name": "near_independent_trace_shape_2016_heads",
+      "passed": true
+    },
+    {
+      "name": "near_independent_selected_ids_all_equal",
+      "passed": true
+    },
+    {
+      "name": "near_reported_trace_summary_matches_recalculation",
+      "passed": true
+    },
+    {
+      "name": "both_decisions_equal_flag",
+      "passed": true
+    },
+    {
+      "name": "both_generated_equal_flag",
+      "passed": true
+    },
+    {
+      "name": "both_layer_outputs_bit_exact",
+      "passed": true
+    },
+    {
+      "name": "both_logits_bit_exact",
+      "passed": true
+    },
+    {
+      "name": "both_all_layer_and_logit_tensors_compared",
+      "passed": true
+    },
+    {
+      "name": "both_reference_identity",
+      "passed": true
+    },
+    {
+      "name": "both_reference_generated_sha",
+      "passed": true
+    },
+    {
+      "name": "both_reference_generated_length",
+      "passed": true
+    },
+    {
+      "name": "both_reference_36_layer_traces",
+      "passed": true
+    },
+    {
+      "name": "both_reference_steps_heads_and_decisions_valid",
+      "passed": true
+    },
+    {
+      "name": "both_reference_ordered_padded_logical_ids_valid",
+      "passed": true
+    },
+    {
+      "name": "both_reference_all_ids_match_region_visibility",
+      "passed": true
+    },
+    {
+      "name": "both_reference_receipt_counts_recomputed",
+      "passed": true
+    },
+    {
+      "name": "both_reference_physical_slot_offsets_valid",
+      "passed": true
+    },
+    {
+      "name": "both_reference_pointer_table_mappings_valid",
+      "passed": true
+    },
+    {
+      "name": "both_physical_identity",
+      "passed": true
+    },
+    {
+      "name": "both_physical_generated_sha",
+      "passed": true
+    },
+    {
+      "name": "both_physical_generated_length",
+      "passed": true
+    },
+    {
+      "name": "both_physical_36_layer_traces",
+      "passed": true
+    },
+    {
+      "name": "both_physical_steps_heads_and_decisions_valid",
+      "passed": true
+    },
+    {
+      "name": "both_physical_ordered_padded_logical_ids_valid",
+      "passed": true
+    },
+    {
+      "name": "both_physical_all_ids_match_region_visibility",
+      "passed": true
+    },
+    {
+      "name": "both_physical_receipt_counts_recomputed",
+      "passed": true
+    },
+    {
+      "name": "both_physical_physical_slot_offsets_valid",
+      "passed": true
+    },
+    {
+      "name": "both_physical_pointer_table_mappings_valid",
+      "passed": true
+    },
+    {
+      "name": "both_generated_ids_independently_equal",
+      "passed": true
+    },
+    {
+      "name": "both_independent_trace_shape_2016_heads",
+      "passed": true
+    },
+    {
+      "name": "both_independent_selected_ids_all_equal",
+      "passed": true
+    },
+    {
+      "name": "both_reported_trace_summary_matches_recalculation",
+      "passed": true
+    },
+    {
+      "name": "four_state_8064_compared_kv_head_steps",
+      "passed": true
+    },
+    {
+      "name": "two_arm_16128_audited_kv_head_steps",
+      "passed": true
+    },
+    {
+      "name": "gpu1_started_at_1_mib",
+      "passed": true
+    },
+    {
+      "name": "single_compute_pid_observed_between_exclusive_start_and_end",
+      "passed": true
+    },
+    {
+      "name": "runner_exit_zero",
+      "passed": true
+    },
+    {
+      "name": "gpu1_returned_to_1_mib_without_compute_pid",
+      "passed": true
+    }
+  ],
+  "summary": {
+    "keep": {
+      "generated_ids": [
+        576,
+        3281,
+        10963,
+        1372,
+        369,
+        1525,
+        538,
+        4577
+      ],
+      "compared_kv_head_steps": 2016,
+      "selected_id_mismatches": 0,
+      "layer_output_max_abs": 0.0,
+      "logits_max_abs": 0.0
+    },
+    "far": {
+      "generated_ids": [
+        576,
+        3281,
+        10963,
+        1372,
+        369,
+        1525,
+        538,
+        4577
+      ],
+      "compared_kv_head_steps": 2016,
+      "selected_id_mismatches": 0,
+      "layer_output_max_abs": 0.0,
+      "logits_max_abs": 0.0
+    },
+    "near": {
+      "generated_ids": [
+        576,
+        3281,
+        10963,
+        1372,
+        369,
+        1525,
+        538,
+        4577
+      ],
+      "compared_kv_head_steps": 2016,
+      "selected_id_mismatches": 0,
+      "layer_output_max_abs": 0.0,
+      "logits_max_abs": 0.0
+    },
+    "both": {
+      "generated_ids": [
+        576,
+        3281,
+        10963,
+        1372,
+        369,
+        1525,
+        538,
+        4577
+      ],
+      "compared_kv_head_steps": 2016,
+      "selected_id_mismatches": 0,
+      "layer_output_max_abs": 0.0,
+      "logits_max_abs": 0.0
+    }
+  },
+  "total_compared_kv_head_steps": 8064,
+  "total_audited_kv_head_steps_across_both_arms": 16128,
+  "gpu_hygiene": "clean",
+  "raw_files": {
+    "protocol.json": {
+      "bytes": 3134,
+      "sha256": "7efd73a61c0efd2de473ea719f95dcdcafb57129ba42048ee63d229329f792b1"
+    },
+    "report.json": {
+      "bytes": 788049083,
+      "sha256": "3c9c50318028735a3945ed383d48c233f89600ddd5315bb8815ac254977e9c6b"
+    },
+    "stdout.log": {
+      "bytes": 3002,
+      "sha256": "b3dd5e47e14710ef7ea9d3912a917d8aab2f2015eba1a30effb1d8843a559e12"
+    },
+    "hygiene.log": {
+      "bytes": 1700,
+      "sha256": "0a4c39df5a09dbdc69c98ea0f4c6565ebbcebdd9a85a70db3ca0735f47e3c503"
+    },
+    "dispatch.log": {
+      "bytes": 15,
+      "sha256": "57d01bdf58827e8d8281c2855a8c68163df422e587f9f701c7474560be877cd6"
+    }
+  },
+  "scope": [
+    "real Qwen3-8B BF16 RULER niah_single_1 row0 128K forced-state paired correctness only",
+    "not dense quality acceptance",
+    "not full RULER quality",
+    "not TPOT or speedup",
+    "not production memory acceptance",
+    "not other rows or sequence lengths"
+  ]
+}
