@@ -1,0 +1,149 @@
+{
+  "schema": "pr10-current-main-static-reachability-v1",
+  "date": "2026-10-31",
+  "audit_type": "static_call_chain_only_no_new_gpu_sampling",
+  "pr_head": "2449f56983d7e97c5fe1c4df300c2b50b0c16b81",
+  "base_verdict": {
+    "path": "exp/trace/results/pr10_main_performance_verdict.json",
+    "sha256": "68a5311ca53c0e7f87c3b1143b33e9261e3417291e699b62900431b49d369c25",
+    "audited_main_commit": "a2e7b67b4e5c131cfa169283f7c66d6fb8892b00"
+  },
+  "current_main": {
+    "commit": "39b6e80e4308f1f21e4927f08df223da2cff31a1",
+    "ref": "local main",
+    "origin_main_at_audit": "55ccfb39fafd2096ee83992d8e667f9d2c11729a",
+    "source_files": {
+      "sparse_attn/ops/eager_decoding.py": {
+        "git_blob": "05919c35978fb8a5be362371ebb669c892e864f5",
+        "sha256": "242bd86b3509ec833529a1436dc6ce78cc5af636f0791b6137aef6570397c1ec"
+      },
+      "sparse_attn/ops/far_skip_graph.py": {
+        "git_blob": "9ca46bf9e917cb50473a6f0ed4959d7295c82bbe",
+        "sha256": "c1d09419ef8836a0383491df56f71ebb69bf16c7ea9dcb876a5c2839666a86e2"
+      },
+      "sparse_attn/ops/operator_pipeline.py": {
+        "git_blob": "ccf190b38b097d941c4b2e079330a85c0746b068",
+        "sha256": "19057a43902190f50dcbee57485727344d600d704f02b57bde3a5418faa39956"
+      },
+      "sparse_attn/ops/far_skip_runtime.py": {
+        "git_blob": "5d7314acc1f435029c62c12f5fcab97a36a535ea",
+        "sha256": "db4ce01af6107ad44bde7d41aeee09323e5aea8a49ad3a93d1cedae942ddb585"
+      },
+      "sparse_attn/ops/far_skip_static.py": {
+        "git_blob": "7d86106ff54eb5111096d15c9cf0af5f60082fea",
+        "sha256": "94e619e2ee237b34625058a4e72572207506d171ba97ad65292e32683474e938"
+      },
+      "sparse_attn/patches/qwen3_attn_patch.py": {
+        "git_blob": "7753084a8c3fb66f9641e41c55727e5d635a39e1",
+        "sha256": "dca24c89ce5ce6aaec0f57b6118df5d20c962af772d8feb1764275cc294446f5"
+      }
+    }
+  },
+  "prior_measurements_unchanged": {
+    "native_exact_output": "18/18",
+    "native_gpu_hygiene": "clean",
+    "e2e_32k_abba_mean_speedup_baseline_over_candidate": 0.999864793,
+    "e2e_32k_abba_baseline_mean_ms": 20.152323667,
+    "e2e_32k_abba_candidate_mean_ms": 20.15504876,
+    "e2e_32k_abba_all_generated_tokens_exact": true,
+    "note_zh": "本轮没有重跑 native microbench 或 e2e；这些数字仅引用并已核对原 verdict。"
+  },
+  "reachability": {
+    "early_dense": {
+      "current_main_status": "unchanged_not_reached_by_32k_main_table",
+      "detail_zh": "eager_decoding.py 自原判决 main 起未变；PR10 只把短序列 dense 路由提前，32K 不属于 <16384 路径。serial/overlap 的 B=1 generic decode 还会提前走 decode_indexed，不能据此主张新的 early-dense 生产收益。"
+    },
+    "pool_assembly": {
+      "current_main_status": "off_only_and_requires_compact_far_off_static_layer",
+      "off_zh": "默认 off 下，compact 且 skip_far=True 的 FarSkipStaticLayer 经 try_far_skip_static 调用 workspace.select；只有 0 < keep < candidates.shape[-1] 时执行 PR10 pool assembly。DynamicCache compact eager 不走该 Graph pool。",
+      "serial_zh": "serial 在 Qwen3 compact bridge 前被排除，B=1 generic decode 改走 decode_indexed，因此不到达 PR10 pool。",
+      "overlap_zh": "overlap 的 compact far-off 静态层会进入 workspace.__call__，随后调用当前直接 raise NotImplementedError 的 decode_ring；不会执行 select/pool。这里只说明该具体调用链不可作为 PR10 加速路径，不宣称所有 overlap 配置都会失败。",
+      "main_table_zh": "原 32K ABBA 所有臂 n_skip_layers=0、36 层均 non-skip，pool 仍不可达；新增 operator 路由不会改变这一事实。"
+    },
+    "batch_cu_row": {
+      "current_main_status": "unchanged_not_reached_by_b1_graph_main_table",
+      "detail_zh": "eager_decoding.py 未变，PR10 补丁仍只优化 B>1 Torch fallback 的逐行只读 cu_row 构造；原 B=1 whole-step Graph 主表不触发。"
+    }
+  },
+  "decision": "current_main_static_recheck_preserves_no_main_table_tpot_claim",
+  "recommendation_zh": "维持原判决：不应以主表加速为由整包合并 PR10。早期短序列与 B>1 fallback 补丁可按各自路径独立评估；pool 补丁的意义进一步限定为默认 off 且实际存在 compact far-off 静态层的配置。不得把 native assembly/wrapper 收益外推为 whole-step TPOT。",
+  "new_gpu_sampling_required": false,
+  "new_gpu_sampling_reason_zh": "本轮只审计新增静态路由；它不能把 32K 变成短序列、把 n_skip_layers=0 变成 far-off，或把 B=1 Graph 变成 B>1 Torch fallback，因此无需重复采数来维持原可达性判决。",
+  "scope_limit_zh": "这是 current-main 静态可达性补记，不是对 serial/overlap 的完整功能验收，也不是新的性能、质量或显存结论。",
+  "assertions": [
+    {
+      "name": "eager_decoding_unchanged_since_base_verdict",
+      "passed": true,
+      "evidence": "a2e7b67..39b6e80 对 eager_decoding.py 无 diff；early-dense 与 B>1 fallback 的静态可达条件未变"
+    },
+    {
+      "name": "operator_mode_default_off",
+      "passed": true,
+      "evidence": "operator_pipeline.py: operator_mode 默认 off"
+    },
+    {
+      "name": "pool_has_strict_selection_gate",
+      "passed": true,
+      "evidence": "far_skip_graph.py: pool assembly 还要求 0 < keep < candidates.shape[-1]"
+    },
+    {
+      "name": "off_enters_legacy_select",
+      "passed": true,
+      "evidence": "FarSkipGraphWorkspace.__call__: 仅 off 进入 select()，其中才包含 PR10 pool assembly"
+    },
+    {
+      "name": "serial_skips_compact_bridge",
+      "passed": true,
+      "evidence": "qwen3_attn_patch.py: serial 不进入 compact far-skip bridge"
+    },
+    {
+      "name": "serial_and_overlap_use_decode_indexed",
+      "passed": true,
+      "evidence": "Qwen3 B=1 generic decode 在 serial/overlap 下先走 decode_indexed，绕开 legacy eager_decoding_attn"
+    },
+    {
+      "name": "static_far_off_calls_workspace",
+      "passed": true,
+      "evidence": "try_far_skip_static: compact far-off 静态层调用 FarSkipGraphWorkspace"
+    },
+    {
+      "name": "only_far_off_layers_prepare_workspace",
+      "passed": true,
+      "evidence": "prepare_far_skip_static: 只有 skip_far=True 的层构造 FarSkipStaticLayer/workspace"
+    },
+    {
+      "name": "dynamic_compact_does_not_use_graph_pool",
+      "passed": true,
+      "evidence": "DynamicCache compact eager 使用 select_far_skip，不是 PR10 Graph pool assembly"
+    },
+    {
+      "name": "nonoff_workspace_calls_unimplemented_decode_ring",
+      "passed": true,
+      "evidence": "当前 main 的 decode_ring 直接 raise NotImplementedError；non-off compact 静态层不进入 pool select"
+    },
+    {
+      "name": "early_dense_length_boundary_unchanged",
+      "passed": true,
+      "evidence": "32K 不满足短序列 <16384 条件；原主表实验不会触发 early-dense 优化"
+    },
+    {
+      "name": "batch_fallback_still_per_row_on_main",
+      "passed": true,
+      "evidence": "main 尚未合入 PR10 的 cu_row 提升；该补丁仍只针对 B>1 Torch fallback，不涉及 B=1 Graph"
+    },
+    {
+      "name": "base_32k_pool_unreachable",
+      "passed": true,
+      "evidence": "原 32K ABBA 全部 36 层 non-skip，未构造 compact far-off workspace"
+    },
+    {
+      "name": "base_32k_batch_fallback_unreachable",
+      "passed": true,
+      "evidence": "原主表为 B=1 whole-step Graph，不是 B>1 Torch fallback"
+    }
+  ],
+  "assertion_summary": {
+    "passed": 14,
+    "failed": 0
+  }
+}
