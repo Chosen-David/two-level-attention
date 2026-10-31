@@ -1,0 +1,2601 @@
+{
+  "schema": "frozen-eager-attended-k-distribution-v1",
+  "date": "2026-10-31",
+  "audit_type": "offline_harvest_of_existing_correctness_decode_trace_no_new_gpu_sampling",
+  "source_verdict": {
+    "path": "exp/trace/results/frozen_eager_c81e57d_row3_four_length_verdict.json",
+    "sha256": "7443ebae94b63e5cda9852312c4aea651997cf9eae56b813790f82507a474f75",
+    "code_commit": "3dbff07c44a3cbcdaa116e3ea2a086e8f204dce9",
+    "selector_commit": "c81e57d940bf1c510539cb49d5916301c3970cae"
+  },
+  "metric_definition_zh": "valid unique attended-K = 每个 decode step/layer/KV-head 的最终 selected_logical_ids 中，位于 [0, logical_tokens) 的唯一逻辑位置数。它直接读取 forcing/dedup/masking 后的 ID，不使用 metrics.py 的页粒度近似。K1=128 是 coarse page 预算，不作为 attended token 加进 K2。",
+  "protocol": {
+    "model": "Qwen3-8B BF16",
+    "task": "RULER niah_single_1 row3",
+    "context_lengths": [
+      8192,
+      32768,
+      65536,
+      131072
+    ],
+    "max_new_tokens": 8,
+    "decode_receipt_steps_per_state": 7,
+    "layers": 36,
+    "kv_heads": 8,
+    "states": [
+      "keep",
+      "far",
+      "near",
+      "both"
+    ],
+    "arms": [
+      "reference",
+      "physical"
+    ],
+    "K1_pages": 128,
+    "K2_token_budget_including_sink_swa": 1024,
+    "sink_tokens": 4,
+    "swa_tokens": 128,
+    "attention_intervention": "诊断 wrapper 仅将 reference attention 消费端替换为与 physical 相同的 compact Triton kernel；cache 逻辑不变"
+  },
+  "lengths": {
+    "8192": {
+      "raw_report": "/tmp/frozen-eager-c81e57d-ruler-row3-regression/8192/report.json",
+      "raw_report_sha256": "5e448ab682be2ec540ce7357beb6a77024702e98b37f14609440c05f9ea78f0a",
+      "input_tokens": 7878,
+      "yarn_factor": null,
+      "yarn_original_max_position_embeddings": null,
+      "states": {
+        "keep": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 6987,
+            "trace_valid_unique_attended_k_total": 2057397,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1020.5342261904761,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1579,
+              "1021": 121,
+              "1022": 75,
+              "1023": 158,
+              "1024": 83
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 293900,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.4861111111111
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 293908,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.5138888888889
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 293897,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.4756944444445
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 293922,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.5625
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 293922,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.5625
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 293923,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.5659722222222
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 293925,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.5729166666666
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 293925,
+            "reported_work_selected_kv_total": 293925
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 6987,
+            "trace_valid_unique_attended_k_total": 2057397,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1020.5342261904761,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1579,
+              "1021": 121,
+              "1022": 75,
+              "1023": 158,
+              "1024": 83
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 293900,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.4861111111111
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 293908,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.5138888888889
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 293897,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.4756944444445
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 293922,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.5625
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 293922,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.5625
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 293923,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.5659722222222
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 293925,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.5729166666666
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 293925,
+            "reported_work_selected_kv_total": 293925
+          }
+        },
+        "far": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 0,
+            "trace_valid_unique_attended_k_total": 2064384,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1024,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1024.0,
+            "median_per_kv_head_step": 1024.0,
+            "count_histogram_per_kv_head_step": {
+              "1024": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294912,
+            "reported_work_selected_kv_total": 294912
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 0,
+            "trace_valid_unique_attended_k_total": 2064384,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1024,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1024.0,
+            "median_per_kv_head_step": 1024.0,
+            "count_histogram_per_kv_head_step": {
+              "1024": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294912,
+            "reported_work_selected_kv_total": 294912
+          }
+        },
+        "near": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 7600,
+            "trace_valid_unique_attended_k_total": 2056784,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1020.2301587301587,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1840,
+              "1021": 52,
+              "1022": 19,
+              "1023": 46,
+              "1024": 59
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 293829,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2395833333334
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 293823,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.21875
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 293825,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2256944444445
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 293826,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2291666666666
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 293826,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2291666666666
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 293830,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2430555555555
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 293825,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2256944444445
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 293825,
+            "reported_work_selected_kv_total": 293825
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 7600,
+            "trace_valid_unique_attended_k_total": 2056784,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1020.2301587301587,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1840,
+              "1021": 52,
+              "1022": 19,
+              "1023": 46,
+              "1024": 59
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 293829,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2395833333334
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 293823,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.21875
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 293825,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2256944444445
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 293826,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2291666666666
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 293826,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2291666666666
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 293830,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2430555555555
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 293825,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.2256944444445
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 293825,
+            "reported_work_selected_kv_total": 293825
+          }
+        },
+        "both": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 1798272,
+            "trace_valid_unique_attended_k_total": 266112,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 132,
+            "max_per_kv_head_step": 132,
+            "mean_per_kv_head_step": 132.0,
+            "median_per_kv_head_step": 132.0,
+            "count_histogram_per_kv_head_step": {
+              "132": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 38016,
+            "reported_work_selected_kv_total": 38016
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 1798272,
+            "trace_valid_unique_attended_k_total": 266112,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 132,
+            "max_per_kv_head_step": 132,
+            "mean_per_kv_head_step": 132.0,
+            "median_per_kv_head_step": 132.0,
+            "count_histogram_per_kv_head_step": {
+              "132": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 38016,
+            "reported_work_selected_kv_total": 38016
+          }
+        }
+      }
+    },
+    "32768": {
+      "raw_report": "/tmp/frozen-eager-c81e57d-ruler-row3-regression/32768/report.json",
+      "raw_report_sha256": "a13af6209327d84abdd416335147f7e8435018152a554784b58d893f5ae21392",
+      "input_tokens": 32612,
+      "yarn_factor": null,
+      "yarn_original_max_position_embeddings": null,
+      "states": {
+        "keep": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 5698,
+            "trace_valid_unique_attended_k_total": 2058686,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.1736111111111,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1146,
+              "1021": 146,
+              "1022": 124,
+              "1023": 428,
+              "1024": 172
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294109,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2118055555555
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294081,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1145833333334
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294089,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1423611111111
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294092,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1527777777778
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294098,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1736111111111
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294109,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2118055555555
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294108,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2083333333334
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294108,
+            "reported_work_selected_kv_total": 294108
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 5698,
+            "trace_valid_unique_attended_k_total": 2058686,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.1736111111111,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1146,
+              "1021": 146,
+              "1022": 124,
+              "1023": 428,
+              "1024": 172
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294109,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2118055555555
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294081,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1145833333334
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294089,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1423611111111
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294092,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1527777777778
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294098,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1736111111111
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294109,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2118055555555
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294108,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2083333333334
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294108,
+            "reported_work_selected_kv_total": 294108
+          }
+        },
+        "far": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 0,
+            "trace_valid_unique_attended_k_total": 2064384,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1024,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1024.0,
+            "median_per_kv_head_step": 1024.0,
+            "count_histogram_per_kv_head_step": {
+              "1024": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294912,
+            "reported_work_selected_kv_total": 294912
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 0,
+            "trace_valid_unique_attended_k_total": 2064384,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1024,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1024.0,
+            "median_per_kv_head_step": 1024.0,
+            "count_histogram_per_kv_head_step": {
+              "1024": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294912,
+            "reported_work_selected_kv_total": 294912
+          }
+        },
+        "near": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 6002,
+            "trace_valid_unique_attended_k_total": 2058382,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.0228174603175,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1263,
+              "1021": 119,
+              "1022": 120,
+              "1023": 353,
+              "1024": 161
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294045,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.9895833333334
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294046,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.9930555555555
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294049,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0034722222222
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294048,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294058,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0347222222222
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294062,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0486111111111
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294074,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0902777777778
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294074,
+            "reported_work_selected_kv_total": 294074
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 6002,
+            "trace_valid_unique_attended_k_total": 2058382,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.0228174603175,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1263,
+              "1021": 119,
+              "1022": 120,
+              "1023": 353,
+              "1024": 161
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294045,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.9895833333334
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294046,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.9930555555555
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294049,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0034722222222
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294048,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294058,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0347222222222
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294062,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0486111111111
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294074,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0902777777778
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294074,
+            "reported_work_selected_kv_total": 294074
+          }
+        },
+        "both": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 1798272,
+            "trace_valid_unique_attended_k_total": 266112,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 132,
+            "max_per_kv_head_step": 132,
+            "mean_per_kv_head_step": 132.0,
+            "median_per_kv_head_step": 132.0,
+            "count_histogram_per_kv_head_step": {
+              "132": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 38016,
+            "reported_work_selected_kv_total": 38016
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 1798272,
+            "trace_valid_unique_attended_k_total": 266112,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 132,
+            "max_per_kv_head_step": 132,
+            "mean_per_kv_head_step": 132.0,
+            "median_per_kv_head_step": 132.0,
+            "count_histogram_per_kv_head_step": {
+              "132": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 38016,
+            "reported_work_selected_kv_total": 38016
+          }
+        }
+      }
+    },
+    "65536": {
+      "raw_report": "/tmp/frozen-eager-c81e57d-ruler-row3-regression/65536/report.json",
+      "raw_report_sha256": "037e48e7572349e08679880e05766350aba9d49181ba2ab832ad4e5a397b8b0b",
+      "input_tokens": 65441,
+      "yarn_factor": 2.0,
+      "yarn_original_max_position_embeddings": 32768,
+      "states": {
+        "keep": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 5687,
+            "trace_valid_unique_attended_k_total": 2058697,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.1790674603175,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1168,
+              "1021": 120,
+              "1022": 100,
+              "1023": 455,
+              "1024": 173
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294125,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2673611111111
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294095,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1631944444445
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294073,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0868055555555
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294096,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1666666666666
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294094,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1597222222222
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294092,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1527777777778
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294122,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2569444444445
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294122,
+            "reported_work_selected_kv_total": 294122
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 5687,
+            "trace_valid_unique_attended_k_total": 2058697,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.1790674603175,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1168,
+              "1021": 120,
+              "1022": 100,
+              "1023": 455,
+              "1024": 173
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294125,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2673611111111
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294095,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1631944444445
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294073,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0868055555555
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294096,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1666666666666
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294094,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1597222222222
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294092,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1527777777778
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294122,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2569444444445
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294122,
+            "reported_work_selected_kv_total": 294122
+          }
+        },
+        "far": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 0,
+            "trace_valid_unique_attended_k_total": 2064384,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1024,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1024.0,
+            "median_per_kv_head_step": 1024.0,
+            "count_histogram_per_kv_head_step": {
+              "1024": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294912,
+            "reported_work_selected_kv_total": 294912
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 0,
+            "trace_valid_unique_attended_k_total": 2064384,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1024,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1024.0,
+            "median_per_kv_head_step": 1024.0,
+            "count_histogram_per_kv_head_step": {
+              "1024": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294912,
+            "reported_work_selected_kv_total": 294912
+          }
+        },
+        "near": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 5905,
+            "trace_valid_unique_attended_k_total": 2058479,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.0709325396825,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1251,
+              "1021": 99,
+              "1022": 107,
+              "1023": 390,
+              "1024": 169
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294079,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1076388888889
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294073,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0868055555555
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294077,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1006944444445
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294046,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.9930555555555
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294074,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0902777777778
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294053,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0173611111111
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294077,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1006944444445
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294077,
+            "reported_work_selected_kv_total": 294077
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 5905,
+            "trace_valid_unique_attended_k_total": 2058479,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.0709325396825,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1251,
+              "1021": 99,
+              "1022": 107,
+              "1023": 390,
+              "1024": 169
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294079,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1076388888889
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294073,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0868055555555
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294077,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1006944444445
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294046,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1020.9930555555555
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294074,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0902777777778
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294053,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.0173611111111
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294077,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1006944444445
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294077,
+            "reported_work_selected_kv_total": 294077
+          }
+        },
+        "both": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 1798272,
+            "trace_valid_unique_attended_k_total": 266112,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 132,
+            "max_per_kv_head_step": 132,
+            "mean_per_kv_head_step": 132.0,
+            "median_per_kv_head_step": 132.0,
+            "count_histogram_per_kv_head_step": {
+              "132": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 38016,
+            "reported_work_selected_kv_total": 38016
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 1798272,
+            "trace_valid_unique_attended_k_total": 266112,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 132,
+            "max_per_kv_head_step": 132,
+            "mean_per_kv_head_step": 132.0,
+            "median_per_kv_head_step": 132.0,
+            "count_histogram_per_kv_head_step": {
+              "132": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 38016,
+            "reported_work_selected_kv_total": 38016
+          }
+        }
+      }
+    },
+    "131072": {
+      "raw_report": "/tmp/frozen-eager-c81e57d-ruler128k-row3-four-state/report.json",
+      "raw_report_sha256": "45857def29232ead7675fee9f210d438240b40b8061d82df4e53eb5f3015f886",
+      "input_tokens": 130981,
+      "yarn_factor": 4.0,
+      "yarn_original_max_position_embeddings": 32768,
+      "states": {
+        "keep": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 5547,
+            "trace_valid_unique_attended_k_total": 2058837,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.2485119047619,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1107,
+              "1021": 145,
+              "1022": 100,
+              "1023": 484,
+              "1024": 180
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294144,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.3333333333334
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294110,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2152777777778
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294091,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1493055555555
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294109,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2118055555555
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294115,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2326388888889
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294113,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2256944444445
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294155,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.3715277777778
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294155,
+            "reported_work_selected_kv_total": 294155
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 5547,
+            "trace_valid_unique_attended_k_total": 2058837,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.2485119047619,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1107,
+              "1021": 145,
+              "1022": 100,
+              "1023": 484,
+              "1024": 180
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294144,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.3333333333334
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294110,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2152777777778
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294091,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1493055555555
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294109,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2118055555555
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294115,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2326388888889
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294113,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2256944444445
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294155,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.3715277777778
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294155,
+            "reported_work_selected_kv_total": 294155
+          }
+        },
+        "far": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 0,
+            "trace_valid_unique_attended_k_total": 2064384,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1024,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1024.0,
+            "median_per_kv_head_step": 1024.0,
+            "count_histogram_per_kv_head_step": {
+              "1024": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294912,
+            "reported_work_selected_kv_total": 294912
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 0,
+            "trace_valid_unique_attended_k_total": 2064384,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1024,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1024.0,
+            "median_per_kv_head_step": 1024.0,
+            "count_histogram_per_kv_head_step": {
+              "1024": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294912,
+                "min_per_kv_head": 1024,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1024.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294912,
+            "reported_work_selected_kv_total": 294912
+          }
+        },
+        "near": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 5736,
+            "trace_valid_unique_attended_k_total": 2058648,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.1547619047619,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1182,
+              "1021": 134,
+              "1022": 85,
+              "1023": 436,
+              "1024": 179
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294099,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1770833333334
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294078,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1041666666666
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294077,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1006944444445
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294088,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1388888888889
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294098,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1736111111111
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294090,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1458333333334
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294118,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2430555555555
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294118,
+            "reported_work_selected_kv_total": 294118
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 5736,
+            "trace_valid_unique_attended_k_total": 2058648,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 1020,
+            "max_per_kv_head_step": 1024,
+            "mean_per_kv_head_step": 1021.1547619047619,
+            "median_per_kv_head_step": 1020.0,
+            "count_histogram_per_kv_head_step": {
+              "1020": 1182,
+              "1021": 134,
+              "1022": 85,
+              "1023": 436,
+              "1024": 179
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 294099,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1770833333334
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 294078,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1041666666666
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 294077,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1006944444445
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 294088,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1388888888889
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 294098,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1736111111111
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 294090,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.1458333333334
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 294118,
+                "min_per_kv_head": 1020,
+                "max_per_kv_head": 1024,
+                "mean_per_kv_head": 1021.2430555555555
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 294118,
+            "reported_work_selected_kv_total": 294118
+          }
+        },
+        "both": {
+          "reference": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 1798272,
+            "trace_valid_unique_attended_k_total": 266112,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 132,
+            "max_per_kv_head_step": 132,
+            "mean_per_kv_head_step": 132.0,
+            "median_per_kv_head_step": 132.0,
+            "count_histogram_per_kv_head_step": {
+              "132": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 38016,
+            "reported_work_selected_kv_total": 38016
+          },
+          "physical": {
+            "head_step_records": 2016,
+            "trace_selected_id_slots_total": 2064384,
+            "trace_padding_slots_total": 1798272,
+            "trace_valid_unique_attended_k_total": 266112,
+            "duplicate_id_occurrences_in_final_valid_region": 0,
+            "min_per_kv_head_step": 132,
+            "max_per_kv_head_step": 132,
+            "mean_per_kv_head_step": 132.0,
+            "median_per_kv_head_step": 132.0,
+            "count_histogram_per_kv_head_step": {
+              "132": 2016
+            },
+            "per_decode_step": [
+              {
+                "decode_step": 0,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 1,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 2,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 3,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 4,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 5,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              },
+              {
+                "decode_step": 6,
+                "head_records": 288,
+                "valid_unique_total": 38016,
+                "min_per_kv_head": 132,
+                "max_per_kv_head": 132,
+                "mean_per_kv_head": 132.0
+              }
+            ],
+            "final_decode_receipt_valid_unique_total": 38016,
+            "reported_work_selected_kv_total": 38016
+          }
+        }
+      }
+    }
+  },
+  "combined_by_state": {
+    "keep": {
+      "reference": {
+        "head_step_records": 8064,
+        "valid_unique_total": 8233617
+      },
+      "physical": {
+        "head_step_records": 8064,
+        "valid_unique_total": 8233617
+      }
+    },
+    "far": {
+      "reference": {
+        "head_step_records": 8064,
+        "valid_unique_total": 8257536
+      },
+      "physical": {
+        "head_step_records": 8064,
+        "valid_unique_total": 8257536
+      }
+    },
+    "near": {
+      "reference": {
+        "head_step_records": 8064,
+        "valid_unique_total": 8232293
+      },
+      "physical": {
+        "head_step_records": 8064,
+        "valid_unique_total": 8232293
+      }
+    },
+    "both": {
+      "reference": {
+        "head_step_records": 8064,
+        "valid_unique_total": 1064448
+      },
+      "physical": {
+        "head_step_records": 8064,
+        "valid_unique_total": 1064448
+      }
+    }
+  },
+  "headline_findings_zh": [
+    "每长度每态每臂均有 2016 个完整 head-step 记录；最终 decode receipt 的 valid unique 总数与既有 work.selected_kv_total 全部一致。",
+    "reference/physical 在四长度四态的 attended-K 直方图、逐 decode step 分布和合计均一致。",
+    "both 态只保留 sink+SWA，所有 head-step 均为 132 个 valid unique attended-K；keep/far/near 的实际分布直接由最终 ID 给出，不能再用 1024 或页近似替代。"
+  ],
+  "scope_limit_zh": "仅覆盖既有 row3、四长度、max_new=8、attention backend 对齐后的 correctness-only trace。本报告不测量延迟/显存，不代表生产全 decode 长度分布、dense/ClusterKV actual unique K、其他任务/请求或完整质量/效率验收。",
+  "remaining_efficiency_gaps_zh": [
+    "候选基线 actual unique K 与 same-K 对比仍未闭合。",
+    "prefill calibration/index/cache conversion 单项成本和 Graph setup/warmup 直接成本仍需独立计时。",
+    "E178 完整 L1+L2+sink/SWA+attention 同口径微基准仍需重测；本报告不恢复旧 5–93× 宣称。"
+  ],
+  "validation": {
+    "passed": 372268,
+    "failed": 0,
+    "check_scope_zh": "逐项执行原始报告 SHA、协议、36×7×8 几何、1024 固定容量、尾部 -1 padding、有效 ID 范围与唯一性、receipt 计数、物理映射、最终 work total、双臂分布及合计检查；任一失败即中止，不输出 PASS 报告。"
+  }
+}
