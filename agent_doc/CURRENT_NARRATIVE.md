@@ -276,6 +276,17 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   K1 裁决三选项（A=128 回退/B=96/C=64 维持）四方表见 E179 总判决，
   **裁决留用户**。
 
+- **【已收官 2026-10-31】NFA B 组区域打分消融**（独立验收
+  `agent_doc/results/nfa_ablation_20261030/B_final_review/REPORT.md` +
+  `paired_statistics.json`，状态 `usable-with-scope`）：HotpotQA/GovReport
+  5 cell × 200 row，共 2000/2000；官方 `sample_score` 全量重算零误差，
+  paired bootstrap B=10000、seed=20261031。HotpotQA 四臂均未检出相对
+  生产默认的差异；GovReport 分区 MinMax/MinMax 为 −0.3788 pp
+  （95% CI [−0.7462, −0.0232]），无边界页为 −0.3252 pp
+  （[−0.6534, −0.0042]）。本协议范围支持保留 near=avg 与 boundary；
+  探索性未校正 CI 不构成最优/等效/无损声明。A/C/E 既有范围验收保持，
+  F 取消，D/全部性能测试暂停。
+
 ## 3. 对比口径（vendor 基线）
 
 - 对比基线（Quest/MInference/SparQ/MoBA/ClusterKV/AsyncTLS/HISA/JSSA/

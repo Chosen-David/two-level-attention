@@ -1,0 +1,552 @@
+{
+  "status": "usable-with-scope",
+  "generated_at": "2026-10-31T12:10:21.200516+08:00",
+  "project_root": "/home/wangyuanshuo02/two-level-attention",
+  "input_root": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/nfa_ablation_20261030/B_final/quality",
+  "reviewer_role": "independent_read_only_acceptance",
+  "expected": {
+    "cells": [
+      "2d2a466b4e9a",
+      "4284d54b0e30",
+      "2d52db39d26d",
+      "06daedae75b2",
+      "a5f4cb3f7cf2"
+    ],
+    "datasets": [
+      "hotpotqa",
+      "gov_report"
+    ],
+    "rows_per_cell_dataset": 200,
+    "total_requests": 2000,
+    "baseline": "2d2a466b4e9a",
+    "expected_specs": {
+      "2d2a466b4e9a": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "avg",
+        "boundary": true
+      },
+      "4284d54b0e30": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": false,
+        "far_score": "minmax",
+        "near_score": "minmax",
+        "boundary": true
+      },
+      "2d52db39d26d": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "minmax",
+        "boundary": true
+      },
+      "06daedae75b2": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "avg",
+        "near_score": "avg",
+        "boundary": true
+      },
+      "a5f4cb3f7cf2": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "avg",
+        "boundary": false
+      }
+    }
+  },
+  "summary": {
+    "observed_request_json": 2000,
+    "unique_request_rows": 2000,
+    "complete_status_count": 2000,
+    "missing_request_count": 0,
+    "duplicate_request_count": 0,
+    "identity_mismatch_count": 0,
+    "pairing_mismatch_count": 0,
+    "rescored_count": 2000,
+    "score_tolerance": 1e-12,
+    "max_absolute_score_error": 0.0,
+    "score_mismatch_count": 0,
+    "error_count": 0
+  },
+  "official_scorer": {
+    "function": "benchmark.LongBench.eval.sample_score",
+    "eval_sha256": "dd945b78e93c0f267efa9099e4834b2081fd32268fe554f763f5372a0124f325",
+    "metrics_sha256": "29a325fa4b4cb81660b1b560bc102d4682fdb39414b75eaa28ad19a2cffe04a0",
+    "all_manifest_source_hashes_match": true
+  },
+  "cell_checks": [
+    {
+      "cell": "2d2a466b4e9a",
+      "dataset": "hotpotqa",
+      "label": "生产默认：MinMax/Avg，分区，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "avg",
+        "boundary": true
+      },
+      "manifests": [
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/2d2a466b4e9a/hotpotqa/manifest_0_200.json",
+          "identity": "bd79d5782025147e65becd92391a248d7b79884d165391dd1481e33de67689aa",
+          "start": 0,
+          "end": 200
+        }
+      ],
+      "manifest_count": 1,
+      "request_file_count": 200,
+      "unique_row_count": 200,
+      "missing_rows": [],
+      "status_counts": {
+        "complete": 200
+      },
+      "identity_mismatch_count": 0,
+      "rescored_count": 200,
+      "max_absolute_score_error": 0.0
+    },
+    {
+      "cell": "2d2a466b4e9a",
+      "dataset": "gov_report",
+      "label": "生产默认：MinMax/Avg，分区，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "avg",
+        "boundary": true
+      },
+      "manifests": [
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/2d2a466b4e9a/gov_report/manifest_0_200.json",
+          "identity": "6323d74cc0a41c3832fe8bef9121347ca51ca35a4c46dd20f189d22d18da042b",
+          "start": 0,
+          "end": 200
+        }
+      ],
+      "manifest_count": 1,
+      "request_file_count": 200,
+      "unique_row_count": 200,
+      "missing_rows": [],
+      "status_counts": {
+        "complete": 200
+      },
+      "identity_mismatch_count": 0,
+      "rescored_count": 200,
+      "max_absolute_score_error": 0.0
+    },
+    {
+      "cell": "4284d54b0e30",
+      "dataset": "hotpotqa",
+      "label": "全局 MinMax/MinMax，无分区，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": false,
+        "far_score": "minmax",
+        "near_score": "minmax",
+        "boundary": true
+      },
+      "manifests": [
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/4284d54b0e30/hotpotqa/manifest_0_200.json",
+          "identity": "497a5751b8267d18fcb6ec88814af31dc0a65a23e90b283d634ace289805ac90",
+          "start": 0,
+          "end": 200
+        }
+      ],
+      "manifest_count": 1,
+      "request_file_count": 200,
+      "unique_row_count": 200,
+      "missing_rows": [],
+      "status_counts": {
+        "complete": 200
+      },
+      "identity_mismatch_count": 0,
+      "rescored_count": 200,
+      "max_absolute_score_error": 0.0
+    },
+    {
+      "cell": "4284d54b0e30",
+      "dataset": "gov_report",
+      "label": "全局 MinMax/MinMax，无分区，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": false,
+        "far_score": "minmax",
+        "near_score": "minmax",
+        "boundary": true
+      },
+      "manifests": [
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/4284d54b0e30/gov_report/manifest_0_200.json",
+          "identity": "6118471ccb253628d679eb18cfcefbe7017af5551dbba1e30d357ddc1697112c",
+          "start": 0,
+          "end": 200
+        }
+      ],
+      "manifest_count": 1,
+      "request_file_count": 200,
+      "unique_row_count": 200,
+      "missing_rows": [],
+      "status_counts": {
+        "complete": 200
+      },
+      "identity_mismatch_count": 0,
+      "rescored_count": 200,
+      "max_absolute_score_error": 0.0
+    },
+    {
+      "cell": "2d52db39d26d",
+      "dataset": "hotpotqa",
+      "label": "分区 MinMax/MinMax，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "minmax",
+        "boundary": true
+      },
+      "manifests": [
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/2d52db39d26d/hotpotqa/manifest_0_200.json",
+          "identity": "c59c30092acc0c3368a76b6898aec1cc58fc2bc48bb76a0990f4e2be56a86a92",
+          "start": 0,
+          "end": 200
+        }
+      ],
+      "manifest_count": 1,
+      "request_file_count": 200,
+      "unique_row_count": 200,
+      "missing_rows": [],
+      "status_counts": {
+        "complete": 200
+      },
+      "identity_mismatch_count": 0,
+      "rescored_count": 200,
+      "max_absolute_score_error": 0.0
+    },
+    {
+      "cell": "2d52db39d26d",
+      "dataset": "gov_report",
+      "label": "分区 MinMax/MinMax，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "minmax",
+        "boundary": true
+      },
+      "manifests": [
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/2d52db39d26d/gov_report/manifest_0_200.json",
+          "identity": "252496615c29637b75d8ed5dfe2c9b0b69a4d908228b23935f3ef90d1297969c",
+          "start": 0,
+          "end": 200
+        },
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/2d52db39d26d/gov_report/manifest_100_200.json",
+          "identity": "252496615c29637b75d8ed5dfe2c9b0b69a4d908228b23935f3ef90d1297969c",
+          "start": 100,
+          "end": 200
+        },
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/2d52db39d26d/gov_report/manifest_150_200.json",
+          "identity": "252496615c29637b75d8ed5dfe2c9b0b69a4d908228b23935f3ef90d1297969c",
+          "start": 150,
+          "end": 200
+        }
+      ],
+      "manifest_count": 3,
+      "request_file_count": 200,
+      "unique_row_count": 200,
+      "missing_rows": [],
+      "status_counts": {
+        "complete": 200
+      },
+      "identity_mismatch_count": 0,
+      "rescored_count": 200,
+      "max_absolute_score_error": 0.0
+    },
+    {
+      "cell": "06daedae75b2",
+      "dataset": "hotpotqa",
+      "label": "分区 Avg/Avg，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "avg",
+        "near_score": "avg",
+        "boundary": true
+      },
+      "manifests": [
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/06daedae75b2/hotpotqa/manifest_0_200.json",
+          "identity": "eb78f17cfd57db8be072e73c4c7a9a802656b6b2d8fdd8f77725af8bd9b86f1d",
+          "start": 0,
+          "end": 200
+        }
+      ],
+      "manifest_count": 1,
+      "request_file_count": 200,
+      "unique_row_count": 200,
+      "missing_rows": [],
+      "status_counts": {
+        "complete": 200
+      },
+      "identity_mismatch_count": 0,
+      "rescored_count": 200,
+      "max_absolute_score_error": 0.0
+    },
+    {
+      "cell": "06daedae75b2",
+      "dataset": "gov_report",
+      "label": "分区 Avg/Avg，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "avg",
+        "near_score": "avg",
+        "boundary": true
+      },
+      "manifests": [
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/06daedae75b2/gov_report/manifest_0_200.json",
+          "identity": "e9b48acfde70671162b1e78f10de7dc1ce28aed725a09c542de035df73c82128",
+          "start": 0,
+          "end": 200
+        }
+      ],
+      "manifest_count": 1,
+      "request_file_count": 200,
+      "unique_row_count": 200,
+      "missing_rows": [],
+      "status_counts": {
+        "complete": 200
+      },
+      "identity_mismatch_count": 0,
+      "rescored_count": 200,
+      "max_absolute_score_error": 0.0
+    },
+    {
+      "cell": "a5f4cb3f7cf2",
+      "dataset": "hotpotqa",
+      "label": "生产默认打分/分区，无边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "avg",
+        "boundary": false
+      },
+      "manifests": [
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/a5f4cb3f7cf2/hotpotqa/manifest_0_200.json",
+          "identity": "22157671bc98a67924ac57d1ed78ef9daef3faba75960e99a4f5cad80ef34721",
+          "start": 0,
+          "end": 200
+        }
+      ],
+      "manifest_count": 1,
+      "request_file_count": 200,
+      "unique_row_count": 200,
+      "missing_rows": [],
+      "status_counts": {
+        "complete": 200
+      },
+      "identity_mismatch_count": 0,
+      "rescored_count": 200,
+      "max_absolute_score_error": 0.0
+    },
+    {
+      "cell": "a5f4cb3f7cf2",
+      "dataset": "gov_report",
+      "label": "生产默认打分/分区，无边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "avg",
+        "boundary": false
+      },
+      "manifests": [
+        {
+          "path": "agent_doc/results/nfa_ablation_20261030/B_final/quality/a5f4cb3f7cf2/gov_report/manifest_0_200.json",
+          "identity": "87743378abfe63f95d5b7696d2811d1df5fb9cdda16f7883307c5a118302cd7a",
+          "start": 0,
+          "end": 200
+        }
+      ],
+      "manifest_count": 1,
+      "request_file_count": 200,
+      "unique_row_count": 200,
+      "missing_rows": [],
+      "status_counts": {
+        "complete": 200
+      },
+      "identity_mismatch_count": 0,
+      "rescored_count": 200,
+      "max_absolute_score_error": 0.0
+    }
+  ],
+  "pairing_mismatches": [],
+  "overlapping_manifest_note": "2d52db39d26d/gov_report 含 0-200、100-200、150-200 三份续跑清单；identity/protocol 相同，请求文件本身按 row 去重核查。",
+  "errors": [],
+  "limitations": [
+    "仅验收已存请求、最终 prediction、answers、score 与清单/配对身份；未重跑 GPU 生成。",
+    "未独立核验 token 解码、EOS、逐层选择门控、KV 几何、运行源码全量 provenance 或模型权重。",
+    "usable-with-scope 仅适用于上述已存质量产物与本次评分/配对统计范围。"
+  ]
+}

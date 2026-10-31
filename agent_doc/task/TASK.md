@@ -2,6 +2,8 @@
 
 ## 2026-10-30
 
+- [x] [TL-NFA-ABLATION-20261030] 仅HotpotQA/GovReport；A/C/E限定验收保持；B 2000/2000及官方重评分、配对bootstrap独立验收通过（usable-with-scope）。F取消/全部性能暂停。([详情](task_details/TL-NFA-ABLATION-20261030.md))
+
 - [ ] [TL-DUO-ASSETS-20261030] 固定官方DuoAttention源码、用户提供v1 PDF已归档；独立Python3.10+Torch2.4/cu121+legacy FlashInfer/FlashAttention已实装、CPU import/pattern与pip check通过，完整哈希锁可复建；BlockSparse/NVCC和GPU/实模验收仍待完成。([详情](task_details/TL-DUO-ASSETS-20261030.md))
 
 - [x] [TL-FROZEN-MAIN-20261030] Integrate accepted independent Near/Far0.05 eager cache reference;84 tests +14 subtests passed. ([details](task_details/TL-FROZEN-MAIN-20261030.md))

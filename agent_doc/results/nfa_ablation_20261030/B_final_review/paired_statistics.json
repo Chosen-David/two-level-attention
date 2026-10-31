@@ -1,0 +1,486 @@
+{
+  "status": "usable-with-scope",
+  "protocol": {
+    "baseline": "2d2a466b4e9a",
+    "baseline_label": "生产默认：MinMax/Avg，分区，有边界页",
+    "bootstrap_replicates": 10000,
+    "seed": 20261031,
+    "confidence": 0.95,
+    "bootstrap_method": "percentile paired row bootstrap; numpy linear quantile",
+    "unit": "percentage points",
+    "score_source": "independent official sample_score recomputation",
+    "pairing": "same dataset row; exact input metadata and answers verified across all cells",
+    "shared_resampled_rows": "one RNG index matrix per dataset, shared by all five cells",
+    "multiplicity": "unadjusted exploratory",
+    "between_runs_variance": "not estimated"
+  },
+  "cells": [
+    {
+      "dataset": "hotpotqa",
+      "cell": "2d2a466b4e9a",
+      "label": "生产默认：MinMax/Avg，分区，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "avg",
+        "boundary": true
+      },
+      "n": 200,
+      "metric": "F1",
+      "mean_percent": 59.16487468624566,
+      "baseline_mean_percent": 59.16487468624566,
+      "baseline": "2d2a466b4e9a",
+      "delta_pp": 0.0,
+      "ci95_pp": [
+        0.0,
+        0.0
+      ],
+      "ci_includes_zero": true,
+      "bootstrap_replicates": 10000,
+      "seed": 20261031,
+      "paired_input_answer_rows": 200
+    },
+    {
+      "dataset": "hotpotqa",
+      "cell": "4284d54b0e30",
+      "label": "全局 MinMax/MinMax，无分区，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": false,
+        "far_score": "minmax",
+        "near_score": "minmax",
+        "boundary": true
+      },
+      "n": 200,
+      "metric": "F1",
+      "mean_percent": 59.16166955804052,
+      "baseline_mean_percent": 59.16487468624566,
+      "baseline": "2d2a466b4e9a",
+      "delta_pp": -0.0032051282051282115,
+      "ci95_pp": [
+        -0.009615384615384635,
+        0.0
+      ],
+      "ci_includes_zero": true,
+      "bootstrap_replicates": 10000,
+      "seed": 20261031,
+      "paired_input_answer_rows": 200
+    },
+    {
+      "dataset": "hotpotqa",
+      "cell": "2d52db39d26d",
+      "label": "分区 MinMax/MinMax，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "minmax",
+        "boundary": true
+      },
+      "n": 200,
+      "metric": "F1",
+      "mean_percent": 59.15261978428487,
+      "baseline_mean_percent": 59.16487468624566,
+      "baseline": "2d2a466b4e9a",
+      "delta_pp": -0.012254901960784319,
+      "ci95_pp": [
+        -0.036764705882352956,
+        0.0
+      ],
+      "ci_includes_zero": true,
+      "bootstrap_replicates": 10000,
+      "seed": 20261031,
+      "paired_input_answer_rows": 200
+    },
+    {
+      "dataset": "hotpotqa",
+      "cell": "06daedae75b2",
+      "label": "分区 Avg/Avg，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "avg",
+        "near_score": "avg",
+        "boundary": true
+      },
+      "n": 200,
+      "metric": "F1",
+      "mean_percent": 59.41487468624566,
+      "baseline_mean_percent": 59.16487468624566,
+      "baseline": "2d2a466b4e9a",
+      "delta_pp": 0.25,
+      "ci95_pp": [
+        0.0,
+        0.75
+      ],
+      "ci_includes_zero": true,
+      "bootstrap_replicates": 10000,
+      "seed": 20261031,
+      "paired_input_answer_rows": 200
+    },
+    {
+      "dataset": "hotpotqa",
+      "cell": "a5f4cb3f7cf2",
+      "label": "生产默认打分/分区，无边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "avg",
+        "boundary": false
+      },
+      "n": 200,
+      "metric": "F1",
+      "mean_percent": 59.16487468624566,
+      "baseline_mean_percent": 59.16487468624566,
+      "baseline": "2d2a466b4e9a",
+      "delta_pp": 0.0,
+      "ci95_pp": [
+        0.0,
+        0.0
+      ],
+      "ci_includes_zero": true,
+      "bootstrap_replicates": 10000,
+      "seed": 20261031,
+      "paired_input_answer_rows": 200
+    },
+    {
+      "dataset": "gov_report",
+      "cell": "2d2a466b4e9a",
+      "label": "生产默认：MinMax/Avg，分区，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "avg",
+        "boundary": true
+      },
+      "n": 200,
+      "metric": "ROUGE-L F1",
+      "mean_percent": 33.818252665095876,
+      "baseline_mean_percent": 33.818252665095876,
+      "baseline": "2d2a466b4e9a",
+      "delta_pp": 0.0,
+      "ci95_pp": [
+        0.0,
+        0.0
+      ],
+      "ci_includes_zero": true,
+      "bootstrap_replicates": 10000,
+      "seed": 20261031,
+      "paired_input_answer_rows": 200
+    },
+    {
+      "dataset": "gov_report",
+      "cell": "4284d54b0e30",
+      "label": "全局 MinMax/MinMax，无分区，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": false,
+        "far_score": "minmax",
+        "near_score": "minmax",
+        "boundary": true
+      },
+      "n": 200,
+      "metric": "ROUGE-L F1",
+      "mean_percent": 33.81728232542829,
+      "baseline_mean_percent": 33.818252665095876,
+      "baseline": "2d2a466b4e9a",
+      "delta_pp": -0.0009703396675890197,
+      "ci95_pp": [
+        -0.3867694470304908,
+        0.39288209155125897
+      ],
+      "ci_includes_zero": true,
+      "bootstrap_replicates": 10000,
+      "seed": 20261031,
+      "paired_input_answer_rows": 200
+    },
+    {
+      "dataset": "gov_report",
+      "cell": "2d52db39d26d",
+      "label": "分区 MinMax/MinMax，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "minmax",
+        "boundary": true
+      },
+      "n": 200,
+      "metric": "ROUGE-L F1",
+      "mean_percent": 33.439405212154774,
+      "baseline_mean_percent": 33.818252665095876,
+      "baseline": "2d2a466b4e9a",
+      "delta_pp": -0.3788474529411061,
+      "ci95_pp": [
+        -0.746219523491035,
+        -0.02322471610609174
+      ],
+      "ci_includes_zero": false,
+      "bootstrap_replicates": 10000,
+      "seed": 20261031,
+      "paired_input_answer_rows": 200
+    },
+    {
+      "dataset": "gov_report",
+      "cell": "06daedae75b2",
+      "label": "分区 Avg/Avg，有边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "avg",
+        "near_score": "avg",
+        "boundary": true
+      },
+      "n": 200,
+      "metric": "ROUGE-L F1",
+      "mean_percent": 33.822447348935285,
+      "baseline_mean_percent": 33.818252665095876,
+      "baseline": "2d2a466b4e9a",
+      "delta_pp": 0.004194683839405577,
+      "ci95_pp": [
+        -0.2596611331291088,
+        0.26519809959926033
+      ],
+      "ci_includes_zero": true,
+      "bootstrap_replicates": 10000,
+      "seed": 20261031,
+      "paired_input_answer_rows": 200
+    },
+    {
+      "dataset": "gov_report",
+      "cell": "a5f4cb3f7cf2",
+      "label": "生产默认打分/分区，无边界页",
+      "spec": {
+        "subspace": "tail",
+        "dimensions": 32,
+        "sink": 4,
+        "swa": 128,
+        "near": 4096,
+        "k1": 128,
+        "k2": 1024,
+        "near_pages": 32,
+        "mode": "full",
+        "epsilon": 0.05,
+        "reclaim": true,
+        "partition": true,
+        "far_score": "minmax",
+        "near_score": "avg",
+        "boundary": false
+      },
+      "n": 200,
+      "metric": "ROUGE-L F1",
+      "mean_percent": 33.49308723142641,
+      "baseline_mean_percent": 33.818252665095876,
+      "baseline": "2d2a466b4e9a",
+      "delta_pp": -0.32516543366947276,
+      "ci95_pp": [
+        -0.6533867089775104,
+        -0.004188220950405136
+      ],
+      "ci_includes_zero": false,
+      "bootstrap_replicates": 10000,
+      "seed": 20261031,
+      "paired_input_answer_rows": 200
+    }
+  ],
+  "arithmetic_crosschecks": [
+    {
+      "dataset": "hotpotqa",
+      "cell": "2d2a466b4e9a",
+      "max_bootstrap_arithmetic_error": 0.0,
+      "ci95_manual_pp": [
+        0.0,
+        0.0
+      ],
+      "max_ci_arithmetic_error": 0.0
+    },
+    {
+      "dataset": "hotpotqa",
+      "cell": "4284d54b0e30",
+      "max_bootstrap_arithmetic_error": 0.0,
+      "ci95_manual_pp": [
+        -0.009615384615384635,
+        0.0
+      ],
+      "max_ci_arithmetic_error": 0.0
+    },
+    {
+      "dataset": "hotpotqa",
+      "cell": "2d52db39d26d",
+      "max_bootstrap_arithmetic_error": 0.0,
+      "ci95_manual_pp": [
+        -0.036764705882352956,
+        0.0
+      ],
+      "max_ci_arithmetic_error": 0.0
+    },
+    {
+      "dataset": "hotpotqa",
+      "cell": "06daedae75b2",
+      "max_bootstrap_arithmetic_error": 0.0,
+      "ci95_manual_pp": [
+        0.0,
+        0.75
+      ],
+      "max_ci_arithmetic_error": 0.0
+    },
+    {
+      "dataset": "hotpotqa",
+      "cell": "a5f4cb3f7cf2",
+      "max_bootstrap_arithmetic_error": 0.0,
+      "ci95_manual_pp": [
+        0.0,
+        0.0
+      ],
+      "max_ci_arithmetic_error": 0.0
+    },
+    {
+      "dataset": "gov_report",
+      "cell": "2d2a466b4e9a",
+      "max_bootstrap_arithmetic_error": 0.0,
+      "ci95_manual_pp": [
+        0.0,
+        0.0
+      ],
+      "max_ci_arithmetic_error": 0.0
+    },
+    {
+      "dataset": "gov_report",
+      "cell": "4284d54b0e30",
+      "max_bootstrap_arithmetic_error": 2.220446049250313e-16,
+      "ci95_manual_pp": [
+        -0.3867694470304908,
+        0.39288209155125897
+      ],
+      "max_ci_arithmetic_error": 0.0
+    },
+    {
+      "dataset": "gov_report",
+      "cell": "2d52db39d26d",
+      "max_bootstrap_arithmetic_error": 2.220446049250313e-16,
+      "ci95_manual_pp": [
+        -0.746219523491035,
+        -0.023224716106091756
+      ],
+      "max_ci_arithmetic_error": 1.734723475976807e-17
+    },
+    {
+      "dataset": "gov_report",
+      "cell": "06daedae75b2",
+      "max_bootstrap_arithmetic_error": 1.1102230246251565e-16,
+      "ci95_manual_pp": [
+        -0.2596611331291088,
+        0.2651980995992603
+      ],
+      "max_ci_arithmetic_error": 5.551115123125783e-17
+    },
+    {
+      "dataset": "gov_report",
+      "cell": "a5f4cb3f7cf2",
+      "max_bootstrap_arithmetic_error": 2.220446049250313e-16,
+      "ci95_manual_pp": [
+        -0.6533867089775105,
+        -0.004188220950405136
+      ],
+      "max_ci_arithmetic_error": 1.1102230246251565e-16
+    }
+  ],
+  "limitations": [
+    "每个任务每格仅一次生成、n=200；CI 只描述任务行重采样不确定性，不含重复运行方差。",
+    "区间为未做多重比较校正的探索性配对区间；CI 含 0 只表示未检出差异，不是等效证明。",
+    "基线是生产默认 NFA 配置，不是 dense/full-KV 注意力基线；不跨任务合并分数。"
+  ]
+}
