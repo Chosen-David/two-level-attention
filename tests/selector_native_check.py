@@ -2,7 +2,7 @@
 import ast,inspect,json
 from types import SimpleNamespace as NS
 import torch
-from sparse_attn.indexer import tli_indexer as mod
+from sparse_attn.indexer import nfa_indexer as mod
 if not torch.cuda.is_available():raise RuntimeError('CUDA required')
 tree=ast.parse(inspect.getsource(mod));guards=[]
 for n in ast.walk(tree):

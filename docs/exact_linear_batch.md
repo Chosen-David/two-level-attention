@@ -11,12 +11,12 @@ explicit row fallback. Initialization and refill still use row-owned host loops.
 Explicit configuration:
 
 ```
-TLI_BATCH_INDEXER=exact
-TLI_OPERATOR_MODE=serial
-TLI_SPARSE_SELECTION=1
-TLI_GRAPH_INC=1
-TLI_OPERATOR_BACKEND=simt
-TLI_OPERATOR_SELECTED_STAGES=1
+NFA_BATCH_INDEXER=exact
+NFA_OPERATOR_MODE=serial
+NFA_SPARSE_SELECTION=1
+NFA_GRAPH_INC=1
+NFA_OPERATOR_BACKEND=simt
+NFA_OPERATOR_SELECTED_STAGES=1
 ```
 
 Scope is B>=2 fixed-address graph-state inputs, linear shared K/V, BF16 D128,
@@ -51,7 +51,7 @@ Lifecycle:
   retained with a false ready flag, so its stale graph cannot silently consume
   replacement storage. Each captured Graph retains its address-owning state;
   obsolete states and KV can be released when their last Graph is deleted.
-* Cache reorder is unsupported, matching TLIStaticLayer. Raw external in-place
+* Cache reorder is unsupported, matching NFAStaticLayer. Raw external in-place
   permutations are outside the fixed-owner API and must not bypass its lifecycle.
 
 The batch producer retains primary pool clipping, bypass-page deduplication,
@@ -112,7 +112,7 @@ maintenance, complete domain, live owner normalization, ranking and attention.
 Native validation of this normalization domain is recorded in 0640/0830;
 earlier branch results are not evidence for the revised domain.
 
-For attribution diagnostics only, `TLI_EXACT_BATCH_REFERENCE=1` keeps the model
+For attribution diagnostics only, `NFA_EXACT_BATCH_REFERENCE=1` keeps the model
 batch shape but calls the established single-row indexer and attention within
 independent row scopes. It shares admission and Graph address ownership with the
 exact route, but does not execute the batched candidate/scoring/maintenance path.
@@ -121,14 +121,14 @@ configuration signature, so changing it requires clear and recapture. Agreement
 with this control cannot by itself resolve a difference from independent B1 model
 requests; model batch shape also changes other arithmetic paths.
 
-The default `TLI_EXACT_ATTENTION=ordered` consumer forms the sorted unique
+The default `NFA_EXACT_ATTENTION=ordered` consumer forms the sorted unique
 union of selected, sink and SWA IDs and invokes the original eager attention
 reduction (BW256, four warps, unchanged BF16 multiplication rounding). Its
-receipt is `exact_batch_ordered_eager`. The split consumer remains available only through explicit `TLI_EXACT_ATTENTION=split`
+receipt is `exact_batch_ordered_eager`. The split consumer remains available only through explicit `NFA_EXACT_ATTENTION=split`
 for diagnostics; its observed B4 token drift in run 0750 makes it unsuitable
 as a quality reference. Ordered same-batch parity has scoped real B2/B4/B8
 evidence (0680/0790/0970); this does not establish whole-benchmark quality.
-The fused batch route itself still requires `TLI_BATCH_INDEXER=exact`, serial
+The fused batch route itself still requires `NFA_BATCH_INDEXER=exact`, serial
 SIMT, and supported no-gate Qwen geometry. Unsupported requests raise; GLM
 dynamic gating at B>1 remains unsupported.
 

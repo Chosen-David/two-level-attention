@@ -26,7 +26,7 @@ def manifest_for(tag):
     m = copy.deepcopy(DEFAULTS)
     kind, nb, nt, nl = grid.parse_tag(tag)
     if kind == 'geo':
-        m.update(tli_near_pages=nb, tli_near_tokens=nt, tli_near_len=nl)
+        m.update(nfa_near_pages=nb, nfa_near_tokens=nt, nfa_near_len=nl)
     return m
 
 
@@ -51,9 +51,9 @@ class GeometryTests(unittest.TestCase):
         folder.mkdir(parents=True, exist_ok=True)
         paths = {}
         for task in grid.AVG5_TASKS:
-            p = folder / f'{task}-tli_h{digest}-run.jsonl'
+            p = folder / f'{task}-nfa_h{digest}-run.jsonl'
             p.write_text('{"_id":"one","pred":"yes","answers":["yes"]}\n' * 2)
-            Path(str(p) + '.tli_manifest.json').write_text(text)
+            Path(str(p) + '.nfa_manifest.json').write_text(text)
             paths[task] = p
         return paths
 
@@ -74,7 +74,7 @@ class GeometryTests(unittest.TestCase):
     def test_wrong_declared_geometry_is_not_scored(self):
         tag = 'pred_nb8nt320nl8192'
         m = manifest_for(tag)
-        m['tli_near_pages'] = 4
+        m['nfa_near_pages'] = 4
         self.cell(tag, m)
         self.rejected(tag)
 
@@ -86,32 +86,32 @@ class GeometryTests(unittest.TestCase):
         self.rejected(tag)
 
     def test_wrong_token_is_not_scored(self):
-        self.mismatch('tli_near_tokens', 'off')
+        self.mismatch('nfa_near_tokens', 'off')
 
     def test_wrong_width_is_not_scored(self):
-        self.mismatch('tli_near_len', 4096)
+        self.mismatch('nfa_near_len', 4096)
 
     def test_wrong_page_size_is_not_scored(self):
         self.mismatch('tia_block_size', 32)
 
     def test_numeric_string_is_not_integer_quota_evidence(self):
-        self.mismatch('tli_near_pages', '8')
+        self.mismatch('nfa_near_pages', '8')
 
     def test_float_is_not_integer_quota_evidence(self):
-        self.mismatch('tli_near_tokens', 320.0)
+        self.mismatch('nfa_near_tokens', 320.0)
 
     def test_missing_manifest_is_not_scored(self):
         tag = 'pred_nb8nt320nl8192'
         paths = self.cell(tag)
-        Path(str(paths['qasper']) + '.tli_manifest.json').unlink()
+        Path(str(paths['qasper']) + '.nfa_manifest.json').unlink()
         self.rejected(tag)
 
     def test_manifest_filename_hash_mismatch_is_not_scored(self):
         tag = 'pred_nb8nt320nl8192'
         paths = self.cell(tag)
-        sidecar = Path(str(paths['qasper']) + '.tli_manifest.json')
+        sidecar = Path(str(paths['qasper']) + '.nfa_manifest.json')
         m = json.loads(sidecar.read_text())
-        m['tli_near_method'] = 'minmax'
+        m['nfa_near_method'] = 'minmax'
         sidecar.write_text(json.dumps(m, sort_keys=True, ensure_ascii=False))
         self.rejected(tag)
 
@@ -123,23 +123,23 @@ class GeometryTests(unittest.TestCase):
     def test_control_cannot_declare_ratio_partition(self):
         tag = 'pred_ctrl_singlepool'
         m = manifest_for(tag)
-        m.update(tli_alpha=.25, tli_beta=.5)
+        m.update(nfa_alpha=.25, nfa_beta=.5)
         self.cell(tag, m)
         self.rejected(tag)
 
     def test_invalid_metadata_is_not_scored(self):
         tag = 'pred_nb8nt320nl8192'
         paths = self.cell(tag)
-        Path(str(paths['qasper']) + '.tli_manifest.json').write_text('[]')
+        Path(str(paths['qasper']) + '.nfa_manifest.json').write_text('[]')
         self.rejected(tag)
 
-    def test_non_tli_method_is_not_a_grid_cell(self):
+    def test_non_nfa_method_is_not_a_grid_cell(self):
         self.mismatch('method', 'fasa_vendor')
 
     def test_missing_geometric_field_is_unknown(self):
         tag = 'pred_nb8nt320nl8192'
         m = manifest_for(tag)
-        del m['tli_near_len']
+        del m['nfa_near_len']
         self.cell(tag, m)
         self.rejected(tag)
 
@@ -150,7 +150,7 @@ class GeometryTests(unittest.TestCase):
         def mutate(command, **kwargs):
             result = self.score(command, **kwargs)
             pred = Path(command[command.index('--output-dir') + 1]) / 'pred'
-            sidecar = next(pred.glob('qasper-*.tli_manifest.json'))
+            sidecar = next(pred.glob('qasper-*.nfa_manifest.json'))
             # Same object and filename identity, different snapshot bytes.
             sidecar.write_text(json.dumps(json.loads(sidecar.read_text()), indent=2))
             return result

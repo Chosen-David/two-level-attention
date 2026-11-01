@@ -1,7 +1,7 @@
 """Dynamic logical width must preserve native per-row softmax rounding."""
 import pytest
 import torch
-from sparse_attn.ops.compact_normalization import build
+from sparse_attn.indexer.compaction.normalizer import build
 
 pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA required')
 
@@ -30,14 +30,14 @@ def test_live_width_capture_replay_exact_probabilities(capacity,lengths):
 def test_bypass_does_not_claim_normalization(monkeypatch):
     import runpy
     from pathlib import Path
-    from sparse_attn.indexer.tli_indexer import TLIIndexer
-    args=runpy.run_path(str(Path(__file__).parents[1]/'exp/bench/test_tli_graph_gates.py'))['_make_prod_args']
-    idx=TLIIndexer(args());idx.layer_idx=14;idx.clear()
+    from sparse_attn.indexer.nfa_indexer import NFAIndexer
+    args=runpy.run_path(str(Path(__file__).parents[1]/'exp/bench/test_nfa_graph_gates.py'))['_make_prod_args']
+    idx=NFAIndexer(args());idx.layer_idx=14;idx.clear()
     k=torch.randn(1,16384,2,128,device='cuda',dtype=torch.bfloat16)
     q=torch.randn(1,1,8,128,device='cuda',dtype=k.dtype)
     index=idx.prepare_index(k,torch.tensor([0,16384],device='cuda',dtype=torch.int32))
-    monkeypatch.setenv('TLI_LIVE_NORMALIZATION','1')
-    monkeypatch.setenv('TLI_L2_BYPASS','1')
+    monkeypatch.setenv('NFA_LIVE_NORMALIZATION','1')
+    monkeypatch.setenv('NFA_L2_BYPASS','1')
     idx._graph_normalization_width_route='live_length'
     idx.compute_mask_graph(q,index,128**-.5,torch.tensor([16384],device='cuda'))
     assert idx._graph_normalization_width_route is None
@@ -46,7 +46,7 @@ def test_bypass_does_not_claim_normalization(monkeypatch):
 @pytest.mark.parametrize('group', [1, 2, 4, 8])
 @pytest.mark.parametrize('length', [9217, 16384, 16385])
 def test_live_candidate_dedup_gqa_matches_native(group, length):
-    from sparse_attn.ops.compact_normalization import compact_probabilities
+    from sparse_attn.indexer.compaction.normalizer import compact_probabilities
     torch.manual_seed(904)
     capacity = 16448
     # Repeated protected IDs and sparse holes exercise owner reduction rather
@@ -73,7 +73,7 @@ def test_live_candidate_dedup_gqa_matches_native(group, length):
 
 @pytest.mark.parametrize('dtype', [torch.float16, torch.float32])
 def test_live_wrapper_rejects_non_bf16_before_launch(dtype):
-    from sparse_attn.ops.compact_normalization import compact_probabilities, supported
+    from sparse_attn.indexer.compaction.normalizer import compact_probabilities, supported
     scores = torch.ones(2, 4, device='cuda', dtype=dtype)
     ids = torch.arange(4, device='cuda', dtype=torch.int32)[None]
     keep = torch.ones_like(ids, dtype=torch.bool)

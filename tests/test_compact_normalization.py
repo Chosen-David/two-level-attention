@@ -11,9 +11,9 @@ pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason='requires 
 @pytest.mark.parametrize('capacity', [9224, 16384, 16400, 16401, 24512, 32768, 32769, 33729])
 @pytest.mark.parametrize('group', [1, 4, 8])
 def test_compact_probability_replay(capacity, group, fused_mean, masked, monkeypatch):
-    monkeypatch.setenv("TLI_COMPACT_FUSED_MEAN", fused_mean)
-    from sparse_attn.ops.compact_normalization import compact_probabilities
-    from sparse_attn.indexer.tli_indexer import _ako_gqa_mean_kernel
+    monkeypatch.setenv("NFA_COMPACT_FUSED_MEAN", fused_mean)
+    from sparse_attn.indexer.compaction.normalizer import compact_probabilities
+    from sparse_attn.indexer.nfa_indexer import _ako_gqa_mean_kernel
     import triton
     torch.manual_seed(619)
     hk, width = 3, 769
@@ -55,24 +55,24 @@ def test_compact_probability_replay(capacity, group, fused_mean, masked, monkeyp
 
 @pytest.mark.parametrize("capacity", [16400, 32832])
 def test_real_selector_compact_replay(capacity, monkeypatch):
-    from sparse_attn.indexer.tli_indexer import TLIIndexer
-    spec = importlib.util.spec_from_file_location('prod_args', Path(__file__).parents[1]/'exp/bench/test_tli_graph_gates.py')
+    from sparse_attn.indexer.nfa_indexer import NFAIndexer
+    spec = importlib.util.spec_from_file_location('prod_args', Path(__file__).parents[1]/'exp/bench/test_nfa_graph_gates.py')
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
     torch.manual_seed(620)
     q = torch.randn(1, 1, 32, 128, device='cuda', dtype=torch.bfloat16)
     k = torch.randn(1, capacity, 8, 128, device='cuda', dtype=q.dtype)
     vl = torch.tensor([capacity], device='cuda', dtype=torch.int64)
     cu = torch.tensor([0, capacity], device='cuda', dtype=torch.int32)
-    idx = TLIIndexer(module._make_prod_args()); idx.layer_idx = 2; idx.clear()
+    idx = NFAIndexer(module._make_prod_args()); idx.layer_idx = 2; idx.clear()
     index = idx.prepare_index(k, cu)
     def run(): return idx.compute_selection_graph(q, index, 128**-.5, vl)
-    monkeypatch.setenv('TLI_COMPACT_NORMALIZATION', '1')
+    monkeypatch.setenv('NFA_COMPACT_NORMALIZATION', '1')
     run(); torch.cuda.synchronize()
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph): actual = run()
     for length in (132, 4097, capacity - 64, capacity, 512, capacity):
         vl.fill_(length); q.normal_(); graph.replay()
-        monkeypatch.setenv('TLI_COMPACT_NORMALIZATION', '0')
+        monkeypatch.setenv('NFA_COMPACT_NORMALIZATION', '0')
         expected = run()
         assert torch.equal(actual.indices, expected.indices), length
         assert torch.equal(actual.counts, expected.counts), length
@@ -80,7 +80,7 @@ def test_real_selector_compact_replay(capacity, monkeypatch):
 
 def test_device_guard_before_launch():
     from types import SimpleNamespace
-    from sparse_attn.ops.compact_normalization import supported, probabilities
+    from sparse_attn.indexer.compaction.normalizer import supported, probabilities
     scores = SimpleNamespace(dtype=torch.bfloat16, device=torch.device('cuda:0'))
     ids = SimpleNamespace(device=torch.device('cuda:1'))
     keep = SimpleNamespace(device=torch.device('cuda:0'))
@@ -90,7 +90,7 @@ def test_device_guard_before_launch():
 
 
 def test_normalization_capacity_boundary():
-    from sparse_attn.ops.compact_normalization import supported, compact_probabilities
+    from sparse_attn.indexer.compaction.normalizer import supported, compact_probabilities
     ids = torch.tensor([[0]], device="cuda")
     keep = torch.ones_like(ids, dtype=torch.bool)
     scores = torch.zeros((1, 1), device="cuda", dtype=torch.bfloat16)

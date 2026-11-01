@@ -11,7 +11,7 @@ restricted_context_treatment=16384、protocol 31500 保留、gate 打
   - 每行 JSONL 只记数据集原字段 length，不记本次 max_length、模板后实际
     输入 token 数、是否截断；
   - 输出文件名只含 dataset/method/时间戳，cap 不在身份中；
-  - sidecar 仅 method==tli 时写，fullkv（method=none）无任何 provenance
+  - sidecar 仅 method==nfa 时写，fullkv（method=none）无任何 provenance
     旁挂；
   → 同一 task/method/时间戳先后用 16K 与 31.5K 跑，路径与记录结构完全
   相同——可覆盖或被当同一 treatment，产物自身无法证明处理口径。
@@ -26,7 +26,7 @@ restricted_context_treatment=16384、protocol 31500 保留、gate 打
      SystemExit 非零退出，拒绝覆盖；同 cap 幂等放行（SKIP 语义）；目标
      manifest 缺失/损坏 → [CAP-SCHEMA-FAIL] fail-closed（provenance 未知
      不放行）；数据存在但无 manifest（096 前存量产物）→ 放行 + 打
-     [CAP-PROVENANCE-MISSING] 警告（076 对非 tli 方法的既有覆盖语义保持，
+     [CAP-PROVENANCE-MISSING] 警告（076 对非 nfa 方法的既有覆盖语义保持，
      由本运行重建 provenance）。
   3. finalize_run_cap_manifest / write_run_cap_manifest —— 生成完成后回填
      每样本实际输入 token 数 / 截断标记 / 结果文件 sha256+行数（status
@@ -43,7 +43,7 @@ sparse_attn/info.py 的 treatment manifest 刻意不消费 model2maxlen——
 解耦；T21 门禁固定该解耦）。本模块是**新增独立层**：run-cap manifest
 回答「这次 run 用什么 cap、输入实际多长、结果文件是谁」，treatment
 manifest 回答「这次 run 用什么稀疏算法配置」。两层同路径旁挂、互不
-污染：cap 变更不触碰 treatment hash（tli 同 treatment 不同 cap 的两次
+污染：cap 变更不触碰 treatment hash（nfa 同 treatment 不同 cap 的两次
 run：treatment sidecar 逐位相同，runcap sidecar 身份不同）。
 
 【provenance 三态】
@@ -67,8 +67,8 @@ import subprocess
 import sys
 
 # sidecar 后缀：{out_path}.runcap.json。刻意不以 .jsonl 结尾（不进任何
-# *.jsonl glob，与 076 的 .tli_manifest.json 同纪律）；长度 13 字节——
-# info.py 的 230 截断上限按 ".jsonl"(6)+".tli_manifest.json"(18) 预算，
+# *.jsonl glob，与 076 的 .nfa_manifest.json 同纪律）；长度 13 字节——
+# info.py 的 230 截断上限按 ".jsonl"(6)+".nfa_manifest.json"(18) 预算，
 # 本后缀更短不超 ext4 255 单文件名上限。
 RUN_CAP_SIDECAR_SUFFIX = ".runcap.json"
 RUN_CAP_SCHEMA = "run-cap-manifest-v1"
@@ -681,7 +681,7 @@ def gate_run_cap_identity(out_path, core_or_identity):
       ② 已存在 manifest 但损坏/schema 不合法 → [CAP-SCHEMA-FAIL]（经
          read_run_cap_manifest）；
       ③ 数据文件存在但 manifest 缺失（096 前存量产物/手工放置）→ 不拒
-         绝（076 对非 tli 的既有覆盖语义保持），但打
+         绝（076 对非 nfa 的既有覆盖语义保持），但打
          [CAP-PROVENANCE-MISSING] 警告并由本次运行重建 provenance——
          存量 5 个非 chat 格 + .24 在飞批走 backfill 工具补制，不靠本门。
     无 manifest + 无数据 → 放行（新产物）。

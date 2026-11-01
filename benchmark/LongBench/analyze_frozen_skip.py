@@ -100,7 +100,7 @@ def analyze(outdir):
             avg=dict(delta_pp=float(np.mean([g.mean() for g in groups])),ci95_pp=[float(x) for x in np.quantile(resampled,[.025,.975])])
         result['comparisons'][arm+'-vs-'+base]=dict(per_task=tasks,avg5=avg)
     policy = 'Near-only retains staging KV and skips attention work only; far-only/both physically evict nodes.' if staging_policy else 'Superseded v1: near-only permanently evicted KV and did not migrate it into far.'
-    result['scope']='Exploratory paired request bootstrap, 5000 repeats, task-stratified macro AVG5; CI containing zero is not proof of equivalence. '+policy+(' TLI tail32 L1/L2 reference adapter; full denotes gates off, not dense attention. No performance claim.' if protocol.get('attention','').startswith('tli') else ' No TLI champion selection or performance claim.')
+    result['scope']='Exploratory paired request bootstrap, 5000 repeats, task-stratified macro AVG5; CI containing zero is not proof of equivalence. '+policy+(' NFA tail32 L1/L2 reference adapter; full denotes gates off, not dense attention. No performance claim.' if protocol.get('attention','').startswith('nfa') else ' No NFA champion selection or performance claim.')
     atomic_json(outdir/'summary.json',result)
     lines=['# Frozen near/far cache exploration','',f"Status: {result['status']}; paired requests {len(records)}/{len(expected)}.",'',
            '| arm | AVG5 | near-active requests | far-active requests | frozen KV / full-node KV | attention tokens / full |',

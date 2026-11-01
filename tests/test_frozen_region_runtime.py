@@ -6,9 +6,9 @@ import torch
 from transformers import Qwen3Config, Qwen3ForCausalLM
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
-from sparse_attn.ops.region_geometry import RegionGeometry
-from sparse_attn.ops.frozen_region_gate import GateConfig
-from sparse_attn.ops.frozen_region_runtime import (
+from sparse_attn.policies.region_geometry import RegionGeometry
+from sparse_attn.policies.frozen_gate import GateConfig
+from sparse_attn.engine.frozen_runner import (
     complete_frozen_request, prefill_frozen_request)
 
 
@@ -48,13 +48,13 @@ def test_each_prefill_owns_a_complete_fresh_cache_and_json_receipt():
 
 
 @torch.inference_mode()
-def test_missing_real_tli_receipt_is_rejected_before_commit():
+def test_missing_real_nfa_receipt_is_rejected_before_commit():
     model = _model()
     output, audit = prefill_frozen_request(
         model, torch.tensor([[2, 3, 4, 5]]), GateConfig(mode='full'),
         RegionGeometry(sink=1, near=4, window=2, page=2, max_new_tokens=3))
-    model._frozen_tli = True
-    with pytest.raises(ValueError, match='missing real TLI decode receipts'):
+    model._frozen_nfa = True
+    with pytest.raises(ValueError, match='missing real NFA decode receipts'):
         complete_frozen_request(model, output.past_key_values, 2, audit)
 
 
@@ -64,16 +64,16 @@ def test_device_receipt_values_are_converted_once_at_request_boundary():
     output, audit = prefill_frozen_request(
         model, torch.tensor([[2, 3, 4, 5]]), GateConfig(mode='full'),
         RegionGeometry(sink=1, near=4, window=2, page=2, max_new_tokens=3))
-    model._frozen_tli = True
+    model._frozen_nfa = True
     cache = output.past_key_values
     cache.decode_trace_enabled = True
     for layer in cache.layers:
-        layer.tli_receipt = {'selected': torch.tensor([1, 2]), 'l1_calls': 1}
-        layer.tli_decode_trace = [dict(
+        layer.nfa_receipt = {'selected': torch.tensor([1, 2]), 'l1_calls': 1}
+        layer.nfa_decode_trace = [dict(
             decode_step=0, selected_logical_ids=torch.tensor([[1, 2]]))]
     receipt = complete_frozen_request(model, cache, 2, audit)
-    assert receipt['tli_receipts'][0]['selected'] == [1, 2]
-    assert receipt['tli_decode_trace'][0][0]['selected_logical_ids'] == [[1, 2]]
+    assert receipt['nfa_receipts'][0]['selected'] == [1, 2]
+    assert receipt['nfa_decode_trace'][0][0]['selected_logical_ids'] == [[1, 2]]
     json.dumps(receipt)
 
 
@@ -83,22 +83,22 @@ def test_incomplete_decode_trace_is_rejected_before_commit():
     output, audit = prefill_frozen_request(
         model, torch.tensor([[2, 3, 4, 5]]), GateConfig(mode='full'),
         RegionGeometry(sink=1, near=4, window=2, page=2, max_new_tokens=3))
-    model._frozen_tli = True
+    model._frozen_nfa = True
     cache = output.past_key_values
     cache.decode_trace_enabled = True
     for layer in cache.layers:
-        layer.tli_receipt = {'selected': torch.tensor([1]), 'l1_calls': 1}
-        layer.tli_decode_trace = []
-    with pytest.raises(ValueError, match='incomplete TLI decode trace at layer 0'):
+        layer.nfa_receipt = {'selected': torch.tensor([1]), 'l1_calls': 1}
+        layer.nfa_decode_trace = []
+    with pytest.raises(ValueError, match='incomplete NFA decode trace at layer 0'):
         complete_frozen_request(model, cache, 3, audit)
 
 
 def test_decode_trace_comparison_locates_head_and_validates_physical_mapping():
     from exp.bench.check_qwen_frozen_eager import compare_decode_traces
-    reference = {'tli_decode_trace': {0: [
+    reference = {'nfa_decode_trace': {0: [
         dict(decode_step=0, selected_logical_ids=[[1, 4, -1], [2, 5, -1]]),
         dict(decode_step=1, selected_logical_ids=[[1, 4, 7], [2, 5, 8]])]}}
-    physical = {'tli_decode_trace': {0: [
+    physical = {'nfa_decode_trace': {0: [
         dict(decode_step=0, selected_logical_ids=[[1, 4, -1], [2, 6, -1]],
              physical_mapping_matches=True),
         dict(decode_step=1, selected_logical_ids=[[1, 4, 7], [2, 5, 8]],

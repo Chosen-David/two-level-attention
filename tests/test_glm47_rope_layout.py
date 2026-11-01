@@ -54,7 +54,7 @@ def test_rope_only_tail_is_rejected_for_glm_d256():
     helpers = runpy.run_path(str(Path(__file__).parents[1] /
                                 "exp/bench/test_glm47_d256_gates.py"))
     args = helpers["make_prod_args"](256)
-    args.tli_subspace = "tail"
+    args.nfa_subspace = "tail"
     indexer = helpers["make_indexer"](256, args)
     with pytest.raises(ValueError, match="RoPE-only tail32"):
         indexer.prepare_index(

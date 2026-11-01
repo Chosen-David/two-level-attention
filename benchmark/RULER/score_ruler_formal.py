@@ -226,7 +226,7 @@ from benchmark.RULER.score_ruler import (  # noqa: E402
 # 066（#197）：acquire/release_output_lock——freeze 冻结窗口与生产者
 #   同键互斥（056/059 口径 realpath 输出路径锁原语，见 yarn_receipt.py）
 # 066/crash-recovery（#198）：resolve_generation_pointer——指针协议产物
-#   从 {pred}.tli_gen 解析不可变 generation（预测与回执同目录同源），
+#   从 {pred}.nfa_gen 解析不可变 generation（预测与回执同目录同源），
 #   混合代不可达；无指针 → legacy-direct 直接读路径（既有产物零改动）
 from benchmark.RULER.yarn_receipt import (  # noqa: E402
     GENERATION_BINDING_LEGACY, GENERATION_BINDING_POINTER,
@@ -580,7 +580,7 @@ def _load_producer_yarn_receipt(staged_pred, source_pred, task, Lnum,
     SHA 校验只能拒绝内容失配的坏态、不能证明运行同代。指针协议下
     （yarn_receipt.resolve_generation_pointer）：生产者把预测与完成
     回执同置不可变 generation 目录 {out}.gen-{attempt_id}/，提交 =
-    单次原子切指针 {out}.tli_gen。本函数先以 best-file 最终路径解析
+    单次原子切指针 {out}.nfa_gen。本函数先以 best-file 最终路径解析
     指针：
       - 有指针 → generation_binding="pointer-v1"：source_pred 必须
         位于指针所指 gen 目录内（否则指针在发现与冻结之间被切换，
@@ -691,7 +691,7 @@ def _load_producer_yarn_receipt(staged_pred, source_pred, task, Lnum,
         "sha256": rcp_sha,
         "receipt_version": version,
         # 066/crash-recovery：generation 绑定口径——pointer-v1 = 从
-        # {out}.tli_gen 指针解析后同时读预测与回执（物理来源同源）；
+        # {out}.nfa_gen 指针解析后同时读预测与回执（物理来源同源）；
         # legacy-direct = 无指针产物按旁挂约定直接读（既有口径零改动）
         "generation_binding": binding_mode,
         # 066/crash-recovery：指针协议产物附带 generation 身份闭包
@@ -778,9 +778,9 @@ def freeze_and_stage(root, postfix, expect_tasks, stamp, staging,
             # ---- 066/crash-recovery：候选发现 = legacy 直写文件 + 指针代预测 ----
             # 指针协议（#198）下预测不再落最终路径 {out}.jsonl，而是与完成
             # 回执同置不可变 gen 目录 {out}.gen-{attempt_id}/，提交 = 切指针
-            # {out}.tli_gen。候选发现双通道：
+            # {out}.nfa_gen。候选发现双通道：
             #   ① legacy 直写文件（{task}-*.jsonl glob，既有口径零改动）；
-            #   ② 指针文件（{task}-*.jsonl.tli_gen glob）→ resolve_
+            #   ② 指针文件（{task}-*.jsonl.nfa_gen glob）→ resolve_
             #      generation_pointer 解析出 gen 目录内预测作为复制源
             #      （指针存在但损坏/缺件 → resolve 内部 fail-closed，不静默
             #      回退 legacy 直读）。同基名双通道并存时指针代优先——指针
@@ -953,7 +953,7 @@ def freeze_and_stage(root, postfix, expect_tasks, stamp, staging,
                     # 066/crash-recovery：src_best = 实际复制源（legacy 直写
                     # 文件 / 指针代 gen 目录内预测），source_final_path =
                     # best-file 最终路径（指针解析基准，回执与代归属从
-                    # {final}.tli_gen 解析——物理来源同源，混合代不可达）。
+                    # {final}.nfa_gen 解析——物理来源同源，混合代不可达）。
                     best_base = os.path.basename(best)
                     src_best = cand[best_base]["source"]
                     best_final = cand[best_base]["final"]
@@ -989,7 +989,7 @@ def freeze_and_stage(root, postfix, expect_tasks, stamp, staging,
                         # 基准；legacy 候选 = source_path 本身）
                         "source_final_path": os.path.abspath(best_final),
                         # 066/crash-recovery：generation 绑定口径——
-                        # pointer-v1（预测+回执从 {final}.tli_gen 指针解析，
+                        # pointer-v1（预测+回执从 {final}.nfa_gen 指针解析，
                         # 同 gen 目录同源）/ legacy-direct（直写路径直接读）
                         "generation_binding": cand[best_base]["binding"],
                         "source_sha256": cell_source_sha,
@@ -1186,7 +1186,7 @@ def _resolve_yarn_identity(args, producer_yarn):
         # missing 格（model_config_sha256=None），完整模型配置闭包不成立
         "model_config_closure": model_config_closure,
         # 066/crash-recovery：generation 绑定口径聚合（pointer-v1 = 预测与
-        # 回执从 {out}.tli_gen 指针解析（同 gen 目录同源，混合代不可达）；
+        # 回执从 {out}.nfa_gen 指针解析（同 gen 目录同源，混合代不可达）；
         # legacy-direct = 直写路径直接读（059 v2 及更早，锁+SHA 双层兜底）。
         # 逐格明细见 cells[].tasks[].generation_binding；过渡期混装如实
         # 记录两种口径（协议代际一致性仍由上方 versions 门禁承载）

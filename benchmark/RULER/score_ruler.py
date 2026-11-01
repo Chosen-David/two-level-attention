@@ -4,7 +4,7 @@
 # 用法：python -u benchmark/RULER/score_ruler.py [--root exp/results_ruler/Qwen3-8B]
 #   【069 边界（GPT 2026-10-10 1330 审计 TL-E119-POINTER-SCORER）】：本
 #   直接入口只支持 legacy-direct 产物（{task}-*.jsonl 直写文件）。root
-#   下检测到任何 .tli_gen generation 指针 → [GATE-FAIL] 非零退出、不写
+#   下检测到任何 .nfa_gen generation 指针 → [GATE-FAIL] 非零退出、不写
 #   任何输出，提示改用 score_ruler_formal.py（legacy+pointer 双通道正式
 #   打分入口）。单口径原则：不在本脚本维护第二套指针解析——base scorer
 #   只作为 formal 的内部后端（formal 经 staging 派生副本调用，staging
@@ -257,7 +257,7 @@ def _score_cell(path, task, key, manifest):
 def _gate_no_generation_pointers(root, pred_postfix):
     """069（TL-E119-POINTER-SCORER）：direct CLI 指针协议门禁。
 
-    验证什么：root（含 pred{postfix} 目录）下不得存在任何 .tli_gen
+    验证什么：root（含 pred{postfix} 目录）下不得存在任何 .nfa_gen
     generation 指针——本脚本候选发现只 glob 直写 JSONL（legacy-direct），
     pointer-only root 会被静默解释成「零方法」：带 --expect-tasks 时误报
     0 方法键，无门禁时 exit 0 写出空 scores/n/sources 结果（GPT 审计复现

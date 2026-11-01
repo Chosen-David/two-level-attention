@@ -11,9 +11,9 @@ def fake_model():
 
 
 def test_strict_short_logical_width_rejected_before_allocation(monkeypatch):
-    monkeypatch.setenv('TLI_CUDA_GRAPH','1')
-    monkeypatch.setenv('TLI_LIVE_NORMALIZATION','1')
-    monkeypatch.setenv('TLI_QUALITY_TIMING','0')
+    monkeypatch.setenv('NFA_CUDA_GRAPH','1')
+    monkeypatch.setenv('NFA_LIVE_NORMALIZATION','1')
+    monkeypatch.setenv('NFA_QUALITY_TIMING','0')
     def forbidden(*args,**kwargs):
         raise AssertionError('CUDA allocation before live-width admission')
     monkeypatch.setattr(torch,'full',forbidden)
@@ -25,21 +25,21 @@ def test_strict_short_logical_width_rejected_before_allocation(monkeypatch):
 
 @pytest.mark.parametrize('lens,reason',[([9215],'live_normalization_length_below_9217'),([9216],None),([16000,9000],'live_normalization_length_below_9217'),([16000,9216],None)])
 def test_live_width_admission_uses_first_decode_length(monkeypatch,lens,reason):
-    monkeypatch.setenv('TLI_LIVE_NORMALIZATION','1')
+    monkeypatch.setenv('NFA_LIVE_NORMALIZATION','1')
     assert quality._live_width_fallback(lens)==reason
 
 
 def test_disabled_live_width_does_not_restrict_old_route(monkeypatch):
-    monkeypatch.setenv('TLI_LIVE_NORMALIZATION','0')
+    monkeypatch.setenv('NFA_LIVE_NORMALIZATION','0')
     assert quality._live_width_fallback([1]) is None
 
 
 @pytest.mark.parametrize('policy',['auto','1','0'])
 def test_dynamic_cache_admission_precedes_conversion(monkeypatch,policy):
-    monkeypatch.setenv('TLI_CUDA_GRAPH',policy)
-    monkeypatch.setenv('TLI_LIVE_NORMALIZATION','1')
+    monkeypatch.setenv('NFA_CUDA_GRAPH',policy)
+    monkeypatch.setenv('NFA_LIVE_NORMALIZATION','1')
     model=fake_model()
-    indexer=type('TLIIndexer',(),{})()
+    indexer=type('NFAIndexer',(),{})()
     model.modules=lambda:[SimpleNamespace(indexer=indexer)]
     model.config=SimpleNamespace(model_type='qwen3')
     past=SimpleNamespace(get_seq_length=lambda:9215)
@@ -56,11 +56,11 @@ def test_dynamic_cache_admission_precedes_conversion(monkeypatch,policy):
 @pytest.mark.parametrize('dtype', [torch.float16, torch.float32])
 @pytest.mark.parametrize('policy', ['auto', '1', '0'])
 def test_non_bf16_live_admission_precedes_conversion(monkeypatch, dtype, policy):
-    monkeypatch.setenv('TLI_CUDA_GRAPH', policy)
-    monkeypatch.setenv('TLI_LIVE_NORMALIZATION', '1')
+    monkeypatch.setenv('NFA_CUDA_GRAPH', policy)
+    monkeypatch.setenv('NFA_LIVE_NORMALIZATION', '1')
     model = fake_model()
     model.parameters = lambda: iter([SimpleNamespace(device=torch.device('cuda'), dtype=dtype)])
-    model.modules = lambda: [SimpleNamespace(indexer=type('TLIIndexer', (), {})())]
+    model.modules = lambda: [SimpleNamespace(indexer=type('NFAIndexer', (), {})())]
     model.config = SimpleNamespace(model_type='qwen3')
     past = SimpleNamespace(get_seq_length=lambda: 16384)
     if policy == '1':

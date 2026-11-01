@@ -1,14 +1,14 @@
 """Quality-only defaults must match host admission and reset across requests."""
 import pytest
 import torch
-from sparse_attn.ops.cuda_graph_state import enable_graph, disable_graph, graph_state
-from sparse_attn.ops.sparse_policy import live_normalization_enabled, stats_policy, selection_fallback
+from sparse_attn.engine.cuda_graph_state import enable_graph, disable_graph, graph_state
+from sparse_attn.policies.sparse_policy import live_normalization_enabled, stats_policy, selection_fallback
 from sparse_attn.ops.quality_graph import _live_width_fallback
 
 
 @pytest.fixture(autouse=True)
 def clean_state(monkeypatch):
-    for key in ('TLI_LIVE_NORMALIZATION', 'TLI_SPARSE_SELECTION', 'TLI_SPARSE_STATS'):
+    for key in ('NFA_LIVE_NORMALIZATION', 'NFA_SPARSE_SELECTION', 'NFA_SPARSE_STATS'):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(torch, '__version__', '2.8.0+cu128')
     disable_graph()
@@ -44,11 +44,11 @@ def test_host_admission_uses_quality_defaults_before_enable():
 
 def test_explicit_policies_override_quality_defaults(monkeypatch):
     enable_graph(1, quality_defaults=True)
-    monkeypatch.setenv('TLI_LIVE_NORMALIZATION', '0')
-    monkeypatch.setenv('TLI_SPARSE_SELECTION', '0')
-    monkeypatch.setenv('TLI_SPARSE_STATS', 'sorted')
+    monkeypatch.setenv('NFA_LIVE_NORMALIZATION', '0')
+    monkeypatch.setenv('NFA_SPARSE_SELECTION', '0')
+    monkeypatch.setenv('NFA_SPARSE_STATS', 'sorted')
     assert not live_normalization_enabled()
     assert _live_width_fallback([1], torch.float32) is None
     assert route() == 'disabled'
-    monkeypatch.setenv('TLI_SPARSE_SELECTION', '1')
+    monkeypatch.setenv('NFA_SPARSE_SELECTION', '1')
     assert route() == 'unaligned_requires_owner'

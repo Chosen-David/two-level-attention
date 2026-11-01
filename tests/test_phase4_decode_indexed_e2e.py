@@ -11,12 +11,12 @@ protected + selected + merge）在变长区间 S_cap∈{16K,24K,32K} 下多 run
 import pytest
 import torch
 
-from sparse_attn.ops.token_selection import graph_middle_selection
+from sparse_attn.indexer.selection.selector import graph_middle_selection
 from sparse_attn.ops.partial_attention import partial_attention, merge_partials
 
 
 class MockIndexer:
-    """dummy TLI indexer，compute_selection_graph 语义近似生产。"""
+    """dummy NFA indexer，compute_selection_graph 语义近似生产。"""
 
     def __init__(self, K2=1024, sink=4, swa=128, group_size=4):
         self.sink_tokens = sink
@@ -44,7 +44,7 @@ class MockIndexer:
 
 def _run_decode_indexed(indexer, S_cap, Hq=32, D=128, dtype=torch.float32,
                         _q=None, _k=None, _v=None):
-    """等价于 sparse_attn.ops.operator_pipeline.decode_indexed 的 torch backend 版。
+    """等价于 sparse_attn.engine.operator_pipeline.decode_indexed 的 torch backend 版。
 
     可选传入 _q/_k/_v 用于确定性测试；未传时内部随机生成。
     """

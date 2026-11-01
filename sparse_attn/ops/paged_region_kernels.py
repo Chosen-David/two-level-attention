@@ -98,8 +98,8 @@ def ring_rounds_probabilities(visible_tokens,qk_width,v_width,*,cuda):
     The reference's global failure flag is respected on subsequent calls.
     """
     from . import eager_decoding as eager
-    upper=min(int(os.environ.get('TLI_E127_W_UPPER','2048')),visible_tokens)
-    fused=(os.environ.get('TLI_E127_FAST','1')!='0' and cuda
+    upper=min(int(os.environ.get('NFA_E127_W_UPPER','2048')),visible_tokens)
+    fused=(os.environ.get('NFA_E127_FAST','1')!='0' and cuda
            and visible_tokens>=16384 and upper*8<=visible_tokens
            and eager._HAS_TRITON and eager._EAGER_TRITON_OK['ok']
            and qk_width==v_width and qk_width>0 and qk_width&(qk_width-1)==0)

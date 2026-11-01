@@ -50,7 +50,7 @@ from sparse_attn.info import stage_fasa_agreement
 # 149（TL-MINFERENCE-PATTERN-IDENTITY）：MInference pattern 内容身份
 # 的入口冻结（与 RULER 入口、treatment 名三方同源）。
 from sparse_attn.info import freeze_minference_pattern_sha8
-# 【095 修复（GPT 审计 2026-10-12_0527）】TLI_E127_FAST=1 的 gather 路径把
+# 【095 修复（GPT 审计 2026-10-12_0527）】NFA_E127_FAST=1 的 gather 路径把
 # 三类契约违规延迟到 GPU 端错误标志，须由本入口在每样本生成段边界消费
 # ——guard 退出校验 raise 必须先于 record 构造/append 与任何落盘。
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
@@ -99,19 +99,19 @@ def parse_args(args=None):
     )
     parser.add_argument('--pred_postfix', type=str, default="")
     # 稀疏 prefill（用户 2026-10-08 指令，MoBA/NSA/DSA 口径）：设
-    # TLI_SPARSE_PREFILL=1 环境变量（须在模型加载/patch 挂载前；patch 层
+    # NFA_SPARSE_PREFILL=1 环境变量（须在模型加载/patch 挂载前；patch 层
     # 逐 forward 读 env，此处 parse 后立即设置即可）。默认不传 = 0 =
     # prefill 走原 dense 分支逐位不变（在跑链零扰动）。
     parser.add_argument(
-        '--tli-sparse-prefill', action='store_true',
+        '--nfa-sparse-prefill', action='store_true',
         help='prefill 也走 indexer 稀疏选择（chunk 共享选择，MoBA 口径）',
     )
     # E138 消融①（prefill-only 稀疏）：decode 显式回退 dense——分离 prefill
-    # 稀疏 KV 污染与 decode 稀疏选择两因素（对照 --tli-sparse-prefill 单开
+    # 稀疏 KV 污染与 decode 稀疏选择两因素（对照 --nfa-sparse-prefill 单开
     # = 消融② prefill+decode 双稀疏）。
     parser.add_argument(
-        '--tli-decode-dense', action='store_true',
-        help='decode 回退 dense 原生前向（须与 --tli-sparse-prefill 同用；'
+        '--nfa-decode-dense', action='store_true',
+        help='decode 回退 dense 原生前向（须与 --nfa-sparse-prefill 同用；'
              'E138 消融① prefill-only 稀疏臂）',
     )
 
@@ -410,8 +410,8 @@ def get_pred(
                 bool(truncated_flag))
 
         # 【095 修复（GPT 审计 2026-10-12_0527，2026-10-12）】请求级
-        # fail-closed guard：TLI_E127_FAST=1 的 gather 路径把三类契约违规
-        # （空 mask 行 / 选中数超 TLI_E127_W_UPPER / cu_seqlens_k 破坏）
+        # fail-closed guard：NFA_E127_FAST=1 的 gather 路径把三类契约违规
+        # （空 mask 行 / 选中数超 NFA_E127_W_UPPER / cu_seqlens_k 破坏）
         # 延迟到 GPU 端错误标志（decode 零同步的配套），由 guard 在本样本
         # 生成段边界一次校验 raise——必须先于 record 构造/append（get_pred
         # 内）与任何落盘（out_path 写入在 get_pred 返回后，raise 传播即
@@ -582,7 +582,7 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
     # method≠none 而 0 匹配（如 GLM-4 等未支持架构）时 fail-closed——
     # 防止静默跑 dense 却把输出文件打上稀疏方法标签。
     # 081（TL-E121-OUTPUT-SNAPSHOT-081）：snapshot 透传给每个 attention
-    # 层的 TLIIndexer（共享同一冻结对象，不按层重开文件）。
+    # 层的 NFAIndexer（共享同一冻结对象，不按层重开文件）。
     if args.method == "quest_vendor":
         # B 轨 vendor（官方源码复用）：不走 indexer_type_dict（A 轨
         # quest_indexer 是语义复现），改为把官方 Quest forward 原样绑定
@@ -855,18 +855,18 @@ if __name__ == "__main__":
     seed_everything(42)
     # 稀疏 prefill 门控：在模型加载/patch 挂载前设置环境变量
     # （qwen3_attn_patch 逐 forward 读取；默认不设 = dense 逐位不变）
-    if args.tli_sparse_prefill:
-        os.environ["TLI_SPARSE_PREFILL"] = "1"
-    # E138 消融①：TLI_DECODE_DENSE=1（qwen3_attn_patch decode 分支逐
+    if args.nfa_sparse_prefill:
+        os.environ["NFA_SPARSE_PREFILL"] = "1"
+    # E138 消融①：NFA_DECODE_DENSE=1（qwen3_attn_patch decode 分支逐
     # forward 读 env）。单独开（无稀疏 prefill）无意义且与产出标注冲突，
     # 拒绝产出被误标的结果。
-    if args.tli_decode_dense:
-        if not args.tli_sparse_prefill:
+    if args.nfa_decode_dense:
+        if not args.nfa_sparse_prefill:
             raise SystemExit(
-                "[GATE-FAIL] E138: --tli-decode-dense 须与 --tli-sparse-prefill "
+                "[GATE-FAIL] E138: --nfa-decode-dense 须与 --nfa-sparse-prefill "
                 "同用（prefill-only 稀疏消融臂）；单独开 = 全 dense，"
-                "method=tli 标注失真，fail closed")
-        os.environ["TLI_DECODE_DENSE"] = "1"
+                "method=nfa 标注失真，fail closed")
+        os.environ["NFA_DECODE_DENSE"] = "1"
 
     config_path = args.config_path
     model2maxlen = json.load(open(f"{config_path}/model2maxlen.json", "r"))
@@ -879,18 +879,18 @@ if __name__ == "__main__":
         model2path = model2path_list[model_name]
     else:
         model2path = args.model_path
-    # 081（TL-E121-OUTPUT-SNAPSHOT-081）：tli 臂在模型加载/patch（文件
+    # 081（TL-E121-OUTPUT-SNAPSHOT-081）：nfa 臂在模型加载/patch（文件
     # 被任何 attention 层消费）之前冻结一次解析的 treatment snapshot——
     # D′ 掩码 / 投影基每个文件只 open 一次，后续 method_name（472）、
     # sidecar 写门（501）全部消费同一冻结对象。修复前：每层各读一次 +
     # 生成后再读 → 生成窗口内文件被替换时 runtime A / 文件名 B /
-    # sidecar C 三方混装可达。非 tli 臂零改动（snapshot=None）。
+    # sidecar C 三方混装可达。非 nfa 臂零改动（snapshot=None）。
     model_config = AutoConfig.from_pretrained(model2path, trust_remote_code=True)
-    if args.method == "tli":
+    if args.method == "nfa":
         raise RuntimeError(
-            "LongBench legacy pred.py TLI cache path has been removed; "
+            "LongBench legacy pred.py NFA cache path has been removed; "
             "use benchmark/LongBench/prefill_frozen_skip.py with PagedRegionCache")
-    if args.method == "tli":
+    if args.method == "nfa":
         snapshot = resolve_treatment_snapshot(args)
     else:
         snapshot = None
@@ -1001,7 +1001,7 @@ if __name__ == "__main__":
         # 烧 GPU 之前完成（同 task/method/时间戳不同 cap 直接拒，不必等
         # 整轮生成跑完才发现口径冲突）。method_name 只依赖 args/snapshot
         # （与 get_pred 无数据依赖），提前计算逐位不变。
-        # 081：method_name 从冻结 snapshot 派生（tli 臂）——生成窗口内
+        # 081：method_name 从冻结 snapshot 派生（nfa 臂）——生成窗口内
         # 文件被替换时文件名仍等于 runtime/sidecar 的内容身份。
         method_name = get_method_name_with_info(args, snapshot)
         out_fn = f"{dataset_prefix}-{method_name}-{args.t}"
@@ -1011,11 +1011,11 @@ if __name__ == "__main__":
         if len(out_fn) > 230:
             # 076（TL-E121-OUTPUT-ID）：截断不得从尾部吃掉 method_name 的
             # 身份 hash 尾段（_h<hash10> 被截后不同 treatment 可再次同名
-            # 互覆）——先截可读中段再保 hash；非 tli 名（无 hash 段）回退
+            # 互覆）——先截可读中段再保 hash；非 nfa 名（无 hash 段）回退
             # 旧口径。截断重建后统一补一次空格/撇号清洗（dataset_prefix
             # 走重建路径时不经过上面的 replace，与未截断路径口径一致）。
             # 081 + kimi3 0316 追加修复 1：上限 245 → 230——out_fn 落盘
-            # 要拼 ".jsonl"（6）且写门会创建 sidecar ".tli_manifest.json"
+            # 要拼 ".jsonl"（6）且写门会创建 sidecar ".nfa_manifest.json"
             # （18）+ ".runcap.json"（13，096），245 下 sidecar 实名超
             # ext4 255 单文件名上限 → open 抛 OSError 36 裸 traceback
             # （破坏 076 fail-closed 统一口径）；230 = 255 − 6 − 18 − 1，
@@ -1081,29 +1081,29 @@ if __name__ == "__main__":
             # （run-cap 写门早期 CAP-CLASH 检测，
             # TL-DSV2-CAP-PROVENANCE-096）。
 
-            # 076（TL-E121-OUTPUT-ID）fail-closed 写入门：tli 输出目标已存在
+            # 076（TL-E121-OUTPUT-ID）fail-closed 写入门：nfa 输出目标已存在
             # 时，须以 sidecar manifest 字节级证明同 treatment 才允许重写
             # （同配置重跑幂等 = SKIP 语义；异配置/无记录 → 拒绝运行，不覆
             # 盖）。先写 sidecar 再写数据：中断只留孤儿 sidecar，下次目标
-            # 不存在 → 门自然放行。非 tli 方法可读段已编码其全部旋钮
-            # （quest/twia/tia/none），维持旧覆盖语义（076 审计范围 = tli
+            # 不存在 → 门自然放行。非 nfa 方法可读段已编码其全部旋钮
+            # （quest/twia/tia/none），维持旧覆盖语义（076 审计范围 = nfa
             # treatment 矩阵）。
             # 079（TL-E121-OUTPUT-ID-079）：本门消费的 manifest 已升级为
-            # resolved manifest（tia_enable_async_topk 生效值 + tli_proj_basis/
-            # tli_layer_skip_path 的 realpath+内容 sha256+shape/n_skip，文件
+            # resolved manifest（tia_enable_async_topk 生效值 + nfa_proj_basis/
+            # nfa_layer_skip_path 的 realpath+内容 sha256+shape/n_skip，文件
             # 缺失/损坏 fail closed）——「同路径、内容已变」不再同 manifest，
             # 写门必拒；与 method hash/RULER receipt 共用 info.py 单一事实源。
             # 081：manifest 从冻结 snapshot 派生（与 472 行 method_name、
             # runtime 各层消费的 skip/basis 同一对象）——删除生成后重读
             # 路径的调用，生成窗口内的文件替换不再产生 name/sidecar 混装。
-            if args.method == "tli":
+            if args.method == "nfa":
                 manifest_json = get_treatment_manifest_json(args, snapshot)
                 sidecar = gate_output_treatment_identity(out_path, manifest_json)
                 with open(sidecar, "w", encoding="utf-8") as f:
                     f.write(manifest_json)
 
             # 096（TL-DSV2-CAP-PROVENANCE-096）：先落 generating manifest 再写
-            # 数据（076 tli sidecar 同款崩溃语义：数据写之前 manifest 已在盘上，
+            # 数据（076 nfa sidecar 同款崩溃语义：数据写之前 manifest 已在盘上，
             # 中断窗口留 manifest 可证 cap，不留无主数据；status=generating 告知
             # 消费侧结果 sha 未绑定）。写门 + 两阶段均在 run_cap_manifest.py。
             write_run_cap_manifest(runcap_sidecar, finalize_run_cap_manifest(

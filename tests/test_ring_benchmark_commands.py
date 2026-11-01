@@ -36,15 +36,15 @@ def test_ring_pairs_freeze_mask_and_construct_graph_commands(monkeypatch,tmp_pat
     assert len(calls)==4
     for (cmd,env),arm_idx in zip(calls,[0,1,1,0]):
         assert cmd[1].endswith('e152v4_graph_latency.py')
-        assert env['TLI_OPERATOR_MODE']==modes[arm_idx]
-        assert env['TLI_OPERATOR_BACKEND']==backends[arm_idx]
-        assert env['TLI_BENCH_REQUIRE_RING']=='1'
-        assert env['TLI_OPERATOR_ORDERED_SELECTION']==('0' if arms[arm_idx]=='graph_ring_simt_canonical' else '1')
+        assert env['NFA_OPERATOR_MODE']==modes[arm_idx]
+        assert env['NFA_OPERATOR_BACKEND']==backends[arm_idx]
+        assert env['NFA_BENCH_REQUIRE_RING']=='1'
+        assert env['NFA_OPERATOR_ORDERED_SELECTION']==('0' if arms[arm_idx]=='graph_ring_simt_canonical' else '1')
         assert cmd[cmd.index('--warmup')+1]=='3'
-        assert env['TLI_OPERATOR_SELECTED_STAGES']==('3' if arms[arm_idx] in ('graph_ring_tc3','graph_ring_tc3_overlap') else '1')
-        for flag,value in [('--method','tli'),('--tli_enable_layer_skip','true'),('--tli_far_skip_backend','compact'),('--tli_far_skip_cache','evict')]:
+        assert env['NFA_OPERATOR_SELECTED_STAGES']==('3' if arms[arm_idx] in ('graph_ring_tc3','graph_ring_tc3_overlap') else '1')
+        for flag,value in [('--method','nfa'),('--nfa_enable_layer_skip','true'),('--nfa_far_skip_backend','compact'),('--nfa_far_skip_cache','evict')]:
             assert cmd.count(flag)==1 and cmd[cmd.index(flag)+1]==value
-        frozen=Path(cmd[cmd.index('--tli_layer_skip_path')+1])
+        frozen=Path(cmd[cmd.index('--nfa_layer_skip_path')+1])
         assert frozen.is_absolute() and json.loads(frozen.read_text())=={'skip':[0,2]}
     receipt=json.loads((out/'receipt.json').read_text())
     assert receipt['ring_skip_ids']==[0,2]

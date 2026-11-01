@@ -74,7 +74,7 @@ def _repo_has_b10():
     「合入实现 vs 原型副本」一致性核对（e64 臂两侧同绿）。"""
     S = 128 + 4096 + 128
     k, q = gen_kq(S)
-    args = make_args(**CCLUSTER_CFG, tli_alpha=0.5, tli_beta=0.25, tli_gamma=0.5)
+    args = make_args(**CCLUSTER_CFG, nfa_alpha=0.5, nfa_beta=0.25, nfa_gamma=0.5)
     idx, _ = run_mask(IDX_OLD, args, k, q)
     return int(idx._km_far_hi_cached) == 2176
 
@@ -93,7 +93,7 @@ def make_args(**kw):
 
 
 def run_mask(idxpkg, args, k, q):
-    idx = idxpkg.TLIIndexer(args)
+    idx = idxpkg.NFAIndexer(args)
     idx.layer_idx = 3
     cu = torch.tensor([0, k.shape[1]])
     q_ids = torch.tensor([k.shape[1] - 1])
@@ -109,9 +109,9 @@ def gen_kq(S, seed=31):
 
 
 CCLUSTER_CFG = dict(
-    tli_far_select="cluster", tli_near_select="cluster",
-    tli_enable_kmeans=True, tli_enable_layer_skip=False,
-    tli_far_method="minmax", tli_near_method="avg",
+    nfa_far_select="cluster", nfa_near_select="cluster",
+    nfa_enable_kmeans=True, nfa_enable_layer_skip=False,
+    nfa_far_method="minmax", nfa_near_method="avg",
 )
 
 MERGED = _repo_has_b10()
@@ -130,7 +130,7 @@ def n1_aligned_counterexample():
         try:
             S = 128 + 4096 + 128
             k, q = gen_kq(S)
-            args = make_args(**CCLUSTER_CFG, tli_alpha=0.5, tli_beta=0.25, tli_gamma=0.5)
+            args = make_args(**CCLUSTER_CFG, nfa_alpha=0.5, nfa_beta=0.25, nfa_gamma=0.5)
             idx_repo, _ = run_mask(IDX_OLD, args, k, q)
             idx_proto, _ = run_mask(IDX_NEW, args, k, q)
             fh_repo = int(idx_repo._km_far_hi_cached)
@@ -152,7 +152,7 @@ def n1_aligned_counterexample():
         # S = sink(128) + mid(4096) + swa(128)，全 64 块对齐；α=0.5 → near_len_dyn=2048
         S = 128 + 4096 + 128
         k, q = gen_kq(S)
-        args = make_args(**CCLUSTER_CFG, tli_alpha=0.5, tli_beta=0.25, tli_gamma=0.5)
+        args = make_args(**CCLUSTER_CFG, nfa_alpha=0.5, nfa_beta=0.25, nfa_gamma=0.5)
         idx_old, _ = run_mask(IDX_OLD, args, k, q)
         idx_new, _ = run_mask(IDX_NEW, args, k, q)
         # 建簇侧 far_hi（= near 左界）：旧 (S-2048)//64*64=2304，新 (S-128-2048)//64*64=2176
@@ -184,7 +184,7 @@ def n3_single_pool_invariant():
     try:
         S = 4352
         k, q = gen_kq(S)
-        args = make_args(**CCLUSTER_CFG, tli_alpha=0.0, tli_beta=0.0)
+        args = make_args(**CCLUSTER_CFG, nfa_alpha=0.0, nfa_beta=0.0)
         _, m_old = run_mask(IDX_OLD, args, k, q)
         _, m_new = run_mask(IDX_NEW, args, k, q)
         if not (torch.equal(m_old, m_new)):
@@ -209,8 +209,8 @@ def n4_legacy_invariant():
         # near-SWA 几何身份（红侧主树 vs 绿侧 /tmp/near_fix_v2 原型副本），
         # 原型副本早于 E155b（旧默认 l2_quant=True）——不锚定则量化退役
         # 混入 144/8704 位假漂移（归因实验已核清：l2_quant=True → 0 位）。
-        args = make_args(tli_enable_layer_skip=False,
-                         tli_l2_quant=True)   # 默认 4bit/4bit，near_len=2048 老语义
+        args = make_args(nfa_enable_layer_skip=False,
+                         nfa_l2_quant=True)   # 默认 4bit/4bit，near_len=2048 老语义
         _, m_old = run_mask(IDX_OLD, args, k, q)
         _, m_new = run_mask(IDX_NEW, args, k, q)
         if not (torch.equal(m_old, m_new)):
@@ -243,14 +243,14 @@ def n5_budget_conservation():
         k, q = gen_kq(S)
         K2_mid = 1024 - 128 - 128
         for tag, extra, mid_expect in [
-            ("ccluster a.5/b.25/g.5", dict(tli_alpha=0.5, tli_beta=0.25, tli_gamma=0.5), K2_mid),
-            ("mavg a.125/b.375/g.625", dict(tli_far_select="4bit", tli_near_select="4bit",
-                                             tli_enable_kmeans=False, tli_alpha=0.125,
-                                             tli_beta=0.375, tli_gamma=0.625), 512),
+            ("ccluster a.5/b.25/g.5", dict(nfa_alpha=0.5, nfa_beta=0.25, nfa_gamma=0.5), K2_mid),
+            ("mavg a.125/b.375/g.625", dict(nfa_far_select="4bit", nfa_near_select="4bit",
+                                             nfa_enable_kmeans=False, nfa_alpha=0.125,
+                                             nfa_beta=0.375, nfa_gamma=0.625), 512),
         ]:
             args = make_args(**CCLUSTER_CFG, **extra) if "ccluster" in tag else \
-                make_args(tli_enable_layer_skip=False, tli_far_method="minmax",
-                          tli_near_method="avg", **extra)
+                make_args(nfa_enable_layer_skip=False, nfa_far_method="minmax",
+                          nfa_near_method="avg", **extra)
             _, m = run_mask(IDX_NEW, args, k, q)
             mm = m[0, 0]
             n_mid = int(mm[0, 128:S - 128].sum())

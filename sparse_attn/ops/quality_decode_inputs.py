@@ -79,4 +79,4 @@ class DeviceDecodeInputs:
             NEG=torch.finfo(mask.dtype).min, num_warps=4)
         # Triton 原地写入不会推进 PyTorch _version；为 eager 几何缓存提供
         # 每步单调修订号，保留同一步跨层复用且禁止跨步 stale hit。
-        lengths._tli_device_revision = getattr(lengths, '_tli_device_revision', 0) + 1
+        lengths._nfa_device_revision = getattr(lengths, '_nfa_device_revision', 0) + 1

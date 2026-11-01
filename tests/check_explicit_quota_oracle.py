@@ -11,7 +11,7 @@ from unittest.mock import patch
 from test_explicit_near_page_budget import ROOT, config, load_constructors
 
 BASE = '50abf698a16c506f30fe72a3fbb1f0a4df080d15'
-PATH = 'sparse_attn/indexer/tli_indexer.py'
+PATH = 'sparse_attn/indexer/nfa_indexer.py'
 
 
 def main():
@@ -19,12 +19,12 @@ def main():
     source = subprocess.check_output(['git', 'show', BASE + ':' + PATH],
                                      cwd=ROOT, text=True)
     node = next(n for n in ast.parse(source).body
-                if isinstance(n, ast.ClassDef) and n.name == 'TLIIndexer')
+                if isinstance(n, ast.ClassDef) and n.name == 'NFAIndexer')
     node.body = [n for n in node.body if isinstance(n, ast.FunctionDef)
                  and n.name == '__init__']
     scope = dict(candidate.__init__.__globals__)
     exec(compile(ast.Module(body=[node], type_ignores=[]), PATH, 'exec'), scope)
-    baseline = scope['TLIIndexer']
+    baseline = scope['NFAIndexer']
     cases = []
     for bs in (16, 32, 64, 128):
         for nb in (0, 1, 2, 4):
@@ -32,21 +32,21 @@ def main():
                 for bypass in (False, True):
                     for quant in (False, True):
                         cases.append((None, dict(tia_block_size=bs,
-                            tli_swa_size=bs, tli_near_pages=nb,
-                            tli_near_tokens=nt, tli_near_len=nb * bs,
-                            tli_boundary_bypass=bypass, tli_l2_quant=quant)))
+                            nfa_swa_size=bs, nfa_near_pages=nb,
+                            nfa_near_tokens=nt, nfa_near_len=nb * bs,
+                            nfa_boundary_bypass=bypass, nfa_l2_quant=quant)))
     for quota in (None, [0], [32, 128], [0.5, 1.5, 2.5]):
         for gamma in (0, .5, 1):
             for far in ('4bit', 'cluster', 'sim_greedy'):
-                cases.append((quota, dict(tli_near_pages=None,
-                    tli_near_tokens=None, tli_near_len=None,
-                    tli_alpha=.5, tli_beta=.5, tli_gamma=gamma,
-                    tli_far_select=far)))
+                cases.append((quota, dict(nfa_near_pages=None,
+                    nfa_near_tokens=None, nfa_near_len=None,
+                    nfa_alpha=.5, nfa_beta=.5, nfa_gamma=gamma,
+                    nfa_far_select=far)))
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / 'quota.json'
         for quota, case in cases:
             path.write_text(json.dumps(quota))
-            with patch.dict(os.environ, TLI_E151C_ORACLE_QUOTA=(
+            with patch.dict(os.environ, NFA_E151C_ORACLE_QUOTA=(
                     '' if quota is None else str(path))):
                 old, new = baseline(config(**case)), candidate(config(**case))
             if vars(old) != vars(new):
@@ -57,10 +57,10 @@ def main():
             for quota in ([0], [32], [128]):
                 conflicts.append((nt, quota))
                 path.write_text(json.dumps(quota))
-                with patch.dict(os.environ, TLI_E151C_ORACLE_QUOTA=str(path)):
-                    baseline(config(tli_near_tokens=nt))
+                with patch.dict(os.environ, NFA_E151C_ORACLE_QUOTA=str(path)):
+                    baseline(config(nfa_near_tokens=nt))
                     try:
-                        candidate(config(tli_near_tokens=nt))
+                        candidate(config(nfa_near_tokens=nt))
                     except ValueError as exc:
                         if 'E151c' not in str(exc):
                             raise

@@ -37,7 +37,7 @@ def _core(identity):
     return build_run_cap_core(
         model_name="Qwen3-8B",
         model_path="/model",
-        method="tli",
+        method="nfa",
         dataset="qasper",
         dataset_fingerprint=identity["source_fingerprint"],
         run_timestamp="20261021-identity",

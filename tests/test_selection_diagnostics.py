@@ -43,13 +43,13 @@ def test_rejects_nonfinite_valid_keys():
 
 
 def test_probe_restores_inherited_method_on_error(tmp_path, monkeypatch):
-    from sparse_attn.indexer.tli_indexer import TLIIndexer
-    monkeypatch.setenv("TLI_CUDA_GRAPH", "0")
-    prepare, clear = TLIIndexer.prepare_mask, TLIIndexer.clear
-    owned = "prepare_mask" in TLIIndexer.__dict__
+    from sparse_attn.indexer.nfa_indexer import NFAIndexer
+    monkeypatch.setenv("NFA_CUDA_GRAPH", "0")
+    prepare, clear = NFAIndexer.prepare_mask, NFAIndexer.clear
+    owned = "prepare_mask" in NFAIndexer.__dict__
     with pytest.raises(RuntimeError):
         with diag.record_selection_mass(tmp_path / "rows.jsonl"):
             raise RuntimeError("injected")
-    assert TLIIndexer.prepare_mask is prepare
-    assert TLIIndexer.clear is clear
-    assert ("prepare_mask" in TLIIndexer.__dict__) == owned
+    assert NFAIndexer.prepare_mask is prepare
+    assert NFAIndexer.clear is clear
+    assert ("prepare_mask" in NFAIndexer.__dict__) == owned

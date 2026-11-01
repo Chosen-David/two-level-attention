@@ -11,7 +11,7 @@
 """
 import pytest
 import torch
-from sparse_attn.ops.token_selection import canonical_selection, middle_selection
+from sparse_attn.indexer.selection.selector import canonical_selection, middle_selection
 
 
 # ---------- 纯 tensor 级别的 compact 接口对拍 ----------
@@ -38,7 +38,7 @@ def test_graph_middle_selection_matches_full_mask():
     mid_mask[sink_tok:S_real - swa_tok] = True
 
     # 正常路径（模拟 compute_mask_graph 返回 full mask 的部分）
-    from sparse_attn.ops.token_selection import graph_middle_selection
+    from sparse_attn.indexer.selection.selector import graph_middle_selection
     sel = graph_middle_selection(top, k2_mid, mid_mask, S_real, S_cap,
                                  sink_tok, swa_tok)
 
@@ -71,7 +71,7 @@ def test_compact_roundtrip_bitexact_deterministic():
     mid_mask[:sink_tok] = False
     mid_mask[S_real - swa_tok:] = False
 
-    from sparse_attn.ops.token_selection import graph_middle_selection
+    from sparse_attn.indexer.selection.selector import graph_middle_selection
     sel = graph_middle_selection(top, k2_mid, mid_mask, S_real, S_cap,
                                  sink_tok, swa_tok)
     mask = sel.to_mask(S_cap)
@@ -98,7 +98,7 @@ def test_swa_exclusion_in_compact():
     mid_mask[:sink_tok] = False  # [0,1] 非 mid
     mid_mask[S_real:] = False    # pad 非 mid
 
-    from sparse_attn.ops.token_selection import graph_middle_selection
+    from sparse_attn.indexer.selection.selector import graph_middle_selection
     sel = graph_middle_selection(top, k2_mid, mid_mask, S_real, S_cap,
                                  sink_tok, swa_tok)
 
@@ -128,7 +128,7 @@ def test_empty_selection_mid_all_excluded():
     mid_mask[:sink_tok] = False  # 实际 16-19 在 mid 内... 不，mid_mask[:2]=False
     # 但 16,17,18,19 ≥ S_real-swa_tok=16 → middle_selection 排除
 
-    from sparse_attn.ops.token_selection import graph_middle_selection
+    from sparse_attn.indexer.selection.selector import graph_middle_selection
     sel = graph_middle_selection(top, k2_mid, mid_mask, S_real, S_cap,
                                  sink_tok, swa_tok)
 
@@ -168,7 +168,7 @@ def test_partial_attention_via_compact_selection():
     top = mid_ids.unsqueeze(0).expand(hk, -1).contiguous()
     k2_mid = torch.full((hk,), K2, dtype=torch.long)
 
-    from sparse_attn.ops.token_selection import graph_middle_selection
+    from sparse_attn.indexer.selection.selector import graph_middle_selection
     sel = graph_middle_selection(top, k2_mid, mid_mask, S_real, t,
                                  sink, swa)
 

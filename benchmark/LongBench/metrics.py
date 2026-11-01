@@ -14,19 +14,19 @@ from rouge import Rouge
 # （indel ratio），没装时走 difflib.SequenceMatcher——同一份预测两任务漂 ~1.5pt，
 # 13 任务宏平均漂 ~0.234。此处显式固定单一后端，禁止可选依赖静默改变语义：
 #   默认 difflib：纯标准库，零依赖，跨环境逐位可复现（canonical 口径）
-#   TLI_SCORER_BACKEND=levenshtein：显式要求 Levenshtein，缺包即启动失败（fail closed）
+#   NFA_SCORER_BACKEND=levenshtein：显式要求 Levenshtein，缺包即启动失败（fail closed）
 # 语义与 fuzzywuzzy 两条历史路径逐一对应（均做 int(round(100*ratio))）。
-_SCORER_BACKEND = _os.environ.get("TLI_SCORER_BACKEND", "difflib").strip().lower()
+_SCORER_BACKEND = _os.environ.get("NFA_SCORER_BACKEND", "difflib").strip().lower()
 if _SCORER_BACKEND not in ("difflib", "levenshtein"):
     raise ImportError(
-        f"TLI_SCORER_BACKEND={_SCORER_BACKEND!r} 非法（合法值: difflib | levenshtein）"
+        f"NFA_SCORER_BACKEND={_SCORER_BACKEND!r} 非法（合法值: difflib | levenshtein）"
     )
 if _SCORER_BACKEND == "levenshtein":
     try:
         import Levenshtein as _Lev
     except ImportError as _e:
         raise ImportError(
-            "TLI_SCORER_BACKEND=levenshtein 但 python-Levenshtein 未安装——"
+            "NFA_SCORER_BACKEND=levenshtein 但 python-Levenshtein 未安装——"
             "拒绝静默回退 difflib（fail closed），请安装或改用默认 difflib"
         ) from _e
     def _fuzz_ratio(s1: str, s2: str) -> int:

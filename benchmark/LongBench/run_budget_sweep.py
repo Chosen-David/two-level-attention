@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TASKS = ('narrativeqa qasper multifieldqa_en hotpotqa 2wikimqa musique gov_report '
          'qmsum multi_news triviaqa passage_retrieval_en '
          'lcc repobench-p').split()
-METHODS = {'Full': 'none', 'LoDA': 'tli', 'Quest': 'quest_vendor',
+METHODS = {'Full': 'none', 'LoDA': 'nfa', 'Quest': 'quest_vendor',
            'JSSA': 'jssa_vendor', 'AsyncTLS': 'asynctls_vendor'}
 ADAPTERS = {m: ROOT / 'exp/vendor_baselines' / f'{m.lower()}_vendor' /
             f'qwen3_{m.lower()}_patch.py' for m in ('Quest', 'JSSA', 'AsyncTLS')}
@@ -114,12 +114,12 @@ def worker_packages(env):
 
 
 def environment():
-    # Explicitly do not inherit TLI_*, CUDA_*, PYTHONPATH or LD_PRELOAD switches.
+    # Explicitly do not inherit NFA_*, CUDA_*, PYTHONPATH or LD_PRELOAD switches.
     env = {k: os.environ[k] for k in ('PATH', 'HOME', 'LANG', 'LC_ALL', 'LD_LIBRARY_PATH')
            if k in os.environ}
     env.update(HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', HF_DATASETS_OFFLINE='1',
                PYTHONPATH=str(ROOT), PYTHONNOUSERSITE='1', OMP_NUM_THREADS='1',
-               TOKENIZERS_PARALLELISM='false', TLI_SPARSE_PREFILL='0', TLI_DECODE_DENSE='0')
+               TOKENIZERS_PARALLELISM='false', NFA_SPARSE_PREFILL='0', NFA_DECODE_DENSE='0')
     return env
 
 
@@ -127,12 +127,12 @@ def flags(method, k2, manifest):
     if method == 'Full':
         return ['--method', 'none']
     if method == 'LoDA':
-        return ['--method', 'tli', '--tia_block_size', '64',
+        return ['--method', 'nfa', '--tia_block_size', '64',
                 '--tia_level1_topk', str(manifest['k1']), '--tia_level2_topk', str(k2),
-                '--tli_far_method', 'minmax', '--tli_near_method', 'avg',
-                '--tli_near_pages', '32', '--tli_near_tokens', 'off', '--tli_near_len', '4096',
-                '--tli_subspace', 'tail', '--tia_level2_cmp_ratio', '4',
-                '--tli_sink_tokens', '4', '--tli_swa_size', '128', '--tli_enable_layer_skip', 'false']
+                '--nfa_far_method', 'minmax', '--nfa_near_method', 'avg',
+                '--nfa_near_pages', '32', '--nfa_near_tokens', 'off', '--nfa_near_len', '4096',
+                '--nfa_subspace', 'tail', '--tia_level2_cmp_ratio', '4',
+                '--nfa_sink_tokens', '4', '--nfa_swa_size', '128', '--nfa_enable_layer_skip', 'false']
     if method == 'Quest':
         return ['--method', 'quest_vendor', '--quest_token_budget', str(k2), '--quest_chunk_size', '16']
     if method == 'JSSA':
@@ -214,7 +214,7 @@ def prepare(manifest):
             for k2 in ([None] if method == 'Full' else m['k2']):
                 job = {'task': task, 'method': method, 'k2': k2, 'input_identity': identity,
                        'rows': len(rows), 'cap': cap, 'max_gen': maxgen[task],
-                       'flags': flags(method, k2, m) + ['--tli_enable_layer_skip', 'false', '--tli_enable_kmeans', 'false'], 'blocked': blocked.get(method, [])}
+                       'flags': flags(method, k2, m) + ['--nfa_enable_layer_skip', 'false', '--nfa_enable_kmeans', 'false'], 'blocked': blocked.get(method, [])}
                 job['id'] = digest(job)
                 jobs.append(job)
     plan = {'schema': 1, 'protocol': 'LongBench-v1-LB13-current-main-split-prompt; seed=42; bf16',
@@ -254,14 +254,14 @@ def inspect_treatments(plan):
             continue
         parser = add_sparse_attn_args(argparse.ArgumentParser())
         args = parser.parse_args(job['flags'])
-        snapshot = resolve_treatment_snapshot(args) if args.method == 'tli' else None
+        snapshot = resolve_treatment_snapshot(args) if args.method == 'nfa' else None
         method = get_method_name_with_info(args, snapshot)
         prefix = job['task'].split('-')[0]
         name = f"{prefix}-{method}-{plan['id'][:16]}".replace(' ', '').replace("'", '')
         if len(name) > 230:
             name = truncate_output_name_keep_hash(prefix, method, plan['id'][:16]).replace(' ', '').replace("'", '')
         output[job['id']] = {'filename': name + '.jsonl',
-            'treatment': json.loads(get_treatment_manifest_json(args, snapshot)) if args.method == 'tli' else None}
+            'treatment': json.loads(get_treatment_manifest_json(args, snapshot)) if args.method == 'nfa' else None}
     return output
 
 
@@ -409,8 +409,8 @@ def validate_prediction(attempt, job, plan, expected_treatment):
     if path.name != expected_treatment['filename']:
         raise ValueError('actual budget/config filename differs from resolved producer flags')
     if expected_treatment['treatment'] is not None:
-        if read(str(path) + '.tli_manifest.json') != expected_treatment['treatment']:
-            raise ValueError('actual TLI K1/K2/treatment mismatch')
+        if read(str(path) + '.nfa_manifest.json') != expected_treatment['treatment']:
+            raise ValueError('actual NFA K1/K2/treatment mismatch')
     meta = read_run_cap_manifest(str(path) + RUN_CAP_SIDECAR_SUFFIX)
     actual_sha, lines = compute_result_binding(str(path))
     expected = {'status': 'complete', 'provenance': 'inline', 'dataset': job['task'],
@@ -448,7 +448,7 @@ def validate_score(attempt, prediction):
 
 def result_files(attempt, pred):
     paths = [pred, Path(str(pred) + RUN_CAP_SIDECAR_SUFFIX), attempt / 'pred/result.json']
-    treatment = Path(str(pred) + '.tli_manifest.json')
+    treatment = Path(str(pred) + '.nfa_manifest.json')
     if treatment.is_file():
         paths.append(treatment)
     return paths

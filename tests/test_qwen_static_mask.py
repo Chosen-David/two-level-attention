@@ -64,7 +64,7 @@ class StaticMask(unittest.TestCase):
             observed.append(m)
             return sdpa_attention_forward(mod, q, k, v, m, **kw)
         self.ns['ALL_ATTENTION_FUNCTIONS'] = {'sdpa': observe}
-        with torch.no_grad(), patch.dict(os.environ, {'TLI_SPARSE_PREFILL': '0', 'TLI_E134_DEBUG': ''}):
+        with torch.no_grad(), patch.dict(os.environ, {'NFA_SPARSE_PREFILL': '0', 'NFA_E134_DEBUG': ''}):
             out, _ = self.ns['qwen3_attn_forward'](
                 attn, x, (torch.ones(1, length, 4), torch.zeros(1, length, 4)), mask,
                 past_key_values=cache, cache_position=torch.arange(start, start + length))
@@ -79,7 +79,7 @@ class StaticMask(unittest.TestCase):
     def test_forward_dynamic_cache_is_not_static(self):
         _, _, cache, _ = self.forward(None, dynamic=True)
         self.assertEqual(cache.get_max_cache_shape(), -1)
-        self.assertFalse(hasattr(cache, '_tli_seq_len'))
+        self.assertFalse(hasattr(cache, '_nfa_seq_len'))
 
     def test_forward_canonical_static_matches_dynamic(self):
         static, seen, _, attn = self.forward(causal())
@@ -173,7 +173,7 @@ class StaticMask(unittest.TestCase):
             self.assertTrue(self.check(m))
             m[..., 2, 0] = False
             self.assertFalse(self.check(m))
-        self.assertIsNone(self.cache._tli_mask_validation)
+        self.assertIsNone(self.cache._nfa_mask_validation)
 
     def test_cache_does_not_retain_mask(self):
         m = causal(); ref = weakref.ref(m)

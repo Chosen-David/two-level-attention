@@ -1,6 +1,6 @@
 import pytest
 import torch
-from sparse_attn.ops.batch_coarse_score import score_average_batched
+from sparse_attn.indexer.candidate.scorer_coarse import score_average_batched
 
 
 def test_average_metadata_guards():
@@ -19,7 +19,7 @@ def test_average_metadata_guards():
 @pytest.mark.parametrize('dtype', [torch.bfloat16, torch.float16])
 @pytest.mark.parametrize('dim,group,mean', [(32, 3, False), (128, 4, True)])
 def test_average_primary_kernel_exact_graph(batch, dtype, dim, group, mean):
-    from sparse_attn.indexer.tli_indexer import TLIIndexer, _score_fine_kernel
+    from sparse_attn.indexer.nfa_indexer import NFAIndexer, _score_fine_kernel
     import triton
     torch.manual_seed(8729)
     tokens, heads = 131, 2
@@ -30,7 +30,7 @@ def test_average_primary_kernel_exact_graph(batch, dtype, dim, group, mean):
     run(); torch.cuda.synchronize()
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph): actual = run()
-    tile, warps = TLIIndexer._TILE_FINE.get(dim, (64, 4))
+    tile, warps = NFAIndexer._TILE_FINE.get(dim, (64, 4))
     for scale in (0., 1., -2.):
         q.copy_(torch.randn_like(q) * scale); k.normal_()
         graph.replay()

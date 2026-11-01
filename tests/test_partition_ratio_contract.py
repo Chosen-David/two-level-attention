@@ -12,20 +12,20 @@ class PartitionRatioContractTests(unittest.TestCase):
         cls.indexer = load_constructors()
 
     def setUp(self):
-        env = patch.dict(os.environ, TLI_E151C_ORACLE_QUOTA='')
+        env = patch.dict(os.environ, NFA_E151C_ORACLE_QUOTA='')
         env.start()
         self.addCleanup(env.stop)
 
     def legacy(self, **changes):
-        return config(tli_near_pages=None, tli_near_tokens=None,
-                      tli_near_len=None, **changes)
+        return config(nfa_near_pages=None, nfa_near_tokens=None,
+                      nfa_near_len=None, **changes)
 
     def test_invalid_ratios_rejected_before_selector(self):
-        for field in ('tli_alpha', 'tli_beta'):
+        for field in ('nfa_alpha', 'nfa_beta'):
             for value in (-1., -.125, 1.0001, 2., float('nan'),
                           float('inf'), float('-inf')):
                 for other in (0., .25):
-                    args = dict(tli_alpha=other, tli_beta=other)
+                    args = dict(nfa_alpha=other, nfa_beta=other)
                     args[field] = value
                     with self.subTest(field=field, value=value, other=other):
                         with self.assertRaisesRegex(ValueError, field):
@@ -37,7 +37,7 @@ class PartitionRatioContractTests(unittest.TestCase):
                 for gamma in (None, 0., .625, 1., 'off'):
                     with self.subTest(alpha=alpha, beta=beta, gamma=gamma):
                         idx = self.indexer(self.legacy(
-                            tli_alpha=alpha, tli_beta=beta, tli_gamma=gamma))
+                            nfa_alpha=alpha, nfa_beta=beta, nfa_gamma=gamma))
                         self.assertEqual(idx.alpha, alpha)
                         self.assertEqual(idx.beta, beta)
                         self.assertEqual(idx.gamma, None if gamma == 'off'
@@ -47,11 +47,11 @@ class PartitionRatioContractTests(unittest.TestCase):
         idx = self.indexer(self.legacy())
         self.assertEqual((idx.alpha, idx.beta, idx.gamma), (0., 0., 1.))
         for nt in (0, 32, 'off'):
-            idx = self.indexer(config(tli_near_tokens=nt))
+            idx = self.indexer(config(nfa_near_tokens=nt))
             self.assertEqual((idx.alpha, idx.beta), (1., 1.))
             self.assertEqual(idx.nt_near_tokens, None if nt == 'off' else nt)
         with self.assertRaises(ValueError):
-            self.indexer(config(tli_alpha=.25))
+            self.indexer(config(nfa_alpha=.25))
 
 
 if __name__ == '__main__':

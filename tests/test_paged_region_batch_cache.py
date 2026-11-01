@@ -1,7 +1,7 @@
 import torch
 from sparse_attn.cache.paged_region_cache import (
     PagedRegionLayer, PagedRegionCache, SINK, FAR, NEAR, SWA)
-from sparse_attn.ops.region_geometry import RegionGeometry
+from sparse_attn.policies.region_geometry import RegionGeometry
 
 
 @torch.inference_mode()

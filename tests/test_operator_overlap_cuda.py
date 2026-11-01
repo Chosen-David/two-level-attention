@@ -2,15 +2,15 @@
 from types import SimpleNamespace
 import pytest
 import torch
-from sparse_attn.ops.operator_pipeline import decode_indexed
+from sparse_attn.engine.operator_pipeline import decode_indexed
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')
 @pytest.mark.parametrize('operator_backend', ['simt', 'tc'])
 @pytest.mark.parametrize('selected_stages', [1, 3])
 def test_overlap_graph_replay_matches_serial(monkeypatch, operator_backend, selected_stages):
-    monkeypatch.setenv('TLI_OPERATOR_BACKEND', operator_backend)
-    monkeypatch.setenv('TLI_OPERATOR_SELECTED_STAGES', str(selected_stages))
+    monkeypatch.setenv('NFA_OPERATOR_BACKEND', operator_backend)
+    monkeypatch.setenv('NFA_OPERATOR_SELECTED_STAGES', str(selected_stages))
     torch.manual_seed(42)
     q = torch.randn(1, 1, 8, 32, device='cuda', dtype=torch.float16)
     k = torch.randn(1, 1024, 2, 32, device='cuda', dtype=q.dtype)
@@ -24,7 +24,7 @@ def test_overlap_graph_replay_matches_serial(monkeypatch, operator_backend, sele
         prepare_index=lambda k, cu: k.square().sum(-1),
         compute_selection_graph=lambda *args: SimpleNamespace(indices=ids, counts=counts))
     def run(mode):
-        monkeypatch.setenv('TLI_OPERATOR_MODE', mode)
+        monkeypatch.setenv('NFA_OPERATOR_MODE', mode)
         return decode_indexed(indexer, None, q, k, v, cu, vl, 32 ** -.5)
     run('overlap')
     torch.cuda.synchronize()
@@ -45,7 +45,7 @@ def test_overlap_graph_replay_matches_serial(monkeypatch, operator_backend, sele
 @pytest.mark.parametrize('dtype', [torch.float16, torch.bfloat16])
 def test_overlap_allocator_lifetime(monkeypatch, dtype):
     """Drop caller-owned inputs while side-stream work is pending; churn storage."""
-    monkeypatch.setenv('TLI_OPERATOR_MODE', 'overlap')
+    monkeypatch.setenv('NFA_OPERATOR_MODE', 'overlap')
     producer = torch.cuda.Stream()
     consumer = torch.cuda.Stream()
     results = []
@@ -62,9 +62,9 @@ def test_overlap_allocator_lifetime(monkeypatch, dtype):
             indexer = SimpleNamespace(sink_tokens=4, sliding_window_size=64,
                 prepare_index=lambda k, cu: k.square().sum(-1),
                 compute_selection_graph=lambda *args: SimpleNamespace(indices=ids, counts=counts))
-            monkeypatch.setenv('TLI_OPERATOR_MODE', 'serial')
+            monkeypatch.setenv('NFA_OPERATOR_MODE', 'serial')
             expected = decode_indexed(indexer, None, q, k, v, cu, vl, 32 ** -.5)
-            monkeypatch.setenv('TLI_OPERATOR_MODE', 'overlap')
+            monkeypatch.setenv('NFA_OPERATOR_MODE', 'overlap')
             actual = decode_indexed(indexer, None, q, k, v, cu, vl, 32 ** -.5)
             results.append((actual, expected))
             del q, k, v, vl, cu, ids, counts, indexer
@@ -86,8 +86,8 @@ def test_real_indexer_compact_and_overlap_graph(monkeypatch, dtype):
     """Exercise production geometry (scalar quota), selection and native graphs."""
     import importlib.util
     from pathlib import Path
-    from sparse_attn.indexer.tli_indexer import TLIIndexer
-    path = Path(__file__).resolve().parents[1] / 'exp/bench/test_tli_graph_gates.py'
+    from sparse_attn.indexer.nfa_indexer import NFAIndexer
+    path = Path(__file__).resolve().parents[1] / 'exp/bench/test_nfa_graph_gates.py'
     spec = importlib.util.spec_from_file_location('operator_prod_args', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -98,7 +98,7 @@ def test_real_indexer_compact_and_overlap_graph(monkeypatch, dtype):
     v = torch.randn_like(k)
     vl = torch.tensor([capacity], device='cuda', dtype=torch.int64)
     cu = torch.tensor([0, capacity], device='cuda', dtype=torch.int32)
-    idx = TLIIndexer(module._make_prod_args())
+    idx = NFAIndexer(module._make_prod_args())
     idx.layer_idx = 2
     idx.clear()
     index = idx.prepare_index(k, cu)
@@ -110,7 +110,7 @@ def test_real_indexer_compact_and_overlap_graph(monkeypatch, dtype):
         protected = (positions < min(length, idx.sink_tokens)) | ((positions >= max(idx.sink_tokens, length-idx.sliding_window_size)) & (positions < length))
         torch.testing.assert_close(sel.to_mask(capacity) | protected, mask[:, 0], atol=0, rtol=0)
     def run(mode):
-        monkeypatch.setenv('TLI_OPERATOR_MODE', mode)
+        monkeypatch.setenv('NFA_OPERATOR_MODE', mode)
         return decode_indexed(idx, None, q, k, v, cu, vl, 128 ** -.5)
     run('overlap')
     torch.cuda.synchronize()

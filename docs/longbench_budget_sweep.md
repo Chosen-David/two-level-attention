@@ -116,10 +116,10 @@ Each task/arm gets an isolated `attempt-<uuid>` directory with full command logs
 identity, prediction, run-cap receipt and scorer output. New attempts never overwrite
 failed or interrupted attempts. The existing `run_cap_manifest` schema/hash/row-count
 validation is reused; expected source IDs/answers, model/cap/code, exact resolved
-producer filename and TLI treatment are checked. Existing `benchmark.LongBench.eval`
+producer filename and NFA treatment are checked. Existing `benchmark.LongBench.eval`
 performs scoring with `--require-runcap --expect-count`; the runner additionally
 requires exactly one expected, finite [0,100] score. Only then is `complete.json`
-atomically written, binding prediction, run-cap, TLI treatment (if applicable), and
+atomically written, binding prediction, run-cap, NFA treatment (if applicable), and
 score hashes. Restart skips only matching, revalidated completions. A prediction
 without successful scoring is not complete. `failure.json` preserves errors.
 
@@ -156,5 +156,5 @@ python -m unittest discover -s tests -p 'test_longbench_budget_sweep.py' -v
 Tests use mocked NVIDIA XML and harmless CPU subprocesses, including parent death,
 timeout, stale/incomplete/corrupt results and file identity changes. No GPU workload,
 pretrained model, quality measurement or GPU performance gate was run for this change.
-The repository's `test_e127_gates.py` and `test_tli_batch_gates.py` GPU hard gates
+The repository's `test_e127_gates.py` and `test_nfa_batch_gates.py` GPU hard gates
 remain **unrun**, not passed. Real remote integration/quality acceptance is separate.

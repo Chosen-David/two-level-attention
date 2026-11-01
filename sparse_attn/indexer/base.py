@@ -49,7 +49,7 @@ class Indexer:
         # 修复（主 AI 审计 10-21）：quest/tia/twi/base 的 prepare_index
         # 签名无 valid_length 形参——按 prepare_index 是否声明支持
         # （supports_valid_length 类属性）决定是否传 kwarg：不支持时不传
-        # 保持旧调用形态（None 分支逐位不变）；TLIIndexer 支持时传
+        # 保持旧调用形态（None 分支逐位不变）；NFAIndexer 支持时传
         # valid_length 供其覆盖 index_dict（固定全宽 KV 真实有效长）。
         k_full_w = k.shape[1]
         if valid_length is None or not getattr(self, "supports_valid_length", False):

@@ -57,7 +57,7 @@ def test_deferred_contract_failure_and_recovery(monkeypatch,bad):
         if bad=='id':ids[1,0,0]=-1
         if bad=='length':lengths[1]=32769
         if bad=='empty':counts.zero_();sink=swa=0;message='全 False'
-        if bad=='overflow':env.setenv('TLI_E127_W_UPPER','1');message='上界'
+        if bad=='overflow':env.setenv('NFA_E127_W_UPPER','1');message='上界'
         ordered_attention(q,k,v,(ids,counts),lengths,sink=sink,swa=swa,scale=128**-.5)
         with pytest.raises(RuntimeError,match=message):eager_decoding_check_errors()
     q,k,v,ids,counts,lengths=_case(2,2,torch.bfloat16)

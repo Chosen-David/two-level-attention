@@ -19,7 +19,7 @@ class PartialPages(unittest.TestCase):
         k = torch.zeros(n+256,8,128)
         k[128+n-1] = 100 if n else 0
         geo = dict(mid_lo=128, mid_hi=128+n, near_lo=128 if near is None else near)
-        return o4.tli_select(q,k,geo,k1,torch.arange(32))
+        return o4.nfa_select(q,k,geo,k1,torch.arange(32))
 
     def test_valid_reductions(self):
         for n in (1,63,64,65,257):
@@ -52,7 +52,7 @@ class PartialPages(unittest.TestCase):
         k=torch.zeros(512,8,128)
         k[128:384]=values[:,None,None]
         geo=dict(mid_lo=128,mid_hi=384,near_lo=128)
-        actual=o4.tli_select(q,k,geo,8,torch.arange(32))
+        actual=o4.nfa_select(q,k,geo,8,torch.arange(32))
         page=int(values.view(4,64).mean(1).argmax())
         chosen=values[page*64:(page+1)*64].topk(40).indices+page*64
         expected=torch.zeros(8,256,dtype=torch.bool)

@@ -4,11 +4,11 @@
 （CPU only + torch；python 与 python -O 双跑安全——全部显式判定，无 assert）。
 
 背景：076 canonical manifest 仍不是有效 treatment 的单射，两个残余——
-  ① tia_enable_async_topk（TLI 继承 TIA：tia_indexer.py:18
-     self.enable_async = args.tia_enable_async_topk；tli_indexer.py
+  ① tia_enable_async_topk（NFA 继承 TIA：tia_indexer.py:18
+     self.enable_async = args.tia_enable_async_topk；nfa_indexer.py
      compute_mask async 分支缓存 prev_mask 并在下一步替换）未入
      manifest/hash → 同步/异步同名同 sidecar；
-  ② tli_proj_basis / tli_layer_skip_path 只记词法路径（default=str），
+  ② nfa_proj_basis / nfa_layer_skip_path 只记词法路径（default=str），
      同路径不同内容 → 同 manifest/hash → LongBench 写门放行覆盖、
      RULER 复用同逻辑指针。
 
@@ -32,8 +32,8 @@ method hash 共用同一份 resolved manifest。
       d) 值 None → manifest null；重复调用逐位稳定（确定性）。
   R3  mutation test：遍历 add_sparse_attn_args 注册的全部参数——
       manifest 字段逐个突变 → hash 必变；readable 编码字段
-      （tli_enable_kmeans/layer_skip 的 B/D）→ 全名必变；白名单
-      字段（quest/twi/method——非 tli treatment）→ tli 名不变；
+      （nfa_enable_kmeans/layer_skip 的 B/D）→ 全名必变；白名单
+      字段（quest/twi/method——非 nfa treatment）→ nfa 名不变；
       任何未登记参数 → FAIL（防未来新参数漏进身份）。
   R4  async 行为差异（CPU torch 确定性 marker 输入，≥2 decode 步）：
       第 1 步 async == 同步（prev_mask 尚未生效）；第 2 步 async 用
@@ -41,7 +41,7 @@ method hash 共用同一份 resolved manifest。
       实证）——079① 不是性能提示而是输出语义。
   R5  RULER receipt 接线：build_yarn_receipt(treatment_manifest_json)
       → 回执含 treatment_manifest {sha256,json}；schema 校验自洽
-      （篡改 json/sha → 拒收）；无该键（非 tli 臂/legacy）前向兼容。
+      （篡改 json/sha → 拒收）；无该键（非 nfa 臂/legacy）前向兼容。
 
 红态对照：修复前（基点 f613ca645）R1 异步同名同 manifest、R2 同路径
 内容变更同 manifest 且写门放行、R3 async/文件字段不触发 hash 变化、
@@ -56,7 +56,7 @@ _base_ns 的 enable_layer_skip=False）逐位不变。
 
 用法：
   cd <repo>/two-level-attention && python3 test_e121_fix_079.py
-  python -O 同上双跑；TLI079_ONLY=R1,R2 子集过滤。
+  python -O 同上双跑；NFA079_ONLY=R1,R2 子集过滤。
 """
 import argparse
 import hashlib
@@ -79,7 +79,7 @@ if REPO not in sys.path:
 
 import sparse_attn.info as INFO                     # noqa: E402
 from sparse_attn.arguments import add_sparse_attn_args  # noqa: E402
-from sparse_attn.indexer.tli_indexer import TLIIndexer   # noqa: E402
+from sparse_attn.indexer.nfa_indexer import NFAIndexer   # noqa: E402
 from benchmark.RULER.yarn_receipt import (         # noqa: E402
     build_yarn_receipt, _validate_common_schema)
 
@@ -92,12 +92,12 @@ def _check(cond, msg=""):
 
 def _base_ns(**kw):
     """R1/R2 用的最小 treatment namespace（getattr 兜底缺省）。"""
-    base = dict(method="tli", tia_block_size=64, tia_level1_topk=128,
+    base = dict(method="nfa", tia_block_size=64, tia_level1_topk=128,
                 tia_level2_topk=2048, tia_level2_cmp_ratio=4,
-                tli_alpha=0.25, tli_beta=0.125, tli_gamma=0.625,
-                tli_enable_kmeans=False, tli_enable_layer_skip=False,
-                tli_far_method="minmax", tli_near_method="avg",
-                tli_far_select="4bit", tli_near_select="4bit")
+                nfa_alpha=0.25, nfa_beta=0.125, nfa_gamma=0.625,
+                nfa_enable_kmeans=False, nfa_enable_layer_skip=False,
+                nfa_far_method="minmax", nfa_near_method="avg",
+                nfa_far_select="4bit", nfa_near_select="4bit")
     base.update(kw)
     return types.SimpleNamespace(**base)
 
@@ -135,7 +135,7 @@ def test_R1_async_identity():
     r_on, hs_on = INFO.split_method_name_hash(n_on)
     _check(r_off == r_on and hs_off != hs_on,
            f"async 分离应只落在 hash 段：{r_off!r} vs {r_on!r}")
-    # TIA（非 TLI）可读名自带 _async——079 范围是 tli，此处锁口径
+    # TIA（非 NFA）可读名自带 _async——079 范围是 nfa，此处锁口径
     tia_off = INFO.get_method_name_with_info(types.SimpleNamespace(
         method="tia", tia_block_size=64, tia_level1_topk=128,
         tia_level2_topk=1024, tia_level2_cmp_ratio=4,
@@ -164,15 +164,15 @@ def test_R2_file_identity_and_gate(base):
 
     # a) 同路径 basis 内容 A→B：manifest/hash 必变（修复前同 manifest）
     sha_A = hashlib.sha256(open(bp, "rb").read()).hexdigest()
-    m1 = INFO.get_treatment_manifest_json(_base_ns(tli_proj_basis=bp))
-    h1 = INFO._treatment_hash(_base_ns(tli_proj_basis=bp))
+    m1 = INFO.get_treatment_manifest_json(_base_ns(nfa_proj_basis=bp))
+    h1 = INFO._treatment_hash(_base_ns(nfa_proj_basis=bp))
     _mk_basis(bp, seed=2)                       # 同路径、不同内容
-    m2 = INFO.get_treatment_manifest_json(_base_ns(tli_proj_basis=bp))
-    h2 = INFO._treatment_hash(_base_ns(tli_proj_basis=bp))
+    m2 = INFO.get_treatment_manifest_json(_base_ns(nfa_proj_basis=bp))
+    h2 = INFO._treatment_hash(_base_ns(nfa_proj_basis=bp))
     _check(m1 != m2 and h1 != h2,
            f"079② 同路径 basis 内容变更未改 manifest/hash（={h1}）："
            f"m1={m1!r} m2={m2!r}")
-    id1 = json.loads(m1)["tli_proj_basis"]
+    id1 = json.loads(m1)["nfa_proj_basis"]
     _check(id1["sha256"] == sha_A,
            f"basis 身份 sha256 应等于文件字节 sha256：{id1['sha256']!r} "
            f"vs {sha_A!r}")
@@ -184,7 +184,7 @@ def test_R2_file_identity_and_gate(base):
     # LongBench 三拒模式（076 套件同款）：目标 + sidecar(m1)，
     # 内容变更后 manifest=m2 → gate 必拒且目标字节不变
     out = os.path.join(d, "hotpotqa-" + INFO.get_method_name_with_info(
-        _base_ns(tli_proj_basis=bp)) + "-09090909.jsonl")
+        _base_ns(nfa_proj_basis=bp)) + "-09090909.jsonl")
     data_bytes = b'{"pred": "arm-A"}\n'
     with open(out, "wb") as f:
         f.write(data_bytes)
@@ -203,15 +203,15 @@ def test_R2_file_identity_and_gate(base):
     _check(sc == sidecar, f"sidecar 路径约定漂移：{sc!r}")
 
     # b) layer_skip 同口径（n_skip 摘要）
-    # 081 口径更新：D′ 掩码按「有效值语义」解析——tli_enable_layer_skip
+    # 081 口径更新：D′ 掩码按「有效值语义」解析——nfa_enable_layer_skip
     # =False 时路径声明不进 manifest（运行时不消费即不解析，079 的
     # 「声明即解析」反向不对称已由 081 修复，见 test_e121_fix_081.py
     # R4）；本内容身份用例须开 enable_layer_skip=True。
     sp = os.path.join(d, "skip.json")
     with open(sp, "w") as f:
         json.dump({"skip": [1, 3]}, f)
-    _ns_skip = lambda: _base_ns(tli_enable_layer_skip=True,
-                               tli_layer_skip_path=sp)
+    _ns_skip = lambda: _base_ns(nfa_enable_layer_skip=True,
+                               nfa_layer_skip_path=sp)
     ms1 = INFO.get_treatment_manifest_json(_ns_skip())
     hs1 = INFO._treatment_hash(_ns_skip())
     with open(sp, "w") as f:
@@ -220,7 +220,7 @@ def test_R2_file_identity_and_gate(base):
     hs2 = INFO._treatment_hash(_ns_skip())
     _check(ms1 != ms2 and hs1 != hs2,
            f"079② 同路径 skip 内容变更未改 manifest/hash：{ms1!r}")
-    _check(json.loads(ms1)["tli_layer_skip_path"]["n_skip"] == 2,
+    _check(json.loads(ms1)["nfa_layer_skip_path"]["n_skip"] == 2,
            "skip 身份应含 n_skip 摘要")
 
     # c) fail closed：缺失/坏 basis/坏 skip JSON → [GATE-FAIL] 079
@@ -233,29 +233,29 @@ def test_R2_file_identity_and_gate(base):
             return
         _check(False, f"{tag} 未 fail closed（079 回归）")
 
-    _expect_gate_fail(_base_ns(tli_proj_basis=os.path.join(d, "missing.pt")),
+    _expect_gate_fail(_base_ns(nfa_proj_basis=os.path.join(d, "missing.pt")),
                       "basis 文件缺失")
     bad_b = os.path.join(d, "bad_basis.pt")
     with open(bad_b, "wb") as f:
         f.write(b"not a tensor file")
-    _expect_gate_fail(_base_ns(tli_proj_basis=bad_b), "basis 非法内容")
+    _expect_gate_fail(_base_ns(nfa_proj_basis=bad_b), "basis 非法内容")
     bad_s = os.path.join(d, "bad_skip.json")
     with open(bad_s, "w") as f:
         f.write("{not-json")
     # 081 口径：skip 文件只在 enable_layer_skip=True 时解析（有效值语义）
-    _expect_gate_fail(_base_ns(tli_enable_layer_skip=True,
-                               tli_layer_skip_path=bad_s), "skip 坏 JSON")
+    _expect_gate_fail(_base_ns(nfa_enable_layer_skip=True,
+                               nfa_layer_skip_path=bad_s), "skip 坏 JSON")
     no_key = os.path.join(d, "nokey_skip.json")
     with open(no_key, "w") as f:
         json.dump({"other": [1]}, f)
-    _expect_gate_fail(_base_ns(tli_enable_layer_skip=True,
-                               tli_layer_skip_path=no_key),
+    _expect_gate_fail(_base_ns(nfa_enable_layer_skip=True,
+                               nfa_layer_skip_path=no_key),
                       "skip 缺 skip 键")
 
     # d) None → null；确定性（重复调用逐位稳定）
     m_none = INFO.get_treatment_manifest_json(_base_ns())
-    _check(json.loads(m_none)["tli_proj_basis"] is None
-           and json.loads(m_none)["tli_layer_skip_path"] is None,
+    _check(json.loads(m_none)["nfa_proj_basis"] is None
+           and json.loads(m_none)["nfa_layer_skip_path"] is None,
            f"无文件配置 manifest 应为 null：{m_none!r}")
     _check(INFO.get_treatment_manifest_json(_base_ns()) == m_none,
            "manifest 重复求值不稳定（确定性破坏）")
@@ -266,21 +266,21 @@ def test_R2_file_identity_and_gate(base):
 
 # ================================================================ R3：mutation test
 
-# 白名单：add_sparse_attn_args 注册但对 tli treatment 身份惰性的参数
+# 白名单：add_sparse_attn_args 注册但对 nfa treatment 身份惰性的参数
 # （逐项理由——mutation 测试的显式豁免记录，新增豁免必须补理由）。
 _R3_WHITELIST = {
-    # method 是臂选择器：tli 名格式本身蕴含 method=tli；quest/twia/tia/
-    # none 各自可读名已编码其全部旋钮（076 审计范围 = tli treatment 矩阵）
+    # method 是臂选择器：nfa 名格式本身蕴含 method=nfa；quest/twia/tia/
+    # none 各自可读名已编码其全部旋钮（076 审计范围 = nfa treatment 矩阵）
     "method": None,
-    # quest/twi 参数在 method=tli 下不被消费（对 tli 身份惰性——测试
-    # 中同时断言突变后 tli 名不变，惰性是被验证的而非被假设的）
+    # quest/twi 参数在 method=nfa 下不被消费（对 nfa 身份惰性——测试
+    # 中同时断言突变后 nfa 名不变，惰性是被验证的而非被假设的）
     "quest_block_size": 32,
     "quest_topk": 8,
     "twi_block_size": 32,
     "twi_level1_topk": 64,
     "twi_level2_topp": 0.9,
     # ── E155e 补齐（用户问题①「R3 manifest 登记缺口」收官）──
-    # vendor 旋钮在 method=tli 下不被消费（manifest 条件登记——tli 名
+    # vendor 旋钮在 method=nfa 下不被消费（manifest 条件登记——nfa 名
     # 不含 vendor 键，惰性由本测试断言验证而非假设）；vendor 方法侧的
     # 身份单射由 E155e 门禁（test_e155e_vendor_identity.py：_VENDOR_
     # TREATMENT_FIELDS 条件入 manifest + _h<hash10> 尾段 + 文件内容
@@ -328,7 +328,7 @@ _R3_WHITELIST = {
     # fail-loudly 哲学），非输出影响旋钮——对 treatment 身份惰性
     "baseline_execute": True,
 }
-# 081 + kimi3 0316 追加修复 2：tli_enable_kmeans/tli_enable_layer_skip
+# 081 + kimi3 0316 追加修复 2：nfa_enable_kmeans/nfa_enable_layer_skip
 # 从 _R3_READABLE 升格入 _R3_MUTATIONS——076 residual「可读段 B/D 已
 # 单射」被 kimi3 反例推翻（极端长可读前缀截断吃掉 B/D 位 → 仅这两个
 # 开关不同的 treatment 截断后同名 + manifest 相同 + hash 相同 → 写门
@@ -337,7 +337,7 @@ _R3_WHITELIST = {
 _R3_READABLE = {}
 # manifest 文件字段：突变值 = 测试运行时在 base 下创建的真实文件
 # （内容身份解析路径；同路径内容变更通道由 R2 覆盖，此处测路径切换）
-_R3_FILE_FIELDS = ("tli_proj_basis", "tli_layer_skip_path")
+_R3_FILE_FIELDS = ("nfa_proj_basis", "nfa_layer_skip_path")
 # manifest 字段突变值（argparse 缺省 → 突变）
 _R3_MUTATIONS = {
     "tia_block_size": 32,
@@ -345,43 +345,43 @@ _R3_MUTATIONS = {
     "tia_level2_topk": 512,
     "tia_level2_cmp_ratio": 4,
     "tia_enable_async_topk": True,
-    "tli_enable_kmeans": False,
-    "tli_enable_layer_skip": False,
-    "tli_enable_subspace": False,
-    "tli_subspace": "rope",
-    "tli_alpha": 0.25,
-    "tli_beta": 0.25,
-    "tli_gamma": 0.5,
-    "tli_far_method": "avg",
-    "tli_near_method": "minmax",
-    "tli_far_select": "cluster",
-    "tli_near_select": "sim_greedy",
-    "tli_far_clusters": 128,
-    "tli_far_niter": 20,
-    "tli_far_blocks": 8,
-    "tli_far_tokens": 256,
-    "tli_sim": 0.95,
-    "tli_sim_dims": "nope",
-    "tli_sigma_select": "far",
-    "tli_sigma": 4.0,
-    "tli_moba": True,
-    "tli_per_q_head": True,
-    "tli_static_pair": True,
-    # E155b/E155c/E155d 入 manifest 的 tli 旋钮（问题①补齐——此前
+    "nfa_enable_kmeans": False,
+    "nfa_enable_layer_skip": False,
+    "nfa_enable_subspace": False,
+    "nfa_subspace": "rope",
+    "nfa_alpha": 0.25,
+    "nfa_beta": 0.25,
+    "nfa_gamma": 0.5,
+    "nfa_far_method": "avg",
+    "nfa_near_method": "minmax",
+    "nfa_far_select": "cluster",
+    "nfa_near_select": "sim_greedy",
+    "nfa_far_clusters": 128,
+    "nfa_far_niter": 20,
+    "nfa_far_blocks": 8,
+    "nfa_far_tokens": 256,
+    "nfa_sim": 0.95,
+    "nfa_sim_dims": "nope",
+    "nfa_sigma_select": "far",
+    "nfa_sigma": 4.0,
+    "nfa_moba": True,
+    "nfa_per_q_head": True,
+    "nfa_static_pair": True,
+    # E155b/E155c/E155d 入 manifest 的 nfa 旋钮（问题①补齐——此前
     # manifest 侧已登记但 R3 登记面未同步，argparse→manifest 完备性
     # 检查出现缺口）
-    "tli_sink_tokens": 64,
-    "tli_swa_size": 64,
-    "tli_near_pages": 8,
-    "tli_near_tokens": 320,
-    "tli_near_len": 4096,
-    "tli_boundary_bypass": False,
-    "tli_l2_quant": True,
-    "tli_l2_subspace": "full",
-    "tli_sinkswa_only": True,
-    "tli_dyn_dgate": True,
-    "tli_dyn_dgate_eps": 0.1,
-    "tli_dyn_dgate_rows": 512,
+    "nfa_sink_tokens": 64,
+    "nfa_swa_size": 64,
+    "nfa_near_pages": 8,
+    "nfa_near_tokens": 320,
+    "nfa_near_len": 4096,
+    "nfa_boundary_bypass": False,
+    "nfa_l2_quant": True,
+    "nfa_l2_subspace": "full",
+    "nfa_sinkswa_only": True,
+    "nfa_dyn_dgate": True,
+    "nfa_dyn_dgate_eps": 0.1,
+    "nfa_dyn_dgate_rows": 512,
 }
 
 
@@ -397,13 +397,13 @@ def test_R3_mutation_over_argparse(base):
     parser = argparse.ArgumentParser()
     add_sparse_attn_args(parser)
     dests = sorted(a.dest for a in parser._actions if a.dest != "help")
-    ns_base = parser.parse_args(["--method", "tli"])
+    ns_base = parser.parse_args(["--method", "nfa"])
     m_base = INFO.get_treatment_manifest_json(ns_base)
     n_base = INFO.get_method_name_with_info(ns_base)
     h_base = INFO._treatment_hash(ns_base)
 
     manifest_fields = set(INFO._TREATMENT_FIELD_DEFAULTS)
-    # tli_sparse_prefill/tli_decode_dense 在 manifest 但不经 argparse 注册
+    # nfa_sparse_prefill/nfa_decode_dense 在 manifest 但不经 argparse 注册
     # （程序化注入——运行时路径选择器）——argparse→manifest 完备性只查
     # 注册面；manifest 侧由 076/079 套件覆盖
     covered = (set(_R3_MUTATIONS) | set(_R3_READABLE) | set(_R3_WHITELIST)
@@ -414,16 +414,16 @@ def test_R3_mutation_over_argparse(base):
            f"改变行为的参数必须进 manifest、readable 编码或白名单（注明"
            f"理由），否则 treatment 单射出现缺口（079 教训）")
     _check(manifest_fields <= covered
-           | {"tli_sparse_prefill", "tli_decode_dense"},
+           | {"nfa_sparse_prefill", "nfa_decode_dense"},
            f"manifest 字段未被本测试覆盖：{sorted(manifest_fields - covered)}")
 
     for dest in dests:
         if dest in _R3_WHITELIST and _R3_WHITELIST[dest] is None:
             continue   # method：臂选择器，突变换名格式无可比性（理由见白名单）
-        ns = parser.parse_args(["--method", "tli"])
-        if dest == "tli_proj_basis":
+        ns = parser.parse_args(["--method", "nfa"])
+        if dest == "nfa_proj_basis":
             val = bp
-        elif dest == "tli_layer_skip_path":
+        elif dest == "nfa_layer_skip_path":
             val = sp
         elif dest in _R3_MUTATIONS:
             val = _R3_MUTATIONS[dest]
@@ -442,13 +442,13 @@ def test_R3_mutation_over_argparse(base):
         elif dest in _R3_READABLE:
             _check(n != n_base,
                    f"readable 编码字段 {dest} 突变未改全名（B/D 段回归）")
-        else:   # 白名单：对 tli 身份惰性（被验证而非被假设）
+        else:   # 白名单：对 nfa 身份惰性（被验证而非被假设）
             _check(n == n_base,
-                   f"白名单字段 {dest} 突变竟改变了 tli 名（白名单理由不"
+                   f"白名单字段 {dest} 突变竟改变了 nfa 名（白名单理由不"
                    f"成立，须移入 manifest）：{n!r} vs {n_base!r}")
     # γ=off（哨兵 "off"，E155d 后 namespace 显式 None=未传→1.0）独立通道
-    ns = parser.parse_args(["--method", "tli"])
-    ns.tli_gamma = "off"
+    ns = parser.parse_args(["--method", "nfa"])
+    ns.nfa_gamma = "off"
     _check(INFO._treatment_hash(ns) != h_base
            and INFO.get_method_name_with_info(ns) != n_base,
            "γ=off 突变未改 hash/名")
@@ -462,18 +462,18 @@ _R4_BS, _R4_S = 64, 1024
 
 def _r4_args(async_topk):
     return types.SimpleNamespace(
-        method="tli", tia_block_size=_R4_BS, tia_level1_topk=5,
+        method="nfa", tia_block_size=_R4_BS, tia_level1_topk=5,
         tia_level2_topk=384, tia_level2_cmp_ratio=4,
         tia_enable_async_topk=async_topk,
-        tli_enable_subspace=True, tli_subspace="full",
-        tli_enable_kmeans=False, tli_enable_layer_skip=False,
-        tli_far_select="4bit", tli_near_select="4bit",
-        tli_far_method="minmax", tli_near_method="avg",
-        tli_alpha=0.0, tli_beta=0.0, tli_gamma=1.0,
-        tli_per_q_head=False, tli_static_pair=False, tli_moba=False,
-        tli_sigma_select="none", tli_sigma=8.0, tli_sim=0.9,
-        tli_sim_dims="subspace", tli_proj_basis=None,
-        tli_layer_skip_path=None, tli_sparse_prefill=False)
+        nfa_enable_subspace=True, nfa_subspace="full",
+        nfa_enable_kmeans=False, nfa_enable_layer_skip=False,
+        nfa_far_select="4bit", nfa_near_select="4bit",
+        nfa_far_method="minmax", nfa_near_method="avg",
+        nfa_alpha=0.0, nfa_beta=0.0, nfa_gamma=1.0,
+        nfa_per_q_head=False, nfa_static_pair=False, nfa_moba=False,
+        nfa_sigma_select="none", nfa_sigma=8.0, nfa_sim=0.9,
+        nfa_sim_dims="subspace", nfa_proj_basis=None,
+        nfa_layer_skip_path=None, nfa_sparse_prefill=False)
 
 
 def _r4_marker_inputs():
@@ -494,7 +494,7 @@ def _r4_marker_inputs():
 
 def _r4_decode(async_topk, qs):
     """同一 indexer 实例上跑多 decode 步（prev_mask 状态跨步保留）。"""
-    idx = TLIIndexer(_r4_args(async_topk))
+    idx = NFAIndexer(_r4_args(async_topk))
     idx.layer_idx = 1
     k, _, _ = _r4_marker_inputs()
     cu = torch.tensor([0, _R4_S])
@@ -553,7 +553,7 @@ def test_R4_async_behavior_divergence():
 # ================================================================ R5：RULER receipt 接线
 
 def test_R5_receipt_treatment_manifest():
-    ns = _base_ns(tli_proj_basis=None)
+    ns = _base_ns(nfa_proj_basis=None)
     manifest_json = INFO.get_treatment_manifest_json(ns)
     # 081 口径更新：prediction_basename 须为生产形态（含与 manifest 同源
     # 的 _h<hash10> 段）——yarn_receipt 的 081 闭包校验要求 tm.sha256[:10]
@@ -565,7 +565,7 @@ def test_R5_receipt_treatment_manifest():
         model_path="/tmp/fake-model-079", model_config_sha256=None,
         native_mpe=32768,
         generation_params={"max_gen": 128, "max_num": 0, "seed": 42,
-                           "method": "tli", "pred_postfix": "_x", "t": "1"},
+                           "method": "nfa", "pred_postfix": "_x", "t": "1"},
         producer_script_path="benchmark/RULER/pred_ruler.py",
         producer_script_sha256=hashlib.sha256(b"079-test").hexdigest(),
         run_id="r5-1", prediction_basename=basename,
@@ -589,7 +589,7 @@ def test_R5_receipt_treatment_manifest():
     _check(_validate_common_schema(bad2, basename) is not None,
            "篡改 treatment_manifest.sha256 后 schema 应拒收")
 
-    # legacy/非 tli：无该键 → 前向兼容（不写不校验）
+    # legacy/非 nfa：无该键 → 前向兼容（不写不校验）
     legacy = build_yarn_receipt(
         yarn_enabled=False, effective_factor=None, yarn_factor_cli=None,
         rope_scaling=None, context_length=32768, task="vt",
@@ -611,7 +611,7 @@ def test_R5_receipt_treatment_manifest():
 
 def main():
     """067 纪律：PASS/SKIP/FAIL 三分显式计数；异常 → FAIL 继续跑完其余
-    用例；任一 SKIP/FAIL → 非全绿且非零退出。TLI079_ONLY 子集过滤。"""
+    用例；任一 SKIP/FAIL → 非全绿且非零退出。NFA079_ONLY 子集过滤。"""
     base = tempfile.mkdtemp(prefix="e121_fix_079_")
     plan = [
         ("R1", test_R1_async_identity),
@@ -620,7 +620,7 @@ def main():
         ("R4", test_R4_async_behavior_divergence),
         ("R5", test_R5_receipt_treatment_manifest),
     ]
-    only = os.environ.get("TLI079_ONLY", "")
+    only = os.environ.get("NFA079_ONLY", "")
     if only:
         keep = {x.strip() for x in only.split(",") if x.strip()}
         plan = [p for p in plan if p[0] in keep]

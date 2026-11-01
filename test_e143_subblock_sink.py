@@ -31,7 +31,7 @@ import torch
 REPO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, REPO)
 
-from sparse_attn.indexer import TLIIndexer          # noqa: E402
+from sparse_attn.indexer import NFAIndexer          # noqa: E402
 
 RESULTS = []
 
@@ -61,12 +61,12 @@ def gen_kq(S, seed=31):
     return k, q
 
 
-CHAMP = dict(tli_alpha=0.25, tli_beta=0.125, tli_gamma=0.625,
-             tli_far_method="minmax", tli_near_method="avg")
+CHAMP = dict(nfa_alpha=0.25, nfa_beta=0.125, nfa_gamma=0.625,
+             nfa_far_method="minmax", nfa_near_method="avg")
 
 
 def run_mask(args, k, q):
-    idx = TLIIndexer(args)
+    idx = NFAIndexer(args)
     idx.layer_idx = 3
     cu = torch.tensor([0, k.shape[1]])
     q_ids = torch.tensor([k.shape[1] - 1])
@@ -88,7 +88,7 @@ def drive_compute_mask(args, fine_1h, kt):
     """直驱 compute_mask（合成分数，绕过 prepare_index/compute_score，
     借 test_e122_gamma_off 同款 harness）：coarse 均匀分 L1 池全过，
     fine [T] 单 head 细筛分扩成 Hkv=2 对称。"""
-    idx = TLIIndexer(args)
+    idx = NFAIndexer(args)
     idx.layer_idx = 3
     idx.group_size = 1
     T = fine_1h.shape[-1]
@@ -110,13 +110,13 @@ def c1_ctor_gate():
     detail = []
     for sk in (4, 0, 16, 63):
         try:
-            TLIIndexer(make_args(tli_sink_tokens=sk))
+            NFAIndexer(make_args(nfa_sink_tokens=sk))
             detail.append(f"sk{sk}=放行")
         except ValueError as e:
             ok = False
             detail.append(f"sk{sk}=误拒({e})")
     try:
-        TLIIndexer(make_args(tli_sink_tokens=4, tli_swa_size=100))
+        NFAIndexer(make_args(nfa_sink_tokens=4, nfa_swa_size=100))
         ok = False
         detail.append("swa100=误放行")
     except ValueError:
@@ -124,7 +124,7 @@ def c1_ctor_gate():
     # 默认与块对齐集合不受影响
     for sk, sw in ((128, 128), (64, 64), (0, 64), (192, 256)):
         try:
-            TLIIndexer(make_args(tli_sink_tokens=sk, tli_swa_size=sw))
+            NFAIndexer(make_args(nfa_sink_tokens=sk, nfa_swa_size=sw))
         except ValueError as e:
             ok = False
             detail.append(f"sk{sk}/sw{sw}=误拒({e})")
@@ -135,7 +135,7 @@ def c1_ctor_gate():
 def c2_subblock_geometry():
     S, bs = 4352, 64
     k, q = gen_kq(S)
-    args = make_args(**CHAMP, tli_sink_tokens=4, tli_swa_size=128)
+    args = make_args(**CHAMP, nfa_sink_tokens=4, nfa_swa_size=128)
     idx, mask = run_mask(args, k, q)
     m = row_mask(mask)
 
@@ -148,11 +148,11 @@ def c2_subblock_geometry():
     #   时未选中是配额语义（test_e122 T4 同口径），非死区。
     S2 = 4352
     fine0 = torch.zeros(S2)
-    args_dense = make_args(tli_sink_tokens=4, tli_swa_size=128,
-                           tia_level2_topk=S2, tli_alpha=0.25, tli_beta=0.125,
-                           tli_gamma="off", tli_far_method="minmax",
-                           tli_near_method="avg", tli_enable_kmeans=False,
-                           tli_enable_layer_skip=False)
+    args_dense = make_args(nfa_sink_tokens=4, nfa_swa_size=128,
+                           tia_level2_topk=S2, nfa_alpha=0.25, nfa_beta=0.125,
+                           nfa_gamma="off", nfa_far_method="minmax",
+                           nfa_near_method="avg", nfa_enable_kmeans=False,
+                           nfa_enable_layer_skip=False)
     _, m_dense = drive_compute_mask(args_dense, fine0, S2 // 64)
     h0d = m_dense[0, 0, 0]
     n_miss = int((~h0d).sum())
@@ -164,10 +164,10 @@ def c2_subblock_geometry():
     fine_inj = torch.full((S2,), -100.0)
     fine_inj[4:64] = 100.0                    # 块 0 非 sink 段打满分
     args_inj = make_args(
-        tli_sink_tokens=4, tli_swa_size=128, tia_level2_topk=1024,
-        tli_alpha=0.25, tli_beta=0.125, tli_gamma="off",
-        tli_far_method="minmax", tli_near_method="avg",
-        tli_enable_kmeans=False, tli_enable_layer_skip=False)
+        nfa_sink_tokens=4, nfa_swa_size=128, tia_level2_topk=1024,
+        nfa_alpha=0.25, nfa_beta=0.125, nfa_gamma="off",
+        nfa_far_method="minmax", nfa_near_method="avg",
+        nfa_enable_kmeans=False, nfa_enable_layer_skip=False)
     _, m_inj = drive_compute_mask(args_inj, fine_inj, S2 // 64)
     ok2b = bool(m_inj[..., 4:64].all())
     # 预算上界：K2=1024 时 unique ≤ 1024（重叠虚耗 ≤ sink%bs=4，保守方向）
@@ -207,7 +207,7 @@ def c3_default_regression():
 def c4_sink_zero():
     S = 4352
     k, q = gen_kq(S)
-    args = make_args(**CHAMP, tli_sink_tokens=0, tli_swa_size=128)
+    args = make_args(**CHAMP, nfa_sink_tokens=0, nfa_swa_size=128)
     idx, mask = run_mask(args, k, q)
     m = row_mask(mask)
     n_sel = int(m.sum())

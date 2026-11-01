@@ -11,14 +11,14 @@
 - 死行（已触发停止）继续吃计算：喂 pad_id filler，其 KV 列被 mask 排除，
   不污染同 batch 其它行（每行因果独立）。
 
-【方法范围（Phase 1）】只支持 `none` / `fasa_vendor` / `tli`（已 batch
+【方法范围（Phase 1）】只支持 `none` / `fasa_vendor` / `nfa`（已 batch
 化）。quest_vendor / jssa_vendor / asynctls_vendor 在 batch_size>1 时
 启动即拒绝（Phase 2 逐个 batch 化后再开），拒绝而非静默产错
 （GATE-FAIL 精神）。batch_size=1 仍走 batch 路径（供 gate_bs1_equiv
 门禁：JSONL 与旧 pred_ruler.py 逐字节一致）。
 
 【同步义务】模型加载 + dispatch 分支内联复制自 pred_ruler.py（同步义务
-标注在各分支注释；tli 挂载内联自 pred_ruler.py L184-185 + L444，
+标注在各分支注释；nfa 挂载内联自 pred_ruler.py L184-185 + L444，
 qwen3_attn_patch 的 batch decode 见 sparse_attn/patches/qwen3_attn_patch.py
 `_tl_decode_batched`）。minference/sparq/moba/hisa/clusterkv 不在此入口。
 producer_script_sha256 用本文件自身 sha（yarn_receipt v2 同代绑定），
@@ -59,15 +59,13 @@ from benchmark.RULER.yarn_receipt import (  # noqa: E402
     resolve_yarn_config, stage_yarn_generation, stage_yarn_receipt,
 )
 from sparse_attn.arguments import add_sparse_attn_args  # noqa: E402
-from sparse_attn.baseline_runtime import (  # noqa: E402
-    baseline_request, baseline_preflight, BatchCtx,
-    batch_decode_scope,
-)
+from sparse_attn.scheduler.batch_builder import BatchCtx, batch_decode_scope
+from sparse_attn.baseline_runtime import baseline_request, baseline_preflight
 from sparse_attn.info import (  # noqa: E402
     get_method_name_with_info, get_treatment_manifest_json,
     resolve_treatment_snapshot,
     stage_fasa_agreement)
-# 【阶段 1】TLI 主方法挂载（同步义务：pred_ruler.py L81/L184-185/L444）。
+# 【阶段 1】NFA 主方法挂载（同步义务：pred_ruler.py L81/L184-185/L444）。
 from sparse_attn.patches import register_patch  # noqa: E402
 # 【阶段 1】budget 采集对齐 pred_ruler.py L549-551（同步义务：read 端
 # get_select_tokens + write 端 "budget" 字段逐字节一致）。
@@ -84,9 +82,9 @@ QWEN3_NATIVE_MPE = 40960
 YARN_FACTOR_AUTO = {65536: 2.0, 131072: 4.0}
 
 # Phase 1 白名单：已 batch 化的方法；其余方法 batch 入口拒绝（Phase 2 逐个开）
-# 【阶段 1】tli 加入（TLI 主方法 batch decode：qwen3_attn_patch 的
+# 【阶段 1】nfa 加入（NFA 主方法 batch decode：qwen3_attn_patch 的
 # _tl_decode_batched 逐行单序列核心 + BatchCtx 驱动）。
-_BATCH_METHODS = {"none", "fasa_vendor", "tli"}
+_BATCH_METHODS = {"none", "fasa_vendor", "nfa"}
 
 
 def parse_args():
@@ -105,8 +103,8 @@ def parse_args():
     parser.add_argument("--max-num", type=int, default=500,
                         help="每任务样本数（0=全量）")
     parser.add_argument("--batch-size", type=int, default=1,
-                        help="decode batch（支持 none/fasa_vendor/tli；"
-                             "compact TLI 支持按请求混合 ring/linear cache）")
+                        help="decode batch（支持 none/fasa_vendor/nfa；"
+                             "compact NFA 支持按请求混合 ring/linear cache）")
     parser.add_argument("--yarn", action="store_true",
                         help="启用 YaRN 位置扩展（65536/131072 档必开）")
     parser.add_argument("--yarn_factor", type=float, default=None)
@@ -154,7 +152,7 @@ def _decode_4d_mask(past_len, seq_lens, neg_inf, dtype, device,
     屏蔽（-inf）。dtype 与 hidden_states 一致（attn_weights + mask 同
     dtype 加法）。
 
-    【阶段 2a】left_pad_kv=True（TLI TLIStaticCache）：有效 KV 在前
+    【阶段 2a】left_pad_kv=True（NFA NFAStaticCache）：有效 KV 在前
     [0, seq_lens[b])、pad 在尾 → 可见列取头部 :L；False（默认，fasa/none
     DynamicCache 有效占尾）→ 可见列取尾部 kv_len-L:。dense/skip 层消费
     本 mask 与 KV 布局必须一致，否则会看零 KV（head 布局错位）。
@@ -177,9 +175,9 @@ def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
 
 
 def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids):
-    """Compact TLI: per-request prefill/gates, batched model decode, optional graph."""
+    """Compact NFA: per-request prefill/gates, batched model decode, optional graph."""
     raise RuntimeError(
-        "TLI hybrid batch cache path has been removed; use B1 PagedRegionCache")
+        "NFA hybrid batch cache path has been removed; use B1 PagedRegionCache")
 
     device = next(model.parameters()).device
     input_ids, position_ids = input_ids.to(device), position_ids.to(device)
@@ -189,9 +187,9 @@ def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, 
     batch, width = input_ids.shape
     builder = HybridBatchCacheBuilder(model, max(lens)+MAX_GEN, batch)
     generated = []
-    prefill_mode = os.environ.get('TLI_HYBRID_PREFILL', 'auto')
+    prefill_mode = os.environ.get('NFA_HYBRID_PREFILL', 'auto')
     if prefill_mode not in ('auto', 'direct', 'conversion'):
-        raise ValueError('TLI_HYBRID_PREFILL must be auto, direct or conversion')
+        raise ValueError('NFA_HYBRID_PREFILL must be auto, direct or conversion')
     # Do not expose the outer B-row BatchCtx to a B=1 unpadded prefill.
     with batch_decode_scope(None):
         for b, length in enumerate(lens):
@@ -244,8 +242,8 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
     语义对齐 pred_ruler.py 生成循环（首位 EOS 不停 ≈ min_length、
     `len(gen)>1` 才断）；dead 行喂 pad_id filler 吃计算、由 4D mask 排除。
 
-    fixed_cache=True（TLI 阶段 2a）：prefill 走 DynamicCache（现状零改动），
-    prefill 后 fill_static_from_dynamic 逐层搬移到 TLIStaticCache（固定容量
+    fixed_cache=True（NFA 阶段 2a）：prefill 走 DynamicCache（现状零改动），
+    prefill 后 fill_static_from_dynamic 逐层搬移到 NFAStaticCache（固定容量
     S_cap、有效在前 left-pad 布局）→ decode 每步 KV 形状恒 [B,Hkv,S_cap,D]
     （CUDA Graph 前置）。decode 4D mask 列数恒 S_cap、可见列取头部
     [0, seq_lens[b])（left_pad_kv=True）。
@@ -255,7 +253,7 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                   for m in model.modules())
     if fixed_cache or compact:
         raise RuntimeError(
-            "TLI fixed/compact batch cache path has been removed; "
+            "NFA fixed/compact batch cache path has been removed; "
             "use B1 PagedRegionCache")
     if compact:
         if not fixed_cache:
@@ -285,7 +283,7 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
         # 避免后续 prefill 与完整 static batch 同时驻留。
         # 生成 token = 每行末 position logits argmax（与旧 batch prefill 语义一致：
         # prefill 后立即预测第一 decode token）。
-        # 非 TLI（fixed_cache=False）：同样逐行 B=1 prefill，
+        # 非 NFA（fixed_cache=False）：同样逐行 B=1 prefill，
         # 后接 staged row-by-row decode（batch>1 无 graph 提速，逐行回退零额外开销）。
         pred_list = []
         if fixed_cache:
@@ -305,7 +303,7 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
             prefilled.clear()
             past = static_cache
         else:
-            # 非 TLI：逐行 B=1 prefill → 独立 DynamicCache → row-by-row staged
+            # 非 NFA：逐行 B=1 prefill → 独立 DynamicCache → row-by-row staged
             # decode；每行 forward 间 del 释放 DynamicCache 控峰值。
             row_caches = []
             for b in range(B):
@@ -324,7 +322,7 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
         pred = torch.tensor(pred_list, dtype=torch.long, device=device)
         gen = [[p] for p in pred.tolist()]            # 每行一个 gen 列表
 
-        # 【阶段 2c-5】CUDA Graph decode（env TLI_CUDA_GRAPH=1；仅 TLI
+        # 【阶段 2c-5】CUDA Graph decode（env NFA_CUDA_GRAPH=1；仅 NFA
         # fixed_cache、S_cap≥16384 且生产主配置——不满足时 helper 返回
         # None → 落下方 staged 逐行路径，行为零扰动）。
         if fixed_cache:
@@ -354,7 +352,7 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                 if ctx.alive[b]:
                     ctx.seq_lens[b] += 1
                     ctx.gen_lens[b] += 1
-            # mask 列数：fixed_cache = 恒 S_cap（TLIStaticCache 固定容量、有效在
+            # mask 列数：fixed_cache = 恒 S_cap（NFAStaticCache 固定容量、有效在
             # 前 → left_pad_kv 可见列取头部 [0, seq_lens[b])）；否则 = S_max +
             # step + 1（变长 DynamicCache 有效占尾 → 可见列取尾部）。行 b 可见
             # 长 = 更新后的 seq_lens[b]（= lens[b] + step + 1，含本步新 token）。
@@ -367,7 +365,7 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                             use_cache=True)
                 pred = out.logits[:, -1, :].argmax(dim=-1)  # [B]
             else:
-                # 非 TLI：逐行独立 B=1 decode（DynamicCache 各行长不同，
+                # 非 NFA：逐行独立 B=1 decode（DynamicCache 各行长不同，
                 # 无法 batch → 逐行 forward + per-row 4D mask）。
                 pred = torch.zeros(B, dtype=torch.long, device=device)
                 for b in range(B):
@@ -404,9 +402,9 @@ def main():
     from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
     from sparse_attn.ops.quality_graph import graph_policy
     args = parse_args()
-    if args.method == "tli":
+    if args.method == "nfa":
         raise RuntimeError(
-            "TLI batch cache path has been removed; use benchmark/RULER/pred_ruler.py "
+            "NFA batch cache path has been removed; use benchmark/RULER/pred_ruler.py "
             "with B1 PagedRegionCache")
     if args.batch_size < 1:
         raise SystemExit("--batch-size 必须 >= 1")
@@ -429,7 +427,7 @@ def main():
     native_mpe = config.max_position_embeddings
     use_yarn = args.yarn
     if is_glm:
-        if (args.method == "tli" and getattr(args, "tli_dyn_dgate", False)
+        if (args.method == "nfa" and getattr(args, "nfa_dyn_dgate", False)
                 and args.batch_size > 1):
             raise SystemExit(
                 "[glm] dynamic far-skip 当前仅支持单请求入口；"
@@ -469,7 +467,7 @@ def main():
         # This constructs the installed framework's rotary module on CPU and
         # checks actual frequencies, scaling and rotation before loading weights.
         rope_preflight = verify_runtime_rope(config)
-    snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
+    snapshot = resolve_treatment_snapshot(args) if args.method == "nfa" else None
     # 【同步义务】加载路径与 pred_ruler.py 一致（device_map="auto"，
     # 调度须设 CUDA_VISIBLE_DEVICES）。
     model = AutoModelForCausalLM.from_pretrained(
@@ -498,7 +496,7 @@ def main():
             max_k=getattr(args, "fasa_max_k", 16),
             mode=getattr(args, "fasa_mode", "topk"),
         )
-    elif args.method == "tli":
+    elif args.method == "nfa":
         # 【同步义务】内联自 pred_ruler.py（L184-185 snapshot 冻结 +
         # L444 register_patch 挂载）；081 快照契约：模型加载前冻结一次，
         # D′ 掩码/投影基每个文件只 open 一次。
@@ -544,7 +542,7 @@ def main():
                 raise ValueError("actual batch input plus output exceeds verified runtime position capacity")
             # 【阶段 1】budget 采集对齐 pred_ruler.py（L549-551 同步义务）：
             # chunk 前 clear 全局 metrics、baseline_request 解包 receipt
-            # （tli 无 _baseline_identity → receipt 空 dict falsy → budget 取
+            # （nfa 无 _baseline_identity → receipt 空 dict falsy → budget 取
             # metrics.get_select_tokens() 实际值）。batch=1 时 chunk=单请求，
             # 与旧 pred_ruler.py 单序列入口逐字节一致（gate_bs1_equiv 依据）；
             # batch>1 时取该 chunk 全部行×步的 select_tokens 均值（聚合口径）。
@@ -555,7 +553,7 @@ def main():
                     gen = _decode_batch_chunk(
                         model, tokenizer, chunk, input_ids, position_ids,
                         mask2d, lens, eos_ids, keep_logits,
-                        fixed_cache=(args.method == "tli"))
+                        fixed_cache=(args.method == "nfa"))
             budget = None if (baseline_receipt or getattr(model, "_quality_graph_execution", {}).get("actual", "").startswith("graph")) else metrics.get_select_tokens()
             for (row, g) in zip(chunk, gen):
                 pred = tokenizer.decode(g, skip_special_tokens=True)
@@ -578,7 +576,7 @@ def main():
         model_cfg_path = os.path.join(args.model_path, "config.json")
         treatment_manifest_json = (
             get_treatment_manifest_json(args, snapshot)
-            if args.method == "tli" else None)
+            if args.method == "nfa" else None)
         yarn_receipt = build_yarn_receipt(
             yarn_enabled=use_yarn,
             effective_factor=factor,
@@ -596,7 +594,7 @@ def main():
                 "method": args.method, "pred_postfix": args.pred_postfix,
                 "t": args.t, "batch_size": args.batch_size,
                 "graph_policy": graph_policy(),
-                "operator_mode": os.environ.get("TLI_OPERATOR_MODE", "off"),
+                "operator_mode": os.environ.get("NFA_OPERATOR_MODE", "off"),
             },
             producer_script_path="benchmark/RULER/pred_ruler_batch.py",
             producer_script_sha256=_file_sha256(os.path.abspath(__file__)),

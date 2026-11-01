@@ -18,7 +18,7 @@ flock）→ stage_yarn_generation（不可变 generation 目录 {out}.gen-{attem
 内的预测文件）→ 生成循环逐行写 → fout.close → SHA256/行数计算 →
 build_yarn_receipt（v2 status=complete 同代绑定）→ stage_yarn_receipt
 （同一 gen 目录内）→ commit_yarn_generation（#198 066/crash-recovery：
-单次原子提交 = 切指针 {out}.tli_gen）→ release_output_lock。
+单次原子提交 = 切指针 {out}.nfa_gen）→ release_output_lock。
 
 模式：
   success        stub 生成 --rows 行预测 → 完整成功提交（v2 回执 + 指针）；
@@ -168,7 +168,7 @@ def install_stubs(pred_tag):
 
     # sparse_attn 旁路桩（与生成/提交协议无关）
     pred_ruler.get_treatment_manifest_json = lambda args, snapshot=None: None
-    pred_ruler.resolve_treatment_snapshot = lambda args: None  # receipt-only stub, not a TLI treatment
+    pred_ruler.resolve_treatment_snapshot = lambda args: None  # receipt-only stub, not a NFA treatment
     pred_ruler.register_patch = lambda model, args, snapshot=None: None
     pred_ruler.get_metrics = lambda: types.SimpleNamespace(
         get_select_tokens=lambda: 0, clear=lambda: None)
@@ -303,7 +303,7 @@ def main():
         "--model", "Qwen3-8B", "--model_path", "/synthetic/Qwen3-8B",
         "--task", args.task, "--context_length", str(args.context_length),
         "--data-root", args.data_root, "--output-dir", args.out_dir,
-        "--t", args.t, "--method", "tli", "--pred_postfix", "_stub",
+        "--t", args.t, "--method", "nfa", "--pred_postfix", "_stub",
         "--max-num", str(args.max_num),
     ]
     print(f"[RUNNER {os.getpid()}] mode={args.mode} tag={args.pred_tag} "

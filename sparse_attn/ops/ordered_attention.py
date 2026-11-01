@@ -71,7 +71,7 @@ def ordered_attention(q,k,v,selection,lengths,*,sink,swa,scale):
             or type(sink) is not int or type(swa) is not int or min(sink,swa)<0
             or ids.shape[-1]+sink+swa>8192):
         raise ValueError('invalid ordered selection metadata')
-    width=min(int(os.environ.get('TLI_E127_W_UPPER','2048')),k.shape[1])
+    width=min(int(os.environ.get('NFA_E127_W_UPPER','2048')),k.shape[1])
     if width<1:raise ValueError('positive attention width required')
     if not _int32_index_extents(b,h,ids.shape[-1],width):
         raise ValueError('ordered index tables exceed native int32 addressing')

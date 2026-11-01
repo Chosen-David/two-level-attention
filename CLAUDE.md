@@ -15,7 +15,7 @@
   [`agent_doc/CURRENT_NARRATIVE.md`](agent_doc/CURRENT_NARRATIVE.md)**；
   `agent_doc/advice/archive/` 与 `exp/trace_archives/` 内的报告已过时或被推翻，不得引用。
 - 新判决落库时必须同步更新 CURRENT_NARRATIVE.md 第 5 节索引（收官流程一部分）。
-- 生产口径 = TLI 冠军几何显式 flags（见锚点第 1 节），`--tli_subspace tail`
+- 生产口径 = NFA 冠军几何显式 flags（见锚点第 1 节），`--nfa_subspace tail`
   与 `--tia_level2_cmp_ratio 4` 必须显式传参。
 
 

@@ -14,20 +14,20 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from transformers.cache_utils import DynamicCache
 
 from benchmark.LongBench.eval import sample_score
-from sparse_attn.ops.region_geometry import RegionGeometry
-from sparse_attn.ops.frozen_region_gate import GateConfig
-from sparse_attn.ops.frozen_region_runtime import (
+from sparse_attn.policies.region_geometry import RegionGeometry
+from sparse_attn.policies.frozen_gate import GateConfig
+from sparse_attn.engine.frozen_runner import (
     complete_frozen_request, prefill_frozen_request)
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 ROOT = Path(__file__).resolve().parents[2]
 SCREEN_TASKS = ('qasper', 'hotpotqa', 'musique', 'gov_report', 'repobench-p')
-SOURCES = ('sparse_attn/patches/glm4_moe_lite_attn_patch.py',
-           'sparse_attn/patches/qwen3_attn_patch.py', 'sparse_attn/ops/paged_region_tli.py',
+SOURCES = ('sparse_attn/patches/qwen3_attn_patch.py',
+           'sparse_attn/ops/paged_region_kernels_nfa.py',
            'sparse_attn/cache/paged_region_cache.py', 'sparse_attn/ops/paged_region_kernels.py',
-           'sparse_attn/ops/region_geometry.py',
-           'sparse_attn/indexer/tli_indexer.py', 'sparse_attn/ops/frozen_region_gate.py',
-           'sparse_attn/ops/frozen_region_runtime.py',
+           'sparse_attn/policies/region_geometry.py',
+           'sparse_attn/indexer/nfa_indexer.py', 'sparse_attn/policies/frozen_gate.py',
+           'sparse_attn/engine/frozen_runner.py',
            'benchmark/LongBench/prefill_frozen_skip.py', 'benchmark/LongBench/metrics.py',
            'benchmark/LongBench/eval.py', 'benchmark/LongBench/config/dataset2prompt.json',
            'benchmark/LongBench/config/dataset2maxlen.json')
@@ -98,7 +98,7 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
 @eager_decoding_request_guard()
 def generate_native(model, ids, max_new_tokens, device):
     cache = DynamicCache(config=model.config)
-    if getattr(model, '_frozen_tli', False):
+    if getattr(model, '_frozen_nfa', False):
         for layer in model.model.layers:
             layer.self_attn.indexer.clear()
             layer.self_attn.indexer.skip_far = False
@@ -153,13 +153,13 @@ def main():
     ap.add_argument('--world-size', type=int, default=1)
     ap.add_argument('--device', default='cuda:0')
     ap.add_argument('--verify-native-full', action='store_true')
-    ap.add_argument('--attention', choices=['sdpa','tli'], default='sdpa')
+    ap.add_argument('--attention', choices=['sdpa','nfa'], default='sdpa')
     args = ap.parse_args()
-    if args.attention == 'tli':
-        os.environ['TLI_OPERATOR_MODE'] = 'off'
-        os.environ['TLI_FINE_GATHER'] = '0'
-        os.environ['TLI_SPARSE_PREFILL'] = '0'
-        os.environ['TLI_DECODE_DENSE'] = '0'
+    if args.attention == 'nfa':
+        os.environ['NFA_OPERATOR_MODE'] = 'off'
+        os.environ['NFA_FINE_GATHER'] = '0'
+        os.environ['NFA_SPARSE_PREFILL'] = '0'
+        os.environ['NFA_DECODE_DENSE'] = '0'
     tasks = args.datasets.split(',')
     if not set(tasks)<=set(SCREEN_TASKS) or len(set(tasks)) != len(tasks):
         raise ValueError('only the five existing LongBench screen tasks are allowed')
@@ -192,17 +192,17 @@ def main():
         git_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         eviction='far-only: evict far; near-only: keep attention-invisible near staging and migrate to far; both: sink+SWA only',
         calibration='query-relative page boundaries, last256 rows; head means; independent near/far mass comparisons, no joint budget')
-    if args.attention == 'tli':
-        from sparse_attn.ops.paged_region_tli import tli_args
+    if args.attention == 'nfa':
+        from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
         model_type = AutoConfig.from_pretrained(args.model).model_type
-        treatment = tli_args(
+        treatment = nfa_args(
             subspace='nope' if model_type == 'glm4_moe_lite' else 'tail')
-        protocol['attention'] = ('tli-nope64-frozen-regions-reference'
+        protocol['attention'] = ('nfa-nope64-frozen-regions-reference'
                                  if model_type == 'glm4_moe_lite' else
-                                 'tli-tail32-frozen-regions-reference')
-        protocol['tli_args'] = vars(treatment)
-        protocol['tli_environment'] = {name:os.environ[name] for name in
-            ('TLI_OPERATOR_MODE','TLI_FINE_GATHER','TLI_SPARSE_PREFILL','TLI_DECODE_DENSE')}
+                                 'nfa-tail32-frozen-regions-reference')
+        protocol['nfa_args'] = vars(treatment)
+        protocol['nfa_environment'] = {name:os.environ[name] for name in
+            ('NFA_OPERATOR_MODE','NFA_FINE_GATHER','NFA_SPARSE_PREFILL','NFA_DECODE_DENSE')}
         for path in sorted((ROOT/'sparse_attn').rglob('*.py')):
             protocol['source_sha256'][str(path.relative_to(ROOT))] = sha_file(path)
     identity = hashlib.sha256(json.dumps(protocol,sort_keys=True).encode()).hexdigest()
@@ -222,14 +222,14 @@ def main():
             device_map=args.device,attn_implementation='sdpa').eval()
     if model.config.model_type not in ('qwen3', 'glm4_moe_lite') or any(getattr(m.self_attn,'sliding_window',None) is not None for m in model.model.layers):
         raise ValueError('only full-attention Qwen3 or GLM-4.7-Flash supported')
-    if model.config.model_type == 'glm4_moe_lite' and args.attention != 'tli':
-        raise ValueError('GLM frozen regions currently require the TLI adapter')
-    if args.attention == 'tli':
+    if model.config.model_type == 'glm4_moe_lite' and args.attention != 'nfa':
+        raise ValueError('GLM frozen regions currently require the NFA adapter')
+    if args.attention == 'nfa':
         from sparse_attn.patches import register_patch
         from sparse_attn.info import resolve_treatment_snapshot
         if register_patch(model,treatment,resolve_treatment_snapshot(treatment)) != model.config.num_hidden_layers:
-            raise ValueError('incomplete TLI patch registration')
-        model._frozen_tli = True
+            raise ValueError('incomplete NFA patch registration')
+        model._frozen_nfa = True
     verified = False
     for ds,row_index,row in shard_inputs(inputs, args.rank, args.world_size):
         path = outdir/'requests'/ds/f'{row_index:04d}.json'

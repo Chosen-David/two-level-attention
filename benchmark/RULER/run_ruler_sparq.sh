@@ -2,7 +2,7 @@
 # SparQ RULER 批量派单（vendor：官方源码复用，decode |Q| 的 r 最大坐标近似→top-k 细筛）
 # 用法：bash benchmark/RULER/run_ruler_sparq.sh <gpu_id> <ts> <max_num> [lens...]
 # 例：bash benchmark/RULER/run_ruler_sparq.sh 6 10160020 50 "65536 131072"
-# 预算口径：--sparq_k 1024（主表固定 token 预算，与 Quest/TLI K2 对齐）；
+# 预算口径：--sparq_k 1024（主表固定 token 预算，与 Quest/NFA K2 对齐）；
 #   r = max(1, round(head_dim/(context_length/(2*k)))) 随序列长度变化
 #   （Qwen3-8B head_dim=128 → 64K: r=4；128K: r=2），--sparq_context_length 默认
 #   None = 跟随 --context_length（r 自适应）。

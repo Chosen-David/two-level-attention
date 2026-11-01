@@ -1,6 +1,6 @@
 # Prefill-frozen Near/Far skip
 
-Opt-in Qwen3 and GLM-4.7-Flash TLI eager inference reference. This does not change the default TLI
+Opt-in Qwen3 and GLM-4.7-Flash NFA eager inference reference. This does not change the default NFA
 path or enable operator/graph optimizations. Supports unpadded batch size 1,
 one-shot dense prefill and single-token decode.
 
@@ -28,10 +28,10 @@ both skip physically reclaim the corresponding logical pages.
 `PagedRegionCache` owns page lifetimes; `GateConfig`/`profile_regions`/
 `decide_regions` calibrate the gates. `frozen_region_runtime.py` is the shared
 prefill/profile/freeze/receipt lifecycle used by LongBench and RULER. The Qwen3
-and GLM patches recognize the explicit `tli_regions` cache marker before generic
+and GLM patches recognize the explicit `nfa_regions` cache marker before generic
 KV update. Passing ordinary DynamicCache does not activate these gates.
 
-For Qwen3 TLI, the default frozen eager path reads selected full-dimensional K/V
+For Qwen3 NFA, the default frozen eager path reads selected full-dimensional K/V
 through page pointer tables after freezing. Decode appends and ages pages without
 gathering all visible KV. L1 reads only live-page tail32 statistics and reuses
 the original `_select_l1_blocks`; L2 scores only L1/bypass/protected candidates,
@@ -42,7 +42,7 @@ full visible KV or use the sub-16K dense masked fallback.
 L1=128, L2=1024, Far=minmax, Near=avg, Near pages=32, Near tokens=off.
 
 The legacy logical-mask path remains available as a test oracle via
-`TLI_FROZEN_EAGER_REFERENCE=1` outside the RULER production entry. The physical
+`NFA_FROZEN_EAGER_REFERENCE=1` outside the RULER production entry. The physical
 selector still materializes a Q-head full-width score buffer for reference-layout
 masked softmax, plus a logical-length probability tensor and original-width mid
 top-k, to preserve reduction, filler and tie behavior; L2 normalization and
@@ -54,15 +54,15 @@ chunked prefill, batches, gradients and CUDA Graphs are unsupported.
 ## Run the validated comparison
 
 ```sh
-TLI_SCORER_BACKEND=difflib python -m benchmark.LongBench.prefill_frozen_skip \
-  --attention tli --thresholds 0.05 --samples 0 \
+NFA_SCORER_BACKEND=difflib python -m benchmark.LongBench.prefill_frozen_skip \
+  --attention nfa --thresholds 0.05 --samples 0 \
   --model /path/to/Qwen3-8B --data /path/to/LongBench/data \
   --device cuda:0 --verify-native-full \
   --out agent_doc/results/frozen_region_skip_RUN_ID
 ```
 
 This runs gates-off (`full`), Far-only and independent Near/Far on all rows of
-Qasper, HotpotQA, Musique, GovReport and RepoBench-p. `full` means TLI gates-off,
+Qasper, HotpotQA, Musique, GovReport and RepoBench-p. `full` means NFA gates-off,
 not dense attention. `--samples 20` selects a smaller screen. For disjoint
 workers use matching `--world-size N` and unique `--rank 0..N-1`; use a fresh
 output directory when code, input or configuration changes. Context cap=31500.
@@ -79,26 +79,26 @@ python -m benchmark.LongBench.export_frozen_skip agent_doc/results/frozen_region
 
 ## RULER B=1 eager production entry
 
-Frozen regions are disabled by default. Opt in explicitly with the validated TLI
+Frozen regions are disabled by default. Opt in explicitly with the validated NFA
 geometry (the ordinary RULER path and its treatment hash are unchanged when the
 flag is absent):
 
 ```sh
 python -u -m benchmark.RULER.pred_ruler \
   --model Qwen3-8B --model_path /path/to/Qwen3-8B \
-  --task niah_single_1 --context_length 8192 --method tli --t RUN_ID \
+  --task niah_single_1 --context_length 8192 --method nfa --t RUN_ID \
   --data-root /path/to/KVCache-Factory/data/RULER \
   --output-dir exp/results_ruler/Qwen3-8B --max-num 1 \
-  --tli_far_method minmax --tli_near_method avg \
-  --tli_near_pages 32 --tli_near_tokens off --tli_near_len 4096 \
-  --tli_subspace tail --tia_level2_cmp_ratio 4 \
-  --tli_sink_tokens 4 --tli_swa_size 128 \
+  --nfa_far_method minmax --nfa_near_method avg \
+  --nfa_near_pages 32 --nfa_near_tokens off --nfa_near_len 4096 \
+  --nfa_subspace tail --tia_level2_cmp_ratio 4 \
+  --nfa_sink_tokens 4 --nfa_swa_size 128 \
   --tia_level1_topk 128 --tia_level2_topk 1024 \
-  --tli_enable_layer_skip false \
-  --tli_far_skip_backend legacy --tli_far_skip_cache retain \
-  --tli_prefill_frozen_regions --tli_frozen_region_mode dual \
-  --tli_frozen_region_epsilon 0.05 \
-  --tli_frozen_region_statistic mean --tli_frozen_region_rows 256
+  --nfa_enable_layer_skip false \
+  --nfa_far_skip_backend legacy --nfa_far_skip_cache retain \
+  --nfa_prefill_frozen_regions --nfa_frozen_region_mode dual \
+  --nfa_frozen_region_epsilon 0.05 \
+  --nfa_frozen_region_statistic mean --nfa_frozen_region_rows 256
 ```
 
 The entry rejects non-Qwen3 models, unvalidated geometry, sparse prefill, dense
@@ -106,7 +106,7 @@ decode and active CUDA Graph configuration before indexer construction. It fixes
 the eager physical execution environment, creates a fresh cache per request and
 keeps RULER greedy decoding, first-token EOS handling, newline stopping and
 MAX_GEN unchanged. Each JSONL row contains `_frozen_region` with profiles,
-decisions, gate counts, prefill/frozen/final physical KV reports and real TLI
+decisions, gate counts, prefill/frozen/final physical KV reports and real NFA
 receipts. Receipt validation completes before that row is written; a failure does
 not commit a new generation. Gate and resolved geometry join the canonical
 treatment manifest only when frozen mode is enabled.
@@ -162,12 +162,12 @@ is retained under the project result directory
 `agent_doc/results/frozen_near_far_full5_independent005_20261029/FINAL_REPORT_ZH.md`.
 These historical quality figures belong to that frozen source, not a fresh
 full evaluation of later main changes. Main integration checks cover the
-four-state cache lifecycle, TLI selection parity, patched Qwen logits and
+four-state cache lifecycle, NFA selection parity, patched Qwen logits and
 benchmark request guard/data coverage. No latency or whole-device memory claim.
 
 ## GLM-4.7-Flash
 
-Use the same entry point with `--attention tli --model /path/to/GLM-4.7-Flash`.
+Use the same entry point with `--attention nfa --model /path/to/GLM-4.7-Flash`.
 The GLM adapter preserves native MLA projections and interleaved RoPE, then
 routes the post-RoPE Q/K and full V to the region consumer before any generic
 cache write. Prefill profiling uses the model attention scale, including any

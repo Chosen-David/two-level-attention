@@ -73,7 +73,7 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
 
         receipt.build_yarn_receipt = build_yarn_receipt
         receipt.commit_yarn_generation = lambda *args: None
-        receipt.generation_pointer_path = lambda path: path + ".tli_gen"
+        receipt.generation_pointer_path = lambda path: path + ".nfa_gen"
         receipt.release_output_lock = lambda fd: None
         receipt.resolve_yarn_config = lambda *args: (None, None)
         receipt.stage_yarn_generation = lambda path, run: path + ".tmp"
@@ -101,7 +101,7 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
 
         def get_method_name_with_info(args, value):
             captured["name_snapshot"] = value
-            return "tli_h0123456789"
+            return "nfa_h0123456789"
 
         def get_treatment_manifest_json(args, value):
             captured["manifest_snapshot"] = value
@@ -148,7 +148,7 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
             spec.loader.exec_module(module)
         return module
 
-    def test_tli_uses_one_preload_snapshot_for_runtime_name_and_receipt(self):
+    def test_nfa_uses_one_preload_snapshot_for_runtime_name_and_receipt(self):
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
             data = tmp / "data" / "4096"
@@ -163,7 +163,7 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
             snapshot = object()
             module = self._load_entry(tmp, events, captured, snapshot)
             args = types.SimpleNamespace(
-                batch_size=1, method="tli", pred_postfix="", yarn=False,
+                batch_size=1, method="nfa", pred_postfix="", yarn=False,
                 context_length=4096, yarn_factor=None,
                 data_root=str(tmp / "data"), task="niah_single_1",
                 max_num=1, model_path=str(tmp / "model"),

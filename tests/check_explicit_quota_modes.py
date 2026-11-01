@@ -10,7 +10,7 @@ from test_explicit_near_page_budget import ROOT, config, load_constructors
 from test_explicit_quota_modes import ALTERNATE_MODES
 
 BASE = '927b7279bd66efcf2c90d23b2c5c4bbaf9ddc8e1'
-PATH = 'sparse_attn/indexer/tli_indexer.py'
+PATH = 'sparse_attn/indexer/nfa_indexer.py'
 
 
 def main():
@@ -18,25 +18,25 @@ def main():
     source = subprocess.check_output(['git', 'show', BASE + ':' + PATH],
                                      cwd=ROOT, text=True)
     node = next(n for n in ast.parse(source).body
-                if isinstance(n, ast.ClassDef) and n.name == 'TLIIndexer')
+                if isinstance(n, ast.ClassDef) and n.name == 'NFAIndexer')
     node.body = [n for n in node.body if isinstance(n, ast.FunctionDef)
                  and n.name == '__init__']
     scope = dict(candidate.__init__.__globals__)
     exec(compile(ast.Module(body=[node], type_ignores=[]), PATH, 'exec'), scope)
-    baseline = scope['TLIIndexer']
+    baseline = scope['NFAIndexer']
     cases = []
     for bs in (16, 32, 64, 128):
         for nb in (0, 1, 2, 4):
             for nt in (0, 'off') if nb == 0 else (0, 16, 'off'):
                 for bypass in (False, True):
                     for quant in (False, True):
-                        cases.append(dict(tia_block_size=bs, tli_swa_size=bs,
-                            tli_near_pages=nb, tli_near_tokens=nt,
-                            tli_near_len=nb * bs, tli_boundary_bypass=bypass,
-                            tli_l2_quant=quant))
-    cases += [dict(tli_near_pages=None, tli_near_tokens=None,
-                   tli_near_len=None, **mode) for mode in ALTERNATE_MODES]
-    with patch.dict(os.environ, TLI_E151C_ORACLE_QUOTA=''):
+                        cases.append(dict(tia_block_size=bs, nfa_swa_size=bs,
+                            nfa_near_pages=nb, nfa_near_tokens=nt,
+                            nfa_near_len=nb * bs, nfa_boundary_bypass=bypass,
+                            nfa_l2_quant=quant))
+    cases += [dict(nfa_near_pages=None, nfa_near_tokens=None,
+                   nfa_near_len=None, **mode) for mode in ALTERNATE_MODES]
+    with patch.dict(os.environ, NFA_E151C_ORACLE_QUOTA=''):
         for case in cases:
             old, new = baseline(config(**case)), candidate(config(**case))
             if vars(old) != vars(new):
@@ -44,9 +44,9 @@ def main():
         rejected = 0
         for mode in ALTERNATE_MODES:
             for nt in (0, 32, 'off'):
-                baseline(config(tli_near_tokens=nt, **mode))
+                baseline(config(nfa_near_tokens=nt, **mode))
                 try:
-                    candidate(config(tli_near_tokens=nt, **mode))
+                    candidate(config(nfa_near_tokens=nt, **mode))
                 except ValueError as exc:
                     if 'fixed geometry' not in str(exc):
                         raise

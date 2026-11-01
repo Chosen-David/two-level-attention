@@ -36,11 +36,11 @@ class DatasetBindingTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
 
     def make_result(self, dataset, prefix):
-        path = Path(self.temp.name) / f"{prefix}-tli-test.jsonl"
+        path = Path(self.temp.name) / f"{prefix}-nfa-test.jsonl"
         raw = b'{"pred":"a","answers":["a"],"all_classes":null}\n'
         path.write_bytes(raw)
         core = build_run_cap_core(
-            model_name="Qwen3-8B", model_path="/model", method="tli",
+            model_name="Qwen3-8B", model_path="/model", method="nfa",
             dataset=dataset, dataset_fingerprint="a" * 12,
             run_timestamp="dataset-binding-test", effective_cap=31500,
             cap_gate_info=None, max_new_tokens=128, producer=None,

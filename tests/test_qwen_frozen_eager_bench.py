@@ -35,7 +35,7 @@ def test_performance_state_reaches_abba_and_profiler(
     monkeypatch.setattr(bench.AutoConfig, 'from_pretrained', lambda *args: config)
     monkeypatch.setattr(
         bench.AutoModelForCausalLM, 'from_pretrained', lambda *args, **kwargs: model)
-    monkeypatch.setattr(bench, 'tli_args', lambda: SimpleNamespace(method='tli'))
+    monkeypatch.setattr(bench, 'nfa_args', lambda: SimpleNamespace(method='nfa'))
     monkeypatch.setattr(bench, 'resolve_treatment_snapshot', lambda args: object())
     monkeypatch.setattr(bench, 'register_patch', lambda *args: 1)
 
@@ -47,7 +47,7 @@ def test_performance_state_reaches_abba_and_profiler(
         return dict(
             arm=arm, state=state, generated_ids=[1],
             audit=dict(decisions={}, gate_counts={}, prefill_full_kv=0,
-                       frozen_kv=0, final_kv=0, tli_receipts={}),
+                       frozen_kv=0, final_kv=0, nfa_receipts={}),
             timings=dict(tpot_ms=1., prefill_seconds=1.),
             memory=dict(final=dict(allocated_bytes=0, peak_allocated_bytes=0)),
             profiler={})

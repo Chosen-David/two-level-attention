@@ -2,9 +2,9 @@
 import pytest
 import torch
 import triton
-from sparse_attn.ops.sparse_normalization import candidate_probabilities
-from sparse_attn.ops.candidate_ranking import rank_candidates
-from sparse_attn.indexer.tli_indexer import _ako_gqa_mean_kernel
+from sparse_attn.indexer.compaction.sparse_normalization import candidate_probabilities
+from sparse_attn.indexer.selection.candidate_ranking import rank_candidates
+from sparse_attn.indexer.nfa_indexer import _ako_gqa_mean_kernel
 
 pytestmark=pytest.mark.skipif(not torch.cuda.is_available(),reason='requires CUDA')
 
@@ -61,7 +61,7 @@ def test_sparse_native_reduction_and_ranking(capacity,group,hk,shared_dedup):
 @pytest.mark.parametrize('narrow',[False,True])
 def test_sparse_key_width_boundary(monkeypatch,capacity,narrow):
     """Observe the actual sort dtype across the signed-key sentinel boundary."""
-    monkeypatch.setenv('TLI_SPARSE_NARROW_KEYS','1' if narrow else '0')
+    monkeypatch.setenv('NFA_SPARSE_NARROW_KEYS','1' if narrow else '0')
     observed=[]
     native=torch.Tensor.sort
     def tracked(tensor,*args,**kwargs):

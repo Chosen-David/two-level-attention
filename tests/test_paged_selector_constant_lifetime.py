@@ -11,12 +11,12 @@ from unittest.mock import patch
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'sparse_attn/indexer/tli_indexer.py'
+SOURCE = ROOT / 'sparse_attn/indexer/nfa_indexer.py'
 
 
 def load_method(name, torch_module):
     tree = ast.parse(SOURCE.read_text())
-    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'TLIIndexer')
+    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'NFAIndexer')
     node = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == name)
     env = {'torch': torch_module}
     exec(compile(ast.Module(body=[node], type_ignores=[]), str(SOURCE), 'exec'), env)
@@ -132,7 +132,7 @@ class ConstantLifetimeTest(unittest.TestCase):
         self.assertEqual(seen[1]['selection_mask'], 'mask')
 
     def test_real_paged_call_opts_out(self):
-        source = ROOT / 'sparse_attn/ops/paged_region_tli.py'
+        source = ROOT / 'sparse_attn/ops/paged_region_kernels_nfa.py'
         tree = ast.parse(source.read_text())
         fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'region_selection_compact')
         call = next(n for n in ast.walk(fn) if isinstance(n, ast.Call)
@@ -153,17 +153,17 @@ class NativeCudaLifetimeTest(unittest.TestCase):
         import torch
         if not torch.cuda.is_available():
             self.skipTest('native CUDA unavailable')
-        from sparse_attn.indexer.tli_indexer import TLIIndexer
-        from sparse_attn.ops.paged_region_tli import tli_args
+        from sparse_attn.indexer.nfa_indexer import NFAIndexer
+        from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
         torch.manual_seed(760)
-        idx = TLIIndexer(tli_args())
+        idx = NFAIndexer(nfa_args())
         idx.layer_idx = 0
-        transient = TLIIndexer(tli_args())
+        transient = NFAIndexer(nfa_args())
         transient.layer_idx = 0
         with torch.inference_mode(), patch.dict('os.environ', {
-                'TLI_SPARSE_SELECTION': '0', 'TLI_LIVE_NORMALIZATION': '0',
-                'TLI_COMPACT_NORMALIZATION': '0', 'TLI_COMPACT_RANKING': '0',
-                'TLI_L2_BYPASS': '0'}):
+                'NFA_SPARSE_SELECTION': '0', 'NFA_LIVE_NORMALIZATION': '0',
+                'NFA_COMPACT_NORMALIZATION': '0', 'NFA_COMPACT_RANKING': '0',
+                'NFA_L2_BYPASS': '0'}):
             for length in (4097, 4098, 4160, 9217):
                 bs = idx.args.tia_block_size
                 pad = (length + bs - 1) // bs * bs

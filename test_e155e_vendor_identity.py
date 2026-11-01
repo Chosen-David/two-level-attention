@@ -3,7 +3,7 @@
 """test_e155e_vendor_identity.py —— vendor treatment 身份补齐门禁（CPU only，0 SKIP）。
 
 【缺陷（用户 2026-10-20 问题 ①「R3 manifest 登记缺口」）】46 个 vendor CLI
-参数不进任何 treatment 身份：076 注释「非 tli 方法可读段已编码其全部
+参数不进任何 treatment 身份：076 注释「非 nfa 方法可读段已编码其全部
 旋钮」对 vendor 方法不成立——
   * clusterkv_vendor：window/fit_iter/head_sel/balance/dist_t/gqa_policy/
     topk_stat 7 参数完全不进可读名——异配置同名互覆（B09 族）可达；
@@ -16,9 +16,9 @@
   1. vendor 参数按 method 条件入 manifest（_VENDOR_TREATMENT_FIELDS；
      文件型字段 → 内容身份 {basename, sha256}，fail closed）；
   2. vendor 方法名统一追加 _h<hash10> 尾段（_vendor_name_with_hash，
-     与 tli 076 同构）；
-  3. tli/none/tia/twi/quest 的 manifest 逐位不变（method 条件登记，
-     E155d 在飞网格与全部 tli hash 锚点稳定——本门禁 T1 硬锚）。
+     与 nfa 076 同构）；
+  3. nfa/none/tia/twi/quest 的 manifest 逐位不变（method 条件登记，
+     E155d 在飞网格与全部 nfa hash 锚点稳定——本门禁 T1 硬锚）。
 
 【红绿口径】修复前 T2-T7 必须红（同名/无 hash 段）；修复后全绿。
 用法：python3 test_e155e_vendor_identity.py（two-level-attention/ 下，
@@ -66,31 +66,31 @@ def _tmp_file(tag, content):
     return p
 
 
-def t1_tli_manifest_unchanged():
-    """tli/无 method namespace 的 manifest 字段集 == _TREATMENT_FIELD_
-    DEFAULTS 逐键相同（E155d 在飞网格 + 全部 tli hash 锚点稳定的硬锚）。"""
-    name = "T1 tli manifest 逐位不变（无 method/vendor 键混入）"
+def t1_nfa_manifest_unchanged():
+    """nfa/无 method namespace 的 manifest 字段集 == _TREATMENT_FIELD_
+    DEFAULTS 逐键相同（E155d 在飞网格 + 全部 nfa hash 锚点稳定的硬锚）。"""
+    name = "T1 nfa manifest 逐位不变（无 method/vendor 键混入）"
     try:
-        ns = _ns("tli")
+        ns = _ns("nfa")
         m = INFO.resolve_treatment_snapshot(ns).manifest
         _check(set(m) == set(INFO._TREATMENT_FIELD_DEFAULTS),
-               f"tli manifest 字段集漂移：多出 "
+               f"nfa manifest 字段集漂移：多出 "
                f"{sorted(set(m) - set(INFO._TREATMENT_FIELD_DEFAULTS))} / 缺 "
                f"{sorted(set(INFO._TREATMENT_FIELD_DEFAULTS) - set(m))}")
-        # e119 锚点配置的 tli hash 不移位（跨构造路径单射的既有锚）。
+        # e119 锚点配置的 nfa hash 不移位（跨构造路径单射的既有锚）。
         # 【开源净化 2026-10-23】a{α}_b{β}_g{γ} 可读段随 αβγ 比例 CLI 退役
-        # 删除（tli_alpha/beta/gamma 三键仍恒记 0.0/0.0/1.0 缺省入 manifest，
+        # 删除（nfa_alpha/beta/gamma 三键仍恒记 0.0/0.0/1.0 缺省入 manifest，
         # 内部载体保留）；manifest 删除 kmeans/layer_skip/σ/moba/proj_basis/
-        # dyn_dgate 等 18 个实验键 → 全部 tli hash 整体移位一轮（079/081/
+        # dyn_dgate 等 18 个实验键 → 全部 nfa hash 整体移位一轮（079/081/
         # E155c/E155d 先例同纪律同步更新锚值）。本门禁断言净化后该 hash
-        # 逐位稳定（E155e vendor 条件登记不污染 tli manifest 的本质不变）。
-        ns2 = _ns("tli", tia_block_size=64, tia_level1_topk=128,
+        # 逐位稳定（E155e vendor 条件登记不污染 nfa manifest 的本质不变）。
+        ns2 = _ns("nfa", tia_block_size=64, tia_level1_topk=128,
                   tia_level2_topk=2048, tia_level2_cmp_ratio=4,
-                  tli_alpha=0.25, tli_beta=0.125, tli_gamma=0.625,
-                  tli_enable_kmeans=False, tli_enable_layer_skip=False)
+                  nfa_alpha=0.25, nfa_beta=0.125, nfa_gamma=0.625,
+                  nfa_enable_kmeans=False, nfa_enable_layer_skip=False)
         _check(INFO.get_method_name_with_info(ns2)
-               == "tli_64_128_2048_c4__hd19bb694a9",
-               "e119 tli 锚点 hash 移位（tli manifest 被污染）")
+               == "nfa_64_128_2048_c4__hd19bb694a9",
+               "e119 nfa 锚点 hash 移位（nfa manifest 被污染）")
         # 无 method 属性（程序化 namespace）也不触发 vendor 登记
         ns3 = types.SimpleNamespace()
         m3 = INFO.resolve_treatment_snapshot(ns3).manifest
@@ -271,7 +271,7 @@ def t7_file_identity_fail_closed():
 
 
 if __name__ == "__main__":
-    t1_tli_manifest_unchanged()
+    t1_nfa_manifest_unchanged()
     t2_clusterkv_injective()
     t3_asynctls_channel_content_identity()
     t4_jssa_basis_content_identity()

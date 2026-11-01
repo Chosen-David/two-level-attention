@@ -93,7 +93,7 @@ class BatchCtx:
 # 逐字保留）；非 None = batch 模式（由 pred_ruler_batch/pred_batch 在
 # decode 循环外层 set/clear）。ContextVar 同时隔离线程与异步任务上下文，
 # 避免两个并发请求在逐层 forward 之间覆盖彼此的长度/存活状态。
-_BATCH_DECODE_CTX = ContextVar("tli_batch_decode_ctx", default=None)
+_BATCH_DECODE_CTX = ContextVar("nfa_batch_decode_ctx", default=None)
 
 
 def set_batch_decode_ctx(ctx):

@@ -1,6 +1,6 @@
 import pytest
 import torch
-from sparse_attn.ops.batch_coarse_score import score_coarse_batched
+from sparse_attn.indexer.candidate.scorer_coarse import score_coarse_batched
 
 
 def test_cpu_rejected_before_launch():
@@ -19,7 +19,7 @@ def test_cpu_rejected_before_launch():
 @pytest.mark.parametrize('dtype', [torch.bfloat16, torch.float16])
 @pytest.mark.parametrize('dim,group,mean', [(32, 3, False), (128, 4, True)])
 def test_primary_kernel_exact_and_live_graph(batch, dtype, dim, group, mean, tokens=131):
-    from sparse_attn.indexer.tli_indexer import TLIIndexer, _score_coarse_kernel
+    from sparse_attn.indexer.nfa_indexer import NFAIndexer, _score_coarse_kernel
     import triton
     torch.manual_seed(8726)
     heads = 2
@@ -34,7 +34,7 @@ def test_primary_kernel_exact_and_live_graph(batch, dtype, dim, group, mean, tok
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):
         actual = run()
-    tile, warps = TLIIndexer._TILE_COARSE.get(dim, (64, 4))
+    tile, warps = NFAIndexer._TILE_COARSE.get(dim, (64, 4))
     for scale in (0., 1., -2.):
         q.copy_(torch.randn_like(q) * scale)
         lo.normal_(); hi.normal_()

@@ -1,14 +1,14 @@
 """CPU checks for capture-time eligibility, including explicit fallback reasons."""
 import pytest
 import torch
-from sparse_attn.ops.sparse_policy import geometry_fallback, selection_fallback
+from sparse_attn.policies.sparse_policy import geometry_fallback, selection_fallback
 
 
 @pytest.fixture(autouse=True)
 def policies(monkeypatch):
     monkeypatch.setattr(torch, '__version__', '2.8.0+cu128')
-    monkeypatch.setenv('TLI_SPARSE_SELECTION', '1')
-    monkeypatch.setenv('TLI_SPARSE_STATS', 'owner')
+    monkeypatch.setenv('NFA_SPARSE_SELECTION', '1')
+    monkeypatch.setenv('NFA_SPARSE_STATS', 'owner')
 
 
 def route(**updates):
@@ -39,14 +39,14 @@ def test_selection_reasons(updates, reason):
 
 
 def test_explicit_policies(monkeypatch):
-    monkeypatch.delenv('TLI_SPARSE_SELECTION')
+    monkeypatch.delenv('NFA_SPARSE_SELECTION')
     assert route() == 'disabled'
-    monkeypatch.setenv('TLI_SPARSE_SELECTION', 'auto')
+    monkeypatch.setenv('NFA_SPARSE_SELECTION', 'auto')
     assert route() == 'selection_policy'
-    monkeypatch.setenv('TLI_SPARSE_SELECTION', '1')
-    monkeypatch.setenv('TLI_SPARSE_STATS', 'owenr')
+    monkeypatch.setenv('NFA_SPARSE_SELECTION', '1')
+    monkeypatch.setenv('NFA_SPARSE_STATS', 'owenr')
     assert route() == 'stats_policy'
-    monkeypatch.setenv('TLI_SPARSE_STATS', 'sorted')
+    monkeypatch.setenv('NFA_SPARSE_STATS', 'sorted')
     assert route() == 'unaligned_requires_owner'
     assert route(capacity=16400) is None
     monkeypatch.setattr(torch, '__version__', '2.9.0')
@@ -54,7 +54,7 @@ def test_explicit_policies(monkeypatch):
 
 
 def test_supported_geometry_uses_same_decision():
-    from sparse_attn.ops.sparse_normalization import supported_geometry
+    from sparse_attn.indexer.compaction.sparse_normalization import supported_geometry
     for capacity in (9216, 9217, 16400, 16401, 2**31-1):
         for group in (0, 1, 3, 4):
             args = (torch.bfloat16, torch.device('cuda'), capacity, group, 8)

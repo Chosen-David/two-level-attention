@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import pytest
 import torch
-from sparse_attn.ops.batch_index_maintenance import validate_maintenance,maintain_batched,maintenance_route
+from sparse_attn.indexer.candidate.maintenance import validate_maintenance,maintain_batched,maintenance_route
 
 
 def _metadata(device='cpu',batch=2,capacity=65):
@@ -40,7 +40,7 @@ def test_large_input_batch_stride_is_validated_without_allocating_storage():
 
 
 def test_kernel_widens_before_batch_products_and_preserves_reduction_nodes():
-    source=Path(__file__).parents[1]/'sparse_attn/indexer/tli_indexer.py'
+    source=Path(__file__).parents[1]/'sparse_attn/indexer/nfa_indexer.py'
     tree=ast.parse(source.read_text());fn=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='_iter3_maint_kernel')
     text=ast.unparse(fn)
     assert 'tl.program_id(0).to(tl.int64)' in text
@@ -65,7 +65,7 @@ def test_configuration_has_explicit_row_fallback(field,value):
 @pytest.mark.parametrize('capacity',[65,129,32768])
 @pytest.mark.parametrize('with_average',[False,True])
 def test_native_batched_maintenance_exact_primary_rows(batch,capacity,with_average):
-    from sparse_attn.indexer.tli_indexer import _iter3_maint
+    from sparse_attn.indexer.nfa_indexer import _iter3_maint
     torch.manual_seed(320304)
     values=list(_metadata('cuda',batch,capacity));k,pos,alive,indices,lo,hi,avg,fine=values
     # Both supported raw-K layouts must use batch strides, not flattened heads.

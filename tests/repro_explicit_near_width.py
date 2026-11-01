@@ -20,10 +20,10 @@ from test_explicit_near_page_budget import config, load_constructors
 
 
 def main():
-    path = ROOT / "sparse_attn/indexer/tli_indexer.py"
+    path = ROOT / "sparse_attn/indexer/nfa_indexer.py"
     source = path.read_text()
     cls = next(n for n in ast.parse(source).body
-               if isinstance(n, ast.ClassDef) and n.name == "TLIIndexer")
+               if isinstance(n, ast.ClassDef) and n.name == "NFAIndexer")
     methods = {n.name: n for n in cls.body if isinstance(n, ast.FunctionDef)}
     predicate = ast.dump(ast.parse("self.nt_near_len is not None", mode="eval").body)
     names = ("_maybe_build_kmeans", "compute_score", "compute_mask",
@@ -47,7 +47,7 @@ def main():
                  str(path), "exec"), property_scope)
     indexer._sink_pool_lo_blk = property_scope["_sink_pool_lo_blk"]
     cases, failures = [], []
-    with patch.dict(os.environ, TLI_E151C_ORACLE_QUOTA=""):
+    with patch.dict(os.environ, NFA_E151C_ORACLE_QUOTA=""):
         for bs in (32, 64, 128):
             for nl in (0, 1, bs - 1, bs, bs + 1, 2 * bs, 512):
                 for nt in (0, "off"):
@@ -55,10 +55,10 @@ def main():
                         case = dict(bs=bs, nl=nl, nt=nt, length=length)
                         cases.append(case)
                         obj = indexer(config(
-                            tia_block_size=bs, tli_sink_tokens=bs, tli_swa_size=bs,
+                            tia_block_size=bs, nfa_sink_tokens=bs, nfa_swa_size=bs,
                             tia_level2_topk=2 * bs + 128,
-                            tli_near_pages=min(2, nl // bs),
-                            tli_near_tokens=nt, tli_near_len=nl))
+                            nfa_near_pages=min(2, nl // bs),
+                            nfa_near_tokens=nt, nfa_near_len=nl))
                         for name in names:
                             scope = dict(self=obj, bs=bs, _bs=bs, sink_tok=bs,
                                          mid_len=length - 2 * bs,
@@ -72,7 +72,7 @@ def main():
                             if got != want:
                                 failures.append(dict(case, method=name, got=got, want=want))
     # Aligned, non-overlapping protection bands avoid page rounding/bypass ambiguity.
-    obj = indexer(config(tli_near_pages=0, tli_near_tokens=0, tli_near_len=0))
+    obj = indexer(config(nfa_near_pages=0, nfa_near_tokens=0, nfa_near_len=0))
     scope = dict(self=obj, bs=64, mid_len=896, near_base=960)
     exec(branches["compute_mask"], scope)
     exec(boundary_code, scope)

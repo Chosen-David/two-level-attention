@@ -19,7 +19,7 @@ except Exception:  # pragma: no cover
 # 【E127 iter3】GPU 端错误标志缓冲：decode 全程零 host 同步的配套机制。
 # 旧口径的两次当场同步（counts 读回取 W + B7 空行检查）每次排空整个
 # launch 队列——36 层模型每 token 36 次，CPU 无法跨层跑在 GPU 前面。
-# 现把契约违规（B7 空行 / W 超 TLI_E127_W_UPPER 上界）以 GPU 端原地点并
+# 现把契约违规（B7 空行 / W 超 NFA_E127_W_UPPER 上界）以 GPU 端原地点并
 # （copy_ + maximum，无同步）记录到本模块全局标志，生成结束由
 # eager_decoding_check_errors() 一次性读回校验——fail-closed 语义保持
 # （错误仍然显式 raise、整次生成作废），仅 raise 时机后移到生成结束，
@@ -41,10 +41,10 @@ def _err_flag(device: torch.device) -> torch.Tensor:
 def eager_decoding_check_errors(device=None, clear: bool = True):
     """【E127 iter3】生成结束一次性错误校验（读取端唯一同步点）。
 
-    TLI_E127_FAST=1 的 gather 路径不再当场 raise（避免每层每步同步），
+    NFA_E127_FAST=1 的 gather 路径不再当场 raise（避免每层每步同步），
     而是把契约违规记录到 GPU 标志；生产接线上层在生成结束后调用本函数
     一次性校验。code=1 → B7 全 False 行（同原报错文案）；code=2 → 某行
-    mask 选中数超过 TLI_E127_W_UPPER（漏选保护，fail-closed——提示调大
+    mask 选中数超过 NFA_E127_W_UPPER（漏选保护，fail-closed——提示调大
     上界或回退 env=0）。clear=True 校验后清零（连续多次生成各查各的）。
     """
     if device is None:
@@ -74,10 +74,10 @@ def _raise_for_code(code: int):
         )
     if code == 2:
         raise RuntimeError(
-            "eager_decoding_attn: mask 某行选中数超过 TLI_E127_W_UPPER"
+            "eager_decoding_attn: mask 某行选中数超过 NFA_E127_W_UPPER"
             "上界——gather 路径已 fail-closed 截断（本提示应在校验点"
-            "raise，整次生成作废）。请调大 TLI_E127_W_UPPER 或设"
-            "TLI_E127_FAST=0 回退稠密路径。"
+            "raise，整次生成作废）。请调大 NFA_E127_W_UPPER 或设"
+            "NFA_E127_FAST=0 回退稠密路径。"
         )
     if code == 3:
         raise RuntimeError(
@@ -99,7 +99,7 @@ def eager_decoding_request_guard(device=None):
     生成作废——但修复前该函数唯一调用者在 exp/bench/{e127_stage_bench,
     test_e127_gates}，三条生产入口（benchmark/LongBench/pred.py、
     benchmark/RULER/pred_ruler.py、benchmark/RULER/llm_eval.py）均未消
-    费：TLI_E127_FAST=1 下触发契约违规时，零输出/截断注意力照常完成生成
+    费：NFA_E127_FAST=1 下触发契约违规时，零输出/截断注意力照常完成生成
     并写盘 JSONL，fail-closed 没落到消费者。
 
     语义：进入时清空设备错误标志（防跨请求继承旧 flag——上一请求未消费
@@ -110,7 +110,7 @@ def eager_decoding_request_guard(device=None):
     生产接线（三条入口均已接入，见各文件「095 修复」注释）：
       benchmark/LongBench/pred.py    —— 每样本生成段（record append 前）
       benchmark/RULER/pred_ruler.py  —— 每行生成段（fout.write 前；raise
-        后 gen 目录不 commit、.tli_gen 指针不切，best-file 口径不变）
+        后 gen 目录不 commit、.nfa_gen 指针不切，best-file 口径不变）
       benchmark/RULER/llm_eval.py    —— simple_evaluate 整段（save_results 前）
 
     【限制（如实登记）】_ERR_FLAG 是设备级全局单例，本 guard 不做同进程
@@ -790,7 +790,7 @@ def eager_decoding_attn(
 ):
     """【E127 iter2+3】稀疏 attention 消费端入口（原实现原样保留为 _dense 版）。
 
-    TLI_E127_FAST=1 时走 gather 路径：原实现对全序列 S 个 token 全量计算
+    NFA_E127_FAST=1 时走 gather 路径：原实现对全序列 S 个 token 全量计算
     fp32 分数再 mask（稀疏性在消费端被完全丢弃——S=64K 时 k.to(float32)
     物化 + 全长 einsum + 全长 softmax ≈ 2.2ms/层步）；gather 路径只取
     每行 mask 选中的 token（~K2=1024，含 sink128+swa128 强制区）做 attention，带宽
@@ -798,7 +798,7 @@ def eager_decoding_attn(
     位 -inf) ≡ softmax(选中子集)（exp(-inf)=0 精确），数值上仅归约顺序
     不同（输出 ULP 级漂移，allclose(1e-2) 门禁）。
 
-    【iter3】gather 路径零 host 同步：W 上界化（TLI_E127_W_UPPER，契约
+    【iter3】gather 路径零 host 同步：W 上界化（NFA_E127_W_UPPER，契约
     上界 K2（含 sink/swa 强制区）≈1024，默认 2048）+ B7/W 校验 GPU 端并入全局错误
     标志（不再当场 raise）——生成结束由 eager_decoding_check_errors()
     一次性校验（fail-closed 语义保持，raise 时机后移）。
@@ -818,8 +818,8 @@ def eager_decoding_attn(
             allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
     _validate_gqa_shape(q, k, v, mask, block_size, allow_kv_hetero)
     # 【E127 inplace 合并（2026-10-12）】gather 路径并为默认——env 门反转，
-    # TLI_E127_FAST=0 显式回退 dense 路径（紧急逃生口，归档复现用）。
-    if os.environ.get("TLI_E127_FAST", "1") != "0":
+    # NFA_E127_FAST=0 显式回退 dense 路径（紧急逃生口，归档复现用）。
+    if os.environ.get("NFA_E127_FAST", "1") != "0":
         return _eager_decoding_attn_gather(
             q, k, v, mask, block_size, cu_seqlens_k, softmax_scale,
             allow_kv_hetero=allow_kv_hetero, valid_length=valid_length)
@@ -853,7 +853,7 @@ def _eager_decoding_attn_batch(
     if softmax_scale is None:
         softmax_scale = k.shape[-1] ** -0.5
     if block_size != 1:
-        raise ValueError("批量路径要求 block_size==1（TLI 生产 mask token 级）")
+        raise ValueError("批量路径要求 block_size==1（NFA 生产 mask token 级）")
     B = q.shape[0]
     H = q.shape[-2]
     Hkv = k.shape[-2]
@@ -883,7 +883,7 @@ def _eager_decoding_attn_batch(
             and _triton_kv_layout_compatible(k, v)
             and m0.stride(-1) == 1 and k.stride(-1) == 1 and v.stride(-1) == 1
             and cu.dtype in (torch.int32, torch.int64)):
-        W_up = min(int(os.environ.get("TLI_E127_W_UPPER", "2048")), T)
+        W_up = min(int(os.environ.get("NFA_E127_W_UPPER", "2048")), T)
         if W_up * 8 <= T:
             try:
                 return _eager_gather_triton_batch(
@@ -1051,7 +1051,7 @@ def _eager_decoding_attn_gather(
     per_qh = m0.shape[0] == q.shape[-2] and q.shape[-2] != k.shape[-2]
 
     # 【iter7】Triton 融合主路径：T ≥ 16K（同 torch gather 路由）、
-    # block_size==1（TLI 生产 mask 即 token 级，kernel A 直接读 m0 免
+    # block_size==1（NFA 生产 mask 即 token 级，kernel A 直接读 m0 免
     # repeat）、布局/dtype 契约满足时，两个 kernel 替代下方 ~15 op 链。
     # 路由条件全部 host 已知量（零同步判走）；W_upper 判定与 torch 路径
     # 同口径（W*8>T 回退 dense，生产 W≈1344 在 16K+ 档同向）。cu 接受
@@ -1072,7 +1072,7 @@ def _eager_decoding_attn_gather(
         and m0.stride(-1) == 1 and k.stride(-1) == 1 and v.stride(-1) == 1
         and cu_seqlens_k.dtype in (torch.int32, torch.int64)
     ):
-        W_up_tri = min(int(os.environ.get("TLI_E127_W_UPPER", "2048")), T_tok)
+        W_up_tri = min(int(os.environ.get("NFA_E127_W_UPPER", "2048")), T_tok)
         if W_up_tri * 8 <= T_tok:
             try:
                 return _eager_gather_triton(
@@ -1113,14 +1113,14 @@ def _eager_decoding_attn_gather(
 
     # 【iter3】零同步化：W 用 host 已知的契约上界（indexer 契约：每行选中
     # = K2 ≈ 1024 token，含 sink128+swa128 强制区；预算从 K2 内扣除，
-    # 不额外叠加），上界取 2048 留安全垫，env TLI_E127_W_UPPER 可调。
+    # 不额外叠加），上界取 2048 留安全垫，env NFA_E127_W_UPPER 可调。
     # topk k=W_upper 时真实
     # counts ≤ W_upper 的行全部命中 + 补齐位由 valid 掩掉（与原精确 W 路径
     # 同一掩码机制）；某行 counts > W_upper 时漏选保护 fail-closed（下方
     # code=2 记入 GPU 标志，生成结束校验 raise）。
     # 路由等价性：原逻辑用真实 W 判 W*8>T，生产 mask W≈1024 与 W_upper=2048
     # 在 16K/32K/64K 档同向（都走 gather），行为零变化。
-    W_upper = min(int(os.environ.get("TLI_E127_W_UPPER", "2048")), T)
+    W_upper = min(int(os.environ.get("NFA_E127_W_UPPER", "2048")), T)
     if W_upper * 8 > T:
         return _eager_decoding_attn_dense(
             q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0),

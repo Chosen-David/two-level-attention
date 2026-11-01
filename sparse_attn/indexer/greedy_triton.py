@@ -3,8 +3,8 @@
 """E113：sim_greedy 增量贪心聚类的 Triton kernel（方案1：单 kernel 顺序化）。
 
 == 地位（E113b e2e 集成）==
-本文件是 **生产路径 kernel 本体**（tli_indexer.py `_greedy_cluster_pass`
-调度器的 CUDA 路径，env 开关 SGLANG_TLI_GREEDY_KERNEL，默认 1）。
+本文件是 **生产路径 kernel 本体**（nfa_indexer.py `_greedy_cluster_pass`
+调度器的 CUDA 路径，env 开关 SGLANG_NFA_GREEDY_KERNEL，默认 1）。
 原型/单测/bench 脚本在 two-level-attention/exp/trace/e113_*.py（exp/trace
 的 e113_greedy_triton.py 是本文件的转发入口，单一事实源在这里——远程部署
 只需 rsync sparse_attn 目录即可携带 kernel）。
@@ -13,7 +13,7 @@ research/docs/sim_greedy_kernel_design.md（设计篇）。
 
 == 背景 ==
 E110 落地的 `_greedy_cluster_pass`（two-level-attention sparse_attn/indexer/
-tli_indexer.py）是逐 token 的 Python 循环：每步 bmm/argmax/gather/index_add
+nfa_indexer.py）是逐 token 的 Python 循环：每步 bmm/argmax/gather/index_add
 约 10 次 kernel launch，E108 probe 实测 T≈16K 时 ~5.8 s/层（sim=0.9 时 27 s），
 是远程 sim_greedy e2e 臂 13 h/臂 的直接根因。
 
@@ -128,7 +128,7 @@ def greedy_pass_triton(x, sim, sums, cnt, sq, k_live, BT=512, num_warps=4):
     #   BT 不影响语义：dot 归约沿 dd 维（行内 32 元素，与 BT 无关），
     #   跨 tile 严格 > 的 first-occurrence tie-break 与 BT 无关 → 改 BT 逐位不变。
     # num_warps=4 时单 tile [512,32] = 64KB fp32，寄存器/L1 平衡点。
-    """与 TLIIndexer._greedy_cluster_pass 同签名同语义的 Triton 版。
+    """与 NFAIndexer._greedy_cluster_pass 同签名同语义的 Triton 版。
 
     x: [T, H, dd]（按序）；sums [H,K,dd] / cnt [H,K] / sq [H,K] / k_live [H]
     为既有簇状态（全零 = 冷启动；非零 = 续跑，与全量重放逐位一致——
@@ -225,7 +225,7 @@ def greedy_build_triton(x, sim, chunk=16384, BT=512, num_warps=4):
 # grid block 数 H·SPLIT ≤ SM 数时保守安全（每 block 仅 4 warps + 少量
 # scratch 寄存器，每 SM 至少驻留 1 block → 全 grid 必然并发驻留，spin
 # barrier 不会等未调度的 program）。wrapper 按 device SM 数自动钳制
-# SPLIT，env 可覆盖（TLI_E131_GREEDY_SPLIT）。
+# SPLIT，env 可覆盖（NFA_E131_GREEDY_SPLIT）。
 #
 # == 【E132b TL-E131S2-BARRIER-RESIDENCY-130】limitation（如实声明）==
 # 跨架构 residency 未证明，H20 实证通过（e131s2_v2_validate V1-V5 全
@@ -233,7 +233,7 @@ def greedy_build_triton(x, sim, chunk=16384, BT=512, num_warps=4):
 # residency_clamp 的寄存器计数法不构成跨架构无死锁证明（未覆盖编译后
 # shared memory 占用与寄存器分配粒度，见其 docstring）；未知架构/
 # 新编译器版本上首次运行前应先小规模探测。带外 watchdog 钩子见
-# greedy_pass_triton_v2 wrapper（TLI_E131_V2_TIMEOUT_MS）。
+# greedy_pass_triton_v2 wrapper（NFA_E131_V2_TIMEOUT_MS）。
 # ====================================================================== #
 
 @triton.jit
@@ -337,7 +337,7 @@ def _v2_split_bound(H, device):
     min(24, 4·SM//H)。死锁安全由 _v2_residency_clamp 二次钳制（按编译
     后实测寄存器数），本函数只定「想要多少」。"""
     import os as _os
-    env = _os.environ.get("TLI_E131_GREEDY_SPLIT", "")
+    env = _os.environ.get("NFA_E131_GREEDY_SPLIT", "")
     if env:
         return max(0, int(env))
     try:
@@ -372,7 +372,7 @@ def _v2_residency_clamp(SPLIT, H, dd, BT, num_warps, device, probe_tensors):
         更小 SPLIT 时靠「n_regs 对 SPLIT 不敏感」的经验假设）。
     跨架构 residency 未证明；H20-3e 实证通过（V1-V5 + e2e mask 逐位）。
     未知架构/新编译器首次运行应先小规模探测（探测失败已 fail-closed
-    回退 v1）。带外 watchdog：TLI_E131_V2_TIMEOUT_MS（见 wrapper）。"""
+    回退 v1）。带外 watchdog：NFA_E131_V2_TIMEOUT_MS（见 wrapper）。"""
     try:
         dev = torch.device(device) if isinstance(device, str) else device
         dev_idx = dev.index if dev.index is not None else torch.cuda.current_device()
@@ -430,7 +430,7 @@ def greedy_pass_triton_v2(x, sim, sums, cnt, sq, k_live, BT=256, num_warps=4):
     【E132b TL-E131S2-BARRIER-RESIDENCY-130】跨架构 residency 未证明
     （H20 实证通过；_v2_residency_clamp 寄存器计数法的 limitation 见
     其 docstring）。带外 watchdog 钩子：launch 前 wrapper 只记录 host
-    时间戳 + 超时阈值（TLI_E131_V2_TIMEOUT_MS，默认 120000ms，≤0 禁
+    时间戳 + 超时阈值（NFA_E131_V2_TIMEOUT_MS，默认 120000ms，≤0 禁
     用）——【不】在 launch 后加 synchronize 计时（会破坏异步语义：
     decode step 内 kernel 本就异步排队，强同步会把流水线串行化，且
     他进程占卡时 sync 等待会被误报成 kernel 超时）。超时检查由带外
@@ -515,10 +515,10 @@ _V2_LAUNCH_TS = None   # (launch_host_ts, timeout_s)：最近一次 v2 launch
 
 
 def _v2_timeout_s():
-    """TLI_E131_V2_TIMEOUT_MS（毫秒，默认 120000）→ 秒；≤0 / 非法值 = 0
+    """NFA_E131_V2_TIMEOUT_MS（毫秒，默认 120000）→ 秒；≤0 / 非法值 = 0
     （禁用带外检查）。"""
     import os as _os
-    env = _os.environ.get("TLI_E131_V2_TIMEOUT_MS", "")
+    env = _os.environ.get("NFA_E131_V2_TIMEOUT_MS", "")
     try:
         ms = float(env) if env else 120000.0
     except ValueError:

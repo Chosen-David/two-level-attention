@@ -7,7 +7,7 @@ import torch
 
 @pytest.mark.parametrize('dtype', [torch.float16, torch.bfloat16, torch.float32])
 def test_fused_gqa_mean_dispatch_dtype(dtype):
-    source = Path(__file__).parents[1] / 'sparse_attn/indexer/tli_indexer.py'
+    source = Path(__file__).parents[1] / 'sparse_attn/indexer/nfa_indexer.py'
     tree = ast.parse(source.read_text())
     guards = [n.test for n in ast.walk(tree) if isinstance(n, ast.If)
               and '_HAS_TRITON' in ast.unparse(n.test)

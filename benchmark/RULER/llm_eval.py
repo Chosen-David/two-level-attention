@@ -67,9 +67,9 @@ def parse_args():
 @torch.no_grad()
 def main():
     args = parse_args()
-    if args.method == "tli":
+    if args.method == "nfa":
         raise RuntimeError(
-            "llm_eval TLI cache path has not been migrated; use "
+            "llm_eval NFA cache path has not been migrated; use "
             "benchmark/RULER/pred_ruler.py with PagedRegionCache")
     print("model: {}".format(args.model))
 
@@ -86,7 +86,7 @@ def main():
         trust_remote_code=True,
     ).eval()
 
-    snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
+    snapshot = resolve_treatment_snapshot(args) if args.method == "nfa" else None
     method_name = get_method_name_with_info(args, snapshot)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     result_filename = build_result_filename(
@@ -125,7 +125,7 @@ def main():
     task_names = lm_eval_utils.pattern_match(args.tasks, task_manager.all_tasks)
 
     print("task_names: {}".format(task_names))
-    # 【095 修复】TLI_E127_FAST=1 的 gather 路径契约违规延迟到 GPU 端错误
+    # 【095 修复】NFA_E127_FAST=1 的 gather 路径契约违规延迟到 GPU 端错误
     # 标志，由 guard 在生成段（simple_evaluate 全程）边界一次校验 raise
     # ——异常传播后 save_results 不可达，无任何完成外观结果产物落盘。
     with eager_decoding_request_guard():
@@ -163,7 +163,7 @@ def save_results(args, filename, result_dict, result_table, metrics,
       ② 结果 receipt（{txt}.receipt.json）：result sha256 + 行数/字节数 +
          cap 回执（max_length 原值）+ 任务集清单与摘要 + 081 treatment
          manifest sha——结果身份可独立复核，不靠文件名单点承载；
-      ③ 082 treatment manifest sidecar（tli 臂）。
+      ③ 082 treatment manifest sidecar（nfa 臂）。
     """
 
     # 保存文本格式的结果表格
@@ -208,7 +208,7 @@ def save_results(args, filename, result_dict, result_table, metrics,
         "treatment_manifest_sha256": None,
     }
 
-    # 082：tli 臂结果旁挂 canonical treatment manifest sidecar（与
+    # 082：nfa 臂结果旁挂 canonical treatment manifest sidecar（与
     # LongBench 写门/sidecar 同一 manifest 对象、同一后缀语义）——
     # 结果身份不靠短哈希单点承载，可独立复核。106：原子落盘 + sha 进
     # receipt。

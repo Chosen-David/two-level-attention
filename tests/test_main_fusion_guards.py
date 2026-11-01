@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import pytest
 import torch
-from sparse_attn.indexer import tli_indexer as mod
+from sparse_attn.indexer import nfa_indexer as mod
 
 def bypass_function(source):
     tree=ast.parse(source)

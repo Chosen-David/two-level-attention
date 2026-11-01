@@ -7,7 +7,7 @@ pytestmark=pytest.mark.skipif(not torch.cuda.is_available(),reason='requires CUD
 @pytest.mark.parametrize('k',[1,32,1024,4096])
 @pytest.mark.parametrize('heads',[1,24])
 def test_native_tie_prefix_replay(capacity,k,heads):
-    from sparse_attn.ops.compact_ranking import compact_topk
+    from sparse_attn.indexer.compaction.packer import compact_topk
     torch.manual_seed(951)
     r=min(1536,capacity//2)
     ids=torch.stack([torch.randperm(capacity,device='cuda')[:r] for _ in range(heads)]).contiguous()
@@ -38,7 +38,7 @@ def test_native_tie_prefix_replay(capacity,k,heads):
 
 
 def test_zero_candidate_domain():
-    from sparse_attn.ops.compact_ranking import compact_topk
+    from sparse_attn.indexer.compaction.packer import compact_topk
     p=torch.zeros((2,16400),device='cuda',dtype=torch.bfloat16)
     ids=torch.empty((2,0),device='cuda',dtype=torch.int64)
     keep=torch.empty_like(ids,dtype=torch.bool)
@@ -50,17 +50,17 @@ def test_zero_candidate_domain():
 def test_production_rank_replay(capacity,monkeypatch):
     import runpy
     from pathlib import Path
-    from sparse_attn.indexer.tli_indexer import TLIIndexer
+    from sparse_attn.indexer.nfa_indexer import NFAIndexer
     torch.manual_seed(952)
-    helpers=runpy.run_path(str(Path(__file__).parents[1]/'exp/bench/test_tli_graph_gates.py'))
-    idx=TLIIndexer(helpers['_make_prod_args']());idx.layer_idx=2;idx.clear()
+    helpers=runpy.run_path(str(Path(__file__).parents[1]/'exp/bench/test_nfa_graph_gates.py'))
+    idx=NFAIndexer(helpers['_make_prod_args']());idx.layer_idx=2;idx.clear()
     q=torch.randn((1,1,32,128),device='cuda',dtype=torch.bfloat16)
     key=torch.randn((1,capacity,8,128),device='cuda',dtype=q.dtype)
     length=torch.tensor([capacity],device='cuda')
     cu=torch.tensor([0,capacity],device='cuda',dtype=torch.int32)
     index=idx.prepare_index(key,cu)
-    monkeypatch.setenv('TLI_COMPACT_NORMALIZATION','1')
-    monkeypatch.setenv('TLI_COMPACT_RANKING','1')
+    monkeypatch.setenv('NFA_COMPACT_NORMALIZATION','1')
+    monkeypatch.setenv('NFA_COMPACT_RANKING','1')
     def run():return idx.compute_selection_graph(q,index,128**-.5,length)
     run();graph=torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):actual=run()
@@ -69,12 +69,12 @@ def test_production_rank_replay(capacity,monkeypatch):
     assert idx._graph_ranking_gather_route=='blocked_prefix'
     for n in (132,4097,capacity,512,capacity-1):
         length.fill_(n);q.normal_();graph.replay()
-        monkeypatch.setenv('TLI_COMPACT_RANKING','0');expected=run()
+        monkeypatch.setenv('NFA_COMPACT_RANKING','0');expected=run()
         assert idx._graph_ranking_route=='full_width_native'
         assert torch.equal(actual.indices,expected.indices),n
         assert torch.equal(actual.counts,expected.counts),n
     from sparse_attn.ops import compact_ranking
-    monkeypatch.setenv('TLI_COMPACT_RANKING','1')
+    monkeypatch.setenv('NFA_COMPACT_RANKING','1')
     monkeypatch.setattr(compact_ranking,'compact_topk',lambda *args:None)
     fallback=run()
     assert idx._graph_ranking_route=='full_width_native'
@@ -83,7 +83,7 @@ def test_production_rank_replay(capacity,monkeypatch):
     assert torch.equal(fallback.counts,expected.counts)
 
 def test_unsupported_static_geometry():
-    from sparse_attn.ops.compact_ranking import compact_topk
+    from sparse_attn.indexer.compaction.packer import compact_topk
     p=torch.zeros((1,16400),device='cuda',dtype=torch.bfloat16)
     ids=torch.zeros((1,1),device='cuda',dtype=torch.int64)
     keep=torch.ones_like(ids,dtype=torch.bool)
@@ -94,7 +94,7 @@ def test_unsupported_static_geometry():
 
 @pytest.mark.parametrize('k',[1,2,3,9,12,32])
 def test_histogram_bit_boundaries(k):
-    from sparse_attn.ops.compact_rank_threshold import bf16_kth
+    from sparse_attn.indexer.compaction.rank_threshold import bf16_kth
     codes=torch.tensor([1,127,128,255,256,257,0x3eff,0x3f00,0x3f7f,0x3f80,0,1],
                        device='cuda',dtype=torch.int16)
     scores=codes.view(torch.bfloat16).expand(3,-1)

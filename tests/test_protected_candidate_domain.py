@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 import torch
 from sparse_attn.indexer.candidate_domain import complete_protected_candidates
-from sparse_attn.indexer import tli_indexer as mod
+from sparse_attn.indexer import nfa_indexer as mod
 
 
 @pytest.mark.parametrize('length,sink,swa', [(1,4,8),(5,4,8),(12,4,8),(19,4,8),(64,0,0),(65,4,0),(129,64,64)])
@@ -23,8 +23,8 @@ def test_protected_union_counts_once(length,sink,swa):
 def make_indexer():
     helpers=runpy.run_path(str(Path(__file__).parents[1]/'exp/bench/test_glm47_d256_gates.py'))
     args=helpers['make_prod_args'](128)
-    args.tia_level1_topk=4;args.tli_near_pages=2;args.tli_near_len=128
-    args.tia_level2_topk=192;args.tli_sink_tokens=4;args.tli_swa_size=128
+    args.tia_level1_topk=4;args.nfa_near_pages=2;args.nfa_near_len=128
+    args.tia_level2_topk=192;args.nfa_sink_tokens=4;args.nfa_swa_size=128
     return helpers['make_indexer'](128,args)
 
 

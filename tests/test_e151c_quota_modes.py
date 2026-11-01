@@ -7,19 +7,19 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from sparse_attn.indexer import TLIIndexer
+from sparse_attn.indexer import NFAIndexer
 
 
 UNSUPPORTED = (
-    dict(tli_gamma="off"),
-    dict(tli_alpha=0),
-    dict(tli_beta=0),
-    dict(tli_alpha=0, tli_beta=0),
-    dict(tli_sinkswa_only=True),
-    dict(tli_moba=True),
-    dict(tli_sigma_select='far'),
-    dict(tli_sigma_select='near'),
-    dict(tli_sigma_select='mid'),
+    dict(nfa_gamma="off"),
+    dict(nfa_alpha=0),
+    dict(nfa_beta=0),
+    dict(nfa_alpha=0, nfa_beta=0),
+    dict(nfa_sinkswa_only=True),
+    dict(nfa_moba=True),
+    dict(nfa_sigma_select='far'),
+    dict(nfa_sigma_select='near'),
+    dict(nfa_sigma_select='mid'),
 )
 
 
@@ -27,17 +27,17 @@ def make_index(overrides, quota=None):
     args = dict(
         tia_block_size=64, tia_level1_topk=8, tia_level2_topk=256,
         tia_level2_cmp_ratio=4, tia_enable_async_topk=False,
-        tli_enable_layer_skip=False, tli_enable_kmeans=False,
-        tli_subspace='tail', tli_sink_tokens=64, tli_swa_size=64,
-        tli_alpha=.5, tli_beta=.5, tli_gamma=.5,
+        nfa_enable_layer_skip=False, nfa_enable_kmeans=False,
+        nfa_subspace='tail', nfa_sink_tokens=64, nfa_swa_size=64,
+        nfa_alpha=.5, nfa_beta=.5, nfa_gamma=.5,
     )
     args.update(overrides)
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / 'quota.json'
         path.write_text(json.dumps(quota))
-        with patch.dict(os.environ, TLI_E151C_ORACLE_QUOTA=(
+        with patch.dict(os.environ, NFA_E151C_ORACLE_QUOTA=(
                 '' if quota is None else str(path))):
-            return TLIIndexer(SimpleNamespace(**args))
+            return NFAIndexer(SimpleNamespace(**args))
 
 
 class QuotaModeTests(unittest.TestCase):
@@ -54,10 +54,10 @@ class QuotaModeTests(unittest.TestCase):
                 self.assertIsNone(make_index(config)._e151c_quota)
 
     def test_supported_modes_preserve_quota(self):
-        for config in ({}, dict(tli_gamma=0), dict(tli_gamma=1),
-                       dict(tli_per_q_head=True),
-                       dict(tli_enable_kmeans=True, tli_far_select='cluster'),
-                       dict(tli_enable_kmeans=True, tli_far_select='sim_greedy')):
+        for config in ({}, dict(nfa_gamma=0), dict(nfa_gamma=1),
+                       dict(nfa_per_q_head=True),
+                       dict(nfa_enable_kmeans=True, nfa_far_select='cluster'),
+                       dict(nfa_enable_kmeans=True, nfa_far_select='sim_greedy')):
             with self.subTest(config=config):
                 self.assertEqual(make_index(config, [0, 32])._e151c_quota, [0, 32])
 

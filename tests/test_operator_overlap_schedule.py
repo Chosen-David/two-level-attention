@@ -21,7 +21,7 @@ def test_protected_starts_before_index_and_join_follows_selected(monkeypatch):
         def record_stream(self, stream):
             events.append(('record', stream.name))
     tensor = Tensor()
-    monkeypatch.setenv('TLI_OPERATOR_MODE', 'overlap')
+    monkeypatch.setenv('NFA_OPERATOR_MODE', 'overlap')
     monkeypatch.setattr(pipeline, '_protected_stream', lambda device: side)
     monkeypatch.setattr(torch.cuda, 'current_stream', lambda device: main)
     monkeypatch.setattr(torch.cuda, 'stream', lambda stream: nullcontext())
@@ -54,6 +54,6 @@ def test_protected_starts_before_index_and_join_follows_selected(monkeypatch):
 
 def test_invalid_operator_backend_fails_before_dispatch(monkeypatch):
     import pytest
-    monkeypatch.setenv('TLI_OPERATOR_BACKEND', 'unknown')
+    monkeypatch.setenv('NFA_OPERATOR_BACKEND', 'unknown')
     with pytest.raises(ValueError, match='BACKEND'):
         pipeline.decode_indexed(None, None, None, None, None, None, None, 1.)
