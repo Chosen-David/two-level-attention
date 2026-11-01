@@ -1606,6 +1606,12 @@ class GraphReadyPagedRegionCache:
 
     def _resident_page_ranges_for_length(self, state, length):
         page = self.geometry.page
+        # Near-only skip hides computation temporarily. Those keys later enter
+        # the retained far region, so their original KV must remain resident.
+        # Page IDs are shared across layers: any far-retaining layer requires
+        # the full history in the common table, even when it skips near.
+        if any(not skip_far for skip_far in state.skip_far_by_layer):
+            return [(0, (length - 1) // page)] if length > 0 else []
         page_ranges = []
         groups = state.skip_policy_groups
         if not groups:
@@ -2246,3 +2252,4 @@ class GraphReadyPagedRegionCache:
                 for layer in self.layers
             ],
         }
+
