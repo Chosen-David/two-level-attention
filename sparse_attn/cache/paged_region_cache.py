@@ -1606,6 +1606,12 @@ class GraphReadyPagedRegionCache:
 
     def _resident_page_ranges_for_length(self, state, length):
         page = self.geometry.page
+        # Near-only skip hides computation temporarily. Those keys later enter
+        # the retained far region, so their original KV must remain resident.
+        # Page IDs are shared across layers: any far-retaining layer requires
+        # the full history in the common table, even when it skips near.
+        if any(not skip_far for skip_far in state.skip_far_by_layer):
+            return [(0, (length - 1) // page)] if length > 0 else []
         page_ranges = []
         groups = state.skip_policy_groups
         if not groups:
@@ -1686,8 +1692,8 @@ class GraphReadyPagedRegionCache:
 
         skip_far=False means the far region stays resident, so the worst case is
         the whole sequence through prompt_len + max_new_tokens.  skip_far=True
-        bounds resident storage to sink + near + SWA.  The extra page is a
-        partial-page safety margin for page-boundary growth.
+        bounds resident storage to sink + near + SWA, with a tighter both-skip
+        bound. Keep slack for allocating new pages before recycling stale ones.
         """
         page = self.geometry.page
         if not state.skip_far_by_layer[layer_idx]:
@@ -1698,9 +1704,17 @@ class GraphReadyPagedRegionCache:
                 + max(self.geometry.near, 0)
                 + self.geometry.window
             )
-            # sink/near/SWA are three disjoint intervals and can straddle up to
-            # two extra page boundaries beyond the token-count page ceiling.
-            return (resident_tokens + page - 1) // page + 2
+            bound = (resident_tokens + page - 1) // page + 2
+            if state.skip_near_by_layer[layer_idx]:
+                # Sink starts at zero; an unaligned window of W tokens spans
+                # at most ceil((W - 1) / page) + 1 pages. Reserve TWO windows
+                # so allocate-before-recycle is safe even for non-unit length
+                # changes. The shared max across layers still protects any
+                # layer that retains near or far. Never enlarge the old pool.
+                sink_pages = (self.geometry.sink + page - 1) // page
+                window_pages = (self.geometry.window + page - 2) // page + 1
+                bound = min(bound, sink_pages + 2 * window_pages)
+            return bound
         return (resident_tokens + page - 1) // page + 1
 
     def _write_block_table_row(self, request_id, state):
@@ -2246,3 +2260,4 @@ class GraphReadyPagedRegionCache:
                 for layer in self.layers
             ],
         }
+
