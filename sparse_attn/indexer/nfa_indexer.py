@@ -4171,8 +4171,39 @@ class NFAIndexer(TIAIndexer):
             "byp_tok": byp_tok, "byp_keep": byp_keep,
         }
 
+    def _selection_constants(self, dev, dtype, kt_cap, S_cap, bs,
+                             sink_pool_lo, sink_tok, sparse_selection, *,
+                             retain_for_graph=True):
+        """Keep fixed-capacity Graph addresses; release varying eager lengths.
+
+        The paged eager caller changes S_cap every token. Retaining each such
+        entry for the indexer's lifetime would accumulate O(sum(lengths))
+        constants. It opts out without evicting any existing Graph entry.
+        """
+        if (not retain_for_graph and dev.type == 'cuda'
+                and torch.cuda.is_current_stream_capturing()):
+            raise RuntimeError('transient selector constants are eager-only')
+        _cst_key = (dev, dtype, kt_cap, S_cap, bs, sink_pool_lo, sink_tok, sparse_selection)
+        entries = getattr(self, '_graph_const_entries', {})
+        _cst = entries.get(_cst_key)
+        if _cst is None:
+            _cst = (_cst_key, {
+                "ar_blk": torch.arange(kt_cap, device=dev),
+                "ar_tok": None if sparse_selection else torch.arange(S_cap, device=dev),
+                "ar_bs": torch.arange(bs, device=dev),
+                "inf_t": torch.tensor(float("-inf"), dtype=dtype, device=dev),
+                "zero_l": torch.tensor(0, dtype=torch.long, device=dev),
+                "sink_cross": torch.tensor(sink_tok % bs != 0, device=dev),
+                "far_lo": torch.tensor(sink_pool_lo, dtype=torch.long, device=dev),
+            })
+        if retain_for_graph:
+            entries[_cst_key] = _cst
+            self._graph_const_entries = entries
+            self._graph_const_cache = _cst
+        return _cst
+
     def compute_selection_graph(self, q, index_dict, softmax_scale, valid_len,
-                                selection_mask=None):
+                                selection_mask=None, *, retain_graph_constants=True):
         """与 compute_mask_graph 相同的选择策略，直出紧凑 TokenSelection。
 
         返回 TokenSelection（indices [1,Hkv,K2_static] int32 + counts
@@ -4182,7 +4213,8 @@ class NFAIndexer(TIAIndexer):
         """
         return self.compute_mask_graph(q, index_dict, softmax_scale, valid_len,
                                        return_selection=True,
-                                       selection_mask=selection_mask)
+                                       selection_mask=selection_mask,
+                                       retain_graph_constants=retain_graph_constants)
 
     def compute_candidate_inputs_graph(self, q, index_dict, softmax_scale, valid_len):
         """Produce one request's exact L1/bypass candidates, stopping before L2.
@@ -4200,7 +4232,7 @@ class NFAIndexer(TIAIndexer):
 
     def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len, *,
                            return_selection=False, return_candidates=False,
-                           selection_mask=None):
+                           selection_mask=None, retain_graph_constants=True):
         """graph 专用全张量 compute_mask（生产主配置，逐位对齐 eager）。
 
         输入：q [1,1,H,D]（replay 注入）、index_dict（容量宽：k_min/k_max/
@@ -4285,26 +4317,9 @@ class NFAIndexer(TIAIndexer):
         # 实例级缓存（首调 = warmup，在 capture 之外构建；key 含形状/dtype
         # 与几何常量，配置级常量）。arange 走设备 kernel，本身可 capture，
         # 一并缓存省 replay 轮次的重复 launch。
-        _cst_key = (dev, q.dtype, kt_cap, S_cap, bs, sink_pool_lo, sink_tok, _sparse_selection)
-        # Graphs retain raw pointers to constants allocated before capture.
-        # Keep each geometry/mode alive for this indexer's lifetime: switching
-        # the active key must not invalidate an already captured graph.
-        if not hasattr(self, "_graph_const_entries"):
-            self._graph_const_entries = {}
-        _cst = self._graph_const_entries.get(_cst_key)
-        if _cst is None:
-            _cst = (_cst_key, {
-                "ar_blk": torch.arange(kt_cap, device=dev),
-                "ar_tok": None if _sparse_selection else torch.arange(S_cap, device=dev),
-                "ar_bs": torch.arange(bs, device=dev),
-                "inf_t": torch.tensor(float("-inf"), dtype=q.dtype, device=dev),
-                "zero_l": torch.tensor(0, dtype=torch.long, device=dev),
-                "sink_cross": torch.tensor(sink_tok % bs != 0, device=dev),
-                "far_lo": torch.tensor(sink_pool_lo, dtype=torch.long,
-                                       device=dev),
-            })
-            self._graph_const_entries[_cst_key] = _cst
-        self._graph_const_cache = _cst
+        _cst = self._selection_constants(
+            dev, q.dtype, kt_cap, S_cap, bs, sink_pool_lo, sink_tok,
+            _sparse_selection, retain_for_graph=retain_graph_constants)
         ar_blk = _cst[1]["ar_blk"]
         ar_tok = _cst[1]["ar_tok"]
         ar_bs = _cst[1]["ar_bs"]
@@ -6039,3 +6054,4 @@ def _iter3_compact(cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev):
         ci_out, kp_out, mid_out if mid_out is not None else kp_out, clen,
         R_cap, S_CAP_M1=S_cap - 1, BLOCK=2048, WITH_MID=mid_mask is not None, num_warps=8)
     return ci_out, kp_out, mid_out, clen
+

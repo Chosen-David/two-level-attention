@@ -133,7 +133,7 @@ def region_selection_compact(indexer,q,layer,scale):
         cu_seqlens_k_fine=torch.tensor([0,length],device=device,dtype=torch.int32),valid_length=length)
     vl=torch.tensor([length],device=device,dtype=torch.int64)
     middle=idx.compute_selection_graph(q.transpose(1,2).contiguous(),dictionary,scale,vl,
-                                       selection_mask=visible)
+                                       selection_mask=visible, retain_graph_constants=False)
     selection=_combine_compact(middle,_protected_ids(layer,idx,device),key_heads,length,device)
     receipt=dict(subspace=idx.subspace,dimensions=dims.tolist(),logical_tokens=length,
         visible_tokens=int(visible.sum()),selected_per_kv_head=selection.counts[0].tolist(),
@@ -279,3 +279,4 @@ def decode_graph_ready(module, q, cache, *, gather_indices=None,
         query_start_loc,
         scale=scale,
     )
+

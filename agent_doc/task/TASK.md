@@ -1,6 +1,8 @@
 # two-level-attention 项目任务索引（AI 维护）
 
 ## 2026-11-01
+
+- [ ] [TL-PAGED-CONSTANT-LIFETIME-20261101] paged eager 逐步增长长度不再永久保留 Graph 常量；128 组 host 常量配对一致、7 项普通/-O 回归通过；2 项 CUDA 回归及真实显存/性能待验。[详情](task_details/TL-PAGED-CONSTANT-LIFETIME-20261101.md)。
 - [x] [TL-GLM-NOPE-LAST32-FULL-20261101] `nope_last32` 全量 RULER64K+LongBench AVG5 dense/selected 跑完：1400/1400、2800/2800 arms、0失败；AVG5 dense 46.55 vs selected 44.88；独立验证已落盘。([详情](task_details/TL-GLM-AVG5-RULER-113-20261030.md))
 
 - [x] [TL-GLM-NOPE-LAST32-ALIGNED-20261101] `nope_last32` 在 clean `origin/main` `42821f81` 重跑同口径全量，排除旧 RULER EOS 与 GLM PagedRegionCache 对齐 bug：1400/1400、2800/2800 arms、0失败；RULER MultiKey2 dense 90 vs selected 28，LongBench AVG5 dense 46.55 vs selected 45.27。([详情](task_details/TL-GLM-AVG5-RULER-113-20261030.md))
@@ -276,3 +278,4 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 ## 2026-10-31 paged batch admission
 
 - [ ] [TL-PAGED-DUPLICATE-20261031] 拒绝重复活跃请求，防止同槽覆盖与长度重复递增；host修前复现、修后通过，native/GPU待验。[详情](task_details/TL-PAGED-DUPLICATE-20261031.md)。
+
