@@ -154,7 +154,7 @@ def prefill_frozen_request(model, input_ids, config, geometry, static_gate=None)
     cache.freeze(request_id, skip_far, skip_near, prefill_topk_by_layer)
     return output, dict(profiles=None if static_gate is not None else profiles,
                         decisions=decisions,
-                        request_id=request_id, cache=cache)
+                        request_id=request_id)
 
 
 def _region_present(layer, geometry):
