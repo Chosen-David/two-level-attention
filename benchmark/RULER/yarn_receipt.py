@@ -84,7 +84,7 @@
 #   预测与完成回执最终写入不可变 generation 目录 {out}.gen-{attempt_id}/
 #   （两文件同目录共存，059 已有 .gen- 命名前例；目录名不以 .jsonl 结尾
 #   → 不污染 best-file glob），提交 = 单次 os.replace 原子切指针
-#   （{out}.tli_gen，内容为 gen 目录名；E116f「指针切换 = 唯一提交信号」
+#   （{out}.nfa_gen，内容为 gen 目录名；E116f「指针切换 = 唯一提交信号」
 #   同语义）。崩溃三阶段只剩：指针未切 → 旧完整代可见；指针已切 →
 #   新完整代可见；混合代不可达（消费侧从指针解析 generation 后【同时】
 #   读预测与回执——物理来源 = 指针所指 gen 目录，不再依赖内容等价推断）。
@@ -132,7 +132,7 @@
 #   TL-E119-POINTER-DECODE-073（P3，resolve_generation_pointer，#202）：
 #       072 的异常分类缺口——指针文本 open(encoding="utf-8").read() 抛
 #       UnicodeDecodeError（UnicodeError 族，非 OSError）穿透 except
-#       OSError，坏 .tli_gen（非法 UTF-8）单格裸 traceback 无四态、
+#       OSError，坏 .nfa_gen（非法 UTF-8）单格裸 traceback 无四态、
 #       audit 首坏格中止。修复：bytes 读 + 同一受控分支严格解码，
 #       except 扩为 (OSError, UnicodeError) 统一转带路径 [GATE-FAIL]
 #       SystemExit（单口径在共享解析器，入口只兜底）。
@@ -189,10 +189,10 @@ CORRECTION_VERSIONS = (CORRECTION_VERSION,)
 # 060：yarn_factor_source 合法枚举（与 build_yarn_receipt 三态一致）
 YARN_FACTOR_SOURCES = ("explicit", "auto", "off")
 # 066/crash-recovery（#198）：generation 指针协议——预测与完成回执同置
-# 不可变 generation 目录，{pred}.tli_gen 指针文件（内容 = gen 目录名）
+# 不可变 generation 目录，{pred}.nfa_gen 指针文件（内容 = gen 目录名）
 # 单次原子切换 = 唯一提交信号。指针不以 .jsonl 结尾 → 不污染
 # {task}-*.jsonl best-file glob。
-GENERATION_POINTER_SUFFIX = ".tli_gen"
+GENERATION_POINTER_SUFFIX = ".nfa_gen"
 # manifest 的 generation 绑定口径标注：pointer-v1 = 指针协议产物
 # （消费侧从指针解析后同时读预测与回执）；legacy-direct = 既有产物
 # （无指针文件，按最终路径直接读——059 v2 与更早协议，历史数据不撤销）
@@ -292,7 +292,7 @@ def build_yarn_receipt(*, yarn_enabled, effective_factor, yarn_factor_cli,
     # 份 resolved manifest（单一事实源，pred_ruler.py 不再各自维护治疗
     # 身份字段子集）。存 {sha256, json} 对：10-hex 文件名段碰撞时回执侧
     # 仍有全长 sha256 可仲裁；schema（_validate_common_schema）校验二者
-    # 自洽（sha256(json utf-8) 必须等于声明值）。None = 非 tli 臂
+    # 自洽（sha256(json utf-8) 必须等于声明值）。None = 非 nfa 臂
     # （其 treatment 身份由可读名整体编码）或 legacy 调用方，不写键。
     if treatment_manifest_json is not None:
         if not isinstance(treatment_manifest_json, str) or \
@@ -404,7 +404,7 @@ def generation_dir_for(pred_out_path, attempt_id):
 def generation_pointer_path(pred_out_path):
     """066/crash-recovery（#198）：generation 指针文件路径。
 
-    {out}.tli_gen（内容 = gen 目录名）。指针不以 .jsonl 结尾 → 不污染
+    {out}.nfa_gen（内容 = gen 目录名）。指针不以 .jsonl 结尾 → 不污染
     best-file glob；消费侧以指针解析当前 generation（物理来源 = 指针
     所指目录，预测与回执同源同代）。"""
     return pred_out_path + GENERATION_POINTER_SUFFIX
@@ -460,7 +460,7 @@ def commit_yarn_generation(tmp_pred, tmp_receipt, pred_out_path):
 
     指针协议：预测与回执已在不可变 gen 目录内就绪（tmp_pred /
     tmp_receipt 须同目录），提交 = 写指针临时文件 + fsync + 单次
-    os.replace 原子切换 {out}.tli_gen（E116f「指针切换 = 唯一提交
+    os.replace 原子切换 {out}.nfa_gen（E116f「指针切换 = 唯一提交
     信号」同语义）。崩溃三阶段：
       - gen 未就绪 / 指针未切 → 旧完整代可见（指针仍指旧 gen 目录）；
       - 指针已切 → 新完整代可见；
@@ -535,7 +535,7 @@ def resolve_generation_pointer(pred_out_path):
          输出树整体位于 symlinked 路径下时锚点与子路径一致解析，
          不产生假阳性）。
 
-    {out}.tli_gen 存在 → 读其内容为 gen 目录名，校验 gen 目录及其内
+    {out}.nfa_gen 存在 → 读其内容为 gen 目录名，校验 gen 目录及其内
     预测/回执两文件齐备，返回 dict：
         {"binding": "pointer-v1",
          "pointer_path": ..., "gen_dir": <gen 目录绝对路径>,
@@ -796,7 +796,7 @@ def _validate_common_schema(receipt, pred_path):
         if m is None:
             return (f"{pred_path}: treatment_manifest 存在但 "
                     f"prediction_basename={pb_tm!r} 无 _h<hash10> 身份段"
-                    f"——tli 产物文件名必含 canonical treatment hash 尾段"
+                    f"——nfa 产物文件名必含 canonical treatment hash 尾段"
                     f"（076），缺失即 basename 与 manifest 异源，"
                     f"fail closed（081）")
         if m.group(1) != tm["sha256"][:10]:

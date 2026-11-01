@@ -7,20 +7,20 @@ Only warmup copies full feature/summary storage into arenas.
 
 Scope: immutable greedy no-skip BF16 batch, pinned sparse normalization/ranking
 geometry, serial graph-state route. Refill requires indexer.clear() and warmup;
-reorder is unsupported (as with TLIStaticLayer). Clear poisons captured ready
+reorder is unsupported (as with NFAStaticLayer). Clear poisons captured ready
 checks until warmup. Keep the owner alive as long as any captured graph uses it.
 """
 import copy
 import os
 from contextlib import contextmanager
 import torch
-from .cuda_graph_state import graph_state
-from .batch_candidate_score import score_candidates_batched
-from .sparse_normalization import candidate_probabilities_batched, supported_geometry
-from .unique_ranking import rank_unique_batched
+from sparse_attn.engine.cuda_graph_state import graph_state
+from sparse_attn.indexer.candidate.scorer_fine import score_candidates_batched
+from sparse_attn.indexer.compaction.sparse_normalization import candidate_probabilities_batched, supported_geometry
+from sparse_attn.indexer.selection.unique_ranking import rank_unique_batched
 from .partial_attention import partial_attention, merge_partials
-from .batch_candidate_producer import BatchedCandidateProducer, BatchedCandidateInputs
-from .batch_index_maintenance import maintain_batched, maintenance_route
+from sparse_attn.indexer.candidate.producer import BatchedCandidateProducer, BatchedCandidateInputs
+from sparse_attn.indexer.candidate.maintenance import maintain_batched, maintenance_route
 
 
 def _config_signature(idx):
@@ -32,18 +32,18 @@ def _config_signature(idx):
         'enable_async', 'moba_gate', 'sigma_select', 'static_pair', 'dyn_dgate',
         'skip_far', 'far_skip_backend', '_triton_ok')) + tuple(getattr(idx.args, key) for key in (
             'tia_block_size', 'tia_level1_topk', 'tia_level2_topk')) + (
-                os.environ.get('TLI_EXACT_BATCH_REFERENCE', '0'),
-                os.environ.get('TLI_EXACT_ATTENTION', 'ordered'),)
+                os.environ.get('NFA_EXACT_BATCH_REFERENCE', '0'),
+                os.environ.get('NFA_EXACT_ATTENTION', 'ordered'),)
 
 
 def _validate_metadata(idx, q, k, v, gs):
-    if os.environ.get('TLI_EXACT_ATTENTION', 'ordered') not in ('split', 'ordered'):
-        raise ValueError('TLI_EXACT_ATTENTION must be split or ordered')
-    if os.environ.get('TLI_EXACT_BATCH_REFERENCE', '0') not in ('0', '1'):
-        raise ValueError('TLI_EXACT_BATCH_REFERENCE must be 0 or 1')
-    if os.environ.get('TLI_LIVE_NORMALIZATION', '1') != '1':
+    if os.environ.get('NFA_EXACT_ATTENTION', 'ordered') not in ('split', 'ordered'):
+        raise ValueError('NFA_EXACT_ATTENTION must be split or ordered')
+    if os.environ.get('NFA_EXACT_BATCH_REFERENCE', '0') not in ('0', '1'):
+        raise ValueError('NFA_EXACT_BATCH_REFERENCE must be 0 or 1')
+    if os.environ.get('NFA_LIVE_NORMALIZATION', '1') != '1':
         raise ValueError('exact batch requires live-length normalization')
-    if os.environ.get('TLI_SPARSE_STATS', 'owner') != 'owner':
+    if os.environ.get('NFA_SPARSE_STATS', 'owner') != 'owner':
         raise ValueError('exact batch requires live owner statistics')
     if (q.ndim != 4 or k.ndim != 4 or v.shape != k.shape or q.shape[0] < 2
             or q.shape[1] != 1 or q.shape[0] != k.shape[0]
@@ -79,13 +79,13 @@ def _validate_metadata(idx, q, k, v, gs):
     nnear = min(max(0,int(idx.nt_near_pages)),pages)
     if (nfar+nnear+2)*bs < 1024:
         raise ValueError('exact batch requires candidate width >= ranking width')
-    if (os.environ.get('TLI_OPERATOR_MODE', 'off') != 'serial'
-            or os.environ.get('TLI_OPERATOR_BACKEND', 'simt') != 'simt'
-            or os.environ.get('TLI_OPERATOR_SELECTED_STAGES', '1') != '1'
-            or os.environ.get('TLI_L2_BYPASS', '0') not in ('', '0')
-            or os.environ.get('TLI_GRAPH_INC', '1') != '1'
-            or os.environ.get('TLI_SPARSE_SELECTION', '0') != '1'):
-        raise ValueError('exact batch requires serial SIMT stage1, incremental L2 and TLI_SPARSE_SELECTION=1')
+    if (os.environ.get('NFA_OPERATOR_MODE', 'off') != 'serial'
+            or os.environ.get('NFA_OPERATOR_BACKEND', 'simt') != 'simt'
+            or os.environ.get('NFA_OPERATOR_SELECTED_STAGES', '1') != '1'
+            or os.environ.get('NFA_L2_BYPASS', '0') not in ('', '0')
+            or os.environ.get('NFA_GRAPH_INC', '1') != '1'
+            or os.environ.get('NFA_SPARSE_SELECTION', '0') != '1'):
+        raise ValueError('exact batch requires serial SIMT stage1, incremental L2 and NFA_SPARSE_SELECTION=1')
 
 
 def _validate_supported(q, k):
@@ -269,7 +269,7 @@ def _consume_batched(inputs,q,k,v,lengths,scale):
                                             inputs.group_size,return_unique=True,valid_lengths=lengths)
     selection=rank_unique_batched(inputs.ids,p,unique,inputs.lower,inputs.upper,inputs.quota,
         capacity=inputs.capacity,width=1024,sink=inputs.sink)
-    if os.environ.get('TLI_EXACT_ATTENTION', 'ordered') == 'ordered':
+    if os.environ.get('NFA_EXACT_ATTENTION', 'ordered') == 'ordered':
         from .ordered_attention import ordered_attention
         return ordered_attention(q,k,v,(selection.indices,selection.counts),lengths,
                                  sink=inputs.sink,swa=inputs.swa,scale=scale)
@@ -284,7 +284,7 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
     """Explicit exact route: unsupported cases raise, never use legacy parallel.
 
     Refill/clear requires a new warmup before capture/replay. Storage replacement
-    additionally requires clear and graph recapture. TLIStaticLayer rejects
+    additionally requires clear and graph recapture. NFAStaticLayer rejects
     reorder; external raw tensor permutation is outside this fixed-owner API.
     """
     indexer._resolve_skip()
@@ -292,7 +292,7 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
     _validate_supported(q,k)
     capturing = torch.cuda.is_current_stream_capturing()
     if capturing:
-        from .cuda_graph_state import current_capture_graph, retain_capture_state
+        from sparse_attn.engine.cuda_graph_state import current_capture_graph, retain_capture_state
         if current_capture_graph() is None:
             raise RuntimeError('exact batch capture requires capture_graph() owner scope')
     state = getattr(indexer,'_exact_linear_batch',None)
@@ -320,7 +320,7 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
         state.warmup(k,gs)
     if capturing:
         retain_capture_state(state)
-    if os.environ.get('TLI_EXACT_BATCH_REFERENCE', '0') == '1':
+    if os.environ.get('NFA_EXACT_BATCH_REFERENCE', '0') == '1':
         # Diagnostic control: retain the same model batch/GEMM shapes, while
         # executing the established single-row selector and attention kernels.
         from .operator_pipeline import decode_indexed
@@ -345,7 +345,7 @@ def exact_linear_batch_decode(indexer, q, k, v, gs, scale):
     indexer._exact_batch_maintenance_calls=state.maintenance_calls
     output = _consume_batched(candidates,q,k,v,gs.valid_len_buf,scale)
     indexer._graph_attention_route = ('exact_batch_ordered_eager'
-        if os.environ.get('TLI_EXACT_ATTENTION', 'ordered') == 'ordered' else 'exact_batch_simt')
+        if os.environ.get('NFA_EXACT_ATTENTION', 'ordered') == 'ordered' else 'exact_batch_simt')
     indexer._graph_batch_index_route = state.maintenance_route
     indexer._graph_candidate_domain_route = 'batch_full_protected'
     indexer._graph_normalization_route = 'batch_candidate_probabilities'

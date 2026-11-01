@@ -7,7 +7,7 @@
 
 | # | 文件 | 证据 | 建议动作 | 风险 | 回滚 |
 |---|---|---|---|---|---|
-| O1 | `exp/trace/debug_tli_e5b.py` | 仅 b0a732d（E1-E8 期）提交；无对应 results JSON；全仓引用 0 | 归档到 `exp/trace/archive/`（git mv） | 极低（无引用） | `git revert <hash>` |
+| O1 | `exp/trace/debug_nfa_e5b.py` | 仅 b0a732d（E1-E8 期）提交；无对应 results JSON；全仓引用 0 | 归档到 `exp/trace/archive/`（git mv） | 极低（无引用） | `git revert <hash>` |
 | O2 | `exp/trace/diag_l03_far.py` | 同 O1 | 同 O1 | 极低 | 同上 |
 | O3 | `exp/trace/analyze_e71_debug.py` | 仅 343651e 提交；无 JSON；引用 0 | 同 O1 | 极低 | 同上 |
 | O4 | `exp/trace/analyze_e71_swa_fix_dryrun.py` | 仅 e9acd1e；是「区域口径修复」（sink/swa 正交）的干跑验证记录，有历史证据价值 | **保留**或归档（二选一由用户拍板；建议保留——口径修复是论文叙事的一部分） | — | — |
@@ -18,7 +18,7 @@
 
 | # | 文件组 | 现状 | 建议 |
 |---|---|---|---|
-| D1 | `exp/figures/fig7_architecture.py` | **脚本名与产物名漂移**：脚本输出 `fig7_psi_architecture.pdf/png`（且 fig7_psi_architecture.py 曾存在后被改名，git status 有过渡痕迹）；论文正文引用的是 `fig7_tli_architecture.pdf`（tex L114）——同一架构图三个名字 | 用户拍板统一命名（建议产物定名 fig7_tli_architecture.pdf 对齐论文，脚本改名 + 改输出名 + grep 引用） |
+| D1 | `exp/figures/fig7_architecture.py` | **脚本名与产物名漂移**：脚本输出 `fig7_psi_architecture.pdf/png`（且 fig7_psi_architecture.py 曾存在后被改名，git status 有过渡痕迹）；论文正文引用的是 `fig7_nfa_architecture.pdf`（tex L114）——同一架构图三个名字 | 用户拍板统一命名（建议产物定名 fig7_nfa_architecture.pdf 对齐论文，脚本改名 + 改输出名 + grep 引用） |
 | D2 | `exp/trace/plot_e64g.py` vs `exp/trace/plot_e64g_heat.py` | 同为 E64g 可视化（前者 3 图含 per-dataset panel，后者热图 + md 表），功能重叠 | 建议保留 `plot_e64g.py`（图更全），`plot_e64g_heat.py` 归档——以「哪个产物被报告/论文引用」为准，用户确认后执行 |
 | D3 | `exp/figures/make_figures.py`（套件入口）vs 各 `plot_*.py` / `make_figN.py`（单图脚本） | 历史层积：早期统一入口与后期单图脚本并存，入口已不能覆盖新图 | backlog（低优先级）：归档 make_figures.py 或补 README 说明各自分工 |
 
@@ -26,7 +26,7 @@
 
 | # | 现象 | 建议 |
 |---|---|---|
-| N1 | **figN 双代编号并存**：旧代 `fig5_e8_speedup` / `fig8_m3_system` / `fig9_e2e_boundaries` / `fig10_m8_kernels`（make_fig8/9/10.py 产物）与新代论文正文 `fig5_abg_scan` / `fig11_mass_vs_e2e`（fig5/fig11_*.py 产物）同目录同号系；且 E98 的 fig8/9/10 由 `exp/trace/plot_e98_abg_grid.py` 生成到 **sglang/ref/figs/**，与 exp/figures 的旧代 fig8/9/10 同号不同物 | 高危混淆点。建议（须先 grep sglang/paper、报告 md 全部引用点）：旧代图 git mv 到 `exp/figures/legacy/`（或改名带实验代号前缀，如 `fig5_e8_speedup` → `legacy_fig5_e8_speedup`）。论文 tex 已核实的引用（fig1_h1_decomposition/fig2_dim_reduction_story/fig5_abg_scan/fig7_tli_architecture/fig11_mass_vs_e2e）不受影响 |
+| N1 | **figN 双代编号并存**：旧代 `fig5_e8_speedup` / `fig8_m3_system` / `fig9_e2e_boundaries` / `fig10_m8_kernels`（make_fig8/9/10.py 产物）与新代论文正文 `fig5_abg_scan` / `fig11_mass_vs_e2e`（fig5/fig11_*.py 产物）同目录同号系；且 E98 的 fig8/9/10 由 `exp/trace/plot_e98_abg_grid.py` 生成到 **sglang/ref/figs/**，与 exp/figures 的旧代 fig8/9/10 同号不同物 | 高危混淆点。建议（须先 grep sglang/paper、报告 md 全部引用点）：旧代图 git mv 到 `exp/figures/legacy/`（或改名带实验代号前缀，如 `fig5_e8_speedup` → `legacy_fig5_e8_speedup`）。论文 tex 已核实的引用（fig1_h1_decomposition/fig2_dim_reduction_story/fig5_abg_scan/fig7_nfa_architecture/fig11_mass_vs_e2e）不受影响 |
 | N2 | method 组合名（mavg/mminmax/aavg/cavg/ccluster）vs pred.py 参数全名（minmax/avg/cluster）两套表示 | 已在 CODEMAP.md「口径速查」固化映射表，不改代码 |
 | N3 | repobench-p（文件/目录名）vs repobench（eval 键名） | 已在 CODEMAP.md 与 exp/trace/results/README 固化；后续打分脚本建议显式注释 |
 

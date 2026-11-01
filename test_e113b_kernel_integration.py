@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""E113b 单测：Triton 贪心 kernel 接入 tli_indexer e2e 路径后的开关对拍。
+"""E113b 单测：Triton 贪心 kernel 接入 nfa_indexer e2e 路径后的开关对拍。
 
 覆盖（GPU 小规模合成数据，显存 <300MB，与 E109 v2 扫描共存）：
-  T1  调度器对拍：SGLANG_TLI_GREEDY_KERNEL=1（Triton）vs =0（Python 循环），
+  T1  调度器对拍：SGLANG_NFA_GREEDY_KERNEL=1（Triton）vs =0（Python 循环），
       T=8192 多 head 结构化数据 × 多 sim —— assign/k_live 逐位相等、
       sums/cnt/sq/簇心 allclose（kernel 与 Python 归约顺序差异的 fp 容差）
   T2  E110 铁律（kernel 路径）：far greedy 增量续跑（S 逐步 +64，far_hi 多次
@@ -45,7 +45,7 @@ def load_sparse_attn(name, root):
 
 
 IDX = load_sparse_attn("sparse_attn_e113b", REPO)
-TLI = IDX.TLIIndexer
+NFA = IDX.NFAIndexer
 
 
 # ---------------------------------------------------------------- 公共工具
@@ -79,11 +79,11 @@ def gen_structured(T, H, dd, seed, n_base=None, noise=0.09, device="cuda"):
     return (base[idx] + noise * torch.randn(T, H, dd, generator=g, device=device)).contiguous()
 
 
-ENV_KEY = "SGLANG_TLI_GREEDY_KERNEL"
+ENV_KEY = "SGLANG_NFA_GREEDY_KERNEL"
 
 
 class env_switch:
-    """临时切换 SGLANG_TLI_GREEDY_KERNEL（调度器每次调用现读 env，可进程内切换）。"""
+    """临时切换 SGLANG_NFA_GREEDY_KERNEL（调度器每次调用现读 env，可进程内切换）。"""
 
     def __init__(self, val):
         self.val = val
@@ -122,7 +122,7 @@ def t1_dispatcher_bitwise():
                 sq = x.new_zeros(H, T)
                 kl = torch.zeros(H, dtype=torch.long, device=x.device)
                 with env_switch(val):
-                    sums, cnt, sq, kl, assign = TLI._greedy_cluster_pass(
+                    sums, cnt, sq, kl, assign = NFA._greedy_cluster_pass(
                         x, sim, sums, cnt, sq, kl)
                 states[val] = (sums, cnt, sq, kl, assign)
             (s0, c0, q0, kl0, a0), (s1, c1, q1, kl1, a1) = states["0"], states["1"]
@@ -153,21 +153,21 @@ def t2_incremental_equals_replay():
     name = "T2 far greedy 增量续跑 == 全量重放（kernel 路径，S 逐步 +64）"
     try:
         args = make_args(
-            tli_far_select="sim_greedy", tli_near_select="4bit",
-            tli_enable_kmeans=True, tli_enable_layer_skip=False,
-            tli_alpha=0.25, tli_beta=0.25, tli_gamma=0.5,
+            nfa_far_select="sim_greedy", nfa_near_select="4bit",
+            nfa_enable_kmeans=True, nfa_enable_layer_skip=False,
+            nfa_alpha=0.25, nfa_beta=0.25, nfa_gamma=0.5,
         )
         S1, DS = 6144, 512
         k, _ = gen_kq(S1 + DS, seed=7)
         with env_switch("1"):
             # 增量：S1 → S1+64 → ... → S1+DS（far_hi 多次前移走续跑路径）
-            idx = TLI(args)
+            idx = NFA(args)
             idx.layer_idx = 3
             idx.prepare_index(k[:, :S1], torch.tensor([0, S1]))
             for S in range(S1 + 64, S1 + DS + 1, 64):
                 idx.prepare_index(k[:, :S], torch.tensor([0, S]))
             # 全量重放（同数据同 far 终态）
-            idx2 = TLI(args)
+            idx2 = NFA(args)
             idx2.layer_idx = 3
             idx2.prepare_index(k[:, :S1 + DS], torch.tensor([0, S1 + DS]))
         if not (torch.equal(idx._km_token_assign, idx2._km_token_assign)):
@@ -194,17 +194,17 @@ def t3_pipeline_mask_bitwise():
         S0, DS = 5120, 256
         k, q = gen_kq(S0 + DS, seed=11)
         cfgs = {
-            "cavg_sim": dict(tli_far_select="sim_greedy", tli_near_select="4bit"),
-            "ccluster_sim(nope)": dict(tli_far_select="sim_greedy",
-                                       tli_near_select="sim_greedy",
-                                       tli_sim_dims="nope"),
+            "cavg_sim": dict(nfa_far_select="sim_greedy", nfa_near_select="4bit"),
+            "ccluster_sim(nope)": dict(nfa_far_select="sim_greedy",
+                                       nfa_near_select="sim_greedy",
+                                       nfa_sim_dims="nope"),
         }
         for tag, extra in cfgs.items():
             args = make_args(
-                tli_enable_kmeans=True, tli_enable_layer_skip=False,
-                tli_alpha=0.25, tli_beta=0.25, tli_gamma=0.5,
-                tli_far_method="minmax", tli_near_method="avg",
-                tli_sim=0.9, **extra,
+                nfa_enable_kmeans=True, nfa_enable_layer_skip=False,
+                nfa_alpha=0.25, nfa_beta=0.25, nfa_gamma=0.5,
+                nfa_far_method="minmax", nfa_near_method="avg",
+                nfa_sim=0.9, **extra,
             )
             # 「kernel=1 臂真的走了 Triton」判据：spy 分段驱动器
             # _greedy_cluster_pass_triton（v1/v2 统一必经）。旧判据读 v1
@@ -212,7 +212,7 @@ def t3_pipeline_mask_bitwise():
             # （greedy_triton.greedy_pass_triton_v2 直调，不碰 v1 加载器），
             # 该缓存恒 None，旧判据已过期失效。
             tri_calls = {"n": 0}
-            drv_orig = TLI._greedy_cluster_pass_triton
+            drv_orig = NFA._greedy_cluster_pass_triton
 
             def spy_drv(*a, **kw):
                 tri_calls["n"] += 1
@@ -220,18 +220,18 @@ def t3_pipeline_mask_bitwise():
 
             # env 开/关各一份 indexer，同步走 prefill + 多步 decode，逐步比对 mask
             idxs, masks = {}, {}
-            TLI._greedy_cluster_pass_triton = staticmethod(spy_drv)
+            NFA._greedy_cluster_pass_triton = staticmethod(spy_drv)
             try:
                 for val in ("0", "1"):
                     with env_switch(val):
-                        ix = TLI(args)
+                        ix = NFA(args)
                         ix.layer_idx = 3
                         for S in [S0] + list(range(S0 + 64, S0 + DS + 1, 64)):
                             m = run_mask(ix, k, q, S)
                             masks.setdefault(val, []).append(m)
                     idxs[val] = ix
             finally:
-                TLI._greedy_cluster_pass_triton = staticmethod(drv_orig)
+                NFA._greedy_cluster_pass_triton = staticmethod(drv_orig)
             for si, (m0, m1) in enumerate(zip(masks["0"], masks["1"])):
                 if not (m0.shape == m1.shape and m0.dtype == m1.dtype):
                     raise AssertionError('m0.shape == m1.shape and m0.dtype == m1.dtype')
@@ -262,22 +262,22 @@ def t4_clear_reset():
     name = "T4 clear() 跨请求重置（kernel 路径，重跑 == 冷启动）"
     try:
         args = make_args(
-            tli_far_select="sim_greedy", tli_near_select="sim_greedy",
-            tli_enable_kmeans=True, tli_enable_layer_skip=False,
-            tli_alpha=0.25, tli_beta=0.25, tli_gamma=0.5, tli_sim=0.9,
+            nfa_far_select="sim_greedy", nfa_near_select="sim_greedy",
+            nfa_enable_kmeans=True, nfa_enable_layer_skip=False,
+            nfa_alpha=0.25, nfa_beta=0.25, nfa_gamma=0.5, nfa_sim=0.9,
         )
         S, DS = 4608, 128
         k, q = gen_kq(S + DS, seed=21)
         with env_switch("1"):
             # 请求 1：跑两个请求长度（第二个请求更短 → far 收缩触发全量重建）
-            ix = TLI(args)
+            ix = NFA(args)
             ix.layer_idx = 3
             for Sreq in (S + DS, S):
                 ix.clear()
                 ix.prepare_index(k[:, :Sreq], torch.tensor([0, Sreq]))
                 a_short = ix._km_token_assign
                 # 冷启动新实例（同数据）
-                ix2 = TLI(args)
+                ix2 = NFA(args)
                 ix2.layer_idx = 3
                 ix2.prepare_index(k[:, :Sreq], torch.tensor([0, Sreq]))
                 if not (torch.equal(a_short, ix2._km_token_assign)):
@@ -297,8 +297,8 @@ def t5_fallback_paths():
     try:
         # env=0：spy 验证 dispatcher 确实调 Python 实现
         calls = {"py": 0, "tri": 0}
-        py_orig = TLI._greedy_cluster_pass_python
-        tri_orig = TLI._greedy_cluster_pass_triton
+        py_orig = NFA._greedy_cluster_pass_python
+        tri_orig = NFA._greedy_cluster_pass_triton
 
         def spy_py(*a, **kw):
             calls["py"] += 1
@@ -308,8 +308,8 @@ def t5_fallback_paths():
             calls["tri"] += 1
             return tri_orig(*a, **kw)
 
-        TLI._greedy_cluster_pass_python = staticmethod(spy_py)
-        TLI._greedy_cluster_pass_triton = staticmethod(spy_tri)
+        NFA._greedy_cluster_pass_python = staticmethod(spy_py)
+        NFA._greedy_cluster_pass_triton = staticmethod(spy_tri)
         try:
             x = gen_structured(256, 4, 32, seed=5)
             sums = x.new_zeros(4, 256, 32)
@@ -317,12 +317,12 @@ def t5_fallback_paths():
             sq = x.new_zeros(4, 256)
             kl = torch.zeros(4, dtype=torch.long, device=x.device)
             with env_switch("0"):
-                TLI._greedy_cluster_pass(x, 0.9, sums, cnt, sq, kl)
+                NFA._greedy_cluster_pass(x, 0.9, sums, cnt, sq, kl)
             if not (calls == {"py": 1, "tri": 0}):
                 raise AssertionError(f"env=0 应走 Python, 实际 {calls}")
             calls.update(py=0, tri=0)
             with env_switch("1"):
-                TLI._greedy_cluster_pass(x, 0.9, sums, cnt, sq, kl)
+                NFA._greedy_cluster_pass(x, 0.9, sums, cnt, sq, kl)
             if not (calls == {"py": 0, "tri": 1}):
                 raise AssertionError(f"env=1 应走 Triton, 实际 {calls}")
             # 非 2 的幂 dd（42）：防御性回退 Python，不抛异常
@@ -333,14 +333,14 @@ def t5_fallback_paths():
             q42 = x42.new_zeros(2, 200)
             kl42 = torch.zeros(2, dtype=torch.long, device=x42.device)
             with env_switch("1"):
-                r = TLI._greedy_cluster_pass(x42, 0.9, s42, c42, q42, kl42)
+                r = NFA._greedy_cluster_pass(x42, 0.9, s42, c42, q42, kl42)
             if not (calls == {"py": 1, "tri": 0}):
                 raise AssertionError(f"dd=42 应回退 Python, 实际 {calls}")
             if not (r[4].shape == (2, 200)):
                 raise AssertionError('r[4].shape == (2, 200)')
         finally:
-            TLI._greedy_cluster_pass_python = staticmethod(py_orig)
-            TLI._greedy_cluster_pass_triton = staticmethod(tri_orig)
+            NFA._greedy_cluster_pass_python = staticmethod(py_orig)
+            NFA._greedy_cluster_pass_triton = staticmethod(tri_orig)
         report(name, True, "env 路由 + dd 非 2 幂回退全过")
     except AssertionError as e:
         report(name, False, str(e))

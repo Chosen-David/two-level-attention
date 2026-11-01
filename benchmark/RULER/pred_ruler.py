@@ -1,7 +1,7 @@
 # #66 RULER 评测适配器：把 KVCache-Factory 预生成的 RULER 数据
 # （data/RULER/{4096,8192,16384,32768}/×11 任务×100 条，零外网；65536/131072
 # 由 gen_ruler_long.py 循环体扩展生成）喂进本仓库 sparse_attn 管线
-# （TIA/TLI/Quest/FullKV 同一 monkeypatch）。
+# （TIA/NFA/Quest/FullKV 同一 monkeypatch）。
 # 口径对齐官方 RULER：prompt 原样（无 chat template）、max_new=64、
 # min_length=context+1 防复读、string_match_all 打分（正式打分入口
 # score_ruler_formal.py——legacy + #198 指针协议双通道；score_ruler.py
@@ -9,7 +9,7 @@
 # 用法（run_ruler.sh 批量调度）：
 #   python -u -m benchmark.RULER.pred_ruler \
 #     --model Qwen3-8B --model_path $MODEL \
-#     --task niah_single_1 --context_length 8192 --method tli --t $TS \
+#     --task niah_single_1 --context_length 8192 --method nfa --t $TS \
 #     --data-root /home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER \
 #     --output-dir exp/results_ruler/Qwen3-8B \
 #     --tia_level2_topk 1024 --tia_level2_cmp_ratio 4 --pred_postfix _1024 \
@@ -20,7 +20,7 @@
 # Actual installed-framework frequencies are verified before inference.
 # 设计文档口径（逐层参数求解器 §10.4）：dense 与所有稀疏方法同一位置缩放/
 # tokenizer/最大输出；先报告 dense 长度能力再看稀疏退化。
-# YaRN 对 TLI 索引透明：indexer 消费的是 post-RoPE 的 K（qwen3_attn_patch
+# YaRN 对 NFA 索引透明：indexer 消费的是 post-RoPE 的 K（qwen3_attn_patch
 # 在 apply_rotary_pos_emb + cache.update 之后传入），位置缩放自动生效。
 # logits 显存账（超 32K 档自动 logits_to_keep=1，等价性审计 0233 已 A/B
 # 实测 bitwise 相等）：131072×151936 vocab bf16 全序列 logits ≈ 39.8GB 纯
@@ -43,7 +43,7 @@
 # formal 接受 A config 标 verified_same_generation=true）。升级为
 # 不可变 generation + 单指针原子切换：预测与完成回执同置
 # {out}.gen-{attempt_id}/ 目录，提交 = 单次 os.replace 切指针
-# {out}.tli_gen（内容 = gen 目录名；指针切换 = 唯一提交信号，E116f
+# {out}.nfa_gen（内容 = gen 目录名；指针切换 = 唯一提交信号，E116f
 # 同语义）。崩溃三阶段：指针未切 → 旧完整代可见；指针已切 → 新完整
 # 代可见；混合代不可达（预测与回执同目录，消费侧从指针同时读两文件）。
 import argparse
@@ -82,9 +82,9 @@ from sparse_attn.metrics import get_metrics  # noqa: E402
 # docstring）——RULER 生成的逐行生成段接线。
 from sparse_attn.ops.eager_decoding import (  # noqa: E402
     eager_decoding_request_guard)
-from sparse_attn.ops.region_geometry import RegionGeometry
-from sparse_attn.ops.frozen_region_gate import GateConfig
-from sparse_attn.ops.frozen_region_runtime import (
+from sparse_attn.policies.region_geometry import RegionGeometry
+from sparse_attn.policies.frozen_gate import GateConfig
+from sparse_attn.engine.frozen_runner import (
     complete_frozen_request, prefill_frozen_request)
 from sparse_attn.info import (  # noqa: E402
     get_method_name_with_info, get_treatment_manifest_json,
@@ -131,67 +131,67 @@ def parse_args():
     parser.add_argument("--yarn_factor", type=float, default=None,
                         help="YaRN factor（默认按档位自动：65536→2.0、"
                              "131072→4.0；显式传入可覆盖做消融）")
-    parser.add_argument("--tli_prefill_frozen_regions", action="store_true",
+    parser.add_argument("--nfa_prefill_frozen_regions", action="store_true",
                         help="启用 B1 eager prefill-frozen near/far gates")
-    parser.add_argument("--tli_frozen_region_mode",
+    parser.add_argument("--nfa_frozen_region_mode",
                         choices=["full", "far", "near", "dual"], default="dual")
-    parser.add_argument("--tli_frozen_region_epsilon", type=float, default=0.05)
-    parser.add_argument("--tli_frozen_region_statistic",
+    parser.add_argument("--nfa_frozen_region_epsilon", type=float, default=0.05)
+    parser.add_argument("--nfa_frozen_region_statistic",
                         choices=["mean", "p95"], default="mean")
-    parser.add_argument("--tli_frozen_region_rows", type=int, default=256)
+    parser.add_argument("--nfa_frozen_region_rows", type=int, default=256)
     add_sparse_attn_args(parser)
     return parser.parse_args()
 
 
 def _configure_frozen_regions(args, config):
     """Fail closed before model/indexer construction; return the request geometry."""
-    is_glm_tli = (
-        args.method == 'tli'
+    is_glm_nfa = (
+        args.method == 'nfa'
         and getattr(config, 'model_type', None) == 'glm4_moe_lite'
     )
-    if not args.tli_prefill_frozen_regions and not is_glm_tli:
+    if not args.nfa_prefill_frozen_regions and not is_glm_nfa:
         return None
-    if args.method != 'tli':
-        raise ValueError('frozen regions require method=tli')
-    if is_glm_tli:
-        # GLM TLI patch 现在强制 PagedRegionCache。RULER 入口没有
-        # Qwen 的 --tli_prefill_frozen_regions 语义，因此对 GLM TLI
+    if args.method != 'nfa':
+        raise ValueError('frozen regions require method=nfa')
+    if is_glm_nfa:
+        # GLM NFA patch 现在强制 PagedRegionCache。RULER 入口没有
+        # Qwen 的 --nfa_prefill_frozen_regions 语义，因此对 GLM NFA
         # 自动使用全保留 frozen reference，只隔离稀疏选择，不回收 KV。
-        args.tli_subspace = 'nope'
+        args.nfa_subspace = 'nope'
         args.tia_level2_cmp_ratio = 4
-        args.tli_l2_quant = False
-        args.tli_static_pair = False
-        args.tli_proj_basis = None
-        if hasattr(args, 'tli_proj_basis_all'):
-            args.tli_proj_basis_all = None
+        args.nfa_l2_quant = False
+        args.nfa_static_pair = False
+        args.nfa_proj_basis = None
+        if hasattr(args, 'nfa_proj_basis_all'):
+            args.nfa_proj_basis_all = None
         gate = GateConfig(mode='full',
-                          rows=args.tli_frozen_region_rows,
-                          statistic=args.tli_frozen_region_statistic)
+                          rows=args.nfa_frozen_region_rows,
+                          statistic=args.nfa_frozen_region_statistic)
         geometry = RegionGeometry(
-            sink=args.tli_sink_tokens, near=args.tli_near_len,
-            window=args.tli_swa_size, page=args.tia_block_size,
+            sink=args.nfa_sink_tokens, near=args.nfa_near_len,
+            window=args.nfa_swa_size, page=args.tia_block_size,
             max_new_tokens=MAX_GEN)
     elif getattr(config, 'model_type', None) != 'qwen3':
-        raise ValueError('frozen regions require full-attention Qwen3 or GLM TLI')
+        raise ValueError('frozen regions require full-attention Qwen3 or GLM NFA')
     elif getattr(config, 'head_dim', None) != 128:
         raise ValueError('frozen regions require Qwen3 head_dim=128')
     else:
         expected = {
             'tia_block_size': 64, 'tia_level1_topk': 128,
             'tia_level2_topk': 1024, 'tia_level2_cmp_ratio': 4,
-            'tli_subspace': 'tail', 'tli_l2_subspace': 'same',
-            'tli_far_method': 'minmax', 'tli_near_method': 'avg',
-            'tli_far_select': '4bit', 'tli_near_select': '4bit',
-            'tli_near_pages': 32, 'tli_near_tokens': 'off',
-            'tli_near_len': 4096, 'tli_sink_tokens': 4, 'tli_swa_size': 128,
-            'tli_enable_subspace': True, 'tli_enable_layer_skip': False,
-            'tli_dyn_dgate': False, 'tli_far_skip_backend': 'legacy',
-            'tli_far_skip_cache': 'retain', 'tli_sparse_prefill': False,
-            'tli_decode_dense': False, 'tli_per_q_head': False,
-            'tia_enable_async_topk': False, 'tli_l2_quant': False,
-            'tli_sinkswa_only': False, 'tli_boundary_bypass': True,
-            'tli_static_pair': False, 'tli_proj_basis': None,
-            'tli_alpha': None, 'tli_beta': None, 'tli_gamma': None,
+            'nfa_subspace': 'tail', 'nfa_l2_subspace': 'same',
+            'nfa_far_method': 'minmax', 'nfa_near_method': 'avg',
+            'nfa_far_select': '4bit', 'nfa_near_select': '4bit',
+            'nfa_near_pages': 32, 'nfa_near_tokens': 'off',
+            'nfa_near_len': 4096, 'nfa_sink_tokens': 4, 'nfa_swa_size': 128,
+            'nfa_enable_subspace': True, 'nfa_enable_layer_skip': False,
+            'nfa_dyn_dgate': False, 'nfa_far_skip_backend': 'legacy',
+            'nfa_far_skip_cache': 'retain', 'nfa_sparse_prefill': False,
+            'nfa_decode_dense': False, 'nfa_per_q_head': False,
+            'tia_enable_async_topk': False, 'nfa_l2_quant': False,
+            'nfa_sinkswa_only': False, 'nfa_boundary_bypass': True,
+            'nfa_static_pair': False, 'nfa_proj_basis': None,
+            'nfa_alpha': None, 'nfa_beta': None, 'nfa_gamma': None,
         }
         mismatches = {
             name: (getattr(args, name, None), value)
@@ -199,35 +199,35 @@ def _configure_frozen_regions(args, config):
             if getattr(args, name, None) != value
         }
         # 这两项由环境变量固定，真实 CLI 不创建同名属性；显式注入 True 仍须拒绝。
-        for name in ('tli_sparse_prefill', 'tli_decode_dense'):
+        for name in ('nfa_sparse_prefill', 'nfa_decode_dense'):
             if getattr(args, name, None) is None:
                 mismatches.pop(name, None)
         if mismatches:
-            raise ValueError(f'frozen regions require the validated TLI geometry: {mismatches}')
-        gate = GateConfig(epsilon=args.tli_frozen_region_epsilon,
-                          rows=args.tli_frozen_region_rows,
-                          statistic=args.tli_frozen_region_statistic,
-                          mode=args.tli_frozen_region_mode)
+            raise ValueError(f'frozen regions require the validated NFA geometry: {mismatches}')
+        gate = GateConfig(epsilon=args.nfa_frozen_region_epsilon,
+                          rows=args.nfa_frozen_region_rows,
+                          statistic=args.nfa_frozen_region_statistic,
+                          mode=args.nfa_frozen_region_mode)
         geometry = RegionGeometry(
-            sink=args.tli_sink_tokens, near=args.tli_near_len,
-            window=args.tli_swa_size, page=args.tia_block_size,
+            sink=args.nfa_sink_tokens, near=args.nfa_near_len,
+            window=args.nfa_swa_size, page=args.tia_block_size,
             max_new_tokens=MAX_GEN)
     environment = {
-        'TLI_OPERATOR_MODE': 'off', 'TLI_FINE_GATHER': '0',
-        'TLI_SPARSE_PREFILL': '0', 'TLI_DECODE_DENSE': '0',
-        'TLI_FROZEN_EAGER_REFERENCE': '0',
+        'NFA_OPERATOR_MODE': 'off', 'NFA_FINE_GATHER': '0',
+        'NFA_SPARSE_PREFILL': '0', 'NFA_DECODE_DENSE': '0',
+        'NFA_FROZEN_EAGER_REFERENCE': '0',
     }
     for name, value in environment.items():
         current = os.environ.get(name)
         if current is not None and current.lower() != value:
             raise ValueError(f'{name}={current!r} conflicts with frozen eager execution')
         os.environ[name] = value
-    graph = os.environ.get('TLI_CUDA_GRAPH', 'auto').lower()
+    graph = os.environ.get('NFA_CUDA_GRAPH', 'auto').lower()
     if graph not in ('auto', '0', 'off'):
         raise ValueError('frozen regions support eager execution only')
-    os.environ['TLI_CUDA_GRAPH'] = 'off'
+    os.environ['NFA_CUDA_GRAPH'] = 'off'
     config._attn_implementation = 'sdpa'
-    args.tli_frozen_region_max_new_tokens = MAX_GEN
+    args.nfa_frozen_region_max_new_tokens = MAX_GEN
     args._frozen_region_gate = gate
     args._frozen_region_geometry = geometry
     return gate, geometry
@@ -250,7 +250,7 @@ def seed_everything(seed=SEED):   # 057：默认值单源化（receipt 身份字
 
 def _extended_receipt_identity(args, data_file):
     """可选的 run 级身份闭包；未设置环境变量时保持既有 RULER 路径。"""
-    config_path = os.environ.get("TLI_RECEIPT_RUN_CONFIG")
+    config_path = os.environ.get("NFA_RECEIPT_RUN_CONFIG")
     if not config_path:
         return {}
     with open(config_path, encoding="utf-8") as f:
@@ -356,7 +356,7 @@ def main():
         # checks actual frequencies, scaling and rotation before loading weights.
         rope_preflight = verify_runtime_rope(config)
     frozen_runtime = _configure_frozen_regions(args, config)
-    snapshot = resolve_treatment_snapshot(args) if args.method == "tli" else None
+    snapshot = resolve_treatment_snapshot(args) if args.method == "nfa" else None
     if args.method == 'ffd_vendor':
         if use_yarn:
             raise ValueError('FFD Llama cannot use Qwen3-specific YaRN defaults')
@@ -583,7 +583,7 @@ def main():
         # `_clusterkv_knl.search_indices` 编译内核在本机不可用（网络阻塞），
         # 由 vendor 包 clusterkv/_clusterkv_knl.py 纯 torch 等价实现替代
         # （语义与官方 KMeansSearchIndicesKernel 一致），官方文件零改动。
-        # 预算口径：官方 token_budget 是「选择预算」（sink 额外），与 TLI
+        # 预算口径：官方 token_budget 是「选择预算」（sink 额外），与 NFA
         # K2=1024 已含 sink+swa 的口径不同，接入验收时按 unique token 数核对。
         vendor_dir = os.path.join(
             REPO, "exp", "vendor_baselines", "clusterkv_vendor")
@@ -610,8 +610,8 @@ def main():
     if frozen_runtime is not None:
         _validate_frozen_model(model)
         if n_patched != model.config.num_hidden_layers:
-            raise ValueError('frozen regions require TLI patches on every Qwen3 layer')
-        model._frozen_tli = True
+            raise ValueError('frozen regions require NFA patches on every Qwen3 layer')
+        model._frozen_nfa = True
     if args.method != "none" and n_patched == 0:
         raise RuntimeError(
             f"method={args.method!r} 但成功挂载 0 个 attention 模块，模型"
@@ -631,14 +631,14 @@ def main():
     out_dir = os.path.join(args.output_dir, f"L{args.context_length}",
                            f"pred{args.pred_postfix}")
     os.makedirs(out_dir, exist_ok=True)
-    # 081：method_name/out_path 从冻结 snapshot 派生（tli 臂）——与
+    # 081：method_name/out_path 从冻结 snapshot 派生（nfa 臂）——与
     # runtime 各层、receipt 的 treatment manifest 同一内容身份。
     method_name = get_method_name_with_info(args, snapshot)
     out_path = os.path.join(
         out_dir, f"{args.task}-{method_name}-{args.t}.jsonl")
     # 076（TL-E121-OUTPUT-ID）：method_name 尾段含 canonical treatment
     # hash _h<hash10>（sparse_attn/info.py——全部输出相关参数排序键
-    # JSON→sha256）→ 逻辑路径与 {out}.tli_gen 指针均为 treatment 单射：
+    # JSON→sha256）→ 逻辑路径与 {out}.nfa_gen 指针均为 treatment 单射：
     # 异配置不可能命中同一路径（「不切指针」结构性成立），同路径重跑
     # = 同 treatment 的 066/crash-recovery 设计语义（新 gen + 单次原子
     # 切指针）。残余 10-hex 碰撞由回执 v2 同代绑定（062 三方 SHA 一致）
@@ -665,7 +665,7 @@ def main():
     #      status=complete 完成回执（producer-yarn-config-v2，含
     #      prediction_basename/SHA/行数/run_id）写进同一 gen 目录；
     #   ④ 单次提交点：commit_yarn_generation 单次 os.replace 原子切
-    #      指针 {out}.tli_gen（内容 = gen 目录名；指针切换 = 唯一
+    #      指针 {out}.nfa_gen（内容 = gen 目录名；指针切换 = 唯一
     #      提交信号）。
     # 崩溃语义（066/crash-recovery 验收口径）：gen 未就绪/指针未切 →
     #   旧完整代可见（指针仍指旧 gen）；指针已切 → 新完整代可见；
@@ -702,11 +702,11 @@ def main():
             if rope_policy_record is not None and context_length + MAX_GEN > config.max_position_embeddings:
                 raise ValueError("actual input plus output exceeds verified runtime position capacity")
             # 【095 修复（GPT 审计 2026-10-12_0527，2026-10-12）】请求级
-            # fail-closed guard：TLI_E127_FAST=1 的 gather 路径把三类契约
+            # fail-closed guard：NFA_E127_FAST=1 的 gather 路径把三类契约
             # 违规（空 mask 行/W 超上界/cu 破坏）延迟到 GPU 端错误标志，
             # 由 guard 在本行生成段边界（写盘前）一次性校验 raise——raise
             # 传播后 finally 只释放 flock，generation 目录不 commit、
-            # .tli_gen 指针不切（066/crash-recovery 语义天然吸收：旧完整
+            # .nfa_gen 指针不切（066/crash-recovery 语义天然吸收：旧完整
             # 代可见，无任何完成外观产物被污染）。进入时清旧 flag 防跨
             # 行继承（上一行未消费的违规不误杀本行）。
             with baseline_request(model) as baseline_receipt, eager_decoding_request_guard():
@@ -781,11 +781,11 @@ def main():
         pred_sha = _file_sha256(tmp_pred)
         pred_lines = sum(1 for _ in open(tmp_pred, "rb"))
         model_cfg_path = os.path.join(args.model_path, "config.json")
-        # 079（TL-E121-OUTPUT-ID-079）：tli 臂把 resolved treatment
+        # 079（TL-E121-OUTPUT-ID-079）：nfa 臂把 resolved treatment
         # manifest 写入回执——与 method hash（method_name 尾段）、
         # LongBench sidecar 共用 sparse_attn/info.py 同一份 resolved
         # manifest（单一事实源），本入口不再各自维护治疗身份字段子集；
-        # 非 tli 臂（none/quest/twia/tia）treatment 身份由可读名整体
+        # 非 nfa 臂（none/quest/twia/tia）treatment 身份由可读名整体
         # 编码，不写。schema 校验 sha256(json) 自洽（yarn_receipt 079）。
         # 081：从冻结 snapshot 派生（与 out_path 的 _h 段、runtime 各层
         # 同一对象）——生成窗口内文件替换不再产生 receipt 混装；yarn_
@@ -793,7 +793,7 @@ def main():
         # 结构性地成立。
         treatment_manifest_json = (
             get_treatment_manifest_json(args, snapshot)
-            if args.method == "tli" else None)
+            if args.method == "nfa" else None)
         yarn_receipt = build_yarn_receipt(
             yarn_enabled=use_yarn,
             effective_factor=factor,
@@ -810,7 +810,7 @@ def main():
                 "max_gen": MAX_GEN, "max_num": args.max_num, "seed": SEED,
                 "method": args.method, "pred_postfix": args.pred_postfix,
                 "t": args.t, "graph_policy": "off",
-                "operator_mode": os.environ.get("TLI_OPERATOR_MODE", "off"),
+                "operator_mode": os.environ.get("NFA_OPERATOR_MODE", "off"),
             },
             producer_script_path="benchmark/RULER/pred_ruler.py",
             producer_script_sha256=_file_sha256(os.path.abspath(__file__)),

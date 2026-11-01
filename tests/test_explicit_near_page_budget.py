@@ -28,7 +28,7 @@ def load_constructors():
                  get_metrics=lambda: None)
     for filename, name in (('base.py', 'Indexer'),
                            ('tia_indexer.py', 'TIAIndexer'),
-                           ('tli_indexer.py', 'TLIIndexer')):
+                           ('nfa_indexer.py', 'NFAIndexer')):
         path = ROOT / 'sparse_attn' / 'indexer' / filename
         node = next(n for n in ast.parse(path.read_text()).body
                     if isinstance(n, ast.ClassDef) and n.name == name)
@@ -37,15 +37,15 @@ def load_constructors():
         if len(node.body) != 1:
             raise RuntimeError('production constructor missing: ' + name)
         exec(compile(ast.Module(body=[node], type_ignores=[]), str(path), 'exec'), scope)
-    return scope['TLIIndexer']
+    return scope['NFAIndexer']
 
 
 def config(**changes):
     values = dict(tia_block_size=64, tia_level1_topk=4,
                   tia_level2_topk=256, tia_level2_cmp_ratio=4,
-                  tia_enable_async_topk=False, tli_enable_layer_skip=False,
-                  tli_sink_tokens=64, tli_swa_size=64,
-                  tli_near_pages=2, tli_near_tokens=32, tli_near_len=512)
+                  tia_enable_async_topk=False, nfa_enable_layer_skip=False,
+                  nfa_sink_tokens=64, nfa_swa_size=64,
+                  nfa_near_pages=2, nfa_near_tokens=32, nfa_near_len=512)
     values.update(changes)
     return SimpleNamespace(**values)
 
@@ -56,7 +56,7 @@ class ExplicitNearPageBudgetTests(unittest.TestCase):
         cls.indexer = load_constructors()
 
     def setUp(self):
-        env = patch.dict(os.environ, TLI_E151C_ORACLE_QUOTA='')
+        env = patch.dict(os.environ, NFA_E151C_ORACLE_QUOTA='')
         env.start()
         self.addCleanup(env.stop)
 
@@ -70,9 +70,9 @@ class ExplicitNearPageBudgetTests(unittest.TestCase):
                     with self.subTest(k1=k1, nb=nb, nt=nt):
                         with self.assertRaisesRegex(ValueError, 'tia_level1_topk'):
                             self.indexer(config(tia_level1_topk=k1,
-                                                tli_near_pages=nb,
-                                                tli_near_tokens=nt,
-                                                tli_near_len=nb * 64))
+                                                nfa_near_pages=nb,
+                                                nfa_near_tokens=nt,
+                                                nfa_near_len=nb * 64))
 
     def test_budget_endpoints_and_interior_preserved(self):
         for bs in (32, 64, 128):
@@ -82,31 +82,31 @@ class ExplicitNearPageBudgetTests(unittest.TestCase):
                         with self.subTest(bs=bs, k1=k1, nb=nb, nt=nt):
                             idx = self.indexer(config(
                                 tia_block_size=bs, tia_level1_topk=k1,
-                                tli_swa_size=bs, tli_near_pages=nb,
-                                tli_near_tokens=nt, tli_near_len=nb * bs))
+                                nfa_swa_size=bs, nfa_near_pages=nb,
+                                nfa_near_tokens=nt, nfa_near_len=nb * bs))
                             self.assertEqual(idx.nt_near_pages, nb)
                             self.assertEqual(idx.nt_near_tokens, None if nt == 'off' else nt)
                             self.assertEqual(idx.gamma, None if nt == 'off' else 1.0)
                             self.assertEqual((idx.alpha, idx.beta), (1., 1.))
 
     def test_other_geometry_checks_preserved(self):
-        for changes in (dict(tli_near_pages=-1), dict(tli_near_len=127),
-                        dict(tli_near_tokens=129), dict(tli_near_tokens=-1),
-                        dict(tia_level2_topk=128), dict(tli_near_pages=None),
-                        dict(tli_near_tokens=None), dict(tli_near_len=None),
-                        dict(tli_alpha=0), dict(tli_beta=1), dict(tli_gamma='off')):
+        for changes in (dict(nfa_near_pages=-1), dict(nfa_near_len=127),
+                        dict(nfa_near_tokens=129), dict(nfa_near_tokens=-1),
+                        dict(tia_level2_topk=128), dict(nfa_near_pages=None),
+                        dict(nfa_near_tokens=None), dict(nfa_near_len=None),
+                        dict(nfa_alpha=0), dict(nfa_beta=1), dict(nfa_gamma='off')):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 self.indexer(config(**changes))
 
     def test_legacy_ratios_unchanged(self):
         for ratios, expected in (({}, (0., 0., 1.)),
-                                 (dict(tli_alpha=.25, tli_beta=.5, tli_gamma=.75),
+                                 (dict(nfa_alpha=.25, nfa_beta=.5, nfa_gamma=.75),
                                   (.25, .5, .75)),
-                                 (dict(tli_gamma='off'), (0., 0., None))):
+                                 (dict(nfa_gamma='off'), (0., 0., None))):
             with self.subTest(ratios=ratios):
-                idx = self.indexer(config(tli_near_pages=None,
-                                          tli_near_tokens=None,
-                                          tli_near_len=None, **ratios))
+                idx = self.indexer(config(nfa_near_pages=None,
+                                          nfa_near_tokens=None,
+                                          nfa_near_len=None, **ratios))
                 self.assertEqual((idx.alpha, idx.beta, idx.gamma), expected)
 
 

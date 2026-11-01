@@ -16,27 +16,27 @@ import torch
 # 指针被后跑代切换。修复：全部输出相关参数排序键 JSON 序列化 →
 # sha256 前 10 hex 作 treatment hash，追加 "_h<hash10>" 尾段；可读段
 # 逐位不动（B09 口径），既有测试锚点只补 hash 段。
-# 字段缺省用 getattr 兜底，与 TLIIndexer.__init__ 的运行时缺省逐字段
-# 同源（sparse_attn/indexer/tli_indexer.py __init__ getattr 序列）——
+# 字段缺省用 getattr 兜底，与 NFAIndexer.__init__ 的运行时缺省逐字段
+# 同源（sparse_attn/indexer/nfa_indexer.py __init__ getattr 序列）——
 # 缺省 namespace 与显式默认值 namespace 必须同 hash（同配置稳定）。
-# 【081 + kimi3 0316 追加修复 2】tli_enable_kmeans/tli_enable_layer_skip
+# 【081 + kimi3 0316 追加修复 2】nfa_enable_kmeans/nfa_enable_layer_skip
 # 此前刻意不进 manifest（076 residual 声明「可读段 B/D 二值编码已单射」
 # ——被 kimi3 2026-10-11 0316 hourly review 反例推翻）：极端长可读前缀
 # 触发 truncate_output_name_keep_hash 截断时，B/D 段被可读中段的 "..."
 # 占位吃掉 → 仅在这两个开关上不同的两 treatment 截断后文件名相同 +
 # manifest 相同 + hash 相同（kimi3 实测 trunc same? True、hash same?
 # True）→ 写门放行互覆。两字段入 manifest 后 hash 恒单射，截断只影响
-# 可读性不影响身份。默认 True 与 argparse 缺省 / TLIIndexer.__init__
+# 可读性不影响身份。默认 True 与 argparse 缺省 / NFAIndexer.__init__
 # 运行时缺省三方同源。
 #
 # ---- 079（TL-E121-OUTPUT-ID-079，GPT 2026-10-11 0332 复审）两个残余 ----
-# ① tia_enable_async_topk 进 manifest：TLI 继承 TIA
+# ① tia_enable_async_topk 进 manifest：NFA 继承 TIA
 #   （sparse_attn/indexer/tia_indexer.py:18 self.enable_async =
-#   args.tia_enable_async_topk；tli_indexer.py compute_mask async 分支
+#   args.tia_enable_async_topk；nfa_indexer.py compute_mask async 分支
 #   缓存 prev_mask 并在下一步替换）——异步第 2 个 decode 步起的细筛
 #   候选集与同步路径可不同，是输出相关参数而非性能提示。getattr 缺省
 #   False 与 argparse store_true 缺省/TIAIndexer 运行时读取三方同源。
-# ② tli_proj_basis/tli_layer_skip_path 由「词法路径」升级为「内容身份」：
+# ② nfa_proj_basis/nfa_layer_skip_path 由「词法路径」升级为「内容身份」：
 #   只记路径时同路径不同内容 → 同 manifest/hash → LongBench sidecar
 #   写门放行覆盖、RULER 复用同逻辑指针（GPT CPU 复现实锤）。现于
 #   manifest 构造时解析为 {path, sha256, shape/n_skip}（值非 None 时），
@@ -48,15 +48,15 @@ import torch
 #
 # ---- 081（TL-E121-OUTPUT-SNAPSHOT-081，GPT 2026-10-11 复审 P1）----
 # 079 只共用了解析「函数」，没有冻结一次解析后的「值」——同一文件在
-# 一次运行内被多次打开：TLIIndexer 逐层各 open 一次（patch.py 对每个
+# 一次运行内被多次打开：NFAIndexer 逐层各 open 一次（patch.py 对每个
 # attention 层建实例），benchmark 入口在生成后重新调 get_method_name_
 # with_info / get_treatment_manifest_json 再读一遍 → 生成窗口内文件被
 # 替换时 runtime A / 文件名 B / sidecar C 三方混装可达。配套两个身份缺口：
-#   ① 默认 D′ 掩码遗漏：arguments.py 缺省 tli_enable_layer_skip=True、
-#     tli_layer_skip_path=None，运行时（tli_indexer）展开 tracked
+#   ① 默认 D′ 掩码遗漏：arguments.py 缺省 nfa_enable_layer_skip=True、
+#     nfa_layer_skip_path=None，运行时（nfa_indexer）展开 tracked
 #     DEFAULT_MASK 并读取；但 079 manifest 只在路径显式非 None 时解析
 #     → 默认配置 manifest 恒 null 而可读名含 D（身份缺口）；
-#   ② 反向不对称：显式给 tli_layer_skip_path 但 enable_layer_skip=False
+#   ② 反向不对称：显式给 nfa_layer_skip_path 但 enable_layer_skip=False
 #     时，manifest 强制解析文件求 hash，而运行时根本不读它——身份按
 #     「argv 声明」而非「实际消费」解析。
 # 修复：
@@ -64,77 +64,77 @@ import torch
 #      （manifest / manifest_json / skip_ids / basis_tensor），每文件只
 #      open 一次、SHA 与内容解析共用同一批 bytes（不再「open 算 SHA 再
 #      torch.load 读第二次」）；
-#   B. D′ 掩码按有效值语义解析：只在 effective tli_enable_layer_skip=True
+#   B. D′ 掩码按有效值语义解析：只在 effective nfa_enable_layer_skip=True
 #      时进入（缺省 True + path=None → 展开 DEFAULT_MASK 并解析其内容；
 #      enable=False 时无论路径是否声明都不解析、manifest 记 null）——
 #      同时修复 ①②；
 #   C. benchmark 两个入口在模型加载（文件被任何 attention 层消费）之前
 #      冻结 snapshot，文件名 / sidecar / receipt 全程消费同一对象；
-#      TLIIndexer(args, snapshot=...) 注入已解析对象，不再按层重开文件。
-# 默认掩码路径定义上移到本模块（单一事实源；tli_indexer.DEFAULT_MASK
+#      NFAIndexer(args, snapshot=...) 注入已解析对象，不再按层重开文件。
+# 默认掩码路径定义上移到本模块（单一事实源；nfa_indexer.DEFAULT_MASK
 # 现引用本常量）——manifest 侧与运行时侧展开的必须是同一个文件。
 DEFAULT_LAYER_SKIP_MASK_PATH = os.path.normpath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "exp", "trace",
-    "results", "tli_layer_skip_mask.json"))
+    "results", "nfa_layer_skip_mask.json"))
 _TREATMENT_FIELD_DEFAULTS = {
     # 既有可读名字段（hash 同样纳入——可读段整体单射的最强保证）
     "tia_block_size": 64,
     "tia_level1_topk": 128,
     "tia_level2_topk": 1024,
     "tia_level2_cmp_ratio": 2,      # argparse 缺省（可读段直接属性访问，兜底不可达）
-    "tli_enable_subspace": True,
-    "tli_subspace": "full",
-    "tli_l2_subspace": "same",      # E134 子空间矩阵第三臂 sub+full（L2 全维量化）
-    "tli_alpha": 0.0,
-    "tli_beta": 0.0,
-    "tli_gamma": 1.0,               # γ 兜底 1.0（B09 既有约定保持；off=None 走 JSON null）
-    "tli_sparse_prefill": False,
+    "nfa_enable_subspace": True,
+    "nfa_subspace": "full",
+    "nfa_l2_subspace": "same",      # E134 子空间矩阵第三臂 sub+full（L2 全维量化）
+    "nfa_alpha": 0.0,
+    "nfa_beta": 0.0,
+    "nfa_gamma": 1.0,               # γ 兜底 1.0（B09 既有约定保持；off=None 走 JSON null）
+    "nfa_sparse_prefill": False,
     # 【E138 消融①】decode dense 回退开关入 manifest（TL-PREFILL-
     # PROVENANCE-001 同族：开关改变输出必须进身份，否则 P on+DD on 与
     # P on 两臂 manifest 逐字节相同）。默认 False；manifest 扩字段使全部
     # treatment hash 移位一轮（E135 加 sink/swa 先例，既有锚点文件名
     # 不重算不受影响）。
-    "tli_decode_dense": False,
+    "nfa_decode_dense": False,
     # 081 + kimi3 0316 追加修复 2：B/D 开关入 manifest（见文件头注释——
     # 截断可吃掉可读段 B/D 位，身份必须由 manifest/hash 承载）
-    "tli_enable_kmeans": True,
-    "tli_enable_layer_skip": True,
+    "nfa_enable_kmeans": True,
+    "nfa_enable_layer_skip": True,
     # 076 遗漏字段：改变算法行为但不在可读段
-    "tli_far_method": "minmax",
-    "tli_near_method": "avg",
-    "tli_far_select": "4bit",
-    "tli_near_select": "4bit",
-    "tli_far_clusters": 256,
-    "tli_far_niter": 10,
-    "tli_far_blocks": 16,
-    "tli_far_tokens": 512,
-    "tli_sim": 0.9,
-    "tli_sim_dims": "subspace",
-    "tli_sigma_select": "none",
-    "tli_moba": False,
-    "tli_sigma": 8.0,
-    "tli_per_q_head": False,
+    "nfa_far_method": "minmax",
+    "nfa_near_method": "avg",
+    "nfa_far_select": "4bit",
+    "nfa_near_select": "4bit",
+    "nfa_far_clusters": 256,
+    "nfa_far_niter": 10,
+    "nfa_far_blocks": 16,
+    "nfa_far_tokens": 512,
+    "nfa_sim": 0.9,
+    "nfa_sim_dims": "subspace",
+    "nfa_sigma_select": "none",
+    "nfa_moba": False,
+    "nfa_sigma": 8.0,
+    "nfa_per_q_head": False,
     # 079①：TIA 继承的异步开关改变第 2 步起的细筛候选集，必须进身份
     "tia_enable_async_topk": False,
     # 079②：文件型配置——值非 None 时经 _resolve_file_identity 解析为
     # 内容身份 {path, sha256, shape/n_skip}（fail closed），不再只记路径
-    "tli_proj_basis": None,
-    "tli_static_pair": False,
-    "tli_layer_skip_path": None,
+    "nfa_proj_basis": None,
+    "nfa_static_pair": False,
+    "nfa_layer_skip_path": None,
     # E135：sink/swa 正交强制区参数化 + sinkswa_only 归因臂——改变算法
     # 行为（强制区宽/池左界/mask 全旁路），必须进 treatment 身份。默认
-    # 128/128/False 与历史硬编码行为逐位一致（同 E134 加 tli_l2_subspace
+    # 128/128/False 与历史硬编码行为逐位一致（同 E134 加 nfa_l2_subspace
     # 先例，manifest 扩字段使全部 treatment hash 移位一轮；既有锚点文件
     # 名不重算不受影响）。
-    "tli_sink_tokens": 128,
-    "tli_swa_size": 128,
-    "tli_sinkswa_only": False,
+    "nfa_sink_tokens": 128,
+    "nfa_swa_size": 128,
+    "nfa_sinkswa_only": False,
     # E137：D' gate 动态标定（默认关零扰动；eps/rows 非默认值才进可读名）
-    "tli_far_skip_backend": "legacy",
-    "tli_far_skip_cache": "retain",
-    "tli_dyn_dgate": False,
-    "tli_dyn_dgate_eps": 0.05,
-    "tli_dyn_dgate_rows": 256,
+    "nfa_far_skip_backend": "legacy",
+    "nfa_far_skip_cache": "retain",
+    "nfa_dyn_dgate": False,
+    "nfa_dyn_dgate_eps": 0.05,
+    "nfa_dyn_dgate_rows": 256,
     # E155/E155b：固定配额几何三参数 + 新口径双开关（GPT 审计 2026-10-19
     # 阻塞级修复：不入 manifest 则 nb/nt/near_L 不同的格子共享同一
     # treatment hash——pred_postfix 目录隔离之外的任何路径（复用格/重跑/
@@ -142,28 +142,28 @@ _TREATMENT_FIELD_DEFAULTS = {
     # 旧口径重跑还会同名不同义覆盖归档）。默认 None/None/None/True/False
     # （新口径）；manifest 扩字段使全部 treatment hash 移位一轮（E134/E135
     # 先例，既有锚点文件名不重算不受影响）。
-    "tli_near_pages": None,
-    "tli_near_tokens": None,
-    "tli_near_len": None,
-    "tli_boundary_bypass": True,
-    "tli_l2_quant": False,
+    "nfa_near_pages": None,
+    "nfa_near_tokens": None,
+    "nfa_near_len": None,
+    "nfa_boundary_bypass": True,
+    "nfa_l2_quant": False,
 }
 
 # 079②：文件型配置字段集合（值非 None → 内容身份解析，见上）
-_FILE_IDENTITY_FIELDS = ("tli_proj_basis", "tli_layer_skip_path")
+_FILE_IDENTITY_FIELDS = ("nfa_proj_basis", "nfa_layer_skip_path")
 
 # 【E155e vendor treatment 身份补齐（用户问题 ①「R3 manifest 登记缺口，
 # 2026-10-20」】46 个 vendor CLI 参数此前不进任何 treatment 身份：076 注释
-# 「非 tli 方法可读段已编码其全部旋钮」对 vendor 方法不成立——
+# 「非 nfa 方法可读段已编码其全部旋钮」对 vendor 方法不成立——
 #   * clusterkv：window/fit_iter/head_sel/balance/dist_t/gqa_policy/
 #     topk_stat 7 参数完全不进可读名（异配置同名互覆可达）；
 #   * asynctls/jssa：channel/basis 文件只编 basename（同 basename 异内容
 #     = 同名，142/149 已修 minference/fasa 的同构缺陷，此两家漏网）；
 #   * 其余 vendor（quest_vendor/minference/fasa/sparq/moba/hisa/ffd）旋钮
 #     已全参数或内容身份编码，但登记进 manifest 使 hash 承载全部身份
-#     （可读段降级为防御性冗余，与 tli 同构）。
-# 修复 = vendor 参数按 method 条件入 manifest（tli/none/tia/twi 的
-# manifest 逐位不变——E155d 在飞网格与全部 tli hash 锚点稳定），
+#     （可读段降级为防御性冗余，与 nfa 同构）。
+# 修复 = vendor 参数按 method 条件入 manifest（nfa/none/tia/twi 的
+# manifest 逐位不变——E155d 在飞网格与全部 nfa hash 锚点稳定），
 # vendor 方法名统一追加 _h<hash10> 尾段（身份单射结构性成立；既有
 # vendor 输出文件名不追溯改动，同 142/149 追加段先例）。quest/tia/twi/
 # none 可读段本就全参数编码，维持 076 旧口径不动。
@@ -215,7 +215,7 @@ def _vendor_file_identity(field, path):
             "sha256": hashlib.sha256(raw).hexdigest()}
 
 # treatment hash 尾段格式：_h + 10 hex。锚定尾正则拆分（可读段以
-# g 段/_P 结尾、非 tli 名以数值/async/none 结尾，不与该模式误撞）。
+# g 段/_P 结尾、非 nfa 名以数值/async/none 结尾，不与该模式误撞）。
 _TREATMENT_HASH_HEX_LEN = 10
 _TREATMENT_HASH_RE = re.compile(
     r"^(?P<readable>.+)_(?P<hash>h[0-9a-f]{%d})$" % _TREATMENT_HASH_HEX_LEN,
@@ -228,7 +228,7 @@ def _resolve_skip_content(path, is_default=False):
     同一批 bytes 同时产出内容身份与解析好的 skip 列表——不再「open 算
     SHA、再 open 解析 JSON」双开（079 的 _resolve_file_identity 即此
     形态，081 起文件只被读一次，快照冻结才有单一事实源）。is_default=
-    True 时错误文案附注该文件为缺省 D′ 掩码展开（tli_layer_skip_path
+    True 时错误文案附注该文件为缺省 D′ 掩码展开（nfa_layer_skip_path
     未声明时的 DEFAULT_MASK）。
 
     081 身份口径：is_default=True 时内容身份只记 {default, sha256,
@@ -241,18 +241,18 @@ def _resolve_skip_content(path, is_default=False):
     与 079② 口径一致。"""
     if not isinstance(path, str) or not path:
         raise SystemExit(
-            f"[GATE-FAIL] 079: tli_layer_skip_path 路径非法（{path!r}）"
+            f"[GATE-FAIL] 079: nfa_layer_skip_path 路径非法（{path!r}）"
             f"——文件型配置必须绑定实际内容，拒绝运行，fail loudly")
     rp = os.path.realpath(path)
     hint = ("（081：此文件为缺省 D′ 掩码 DEFAULT_MASK 的展开——"
-            "tli_layer_skip_path 未声明时运行时同样读它）" if is_default
+            "nfa_layer_skip_path 未声明时运行时同样读它）" if is_default
             else "")
     try:
         with open(rp, "rb") as f:
             raw = f.read()
     except OSError as e:
         raise SystemExit(
-            f"[GATE-FAIL] 079: tli_layer_skip_path 文件读取失败（{path} → "
+            f"[GATE-FAIL] 079: nfa_layer_skip_path 文件读取失败（{path} → "
             f"{type(e).__name__}: {e}）——文件型配置必须绑定实际内容，"
             f"拒绝运行，fail loudly{hint}")
     if is_default:
@@ -267,7 +267,7 @@ def _resolve_skip_content(path, is_default=False):
         skip_list = list(doc["skip"])
     except (UnicodeDecodeError, ValueError, KeyError, TypeError) as e:
         raise SystemExit(
-            f"[GATE-FAIL] 079: tli_layer_skip_path 解析失败（{path} → "
+            f"[GATE-FAIL] 079: nfa_layer_skip_path 解析失败（{path} → "
             f"{type(e).__name__}: {e}）——须为含 \"skip\" 键的 JSON；"
             f"旧口径静默关 D' 属静默退化，生产入口拒绝运行{hint}")
     return ident, skip_list
@@ -282,7 +282,7 @@ def _resolve_basis_content(path):
     同源，杜绝「算 SHA 的字节 ≠ 加载进显存的字节」的混装窗口。"""
     if not isinstance(path, str) or not path:
         raise SystemExit(
-            f"[GATE-FAIL] 079: tli_proj_basis 路径非法（{path!r}）——"
+            f"[GATE-FAIL] 079: nfa_proj_basis 路径非法（{path!r}）——"
             f"文件型配置必须绑定实际内容，拒绝运行，fail loudly")
     rp = os.path.realpath(path)
     try:
@@ -290,7 +290,7 @@ def _resolve_basis_content(path):
             raw = f.read()
     except OSError as e:
         raise SystemExit(
-            f"[GATE-FAIL] 079: tli_proj_basis 文件读取失败（{path} → "
+            f"[GATE-FAIL] 079: nfa_proj_basis 文件读取失败（{path} → "
             f"{type(e).__name__}: {e}）——文件型配置必须绑定实际内容，"
             f"拒绝运行，fail loudly")
     ident = {"path": rp, "sha256": hashlib.sha256(raw).hexdigest()}
@@ -302,9 +302,9 @@ def _resolve_basis_content(path):
         raise
     except Exception as e:   # 加载失败/非裸 tensor——运行时同样会失败
         raise SystemExit(
-            f"[GATE-FAIL] 079: tli_proj_basis 加载/取 shape 失败"
+            f"[GATE-FAIL] 079: nfa_proj_basis 加载/取 shape 失败"
             f"（{path} → {type(e).__name__}: {e}）——生产路径要求裸"
-            f"tensor [n_layers,Hkv,128,r]，TLIIndexer 稍后同样会失败，"
+            f"tensor [n_layers,Hkv,128,r]，NFAIndexer 稍后同样会失败，"
             f"拒绝运行，fail loudly")
     return ident, t
 
@@ -313,11 +313,11 @@ def _resolve_file_identity(field, path):
     """079②：文件型配置的内容身份解析（fail closed；081 兼容包装）。
 
     返回 {"path": 规范路径, "sha256": 文件字节 sha256, 摘要}：
-      - tli_proj_basis：附加 shape（torch.load weights_only 提取——
-        与 TLIIndexer.__init__ 同一加载口径；加载失败意味着运行时
+      - nfa_proj_basis：附加 shape（torch.load weights_only 提取——
+        与 NFAIndexer.__init__ 同一加载口径；加载失败意味着运行时
         同样会失败，提前 fail closed 不留「能算名不能跑」的半配置）；
-      - tli_layer_skip_path：附加 n_skip（解析 JSON 并要求含 "skip"
-        键——TLIIndexer.__init__ 对坏文件静默关 D' 的旧语义属「静默
+      - nfa_layer_skip_path：附加 n_skip（解析 JSON 并要求含 "skip"
+        键——NFAIndexer.__init__ 对坏文件静默关 D' 的旧语义属「静默
         退化」家族，生产入口不再放行）。
 
     文件缺失/读取失败/解析失败 → [GATE-FAIL] 079 SystemExit。
@@ -328,7 +328,7 @@ def _resolve_file_identity(field, path):
     D′ 掩码的有效值语义（enable=False 不解析、path=None 展开
     DEFAULT_MASK）见 resolve_treatment_snapshot——本包装保持 079 的
     「声明即解析」口径仅供兼容，生产路径不再经此入口。"""
-    if field == "tli_proj_basis":
+    if field == "nfa_proj_basis":
         return _resolve_basis_content(path)[0]
     return _resolve_skip_content(path)[0]
 
@@ -341,7 +341,7 @@ class TreatmentSnapshot:
 
     生产入口（benchmark pred.py / pred_ruler.py）在模型加载前调用
     resolve_treatment_snapshot(args) 取得唯一实例，随后：
-      - register_patch → 每个 attention 层的 TLIIndexer 注入同一对象
+      - register_patch → 每个 attention 层的 NFAIndexer 注入同一对象
         （层实例仍逐层建，但共享同一 snapshot——不再按层重开文件）；
       - method_name（文件名 _h<hash10> 段）、LongBench sidecar 写门、
         RULER receipt 的 treatment_manifest_json 全部从本对象派生。
@@ -366,14 +366,14 @@ def resolve_treatment_snapshot(args):
     """081：把全部文件型 treatment 配置一次解析并冻结为 TreatmentSnapshot。
 
     有效值语义（D′ 掩码，081 修复身份缺口 ①②）：
-      - effective tli_enable_layer_skip=True（缺省 True）且
-        tli_layer_skip_path=None → 展开 DEFAULT_LAYER_SKIP_MASK_PATH
+      - effective nfa_enable_layer_skip=True（缺省 True）且
+        nfa_layer_skip_path=None → 展开 DEFAULT_LAYER_SKIP_MASK_PATH
         并解析其内容（默认配置的 manifest 从此含掩码内容身份，
         而非恒 null 而可读名含 D）；
-      - tli_enable_layer_skip=False → 无论路径是否声明都不解析、
+      - nfa_enable_layer_skip=False → 无论路径是否声明都不解析、
         manifest 记 null（身份按「实际消费」而非「argv 声明」——
         修复 079 的反向不对称）。
-    投影基：声明即解析（与 TLIIndexer 运行时同口径），同一批 bytes
+    投影基：声明即解析（与 NFAIndexer 运行时同口径），同一批 bytes
     同时求 SHA256 / shape / tensor。文件缺失/损坏一律 [GATE-FAIL]
     079 SystemExit fail closed（沿用 079 错误口径）——不允许静默关 D′
     或「能算名不能跑」的半配置。
@@ -383,56 +383,56 @@ def resolve_treatment_snapshot(args):
     snapshot 时，输出与逐字段重新解析逐位一致（manifest 构造只有本
     函数一条路径，无第二套字段子集逻辑）。"""
     if any(getattr(args, name, None) == "auto" for name in
-           ("tli_far_skip_backend", "tli_far_skip_cache")):
+           ("nfa_far_skip_backend", "nfa_far_skip_cache")):
         raise ValueError("resolve auto far skip modes from model/config before treatment snapshot")
     manifest = {}
     skip_ids = None
     basis_tensor = None
     # ---- D′：有效值语义 ----
-    enable_skip = bool(getattr(args, "tli_enable_layer_skip", True))
+    enable_skip = bool(getattr(args, "nfa_enable_layer_skip", True))
     if enable_skip:
-        mask_path = getattr(args, "tli_layer_skip_path", None)
+        mask_path = getattr(args, "nfa_layer_skip_path", None)
         is_default = mask_path is None
         if is_default:
             mask_path = DEFAULT_LAYER_SKIP_MASK_PATH
         ident, skip_list = _resolve_skip_content(mask_path,
                                                  is_default=is_default)
-        manifest["tli_layer_skip_path"] = ident
+        manifest["nfa_layer_skip_path"] = ident
         skip_ids = frozenset(skip_list)
     else:
         # 081②：enable=False 时路径声明不进身份（运行时不消费）
-        manifest["tli_layer_skip_path"] = None
+        manifest["nfa_layer_skip_path"] = None
     # ---- 投影基：声明即解析（单次 open，身份与 tensor 同 bytes）----
-    bp = getattr(args, "tli_proj_basis", None)
+    bp = getattr(args, "nfa_proj_basis", None)
     if bp is not None:
         ident, basis_tensor = _resolve_basis_content(bp)
-        manifest["tli_proj_basis"] = ident
+        manifest["nfa_proj_basis"] = ident
         basis_tensor = basis_tensor.float()
     else:
-        manifest["tli_proj_basis"] = None
-    # ---- 其余标量字段（getattr 兜底缺省，与 TLIIndexer 运行时同源）----
+        manifest["nfa_proj_basis"] = None
+    # ---- 其余标量字段（getattr 兜底缺省，与 NFAIndexer 运行时同源）----
     for f, d in _TREATMENT_FIELD_DEFAULTS.items():
         if f in _FILE_IDENTITY_FIELDS:
             continue
         v = getattr(args, f, d)
         # Preserve historical identities when the opt-in path is unused.
-        if f in ("tli_far_skip_backend", "tli_far_skip_cache") and v == d:
+        if f in ("nfa_far_skip_backend", "nfa_far_skip_cache") and v == d:
             continue
         # 【E155d 参数退役归一】α/β/γ argparse 缺省翻转为 None=未传，
         # manifest 归一回 legacy 数值缺省（0.0/0.0/1.0）；γ CLI "off"
         # 哨兵字符串归一为 None（JSON null，E122 既有口径）——既有
         # treatment hash 逐位不变，未传 γ 的全部在跑/历史链身份稳定。
-        if f == "tli_alpha" and v is None:
+        if f == "nfa_alpha" and v is None:
             v = 0.0
-        elif f == "tli_beta" and v is None:
+        elif f == "nfa_beta" and v is None:
             v = 0.0
-        elif f == "tli_gamma":
+        elif f == "nfa_gamma":
             if v is None:
                 v = 1.0
             elif isinstance(v, str) and v.strip().lower() == "off":
                 v = None
         manifest[f] = v
-    # 【E155e 回退（主 AI 审计 2026-10-21）】tli_indexer.py __init__ 无
+    # 【E155e 回退（主 AI 审计 2026-10-21）】nfa_indexer.py __init__ 无
     # 隐式注入分支（缺省主路径 = legacy 单池，α/β/γ 归一 0/0/1）——
     # manifest 侧的镜像注入若保留会记 nb32/ntoff/nl4096 而实际跑单池
     # （文件名声称冠军几何、行为是单池，E155c 同型身份失配）。已删；
@@ -440,8 +440,8 @@ def resolve_treatment_snapshot(args):
     # 运行时逐位一致。若未来恢复隐式注入，必须 indexer/arguments/info
     # 三处同改同测。
     # ---- E155e：vendor 参数按 method 条件入 manifest ----
-    # tli/none/tia/twi/quest 不进本分支 → manifest 逐位不变（E155d 在飞
-    # 网格与全部 tli hash 锚点稳定）。vendor 方法登记 method 键 + 该
+    # nfa/none/tia/twi/quest 不进本分支 → manifest 逐位不变（E155d 在飞
+    # 网格与全部 nfa hash 锚点稳定）。vendor 方法登记 method 键 + 该
     # method 的全部旋钮；文件型字段（channel/basis/config）解析为内容
     # 身份，fasa_agreement_dir 经 142 路径口径归一到具体 pkl 内容身份。
     _m = getattr(args, "method", None)
@@ -477,12 +477,12 @@ def resolve_treatment_snapshot(args):
                 # 缺失如实记 null——stage_fasa_agreement 的 GATE-FAIL
                 # 在命名侧先拦截，manifest 不重复设防。
                 manifest["fasa_agreement"] = None
-    if getattr(args, "tli_prefill_frozen_regions", False):
+    if getattr(args, "nfa_prefill_frozen_regions", False):
         gate = getattr(args, "_frozen_region_gate", None)
         geometry = getattr(args, "_frozen_region_geometry", None)
         if not dataclasses.is_dataclass(gate) or not dataclasses.is_dataclass(geometry):
             raise ValueError("frozen region treatment requires resolved gate and geometry")
-        manifest["tli_prefill_frozen_regions"] = {
+        manifest["nfa_prefill_frozen_regions"] = {
             "gate": dataclasses.asdict(gate),
             "geometry": dataclasses.asdict(geometry),
         }
@@ -494,7 +494,7 @@ def resolve_treatment_snapshot(args):
 
 def _treatment_manifest(args, snapshot=None):
     """076：canonical treatment manifest——全部输出相关参数的
-    规范化字典（getattr 兜底缺省与 TLIIndexer 运行时同源）。
+    规范化字典（getattr 兜底缺省与 NFAIndexer 运行时同源）。
 
     079②：文件型配置字段（_FILE_IDENTITY_FIELDS）解析为内容身份
     （realpath + 字节 sha256 + shape/n_skip，fail closed）。
@@ -534,10 +534,10 @@ def _treatment_hash(args, snapshot=None):
         :_TREATMENT_HASH_HEX_LEN]
 
 
-# 076 fail-closed 写入门的 sidecar 后缀：{out_path}.tli_manifest.json。
+# 076 fail-closed 写入门的 sidecar 后缀：{out_path}.nfa_manifest.json。
 # 刻意不以 .jsonl 结尾（不进 LongBench/RULER 任何 *.jsonl glob）且与
-# .tli_gen 指针后缀互不混淆。
-TREATMENT_MANIFEST_SIDECAR_SUFFIX = ".tli_manifest.json"
+# .nfa_gen 指针后缀互不混淆。
+TREATMENT_MANIFEST_SIDECAR_SUFFIX = ".nfa_manifest.json"
 
 
 def gate_output_treatment_identity(out_path, manifest_json):
@@ -586,7 +586,7 @@ def gate_output_treatment_identity(out_path, manifest_json):
 def split_method_name_hash(method_name):
     """076 配套：把 method_name 拆成 (可读段, 身份 hash 段)。
 
-    hash 段形如 "_h<10 hex>"（含前导下划线，可直接拼回）；非 tli 名
+    hash 段形如 "_h<10 hex>"（含前导下划线，可直接拼回）；非 nfa 名
     （quest/twia/tia/none——无 hash 段）返回 ("原名", "")。供 LongBench
     pred.py 的超长名截断「先截可读中段、保 hash 尾段」使用。"""
     m = _TREATMENT_HASH_RE.match(method_name)
@@ -602,12 +602,12 @@ def truncate_output_name_keep_hash(dataset_prefix, method_name, t,
     旧口径 out_fn[:245]+"..." 会从尾部截，method_name 尾部的
     "_h<hash10>" 被截后不同 treatment 可再次同名互覆（076 回归）。
     新口径：可读中段先截（"..." 占位），dataset 前缀 / hash 尾段 /
-    "-t" 后缀全保；非 tli 名（无 hash 段）回退旧口径（其可读段已全
+    "-t" 后缀全保；非 nfa 名（无 hash 段）回退旧口径（其可读段已全
     参数编码）。
 
     【081 + kimi3 0316 追加修复 1】limit 缺省 245 → 230：上限与
     sidecar 后缀链绑定——out_fn 落盘时实际还要拼 ".jsonl"（6 字节），
-    且 076 写门会为它创建 sidecar "{out_fn}.tli_manifest.json"（18
+    且 076 写门会为它创建 sidecar "{out_fn}.nfa_manifest.json"（18
     字节），故 245 截断下 sidecar 实际文件名 = 245+6+18 = 269 字节
     > ext4 单文件名 255 上限，open(sidecar,"w") 抛 OSError 36 裸
     traceback，破坏 076 fail-closed 统一口径（kimi3 实测复现）。
@@ -957,7 +957,7 @@ def _minference_cfg_sha8(args):
 
 
 def _vendor_name_with_hash(args, base, snapshot=None):
-    """E155e：vendor 方法名追加 canonical treatment hash 尾段（与 tli
+    """E155e：vendor 方法名追加 canonical treatment hash 尾段（与 nfa
     076 同构）。base = 既有可读段（含 142/149 的 _agr/_cfg/_src 内容
     身份段），追加段不改既有语义字段——既有 vendor 文件名不追溯改动。
     hash 从 vendor manifest（method 条件字段 + 文件内容身份）派生，
@@ -967,7 +967,7 @@ def _vendor_name_with_hash(args, base, snapshot=None):
 
 
 def get_method_name_with_info(args, snapshot=None):
-    # 081：snapshot 提供时 tli 名的 _h<hash10> 段从冻结 manifest_json
+    # 081：snapshot 提供时 nfa 名的 _h<hash10> 段从冻结 manifest_json
     # 派生（与 sidecar/receipt 同源）；E155e 起 vendor 分支同样消费
     # snapshot 的冻结 manifest（_vendor_name_with_hash）。
     if args.method == "ffd_vendor":
@@ -991,7 +991,7 @@ def get_method_name_with_info(args, snapshot=None):
         # 取 basename 编码进文件名；starting_layer 之前浅层 dense。
         # 149（TL-MINFERENCE-PATTERN-IDENTITY，GPT 审计 8b56bbd）：只编码
         # basename 时两份不同内容、同 basename 的 pattern 共享同一 method
-        # name（且非 tli 路径 treatment sidecar 不写，无第二道门）。修复 =
+        # name（且非 nfa 路径 treatment sidecar 不写，无第二道门）。修复 =
         # 追加 pattern JSON 内容 SHA256 前 8 位尾段 `_cfg<sha8>`（内容身份，
         # 与路径无关），追加段不改既有语义字段（既有文件名不追溯改动）。
         # 内容 sha 优先消费入口加载期冻结值（freeze_minference_pattern_
@@ -1104,35 +1104,35 @@ def get_method_name_with_info(args, snapshot=None):
     elif args.method == "tia":
         async_info = "_async" if args.tia_enable_async_topk else ""
         return f"tia_{args.tia_block_size}_{args.tia_level1_topk}_{args.tia_level2_topk}_c{args.tia_level2_cmp_ratio}{async_info}"
-    elif args.method == "tli":
+    elif args.method == "nfa":
         # 【F11 修复（kimi3 清单 2026-10-08）】ab 用「生效值」而非 flag 原值：
-        # tli_subspace=full 时 TLIIndexer.__init__ 内部强制 enable_subspace=False
+        # nfa_subspace=full 时 NFAIndexer.__init__ 内部强制 enable_subspace=False
         # → 不写 "A"（原按 flag 原值写 "A"，默认 full 口径下文件名虚标子空间，
-        # 与实际 treatment 不符——历史 ARM_CONTRACT 串 tli_64_128_1024_c4_A 的
+        # 与实际 treatment 不符——历史 ARM_CONTRACT 串 nfa_64_128_1024_c4_A 的
         # "A" 即此虚标，既有文件名不追溯改动）。
-        subspace = getattr(args, "tli_subspace", "full")
-        eff_subspace = getattr(args, "tli_enable_subspace", True)
+        subspace = getattr(args, "nfa_subspace", "full")
+        eff_subspace = getattr(args, "nfa_enable_subspace", True)
         if subspace == "full":
-            eff_subspace = False          # 与 TLIIndexer.__init__ 同源
+            eff_subspace = False          # 与 NFAIndexer.__init__ 同源
         elif subspace in ("rope", "nope", "mla_rope"):
             eff_subspace = True
-        ab = ("A" if eff_subspace else "") + ("B" if args.tli_enable_kmeans else "") + ("D" if args.tli_enable_layer_skip else "")
+        ab = ("A" if eff_subspace else "") + ("B" if args.nfa_enable_kmeans else "") + ("D" if args.nfa_enable_layer_skip else "")
         # 【B09 修复（kimi3 清单 2026-10-08）】α/β/γ 是 treatment 的一部分，
         # 必须进输出文件名（a0.25_b0.125_g0.625 风格），否则不同分区配置
         # 共享同 method_name → 同路径 w 模式互相覆盖 / 同名混装不可区分。
         # γ=off（显式传 "off" → None）渲染 "off"；缺省属性按 1.0 兜底——与
-        # TLIIndexer.__init__ 的运行时缺省 getattr(args,"tli_gamma",1.0) 同源，
+        # NFAIndexer.__init__ 的运行时缺省 getattr(args,"nfa_gamma",1.0) 同源，
         # 否则程序化构造的 args（无该属性）文件名标 goff 而实际跑 γ=1.0，
         # 文件名/行为失配（B09 族）。
-        alpha = getattr(args, "tli_alpha", 0.0)
-        beta = getattr(args, "tli_beta", 0.0)
+        alpha = getattr(args, "nfa_alpha", 0.0)
+        beta = getattr(args, "nfa_beta", 0.0)
         # 【E155d 参数退役归一】None=未传 → legacy 缺省渲染（既有文件名
         # 逐位不变）；"off" 哨兵 → None → goff（与 E122 γ-off 同渲染）。
         if alpha is None:
             alpha = 0.0
         if beta is None:
             beta = 0.0
-        gamma = getattr(args, "tli_gamma", 1.0)
+        gamma = getattr(args, "nfa_gamma", 1.0)
         if isinstance(gamma, str) and gamma.strip().lower() == "off":
             gamma = None
         elif gamma is None:
@@ -1141,28 +1141,28 @@ def get_method_name_with_info(args, snapshot=None):
         # 【10-09 TL-PREFILL-PROVENANCE-001 修复】稀疏 prefill 开关必须进输出文件名，
         # 否则 P-off/P-on 同路径 w 模式互相覆盖（GPT 审计 B09 族新实例）。默认不传
         # flag 时后缀为空 → 在跑链文件名逐位不变。
-        p = "_P" if getattr(args, "tli_sparse_prefill", False) else ""
+        p = "_P" if getattr(args, "nfa_sparse_prefill", False) else ""
         # 【E138 消融①】decode dense 回退标记进可读名——P on + DD on
         # （prefill-only 稀疏臂）与 P on（双稀疏臂）文件名必须可分（同
         # TL-PREFILL-PROVENANCE-001 族：开关不进名则同路径 w 模式互覆）。
         # 默认关不加后缀，在跑链文件名逐位不变。
-        pdd = "_DD" if getattr(args, "tli_decode_dense", False) else ""
+        pdd = "_DD" if getattr(args, "nfa_decode_dense", False) else ""
         # 【E135】sink/swa 非默认值/归因臂标记进可读名——默认（128/128/关）
         # 不加任何后缀，锚点文件名逐位不变；身份单射由 manifest/hash 恒承载。
-        sk = getattr(args, "tli_sink_tokens", 128)
-        sw = getattr(args, "tli_swa_size", 128)
-        sso = getattr(args, "tli_sinkswa_only", False)
+        sk = getattr(args, "nfa_sink_tokens", 128)
+        sw = getattr(args, "nfa_swa_size", 128)
+        sso = getattr(args, "nfa_sinkswa_only", False)
         e135 = ""
         if sso:
             e135 += "_sinkswaonly"
         if sk != 128 or sw != 128:
             e135 += f"_sk{sk:g}_sw{sw:g}"
         # E137：动态 D' gate 标记（默认关不加后缀；eps/rows 非默认时渲染）
-        ddg = getattr(args, "tli_dyn_dgate", False)
+        ddg = getattr(args, "nfa_dyn_dgate", False)
         if ddg:
             e135 += "_dyndgate"
-            dep = getattr(args, "tli_dyn_dgate_eps", 0.05)
-            drw = getattr(args, "tli_dyn_dgate_rows", 256)
+            dep = getattr(args, "nfa_dyn_dgate_eps", 0.05)
+            drw = getattr(args, "nfa_dyn_dgate_rows", 256)
             if dep != 0.02:
                 e135 += f"_eps{dep:g}"
             if drw != 256:
@@ -1176,9 +1176,9 @@ def get_method_name_with_info(args, snapshot=None):
         # 消融臂显式 _bb0（bypass 关）/ _lq4（quant 开）。身份单射由
         # manifest/hash 恒承载（可读段仅防御性冗余）。
         e155 = ""
-        _np = getattr(args, "tli_near_pages", None)
-        _nt = getattr(args, "tli_near_tokens", None)
-        _nl = getattr(args, "tli_near_len", None)
+        _np = getattr(args, "nfa_near_pages", None)
+        _nt = getattr(args, "nfa_near_tokens", None)
+        _nl = getattr(args, "nfa_near_len", None)
         # E155d：nt=off 哨兵渲染 _ntoff（自由竞争几何臂），与数值 nt
         # 天然区分（f"{_nt:g}" 对 str 会崩，须先分流）。
         _nt_off = isinstance(_nt, str) and str(_nt).strip().lower() == "off"
@@ -1191,9 +1191,9 @@ def get_method_name_with_info(args, snapshot=None):
                 e155 += f"_nt{_nt:g}"
         if _nl is not None:
             e155 += f"_nl{_nl:g}"
-        if not getattr(args, "tli_boundary_bypass", True):
+        if not getattr(args, "nfa_boundary_bypass", True):
             e155 += "_bb0"
-        if getattr(args, "tli_l2_quant", False):
+        if getattr(args, "nfa_l2_quant", False):
             e155 += "_lq4"
         # 076（TL-E121-OUTPUT-ID）：可读段逐位不动（B09 口径），追加
         # canonical treatment hash 尾段 _h<hash10>——全部输出相关参数
@@ -1202,7 +1202,7 @@ def get_method_name_with_info(args, snapshot=None):
         # treatment 必不同名（单射），同名互覆/指针错切不再可达。
         # 081：hash 从冻结 snapshot 派生（生产入口传入）——生成窗口内
         # 文件被替换时文件名与 runtime/sidecar 仍同源。
-        return (f"tli_{args.tia_block_size}_{args.tia_level1_topk}_"
+        return (f"nfa_{args.tia_block_size}_{args.tia_level1_topk}_"
                 f"{args.tia_level2_topk}_c{args.tia_level2_cmp_ratio}_"
                 f"{ab}a{alpha:g}_b{beta:g}_g{g_str}{p}{pdd}{e135}{e155}"
                 f"_h{_treatment_hash(args, snapshot)}")

@@ -8,15 +8,15 @@ from sparse_attn.ops import batch_candidate_producer as producer
 
 @pytest.fixture
 def primary(monkeypatch):
-    from sparse_attn.indexer import tli_indexer as mod
-    spec=importlib.util.spec_from_file_location('producer_args',Path(__file__).parents[1]/'exp/bench/test_tli_graph_gates.py')
+    from sparse_attn.indexer import nfa_indexer as mod
+    spec=importlib.util.spec_from_file_location('producer_args',Path(__file__).parents[1]/'exp/bench/test_nfa_graph_gates.py')
     args=importlib.util.module_from_spec(spec);spec.loader.exec_module(args)
     monkeypatch.setattr(mod,'_HAS_TRITON',False)
-    monkeypatch.setenv('TLI_L2_BYPASS','0');monkeypatch.setenv('TLI_SPARSE_SELECTION','0')
-    monkeypatch.setenv('TLI_COMPACT_NORMALIZATION','0')
+    monkeypatch.setenv('NFA_L2_BYPASS','0');monkeypatch.setenv('NFA_SPARSE_SELECTION','0')
+    monkeypatch.setenv('NFA_COMPACT_NORMALIZATION','0')
     before=torch.get_num_threads();torch.set_num_threads(1)
     def make(sink,swa,near,k1,nn):
-        i=mod.TLIIndexer(args._make_prod_args());i.layer_idx=2;i.clear()
+        i=mod.NFAIndexer(args._make_prod_args());i.layer_idx=2;i.clear()
         i.sink_tokens=sink;i.sliding_window_size=swa;i.nt_near_len=near
         i.nt_near_pages=nn;i.args.tia_level1_topk=k1
         return i

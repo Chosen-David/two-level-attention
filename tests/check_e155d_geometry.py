@@ -21,9 +21,9 @@ def main():
                     tag = f'pred_nb{nb}nt{nt}nl{nl}'
                     if grid.parse_tag(tag) is None:
                         continue
-                    args = dict(DEFAULTS, method='tli', tli_enable_layer_skip=False,
-                                tli_alpha=None, tli_beta=None, tli_gamma=None,
-                                tli_near_pages=nb, tli_near_tokens=nt, tli_near_len=nl)
+                    args = dict(DEFAULTS, method='nfa', nfa_enable_layer_skip=False,
+                                nfa_alpha=None, nfa_beta=None, nfa_gamma=None,
+                                nfa_near_pages=nb, nfa_near_tokens=nt, nfa_near_len=nl)
                     args = SimpleNamespace(**args)
                     snap = info.resolve_treatment_snapshot(args)
                     name = info.get_method_name_with_info(args, snap)
@@ -31,7 +31,7 @@ def main():
                     digest.update(text.encode('utf-8'))
                     path = root / f'qasper-{name}-fixed.jsonl'
                     # Only metadata is consumed by this helper, no scoring.
-                    sidecar = Path(str(path) + '.tli_manifest.json')
+                    sidecar = Path(str(path) + '.nfa_manifest.json')
                     sidecar.write_text(text)
                     result = grid.cell_treatment_hashes(tag, {'qasper': str(path)})
                     if result != {'qasper': hashlib.sha256(text.encode()).hexdigest()}:
@@ -46,14 +46,14 @@ def main():
                             rejected += 1
                         else:
                             raise AssertionError('mislabeled producer accepted')
-        args = SimpleNamespace(**dict(DEFAULTS, method='tli', tli_enable_layer_skip=False,
-                                      tli_alpha=0., tli_beta=0., tli_gamma=None))
+        args = SimpleNamespace(**dict(DEFAULTS, method='nfa', nfa_enable_layer_skip=False,
+                                      nfa_alpha=0., nfa_beta=0., nfa_gamma=None))
         snap = info.resolve_treatment_snapshot(args)
         name = info.get_method_name_with_info(args, snap)
         text = info.get_treatment_manifest_json(args, snap)
         digest.update(text.encode('utf-8'))
         path = root / f'qasper-{name}-fixed.jsonl'
-        Path(str(path) + '.tli_manifest.json').write_text(text)
+        Path(str(path) + '.nfa_manifest.json').write_text(text)
         grid.cell_treatment_hashes('pred_ctrl_singlepool', {'qasper': str(path)})
         count += 1
     if count != 87 or rejected == 0:

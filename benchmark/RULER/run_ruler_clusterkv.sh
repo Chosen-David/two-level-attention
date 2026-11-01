@@ -7,7 +7,7 @@
 #   nlist=400, fit_iter=20, head_sel=truc, balance=False, dist_t=cosine；
 #   window 仅 statistics/换算用，accuracy selector 路径不施加 window）。
 #   注意预算语义：官方 controller 的 kv_cache_size = sink + token_budget + window，
-#   token_budget 是中间选择预算，sink/window 是额外的（不同于 TLI 的 K2 已含 sink/swa）。
+#   token_budget 是中间选择预算，sink/window 是额外的（不同于 NFA 的 K2 已含 sink/swa）。
 #   接入验收时须按 evaluation.md「记录实际 unique token 数」口径换算对齐总预算 1024。
 # 附录档：官方论文 LongBench/PG19 的预算扫描（256/512/1024/2048）另行派单，不入主表。
 # lens 超过原生 40960 自动加 --yarn（同 run_ruler_moba.sh 做法）。

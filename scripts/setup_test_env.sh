@@ -22,10 +22,10 @@ if [[ -z "${PYTHON:-}" && ! -x "$python_bin" ]]; then
     # Do not sync an existing GPU environment: that could remove local packages.
     echo "Creating .venv from pyproject.toml; its flash-attn wheel must be available on this host."
     if [[ -f uv.lock ]]; then
-        uv sync --frozen --python "${TLI_BASE_PYTHON:-3.11}"
+        uv sync --frozen --python "${NFA_BASE_PYTHON:-3.11}"
     else
         echo "No uv.lock in checkout: dependencies will be resolved locally (not a fully locked reproduction)." >&2
-        uv sync --python "${TLI_BASE_PYTHON:-3.11}"
+        uv sync --python "${NFA_BASE_PYTHON:-3.11}"
     fi
 fi
 command -v "$python_bin" >/dev/null || { echo "Python not found: $python_bin" >&2; exit 1; }
@@ -57,5 +57,5 @@ print(json.dumps(report, indent=2))
 if int(sys.argv[1]) and not (report["cuda_available"] and report["triton_installed"]):
     raise SystemExit("Native GPU tests require CUDA-enabled Torch, a visible GPU and Triton. No GPU stack was replaced.")
 PY
-echo "Use this exact interpreter for tests: PYTHON=$python_bin bash scripts/test_tli_operator.sh --cuda"
+echo "Use this exact interpreter for tests: PYTHON=$python_bin bash scripts/test_nfa_operator.sh --cuda"
 echo "The operator script is present on the operator branch; setup alone is not GPU test acceptance."

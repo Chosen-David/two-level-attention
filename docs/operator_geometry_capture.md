@@ -8,7 +8,7 @@ version-less inference tensors retain conservative recomputation. Existing graph
 pool ordering and fixed-buffer lifecycle requirements still apply.
 
 The four repository capture entrypoints use this wrapper. Set
-`TLI_GRAPH_GEOMETRY_SHARED=0` to disable sharing for an ablation; the default is 1.
+`NFA_GRAPH_GEOMETRY_SHARED=0` to disable sharing for an ablation; the default is 1.
 This does not change selection scores, softmax denominators, rounding or ranking.
 
 ## Verified scope (2026-10-30)

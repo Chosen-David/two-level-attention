@@ -28,14 +28,14 @@ class SnapshotTests(unittest.TestCase):
             directory = self.root / 'collect/local' / tag
             directory.mkdir(parents=True)
             _, nb, nt, nl = grid.parse_tag(tag)
-            manifest = json.dumps(dict(tli_near_pages=nb, tli_near_tokens=nt,
-                                       tli_near_len=nl, tia_block_size=64),
+            manifest = json.dumps(dict(nfa_near_pages=nb, nfa_near_tokens=nt,
+                                       nfa_near_len=nl, tia_block_size=64),
                                   sort_keys=True, ensure_ascii=False)
             digest = hashlib.sha256(manifest.encode()).hexdigest()[:10]
             for task in grid.AVG5_TASKS:
-                path = directory / (task + '-tli_h' + digest + '-run.jsonl')
+                path = directory / (task + '-nfa_h' + digest + '-run.jsonl')
                 self.write_rows(path, score)
-                Path(str(path) + '.tli_manifest.json').write_text(manifest)
+                Path(str(path) + '.nfa_manifest.json').write_text(manifest)
                 self.paths[tag, task] = path
         for name, value in [('COLLECT_ROOT', str(self.root / 'collect')),
                             ('STAGING', str(self.root / 'staging')),

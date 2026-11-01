@@ -1,6 +1,6 @@
 # Quality generation with CUDA Graphs
 
-`TLI_CUDA_GRAPH=auto` is the quality-entry default. `0`/`off` uses
+`NFA_CUDA_GRAPH=auto` is the quality-entry default. `0`/`off` uses
 the eager reference; `1`/`on` requires capture and raises if unsupported or
 capture fails. A selected environment variable is not evidence of execution.
 Inspect `model._quality_graph_execution`: `actual`, `captures`, `replay_steps`,
@@ -24,7 +24,7 @@ overlap is not assumed faster than serial. See
 
 ## Decode input updates
 
-`TLI_DEVICE_DECODE_INPUTS=1` enables a row kernel that updates tokens, positions,
+`NFA_DEVICE_DECODE_INPUTS=1` enables a row kernel that updates tokens, positions,
 lengths, live flags and the decode mask on device after successful capture, for
 capacity at most 65536. `0` retains host preparation. The receipt includes
 `input_update_requested`, `input_update_route` and `input_update_fallback`.
@@ -32,7 +32,7 @@ Requests without a captured Graph or above the capacity limit retain the host
 path. Sampling remains greedy argmax; token readback, host stopping decisions,
 EOS/min-generation semantics and capacity checks remain in the generation loop.
 
-`TLI_REUSE_WARMUP_STREAM=1` reuses one warmup stream per calling thread/device;
+`NFA_REUSE_WARMUP_STREAM=1` reuses one warmup stream per calling thread/device;
 `0` creates a stream per request. Stream reuse retains neither request KV nor
 Graph ownership. `warmup_stream` and `warmup_stream_reused` report actual use.
 This bounds the stream registry per thread/device; it is not a measured bound
@@ -44,7 +44,7 @@ do not imply a speedup for every model or request, and do not change Graph polic
 
 ## Measurements and scope
 
-`TLI_QUALITY_TIMING=1` records replay CUDA events and step wall time including
+`NFA_QUALITY_TIMING=1` records replay CUDA events and step wall time including
 input updates, sampling, readback and EOS processing. Instrumentation has
 overhead and is off by default. Full request time must also include prefill,
 KV conversion and capture; `setup_wall_ms + decode_wall_ms` does not include

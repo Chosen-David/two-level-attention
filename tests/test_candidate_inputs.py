@@ -3,7 +3,7 @@ import importlib.util
 from pathlib import Path
 import pytest
 import torch
-from sparse_attn.ops.candidate_inputs import candidate_inputs
+from sparse_attn.indexer.candidate.inputs import candidate_inputs
 
 
 def inputs():
@@ -39,15 +39,15 @@ def test_metadata_rejects_incompatible_shapes_and_dtypes(field,value):
 
 @pytest.fixture
 def real_indexer(monkeypatch):
-    from sparse_attn.indexer import tli_indexer as mod
-    path=Path(__file__).parents[1]/'exp/bench/test_tli_graph_gates.py'
+    from sparse_attn.indexer import nfa_indexer as mod
+    path=Path(__file__).parents[1]/'exp/bench/test_nfa_graph_gates.py'
     spec=importlib.util.spec_from_file_location('candidate_test_args',path)
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
     monkeypatch.setattr(mod,'_HAS_TRITON',False)
-    monkeypatch.setenv('TLI_SPARSE_SELECTION','0')
-    monkeypatch.setenv('TLI_COMPACT_NORMALIZATION','0')
-    monkeypatch.setenv('TLI_L2_BYPASS','0')
-    indexer=mod.TLIIndexer(module._make_prod_args());indexer.layer_idx=2;indexer.clear()
+    monkeypatch.setenv('NFA_SPARSE_SELECTION','0')
+    monkeypatch.setenv('NFA_COMPACT_NORMALIZATION','0')
+    monkeypatch.setenv('NFA_L2_BYPASS','0')
+    indexer=mod.NFAIndexer(module._make_prod_args());indexer.layer_idx=2;indexer.clear()
     # Reduce CPU scheduling noise in this semantic test, not a timing claim.
     before=torch.get_num_threads();torch.set_num_threads(1)
     yield indexer
@@ -57,7 +57,7 @@ def real_indexer(monkeypatch):
 @pytest.mark.parametrize('dtype',[torch.float16,torch.bfloat16])
 @pytest.mark.parametrize('capacity,length',[(128,33),(1024,132),(1024,1000)])
 def test_real_cpu_producer_reconstructs_unchanged_selection(real_indexer,dtype,capacity,length):
-    from sparse_attn.ops.token_selection import graph_middle_selection
+    from sparse_attn.indexer.selection.selector import graph_middle_selection
     torch.manual_seed(19)
     indexer=real_indexer
     q=torch.randn(1,1,8,128,dtype=dtype)
@@ -99,7 +99,7 @@ def test_producer_excludes_bypass_and_multi_request(real_indexer,monkeypatch):
     q=torch.randn(1,1,8,128,dtype=torch.bfloat16)
     k=torch.randn(1,128,2,128,dtype=q.dtype)
     index=real_indexer.prepare_index(k,torch.tensor([0,128],dtype=torch.int32))
-    monkeypatch.setenv('TLI_L2_BYPASS','1')
+    monkeypatch.setenv('NFA_L2_BYPASS','1')
     with pytest.raises(NotImplementedError,match='L2 bypass'):
         real_indexer.compute_candidate_inputs_graph(q,index,1.,torch.tensor([128]))
     with pytest.raises(ValueError,match='one decode request'):
@@ -107,7 +107,7 @@ def test_producer_excludes_bypass_and_multi_request(real_indexer,monkeypatch):
 
 
 def test_producer_stops_before_fine_normalization_and_ranking(real_indexer,monkeypatch):
-    from sparse_attn.indexer import tli_indexer as mod
+    from sparse_attn.indexer import nfa_indexer as mod
     q=torch.randn(1,1,8,128,dtype=torch.bfloat16)
     k=torch.randn(1,1024,2,128,dtype=q.dtype)
     index=real_indexer.prepare_index(k,torch.tensor([0,1024],dtype=torch.int32))

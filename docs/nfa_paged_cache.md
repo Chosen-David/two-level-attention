@@ -25,7 +25,7 @@ its tensor references to the Torch allocator and its integer ID to the free-ID
 heap. This reduces active KV allocations; cached allocator reservations are not
 claimed as released driver memory. Report inactive page slots separately.
 
-The adapter reuses `TLIIndexer.compute_score/compute_mask` on low-dimensional
+The adapter reuses `NFAIndexer.compute_score/compute_mask` on low-dimensional
 logical scratch to match the current tail-subspace selector. Final CUDA attention
 reads selected full-dimensional K/V directly via page pointer tables. It does not
 construct a contiguous full-width historical KV buffer. Scratch, table creation,
@@ -48,7 +48,7 @@ CUDA pages are owned by the stream that first writes them. Updates, freezing and
 pointer-table reads on another stream are rejected before state mutation; stream
 handoff and CUDA Graph lifetime management are not implemented.
 
-The TLI adapter matches the prior ring reference's activation-dtype Q scaling. For
+The NFA adapter matches the prior ring reference's activation-dtype Q scaling. For
 fewer than 16,384 visible tokens, it additionally rounds normalized probabilities
 to activation dtype, matching that reference's dense arithmetic. This requires a second
 page-read pass; its cost is included in timing. The standalone kernel's default

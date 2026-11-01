@@ -4,7 +4,7 @@ import os
 
 def validate_selector_options(capacity=None):
     values=[]
-    for name in ('TLI_SPARSE_SORT_INT16','TLI_COMPACT_SCAN_TILED'):
+    for name in ('NFA_SPARSE_SORT_INT16','NFA_COMPACT_SCAN_TILED'):
         value=os.environ.get(name,'0')
         if value not in ('0','1'):
             raise ValueError(name+' must be 0 or 1')

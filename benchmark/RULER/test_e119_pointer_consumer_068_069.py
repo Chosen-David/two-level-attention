@@ -8,7 +8,7 @@
      fail-closed 拒收：调度与交付的完成定义分裂，坏格永久 SKIP（#200）
 
 违反事实（GPT 审计已 CPU 复现）：
-  068  #198 指针协议（066/crash-recovery）提交后只留 {out}.tli_gen 指针 +
+  068  #198 指针协议（066/crash-recovery）提交后只留 {out}.nfa_gen 指针 +
        gen 目录内 JSONL，逻辑 .jsonl 不落盘；run_ruler_e109.sh:63 仍
        `ls $OUTDIR/$T-*.jsonl | head -1`——对已提交完整代实测
        SKIP_CONDITION=false（指针在、gen 预测在、调度仍重跑），断点续跑
@@ -27,7 +27,7 @@
        改调探针：complete→SKIP / partial|missing→跑 / invalid→
        PROBE-FAIL 计失败（协议错误人工介入）。
   069  方案 2（单口径原则，不维护第二套指针解析）：direct CLI 检测到
-       root 下任何 .tli_gen → [GATE-FAIL] 非零退出零输出、提示改用
+       root 下任何 .nfa_gen → [GATE-FAIL] 非零退出零输出、提示改用
        score_ruler_formal.py；门禁只在 main() 生效（formal import 本
        模块函数不经 main，staging 派生副本无指针文件恒零触发）；
        pred_ruler.py docstring 打分指向改为 formal。
@@ -80,7 +80,7 @@
      逃逸）不得误伤——经链路径与真实路径双入口 probe complete、
      resolve canonical realpath 闭合、formal 消费入口接受
      （防 071 门禁把父目录分量是 symlink 的正常部署误判成逃逸）
-  S4（073 审计复现格，#202）非法 UTF-8（单字节 0xff）坏 .tli_gen 夹在
+  S4（073 审计复现格，#202）非法 UTF-8（单字节 0xff）坏 .nfa_gen 夹在
      两个合法好格之间——单格 STATE=invalid rc=2 + [GATE-FAIL]+073
      （修复前 UnicodeDecodeError 裸 traceback rc=1）；audit 坏格居中
      不中止 → 三格全列出 total=3 invalid=1 rc=2
@@ -1018,7 +1018,7 @@ def test_S3_symlinked_output_tree_no_false_positive(base):
 
 def test_S4_invalid_utf8_pointer_normalized_invalid(base):
     """S4（073 审计复现格，#202）：非法 UTF-8（单字节 0xff）坏
-    .tli_gen 夹在两个合法好格之间。修复前 open(..., encoding="utf-8")
+    .nfa_gen 夹在两个合法好格之间。修复前 open(..., encoding="utf-8")
     的 f.read() 抛 UnicodeDecodeError（UnicodeError 族，非 OSError），
     穿透 resolve 的 except OSError 与 probe/audit 的
     (SystemExit, OSError) 兜底 → 单格裸 traceback rc=1（无 STATE=

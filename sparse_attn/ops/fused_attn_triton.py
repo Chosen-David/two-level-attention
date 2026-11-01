@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-"""【E139 纲领④】稀疏 prefill 融合紧凑 attention Triton kernel。
+"""【E139 纲领④】稀疏 prefill 融合紧凑 attention Triton kernel（当前保留为
+可选/历史 prefill 算子；生产 prefill 已切换为 dense）。
 
 用户纲领④原话：「融合紧凑 attention。消除 2048 行跨组候选并集、重复搬运、
 .item() 同步及完整 score/P 中间量。kernel 按每行绝对 token 位置处理
 causal、sink、SWA；普通 varlen FlashAttention 不能直接替换这套不规则掩码」。
 
-设计（对齐 eager_prefill._chunk_rows_attn 组版语义，L62-271）：
+设计（对齐旧 eager_prefill 组版语义）：
   1. **原位置块访问，不走并集 argsort**：每行（绝对位置 p = pos_lo + r）
      的有效列谓词 = (j <= p) AND (j < sink_tok OR j >= p-swa_tok+1 OR
      sel[j(r)//grp][h, j])——列遍历按 K 原始位置序天然因果，无需
@@ -32,7 +33,7 @@ causal、sink、SWA；普通 varlen FlashAttention 不能直接替换这套不�
 fail-closed：仅组版（sel_list 非 None）+ kv 共享（非 per_q_head）+ CUDA
 + G 为 2 的幂（tl.arange 约束）启用；异常由调用方捕获回退原 gather 路径。
 
-实验选项 TLI_PREFILL_BLOCK_LIST=1：GPU 前缀和生成每组有序活跃块索引，
+实验选项 NFA_PREFILL_BLOCK_LIST=1：GPU 前缀和生成每组有序活跃块索引，
 避免每个 query tile 重扫全前缀。默认关闭；尚需目标 GPU 对拍与含打包计时。
 它只减少块判定循环，不消除活跃块内部未选中 token 的点积。
 """
@@ -269,7 +270,7 @@ def fused_group_attn(q_c, k_c, v_c, sel_list, pos_lo, G, softmax_scale,
     sel_blk = sel_stack.view(n_g, Hkv, Tb, _BLK).any(dim=-1).contiguous()
 
     if use_block_list is None:
-        use_block_list = os.environ.get("TLI_PREFILL_BLOCK_LIST", "0") == "1"
+        use_block_list = os.environ.get("NFA_PREFILL_BLOCK_LIST", "0") == "1"
     BR = _BRG // G
     block_ids = block_counts = sel_blk  # Unused pointer arguments in baseline.
     if use_block_list:

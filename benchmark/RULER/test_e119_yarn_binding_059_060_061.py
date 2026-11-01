@@ -272,7 +272,7 @@ def _receipt_for(f, context_length, task, factor=2.0, enabled=True,
         model_path="/synthetic/Qwen3-8B", model_config_sha256=None,
         native_mpe=NATIVE_MPE,
         generation_params={"max_gen": 64, "max_num": max_num, "seed": seed,
-                           "method": "tli", "pred_postfix": "_fx",
+                           "method": "nfa", "pred_postfix": "_fx",
                            "t": "01010000"},
         producer_script_path="benchmark/RULER/pred_ruler.py",
         producer_script_sha256="0" * 64,
@@ -353,7 +353,7 @@ def _producer_products(base, name):
     d = os.path.join(base, name, "out", "L32768", "pred_stub")
     pred_final = os.path.join(d, "vt-stubm-09090909.jsonl")
     gi = resolve_generation_pointer(pred_final)
-    _check(gi is not None, f"{name}: 指针 {pred_final}.tli_gen 未生成"
+    _check(gi is not None, f"{name}: 指针 {pred_final}.nfa_gen 未生成"
                             f"（#198 指针协议提交失败）")
     return d, pred_final, gi["pred_path"], gi["rcp_path"]
 
@@ -752,7 +752,7 @@ def test_C9_basename_mismatch():
         context_length=32768, task="vt", model_path="/synthetic/Qwen3-8B",
         model_config_sha256=None, native_mpe=NATIVE_MPE,
         generation_params={"max_gen": 64, "max_num": 500, "seed": 42,
-                           "method": "tli", "pred_postfix": "_fx",
+                           "method": "nfa", "pred_postfix": "_fx",
                            "t": "01010000"},
         producer_script_path="benchmark/RULER/pred_ruler.py",
         producer_script_sha256="0" * 64,
@@ -1250,7 +1250,7 @@ def test_S1_schema_negatives():
             model_path="/synthetic/Qwen3-8B", model_config_sha256=None,
             native_mpe=NATIVE_MPE,
             generation_params={"max_gen": 64, "max_num": 500, "seed": 42,
-                               "method": "tli", "pred_postfix": "_fx",
+                               "method": "nfa", "pred_postfix": "_fx",
                                "t": "01010000"},
             producer_script_path="benchmark/RULER/pred_ruler.py",
             producer_script_sha256="0" * 64, run_id="x",
@@ -1334,7 +1334,7 @@ def test_S3_grouping_rules(base):
     """S3：分组规则——task/method/t 不进指纹（同配置同 hash）；跨档
     （context_length）不比较；formal 双档 yarn off 正例通过。"""
     def receipt_for(task, context_length, seed=42, t="01010000",
-                    method="tli"):
+                    method="nfa"):
         return build_yarn_receipt(
             yarn_enabled=True, effective_factor=2.0, yarn_factor_cli=None,
             rope_scaling={"rope_type": "yarn", "type": "yarn",
@@ -1411,7 +1411,7 @@ def test_S4_config_closure_negatives(base):
             model_path="/synthetic/Qwen3-8B", model_config_sha256=None,
             native_mpe=NATIVE_MPE,
             generation_params={"max_gen": 64, "max_num": max_num, "seed": 42,
-                               "method": "tli", "pred_postfix": "_fx",
+                               "method": "nfa", "pred_postfix": "_fx",
                                "t": "01010000"},
             producer_script_path="benchmark/RULER/pred_ruler.py",
             producer_script_sha256="0" * 64, run_id="x",

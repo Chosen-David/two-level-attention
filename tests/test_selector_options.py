@@ -6,11 +6,11 @@ import pytest
 from sparse_attn.ops.selector_options import validate_selector_options
 
 
-@pytest.mark.parametrize('name',['TLI_SPARSE_SORT_INT16','TLI_COMPACT_SCAN_TILED'])
+@pytest.mark.parametrize('name',['NFA_SPARSE_SORT_INT16','NFA_COMPACT_SCAN_TILED'])
 @pytest.mark.parametrize('value',['','bad','2'])
 def test_qwen_rejects_invalid_selector_flag_before_cache_update(monkeypatch,name,value):
     from sparse_attn.patches.qwen3_attn_patch import qwen3_attn_forward
-    for key in ['TLI_SPARSE_SORT_INT16','TLI_COMPACT_SCAN_TILED']:monkeypatch.delenv(key,raising=False)
+    for key in ['NFA_SPARSE_SORT_INT16','NFA_COMPACT_SCAN_TILED']:monkeypatch.delenv(key,raising=False)
     monkeypatch.setenv(name,value)
     class Cache:
         def get_max_cache_shape(self):return 32840
@@ -21,7 +21,7 @@ def test_qwen_rejects_invalid_selector_flag_before_cache_update(monkeypatch,name
 
 def test_packed_capacity_rejected_before_projection_or_cache_update(monkeypatch):
     from sparse_attn.patches.qwen3_attn_patch import qwen3_attn_forward
-    monkeypatch.setenv('TLI_SPARSE_SORT_INT16','1');monkeypatch.setenv('TLI_COMPACT_SCAN_TILED','1')
+    monkeypatch.setenv('NFA_SPARSE_SORT_INT16','1');monkeypatch.setenv('NFA_COMPACT_SCAN_TILED','1')
     class Cache:
         def get_max_cache_shape(self):return 131072
         def update(self,*a,**kw):raise AssertionError('cache mutated')
@@ -47,13 +47,13 @@ def test_actual_paired_commands_keep_baseline_and_optimized_treatments_separate(
     monkeypatch.setattr(module.subprocess,'check_output',lambda *a,**kw:'test-revision\n')
     out=tmp_path/'pair'
     monkeypatch.setattr(sys,'argv',['paired','--out-dir',str(out),'--arms','graph_sparse','graph_sparse_index_optimized','--cycles','1','--warmup','1','--repeats','1'])
-    monkeypatch.setenv('TLI_SPARSE_SORT_INT16','invalid-inherited-value')
+    monkeypatch.setenv('NFA_SPARSE_SORT_INT16','invalid-inherited-value')
     module.main()
     assert len(launches)==4
     for (command,env),enabled in zip(launches,['0','1','1','0']):
         assert command[1].endswith('e152v4_graph_latency.py')
-        assert env['TLI_OPERATOR_MODE']=='serial' and env['TLI_SPARSE_SELECTION']=='1'
-        assert env['TLI_SPARSE_SORT_INT16']==env['TLI_COMPACT_SCAN_TILED']==enabled
+        assert env['NFA_OPERATOR_MODE']=='serial' and env['NFA_SPARSE_SELECTION']=='1'
+        assert env['NFA_SPARSE_SORT_INT16']==env['NFA_COMPACT_SCAN_TILED']==enabled
     assert json.loads((out/'receipt.json').read_text())['execution_complete']
 
 

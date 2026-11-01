@@ -4,7 +4,7 @@ import weakref
 import pytest
 import torch
 from sparse_attn.cache.paged_region_cache import PagedRegionLayer,PagedRegionCache
-from sparse_attn.ops.region_geometry import RegionGeometry
+from sparse_attn.policies.region_geometry import RegionGeometry
 from sparse_attn.ops.paged_region_kernels import paged_attention
 
 @pytest.mark.parametrize('near,far',[(False,False),(True,False),(False,True),(True,True)])
@@ -96,7 +96,7 @@ def test_ring_arithmetic_bfloat16_rounding(near,far):
 def test_ring_probability_rounding_tracks_fallbacks(monkeypatch,length,width,vwidth,fast,upper,healthy,cuda,expected):
     from sparse_attn.ops import eager_decoding as eager
     from sparse_attn.ops.paged_region_kernels import ring_rounds_probabilities
-    monkeypatch.setenv('TLI_E127_FAST',fast);monkeypatch.setenv('TLI_E127_W_UPPER',upper)
+    monkeypatch.setenv('NFA_E127_FAST',fast);monkeypatch.setenv('NFA_E127_W_UPPER',upper)
     monkeypatch.setattr(eager,'_HAS_TRITON',True)
     monkeypatch.setitem(eager._EAGER_TRITON_OK,'ok',healthy)
     assert ring_rounds_probabilities(length,width,vwidth,cuda=cuda)==expected

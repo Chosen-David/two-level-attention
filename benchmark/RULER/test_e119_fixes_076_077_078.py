@@ -16,8 +16,8 @@
       → SystemExit 拒绝且目标字节不变（不覆盖）；同 manifest →
       幂等放行；目标存在但无 sidecar → 拒绝；新路径 → 放行。
   P4  076 截断保身份段：超长名截断后 _h<hash10> 尾段保留、异配置
-      截断名仍互异；非 tli 名回退旧口径。
-  N1  077 NUL pointer 单格：.tli_gen 内容 b"gen\x00name\n" → 探针
+      截断名仍互异；非 nfa 名回退旧口径。
+  N1  077 NUL pointer 单格：.nfa_gen 内容 b"gen\x00name\n" → 探针
       STATE=invalid rc=2（修复前 ValueError 裸 traceback rc=1）；
       控制字符 \x01 同口径；进程内 resolve 直接 SystemExit（077）。
   N2  077 audit 坏格夹好格：好格(111) + NUL 坏格(155) + 好格(222)
@@ -28,7 +28,7 @@
       （修复前 total=0 invalid=0 coverage_errors=0 rc=0）。
   D2  078 好格夹 dangling 别名：非指针形 dangling 链接计 coverage
       error（保留「从有效别名根直接审计」出口），两好格照常 OK。
-  D3  078 指针形 dangling：*.tli_gen 名的 dangling 链接走「存在即
+  D3  078 指针形 dangling：*.nfa_gen 名的 dangling 链接走「存在即
       证据」invalid 口径（071① symlink 门禁），不与 coverage 双计。
 
 红态对照：修复前（基点 9fb2643b0）P1-P4 因缺 _h 尾段/gate 函数、
@@ -82,12 +82,12 @@ def _gcfg(far_m="minmax", near_m="avg", far_s="4bit", near_s="4bit",
     """GPT 076 矩阵配置构造（tia_level2_topk=2048/c4，α.25/β.125/γ.625）。
 
     kw 可覆盖任意字段（P2 缺省等价用）。"""
-    base = dict(method="tli", tia_block_size=64, tia_level1_topk=128,
+    base = dict(method="nfa", tia_block_size=64, tia_level1_topk=128,
                 tia_level2_topk=2048, tia_level2_cmp_ratio=4,
-                tli_alpha=0.25, tli_beta=0.125, tli_gamma=0.625,
-                tli_enable_kmeans=kmeans, tli_enable_layer_skip=False,
-                tli_far_method=far_m, tli_near_method=near_m,
-                tli_far_select=far_s, tli_near_select=near_s)
+                nfa_alpha=0.25, nfa_beta=0.125, nfa_gamma=0.625,
+                nfa_enable_kmeans=kmeans, nfa_enable_layer_skip=False,
+                nfa_far_method=far_m, nfa_near_method=near_m,
+                nfa_far_select=far_s, nfa_near_select=near_s)
     base.update(kw)
     return types.SimpleNamespace(**base)
 
@@ -111,7 +111,7 @@ def _mk_committed_cell(out_dir, task, t, rows=3):
         model_path="/tmp/fake-model-e119-076-078", model_config_sha256=None,
         native_mpe=32768,
         generation_params={"max_gen": 128, "max_num": 0, "seed": 42,
-                           "method": "tli", "pred_postfix": "_stub", "t": t},
+                           "method": "nfa", "pred_postfix": "_stub", "t": t},
         producer_script_path="benchmark/RULER/test_e119_fixes_076_077_078.py",
         producer_script_sha256=hashlib.sha256(b"fixture").hexdigest(),
         run_id=attempt,
@@ -182,7 +182,7 @@ def test_P1_matrix_pairwise_injective():
     for tag, ns in cfgs:
         n = INFO.get_method_name_with_info(ns)
         _check(INFO._TREATMENT_HASH_RE.match(n) is not None,
-               f"{tag}: tli 名缺 _h<hash10> 身份尾段：{n!r}")
+               f"{tag}: nfa 名缺 _h<hash10> 身份尾段：{n!r}")
         names[tag] = n
         print(f"  076-matrix {tag} -> {n}")
     # pairwise 互异（6 选 2 = 15 对全查）
@@ -200,30 +200,30 @@ def test_P1_matrix_pairwise_injective():
     r = {k: _readable(v) for k, v in names.items()}
     _check(r["c1 minmax/avg/4bit/4bit"] == r["c2 avg/avg/4bit/4bit"]
            == r["c3 minmax/minmax/4bit/4bit"]
-           == "tli_64_128_2048_c4_a0.25_b0.125_g0.625",
+           == "nfa_64_128_2048_c4_a0.25_b0.125_g0.625",
            f"c1/c2/c3 应为 GPT 矩阵碰撞组 1（同 readable），实际 {r}")
     _check(r["c4 avg/avg/cluster/4bit"] == r["c5 avg/avg/cluster/cluster"]
-           == "tli_64_128_2048_c4_Ba0.25_b0.125_g0.625",
+           == "nfa_64_128_2048_c4_Ba0.25_b0.125_g0.625",
            f"c4/c5 应为 GPT 矩阵碰撞组 2，实际 {r}")
     _check(r["c6 avg/avg/sim_greedy/4bit"]
-           == "tli_64_128_2048_c4_a0.25_b0.125_g0.625",
+           == "nfa_64_128_2048_c4_a0.25_b0.125_g0.625",
            f"c6 readable 应与审计矩阵一致（组 3 与组 1 同 readable），实际 {r}")
     # c1 精确名硬锚点：_TREATMENT_FIELD_DEFAULTS 固定后逐位稳定；
     # 字段集变更时此锚点必须重算（同步更新 A4/T5 同理）。
     # 079 口径：manifest 新增 tia_enable_async_topk（getattr 缺省
-    # False）→ 全部 tli hash 重算，锚点由 he797a70df5 更新。
+    # False）→ 全部 nfa hash 重算，锚点由 he797a70df5 更新。
     # 081 + kimi3 0316 口径（B/D 开关入 manifest + 默认 D′ 掩码内容
-    # 身份）：tli_enable_kmeans/tli_enable_layer_skip 入
+    # 身份）：nfa_enable_kmeans/nfa_enable_layer_skip 入
     # _TREATMENT_FIELD_DEFAULTS（防可读段截断吃掉 B/D 位后 hash 互覆）
-    # → 全部 tli hash 重算，锚点由 h046b987e01 更新为 h68aa19d58f
+    # → 全部 nfa hash 重算，锚点由 h046b987e01 更新为 h68aa19d58f
     #（本矩阵 c1-c6 全部 layer_skip=False，manifest D′ 掩码身份恒
     # null，故本锚点只受 kimi3 0316 字段集扩张影响）。
     # E155e 收官轮（2026-10-20）：E135/E138/E155/E155b/E155c/E155d
     # 字段集连续扩张但本锚点漏更（本套件 P1/P2 在主线长红）——按注释
     # 自身纪律重算为 h68aa19d58f（git stash 对照核验 E155e vendor 条件
-    # 登记未污染 tli hash，纯历史漂移补账）。
+    # 登记未污染 nfa hash，纯历史漂移补账）。
     _check(names["c1 minmax/avg/4bit/4bit"]
-           == "tli_64_128_2048_c4_a0.25_b0.125_g0.625_h68aa19d58f",
+           == "nfa_64_128_2048_c4_a0.25_b0.125_g0.625_h68aa19d58f",
            f"c1 稳定性锚点失配（字段集被改？须重算锚点）："
            f"{names['c1 minmax/avg/4bit/4bit']!r}")
     return "PASS"
@@ -240,10 +240,10 @@ def test_P2_order_independent_and_default_equivalent():
     # argparse 缺省（kmeans/layer_skip 默认 True）须显式对齐 _gcfg 的
     # False——本测试比对的缺省等价是 manifest 字段集，非 readable 段
     ns_argparse = parser.parse_args(
-        ["--method", "tli", "--tia_level2_topk", "2048",
-         "--tia_level2_cmp_ratio", "4", "--tli_alpha", "0.25",
-         "--tli_beta", "0.125", "--tli_gamma", "0.625",
-         "--tli_enable_kmeans", "false", "--tli_enable_layer_skip",
+        ["--method", "nfa", "--tia_level2_topk", "2048",
+         "--tia_level2_cmp_ratio", "4", "--nfa_alpha", "0.25",
+         "--nfa_beta", "0.125", "--nfa_gamma", "0.625",
+         "--nfa_enable_kmeans", "false", "--nfa_enable_layer_skip",
          "false"])
     name_argparse = INFO.get_method_name_with_info(ns_argparse)
 
@@ -255,17 +255,17 @@ def test_P2_order_independent_and_default_equivalent():
     # 与 P1 的 c1（同一配置）也须一致——跨构造路径单射到同一身份
     # （079 口径锚点：async 字段入 manifest 后重算；081+kimi3 0316
     # 口径：B/D 入 _TREATMENT_FIELD_DEFAULTS 后与 P1 c1 同步重算）
-    _check(name_min == "tli_64_128_2048_c4_a0.25_b0.125_g0.625_h68aa19d58f",
+    _check(name_min == "nfa_64_128_2048_c4_a0.25_b0.125_g0.625_h68aa19d58f",
            f"跨构造路径身份漂移：{name_min!r}")
 
     # 乱序构造（字段注入顺序不影响 sort_keys 序列化）
-    kw = {"tli_far_select": "4bit", "tia_block_size": 64,
-          "tli_gamma": 0.625, "tli_near_method": "avg",
-          "tia_level2_cmp_ratio": 4, "tli_beta": 0.125,
-          "tli_far_method": "minmax", "tia_level1_topk": 128,
-          "tli_alpha": 0.25, "tli_near_select": "4bit",
-          "tia_level2_topk": 2048, "tli_enable_kmeans": False,
-          "tli_enable_layer_skip": False, "method": "tli"}
+    kw = {"nfa_far_select": "4bit", "tia_block_size": 64,
+          "nfa_gamma": 0.625, "nfa_near_method": "avg",
+          "tia_level2_cmp_ratio": 4, "nfa_beta": 0.125,
+          "nfa_far_method": "minmax", "tia_level1_topk": 128,
+          "nfa_alpha": 0.25, "nfa_near_select": "4bit",
+          "tia_level2_topk": 2048, "nfa_enable_kmeans": False,
+          "nfa_enable_layer_skip": False, "method": "nfa"}
     ns_shuffle = types.SimpleNamespace(**{k: kw[k] for k in reversed(list(kw))})
     _check(INFO.get_method_name_with_info(ns_shuffle) == name_min,
            "同配置乱序构造应同名（sort_keys 序列化顺序无关）")
@@ -289,7 +289,7 @@ def test_P3_gate_fail_closed_no_overwrite(base):
     d = os.path.join(base, "p3")
     os.makedirs(d, exist_ok=True)
     out = os.path.join(
-        d, "hotpotqa-tli_64_128_2048_c4_a0.25_b0.125_g0.625_"
+        d, "hotpotqa-nfa_64_128_2048_c4_a0.25_b0.125_g0.625_"
           "h68aa19d58f-09090909.jsonl")   # 081+kimi3 0316 口径：与 P1 c1 同步重算
     data_bytes = b'{"pred": "arm-A"}\n'
     with open(out, "wb") as f:
@@ -320,7 +320,7 @@ def test_P3_gate_fail_closed_no_overwrite(base):
     _check(sc == sidecar, f"sidecar 路径约定漂移：{sc!r}")
 
     # ① 目标存在但无 sidecar → 拒绝（provenance 未知）
-    out2 = os.path.join(d, "gov_report-tli_x_h0000000000-09090909.jsonl")
+    out2 = os.path.join(d, "gov_report-nfa_x_h0000000000-09090909.jsonl")
     with open(out2, "wb") as f:
         f.write(b"stale\n")
     refused2 = False
@@ -331,7 +331,7 @@ def test_P3_gate_fail_closed_no_overwrite(base):
     _check(refused2, "无 sidecar 的既有目标未拒绝（provenance 未知须 fail loudly）")
 
     # 新路径 → 放行（返回 sidecar 路径）
-    out3 = os.path.join(d, "musique-tli_x_h1111111111-09090909.jsonl")
+    out3 = os.path.join(d, "musique-nfa_x_h1111111111-09090909.jsonl")
     sc3 = INFO.gate_output_treatment_identity(out3, manifest_A)
     _check(sc3 == out3 + INFO.TREATMENT_MANIFEST_SIDECAR_SUFFIX,
            "新路径应放行并返回 sidecar 约定路径")
@@ -342,7 +342,7 @@ def test_P3_gate_fail_closed_no_overwrite(base):
 def test_P4_truncation_keeps_hash():
     """截断保身份段：超长名先截 readable 中段、保 _h 尾段与 -t 后缀；
     异配置截断名仍互异（076 审计：尾部截断后再碰撞的回归位）；
-    非 tli 名回退旧口径。"""
+    非 nfa 名回退旧口径。"""
     import re as _re
     prefix = "d" * 200
     mn1 = INFO.get_method_name_with_info(_gcfg("minmax", "avg", "4bit",
@@ -359,32 +359,32 @@ def test_P4_truncation_keeps_hash():
         _check(t.endswith(f"_h{m.group(1)}-09090909"),
                f"截断名须保 hash 尾段与 -t：{t!r}")
         # 081 + kimi3 0316 追加修复 1：上限 245 → 230——out_fn 落盘拼
-        # ".jsonl"（6）+ 写门 sidecar ".tli_manifest.json"（18），245 下
+        # ".jsonl"（6）+ 写门 sidecar ".nfa_manifest.json"（18），245 下
         # sidecar 实名 269 > ext4 255 → OSError 36（kimi3 实测）；
         # 230 = 255 − 6 − 18 − 1。
         _check(len(t) <= 230, f"截断名超 230 上限（sidecar 链超 ext4）：{len(t)}")
-        _check(len(t) + len(".jsonl") + len(".tli_manifest.json") <= 255,
+        _check(len(t) + len(".jsonl") + len(".nfa_manifest.json") <= 255,
                f"sidecar 实名链超 ext4 255：{len(t) + 6 + 18}")
     # readable 中段截断占位存在（前缀保留）
     _check(t1.startswith(prefix + "-") and "..." in t1,
            "截断名应保留 dataset 前缀并以 ... 占位中段")
-    # 非 tli 名回退旧口径（旧代码 out_fn[:limit]+"..." 语义，limit=230）
+    # 非 nfa 名回退旧口径（旧代码 out_fn[:limit]+"..." 语义，limit=230）
     fb = INFO.truncate_output_name_keep_hash(prefix, "quest_64_128", "0909")
     _check(fb == (prefix + "-quest_64_128-0909")[:230] + "...",
-           f"非 tli 名应回退旧截断口径，实际 {fb!r}")
+           f"非 nfa 名应回退旧截断口径，实际 {fb!r}")
     # split_method_name_hash：可拆回（readable + hash 段）
     r1, h1 = INFO.split_method_name_hash(mn1)
     _check(r1 + h1 == mn1 and h1.startswith("_h"),
            f"split 不可逆：{r1!r} + {h1!r} != {mn1!r}")
     rn, hn = INFO.split_method_name_hash("none")
-    _check(rn == "none" and hn == "", "非 tli 名 split 应返回原名/空段")
+    _check(rn == "none" and hn == "", "非 nfa 名 split 应返回原名/空段")
     return "PASS"
 
 
 # ================================================================ 077
 
 def test_N1_nul_pointer_single_cell_invalid(base):
-    """077：.tli_gen 内容 b"gen\x00name\n"（合法 UTF-8，NUL 穿透名称三查）
+    """077：.nfa_gen 内容 b"gen\x00name\n"（合法 UTF-8，NUL 穿透名称三查）
     → 单格 STATE=invalid rc=2（修复前 ValueError 裸 traceback rc=1 无四态）；
     控制字符同口径；进程内 resolve 直接 SystemExit（077 前置拒绝，
     任何文件系统调用前）。"""
@@ -509,7 +509,7 @@ def test_D2_dangling_alias_between_goods(base):
 
 
 def test_D3_pointer_shaped_dangling_invalid(base):
-    """078 口径分界：*.tli_gen 名的 dangling 链接走「存在即证据」
+    """078 口径分界：*.nfa_gen 名的 dangling 链接走「存在即证据」
     invalid（071① symlink 门禁），不与 coverage 双计；单格探针同判
     STATE=invalid rc=2。"""
     d = os.path.join(base, "d3")

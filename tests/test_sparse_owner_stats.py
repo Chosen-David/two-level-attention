@@ -1,7 +1,7 @@
 """Owner stats preserve candidate probabilities without traversal sorting."""
 import pytest
 import torch
-from sparse_attn.ops.sparse_normalization import candidate_probabilities
+from sparse_attn.indexer.compaction.sparse_normalization import candidate_probabilities
 
 pytestmark=pytest.mark.skipif(not torch.cuda.is_available(),reason='requires CUDA')
 
@@ -16,9 +16,9 @@ def test_owner_invalid_duplicates_and_no_sort(monkeypatch,capacity,group):
     keep=torch.rand(ids.shape,device='cuda')>.2
     token=torch.randn(3*group,capacity,device='cuda',dtype=torch.bfloat16)
     scores=token.gather(1,ids.clamp(0,capacity-1).repeat_interleave(group,0))
-    monkeypatch.setenv('TLI_SPARSE_STATS','sorted')
+    monkeypatch.setenv('NFA_SPARSE_STATS','sorted')
     expected,expected_unique=candidate_probabilities(scores,ids,keep,capacity,group,return_unique=True)
-    monkeypatch.setenv('TLI_SPARSE_STATS','owner')
+    monkeypatch.setenv('NFA_SPARSE_STATS','owner')
     def forbidden(*args,**kwargs):
         raise AssertionError('owner stats must not sort candidates')
     monkeypatch.setattr(torch.Tensor,'sort',forbidden)
@@ -35,14 +35,14 @@ def test_owner_unaligned_native_reduction(monkeypatch,capacity,group):
     # Reuse the independently defined full-token softmax/TopK reference and
     # Graph mutation cases, including BF16 ties, underflow, NaN/Inf and zeros.
     from test_sparse_selection_cuda import test_sparse_native_reduction_and_ranking
-    monkeypatch.setenv('TLI_SPARSE_STATS','owner')
+    monkeypatch.setenv('NFA_SPARSE_STATS','owner')
     test_sparse_native_reduction_and_ranking(capacity,group,3,True)
 
 
 def test_owner_geometry_limit(monkeypatch):
-    from sparse_attn.ops.sparse_normalization import supported_geometry
-    monkeypatch.setenv('TLI_SPARSE_STATS','owner')
+    from sparse_attn.indexer.compaction.sparse_normalization import supported_geometry
+    monkeypatch.setenv('NFA_SPARSE_STATS','owner')
     assert supported_geometry(torch.bfloat16,torch.device('cuda'),16401,4,8)
     assert not supported_geometry(torch.bfloat16,torch.device('cuda'),2**30,1,2)
-    monkeypatch.setenv('TLI_SPARSE_STATS','sorted')
+    monkeypatch.setenv('NFA_SPARSE_STATS','sorted')
     assert not supported_geometry(torch.bfloat16,torch.device('cuda'),16401,4,8)

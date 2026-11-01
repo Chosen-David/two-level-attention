@@ -11,7 +11,7 @@ from collections import deque
 from dataclasses import dataclass, field
 import torch
 from transformers.cache_utils import Cache, CacheLayerMixin
-from ..ops.region_geometry import RegionGeometry
+from ..policies.region_geometry import RegionGeometry
 
 INVALID_PAGE_IDX = -1
 INVALID_GATHER_IDX = -1
@@ -124,7 +124,7 @@ class PagedRegionLayer(CacheLayerMixin):
         self.write_bytes = 0
         self._tables = None
         self._reclaim_cursor = None
-        self.tli_receipt = None
+        self.nfa_receipt = None
         self._stream_id = None
         # vLLM-style batch state: one shared physical pool per layer and a
         # block table plus region state for every active request.
@@ -136,7 +136,7 @@ class PagedRegionLayer(CacheLayerMixin):
         self.skip_far_flags = []
         self.reclaim_cursors = []
         self.active_flags = []
-        self.tli_receipts = []
+        self.nfa_receipts = []
         self.free_slots = []
         self.next_slot = 0
         self._k_ptr = None
@@ -265,7 +265,7 @@ class PagedRegionLayer(CacheLayerMixin):
             self.skip_far_flags.append(False)
             self.reclaim_cursors.append(None)
             self.active_flags.append(False)
-            self.tli_receipts.append(None)
+            self.nfa_receipts.append(None)
 
     def add_request(self, request_id=None):
         if request_id is None:
@@ -294,7 +294,7 @@ class PagedRegionLayer(CacheLayerMixin):
         self.skip_far_flags[request_id] = False
         self.reclaim_cursors[request_id] = None
         self.active_flags[request_id] = True
-        self.tli_receipts[request_id] = None
+        self.nfa_receipts[request_id] = None
         return request_id
 
     def remove_request(self, request_id):
@@ -310,7 +310,7 @@ class PagedRegionLayer(CacheLayerMixin):
         self.skip_far_flags[request_id] = False
         self.reclaim_cursors[request_id] = None
         self.active_flags[request_id] = False
-        self.tli_receipts[request_id] = None
+        self.nfa_receipts[request_id] = None
         heapq.heappush(self.free_slots, request_id)
         self._k_ptr = self._v_ptr = None
 
@@ -940,7 +940,7 @@ class PagedRegionLayer(CacheLayerMixin):
 
 
 class PagedRegionCache(Cache):
-    tli_regions=True
+    nfa_regions=True
     paged_regions=True
 
     def __init__(self,n_layers,geometry=RegionGeometry()):
@@ -1006,7 +1006,7 @@ class PagedRegionCache(Cache):
         if self.active_request_id is not None and 'request_id' not in cache_kwargs:
             cache_kwargs['request_id'] = self.active_request_id
         if self.layers[layer_idx].frozen:
-            if getattr(self, 'tli_regions', False):
+            if getattr(self, 'nfa_regions', False):
                 # 通用 HF attention 会把返回值当作完整历史；只允许直接分页消费者写入。
                 raise ValueError('frozen paged decode requires the patched direct-page consumer')
             self.layers[layer_idx].update(key_states,value_states,cache_kwargs)
@@ -1050,7 +1050,7 @@ class GraphReadyPagedRegionCache:
 
     INVALID_REQ_ID = -1
     paged_regions = True
-    tli_regions = True
+    nfa_regions = True
 
     def __init__(
         self,

@@ -1,14 +1,14 @@
 """Fused packing preserves rank gating and dynamic-length Graph semantics."""
 import pytest
 import torch
-from sparse_attn.ops.token_selection import graph_middle_selection
+from sparse_attn.indexer.selection.selector import graph_middle_selection
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA required')
 @pytest.mark.parametrize('width', [1, 33, 1024, 4096])
 @pytest.mark.parametrize('per_head', [False, True])
 def test_pack_replay_matches_generic(width, per_head):
-    from sparse_attn.ops.selection_pack import pack_unique_top
+    from sparse_attn.indexer.selection.selection_pack import pack_unique_top
     torch.manual_seed(729)
     capacity, heads = 8192, 3
     top = torch.stack([torch.randperm(capacity, device='cuda')[:width]
@@ -42,7 +42,7 @@ def test_pack_replay_matches_generic(width, per_head):
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA required')
 @pytest.mark.parametrize('dtype', [torch.int32, torch.int64])
 def test_pack_valid_singleton_and_layout_fallback(dtype):
-    from sparse_attn.ops.selection_pack import pack_unique_top
+    from sparse_attn.indexer.selection.selection_pack import pack_unique_top
     top = torch.tensor([[0], [7]], device='cuda', dtype=dtype)
     quota = torch.tensor([1], device='cuda', dtype=dtype)
     length = torch.tensor([8], device='cuda', dtype=dtype)

@@ -5,7 +5,7 @@
 E109 调度器 SKIP 幂等判定的 generation 指针感知探针（零重依赖 CLI）。
 
 违反事实 068（审计已 CPU 复现）：#198 指针协议（066/crash-recovery）下
-生产者 pred_ruler.py 成功提交后只留 {out}.tli_gen 指针 + 不可变
+生产者 pred_ruler.py 成功提交后只留 {out}.nfa_gen 指针 + 不可变
 generation 目录内 JSONL，逻辑 {out}.jsonl 刻意不落盘；而
 run_ruler_e109.sh 的断点续跑判定仍只 `ls $OUTDIR/$T-*.jsonl | head -1`
 ——pointer-only 已完成格确定性不可见（SKIP_CONDITION=false），重启会
@@ -27,7 +27,7 @@ schema → v2 同代字节绑定（实际 SHA/行数 vs 回执声明逐位比对
 本探针是 shell 与指针协议之间的唯一桥（不在 shell 里复制协议解析）：
   - 候选发现双通道（与 score_ruler_formal.py formal 入口 782-807 同口径）：
     ① legacy 直写文件（{task}-*.jsonl glob，E116d 口径排除 -merged 派生物）；
-    ② 指针文件（{task}-*.jsonl.tli_gen glob）→ resolve_generation_pointer
+    ② 指针文件（{task}-*.jsonl.nfa_gen glob）→ resolve_generation_pointer
     解析 gen 目录内预测。同基名双通道并存 → 指针优先（指针切换 = 唯一
     提交信号，直写残留只可能来自更早旧协议运行）。
   - best-file 语义：多候选取最大行数（并列取时间戳最新，与
@@ -55,7 +55,7 @@ schema → v2 同代字节绑定（实际 SHA/行数 vs 回执声明逐位比对
 
 另附只读预检模式（070 建议 5）：
   python benchmark/RULER/gen_completion_probe.py --audit-dir <root>
-遍历 root 下全部 {*.jsonl}.tli_gen 指针，逐格验证回执绑定（共享校验器
+遍历 root 下全部 {*.jsonl}.nfa_gen 指针，逐格验证回执绑定（共享校验器
 同口径），输出 OK/INVALID 清单与汇总；INVALID 存在 → exit 2。全程零写
 （E109 已收口数据零改动），供定点重跑决策，不修改任何数据。
 
@@ -91,7 +91,7 @@ schema → v2 同代字节绑定（实际 SHA/行数 vs 回执声明逐位比对
       os.walk 归入 filenames → audit 可返回 total=0 invalid=0
       coverage_errors=0 rc=0「假干净」。修复：dirnames 与 filenames
       双查——非指针形 dangling symlink 计 coverage error（保留「从
-      有效别名根单独审计」出口）；指针形（*.tli_gen）对象维持「存在
+      有效别名根单独审计」出口）；指针形（*.nfa_gen）对象维持「存在
       即证据」逐格 invalid 口径（resolve 的 071① symlink 门禁拒）。
 
 用法：
@@ -266,7 +266,7 @@ def audit_directory(root):
     symlink；指向不存在目标的目录链接 entry.is_dir()（跟随链接）失败
     → 被 os.walk 归入 filenames，检查完全看不到 → total=0 rc=0 假干净
     摘要。修复：filenames 同查——非指针形 dangling symlink 计 coverage
-    error（保留「从有效别名根直接审计」出口）；指针形（*.tli_gen）
+    error（保留「从有效别名根直接审计」出口）；指针形（*.nfa_gen）
     对象维持「存在即证据」逐格 invalid 口径（071① symlink 门禁）。
 
     全程零写（不修改任何数据——E109 已收口数据零改动纪律）。
@@ -305,7 +305,7 @@ def audit_directory(root):
             # os.walk 分入 filenames——指向不存在目标的目录链接
             # entry.is_dir()（跟随链接）stat 失败 → 归 filenames，074
             # 的 dirnames 检查完全看不到 → 聚合摘要假干净。口径：
-            #   - 指针形（*.tli_gen）对象走下方 pointer 枚举——「存在
+            #   - 指针形（*.nfa_gen）对象走下方 pointer 枚举——「存在
             #     即证据」，resolve 的 071① symlink 门禁逐格计 invalid
             #     （不因 dangling 降级为 coverage）；
             #   - 非指针形 dangling 链接对审计不可见（可能是失效的
@@ -362,7 +362,7 @@ def main(argv=None):
     ap.add_argument("--max-num", type=int,
                     help="调度阈值 N（行数 >= N → complete/SKIP）")
     ap.add_argument("--audit-dir",
-                    help="只读预检模式：遍历该目录下全部 .tli_gen 指针，"
+                    help="只读预检模式：遍历该目录下全部 .nfa_gen 指针，"
                          "逐格验证回执绑定（零写；invalid 或遍历覆盖错误"
                          "存在 → exit 2）")
     args = ap.parse_args(argv)

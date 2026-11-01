@@ -8,7 +8,7 @@ import torch
 def test_observer_copies_without_changing_output_and_restores_after_exception(tmp_path,monkeypatch):
     from sparse_attn.patches import qwen3_attn_patch as patch
     from sparse_attn.ops import exact_linear_batch as exact
-    from sparse_attn.ops.cuda_graph_state import graph_state
+    from sparse_attn.engine.cuda_graph_state import graph_state
     path=Path(__file__).parents[1]/'exp/bench/batch_decode_trace.py'
     spec=importlib.util.spec_from_file_location('batch_trace',path)
     trace=importlib.util.module_from_spec(spec);spec.loader.exec_module(trace)

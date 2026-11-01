@@ -1,6 +1,6 @@
 import pytest
 import torch
-from sparse_attn.ops.batch_candidate_score import score_candidates_batched
+from sparse_attn.indexer.candidate.scorer_fine import score_candidates_batched
 
 
 def test_cpu_rejected_before_launch():
@@ -14,7 +14,7 @@ def test_cpu_rejected_before_launch():
 @pytest.mark.parametrize('dtype',[torch.bfloat16,torch.float16])
 @pytest.mark.parametrize('dim,group',[(32,3),(128,4)])
 def test_exact_score_and_live_count_graph(batch,dtype,dim,group):
-    from sparse_attn.indexer.tli_indexer import _score_fine_cand_kernel,TLIIndexer
+    from sparse_attn.indexer.nfa_indexer import _score_fine_cand_kernel,NFAIndexer
     import triton
     torch.manual_seed(9021)
     cap,h,width=257,2,130
@@ -27,7 +27,7 @@ def test_exact_score_and_live_count_graph(batch,dtype,dim,group):
     def run():return score_candidates_batched(k,q,ids,counts,out_dtype=dtype)
     run();torch.cuda.synchronize();graph=torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):actual=run()
-    tile,warps=TLIIndexer._TILE_FINE.get(dim,(64,4))
+    tile,warps=NFAIndexer._TILE_FINE.get(dim,(64,4))
     for active in (0,17,width,3):
         live=(torch.arange(batch*h,device='cuda').reshape(batch,h)+active).clamp(max=width)
         if active==0:live.zero_()

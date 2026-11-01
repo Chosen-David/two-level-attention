@@ -1,20 +1,20 @@
 # Compact far skipping、KV eviction 与 direct partitioned prefill
 
-本路径面向受支持的 Qwen3 TLI decode：被冻结为 `skip_far=True` 的层从页统计、
+本路径面向受支持的 Qwen3 NFA decode：被冻结为 `skip_far=True` 的层从页统计、
 L1/L2 打分和最终注意力中物理排除 far KV，只保留固定 sink 与有界 Near/SWA
-环形存储。普通 non-skip 层仍执行原有 TLI 全历史索引并保留完整 linear KV。
+环形存储。普通 non-skip 层仍执行原有 NFA 全历史索引并保留完整 linear KV。
 
 ## 默认解析与启用
 
 两个选项的 CLI 缺省均为 `auto`：
 
 ```text
---tli_far_skip_backend auto --tli_far_skip_cache auto
+--nfa_far_skip_backend auto --nfa_far_skip_cache auto
 ```
 
 入口在模型/config 已知后、treatment snapshot 冻结前统一解析：
 
-- 受支持的 TLI Qwen3（目标层 `head_dim=128`、无 native sliding window），且已
+- 受支持的 NFA Qwen3（目标层 `head_dim=128`、无 native sliding window），且已
   显式配置固定 `near_len/near_pages`、`near_tokens=off` 及 compact 支持的普通
   shared-head 两级选择时，解析为 `compact/evict`；缺省几何或其他不兼容选择解析为
   `legacy/retain`，避免先解析成功再在 indexer 构造时失败；
@@ -24,21 +24,21 @@ L1/L2 打分和最终注意力中物理排除 far KV，只保留固定 sink 与�
   未解析的 `auto` 不得进入 snapshot 或 manifest。
 
 默认 compact **不等于**默认打开 layer skip。生产冠军口径仍须显式传
-`--tli_enable_layer_skip false`；只有静态 skip mask 或动态 gate 选中的层才驱逐 far。
+`--nfa_enable_layer_skip false`；只有静态 skip mask 或动态 gate 选中的层才驱逐 far。
 例如：
 
 ```bash
---tli_far_skip_backend compact --tli_far_skip_cache evict \
---tli_near_len 4096 --tli_near_pages 32 --tli_near_tokens off \
---tli_sink_tokens 4 --tli_swa_size 128 \
---tli_enable_layer_skip true \
---tli_layer_skip_path exp/trace/results/tli_layer_skip_mask.json
+--nfa_far_skip_backend compact --nfa_far_skip_cache evict \
+--nfa_near_len 4096 --nfa_near_pages 32 --nfa_near_tokens off \
+--nfa_sink_tokens 4 --nfa_swa_size 128 \
+--nfa_enable_layer_skip true \
+--nfa_layer_skip_path exp/trace/results/nfa_layer_skip_mask.json
 ```
 
 动态 request-local 标定使用：
 
 ```bash
---tli_enable_layer_skip false --tli_dyn_dgate --tli_dyn_dgate_eps 0.05
+--nfa_enable_layer_skip false --nfa_dyn_dgate --nfa_dyn_dgate_eps 0.05
 ```
 
 `retain` 是保留完整 KV 的 compact 消融臂；`evict` 在 gate 冻结后释放 far
@@ -56,7 +56,7 @@ prepare_direct_prefill → one-shot dense prefill → finalize_direct_prefill
 该路径只接受 B=1、unpadded、eval/no-grad、一次完整 prompt 的 dense prefill。
 chunked/padded/beam/offload/grad、自定义非 None prefill mask、未 finalize 就
 decode、重复 finalize 或 prefill 后 gate/geometry 改变均 fail-closed。普通
-`TLIStaticLayer.update()` 的 decode-only 守卫没有放宽。
+`NFAStaticLayer.update()` 的 decode-only 守卫没有放宽。
 
 每层 staging `update()` 直接写最终物理分区，同时把**原始完整 K/V 原样返回**
 给 dense attention；attention 不消费 static/ring 拼接视图。因此 RoPE、dense
@@ -135,7 +135,7 @@ python -m pytest -q \
   tests/test_far_skip_hybrid_cache.py tests/test_hybrid_batch_cache.py \
   tests/test_qwen_static_mask.py
 python exp/bench/test_e127_gates.py
-python exp/bench/test_tli_batch_gates.py
+python exp/bench/test_nfa_batch_gates.py
 ```
 
 B=1 GraphRunner direct/conversion 对拍：
@@ -143,13 +143,13 @@ B=1 GraphRunner direct/conversion 对拍：
 ```bash
 python exp/bench/e152v4_graph_latency.py \
   -L 65536 --repeats 2 --warmup 0 --max-gen 128 \
-  --method tli --graph-mode graph --prefill-mode direct \
+  --method nfa --graph-mode graph --prefill-mode direct \
   --tia_level1_topk 64 --tia_level2_topk 1024 \
-  --tli_near_len 4096 --tli_near_pages 32 --tli_near_tokens off \
-  --tli_subspace tail --tia_level2_cmp_ratio 4 \
-  --tli_sink_tokens 4 --tli_swa_size 128 \
-  --tli_enable_layer_skip false --tli_far_skip_backend compact \
-  --tli_far_skip_cache evict --out /tmp/direct.json
+  --nfa_near_len 4096 --nfa_near_pages 32 --nfa_near_tokens off \
+  --nfa_subspace tail --tia_level2_cmp_ratio 4 \
+  --nfa_sink_tokens 4 --nfa_swa_size 128 \
+  --nfa_enable_layer_skip false --nfa_far_skip_backend compact \
+  --nfa_far_skip_cache evict --out /tmp/direct.json
 ```
 
 将 `--prefill-mode` 改为 `conversion` 得到对拍臂；将 `--graph-mode` 改为

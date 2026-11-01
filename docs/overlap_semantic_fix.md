@@ -20,10 +20,10 @@ not merge that PR's other changes. Operator redesign is developed separately.
 Run using the existing project environment (no automatic installation):
 
 ```bash
-bash scripts/test_tli_semantics.sh --cpu
-bash scripts/test_tli_semantics.sh --cuda
+bash scripts/test_nfa_semantics.sh --cpu
+bash scripts/test_nfa_semantics.sh --cuda
 # Optional actual CUDA memory-access validation:
-compute-sanitizer --tool memcheck --error-exitcode 1 bash scripts/test_tli_semantics.sh --cuda
+compute-sanitizer --tool memcheck --error-exitcode 1 bash scripts/test_nfa_semantics.sh --cuda
 ```
 
 CUDA mode refuses to pass on a CPU-only machine. CUDA tests exercise compact

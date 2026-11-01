@@ -1,7 +1,7 @@
 """Fused unique ranking: implicit zeros, ties, and dynamic quota under Graph."""
 import pytest
 import torch
-from sparse_attn.ops.candidate_ranking import rank_candidates
+from sparse_attn.indexer.selection.candidate_ranking import rank_candidates
 
 pytestmark=pytest.mark.skipif(not torch.cuda.is_available(),reason='CUDA required')
 
@@ -38,7 +38,7 @@ def test_fused_unique_ranking(dtype,kind):
 @pytest.mark.parametrize('r',[1024,2048,2049,4096,4097,8448])
 @pytest.mark.parametrize('dtype',[torch.float16,torch.bfloat16])
 def test_tree_topk_tail_and_merge_groups(r,dtype):
-    from sparse_attn.ops.unique_ranking import tree_topk
+    from sparse_attn.indexer.selection.unique_ranking import tree_topk
     torch.manual_seed(913)
     capacity=r+257
     ids=torch.stack([torch.randperm(capacity)[:r] for _ in range(3)]).cuda()

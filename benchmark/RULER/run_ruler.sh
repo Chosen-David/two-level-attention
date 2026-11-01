@@ -1,7 +1,7 @@
 #!/bin/bash
 # #66 RULER 批量调度：11 任务 × 3 长度 × 方法
 # 用法：bash benchmark/RULER/run_ruler.sh <method> <gpu_id> [max_num]
-# 例：bash benchmark/RULER/run_ruler.sh tli 0 100
+# 例：bash benchmark/RULER/run_ruler.sh nfa 0 100
 # B06 修复（GPT 审查 2026-10-08）：原版 `python ... | tail -2` 无 pipefail，
 # 退出码来自 tail 而非 python；cd 失败也继续跑；末尾无条件 ALL DONE——
 # 33 次 python 失败仍退出 0。修复：逐任务 PIPESTATUS 检查 + FAILED 计数 +

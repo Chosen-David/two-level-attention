@@ -1,6 +1,6 @@
 import pytest
 import torch
-from sparse_attn.ops.candidate_ranking import rank_candidates
+from sparse_attn.indexer.selection.candidate_ranking import rank_candidates
 
 
 @pytest.mark.parametrize('kind', ['random', 'plateau', 'zero', 'few_positive'])

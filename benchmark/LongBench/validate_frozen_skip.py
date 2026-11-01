@@ -94,12 +94,12 @@ def validate(outdir,allow_partial=False):
             score=sample_score('repobench' if ds=='repobench-p' else ds,trial['prediction'],row['answers'],row.get('all_classes',[]))
             assert abs(score-trial['score'])<1e-12
             if trial.get('native_full_parity'):native_checks+=1
-            if protocol.get('attention','sdpa').startswith('tli') and len(generated)>1:
-                assert protocol['tli_environment']['TLI_OPERATOR_MODE']=='off'
-                receipts=trial['tli_receipts'];assert len(receipts)==layers
+            if protocol.get('attention','sdpa').startswith('nfa') and len(generated)>1:
+                assert protocol['nfa_environment']['NFA_OPERATOR_MODE']=='off'
+                receipts=trial['nfa_receipts'];assert len(receipts)==layers
                 for li,receipt in receipts.items():
-                    assert receipt['scorer']=='TLIIndexer.compute_score'
-                    assert receipt['selector']=='TLIIndexer.compute_mask'
+                    assert receipt['scorer']=='NFAIndexer.compute_score'
+                    assert receipt['selector']=='NFAIndexer.compute_mask'
                     assert receipt['dimensions']==list(range(48,64))+list(range(112,128))
                     assert max(receipt['selected_per_kv_head'])<=1024
                     assert min(receipt['selected_per_kv_head'])>0

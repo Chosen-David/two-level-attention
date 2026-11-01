@@ -1,7 +1,7 @@
 # Experimental compact decode and protected attention overlap
 
-Default remains TLI_OPERATOR_MODE=off. Opt in with serial or overlap;
-TLI_BATCH_INDEXER=legacy is required. Overlap starts a fused Sink/SWA partial
+Default remains NFA_OPERATOR_MODE=off. Opt in with serial or overlap;
+NFA_BATCH_INDEXER=legacy is required. Overlap starts a fused Sink/SWA partial
 attention kernel before index preparation and joins after selected-token
 attention. The two softmax states are merged exactly in FP32. Q scaling retains
 model dtype rounding. Warm up before graph capture. Ring decode is unsupported
@@ -16,7 +16,7 @@ Hopper warp specialization remain outstanding. Pipeline stages=2 only requests
 compiler software pipelining; default is 1.
 
 Run PYTHON=/existing/gpu/python bash scripts/setup_test_env.sh --require-cuda,
-then PYTHON=/same/python bash scripts/test_tli_operator.sh --cuda.
+then PYTHON=/same/python bash scripts/test_nfa_operator.sh --cuda.
 
 Integration validation: 124 regression tests passed on the isolated main-based
 checkout; native compute-sanitizer memcheck: 63 passed, zero reported errors.
@@ -28,13 +28,13 @@ middle-region mask. Dtype dispatch CPU checks and native G=1 eager/captured
 checks pass for FP16/BF16/FP32; 22 targeted native regression cases pass.
 These checks do not establish full-model quality or a selector speedup.
 
-Experimental model entry routing: TLI_OPERATOR_BACKEND=simt|tc selects both
-partial attention backends; TC requires fp16/bf16. TLI_OPERATOR_SELECTED_STAGES
+Experimental model entry routing: NFA_OPERATOR_BACKEND=simt|tc selects both
+partial attention backends; TC requires fp16/bf16. NFA_OPERATOR_SELECTED_STAGES
 accepts 1/2/3 for selected attention only. Defaults remain simt/1. Four native
 SIMT/TC x stage1/3 fork/join graph replay tests pass; these options are not an
 automatic tuning policy and do not establish model speedups.
 
-Opt-in exact normalization: `TLI_COMPACT_NORMALIZATION=1` removes dense
+Opt-in exact normalization: `NFA_COMPACT_NORMALIZATION=1` removes dense
 query-head score/probability buffers for pinned Torch 2.8.0 BF16 generic/shared CUDA
 softmax geometry. Unsupported shapes retain the reference path. Warm up before
 Graph capture; the extension requires a CUDA compiler. Per-KV-head owner and
@@ -53,7 +53,7 @@ was excluded by warmup, but per-request cache fill is included in request wall.
 This is not an FA2/overlap/quality claim. Evidence: project-local
 `agent_doc/results/operator_compact_integrated_20261029/paired-confirmed-domain`.
 
-Opt-in candidate-domain selection: set `TLI_SPARSE_SELECTION=1`. On the
+Opt-in candidate-domain selection: set `NFA_SPARSE_SELECTION=1`. On the
 supported Torch 2.8.0 BF16 CUDA geometry (aligned capacity above 9216,
 native generic/shared softmax, power-of-two GQA group, K2=1024), this removes
 capacity-wide normalization, owner and ranking buffers after candidate scoring.
@@ -64,7 +64,7 @@ geometry falls back explicitly. The flag stays off by default; overlap remains
 experimental. Inspect `_graph_normalization_route`, `_graph_ranking_route` and
 `_graph_sparse_selection_fallback` on the actual capturing indexer.
 
-`TLI_SPARSE_STATS=owner` selects an alternative normalization implementation:
+`NFA_SPARSE_STATS=owner` selects an alternative normalization implementation:
 integer token ownership followed by native-order statistics and candidate-only
 probabilities/GQA. It avoids the normalization traversal sort but retains an
 O(Hkv * capacity) int32 owner buffer; the no-capacity-buffer claim above applies
@@ -77,7 +77,7 @@ selection.
 
 Normalization keys encode (native worker, traversal ordinal); sufficiently small
 geometries use shifted signed16 keys with the sentinel in range. Setting
-`TLI_SPARSE_NARROW_KEYS=0` uses wider keys with the same compact stride. It does
+`NFA_SPARSE_NARROW_KEYS=0` uses wider keys with the same compact stride. It does
 not restore the historical capacity-stride implementation. New-source GPU and
 independent correctness evidence is in the main project's
 `graph_g1_sparse_shared_20261030_0080`, `graph_g1_sparse_mask_20261030_0100`,

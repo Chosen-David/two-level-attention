@@ -1,6 +1,6 @@
 # Optional exact selector compaction
 
-Set `TLI_SPARSE_SORT_INT16=1` and `TLI_COMPACT_SCAN_TILED=1` before constructing
+Set `NFA_SPARSE_SORT_INT16=1` and `NFA_COMPACT_SCAN_TILED=1` before constructing
 the runner to enable the measured combination. Both default to 0. Packed sort
 requires a positive integer cache capacity below 65536; invalid configuration
 is rejected before the Qwen decode path writes KV. Rebuild captured runners

@@ -10,31 +10,31 @@ import torch
 
 from benchmark.RULER import pred_ruler
 from sparse_attn.info import get_treatment_manifest_json, resolve_treatment_snapshot
-from sparse_attn.ops.region_geometry import RegionGeometry
-from sparse_attn.ops.frozen_region_gate import GateConfig
+from sparse_attn.policies.region_geometry import RegionGeometry
+from sparse_attn.policies.frozen_gate import GateConfig
 
 
 def _args(**overrides):
     values = dict(
         model='Qwen3-8B', model_path='/unused/model', task='niah_single_1',
         context_length=8192, data_root='/unused/data', output_dir='/unused/out',
-        max_num=1, yarn=False, yarn_factor=None, method='tli', t='contract',
-        pred_postfix='', tli_prefill_frozen_regions=True,
-        tli_frozen_region_mode='dual', tli_frozen_region_epsilon=.05,
-        tli_frozen_region_statistic='mean', tli_frozen_region_rows=256,
+        max_num=1, yarn=False, yarn_factor=None, method='nfa', t='contract',
+        pred_postfix='', nfa_prefill_frozen_regions=True,
+        nfa_frozen_region_mode='dual', nfa_frozen_region_epsilon=.05,
+        nfa_frozen_region_statistic='mean', nfa_frozen_region_rows=256,
         tia_block_size=64, tia_level1_topk=128, tia_level2_topk=1024,
-        tia_level2_cmp_ratio=4, tli_subspace='tail', tli_l2_subspace='same',
-        tli_far_method='minmax', tli_near_method='avg', tli_far_select='4bit',
-        tli_near_select='4bit', tli_near_pages=32, tli_near_tokens='off',
-        tli_near_len=4096, tli_sink_tokens=4, tli_swa_size=128,
-        tli_enable_subspace=True, tli_enable_layer_skip=False,
-        tli_dyn_dgate=False, tli_far_skip_backend='legacy',
-        tli_far_skip_cache='retain', tli_sparse_prefill=False,
-        tli_decode_dense=False, tli_per_q_head=False,
-        tia_enable_async_topk=False, tli_l2_quant=False,
-        tli_sinkswa_only=False, tli_boundary_bypass=True,
-        tli_static_pair=False, tli_proj_basis=None,
-        tli_alpha=None, tli_beta=None, tli_gamma=None)
+        tia_level2_cmp_ratio=4, nfa_subspace='tail', nfa_l2_subspace='same',
+        nfa_far_method='minmax', nfa_near_method='avg', nfa_far_select='4bit',
+        nfa_near_select='4bit', nfa_near_pages=32, nfa_near_tokens='off',
+        nfa_near_len=4096, nfa_sink_tokens=4, nfa_swa_size=128,
+        nfa_enable_subspace=True, nfa_enable_layer_skip=False,
+        nfa_dyn_dgate=False, nfa_far_skip_backend='legacy',
+        nfa_far_skip_cache='retain', nfa_sparse_prefill=False,
+        nfa_decode_dense=False, nfa_per_q_head=False,
+        tia_enable_async_topk=False, nfa_l2_quant=False,
+        nfa_sinkswa_only=False, nfa_boundary_bypass=True,
+        nfa_static_pair=False, nfa_proj_basis=None,
+        nfa_alpha=None, nfa_beta=None, nfa_gamma=None)
     values.update(overrides)
     return SimpleNamespace(**values)
 
@@ -46,17 +46,17 @@ def _config():
 
 
 def test_default_off_does_not_touch_environment_or_config(monkeypatch):
-    monkeypatch.setenv('TLI_OPERATOR_MODE', 'operator')
+    monkeypatch.setenv('NFA_OPERATOR_MODE', 'operator')
     config = _config()
     assert pred_ruler._configure_frozen_regions(
-        _args(tli_prefill_frozen_regions=False), config) is None
-    assert os.environ['TLI_OPERATOR_MODE'] == 'operator'
+        _args(nfa_prefill_frozen_regions=False), config) is None
+    assert os.environ['NFA_OPERATOR_MODE'] == 'operator'
     assert config._attn_implementation == 'eager'
 
 
 def test_valid_configuration_is_resolved_before_patch_registration(monkeypatch):
-    for name in ('TLI_OPERATOR_MODE', 'TLI_FINE_GATHER', 'TLI_SPARSE_PREFILL',
-                 'TLI_DECODE_DENSE', 'TLI_FROZEN_EAGER_REFERENCE', 'TLI_CUDA_GRAPH'):
+    for name in ('NFA_OPERATOR_MODE', 'NFA_FINE_GATHER', 'NFA_SPARSE_PREFILL',
+                 'NFA_DECODE_DENSE', 'NFA_FROZEN_EAGER_REFERENCE', 'NFA_CUDA_GRAPH'):
         monkeypatch.delenv(name, raising=False)
     args = _args()
     config = _config()
@@ -64,42 +64,42 @@ def test_valid_configuration_is_resolved_before_patch_registration(monkeypatch):
     assert gate == GateConfig()
     assert geometry == RegionGeometry(max_new_tokens=pred_ruler.MAX_GEN)
     assert config._attn_implementation == 'sdpa'
-    assert os.environ['TLI_OPERATOR_MODE'] == 'off'
-    assert os.environ['TLI_FROZEN_EAGER_REFERENCE'] == '0'
-    assert os.environ['TLI_CUDA_GRAPH'] == 'off'
+    assert os.environ['NFA_OPERATOR_MODE'] == 'off'
+    assert os.environ['NFA_FROZEN_EAGER_REFERENCE'] == '0'
+    assert os.environ['NFA_CUDA_GRAPH'] == 'off'
     assert args._frozen_region_gate is gate
     assert args._frozen_region_geometry is geometry
 
 
 def test_real_cli_accepts_environment_only_sparse_flags(monkeypatch):
-    for name in ('TLI_OPERATOR_MODE', 'TLI_FINE_GATHER', 'TLI_SPARSE_PREFILL',
-                 'TLI_DECODE_DENSE', 'TLI_FROZEN_EAGER_REFERENCE', 'TLI_CUDA_GRAPH'):
+    for name in ('NFA_OPERATOR_MODE', 'NFA_FINE_GATHER', 'NFA_SPARSE_PREFILL',
+                 'NFA_DECODE_DENSE', 'NFA_FROZEN_EAGER_REFERENCE', 'NFA_CUDA_GRAPH'):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(sys, 'argv', [
         'pred_ruler', '--model', 'Qwen3-8B', '--model_path', '/unused/model',
         '--task', 'niah_single_1', '--context_length', '65536',
         '--data-root', '/unused/data', '--output-dir', '/unused/out',
-        '--method', 'tli', '--yarn', '--tli_prefill_frozen_regions',
-        '--tli_far_method', 'minmax', '--tli_near_method', 'avg',
-        '--tli_near_pages', '32', '--tli_near_tokens', 'off',
-        '--tli_near_len', '4096', '--tli_subspace', 'tail',
-        '--tia_level2_cmp_ratio', '4', '--tli_sink_tokens', '4',
-        '--tli_swa_size', '128', '--tia_level1_topk', '128',
-        '--tia_level2_topk', '1024', '--tli_enable_layer_skip', 'false',
-        '--tli_far_skip_backend', 'legacy', '--tli_far_skip_cache', 'retain',
+        '--method', 'nfa', '--yarn', '--nfa_prefill_frozen_regions',
+        '--nfa_far_method', 'minmax', '--nfa_near_method', 'avg',
+        '--nfa_near_pages', '32', '--nfa_near_tokens', 'off',
+        '--nfa_near_len', '4096', '--nfa_subspace', 'tail',
+        '--tia_level2_cmp_ratio', '4', '--nfa_sink_tokens', '4',
+        '--nfa_swa_size', '128', '--tia_level1_topk', '128',
+        '--tia_level2_topk', '1024', '--nfa_enable_layer_skip', 'false',
+        '--nfa_far_skip_backend', 'legacy', '--nfa_far_skip_cache', 'retain',
     ])
     args = pred_ruler.parse_args()
-    assert not hasattr(args, 'tli_sparse_prefill')
-    assert not hasattr(args, 'tli_decode_dense')
+    assert not hasattr(args, 'nfa_sparse_prefill')
+    assert not hasattr(args, 'nfa_decode_dense')
     pred_ruler._configure_frozen_regions(args, _config())
-    assert os.environ['TLI_SPARSE_PREFILL'] == '0'
-    assert os.environ['TLI_DECODE_DENSE'] == '0'
+    assert os.environ['NFA_SPARSE_PREFILL'] == '0'
+    assert os.environ['NFA_DECODE_DENSE'] == '0'
 
 
 @pytest.mark.parametrize('field,value', [
-    ('method', 'none'), ('tia_level1_topk', 64), ('tli_near_pages', 16),
-    ('tli_enable_layer_skip', True), ('tli_dyn_dgate', True),
-    ('tli_sparse_prefill', True), ('tli_decode_dense', True),
+    ('method', 'none'), ('tia_level1_topk', 64), ('nfa_near_pages', 16),
+    ('nfa_enable_layer_skip', True), ('nfa_dyn_dgate', True),
+    ('nfa_sparse_prefill', True), ('nfa_decode_dense', True),
 ])
 def test_unvalidated_geometry_or_method_fails_closed(field, value):
     with pytest.raises(ValueError):
@@ -110,30 +110,30 @@ def test_non_qwen_and_graph_execution_fail_closed(monkeypatch):
     with pytest.raises(ValueError, match='Qwen3'):
         pred_ruler._configure_frozen_regions(
             _args(), SimpleNamespace(model_type='llama', head_dim=128))
-    monkeypatch.setenv('TLI_CUDA_GRAPH', 'on')
+    monkeypatch.setenv('NFA_CUDA_GRAPH', 'on')
     with pytest.raises(ValueError, match='eager execution only'):
         pred_ruler._configure_frozen_regions(_args(), _config())
 
 
 def test_manifest_is_byte_identical_when_off_and_tracks_gate_and_geometry():
     args = SimpleNamespace(
-        method='tli', tli_enable_layer_skip=False, tli_proj_basis=None,
-        tli_far_skip_backend='legacy', tli_far_skip_cache='retain',
-        tli_prefill_frozen_regions=False)
+        method='nfa', nfa_enable_layer_skip=False, nfa_proj_basis=None,
+        nfa_far_skip_backend='legacy', nfa_far_skip_cache='retain',
+        nfa_prefill_frozen_regions=False)
     baseline = get_treatment_manifest_json(args, resolve_treatment_snapshot(args))
-    args.tli_frozen_region_mode = 'dual'
-    args.tli_frozen_region_epsilon = .05
+    args.nfa_frozen_region_mode = 'dual'
+    args.nfa_frozen_region_epsilon = .05
     assert get_treatment_manifest_json(args, resolve_treatment_snapshot(args)) == baseline
 
-    args.tli_prefill_frozen_regions = True
+    args.nfa_prefill_frozen_regions = True
     with pytest.raises(ValueError, match='resolved gate and geometry'):
         resolve_treatment_snapshot(args)
     args._frozen_region_gate = GateConfig()
     args._frozen_region_geometry = RegionGeometry(max_new_tokens=64)
     frozen = resolve_treatment_snapshot(args)
     payload = json.loads(frozen.manifest_json)
-    assert payload['tli_prefill_frozen_regions']['gate']['epsilon'] == .05
-    assert payload['tli_prefill_frozen_regions']['geometry']['max_new_tokens'] == 64
+    assert payload['nfa_prefill_frozen_regions']['gate']['epsilon'] == .05
+    assert payload['nfa_prefill_frozen_regions']['geometry']['max_new_tokens'] == 64
     assert frozen.manifest_json != baseline
     args._frozen_region_gate = GateConfig(epsilon=.1)
     assert resolve_treatment_snapshot(args).manifest_json != frozen.manifest_json
@@ -201,7 +201,7 @@ def _run_ruler_main(monkeypatch, tmp_path, complete):
 
     def register(model, args, snapshot):
         # Environment and geometry must already be fixed before indexer construction.
-        assert os.environ['TLI_OPERATOR_MODE'] == 'off'
+        assert os.environ['NFA_OPERATOR_MODE'] == 'off'
         assert args._frozen_region_geometry.max_new_tokens == pred_ruler.MAX_GEN
         return 1
 

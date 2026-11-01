@@ -31,19 +31,19 @@ TASKS="niah_single_1 niah_single_2 niah_single_3 niah_multikey_1 niah_multikey_2
 
 # ---- 三臂参数（E109 海选终判 2026-10-09：mavg 冠军 46.95 / aavg(0,0) Pareto hq 王）----
 # 共同参数：--tia_level1_topk 128 --tia_level2_topk 1024 --tia_level2_cmp_ratio 4
-#           --tli_enable_layer_skip false（tli 臂）
+#           --nfa_enable_layer_skip false（nfa 臂）
 case $ARM in
   mavg)
-    METHOD=tli
-    TLI_ARGS="--tli_far_method minmax --tli_near_method avg --tli_enable_kmeans false --tli_alpha 0.25 --tli_beta 0.125 --tli_gamma 0.625"
+    METHOD=nfa
+    NFA_ARGS="--nfa_far_method minmax --nfa_near_method avg --nfa_enable_kmeans false --nfa_alpha 0.25 --nfa_beta 0.125 --nfa_gamma 0.625"
     ;;
   aavg)
-    METHOD=tli
-    TLI_ARGS="--tli_far_method avg --tli_near_method avg --tli_enable_kmeans false --tli_alpha 0 --tli_beta 0 --tli_gamma 0"
+    METHOD=nfa
+    NFA_ARGS="--nfa_far_method avg --nfa_near_method avg --nfa_enable_kmeans false --nfa_alpha 0 --nfa_beta 0 --nfa_gamma 0"
     ;;
   fullkv)
     METHOD=none
-    TLI_ARGS=""
+    NFA_ARGS=""
     ;;
   *)
     echo "usage: $0 <mavg|aavg|fullkv> <gpu_id> [max_num] [lens]"
@@ -97,8 +97,8 @@ for L in $LENS; do
       --data-root $DATA \
       --output-dir $OUTROOT/$ARM \
       --tia_level1_topk 128 --tia_level2_topk 1024 \
-      --tia_level2_cmp_ratio 4 --tli_enable_layer_skip false \
-      $TLI_ARGS $YARN \
+      --tia_level2_cmp_ratio 4 --nfa_enable_layer_skip false \
+      $NFA_ARGS $YARN \
       --pred_postfix $POSTFIX --max-num $N 2>&1 | tail -2
     rc=${PIPESTATUS[0]}
     if [ "$rc" -ne 0 ]; then

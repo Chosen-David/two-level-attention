@@ -18,13 +18,13 @@ def fake_capture(monkeypatch):
 
 
 def test_capture_owner_nested_exception_restore_and_geometry_disabled(fake_capture,monkeypatch):
-    monkeypatch.setenv('TLI_GRAPH_GEOMETRY_SHARED','0')
+    monkeypatch.setenv('NFA_GRAPH_GEOMETRY_SHARED','0')
     outer=SimpleNamespace();inner=SimpleNamespace();state=SimpleNamespace()
     assert cgs.current_capture_graph() is None
     with cgs.capture_graph(outer):
         assert cgs.current_capture_graph() is outer
         cgs.retain_capture_state(state);cgs.retain_capture_state(state)
-        assert outer._tli_address_owners==[state]
+        assert outer._nfa_address_owners==[state]
         with pytest.raises(ValueError,match='failure'):
             with cgs.capture_graph(inner):
                 assert cgs.current_capture_graph() is inner
@@ -35,14 +35,14 @@ def test_capture_owner_nested_exception_restore_and_geometry_disabled(fake_captu
 
 
 def test_replacement_state_and_kv_die_with_old_graph_while_indexer_lives(fake_capture,monkeypatch):
-    from sparse_attn.indexer.tli_indexer import TLIIndexer
+    from sparse_attn.indexer.nfa_indexer import NFAIndexer
     # Preserve actual state constructor/storage ownership, clear invalidation,
     # and replacement entry. Only tensor compute/unsupported CPU guards are mocked.
     import importlib.util
     from pathlib import Path
-    spec=importlib.util.spec_from_file_location('lifetime_args',Path(__file__).parents[1]/'exp/bench/test_tli_graph_gates.py')
+    spec=importlib.util.spec_from_file_location('lifetime_args',Path(__file__).parents[1]/'exp/bench/test_nfa_graph_gates.py')
     args=importlib.util.module_from_spec(spec);spec.loader.exec_module(args)
-    idx=TLIIndexer(args._make_prod_args());idx.layer_idx=2;idx.clear()
+    idx=NFAIndexer(args._make_prod_args());idx.layer_idx=2;idx.clear()
     monkeypatch.setattr(exact,'_validate_metadata',lambda *a:None)
     monkeypatch.setattr(exact,'_validate_supported',lambda *a:None)
     monkeypatch.setattr(exact,'BatchedCandidateProducer',lambda *a:None)
@@ -63,7 +63,7 @@ def test_replacement_state_and_kv_die_with_old_graph_while_indexer_lives(fake_ca
     class Graph:pass
     graph=Graph();capturing=True
     with cgs.capture_graph(graph):exact.exact_linear_batch_decode(idx,q,k,v,gs,1.)
-    assert graph._tli_address_owners==[old]
+    assert graph._nfa_address_owners==[old]
     capturing=False;idx.clear()
     assert not bool(old.ready)
     new_k=torch.ones_like(k);new_v=torch.ones_like(v)

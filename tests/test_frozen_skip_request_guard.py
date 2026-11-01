@@ -7,7 +7,7 @@ from transformers import Qwen3Config, Qwen3ForCausalLM
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
 from benchmark.LongBench.prefill_frozen_skip import generate, generate_native
-from sparse_attn.ops.frozen_region_gate import GateConfig
+from sparse_attn.policies.frozen_gate import GateConfig
 from sparse_attn.ops import eager_decoding
 
 

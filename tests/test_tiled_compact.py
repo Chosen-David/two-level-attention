@@ -1,6 +1,6 @@
 import pytest
 import torch
-from sparse_attn.ops.tiled_compact import compact_tiled
+from sparse_attn.indexer.compaction.tiled_compact import compact_tiled
 
 
 def test_metadata_rejects_without_launch():
@@ -16,12 +16,12 @@ def test_metadata_rejects_without_launch():
 @pytest.mark.parametrize('width',[0,1,1023,1024,1025,8193,8448,33024,65536])
 @pytest.mark.parametrize('with_mid',[False,True])
 def test_native_graph_stable_prefix_and_inactive_sentinel(monkeypatch,width,with_mid):
-    from sparse_attn.indexer.tli_indexer import _iter3_compact
+    from sparse_attn.indexer.nfa_indexer import _iter3_compact
     torch.manual_seed(1030);h=8 if width>=8448 else 3;s=32840
     ids=torch.randint(s,(h,width),device='cuda');keep=torch.ones_like(ids,dtype=torch.bool)
     mid=torch.randint(2,(s,),device='cuda',dtype=torch.bool) if with_mid else None
     def run():
-        monkeypatch.setenv('TLI_COMPACT_SCAN_TILED','1')
+        monkeypatch.setenv('NFA_COMPACT_SCAN_TILED','1')
         return _iter3_compact(ids,keep,mid,width,h,s,ids.device)
     run();torch.cuda.synchronize();graph=torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):actual=run()
@@ -46,7 +46,7 @@ def test_native_graph_stable_prefix_and_inactive_sentinel(monkeypatch,width,with
         assert torch.equal(actual[3],expected_count)
         if mid is not None:assert torch.equal(actual[2],mid[expected_ids])
         else:assert actual[2] is None
-        monkeypatch.setenv('TLI_COMPACT_SCAN_TILED','0')
+        monkeypatch.setenv('NFA_COMPACT_SCAN_TILED','0')
         old=_iter3_compact(ids,keep,mid,width,h,s,ids.device)
         for a,b in zip(actual,old):
             if a is not None:assert torch.equal(a,b),(width,with_mid,pattern)

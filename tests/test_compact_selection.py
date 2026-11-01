@@ -7,7 +7,7 @@
 """
 import pytest
 import torch
-from sparse_attn.ops.token_selection import (
+from sparse_attn.indexer.selection.selector import (
     TokenSelection, canonical_selection, middle_selection,
     graph_middle_selection,
 )
@@ -148,7 +148,7 @@ def test_graph_middle_selection_scalar_quota_matches_per_head(quota):
 
 @pytest.mark.parametrize('quota', [0, 1, 17, 64])
 def test_unique_top_fast_path_matches_generic(quota):
-    from sparse_attn.ops.token_selection import graph_middle_selection
+    from sparse_attn.indexer.selection.selector import graph_middle_selection
     torch.manual_seed(39)
     top = torch.stack([torch.randperm(64) for _ in range(3)])
     mid = torch.arange(64).remainder(3) != 0

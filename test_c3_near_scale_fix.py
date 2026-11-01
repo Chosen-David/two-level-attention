@@ -71,9 +71,9 @@ def make_args(**kw):
 
 
 C3_CFG = dict(
-    tli_far_select="sim_greedy", tli_near_select="sim_greedy", tli_sim=0.9,
-    tli_enable_kmeans=True, tli_enable_layer_skip=False,
-    tli_alpha=0.25, tli_beta=0.25, tli_gamma=0.125,
+    nfa_far_select="sim_greedy", nfa_near_select="sim_greedy", nfa_sim=0.9,
+    nfa_enable_kmeans=True, nfa_enable_layer_skip=False,
+    nfa_alpha=0.25, nfa_beta=0.25, nfa_gamma=0.125,
 )
 
 
@@ -103,7 +103,7 @@ def build_scene(seed=20261008):
 
 
 def run_mask_idx(idxpkg, args, k, q):
-    idx = idxpkg.TLIIndexer(args)
+    idx = idxpkg.NFAIndexer(args)
     idx.layer_idx = 3
     cu = torch.tensor([0, k.shape[1]])
     q_ids = torch.tensor([k.shape[1] - 1])
@@ -227,7 +227,7 @@ def c3_5_kmeans_path():
     try:
         S, k, q = build_scene()
         cfg = dict(C3_CFG)
-        cfg.update(tli_far_select="cluster", tli_near_select="cluster")
+        cfg.update(nfa_far_select="cluster", nfa_near_select="cluster")
         idx, mask, _ = run_mask_idx(IDX_NEW, make_args(**cfg), k, q)
         m = mask[0, 0]
         assert mask.dtype == torch.bool and mask.shape[-1] == S

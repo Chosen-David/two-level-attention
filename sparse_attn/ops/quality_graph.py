@@ -11,8 +11,8 @@ import threading
 
 import torch
 
-from ..baseline_runtime import BatchCtx, batch_decode_scope
-from .cuda_graph_state import graph_state, enable_graph, disable_graph, capture_graph
+from sparse_attn.scheduler.batch_builder import BatchCtx, batch_decode_scope
+from sparse_attn.engine.cuda_graph_state import graph_state, enable_graph, disable_graph, capture_graph
 from .eager_decoding import eager_decoding_check_errors
 
 
@@ -20,9 +20,9 @@ _warmup_streams = threading.local()
 
 
 def _request_warmup_stream(device):
-    reuse = os.environ.get('TLI_REUSE_WARMUP_STREAM', '1')
+    reuse = os.environ.get('NFA_REUSE_WARMUP_STREAM', '1')
     if reuse not in ('0', '1'):
-        raise ValueError('TLI_REUSE_WARMUP_STREAM must be 0 or 1')
+        raise ValueError('NFA_REUSE_WARMUP_STREAM must be 0 or 1')
     if reuse == '0':
         return torch.cuda.Stream(device=device), False
     # cuBLAS workspaces are stream-associated. Bound the number of warmup
@@ -38,17 +38,17 @@ def _request_warmup_stream(device):
 
 
 def graph_policy():
-    value = os.environ.get("TLI_CUDA_GRAPH", "auto").lower()
+    value = os.environ.get("NFA_CUDA_GRAPH", "auto").lower()
     values = {"0": "off", "off": "off", "1": "on", "on": "on", "auto": "auto"}
     if value not in values:
-        raise ValueError("TLI_CUDA_GRAPH must be auto, 0/off, or 1/on")
+        raise ValueError("NFA_CUDA_GRAPH must be auto, 0/off, or 1/on")
     return values[value]
 
 
 def execution(model, actual, reason=None, **kwargs):
     record = dict(requested=graph_policy(), actual=actual, fallback_reason=reason,
                   captures=0, replay_steps=0,
-                  operator_mode=os.environ.get("TLI_OPERATOR_MODE", "off"))
+                  operator_mode=os.environ.get("NFA_OPERATOR_MODE", "off"))
     record.update(kwargs)
     model._quality_graph_execution = record
     return record
@@ -127,7 +127,7 @@ def _capture_routes(model):
 def _live_width_fallback(prompt_lengths, dtype=None):
     # The first decode appends one token. Check host-known lengths before
     # allocation/capture; capacity alone does not imply a supported row width.
-    from .sparse_policy import live_normalization_enabled
+    from sparse_attn.policies.sparse_policy import live_normalization_enabled
     if live_normalization_enabled(quality_request=True):
         if dtype is not None and dtype != torch.bfloat16:
             return "live_normalization_requires_bfloat16"
@@ -149,7 +149,7 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
     parameter = next(model.parameters())
     device, dtype = parameter.device, parameter.dtype
     batch, capacity = len(gen), cache.get_max_cache_shape()
-    measure = os.environ.get("TLI_QUALITY_TIMING", "0") == "1"
+    measure = os.environ.get("NFA_QUALITY_TIMING", "0") == "1"
     def synchronize():
         if device.type == "cuda":
             torch.cuda.synchronize(device)
@@ -164,7 +164,7 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                        token_readback='per_step' if online_eos else 'final')
     # static_decode 自身就是请求边界，不能依赖调用者一定先跑过 prefill。
     # 新池只保留本请求每层/每行摘要；clear 保留旧 Graph 地址但软失效。
-    ctx._tli_row_index_pools = {}
+    ctx._nfa_row_index_pools = {}
     _reset_indexes(model)
     if max_gen <= 1 or not any(ctx.alive):
         record["actual"] = "no_decode"
@@ -272,7 +272,7 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     graph, output = None, None
                     restore()
                     _reset_indexes(model)
-                    ctx._tli_row_index_pools = {}
+                    ctx._nfa_row_index_pools = {}
                     if reuse_tensor_eager:
                         enable_graph(batch, quality_defaults=True)
                         gs.pos_buf, gs.valid_len_buf, gs.alive_buf = pos, lengths, alive
@@ -288,9 +288,9 @@ def static_decode(model, cache, gen, lens, eos_ids, max_gen, ctx, *, min_new_tok
                     gc.collect()
                     torch.cuda.empty_cache()
                 restore()
-            input_mode = os.environ.get('TLI_DEVICE_DECODE_INPUTS', '1')
+            input_mode = os.environ.get('NFA_DEVICE_DECODE_INPUTS', '1')
             if input_mode not in ('0', '1'):
-                raise ValueError('TLI_DEVICE_DECODE_INPUTS must be 0 or 1')
+                raise ValueError('NFA_DEVICE_DECODE_INPUTS must be 0 or 1')
             record.update(input_update_requested=input_mode,
                           input_update_route='host_reference', input_update_fallback=None)
             if input_mode == '1':
@@ -422,8 +422,8 @@ def from_dynamic(model, past, first_token, max_gen, eos_ids, *, min_new_tokens=2
     modules = list(model.modules()) if hasattr(model, "modules") else []
     indexes = [m.indexer for m in modules if hasattr(m, "indexer")]
     reason = None
-    if not indexes or any(type(idx).__name__ != "TLIIndexer" for idx in indexes):
-        reason = "method_has_no_supported_tli_indexer"
+    if not indexes or any(type(idx).__name__ != "NFAIndexer" for idx in indexes):
+        reason = "method_has_no_supported_nfa_indexer"
     elif getattr(model.config, "model_type", None) not in ("qwen3", "glm4_moe_lite"):
         reason = "model_not_in_quality_graph_allowlist"
     elif any(getattr(idx, "far_skip_backend", "legacy") not in ("legacy", "compact")

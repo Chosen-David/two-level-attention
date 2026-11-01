@@ -5,9 +5,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import pytest
 import torch
-from sparse_attn.ops.cuda_graph_state import capture_graph, geometry_cache_key
+from sparse_attn.engine.cuda_graph_state import capture_graph, geometry_cache_key
 
-source=Path(__file__).resolve().parents[1]/'sparse_attn/indexer/tli_indexer.py'
+source=Path(__file__).resolve().parents[1]/'sparse_attn/indexer/nfa_indexer.py'
 functions=[n for n in ast.parse(source.read_text()).body if isinstance(n,ast.FunctionDef) and n.name in ('_graph_geo_version','_graph_geo_lookup','_graph_geo_store')]
 ns={'_GRAPH_GEO_CACHE':{}};exec(compile(ast.Module(body=functions,type_ignores=[]),str(source),'exec'),ns)
 lookup,store=ns['_graph_geo_lookup'],ns['_graph_geo_store']
@@ -59,18 +59,18 @@ def test_inference_device_revision_and_managed_capture(monkeypatch):
         # 无显式修订号的 eager inference tensor 仍禁止缓存。
         store(length,('device',),value)
         assert lookup(length,('device',)) is None
-        length._tli_device_revision=1
+        length._nfa_device_revision=1
         store(length,('device',),value)
         assert lookup(length,('device',)) is value
-        length._tli_device_revision=2
+        length._nfa_device_revision=2
         assert lookup(length,('device',)) is None
         # inference 视图没有 _base，调用方必须显式传播修订号。
         row=length[:1]
-        row._tli_device_revision=2
+        row._nfa_device_revision=2
         store(row,('device',),value)
         assert lookup(row,('device',)) is value
-        length._tli_device_revision=3
-        row._tli_device_revision=3
+        length._nfa_device_revision=3
+        row._nfa_device_revision=3
         assert lookup(row,('device',)) is None
         unversioned=torch.tensor([9])
         with capture_graph(object()):
@@ -116,12 +116,12 @@ def test_two_graphs_replay_live_geometry_and_raw_capture():
 def test_real_selector_cross_graph_geometry(monkeypatch, sparse):
     """Real selectors share only equal geometry and replay independent live inputs."""
     import importlib.util
-    from sparse_attn.indexer.tli_indexer import TLIIndexer
+    from sparse_attn.indexer.nfa_indexer import NFAIndexer
     spec = importlib.util.spec_from_file_location(
-        'geometry_prod_args', source.parents[2] / 'exp/bench/test_tli_graph_gates.py')
+        'geometry_prod_args', source.parents[2] / 'exp/bench/test_nfa_graph_gates.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    monkeypatch.setenv('TLI_SPARSE_SELECTION', sparse)
+    monkeypatch.setenv('NFA_SPARSE_SELECTION', sparse)
     torch.manual_seed(827)
     capacity = 32840
     k = torch.randn(1, capacity, 8, 128, device='cuda', dtype=torch.bfloat16)
@@ -131,18 +131,18 @@ def test_real_selector_cross_graph_geometry(monkeypatch, sparse):
     selectors = []
     for swa in (128, 128, 192, 128):
         args = module._make_prod_args()
-        args.tli_swa_size = swa
-        idx = TLIIndexer(args)
+        args.nfa_swa_size = swa
+        idx = NFAIndexer(args)
         idx.layer_idx = 2
         idx.clear()
         selectors.append((idx, idx.prepare_index(k, cu)))
 
     builds = [0]
-    original = TLIIndexer._build_graph_geometry
+    original = NFAIndexer._build_graph_geometry
     def counted(self, *args, **kwargs):
         builds[0] += 1
         return original(self, *args, **kwargs)
-    monkeypatch.setattr(TLIIndexer, '_build_graph_geometry', counted)
+    monkeypatch.setattr(NFAIndexer, '_build_graph_geometry', counted)
     def run():
         return [idx.compute_selection_graph(q, index, 128 ** -.5, length)
                 for idx, index in selectors]
@@ -179,12 +179,12 @@ def test_capture_ablation_and_invalid_flag(monkeypatch):
         entered.append(True)
         return nullcontext()
     monkeypatch.setattr(torch.cuda, 'graph', graph)
-    monkeypatch.setenv('TLI_GRAPH_GEOMETRY_SHARED', '0')
+    monkeypatch.setenv('NFA_GRAPH_GEOMETRY_SHARED', '0')
     with capture_graph(object()):
         assert geometry_cache_key(('geometry',), capturing=True, stream=11) is None
     assert len(entered) == 1
-    monkeypatch.setenv('TLI_GRAPH_GEOMETRY_SHARED', 'invalid')
-    with pytest.raises(ValueError, match='TLI_GRAPH_GEOMETRY_SHARED'):
+    monkeypatch.setenv('NFA_GRAPH_GEOMETRY_SHARED', 'invalid')
+    with pytest.raises(ValueError, match='NFA_GRAPH_GEOMETRY_SHARED'):
         with capture_graph(object()):
             pass
     assert len(entered) == 1  # Invalid configuration rejected before capture.

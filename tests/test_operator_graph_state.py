@@ -1,10 +1,10 @@
 import pytest
 import torch
-from sparse_attn.ops.cuda_graph_state import graph_state, enable_graph, disable_graph
+from sparse_attn.engine.cuda_graph_state import graph_state, enable_graph, disable_graph
 
 @pytest.mark.parametrize('mode', ['off', 'serial', 'overlap'])
 def test_operator_preserves_explicit_graph_state(monkeypatch, mode):
-    monkeypatch.setenv('TLI_OPERATOR_MODE', mode)
+    monkeypatch.setenv('NFA_OPERATOR_MODE', mode)
     disable_graph()
     try:
         enable_graph(1)
@@ -23,13 +23,13 @@ def test_operator_preserves_explicit_graph_state(monkeypatch, mode):
 def test_serial_incremental_graph_crosses_block_boundary(monkeypatch, dtype):
     import importlib.util
     from pathlib import Path
-    from sparse_attn.indexer.tli_indexer import TLIIndexer
-    spec = importlib.util.spec_from_file_location('graph_args', Path(__file__).parents[1] / 'exp/bench/test_tli_graph_gates.py')
+    from sparse_attn.indexer.nfa_indexer import NFAIndexer
+    spec = importlib.util.spec_from_file_location('graph_args', Path(__file__).parents[1] / 'exp/bench/test_nfa_graph_gates.py')
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    monkeypatch.setenv('TLI_OPERATOR_MODE', 'serial')
-    idx = TLIIndexer(mod._make_prod_args()); idx.layer_idx = 2; idx.clear()
-    ref = TLIIndexer(mod._make_prod_args()); ref.layer_idx = 2; ref.clear()
+    monkeypatch.setenv('NFA_OPERATOR_MODE', 'serial')
+    idx = NFAIndexer(mod._make_prod_args()); idx.layer_idx = 2; idx.clear()
+    ref = NFAIndexer(mod._make_prod_args()); ref.layer_idx = 2; ref.clear()
     k = torch.zeros(1, 193, 8, 128, device='cuda', dtype=dtype)
     k[:, :63].normal_()
     cu = torch.tensor([0, 193], device='cuda', dtype=torch.int32)

@@ -51,9 +51,9 @@ class Metrics:
         block_size: int,
     ):
         # E127 iter1→inplace 合并（2026-10-12）：惰性路径（数值逐位一致）
-        # 并为默认——env 门反转，TLI_E127_FAST=0 显式回退原路径（紧急
+        # 并为默认——env 门反转，NFA_E127_FAST=0 显式回退原路径（紧急
         # 逃生口，归档复现用）。
-        if os.environ.get("TLI_E127_FAST", "1") != "0":
+        if os.environ.get("NFA_E127_FAST", "1") != "0":
             return self._add_select_result_lazy(q_ids, mask, block_size)
         mask = mask.squeeze(0) # [tq, h, tk]
         for i in range(q_ids.shape[0]):

@@ -1,8 +1,8 @@
 """Batch primitives vs independent per-request pinned exact primitives."""
 import pytest
 import torch
-from sparse_attn.ops.sparse_normalization import candidate_probabilities,candidate_probabilities_batched
-from sparse_attn.ops.unique_ranking import rank_unique,rank_unique_batched
+from sparse_attn.indexer.compaction.sparse_normalization import candidate_probabilities,candidate_probabilities_batched
+from sparse_attn.indexer.selection.unique_ranking import rank_unique,rank_unique_batched
 from test_sparse_selection_cuda import dense_reference
 
 @pytest.mark.parametrize('group',[0,3,1.5])

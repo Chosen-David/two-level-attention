@@ -14,7 +14,7 @@ import torch
 
 from sparse_attn.ops.partial_attention import (
     partial_attention, merge_partials)
-from sparse_attn.ops.token_selection import (
+from sparse_attn.indexer.selection.selector import (
     graph_middle_selection, TokenSelection)
 
 
@@ -257,21 +257,21 @@ def test_decode_indexed_large_swa():
 
 
 def test_operator_mode_off_routing():
-    """TLI_OPERATOR_MODE=off 时不应走 decode_indexed 路由。"""
+    """NFA_OPERATOR_MODE=off 时不应走 decode_indexed 路由。"""
     import os
-    os.environ["TLI_OPERATOR_MODE"] = "off"
-    from sparse_attn.ops.operator_pipeline import operator_mode
+    os.environ["NFA_OPERATOR_MODE"] = "off"
+    from sparse_attn.engine.operator_pipeline import operator_mode
     assert operator_mode() == 'off'
     # off 模式下 qwen3_attn_patch 走 legacy 路径，不调用 decode_indexed
-    os.environ.pop("TLI_OPERATOR_MODE", None)
+    os.environ.pop("NFA_OPERATOR_MODE", None)
 
 
 def test_operator_mode_serial_signature():
-    """TLI_OPERATOR_MODE=serial 时 decode_indexed 有正确签名。"""
+    """NFA_OPERATOR_MODE=serial 时 decode_indexed 有正确签名。"""
     import os
-    os.environ["TLI_OPERATOR_MODE"] = "serial"
+    os.environ["NFA_OPERATOR_MODE"] = "serial"
     import importlib
-    import sparse_attn.ops.operator_pipeline as op
+    import sparse_attn.engine.operator_pipeline as op
     importlib.reload(op)
     assert op.operator_mode() == 'serial'
     import inspect
@@ -279,4 +279,4 @@ def test_operator_mode_serial_signature():
     params = list(sig.parameters.keys())
     assert 'indexer' in params
     assert 'softmax_scale' in params
-    os.environ.pop("TLI_OPERATOR_MODE", None)
+    os.environ.pop("NFA_OPERATOR_MODE", None)

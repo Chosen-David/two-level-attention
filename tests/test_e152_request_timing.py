@@ -177,9 +177,9 @@ class RequestTiming(unittest.TestCase):
             ns["timed_request"](fail, [11], 2, "fake")
 
     def test_cli_rejects_wrong_protocol_before_loader_even_under_O(self):
-        base = ["e152", "--method", "tli", "-L", "64", "--out", "unused.json"]
-        cases = [([], {"TLI_SPARSE_PREFILL": "1"}),
-                 ([], {"TLI_SPARSE_PREFILL": "invalid"}),
+        base = ["e152", "--method", "nfa", "-L", "64", "--out", "unused.json"]
+        cases = [([], {"NFA_SPARSE_PREFILL": "1"}),
+                 ([], {"NFA_SPARSE_PREFILL": "invalid"}),
                  (["--max-gen", "0"], {}), (["--repeats", "0"], {}),
                  (["--warmup", "-1"], {}), (["-L", "0"], {}),
                  (["--method", "tia"], {}), (["--method", "sparq_vendor"], {})]
@@ -187,7 +187,7 @@ class RequestTiming(unittest.TestCase):
             with self.subTest(extra=extra, env=env):
                 ns, _ = namespace(Clock())
                 with patch.object(sys, "argv", base + extra), \
-                     patch.dict(os.environ, {"TLI_SPARSE_PREFILL": "0", **env}), \
+                     patch.dict(os.environ, {"NFA_SPARSE_PREFILL": "0", **env}), \
                      contextlib.redirect_stderr(io.StringIO()):
                     with self.assertRaises(SystemExit) as raised:
                         ns["main"]()
@@ -206,7 +206,7 @@ class RequestTiming(unittest.TestCase):
             path = Path(directory) / "runs.json"
             old = {"schema": "e152-e2e-latency-v1", "runs": []}
             path.write_text(json.dumps([old]))
-            for method in ("none", "tli"):
+            for method in ("none", "nfa"):
                 clock = Clock()
                 ns, device = namespace(clock)
                 model = Model(clock)
@@ -234,7 +234,7 @@ class RequestTiming(unittest.TestCase):
                 exec(compile(FUNCTIONS, str(SOURCE), "exec"), ns)
                 ns.update(
                     build_prompt_tokens=lambda *a: [11, 22, 33],
-                    register_patch=lambda *a: 1 if method == "tli" else 0,
+                    register_patch=lambda *a: 1 if method == "nfa" else 0,
                     resolve_treatment_snapshot=lambda args: SimpleNamespace(
                         manifest_json='{"test_budget": 7}'),
                     subprocess=SimpleNamespace(check_output=lambda *a, **kw: "baseline-sha\n"),
@@ -248,7 +248,7 @@ class RequestTiming(unittest.TestCase):
                         "--max-gen", "1", "--warmup", "1", "--repeats", "1"]
                 stream = io.StringIO()
                 with patch.object(sys, "argv", args), \
-                     patch.dict(os.environ, {"TLI_SPARSE_PREFILL": "0"}), \
+                     patch.dict(os.environ, {"NFA_SPARSE_PREFILL": "0"}), \
                      contextlib.redirect_stdout(stream):
                     ns["main"]()
                 self.assertIn("tpot=N/A", stream.getvalue())
@@ -260,7 +260,7 @@ class RequestTiming(unittest.TestCase):
                 self.assertEqual(record["caliber"]["instrumentation_mode"],
                                  "per-step-device-synchronized")
                 self.assertEqual(record["caliber"]["treatment_manifest"],
-                                 {"test_budget": 7} if method == "tli" else None)
+                                 {"test_budget": 7} if method == "nfa" else None)
                 self.assertEqual([r["phase"] for r in record["runs"]], ["warmup", "measured"])
                 self.assertTrue(all(r["tpot_ms"] is None for r in record["runs"]))
                 self.assertTrue(all(r["request_wall_ms"] == r["ttft_ms"]

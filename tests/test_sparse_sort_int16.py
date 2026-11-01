@@ -2,7 +2,7 @@
 import pytest
 import torch
 import triton
-from sparse_attn.ops.sparse_normalization import _prepare_keys,_offsets_and_keys,candidate_probabilities
+from sparse_attn.indexer.compaction.sparse_normalization import _prepare_keys,_offsets_and_keys,candidate_probabilities
 
 @pytest.mark.parametrize('capacity',[1,8192,16384,32768,32840,57344,65528,65535])
 def test_all_tokens_signed_encoding_order(capacity):
@@ -43,8 +43,8 @@ def test_native_packed_keys_offsets_and_unique(capacity,r):
 @pytest.mark.skipif(not torch.cuda.is_available(),reason='queued CUDA gate')
 @pytest.mark.parametrize('capacity',[16400,32768,32840,65528])
 def test_native_graph_probability_and_unique(monkeypatch,capacity):
-    import sparse_attn.ops.sparse_normalization as normalization
-    monkeypatch.setenv('TLI_SPARSE_STATS','sorted')
+    import sparse_attn.indexer.compaction.sparse_normalization as normalization
+    monkeypatch.setenv('NFA_SPARSE_STATS','sorted')
     shared=capacity<(torch.cuda.get_device_properties('cuda').shared_memory_per_block-128)//2
     if capacity==16400 and not shared:
         pytest.skip('16400 shared-tail gate requires sufficient native shared memory')
@@ -64,7 +64,7 @@ def test_native_graph_probability_and_unique(monkeypatch,capacity):
     token=torch.randn(h*g,capacity,device='cuda',dtype=torch.bfloat16)
     scores=token.gather(1,ids.repeat_interleave(g,0))
     def run(flag):
-        monkeypatch.setenv('TLI_SPARSE_SORT_INT16',str(flag))
+        monkeypatch.setenv('NFA_SPARSE_SORT_INT16',str(flag))
         return candidate_probabilities(scores,ids,keep,capacity,g,return_unique=True)
     run(1);torch.cuda.synchronize();graph=torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):actual=run(1)
@@ -86,14 +86,14 @@ def test_native_graph_probability_and_unique(monkeypatch,capacity):
 
 @pytest.mark.parametrize('value',['','true','2','-1'])
 def test_packed_flag_is_explicit(monkeypatch,value):
-    from sparse_attn.ops.sparse_normalization import _packed_sort_enabled
-    monkeypatch.setenv('TLI_SPARSE_SORT_INT16',value)
+    from sparse_attn.indexer.compaction.sparse_normalization import _packed_sort_enabled
+    monkeypatch.setenv('NFA_SPARSE_SORT_INT16',value)
     with pytest.raises(ValueError,match='must be 0 or 1'):_packed_sort_enabled(32840)
 
 @pytest.mark.parametrize('capacity',[0,65536,131072,True,32768.0])
 def test_packed_capacity_guard(monkeypatch,capacity):
-    from sparse_attn.ops.sparse_normalization import _packed_sort_enabled
-    monkeypatch.setenv('TLI_SPARSE_SORT_INT16','1')
+    from sparse_attn.indexer.compaction.sparse_normalization import _packed_sort_enabled
+    monkeypatch.setenv('NFA_SPARSE_SORT_INT16','1')
     with pytest.raises(ValueError,match='integer capacity'):_packed_sort_enabled(capacity)
-    monkeypatch.setenv('TLI_SPARSE_SORT_INT16','0')
+    monkeypatch.setenv('NFA_SPARSE_SORT_INT16','0')
     assert not _packed_sort_enabled(capacity)

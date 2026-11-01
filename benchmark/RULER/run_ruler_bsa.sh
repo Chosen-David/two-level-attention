@@ -1,8 +1,8 @@
 #!/bin/bash
-# 单池 BSA（TLI 单池变体）RULER 派单：单一 method（minmax/avg）两级筛选
+# 单池 BSA（NFA 单池变体）RULER 派单：单一 method（minmax/avg）两级筛选
 # 用户指令 2026-10-21：「增加单池子 BSA（单一 method,minmax/avg 的两级筛选），出 Qwen8B 数据」。
 # 语义：α=0 β=0 单池（无 far/near 双池分区）+ L1 块粗筛（far_method 单一源）top-K1
-#       + L2 细筛 top-K2；预算与 TLI 主方法同款（bs=64、K1=128、K2=1024、sink=4、swa=128）。
+#       + L2 细筛 top-K2；预算与 NFA 主方法同款（bs=64、K1=128、K2=1024、sink=4、swa=128）。
 # 用法：bash benchmark/RULER/run_ruler_bsa.sh [ts] [method...]
 # 无 method 时默认 minmax avg；一卡一进程，每轮最多 8 并发。
 set -u
@@ -44,14 +44,14 @@ run_len() {
         PYTHONPATH=~/local_pylibs:$REPO PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
           CUDA_VISIBLE_DEVICES=$card python -u -m benchmark.RULER.pred_ruler \
           --model Qwen3-8B --model_path "$MODEL_PATH" \
-          --task "$T" --context_length "$L" --method tli --t "$TS" \
+          --task "$T" --context_length "$L" --method nfa --t "$TS" \
           --data-root "$DATA" --output-dir "$OUT" \
           --tia_level1_topk 128 --tia_level2_topk 1024 \
-          --tli_alpha 0 --tli_beta 0 --tli_gamma 0.625 \
-          --tli_far_method "$M" \
-          --tli_enable_kmeans false --tli_enable_layer_skip false \
-          --tli_subspace tail --tia_level2_cmp_ratio 4 \
-          --tli_sink_tokens 4 --tli_swa_size 128 \
+          --nfa_alpha 0 --nfa_beta 0 --nfa_gamma 0.625 \
+          --nfa_far_method "$M" \
+          --nfa_enable_kmeans false --nfa_enable_layer_skip false \
+          --nfa_subspace tail --tia_level2_cmp_ratio 4 \
+          --nfa_sink_tokens 4 --nfa_swa_size 128 \
           --pred_postfix _1024 --max-num 100 $YARN \
           >> "$LOG_DIR/card$card.log" 2>&1
         local rc=$?

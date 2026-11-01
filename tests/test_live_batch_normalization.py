@@ -1,7 +1,7 @@
 """Batched native live-width reduction must equal each row's eager softmax."""
 import pytest
 import torch
-from sparse_attn.ops.sparse_normalization import candidate_probabilities_batched
+from sparse_attn.indexer.compaction.sparse_normalization import candidate_probabilities_batched
 from test_sparse_selection_cuda import dense_reference
 
 
@@ -41,7 +41,7 @@ def test_live_batch_ragged_capture_exact(batch, group):
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA required')
 def test_live_extension_rejects_lengths_splitting_gqa_groups():
-    from sparse_attn.ops.compact_normalization import build
+    from sparse_attn.indexer.compaction.normalizer import build
     scores = torch.zeros(8, 16, device='cuda', dtype=torch.bfloat16)
     owners = torch.full((4, 16384), -1, device='cuda', dtype=torch.int32)
     lengths = torch.full((3,), 16384, device='cuda', dtype=torch.int64)
@@ -54,7 +54,7 @@ def test_live_extension_rejects_lengths_splitting_gqa_groups():
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA required')
 @pytest.mark.parametrize('dtype', [torch.float32, torch.bfloat16])
 def test_live_request_base_alignment_is_independent(dtype):
-    from sparse_attn.ops.compact_normalization import build
+    from sparse_attn.indexer.compaction.normalizer import build
     torch.manual_seed(907)
     # Hq=1 exposes an alignment offset hidden by production Hq divisible by8.
     # FP32 output also exposes changes otherwise hidden by BF16 final rounding.

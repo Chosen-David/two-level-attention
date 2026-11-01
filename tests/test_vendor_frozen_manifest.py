@@ -32,7 +32,7 @@ class VendorFrozenManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             payload = b'{"0": {"0": ["vertical_and_slash", 64, 64, 1]}}'
-            args = SimpleNamespace(method=method, tli_enable_layer_skip=False)
+            args = SimpleNamespace(method=method, nfa_enable_layer_skip=False)
             if method == 'minference_vendor':
                 source = root / 'pattern.json'
                 source.write_bytes(payload)
@@ -89,7 +89,7 @@ class VendorFrozenManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'pattern.json'
             args = SimpleNamespace(method='minference_vendor',
-                minference_config_path=str(source), tli_enable_layer_skip=False)
+                minference_config_path=str(source), nfa_enable_layer_skip=False)
             for data in (b'first', b'second'):
                 source.write_bytes(data)
                 identity = self.info.resolve_treatment_snapshot(args).manifest['minference_config_path']
