@@ -1,42 +1,4 @@
-# -*- coding: utf-8 -*-
-"""【E139 纲领④】稀疏 prefill 融合紧凑 attention Triton kernel（当前保留为
-可选/历史 prefill 算子；生产 prefill 已切换为 dense）。
 
-用户纲领④原话：「融合紧凑 attention。消除 2048 行跨组候选并集、重复搬运、
-.item() 同步及完整 score/P 中间量。kernel 按每行绝对 token 位置处理
-causal、sink、SWA；普通 varlen FlashAttention 不能直接替换这套不规则掩码」。
-
-设计（对齐旧 eager_prefill 组版语义）：
-  1. **原位置块访问，不走并集 argsort**：每行（绝对位置 p = pos_lo + r）
-     的有效列谓词 = (j <= p) AND (j < sink_tok OR j >= p-swa_tok+1 OR
-     sel[j(r)//grp][h, j])——列遍历按 K 原始位置序天然因果，无需
-     argsort/compact/并集物化（原实现对全 T 列 argsort，L=32K 每行块一次）。
-  2. **flash 风格在线 softmax**：行内分块累积 m_i/l_i/acc，不物化完整
-     score/P；q tile [BR*G, D]（GQA 折叠：行维 = 行×组内 q-head，K/V 每
-     program 只载一次，G 个 q-head 共享）× K tile [D, BK] → tl.dot
-     （bf16 输入 fp32 累加——bf16×bf16 乘积在 fp32 中精确，累加序与
-     参考 fp32 einsum 仅树形归约分组差，口径同 E138b/SDPA-PoC 判决）。
-  3. **块级跳空**（主要加速来源，每行有效 ~1.2K/32K 列）：每 K tile 先读
-     组选择块位图 sel_blk[j, h, b]（64-token 块 any 聚合，host 一次
-     预计算）；若 tile 内无任何 sel 块且不与 sink 区 / 行块保护带窗口
-     [p_lo-swa+1, p_hi] 相交 → 整 tile 跳过（不载 K/V、不算 dot）。
-     跳空判定保守正确：bitmap any==False ⇒ 块内 sel 全 False；sink/swa
-     窗口相交条件是「存在有效列」的必要条件补集——漏跳只损失性能，
-     误跳不可能（窗口外且 sel 全 False ⇒ 谓词全 False）。
-  4. **空行兜底对齐原版**：l_i==0（该行无任何有效列）→ 输出 = v[p]
-     （原版 diag OR 单列 softmax=1·v 语义的精确等价，L249-255）。
-  5. **数值口径**：score bf16 dot fp32 累加（参考为 fp32 einsum，bf16
-     输入乘积精确、仅累加树差 → ULP 级）；p_exp 转 bf16 后与 v dot
-     （对齐原版 softmax→bf16→einsum 的 cast 序，L264-270）；对拍硬门
-     allclose(rtol=1e-2, atol=1e-3) + maxdiff 报告（E138b 口径）。
-
-fail-closed：仅组版（sel_list 非 None）+ kv 共享（非 per_q_head）+ CUDA
-+ G 为 2 的幂（tl.arange 约束）启用；异常由调用方捕获回退原 gather 路径。
-
-实验选项 NFA_PREFILL_BLOCK_LIST=1：GPU 前缀和生成每组有序活跃块索引，
-避免每个 query tile 重扫全前缀。默认关闭；尚需目标 GPU 对拍与含打包计时。
-它只减少块判定循环，不消除活跃块内部未选中 token 的点积。
-"""
 import os
 
 import torch

@@ -50,6 +50,48 @@ def profile_regions(q, k, geometry=RegionGeometry(), rows=256, chunk=16, scale=N
                    'max': float(torch.cat(values).max())} for name, values in signals.items()}
 
 
+def profile_core_tokens(q, k, geometry=RegionGeometry(), rows=256, topk=64, scale=None):
+    """Return the highest-attention prefill tokens per region.
+
+    Uses the last ``rows`` prefill queries, averages probabilities across query
+    positions and heads, then returns ``topk`` token positions from the far and
+    near regions.  These IDs seed the first decode step when a region is frozen
+    out, avoiding a first-token distribution cliff.
+    """
+    if q.ndim != 4 or q.shape[0] != 1 or q.shape[2] != k.shape[2]:
+        raise ValueError('one-shot unpadded B=1 prefill required')
+    scale = q.shape[-1] ** -.5 if scale is None else float(scale)
+    length = q.shape[2]
+    n = min(rows, length)
+    heads, dim = q.shape[1], q.shape[-1]
+    kk = k.detach().float().repeat_interleave(heads // k.shape[1], 1)
+    qs = q.detach()[:, :, length - n:].float()
+    scores = qs @ kk.transpose(-1, -2) * scale
+    pos = torch.arange(length, device=q.device)[None, None, :]
+    qlen = torch.arange(length - n + 1, length + 1, device=q.device)[None, :, None]
+    scores.masked_fill_(pos >= qlen, -torch.inf)
+    probs = scores.softmax(-1).mean(dim=(0, 1)).mean(dim=0)
+
+    sink_hi, far_hi, near_hi = geometry.bounds(length)
+    ids = torch.arange(length, device=q.device)
+    out = {}
+    if far_hi > sink_hi:
+        far_pos = ids[(ids >= sink_hi) & (ids < far_hi)]
+        far_scores = probs[far_pos]
+        kk = min(topk, far_pos.numel())
+        out['far'] = far_pos[torch.topk(far_scores, kk).indices].tolist()
+    else:
+        out['far'] = []
+    if near_hi > far_hi:
+        near_pos = ids[(ids >= far_hi) & (ids < near_hi)]
+        near_scores = probs[near_pos]
+        kk = min(topk, near_pos.numel())
+        out['near'] = near_pos[torch.topk(near_scores, kk).indices].tolist()
+    else:
+        out['near'] = []
+    return out
+
+
 def decide_regions(profile, config, present_near=True, present_far=True):
     n, f = (profile[name][config.statistic] for name in ('near', 'far'))
     near = present_near and config.mode in ('near', 'dual') and n < config.epsilon

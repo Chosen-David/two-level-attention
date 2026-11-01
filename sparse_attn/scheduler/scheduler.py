@@ -1,8 +1,9 @@
 """Graph-ready continuous-batching scheduler.
 
-Keeps ``active_req_ids`` and pads each decode step to the next power-of-two
-batch bucket.  Every per-step tensor is preallocated; the scheduler only
-rewrites contents, never allocates tensors on the hot path.
+The CUDA path keeps next-token, input-id and position state on device.  Argmax
+never leaves the GPU on the decode hot path; the previous step's tokens are
+copied back through a dedicated stream and drained at the start of the next
+step.
 """
 import torch
 
@@ -16,21 +17,63 @@ class ContinuousBatchScheduler:
         self.active_req_ids = []
         self.next_tokens = {}
 
-        self.req_ids_buf = torch.full(
-            (max_batch,), -1, dtype=torch.int64, device='cpu')
-        self.flat_input_ids_buf = torch.empty(
-            (max_batch, 1), dtype=torch.long, device='cpu')
-        self.flat_position_ids_buf = torch.empty(
-            (max_batch, 1), dtype=torch.long, device='cpu')
+        self.device = self.cache.layers[0].kv_pool_k.device
+        if self.device.type != 'cuda' or not torch.cuda.is_available():
+            raise RuntimeError('ContinuousBatchScheduler requires CUDA')
+        self._step_counter = 0
+        self._seen_active = set()
+
+        self._cpu_req_staging = torch.full(
+            (max_batch,), -1, dtype=torch.int64).pin_memory()
+        self._device_req_ids_buf = torch.full(
+            (max_batch,), -1, dtype=torch.int64, device=self.device)
+        self._device_input_ids_buf = torch.full(
+            (max_batch, 1), pad_token_id, dtype=torch.long,
+            device=self.device)
+        self._device_positions_buf = torch.zeros(
+            (max_batch, 1), dtype=torch.long, device=self.device)
+        self._device_alive_buf = torch.zeros(
+            (max_batch,), dtype=torch.bool, device=self.device)
+        self._device_req_input_ids = torch.full(
+            (max_batch,), pad_token_id, dtype=torch.long,
+            device=self.device)
+        self._device_req_positions = torch.zeros(
+            (max_batch,), dtype=torch.long, device=self.device)
+        self._device_req_alive = torch.zeros(
+            (max_batch,), dtype=torch.bool, device=self.device)
+        self._zero_buf = torch.zeros(
+            (max_batch,), dtype=torch.long, device=self.device)
+
+        self._eos_tensor = torch.tensor(
+            list(self.eos_ids), dtype=torch.int64, device=self.device)
+        self._eos_cpu_tensor = torch.tensor(
+            list(self.eos_ids), dtype=torch.int64)
+
+        self._token_dev = [
+            torch.zeros((max_batch,), dtype=torch.int64, device=self.device)
+            for _ in range(2)
+        ]
+        self._token_cpu = [
+            torch.empty((max_batch,), dtype=torch.int64).pin_memory()
+            for _ in range(2)
+        ]
+        self._copy_events = [torch.cuda.Event() for _ in range(2)]
+        for event in self._copy_events:
+            event.record()
+        self._copy_stream = torch.cuda.Stream()
+        self._pending_copy_idx = None
+        self._pending_batch = 0
 
     def add_request(self, request_id):
         if request_id not in self.active_req_ids:
             self.active_req_ids.append(request_id)
+            self._seen_active.discard(request_id)
 
     def finish_request(self, request_id):
         self.cache.remove_request(request_id)
         self.active_req_ids.remove(request_id)
         self.next_tokens.pop(request_id, None)
+        self._seen_active.discard(request_id)
 
     def _pad_to_bucket(self, req_ids):
         n = len(req_ids)
@@ -40,31 +83,126 @@ class ContinuousBatchScheduler:
         bucket = min(bucket, self.max_batch)
         return req_ids + [-1] * (bucket - n)
 
+    def _drain_pending_next_tokens(self):
+        if self._pending_copy_idx is None:
+            return
+
+        idx = self._pending_copy_idx
+        self._copy_events[idx].synchronize()
+
+        batch = self._pending_batch
+        tokens = self._token_cpu[idx][:batch]
+        req_ids = self._cpu_req_staging[:batch]
+        valid = req_ids >= 0
+
+        if valid.any():
+            ids = req_ids[valid].tolist()
+            toks = tokens[valid].tolist()
+            self.next_tokens.update(zip(ids, toks))
+
+        eos = valid & torch.isin(tokens, self._eos_cpu_tensor)
+        finished_ids = req_ids[eos].tolist()
+        for request_id in finished_ids:
+            self.finish_request(request_id)
+
+        self._pending_copy_idx = None
+        self._pending_batch = 0
+
+    def _seed_new_requests(self, padded):
+        if not padded:
+            return
+
+        request_ids = []
+        tokens = []
+        positions = []
+        for slot, request_id in enumerate(padded):
+            if request_id < 0 or request_id in self._seen_active:
+                continue
+            state = self.cache.states[request_id]
+            request_ids.append(request_id)
+            tokens.append(self.next_tokens.get(request_id, self.pad_token_id))
+            positions.append(state.logical_length)
+            self._seen_active.add(request_id)
+
+        if not request_ids:
+            return
+
+        req_idx = torch.tensor(request_ids, dtype=torch.long, device=self.device)
+        self._device_req_input_ids[req_idx] = torch.tensor(
+            tokens, dtype=torch.long, device=self.device)
+        self._device_req_positions[req_idx] = torch.tensor(
+            positions, dtype=torch.long, device=self.device)
+        self._device_req_alive[req_idx] = True
+
     def prepare_step(self):
+        self._drain_pending_next_tokens()
         padded = self._pad_to_bucket(self.active_req_ids)
         batch = len(padded)
 
-        self.req_ids_buf.zero_()
-        self.req_ids_buf[:batch] = torch.tensor(padded, dtype=torch.int64)
-        self.flat_input_ids_buf.fill_(self.pad_token_id)
-        self.flat_position_ids_buf.zero_()
+        self._cpu_req_staging.numpy()[:batch] = padded
+        self._device_req_ids_buf[:batch].copy_(
+            self._cpu_req_staging[:batch], non_blocking=True)
+        self._device_req_ids_buf[batch:].fill_(-1)
 
-        for b, req_id in enumerate(padded):
-            if req_id < 0:
-                continue
-            state = self.cache.states[req_id]
-            self.flat_input_ids_buf[b, 0] = self.next_tokens.get(req_id, self.pad_token_id)
-            self.flat_position_ids_buf[b, 0] = state.logical_length
+        self._seed_new_requests(padded)
+
+        valid = self._device_req_ids_buf[:batch] >= 0
+        safe_req = torch.where(
+            valid, self._device_req_ids_buf[:batch],
+            self._zero_buf[:batch])
+
+        self._device_input_ids_buf[:batch, 0].copy_(
+            self._device_req_input_ids[safe_req], non_blocking=True)
+        self._device_positions_buf[:batch, 0].copy_(
+            self._device_req_positions[safe_req], non_blocking=True)
+        self._device_alive_buf[:batch].copy_(
+            self._device_req_alive[safe_req] & valid, non_blocking=True)
+
+        self._device_input_ids_buf[:batch, 0].masked_fill_(
+            ~valid, self.pad_token_id)
+        self._device_positions_buf[:batch, 0].masked_fill_(~valid, 0)
 
         self.cache.new_step(padded)
-        return padded, self.flat_input_ids_buf[:batch], self.flat_position_ids_buf[:batch]
+        return (
+            padded,
+            self._device_input_ids_buf[:batch],
+            self._device_positions_buf[:batch],
+        )
 
     def record_next_tokens(self, req_ids, logits):
         logits = getattr(logits, 'logits', logits)
-        next_tokens = logits[:, -1].argmax(dim=-1).tolist()
-        for req_id, token in zip(req_ids, next_tokens):
-            if req_id < 0:
-                continue
-            self.next_tokens[req_id] = token
-            if token in self.eos_ids:
-                self.finish_request(req_id)
+
+        if logits.device.type != 'cuda':
+            raise RuntimeError('ContinuousBatchScheduler requires CUDA logits')
+
+        batch = len(req_ids)
+        next_tokens = logits[:, -1].argmax(dim=-1).to(torch.int64)
+        req_ids_tensor = self._device_req_ids_buf[:batch]
+        valid = req_ids_tensor >= 0
+        eos_hit = valid & torch.isin(next_tokens, self._eos_tensor)
+        alive_by_slot = valid & ~eos_hit
+
+        valid_req_ids = req_ids_tensor[valid].to(torch.long)
+        valid_next_tokens = next_tokens[valid]
+        valid_alive = alive_by_slot[valid]
+
+        self._device_req_alive[valid_req_ids] = valid_alive
+        self._device_req_input_ids[valid_req_ids] = torch.where(
+            valid_alive, valid_next_tokens, self.pad_token_id)
+        self._device_req_positions[valid_req_ids] += (
+            valid_alive.to(torch.long))
+
+        idx = self._step_counter & 1
+        self._step_counter += 1
+
+        torch.cuda.current_stream().wait_event(self._copy_events[idx])
+        device_buf = self._token_dev[idx]
+        device_buf[:batch].copy_(next_tokens, non_blocking=True)
+
+        self._copy_stream.wait_stream(torch.cuda.current_stream())
+        self._token_cpu[idx][:batch].copy_(
+            device_buf[:batch], non_blocking=True)
+        self._copy_events[idx].record(self._copy_stream)
+
+        self._pending_copy_idx = idx
+        self._pending_batch = batch

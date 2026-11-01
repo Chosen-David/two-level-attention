@@ -246,6 +246,8 @@ if triton is not None:
         if b >= B:
             return
         slot = tl.load(SLOTS + b)
+        if slot < 0:
+            return
         safe = tl.where(slot >= 0, slot, PAD_SLOT_SAFE)
         phys = (safe // PAGE).to(tl.int64)
         off = (safe % PAGE).to(tl.int64)
@@ -283,10 +285,9 @@ if triton is not None:
         Q,
         K_POOL,
         V_POOL,
-        GATHER,          # [B, MAX_VISIBLE]
+        GATHER,          # [B, MAX_VISIBLE] absolute physical slots
         VISIBLE_LENS,    # [B]
-        BLOCK_TABLE,     # [B, MAX_BLOCKS]
-        QUERY_START_LOC, # [B+1]
+        QUERY_TO_REQ,    # [TOTAL_QUERIES]
         OUT,
         TOTAL_QUERIES,
         HQ: tl.constexpr,
@@ -294,60 +295,82 @@ if triton is not None:
         D: tl.constexpr,
         DV: tl.constexpr,
         PAGE: tl.constexpr,
-        MAX_BLOCKS: tl.constexpr,
+        LOG2_PAGE: tl.constexpr,
         MAX_VISIBLE: tl.constexpr,
         MAX_BATCH: tl.constexpr,
         BT: tl.constexpr,
         SCALE: tl.constexpr,
         BD: tl.constexpr,
         BV: tl.constexpr,
+        USE_BF16: tl.constexpr,
+        USE_DOT: tl.constexpr,
     ):
-        pid = tl.program_id(0)
-        q_idx = pid // HQ
-        head = pid % HQ
+        # 2D grid: one program per (flat query row, query head).  This avoids
+        # the flattened pid division/modulo on the inner path and keeps page
+        # loads private to each q/head program.
+        q_idx = tl.program_id(0)
+        head = tl.program_id(1)
         if q_idx >= TOTAL_QUERIES:
             return
 
-        # 定位 q_idx 属于哪个请求。B 很小，固定循环不会引入动态 shape。
-        req_idx = -1
-        for r in range(MAX_BATCH):
-            lo = tl.load(QUERY_START_LOC + r)
-            hi = tl.load(QUERY_START_LOC + r + 1)
-            if (q_idx >= lo) and (q_idx < hi):
-                req_idx = r
-
-        vis_len = tl.load(VISIBLE_LENS + req_idx)
+        # Host precomputes q_idx -> req_idx, eliminating the per-program
+        # linear scan over query_start_loc in the inner kernel.
+        req_idx = tl.load(QUERY_TO_REQ + q_idx, cache_modifier='.cg')
         kv_head = head // (HQ // HK)
 
         d = tl.arange(0, BD)
         vd = tl.arange(0, BV)
         t = tl.arange(0, BT)
 
-        q = tl.load(
+        if req_idx < 0:
+            # Padded batch rows have no request slot.  Their q rows are never
+            # consumed by the scheduler, but write zeros to keep graph replay
+            # deterministic and avoid an out-of-bounds VISIBLE_LENS load.
+            tl.store(
+                OUT + q_idx * HQ * DV + head * DV + vd,
+                tl.zeros((BV,), tl.float32).to(OUT.dtype.element_ty),
+                mask=vd < DV,
+            )
+            return
+        vis_len = tl.load(VISIBLE_LENS + req_idx, cache_modifier='.cg')
+
+        # Keep Q and K in the KV dtype for tl.dot.  bf16 and fp16 both map to
+        # Tensor Core MMA; the online softmax accumulators stay in fp32.
+        q_vec = tl.load(
             Q + q_idx * HQ * D + head * D + d,
-            mask=d < D, other=0.0).to(tl.float32)
+            mask=d < D, other=0.0, cache_modifier='.ca')
+        if USE_DOT:
+            if USE_BF16:
+                q_vec = q_vec.to(tl.bfloat16)
+            else:
+                q_vec = q_vec.to(tl.float16)
+            # tl.dot requires N >= 16.  Replicate the single query vector to
+            # a [BD, 16] tile and reduce the identical columns afterwards.
+            q_tile = tl.broadcast_to(
+                tl.reshape(q_vec, (BD, 1)), (BD, 16))
+        else:
+            q_vec = q_vec.to(tl.float32)
 
         m = tl.full((), float('-inf'), tl.float32)
         z = tl.zeros((), tl.float32)
         acc = tl.zeros((BV,), tl.float32)
 
-        # 循环上界是固定 MAX_VISIBLE；每列再用 vis_len 屏蔽 padding。
-        for start in range(0, MAX_VISIBLE, BT):
-            col = start + t
+        # Triton 3.4 does not accept ``break`` inside ``tl.range``.  The
+        # equivalent dynamic upper bound below stops at the first block beyond
+        # this request's actual visible length, so short requests do not ride
+        # along with the fixed MAX_VISIBLE tail.
+        num_blocks = tl.cdiv(tl.minimum(vis_len, MAX_VISIBLE), BT)
+        for block_idx in range(0, num_blocks):
+            start = block_idx * BT
+            col = tl.max_contiguous(start + t, BT)
             col_valid = col < vis_len
-            logical_pos = tl.load(
+            slot = tl.load(
                 GATHER + req_idx * MAX_VISIBLE + col,
-                mask=col_valid, other=-1)
-            valid = col_valid & (logical_pos >= 0)
+                mask=col_valid, other=-1, cache_modifier='.cg')
+            valid = col_valid & (slot >= 0)
 
-            logical_page = logical_pos // PAGE
-            offset = logical_pos % PAGE
-            phys_page = tl.load(
-                BLOCK_TABLE + req_idx * MAX_BLOCKS + logical_page,
-                mask=valid, other=0)
-            # 不分支判断 phys_page 是否 PAD。业务路径 phys_page 合法；
-            # invalid 时 mask 已为 False，不会真正读 K/V。
-            phys_page = phys_page.to(tl.int64)
+            phys_page = (slot >> LOG2_PAGE).to(tl.int64)
+            offset = slot & (PAGE - 1)
 
             k_base = (
                 K_POOL
@@ -365,8 +388,17 @@ if triton is not None:
             k = tl.load(
                 k_base[:, None] + d[None, :],
                 mask=valid[:, None] & (d[None, :] < D),
-                other=0.0).to(tl.float32)
-            score = tl.sum(k * q[None, :], axis=1) * SCALE
+                other=0.0, cache_modifier='.ca')
+            if USE_DOT:
+                if USE_BF16:
+                    k = k.to(tl.bfloat16)
+                else:
+                    k = k.to(tl.float16)
+                score_tile = tl.dot(k, q_tile)
+                score = tl.max(score_tile, 1) * SCALE
+            else:
+                k = k.to(tl.float32)
+                score = tl.sum(k * q_vec[None, :], axis=1) * SCALE
             score = tl.where(valid, score, float('-inf'))
 
             new_m = tl.maximum(m, tl.max(score, 0))
@@ -377,7 +409,7 @@ if triton is not None:
             v = tl.load(
                 v_base[:, None] + vd[None, :],
                 mask=valid[:, None] & (vd[None, :] < DV),
-                other=0.0).to(tl.float32)
+                other=0.0, cache_modifier='.ca').to(tl.float32)
 
             acc = acc * alpha + tl.sum(v * prob[:, None], axis=0)
             z = z * alpha + tl.sum(prob, 0)
@@ -389,6 +421,144 @@ if triton is not None:
             out.to(OUT.dtype.element_ty),
             mask=vd < DV,
         )
+
+
+
+    @triton.jit
+    def _gather_attend_grouped_kernel(
+        Q,
+        K_POOL,
+        V_POOL,
+        GATHER,          # [B, MAX_VISIBLE] absolute physical slots
+        VISIBLE_LENS,    # [B]
+        QUERY_TO_REQ,    # [TOTAL_QUERIES]
+        OUT,
+        TOTAL_QUERIES,
+        HQ: tl.constexpr,
+        HK: tl.constexpr,
+        D: tl.constexpr,
+        DV: tl.constexpr,
+        PAGE: tl.constexpr,
+        LOG2_PAGE: tl.constexpr,
+        MAX_VISIBLE: tl.constexpr,
+        MAX_BATCH: tl.constexpr,
+        BT: tl.constexpr,
+        SCALE: tl.constexpr,
+        BD: tl.constexpr,
+        BV: tl.constexpr,
+        HEAD_GROUP: tl.constexpr,
+        HEAD_TILE: tl.constexpr,
+        USE_BF16: tl.constexpr,
+    ):
+        """Grouped Tensor-Core gather attention.
+
+        One program owns one ``(query row, KV head)`` pair and computes all
+        ``HEAD_GROUP`` query heads that share that KV head.  The Q tile is
+        therefore ``[BD, HEAD_TILE]``, where ``HEAD_TILE`` is padded to at
+        least 16 so both QK and PV use MMA instructions without the previous
+        per-head 16-column replication.
+        """
+        q_idx = tl.program_id(0)
+        kv_head = tl.program_id(1)
+        if q_idx >= TOTAL_QUERIES:
+            return
+
+        d = tl.arange(0, BD)
+        vd = tl.arange(0, BV)
+        t = tl.arange(0, BT)
+        h = tl.arange(0, HEAD_TILE)
+
+        req_idx = tl.load(QUERY_TO_REQ + q_idx, cache_modifier='.cg')
+        out_base = OUT + q_idx * HQ * DV + kv_head * HEAD_GROUP * DV
+        out_ptrs = out_base + h[:, None] * DV + vd[None, :]
+        out_mask = (h[:, None] < HEAD_GROUP) & (vd[None, :] < DV)
+
+        if req_idx < 0:
+            # Padded batch row: no request slot and no KV gather.  Zero the
+            # output tile deterministically and return before touching
+            # VISIBLE_LENS at a negative index.
+            tl.store(
+                out_ptrs,
+                tl.zeros((HEAD_TILE, BV), tl.float32).to(OUT.dtype.element_ty),
+                mask=out_mask,
+            )
+            return
+
+        vis_len = tl.load(VISIBLE_LENS + req_idx, cache_modifier='.cg')
+
+        q_ptrs = Q + q_idx * HQ * D + d[:, None] + (kv_head * HEAD_GROUP + h)[None, :] * D
+        q_tile = tl.load(
+            q_ptrs,
+            mask=(d[:, None] < D) & (h[None, :] < HEAD_GROUP),
+            other=0.0,
+            cache_modifier='.ca',
+        )
+        if USE_BF16:
+            q_tile = q_tile.to(tl.bfloat16)
+        else:
+            q_tile = q_tile.to(tl.float16)
+
+        m = tl.full((HEAD_TILE,), float('-inf'), tl.float32)
+        z = tl.zeros((HEAD_TILE,), tl.float32)
+        acc = tl.zeros((HEAD_TILE, BV), tl.float32)
+
+        # Dynamic upper bound is the functional replacement for ``break`` on
+        # Triton 3.4: a short request never walks the fixed MAX_VISIBLE tail.
+        num_blocks = tl.cdiv(tl.minimum(vis_len, MAX_VISIBLE), BT)
+        for block_idx in range(0, num_blocks):
+            start = block_idx * BT
+            col = tl.max_contiguous(start + t, BT)
+            col_valid = col < vis_len
+            slot = tl.load(
+                GATHER + req_idx * MAX_VISIBLE + col,
+                mask=col_valid, other=-1, cache_modifier='.cg')
+            valid = col_valid & (slot >= 0)
+
+            phys_page = (slot >> LOG2_PAGE).to(tl.int64)
+            offset = slot & (PAGE - 1)
+
+            k_base = (
+                K_POOL
+                + phys_page * (HK * PAGE * D)
+                + kv_head * (PAGE * D)
+                + offset * D
+            )
+            v_base = (
+                V_POOL
+                + phys_page * (HK * PAGE * DV)
+                + kv_head * (PAGE * DV)
+                + offset * DV
+            )
+
+            k = tl.load(
+                k_base[:, None] + d[None, :],
+                mask=valid[:, None] & (d[None, :] < D),
+                other=0.0, cache_modifier='.ca')
+            if USE_BF16:
+                k = k.to(tl.bfloat16)
+            else:
+                k = k.to(tl.float16)
+
+            score_tile = tl.dot(k, q_tile) * SCALE
+            score_valid = valid[:, None] & (h[None, :] < HEAD_GROUP)
+            score_tile = tl.where(score_valid, score_tile, float('-inf'))
+
+            new_m = tl.maximum(m, tl.max(score_tile, 0))
+            safe_m = tl.where(new_m == float('-inf'), 0.0, new_m)
+            alpha = tl.exp(m - safe_m)
+            prob = tl.exp(score_tile - safe_m[None, :])
+
+            v = tl.load(
+                v_base[:, None] + vd[None, :],
+                mask=valid[:, None] & (vd[None, :] < DV),
+                other=0.0, cache_modifier='.ca').to(tl.float32)
+
+            acc = acc * alpha[:, None] + tl.dot(tl.trans(prob), v)
+            z = z * alpha + tl.sum(prob, 0)
+            m = new_m
+
+        out = tl.where(z[:, None] == 0.0, 0.0, acc / z[:, None])
+        tl.store(out_ptrs, out.to(OUT.dtype.element_ty), mask=out_mask)
 
 
 def paged_write_decode(cache_layer, key_states, value_states, slot_mapping):
@@ -453,16 +623,16 @@ def sparse_paged_attention_gather(
     q,
     gather_indices,
     visible_lens,
-    block_table,
-    query_start_loc,
+    query_to_req,
     *,
     scale,
 ):
     """Sparse gather paged attention over a GraphReadyPagedRegionLayer arena.
 
-    ``q`` is flat [T, HQ, D]. ``gather_indices`` is [B, MAX_VISIBLE] logical
-    token positions and ``visible_lens`` is [B]. The kernel never loops over
-    seq_len; it loops over MAX_VISIBLE and masks columns with visible_lens.
+    ``q`` is flat [T, HQ, D].  ``gather_indices`` is [B, MAX_VISIBLE] absolute
+    physical slots (``physical_page * PAGE + offset``), ``visible_lens`` is [B],
+    and ``query_to_req`` is [T] mapping each flat query row to its request slot.
+    The kernel performs no block-table lookup and no integer division.
     """
     if q.ndim != 3 or q.shape[-1] != cache_layer.head_dim_k:
         raise ValueError('sparse gather attention expects flat [T,HQ,D] query')
@@ -473,41 +643,87 @@ def sparse_paged_attention_gather(
         raise ValueError('GQA requires HQ % HK == 0')
     total_q = q.shape[0]
     max_visible = gather_indices.shape[1]
+    page = cache_layer.geometry.page
+    log2_page = page.bit_length() - 1
+    if (page & (page - 1)) != 0:
+        raise ValueError('sparse gather attention requires power-of-two page size')
+    use_bf16 = cache_layer.kv_pool_k.dtype == torch.bfloat16
+    head_group = hq // hk
+    head_tile = max(16, triton.next_power_of_2(head_group)) if triton is not None else 16
+    use_grouped = (
+        cache_layer.head_dim_k >= 16
+        and cache_layer.head_dim_v >= 16
+        and head_group <= head_tile
+    )
 
     if q.is_cuda:
         if triton is None:
             raise RuntimeError('Triton required for sparse gather attention')
         out = q.new_empty((total_q, hq, cache_layer.head_dim_v))
-        _gather_attend_kernel[(total_q * hq,)](
-            q.contiguous(),
-            cache_layer.kv_pool_k,
-            cache_layer.kv_pool_v,
-            gather_indices,
-            visible_lens,
-            block_table,
-            query_start_loc,
-            out,
-            total_q,
-            hq, hk,
-            cache_layer.head_dim_k,
-            cache_layer.head_dim_v,
-            cache_layer.geometry.page,
-            block_table.shape[1],
-            max_visible,
-            visible_lens.shape[0],
-            32,
-            scale,
-            triton.next_power_of_2(cache_layer.head_dim_k),
-            triton.next_power_of_2(cache_layer.head_dim_v),
-        )
+        if use_grouped:
+            # Small batches are latency-bound and prefer a wider token tile;
+            # larger batches are occupancy-bound and prefer BT=64.
+            block_tokens = 128 if total_q <= 8 else 64
+            _gather_attend_grouped_kernel[(total_q, hk)](
+                q.contiguous(),
+                cache_layer.kv_pool_k,
+                cache_layer.kv_pool_v,
+                gather_indices,
+                visible_lens,
+                query_to_req,
+                out,
+                total_q,
+                hq, hk,
+                cache_layer.head_dim_k,
+                cache_layer.head_dim_v,
+                page,
+                log2_page,
+                max_visible,
+                visible_lens.shape[0],
+                block_tokens,
+                scale,
+                triton.next_power_of_2(cache_layer.head_dim_k),
+                triton.next_power_of_2(cache_layer.head_dim_v),
+                head_group,
+                head_tile,
+                use_bf16,
+            )
+        else:
+            # Small-head fallback keeps the scalar-FMA path because tl.dot
+            # requires N >= 16 and would otherwise fabricate dummy columns.
+            _gather_attend_kernel[(total_q, hq)](
+                q.contiguous(),
+                cache_layer.kv_pool_k,
+                cache_layer.kv_pool_v,
+                gather_indices,
+                visible_lens,
+                query_to_req,
+                out,
+                total_q,
+                hq, hk,
+                cache_layer.head_dim_k,
+                cache_layer.head_dim_v,
+                page,
+                log2_page,
+                max_visible,
+                visible_lens.shape[0],
+                32,
+                scale,
+                triton.next_power_of_2(cache_layer.head_dim_k),
+                triton.next_power_of_2(cache_layer.head_dim_v),
+                use_bf16,
+                False,
+            )
         return out
 
-    # CPU reference: still pagewise, still loops only visible_lens tokens.
+    # CPU reference: physical-slot gather, loops only visible_lens slots.
     page = cache_layer.geometry.page
     out = q.new_zeros((total_q, hq, cache_layer.head_dim_v))
     for q_idx in range(total_q):
-        req_idx = int(torch.searchsorted(
-            query_start_loc, q_idx, right=True).item()) - 1
+        req_idx = int(query_to_req[q_idx])
+        if req_idx < 0:
+            # Padded batch rows have no request slot; leave their output zero.
+            continue
         vis_len = int(visible_lens[req_idx].item())
         for h in range(hq):
             kh = h // (hq // hk)
@@ -516,11 +732,10 @@ def sparse_paged_attention_gather(
             acc = torch.zeros(cache_layer.head_dim_v, dtype=torch.float32,
                               device=q.device)
             for col in range(vis_len):
-                logical_pos = int(gather_indices[req_idx, col].item())
-                if logical_pos < 0:
+                slot = int(gather_indices[req_idx, col].item())
+                if slot < 0:
                     continue
-                lp, offset = divmod(logical_pos, page)
-                phys = int(block_table[req_idx, lp].item())
+                phys, offset = divmod(slot, page)
                 k = cache_layer.kv_pool_k[phys, 0, kh, offset].float()
                 v = cache_layer.kv_pool_v[phys, 0, kh, offset].float()
                 score = (q[q_idx, h].float() * k).sum() * scale

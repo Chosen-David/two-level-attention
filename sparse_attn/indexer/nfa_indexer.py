@@ -4600,6 +4600,46 @@ class NFAIndexer(TIAIndexer):
                 lower, upper, k2_mid, capacity=S_cap, group_size=group_size,
                 output_dtype=q.dtype, rank_width=min(S_cap, K2),
                 sink=sink_tok, swa=swa_tok)
+        # ---- 5.5 opt-in fused fine scorer + local Top-K prototype ----
+        _nfa_fused = os.environ.get("NFA_FINE_TOPK_TRITON", "0") == "1"
+        if (_nfa_fused and _sparse_selection and not live_normalization
+                and q.dtype == torch.bfloat16 and S_cap < 65536
+                and _HAS_TRITON and cand_idx2.is_contiguous()
+                and keep2.is_contiguous() and cand_len.is_contiguous()
+                and k_qat.stride(-1) == 1 and b_q_fine.stride(-1) == 1):
+            try:
+                from ..ops.nfa_fine_topk_triton import fused_fine_probabilities
+                from .selection.unique_ranking import rank_unique
+
+                probability, unique = fused_fine_probabilities(
+                    k_qat[0], b_q_fine, cand_idx2, keep2, cand_len,
+                    S_cap, group_size, num_warps=16)
+                lower = torch.full_like(S_real, far_tok_lo)
+                upper = torch.maximum(lower, swa_lo_tok)
+                selection = rank_unique(
+                    cand_idx2, probability, unique, lower, upper, k2_mid,
+                    capacity=S_cap, width=1024, sink=sink_tok)
+
+                self._graph_normalization_width_route = "capacity"
+                self._graph_normalization_route = "fused_fine_topk_triton"
+                self._graph_normalization_stats_route = "fused_fine_topk_triton"
+                self._graph_ranking_route = "fused_fine_topk_triton_unique_1024"
+                self._graph_ranking_kth_route = None
+                self._graph_ranking_gather_route = None
+                self._graph_ranking_fallback = None
+
+                if return_selection:
+                    return selection
+                token = torch.arange(S_cap, device=dev)
+                selected = selection.to_mask(S_cap).unsqueeze(1)
+                protected = (token < sink_tok) | (token >= swa_lo_tok)
+                selected = (selected | protected.view(1, 1, 1, -1)) & (
+                    token < S_real).view(1, 1, 1, -1)
+                if not (q.is_cuda and torch.cuda.is_current_stream_capturing()):
+                    self.metrics.add_select_result(valid_len - 1, selected, 1)
+                return selected
+            except Exception:
+                pass
         # ---- 6. fine 打分（Triton 候选 kernel，与 eager 同 kernel 逐位）----
         try:
             if self._triton_ok and _HAS_TRITON and k_qat.dim() == 4 \
@@ -6032,10 +6072,10 @@ def _iter3_compact(cand_idx2, keep2, mid_mask, R_cap, Hkv, S_cap, dev):
     kp_out = torch.empty_like(keep2)
     mid_out = torch.empty_like(keep2) if mid_mask is not None else None
     clen = torch.empty((Hkv,), dtype=torch.long, device=dev)
-    # 【E166e】launch 配置调优：BLOCK=2048/num_warps=8（扫描 16 组，
+    # 【E166e】launch 配置调优：BLOCK=2048/num_warps=16（扫描 16 组，
     # 33.5→24.7us/层；kernel 语义不动，13 例单测保障）
     _iter3_compact_kernel[(Hkv,)](
         cand_idx2, keep2, mid_mask if mid_mask is not None else keep2,
         ci_out, kp_out, mid_out if mid_out is not None else kp_out, clen,
-        R_cap, S_CAP_M1=S_cap - 1, BLOCK=2048, WITH_MID=mid_mask is not None, num_warps=8)
+        R_cap, S_CAP_M1=S_cap - 1, BLOCK=2048, WITH_MID=mid_mask is not None, num_warps=16)
     return ci_out, kp_out, mid_out, clen

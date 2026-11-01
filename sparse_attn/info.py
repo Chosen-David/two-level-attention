@@ -482,10 +482,24 @@ def resolve_treatment_snapshot(args):
         geometry = getattr(args, "_frozen_region_geometry", None)
         if not dataclasses.is_dataclass(gate) or not dataclasses.is_dataclass(geometry):
             raise ValueError("frozen region treatment requires resolved gate and geometry")
-        manifest["nfa_prefill_frozen_regions"] = {
+        frozen_region_manifest = {
             "gate": dataclasses.asdict(gate),
             "geometry": dataclasses.asdict(geometry),
         }
+        static_gate = getattr(args, "_frozen_region_static_gate", None)
+        if static_gate is not None:
+            static_path = getattr(args, "_frozen_region_static_gate_path", None)
+            if not isinstance(static_path, str) or not os.path.isfile(static_path):
+                raise ValueError(
+                    "static gate treatment requires the resolved artifact on disk")
+            with open(static_path, "rb") as _f:
+                _raw = _f.read()
+            frozen_region_manifest["static_gate"] = {
+                "path": static_path,
+                "sha256": hashlib.sha256(_raw).hexdigest(),
+                "num_layers": static_gate.num_layers,
+            }
+        manifest["nfa_prefill_frozen_regions"] = frozen_region_manifest
     manifest_json = json.dumps(manifest, sort_keys=True,
                               ensure_ascii=False, default=str)
     return TreatmentSnapshot(manifest=manifest, manifest_json=manifest_json,

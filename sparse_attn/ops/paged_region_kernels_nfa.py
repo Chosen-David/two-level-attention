@@ -100,7 +100,7 @@ def _combine_compact(selection, protected_ids, key_heads, length, device):
     return canonical_selection(ids[None],valid[None],length,width=ids.shape[-1])
 
 
-def region_selection_compact(indexer,q,layer,scale):
+def region_selection_compact(indexer,q,layer,scale,*,build_receipt=True):
     """Compact paged selection: coarse/fine scoring then selected-token IDs only.
 
     This is the production paged-region path.  It never materializes the
@@ -110,20 +110,25 @@ def region_selection_compact(indexer,q,layer,scale):
     _validate_indexer(idx)
     length=layer.logical_length
     device=q.device
-    visible=_visible_mask(layer,device)
     key_heads=next(iter(layer.pages.values()))[1].shape[1]
     if layer.skip_near and layer.skip_far:
-        ids=torch.arange(length,device=device)[visible].to(torch.int32)
+        parts=[torch.arange(a,b,device=device,dtype=torch.int32)
+               for a,b in layer.intervals()]
+        ids=torch.cat(parts) if parts else torch.empty(
+            (0,),dtype=torch.int32,device=device)
         width=ids.numel()
         selection=TokenSelection(ids[None].expand(1,key_heads,-1).contiguous(),
                                  torch.full((1,key_heads),width,dtype=torch.int32,device=device))
-        receipt=dict(subspace=idx.subspace,dimensions=[],logical_tokens=length,
-            visible_tokens=width,selected_per_kv_head=[width]*key_heads,
-            scorer='protected_only',selector='protected_only',skip_near=True,skip_far=True,
-            l1_calls=0,l2_calls=0,selection_topk_calls=0,kv_route='direct_page_table',
-            full_width_gather_bytes=0,index_scratch_bytes=0)
+        receipt=None
+        if build_receipt:
+            receipt=dict(subspace=idx.subspace,dimensions=[],logical_tokens=length,
+                visible_tokens=width,selected_per_kv_head=[width]*key_heads,
+                scorer='protected_only',selector='protected_only',skip_near=True,skip_far=True,
+                l1_calls=0,l2_calls=0,selection_topk_calls=0,kv_route='direct_page_table',
+                full_width_gather_bytes=0,index_scratch_bytes=0)
         return selection,receipt
     dims=idx._subspace_indices(device);bs=idx.args.tia_block_size
+    visible=_visible_mask(layer,device)
     projected=layer.project_visible(dims,bs)
     pages=projected.reshape(1,-1,bs,projected.shape[2],dims.numel())
     fine=projected[:,:length]
@@ -135,11 +140,13 @@ def region_selection_compact(indexer,q,layer,scale):
     middle=idx.compute_selection_graph(q.transpose(1,2).contiguous(),dictionary,scale,vl,
                                        selection_mask=visible)
     selection=_combine_compact(middle,_protected_ids(layer,idx,device),key_heads,length,device)
-    receipt=dict(subspace=idx.subspace,dimensions=dims.tolist(),logical_tokens=length,
-        visible_tokens=int(visible.sum()),selected_per_kv_head=selection.counts[0].tolist(),
-        scorer='NFAIndexer.compute_selection_graph',selector='NFAIndexer.compute_selection_graph',
-        skip_near=layer.skip_near,skip_far=layer.skip_far,kv_route='direct_page_table',
-        full_width_gather_bytes=0,index_scratch_bytes=projected.numel()*projected.element_size())
+    receipt=None
+    if build_receipt:
+        receipt=dict(subspace=idx.subspace,dimensions=dims.tolist(),logical_tokens=length,
+            visible_tokens=int(visible.sum()),selected_per_kv_head=selection.counts[0].tolist(),
+            scorer='NFAIndexer.compute_selection_graph',selector='NFAIndexer.compute_selection_graph',
+            skip_near=layer.skip_near,skip_far=layer.skip_far,kv_route='direct_page_table',
+            full_width_gather_bytes=0,index_scratch_bytes=projected.numel()*projected.element_size())
     return selection,receipt
 
 
@@ -172,6 +179,62 @@ class _GraphReadyLayerView:
             length=self._length)
 
 
+def _protected_selection_batch(cache, layer_idx, req_ids, indexer):
+    """Build sink+SWA selections for a whole batch in one vectorized pass.
+
+    This is only valid when every request in this layer has both near and far
+    skipped; no indexer scoring or host scalar reads are required.
+    """
+    batch = len(req_ids)
+    lengths = [
+        (cache.pending_lengths.get(rid, cache.states[rid].logical_length)
+         if rid >= 0 and rid in cache.states else 0)
+        for rid in req_ids
+    ]
+    max_len = max(lengths) if lengths else 0
+    protected_width = min(
+        max_len, indexer.sink_tokens + indexer.sliding_window_size)
+    if max_len == 0 or protected_width == 0:
+        device = cache.gather_indices_buf.device
+        return (
+            torch.zeros((batch, 0), dtype=torch.int32, device=device),
+            torch.zeros((batch,), dtype=torch.int32, device=device),
+        )
+
+    device = cache.gather_indices_buf.device
+    length_t = torch.tensor(lengths, dtype=torch.long, device=device)
+    if max_len <= indexer.sink_tokens + indexer.sliding_window_size:
+        col_full = torch.arange(max_len, dtype=torch.long, device=device)
+        valid = col_full[None, :] < length_t[:, None]
+        ids = torch.where(
+            valid, col_full[None, :].expand(batch, -1),
+            torch.full_like(col_full[None, :].expand(batch, -1), -1))
+        counts = length_t.to(torch.int32)
+        return ids.to(torch.int32), counts
+
+    col = torch.arange(protected_width, dtype=torch.long, device=device)
+    sink_count = torch.minimum(
+        length_t, torch.tensor(indexer.sink_tokens, device=device))
+    total_count = torch.minimum(
+        length_t,
+        torch.tensor(indexer.sink_tokens + indexer.sliding_window_size,
+                     device=device))
+    swa_count = total_count - sink_count
+
+    in_sink = col[None, :] < sink_count[:, None]
+    in_swa = (col[None, :] >= sink_count[:, None]) & (
+        col[None, :] < total_count[:, None])
+    swa_col = col[None, :] - sink_count[:, None]
+    swa_id = length_t[:, None] - indexer.sliding_window_size + swa_col
+    ids = torch.where(
+        in_sink,
+        col[None, :].expand(batch, -1),
+        torch.where(in_swa, swa_id, torch.zeros_like(swa_id)))
+    ids = ids.to(torch.int32)
+    counts = total_count.to(torch.int32)
+    return ids, counts
+
+
 def _selected_logical_ids_graph_ready(cache, layer_idx, request_id, indexer,
                                       q_row, scale, length):
     """Run the production NFA selector and return one shared ID sequence.
@@ -181,12 +244,11 @@ def _selected_logical_ids_graph_ready(cache, layer_idx, request_id, indexer,
     kernel.
     """
     layer_view = _GraphReadyLayerView(cache, layer_idx, request_id, length)
-    selection, _ = region_selection_compact(indexer, q_row, layer_view, scale)
-    selected = selection.indices[0, 0]
-    count = int(selection.counts[0, 0].item())
-    if count <= 0:
-        return torch.empty((0,), dtype=torch.int32, device=q_row.device)
-    return selected[:count].contiguous()
+    selection, _ = region_selection_compact(
+        indexer, q_row, layer_view, scale, build_receipt=False)
+    ids = selection.indices[0, 0].contiguous()
+    count = selection.counts[0, 0].contiguous()
+    return ids, count
 
 
 def _prepare_nfa_gather_for_layer(cache, layer_idx, req_ids, q, indexer, scale):
@@ -206,15 +268,14 @@ def _prepare_nfa_gather_for_layer(cache, layer_idx, req_ids, q, indexer, scale):
         state = cache.states[request_id]
         length = cache.pending_lengths.get(request_id, state.logical_length)
         q_row = q[b:b + 1].reshape(1, 1, q.shape[1], q.shape[2])
-        ids = _selected_logical_ids_graph_ready(
+        ids, count = _selected_logical_ids_graph_ready(
             cache, layer_idx, request_id, indexer, q_row, scale, length)
-        if ids.numel() > cache.max_visible_len:
-            raise RuntimeError(
-                f'request {request_id} layer {layer_idx} selected count '
-                f'{ids.numel()} exceeds max_visible_len {cache.max_visible_len}')
-        if ids.numel():
-            layer_buf[b, :ids.numel()].copy_(ids, non_blocking=True)
-        vis_buf[b] = ids.numel()
+        torch._assert_async(count <= cache.max_visible_len)
+        width = ids.numel()
+        valid_cols = torch.arange(width, device=ids.device) < count
+        safe_ids = torch.where(valid_cols, ids, INVALID_GATHER_IDX)
+        cache._store_gather_slots(layer_idx, b, safe_ids, width)
+        vis_buf[b].copy_(count, non_blocking=True)
 
 
 def decode(module,q,k,v,cache,cache_position):
@@ -236,12 +297,12 @@ def decode(module,q,k,v,cache,cache_position):
 
 
 def decode_graph_ready(module, q, cache, *, gather_indices=None,
-                       visible_lens=None, block_table=None,
-                       query_start_loc=None, scale=None):
+                       visible_lens=None, query_to_req=None, scale=None):
     """Graph-ready sparse gather consumer for the new arena cache.
 
     ``q`` may be flat [T, HQ, D] or [B, 1, HQ, D]; the latter is flattened to
-    the kernel contract.  This path never builds a dense attention mask.
+    the kernel contract.  This path never builds a dense attention mask and
+    consumes precomputed absolute physical slots.
     """
     from .paged_region_kernels import sparse_paged_attention_gather
 
@@ -265,17 +326,119 @@ def decode_graph_ready(module, q, cache, *, gather_indices=None,
     visible_lens = (
         cache.visible_lens_buf[layer_idx]
         if visible_lens is None else visible_lens)
-    block_table = cache.block_table_buf if block_table is None else block_table
-    query_start_loc = (
-        cache.query_start_loc_buf
-        if query_start_loc is None else query_start_loc)
+    query_to_req = cache.query_to_req_buf if query_to_req is None else query_to_req
+
+    # The frozen-runner completion receipt only needs proof that this layer
+    # executed the sparse gather path.  The actual selected token count is the
+    # fixed-width visible-lens row for this request slot.
+    layer.nfa_receipt = {
+        'route': 'graph_ready_sparse',
+        'visible_lens': visible_lens[:cache.max_requests].detach().cpu().tolist(),
+    }
 
     return sparse_paged_attention_gather(
         layer,
         q,
         gather_indices,
         visible_lens,
-        block_table,
-        query_start_loc,
+        query_to_req,
         scale=scale,
     )
+
+
+
+def project_visible_varlen_kernel(kv_pool_k, block_table, lengths,
+                                  skip_far, skip_near, dims, pad,
+                                  *, sink, near_len, window):
+    """Batch low-dimensional visible-K projection over the graph-ready arena.
+
+    Grid is one program per request.  The kernel writes ``[B, pad, HK, D]`` in
+    token order, zeroing non-visible positions exactly like the eager
+    ``project_visible_for_request`` buffer contract.
+    """
+    import triton
+    import triton.language as tl
+
+    device = kv_pool_k.device
+    batch = lengths.numel()
+    hk = kv_pool_k.shape[2]
+    page = kv_pool_k.shape[3]
+    head_dim = kv_pool_k.shape[4]
+    dims_numel = dims.numel()
+
+    if device.type != 'cuda':
+        raise RuntimeError('project_visible_varlen_kernel requires CUDA')
+    if pad <= 0:
+        raise ValueError('pad must be positive')
+
+    out = torch.empty(
+        (batch, pad, hk, dims_numel),
+        dtype=kv_pool_k.dtype, device=device)
+    block_table = block_table.contiguous()
+    dims = dims.contiguous().to(device)
+
+    @triton.jit
+    def _kernel(
+        kv_ptr, bt_ptr, len_ptr, skip_far_ptr, skip_near_ptr,
+        out_ptr, dims_ptr,
+        PAD, PAGE: tl.constexpr, SINK: tl.constexpr,
+        NEAR_LEN: tl.constexpr, WINDOW: tl.constexpr,
+        MAX_BLOCKS: tl.constexpr, HK: tl.constexpr, HEAD_DIM: tl.constexpr,
+        DIM_NUMEL: tl.constexpr,
+    ):
+        pid = tl.program_id(0)
+        length = tl.load(len_ptr + pid).to(tl.int32)
+        skip_far = tl.load(skip_far_ptr + pid).to(tl.int32)
+        skip_near = tl.load(skip_near_ptr + pid).to(tl.int32)
+        far_on = skip_far == 0
+        near_on = skip_near == 0
+
+        sink_hi = tl.minimum(SINK, length)
+        near_hi = tl.maximum(sink_hi, length - WINDOW)
+        tmp = length - WINDOW - NEAR_LEN
+        far_blk = tmp // PAGE
+        far_hi = tl.minimum(
+            near_hi, tl.maximum(sink_hi, far_blk * PAGE))
+
+        for tok in range(0, PAD):
+            visible = tok < sink_hi
+            visible = visible | (
+                far_on & (tok >= sink_hi) & (tok < far_hi))
+            visible = visible | (
+                near_on & (tok >= far_hi) & (tok < near_hi))
+            visible = visible | (
+                (tok >= near_hi) & (tok < length))
+
+            for h in range(0, HK):
+                for d in range(0, DIM_NUMEL):
+                    dst = (out_ptr
+                           + pid * PAD * HK * DIM_NUMEL
+                           + tok * HK * DIM_NUMEL
+                           + h * DIM_NUMEL
+                           + d)
+                    if visible:
+                        lp = tok // PAGE
+                        if lp < MAX_BLOCKS:
+                            off = tok % PAGE
+                            phys = tl.load(bt_ptr + pid * MAX_BLOCKS + lp)
+                            dim = tl.load(dims_ptr + d)
+                            src = (kv_ptr
+                                   + phys.to(tl.int64) * HK * PAGE * HEAD_DIM
+                                   + h * PAGE * HEAD_DIM
+                                   + off * HEAD_DIM
+                                   + dim)
+                            tl.store(dst, tl.load(src))
+                        else:
+                            tl.store(dst, 0.0)
+                    else:
+                        tl.store(dst, 0.0)
+
+    grid = (batch,)
+    _kernel[grid](
+        kv_pool_k, block_table, lengths, skip_far, skip_near,
+        out, dims,
+        PAD=pad, PAGE=page, SINK=sink, NEAR_LEN=near_len, WINDOW=window,
+        MAX_BLOCKS=block_table.shape[1], HK=hk, HEAD_DIM=head_dim,
+        DIM_NUMEL=dims_numel,
+    )
+    return out

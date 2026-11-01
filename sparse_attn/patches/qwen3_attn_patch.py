@@ -175,18 +175,47 @@ def qwen3_attn_forward(
     # Graph-ready multi-request sparse-gather cache path.
     from ..cache import GraphReadyPagedRegionCache
     if isinstance(past_key_values, GraphReadyPagedRegionCache):
+        if input_shape[1] != 1:
+            request_id = past_key_values.active_request_id
+            if request_id is None:
+                raise ValueError(
+                    'GraphReady prefill requires an active request id')
+            past_key_values.write_prefill(
+                self.layer_idx, request_id, key_states, value_states)
+            if hasattr(past_key_values, 'record_query'):
+                past_key_values.record_query(
+                    self.layer_idx, [request_id], query_states[:, :, -1:])
+            attention_interface = ALL_ATTENTION_FUNCTIONS.get(
+                self.config._attn_implementation, eager_attention_forward)
+            attn_output, attn_weights = attention_interface(
+                self,
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                dropout=0.0 if not self.training else self.attention_dropout,
+                scaling=self.scaling,
+                sliding_window=self.sliding_window,
+                **kwargs,
+            )
+            _paper_route(self.layer_idx, 'graph-ready-prefill')
+            return self.o_proj(
+                attn_output.reshape(*input_shape, -1).contiguous()), attn_weights
+
         slot_mapping = past_key_values.slot_mapping_buf[:input_shape[0]]
         past_key_values.write_decode(
             self.layer_idx, key_states, value_states, slot_mapping)
+        if hasattr(past_key_values, 'record_query'):
+            past_key_values.record_query(
+                self.layer_idx, past_key_values.active_req_ids, query_states[:, :, 0])
         from ..ops.paged_region_kernels_nfa import decode_graph_ready
         result = decode_graph_ready(
             self,
             query_states,
             past_key_values,
-            gather_indices=past_key_values.gather_indices_buf[self.layer_idx],
-            visible_lens=past_key_values.visible_lens_buf[self.layer_idx],
-            block_table=past_key_values.block_table_buf,
-            query_start_loc=past_key_values.query_start_loc_buf,
+            gather_indices=past_key_values.gather_indices_for_layer(self.layer_idx),
+            visible_lens=past_key_values.visible_lens_for_layer(self.layer_idx),
+            query_to_req=past_key_values.query_to_req_buf,
         )
         return self.o_proj(result.reshape(*input_shape, -1).contiguous()), None
 

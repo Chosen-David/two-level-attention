@@ -86,6 +86,8 @@ from sparse_attn.policies.region_geometry import RegionGeometry
 from sparse_attn.policies.frozen_gate import GateConfig
 from sparse_attn.engine.frozen_runner import (
     complete_frozen_request, prefill_frozen_request)
+from sparse_attn.policies.static_gate import (
+    default_static_gate_path, load_static_gate)
 from sparse_attn.info import (  # noqa: E402
     get_method_name_with_info, get_treatment_manifest_json,
     resolve_treatment_snapshot)
@@ -139,6 +141,10 @@ def parse_args():
     parser.add_argument("--nfa_frozen_region_statistic",
                         choices=["mean", "p95"], default="mean")
     parser.add_argument("--nfa_frozen_region_rows", type=int, default=256)
+    parser.add_argument("--nfa_static_gate", action="store_true",
+                        help="读取预计算静态 near/far skip gate，而非 prefill 期标定")
+    parser.add_argument("--nfa_static_gate_path", type=str, default=None,
+                        help="静态 gate 文件路径（缺省按 model_type 展开 repo 内 artifact）")
     add_sparse_attn_args(parser)
     return parser.parse_args()
 
@@ -237,6 +243,33 @@ def _validate_frozen_model(model):
     if any(getattr(module.self_attn, 'sliding_window', None) is not None
            for module in model.model.layers):
         raise ValueError('frozen regions require full-attention Qwen3 layers')
+
+
+def _resolve_static_gate(args, config):
+    """Load the precomputed static gate when requested.
+
+    Fails closed when missing so a caller never silently falls back to dynamic
+    calibration under a static-gate treatment identity.  Use the separate
+    static calibration entrypoint to create missing artifacts.
+    """
+    if not getattr(args, 'nfa_static_gate', False):
+        return None
+    model_type = config.model_type
+    path = getattr(args, 'nfa_static_gate_path', None) or default_static_gate_path(model_type)
+    static_gate = load_static_gate(model_type, path=path)
+    if static_gate is None:
+        raise SystemExit(
+            f"[static-gate] 未找到静态 gate 文件 {path}；请先运行静态标定脚本"
+            f"（或显式 --nfa_static_gate_path）生成 artifact，再重跑本入口")
+    if static_gate.num_layers != config.num_hidden_layers:
+        raise SystemExit(
+            f"[static-gate] {path} num_layers={static_gate.num_layers} 与模型 "
+            f"{config.num_hidden_layers} 不一致")
+    args._frozen_region_static_gate = static_gate
+    args._frozen_region_static_gate_path = path
+    print(f"[static-gate] 读取 {path} num_layers={static_gate.num_layers} "
+          f"skip_far={sum(static_gate.skip_far)} skip_near={sum(static_gate.skip_near)}")
+    return static_gate
 
 
 def seed_everything(seed=SEED):   # 057：默认值单源化（receipt 身份字段）
@@ -356,6 +389,8 @@ def main():
         # checks actual frequencies, scaling and rotation before loading weights.
         rope_preflight = verify_runtime_rope(config)
     frozen_runtime = _configure_frozen_regions(args, config)
+    static_gate = (_resolve_static_gate(args, config)
+                   if frozen_runtime is not None else None)
     snapshot = resolve_treatment_snapshot(args) if args.method == "nfa" else None
     if args.method == 'ffd_vendor':
         if use_yarn:
@@ -715,7 +750,7 @@ def main():
                     if frozen_runtime is not None:
                         gate, geometry = frozen_runtime
                         output, frozen_audit = prefill_frozen_request(
-                            model, input_ids, gate, geometry)
+                            model, input_ids, gate, geometry, static_gate)
                     else:
                         output = model(input_ids=input_ids, past_key_values=None,
                                        use_cache=True,
@@ -738,9 +773,20 @@ def main():
                                 decode_kwargs = {'attention_mask': {'full_attention': None}}
                             else:
                                 decode_kwargs = {}
+                            if frozen_runtime is not None:
+                                request_id = past.active_request_id
+                                past.new_step([request_id])
+                                past.plan_common([request_id])
+                                selected_ids_by_layer = past.compute_selected_ids_by_layer(
+                                    model, [request_id])
+                                past.prepare_all_layers(
+                                    [request_id],
+                                    selected_ids_by_layer=selected_ids_by_layer)
                             out = model(input_ids=pred_idx, past_key_values=past,
                                         use_cache=True, **decode_kwargs)
                             past = out.past_key_values
+                            if frozen_runtime is not None:
+                                past.commit_step()
                             pred_idx = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
                             gen.append(pred_idx.item())
                             if pred_idx.item() in eos_ids and len(gen) > 1:

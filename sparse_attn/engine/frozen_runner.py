@@ -4,8 +4,10 @@ from contextlib import contextmanager
 import torch
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
-from sparse_attn.cache.paged_region_cache import PagedRegionCache
-from sparse_attn.policies.frozen_gate import decide_regions, profile_regions
+from sparse_attn.cache.paged_region_cache import GraphReadyPagedRegionCache
+from sparse_attn.policies.frozen_gate import (
+    decide_regions, profile_core_tokens, profile_regions)
+from sparse_attn.policies.static_gate import StaticGateDecision
 
 
 @contextmanager
@@ -16,12 +18,15 @@ def capture_profiles(cache, geometry, config):
 
     def profiled(module, query, key, value, *args, **kwargs):
         layer_idx = module.layer_idx
-        if not cache.layers[layer_idx].frozen:
-            if layer_idx in profiles:
-                raise ValueError('multiple prefill chunks unsupported')
-            profiles[layer_idx] = profile_regions(
-                query, key, geometry, rows=config.rows,
-                scale=kwargs.get('scaling', module.scaling))
+        if layer_idx in profiles:
+            raise ValueError('multiple prefill chunks unsupported')
+        profile = profile_regions(
+            query, key, geometry, rows=config.rows,
+            scale=kwargs.get('scaling', module.scaling))
+        profile['core'] = profile_core_tokens(
+            query, key, geometry, rows=config.rows,
+            scale=kwargs.get('scaling', module.scaling))
+        profiles[layer_idx] = profile
         return original(module, query, key, value, *args, **kwargs)
 
     ALL_ATTENTION_FUNCTIONS['sdpa'] = profiled
@@ -31,42 +36,134 @@ def capture_profiles(cache, geometry, config):
         ALL_ATTENTION_FUNCTIONS['sdpa'] = original
 
 
-def prefill_frozen_request(model, input_ids, config, geometry):
-    """Run one-shot dense prefill, then freeze independent per-layer decisions."""
-    cache = PagedRegionCache(model.config.num_hidden_layers, geometry)
-    cache.nfa_regions = bool(getattr(model, '_frozen_nfa', False))
-    if cache.nfa_regions:
-        for module in model.model.layers:
-            module.self_attn.indexer.clear()
-            module.self_attn.indexer.skip_far = False
-    with capture_profiles(cache, geometry, config) as profiles:
-        output = model(input_ids, past_key_values=cache, use_cache=True,
-                       logits_to_keep=1)
-    if len(profiles) != model.config.num_hidden_layers:
-        raise ValueError('incomplete native layer profiling')
-    before = cache.report()
-    decisions = {
-        layer_idx: decide_regions(
-            profile, config,
-            present_near=_region_present(cache.layers[layer_idx], geometry)[0],
-            present_far=_region_present(cache.layers[layer_idx], geometry)[1])
-        for layer_idx, profile in profiles.items()
-    }
-    cache.freeze(decisions)
-    after = cache.report()
-    for layer_idx, decision in decisions.items():
-        if decision['skip_near'] and not decision['skip_far']:
-            before_bytes = before['layers'][layer_idx]['kv_bytes']
-            after_bytes = after['layers'][layer_idx]['kv_bytes']
-            if before_bytes != after_bytes:
-                raise ValueError('near-only must not claim a resident KV reduction')
-    return output, dict(profiles=profiles, decisions=decisions,
-                        prefill_full_kv=before, frozen_kv=after)
+@contextmanager
+def capture_core_tokens(cache, geometry, config):
+    """Capture only first-decode seed tokens without running gate profiling."""
+    original = ALL_ATTENTION_FUNCTIONS['sdpa']
+    core = {}
+
+    def profiled(module, query, key, value, *args, **kwargs):
+        layer_idx = module.layer_idx
+        if layer_idx in core:
+            raise ValueError('multiple prefill chunks unsupported')
+        core[layer_idx] = profile_core_tokens(
+            query, key, geometry, rows=config.rows,
+            scale=kwargs.get('scaling', module.scaling))
+        return original(module, query, key, value, *args, **kwargs)
+
+    ALL_ATTENTION_FUNCTIONS['sdpa'] = profiled
+    try:
+        yield core
+    finally:
+        ALL_ATTENTION_FUNCTIONS['sdpa'] = original
+
+
+def _validate_static_gate(static_gate, n_layers, model_type):
+    if static_gate is None:
+        return
+    if static_gate.model_type != model_type:
+        raise ValueError(
+            f"static gate model_type={static_gate.model_type} 与当前模型 "
+            f"{model_type} 不一致")
+    if static_gate.num_layers != n_layers:
+        raise ValueError(
+            f"static gate num_layers={static_gate.num_layers} 与当前模型 "
+            f"{n_layers} 不一致")
+
+
+def prefill_frozen_request(model, input_ids, config, geometry, static_gate=None):
+    """Run one-shot dense prefill directly inside GraphReadyPagedRegionCache.
+
+    When ``static_gate`` is None the original request-time calibration runs
+    (dynamic frozen gate).  When provided, only the first-decode seed tokens
+    are profiled and the per-layer near/far skip decisions are read from the
+    precomputed artifact.
+    """
+    n_layers = model.config.num_hidden_layers
+    prompt_length = int(input_ids.shape[-1])
+    page = geometry.page
+    max_blocks = ((prompt_length + geometry.max_new_tokens + page - 1) // page) + 8
+    max_visible_len = prompt_length + geometry.max_new_tokens + 16
+    device = next(model.parameters()).device
+    head_dim = getattr(model.config, 'head_dim', None) or (
+        model.config.hidden_size // model.config.num_attention_heads)
+    cache = GraphReadyPagedRegionCache(
+        n_layers, geometry,
+        max_requests=1,
+        max_physical_pages=max_blocks + 8,
+        max_blocks=max_blocks,
+        max_visible_len=max_visible_len,
+        max_query_tokens=1,
+        num_kv_heads=model.config.num_key_value_heads,
+        num_query_heads=model.config.num_attention_heads,
+        head_dim_k=head_dim,
+        head_dim_v=head_dim,
+        dtype=model.dtype,
+        device=device,
+    )
+    request_id = cache.add_request()
+    cache.set_active_request(request_id)
+
+    if static_gate is None:
+        with capture_profiles(cache, geometry, config) as profiles:
+            output = model(input_ids, past_key_values=cache, use_cache=True,
+                           logits_to_keep=1)
+        if len(profiles) != model.config.num_hidden_layers:
+            raise ValueError('incomplete native layer profiling')
+        decisions = {
+            layer_idx: decide_regions(
+                profile, config,
+                present_near=_region_present_from_length(prompt_length, geometry)[0],
+                present_far=_region_present_from_length(prompt_length, geometry)[1])
+            for layer_idx, profile in profiles.items()
+        }
+        skip_far = [decisions[layer_idx]['skip_far'] for layer_idx in range(n_layers)]
+        skip_near = [decisions[layer_idx]['skip_near'] for layer_idx in range(n_layers)]
+        prefill_topk_by_layer = {}
+        for layer_idx, profile in profiles.items():
+            ids = []
+            if decisions[layer_idx]['skip_far']:
+                ids.extend(profile['core'].get('far', []))
+            if decisions[layer_idx]['skip_near']:
+                ids.extend(profile['core'].get('near', []))
+            prefill_topk_by_layer[layer_idx] = sorted(set(ids))
+    else:
+        _validate_static_gate(
+            static_gate, n_layers, getattr(model.config, 'model_type', None))
+        with capture_core_tokens(cache, geometry, config) as core:
+            output = model(input_ids, past_key_values=cache, use_cache=True,
+                           logits_to_keep=1)
+        if len(core) != model.config.num_hidden_layers:
+            raise ValueError('incomplete native layer core-token profiling')
+        skip_far = list(static_gate.skip_far)
+        skip_near = list(static_gate.skip_near)
+        decisions = {
+            layer_idx: {'skip_near': skip_near[layer_idx],
+                        'skip_far': skip_far[layer_idx]}
+            for layer_idx in range(n_layers)
+        }
+        prefill_topk_by_layer = {}
+        for layer_idx in range(n_layers):
+            ids = []
+            if skip_far[layer_idx]:
+                ids.extend(core[layer_idx].get('far', []))
+            if skip_near[layer_idx]:
+                ids.extend(core[layer_idx].get('near', []))
+            prefill_topk_by_layer[layer_idx] = sorted(set(ids))
+
+    cache.freeze(request_id, skip_far, skip_near, prefill_topk_by_layer)
+    return output, dict(profiles=None if static_gate is not None else profiles,
+                        decisions=decisions,
+                        request_id=request_id, cache=cache)
 
 
 def _region_present(layer, geometry):
     """Return (near_region_present, far_region_present) for a filled layer."""
-    sink_hi, far_hi, near_hi = geometry.bounds(layer.logical_length)
+    return _region_present_from_length(layer.logical_length, geometry)
+
+
+def _region_present_from_length(length, geometry):
+    sink_hi, far_hi, near_hi = geometry.bounds(length)
     return near_hi > far_hi, far_hi > sink_hi
 
 
