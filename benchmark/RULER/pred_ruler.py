@@ -145,44 +145,73 @@ def parse_args():
 
 def _configure_frozen_regions(args, config):
     """Fail closed before model/indexer construction; return the request geometry."""
-    if not args.tli_prefill_frozen_regions:
+    is_glm_tli = (
+        args.method == 'tli'
+        and getattr(config, 'model_type', None) == 'glm4_moe_lite'
+    )
+    if not args.tli_prefill_frozen_regions and not is_glm_tli:
         return None
-    if args.method != 'tli' or getattr(config, 'model_type', None) != 'qwen3':
-        raise ValueError('frozen regions require full-attention Qwen3 with method=tli')
-    if getattr(config, 'head_dim', None) != 128:
+    if args.method != 'tli':
+        raise ValueError('frozen regions require method=tli')
+    if is_glm_tli:
+        # GLM TLI patch 现在强制 PagedRegionCache。RULER 入口没有
+        # Qwen 的 --tli_prefill_frozen_regions 语义，因此对 GLM TLI
+        # 自动使用全保留 frozen reference，只隔离稀疏选择，不回收 KV。
+        args.tli_subspace = 'nope'
+        args.tia_level2_cmp_ratio = 4
+        args.tli_l2_quant = False
+        args.tli_static_pair = False
+        args.tli_proj_basis = None
+        if hasattr(args, 'tli_proj_basis_all'):
+            args.tli_proj_basis_all = None
+        gate = GateConfig(mode='full',
+                          rows=args.tli_frozen_region_rows,
+                          statistic=args.tli_frozen_region_statistic)
+        geometry = RegionGeometry(
+            sink=args.tli_sink_tokens, near=args.tli_near_len,
+            window=args.tli_swa_size, page=args.tia_block_size,
+            max_new_tokens=MAX_GEN)
+    elif getattr(config, 'model_type', None) != 'qwen3':
+        raise ValueError('frozen regions require full-attention Qwen3 or GLM TLI')
+    elif getattr(config, 'head_dim', None) != 128:
         raise ValueError('frozen regions require Qwen3 head_dim=128')
-    expected = {
-        'tia_block_size': 64, 'tia_level1_topk': 128,
-        'tia_level2_topk': 1024, 'tia_level2_cmp_ratio': 4,
-        'tli_subspace': 'tail', 'tli_l2_subspace': 'same',
-        'tli_far_method': 'minmax', 'tli_near_method': 'avg',
-        'tli_far_select': '4bit', 'tli_near_select': '4bit',
-        'tli_near_pages': 32, 'tli_near_tokens': 'off',
-        'tli_near_len': 4096, 'tli_sink_tokens': 4, 'tli_swa_size': 128,
-        'tli_enable_subspace': True, 'tli_enable_layer_skip': False,
-        'tli_dyn_dgate': False, 'tli_far_skip_backend': 'legacy',
-        'tli_far_skip_cache': 'retain', 'tli_sparse_prefill': False,
-        'tli_decode_dense': False, 'tli_per_q_head': False,
-        'tia_enable_async_topk': False, 'tli_l2_quant': False,
-        'tli_sinkswa_only': False, 'tli_boundary_bypass': True,
-        'tli_static_pair': False, 'tli_proj_basis': None,
-        'tli_alpha': None, 'tli_beta': None, 'tli_gamma': None,
-    }
-    mismatches = {
-        name: (getattr(args, name, None), value)
-        for name, value in expected.items()
-        if getattr(args, name, None) != value
-    }
-    # 这两项由环境变量固定，真实 CLI 不创建同名属性；显式注入 True 仍须拒绝。
-    for name in ('tli_sparse_prefill', 'tli_decode_dense'):
-        if getattr(args, name, None) is None:
-            mismatches.pop(name, None)
-    if mismatches:
-        raise ValueError(f'frozen regions require the validated TLI geometry: {mismatches}')
-    gate = GateConfig(epsilon=args.tli_frozen_region_epsilon,
-                      rows=args.tli_frozen_region_rows,
-                      statistic=args.tli_frozen_region_statistic,
-                      mode=args.tli_frozen_region_mode)
+    else:
+        expected = {
+            'tia_block_size': 64, 'tia_level1_topk': 128,
+            'tia_level2_topk': 1024, 'tia_level2_cmp_ratio': 4,
+            'tli_subspace': 'tail', 'tli_l2_subspace': 'same',
+            'tli_far_method': 'minmax', 'tli_near_method': 'avg',
+            'tli_far_select': '4bit', 'tli_near_select': '4bit',
+            'tli_near_pages': 32, 'tli_near_tokens': 'off',
+            'tli_near_len': 4096, 'tli_sink_tokens': 4, 'tli_swa_size': 128,
+            'tli_enable_subspace': True, 'tli_enable_layer_skip': False,
+            'tli_dyn_dgate': False, 'tli_far_skip_backend': 'legacy',
+            'tli_far_skip_cache': 'retain', 'tli_sparse_prefill': False,
+            'tli_decode_dense': False, 'tli_per_q_head': False,
+            'tia_enable_async_topk': False, 'tli_l2_quant': False,
+            'tli_sinkswa_only': False, 'tli_boundary_bypass': True,
+            'tli_static_pair': False, 'tli_proj_basis': None,
+            'tli_alpha': None, 'tli_beta': None, 'tli_gamma': None,
+        }
+        mismatches = {
+            name: (getattr(args, name, None), value)
+            for name, value in expected.items()
+            if getattr(args, name, None) != value
+        }
+        # 这两项由环境变量固定，真实 CLI 不创建同名属性；显式注入 True 仍须拒绝。
+        for name in ('tli_sparse_prefill', 'tli_decode_dense'):
+            if getattr(args, name, None) is None:
+                mismatches.pop(name, None)
+        if mismatches:
+            raise ValueError(f'frozen regions require the validated TLI geometry: {mismatches}')
+        gate = GateConfig(epsilon=args.tli_frozen_region_epsilon,
+                          rows=args.tli_frozen_region_rows,
+                          statistic=args.tli_frozen_region_statistic,
+                          mode=args.tli_frozen_region_mode)
+        geometry = RegionGeometry(
+            sink=args.tli_sink_tokens, near=args.tli_near_len,
+            window=args.tli_swa_size, page=args.tia_block_size,
+            max_new_tokens=MAX_GEN)
     environment = {
         'TLI_OPERATOR_MODE': 'off', 'TLI_FINE_GATHER': '0',
         'TLI_SPARSE_PREFILL': '0', 'TLI_DECODE_DENSE': '0',
@@ -199,10 +228,6 @@ def _configure_frozen_regions(args, config):
     os.environ['TLI_CUDA_GRAPH'] = 'off'
     config._attn_implementation = 'sdpa'
     args.tli_frozen_region_max_new_tokens = MAX_GEN
-    geometry = RegionGeometry(
-        sink=args.tli_sink_tokens, near=args.tli_near_len,
-        window=args.tli_swa_size, page=args.tia_block_size,
-        max_new_tokens=MAX_GEN)
     args._frozen_region_gate = gate
     args._frozen_region_geometry = geometry
     return gate, geometry
@@ -707,10 +732,14 @@ def main():
                             # min_length 语义：禁止在 context 结束前停（RULER 官方口径）
                             if len(gen) < 2 and pred_idx.item() in eos_ids:
                                 pass  # 首位不许停（近似 min_length=context+1）
+                            if frozen_runtime is not None and config.model_type == 'glm4_moe_lite':
+                                decode_kwargs = {'attention_mask': None}
+                            elif frozen_runtime is not None:
+                                decode_kwargs = {'attention_mask': {'full_attention': None}}
+                            else:
+                                decode_kwargs = {}
                             out = model(input_ids=pred_idx, past_key_values=past,
-                                        use_cache=True,
-                                        **({'attention_mask': {'full_attention': None}}
-                                           if frozen_runtime is not None else {}))
+                                        use_cache=True, **decode_kwargs)
                             past = out.past_key_values
                             pred_idx = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
                             gen.append(pred_idx.item())

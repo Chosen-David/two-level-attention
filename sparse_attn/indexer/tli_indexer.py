@@ -4171,7 +4171,8 @@ class TLIIndexer(TIAIndexer):
             "byp_tok": byp_tok, "byp_keep": byp_keep,
         }
 
-    def compute_selection_graph(self, q, index_dict, softmax_scale, valid_len):
+    def compute_selection_graph(self, q, index_dict, softmax_scale, valid_len,
+                                selection_mask=None):
         """与 compute_mask_graph 相同的选择策略，直出紧凑 TokenSelection。
 
         返回 TokenSelection（indices [1,Hkv,K2_static] int32 + counts
@@ -4180,7 +4181,8 @@ class TLIIndexer(TIAIndexer):
         语义等效：to_mask(S_cap) == compute_mask_graph(...)（单元测试逐位对拍）。
         """
         return self.compute_mask_graph(q, index_dict, softmax_scale, valid_len,
-                                       return_selection=True)
+                                       return_selection=True,
+                                       selection_mask=selection_mask)
 
     def compute_candidate_inputs_graph(self, q, index_dict, softmax_scale, valid_len):
         """Produce one request's exact L1/bypass candidates, stopping before L2.
@@ -4197,7 +4199,8 @@ class TLIIndexer(TIAIndexer):
                                        return_selection=True, return_candidates=True)
 
     def compute_mask_graph(self, q, index_dict, softmax_scale, valid_len, *,
-                           return_selection=False, return_candidates=False):
+                           return_selection=False, return_candidates=False,
+                           selection_mask=None):
         """graph 专用全张量 compute_mask（生产主配置，逐位对齐 eager）。
 
         输入：q [1,1,H,D]（replay 注入）、index_dict（容量宽：k_min/k_max/
@@ -4348,6 +4351,14 @@ class TLIIndexer(TIAIndexer):
         swa_force = geo["swa_force"]
         k2_mid = geo["k2_mid"]
         far_tok_lo = geo["far_tok_lo"]
+        if selection_mask is not None:
+            if (selection_mask.shape != (S_cap,) or selection_mask.dtype != torch.bool
+                    or selection_mask.device != dev):
+                raise ValueError(
+                    'selection_mask must be a same-device bool[S_cap] tensor')
+            if mid_mask is not None:
+                mid_mask = mid_mask & selection_mask
+                mid_mask_inv = ~mid_mask
         # ---- 3. coarse 分（Triton，与 eager 同 kernel 逐位一致）----
         # 【2c-2 修复】Q 侧子空间 gather 与 eager 同源（compute_score L1742-1743
         # b_q = q_full[..., idx_sub]）：生产主配置 tail/l2_subspace=same 下
@@ -4484,6 +4495,8 @@ class TLIIndexer(TIAIndexer):
                 byp_keep.reshape(1, 1, Hkv, 2 * bs)], dim=-1)   # bool
             cand_idx2 = cand_idx[0, 0]                         # [Hkv,R_cap]
             keep2 = keep[0, 0]                                 # [Hkv,R_cap]
+        if selection_mask is not None:
+            keep2 = keep2 & selection_mask[cand_idx2.clamp(0, S_cap - 1)]
         # 【iter3f-3】哨兵重定向由 _iter3_compact_kernel 内联
         # （keep=False 槽写 S_CAP_M1）；fallback argsort 分支需在 _iter3_compact
         # 守卫失败时独立执行（见下方 except/else 分支）。

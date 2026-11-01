@@ -172,6 +172,24 @@ def qwen3_attn_forward(
     cos, sin = position_embeddings
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
+    # Graph-ready multi-request sparse-gather cache path.
+    from ..cache import GraphReadyPagedRegionCache
+    if isinstance(past_key_values, GraphReadyPagedRegionCache):
+        slot_mapping = past_key_values.slot_mapping_buf[:input_shape[0]]
+        past_key_values.write_decode(
+            self.layer_idx, key_states, value_states, slot_mapping)
+        from ..ops.paged_region_tli import decode_graph_ready
+        result = decode_graph_ready(
+            self,
+            query_states,
+            past_key_values,
+            gather_indices=past_key_values.gather_indices_buf[self.layer_idx],
+            visible_lens=past_key_values.visible_lens_buf[self.layer_idx],
+            block_table=past_key_values.block_table_buf,
+            query_start_loc=past_key_values.query_start_loc_buf,
+        )
+        return self.o_proj(result.reshape(*input_shape, -1).contiguous()), None
+
     # Request-local segmented cache owns logical/physical position mapping.
     if getattr(past_key_values, "tli_regions", False):
         from ..ops.cuda_graph_state import graph_state

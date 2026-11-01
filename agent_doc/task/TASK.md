@@ -1,5 +1,13 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-01
+- [x] [TL-GLM-NOPE-LAST32-FULL-20261101] `nope_last32` 全量 RULER64K+LongBench AVG5 dense/selected 跑完：1400/1400、2800/2800 arms、0失败；AVG5 dense 46.55 vs selected 44.88；独立验证已落盘。([详情](task_details/TL-GLM-AVG5-RULER-113-20261030.md))
+
+- [x] [TL-GLM-NOPE-LAST32-ALIGNED-20261101] `nope_last32` 在 clean `origin/main` `42821f81` 重跑同口径全量，排除旧 RULER EOS 与 GLM PagedRegionCache 对齐 bug：1400/1400、2800/2800 arms、0失败；RULER MultiKey2 dense 90 vs selected 28，LongBench AVG5 dense 46.55 vs selected 45.27。([详情](task_details/TL-GLM-AVG5-RULER-113-20261030.md))
+
+
+- [x] [TL-KV-SYSTEM-METRICS-20261101] 实测 32/64/128K freeze 后 far/both 的 KV 节省、B1 decode 吞吐、32GiB 池有效显存利用率与吞吐容量投影；near-only 0% 节省。当前 paged direct decode 仍 B1，B>1 投影非直接 batch 实测。([详情](task_details/TL-KV-SYSTEM-METRICS-20261101.md))
+
 ## 2026-10-30
 
 - [x] [TL-NFA-ABLATION-20261030] 仅HotpotQA/GovReport；A/C/E限定验收保持；B 2000/2000及官方重评分、配对bootstrap独立验收通过（usable-with-scope）。F取消/全部性能暂停。([详情](task_details/TL-NFA-ABLATION-20261030.md))

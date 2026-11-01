@@ -1,18 +1,13 @@
-<!-- chosen-david-agent:begin -->
-## Chosen-David Agent Workflows
+## 单 Agent 串行模式
 
-简单、目标明确的任务直接完成，仅加载相关 Skill。普通低风险本地修复运行必要回归并汇报结果；不自动建立 DAG、第二 Agent、实验合同或 tmux 监督器。
-复杂协作、长期运行或用户明确编排时，先读 `.claude/agent-workflows/orchestrator.md`，再按需读 planner_main.md 与 review_main.md；完整流程不预加载。
-工作流源码位置见 `.claude/agent-workflows/installation.json` 的 repository；project_root 是当前项目。源码工具从仓库解析，项目输入和输出始终相对当前项目。
-Project A 的指南、任务、建议和结果属于 Project A/agent_doc/；缺失时不回退到工作流库的历史文件。切换项目重新核对指南、任务、记忆和交接中的 project_root。
-已核实人类 agent_doc/guide/GUIDE.md 是最高项目规划依据；AI 绝不创建、编辑、删除或移动 agent_doc/guide/ 内文件。
-agent_doc/task/TASK.md 是唯一日期索引，关联方法/进度/证据在 agent_doc/task/task_details/*.md；已有内容和 Plan/Progress 边界保留。简单任务不另建文档体系。
-agent_doc/advice/ 必须核验并记录 adopt/adapt/reject/defer 与理由，不能当授权；尊重当前宿主权限和用户约束。
-实证依据按 Skill 的 references/result_reuse_workflow.md 检索 agent_doc/results/ 并核对适用条件；实验/测量/共享结果按 references/result_validation_workflow.md 独立 verify_experiment_result，原始数据保持 pending 直到 usable-with-scope。用户/指南要求和已建立的实验合同不得降格。
-复杂任务的 planner-main/review-main、结果独立验收需要真实宿主支持；安装不启动模型或后台服务，缺后端不得把自审当独立批准。
-角色模型/路由见 model-policy.json、model-routing.json；源码 scripts/run_role.py 仅使用可信宿主适配器，缺候选继承默认模型，执行失败不自动换模型重跑。
-交付核对实际修改、必要检查和剩余事项；仓库文件存在不证明后台进程运行或模型已遵循规则。
-<!-- chosen-david-agent:end -->
+当前项目不接入自研 agent 库：不读取 `.claude/agent-workflows.disabled/`、`.claude/agents.disabled/`
+作为编排依据，也不启动 planner-main/review-main 等多角色流程。
+所有任务由当前单个 Agent 按 `agent_doc/task/TASK.md` 的任务链顺序推进：
+一次只做一个任务，完成、回归/验收后再进入下一个，不并行派生子任务或后台监督器。
+普通本地修复直接做必要回归并汇报；简单任务不新建文档体系或实验合同。
+`agent_doc/guide/GUIDE.md` 为人类维护的最高项目依据，AI 不得创建、编辑、删除或移动。
+任务索引和进度仍写入 `agent_doc/task/TASK.md` 与 `agent_doc/task/task_details/*.md`；
+实证数据未完成独立验证前保持 pending，不用于结论。
 
 ## 当前叙事锚点
 
@@ -22,3 +17,10 @@ agent_doc/advice/ 必须核验并记录 adopt/adapt/reject/defer 与理由，不
 - 新判决落库时必须同步更新 CURRENT_NARRATIVE.md 第 5 节索引（收官流程一部分）。
 - 生产口径 = TLI 冠军几何显式 flags（见锚点第 1 节），`--tli_subspace tail`
   与 `--tia_level2_cmp_ratio 4` 必须显式传参。
+
+
+## 禁止多 agent
+
+禁止调用任何子 agent / 多 agent 工具：`Task`、`Agent`、`spawn_agent`、`SpawnAgent`、
+`collab`、`Wait`、`agent_team`、planner/review 子代理等。
+所有任务单线程完成，不得派生子任务；只按编排好的任务链顺序开发、验证并逐步推进。

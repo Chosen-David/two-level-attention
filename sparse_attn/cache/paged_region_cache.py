@@ -7,16 +7,103 @@ B1 request path is preserved; batch requests share one physical page pool per
 layer and keep independent block tables / region state.
 """
 import heapq
+from collections import deque
+from dataclasses import dataclass, field
 import torch
 from transformers.cache_utils import Cache, CacheLayerMixin
 from ..ops.region_geometry import RegionGeometry
 
+INVALID_PAGE_IDX = -1
+INVALID_GATHER_IDX = -1
+PAD_SLOT = -1
 
 SINK = 0b0001
 FAR = 0b0010
 NEAR = 0b0100
 SWA = 0b1000
 REGION_BITS = (SINK, FAR, NEAR, SWA)
+
+
+@dataclass
+class RequestState:
+    """One continuous-batching request slot.
+
+    ``block_table`` maps logical page id -> physical page id.  Physical page ids
+    are shared by every layer; each layer still owns a private physical arena,
+    so the same physical id indexes a different tensor in each layer.
+
+    ``free_phys_slots`` is a request-local deque populated at ``freeze()``.  It
+    contains the request's preallocated resident pages that are currently not
+    bound to any logical page.  Decode never touches the global ``free_ids``.
+    """
+    logical_length: int = 0
+    prompt_length: int = 0
+    max_resident_pages: int = 0
+    block_table: dict[int, int] = field(default_factory=dict)
+    free_phys_slots: deque = field(default_factory=deque)
+    skip_far_by_layer: list = field(default_factory=list)
+    skip_near_by_layer: list = field(default_factory=list)
+    active: bool = True
+
+
+class GraphReadyPagedRegionLayer:
+    """Per-layer fixed-size physical arena with a PAD safety page.
+
+    This class deliberately owns only physical storage and the free-list.  The
+    cross-layer request state and shared metadata are coordinated by
+    ``GraphReadyPagedRegionCache``.
+    """
+
+    def __init__(
+        self,
+        *,
+        geometry,
+        max_physical_pages,
+        num_kv_heads,
+        head_dim_k,
+        head_dim_v,
+        dtype,
+        device,
+    ):
+        self.geometry = geometry
+        self.max_physical_pages = max_physical_pages
+        self.PAD_PAGE_ID = max_physical_pages
+        self.num_kv_heads = num_kv_heads
+        self.head_dim_k = head_dim_k
+        self.head_dim_v = head_dim_v
+        self.dtype = dtype
+        self.device = device
+
+        # 物理池：max_physical_pages 个业务页 + 1 个 PAD 页。
+        # 布局 [page_id, 1, num_kv_heads, page_size, head_dim]。
+        total_pages = max_physical_pages + 1
+        page = self.geometry.page
+        self.kv_pool_k = torch.empty(
+            (total_pages, 1, num_kv_heads, page, head_dim_k),
+            dtype=dtype, device=device)
+        self.kv_pool_v = torch.empty(
+            (total_pages, 1, num_kv_heads, page, head_dim_v),
+            dtype=dtype, device=device)
+
+        # PAD 页必须全零。无效 block_table 条目指向它，Kernel 可以不分支地
+        # 计算 Base + physical_id * stride。
+        self.kv_pool_k[self.PAD_PAGE_ID].zero_()
+        self.kv_pool_v[self.PAD_PAGE_ID].zero_()
+
+        # 只把业务页放入全局空闲池。PAD_PAGE_ID 永远不参与分配。
+        self.free_ids = list(range(max_physical_pages))
+        heapq.heapify(self.free_ids)
+
+    def alloc_pages(self, count):
+        if len(self.free_ids) < count:
+            raise RuntimeError('graph-ready physical page pool exhausted')
+        return [heapq.heappop(self.free_ids) for _ in range(count)]
+
+    def free_pages(self, physical_ids):
+        for physical_id in physical_ids:
+            if physical_id == self.PAD_PAGE_ID:
+                raise RuntimeError('PAD page leaked into free_ids')
+            heapq.heappush(self.free_ids, physical_id)
 
 
 class PagedRegionLayer(CacheLayerMixin):
@@ -951,3 +1038,507 @@ class PagedRegionCache(Cache):
         return dict(request_id=request_id, layers=layers,
                     kv_bytes=sum(x['kv_bytes'] for x in layers),
                     device_page_table_bytes=sum(x['device_page_table_bytes'] for x in layers))
+
+
+class GraphReadyPagedRegionCache:
+    """Continuous-batching coordinator for the graph-ready paged cache.
+
+    The block table and slot mapping are common across layers, while
+    ``gather_indices`` and ``visible_lens`` are per layer because different
+    layers may skip different near/far regions.
+    """
+
+    INVALID_REQ_ID = -1
+    paged_regions = True
+    tli_regions = True
+
+    def __init__(
+        self,
+        n_layers,
+        geometry,
+        *,
+        max_requests,
+        max_physical_pages,
+        max_blocks,
+        max_visible_len,
+        max_query_tokens,
+        num_kv_heads,
+        head_dim_k,
+        head_dim_v,
+        dtype,
+        device,
+    ):
+        self.geometry = geometry
+        self.n_layers = n_layers
+        self.max_requests = max_requests
+        self.max_blocks = max_blocks
+        self.max_visible_len = max_visible_len
+        self.max_query_tokens = max_query_tokens
+
+        self.layers = [
+            GraphReadyPagedRegionLayer(
+                geometry=geometry,
+                max_physical_pages=max_physical_pages,
+                num_kv_heads=num_kv_heads,
+                head_dim_k=head_dim_k,
+                head_dim_v=head_dim_v,
+                dtype=dtype,
+                device=device,
+            )
+            for _ in range(n_layers)
+        ]
+
+        self.states: dict[int, RequestState] = {}
+        self.pending_lengths: dict[int, int] = {}
+        self.active_request_id = None
+        self.common_dirty = True
+
+        # 全模型共享一套页表和写入 slot。各层持有自己的物理 Arena，但 page id
+        # 对齐，所以同一份 logical->physical 映射对所有层有效。
+        self.block_table_buf = torch.full(
+            (max_requests, max_blocks),
+            self.layers[0].PAD_PAGE_ID,
+            dtype=torch.int32,
+            device=device,
+        )
+        self.slot_mapping_buf = torch.full(
+            (max_query_tokens,),
+            PAD_SLOT,
+            dtype=torch.int32,
+            device=device,
+        )
+        self.query_start_loc_buf = torch.zeros(
+            (max_requests + 1,),
+            dtype=torch.int32,
+            device=device,
+        )
+
+        # 层间异构计算量：每层一套 gather_indices / visible_lens。
+        self.gather_indices_buf = torch.full(
+            (n_layers, max_requests, max_visible_len),
+            INVALID_GATHER_IDX,
+            dtype=torch.int32,
+            device=device,
+        )
+        self.visible_lens_buf = torch.zeros(
+            (n_layers, max_requests),
+            dtype=torch.int32,
+            device=device,
+        )
+
+        # CPU staging：capture 后每步只 copy_，不在热路径 torch.tensor()。
+        self._cpu_gather_staging = torch.full(
+            (max_requests, max_visible_len),
+            INVALID_GATHER_IDX,
+            dtype=torch.int32,
+            device='cpu',
+        )
+
+    # ------------------------------------------------------------------
+    # Physical page allocation (all layers advance together)
+    # ------------------------------------------------------------------
+    def _alloc_pages(self, count):
+        if count == 0:
+            return []
+        for layer in self.layers:
+            if len(layer.free_ids) < count:
+                raise RuntimeError('graph-ready physical page pool exhausted')
+        physical_ids = []
+        for _ in range(count):
+            physical_id = heapq.heappop(self.layers[0].free_ids)
+            for layer in self.layers[1:]:
+                other = heapq.heappop(layer.free_ids)
+                if other != physical_id:
+                    raise RuntimeError('physical page free lists diverged across layers')
+            physical_ids.append(physical_id)
+        return physical_ids
+
+    def _free_pages(self, physical_ids):
+        for physical_id in physical_ids:
+            for layer in self.layers:
+                layer.free_pages([physical_id])
+
+    # ------------------------------------------------------------------
+    # Request lifecycle
+    # ------------------------------------------------------------------
+    def add_request(self, request_id=None):
+        if request_id is None:
+            request_id = self._next_free_slot()
+        if request_id < 0 or request_id >= self.max_requests:
+            raise ValueError('request_id outside fixed batch capacity')
+        if request_id in self.states:
+            raise ValueError(f'request {request_id} already active')
+        self.states[request_id] = RequestState()
+        return request_id
+
+    def _next_free_slot(self):
+        for request_id in range(self.max_requests):
+            if request_id not in self.states:
+                return request_id
+        raise RuntimeError('no free request slot')
+
+    def remove_request(self, request_id):
+        state = self.states.pop(request_id, None)
+        if state is None:
+            return
+        # 所有业务物理页（已绑定和未绑定）一次性归还全局池。
+        physical_ids = set(state.block_table.values())
+        physical_ids.update(state.free_phys_slots)
+        self._free_pages(physical_ids)
+        if self.active_request_id == request_id:
+            self.active_request_id = None
+
+    def set_active_request(self, request_id):
+        if request_id not in self.states:
+            raise ValueError(f'unknown request {request_id}')
+        self.active_request_id = request_id
+
+    # ------------------------------------------------------------------
+    # Prefill and freeze
+    # ------------------------------------------------------------------
+    def write_prefill(self, layer_idx, request_id, keys, values):
+        state = self.states[request_id]
+        layer = self.layers[layer_idx]
+        page = self.geometry.page
+
+        if keys.ndim != 4 or keys.shape[0] != 1 or keys.shape[-2] < 1:
+            raise ValueError('graph-ready prefill expects unpadded B1 KV')
+        if keys.shape[1] != layer.num_kv_heads:
+            raise ValueError('KV head count does not match arena')
+        if keys.device != values.device or keys.dtype != values.dtype:
+            raise ValueError('KV dtype/device mismatch')
+
+        n = keys.shape[-2]
+        if not state.block_table:
+            # 首个 layer 负责建立全模型共享的逻辑页->物理页映射。
+            logical_pages = list(range(0, (n + page - 1) // page))
+            physical_ids = self._alloc_pages(len(logical_pages))
+            state.block_table = dict(zip(logical_pages, physical_ids))
+            state.prompt_length = n
+            state.logical_length = n
+        elif n != state.prompt_length:
+            raise ValueError('prefill length diverged across layers')
+
+        # 逐页写入该层自己的物理 Arena。
+        for logical_page, physical_id in state.block_table.items():
+            lo = logical_page * page
+            hi = min(lo + page, n)
+            if hi <= lo:
+                continue
+            off = lo - logical_page * page
+            layer.kv_pool_k[physical_id, 0, :, off:off + (hi - lo), :].copy_(
+                keys[0, :, lo:hi, :])
+            layer.kv_pool_v[physical_id, 0, :, off:off + (hi - lo), :].copy_(
+                values[0, :, lo:hi, :])
+
+        return keys, values
+
+    def freeze(self, request_id, skip_far_list, skip_near_list):
+        state = self.states[request_id]
+        if len(skip_far_list) != self.n_layers or len(skip_near_list) != self.n_layers:
+            raise ValueError('freeze expects per-layer skip decisions')
+        if state.logical_length == 0:
+            raise ValueError('prefill before freeze')
+
+        state.skip_far_by_layer = [bool(x) for x in skip_far_list]
+        state.skip_near_by_layer = [bool(x) for x in skip_near_list]
+
+        # 物理木桶效应：按最贪心层预留 resident pages。
+        per_layer_pages = [
+            self._max_resident_pages_for_layer(state, layer_idx)
+            for layer_idx in range(self.n_layers)
+        ]
+        state.max_resident_pages = max(per_layer_pages)
+
+        # 释放当前非 resident 的 prefill 页，只保留当前 resident 页。
+        resident_now = self._resident_page_union_for_length(
+            state, state.logical_length)
+        stale = [
+            logical_page for logical_page in state.block_table
+            if logical_page not in resident_now
+        ]
+        if stale:
+            self._free_pages([state.block_table.pop(lp) for lp in stale])
+
+        # 补足请求专属 slot 池。decode 阶段只消费这个 deque，不碰全局池。
+        deficit = state.max_resident_pages - len(state.block_table)
+        if deficit < 0:
+            raise RuntimeError('resident page accounting is inconsistent')
+        if deficit:
+            state.free_phys_slots.extend(self._alloc_pages(deficit))
+
+        self._sync_block_table(state, state.logical_length)
+
+    # ------------------------------------------------------------------
+    # Region helpers
+    # ------------------------------------------------------------------
+    def _intervals_for_layer(self, state, layer_idx, length):
+        sink_hi, far_hi, near_hi = self.geometry.bounds(length)
+        spans = [(0, sink_hi), (near_hi, length)]
+        if not state.skip_far_by_layer[layer_idx]:
+            spans.append((sink_hi, far_hi))
+        if not state.skip_near_by_layer[layer_idx]:
+            spans.append((far_hi, near_hi))
+        return sorted((a, b) for a, b in spans if a < b)
+
+    def _pages_in_intervals(self, intervals):
+        page = self.geometry.page
+        pages = set()
+        for a, b in intervals:
+            for lp in range(a // page, (b - 1) // page + 1):
+                pages.add(lp)
+        return pages
+
+    def _resident_page_union_for_length(self, state, length):
+        pages = set()
+        for layer_idx in range(self.n_layers):
+            pages.update(self._pages_in_intervals(
+                self._intervals_for_layer(state, layer_idx, length)))
+        return pages
+
+    def _max_resident_pages_for_layer(self, state, layer_idx):
+        """O(1) upper bound for the resident-page pool.
+
+        skip_far=False means the far region stays resident, so the worst case is
+        the whole sequence through prompt_len + max_new_tokens.  skip_far=True
+        bounds resident storage to sink + near + SWA.  The extra page is a
+        partial-page safety margin for page-boundary growth.
+        """
+        page = self.geometry.page
+        if not state.skip_far_by_layer[layer_idx]:
+            resident_tokens = state.prompt_length + self.geometry.max_new_tokens
+        else:
+            resident_tokens = (
+                self.geometry.sink
+                + max(self.geometry.near, 0)
+                + self.geometry.window
+            )
+        return (resident_tokens + page - 1) // page + 1
+
+    def _sync_block_table(self, state, length):
+        resident = self._resident_page_union_for_length(state, length)
+        for logical_page in resident:
+            if logical_page not in state.block_table:
+                if not state.free_phys_slots:
+                    raise RuntimeError('resident slot pool exhausted')
+                state.block_table[logical_page] = state.free_phys_slots.popleft()
+        for logical_page in list(state.block_table):
+            if logical_page not in resident:
+                state.free_phys_slots.append(state.block_table.pop(logical_page))
+
+    def _visible_logical_ids_for_layer(self, state, layer_idx, selected_ids=None,
+                                       length=None):
+        if length is None:
+            length = state.logical_length
+        intervals = self._intervals_for_layer(state, layer_idx, length)
+        count = sum(b - a for a, b in intervals)
+        ids = torch.empty((count,), dtype=torch.int32, device='cpu')
+        offset = 0
+        for a, b in intervals:
+            n = b - a
+            if n > 0:
+                torch.arange(a, b, dtype=torch.int32,
+                             out=ids[offset:offset + n])
+                offset += n
+        if selected_ids is not None:
+            if not isinstance(selected_ids, torch.Tensor):
+                selected_ids = torch.as_tensor(selected_ids, dtype=torch.int32,
+                                               device='cpu')
+            ids = ids[torch.isin(ids, selected_ids)]
+        return ids
+
+    def project_visible_for_request(self, layer_idx, request_id, dims,
+                                    block_size, length=None):
+        """Low-dimensional visible-K projection for one request/layer.
+
+        Returns [1, padded_length, num_kv_heads, dims.numel()] in the KV dtype.
+        Hidden/reclaimed positions remain zero, matching the legacy
+        ``PagedRegionLayer.project_visible`` semantics.
+        """
+        state = self.states[request_id]
+        layer = self.layers[layer_idx]
+        if length is None:
+            length = self.pending_lengths.get(request_id, state.logical_length)
+        device = layer.kv_pool_k.device
+        hk = layer.num_kv_heads
+        d = layer.head_dim_k
+        pad = ((length + block_size - 1) // block_size) * block_size
+        out = torch.zeros((1, pad, hk, dims.numel()),
+                          dtype=layer.kv_pool_k.dtype, device=device)
+        page = self.geometry.page
+        intervals = self._intervals_for_layer(state, layer_idx, length)
+        for a, b in intervals:
+            first_page = a // page
+            last_page = (b - 1) // page
+            for logical_page in range(first_page, last_page + 1):
+                physical_id = state.block_table.get(logical_page)
+                if physical_id is None:
+                    continue
+                lo = max(a, logical_page * page)
+                hi = min(b, (logical_page + 1) * page)
+                positions = torch.arange(lo, hi, device=device, dtype=torch.long)
+                offsets = positions - logical_page * page
+                vals = layer.kv_pool_k[physical_id, 0, :, offsets, :]
+                # vals: [HK, n, D] -> [n, HK, D]
+                vals = vals.permute(1, 0, 2)[..., dims]
+                out[0, positions] = vals
+        return out
+
+    # ------------------------------------------------------------------
+    # Metadata preparation (common page table + per-layer sparse gather)
+    # ------------------------------------------------------------------
+    def new_step(self, active_req_ids):
+        self.active_req_ids = list(active_req_ids)
+        self.common_dirty = True
+
+    def _prepare_common(self, req_ids, query_lengths):
+        page = self.geometry.page
+        batch = len(req_ids)
+
+        self.query_start_loc_buf.zero_()
+        self.block_table_buf.fill_(self.layers[0].PAD_PAGE_ID)
+        self.slot_mapping_buf.fill_(PAD_SLOT)
+        self.pending_lengths.clear()
+
+        cumsum = 0
+        flat = 0
+        for b, request_id in enumerate(req_ids):
+            self.query_start_loc_buf[b] = cumsum
+            qlen = int(query_lengths[b]) if b < len(query_lengths) else 0
+            if request_id < 0 or request_id not in self.states:
+                cumsum += qlen
+                continue
+
+            state = self.states[request_id]
+            planned_length = state.logical_length + qlen
+
+            # 只预分配/更新 block_table，不推进 state.logical_length。
+            # 所有层共享同一 planned_length，避免层间状态分叉。
+            self._sync_block_table(state, planned_length)
+            self.pending_lengths[request_id] = planned_length
+
+            for t in range(qlen):
+                pos = state.logical_length + t
+                logical_page, offset = divmod(pos, page)
+                physical_id = state.block_table.get(logical_page)
+                if physical_id is None:
+                    raise RuntimeError(
+                        f'missing logical page {logical_page} for request {request_id}')
+                self.slot_mapping_buf[flat] = physical_id * page + offset
+                flat += 1
+
+            for logical_page, physical_id in state.block_table.items():
+                if logical_page < self.max_blocks:
+                    self.block_table_buf[b, logical_page] = physical_id
+            cumsum += qlen
+
+        self.query_start_loc_buf[batch] = cumsum
+        self.common_dirty = False
+
+    def _prepare_layer_gather(self, layer_idx, req_ids, selected_ids_by_req=None):
+        self.visible_lens_buf[layer_idx].zero_()
+        self.gather_indices_buf[layer_idx].fill_(INVALID_GATHER_IDX)
+        self._cpu_gather_staging.fill_(INVALID_GATHER_IDX)
+
+        for batch_idx, request_id in enumerate(req_ids):
+            if request_id < 0 or request_id not in self.states:
+                continue
+            state = self.states[request_id]
+            length = self.pending_lengths.get(request_id, state.logical_length)
+            intervals = self._intervals_for_layer(state, layer_idx, length)
+            total = sum(b - a for a, b in intervals)
+
+            selected = None
+            if selected_ids_by_req is not None:
+                selected = selected_ids_by_req.get(request_id)
+
+            if selected is None:
+                if total > self.max_visible_len:
+                    raise RuntimeError(
+                        f'request {request_id} layer {layer_idx} visible_len '
+                        f'{total} exceeds fixed capacity {self.max_visible_len}')
+                offset = 0
+                for a, interval_end in intervals:
+                    n = interval_end - a
+                    if n > 0:
+                        torch.arange(a, interval_end, dtype=torch.int32,
+                                     out=self._cpu_gather_staging[batch_idx, offset:offset + n])
+                        offset += n
+                ids = offset
+            else:
+                ids = self._visible_logical_ids_for_layer(
+                    state, layer_idx, selected, length=length)
+                if ids.numel() > self.max_visible_len:
+                    raise RuntimeError(
+                        f'request {request_id} layer {layer_idx} visible_len '
+                        f'{ids.numel()} exceeds fixed capacity '
+                        f'{self.max_visible_len}')
+                if ids.numel():
+                    self._cpu_gather_staging[batch_idx, :ids.numel()].copy_(ids)
+                ids = ids.numel()
+            self.visible_lens_buf[layer_idx, batch_idx] = ids
+
+        self.gather_indices_buf[layer_idx].copy_(
+            self._cpu_gather_staging, non_blocking=True)
+
+    def prepare_metadata(self, active_req_ids, current_layer_id,
+                         query_lengths=None, selected_ids_by_req=None):
+        if current_layer_id < 0 or current_layer_id >= self.n_layers:
+            raise ValueError('invalid layer id')
+        if self.common_dirty:
+            if query_lengths is None:
+                query_lengths = [
+                    1 if (rid >= 0 and rid in self.states) else 0
+                    for rid in active_req_ids
+                ]
+            self._prepare_common(active_req_ids, query_lengths)
+        self._prepare_layer_gather(
+            current_layer_id, active_req_ids, selected_ids_by_req)
+        return (
+            self.gather_indices_buf[current_layer_id],
+            self.visible_lens_buf[current_layer_id],
+        )
+
+    def commit_step(self):
+        """Advance request lengths exactly once after all layers finish.
+
+        ``_prepare_common`` only planned the next tokens; committing here keeps
+        every layer synchronized and keeps state mutation outside the captured
+        model graph.
+        """
+        for request_id, planned_length in self.pending_lengths.items():
+            state = self.states[request_id]
+            state.logical_length = planned_length
+            self._sync_block_table(state, state.logical_length)
+        self.pending_lengths.clear()
+
+
+    # ------------------------------------------------------------------
+    # Decode write
+    # ------------------------------------------------------------------
+    def write_decode(self, layer_idx, key_states, value_states, slot_mapping):
+        layer = self.layers[layer_idx]
+        if key_states.ndim != 4 or key_states.shape[-2] != 1:
+            raise ValueError('graph-ready decode KV must be one token per row')
+        if key_states.shape[0] != slot_mapping.shape[0]:
+            raise ValueError('request batch must match KV batch')
+        from ..ops.paged_region_kernels import paged_write_decode
+        return paged_write_decode(layer, key_states, value_states, slot_mapping)
+
+    def block_table(self):
+        return self.block_table_buf
+
+    def slot_mapping(self):
+        return self.slot_mapping_buf
+
+    def query_start_loc(self):
+        return self.query_start_loc_buf
+
+    def get_max_cache_shape(self):
+        return -1
+
+    def get_seq_length(self, layer_idx=0):
+        # 公共长度由 scheduler/state 维护；此接口仅兼容 HF attention 前置校验。
+        if self.states:
+            return max(state.logical_length for state in self.states.values())
+        return 0
