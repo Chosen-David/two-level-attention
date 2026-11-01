@@ -1,6 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
 ## 2026-11-01
+- [ ] [TL-GRAPH-REQUEST-ROWS-20261101] 修复 GraphReady EOS/重排后的 request→page 映射；主机回归通过，原生 CUDA/整步性能待验。([详情](task_details/TL-GRAPH-REQUEST-ROWS-20261101.md))
 - [x] [TL-STATIC-GATE-MAIN-20261101] 静态 near/far gate 接入 main，GLM 静态 artifact 随仓发布；Qwen3-8B 远端动态标定→freeze→decode 烟测通过。([详情](task_details/TL-STATIC-GATE-MAIN-20261101.md))
 
 - [x] [TL-GLM-NOPE-LAST32-FULL-20261101] `nope_last32` 全量 RULER64K+LongBench AVG5 dense/selected 跑完：1400/1400、2800/2800 arms、0失败；AVG5 dense 46.55 vs selected 44.88；独立验证已落盘。([详情](task_details/TL-GLM-AVG5-RULER-113-20261030.md))
@@ -278,3 +279,4 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 ## 2026-10-31 paged batch admission
 
 - [ ] [TL-PAGED-DUPLICATE-20261031] 拒绝重复活跃请求，防止同槽覆盖与长度重复递增；host修前复现、修后通过，native/GPU待验。[详情](task_details/TL-PAGED-DUPLICATE-20261031.md)。
+

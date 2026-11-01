@@ -83,7 +83,7 @@ def _build_cache(B, L, K, HQ, HK, D, DV, page):
     logical_ids = torch.arange(
         K, dtype=torch.int32, device='cuda').unsqueeze(0).expand(B, -1).contiguous()
     counts = torch.full((B,), K, dtype=torch.int32, device='cuda')
-    cache._store_gather_slots_batch(0, logical_ids, counts)
+    cache._store_gather_slots_batch(0, logical_ids, counts, req_ids)
 
     query = torch.randn(B, HQ, D, dtype=torch.bfloat16, device='cuda')
     query_to_req = torch.arange(B, dtype=torch.int32, device='cuda')
@@ -182,3 +182,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
