@@ -189,9 +189,10 @@ def paged_attention_selected(layer,q,selection,scale,*,ring_arithmetic=False):
     count=counts[0]
     active=torch.arange(width,device=ids.device)[None] < count[:,None]
     safe_ids=ids.clamp(0,length-1)
-    if torch.any(active & ~visible[safe_ids]):
+    if torch.any(active & ((ids < 0) | (ids >= length) | ~visible[safe_ids])):
         raise ValueError('selection references hidden/reclaimed KV')
-    if torch.any(count==0):raise ValueError('empty attention row')
+    if torch.any((count <= 0) | (count > width)):
+        raise ValueError('compact attention counts must be in [1, selection width]')
     K=int(count.max())
     attn_ids=torch.where(torch.arange(K,device=ids.device)[None] < count[:,None],
                          ids[:,:K], -1).contiguous()
