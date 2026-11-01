@@ -1408,7 +1408,7 @@ class GraphReadyPagedRegionCache:
                     for state in active_states):
                 ids, counts = _protected_selection_batch(
                     self, layer_idx, req_ids, indexer)
-                self._store_gather_slots_batch(layer_idx, ids, counts)
+                self._store_gather_slots_batch(layer_idx, ids, counts, req_ids)
                 for rid in req_ids:
                     if rid >= 0 and rid in self.states:
                         self.states[rid].first_decode_seeded = True
@@ -1916,7 +1916,8 @@ class GraphReadyPagedRegionCache:
     # ------------------------------------------------------------------
     # Metadata preparation (common page table + per-layer sparse gather)
     # ------------------------------------------------------------------
-    def _store_gather_slots(self, layer_idx, batch_idx, logical_ids, width):
+    def _store_gather_slots(self, layer_idx, batch_idx, logical_ids, width,
+                            *, request_id):
         """Convert logical token ids to absolute physical slots in-place.
 
         The attention kernel now consumes ``physical_page * PAGE + offset``
@@ -1945,7 +1946,8 @@ class GraphReadyPagedRegionCache:
             offsets = torch.remainder(ids, page_size)
 
         safe_pages = torch.clamp(pages, min=0, max=self.max_blocks - 1)
-        phys_pages = self.block_table_buf[batch_idx].gather(
+        # Page-table rows are persistent request slots; output rows are batch slots.
+        phys_pages = self.block_table_buf[request_id].gather(
             0, safe_pages.to(torch.int64))
         slots = phys_pages.to(torch.int32) * page_size + offsets.to(torch.int32)
         slots = torch.where(ids >= 0, slots,
@@ -1953,16 +1955,19 @@ class GraphReadyPagedRegionCache:
         self.gather_indices_buf[layer_idx, batch_idx, :width].copy_(
             slots, non_blocking=True)
 
-    def _store_gather_slots_batch(self, layer_idx, logical_ids, counts):
+    def _store_gather_slots_batch(self, layer_idx, logical_ids, counts, request_ids):
         """Batch version of ``_store_gather_slots`` for fixed-width varlen rows.
 
         ``logical_ids`` is ``[B, MAX_WIDTH]`` and ``counts`` is ``[B]``.  Rows
         beyond their count are already sentinel-padded by the caller; this
-        helper converts all rows to absolute physical slots in one GPU pass.
+        helper converts all rows without a per-request Python loop.
+        ``request_ids`` maps those batch rows to persistent page-table rows.
         """
         if logical_ids.numel() == 0 or counts.numel() == 0:
             return
         batch, width = logical_ids.shape
+        if len(request_ids) != batch:
+            raise ValueError('request_ids must align with logical_ids rows')
         ids = logical_ids
         if ids.device != self.gather_indices_buf.device:
             ids = ids.to(self.gather_indices_buf.device)
@@ -1981,11 +1986,15 @@ class GraphReadyPagedRegionCache:
             offsets = torch.remainder(ids, page_size)
 
         safe_pages = torch.clamp(pages, min=0, max=self.max_blocks - 1)
-        phys_pages = self.block_table_buf[:batch].gather(
-            1, safe_pages.to(torch.int64))
+        # Index only selected pages rather than materializing a reordered [B,M]
+        # page table. Padding rows use row 0 safely and are masked below.
+        request_rows = torch.tensor(
+            request_ids, dtype=torch.int64, device=ids.device).unsqueeze(1)
+        phys_pages = self.block_table_buf[
+            request_rows.clamp(min=0), safe_pages.to(torch.int64)]
         slots = phys_pages.to(torch.int32) * page_size + offsets.to(torch.int32)
         slots = torch.where(
-            ids >= 0, slots,
+            (ids >= 0) & (request_rows >= 0), slots,
             torch.full_like(slots, INVALID_GATHER_IDX))
         self.gather_indices_buf[layer_idx, :batch, :width].copy_(
             slots, non_blocking=True)
@@ -2090,7 +2099,8 @@ class GraphReadyPagedRegionCache:
                                      out=self._gather_logical_tmp[offset:offset + n])
                         offset += n
                 self._store_gather_slots(layer_idx, batch_idx,
-                                         self._gather_logical_tmp, total)
+                                         self._gather_logical_tmp, total,
+                                         request_id=request_id)
                 self.visible_lens_buf[layer_idx, batch_idx] = total
             else:
                 if isinstance(selected, tuple):
@@ -2119,7 +2129,8 @@ class GraphReadyPagedRegionCache:
                     self.visible_lens_buf[layer_idx, batch_idx] = width
                 if width:
                     self._store_gather_slots(
-                        layer_idx, batch_idx, selected, width)
+                        layer_idx, batch_idx, selected, width,
+                        request_id=request_id)
 
     def prepare_metadata(self, active_req_ids, current_layer_id,
                          query_lengths=None, selected_ids_by_req=None):
@@ -2246,3 +2257,4 @@ class GraphReadyPagedRegionCache:
                 for layer in self.layers
             ],
         }
+
