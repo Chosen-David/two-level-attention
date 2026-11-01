@@ -1,6 +1,8 @@
 # two-level-attention 项目任务索引（AI 维护）
 
 ## 2026-11-01
+
+- [ ] [TL-PAGED-COMPACT-BOUNDS-20261101] Compact paged attention 校验原始有效 ID 与 counts 范围，避免截断校验后交付越界 ID；8 项 host 普通/-O通过，Torch CPU/CUDA待验，无 GPU 性能结论。[详情](task_details/TL-PAGED-COMPACT-BOUNDS-20261101.md)。
 - [x] [TL-GLM-NOPE-LAST32-FULL-20261101] `nope_last32` 全量 RULER64K+LongBench AVG5 dense/selected 跑完：1400/1400、2800/2800 arms、0失败；AVG5 dense 46.55 vs selected 44.88；独立验证已落盘。([详情](task_details/TL-GLM-AVG5-RULER-113-20261030.md))
 
 - [x] [TL-GLM-NOPE-LAST32-ALIGNED-20261101] `nope_last32` 在 clean `origin/main` `42821f81` 重跑同口径全量，排除旧 RULER EOS 与 GLM PagedRegionCache 对齐 bug：1400/1400、2800/2800 arms、0失败；RULER MultiKey2 dense 90 vs selected 28，LongBench AVG5 dense 46.55 vs selected 45.27。([详情](task_details/TL-GLM-AVG5-RULER-113-20261030.md))
