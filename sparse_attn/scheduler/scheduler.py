@@ -200,9 +200,13 @@ class ContinuousBatchScheduler:
         device_buf[:batch].copy_(next_tokens, non_blocking=True)
 
         self._copy_stream.wait_stream(torch.cuda.current_stream())
-        self._token_cpu[idx][:batch].copy_(
-            device_buf[:batch], non_blocking=True)
-        self._copy_events[idx].record(self._copy_stream)
+        # The completion event must cover D2H before the host reads tokens/EOS.
+        # wait_stream establishes a dependency; it does not select that stream.
+        with torch.cuda.stream(self._copy_stream):
+            self._token_cpu[idx][:batch].copy_(
+                device_buf[:batch], non_blocking=True)
+            self._copy_events[idx].record(self._copy_stream)
 
         self._pending_copy_idx = idx
         self._pending_batch = batch
+
