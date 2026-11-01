@@ -1,0 +1,107 @@
+{
+  "scope": "Recoverable working-tree cleanup; no history rewriting. Not a new scientific result.",
+  "baseline_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559",
+  "date_utc": "2026-11-01",
+  "removed": [
+    {
+      "path": "agent_doc/advice/dac_manuscript/figures/observation_current.pdf",
+      "git_blob": "a684ea1af48760f9a1b92559851ebca79ccdd639",
+      "bytes": 110479,
+      "reason": "Superseded derived figure; current manuscript/build uses o_observation family. Historical inputs and notes retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/advice/dac_manuscript/figures/observation_current.png",
+      "git_blob": "6dee7f8b06b8e6688ec66c82d2a77ddeef47bceb",
+      "bytes": 53786,
+      "reason": "Superseded derived figure; current manuscript/build uses o_observation family. Historical inputs and notes retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/advice/dac_manuscript/figures/observation_current.svg",
+      "git_blob": "cbbb12fa23d5024b1f129b422df80e2c470b7c35",
+      "bytes": 72000,
+      "reason": "Superseded derived figure; current manuscript/build uses o_observation family. Historical inputs and notes retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/advice/dac_manuscript/figures/observation_current_zh.pdf",
+      "git_blob": "ec7740873c7e93e32cdc3450b6bcdd3d9d53cf25",
+      "bytes": 97970,
+      "reason": "Superseded derived figure; current manuscript/build uses o_observation family. Historical inputs and notes retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/advice/dac_manuscript/figures/observation_current_zh.png",
+      "git_blob": "3a7812f0de461519b18c21b56b80e23836547e8f",
+      "bytes": 59544,
+      "reason": "Superseded derived figure; current manuscript/build uses o_observation family. Historical inputs and notes retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/advice/dac_manuscript/figures/observation_current_zh.svg",
+      "git_blob": "d9eb28df75faa400dac69f1e0cdd7025e85b5ef1",
+      "bytes": 95831,
+      "reason": "Superseded derived figure; current manuscript/build uses o_observation family. Historical inputs and notes retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/advice/other_paper_pdf/StreamingLLM.pdf",
+      "git_blob": "e209dfe7ca1c34b9d35383918eb5c9919d112642",
+      "bytes": 16952848,
+      "reason": "Byte-identical duplicate of StreamingLLM-2309.17453v4.pdf; canonical file retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/results/far_skip_optimized_20261025/paired_cpu_holdout_contended.json",
+      "git_blob": "10228d2872b40cac4570da1cfda83b9588ab1bf6",
+      "bytes": 20151,
+      "reason": "Explicitly excluded intermediate/contended CPU result in retained summary.json; final raw, negative findings, validation and profiler retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/results/far_skip_optimized_20261025/paired_cpu_holdout_initial.json",
+      "git_blob": "3a53978fb163ea3f405d907e5bf31897254f04b1",
+      "bytes": 20166,
+      "reason": "Explicitly excluded intermediate/contended CPU result in retained summary.json; final raw, negative findings, validation and profiler retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/results/far_skip_optimized_20261025/paired_cpu_holdout_pre_validation_guard.json",
+      "git_blob": "a5e541c32d61536fdba89f209cc4e058339c1520",
+      "bytes": 20621,
+      "reason": "Explicitly excluded intermediate/contended CPU result in retained summary.json; final raw, negative findings, validation and profiler retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/results/far_skip_optimized_20261025/paired_cpu_initial.json",
+      "git_blob": "cf67d8df7d2865b4af31dbd1c163e81aabfc55b3",
+      "bytes": 32309,
+      "reason": "Explicitly excluded intermediate/contended CPU result in retained summary.json; final raw, negative findings, validation and profiler retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    },
+    {
+      "path": "agent_doc/results/far_skip_optimized_20261025/paired_cpu_pre_validation_guard.json",
+      "git_blob": "e769e3fc43bee9464c3c0d1d172ae90a7ac9ad27",
+      "bytes": 32782,
+      "reason": "Explicitly excluded intermediate/contended CPU result in retained summary.json; final raw, negative findings, validation and profiler retained.",
+      "recover_from_commit": "dbbba689e19d0d1507d2005a7a4fb4227d281559"
+    }
+  ],
+  "retained": [
+    "All nfa_ablation_20261030 evidence pending field-level storage review",
+    "Fonts and required license/source archives",
+    "Observation inputs, current figures and historical explanatory notes",
+    "far_skip final paired_cpu.json, paired_cpu_holdout.json, operator_profile_cpu.json, summary.json, validation.json, tests.txt"
+  ],
+  "verification": {
+    "independent_review": true,
+    "checks": "Exact duplicate blob; current paper/build text dependency review; exclusion list and final raw references checked. GitHub code search incomplete, not treated as global absence proof.",
+    "not_run": [
+      "GPU",
+      "model experiments",
+      "full paper compilation"
+    ]
+  },
+  "caveat": "Working-tree bytes decrease; Git historical objects remain. Removed historical paths remain recoverable at baseline commit."
+}
