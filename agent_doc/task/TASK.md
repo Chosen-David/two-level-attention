@@ -1,7 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
 ## 2026-11-02
-- [ ] [TL-GRAPH-NEAR-RESIDENCY-20261102] GraphReady near-only 保留历史 KV，避免 near→far 后读取重分配页；18 组主机生命周期回归通过，原生 GPU 待验。([详情](task_details/TL-GRAPH-NEAR-RESIDENCY-20261102.md))
+- [ ] [TL-GRAPH-NEAR-RESIDENCY-20261102] GraphReady near-only 保留历史KV；both-skip消除near页过量预留（示例69→7页/请求）；18组KV生命周期及768组容量回归通过，原生GPU/性能待验。([详情](task_details/TL-GRAPH-NEAR-RESIDENCY-20261102.md))
 
 ## 2026-11-01
 - [x] [TL-STATIC-GATE-MAIN-20261101] 静态 near/far gate 接入 main，GLM 静态 artifact 随仓发布；Qwen3-8B 远端动态标定→freeze→decode 烟测通过。([详情](task_details/TL-STATIC-GATE-MAIN-20261101.md))
