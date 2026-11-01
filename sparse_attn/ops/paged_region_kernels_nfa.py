@@ -384,12 +384,14 @@ def project_visible_varlen_kernel(kv_pool_k, block_table, lengths,
         PAD, PAGE: tl.constexpr, SINK: tl.constexpr,
         NEAR_LEN: tl.constexpr, WINDOW: tl.constexpr,
         MAX_BLOCKS: tl.constexpr, HK: tl.constexpr, HEAD_DIM: tl.constexpr,
-        DIM_NUMEL: tl.constexpr,
+        DIM_NUMEL: tl.constexpr, BLOCK: tl.constexpr,
     ):
         pid = tl.program_id(0)
-        length = tl.load(len_ptr + pid).to(tl.int32)
-        skip_far = tl.load(skip_far_ptr + pid).to(tl.int32)
-        skip_near = tl.load(skip_near_ptr + pid).to(tl.int32)
+        req = tl.program_id(1)
+
+        length = tl.load(len_ptr + req).to(tl.int32)
+        skip_far = tl.load(skip_far_ptr + req).to(tl.int32)
+        skip_near = tl.load(skip_near_ptr + req).to(tl.int32)
         far_on = skip_far == 0
         near_on = skip_near == 0
 
@@ -400,45 +402,51 @@ def project_visible_varlen_kernel(kv_pool_k, block_table, lengths,
         far_hi = tl.minimum(
             near_hi, tl.maximum(sink_hi, far_blk * PAGE))
 
-        for tok in range(0, PAD):
-            visible = tok < sink_hi
-            visible = visible | (
-                far_on & (tok >= sink_hi) & (tok < far_hi))
-            visible = visible | (
-                near_on & (tok >= far_hi) & (tok < near_hi))
-            visible = visible | (
-                (tok >= near_hi) & (tok < length))
+        total = PAD * HK * DIM_NUMEL
+        row = pid * BLOCK + tl.arange(0, BLOCK)
+        out_mask = row < total
 
-            for h in range(0, HK):
-                for d in range(0, DIM_NUMEL):
-                    dst = (out_ptr
-                           + pid * PAD * HK * DIM_NUMEL
-                           + tok * HK * DIM_NUMEL
-                           + h * DIM_NUMEL
-                           + d)
-                    if visible:
-                        lp = tok // PAGE
-                        if lp < MAX_BLOCKS:
-                            off = tok % PAGE
-                            phys = tl.load(bt_ptr + pid * MAX_BLOCKS + lp)
-                            dim = tl.load(dims_ptr + d)
-                            src = (kv_ptr
-                                   + phys.to(tl.int64) * HK * PAGE * HEAD_DIM
-                                   + h * PAGE * HEAD_DIM
-                                   + off * HEAD_DIM
-                                   + dim)
-                            tl.store(dst, tl.load(src))
-                        else:
-                            tl.store(dst, 0.0)
-                    else:
-                        tl.store(dst, 0.0)
+        tok = row // (HK * DIM_NUMEL)
+        rem = row % (HK * DIM_NUMEL)
+        head = rem // DIM_NUMEL
+        dim_idx = rem % DIM_NUMEL
 
-    grid = (batch,)
+        visible = tok < sink_hi
+        visible = visible | (
+            far_on & (tok >= sink_hi) & (tok < far_hi))
+        visible = visible | (
+            near_on & (tok >= far_hi) & (tok < near_hi))
+        visible = visible | (
+            (tok >= near_hi) & (tok < length))
+
+        lp = tok // PAGE
+        off = tok % PAGE
+        page_valid = lp < MAX_BLOCKS
+        phys = tl.load(
+            bt_ptr + req * MAX_BLOCKS + lp,
+            mask=out_mask & page_valid, other=0).to(tl.int64)
+        dim = tl.load(
+            dims_ptr + dim_idx, mask=out_mask, other=0).to(tl.int64)
+
+        src = (kv_ptr
+               + phys * HK * PAGE * HEAD_DIM
+               + head * PAGE * HEAD_DIM
+               + off * HEAD_DIM
+               + dim)
+        load_mask = out_mask & visible & page_valid
+        val = tl.load(src, mask=load_mask, other=0.0)
+        tl.store(
+            out_ptr + req * PAD * HK * DIM_NUMEL + row,
+            val, mask=out_mask)
+
+    block = 256
+    grid = (triton.cdiv(pad * hk * dims_numel, block), batch)
     _kernel[grid](
         kv_pool_k, block_table, lengths, skip_far, skip_near,
         out, dims,
         PAD=pad, PAGE=page, SINK=sink, NEAR_LEN=near_len, WINDOW=window,
         MAX_BLOCKS=block_table.shape[1], HK=hk, HEAD_DIM=head_dim,
-        DIM_NUMEL=dims_numel,
+        DIM_NUMEL=dims_numel, BLOCK=block,
+        num_warps=4,
     )
     return out
