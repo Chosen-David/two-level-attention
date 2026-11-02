@@ -147,6 +147,9 @@ _TREATMENT_FIELD_DEFAULTS = {
     "nfa_near_len": None,
     "nfa_boundary_bypass": True,
     "nfa_l2_quant": False,
+    # 架构收敛（2026-11-02）：GraphReady-only 主线的静态 Gate 实验开关。
+    # 默认 False = 动态 Gate + Layer 串行 + 单层 Req-Batched。
+    "nfa_enable_static_gate": False,
 }
 
 # 079②：文件型配置字段集合（值非 None → 内容身份解析，见上）
@@ -1209,6 +1212,9 @@ def get_method_name_with_info(args, snapshot=None):
             e155 += "_bb0"
         if getattr(args, "nfa_l2_quant", False):
             e155 += "_lq4"
+        # 架构收敛（2026-11-02）：静态 Gate 实验开关默认关闭，仅在开启时加后缀。
+        if getattr(args, "nfa_enable_static_gate", False):
+            e155 += "_sgate"
         # 076（TL-E121-OUTPUT-ID）：可读段逐位不动（B09 口径），追加
         # canonical treatment hash 尾段 _h<hash10>——全部输出相关参数
         # （far/near method/select、subspace 具体值、投影基、per_q_head、

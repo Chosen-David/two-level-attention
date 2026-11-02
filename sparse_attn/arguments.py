@@ -384,6 +384,11 @@ def _add_nfa_args(parser: argparse.ArgumentParser):
                             '质量-速度旋钮，e2e 双臂判决）')
     group.add_argument('--nfa_dyn_dgate_rows', type=_parse_dgate_rows, default=256,
                        help='标定用 prefill q 尾行数（与 observe_prefill_q E85f 同口径，必须 >= 1）')
+    # ---- 架构收敛（2026-11-02）：只保留 GraphReadyPagedRegionCache + GraphRunner ----
+    # 默认主线 = 动态 Gate + Layer 串行 + 单层 Req-Batched selector。
+    group.add_argument('--nfa_enable_static_gate', type=lambda x: str(x).lower() != 'false', default=False,
+                       help='实验特性：从预计算 JSON 加载静态 Gate（skip_far/skip_near），'
+                            '替代 prefill 期动态标定。默认 False = 动态 Gate 为主线。')
     return parser
 
 def parse_args():

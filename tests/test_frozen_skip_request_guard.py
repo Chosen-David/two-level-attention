@@ -9,6 +9,8 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 from benchmark.LongBench.prefill_frozen_skip import generate, generate_native
 from sparse_attn.policies.frozen_gate import GateConfig
 from sparse_attn.ops import eager_decoding
+from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
+from sparse_attn.patches import register_patch
 
 
 @pytest.fixture
@@ -23,12 +25,17 @@ def guarded_request(monkeypatch):
                         num_key_value_heads=2, head_dim=8, attention_dropout=0.)
     config._attn_implementation = 'sdpa'
     model = Qwen3ForCausalLM(config).eval()
-    model.generation_config.eos_token_id = None
+    assert register_patch(model, nfa_args()) == config.num_hidden_layers
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = model.to(device=device, dtype=torch.bfloat16 if device == 'cuda' else torch.float32)
+    model.generation_config.eos_token_id = []
     tokenizer = SimpleNamespace(decode=lambda ids, **kw: ' '.join(map(str, ids)))
     def run(kind):
         if kind == 'segmented':
-            return generate(model, tokenizer, [3, 4, 5, 6], 3, GateConfig(), 'cpu')
-        return generate_native(model, [3, 4, 5, 6], 3, 'cpu')
+            if device != 'cuda':
+                pytest.skip('GraphReady decode requires CUDA')
+            return generate(model, tokenizer, [3, 4, 5, 6], 3, GateConfig(), device)
+        return generate_native(model, [3, 4, 5, 6], 3, device)
     yield model, flag, run
     torch.set_num_threads(old_threads)
 

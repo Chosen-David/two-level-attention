@@ -1,0 +1,35 @@
+{
+  "protocol_version": 1,
+  "fixed_before_candidate": true,
+  "correctness": {
+    "native_prefill_logits_sha256": "exact match between legacy and candidate",
+    "next_token_id": "exact match",
+    "dynamic_gate_decisions": "exact match for every layer and region",
+    "core_token_ids": "exact ordered IDs for every layer and region; no local Top-K approximation",
+    "region_statistics": "mean/p95/max use the original definitions; absolute error <= 1e-6",
+    "core_aggregation": "normalize each complete causal query row first, then average heads and query positions",
+    "static_gate": "core-only path preserves ordered IDs exactly",
+    "decode": "eager/Graph token identity remains exact"
+  },
+  "performance": {
+    "design": "locked GPU, independent process per run, at least three paired repetitions, native/A/B measurements with identical input and backend",
+    "primary_metrics": [
+      "full prefill wall time",
+      "dynamic-minus-native profiling overhead",
+      "peak allocated memory"
+    ],
+    "candidate_gate": {
+      "profiling_overhead_reduction_vs_A": ">= 40% at 32K/64K/128K",
+      "full_dynamic_prefill_regression_vs_A": "<= 2%",
+      "native_attention_replacement": "not allowed unless separately proven faster"
+    },
+    "low_overhead_claim": "allowed only if candidate dynamic-minus-native overhead <= 10% of native full prefill at 32K/64K/128K; otherwise report the measured value without claiming low overhead"
+  },
+  "candidate_comparison": {
+    "A": "independent legacy region and core profiling",
+    "B": "one shared tail attention normalization producing both region mass and core scores",
+    "C": "native LSE plus bounded mass recomputation plus required core scan",
+    "selection": "choose B if C does not outperform B after the complete core-token cost is included"
+  },
+  "hygiene": "GPU memory.used < 500 MiB and no compute process before launch; external nvidia-smi monitoring throughout; polluted runs are invalid"
+}

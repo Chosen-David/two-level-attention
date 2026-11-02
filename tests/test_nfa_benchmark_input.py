@@ -1,0 +1,49 @@
+"""NFA 端到端性能入口的长上下文身份与长度门禁。"""
+import json
+from types import SimpleNamespace
+
+import pytest
+import torch
+
+from benchmark.efficiency.benchmark_nfa_end_to_end import _load_input
+
+
+class _StubTokenizer:
+    def __init__(self, length):
+        self.length = length
+
+    def __call__(self, text, return_tensors, truncation):
+        assert return_tensors == 'pt'
+        assert truncation is False
+        return SimpleNamespace(
+            input_ids=torch.zeros((1, self.length), dtype=torch.long))
+
+
+def _args(root, provenance='native-ruler'):
+    return SimpleNamespace(
+        data_root=str(root), context_length=32768, task='niah_single_1',
+        sample_index=0, input_provenance=provenance)
+
+
+def _write_input(root):
+    directory = root / '32768'
+    directory.mkdir(parents=True)
+    (directory / 'niah_single_1.jsonl').write_text(
+        json.dumps({'index': 7, 'input': 'stub'}) + '\n', encoding='utf-8')
+
+
+def test_input_receipt_binds_explicit_native_provenance(tmp_path, monkeypatch):
+    monkeypatch.setattr(torch.Tensor, 'cuda', lambda self: self)
+    _write_input(tmp_path)
+    ids, receipt = _load_input(_args(tmp_path), _StubTokenizer(32612))
+    assert ids.shape == (32612,)
+    assert receipt['actual_prompt_tokens'] == 32612
+    assert receipt['sample_id'] == 7
+    assert receipt['provenance'] == 'native-ruler'
+
+
+def test_short_placeholder_cannot_impersonate_long_context(tmp_path, monkeypatch):
+    monkeypatch.setattr(torch.Tensor, 'cuda', lambda self: self)
+    _write_input(tmp_path)
+    with pytest.raises(ValueError, match='prompt length mismatch'):
+        _load_input(_args(tmp_path), _StubTokenizer(12))

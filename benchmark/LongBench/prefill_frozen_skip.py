@@ -1,5 +1,6 @@
 """Paired screen: far eviction, near staging, and prefill-frozen region gates."""
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -17,7 +18,7 @@ from benchmark.LongBench.eval import sample_score
 from sparse_attn.policies.region_geometry import RegionGeometry
 from sparse_attn.policies.frozen_gate import GateConfig
 from sparse_attn.engine.frozen_runner import (
-    complete_frozen_request, prefill_frozen_request)
+    complete_frozen_request, decode_frozen_request, prefill_frozen_request)
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -55,37 +56,51 @@ def prepare_ids(tokenizer, row, dataset, prompt, context_cap):
     if original_length > context_cap:
         half = context_cap//2
         text = tokenizer.decode(ids[:half], skip_special_tokens=True)+tokenizer.decode(ids[-(context_cap-half):], skip_special_tokens=True)
+    material_text = text
     if dataset != 'repobench-p':
-        text = tokenizer.apply_chat_template([dict(role='user', content=text)], tokenize=False,
-                    add_generation_prompt=True, enable_thinking=False)
-    ids = tokenizer(text, add_special_tokens=False).input_ids
-    if not ids:
-        raise ValueError('empty prompt')
-    return ids, dict(raw_tokens=original_length, input_tokens=len(ids), truncated=original_length>context_cap,
-                     input_sha256=hashlib.sha256(json.dumps(ids).encode()).hexdigest())
+        messages = [dict(role='user', content=text)]
+        material_text = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=False,
+            enable_thinking=False)
+        full_text = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True,
+            enable_thinking=False)
+        if not full_text.startswith(material_text):
+            raise ValueError('chat generation suffix is not a strict prompt suffix')
+    else:
+        full_text = material_text
+    ids = tokenizer(full_text, add_special_tokens=False).input_ids
+    material_ids = tokenizer(material_text, add_special_tokens=False).input_ids
+    if not ids or ids[:len(material_ids)] != material_ids:
+        raise ValueError('material tokenization is not a prefix of the full prompt')
+    suffix_ids = ids[len(material_ids):]
+    return material_ids, suffix_ids, dict(
+        raw_tokens=original_length, input_tokens=len(ids),
+        material_tokens=len(material_ids), suffix_tokens=len(suffix_ids),
+        truncated=original_length>context_cap,
+        input_sha256=hashlib.sha256(json.dumps(ids).encode()).hexdigest(),
+        material_sha256=hashlib.sha256(
+            json.dumps(material_ids).encode()).hexdigest(),
+        suffix_sha256=hashlib.sha256(
+            json.dumps(suffix_ids).encode()).hexdigest())
 
 
 @torch.inference_mode()
 @eager_decoding_request_guard()
-def generate(model, tokenizer, ids, max_new_tokens, config, device):
+def generate(model, tokenizer, ids, max_new_tokens, config, device, suffix_ids=()):
     geometry = RegionGeometry(max_new_tokens=max_new_tokens)
     eos = model.generation_config.eos_token_id
     eos = eos if isinstance(eos, list) else [eos]
     start = time.time()
     with torch.inference_mode():
         out, audit = prefill_frozen_request(
-            model, torch.tensor([ids], device=device), config, geometry)
-        cache = out.past_key_values
-        generated = []
-        for _ in range(max_new_tokens):
-            token = out.logits[:, -1].argmax(-1, keepdim=True)
-            generated.append(int(token))
-            if int(token) in eos or len(generated) == max_new_tokens:
-                break
-            out = model(token, past_key_values=cache,
-                        attention_mask=(None if model.config.model_type == 'glm4_moe_lite'
-                                        else {'full_attention':None}),
-                        use_cache=True, logits_to_keep=1)
+            model, torch.tensor([ids], device=device), config, geometry,
+            suffix_length=len(suffix_ids))
+        generated, cache = decode_frozen_request(
+            model, out, max_new_tokens=max_new_tokens, eos_ids=eos,
+            pad_token_id=getattr(model.config, 'pad_token_id', None) or 0,
+            capture_graph=torch.device(device).type == 'cuda',
+            suffix_ids=suffix_ids)
         audit = complete_frozen_request(model, cache, len(generated), audit)
     result = dict(generated_ids=generated, prediction=tokenizer.decode(generated, skip_special_tokens=True),
         generated_tokens=len(generated), wall_seconds=time.time()-start, **audit,
@@ -94,22 +109,39 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device):
     return result
 
 
+@contextmanager
+def _native_attention_modules(model):
+    """仅在显式 dense 对照臂中临时恢复原生 attention。"""
+    patched = []
+    for module in model.modules():
+        original = getattr(module, '_nfa_original_forward', None)
+        if original is not None:
+            patched.append((module, module.forward))
+            module.forward = original
+    try:
+        yield
+    finally:
+        for module, patched_forward in reversed(patched):
+            module.forward = patched_forward
+
+
 @torch.inference_mode()
 @eager_decoding_request_guard()
 def generate_native(model, ids, max_new_tokens, device):
     cache = DynamicCache(config=model.config)
-    if getattr(model, '_frozen_nfa', False):
-        for layer in model.model.layers:
-            layer.self_attn.indexer.clear()
-            layer.self_attn.indexer.skip_far = False
-    out = model(torch.tensor([ids], device=device), past_key_values=cache, use_cache=True, logits_to_keep=1)
-    eos = model.generation_config.eos_token_id
-    eos = eos if isinstance(eos,list) else [eos]
-    generated = []
-    for _ in range(max_new_tokens):
-        token = out.logits[:, -1].argmax(-1, keepdim=True); generated.append(int(token))
-        if int(token) in eos or len(generated) == max_new_tokens: break
-        out = model(token, past_key_values=cache, use_cache=True, logits_to_keep=1)
+    with _native_attention_modules(model):
+        out = model(torch.tensor([ids], device=device), past_key_values=cache,
+                    use_cache=True, logits_to_keep=1)
+        eos = model.generation_config.eos_token_id
+        eos = eos if isinstance(eos,list) else [eos]
+        generated = []
+        for _ in range(max_new_tokens):
+            token = out.logits[:, -1].argmax(-1, keepdim=True)
+            generated.append(int(token))
+            if int(token) in eos or len(generated) == max_new_tokens:
+                break
+            out = model(token, past_key_values=cache, use_cache=True,
+                        logits_to_keep=1)
     return generated
 
 
@@ -180,7 +212,7 @@ def main():
         indices = select_row_indices(len(rows), args.samples, args.seed)
         selected[ds] = indices
         inputs.extend((ds,i,rows[i]) for i in indices)
-    protocol = dict(schema='frozen-near-far-screen-v3-independent-gates',model=args.model,context_cap=args.context_cap,
+    protocol = dict(schema='frozen-near-far-screen-v4-material-suffix',model=args.model,context_cap=args.context_cap,
         **sampling_metadata(args.samples, dataset_counts),
         seed=args.seed,statistic=args.statistic,thresholds=thresholds,
         datasets=tasks,selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
@@ -191,6 +223,7 @@ def main():
         torch=torch.__version__,transformers=transformers.__version__,dtype='bfloat16',world_size=args.world_size,
         git_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         eviction='far-only: evict far; near-only: keep attention-invisible near staging and migrate to far; both: sink+SWA only',
+        generation_protocol='material prefill; complete chat generation suffix consumed token-by-token; output contains answer tokens only',
         calibration='query-relative page boundaries, last256 rows; head means; independent near/far mass comparisons, no joint budget')
     if args.attention == 'nfa':
         from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
@@ -233,7 +266,9 @@ def main():
     verified = False
     for ds,row_index,row in shard_inputs(inputs, args.rank, args.world_size):
         path = outdir/'requests'/ds/f'{row_index:04d}.json'
-        ids, input_info = prepare_ids(tokenizer,row,ds,prompts[ds],args.context_cap)
+        material_ids, suffix_ids, input_info = prepare_ids(
+            tokenizer,row,ds,prompts[ds],args.context_cap)
+        ids = material_ids + suffix_ids
         if len(ids)+lengths[ds] > model.config.max_position_embeddings:
             raise ValueError('prompt plus generation exceeds native context')
         if path.exists():
@@ -246,7 +281,8 @@ def main():
         for arm, config in arms:
             if arm in record['arms']: continue
             atomic_json(outdir/f'heartbeat_rank{args.rank}.json',dict(pid=os.getpid(),time=time.time(),dataset=ds,row=row_index,arm=arm))
-            result = generate(model,tokenizer,ids,lengths[ds],config,args.device)
+            result = generate(model,tokenizer,material_ids,lengths[ds],config,args.device,
+                              suffix_ids=suffix_ids)
             metric_ds = 'repobench' if ds == 'repobench-p' else ds
             result['score'] = sample_score(metric_ds,result['prediction'],row['answers'],row.get('all_classes',[]))
             if arm == 'full' and args.verify_native_full and not verified:

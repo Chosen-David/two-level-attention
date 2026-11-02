@@ -18,8 +18,9 @@ def _args(**overrides):
     values = dict(
         model='Qwen3-8B', model_path='/unused/model', task='niah_single_1',
         context_length=8192, data_root='/unused/data', output_dir='/unused/out',
-        max_num=1, yarn=False, yarn_factor=None, method='nfa', t='contract',
+        max_num=1, skip=0, yarn=False, yarn_factor=None, method='nfa', t='contract',
         pred_postfix='', nfa_prefill_frozen_regions=True,
+        nfa_static_gate=False, nfa_static_gate_path=None,
         nfa_frozen_region_mode='dual', nfa_frozen_region_epsilon=.05,
         nfa_frozen_region_statistic='mean', nfa_frozen_region_rows=256,
         tia_block_size=64, tia_level1_topk=128, tia_level2_topk=1024,
@@ -62,13 +63,29 @@ def test_valid_configuration_is_resolved_before_patch_registration(monkeypatch):
     config = _config()
     gate, geometry = pred_ruler._configure_frozen_regions(args, config)
     assert gate == GateConfig()
-    assert geometry == RegionGeometry(max_new_tokens=pred_ruler.MAX_GEN)
+    assert geometry == RegionGeometry(max_new_tokens=128)
     assert config._attn_implementation == 'sdpa'
     assert os.environ['NFA_OPERATOR_MODE'] == 'off'
     assert os.environ['NFA_FROZEN_EAGER_REFERENCE'] == '0'
-    assert os.environ['NFA_CUDA_GRAPH'] == 'off'
+    assert os.environ['NFA_CUDA_GRAPH'] == 'auto'
     assert args._frozen_region_gate is gate
     assert args._frozen_region_geometry is geometry
+
+
+@pytest.mark.parametrize('task,budget', [
+    ('niah_single_1', 128), ('niah_multiquery', 128),
+    ('cwe', 120), ('fwe', 50), ('vt', 30),
+])
+def test_task_generation_budget_drives_geometry(task, budget):
+    args = _args(task=task)
+    _, geometry = pred_ruler._configure_frozen_regions(args, _config())
+    assert geometry.max_new_tokens == budget
+    assert args.nfa_frozen_region_max_new_tokens == budget
+
+
+def test_unknown_task_generation_budget_fails_closed():
+    with pytest.raises(ValueError, match='generation budget'):
+        pred_ruler._ruler_max_new_tokens('unknown')
 
 
 def test_real_cli_accepts_environment_only_sparse_flags(monkeypatch):
@@ -106,13 +123,10 @@ def test_unvalidated_geometry_or_method_fails_closed(field, value):
         pred_ruler._configure_frozen_regions(_args(**{field: value}), _config())
 
 
-def test_non_qwen_and_graph_execution_fail_closed(monkeypatch):
+def test_non_qwen_fails_closed():
     with pytest.raises(ValueError, match='Qwen3'):
         pred_ruler._configure_frozen_regions(
             _args(), SimpleNamespace(model_type='llama', head_dim=128))
-    monkeypatch.setenv('NFA_CUDA_GRAPH', 'on')
-    with pytest.raises(ValueError, match='eager execution only'):
-        pred_ruler._configure_frozen_regions(_args(), _config())
 
 
 def test_manifest_is_byte_identical_when_off_and_tracks_gate_and_geometry():
@@ -150,6 +164,13 @@ class _Tokenizer:
 
     def decode(self, ids, skip_special_tokens):
         return ' '.join(map(str, ids))
+
+
+def test_ruler_eos_ids_include_all_model_terminators_but_not_newline():
+    tokenizer = _Tokenizer()
+    model = SimpleNamespace(
+        generation_config=SimpleNamespace(eos_token_id=[2, 1, 2]))
+    assert pred_ruler._ruler_eos_ids(model, tokenizer) == (2, 1)
 
 
 class _Model:
@@ -202,17 +223,39 @@ def _run_ruler_main(monkeypatch, tmp_path, complete):
     def register(model, args, snapshot):
         # Environment and geometry must already be fixed before indexer construction.
         assert os.environ['NFA_OPERATOR_MODE'] == 'off'
-        assert args._frozen_region_geometry.max_new_tokens == pred_ruler.MAX_GEN
+        assert args._frozen_region_geometry.max_new_tokens == 128
         return 1
 
-    def prefill(model, input_ids, gate, geometry):
+    def prefill(model, input_ids, gate, geometry, static_gate):
+        assert static_gate is None
         cache = object()
         logits = torch.full((1, 1, 16), -100.)
-        logits[0, 0, 1] = 0.  # First-token EOS must not stop RULER generation.
+        logits[0, 0, 1] = 0.
+        logits[0, 0, 6] = -1.
         return SimpleNamespace(logits=logits, past_key_values=cache), {'profiles': {}}
+
+    def decode(model, output, *, max_new_tokens, eos_ids, pad_token_id,
+               min_new_tokens):
+        assert min_new_tokens == pred_ruler.MIN_NEW_TOKENS == 1
+        assert eos_ids == (1,)
+        generated = []
+        logits = output.logits
+        cache = output.past_key_values
+        while len(generated) < max_new_tokens:
+            token = pred_ruler.greedy_next_tokens(
+                logits, eos_ids, generated_counts=len(generated),
+                min_new_tokens=min_new_tokens)
+            generated.append(int(token[0]))
+            if generated[-1] in eos_ids and len(generated) >= min_new_tokens:
+                break
+            logits = model(
+                input_ids=token.view(1, 1), past_key_values=cache,
+                use_cache=True, attention_mask={'full_attention': None}).logits
+        return generated, cache
 
     monkeypatch.setattr(pred_ruler, 'register_patch', register)
     monkeypatch.setattr(pred_ruler, 'prefill_frozen_request', prefill)
+    monkeypatch.setattr(pred_ruler, 'decode_frozen_request', decode)
     monkeypatch.setattr(pred_ruler, 'complete_frozen_request', complete)
     with pytest.raises(ValueError, match='receipt failure') if complete is _fail_complete else _null_context():
         pred_ruler.main()
@@ -233,7 +276,7 @@ def _fail_complete(*args):
     raise ValueError('receipt failure')
 
 
-def test_ruler_preserves_first_token_eos_and_commits_frozen_audit(monkeypatch, tmp_path):
+def test_ruler_masks_first_token_eos_and_commits_frozen_audit(monkeypatch, tmp_path):
     def complete(model, cache, generated_count, audit):
         assert generated_count == 3
         return {**audit, 'gate_counts': {'keep': 1}}
@@ -242,7 +285,7 @@ def test_ruler_preserves_first_token_eos_and_commits_frozen_audit(monkeypatch, t
     pointer = Path(pred_ruler.generation_pointer_path(str(out_path)))
     generation = pointer.read_text().strip()
     record = json.loads((pointer.parent/generation/out_path.name).read_text())
-    assert record['generated_token_ids'] == [1, 5, 1]
+    assert record['generated_token_ids'] == [6, 5, 1]
     assert record['_frozen_region']['gate_counts'] == {'keep': 1}
     assert all(call['attention_mask'] == {'full_attention': None}
                for call in model.decode_calls)

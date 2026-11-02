@@ -43,7 +43,7 @@ from sparse_attn.patches import register_patch
 from sparse_attn.metrics import get_metrics
 from sparse_attn.info import get_method_name_with_info, \
     truncate_output_name_keep_hash, get_treatment_manifest_json, \
-    gate_output_treatment_identity, resolve_treatment_snapshot
+    gate_output_treatment_identity
 # 142（TL-FASA-CALIBRATION-IDENTITY）：FASA agreement 源/目标身份的
 # 唯一 staging 口径（与 RULER 入口、treatment 名三方同源）。
 from sparse_attn.info import stage_fasa_agreement
@@ -54,7 +54,6 @@ from sparse_attn.info import freeze_minference_pattern_sha8
 # 三类契约违规延迟到 GPU 端错误标志，须由本入口在每样本生成段边界消费
 # ——guard 退出校验 raise 必须先于 record 构造/append 与任何落盘。
 from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
-from sparse_attn.ops.quality_graph import from_dynamic, execution, unsupported
 
 
 def parse_args(args=None):
@@ -77,6 +76,7 @@ def parse_args(args=None):
             'Qwen3-8B',
             'Qwen3-14B',
             'Qwen3-32B',
+            'GLM-4.7-Flash',
             'DeepSeek-V2-Lite-Chat',
         ],
     )
@@ -219,8 +219,9 @@ def _manual_generate(
     model, material_ids, question_ids, max_gen, eos_token_id, capture=None
 ):
     """Existing LongBench greedy loop, instrumented only when capture is enabled."""
-    from sparse_attn.ops.quality_graph import from_dynamic, unsupported
     if type(max_gen) is not int or max_gen<1:raise ValueError('max_gen must be positive')
+    eos_ids = frozenset(eos_token_id) if isinstance(
+        eos_token_id, (list, tuple, set, frozenset)) else frozenset((eos_token_id,))
     if capture is not None:
         capture.generation_policy=dict(max_new_tokens=max_gen,eos_token_id=eos_token_id,decoding='greedy')
     def invoke(phase,**kwargs):
@@ -247,23 +248,15 @@ def _manual_generate(
         token=output.logits[:,-1,:].argmax(dim=-1).unsqueeze(1)
         generated=[token.item()]
         del output
-        if capture is None:
-            graphed = from_dynamic(model,cache,generated[0],max_gen,
-                                   set() if eos_token_id is None else {eos_token_id},
-                                   min_new_tokens=1)
-            if graphed is not None:
-                return graphed
-        else:
-            unsupported(model,"instrumented_request_requires_eager")
         if capture is not None:capture.token_ready(generated[-1])
-        if eos_token_id is None or generated[-1]!=eos_token_id:
+        if generated[-1] not in eos_ids:
             for _ in range(max_gen-1):
                 output=invoke('decode',input_ids=token,past_key_values=cache,use_cache=True)
                 cache=output.past_key_values
                 token=output.logits[:,-1,:].argmax(dim=-1).unsqueeze(1)
                 generated.append(token.item())
                 if capture is not None:capture.token_ready(generated[-1])
-                if generated[-1]==eos_token_id:break
+                if generated[-1] in eos_ids:break
         if capture is not None:capture.generation_complete()
         return generated
 
@@ -417,7 +410,6 @@ def get_pred(
         # 内）与任何落盘（out_path 写入在 get_pred 返回后，raise 传播即
         # 整次任务输出作废）。进入时清旧 flag：上一样本未消费的违规不
         # 误杀本样本（guard 语义/并发限制见其 docstring）。
-        execution(model,"eager","generate_path_not_graphed")
         capture_context,capture = _paper_capture_request(
             paper_capture_mode,model,input.input_ids,q_input.input_ids,dataset,model_name)
         with baseline_request(model) as baseline_receipt, capture_context, eager_decoding_request_guard():
@@ -428,8 +420,16 @@ def get_pred(
                 # ① q_input 切出的 question 没接回，只喂了 prefix；② output 赋值后
                 # generated_content 从未赋值，下方共用 decode 必 UnboundLocalError。
                 # 修法：拼接完整输入（与 else 分支同协议），generate 后取新增 token。
-                unsupported(model,"generate_path_not_graphed")
                 full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
+                samsum_eos = [tokenizer.eos_token_id]
+                if model.config.model_type == "glm4_moe_lite":
+                    configured_eos = getattr(
+                        model.generation_config, "eos_token_id", None)
+                    if configured_eos is not None:
+                        samsum_eos = list(configured_eos) if isinstance(
+                            configured_eos, (list, tuple)) else [configured_eos]
+                samsum_eos.append(
+                    tokenizer.encode("\n", add_special_tokens=False)[-1])
                 output = model.generate(
                     input_ids=full_ids,
                     attention_mask=torch.ones_like(full_ids),
@@ -438,10 +438,7 @@ def get_pred(
                     do_sample=False,
                     temperature=1.0,
                     min_length=full_ids.shape[-1] + 1,
-                    eos_token_id=[
-                        tokenizer.eos_token_id,
-                        tokenizer.encode("\n", add_special_tokens=False)[-1],
-                    ],
+                    eos_token_id=samsum_eos,
                 )[0]
                 generated_content = output[full_ids.shape[-1]:].tolist()
             elif IS_DSV2:
@@ -454,7 +451,6 @@ def get_pred(
                 # ValueError。改用 model.generate 路径（与 samsum 分支同协议：full_ids
                 # 一次 prefill + 贪心生成），cache_position/cache 全权交给 transformers
                 # 管理，生成语义与手动 argmax 循环严格等价。
-                unsupported(model,"generate_path_not_graphed")
                 full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
                 output = model.generate(
                     input_ids=full_ids,
@@ -468,8 +464,12 @@ def get_pred(
                 )[0]
                 generated_content = output[full_ids.shape[-1]:].tolist()
             else:
+                eos_token_id = tokenizer.eos_token_id
+                if model.config.model_type == "glm4_moe_lite":
+                    eos_token_id = getattr(
+                        model.generation_config, "eos_token_id", eos_token_id)
                 generated_content = _manual_generate(
-                    model,input.input_ids,q_input.input_ids,max_gen,tokenizer.eos_token_id,capture)
+                    model,input.input_ids,q_input.input_ids,max_gen,eos_token_id,capture)
 
         pred = tokenizer.decode(generated_content, skip_special_tokens=True)
         # pred = tokenizer.decode(output[context_length:], skip_special_tokens=True)
@@ -486,12 +486,12 @@ def get_pred(
         # avg_B0 = budget_info.get_total_avg_budget_B0()
 
         metrics = get_metrics()
-        budget = None if (baseline_receipt or getattr(model,"_quality_graph_execution",{}).get("actual","").startswith("graph")) else metrics.get_select_tokens()
+        budget = None if baseline_receipt else metrics.get_select_tokens()
         metrics.clear()
 
         record = {
             "pred": pred,
-            "execution": getattr(model,"_quality_graph_execution",{}),
+            "execution": {"requested": "eager", "actual": "eager"},
             "answers": json_obj["answers"],
             "all_classes": json_obj["all_classes"],
             "length": json_obj["length"],
@@ -594,7 +594,10 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
             "..", "..", "exp", "vendor_baselines", "quest_vendor",
         )
         sys.path.insert(0, vendor_dir)
-        from qwen3_quest_patch import enable_quest
+        if model.config.model_type == "glm4_moe_lite":
+            from glm4_moe_lite_quest_patch import enable_quest
+        else:
+            from qwen3_quest_patch import enable_quest
         n_patched = enable_quest(
             model,
             token_budget=getattr(args, "quest_token_budget", 1024),
@@ -791,7 +794,10 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
         )
         vendor_dir = os.path.join(repo, "exp", "vendor_baselines", "jssa_vendor")
         sys.path.insert(0, vendor_dir)
-        from qwen3_jssa_patch import enable_jssa
+        if model.config.model_type == "glm4_moe_lite":
+            from glm4_moe_lite_jssa_patch import enable_jssa
+        else:
+            from qwen3_jssa_patch import enable_jssa
         n_patched = enable_jssa(
             model,
             basis_path=getattr(args, "jssa_basis_path", None),
@@ -879,21 +885,13 @@ if __name__ == "__main__":
         model2path = model2path_list[model_name]
     else:
         model2path = args.model_path
-    # 081（TL-E121-OUTPUT-SNAPSHOT-081）：nfa 臂在模型加载/patch（文件
-    # 被任何 attention 层消费）之前冻结一次解析的 treatment snapshot——
-    # D′ 掩码 / 投影基每个文件只 open 一次，后续 method_name（472）、
-    # sidecar 写门（501）全部消费同一冻结对象。修复前：每层各读一次 +
-    # 生成后再读 → 生成窗口内文件被替换时 runtime A / 文件名 B /
-    # sidecar C 三方混装可达。非 nfa 臂零改动（snapshot=None）。
+    # 本入口只保留非 NFA 基线；NFA 由 GraphRunner 生产入口执行。
     model_config = AutoConfig.from_pretrained(model2path, trust_remote_code=True)
     if args.method == "nfa":
         raise RuntimeError(
             "LongBench legacy pred.py NFA cache path has been removed; "
-            "use benchmark/LongBench/prefill_frozen_skip.py with PagedRegionCache")
-    if args.method == "nfa":
-        snapshot = resolve_treatment_snapshot(args)
-    else:
-        snapshot = None
+            "use benchmark/LongBench/prefill_frozen_skip.py with GraphRunner")
+    snapshot = None
     # TL-DSV2-CONTEXT-CAP-093 修复（GPT 审计 2026-10-12_0330，031e6b8）：
     # 加载 tokenizer/model 之前核对实验 cap 与模型上下文能力（注册表 +
     # 本地快照活值），三方冲突打印明细不静默挑选，cap 超过

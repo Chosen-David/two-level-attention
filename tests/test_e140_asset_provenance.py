@@ -10,7 +10,8 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-import fitz
+import pytest
+fitz = pytest.importorskip('fitz')
 from PIL import Image
 from exp.paper import e140_asset_provenance as asset
 

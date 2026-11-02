@@ -4,9 +4,8 @@ import runpy
 
 import pytest
 import torch
-from transformers.models.glm4_moe_lite.modeling_glm4_moe_lite import (
-    apply_rotary_pos_emb_interleave,
-)
+glm4 = pytest.importorskip('transformers.models.glm4_moe_lite.modeling_glm4_moe_lite')
+apply_rotary_pos_emb_interleave = glm4.apply_rotary_pos_emb_interleave
 
 
 def test_tail_selects_both_components_of_low_frequency_pairs():

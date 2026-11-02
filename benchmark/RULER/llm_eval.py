@@ -70,7 +70,7 @@ def main():
     if args.method == "nfa":
         raise RuntimeError(
             "llm_eval NFA cache path has not been migrated; use "
-            "benchmark/RULER/pred_ruler.py with PagedRegionCache")
+            "benchmark/RULER/pred_ruler.py with GraphRunner")
     print("model: {}".format(args.model))
 
     # 创建输出目录

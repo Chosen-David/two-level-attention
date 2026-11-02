@@ -8,6 +8,42 @@ step.
 import torch
 
 
+def greedy_next_tokens(logits, eos_ids, *, generated_counts=0, min_new_tokens=0):
+    """在 argmax 前屏蔽未达最小生成长度请求的 EOS。
+
+    首 token 与 GraphRunner 解码共用此函数，避免 Scheduler 消费的 token
+    与请求边界返回的 token 不一致。``generated_counts`` 是候选 token 之前
+    已生成的数量，可按 batch row 传入整数、列表或 tensor。
+    """
+    logits = getattr(logits, 'logits', logits)
+    if logits.ndim != 3:
+        raise ValueError('greedy decoding expects [B,T,V] logits')
+    if min_new_tokens < 0:
+        raise ValueError('min_new_tokens must be non-negative')
+
+    next_logits = logits[:, -1]
+    batch = next_logits.shape[0]
+    counts = torch.as_tensor(
+        generated_counts, dtype=torch.long, device=next_logits.device)
+    if counts.ndim == 0:
+        counts = counts.expand(batch)
+    if counts.ndim != 1 or counts.numel() != batch:
+        raise ValueError('generated_counts must be scalar or [B]')
+
+    suppress = counts < min_new_tokens
+    eos_ids = tuple(int(token) for token in eos_ids)
+    if eos_ids and min_new_tokens > 0:
+        # 仅复制最后一位置 logits，避免改写 GraphRunner 持有的静态输出。
+        next_logits = next_logits.clone()
+        eos = torch.tensor(
+            eos_ids, dtype=torch.long, device=next_logits.device)
+        eos_logits = next_logits[:, eos]
+        next_logits[:, eos] = torch.where(
+            suppress[:, None], next_logits.new_full((), -torch.inf),
+            eos_logits)
+    return next_logits.argmax(dim=-1).to(torch.int64)
+
+
 class ContinuousBatchScheduler:
     def __init__(self, *, cache, max_batch, eos_ids, pad_token_id):
         self.cache = cache
@@ -63,6 +99,7 @@ class ContinuousBatchScheduler:
         self._copy_stream = torch.cuda.Stream()
         self._pending_copy_idx = None
         self._pending_batch = 0
+        self._pending_stop_on_eos = True
 
     def add_request(self, request_id):
         if request_id not in self.active_req_ids:
@@ -70,6 +107,7 @@ class ContinuousBatchScheduler:
             self._seen_active.discard(request_id)
 
     def finish_request(self, request_id):
+        self.cache.transition_request(request_id, 'FINISHED')
         self.cache.remove_request(request_id)
         self.active_req_ids.remove(request_id)
         self.next_tokens.pop(request_id, None)
@@ -101,12 +139,14 @@ class ContinuousBatchScheduler:
             self.next_tokens.update(zip(ids, toks))
 
         eos = valid & torch.isin(tokens, self._eos_cpu_tensor)
-        finished_ids = req_ids[eos].tolist()
-        for request_id in finished_ids:
-            self.finish_request(request_id)
+        if self._pending_stop_on_eos:
+            finished_ids = req_ids[eos].tolist()
+            for request_id in finished_ids:
+                self.finish_request(request_id)
 
         self._pending_copy_idx = None
         self._pending_batch = 0
+        self._pending_stop_on_eos = True
 
     def _seed_new_requests(self, padded):
         if not padded:
@@ -169,17 +209,28 @@ class ContinuousBatchScheduler:
             self._device_positions_buf[:batch],
         )
 
-    def record_next_tokens(self, req_ids, logits):
+    def record_next_tokens(self, req_ids, logits, *, generated_counts=0,
+                           min_new_tokens=0, forced_tokens=None,
+                           stop_on_eos=True):
         logits = getattr(logits, 'logits', logits)
 
         if logits.device.type != 'cuda':
             raise RuntimeError('ContinuousBatchScheduler requires CUDA logits')
 
         batch = len(req_ids)
-        next_tokens = logits[:, -1].argmax(dim=-1).to(torch.int64)
+        if forced_tokens is None:
+            next_tokens = greedy_next_tokens(
+                logits, self.eos_ids, generated_counts=generated_counts,
+                min_new_tokens=min_new_tokens)
+        else:
+            if len(forced_tokens) != batch:
+                raise ValueError('forced token count must match the padded batch')
+            next_tokens = torch.as_tensor(
+                forced_tokens, dtype=torch.long, device=logits.device)
         req_ids_tensor = self._device_req_ids_buf[:batch]
         valid = req_ids_tensor >= 0
-        eos_hit = valid & torch.isin(next_tokens, self._eos_tensor)
+        eos_hit = (valid & torch.isin(next_tokens, self._eos_tensor)
+                   if stop_on_eos else torch.zeros_like(valid))
         alive_by_slot = valid & ~eos_hit
 
         valid_req_ids = req_ids_tensor[valid].to(torch.long)
@@ -206,3 +257,5 @@ class ContinuousBatchScheduler:
 
         self._pending_copy_idx = idx
         self._pending_batch = batch
+        self._pending_stop_on_eos = stop_on_eos
+        return next_tokens

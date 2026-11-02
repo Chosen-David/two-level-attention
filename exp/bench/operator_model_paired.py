@@ -99,39 +99,39 @@ def main():
                 if time.monotonic() > deadline:
                     raise RuntimeError('GPU1 did not settle to stable idle')
                 time.sleep(1)
-            env = {k: v for k, v in os.environ.items() if not k.startswith('TLI_')}
-            env.update(CUDA_VISIBLE_DEVICES='1', TLI_OPERATOR_MODE='off' if arm in ['fa2', 'legacy', 'graph_fa2'] else ('serial' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off', 'graph_sparse_index_optimized') else arm),
-                       TLI_OPERATOR_FUSED_SELECTION='0', TLI_SPARSE_PREFILL='0',
-                       TLI_COMPACT_NORMALIZATION='1' if arm == 'graph_compact' else '0',
-                       TLI_SPARSE_SELECTION='1' if arm in ('graph_sparse', 'graph_sparse_geometry_off', 'graph_sparse_index_optimized') else '0')
-            env['TLI_GRAPH_GEOMETRY_SHARED'] = '0' if arm == 'graph_sparse_geometry_off' else '1'
-            env['TLI_BENCH_GEOMETRY_COUNTS'] = '1'
+            env = {k: v for k, v in os.environ.items() if not k.startswith('NFA_')}
+            env.update(CUDA_VISIBLE_DEVICES='1', NFA_OPERATOR_MODE='off' if arm in ['fa2', 'legacy', 'graph_fa2'] else ('serial' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off', 'graph_sparse_index_optimized') else arm),
+                       NFA_OPERATOR_FUSED_SELECTION='0', NFA_SPARSE_PREFILL='0',
+                       NFA_COMPACT_NORMALIZATION='1' if arm == 'graph_compact' else '0',
+                       NFA_SPARSE_SELECTION='1' if arm in ('graph_sparse', 'graph_sparse_geometry_off', 'graph_sparse_index_optimized') else '0')
+            env['NFA_GRAPH_GEOMETRY_SHARED'] = '0' if arm == 'graph_sparse_geometry_off' else '1'
+            env['NFA_BENCH_GEOMETRY_COUNTS'] = '1'
             if arm in RING_ARMS:
-                env.update(TLI_OPERATOR_MODE={'graph_ring_legacy':'off', 'graph_ring_simt':'serial', 'graph_ring_simt_canonical':'serial', 'graph_ring_tc':'serial', 'graph_ring_tc3':'serial', 'graph_ring_tc3_overlap':'overlap', 'graph_ring_overlap':'overlap'}[arm],
-                           TLI_OPERATOR_BACKEND='tc' if arm in ('graph_ring_tc','graph_ring_tc3','graph_ring_tc3_overlap') else 'simt',
-                           TLI_OPERATOR_SELECTED_STAGES='3' if arm in ('graph_ring_tc3','graph_ring_tc3_overlap') else '1',
-                           TLI_OPERATOR_ORDERED_SELECTION='0' if arm == 'graph_ring_simt_canonical' else '1',
-                           TLI_BENCH_REQUIRE_RING='1')
-            env['TLI_SPARSE_SORT_INT16'] = '1' if arm == 'graph_sparse_index_optimized' else '0'
-            env['TLI_COMPACT_SCAN_TILED'] = '1' if arm == 'graph_sparse_index_optimized' else '0'
+                env.update(NFA_OPERATOR_MODE={'graph_ring_legacy':'off', 'graph_ring_simt':'serial', 'graph_ring_simt_canonical':'serial', 'graph_ring_tc':'serial', 'graph_ring_tc3':'serial', 'graph_ring_tc3_overlap':'overlap', 'graph_ring_overlap':'overlap'}[arm],
+                           NFA_OPERATOR_BACKEND='tc' if arm in ('graph_ring_tc','graph_ring_tc3','graph_ring_tc3_overlap') else 'simt',
+                           NFA_OPERATOR_SELECTED_STAGES='3' if arm in ('graph_ring_tc3','graph_ring_tc3_overlap') else '1',
+                           NFA_OPERATOR_ORDERED_SELECTION='0' if arm == 'graph_ring_simt_canonical' else '1',
+                           NFA_BENCH_REQUIRE_RING='1')
+            env['NFA_SPARSE_SORT_INT16'] = '1' if arm == 'graph_sparse_index_optimized' else '0'
+            env['NFA_COMPACT_SCAN_TILED'] = '1' if arm == 'graph_sparse_index_optimized' else '0'
             command = [sys.executable, str(root / ('exp/bench/e152v4_graph_latency.py' if arm in ('graph_serial', 'graph_compact', 'graph_sparse', 'graph_sparse_geometry_off', 'graph_sparse_index_optimized', 'graph_fa2', *RING_ARMS) else 'exp/bench/operator_model_latency.py')),
-                       '--method', 'none' if arm in ('fa2', 'graph_fa2') else 'tli',
+                       '--method', 'none' if arm in ('fa2', 'graph_fa2') else 'nfa',
                        '--attention-backend', 'flash_attention_2', '--context-length', '32768',
                        '--warmup', str(args.warmup), '--repeats', str(args.repeats), '--max-gen', str(args.max_gen),
                        '--out', str(args.out_dir / 'samples.json'), '--label', f'{index:02d}-{arm}',
-                       '--tli_subspace', 'tail', '--tia_level2_cmp_ratio', '4',
-                       '--tli_enable_kmeans', 'false', '--tli_enable_layer_skip', 'true' if ring else 'false',
-                       '--tli_near_pages', '32', '--tli_near_tokens', 'off', '--tli_near_len', '4096',
-                       '--tli_sink_tokens', '4', '--tli_swa_size', '128',
-                       '--tli_far_skip_backend', 'compact' if ring else 'legacy',
-                       '--tli_far_skip_cache', 'evict' if ring else 'retain']
+                       '--nfa_subspace', 'tail', '--tia_level2_cmp_ratio', '4',
+                       '--nfa_enable_kmeans', 'false', '--nfa_enable_layer_skip', 'true' if ring else 'false',
+                       '--nfa_near_pages', '32', '--nfa_near_tokens', 'off', '--nfa_near_len', '4096',
+                       '--nfa_sink_tokens', '4', '--nfa_swa_size', '128',
+                       '--nfa_far_skip_backend', 'compact' if ring else 'legacy',
+                       '--nfa_far_skip_cache', 'evict' if ring else 'retain']
             if arm in RING_ARMS:
-                command += ['--tli_layer_skip_path',str(frozen_mask)]
+                command += ['--nfa_layer_skip_path',str(frozen_mask)]
             if arm == 'graph_fa2':
                 command += ['--fa2-static-decode']
             with (args.out_dir / 'commands.jsonl').open('a') as commands:
                 commands.write(json.dumps(dict(command=command, cwd=str(root),
-                    environment={k: v for k, v in env.items() if k.startswith('TLI_') or k == 'CUDA_VISIBLE_DEVICES'})) + '\n')
+                    environment={k: v for k, v in env.items() if k.startswith('NFA_') or k == 'CUDA_VISIBLE_DEVICES'})) + '\n')
             with (args.out_dir / f'{index:02d}-{arm}.log').open('x') as log:
                 child = subprocess.Popen(command, cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT)
                 observed_gpu_pid = None

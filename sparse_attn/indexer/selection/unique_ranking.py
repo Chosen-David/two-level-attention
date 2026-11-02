@@ -1,4 +1,4 @@
-"""Fused pinned BF16/FP16 unique-candidate ranking for <=65535 tokens."""
+"""Fused BF16/FP16 unique-candidate ranking with 16/32-bit token packing."""
 import torch
 import triton
 import triton.language as tl
@@ -7,7 +7,8 @@ from .selector import TokenSelection
 
 @triton.jit
 def _tile_keys(IDS,P,VALID,LOW,HIGH,QUOTA,OUT,R:tl.constexpr,S:tl.constexpr,
-               GROUPS:tl.constexpr,K:tl.constexpr,META_GROUP:tl.constexpr):
+               GROUPS:tl.constexpr,K:tl.constexpr,META_GROUP:tl.constexpr,
+               TOKEN_BITS:tl.constexpr):
     h=tl.program_id(0);tile=tl.program_id(1);i=tl.arange(0,2*K)
     r=tile*(2*K)+i
     token=tl.load(IDS+h*R+r,r<R,other=0)
@@ -16,7 +17,11 @@ def _tile_keys(IDS,P,VALID,LOW,HIGH,QUOTA,OUT,R:tl.constexpr,S:tl.constexpr,
     b=0 if META_GROUP==0 else h//META_GROUP
     good=keep&(token>=tl.load(LOW+b))&(token<tl.load(HIGH+b))&(probability>0)&(tl.load(QUOTA+b)>0)
     bits=probability.to(tl.uint16,bitcast=True).to(tl.int32)
-    key=tl.where(good,(bits<<16)+(S-token).to(tl.int32),0)
+    delta=(S-token).to(tl.int32)
+    if TOKEN_BITS==32:
+        bits=bits.to(tl.int64)
+        delta=delta.to(tl.int64)
+    key=tl.where(good,(bits<<TOKEN_BITS)+delta,0)
     ordered=tl.sort(key,descending=True)
     tl.store(OUT+(h*GROUPS+tile)*K+i,ordered,i<K)
 
@@ -39,18 +44,20 @@ def tree_topk(ids,p,valid,lower,upper,quota,capacity,width,*,metadata_group=None
     hk,r=ids.shape
     metadata_group=0 if metadata_group is None else metadata_group
     groups=triton.cdiv(r,2*width)
-    current=torch.empty((hk,groups,width),device=ids.device,dtype=torch.int32)
-    _tile_keys[(hk,groups)](ids,p,valid,lower,upper,quota,current,r,capacity,groups,width,metadata_group,num_warps=8)
+    token_bits=32 if capacity>=65536 else 16
+    packed_dtype=torch.int64 if token_bits==32 else torch.int32
+    current=torch.empty((hk,groups,width),device=ids.device,dtype=packed_dtype)
+    _tile_keys[(hk,groups)](ids,p,valid,lower,upper,quota,current,r,capacity,groups,width,metadata_group,token_bits,num_warps=8)
     while groups>1:
         following=triton.cdiv(groups,2)
-        output=torch.empty((hk,following,width),device=ids.device,dtype=torch.int32)
+        output=torch.empty((hk,following,width),device=ids.device,dtype=current.dtype)
         _merge_topk[(hk,following)](current,output,groups,following,width,num_warps=8)
         current=output;groups=following
     return current.view(hk,width)
 
 
 @triton.jit
-def _finish(TOP,LOW,HIGH,QUOTA,OUT,COUNT,S:tl.constexpr,K:tl.constexpr,SINK:tl.constexpr,META_GROUP:tl.constexpr):
+def _finish(TOP,LOW,HIGH,QUOTA,OUT,COUNT,S:tl.constexpr,K:tl.constexpr,SINK:tl.constexpr,META_GROUP:tl.constexpr,TOKEN_BITS:tl.constexpr):
     h=tl.program_id(0);i=tl.arange(0,K)
     b=0 if META_GROUP==0 else h//META_GROUP
     q=tl.load(QUOTA+b).to(tl.int32)
@@ -59,8 +66,9 @@ def _finish(TOP,LOW,HIGH,QUOTA,OUT,COUNT,S:tl.constexpr,K:tl.constexpr,SINK:tl.c
         tl.store(COUNT+h,0)
     else:
         key=tl.load(TOP+h*K+i)
-        positive=(key>>16)>0
-        chosen=tl.where((i<q)&positive,S-(key&65535),S)
+        positive=(key>>TOKEN_BITS)>0
+        token_mask=(1<<TOKEN_BITS)-1
+        chosen=tl.where((i<q)&positive,S-(key&token_mask),S).to(tl.int32)
         npositive=tl.sum(((i<q)&positive).to(tl.int32),0)
         if npositive==q:
             fast_packed=tl.sort(tl.where(chosen>=SINK,chosen,S),descending=False)
@@ -93,7 +101,7 @@ def rank_unique(ids,p,valid,lower,upper,quota,*,capacity,width,sink):
     top=tree_topk(ids,p,valid,lower,upper,quota,capacity,width)
     out=torch.empty((1,hk,width),device=ids.device,dtype=torch.int32)
     counts=torch.empty((1,hk),device=ids.device,dtype=torch.int32)
-    _finish[(hk,)](top,lower,upper,quota,out,counts,capacity,width,sink,0,num_warps=8)
+    _finish[(hk,)](top,lower,upper,quota,out,counts,capacity,width,sink,0,32 if capacity>=65536 else 16,num_warps=8)
     return TokenSelection(out,counts)
 
 
@@ -104,7 +112,7 @@ def rank_unique_batched(ids,p,valid,lower,upper,quota,*,capacity,width=1024,sink
     and deduplicating candidates. No request loop or capacity-wide storage.
     """
     if (ids.ndim!=3 or p.shape!=ids.shape or valid.shape!=ids.shape
-            or type(capacity) is not int or not 0<capacity<65536 or width!=1024
+            or type(capacity) is not int or not 0<capacity<2**31 or width!=1024
             or type(sink) is not int or not 0<=sink<=capacity
             or ids.shape[2]<width or min(ids.shape[:2])<1 or ids.numel()>=2**31
             or ids.dtype!=torch.int64 or valid.dtype!=torch.bool
@@ -121,5 +129,5 @@ def rank_unique_batched(ids,p,valid,lower,upper,quota,*,capacity,width=1024,sink
                   capacity,width,metadata_group=h)
     out=torch.empty((b,h,width),device=ids.device,dtype=torch.int32)
     counts=torch.empty((b,h),device=ids.device,dtype=torch.int32)
-    _finish[(b*h,)](top,lower,upper,quota,out,counts,capacity,width,sink,h,num_warps=8)
+    _finish[(b*h,)](top,lower,upper,quota,out,counts,capacity,width,sink,h,32 if capacity>=65536 else 16,num_warps=8)
     return TokenSelection(out,counts)

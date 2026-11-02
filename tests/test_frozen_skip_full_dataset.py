@@ -1,8 +1,10 @@
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
 from benchmark.LongBench.prefill_frozen_skip import (
-    SCREEN_TASKS, select_row_indices, sampling_metadata, shard_inputs,
+    SCREEN_TASKS, prepare_ids, select_row_indices, sampling_metadata, shard_inputs,
 )
 from benchmark.LongBench.export_frozen_skip import coverage_text
 
@@ -52,3 +54,49 @@ def test_full_dataset_report_uses_actual_unequal_counts():
     assert '小样本' not in text and '各 0 条' not in text and '1000000' not in text
     legacy = coverage_text(dict(datasets=list(SCREEN_TASKS), samples_per_task=20),100,300)
     assert '各 20 条' in legacy and '不是' in legacy
+
+
+class _ChatTokenizer:
+    def __call__(self, text, add_special_tokens):
+        return SimpleNamespace(input_ids=[ord(char) for char in text])
+
+    def decode(self, ids, skip_special_tokens):
+        return ''.join(chr(token) for token in ids)
+
+    def apply_chat_template(self, messages, *, tokenize, add_generation_prompt,
+                            enable_thinking):
+        material = '<user>' + messages[0]['content'] + '</user>'
+        return material + ('<assistant>' if add_generation_prompt else '')
+
+
+def test_longbench_material_and_generation_suffix_preserve_full_token_identity():
+    tokenizer = _ChatTokenizer()
+    material, suffix, info = prepare_ids(
+        tokenizer, {'context': 'abc'}, 'qasper', '{context}', 100)
+    assert tokenizer.decode(material, True) == '<user>abc</user>'
+    assert tokenizer.decode(suffix, True) == '<assistant>'
+    assert info['input_tokens'] == len(material) + len(suffix)
+    assert info['material_tokens'] == len(material)
+    assert info['suffix_tokens'] == len(suffix)
+
+    material, suffix, _ = prepare_ids(
+        tokenizer, {'context': 'abc'}, 'repobench-p', '{context}', 100)
+    assert tokenizer.decode(material, True) == 'abc'
+    assert suffix == []
+
+
+def test_non_suffix_chat_template_fails_closed():
+    class BadTokenizer(_ChatTokenizer):
+        def apply_chat_template(self, messages, *, tokenize,
+                                add_generation_prompt, enable_thinking):
+            if add_generation_prompt:
+                return '<assistant>' + super().apply_chat_template(
+                    messages, tokenize=tokenize,
+                    add_generation_prompt=False,
+                    enable_thinking=enable_thinking)
+            return super().apply_chat_template(
+                messages, tokenize=tokenize, add_generation_prompt=False,
+                enable_thinking=enable_thinking)
+
+    with pytest.raises(ValueError, match='strict prompt suffix'):
+        prepare_ids(BadTokenizer(), {'context': 'abc'}, 'qasper', '{context}', 100)

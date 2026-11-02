@@ -21,11 +21,11 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from benchmark.RULER.yarn_receipt import resolve_yarn_config
 
 from sparse_attn.info import resolve_treatment_snapshot
-from sparse_attn.ops.region_geometry import RegionGeometry
-from sparse_attn.ops.frozen_region_gate import GateConfig
-from sparse_attn.ops.frozen_region_runtime import (
+from sparse_attn.policies.region_geometry import RegionGeometry
+from sparse_attn.policies.frozen_gate import GateConfig
+from sparse_attn.engine.frozen_runner import (
     complete_frozen_request, prefill_frozen_request)
-from sparse_attn.ops.paged_region_tli import tli_args
+from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
 from sparse_attn.patches import register_patch
 
 
@@ -54,7 +54,7 @@ def _memory(device):
 
 
 def _work_summary(audit):
-    receipts = audit.get('tli_receipts', {})
+    receipts = audit.get('nfa_receipts', {})
     selected = []
     l1 = l2 = 0
     physical = True
@@ -93,7 +93,7 @@ def _public_result(result, include_audit=False):
 def run_request(model, ids, max_new, arm, state, device, capture=False,
                 forced_tokens=None, profile_path=None, trace_decode=False):
     reference = arm == 'reference'
-    os.environ['TLI_FROZEN_EAGER_REFERENCE'] = '1' if reference else '0'
+    os.environ['NFA_FROZEN_EAGER_REFERENCE'] = '1' if reference else '0'
     gc.collect()
     if device.type == 'cuda':
         torch.cuda.empty_cache()
@@ -194,8 +194,8 @@ def _max_delta(left, right):
 
 def compare_decode_traces(reference_audit, physical_audit):
     """逐 step/layer/KV-head 对拍最终逻辑支持集，并检查物理槽位映射。"""
-    reference = reference_audit['tli_decode_trace']
-    physical = physical_audit['tli_decode_trace']
+    reference = reference_audit['nfa_decode_trace']
+    physical = physical_audit['nfa_decode_trace']
     if set(reference) != set(physical):
         raise ValueError('decode trace layer sets differ')
     mismatches = []
@@ -248,8 +248,8 @@ def compare_pair(reference, physical):
         logits_max_abs=logit_delta,
         decode_layer_tensors=len(reference['captured_layers']),
         decode_logit_tensors=len(reference['captured_logits']))
-    reference_traced = 'tli_decode_trace' in reference['audit']
-    physical_traced = 'tli_decode_trace' in physical['audit']
+    reference_traced = 'nfa_decode_trace' in reference['audit']
+    physical_traced = 'nfa_decode_trace' in physical['audit']
     if reference_traced != physical_traced:
         raise ValueError('decode trace is missing from one arm')
     if reference_traced:
@@ -298,9 +298,9 @@ def main():
     args = parser.parse_args()
     if args.max_new < 2 or args.reps < 1 or args.row < 0:
         raise ValueError('max-new>=2, reps>=1 and row>=0 required')
-    for name, value in dict(TLI_OPERATOR_MODE='off', TLI_FINE_GATHER='0',
-                            TLI_SPARSE_PREFILL='0', TLI_DECODE_DENSE='0',
-                            TLI_CUDA_GRAPH='off').items():
+    for name, value in dict(NFA_OPERATOR_MODE='off', NFA_FINE_GATHER='0',
+                            NFA_SPARSE_PREFILL='0', NFA_DECODE_DENSE='0',
+                            NFA_CUDA_GRAPH='off').items():
         os.environ[name] = value
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -318,10 +318,10 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model, config=config, dtype=torch.bfloat16, device_map=device,
         attn_implementation='sdpa').eval()
-    tli = tli_args()
+    tli = nfa_args()
     if register_patch(model, tli, resolve_treatment_snapshot(tli)) != model.config.num_hidden_layers:
         raise ValueError('incomplete TLI registration')
-    model._frozen_tli = True
+    model._frozen_nfa = True
     source = Path(args.data_root)
     row = json.loads((source/str(args.context_length)/(args.task+'.jsonl'))
                      .read_text().splitlines()[args.row])

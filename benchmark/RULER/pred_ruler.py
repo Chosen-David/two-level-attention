@@ -85,7 +85,8 @@ from sparse_attn.ops.eager_decoding import (  # noqa: E402
 from sparse_attn.policies.region_geometry import RegionGeometry
 from sparse_attn.policies.frozen_gate import GateConfig
 from sparse_attn.engine.frozen_runner import (
-    complete_frozen_request, prefill_frozen_request)
+    complete_frozen_request, decode_frozen_request, prefill_frozen_request)
+from sparse_attn.scheduler.scheduler import greedy_next_tokens
 from sparse_attn.policies.static_gate import (
     default_static_gate_path, load_static_gate)
 from sparse_attn.info import (  # noqa: E402
@@ -103,7 +104,21 @@ RULER_TASKS = [
     "niah_multikey_1", "niah_multikey_2", "niah_multikey_3",
     "niah_multiquery", "niah_multivalue", "cwe", "fwe", "vt",
 ]
-MAX_GEN = 64  # 官方 RULER 口径（全部任务统一）
+RULER_MAX_NEW_TOKENS = {
+    **{task: 128 for task in RULER_TASKS if task.startswith('niah_')},
+    'cwe': 120,
+    'fwe': 50,
+    'vt': 30,
+}
+MIN_NEW_TOKENS = 1  # min_length=context_length+1；在 argmax 前屏蔽首 token EOS
+
+
+def _ruler_max_new_tokens(task):
+    """官方 RULER 任务级输出预算；禁止用统一上限截断长答案任务。"""
+    try:
+        return RULER_MAX_NEW_TOKENS[task]
+    except KeyError as exc:
+        raise ValueError(f'unknown RULER task generation budget: {task!r}') from exc
 SEED = 42     # seed_everything 默认值（receipt 身份字段，057）
 # Qwen3-8B 原生上下文上限（config.max_position_embeddings）
 QWEN3_NATIVE_MPE = 40960
@@ -124,6 +139,8 @@ def parse_args():
     parser.add_argument("--output-dir", type=str, required=True)
     parser.add_argument("--t", type=str, default="ruler run")
     parser.add_argument("--pred_postfix", type=str, default="")
+    parser.add_argument("--skip", type=int, default=0,
+                        help="跳过前 N 行，便于按 rank 分片（默认 0）")
     parser.add_argument("--max-num", type=int, default=500,
                         help="每任务样本数（0=全量）")
     parser.add_argument("--yarn", action="store_true",
@@ -149,34 +166,69 @@ def parse_args():
     return parser.parse_args()
 
 
+def _ruler_eos_ids(model, tokenizer):
+    """收集模型声明的全部 EOS；换行和 pad 不被隐式当作停止符。"""
+    configured = getattr(
+        getattr(model, 'generation_config', None), 'eos_token_id', None)
+    if configured is None:
+        configured = ()
+    elif not isinstance(configured, (list, tuple)):
+        configured = (configured,)
+    candidates = (*configured, getattr(tokenizer, 'eos_token_id', None))
+    return tuple(dict.fromkeys(
+        token for token in candidates
+        if isinstance(token, int) and not isinstance(token, bool) and token >= 0))
+
+
 def _configure_frozen_regions(args, config):
     """Fail closed before model/indexer construction; return the request geometry."""
     is_glm_nfa = (
         args.method == 'nfa'
         and getattr(config, 'model_type', None) == 'glm4_moe_lite'
     )
+    max_new_tokens = _ruler_max_new_tokens(args.task)
     if not args.nfa_prefill_frozen_regions and not is_glm_nfa:
         return None
     if args.method != 'nfa':
         raise ValueError('frozen regions require method=nfa')
     if is_glm_nfa:
-        # GLM NFA patch 现在强制 PagedRegionCache。RULER 入口没有
-        # Qwen 的 --nfa_prefill_frozen_regions 语义，因此对 GLM NFA
-        # 自动使用全保留 frozen reference，只隔离稀疏选择，不回收 KV。
+        # GLM 与 Qwen 共用 frozen-region 配置；full/far/near/dual 均通过
+        # 同一 CLI 显式选择，静态 gate 走同一 freeze/选择器/回收生命周期。
         args.nfa_subspace = 'nope'
         args.tia_level2_cmp_ratio = 4
+        args.nfa_far_method = 'minmax'
+        args.nfa_near_method = 'avg'
+        args.nfa_far_select = '4bit'
+        args.nfa_near_select = '4bit'
+        args.nfa_near_pages = 32
+        args.nfa_near_tokens = 'off'
+        args.nfa_near_len = 4096
+        args.nfa_sink_tokens = 4
+        args.nfa_swa_size = 128
+        args.tia_level1_topk = 128
+        args.tia_level2_topk = 1024
+        args.nfa_enable_subspace = True
+        args.nfa_enable_layer_skip = False
+        args.nfa_dyn_dgate = False
+        args.nfa_per_q_head = False
+        args.tia_enable_async_topk = False
         args.nfa_l2_quant = False
         args.nfa_static_pair = False
+        args.nfa_boundary_bypass = True
+        args.nfa_sinkswa_only = False
+        args.nfa_alpha = None
+        args.nfa_beta = None
+        args.nfa_gamma = None
         args.nfa_proj_basis = None
         if hasattr(args, 'nfa_proj_basis_all'):
             args.nfa_proj_basis_all = None
-        gate = GateConfig(mode='full',
+        gate = GateConfig(mode=args.nfa_frozen_region_mode,
+                          epsilon=args.nfa_frozen_region_epsilon,
                           rows=args.nfa_frozen_region_rows,
                           statistic=args.nfa_frozen_region_statistic)
         geometry = RegionGeometry(
-            sink=args.nfa_sink_tokens, near=args.nfa_near_len,
-            window=args.nfa_swa_size, page=args.tia_block_size,
-            max_new_tokens=MAX_GEN)
+            sink=4, near=4096, window=128,
+            page=args.tia_block_size, max_new_tokens=max_new_tokens)
     elif getattr(config, 'model_type', None) != 'qwen3':
         raise ValueError('frozen regions require full-attention Qwen3 or GLM NFA')
     elif getattr(config, 'head_dim', None) != 128:
@@ -217,7 +269,7 @@ def _configure_frozen_regions(args, config):
         geometry = RegionGeometry(
             sink=args.nfa_sink_tokens, near=args.nfa_near_len,
             window=args.nfa_swa_size, page=args.tia_block_size,
-            max_new_tokens=MAX_GEN)
+            max_new_tokens=max_new_tokens)
     environment = {
         'NFA_OPERATOR_MODE': 'off', 'NFA_FINE_GATHER': '0',
         'NFA_SPARSE_PREFILL': '0', 'NFA_DECODE_DENSE': '0',
@@ -226,14 +278,11 @@ def _configure_frozen_regions(args, config):
     for name, value in environment.items():
         current = os.environ.get(name)
         if current is not None and current.lower() != value:
-            raise ValueError(f'{name}={current!r} conflicts with frozen eager execution')
+            raise ValueError(f'{name}={current!r} conflicts with frozen execution')
         os.environ[name] = value
-    graph = os.environ.get('NFA_CUDA_GRAPH', 'auto').lower()
-    if graph not in ('auto', '0', 'off'):
-        raise ValueError('frozen regions support eager execution only')
-    os.environ['NFA_CUDA_GRAPH'] = 'off'
+    os.environ['NFA_CUDA_GRAPH'] = 'auto'
     config._attn_implementation = 'sdpa'
-    args.nfa_frozen_region_max_new_tokens = MAX_GEN
+    args.nfa_frozen_region_max_new_tokens = max_new_tokens
     args._frozen_region_gate = gate
     args._frozen_region_geometry = geometry
     return gate, geometry
@@ -252,8 +301,10 @@ def _resolve_static_gate(args, config):
     calibration under a static-gate treatment identity.  Use the separate
     static calibration entrypoint to create missing artifacts.
     """
-    if not getattr(args, 'nfa_static_gate', False):
+    if not (getattr(args, 'nfa_static_gate', False)
+            or getattr(args, 'nfa_enable_static_gate', False)):
         return None
+    args.nfa_enable_static_gate = True
     model_type = config.model_type
     path = getattr(args, 'nfa_static_gate_path', None) or default_static_gate_path(model_type)
     static_gate = load_static_gate(model_type, path=path)
@@ -327,6 +378,7 @@ def _extended_receipt_identity(args, data_file):
 
 def main():
     args = parse_args()
+    max_new_tokens = _ruler_max_new_tokens(args.task)
     baseline_preflight(args)
     seed_everything()
 
@@ -369,6 +421,8 @@ def main():
                              f"{args.task}.jsonl")
     receipt_identity = _extended_receipt_identity(args, data_file)
     rows = [json.loads(l) for l in open(data_file)]
+    if args.skip:
+        rows = rows[args.skip:]
     if args.max_num and len(rows) > args.max_num:
         rows = rows[:args.max_num]  # topk 口径（确定性）
     print(f"[ruler] task={args.task} L={args.context_length} "
@@ -383,7 +437,7 @@ def main():
     from benchmark.rope_policy import configure_rope, verify_runtime_rope
     rope_policy_record = None
     if config.model_type in ('qwen3', 'glm4_moe_lite'):
-        rope_policy_record = configure_rope(config, args.context_length, MAX_GEN,
+        rope_policy_record = configure_rope(config, args.context_length, max_new_tokens,
                                            yarn=use_yarn, factor=args.yarn_factor)
         # This constructs the installed framework's rotary module on CPU and
         # checks actual frequencies, scaling and rotation before loading weights.
@@ -415,7 +469,10 @@ def main():
             REPO, "exp", "vendor_baselines", "quest_vendor")
         if vendor_dir not in sys.path:
             sys.path.insert(0, vendor_dir)
-        from qwen3_quest_patch import enable_quest  # noqa: E402
+        if is_glm:
+            from glm4_moe_lite_quest_patch import enable_quest  # noqa: E402
+        else:
+            from qwen3_quest_patch import enable_quest  # noqa: E402
         n_patched = enable_quest(
             model,
             token_budget=getattr(args, "quest_token_budget", 1024),
@@ -599,7 +656,10 @@ def main():
             REPO, "exp", "vendor_baselines", "jssa_vendor")
         if vendor_dir not in sys.path:
             sys.path.insert(0, vendor_dir)
-        from qwen3_jssa_patch import enable_jssa  # noqa: E402
+        if is_glm:
+            from glm4_moe_lite_jssa_patch import enable_jssa  # noqa: E402
+        else:
+            from qwen3_jssa_patch import enable_jssa  # noqa: E402
         n_patched = enable_jssa(
             model,
             basis_path=getattr(args, "jssa_basis_path", None),
@@ -658,10 +718,7 @@ def main():
     # 0233 A/B 实测 bitwise 相等保证；≤32K 档不启用，路径逐位不变）
     keep_logits = args.context_length > 32768
 
-    eos_ids = [tokenizer.eos_token_id]
-    nl = tokenizer.encode("\n", add_special_tokens=False)
-    if nl:
-        eos_ids.append(nl[-1])
+    eos_ids = _ruler_eos_ids(model, tokenizer)
 
     out_dir = os.path.join(args.output_dir, f"L{args.context_length}",
                            f"pred{args.pred_postfix}")
@@ -734,7 +791,7 @@ def main():
             input_ids = tokenizer(row["input"], truncation=False,
                                   return_tensors="pt").input_ids.to("cuda")
             context_length = input_ids.shape[-1]
-            if rope_policy_record is not None and context_length + MAX_GEN > config.max_position_embeddings:
+            if rope_policy_record is not None and context_length + max_new_tokens > config.max_position_embeddings:
                 raise ValueError("actual input plus output exceeds verified runtime position capacity")
             # 【095 修复（GPT 审计 2026-10-12_0527，2026-10-12）】请求级
             # fail-closed guard：NFA_E127_FAST=1 的 gather 路径把三类契约
@@ -751,52 +808,37 @@ def main():
                         gate, geometry = frozen_runtime
                         output, frozen_audit = prefill_frozen_request(
                             model, input_ids, gate, geometry, static_gate)
+                        gen, past = decode_frozen_request(
+                            model, output, max_new_tokens=max_new_tokens,
+                            eos_ids=eos_ids,
+                            pad_token_id=getattr(model.config, 'pad_token_id', None) or 0,
+                            min_new_tokens=MIN_NEW_TOKENS)
+                        frozen_audit = complete_frozen_request(
+                            model, past, len(gen), frozen_audit)
                     else:
                         output = model(input_ids=input_ids, past_key_values=None,
                                        use_cache=True,
                                        **({"logits_to_keep": 1} if keep_logits else {}))
-                    past = output.past_key_values
-                    pred_idx = output.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
-                    gen = [pred_idx.item()]
-                    del output
-                    graphed = None
-                    if graphed is not None:
-                        gen = graphed
-                    else:
-                        for _ in range(MAX_GEN - 1):
-                            # min_length 语义：禁止在 context 结束前停（RULER 官方口径）
-                            if len(gen) < 2 and pred_idx.item() in eos_ids:
-                                pass  # 首位不许停（近似 min_length=context+1）
-                            if frozen_runtime is not None and config.model_type == 'glm4_moe_lite':
-                                decode_kwargs = {'attention_mask': None}
-                            elif frozen_runtime is not None:
-                                decode_kwargs = {'attention_mask': {'full_attention': None}}
-                            else:
-                                decode_kwargs = {}
-                            if frozen_runtime is not None:
-                                request_id = past.active_request_id
-                                past.new_step([request_id])
-                                past.plan_common([request_id])
-                                selected_ids_by_layer = past.compute_selected_ids_by_layer(
-                                    model, [request_id])
-                                past.prepare_all_layers(
-                                    [request_id],
-                                    selected_ids_by_layer=selected_ids_by_layer)
+                        past = output.past_key_values
+                        pred_idx = greedy_next_tokens(
+                            output.logits, eos_ids, generated_counts=0,
+                            min_new_tokens=MIN_NEW_TOKENS).unsqueeze(1)
+                        gen = [pred_idx.item()]
+                        del output
+                        for _ in range(max_new_tokens - 1):
                             out = model(input_ids=pred_idx, past_key_values=past,
-                                        use_cache=True, **decode_kwargs)
+                                        use_cache=True)
                             past = out.past_key_values
-                            if frozen_runtime is not None:
-                                past.commit_step()
-                            pred_idx = out.logits[:, -1, :].argmax(dim=-1).unsqueeze(1)
+                            pred_idx = greedy_next_tokens(
+                                out.logits, eos_ids, generated_counts=len(gen),
+                                min_new_tokens=MIN_NEW_TOKENS).unsqueeze(1)
                             gen.append(pred_idx.item())
-                            if pred_idx.item() in eos_ids and len(gen) > 1:
+                            if (len(gen) >= MIN_NEW_TOKENS
+                                    and pred_idx.item() in eos_ids):
                                 break
-                    if frozen_runtime is not None:
-                        frozen_audit = complete_frozen_request(
-                            model, past, len(gen), frozen_audit)
             pred = tokenizer.decode(gen, skip_special_tokens=True)
             metrics = get_metrics()
-            budget = None if (baseline_receipt or getattr(model, "_quality_graph_execution", {}).get("actual", "").startswith("graph")) else metrics.get_select_tokens()
+            budget = None if (baseline_receipt or frozen_runtime is not None) else metrics.get_select_tokens()
             metrics.clear()
             # E116c（GPT 0826 审计 TL-RULER-SAMPLE-GATE-026）：样本身份绑定源行
             # index（RULER 源 jsonl 自带 0..99 int，比 LB v1 的 data_fp 指纹更直接）
@@ -809,7 +851,10 @@ def main():
                 # Decoding drops special tokens; retain EOS for exact parity.
                 "generated_token_ids": gen,
                 "length": row["length"], "budget": budget,
-                "execution": getattr(model, "_quality_graph_execution", {}),
+                "execution": {
+                    "requested": "graph" if frozen_runtime is not None else "eager",
+                    "actual": "graph" if frozen_runtime is not None else "eager",
+                },
                 "_id": f"{args.task}:{row['index']}",
                 "_answers_sha": hashlib.sha256(json.dumps(
                     row["outputs"], ensure_ascii=False, sort_keys=True)
@@ -853,9 +898,12 @@ def main():
                 if os.path.isfile(model_cfg_path) else None),
             native_mpe=native_mpe,
             generation_params={
-                "max_gen": MAX_GEN, "max_num": args.max_num, "seed": SEED,
+                "max_gen": max_new_tokens, "min_new_tokens": MIN_NEW_TOKENS,
+                "eos_token_ids": list(eos_ids),
+                "max_num": args.max_num, "seed": SEED,
                 "method": args.method, "pred_postfix": args.pred_postfix,
-                "t": args.t, "graph_policy": "off",
+                "t": args.t,
+                "graph_policy": os.environ.get("NFA_CUDA_GRAPH", "off"),
                 "operator_mode": os.environ.get("NFA_OPERATOR_MODE", "off"),
             },
             producer_script_path="benchmark/RULER/pred_ruler.py",

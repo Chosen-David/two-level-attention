@@ -11,16 +11,15 @@
 - 死行（已触发停止）继续吃计算：喂 pad_id filler，其 KV 列被 mask 排除，
   不污染同 batch 其它行（每行因果独立）。
 
-【方法范围（Phase 1）】只支持 `none` / `fasa_vendor` / `nfa`（已 batch
-化）。quest_vendor / jssa_vendor / asynctls_vendor 在 batch_size>1 时
-启动即拒绝（Phase 2 逐个 batch 化后再开），拒绝而非静默产错
-（GATE-FAIL 精神）。batch_size=1 仍走 batch 路径（供 gate_bs1_equiv
-门禁：JSONL 与旧 pred_ruler.py 逐字节一致）。
+【方法范围】只支持 `none` / `fasa_vendor`；NFA batch/cache 旧路径已移除，
+本入口启动即拒绝，生产 NFA 使用 `pred_ruler.py` 的 GraphRunner 质量路径，
+或 `benchmark/efficiency/benchmark_nfa_end_to_end.py` 的多 BS 性能路径。
+quest_vendor / jssa_vendor / asynctls_vendor 在 batch_size>1 时同样启动即
+拒绝，避免把逐行回退或旧 cache 代码夸大为已验证的批量/CUDA Graph 能力。
 
-【同步义务】模型加载 + dispatch 分支内联复制自 pred_ruler.py（同步义务
-标注在各分支注释；nfa 挂载内联自 pred_ruler.py L184-185 + L444，
-qwen3_attn_patch 的 batch decode 见 sparse_attn/patches/qwen3_attn_patch.py
-`_tl_decode_batched`）。minference/sparq/moba/hisa/clusterkv 不在此入口。
+【同步义务】模型加载 + dispatch 分支内联复制自 pred_ruler.py；本文件只维护
+none/fasa_vendor 基线，不再包含 NFA cache 或 decode 实现。
+minference/sparq/moba/hisa/clusterkv 不在此入口。
 producer_script_sha256 用本文件自身 sha（yarn_receipt v2 同代绑定），
 pred_postfix 强制注入 `_bs{B}` 后缀隔离 producer（batch 入口产物不与
 旧入口同名互覆）。
@@ -39,7 +38,6 @@ import json
 import os
 import random
 import sys
-import time
 from datetime import datetime
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(
@@ -58,6 +56,9 @@ from benchmark.RULER.yarn_receipt import (  # noqa: E402
     commit_yarn_generation, generation_pointer_path, release_output_lock,
     resolve_yarn_config, stage_yarn_generation, stage_yarn_receipt,
 )
+from benchmark.RULER.pred_ruler import (  # noqa: E402
+    RULER_TASKS, _ruler_eos_ids, _ruler_max_new_tokens)
+from sparse_attn.scheduler.scheduler import greedy_next_tokens  # noqa: E402
 from sparse_attn.arguments import add_sparse_attn_args  # noqa: E402
 from sparse_attn.scheduler.batch_builder import BatchCtx, batch_decode_scope
 from sparse_attn.baseline_runtime import baseline_request, baseline_preflight
@@ -71,12 +72,6 @@ from sparse_attn.patches import register_patch  # noqa: E402
 # get_select_tokens + write 端 "budget" 字段逐字节一致）。
 from sparse_attn.metrics import get_metrics  # noqa: E402
 
-RULER_TASKS = [
-    "niah_single_1", "niah_single_2", "niah_single_3",
-    "niah_multikey_1", "niah_multikey_2", "niah_multikey_3",
-    "niah_multiquery", "niah_multivalue", "cwe", "fwe", "vt",
-]
-MAX_GEN = 64  # 官方 RULER 口径（全部任务统一，同步 pred_ruler.py）
 SEED = 42
 QWEN3_NATIVE_MPE = 40960
 YARN_FACTOR_AUTO = {65536: 2.0, 131072: 4.0}
@@ -84,7 +79,7 @@ YARN_FACTOR_AUTO = {65536: 2.0, 131072: 4.0}
 # Phase 1 白名单：已 batch 化的方法；其余方法 batch 入口拒绝（Phase 2 逐个开）
 # 【阶段 1】nfa 加入（NFA 主方法 batch decode：qwen3_attn_patch 的
 # _tl_decode_batched 逐行单序列核心 + BatchCtx 驱动）。
-_BATCH_METHODS = {"none", "fasa_vendor", "nfa"}
+_BATCH_METHODS = {"none", "fasa_vendor"}
 
 
 def parse_args():
@@ -168,104 +163,14 @@ def _decode_4d_mask(past_len, seq_lens, neg_inf, dtype, device,
     return mask
 
 
-def _decode_batch_graph(model, ctx, past, gen, lens, eos_ids, pad_id,
-                        neg_inf, dtype, device, B, S_cap):
-    from sparse_attn.ops.quality_graph import static_decode
-    return static_decode(model, past, gen, lens, eos_ids, MAX_GEN, ctx)
-
-
-def _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids):
-    """Compact NFA: per-request prefill/gates, batched model decode, optional graph."""
-    raise RuntimeError(
-        "NFA hybrid batch cache path has been removed; use B1 PagedRegionCache")
-
-    device = next(model.parameters()).device
-    input_ids, position_ids = input_ids.to(device), position_ids.to(device)
-    pad_id = tokenizer.pad_token_id
-    if pad_id is None:
-        pad_id = tokenizer.eos_token_id
-    batch, width = input_ids.shape
-    builder = HybridBatchCacheBuilder(model, max(lens)+MAX_GEN, batch)
-    generated = []
-    prefill_mode = os.environ.get('NFA_HYBRID_PREFILL', 'auto')
-    if prefill_mode not in ('auto', 'direct', 'conversion'):
-        raise ValueError('NFA_HYBRID_PREFILL must be auto, direct or conversion')
-    # Do not expose the outer B-row BatchCtx to a B=1 unpadded prefill.
-    with batch_decode_scope(None):
-        for b, length in enumerate(lens):
-            row_cache = builder.prepare_row(length) if prefill_mode != 'conversion' else None
-            output = model(input_ids=input_ids[b:b+1, width-length:],
-                           position_ids=position_ids[b:b+1, width-length:],
-                           past_key_values=row_cache, use_cache=True)
-            generated.append([output.logits[0, -1].argmax().item()])
-            if row_cache is None:
-                builder.add(output.past_key_values, length)
-            else:
-                builder.finalize_row(row_cache, length)
-            del output  # Release prefill logits before the next request.
-    runner = HybridBatchRunner(model, builder.finish(), pad_id)
-    # Compact capture recovery has a distinct cache lifecycle; keep auto on
-    # its validated staged path until that recovery is independently checked.
-    use_graph = graph_policy() == 'on'
-    record = execution(model,'staged_hybrid',
-                       'hybrid_auto_capture_not_validated' if graph_policy()=='auto' else None,
-                       batch_size=batch)
-    alive, lengths = [True]*batch, list(lens)
-    for step in range(MAX_GEN-1):
-        if not any(alive):
-            break
-        tokens = [row[-1] if active else pad_id for row, active in zip(generated, alive)]
-        lengths = [length+int(active) for length, active in zip(lengths, alive)]
-        runner.inject(tokens, lengths, alive)
-        if use_graph and step == 0:
-            # This path supports short contexts too; capture failures are visible.
-            runner.capture()
-            record.update(actual="graph_hybrid",captures=1)
-        if runner.graph is not None:
-            record["replay_steps"] += 1
-        predicted = runner.run().logits[:, -1].argmax(-1).tolist()
-        for b, token in enumerate(predicted):
-            if alive[b]:
-                generated[b].append(token)
-                if token in eos_ids and len(generated[b]) > 1:
-                    alive[b] = False
-    print(f'[hybrid-batch] B={batch} graph={runner.graph is not None} '
-          f'kv_storage_bytes={runner.kv_storage_bytes()}', flush=True)
-    return generated
-
-
 def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
-                        mask2d, lens, eos_ids, keep_logits,
-                        fixed_cache=False):
-    """一个 left-pad chunk 的 prefill + 多步 decode，返回逐行 (pred, gen)。
-
-    语义对齐 pred_ruler.py 生成循环（首位 EOS 不停 ≈ min_length、
-    `len(gen)>1` 才断）；dead 行喂 pad_id filler 吃计算、由 4D mask 排除。
-
-    fixed_cache=True（NFA 阶段 2a）：prefill 走 DynamicCache（现状零改动），
-    prefill 后 fill_static_from_dynamic 逐层搬移到 NFAStaticCache（固定容量
-    S_cap、有效在前 left-pad 布局）→ decode 每步 KV 形状恒 [B,Hkv,S_cap,D]
-    （CUDA Graph 前置）。decode 4D mask 列数恒 S_cap、可见列取头部
-    [0, seq_lens[b])（left_pad_kv=True）。
-    """
-    from sparse_attn.ops.quality_graph import unsupported
-    compact = any(getattr(getattr(m, 'indexer', None), 'far_skip_backend', '') == 'compact'
-                  for m in model.modules())
-    if fixed_cache or compact:
-        raise RuntimeError(
-            "NFA fixed/compact batch cache path has been removed; "
-            "use B1 PagedRegionCache")
-    if compact:
-        if not fixed_cache:
-            raise ValueError('compact batched decode requires fixed_cache=True')
-        return _decode_hybrid_batch_chunk(model, tokenizer, input_ids, position_ids, lens, eos_ids)
-    if not fixed_cache:
-        unsupported(model, "method_has_no_fixed_cache_graph")
+                        mask2d, lens, eos_ids, keep_logits, max_new_tokens):
+    """none/fasa_vendor 的逐行 DynamicCache prefill/decode 基线路径。"""
     B = len(rows)
     pad_id = getattr(tokenizer, "pad_token_id", None) or tokenizer.eos_token_id
     input_ids = input_ids.to("cuda")
     position_ids = position_ids.to("cuda")
-    mask2d = None if fixed_cache else mask2d.to("cuda")
+    mask2d = mask2d.to("cuda")
     device = input_ids.device
     neg_inf = torch.finfo(next(model.parameters()).dtype).min
     dtype = next(model.parameters()).dtype
@@ -276,64 +181,25 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
         alive=[True] * B, pad_id=pad_id)
     with batch_decode_scope(ctx):
 
-        # prefill row-by-row（避免 B>1 触发 HF SDPA 构造
-        # [B*n_heads, S, S] bool mask OOM：B=8/32K ≈ 256 GB > 140 GB H20）：
-        # 每行 B=1 走普通 SDPA（[1*n_heads, S_row, S_row] ≈ 32 GB 单行可容），
-        # 先保留各行实际 KV，全部 prefill 后逐层搬入 static 并释放源层，
-        # 避免后续 prefill 与完整 static batch 同时驻留。
-        # 生成 token = 每行末 position logits argmax（与旧 batch prefill 语义一致：
-        # prefill 后立即预测第一 decode token）。
-        # 非 NFA（fixed_cache=False）：同样逐行 B=1 prefill，
-        # 后接 staged row-by-row decode（batch>1 无 graph 提速，逐行回退零额外开销）。
+        # 逐行 prefill 保留各自 DynamicCache，避免批量 SDPA 的显存峰值。
         pred_list = []
-        if fixed_cache:
-            S_cap = S_max + MAX_GEN
-            static_cache = None
-            prefilled = []
-            for b in range(B):
-                base = S_max - lens[b]
-                row_input = input_ids[b:b+1, base:]
-                row_pos = position_ids[b:b+1, base:]
-                out = model(input_ids=row_input, position_ids=row_pos,
-                            use_cache=True)
-                pred_list.append(out.logits[0, -1, :].argmax(dim=-1))
-                prefilled.append(out.past_key_values)
-                del out
-            consume_prefill_rows(static_cache, prefilled, lens)
-            prefilled.clear()
-            past = static_cache
-        else:
-            # 非 NFA：逐行 B=1 prefill → 独立 DynamicCache → row-by-row staged
-            # decode；每行 forward 间 del 释放 DynamicCache 控峰值。
-            row_caches = []
-            for b in range(B):
-                base = S_max - lens[b]
-                row_input = input_ids[b:b+1, base:]
-                row_pos = position_ids[b:b+1, base:]
-                out = model(input_ids=row_input, position_ids=row_pos,
-                            use_cache=True)
-                pred_list.append(out.logits[0, -1, :].argmax(dim=-1))
-                row_caches.append(out.past_key_values)
-                del out
-            # Multi-row DynamicCache 组装为 left-pad 全宽（有效占尾），
-            # row-by-row staged decode 使用此 per-row cache；
-            # 下面 staged 循环改为逐行独立 cache、mask2d 逐行。
-            past = row_caches
+        row_caches = []
+        for b in range(B):
+            base = S_max - lens[b]
+            row_input = input_ids[b:b+1, base:]
+            row_pos = position_ids[b:b+1, base:]
+            out = model(input_ids=row_input, position_ids=row_pos,
+                        use_cache=True)
+            pred_list.append(greedy_next_tokens(
+                out.logits[:, -1:, :], eos_ids, generated_counts=0,
+                min_new_tokens=1)[0])
+            row_caches.append(out.past_key_values)
+            del out
+        past = row_caches
         pred = torch.tensor(pred_list, dtype=torch.long, device=device)
         gen = [[p] for p in pred.tolist()]            # 每行一个 gen 列表
 
-        # 【阶段 2c-5】CUDA Graph decode（env NFA_CUDA_GRAPH=1；仅 NFA
-        # fixed_cache、S_cap≥16384 且生产主配置——不满足时 helper 返回
-        # None → 落下方 staged 逐行路径，行为零扰动）。
-        if fixed_cache:
-            gen_g = _decode_batch_graph(
-                model, ctx, past, gen, lens, eos_ids, pad_id, neg_inf,
-                dtype, device, B, S_cap)
-            if gen_g is not None:
-                return gen_g
-
-        _t_stage, _n_stage = time.time(), 0
-        for step in range(MAX_GEN - 1):
+        for step in range(max_new_tokens - 1):
             if not any(ctx.alive):
                 break
             # 本步喂入 token：alive 行 = 当前最后产生 token，dead 行 = pad_id
@@ -352,60 +218,40 @@ def _decode_batch_chunk(model, tokenizer, rows, input_ids, position_ids,
                 if ctx.alive[b]:
                     ctx.seq_lens[b] += 1
                     ctx.gen_lens[b] += 1
-            # mask 列数：fixed_cache = 恒 S_cap（NFAStaticCache 固定容量、有效在
-            # 前 → left_pad_kv 可见列取头部 [0, seq_lens[b])）；否则 = S_max +
-            # step + 1（变长 DynamicCache 有效占尾 → 可见列取尾部）。行 b 可见
-            # 长 = 更新后的 seq_lens[b]（= lens[b] + step + 1，含本步新 token）。
-            if fixed_cache:
-                kv_len = S_cap
-                m4 = _decode_4d_mask(kv_len, ctx.seq_lens, neg_inf, dtype,
-                                     device, left_pad_kv=True)
-                out = model(input_ids=nxt_ids, position_ids=pos,
-                            attention_mask=m4, past_key_values=past,
-                            use_cache=True)
-                pred = out.logits[:, -1, :].argmax(dim=-1)  # [B]
-            else:
-                # 非 NFA：逐行独立 B=1 decode（DynamicCache 各行长不同，
-                # 无法 batch → 逐行 forward + per-row 4D mask）。
-                pred = torch.zeros(B, dtype=torch.long, device=device)
-                for b in range(B):
-                    if not ctx.alive[b]:
-                        continue
-                    base = S_max - lens[b]
-                    kv_len_b = lens[b] + step + 1
-                    m4b = _decode_4d_mask(
-                        kv_len_b, [ctx.seq_lens[b]], neg_inf, dtype, device,
-                        left_pad_kv=False)
-                    out_b = model(input_ids=nxt_ids[b:b+1],
-                                  position_ids=pos[b:b+1],
-                                  attention_mask=m4b,
-                                  past_key_values=past[b],
-                                  use_cache=True)
-                    past[b] = out_b.past_key_values
-                    pred[b] = out_b.logits[0, -1, :].argmax(dim=-1)
-                    del out_b
-            _n_stage += 1
+            # 各行 DynamicCache 长度不同，decode 也保持逐行独立。
+            pred = torch.zeros(B, dtype=torch.long, device=device)
+            for b in range(B):
+                if not ctx.alive[b]:
+                    continue
+                kv_len_b = lens[b] + step + 1
+                m4b = _decode_4d_mask(
+                    kv_len_b, [ctx.seq_lens[b]], neg_inf, dtype, device,
+                    left_pad_kv=False)
+                out_b = model(input_ids=nxt_ids[b:b+1],
+                              position_ids=pos[b:b+1],
+                              attention_mask=m4b,
+                              past_key_values=past[b],
+                              use_cache=True)
+                past[b] = out_b.past_key_values
+                pred[b] = out_b.logits[0, -1, :].argmax(dim=-1)
+                del out_b
             for b in range(B):
                 if not ctx.alive[b]:
                     continue
                 gen[b].append(pred[b].item())
                 if pred[b].item() in eos_ids and len(gen[b]) > 1:
                     ctx.alive[b] = False
-        if fixed_cache and _n_stage:
-            _dt = time.time() - _t_stage
-            print(f"[2c-wall] staged decode: steps={_n_stage} wall={_dt:.3f}s "
-                  f"({1000 * _dt / _n_stage:.2f} ms/step, B={B})", flush=True)
         return gen
 
 
 def main():
     from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
-    from sparse_attn.ops.quality_graph import graph_policy
     args = parse_args()
+    max_new_tokens = _ruler_max_new_tokens(args.task)
     if args.method == "nfa":
         raise RuntimeError(
-            "NFA batch cache path has been removed; use benchmark/RULER/pred_ruler.py "
-            "with B1 PagedRegionCache")
+            "NFA batch cache path has been removed; use pred_ruler.py for B1 quality "
+            "or benchmark/efficiency/benchmark_nfa_end_to_end.py for multi-BS performance")
     if args.batch_size < 1:
         raise SystemExit("--batch-size 必须 >= 1")
     if args.batch_size > 1 and args.method not in _BATCH_METHODS:
@@ -462,7 +308,7 @@ def main():
     from benchmark.rope_policy import configure_rope, verify_runtime_rope
     rope_policy_record = None
     if config.model_type in ('qwen3', 'glm4_moe_lite'):
-        rope_policy_record = configure_rope(config, args.context_length, MAX_GEN,
+        rope_policy_record = configure_rope(config, args.context_length, max_new_tokens,
                                            yarn=use_yarn, factor=args.yarn_factor)
         # This constructs the installed framework's rotary module on CPU and
         # checks actual frequencies, scaling and rotation before loading weights.
@@ -509,10 +355,7 @@ def main():
             f"实际将以 dense 运行——拒绝产出被误标为稀疏方法的结果。")
 
     keep_logits = args.context_length > 32768
-    eos_ids = [tokenizer.eos_token_id]
-    nl = tokenizer.encode("\n", add_special_tokens=False)
-    if nl:
-        eos_ids.append(nl[-1])
+    eos_ids = _ruler_eos_ids(model, tokenizer)
 
     out_dir = os.path.join(args.output_dir, f"L{args.context_length}",
                            f"pred{args.pred_postfix}")
@@ -538,7 +381,7 @@ def main():
             torch.cuda.empty_cache()
             input_ids, position_ids, mask2d, lens = _pack_rows(
                 tokenizer, chunk, pad_id)
-            if rope_policy_record is not None and max(lens) + MAX_GEN > config.max_position_embeddings:
+            if rope_policy_record is not None and max(lens) + max_new_tokens > config.max_position_embeddings:
                 raise ValueError("actual batch input plus output exceeds verified runtime position capacity")
             # 【阶段 1】budget 采集对齐 pred_ruler.py（L549-551 同步义务）：
             # chunk 前 clear 全局 metrics、baseline_request 解包 receipt
@@ -552,17 +395,17 @@ def main():
                 with torch.no_grad():
                     gen = _decode_batch_chunk(
                         model, tokenizer, chunk, input_ids, position_ids,
-                        mask2d, lens, eos_ids, keep_logits,
-                        fixed_cache=(args.method == "nfa"))
-            budget = None if (baseline_receipt or getattr(model, "_quality_graph_execution", {}).get("actual", "").startswith("graph")) else metrics.get_select_tokens()
+                        mask2d, lens, eos_ids, keep_logits, max_new_tokens)
+            budget = None if baseline_receipt else metrics.get_select_tokens()
             for (row, g) in zip(chunk, gen):
                 pred = tokenizer.decode(g, skip_special_tokens=True)
                 fout.write(json.dumps({
                     **({"baseline_receipt": baseline_receipt}
                        if baseline_receipt else {}),
                     "pred": pred, "answers": row["outputs"],
+                    "generated_token_ids": g,
                     "length": row["length"], "budget": budget,
-                    "execution": getattr(model, "_quality_graph_execution", {}),
+                    "execution": {"requested": "eager", "actual": "eager"},
                     "_id": f"{args.task}:{row['index']}",
                     "_answers_sha": hashlib.sha256(json.dumps(
                         row["outputs"], ensure_ascii=False, sort_keys=True)
@@ -590,10 +433,12 @@ def main():
                 if os.path.isfile(model_cfg_path) else None),
             native_mpe=native_mpe,
             generation_params={
-                "max_gen": MAX_GEN, "max_num": args.max_num, "seed": SEED,
+                "max_gen": max_new_tokens, "min_new_tokens": 1,
+                "eos_token_ids": list(eos_ids),
+                "max_num": args.max_num, "seed": SEED,
                 "method": args.method, "pred_postfix": args.pred_postfix,
                 "t": args.t, "batch_size": args.batch_size,
-                "graph_policy": graph_policy(),
+                "graph_policy": "off",
                 "operator_mode": os.environ.get("NFA_OPERATOR_MODE", "off"),
             },
             producer_script_path="benchmark/RULER/pred_ruler_batch.py",

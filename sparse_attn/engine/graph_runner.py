@@ -45,12 +45,10 @@ class GraphRunner:
         width = cache.choose_visible_bucket(padded_ids, self.visible_buckets)
         return min(width, cache.max_visible_len)
 
-    def _prepare_metadata(self, cache, padded_ids,
-                          selected_ids_by_layer=None, visible_bucket=None):
-        cache.prepare_all_layers(
-            padded_ids,
-            selected_ids_by_layer=selected_ids_by_layer,
-            visible_bucket=visible_bucket)
+    def _prepare_metadata(self, cache, padded_ids, visible_bucket):
+        """只准备公共页表/长度；各层 gather 由当前 Q 在 attention 内产生。"""
+        cache.plan_common(padded_ids)
+        cache.set_active_visible_bucket(visible_bucket)
 
     def _copy_inputs(self, bucket, input_ids, position_ids):
         self.input_ids_buf[bucket].copy_(input_ids, non_blocking=True)
@@ -69,6 +67,7 @@ class GraphRunner:
         key = self._key(bucket, visible_bucket)
         padded_ids = [-1] * bucket
         cache.ensure_visible_buckets((visible_bucket,))
+        cache.new_step(padded_ids)
         self._prepare_metadata(
             cache, padded_ids, visible_bucket=visible_bucket)
         self.input_ids_buf[bucket].zero_()
@@ -115,7 +114,8 @@ class GraphRunner:
                 self.capture(model, cache, bucket, cache.max_visible_len)
         return self.graphs
 
-    def step(self, model, cache):
+    def step(self, model, cache, *, generated_counts=0, min_new_tokens=0,
+             return_next_tokens=False, forced_tokens=None, stop_on_eos=True):
         req_ids, input_ids, position_ids = self.scheduler.prepare_step()
         bucket = self.bucket_for(len(req_ids), cache.max_requests)
         padded_ids = req_ids + [-1] * (bucket - len(req_ids))
@@ -125,13 +125,10 @@ class GraphRunner:
         cache.new_step(padded_ids)
         cache.plan_common(padded_ids)
 
-        selected_ids_by_layer = cache.compute_selected_ids_by_layer(
-            model, padded_ids)
+        # selector 不能放在整步 forward 前：各层必须在 post-RoPE 当前 Q 上
+        # 独立选择。这里只刷新固定元数据和本图使用的 visible bucket。
         visible_bucket = self.visible_bucket_for(cache, padded_ids)
-        self._prepare_metadata(
-            cache, padded_ids,
-            selected_ids_by_layer=selected_ids_by_layer,
-            visible_bucket=visible_bucket)
+        self._prepare_metadata(cache, padded_ids, visible_bucket)
         self._copy_inputs(bucket, input_ids, position_ids)
 
         key = self._key(bucket, visible_bucket)
@@ -147,6 +144,14 @@ class GraphRunner:
                 use_cache=True,
                 attention_mask={'full_attention': None},
             )
+        # 所有层均完成当前 Q 选择后，才统一消费 first-decode seed。
+        from ..indexer.nfa_layer_batch_selector import mark_first_decode_seeded
+        mark_first_decode_seeded(cache, padded_ids)
         cache.commit_step()
-        self.scheduler.record_next_tokens(padded_ids, logits)
+        next_tokens = self.scheduler.record_next_tokens(
+            padded_ids, logits, generated_counts=generated_counts,
+            min_new_tokens=min_new_tokens, forced_tokens=forced_tokens,
+            stop_on_eos=stop_on_eos)
+        if return_next_tokens:
+            return logits, next_tokens
         return logits

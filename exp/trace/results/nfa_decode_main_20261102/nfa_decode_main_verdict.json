@@ -1,0 +1,240 @@
+{
+  "schema": "nfa_decode_main_verdict_v1",
+  "date": "2026-11-02",
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "configurations": 18,
+  "timing": "steady TPOT median; speedup = FA2 / NFA",
+  "correctness": {
+    "native_ruler_input_identity": true,
+    "fixed_128_tokens_per_row": true,
+    "eager_graph_token_identity_all_method_length_batch": true,
+    "fa2_64k_b2_cpu_offload_vs_original_128_tokens_exact": true
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "evidence": "locked GPUs; external nvidia-smi logs; no multi-process sample in PID-recording logs"
+  },
+  "fa2_128k_b4_note": "Prefill uses per-layer KV CPU offload to avoid OOM; full B4 attention shapes and decode GPU StaticCache are unchanged; decode timing excludes prefill.",
+  "rows": [
+    {
+      "context_length": 32768,
+      "batch_size": 1,
+      "execution": "eager",
+      "nfa_tpot_ms_median": 146.54681396484375,
+      "fa2_tpot_ms_median": 22.91548728942871,
+      "nfa_steady_tpot_ms_median": 146.50198364257812,
+      "fa2_steady_tpot_ms_median": 22.909567832946777,
+      "fa2_over_nfa_speedup": 0.15637718523210856,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 32768,
+      "batch_size": 1,
+      "execution": "graph",
+      "nfa_tpot_ms_median": 64.72496032714844,
+      "fa2_tpot_ms_median": 12.560864448547363,
+      "nfa_steady_tpot_ms_median": 64.72382354736328,
+      "fa2_steady_tpot_ms_median": 12.560640335083008,
+      "fa2_over_nfa_speedup": 0.19406517796173528,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 32768,
+      "batch_size": 2,
+      "execution": "eager",
+      "nfa_tpot_ms_median": 150.10060119628906,
+      "fa2_tpot_ms_median": 22.62175941467285,
+      "nfa_steady_tpot_ms_median": 150.06798553466797,
+      "fa2_steady_tpot_ms_median": 22.619471549987793,
+      "fa2_over_nfa_speedup": 0.15072816143562048,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 32768,
+      "batch_size": 2,
+      "execution": "graph",
+      "nfa_tpot_ms_median": 71.25587463378906,
+      "fa2_tpot_ms_median": 16.529888153076172,
+      "nfa_steady_tpot_ms_median": 71.25321578979492,
+      "fa2_steady_tpot_ms_median": 16.52956771850586,
+      "fa2_over_nfa_speedup": 0.2319834625747975,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 32768,
+      "batch_size": 4,
+      "execution": "eager",
+      "nfa_tpot_ms_median": 150.98025512695312,
+      "fa2_tpot_ms_median": 27.680864334106445,
+      "nfa_steady_tpot_ms_median": 150.96733856201172,
+      "fa2_steady_tpot_ms_median": 27.679759979248047,
+      "fa2_over_nfa_speedup": 0.18334932736380088,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 32768,
+      "batch_size": 4,
+      "execution": "graph",
+      "nfa_tpot_ms_median": 83.64268493652344,
+      "fa2_tpot_ms_median": 24.24083137512207,
+      "nfa_steady_tpot_ms_median": 83.63651275634766,
+      "fa2_steady_tpot_ms_median": 24.240175247192383,
+      "fa2_over_nfa_speedup": 0.28982766555331607,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 65536,
+      "batch_size": 1,
+      "execution": "eager",
+      "nfa_tpot_ms_median": 145.89520263671875,
+      "fa2_tpot_ms_median": 22.942495346069336,
+      "nfa_steady_tpot_ms_median": 145.87100982666016,
+      "fa2_steady_tpot_ms_median": 22.9401912689209,
+      "fa2_over_nfa_speedup": 0.15726353917876443,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 65536,
+      "batch_size": 1,
+      "execution": "graph",
+      "nfa_tpot_ms_median": 70.46546936035156,
+      "fa2_tpot_ms_median": 16.869983673095703,
+      "nfa_steady_tpot_ms_median": 70.46430206298828,
+      "fa2_steady_tpot_ms_median": 16.869808197021484,
+      "fa2_over_nfa_speedup": 0.2394092853135976,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 65536,
+      "batch_size": 2,
+      "execution": "eager",
+      "nfa_tpot_ms_median": 163.3579864501953,
+      "fa2_tpot_ms_median": 27.767488479614258,
+      "nfa_steady_tpot_ms_median": 163.3488998413086,
+      "fa2_steady_tpot_ms_median": 27.766575813293457,
+      "fa2_over_nfa_speedup": 0.1699832434761932,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 65536,
+      "batch_size": 2,
+      "execution": "graph",
+      "nfa_tpot_ms_median": 94.86131286621094,
+      "fa2_tpot_ms_median": 24.082239151000977,
+      "nfa_steady_tpot_ms_median": 94.85382461547852,
+      "fa2_steady_tpot_ms_median": 24.083407402038574,
+      "fa2_over_nfa_speedup": 0.25390022489518654,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 65536,
+      "batch_size": 4,
+      "execution": "eager",
+      "nfa_tpot_ms_median": 182.36550903320312,
+      "fa2_tpot_ms_median": 42.6288948059082,
+      "nfa_steady_tpot_ms_median": 182.1482925415039,
+      "fa2_steady_tpot_ms_median": 42.626895904541016,
+      "fa2_over_nfa_speedup": 0.2340230331548573,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 65536,
+      "batch_size": 4,
+      "execution": "graph",
+      "nfa_tpot_ms_median": 129.68885803222656,
+      "fa2_tpot_ms_median": 39.05196762084961,
+      "nfa_steady_tpot_ms_median": 129.35564422607422,
+      "fa2_steady_tpot_ms_median": 39.04987335205078,
+      "fa2_over_nfa_speedup": 0.3018799340816046,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 131072,
+      "batch_size": 1,
+      "execution": "eager",
+      "nfa_tpot_ms_median": 147.7953338623047,
+      "fa2_tpot_ms_median": 28.585567474365234,
+      "nfa_steady_tpot_ms_median": 147.7979736328125,
+      "fa2_steady_tpot_ms_median": 28.58476734161377,
+      "fa2_over_nfa_speedup": 0.19340432510008168,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 131072,
+      "batch_size": 1,
+      "execution": "graph",
+      "nfa_tpot_ms_median": 83.12879943847656,
+      "fa2_tpot_ms_median": 24.906496047973633,
+      "nfa_steady_tpot_ms_median": 83.1255989074707,
+      "fa2_steady_tpot_ms_median": 24.902112007141113,
+      "fa2_over_nfa_speedup": 0.29957212139740863,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 131072,
+      "batch_size": 2,
+      "execution": "eager",
+      "nfa_tpot_ms_median": 161.5944061279297,
+      "fa2_tpot_ms_median": 43.00735855102539,
+      "nfa_steady_tpot_ms_median": 161.5876007080078,
+      "fa2_steady_tpot_ms_median": 43.0047664642334,
+      "fa2_over_nfa_speedup": 0.26613902475069184,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 131072,
+      "batch_size": 2,
+      "execution": "graph",
+      "nfa_tpot_ms_median": 113.11949157714844,
+      "fa2_tpot_ms_median": 39.25641632080078,
+      "nfa_steady_tpot_ms_median": 113.07215881347656,
+      "fa2_steady_tpot_ms_median": 39.25516700744629,
+      "fa2_over_nfa_speedup": 0.3471691654194157,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": false
+    },
+    {
+      "context_length": 131072,
+      "batch_size": 4,
+      "execution": "eager",
+      "nfa_tpot_ms_median": 184.82537841796875,
+      "fa2_tpot_ms_median": 72.95584106445312,
+      "nfa_steady_tpot_ms_median": 183.2161407470703,
+      "fa2_steady_tpot_ms_median": 72.9498405456543,
+      "fa2_over_nfa_speedup": 0.3981627396374508,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": true
+    },
+    {
+      "context_length": 131072,
+      "batch_size": 4,
+      "execution": "graph",
+      "nfa_tpot_ms_median": 140.7697296142578,
+      "fa2_tpot_ms_median": 69.04608154296875,
+      "nfa_steady_tpot_ms_median": 140.32962799072266,
+      "fa2_steady_tpot_ms_median": 69.04248046875,
+      "fa2_over_nfa_speedup": 0.49200216274580644,
+      "eager_graph_token_identity": true,
+      "fa2_prefill_cpu_offload": true
+    }
+  ],
+  "source": {
+    "head": "74823f847a8761a6598849a22998adb15e68206b",
+    "diff_sha256": "cdef45f19d1d0891ee3aa1d0428d880e8467fe7a1120b6b018d872d85a527f58"
+  }
+}

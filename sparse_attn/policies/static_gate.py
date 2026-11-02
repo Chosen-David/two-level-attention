@@ -20,6 +20,9 @@ class StaticGateDecision:
     skip_near: tuple
     gate: dict
     source: str = ""
+    skip_far_frequency: tuple = ()
+    skip_near_frequency: tuple = ()
+    tau: float = 0.5
 
     def __post_init__(self):
         if self.num_layers < 0:
@@ -36,6 +39,19 @@ class StaticGateDecision:
                              ("skip_near", self.skip_near)):
             if not all(type(value) is bool for value in values):
                 raise ValueError(f"{name} must contain only booleans")
+        for name, values in (("skip_far_frequency", self.skip_far_frequency),
+                             ("skip_near_frequency", self.skip_near_frequency)):
+            if not values:
+                continue
+            if len(values) != self.num_layers:
+                raise ValueError(
+                    f"{name} length {len(values)} != num_layers "
+                    f"{self.num_layers}")
+            if not all(isinstance(value, (int, float)) and not isinstance(value, bool)
+                       for value in values):
+                raise ValueError(f"{name} must contain numeric frequencies")
+        if not isinstance(self.tau, (int, float)):
+            raise ValueError("tau must be numeric")
         if not isinstance(self.gate, dict):
             raise ValueError("gate must be a dict")
 
@@ -67,6 +83,19 @@ def _parse_static_gate(path, data):
     skip_near = data.get("skip_near")
     if not isinstance(skip_far, list) or not isinstance(skip_near, list):
         raise ValueError(f"{path}: skip_far/skip_near 非法")
+
+    skip_far_frequency = data.get("skip_far_frequency")
+    skip_near_frequency = data.get("skip_near_frequency")
+    tau_value = data.get("tau", gate.get("tau"))
+    tau = float(0.5 if tau_value is None else tau_value)
+    # 旧 artifact 同时保存布尔决策和诊断频率；没有显式 tau 时必须以
+    # 布尔决策为准，不能在加载时静默改变 treatment 身份。
+    if tau_value is not None:
+        if isinstance(skip_far_frequency, list) and len(skip_far_frequency) == num_layers:
+            skip_far = [float(x) >= tau for x in skip_far_frequency]
+        if isinstance(skip_near_frequency, list) and len(skip_near_frequency) == num_layers:
+            skip_near = [float(x) >= tau for x in skip_near_frequency]
+
     try:
         decision = StaticGateDecision(
             model_type=model_type,
@@ -75,6 +104,15 @@ def _parse_static_gate(path, data):
             skip_near=tuple(bool(x) for x in skip_near),
             gate=gate,
             source=str(data.get("source", "")),
+            skip_far_frequency=(
+                tuple(float(x) for x in skip_far_frequency)
+                if isinstance(skip_far_frequency, list)
+                else ()),
+            skip_near_frequency=(
+                tuple(float(x) for x in skip_near_frequency)
+                if isinstance(skip_near_frequency, list)
+                else ()),
+            tau=tau,
         )
     except ValueError as exc:
         raise ValueError(f"{path}: {exc}") from exc
@@ -120,7 +158,12 @@ def save_static_gate(decision, path=None, repo_root=None):
         "skip_near": list(decision.skip_near),
         "gate": decision.gate,
         "source": decision.source,
+        "tau": float(decision.tau),
     }
+    if decision.skip_far_frequency:
+        payload["skip_far_frequency"] = list(decision.skip_far_frequency)
+    if decision.skip_near_frequency:
+        payload["skip_near_frequency"] = list(decision.skip_near_frequency)
     tmp = f"{path}.tmp-{os.getpid()}"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=1, sort_keys=True)
@@ -141,4 +184,26 @@ def static_gate_from_audit(model_type, num_layers, audit, gate, source=""):
         skip_near=tuple(bool(decisions[i]["skip_near"]) for i in range(num_layers)),
         gate=dict(gate),
         source=source,
+    )
+
+
+def static_gate_from_frequency(
+        model_type, num_layers, skip_far_frequency, skip_near_frequency,
+        gate, source="", tau=0.5):
+    """Build frequency-threshold decisions, preserving frequencies for reuse."""
+    skip_far = tuple(bool(float(x) >= tau) for x in skip_far_frequency)
+    skip_near = tuple(bool(float(x) >= tau) for x in skip_near_frequency)
+    gate = dict(gate)
+    gate["statistic"] = "frequency"
+    gate["tau"] = float(tau)
+    return StaticGateDecision(
+        model_type=model_type,
+        num_layers=num_layers,
+        skip_far=skip_far,
+        skip_near=skip_near,
+        gate=gate,
+        source=source,
+        skip_far_frequency=tuple(float(x) for x in skip_far_frequency),
+        skip_near_frequency=tuple(float(x) for x in skip_near_frequency),
+        tau=float(tau),
     )

@@ -85,6 +85,7 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
         runtime = types.ModuleType("sparse_attn.baseline_runtime")
         runtime.BatchCtx = object
         runtime.baseline_preflight = lambda args: None
+        runtime.load_ffd = lambda *args, **kwargs: None
         runtime.batch_decode_scope = contextlib.nullcontext
 
         @contextlib.contextmanager
@@ -111,6 +112,7 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
         info.get_method_name_with_info = get_method_name_with_info
         info.get_treatment_manifest_json = get_treatment_manifest_json
         info.stage_fasa_agreement = lambda *args: None
+        info.freeze_minference_pattern_sha8 = lambda *args: None
 
         patches = types.ModuleType("sparse_attn.patches")
 
@@ -123,6 +125,25 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
         metrics = types.ModuleType("sparse_attn.metrics")
         metrics.get_metrics = lambda: types.SimpleNamespace(
             clear=lambda: None, get_select_tokens=lambda: 17)
+
+        eager = types.ModuleType("sparse_attn.ops.eager_decoding")
+        eager.eager_decoding_request_guard = contextlib.nullcontext
+        frozen = types.ModuleType("sparse_attn.engine.frozen_runner")
+        frozen.complete_frozen_request = lambda *args, **kwargs: None
+        frozen.decode_frozen_request = lambda *args, **kwargs: None
+        frozen.prefill_frozen_request = lambda *args, **kwargs: None
+        scheduler = types.ModuleType("sparse_attn.scheduler.scheduler")
+        scheduler.greedy_next_tokens = lambda *args, **kwargs: None
+        batch_builder = types.ModuleType("sparse_attn.scheduler.batch_builder")
+        batch_builder.BatchCtx = object
+        batch_builder.batch_decode_scope = contextlib.nullcontext
+        static_gate = types.ModuleType("sparse_attn.policies.static_gate")
+        static_gate.default_static_gate_path = lambda *args, **kwargs: ""
+        static_gate.load_static_gate = lambda *args, **kwargs: None
+        geometry = types.ModuleType("sparse_attn.policies.region_geometry")
+        geometry.RegionGeometry = object
+        gate = types.ModuleType("sparse_attn.policies.frozen_gate")
+        gate.GateConfig = object
 
         tqdm = types.ModuleType("tqdm")
         tqdm.tqdm = lambda values: values
@@ -141,6 +162,13 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
             "sparse_attn.info": info,
             "sparse_attn.patches": patches,
             "sparse_attn.metrics": metrics,
+            "sparse_attn.ops.eager_decoding": eager,
+            "sparse_attn.engine.frozen_runner": frozen,
+            "sparse_attn.scheduler.scheduler": scheduler,
+            "sparse_attn.scheduler.batch_builder": batch_builder,
+            "sparse_attn.policies.static_gate": static_gate,
+            "sparse_attn.policies.region_geometry": geometry,
+            "sparse_attn.policies.frozen_gate": gate,
             "tqdm": tqdm,
             "numpy": numpy,
         }
@@ -148,41 +176,23 @@ class RulerBatchTreatmentSnapshotTests(unittest.TestCase):
             spec.loader.exec_module(module)
         return module
 
-    def test_nfa_uses_one_preload_snapshot_for_runtime_name_and_receipt(self):
+    def test_nfa_batch_entry_fails_closed_before_model_or_output(self):
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
-            data = tmp / "data" / "4096"
-            data.mkdir(parents=True)
-            row = {"input": "prompt", "outputs": ["answer"],
-                   "length": 4096, "index": 0}
-            (data / "niah_single_1.jsonl").write_text(
-                json.dumps(row) + "\n", encoding="utf-8")
-
             events = []
             captured = {}
-            snapshot = object()
-            module = self._load_entry(tmp, events, captured, snapshot)
-            args = types.SimpleNamespace(
+            module = self._load_entry(tmp, events, captured, object())
+            module.parse_args = lambda: types.SimpleNamespace(
                 batch_size=1, method="nfa", pred_postfix="", yarn=False,
                 context_length=4096, yarn_factor=None,
                 data_root=str(tmp / "data"), task="niah_single_1",
                 max_num=1, model_path=str(tmp / "model"),
                 model="Qwen3-8B", output_dir=str(tmp / "out"), t="test")
-            module.parse_args = lambda: args
-            module._pack_rows = lambda *args: (object(), object(), object(), [1])
-            module._decode_batch_chunk = lambda *args, **kwargs: [[1]]
-
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", ResourceWarning)
+            with self.assertRaisesRegex(RuntimeError, "NFA batch cache path"):
                 module.main()
-
-            self.assertLess(events.index("snapshot"), events.index("model"))
-            self.assertIs(captured["runtime_snapshot"], snapshot)
-            self.assertIs(captured["name_snapshot"], snapshot)
-            self.assertIs(captured["manifest_snapshot"], snapshot)
-            self.assertEqual(
-                captured["receipt"]["treatment_manifest_json"],
-                '{"frozen":true}')
+            self.assertEqual(events, [])
+            self.assertEqual(captured, {})
+            self.assertFalse((tmp / "out").exists())
 
 
 if __name__ == "__main__":
