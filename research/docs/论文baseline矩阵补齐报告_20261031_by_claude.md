@@ -100,7 +100,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 补跑任务 FullKV 分数：`passage_count=19.00`、`samsum=36.46`、`trec=72.50`。三项在 pc02 以 TS=`20261102081500` 完成，逐任务产物行数均与参考数据一致；合并原有 13 任务后的正式结果已落盘 `exp/trace/results/qwen3_32b_longbench_fullkv.json`。既有 TIA 仍只有 AVG13，暂不与 FullKV AVG16 直接作差；当前 Quest/JSSA 正式矩阵进度见下表。
 
-### 2.4 状态（更新 2026-11-03 05:10）
+### 2.4 状态（更新 2026-11-03 06:10）
 
 | 数据集 | 状态 |
 |--------|------|
@@ -108,7 +108,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | RULER 32K FullKV | ✅ 完成，AVG11 = 52.22 |
 | LongBench FullKV | ✅ 16/16，AVG16 = 42.37 |
 | LongBench TIA（既有口径） | 13/16，待补 3 任务 |
-| RULER/LongBench Quest + JSSA | 🔄 Quest RULER 4/11、LongBench 6/16；JSSA RULER ✅ 11/11（AVG11=54.06）、LongBench 11/16；已完成任务均 rc=0 且产物行数完整 |
+| RULER/LongBench Quest + JSSA | 🔄 Quest RULER 4/11、LongBench 7/16；JSSA RULER ✅ 11/11（AVG11=54.06）、LongBench 12/16；已完成任务均 rc=0 且产物行数完整 |
 | RULER/LongBench FASA/AsyncTLS/HISA | 未派单 |
 
 ---
@@ -159,18 +159,39 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 11 任务均 `rc=0`、每任务 100 样本，按 TS=`11021635` 的同代 `.tli_gen` 指针解析并记录源文件 SHA256；打分结果：`exp/trace/results/glm_4_7_flash_ruler32k_jssa_vendor.json`。该结果显示当前预算下存在严重质量缺口，后续需区分稀疏预算敏感性与适配问题；这是 **JSSA vendor baseline** 结果，不是 TLI 主方法结果。
 
-### 3.3 LongBench FullKV
+### 3.3 RULER 32K Quest（✅ 11/11 已打分）
+
+**Quest AVG11 = 21.66 / FullKV AVG11 = 26.58 / Δ = -4.92**
+
+| Task | FullKV | Quest (token_budget=1024, chunk_size=16) | Δ(Quest-FKV) |
+|------|--------|------------------------------------------|--------------|
+| niah_single_1 | 5.00 | 13.00 | +8.00 |
+| niah_single_2 | 2.00 | 1.00 | -1.00 |
+| niah_single_3 | 3.00 | 0.00 | -3.00 |
+| niah_multikey_1 | 1.00 | 4.00 | +3.00 |
+| niah_multikey_2 | 27.00 | 16.00 | -11.00 |
+| niah_multikey_3 | 7.00 | 0.00 | -7.00 |
+| niah_multiquery | 15.00 | 56.00 | +41.00 |
+| niah_multivalue | 24.00 | 59.25 | +35.25 |
+| cwe | 69.80 | 21.50 | -48.30 |
+| fwe | 72.33 | 64.67 | -7.66 |
+| vt | 66.20 | 2.80 | -63.40 |
+| **AVG11** | **26.58** | **21.66** | **-4.92** |
+
+11 任务均 `rc=0`、每任务 100 样本，按 TS=`11021635` 的同代 `.tli_gen` 指针解析并记录源文件 SHA256；打分结果：`exp/trace/results/glm_4_7_flash_ruler32k_quest_vendor.json`。Quest 总分比 JSSA 2.52 高 19.14，但仍低于 FullKV；`niah_multiquery`/`niah_multivalue` 分别反超 FullKV 41.00/35.25，`cwe`/`vt` 则存在明显质量缺口。这是 **Quest vendor baseline** 结果，不是 TLI 主方法结果。
+
+### 3.4 LongBench FullKV
 
 ✅ 已完成（task #11）。
 
-### 3.4 状态
+### 3.5 状态（更新 2026-11-03 06:10）
 
 | 数据集 | 状态 |
 |--------|------|
 | RULER 32K FullKV | ✅ 完成，AVG11 = 26.58 |
 | LongBench FullKV | ✅ 完成 |
 | TLI 跑分 | 未派单 |
-| Vendor baselines | 🔄 TS=11021635；Quest RULER 10/11、LongBench 14/16；JSSA RULER ✅ 11/11（AVG11=2.52）、LongBench 15/16 有效（`passage_count`/`lcc` 补跑均 rc=0，分别 200/500 行；`repobench-p` 补跑中）；已完成任务产物行数完整 |
+| Vendor baselines | 🔄 TS=11021635；Quest RULER ✅ 11/11（AVG11=21.66）、LongBench 14/16；JSSA RULER ✅ 11/11（AVG11=2.52）、LongBench 15/16 有效（`passage_count`/`lcc` 补跑均 rc=0，分别 200/500 行；`repobench-p` 395/500）；已完成任务产物行数完整 |
 
 ---
 
@@ -186,7 +207,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ### 补充材料
 - Qwen3-32B RULER 32K：JSSA 54.06 / FullKV 52.22 / TLI 50.70；JSSA 总分领先但 `vt=0`，TLI 与 FullKV 的 fwe 差距仍是 TLI 落后主因
-- GLM-4.7-Flash RULER 32K：FullKV 26.58（grass-is-green 退化），JSSA 2.52（Δ=-24.06，质量缺口待归因），TLI 待跑
+- GLM-4.7-Flash RULER 32K：FullKV 26.58（grass-is-green 退化），Quest 21.66（Δ=-4.92），JSSA 2.52（Δ=-24.06，质量缺口待归因），TLI 待跑
 
 ### 不在主表
 - DuoAttention：蒸馏未完成 → 论文说明 "开源代码仅支持 Llama 架构"
@@ -213,8 +234,9 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 - TLI: `exp/results_ruler/Qwen3-32B/L32768/pred_bs2_champ/`
 
 ### RULER 32K (GLM-4.7-Flash)
+- Quest 打分汇总: `exp/trace/results/glm_4_7_flash_ruler32k_quest_vendor.json`
 - JSSA 打分汇总: `exp/trace/results/glm_4_7_flash_ruler32k_jssa_vendor.json`
-- JSSA 同代产物: 远程 `/tmp/tli-baseline-jssa-quest/exp/results_ruler/GLM-4.7-Flash/L32768/pred/`（TS=11021635，逐任务 `.tli_gen` 指针）
+- Quest/JSSA 同代产物: 远程 `/tmp/tli-baseline-jssa-quest/exp/results_ruler/GLM-4.7-Flash/L32768/pred/`（TS=11021635，逐任务 `.tli_gen` 指针）
 
 ### LongBench (Qwen3-8B)
 - 打分汇总: `exp/trace/results/qwen3_8b_longbench_*.json`（6 文件）
@@ -227,7 +249,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ---
 
-## 6. 下一步行动（更新 2026-11-03 05:10）
+## 6. 下一步行动（更新 2026-11-03 06:10）
 
 | 优先级 | 行动 | 状态 |
 |--------|------|------|
@@ -236,8 +258,8 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | P0 | GLM-4.7-Flash RULER 32K FullKV | ✅ 完成（AVG11=26.58） |
 | P0 | Qwen3-32B LongBench 缺失 3 任务 | ✅ 完成（pc02 各任务产物完整） |
 | P0 | Qwen3-32B LongBench FullKV 16 任务完整打分 | ✅ 完成（AVG16=42.37） |
-| P1 | Qwen3-32B + GLM Quest/JSSA RULER 32K + LongBench | 🔄 5 套原矩阵 + GLM JSSA LongBench 补跑运行中；Q32B/GLM JSSA RULER 均已完成 |
-| P1 | Vendor 矩阵完成后打分、汇总并核验论文 | 🔄 Q32B JSSA RULER 已打分（AVG11=54.06），GLM JSSA RULER 已打分（AVG11=2.52）；GLM JSSA LongBench 待最后一项补跑形成 16/16 后打分，其余待生成完成 |
+| P1 | Qwen3-32B + GLM Quest/JSSA RULER 32K + LongBench | 🔄 Q32B Quest RULER、Q32B Quest/JSSA LongBench、GLM Quest LongBench 与 GLM JSSA LongBench 最后一项补跑运行中；Q32B/GLM JSSA RULER 与 GLM Quest RULER 已完成 |
+| P1 | Vendor 矩阵完成后打分、汇总并核验论文 | 🔄 Q32B JSSA RULER 已打分（AVG11=54.06），GLM JSSA RULER 已打分（AVG11=2.52），GLM Quest RULER 已打分（AVG11=21.66）；GLM JSSA LongBench 待最后一项补跑形成 16/16 后打分，其余待生成完成 |
 | P1 | GLM-4.7-Flash TLI 跑分 | 待 GPU 空闲派单 |
 | P2 | FASA/AsyncTLS/HISA for Q32B/GLM | 待当前矩阵完成后评估 |
 | N/A | DuoAttention → 论文脚注说明 | 用户已确认 |
@@ -247,6 +269,11 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ## 7. 更新记录
 
+- 2026-11-03 06:10:
+  - **GLM Quest RULER 32K 完整套件正式发布**：11/11 全部 `rc=0`、每任务 100 行，按 TS=`11021635` 同代 `.tli_gen` 指针打分并记录 SHA256。**AVG11=21.66**，对比 FullKV 26.58 为 -4.92、对比 JSSA 2.52 为 +19.14；`niah_multiquery=56.00`/`niah_multivalue=59.25` 反超 FullKV，但 `cwe=21.50`/`vt=2.80` 存在明显缺口。结果落盘 `glm_4_7_flash_ruler32k_quest_vendor.json`，不与 TLI 主方法结果混淆。
+  - Q32B 进度：Quest RULER 4/11（当前 `niah_multikey_2` 69/100）、LongBench 7/16（新完成 `gov_report`，当前 `qmsum`）；JSSA LongBench 12/16（当前 `passage_count`）。Q32B JSSA RULER 11/11 与 AVG11=54.06 保持不变。
+  - GLM 其余矩阵：Quest LongBench 14/16（当前 `lcc`）；JSSA LongBench 15/16 有效，`repobench-p` 推进至 395/500、无异常，待 `rc=0` 且 500 行核验后形成 16/16 再正式打分。
+  - 当前 GPU0/GPU1/GPU4 空闲；不追加尚未完成 Q32B/GLM 适配验证的 FASA/AsyncTLS/HISA。Q32B LongBench FullKV 16/16 与 AVG16=42.37 保持完成，无需重复 eval。
 - 2026-11-03 05:10:
   - **Q32B JSSA RULER 32K 完整套件正式发布**：11/11 全部 `rc=0`、每任务 100 行，按 TS=`11021830` 同代 `.tli_gen` 指针打分并记录 SHA256。**AVG11=54.06**，对比 FullKV 52.22 为 +1.84、对比 TLI 50.70 为 +3.36；但 `vt=0`（FullKV 96.40），任务间差异显著，不与 TLI 主方法结果混淆。结果落盘 `qwen3_32b_ruler32k_jssa_vendor.json`。
   - Q32B 其余进度：Quest RULER 4/11（新完成 `niah_multikey_1`，100 行；当前 `niah_multikey_2` 32/100）、LongBench 6/16（`gov_report` 运行中）；JSSA LongBench 11/16（新完成 `triviaqa`，200 行；当前 `samsum`）。
