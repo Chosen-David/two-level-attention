@@ -225,7 +225,8 @@ if _has_triton():
                    + dim[None, :])
             k = tl.load(src, mask=(read_r & lp_valid)[:, None] & dim_mask[None, :], other=0.0).to(tl.float32)
             for j in tl.static_range(G):
-                q = tl.load(Q + m * stride_qm + (kv * G + j) * stride_qh + offs_d)
+                q = tl.load(Q + m * stride_qm + (kv * G + j) * stride_qh + offs_d,
+                            mask=dim_mask, other=0.0)
                 s = tl.sum(k * q[None, :], axis=1)
                 s = tl.where(read_r & lp_valid, s, float("-inf"))
                 s = s.to(tl.bfloat16).to(tl.float32)
@@ -261,7 +262,8 @@ if _has_triton():
             k = tl.load(src, mask=(read_r & lp_valid)[:, None] & dim_mask[None, :], other=0.0).to(tl.float32)
             prob_sum = tl.zeros((TILE,), tl.float32)
             for j in tl.static_range(G):
-                q = tl.load(Q + m * stride_qm + (kv * G + j) * stride_qh + offs_d)
+                q = tl.load(Q + m * stride_qm + (kv * G + j) * stride_qh + offs_d,
+                            mask=dim_mask, other=0.0)
                 s = tl.sum(k * q[None, :], axis=1)
                 s = tl.where(read_r & lp_valid, s, float("-inf"))
                 s = s.to(tl.bfloat16).to(tl.float32)
@@ -873,11 +875,13 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     kt_cap = cache.max_blocks
     s_cap = pad
 
-    dims = indexer._subspace_indices(device).long()
     if indexer.enable_subspace:
-        q_dims = dims
+        dims = indexer._subspace_indices(device).long()
     else:
-        q_dims = None
+        # _subspace_indices also supplies the legacy tail/QAT coordinates;
+        # disabling L1 projection must instead read full-width K and Q.
+        dims = torch.arange(cache.layers[0].head_dim_k,
+                            dtype=torch.int64, device=device)
 
     # PAD 行使用 request 0 的安全页表地址，但 length=0 且不消费 seed。
     active_req_t = cache.active_req_ids_buf[:b]
@@ -911,20 +915,18 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
             DQ_BLOCK=triton.next_power_of_2(d_q), num_warps=4)
         return out
 
-    if q_dims is not None:
-        b_q_full = _prepare_q(dims, dims.numel())
-    else:
-        full_dims = torch.arange(d_full, dtype=torch.int64, device=device)
-        b_q_full = _prepare_q(full_dims, d_full)
-
+    b_q_full = _prepare_q(dims, dims.numel())
     if indexer.l2_subspace == "full":
-        full_dims = torch.arange(d_full, dtype=torch.int64, device=device)
-        b_q_fine = _prepare_q(full_dims, d_full)
-    elif q_dims is not None:
-        b_q_fine = b_q_full
+        fine_dims = (torch.arange(d_full, dtype=torch.int64, device=device)
+                     if indexer.enable_subspace else dims)
+    elif indexer.enable_subspace:
+        fine_dims = dims
     else:
-        qat = indexer._qat_indices(device).long()
-        b_q_fine = _prepare_q(qat, qat.numel())
+        fine_dims = indexer._qat_indices(device).long()
+    # Each stage uses the same ordered coordinates for K and Q. Reuse the
+    # current query workspace only when the coordinate object is shared.
+    b_q_fine = (b_q_full if fine_dims is dims else
+                _prepare_q(fine_dims, fine_dims.numel()))
 
     # Layer pointers and persistent tensor-only skip flags [layer, request].
     # Skip/block-table lookups now read the full persistent buffers directly
@@ -980,7 +982,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
 
     # ---- fused fine score + local unique topk ----------------------------
     probs, unique = _fused_fine_probabilities_paged(
-        cache, valid_req_t, layer_ptrs, dims, b_q_fine,
+        cache, valid_req_t, layer_ptrs, fine_dims, b_q_fine,
         cand_idx2, keep2, cand_len, s_cap, group_size,
         layer_offset=layer_offset)
 
@@ -1101,3 +1103,4 @@ def mark_first_decode_seeded(cache, req_ids):
     cache.first_decode_seeded_buf[valid_req_t] = 1
     for rid in valid_req_ids:
         cache.states[rid].first_decode_seeded = True
+
