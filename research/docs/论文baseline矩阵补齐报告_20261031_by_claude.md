@@ -69,24 +69,26 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 - 与 Qwen3-8B 不同（8B 上 TLI 60.77 > FullKV 59.38），32B 上 FullKV 基线更强，TLI 稀疏化代价更明显
 - 打分文件：`exp/trace/results/qwen3_32b_ruler32k_fullkv_vs_tli.json`
 
-### 2.2 LongBench FullKV（13/16 已打分 + 3 在飞）
+### 2.2 LongBench FullKV（✅ 16/16 已打分）
 
-| Method | AVG13 | Δ vs FullKV |
-|--------|-------|-------------|
-| FullKV (none) | **42.31** | 0.00 |
-| TIA (champion) | 41.85 | -0.46 |
-| Quest_1024 | 38.49 | -3.82 |
+| Method | 分数口径 | 分数 |
+|--------|----------|------|
+| FullKV (none) | **AVG16** | **42.37** |
+| TIA (champion) | AVG13（尚缺 3 任务） | 41.85 |
+| Quest_1024 | AVG13（尚缺 3 任务） | 38.49 |
 
-**缺失 3 任务**（passage_count、samsum、trec）：2026-11-02 08:05 已派单（GPU0: passage_count+trec 并行, GPU1: samsum），预计 ~09:00 完成后重打分为 AVG16。
+补跑任务 FullKV 分数：`passage_count=19.00`、`samsum=36.46`、`trec=72.50`。三项在 pc02 以 TS=`20261102081500` 完成，逐任务产物行数均与参考数据一致；合并原有 13 任务后的正式结果已落盘 `exp/trace/results/qwen3_32b_longbench_fullkv.json`。TIA/Quest 仍只有 AVG13，暂不与 FullKV AVG16 直接作差。
 
-### 2.3 状态（更新 2026-11-02 08:05）
+### 2.3 状态（更新 2026-11-02 17:45）
 
 | 数据集 | 状态 |
 |--------|------|
 | RULER 32K TLI | ✅ 完成，AVG11 = 50.70 |
 | RULER 32K FullKV | ✅ 完成，AVG11 = 52.22 |
-| LongBench FullKV + TIA + Quest | ✅ 13/16，3 任务在飞 |
-| RULER/LongBench 其他方法（FASA/JSSA/AsyncTLS/HISA）| 未派单 |
+| LongBench FullKV | ✅ 16/16，AVG16 = 42.37 |
+| LongBench TIA + Quest（既有口径） | 13/16，待补 3 任务 |
+| RULER/LongBench Quest + JSSA | 🔄 正式矩阵运行中（TS=11021713/11021830），已完成任务 rc=0 |
+| RULER/LongBench FASA/AsyncTLS/HISA | 未派单 |
 
 ---
 
@@ -126,7 +128,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | RULER 32K FullKV | ✅ 完成，AVG11 = 26.58 |
 | LongBench FullKV | ✅ 完成 |
 | TLI 跑分 | 未派单 |
-| Vendor baselines | 未派单 |
+| Vendor baselines | 🔄 Quest/JSSA RULER 32K + LongBench 正式矩阵运行中（TS=11021635），已完成任务 rc=0 |
 
 ---
 
@@ -171,22 +173,25 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 - pred 输出: `exp/results_longbench/Qwen3-8B/pred_1024/result.json`, `pred_tls/result.json`
 
 ### LongBench (Qwen3-32B)
-- pred 输出: `exp/results_longbench/Qwen3-32B/pred_e141_lb_fullkv/`
+- FullKV 16 任务打分汇总: `exp/trace/results/qwen3_32b_longbench_fullkv.json`
+- 既有 13 任务 pred: `exp/results_longbench/Qwen3-32B/pred_1024/`
+- 补跑 3 任务 pred: `exp/results_longbench/Qwen3-32B/pred_e141_lb_fullkv/`（TS=20261102081500）
 
 ---
 
-## 6. 下一步行动（更新 2026-11-02 08:05）
+## 6. 下一步行动（更新 2026-11-02 17:45）
 
 | 优先级 | 行动 | 状态 |
 |--------|------|------|
 | P0 | Qwen3-8B RULER 32K — 7 方法矩阵 | ✅ 完成 |
 | P0 | Qwen3-32B RULER 32K FullKV | ✅ 完成（AVG11=52.22） |
 | P0 | GLM-4.7-Flash RULER 32K FullKV | ✅ 完成（AVG11=26.58） |
-| P0 | Qwen3-32B LongBench 缺失 3 任务 | 🔄 在飞（08:05 派单，ETA ~09:00） |
-| P1 | Qwen3-32B LongBench 16 任务完整打分 | 待 3 任务完成后 |
+| P0 | Qwen3-32B LongBench 缺失 3 任务 | ✅ 完成（pc02 各任务产物完整） |
+| P0 | Qwen3-32B LongBench FullKV 16 任务完整打分 | ✅ 完成（AVG16=42.37） |
+| P1 | Qwen3-32B + GLM Quest/JSSA RULER 32K + LongBench | 🔄 8 套正式矩阵运行中 |
+| P1 | Vendor 矩阵完成后打分、汇总并核验论文 | 待生成完成 |
 | P1 | GLM-4.7-Flash TLI 跑分 | 待 GPU 空闲派单 |
-| P2 | Vendor baselines（Quest/FASA/JSSA/AsyncTLS/HISA）for Q32B | 待用户确认 |
-| P2 | Vendor baselines for GLM | 待用户确认 |
+| P2 | FASA/AsyncTLS/HISA for Q32B/GLM | 待当前矩阵完成后评估 |
 | N/A | DuoAttention → 论文脚注说明 | 用户已确认 |
 | N/A | HISA LongBench (Qwen3-8B) | 暂缓 |
 
@@ -194,6 +199,10 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ## 7. 更新记录
 
+- 2026-11-02 17:45:
+  - 定位 Q32B LongBench 三项缺失任务已在 pc02 完整生成（TS=20261102081500），同步产物并合并原有 13 任务完成 FullKV AVG16=42.37。
+  - Q32B/GLM Quest/JSSA 共 8 套 RULER 32K + LongBench 正式矩阵均在运行；当前已完成任务全部 rc=0。
+  - Q32B JSSA 正式 basis 校验通过（64 层、rank=32、M[0]=(8,32,128)），RULER/LongBench smoke 均通过。
 - 2026-11-02 08:05:
   - Q32B RULER FullKV 11/11 全部完成，AVG11 = 52.22（TLI = 50.70, Δ = -1.52）
   - 打分文件落盘：`qwen3_32b_ruler32k_fullkv_vs_tli.json`
