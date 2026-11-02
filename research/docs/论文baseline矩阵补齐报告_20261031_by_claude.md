@@ -77,17 +77,17 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | TIA (champion) | AVG13（尚缺 3 任务） | 41.85 |
 | Quest_1024 | AVG13（尚缺 3 任务） | 38.49 |
 
-补跑任务 FullKV 分数：`passage_count=19.00`、`samsum=36.46`、`trec=72.50`。三项在 pc02 以 TS=`20261102081500` 完成，逐任务产物行数均与参考数据一致；合并原有 13 任务后的正式结果已落盘 `exp/trace/results/qwen3_32b_longbench_fullkv.json`。TIA/Quest 仍只有 AVG13，暂不与 FullKV AVG16 直接作差。
+补跑任务 FullKV 分数：`passage_count=19.00`、`samsum=36.46`、`trec=72.50`。三项在 pc02 以 TS=`20261102081500` 完成，逐任务产物行数均与参考数据一致；合并原有 13 任务后的正式结果已落盘 `exp/trace/results/qwen3_32b_longbench_fullkv.json`。既有 TIA 仍只有 AVG13，暂不与 FullKV AVG16 直接作差；当前 Quest/JSSA 正式矩阵进度见下表。
 
-### 2.3 状态（更新 2026-11-02 17:45）
+### 2.3 状态（更新 2026-11-02 19:07）
 
 | 数据集 | 状态 |
 |--------|------|
 | RULER 32K TLI | ✅ 完成，AVG11 = 50.70 |
 | RULER 32K FullKV | ✅ 完成，AVG11 = 52.22 |
 | LongBench FullKV | ✅ 16/16，AVG16 = 42.37 |
-| LongBench TIA + Quest（既有口径） | 13/16，待补 3 任务 |
-| RULER/LongBench Quest + JSSA | 🔄 正式矩阵运行中（TS=11021713/11021830），已完成任务 rc=0 |
+| LongBench TIA（既有口径） | 13/16，待补 3 任务 |
+| RULER/LongBench Quest + JSSA | 🔄 4 套正式矩阵运行中（TS=11021713/11021830），当前均在首任务，无失败 |
 | RULER/LongBench FASA/AsyncTLS/HISA | 未派单 |
 
 ---
@@ -128,7 +128,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | RULER 32K FullKV | ✅ 完成，AVG11 = 26.58 |
 | LongBench FullKV | ✅ 完成 |
 | TLI 跑分 | 未派单 |
-| Vendor baselines | 🔄 Quest/JSSA RULER 32K + LongBench 正式矩阵运行中（TS=11021635），已完成任务 rc=0 |
+| Vendor baselines | 🔄 TS=11021635；Quest RULER 1/11、JSSA RULER 2/11、Quest LongBench 4/16、JSSA LongBench 5/16，已完成任务均 rc=0 且产物行数完整 |
 
 ---
 
@@ -179,7 +179,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ---
 
-## 6. 下一步行动（更新 2026-11-02 17:45）
+## 6. 下一步行动（更新 2026-11-02 19:07）
 
 | 优先级 | 行动 | 状态 |
 |--------|------|------|
@@ -199,6 +199,10 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ## 7. 更新记录
 
+- 2026-11-02 19:07:
+  - 8 卡仍全部分配给 Quest/JSSA 正式矩阵，无空闲卡追加其他 vendor；当前无新增失败。
+  - GLM 进度：Quest RULER 1/11、JSSA RULER 2/11、Quest LongBench 4/16、JSSA LongBench 5/16；已完成 RULER 任务均 100 行，LongBench 行数与参考数据一致。
+  - Q32B 四套矩阵仍在首任务；RULER 正式产物持续增长，LongBench 尚未结束首任务，不使用部分产物打分。
 - 2026-11-02 17:45:
   - 定位 Q32B LongBench 三项缺失任务已在 pc02 完整生成（TS=20261102081500），同步产物并合并原有 13 任务完成 FullKV AVG16=42.37。
   - Q32B/GLM Quest/JSSA 共 8 套 RULER 32K + LongBench 正式矩阵均在运行；当前已完成任务全部 rc=0。
