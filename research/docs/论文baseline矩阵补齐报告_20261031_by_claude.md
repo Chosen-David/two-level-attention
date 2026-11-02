@@ -79,7 +79,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 补跑任务 FullKV 分数：`passage_count=19.00`、`samsum=36.46`、`trec=72.50`。三项在 pc02 以 TS=`20261102081500` 完成，逐任务产物行数均与参考数据一致；合并原有 13 任务后的正式结果已落盘 `exp/trace/results/qwen3_32b_longbench_fullkv.json`。既有 TIA 仍只有 AVG13，暂不与 FullKV AVG16 直接作差；当前 Quest/JSSA 正式矩阵进度见下表。
 
-### 2.3 状态（更新 2026-11-02 22:10）
+### 2.3 状态（更新 2026-11-02 23:10）
 
 | 数据集 | 状态 |
 |--------|------|
@@ -87,7 +87,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | RULER 32K FullKV | ✅ 完成，AVG11 = 52.22 |
 | LongBench FullKV | ✅ 16/16，AVG16 = 42.37 |
 | LongBench TIA（既有口径） | 13/16，待补 3 任务 |
-| RULER/LongBench Quest + JSSA | 🔄 Quest RULER 1/11、LongBench 5/16；JSSA RULER 4/11、LongBench 6/16；已完成任务均 rc=0 且产物行数完整 |
+| RULER/LongBench Quest + JSSA | 🔄 Quest RULER 2/11、LongBench 5/16；JSSA RULER 5/11、LongBench 6/16；已完成任务均 rc=0 且产物行数完整 |
 | RULER/LongBench FASA/AsyncTLS/HISA | 未派单 |
 
 ---
@@ -128,7 +128,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | RULER 32K FullKV | ✅ 完成，AVG11 = 26.58 |
 | LongBench FullKV | ✅ 完成 |
 | TLI 跑分 | 未派单 |
-| Vendor baselines | 🔄 TS=11021635；Quest RULER 3/11、JSSA RULER 7/11、Quest LongBench 6/16、JSSA LongBench 7/16，已完成任务均 rc=0 且产物行数完整 |
+| Vendor baselines | 🔄 TS=11021635；Quest RULER 4/11、JSSA RULER 9/11、Quest LongBench 7/16、JSSA LongBench 8/16，已完成任务均 rc=0 且产物行数完整 |
 
 ---
 
@@ -179,7 +179,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ---
 
-## 6. 下一步行动（更新 2026-11-02 22:10）
+## 6. 下一步行动（更新 2026-11-02 23:10）
 
 | 优先级 | 行动 | 状态 |
 |--------|------|------|
@@ -199,6 +199,11 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ## 7. 更新记录
 
+- 2026-11-02 23:10:
+  - 8 套正式矩阵继续运行，无新增失败、无空闲 GPU；所有新完成 RULER 任务均 100 行，LongBench 行数符合对应任务全量样本数。
+  - Q32B 进度：Quest RULER 2/11、LongBench 5/16；JSSA RULER 5/11、LongBench 6/16。当前分别运行 RULER `niah_single_3`/`niah_multikey_3` 与 LongBench `musique`/`gov_report`。
+  - GLM 进度：Quest RULER 4/11、LongBench 7/16；JSSA RULER 9/11、LongBench 8/16。当前分别运行 RULER `niah_multikey_2`/`fwe` 与 LongBench `qmsum`/`multi_news`。
+  - 长任务进度复核：Q32B JSSA `gov_report` 推进至 140/200，Q32B Quest `musique` 推进至 188/200，均持续增长。Q32B LongBench FullKV 16/16 与 AVG16=42.37 已核验，无需重复打分；尚未形成任一完整 vendor 套件，不提前发布部分均值。
 - 2026-11-02 22:10:
   - 8 套正式矩阵继续运行，无新增失败、无空闲 GPU；所有新完成 RULER 任务均 100 行，LongBench 行数符合对应任务全量样本数。
   - Q32B 进度：Quest RULER 1/11、LongBench 5/16；JSSA RULER 4/11、LongBench 6/16。当前分别运行 RULER `niah_single_2`/`niah_multikey_2` 与 LongBench `musique`/`gov_report`。
