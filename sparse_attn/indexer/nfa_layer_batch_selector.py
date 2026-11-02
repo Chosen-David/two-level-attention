@@ -33,7 +33,7 @@ if _has_triton():
     @triton.jit
     def _nfa_page_stats_kernel(
         KV_PTRS, BLOCK_TABLE, LENGTHS, SKIP_FAR, SKIP_NEAR, VALID_REQ, DIMS,
-        OUT_MIN, OUT_MAX, OUT_SUM,
+        OUT_MIN, OUT_MAX, OUT_AVG,
         MAX_BLOCKS: tl.constexpr, PAGE: tl.constexpr,
         SINK: tl.constexpr, NEAR_LEN: tl.constexpr, WINDOW: tl.constexpr,
         HK: tl.constexpr, HEAD_DIM: tl.constexpr,
@@ -98,7 +98,12 @@ if _has_triton():
                     + offs_d)
         tl.store(OUT_MIN + out_base, vmin.to(OUT_MIN.dtype.element_ty), mask=dim_mask)
         tl.store(OUT_MAX + out_base, vmax.to(OUT_MAX.dtype.element_ty), mask=dim_mask)
-        tl.store(OUT_SUM + out_base, vsum.to(OUT_SUM.dtype.element_ty), mask=dim_mask)
+        # Preserve the former sum-buffer rounding before normalization.
+        # Dividing the FP32 reduction directly changes low-precision overflow
+        # and rounding behavior relative to the materialized sum path.
+        rounded_sum = vsum.to(OUT_AVG.dtype.element_ty).to(tl.float32)
+        avg = rounded_sum / BS
+        tl.store(OUT_AVG + out_base, avg.to(OUT_AVG.dtype.element_ty), mask=dim_mask)
 
     @triton.jit
     def _nfa_coarse_score_kernel(
@@ -514,12 +519,12 @@ def _topk_indices(scores, k):
 
 def _page_stats_all_layers(cache, req_ids, layer_ptrs, dims, bs, pad, lengths,
                            layer_offset=0):
-    """Compute per-logical-block min/max/sum directly from paged KV.
+    """Compute per-logical-block min/max/average directly from paged KV.
 
     No intermediate [L,B,pad,HK,D] projection is materialized.  Each
     program handles one logical token block for one (layer, request, KV
     head) and reduces inside registers, mirroring the old projected
-    ``amin/amax/mean`` contract exactly.
+    ``amin/amax`` and rounded-sum normalization contract.
     """
     if not _has_triton():
         raise FallbackRequired("Triton unavailable")
@@ -545,12 +550,12 @@ def _page_stats_all_layers(cache, req_ids, layer_ptrs, dims, bs, pad, lengths,
     k_min = torch.empty(
         (m, kt_cap, hk, dim_numel), dtype=out_dtype, device=device)
     k_max = torch.empty_like(k_min)
-    k_sum = torch.empty_like(k_min)
+    k_avg = torch.empty_like(k_min)
 
     _nfa_page_stats_kernel[(kt_cap, m * hk)](
         kv_ptrs, block_table, lengths_t, skip_far_t, skip_near_t, valid_req_t,
         dims_t,
-        k_min, k_max, k_sum,
+        k_min, k_max, k_avg,
         MAX_BLOCKS=cache.max_blocks, PAGE=cache.geometry.page,
         SINK=cache.geometry.sink, NEAR_LEN=cache.geometry.near,
         WINDOW=cache.geometry.window,
@@ -560,7 +565,6 @@ def _page_stats_all_layers(cache, req_ids, layer_ptrs, dims, bs, pad, lengths,
         MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
         num_warps=4,
     )
-    k_avg = (k_sum.to(torch.float32) / bs).to(out_dtype)
     return k_min, k_max, k_avg
 
 
