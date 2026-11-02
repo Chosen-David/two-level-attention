@@ -1424,19 +1424,11 @@ class GraphReadyPagedRegionCache:
                 self.pending_lengths.get(rid, self.states[rid].logical_length)
                 for rid in valid_req_ids
             ]
+            # These lengths already live on the host. The per-request selector
+            # consumes them directly; no device batch metadata is needed here.
+            if any(length <= 0 for length in lengths):
+                raise ValueError("active selector requests require positive lengths")
             q_flat = self._last_q_buf[layer_idx, valid_req_ids]
-            length_t = torch.tensor(
-                lengths, dtype=torch.long, device=q_flat.device)
-            query_start_loc = torch.arange(
-                len(valid_req_ids) + 1, dtype=torch.int32,
-                device=q_flat.device)
-            seq_idx = torch.arange(
-                len(valid_req_ids), dtype=torch.int32,
-                device=q_flat.device)
-            if valid_req_ids:
-                torch._assert_async(length_t > 0)
-                torch._assert_async(query_start_loc[-1] == len(valid_req_ids))
-                torch._assert_async(seq_idx[-1] == len(valid_req_ids) - 1)
 
             per_request = {}
             for row_idx, request_id in enumerate(valid_req_ids):
