@@ -654,10 +654,9 @@ def _batched_geometry(cache, req_ids, lengths, indexer, device, kt_cap, s_cap):
                         & (ar_blk[None] < swa_lo_blk[:, None]))
         near_pool_mask = near_pool_mask & ~sink_in_near
 
-    ar_tok = torch.arange(s_cap, dtype=torch.long, device=device)
     far_tok_lo = sink_pool_lo * bs
-    mid_mask = (ar_tok[None] >= far_tok_lo) & (ar_tok[None] < swa_lo_tok[:, None])
-    swa_force = (ar_tok[None] >= swa_lo_tok[:, None]) & (ar_tok[None] < s_real[:, None])
+    # Ranking uses interval bounds and protected IDs are built separately;
+    # neither path needs a token-capacity mask in this block-level geometry.
     k2_mid = torch.clamp(torch.clamp(s_real, max=k2) - sink - (s_real - swa_lo_tok), min=0)
 
     ar_bs = torch.arange(bs, dtype=torch.long, device=device)
@@ -675,8 +674,6 @@ def _batched_geometry(cache, req_ids, lengths, indexer, device, kt_cap, s_cap):
         "swa_lo_tok": swa_lo_tok,
         "far_pool_mask": far_pool_mask,
         "near_pool_mask": near_pool_mask,
-        "mid_mask": mid_mask,
-        "swa_force": swa_force,
         "k2_mid": k2_mid,
         "far_tok_lo": s_real.new_full((), far_tok_lo),
         "byp_tok": byp_tok,

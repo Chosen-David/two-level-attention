@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-02
+
+- [ ] [TL-NFA-GEOMETRY-WORKSPACE-20261102] 删除当前层 batch selector 未消费的完整 token 轴及两个 mask；540 组主机配对普通/-O 一致，CUDA/Graph 与实际性能待验。([详情](task_details/TL-NFA-GEOMETRY-WORKSPACE-20261102.md))
+
 ## 2026-11-01
 - [x] [TL-STATIC-GATE-MAIN-20261101] 静态 near/far gate 接入 main，GLM 静态 artifact 随仓发布；Qwen3-8B 远端动态标定→freeze→decode 烟测通过。([详情](task_details/TL-STATIC-GATE-MAIN-20261101.md))
 
