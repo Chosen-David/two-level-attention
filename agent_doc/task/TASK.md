@@ -1,5 +1,7 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+- [ ] [TL-SELECTOR-HOST-ADMISSION-20261102] GraphReady 多请求 selector 改为主机长度校验，移除未消费的设备元数据；host 修前失败/修后通过，native GPU 待验。[详情](task_details/TL-SELECTOR-HOST-ADMISSION-20261102.md)。
+
 ## 2026-11-01
 - [x] [TL-STATIC-GATE-MAIN-20261101] 静态 near/far gate 接入 main，GLM 静态 artifact 随仓发布；Qwen3-8B 远端动态标定→freeze→decode 烟测通过。([详情](task_details/TL-STATIC-GATE-MAIN-20261101.md))
 
