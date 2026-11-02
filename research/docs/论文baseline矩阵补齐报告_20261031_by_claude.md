@@ -79,7 +79,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 补跑任务 FullKV 分数：`passage_count=19.00`、`samsum=36.46`、`trec=72.50`。三项在 pc02 以 TS=`20261102081500` 完成，逐任务产物行数均与参考数据一致；合并原有 13 任务后的正式结果已落盘 `exp/trace/results/qwen3_32b_longbench_fullkv.json`。既有 TIA 仍只有 AVG13，暂不与 FullKV AVG16 直接作差；当前 Quest/JSSA 正式矩阵进度见下表。
 
-### 2.3 状态（更新 2026-11-02 19:11）
+### 2.3 状态（更新 2026-11-02 20:10）
 
 | 数据集 | 状态 |
 |--------|------|
@@ -87,7 +87,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | RULER 32K FullKV | ✅ 完成，AVG11 = 52.22 |
 | LongBench FullKV | ✅ 16/16，AVG16 = 42.37 |
 | LongBench TIA（既有口径） | 13/16，待补 3 任务 |
-| RULER/LongBench Quest + JSSA | 🔄 4 套正式矩阵运行中；JSSA RULER 1/11、LongBench 2/16，Quest 两项仍在首任务，无失败 |
+| RULER/LongBench Quest + JSSA | 🔄 Quest RULER 1/11、LongBench 2/16；JSSA RULER 2/11、LongBench 4/16；已完成任务均 rc=0 |
 | RULER/LongBench FASA/AsyncTLS/HISA | 未派单 |
 
 ---
@@ -128,7 +128,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | RULER 32K FullKV | ✅ 完成，AVG11 = 26.58 |
 | LongBench FullKV | ✅ 完成 |
 | TLI 跑分 | 未派单 |
-| Vendor baselines | 🔄 TS=11021635；Quest RULER 1/11、JSSA RULER 3/11、Quest LongBench 6/16、JSSA LongBench 6/16，已完成任务均 rc=0 且产物行数完整 |
+| Vendor baselines | 🔄 TS=11021635；Quest RULER 2/11、JSSA RULER 4/11、Quest LongBench 6/16、JSSA LongBench 6/16，已完成任务均 rc=0 且产物行数完整 |
 
 ---
 
@@ -179,7 +179,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ---
 
-## 6. 下一步行动（更新 2026-11-02 19:11）
+## 6. 下一步行动（更新 2026-11-02 20:10）
 
 | 优先级 | 行动 | 状态 |
 |--------|------|------|
@@ -199,6 +199,10 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ## 7. 更新记录
 
+- 2026-11-02 20:10:
+  - 8 套正式矩阵继续运行，无新增失败、无空闲 GPU；所有新完成 RULER 任务均 100 行，LongBench 行数符合对应任务全量样本数。
+  - Q32B 进度：Quest RULER 1/11、LongBench 2/16；JSSA RULER 2/11、LongBench 4/16。
+  - GLM 进度：Quest RULER 2/11、LongBench 6/16；JSSA RULER 4/11、LongBench 6/16。尚未形成任一完整套件，不提前发布部分均值。
 - 2026-11-02 19:11:
   - 8 卡继续满载运行，无新增失败；GLM Quest/JSSA LongBench 均完成 6/16，JSSA RULER 完成 3/11，Quest RULER 完成 1/11。
   - Q32B JSSA RULER 完成 1/11（100 行）、LongBench 完成 2/16（各 200 行）；Quest 两套仍在首任务，不使用部分产物打分。
