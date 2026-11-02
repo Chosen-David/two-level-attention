@@ -1,5 +1,8 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-02
+- [ ] [TL-NFA-SUBSPACE-PAIRING-20261102] 当前 Q 批量 selector 分离 L1/L2 维度映射，修复 full L2 的 Q/K 错配和关闭子空间后的粗筛 reshape；host 6 项/144 组合及 27 组默认路径配对通过，CUDA/Graph/质量/性能待验。([详情](task_details/TL-NFA-SUBSPACE-PAIRING-20261102.md))
+
 ## 2026-11-01
 - [x] [TL-STATIC-GATE-MAIN-20261101] 静态 near/far gate 接入 main，GLM 静态 artifact 随仓发布；Qwen3-8B 远端动态标定→freeze→decode 烟测通过。([详情](task_details/TL-STATIC-GATE-MAIN-20261101.md))
 
@@ -278,3 +281,4 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 ## 2026-10-31 paged batch admission
 
 - [ ] [TL-PAGED-DUPLICATE-20261031] 拒绝重复活跃请求，防止同槽覆盖与长度重复递增；host修前复现、修后通过，native/GPU待验。[详情](task_details/TL-PAGED-DUPLICATE-20261031.md)。
+
