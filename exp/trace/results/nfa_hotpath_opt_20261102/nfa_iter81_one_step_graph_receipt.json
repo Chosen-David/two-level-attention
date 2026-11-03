@@ -1,0 +1,113 @@
+{
+  "decode_steps": 7,
+  "tpot_ms_median": 12.829024314880371,
+  "steady_tpot_ms_median": 12.815920352935791,
+  "tpot_ms_all": [
+    59.22911834716797,
+    12.829024314880371,
+    12.472864151000977,
+    269.0692443847656,
+    12.927840232849121,
+    12.704000473022461,
+    12.64412784576416
+  ],
+  "warmup_steps_excluded_from_steady": 3,
+  "prefill_seconds": 9.425448007881641,
+  "generated_token_ids": [
+    [
+      576,
+      1372,
+      374,
+      220,
+      19,
+      17,
+      17,
+      21
+    ]
+  ],
+  "skip_policy_counts": {
+    "0": {
+      "far": 0,
+      "near": 0,
+      "both": 0
+    }
+  },
+  "gate_mode": "dynamic",
+  "gate_epsilon": 0.05,
+  "graph_replays": 7,
+  "memory": {
+    "prefill_end": {
+      "allocated_bytes": 21409807360,
+      "reserved_bytes": 26461863936,
+      "max_allocated_bytes": 24900810240,
+      "max_reserved_bytes": 26461863936
+    },
+    "decode_ready": {
+      "allocated_bytes": 21475127808,
+      "reserved_bytes": 21644705792,
+      "max_allocated_bytes": 24900810240,
+      "max_reserved_bytes": 26491224064
+    },
+    "steady_decode_start": {
+      "allocated_bytes": 21475128320,
+      "reserved_bytes": 21644705792,
+      "max_allocated_bytes": 24900810240,
+      "max_reserved_bytes": 26491224064
+    },
+    "decode_end": {
+      "allocated_bytes": 21475128320,
+      "reserved_bytes": 21644705792,
+      "max_allocated_bytes": 21475435520,
+      "max_reserved_bytes": 21644705792
+    },
+    "model_loaded": {
+      "allocated_bytes": 16417402368,
+      "reserved_bytes": 16569597952,
+      "max_allocated_bytes": 16417414656,
+      "max_reserved_bytes": 16569597952
+    },
+    "peak_incremental_allocated_bytes": 8483407872,
+    "peak_incremental_reserved_bytes": 9921626112,
+    "steady_decode_resident_incremental_allocated_bytes": 5057725952,
+    "steady_decode_resident_incremental_reserved_bytes": 5075107840,
+    "steady_decode_peak_incremental_allocated_bytes": 307200,
+    "steady_decode_peak_incremental_reserved_bytes": 0
+  },
+  "nfa_selector_config": {
+    "subspace": "tail",
+    "subspace_cmp_ratio": 4,
+    "level1_topk": 128,
+    "level2_topk": 1024,
+    "near_pages": 32,
+    "near_tokens": "off",
+    "near_len": 4096,
+    "enable_layer_skip": false,
+    "sink_tokens": 4,
+    "sliding_window_size": 128
+  },
+  "method": "nfa",
+  "execution": "graph",
+  "batch_size": 1,
+  "context_length": 32768,
+  "max_new_tokens": 8,
+  "model_path": "/home/wangyuanshuo02/models/Qwen3-8B",
+  "input": {
+    "path": "/home/wangyuanshuo02/nfa_hisa_inputs/32768/niah_single_1.jsonl",
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 32612,
+    "provenance": "native-ruler",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "measurement_mode": "memory",
+  "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+  "timing_scope": "CUDA events around model decode, selector where applicable, and argmax",
+  "timing_quality": "host-readback-and-memory-sampling-in-loop",
+  "host_readback_in_decode_loop": true,
+  "gpu_hygiene": {
+    "status": "requires external process monitor"
+  },
+  "transformers_version": "4.56.2",
+  "torch_version": "2.8.0+cu128"
+}

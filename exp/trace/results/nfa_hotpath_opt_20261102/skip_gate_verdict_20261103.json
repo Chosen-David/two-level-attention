@@ -87,6 +87,54 @@
       "/tmp/longbench39_fa2_latency_graph.json"
     ]
   },
+  "longbench_full_gate_scan": {
+    "path": "longbench_v2_dynamic_gate.json",
+    "real_longbench_v2_candidates": 116,
+    "prompt_token_range": [8192, 32768],
+    "samples_with_natural_far_skip": 76,
+    "samples_with_natural_near_skip": 8,
+    "samples_with_natural_same_layer_both_skip": 0,
+    "scan_complete": true,
+    "conclusion": "完整候选扫描未发现自然同层 both-skip；没有手工修改 flags 冒充触发"
+  },
+  "longbench170_natural_near_far_same_input": {
+    "task": "longbench_v2_170",
+    "source_id": "66ebc0c95a08c7b9b35de7f3",
+    "domain": "Single-Document QA",
+    "sub_domain": "Academic",
+    "prompt_tokens": 28865,
+    "sha256": "28da727653146951f7b76f3c4ffb67f5f2e9930b0170d388c00a802b7d246a50",
+    "natural_skip": {"far_layers": [8, 10, 11, 14], "near_layers": [23, 25, 26, 28, 29, 30, 31, 32], "both_layers": []},
+    "eager_steady_ms": {"no_skip": 24.934288024902344, "natural": 25.0153751373291, "fa2": 22.87448024749756},
+    "graph_steady_ms": {"no_skip": 12.350607872009277, "natural": 12.317488193511963, "fa2": 12.289055824279785},
+    "no_skip_over_natural_speedup": {"eager": 0.9967585090376776, "graph": 1.002688833792815},
+    "fa2_over_natural_speedup": {"eager": 0.9144168385211701, "graph": 0.9976917072064129},
+    "token_identity": {
+      "natural_eager_graph": true,
+      "no_skip_eager_graph": true,
+      "no_skip_vs_natural": false,
+      "no_skip_natural_first_divergence_token": 12,
+      "nfa_vs_fa2": false,
+      "nfa_fa2_first_divergence_token": 1
+    },
+    "raw_results": [
+      "longbench170_nfa_noskip_latency_eager.json",
+      "longbench170_nfa_natural_latency_eager.json",
+      "longbench170_fa2_latency_eager.json",
+      "longbench170_nfa_noskip_latency_graph.json",
+      "longbench170_nfa_natural_latency_graph.json",
+      "longbench170_fa2_latency_graph.json"
+    ],
+    "gpu_hygiene": "clean; 两侧 30 秒日志仅包含本轮自有 PID"
+  },
+  "iter81_one_step_profile": {
+    "path": "iter81_one_step_profile_20261103.json",
+    "graph_selector_ms": 2.901949,
+    "graph_gather_attention_ms": 1.013,
+    "graph_remaining_device_ms_if_selector_and_gather_were_zero": 7.881051,
+    "graph_two_x_threshold_ms": 6.284047842025757,
+    "conclusion": "只优化 selector 和 gather 无法达到 2x；必须减少模型公共路径工作或报告未达项"
+  },
   "main_ruler_zero_skip_clean_latency": {
     "task": "niah_single_1",
     "sample_index": 0,

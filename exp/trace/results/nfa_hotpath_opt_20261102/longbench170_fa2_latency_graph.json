@@ -1,0 +1,109 @@
+{
+  "decode_steps": 15,
+  "tpot_ms_median": 12.290752410888672,
+  "steady_tpot_ms_median": 12.289055824279785,
+  "tpot_ms_all": [
+    12.796480178833008,
+    12.309920310974121,
+    12.3023042678833,
+    12.311776161193848,
+    12.289631843566895,
+    12.291328430175781,
+    12.311424255371094,
+    12.296799659729004,
+    12.288479804992676,
+    12.283424377441406,
+    12.287103652954102,
+    12.290752410888672,
+    12.28649616241455,
+    12.283583641052246,
+    12.27676773071289
+  ],
+  "warmup_steps_excluded_from_steady": 3,
+  "prefill_seconds": 6.235243432223797,
+  "generated_token_ids": [
+    [
+      198,
+      5728,
+      25,
+      220,
+      16,
+      19,
+      15,
+      21,
+      15,
+      19,
+      84435,
+      198,
+      72214,
+      25,
+      220,
+      16
+    ]
+  ],
+  "prefill_cpu_offload": false,
+  "graph_replays": 15,
+  "memory": {
+    "prefill_end": {
+      "allocated_bytes": 20676281344,
+      "reserved_bytes": 24830279680,
+      "max_allocated_bytes": 23767647744,
+      "max_reserved_bytes": 24830279680
+    },
+    "decode_ready": {
+      "allocated_bytes": 20710142464,
+      "reserved_bytes": 20986200064,
+      "max_allocated_bytes": 23767647744,
+      "max_reserved_bytes": 24830279680
+    },
+    "steady_decode_start": {
+      "allocated_bytes": 20710142976,
+      "reserved_bytes": 20986200064,
+      "max_allocated_bytes": 23767647744,
+      "max_reserved_bytes": 24830279680
+    },
+    "decode_end": {
+      "allocated_bytes": 20710142976,
+      "reserved_bytes": 20986200064,
+      "max_allocated_bytes": 23767647744,
+      "max_reserved_bytes": 24830279680
+    },
+    "model_loaded": {
+      "allocated_bytes": 16417372672,
+      "reserved_bytes": 16569597952,
+      "max_allocated_bytes": 16417384960,
+      "max_reserved_bytes": 16569597952
+    },
+    "peak_incremental_allocated_bytes": 7350275072,
+    "peak_incremental_reserved_bytes": 8260681728,
+    "steady_decode_resident_incremental_allocated_bytes": 4292770304,
+    "steady_decode_resident_incremental_reserved_bytes": 4416602112,
+    "steady_decode_peak_incremental_allocated_bytes": 3057504768,
+    "steady_decode_peak_incremental_reserved_bytes": 3844079616
+  },
+  "method": "fa2",
+  "execution": "graph",
+  "batch_size": 1,
+  "context_length": 32768,
+  "max_new_tokens": 16,
+  "model_path": "/home/wangyuanshuo02/models/Qwen3-8B",
+  "input": {
+    "path": "/home/wangyuanshuo02/nfa_longbench_inputs/32768/longbench_v2_170.jsonl",
+    "sha256": "28da727653146951f7b76f3c4ffb67f5f2e9930b0170d388c00a802b7d246a50",
+    "sample_index": 0,
+    "sample_id": 170,
+    "actual_prompt_tokens": 28865,
+    "provenance": "longbench-v2",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "measurement_mode": "latency",
+  "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+  "timing_scope": "CUDA events around model decode, selector where applicable, and argmax",
+  "timing_quality": "clean-device-history",
+  "host_readback_in_decode_loop": false,
+  "gpu_hygiene": {
+    "status": "requires external process monitor"
+  },
+  "transformers_version": "4.56.2",
+  "torch_version": "2.8.0+cu128"
+}

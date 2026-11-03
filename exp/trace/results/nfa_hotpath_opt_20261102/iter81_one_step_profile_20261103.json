@@ -1,0 +1,59 @@
+{
+  "date": "2026-11-03",
+  "scope": "真实 Qwen3-8B RULER32K niah_single_1 sample 0 的第4个生产 GraphRunner.step；torch profiler 独立运行，TPOT 不作为干净 verdict",
+  "input_sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+  "raw_receipts": [
+    "nfa_iter81_one_step_graph_receipt.json",
+    "nfa_iter81_one_step_eager_receipt.json"
+  ],
+  "graph": {
+    "self_cuda_time_total_ms": 11.796,
+    "self_cpu_time_total_ms": 15.388,
+    "kernels_ms_per_step": {
+      "_nfa_filtered_topk_partial_kernel": 0.750911,
+      "_nfa_fine_scores_paged_kernel": 0.681501,
+      "_topk_candidate_batched_kernel": 0.434820,
+      "_nfa_filtered_topk_merge_kernel": 0.377060,
+      "_final_union_physical_kernel": 0.239420,
+      "_nfa_page_stats_prepare_q_kernel": 0.233310,
+      "_nfa_l1_scores_kernel": 0.126910,
+      "_prepare_q_grouped_kernel": 0.058017,
+      "_gather_attend_grouped_kernel": 1.013
+    },
+    "selector_total_ms": 2.901949,
+    "selector_plus_gather_ms": 3.914949,
+    "remaining_device_ms_if_selector_and_gather_were_zero": 7.881051
+  },
+  "eager": {
+    "self_cuda_time_total_ms": 12.499,
+    "self_cpu_time_total_ms": 28.014,
+    "kernels_ms_per_step": {
+      "_nfa_filtered_topk_partial_kernel": 0.758176,
+      "_nfa_fine_scores_paged_kernel": 0.672956,
+      "_topk_candidate_batched_kernel": 0.439196,
+      "_nfa_filtered_topk_merge_kernel": 0.383619,
+      "_final_union_physical_kernel": 0.244576,
+      "_nfa_page_stats_prepare_q_kernel": 0.234335,
+      "_nfa_l1_scores_kernel": 0.131387,
+      "_prepare_q_grouped_kernel": 0.060226,
+      "_gather_attend_grouped_kernel": 1.021
+    },
+    "selector_total_ms": 2.924471,
+    "selector_plus_gather_ms": 3.945471,
+    "remaining_device_ms_if_selector_and_gather_were_zero": 8.553529,
+    "aten_mm_self_cpu_ms": 3.473,
+    "cuLaunchKernelEx_calls": 577,
+    "cuLaunchKernelEx_self_cpu_ms": 2.128
+  },
+  "clean_latency_reference_ms": {
+    "nfa_graph": 12.401631832122803,
+    "fa2_graph": 12.568095684051514,
+    "nfa_eager": 24.927759170532227,
+    "fa2_eager": 23.400752067565918
+  },
+  "two_x_threshold_ms": {
+    "graph": 6.284047842025757,
+    "eager": 11.700376033782959
+  },
+  "roofline_conclusion": "只消除 selector 与 gather 而不减少其余模型工作时，Graph 仍有 7.881051 ms 设备时间，高于 6.284048 ms 门槛；2x 必须包含模型公共路径优化，否则不可达。该剩余值不是任意优化下的物理下界。"
+}
