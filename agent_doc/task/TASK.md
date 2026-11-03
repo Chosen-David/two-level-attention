@@ -1,5 +1,8 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-04
+- [ ] [TL-SEED-PAGE-CAPACITY-20261104] 修复 far-skip seed 绝对位置容量漏计；主机回归通过，原生 CPU/CUDA/Graph 待验。([详情](task_details/TL-SEED-PAGE-CAPACITY-20261104.md))
+
 ## 2026-11-01
 - [x] [TL-STATIC-GATE-MAIN-20261101] 静态 near/far gate 接入 main，GLM 静态 artifact 随仓发布；Qwen3-8B 远端动态标定→freeze→decode 烟测通过。([详情](task_details/TL-STATIC-GATE-MAIN-20261101.md))
 
