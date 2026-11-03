@@ -1,0 +1,42 @@
+{
+  "comparison": "iter103(A) vs iter104(B), Graph/eager ABBA, pc40 GPU0",
+  "input_sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+  "prompt_tokens": 32612,
+  "generated_tokens": 128,
+  "batch_size": 1,
+  "graph": {
+    "iter103_steady_ms": [10.202000141143799, 10.250016212463379],
+    "iter104_steady_ms": [10.156480312347412, 10.16916799545288],
+    "iter103_mean_ms": 10.226008176803589,
+    "iter104_mean_ms": 10.162824153900146,
+    "speedup": 1.0062171717178827,
+    "latency_reduction_ms": 0.06318402290344238
+  },
+  "eager": {
+    "iter103_steady_ms": [25.16806411743164, 25.458255767822266],
+    "iter104_steady_ms": [25.29252815246582, 25.340736389160156],
+    "iter103_mean_ms": 25.313159942626953,
+    "iter104_mean_ms": 25.31663227081299,
+    "speedup": 0.9998628439932732
+  },
+  "fa2_reference": {
+    "graph_steady_ms": 12.595712,
+    "eager_steady_ms": 22.968448,
+    "fa2_over_iter104_graph": 1.239390922174541,
+    "fa2_over_iter104_eager": 0.9072473682244,
+    "graph_two_x_target_ms": 6.297856,
+    "eager_two_x_target_ms": 11.484224,
+    "target_reached": false
+  },
+  "token_identity": {
+    "status": "pass",
+    "arms": 8,
+    "matching_tokens_per_arm": 128,
+    "first_divergence": null
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "evidence": "iter104_abba_gpu0_hygiene.log；起跑前双卡 used=1 MiB，采数期间仅本轮 compute PID"
+  },
+  "conclusion": "K-wide merge 带来可重复的 0.62% Graph 收益，iter104 成为正式 Graph best；eager 无可辨收益或回退。保留实现，继续优化主要热点，不推送 main。"
+}
