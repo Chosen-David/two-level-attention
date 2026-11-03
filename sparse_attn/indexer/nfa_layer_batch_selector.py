@@ -1206,7 +1206,8 @@ def select_topk_for_layer_batched(cache, layer_idx, req_ids,
     if workspace is not None:
         call_plan = workspace.get(('eager_selector_call_plan', layer_idx))
         geometry = workspace.get('_nfa_launch_geometry')
-        if (call_plan is not None and call_plan[0] is geometry
+        if (decode_write is not None
+                and call_plan is not None and call_plan[0] is geometry
                 and not torch.cuda.is_current_stream_capturing()
                 and len(req_ids) == geometry[0]
                 and cache.active_visible_bucket == geometry[12]
@@ -1215,7 +1216,7 @@ def select_topk_for_layer_batched(cache, layer_idx, req_ids,
             q_src = query_states.unsqueeze(0)
             q_geometry = (q_src.dtype, q_src.data_ptr() % 16,
                           q_src.stride(0), q_src.stride(1), q_src.stride(2))
-            if q_geometry == geometry[27:]:
+            if q_geometry == geometry[27:32]:
                 _replay_eager_selector_call_plan(
                     workspace, call_plan, q_src, decode_write)
                 return
@@ -1315,6 +1316,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         indexer.args.tia_level2_topk, indexer.sink_tokens,
         indexer.sliding_window_size, indexer._sink_pool_lo_blk,
         q_src.dtype, q_src.data_ptr() % 16, s0, s1, s2,
+        decode_write is not None,
     )
     previous_geometry = workspace.get('_nfa_launch_geometry')
     if previous_geometry == geometry:
@@ -1323,7 +1325,8 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
 
     plan_key = ('eager_selector_call_plan', layer_offset)
     call_plan = workspace.get(plan_key)
-    if not capturing and call_plan is not None and call_plan[0] is geometry:
+    if (not capturing and decode_write is not None
+            and call_plan is not None and call_plan[0] is geometry):
         _replay_eager_selector_call_plan(
             workspace, call_plan, q_src, decode_write)
         return
@@ -1486,7 +1489,13 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     )
 
     record = workspace.pop('_nfa_eager_record', None)
-    if record is not None and fixed_candidate_buffers:
+    # Whole-call replay only rebinds the fused producer's current Q/K/V.
+    # Standalone prepare-Q and paged-write launches would retain first-step
+    # inputs/slots. Keep their normal dispatch (and per-kernel launch cache).
+    # Requiring a write also prevents reusing HAS_WRITE=False specialization
+    # when a later call starts supplying decode K/V.
+    if (record is not None and fixed_candidate_buffers
+            and fuse_prepare_q and decode_write is not None):
         prepared = []
         for key, kernel, grid, args, kwargs in record:
             launch = workspace.get(('triton_plan', key))
