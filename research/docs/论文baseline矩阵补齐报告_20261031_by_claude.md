@@ -126,7 +126,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 16 任务均使用 TS=`11021830` 的正式产物，driver `ALL_DONE FAILED=0`；隔离目录打分避免混入 Quest，`strict runcap=16`，逐任务行数与参考数据一致，并记录源文件 SHA256。正式结果：`exp/trace/results/qwen3_32b_longbench_jssa_vendor.json`。
 
-### 2.5 状态（更新 2026-11-03 15:10）
+### 2.5 状态（更新 2026-11-03 16:10）
 
 | 数据集 | 状态 |
 |--------|------|
@@ -134,7 +134,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | RULER 32K FullKV | ✅ 完成，AVG11 = 52.22 |
 | LongBench FullKV | ✅ 16/16，AVG16 = 42.37 |
 | LongBench TIA（既有口径） | 13/16，待补 3 任务 |
-| RULER/LongBench Quest + JSSA | 🔄 Quest RULER 7/11、LongBench 11/16；JSSA RULER ✅ 11/11（AVG11=54.06）、LongBench ✅ 16/16（AVG16=43.09） |
+| RULER/LongBench Quest + JSSA | 🔄 Quest RULER 8/11、LongBench 12/16；JSSA RULER ✅ 11/11（AVG11=54.06）、LongBench ✅ 16/16（AVG16=43.09） |
 | FASA/AsyncTLS/HISA | 按用户 2026-11-03 指令不再推进；后续仅保留 JSSA、Quest |
 
 ---
@@ -333,7 +333,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ---
 
-## 6. 下一步行动（更新 2026-11-03 15:10）
+## 6. 下一步行动（更新 2026-11-03 16:10）
 
 | 优先级 | 行动 | 状态 |
 |--------|------|------|
@@ -353,6 +353,9 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ## 7. 更新记录
 
+- 2026-11-03 16:10:
+  - Q32B Quest 两套矩阵各新完成一项：RULER 32K 8/11（`niah_multivalue` 100 行，当前 `cwe` 32/100）；LongBench 12/16（`samsum` 200 行，当前 `passage_count` 3/200）。两套 driver 存活，GPU5/GPU7 正常计算；未形成完整套件，不打分、不发布部分均值。
+  - Q32B LongBench FullKV 三项补跑产物齐全，16/16 与 AVG16=42.37 保持不变，无需重复 eval。GLM Quest/JSSA 四套矩阵均已完成；GPU0–4、GPU6 空闲，但不重复派发同 TS 的 Quest 剩余任务，且不推进已取消的 FASA/AsyncTLS/HISA。
 - 2026-11-03 15:10:
   - Q32B Quest LongBench 新完成 `triviaqa`（200 行），进度 11/16，当前 `samsum` 88/200；RULER 32K 保持 7/11，`niah_multivalue` 95/100。两套 driver 存活，GPU5/GPU7 正常计算；未形成完整套件，不打分、不发布部分均值。
   - Q32B LongBench FullKV 三项补跑产物齐全，16/16 与 AVG16=42.37 保持不变，无需重复 eval。GLM Quest/JSSA 四套矩阵均已完成；GPU0–4、GPU6 空闲，但不重复派发同 TS 的 Quest 剩余任务，且不推进已取消的 FASA/AsyncTLS/HISA。
