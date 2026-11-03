@@ -717,12 +717,9 @@ def sparse_paged_attention_gather(
     use_bf16 = cache_layer.kv_pool_k.dtype == torch.bfloat16
     head_group = hq // hk
     head_tile = max(16, triton.next_power_of_2(head_group)) if triton is not None else 16
-    # B1 每 CTA 处理 2 个 query head：相对单 head 减少同组 K/V 重读，
-    # 相对 4-head grouped 仍保留足够 CTA；逐 head 的 online-softmax 顺序不变。
-    heads_per_program = (
-        2 if total_q == 1 and head_group > 1 and head_group % 2 == 0
-        else head_group
-    )
+    # B1 的 grouped grid 仅有 HK 个 CTA，无法填满 GPU。按 query head 拆分
+    # 后仍保持每个 head 内完全相同的 online-softmax 循环与 tile 几何。
+    heads_per_program = 1 if total_q == 1 and head_group > 1 else head_group
     use_grouped = (
         cache_layer.head_dim_k >= 16
         and cache_layer.head_dim_v >= 16
@@ -766,9 +763,10 @@ def sparse_paged_attention_gather(
                 kernel_kwargs = {'num_stages': 1}
             else:
                 block_tokens = 128 if total_q <= 8 else 64
-                # B1 拆分为多个 CTA；BT128 下 8 warps 保持逐 head 数值路径。
+                # B1 已按 query head 拆成 32 个 CTA；BT128 下 8 warps
+                # 保持 online-softmax 循环与输出逐项一致，并降低单 CTA 延迟。
                 kernel_kwargs = ({'num_warps': 8}
-                                 if heads_per_program < head_group else {})
+                                 if heads_per_program == 1 else {})
             if not split_kv:
                 gather_args = (
                     q.contiguous(),
