@@ -1,5 +1,8 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-03
+- [ ] [TL-NFA-WIDE-AUX-UNION-20261103] 修复大 seed/保护区容量的融合 union 越界索引与不完整归并；80 组主机回归通过，原生 GPU/Graph 待验收。([详情](task_details/TL-NFA-WIDE-AUX-UNION-20261103.md))
+
 ## 2026-11-01
 - [x] [TL-STATIC-GATE-MAIN-20261101] 静态 near/far gate 接入 main，GLM 静态 artifact 随仓发布；Qwen3-8B 远端动态标定→freeze→decode 烟测通过。([详情](task_details/TL-STATIC-GATE-MAIN-20261101.md))
 
