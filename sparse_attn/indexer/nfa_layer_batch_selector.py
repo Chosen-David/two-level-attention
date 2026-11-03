@@ -1106,7 +1106,7 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
         workspace, 'middle_counts', (m, hkv), torch.int32, logits.device)
     token_bits = 32 if capacity >= 65536 else 16
     if token_bits == 16:
-        tile = 8192
+        tile = 2048
         ntiles = triton.cdiv(r, tile)
         partial = _workspace_empty(
             workspace, 'filtered_topk_partial', (m, hkv, ntiles, width),

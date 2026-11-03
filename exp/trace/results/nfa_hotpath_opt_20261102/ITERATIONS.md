@@ -661,3 +661,6 @@
 - 正确性：合成同分/quota/无效候选直接对拍 1/1 通过，微基准 indices/counts bit-exact。
 - 算子微基准：原实现 0.230623 ms，候选 0.115244 ms，**2.001x**；相对 Iter 77 的 0.115675 ms 仅快约 0.37%，属于很薄的算子信号，必须经完整回归和真实 Qwen identity/TPOT 判断是否保留。
 - 状态：暂作为候选保留；尚未据此宣称生产加速或最终达标。
+- 完整回归与生产身份：selector/cache/GraphRunner 35/35 通过；真实 Qwen eager/Graph 的 B1 `generated_token_ids` 均与 Iter 77 完全一致。
+- 生产 16-token TPOT：eager median/steady 25.854368/25.773280 ms，Graph 17.468160/17.451103 ms。eager 表面优于 Iter 77，但 Graph steady 比 Iter 77 的 15.634048 ms 慢约 11.6%；微基准收益过薄且主 Graph 口径明确回退。
+- 判决：恢复 `tile=2048`，不保留 8192 配置； eager 数字不作为保留候选的理由。
