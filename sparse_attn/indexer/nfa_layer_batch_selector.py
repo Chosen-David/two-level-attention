@@ -558,13 +558,9 @@ if _has_triton():
                     key = tl.where(
                         (i & stride) == 0,
                         tl.maximum(key, peer), tl.minimum(key, peer))
-                first_group = 4
-            else:
-                key = tl.load(PARTIAL + h * NTILES * K + i)
-                first_group = 1
-            for group in tl.static_range(first_group, NTILES):
-                incoming = tl.load(
-                    PARTIAL + (h * NTILES + group) * K + rank)
+                # 直接展开 run 4，避免把 constexpr 分支变量用作
+                # tl.static_range 起点。
+                incoming = tl.load(PARTIAL + (h * NTILES + 4) * K + rank)
                 retained = tl.gather(key, rank, axis=0)
                 value = tl.where(pair < K, retained, incoming)
                 peer = tl.gather(value, pair ^ K, axis=0)
@@ -577,6 +573,23 @@ if _has_triton():
                     key = tl.where(
                         (i & stride) == 0,
                         tl.maximum(key, peer), tl.minimum(key, peer))
+            else:
+                key = tl.load(PARTIAL + h * NTILES * K + i)
+                for group in tl.static_range(1, NTILES):
+                    incoming = tl.load(
+                        PARTIAL + (h * NTILES + group) * K + rank)
+                    retained = tl.gather(key, rank, axis=0)
+                    value = tl.where(pair < K, retained, incoming)
+                    peer = tl.gather(value, pair ^ K, axis=0)
+                    value = tl.where(
+                        pair < K, tl.maximum(value, peer), tl.minimum(value, peer))
+                    key = tl.gather(value, i, axis=0)
+                    for bit in tl.static_range(LOG2_K - 1, -1, -1):
+                        stride = 1 << bit
+                        peer = tl.gather(key, i ^ stride, axis=0)
+                        key = tl.where(
+                            (i & stride) == 0,
+                            tl.maximum(key, peer), tl.minimum(key, peer))
         _finish_sorted_logits_key(
             h, key, LOW, HIGH, QUOTA, OUT, COUNT,
             S=S, K=K, SINK=SINK, META_GROUP=META_GROUP,

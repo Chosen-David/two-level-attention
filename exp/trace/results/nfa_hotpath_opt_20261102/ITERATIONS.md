@@ -711,3 +711,10 @@
 - 修改：针对生产 `NTILES=5`，尝试同时归并 run (0,1) 与 (2,3)，再顺序归并配对结果和 run 4，将四轮归并降为三轮；其余 run 数保留 Iter 81 路径。
 - 结果：Triton 编译失败，`first_group` 经 constexpr 分支赋值后被视为 `int32[]`，不能作为 `tl.static_range(first_group, NTILES)` 的起点；尚未进入对拍或计时。
 - 判决：记录为失败迭代。下一轮将 `NTILES=5` 的最后一轮直接展开，通用路径保留独立 `static_range(1, NTILES)`，消除非常量起点。
+
+## Iter 85：五路配对归并的 constexpr 修复（GPU 占用，未验证）
+
+- 修改：`NTILES=5` 特化中直接展开 run 4 的最后归并；通用路径改用独立的 `tl.static_range(1, NTILES)`，删除 `first_group` 非常量起点。packed key、归并比较与同分规则不变。
+- GPU hygiene：修改后复查本机 GPU0 used=77294 MiB，compute PID 2754683 used=77284 MiB，不满足 used<500 MiB 且无他方进程的起跑条件；未抢占、未启动微基准。
+- 正确性与算子微基准：因 GPU0 被其他会话占用，本轮尚未完成编译、bit-exact 对拍和延迟测量，不能宣称改善。
+- 判决：仅提交 constexpr 结构修复与阻塞记录，等待干净 GPU0 后再验证；当前最佳仍为 Iter 81 的 0.038990 ms。
