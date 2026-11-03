@@ -792,4 +792,4 @@
 - 完整生产 Graph 128-token：steady TPOT 10.569072 ms，相对 Iter 92 的 11.168112 ms 加速 1.056682×（耗时降低 5.36%），相对 Iter 90 的 11.758976 ms 累计加速 1.112586×；当前 FA2/NFA=1.192167×，仍未达到 2×。本轮为独立单次生产结果，需 ABBA 复验；128-token identity 和原始证据归档紧随本次 benchmark 处理。
 - 生产正确性与归档：iter93 Graph 与 iter92 Graph、iter92 eager 的 128/128 token 均完全一致，输入 SHA 与 selector 配置不变。微基准、生产 receipt/log 和两份 GPU hygiene 已归档到本结果目录。
 - 覆盖复核：新的独立生产单步画像中 `_square_fp32_kernel` 与 `_norm_scale_kernel` 均为 145 calls，`torch.mean` 也是 145 calls，Q/K 的 72 个实例已全部进入三 kernel；该画像 self-device 合计 9.937 ms，其 TPOT 仍不作 verdict。
-- 同卡 ABBA：pc40 GPU0 四个独立进程按 iter92(A)→iter93(B)→iter93(B)→iter92(A) 运行，steady TPOT 分别为 11.166352、10.555744、10.536640、11.161680 ms；两臂各自均值为 11.164016/10.546192 ms，ABBA 加速约 1.0586×，与首次单跑的 1.0567× 一致，收益可重复。四臂均生成 128 token，序列对拍与证据归档随后处理。
+- 同卡 ABBA：pc40 GPU0 四个独立进程按 iter92(A)→iter93(B)→iter93(B)→iter92(A) 运行，steady TPOT 分别为 11.166352、10.555744、10.536640、11.161680 ms；两臂各自均值为 11.164016/10.546192 ms，ABBA 加速 1.058583×，与首次单跑的 1.0567× 一致，收益可重复。四臂 128/128 token 全部一致，输入 SHA 不变；按 ABBA 均值 FA2/NFA=1.194337×，仍未达到 2×。证据见 `iter93_abba/`（含 verdict 与 hygiene）和 `iter93_profile/`。
