@@ -908,3 +908,4 @@
 
 - 修改：生产 `_nfa_filtered_topk_partial_kernel` 启动配置由 8 改为 16 warp，TILE=2048、K=1024、packed key、`tl.topk` 和下游 merge 完全不变。新增独立 8/16 warp 对拍基准。
 - 正确性与运行异常：10/10 个 B3×HKV8 seed 的 partial key 全部逐位一致，覆盖同分、无效项和 quota 过滤；但 B1 性能阶段在 eager `do_bench` 后、Graph capture 前的 `torch.cuda.synchronize()` 报 `illegal memory access`，未生成 Graph 时间或完整 JSON，当前候选不能进入生产。下一轮先用 `CUDA_LAUNCH_BLOCKING=1` 和缩小 Graph inner/replay 定位非法访问所属 kernel/阶段，不能把此前的扫描收益直接作为有效判决。
+- memcheck 定位：最小 eager/Graph 复现中 Graph 后 8/16 warp 输出曾交替不一致；`compute-sanitizer --tool memcheck --error-exitcode 99` 返回 99，明确报告 `_nfa_filtered_topk_partial_kernel+0xc300` 在 `nfa_layer_batch_selector.py:514` 的 `tl.store` 发生 `Invalid __global__ write of size 16 bytes`、访问越界。此前 eager 对拍和 warp 扫描性能因此全部降级为未验收信号；下一步分别只运行 8/16 warp memcheck，确定触发配置并恢复安全实现，禁止以截断 store 掩盖问题。
