@@ -893,3 +893,4 @@
 - 候选：生产 tail32 在编译期生成 `[48:64]+[112:128]`，删除 DIMS 的 32 维设备加载；KV 池 numel 不超过 int32 上限时，物理页号和维度偏移保持 int32，其他几何保留 int64 通用路径。Q/K 维度顺序、`tl.sum` 点积、BF16 舍入、signed ordered key、owner/quota 过滤均不变；新增 `benchmark_nfa_fine_scores.py`，保留 iter104 参考 kernel，覆盖重复 token、keep 洞、无效项、quota、尾 tile 及 Graph/eager 两种 warp 配置。
 - 首次远端执行未进入 kernel：后台监控的 shell 优先级使 `cd /tmp/nfa-iter105-candidate` 只作用于后台子 shell，主 Python 从 home 目录寻找 benchmark，报 `can't open file ... No such file or directory`，未编译或执行候选，未产生正确性或性能结论。pc40 GPU0 起跑前 used=1 MiB 且无计算进程；下一提交仅修正远端命令的目录与后台分组，不改候选实现。
 - 修正目录后第二次执行仍未进入 kernel：直接运行 `benchmark/efficiency/benchmark_nfa_fine_scores.py` 时 `sys.path` 只含脚本目录，报 `ModuleNotFoundError: No module named 'sparse_attn'`。这是隔离运行命令漏设 `PYTHONPATH`，不是候选编译或数值失败；下一次显式设置 `PYTHONPATH=.` 后重跑，不改实现。
+- 首次实际对拍硬门失败：seed=0、Graph 生产配置 warps=1 时有 2 个 int32 packed key 不同，脚本立即停止，未运行后续 case 或性能计时。当前候选不得进入生产；下一步先定位这 2 项的 row/token/cand、参考与候选 key 及原始 K/Q 值，区分 tail32 维度映射和 int32 地址特化，不能因差异很小而放宽 bit-exact 门。
