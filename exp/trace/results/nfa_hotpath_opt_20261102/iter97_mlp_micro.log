@@ -1,0 +1,54 @@
+device=cuda:0, torch=2.8.0+cu128, triton=3.4.0, transformers=4.56.2
+
+[1/5] HF 完整 MLP elementwise 段逐位对拍
+  [bit-exact PASS] Qwen3-8B B1 random scale=1.0
+  [bit-exact PASS] Qwen3-8B B1 random scale=16.0
+  [bit-exact PASS] Qwen3-8B B4 random scale=1.0
+  [bit-exact PASS] Qwen3-8B B4 random scale=16.0
+  [bit-exact FAIL] special gate × special up（含 NaN/Inf/±0）
+      mismatch_count=66
+      at (0, 0, 96): got=0x0000 ref=0x0040
+      at (0, 0, 97): got=0x8000 ref=0x8040
+      at (0, 0, 98): got=0x0000 ref=0x0330
+      at (0, 0, 99): got=0x8000 ref=0x8330
+      at (0, 0, 100): got=0x0000 ref=0x0348
+      at (0, 0, 101): got=0x8000 ref=0x8348
+      at (0, 0, 102): got=0x0000 ref=0x3fff
+      at (0, 0, 103): got=0x8000 ref=0xbfff
+  [bit-exact FAIL] 穷举 65536 个 BF16 gate 位模式
+      mismatch_count=3613
+      at (0, 0, 8): got=0x0000 ref=0x0004
+      at (0, 0, 9): got=0x8000 ref=0x8004
+      at (0, 0, 10): got=0x0000 ref=0x015c
+      at (0, 0, 11): got=0x8000 ref=0x8184
+      at (0, 0, 12): got=0x0000 ref=0x0196
+      at (0, 0, 13): got=0x8000 ref=0x8196
+      at (0, 0, 14): got=0x0000 ref=0x3e5f
+      at (0, 0, 15): got=0x8000 ref=0xbe7f
+
+[2/5] gate / 实例 patch / prefill 回退
+  [gate/patch PASS] decode contiguous BF16 可融合
+  [gate/patch PASS] prefill 几何回退
+  [gate/patch PASS] FP32 回退
+  [gate/patch PASS] 非连续输入回退
+  [gate/patch PASS] 真实 Qwen3MLP 注册计数=1
+  [gate/patch PASS] patched decode 完整 MLP 逐位一致
+  [gate/patch PASS] patched prefill 回退逐位一致
+  [gate/patch PASS] unregister 恢复原 forward
+
+[3/5] CUDA Graph capture/replay
+  [bit-exact PASS] Qwen3-8B B1 Graph capture/replay
+  [bit-exact PASS] Qwen3-8B B4 Graph capture/replay
+
+[4/5] CUDA kernel 计数
+  HF elementwise CUDA kernels=2（目标 2）
+  fused elementwise CUDA kernels=1（目标 1）
+
+[5/5] eager wrapper 与 Graph device time（CUDA event 中位数）
+  case                   HF eager ms  fused eager ms   HF graph ms  fused graph ms
+  Qwen3-8B B1               0.015277        0.029166      0.002746        0.001381
+    speedup: eager=0.524x, graph=1.989x
+  Qwen3-8B B4               0.015076        0.028784      0.003180        0.001460
+    speedup: eager=0.524x, graph=2.178x
+
+==== 汇总：bit-exact 4/6，gate/patch 8/8，graph 2/2，kernel HF/fused=2/1；FAIL ====

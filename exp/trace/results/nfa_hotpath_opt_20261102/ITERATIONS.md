@@ -823,3 +823,12 @@
 - 完整生产正确性通过：pc40 GPU0 同卡顺序运行 Graph→eager，Graph 相对 Iter 93 Graph、eager 相对 Iter 92 eager、eager 相对 Graph 均为 128/128 token 完全一致；输入 SHA256 保持 `e851c310…99c2db`，Graph replay=127、eager replay=0，自然 skip 仍为 0，未把本样本当作 skip 证据。
 - 完整生产单跑：Graph steady TPOT=10.470832 ms，低于 Iter 95 的 10.498944 ms 和 Iter 93 单跑的 10.569072 ms；eager steady TPOT=25.755888 ms，虽然源码已恢复单 fused launch，但仍高于 Iter 92 的 23.982288 ms，不能宣称 eager 性能已恢复。两者均需独立 ABBA 区分真实收益与 host/频率波动；当前正式 best 不变，双口径仍未达到 2×。
 - 测量边界：30 秒旁路日志只观察到本轮 compute process，未见第三方进程；单跑 TPOT 不替代正式 ABBA。生产 receipt、stdout 和 hygiene 已归档为 `ruler32k_iter96_128_{graph,eager}.json`、`iter96_production_{graph,eager}.log`、`iter96_production_gpu0_hygiene.log`。
+
+## Iter 97：Graph MLP SiLU+multiply 逐位融合
+
+- 修改：Qwen3MLP 保持 gate/up/down 三次 GEMM 与调用顺序不变，仅将 `SiLU(gate) * up` 的两个 BF16 elementwise kernel 合成一个 Triton kernel。保留 FP32 `expf`、RN 加/除/乘、SiLU 中间 BF16 舍入和最终 BF16 舍入；仅 Graph 注册，eager 继续 HF。
+- 首轮数值失败与修复：libdevice `fdiv_rn/fmul_rn` 实际降为 `div.rn.ftz.f32/mul.rn.ftz.f32`，特殊值交叉组合出现 66 处差异，穷举 65536 个 gate BF16 编码出现 3613 处差异，主要是次正规数被冲刷为零。改用非 FTZ 的 `div.rn.f32/mul.rn.f32` inline PTX 后复验全部通过；未以随机输入通过替代特殊值门禁。
+- 微基准最终通过：B1/B4 两种随机尺度、NaN/Inf/正负零/次正规数交叉组合、全部 65536 个 gate 编码均逐位一致；patch/fallback 8/8、B1/B4 Graph capture/replay 2/2、完整小 MLP bit-exact，HF/fused kernel 数 2→1。B1 HF/fused Graph device time 为 0.002743/0.001382 ms，局部加速 1.985×；eager 为 0.015039/0.029380 ms，仅 0.512×，所以不接入 eager。
+- 完整生产正确性通过：Graph 相对 Iter 96 Graph、eager 相对 Iter 96 eager、eager 相对 Graph 均为 128/128 token 完全一致；输入 SHA256 不变，Graph 日志包含 iter97 MLP 注册，eager 日志无 MLP/RMSNorm 注册，证明执行隔离生效。
+- 完整生产单跑：Graph steady TPOT=10.420880 ms，相对 Iter 96 的 10.470832 ms 降低 0.049952 ms；微基准每层节省约 0.001361 ms，36 层理论节省 0.048996 ms，与生产吻合。eager steady TPOT=25.443088 ms，同路径相对 Iter 96 的 25.755888 ms 波动再次说明需要 ABBA，不能据此宣称 eager 改善。Graph 仍需正式 ABBA，当前双口径均未达到 2×。
+- 证据：`iter97_mlp_micro{,_noftz,_integrated}.log`、生产 receipt/stdout 和 GPU hygiene 已归档；失败数值日志保留用于防止回退到 FTZ libdevice 调用。

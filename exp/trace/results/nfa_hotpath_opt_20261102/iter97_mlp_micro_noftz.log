@@ -1,0 +1,36 @@
+device=cuda:0, torch=2.8.0+cu128, triton=3.4.0, transformers=4.56.2
+
+[1/5] HF 完整 MLP elementwise 段逐位对拍
+  [bit-exact PASS] Qwen3-8B B1 random scale=1.0
+  [bit-exact PASS] Qwen3-8B B1 random scale=16.0
+  [bit-exact PASS] Qwen3-8B B4 random scale=1.0
+  [bit-exact PASS] Qwen3-8B B4 random scale=16.0
+  [bit-exact PASS] special gate × special up（含 NaN/Inf/±0）
+  [bit-exact PASS] 穷举 65536 个 BF16 gate 位模式
+
+[2/5] gate / 实例 patch / prefill 回退
+  [gate/patch PASS] decode contiguous BF16 可融合
+  [gate/patch PASS] prefill 几何回退
+  [gate/patch PASS] FP32 回退
+  [gate/patch PASS] 非连续输入回退
+  [gate/patch PASS] 真实 Qwen3MLP 注册计数=1
+  [gate/patch PASS] patched decode 完整 MLP 逐位一致
+  [gate/patch PASS] patched prefill 回退逐位一致
+  [gate/patch PASS] unregister 恢复原 forward
+
+[3/5] CUDA Graph capture/replay
+  [bit-exact PASS] Qwen3-8B B1 Graph capture/replay
+  [bit-exact PASS] Qwen3-8B B4 Graph capture/replay
+
+[4/5] CUDA kernel 计数
+  HF elementwise CUDA kernels=2（目标 2）
+  fused elementwise CUDA kernels=1（目标 1）
+
+[5/5] eager wrapper 与 Graph device time（CUDA event 中位数）
+  case                   HF eager ms  fused eager ms   HF graph ms  fused graph ms
+  Qwen3-8B B1               0.015253        0.029351      0.002744        0.001383
+    speedup: eager=0.520x, graph=1.984x
+  Qwen3-8B B4               0.015200        0.028773      0.003177        0.001463
+    speedup: eager=0.528x, graph=2.171x
+
+==== 汇总：bit-exact 6/6，gate/patch 8/8，graph 2/2，kernel HF/fused=2/1；PASS ====

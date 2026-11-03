@@ -27,7 +27,8 @@ def _is_glm4_moe_lite_attn(module) -> bool:
 
 
 def register_patch(model: nn.Module, args, snapshot=None,
-                   rmsnorm_decode: bool = False) -> int:
+                   rmsnorm_decode: bool = False,
+                   mlp_silu_decode: bool = False) -> int:
     """注册稀疏 attention patch，返回成功 patch 的模块数。
 
     当前生产路径仅支持 Qwen3：dense prefill + frozen-region gate ->
@@ -48,6 +49,7 @@ def register_patch(model: nn.Module, args, snapshot=None,
     其他 indexer 类型忽略 snapshot（其无文件型配置）。
     rmsnorm_decode：仅为 Graph 生产 decode 开启 iter91 三 kernel 路径；
     eager 的 Python/Triton launch 外壳实测回退，默认保持 HF 原实现。
+    mlp_silu_decode：独立开启 Qwen3MLP SiLU+multiply 单 kernel；默认关闭。
     """
     _reject_removed_cache_args(args)
     IndexerType = indexer_type_dict.get(args.method, None)
@@ -110,6 +112,11 @@ def register_patch(model: nn.Module, args, snapshot=None,
         from .qwen3_rmsnorm_patch import register_rmsnorm_patch
         register_rmsnorm_patch(
             model, expected=model.config.num_hidden_layers * 4 + 1)
+    if (mlp_silu_decode and n_patched
+            and getattr(model.config, 'model_type', None) == 'qwen3'):
+        from .qwen3_mlp_silu_patch import register_mlp_silu_patch
+        register_mlp_silu_patch(
+            model, expected=model.config.num_hidden_layers)
     if args.method != 'none' and n_patched == 0:
         mod_types = sorted({type(m).__name__ for _, m in model.named_modules()})
         hint = ""
