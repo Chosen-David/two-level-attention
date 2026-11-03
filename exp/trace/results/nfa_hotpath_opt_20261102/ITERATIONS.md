@@ -790,4 +790,4 @@
 - 微基准正确性：Qwen3-8B/32B/30B-A3B 的真实 Q/K `(1,1,H,128)` 与 B4 几何共 18 组 square/mean/out 逐级位型一致；gate 4/4、patch 7/7、Graph capture/replay 3/3 通过，新增 Q/K pre-transpose 图重放对拍。
 - eager wrapper 信号：九种 shape 的 HF/候选仅 0.74–0.75×，再次确认该实现不能用于 eager；生产继续由 Iter 92 开关保证仅 Graph 注册。此数字只用于否定 eager 外壳，不作为 Graph 收益结论。
 - 完整生产 Graph 128-token：steady TPOT 10.569072 ms，相对 Iter 92 的 11.168112 ms 加速 1.056682×（耗时降低 5.36%），相对 Iter 90 的 11.758976 ms 累计加速 1.112586×；当前 FA2/NFA=1.192167×，仍未达到 2×。本轮为独立单次生产结果，需 ABBA 复验；128-token identity 和原始证据归档紧随本次 benchmark 处理。
-- 原始证据：pc40 `/tmp/iter93_rmsnorm_micro.log`、`iter93_rmsnorm_micro_gpu0_hygiene.log`、`ruler32k_iter93_128_graph.json`、`iter93_production_graph.log` 与 `iter93_production_gpu0_hygiene.log`，待下载归档；另需复核生产 kernel 调用数是否由 73/145 变为 145/145。
+- 生产正确性与归档：iter93 Graph 与 iter92 Graph、iter92 eager 的 128/128 token 均完全一致，输入 SHA 与 selector 配置不变。微基准、生产 receipt/log 和两份 GPU hygiene 已归档到本结果目录；另需复核生产 kernel 调用数是否由 73/145 变为 145/145。
