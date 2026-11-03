@@ -801,4 +801,5 @@
 - 微基准：eager 三次/一次投影为 0.042787/0.019005 ms（2.2513×），Graph 为 0.025374/0.015784 ms（1.6076×）；该单算子收益不能外推为完整 TPOT。
 - 显存复核：初次探针的约 32 MiB 增量来自首次 GEMM 的 cuBLAS workspace，不是旧权重引用；独立 weakref 检查显示旧 Q/K/V 权重均已释放。预热 workspace 后，准备融合权重的 allocated delta 仅为保留参考输出的 12,288 bytes，共享存储未增加权重副本。生产 model-loaded/decode-ready 显存仍需实测。
 - 完整生产 128-token：Graph steady TPOT 10.274896 ms，相对 Iter 93 单跑 10.569072 ms 加速 1.028632×；eager steady TPOT 22.864288 ms，相对 Iter 92 的 23.982288 ms 加速 1.048903×。当前 FA2/NFA 约为 Graph 1.225953×、eager 1.004556×，eager 仅略超过 FA2，双口径仍未达到 2×。两臂 model-loaded allocated 均为 16,417,402,368 bytes，与 Iter 93 相同。
-- 原始证据：pc40 `/tmp/iter94_qkv_micro.log`、`iter94_qkv_micro_gpu0_hygiene.log`、`ruler32k_iter94_128_{graph,eager}.json`、`iter94_production_{graph,eager}.log` 与 `iter94_production_gpu0_hygiene.log`，待下载归档；完整 token identity 随后校验，未通过则回退。
+- 正确性判决：拒绝。iter94 Graph 相对 iter93 Graph、eager 相对 iter92 eager 均从第 11 个 token 开始分叉，最终 115/128 token 不同；iter94 eager 与 Graph 彼此一致也不能满足“优化前后 NFA 一致”硬门。少量 Q GEMM 舍入差已转化为明显生成漂移，不做 ABBA、不合入主线，下一提交恢复独立 Q/K/V 投影。
+- 原始证据：微基准、生产 receipt/log 与 GPU hygiene 已归档到本结果目录；model-loaded allocated 虽与 iter93 相同，但 Graph decode-ready allocated 增加 368,640 bytes，且性能收益不能抵消 token identity 失败。
