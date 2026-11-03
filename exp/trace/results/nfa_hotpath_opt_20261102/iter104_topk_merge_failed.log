@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/tmp/nfa-iter104-candidate/benchmark/efficiency/benchmark_nfa_topk_merge.py", line 169, in <module>
+    raise SystemExit(main())
+  File "/tmp/nfa-iter104-candidate/benchmark/efficiency/benchmark_nfa_topk_merge.py", line 123, in main
+    _launch(ops._nfa_filtered_topk_merge_kernel, partial, lower, upper, quota,
+  File "/tmp/nfa-iter104-candidate/benchmark/efficiency/benchmark_nfa_topk_merge.py", line 48, in _launch
+    kernel[(m * hkv,)](
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/triton/runtime/jit.py", line 390, in <lambda>
+    return lambda *args, **kwargs: self.run(grid=grid, warmup=False, *args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/triton/runtime/jit.py", line 561, in run
+    bound_args, specialization, options = binder(*args, **kwargs)
+TypeError: dynamic_func() missing 1 required positional argument: 'MERGE_PAD'

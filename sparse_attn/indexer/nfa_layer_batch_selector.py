@@ -528,22 +528,16 @@ if _has_triton():
                           mask=offs < NTILES * K, other=invalid)
             key = tl.max(key, axis=0, keep_dims=True)
         else:
-            # 各 partial run 已按降序排列。将另一条 run 反转拼接形成
-            # bitonic 序列，只保留比较后的前 K 项，再做 K-wide 排序；
-            # 与对所有 NTILES*K 项重新 Top-K 的集合和同分顺序一致。
+            # 各 partial run 已按降序排列。原实现将 A 与反转后的 B 拼成
+            # 2K bitonic 序列；其前半项逐元素恰为 max(A[i], B[K-1-i])，
+            # 因此直接生成这 K 项，删除等价的 2K gather/select 中间网络。
+            # 后续 K-wide 排序与 run 归并顺序不变，packed key 逐位一致。
             i = tl.arange(0, K)
-            pair = tl.arange(0, 2 * K)
-            rank = tl.where(pair < K, pair, 2 * K - 1 - pair)
             key = tl.load(PARTIAL + h * NTILES * K + i)
             for group in tl.static_range(1, NTILES):
                 incoming = tl.load(
-                    PARTIAL + (h * NTILES + group) * K + rank)
-                retained = tl.gather(key, rank, axis=0)
-                value = tl.where(pair < K, retained, incoming)
-                peer = tl.gather(value, pair ^ K, axis=0)
-                value = tl.where(
-                    pair < K, tl.maximum(value, peer), tl.minimum(value, peer))
-                key = tl.gather(value, i, axis=0)
+                    PARTIAL + (h * NTILES + group) * K + (K - 1 - i))
+                key = tl.maximum(key, incoming)
                 for bit in tl.static_range(LOG2_K - 1, -1, -1):
                     stride = 1 << bit
                     peer = tl.gather(key, i ^ stride, axis=0)

@@ -875,3 +875,8 @@
 - 正确性通过：iter103 Graph 相对 iter99 Graph 为 128/128 token 完全一致，first_divergence=None；结合 iter99 eager↔Graph 已通过的 identity，iter103 Graph 也与参考 eager 序列一致。全量单 kernel 与 Q/K-only 的唯一生产差异是 hidden/final norm 路径，因此 hidden/final 继续保留原归约；当前候选只主张 Q/K 的约 0.197 ms 单跑收益，仍待同卡 ABBA。
 - iter97↔iter99 同卡 ABBA 收尾：pc40 GPU0 的 Graph 四臂为 iter97 10.428176/10.469168 ms、iter99 10.412992/10.388400 ms，两臂均值 10.448672→10.400696 ms，加速 1.004613×；eager 四臂为 iter97 25.508863/25.699857 ms、iter99 25.621520/25.304096 ms，均值 25.604360→25.462808 ms，加速 1.005559×。八臂生成序列全部 128/128 一致，输入 SHA 不变；旁路日志只见本轮 PID，判定 clean。固定小 grid 的收益不足 1%，不再作为主要方向。证据与 verdict 归档于 `iter99_abba/`。
 - iter99↔iter103 Graph 同卡 ABBA：pc40 GPU1 按 A→B→B→A 运行，iter99 为 10.428912/10.412640 ms，iter103 为 10.219168/10.214016 ms；两臂均值 10.420776→10.216592 ms，降低 0.204184 ms，加速 **1.019986×**。四臂 128/128 token 全部一致，输入 SHA 与 selector 配置不变，旁路日志仅见本轮 PID，判定 clean。iter103 因此取代 iter93 的 10.546192 ms 成为当前正式 Graph best；相对 FA2 Graph 12.595712 ms 为 1.232868×，距 2× 门槛 6.297856 ms 仍远。eager 未注册该 patch，正式 eager 对照仍慢于 FA2，禁止用 Graph 数字替代 eager。证据与 verdict 归档于 `iter103_abba/`。
+
+## Iter 104：有序 merge 删除等价 2K 中间网络
+
+- 修改：两条降序 run A/B 的原 2K bitonic 拼接，其保留的前半项逐元素恰为 `max(A[i], B[K-1-i])`；直接生成这 K 项后沿用原 K-wide 排序、run 顺序和 finish，删除 2K `rank/retained/value/peer` gather/select。新增独立 `benchmark_nfa_topk_merge.py`，保留 iter103 参考 kernel，使用 R=8452、五条 run、同分/重复 token/无效项及 quota=0/300/1024 对拍。
+- 首次远端执行未进入候选 kernel：生产 `_nfa_filtered_topk_merge_kernel` 的 K==1 分支仍要求 `MERGE_PAD`，新基准的公共 launch 漏传该 constexpr，报 `TypeError: dynamic_func() missing ... MERGE_PAD`；参考 kernel 已运行，但候选未执行，因此没有 bit-exact 或性能结论。监控 shell 的 `wait $!` 另发生引号错误，已落盘的旁路样本仍仅见本轮 PID。失败证据为 `iter104_topk_merge_failed.log` 与对应 hygiene；下一提交仅修基准参数和监控等待方式，不改生产 kernel。
