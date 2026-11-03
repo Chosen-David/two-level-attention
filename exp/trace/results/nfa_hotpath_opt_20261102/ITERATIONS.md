@@ -832,3 +832,10 @@
 - 完整生产正确性通过：Graph 相对 Iter 96 Graph、eager 相对 Iter 96 eager、eager 相对 Graph 均为 128/128 token 完全一致；输入 SHA256 不变，Graph 日志包含 iter97 MLP 注册，eager 日志无 MLP/RMSNorm 注册，证明执行隔离生效。
 - 完整生产单跑：Graph steady TPOT=10.420880 ms，相对 Iter 96 的 10.470832 ms 降低 0.049952 ms；微基准每层节省约 0.001361 ms，36 层理论节省 0.048996 ms，与生产吻合。eager steady TPOT=25.443088 ms，同路径相对 Iter 96 的 25.755888 ms 波动再次说明需要 ABBA，不能据此宣称 eager 改善。Graph 仍需正式 ABBA，当前双口径均未达到 2×。
 - 证据：`iter97_mlp_micro{,_noftz,_integrated}.log`、生产 receipt/stdout 和 GPU hygiene 已归档；失败数值日志保留用于防止回退到 FTZ libdevice 调用。
+
+## Iter 98：页统计固定小 grid
+
+- 修改：稳态页统计从 `ceil(KT_CAP/16) × stats_rows` 改为固定 `4 × stats_rows` 个 CTA；正常连续 decode 仍只有最新块 owner 计算，首次、重复/非连续长度和历史页重绑定触发的全量重建由 4 路按 stride 覆盖全部块组。Q 预处理、当前 K/V 写入、最新块统计顺序、STATS_LEN 提交位置和全部选择语义不变。
+- 生产 32K B1 每层统计 CTA 从 256 降为 32，融合 Q 后总 CTA 从 288 降为 64；grid 不再随逻辑上下文容量增长。回归 17/18 通过，唯一 `test_radix_filtered_topk_bit_exact_with_quota_and_ties` 在 iter97 原样复现同样 2648/6144 差异，确认为既有 Top-K 失败而非本轮回归。
+- Graph 完整生产单跑：steady TPOT=10.275776 ms，相对 iter97 的 10.420880 ms 降低 0.145104 ms；输入 SHA256、32612 prompt tokens、128 decode tokens 和 graph_replays=127 均不变。该数字仅为单跑信号，不更新正式 ABBA 最佳，也未达到 2×。
+- 证据：`/tmp/ruler32k_iter98_128_graph.json`、`/tmp/iter98_graph_stdout.log`、`/tmp/iter98_graph_gpu0_hygiene.log`（pc40 GPU0）；token identity 与 eager 结果在本条提交后继续验收，不在此处提前宣称通过。

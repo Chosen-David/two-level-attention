@@ -37,7 +37,8 @@ if _has_triton():
         HK: tl.constexpr, HEAD_DIM: tl.constexpr,
         DIM_NUMEL: tl.constexpr, D_BLOCK: tl.constexpr, BS: tl.constexpr,
         KT_CAP: tl.constexpr, L: tl.constexpr, B: tl.constexpr,
-        BLOCKS_PER_PROGRAM: tl.constexpr,
+        BLOCKS_PER_PROGRAM: tl.constexpr, BLOCK_GROUPS: tl.constexpr,
+        BLOCK_GROUP_STRIDE: tl.constexpr,
         MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
     ):
         m = row // HK
@@ -54,41 +55,45 @@ if _has_triton():
         owner = block_group == last_blk // BLOCKS_PER_PROGRAM
 
         if active & (~incremental | owner):
-            group_start = block_group * BLOCKS_PER_PROGRAM
-            blk_start = tl.where(incremental, last_blk, group_start)
-            blk_end = tl.where(
-                incremental, last_blk + 1,
-                tl.minimum(group_start + BLOCKS_PER_PROGRAM, KT_CAP))
-            offs_d = tl.arange(0, D_BLOCK)
-            dim_mask = offs_d < DIM_NUMEL
-            dim = tl.load(DIMS + offs_d, mask=dim_mask, other=0).to(tl.int64)
-            kv_addr = tl.load(KV_PTRS + layer)
-            kv_ptr = kv_addr.to(tl.pointer_type(P_MIN.dtype.element_ty))
-            for blk in range(blk_start, blk_end):
-                tok = blk * BS + tl.arange(0, BS)
-                visible = tok < length
-                lp = tok // PAGE
-                off = tok % PAGE
-                page_valid = lp < MAX_BLOCKS
-                phys = tl.load(
-                    BLOCK_TABLE + (layer + LAYER_OFFSET) * MAX_REQ * MAX_BLOCKS
-                    + req_id * MAX_BLOCKS + lp,
-                    mask=page_valid & visible, other=0).to(tl.int64)
-                src = (kv_ptr
-                       + phys[:, None] * HK * PAGE * HEAD_DIM
-                       + kv * PAGE * HEAD_DIM
-                       + off[:, None] * HEAD_DIM
-                       + dim[None, :])
-                read_mask = (visible & page_valid)[:, None] & dim_mask[None, :]
-                val = tl.load(src, mask=read_mask, other=0.0).to(tl.float32)
-                vmin = tl.min(val, axis=0)
-                vmax = tl.max(val, axis=0)
-                vsum = tl.sum(val, axis=0)
-                p_base = ((layer * MAX_REQ + req_id) * KT_CAP * HK * DIM_NUMEL
-                          + blk * HK * DIM_NUMEL + kv * DIM_NUMEL + offs_d)
-                tl.store(P_MIN + p_base, vmin.to(P_MIN.dtype.element_ty), mask=dim_mask)
-                tl.store(P_MAX + p_base, vmax.to(P_MAX.dtype.element_ty), mask=dim_mask)
-                tl.store(P_SUM + p_base, vsum.to(P_SUM.dtype.element_ty), mask=dim_mask)
+            # 稳态 owner 只处理最新块；重建时固定少量 CTA 按 stride 覆盖
+            # 全部块组，grid 不再随上下文容量增长。
+            group_end = tl.where(incremental, block_group + 1, BLOCK_GROUPS)
+            for group in range(block_group, group_end, BLOCK_GROUP_STRIDE):
+                group_start = group * BLOCKS_PER_PROGRAM
+                blk_start = tl.where(incremental, last_blk, group_start)
+                blk_end = tl.where(
+                    incremental, last_blk + 1,
+                    tl.minimum(group_start + BLOCKS_PER_PROGRAM, KT_CAP))
+                offs_d = tl.arange(0, D_BLOCK)
+                dim_mask = offs_d < DIM_NUMEL
+                dim = tl.load(DIMS + offs_d, mask=dim_mask, other=0).to(tl.int64)
+                kv_addr = tl.load(KV_PTRS + layer)
+                kv_ptr = kv_addr.to(tl.pointer_type(P_MIN.dtype.element_ty))
+                for blk in range(blk_start, blk_end):
+                    tok = blk * BS + tl.arange(0, BS)
+                    visible = tok < length
+                    lp = tok // PAGE
+                    off = tok % PAGE
+                    page_valid = lp < MAX_BLOCKS
+                    phys = tl.load(
+                        BLOCK_TABLE + (layer + LAYER_OFFSET) * MAX_REQ * MAX_BLOCKS
+                        + req_id * MAX_BLOCKS + lp,
+                        mask=page_valid & visible, other=0).to(tl.int64)
+                    src = (kv_ptr
+                           + phys[:, None] * HK * PAGE * HEAD_DIM
+                           + kv * PAGE * HEAD_DIM
+                           + off[:, None] * HEAD_DIM
+                           + dim[None, :])
+                    read_mask = (visible & page_valid)[:, None] & dim_mask[None, :]
+                    val = tl.load(src, mask=read_mask, other=0.0).to(tl.float32)
+                    vmin = tl.min(val, axis=0)
+                    vmax = tl.max(val, axis=0)
+                    vsum = tl.sum(val, axis=0)
+                    p_base = ((layer * MAX_REQ + req_id) * KT_CAP * HK * DIM_NUMEL
+                              + blk * HK * DIM_NUMEL + kv * DIM_NUMEL + offs_d)
+                    tl.store(P_MIN + p_base, vmin.to(P_MIN.dtype.element_ty), mask=dim_mask)
+                    tl.store(P_MAX + p_base, vmax.to(P_MAX.dtype.element_ty), mask=dim_mask)
+                    tl.store(P_SUM + p_base, vsum.to(P_SUM.dtype.element_ty), mask=dim_mask)
 
     @triton.jit
     def _nfa_page_stats_kernel(
@@ -98,7 +103,8 @@ if _has_triton():
         HK: tl.constexpr, HEAD_DIM: tl.constexpr,
         DIM_NUMEL: tl.constexpr, D_BLOCK: tl.constexpr, BS: tl.constexpr,
         KT_CAP: tl.constexpr, L: tl.constexpr, B: tl.constexpr,
-        BLOCKS_PER_PROGRAM: tl.constexpr,
+        BLOCKS_PER_PROGRAM: tl.constexpr, BLOCK_GROUPS: tl.constexpr,
+        BLOCK_GROUP_STRIDE: tl.constexpr,
         MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
     ):
         """稳态仅一个 program 更新最新块，全量重建按块组并行。"""
@@ -109,6 +115,7 @@ if _has_triton():
             MAX_BLOCKS=MAX_BLOCKS, PAGE=PAGE, HK=HK, HEAD_DIM=HEAD_DIM,
             DIM_NUMEL=DIM_NUMEL, D_BLOCK=D_BLOCK, BS=BS, KT_CAP=KT_CAP,
             L=L, B=B, BLOCKS_PER_PROGRAM=BLOCKS_PER_PROGRAM,
+            BLOCK_GROUPS=BLOCK_GROUPS, BLOCK_GROUP_STRIDE=BLOCK_GROUP_STRIDE,
             MAX_REQ=MAX_REQ, LAYER_OFFSET=LAYER_OFFSET)
 
     @triton.jit
@@ -618,7 +625,8 @@ if _has_triton():
         HK: tl.constexpr, HEAD_DIM: tl.constexpr,
         DIM_NUMEL: tl.constexpr, D_BLOCK: tl.constexpr, BS: tl.constexpr,
         KT_CAP: tl.constexpr, L: tl.constexpr, B: tl.constexpr,
-        BLOCKS_PER_PROGRAM: tl.constexpr,
+        BLOCKS_PER_PROGRAM: tl.constexpr, BLOCK_GROUPS: tl.constexpr,
+        BLOCK_GROUP_STRIDE: tl.constexpr,
         MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
         HQ: tl.constexpr, D: tl.constexpr, DQ: tl.constexpr,
         DQ_BLOCK: tl.constexpr, STATS_PROGRAMS: tl.constexpr,
@@ -669,6 +677,7 @@ if _has_triton():
                 MAX_BLOCKS=MAX_BLOCKS, PAGE=PAGE, HK=HK, HEAD_DIM=HEAD_DIM,
                 DIM_NUMEL=DIM_NUMEL, D_BLOCK=D_BLOCK, BS=BS, KT_CAP=KT_CAP,
                 L=L, B=B, BLOCKS_PER_PROGRAM=BLOCKS_PER_PROGRAM,
+                BLOCK_GROUPS=BLOCK_GROUPS, BLOCK_GROUP_STRIDE=BLOCK_GROUP_STRIDE,
                 MAX_REQ=MAX_REQ, LAYER_OFFSET=LAYER_OFFSET)
         else:
             _prepare_q_body(
@@ -1127,17 +1136,22 @@ def _page_stats_all_layers(cache, req_ids, n_layers, dims, bs, pad, lengths,
     p_min, p_max, p_sum = buffers
 
     blocks_per_program = 16
+    block_groups = triton.cdiv(kt_cap, blocks_per_program)
+    # 固定 4 路覆盖重建；稳态只有最新块 owner 工作，避免按 KT_CAP
+    # 启动大量读取元数据后立即退出的空 CTA。
+    stats_group_count = min(4, block_groups)
     stats_rows = m * hk
-    stats_programs = triton.cdiv(kt_cap, blocks_per_program) * stats_rows
+    stats_programs = stats_group_count * stats_rows
     if q_job is None:
         _fast_launch(workspace, ('page_stats', layer_offset), _nfa_page_stats_kernel,
-                     (triton.cdiv(kt_cap, blocks_per_program), stats_rows),
+                     (stats_group_count, stats_rows),
             kv_ptrs, block_table, lengths_t, active_req_t, valid_req_t, dims_t,
             stats_len, p_min, p_max, p_sum,
             MAX_BLOCKS=cache.max_blocks, PAGE=cache.geometry.page,
             HK=hk, HEAD_DIM=head_dim, DIM_NUMEL=dim_numel,
             D_BLOCK=triton.next_power_of_2(dim_numel), BS=bs,
             KT_CAP=kt_cap, L=l, B=b, BLOCKS_PER_PROGRAM=blocks_per_program,
+            BLOCK_GROUPS=block_groups, BLOCK_GROUP_STRIDE=stats_group_count,
             MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
             num_warps=4,
         )
@@ -1163,6 +1177,7 @@ def _page_stats_all_layers(cache, req_ids, n_layers, dims, bs, pad, lengths,
             HK=hk, HEAD_DIM=head_dim, DIM_NUMEL=dim_numel,
             D_BLOCK=triton.next_power_of_2(dim_numel), BS=bs,
             KT_CAP=kt_cap, L=l, B=b, BLOCKS_PER_PROGRAM=blocks_per_program,
+            BLOCK_GROUPS=block_groups, BLOCK_GROUP_STRIDE=stats_group_count,
             MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
             HQ=hq, D=d_full, DQ=dim_numel,
             DQ_BLOCK=triton.next_power_of_2(dim_numel),
