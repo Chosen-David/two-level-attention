@@ -1,5 +1,8 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-03
+- [ ] [TL-NFA-EAGER-REPLAY-ADMISSION-20261103] 限制整段 eager 计划重放为可重绑定的融合 Q/K/V 写入路径，避免 full 子空间等配置复用首步输入；主机回归通过，原生 GPU/Graph/性能验收待完成。([详情](task_details/TL-NFA-EAGER-REPLAY-ADMISSION-20261103.md))
+
 ## 2026-11-01
 - [x] [TL-STATIC-GATE-MAIN-20261101] 静态 near/far gate 接入 main，GLM 静态 artifact 随仓发布；Qwen3-8B 远端动态标定→freeze→decode 烟测通过。([详情](task_details/TL-STATIC-GATE-MAIN-20261101.md))
 
