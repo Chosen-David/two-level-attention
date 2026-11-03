@@ -847,3 +847,9 @@
 - 修复后 Graph 完整生产单跑：steady TPOT=10.415792 ms，相对 iter97 的 10.420880 ms 仅降低 0.005088 ms，说明删除空 CTA 在正确工作口径下几乎没有收益；不更新正式最佳，未达到 2×。
 - 证据：`/tmp/ruler32k_iter99_128_graph.json`、`/tmp/iter99_graph_stdout.log`、`/tmp/iter99_graph_gpu0_hygiene.log`；token identity 在本条提交后核对，不提前宣称通过。
 - 补充验收：iter97 Graph 与 iter99 Graph 已确认 128/128 token 完全一致，first_divergence=None。iter99 eager 完整生产单跑 steady TPOT=25.560336 ms、graph_replays=0；同路径相对 iter97 eager 的 25.443088 ms 属于 host 波动，不宣称改善或回退，仍待 ABBA。eager receipt/stdout/hygiene 为 `/tmp/ruler32k_iter99_128_eager.json`、`/tmp/iter99_eager_stdout.log`、`/tmp/iter99_eager_gpu0_hygiene.log`。最终 token identity：iter97 eager ↔ iter99 eager 为 128/128，iter99 eager ↔ iter99 Graph 为 128/128，两项 first_divergence 均为 None；iter99 正确性门全部通过。
+
+## Iter 100：B1 gather 每 CTA 两个 query head（微基准回退）
+
+- 假设：当前 B1 每 CTA 一个 query head，同 KV group 的四个 CTA 重读 K/V；改为每 CTA 两个 head，Grid 从 32 降为 16，试图在占用与 K/V 复用间折中。通用 kernel 改为按 `HEADS_PER_PROGRAM` 计算 head base/KV head，逐 head online-softmax 循环和 tile 数值路径不变。
+- 真实生产形状微基准 `[T=1,HQ=32,HKV=8,D=128]`、MAX_VISIBLE=1280、visible=1156、BT=128、8 warps：修改前 1/4 heads-per-CTA Graph 分别 0.034608/0.034922 ms；修改后 1/2/4 分别 0.034731/0.034951/0.034990 ms，三种配置 eager 与 Graph 输出均逐位一致。2-head 相对同 run 1-head 慢约 0.63%，按 36 层估计无端到端收益，拒绝候选并恢复 iter99 的 1-head 生产分派。
+- 证据：`/tmp/iter100_gather_{baseline,candidate}.log` 与对应 GPU1 hygiene；该算子微基准不包含 selector、其他模型层或 host，不外推为 TPOT。保留独立 `benchmark_nfa_gather_head_tile.py` 便于后续配置复验。
