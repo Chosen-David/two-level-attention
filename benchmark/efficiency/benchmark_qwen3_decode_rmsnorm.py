@@ -88,10 +88,10 @@ def run_bitexact(dev, verbose=True):
         arms = [
             (f"{name} input_layernorm  (1,1,{hidden})", (1, 1, hidden), hidden),
             (f"{name} post_attn_norm   (1,1,{hidden})", (1, 1, hidden), hidden),
-            (f"{name} q_norm           (1,{qh},1,{hd})", (1, qh, 1, hd), hd),
-            (f"{name} k_norm           (1,{kvh},1,{hd})", (1, kvh, 1, hd), hd),
+            (f"{name} q_norm           (1,1,{qh},{hd})", (1, 1, qh, hd), hd),
+            (f"{name} k_norm           (1,1,{kvh},{hd})", (1, 1, kvh, hd), hd),
             (f"{name} batched norm     (4,1,{hidden})", (4, 1, hidden), hidden),
-            (f"{name} batched q_norm   (4,{qh},1,{hd})", (4, qh, 1, hd), hd),
+            (f"{name} batched q_norm   (4,1,{qh},{hd})", (4, 1, qh, hd), hd),
         ]
         for label, shape, n in arms:
             seed += 1
@@ -187,8 +187,8 @@ def run_patch_test(dev):
     for sub, shape, n in [
         ("input_layernorm", (1, 1, hidden), hidden),
         ("post_attention_layernorm", (1, 1, hidden), hidden),
-        ("q_norm", (1, qh, 1, head_dim), head_dim),
-        ("k_norm", (1, kvh, 1, head_dim), head_dim),
+        ("q_norm", (1, 1, qh, head_dim), head_dim),
+        ("k_norm", (1, 1, kvh, head_dim), head_dim),
     ]:
         x, _ = _make_inputs(shape, n, dev, seed=7)
         mod = getattr(model.layers[0], sub) if sub in (
@@ -262,6 +262,23 @@ def run_graph_test(dev):
     ok2 = torch.equal(static_out2, ref3)
     results.append(("graph capture/replay(patched module) 逐位一致", ok2))
     print(f"  [graph {'PASS' if ok2 else 'FAIL'}] patched module capture+replay")
+
+    # —— 4c. 生产 Q/K norm 的 pre-transpose 几何 (B,1,H,D) ——
+    static_q, q_w = _make_inputs((1, 1, 32, 128), 128, dev, seed=14)
+    for _ in range(3):
+        fused_rmsnorm_decode(static_q, q_w, eps)
+    torch.cuda.synchronize()
+    g3 = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(g3):
+        static_q_out = fused_rmsnorm_decode(static_q, q_w, eps)
+    q_x2, _ = _make_inputs((1, 1, 32, 128), 128, dev, seed=15)
+    static_q.copy_(q_x2)
+    g3.replay()
+    torch.cuda.synchronize()
+    ok3 = torch.equal(static_q_out, hf_reference_forward(q_x2, q_w, eps))
+    results.append(("graph capture/replay(Q/K pre-transpose) 逐位一致", ok3))
+    print(f"  [graph {'PASS' if ok3 else 'FAIL'}] Q/K pre-transpose capture+replay")
+
     unregister_rmsnorm_patch(model)
     return [ok for _, ok in results]
 
@@ -329,8 +346,8 @@ def run_perf(dev, iters):
     for name, hidden, qh, kvh, hd, eps in MODEL_SHAPES:
         for label, shape, n in [
             (f"{name} norm (1,1,{hidden})", (1, 1, hidden), hidden),
-            (f"{name} q_norm (1,{qh},1,{hd})", (1, qh, 1, hd), hd),
-            (f"{name} k_norm (1,{kvh},1,{hd})", (1, kvh, 1, hd), hd),
+            (f"{name} q_norm (1,1,{qh},{hd})", (1, 1, qh, hd), hd),
+            (f"{name} k_norm (1,1,{kvh},{hd})", (1, 1, kvh, hd), hd),
         ]:
             x, w = _make_inputs(shape, n, dev, seed=31)
             t_hf = _bench_fn(lambda: hf_reference_forward(x, w, eps), iters)

@@ -783,3 +783,10 @@
 - FA2 对照画像：同一真实 decode step 的 self-device 合计 12.447703 ms，其中 `flash_fwd_splitkv` 4.185024 ms、combine 0.294814 ms。NFA 的 gather attention 相对这两核少约 3.456 ms，但额外支付约 2.834 ms selector；画像 run 的 TPOT 只作定位，不作干净 verdict。
 - RMSNorm 实际覆盖：`torch.mean` 145 calls，而 `_square_fp32_kernel`/`_norm_scale_kernel` 各 73 calls，说明只有 decoder 两级 norm×36+final norm 共 73 个实例进入三 kernel，Q/K norm 的 72 个实例因真实非连续布局仍回退 HF；下一轮候选必须按真实 strides 逐级对拍。
 - 画像证据：`iter92_profile/` 下 NFA/FA2 结构化日志、Chrome trace、receipt、采集脚本和 GPU hygiene。
+
+## Iter 93：覆盖生产 Q/K norm 的 pre-transpose 几何
+
+- 归因修正：Q/K norm 在 `qwen3_attn_forward` 中先于 transpose 调用，真实输入是连续的 `(B,1,H,D)`；Iter 92 补充画像中“因非连续布局回退”的判断不准确，实际原因是旧 gate 只接受 `shape[-2]==1`，而此处 `shape[-2]=H`。本轮仅新增四维 `shape[1]==1` 的 decode 几何，不做非连续 stride 泛化。
+- 微基准正确性：Qwen3-8B/32B/30B-A3B 的真实 Q/K `(1,1,H,128)` 与 B4 几何共 18 组 square/mean/out 逐级位型一致；gate 4/4、patch 7/7、Graph capture/replay 3/3 通过，新增 Q/K pre-transpose 图重放对拍。
+- eager wrapper 信号：九种 shape 的 HF/候选仅 0.74–0.75×，再次确认该实现不能用于 eager；生产继续由 Iter 92 开关保证仅 Graph 注册。此数字只用于否定 eager 外壳，不作为 Graph 收益结论。
+- 原始证据：pc40 `/tmp/iter93_rmsnorm_micro.log` 与 `iter93_rmsnorm_micro_gpu0_hygiene.log`，待随生产结果归档。下一步必须跑完整 Graph 128-token identity/TPOT，并复核生产 kernel 调用数是否由 73/145 变为 145/145。

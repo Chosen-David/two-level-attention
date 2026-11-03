@@ -52,8 +52,9 @@ HF 原文（modeling_qwen3.py L59-64）：
 ==========================================================================
 约束（与用户 iter91 指令一致）
 ==========================================================================
-  - 仅 `seq_len == 1` 的 decode（gate: shape[-2] == 1 且 BF16 且 CUDA 且
-    contiguous）走融合；prefill / 其它 dtype / 布局回退 HF 原 forward；
+  - 仅 `seq_len == 1` 的 decode（BF16、CUDA、contiguous）走融合；
+    decoder norm 几何为 (B,1,H)，Q/K norm 在 attention patch 中的真实
+    pre-transpose 几何为 (B,1,num_heads,D)；prefill/其它布局回退 HF；
   - 覆盖 Q/K norm（head_dim=128，行数 = B*num_heads）与 decoder 两层 norm
     （hidden_size，行数 = B）；不含 residual / RoPE / GEMM；
   - Graph capture 安全：无 .item()/host sync/数据依赖分支；grid 由静态
@@ -189,8 +190,9 @@ def is_fusable(hidden_states: torch.Tensor, weight: torch.Tensor) -> bool:
 
     判据（全部为元数据判断，无 host sync，graph capture 安全）：
       - 输入至少 2 维且最后一维 == weight.numel()
-      - shape[-2] == 1：decoder norm (B,1,H) 与 Q/K norm (B,H,1,D) 均命中，
-        prefill (B,T>1,H) 不命中 → 回退
+      - decoder norm (B,1,H) 的 shape[-2]==1；attention patch 在 transpose
+        前调用 Q/K norm，其真实几何是 (B,1,H,D)，故四维时以 shape[1]==1
+        判定 seq_len==1。两种几何均可零拷贝 view 成 (rows,N)。
       - x / weight 均 BF16（Qwen3 生产 dtype）且 CUDA 且 contiguous
       - N <= 8192（BLOCK 寄存器预算保护）
     """
@@ -198,7 +200,9 @@ def is_fusable(hidden_states: torch.Tensor, weight: torch.Tensor) -> bool:
         return False
     if hidden_states.dim() < 2:
         return False
-    if hidden_states.shape[-2] != 1:  # 仅 seq_len==1 decode
+    is_decode = hidden_states.shape[-2] == 1 or (
+        hidden_states.dim() == 4 and hidden_states.shape[1] == 1)
+    if not is_decode:
         return False
     n = weight.numel()
     if hidden_states.shape[-1] != n:

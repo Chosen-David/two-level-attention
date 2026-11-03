@@ -7,7 +7,7 @@ MethodType 注入约定）。
 可完整撤销。
 
 覆盖范围（一个 Qwen3 模型内的全部 Qwen3RMSNorm 实例）：
-  - 每层 attention 的 `q_norm` / `k_norm`（head_dim=128，输入 (B, H, 1, D)）
+  - 每层 attention 的 `q_norm` / `k_norm`（head_dim=128，pre-transpose 输入 (B,1,H,D)）
   - 每层 decoder 的 `input_layernorm` / `post_attention_layernorm`（(B, 1, H)）
   - 末层 `model.norm`（同为 (B, 1, H)，语义一致顺带覆盖）
 预期实例数 = num_hidden_layers * 4 + 1（如 8B 为 36*4+1=145）。
