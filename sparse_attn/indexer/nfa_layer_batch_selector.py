@@ -248,8 +248,9 @@ if _has_triton():
         HK: tl.constexpr, HEAD_DIM: tl.constexpr, DIM_NUMEL: tl.constexpr,
         D_BLOCK: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
         TILE: tl.constexpr, MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
+        PACK_KEY: tl.constexpr,
     ):
-        """按 tile 并行计算 grouped-Q 的单次 BF16 Logits。"""
+        """按 tile 并行计算 grouped-Q 的 BF16 Logits 或有序 packed key。"""
         row = tl.program_id(0)
         t = tl.program_id(1)
         m = row // HKV
@@ -296,14 +297,28 @@ if _has_triton():
             Q + m * stride_qm + kv * stride_qh + offs_d,
             mask=dim_mask, other=0.0)
         score = tl.sum(k.to(tl.float32) * q[None, :], axis=1)
-        score = score.to(tl.bfloat16).to(tl.float32)
+        score_bf16 = score.to(tl.bfloat16)
+        score = score_bf16.to(tl.float32)
         good = (unique & lp_valid
                 & (cand >= tl.load(LOW + m))
                 & (cand < tl.load(HIGH + m))
                 & (tl.load(QUOTA + m) > 0)
                 & (score == score))
         score = tl.where(good, score, float("-inf"))
-        tl.store(LOGITS + row * R + offs_r, score.to(tl.bfloat16), mask=mask_r)
+        if PACK_KEY:
+            # 与原 partial Top-K 完全相同的 signed-BF16 ordered key 和
+            # 同分新 token 优先编码；无效项统一为最小 int32 key。
+            bits = score_bf16.to(tl.uint16, bitcast=True).to(tl.int32) & 0xFFFF
+            negative = (bits & 0x8000) != 0
+            ordered = tl.where(
+                negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
+            packed_good = good & (score != float("-inf"))
+            delta = S - cand.to(tl.int32)
+            invalid = -32768 << 16
+            key = tl.where(packed_good, (ordered << 16) + delta, invalid)
+            tl.store(LOGITS + row * R + offs_r, key, mask=mask_r)
+        else:
+            tl.store(LOGITS + row * R + offs_r, score.to(tl.bfloat16), mask=mask_r)
 
     @triton.jit
     def _finish_sorted_logits_key(
@@ -473,31 +488,17 @@ if _has_triton():
 
     @triton.jit
     def _nfa_filtered_topk_partial_kernel(
-        LOGITS, CAND, LOW, HIGH, QUOTA, PARTIAL, R,
+        LOGITS, PARTIAL, R,
         TILE: tl.constexpr, NTILES: tl.constexpr,
         S: tl.constexpr, K: tl.constexpr, META_GROUP: tl.constexpr,
     ):
-        """每个 tile 保留局部 K 项；全局 K 项必然包含在这些局部结果中。"""
+        """直接对 fine-score 阶段生成的 packed key 做局部 Top-K。"""
         h = tl.program_id(0)
         tile = tl.program_id(1)
-        b = 0 if META_GROUP == 0 else h // META_GROUP
         offs = tile * TILE + tl.arange(0, TILE)
         mask = offs < R
-        token = tl.load(CAND + h * R + offs, mask=mask, other=0).to(tl.int32)
-        logits = tl.load(LOGITS + h * R + offs, mask=mask,
-                         other=float("-inf"))
-        score = logits.to(tl.float32)
-        good = (mask & (token >= tl.load(LOW + b))
-                & (token < tl.load(HIGH + b))
-                & (tl.load(QUOTA + b) > 0)
-                & (score == score) & (score != float("-inf")))
-        bits = logits.to(tl.uint16, bitcast=True).to(tl.int32) & 0xFFFF
-        negative = (bits & 0x8000) != 0
-        ordered = tl.where(
-            negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
-        delta = S - token
         invalid = -32768 << 16
-        key = tl.where(good, (ordered << 16) + delta, invalid)
+        key = tl.load(LOGITS + h * R + offs, mask=mask, other=invalid)
         if K == 1:
             key = tl.max(key, axis=0, keep_dims=True)
         else:
@@ -1081,7 +1082,7 @@ def _fused_fine_scores_paged(
         cache, req_ids, n_layers, dims, q_fine, cand_idx2, keep2, owners,
         generations, capacity, lower, upper, quota,
         tile=128, num_warps=4, layer_offset=0, workspace=None):
-    """Candidate gather -> paged K load -> grouped-Q BF16 Logits。"""
+    """Candidate gather -> paged K load -> grouped-Q BF16 Logits/packed key。"""
     if not _has_triton():
         raise FallbackRequired("Triton unavailable")
     layer0 = cache.layers[0]
@@ -1095,8 +1096,10 @@ def _fused_fine_scores_paged(
 
     valid_req_t = (req_ids if torch.is_tensor(req_ids) else
                    torch.as_tensor(req_ids, dtype=torch.int64, device=device))
+    pack_key = capacity < 65536
     logits = _workspace_empty(
-        workspace, 'fine_logits', (m, hkv, r), torch.bfloat16, device)
+        workspace, 'fine_logits', (m, hkv, r),
+        torch.int32 if pack_key else torch.bfloat16, device)
     kv_ptrs = cache.layer_kv_ptrs_buf[
         layer_offset:layer_offset + n_layers]
     _fast_launch(workspace, ('fine_logits', layer_offset),
@@ -1112,6 +1115,7 @@ def _fused_fine_scores_paged(
         D_BLOCK=triton.next_power_of_2(dims.numel()),
         HKV=hkv, B=b, TILE=tile,
         MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
+        PACK_KEY=pack_key,
         num_warps=num_warps,
     )
     return logits
@@ -1134,7 +1138,7 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
             torch.int32, logits.device)
         _fast_launch(workspace, ('filtered_topk_partial', layer_offset),
                      _nfa_filtered_topk_partial_kernel, (m * hkv, ntiles),
-            logits, cand_idx2, lower, upper, quota, partial, r,
+            logits, partial, r,
             TILE=tile, NTILES=ntiles,
             S=capacity, K=width, META_GROUP=hkv,
             num_warps=8,

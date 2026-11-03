@@ -731,3 +731,10 @@
 - 验证：在 pc40 GPU0 的隔离 worktree 中运行真实生产 shape `[1,8,8320]`、K=1024 对拍；起跑前 used<500 MiB，并有 30 秒旁路监控。
 - 正确性：Iter 85 可编译运行，但最终 indices 有 7949/8192（97.0%）元素与原单 CTA 参考不一致，最大绝对差 32697；脚本在断言处停止，未执行延迟测量。
 - 判决：配对归并改变了选择结果，不能进入生产或真实模型验收。主线继续保持 Iter 86 恢复后的 Iter 81 精确源码；后续若重试必须逐轮检查五路有序 run 的覆盖、反转和最后一轮索引映射。
+
+## Iter 88：fine-score 直接生成 packed Top-K key
+
+- 修改：16-bit token key 几何下，fine-score kernel 直接写 packed int32 key；partial Top-K 不再重读候选 ID、范围、quota 或重做 BF16 ordered-key 位变换。64K/128K 保留原 BF16 logits 路径。
+- 验证：pc40 GPU0 隔离 worktree，真实生产 shape `[1,8,8320]`、K=1024；起跑前 used=1 MiB 且无 compute apps。最终 indices 与 counts 全部 bit-exact。
+- 微基准：原单 CTA reference 0.230609 ms，候选 partial+merge 0.028474 ms，reference/candidate=8.098947×；相对 Iter 81 的 0.038990 ms 降低 26.97%（约 1.369×）。
+- 边界：该微基准不包含 fine-score 新增打包工作，不能据此宣称生产 TPOT 同幅改善；下一步必须跑完整 NFA eager/Graph token identity 与 TPOT。
