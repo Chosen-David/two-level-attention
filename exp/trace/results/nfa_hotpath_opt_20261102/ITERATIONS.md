@@ -779,3 +779,7 @@
 - 生产正确性：iter92 eager 与 iter90 eager、iter92 Graph 与 iter91 Graph、iter92 eager 与 Graph 的 128/128 token 全部一致。eager 日志无 RMSNorm 注册行，Graph 日志有完整注册行，证明执行口径隔离真实生效。
 - 当前边界：FA2/NFA 为 eager 0.957725×、Graph 1.127828×；eager 仍慢于 FA2，Graph 仅快约 12.78%，双口径均未达到 2×。本轮建立的是“两种执行各自最佳已知路径”，仍需 Graph ABBA 和新的实质性优化。
 - 原始证据：`ruler32k_iter92_128_{eager,graph}.json`、`iter92_production_{eager,graph}.log`、`iter92_production_gpu0_hygiene.log`。
+- 独立单步画像：NFA Graph 第 4 个完整 `GraphRunner.step` 的 self-device 合计 10.669 ms，其中 selector 2.833927 ms、gather 1.024 ms、skinny GEMM 与 split-K reduce 约 4.6928 ms；即使把 selector+gather 全部清零仍约 6.811 ms，高于当前 Graph 2× 门槛约 6.298 ms，因此后续必须同时降低 selector 与公共模型路径。该分解不是任意实现下的物理下界。
+- FA2 对照画像：同一真实 decode step 的 self-device 合计 12.447703 ms，其中 `flash_fwd_splitkv` 4.185024 ms、combine 0.294814 ms。NFA 的 gather attention 相对这两核少约 3.456 ms，但额外支付约 2.834 ms selector；画像 run 的 TPOT 只作定位，不作干净 verdict。
+- RMSNorm 实际覆盖：`torch.mean` 145 calls，而 `_square_fp32_kernel`/`_norm_scale_kernel` 各 73 calls，说明只有 decoder 两级 norm×36+final norm 共 73 个实例进入三 kernel，Q/K norm 的 72 个实例因真实非连续布局仍回退 HF；下一轮候选必须按真实 strides 逐级对拍。
+- 画像证据：`iter92_profile/` 下 NFA/FA2 结构化日志、Chrome trace、receipt、采集脚本和 GPU hygiene。
