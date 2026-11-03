@@ -691,3 +691,10 @@
 - 完整回归与生产身份：selector/cache/GraphRunner 35/35 通过；真实 Qwen eager/Graph 16/16 token 均与 Iter 80 完全一致，且两种 execution 一致。
 - 生产 16-token TPOT：eager median/steady 25.845119/25.793744 ms，Graph 12.505600/12.462192 ms。Graph 相对 Iter 80 steady 14.123424 ms 改善约 11.77%，相对原 baseline 23.588048 ms 为 **1.893x**；首次在该 16-token 迭代口径略快于 FA2 Graph steady 12.602576 ms（约 1.13%），但不是最终 ABBA/128-token 验收。
 - 判决：保留为当前最佳正确实现。Graph 已出现超过 FA2 的早期信号；eager 25.793744 ms 仍慢于 FA2 23.725280 ms，继续优化 eager host/launch 与剩余设备热点。
+
+## Iter 82：1024-token 最小 tile 回退
+
+- 修改：将 partial tile 从 2048 降为最小合法值 1024；局部 Top-K 退化为整 tile 排序，同时有序归并需顺序处理 9 条 run。
+- 正确性：合成同分/quota/无效候选直接对拍 1/1 通过，微基准 indices/counts bit-exact。
+- 算子微基准：原实现 0.230508 ms，候选 0.042952 ms，**5.367x**；比 Iter 81 的 0.038990 ms 慢约 10.2%。
+- 判决：直接恢复 `tile=2048`，不进入完整生产验收；更多 run 的有序归并成本超过小 partial 的收益。
