@@ -705,3 +705,9 @@
 - 正确性：真实生产 shape `[1,8,8320]`、K=1024 的独立 paged-K 微基准中，融合前后最终 indices/counts bit-exact。
 - 算子微基准：原 fine + partial + merge 为 0.078129 ms，融合 + merge 为 0.122961 ms，候选慢约 57.4%（speedup 0.635x）。融合将 fine 的 65 路 tile 并行降为 5 路，并扩大单 CTA 点积/寄存器压力，节省的 launch 与中间流量不足以补偿。
 - 判决：不进入完整生产验收；恢复 Iter 81 的 fine/partial 分离路径。后续融合需保持细粒度并行或选择更小生产者 tile，不能沿用本次大 tile 直接融合。
+
+## Iter 84：五路配对归并的 static_range 编译失败
+
+- 修改：针对生产 `NTILES=5`，尝试同时归并 run (0,1) 与 (2,3)，再顺序归并配对结果和 run 4，将四轮归并降为三轮；其余 run 数保留 Iter 81 路径。
+- 结果：Triton 编译失败，`first_group` 经 constexpr 分支赋值后被视为 `int32[]`，不能作为 `tl.static_range(first_group, NTILES)` 的起点；尚未进入对拍或计时。
+- 判决：记录为失败迭代。下一轮将 `NTILES=5` 的最后一轮直接展开，通用路径保留独立 `static_range(1, NTILES)`，消除非常量起点。

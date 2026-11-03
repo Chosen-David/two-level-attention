@@ -306,80 +306,6 @@ if _has_triton():
         tl.store(LOGITS + row * R + offs_r, score.to(tl.bfloat16), mask=mask_r)
 
     @triton.jit
-    def _nfa_fine_topk_partial_kernel(
-        KV_PTRS, BLOCK_TABLE, VALID_REQ, DIMS, Q, CAND, KEEP, OWNERS,
-        GENERATIONS, LOW, HIGH, QUOTA, KV_REF, PARTIAL, R,
-        stride_qm, stride_qh, stride_ch, stride_cr,
-        S: tl.constexpr, MAX_BLOCKS: tl.constexpr, PAGE: tl.constexpr,
-        HK: tl.constexpr, HEAD_DIM: tl.constexpr, DIM_NUMEL: tl.constexpr,
-        D_BLOCK: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
-        TILE: tl.constexpr, NTILES: tl.constexpr, K: tl.constexpr,
-        MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
-    ):
-        """直接由 paged K 生成局部 Top-K，避免物化整行 BF16 Logits。"""
-        row = tl.program_id(0)
-        tile = tl.program_id(1)
-        m = row // HKV
-        kv = row % HKV
-        layer = m // B
-        req = m % B
-        req_id = tl.load(VALID_REQ + req).to(tl.int32)
-        kv_addr = tl.load(KV_PTRS + layer)
-        kv_ptr = kv_addr.to(tl.pointer_type(KV_REF.dtype.element_ty))
-        offs_d = tl.arange(0, D_BLOCK)
-        dim_mask = offs_d < DIM_NUMEL
-        dim = tl.load(DIMS + offs_d, mask=dim_mask, other=0).to(tl.int64)
-        offs_r = tile * TILE + tl.arange(0, TILE)
-        mask_r = offs_r < R
-        keep = tl.load(KEEP + row * stride_ch + offs_r * stride_cr,
-                       mask=mask_r, other=False)
-        read_r = mask_r & keep
-        cand = tl.load(CAND + row * stride_ch + offs_r * stride_cr,
-                       mask=read_r, other=0)
-        in_range = (cand >= 0) & (cand < S)
-        owner = tl.load(OWNERS + row * S + cand,
-                        mask=read_r & in_range, other=-1)
-        generation = tl.load(GENERATIONS + row)
-        unique = read_r & in_range & (owner == generation * R + offs_r)
-        safe = tl.where(read_r, cand, 0)
-        lp = safe // PAGE
-        off = safe % PAGE
-        lp_valid = lp < MAX_BLOCKS
-        phys = tl.load(
-            BLOCK_TABLE + (layer + LAYER_OFFSET) * MAX_REQ * MAX_BLOCKS
-            + req_id * MAX_BLOCKS + lp,
-            mask=read_r & lp_valid, other=0).to(tl.int64)
-        src = (kv_ptr
-               + phys[:, None] * HK * PAGE * HEAD_DIM
-               + kv * PAGE * HEAD_DIM
-               + off[:, None] * HEAD_DIM
-               + dim[None, :])
-        k = tl.load(
-            src, mask=(read_r & lp_valid)[:, None] & dim_mask[None, :],
-            other=0.0)
-        q = tl.load(Q + m * stride_qm + kv * stride_qh + offs_d,
-                    mask=dim_mask, other=0.0)
-        score = tl.sum(k.to(tl.float32) * q[None, :], axis=1)
-        logits = score.to(tl.bfloat16)
-        score = logits.to(tl.float32)
-        good = (unique & lp_valid
-                & (cand >= tl.load(LOW + m))
-                & (cand < tl.load(HIGH + m))
-                & (tl.load(QUOTA + m) > 0)
-                & (score == score) & (score != float("-inf")))
-        bits = logits.to(tl.uint16, bitcast=True).to(tl.int32) & 0xFFFF
-        negative = (bits & 0x8000) != 0
-        ordered = tl.where(
-            negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
-        invalid = -32768 << 16
-        key = tl.where(good, (ordered << 16) + S - cand, invalid)
-        if K == 1:
-            key = tl.max(key, axis=0, keep_dims=True)
-        else:
-            key = tl.topk(key, K)
-        tl.store(PARTIAL + (row * NTILES + tile) * K + tl.arange(0, K), key)
-
-    @triton.jit
     def _finish_sorted_logits_key(
         h, key, LOW, HIGH, QUOTA, OUT, COUNT,
         S: tl.constexpr, K: tl.constexpr, SINK: tl.constexpr,
@@ -599,8 +525,44 @@ if _has_triton():
             i = tl.arange(0, K)
             pair = tl.arange(0, 2 * K)
             rank = tl.where(pair < K, pair, 2 * K - 1 - pair)
-            key = tl.load(PARTIAL + h * NTILES * K + i)
-            for group in tl.static_range(1, NTILES):
+            if NTILES == 5:
+                # 同时归并 (0,1) 与 (2,3)，随后归并两条结果和 run 4；
+                # 三轮归并替代四次顺序归并，段内 xor 不会跨越 K 边界。
+                wide = tl.arange(0, 4 * K)
+                local = wide % (2 * K)
+                segment = wide // (2 * K)
+                source_run = 2 * segment + (local >= K)
+                source_idx = tl.where(local < K, local, 2 * K - 1 - local)
+                value = tl.load(
+                    PARTIAL + (h * NTILES + source_run) * K + source_idx)
+                peer = tl.gather(value, wide ^ K, axis=0)
+                value = tl.where(
+                    local < K, tl.maximum(value, peer), tl.minimum(value, peer))
+                two = tl.arange(0, 2 * K)
+                retained_pos = two + (two // K) * K
+                key2 = tl.gather(value, retained_pos, axis=0)
+                for bit in tl.static_range(LOG2_K - 1, -1, -1):
+                    stride = 1 << bit
+                    peer = tl.gather(key2, two ^ stride, axis=0)
+                    key2 = tl.where(
+                        (two & stride) == 0,
+                        tl.maximum(key2, peer), tl.minimum(key2, peer))
+                value = tl.gather(key2, rank, axis=0)
+                peer = tl.gather(value, pair ^ K, axis=0)
+                value = tl.where(
+                    pair < K, tl.maximum(value, peer), tl.minimum(value, peer))
+                key = tl.gather(value, i, axis=0)
+                for bit in tl.static_range(LOG2_K - 1, -1, -1):
+                    stride = 1 << bit
+                    peer = tl.gather(key, i ^ stride, axis=0)
+                    key = tl.where(
+                        (i & stride) == 0,
+                        tl.maximum(key, peer), tl.minimum(key, peer))
+                first_group = 4
+            else:
+                key = tl.load(PARTIAL + h * NTILES * K + i)
+                first_group = 1
+            for group in tl.static_range(first_group, NTILES):
                 incoming = tl.load(
                     PARTIAL + (h * NTILES + group) * K + rank)
                 retained = tl.gather(key, rank, axis=0)
@@ -1191,52 +1153,6 @@ def _fused_fine_scores_paged(
     return logits
 
 
-def _fused_fine_topk_paged(
-        cache, req_ids, n_layers, dims, q_fine, cand_idx2, keep2, owners,
-        generations, capacity, lower, upper, quota, width, sink,
-        layer_offset=0, workspace=None):
-    """融合 paged fine score 与局部 Top-K，并复用标准有序归并。"""
-    layer0 = cache.layers[0]
-    device = layer0.kv_pool_k.device
-    hk = layer0.num_kv_heads
-    head_dim = layer0.head_dim_k
-    b = req_ids.numel() if torch.is_tensor(req_ids) else len(req_ids)
-    m, hkv, r = cand_idx2.shape
-    valid_req_t = (req_ids if torch.is_tensor(req_ids) else
-                   torch.as_tensor(req_ids, dtype=torch.int64, device=device))
-    tile = 2048
-    ntiles = triton.cdiv(r, tile)
-    partial = _workspace_empty(
-        workspace, 'filtered_topk_partial', (m, hkv, ntiles, width),
-        torch.int32, device)
-    kv_ptrs = cache.layer_kv_ptrs_buf[layer_offset:layer_offset + n_layers]
-    _fast_launch(
-        workspace, ('fine_topk_partial', layer_offset),
-        _nfa_fine_topk_partial_kernel, (m * hkv, ntiles),
-        kv_ptrs, cache.block_table_buf, valid_req_t, dims, q_fine, cand_idx2,
-        keep2, owners, generations, lower, upper, quota, layer0.kv_pool_k,
-        partial, r,
-        stride_qm=q_fine.stride(0), stride_qh=q_fine.stride(1),
-        stride_ch=cand_idx2.stride(1), stride_cr=cand_idx2.stride(2),
-        S=capacity, MAX_BLOCKS=cache.max_blocks, PAGE=cache.geometry.page,
-        HK=hk, HEAD_DIM=head_dim, DIM_NUMEL=dims.numel(),
-        D_BLOCK=triton.next_power_of_2(dims.numel()), HKV=hkv, B=b,
-        TILE=tile, NTILES=ntiles, K=width, MAX_REQ=cache.max_requests,
-        LAYER_OFFSET=layer_offset, num_warps=8)
-    out = _workspace_empty(
-        workspace, 'middle_indices', (m, hkv, width), torch.int32, device)
-    count = _workspace_empty(
-        workspace, 'middle_counts', (m, hkv), torch.int32, device)
-    _fast_launch(
-        workspace, ('filtered_topk_merge', layer_offset),
-        _nfa_filtered_topk_merge_kernel, (m * hkv,),
-        partial, lower, upper, quota, out, count,
-        NTILES=ntiles, MERGE_PAD=triton.next_power_of_2(ntiles * width),
-        LOG2_K=width.bit_length() - 1, S=capacity, K=width, SINK=sink,
-        META_GROUP=hkv, TOKEN_BITS=16, num_warps=8)
-    return TokenSelection(out, count)
-
-
 def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
                        sink, layer_offset=0, workspace=None):
     """将 grouped-Q Logits 直接转换为 canonical ``TokenSelection``。"""
@@ -1741,22 +1657,15 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
 
     # ---- grouped-Q Logits + signed packed-key Top-K ----------------------
     width = 1024
-    if s_cap < 65536:
-        middle = _fused_fine_topk_paged(
-            cache, valid_req_t, n_layers, dims, b_q_fine,
-            cand_idx2, keep2, owners, generations, s_cap, lower, upper, quota,
-            width, sink=int(indexer.sink_tokens), layer_offset=layer_offset,
-            workspace=workspace)
-    else:
-        logits = _fused_fine_scores_paged(
-            cache, valid_req_t, n_layers, dims, b_q_fine,
-            cand_idx2, keep2, owners, generations, s_cap, lower, upper, quota,
-            tile=128, num_warps=1 if capturing else 4,
-            layer_offset=layer_offset, workspace=workspace)
-        middle = _nfa_filtered_topk(
-            logits, cand_idx2, lower, upper, quota, s_cap, width,
-            sink=int(indexer.sink_tokens), layer_offset=layer_offset,
-            workspace=workspace)
+    logits = _fused_fine_scores_paged(
+        cache, valid_req_t, n_layers, dims, b_q_fine,
+        cand_idx2, keep2, owners, generations, s_cap, lower, upper, quota,
+        tile=128, num_warps=1 if capturing else 4,
+        layer_offset=layer_offset, workspace=workspace)
+    middle = _nfa_filtered_topk(
+        logits, cand_idx2, lower, upper, quota, s_cap, width,
+        sink=int(indexer.sink_tokens), layer_offset=layer_offset,
+        workspace=workspace)
 
     # ---- final canonical union + physical mapping ------------------------
     # 每个 KV group 独立合并 middle、保护集与 seed，并按真实 request slot 写回。
