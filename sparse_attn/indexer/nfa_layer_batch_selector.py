@@ -1306,7 +1306,8 @@ def _l1_scores(k_min, k_max, k_sum, b_q_full, group_size, indexer, dtype,
 
 def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
                             cache, valid_req, indexer, bs, capacity,
-                            layer_offset=0, workspace=None, fuse_topk=False):
+                            layer_offset=0, workspace=None, fuse_topk=False,
+                            parallel_expand=False):
     """直接生成 complete-pack 候选及过滤元数据，无 aten 中间张量。"""
     m, hkv, k_f = i_f.shape
     k_n = i_n.shape[-1]
@@ -1347,25 +1348,35 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
             K2=int(indexer.args.tia_level2_topk),
             HKV=hkv, B=b,
             MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset)
-        # Graph 的关键是 device time：Top-K/metadata 只由每行一个 CTA 完成，
-        # 相互独立的 candidate chunk 则在下一 kernel 并行展开。生产 R=8320、
-        # protected=132 时每行由 1 路串行 9 chunk 变为 9 路并行；多一次
-        # launch 换取更高 SM 覆盖，不改变任何排序、打分或去重语义。
-        _fast_launch(workspace, ('topk_candidate_prepare', layer_offset),
-                     _topk_candidate_prepare_kernel, (m * hkv,),
-            far_scored, near_scored, i_f, i_n, lengths_t,
-            cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
-            lower, upper, quota, owners, generations,
-            **common, num_warps=8)
-        _fast_launch(workspace, ('candidate_expand', layer_offset),
-                     _candidate_expand_batched_kernel,
-                     (m * hkv, triton.cdiv(width, 1024)),
-            i_f, i_n, far_scored, near_scored, lengths_t,
-            out, valid, owners, generations,
-            K_F=k_f, K_N=k_n, KT=far_scored.shape[-1],
-            R=r, HEAD=head, TAIL=tail, SINK=sink, SWA=swa, CAP=capacity,
-            SINK_POOL_LO=int(indexer._sink_pool_lo_blk), BS=bs,
-            HKV=hkv, B=b, num_warps=4)
+        if parallel_expand:
+            # Graph 的关键是 device time：Top-K/metadata 只由每行一个 CTA 完成，
+            # 相互独立的 candidate chunk 则在下一 kernel 并行展开。生产 R=8320、
+            # protected=132 时每行由 1 路串行 9 chunk 变为 9 路并行；多一次
+            # launch 换取更高 SM 覆盖，不改变任何排序、打分或去重语义。
+            _fast_launch(workspace, ('topk_candidate_prepare', layer_offset),
+                         _topk_candidate_prepare_kernel, (m * hkv,),
+                far_scored, near_scored, i_f, i_n, lengths_t,
+                cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
+                lower, upper, quota, owners, generations,
+                **common, num_warps=8)
+            _fast_launch(workspace, ('candidate_expand', layer_offset),
+                         _candidate_expand_batched_kernel,
+                         (m * hkv, triton.cdiv(width, 1024)),
+                i_f, i_n, far_scored, near_scored, lengths_t,
+                out, valid, owners, generations,
+                K_F=k_f, K_N=k_n, KT=far_scored.shape[-1],
+                R=r, HEAD=head, TAIL=tail, SINK=sink, SWA=swa, CAP=capacity,
+                SINK_POOL_LO=int(indexer._sink_pool_lo_blk), BS=bs,
+                HKV=hkv, B=b, num_warps=4)
+        else:
+            # eager 中第二个 Python/Triton launch 的 host 开销高于并行收益，
+            # 保留单 fused kernel；两种路径使用同一 Top-K 与 owner 语义。
+            _fast_launch(workspace, ('topk_candidate', layer_offset),
+                         _topk_candidate_batched_kernel, (m * hkv,),
+                far_scored, near_scored, i_f, i_n, lengths_t,
+                cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
+                out, valid, lower, upper, quota, owners, generations,
+                **common, num_warps=8)
     else:
         _fast_launch(workspace, ('candidate', layer_offset),
                      _candidate_pack_batched_kernel, (m * hkv,),
@@ -1732,7 +1743,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     cand_idx2, keep2, lower, upper, quota, owners, generations = _candidate_pack_batched(
         i_f, i_n, far_scored, near_scored, lengths, cache, valid_req_t,
         indexer, bs, s_cap, layer_offset=layer_offset, workspace=workspace,
-        fuse_topk=True)
+        fuse_topk=True, parallel_expand=capturing)
 
     # ---- grouped-Q Logits + signed packed-key Top-K ----------------------
     width = 1024
