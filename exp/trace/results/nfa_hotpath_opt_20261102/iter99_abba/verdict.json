@@ -1,0 +1,32 @@
+{
+  "comparison": "iter97(A) vs iter99(B), ABBA, pc40 GPU0",
+  "input_sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+  "prompt_tokens": 32612,
+  "generated_tokens": 128,
+  "batch_size": 1,
+  "graph": {
+    "iter97_steady_ms": [10.428175926208496, 10.469167709350586],
+    "iter99_steady_ms": [10.412992000579834, 10.388399600982666],
+    "iter97_mean_ms": 10.448671817779541,
+    "iter99_mean_ms": 10.40069580078125,
+    "speedup": 1.0046127699451308
+  },
+  "eager": {
+    "iter97_steady_ms": [25.50886344909668, 25.699856758117676],
+    "iter99_steady_ms": [25.621520042419434, 25.304096221923828],
+    "iter97_mean_ms": 25.604360103607178,
+    "iter99_mean_ms": 25.46280813217163,
+    "speedup": 1.005559165772321
+  },
+  "token_identity": {
+    "status": "pass",
+    "arms": 8,
+    "matching_tokens_per_arm": 128,
+    "first_divergence": null
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "evidence": "iter99_abba_gpu0_hygiene.log；起跑前双卡 used=1 MiB，采数期间仅本轮 compute PID"
+  },
+  "conclusion": "固定小 grid 的正确实现仅有约 0.46% Graph 和 0.56% eager 均值收益；不是主要瓶颈，未达 2×。"
+}

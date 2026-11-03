@@ -1,0 +1,32 @@
+{
+  "comparison": "iter99(A) vs iter103(B), Graph ABBA, pc40 GPU1",
+  "input_sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+  "prompt_tokens": 32612,
+  "generated_tokens": 128,
+  "batch_size": 1,
+  "graph": {
+    "iter99_steady_ms": [10.428912162780762, 10.41264009475708],
+    "iter103_steady_ms": [10.219167709350586, 10.21401596069336],
+    "iter99_mean_ms": 10.420776128768921,
+    "iter103_mean_ms": 10.216591835021973,
+    "speedup": 1.0199855584958395,
+    "latency_reduction_ms": 0.20418429374694824
+  },
+  "fa2_reference": {
+    "graph_steady_ms": 12.595712,
+    "fa2_over_iter103_speedup": 1.2328682796960255,
+    "two_x_target_ms": 6.297856,
+    "target_reached": false
+  },
+  "token_identity": {
+    "status": "pass",
+    "arms": 4,
+    "matching_tokens_per_arm": 128,
+    "first_divergence": null
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "evidence": "iter103_abba_gpu1_hygiene.log；起跑前双卡 used=1 MiB，采数期间仅本轮 compute PID"
+  },
+  "conclusion": "仅 Q/K RMSNorm 单 kernel 带来可重复的约 2.00% Graph 收益，成为当前正式 Graph best；eager 未启用该 patch，双口径均未达 2×。"
+}
