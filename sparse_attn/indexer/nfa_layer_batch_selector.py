@@ -507,19 +507,40 @@ if _has_triton():
     @triton.jit
     def _nfa_filtered_topk_merge_kernel(
         PARTIAL, LOW, HIGH, QUOTA, OUT, COUNT,
-        NTILES: tl.constexpr, MERGE_PAD: tl.constexpr,
+        NTILES: tl.constexpr, MERGE_PAD: tl.constexpr, LOG2_K: tl.constexpr,
         S: tl.constexpr, K: tl.constexpr, SINK: tl.constexpr,
         META_GROUP: tl.constexpr, TOKEN_BITS: tl.constexpr,
     ):
         h = tl.program_id(0)
-        offs = tl.arange(0, MERGE_PAD)
-        invalid = -32768 << TOKEN_BITS
-        key = tl.load(PARTIAL + h * NTILES * K + offs,
-                      mask=offs < NTILES * K, other=invalid)
         if K == 1:
+            offs = tl.arange(0, MERGE_PAD)
+            invalid = -32768 << TOKEN_BITS
+            key = tl.load(PARTIAL + h * NTILES * K + offs,
+                          mask=offs < NTILES * K, other=invalid)
             key = tl.max(key, axis=0, keep_dims=True)
         else:
-            key = tl.topk(key, K)
+            # 各 partial run 已按降序排列。将另一条 run 反转拼接形成
+            # bitonic 序列，只保留比较后的前 K 项，再做 K-wide 排序；
+            # 与对所有 NTILES*K 项重新 Top-K 的集合和同分顺序一致。
+            i = tl.arange(0, K)
+            pair = tl.arange(0, 2 * K)
+            rank = tl.where(pair < K, pair, 2 * K - 1 - pair)
+            key = tl.load(PARTIAL + h * NTILES * K + i)
+            for group in tl.static_range(1, NTILES):
+                incoming = tl.load(
+                    PARTIAL + (h * NTILES + group) * K + rank)
+                retained = tl.gather(key, rank, axis=0)
+                value = tl.where(pair < K, retained, incoming)
+                peer = tl.gather(value, pair ^ K, axis=0)
+                value = tl.where(
+                    pair < K, tl.maximum(value, peer), tl.minimum(value, peer))
+                key = tl.gather(value, i, axis=0)
+                for bit in tl.static_range(LOG2_K - 1, -1, -1):
+                    stride = 1 << bit
+                    peer = tl.gather(key, i ^ stride, axis=0)
+                    key = tl.where(
+                        (i & stride) == 0,
+                        tl.maximum(key, peer), tl.minimum(key, peer))
         _finish_sorted_logits_key(
             h, key, LOW, HIGH, QUOTA, OUT, COUNT,
             S=S, K=K, SINK=SINK, META_GROUP=META_GROUP,
@@ -1122,6 +1143,7 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
                      _nfa_filtered_topk_merge_kernel, (m * hkv,),
             partial, lower, upper, quota, out, count,
             NTILES=ntiles, MERGE_PAD=triton.next_power_of_2(ntiles * width),
+            LOG2_K=width.bit_length() - 1,
             S=capacity, K=width, SINK=sink,
             META_GROUP=hkv, TOKEN_BITS=token_bits,
             num_warps=8,
