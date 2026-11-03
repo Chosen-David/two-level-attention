@@ -894,3 +894,10 @@
 - 首次远端执行未进入 kernel：后台监控的 shell 优先级使 `cd /tmp/nfa-iter105-candidate` 只作用于后台子 shell，主 Python 从 home 目录寻找 benchmark，报 `can't open file ... No such file or directory`，未编译或执行候选，未产生正确性或性能结论。pc40 GPU0 起跑前 used=1 MiB 且无计算进程；下一提交仅修正远端命令的目录与后台分组，不改候选实现。
 - 修正目录后第二次执行仍未进入 kernel：直接运行 `benchmark/efficiency/benchmark_nfa_fine_scores.py` 时 `sys.path` 只含脚本目录，报 `ModuleNotFoundError: No module named 'sparse_attn'`。这是隔离运行命令漏设 `PYTHONPATH`，不是候选编译或数值失败；下一次显式设置 `PYTHONPATH=.` 后重跑，不改实现。
 - 首次实际对拍硬门失败：seed=0、Graph 生产配置 warps=1 时有 2 个 int32 packed key 不同，脚本立即停止，未运行后续 case 或性能计时。当前候选不得进入生产；下一步先定位这 2 项的 row/token/cand、参考与候选 key 及原始 K/Q 值，区分 tail32 维度映射和 int32 地址特化，不能因差异很小而放宽 bit-exact 门。
+- 拆分定位：warps=1 时“仅 tail32”与“tail32+int32”均在相同 2 项相差 1 个 BF16 ULP，warps=4 时为 1 项；“仅 int32 地址”在两种 warp 配置均为 0 差异，未启用 tail32 的 int64 原路径也为 0 差异。因此地址宽度本身可保持数值，tail32 常量维度映射虽语义等价，却改变编译后的归约实现，不能通过 identity 硬门；不再采用该映射。
+
+## Iter 106：仅保留 fine-score int32 地址
+
+- 修改：撤掉 iter105 的 tail32 常量映射和调用方判定，只保留受 `kv_pool_k.numel() <= INT32_MAX` 保护的 int32 物理页号/维度偏移；通用大 KV 池仍使用 int64。微基准其余输入、参考 kernel 和 packed-key 门禁不变。
+- 正确性通过：5 个独立 seed 的 B3×HKV8 矩阵在 Graph 生产 warps=1 与 eager 生产 warps=4 下共 10/10 组全部 int32 key 逐位一致，覆盖重复 token、keep 洞、无效项、quota=0/300/1024 和尾 tile；Graph capture/replay 也逐位一致。
+- 性能判决：B1、R=8452、32 维下 eager 0.0244015→0.0243781 ms，仅 1.000958×；Graph 0.0180893→0.0181036 ms，0.999210×。差异均不足 0.1%，Graph 方向还略慢，没有可辨收益；不运行完整生产 ABBA、不更新 best、不推送 main。该分支增加的地址分派没有保留价值，下一提交恢复 iter104 通用地址实现，微基准和失败证据保留用于避免重复尝试。

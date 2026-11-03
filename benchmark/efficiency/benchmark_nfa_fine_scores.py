@@ -1,4 +1,4 @@
-"""iter105：fine-score tail32/int32 地址特化与原实现逐位对拍。"""
+"""iter106：fine-score int32 地址特化与原实现逐位对拍。"""
 
 import json
 import statistics
@@ -95,7 +95,7 @@ def _launch(kernel, case, out, num_warps, optimized):
         B=case['m'], TILE=128, MAX_REQ=case['m'], LAYER_OFFSET=0,
         PACK_KEY=True, num_warps=num_warps)
     if optimized:
-        kwargs.update(TAIL32=True, ADDRESS32=True)
+        kwargs.update(ADDRESS32=True)
     kernel[(case['m'] * 8, triton.cdiv(case['r'], 128))](
         case['kv_ptrs'], case['block_table'], case['valid_req'], case['dims'],
         case['q'], case['cand'], case['keep'], case['owners'],

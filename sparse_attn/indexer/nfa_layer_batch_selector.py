@@ -256,7 +256,7 @@ if _has_triton():
         HK: tl.constexpr, HEAD_DIM: tl.constexpr, DIM_NUMEL: tl.constexpr,
         D_BLOCK: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
         TILE: tl.constexpr, MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
-        PACK_KEY: tl.constexpr, TAIL32: tl.constexpr, ADDRESS32: tl.constexpr,
+        PACK_KEY: tl.constexpr, ADDRESS32: tl.constexpr,
     ):
         """按 tile 并行计算 grouped-Q 的 BF16 Logits 或有序 packed key。"""
         row = tl.program_id(0)
@@ -271,14 +271,7 @@ if _has_triton():
         kv_ptr = kv_addr.to(tl.pointer_type(KV_REF.dtype.element_ty))
         offs_d = tl.arange(0, D_BLOCK)
         dim_mask = offs_d < DIM_NUMEL
-        if TAIL32:
-            # tail=[48:64]+[112:128]；顺序与原 DIMS 完全一致。
-            dim = tl.where(
-                offs_d < DIM_NUMEL // 2,
-                HEAD_DIM // 2 - DIM_NUMEL // 2 + offs_d,
-                HEAD_DIM - DIM_NUMEL + offs_d)
-        else:
-            dim = tl.load(DIMS + offs_d, mask=dim_mask, other=0)
+        dim = tl.load(DIMS + offs_d, mask=dim_mask, other=0)
         if not ADDRESS32:
             dim = dim.to(tl.int64)
 
@@ -1200,7 +1193,7 @@ def _page_stats_all_layers(cache, req_ids, n_layers, dims, bs, pad, lengths,
 def _fused_fine_scores_paged(
         cache, req_ids, n_layers, dims, q_fine, cand_idx2, keep2, owners,
         generations, capacity, lower, upper, quota,
-        tile=128, num_warps=4, layer_offset=0, workspace=None, tail32=False):
+        tile=128, num_warps=4, layer_offset=0, workspace=None):
     """Candidate gather -> paged K load -> grouped-Q BF16 Logits/packed key。"""
     if not _has_triton():
         raise FallbackRequired("Triton unavailable")
@@ -1234,7 +1227,7 @@ def _fused_fine_scores_paged(
         D_BLOCK=triton.next_power_of_2(dims.numel()),
         HKV=hkv, B=b, TILE=tile,
         MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
-        PACK_KEY=pack_key, TAIL32=tail32,
+        PACK_KEY=pack_key,
         ADDRESS32=layer0.kv_pool_k.numel() <= torch.iinfo(torch.int32).max,
         num_warps=num_warps,
     )
@@ -1774,10 +1767,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         cache, valid_req_t, n_layers, dims, b_q_fine,
         cand_idx2, keep2, owners, generations, s_cap, lower, upper, quota,
         tile=128, num_warps=1 if capturing else 4,
-        layer_offset=layer_offset, workspace=workspace,
-        tail32=(fine_dims is dims and indexer.subspace == 'tail'
-                and d_full == 128 and indexer.cmp_ratio == 4
-                and dims.numel() == 32))
+        layer_offset=layer_offset, workspace=workspace)
     middle = _nfa_filtered_topk(
         logits, cand_idx2, lower, upper, quota, s_cap, width,
         sink=int(indexer.sink_tokens), layer_offset=layer_offset,
