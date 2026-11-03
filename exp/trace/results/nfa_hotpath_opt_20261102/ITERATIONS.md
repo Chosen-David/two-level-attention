@@ -679,3 +679,6 @@
 - 修改：partial kernel 已输出降序 run，merge 不再对 `NTILES*K` 项重新执行 `tl.topk`。逐条读入 run，反转后与当前结果组成 bitonic 序列，跨 K 比较仅保留前 K 项，再以 `log2(K)` 轮 bitonic 排序恢复降序；packed key 比较、同分优先级和 finish 不变。
 - 正确性：合成同分/quota/无效候选直接对拍 1/1 通过，微基准 indices/counts bit-exact。
 - 算子微基准：原实现 0.230492 ms，候选 0.052419 ms，**4.397x**；相对 Iter 79 的 0.091244 ms 降低约 42.5%。该结果仅限 Top-K 算子，需完整回归与真实 Qwen 双口径验收。
+- 完整回归与生产身份：selector/cache/GraphRunner 35/35 通过；真实 Qwen eager/Graph 16/16 token 均与 Iter 79 完全一致，且两种 execution 一致。
+- 生产 16-token TPOT：eager median/steady 26.325567/26.304608 ms，Graph 14.142432/14.123424 ms。Graph 相对 Iter 79 steady 15.465488 ms 改善约 8.68%，相对原 baseline 23.588048 ms 为 **1.670x**；仍比 FA2 Graph 12.602576 ms 慢约 12.1%。eager 相对 Iter 79 有噪声级回退，保留后续单独处理 host/launch 开销。
+- 判决：保留为当前最佳正确 Graph 实现；下一轮转向剩余 partial Top-K、通用 elementwise/softmax 和 eager host 路径。
