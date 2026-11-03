@@ -525,42 +525,10 @@ if _has_triton():
             i = tl.arange(0, K)
             pair = tl.arange(0, 2 * K)
             rank = tl.where(pair < K, pair, 2 * K - 1 - pair)
-            if NTILES == 5:
-                # 同时归并 (0,1) 与 (2,3)，随后归并两条结果和 run 4；
-                # 三轮归并替代四次顺序归并，段内 xor 不会跨越 K 边界。
-                wide = tl.arange(0, 4 * K)
-                local = wide % (2 * K)
-                segment = wide // (2 * K)
-                source_run = 2 * segment + (local >= K)
-                source_idx = tl.where(local < K, local, 2 * K - 1 - local)
-                value = tl.load(
-                    PARTIAL + (h * NTILES + source_run) * K + source_idx)
-                peer = tl.gather(value, wide ^ K, axis=0)
-                value = tl.where(
-                    local < K, tl.maximum(value, peer), tl.minimum(value, peer))
-                two = tl.arange(0, 2 * K)
-                retained_pos = two + (two // K) * K
-                key2 = tl.gather(value, retained_pos, axis=0)
-                for bit in tl.static_range(LOG2_K - 1, -1, -1):
-                    stride = 1 << bit
-                    peer = tl.gather(key2, two ^ stride, axis=0)
-                    key2 = tl.where(
-                        (two & stride) == 0,
-                        tl.maximum(key2, peer), tl.minimum(key2, peer))
-                value = tl.gather(key2, rank, axis=0)
-                peer = tl.gather(value, pair ^ K, axis=0)
-                value = tl.where(
-                    pair < K, tl.maximum(value, peer), tl.minimum(value, peer))
-                key = tl.gather(value, i, axis=0)
-                for bit in tl.static_range(LOG2_K - 1, -1, -1):
-                    stride = 1 << bit
-                    peer = tl.gather(key, i ^ stride, axis=0)
-                    key = tl.where(
-                        (i & stride) == 0,
-                        tl.maximum(key, peer), tl.minimum(key, peer))
-                # 直接展开 run 4，避免把 constexpr 分支变量用作
-                # tl.static_range 起点。
-                incoming = tl.load(PARTIAL + (h * NTILES + 4) * K + rank)
+            key = tl.load(PARTIAL + h * NTILES * K + i)
+            for group in tl.static_range(1, NTILES):
+                incoming = tl.load(
+                    PARTIAL + (h * NTILES + group) * K + rank)
                 retained = tl.gather(key, rank, axis=0)
                 value = tl.where(pair < K, retained, incoming)
                 peer = tl.gather(value, pair ^ K, axis=0)
@@ -573,23 +541,6 @@ if _has_triton():
                     key = tl.where(
                         (i & stride) == 0,
                         tl.maximum(key, peer), tl.minimum(key, peer))
-            else:
-                key = tl.load(PARTIAL + h * NTILES * K + i)
-                for group in tl.static_range(1, NTILES):
-                    incoming = tl.load(
-                        PARTIAL + (h * NTILES + group) * K + rank)
-                    retained = tl.gather(key, rank, axis=0)
-                    value = tl.where(pair < K, retained, incoming)
-                    peer = tl.gather(value, pair ^ K, axis=0)
-                    value = tl.where(
-                        pair < K, tl.maximum(value, peer), tl.minimum(value, peer))
-                    key = tl.gather(value, i, axis=0)
-                    for bit in tl.static_range(LOG2_K - 1, -1, -1):
-                        stride = 1 << bit
-                        peer = tl.gather(key, i ^ stride, axis=0)
-                        key = tl.where(
-                            (i & stride) == 0,
-                            tl.maximum(key, peer), tl.minimum(key, peer))
         _finish_sorted_logits_key(
             h, key, LOW, HIGH, QUOTA, OUT, COUNT,
             S=S, K=K, SINK=SINK, META_GROUP=META_GROUP,

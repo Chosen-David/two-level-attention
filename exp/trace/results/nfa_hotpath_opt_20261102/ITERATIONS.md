@@ -718,3 +718,10 @@
 - GPU hygiene：修改后复查本机 GPU0 used=77294 MiB，compute PID 2754683 used=77284 MiB，不满足 used<500 MiB 且无他方进程的起跑条件；未抢占、未启动微基准。
 - 正确性与算子微基准：因 GPU0 被其他会话占用，本轮尚未完成编译、bit-exact 对拍和延迟测量，不能宣称改善。
 - 判决：仅提交 constexpr 结构修复与阻塞记录，等待干净 GPU0 后再验证；当前最佳仍为 Iter 81 的 0.038990 ms。
+
+## Iter 86：GPU 持续占用，未验证候选按规程回退
+
+- GPU hygiene：再次复查 GPU0 used=75902 MiB，compute PID 2754683 used=75892 MiB；GPU0 始终不满足起跑条件，本轮仍未执行任何 GPU 编译、对拍或微基准。
+- 结果：没有候选延迟或 bit-exact 证据，不能确认相对 Iter 81 的改善。
+- 回退：按“无改善恢复精确版本”规程，将 `nfa_layer_batch_selector.py` 恢复为 `22dccea4` 的精确内容；恢复后 git blob SHA-1 为 `170347ca84bd7db2ffe42ddfbd64a2acfa4c9a5e`，与该提交一致。
+- 判决：最终源码回到当前最佳 Iter 81（参考候选 0.038990 ms）；Iter 85 的 constexpr 修复仅保留在历史提交中，未作为已验证优化合入最终工作树。
