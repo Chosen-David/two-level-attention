@@ -52,7 +52,8 @@ if _has_triton():
         previous = tl.load(STATS_LEN + stats_len_offset).to(tl.int32)
         incremental = active & (previous > 0) & (length == previous + 1)
         last_blk = (length - 1) // BS
-        owner = block_group == last_blk // BLOCKS_PER_PROGRAM
+        owner = (block_group
+                 == (last_blk // BLOCKS_PER_PROGRAM) % BLOCK_GROUP_STRIDE)
 
         if active & (~incremental | owner):
             # 稳态 owner 只处理最新块；重建时固定少量 CTA 按 stride 覆盖
@@ -645,7 +646,8 @@ if _has_triton():
                 active = tl.load(ACTIVE_REQ + req) >= 0
                 length = tl.load(LENGTHS + req).to(tl.int32)
                 last_blk = (length - 1) // BS
-                owner = block_group == last_blk // BLOCKS_PER_PROGRAM
+                owner = (block_group
+                 == (last_blk // BLOCKS_PER_PROGRAM) % BLOCK_GROUP_STRIDE)
                 if active & owner:
                     slot = tl.load(SLOTS + req)
                     if slot >= 0:

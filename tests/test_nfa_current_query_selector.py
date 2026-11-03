@@ -324,6 +324,61 @@ def test_near_skip_reentry_rebuilds_stats_and_slot_reuse_invalidates():
     assert int(incremental._nfa_page_stats_lengths[0, 2]) == 0
 
 
+def test_fixed_stats_grid_owner_writes_and_refreshes_latest_block():
+    # 80 个逻辑块对应 5 个统计块组，覆盖固定 4 路 grid 不启动绝对
+    # owner=4 的情形；第二步直接从当前 KV 计算最新块 min/max 参考。
+    cache, attention, generator = _make_cache(
+        [2], [4500], [(False, False)], k1=2, near_pages=0,
+        max_blocks=80, max_physical_pages=100)
+    query = torch.randn(
+        1, 2, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+
+    for step in range(2):
+        cache.new_step([2])
+        cache.plan_common([2])
+        keys = torch.randn(
+            1, 1, 1, HEAD_DIM, generator=generator,
+            dtype=torch.bfloat16, device='cuda')
+        values = torch.randn_like(keys)
+        decode_write = (keys, values, cache.slot_mapping_for_layer(0)[:1])
+
+        select_topk_for_layer_batched(
+            cache, 0, [2], query, attention=attention,
+            decode_write=decode_write)
+        logical_length = int(cache.planned_lengths_buf[0])
+        last_blk = (logical_length - 1) // PAGE
+        valid = logical_length - last_blk * PAGE
+        physical = cache.states[2].block_tables[0][last_blk]
+        dims = attention.indexer._subspace_indices(
+            query.device).long()
+        current_k = cache.layers[0].kv_pool_k[
+            physical, 0, 0, :valid, :][:, dims].float()
+        # 生产 kernel 对末块无效 lane 以 0 参与 min/max/sum，而非只归约
+        # valid 前缀；参考必须复现这一既有数值契约。
+        padded_k = current_k.new_zeros((PAGE, dims.numel()))
+        padded_k[:valid] = current_k
+        buffers = next(iter(cache._nfa_page_stats_persistent.values()))
+        torch.testing.assert_close(
+            buffers[0][0, 2, last_blk, 0],
+            padded_k.min(dim=0).values.to(torch.bfloat16), rtol=0, atol=0)
+        torch.testing.assert_close(
+            buffers[1][0, 2, last_blk, 0],
+            padded_k.max(dim=0).values.to(torch.bfloat16), rtol=0, atol=0)
+        if decode_write is not None:
+            slot = int(decode_write[2][0])
+            physical, offset = slot // PAGE, slot % PAGE
+            torch.testing.assert_close(
+                cache.layers[0].kv_pool_k[physical, 0, 0, offset],
+                decode_write[0][0, 0, 0], rtol=0, atol=0)
+            torch.testing.assert_close(
+                cache.layers[0].kv_pool_v[physical, 0, 0, offset],
+                decode_write[1][0, 0, 0], rtol=0, atol=0)
+        if step == 0:
+            mark_first_decode_seeded(cache, [2])
+            cache.commit_step()
+
+
 def test_both_skip_light_path_replay_writes_decode_kv():
     cache, attention, generator = _make_cache(
         [2], [448], [(True, True)], seeds={2: [64, 300]})

@@ -839,3 +839,10 @@
 - 生产 32K B1 每层统计 CTA 从 256 降为 32，融合 Q 后总 CTA 从 288 降为 64；grid 不再随逻辑上下文容量增长。回归 17/18 通过，唯一 `test_radix_filtered_topk_bit_exact_with_quota_and_ties` 在 iter97 原样复现同样 2648/6144 差异，确认为既有 Top-K 失败而非本轮回归。
 - Graph 完整生产单跑：steady TPOT=10.275776 ms，相对 iter97 的 10.420880 ms 降低 0.145104 ms；输入 SHA256、32612 prompt tokens、128 decode tokens 和 graph_replays=127 均不变。该数字仅为单跑信号，不更新正式 ABBA 最佳，也未达到 2×。
 - 证据：`/tmp/ruler32k_iter98_128_graph.json`、`/tmp/iter98_graph_stdout.log`、`/tmp/iter98_graph_gpu0_hygiene.log`（pc40 GPU0）；token identity 与 eager 结果在本条提交后继续验收，不在此处提前宣称通过。
+
+## Iter 99：修复固定 grid 的稳态 owner 映射
+
+- Iter 98 正确性判决：Graph 相对 iter97 仅 7/128 token 一致，拒绝该候选。根因是 fused K/V 写入与页统计仍按绝对块组号判断 owner；32K 最新块位于第 31 组，而固定 grid 只启动 0–3，导致最新块未写入、未刷新。此前 10.275776 ms 是遗漏生产工作后的无效数字，不得作为性能收益。
+- 修复：两处 owner 均改为 `(last_blk // BLOCKS_PER_PROGRAM) % BLOCK_GROUP_STRIDE`，在固定 4 路 grid 内映射真实最新块；全量重建覆盖关系不变。新增 5 块组连续两步 fused-write 回归，直接按 planned length 和末块零填充契约逐位检查最新块 min/max、当前 K/V 写入。完整 selector 回归 18/19 通过，唯一失败仍是 iter97 可复现的既有 Top-K 用例。
+- 修复后 Graph 完整生产单跑：steady TPOT=10.415792 ms，相对 iter97 的 10.420880 ms 仅降低 0.005088 ms，说明删除空 CTA 在正确工作口径下几乎没有收益；不更新正式最佳，未达到 2×。
+- 证据：`/tmp/ruler32k_iter99_128_graph.json`、`/tmp/iter99_graph_stdout.log`、`/tmp/iter99_graph_gpu0_hygiene.log`；token identity 在本条提交后核对，不提前宣称通过。
