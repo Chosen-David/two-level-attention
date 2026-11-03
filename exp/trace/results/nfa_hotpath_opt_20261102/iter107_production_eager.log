@@ -1,0 +1,96 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 154.25it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+{
+  "decode_steps": 127,
+  "tpot_ms_median": 25.61622428894043,
+  "steady_tpot_ms_median": 25.61019229888916,
+  "warmup_steps_excluded_from_steady": 3,
+  "prefill_seconds": 9.375921726226807,
+  "skip_policy_counts": {
+    "0": {
+      "far": 0,
+      "near": 0,
+      "both": 0
+    }
+  },
+  "gate_mode": "dynamic",
+  "gate_epsilon": 0.05,
+  "graph_replays": 0,
+  "memory": {
+    "prefill_end": {
+      "allocated_bytes": 21419245056,
+      "reserved_bytes": 26612858880,
+      "max_allocated_bytes": 24910247936,
+      "max_reserved_bytes": 26612858880
+    },
+    "decode_ready": {
+      "allocated_bytes": 21419252224,
+      "reserved_bytes": 26612858880,
+      "max_allocated_bytes": 24910247936,
+      "max_reserved_bytes": 26612858880
+    },
+    "steady_decode_start": {
+      "allocated_bytes": 21452162560,
+      "reserved_bytes": 26642219008,
+      "max_allocated_bytes": 24910247936,
+      "max_reserved_bytes": 26642219008
+    },
+    "decode_end": {
+      "allocated_bytes": 21452162560,
+      "reserved_bytes": 26642219008,
+      "max_allocated_bytes": 24910247936,
+      "max_reserved_bytes": 26642219008
+    },
+    "model_loaded": {
+      "allocated_bytes": 16417402368,
+      "reserved_bytes": 16569597952,
+      "max_allocated_bytes": 16417414656,
+      "max_reserved_bytes": 16569597952
+    },
+    "peak_incremental_allocated_bytes": 8492845568,
+    "peak_incremental_reserved_bytes": 10072621056,
+    "steady_decode_resident_incremental_allocated_bytes": 5034760192,
+    "steady_decode_resident_incremental_reserved_bytes": 10072621056,
+    "steady_decode_peak_incremental_allocated_bytes": 3458085376,
+    "steady_decode_peak_incremental_reserved_bytes": 0
+  },
+  "nfa_selector_config": {
+    "subspace": "tail",
+    "subspace_cmp_ratio": 4,
+    "level1_topk": 128,
+    "level2_topk": 1024,
+    "near_pages": 32,
+    "near_tokens": "off",
+    "near_len": 4096,
+    "enable_layer_skip": false,
+    "sink_tokens": 4,
+    "sliding_window_size": 128
+  },
+  "method": "nfa",
+  "execution": "eager",
+  "batch_size": 1,
+  "context_length": 32768,
+  "max_new_tokens": 128,
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "input": {
+    "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_single_1.jsonl",
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 32612,
+    "provenance": "native-ruler",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "measurement_mode": "latency",
+  "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+  "timing_scope": "CUDA events around model decode, selector where applicable, and argmax",
+  "timing_quality": "clean-device-history",
+  "host_readback_in_decode_loop": false,
+  "gpu_hygiene": {
+    "status": "requires external process monitor"
+  },
+  "transformers_version": "4.56.2",
+  "torch_version": "2.8.0+cu128"
+}
+saved -> /tmp/ruler32k_iter107_128_eager.json
