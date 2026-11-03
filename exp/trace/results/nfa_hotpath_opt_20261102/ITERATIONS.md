@@ -887,3 +887,8 @@
 - selector 回归为 18/19，通过项之外唯一失败仍是 `test_radix_filtered_topk_bit_exact_with_quota_and_ties` 的既有 2648/6144 差异，与 iter97/99 完全相同；其余 18 项通过，未发现本轮新增回归。日志归档为 `iter104_selector_regression.log`。下一步只做 iter103↔iter104 同卡 ABBA，不借既有失败放宽门禁。
 - iter103↔iter104 双口径 ABBA：pc40 GPU0，Graph iter103=10.202000/10.250016 ms、iter104=10.156480/10.169168 ms，两臂均值 10.226008→10.162824 ms，降低 0.063184 ms，**1.006217×**；eager iter103=25.168064/25.458256 ms、iter104=25.292528/25.340736 ms，均值 25.313160→25.316632 ms，0.999863×，仅 0.003472 ms 差异，无可辨 eager 收益或回退。八臂 128/128 token 全一致，输入 SHA 与 selector 配置不变，旁路仅见本轮 PID，判定 clean。
 - 正式判决：保留 iter104，Graph 正式 best 更新为 **10.162824 ms**，相对 FA2 Graph 12.595712 ms 为 1.239391×，仍未达 2×；eager 正式 best 不因噪声更新，当前 ABBA 口径相对 FA2 eager 仅 0.907247×。不推送 main。完整收据、日志、hygiene 与 verdict 归档于 `iter104_abba/`。
+
+## Iter 105：fine-score tail32 与 int32 地址特化
+
+- 候选：生产 tail32 在编译期生成 `[48:64]+[112:128]`，删除 DIMS 的 32 维设备加载；KV 池 numel 不超过 int32 上限时，物理页号和维度偏移保持 int32，其他几何保留 int64 通用路径。Q/K 维度顺序、`tl.sum` 点积、BF16 舍入、signed ordered key、owner/quota 过滤均不变；新增 `benchmark_nfa_fine_scores.py`，保留 iter104 参考 kernel，覆盖重复 token、keep 洞、无效项、quota、尾 tile 及 Graph/eager 两种 warp 配置。
+- 首次远端执行未进入 kernel：后台监控的 shell 优先级使 `cd /tmp/nfa-iter105-candidate` 只作用于后台子 shell，主 Python 从 home 目录寻找 benchmark，报 `can't open file ... No such file or directory`，未编译或执行候选，未产生正确性或性能结论。pc40 GPU0 起跑前 used=1 MiB 且无计算进程；下一提交仅修正远端命令的目录与后台分组，不改候选实现。
