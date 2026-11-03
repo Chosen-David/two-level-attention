@@ -75,12 +75,12 @@ def _core_tokens_from_probabilities(probs, geometry, topk):
     length = probs.shape[-1]
     token_scores = probs.mean(dim=(0, 1)).mean(dim=0)
     sink_hi, far_hi, near_hi = geometry.bounds(length)
-    ids = torch.arange(length, device=probs.device)
     selected = {}
     for name, lo, hi in (('far', sink_hi, far_hi), ('near', far_hi, near_hi)):
-        positions = ids[(ids >= lo) & (ids < hi)]
-        count = min(topk, positions.numel())
-        selected[name] = positions[torch.topk(token_scores[positions], count).indices]
+        # Region bounds are host integers and each region is contiguous.
+        # Slice the same scores without a full-length boolean compaction.
+        count = min(topk, hi - lo)
+        selected[name] = torch.topk(token_scores[lo:hi], count).indices + lo
     counts = {name: int(value.numel()) for name, value in selected.items()}
     values = torch.cat([selected['far'], selected['near']]).cpu().tolist()
     return {'far': values[:counts['far']], 'near': values[counts['far']:]}
