@@ -11,8 +11,8 @@ except Exception:  # pragma: no cover - CPU-only or missing triton
     tl = None
 
 from ..ops.paged_region_kernels_nfa import INVALID_GATHER_IDX
-from .selection.unique_ranking import (
-    _fast_launch, _tile_keys_from_scores_body, rank_unique_batched)
+from .selection.selector import TokenSelection
+from .selection.unique_ranking import _fast_launch
 
 def _has_triton() -> bool:
     return triton is not None and tl is not None
@@ -242,21 +242,14 @@ if _has_triton():
     @triton.jit
     def _nfa_fine_scores_paged_kernel(
         KV_PTRS, BLOCK_TABLE, VALID_REQ, DIMS, Q, CAND, KEEP, OWNERS,
-        GENERATIONS, UNIQUE, SCORES, PARTIAL_M, PARTIAL_L, MSTAT, LSTAT,
-        TILE_COUNTERS, RANK_OUT, LOW, HIGH, QUOTA,
-        KV_REF, R, NUM_TILES,
+        GENERATIONS, LOGITS, LOW, HIGH, QUOTA, KV_REF, R,
         stride_qm, stride_qh, stride_ch, stride_cr,
         S: tl.constexpr, MAX_BLOCKS: tl.constexpr, PAGE: tl.constexpr,
         HK: tl.constexpr, HEAD_DIM: tl.constexpr, DIM_NUMEL: tl.constexpr,
-        D_BLOCK: tl.constexpr, G_PAD: tl.constexpr,
-        HKV: tl.constexpr, G: tl.constexpr, B: tl.constexpr,
+        D_BLOCK: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
         TILE: tl.constexpr, MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
-        FUSE_STATE: tl.constexpr, FUSE_RANK: tl.constexpr,
-        RANK_GROUPS: tl.constexpr, RANK_K: tl.constexpr,
-        META_GROUP: tl.constexpr, TOKEN_BITS: tl.constexpr,
-        PROB_BF16: tl.constexpr,
     ):
-        """按 tile 并行计算 BF16 score；避免为 online softmax 重读 paged K。"""
+        """按 tile 并行计算 grouped-Q 的单次 BF16 Logits。"""
         row = tl.program_id(0)
         t = tl.program_id(1)
         m = row // HKV
@@ -283,7 +276,6 @@ if _has_triton():
                         mask=read_r & in_range, other=-1)
         generation = tl.load(GENERATIONS + row)
         unique = read_r & in_range & (owner == generation * R + offs_r)
-        tl.store(UNIQUE + row * R + offs_r, unique, mask=mask_r)
         safe = tl.where(read_r, cand, 0)
         lp = safe // PAGE
         off = safe % PAGE
@@ -300,88 +292,184 @@ if _has_triton():
         k = tl.load(
             src, mask=(read_r & lp_valid)[:, None] & dim_mask[None, :],
             other=0.0)
-        for qrow in tl.static_range(G):
-            q = tl.load(
-                Q + m * stride_qm + (kv * G + qrow) * stride_qh + offs_d,
-                mask=dim_mask, other=0.0)
-            s = tl.sum(k.to(tl.float32) * q[None, :], axis=1)
-            s = tl.where(read_r & lp_valid, s, float("-inf"))
-            s = s.to(tl.bfloat16).to(tl.float32)
-            tl.store(SCORES + (row * G + qrow) * R + offs_r,
-                     s.to(tl.bfloat16), mask=mask_r)
-            tile_m = tl.max(s, axis=0)
-            safe_m = tl.where(tile_m == float("-inf"), 0.0, tile_m)
-            tile_l = tl.sum(tl.exp(s - safe_m), axis=0)
-            tile_l = tl.where(tile_m == float("-inf"), 0.0, tile_l)
-            partial_offset = (row * G + qrow) * NUM_TILES + t
-            tl.store(PARTIAL_M + partial_offset, tile_m)
-            tl.store(PARTIAL_L + partial_offset, tile_l)
-
-        if FUSE_STATE:
-            # 最后一个完成的 tile CTA 直接按原 tile 顺序归并 softmax 状态，
-            # 省去独立 state launch；acq_rel 保证其他 CTA 的 partial 写入可见。
-            tl.debug_barrier()
-            finished = tl.atomic_add(
-                TILE_COUNTERS + row, 1, sem="acq_rel", scope="gpu")
-            if finished == NUM_TILES - 1:
-                # GQA 各 query head 之间没有归约依赖；按 lane 并行，保持每个
-                # head 内部仍严格按 tile 顺序执行同一组 FP32 标量运算。
-                qrows = tl.arange(0, G_PAD)
-                active_q = qrows < G
-                mstat = tl.full((G_PAD,), float("-inf"), tl.float32)
-                lstat = tl.zeros((G_PAD,), tl.float32)
-                for tile_idx in range(NUM_TILES):
-                    offset = (row * G * NUM_TILES
-                              + qrows * NUM_TILES + tile_idx)
-                    part_m = tl.load(PARTIAL_M + offset, mask=active_q,
-                                     other=float("-inf"))
-                    part_l = tl.load(PARTIAL_L + offset, mask=active_q, other=0.0)
-                    new_m = tl.maximum(mstat, part_m)
-                    old_corr = tl.exp(mstat - new_m)
-                    old_corr = tl.where(
-                        (mstat == float("-inf")) & (new_m == float("-inf")),
-                        1.0, old_corr)
-                    tile_corr = tl.exp(part_m - new_m)
-                    tile_corr = tl.where(part_m == float("-inf"), 0.0, tile_corr)
-                    lstat = lstat * old_corr + part_l * tile_corr
-                    mstat = new_m
-                tl.store(MSTAT + row * G + qrows, mstat, mask=active_q)
-                tl.store(LSTAT + row * G + qrows, lstat, mask=active_q)
-                if FUSE_RANK:
-                    tl.debug_barrier()
-                    for rank_tile in range(RANK_GROUPS):
-                        _tile_keys_from_scores_body(
-                            row, rank_tile, CAND, SCORES, MSTAT, LSTAT, UNIQUE,
-                            LOW, HIGH, QUOTA, RANK_OUT,
-                            R=R, S=S, GROUPS=RANK_GROUPS, K=RANK_K,
-                            META_GROUP=META_GROUP, TOKEN_BITS=TOKEN_BITS, G=G,
-                            PROB_BF16=PROB_BF16)
+        q = tl.load(
+            Q + m * stride_qm + kv * stride_qh + offs_d,
+            mask=dim_mask, other=0.0)
+        score = tl.sum(k.to(tl.float32) * q[None, :], axis=1)
+        score = score.to(tl.bfloat16).to(tl.float32)
+        good = (unique & lp_valid
+                & (cand >= tl.load(LOW + m))
+                & (cand < tl.load(HIGH + m))
+                & (tl.load(QUOTA + m) > 0)
+                & (score == score))
+        score = tl.where(good, score, float("-inf"))
+        tl.store(LOGITS + row * R + offs_r, score.to(tl.bfloat16), mask=mask_r)
 
     @triton.jit
-    def _nfa_fine_softmax_state_kernel(
-        PARTIAL_M, PARTIAL_L, MSTAT, LSTAT, NUM_TILES,
-        G: tl.constexpr,
+    def _finish_sorted_logits_key(
+        h, key, LOW, HIGH, QUOTA, OUT, COUNT,
+        S: tl.constexpr, K: tl.constexpr, SINK: tl.constexpr,
+        META_GROUP: tl.constexpr, TOKEN_BITS: tl.constexpr,
     ):
-        """按 tile 顺序合并并行计算的部分 max/sum，避免全候选串行 exp。"""
-        row = tl.program_id(0) // G
-        qrow = tl.program_id(0) % G
-        mstat = tl.full((), float("-inf"), tl.float32)
-        lstat = tl.zeros((), tl.float32)
-        for t in range(NUM_TILES):
-            offset = row * G * NUM_TILES + qrow * NUM_TILES + t
-            tile_m = tl.load(PARTIAL_M + offset)
-            tile_l = tl.load(PARTIAL_L + offset)
-            new_m = tl.maximum(mstat, tile_m)
-            old_corr = tl.exp(mstat - new_m)
-            old_corr = tl.where(
-                (mstat == float("-inf")) & (new_m == float("-inf")),
-                1.0, old_corr)
-            tile_corr = tl.exp(tile_m - new_m)
-            tile_corr = tl.where(tile_m == float("-inf"), 0.0, tile_corr)
-            lstat = lstat * old_corr + tile_l * tile_corr
-            mstat = new_m
-        tl.store(MSTAT + row * G + qrow, mstat)
-        tl.store(LSTAT + row * G + qrow, lstat)
+        """解码 signed-Logits key，并保留 canonical middle 的补洞语义。"""
+        i = tl.arange(0, K)
+        b = 0 if META_GROUP == 0 else h // META_GROUP
+        q = tl.load(QUOTA + b).to(tl.int32)
+        if q == 0:
+            tl.store(OUT + h * K + i, 0)
+            tl.store(COUNT + h, 0)
+        else:
+            invalid = (-32768 << TOKEN_BITS)
+            valid = key > invalid
+            token_mask = (1 << TOKEN_BITS) - 1
+            chosen = tl.where(
+                (i < q) & valid, S - (key & token_mask), S).to(tl.int32)
+            nvalid = tl.sum(((i < q) & valid).to(tl.int32), 0)
+            if nvalid == q:
+                fast_packed = tl.sort(tl.where(chosen >= SINK, chosen, S),
+                                      descending=False)
+                tl.store(OUT + h * K + i,
+                         tl.where(fast_packed < S, fast_packed, 0))
+                tl.store(COUNT + h,
+                         tl.sum((fast_packed < S).to(tl.int32), 0))
+            else:
+                chosen = tl.sort(chosen, descending=False)
+                low = tl.load(LOW + b).to(tl.int32)
+                high = tl.load(HIGH + b).to(tl.int32)
+                boundaries = tl.where(chosen < S, chosen - low - i, S)
+                lo = tl.zeros((K,), tl.int32)
+                hi = tl.full((K,), K, tl.int32)
+                for _ in range(11):
+                    mid = lo + (hi - lo) // 2
+                    value = tl.gather(boundaries, tl.minimum(mid, K - 1), axis=0)
+                    right = value <= i
+                    active = lo < hi
+                    lo = tl.where(active & right, mid + 1, lo)
+                    hi = tl.where(active & ~right, mid, hi)
+                zero = low + i + lo
+                zero = tl.where((i < q - nvalid) & (zero < high), zero, S)
+                combined = tl.cat(chosen, zero, can_reorder=True)
+                combined = tl.where(combined >= SINK, combined, S)
+                packed = tl.sort(combined, descending=False)
+                j = tl.arange(0, 2 * K)
+                tl.store(OUT + h * K + j, tl.where(packed < S, packed, 0), j < K)
+                tl.store(COUNT + h, tl.sum((packed < S).to(tl.int32), 0))
+
+    @triton.jit
+    def _nfa_filtered_topk_kernel(
+        LOGITS, CAND, LOW, HIGH, QUOTA, OUT, COUNT, R,
+        R_PAD: tl.constexpr, S: tl.constexpr, K: tl.constexpr,
+        SINK: tl.constexpr, META_GROUP: tl.constexpr,
+        TOKEN_BITS: tl.constexpr,
+    ):
+        """单 CTA 对 signed BF16 Logits 做 Top-K，同分优先新 token。"""
+        h = tl.program_id(0)
+        b = 0 if META_GROUP == 0 else h // META_GROUP
+        offs = tl.arange(0, R_PAD)
+        mask = offs < R
+        token = tl.load(CAND + h * R + offs, mask=mask, other=0).to(tl.int32)
+        logits = tl.load(LOGITS + h * R + offs, mask=mask,
+                         other=float("-inf"))
+        score = logits.to(tl.float32)
+        good = (mask & (token >= tl.load(LOW + b))
+                & (token < tl.load(HIGH + b))
+                & (tl.load(QUOTA + b) > 0)
+                & (score == score) & (score != float("-inf")))
+        bits = logits.to(tl.uint16, bitcast=True).to(tl.int32) & 0xFFFF
+        negative = (bits & 0x8000) != 0
+        ordered = tl.where(
+            negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
+        delta = S - token
+        if TOKEN_BITS == 32:
+            ordered = ordered.to(tl.int64)
+            delta = delta.to(tl.int64)
+        invalid = -32768 << TOKEN_BITS
+        key = tl.where(good, (ordered << TOKEN_BITS) + delta, invalid)
+        if K == 1:
+            key = tl.max(key, axis=0, keep_dims=True)
+        else:
+            key = tl.topk(key, K)
+        _finish_sorted_logits_key(
+            h, key, LOW, HIGH, QUOTA, OUT, COUNT,
+            S=S, K=K, SINK=SINK, META_GROUP=META_GROUP,
+            TOKEN_BITS=TOKEN_BITS)
+
+    @triton.jit
+    def _nfa_filtered_topk_radix_kernel(
+        LOGITS, CAND, LOW, HIGH, QUOTA, TOP, R,
+        R_PAD: tl.constexpr, S: tl.constexpr, K: tl.constexpr,
+        META_GROUP: tl.constexpr,
+    ):
+        """Radix-select 第 K 个 signed-BF16 key，再精确压实 Top-K。
+
+        与整行 ``tl.topk`` 使用同一 packed key；输出无需有序，因为 finish
+        随后会按逻辑 token 重排并执行 quota 补洞。
+        """
+        h = tl.program_id(0)
+        b = 0 if META_GROUP == 0 else h // META_GROUP
+        offs = tl.arange(0, R_PAD)
+        mask = offs < R
+        token = tl.load(CAND + h * R + offs, mask=mask, other=0).to(tl.int32)
+        logits = tl.load(LOGITS + h * R + offs, mask=mask,
+                         other=float("-inf"))
+        score = logits.to(tl.float32)
+        good = (mask & (token >= tl.load(LOW + b))
+                & (token < tl.load(HIGH + b))
+                & (tl.load(QUOTA + b) > 0)
+                & (score == score) & (score != float("-inf")))
+        bits = logits.to(tl.uint16, bitcast=True).to(tl.int32) & 0xFFFF
+        negative = (bits & 0x8000) != 0
+        ordered = tl.where(
+            negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
+        delta = S - token
+        invalid = -32768 << 16
+        key = tl.where(good, (ordered << 16) + delta, invalid)
+        out_offs = tl.arange(0, K)
+        if tl.load(QUOTA + b) > 0:
+            nvalid = tl.sum(good.to(tl.int32), axis=0)
+            if nvalid >= K:
+                # 在 packed int32 全值域二分第 K 个 key；packed key 与
+                # 原 tl.topk 完全一致，因此阈值和压实结果也保持一致。
+                lo = tl.full((), -2147483648, tl.int64)
+                hi = tl.full((), 2147483647, tl.int64)
+                for _ in tl.static_range(32):
+                    mid = (lo + hi + 1) // 2
+                    count = tl.sum(
+                        (good & (key >= mid.to(tl.int32))).to(tl.int32), axis=0)
+                    take = count >= K
+                    lo = tl.where(take, mid, lo)
+                    hi = tl.where(take, hi, mid - 1)
+                threshold = lo.to(tl.int32)
+            else:
+                threshold = invalid
+            greater = good & (key > threshold)
+            greater_pos = tl.cumsum(greater.to(tl.int32), axis=0) - 1
+            tl.store(TOP + h * K + greater_pos, key,
+                     mask=greater & (greater_pos < K))
+            equal = good & (key == threshold)
+            ngreater = tl.sum(greater.to(tl.int32), axis=0)
+            equal_pos = ngreater + tl.cumsum(equal.to(tl.int32), axis=0) - 1
+            tl.store(TOP + h * K + equal_pos, key,
+                     mask=equal & (equal_pos < K))
+            nequal = tl.sum(equal.to(tl.int32), axis=0)
+            total = tl.minimum(ngreater + nequal, K)
+            tl.store(TOP + h * K + out_offs, invalid, mask=out_offs >= total)
+        else:
+            tl.store(TOP + h * K + out_offs, invalid)
+
+    @triton.jit
+    def _nfa_finish_topk_kernel(
+        TOP, LOW, HIGH, QUOTA, OUT, COUNT,
+        S: tl.constexpr, K: tl.constexpr, SINK: tl.constexpr,
+        META_GROUP: tl.constexpr, TOKEN_BITS: tl.constexpr,
+    ):
+        h = tl.program_id(0)
+        i = tl.arange(0, K)
+        key = tl.load(TOP + h * K + i)
+        _finish_sorted_logits_key(
+            h, key, LOW, HIGH, QUOTA, OUT, COUNT,
+            S=S, K=K, SINK=SINK, META_GROUP=META_GROUP,
+            TOKEN_BITS=TOKEN_BITS)
 
     @triton.jit
     def _prepare_q_body(
@@ -417,6 +505,32 @@ if _has_triton():
         _prepare_q_body(
             tl.program_id(0), Q_SRC, REQ_IDS, SCALES, DIM_IDX, OUT, S0, S1, S2,
             HQ=HQ, D=D, DQ=DQ, B=B, DQ_BLOCK=DQ_BLOCK)
+
+    @triton.jit
+    def _prepare_q_grouped_kernel(
+        Q_SRC, REQ_IDS, SCALES, DIM_IDX, OUT, S0, S1, S2,
+        HKV: tl.constexpr, G: tl.constexpr, D: tl.constexpr,
+        DQ: tl.constexpr, B: tl.constexpr, DQ_BLOCK: tl.constexpr,
+    ):
+        """逐 query head 保留生产缩放/BF16 舍入，再在 FP32 中求和。"""
+        pid = tl.program_id(0)
+        m_idx = pid // HKV
+        kv = pid % HKV
+        layer = m_idx // B
+        req = m_idx % B
+        req_id = tl.load(REQ_IDS + req)
+        scale = tl.load(SCALES + layer)
+        offs = tl.arange(0, DQ_BLOCK)
+        mask = offs < DQ
+        dim = tl.load(DIM_IDX + offs, mask=mask, other=0)
+        grouped = tl.zeros((DQ_BLOCK,), tl.float32)
+        for j in tl.static_range(G):
+            hq = kv * G + j
+            src = Q_SRC + layer * S0 + req_id * S1 + hq * S2 + dim
+            q = tl.load(src, mask=mask, other=0.0).to(tl.float32)
+            grouped += (q * scale).to(tl.bfloat16).to(tl.float32)
+        tl.store(OUT + m_idx * (HKV * DQ) + kv * DQ + offs,
+                 grouped, mask=mask)
 
     @triton.jit
     def _nfa_page_stats_prepare_q_kernel(
@@ -471,17 +585,15 @@ if _has_triton():
                             value, mask=vd < DV)
                     # 页统计随后在同一 CTA 读取刚写入的最新 K。
                     tl.debug_barrier()
-            # L1 与最终 canonical union 均只消费 KV head 0；其他头仍须在
-            # 上方写入当前 K/V，但其页 min/max/sum 没有 downstream 消费者。
-            if row % HK == 0:
-                _nfa_page_stats_body(
-                    block_group, row,
-                    KV_PTRS, BLOCK_TABLE, LENGTHS, ACTIVE_REQ, VALID_REQ, DIMS,
-                    STATS_LEN, P_MIN, P_MAX, P_SUM,
-                    MAX_BLOCKS=MAX_BLOCKS, PAGE=PAGE, HK=HK, HEAD_DIM=HEAD_DIM,
-                    DIM_NUMEL=DIM_NUMEL, D_BLOCK=D_BLOCK, BS=BS, KT_CAP=KT_CAP,
-                    L=L, B=B, BLOCKS_PER_PROGRAM=BLOCKS_PER_PROGRAM,
-                    MAX_REQ=MAX_REQ, LAYER_OFFSET=LAYER_OFFSET)
+            # 每个 KV group 都有独立的 L1/L2 与 attention 消费者。
+            _nfa_page_stats_body(
+                block_group, row,
+                KV_PTRS, BLOCK_TABLE, LENGTHS, ACTIVE_REQ, VALID_REQ, DIMS,
+                STATS_LEN, P_MIN, P_MAX, P_SUM,
+                MAX_BLOCKS=MAX_BLOCKS, PAGE=PAGE, HK=HK, HEAD_DIM=HEAD_DIM,
+                DIM_NUMEL=DIM_NUMEL, D_BLOCK=D_BLOCK, BS=BS, KT_CAP=KT_CAP,
+                L=L, B=B, BLOCKS_PER_PROGRAM=BLOCKS_PER_PROGRAM,
+                MAX_REQ=MAX_REQ, LAYER_OFFSET=LAYER_OFFSET)
         else:
             _prepare_q_body(
                 pid - STATS_PROGRAMS, Q_SRC, Q_REQ, SCALES, DIMS, Q_OUT,
@@ -491,7 +603,7 @@ if _has_triton():
     def _candidate_pack_batched_kernel(
         I_F, I_N, FAR_SCORES, NEAR_SCORES, LENGTHS,
         SKIP_FAR, SKIP_NEAR, VALID_REQ,
-        OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS, TILE_COUNTERS,
+        OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS,
         K_F: tl.constexpr, K_N: tl.constexpr, KT: tl.constexpr,
         R: tl.constexpr, HEAD: tl.constexpr, TAIL: tl.constexpr,
         SINK: tl.constexpr, SWA: tl.constexpr, CAP: tl.constexpr,
@@ -504,7 +616,6 @@ if _has_triton():
         row = tl.program_id(0)
         m = row // HKV
         h = row % HKV
-        tl.store(TILE_COUNTERS + row, 0)
         req = m % B
         length = tl.load(LENGTHS + req)
         lo = tl.maximum(0, length - SWA)
@@ -513,6 +624,15 @@ if _has_triton():
         # generation 隔离不同 selector 调用；同次调用仍由 atomic_max 选择
         # 最大 candidate slot，不再清空整个 CAP 的 owner 表。
         generation = tl.load(GENERATIONS + row) + 1
+        # int32 owner 表将去重 workspace/atomic 位宽减半。极限计数到达前
+        # 逐行清空并重新计代，避免 generation*width 溢出后误复用旧 owner。
+        generation_limit = 2147483647 // width
+        if generation > generation_limit:
+            generation = 1
+            clear_offs = tl.arange(0, 1024)
+            for clear_start in range(0, CAP, 1024):
+                clear = clear_start + clear_offs
+                tl.store(OWNERS + row * CAP + clear, 0, mask=clear < CAP)
         tl.store(GENERATIONS + row, generation)
         for start in range(0, width, 1024):
             r = start + tl.arange(0, 1024)
@@ -613,10 +733,12 @@ if _has_triton():
         MAX_BLOCKS: tl.constexpr, PAGE: tl.constexpr,
         MAX_REQ: tl.constexpr, MAX_VIS: tl.constexpr,
         INVALID: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
-        LAYER_OFFSET: tl.constexpr,
+        LAYER_OFFSET: tl.constexpr, EMPTY: tl.constexpr,
     ):
-        """middle ∪ protected ∪ seed：一次排序、cumsum 去重并写物理槽。"""
-        m = tl.program_id(0)
+        """逐 KV group 做 middle ∪ protected ∪ seed 并写物理槽。"""
+        row = tl.program_id(0)
+        m = row // HKV
+        kv = row % HKV
         layer = m // B
         req = m % B
         req_id = tl.load(VALID_REQ + req).to(tl.int32)
@@ -626,9 +748,14 @@ if _has_triton():
 
         # ranking 的 middle 已经按逻辑 token 升序；只需排序较短的
         # protected+seed，再把第二路反转后与 middle 做 bitonic merge。
-        middle_count = tl.load(MIDDLE_COUNTS + m * HKV)
-        middle_id = tl.load(MIDDLE + m * (HKV * W) + offs,
-                            mask=(offs < W) & (offs < middle_count), other=CAP)
+        if EMPTY:
+            middle_count = 0
+            middle_id = tl.full(offs.shape, CAP, tl.int32)
+        else:
+            middle_count = tl.load(MIDDLE_COUNTS + row)
+            middle_id = tl.load(
+                MIDDLE + row * W + offs,
+                mask=(offs < W) & (offs < middle_count), other=CAP)
 
         aux_offs = tl.arange(0, A_PAD)
         prot = aux_offs < PROT
@@ -658,8 +785,11 @@ if _has_triton():
         aux_sorted = tl.sort(aux_id, descending=False)
 
         reverse_idx = 2 * W - 1 - offs
-        aux_reverse = tl.gather(
-            aux_sorted, tl.minimum(reverse_idx, A_PAD - 1), 0)
+        # N_PAD 尾部 lane 的 reverse_idx 可能为负；where 的掩码不能撤销
+        # tl.gather 本身，因此索引必须先夹到合法范围再按原条件丢弃。
+        aux_gather_idx = tl.maximum(
+            tl.minimum(reverse_idx, A_PAD - 1), 0)
+        aux_reverse = tl.gather(aux_sorted, aux_gather_idx, 0)
         aux_reverse = tl.where(
             (offs >= W) & (reverse_idx < A_PAD), aux_reverse, CAP)
         ordered = tl.where(offs < W, middle_id, aux_reverse)
@@ -678,7 +808,8 @@ if _has_triton():
 
         # 无效尾槽与有效 destination 不重叠，可在同一 program 内直接写入。
         tail = in_n & (offs < MAX_VIS) & (offs >= count)
-        dst = GATHER + layer * (MAX_REQ * MAX_VIS) + req * MAX_VIS
+        dst = (GATHER + layer * (MAX_REQ * HKV * MAX_VIS)
+               + req * (HKV * MAX_VIS) + kv * MAX_VIS)
         tl.store(dst + offs, INVALID, mask=tail)
         emit = unique & (destination >= 0) & (destination < MAX_VIS)
         safe_id = tl.where(emit, ordered, 0)
@@ -689,56 +820,7 @@ if _has_triton():
             mask=emit, other=0).to(tl.int32)
         slot = phys * PAGE + safe_id % PAGE
         tl.store(dst + destination, slot, mask=emit)
-        tl.store(VIS_LENS + layer * MAX_REQ + req, count)
-
-    @triton.jit
-    def _final_physical_map_kernel(
-        IDS, COUNTS, BLOCK_TABLE, VALID_REQ, GATHER, VIS_LENS,
-        W: tl.constexpr, MAX_BLOCKS: tl.constexpr, PAGE: tl.constexpr,
-        MAX_REQ: tl.constexpr, MAX_VIS: tl.constexpr,
-        INVALID: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
-        BLOCK_W: tl.constexpr, LAYER_OFFSET: tl.constexpr,
-    ):
-        """Head-0 selection -> absolute physical slot, written in-place.
-
-        ``IDS`` is ``canonical_selection``'s contiguous ``[M, HKV, W]`` int32
-        output and ``COUNTS`` is its ``[M, HKV]`` int32 count.  Each program
-        handles one (layer, request) row and ``BLOCK_W`` columns, converting a
-        logical token id to ``phys_page * PAGE + offset`` through the request
-        block table and writing directly into the persistent
-        ``gather_indices_buf``/``visible_lens_buf``.  No ``gather``/``where``/
-        ``index_copy_`` materialization is needed.
-        """
-        pid_m = tl.program_id(0)
-        pid_w = tl.program_id(1)
-        layer = pid_m // B
-        req = pid_m % B
-        req_id = tl.load(VALID_REQ + req).to(tl.int32)
-
-        offs_w = pid_w * BLOCK_W + tl.arange(0, BLOCK_W)
-        mask_w = (offs_w < W) & (offs_w < MAX_VIS)
-        sel = tl.load(
-            IDS + pid_m * (HKV * W) + offs_w, mask=mask_w, other=INVALID
-        ).to(tl.int32)
-
-        cnt = tl.load(COUNTS + pid_m * HKV)
-        valid = (sel >= 0) & (offs_w < cnt)
-        page_idx = tl.where(valid, sel // PAGE, 0)
-        page_idx = tl.minimum(tl.maximum(page_idx, 0), MAX_BLOCKS - 1)
-        phys = tl.load(
-            BLOCK_TABLE + (layer + LAYER_OFFSET) * MAX_REQ * MAX_BLOCKS
-            + req_id * MAX_BLOCKS + page_idx,
-            mask=mask_w & valid, other=0,
-        ).to(tl.int32)
-
-        slot = phys * PAGE + (sel % PAGE)
-        slot = tl.where(valid, slot, INVALID)
-        # 输出由 attention 按 batch 行消费；request id 只用于查页表。
-        dst = GATHER + layer * (MAX_REQ * MAX_VIS) + req * MAX_VIS + offs_w
-        tl.store(dst, slot, mask=mask_w)
-
-        if pid_w == 0:
-            tl.store(VIS_LENS + layer * MAX_REQ + req, cnt)
+        tl.store(VIS_LENS + (layer * MAX_REQ + req) * HKV + kv, count)
 
     @triton.jit
     def _topk_indices_body(
@@ -757,34 +839,21 @@ if _has_triton():
         idx = KT - 1 - offs
         packed = (key_signed << 16) | (idx & 0xFFFF)
         packed = tl.where(mask, packed, -0x80000000)
-        ordered = tl.sort(packed, descending=True)
+        # 只需有序 Top-K；直接部分排序，避免对 KT_PAD 个整数做全排序。
+        # Triton 3.4 的 topk(k=1) reshape 有缺陷，单项直接 max。
+        if K_PAD == 1:
+            top = tl.max(packed, axis=0, keep_dims=True)
+        else:
+            top = tl.topk(packed, K_PAD)
         top_idx = tl.arange(0, K_PAD)
-        top = tl.gather(ordered, top_idx, 0)
         out_idx = (KT - 1 - (top & 0xFFFF)).to(OUT.dtype.element_ty)
         tl.store(OUT + row * K + top_idx, out_idx, mask=top_idx < K)
-
-    @triton.jit
-    def _topk_indices_pair_kernel(
-        FAR_SCORES, NEAR_SCORES, FAR_OUT, NEAR_OUT,
-        KT: tl.constexpr, KT_PAD: tl.constexpr,
-        K_F: tl.constexpr, K_N: tl.constexpr,
-        K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
-    ):
-        """同一次 launch 完成 far/near 两路独立 Top-K。"""
-        if tl.program_id(1) == 0:
-            _topk_indices_body(
-                FAR_SCORES, FAR_OUT, KT=KT, KT_PAD=KT_PAD,
-                K=K_F, K_PAD=K_F_PAD)
-        else:
-            _topk_indices_body(
-                NEAR_SCORES, NEAR_OUT, KT=KT, KT_PAD=KT_PAD,
-                K=K_N, K_PAD=K_N_PAD)
 
     @triton.jit
     def _topk_candidate_batched_kernel(
         FAR_SCORES, NEAR_SCORES, I_F, I_N, LENGTHS,
         SKIP_FAR, SKIP_NEAR, VALID_REQ,
-        OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS, TILE_COUNTERS,
+        OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS,
         KT: tl.constexpr, KT_PAD: tl.constexpr,
         K_F: tl.constexpr, K_N: tl.constexpr,
         K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
@@ -804,7 +873,7 @@ if _has_triton():
         _candidate_pack_batched_kernel(
             I_F, I_N, FAR_SCORES, NEAR_SCORES, LENGTHS,
             SKIP_FAR, SKIP_NEAR, VALID_REQ,
-            OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS, TILE_COUNTERS,
+            OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS,
             K_F=K_F, K_N=K_N, KT=KT, R=R, HEAD=HEAD, TAIL=TAIL,
             SINK=SINK, SWA=SWA, CAP=CAP, SINK_POOL_LO=SINK_POOL_LO,
             BS=BS, PAGE=PAGE, NEAR_LEN=NEAR_LEN, K2=K2, HKV=HKV, B=B,
@@ -841,39 +910,7 @@ def _workspace_zeros(workspace, name, shape, dtype, device):
     return out
 
 
-def _topk_indices_pair(far_scores, near_scores, k_f, k_n, workspace=None, launch=True):
-    """一次 launch 生成 far/near 两路 int64 Top-K 索引。"""
-    if not _has_triton():
-        raise FallbackRequired("Triton unavailable")
-    m, hkv, kt_cap = far_scores.shape
-    k_f = min(int(k_f), kt_cap)
-    k_n = min(int(k_n), kt_cap)
-    out_f = _workspace_empty(
-        workspace, 'topk_far', (m, hkv, k_f), torch.int64, far_scores.device)
-    out_n = _workspace_empty(
-        workspace, 'topk_near', (m, hkv, k_n), torch.int64, far_scores.device)
-    if k_f + k_n == 0:
-        return out_f, out_n
-    if not launch:
-        return out_f, out_n
-    if kt_cap == 1:
-        out_f.zero_()
-        out_n.zero_()
-        return out_f, out_n
-    _fast_launch(workspace, 'topk_pair', _topk_indices_pair_kernel,
-                 (m * hkv, 2),
-        far_scores.reshape(m * hkv, kt_cap),
-        near_scores.reshape(m * hkv, kt_cap), out_f, out_n,
-        KT=kt_cap, KT_PAD=triton.next_power_of_2(kt_cap),
-        K_F=k_f, K_N=k_n,
-        K_F_PAD=triton.next_power_of_2(max(1, k_f)),
-        K_N_PAD=triton.next_power_of_2(max(1, k_n)),
-        num_warps=8,
-    )
-    return out_f, out_n
-
-
-def _page_stats_all_layers(cache, req_ids, layer_ptrs, dims, bs, pad, lengths,
+def _page_stats_all_layers(cache, req_ids, n_layers, dims, bs, pad, lengths,
                            layer_offset=0, workspace=None, q_job=None,
                            write_job=None):
     """持久化 request-slot 页统计；连续 decode 只更新最新逻辑块。"""
@@ -884,7 +921,7 @@ def _page_stats_all_layers(cache, req_ids, layer_ptrs, dims, bs, pad, lengths,
     hk = layer0.num_kv_heads
     head_dim = layer0.head_dim_k
     b = lengths.numel() if torch.is_tensor(lengths) else len(lengths)
-    l = len(layer_ptrs)
+    l = n_layers
     m = l * b
     kt_cap = pad // bs
     dim_numel = dims.numel()
@@ -966,16 +1003,10 @@ def _page_stats_all_layers(cache, req_ids, layer_ptrs, dims, bs, pad, lengths,
 
 
 def _fused_fine_scores_paged(
-        cache, req_ids, layer_ptrs, dims, q_fine, cand_idx2, keep2, owners,
-        generations, tile_counters, capacity, group_size, tile=128, num_warps=4,
-        fuse_state=True, fuse_rank=False, rank_out=None, lower=None, upper=None,
-        quota=None, layer_offset=0, workspace=None):
-    """Candidate gather -> paged K load -> BF16 score 与 online-softmax 状态。
-
-    Reads candidate tokens straight from ``kv_pool_k`` through the request
-    block table; the old ``projected[:, :s_cap]`` fine-K materialization is
-    gone from this path.
-    """
+        cache, req_ids, n_layers, dims, q_fine, cand_idx2, keep2, owners,
+        generations, capacity, lower, upper, quota,
+        tile=128, num_warps=4, layer_offset=0, workspace=None):
+    """Candidate gather -> paged K load -> grouped-Q BF16 Logits。"""
     if not _has_triton():
         raise FallbackRequired("Triton unavailable")
     layer0 = cache.layers[0]
@@ -989,61 +1020,65 @@ def _fused_fine_scores_paged(
 
     valid_req_t = (req_ids if torch.is_tensor(req_ids) else
                    torch.as_tensor(req_ids, dtype=torch.int64, device=device))
-    block_table = cache.block_table_buf
-    dims_t = dims
+    logits = _workspace_empty(
+        workspace, 'fine_logits', (m, hkv, r), torch.bfloat16, device)
     kv_ptrs = cache.layer_kv_ptrs_buf[
-        layer_offset:layer_offset + len(layer_ptrs)]
-
-    unique = _workspace_empty(
-        workspace, 'fine_unique', keep2.shape, keep2.dtype, device)
-    scores = _workspace_empty(
-        workspace, 'fine_scores', (m, hkv, group_size, r), torch.bfloat16,
-        device)
-    mstat = _workspace_empty(
-        workspace, 'fine_mstat', (m, hkv, group_size), torch.float32, device)
-    lstat = _workspace_empty(
-        workspace, 'fine_lstat', mstat.shape, torch.float32, device)
-
-    grid_prob = (m * hkv, triton.cdiv(r, tile))
-    num_tiles = triton.cdiv(r, tile)
-    partial_m = _workspace_empty(
-        workspace, 'fine_partial_m', (m, hkv, group_size, num_tiles),
-        torch.float32, device)
-    partial_l = _workspace_empty(
-        workspace, 'fine_partial_l', partial_m.shape, torch.float32, device)
-
-    rank_groups = rank_out.shape[1]
-    rank_k = rank_out.shape[2]
-    token_bits = 32 if capacity >= 65536 else 16
-    _fast_launch(workspace, ('fine_score', layer_offset, fuse_state, fuse_rank),
-                 _nfa_fine_scores_paged_kernel, grid_prob,
-        kv_ptrs, block_table, valid_req_t, dims_t, q_fine, cand_idx2,
-        keep2, owners, generations, unique, scores, partial_m, partial_l,
-        mstat, lstat, tile_counters, rank_out,
-        lower, upper, quota,
-        layer0.kv_pool_k,
-        R=r, NUM_TILES=num_tiles,
+        layer_offset:layer_offset + n_layers]
+    _fast_launch(workspace, ('fine_logits', layer_offset),
+                 _nfa_fine_scores_paged_kernel,
+                 (m * hkv, triton.cdiv(r, tile)),
+        kv_ptrs, cache.block_table_buf, valid_req_t, dims, q_fine, cand_idx2,
+        keep2, owners, generations, logits, lower, upper, quota,
+        layer0.kv_pool_k, r,
         stride_qm=q_fine.stride(0), stride_qh=q_fine.stride(1),
         stride_ch=cand_idx2.stride(1), stride_cr=cand_idx2.stride(2),
         S=capacity, MAX_BLOCKS=cache.max_blocks, PAGE=cache.geometry.page,
         HK=hk, HEAD_DIM=head_dim, DIM_NUMEL=dims.numel(),
         D_BLOCK=triton.next_power_of_2(dims.numel()),
-        G_PAD=triton.next_power_of_2(max(16, group_size)),
-        HKV=hkv, G=group_size, B=b, TILE=tile,
+        HKV=hkv, B=b, TILE=tile,
         MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
-        FUSE_STATE=fuse_state, FUSE_RANK=fuse_rank,
-        RANK_GROUPS=rank_groups, RANK_K=rank_k,
-        META_GROUP=hkv,
-        TOKEN_BITS=token_bits,
-        PROB_BF16=layer0.kv_pool_k.dtype == torch.bfloat16,
         num_warps=num_warps,
     )
-    if not fuse_state:
-        _fast_launch(workspace, 'fine_state', _nfa_fine_softmax_state_kernel,
-                     (m * hkv * group_size,),
-            partial_m, partial_l, mstat, lstat, NUM_TILES=num_tiles,
-            G=group_size, num_warps=1)
-    return scores, mstat, lstat, unique
+    return logits
+
+
+def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
+                       sink, layer_offset=0, workspace=None):
+    """将 grouped-Q Logits 直接转换为 canonical ``TokenSelection``。"""
+    m, hkv, r = cand_idx2.shape
+    out = _workspace_empty(
+        workspace, 'middle_indices', (m, hkv, width), torch.int32, logits.device)
+    count = _workspace_empty(
+        workspace, 'middle_counts', (m, hkv), torch.int32, logits.device)
+    token_bits = 32 if capacity >= 65536 else 16
+    if token_bits == 16:
+        top = _workspace_empty(
+            workspace, 'filtered_topk_keys', (m, hkv, width),
+            torch.int32, logits.device)
+        _fast_launch(workspace, ('filtered_topk_radix', layer_offset),
+                     _nfa_filtered_topk_radix_kernel, (m * hkv,),
+            logits, cand_idx2, lower, upper, quota, top, r,
+            R_PAD=triton.next_power_of_2(max(r, width)),
+            S=capacity, K=width, META_GROUP=hkv,
+            num_warps=8,
+        )
+        _fast_launch(workspace, ('filtered_topk_finish', layer_offset),
+                     _nfa_finish_topk_kernel, (m * hkv,),
+            top, lower, upper, quota, out, count,
+            S=capacity, K=width, SINK=sink,
+            META_GROUP=hkv, TOKEN_BITS=token_bits,
+            num_warps=8,
+        )
+    else:
+        _fast_launch(workspace, ('filtered_topk', layer_offset),
+                     _nfa_filtered_topk_kernel, (m * hkv,),
+            logits, cand_idx2, lower, upper, quota, out, count, r,
+            R_PAD=triton.next_power_of_2(max(r, width)),
+            S=capacity, K=width, SINK=sink,
+            META_GROUP=hkv, TOKEN_BITS=token_bits,
+            num_warps=8,
+        )
+    return TokenSelection(out, count)
 
 
 def _l1_scores(k_min, k_max, k_sum, b_q_full, group_size, indexer, dtype,
@@ -1055,18 +1090,18 @@ def _l1_scores(k_min, k_max, k_sum, b_q_full, group_size, indexer, dtype,
     hq = b_q_full.shape[1]
     q_flat = b_q_full.reshape(m * hq, d).contiguous()
     far_scored = _workspace_empty(
-        workspace, 'l1_far', (m, 1, kt_cap), dtype, k_min.device)
+        workspace, 'l1_far', (m, hkv, kt_cap), dtype, k_min.device)
     near_scored = _workspace_empty(
-        workspace, 'l1_near', (m, 1, kt_cap), dtype, k_min.device)
+        workspace, 'l1_near', (m, hkv, kt_cap), dtype, k_min.device)
     bt, nw = indexer._TILE_COARSE.get(d, (64, 4))
-    lengths_t = torch.as_tensor(lengths, dtype=torch.int32, device=k_min.device)
-    b = lengths.numel() if torch.is_tensor(lengths) else len(lengths)
+    lengths_t = lengths
+    b = lengths.numel()
     far_avg = indexer.far_method == "avg"
     near_avg = indexer.near_method != "minmax"
     has_avg = far_avg or near_avg
     k_sum_arg = k_sum if has_avg else k_min
     _fast_launch(workspace, ('l1', layer_offset), _nfa_l1_scores_kernel,
-                 (triton.cdiv(kt_cap, bt), m),
+                 (triton.cdiv(kt_cap, bt), m * hkv),
         k_min, k_max, k_sum_arg, q_flat, lengths_t,
         cache.active_req_ids_buf[:b], cache.skip_far_layer_buf,
         cache.skip_near_layer_buf, valid_req, cache._nfa_page_stats_lengths,
@@ -1077,7 +1112,7 @@ def _l1_scores(k_min, k_max, k_sum, b_q_full, group_size, indexer, dtype,
         PAGE=page, BS=bs, SINK=sink, NEAR_LEN=near_len, WINDOW=window,
         POOL_NEAR_LEN=max(bs, int(indexer.nt_near_len)),
         SINK_POOL_LO=int(indexer._sink_pool_lo_blk),
-        Hkv=1, G=group_size, D=d, BT=bt, B=b,
+        Hkv=hkv, G=group_size, D=d, BT=bt, B=b,
         STRIDE_KB=k_min.stride(0), STRIDE_KB2=k_max.stride(0),
         STRIDE_KS=k_sum_arg.stride(0), STRIDE_KR=k_min.stride(1),
         STRIDE_KR2=k_max.stride(1), STRIDE_KRS=k_sum_arg.stride(1),
@@ -1092,7 +1127,7 @@ def _l1_scores(k_min, k_max, k_sum, b_q_full, group_size, indexer, dtype,
 def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
                             cache, valid_req, indexer, bs, capacity,
                             layer_offset=0, workspace=None, fuse_topk=False):
-    """直接生成 complete-pack 候选及 rank 元数据，无 aten 中间张量。"""
+    """直接生成 complete-pack 候选及过滤元数据，无 aten 中间张量。"""
     m, hkv, k_f = i_f.shape
     k_n = i_n.shape[-1]
     sink = int(indexer.sink_tokens)
@@ -1113,11 +1148,9 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
     quota = _workspace_empty(
         workspace, 'candidate_quota', (m,), torch.int64, device)
     owners = _workspace_zeros(
-        workspace, 'fine_owners', (m, hkv, capacity), torch.int64, device)
+        workspace, 'fine_owners', (m, hkv, capacity), torch.int32, device)
     generations = _workspace_zeros(
-        workspace, 'fine_owner_generations', (m, hkv), torch.int64, device)
-    tile_counters = _workspace_empty(
-        workspace, 'fine_tile_counters', (m, hkv), torch.int32, device)
+        workspace, 'fine_owner_generations', (m, hkv), torch.int32, device)
     b = lengths.numel() if torch.is_tensor(lengths) else len(lengths)
     lengths_t = (lengths if torch.is_tensor(lengths) else
                  torch.as_tensor(lengths, dtype=torch.int64, device=device))
@@ -1126,7 +1159,7 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
                      _topk_candidate_batched_kernel, (m * hkv,),
             far_scored, near_scored, i_f, i_n, lengths_t,
             cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
-            out, valid, lower, upper, quota, owners, generations, tile_counters,
+            out, valid, lower, upper, quota, owners, generations,
             KT=far_scored.shape[-1],
             KT_PAD=triton.next_power_of_2(far_scored.shape[-1]),
             K_F=k_f, K_N=k_n,
@@ -1144,7 +1177,7 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
                      _candidate_pack_batched_kernel, (m * hkv,),
             i_f, i_n, far_scored, near_scored, lengths_t,
             cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
-            out, valid, lower, upper, quota, owners, generations, tile_counters,
+            out, valid, lower, upper, quota, owners, generations,
             K_F=k_f, K_N=k_n, KT=far_scored.shape[-1],
             R=r, HEAD=head, TAIL=tail, SINK=sink, SWA=swa, CAP=capacity,
             SINK_POOL_LO=int(indexer._sink_pool_lo_blk), BS=bs,
@@ -1153,7 +1186,7 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
             HKV=hkv, B=b,
             MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
             num_warps=4)
-    return out, valid, lower, upper, quota, owners, generations, tile_counters
+    return out, valid, lower, upper, quota, owners, generations
 
 
 # ---------------------------------------------------------------------------
@@ -1169,6 +1202,10 @@ def _replay_eager_selector_call_plan(workspace, call_plan, q_src, decode_write):
     stream, enter_hook, exit_hook, _ = workspace['_nfa_launch_context']
     for (key, kernel, grid, args, kwargs, run, function, packed_metadata,
          compiled, launch_values, grid_1, grid_2) in call_plan[1]:
+        if kernel in (_prepare_q_kernel, _prepare_q_grouped_kernel):
+            args = (q_src,) + args[1:]
+            if run is not None:
+                launch_values = (q_src,) + launch_values[1:]
         if kernel is _nfa_page_stats_prepare_q_kernel:
             args = args[:10] + (q_src,) + args[11:]
             if run is not None:
@@ -1185,6 +1222,28 @@ def _replay_eager_selector_call_plan(workspace, call_plan, q_src, decode_write):
                 None, None, exit_hook, *launch_values)
         else:
             _fast_launch(workspace, key, kernel, grid, *args, **kwargs)
+
+
+def _store_eager_selector_call_plan(workspace, plan_key, geometry):
+    """固定几何下保存本层 launch 序列，供后续 eager step 原序重放。"""
+    record = workspace.pop('_nfa_eager_record', None)
+    if record is None:
+        return
+    prepared = []
+    for key, kernel, grid, args, kwargs in record:
+        launch = workspace.get(('triton_plan', key))
+        if launch is not None and launch[0] is geometry:
+            (_, _, run, function, packed_metadata, compiled, tail,
+             grid_1, grid_2) = launch
+            launch_values = args + tail
+        else:
+            run = function = packed_metadata = compiled = None
+            launch_values = ()
+            grid_1 = grid_2 = 1
+        prepared.append((key, kernel, grid, args, kwargs, run, function,
+                         packed_metadata, compiled, launch_values,
+                         grid_1, grid_2))
+    workspace[plan_key] = (geometry, prepared)
 
 
 def select_topk_for_layer_batched(cache, layer_idx, req_ids,
@@ -1215,7 +1274,11 @@ def select_topk_for_layer_batched(cache, layer_idx, req_ids,
             q_src = query_states.unsqueeze(0)
             q_geometry = (q_src.dtype, q_src.data_ptr() % 16,
                           q_src.stride(0), q_src.stride(1), q_src.stride(2))
-            if q_geometry == geometry[27:]:
+            if q_geometry == geometry[27:32]:
+                if geometry[32] and decode_write is not None:
+                    # both-skip 轻路径没有 page-stats/Q fused kernel 可携带
+                    # decode 写入，重放 final union 前必须显式写当前 K/V。
+                    cache.write_decode(layer_idx, *decode_write)
                 _replay_eager_selector_call_plan(
                     workspace, call_plan, q_src, decode_write)
                 return
@@ -1302,6 +1365,17 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     q_req_ids = cache.query_req_ids_buf[:b]
     d_full = q_src.shape[-1]
     s0, s1, s2 = q_src.stride(0), q_src.stride(1), q_src.stride(2)
+    # 所有有效请求都跳过 far/near 时 middle 恒为空；无效 padding 行不参与
+    # 判定。全 padding 的 Graph capture 必须走通用路径，否则会把真实 replay
+    # 请求错误特化成空 middle。该状态进入 eager 几何，防止 mixed batch 误重放。
+    has_live_req = any(
+        rid is not None and rid >= 0 and rid in cache.states
+        for rid in req_ids)
+    protected_only = n_layers == 1 and has_live_req and all(
+        rid is None or rid < 0 or rid not in cache.states
+        or (cache.states[rid].skip_far_by_layer[layer_offset]
+            and cache.states[rid].skip_near_by_layer[layer_offset])
+        for rid in req_ids)
     # 同一 Cache 的生产几何固定；用一个严格令牌替代每次 launch 的逐张量键。
     # 独立 ranking 调用没有该令牌，仍使用完整逐参数 specialization 键。
     geometry = (
@@ -1315,6 +1389,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         indexer.args.tia_level2_topk, indexer.sink_tokens,
         indexer.sliding_window_size, indexer._sink_pool_lo_blk,
         q_src.dtype, q_src.data_ptr() % 16, s0, s1, s2,
+        protected_only,
     )
     previous_geometry = workspace.get('_nfa_launch_geometry')
     if previous_geometry == geometry:
@@ -1330,6 +1405,50 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     if not capturing:
         workspace['_nfa_eager_record'] = []
 
+    if protected_only:
+        # middle quota 恒为 0：跳过页统计、L1/L2、candidate 与 ranking，
+        # 但仍复用 canonical union，保证保护集、seed 去重和物理映射一致。
+        if decode_write is not None:
+            # paged write 由公共 eager replay 入口显式执行，不能录进本层
+            # selector 计划，否则旧 K/V 会在当前写入之后再次覆盖同一 slot。
+            record = workspace.pop('_nfa_eager_record', None)
+            cache.write_decode(layer_offset, *decode_write)
+            if record is not None:
+                workspace['_nfa_eager_record'] = record
+        gather_out = cache.gather_indices_for_layer(layer_offset).unsqueeze(0)
+        vis_out = cache.visible_lens_for_layer(layer_offset).unsqueeze(0)
+        output_width = gather_out.shape[-1]
+        prot_width = min(
+            s_cap, int(indexer.sink_tokens + indexer.sliding_window_size))
+        max_seed = cache.prefill_seed_ids_buf.shape[-1]
+        aux_width = prot_width + max_seed
+        empty_middle = _workspace_empty(
+            workspace, 'empty_middle', (m * hkv, aux_width), torch.int32, device)
+        empty_counts = _workspace_empty(
+            workspace, 'empty_middle_counts', (m * hkv,), torch.int32, device)
+        # bitonic merge 的两路各占 W；空 middle 也必须保留与 aux 等宽
+        # 的第一路，不能用 W=1 压缩掉第二路 reversing 所需空间。
+        union_width = 2 * aux_width
+        _fast_launch(workspace, ('final_union', layer_offset, 'empty'),
+                     _final_union_physical_kernel, (m * hkv,),
+            empty_middle, empty_counts, lengths, active_req_t, valid_req_t,
+            cache.first_decode_seeded_buf, cache.prefill_seed_ids_buf,
+            cache.prefill_seed_counts_buf, cache.block_table_buf,
+            gather_out, vis_out,
+            W=aux_width, PROT=prot_width, MAX_SEED=max_seed,
+            N=union_width, N_PAD=triton.next_power_of_2(union_width),
+            A_PAD=triton.next_power_of_2(prot_width + max_seed),
+            MERGE_BITS=(triton.next_power_of_2(union_width)).bit_length() - 1,
+            SINK=int(indexer.sink_tokens), SWA=int(indexer.sliding_window_size),
+            CAP=s_cap, MAX_BLOCKS=cache.max_blocks, PAGE=page,
+            MAX_REQ=cache.max_requests, MAX_VIS=output_width,
+            INVALID=INVALID_GATHER_IDX, HKV=hkv, B=b,
+            LAYER_OFFSET=layer_offset, EMPTY=True, num_warps=8,
+        )
+        if not capturing:
+            _store_eager_selector_call_plan(workspace, plan_key, geometry)
+        return
+
     def _prepare_q(dim_idx, d_q, name, launch=True):
         out = _workspace_empty(
             workspace, name, (m, hq, d_q), torch.float32, device)
@@ -1342,6 +1461,16 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
                 DQ_BLOCK=triton.next_power_of_2(d_q), num_warps=4)
         return out
 
+    def _prepare_q_grouped(dim_idx, d_q):
+        out = _workspace_empty(
+            workspace, 'q_fine_grouped', (m, hkv, d_q), torch.float32, device)
+        _fast_launch(workspace, ('prepare_q_grouped', layer_offset),
+                     _prepare_q_grouped_kernel, (m * hkv,),
+            q_src, q_req_ids, scales, dim_idx, out, s0, s1, s2,
+            HKV=hkv, G=group_size, D=d_full, DQ=d_q, B=b,
+            DQ_BLOCK=triton.next_power_of_2(d_q), num_warps=4)
+        return out
+
     fuse_prepare_q = q_dims is not None and indexer.l2_subspace != "full"
     if q_dims is not None:
         b_q_full = _prepare_q(
@@ -1351,13 +1480,12 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         b_q_full = _prepare_q(full_dims, d_full, 'q_full')
 
     if indexer.l2_subspace == "full":
-        full_dims = torch.arange(d_full, dtype=torch.int64, device=device)
-        b_q_fine = _prepare_q(full_dims, d_full, 'q_fine')
+        fine_dims = torch.arange(d_full, dtype=torch.int64, device=device)
     elif q_dims is not None:
-        b_q_fine = b_q_full
+        fine_dims = dims
     else:
-        qat = indexer._qat_indices(device).long()
-        b_q_fine = _prepare_q(qat, qat.numel(), 'q_fine')
+        fine_dims = indexer._qat_indices(device).long()
+    b_q_fine = _prepare_q_grouped(fine_dims, fine_dims.numel())
     q_job = ((q_src, q_req_ids, scales, b_q_full,
               s0, s1, s2, hq, d_full) if fuse_prepare_q else None)
 
@@ -1379,14 +1507,11 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
                 slots = slots.to(device)
             write_job = (keys, values, slots.contiguous())
 
-    # Layer pointers and persistent tensor-only skip flags [layer, request].
-    # Skip/block-table lookups now read the full persistent buffers directly
-    # via ``valid_req_t``, so no ``.contiguous()`` column copy is materialized.
-    layer_ptrs = [cache.layers[li].kv_pool_k.data_ptr() for li in layer_indices]
-
+    # Persistent tensor-only skip flags [layer, request] are read directly via
+    # ``valid_req_t``；不再逐层收集 Python data_ptr 或复制列。
     # ---- one launch: in-place paged block stats, no projection -----------
     k_min, k_max, k_sum = _page_stats_all_layers(
-        cache, valid_req_t, layer_ptrs, dims, bs, pad,
+        cache, valid_req_t, n_layers, dims, bs, pad,
         lengths, layer_offset=layer_offset, workspace=workspace,
         q_job=q_job, write_job=write_job)  # [L,max_req,kt_cap,Hkv,d]
 
@@ -1402,65 +1527,33 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     k1 = int(indexer.args.tia_level1_topk)
     nb_far = max(0, k1 - nb_near)
 
-    i_f, i_n = _topk_indices_pair(
-        far_scored, near_scored, min(nb_far, kt_cap), min(nb_near, kt_cap),
-        workspace=workspace, launch=capturing)
+    k_f = min(nb_far, kt_cap)
+    k_n = min(nb_near, kt_cap)
+    i_f = _workspace_empty(
+        workspace, 'topk_far', (m, hkv, k_f), torch.int64, device)
+    i_n = _workspace_empty(
+        workspace, 'topk_near', (m, hkv, k_n), torch.int64, device)
 
-    # ---- candidate expansion + completion + rank metadata ---------------
-    cand_idx2, keep2, lower, upper, quota, owners, generations, tile_counters = _candidate_pack_batched(
+    # ---- candidate expansion + completion --------------------------------
+    cand_idx2, keep2, lower, upper, quota, owners, generations = _candidate_pack_batched(
         i_f, i_n, far_scored, near_scored, lengths, cache, valid_req_t,
         indexer, bs, s_cap, layer_offset=layer_offset, workspace=workspace,
-        fuse_topk=not capturing)
+        fuse_topk=True)
 
-    # final canonical union 只消费 request-level KV head 0；其余头的
-    # fine/state/ranking 结果没有 downstream 消费者，无需物化。
-    cand_idx2 = cand_idx2[:, :1]
-    keep2 = keep2[:, :1]
-    owners = owners[:, :1]
-    generations = generations[:, :1]
-    tile_counters = tile_counters[:, :1]
-
-    # ---- fused fine score + local unique topk ----------------------------
+    # ---- grouped-Q Logits + signed packed-key Top-K ----------------------
     width = 1024
-    rank_groups = triton.cdiv(max(cand_idx2.shape[-1], width), 2 * width)
-    rank_dtype = torch.int64 if s_cap >= 65536 else torch.int32
-    rank_tile = _workspace_empty(
-        workspace, 'rank_tile', (m, rank_groups, width), rank_dtype, device)
-    scores, mstat, lstat, unique = _fused_fine_scores_paged(
-        cache, valid_req_t, layer_ptrs, dims, b_q_fine,
-        cand_idx2, keep2, owners, generations, tile_counters, s_cap, group_size,
-        tile=256 if capturing else 128, fuse_state=not capturing,
-        fuse_rank=not capturing, rank_out=rank_tile,
-        lower=lower, upper=upper, quota=quota,
+    logits = _fused_fine_scores_paged(
+        cache, valid_req_t, n_layers, dims, b_q_fine,
+        cand_idx2, keep2, owners, generations, s_cap, lower, upper, quota,
+        tile=128, num_warps=1 if capturing else 4,
         layer_offset=layer_offset, workspace=workspace)
-
-    fixed_candidate_buffers = cand_idx2.shape[-1] >= width
-    if cand_idx2.shape[-1] < width:
-        # 短 prompt 的 L1 候选数可小于固定 ranking 宽度；补无效项不改变
-        # Top-K 语义，也避免 max_new_tokens=1/首 token 等短序列被误拒绝。
-        pad_width = width - cand_idx2.shape[-1]
-        cand_idx2 = torch.cat([
-            cand_idx2,
-            torch.zeros((*cand_idx2.shape[:-1], pad_width),
-                        dtype=cand_idx2.dtype, device=device)], dim=-1)
-        scores = torch.cat([
-            scores,
-            torch.full((*scores.shape[:-1], pad_width), float('-inf'),
-                       dtype=scores.dtype, device=device)], dim=-1)
-        unique = torch.cat([
-            unique,
-            torch.zeros((*unique.shape[:-1], pad_width),
-                        dtype=unique.dtype, device=device)], dim=-1)
-    middle = rank_unique_batched(
-        cand_idx2, None, unique, lower, upper, quota,
-        capacity=s_cap, width=width, sink=int(indexer.sink_tokens),
-        validate=False, prevalidated=True, fuse_tree=not capturing,
-        fuse_tiles=not capturing, workspace=workspace,
-        score_state=(scores, mstat, lstat, group_size,
-                     cache.layers[0].kv_pool_k.dtype))
+    middle = _nfa_filtered_topk(
+        logits, cand_idx2, lower, upper, quota, s_cap, width,
+        sink=int(indexer.sink_tokens), layer_offset=layer_offset,
+        workspace=workspace)
 
     # ---- final canonical union + physical mapping ------------------------
-    # 只消费 request-level head 0；保护集与 seed 在 kernel 内按原语义生成。
+    # 每个 KV group 独立合并 middle、保护集与 seed，并按真实 request slot 写回。
     gather_out = cache.gather_indices_for_layer(layer_offset).unsqueeze(0)
     vis_out = cache.visible_lens_for_layer(layer_offset).unsqueeze(0)
     output_width = gather_out.shape[-1]
@@ -1469,7 +1562,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     max_seed = cache.prefill_seed_ids_buf.shape[-1]
     union_width = middle.indices.shape[-1] + prot_width + max_seed
     _fast_launch(workspace, ('final_union', layer_offset),
-                 _final_union_physical_kernel, (m,),
+                 _final_union_physical_kernel, (m * hkv,),
         middle.indices, middle.counts, lengths, active_req_t, valid_req_t,
         cache.first_decode_seeded_buf, cache.prefill_seed_ids_buf,
         cache.prefill_seed_counts_buf, cache.block_table_buf,
@@ -1481,27 +1574,15 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         SINK=int(indexer.sink_tokens), SWA=int(indexer.sliding_window_size),
         CAP=s_cap, MAX_BLOCKS=cache.max_blocks, PAGE=page,
         MAX_REQ=cache.max_requests, MAX_VIS=output_width,
-        INVALID=INVALID_GATHER_IDX, HKV=1, B=b,
-        LAYER_OFFSET=layer_offset, num_warps=8,
+        INVALID=INVALID_GATHER_IDX, HKV=hkv, B=b,
+        LAYER_OFFSET=layer_offset, EMPTY=False, num_warps=8,
     )
 
-    record = workspace.pop('_nfa_eager_record', None)
-    if record is not None and fixed_candidate_buffers:
-        prepared = []
-        for key, kernel, grid, args, kwargs in record:
-            launch = workspace.get(('triton_plan', key))
-            if launch is not None and launch[0] is geometry:
-                (_, _, run, function, packed_metadata, compiled, tail,
-                 grid_1, grid_2) = launch
-                launch_values = args + tail
-            else:
-                run = function = packed_metadata = compiled = None
-                launch_values = ()
-                grid_1 = grid_2 = 1
-            prepared.append((key, kernel, grid, args, kwargs, run, function,
-                             packed_metadata, compiled, launch_values,
-                             grid_1, grid_2))
-        workspace[plan_key] = (geometry, prepared)
+    record = workspace.get('_nfa_eager_record')
+    if record is not None:
+        _store_eager_selector_call_plan(workspace, plan_key, geometry)
+    else:
+        workspace.pop('_nfa_eager_record', None)
 
 
 def mark_first_decode_seeded(cache, req_ids):
@@ -1513,8 +1594,12 @@ def mark_first_decode_seeded(cache, req_ids):
     ]
     if not valid_req_ids:
         return
-    device = cache.first_decode_seeded_buf.device
-    valid_req_t = torch.as_tensor(valid_req_ids, dtype=torch.int64, device=device)
-    cache.first_decode_seeded_buf[valid_req_t] = 1
+    count = len(valid_req_ids)
+    for row, rid in enumerate(valid_req_ids):
+        cache._cpu_first_decode_seed_reqs_staging[row] = rid
+    cache.first_decode_seed_reqs_buf[:count].copy_(
+        cache._cpu_first_decode_seed_reqs_staging[:count], non_blocking=True)
+    cache.first_decode_seeded_buf[
+        cache.first_decode_seed_reqs_buf[:count]] = 1
     for rid in valid_req_ids:
         cache.states[rid].first_decode_seeded = True

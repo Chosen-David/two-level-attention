@@ -90,8 +90,9 @@ def _tile_keys(IDS,P,VALID,LOW,HIGH,QUOTA,OUT,R:tl.constexpr,S:tl.constexpr,
         bits=bits.to(tl.int64)
         delta=delta.to(tl.int64)
     key=tl.where(good,(bits<<TOKEN_BITS)+delta,0)
-    ordered=tl.sort(key,descending=True)
-    tl.store(OUT+(h*GROUPS+tile)*K+i,ordered,i<K)
+    ordered=tl.topk(key,K)
+    i=tl.arange(0,K)
+    tl.store(OUT+(h*GROUPS+tile)*K+i,ordered)
 
 
 @triton.jit
@@ -127,8 +128,9 @@ def _tile_keys_from_scores_body(h,tile,IDS,SCORES,MSTAT,LSTAT,VALID,LOW,HIGH,QUO
         bits=bits.to(tl.int64)
         delta=delta.to(tl.int64)
     key=tl.where(good,(bits<<TOKEN_BITS)+delta,0)
-    ordered=tl.sort(key,descending=True)
-    tl.store(OUT+(h*GROUPS+tile)*K+i,ordered,i<K)
+    ordered=tl.topk(key,K)
+    i=tl.arange(0,K)
+    tl.store(OUT+(h*GROUPS+tile)*K+i,ordered)
 
 
 @triton.jit
@@ -147,12 +149,17 @@ def _merge_topk(IN,OUT,GROUPS:tl.constexpr,NEXT:tl.constexpr,K:tl.constexpr):
     group=2*tile+(i>=K).to(tl.int32)
     rank=tl.where(i<K,i,2*K-1-i)
     value=tl.load(IN+(h*GROUPS+group)*K+rank,group<GROUPS,other=0)
-    # Two descending runs become a bitonic sequence by reversing the second.
-    for bit in tl.static_range(10,-1,-1):
+    # 两条降序 run 反转拼接成 bitonic 序列。首个跨 K 比较后，较大的
+    # K 项已完整包含 Top-K；无需再排序会被丢弃的另外 K 项。
+    peer=tl.gather(value,i^K,axis=0)
+    value=tl.where(i<K,tl.maximum(value,peer),tl.minimum(value,peer))
+    i=tl.arange(0,K)
+    value=tl.gather(value,i,axis=0)
+    for bit in tl.static_range(9,-1,-1):
         stride=1<<bit
         peer=tl.gather(value,i^stride,axis=0)
         value=tl.where((i&stride)==0,tl.maximum(value,peer),tl.minimum(value,peer))
-    tl.store(OUT+(h*NEXT+tile)*K+i,value,i<K)
+    tl.store(OUT+(h*NEXT+tile)*K+i,value)
 
 
 def tree_topk(ids,p,valid,lower,upper,quota,capacity,width,*,metadata_group=None):
@@ -225,11 +232,13 @@ def _merge_tree_finish(IN,LOW,HIGH,QUOTA,OUT,COUNT,GROUPS:tl.constexpr,
         incoming=tl.load(IN+(h*GROUPS+group)*K+rank)
         retained=tl.gather(current,rank,axis=0)
         value=tl.where(pair<K,retained,incoming)
-        for bit in tl.static_range(10,-1,-1):
-            stride=1<<bit
-            peer=tl.gather(value,pair^stride,axis=0)
-            value=tl.where((pair&stride)==0,tl.maximum(value,peer),tl.minimum(value,peer))
+        peer=tl.gather(value,pair^K,axis=0)
+        value=tl.where(pair<K,tl.maximum(value,peer),tl.minimum(value,peer))
         current=tl.gather(value,i,axis=0)
+        for bit in tl.static_range(9,-1,-1):
+            stride=1<<bit
+            peer=tl.gather(current,i^stride,axis=0)
+            current=tl.where((i&stride)==0,tl.maximum(current,peer),tl.minimum(current,peer))
     _finish_sorted_key(h,current,LOW,HIGH,QUOTA,OUT,COUNT,S=S,K=K,SINK=SINK,
                        META_GROUP=META_GROUP,TOKEN_BITS=TOKEN_BITS)
 
@@ -240,13 +249,16 @@ def _merge_finish(IN,LOW,HIGH,QUOTA,OUT,COUNT,S:tl.constexpr,K:tl.constexpr,SINK
     group=(i>=K).to(tl.int32)
     rank=tl.where(i<K,i,2*K-1-i)
     key=tl.load(IN+(h*2+group)*K+rank)
-    # 最后一级归并直接消费寄存器中的 key，省掉一次中间写读和 launch。
-    for bit in tl.static_range(10,-1,-1):
+    # 最后一级归并直接消费寄存器中的 key；跨 K 比较后只保留并排序
+    # 较大的 K 项，省掉一次中间写读、一个 launch 和无效半边排序。
+    peer=tl.gather(key,i^K,axis=0)
+    key=tl.where(i<K,tl.maximum(key,peer),tl.minimum(key,peer))
+    i=tl.arange(0,K)
+    key=tl.gather(key,i,axis=0)
+    for bit in tl.static_range(9,-1,-1):
         stride=1<<bit
         peer=tl.gather(key,i^stride,axis=0)
         key=tl.where((i&stride)==0,tl.maximum(key,peer),tl.minimum(key,peer))
-    i=tl.arange(0,K)
-    key=tl.gather(key,i,axis=0)
     _finish_sorted_key(h,key,LOW,HIGH,QUOTA,OUT,COUNT,S=S,K=K,SINK=SINK,
                        META_GROUP=META_GROUP,TOKEN_BITS=TOKEN_BITS)
 

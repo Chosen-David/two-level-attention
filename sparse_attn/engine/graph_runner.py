@@ -65,6 +65,10 @@ class GraphRunner:
                 f'visible bucket {visible_bucket} exceeds cache {cache.max_visible_len}')
 
         key = self._key(bucket, visible_bucket)
+        if key in self.graphs:
+            # 图只依赖固定 bucket 与设备 buffer 地址；真实 request/length 均由
+            # replay 前的 metadata 刷新，重复 capture 只会增加私有池与 JIT 开销。
+            return self.graphs[key]
         padded_ids = [-1] * bucket
         cache.ensure_visible_buckets((visible_bucket,))
         cache.new_step(padded_ids)
@@ -143,6 +147,9 @@ class GraphRunner:
                 use_cache=True,
                 attention_mask={'full_attention': None},
             )
+        # 第 N 步 GPU 工作已提交；此时处理第 N-1 步已就绪的 CPU 回执，
+        # 不让上一帧 D2H 等待阻塞本帧 replay，也不依赖其完成来组装设备输入。
+        self.scheduler._drain_pending_next_tokens()
         # 回执只在 step 边界记录一次；具体设备数据延迟到请求结束时读取，
         # 不在各层 forward 中更新 Python 对象或触发 D2H。
         cache.nfa_decode_steps += 1

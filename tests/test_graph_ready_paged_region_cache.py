@@ -32,6 +32,7 @@ class GraphReadyPagedRegionCacheTest(unittest.TestCase):
 
         for _ in range(8):
             cache.new_step([req, -1])
+            cache.plan_common([req, -1])
             cache.prepare_metadata([req, -1], 0)
             dk = torch.randn(1, 2, 1, 4)
             dv = torch.randn(1, 2, 1, 4)
@@ -41,6 +42,78 @@ class GraphReadyPagedRegionCacheTest(unittest.TestCase):
 
         self.assertEqual(len(cache.layers[0].free_ids), global_free)
         self.assertEqual(state.logical_length, length + 8)
+
+    def test_block_table_h2d_only_after_resident_membership_changes(self):
+        from sparse_attn.indexer.nfa_layer_batch_selector import (
+            mark_first_decode_seeded)
+
+        cache = self._make_cache(n_layers=1)
+        req = cache.add_request()
+        cache.write_prefill(0, req, torch.randn(1, 2, 20, 4),
+                            torch.randn(1, 2, 20, 4))
+        cache.freeze(req, [True], [True], {0: [8]})
+        state = cache.states[req]
+
+        cache.new_step([req])
+        cache.plan_common([req])
+        self.assertFalse(state.block_table_dirty)
+        mark_first_decode_seeded(cache, [req])
+        cache.commit_step()
+        # seed-only 页在 commit 中离开 resident 集，下一步必须刷新 GPU 页表。
+        self.assertTrue(state.block_table_dirty)
+
+        cache.new_step([req])
+        cache.plan_common([req])
+        self.assertFalse(state.block_table_dirty)
+        self.assertEqual(cache.block_table_buf[0, req, 2].item(),
+                         cache.layers[0].PAD_PAGE_ID)
+        cache.commit_step()
+        self.assertFalse(state.block_table_dirty)
+
+        # 同一物理页内 +1 token 不改变 resident membership，不再重复 H2D。
+        cache.new_step([req])
+        cache.plan_common([req])
+        self.assertFalse(state.block_table_dirty)
+
+    def test_far_seed_pages_are_budgeted_until_first_decode_commit(self):
+        from sparse_attn.indexer.nfa_layer_batch_selector import (
+            mark_first_decode_seeded)
+
+        cache = self._make_cache(n_layers=1)
+        req = cache.add_request()
+        cache.write_prefill(0, req, torch.randn(1, 2, 40, 4),
+                            torch.randn(1, 2, 40, 4))
+        # 三个 seed 均位于 far 区且高于 sink+near+SWA 的 token 预算。
+        # 它们仍须在首步消费前驻留，并在消费后由常规回收释放。
+        cache.freeze(req, [True], [True], {0: [16, 20, 24]})
+        state = cache.states[req]
+        self.assertTrue({4, 5, 6}.issubset(state.block_tables[0]))
+
+        cache.new_step([req])
+        cache.plan_common([req])
+        mark_first_decode_seeded(cache, [req])
+        cache.commit_step()
+        self.assertTrue({4, 5, 6}.isdisjoint(state.block_tables[0]))
+
+    def test_visible_bucket_uses_unique_skip_policy_groups(self):
+        cache = self._make_cache(n_layers=4)
+        req = cache.add_request()
+        for layer_idx in range(4):
+            cache.write_prefill(
+                layer_idx, req, torch.randn(1, 2, 20, 4),
+                torch.randn(1, 2, 20, 4))
+        cache.freeze(
+            req, [True, False, True, False], [True, True, True, True])
+        original = cache._intervals_for_layer
+        calls = []
+
+        def counted(state, layer_idx, length):
+            calls.append(layer_idx)
+            return original(state, layer_idx, length)
+
+        cache._intervals_for_layer = counted
+        cache.choose_visible_bucket([req], (16, 32, 64))
+        self.assertEqual(calls, [0, 1])
 
     def test_metadata_shapes_and_padding(self):
         cache = self._make_cache(n_layers=2)
@@ -57,9 +130,9 @@ class GraphReadyPagedRegionCacheTest(unittest.TestCase):
         cache.new_step(req_ids)
         for layer_idx in range(2):
             gather, vis = cache.prepare_metadata(req_ids, layer_idx)
-            self.assertEqual(gather.shape, (4, 64))
-            self.assertEqual(vis.shape, (4,))
-            self.assertEqual(vis.tolist()[2:], [0, 0])
+            self.assertEqual(gather.shape, (4, 2, 64))
+            self.assertEqual(vis.shape, (4, 2))
+            self.assertEqual(vis.tolist()[2:], [[0, 0], [0, 0]])
 
         self.assertEqual(cache.block_table_buf[:, 2].unique().tolist(),
                          [cache.layers[0].PAD_PAGE_ID])
@@ -132,6 +205,49 @@ class GraphReadyPagedRegionCacheTest(unittest.TestCase):
 
         cache.remove_request(req)
         self.assertEqual([len(layer.free_ids) for layer in cache.layers], [64, 64])
+
+    @unittest.skipUnless(torch.cuda.is_available(), 'requires CUDA')
+    def test_prefill_batched_scatter_matches_cpu_reference(self):
+        def make_cache(device):
+            geometry = RegionGeometry(
+                sink=2, near=8, window=3, page=4, max_new_tokens=20)
+            cache = GraphReadyPagedRegionCache(
+                2, geometry, max_requests=8, max_physical_pages=64,
+                max_blocks=8, max_visible_len=64, max_query_tokens=16,
+                num_kv_heads=2, head_dim_k=4, head_dim_v=4,
+                dtype=torch.float32, device=device)
+            for layer in cache.layers:
+                layer.kv_pool_k.fill_(-7)
+                layer.kv_pool_v.fill_(-11)
+            return cache
+
+        cpu_cache = make_cache('cpu')
+        gpu_cache = make_cache('cuda')
+        generator = torch.Generator().manual_seed(20261103)
+        lengths = {0: 1, 1: 3, 2: 4, 4: 5, 5: 9, 6: 17}
+        for request_id, length in lengths.items():
+            cpu_cache.add_request(request_id)
+            gpu_cache.add_request(request_id)
+            for layer_idx in range(2):
+                keys = torch.randn(
+                    1, 2, length, 4, generator=generator) + layer_idx
+                values = torch.randn(
+                    1, 2, length, 4, generator=generator) - layer_idx
+                cpu_cache.write_prefill(layer_idx, request_id, keys, values)
+                gpu_cache.write_prefill(
+                    layer_idx, request_id, keys.cuda(), values.cuda())
+
+        torch.testing.assert_close(
+            gpu_cache.block_table_buf.cpu(), cpu_cache.block_table_buf,
+            rtol=0, atol=0)
+        for layer_idx in range(2):
+            # 比较整个 arena，同时覆盖非整页尾部和越界写入。
+            torch.testing.assert_close(
+                gpu_cache.layers[layer_idx].kv_pool_k.cpu(),
+                cpu_cache.layers[layer_idx].kv_pool_k, rtol=0, atol=0)
+            torch.testing.assert_close(
+                gpu_cache.layers[layer_idx].kv_pool_v.cpu(),
+                cpu_cache.layers[layer_idx].kv_pool_v, rtol=0, atol=0)
 
 
 if __name__ == '__main__':

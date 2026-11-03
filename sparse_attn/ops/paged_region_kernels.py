@@ -62,12 +62,54 @@ if triton is not None:
 
 
     @triton.jit
+    def _paged_write_prefill_kernel(
+        KEYS, VALUES, BLOCK_TABLE, K_POOL, V_POOL, N,
+        HK: tl.constexpr,
+        D: tl.constexpr,
+        DV: tl.constexpr,
+        PAGE: tl.constexpr,
+        BT: tl.constexpr,
+        BD: tl.constexpr,
+        BV: tl.constexpr,
+    ):
+        # 一个 program 搬运单个 KV head 的二维 token/dim tile；同一 tile
+        # 可以跨逻辑页，物理页号逐 token 查表，尾部仅由 N mask。
+        tile = tl.program_id(0)
+        h = tl.program_id(1)
+        token = tile * BT + tl.arange(0, BT)
+        d = tl.arange(0, BD)
+        vd = tl.arange(0, BV)
+        token_mask = token < N
+        logical_page = token // PAGE
+        offset = token % PAGE
+        physical = tl.load(
+            BLOCK_TABLE + logical_page, mask=token_mask, other=0).to(tl.int64)
+        token64 = token.to(tl.int64)
+
+        key = tl.load(
+            KEYS + h * N * D + token64[:, None] * D + d[None, :],
+            mask=token_mask[:, None] & (d[None, :] < D), other=0.0)
+        k_ptr = (
+            K_POOL + physical[:, None] * (HK * PAGE * D)
+            + h * (PAGE * D) + offset[:, None] * D + d[None, :])
+        tl.store(k_ptr, key, mask=token_mask[:, None] & (d[None, :] < D))
+
+        value = tl.load(
+            VALUES + h * N * DV + token64[:, None] * DV + vd[None, :],
+            mask=token_mask[:, None] & (vd[None, :] < DV), other=0.0)
+        v_ptr = (
+            V_POOL + physical[:, None] * (HK * PAGE * DV)
+            + h * (PAGE * DV) + offset[:, None] * DV + vd[None, :])
+        tl.store(v_ptr, value, mask=token_mask[:, None] & (vd[None, :] < DV))
+
+
+    @triton.jit
     def _gather_attend_kernel(
         Q,
         K_POOL,
         V_POOL,
-        GATHER,          # [B, MAX_VISIBLE] absolute physical slots
-        VISIBLE_LENS,    # [B]
+        GATHER,          # [B, HK, MAX_VISIBLE] absolute physical slots
+        VISIBLE_LENS,    # [B, HK]
         QUERY_TO_REQ,    # [TOTAL_QUERIES]
         OUT,
         TOTAL_QUERIES,
@@ -113,7 +155,7 @@ if triton is not None:
                 mask=vd < DV,
             )
             return
-        vis_len = tl.load(VISIBLE_LENS + req_idx, cache_modifier='.cg')
+        vis_len = tl.load(VISIBLE_LENS + req_idx * HK + kv_head, cache_modifier='.cg')
 
         # Keep Q and K in the KV dtype for tl.dot.  bf16 and fp16 both map to
         # Tensor Core MMA; the online softmax accumulators stay in fp32.
@@ -146,7 +188,7 @@ if triton is not None:
             col = tl.max_contiguous(start + t, BT)
             col_valid = col < vis_len
             slot = tl.load(
-                GATHER + req_idx * MAX_VISIBLE + col,
+                GATHER + (req_idx * HK + kv_head) * MAX_VISIBLE + col,
                 mask=col_valid, other=-1, cache_modifier='.cg')
             valid = col_valid & (slot >= 0)
 
@@ -229,11 +271,18 @@ if triton is not None:
         BV: tl.constexpr,
         HEAD_GROUP: tl.constexpr,
         HEAD_TILE: tl.constexpr,
+        HEADS_PER_PROGRAM: tl.constexpr,
         USE_BF16: tl.constexpr,
     ):
         """Grouped Tensor-Core gather attention over all visible blocks."""
         q_idx = tl.program_id(0)
-        kv_head = tl.program_id(1)
+        if HEADS_PER_PROGRAM == 1:
+            head = tl.program_id(1)
+            kv_head = head // HEAD_GROUP
+            head_base = head
+        else:
+            kv_head = tl.program_id(1)
+            head_base = kv_head * HEAD_GROUP
         if q_idx >= TOTAL_QUERIES:
             return
 
@@ -242,9 +291,9 @@ if triton is not None:
         t = tl.arange(0, BT)
         h = tl.arange(0, HEAD_TILE)
         req_idx = tl.load(QUERY_TO_REQ + q_idx, cache_modifier='.cg')
-        out_base = OUT + q_idx * HQ * DV + kv_head * HEAD_GROUP * DV
+        out_base = OUT + q_idx * HQ * DV + head_base * DV
         out_ptrs = out_base + h[:, None] * DV + vd[None, :]
-        out_mask = (h[:, None] < HEAD_GROUP) & (vd[None, :] < DV)
+        out_mask = (h[:, None] < HEADS_PER_PROGRAM) & (vd[None, :] < DV)
         if req_idx < 0:
             tl.store(
                 out_ptrs,
@@ -253,11 +302,11 @@ if triton is not None:
             )
             return
 
-        vis_len = tl.load(VISIBLE_LENS + req_idx, cache_modifier='.cg')
-        q_ptrs = Q + q_idx * HQ * D + d[:, None] + (kv_head * HEAD_GROUP + h)[None, :] * D
+        vis_len = tl.load(VISIBLE_LENS + req_idx * HK + kv_head, cache_modifier='.cg')
+        q_ptrs = Q + q_idx * HQ * D + d[:, None] + (head_base + h)[None, :] * D
         q_tile = tl.load(
             q_ptrs,
-            mask=(d[:, None] < D) & (h[None, :] < HEAD_GROUP),
+            mask=(d[:, None] < D) & (h[None, :] < HEADS_PER_PROGRAM),
             other=0.0,
             cache_modifier='.ca',
         )
@@ -275,7 +324,7 @@ if triton is not None:
             col = tl.max_contiguous(start + t, BT)
             col_valid = col < vis_len
             slot = tl.load(
-                GATHER + req_idx * MAX_VISIBLE + col,
+                GATHER + (req_idx * HK + kv_head) * MAX_VISIBLE + col,
                 mask=col_valid, other=-1, cache_modifier='.cg')
             valid = col_valid & (slot >= 0)
             phys_page = (slot >> LOG2_PAGE).to(tl.int64)
@@ -301,7 +350,7 @@ if triton is not None:
             else:
                 k = k.to(tl.float16)
             score_tile = tl.dot(k, q_tile) * SCALE
-            score_valid = valid[:, None] & (h[None, :] < HEAD_GROUP)
+            score_valid = valid[:, None] & (h[None, :] < HEADS_PER_PROGRAM)
             score_tile = tl.where(score_valid, score_tile, float('-inf'))
             new_m = tl.maximum(m, tl.max(score_tile, 0))
             safe_m = tl.where(new_m == float('-inf'), 0.0, new_m)
@@ -324,8 +373,8 @@ if triton is not None:
         Q,
         K_POOL,
         V_POOL,
-        GATHER,          # [B, MAX_VISIBLE] absolute physical slots
-        VISIBLE_LENS,    # [B]
+        GATHER,          # [B, HK, MAX_VISIBLE] absolute physical slots
+        VISIBLE_LENS,    # [B, HK]
         QUERY_TO_REQ,    # [TOTAL_QUERIES]
         OUT,
         PART_ACC, PART_M, PART_Z,
@@ -391,7 +440,7 @@ if triton is not None:
                 )
             return
 
-        vis_len = tl.load(VISIBLE_LENS + req_idx, cache_modifier='.cg')
+        vis_len = tl.load(VISIBLE_LENS + req_idx * HK + kv_head, cache_modifier='.cg')
 
         q_ptrs = Q + q_idx * HQ * D + d[:, None] + (kv_head * HEAD_GROUP + h)[None, :] * D
         q_tile = tl.load(
@@ -426,7 +475,7 @@ if triton is not None:
             col = tl.max_contiguous(start + t, BT)
             col_valid = col < vis_len
             slot = tl.load(
-                GATHER + req_idx * MAX_VISIBLE + col,
+                GATHER + (req_idx * HK + kv_head) * MAX_VISIBLE + col,
                 mask=col_valid, other=-1, cache_modifier='.cg')
             valid = col_valid & (slot >= 0)
 
@@ -518,6 +567,61 @@ if triton is not None:
                  out.to(OUT.dtype.element_ty), mask=mask)
 
 
+def paged_write_prefill(cache_layer, key_states, value_states, block_table, *,
+                        workspace=None):
+    """Write an unpadded B1 prefill with one batched paged-scatter launch.
+
+    ``key_states`` / ``value_states`` are [1,HK,N,D] / [1,HK,N,DV], and
+    ``block_table`` is the current layer/request logical-to-physical row.
+    """
+    if key_states.ndim != 4 or key_states.shape[0] != 1 or key_states.shape[2] < 1:
+        raise ValueError('paged write prefill expects [1,HK,N,D] keys')
+    if value_states.ndim != 4 or value_states.shape[:3] != key_states.shape[:3]:
+        raise ValueError('paged write prefill expects [1,HK,N,DV] values')
+    if key_states.shape[1] != cache_layer.num_kv_heads:
+        raise ValueError('KV head count does not match arena')
+    if key_states.shape[-1] != cache_layer.head_dim_k:
+        raise ValueError('key head dimension does not match arena')
+    if value_states.shape[-1] != cache_layer.head_dim_v:
+        raise ValueError('value head dimension does not match arena')
+    if block_table.ndim != 1 or block_table.device != key_states.device:
+        raise ValueError('prefill block table must be a device-matched 1D row')
+
+    n = key_states.shape[2]
+    hk = cache_layer.num_kv_heads
+    d = cache_layer.head_dim_k
+    dv = cache_layer.head_dim_v
+    page = cache_layer.geometry.page
+    if n > block_table.numel() * page:
+        raise ValueError('prefill length exceeds block-table capacity')
+
+    if key_states.is_cuda:
+        if triton is None:
+            raise RuntimeError('Triton required for paged write prefill')
+        from ..indexer.selection.unique_ranking import _fast_launch
+        bt = 16
+        _fast_launch(
+            workspace, ('paged_write_prefill', id(cache_layer)),
+            _paged_write_prefill_kernel, (triton.cdiv(n, bt), hk),
+            key_states.contiguous(), value_states.contiguous(),
+            block_table.contiguous(), cache_layer.kv_pool_k,
+            cache_layer.kv_pool_v, n,
+            hk, d, dv, page, bt,
+            triton.next_power_of_2(d), triton.next_power_of_2(dv))
+        return key_states, value_states
+
+    # CPU reference 与 Triton 使用同一 logical->physical 映射。
+    for logical_page in range((n + page - 1) // page):
+        physical_id = int(block_table[logical_page])
+        lo = logical_page * page
+        hi = min(lo + page, n)
+        cache_layer.kv_pool_k[physical_id, 0, :, :hi-lo, :].copy_(
+            key_states[0, :, lo:hi, :])
+        cache_layer.kv_pool_v[physical_id, 0, :, :hi-lo, :].copy_(
+            value_states[0, :, lo:hi, :])
+    return key_states, value_states
+
+
 def paged_write_decode(cache_layer, key_states, value_states, slot_mapping, *,
                        workspace=None):
     """Write one decode token per batch row into a fixed physical arena.
@@ -587,13 +691,17 @@ def sparse_paged_attention_gather(
     *,
     scale,
     workspace=None,
+    split_kv=False,
 ):
     """Sparse gather paged attention over a GraphReadyPagedRegionLayer arena.
 
-    ``q`` is flat [T, HQ, D].  ``gather_indices`` is [B, MAX_VISIBLE] absolute
-    physical slots (``physical_page * PAGE + offset``), ``visible_lens`` is [B],
-    and ``query_to_req`` is [T] mapping each flat query row to its request slot.
+    ``q`` is flat [T, HQ, D].  ``gather_indices`` is [B, HK, MAX_VISIBLE]
+    absolute physical slots (``physical_page * PAGE + offset``),
+    ``visible_lens`` is [B, HK], and ``query_to_req`` maps each flat query row
+    to its request slot. Each query head consumes its own KV group's selection.
     The kernel performs no block-table lookup and no integer division.
+    ``split_kv=True`` 是实验对照路径：按 split 顺序归并 online-softmax，
+    数值归约顺序不同于默认 grouped 单 program 路径，不作为语义不变优化。
     """
     if q.ndim != 3 or q.shape[-1] != cache_layer.head_dim_k:
         raise ValueError('sparse gather attention expects flat [T,HQ,D] query')
@@ -602,8 +710,11 @@ def sparse_paged_attention_gather(
     hk = cache_layer.num_kv_heads
     if hq % hk != 0:
         raise ValueError('GQA requires HQ % HK == 0')
+    if (gather_indices.ndim != 3 or gather_indices.shape[1] != hk
+            or visible_lens.shape != gather_indices.shape[:2]):
+        raise ValueError('gather attention expects indices [B,HK,K] and lens [B,HK]')
     total_q = q.shape[0]
-    max_visible = gather_indices.shape[1]
+    max_visible = gather_indices.shape[-1]
     page = cache_layer.geometry.page
     log2_page = page.bit_length() - 1
     if (page & (page - 1)) != 0:
@@ -611,6 +722,9 @@ def sparse_paged_attention_gather(
     use_bf16 = cache_layer.kv_pool_k.dtype == torch.bfloat16
     head_group = hq // hk
     head_tile = max(16, triton.next_power_of_2(head_group)) if triton is not None else 16
+    # B1 的 grouped grid 仅有 HK 个 CTA，无法填满 GPU。按 query head 拆分
+    # 后仍保持每个 head 内完全相同的 online-softmax 循环与 tile 几何。
+    heads_per_program = 1 if total_q == 1 and head_group > 1 else head_group
     use_grouped = (
         cache_layer.head_dim_k >= 16
         and cache_layer.head_dim_v >= 16
@@ -619,7 +733,8 @@ def sparse_paged_attention_gather(
 
     # 生产稳态下 selector 已建立固定几何与 launch context。直接重放 grouped
     # gather 的预绑定 launch，仅替换当前 Q 和新输出，避免重复组织 host 参数。
-    if workspace is not None and q.is_cuda and workspace.get('_nfa_capturing') is False:
+    if (not split_kv and workspace is not None and q.is_cuda
+            and workspace.get('_nfa_capturing') is False):
         context = workspace.get('_nfa_launch_context')
         geometry = workspace.get('_nfa_launch_geometry')
         plan = workspace.get(('eager_gather_call_plan', id(cache_layer)))
@@ -643,7 +758,6 @@ def sparse_paged_attention_gather(
                      else None)
         if capturing is None:
             capturing = torch.cuda.is_current_stream_capturing()
-        split_kv = False
         if use_grouped:
             # Small batches are latency-bound and prefer a wider token tile;
             # larger batches are occupancy-bound and prefer BT=64.  GLM's
@@ -654,7 +768,10 @@ def sparse_paged_attention_gather(
                 kernel_kwargs = {'num_stages': 1}
             else:
                 block_tokens = 128 if total_q <= 8 else 64
-                kernel_kwargs = {}
+                # B1 已按 query head 拆成 32 个 CTA；BT128 下 8 warps
+                # 保持 online-softmax 循环与输出逐项一致，并降低单 CTA 延迟。
+                kernel_kwargs = ({'num_warps': 8}
+                                 if heads_per_program == 1 else {})
             if not split_kv:
                 gather_args = (
                     q.contiguous(),
@@ -678,11 +795,13 @@ def sparse_paged_attention_gather(
                     triton.next_power_of_2(cache_layer.head_dim_v),
                     head_group,
                     head_tile,
+                    heads_per_program,
                     use_bf16,
                 )
                 _fast_launch(
                     workspace, 'gather_attend_grouped',
-                    _gather_attend_grouped_kernel, (total_q, hk),
+                    _gather_attend_grouped_kernel,
+                    (total_q, hq if heads_per_program == 1 else hk),
                     *gather_args, **kernel_kwargs,
                 )
                 if not capturing and workspace is not None:
@@ -779,15 +898,15 @@ def sparse_paged_attention_gather(
         if req_idx < 0:
             # Padded batch rows have no request slot; leave their output zero.
             continue
-        vis_len = int(visible_lens[req_idx].item())
         for h in range(hq):
             kh = h // (hq // hk)
+            vis_len = int(visible_lens[req_idx, kh].item())
             m = float('-inf')
             z = 0.0
             acc = torch.zeros(cache_layer.head_dim_v, dtype=torch.float32,
                               device=q.device)
             for col in range(vis_len):
-                slot = int(gather_indices[req_idx, col].item())
+                slot = int(gather_indices[req_idx, kh, col].item())
                 if slot < 0:
                     continue
                 phys, offset = divmod(slot, page)

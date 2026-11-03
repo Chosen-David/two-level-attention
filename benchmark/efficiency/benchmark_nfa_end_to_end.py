@@ -136,6 +136,15 @@ def _summary(step_ms, warmup):
     }
 
 
+def _memory_snapshot():
+    return {
+        'allocated_bytes': torch.cuda.memory_allocated(),
+        'reserved_bytes': torch.cuda.memory_reserved(),
+        'max_allocated_bytes': torch.cuda.max_memory_allocated(),
+        'max_reserved_bytes': torch.cuda.max_memory_reserved(),
+    }
+
+
 def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
     batch = args.batch_size
     patch_args = nfa_args()
@@ -163,6 +172,7 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
         del output
     torch.cuda.synchronize()
     prefill_seconds = time.perf_counter() - prefill_start
+    prefill_memory = _memory_snapshot()
 
     scheduler = ContinuousBatchScheduler(
         cache=cache, max_batch=batch, eos_ids=eos_ids, pad_token_id=0)
@@ -174,9 +184,15 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
         device=prompt.device)
     if args.execution == 'graph':
         runner.capture_all(model, cache)
+    decode_ready_memory = _memory_snapshot()
 
     step_ms = []
-    for _ in range(max_new_tokens - 1):
+    steady_decode_start = None
+    if args.warmup_steps == 0:
+        torch.cuda.synchronize()
+        steady_decode_start = _memory_snapshot()
+        torch.cuda.reset_peak_memory_stats()
+    for step in range(max_new_tokens - 1):
         counts = [len(generated[request_id]) for request_id in req_ids]
         start, end = _events()
         start.record()
@@ -188,11 +204,31 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
         for row, request_id in enumerate(req_ids):
             generated[request_id].append(int(rows[row]))
         step_ms.append(start.elapsed_time(end))
+        if step + 1 == args.warmup_steps:
+            torch.cuda.synchronize()
+            steady_decode_start = _memory_snapshot()
+            torch.cuda.reset_peak_memory_stats()
+    if steady_decode_start is None:
+        steady_decode_start = _memory_snapshot()
     scheduler.prepare_step()
     result = _summary(step_ms, args.warmup_steps)
     result.update(prefill_seconds=prefill_seconds,
                   generated_token_ids=[generated[request_id] for request_id in req_ids],
-                  gate_mode='dynamic', graph_replays=(len(step_ms) if args.execution == 'graph' else 0))
+                  skip_policy_counts={
+                      str(request_id): {
+                          'far': sum(cache.states[request_id].skip_far_by_layer),
+                          'near': sum(cache.states[request_id].skip_near_by_layer),
+                          'both': sum(far and near for far, near in zip(
+                              cache.states[request_id].skip_far_by_layer,
+                              cache.states[request_id].skip_near_by_layer)),
+                      } for request_id in req_ids},
+                  gate_mode='dynamic', graph_replays=(len(step_ms) if args.execution == 'graph' else 0),
+                  memory={
+                      'prefill_end': prefill_memory,
+                      'decode_ready': decode_ready_memory,
+                      'steady_decode_start': steady_decode_start,
+                      'decode_end': _memory_snapshot(),
+                  })
     return result
 
 
@@ -228,6 +264,7 @@ def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
     torch.cuda.synchronize()
     prefill_seconds = time.perf_counter() - prefill_start
     del output
+    prefill_memory = _memory_snapshot()
 
     input_buf = torch.empty((batch, 1), dtype=torch.long, device=device)
     position_buf = torch.empty((batch, 1), dtype=torch.long, device=device)
@@ -250,8 +287,14 @@ def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.graph(graph):
             static_logits = forward()
+    decode_ready_memory = _memory_snapshot()
 
     step_ms = []
+    steady_decode_start = None
+    if args.warmup_steps == 0:
+        torch.cuda.synchronize()
+        steady_decode_start = _memory_snapshot()
+        torch.cuda.reset_peak_memory_stats()
     for step in range(max_new_tokens - 1):
         start, end = _events()
         input_buf.copy_(next_tokens[:, None])
@@ -270,10 +313,22 @@ def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
         for row in range(batch):
             generated[row].append(int(rows[row]))
         step_ms.append(start.elapsed_time(end))
+        if step + 1 == args.warmup_steps:
+            torch.cuda.synchronize()
+            steady_decode_start = _memory_snapshot()
+            torch.cuda.reset_peak_memory_stats()
+    if steady_decode_start is None:
+        steady_decode_start = _memory_snapshot()
     result = _summary(step_ms, args.warmup_steps)
     result.update(prefill_seconds=prefill_seconds, generated_token_ids=generated,
                   prefill_cpu_offload=args.fa2_prefill_cpu_offload,
-                  graph_replays=(len(step_ms) if graph is not None else 0))
+                  graph_replays=(len(step_ms) if graph is not None else 0),
+                  memory={
+                      'prefill_end': prefill_memory,
+                      'decode_ready': decode_ready_memory,
+                      'steady_decode_start': steady_decode_start,
+                      'decode_end': _memory_snapshot(),
+                  })
     return result
 
 
@@ -289,12 +344,50 @@ def main():
     model = _load_model(args, args.max_new_tokens)
     from benchmark.RULER.pred_ruler import _ruler_eos_ids
     eos_ids = _ruler_eos_ids(model, tokenizer)
+    model_loaded_memory = _memory_snapshot()
+    torch.cuda.reset_peak_memory_stats()
     fa2_scope = _fa2_no_packed_position_ids() if args.method == 'fa2' else nullcontext()
     with torch.inference_mode(), fa2_scope as fa2_state:
         if args.method == 'nfa':
             result = _run_nfa(args, model, prompt, args.max_new_tokens, eos_ids)
         else:
             result = _run_fa2(args, model, prompt, args.max_new_tokens, eos_ids, fa2_state)
+    memory = result.setdefault('memory', {})
+    memory['model_loaded'] = model_loaded_memory
+    # steady_decode_start 在 reset 前保留了 prefill + warmup 的历史峰值；
+    # decode_end 则只反映 reset 后的稳态 decode 峰值。
+    memory['peak_incremental_allocated_bytes'] = (
+        memory['steady_decode_start']['max_allocated_bytes']
+        - model_loaded_memory['allocated_bytes'])
+    memory['peak_incremental_reserved_bytes'] = (
+        memory['steady_decode_start']['max_reserved_bytes']
+        - model_loaded_memory['reserved_bytes'])
+    memory['steady_decode_resident_incremental_allocated_bytes'] = (
+        memory['steady_decode_start']['allocated_bytes']
+        - model_loaded_memory['allocated_bytes'])
+    memory['steady_decode_resident_incremental_reserved_bytes'] = (
+        memory['steady_decode_start']['reserved_bytes']
+        - model_loaded_memory['reserved_bytes'])
+    memory['steady_decode_peak_incremental_allocated_bytes'] = (
+        memory['decode_end']['max_allocated_bytes']
+        - memory['steady_decode_start']['allocated_bytes'])
+    memory['steady_decode_peak_incremental_reserved_bytes'] = (
+        memory['decode_end']['max_reserved_bytes']
+        - memory['steady_decode_start']['reserved_bytes'])
+    if args.method == 'nfa':
+        selector_args = nfa_args()
+        result['nfa_selector_config'] = {
+            'subspace': selector_args.nfa_subspace,
+            'subspace_cmp_ratio': selector_args.tia_level2_cmp_ratio,
+            'level1_topk': selector_args.tia_level1_topk,
+            'level2_topk': selector_args.tia_level2_topk,
+            'near_pages': selector_args.nfa_near_pages,
+            'near_tokens': selector_args.nfa_near_tokens,
+            'near_len': selector_args.nfa_near_len,
+            'enable_layer_skip': selector_args.nfa_enable_layer_skip,
+            'sink_tokens': selector_args.nfa_sink_tokens,
+            'sliding_window_size': selector_args.nfa_swa_size,
+        }
     result.update(
         method=args.method, execution=args.execution, batch_size=args.batch_size,
         context_length=args.context_length, max_new_tokens=args.max_new_tokens,

@@ -79,6 +79,10 @@ class ContinuousBatchScheduler:
             (max_batch,), dtype=torch.bool, device=self.device)
         self._zero_buf = torch.zeros(
             (max_batch,), dtype=torch.long, device=self.device)
+        self._cpu_generated_counts_staging = torch.zeros(
+            (max_batch,), dtype=torch.long).pin_memory()
+        self._device_generated_counts_buf = torch.zeros(
+            (max_batch,), dtype=torch.long, device=self.device)
 
         self._eos_tensor = torch.tensor(
             list(self.eos_ids), dtype=torch.int64, device=self.device)
@@ -93,13 +97,16 @@ class ContinuousBatchScheduler:
             torch.empty((max_batch,), dtype=torch.int64).pin_memory()
             for _ in range(2)
         ]
+        self._token_req_cpu = [
+            torch.empty((max_batch,), dtype=torch.int64).pin_memory()
+            for _ in range(2)
+        ]
         self._copy_events = [torch.cuda.Event() for _ in range(2)]
         for event in self._copy_events:
             event.record()
         self._copy_stream = torch.cuda.Stream()
-        self._pending_copy_idx = None
-        self._pending_batch = 0
-        self._pending_stop_on_eos = True
+        self._pending_batches = [0, 0]
+        self._pending_stop_on_eos = [True, True]
 
     def add_request(self, request_id):
         if request_id not in self.active_req_ids:
@@ -122,31 +129,31 @@ class ContinuousBatchScheduler:
         return req_ids + [-1] * (bucket - n)
 
     def _drain_pending_next_tokens(self):
-        if self._pending_copy_idx is None:
-            return
+        # 设备端下一步输入不依赖这份 CPU 回执；拷贝未就绪时直接跳过，
+        # 让主调度循环继续提交 GPU 工作。两个槽位独立保存，避免慢回执被覆盖。
+        for idx, batch in enumerate(self._pending_batches):
+            if batch == 0:
+                continue
+            if not self._copy_events[idx].query():
+                continue
 
-        idx = self._pending_copy_idx
-        self._copy_events[idx].synchronize()
+            tokens = self._token_cpu[idx][:batch]
+            req_ids = self._token_req_cpu[idx][:batch]
+            valid = req_ids >= 0
 
-        batch = self._pending_batch
-        tokens = self._token_cpu[idx][:batch]
-        req_ids = self._cpu_req_staging[:batch]
-        valid = req_ids >= 0
+            if valid.any():
+                ids = req_ids[valid].tolist()
+                toks = tokens[valid].tolist()
+                self.next_tokens.update(zip(ids, toks))
 
-        if valid.any():
-            ids = req_ids[valid].tolist()
-            toks = tokens[valid].tolist()
-            self.next_tokens.update(zip(ids, toks))
+            eos = valid & torch.isin(tokens, self._eos_cpu_tensor)
+            if self._pending_stop_on_eos[idx]:
+                finished_ids = req_ids[eos].tolist()
+                for request_id in finished_ids:
+                    self.finish_request(request_id)
 
-        eos = valid & torch.isin(tokens, self._eos_cpu_tensor)
-        if self._pending_stop_on_eos:
-            finished_ids = req_ids[eos].tolist()
-            for request_id in finished_ids:
-                self.finish_request(request_id)
-
-        self._pending_copy_idx = None
-        self._pending_batch = 0
-        self._pending_stop_on_eos = True
+            self._pending_batches[idx] = 0
+            self._pending_stop_on_eos[idx] = True
 
     def _seed_new_requests(self, padded):
         if not padded:
@@ -219,8 +226,17 @@ class ContinuousBatchScheduler:
 
         batch = len(req_ids)
         if forced_tokens is None:
+            counts = generated_counts
+            if not isinstance(counts, torch.Tensor):
+                staging = self._cpu_generated_counts_staging[:batch]
+                if isinstance(counts, int):
+                    staging.fill_(counts)
+                else:
+                    staging.copy_(torch.as_tensor(counts, dtype=torch.long))
+                counts = self._device_generated_counts_buf[:batch]
+                counts.copy_(staging, non_blocking=True)
             next_tokens = greedy_next_tokens(
-                logits, self.eos_ids, generated_counts=generated_counts,
+                logits, self.eos_ids, generated_counts=counts,
                 min_new_tokens=min_new_tokens)
         else:
             if len(forced_tokens) != batch:
@@ -245,6 +261,7 @@ class ContinuousBatchScheduler:
 
         idx = self._step_counter & 1
         self._step_counter += 1
+        self._token_req_cpu[idx][:batch].copy_(self._cpu_req_staging[:batch])
 
         torch.cuda.current_stream().wait_event(self._copy_events[idx])
         device_buf = self._token_dev[idx]
@@ -255,7 +272,6 @@ class ContinuousBatchScheduler:
             device_buf[:batch], non_blocking=True)
         self._copy_events[idx].record(self._copy_stream)
 
-        self._pending_copy_idx = idx
-        self._pending_batch = batch
-        self._pending_stop_on_eos = stop_on_eos
+        self._pending_batches[idx] = batch
+        self._pending_stop_on_eos[idx] = stop_on_eos
         return next_tokens

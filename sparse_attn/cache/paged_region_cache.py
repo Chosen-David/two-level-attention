@@ -68,6 +68,9 @@ class RequestState:
     resident_page_ranges_by_layer: list = field(default_factory=list)
     last_sync_length: int = 0
     skip_policy_groups: tuple = ()
+    # CPU staging 与 GPU block_table_buf 的同步脏标记；稳态无页表变化时
+    # 不再重复执行全层、全宽 H2D。
+    block_table_dirty: bool = True
 
 
 class GraphReadyPagedRegionLayer:
@@ -171,6 +174,7 @@ class GraphReadyPagedRegionCache:
         self.max_visible_len = max_visible_len
         self.max_query_tokens = max_query_tokens
         self.max_prefill_seed_len = max_prefill_seed_len
+        self.num_kv_heads = num_kv_heads
         self.num_query_heads = num_kv_heads if num_query_heads is None else num_query_heads
 
         self.layers = [
@@ -200,6 +204,9 @@ class GraphReadyPagedRegionCache:
         self._pending_free_pages = []
         self._reclaimed_pages_by_layer = [0] * n_layers
         self.common_dirty = True
+        self._common_active_req_ids = ()
+        self._common_state_refs = ()
+        self._visible_bucket_cache = {}
         # 仅由 GraphRunner 在完整 decode step 后递增；请求结束回执据此
         # fail-closed，避免把只完成 prefill 的 Cache 误认为已跑过 NFA decode。
         self.nfa_decode_steps = 0
@@ -242,22 +249,22 @@ class GraphReadyPagedRegionCache:
         self.planned_lengths_buf = torch.zeros(
             (max_query_tokens,), dtype=torch.int32, device=device)
 
-        # 层间异构计算量：每层一套 gather_indices / visible_lens。
+        # 层间与 KV group 间均允许不同选集；query head 消费所属 KV group 的行。
         self.gather_indices_buf = torch.full(
-            (n_layers, max_requests, max_visible_len),
+            (n_layers, max_requests, num_kv_heads, max_visible_len),
             INVALID_GATHER_IDX,
             dtype=torch.int32,
             device=device,
         )
         self.visible_lens_buf = torch.zeros(
-            (n_layers, max_requests),
+            (n_layers, max_requests, num_kv_heads),
             dtype=torch.int32,
             device=device,
         )
 
         # CPU staging：capture 后每步只 copy_，不在热路径 torch.tensor()。
         self._cpu_gather_staging = torch.full(
-            (max_requests, max_visible_len),
+            (max_requests, num_kv_heads, max_visible_len),
             INVALID_GATHER_IDX,
             dtype=torch.int32,
             device='cpu',
@@ -302,14 +309,6 @@ class GraphReadyPagedRegionCache:
             (max_query_tokens,), dtype=torch.int64, device='cpu')
         self._cpu_planned_lengths_staging = torch.zeros(
             (max_query_tokens,), dtype=torch.int32, device='cpu')
-        self._cpu_skip_far_staging = torch.zeros(
-            (max_requests,), dtype=torch.int32, device='cpu')
-        self._cpu_skip_near_staging = torch.zeros(
-            (max_requests,), dtype=torch.int32, device='cpu')
-        self.skip_far_buf = torch.zeros(
-            (max_requests,), dtype=torch.int32, device=device)
-        self.skip_near_buf = torch.zeros(
-            (max_requests,), dtype=torch.int32, device=device)
         self.skip_far_layer_buf = torch.zeros(
             (n_layers, max_requests), dtype=torch.int32, device=device)
         self.skip_near_layer_buf = torch.zeros(
@@ -325,8 +324,6 @@ class GraphReadyPagedRegionCache:
             self._cpu_query_to_req_staging = self._cpu_query_to_req_staging.pin_memory()
             self._cpu_active_req_ids_staging = self._cpu_active_req_ids_staging.pin_memory()
             self._cpu_planned_lengths_staging = self._cpu_planned_lengths_staging.pin_memory()
-            self._cpu_skip_far_staging = self._cpu_skip_far_staging.pin_memory()
-            self._cpu_skip_near_staging = self._cpu_skip_near_staging.pin_memory()
             self._cpu_skip_far_layer_staging = self._cpu_skip_far_layer_staging.pin_memory()
             self._cpu_skip_near_layer_staging = self._cpu_skip_near_layer_staging.pin_memory()
         # 固定 prefill seed buffer：freeze 时一次性写入，decode 热路径不再
@@ -354,6 +351,11 @@ class GraphReadyPagedRegionCache:
             dtype=torch.int32,
             device='cpu',
         )
+        # 首步 seed 消费使用固定 request-id staging，避免每步创建 GPU 张量。
+        self.first_decode_seed_reqs_buf = torch.zeros(
+            (max_requests,), dtype=torch.int64, device=device)
+        self._cpu_first_decode_seed_reqs_staging = torch.zeros(
+            (max_requests,), dtype=torch.int64, device='cpu')
         self._cpu_prefill_seed_ids_staging = torch.full(
             (n_layers, max_requests, max_prefill_seed_len),
             -1,
@@ -369,6 +371,7 @@ class GraphReadyPagedRegionCache:
             self._cpu_prefill_seed_ids_staging = self._cpu_prefill_seed_ids_staging.pin_memory()
             self._cpu_prefill_seed_counts_staging = self._cpu_prefill_seed_counts_staging.pin_memory()
             self._cpu_first_decode_seeded_staging = self._cpu_first_decode_seeded_staging.pin_memory()
+            self._cpu_first_decode_seed_reqs_staging = self._cpu_first_decode_seed_reqs_staging.pin_memory()
 
         # Optional visible-length graph buckets.  ``max_visible_len`` itself is
         # always served by the primary contiguous buffers; smaller buckets own
@@ -394,13 +397,13 @@ class GraphReadyPagedRegionCache:
             if width in self._gather_indices_by_vis:
                 continue
             self._gather_indices_by_vis[width] = torch.full(
-                (self.n_layers, self.max_requests, width),
+                (self.n_layers, self.max_requests, self.num_kv_heads, width),
                 INVALID_GATHER_IDX,
                 dtype=torch.int32,
                 device=self.gather_indices_buf.device,
             )
             self._visible_lens_by_vis[width] = torch.zeros(
-                (self.n_layers, self.max_requests),
+                (self.n_layers, self.max_requests, self.num_kv_heads),
                 dtype=torch.int32,
                 device=self.visible_lens_buf.device,
             )
@@ -427,30 +430,61 @@ class GraphReadyPagedRegionCache:
         return self.slot_mapping_buf[layer_idx]
 
     def choose_visible_bucket(self, req_ids, visible_buckets):
-        """Smallest bucket >= max coarse visible length for this decode batch.
-
-        The NFA Top-K result is always a subset of the coarse visible
-        intervals, so bounding by interval length is conservative and requires
-        no device-to-host read.
-        """
-        max_total = 0
+        """按策略缓存 coarse 上界；连续 decode 仅在余量不足时重算。"""
+        states = []
+        lengths = []
+        policies = []
         for request_id in req_ids:
             if request_id is None or request_id < 0 or request_id not in self.states:
+                states.append(None)
+                lengths.append(-1)
+                policies.append(None)
                 continue
             state = self.states[request_id]
-            length = self.pending_lengths.get(request_id, state.logical_length)
+            states.append(state)
+            lengths.append(self.pending_lengths.get(
+                request_id, state.logical_length))
+            groups = (state.skip_policy_groups
+                      or self._build_skip_policy_groups(state))
+            policies.append(tuple(key for key, _layer_idx in groups))
+
+        cache_key = (tuple(policies), len(req_ids), tuple(sorted(visible_buckets)))
+        cached = self._visible_bucket_cache.get(cache_key)
+        state_refs = tuple(states)
+        current_lengths = tuple(lengths)
+        if cached is not None:
+            old_refs, old_lengths, old_max, old_width = cached
+            if old_refs == state_refs and all(
+                    new >= old for new, old in zip(current_lengths, old_lengths)):
+                max_delta = max(
+                    (new - old for new, old in zip(current_lengths, old_lengths)),
+                    default=0)
+                # 每个请求的 coarse 区间总长度随 logical length 的增长量
+                # 不超过长度增量；seed 消失只会缩小支持集。
+                if old_max + max_delta <= old_width:
+                    return old_width
+
+        max_total = 0
+        for state, length in zip(states, lengths):
+            if state is None:
+                continue
             seed_max = max(
                 (len(ids) for ids in state.prefill_topk_ids_by_layer.values()),
                 default=0)
-            for layer_idx in range(self.n_layers):
+            groups = (state.skip_policy_groups
+                      or self._build_skip_policy_groups(state))
+            for _key, layer_idx in groups:
                 intervals = self._intervals_for_layer(state, layer_idx, length)
                 total = sum(b - a for a, b in intervals) + seed_max
-                if total > max_total:
-                    max_total = total
-        for width in sorted(visible_buckets):
-            if width >= max_total:
-                return width
-        return self.max_visible_len
+                max_total = max(max_total, total)
+        width = self.max_visible_len
+        for candidate in sorted(visible_buckets):
+            if candidate >= max_total:
+                width = candidate
+                break
+        self._visible_bucket_cache[cache_key] = (
+            state_refs, current_lengths, max_total, width)
+        return width
 
     # ------------------------------------------------------------------
     # Physical page allocation (independent per layer)
@@ -594,21 +628,21 @@ class GraphReadyPagedRegionCache:
         elif n != state.prompt_length:
             raise ValueError('prefill length diverged across layers')
 
-        self._write_block_table_row(request_id, state)
-
-        # 逐页写入该层自己的物理 Arena。
+        # 只刷新并同步当前层/request 行；其余层在各自 prefill 到达时更新。
+        row = self._cpu_block_table_staging[layer_idx, request_id]
+        row.fill_(self.layers[0].PAD_PAGE_ID)
         for logical_page, physical_id in block_table.items():
-            lo = logical_page * page
-            hi = min(lo + page, n)
-            if hi <= lo:
-                continue
-            off = lo - logical_page * page
-            layer.kv_pool_k[physical_id, 0, :, off:off + (hi - lo), :].copy_(
-                keys[0, :, lo:hi, :])
-            layer.kv_pool_v[physical_id, 0, :, off:off + (hi - lo), :].copy_(
-                values[0, :, lo:hi, :])
+            if 0 <= logical_page < self.max_blocks:
+                row[logical_page] = physical_id
+        self.block_table_buf[layer_idx, request_id].copy_(
+            row, non_blocking=keys.is_cuda)
 
-        return keys, values
+        # 整段 KV 单次批量 scatter，消除逐逻辑页 Python 循环和小拷贝。
+        from ..ops.paged_region_kernels import paged_write_prefill
+        workspace = getattr(self, '_nfa_selector_workspace', None)
+        return paged_write_prefill(
+            layer, keys, values, self.block_table_buf[layer_idx, request_id],
+            workspace=workspace)
 
     def freeze(self, request_id, skip_far_list, skip_near_list,
                prefill_topk_by_layer=None):
@@ -691,6 +725,7 @@ class GraphReadyPagedRegionCache:
         state.resident_page_ranges_by_layer = resident_now_ranges
         state.last_sync_length = state.logical_length
         self._write_block_table_row(request_id, state)
+        state.block_table_dirty = True
         state.frozen = True
         self.transition_request(request_id, RequestPhase.FREEZE)
         state.first_decode_seeded = False
@@ -780,12 +815,6 @@ class GraphReadyPagedRegionCache:
                     page_ranges.append((a // page, (b - 1) // page))
         return self._merge_page_ranges(page_ranges)
 
-    def _resident_page_union_for_length(self, state, length):
-        # Kept as a compatibility helper.  New hot paths use the range form so
-        # long resident intervals do not materialize Python set(range(...)).
-        return set(self._pages_in_ranges(
-            self._resident_page_ranges_for_length(state, length)))
-
     @staticmethod
     def _pages_in_ranges(ranges):
         pages = []
@@ -846,7 +875,7 @@ class GraphReadyPagedRegionCache:
             seed_pages = {
                 token_id // page
                 for token_id in state.prefill_topk_ids_by_layer.get(layer_idx, ())
-                if 0 <= token_id < resident_tokens
+                if 0 <= token_id < state.prompt_length
             }
             max_pages += len(seed_pages)
         return max_pages
@@ -867,6 +896,7 @@ class GraphReadyPagedRegionCache:
             state.resident_page_ranges_by_layer = [
                 () for _ in range(self.n_layers)]
         new_ranges_by_layer = []
+        changed = False
         pad = self.layers[0].PAD_PAGE_ID
         for layer_idx in range(self.n_layers):
             new_ranges = self._resident_page_ranges_for_layer(
@@ -885,6 +915,8 @@ class GraphReadyPagedRegionCache:
                 if logical_page in block_table:
                     free_slots.append(block_table.pop(logical_page))
 
+            if missing or stale:
+                changed = True
             if request_id is not None and (missing or stale):
                 row = self._cpu_block_table_staging[layer_idx, request_id]
                 for logical_page in missing:
@@ -893,33 +925,18 @@ class GraphReadyPagedRegionCache:
                 for logical_page in stale:
                     if 0 <= logical_page < self.max_blocks:
                         row[logical_page] = pad
+                # near-skip 的历史页进入 far 时会重新绑定非最新逻辑页。
+                # 该页旧统计可能是 PAD 零占位，不能只增量重算最新块。
+                latest_page = max(0, (length - 1) // self.geometry.page)
+                if (hasattr(self, '_nfa_page_stats_lengths')
+                        and any(lp < latest_page for lp in missing)):
+                    self._nfa_page_stats_lengths[layer_idx, request_id].zero_()
             new_ranges_by_layer.append(new_ranges)
 
         state.resident_page_ranges_by_layer = new_ranges_by_layer
         state.last_sync_length = length
-
-    def _visible_logical_ids_for_layer(self, state, layer_idx, selected_ids=None,
-                                       length=None):
-        if length is None:
-            length = state.logical_length
-        intervals = self._intervals_for_layer(state, layer_idx, length)
-        count = sum(b - a for a, b in intervals)
-        ids = torch.empty((count,), dtype=torch.int32, device='cpu')
-        offset = 0
-        for a, b in intervals:
-            n = b - a
-            if n > 0:
-                torch.arange(a, b, dtype=torch.int32,
-                             out=ids[offset:offset + n])
-                offset += n
-        if selected_ids is not None:
-            if not isinstance(selected_ids, torch.Tensor):
-                selected_ids = torch.as_tensor(selected_ids, dtype=torch.int32,
-                                               device='cpu')
-            elif selected_ids.device != ids.device:
-                selected_ids = selected_ids.to(ids.device)
-            ids = ids[torch.isin(ids, selected_ids)]
-        return ids
+        if changed:
+            state.block_table_dirty = True
 
     # ------------------------------------------------------------------
     # Metadata preparation (common page table + per-layer sparse gather)
@@ -958,8 +975,8 @@ class GraphReadyPagedRegionCache:
         slots = phys_pages.to(torch.int32) * page_size + offsets.to(torch.int32)
         slots = torch.where(ids >= 0, slots,
                             torch.full_like(slots, INVALID_GATHER_IDX))
-        self.gather_indices_buf[layer_idx, batch_idx, :width].copy_(
-            slots, non_blocking=True)
+        self.gather_indices_buf[layer_idx, batch_idx, :, :width].copy_(
+            slots.unsqueeze(0), non_blocking=True)
 
     def _store_gather_slots_batch(self, layer_idx, logical_ids, counts):
         """Batch version of ``_store_gather_slots`` for fixed-width varlen rows.
@@ -970,7 +987,11 @@ class GraphReadyPagedRegionCache:
         """
         if logical_ids.numel() == 0 or counts.numel() == 0:
             return
-        batch, width = logical_ids.shape
+        if logical_ids.ndim == 2:
+            logical_ids = logical_ids.unsqueeze(1)
+        if logical_ids.ndim != 3 or logical_ids.shape[1] != self.num_kv_heads:
+            raise ValueError('logical gather ids must be [B,W] or [B,Hkv,W]')
+        batch, _, width = logical_ids.shape
         ids = logical_ids
         if ids.device != self.gather_indices_buf.device:
             ids = ids.to(self.gather_indices_buf.device)
@@ -989,28 +1010,45 @@ class GraphReadyPagedRegionCache:
             offsets = torch.remainder(ids, page_size)
 
         safe_pages = torch.clamp(pages, min=0, max=self.max_blocks - 1)
-        phys_pages = self.block_table_buf[layer_idx, :batch].gather(
-            1, safe_pages.to(torch.int64))
+        phys_pages = self.block_table_buf[
+            layer_idx, :batch, None, :].expand(-1, ids.shape[1], -1).gather(
+                2, safe_pages.to(torch.int64))
         slots = phys_pages.to(torch.int32) * page_size + offsets.to(torch.int32)
         slots = torch.where(
             ids >= 0, slots,
             torch.full_like(slots, INVALID_GATHER_IDX))
-        self.gather_indices_buf[layer_idx, :batch, :width].copy_(
+        self.gather_indices_buf[layer_idx, :batch, :, :width].copy_(
             slots, non_blocking=True)
+        if counts.ndim == 1:
+            counts = counts.unsqueeze(1)
         self.visible_lens_buf[layer_idx, :batch].copy_(
             counts.to(torch.int32), non_blocking=True)
 
     def new_step(self, active_req_ids):
         self._reclaim_pending_free()
-        self.active_req_ids = list(active_req_ids)
-        self.common_dirty = True
+        req_ids = tuple(active_req_ids)
+        state_refs = tuple(
+            self.states.get(rid) if rid is not None and rid >= 0 else None
+            for rid in req_ids)
+        active_changed = (
+            req_ids != self._common_active_req_ids
+            or len(state_refs) != len(self._common_state_refs)
+            or any(new is not old for new, old in zip(
+                state_refs, self._common_state_refs)))
+        page = self.geometry.page
+        needs_full = active_changed
+        for state in state_refs:
+            if state is None:
+                continue
+            # 下一 token 位于新逻辑页，或页表有其他显式失效时，slot/page
+            # 元数据必须完整重建。普通连续 decode 不再无条件 dirty。
+            needs_full = needs_full or state.block_table_dirty
+            needs_full = needs_full or state.logical_length % page == 0
+        self.active_req_ids = list(req_ids)
+        self.common_dirty = self.common_dirty or needs_full
 
     def plan_common(self, active_req_ids, query_lengths=None):
-        """Prepare common page/slot/query metadata without layer gather.
-
-        This gives the request-batched selector the planned decode lengths
-        before Top-K selection, without an extra all-layer gather pass.
-        """
+        """准备公共元数据；稳态单 token decode 只推进计划长度。"""
         if query_lengths is None:
             query_lengths = [
                 1 if (rid >= 0 and rid in self.states) else 0
@@ -1019,6 +1057,65 @@ class GraphReadyPagedRegionCache:
         self.active_req_ids = list(active_req_ids)
         if self.common_dirty:
             self._prepare_common(active_req_ids, query_lengths)
+        elif not self._prepare_decode_common_fast(active_req_ids, query_lengths):
+            self._prepare_common(active_req_ids, query_lengths)
+
+    def _resident_pages_change(self, state, planned_length):
+        """只比较唯一 skip-policy 组，覆盖区域迁移导致的页表变化。"""
+        page = self.geometry.page
+        if (state.logical_length // page
+                != (planned_length - 1) // page):
+            return True
+        groups = (state.skip_policy_groups
+                  or self._build_skip_policy_groups(state))
+        for _key, layer_idx in groups:
+            new_ranges = self._resident_page_ranges_for_layer(
+                state, layer_idx, planned_length)
+            if new_ranges != state.resident_page_ranges_by_layer[layer_idx]:
+                return True
+        return False
+
+    def _prepare_decode_common_fast(self, req_ids, query_lengths):
+        """复用未变化的页表/query 映射，并推进计划长度和页内写入位置。"""
+        req_ids = tuple(req_ids)
+        if req_ids != self._common_active_req_ids:
+            return False
+        batch = len(req_ids)
+        state_refs = tuple(
+            self.states.get(rid) if rid is not None and rid >= 0 else None
+            for rid in req_ids)
+        if len(state_refs) != len(self._common_state_refs) or any(
+                new is not old for new, old in zip(
+                    state_refs, self._common_state_refs)):
+            return False
+        planned = []
+        for row, (request_id, state) in enumerate(zip(req_ids, state_refs)):
+            qlen = int(query_lengths[row]) if row < len(query_lengths) else 0
+            expected = 1 if state is not None else 0
+            if qlen != expected:
+                return False
+            if state is None:
+                planned.append(0)
+                continue
+            if state.block_table_dirty:
+                return False
+            if qlen and self._resident_pages_change(
+                    state, state.logical_length + qlen):
+                return False
+            planned.append(state.logical_length + qlen)
+
+        # 上一步与当前 token 位于同一物理页；有效 decode slot 的页内 offset
+        # 随 token 位置加一，PAD_SLOT 保持不变。
+        slots = self.slot_mapping_buf[:, :batch]
+        slots.add_(slots >= 0)
+        self.pending_lengths.clear()
+        for row, (request_id, state) in enumerate(zip(req_ids, state_refs)):
+            self._cpu_planned_lengths_staging[row] = planned[row]
+            if state is not None:
+                self.pending_lengths[request_id] = planned[row]
+        self.planned_lengths_buf[:batch].copy_(
+            self._cpu_planned_lengths_staging[:batch], non_blocking=True)
+        return True
 
     def _prepare_common(self, req_ids, query_lengths):
         page = self.geometry.page
@@ -1050,8 +1147,14 @@ class GraphReadyPagedRegionCache:
             # 只预分配/更新各层 block_table，不推进 state.logical_length。
             self._sync_block_table(state, planned_length, request_id=request_id)
             self.pending_lengths[request_id] = planned_length
-            self.block_table_buf[:, request_id].copy_(
-                self._cpu_block_table_staging[:, request_id], non_blocking=True)
+            if state.block_table_dirty:
+                # commit_step 也会改变 resident membership；此时没有 request_id
+                # 可做逐页 staging 更新，因此 dirty 复制前以权威 Python 页表重建。
+                self._write_block_table_row(request_id, state)
+                self.block_table_buf[:, request_id].copy_(
+                    self._cpu_block_table_staging[:, request_id],
+                    non_blocking=True)
+                state.block_table_dirty = False
 
             for t in range(qlen):
                 pos = state.logical_length + t
@@ -1080,35 +1183,13 @@ class GraphReadyPagedRegionCache:
             self._cpu_valid_req_ids_staging, non_blocking=True)
         self.planned_lengths_buf.copy_(
             self._cpu_planned_lengths_staging, non_blocking=True)
+        self._common_active_req_ids = tuple(req_ids)
+        self._common_state_refs = tuple(
+            self.states.get(rid) if rid is not None and rid >= 0 else None
+            for rid in req_ids)
         self.common_dirty = False
 
-    def _pack_skip_flags(self, layer_idx, req_ids):
-        """Copy the current layer's per-request skip flags to pinned/GPU buffers.
-
-        No Python branch is used downstream; the Triton kernels read these two
-        fixed int32 buffers as tensors.  During CUDA Graph capture the staging
-        copy is the same persistent buffer, so no host-device synchronization is
-        introduced.
-        """
-        batch = len(req_ids)
-        self._cpu_skip_far_staging[:batch].zero_()
-        self._cpu_skip_near_staging[:batch].zero_()
-        for batch_idx, request_id in enumerate(req_ids):
-            if request_id < 0 or request_id not in self.states:
-                continue
-            state = self.states[request_id]
-            self._cpu_skip_far_staging[batch_idx] = int(
-                state.skip_far_by_layer[layer_idx])
-            self._cpu_skip_near_staging[batch_idx] = int(
-                state.skip_near_by_layer[layer_idx])
-        non_blocking = self.layers[0].kv_pool_k.is_cuda
-        self.skip_far_buf[:batch].copy_(
-            self._cpu_skip_far_staging[:batch], non_blocking=non_blocking)
-        self.skip_near_buf[:batch].copy_(
-            self._cpu_skip_near_staging[:batch], non_blocking=non_blocking)
-
     def _prepare_layer_gather(self, layer_idx, req_ids, selected_ids_by_req=None):
-        self._pack_skip_flags(layer_idx, req_ids)
         self.visible_lens_buf[layer_idx].zero_()
         # Padding columns are masked by visible_lens in the kernel, so the
         # entire MAX_VISIBLE tail does not need to be rewritten every step.
@@ -1219,7 +1300,7 @@ class GraphReadyPagedRegionCache:
                 dst_lens = self._visible_lens_by_vis[visible_bucket]
                 for layer_idx in range(self.n_layers):
                     dst_gather[layer_idx].copy_(
-                        self.gather_indices_buf[layer_idx, :, :visible_bucket],
+                        self.gather_indices_buf[layer_idx, :, :, :visible_bucket],
                         non_blocking=True)
                     dst_lens[layer_idx].copy_(
                         self.visible_lens_buf[layer_idx], non_blocking=True)

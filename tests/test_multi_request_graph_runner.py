@@ -169,3 +169,23 @@ def test_dynamic_eos_completion_and_request_admission(capture_graph):
     assert cache.request_phases[3] == RequestPhase.FINISHED
     assert cache.request_phases[0] == RequestPhase.FINISHED
     assert not cache.states
+
+
+def test_capture_reuses_fixed_bucket_graph():
+    cache = GraphReadyPagedRegionCache(
+        1, GEOMETRY, max_requests=1, max_physical_pages=32, max_blocks=16,
+        max_visible_len=64, max_query_tokens=1, num_kv_heads=2,
+        num_query_heads=2, head_dim_k=64, head_dim_v=64,
+        dtype=torch.bfloat16, device='cuda')
+    runner = GraphRunner(
+        scheduler=None, buckets=(1,), visible_buckets=(64,), device='cuda')
+    calls = []
+
+    def model(input_ids, position_ids, **kwargs):
+        calls.append(1)
+        return input_ids * 2 + position_ids
+
+    first = runner.capture(model, cache, 1, 64)
+    second = runner.capture(model, cache, 1, 64)
+    assert first is second
+    assert len(calls) == 2

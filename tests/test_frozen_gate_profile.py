@@ -81,3 +81,22 @@ def test_static_gate_core_only_matches_legacy(length, kv_heads):
     actual = profile_core_tokens(
         q, k, geometry, rows=rows, topk=topk, scale=scale)
     assert actual == expected
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')
+@pytest.mark.parametrize('length', [64, 257])
+def test_streaming_profile_matches_legacy_on_cuda(length):
+    torch.manual_seed(20261103 + length)
+    geometry = RegionGeometry(
+        sink=4, near=16, window=8, page=4, max_new_tokens=3)
+    q = torch.randn(1, 4, length, 32, device='cuda')
+    k = torch.randn(1, 2, length, 32, device='cuda')
+    rows, chunk, topk, scale = 17, 5, 7, .7
+    expected = _legacy_profile(q, k, geometry, rows, chunk, topk, scale)
+    actual = profile_regions_and_core_tokens(
+        q, k, geometry, rows=rows, chunk=chunk, topk=topk, scale=scale)
+    for name in ('near', 'far'):
+        for statistic in ('mean', 'p95', 'max'):
+            assert actual[name][statistic] == pytest.approx(
+                expected[name][statistic], abs=1e-6, rel=0)
+    assert actual['core'] == expected['core']

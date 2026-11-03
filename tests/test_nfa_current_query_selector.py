@@ -3,11 +3,14 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+import triton
 
+import sparse_attn.indexer.nfa_layer_batch_selector as selector_ops
 from sparse_attn.cache import GraphReadyPagedRegionCache
 from sparse_attn.indexer.nfa_indexer import NFAIndexer
 from sparse_attn.indexer.nfa_layer_batch_selector import (
     mark_first_decode_seeded, select_topk_for_layer_batched)
+from sparse_attn.ops.paged_region_kernels import sparse_paged_attention_gather
 from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
 from sparse_attn.policies.region_geometry import RegionGeometry
 
@@ -31,18 +34,20 @@ def _indexer(k1=4, near_pages=2):
 
 
 def _make_cache(req_ids, lengths, skip_states, *, seeds=None, k1=4,
-                near_pages=2):
+                near_pages=2, num_kv_heads=1, max_physical_pages=64,
+                max_blocks=16, max_visible_len=640):
     cache = GraphReadyPagedRegionCache(
-        1, GEOMETRY, max_requests=8, max_physical_pages=64, max_blocks=16,
-        max_visible_len=640, max_query_tokens=8, num_kv_heads=1,
-        num_query_heads=2, head_dim_k=HEAD_DIM, head_dim_v=HEAD_DIM,
+        1, GEOMETRY, max_requests=8, max_physical_pages=max_physical_pages,
+        max_blocks=max_blocks,
+        max_visible_len=max_visible_len, max_query_tokens=8, num_kv_heads=num_kv_heads,
+        num_query_heads=2 * num_kv_heads, head_dim_k=HEAD_DIM, head_dim_v=HEAD_DIM,
         dtype=torch.bfloat16, device='cuda')
     generator = torch.Generator(device='cuda').manual_seed(20261102)
     for request_id, length, (skip_far, skip_near) in zip(
             req_ids, lengths, skip_states):
         cache.add_request(request_id)
         keys = torch.randn(
-            1, 1, length, HEAD_DIM, generator=generator,
+            1, num_kv_heads, length, HEAD_DIM, generator=generator,
             dtype=torch.bfloat16, device='cuda')
         values = torch.randn_like(keys)
         cache.write_prefill(0, request_id, keys, values)
@@ -58,16 +63,16 @@ def _plan_and_write(cache, req_ids, generator):
     cache.plan_common(req_ids)
     batch = len(req_ids)
     keys = torch.randn(
-        batch, 1, 1, HEAD_DIM, generator=generator,
+        batch, cache.num_kv_heads, 1, HEAD_DIM, generator=generator,
         dtype=torch.bfloat16, device='cuda')
     values = torch.randn_like(keys)
     cache.write_decode(
         0, keys, values, cache.slot_mapping_for_layer(0)[:batch])
 
 
-def _logical_ids(cache, request_id, row):
-    count = int(cache.visible_lens_for_layer(0)[row])
-    slots = cache.gather_indices_for_layer(0)[row, :count].cpu().tolist()
+def _logical_ids(cache, request_id, row, kv_head=0):
+    count = int(cache.visible_lens_for_layer(0)[row, kv_head])
+    slots = cache.gather_indices_for_layer(0)[row, kv_head, :count].cpu().tolist()
     inverse = {
         physical: logical
         for logical, physical in cache.states[request_id].block_tables[0].items()}
@@ -121,16 +126,50 @@ def test_current_query_not_previous_frame_query():
     assert current_ids != previous_ids
 
 
+def test_owner_generation_wrap_rebuilds_int32_dedup_table():
+    wrapped, attention, _ = _make_counterfactual_cache()
+    reference, reference_attention, _ = _make_counterfactual_cache()
+    query, _ = _counterfactual_queries()
+    select_topk_for_layer_batched(
+        wrapped, 0, [2], query, attention=attention)
+    select_topk_for_layer_batched(
+        reference, 0, [2], query, attention=reference_attention)
+
+    workspace = wrapped._nfa_selector_workspace
+
+    def buffer(name):
+        return next(value for key, value in workspace.items()
+                    if isinstance(key, tuple) and key[0] == name)
+
+    candidate = buffer('candidate_ids')
+    owners = buffer('fine_owners')
+    generations = buffer('fine_owner_generations')
+    assert owners.dtype == torch.int32
+    assert generations.dtype == torch.int32
+    owners.fill_(2147483647)
+    generations.fill_(2147483647 // candidate.shape[-1])
+
+    select_topk_for_layer_batched(
+        wrapped, 0, [2], query, attention=attention)
+    select_topk_for_layer_batched(
+        reference, 0, [2], query, attention=reference_attention)
+    assert _logical_ids(wrapped, 2, 0) == _logical_ids(reference, 2, 0)
+    assert generations.tolist() == [[1]]
+
+
 @pytest.mark.parametrize('batch', [1, 2, 4])
-def test_batched_rows_match_isolated_noncontiguous_requests_and_skip_states(batch):
+@pytest.mark.parametrize('num_kv_heads', [1, 2])
+def test_batched_rows_match_isolated_noncontiguous_requests_and_skip_states(
+        batch, num_kv_heads):
     req_ids = [1, 3, 6, 7][:batch]
     lengths = [448, 449, 510, 513][:batch]
     skip_states = [
         (False, False), (True, False), (False, True), (True, True)][:batch]
-    cache, attention, generator = _make_cache(req_ids, lengths, skip_states)
+    cache, attention, generator = _make_cache(
+        req_ids, lengths, skip_states, num_kv_heads=num_kv_heads)
     _plan_and_write(cache, req_ids, generator)
     query = torch.randn(
-        batch, 2, HEAD_DIM, generator=generator,
+        batch, 2 * num_kv_heads, HEAD_DIM, generator=generator,
         dtype=torch.bfloat16, device='cuda')
 
     expected = {}
@@ -140,7 +179,9 @@ def test_batched_rows_match_isolated_noncontiguous_requests_and_skip_states(batc
         select_topk_for_layer_batched(
             cache, 0, [request_id], query[row:row+1],
             attention=attention)
-        expected[request_id] = _logical_ids(cache, request_id, 0)
+        expected[request_id] = [
+            _logical_ids(cache, request_id, 0, kv_head=kv)
+            for kv in range(num_kv_heads)]
 
     cache.new_step(req_ids)
     cache.plan_common(req_ids)
@@ -148,15 +189,19 @@ def test_batched_rows_match_isolated_noncontiguous_requests_and_skip_states(batc
         cache, 0, req_ids, query, attention=attention)
     for row, (request_id, length, (skip_far, skip_near)) in enumerate(
             zip(req_ids, lengths, skip_states)):
-        actual = _logical_ids(cache, request_id, row)
+        actual = [
+            _logical_ids(cache, request_id, row, kv_head=kv)
+            for kv in range(num_kv_heads)]
         assert actual == expected[request_id]
         sink_hi, far_hi, near_hi = GEOMETRY.bounds(length+1)
+        flat_actual = [token for group in actual for token in group]
         if skip_far:
-            assert not any(sink_hi <= token < far_hi for token in actual)
+            assert not any(sink_hi <= token < far_hi for token in flat_actual)
         if skip_near:
-            assert not any(far_hi <= token < near_hi for token in actual)
+            assert not any(far_hi <= token < near_hi for token in flat_actual)
         if skip_far and skip_near:
-            assert len(actual) == GEOMETRY.sink + GEOMETRY.window
+            assert all(len(group) == GEOMETRY.sink + GEOMETRY.window
+                       for group in actual)
 
 
 def test_first_decode_seed_union_is_deduplicated_and_consumed_once():
@@ -216,6 +261,184 @@ def test_first_decode_seed_union_is_deduplicated_and_consumed_once():
     assert cache.first_decode_seeded_buf[req_ids].tolist() == [1, 1]
 
 
+def test_near_skip_reentry_rebuilds_stats_and_slot_reuse_invalidates():
+    incremental, attention, incremental_generator = _make_cache(
+        [2], [504], [(False, True)], k1=2, near_pages=0)
+    reference, reference_attention, reference_generator = _make_cache(
+        [2], [504], [(False, True)], k1=2, near_pages=0)
+    generator = torch.Generator(device='cuda').manual_seed(20261103)
+    queries = torch.randn(
+        8, 2, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+
+    for step in range(8):
+        _plan_and_write(incremental, [2], incremental_generator)
+        _plan_and_write(reference, [2], reference_generator)
+        if step == 7:
+            # 长度 512 时逻辑页 4 从 near 进入 far，必须使旧统计失效。
+            assert int(incremental._nfa_page_stats_lengths[0, 2]) == 0
+        if hasattr(reference, '_nfa_page_stats_lengths'):
+            reference._nfa_page_stats_lengths.zero_()
+        select_topk_for_layer_batched(
+            incremental, 0, [2], queries[step:step+1], attention=attention)
+        select_topk_for_layer_batched(
+            reference, 0, [2], queries[step:step+1],
+            attention=reference_attention)
+        assert _logical_ids(incremental, 2, 0) == _logical_ids(reference, 2, 0)
+        mark_first_decode_seeded(incremental, [2])
+        mark_first_decode_seeded(reference, [2])
+        incremental.commit_step()
+        reference.commit_step()
+
+    torch.testing.assert_close(
+        incremental.block_table_buf, reference.block_table_buf, rtol=0, atol=0)
+    logical_length = incremental.states[2].logical_length
+    for logical_page, physical_page in incremental.states[2].block_tables[0].items():
+        valid = min(PAGE, logical_length - logical_page * PAGE)
+        torch.testing.assert_close(
+            incremental.layers[0].kv_pool_k[physical_page, 0, :, :valid],
+            reference.layers[0].kv_pool_k[physical_page, 0, :, :valid],
+            rtol=0, atol=0)
+    incremental_buffers = next(iter(
+        incremental._nfa_page_stats_persistent.values()))
+    reference_buffers = next(iter(
+        reference._nfa_page_stats_persistent.values()))
+    resident_ranges = incremental._resident_page_ranges_for_layer(
+        incremental.states[2], 0, incremental.states[2].logical_length)
+    resident_pages = incremental._pages_in_ranges(resident_ranges)
+    for logical_page in resident_pages:
+        for actual, expected in zip(incremental_buffers, reference_buffers):
+            torch.testing.assert_close(
+                actual[:, 2:3, logical_page], expected[:, 2:3, logical_page],
+                rtol=0, atol=0)
+
+    incremental.remove_request(2)
+    torch.cuda.synchronize()
+    incremental._reclaim_pending_free()
+    incremental.add_request(2)
+    keys = torch.randn(
+        1, 1, 448, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+    incremental.write_prefill(0, 2, keys, torch.randn_like(keys))
+    incremental.freeze(2, [False], [True])
+    assert int(incremental._nfa_page_stats_lengths[0, 2]) == 0
+
+
+def test_both_skip_light_path_replay_writes_decode_kv():
+    cache, attention, generator = _make_cache(
+        [2], [448], [(True, True)], seeds={2: [64, 300]})
+    _plan_and_write(cache, [2], generator)
+    query = torch.randn(
+        1, 2, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+    first_keys = torch.randn(
+        1, 1, 1, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+    first_values = torch.randn_like(first_keys)
+    select_topk_for_layer_batched(
+        cache, 0, [2], query, attention=attention,
+        decode_write=(first_keys, first_values,
+                      cache.slot_mapping_for_layer(0)[:1]))
+    assert set((64, 300)) <= set(_logical_ids(cache, 2, 0))
+
+    call_plan = cache._nfa_selector_workspace[
+        ('eager_selector_call_plan', 0)]
+    assert [item[0][0] for item in call_plan[1]] == ['final_union']
+    mark_first_decode_seeded(cache, [2])
+    cache.commit_step()
+
+    # 第二次调用走固定 eager launch 计划；轻路径没有 fused stats/Q kernel，
+    # 因此必须在 replay 前显式写入本步 K/V。
+    cache.new_step([2])
+    cache.plan_common([2])
+    keys = torch.randn(
+        1, 1, 1, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+    values = torch.randn_like(keys)
+    slots = cache.slot_mapping_for_layer(0)[:1]
+    select_topk_for_layer_batched(
+        cache, 0, [2], query, attention=attention,
+        decode_write=(keys, values, slots))
+    slot = int(slots[0])
+    physical, offset = slot // PAGE, slot % PAGE
+    torch.testing.assert_close(
+        cache.layers[0].kv_pool_k[physical, 0, 0, offset], keys[0, 0, 0])
+    torch.testing.assert_close(
+        cache.layers[0].kv_pool_v[physical, 0, 0, offset], values[0, 0, 0])
+    steady = _logical_ids(cache, 2, 0)
+    assert len(steady) == GEOMETRY.sink + GEOMETRY.window
+    assert not {64, 300} & set(steady)
+
+
+def test_both_skip_light_path_real_gqa_geometry():
+    # 精确模拟 Qwen3-8B Graph capture 的 padding 行：36 层、8 个 KV group、
+    # 32K 页表容量与 8K visible bucket；大 N_PAD 尾部 lane 不得负索引 gather。
+    cache = GraphReadyPagedRegionCache(
+        36, GEOMETRY, max_requests=1, max_physical_pages=8, max_blocks=521,
+        max_visible_len=8192, max_query_tokens=1, num_kv_heads=8,
+        num_query_heads=32, head_dim_k=HEAD_DIM, head_dim_v=HEAD_DIM,
+        dtype=torch.bfloat16, device='cuda')
+    attention = SimpleNamespace(indexer=_indexer(), scaling=1.0)
+    cache.new_step([-1])
+    cache.plan_common([-1])
+    query = torch.randn(
+        1, 32, HEAD_DIM, dtype=torch.bfloat16, device='cuda')
+    select_topk_for_layer_batched(
+        cache, 0, [-1], query, attention=attention)
+    torch.cuda.synchronize()
+    assert int(cache.visible_lens_for_layer(0)[0, 0]) >= 0
+
+
+def test_both_skip_light_path_capture_replay_writes_live_decode_kv():
+    cache, attention, generator = _make_cache(
+        [2], [448], [(True, True)], seeds={2: [64, 300]})
+    _plan_and_write(cache, [2], generator)
+    query = torch.randn(
+        1, 2, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+    keys = torch.randn(
+        1, 1, 1, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+    values = torch.randn_like(keys)
+    slots = cache.slot_mapping_for_layer(0)[:1].clone()
+
+    def run():
+        select_topk_for_layer_batched(
+            cache, 0, [2], query, attention=attention,
+            decode_write=(keys, values, slots))
+
+    warmup = torch.cuda.Stream()
+    warmup.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(warmup):
+        for _ in range(2):
+            run()
+    torch.cuda.current_stream().wait_stream(warmup)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        run()
+    assert set((64, 300)) <= set(_logical_ids(cache, 2, 0))
+    mark_first_decode_seeded(cache, [2])
+    cache.commit_step()
+
+    cache.new_step([2])
+    cache.plan_common([2])
+    keys.normal_(generator=generator)
+    values.normal_(generator=generator)
+    slots.copy_(cache.slot_mapping_for_layer(0)[:1])
+    graph.replay()
+    slot = int(slots[0])
+    physical, offset = slot // PAGE, slot % PAGE
+    torch.testing.assert_close(
+        cache.layers[0].kv_pool_k[physical, 0, 0, offset], keys[0, 0, 0])
+    torch.testing.assert_close(
+        cache.layers[0].kv_pool_v[physical, 0, 0, offset], values[0, 0, 0])
+    replay_ids = _logical_ids(cache, 2, 0)
+    run()
+    assert replay_ids == _logical_ids(cache, 2, 0)
+    assert len(replay_ids) == GEOMETRY.sink + GEOMETRY.window
+    assert not {64, 300} & set(replay_ids)
+
+
 def test_selector_capture_replay_uses_live_current_query():
     cache, attention, _ = _make_counterfactual_cache()
     query, previous = _counterfactual_queries()
@@ -244,3 +467,110 @@ def test_selector_capture_replay_uses_live_current_query():
     assert replay_ids == eager_ids
     assert sum(192 <= token < 256 for token in replay_ids) == 60
     assert not any(64 <= token < 128 for token in replay_ids)
+
+
+def test_padded_capture_does_not_specialize_non_skip_replay():
+    cache, attention, _ = _make_counterfactual_cache()
+    query, _ = _counterfactual_queries()
+
+    # GraphRunner 用全 padding 行 capture；这不代表 replay 请求会 both-skip。
+    cache.new_step([-1])
+    cache.plan_common([-1])
+    select_topk_for_layer_batched(
+        cache, 0, [-1], query, attention=attention)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        select_topk_for_layer_batched(
+            cache, 0, [-1], query, attention=attention)
+
+    cache.new_step([2])
+    cache.plan_common([2])
+    graph.replay()
+    replay_ids = _logical_ids(cache, 2, 0)
+    select_topk_for_layer_batched(
+        cache, 0, [2], query, attention=attention)
+    eager_ids = _logical_ids(cache, 2, 0)
+    assert replay_ids == eager_ids
+    assert sum(64 <= token < 128 for token in replay_ids) == 60
+
+
+@pytest.mark.parametrize('split_kv', [False, True])
+def test_per_kv_group_selection_and_attention_consumer(split_kv):
+    cache, attention, generator = _make_cache(
+        [2], [448], [(False, False)], k1=1, near_pages=0, num_kv_heads=2)
+    request_id = 2
+    cache.remove_request(request_id)
+    cache.add_request(request_id)
+    keys = torch.zeros(
+        1, 2, 448, HEAD_DIM, dtype=torch.bfloat16, device='cuda')
+    # 两个 KV group 的重要远端块不同，head-0 共享选集必然漏掉其中一组。
+    keys[0, 0, 64:128, 48] = 8
+    keys[0, 1, 192:256, 49] = 8
+    values = torch.randn(
+        keys.shape, generator=generator, dtype=torch.bfloat16, device='cuda')
+    cache.write_prefill(0, request_id, keys, values)
+    cache.freeze(request_id, [False], [False])
+    _plan_and_write(cache, [request_id], generator)
+
+    query = torch.zeros(
+        1, 4, HEAD_DIM, dtype=torch.bfloat16, device='cuda')
+    query[0, :2, 48] = 1
+    query[0, 2:, 49] = 1
+    select_topk_for_layer_batched(
+        cache, 0, [request_id], query, attention=attention)
+
+    group0 = _logical_ids(cache, request_id, 0, kv_head=0)
+    group1 = _logical_ids(cache, request_id, 0, kv_head=1)
+    assert sum(64 <= token < 128 for token in group0) == 60
+    assert not any(192 <= token < 256 for token in group0)
+    assert sum(192 <= token < 256 for token in group1) == 60
+    assert not any(64 <= token < 128 for token in group1)
+
+    gather = cache.gather_indices_for_layer(0)
+    lens = cache.visible_lens_for_layer(0)
+    actual = sparse_paged_attention_gather(
+        cache.layers[0], query, gather, lens,
+        torch.zeros(1, dtype=torch.int32, device='cuda'), scale=1.0,
+        split_kv=split_kv)
+    expected = torch.empty_like(actual)
+    for kv in range(2):
+        count = int(lens[0, kv])
+        slots = gather[0, kv, :count].long()
+        phys, offset = slots // PAGE, slots % PAGE
+        k = cache.layers[0].kv_pool_k[phys, 0, kv, offset].float()
+        v = cache.layers[0].kv_pool_v[phys, 0, kv, offset].float()
+        q_group = query[0, kv * 2:(kv + 1) * 2].float()
+        probabilities = torch.softmax(k @ q_group.T, dim=0)
+        expected[0, kv * 2:(kv + 1) * 2] = probabilities.T @ v
+    torch.testing.assert_close(actual, expected, atol=0.03, rtol=0.03)
+
+
+def test_radix_filtered_topk_bit_exact_with_quota_and_ties():
+    m, hkv, r, width, capacity = 3, 2, 8320, 1024, 16384
+    generator = torch.Generator(device='cuda').manual_seed(20261103)
+    cand = torch.stack([
+        torch.randperm(capacity, generator=generator, device='cuda')[:r]
+        for _ in range(m * hkv)
+    ]).view(m, hkv, r).to(torch.int64).contiguous()
+    logits = torch.randn(
+        m, hkv, r, generator=generator, dtype=torch.bfloat16,
+        device='cuda').contiguous()
+    # 大量同分、显式无效项和区间外 token 同时覆盖阈值与补洞路径。
+    logits[:, :, 128:512] = 0.25
+    logits[:, :, 512:640] = float('-inf')
+    cand[:, :, 640:768] = capacity - 1
+    lower = torch.tensor([128, 0, 0], dtype=torch.int64, device='cuda')
+    upper = torch.tensor([8000, 64, 4096], dtype=torch.int64, device='cuda')
+    quota = torch.tensor([1024, 300, 0], dtype=torch.int64, device='cuda')
+
+    reference_out = torch.empty(
+        m, hkv, width, dtype=torch.int32, device='cuda')
+    reference_count = torch.empty(m, hkv, dtype=torch.int32, device='cuda')
+    selector_ops._nfa_filtered_topk_kernel[(m * hkv,)](
+        logits, cand, lower, upper, quota, reference_out, reference_count, r,
+        R_PAD=triton.next_power_of_2(max(r, width)), S=capacity, K=width,
+        SINK=4, META_GROUP=hkv, TOKEN_BITS=16, num_warps=8)
+    actual = selector_ops._nfa_filtered_topk(
+        logits, cand, lower, upper, quota, capacity, width, sink=4)
+    torch.testing.assert_close(actual.indices, reference_out, rtol=0, atol=0)
+    torch.testing.assert_close(actual.counts, reference_count, rtol=0, atol=0)

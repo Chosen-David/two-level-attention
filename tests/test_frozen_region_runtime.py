@@ -76,13 +76,13 @@ def test_device_receipt_values_are_converted_once_at_request_boundary():
     cache = output.past_key_values
     cache.decode_trace_enabled = True
     cache.nfa_decode_steps = 1
-    cache.visible_lens_buf.copy_(torch.tensor([[2], [1]]))
+    cache.visible_lens_buf.copy_(torch.tensor([2, 1]).view(2, 1, 1))
     for layer in cache.layers:
         layer.nfa_decode_trace = [dict(
             decode_step=0, selected_logical_ids=torch.tensor([[1, 2]]))]
     receipt = complete_frozen_request(model, cache, 2, audit)
     assert receipt['nfa_receipts'][0] == {
-        'route': 'graph_ready_sparse', 'visible_lens': [2]}
+        'route': 'graph_ready_sparse', 'visible_lens': [[2, 2]]}
     assert receipt['nfa_decode_trace'][0][0]['selected_logical_ids'] == [[1, 2]]
     json.dumps(receipt)
 
@@ -91,8 +91,8 @@ def test_decode_graph_ready_has_no_layer_receipt_or_hidden_d2h(monkeypatch):
     layer = SimpleNamespace()
     cache = SimpleNamespace(
         layers=[layer], max_requests=1,
-        gather_indices_buf=torch.zeros((1, 2), dtype=torch.int32),
-        visible_lens_buf=torch.tensor([2], dtype=torch.int32),
+        gather_indices_buf=torch.zeros((1, 1, 2), dtype=torch.int32),
+        visible_lens_buf=torch.tensor([[2]], dtype=torch.int32),
         query_to_req_buf=torch.tensor([0], dtype=torch.int32))
     module = SimpleNamespace(layer_idx=0, scaling=1.)
     query = torch.zeros((1, 1, 1))
