@@ -654,3 +654,10 @@
 - 算子微基准：原实现 0.230504 ms，候选 0.115675 ms，**1.993x**；比 Iter 74 的 0.132365 ms 再快约 12.6%。该结果仅限 Top-K 算子，不作为完整 decode 加速结论。
 - 完整回归与生产身份：selector/cache/GraphRunner 35/35 通过；真实 Qwen eager/Graph 16/16 token 均与对应 baseline 完全一致，且两种 execution 一致。与 Iter 74 不同，本轮通过了真实生产 identity 早期门禁；最终仍需 128-token。
 - 生产 16-token TPOT：eager median/steady 27.293312/27.092000 ms，Graph 15.650048/15.634048 ms。相对 baseline Graph steady 23.588048 ms 为 **1.508x**，但相对 FA2 Graph 12.602576 ms 仍慢约 24.1%；eager 也仍慢于 FA2 23.725280 ms。暂保留为当前最佳正确实现，继续优化。
+
+## Iter 78：8192-token tile 缩减归并输入
+
+- 修改：部分 Top-K tile 从 2048 提到 8192；真实 8320 个候选只产生 2 个局部结果集，merge 有效输入由 5120 降至 2048，`MERGE_PAD` 同步由 8192 降至 2048。两阶段包含性、packed key 和 finish 语义均不变。
+- 正确性：合成同分/quota/无效候选直接对拍 1/1 通过，微基准 indices/counts bit-exact。
+- 算子微基准：原实现 0.230623 ms，候选 0.115244 ms，**2.001x**；相对 Iter 77 的 0.115675 ms 仅快约 0.37%，属于很薄的算子信号，必须经完整回归和真实 Qwen identity/TPOT 判断是否保留。
+- 状态：暂作为候选保留；尚未据此宣称生产加速或最终达标。
