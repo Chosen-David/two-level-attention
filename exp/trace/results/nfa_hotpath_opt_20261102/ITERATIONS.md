@@ -768,3 +768,6 @@
 - kernel 计数：HF eager 一次 forward 为 8 个 CUDA kernel，候选为 `_square_fp32_kernel + torch.mean + _norm_scale_kernel` 共 3 个；单次数值执行设备时间约 14.1 μs→5.7 μs，但这不含 Python/分配/launch 外壳，不能据此宣称 wrapper 或生产加速。
 - eager wrapper 微基准：CUDA event 中位数显示九种真实 shape 全部回退，HF/候选仅 0.89–0.90×。Qwen3-8B hidden norm 为 0.0609→0.0683 ms，q_norm 为 0.0614→0.0683 ms，k_norm 为 0.0613→0.0681 ms；减少设备 kernel 被外壳开销抵消。
 - 测量卫生与边界：起跑前 GPU0 used=1 MiB 且无 compute apps；5 秒旁路日志仅见本轮 1→4 MiB 显存变化，无异常共居跳变。原始证据为 `iter91_rmsnorm_micro.log`、`iter91_rmsnorm_micro_gpu0_hygiene.log`。当前只证明数值与 Graph 安全性，尚未证明生产收益；下一步必须跑完整 128-token eager/Graph token identity 与 TPOT，再决定保留或恢复 Iter 90。
+- 完整生产 128-token：eager steady TPOT 27.129328 ms，相对 Iter 90 的 23.755264 ms 明显回退（Iter90/Iter91=0.875630×，耗时增加 14.16%）；Graph steady TPOT 11.151200 ms，相对 Iter 90 的 11.758976 ms 加速 1.054503×（耗时降低 5.17%）。当前 FA2/NFA 为 eager 0.846628×、Graph 1.129539×，双口径均未达到 2×。
+- 生产正确性：iter91 eager 与 iter90 eager、iter91 Graph 与 iter90 Graph、iter91 eager 与 Graph 的 128/128 token 全部一致，输入身份与 selector 配置不变。说明三 kernel 路径数值可保留，但 eager 外壳开销不可接受；后续若保留必须按执行口径隔离，不能用 Graph 收益掩盖 eager 回退。
+- 原始证据：`ruler32k_iter91_128_{eager,graph}.json`、`iter91_production_{eager,graph}.log`、`iter91_production_gpu0_hygiene.log`。pc40 GPU0 起跑前 used=1 MiB 且无 compute apps；旁路样本未记录到其他 PID。本轮仍是单次生产结果，Graph 收益需同卡 ABBA 复验。
