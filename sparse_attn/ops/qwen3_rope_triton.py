@@ -126,6 +126,8 @@ def qwen3_decode_rope(q, k, cos, sin, *, owner):
         return apply_rotary_pos_emb(q, k, cos, sin)
 
     q_out, k_out = _persistent_outputs(owner, q, k)
+    # 禁用 FMA 收缩：否则 q*cos 会被并入最终加法，第一次 BF16
+    # 中间舍入会被编译器消除（已实测产生数百个单 ULP 差异）。
     _qwen3_qk_rope_kernel[(40,)](
         q, k, cos, sin, q_out, k_out,
         q.stride(1), q.stride(3),
@@ -133,5 +135,6 @@ def qwen3_decode_rope(q, k, cos, sin, *, owner):
         cos.stride(2), sin.stride(2),
         HQ=32, D=128,
         num_warps=4,
+        enable_fp_fusion=False,
     )
     return q_out, k_out

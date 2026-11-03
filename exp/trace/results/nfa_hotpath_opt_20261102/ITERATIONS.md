@@ -749,3 +749,11 @@
 - 首次 GPU 验收：pc40 GPU0，起跑前 used=1 MiB 且无 compute apps，运行真实目标几何 Q=`[1,32,1,128]`、K=`[1,8,1,128]` 的 HF `apply_rotary_pos_emb` 位型对拍。
 - 结果：第 1 组即失败，Q 有 935 个 BF16 元素不同；脚本在首次断言处退出，尚未得到 K 对拍和 `do_bench` 延迟。该臂不满足正确性硬门，不得进入完整生产 TPOT，也不得宣称加速。
 - 原始证据：`iter89_rope_micro.log`、`iter89_rope_micro_gpu0_hygiene.log`。下一步仅定位该舍入/符号语义差异，修复后作为新一轮独立对拍。
+
+## Iter 90：RoPE 禁用 FP fusion，恢复逐位一致
+
+- 根因探针：Iter 89 候选输出与“`q*cos` 保持 FP32、`rotate_half(q)*sin` 先舍入 BF16、最后相加”的 PyTorch 组合逐元素完全一致（0/4096 不同），证明 LLVM 将第一次乘法与最终加法收缩为 FMA，消除了第一次 BF16 中间舍入；不是索引或 `rotate_half` 符号错误。
+- 修改：仅在该 Q/K RoPE kernel launch 增加 `enable_fp_fusion=False`，不改变公式、选中集合或其他模型路径。
+- 正确性：pc40 GPU0 干净起跑，16 组随机输入覆盖 scale `1/2^-8/2^8/2^-16`，Q/K BF16 位型全部一致。
+- 微基准：完整 Python wrapper 的 HF `apply_rotary_pos_emb` 中位数 0.037728 ms，Triton Q/K 单 launch 0.005600 ms，HF/Triton=6.7371×。该数字只含 RoPE 算子，不能外推为完整 decode TPOT。
+- 原始证据：`iter90_rope_micro.log`、`iter90_rope_micro_gpu0_hygiene.log`。下一步跑完整生产 eager/Graph 128-token identity 与 TPOT，仍不宣称达到 2×。
