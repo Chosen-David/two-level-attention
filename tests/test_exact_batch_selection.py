@@ -6,9 +6,10 @@ from sparse_attn.indexer.selection.unique_ranking import rank_unique,rank_unique
 @pytest.mark.skipif(not torch.cuda.is_available(),reason='native CUDA Graph required')
 @pytest.mark.parametrize('batch',[1,2,4,8])
 @pytest.mark.parametrize('kind',['random','ties','zeros'])
-def test_batch_ranking_mutable_bounds(batch,kind):
+@pytest.mark.parametrize('r',[2048,4096])
+def test_batch_ranking_mutable_bounds(batch,kind,r):
     torch.manual_seed(32031)
-    h,r,c=2,2048,4096
+    h,c=2,4096
     ids=torch.stack([torch.randperm(c,device='cuda')[:r] for _ in range(batch*h)]).reshape(batch,h,r)
     p=torch.rand(batch,h,r,device='cuda',dtype=torch.bfloat16)
     if kind=='ties':p.fill_(.5)

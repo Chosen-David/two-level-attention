@@ -14,7 +14,7 @@ from sparse_attn.engine.frozen_runner import (
     complete_frozen_request, decode_frozen_request, prefill_frozen_request)
 from sparse_attn.scheduler.scheduler import (
     ContinuousBatchScheduler, greedy_next_tokens)
-from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
+from sparse_attn.ops.paged_region_kernels_nfa import decode_graph_ready, nfa_args
 from sparse_attn.patches import register_patch
 
 
@@ -75,14 +75,38 @@ def test_device_receipt_values_are_converted_once_at_request_boundary():
     model._frozen_nfa = True
     cache = output.past_key_values
     cache.decode_trace_enabled = True
+    cache.nfa_decode_steps = 1
+    cache.visible_lens_buf.copy_(torch.tensor([[2], [1]]))
     for layer in cache.layers:
-        layer.nfa_receipt = {'selected': torch.tensor([1, 2]), 'l1_calls': 1}
         layer.nfa_decode_trace = [dict(
             decode_step=0, selected_logical_ids=torch.tensor([[1, 2]]))]
     receipt = complete_frozen_request(model, cache, 2, audit)
-    assert receipt['nfa_receipts'][0]['selected'] == [1, 2]
+    assert receipt['nfa_receipts'][0] == {
+        'route': 'graph_ready_sparse', 'visible_lens': [2]}
     assert receipt['nfa_decode_trace'][0][0]['selected_logical_ids'] == [[1, 2]]
     json.dumps(receipt)
+
+
+def test_decode_graph_ready_has_no_layer_receipt_or_hidden_d2h(monkeypatch):
+    layer = SimpleNamespace()
+    cache = SimpleNamespace(
+        layers=[layer], max_requests=1,
+        gather_indices_buf=torch.zeros((1, 2), dtype=torch.int32),
+        visible_lens_buf=torch.tensor([2], dtype=torch.int32),
+        query_to_req_buf=torch.tensor([0], dtype=torch.int32))
+    module = SimpleNamespace(layer_idx=0, scaling=1.)
+    query = torch.zeros((1, 1, 1))
+    monkeypatch.setattr(
+        'sparse_attn.ops.paged_region_kernels.sparse_paged_attention_gather',
+        lambda *args, **kwargs: query)
+
+    def forbidden_d2h(*args, **kwargs):
+        raise AssertionError('decode forward must not synchronize device data')
+
+    monkeypatch.setattr(torch.Tensor, 'cpu', forbidden_d2h)
+    monkeypatch.setattr(torch.Tensor, 'tolist', forbidden_d2h)
+    assert decode_graph_ready(module, query, cache) is query
+    assert not hasattr(layer, 'nfa_receipt')
 
 
 @torch.inference_mode()
@@ -94,8 +118,8 @@ def test_incomplete_decode_trace_is_rejected_before_commit():
     model._frozen_nfa = True
     cache = output.past_key_values
     cache.decode_trace_enabled = True
+    cache.nfa_decode_steps = 1
     for layer in cache.layers:
-        layer.nfa_receipt = {'selected': torch.tensor([1]), 'l1_calls': 1}
         layer.nfa_decode_trace = []
     with pytest.raises(ValueError, match='incomplete NFA decode trace at layer 0'):
         complete_frozen_request(model, cache, 3, audit)

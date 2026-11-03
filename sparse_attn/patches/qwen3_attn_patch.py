@@ -32,10 +32,11 @@ def qwen3_attn_forward(
     from ..cache import GraphReadyPagedRegionCache
     from ..ops.selector_options import validate_selector_options
 
-    capacity = (past_key_values.get_max_cache_shape()
-                if past_key_values is not None else None)
-    validate_selector_options(
-        capacity if isinstance(capacity, int) and capacity > 0 else None)
+    if getattr(self, 'layer_idx', 0) == 0:
+        capacity = (past_key_values.get_max_cache_shape()
+                    if past_key_values is not None else None)
+        validate_selector_options(
+            capacity if isinstance(capacity, int) and capacity > 0 else None)
     if not isinstance(past_key_values, GraphReadyPagedRegionCache):
         raise ValueError(
             "NFA requires GraphReadyPagedRegionCache; use prefill_frozen_request")
@@ -75,17 +76,30 @@ def qwen3_attn_forward(
         return self.o_proj(
             attn_output.reshape(*input_shape, -1).contiguous()), attn_weights
 
+    if self.layer_idx == 0:
+        # 每次 model forward（包括 Graph capture）只刷新一次执行上下文；
+        # 后续 KV write、selector 与 gather 均复用同一 stream/hooks。
+        from triton import knobs
+        workspace = getattr(past_key_values, '_nfa_selector_workspace', None)
+        if workspace is None:
+            workspace = past_key_values._nfa_selector_workspace = {}
+        workspace['_nfa_launch_context'] = (
+            torch.cuda.current_stream().cuda_stream,
+            knobs.runtime.launch_enter_hook, knobs.runtime.launch_exit_hook,
+            knobs.runtime.debug,
+        )
+
     slot_mapping = past_key_values.slot_mapping_for_layer(
         self.layer_idx)[:input_shape[0]]
-    past_key_values.write_decode(
-        self.layer_idx, key_states, value_states, slot_mapping)
 
     # 当前 token 的 post-RoPE Q 必须在本层内完成 L1/L2 选择；禁止提前到
-    # 整步 forward 前读取上一帧 Q。capture 时该调用也进入同一张 CUDA Graph。
+    # 整步 forward 前读取上一帧 Q。生产子空间路径由 selector 的页统计 owner
+    # 同步写入当前 K/V；其他几何在 selector 内保留原独立写入。
     from ..indexer.nfa_layer_batch_selector import select_topk_for_layer_batched
     select_topk_for_layer_batched(
         past_key_values, self.layer_idx,
-        past_key_values.active_req_ids, query_states[:, :, 0], attention=self)
+        past_key_values.active_req_ids, query_states[:, :, 0], attention=self,
+        decode_write=(key_states, value_states, slot_mapping))
 
     from ..ops.paged_region_kernels_nfa import decode_graph_ready
     result = decode_graph_ready(

@@ -5,6 +5,74 @@ import triton.language as tl
 from .selector import TokenSelection
 
 
+def _workspace_empty(workspace,name,shape,dtype,device):
+    if workspace is None:
+        return torch.empty(shape,device=device,dtype=dtype)
+    key=(name,tuple(shape),dtype,device)
+    out=workspace.get(key)
+    if out is None:
+        out=workspace[key]=torch.empty(shape,device=device,dtype=dtype)
+    return out
+
+
+def _fast_launch(workspace,key,kernel,grid,*args,**kwargs):
+    if workspace is None:
+        return kernel[grid](*args,**kwargs)
+    record=workspace.get('_nfa_eager_record')
+    if record is not None:
+        record.append((key,kernel,grid,args,kwargs.copy()))
+    context=workspace.get('_nfa_launch_context')
+    if context is None:
+        from triton import knobs
+        stream=None
+        enter_hook=knobs.runtime.launch_enter_hook
+        exit_hook=knobs.runtime.launch_exit_hook
+        runtime_debug=knobs.runtime.debug
+    else:
+        stream,enter_hook,exit_hook,runtime_debug=context
+    kwargs['debug']=kwargs.get('debug',kernel.debug) or runtime_debug
+    geometry=workspace.get('_nfa_launch_geometry')
+    plan_key=('triton_plan',key)
+    plan=workspace.get(plan_key) if geometry is not None else None
+    if plan is not None and plan[0] is geometry and plan[1]==kwargs['debug']:
+        _,_,run,function,packed_metadata,compiled,tail,grid_1,grid_2=plan
+        values=args+tail
+    else:
+        arg_key=tuple((x.dtype,x.device,x.data_ptr()%16)
+                      if isinstance(x,torch.Tensor) else x for x in args)
+        cache_key=('triton_launch',key,arg_key,tuple(sorted(kwargs.items())))
+        entry=workspace.get(cache_key)
+        if entry is None:
+            compiled=kernel[grid](*args,**kwargs)
+            names=kernel.arg_names
+            workspace[cache_key]=(compiled,names)
+            if geometry is not None:
+                grid_1=grid[1] if len(grid)>1 else 1
+                grid_2=grid[2] if len(grid)>2 else 1
+                tail=tuple(kwargs[name] for name in names[len(args):])
+                workspace[plan_key]=(geometry,kwargs['debug'],compiled.run,
+                    compiled.function,compiled.packed_metadata,compiled,tail,
+                    grid_1,grid_2)
+            return
+        compiled,names=entry
+        tail=tuple(kwargs[name] for name in names[len(args):])
+        values=args+tail
+        grid_1=grid[1] if len(grid)>1 else 1
+        grid_2=grid[2] if len(grid)>2 else 1
+        if geometry is not None:
+            workspace[plan_key]=(geometry,kwargs['debug'],compiled.run,
+                compiled.function,compiled.packed_metadata,compiled,tail,
+                grid_1,grid_2)
+        run=compiled.run;function=compiled.function
+        packed_metadata=compiled.packed_metadata
+    if stream is None:
+        stream=torch.cuda.current_stream().cuda_stream
+    launch_metadata=(None if enter_hook is None else
+                     compiled.launch_metadata(grid,stream,*values))
+    run(grid[0],grid_1,grid_2,stream,function,packed_metadata,
+        launch_metadata,enter_hook,exit_hook,*values)
+
+
 @triton.jit
 def _tile_keys(IDS,P,VALID,LOW,HIGH,QUOTA,OUT,R:tl.constexpr,S:tl.constexpr,
                GROUPS:tl.constexpr,K:tl.constexpr,META_GROUP:tl.constexpr,
@@ -24,6 +92,53 @@ def _tile_keys(IDS,P,VALID,LOW,HIGH,QUOTA,OUT,R:tl.constexpr,S:tl.constexpr,
     key=tl.where(good,(bits<<TOKEN_BITS)+delta,0)
     ordered=tl.sort(key,descending=True)
     tl.store(OUT+(h*GROUPS+tile)*K+i,ordered,i<K)
+
+
+@triton.jit
+def _tile_keys_from_scores_body(h,tile,IDS,SCORES,MSTAT,LSTAT,VALID,LOW,HIGH,QUOTA,OUT,
+               R:tl.constexpr,S:tl.constexpr,GROUPS:tl.constexpr,K:tl.constexpr,
+               META_GROUP:tl.constexpr,TOKEN_BITS:tl.constexpr,G:tl.constexpr,
+               PROB_BF16:tl.constexpr):
+    i=tl.arange(0,2*K)
+    r=tile*(2*K)+i
+    token=tl.load(IDS+h*R+r,r<R,other=0)
+    keep=tl.load(VALID+h*R+r,r<R,other=0)
+    prob_sum=tl.zeros((2*K,),tl.float32)
+    for j in tl.static_range(G):
+        score=tl.load(SCORES+(h*G+j)*R+r,r<R,other=float('-inf')).to(tl.float32)
+        m=tl.load(MSTAT+h*G+j);l=tl.load(LSTAT+h*G+j)
+        safe_l=tl.where(l>0.0,l,1.0)
+        head_p=tl.exp(score-m)/safe_l
+        head_p=tl.where(l>0.0,head_p,0.0)
+        if PROB_BF16:
+            prob_sum+=head_p.to(tl.bfloat16).to(tl.float32)
+        else:
+            prob_sum+=head_p.to(tl.float16).to(tl.float32)
+    probability=prob_sum*(1.0/G)
+    if PROB_BF16:
+        probability=probability.to(tl.bfloat16)
+    else:
+        probability=probability.to(tl.float16)
+    b=0 if META_GROUP==0 else h//META_GROUP
+    good=keep&(token>=tl.load(LOW+b))&(token<tl.load(HIGH+b))&(probability>0)&(tl.load(QUOTA+b)>0)
+    bits=probability.to(tl.uint16,bitcast=True).to(tl.int32)
+    delta=(S-token).to(tl.int32)
+    if TOKEN_BITS==32:
+        bits=bits.to(tl.int64)
+        delta=delta.to(tl.int64)
+    key=tl.where(good,(bits<<TOKEN_BITS)+delta,0)
+    ordered=tl.sort(key,descending=True)
+    tl.store(OUT+(h*GROUPS+tile)*K+i,ordered,i<K)
+
+
+@triton.jit
+def _tile_keys_from_scores(IDS,SCORES,MSTAT,LSTAT,VALID,LOW,HIGH,QUOTA,OUT,
+               R:tl.constexpr,S:tl.constexpr,GROUPS:tl.constexpr,K:tl.constexpr,
+               META_GROUP:tl.constexpr,TOKEN_BITS:tl.constexpr,G:tl.constexpr,
+               PROB_BF16:tl.constexpr):
+    _tile_keys_from_scores_body(tl.program_id(0),tl.program_id(1),IDS,SCORES,
+        MSTAT,LSTAT,VALID,LOW,HIGH,QUOTA,OUT,R=R,S=S,GROUPS=GROUPS,K=K,
+        META_GROUP=META_GROUP,TOKEN_BITS=TOKEN_BITS,G=G,PROB_BF16=PROB_BF16)
 
 
 @triton.jit
@@ -54,6 +169,86 @@ def tree_topk(ids,p,valid,lower,upper,quota,capacity,width,*,metadata_group=None
         _merge_topk[(hk,following)](current,output,groups,following,width,num_warps=8)
         current=output;groups=following
     return current.view(hk,width)
+
+
+@triton.jit
+def _finish_sorted_key(h,key,LOW,HIGH,QUOTA,OUT,COUNT,S:tl.constexpr,K:tl.constexpr,
+                       SINK:tl.constexpr,META_GROUP:tl.constexpr,TOKEN_BITS:tl.constexpr):
+    i=tl.arange(0,K)
+    b=0 if META_GROUP==0 else h//META_GROUP
+    q=tl.load(QUOTA+b).to(tl.int32)
+    if q==0:
+        tl.store(OUT+h*K+i,0)
+        tl.store(COUNT+h,0)
+    else:
+        positive=(key>>TOKEN_BITS)>0
+        token_mask=(1<<TOKEN_BITS)-1
+        chosen=tl.where((i<q)&positive,S-(key&token_mask),S).to(tl.int32)
+        npositive=tl.sum(((i<q)&positive).to(tl.int32),0)
+        if npositive==q:
+            fast_packed=tl.sort(tl.where(chosen>=SINK,chosen,S),descending=False)
+            tl.store(OUT+h*K+i,tl.where(fast_packed<S,fast_packed,0))
+            tl.store(COUNT+h,tl.sum((fast_packed<S).to(tl.int32),0))
+        else:
+            chosen=tl.sort(chosen,descending=False)
+            low=tl.load(LOW+b).to(tl.int32);high=tl.load(HIGH+b).to(tl.int32)
+            boundaries=tl.where(chosen<S,chosen-low-i,S)
+            lo=tl.zeros((K,),tl.int32);hi=tl.full((K,),K,tl.int32)
+            for _ in range(11):
+                mid=lo+(hi-lo)//2
+                value=tl.gather(boundaries,tl.minimum(mid,K-1),axis=0)
+                right=value<=i
+                active=lo<hi
+                lo=tl.where(active&right,mid+1,lo)
+                hi=tl.where(active&~right,mid,hi)
+            zero=low+i+lo
+            zero=tl.where((i<q-npositive)&(zero<high),zero,S)
+            combined=tl.cat(chosen,zero,can_reorder=True)
+            combined=tl.where(combined>=SINK,combined,S)
+            packed=tl.sort(combined,descending=False)
+            j=tl.arange(0,2*K)
+            tl.store(OUT+h*K+j,tl.where(packed<S,packed,0),j<K)
+            tl.store(COUNT+h,tl.sum((packed<S).to(tl.int32),0))
+
+
+@triton.jit
+def _merge_tree_finish(IN,LOW,HIGH,QUOTA,OUT,COUNT,GROUPS:tl.constexpr,
+                       S:tl.constexpr,K:tl.constexpr,SINK:tl.constexpr,
+                       META_GROUP:tl.constexpr,TOKEN_BITS:tl.constexpr):
+    """单 CTA 顺序合并所有降序 run；Top-K 集合与原归并树一致。"""
+    h=tl.program_id(0)
+    i=tl.arange(0,K)
+    current=tl.load(IN+h*GROUPS*K+i)
+    pair=tl.arange(0,2*K)
+    rank=tl.where(pair<K,pair,2*K-1-pair)
+    for group in tl.static_range(1,GROUPS):
+        incoming=tl.load(IN+(h*GROUPS+group)*K+rank)
+        retained=tl.gather(current,rank,axis=0)
+        value=tl.where(pair<K,retained,incoming)
+        for bit in tl.static_range(10,-1,-1):
+            stride=1<<bit
+            peer=tl.gather(value,pair^stride,axis=0)
+            value=tl.where((pair&stride)==0,tl.maximum(value,peer),tl.minimum(value,peer))
+        current=tl.gather(value,i,axis=0)
+    _finish_sorted_key(h,current,LOW,HIGH,QUOTA,OUT,COUNT,S=S,K=K,SINK=SINK,
+                       META_GROUP=META_GROUP,TOKEN_BITS=TOKEN_BITS)
+
+
+@triton.jit
+def _merge_finish(IN,LOW,HIGH,QUOTA,OUT,COUNT,S:tl.constexpr,K:tl.constexpr,SINK:tl.constexpr,META_GROUP:tl.constexpr,TOKEN_BITS:tl.constexpr):
+    h=tl.program_id(0);i=tl.arange(0,2*K)
+    group=(i>=K).to(tl.int32)
+    rank=tl.where(i<K,i,2*K-1-i)
+    key=tl.load(IN+(h*2+group)*K+rank)
+    # 最后一级归并直接消费寄存器中的 key，省掉一次中间写读和 launch。
+    for bit in tl.static_range(10,-1,-1):
+        stride=1<<bit
+        peer=tl.gather(key,i^stride,axis=0)
+        key=tl.where((i&stride)==0,tl.maximum(key,peer),tl.minimum(key,peer))
+    i=tl.arange(0,K)
+    key=tl.gather(key,i,axis=0)
+    _finish_sorted_key(h,key,LOW,HIGH,QUOTA,OUT,COUNT,S=S,K=K,SINK=SINK,
+                       META_GROUP=META_GROUP,TOKEN_BITS=TOKEN_BITS)
 
 
 @triton.jit
@@ -105,29 +300,69 @@ def rank_unique(ids,p,valid,lower,upper,quota,*,capacity,width,sink):
     return TokenSelection(out,counts)
 
 
-def rank_unique_batched(ids,p,valid,lower,upper,quota,*,capacity,width=1024,sink=0):
+def rank_unique_batched(ids,p,valid,lower,upper,quota,*,capacity,width=1024,sink=0,
+                        validate=True,workspace=None,score_state=None,
+                        prevalidated=False,fuse_tree=False,fuse_tiles=False):
     """Rank deduplicated [B,Hkv,R] candidates with live per-request metadata.
 
     Uses the pinned unique-ranking contract; not a replacement for selecting
     and deduplicating candidates. No request loop or capacity-wide storage.
     """
-    if (ids.ndim!=3 or p.shape!=ids.shape or valid.shape!=ids.shape
+    fused=score_state is not None
+    if not prevalidated and (ids.ndim!=3 or valid.shape!=ids.shape
+            or (not fused and (p is None or p.shape!=ids.shape))
             or type(capacity) is not int or not 0<capacity<2**31 or width!=1024
             or type(sink) is not int or not 0<=sink<=capacity
             or ids.shape[2]<width or min(ids.shape[:2])<1 or ids.numel()>=2**31
             or ids.dtype!=torch.int64 or valid.dtype!=torch.bool
-            or p.dtype not in (torch.float16,torch.bfloat16)):
+            or (not fused and p.dtype not in (torch.float16,torch.bfloat16))):
         raise ValueError('unsupported batched unique ranking geometry')
     b,h,r=ids.shape
-    if (any(x.shape!=(b,) or x.dtype!=torch.int64 for x in (lower,upper,quota))
+    if fused:
+        scores,mstat,lstat,gqa_group,prob_dtype=score_state
+        if not prevalidated and (type(gqa_group) is not int or gqa_group<1
+                or scores.shape!=(b,h,gqa_group,r)
+                or mstat.shape!=(b,h,gqa_group) or lstat.shape!=mstat.shape
+                or scores.dtype!=torch.bfloat16
+                or mstat.dtype!=torch.float32 or lstat.dtype!=torch.float32
+                or prob_dtype not in (torch.float16,torch.bfloat16)):
+            raise ValueError('unsupported fused score-state ranking geometry')
+        tensors=(ids,valid,lower,upper,quota,scores,mstat,lstat)
+    else:
+        tensors=(ids,p,valid,lower,upper,quota)
+    if not prevalidated and (any(x.shape!=(b,) or x.dtype!=torch.int64 for x in (lower,upper,quota))
             or not all(x.is_cuda and x.device==ids.device and x.is_contiguous()
-                       for x in (ids,p,valid,lower,upper,quota))):
+                       for x in tensors)):
         raise ValueError('same-device contiguous CUDA candidates and int64 bounds[B] required')
-    torch._assert_async(((lower>=0)&(upper>=lower)&(upper<=capacity)
-                         &(quota>=0)&(quota<=width)).all(),'invalid batch ranking bounds/quota')
-    top=tree_topk(ids.view(b*h,r),p.view(b*h,r),valid.view(b*h,r),lower,upper,quota,
-                  capacity,width,metadata_group=h)
-    out=torch.empty((b,h,width),device=ids.device,dtype=torch.int32)
-    counts=torch.empty((b,h),device=ids.device,dtype=torch.int32)
-    _finish[(b*h,)](top,lower,upper,quota,out,counts,capacity,width,sink,h,32 if capacity>=65536 else 16,num_warps=8)
+    if validate:
+        torch._assert_async(((lower>=0)&(upper>=lower)&(upper<=capacity)
+                             &(quota>=0)&(quota<=width)).all(),'invalid batch ranking bounds/quota')
+    hk=b*h
+    groups=triton.cdiv(r,2*width)
+    token_bits=32 if capacity>=65536 else 16
+    packed_dtype=torch.int64 if token_bits==32 else torch.int32
+    current=_workspace_empty(workspace,'rank_tile',(hk,groups,width),packed_dtype,ids.device)
+    if fused:
+        if not fuse_tiles:
+            _fast_launch(workspace,'rank_tile_scores_launch',_tile_keys_from_scores,(hk,groups),ids.view(hk,r),scores,mstat,lstat,valid.view(hk,r),lower,upper,quota,current,r,capacity,groups,width,h,token_bits,gqa_group,prob_dtype==torch.bfloat16,num_warps=8)
+    else:
+        _fast_launch(workspace,'rank_tile_launch',_tile_keys,(hk,groups),ids.view(hk,r),p.view(hk,r),valid.view(hk,r),lower,upper,quota,current,r,capacity,groups,width,h,token_bits,num_warps=8)
+    if fuse_tree and groups>2:
+        out=_workspace_empty(workspace,'rank_out',(b,h,width),torch.int32,ids.device)
+        counts=_workspace_empty(workspace,'rank_counts',(b,h),torch.int32,ids.device)
+        _fast_launch(workspace,'rank_tree_finish_launch',_merge_tree_finish,(hk,),
+                     current,lower,upper,quota,out,counts,groups,capacity,width,
+                     sink,h,token_bits,num_warps=8)
+        return TokenSelection(out,counts)
+    while groups>2:
+        following=triton.cdiv(groups,2)
+        output=_workspace_empty(workspace,'rank_merge',(hk,following,width),current.dtype,ids.device)
+        _fast_launch(workspace,('rank_merge_launch',following),_merge_topk,(hk,following),current,output,groups,following,width,num_warps=8)
+        current=output;groups=following
+    out=_workspace_empty(workspace,'rank_out',(b,h,width),torch.int32,ids.device)
+    counts=_workspace_empty(workspace,'rank_counts',(b,h),torch.int32,ids.device)
+    if groups==2:
+        _fast_launch(workspace,'rank_merge_finish_launch',_merge_finish,(hk,),current,lower,upper,quota,out,counts,capacity,width,sink,h,token_bits,num_warps=8)
+    else:
+        _fast_launch(workspace,'rank_finish_launch',_finish,(hk,),current,lower,upper,quota,out,counts,capacity,width,sink,h,token_bits,num_warps=8)
     return TokenSelection(out,counts)

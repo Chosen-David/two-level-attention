@@ -120,10 +120,9 @@ class GraphRunner:
         bucket = self.bucket_for(len(req_ids), cache.max_requests)
         padded_ids = req_ids + [-1] * (bucket - len(req_ids))
 
-        # Plan common metadata first so Top-K selection sees this step's
-        # planned decode length rather than the previous committed length.
+        # _prepare_metadata 统一准备本步页表/长度，避免同一 step 重复
+        # plan_common；selector 看到的就是本步 planned decode length。
         cache.new_step(padded_ids)
-        cache.plan_common(padded_ids)
 
         # selector 不能放在整步 forward 前：各层必须在 post-RoPE 当前 Q 上
         # 独立选择。这里只刷新固定元数据和本图使用的 visible bucket。
@@ -144,6 +143,9 @@ class GraphRunner:
                 use_cache=True,
                 attention_mask={'full_attention': None},
             )
+        # 回执只在 step 边界记录一次；具体设备数据延迟到请求结束时读取，
+        # 不在各层 forward 中更新 Python 对象或触发 D2H。
+        cache.nfa_decode_steps += 1
         # 所有层均完成当前 Q 选择后，才统一消费 first-decode seed。
         from ..indexer.nfa_layer_batch_selector import mark_first_decode_seeded
         mark_first_decode_seeded(cache, padded_ids)

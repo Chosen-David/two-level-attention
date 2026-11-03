@@ -68,9 +68,6 @@ class RequestState:
     resident_page_ranges_by_layer: list = field(default_factory=list)
     last_sync_length: int = 0
     skip_policy_groups: tuple = ()
-    # Incremental low-dimensional visible projection, keyed by
-    # (layer_idx, dims.data_ptr(), dims.numel(), block_size).
-    projection_cache: dict = field(default_factory=dict)
 
 
 class GraphReadyPagedRegionLayer:
@@ -203,6 +200,9 @@ class GraphReadyPagedRegionCache:
         self._pending_free_pages = []
         self._reclaimed_pages_by_layer = [0] * n_layers
         self.common_dirty = True
+        # 仅由 GraphRunner 在完整 decode step 后递增；请求结束回执据此
+        # fail-closed，避免把只完成 prefill 的 Cache 误认为已跑过 NFA decode。
+        self.nfa_decode_steps = 0
 
         # 每层独立持有 logical->physical 映射和写入 slot；固定地址可被 Graph
         # capture，物理页号不再要求跨层对齐。
@@ -234,6 +234,11 @@ class GraphReadyPagedRegionCache:
         self.active_req_ids_buf = torch.full(
             (max_query_tokens,), self.INVALID_REQ_ID,
             dtype=torch.int64, device=device)
+        # selector 每层只读：PAD 行映射到安全的 request 0，Q gather 使用固定行号。
+        self.valid_req_ids_buf = torch.zeros(
+            (max_query_tokens,), dtype=torch.int64, device=device)
+        self.query_req_ids_buf = torch.arange(
+            max_query_tokens, dtype=torch.int64, device=device)
         self.planned_lengths_buf = torch.zeros(
             (max_query_tokens,), dtype=torch.int32, device=device)
 
@@ -293,6 +298,8 @@ class GraphReadyPagedRegionCache:
         self._cpu_active_req_ids_staging = torch.full(
             (max_query_tokens,), self.INVALID_REQ_ID,
             dtype=torch.int64, device='cpu')
+        self._cpu_valid_req_ids_staging = torch.zeros(
+            (max_query_tokens,), dtype=torch.int64, device='cpu')
         self._cpu_planned_lengths_staging = torch.zeros(
             (max_query_tokens,), dtype=torch.int32, device='cpu')
         self._cpu_skip_far_staging = torch.zeros(
@@ -625,6 +632,9 @@ class GraphReadyPagedRegionCache:
         self.skip_near_layer_buf[:, request_id].copy_(
             self._cpu_skip_near_layer_staging[:, request_id],
             non_blocking=non_blocking)
+        # request slot 复用时强制下一步全量重建 NFA 持久页统计。
+        if hasattr(self, '_nfa_page_stats_lengths'):
+            self._nfa_page_stats_lengths[:, request_id].zero_()
         if prefill_topk_by_layer is not None:
             state.prefill_topk_ids_by_layer = {
                 layer_idx: [int(x) for x in prefill_topk_by_layer.get(layer_idx, [])]
@@ -784,31 +794,6 @@ class GraphReadyPagedRegionCache:
         return pages
 
     @staticmethod
-    def _interval_difference(a_intervals, b_intervals):
-        """Segments covered by ``a_intervals`` but not ``b_intervals``.
-
-        Both inputs are sorted half-open token intervals.  Decode shifts the
-        visible SWA/near/far boundaries by only a few edges per step, so this
-        is O(len(a)+len(b)) and avoids rebuilding a full visibility mask.
-        """
-        out = []
-        for a_lo, a_hi in a_intervals:
-            cur = a_lo
-            for b_lo, b_hi in b_intervals:
-                if b_hi <= cur:
-                    continue
-                if b_lo >= a_hi:
-                    break
-                if b_lo > cur:
-                    out.append((cur, min(b_lo, a_hi)))
-                cur = max(cur, b_hi)
-                if cur >= a_hi:
-                    break
-            if cur < a_hi:
-                out.append((cur, a_hi))
-        return out
-
-    @staticmethod
     def _range_diff(a_ranges, b_ranges):
         """Pages present in ``a_ranges`` but absent from ``b_ranges``.
 
@@ -936,139 +921,6 @@ class GraphReadyPagedRegionCache:
             ids = ids[torch.isin(ids, selected_ids)]
         return ids
 
-    def project_visible_for_request(self, layer_idx, request_id, dims,
-                                    block_size, length=None):
-        """Incremental low-dimensional visible-K projection.
-
-        Returns ``[1, padded_length, num_kv_heads, dims.numel()]`` in the KV
-        dtype.  The buffer is cached per request/layer/subspace and only the
-        newly appended decode positions are gathered.  K/V are append-only, so
-        old visible positions never need to be recomputed; positions that leave
-        the visible intervals are masked by the selector and need not be zeroed
-        in this projection.
-        """
-        state = self.states[request_id]
-        layer = self.layers[layer_idx]
-        if length is None:
-            length = self.pending_lengths.get(request_id, state.logical_length)
-        device = layer.kv_pool_k.device
-        hk = layer.num_kv_heads
-        page = self.geometry.page
-        pad = ((length + block_size - 1) // block_size) * block_size
-        dims_numel = dims.numel()
-        key = (layer_idx, dims.data_ptr(), dims_numel, block_size)
-        cached = state.projection_cache.get(key)
-
-        if cached is None or cached['buffer'].dtype != layer.kv_pool_k.dtype                 or cached['buffer'].device != device                 or cached['buffer'].shape[1] < pad:
-            out = torch.zeros((1, pad, hk, dims_numel),
-                              dtype=layer.kv_pool_k.dtype, device=device)
-            start_pos = 0
-            if cached is not None and cached['buffer'].shape[1] < pad:
-                old_rows = cached['buffer'].shape[1]
-                out[0, :old_rows].copy_(cached['buffer'][0, :old_rows])
-                start_pos = cached['last_length']
-            cached = {
-                'buffer': out,
-                'last_length': start_pos,
-                'dims_ptr': dims.data_ptr(),
-                'dims_numel': dims_numel,
-                'block_size': block_size,
-            }
-            state.projection_cache[key] = cached
-
-        out = cached['buffer']
-        start_pos = cached['last_length']
-        if length <= start_pos:
-            cached['last_length'] = length
-            return out
-
-        old_intervals = (
-            self._intervals_for_layer(state, layer_idx, start_pos)
-            if start_pos > 0 else ())
-        new_intervals = self._intervals_for_layer(state, layer_idx, length)
-
-        # Tokens that age out of the visible set must be zeroed, otherwise their
-        # stale projected values would pollute block min/max/mean statistics
-        # for blocks shared with still-visible tokens.
-        for a, b in self._interval_difference(old_intervals, new_intervals):
-            if a >= b:
-                continue
-            positions = torch.arange(a, b, device=device, dtype=torch.long)
-            out[0, positions] = 0
-
-        # Only fill tokens that are newly visible since the last cached length.
-        for a, b in self._interval_difference(new_intervals, old_intervals):
-            if a >= b:
-                continue
-            first_page = a // page
-            last_page = (b - 1) // page
-            for logical_page in range(first_page, last_page + 1):
-                physical_id = state.block_tables[layer_idx].get(logical_page)
-                if physical_id is None:
-                    continue
-                lo = max(a, logical_page * page)
-                hi = min(b, (logical_page + 1) * page)
-                if hi <= lo:
-                    continue
-                positions = torch.arange(lo, hi, device=device, dtype=torch.long)
-                offsets = positions - logical_page * page
-                vals = layer.kv_pool_k[physical_id, 0, :, offsets, :]
-                # vals: [HK, n, D] -> [n, HK, D]
-                vals = vals.permute(1, 0, 2)[..., dims]
-                out[0, positions] = vals
-
-        cached['last_length'] = length
-        return out
-
-    def project_visible_varlen(self, layer_idx, req_ids, dims, block_size,
-                               lengths=None):
-        """Batch visible-K projection for the graph-ready NFA selector.
-
-        Unlike :meth:`project_visible_for_request`, this computes every valid
-        request's projection with one kernel launch and returns a unified
-        ``[B, pad, HK, dims.numel()]`` tensor.  It is a full-visible projection
-        intended for the varlen indexer path; the eager incremental path remains
-        authoritative for correctness checks.
-        """
-        from ..ops.paged_region_kernels_nfa import project_visible_varlen_kernel
-
-        if not req_ids:
-            raise ValueError('project_visible_varlen requires at least one request')
-        if any(rid < 0 or rid not in self.states for rid in req_ids):
-            raise ValueError('project_visible_varlen accepts only active request ids')
-
-        layer = self.layers[layer_idx]
-        device = layer.kv_pool_k.device
-        if device.type != 'cuda':
-            raise RuntimeError('project_visible_varlen requires CUDA')
-
-        if lengths is None:
-            lengths = [
-                self.pending_lengths.get(rid, self.states[rid].logical_length)
-                for rid in req_ids
-            ]
-        if len(lengths) != len(req_ids):
-            raise ValueError('lengths must align with req_ids')
-
-        max_len = max(lengths) if lengths else 0
-        pad = ((max_len + block_size - 1) // block_size) * block_size
-        dims = dims.to(device=device).contiguous()
-
-        lengths_t = torch.tensor(
-            lengths, dtype=torch.int32, device=device)
-        self._pack_skip_flags(layer_idx, req_ids)
-        skip_far_t = self.skip_far_buf[:len(req_ids)]
-        skip_near_t = self.skip_near_buf[:len(req_ids)]
-        block_table = self.block_table_buf[layer_idx, req_ids].contiguous()
-
-        return project_visible_varlen_kernel(
-            layer.kv_pool_k, block_table, lengths_t,
-            skip_far_t, skip_near_t, dims, pad,
-            sink=self.geometry.sink,
-            near_len=self.geometry.near,
-            window=self.geometry.window,
-        )
-
     # ------------------------------------------------------------------
     # Metadata preparation (common page table + per-layer sparse gather)
     # ------------------------------------------------------------------
@@ -1176,6 +1028,7 @@ class GraphReadyPagedRegionCache:
         # 只清当前 step 会用到的 slot 前缀，避免每步 fill 整个长 buffer。
         self._cpu_slot_mapping_staging[:, :batch].fill_(PAD_SLOT)
         self._cpu_active_req_ids_staging[:batch].fill_(self.INVALID_REQ_ID)
+        self._cpu_valid_req_ids_staging[:batch].zero_()
         self._cpu_planned_lengths_staging[:batch].zero_()
         self.pending_lengths.clear()
 
@@ -1191,6 +1044,7 @@ class GraphReadyPagedRegionCache:
             state = self.states[request_id]
             planned_length = state.logical_length + qlen
             self._cpu_active_req_ids_staging[b] = request_id
+            self._cpu_valid_req_ids_staging[b] = request_id
             self._cpu_planned_lengths_staging[b] = planned_length
 
             # 只预分配/更新各层 block_table，不推进 state.logical_length。
@@ -1222,6 +1076,8 @@ class GraphReadyPagedRegionCache:
         self.query_to_req_buf.copy_(self._cpu_query_to_req_staging, non_blocking=True)
         self.active_req_ids_buf.copy_(
             self._cpu_active_req_ids_staging, non_blocking=True)
+        self.valid_req_ids_buf.copy_(
+            self._cpu_valid_req_ids_staging, non_blocking=True)
         self.planned_lengths_buf.copy_(
             self._cpu_planned_lengths_staging, non_blocking=True)
         self.common_dirty = False
@@ -1416,7 +1272,10 @@ class GraphReadyPagedRegionCache:
         if key_states.shape[0] != slot_mapping.shape[0]:
             raise ValueError('request batch must match KV batch')
         from ..ops.paged_region_kernels import paged_write_decode
-        return paged_write_decode(layer, key_states, value_states, slot_mapping)
+        workspace = getattr(self, '_nfa_selector_workspace', None)
+        return paged_write_decode(
+            layer, key_states, value_states, slot_mapping,
+            workspace=workspace)
 
     def block_table(self):
         return self.block_table_buf

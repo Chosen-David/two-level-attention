@@ -292,9 +292,14 @@ def _json_safe(value):
 def complete_frozen_request(model, cache, generated_count, audit):
     """Verify real decode receipts before a prediction can be committed."""
     final = cache.report()
+    decode_steps = getattr(cache, 'nfa_decode_steps', 0)
     receipts = {
-        layer_idx: getattr(layer, 'nfa_receipt', None)
-        for layer_idx, layer in enumerate(cache.layers)
+        layer_idx: ({
+            'route': 'graph_ready_sparse',
+            'visible_lens': cache.visible_lens_buf[
+                layer_idx, :cache.max_requests].detach(),
+        } if decode_steps > 0 else None)
+        for layer_idx in range(cache.n_layers)
     }
     if getattr(model, '_frozen_nfa', False) and generated_count > 1:
         if not all(receipts.values()):

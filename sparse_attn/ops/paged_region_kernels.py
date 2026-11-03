@@ -210,9 +210,9 @@ if triton is not None:
         Q,
         K_POOL,
         V_POOL,
-        GATHER,          # [B, MAX_VISIBLE] absolute physical slots
-        VISIBLE_LENS,    # [B]
-        QUERY_TO_REQ,    # [TOTAL_QUERIES]
+        GATHER,
+        VISIBLE_LENS,
+        QUERY_TO_REQ,
         OUT,
         TOTAL_QUERIES,
         HQ: tl.constexpr,
@@ -231,6 +231,123 @@ if triton is not None:
         HEAD_TILE: tl.constexpr,
         USE_BF16: tl.constexpr,
     ):
+        """Grouped Tensor-Core gather attention over all visible blocks."""
+        q_idx = tl.program_id(0)
+        kv_head = tl.program_id(1)
+        if q_idx >= TOTAL_QUERIES:
+            return
+
+        d = tl.arange(0, BD)
+        vd = tl.arange(0, BV)
+        t = tl.arange(0, BT)
+        h = tl.arange(0, HEAD_TILE)
+        req_idx = tl.load(QUERY_TO_REQ + q_idx, cache_modifier='.cg')
+        out_base = OUT + q_idx * HQ * DV + kv_head * HEAD_GROUP * DV
+        out_ptrs = out_base + h[:, None] * DV + vd[None, :]
+        out_mask = (h[:, None] < HEAD_GROUP) & (vd[None, :] < DV)
+        if req_idx < 0:
+            tl.store(
+                out_ptrs,
+                tl.zeros((HEAD_TILE, BV), tl.float32).to(OUT.dtype.element_ty),
+                mask=out_mask,
+            )
+            return
+
+        vis_len = tl.load(VISIBLE_LENS + req_idx, cache_modifier='.cg')
+        q_ptrs = Q + q_idx * HQ * D + d[:, None] + (kv_head * HEAD_GROUP + h)[None, :] * D
+        q_tile = tl.load(
+            q_ptrs,
+            mask=(d[:, None] < D) & (h[None, :] < HEAD_GROUP),
+            other=0.0,
+            cache_modifier='.ca',
+        )
+        if USE_BF16:
+            q_tile = q_tile.to(tl.bfloat16)
+        else:
+            q_tile = q_tile.to(tl.float16)
+
+        m = tl.full((HEAD_TILE,), float('-inf'), tl.float32)
+        z = tl.zeros((HEAD_TILE,), tl.float32)
+        acc = tl.zeros((HEAD_TILE, BV), tl.float32)
+        num_blocks = tl.cdiv(tl.minimum(vis_len, MAX_VISIBLE), BT)
+        for block_idx in range(0, num_blocks):
+            start = block_idx * BT
+            col = tl.max_contiguous(start + t, BT)
+            col_valid = col < vis_len
+            slot = tl.load(
+                GATHER + req_idx * MAX_VISIBLE + col,
+                mask=col_valid, other=-1, cache_modifier='.cg')
+            valid = col_valid & (slot >= 0)
+            phys_page = (slot >> LOG2_PAGE).to(tl.int64)
+            offset = slot & (PAGE - 1)
+            k_base = (
+                K_POOL
+                + phys_page * (HK * PAGE * D)
+                + kv_head * (PAGE * D)
+                + offset * D
+            )
+            v_base = (
+                V_POOL
+                + phys_page * (HK * PAGE * DV)
+                + kv_head * (PAGE * DV)
+                + offset * DV
+            )
+            k = tl.load(
+                k_base[:, None] + d[None, :],
+                mask=valid[:, None] & (d[None, :] < D),
+                other=0.0, cache_modifier='.ca')
+            if USE_BF16:
+                k = k.to(tl.bfloat16)
+            else:
+                k = k.to(tl.float16)
+            score_tile = tl.dot(k, q_tile) * SCALE
+            score_valid = valid[:, None] & (h[None, :] < HEAD_GROUP)
+            score_tile = tl.where(score_valid, score_tile, float('-inf'))
+            new_m = tl.maximum(m, tl.max(score_tile, 0))
+            safe_m = tl.where(new_m == float('-inf'), 0.0, new_m)
+            alpha = tl.exp(m - safe_m)
+            prob = tl.exp(score_tile - safe_m[None, :])
+            v = tl.load(
+                v_base[:, None] + vd[None, :],
+                mask=valid[:, None] & (vd[None, :] < DV),
+                other=0.0, cache_modifier='.ca').to(tl.float32)
+            acc = acc * alpha[:, None] + tl.dot(tl.trans(prob), v)
+            z = z * alpha + tl.sum(prob, 0)
+            m = new_m
+
+        out = tl.where(z[:, None] == 0.0, 0.0, acc / z[:, None])
+        tl.store(out_ptrs, out.to(OUT.dtype.element_ty), mask=out_mask)
+
+
+    @triton.jit
+    def _gather_attend_grouped_split_kernel(
+        Q,
+        K_POOL,
+        V_POOL,
+        GATHER,          # [B, MAX_VISIBLE] absolute physical slots
+        VISIBLE_LENS,    # [B]
+        QUERY_TO_REQ,    # [TOTAL_QUERIES]
+        OUT,
+        PART_ACC, PART_M, PART_Z,
+        TOTAL_QUERIES,
+        HQ: tl.constexpr,
+        HK: tl.constexpr,
+        D: tl.constexpr,
+        DV: tl.constexpr,
+        PAGE: tl.constexpr,
+        LOG2_PAGE: tl.constexpr,
+        MAX_VISIBLE: tl.constexpr,
+        MAX_BATCH: tl.constexpr,
+        BT: tl.constexpr,
+        SCALE: tl.constexpr,
+        BD: tl.constexpr,
+        BV: tl.constexpr,
+        HEAD_GROUP: tl.constexpr,
+        HEAD_TILE: tl.constexpr,
+        USE_BF16: tl.constexpr,
+        NSPLIT: tl.constexpr,
+        WRITE_PARTIAL: tl.constexpr,
+    ):
         """Grouped Tensor-Core gather attention.
 
         One program owns one ``(query row, KV head)`` pair and computes all
@@ -241,6 +358,7 @@ if triton is not None:
         """
         q_idx = tl.program_id(0)
         kv_head = tl.program_id(1)
+        split = tl.program_id(2)
         if q_idx >= TOTAL_QUERIES:
             return
 
@@ -255,14 +373,22 @@ if triton is not None:
         out_mask = (h[:, None] < HEAD_GROUP) & (vd[None, :] < DV)
 
         if req_idx < 0:
-            # Padded batch row: no request slot and no KV gather.  Zero the
-            # output tile deterministically and return before touching
-            # VISIBLE_LENS at a negative index.
-            tl.store(
-                out_ptrs,
-                tl.zeros((HEAD_TILE, BV), tl.float32).to(OUT.dtype.element_ty),
-                mask=out_mask,
-            )
+            # PAD 不触碰负 request 地址；split 路径写空部分和供统一归并。
+            if WRITE_PARTIAL:
+                part = ((split * TOTAL_QUERIES + q_idx) * HQ
+                        + kv_head * HEAD_GROUP + h)
+                tl.store(PART_ACC + part[:, None] * DV + vd[None, :],
+                         tl.zeros((HEAD_TILE, BV), tl.float32), mask=out_mask)
+                tl.store(PART_M + part, tl.full((HEAD_TILE,), float('-inf'), tl.float32),
+                         mask=h < HEAD_GROUP)
+                tl.store(PART_Z + part, tl.zeros((HEAD_TILE,), tl.float32),
+                         mask=h < HEAD_GROUP)
+            else:
+                tl.store(
+                    out_ptrs,
+                    tl.zeros((HEAD_TILE, BV), tl.float32).to(OUT.dtype.element_ty),
+                    mask=out_mask,
+                )
             return
 
         vis_len = tl.load(VISIBLE_LENS + req_idx, cache_modifier='.cg')
@@ -285,8 +411,17 @@ if triton is not None:
 
         # Dynamic upper bound is the functional replacement for ``break`` on
         # Triton 3.4: a short request never walks the fixed MAX_VISIBLE tail.
+        # split-KV 各 program 只处理连续的一段 block，保持分区内原运算顺序。
         num_blocks = tl.cdiv(tl.minimum(vis_len, MAX_VISIBLE), BT)
-        for block_idx in range(0, num_blocks):
+        if WRITE_PARTIAL:
+            # 用 floor 边界均衡分配，避免 num_blocks=10、NSPLIT=8 时仅前 5 个
+            # split 获得工作；所有 split 均参与，且单个 split 最多多处理一块。
+            block_begin = (split * num_blocks) // NSPLIT
+            block_end = ((split + 1) * num_blocks) // NSPLIT
+        else:
+            block_begin = 0
+            block_end = num_blocks
+        for block_idx in range(block_begin, block_end):
             start = block_idx * BT
             col = tl.max_contiguous(start + t, BT)
             col_valid = col < vis_len
@@ -338,11 +473,53 @@ if triton is not None:
             z = z * alpha + tl.sum(prob, 0)
             m = new_m
 
-        out = tl.where(z[:, None] == 0.0, 0.0, acc / z[:, None])
-        tl.store(out_ptrs, out.to(OUT.dtype.element_ty), mask=out_mask)
+        if WRITE_PARTIAL:
+            part = ((split * TOTAL_QUERIES + q_idx) * HQ
+                    + kv_head * HEAD_GROUP + h)
+            tl.store(PART_ACC + part[:, None] * DV + vd[None, :], acc,
+                     mask=out_mask)
+            tl.store(PART_M + part, m, mask=h < HEAD_GROUP)
+            tl.store(PART_Z + part, z, mask=h < HEAD_GROUP)
+        else:
+            out = tl.where(z[:, None] == 0.0, 0.0, acc / z[:, None])
+            tl.store(out_ptrs, out.to(OUT.dtype.element_ty), mask=out_mask)
 
 
-def paged_write_decode(cache_layer, key_states, value_states, slot_mapping):
+    @triton.jit
+    def _gather_attend_split_combine_kernel(
+        PART_ACC, PART_M, PART_Z, OUT, TOTAL_QUERIES,
+        HQ: tl.constexpr, DV: tl.constexpr, BV: tl.constexpr,
+        NSPLIT: tl.constexpr,
+    ):
+        """按 split 序号归并 online-softmax 状态，保持确定性。"""
+        q_idx = tl.program_id(0)
+        head = tl.program_id(1)
+        if q_idx >= TOTAL_QUERIES:
+            return
+        vd = tl.arange(0, BV)
+        mask = vd < DV
+        acc = tl.zeros((BV,), tl.float32)
+        m = float('-inf')
+        z = 0.0
+        for split in tl.static_range(NSPLIT):
+            part = (split * TOTAL_QUERIES + q_idx) * HQ + head
+            part_m = tl.load(PART_M + part)
+            part_z = tl.load(PART_Z + part)
+            part_acc = tl.load(PART_ACC + part * DV + vd, mask=mask, other=0.0)
+            new_m = tl.maximum(m, part_m)
+            safe_m = tl.where(new_m == float('-inf'), 0.0, new_m)
+            alpha = tl.exp(m - safe_m)
+            beta = tl.exp(part_m - safe_m)
+            acc = acc * alpha + part_acc * beta
+            z = z * alpha + part_z * beta
+            m = new_m
+        out = tl.where(z == 0.0, 0.0, acc / z)
+        tl.store(OUT + (q_idx * HQ + head) * DV + vd,
+                 out.to(OUT.dtype.element_ty), mask=mask)
+
+
+def paged_write_decode(cache_layer, key_states, value_states, slot_mapping, *,
+                       workspace=None):
     """Write one decode token per batch row into a fixed physical arena.
 
     ``key_states`` / ``value_states`` are [B, HK, 1, D] / [B, HK, 1, DV].
@@ -371,7 +548,9 @@ def paged_write_decode(cache_layer, key_states, value_states, slot_mapping):
     if key_states.is_cuda:
         if triton is None:
             raise RuntimeError('Triton required for paged write decode')
-        _paged_write_kernel[(B,)](
+        from ..indexer.selection.unique_ranking import _fast_launch
+        _fast_launch(
+            workspace, 'paged_write', _paged_write_kernel, (B,),
             key_states,
             value_states,
             slot_mapping.contiguous(),
@@ -407,6 +586,7 @@ def sparse_paged_attention_gather(
     query_to_req,
     *,
     scale,
+    workspace=None,
 ):
     """Sparse gather paged attention over a GraphReadyPagedRegionLayer arena.
 
@@ -437,10 +617,33 @@ def sparse_paged_attention_gather(
         and head_group <= head_tile
     )
 
+    # 生产稳态下 selector 已建立固定几何与 launch context。直接重放 grouped
+    # gather 的预绑定 launch，仅替换当前 Q 和新输出，避免重复组织 host 参数。
+    if workspace is not None and q.is_cuda and workspace.get('_nfa_capturing') is False:
+        context = workspace.get('_nfa_launch_context')
+        geometry = workspace.get('_nfa_launch_geometry')
+        plan = workspace.get(('eager_gather_call_plan', id(cache_layer)))
+        if (context is not None and context[1] is None and plan is not None
+                and plan[0] is geometry):
+            args, launch = plan[1], plan[2]
+            if launch[1] == (_gather_attend_grouped_kernel.debug or context[3]):
+                out = q.new_empty(args[6].shape)
+                values = ((q.contiguous(),) + args[1:6] + (out,)
+                          + args[7:] + launch[6])
+                launch[2](args[7], launch[7], launch[8], context[0], launch[3],
+                          launch[4], None, None, context[2], *values)
+                return out
+
     if q.is_cuda:
         if triton is None:
             raise RuntimeError('Triton required for sparse gather attention')
         out = q.new_empty((total_q, hq, cache_layer.head_dim_v))
+        from ..indexer.selection.unique_ranking import _fast_launch, _workspace_empty
+        capturing = (workspace.get('_nfa_capturing') if workspace is not None
+                     else None)
+        if capturing is None:
+            capturing = torch.cuda.is_current_stream_capturing()
+        split_kv = False
         if use_grouped:
             # Small batches are latency-bound and prefer a wider token tile;
             # larger batches are occupancy-bound and prefer BT=64.  GLM's
@@ -452,7 +655,58 @@ def sparse_paged_attention_gather(
             else:
                 block_tokens = 128 if total_q <= 8 else 64
                 kernel_kwargs = {}
-            _gather_attend_grouped_kernel[(total_q, hk)](
+            if not split_kv:
+                gather_args = (
+                    q.contiguous(),
+                    cache_layer.kv_pool_k,
+                    cache_layer.kv_pool_v,
+                    gather_indices,
+                    visible_lens,
+                    query_to_req,
+                    out,
+                    total_q,
+                    hq, hk,
+                    cache_layer.head_dim_k,
+                    cache_layer.head_dim_v,
+                    page,
+                    log2_page,
+                    max_visible,
+                    visible_lens.shape[0],
+                    block_tokens,
+                    scale,
+                    triton.next_power_of_2(cache_layer.head_dim_k),
+                    triton.next_power_of_2(cache_layer.head_dim_v),
+                    head_group,
+                    head_tile,
+                    use_bf16,
+                )
+                _fast_launch(
+                    workspace, 'gather_attend_grouped',
+                    _gather_attend_grouped_kernel, (total_q, hk),
+                    *gather_args, **kernel_kwargs,
+                )
+                if not capturing and workspace is not None:
+                    geometry = workspace.get('_nfa_launch_geometry')
+                    launch = workspace.get(('triton_plan', 'gather_attend_grouped'))
+                    if launch is not None and launch[0] is geometry:
+                        workspace[('eager_gather_call_plan', id(cache_layer))] = (
+                            geometry, gather_args, launch)
+                return out
+
+            nsplit = 8
+            part_acc = _workspace_empty(
+                workspace, 'gather_split_acc',
+                (nsplit, total_q, hq, cache_layer.head_dim_v),
+                torch.float32, q.device)
+            part_m = _workspace_empty(
+                workspace, 'gather_split_m', (nsplit, total_q, hq),
+                torch.float32, q.device)
+            part_z = _workspace_empty(
+                workspace, 'gather_split_z', (nsplit, total_q, hq),
+                torch.float32, q.device)
+            _fast_launch(
+                workspace, 'gather_attend_grouped_split',
+                _gather_attend_grouped_split_kernel, (total_q, hk, nsplit),
                 q.contiguous(),
                 cache_layer.kv_pool_k,
                 cache_layer.kv_pool_v,
@@ -460,6 +714,7 @@ def sparse_paged_attention_gather(
                 visible_lens,
                 query_to_req,
                 out,
+                part_acc, part_m, part_z,
                 total_q,
                 hq, hk,
                 cache_layer.head_dim_k,
@@ -475,12 +730,23 @@ def sparse_paged_attention_gather(
                 head_group,
                 head_tile,
                 use_bf16,
+                nsplit,
+                True,
                 **kernel_kwargs,
+            )
+            _fast_launch(
+                workspace, 'gather_attend_split_combine',
+                _gather_attend_split_combine_kernel, (total_q, hq),
+                part_acc, part_m, part_z, out, total_q,
+                hq, cache_layer.head_dim_v,
+                triton.next_power_of_2(cache_layer.head_dim_v), nsplit,
             )
         else:
             # Small-head fallback keeps the scalar-FMA path because tl.dot
             # requires N >= 16 and would otherwise fabricate dummy columns.
-            _gather_attend_kernel[(total_q, hq)](
+            _fast_launch(
+                workspace, 'gather_attend', _gather_attend_kernel,
+                (total_q, hq),
                 q.contiguous(),
                 cache_layer.kv_pool_k,
                 cache_layer.kv_pool_v,

@@ -1,4 +1,4 @@
-"""GraphReady NFA 的保护集、页投影和 gather attention 入口。"""
+"""GraphReady NFA 的保护集和 gather attention 入口。"""
 import argparse
 import torch
 from sparse_attn.arguments import add_sparse_attn_args
@@ -89,17 +89,6 @@ def decode_graph_ready(module, q, cache, *, gather_indices=None,
         if visible_lens is None else visible_lens)
     query_to_req = cache.query_to_req_buf if query_to_req is None else query_to_req
 
-    # The frozen-runner completion receipt only needs proof that this layer
-    # executed the sparse gather path.  The actual selected token count is the
-    # fixed-width visible-lens row for this request slot.
-    # Graph capture 中禁止 D2H 同步；replay 不执行 Python，receipt 由 capture
-    # 前的 eager warmup 建立，eager 生产步则继续记录真实 visible_lens。
-    if not torch.cuda.is_current_stream_capturing():
-        layer.nfa_receipt = {
-            'route': 'graph_ready_sparse',
-            'visible_lens': visible_lens[:cache.max_requests].detach().cpu().tolist(),
-        }
-
     return sparse_paged_attention_gather(
         layer,
         q,
@@ -107,110 +96,5 @@ def decode_graph_ready(module, q, cache, *, gather_indices=None,
         visible_lens,
         query_to_req,
         scale=scale,
+        workspace=getattr(cache, '_nfa_selector_workspace', None),
     )
-
-
-
-def project_visible_varlen_kernel(kv_pool_k, block_table, lengths,
-                                  skip_far, skip_near, dims, pad,
-                                  *, sink, near_len, window):
-    """Batch low-dimensional visible-K projection over the graph-ready arena.
-
-    Grid is one program per request.  The kernel writes ``[B, pad, HK, D]`` in
-    token order, zeroing non-visible positions exactly like the eager
-    ``project_visible_for_request`` buffer contract.
-    """
-    import triton
-    import triton.language as tl
-
-    device = kv_pool_k.device
-    batch = lengths.numel()
-    hk = kv_pool_k.shape[2]
-    page = kv_pool_k.shape[3]
-    head_dim = kv_pool_k.shape[4]
-    dims_numel = dims.numel()
-
-    if device.type != 'cuda':
-        raise RuntimeError('project_visible_varlen_kernel requires CUDA')
-    if pad <= 0:
-        raise ValueError('pad must be positive')
-
-    out = torch.empty(
-        (batch, pad, hk, dims_numel),
-        dtype=kv_pool_k.dtype, device=device)
-    block_table = block_table.contiguous()
-    dims = dims.contiguous().to(device)
-
-    @triton.jit
-    def _kernel(
-        kv_ptr, bt_ptr, len_ptr, skip_far_ptr, skip_near_ptr,
-        out_ptr, dims_ptr,
-        PAD, PAGE: tl.constexpr, SINK: tl.constexpr,
-        NEAR_LEN: tl.constexpr, WINDOW: tl.constexpr,
-        MAX_BLOCKS: tl.constexpr, HK: tl.constexpr, HEAD_DIM: tl.constexpr,
-        DIM_NUMEL: tl.constexpr, BLOCK: tl.constexpr,
-    ):
-        pid = tl.program_id(0)
-        req = tl.program_id(1)
-
-        length = tl.load(len_ptr + req).to(tl.int32)
-        skip_far = tl.load(skip_far_ptr + req).to(tl.int32)
-        skip_near = tl.load(skip_near_ptr + req).to(tl.int32)
-        far_on = skip_far == 0
-        near_on = skip_near == 0
-
-        sink_hi = tl.minimum(SINK, length)
-        near_hi = tl.maximum(sink_hi, length - WINDOW)
-        tmp = length - WINDOW - NEAR_LEN
-        far_blk = tmp // PAGE
-        far_hi = tl.minimum(
-            near_hi, tl.maximum(sink_hi, far_blk * PAGE))
-
-        total = PAD * HK * DIM_NUMEL
-        row = pid * BLOCK + tl.arange(0, BLOCK)
-        out_mask = row < total
-
-        tok = row // (HK * DIM_NUMEL)
-        rem = row % (HK * DIM_NUMEL)
-        head = rem // DIM_NUMEL
-        dim_idx = rem % DIM_NUMEL
-
-        visible = tok < sink_hi
-        visible = visible | (
-            far_on & (tok >= sink_hi) & (tok < far_hi))
-        visible = visible | (
-            near_on & (tok >= far_hi) & (tok < near_hi))
-        visible = visible | (
-            (tok >= near_hi) & (tok < length))
-
-        lp = tok // PAGE
-        off = tok % PAGE
-        page_valid = lp < MAX_BLOCKS
-        phys = tl.load(
-            bt_ptr + req * MAX_BLOCKS + lp,
-            mask=out_mask & page_valid, other=0).to(tl.int64)
-        dim = tl.load(
-            dims_ptr + dim_idx, mask=out_mask, other=0).to(tl.int64)
-
-        src = (kv_ptr
-               + phys * HK * PAGE * HEAD_DIM
-               + head * PAGE * HEAD_DIM
-               + off * HEAD_DIM
-               + dim)
-        load_mask = out_mask & visible & page_valid
-        val = tl.load(src, mask=load_mask, other=0.0)
-        tl.store(
-            out_ptr + req * PAD * HK * DIM_NUMEL + row,
-            val, mask=out_mask)
-
-    block = 256
-    grid = (triton.cdiv(pad * hk * dims_numel, block), batch)
-    _kernel[grid](
-        kv_pool_k, block_table, lengths, skip_far, skip_near,
-        out, dims,
-        PAD=pad, PAGE=page, SINK=sink, NEAR_LEN=near_len, WINDOW=window,
-        MAX_BLOCKS=block_table.shape[1], HK=hk, HEAD_DIM=head_dim,
-        DIM_NUMEL=dims_numel, BLOCK=block,
-        num_warps=4,
-    )
-    return out
