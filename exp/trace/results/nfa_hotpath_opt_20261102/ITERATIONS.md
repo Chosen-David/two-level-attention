@@ -793,3 +793,11 @@
 - 生产正确性与归档：iter93 Graph 与 iter92 Graph、iter92 eager 的 128/128 token 均完全一致，输入 SHA 与 selector 配置不变。微基准、生产 receipt/log 和两份 GPU hygiene 已归档到本结果目录。
 - 覆盖复核：新的独立生产单步画像中 `_square_fp32_kernel` 与 `_norm_scale_kernel` 均为 145 calls，`torch.mean` 也是 145 calls，Q/K 的 72 个实例已全部进入三 kernel；该画像 self-device 合计 9.937 ms，其 TPOT 仍不作 verdict。
 - 同卡 ABBA：pc40 GPU0 四个独立进程按 iter92(A)→iter93(B)→iter93(B)→iter92(A) 运行，steady TPOT 分别为 11.166352、10.555744、10.536640、11.161680 ms；两臂各自均值为 11.164016/10.546192 ms，ABBA 加速 1.058583×，与首次单跑的 1.0567× 一致，收益可重复。四臂 128/128 token 全部一致，输入 SHA 不变；按 ABBA 均值 FA2/NFA=1.194337×，仍未达到 2×。证据见 `iter93_abba/`（含 verdict 与 hygiene）和 `iter93_profile/`。
+
+## Iter 94：共享存储的一次 QKV skinny GEMM 实验臂
+
+- 修改：模型加载后为 Q/K/V 权重建立一份拼接存储，三个 Linear 权重改成其视图，避免设计上长期保留第二份完整 QKV 权重；仅 B1 decode 使用一次 `F.linear`，prefill 和 B>1 仍走原三次投影。
+- 数值边界：权重替换后的原三路 fallback 与替换前逐位一致；合并 GEMM 的 K/V 在本探针逐位一致，但 Q 有 8/4096 个 BF16 元素不同、max_abs=0.0078125，不能标记为算子 bit-exact。必须由完整生产 128-token identity 决定是否保留，若分叉立即回退。
+- 微基准：eager 三次/一次投影为 0.042777/0.019033 ms（2.2475×），Graph 为 0.025320/0.015814 ms（1.6011×）；该单算子收益不能外推为完整 TPOT。
+- 待修问题：共享存储检查通过，但 `memory_allocated` 仍增加 33,566,720 bytes，其中 12,288 bytes 是保留的参考输出，其余约 32 MiB 表明旧 Q 权重尚未释放；在解决该生命周期问题并实测 model-loaded/decode-ready 显存前，不宣称零显存副本。
+- 原始证据：pc40 `/tmp/iter94_qkv_micro.log` 与 `iter94_qkv_micro_gpu0_hygiene.log`，待随生产结果归档。
