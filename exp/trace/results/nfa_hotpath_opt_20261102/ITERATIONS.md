@@ -738,3 +738,5 @@
 - 验证：pc40 GPU0 隔离 worktree，真实生产 shape `[1,8,8320]`、K=1024；起跑前 used=1 MiB 且无 compute apps。最终 indices 与 counts 全部 bit-exact。
 - 微基准：原单 CTA reference 0.230609 ms，候选 partial+merge 0.028474 ms，reference/candidate=8.098947×；相对 Iter 81 的 0.038990 ms 降低 26.97%（约 1.369×）。
 - 边界：该微基准不包含 fine-score 新增打包工作，不能据此宣称生产 TPOT 同幅改善；下一步必须跑完整 NFA eager/Graph token identity 与 TPOT。
+- 完整生产 128-token：eager steady TPOT 24.480000 ms，相对 Iter 81 独占基线 24.438424 ms 慢 0.17%（噪声量级）；Graph steady TPOT 12.361072 ms，相对 Iter 81 的 12.443976 ms 降低 0.67%（1.0067×）。FA2/NFA 当前为 eager 0.9383×、Graph 1.0190×，均未达到 2×。
+- 生产正确性：微基准已逐位通过；128-token 完整序列将在结果文件归档后逐项对拍，未对拍前不晋升为最终冠军。
