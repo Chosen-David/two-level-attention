@@ -800,4 +800,5 @@
 - 数值边界：权重替换后的原三路 fallback 与替换前逐位一致；合并 GEMM 的 K/V 在本探针逐位一致，但 Q 有 8/4096 个 BF16 元素不同、max_abs=0.0078125，不能标记为算子 bit-exact。必须由完整生产 128-token identity 决定是否保留，若分叉立即回退。
 - 微基准：eager 三次/一次投影为 0.042787/0.019005 ms（2.2513×），Graph 为 0.025374/0.015784 ms（1.6076×）；该单算子收益不能外推为完整 TPOT。
 - 显存复核：初次探针的约 32 MiB 增量来自首次 GEMM 的 cuBLAS workspace，不是旧权重引用；独立 weakref 检查显示旧 Q/K/V 权重均已释放。预热 workspace 后，准备融合权重的 allocated delta 仅为保留参考输出的 12,288 bytes，共享存储未增加权重副本。生产 model-loaded/decode-ready 显存仍需实测。
-- 原始证据：pc40 `/tmp/iter94_qkv_micro.log` 与 `iter94_qkv_micro_gpu0_hygiene.log`，待随生产结果归档。
+- 完整生产 128-token：Graph steady TPOT 10.274896 ms，相对 Iter 93 单跑 10.569072 ms 加速 1.028632×；eager steady TPOT 22.864288 ms，相对 Iter 92 的 23.982288 ms 加速 1.048903×。当前 FA2/NFA 约为 Graph 1.225953×、eager 1.004556×，eager 仅略超过 FA2，双口径仍未达到 2×。两臂 model-loaded allocated 均为 16,417,402,368 bytes，与 Iter 93 相同。
+- 原始证据：pc40 `/tmp/iter94_qkv_micro.log`、`iter94_qkv_micro_gpu0_hygiene.log`、`ruler32k_iter94_128_{graph,eager}.json`、`iter94_production_{graph,eager}.log` 与 `iter94_production_gpu0_hygiene.log`，待下载归档；完整 token identity 随后校验，未通过则回退。
