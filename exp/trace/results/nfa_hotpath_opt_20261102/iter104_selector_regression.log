@@ -1,0 +1,42 @@
+..................F                                                      [100%]
+=================================== FAILURES ===================================
+____________ test_radix_filtered_topk_bit_exact_with_quota_and_ties ____________
+
+    def test_radix_filtered_topk_bit_exact_with_quota_and_ties():
+        m, hkv, r, width, capacity = 3, 2, 8320, 1024, 16384
+        generator = torch.Generator(device='cuda').manual_seed(20261103)
+        cand = torch.stack([
+            torch.randperm(capacity, generator=generator, device='cuda')[:r]
+            for _ in range(m * hkv)
+        ]).view(m, hkv, r).to(torch.int64).contiguous()
+        logits = torch.randn(
+            m, hkv, r, generator=generator, dtype=torch.bfloat16,
+            device='cuda').contiguous()
+        # 大量同分、显式无效项和区间外 token 同时覆盖阈值与补洞路径。
+        logits[:, :, 128:512] = 0.25
+        logits[:, :, 512:640] = float('-inf')
+        cand[:, :, 640:768] = capacity - 1
+        lower = torch.tensor([128, 0, 0], dtype=torch.int64, device='cuda')
+        upper = torch.tensor([8000, 64, 4096], dtype=torch.int64, device='cuda')
+        quota = torch.tensor([1024, 300, 0], dtype=torch.int64, device='cuda')
+    
+        reference_out = torch.empty(
+            m, hkv, width, dtype=torch.int32, device='cuda')
+        reference_count = torch.empty(m, hkv, dtype=torch.int32, device='cuda')
+        selector_ops._nfa_filtered_topk_kernel[(m * hkv,)](
+            logits, cand, lower, upper, quota, reference_out, reference_count, r,
+            R_PAD=triton.next_power_of_2(max(r, width)), S=capacity, K=width,
+            SINK=4, META_GROUP=hkv, TOKEN_BITS=16, num_warps=8)
+        actual = selector_ops._nfa_filtered_topk(
+            logits, cand, lower, upper, quota, capacity, width, sink=4)
+>       torch.testing.assert_close(actual.indices, reference_out, rtol=0, atol=0)
+E       AssertionError: Tensor-likes are not equal!
+E       
+E       Mismatched elements: 2648 / 6144 (43.1%)
+E       Greatest absolute difference: 16383 at index (1, 0, 154)
+E       Greatest relative difference: inf at index (1, 0, 60)
+
+../nfa-iter98-candidate/tests/test_nfa_current_query_selector.py:630: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_nfa_current_query_selector.py::test_radix_filtered_topk_bit_exact_with_quota_and_ties
+1 failed, 18 passed in 45.07s
