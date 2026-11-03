@@ -804,3 +804,5 @@
 - 正确性判决：拒绝。iter94 Graph 相对 iter93 Graph、eager 相对 iter92 eager 均从第 11 个 token 开始分叉，最终 115/128 token 不同；iter94 eager 与 Graph 彼此一致也不能满足“优化前后 NFA 一致”硬门。少量 Q GEMM 舍入差已转化为明显生成漂移，不做 ABBA、不合入主线，下一提交恢复独立 Q/K/V 投影。
 - 原始证据：微基准、生产 receipt/log 与 GPU hygiene 已归档到本结果目录；model-loaded allocated 虽与 iter93 相同，但 Graph decode-ready allocated 增加 368,640 bytes，且性能收益不能抵消 token identity 失败。
 - 回退：生产代码恢复独立 Q/K/V 投影，删除 `prepare_qkv_fused_weight` 的注册 import/调用和仅属于失败实验的 QKV 探针；失败日志、receipt 与判决继续保留。回退后的 Graph/eager 应分别回到 Iter 93/92 路径，仍需完整 128-token 复验确认，不能仅凭源码差异宣布恢复验收通过。
+- 回退复验通过：回退 Graph 相对 Iter 93 Graph、回退 eager 相对 Iter 92 eager、回退 eager 相对回退 Graph 均为 128/128 token 完全一致，无首个分叉点；两臂输入 SHA256 均保持 `e851c310…99c2db`，Graph replay=127、eager replay=0。Graph 日志含 145 个 RMSNorm 注册路径，eager 日志无注册行，执行隔离符合预期。
+- 复验测量边界：Graph 单跑 steady TPOT=10.614384 ms，与 Iter 93 接近但不替代其 ABBA best；eager 单跑 steady TPOT=26.300208 ms，本次与 Graph 在两张卡并发运行，CPU host 竞争可能影响 eager，因此仅作正确性恢复证据，不作性能 verdict。GPU hygiene 仅观察到本轮两个进程，未见第三方 compute process；六份 receipt/log/hygiene 已归档到本结果目录。
