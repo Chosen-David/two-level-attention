@@ -853,3 +853,8 @@
 - 假设：当前 B1 每 CTA 一个 query head，同 KV group 的四个 CTA 重读 K/V；改为每 CTA 两个 head，Grid 从 32 降为 16，试图在占用与 K/V 复用间折中。通用 kernel 改为按 `HEADS_PER_PROGRAM` 计算 head base/KV head，逐 head online-softmax 循环和 tile 数值路径不变。
 - 真实生产形状微基准 `[T=1,HQ=32,HKV=8,D=128]`、MAX_VISIBLE=1280、visible=1156、BT=128、8 warps：修改前 1/4 heads-per-CTA Graph 分别 0.034608/0.034922 ms；修改后 1/2/4 分别 0.034731/0.034951/0.034990 ms，三种配置 eager 与 Graph 输出均逐位一致。2-head 相对同 run 1-head 慢约 0.63%，按 36 层估计无端到端收益，拒绝候选并恢复 iter99 的 1-head 生产分派。
 - 证据：`/tmp/iter100_gather_{baseline,candidate}.log` 与对应 GPU1 hygiene；该算子微基准不包含 selector、其他模型层或 host，不外推为 TPOT。保留独立 `benchmark_nfa_gather_head_tile.py` 便于后续配置复验。恢复 1-head 后复测 0.034578 ms，与修改前基线一致，输出逐位通过（`iter100_gather_restored.log`）。
+
+## Iter 101：单 kernel RMSNorm 实验臂
+
+- 候选：新增独立 `_rmsnorm_single_kernel` / `fused_rmsnorm_decode_single`，在行内完成 FP32 平方、`tl.sum` 均值及原 BF16 舍入链；生产三 kernel 入口尚未替换。目标是消除 square/mean 中间张量和两次 launch，但 `tl.sum` 与 `torch.mean` 的归约顺序不同，必须先过最终输出逐位门。
+- 首次远端执行未进入 kernel：scp 将新 ops 文件放在候选根目录，探针仍导入旧 `sparse_attn/ops/qwen3_rmsnorm_triton.py`，报 `ImportError: fused_rmsnorm_decode_single`；这是部署路径错误，不是数值或性能结论。原始日志 `/tmp/iter101_rms_single.log`，修正部署后重跑同一实验臂。

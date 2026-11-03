@@ -162,6 +162,25 @@ def _norm_scale_kernel(
     tl.store(OUT_PTR + row * out_row_stride + cols, out, mask=mask)
 
 
+@triton.jit
+def _rmsnorm_single_kernel(
+    X_PTR, W_PTR, OUT_PTR, x_row_stride, out_row_stride, n_cols, eps,
+    BLOCK_SIZE: tl.constexpr,
+):
+    """实验臂：单行内完成平方、归约和输出，不改变最终舍入链。"""
+    row = tl.program_id(0).to(tl.int64)
+    cols = tl.arange(0, BLOCK_SIZE)
+    mask = cols < n_cols
+    x = tl.load(X_PTR + row * x_row_stride + cols, mask=mask, other=0.0)
+    x32 = x.to(tl.float32)
+    mean = tl.sum(x32 * x32, axis=0) / n_cols
+    rstd = _tl_rsqrt(mean + eps.to(tl.float32))
+    bf16_round = (x32 * rstd).to(tl.bfloat16)
+    w = tl.load(W_PTR + cols, mask=mask, other=0.0)
+    out = (w.to(tl.float32) * bf16_round.to(tl.float32)).to(tl.bfloat16)
+    tl.store(OUT_PTR + row * out_row_stride + cols, out, mask=mask)
+
+
 # ---------------------------------------------------------------------------
 # Python 包装层
 # ---------------------------------------------------------------------------
@@ -276,4 +295,18 @@ def fused_rmsnorm_decode(
 
     if return_intermediates:
         return out, square, mean
+    return out
+
+
+def fused_rmsnorm_decode_single(hidden_states, weight, eps):
+    """单 kernel 实验入口；生产仍默认使用逐位归约一致的三 kernel 路径。"""
+    assert is_fusable(hidden_states, weight)
+    n = weight.numel()
+    x2 = hidden_states.view(-1, n)
+    out = torch.empty_like(hidden_states)
+    out2 = out.view(-1, n)
+    block = _next_pow2(n)
+    _rmsnorm_single_kernel[(x2.shape[0],)](
+        x2, weight, out2, x2.stride(0), out2.stride(0), n, eps,
+        BLOCK_SIZE=block, num_warps=_pick_num_warps(block))
     return out
