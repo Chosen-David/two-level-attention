@@ -698,3 +698,10 @@
 - 正确性：合成同分/quota/无效候选直接对拍 1/1 通过，微基准 indices/counts bit-exact。
 - 算子微基准：原实现 0.230508 ms，候选 0.042952 ms，**5.367x**；比 Iter 81 的 0.038990 ms 慢约 10.2%。
 - 判决：直接恢复 `tile=2048`，不进入完整生产验收；更多 run 的有序归并成本超过小 partial 的收益。
+
+## Iter 83：fine-score 与 partial Top-K 融合回退
+
+- 修改：新增 `_nfa_fine_topk_partial_kernel`，在 2048-token tile 内直接完成 paged K 标量点积、BF16 舍入、signed packed-key 与局部 Top-K，移除 `[m,hkv,r]` logits 物化和一次 launch；merge/finish 保持 Iter 81 实现。
+- 正确性：真实生产 shape `[1,8,8320]`、K=1024 的独立 paged-K 微基准中，融合前后最终 indices/counts bit-exact。
+- 算子微基准：原 fine + partial + merge 为 0.078129 ms，融合 + merge 为 0.122961 ms，候选慢约 57.4%（speedup 0.635x）。融合将 fine 的 65 路 tile 并行降为 5 路，并扩大单 CTA 点积/寄存器压力，节省的 launch 与中间流量不足以补偿。
+- 判决：不进入完整生产验收；恢复 Iter 81 的 fine/partial 分离路径。后续融合需保持细粒度并行或选择更小生产者 tile，不能沿用本次大 tile 直接融合。
