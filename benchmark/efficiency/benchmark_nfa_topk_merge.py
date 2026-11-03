@@ -114,7 +114,7 @@ def main():
     all_ok = True
     for seed in range(10):
         partial, lower, upper, quota, capacity = _make_partial(20261104 + seed)
-        shape = (partial.shape[0], partial.shape[1], partial.shape[2])
+        shape = (partial.shape[0], partial.shape[1], partial.shape[3])
         reference_out = torch.empty(shape, dtype=torch.int32, device='cuda')
         candidate_out = torch.empty_like(reference_out)
         reference_count = torch.empty(shape[:2], dtype=torch.int32, device='cuda')
