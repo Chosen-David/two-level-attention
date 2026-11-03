@@ -740,3 +740,4 @@
 - 边界：该微基准不包含 fine-score 新增打包工作，不能据此宣称生产 TPOT 同幅改善；下一步必须跑完整 NFA eager/Graph token identity 与 TPOT。
 - 完整生产 128-token：eager steady TPOT 24.480000 ms，相对 Iter 81 独占基线 24.438424 ms 慢 0.17%（噪声量级）；Graph steady TPOT 12.361072 ms，相对 Iter 81 的 12.443976 ms 降低 0.67%（1.0067×）。FA2/NFA 当前为 eager 0.9383×、Graph 1.0190×，均未达到 2×。
 - 生产正确性：微基准逐位通过；iter88 eager/Graph 的 128/128 token 完全一致，且分别与 iter81 参考序列完全一致，无首个分叉点。GPU 旁路日志仅见本轮两个生产 PID。
+- Graph 同卡 ABBA 复验：iter81 A/B=12.413488/12.432272 ms，iter88 A/B=12.352848/12.346640 ms；中位数 12.422880→12.349744 ms，加速 1.005922×（降低 0.5888%），四个 arm 的 128-token 序列全部一致，确认小幅收益可重复。
