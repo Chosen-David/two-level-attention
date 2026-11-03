@@ -860,3 +860,9 @@
 - 首次远端执行未进入 kernel：scp 将新 ops 文件放在候选根目录，探针仍导入旧 `sparse_attn/ops/qwen3_rmsnorm_triton.py`，报 `ImportError: fused_rmsnorm_decode_single`；这是部署路径错误，不是数值或性能结论。原始日志 `/tmp/iter101_rms_single.log`，修正部署后重跑同一实验臂。
 - 修正部署后，三模型 12 种真实 B1/B4 几何各 10 个随机输入共 120 组最终 BF16 输出全部逐位一致；Qwen3-8B hidden/q、Qwen3-32B hidden/q、Qwen3-30B-A3B hidden/q 的 Graph capture/replay 也全部逐位通过。Graph device time：三 kernel→单 kernel 为 8B hidden 0.004593→0.001491 ms、8B q 0.004667→0.001538 ms；其余四组为 2.951–3.097×，六组均约 3×。证据 `/tmp/iter101_rms_single.log` 与 GPU1 hygiene。
 - 边界：当前只验证独立算子及有限随机输入，尚未替换生产 wrapper；理论每步 145 个实例可省约 0.45 ms，但必须由完整 Qwen 128-token identity 与生产 TPOT 裁决，不外推为已实现收益。
+
+## Iter 102：生产 RMSNorm 切换单 kernel
+
+- 修改：仅 Graph 注册的 `qwen3_rmsnorm_patch` 从三 kernel wrapper 切换到 iter101 单 kernel；eager 仍不注册 RMSNorm patch，prefill/非连续/非 BF16 回退 HF，MLP、selector、gather 与 GEMM 均不变。
+- 完整 Qwen3-8B RULER 32K B1 Graph 单跑：steady TPOT=10.020320 ms、graph_replays=127，相对 iter99 的 10.415792 ms 降低 0.395472 ms，接近微基准理论节省；输入 SHA256、32612 prompt tokens、128 decode tokens 和零自然 skip 口径不变。该结果仍未达到 Graph 2× 门槛，且需 token identity 与同卡 ABBA 后才更新正式最佳。
+- 证据：`/tmp/ruler32k_iter102_128_graph.json`、`/tmp/iter102_graph_stdout.log`、`/tmp/iter102_graph_gpu1_hygiene.log`（pc40 GPU1）；token 对照在本条提交后读取 receipt。
