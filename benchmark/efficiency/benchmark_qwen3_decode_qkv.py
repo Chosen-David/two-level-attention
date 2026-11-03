@@ -67,8 +67,12 @@ def main():
     module.v_proj = torch.nn.Linear(4096, 1024, bias=False)
     module = module.to(device='cuda', dtype=torch.bfloat16)
     x = torch.randn(1, 1, 4096, device='cuda', dtype=torch.bfloat16)
-    allocated_before = torch.cuda.memory_allocated()
     with torch.inference_mode():
+        # 先建立 cuBLAS workspace，避免把首次 GEMM 的约 32 MiB 运行时
+        # 分配误算为 QKV 权重副本。
+        separate(x, module.q_proj.weight, module.k_proj.weight, module.v_proj.weight)
+        torch.cuda.synchronize()
+        allocated_before = torch.cuda.memory_allocated()
         ref = separate(x, module.q_proj.weight, module.k_proj.weight, module.v_proj.weight)
         assert prepare_qkv_fused_weight(module)
         fw = module._nfa_qkv_weight
