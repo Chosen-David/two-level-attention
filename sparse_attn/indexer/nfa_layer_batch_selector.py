@@ -428,30 +428,18 @@ if _has_triton():
         if tl.load(QUOTA + b) > 0:
             nvalid = tl.sum(good.to(tl.int32), axis=0)
             if nvalid >= K:
-                # 符号位翻转后，uint32 数值序与 packed int32 key 完全一致。
-                # 八趟 4-bit histogram 以窄归约定位第 K 个 key。
-                ukey = key.to(tl.uint32, bitcast=True) ^ 0x80000000
-                prefix = tl.full((), 0, tl.uint32)
-                remaining = tl.full((), K, tl.int32)
-                bins = tl.arange(0, 32)
-                for pass_id in tl.static_range(8):
-                    shift = 28 - pass_id * 4
-                    nibble = ((ukey >> shift) & 0xF).to(tl.int32)
-                    if pass_id == 0:
-                        match = good
-                    else:
-                        prefix_shift = 32 - pass_id * 4
-                        match = good & (
-                            (ukey >> prefix_shift) == (prefix >> prefix_shift))
-                    hist = tl.histogram(tl.where(match, nibble, 16), 32)
-                    above = tl.sum(match.to(tl.int32), axis=0) - tl.cumsum(
-                        hist, axis=0)
-                    choose = ((bins < 16) & (above < remaining)
-                              & ((above + hist) >= remaining))
-                    selected_bin = tl.sum(tl.where(choose, bins, 0), axis=0)
-                    remaining -= tl.sum(tl.where(choose, above, 0), axis=0)
-                    prefix |= selected_bin.to(tl.uint32) << shift
-                threshold = (prefix ^ 0x80000000).to(tl.int32, bitcast=True)
+                # 在 packed int32 全值域二分第 K 个 key；packed key 与
+                # 原 tl.topk 完全一致，因此阈值和压实结果也保持一致。
+                lo = tl.full((), -2147483648, tl.int64)
+                hi = tl.full((), 2147483647, tl.int64)
+                for _ in tl.static_range(32):
+                    mid = (lo + hi + 1) // 2
+                    count = tl.sum(
+                        (good & (key >= mid.to(tl.int32))).to(tl.int32), axis=0)
+                    take = count >= K
+                    lo = tl.where(take, mid, lo)
+                    hi = tl.where(take, hi, mid - 1)
+                threshold = lo.to(tl.int32)
             else:
                 threshold = invalid
             greater = good & (key > threshold)
@@ -478,6 +466,60 @@ if _has_triton():
         h = tl.program_id(0)
         i = tl.arange(0, K)
         key = tl.load(TOP + h * K + i)
+        _finish_sorted_logits_key(
+            h, key, LOW, HIGH, QUOTA, OUT, COUNT,
+            S=S, K=K, SINK=SINK, META_GROUP=META_GROUP,
+            TOKEN_BITS=TOKEN_BITS)
+
+    @triton.jit
+    def _nfa_filtered_topk_partial_kernel(
+        LOGITS, CAND, LOW, HIGH, QUOTA, PARTIAL, R,
+        TILE: tl.constexpr, NTILES: tl.constexpr,
+        S: tl.constexpr, K: tl.constexpr, META_GROUP: tl.constexpr,
+    ):
+        """每个 tile 保留局部 K 项；全局 K 项必然包含在这些局部结果中。"""
+        h = tl.program_id(0)
+        tile = tl.program_id(1)
+        b = 0 if META_GROUP == 0 else h // META_GROUP
+        offs = tile * TILE + tl.arange(0, TILE)
+        mask = offs < R
+        token = tl.load(CAND + h * R + offs, mask=mask, other=0).to(tl.int32)
+        logits = tl.load(LOGITS + h * R + offs, mask=mask,
+                         other=float("-inf"))
+        score = logits.to(tl.float32)
+        good = (mask & (token >= tl.load(LOW + b))
+                & (token < tl.load(HIGH + b))
+                & (tl.load(QUOTA + b) > 0)
+                & (score == score) & (score != float("-inf")))
+        bits = logits.to(tl.uint16, bitcast=True).to(tl.int32) & 0xFFFF
+        negative = (bits & 0x8000) != 0
+        ordered = tl.where(
+            negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
+        delta = S - token
+        invalid = -32768 << 16
+        key = tl.where(good, (ordered << 16) + delta, invalid)
+        if K == 1:
+            key = tl.max(key, axis=0, keep_dims=True)
+        else:
+            key = tl.topk(key, K)
+        tl.store(PARTIAL + (h * NTILES + tile) * K + tl.arange(0, K), key)
+
+    @triton.jit
+    def _nfa_filtered_topk_merge_kernel(
+        PARTIAL, LOW, HIGH, QUOTA, OUT, COUNT,
+        NTILES: tl.constexpr, MERGE_PAD: tl.constexpr,
+        S: tl.constexpr, K: tl.constexpr, SINK: tl.constexpr,
+        META_GROUP: tl.constexpr, TOKEN_BITS: tl.constexpr,
+    ):
+        h = tl.program_id(0)
+        offs = tl.arange(0, MERGE_PAD)
+        invalid = -32768 << TOKEN_BITS
+        key = tl.load(PARTIAL + h * NTILES * K + offs,
+                      mask=offs < NTILES * K, other=invalid)
+        if K == 1:
+            key = tl.max(key, axis=0, keep_dims=True)
+        else:
+            key = tl.topk(key, K)
         _finish_sorted_logits_key(
             h, key, LOW, HIGH, QUOTA, OUT, COUNT,
             S=S, K=K, SINK=SINK, META_GROUP=META_GROUP,
@@ -1064,19 +1106,22 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
         workspace, 'middle_counts', (m, hkv), torch.int32, logits.device)
     token_bits = 32 if capacity >= 65536 else 16
     if token_bits == 16:
-        top = _workspace_empty(
-            workspace, 'filtered_topk_keys', (m, hkv, width),
+        tile = 2048
+        ntiles = triton.cdiv(r, tile)
+        partial = _workspace_empty(
+            workspace, 'filtered_topk_partial', (m, hkv, ntiles, width),
             torch.int32, logits.device)
-        _fast_launch(workspace, ('filtered_topk_radix', layer_offset),
-                     _nfa_filtered_topk_radix_kernel, (m * hkv,),
-            logits, cand_idx2, lower, upper, quota, top, r,
-            R_PAD=triton.next_power_of_2(max(r, width)),
+        _fast_launch(workspace, ('filtered_topk_partial', layer_offset),
+                     _nfa_filtered_topk_partial_kernel, (m * hkv, ntiles),
+            logits, cand_idx2, lower, upper, quota, partial, r,
+            TILE=tile, NTILES=ntiles,
             S=capacity, K=width, META_GROUP=hkv,
             num_warps=8,
         )
-        _fast_launch(workspace, ('filtered_topk_finish', layer_offset),
-                     _nfa_finish_topk_kernel, (m * hkv,),
-            top, lower, upper, quota, out, count,
+        _fast_launch(workspace, ('filtered_topk_merge', layer_offset),
+                     _nfa_filtered_topk_merge_kernel, (m * hkv,),
+            partial, lower, upper, quota, out, count,
+            NTILES=ntiles, MERGE_PAD=triton.next_power_of_2(ntiles * width),
             S=capacity, K=width, SINK=sink,
             META_GROUP=hkv, TOKEN_BITS=token_bits,
             num_warps=8,

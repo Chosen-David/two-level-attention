@@ -632,7 +632,8 @@
 - 算子微基准：真实生产形状 `[M=1,Hkv=8,R=8320]`、K=1024、capacity=32768，原实现 0.230451 ms，候选 radix+finish 0.132365 ms，**1.741x**；选中 indices 与 counts bit-exact。该数字只描述 Top-K 算子，不等同完整 decode 加速。
 - 生产 Graph 16-token 迭代信号：baseline steady 23.588048 ms，iter74 steady 15.390720 ms，约 **1.532x**；candidate TPOT median 15.397056 ms，15 次 Graph replay。结果文件为 `/tmp/nfa_hisa_baseline_graph.json` 与 `/tmp/nfa_hisa_iter74_graph.json`（pc40）。
 - 尚未完成：iter74 eager、同机 FA2 eager/Graph、完整生成 token identity 与运行期 hygiene 仍在同一独立测量任务中收集；16-token Graph 结果不作为最终 2x 或 128-token 验收。
-- 回收补充：iter74 eager TPOT median 25.032255 ms、steady 24.995888 ms，相对 baseline eager steady 27.375008 ms 为约 **1.095x**。Graph/eager 两侧旁路日志各仅见对应本进程，未见其他计算进程；完整 token identity 和 FA2 对照仍单独验收。
+- 回收补充：iter74 eager TPOT median 25.032255 ms、steady 24.995888 ms，相对 baseline eager steady 27.375008 ms 为约 **1.095x**。Graph/eager 两侧旁路日志各仅见对应本进程，未见其他计算进程。
+- **生产 identity 失败**：回收 JSON 的完整 `generated_token_ids` 后，iter74 eager/Graph 彼此一致，但二者均在生成索引 1 偏离对应 baseline；baseline token 为 `[576,1372,374,...]`，iter74 为 `[576,3281,10963,...]`。远端源码审计确认 baseline/candidate 的 `sparse_attn` 只有 `nfa_layer_batch_selector.py` 存在非 pycache 差异，因此不能把分叉归因于其他优化文件。合成同分/quota 对拍与随机微基准不足以覆盖真实选择状态，iter74 的生产 TPOT 只能作为失效实验记录，不能验收。
 
 ## Iter 75：四趟 8-bit histogram radix-select（回退）
 
@@ -645,3 +646,9 @@
 - 修改：把 Iter 75 的 4×512-bin 直方图缩窄为 8×32-bin（16 个有效 nibble 槽），减少每趟 histogram/cumsum 宽度；其余选择语义不变。
 - 正确性：直接 bit-exact 对拍和微基准 indices/counts 对拍均通过。
 - 算子微基准：原实现 0.230320 ms，4-bit 候选 0.160927 ms，1.431x；虽优于 8-bit histogram，但仍慢于 Iter 74 二分的 0.132365 ms。回退多趟 histogram 方向，继续以 Iter 74 为最佳 Top-K 实现。
+
+## Iter 77：2048-token tile 部分 Top-K + 精确归并
+
+- 修改：每个 KV group 的候选按 2048-token tile 分给独立 CTA，各 tile 用原 `tl.topk` 保留局部 K=1024 个 packed key；第二个 kernel 对全部局部结果再做原 `tl.topk` 和 finish。全局前 K 项必然包含于各 tile 的局部前 K 项，packed key、同分优先级、quota 和补洞语义均不变。
+- 正确性：合成同分/quota/无效候选直接对拍通过，微基准 indices/counts bit-exact。Iter 74 已证明这些检查不足以替代生产 identity，本轮必须继续通过真实 Qwen 16/128-token 门禁才可保留。
+- 算子微基准：原实现 0.230504 ms，候选 0.115675 ms，**1.993x**；比 Iter 74 的 0.132365 ms 再快约 12.6%。该结果仅限 Top-K 算子，不作为完整 decode 加速结论。
