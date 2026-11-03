@@ -872,3 +872,4 @@
 
 - 修改：`weight.numel()==128` 的 Q/K norm 使用单 kernel，hidden/final norm 恢复原 `torch.mean` 三 kernel 路径，隔离 iter102 的分叉来源。Graph 完整生产单跑 steady TPOT=10.218576 ms，相对 iter99 降低 0.197216 ms，接近 72 个 Q/K 实例的理论收益；该数字仍以 token identity 为硬门。
 - 证据：`/tmp/ruler32k_iter103_128_graph.json`、`/tmp/iter103_graph_stdout.log`、`/tmp/iter103_graph_gpu1_hygiene.log`；128-token 对照在本条提交后判决。
+- 正确性通过：iter103 Graph 相对 iter99 Graph 为 128/128 token 完全一致，first_divergence=None；结合 iter99 eager↔Graph 已通过的 identity，iter103 Graph 也与参考 eager 序列一致。全量单 kernel 与 Q/K-only 的唯一生产差异是 hidden/final norm 路径，因此 hidden/final 继续保留原归约；当前候选只主张 Q/K 的约 0.197 ms 单跑收益，仍待同卡 ABBA。
