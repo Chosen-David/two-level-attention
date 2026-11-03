@@ -757,3 +757,6 @@
 - 正确性：pc40 GPU0 干净起跑，16 组随机输入覆盖 scale `1/2^-8/2^8/2^-16`，Q/K BF16 位型全部一致。
 - 微基准：完整 Python wrapper 的 HF `apply_rotary_pos_emb` 中位数 0.037728 ms，Triton Q/K 单 launch 0.005600 ms，HF/Triton=6.7371×。该数字只含 RoPE 算子，不能外推为完整 decode TPOT。
 - 原始证据：`iter90_rope_micro.log`、`iter90_rope_micro_gpu0_hygiene.log`。下一步跑完整生产 eager/Graph 128-token identity 与 TPOT，仍不宣称达到 2×。
+- 完整生产 128-token：eager steady TPOT 23.755264 ms，相对 Iter 88 的 24.480000 ms 加速 1.030508×；Graph steady TPOT 11.758976 ms，相对 Iter 88 的 12.361072 ms 加速 1.051203×。当前 FA2/NFA 为 eager 0.966878×、Graph 1.071157×，eager 仍略慢于 FA2，双口径均未达到 2×。
+- 生产正确性：iter90 eager 与 iter88 eager、iter90 Graph 与 iter88 Graph、iter90 eager 与 Graph 的 128/128 token 全部一致。输入 SHA256 保持 `e851c310…99c2db`，selector 配置不变。
+- 测量卫生：pc40 GPU0 起跑前和结束后均 used=1 MiB 且无 compute apps；30 秒旁路日志未观察到其他进程。本轮为两次独立执行的单次生产结果，后续仍需同卡 ABBA 复验，原始证据为 `ruler32k_iter90_128_{eager,graph}.json`、`iter90_production_{eager,graph}.log`、`iter90_production_gpu0_hygiene.log`。

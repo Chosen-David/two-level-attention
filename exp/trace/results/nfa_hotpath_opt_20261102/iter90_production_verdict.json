@@ -1,0 +1,39 @@
+{
+  "iteration": 90,
+  "change": "Qwen3-8B B1 decode Q/K RoPE single Triton launch with FP fusion disabled",
+  "root_cause_of_iter89_failure": "LLVM contracted q*cos with the final add into FMA, eliminating the first BF16 intermediate rounding; iter89 exactly matched the a_raw_b_round variant",
+  "input": {
+    "task": "niah_single_1",
+    "sample_index": 0,
+    "prompt_tokens": 32612,
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "generated_tokens": 128
+  },
+  "microbenchmark": {
+    "q_shape": [1, 32, 1, 128],
+    "k_shape": [1, 8, 1, 128],
+    "random_checks": 16,
+    "bit_exact": true,
+    "hf_ms": 0.037728,
+    "candidate_ms": 0.005600,
+    "hf_over_candidate": 6.7371,
+    "scope": "RoPE wrapper only; not end-to-end TPOT"
+  },
+  "production": {
+    "eager_steady_ms": 23.755264282226562,
+    "iter88_eager_steady_ms": 24.479999542236328,
+    "iter88_over_iter90_eager": 1.030508406532526,
+    "graph_steady_ms": 11.758975982666016,
+    "iter88_graph_steady_ms": 12.361072063446045,
+    "iter88_over_iter90_graph": 1.0512031049019561,
+    "fa2_over_iter90_eager": 0.9668782417741236,
+    "fa2_over_iter90_graph": 1.0711572337143496,
+    "eager_graph_token_identity": true,
+    "eager_vs_iter88_token_identity": true,
+    "graph_vs_iter88_token_identity": true,
+    "gpu_hygiene": "clean",
+    "requires_same_gpu_abba_confirmation": true
+  },
+  "two_x_eager_and_graph_achieved": false,
+  "push_to_main_allowed": false
+}
