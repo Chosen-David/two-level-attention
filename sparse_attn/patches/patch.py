@@ -100,6 +100,12 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
                 n_patched += 1
                 if module.layer_idx == 0:
                     print(f"register glm4_moe_lite attn (D=256): [{name}]")
+    if n_patched and getattr(model.config, 'model_type', None) == 'qwen3':
+        # iter91：Qwen3 decode RMSNorm 三 kernel 路径；注册数量必须完整，
+        # 防止只 patch 部分层后把混合实现误标为统一候选。
+        from .qwen3_rmsnorm_patch import register_rmsnorm_patch
+        register_rmsnorm_patch(
+            model, expected=model.config.num_hidden_layers * 4 + 1)
     if args.method != 'none' and n_patched == 0:
         mod_types = sorted({type(m).__name__ for _, m in model.named_modules()})
         hint = ""

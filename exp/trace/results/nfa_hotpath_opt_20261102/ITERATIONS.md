@@ -760,3 +760,11 @@
 - 完整生产 128-token：eager steady TPOT 23.755264 ms，相对 Iter 88 的 24.480000 ms 加速 1.030508×；Graph steady TPOT 11.758976 ms，相对 Iter 88 的 12.361072 ms 加速 1.051203×。当前 FA2/NFA 为 eager 0.966878×、Graph 1.071157×，eager 仍略慢于 FA2，双口径均未达到 2×。
 - 生产正确性：iter90 eager 与 iter88 eager、iter90 Graph 与 iter88 Graph、iter90 eager 与 Graph 的 128/128 token 全部一致。输入 SHA256 保持 `e851c310…99c2db`，selector 配置不变。
 - 测量卫生：pc40 GPU0 起跑前和结束后均 used=1 MiB 且无 compute apps；30 秒旁路日志未观察到其他进程。本轮为两次独立执行的单次生产结果，后续仍需同卡 ABBA 复验，原始证据为 `ruler32k_iter90_128_{eager,graph}.json`、`iter90_production_{eager,graph}.log`、`iter90_production_gpu0_hygiene.log`。
+
+## Iter 91：Qwen3 decode RMSNorm 三 kernel 路径
+
+- 修改：仅在 BF16、contiguous、seq_len=1 decode 融合 HF RMSNorm 的 `to(fp32)+pow(2)` 与归一化/舍入/weight 外壳；中间仍调用原 `torch.mean`，保持归约 kernel 和顺序。Qwen3 attention patch 后注册全部 RMSNorm，Qwen3-8B 数量硬校验为 `36*4+1=145`；prefill、其它 dtype/布局回退 HF。
+- 正确性：pc40 GPU0 独立执行，Qwen3-8B/32B/30B-A3B 共 18 组 square/mean/out 逐级 BF16/FP32 位型对拍全部通过；gate 4/4、真实 Qwen3RMSNorm 实例树 patch/unregister 7/7、ops 与 patched module 的 CUDA Graph capture/replay 2/2 通过。
+- kernel 计数：HF eager 一次 forward 为 8 个 CUDA kernel，候选为 `_square_fp32_kernel + torch.mean + _norm_scale_kernel` 共 3 个；单次数值执行设备时间约 14.1 μs→5.7 μs，但这不含 Python/分配/launch 外壳，不能据此宣称 wrapper 或生产加速。
+- eager wrapper 微基准：CUDA event 中位数显示九种真实 shape 全部回退，HF/候选仅 0.89–0.90×。Qwen3-8B hidden norm 为 0.0609→0.0683 ms，q_norm 为 0.0614→0.0683 ms，k_norm 为 0.0613→0.0681 ms；减少设备 kernel 被外壳开销抵消。
+- 测量卫生与边界：起跑前 GPU0 used=1 MiB 且无 compute apps；5 秒旁路日志仅见本轮 1→4 MiB 显存变化，无异常共居跳变。原始证据为 `iter91_rmsnorm_micro.log`、`iter91_rmsnorm_micro_gpu0_hygiene.log`。当前只证明数值与 Graph 安全性，尚未证明生产收益；下一步必须跑完整 128-token eager/Graph token identity 与 TPOT，再决定保留或恢复 Iter 90。
