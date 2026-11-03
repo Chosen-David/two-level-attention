@@ -14,7 +14,7 @@ import sparse_attn.indexer.nfa_layer_batch_selector as ops
 @triton.jit
 def _reference_merge_kernel(
     PARTIAL, LOW, HIGH, QUOTA, OUT, COUNT,
-    NTILES: tl.constexpr, LOG2_K: tl.constexpr,
+    NTILES: tl.constexpr, MERGE_PAD: tl.constexpr, LOG2_K: tl.constexpr,
     S: tl.constexpr, K: tl.constexpr, SINK: tl.constexpr,
     META_GROUP: tl.constexpr, TOKEN_BITS: tl.constexpr,
 ):
@@ -47,7 +47,8 @@ def _launch(kernel, partial, lower, upper, quota, out, count, capacity):
     m, hkv, ntiles, width = partial.shape
     kernel[(m * hkv,)](
         partial, lower, upper, quota, out, count,
-        NTILES=ntiles, LOG2_K=width.bit_length() - 1,
+        NTILES=ntiles, MERGE_PAD=triton.next_power_of_2(ntiles * width),
+        LOG2_K=width.bit_length() - 1,
         S=capacity, K=width, SINK=4, META_GROUP=hkv, TOKEN_BITS=16,
         num_warps=8)
 
