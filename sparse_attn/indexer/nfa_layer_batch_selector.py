@@ -1249,7 +1249,7 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
             logits, partial, r,
             TILE=tile, NTILES=ntiles,
             S=capacity, K=width, META_GROUP=hkv,
-            num_warps=8,
+            num_warps=16,
         )
         _fast_launch(workspace, ('filtered_topk_merge', layer_offset),
                      _nfa_filtered_topk_merge_kernel, (m * hkv,),
