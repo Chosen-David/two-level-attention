@@ -594,7 +594,7 @@ class GraphReadyPagedRegionCache:
         elif n != state.prompt_length:
             raise ValueError('prefill length diverged across layers')
 
-        self._write_block_table_row(request_id, state)
+        self._write_block_table_row(request_id, state, layer_idx=layer_idx)
 
         # 逐页写入该层自己的物理 Arena。
         for logical_page, physical_id in block_table.items():
@@ -851,10 +851,12 @@ class GraphReadyPagedRegionCache:
             max_pages += len(seed_pages)
         return max_pages
 
-    def _write_block_table_row(self, request_id, state):
-        """Refresh all layers' CPU staging rows after block-table mutations."""
+    def _write_block_table_row(self, request_id, state, layer_idx=None):
+        """Refresh a mutated layer, or all layers after request-wide changes."""
         pad = self.layers[0].PAD_PAGE_ID
-        for layer_idx in range(self.n_layers):
+        # Prefill changes only its current layer. Freeze changes every layer.
+        layer_indices = range(self.n_layers) if layer_idx is None else (layer_idx,)
+        for layer_idx in layer_indices:
             row = self._cpu_block_table_staging[layer_idx, request_id]
             row.fill_(pad)
             for logical_page, physical_id in state.block_tables[layer_idx].items():
@@ -1330,3 +1332,4 @@ class GraphReadyPagedRegionCache:
                 for layer in self.layers
             ],
         }
+
