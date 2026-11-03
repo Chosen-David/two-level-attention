@@ -428,18 +428,30 @@ if _has_triton():
         if tl.load(QUOTA + b) > 0:
             nvalid = tl.sum(good.to(tl.int32), axis=0)
             if nvalid >= K:
-                # 在 packed int32 全值域二分第 K 个 key；packed key 与
-                # 原 tl.topk 完全一致，因此阈值和压实结果也保持一致。
-                lo = tl.full((), -2147483648, tl.int64)
-                hi = tl.full((), 2147483647, tl.int64)
-                for _ in tl.static_range(32):
-                    mid = (lo + hi + 1) // 2
-                    count = tl.sum(
-                        (good & (key >= mid.to(tl.int32))).to(tl.int32), axis=0)
-                    take = count >= K
-                    lo = tl.where(take, mid, lo)
-                    hi = tl.where(take, hi, mid - 1)
-                threshold = lo.to(tl.int32)
+                # 符号位翻转后，uint32 数值序与 packed int32 key 完全一致。
+                # 四趟 8-bit histogram 直接定位第 K 个 key，避免 32 次全行归约。
+                ukey = key.to(tl.uint32, bitcast=True) ^ 0x80000000
+                prefix = tl.full((), 0, tl.uint32)
+                remaining = tl.full((), K, tl.int32)
+                bins = tl.arange(0, 512)
+                for pass_id in tl.static_range(4):
+                    shift = 24 - pass_id * 8
+                    byte = ((ukey >> shift) & 0xFF).to(tl.int32)
+                    if pass_id == 0:
+                        match = good
+                    else:
+                        prefix_shift = 32 - pass_id * 8
+                        match = good & (
+                            (ukey >> prefix_shift) == (prefix >> prefix_shift))
+                    hist = tl.histogram(tl.where(match, byte, 256), 512)
+                    above = tl.sum(match.to(tl.int32), axis=0) - tl.cumsum(
+                        hist, axis=0)
+                    choose = ((bins < 256) & (above < remaining)
+                              & ((above + hist) >= remaining))
+                    selected_bin = tl.sum(tl.where(choose, bins, 0), axis=0)
+                    remaining -= tl.sum(tl.where(choose, above, 0), axis=0)
+                    prefix |= selected_bin.to(tl.uint32) << shift
+                threshold = (prefix ^ 0x80000000).to(tl.int32, bitcast=True)
             else:
                 threshold = invalid
             greater = good & (key > threshold)

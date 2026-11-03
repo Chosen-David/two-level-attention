@@ -632,3 +632,10 @@
 - 算子微基准：真实生产形状 `[M=1,Hkv=8,R=8320]`、K=1024、capacity=32768，原实现 0.230451 ms，候选 radix+finish 0.132365 ms，**1.741x**；选中 indices 与 counts bit-exact。该数字只描述 Top-K 算子，不等同完整 decode 加速。
 - 生产 Graph 16-token 迭代信号：baseline steady 23.588048 ms，iter74 steady 15.390720 ms，约 **1.532x**；candidate TPOT median 15.397056 ms，15 次 Graph replay。结果文件为 `/tmp/nfa_hisa_baseline_graph.json` 与 `/tmp/nfa_hisa_iter74_graph.json`（pc40）。
 - 尚未完成：iter74 eager、同机 FA2 eager/Graph、完整生成 token identity 与运行期 hygiene 仍在同一独立测量任务中收集；16-token Graph 结果不作为最终 2x 或 128-token 验收。
+- 回收补充：iter74 eager TPOT median 25.032255 ms、steady 24.995888 ms，相对 baseline eager steady 27.375008 ms 为约 **1.095x**。Graph/eager 两侧旁路日志各仅见对应本进程，未见其他计算进程；完整 token identity 和 FA2 对照仍单独验收。
+
+## Iter 75：四趟 8-bit histogram radix-select（回退）
+
+- 修改：将 Iter 74 的 32 次全行二分归约改为四趟 8-bit `tl.histogram`，每趟在 512 bins（256 个无效填充槽）上定位第 K 个 packed key 的一个字节；后续压实与 finish 完全不变。
+- 正确性：直接 bit-exact 对拍通过；微基准再次确认 indices/counts 与参考完全一致。
+- 算子微基准：原实现 0.230634 ms，histogram 候选 0.213023 ms，仅 1.083x，且显著慢于 Iter 74 的 0.132365 ms。四趟 512-bin histogram/cumsum 的寄存器和归约成本超过减少全行扫描的收益，本轮回退，不运行完整 eager/Graph 生产臂。
