@@ -657,18 +657,27 @@ if _has_triton():
                           aux_id, CAP)
         aux_sorted = tl.sort(aux_id, descending=False)
 
-        reverse_idx = 2 * W - 1 - offs
-        aux_reverse = tl.gather(
-            aux_sorted, tl.minimum(reverse_idx, A_PAD - 1), 0)
-        aux_reverse = tl.where(
-            (offs >= W) & (reverse_idx < A_PAD), aux_reverse, CAP)
-        ordered = tl.where(offs < W, middle_id, aux_reverse)
-        for bit in tl.static_range(MERGE_BITS - 1, -1, -1):
-            stride = 1 << bit
-            peer = tl.gather(ordered, offs ^ stride, axis=0)
-            ordered = tl.where((offs & stride) == 0,
-                               tl.minimum(ordered, peer),
-                               tl.maximum(ordered, peer))
+        if A_PAD > W:
+            # The bitonic fast path requires each sorted run to fit in W.
+            # Larger protection/seed capacities need the complete union.
+            aux_idx = tl.minimum(tl.maximum(offs - W, 0), A_PAD - 1)
+            aux_forward = tl.gather(aux_sorted, aux_idx, 0)
+            combined = tl.where(offs < W, middle_id,
+                                tl.where(offs - W < A_PAD, aux_forward, CAP))
+            ordered = tl.sort(combined, descending=False)
+        else:
+            reverse_idx = 2 * W - 1 - offs
+            aux_reverse = tl.gather(
+                aux_sorted, tl.minimum(reverse_idx, A_PAD - 1), 0)
+            aux_reverse = tl.where(
+                (offs >= W) & (reverse_idx < A_PAD), aux_reverse, CAP)
+            ordered = tl.where(offs < W, middle_id, aux_reverse)
+            for bit in tl.static_range(MERGE_BITS - 1, -1, -1):
+                stride = 1 << bit
+                peer = tl.gather(ordered, offs ^ stride, axis=0)
+                ordered = tl.where((offs & stride) == 0,
+                                   tl.minimum(ordered, peer),
+                                   tl.maximum(ordered, peer))
         prev_idx = tl.maximum(offs - 1, 0)
         previous = tl.gather(ordered, prev_idx, 0)
         previous = tl.where(offs == 0, -1, previous)
@@ -1518,3 +1527,4 @@ def mark_first_decode_seeded(cache, req_ids):
     cache.first_decode_seeded_buf[valid_req_t] = 1
     for rid in valid_req_ids:
         cache.states[rid].first_decode_seeded = True
+
