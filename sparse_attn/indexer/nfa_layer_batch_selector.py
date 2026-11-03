@@ -955,6 +955,103 @@ if _has_triton():
             BS=BS, PAGE=PAGE, NEAR_LEN=NEAR_LEN, K2=K2, HKV=HKV, B=B,
             MAX_REQ=MAX_REQ, LAYER_OFFSET=LAYER_OFFSET)
 
+    @triton.jit
+    def _topk_candidate_prepare_kernel(
+        FAR_SCORES, NEAR_SCORES, I_F, I_N, LENGTHS,
+        SKIP_FAR, SKIP_NEAR, VALID_REQ,
+        LOWER, UPPER, QUOTA, OWNERS, GENERATIONS,
+        KT: tl.constexpr, KT_PAD: tl.constexpr,
+        K_F: tl.constexpr, K_N: tl.constexpr,
+        K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
+        R: tl.constexpr, HEAD: tl.constexpr, TAIL: tl.constexpr,
+        SINK: tl.constexpr, SWA: tl.constexpr, CAP: tl.constexpr,
+        SINK_POOL_LO: tl.constexpr, BS: tl.constexpr, PAGE: tl.constexpr,
+        NEAR_LEN: tl.constexpr, K2: tl.constexpr,
+        HKV: tl.constexpr, B: tl.constexpr,
+        MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
+    ):
+        """完成两路精确 Top-K，并在并行展开前稳定 generation/metadata。"""
+        _topk_indices_body(
+            FAR_SCORES, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
+        _topk_indices_body(
+            NEAR_SCORES, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
+
+        row = tl.program_id(0)
+        m = row // HKV
+        h = row % HKV
+        req = m % B
+        length = tl.load(LENGTHS + req)
+        lo = tl.maximum(0, length - SWA)
+        width = R + HEAD + TAIL
+
+        # 与 fused kernel 相同：每行每次 selector 调用只推进一次 generation。
+        # 独立 kernel 边界保证后续所有展开 CTA 读到同一个稳定值，也保证
+        # 极端回绕时的 owner 清零先于任何新 tagged atomic_max。
+        generation = tl.load(GENERATIONS + row) + 1
+        generation_limit = 2147483647 // width
+        if generation > generation_limit:
+            generation = 1
+            clear_offs = tl.arange(0, 1024)
+            for clear_start in range(0, CAP, 1024):
+                clear = clear_start + clear_offs
+                tl.store(OWNERS + row * CAP + clear, 0, mask=clear < CAP)
+        tl.store(GENERATIONS + row, generation)
+
+        if h == 0:
+            layer = m // B
+            req_id = tl.load(VALID_REQ + req).to(tl.int32)
+            skip_far = tl.load(
+                SKIP_FAR + (layer + LAYER_OFFSET) * MAX_REQ + req_id) != 0
+            skip_near = tl.load(
+                SKIP_NEAR + (layer + LAYER_OFFSET) * MAX_REQ + req_id) != 0
+            lower = SINK_POOL_LO * BS
+            upper = tl.maximum(lower, lo)
+            quota = tl.maximum(
+                tl.minimum(length, K2) - SINK - (length - lo), 0)
+            sink_hi = tl.minimum(length, SINK)
+            swa_hi = tl.maximum(sink_hi, length - SWA)
+            far_blk = (tl.maximum(length - SWA - NEAR_LEN, 0) // PAGE) * PAGE
+            far_hi = tl.minimum(swa_hi, tl.maximum(sink_hi, far_blk))
+            lower = tl.where(skip_far, far_hi, lower)
+            upper = tl.where(skip_near, far_hi, upper)
+            upper = tl.maximum(lower, upper)
+            quota = tl.minimum(quota, upper - lower)
+            tl.store(LOWER + m, lower)
+            tl.store(UPPER + m, upper)
+            tl.store(QUOTA + m, quota)
+
+    @triton.jit
+    def _candidate_expand_batched_kernel(
+        I_F, I_N, FAR_SCORES, NEAR_SCORES, LENGTHS,
+        OUT, VALID, OWNERS, GENERATIONS,
+        K_F: tl.constexpr, K_N: tl.constexpr, KT: tl.constexpr,
+        R: tl.constexpr, HEAD: tl.constexpr, TAIL: tl.constexpr,
+        SINK: tl.constexpr, SWA: tl.constexpr, CAP: tl.constexpr,
+        SINK_POOL_LO: tl.constexpr, BS: tl.constexpr,
+        HKV: tl.constexpr, B: tl.constexpr,
+    ):
+        """按 1024-slot chunk 并行展开；每个 virtual slot 的语义不变。"""
+        row = tl.program_id(0)
+        chunk = tl.program_id(1)
+        m = row // HKV
+        req = m % B
+        length = tl.load(LENGTHS + req)
+        generation = tl.load(GENERATIONS + row)
+        width = R + HEAD + TAIL
+        r = chunk * 1024 + tl.arange(0, 1024)
+        token, active = _candidate_pack_virtual_slot(
+            I_F, I_N, FAR_SCORES, NEAR_SCORES, row, r, length,
+            K_F=K_F, K_N=K_N, KT=KT, R=R, HEAD=HEAD, TAIL=TAIL,
+            SINK=SINK, SWA=SWA, SINK_POOL_LO=SINK_POOL_LO, BS=BS,
+            live=r < width)
+        tl.store(OUT + row * width + r, token, r < width)
+        tl.store(VALID + row * width + r, active, r < width)
+        # max 对重复 token 的结果与 CTA/原子到达顺序无关；tagged_slot 仍
+        # 精确等于 fused 单 CTA 版本，最大 candidate slot 去重规则不变。
+        tagged_slot = generation * width + r
+        tl.atomic_max(OWNERS + row * CAP + token, tagged_slot,
+                      mask=active, sem="relaxed")
+
 # ---------------------------------------------------------------------------
 # Host-side batched helpers
 # ---------------------------------------------------------------------------
@@ -1238,11 +1335,7 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
     lengths_t = (lengths if torch.is_tensor(lengths) else
                  torch.as_tensor(lengths, dtype=torch.int64, device=device))
     if fuse_topk:
-        _fast_launch(workspace, ('topk_candidate', layer_offset),
-                     _topk_candidate_batched_kernel, (m * hkv,),
-            far_scored, near_scored, i_f, i_n, lengths_t,
-            cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
-            out, valid, lower, upper, quota, owners, generations,
+        common = dict(
             KT=far_scored.shape[-1],
             KT_PAD=triton.next_power_of_2(far_scored.shape[-1]),
             K_F=k_f, K_N=k_n,
@@ -1253,8 +1346,26 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
             PAGE=cache.geometry.page, NEAR_LEN=cache.geometry.near,
             K2=int(indexer.args.tia_level2_topk),
             HKV=hkv, B=b,
-            MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
-            num_warps=8)
+            MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset)
+        # Graph 的关键是 device time：Top-K/metadata 只由每行一个 CTA 完成，
+        # 相互独立的 candidate chunk 则在下一 kernel 并行展开。生产 R=8320、
+        # protected=132 时每行由 1 路串行 9 chunk 变为 9 路并行；多一次
+        # launch 换取更高 SM 覆盖，不改变任何排序、打分或去重语义。
+        _fast_launch(workspace, ('topk_candidate_prepare', layer_offset),
+                     _topk_candidate_prepare_kernel, (m * hkv,),
+            far_scored, near_scored, i_f, i_n, lengths_t,
+            cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
+            lower, upper, quota, owners, generations,
+            **common, num_warps=8)
+        _fast_launch(workspace, ('candidate_expand', layer_offset),
+                     _candidate_expand_batched_kernel,
+                     (m * hkv, triton.cdiv(width, 1024)),
+            i_f, i_n, far_scored, near_scored, lengths_t,
+            out, valid, owners, generations,
+            K_F=k_f, K_N=k_n, KT=far_scored.shape[-1],
+            R=r, HEAD=head, TAIL=tail, SINK=sink, SWA=swa, CAP=capacity,
+            SINK_POOL_LO=int(indexer._sink_pool_lo_blk), BS=bs,
+            HKV=hkv, B=b, num_warps=4)
     else:
         _fast_launch(workspace, ('candidate', layer_offset),
                      _candidate_pack_batched_kernel, (m * hkv,),

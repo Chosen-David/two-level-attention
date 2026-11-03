@@ -806,3 +806,10 @@
 - 回退：生产代码恢复独立 Q/K/V 投影，删除 `prepare_qkv_fused_weight` 的注册 import/调用和仅属于失败实验的 QKV 探针；失败日志、receipt 与判决继续保留。回退后的 Graph/eager 应分别回到 Iter 93/92 路径，仍需完整 128-token 复验确认，不能仅凭源码差异宣布恢复验收通过。
 - 回退复验通过：回退 Graph 相对 Iter 93 Graph、回退 eager 相对 Iter 92 eager、回退 eager 相对回退 Graph 均为 128/128 token 完全一致，无首个分叉点；两臂输入 SHA256 均保持 `e851c310…99c2db`，Graph replay=127、eager replay=0。Graph 日志含 145 个 RMSNorm 注册路径，eager 日志无注册行，执行隔离符合预期。
 - 复验测量边界：Graph 单跑 steady TPOT=10.614384 ms，与 Iter 93 接近但不替代其 ABBA best；eager 单跑 steady TPOT=26.300208 ms，本次与 Graph 在两张卡并发运行，CPU host 竞争可能影响 eager，因此仅作正确性恢复证据，不作性能 verdict。GPU hygiene 仅观察到本轮两个进程，未见第三方 compute process；六份 receipt/log/hygiene 已归档到本结果目录。
+
+## Iter 95：L1 Top-K 与 candidate expansion 解耦并行
+
+- 修改：保留原 `_topk_indices_body`、K 值、tie 规则、owner tag 与 `atomic_max` 语义，将原每个 KV row 单 CTA 串行展开 9 个 1024-slot chunk 的 fused kernel 拆成 prepare + expansion 两个 kernel。prepare 每行只推进一次 generation 并处理回绕；expansion 使用 `(KV row, chunk)` 二维 grid，B1/HKV=8 时从 8 个 CTA 增至 72 个 CTA。下游 fine score、packed key、partial/merge Top-K 和 finish 均未修改。
+- 微基准正确性硬门通过：pc40 GPU0，B1 生产行宽 8452，覆盖常规生产、大量 BF16 同分与重复 token、短序列 quota、owner generation 回绕；eager 和 CUDA Graph capture/replay 的 far/near scores、i_f/i_n、candidate out/valid、lower/upper/quota、owners、generations 全部逐位一致。
+- 微基准 Graph ABBA：reference 两臂 0.0111568/0.0111283 ms，candidate 两臂 0.00758304/0.00756992 ms；中位数 0.01114256→0.00757648 ms，该阶段加速 1.470678×、耗时降低 32.00%。这是 L1 Top-K + generation/metadata + candidate expansion 的局部结果，不能外推为完整 decode TPOT；生产 Graph/eager 128-token identity 与完整 TPOT 待测。
+- 首轮远端命令因 shell 后台优先级使工作目录只作用于监控子 shell，Python 在参数解析前即报文件不存在，未启动 CUDA、未产生采数；修正后主 benchmark 成功。正式 receipt/log 与 30 秒旁路 hygiene 随本轮归档。
