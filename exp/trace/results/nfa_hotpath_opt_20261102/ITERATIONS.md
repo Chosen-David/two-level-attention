@@ -670,3 +670,6 @@
 - 修改：部分 Top-K tile 从 2048 调整为 4096；8320 个候选形成 3 个局部结果集，merge 有效输入为 3072、`MERGE_PAD=4096`，避免 Iter 77 的 8192-wide 归并和 Iter 78 的大局部 tile。
 - 正确性：合成同分/quota/无效候选直接对拍 1/1 通过，微基准 indices/counts bit-exact。
 - 算子微基准：原实现 0.230724 ms，候选 0.091244 ms，**2.529x**；相对 Iter 77 的 0.115675 ms 降低约 21.2%。该结果仅限 Top-K 算子，需完整回归与真实 Qwen 双口径验收。
+- 完整回归与生产身份：selector/cache/GraphRunner 35/35 通过；真实 Qwen eager/Graph 16/16 token 均与 Iter 77 完全一致，且两种 execution 一致。
+- 生产 16-token TPOT：eager median/steady 25.827711/25.787408 ms，Graph 15.497696/15.465488 ms。Graph 相对 Iter 77 steady 15.634048 ms 再改善约 1.08%，相对原 baseline 23.588048 ms 为 **1.525x**；仍慢于 FA2 Graph 12.602576 ms，eager 也仍慢于 FA2 23.725280 ms。
+- 判决：保留为当前最佳正确实现；算子明显下降但完整 Graph 收益较薄，继续处理剩余 selector 与模型路径热点。
