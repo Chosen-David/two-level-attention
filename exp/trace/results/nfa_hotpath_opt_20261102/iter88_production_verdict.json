@@ -1,0 +1,38 @@
+{
+  "iteration": 88,
+  "change": "fine-score directly emits packed int32 Top-K keys for 16-bit token-key geometry",
+  "input": {
+    "task": "niah_single_1",
+    "sample_index": 0,
+    "prompt_tokens": 32612,
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "generated_tokens": 128
+  },
+  "microbenchmark": {
+    "shape": [1, 8, 8320],
+    "width": 1024,
+    "reference_ms": 0.23060937449793142,
+    "candidate_ms": 0.028473996365602335,
+    "reference_over_candidate": 8.09894654536503,
+    "iter81_candidate_ms": 0.038990,
+    "reduction_vs_iter81_percent": 26.97,
+    "bit_exact": true,
+    "scope": "partial+merge only; fine-score packing cost excluded"
+  },
+  "production": {
+    "eager_steady_ms": 24.479999542236328,
+    "iter81_eager_steady_ms": 24.43842363357544,
+    "iter81_over_iter88_eager": 0.9983016376863424,
+    "graph_steady_ms": 12.361072063446045,
+    "iter81_graph_steady_ms": 12.443975925445556,
+    "iter81_over_iter88_graph": 1.0067068504717058,
+    "fa2_over_iter88_eager": 0.9382536189369803,
+    "fa2_over_iter88_graph": 1.0189821821485723,
+    "eager_graph_token_identity": true,
+    "eager_vs_iter81_token_identity": true,
+    "graph_vs_iter81_token_identity": true,
+    "gpu_hygiene": "clean"
+  },
+  "two_x_eager_and_graph_achieved": false,
+  "push_to_main_allowed": false
+}

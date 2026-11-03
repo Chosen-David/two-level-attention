@@ -1,0 +1,38 @@
+{
+  "model": "Qwen3-8B",
+  "input": {
+    "task": "niah_single_1",
+    "sample_index": 0,
+    "prompt_tokens": 32612,
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "generated_tokens": 128
+  },
+  "source": "iter81",
+  "eager_solo_abba": {
+    "order": ["nfa_a", "fa2_a", "fa2_b", "nfa_b"],
+    "nfa_steady_ms": [24.391215324401855, 24.485631942749023],
+    "fa2_steady_ms": [22.969120025634766, 22.96777629852295],
+    "nfa_median_ms": 24.43842363357544,
+    "fa2_median_ms": 22.968448162078857,
+    "fa2_over_nfa": 0.9398498244593397,
+    "nfa_repeat_token_identity": true,
+    "fa2_repeat_token_identity": true,
+    "nfa_fa2_token_identity": false,
+    "gpu_hygiene": "clean"
+  },
+  "graph_parallel_abba_reference_only": {
+    "order": ["nfa_a", "fa2_a", "fa2_b", "nfa_b"],
+    "nfa_steady_ms": [12.442031860351562, 12.44591999053955],
+    "fa2_steady_ms": [12.591887950897217, 12.599536418914795],
+    "nfa_median_ms": 12.443975925445556,
+    "fa2_median_ms": 12.595712184906006,
+    "fa2_over_nfa": 1.012193551,
+    "nfa_repeat_token_identity": true,
+    "fa2_repeat_token_identity": true,
+    "nfa_eager_graph_token_identity": true,
+    "nfa_fa2_token_identity": false,
+    "gpu_hygiene": "clean-device; parallel eager arm on other GPU may contend for host CPU"
+  },
+  "two_x_eager_and_graph_achieved": false,
+  "push_to_main_allowed": false
+}
