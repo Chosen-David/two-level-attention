@@ -901,3 +901,4 @@
 - 修改：撤掉 iter105 的 tail32 常量映射和调用方判定，只保留受 `kv_pool_k.numel() <= INT32_MAX` 保护的 int32 物理页号/维度偏移；通用大 KV 池仍使用 int64。微基准其余输入、参考 kernel 和 packed-key 门禁不变。
 - 正确性通过：5 个独立 seed 的 B3×HKV8 矩阵在 Graph 生产 warps=1 与 eager 生产 warps=4 下共 10/10 组全部 int32 key 逐位一致，覆盖重复 token、keep 洞、无效项、quota=0/300/1024 和尾 tile；Graph capture/replay 也逐位一致。
 - 性能判决：B1、R=8452、32 维下 eager 0.0244015→0.0243781 ms，仅 1.000958×；Graph 0.0180893→0.0181036 ms，0.999210×。差异均不足 0.1%，Graph 方向还略慢，没有可辨收益；不运行完整生产 ABBA、不更新 best、不推送 main。该分支增加的地址分派没有保留价值，下一提交恢复 iter104 通用地址实现，微基准和失败证据保留用于避免重复尝试。
+- 恢复与复测：生产 `nfa_layer_batch_selector.py` 已逐行恢复到 iter104，并用 `git diff --exit-code 9ec53b65` 确认零差异；微基准改为自包含的 `ADDRESS32` 参考/候选双臂，不再依赖已恢复的生产 kernel。复测仍 10/10 bit-exact，eager 1.000978×、Graph 1.000434×，与首轮的微小正负差异共同证明该方向只有噪声级影响，拒绝结论不变。当前正式 Graph best 仍为 iter104 10.162824 ms。

@@ -256,7 +256,7 @@ if _has_triton():
         HK: tl.constexpr, HEAD_DIM: tl.constexpr, DIM_NUMEL: tl.constexpr,
         D_BLOCK: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
         TILE: tl.constexpr, MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
-        PACK_KEY: tl.constexpr, ADDRESS32: tl.constexpr,
+        PACK_KEY: tl.constexpr,
     ):
         """按 tile 并行计算 grouped-Q 的 BF16 Logits 或有序 packed key。"""
         row = tl.program_id(0)
@@ -271,9 +271,7 @@ if _has_triton():
         kv_ptr = kv_addr.to(tl.pointer_type(KV_REF.dtype.element_ty))
         offs_d = tl.arange(0, D_BLOCK)
         dim_mask = offs_d < DIM_NUMEL
-        dim = tl.load(DIMS + offs_d, mask=dim_mask, other=0)
-        if not ADDRESS32:
-            dim = dim.to(tl.int64)
+        dim = tl.load(DIMS + offs_d, mask=dim_mask, other=0).to(tl.int64)
 
         offs_r = t * TILE + tl.arange(0, TILE)
         mask_r = offs_r < R
@@ -294,9 +292,7 @@ if _has_triton():
         phys = tl.load(
             BLOCK_TABLE + (layer + LAYER_OFFSET) * MAX_REQ * MAX_BLOCKS
             + req_id * MAX_BLOCKS + lp,
-            mask=read_r & lp_valid, other=0)
-        if not ADDRESS32:
-            phys = phys.to(tl.int64)
+            mask=read_r & lp_valid, other=0).to(tl.int64)
         src = (kv_ptr
                + phys[:, None] * HK * PAGE * HEAD_DIM
                + kv * PAGE * HEAD_DIM
@@ -1228,7 +1224,6 @@ def _fused_fine_scores_paged(
         HKV=hkv, B=b, TILE=tile,
         MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
         PACK_KEY=pack_key,
-        ADDRESS32=layer0.kv_pool_k.numel() <= torch.iinfo(torch.int32).max,
         num_warps=num_warps,
     )
     return logits

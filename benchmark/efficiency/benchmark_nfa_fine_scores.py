@@ -9,11 +9,10 @@ import triton
 import triton.language as tl
 from triton.testing import do_bench
 
-import sparse_attn.indexer.nfa_layer_batch_selector as ops
 
 
 @triton.jit
-def _reference_fine_scores_kernel(
+def _fine_scores_kernel(
     KV_PTRS, BLOCK_TABLE, VALID_REQ, DIMS, Q, CAND, KEEP, OWNERS,
     GENERATIONS, LOGITS, LOW, HIGH, QUOTA, KV_REF, R,
     stride_qm, stride_qh, stride_ch, stride_cr,
@@ -21,9 +20,9 @@ def _reference_fine_scores_kernel(
     HK: tl.constexpr, HEAD_DIM: tl.constexpr, DIM_NUMEL: tl.constexpr,
     D_BLOCK: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
     TILE: tl.constexpr, MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
-    PACK_KEY: tl.constexpr,
+    PACK_KEY: tl.constexpr, ADDRESS32: tl.constexpr,
 ):
-    """iter104 的通用 int64 地址路径，仅作为独立参考。"""
+    """独立参考/候选：ADDRESS32=False 复现 iter104 通用路径。"""
     row = tl.program_id(0)
     t = tl.program_id(1)
     m = row // HKV
@@ -35,7 +34,9 @@ def _reference_fine_scores_kernel(
     kv_ptr = kv_addr.to(tl.pointer_type(KV_REF.dtype.element_ty))
     offs_d = tl.arange(0, D_BLOCK)
     dim_mask = offs_d < DIM_NUMEL
-    dim = tl.load(DIMS + offs_d, mask=dim_mask, other=0).to(tl.int64)
+    dim = tl.load(DIMS + offs_d, mask=dim_mask, other=0)
+    if not ADDRESS32:
+        dim = dim.to(tl.int64)
     offs_r = t * TILE + tl.arange(0, TILE)
     mask_r = offs_r < R
     keep = tl.load(KEEP + row * stride_ch + offs_r * stride_cr,
@@ -55,7 +56,9 @@ def _reference_fine_scores_kernel(
     phys = tl.load(
         BLOCK_TABLE + (layer + LAYER_OFFSET) * MAX_REQ * MAX_BLOCKS
         + req_id * MAX_BLOCKS + lp,
-        mask=read_r & lp_valid, other=0).to(tl.int64)
+        mask=read_r & lp_valid, other=0)
+    if not ADDRESS32:
+        phys = phys.to(tl.int64)
     src = (kv_ptr
            + phys[:, None] * HK * PAGE * HEAD_DIM
            + kv * PAGE * HEAD_DIM
@@ -93,9 +96,7 @@ def _launch(kernel, case, out, num_warps, optimized):
         S=case['capacity'], MAX_BLOCKS=case['max_blocks'], PAGE=case['page'],
         HK=8, HEAD_DIM=128, DIM_NUMEL=32, D_BLOCK=32, HKV=8,
         B=case['m'], TILE=128, MAX_REQ=case['m'], LAYER_OFFSET=0,
-        PACK_KEY=True, num_warps=num_warps)
-    if optimized:
-        kwargs.update(ADDRESS32=True)
+        PACK_KEY=True, ADDRESS32=optimized, num_warps=num_warps)
     kernel[(case['m'] * 8, triton.cdiv(case['r'], 128))](
         case['kv_ptrs'], case['block_table'], case['valid_req'], case['dims'],
         case['q'], case['cand'], case['keep'], case['owners'],
@@ -185,9 +186,9 @@ def main():
         candidate_out = torch.empty_like(reference_out)
         # Graph/eager 两种生产 warp 配置都必须逐位一致。
         for warps in (1, 4):
-            _launch(_reference_fine_scores_kernel, case, reference_out,
+            _launch(_fine_scores_kernel, case, reference_out,
                     warps, optimized=False)
-            _launch(ops._nfa_fine_scores_paged_kernel, case, candidate_out,
+            _launch(_fine_scores_kernel, case, candidate_out,
                     warps, optimized=True)
             torch.cuda.synchronize()
             ok = torch.equal(reference_out, candidate_out)
@@ -201,13 +202,13 @@ def main():
     ref_out = torch.empty(case['cand'].shape, dtype=torch.int32, device='cuda')
     new_out = torch.empty_like(ref_out)
     reference_eager = lambda: _launch(
-        _reference_fine_scores_kernel, case, ref_out, 4, optimized=False)
+        _fine_scores_kernel, case, ref_out, 4, optimized=False)
     candidate_eager = lambda: _launch(
-        ops._nfa_fine_scores_paged_kernel, case, new_out, 4, optimized=True)
+        _fine_scores_kernel, case, new_out, 4, optimized=True)
     reference_graph = lambda: _launch(
-        _reference_fine_scores_kernel, case, ref_out, 1, optimized=False)
+        _fine_scores_kernel, case, ref_out, 1, optimized=False)
     candidate_graph = lambda: _launch(
-        ops._nfa_fine_scores_paged_kernel, case, new_out, 1, optimized=True)
+        _fine_scores_kernel, case, new_out, 1, optimized=True)
     reference_eager()
     candidate_eager()
     reference_graph()
