@@ -867,3 +867,8 @@
 - 完整 Qwen3-8B RULER 32K B1 Graph 单跑：steady TPOT=10.020320 ms、graph_replays=127，相对 iter99 的 10.415792 ms 降低 0.395472 ms，接近微基准理论节省；输入 SHA256、32612 prompt tokens、128 decode tokens 和零自然 skip 口径不变。该结果仍未达到 Graph 2× 门槛，且需 token identity 与同卡 ABBA 后才更新正式最佳。
 - 证据：`/tmp/ruler32k_iter102_128_graph.json`、`/tmp/iter102_graph_stdout.log`、`/tmp/iter102_graph_gpu1_hygiene.log`（pc40 GPU1）；token 对照在本条提交后读取 receipt。
 - 正确性判决：拒绝全量切换。iter102 Graph 相对 iter99 Graph 从索引 121 开始分叉，最终 122/128 token 一致，first_divergence=121；尽管独立算子 120 组随机对拍通过，真实长生成仍暴露稀有归约差异，10.020320 ms 不得作为有效候选或正式最佳。后续将 Q/K 与 hidden norm 拆臂定位，不放宽 128/128 硬门。
+
+## Iter 103：仅 Q/K RMSNorm 使用单 kernel
+
+- 修改：`weight.numel()==128` 的 Q/K norm 使用单 kernel，hidden/final norm 恢复原 `torch.mean` 三 kernel 路径，隔离 iter102 的分叉来源。Graph 完整生产单跑 steady TPOT=10.218576 ms，相对 iter99 降低 0.197216 ms，接近 72 个 Q/K 实例的理论收益；该数字仍以 token identity 为硬门。
+- 证据：`/tmp/ruler32k_iter103_128_graph.json`、`/tmp/iter103_graph_stdout.log`、`/tmp/iter103_graph_gpu1_hygiene.log`；128-token 对照在本条提交后判决。

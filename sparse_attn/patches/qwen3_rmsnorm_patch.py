@@ -25,7 +25,8 @@ from types import MethodType
 
 from transformers.models.qwen3.modeling_qwen3 import Qwen3RMSNorm
 
-from ..ops.qwen3_rmsnorm_triton import fused_rmsnorm_decode_single, is_fusable
+from ..ops.qwen3_rmsnorm_triton import (
+    fused_rmsnorm_decode, fused_rmsnorm_decode_single, is_fusable)
 
 _ORIG_ATTR = "_iter91_original_forward"
 
@@ -35,7 +36,10 @@ def _iter91_rmsnorm_forward(self, hidden_states):
     # gate 全部为 shape/dtype/布局元数据判断：无 .item()、无 device sync，
     # CUDA graph capture 期间路径确定（同一静态 shape 恒走同一路径）。
     if is_fusable(hidden_states, self.weight):
-        return fused_rmsnorm_decode_single(
+        if self.weight.numel() == 128:
+            return fused_rmsnorm_decode_single(
+                hidden_states, self.weight, self.variance_epsilon)
+        return fused_rmsnorm_decode(
             hidden_states, self.weight, self.variance_epsilon)
     # prefill / 其它 dtype / 非连续 → HF 原 forward，语义零改动
     return getattr(self, _ORIG_ATTR)(hidden_states)
