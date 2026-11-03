@@ -1,7 +1,7 @@
 import torch.nn as nn
 from types import MethodType
 from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention
-from .qwen3_attn_patch import prepare_qkv_fused_weight, qwen3_attn_forward
+from .qwen3_attn_patch import qwen3_attn_forward
 from ..indexer import indexer_type_dict
 from ..indexer.nfa_indexer import NFAIndexer
 
@@ -84,7 +84,6 @@ def register_patch(model: nn.Module, args, snapshot=None,
                 module.indexer.head_dim = module.head_dim
                 if hasattr(module, "layer_idx"):
                     module.indexer.layer_idx = module.layer_idx  # NFA D' 层掩码用
-                prepare_qkv_fused_weight(module)
                 if not hasattr(module, '_nfa_original_forward'):
                     module._nfa_original_forward = module.forward
                 module.forward = MethodType(qwen3_attn_forward, module)

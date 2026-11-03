@@ -803,3 +803,4 @@
 - 完整生产 128-token：Graph steady TPOT 10.274896 ms，相对 Iter 93 单跑 10.569072 ms 加速 1.028632×；eager steady TPOT 22.864288 ms，相对 Iter 92 的 23.982288 ms 加速 1.048903×。当前 FA2/NFA 约为 Graph 1.225953×、eager 1.004556×，eager 仅略超过 FA2，双口径仍未达到 2×。两臂 model-loaded allocated 均为 16,417,402,368 bytes，与 Iter 93 相同。
 - 正确性判决：拒绝。iter94 Graph 相对 iter93 Graph、eager 相对 iter92 eager 均从第 11 个 token 开始分叉，最终 115/128 token 不同；iter94 eager 与 Graph 彼此一致也不能满足“优化前后 NFA 一致”硬门。少量 Q GEMM 舍入差已转化为明显生成漂移，不做 ABBA、不合入主线，下一提交恢复独立 Q/K/V 投影。
 - 原始证据：微基准、生产 receipt/log 与 GPU hygiene 已归档到本结果目录；model-loaded allocated 虽与 iter93 相同，但 Graph decode-ready allocated 增加 368,640 bytes，且性能收益不能抵消 token identity 失败。
+- 回退：生产代码恢复独立 Q/K/V 投影，删除 `prepare_qkv_fused_weight` 的注册 import/调用和仅属于失败实验的 QKV 探针；失败日志、receipt 与判决继续保留。回退后的 Graph/eager 应分别回到 Iter 93/92 路径，仍需完整 128-token 复验确认，不能仅凭源码差异宣布恢复验收通过。

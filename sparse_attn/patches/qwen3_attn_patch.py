@@ -19,26 +19,6 @@ def _paper_route(layer, route):
         observer.record_qwen_route(layer, route)
 
 
-def prepare_qkv_fused_weight(module) -> bool:
-    """为 B1 decode 准备共享存储的 QKV 权重，不保留第二份长期副本。"""
-    if hasattr(module, '_nfa_qkv_weight'):
-        return True
-    projections = (module.q_proj, module.k_proj, module.v_proj)
-    if any(proj.bias is not None for proj in projections):
-        return False
-    requires_grad = tuple(proj.weight.requires_grad for proj in projections)
-    with torch.no_grad():
-        fused = torch.cat(tuple(proj.weight for proj in projections), dim=0).detach()
-        offset = 0
-        for proj, grad in zip(projections, requires_grad):
-            end = offset + proj.out_features
-            proj.weight = torch.nn.Parameter(fused[offset:end], requires_grad=grad)
-            offset = end
-    # 三个 Linear 权重均为 fused 的视图；该属性持有完整底层存储。
-    module._nfa_qkv_weight = fused
-    return True
-
-
 def qwen3_attn_forward(
     self,
     hidden_states: torch.Tensor,
@@ -63,23 +43,11 @@ def qwen3_attn_forward(
 
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
-    if (input_shape == (1, 1) and hasattr(self, '_nfa_qkv_weight')):
-        # iter94 实验臂：一次 QKV skinny GEMM 替代三次投影。B>1 的切片
-        # view 非连续，且 prefill 不在本轮验收范围，均保持原 HF 投影路径。
-        qkv = torch.nn.functional.linear(hidden_states, self._nfa_qkv_weight)
-        q_end = self.q_proj.out_features
-        k_end = q_end + self.k_proj.out_features
-        query_states = self.q_norm(
-            qkv[..., :q_end].view(hidden_shape)).transpose(1, 2)
-        key_states = self.k_norm(
-            qkv[..., q_end:k_end].view(hidden_shape)).transpose(1, 2)
-        value_states = qkv[..., k_end:].view(hidden_shape).transpose(1, 2)
-    else:
-        query_states = self.q_norm(
-            self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
-        key_states = self.k_norm(
-            self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
-        value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
+    query_states = self.q_norm(
+        self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+    key_states = self.k_norm(
+        self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+    value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
 
     cos, sin = position_embeddings
     if input_shape[0] == 1 and input_shape[1] == 1:
