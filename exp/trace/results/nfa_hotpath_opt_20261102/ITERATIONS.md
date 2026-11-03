@@ -688,3 +688,6 @@
 - 修改：在 Iter 80 的有序归并基础上将 partial tile 从 4096 降回 2048。此前 Iter 77 的瓶颈是 8192-wide `tl.topk` merge；该瓶颈已被 bitonic 归并消除，因此重新利用 2048-wide partial 的较低成本，归并仅顺序处理 5 条有序 run。
 - 正确性：合成同分/quota/无效候选直接对拍 1/1 通过，微基准 indices/counts bit-exact。
 - 算子微基准：原实现 0.230753 ms，候选 0.038990 ms，**5.918x**；相对 Iter 80 的 0.052419 ms 再降低约 25.6%。需完整回归与真实 Qwen 双口径验收。
+- 完整回归与生产身份：selector/cache/GraphRunner 35/35 通过；真实 Qwen eager/Graph 16/16 token 均与 Iter 80 完全一致，且两种 execution 一致。
+- 生产 16-token TPOT：eager median/steady 25.845119/25.793744 ms，Graph 12.505600/12.462192 ms。Graph 相对 Iter 80 steady 14.123424 ms 改善约 11.77%，相对原 baseline 23.588048 ms 为 **1.893x**；首次在该 16-token 迭代口径略快于 FA2 Graph steady 12.602576 ms（约 1.13%），但不是最终 ABBA/128-token 验收。
+- 判决：保留为当前最佳正确实现。Graph 已出现超过 FA2 的早期信号；eager 25.793744 ms 仍慢于 FA2 23.725280 ms，继续优化 eager host/launch 与剩余设备热点。
