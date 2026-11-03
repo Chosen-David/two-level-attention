@@ -46,10 +46,17 @@ def parse_args():
     parser.add_argument('--execution', required=True, choices=('eager', 'graph'))
     parser.add_argument('--sample-index', type=int, default=0)
     parser.add_argument('--input-provenance', required=True,
-                        choices=('native-ruler', 'repeated-needle-body-extension'),
+                        choices=('native-ruler', 'repeated-needle-body-extension',
+                                 'longbench-v2'),
                         help='输入数据来源必须显式声明，禁止按长度猜测')
     parser.add_argument('--max-new-tokens', type=int, default=128)
     parser.add_argument('--warmup-steps', type=int, default=3)
+    parser.add_argument('--gate-epsilon', type=float, default=0.05,
+                        help='NFA prefill 区域 gate 阈值；0 用于同输入 no-skip 对照')
+    parser.add_argument(
+        '--measurement-mode', default='memory',
+        choices=('latency', 'memory', 'profile', 'traffic', 'correctness'),
+        help='latency/correctness 在 decode 后统一同步读取；其他模式保留逐步回执')
     parser.add_argument('--visible-len', type=int, default=8192)
     parser.add_argument('--fa2-prefill-cpu-offload', action='store_true',
                         help='仅在 prefill 逐层卸载 KV 以降低峰值；decode 前恢复固定 GPU Cache')
@@ -65,10 +72,13 @@ def _load_input(args, tokenizer):
     row = rows[args.sample_index]
     ids = tokenizer(row['input'], return_tensors='pt', truncation=False).input_ids
     prompt_tokens = ids.shape[-1]
-    if not 0.95 * args.context_length <= prompt_tokens <= args.context_length:
+    min_tokens = (8192 if args.input_provenance == 'longbench-v2'
+                  else 0.95 * args.context_length)
+    if not min_tokens <= prompt_tokens <= args.context_length:
         raise ValueError(
-            f'RULER prompt length mismatch: requested {args.context_length}, '
-            f'got {prompt_tokens} tokens from {path} sample {args.sample_index}')
+            f'prompt length mismatch: requested {args.context_length}, '
+            f'minimum {min_tokens}, got {prompt_tokens} tokens from '
+            f'{path} sample {args.sample_index}')
     return ids[0].cuda(), {
         'path': os.path.abspath(path), 'sha256': data_sha256,
         'sample_index': args.sample_index, 'sample_id': row.get('index'),
@@ -155,7 +165,7 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
     cache = build_frozen_cache(
         model, geometry, prompt.numel(), max_requests=batch,
         max_visible_len=args.visible_len)
-    gate = GateConfig()
+    gate = GateConfig(epsilon=args.gate_epsilon)
     generated = {}
     req_ids = []
     torch.cuda.synchronize()
@@ -188,29 +198,49 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
 
     step_ms = []
     steady_decode_start = None
-    if args.warmup_steps == 0:
+    clean_decode = args.measurement_mode in ('latency', 'correctness')
+    decode_steps = max_new_tokens - 1
+    event_pairs = [_events() for _ in range(decode_steps)] if clean_decode else None
+    token_history = (torch.empty(
+        (decode_steps, batch), dtype=torch.long, device=prompt.device)
+        if clean_decode else None)
+    if args.warmup_steps == 0 and not clean_decode:
         torch.cuda.synchronize()
         steady_decode_start = _memory_snapshot()
         torch.cuda.reset_peak_memory_stats()
-    for step in range(max_new_tokens - 1):
-        counts = [len(generated[request_id]) for request_id in req_ids]
-        start, end = _events()
+    for step in range(decode_steps):
+        if clean_decode:
+            counts = [step + 1] * batch
+            start, end = event_pairs[step]
+        else:
+            counts = [len(generated[request_id]) for request_id in req_ids]
+            start, end = _events()
         start.record()
         _, tokens = runner.step(
             model, cache, generated_counts=counts, min_new_tokens=1,
             return_next_tokens=True, stop_on_eos=False)
         end.record()
-        rows = tokens.detach().cpu().tolist()
-        for row, request_id in enumerate(req_ids):
-            generated[request_id].append(int(rows[row]))
-        step_ms.append(start.elapsed_time(end))
-        if step + 1 == args.warmup_steps:
+        if clean_decode:
+            token_history[step].copy_(tokens)
+        else:
+            rows = tokens.detach().cpu().tolist()
+            for row, request_id in enumerate(req_ids):
+                generated[request_id].append(int(rows[row]))
+            step_ms.append(start.elapsed_time(end))
+        if not clean_decode and step + 1 == args.warmup_steps:
             torch.cuda.synchronize()
             steady_decode_start = _memory_snapshot()
             torch.cuda.reset_peak_memory_stats()
+    scheduler.prepare_step()
+    if clean_decode:
+        torch.cuda.synchronize()
+        history = token_history.cpu().tolist()
+        for rows in history:
+            for row, request_id in enumerate(req_ids):
+                generated[request_id].append(int(rows[row]))
+        step_ms = [start.elapsed_time(end) for start, end in event_pairs]
     if steady_decode_start is None:
         steady_decode_start = _memory_snapshot()
-    scheduler.prepare_step()
     result = _summary(step_ms, args.warmup_steps)
     result.update(prefill_seconds=prefill_seconds,
                   generated_token_ids=[generated[request_id] for request_id in req_ids],
@@ -222,7 +252,8 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
                               cache.states[request_id].skip_far_by_layer,
                               cache.states[request_id].skip_near_by_layer)),
                       } for request_id in req_ids},
-                  gate_mode='dynamic', graph_replays=(len(step_ms) if args.execution == 'graph' else 0),
+                  gate_mode='dynamic', gate_epsilon=args.gate_epsilon,
+                  graph_replays=(len(step_ms) if args.execution == 'graph' else 0),
                   memory={
                       'prefill_end': prefill_memory,
                       'decode_ready': decode_ready_memory,
@@ -291,12 +322,18 @@ def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
 
     step_ms = []
     steady_decode_start = None
-    if args.warmup_steps == 0:
+    clean_decode = args.measurement_mode in ('latency', 'correctness')
+    decode_steps = max_new_tokens - 1
+    event_pairs = [_events() for _ in range(decode_steps)] if clean_decode else None
+    token_history = (torch.empty(
+        (decode_steps, batch), dtype=torch.long, device=device)
+        if clean_decode else None)
+    if args.warmup_steps == 0 and not clean_decode:
         torch.cuda.synchronize()
         steady_decode_start = _memory_snapshot()
         torch.cuda.reset_peak_memory_stats()
-    for step in range(max_new_tokens - 1):
-        start, end = _events()
+    for step in range(decode_steps):
+        start, end = event_pairs[step] if clean_decode else _events()
         input_buf.copy_(next_tokens[:, None])
         position_buf.fill_(length + step)
         cache_position_buf.fill_(length + step)
@@ -309,14 +346,24 @@ def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
         next_tokens = greedy_next_tokens(
             logits, eos_ids, generated_counts=step + 1, min_new_tokens=1)
         end.record()
-        rows = next_tokens.cpu().tolist()
-        for row in range(batch):
-            generated[row].append(int(rows[row]))
-        step_ms.append(start.elapsed_time(end))
-        if step + 1 == args.warmup_steps:
+        if clean_decode:
+            token_history[step].copy_(next_tokens)
+        else:
+            rows = next_tokens.cpu().tolist()
+            for row in range(batch):
+                generated[row].append(int(rows[row]))
+            step_ms.append(start.elapsed_time(end))
+        if not clean_decode and step + 1 == args.warmup_steps:
             torch.cuda.synchronize()
             steady_decode_start = _memory_snapshot()
             torch.cuda.reset_peak_memory_stats()
+    if clean_decode:
+        torch.cuda.synchronize()
+        history = token_history.cpu().tolist()
+        for rows in history:
+            for row in range(batch):
+                generated[row].append(int(rows[row]))
+        step_ms = [start.elapsed_time(end) for start, end in event_pairs]
     if steady_decode_start is None:
         steady_decode_start = _memory_snapshot()
     result = _summary(step_ms, args.warmup_steps)
@@ -392,8 +439,14 @@ def main():
         method=args.method, execution=args.execution, batch_size=args.batch_size,
         context_length=args.context_length, max_new_tokens=args.max_new_tokens,
         model_path=os.path.abspath(args.model_path), input=input_receipt,
+        measurement_mode=args.measurement_mode,
         decode_protocol='fixed length; EOS recorded but not used for early stop',
         timing_scope='CUDA events around model decode, selector where applicable, and argmax',
+        timing_quality=(
+            'clean-device-history' if args.measurement_mode == 'latency'
+            else 'host-readback-and-memory-sampling-in-loop'),
+        host_readback_in_decode_loop=args.measurement_mode not in (
+            'latency', 'correctness'),
         gpu_hygiene={'status': 'requires external process monitor'},
         transformers_version=__import__('transformers').__version__,
         torch_version=torch.__version__)

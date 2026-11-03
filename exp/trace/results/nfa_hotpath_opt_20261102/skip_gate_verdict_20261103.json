@@ -1,0 +1,110 @@
+{
+  "date": "2026-11-03",
+  "status": "real-data quick matrix complete; final 128-token ABBA pending",
+  "model": "Qwen3-8B",
+  "selector": {
+    "version": "iter81",
+    "subspace": "tail",
+    "subspace_cmp_ratio": 4,
+    "level1_topk": 128,
+    "level2_topk": 1024,
+    "near_pages": 32,
+    "near_tokens": "off",
+    "near_len": 4096,
+    "sink_tokens": 4,
+    "sliding_window_size": 128
+  },
+  "measurement": {
+    "mode": "latency",
+    "decode_steps_per_arm": 15,
+    "max_new_tokens": 16,
+    "warmup_steps_excluded": 3,
+    "host_readback_in_decode_loop": false,
+    "process_per_arm": true,
+    "timing": "CUDA events around complete production decode and argmax",
+    "gpu_hygiene": "clean; pre-start used < 500 MiB and 30-second sideband logs contain only owned processes"
+  },
+  "ruler32k_gate_scan": {
+    "path": "/tmp/ruler32k_all_dynamic_gate.json",
+    "tasks": 11,
+    "tasks_with_natural_far_skip": 5,
+    "tasks_with_natural_near_skip": 0,
+    "minimum_near_mean": 0.06566230952739716,
+    "epsilon": 0.05,
+    "conclusion": "RULER 无 near-skip 是真实 profile 未越阈值，不是 near 代码被禁用"
+  },
+  "ruler_multikey_same_input": {
+    "task": "niah_multikey_1",
+    "sample_index": 0,
+    "prompt_tokens": 32621,
+    "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+    "natural_skip": {"far_layers": [11, 14], "near_layers": [], "both_layers": []},
+    "eager_steady_ms": {"no_skip": 25.186912536621094, "natural": 25.965487480163574, "fa2": 23.12996768951416},
+    "graph_steady_ms": {"no_skip": 12.395776271820068, "natural": 12.43782377243042, "fa2": 12.562367916107178},
+    "no_skip_over_natural_speedup": {"eager": 0.9700150076466973, "graph": 0.9966193844373681},
+    "fa2_over_natural_speedup": {"eager": 0.8907965894029288, "graph": 1.010013338824821},
+    "token_identity": {
+      "old_nfa_eager_graph": true,
+      "iter81_eager_graph": true,
+      "no_skip_vs_natural_16_tokens": true,
+      "nfa_vs_fa2": false,
+      "nfa_fa2_first_divergence_token": 0
+    },
+    "raw_results": [
+      "/tmp/nfa_multikey_iter81_noskip_latency_eager.json",
+      "/tmp/nfa_multikey_iter81_latency_eager.json",
+      "/tmp/nfa_multikey_fa2_latency_eager.json",
+      "/tmp/nfa_multikey_iter81_noskip_latency_graph.json",
+      "/tmp/nfa_multikey_iter81_latency_graph.json",
+      "/tmp/nfa_multikey_fa2_latency_graph.json"
+    ]
+  },
+  "longbench_natural_near_far_same_input": {
+    "task": "longbench_v2_39",
+    "source_id": "66eefe85821e116aacb228dc",
+    "domain": "Multi-Document QA",
+    "sub_domain": "Academic",
+    "prompt_tokens": 30023,
+    "sha256": "9543baeda067eff018dc502f99330d72dd2799f0802213200b9f30de5fdfb656",
+    "natural_skip": {"far_layers": [11], "near_layers": [30, 31], "both_layers": []},
+    "eager_steady_ms": {"no_skip": 25.34828758239746, "natural": 25.131311416625977, "fa2": 24.209904670715332},
+    "graph_steady_ms": {"no_skip": 12.362016201019287, "natural": 12.355055809020996, "fa2": 12.356544017791748},
+    "no_skip_over_natural_speedup": {"eager": 1.0086336985036102, "graph": 1.0005633638654394},
+    "fa2_over_natural_speedup": {"eager": 0.9633363046346609, "graph": 1.0001204534235828},
+    "token_identity": {
+      "natural_eager_graph": true,
+      "no_skip_eager_graph": true,
+      "no_skip_vs_natural": false,
+      "no_skip_natural_first_divergence_token": 1,
+      "nfa_vs_fa2": false
+    },
+    "raw_results": [
+      "/tmp/longbench39_nfa_noskip_latency_eager.json",
+      "/tmp/longbench39_nfa_natural_latency_eager.json",
+      "/tmp/longbench39_fa2_latency_eager.json",
+      "/tmp/longbench39_nfa_noskip_latency_graph.json",
+      "/tmp/longbench39_nfa_natural_latency_graph.json",
+      "/tmp/longbench39_fa2_latency_graph.json"
+    ]
+  },
+  "main_ruler_zero_skip_clean_latency": {
+    "task": "niah_single_1",
+    "sample_index": 0,
+    "prompt_tokens": 32612,
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "natural_skip": {"far_layers": [], "near_layers": [], "both_layers": []},
+    "eager_steady_ms": {"nfa": 24.927759170532227, "fa2": 23.400752067565918},
+    "graph_steady_ms": {"nfa": 12.401631832122803, "fa2": 12.568095684051514},
+    "fa2_over_nfa_speedup": {"eager": 0.9387427047686089, "graph": 1.0134227377640364},
+    "nfa_eager_graph_token_identity": true,
+    "nfa_vs_fa2_token_identity": false
+  },
+  "verdict": {
+    "natural_far_skip_observed": true,
+    "natural_near_skip_observed": true,
+    "natural_same_layer_both_skip_observed": false,
+    "skip_is_not_an_e2e_speed_claim_on_main_zero_skip_sample": true,
+    "two_x_eager_and_graph_achieved": false,
+    "push_to_main_allowed": false
+  }
+}
