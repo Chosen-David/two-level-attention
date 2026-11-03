@@ -813,3 +813,5 @@
 - 微基准正确性硬门通过：pc40 GPU0，B1 生产行宽 8452，覆盖常规生产、大量 BF16 同分与重复 token、短序列 quota、owner generation 回绕；eager 和 CUDA Graph capture/replay 的 far/near scores、i_f/i_n、candidate out/valid、lower/upper/quota、owners、generations 全部逐位一致。
 - 微基准 Graph ABBA：reference 两臂 0.0111568/0.0111283 ms，candidate 两臂 0.00758304/0.00756992 ms；中位数 0.01114256→0.00757648 ms，该阶段加速 1.470678×、耗时降低 32.00%。这是 L1 Top-K + generation/metadata + candidate expansion 的局部结果，不能外推为完整 decode TPOT；生产 Graph/eager 128-token identity 与完整 TPOT 待测。
 - 首轮远端命令因 shell 后台优先级使工作目录只作用于监控子 shell，Python 在参数解析前即报文件不存在，未启动 CUDA、未产生采数；修正后主 benchmark 成功。正式 receipt/log 与 30 秒旁路 hygiene 随本轮归档。
+- 完整生产正确性通过：pc40 GPU0 同卡顺序运行 Graph→eager，Graph 相对 Iter 93 Graph、eager 相对 Iter 92 eager、eager 相对 Graph 均为 128/128 token 完全一致，无分叉；两臂输入 SHA256 不变，Graph replay=127、eager replay=0。
+- 完整生产单跑：Graph steady TPOT=10.498944 ms，相对 Iter 93 单跑 10.569072 ms 仅低 0.070128 ms；eager steady TPOT=25.539792 ms，高于 Iter 92 的 23.982288 ms。单跑不能排除频率与 host 波动，尤其 eager 拆成两个 launch 可能回退，必须分别 ABBA 后再决定 Graph/eager 是否共用新路径；当前最佳正式口径仍是 Iter 93 Graph ABBA 10.546192 ms、Iter 92 eager 23.982288 ms，双口径均未达到 2×。生产 receipt/log 与同一段 30 秒 hygiene 已归档。
