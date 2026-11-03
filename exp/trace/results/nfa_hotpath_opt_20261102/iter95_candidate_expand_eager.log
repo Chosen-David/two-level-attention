@@ -1,0 +1,58 @@
+{
+  "scope": "L1 Top-K + generation/metadata + candidate expansion only",
+  "geometry": {
+    "HKV": 8,
+    "KT": 512,
+    "KT_PAD": 512,
+    "K_F": 96,
+    "K_N": 32,
+    "K_F_PAD": 128,
+    "K_N_PAD": 32,
+    "R": 8320,
+    "HEAD": 4,
+    "TAIL": 128,
+    "SINK": 4,
+    "SWA": 128,
+    "CAP": 32768,
+    "SINK_POOL_LO": 0,
+    "BS": 64,
+    "PAGE": 64,
+    "NEAR_LEN": 4096,
+    "K2": 1024,
+    "MAX_REQ": 8,
+    "LAYER_OFFSET": 0,
+    "candidate_width": 8452,
+    "expand_chunks": 9
+  },
+  "batch_size": 1,
+  "execution": "eager",
+  "correctness": {
+    "all_scenarios_bit_exact": true,
+    "graph_capture_replay_bit_exact": false,
+    "covers": [
+      "production",
+      "ties-and-duplicates",
+      "short-quota",
+      "owner-generation-wrap"
+    ]
+  },
+  "timing": {
+    "reference": {
+      "samples_ms": [
+        0.058508801460266116,
+        0.057883200645446775
+      ],
+      "median_ms": 0.058196001052856446
+    },
+    "candidate": {
+      "samples_ms": [
+        0.0962399959564209,
+        0.096014404296875
+      ],
+      "median_ms": 0.09612720012664794
+    }
+  },
+  "reference_over_candidate": 0.6054061803129915,
+  "warmup": 20,
+  "iters_per_sample": 100
+}

@@ -815,3 +815,4 @@
 - 首轮远端命令因 shell 后台优先级使工作目录只作用于监控子 shell，Python 在参数解析前即报文件不存在，未启动 CUDA、未产生采数；修正后主 benchmark 成功。正式 receipt/log 与 30 秒旁路 hygiene 随本轮归档。
 - 完整生产正确性通过：pc40 GPU0 同卡顺序运行 Graph→eager，Graph 相对 Iter 93 Graph、eager 相对 Iter 92 eager、eager 相对 Graph 均为 128/128 token 完全一致，无分叉；两臂输入 SHA256 不变，Graph replay=127、eager replay=0。
 - 完整生产单跑：Graph steady TPOT=10.498944 ms，相对 Iter 93 单跑 10.569072 ms 仅低 0.070128 ms；eager steady TPOT=25.539792 ms，高于 Iter 92 的 23.982288 ms。单跑不能排除频率与 host 波动，尤其 eager 拆成两个 launch 可能回退，必须分别 ABBA 后再决定 Graph/eager 是否共用新路径；当前最佳正式口径仍是 Iter 93 Graph ABBA 10.546192 ms、Iter 92 eager 23.982288 ms，双口径均未达到 2×。生产 receipt/log 与同一段 30 秒 hygiene 已归档。
+- eager 局部判决：同脚本非 Graph ABBA 的 reference 为 0.0585088/0.0578832 ms，candidate 为 0.0962400/0.0960144 ms，中位数 0.0581960→0.0961272 ms，reference/candidate=0.605406×。两个 Python/Triton launch 外壳使每层增加约 0.037931 ms，36 层理论增加约 1.3655 ms，与生产 eager 回退相符；因此并行 expansion 只能保留在 Graph，eager 必须恢复原单 fused launch，不能把 Graph 的 1.47× 局部收益套到 eager。
