@@ -843,10 +843,12 @@ class GraphReadyPagedRegionCache:
             max_pages = (resident_tokens + page - 1) // page + 2
         if not state.first_decode_seeded:
             # 上界允许与常规 resident 页重复计数；首步提交时会归还这部分余量。
+            # Seed IDs are absolute positions, not offsets in the compact pool.
+            # Match the residency filter even when far history is skipped.
             seed_pages = {
                 token_id // page
                 for token_id in state.prefill_topk_ids_by_layer.get(layer_idx, ())
-                if 0 <= token_id < resident_tokens
+                if 0 <= token_id < state.logical_length
             }
             max_pages += len(seed_pages)
         return max_pages
