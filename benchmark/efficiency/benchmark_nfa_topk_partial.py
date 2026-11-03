@@ -22,9 +22,9 @@ def _make_logits(seed, m=3, hkv=8, r=8452, capacity=32768):
     logits[:, :, 128:512] = 0.25
     logits[:, :, 512:640] = float('-inf')
     cand[:, :, 640:768] = capacity - 1
-    lower = torch.tensor([128, 0, 0], dtype=torch.int64, device='cuda')
-    upper = torch.tensor([8000, 64, 4096], dtype=torch.int64, device='cuda')
-    quota = torch.tensor([1024, 300, 0], dtype=torch.int64, device='cuda')
+    lower = torch.tensor([128, 0, 0], dtype=torch.int64, device='cuda')[:m]
+    upper = torch.tensor([8000, 64, 4096], dtype=torch.int64, device='cuda')[:m]
+    quota = torch.tensor([1024, 300, 0], dtype=torch.int64, device='cuda')[:m]
     bits = logits.view(torch.int16).to(torch.int32) & 0xFFFF
     negative = (bits & 0x8000) != 0
     ordered = torch.where(negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
