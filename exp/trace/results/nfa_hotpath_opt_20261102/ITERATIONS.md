@@ -639,3 +639,9 @@
 - 修改：将 Iter 74 的 32 次全行二分归约改为四趟 8-bit `tl.histogram`，每趟在 512 bins（256 个无效填充槽）上定位第 K 个 packed key 的一个字节；后续压实与 finish 完全不变。
 - 正确性：直接 bit-exact 对拍通过；微基准再次确认 indices/counts 与参考完全一致。
 - 算子微基准：原实现 0.230634 ms，histogram 候选 0.213023 ms，仅 1.083x，且显著慢于 Iter 74 的 0.132365 ms。四趟 512-bin histogram/cumsum 的寄存器和归约成本超过减少全行扫描的收益，本轮回退，不运行完整 eager/Graph 生产臂。
+
+## Iter 76：八趟 4-bit histogram radix-select（回退）
+
+- 修改：把 Iter 75 的 4×512-bin 直方图缩窄为 8×32-bin（16 个有效 nibble 槽），减少每趟 histogram/cumsum 宽度；其余选择语义不变。
+- 正确性：直接 bit-exact 对拍和微基准 indices/counts 对拍均通过。
+- 算子微基准：原实现 0.230320 ms，4-bit 候选 0.160927 ms，1.431x；虽优于 8-bit histogram，但仍慢于 Iter 74 二分的 0.132365 ms。回退多趟 histogram 方向，继续以 Iter 74 为最佳 Top-K 实现。

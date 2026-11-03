@@ -429,24 +429,24 @@ if _has_triton():
             nvalid = tl.sum(good.to(tl.int32), axis=0)
             if nvalid >= K:
                 # 符号位翻转后，uint32 数值序与 packed int32 key 完全一致。
-                # 四趟 8-bit histogram 直接定位第 K 个 key，避免 32 次全行归约。
+                # 八趟 4-bit histogram 以窄归约定位第 K 个 key。
                 ukey = key.to(tl.uint32, bitcast=True) ^ 0x80000000
                 prefix = tl.full((), 0, tl.uint32)
                 remaining = tl.full((), K, tl.int32)
-                bins = tl.arange(0, 512)
-                for pass_id in tl.static_range(4):
-                    shift = 24 - pass_id * 8
-                    byte = ((ukey >> shift) & 0xFF).to(tl.int32)
+                bins = tl.arange(0, 32)
+                for pass_id in tl.static_range(8):
+                    shift = 28 - pass_id * 4
+                    nibble = ((ukey >> shift) & 0xF).to(tl.int32)
                     if pass_id == 0:
                         match = good
                     else:
-                        prefix_shift = 32 - pass_id * 8
+                        prefix_shift = 32 - pass_id * 4
                         match = good & (
                             (ukey >> prefix_shift) == (prefix >> prefix_shift))
-                    hist = tl.histogram(tl.where(match, byte, 256), 512)
+                    hist = tl.histogram(tl.where(match, nibble, 16), 32)
                     above = tl.sum(match.to(tl.int32), axis=0) - tl.cumsum(
                         hist, axis=0)
-                    choose = ((bins < 256) & (above < remaining)
+                    choose = ((bins < 16) & (above < remaining)
                               & ((above + hist) >= remaining))
                     selected_bin = tl.sum(tl.where(choose, bins, 0), axis=0)
                     remaining -= tl.sum(tl.where(choose, above, 0), axis=0)
