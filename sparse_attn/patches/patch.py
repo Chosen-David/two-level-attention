@@ -26,7 +26,8 @@ def _is_glm4_moe_lite_attn(module) -> bool:
     )
 
 
-def register_patch(model: nn.Module, args, snapshot=None) -> int:
+def register_patch(model: nn.Module, args, snapshot=None,
+                   rmsnorm_decode: bool = False) -> int:
     """注册稀疏 attention patch，返回成功 patch 的模块数。
 
     当前生产路径仅支持 Qwen3：dense prefill + frozen-region gate ->
@@ -45,6 +46,8 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
     D′ 掩码 / 投影基内容不再按层重开文件（旧路径每层各 open 一次，
     patch 中途换文件 → 跨层混代可达）。仅 NFAIndexer 接受注入，
     其他 indexer 类型忽略 snapshot（其无文件型配置）。
+    rmsnorm_decode：仅为 Graph 生产 decode 开启 iter91 三 kernel 路径；
+    eager 的 Python/Triton launch 外壳实测回退，默认保持 HF 原实现。
     """
     _reject_removed_cache_args(args)
     IndexerType = indexer_type_dict.get(args.method, None)
@@ -100,9 +103,10 @@ def register_patch(model: nn.Module, args, snapshot=None) -> int:
                 n_patched += 1
                 if module.layer_idx == 0:
                     print(f"register glm4_moe_lite attn (D=256): [{name}]")
-    if n_patched and getattr(model.config, 'model_type', None) == 'qwen3':
-        # iter91：Qwen3 decode RMSNorm 三 kernel 路径；注册数量必须完整，
-        # 防止只 patch 部分层后把混合实现误标为统一候选。
+    if (rmsnorm_decode and n_patched
+            and getattr(model.config, 'model_type', None) == 'qwen3'):
+        # iter92：RMSNorm 仅用于 Graph decode；eager 外壳实测回退。
+        # 注册数量必须完整，防止混合实现被误标为统一候选。
         from .qwen3_rmsnorm_patch import register_rmsnorm_patch
         register_rmsnorm_patch(
             model, expected=model.config.num_hidden_layers * 4 + 1)

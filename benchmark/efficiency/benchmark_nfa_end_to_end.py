@@ -101,7 +101,9 @@ def _load_model(args, max_new_tokens):
     verify_runtime_rope(model)
     if args.method == 'nfa':
         patch_args = nfa_args()
-        patched = register_patch(model, patch_args, resolve_treatment_snapshot(patch_args))
+        patched = register_patch(
+            model, patch_args, resolve_treatment_snapshot(patch_args),
+            rmsnorm_decode=args.execution == 'graph')
         if patched != config.num_hidden_layers:
             raise RuntimeError(f'NFA patched {patched}/{config.num_hidden_layers} layers')
     return model

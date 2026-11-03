@@ -771,3 +771,11 @@
 - 完整生产 128-token：eager steady TPOT 27.129328 ms，相对 Iter 90 的 23.755264 ms 明显回退（Iter90/Iter91=0.875630×，耗时增加 14.16%）；Graph steady TPOT 11.151200 ms，相对 Iter 90 的 11.758976 ms 加速 1.054503×（耗时降低 5.17%）。当前 FA2/NFA 为 eager 0.846628×、Graph 1.129539×，双口径均未达到 2×。
 - 生产正确性：iter91 eager 与 iter90 eager、iter91 Graph 与 iter90 Graph、iter91 eager 与 Graph 的 128/128 token 全部一致，输入身份与 selector 配置不变。说明三 kernel 路径数值可保留，但 eager 外壳开销不可接受；后续若保留必须按执行口径隔离，不能用 Graph 收益掩盖 eager 回退。
 - 原始证据：`ruler32k_iter91_128_{eager,graph}.json`、`iter91_production_{eager,graph}.log`、`iter91_production_gpu0_hygiene.log`。pc40 GPU0 起跑前 used=1 MiB 且无 compute apps；旁路样本未记录到其他 PID。本轮仍是单次生产结果，Graph 收益需同卡 ABBA 复验。
+
+## Iter 92：RMSNorm 仅保留 Graph，eager 恢复 HF
+
+- 修改：`register_patch` 新增默认关闭的 `rmsnorm_decode` 开关；真实生产 runner 仅在 `execution=graph` 时注册 RMSNorm 三 kernel。eager 完全回到 Iter 90 的 HF norm，不保留逐 norm Python patch 外壳；Graph 保留 Iter 91 已验证实现。
+- 完整生产 128-token：eager steady TPOT 23.982288 ms，与 Iter 90 的 23.755264 ms 相差 0.95%（Iter90/Iter92=0.990534×），已消除 Iter 91 的 14.16% 回退；Graph steady TPOT 11.168112 ms，与 Iter 91 的 11.151200 ms 相差 0.15%，相对 Iter 90 加速 1.052906×。
+- 生产正确性：iter92 eager 与 iter90 eager、iter92 Graph 与 iter91 Graph、iter92 eager 与 Graph 的 128/128 token 全部一致。eager 日志无 RMSNorm 注册行，Graph 日志有完整注册行，证明执行口径隔离真实生效。
+- 当前边界：FA2/NFA 为 eager 0.957725×、Graph 1.127828×；eager 仍慢于 FA2，Graph 仅快约 12.78%，双口径均未达到 2×。本轮建立的是“两种执行各自最佳已知路径”，仍需 Graph ABBA 和新的实质性优化。
+- 原始证据：`ruler32k_iter92_128_{eager,graph}.json`、`iter92_production_{eager,graph}.log`、`iter92_production_gpu0_hygiene.log`。
