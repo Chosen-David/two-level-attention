@@ -50,8 +50,15 @@ def qwen3_attn_forward(
     value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
 
     cos, sin = position_embeddings
-    query_states, key_states = apply_rotary_pos_emb(
-        query_states, key_states, cos, sin)
+    if input_shape[0] == 1 and input_shape[1] == 1:
+        # iter89：仅 Qwen3-8B B1 decode 使用 Q/K 单 launch；其他几何在
+        # wrapper 内回退 HF。prefill 与 B>1 始终保持原 apply_rotary_pos_emb。
+        from ..ops.qwen3_rope_triton import qwen3_decode_rope
+        query_states, key_states = qwen3_decode_rope(
+            query_states, key_states, cos, sin, owner=self)
+    else:
+        query_states, key_states = apply_rotary_pos_emb(
+            query_states, key_states, cos, sin)
 
     if input_shape[1] != 1:
         request_id = past_key_values.active_request_id

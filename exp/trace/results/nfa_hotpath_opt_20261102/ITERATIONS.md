@@ -741,3 +741,11 @@
 - 完整生产 128-token：eager steady TPOT 24.480000 ms，相对 Iter 81 独占基线 24.438424 ms 慢 0.17%（噪声量级）；Graph steady TPOT 12.361072 ms，相对 Iter 81 的 12.443976 ms 降低 0.67%（1.0067×）。FA2/NFA 当前为 eager 0.9383×、Graph 1.0190×，均未达到 2×。
 - 生产正确性：微基准逐位通过；iter88 eager/Graph 的 128/128 token 完全一致，且分别与 iter81 参考序列完全一致，无首个分叉点。GPU 旁路日志仅见本轮两个生产 PID。
 - Graph 同卡 ABBA 复验：iter81 A/B=12.413488/12.432272 ms，iter88 A/B=12.352848/12.346640 ms；中位数 12.422880→12.349744 ms，加速 1.005922×（降低 0.5888%），四个 arm 的 128-token 序列全部一致，确认小幅收益可重复。
+
+## Iter 89：Q/K RoPE 单 launch，首次逐位对拍失败
+
+- 修改：仅在 Qwen3-8B B1、seq_len=1 decode 用一次 Triton launch 同时处理 Q/K；两次乘法显式保留 BF16 中间舍入，最终加法写回 BF16。prefill、B>1 和非目标几何回退 HF；输出由各 attention 模块持久持有以覆盖 Graph 生命周期。
+- 静态检查：三个变更文件通过 `py_compile` 与 `git diff --check`；agent 实现阶段未运行 GPU。
+- 首次 GPU 验收：pc40 GPU0，起跑前 used=1 MiB 且无 compute apps，运行真实目标几何 Q=`[1,32,1,128]`、K=`[1,8,1,128]` 的 HF `apply_rotary_pos_emb` 位型对拍。
+- 结果：第 1 组即失败，Q 有 935 个 BF16 元素不同；脚本在首次断言处退出，尚未得到 K 对拍和 `do_bench` 延迟。该臂不满足正确性硬门，不得进入完整生产 TPOT，也不得宣称加速。
+- 原始证据：`iter89_rope_micro.log`、`iter89_rope_micro_gpu0_hygiene.log`。下一步仅定位该舍入/符号语义差异，修复后作为新一轮独立对拍。
