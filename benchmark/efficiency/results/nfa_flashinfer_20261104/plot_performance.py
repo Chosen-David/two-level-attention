@@ -149,74 +149,43 @@ def load_e2e(allow_partial=False):
     return [records[key] for key in sorted(records)], receipts, missing
 
 
-def load_operators(root, allow_partial=False):
-    root = Path(root)
-    records = []
-    receipts = []
-    for length in (32768, 65536, 98304, 131072):
-        for execution in EXECUTIONS:
-            arms = {}
-            for method, abba in (('nfa', 'a1'), ('flashinfer', 'b1'),
-                                 ('flashinfer', 'b2'), ('nfa', 'a2')):
-                path = root / f'niah_multikey_1_s0_{length}_{execution}_{abba}.json'
-                if not path.is_file():
-                    if allow_partial:
-                        continue
-                    raise FileNotFoundError(f'纯算子结果尚未完成: {path}')
-                data = read_json(path)
-                if data.get('schema') != 'nfa-pure-kernel-stages-v1':
-                    raise ValueError(f'{path} schema 不符')
-                if data.get('gpu_hygiene') != 'clean':
-                    raise ValueError(f'{path} 不是 clean')
-                if data['method'] != method or data['execution'] != execution:
-                    raise ValueError(f'{path} arm 身份不符')
-                if data['warmup_steps'] != 3 or data['repeat'] != 5:
-                    raise ValueError(f'{path} warmup/repeat 口径不符')
-                arms[abba] = data
-                receipts.append(source_receipt(path, data))
-            if len(arms) != 4:
-                continue
-            input_sha = {arm['input']['sha256'] for arm in arms.values()}
-            if len(input_sha) != 1:
-                raise ValueError(f'{length} {execution} ABBA 输入 SHA 不一致')
-            stages = {}
-            for method, names, abbas in (
-                    ('nfa', ('l1_ms', 'l2_ms', 'main_attention_ms'), ('a1', 'a2')),
-                    ('flashinfer', ('flashinfer_dense_ms',), ('b1', 'b2'))):
-                for name in names:
-                    arm_medians = [arms[abba]['summary'][name]['median_ms'] for abba in abbas]
-                    stages[name] = statistics.median(arm_medians)
-                    stages[f'{name}_arm_medians_ms'] = arm_medians
-            nfa_total = stages['l1_ms'] + stages['l2_ms'] + stages['main_attention_ms']
-            if nfa_total <= 0 or stages['flashinfer_dense_ms'] <= 0:
-                raise ValueError(f'{length} {execution} 纯算子计时出现非正数')
-            source_identities = {
-                (arm['repo_head'], arm['repo_diff_sha256'])
-                for arm in arms.values()}
-            if len(source_identities) != 1:
-                raise ValueError(f'{length} {execution} ABBA 源码 receipt 不一致')
-            row = {
-                'context_length': length,
-                'execution': execution,
-                **stages,
-                'nfa_operator_total_ms': nfa_total,
-                'flashinfer_over_nfa_operator': stages['flashinfer_dense_ms'] / nfa_total,
-                'nfa_skip': arms['a1']['metadata']['skip'],
-                'input': arms['a1']['input'],
-                'gpu_hygiene': 'clean',
-                'source_paths': [arms[abba]['output'] if 'output' in arms[abba]
-                                 else str(root / f'niah_multikey_1_s0_{length}_{execution}_{abba}.json')
-                                 for abba in ('a1', 'b1', 'b2', 'a2')],
-            }
-            for abba in ('a1', 'a2'):
-                for repeat in arms[abba]['repeats']:
-                    values = repeat['stages']
-                    expected_total = values['l1_ms'] + values['l2_ms'] + values['main_attention_ms']
-                    if not math.isclose(values['nfa_operator_total_ms'], expected_total,
-                                        rel_tol=1e-9, abs_tol=1e-9):
-                        raise ValueError(f'{length} {execution} {abba} NFA 总耗时不是阶段和')
-            records.append(row)
-    return records, receipts
+def load_operators(summary_path, allow_partial=False):
+    """只消费通过 exactly-once coverage 的 v2 汇总，禁止旧 summary 漏项传播。"""
+    summary_path = Path(summary_path)
+    data = read_json(summary_path)
+    if data.get('schema') != 'nfa-pure-kernel-abba-summary-v2':
+        raise ValueError(f'{summary_path} 必须使用 v2 更正汇总')
+    accounting = data.get('accounting', {})
+    if 'exactly once' not in accounting.get('coverage', ''):
+        raise ValueError(f'{summary_path} 缺少 exactly-once coverage 证明')
+    records = data['records']
+    expected = {(length, execution) for length in (32768, 65536, 98304, 131072)
+                for execution in EXECUTIONS}
+    present = {(row['context_length'], row['execution']) for row in records}
+    if len(present) != len(records):
+        raise ValueError(f'{summary_path} 纯算子配置重复')
+    missing = sorted(expected - present)
+    if missing and not allow_partial:
+        raise ValueError(f'纯算子配置不完整: {missing}')
+    for row in records:
+        if row.get('gpu_hygiene') != 'clean':
+            raise ValueError(f'{summary_path} 含非 clean 臂')
+        if row['nfa_operator_total_ms'] <= 0 or row['flashinfer_dense_ms'] <= 0:
+            raise ValueError(f'{summary_path} 纯算子计时出现非正数')
+        if not math.isclose(
+                row['flashinfer_over_nfa_operator'],
+                row['flashinfer_dense_ms'] / row['nfa_operator_total_ms'],
+                rel_tol=1e-12):
+            raise ValueError(f'{summary_path} FI/NFA 与原始计时不一致')
+    metadata = {
+        'task': data.get('task'),
+        'sample_index': data.get('sample_index'),
+        'gate_epsilon': data.get('gate_epsilon'),
+        'accounting': accounting,
+        'source': data.get('source'),
+        'source_schemas': data.get('source_schemas'),
+    }
+    return records, [source_receipt(summary_path, data)], metadata
 
 
 def style_axis(ax):
@@ -313,7 +282,8 @@ def operator_figure(rows, execution, output_dir, index):
     l1 = np.array([row['l1_ms'] for row in selected])
     l2 = np.array([row['l2_ms'] for row in selected])
     attention = np.array([row['main_attention_ms'] for row in selected])
-    total = l1 + l2 + attention
+    stacked = l1 + l2 + attention
+    total = np.array([row['nfa_operator_total_ms'] for row in selected])
     fi = np.array([row['flashinfer_dense_ms'] for row in selected])
     left = x - width / 2
     ax.bar(left, l1, width, color=COLORS['l1'], edgecolor=COLORS['nfa_edge'], linewidth=0.75)
@@ -324,12 +294,13 @@ def operator_figure(rows, execution, output_dir, index):
     fi_bars = ax.bar(x + width / 2, fi, width, color=COLORS['flashinfer'],
                      edgecolor=COLORS['flashinfer_edge'], linewidth=0.8)
     for i, value in enumerate(total):
-        ax.text(left[i], value * 1.018, f'{value:.2f}', ha='center', va='bottom', fontsize=7)
+        ax.text(left[i], stacked[i] * 1.018, f'{value:.2f}',
+                ha='center', va='bottom', fontsize=7)
     ax.bar_label(fi_bars, fmt='%.2f', padding=3, fontsize=7)
     ax.set_xticks(x, [f"{row['context_length'] // 1024}K" for row in selected])
     ax.set_xlabel('Input context length')
     ax.set_ylabel('Pure GPU kernel time (ms/decode step)')
-    ax.set_ylim(0, max(total.max(), fi.max()) * 1.23)
+    ax.set_ylim(0, max(stacked.max(), total.max(), fi.max()) * 1.23)
     handles = [
         Patch(facecolor=COLORS['l1'], edgecolor=COLORS['nfa_edge'], label='NFA L1'),
         Patch(facecolor=COLORS['l2'], edgecolor=COLORS['nfa_edge'], label='NFA L2'),
@@ -344,7 +315,8 @@ def operator_figure(rows, execution, output_dir, index):
     save_figure(fig, stem, output_dir)
     return {
         'execution': execution,
-        'nfa_total_definition': 'sum of the two-arm medians of L1, L2 and main Attention',
+        'nfa_total_definition': 'median across repeats of per-repeat L1+L2+Attention sums, '
+                                'then median of the two NFA arm medians; not a sum of stage medians',
         'configurations': selected,
     }
 
@@ -352,15 +324,18 @@ def operator_figure(rows, execution, output_dir, index):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=('e2e', 'operators', 'all'), default='all')
-    parser.add_argument('--kernel-root', default=RESULT_ROOT / 'operators' / 'natural')
-    parser.add_argument('--output-dir', default=RESULT_ROOT / 'figures')
+    parser.add_argument(
+        '--kernel-summary',
+        default=RESULT_ROOT / 'operators' / 'niah_multikey_1_summary_v2.json',
+        help='exactly-once 口径的 nfa-pure-kernel-abba-summary-v2 JSON')
+    parser.add_argument('--output-dir', default=RESULT_ROOT / 'figures_v2')
     parser.add_argument('--allow-partial', action='store_true',
                         help='仅用于明确隔离的预览；正式交付不得使用')
     args = parser.parse_args()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     stats = {
-        'schema': 'nfa-flashinfer-performance-figures-v1',
+        'schema': 'nfa-flashinfer-performance-figures-v2',
         'partial_preview': args.allow_partial,
         'font_family': FONT_FAMILY,
         'color_semantics': {
@@ -393,8 +368,9 @@ def main():
                     stats['figures'][f'E2E-{index:02d}'] = result
                 index += 1
     if args.mode in ('operators', 'all'):
-        rows, receipts = load_operators(args.kernel_root, args.allow_partial)
+        rows, receipts, metadata = load_operators(args.kernel_summary, args.allow_partial)
         stats['operators'] = {
+            **metadata,
             'scope': 'pure CUDA device kernels; 3 warmup + 5 profiled repeats per arm; '
                      'ABBA arm medians; no host or other model kernels',
             'sources': receipts,
