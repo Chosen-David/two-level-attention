@@ -107,10 +107,12 @@ def _load_model(args, max_new_tokens):
     verify_runtime_rope(model)
     if args.method == 'nfa':
         patch_args = nfa_args()
+        # 两种执行必须使用同一逐位等价的 decode 融合链；仅 Graph 开启会在
+        # 长生成中累积数值差异并改变 argmax，破坏 eager/Graph token 身份。
         patched = register_patch(
             model, patch_args, resolve_treatment_snapshot(patch_args),
-            rmsnorm_decode=args.execution == 'graph',
-            mlp_silu_decode=args.execution == 'graph')
+            rmsnorm_decode=True,
+            mlp_silu_decode=True)
         if patched != config.num_hidden_layers:
             raise RuntimeError(f'NFA patched {patched}/{config.num_hidden_layers} layers')
     elif args.method == 'flashinfer':
