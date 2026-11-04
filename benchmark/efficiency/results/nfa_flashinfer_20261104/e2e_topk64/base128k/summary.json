@@ -1,0 +1,1129 @@
+{
+  "timestamp": "2026-11-05T01:48:04",
+  "benchmark_scope": "actual Qwen3-8B weights, native-ruler prompt, complete decode step; ABBA independent subprocesses (two measured repeats per method); first 3 decode steps excluded from steady TPOT; TPOT excludes prefill; throughput is per-request tokens/s",
+  "arguments": {
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+    "task": "niah_multikey_1",
+    "input_provenance": "native-ruler",
+    "context_length": 131072,
+    "batch_size": [
+      1
+    ],
+    "execution": [
+      "eager",
+      "graph"
+    ],
+    "sample_index": 0,
+    "max_new_tokens": 512,
+    "warmup_steps": 3,
+    "visible_len": 8192,
+    "gate_epsilon": 0.05,
+    "methods": [
+      "nfa",
+      "flashinfer"
+    ],
+    "gpu_id": 0,
+    "output_dir": "/tmp/nfa_topk64_e2e/base128k/arms",
+    "output": "/tmp/nfa_topk64_e2e/base128k/summary.json"
+  },
+  "source": {
+    "head": "62d39d8de61fe5a96d728a298148de554a00735e",
+    "diff_path": "/tmp/nfa_topk64_e2e/base128k/arms/source.diff",
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "model": {
+    "path": "/home/wangyuanshuo02/Qwen3-8B",
+    "metadata_sha256": {
+      "config.json": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+      "model.safetensors.index.json": "f9fdbcb91c23971c13ec5d5f2573d2349e8f61f2f049371ec699281748fdb1bc"
+    }
+  },
+  "input": {
+    "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/131072/niah_multikey_1.jsonl",
+    "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 130986,
+    "provenance": "native-ruler",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "gpu": {
+    "id": 0,
+    "name": "NVIDIA H20-3e",
+    "driver_version": "550.127.08"
+  },
+  "software": {
+    "python": "3.11.12 (main, Apr  9 2025, 04:04:00) [Clang 20.1.0 ]",
+    "executable": "/home/wangyuanshuo02/two-level-attention/.venv/bin/python",
+    "torch": "2.8.0+cu128",
+    "transformers": "4.56.2"
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "configs": {
+      "B1/eager": {
+        "status": "clean",
+        "attempt": 0,
+        "log": "/tmp/nfa_topk64_e2e/base128k/arms/gpu0_b1_eager_attempt0_hygiene.jsonl",
+        "pollution_samples": 0
+      },
+      "B1/graph": {
+        "status": "clean",
+        "attempt": 0,
+        "log": "/tmp/nfa_topk64_e2e/base128k/arms/gpu0_b1_graph_attempt0_hygiene.jsonl",
+        "pollution_samples": 0
+      }
+    }
+  },
+  "runs": {
+    "B1/eager": {
+      "nfa_a": {
+        "json": "/tmp/nfa_topk64_e2e/base128k/arms/nfa_a_ruler128k_b1_eager_attempt0.json",
+        "log": "/tmp/nfa_topk64_e2e/base128k/arms/nfa_a_ruler128k_b1_eager_attempt0.log",
+        "pid": 2129460
+      },
+      "flashinfer_a": {
+        "json": "/tmp/nfa_topk64_e2e/base128k/arms/flashinfer_a_ruler128k_b1_eager_attempt0.json",
+        "log": "/tmp/nfa_topk64_e2e/base128k/arms/flashinfer_a_ruler128k_b1_eager_attempt0.log",
+        "pid": 2130277
+      },
+      "flashinfer_b": {
+        "json": "/tmp/nfa_topk64_e2e/base128k/arms/flashinfer_b_ruler128k_b1_eager_attempt0.json",
+        "log": "/tmp/nfa_topk64_e2e/base128k/arms/flashinfer_b_ruler128k_b1_eager_attempt0.log",
+        "pid": 2131917
+      },
+      "nfa_b": {
+        "json": "/tmp/nfa_topk64_e2e/base128k/arms/nfa_b_ruler128k_b1_eager_attempt0.json",
+        "log": "/tmp/nfa_topk64_e2e/base128k/arms/nfa_b_ruler128k_b1_eager_attempt0.log",
+        "pid": 2133392
+      }
+    },
+    "B1/graph": {
+      "nfa_a": {
+        "json": "/tmp/nfa_topk64_e2e/base128k/arms/nfa_a_ruler128k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_topk64_e2e/base128k/arms/nfa_a_ruler128k_b1_graph_attempt0.log",
+        "pid": 2134449
+      },
+      "flashinfer_a": {
+        "json": "/tmp/nfa_topk64_e2e/base128k/arms/flashinfer_a_ruler128k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_topk64_e2e/base128k/arms/flashinfer_a_ruler128k_b1_graph_attempt0.log",
+        "pid": 2134935
+      },
+      "flashinfer_b": {
+        "json": "/tmp/nfa_topk64_e2e/base128k/arms/flashinfer_b_ruler128k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_topk64_e2e/base128k/arms/flashinfer_b_ruler128k_b1_graph_attempt0.log",
+        "pid": 2135488
+      },
+      "nfa_b": {
+        "json": "/tmp/nfa_topk64_e2e/base128k/arms/nfa_b_ruler128k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_topk64_e2e/base128k/arms/nfa_b_ruler128k_b1_graph_attempt0.log",
+        "pid": 2136151
+      }
+    }
+  },
+  "comparisons": [
+    {
+      "batch_size": 1,
+      "execution": "eager",
+      "candidate_method": "nfa",
+      "baseline_method": "flashinfer",
+      "nfa_repeat_token_identity": true,
+      "flashinfer_repeat_token_identity": true,
+      "nfa_flashinfer_token_identity": false,
+      "nfa_flashinfer_first_divergence": {
+        "batch": 0,
+        "token": 31
+      },
+      "nfa_steady_tpot_ms": [
+        31.086112022399902,
+        30.80247974395752
+      ],
+      "flashinfer_steady_tpot_ms": [
+        20.60190486907959,
+        20.78017520904541
+      ],
+      "nfa_steady_tpot_median_ms": 30.94429588317871,
+      "flashinfer_steady_tpot_median_ms": 20.6910400390625,
+      "nfa_throughput_tokens_per_second": 32.31613360262623,
+      "flashinfer_throughput_tokens_per_second": 48.33009834750237,
+      "flashinfer_over_nfa_tpot": 0.6686544142796323,
+      "nfa_prefill_seconds": [
+        77.74877738207579,
+        77.31691810488701
+      ],
+      "flashinfer_prefill_seconds": [
+        70.83214373886585,
+        70.9141925945878
+      ],
+      "nfa_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 13,
+          "both": 0
+        }
+      },
+      "nfa_skip_policy_layers": {
+        "0": {
+          "far": [],
+          "near": [
+            7,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34
+          ]
+        }
+      },
+      "nfa_skip_decode_receipt": {
+        "nfa_decode_steps": 511,
+        "request_ids": [
+          0
+        ],
+        "layer_major_final_visible_lens": [
+          [
+            [
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024
+            ]
+          ],
+          [
+            [
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024
+            ]
+          ],
+          [
+            [
+              1023,
+              1024,
+              1024,
+              1024,
+              1023,
+              1024,
+              1024,
+              1023
+            ]
+          ],
+          [
+            [
+              1024,
+              1021,
+              1020,
+              1022,
+              1023,
+              1020,
+              1020,
+              1024
+            ]
+          ],
+          [
+            [
+              1022,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1024,
+              1024
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1024,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1024,
+              1024,
+              1024,
+              1024,
+              1023,
+              1024,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1020,
+              1022,
+              1023,
+              1021,
+              1022,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1021,
+              1023,
+              1021,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1021,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1022,
+              1022,
+              1022,
+              1020,
+              1022
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1020,
+              1022
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1020,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1022,
+              1022,
+              1023,
+              1022,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1021,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1021,
+              1023,
+              1023,
+              1023,
+              1021
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1021,
+              1020,
+              1023,
+              1023,
+              1021,
+              1022
+            ]
+          ],
+          [
+            [
+              1022,
+              1023,
+              1021,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1022,
+              1023,
+              1023,
+              1023,
+              1023,
+              1022,
+              1023,
+              1022
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1022,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1022,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1020,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1020,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1020,
+              1021,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1022,
+              1022,
+              1023,
+              1023,
+              1023,
+              1023,
+              1020,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1022,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "batch_size": 1,
+      "execution": "graph",
+      "candidate_method": "nfa",
+      "baseline_method": "flashinfer",
+      "nfa_repeat_token_identity": true,
+      "flashinfer_repeat_token_identity": true,
+      "nfa_flashinfer_token_identity": false,
+      "nfa_flashinfer_first_divergence": {
+        "batch": 0,
+        "token": 31
+      },
+      "nfa_steady_tpot_ms": [
+        26.196303367614746,
+        26.19152069091797
+      ],
+      "flashinfer_steady_tpot_ms": [
+        14.056096076965332,
+        14.044800281524658
+      ],
+      "nfa_steady_tpot_median_ms": 26.193912029266357,
+      "flashinfer_steady_tpot_median_ms": 14.050448179244995,
+      "nfa_throughput_tokens_per_second": 38.17680989699835,
+      "flashinfer_throughput_tokens_per_second": 71.17210691379778,
+      "flashinfer_over_nfa_tpot": 0.5364012891066627,
+      "nfa_prefill_seconds": [
+        77.3032051473856,
+        77.41645944863558
+      ],
+      "flashinfer_prefill_seconds": [
+        71.35597011446953,
+        71.39043112844229
+      ],
+      "nfa_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 13,
+          "both": 0
+        }
+      },
+      "nfa_skip_policy_layers": {
+        "0": {
+          "far": [],
+          "near": [
+            7,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34
+          ]
+        }
+      },
+      "nfa_skip_decode_receipt": {
+        "nfa_decode_steps": 511,
+        "request_ids": [
+          0
+        ],
+        "layer_major_final_visible_lens": [
+          [
+            [
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024
+            ]
+          ],
+          [
+            [
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024,
+              1024
+            ]
+          ],
+          [
+            [
+              1023,
+              1024,
+              1024,
+              1024,
+              1023,
+              1024,
+              1024,
+              1023
+            ]
+          ],
+          [
+            [
+              1024,
+              1021,
+              1022,
+              1023,
+              1023,
+              1020,
+              1024,
+              1024
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1024,
+              1023,
+              1024,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1024,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1024,
+              1024,
+              1024,
+              1024,
+              1023,
+              1024,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1020,
+              1022,
+              1022,
+              1022,
+              1022,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1021,
+              1023,
+              1023,
+              1023,
+              1022
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1022,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1021,
+              1021,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1022,
+              1023,
+              1020,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1021,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1022,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1022
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1022,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1022,
+              1023,
+              1023,
+              1023,
+              1022,
+              1023
+            ]
+          ],
+          [
+            [
+              1021,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1022,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1022,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1021,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1020,
+              1021,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1021,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1020,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ],
+          [
+            [
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

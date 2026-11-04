@@ -227,28 +227,16 @@ def test_first_decode_seed_union_is_deduplicated_and_consumed_once():
     assert len(first[3]) == GEOMETRY.sink + GEOMETRY.window + 2
 
     # 与 GraphRunner 一致：整步所有层完成后才统一消费 seed。
+    # 当前契约为全量 KV 驻留；消费 seed 只改变可见集，不释放物理页。
     global_free_before = len(cache.layers[0].free_ids)
-    seeded_totals = {
-        rid: (len(cache.states[rid].block_tables[0])
-              + len(cache.states[rid].free_phys_slots_by_layer[0]))
-        for rid in req_ids
-    }
+    block_tables_before = {
+        rid: dict(cache.states[rid].block_tables[0]) for rid in req_ids}
     mark_first_decode_seeded(cache, req_ids)
     cache.commit_step()
     torch.cuda.synchronize()
-    cache._reclaim_pending_free()
-    # 首步结束后 seed-only 页及重复计算的临时余量必须回到全局池。
-    expected_release = sum(
-        seeded_totals[rid]-cache.states[rid].max_resident_pages_by_layer[0]
-        for rid in req_ids)
-    assert expected_release >= 4
-    assert len(cache.layers[0].free_ids) == global_free_before + expected_release
+    assert len(cache.layers[0].free_ids) == global_free_before
     for rid in req_ids:
-        state = cache.states[rid]
-        total = (len(state.block_tables[0])
-                 + len(state.free_phys_slots_by_layer[0]))
-        assert total == state.max_resident_pages_by_layer[0]
-        assert total < seeded_totals[rid]
+        assert cache.states[rid].block_tables[0] == block_tables_before[rid]
     _plan_and_write(cache, req_ids, generator)
     select_topk_for_layer_batched(
         cache, 0, req_ids, query, attention=attention)
@@ -261,7 +249,7 @@ def test_first_decode_seed_union_is_deduplicated_and_consumed_once():
     assert cache.first_decode_seeded_buf[req_ids].tolist() == [1, 1]
 
 
-def test_near_skip_reentry_rebuilds_stats_and_slot_reuse_invalidates():
+def test_near_skip_reentry_incremental_stats_match_rebuild_and_slot_reuse_invalidates():
     incremental, attention, incremental_generator = _make_cache(
         [2], [504], [(False, True)], k1=2, near_pages=0)
     reference, reference_attention, reference_generator = _make_cache(
@@ -275,8 +263,9 @@ def test_near_skip_reentry_rebuilds_stats_and_slot_reuse_invalidates():
         _plan_and_write(incremental, [2], incremental_generator)
         _plan_and_write(reference, [2], reference_generator)
         if step == 7:
-            # 长度 512 时逻辑页 4 从 near 进入 far，必须使旧统计失效。
-            assert int(incremental._nfa_page_stats_lengths[0, 2]) == 0
+            # 长度 512 时逻辑页 4 从 near 进入 far。统计内容不依赖区域归属，
+            # 应继续走增量路径，并由下方全量重建 reference 验证数值等价。
+            assert int(incremental._nfa_page_stats_lengths[0, 2]) == 511
         if hasattr(reference, '_nfa_page_stats_lengths'):
             reference._nfa_page_stats_lengths.zero_()
         select_topk_for_layer_batched(
@@ -303,10 +292,8 @@ def test_near_skip_reentry_rebuilds_stats_and_slot_reuse_invalidates():
         incremental._nfa_page_stats_persistent.values()))
     reference_buffers = next(iter(
         reference._nfa_page_stats_persistent.values()))
-    resident_ranges = incremental._resident_page_ranges_for_layer(
-        incremental.states[2], 0, incremental.states[2].logical_length)
-    resident_pages = incremental._pages_in_ranges(resident_ranges)
-    for logical_page in resident_pages:
+    # 全量 KV 驻留下，对请求的全部逻辑页比较增量与全量重建统计。
+    for logical_page in incremental.states[2].block_tables[0]:
         for actual, expected in zip(incremental_buffers, reference_buffers):
             torch.testing.assert_close(
                 actual[:, 2:3, logical_page], expected[:, 2:3, logical_page],
@@ -314,7 +301,6 @@ def test_near_skip_reentry_rebuilds_stats_and_slot_reuse_invalidates():
 
     incremental.remove_request(2)
     torch.cuda.synchronize()
-    incremental._reclaim_pending_free()
     incremental.add_request(2)
     keys = torch.randn(
         1, 1, 448, HEAD_DIM, generator=generator,
@@ -600,7 +586,7 @@ def test_per_kv_group_selection_and_attention_consumer(split_kv):
     torch.testing.assert_close(actual, expected, atol=0.03, rtol=0.03)
 
 
-def test_radix_filtered_topk_bit_exact_with_quota_and_ties():
+def test_tiled_filtered_topk_bit_exact_with_quota_and_ties():
     m, hkv, r, width, capacity = 3, 2, 8320, 1024, 16384
     generator = torch.Generator(device='cuda').manual_seed(20261103)
     cand = torch.stack([
@@ -625,7 +611,20 @@ def test_radix_filtered_topk_bit_exact_with_quota_and_ties():
         logits, cand, lower, upper, quota, reference_out, reference_count, r,
         R_PAD=triton.next_power_of_2(max(r, width)), S=capacity, K=width,
         SINK=4, META_GROUP=hkv, TOKEN_BITS=16, num_warps=8)
+    # 当前 <64K dispatcher 消费 fine-score kernel 生成的 int32 packed key，
+    # mono reference 仍直接读取 BF16 logits；二者必须保持逐位同构。
+    bits = logits.view(torch.int16).to(torch.int32) & 0xFFFF
+    negative = (bits & 0x8000) != 0
+    ordered = torch.where(negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
+    score = logits.float()
+    good = (
+        (cand >= lower[:, None, None]) & (cand < upper[:, None, None])
+        & (quota[:, None, None] > 0) & (score == score)
+        & (score != float('-inf')))
+    packed = torch.where(
+        good, (ordered << 16) + capacity - cand.to(torch.int32),
+        torch.full((), -32768 << 16, dtype=torch.int32, device='cuda'))
     actual = selector_ops._nfa_filtered_topk(
-        logits, cand, lower, upper, quota, capacity, width, sink=4)
+        packed.contiguous(), cand, lower, upper, quota, capacity, width, sink=4)
     torch.testing.assert_close(actual.indices, reference_out, rtol=0, atol=0)
     torch.testing.assert_close(actual.counts, reference_count, rtol=0, atol=0)
