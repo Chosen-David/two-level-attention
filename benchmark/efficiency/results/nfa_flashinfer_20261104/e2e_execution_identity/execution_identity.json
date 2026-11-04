@@ -1,0 +1,484 @@
+{
+  "timestamp_utc": "2026-11-04T22:23:20.237254+00:00",
+  "scope": "Qwen3-8B native RULER niah_multikey_1 sample 0; complete NFA decode; 32K/64K/128K B1/B4; 512 generated tokens per request",
+  "source": {
+    "pre_fix_head": "2c16b6754ba60f2892f7aee449283b63be267b46",
+    "diff_path": "fix32k_abba/arms/source.diff",
+    "diff_sha256": "0607b6f039035872ac6047ffc6df50519bb4262d13f3dc3e34c83e4c5a0d805b",
+    "diff_matches_validated_worktree": true,
+    "fix": {
+      "rmsnorm_decode": true,
+      "mlp_silu_decode": true,
+      "applies_to": [
+        "eager",
+        "graph"
+      ]
+    }
+  },
+  "root_cause": "Only Graph registered the Triton RMSNorm and MLP SiLU+mul decode chain; eager used the HF native chain. Unifying fine-score num_warps alone did not remove the token divergence.",
+  "single_variable_ablation_32k_b1_64_tokens": {
+    "base_eager": {
+      "path": "diagnostics/nfa_eg_diag_base_eager.json",
+      "tokens": 64,
+      "steady_tpot_ms": 24.28494358062744,
+      "generated_token_ids_sha256": "23e26f1086fd95b13f65c6a18be87126c853d18ce12e24e6bfd0425d5989b696"
+    },
+    "base_graph": {
+      "path": "diagnostics/nfa_eg_diag_base_graph.json",
+      "tokens": 64,
+      "steady_tpot_ms": 9.88256025314331,
+      "generated_token_ids_sha256": "94b1c74b7368d0001e6610f0ad44abe121e9cb5c103444ddd5eb6ec203b1710c"
+    },
+    "warps4_graph": {
+      "path": "diagnostics/nfa_eg_diag_warps4_graph.json",
+      "tokens": 64,
+      "steady_tpot_ms": 9.956464290618896,
+      "generated_token_ids_sha256": "94b1c74b7368d0001e6610f0ad44abe121e9cb5c103444ddd5eb6ec203b1710c",
+      "matches_reference_all_64_tokens": true
+    },
+    "fused_eager": {
+      "path": "diagnostics/nfa_eg_diag_fused_eager.json",
+      "tokens": 64,
+      "steady_tpot_ms": 26.146095275878906,
+      "generated_token_ids_sha256": "94b1c74b7368d0001e6610f0ad44abe121e9cb5c103444ddd5eb6ec203b1710c",
+      "matches_reference_all_64_tokens": true
+    },
+    "native_graph": {
+      "path": "diagnostics/nfa_eg_diag_native_graph.json",
+      "tokens": 64,
+      "steady_tpot_ms": 11.308512210845947,
+      "generated_token_ids_sha256": "23e26f1086fd95b13f65c6a18be87126c853d18ce12e24e6bfd0425d5989b696",
+      "matches_reference_all_64_tokens": true
+    },
+    "base_eager_graph_first_divergence": {
+      "batch": 0,
+      "token": 39,
+      "eager": 1212,
+      "graph": 1380
+    },
+    "warps4_graph_vs_base_eager_first_divergence": {
+      "batch": 0,
+      "token": 39,
+      "eager": 1212,
+      "graph": 1380
+    }
+  },
+  "elementwise_random_input_bitwise_check": {
+    "path": "diagnostics/nfa_eg_diag_ops.json",
+    "script": "diagnostics/check_nfa_eg_ops.py",
+    "checks": 28,
+    "all_equal": true,
+    "note": "Four random BF16 inputs per shape; supporting evidence, not an all-input mathematical proof."
+  },
+  "formal_32k_b1_abba": {
+    "summary_path": "fix32k_abba/summary.json",
+    "gpu_hygiene": {
+      "status": "clean",
+      "configs": {
+        "B1/eager": {
+          "status": "clean",
+          "attempt": 0,
+          "log": "/tmp/nfa_eg_fix_e2e/fix32k/arms/gpu0_b1_eager_attempt0_hygiene.jsonl",
+          "pollution_samples": 0
+        },
+        "B1/graph": {
+          "status": "clean",
+          "attempt": 0,
+          "log": "/tmp/nfa_eg_fix_e2e/fix32k/arms/gpu0_b1_graph_attempt0_hygiene.jsonl",
+          "pollution_samples": 0
+        }
+      }
+    },
+    "comparisons": [
+      {
+        "batch_size": 1,
+        "execution": "eager",
+        "nfa_repeat_token_identity": true,
+        "nfa_steady_tpot_median_ms": 26.330528259277344,
+        "flashinfer_steady_tpot_median_ms": 20.81121587753296,
+        "flashinfer_over_nfa_tpot": 0.7903835301975113
+      },
+      {
+        "batch_size": 1,
+        "execution": "graph",
+        "nfa_repeat_token_identity": true,
+        "nfa_steady_tpot_median_ms": 9.834887981414795,
+        "flashinfer_steady_tpot_median_ms": 9.848592042922974,
+        "flashinfer_over_nfa_tpot": 1.0013934130753777
+      }
+    ]
+  },
+  "cases": [
+    {
+      "context_length": 32768,
+      "batch_size": 1,
+      "measurement_role": "formal ABBA latency and token identity",
+      "eager_paths": [
+        "fix32k_abba/arms/nfa_a_ruler32k_b1_eager_attempt0.json",
+        "fix32k_abba/arms/nfa_b_ruler32k_b1_eager_attempt0.json"
+      ],
+      "graph_paths": [
+        "fix32k_abba/arms/nfa_a_ruler32k_b1_graph_attempt0.json",
+        "fix32k_abba/arms/nfa_b_ruler32k_b1_graph_attempt0.json"
+      ],
+      "input": {
+        "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_1.jsonl",
+        "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 32621,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "requests": 1,
+      "tokens_per_request": 512,
+      "eager_graph_identical": true,
+      "eager_repeat_identical": true,
+      "graph_repeat_identical": true,
+      "graph_unchanged_vs_pre_fix": true,
+      "pre_fix_graph_paths": [
+        "../e2e_topk64/opt32k/arms/nfa_a_ruler32k_b1_graph_attempt0.json",
+        "../e2e_topk64/opt32k/arms/nfa_b_ruler32k_b1_graph_attempt0.json"
+      ],
+      "skip_policy_counts": {
+        "0": {
+          "far": 2,
+          "near": 0,
+          "both": 0
+        }
+      },
+      "diagnostic_steady_tpot_ms": {
+        "eager": 26.310304641723633,
+        "graph": 9.8155837059021
+      },
+      "run_gpu_hygiene": {
+        "status": "clean",
+        "configs": {
+          "B1/eager": {
+            "status": "clean",
+            "attempt": 0,
+            "log": "/tmp/nfa_eg_fix_e2e/fix32k/arms/gpu0_b1_eager_attempt0_hygiene.jsonl",
+            "pollution_samples": 0
+          },
+          "B1/graph": {
+            "status": "clean",
+            "attempt": 0,
+            "log": "/tmp/nfa_eg_fix_e2e/fix32k/arms/gpu0_b1_graph_attempt0_hygiene.jsonl",
+            "pollution_samples": 0
+          }
+        }
+      }
+    },
+    {
+      "context_length": 32768,
+      "batch_size": 4,
+      "measurement_role": "direct run; correctness only, not hygiene-clean performance evidence",
+      "eager_paths": [
+        "arms/nfa_eg_fix_32k_b4_eager.json"
+      ],
+      "graph_paths": [
+        "arms/nfa_eg_fix_32k_b4_graph.json"
+      ],
+      "input": {
+        "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_1.jsonl",
+        "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 32621,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "requests": 4,
+      "tokens_per_request": 512,
+      "eager_graph_identical": true,
+      "eager_repeat_identical": null,
+      "graph_repeat_identical": null,
+      "graph_unchanged_vs_pre_fix": true,
+      "pre_fix_graph_paths": [
+        "../e2e_topk64/opt32k_b24/arms/nfa_a_ruler32k_b4_graph_attempt0.json",
+        "../e2e_topk64/opt32k_b24/arms/nfa_b_ruler32k_b4_graph_attempt0.json"
+      ],
+      "skip_policy_counts": {
+        "0": {
+          "far": 2,
+          "near": 0,
+          "both": 0
+        },
+        "1": {
+          "far": 2,
+          "near": 0,
+          "both": 0
+        },
+        "2": {
+          "far": 2,
+          "near": 0,
+          "both": 0
+        },
+        "3": {
+          "far": 2,
+          "near": 0,
+          "both": 0
+        }
+      },
+      "diagnostic_steady_tpot_ms": {
+        "eager": 28.191871643066406,
+        "graph": 13.656400203704834
+      },
+      "run_gpu_hygiene": {
+        "status": "requires external process monitor"
+      }
+    },
+    {
+      "context_length": 65536,
+      "batch_size": 1,
+      "measurement_role": "direct run; correctness only, not hygiene-clean performance evidence",
+      "eager_paths": [
+        "arms/nfa_eg_fix_64k_eager.json"
+      ],
+      "graph_paths": [
+        "arms/nfa_eg_fix_64k_graph.json"
+      ],
+      "input": {
+        "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+        "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 65198,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "requests": 1,
+      "tokens_per_request": 512,
+      "eager_graph_identical": true,
+      "eager_repeat_identical": null,
+      "graph_repeat_identical": null,
+      "graph_unchanged_vs_pre_fix": true,
+      "pre_fix_graph_paths": [
+        "../e2e_topk64/opt64k/arms/nfa_a_ruler64k_b1_graph_attempt0.json",
+        "../e2e_topk64/opt64k/arms/nfa_b_ruler64k_b1_graph_attempt0.json"
+      ],
+      "skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      },
+      "diagnostic_steady_tpot_ms": {
+        "eager": 26.243247985839844,
+        "graph": 10.70527982711792
+      },
+      "run_gpu_hygiene": {
+        "status": "requires external process monitor"
+      }
+    },
+    {
+      "context_length": 65536,
+      "batch_size": 4,
+      "measurement_role": "direct run; correctness only, not hygiene-clean performance evidence",
+      "eager_paths": [
+        "arms/nfa_eg_fix_64k_b4_eager.json"
+      ],
+      "graph_paths": [
+        "arms/nfa_eg_fix_64k_b4_graph.json"
+      ],
+      "input": {
+        "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+        "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 65198,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "requests": 4,
+      "tokens_per_request": 512,
+      "eager_graph_identical": true,
+      "eager_repeat_identical": null,
+      "graph_repeat_identical": null,
+      "graph_unchanged_vs_pre_fix": true,
+      "pre_fix_graph_paths": [
+        "../e2e_topk64/opt64k_b24/arms/nfa_a_ruler64k_b4_graph_attempt0.json",
+        "../e2e_topk64/opt64k_b24/arms/nfa_b_ruler64k_b4_graph_attempt0.json"
+      ],
+      "skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "1": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "2": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "3": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      },
+      "diagnostic_steady_tpot_ms": {
+        "eager": 28.531920433044434,
+        "graph": 15.398831844329834
+      },
+      "run_gpu_hygiene": {
+        "status": "requires external process monitor"
+      }
+    },
+    {
+      "context_length": 131072,
+      "batch_size": 1,
+      "measurement_role": "direct run; correctness only, not hygiene-clean performance evidence",
+      "eager_paths": [
+        "arms/nfa_eg_fix_128k_eager.json"
+      ],
+      "graph_paths": [
+        "arms/nfa_eg_fix_128k_graph.json"
+      ],
+      "input": {
+        "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/131072/niah_multikey_1.jsonl",
+        "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 130986,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "requests": 1,
+      "tokens_per_request": 512,
+      "eager_graph_identical": true,
+      "eager_repeat_identical": null,
+      "graph_repeat_identical": null,
+      "graph_unchanged_vs_pre_fix": true,
+      "pre_fix_graph_paths": [
+        "../e2e_topk64/opt128k/arms/nfa_a_ruler128k_b1_graph_attempt0.json",
+        "../e2e_topk64/opt128k/arms/nfa_b_ruler128k_b1_graph_attempt0.json"
+      ],
+      "skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 13,
+          "both": 0
+        }
+      },
+      "diagnostic_steady_tpot_ms": {
+        "eager": 26.58739185333252,
+        "graph": 12.094703674316406
+      },
+      "run_gpu_hygiene": {
+        "status": "requires external process monitor"
+      }
+    },
+    {
+      "context_length": 131072,
+      "batch_size": 4,
+      "measurement_role": "direct run; correctness only, not hygiene-clean performance evidence",
+      "eager_paths": [
+        "arms/nfa_eg_fix_128k_b4_eager.json"
+      ],
+      "graph_paths": [
+        "arms/nfa_eg_fix_128k_b4_graph.json"
+      ],
+      "input": {
+        "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/131072/niah_multikey_1.jsonl",
+        "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 130986,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "requests": 4,
+      "tokens_per_request": 512,
+      "eager_graph_identical": true,
+      "eager_repeat_identical": null,
+      "graph_repeat_identical": null,
+      "graph_unchanged_vs_pre_fix": true,
+      "pre_fix_graph_paths": [
+        "../e2e_topk64/opt128k_b24/arms/nfa_a_ruler128k_b4_graph_attempt0.json",
+        "../e2e_topk64/opt128k_b24/arms/nfa_b_ruler128k_b4_graph_attempt0.json"
+      ],
+      "skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 13,
+          "both": 0
+        },
+        "1": {
+          "far": 0,
+          "near": 13,
+          "both": 0
+        },
+        "2": {
+          "far": 0,
+          "near": 13,
+          "both": 0
+        },
+        "3": {
+          "far": 0,
+          "near": 13,
+          "both": 0
+        }
+      },
+      "diagnostic_steady_tpot_ms": {
+        "eager": 29.161680221557617,
+        "graph": 16.725055694580078
+      },
+      "run_gpu_hygiene": {
+        "status": "requires external process monitor"
+      }
+    }
+  ],
+  "all_b1_b4_execution_identity_pass": true,
+  "all_b1_b4_graph_unchanged_pass": true,
+  "limits": [
+    "Direct runs outside fix32k_abba are correctness evidence only; their JSON requires an external process monitor and is not formal clean TPOT evidence.",
+    "B2 cross-execution generation was not rerun in this fix campaign; B1/B4 results are not presented as new B2 measurements.",
+    "NFA versus FlashInfer token divergence is a separate sparse-approximation result and is not hidden by these NFA execution-identity checks."
+  ],
+  "archived_file_sha256": {
+    "arms/nfa_eg_fix_128k_b4_eager.json": "676f2a572919dda8cbaf305a76fa6d58a53b88b85d86c9716a4911f09d9295d0",
+    "arms/nfa_eg_fix_128k_b4_graph.json": "e37566028a8b0bcb80c286e82b527c69766014f54009640c158a324af04c7d45",
+    "arms/nfa_eg_fix_128k_eager.json": "1868b6e9b33e5647d5e4531f99cfe43070b525fa06ba02835a1767733e575761",
+    "arms/nfa_eg_fix_128k_graph.json": "1f04e1249b68c3608e6d2ef83acb0972a5603fb8474782e4265f97efa44c207f",
+    "arms/nfa_eg_fix_32k_b4_eager.json": "087284d7660b5e742787ef25d90ae425100fd2a2e42eb5a167fd15804c2356e0",
+    "arms/nfa_eg_fix_32k_b4_graph.json": "138e8d3c0c47e5ed5b1fcfd7846978e7563b6026738f5825b9ff42e06dae563b",
+    "arms/nfa_eg_fix_64k_b4_eager.json": "e41fd090b81de76ed471e7b3210b6da27a1d15dcfd3557abc6615aeab4e40f70",
+    "arms/nfa_eg_fix_64k_b4_graph.json": "8902c05bf0e4aa38f8e0d4451598925ebd5feb204950a6a8857a4402acbd0f78",
+    "arms/nfa_eg_fix_64k_eager.json": "d77a118a1efd53ca5de1f30e0eb20cdf247f70ca70d26a07babde664e25f1413",
+    "arms/nfa_eg_fix_64k_graph.json": "78ab689979286fe43632b4c1ec7e0b5b1bde98ac62da6607e4cbdd881c71a442",
+    "diagnostics/check_nfa_eg_ops.py": "6d1d522a84b90ab04641606be727025d82b811b5328fe336fe1735f8deae410d",
+    "diagnostics/nfa_eg_diag_base_eager.json": "a62ed2c3ae1653904212683bdd79c0fb9cbbf88f4e9b9b911affa23902b5cd2d",
+    "diagnostics/nfa_eg_diag_base_graph.json": "d0dc9f21f4a34503d906936610a0666e0066cbfbbbed6a6da1644caf1eab3993",
+    "diagnostics/nfa_eg_diag_fused_eager.json": "3580ce6a74b955dee93c90a7dfc5465841b4c1e0f4c5a852b4e1035138f67f42",
+    "diagnostics/nfa_eg_diag_native_graph.json": "6d4195a401fa44cefe932433923f5e2f997031e5f824c407bdbeba818e0463b0",
+    "diagnostics/nfa_eg_diag_ops.json": "4be06c85f0bb442771b44301976e87d221c2780219182ce2433d069e13107bbd",
+    "diagnostics/nfa_eg_diag_warps4_graph.json": "bf1cdf53a727f9410a1f6b6d5c82949d7a6e8267d86d67efb9fd2c308577761d",
+    "fix32k_abba/arms/flashinfer_a_ruler32k_b1_eager_attempt0.json": "e983b743dea7265fcc8725cdec5f2680876d10e2b5cc404cf15ee36ffe97ec41",
+    "fix32k_abba/arms/flashinfer_a_ruler32k_b1_eager_attempt0.log": "8e3787c8a8a88c216144ecfc4dc56d7b86e16d58bd1afe79b4661897bfc16a34",
+    "fix32k_abba/arms/flashinfer_a_ruler32k_b1_graph_attempt0.json": "9657f476c4c8100120a02cd9c30c7ea1cb482e6e9a141057992597c0aa64d631",
+    "fix32k_abba/arms/flashinfer_a_ruler32k_b1_graph_attempt0.log": "e968c63a69bb0020337e433404210ea0dd84ce058edc30e31d9c6513ef28e762",
+    "fix32k_abba/arms/flashinfer_b_ruler32k_b1_eager_attempt0.json": "0ac624b83a06a10709b0d69de0ffa827819e2df8019bd72ad44f1f4b0475284f",
+    "fix32k_abba/arms/flashinfer_b_ruler32k_b1_eager_attempt0.log": "f98e26858ca1c3a785a6f6184565bca5f0058a0df003cfb49e3b07df9ad2eac7",
+    "fix32k_abba/arms/flashinfer_b_ruler32k_b1_graph_attempt0.json": "75c0fa24c1a38d558112bcb2f444791664fff283a6d0e4d647d9099db973edb2",
+    "fix32k_abba/arms/flashinfer_b_ruler32k_b1_graph_attempt0.log": "077719630b43be052707dce2ecff82ee3dc3d2f61ae0d756e0204207eaf117b2",
+    "fix32k_abba/arms/gpu0_b1_eager_attempt0_hygiene.jsonl": "1e2bfeb6c60a98e63875b6803d5cb08f4e3da8f5e16adab0b389aa9c3ac7f2cc",
+    "fix32k_abba/arms/gpu0_b1_graph_attempt0_hygiene.jsonl": "bab8d57342ac516c4c60b57beb61150ce97bb78f43b5ec5434b9e43684e3083c",
+    "fix32k_abba/arms/nfa_a_ruler32k_b1_eager_attempt0.json": "314b80af3ae8d2c2d5951a81b9498680b4d2f8deb099b5b9a23fa326c08cbcc1",
+    "fix32k_abba/arms/nfa_a_ruler32k_b1_eager_attempt0.log": "9c11d33dba9ebabbf209fd0099dbed99dd722872547d884e7b9c96f854998c3d",
+    "fix32k_abba/arms/nfa_a_ruler32k_b1_graph_attempt0.json": "e0510d061af88d99b64101b53c7edb02fde005596c38d5d840f7aacb23b0d6cd",
+    "fix32k_abba/arms/nfa_a_ruler32k_b1_graph_attempt0.log": "90eecdc3b7a61ca695059495b9a15cb842e1502fcd259c0cc23424a027fef816",
+    "fix32k_abba/arms/nfa_b_ruler32k_b1_eager_attempt0.json": "a2710f83ceb196b2e1a8da232f7fc65f38e950f460c3ac3e103f16ac2eebd789",
+    "fix32k_abba/arms/nfa_b_ruler32k_b1_eager_attempt0.log": "2abc96626651092e7b8282fae5f664b734fc22d0d7a773867865f54743b78931",
+    "fix32k_abba/arms/nfa_b_ruler32k_b1_graph_attempt0.json": "defd943308c1c406e4b683a5a975c2376d9ffa9c110739fa72c1bfdd8928dfa1",
+    "fix32k_abba/arms/nfa_b_ruler32k_b1_graph_attempt0.log": "2cccd56808447a2569604b3c0a57be5a94c9eb93b6df084b5ee7bbe0d615c33f",
+    "fix32k_abba/arms/source.diff": "0607b6f039035872ac6047ffc6df50519bb4262d13f3dc3e34c83e4c5a0d805b",
+    "fix32k_abba/summary.json": "339dc619a3dacf075bdd170377dcc0cb128405a0e1845618fb420ccf0e869fd3"
+  }
+}

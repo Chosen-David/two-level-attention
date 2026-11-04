@@ -118,10 +118,54 @@ tests/test_nfa_current_query_selector.py: 19 passed in 4.21s
 
 至此 32K/64K/128K 的 B1/B2/B4 生产验收网格已全部形成。Top-K 候选的同执行生产身份、三档 selector 测试、批量回归和重基验收均已通过，具备合入条件。
 
-## 8. 尚未关闭的问题
+## 8. eager/Graph 跨执行 token 分叉已修复并完成 B1/B4 验收
 
-- eager/Graph 跨执行 token 分叉仍存在。
+### 8.1 根因与单变量消融
+
+根因位于 `benchmark/efficiency/benchmark_nfa_end_to_end.py::_load_model`：原实现只在 Graph 下注册 Triton RMSNorm 和 MLP SiLU+mul decode 融合链，eager 使用 HF 原生链。两种执行的逐层数值差异最终改变 argmax；这不是 selector 的 fine-score `num_warps` 差异所能解释的。
+
+32K B1、64 token 的单变量结果如下。这里的 TPOT 只用于诊断方案选择，不作为正式 clean 性能结论。
+
+| 方案 | 稳态 TPOT (ms) | token 对拍结果 |
+|---|---:|---|
+| 原 eager | 24.284944 | 与原 Graph 在 token 39 首次分叉 |
+| 原 Graph | 9.882560 | 基准 Graph 序列 |
+| Graph fine-score `num_warps=4` | 9.956464 | 与原 Graph 全部一致，但与原 eager 仍在 token 39 同样分叉 |
+| eager 也启用 RMSNorm+SiLU 融合 | 26.146095 | 与原 Graph 全部 64 token 一致 |
+| Graph 禁用融合、双执行均用原生链 | 11.308512 | 与原 eager 全部 64 token 一致 |
+
+因此统一 fine-score warps 不是充分修复，统一执行间 elementwise 实现才是有效修复。最终选择双执行都启用融合链，避免双原生使 Graph 从 9.882560 ms 退化到 11.308512 ms。`diagnostics/nfa_eg_diag_ops.json` 的 28 项随机 BF16 输入对拍也全部逐位相等；这只是每个形状四组随机输入的支持证据，不宣称全输入数学证明。
+
+### 8.2 512 token 全量身份门禁
+
+修复为 eager/Graph 均传入 `rmsnorm_decode=True, mlp_silu_decode=True`，未改 selector。以下每组均逐请求比较全部 512 token；同时把修复后 Graph 与 Top-K 验收时的修复前 Graph A/B 序列对拍：
+
+| 长度 | Batch | eager/Graph | 修复后 Graph == 修复前 Graph | 自然 skip（每请求） |
+|---|---:|---|---|---|
+| 32K | B1 | 512/512 一致 | 一致 | 2 far |
+| 32K | B4 | 4×512/512 一致 | 一致 | 2 far |
+| 64K | B1 | 512/512 一致 | 一致 | 3 near |
+| 64K | B4 | 4×512/512 一致 | 一致 | 3 near |
+| 128K | B1 | 512/512 一致 | 一致 | 13 near |
+| 128K | B4 | 4×512/512 一致 | 一致 | 13 near |
+
+原先 32K B1 token 39、64K B1 token 30、128K B1 token 87，以及 32K B4 token 25、64K B4 token 34、128K B4 token 10 的跨执行分叉均消失。完整机器可读判决为 `e2e_execution_identity/execution_identity.json`，六个 case 的 `eager_graph_identical` 和 `graph_unchanged_vs_pre_fix` 全部为 true。B2 没有在本轮重新生成，上述结果不外推为新的 B2 实测。
+
+32K B1 使用正式 ABBA、独立子进程、3 warmup + 2 个测量 repeat，两个执行均为 `gpu_hygiene=clean`：
+
+| 执行 | NFA 稳态 TPOT (ms) | FlashInfer 稳态 TPOT (ms) | FI/NFA | NFA repeat identity |
+|---|---:|---:|---:|---|
+| eager | 26.330528 | 20.811216 | 0.790384× | 通过 |
+| Graph | 9.834888 | 9.848592 | 1.001393× | 通过 |
+
+Graph 的既有性能和 token 序列均保留；eager 统一融合链有时延代价，且仍慢于 FlashInfer，不能用 Graph 结果掩盖。其余 64K/128K B1 与三档 B4 direct run 只作为正确性证据，原始 JSON 的 `gpu_hygiene=requires external process monitor`，不把它们作为正式 clean TPOT 结论。NFA 与 FlashInfer 的稀疏近似 token 分叉仍单独保留，不与本次 NFA 跨执行身份混为一谈。
+
+配置回归 `tests/test_nfa_benchmark_input.py` 参数化覆盖 eager/Graph，实测 `5 passed in 3.00s`，防止重新退化为仅 Graph 注册融合链。
+
+## 9. 尚未关闭的问题
+
+- B2 跨执行生成未在本轮单独复跑；已有 B1/B4 证据不冒充 B2 新结果。
 - eager host/runtime 开销、128K niah L1 上涨，以及此前 response 中的异步、padding、短序列 union、full 子空间等问题仍未关闭。
 - tiled partial 与 fine-score 直接编码仍是组合候选，未严格拆成两个单变量实验；这不影响上述组合候选的同执行身份与生产验收结论。
 
-原始 arms、逐步 TPOT、生成 token、skip receipt、源码 diff 与 GPU hygiene 均归档在 `benchmark/efficiency/results/nfa_flashinfer_20261104/e2e_topk64/`。
+Top-K 原始 arms、逐步 TPOT、生成 token、skip receipt、源码 diff 与 GPU hygiene 均归档在 `benchmark/efficiency/results/nfa_flashinfer_20261104/e2e_topk64/`。本轮跨执行修复的原始 direct runs、正式 32K ABBA、日志、hygiene monitor、单变量消融、随机算子对拍、source diff 和逐文件 SHA256 清单归档在 `benchmark/efficiency/results/nfa_flashinfer_20261104/e2e_execution_identity/`。
