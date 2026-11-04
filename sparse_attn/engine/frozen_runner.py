@@ -1,5 +1,6 @@
 """Shared prefill/freeze/receipt lifecycle for frozen-region requests."""
 from contextlib import contextmanager
+from dataclasses import replace
 
 import torch
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
@@ -128,9 +129,14 @@ def prefill_frozen_request(model, input_ids, config, geometry, static_gate=None,
     if not isinstance(suffix_length, int) or suffix_length < 0:
         raise ValueError('suffix_length must be a non-negative integer')
     sequence_capacity = prompt_length + suffix_length
+    # Decode 会先逐 token 消费 chat suffix，再生成 answer；Cache 的物理容量
+    # 必须把 suffix 计入 max_new_tokens，否则最后一 token 会越过 capacity。
+    effective_geometry = (
+        replace(geometry, max_new_tokens=geometry.max_new_tokens + suffix_length)
+        if suffix_length else geometry)
     if cache is None:
-        cache = build_frozen_cache(model, geometry, sequence_capacity)
-    if cache.n_layers != n_layers or cache.geometry != geometry:
+        cache = build_frozen_cache(model, effective_geometry, sequence_capacity)
+    if cache.n_layers != n_layers or cache.geometry != effective_geometry:
         raise ValueError('shared cache does not match model layers or geometry')
     if sequence_capacity + geometry.max_new_tokens > cache.max_blocks * geometry.page:
         raise ValueError('request exceeds shared cache sequence capacity')

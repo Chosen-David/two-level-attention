@@ -650,8 +650,8 @@ def paged_write_decode(cache_layer, key_states, value_states, slot_mapping, *,
         from ..indexer.selection.unique_ranking import _fast_launch
         _fast_launch(
             workspace, 'paged_write', _paged_write_kernel, (B,),
-            key_states,
-            value_states,
+            key_states.contiguous(),
+            value_states.contiguous(),
             slot_mapping.contiguous(),
             cache_layer.kv_pool_k,
             cache_layer.kv_pool_v,

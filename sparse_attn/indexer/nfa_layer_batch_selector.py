@@ -1484,13 +1484,23 @@ def select_topk_for_layer_batched(cache, layer_idx, req_ids,
         if (call_plan is not None and call_plan[0] is geometry
                 and not torch.cuda.is_current_stream_capturing()
                 and len(req_ids) == geometry[0]
+                and tuple(req_ids) == workspace.get('_nfa_launch_req_ids')
                 and cache.active_visible_bucket == geometry[12]
                 and query_states.shape ==
                     (geometry[0], geometry[2], cache.layers[0].head_dim_k)):
+            has_live_req = any(
+                rid is not None and rid >= 0 and rid in cache.states
+                for rid in req_ids)
+            protected_only = has_live_req and all(
+                rid is None or rid < 0 or rid not in cache.states
+                or (cache.states[rid].skip_far_by_layer[layer_idx]
+                    and cache.states[rid].skip_near_by_layer[layer_idx])
+                for rid in req_ids)
             q_src = query_states.unsqueeze(0)
             q_geometry = (q_src.dtype, q_src.data_ptr() % 16,
                           q_src.stride(0), q_src.stride(1), q_src.stride(2))
-            if q_geometry == geometry[27:32]:
+            if (q_geometry == geometry[27:32]
+                    and protected_only == geometry[32]):
                 if geometry[32] and decode_write is not None:
                     # both-skip 轻路径没有 page-stats/Q fused kernel 可携带
                     # decode 写入，重放 final union 前必须显式写当前 K/V。
@@ -1611,6 +1621,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     if previous_geometry == geometry:
         geometry = previous_geometry
     workspace['_nfa_launch_geometry'] = geometry
+    workspace['_nfa_launch_req_ids'] = tuple(req_ids)
 
     plan_key = ('eager_selector_call_plan', layer_offset)
     call_plan = workspace.get(plan_key)

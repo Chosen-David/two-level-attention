@@ -5,7 +5,8 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from benchmark.efficiency.benchmark_nfa_end_to_end import _load_input
+from benchmark.efficiency.benchmark_nfa_end_to_end import (
+    _fa2_unpacked_position_ids, _load_input)
 
 
 class _StubTokenizer:
@@ -47,3 +48,14 @@ def test_short_placeholder_cannot_impersonate_long_context(tmp_path, monkeypatch
     _write_input(tmp_path)
     with pytest.raises(ValueError, match='prompt length mismatch'):
         _load_input(_args(tmp_path), _StubTokenizer(12))
+
+
+def test_fa2_unpacked_mode_preserves_native_attention_and_restores_globals():
+    from transformers import modeling_flash_attention_utils as fa_utils
+    from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
+    original_check = fa_utils._is_packed_sequence
+    original_attention = ALL_ATTENTION_FUNCTIONS['flash_attention_2']
+    with _fa2_unpacked_position_ids():
+        assert fa_utils._is_packed_sequence(None, 1) is False
+        assert ALL_ATTENTION_FUNCTIONS['flash_attention_2'] is original_attention
+    assert fa_utils._is_packed_sequence is original_check

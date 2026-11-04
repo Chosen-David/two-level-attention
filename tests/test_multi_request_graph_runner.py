@@ -171,6 +171,45 @@ def test_dynamic_eos_completion_and_request_admission(capture_graph):
     assert not cache.states
 
 
+@torch.inference_mode()
+def test_eager_request_admission_invalidates_protected_only_plan():
+    model = _model()
+    cache, first_tokens = _prefill_cache(model, [0])
+    scheduler = ContinuousBatchScheduler(
+        cache=cache, max_batch=cache.max_requests,
+        eos_ids={127}, pad_token_id=0)
+    scheduler.add_request(0)
+    scheduler.next_tokens[0] = first_tokens[0]
+    runner = GraphRunner(scheduler=scheduler, buckets=(1,), device='cuda')
+
+    # 请求 0 两层均 both-skip，建立 protected_only 的 eager 快速重放计划。
+    runner.step(
+        model, cache, generated_counts=[0], min_new_tokens=1,
+        return_next_tokens=True, stop_on_eos=False)
+    scheduler.prepare_step()
+    scheduler.finish_request(0)
+
+    # 保持 B1/bucket/Q 几何不变，但换成完全不 skip 的请求 1。
+    cache.add_request(1)
+    cache.set_active_request(1)
+    output = model(
+        _input_ids(1), past_key_values=cache, use_cache=True,
+        logits_to_keep=1)
+    cache.freeze(1, [False] * 2, [False] * 2, {0: [], 1: []})
+    scheduler.add_request(1)
+    scheduler.next_tokens[1] = int(output.logits[0, -1].argmax())
+    cache.transition_request(1, RequestPhase.GENERATE)
+    runner.step(
+        model, cache, generated_counts=[0], min_new_tokens=1,
+        return_next_tokens=True, stop_on_eos=False)
+
+    protected_width = GEOMETRY.sink + GEOMETRY.window
+    # selector 输出按本步 batch 行写入；request 1 是当前唯一请求，位于第 0 行。
+    assert torch.all(
+        cache.visible_lens_buf[:, 0] > protected_width
+    ), '请求切换后不得重放上一请求的 both-skip EMPTY 计划'
+
+
 def test_capture_reuses_fixed_bucket_graph():
     cache = GraphReadyPagedRegionCache(
         1, GEOMETRY, max_requests=1, max_physical_pages=32, max_blocks=16,

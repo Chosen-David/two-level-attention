@@ -1,6 +1,5 @@
 """GraphReady 固定地址分页 KV Cache 与连续批请求生命周期。"""
 import heapq
-from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 import torch
@@ -43,34 +42,21 @@ _REQUEST_PHASE_TRANSITIONS = {
 class RequestState:
     """One continuous-batching request slot.
 
-    ``block_tables[layer]`` maps logical page id -> physical page id.  Every
-    layer owns its page ids independently, so a keep layer cannot pin pages in
-    a layer whose near/far regions were skipped.
-
-    ``free_phys_slots_by_layer`` contains each layer's request-local resident
-    pages that are not currently bound to a logical page.  Decode never touches
-    the global ``free_ids``.
+    ``block_tables[layer]`` maps logical page id -> physical page id.  Tables
+    are append-only for the request lifetime: near/far skip decisions change
+    only the selector-visible intervals, never physical page membership.
     """
     logical_length: int = 0
     prompt_length: int = 0
     phase: RequestPhase = RequestPhase.PREFILL
-    max_resident_pages_by_layer: list = field(default_factory=list)
     block_tables: list = field(default_factory=list)
-    free_phys_slots_by_layer: list = field(default_factory=list)
     skip_far_by_layer: list = field(default_factory=list)
     skip_near_by_layer: list = field(default_factory=list)
     prefill_topk_ids_by_layer: dict = field(default_factory=dict)
     first_decode_seeded: bool = False
     frozen: bool = False
     active: bool = True
-    # Per-layer decode-incremental resident-page cache.  A +1 token step only
-    # diffs interval edges for the affected layers.
-    resident_page_ranges_by_layer: list = field(default_factory=list)
-    last_sync_length: int = 0
     skip_policy_groups: tuple = ()
-    # CPU staging 与 GPU block_table_buf 的同步脏标记；稳态无页表变化时
-    # 不再重复执行全层、全宽 H2D。
-    block_table_dirty: bool = True
 
 
 class GraphReadyPagedRegionLayer:
@@ -126,12 +112,6 @@ class GraphReadyPagedRegionLayer:
         if len(self.free_ids) < count:
             raise RuntimeError('graph-ready physical page pool exhausted')
         return [heapq.heappop(self.free_ids) for _ in range(count)]
-
-    def free_pages(self, physical_ids):
-        for physical_id in physical_ids:
-            if physical_id == self.PAD_PAGE_ID:
-                raise RuntimeError('PAD page leaked into free_ids')
-            heapq.heappush(self.free_ids, physical_id)
 
 
 class GraphReadyPagedRegionCache:
@@ -201,8 +181,6 @@ class GraphReadyPagedRegionCache:
         self.pending_lengths: dict[int, int] = {}
         self.active_request_id = None
         self.active_req_ids = []
-        self._pending_free_pages = []
-        self._reclaimed_pages_by_layer = [0] * n_layers
         self.common_dirty = True
         self._common_active_req_ids = ()
         self._common_state_refs = ()
@@ -490,35 +468,7 @@ class GraphReadyPagedRegionCache:
     # Physical page allocation (independent per layer)
     # ------------------------------------------------------------------
     def _alloc_pages(self, layer_idx, count):
-        self._reclaim_pending_free()
-        if count == 0:
-            return []
-        layer = self.layers[layer_idx]
-        if len(layer.free_ids) < count:
-            raise RuntimeError('graph-ready physical page pool exhausted')
-        return [heapq.heappop(layer.free_ids) for _ in range(count)]
-
-    def _free_pages(self, layer_idx, physical_ids):
-        if physical_ids:
-            self.layers[layer_idx].free_pages(list(physical_ids))
-
-    def _batch_reclaim(self, request_id):
-        """Reclaim each layer's non-resident pages without cross-layer pinning."""
-        state = self.states[request_id]
-        if state.logical_length <= 0:
-            return [[] for _ in range(self.n_layers)]
-        reclaimed = []
-        for layer_idx in range(self.n_layers):
-            resident_ranges = self._resident_page_ranges_for_layer(
-                state, layer_idx, state.logical_length)
-            resident = set(self._pages_in_ranges(resident_ranges))
-            block_table = state.block_tables[layer_idx]
-            stale = [lp for lp in block_table if lp not in resident]
-            physical_ids = [block_table.pop(lp) for lp in stale]
-            self._free_pages(layer_idx, physical_ids)
-            self._reclaimed_pages_by_layer[layer_idx] += len(physical_ids)
-            reclaimed.append(physical_ids)
-        return reclaimed
+        return self.layers[layer_idx].alloc_pages(count)
 
     # ------------------------------------------------------------------
     # Request lifecycle
@@ -532,8 +482,6 @@ class GraphReadyPagedRegionCache:
             raise ValueError(f'request {request_id} already active')
         self.states[request_id] = RequestState(
             block_tables=[{} for _ in range(self.n_layers)],
-            free_phys_slots_by_layer=[deque() for _ in range(self.n_layers)],
-            resident_page_ranges_by_layer=[() for _ in range(self.n_layers)],
         )
         self.request_phases[request_id] = RequestPhase.PREFILL
         self._cpu_block_table_staging[:, request_id].fill_(
@@ -566,35 +514,24 @@ class GraphReadyPagedRegionCache:
         state = self.states.pop(request_id, None)
         if state is None:
             return
-        # 各层分别归还已绑定和预留的物理页；页号在层间无需一致。
-        physical_ids_by_layer = []
-        for layer_idx in range(self.n_layers):
-            physical_ids = set(state.block_tables[layer_idx].values())
-            physical_ids.update(state.free_phys_slots_by_layer[layer_idx])
-            physical_ids_by_layer.append(physical_ids)
+        # 请求存续期间不归还任何页。删除时先等待所有流上已提交的 KV 读写，
+        # 再一次性归还各层页，保证后续请求复用不会发生异步 UAF。
+        physical_ids_by_layer = [
+            set(state.block_tables[layer_idx].values())
+            for layer_idx in range(self.n_layers)
+        ]
         self._cpu_block_table_staging[:, request_id].fill_(
             self.layers[0].PAD_PAGE_ID)
         if self.layers[0].kv_pool_k.is_cuda:
-            event = torch.cuda.Event()
-            event.record()
-            self._pending_free_pages.append((event, physical_ids_by_layer))
-        else:
-            for layer_idx, physical_ids in enumerate(physical_ids_by_layer):
-                self._free_pages(layer_idx, physical_ids)
+            torch.cuda.synchronize(self.layers[0].kv_pool_k.device)
+        for layer_idx, physical_ids in enumerate(physical_ids_by_layer):
+            layer = self.layers[layer_idx]
+            for physical_id in sorted(physical_ids):
+                if physical_id == layer.PAD_PAGE_ID:
+                    raise RuntimeError('PAD page leaked into free_ids')
+                heapq.heappush(layer.free_ids, physical_id)
         if self.active_request_id == request_id:
             self.active_request_id = None
-
-    def _reclaim_pending_free(self):
-        if not self._pending_free_pages:
-            return
-        ready = []
-        for event, physical_ids_by_layer in self._pending_free_pages:
-            if event.query():
-                for layer_idx, physical_ids in enumerate(physical_ids_by_layer):
-                    self._free_pages(layer_idx, physical_ids)
-                ready.append((event, physical_ids_by_layer))
-        for item in ready:
-            self._pending_free_pages.remove(item)
 
     def set_active_request(self, request_id):
         if request_id not in self.states:
@@ -617,6 +554,9 @@ class GraphReadyPagedRegionCache:
             raise ValueError('KV dtype/device mismatch')
 
         n = keys.shape[-2]
+        required_pages = (n + page - 1) // page
+        if required_pages > self.max_blocks:
+            raise ValueError('prefill length exceeds fixed block-table capacity')
         block_table = state.block_tables[layer_idx]
         if not block_table:
             logical_pages = list(range(0, (n + page - 1) // page))
@@ -695,37 +635,21 @@ class GraphReadyPagedRegionCache:
                 self._cpu_prefill_seed_counts_staging[:, request_id],
                 non_blocking=non_blocking)
 
-        # 首步 selector 会把 prefill seed 并入支持集；对应物理页必须在 freeze
-        # 回收和首步 plan 中暂时保持 resident，消费后再由 commit_step 释放。
+        # 所有 skip 策略共用 prompt + max_new_tokens 的物理容量上限；实际页
+        # 已在 prefill 分配，后续 decode 仅在跨入新逻辑页时追加分配。
+        page = self.geometry.page
+        capacity_pages = (
+            state.prompt_length + self.geometry.max_new_tokens + page - 1) // page
+        if capacity_pages > self.max_blocks:
+            raise ValueError(
+                'prompt + max_new_tokens exceeds fixed block-table capacity')
+
         state.first_decode_seeded = False
-        state.max_resident_pages_by_layer = [
-            self._max_resident_pages_for_layer(state, layer_idx)
-            for layer_idx in range(self.n_layers)
-        ]
-
-        resident_now_ranges = [
-            self._resident_page_ranges_for_layer(
-                state, layer_idx, state.logical_length)
-            for layer_idx in range(self.n_layers)
-        ]
-        # 每层只回收自己的非 resident prefill 页。
-        self._batch_reclaim(request_id)
-
-        # 各层独立补足请求专属 slot 池，decode 不触碰全局池。
-        for layer_idx in range(self.n_layers):
-            deficit = (state.max_resident_pages_by_layer[layer_idx]
-                       - len(state.block_tables[layer_idx]))
-            if deficit < 0:
-                raise RuntimeError('resident page accounting is inconsistent')
-            if deficit:
-                state.free_phys_slots_by_layer[layer_idx].extend(
-                    self._alloc_pages(layer_idx, deficit))
-
-        # 记录每层增量 diff 基线，后续 decode 仅比较区间边沿。
-        state.resident_page_ranges_by_layer = resident_now_ranges
-        state.last_sync_length = state.logical_length
         self._write_block_table_row(request_id, state)
-        state.block_table_dirty = True
+        self.block_table_buf[:, request_id].copy_(
+            self._cpu_block_table_staging[:, request_id],
+            non_blocking=non_blocking)
+        self.common_dirty = True
         state.frozen = True
         self.transition_request(request_id, RequestPhase.FREEZE)
         state.first_decode_seeded = False
@@ -746,36 +670,12 @@ class GraphReadyPagedRegionCache:
             spans.append((far_hi, near_hi))
         return sorted((a, b) for a, b in spans if a < b)
 
-    def _pages_in_intervals(self, intervals):
-        page = self.geometry.page
-        pages = set()
-        for a, b in intervals:
-            if a < b:
-                pages.update(range(a // page, (b - 1) // page + 1))
-        return pages
-
-    @staticmethod
-    def _merge_page_ranges(page_ranges):
-        if not page_ranges:
-            return ()
-        page_ranges = sorted(page_ranges)
-        merged = []
-        cur_lo, cur_hi = page_ranges[0]
-        for lo, hi in page_ranges[1:]:
-            if lo <= cur_hi + 1:
-                cur_hi = max(cur_hi, hi)
-            else:
-                merged.append((cur_lo, cur_hi))
-                cur_lo, cur_hi = lo, hi
-        merged.append((cur_lo, cur_hi))
-        return tuple(merged)
-
     def _build_skip_policy_groups(self, state):
         """Group layers by their frozen (skip_far, skip_near) policy.
 
-        Decode metadata only depends on these two flags, so the per-step
-        resident-page union can be computed once per unique policy instead of
-        once per layer.
+        Decode visible metadata only depends on these two flags, so the coarse
+        interval bound can be computed once per unique policy instead of once
+        per layer.
         """
         groups = []
         seen = set()
@@ -788,98 +688,6 @@ class GraphReadyPagedRegionCache:
             groups.append((key, layer_idx))
         return tuple(groups)
 
-    def _resident_page_ranges_for_layer(self, state, layer_idx, length):
-        page = self.geometry.page
-        page_ranges = [
-            (a // page, (b - 1) // page)
-            for a, b in self._intervals_for_layer(state, layer_idx, length)
-            if a < b
-        ]
-        if not state.first_decode_seeded:
-            page_ranges.extend(
-                (token_id // page, token_id // page)
-                for token_id in state.prefill_topk_ids_by_layer.get(layer_idx, ())
-                if 0 <= token_id < length
-            )
-        return self._merge_page_ranges(page_ranges)
-
-    def _resident_page_ranges_for_length(self, state, length):
-        page = self.geometry.page
-        page_ranges = []
-        groups = state.skip_policy_groups
-        if not groups:
-            groups = self._build_skip_policy_groups(state)
-        for _key, layer_idx in groups:
-            for a, b in self._intervals_for_layer(state, layer_idx, length):
-                if a < b:
-                    page_ranges.append((a // page, (b - 1) // page))
-        return self._merge_page_ranges(page_ranges)
-
-    @staticmethod
-    def _pages_in_ranges(ranges):
-        pages = []
-        for lo, hi in ranges:
-            pages.extend(range(lo, hi + 1))
-        return pages
-
-    @staticmethod
-    def _range_diff(a_ranges, b_ranges):
-        """Pages present in ``a_ranges`` but absent from ``b_ranges``.
-
-        Both inputs are sorted, disjoint inclusive page ranges.  A +1 token
-        decode step normally changes only one or two page edges, so this runs
-        in O(len(a)+len(b)) and only materializes those changed pages.
-        """
-        out = []
-        j = 0
-        n = len(b_ranges)
-        for lo, hi in a_ranges:
-            while j < n and b_ranges[j][1] < lo:
-                j += 1
-            cur = lo
-            k = j
-            while k < n and b_ranges[k][0] <= hi:
-                if b_ranges[k][0] > cur:
-                    out.extend(range(cur, min(hi, b_ranges[k][0] - 1) + 1))
-                cur = max(cur, b_ranges[k][1] + 1)
-                if cur > hi:
-                    break
-                k += 1
-            if cur <= hi:
-                out.extend(range(cur, hi + 1))
-        return out
-
-    def _max_resident_pages_for_layer(self, state, layer_idx):
-        """O(1) upper bound for the resident-page pool.
-
-        skip_far=False means the far region stays resident, so the worst case is
-        the whole sequence through prompt_len + max_new_tokens.  skip_far=True
-        bounds resident storage to sink + near + SWA.  The extra page is a
-        partial-page safety margin for page-boundary growth.
-        """
-        page = self.geometry.page
-        if not state.skip_far_by_layer[layer_idx]:
-            resident_tokens = state.prompt_length + self.geometry.max_new_tokens
-            max_pages = (resident_tokens + page - 1) // page + 1
-        else:
-            resident_tokens = (
-                self.geometry.sink
-                + max(self.geometry.near, 0)
-                + self.geometry.window
-            )
-            # sink/near/SWA are three disjoint intervals and can straddle up to
-            # two extra page boundaries beyond the token-count page ceiling.
-            max_pages = (resident_tokens + page - 1) // page + 2
-        if not state.first_decode_seeded:
-            # 上界允许与常规 resident 页重复计数；首步提交时会归还这部分余量。
-            seed_pages = {
-                token_id // page
-                for token_id in state.prefill_topk_ids_by_layer.get(layer_idx, ())
-                if 0 <= token_id < state.prompt_length
-            }
-            max_pages += len(seed_pages)
-        return max_pages
-
     def _write_block_table_row(self, request_id, state):
         """Refresh all layers' CPU staging rows after block-table mutations."""
         pad = self.layers[0].PAD_PAGE_ID
@@ -891,52 +699,30 @@ class GraphReadyPagedRegionCache:
                     row[logical_page] = physical_id
 
     def _sync_block_table(self, state, length, request_id=None):
-        """Incrementally reconcile every layer's logical->physical table."""
-        if len(state.resident_page_ranges_by_layer) != self.n_layers:
-            state.resident_page_ranges_by_layer = [
-                () for _ in range(self.n_layers)]
-        new_ranges_by_layer = []
-        changed = False
-        pad = self.layers[0].PAD_PAGE_ID
+        """Append physical pages for newly reached logical pages only."""
+        if length < state.logical_length:
+            raise ValueError('paged block tables cannot move backwards')
+        capacity = state.prompt_length + self.geometry.max_new_tokens
+        if length > capacity:
+            raise RuntimeError(
+                f'planned length {length} exceeds request capacity {capacity}')
+        page = self.geometry.page
+        required_pages = (length + page - 1) // page
+        if required_pages > self.max_blocks:
+            raise RuntimeError('planned length exceeds fixed block-table capacity')
+
         for layer_idx in range(self.n_layers):
-            new_ranges = self._resident_page_ranges_for_layer(
-                state, layer_idx, length)
-            old_ranges = state.resident_page_ranges_by_layer[layer_idx] or ()
-            missing = self._range_diff(new_ranges, old_ranges)
-            stale = self._range_diff(old_ranges, new_ranges)
             block_table = state.block_tables[layer_idx]
-            free_slots = state.free_phys_slots_by_layer[layer_idx]
-
-            if len(missing) > len(free_slots):
-                raise RuntimeError('resident slot pool exhausted')
-            for logical_page in missing:
-                block_table[logical_page] = free_slots.popleft()
-            for logical_page in stale:
-                if logical_page in block_table:
-                    free_slots.append(block_table.pop(logical_page))
-
-            if missing or stale:
-                changed = True
-            if request_id is not None and (missing or stale):
-                row = self._cpu_block_table_staging[layer_idx, request_id]
-                for logical_page in missing:
-                    if 0 <= logical_page < self.max_blocks:
-                        row[logical_page] = block_table[logical_page]
-                for logical_page in stale:
-                    if 0 <= logical_page < self.max_blocks:
-                        row[logical_page] = pad
-                # near-skip 的历史页进入 far 时会重新绑定非最新逻辑页。
-                # 该页旧统计可能是 PAD 零占位，不能只增量重算最新块。
-                latest_page = max(0, (length - 1) // self.geometry.page)
-                if (hasattr(self, '_nfa_page_stats_lengths')
-                        and any(lp < latest_page for lp in missing)):
-                    self._nfa_page_stats_lengths[layer_idx, request_id].zero_()
-            new_ranges_by_layer.append(new_ranges)
-
-        state.resident_page_ranges_by_layer = new_ranges_by_layer
-        state.last_sync_length = length
-        if changed:
-            state.block_table_dirty = True
+            first_missing = len(block_table)
+            if list(block_table) != list(range(first_missing)):
+                raise RuntimeError('physical block table is not append-only')
+            missing = range(first_missing, required_pages)
+            physical_ids = self._alloc_pages(layer_idx, len(missing))
+            for logical_page, physical_id in zip(missing, physical_ids):
+                block_table[logical_page] = physical_id
+                if request_id is not None:
+                    self._cpu_block_table_staging[
+                        layer_idx, request_id, logical_page] = physical_id
 
     # ------------------------------------------------------------------
     # Metadata preparation (common page table + per-layer sparse gather)
@@ -1025,7 +811,6 @@ class GraphReadyPagedRegionCache:
             counts.to(torch.int32), non_blocking=True)
 
     def new_step(self, active_req_ids):
-        self._reclaim_pending_free()
         req_ids = tuple(active_req_ids)
         state_refs = tuple(
             self.states.get(rid) if rid is not None and rid >= 0 else None
@@ -1040,9 +825,8 @@ class GraphReadyPagedRegionCache:
         for state in state_refs:
             if state is None:
                 continue
-            # 下一 token 位于新逻辑页，或页表有其他显式失效时，slot/page
-            # 元数据必须完整重建。普通连续 decode 不再无条件 dirty。
-            needs_full = needs_full or state.block_table_dirty
+            # 下一 token 跨入新逻辑页时才需要重建设备页表；普通连续 decode
+            # 只推进固定 slot mapping 中的页内 offset。
             needs_full = needs_full or state.logical_length % page == 0
         self.active_req_ids = list(req_ids)
         self.common_dirty = self.common_dirty or needs_full
@@ -1059,21 +843,6 @@ class GraphReadyPagedRegionCache:
             self._prepare_common(active_req_ids, query_lengths)
         elif not self._prepare_decode_common_fast(active_req_ids, query_lengths):
             self._prepare_common(active_req_ids, query_lengths)
-
-    def _resident_pages_change(self, state, planned_length):
-        """只比较唯一 skip-policy 组，覆盖区域迁移导致的页表变化。"""
-        page = self.geometry.page
-        if (state.logical_length // page
-                != (planned_length - 1) // page):
-            return True
-        groups = (state.skip_policy_groups
-                  or self._build_skip_policy_groups(state))
-        for _key, layer_idx in groups:
-            new_ranges = self._resident_page_ranges_for_layer(
-                state, layer_idx, planned_length)
-            if new_ranges != state.resident_page_ranges_by_layer[layer_idx]:
-                return True
-        return False
 
     def _prepare_decode_common_fast(self, req_ids, query_lengths):
         """复用未变化的页表/query 映射，并推进计划长度和页内写入位置。"""
@@ -1097,12 +866,14 @@ class GraphReadyPagedRegionCache:
             if state is None:
                 planned.append(0)
                 continue
-            if state.block_table_dirty:
+            planned_length = state.logical_length + qlen
+            if (qlen and state.logical_length // self.geometry.page
+                    != (planned_length - 1) // self.geometry.page):
                 return False
-            if qlen and self._resident_pages_change(
-                    state, state.logical_length + qlen):
+            capacity = state.prompt_length + self.geometry.max_new_tokens
+            if planned_length > capacity:
                 return False
-            planned.append(state.logical_length + qlen)
+            planned.append(planned_length)
 
         # 上一步与当前 token 位于同一物理页；有效 decode slot 的页内 offset
         # 随 token 位置加一，PAD_SLOT 保持不变。
@@ -1120,7 +891,6 @@ class GraphReadyPagedRegionCache:
     def _prepare_common(self, req_ids, query_lengths):
         page = self.geometry.page
         batch = len(req_ids)
-        pad_page_id = self.layers[0].PAD_PAGE_ID
 
         # 只清当前 step 会用到的 slot 前缀，避免每步 fill 整个长 buffer。
         self._cpu_slot_mapping_staging[:, :batch].fill_(PAD_SLOT)
@@ -1144,17 +914,13 @@ class GraphReadyPagedRegionCache:
             self._cpu_valid_req_ids_staging[b] = request_id
             self._cpu_planned_lengths_staging[b] = planned_length
 
-            # 只预分配/更新各层 block_table，不推进 state.logical_length。
+            # 只追加本步新到达的逻辑页，不推进 state.logical_length。
             self._sync_block_table(state, planned_length, request_id=request_id)
             self.pending_lengths[request_id] = planned_length
-            if state.block_table_dirty:
-                # commit_step 也会改变 resident membership；此时没有 request_id
-                # 可做逐页 staging 更新，因此 dirty 复制前以权威 Python 页表重建。
-                self._write_block_table_row(request_id, state)
-                self.block_table_buf[:, request_id].copy_(
-                    self._cpu_block_table_staging[:, request_id],
-                    non_blocking=True)
-                state.block_table_dirty = False
+            self._write_block_table_row(request_id, state)
+            self.block_table_buf[:, request_id].copy_(
+                self._cpu_block_table_staging[:, request_id],
+                non_blocking=True)
 
             for t in range(qlen):
                 pos = state.logical_length + t
@@ -1313,34 +1079,9 @@ class GraphReadyPagedRegionCache:
         every layer synchronized and keeps state mutation outside the captured
         model graph.
         """
-        release_by_layer = [[] for _ in range(self.n_layers)]
         for request_id, planned_length in self.pending_lengths.items():
-            state = self.states[request_id]
-            state.logical_length = planned_length
-            self._sync_block_table(state, state.logical_length)
-            if state.first_decode_seeded:
-                # seed-only 页已被 _sync_block_table 移入请求本地空闲池。首步
-                # Graph 可能仍在异步读取，归还全局池前必须用 event 建立时序。
-                for layer_idx in range(self.n_layers):
-                    steady_max = self._max_resident_pages_for_layer(
-                        state, layer_idx)
-                    previous_max = state.max_resident_pages_by_layer[layer_idx]
-                    release_count = max(0, previous_max-steady_max)
-                    free_slots = state.free_phys_slots_by_layer[layer_idx]
-                    if release_count > len(free_slots):
-                        raise RuntimeError('seed page release accounting is inconsistent')
-                    for _ in range(release_count):
-                        release_by_layer[layer_idx].append(free_slots.pop())
-                    state.max_resident_pages_by_layer[layer_idx] = steady_max
+            self.states[request_id].logical_length = planned_length
         self.pending_lengths.clear()
-        if any(release_by_layer):
-            if self.layers[0].kv_pool_k.is_cuda:
-                event = torch.cuda.Event()
-                event.record()
-                self._pending_free_pages.append((event, release_by_layer))
-            else:
-                for layer_idx, physical_ids in enumerate(release_by_layer):
-                    self._free_pages(layer_idx, physical_ids)
 
 
     # ------------------------------------------------------------------
@@ -1399,9 +1140,6 @@ class GraphReadyPagedRegionCache:
             "requests": len(self.states),
             "active_requests": list(self.states),
             "n_layers": self.n_layers,
-            "reclaimed_pages_by_layer": list(self._reclaimed_pages_by_layer),
-            "free_physical_pages_by_layer": [
-                len(layer.free_ids) for layer in self.layers],
             "layers": [
                 {
                     "num_kv_heads": layer.num_kv_heads,

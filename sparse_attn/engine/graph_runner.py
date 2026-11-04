@@ -41,6 +41,12 @@ class GraphRunner:
             return max_requests
         return max(self.buckets)
 
+    @staticmethod
+    def _attention_mask_arg(model):
+        if getattr(getattr(model, 'config', None), 'model_type', None) == 'qwen3':
+            return {'full_attention': None}
+        return None
+
     def visible_bucket_for(self, cache, padded_ids):
         width = cache.choose_visible_bucket(padded_ids, self.visible_buckets)
         return min(width, cache.max_visible_len)
@@ -77,12 +83,13 @@ class GraphRunner:
         self.input_ids_buf[bucket].zero_()
         self.position_ids_buf[bucket].zero_()
 
+        attention_mask = self._attention_mask_arg(model)
         model(
             input_ids=self.input_ids_buf[bucket],
             position_ids=self.position_ids_buf[bucket],
             past_key_values=cache,
             use_cache=True,
-            attention_mask={'full_attention': None},
+            attention_mask=attention_mask,
         )
         torch.cuda.synchronize()
 
@@ -93,7 +100,7 @@ class GraphRunner:
                 position_ids=self.position_ids_buf[bucket],
                 past_key_values=cache,
                 use_cache=True,
-                attention_mask={'full_attention': None},
+                attention_mask=attention_mask,
             )
         self.graphs[key] = graph
         self.static_logits[key] = static_logits
@@ -145,7 +152,7 @@ class GraphRunner:
                 position_ids=self.position_ids_buf[bucket],
                 past_key_values=cache,
                 use_cache=True,
-                attention_mask={'full_attention': None},
+                attention_mask=self._attention_mask_arg(model),
             )
         # 第 N 步 GPU 工作已提交；此时处理第 N-1 步已就绪的 CPU 回执，
         # 不让上一帧 D2H 等待阻塞本帧 replay，也不依赖其完成来组装设备输入。
