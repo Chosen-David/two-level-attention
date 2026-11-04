@@ -1,0 +1,3166 @@
+{
+  "schema": "nfa-flashinfer-performance-figures-v1",
+  "partial_preview": false,
+  "font_family": "TeX Gyre Termes",
+  "color_semantics": {
+    "nfa_sparse": "blue fill with diagonal hatch",
+    "flashinfer_dense": "neutral gray fill",
+    "error_bars": "range of two measured ABBA repeats"
+  },
+  "correctness_note": "Cross-method token identity is reported, never required or hidden; NFA is a sparse approximation of FlashInfer Dense.",
+  "skip_note": "Single-sided near/far skip restricts the L1/L2 candidate range; the middle quota can be refilled from the other region, so visible_lens need not decrease. Both-skip uses the protected-only path.",
+  "figures": {
+    "E2E-01": {
+      "execution": "eager",
+      "metric": "tpot",
+      "configurations": [
+        {
+          "context_length": 32768,
+          "batch_size": 1,
+          "nfa": 24.152679920196533,
+          "flashinfer": 20.652007579803467,
+          "nfa_repeats": [
+            24.286399841308594,
+            24.018959999084473
+          ],
+          "flashinfer_repeats": [
+            20.610447883605957,
+            20.693567276000977
+          ]
+        },
+        {
+          "context_length": 32768,
+          "batch_size": 2,
+          "nfa": 25.23688840866089,
+          "flashinfer": 20.810839653015137,
+          "nfa_repeats": [
+            25.13088035583496,
+            25.342896461486816
+          ],
+          "flashinfer_repeats": [
+            20.836159706115723,
+            20.78551959991455
+          ]
+        },
+        {
+          "context_length": 32768,
+          "batch_size": 4,
+          "nfa": 24.823471546173096,
+          "flashinfer": 20.673255920410156,
+          "nfa_repeats": [
+            24.92209529876709,
+            24.7248477935791
+          ],
+          "flashinfer_repeats": [
+            20.657743453979492,
+            20.68876838684082
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 1,
+          "nfa": 29.546112060546875,
+          "flashinfer": 20.746944427490234,
+          "nfa_repeats": [
+            29.44204807281494,
+            29.65017604827881
+          ],
+          "flashinfer_repeats": [
+            20.733216285705566,
+            20.760672569274902
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 2,
+          "nfa": 31.97819995880127,
+          "flashinfer": 20.805543899536133,
+          "nfa_repeats": [
+            31.89014434814453,
+            32.06625556945801
+          ],
+          "flashinfer_repeats": [
+            20.905920028686523,
+            20.705167770385742
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 4,
+          "nfa": 33.40548038482666,
+          "flashinfer": 24.83028793334961,
+          "nfa_repeats": [
+            33.39529609680176,
+            33.41566467285156
+          ],
+          "flashinfer_repeats": [
+            24.632495880126953,
+            25.028079986572266
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 1,
+          "nfa": 30.98465633392334,
+          "flashinfer": 20.717408180236816,
+          "nfa_repeats": [
+            31.109872817993164,
+            30.859439849853516
+          ],
+          "flashinfer_repeats": [
+            20.73678493499756,
+            20.698031425476074
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 2,
+          "nfa": 33.27283191680908,
+          "flashinfer": 23.65659189224243,
+          "nfa_repeats": [
+            33.436767578125,
+            33.108896255493164
+          ],
+          "flashinfer_repeats": [
+            23.605728149414062,
+            23.7074556350708
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 4,
+          "nfa": 34.395463943481445,
+          "flashinfer": 37.43773555755615,
+          "nfa_repeats": [
+            34.40956687927246,
+            34.38136100769043
+          ],
+          "flashinfer_repeats": [
+            37.42188835144043,
+            37.453582763671875
+          ]
+        }
+      ]
+    },
+    "E2E-02": {
+      "execution": "eager",
+      "metric": "throughput",
+      "configurations": [
+        {
+          "context_length": 32768,
+          "batch_size": 1,
+          "nfa": 41.4032729827135,
+          "flashinfer": 48.421442619358,
+          "nfa_repeats": [
+            41.175308260350135,
+            41.63377598522654
+          ],
+          "flashinfer_repeats": [
+            48.519081470103515,
+            48.32419595241723
+          ]
+        },
+        {
+          "context_length": 32768,
+          "batch_size": 2,
+          "nfa": 39.6245362663971,
+          "flashinfer": 48.0518814556873,
+          "nfa_repeats": [
+            39.79168201991846,
+            39.45878883732503
+          ],
+          "flashinfer_repeats": [
+            47.993488920440804,
+            48.11041625363607
+          ]
+        },
+        {
+          "context_length": 32768,
+          "batch_size": 4,
+          "nfa": 40.28445409579164,
+          "flashinfer": 48.371674198292425,
+          "nfa_repeats": [
+            40.12503716128036,
+            40.44514281134197
+          ],
+          "flashinfer_repeats": [
+            48.407997815819556,
+            48.33540505176008
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 1,
+          "nfa": 33.84540063852621,
+          "flashinfer": 48.19986882863456,
+          "nfa_repeats": [
+            33.96502843575414,
+            33.726612562829956
+          ],
+          "flashinfer_repeats": [
+            48.231783540957224,
+            48.167996323971046
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 2,
+          "nfa": 31.27130361584886,
+          "flashinfer": 48.06411237450492,
+          "nfa_repeats": [
+            31.357650472917445,
+            31.185430984728544
+          ],
+          "flashinfer_repeats": [
+            47.83334092103231,
+            48.29712133172296
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 4,
+          "nfa": 29.935207890445938,
+          "flashinfer": 40.27339524552585,
+          "nfa_repeats": [
+            29.94433698390742,
+            29.92608436163912
+          ],
+          "flashinfer_repeats": [
+            40.596779346537176,
+            39.9551224279492
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 1,
+          "nfa": 32.274038776578486,
+          "flashinfer": 48.2685860750642,
+          "nfa_repeats": [
+            32.14413655274171,
+            32.40499519322114
+          ],
+          "flashinfer_repeats": [
+            48.2234832031409,
+            48.313773394369996
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 2,
+          "nfa": 30.054550285958996,
+          "flashinfer": 42.27151588678013,
+          "nfa_repeats": [
+            29.90719714947027,
+            30.203362633512373
+          ],
+          "flashinfer_repeats": [
+            42.362599182301516,
+            42.1808234250446
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 4,
+          "nfa": 29.073601148197852,
+          "flashinfer": 26.711017242552415,
+          "nfa_repeats": [
+            29.06168518506919,
+            29.08552688697576
+          ],
+          "flashinfer_repeats": [
+            26.722328670554873,
+            26.699715386639877
+          ]
+        }
+      ]
+    },
+    "E2E-03": {
+      "execution": "graph",
+      "metric": "tpot",
+      "configurations": [
+        {
+          "context_length": 32768,
+          "batch_size": 1,
+          "nfa": 9.816295862197876,
+          "flashinfer": 9.827192068099976,
+          "nfa_repeats": [
+            9.82047986984253,
+            9.812111854553223
+          ],
+          "flashinfer_repeats": [
+            9.826720237731934,
+            9.827663898468018
+          ]
+        },
+        {
+          "context_length": 32768,
+          "batch_size": 2,
+          "nfa": 11.724823951721191,
+          "flashinfer": 11.60698413848877,
+          "nfa_repeats": [
+            11.727215766906738,
+            11.722432136535645
+          ],
+          "flashinfer_repeats": [
+            11.59275197982788,
+            11.621216297149658
+          ]
+        },
+        {
+          "context_length": 32768,
+          "batch_size": 4,
+          "nfa": 13.664368152618408,
+          "flashinfer": 15.08731985092163,
+          "nfa_repeats": [
+            13.66425609588623,
+            13.664480209350586
+          ],
+          "flashinfer_repeats": [
+            15.080447673797607,
+            15.094192028045654
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 1,
+          "nfa": 24.665128707885742,
+          "flashinfer": 11.303776025772095,
+          "nfa_repeats": [
+            24.687792778015137,
+            24.642464637756348
+          ],
+          "flashinfer_repeats": [
+            11.3056960105896,
+            11.30185604095459
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 2,
+          "nfa": 26.53829574584961,
+          "flashinfer": 14.468631982803345,
+          "nfa_repeats": [
+            26.579471588134766,
+            26.497119903564453
+          ],
+          "flashinfer_repeats": [
+            14.471680164337158,
+            14.465583801269531
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 4,
+          "nfa": 27.78452777862549,
+          "flashinfer": 21.48300790786743,
+          "nfa_repeats": [
+            27.77414321899414,
+            27.794912338256836
+          ],
+          "flashinfer_repeats": [
+            21.466896057128906,
+            21.499119758605957
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 1,
+          "nfa": 26.20753574371338,
+          "flashinfer": 14.007799863815308,
+          "nfa_repeats": [
+            26.22001552581787,
+            26.195055961608887
+          ],
+          "flashinfer_repeats": [
+            14.011583805084229,
+            14.004015922546387
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 2,
+          "nfa": 27.906776428222656,
+          "flashinfer": 20.386832237243652,
+          "nfa_repeats": [
+            27.938048362731934,
+            27.87550449371338
+          ],
+          "flashinfer_repeats": [
+            20.362688064575195,
+            20.41097640991211
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 4,
+          "nfa": 29.122439861297607,
+          "flashinfer": 34.98308849334717,
+          "nfa_repeats": [
+            29.142640113830566,
+            29.10223960876465
+          ],
+          "flashinfer_repeats": [
+            34.9453125,
+            35.020864486694336
+          ]
+        }
+      ]
+    },
+    "E2E-04": {
+      "execution": "graph",
+      "metric": "throughput",
+      "configurations": [
+        {
+          "context_length": 32768,
+          "batch_size": 1,
+          "nfa": 101.87142014035621,
+          "flashinfer": 101.75846702397295,
+          "nfa_repeats": [
+            101.82801790275803,
+            101.91485939247207
+          ],
+          "flashinfer_repeats": [
+            101.76335296086602,
+            101.75358155623177
+          ]
+        },
+        {
+          "context_length": 32768,
+          "batch_size": 2,
+          "nfa": 85.2891270792344,
+          "flashinfer": 86.15502425681785,
+          "nfa_repeats": [
+            85.27173200154803,
+            85.30652925541543
+          ],
+          "flashinfer_repeats": [
+            86.26079482594496,
+            86.04951275584385
+          ]
+        },
+        {
+          "context_length": 32768,
+          "batch_size": 4,
+          "nfa": 73.18303992039155,
+          "flashinfer": 66.28082455207667,
+          "nfa_repeats": [
+            73.18364007397817,
+            73.18243977664817
+          ],
+          "flashinfer_repeats": [
+            66.31102879906594,
+            66.25064780824023
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 1,
+          "nfa": 40.54306838789322,
+          "flashinfer": 88.46601327910652,
+          "nfa_repeats": [
+            40.50584874037486,
+            40.580356498425644
+          ],
+          "flashinfer_repeats": [
+            88.45098957758456,
+            88.48104208514913
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 2,
+          "nfa": 37.681394825679135,
+          "flashinfer": 69.11503459266552,
+          "nfa_repeats": [
+            37.62302033297028,
+            37.73995074330617
+          ],
+          "flashinfer_repeats": [
+            69.10047683781178,
+            69.12959848272683
+          ]
+        },
+        {
+          "context_length": 65536,
+          "batch_size": 4,
+          "nfa": 35.991254124149464,
+          "flashinfer": 46.54841651078961,
+          "nfa_repeats": [
+            36.004711004590824,
+            35.977807299057496
+          ],
+          "flashinfer_repeats": [
+            46.5833531470383,
+            46.51353223890511
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 1,
+          "nfa": 38.15696408006916,
+          "flashinfer": 71.38879836391592,
+          "nfa_repeats": [
+            38.13880274080453,
+            38.17514272409214
+          ],
+          "flashinfer_repeats": [
+            71.36951924286683,
+            71.40808790355669
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 2,
+          "nfa": 35.83359054644093,
+          "flashinfer": 49.05126938618505,
+          "nfa_repeats": [
+            35.79348088372392,
+            35.87379020263202
+          ],
+          "flashinfer_repeats": [
+            49.10942979771379,
+            48.99324657072131
+          ]
+        },
+        {
+          "context_length": 131072,
+          "batch_size": 4,
+          "nfa": 34.3377822999286,
+          "flashinfer": 28.585240556738515,
+          "nfa_repeats": [
+            34.31398102896718,
+            34.36161661244905
+          ],
+          "flashinfer_repeats": [
+            28.61614129219763,
+            28.55440648473813
+          ]
+        }
+      ]
+    },
+    "OP-01": {
+      "execution": "eager",
+      "nfa_total_definition": "sum of the two-arm medians of L1, L2 and main Attention",
+      "configurations": [
+        {
+          "context_length": 32768,
+          "execution": "eager",
+          "l1_ms": 0.7904665000000095,
+          "l1_ms_arm_medians_ms": [
+            0.7899830000000111,
+            0.7909500000000078
+          ],
+          "l2_ms": 0.9680819999999954,
+          "l2_ms_arm_medians_ms": [
+            0.9674279999999964,
+            0.9687359999999944
+          ],
+          "main_attention_ms": 1.0220814999999994,
+          "main_attention_ms_arm_medians_ms": [
+            1.0219530000000077,
+            1.0222099999999912
+          ],
+          "flashinfer_dense_ms": 2.9122069999999995,
+          "flashinfer_dense_ms_arm_medians_ms": [
+            2.922041000000001,
+            2.902372999999998
+          ],
+          "nfa_operator_total_ms": 2.7806300000000044,
+          "flashinfer_over_nfa_operator": 1.0473191327145268,
+          "nfa_skip": {
+            "near_layers": [],
+            "far_layers": [
+              11,
+              14
+            ],
+            "both_layers": []
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+            "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 32621,
+            "provenance": "native-ruler",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "gpu_hygiene": "clean",
+          "source_paths": [
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_a1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_b1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_b2.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_a2.json"
+          ]
+        },
+        {
+          "context_length": 65536,
+          "execution": "eager",
+          "l1_ms": 1.1557219999999968,
+          "l1_ms_arm_medians_ms": [
+            1.1554970000000184,
+            1.1559469999999754
+          ],
+          "l2_ms": 16.301057000000007,
+          "l2_ms_arm_medians_ms": [
+            16.294573000000018,
+            16.307541
+          ],
+          "main_attention_ms": 1.021157999999998,
+          "main_attention_ms_arm_medians_ms": [
+            1.0214779999999917,
+            1.0208380000000041
+          ],
+          "flashinfer_dense_ms": 5.567942000000001,
+          "flashinfer_dense_ms_arm_medians_ms": [
+            5.5799489999999965,
+            5.555935000000006
+          ],
+          "nfa_operator_total_ms": 18.477937000000004,
+          "flashinfer_over_nfa_operator": 0.3013292014146384,
+          "nfa_skip": {
+            "near_layers": [
+              7,
+              29,
+              30
+            ],
+            "far_layers": [],
+            "both_layers": []
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+            "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 65198,
+            "provenance": "native-ruler",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "gpu_hygiene": "clean",
+          "source_paths": [
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_a1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_b1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_b2.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_a2.json"
+          ]
+        },
+        {
+          "context_length": 98304,
+          "execution": "eager",
+          "l1_ms": 1.1998159999999929,
+          "l1_ms_arm_medians_ms": [
+            1.2003599999999928,
+            1.199271999999993
+          ],
+          "l2_ms": 16.215662499999997,
+          "l2_ms_arm_medians_ms": [
+            16.217895999999985,
+            16.21342900000001
+          ],
+          "main_attention_ms": 1.0224534999999921,
+          "main_attention_ms_arm_medians_ms": [
+            1.0215079999999852,
+            1.023398999999999
+          ],
+          "flashinfer_dense_ms": 8.231842,
+          "flashinfer_dense_ms_arm_medians_ms": [
+            8.234898999999999,
+            8.228785
+          ],
+          "nfa_operator_total_ms": 18.437931999999982,
+          "flashinfer_over_nfa_operator": 0.44646232560137483,
+          "nfa_skip": {
+            "near_layers": [
+              7,
+              28,
+              29,
+              30,
+              31,
+              33
+            ],
+            "far_layers": [],
+            "both_layers": []
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+            "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 98227,
+            "provenance": "repeated-needle-body-extension",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "gpu_hygiene": "clean",
+          "source_paths": [
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_a1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_b1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_b2.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_a2.json"
+          ]
+        },
+        {
+          "context_length": 131072,
+          "execution": "eager",
+          "l1_ms": 2.56820649999999,
+          "l1_ms_arm_medians_ms": [
+            2.566285999999988,
+            2.5701269999999914
+          ],
+          "l2_ms": 16.34987099999999,
+          "l2_ms_arm_medians_ms": [
+            16.348207,
+            16.35153499999998
+          ],
+          "main_attention_ms": 1.022549000000007,
+          "main_attention_ms_arm_medians_ms": [
+            1.0225940000000047,
+            1.0225040000000094
+          ],
+          "flashinfer_dense_ms": 10.870391999999994,
+          "flashinfer_dense_ms_arm_medians_ms": [
+            10.857919999999991,
+            10.882863999999996
+          ],
+          "nfa_operator_total_ms": 19.94062649999999,
+          "flashinfer_over_nfa_operator": 0.5451379373662106,
+          "nfa_skip": {
+            "near_layers": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ],
+            "far_layers": [],
+            "both_layers": []
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+            "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 130986,
+            "provenance": "native-ruler",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "gpu_hygiene": "clean",
+          "source_paths": [
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_a1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_b1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_b2.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_a2.json"
+          ]
+        }
+      ]
+    },
+    "OP-02": {
+      "execution": "graph",
+      "nfa_total_definition": "sum of the two-arm medians of L1, L2 and main Attention",
+      "configurations": [
+        {
+          "context_length": 32768,
+          "execution": "graph",
+          "l1_ms": 0.34400200000000114,
+          "l1_ms_arm_medians_ms": [
+            0.34381099999999154,
+            0.34419300000001074
+          ],
+          "l2_ms": 0.9382895000000033,
+          "l2_ms_arm_medians_ms": [
+            0.9397130000000095,
+            0.9368659999999972
+          ],
+          "main_attention_ms": 1.0225305000000051,
+          "main_attention_ms_arm_medians_ms": [
+            1.026402000000004,
+            1.0186590000000062
+          ],
+          "flashinfer_dense_ms": 2.9045335000000003,
+          "flashinfer_dense_ms_arm_medians_ms": [
+            2.9042760000000003,
+            2.904791
+          ],
+          "nfa_operator_total_ms": 2.3048220000000095,
+          "flashinfer_over_nfa_operator": 1.260198618374863,
+          "nfa_skip": {
+            "near_layers": [],
+            "far_layers": [
+              11,
+              14
+            ],
+            "both_layers": []
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+            "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 32621,
+            "provenance": "native-ruler",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "gpu_hygiene": "clean",
+          "source_paths": [
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_a1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_b1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_b2.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_a2.json"
+          ]
+        },
+        {
+          "context_length": 65536,
+          "execution": "graph",
+          "l1_ms": 0.3492149999999993,
+          "l1_ms_arm_medians_ms": [
+            0.34838199999999236,
+            0.35004800000000613
+          ],
+          "l2_ms": 16.295239499999994,
+          "l2_ms_arm_medians_ms": [
+            16.302447000000004,
+            16.288031999999983
+          ],
+          "main_attention_ms": 1.0240685000000012,
+          "main_attention_ms_arm_medians_ms": [
+            1.0246750000000036,
+            1.0234619999999985
+          ],
+          "flashinfer_dense_ms": 5.5507420000000005,
+          "flashinfer_dense_ms_arm_medians_ms": [
+            5.572486000000003,
+            5.528997999999998
+          ],
+          "nfa_operator_total_ms": 17.668522999999997,
+          "flashinfer_over_nfa_operator": 0.31415993289308913,
+          "nfa_skip": {
+            "near_layers": [
+              7,
+              29,
+              30
+            ],
+            "far_layers": [],
+            "both_layers": []
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+            "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 65198,
+            "provenance": "native-ruler",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "gpu_hygiene": "clean",
+          "source_paths": [
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_a1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_b1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_b2.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_a2.json"
+          ]
+        },
+        {
+          "context_length": 98304,
+          "execution": "graph",
+          "l1_ms": 0.3712790000000073,
+          "l1_ms_arm_medians_ms": [
+            0.37187200000000487,
+            0.37068600000000973
+          ],
+          "l2_ms": 16.279699500000014,
+          "l2_ms_arm_medians_ms": [
+            16.282917000000023,
+            16.27648200000001
+          ],
+          "main_attention_ms": 1.0219410000000018,
+          "main_attention_ms_arm_medians_ms": [
+            1.0234250000000071,
+            1.0204569999999962
+          ],
+          "flashinfer_dense_ms": 8.249757000000002,
+          "flashinfer_dense_ms_arm_medians_ms": [
+            8.226649000000004,
+            8.272865000000001
+          ],
+          "nfa_operator_total_ms": 17.672919500000024,
+          "flashinfer_over_nfa_operator": 0.46680216022032983,
+          "nfa_skip": {
+            "near_layers": [
+              7,
+              28,
+              29,
+              30,
+              31,
+              33
+            ],
+            "far_layers": [],
+            "both_layers": []
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+            "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 98227,
+            "provenance": "repeated-needle-body-extension",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "gpu_hygiene": "clean",
+          "source_paths": [
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_a1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_b1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_b2.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_a2.json"
+          ]
+        },
+        {
+          "context_length": 131072,
+          "execution": "graph",
+          "l1_ms": 0.36915250000000266,
+          "l1_ms_arm_medians_ms": [
+            0.36896200000001317,
+            0.3693429999999921
+          ],
+          "l2_ms": 16.302771,
+          "l2_ms_arm_medians_ms": [
+            16.308119,
+            16.297422999999995
+          ],
+          "main_attention_ms": 1.026981500000002,
+          "main_attention_ms_arm_medians_ms": [
+            1.0274920000000043,
+            1.0264709999999995
+          ],
+          "flashinfer_dense_ms": 10.842950999999996,
+          "flashinfer_dense_ms_arm_medians_ms": [
+            10.84396799999999,
+            10.841934000000004
+          ],
+          "nfa_operator_total_ms": 17.698905000000003,
+          "flashinfer_over_nfa_operator": 0.6126340019340176,
+          "nfa_skip": {
+            "near_layers": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ],
+            "far_layers": [],
+            "both_layers": []
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+            "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 130986,
+            "provenance": "native-ruler",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "gpu_hygiene": "clean",
+          "source_paths": [
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_a1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_b1.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_b2.json",
+            "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_a2.json"
+          ]
+        }
+      ]
+    }
+  },
+  "e2e": {
+    "scope": "complete decode; 512 generated tokens; first 3 steps excluded; steady TPOT median of two ABBA measured repeats; prefill excluded",
+    "throughput_scope": "per-request tokens/s = 1000 / TPOT; not batch-aggregated",
+    "missing_configurations": [],
+    "sources": [
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler32k.json",
+        "sha256": "ba4d864f9221a973704740f11909ea82f4e67079891929733efb34f9b249e7c5",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "9a1b1ac87e5551895fb8ee83411c7e969902e5c90a52062145d8622cc1c70ab9"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler64k.json",
+        "sha256": "530028e505e90906c6bc0f7f2661281f17cf565c20bc7316e44cfd83f641f60e",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler128k_b1_graph.json",
+        "sha256": "73790ccf7b063cae95b31a856d14d2917c7ef05ba6db0afb5c40f165632dfcdc",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler128k_b1_eager.json",
+        "sha256": "ebf8b4de67ad2385683bed9d9b80cf927515c9846565ef21f7073b185aa62a91",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler128k_b2_b4.json",
+        "sha256": "86cde58ec05042a563869ca68eebf5e21d0a13a300fd282b524c494cdb9b7690",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      }
+    ],
+    "records": [
+      {
+        "context_length": 32768,
+        "batch_size": 1,
+        "execution": "eager",
+        "nfa_tpot_ms": 24.152679920196533,
+        "flashinfer_tpot_ms": 20.652007579803467,
+        "nfa_repeat_tpot_ms": [
+          24.286399841308594,
+          24.018959999084473
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          20.610447883605957,
+          20.693567276000977
+        ],
+        "nfa_throughput_tokens_per_second": 41.4032729827135,
+        "flashinfer_throughput_tokens_per_second": 48.421442619358,
+        "flashinfer_over_nfa_tpot": 0.8550607074676713,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 23
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_1.jsonl",
+          "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 32621,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler32k.json",
+          "sha256": "ba4d864f9221a973704740f11909ea82f4e67079891929733efb34f9b249e7c5",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "9a1b1ac87e5551895fb8ee83411c7e969902e5c90a52062145d8622cc1c70ab9"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_a_ruler32k_b1_eager_attempt0.json",
+            "sha256": "ed3262550daeb499a8af539c77e4873abec941d299ab8334c517551e3f996e39"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_a_ruler32k_b1_eager_attempt0.json",
+            "sha256": "9736dc7402317cbe81e372e518aff35a55eb7d0b36fb3b5104aec19d4c9fddc0"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_b_ruler32k_b1_eager_attempt0.json",
+            "sha256": "d7cd076761e2f9b31675ddcb4c4aaf18cabff66dfb19856a63a60d792c2ccf47"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_b_ruler32k_b1_eager_attempt0.json",
+            "sha256": "0e9adc8c5f20c10290cfc395f8da437827407f9a217a238033974f2651f6bbf6"
+          }
+        }
+      },
+      {
+        "context_length": 32768,
+        "batch_size": 1,
+        "execution": "graph",
+        "nfa_tpot_ms": 9.816295862197876,
+        "flashinfer_tpot_ms": 9.827192068099976,
+        "nfa_repeat_tpot_ms": [
+          9.82047986984253,
+          9.812111854553223
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          9.826720237731934,
+          9.827663898468018
+        ],
+        "nfa_throughput_tokens_per_second": 101.87142014035621,
+        "flashinfer_throughput_tokens_per_second": 101.75846702397295,
+        "flashinfer_over_nfa_tpot": 1.0011100119693885,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 23
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_1.jsonl",
+          "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 32621,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler32k.json",
+          "sha256": "ba4d864f9221a973704740f11909ea82f4e67079891929733efb34f9b249e7c5",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "9a1b1ac87e5551895fb8ee83411c7e969902e5c90a52062145d8622cc1c70ab9"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_a_ruler32k_b1_graph_attempt0.json",
+            "sha256": "d5b4b04696fa87db93ed87a3635ae5555cbeb988cc348502d89bbd68a0482489"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_a_ruler32k_b1_graph_attempt0.json",
+            "sha256": "776d91982e02f1190d5d021d248ec394cb975c28c09e2504cdcc9014b2b4d2ba"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_b_ruler32k_b1_graph_attempt0.json",
+            "sha256": "13423508de1a6bd8c0ea683dc9a01ac22914b89f256fcf24e7c2317d4345f274"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_b_ruler32k_b1_graph_attempt0.json",
+            "sha256": "69585dbcd2a524b836225589ac8705ce8d31b291c781526a11c3bf3e500e23cd"
+          }
+        }
+      },
+      {
+        "context_length": 32768,
+        "batch_size": 2,
+        "execution": "eager",
+        "nfa_tpot_ms": 25.23688840866089,
+        "flashinfer_tpot_ms": 20.810839653015137,
+        "nfa_repeat_tpot_ms": [
+          25.13088035583496,
+          25.342896461486816
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          20.836159706115723,
+          20.78551959991455
+        ],
+        "nfa_throughput_tokens_per_second": 39.6245362663971,
+        "flashinfer_throughput_tokens_per_second": 48.0518814556873,
+        "flashinfer_over_nfa_tpot": 0.8246198705650731,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 25
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          },
+          "1": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_1.jsonl",
+          "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 32621,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler32k.json",
+          "sha256": "ba4d864f9221a973704740f11909ea82f4e67079891929733efb34f9b249e7c5",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "9a1b1ac87e5551895fb8ee83411c7e969902e5c90a52062145d8622cc1c70ab9"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_a_ruler32k_b2_eager_attempt0.json",
+            "sha256": "6f0e4c96b7206accd1f8e72b0f1b3ea2b4e60f0aea81a68159ff735b6f543b58"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_a_ruler32k_b2_eager_attempt0.json",
+            "sha256": "4a3d584b6177aba1a4a35dafe46e6d65b30bbff5500ceefb12cd0aaa586f29e6"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_b_ruler32k_b2_eager_attempt0.json",
+            "sha256": "86538a28a5ca256fe6f11da78ff5ade5f1639660c1222a38fead863d4bc875e2"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_b_ruler32k_b2_eager_attempt0.json",
+            "sha256": "9d2fb84b0ab7534271fd59be3405b086a28fc61f01d60b3681a3a80855c68f12"
+          }
+        }
+      },
+      {
+        "context_length": 32768,
+        "batch_size": 2,
+        "execution": "graph",
+        "nfa_tpot_ms": 11.724823951721191,
+        "flashinfer_tpot_ms": 11.60698413848877,
+        "nfa_repeat_tpot_ms": [
+          11.727215766906738,
+          11.722432136535645
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          11.59275197982788,
+          11.621216297149658
+        ],
+        "nfa_throughput_tokens_per_second": 85.2891270792344,
+        "flashinfer_throughput_tokens_per_second": 86.15502425681785,
+        "flashinfer_over_nfa_tpot": 0.9899495451942267,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 32
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          },
+          "1": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_1.jsonl",
+          "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 32621,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler32k.json",
+          "sha256": "ba4d864f9221a973704740f11909ea82f4e67079891929733efb34f9b249e7c5",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "9a1b1ac87e5551895fb8ee83411c7e969902e5c90a52062145d8622cc1c70ab9"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_a_ruler32k_b2_graph_attempt0.json",
+            "sha256": "7501c0496b697026073f109fc409ca168dda6f9fc37bcdf100946487555d31d2"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_a_ruler32k_b2_graph_attempt0.json",
+            "sha256": "f57276809ddf88f3b97c6b9d827b66e5ff8c13b0da5227a2a547872b86ca8a5b"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_b_ruler32k_b2_graph_attempt0.json",
+            "sha256": "c09c63e36bf028d7d8171077c3ab319e93feb6134e685a25fe0bf9847b96d159"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_b_ruler32k_b2_graph_attempt0.json",
+            "sha256": "61daf10cb095cf3f24d66ad90f5b0896a8ffddf1417140e1e8475a591c58d4e7"
+          }
+        }
+      },
+      {
+        "context_length": 32768,
+        "batch_size": 4,
+        "execution": "eager",
+        "nfa_tpot_ms": 24.823471546173096,
+        "flashinfer_tpot_ms": 20.673255920410156,
+        "nfa_repeat_tpot_ms": [
+          24.92209529876709,
+          24.7248477935791
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          20.657743453979492,
+          20.68876838684082
+        ],
+        "nfa_throughput_tokens_per_second": 40.28445409579164,
+        "flashinfer_throughput_tokens_per_second": 48.371674198292425,
+        "flashinfer_over_nfa_tpot": 0.8328108291363157,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 25
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          },
+          "1": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          },
+          "2": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          },
+          "3": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_1.jsonl",
+          "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 32621,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler32k.json",
+          "sha256": "ba4d864f9221a973704740f11909ea82f4e67079891929733efb34f9b249e7c5",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "9a1b1ac87e5551895fb8ee83411c7e969902e5c90a52062145d8622cc1c70ab9"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_a_ruler32k_b4_eager_attempt0.json",
+            "sha256": "75e4c4f6427641ef64d6f8dc52770dcb6f92ca153ea450e0a0bcdd0db88b195a"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_a_ruler32k_b4_eager_attempt0.json",
+            "sha256": "73a0fd034b9264fb62efe55f01a77356f49cd81e8f52c44be7e16f339a6c8eb4"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_b_ruler32k_b4_eager_attempt0.json",
+            "sha256": "4fefd76b6be944c7686a05155722de77c83591795820bc8e73de9de67dff0bb0"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_b_ruler32k_b4_eager_attempt0.json",
+            "sha256": "c3f4895ee10ec74539785c2f52f8a627982e430350d8dab87f938c3f75f56fc2"
+          }
+        }
+      },
+      {
+        "context_length": 32768,
+        "batch_size": 4,
+        "execution": "graph",
+        "nfa_tpot_ms": 13.664368152618408,
+        "flashinfer_tpot_ms": 15.08731985092163,
+        "nfa_repeat_tpot_ms": [
+          13.66425609588623,
+          13.664480209350586
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          15.080447673797607,
+          15.094192028045654
+        ],
+        "nfa_throughput_tokens_per_second": 73.18303992039155,
+        "flashinfer_throughput_tokens_per_second": 66.28082455207667,
+        "flashinfer_over_nfa_tpot": 1.1041359309417138,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 32
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          },
+          "1": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          },
+          "2": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          },
+          "3": {
+            "far": 2,
+            "near": 0,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/32768/niah_multikey_1.jsonl",
+          "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 32621,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler32k.json",
+          "sha256": "ba4d864f9221a973704740f11909ea82f4e67079891929733efb34f9b249e7c5",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "9a1b1ac87e5551895fb8ee83411c7e969902e5c90a52062145d8622cc1c70ab9"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_a_ruler32k_b4_graph_attempt0.json",
+            "sha256": "8531978adafaf6dcc9b87ac291bdabdb407db52abf4aa446d5d2b0cfdd5c4510"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_a_ruler32k_b4_graph_attempt0.json",
+            "sha256": "f6192fbbfd7e0962386cfb7c4155b20648ed3dbe2cf5ff81185799243dca20c8"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/flashinfer_b_ruler32k_b4_graph_attempt0.json",
+            "sha256": "a188056377b9ed2e8212cc1ba7aad8a5004d27aa24e6df1109568c68061c809b"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler32k/nfa_b_ruler32k_b4_graph_attempt0.json",
+            "sha256": "4a35094ec4ae5189dc196f45bb892fa4b35868e8f14f6eb9a0de873bb6dfa31b"
+          }
+        }
+      },
+      {
+        "context_length": 65536,
+        "batch_size": 1,
+        "execution": "eager",
+        "nfa_tpot_ms": 29.546112060546875,
+        "flashinfer_tpot_ms": 20.746944427490234,
+        "nfa_repeat_tpot_ms": [
+          29.44204807281494,
+          29.65017604827881
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          20.733216285705566,
+          20.760672569274902
+        ],
+        "nfa_throughput_tokens_per_second": 33.84540063852621,
+        "flashinfer_throughput_tokens_per_second": 48.19986882863456,
+        "flashinfer_over_nfa_tpot": 0.7021886461736456,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 22
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+          "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 65198,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler64k.json",
+          "sha256": "530028e505e90906c6bc0f7f2661281f17cf565c20bc7316e44cfd83f641f60e",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_a_ruler64k_b1_eager_attempt0.json",
+            "sha256": "59a833eb178388ef562c081d859eccfb6a3c4eeca35fda877a7768d658f195d6"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_a_ruler64k_b1_eager_attempt0.json",
+            "sha256": "ac7852ab52c56ef5133683350c99347de3148ce5dd25aeeb046f90322903ffa6"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_b_ruler64k_b1_eager_attempt0.json",
+            "sha256": "dd00490f554684c688859efa1c1e48a2fb7a16353ed2bca76ee41e556cacd74e"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_b_ruler64k_b1_eager_attempt0.json",
+            "sha256": "f3f902008ecf0396455d3ea122d79beb377afaed9e666f132b9d2af9026408a2"
+          }
+        }
+      },
+      {
+        "context_length": 65536,
+        "batch_size": 1,
+        "execution": "graph",
+        "nfa_tpot_ms": 24.665128707885742,
+        "flashinfer_tpot_ms": 11.303776025772095,
+        "nfa_repeat_tpot_ms": [
+          24.687792778015137,
+          24.642464637756348
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          11.3056960105896,
+          11.30185604095459
+        ],
+        "nfa_throughput_tokens_per_second": 40.54306838789322,
+        "flashinfer_throughput_tokens_per_second": 88.46601327910652,
+        "flashinfer_over_nfa_tpot": 0.45828976445430586,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 22
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+          "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 65198,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler64k.json",
+          "sha256": "530028e505e90906c6bc0f7f2661281f17cf565c20bc7316e44cfd83f641f60e",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_a_ruler64k_b1_graph_attempt0.json",
+            "sha256": "c46fa179d716230c1d75b33f1338e2a113792854ef7b78f269300ce67ee54214"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_a_ruler64k_b1_graph_attempt0.json",
+            "sha256": "cbe511692b5c5609881af8b287ef866510345b96fcce1012a3a734f064ce5694"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_b_ruler64k_b1_graph_attempt0.json",
+            "sha256": "8c44ad976bc881115f3cbd3b1c2db9a4d97090e5d5a09a9c3356f7971f762efc"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_b_ruler64k_b1_graph_attempt0.json",
+            "sha256": "74ef7dddb5328922b7a41488800233f3209e3395ac2c9ce7e24d9fa79ca73993"
+          }
+        }
+      },
+      {
+        "context_length": 65536,
+        "batch_size": 2,
+        "execution": "eager",
+        "nfa_tpot_ms": 31.97819995880127,
+        "flashinfer_tpot_ms": 20.805543899536133,
+        "nfa_repeat_tpot_ms": [
+          31.89014434814453,
+          32.06625556945801
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          20.905920028686523,
+          20.705167770385742
+        ],
+        "nfa_throughput_tokens_per_second": 31.27130361584886,
+        "flashinfer_throughput_tokens_per_second": 48.06411237450492,
+        "flashinfer_over_nfa_tpot": 0.6506164801752664,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 22
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          },
+          "1": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+          "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 65198,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler64k.json",
+          "sha256": "530028e505e90906c6bc0f7f2661281f17cf565c20bc7316e44cfd83f641f60e",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_a_ruler64k_b2_eager_attempt0.json",
+            "sha256": "33dd828554612a010f96b6b0ca506ba5177b31894ed14b1396cb11c24343090c"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_a_ruler64k_b2_eager_attempt0.json",
+            "sha256": "eb7c5eeb07c890e7b077467a8a6d9bc479f27d7302af4b3b223ab647523b137e"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_b_ruler64k_b2_eager_attempt0.json",
+            "sha256": "7136699c25fe9866affec57404514b2927a7b5d018efd12c4b7f89251805b852"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_b_ruler64k_b2_eager_attempt0.json",
+            "sha256": "3d308e60c2f370e2095fc576861cbe8cc5f7a5397b15bf0fcb320a4df990ef6a"
+          }
+        }
+      },
+      {
+        "context_length": 65536,
+        "batch_size": 2,
+        "execution": "graph",
+        "nfa_tpot_ms": 26.53829574584961,
+        "flashinfer_tpot_ms": 14.468631982803345,
+        "nfa_repeat_tpot_ms": [
+          26.579471588134766,
+          26.497119903564453
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          14.471680164337158,
+          14.465583801269531
+        ],
+        "nfa_throughput_tokens_per_second": 37.681394825679135,
+        "flashinfer_throughput_tokens_per_second": 69.11503459266552,
+        "flashinfer_over_nfa_tpot": 0.5451982343314615,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 22
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          },
+          "1": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+          "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 65198,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler64k.json",
+          "sha256": "530028e505e90906c6bc0f7f2661281f17cf565c20bc7316e44cfd83f641f60e",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_a_ruler64k_b2_graph_attempt0.json",
+            "sha256": "07aee882670020f67ab716a5a5d4c283ca2bcc11f37d9d4766b176e765cb61c9"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_a_ruler64k_b2_graph_attempt0.json",
+            "sha256": "3c04bfd22ca462c63f9ed8d50160243fbcfd61b1f7536acf2f00ca462237d30a"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_b_ruler64k_b2_graph_attempt0.json",
+            "sha256": "b87a5312d7d3589d97b505c588836b35bb18a92329fb2dd11dd34a8a984ff50c"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_b_ruler64k_b2_graph_attempt0.json",
+            "sha256": "98113a6bfde79496440b74614050bf06e2fcdd6d158f7749e55e713adfe6e441"
+          }
+        }
+      },
+      {
+        "context_length": 65536,
+        "batch_size": 4,
+        "execution": "eager",
+        "nfa_tpot_ms": 33.40548038482666,
+        "flashinfer_tpot_ms": 24.83028793334961,
+        "nfa_repeat_tpot_ms": [
+          33.39529609680176,
+          33.41566467285156
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          24.632495880126953,
+          25.028079986572266
+        ],
+        "nfa_throughput_tokens_per_second": 29.935207890445938,
+        "flashinfer_throughput_tokens_per_second": 40.27339524552585,
+        "flashinfer_over_nfa_tpot": 0.7432998312644518,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 22
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          },
+          "1": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          },
+          "2": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          },
+          "3": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+          "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 65198,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler64k.json",
+          "sha256": "530028e505e90906c6bc0f7f2661281f17cf565c20bc7316e44cfd83f641f60e",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_a_ruler64k_b4_eager_attempt0.json",
+            "sha256": "61c3f555b216b42997a1bb1f36f430a91bfe0d2e40b706475e52e0291078c6b3"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_a_ruler64k_b4_eager_attempt0.json",
+            "sha256": "87d5a5c6c83bc8aa3be168c183e6e4eb73b530c37b155b6b9411d4dbbc2dc6be"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_b_ruler64k_b4_eager_attempt0.json",
+            "sha256": "ea5b53f79b8b90c93c54bdff7c72d4d255a6a3f5e91c0e938bf7168ff50b9bdf"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_b_ruler64k_b4_eager_attempt0.json",
+            "sha256": "f584ad6dc61232f5c0a31c31a4a3d41fc38454f0b5ad59bcf501f9cbfcc9d9fd"
+          }
+        }
+      },
+      {
+        "context_length": 65536,
+        "batch_size": 4,
+        "execution": "graph",
+        "nfa_tpot_ms": 27.78452777862549,
+        "flashinfer_tpot_ms": 21.48300790786743,
+        "nfa_repeat_tpot_ms": [
+          27.77414321899414,
+          27.794912338256836
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          21.466896057128906,
+          21.499119758605957
+        ],
+        "nfa_throughput_tokens_per_second": 35.991254124149464,
+        "flashinfer_throughput_tokens_per_second": 46.54841651078961,
+        "flashinfer_over_nfa_tpot": 0.7732003969631693,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 22
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          },
+          "1": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          },
+          "2": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          },
+          "3": {
+            "far": 0,
+            "near": 3,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+          "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 65198,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler64k.json",
+          "sha256": "530028e505e90906c6bc0f7f2661281f17cf565c20bc7316e44cfd83f641f60e",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_a_ruler64k_b4_graph_attempt0.json",
+            "sha256": "cd8a370544df168d9b5880696eebd0de4fb0d352dff6244b9b0a99008f5c3a23"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_a_ruler64k_b4_graph_attempt0.json",
+            "sha256": "b8d1898182901eea85a99629edcf7e026df842e2b716dbb04998be1ef22178b2"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/flashinfer_b_ruler64k_b4_graph_attempt0.json",
+            "sha256": "7b041c2f50de4f19187421605d8db21a383eca97ec9633acf410903b41ee95b0"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler64k/nfa_b_ruler64k_b4_graph_attempt0.json",
+            "sha256": "db8c6bf863a55c84b727e5c87a63120f97c1c14315e40c2d1f53d168bbc43b0b"
+          }
+        }
+      },
+      {
+        "context_length": 131072,
+        "batch_size": 1,
+        "execution": "eager",
+        "nfa_tpot_ms": 30.98465633392334,
+        "flashinfer_tpot_ms": 20.717408180236816,
+        "nfa_repeat_tpot_ms": [
+          31.109872817993164,
+          30.859439849853516
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          20.73678493499756,
+          20.698031425476074
+        ],
+        "nfa_throughput_tokens_per_second": 32.274038776578486,
+        "flashinfer_throughput_tokens_per_second": 48.2685860750642,
+        "flashinfer_over_nfa_tpot": 0.6686344349591673,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 31
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/131072/niah_multikey_1.jsonl",
+          "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 130986,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler128k_b1_eager.json",
+          "sha256": "ebf8b4de67ad2385683bed9d9b80cf927515c9846565ef21f7073b185aa62a91",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b1_eager/nfa_a_ruler128k_b1_eager_attempt1.json",
+            "sha256": "52e67ee601741ac32f5976e0b2a495bfe0fcb0fb5bc65f58288ebc6395f4a1d8"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b1_eager/flashinfer_a_ruler128k_b1_eager_attempt1.json",
+            "sha256": "73585a9edc8b8de11462d9ee9da64c79006e3ce3fc0f37d366cbe1cfa3697866"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b1_eager/flashinfer_b_ruler128k_b1_eager_attempt1.json",
+            "sha256": "a5915f314218a4908be8f1d2631b90ce062ff9184b719bc0ded34a3e4d0eb678"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b1_eager/nfa_b_ruler128k_b1_eager_attempt1.json",
+            "sha256": "353d98e8ffa5172870e6762389c0da3d05afbdf3da2c596016bdee0940071c8b"
+          }
+        }
+      },
+      {
+        "context_length": 131072,
+        "batch_size": 1,
+        "execution": "graph",
+        "nfa_tpot_ms": 26.20753574371338,
+        "flashinfer_tpot_ms": 14.007799863815308,
+        "nfa_repeat_tpot_ms": [
+          26.22001552581787,
+          26.195055961608887
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          14.011583805084229,
+          14.004015922546387
+        ],
+        "nfa_throughput_tokens_per_second": 38.15696408006916,
+        "flashinfer_throughput_tokens_per_second": 71.38879836391592,
+        "flashinfer_over_nfa_tpot": 0.5344951162443984,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 31
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": null,
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/131072/niah_multikey_1.jsonl",
+          "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 130986,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler128k_b1_graph.json",
+          "sha256": "73790ccf7b063cae95b31a856d14d2917c7ef05ba6db0afb5c40f165632dfcdc",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b1_graph/nfa_a_ruler128k_b1_graph_attempt0.json",
+            "sha256": "50a2ff3cec1a5cc176ad29a6ac68715762f4f8646b04450152ac8de4a8c6aa85"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b1_graph/flashinfer_a_ruler128k_b1_graph_attempt0.json",
+            "sha256": "fe32db9fcd95638f3bb7431af28b973119ab5752e03fb565a36063f95af9d136"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b1_graph/flashinfer_b_ruler128k_b1_graph_attempt0.json",
+            "sha256": "a7a701753f81a17a9cf052c53d949261875a2cbc72d7dd3a5d76333bb173c1f8"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b1_graph/nfa_b_ruler128k_b1_graph_attempt0.json",
+            "sha256": "097234dada1b5ea8b35b5de82a08f560cabe6fb4b43770547e609779d86f153a"
+          }
+        }
+      },
+      {
+        "context_length": 131072,
+        "batch_size": 2,
+        "execution": "eager",
+        "nfa_tpot_ms": 33.27283191680908,
+        "flashinfer_tpot_ms": 23.65659189224243,
+        "nfa_repeat_tpot_ms": [
+          33.436767578125,
+          33.108896255493164
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          23.605728149414062,
+          23.7074556350708
+        ],
+        "nfa_throughput_tokens_per_second": 30.054550285958996,
+        "flashinfer_throughput_tokens_per_second": 42.27151588678013,
+        "flashinfer_over_nfa_tpot": 0.7109882306198101,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 31
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          },
+          "1": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": {
+          "0": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          },
+          "1": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          }
+        },
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/131072/niah_multikey_1.jsonl",
+          "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 130986,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler128k_b2_b4.json",
+          "sha256": "86cde58ec05042a563869ca68eebf5e21d0a13a300fd282b524c494cdb9b7690",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/nfa_a_ruler128k_b2_eager_attempt0.json",
+            "sha256": "879d619cc05c2a2791ffb5909b8e7392ef38696a82e01050b6e7e81347a0b206"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/flashinfer_a_ruler128k_b2_eager_attempt0.json",
+            "sha256": "55b3da00513f1bedd1f76e18b1d1af06315a646e0d93475bc3f4d54a77f12d16"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/flashinfer_b_ruler128k_b2_eager_attempt0.json",
+            "sha256": "c71c8b5a72ddd4afbaf12c5e8acc87a9410212fad198704f18cc26c427bfbd40"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/nfa_b_ruler128k_b2_eager_attempt0.json",
+            "sha256": "4da926e2185839e8fae2943a2c036166045e83927742e340b274248b8f5bcda9"
+          }
+        }
+      },
+      {
+        "context_length": 131072,
+        "batch_size": 2,
+        "execution": "graph",
+        "nfa_tpot_ms": 27.906776428222656,
+        "flashinfer_tpot_ms": 20.386832237243652,
+        "nfa_repeat_tpot_ms": [
+          27.938048362731934,
+          27.87550449371338
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          20.362688064575195,
+          20.41097640991211
+        ],
+        "nfa_throughput_tokens_per_second": 35.83359054644093,
+        "flashinfer_throughput_tokens_per_second": 49.05126938618505,
+        "flashinfer_over_nfa_tpot": 0.7305333989283713,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 10
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          },
+          "1": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": {
+          "0": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          },
+          "1": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          }
+        },
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/131072/niah_multikey_1.jsonl",
+          "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 130986,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler128k_b2_b4.json",
+          "sha256": "86cde58ec05042a563869ca68eebf5e21d0a13a300fd282b524c494cdb9b7690",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/nfa_a_ruler128k_b2_graph_attempt0.json",
+            "sha256": "f6b1bbd953d47bc11f01836106e7a500dd9da8100e7d6b8439ee1ab96ad2851c"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/flashinfer_a_ruler128k_b2_graph_attempt0.json",
+            "sha256": "3e7b919548aea21827d9a2103002d778fd842454501be5a53d6668290776fe1a"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/flashinfer_b_ruler128k_b2_graph_attempt0.json",
+            "sha256": "3689281f04327f5a0ee037e9cf19f52b899eda795cd0890389d6147fd4cca25a"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/nfa_b_ruler128k_b2_graph_attempt0.json",
+            "sha256": "00238e5ff69080af2c20000d98007c91cc9e0cbb33716e4fbc2fc095ca639fff"
+          }
+        }
+      },
+      {
+        "context_length": 131072,
+        "batch_size": 4,
+        "execution": "eager",
+        "nfa_tpot_ms": 34.395463943481445,
+        "flashinfer_tpot_ms": 37.43773555755615,
+        "nfa_repeat_tpot_ms": [
+          34.40956687927246,
+          34.38136100769043
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          37.42188835144043,
+          37.453582763671875
+        ],
+        "nfa_throughput_tokens_per_second": 29.073601148197852,
+        "flashinfer_throughput_tokens_per_second": 26.711017242552415,
+        "flashinfer_over_nfa_tpot": 1.088449791492092,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 31
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          },
+          "1": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          },
+          "2": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          },
+          "3": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": {
+          "0": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          },
+          "1": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          },
+          "2": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          },
+          "3": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          }
+        },
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/131072/niah_multikey_1.jsonl",
+          "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 130986,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler128k_b2_b4.json",
+          "sha256": "86cde58ec05042a563869ca68eebf5e21d0a13a300fd282b524c494cdb9b7690",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/nfa_a_ruler128k_b4_eager_attempt0.json",
+            "sha256": "d954caade4bc85cc41538e2e10754a09f50a24544198823dd17d1362b64a5e38"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/flashinfer_a_ruler128k_b4_eager_attempt0.json",
+            "sha256": "f42a07bb3d9bad0896f441a29f42f640346be290950ceccc8628b80c6a9dc869"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/flashinfer_b_ruler128k_b4_eager_attempt0.json",
+            "sha256": "3489db54a9e5e2b252e54a27a76a17daac740be8402c4b68ec68e12aa64aefdd"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/nfa_b_ruler128k_b4_eager_attempt0.json",
+            "sha256": "e3215e142cfe4eb48fc53b8b4abc481662e11e5c065a9873728531a9483374cf"
+          }
+        }
+      },
+      {
+        "context_length": 131072,
+        "batch_size": 4,
+        "execution": "graph",
+        "nfa_tpot_ms": 29.122439861297607,
+        "flashinfer_tpot_ms": 34.98308849334717,
+        "nfa_repeat_tpot_ms": [
+          29.142640113830566,
+          29.10223960876465
+        ],
+        "flashinfer_repeat_tpot_ms": [
+          34.9453125,
+          35.020864486694336
+        ],
+        "nfa_throughput_tokens_per_second": 34.3377822999286,
+        "flashinfer_throughput_tokens_per_second": 28.585240556738515,
+        "flashinfer_over_nfa_tpot": 1.2012416768636922,
+        "nfa_flashinfer_token_identity": false,
+        "nfa_flashinfer_first_divergence": {
+          "batch": 0,
+          "token": 10
+        },
+        "nfa_skip_policy_counts": {
+          "0": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          },
+          "1": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          },
+          "2": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          },
+          "3": {
+            "far": 0,
+            "near": 13,
+            "both": 0
+          }
+        },
+        "nfa_skip_policy_layers": {
+          "0": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          },
+          "1": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          },
+          "2": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          },
+          "3": {
+            "far": [],
+            "near": [
+              7,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ]
+          }
+        },
+        "gpu_hygiene": "clean",
+        "input": {
+          "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/131072/niah_multikey_1.jsonl",
+          "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 130986,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "source": {
+          "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler128k_b2_b4.json",
+          "sha256": "86cde58ec05042a563869ca68eebf5e21d0a13a300fd282b524c494cdb9b7690",
+          "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+        },
+        "arm_receipts": {
+          "nfa_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/nfa_a_ruler128k_b4_graph_attempt0.json",
+            "sha256": "853d22006886bf3bbaf104da8a718afea6d2783202125d135c8385f8bbdea13a"
+          },
+          "flashinfer_a": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/flashinfer_a_ruler128k_b4_graph_attempt0.json",
+            "sha256": "ded4573dda854acfdf7c46baef1447cb9d95c50b4dbe77135d5559a665e83c7e"
+          },
+          "flashinfer_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/flashinfer_b_ruler128k_b4_graph_attempt0.json",
+            "sha256": "34731f3f3478ce36ce3455944eb62fa35b5ad4cb0f4ab80555720cd7147c8a43"
+          },
+          "nfa_b": {
+            "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/arms/ruler128k_b2_b4/nfa_b_ruler128k_b4_graph_attempt0.json",
+            "sha256": "313591ef8921d9cf0dff8fc18203f6aef63f4b6a04308263bda667795e5d00bf"
+          }
+        }
+      }
+    ]
+  },
+  "operators": {
+    "scope": "pure CUDA device kernels; 3 warmup + 5 profiled repeats per arm; ABBA arm medians; no host or other model kernels",
+    "sources": [
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_a1.json",
+        "sha256": "dd4519f6dd22e39c2854b1bf6f3e25a8f5cfe0acf7cec01581721cc92d432b6f",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_b1.json",
+        "sha256": "c7aad64623196e61d34051936ef1e01eda3a61d9e80b3617e5ba813a5c631557",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_b2.json",
+        "sha256": "084b6dbc8aae980aa2ba835a580b207af8725136a87355a1b6edde89e2b88a5b",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_a2.json",
+        "sha256": "281186c15cae3808c782ecd06683b3961ae4a62687ffe3134e85c2a34adfcd68",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_a1.json",
+        "sha256": "cedfd6e146761728ba6a1e05235a5da37b1f3b8c3cff3c418bfe716e015474f7",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_b1.json",
+        "sha256": "243ff2e531403850dd7ae77a3eec6b7ed1cd2f663c0fa2a5e68a3261e13716e9",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_b2.json",
+        "sha256": "a6feecf69af30bb798c0c9698eaac71959c3ab51b8d510c9f3ad9e95df1a5757",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_a2.json",
+        "sha256": "83831478deba27ab813822265656d2361950716bda65c03698db0a85ac0a07fd",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_a1.json",
+        "sha256": "214400ca0a559c51cd05008cdd0288f69d7e1e3eb6b8eb4ce7853275b43721c0",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_b1.json",
+        "sha256": "3782ed673884be23ca12b6ff7c818cd0e9f84b0aec7b4ee83bf9d3a62078f14f",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_b2.json",
+        "sha256": "fcb8460e184812f457c269b4225cd78db11d7880bbfb29e11e9dbd3f4b92e7e3",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_a2.json",
+        "sha256": "37d5dee030d4f2619579ddcc613ea4ce7a88a2a44a0672a9a62de7a8334c6655",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_a1.json",
+        "sha256": "ea2681afcbdbbe57b6c65ca680fc48ddbfb8ee88b5ef3dce1ef06f9ea8142062",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_b1.json",
+        "sha256": "a4ac2d4703f61482a1f666fdf2fb5f9a5bf15f735126ef8f80015486f37549a6",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_b2.json",
+        "sha256": "1342503add838339d85c77e9c421626770171df7db44f2efc06ae8e9694de75e",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_a2.json",
+        "sha256": "c97c0fa6fb8df58b9be68a7c218bda9b17f1b96a239168c3ff72bd8cb0147226",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_a1.json",
+        "sha256": "962679b668c432f0064f06080780f718b55db003f1af4bcc31d06d6fe10c4f8f",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_b1.json",
+        "sha256": "319a1d96a370c599baa5c065a2c3467b59bea41522400a002ebaf5f551588e94",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_b2.json",
+        "sha256": "09d707b0d567960cc26b0dd69c4062a6a73cfce7baba4bae71539cfa421c69dc",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_a2.json",
+        "sha256": "a5bc4f03a2b885d360e48f368107499c163aaab7c0c84e8a8404d24d3e784722",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_a1.json",
+        "sha256": "a4f976dbb9aca4d827f2a5bd0ac5571bd48553ef881926ac5b9a95c81e686b14",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_b1.json",
+        "sha256": "14bf9872ac274bd845d14d70047349d2ab0250fa77424146bdc6b3a1a8d9fa41",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_b2.json",
+        "sha256": "e8ecd671881ccdf4cc7a91c4111dd1ab15cf642577f3a27819996d3e1a510e12",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_a2.json",
+        "sha256": "393e8b745123e104e02355ccbb2da49727dfb5f45c8c53fafe09b002a5b35764",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_a1.json",
+        "sha256": "38d6003a425459a5ae2e847e1063a3161914bb907a39463188876f5147674261",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_b1.json",
+        "sha256": "dd912f7a1eec9a0ae16a73c36c1d35e8cd78f891710c5f755a113c4e2c69699d",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_b2.json",
+        "sha256": "941fc8116d9984499fbec238144d90a5f545f14184f520a4fc50b619032f1d56",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_a2.json",
+        "sha256": "c6aa4bece7112e79b9a50abf14f67f3e125cf1d5d7a917f486de7c89746ac509",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_a1.json",
+        "sha256": "48b94227d0e67d44925f79ea0dbf02e39c28bc73765934a678aaeb70ed1fafde",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_b1.json",
+        "sha256": "14f63edae22ce3bb130701ececaec7eee99775df915c81c84b1ba80a87aa0ada",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_b2.json",
+        "sha256": "45a6e292a3f4144fd1cf1d0e22ad7b286227473e7d9120d6d127a6e41d086b3b",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      {
+        "path": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_a2.json",
+        "sha256": "b0466b566b8d2f4311a2c692359714aaabd8611c7db3ab209618bd12bdb45174",
+        "source_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "source_diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      }
+    ],
+    "records": [
+      {
+        "context_length": 32768,
+        "execution": "eager",
+        "l1_ms": 0.7904665000000095,
+        "l1_ms_arm_medians_ms": [
+          0.7899830000000111,
+          0.7909500000000078
+        ],
+        "l2_ms": 0.9680819999999954,
+        "l2_ms_arm_medians_ms": [
+          0.9674279999999964,
+          0.9687359999999944
+        ],
+        "main_attention_ms": 1.0220814999999994,
+        "main_attention_ms_arm_medians_ms": [
+          1.0219530000000077,
+          1.0222099999999912
+        ],
+        "flashinfer_dense_ms": 2.9122069999999995,
+        "flashinfer_dense_ms_arm_medians_ms": [
+          2.922041000000001,
+          2.902372999999998
+        ],
+        "nfa_operator_total_ms": 2.7806300000000044,
+        "flashinfer_over_nfa_operator": 1.0473191327145268,
+        "nfa_skip": {
+          "near_layers": [],
+          "far_layers": [
+            11,
+            14
+          ],
+          "both_layers": []
+        },
+        "input": {
+          "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+          "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 32621,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "gpu_hygiene": "clean",
+        "source_paths": [
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_a1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_b1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_b2.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_eager_a2.json"
+        ]
+      },
+      {
+        "context_length": 32768,
+        "execution": "graph",
+        "l1_ms": 0.34400200000000114,
+        "l1_ms_arm_medians_ms": [
+          0.34381099999999154,
+          0.34419300000001074
+        ],
+        "l2_ms": 0.9382895000000033,
+        "l2_ms_arm_medians_ms": [
+          0.9397130000000095,
+          0.9368659999999972
+        ],
+        "main_attention_ms": 1.0225305000000051,
+        "main_attention_ms_arm_medians_ms": [
+          1.026402000000004,
+          1.0186590000000062
+        ],
+        "flashinfer_dense_ms": 2.9045335000000003,
+        "flashinfer_dense_ms_arm_medians_ms": [
+          2.9042760000000003,
+          2.904791
+        ],
+        "nfa_operator_total_ms": 2.3048220000000095,
+        "flashinfer_over_nfa_operator": 1.260198618374863,
+        "nfa_skip": {
+          "near_layers": [],
+          "far_layers": [
+            11,
+            14
+          ],
+          "both_layers": []
+        },
+        "input": {
+          "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+          "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 32621,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "gpu_hygiene": "clean",
+        "source_paths": [
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_a1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_b1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_b2.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_32768_graph_a2.json"
+        ]
+      },
+      {
+        "context_length": 65536,
+        "execution": "eager",
+        "l1_ms": 1.1557219999999968,
+        "l1_ms_arm_medians_ms": [
+          1.1554970000000184,
+          1.1559469999999754
+        ],
+        "l2_ms": 16.301057000000007,
+        "l2_ms_arm_medians_ms": [
+          16.294573000000018,
+          16.307541
+        ],
+        "main_attention_ms": 1.021157999999998,
+        "main_attention_ms_arm_medians_ms": [
+          1.0214779999999917,
+          1.0208380000000041
+        ],
+        "flashinfer_dense_ms": 5.567942000000001,
+        "flashinfer_dense_ms_arm_medians_ms": [
+          5.5799489999999965,
+          5.555935000000006
+        ],
+        "nfa_operator_total_ms": 18.477937000000004,
+        "flashinfer_over_nfa_operator": 0.3013292014146384,
+        "nfa_skip": {
+          "near_layers": [
+            7,
+            29,
+            30
+          ],
+          "far_layers": [],
+          "both_layers": []
+        },
+        "input": {
+          "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+          "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 65198,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "gpu_hygiene": "clean",
+        "source_paths": [
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_a1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_b1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_b2.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_eager_a2.json"
+        ]
+      },
+      {
+        "context_length": 65536,
+        "execution": "graph",
+        "l1_ms": 0.3492149999999993,
+        "l1_ms_arm_medians_ms": [
+          0.34838199999999236,
+          0.35004800000000613
+        ],
+        "l2_ms": 16.295239499999994,
+        "l2_ms_arm_medians_ms": [
+          16.302447000000004,
+          16.288031999999983
+        ],
+        "main_attention_ms": 1.0240685000000012,
+        "main_attention_ms_arm_medians_ms": [
+          1.0246750000000036,
+          1.0234619999999985
+        ],
+        "flashinfer_dense_ms": 5.5507420000000005,
+        "flashinfer_dense_ms_arm_medians_ms": [
+          5.572486000000003,
+          5.528997999999998
+        ],
+        "nfa_operator_total_ms": 17.668522999999997,
+        "flashinfer_over_nfa_operator": 0.31415993289308913,
+        "nfa_skip": {
+          "near_layers": [
+            7,
+            29,
+            30
+          ],
+          "far_layers": [],
+          "both_layers": []
+        },
+        "input": {
+          "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+          "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 65198,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "gpu_hygiene": "clean",
+        "source_paths": [
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_a1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_b1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_b2.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_65536_graph_a2.json"
+        ]
+      },
+      {
+        "context_length": 98304,
+        "execution": "eager",
+        "l1_ms": 1.1998159999999929,
+        "l1_ms_arm_medians_ms": [
+          1.2003599999999928,
+          1.199271999999993
+        ],
+        "l2_ms": 16.215662499999997,
+        "l2_ms_arm_medians_ms": [
+          16.217895999999985,
+          16.21342900000001
+        ],
+        "main_attention_ms": 1.0224534999999921,
+        "main_attention_ms_arm_medians_ms": [
+          1.0215079999999852,
+          1.023398999999999
+        ],
+        "flashinfer_dense_ms": 8.231842,
+        "flashinfer_dense_ms_arm_medians_ms": [
+          8.234898999999999,
+          8.228785
+        ],
+        "nfa_operator_total_ms": 18.437931999999982,
+        "flashinfer_over_nfa_operator": 0.44646232560137483,
+        "nfa_skip": {
+          "near_layers": [
+            7,
+            28,
+            29,
+            30,
+            31,
+            33
+          ],
+          "far_layers": [],
+          "both_layers": []
+        },
+        "input": {
+          "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+          "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 98227,
+          "provenance": "repeated-needle-body-extension",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "gpu_hygiene": "clean",
+        "source_paths": [
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_a1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_b1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_b2.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_eager_a2.json"
+        ]
+      },
+      {
+        "context_length": 98304,
+        "execution": "graph",
+        "l1_ms": 0.3712790000000073,
+        "l1_ms_arm_medians_ms": [
+          0.37187200000000487,
+          0.37068600000000973
+        ],
+        "l2_ms": 16.279699500000014,
+        "l2_ms_arm_medians_ms": [
+          16.282917000000023,
+          16.27648200000001
+        ],
+        "main_attention_ms": 1.0219410000000018,
+        "main_attention_ms_arm_medians_ms": [
+          1.0234250000000071,
+          1.0204569999999962
+        ],
+        "flashinfer_dense_ms": 8.249757000000002,
+        "flashinfer_dense_ms_arm_medians_ms": [
+          8.226649000000004,
+          8.272865000000001
+        ],
+        "nfa_operator_total_ms": 17.672919500000024,
+        "flashinfer_over_nfa_operator": 0.46680216022032983,
+        "nfa_skip": {
+          "near_layers": [
+            7,
+            28,
+            29,
+            30,
+            31,
+            33
+          ],
+          "far_layers": [],
+          "both_layers": []
+        },
+        "input": {
+          "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+          "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 98227,
+          "provenance": "repeated-needle-body-extension",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "gpu_hygiene": "clean",
+        "source_paths": [
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_a1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_b1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_b2.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_98304_graph_a2.json"
+        ]
+      },
+      {
+        "context_length": 131072,
+        "execution": "eager",
+        "l1_ms": 2.56820649999999,
+        "l1_ms_arm_medians_ms": [
+          2.566285999999988,
+          2.5701269999999914
+        ],
+        "l2_ms": 16.34987099999999,
+        "l2_ms_arm_medians_ms": [
+          16.348207,
+          16.35153499999998
+        ],
+        "main_attention_ms": 1.022549000000007,
+        "main_attention_ms_arm_medians_ms": [
+          1.0225940000000047,
+          1.0225040000000094
+        ],
+        "flashinfer_dense_ms": 10.870391999999994,
+        "flashinfer_dense_ms_arm_medians_ms": [
+          10.857919999999991,
+          10.882863999999996
+        ],
+        "nfa_operator_total_ms": 19.94062649999999,
+        "flashinfer_over_nfa_operator": 0.5451379373662106,
+        "nfa_skip": {
+          "near_layers": [
+            7,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34
+          ],
+          "far_layers": [],
+          "both_layers": []
+        },
+        "input": {
+          "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+          "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 130986,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "gpu_hygiene": "clean",
+        "source_paths": [
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_a1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_b1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_b2.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_eager_a2.json"
+        ]
+      },
+      {
+        "context_length": 131072,
+        "execution": "graph",
+        "l1_ms": 0.36915250000000266,
+        "l1_ms_arm_medians_ms": [
+          0.36896200000001317,
+          0.3693429999999921
+        ],
+        "l2_ms": 16.302771,
+        "l2_ms_arm_medians_ms": [
+          16.308119,
+          16.297422999999995
+        ],
+        "main_attention_ms": 1.026981500000002,
+        "main_attention_ms_arm_medians_ms": [
+          1.0274920000000043,
+          1.0264709999999995
+        ],
+        "flashinfer_dense_ms": 10.842950999999996,
+        "flashinfer_dense_ms_arm_medians_ms": [
+          10.84396799999999,
+          10.841934000000004
+        ],
+        "nfa_operator_total_ms": 17.698905000000003,
+        "flashinfer_over_nfa_operator": 0.6126340019340176,
+        "nfa_skip": {
+          "near_layers": [
+            7,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34
+          ],
+          "far_layers": [],
+          "both_layers": []
+        },
+        "input": {
+          "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+          "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+          "sample_index": 0,
+          "sample_id": 0,
+          "actual_prompt_tokens": 130986,
+          "provenance": "native-ruler",
+          "performance_input_mode": "replicate one prompt across all batch rows"
+        },
+        "gpu_hygiene": "clean",
+        "source_paths": [
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_a1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_b1.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_b2.json",
+          "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/results/nfa_flashinfer_20261104/operators/natural/niah_multikey_1_s0_131072_graph_a2.json"
+        ]
+      }
+    ]
+  }
+}

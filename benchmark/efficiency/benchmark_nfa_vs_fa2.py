@@ -1,7 +1,7 @@
-"""真实 Qwen3-8B + 原生 RULER 的 NFA / FlashAttention-2 ABBA 对照驱动。
+"""真实 Qwen3-8B + 显式来源长文本的双方法完整 decode ABBA 对照驱动。
 
-每个 arm 启动独立进程，按 NFA-A、FA2-A、FA2-B、NFA-B 顺序测量。
-latency 与 memory 使用不同 run；默认只报告完整生产 decode TPOT。
+每个 arm 启动独立进程，按 A、B、B、A 顺序测量，只报告生产 decode
+TPOT、吞吐量与正确性，不提供显存测量模式。
 """
 from __future__ import annotations
 
@@ -29,7 +29,11 @@ def parse_args():
         '--data-root',
         default='/home/wangyuanshuo02/sparse-bench/third_party/'
                 'KVCache-Factory/data/RULER')
-    parser.add_argument('--task', default='niah_single_1')
+    parser.add_argument('--task', default='niah_multikey_1')
+    parser.add_argument('--input-provenance', default='native-ruler',
+                        choices=('native-ruler', 'repeated-needle-body-extension',
+                                 'longbench-v2'),
+                        help='输入数据来源必须显式声明并透传到每个测量臂')
     parser.add_argument('--context-length', type=int, default=32768,
                         choices=(32768, 65536, 131072))
     parser.add_argument('--batch-size', type=int, nargs='+', default=[1],
@@ -37,17 +41,18 @@ def parse_args():
     parser.add_argument('--execution', nargs='+', default=['eager', 'graph'],
                         choices=('eager', 'graph'))
     parser.add_argument('--sample-index', type=int, default=0)
-    parser.add_argument('--max-new-tokens', type=int, default=128)
+    parser.add_argument('--max-new-tokens', type=int, default=512)
     parser.add_argument('--warmup-steps', type=int, default=3)
     parser.add_argument('--visible-len', type=int, default=8192)
     parser.add_argument('--gate-epsilon', type=float, default=0.05)
-    parser.add_argument('--measurement-mode', choices=('latency', 'memory'),
-                        default='latency')
+    parser.add_argument('--methods', nargs='+', default=['nfa', 'flashinfer'],
+                        choices=('nfa', 'flashinfer'),
+                        help='恰好两个方法：前者为候选，后者为 dense 对照')
     parser.add_argument('--gpu-id', type=int, default=0)
     parser.add_argument('--output-dir',
-                        default='/tmp/nfa_vs_fa2_qwen3_8b_ruler32k')
+                        default='/tmp/nfa_vs_flashinfer_qwen3_8b_ruler32k')
     parser.add_argument('--output',
-                        default='/tmp/nfa_vs_fa2_qwen3_8b_ruler32k.json')
+                        default='/tmp/nfa_vs_flashinfer_qwen3_8b_ruler32k.json')
     return parser.parse_args()
 
 
@@ -67,12 +72,13 @@ def _preflight(gpu_id):
 
 
 class GpuMonitor:
-    """30 秒旁路监控；只允许本 driver 直接启动的 runner PID。"""
+    """30 秒旁路监控；活动 arm 只允许一个 CUDA 进程，空闲期必须为空。"""
 
     def __init__(self, gpu_id, log_path):
         self.gpu_id = gpu_id
         self.log_path = log_path
         self.allowed_pids = set()
+        self.active_pid = None
         self.pollution = []
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -83,8 +89,20 @@ class GpuMonitor:
         self._thread.start()
 
     def register(self, pid):
+        # nvidia-smi 返回的宿主 PID 在当前容器 /proc 中不可见，Ngid 也不是
+        # 宿主 PID。各 arm 已串行独立起跑且 preflight 为空，因此活动期的
+        # 唯一 CUDA 进程归属当前 runner；其他组合一律按污染处理。
         with self._lock:
+            if self.active_pid is not None:
+                raise RuntimeError('GpuMonitor 不允许并发注册多个活动 arm')
+            self.active_pid = pid
             self.allowed_pids.add(pid)
+
+    def unregister(self, pid):
+        with self._lock:
+            if self.active_pid != pid:
+                raise RuntimeError(f'GpuMonitor 活动 arm 不匹配: {pid}')
+            self.active_pid = None
 
     def _sample(self):
         timestamp = int(time.time())
@@ -93,13 +111,12 @@ class GpuMonitor:
         rows = [row.strip() for row in apps.splitlines() if row.strip()]
         with self._lock:
             allowed = set(self.allowed_pids)
-        unknown = []
-        for row in rows:
-            pid = int(row.split(',')[0].strip())
-            if pid not in allowed:
-                unknown.append(row)
+            active_pid = self.active_pid
+        owned_apps = rows if active_pid is not None and len(rows) == 1 else []
+        unknown = [] if not rows or owned_apps else rows
         record = {'timestamp': timestamp, 'gpu': gpu, 'apps': rows,
-                  'allowed_pids': sorted(allowed), 'unknown_apps': unknown}
+                  'allowed_pids': sorted(allowed), 'active_pid': active_pid,
+                  'owned_apps': owned_apps, 'unknown_apps': unknown}
         with open(self.log_path, 'a', encoding='utf-8') as handle:
             handle.write(json.dumps(record) + '\n')
         if unknown:
@@ -117,7 +134,9 @@ class GpuMonitor:
 
 def _run_one(args, batch, execution, method, leg, attempt, monitor):
     tag = f'{method}_{leg}'
-    stem = (f'{tag}_ruler{args.context_length // 1024}k_b{batch}_'
+    input_family = ('ruler' if args.input_provenance == 'native-ruler'
+                    else args.input_provenance)
+    stem = (f'{tag}_{input_family}{args.context_length // 1024}k_b{batch}_'
             f'{execution}_attempt{attempt}')
     output = os.path.join(args.output_dir, stem + '.json')
     log_path = os.path.join(args.output_dir, stem + '.log')
@@ -132,12 +151,12 @@ def _run_one(args, batch, execution, method, leg, attempt, monitor):
         '--method', method,
         '--execution', execution,
         '--sample-index', str(args.sample_index),
-        '--input-provenance', 'native-ruler',
+        '--input-provenance', args.input_provenance,
         '--max-new-tokens', str(args.max_new_tokens),
         '--warmup-steps', str(args.warmup_steps),
         '--visible-len', str(args.visible_len),
         '--gate-epsilon', str(args.gate_epsilon),
-        '--measurement-mode', args.measurement_mode,
+        '--measurement-mode', 'latency',
     ]
     print(f'\n===== {tag.upper()} B{batch} {execution} attempt{attempt} =====',
           flush=True)
@@ -154,7 +173,10 @@ def _run_one(args, batch, execution, method, leg, attempt, monitor):
         process = subprocess.Popen(command, cwd=REPO, env=env,
                                    stdout=log, stderr=subprocess.STDOUT)
         monitor.register(process.pid)
-        returncode = process.wait()
+        try:
+            returncode = process.wait()
+        finally:
+            monitor.unregister(process.pid)
     if returncode:
         raise RuntimeError(f'{tag} 失败，日志: {log_path}')
     with open(output, encoding='utf-8') as handle:
@@ -165,8 +187,9 @@ def _run_one(args, batch, execution, method, leg, attempt, monitor):
 def _run_abba(args, batch, execution, attempt, monitor):
     arms = {}
     paths = {}
-    for method, leg in (('nfa', 'a'), ('fa2', 'a'),
-                        ('fa2', 'b'), ('nfa', 'b')):
+    candidate, baseline = args.methods
+    for method, leg in ((candidate, 'a'), (baseline, 'a'),
+                        (baseline, 'b'), (candidate, 'b')):
         result, path = _run_one(
             args, batch, execution, method, leg, attempt, monitor)
         key = f'{method}_{leg}'
@@ -175,90 +198,69 @@ def _run_abba(args, batch, execution, attempt, monitor):
     return arms, paths
 
 
-def _gib(value):
-    return value / (1024 ** 3)
-
-
 def _first_divergence(lhs, rhs):
-    for index, (left, right) in enumerate(zip(lhs[0], rhs[0])):
-        if left != right:
-            return index
-    return None if len(lhs[0]) == len(rhs[0]) else min(len(lhs[0]), len(rhs[0]))
-
-
-def _memory_compare(nfa, fa2):
-    nfa_memory = nfa['memory']
-    fa2_memory = fa2['memory']
-    nfa_peak = nfa_memory['peak_incremental_allocated_bytes']
-    fa2_peak = fa2_memory['peak_incremental_allocated_bytes']
-    nfa_ready = nfa_memory['decode_ready']['allocated_bytes']
-    fa2_ready = fa2_memory['decode_ready']['allocated_bytes']
-    nfa_resident = nfa_memory[
-        'steady_decode_resident_incremental_allocated_bytes']
-    fa2_resident = fa2_memory[
-        'steady_decode_resident_incremental_allocated_bytes']
-    return {
-        'nfa_peak_incremental_allocated_gib': _gib(nfa_peak),
-        'fa2_peak_incremental_allocated_gib': _gib(fa2_peak),
-        'peak_incremental_allocated_saved_gib': _gib(fa2_peak - nfa_peak),
-        'decode_ready_allocated_saved_gib': _gib(fa2_ready - nfa_ready),
-        'nfa_steady_decode_resident_incremental_allocated_gib': _gib(nfa_resident),
-        'fa2_steady_decode_resident_incremental_allocated_gib': _gib(fa2_resident),
-        'steady_decode_resident_allocated_saved_gib': _gib(fa2_resident - nfa_resident),
-        'steady_decode_resident_allocated_saving_percent': (
-            100.0 * (fa2_resident - nfa_resident) / fa2_resident
-            if fa2_resident else None),
-        'nfa_steady_decode_peak_incremental_allocated_gib': _gib(
-            nfa_memory['steady_decode_peak_incremental_allocated_bytes']),
-        'fa2_steady_decode_peak_incremental_allocated_gib': _gib(
-            fa2_memory['steady_decode_peak_incremental_allocated_bytes']),
-        'nfa_decode_ready_reserved_gib': _gib(
-            nfa_memory['decode_ready']['reserved_bytes']),
-        'fa2_decode_ready_reserved_gib': _gib(
-            fa2_memory['decode_ready']['reserved_bytes']),
-    }
+    """返回任意 batch 行内的首个 token 分叉，而不是只检查第 0 行。"""
+    for batch, (left_row, right_row) in enumerate(zip(lhs, rhs)):
+        for index, (left, right) in enumerate(zip(left_row, right_row)):
+            if left != right:
+                return {'batch': batch, 'token': index}
+        if len(left_row) != len(right_row):
+            return {'batch': batch, 'token': min(len(left_row), len(right_row))}
+    if len(lhs) != len(rhs):
+        return {'batch': min(len(lhs), len(rhs)), 'token': 0}
+    return None
 
 
 def _compare(args, batch, execution, arms):
-    nfa_a, nfa_b = arms['nfa_a'], arms['nfa_b']
-    fa2_a, fa2_b = arms['fa2_a'], arms['fa2_b']
-    for method in ('nfa', 'fa2'):
+    candidate, baseline = args.methods
+    candidate_a, candidate_b = arms[f'{candidate}_a'], arms[f'{candidate}_b']
+    baseline_a, baseline_b = arms[f'{baseline}_a'], arms[f'{baseline}_b']
+    for method in (candidate, baseline):
         lhs, rhs = arms[f'{method}_a'], arms[f'{method}_b']
         if lhs['input']['sha256'] != rhs['input']['sha256']:
             raise RuntimeError(f'{method} ABBA 输入 SHA256 不一致')
-    if nfa_a['input']['sha256'] != fa2_a['input']['sha256']:
-        raise RuntimeError('NFA/FA2 输入 SHA256 不一致')
-    if nfa_a['input']['actual_prompt_tokens'] != fa2_a['input']['actual_prompt_tokens']:
-        raise RuntimeError('NFA/FA2 prompt 长度不一致')
-    nfa_ms = [nfa_a['steady_tpot_ms_median'], nfa_b['steady_tpot_ms_median']]
-    fa2_ms = [fa2_a['steady_tpot_ms_median'], fa2_b['steady_tpot_ms_median']]
+    if candidate_a['input']['sha256'] != baseline_a['input']['sha256']:
+        raise RuntimeError('对照方法输入 SHA256 不一致')
+    if (candidate_a['input']['actual_prompt_tokens']
+            != baseline_a['input']['actual_prompt_tokens']):
+        raise RuntimeError('对照方法 prompt 长度不一致')
+    candidate_ms = [
+        candidate_a['steady_tpot_ms_median'],
+        candidate_b['steady_tpot_ms_median']]
+    baseline_ms = [
+        baseline_a['steady_tpot_ms_median'],
+        baseline_b['steady_tpot_ms_median']]
+    candidate_median = statistics.median(candidate_ms)
+    baseline_median = statistics.median(baseline_ms)
     result = {
         'batch_size': batch,
         'execution': execution,
-        'nfa_repeat_token_identity': (
-            nfa_a['generated_token_ids'] == nfa_b['generated_token_ids']),
-        'fa2_repeat_token_identity': (
-            fa2_a['generated_token_ids'] == fa2_b['generated_token_ids']),
-        'nfa_fa2_token_identity': (
-            nfa_a['generated_token_ids'] == fa2_a['generated_token_ids']),
-        'nfa_fa2_first_divergence': _first_divergence(
-            nfa_a['generated_token_ids'], fa2_a['generated_token_ids']),
-        'nfa_skip_policy_counts': nfa_a.get('skip_policy_counts'),
+        'candidate_method': candidate,
+        'baseline_method': baseline,
+        f'{candidate}_repeat_token_identity': (
+            candidate_a['generated_token_ids'] == candidate_b['generated_token_ids']),
+        f'{baseline}_repeat_token_identity': (
+            baseline_a['generated_token_ids'] == baseline_b['generated_token_ids']),
+        f'{candidate}_{baseline}_token_identity': (
+            candidate_a['generated_token_ids'] == baseline_a['generated_token_ids']),
+        f'{candidate}_{baseline}_first_divergence': _first_divergence(
+            candidate_a['generated_token_ids'], baseline_a['generated_token_ids']),
+        f'{candidate}_steady_tpot_ms': candidate_ms,
+        f'{baseline}_steady_tpot_ms': baseline_ms,
+        f'{candidate}_steady_tpot_median_ms': candidate_median,
+        f'{baseline}_steady_tpot_median_ms': baseline_median,
+        f'{candidate}_throughput_tokens_per_second': 1000.0 / candidate_median,
+        f'{baseline}_throughput_tokens_per_second': 1000.0 / baseline_median,
+        f'{baseline}_over_{candidate}_tpot': baseline_median / candidate_median,
+        f'{candidate}_prefill_seconds': [
+            candidate_a['prefill_seconds'], candidate_b['prefill_seconds']],
+        f'{baseline}_prefill_seconds': [
+            baseline_a['prefill_seconds'], baseline_b['prefill_seconds']],
     }
-    if args.measurement_mode == 'latency':
-        result.update(
-            nfa_steady_tpot_ms=nfa_ms,
-            fa2_steady_tpot_ms=fa2_ms,
-            nfa_steady_tpot_median_ms=statistics.median(nfa_ms),
-            fa2_steady_tpot_median_ms=statistics.median(fa2_ms),
-            fa2_over_nfa_tpot=(
-                statistics.median(fa2_ms) / statistics.median(nfa_ms)),
-            nfa_prefill_seconds=[nfa_a['prefill_seconds'], nfa_b['prefill_seconds']],
-            fa2_prefill_seconds=[fa2_a['prefill_seconds'], fa2_b['prefill_seconds']],
-        )
-    else:
-        result['memory'] = {'a': _memory_compare(nfa_a, fa2_a),
-                            'b': _memory_compare(nfa_b, fa2_b)}
+    if candidate == 'nfa':
+        result['nfa_skip_policy_counts'] = candidate_a.get('skip_policy_counts')
+        result['nfa_skip_policy_layers'] = candidate_a.get('skip_policy_layers')
+        result['nfa_skip_decode_receipt'] = candidate_a.get('skip_decode_receipt')
     return result
 
 
@@ -274,6 +276,20 @@ def _source_receipt(output_dir):
     head = subprocess.check_output(
         ['git', '-C', REPO, 'rev-parse', 'HEAD'], text=True).strip()
     diff = subprocess.check_output(['git', '-C', REPO, 'diff', '--binary'])
+    # FlashInfer runtime 首次引入时可能尚未 tracked；正式 receipt 必须包含
+    # 实际执行的源码，不能只记录一个看似完整但缺失新文件的 tracked diff。
+    runtime_source = 'sparse_attn/patches/qwen3_flashinfer_patch.py'
+    untracked = subprocess.check_output(
+        ['git', '-C', REPO, 'ls-files', '--others', '--exclude-standard',
+         '--', runtime_source], text=True).strip()
+    if untracked:
+        added = subprocess.run(
+            ['git', '-C', REPO, 'diff', '--no-index', '--binary',
+             '/dev/null', runtime_source], stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        if added.returncode != 1:
+            raise RuntimeError(added.stderr.decode(errors='replace'))
+        diff += added.stdout
     diff_path = os.path.join(output_dir, 'source.diff')
     with open(diff_path, 'wb') as handle:
         handle.write(diff)
@@ -292,6 +308,8 @@ def _model_receipt(model_path):
 
 def main():
     args = parse_args()
+    if len(args.methods) != 2 or len(set(args.methods)) != 2:
+        raise ValueError('--methods 必须指定两个不同方法，前者为候选、后者为对照')
     os.makedirs(args.output_dir, exist_ok=True)
     runs = {}
     comparisons = []
@@ -317,13 +335,17 @@ def main():
                     break
                 print(f'WARNING {key} attempt{attempt} 检测到其他 GPU 进程，作废重跑',
                       flush=True)
+            else:
+                raise RuntimeError(
+                    f'{key} 两次 ABBA 均受其他 GPU 进程污染，拒绝输出有效判决')
             comparison = _compare(args, batch, execution, arms)
             comparisons.append(comparison)
             if input_receipt is None:
-                input_receipt = arms['nfa_a']['input']
+                first_arm = arms[f'{args.methods[0]}_a']
+                input_receipt = first_arm['input']
                 software_receipt = {
-                    'torch': arms['nfa_a']['torch_version'],
-                    'transformers': arms['nfa_a']['transformers_version'],
+                    'torch': first_arm['torch_version'],
+                    'transformers': first_arm['transformers_version'],
                 }
             runs[key] = paths
             hygiene[key] = {
@@ -332,29 +354,30 @@ def main():
                 'log': monitor_path,
                 'pollution_samples': len(monitor.pollution),
             }
-            if args.measurement_mode == 'latency':
-                print(
-                    f"SUMMARY {key}: NFA={comparison['nfa_steady_tpot_median_ms']:.4f}ms "
-                    f"FA2={comparison['fa2_steady_tpot_median_ms']:.4f}ms "
-                    f"FA2/NFA={comparison['fa2_over_nfa_tpot']:.3f}x | "
-                    f"NFA repeat identity={comparison['nfa_repeat_token_identity']} | "
-                    f"NFA/FA2 identity={comparison['nfa_fa2_token_identity']} | "
-                    f"hygiene={hygiene[key]['status']}", flush=True)
-            else:
-                memory_a = comparison['memory']['a']
-                memory_b = comparison['memory']['b']
-                print(
-                    f"SUMMARY {key}: steady resident saved "
-                    f"A={memory_a['steady_decode_resident_allocated_saved_gib']:.3f}GiB "
-                    f"B={memory_b['steady_decode_resident_allocated_saved_gib']:.3f}GiB | "
-                    f"hygiene={hygiene[key]['status']}（本模式不报告 TPOT）",
-                    flush=True)
+            candidate, baseline = args.methods
+            candidate_ms = comparison[f'{candidate}_steady_tpot_median_ms']
+            baseline_ms = comparison[f'{baseline}_steady_tpot_median_ms']
+            speedup = comparison[f'{baseline}_over_{candidate}_tpot']
+            repeat_identity = comparison[f'{candidate}_repeat_token_identity']
+            cross_identity = comparison[f'{candidate}_{baseline}_token_identity']
+            print(
+                f'SUMMARY {key}: {candidate}={candidate_ms:.4f}ms '
+                f'({1000.0 / candidate_ms:.2f} tok/s) | '
+                f'{baseline}={baseline_ms:.4f}ms '
+                f'({1000.0 / baseline_ms:.2f} tok/s) | '
+                f'{baseline}/{candidate}={speedup:.3f}x | '
+                f'{candidate} repeat identity={repeat_identity} | '
+                f'{candidate}/{baseline} identity={cross_identity} | '
+                f"hygiene={hygiene[key]['status']}", flush=True)
 
     receipt = {
         'timestamp': datetime.now().isoformat(timespec='seconds'),
         'benchmark_scope': (
-            'actual Qwen3-8B weights, native RULER prompt, full GraphRunner.step; '
-            'ABBA independent subprocesses; TPOT excludes prefill'),
+            f'actual Qwen3-8B weights, {args.input_provenance} prompt, '
+            'complete decode step; '
+            'ABBA independent subprocesses (two measured repeats per method); '
+            f'first {args.warmup_steps} decode steps excluded from steady TPOT; '
+            'TPOT excludes prefill; throughput is per-request tokens/s'),
         'arguments': vars(args),
         'source': _source_receipt(args.output_dir),
         'model': _model_receipt(args.model_path),
@@ -369,10 +392,6 @@ def main():
             'executable': sys.executable,
             **software_receipt,
         },
-        'memory_scope': (
-            '独立 memory run；steady resident 是 post-warmup allocated 减 model-loaded '
-            'allocated；legacy peak 含 prefill，仅作辅助'
-            if args.measurement_mode == 'memory' else None),
         'gpu_hygiene': {
             'status': ('clean' if all(x['status'] == 'clean' for x in hygiene.values())
                        else 'polluted-rerun'),

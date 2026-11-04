@@ -1,8 +1,8 @@
-"""真实 Qwen RULER decode：当前 Q NFA / FlashAttention-2，支持 B1/2/4 与 Graph。
+"""真实 Qwen 长文本 decode：NFA / FlashAttention-2 / FlashInfer，支持 B1/2/4 与 Graph。
 
-性能口径固定复制同一条 RULER prompt 到 B 行，并执行固定长度 decode；它不是
-质量评测。输入来源由 --input-provenance 显式记录，实际 token 长度必须落在
-声明档位的 95%--100%；64K/128K 循环体扩展数据不得冒充原生 RULER。
+性能口径固定复制同一条 prompt 到 B 行，并执行固定长度 decode；它不是质量评测。
+输入来源由 --input-provenance 显式记录；原生/扩展 RULER 的实际 token 长度必须
+落在声明档位的 95%--100%，LongBench-v2 保留真实长度且不得冒充原生 RULER。
 每个进程只跑一个配置，避免 CUDA Graph 私有池跨配置残留。
 """
 import argparse
@@ -28,6 +28,11 @@ from sparse_attn.engine.graph_runner import GraphRunner
 from sparse_attn.info import resolve_treatment_snapshot
 from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
 from sparse_attn.patches import register_patch
+from sparse_attn.patches.qwen3_flashinfer_patch import (
+    FlashInferQwen3Runtime,
+    bind_flashinfer_runtime,
+    register_flashinfer_patch,
+)
 from sparse_attn.policies.frozen_gate import GateConfig
 from sparse_attn.policies.region_geometry import RegionGeometry
 from sparse_attn.scheduler.scheduler import ContinuousBatchScheduler, greedy_next_tokens
@@ -38,24 +43,24 @@ def parse_args():
     parser.add_argument('--model-path', required=True)
     parser.add_argument('--data-root', required=True)
     parser.add_argument('--output', required=True)
-    parser.add_argument('--task', default='niah_single_1')
+    parser.add_argument('--task', default='niah_multikey_1')
     parser.add_argument('--context-length', type=int, required=True,
                         choices=(32768, 65536, 131072))
     parser.add_argument('--batch-size', type=int, required=True, choices=(1, 2, 4))
-    parser.add_argument('--method', required=True, choices=('nfa', 'fa2'))
+    parser.add_argument('--method', required=True, choices=('nfa', 'fa2', 'flashinfer'))
     parser.add_argument('--execution', required=True, choices=('eager', 'graph'))
     parser.add_argument('--sample-index', type=int, default=0)
     parser.add_argument('--input-provenance', required=True,
                         choices=('native-ruler', 'repeated-needle-body-extension',
                                  'longbench-v2'),
                         help='输入数据来源必须显式声明，禁止按长度猜测')
-    parser.add_argument('--max-new-tokens', type=int, default=128)
+    parser.add_argument('--max-new-tokens', type=int, default=512)
     parser.add_argument('--warmup-steps', type=int, default=3)
     parser.add_argument('--gate-epsilon', type=float, default=0.05,
                         help='NFA prefill 区域 gate 阈值；0 用于同输入 no-skip 对照')
     parser.add_argument(
-        '--measurement-mode', default='memory',
-        choices=('latency', 'memory', 'profile', 'traffic', 'correctness'),
+        '--measurement-mode', default='latency',
+        choices=('latency', 'profile', 'traffic', 'correctness'),
         help='latency/correctness 在 decode 后统一同步读取；其他模式保留逐步回执')
     parser.add_argument('--visible-len', type=int, default=8192)
     parser.add_argument('--fa2-prefill-cpu-offload', action='store_true',
@@ -95,7 +100,8 @@ def _load_model(args, max_new_tokens):
     configure_rope(config, args.context_length, max_new_tokens,
                    yarn=args.context_length > 32768,
                    factor={65536: 2.0, 131072: 4.0}.get(args.context_length))
-    config._attn_implementation = 'sdpa' if args.method == 'nfa' else 'flash_attention_2'
+    config._attn_implementation = (
+        'flash_attention_2' if args.method == 'fa2' else 'sdpa')
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path, config=config, torch_dtype=torch.bfloat16).cuda().eval()
     verify_runtime_rope(model)
@@ -107,6 +113,11 @@ def _load_model(args, max_new_tokens):
             mlp_silu_decode=args.execution == 'graph')
         if patched != config.num_hidden_layers:
             raise RuntimeError(f'NFA patched {patched}/{config.num_hidden_layers} layers')
+    elif args.method == 'flashinfer':
+        patched = register_flashinfer_patch(model)
+        if patched != config.num_hidden_layers:
+            raise RuntimeError(
+                f'FlashInfer patched {patched}/{config.num_hidden_layers} layers')
     return model
 
 
@@ -115,46 +126,50 @@ def _events():
 
 
 @contextmanager
-def _fa2_no_packed_position_ids():
-    """固定无 padding 输入避免 packed D2H；可选在 prefill 注意力后逐层卸载 KV。"""
+def _fa2_unpacked_position_ids():
+    """已知无 padding/非 packed 输入走原生 FA2 regular kernel，避免 packed 检测 D2H。"""
+    from transformers import modeling_flash_attention_utils as fa_utils
+    original = fa_utils._is_packed_sequence
+    # Qwen3 在调用 attention 前已用 position_ids 完成 RoPE；这里只关闭 HF
+    # 对 packed 序列的检测，不丢弃模型 position_ids，也不改变 RoPE/FA2 kernel。
+    fa_utils._is_packed_sequence = lambda position_ids, batch_size: False
+    try:
+        yield
+    finally:
+        fa_utils._is_packed_sequence = original
+
+
+@contextmanager
+def _fa2_prefill_cpu_offload(cache):
+    """仅在 FA2 prefill 注意力后逐层卸载 KV；decode 不保留额外 Python wrapper。"""
     from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
     original = ALL_ATTENTION_FUNCTIONS['flash_attention_2']
-    state = {'prefill_cache': None}
 
     def forward(module, query, key, value, *args, **kwargs):
-        kwargs.pop('position_ids', None)
         result = original(module, query, key, value, *args, **kwargs)
-        cache = state['prefill_cache']
-        if cache is not None:
-            layer = cache.layers[module.layer_idx]
-            layer.keys = layer.keys.to('cpu')
-            layer.values = layer.values.to('cpu')
+        layer = cache.layers[module.layer_idx]
+        layer.keys = layer.keys.to('cpu')
+        layer.values = layer.values.to('cpu')
         return result
 
     ALL_ATTENTION_FUNCTIONS['flash_attention_2'] = forward
     try:
-        yield state
+        yield
     finally:
         ALL_ATTENTION_FUNCTIONS['flash_attention_2'] = original
 
 
 def _summary(step_ms, warmup):
     steady = step_ms[warmup:] or step_ms
+    steady_tpot_ms_median = statistics.median(steady)
     return {
         'decode_steps': len(step_ms),
         'tpot_ms_median': statistics.median(step_ms),
-        'steady_tpot_ms_median': statistics.median(steady),
+        'steady_tpot_ms_median': steady_tpot_ms_median,
+        # 每行 token 生成速率；batch 聚合吞吐不得混入此字段。
+        'throughput_tokens_per_second': 1000.0 / steady_tpot_ms_median,
         'tpot_ms_all': step_ms,
         'warmup_steps_excluded_from_steady': min(warmup, len(step_ms)),
-    }
-
-
-def _memory_snapshot():
-    return {
-        'allocated_bytes': torch.cuda.memory_allocated(),
-        'reserved_bytes': torch.cuda.memory_reserved(),
-        'max_allocated_bytes': torch.cuda.max_memory_allocated(),
-        'max_reserved_bytes': torch.cuda.max_memory_reserved(),
     }
 
 
@@ -185,7 +200,6 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
         del output
     torch.cuda.synchronize()
     prefill_seconds = time.perf_counter() - prefill_start
-    prefill_memory = _memory_snapshot()
 
     scheduler = ContinuousBatchScheduler(
         cache=cache, max_batch=batch, eos_ids=eos_ids, pad_token_id=0)
@@ -197,20 +211,14 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
         device=prompt.device)
     if args.execution == 'graph':
         runner.capture_all(model, cache)
-    decode_ready_memory = _memory_snapshot()
 
     step_ms = []
-    steady_decode_start = None
     clean_decode = args.measurement_mode in ('latency', 'correctness')
     decode_steps = max_new_tokens - 1
     event_pairs = [_events() for _ in range(decode_steps)] if clean_decode else None
     token_history = (torch.empty(
         (decode_steps, batch), dtype=torch.long, device=prompt.device)
         if clean_decode else None)
-    if args.warmup_steps == 0 and not clean_decode:
-        torch.cuda.synchronize()
-        steady_decode_start = _memory_snapshot()
-        torch.cuda.reset_peak_memory_stats()
     for step in range(decode_steps):
         if clean_decode:
             counts = [step + 1] * batch
@@ -230,10 +238,6 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
             for row, request_id in enumerate(req_ids):
                 generated[request_id].append(int(rows[row]))
             step_ms.append(start.elapsed_time(end))
-        if not clean_decode and step + 1 == args.warmup_steps:
-            torch.cuda.synchronize()
-            steady_decode_start = _memory_snapshot()
-            torch.cuda.reset_peak_memory_stats()
     scheduler.prepare_step()
     if clean_decode:
         torch.cuda.synchronize()
@@ -242,9 +246,20 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
             for row, request_id in enumerate(req_ids):
                 generated[request_id].append(int(rows[row]))
         step_ms = [start.elapsed_time(end) for start, end in event_pairs]
-    if steady_decode_start is None:
-        steady_decode_start = _memory_snapshot()
     result = _summary(step_ms, args.warmup_steps)
+    skip_layers = {
+        str(request_id): {
+            'far': [layer for layer, skip in enumerate(
+                cache.states[request_id].skip_far_by_layer) if skip],
+            'near': [layer for layer, skip in enumerate(
+                cache.states[request_id].skip_near_by_layer) if skip],
+        } for request_id in req_ids}
+    # 计时循环结束后一次 D2H：这些最终步 visible_lens 是 selector 写给
+    # sparse attention 的实际消费缓冲，不只是 prefill gate flags。
+    final_visible_lens = torch.stack([
+        cache.visible_lens_for_layer(layer)
+        for layer in range(cache.n_layers)
+    ])[:, req_ids].detach().cpu().tolist()
     result.update(prefill_seconds=prefill_seconds,
                   generated_token_ids=[generated[request_id] for request_id in req_ids],
                   skip_policy_counts={
@@ -255,18 +270,18 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
                               cache.states[request_id].skip_far_by_layer,
                               cache.states[request_id].skip_near_by_layer)),
                       } for request_id in req_ids},
+                  skip_policy_layers=skip_layers,
+                  skip_decode_receipt={
+                      'nfa_decode_steps': cache.nfa_decode_steps,
+                      'request_ids': req_ids,
+                      'layer_major_final_visible_lens': final_visible_lens,
+                  },
                   gate_mode='dynamic', gate_epsilon=args.gate_epsilon,
-                  graph_replays=(len(step_ms) if args.execution == 'graph' else 0),
-                  memory={
-                      'prefill_end': prefill_memory,
-                      'decode_ready': decode_ready_memory,
-                      'steady_decode_start': steady_decode_start,
-                      'decode_end': _memory_snapshot(),
-                  })
+                  graph_replays=(len(step_ms) if args.execution == 'graph' else 0))
     return result
 
 
-def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
+def _run_fa2(args, model, prompt, max_new_tokens, eos_ids):
     batch = args.batch_size
     length = prompt.numel()
     device = prompt.device
@@ -280,14 +295,14 @@ def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
     position_ids = cache_position.unsqueeze(0).expand(batch, -1)
     torch.cuda.synchronize()
     prefill_start = time.perf_counter()
-    fa2_state['prefill_cache'] = cache if args.fa2_prefill_cpu_offload else None
-    try:
+    offload_scope = (
+        _fa2_prefill_cpu_offload(cache)
+        if args.fa2_prefill_cpu_offload else nullcontext())
+    with offload_scope:
         output = model(
             input_ids=input_ids, position_ids=position_ids,
             cache_position=cache_position, past_key_values=cache,
             use_cache=True, logits_to_keep=1)
-    finally:
-        fa2_state['prefill_cache'] = None
     if args.fa2_prefill_cpu_offload:
         for layer in cache.layers:
             layer.keys = layer.keys.to(device)
@@ -298,7 +313,6 @@ def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
     torch.cuda.synchronize()
     prefill_seconds = time.perf_counter() - prefill_start
     del output
-    prefill_memory = _memory_snapshot()
 
     input_buf = torch.empty((batch, 1), dtype=torch.long, device=device)
     position_buf = torch.empty((batch, 1), dtype=torch.long, device=device)
@@ -321,26 +335,21 @@ def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.graph(graph):
             static_logits = forward()
-    decode_ready_memory = _memory_snapshot()
 
     step_ms = []
-    steady_decode_start = None
     clean_decode = args.measurement_mode in ('latency', 'correctness')
     decode_steps = max_new_tokens - 1
     event_pairs = [_events() for _ in range(decode_steps)] if clean_decode else None
     token_history = (torch.empty(
         (decode_steps, batch), dtype=torch.long, device=device)
         if clean_decode else None)
-    if args.warmup_steps == 0 and not clean_decode:
-        torch.cuda.synchronize()
-        steady_decode_start = _memory_snapshot()
-        torch.cuda.reset_peak_memory_stats()
     for step in range(decode_steps):
         start, end = event_pairs[step] if clean_decode else _events()
+        start.record()
+        # 与 NFA GraphRunner.step 对齐：输入、位置更新也计入完整 decode step。
         input_buf.copy_(next_tokens[:, None])
         position_buf.fill_(length + step)
         cache_position_buf.fill_(length + step)
-        start.record()
         if graph is None:
             logits = forward().logits
         else:
@@ -356,10 +365,6 @@ def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
             for row in range(batch):
                 generated[row].append(int(rows[row]))
             step_ms.append(start.elapsed_time(end))
-        if not clean_decode and step + 1 == args.warmup_steps:
-            torch.cuda.synchronize()
-            steady_decode_start = _memory_snapshot()
-            torch.cuda.reset_peak_memory_stats()
     if clean_decode:
         torch.cuda.synchronize()
         history = token_history.cpu().tolist()
@@ -367,18 +372,142 @@ def _run_fa2(args, model, prompt, max_new_tokens, eos_ids, fa2_state):
             for row in range(batch):
                 generated[row].append(int(rows[row]))
         step_ms = [start.elapsed_time(end) for start, end in event_pairs]
-    if steady_decode_start is None:
-        steady_decode_start = _memory_snapshot()
     result = _summary(step_ms, args.warmup_steps)
     result.update(prefill_seconds=prefill_seconds, generated_token_ids=generated,
                   prefill_cpu_offload=args.fa2_prefill_cpu_offload,
-                  graph_replays=(len(step_ms) if graph is not None else 0),
-                  memory={
-                      'prefill_end': prefill_memory,
-                      'decode_ready': decode_ready_memory,
-                      'steady_decode_start': steady_decode_start,
-                      'decode_end': _memory_snapshot(),
-                  })
+                  graph_replays=(len(step_ms) if graph is not None else 0))
+    return result
+
+
+def _run_flashinfer(args, model, prompt, max_new_tokens, eos_ids):
+    """完整 Qwen3 decode：页表更新、KV append、FlashInfer、所有层与 argmax。"""
+    batch = args.batch_size
+    length = prompt.numel()
+    device = prompt.device
+    decode_steps = max_new_tokens - 1
+    runtime = FlashInferQwen3Runtime(
+        model, batch, length, max_new_tokens, device=device)
+    bind_flashinfer_runtime(model, runtime)
+
+    input_ids = prompt.unsqueeze(0)
+    cache_position = torch.arange(length, device=device)
+    position_ids = cache_position.unsqueeze(0)
+    torch.cuda.synchronize()
+    prefill_start = time.perf_counter()
+    # 与 NFA 一致逐请求 prefill，避免 128K B4 的 SDPA 激活同时驻留而 OOM。
+    # runtime 的 append 索引切到当前请求；decode wrapper、页表和计时口径不变。
+    all_prefill_batch_indices = runtime.prefill_batch_indices
+    all_prefill_positions = runtime.prefill_positions
+    next_token_rows = []
+    for request_id in range(batch):
+        runtime.prefill_batch_indices = all_prefill_batch_indices[
+            request_id * length:(request_id + 1) * length]
+        runtime.prefill_positions = all_prefill_positions[:length]
+        # mask_metadata 只抑制 HF 的 packed/mask 误构，不保存 K/V；独立
+        # runtime 在 patched attention 内完成真实 paged append。
+        output = model(
+            input_ids=input_ids, position_ids=position_ids,
+            cache_position=cache_position, past_key_values=runtime.mask_metadata,
+            use_cache=True, logits_to_keep=1)
+        next_token_rows.append(greedy_next_tokens(
+            output.logits, eos_ids, generated_counts=0, min_new_tokens=1))
+        del output
+    runtime.prefill_batch_indices = all_prefill_batch_indices
+    runtime.prefill_positions = all_prefill_positions
+    next_tokens = torch.cat(next_token_rows)
+    generated = [[int(token)] for token in next_tokens.cpu()]
+    torch.cuda.synchronize()
+    prefill_seconds = time.perf_counter() - prefill_start
+    del input_ids, position_ids, cache_position
+
+    runtime.prepare_decode(args.execution, decode_steps)
+    input_buf = torch.empty((batch, 1), dtype=torch.long, device=device)
+    position_buf = torch.empty((batch, 1), dtype=torch.long, device=device)
+    cache_position_buf = torch.empty((1,), dtype=torch.long, device=device)
+    graph = None
+    static_logits = None
+
+    def forward():
+        return model(
+            input_ids=input_buf, position_ids=position_buf,
+            cache_position=cache_position_buf,
+            past_key_values=runtime.mask_metadata, use_cache=True,
+            logits_to_keep=1)
+
+    if args.execution == 'graph':
+        input_buf.copy_(next_tokens[:, None])
+        position_buf.fill_(length)
+        cache_position_buf.fill_(length)
+        runtime.prepare_decode_step(0)
+        forward()
+        torch.cuda.synchronize()
+        graph = torch.cuda.CUDAGraph()
+        # FlashInfer plan 已在 prepare_decode 中完成；capture 仅包含 append/run。
+        runtime.prepare_decode_step(0)
+        with torch.cuda.graph(graph):
+            static_logits = forward()
+
+    step_ms = []
+    clean_decode = args.measurement_mode in ('latency', 'correctness')
+    event_pairs = [_events() for _ in range(decode_steps)] if clean_decode else None
+    token_history = (torch.empty(
+        (decode_steps, batch), dtype=torch.long, device=device)
+        if clean_decode else None)
+    for step in range(decode_steps):
+        start, end = event_pairs[step] if clean_decode else _events()
+        start.record()
+        # 与 NFA/FA2 同口径：输入、位置、页表和 slot mapping 均在事件内。
+        input_buf.copy_(next_tokens[:, None])
+        position_buf.fill_(length + step)
+        cache_position_buf.fill_(length + step)
+        runtime.prepare_decode_step(step)
+        if graph is None:
+            logits = forward().logits
+        else:
+            graph.replay()
+            logits = static_logits.logits
+        next_tokens = greedy_next_tokens(
+            logits, eos_ids, generated_counts=step + 1, min_new_tokens=1)
+        end.record()
+        if clean_decode:
+            token_history[step].copy_(next_tokens)
+        else:
+            rows = next_tokens.cpu().tolist()
+            for row in range(batch):
+                generated[row].append(int(rows[row]))
+            step_ms.append(start.elapsed_time(end))
+    if clean_decode:
+        torch.cuda.synchronize()
+        history = token_history.cpu().tolist()
+        for rows in history:
+            for row in range(batch):
+                generated[row].append(int(rows[row]))
+        step_ms = [start.elapsed_time(end) for start, end in event_pairs]
+    result = _summary(step_ms, args.warmup_steps)
+    result.update(
+        prefill_seconds=prefill_seconds, generated_token_ids=generated,
+        prefill_cpu_offload=False,
+        graph_replays=(len(step_ms) if graph is not None else 0),
+        flashinfer_runtime={
+            'version': __import__('flashinfer').__version__,
+            'decode_attention': 'FlashInfer paged KV decode wrapper',
+            'wrapper': type(runtime.wrapper).__name__,
+            'kv_layout': 'NHD',
+            'paged_cache_shape_per_layer': list(
+                runtime.paged_kv_cache.shape[1:]),
+            'page_size': runtime.page_size,
+            'use_tensor_cores': True,
+            'fixed_split_size_pages': runtime.fixed_split_size,
+            'fixed_split_size_tokens': (
+                runtime.fixed_split_size * runtime.page_size),
+            'max_plan_seq_len': runtime.max_seq_len,
+            'physical_pages_per_request': runtime.pages_per_request,
+            'page_table_update': (
+                'fixed physical pages; compact CSR indices updated at page '
+                'boundaries; indptr/last_page_len and current-token slot '
+                'mapping updated every step'),
+            'prefill_attention': 'HF SDPA with original Qwen3 RoPE',
+        })
     return result
 
 
@@ -394,36 +523,15 @@ def main():
     model = _load_model(args, args.max_new_tokens)
     from benchmark.RULER.pred_ruler import _ruler_eos_ids
     eos_ids = _ruler_eos_ids(model, tokenizer)
-    model_loaded_memory = _memory_snapshot()
-    torch.cuda.reset_peak_memory_stats()
-    fa2_scope = _fa2_no_packed_position_ids() if args.method == 'fa2' else nullcontext()
-    with torch.inference_mode(), fa2_scope as fa2_state:
+    fa2_scope = _fa2_unpacked_position_ids() if args.method == 'fa2' else nullcontext()
+    with torch.inference_mode(), fa2_scope:
         if args.method == 'nfa':
             result = _run_nfa(args, model, prompt, args.max_new_tokens, eos_ids)
+        elif args.method == 'fa2':
+            result = _run_fa2(args, model, prompt, args.max_new_tokens, eos_ids)
         else:
-            result = _run_fa2(args, model, prompt, args.max_new_tokens, eos_ids, fa2_state)
-    memory = result.setdefault('memory', {})
-    memory['model_loaded'] = model_loaded_memory
-    # steady_decode_start 在 reset 前保留了 prefill + warmup 的历史峰值；
-    # decode_end 则只反映 reset 后的稳态 decode 峰值。
-    memory['peak_incremental_allocated_bytes'] = (
-        memory['steady_decode_start']['max_allocated_bytes']
-        - model_loaded_memory['allocated_bytes'])
-    memory['peak_incremental_reserved_bytes'] = (
-        memory['steady_decode_start']['max_reserved_bytes']
-        - model_loaded_memory['reserved_bytes'])
-    memory['steady_decode_resident_incremental_allocated_bytes'] = (
-        memory['steady_decode_start']['allocated_bytes']
-        - model_loaded_memory['allocated_bytes'])
-    memory['steady_decode_resident_incremental_reserved_bytes'] = (
-        memory['steady_decode_start']['reserved_bytes']
-        - model_loaded_memory['reserved_bytes'])
-    memory['steady_decode_peak_incremental_allocated_bytes'] = (
-        memory['decode_end']['max_allocated_bytes']
-        - memory['steady_decode_start']['allocated_bytes'])
-    memory['steady_decode_peak_incremental_reserved_bytes'] = (
-        memory['decode_end']['max_reserved_bytes']
-        - memory['steady_decode_start']['reserved_bytes'])
+            result = _run_flashinfer(
+                args, model, prompt, args.max_new_tokens, eos_ids)
     if args.method == 'nfa':
         selector_args = nfa_args()
         result['nfa_selector_config'] = {
@@ -444,10 +552,19 @@ def main():
         model_path=os.path.abspath(args.model_path), input=input_receipt,
         measurement_mode=args.measurement_mode,
         decode_protocol='fixed length; EOS recorded but not used for early stop',
-        timing_scope='CUDA events around model decode, selector where applicable, and argmax',
+        prefill_batch_execution=(
+            'serial one-request prefills'
+            if args.method in ('nfa', 'flashinfer')
+            else 'one batched prefill forward'),
+        prefill_timing_scope=(
+            'model prefill, first-token argmax/readback, and request/cache setup; '
+            'FA2 optional KV restore included; FlashInfer paged KV append included'),
+        timing_scope=(
+            'CUDA events around complete decode step: input/position updates, '
+            'scheduler/cache planning where applicable, model/selector, and argmax'),
         timing_quality=(
             'clean-device-history' if args.measurement_mode == 'latency'
-            else 'host-readback-and-memory-sampling-in-loop'),
+            else 'host-readback-in-loop'),
         host_readback_in_decode_loop=args.measurement_mode not in (
             'latency', 'correctness'),
         gpu_hygiene={'status': 'requires external process monitor'},

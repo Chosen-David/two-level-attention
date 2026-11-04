@@ -1,0 +1,138 @@
+{
+  "timestamp": "2026-11-04T18:00:20",
+  "benchmark_scope": "actual Qwen3-8B weights, native RULER prompt, complete decode step; ABBA independent subprocesses (two measured repeats per method); first 3 decode steps excluded from steady TPOT; TPOT excludes prefill; throughput is per-request tokens/s",
+  "arguments": {
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+    "task": "niah_multikey_1",
+    "context_length": 131072,
+    "batch_size": [
+      1
+    ],
+    "execution": [
+      "graph"
+    ],
+    "sample_index": 0,
+    "max_new_tokens": 512,
+    "warmup_steps": 3,
+    "visible_len": 8192,
+    "gate_epsilon": 0.05,
+    "methods": [
+      "nfa",
+      "flashinfer"
+    ],
+    "gpu_id": 1,
+    "output_dir": "/tmp/nfa_fi_smoke_128k_b1_graph",
+    "output": "/tmp/nfa_fi_smoke_128k_b1_graph.json"
+  },
+  "source": {
+    "head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+    "diff_path": "/tmp/nfa_fi_smoke_128k_b1_graph/source.diff",
+    "diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+  },
+  "model": {
+    "path": "/home/wangyuanshuo02/Qwen3-8B",
+    "metadata_sha256": {
+      "config.json": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+      "model.safetensors.index.json": "f9fdbcb91c23971c13ec5d5f2573d2349e8f61f2f049371ec699281748fdb1bc"
+    }
+  },
+  "input": {
+    "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/131072/niah_multikey_1.jsonl",
+    "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 130986,
+    "provenance": "native-ruler",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "gpu": {
+    "id": 1,
+    "name": "NVIDIA H20-3e",
+    "driver_version": "550.127.08"
+  },
+  "software": {
+    "python": "3.11.12 (main, Apr  9 2025, 04:04:00) [Clang 20.1.0 ]",
+    "executable": "/home/wangyuanshuo02/two-level-attention/.venv/bin/python",
+    "torch": "2.8.0+cu128",
+    "transformers": "4.56.2"
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "configs": {
+      "B1/graph": {
+        "status": "clean",
+        "attempt": 0,
+        "log": "/tmp/nfa_fi_smoke_128k_b1_graph/gpu1_b1_graph_attempt0_hygiene.jsonl",
+        "pollution_samples": 0
+      }
+    }
+  },
+  "runs": {
+    "B1/graph": {
+      "nfa_a": {
+        "json": "/tmp/nfa_fi_smoke_128k_b1_graph/nfa_a_ruler128k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_smoke_128k_b1_graph/nfa_a_ruler128k_b1_graph_attempt0.log",
+        "pid": 1679930
+      },
+      "flashinfer_a": {
+        "json": "/tmp/nfa_fi_smoke_128k_b1_graph/flashinfer_a_ruler128k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_smoke_128k_b1_graph/flashinfer_a_ruler128k_b1_graph_attempt0.log",
+        "pid": 1701107
+      },
+      "flashinfer_b": {
+        "json": "/tmp/nfa_fi_smoke_128k_b1_graph/flashinfer_b_ruler128k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_smoke_128k_b1_graph/flashinfer_b_ruler128k_b1_graph_attempt0.log",
+        "pid": 1703359
+      },
+      "nfa_b": {
+        "json": "/tmp/nfa_fi_smoke_128k_b1_graph/nfa_b_ruler128k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_smoke_128k_b1_graph/nfa_b_ruler128k_b1_graph_attempt0.log",
+        "pid": 1707028
+      }
+    }
+  },
+  "comparisons": [
+    {
+      "batch_size": 1,
+      "execution": "graph",
+      "candidate_method": "nfa",
+      "baseline_method": "flashinfer",
+      "nfa_repeat_token_identity": true,
+      "flashinfer_repeat_token_identity": true,
+      "nfa_flashinfer_token_identity": false,
+      "nfa_flashinfer_first_divergence": {
+        "batch": 0,
+        "token": 31
+      },
+      "nfa_steady_tpot_ms": [
+        26.22001552581787,
+        26.195055961608887
+      ],
+      "flashinfer_steady_tpot_ms": [
+        14.011583805084229,
+        14.004015922546387
+      ],
+      "nfa_steady_tpot_median_ms": 26.20753574371338,
+      "flashinfer_steady_tpot_median_ms": 14.007799863815308,
+      "nfa_throughput_tokens_per_second": 38.15696408006916,
+      "flashinfer_throughput_tokens_per_second": 71.38879836391592,
+      "flashinfer_over_nfa_tpot": 0.5344951162443984,
+      "nfa_prefill_seconds": [
+        77.46181957423687,
+        77.80545175075531
+      ],
+      "flashinfer_prefill_seconds": [
+        71.02015337347984,
+        71.23093415796757
+      ],
+      "nfa_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 13,
+          "both": 0
+        }
+      }
+    }
+  ]
+}

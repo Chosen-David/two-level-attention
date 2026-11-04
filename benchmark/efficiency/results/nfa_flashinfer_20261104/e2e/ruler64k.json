@@ -1,0 +1,526 @@
+{
+  "timestamp": "2026-11-04T18:04:46",
+  "benchmark_scope": "actual Qwen3-8B weights, native RULER prompt, complete decode step; ABBA independent subprocesses (two measured repeats per method); first 3 decode steps excluded from steady TPOT; TPOT excludes prefill; throughput is per-request tokens/s",
+  "arguments": {
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+    "task": "niah_multikey_1",
+    "context_length": 65536,
+    "batch_size": [
+      1,
+      2,
+      4
+    ],
+    "execution": [
+      "eager",
+      "graph"
+    ],
+    "sample_index": 0,
+    "max_new_tokens": 512,
+    "warmup_steps": 3,
+    "visible_len": 8192,
+    "gate_epsilon": 0.05,
+    "methods": [
+      "nfa",
+      "flashinfer"
+    ],
+    "gpu_id": 0,
+    "output_dir": "/tmp/nfa_fi_full_ruler64k",
+    "output": "/tmp/nfa_fi_full_ruler64k.json"
+  },
+  "source": {
+    "head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+    "diff_path": "/tmp/nfa_fi_full_ruler64k/source.diff",
+    "diff_sha256": "f97c70179fa1a653231210c40e39b88429d1d940f7d56f1999f7b7d631ef1bf5"
+  },
+  "model": {
+    "path": "/home/wangyuanshuo02/Qwen3-8B",
+    "metadata_sha256": {
+      "config.json": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+      "model.safetensors.index.json": "f9fdbcb91c23971c13ec5d5f2573d2349e8f61f2f049371ec699281748fdb1bc"
+    }
+  },
+  "input": {
+    "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+    "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 65198,
+    "provenance": "native-ruler",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "gpu": {
+    "id": 0,
+    "name": "NVIDIA H20-3e",
+    "driver_version": "550.127.08"
+  },
+  "software": {
+    "python": "3.11.12 (main, Apr  9 2025, 04:04:00) [Clang 20.1.0 ]",
+    "executable": "/home/wangyuanshuo02/two-level-attention/.venv/bin/python",
+    "torch": "2.8.0+cu128",
+    "transformers": "4.56.2"
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "configs": {
+      "B1/eager": {
+        "status": "clean",
+        "attempt": 0,
+        "log": "/tmp/nfa_fi_full_ruler64k/gpu0_b1_eager_attempt0_hygiene.jsonl",
+        "pollution_samples": 0
+      },
+      "B1/graph": {
+        "status": "clean",
+        "attempt": 0,
+        "log": "/tmp/nfa_fi_full_ruler64k/gpu0_b1_graph_attempt0_hygiene.jsonl",
+        "pollution_samples": 0
+      },
+      "B2/eager": {
+        "status": "clean",
+        "attempt": 0,
+        "log": "/tmp/nfa_fi_full_ruler64k/gpu0_b2_eager_attempt0_hygiene.jsonl",
+        "pollution_samples": 0
+      },
+      "B2/graph": {
+        "status": "clean",
+        "attempt": 0,
+        "log": "/tmp/nfa_fi_full_ruler64k/gpu0_b2_graph_attempt0_hygiene.jsonl",
+        "pollution_samples": 0
+      },
+      "B4/eager": {
+        "status": "clean",
+        "attempt": 0,
+        "log": "/tmp/nfa_fi_full_ruler64k/gpu0_b4_eager_attempt0_hygiene.jsonl",
+        "pollution_samples": 0
+      },
+      "B4/graph": {
+        "status": "clean",
+        "attempt": 0,
+        "log": "/tmp/nfa_fi_full_ruler64k/gpu0_b4_graph_attempt0_hygiene.jsonl",
+        "pollution_samples": 0
+      }
+    }
+  },
+  "runs": {
+    "B1/eager": {
+      "nfa_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b1_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b1_eager_attempt0.log",
+        "pid": 1620767
+      },
+      "flashinfer_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b1_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b1_eager_attempt0.log",
+        "pid": 1632700
+      },
+      "flashinfer_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b1_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b1_eager_attempt0.log",
+        "pid": 1634679
+      },
+      "nfa_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b1_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b1_eager_attempt0.log",
+        "pid": 1636205
+      }
+    },
+    "B1/graph": {
+      "nfa_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b1_graph_attempt0.log",
+        "pid": 1638404
+      },
+      "flashinfer_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b1_graph_attempt0.log",
+        "pid": 1643987
+      },
+      "flashinfer_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b1_graph_attempt0.log",
+        "pid": 1644952
+      },
+      "nfa_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b1_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b1_graph_attempt0.log",
+        "pid": 1646023
+      }
+    },
+    "B2/eager": {
+      "nfa_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b2_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b2_eager_attempt0.log",
+        "pid": 1647425
+      },
+      "flashinfer_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b2_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b2_eager_attempt0.log",
+        "pid": 1658433
+      },
+      "flashinfer_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b2_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b2_eager_attempt0.log",
+        "pid": 1660720
+      },
+      "nfa_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b2_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b2_eager_attempt0.log",
+        "pid": 1663209
+      }
+    },
+    "B2/graph": {
+      "nfa_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b2_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b2_graph_attempt0.log",
+        "pid": 1665234
+      },
+      "flashinfer_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b2_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b2_graph_attempt0.log",
+        "pid": 1672415
+      },
+      "flashinfer_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b2_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b2_graph_attempt0.log",
+        "pid": 1674195
+      },
+      "nfa_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b2_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b2_graph_attempt0.log",
+        "pid": 1676128
+      }
+    },
+    "B4/eager": {
+      "nfa_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b4_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b4_eager_attempt0.log",
+        "pid": 1677174
+      },
+      "flashinfer_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b4_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b4_eager_attempt0.log",
+        "pid": 1686550
+      },
+      "flashinfer_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b4_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b4_eager_attempt0.log",
+        "pid": 1692075
+      },
+      "nfa_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b4_eager_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b4_eager_attempt0.log",
+        "pid": 1696719
+      }
+    },
+    "B4/graph": {
+      "nfa_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b4_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_a_ruler64k_b4_graph_attempt0.log",
+        "pid": 1700856
+      },
+      "flashinfer_a": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b4_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_a_ruler64k_b4_graph_attempt0.log",
+        "pid": 1708068
+      },
+      "flashinfer_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b4_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/flashinfer_b_ruler64k_b4_graph_attempt0.log",
+        "pid": 1710392
+      },
+      "nfa_b": {
+        "json": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b4_graph_attempt0.json",
+        "log": "/tmp/nfa_fi_full_ruler64k/nfa_b_ruler64k_b4_graph_attempt0.log",
+        "pid": 1712620
+      }
+    }
+  },
+  "comparisons": [
+    {
+      "batch_size": 1,
+      "execution": "eager",
+      "candidate_method": "nfa",
+      "baseline_method": "flashinfer",
+      "nfa_repeat_token_identity": true,
+      "flashinfer_repeat_token_identity": true,
+      "nfa_flashinfer_token_identity": false,
+      "nfa_flashinfer_first_divergence": {
+        "batch": 0,
+        "token": 22
+      },
+      "nfa_steady_tpot_ms": [
+        29.44204807281494,
+        29.65017604827881
+      ],
+      "flashinfer_steady_tpot_ms": [
+        20.733216285705566,
+        20.760672569274902
+      ],
+      "nfa_steady_tpot_median_ms": 29.546112060546875,
+      "flashinfer_steady_tpot_median_ms": 20.746944427490234,
+      "nfa_throughput_tokens_per_second": 33.84540063852621,
+      "flashinfer_throughput_tokens_per_second": 48.19986882863456,
+      "flashinfer_over_nfa_tpot": 0.7021886461736456,
+      "nfa_prefill_seconds": [
+        24.895127221941948,
+        24.88140942901373
+      ],
+      "flashinfer_prefill_seconds": [
+        21.655199244618416,
+        21.626486986875534
+      ],
+      "nfa_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      }
+    },
+    {
+      "batch_size": 1,
+      "execution": "graph",
+      "candidate_method": "nfa",
+      "baseline_method": "flashinfer",
+      "nfa_repeat_token_identity": true,
+      "flashinfer_repeat_token_identity": true,
+      "nfa_flashinfer_token_identity": false,
+      "nfa_flashinfer_first_divergence": {
+        "batch": 0,
+        "token": 22
+      },
+      "nfa_steady_tpot_ms": [
+        24.687792778015137,
+        24.642464637756348
+      ],
+      "flashinfer_steady_tpot_ms": [
+        11.3056960105896,
+        11.30185604095459
+      ],
+      "nfa_steady_tpot_median_ms": 24.665128707885742,
+      "flashinfer_steady_tpot_median_ms": 11.303776025772095,
+      "nfa_throughput_tokens_per_second": 40.54306838789322,
+      "flashinfer_throughput_tokens_per_second": 88.46601327910652,
+      "flashinfer_over_nfa_tpot": 0.45828976445430586,
+      "nfa_prefill_seconds": [
+        25.02791142463684,
+        24.814437344670296
+      ],
+      "flashinfer_prefill_seconds": [
+        21.64018525928259,
+        21.64868701994419
+      ],
+      "nfa_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      }
+    },
+    {
+      "batch_size": 2,
+      "execution": "eager",
+      "candidate_method": "nfa",
+      "baseline_method": "flashinfer",
+      "nfa_repeat_token_identity": true,
+      "flashinfer_repeat_token_identity": true,
+      "nfa_flashinfer_token_identity": false,
+      "nfa_flashinfer_first_divergence": {
+        "batch": 0,
+        "token": 22
+      },
+      "nfa_steady_tpot_ms": [
+        31.89014434814453,
+        32.06625556945801
+      ],
+      "flashinfer_steady_tpot_ms": [
+        20.905920028686523,
+        20.705167770385742
+      ],
+      "nfa_steady_tpot_median_ms": 31.97819995880127,
+      "flashinfer_steady_tpot_median_ms": 20.805543899536133,
+      "nfa_throughput_tokens_per_second": 31.27130361584886,
+      "flashinfer_throughput_tokens_per_second": 48.06411237450492,
+      "flashinfer_over_nfa_tpot": 0.6506164801752664,
+      "nfa_prefill_seconds": [
+        49.18626172840595,
+        48.90378188341856
+      ],
+      "flashinfer_prefill_seconds": [
+        42.72772070765495,
+        42.725173987448215
+      ],
+      "nfa_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "1": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      }
+    },
+    {
+      "batch_size": 2,
+      "execution": "graph",
+      "candidate_method": "nfa",
+      "baseline_method": "flashinfer",
+      "nfa_repeat_token_identity": true,
+      "flashinfer_repeat_token_identity": true,
+      "nfa_flashinfer_token_identity": false,
+      "nfa_flashinfer_first_divergence": {
+        "batch": 0,
+        "token": 22
+      },
+      "nfa_steady_tpot_ms": [
+        26.579471588134766,
+        26.497119903564453
+      ],
+      "flashinfer_steady_tpot_ms": [
+        14.471680164337158,
+        14.465583801269531
+      ],
+      "nfa_steady_tpot_median_ms": 26.53829574584961,
+      "flashinfer_steady_tpot_median_ms": 14.468631982803345,
+      "nfa_throughput_tokens_per_second": 37.681394825679135,
+      "flashinfer_throughput_tokens_per_second": 69.11503459266552,
+      "flashinfer_over_nfa_tpot": 0.5451982343314615,
+      "nfa_prefill_seconds": [
+        49.02293663471937,
+        48.92382089793682
+      ],
+      "flashinfer_prefill_seconds": [
+        42.755606681108475,
+        42.774519465863705
+      ],
+      "nfa_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "1": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      }
+    },
+    {
+      "batch_size": 4,
+      "execution": "eager",
+      "candidate_method": "nfa",
+      "baseline_method": "flashinfer",
+      "nfa_repeat_token_identity": true,
+      "flashinfer_repeat_token_identity": true,
+      "nfa_flashinfer_token_identity": false,
+      "nfa_flashinfer_first_divergence": {
+        "batch": 0,
+        "token": 22
+      },
+      "nfa_steady_tpot_ms": [
+        33.39529609680176,
+        33.41566467285156
+      ],
+      "flashinfer_steady_tpot_ms": [
+        24.632495880126953,
+        25.028079986572266
+      ],
+      "nfa_steady_tpot_median_ms": 33.40548038482666,
+      "flashinfer_steady_tpot_median_ms": 24.83028793334961,
+      "nfa_throughput_tokens_per_second": 29.935207890445938,
+      "flashinfer_throughput_tokens_per_second": 40.27339524552585,
+      "flashinfer_over_nfa_tpot": 0.7432998312644518,
+      "nfa_prefill_seconds": [
+        97.10237254947424,
+        97.17944285273552
+      ],
+      "flashinfer_prefill_seconds": [
+        84.78871077299118,
+        84.69671109318733
+      ],
+      "nfa_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "1": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "2": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "3": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      }
+    },
+    {
+      "batch_size": 4,
+      "execution": "graph",
+      "candidate_method": "nfa",
+      "baseline_method": "flashinfer",
+      "nfa_repeat_token_identity": true,
+      "flashinfer_repeat_token_identity": true,
+      "nfa_flashinfer_token_identity": false,
+      "nfa_flashinfer_first_divergence": {
+        "batch": 0,
+        "token": 22
+      },
+      "nfa_steady_tpot_ms": [
+        27.77414321899414,
+        27.794912338256836
+      ],
+      "flashinfer_steady_tpot_ms": [
+        21.466896057128906,
+        21.499119758605957
+      ],
+      "nfa_steady_tpot_median_ms": 27.78452777862549,
+      "flashinfer_steady_tpot_median_ms": 21.48300790786743,
+      "nfa_throughput_tokens_per_second": 35.991254124149464,
+      "flashinfer_throughput_tokens_per_second": 46.54841651078961,
+      "flashinfer_over_nfa_tpot": 0.7732003969631693,
+      "nfa_prefill_seconds": [
+        97.60454978048801,
+        97.0811353996396
+      ],
+      "flashinfer_prefill_seconds": [
+        84.77334344387054,
+        84.77846496552229
+      ],
+      "nfa_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "1": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "2": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "3": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      }
+    }
+  ]
+}
