@@ -49,7 +49,8 @@ def _protected_selection_batch(lengths, indexer, capacity):
     in_swa = (col[None, :] >= sink_count[:, None]) & (
         col[None, :] < total_count[:, None])
     swa_col = col[None, :] - sink_count[:, None]
-    swa_id = length_t[:, None] - indexer.sliding_window_size + swa_col
+    # Short rows may overlap sink/SWA even when another row is long.
+    swa_id = length_t[:, None] - swa_count[:, None] + swa_col
     ids = torch.where(
         in_sink,
         col[None, :].expand(batch, -1),
