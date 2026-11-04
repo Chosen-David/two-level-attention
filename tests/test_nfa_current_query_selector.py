@@ -586,8 +586,10 @@ def test_per_kv_group_selection_and_attention_consumer(split_kv):
     torch.testing.assert_close(actual, expected, atol=0.03, rtol=0.03)
 
 
-def test_tiled_filtered_topk_bit_exact_with_quota_and_ties():
-    m, hkv, r, width, capacity = 3, 2, 8320, 1024, 16384
+@pytest.mark.parametrize('capacity', [16384, 65728, 131520])
+def test_tiled_filtered_topk_bit_exact_with_quota_and_ties(capacity):
+    m, hkv, r, width = 3, 2, 8452, 1024
+    token_bits = 32 if capacity >= 65536 else 16
     generator = torch.Generator(device='cuda').manual_seed(20261103)
     cand = torch.stack([
         torch.randperm(capacity, generator=generator, device='cuda')[:r]
@@ -596,9 +598,12 @@ def test_tiled_filtered_topk_bit_exact_with_quota_and_ties():
     logits = torch.randn(
         m, hkv, r, generator=generator, dtype=torch.bfloat16,
         device='cuda').contiguous()
-    # 大量同分、显式无效项和区间外 token 同时覆盖阈值与补洞路径。
+    # 同分、同 token、NaN/Inf、区间外 token 和零 quota 同时覆盖阈值与补洞。
     logits[:, :, 128:512] = 0.25
     logits[:, :, 512:640] = float('-inf')
+    logits[:, :, 640:768] = 0.5
+    logits[:, :, 768:800] = float('nan')
+    logits[:, :, 800:808] = float('inf')
     cand[:, :, 640:768] = capacity - 1
     lower = torch.tensor([128, 0, 0], dtype=torch.int64, device='cuda')
     upper = torch.tensor([8000, 64, 4096], dtype=torch.int64, device='cuda')
@@ -610,9 +615,9 @@ def test_tiled_filtered_topk_bit_exact_with_quota_and_ties():
     selector_ops._nfa_filtered_topk_kernel[(m * hkv,)](
         logits, cand, lower, upper, quota, reference_out, reference_count, r,
         R_PAD=triton.next_power_of_2(max(r, width)), S=capacity, K=width,
-        SINK=4, META_GROUP=hkv, TOKEN_BITS=16, num_warps=8)
-    # 当前 <64K dispatcher 消费 fine-score kernel 生成的 int32 packed key，
-    # mono reference 仍直接读取 BF16 logits；二者必须保持逐位同构。
+        SINK=4, META_GROUP=hkv, TOKEN_BITS=token_bits, num_warps=8)
+
+    # 模拟 fine-score kernel 的 packed-key 输出，与 mono reference 逐位同构。
     bits = logits.view(torch.int16).to(torch.int32) & 0xFFFF
     negative = (bits & 0x8000) != 0
     ordered = torch.where(negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
@@ -621,10 +626,13 @@ def test_tiled_filtered_topk_bit_exact_with_quota_and_ties():
         (cand >= lower[:, None, None]) & (cand < upper[:, None, None])
         & (quota[:, None, None] > 0) & (score == score)
         & (score != float('-inf')))
+    dtype = torch.int64 if token_bits == 32 else torch.int32
+    delta = capacity - cand.to(dtype)
+    invalid = -32768 << token_bits
     packed = torch.where(
-        good, (ordered << 16) + capacity - cand.to(torch.int32),
-        torch.full((), -32768 << 16, dtype=torch.int32, device='cuda'))
+        good, (ordered.to(dtype) << token_bits) + delta,
+        torch.full((), invalid, dtype=dtype, device='cuda')).contiguous()
     actual = selector_ops._nfa_filtered_topk(
-        packed.contiguous(), cand, lower, upper, quota, capacity, width, sink=4)
+        packed, cand, lower, upper, quota, capacity, width, sink=4)
     torch.testing.assert_close(actual.indices, reference_out, rtol=0, atol=0)
     torch.testing.assert_close(actual.counts, reference_count, rtol=0, atol=0)
