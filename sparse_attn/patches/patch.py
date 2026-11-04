@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 from types import MethodType
 from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention
@@ -29,8 +28,7 @@ def _is_glm4_moe_lite_attn(module) -> bool:
 
 def register_patch(model: nn.Module, args, snapshot=None,
                    rmsnorm_decode: bool = False,
-                   mlp_silu_decode: bool = False,
-                   parallel_projections: bool = False) -> int:
+                   mlp_silu_decode: bool = False) -> int:
     """注册稀疏 attention patch，返回成功 patch 的模块数。
 
     当前生产路径仅支持 Qwen3：dense prefill + frozen-region gate ->
@@ -52,13 +50,8 @@ def register_patch(model: nn.Module, args, snapshot=None,
     rmsnorm_decode：仅为 Graph 生产 decode 开启 iter91 三 kernel 路径；
     eager 的 Python/Triton launch 外壳实测回退，默认保持 HF 原实现。
     mlp_silu_decode：独立开启 Qwen3MLP SiLU+multiply 单 kernel；默认关闭。
-    parallel_projections：仅为 Graph B1 decode 并行原形状独立 GEMM。
     """
     _reject_removed_cache_args(args)
-    projection_stream = None
-    if (parallel_projections
-            and getattr(model.config, 'model_type', None) == 'qwen3'):
-        projection_stream = torch.cuda.Stream(device=next(model.parameters()).device)
     IndexerType = indexer_type_dict.get(args.method, None)
     if args.method != 'none' and IndexerType is None:
         raise ValueError(f"not support {args.method}")
@@ -95,8 +88,6 @@ def register_patch(model: nn.Module, args, snapshot=None,
                     module.indexer.layer_idx = module.layer_idx  # NFA D' 层掩码用
                 if not hasattr(module, '_nfa_original_forward'):
                     module._nfa_original_forward = module.forward
-                if projection_stream is not None:
-                    module._nfa_parallel_projection_stream = projection_stream
                 module.forward = MethodType(qwen3_attn_forward, module)
                 n_patched += 1
                 if hasattr(module, "layer_idx") and module.layer_idx == 0:
@@ -125,8 +116,7 @@ def register_patch(model: nn.Module, args, snapshot=None,
             and getattr(model.config, 'model_type', None) == 'qwen3'):
         from .qwen3_mlp_silu_patch import register_mlp_silu_patch
         register_mlp_silu_patch(
-            model, expected=model.config.num_hidden_layers,
-            projection_stream=projection_stream)
+            model, expected=model.config.num_hidden_layers)
     if args.method != 'none' and n_patched == 0:
         mod_types = sorted({type(m).__name__ for _, m in model.named_modules()})
         hint = ""

@@ -1,0 +1,23 @@
+{
+  "iteration": 113,
+  "candidate": "Graph B1 original-shape Q/KV and gate/up cross-stream parallelism",
+  "reference": "iter110",
+  "execution": "graph",
+  "input_sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+  "generated_tokens_per_arm": 128,
+  "all_four_abba_arms_token_identical": true,
+  "iter110_runs_ms": [9.928287982940674, 9.893775939941406],
+  "iter113_runs_ms": [10.228463649749756, 10.257247924804688],
+  "iter110_mean_ms": 9.91103196144104,
+  "iter113_mean_ms": 10.242855787277222,
+  "regression_ms": 0.33182382583618164,
+  "reference_over_candidate": 0.9676043641805107,
+  "fa2_over_candidate": 1.2297070525629474,
+  "gpu_hygiene": {
+    "status": "clean",
+    "max_concurrent_compute_processes": 1,
+    "monitor": "iter113_abba_hygiene.log"
+  },
+  "verdict": "reject-and-revert",
+  "reason": "Bit-exact outputs do not compensate for a repeatable 0.331824 ms production Graph regression."
+}

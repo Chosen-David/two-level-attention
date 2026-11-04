@@ -43,29 +43,11 @@ def qwen3_attn_forward(
 
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
-    projection_stream = getattr(self, '_nfa_parallel_projection_stream', None)
-    if (projection_stream is not None and input_shape == (1, 1)
-            and hidden_states.dtype is torch.bfloat16
-            and hidden_states.is_cuda and hidden_states.is_contiguous()):
-        # iter113：三个 GEMM 的形状和归约算法完全不变，仅让 K/V 与 Q 重叠。
-        # side stream 在 join 后才允许下游读取；record_stream 防止 eager warmup
-        # 的缓存分配器过早复用 side-stream 输出。Graph replay 直接重放依赖边。
-        current = torch.cuda.current_stream()
-        projection_stream.wait_stream(current)
-        with torch.cuda.stream(projection_stream):
-            key = self.k_proj(hidden_states)
-            value = self.v_proj(hidden_states)
-        query = self.q_proj(hidden_states)
-        current.wait_stream(projection_stream)
-        key.record_stream(current)
-        value.record_stream(current)
-    else:
-        query = self.q_proj(hidden_states)
-        key = self.k_proj(hidden_states)
-        value = self.v_proj(hidden_states)
-    query_states = self.q_norm(query.view(hidden_shape)).transpose(1, 2)
-    key_states = self.k_norm(key.view(hidden_shape)).transpose(1, 2)
-    value_states = value.view(hidden_shape).transpose(1, 2)
+    query_states = self.q_norm(
+        self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+    key_states = self.k_norm(
+        self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+    value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
 
     cos, sin = position_embeddings
     if input_shape[0] == 1 and input_shape[1] == 1:
