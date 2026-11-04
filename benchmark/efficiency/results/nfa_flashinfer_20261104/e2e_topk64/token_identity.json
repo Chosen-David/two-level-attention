@@ -1,0 +1,50 @@
+{
+  "schema": "nfa-topk64-e2e-token-identity-v1",
+  "context_length": 65536,
+  "batch_size": 1,
+  "max_new_tokens": 512,
+  "task": "niah_multikey_1",
+  "sample_index": 0,
+  "checks": {
+    "eager:base64k/a vs base64k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "eager:base64k/a vs opt64k/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "eager:base64k/a vs opt64k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:base64k/a vs base64k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:base64k/a vs opt64k/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:base64k/a vs opt64k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "base64k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": 30,
+      "tokens_per_request": 512
+    },
+    "opt64k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": 30,
+      "tokens_per_request": 512
+    }
+  }
+}
