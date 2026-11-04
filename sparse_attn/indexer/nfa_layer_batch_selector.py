@@ -256,7 +256,7 @@ if _has_triton():
         HK: tl.constexpr, HEAD_DIM: tl.constexpr, DIM_NUMEL: tl.constexpr,
         D_BLOCK: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
         TILE: tl.constexpr, MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
-        PACK_KEY: tl.constexpr,
+        TOKEN_BITS: tl.constexpr,
     ):
         """按 tile 并行计算 grouped-Q 的 BF16 Logits 或有序 packed key。"""
         row = tl.program_id(0)
@@ -313,17 +313,21 @@ if _has_triton():
                 & (tl.load(QUOTA + m) > 0)
                 & (score == score))
         score = tl.where(good, score, float("-inf"))
-        if PACK_KEY:
-            # 与原 partial Top-K 完全相同的 signed-BF16 ordered key 和
-            # 同分新 token 优先编码；无效项统一为最小 int32 key。
+        if TOKEN_BITS:
+            # 与原 mono Top-K 完全相同的 signed-BF16 ordered key 和
+            # 同分新 token 优先编码；长序列使用 int64，保留完整 token 域。
             bits = score_bf16.to(tl.uint16, bitcast=True).to(tl.int32) & 0xFFFF
             negative = (bits & 0x8000) != 0
             ordered = tl.where(
                 negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
             packed_good = good & (score != float("-inf"))
             delta = S - cand.to(tl.int32)
-            invalid = -32768 << 16
-            key = tl.where(packed_good, (ordered << 16) + delta, invalid)
+            if TOKEN_BITS == 32:
+                ordered = ordered.to(tl.int64)
+                delta = delta.to(tl.int64)
+            invalid = -32768 << TOKEN_BITS
+            key = tl.where(
+                packed_good, (ordered << TOKEN_BITS) + delta, invalid)
             tl.store(LOGITS + row * R + offs_r, key, mask=mask_r)
         else:
             tl.store(LOGITS + row * R + offs_r, score.to(tl.bfloat16), mask=mask_r)
@@ -499,13 +503,14 @@ if _has_triton():
         LOGITS, PARTIAL, R,
         TILE: tl.constexpr, NTILES: tl.constexpr,
         S: tl.constexpr, K: tl.constexpr, META_GROUP: tl.constexpr,
+        TOKEN_BITS: tl.constexpr,
     ):
         """直接对 fine-score 阶段生成的 packed key 做局部 Top-K。"""
         h = tl.program_id(0)
         tile = tl.program_id(1)
         offs = tile * TILE + tl.arange(0, TILE)
         mask = offs < R
-        invalid = -32768 << 16
+        invalid = -32768 << TOKEN_BITS
         key = tl.load(LOGITS + h * R + offs, mask=mask, other=invalid)
         if K == 1:
             key = tl.max(key, axis=0, keep_dims=True)
@@ -1204,10 +1209,10 @@ def _fused_fine_scores_paged(
 
     valid_req_t = (req_ids if torch.is_tensor(req_ids) else
                    torch.as_tensor(req_ids, dtype=torch.int64, device=device))
-    pack_key = capacity < 65536
+    token_bits = 32 if capacity >= 65536 else 16
     logits = _workspace_empty(
         workspace, 'fine_logits', (m, hkv, r),
-        torch.int32 if pack_key else torch.bfloat16, device)
+        torch.int64 if token_bits == 32 else torch.int32, device)
     kv_ptrs = cache.layer_kv_ptrs_buf[
         layer_offset:layer_offset + n_layers]
     _fast_launch(workspace, ('fine_logits', layer_offset),
@@ -1223,7 +1228,7 @@ def _fused_fine_scores_paged(
         D_BLOCK=triton.next_power_of_2(dims.numel()),
         HKV=hkv, B=b, TILE=tile,
         MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset,
-        PACK_KEY=pack_key,
+        TOKEN_BITS=token_bits,
         num_warps=num_warps,
     )
     return logits
@@ -1238,37 +1243,29 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
     count = _workspace_empty(
         workspace, 'middle_counts', (m, hkv), torch.int32, logits.device)
     token_bits = 32 if capacity >= 65536 else 16
-    if token_bits == 16:
-        tile = 2048
-        ntiles = triton.cdiv(r, tile)
-        partial = _workspace_empty(
-            workspace, 'filtered_topk_partial', (m, hkv, ntiles, width),
-            torch.int32, logits.device)
-        _fast_launch(workspace, ('filtered_topk_partial', layer_offset),
-                     _nfa_filtered_topk_partial_kernel, (m * hkv, ntiles),
-            logits, partial, r,
-            TILE=tile, NTILES=ntiles,
-            S=capacity, K=width, META_GROUP=hkv,
-            num_warps=16,
-        )
-        _fast_launch(workspace, ('filtered_topk_merge', layer_offset),
-                     _nfa_filtered_topk_merge_kernel, (m * hkv,),
-            partial, lower, upper, quota, out, count,
-            NTILES=ntiles, MERGE_PAD=triton.next_power_of_2(ntiles * width),
-            LOG2_K=width.bit_length() - 1,
-            S=capacity, K=width, SINK=sink,
-            META_GROUP=hkv, TOKEN_BITS=token_bits,
-            num_warps=16,
-        )
-    else:
-        _fast_launch(workspace, ('filtered_topk', layer_offset),
-                     _nfa_filtered_topk_kernel, (m * hkv,),
-            logits, cand_idx2, lower, upper, quota, out, count, r,
-            R_PAD=triton.next_power_of_2(max(r, width)),
-            S=capacity, K=width, SINK=sink,
-            META_GROUP=hkv, TOKEN_BITS=token_bits,
-            num_warps=8,
-        )
+    # 两种 token 域都按 2048 候选并行局部 Top-K，再精确归并；mono kernel
+    # 保留为 bit-exact reference，避免长序列退化为单 CTA 的 16384-wide 排序。
+    tile = 2048
+    ntiles = triton.cdiv(r, tile)
+    partial = _workspace_empty(
+        workspace, 'filtered_topk_partial', (m, hkv, ntiles, width),
+        logits.dtype, logits.device)
+    _fast_launch(workspace, ('filtered_topk_partial', layer_offset),
+                 _nfa_filtered_topk_partial_kernel, (m * hkv, ntiles),
+        logits, partial, r,
+        TILE=tile, NTILES=ntiles,
+        S=capacity, K=width, META_GROUP=hkv, TOKEN_BITS=token_bits,
+        num_warps=16,
+    )
+    _fast_launch(workspace, ('filtered_topk_merge', layer_offset),
+                 _nfa_filtered_topk_merge_kernel, (m * hkv,),
+        partial, lower, upper, quota, out, count,
+        NTILES=ntiles, MERGE_PAD=triton.next_power_of_2(ntiles * width),
+        LOG2_K=width.bit_length() - 1,
+        S=capacity, K=width, SINK=sink,
+        META_GROUP=hkv, TOKEN_BITS=token_bits,
+        num_warps=16,
+    )
     return TokenSelection(out, count)
 
 
