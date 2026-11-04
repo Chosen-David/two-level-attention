@@ -336,6 +336,7 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 | 过时结论（出现在 archived 报告/早期叙事中） | 推翻/修正判决 |
 |---|---|
+| 将旧 ring/eviction 显存结论直接用于当前 GraphReady 路径，或以 TPOT 中位数排除周期性长尾 | `37a8e5d` 的物理页在请求内 append-only，remove_request 才释放；128K B1 归档存在每64步跨页长尾。见 [TL-DECODE-PAGE-STAGING-20261104](task/task_details/TL-DECODE-PAGE-STAGING-20261104.md)：仅源码/主机验证，补丁GPU收益待验，旧实验结论不因此被追溯修改。 |
 | 保护带（boundary bypass 前的 sink/swa 保护带几何）假设最优 | `e148_sinkswa_verdict.json`（否决） |
 | prefill 稀疏可提速（FS/prefill sparse e2e） | `e149_sink4_verdict.json`（FS 质量 -5.18% → decode-only 叙事）；prefill 性能详见 `e139_prefill_profile_verdict.json` / `e140a_prefill_k1up_verdict.json` |
 | K1 越大越好 | `e140b_k1_downscan_verdict.json` + `e140h_k64sweet_verdict.json`（倒 U 峰 K1=64）+ `e168_k64_e2e_verdict.json` / `e169_k64_llama_verdict.json`（K1=64 双模型族 e2e 成立，2026-10-25 生产口径切换 K1=64） |
@@ -359,3 +360,4 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
   advice 报告与 superseded research 文档。
 - 对拍铁律：`exp/bench/test_e127_gates.py`（微逻辑回归门）+
   `exp/bench/test_tli_batch_gates.py` 每次改动后必须全绿。
+
