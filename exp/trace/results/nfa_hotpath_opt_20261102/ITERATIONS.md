@@ -964,4 +964,6 @@
 
 - 修改：隔离 iter113 的 MLP 半边，attention 完全恢复并保持 iter110。`register_patch` 新增默认关闭的 `parallel_mlp_decode`，真实 runner 仅 Graph 开启；所有 Qwen3MLP 共享一条 side stream，仅 B1 decode 让原形状 up 与主 stream 的 gate 并行，join 后 `record_stream`。eager、prefill、B>1 和其他非生产几何保持顺序路径。
 - 静态检查与首跑：三个修改文件 `py_compile` 和 `git diff --check` 通过；pc40 GPU0、RULER 32K sample 0、128 tokens、latency-only，Graph 正常 capture 并完成 127 次 replay，steady TPOT=**10.280992 ms**，比 iter110 正式 best 9.911680 ms 高 0.369312 ms，未复现 iter112 的 MLP 局部收益。decode-ready allocated 增加 33,554,432 bytes，candidate 暂定回退，不能更新 best。
-- 当前边界：本提交固化生产首跑证据，token identity 和 ABBA 尚未判定；即使 identity 通过，也必须由完整生产 ABBA 决定是否拒绝。旁路日志未观察到他方进程，但也未显示本轮自身进程，因此该首跑不据此宣称 hygiene clean；正式判决需复核监控证据。原始 receipt/stdout/hygiene 位于 `iter114_mlp_parallel/`。
+- 当前边界：首跑旁路日志未观察到他方进程，但也未显示本轮自身进程，因此该首跑不据此宣称 hygiene clean；正式判决改用后续 10 秒间隔的完整 ABBA 监控。原始 receipt/stdout/hygiene 位于 `iter114_mlp_parallel/`。
+- 512-token ABBA 正式判决：按用户新口径，四臂均实际生成 **512/512 token**、执行 511 次 Graph replay，且逐 token 完全一致。iter110 A1/A2=9.917808/9.895136 ms，iter114 B1/B2=10.271616/10.280080 ms，均值 9.906472→**10.275848 ms**，reference/candidate=**0.964054×**，稳定回退 0.369376 ms；hygiene=clean，未观察到并发计算进程。四个 NFA 臂仍均为 far/near/both=0，不能作为 skip 证据。拒绝 MLP-only 候选并恢复 iter110；判决为 `iter114_mlp_parallel/iter114_mlp_parallel_512_verdict.json`。
+- FA2 512-token 补测在模型加载阶段因 pc40 Python 环境缺少 `flash_attn` 退出，未产生性能样本；本轮不以旧 128-token FA2 数字填补，后续须在具备 FA2 的干净环境重测。

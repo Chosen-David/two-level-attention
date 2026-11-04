@@ -1,0 +1,38 @@
+{
+  "iteration": 114,
+  "candidate": "Graph B1 MLP gate/up original-shape cross-stream parallel",
+  "input": {
+    "task": "niah_single_1",
+    "sample_index": 0,
+    "prompt_tokens": 32612,
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "max_new_tokens": 512,
+    "decode_steps": 511
+  },
+  "execution": "graph",
+  "iter110_steady_ms": [
+    9.917808055877686,
+    9.89513635635376
+  ],
+  "iter114_steady_ms": [
+    10.271615982055664,
+    10.28007984161377
+  ],
+  "iter110_mean_ms": 9.906472206115723,
+  "iter114_mean_ms": 10.275847911834717,
+  "regression_ms": 0.369375705718994,
+  "reference_over_candidate": 0.9640539925378242,
+  "all_four_abba_arms_512_token_identical": true,
+  "skip_policy_counts_each_arm": {
+    "far": 0,
+    "near": 0,
+    "both": 0
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "monitor_interval_seconds": 10,
+    "concurrent_compute_processes_observed": false
+  },
+  "fa2_512_status": "not-measured: model loading raised ImportError because flash_attn is not installed in the pc40 python environment",
+  "verdict": "reject-and-revert"
+}

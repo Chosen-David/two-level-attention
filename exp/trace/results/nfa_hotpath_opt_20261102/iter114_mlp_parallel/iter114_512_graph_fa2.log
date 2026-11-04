@@ -1,0 +1,25 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Traceback (most recent call last):
+  File "/tmp/nfa-iter110-merge16-candidate/benchmark/efficiency/benchmark_nfa_end_to_end.py", line 465, in <module>
+    main()
+  File "/tmp/nfa-iter110-merge16-candidate/benchmark/efficiency/benchmark_nfa_end_to_end.py", line 394, in main
+    model = _load_model(args, args.max_new_tokens)
+  File "/tmp/nfa-iter110-merge16-candidate/benchmark/efficiency/benchmark_nfa_end_to_end.py", line 99, in _load_model
+    model = AutoModelForCausalLM.from_pretrained(
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/models/auto/auto_factory.py", line 604, in from_pretrained
+    return model_class.from_pretrained(
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/modeling_utils.py", line 288, in _wrapper
+    return func(*args, **kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/modeling_utils.py", line 5106, in from_pretrained
+    model = cls(config, *model_args, **model_kwargs)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 435, in __init__
+    super().__init__(config)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/modeling_utils.py", line 2197, in __init__
+    self.config._attn_implementation_internal = self._check_and_adjust_attn_implementation(
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/modeling_utils.py", line 2807, in _check_and_adjust_attn_implementation
+    applicable_attn_implementation = self.get_correct_attn_implementation(
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/modeling_utils.py", line 2835, in get_correct_attn_implementation
+    self._flash_attn_2_can_dispatch(is_init_check)
+  File "/home/wangyuanshuo02/.local/lib/python3.9/site-packages/transformers/modeling_utils.py", line 2547, in _flash_attn_2_can_dispatch
+    raise ImportError(f"{preface} the package flash_attn seems to be not installed. {install_message}")
+ImportError: FlashAttention2 has been toggled on, but it cannot be used due to the following error: the package flash_attn seems to be not installed. Please refer to the documentation of https://huggingface.co/docs/transformers/perf_infer_gpu_one#flashattention-2 to install Flash Attention 2.
