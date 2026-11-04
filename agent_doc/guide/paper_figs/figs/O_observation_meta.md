@@ -12,7 +12,7 @@ python3 agent_doc/guide/paper_figs/figs/fig_o_observation.py
 # 输出：O_observation.{pdf,png,svg} + O_observation_figure_data.tsv（同目录）
 ```
 
-版式（2026-10-23 第八轮起）：**1×3 网格**（(a) 条带；(b) 坐标三臂；(c) 逐层热图），
+版式（2026-10-23 第八轮起）：**1×3 网格**（(a) 条带；(b) 坐标三臂；(c) 近远区质量中位柱），
 figsize 10.2×3.9in（曾试 3.6in 回收 en 页预算，(c) 16 序列双行 ytick 行距闭合
 15 处硬碰撞故回退；页预算改由正文/结论文字压缩回收），
 width_ratios [1.85, 0.78, 0.76]，wspace 0.46，对 IEEE 双栏
@@ -63,7 +63,7 @@ far/near 区域标签与区域洗色、紧凑四态图例（蓝=in ref 且选中
    hotpotqa:s1:L8:q14212）+ 逐 query 差值保留负号（43/128 为负）；
 4. 代表点披露统一为固定示例（撤销 docstring/TSV 残留的 closest-median 规则
    说法——该旧规则实际产出 L8 q13158，与固定点不符）；
-5. 逐层热图面板（现编号 (c)）撤销 e6_layer_skip.json（10 prompt 异源摘要），skip 范围改从同一
+5. 近远区质量面板（现编号 (c)）撤销 e6_layer_skip.json（10 prompt 异源摘要），skip 范围改从同一
    张 16×36 热图逐行计数（交叉验证 hotpotqa_0=22 等与 GPT 复算一致）。
 
 ## 数据源（全部为 pin 住的真实采集）
@@ -182,10 +182,11 @@ minmax 漏在近区（均匀 mass 下极值不占优）。设计蕴含 = 分区�
 等宽 32/128 维预算：tail32（低频完整对）0.84 / random32（非成对）0.51 /
 high32（高频）0.24。主指标 = 选中质量 / 参考 top-K 质量（非全部注意力质量）。
 
-### (c) Far mass by layer — 逐层 far 门控（D′）动机（第八轮前编号 (d)）
+### (c) Near vs far mass — 近远区注意力质量中位柱（D′ 门控动机，第八轮前编号 (d)）
 
-16 序列 × 36 层 prefill far mass 热图（log 色标，单一来源 e6b_far_profiles.json）：
-24/36 层逐样本中位 <0.01；同一热图逐 prompt 计数 12–32 层 <0.01。prefill 统计，
+16 序列 × 36 层 prefill near/far 注意力质量中位柱（log 轴，单一来源
+e6b_near_far_profiles.json）：far 中位 0.0025 vs near 中位 0.1346（均值 far 0.0809
+vs near 0.2361）；far 区 63.9% 单元 <0.01、near 区 25.7%。prefill 统计，
 不约束 decode（正文第五节有反例：prefill <.05 → decode .1678）。
 
 ## 诚实约束（任何改写不得违反）
@@ -195,7 +196,7 @@ high32（高频）0.24。主指标 = 选中质量 / 参考 top-K 质量（非全
    oracle；avg/minmax = 32 维共享子空间诊断打分器），非生产 near-avg/far-minmax 逐
    KV 头实现；集合差异是候选访问差异，不能判定打分器质量优劣。
 3. 质量捕获 ≠ 任务精度；e2e 证据属于评估章节（E155d 网格 + β 让渡消融）。
-4. (c)（逐层热图）是 prefill 统计；门控有效性不得由本图断言。
+4. (c)（近远区质量中位柱）是 prefill 统计；门控有效性不得由本图断言。
 5. （b'-retired 面板数字）区域互补漏失是**诊断平面的 128q 均值口径**（分 query 的
    near/far 参考质量归一），非逐 query 配对差异、非任务精度；近区「打平」指均值差
    0.0056，非逐 query 相等。数字现以文本形式保留（Intro P2 / S6）。

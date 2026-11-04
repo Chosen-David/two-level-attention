@@ -31,10 +31,10 @@
   (b) 子空间创新点（第八轮前编号称 (c)）：同 32/128 维预算 tail32 0.84 vs
       random32 0.51 vs high32 0.24（v2 主指标
       selected_mass_over_reference_topk_mass）。
-  (c) D' gate 创新点（第八轮前编号称 (d)）：E6 逐层 far mass 热图
-      （16 样本 × 36 层，log 色标，单一来源 e6b_far_profiles.json）——
-      24/36 层逐样本中位 <0.01；同一热图逐 prompt 计数有 12–32 层 <0.01
-      → 逐层 far gate。
+  (c) D' gate 创新点（第八轮前编号称 (d)）：E6 near/far 注意力质量中位柱
+      （16 样本 × 36 层，单一来源 e6b_near_far_profiles.json，log 轴）——
+      far 中位 0.0025 vs near 中位 0.1346（均值 far 0.0809 vs near 0.2361），
+      far 区 63.9% 单元 <0.01、near 区 25.7% → 逐层 far gate。
   (b'-retired) 区域互补漏失堆叠柱（2026-10-21 新，2026-10-23 第八轮退役）：
       128 query 均值的漏失参考质量按 near/far 区域堆叠分解，block-avg 与
       minmax 两柱互补镜像——avg 漏失 2/3 集中在 far（0.170 vs 近端 0.084），
@@ -87,7 +87,7 @@
   e6b_far_profiles.json（E6 逐层 far profile，gate 标定同源；panel d 单一来源）
 
 输出 PDF+PNG+SVG + figure_data.tsv（含 (b) 全部 128 query 的区域分解漏失、
-(d) 全矩阵）。
+(c) near/far 全矩阵与聚合统计）。
 """
 import json
 import math
@@ -111,7 +111,8 @@ REPO = "/home/wangyuanshuo02/two-level-attention"
 SRC = os.path.join(REPO, "exp/trace/results/e140_o_trace_v2.json")
 SRCB = os.path.join(REPO, "exp/trace/results/e140b_pooling_anatomy.json")
 SRC6B = os.path.join(REPO, "exp/trace/results/e6b_far_profiles.json")
-for _p in (SRC, SRCB, SRC6B):
+SRC6N = os.path.join(REPO, "exp/trace/results/e6b_near_far_profiles.json")
+for _p in (SRC, SRCB, SRC6B, SRC6N):
     if not os.path.exists(_p):
         raise SystemExit(f"missing input: {_p}")
 OUT = os.path.join(REPO, "agent_doc", "guide", "paper_figs", "figs")
@@ -237,6 +238,10 @@ if sel_o != set(np.where(sel_mask)[0].tolist()):
 missed = sorted(sel_o - sel_avg)          # 参考选中但 avg 漏掉的页
 recov = sorted(set(missed) & sel_mm)      # 其中被 minmax 上界救回的页
 far_set = set(np.where(is_far)[0].tolist())
+avg_sel_far = len(sel_avg & far_set)
+avg_sel_near = len(sel_avg - far_set)
+mm_sel_far = len(sel_mm & far_set)
+mm_sel_near = len(sel_mm - far_set)
 n_miss_far = len(set(missed) & far_set)
 n_rec_far = len(set(recov) & far_set)
 miss_frac = qa_q["miss_mass_frac"]
@@ -340,10 +345,11 @@ mets_all = ["reference_token_page_coverage", "reference_token_overlap_recall",
 arm_val = {a: [float(np.mean([c["o3"][a][mm]["mean"] for c in cells]))
                for mm in mets_all] for a in arms}
 
-# ================= (d) E6 逐层 far mass 热图 =================
+# ================= (c) E6 near/far 注意力质量中位柱 =================
 # GPT 审查点 5：撤销 e6_layer_skip.json（仅 10 prompt 的异源摘要），
 # 逐 prompt 计数改从同一张 16×36 热图按 <0.01 重数（单一来源）。
 d6b = json.load(open(SRC6B))
+d6n = json.load(open(SRC6N))
 ROW_ORDER = ["lb_gov_report_0", "lb_gov_report_1", "lb_hotpotqa_0",
              "lb_hotpotqa_1", "lb_multifieldqa_en_0", "lb_multifieldqa_en_1",
              "lb_musique_0", "lb_musique_1", "lb_narrativeqa_0",
@@ -359,9 +365,17 @@ ROW_LAB = {"lb_gov_report_0": "gov_0", "lb_gov_report_1": "gov_1",
            "lb_qasper_0": "qas_0", "lb_qasper_1": "qas_1",
            "natural32k": "natural", "needle32k": "needle"}
 M = np.array([d6b[k] for k in ROW_ORDER])  # 16 x 36
+N = np.array([[d6n[k][li]["near"] for li in range(len(d6n[k]))]
+              for k in ROW_ORDER])
 lay_med = np.median(M, axis=0)
 n_light = int((lay_med < 0.01).sum())
 skip_rng = (M < 0.01).sum(axis=1)  # 逐 prompt <0.01 层数（同源重算）
+far_flat = M.ravel()
+near_flat = N.ravel()
+far_med = float(np.median(far_flat))
+near_med = float(np.median(near_flat))
+far_mean = float(far_flat.mean())
+near_mean = float(near_flat.mean())
 
 # ================= 画布 1x4 网格（IEEE 双栏 \textwidth≈7.16in，缩放比 ≈0.70） =================
 # 2026-10-22 第五轮重设计（用户裁决）：(a)+(b) 合并为单面板——条带图展示单查询
@@ -421,21 +435,23 @@ ax_a.axvspan(rb["swa_lo"], q_a + 1, color=C_NEU, alpha=0.35, lw=0)
 # 根因之一）；第九轮 alpha 0.15→0.20（印刷缩放后几乎不可读的残留因素），
 # 与退役 (b') 堆叠配色一致（far=C_HL、near=C_MAIN），
 # 配 near_lo 虚线分界 + 头部区域标注
-ax_a.axvspan(rb["sink_hi"], rb["near_lo"], color=C_HL, alpha=0.20,
+ax_a.axvspan(rb["sink_hi"], rb["near_lo"], color=C_HL, alpha=0.28,
              lw=0, zorder=3.5)
-ax_a.axvspan(rb["near_lo"], rb["swa_lo"], color=C_MAIN, alpha=0.20,
+ax_a.axvspan(rb["near_lo"], rb["swa_lo"], color=C_MAIN, alpha=0.28,
              lw=0, zorder=3.5)
 # near/far 区域标注（头部空带 y≈3.65，图例带之下——图例实测横跨全宽，
 # 须纵向分层避让；far 中心约 near_lo/2，
 # near 中心 (near_lo+swa_lo)/2——版式铁律：区域占比数字进 caption/TSV）
 _tagbox = dict(boxstyle="round,pad=0.2", facecolor="white",
                edgecolor="none", alpha=0.85)
+_far_lab = f"远区\navg {avg_sel_far} / mm {mm_sel_far}" if ZH else f"far\navg {avg_sel_far} / mm {mm_sel_far}"
+_near_lab = f"近区\navg {avg_sel_near} / mm {mm_sel_near}" if ZH else f"near\navg {avg_sel_near} / mm {mm_sel_near}"
 ax_a.text((rb["sink_hi"] + rb["near_lo"]) / 2, 3.50,
-          "远区" if ZH else "far", ha="center",
-          va="center", fontsize=AN - 2, color=C_HL, fontweight="bold",
-          bbox=_tagbox)
-ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 3.50, "近区" if ZH else "near",
-          ha="center", fontsize=AN, color=C_MAIN, fontweight="bold", bbox=_tagbox)
+          _far_lab, ha="center", va="center", fontsize=AN - 2,
+          color=C_HL, fontweight="bold", bbox=_tagbox)
+ax_a.text((rb["near_lo"] + rb["swa_lo"]) / 2, 3.50, _near_lab,
+          ha="center", va="center", fontsize=AN - 1, color=C_MAIN,
+          fontweight="bold", bbox=_tagbox)
 ax_a.axvline(rb["near_lo"], color=C_HL, lw=1.6, linestyle="--")
 # 尖峰页标记（▼，页 @spike.pos_lo=832：单 token 占页质量 99.85%，oracle
 # 选中→avg 稀释落选→minmax 救回；说明在 caption）
@@ -511,20 +527,28 @@ ax_c.set_title("(b) 选哪 32 维" if ZH else "(b) Which 32 dims",
                fontweight="bold")
 ax_c.tick_params(labelsize=TK)
 
-# ---- (c) E6 逐层 far mass 热图（第八轮前编号 (d)） ----
-norm6 = mcolors.LogNorm(vmin=1e-7, vmax=1.0)
-im = ax_d.imshow(M, aspect="auto", cmap=cmap_mass, norm=norm6,
-                 interpolation="nearest")
-ax_d.set_xticks([0, 8, 16, 24, 32])
-ax_d.set_yticks(range(len(ROW_ORDER)))
-ax_d.set_yticklabels([ROW_LAB[k] for k in ROW_ORDER], fontsize=TK - 5.3)
-ax_d.set_xlabel("层" if ZH else "layer", fontsize=L, labelpad=12)
-ax_d.set_title("(c) 逐层远区质量" if ZH else "(c) Far mass by layer",
-               loc="left", pad=10,
-               fontsize=T, fontweight="bold")
-ax_d.tick_params(axis="x", labelsize=TK)
-cb6 = fig.colorbar(im, ax=ax_d, fraction=0.045, pad=0.12)
-cb6.ax.tick_params(labelsize=TK - 3)
+# ---- (c) near/far attention mass（16 prompts × 36 layers, median） ----
+vals = [far_med, near_med]
+cols = [C_HL, C_MAIN]
+labels = ["远区" if ZH else "far", "近区" if ZH else "near"]
+for i, (v, col) in enumerate(zip(vals, cols)):
+    ax_d.bar([i], [v], width=0.52, color=col, edgecolor="black", linewidth=1.0)
+    ax_d.text(i, v * 1.18, f"{v:.3f}", ha="center", va="bottom",
+              fontsize=AN, fontweight="bold")
+ax_d.set_yscale("log")
+ax_d.set_ylim(1e-4, 1.0)
+ax_d.set_yticks([1e-4, 1e-3, 1e-2, 1e-1, 1e0])
+ax_d.set_xticks([0, 1])
+ax_d.set_xticklabels(labels, fontsize=TK)
+ax_d.set_ylabel("中位注意力质量" if ZH else "median attn mass",
+                fontsize=L)
+for _sp in ("top", "right"):
+    ax_d.spines[_sp].set_visible(False)
+ax_d.grid(axis="y", color="#d5d5d5", linewidth=0.5)
+ax_d.set_axisbelow(True)
+ax_d.set_title("(c) 近远区质量对比" if ZH else "(c) Near vs far mass",
+               loc="left", pad=10, fontsize=T, fontweight="bold")
+ax_d.tick_params(labelsize=TK)
 
 fig.subplots_adjust(left=0.10, right=0.93, top=0.94, bottom=0.09)
 
@@ -563,6 +587,8 @@ rows.append(f"O\ta\trepr_query\tminmax_miss_pages\tcount\t{len(mm_missed)}/{len(
 rows.append(f"O\ta\trepr_query\tminmax_miss_mass_frac\tfrac\t{mm_miss_frac:.4f}\t{srcb}\tbut LESS ref mass than avg ({miss_frac:.4f}): page-count vs mass criteria differ")
 rows.append(f"O\ta\trepr_query\tavg_extra_pages\tcount\t{len(avg_extra)}\t{srcb}\tselected outside mass-rank reference")
 rows.append(f"O\ta\trepr_query\tminmax_extra_pages\tcount\t{len(mm_extra)}\t{srcb}\tselected outside mass-rank reference")
+rows.append(f"O\ta\trepr_query\tavg_sel_pages_near_far\tcount\t{avg_sel_near}/{avg_sel_far}\t{srcb}\trepresentative query selected-page split by aligned-bin region (near/far)")
+rows.append(f"O\ta\trepr_query\tminmax_sel_pages_near_far\tcount\t{mm_sel_near}/{mm_sel_far}\t{srcb}\trepresentative query selected-page split by aligned-bin region (near/far); minmax keeps more far critical pages")
 rows.append(f"O\ta\tall_queries\tmiss_mass_frac_avg_vs_minmax\tfrac\t{ams_mean:.4f},{mms_mean:.4f}\t{srcb}\tmean over 128 queries; minmax misses less ref mass")
 if spike:
     rows.append(f"O\ta\trepr_query\tspike_page_top1_token_share\tfrac\t{spike_top1:.4f}\t{srcb}\tpage@{spike['pos_lo']}")
@@ -584,6 +610,13 @@ for a in arms:
 for k, row in zip(ROW_ORDER, M):
     for li, v in enumerate(row):
         rows.append(f"O\tc\t{k}\tfar_mass\tfrac\t{v:.4e}\te6b_far_profiles.json\tlayer={li}")
+for k, row in zip(ROW_ORDER, N):
+    for li, v in enumerate(row):
+        rows.append(f"O\tc\t{k}\tnear_mass\tfrac\t{v:.4e}\te6b_near_far_profiles.json\tlayer={li}")
+rows.append(f"O\tc\tall\tfar_median_mass\tfrac\t{far_med:.4f}\te6b_near_far_profiles.json\tmedian over 16 prompts x 36 layers")
+rows.append(f"O\tc\tall\tnear_median_mass\tfrac\t{near_med:.4f}\te6b_near_far_profiles.json\tmedian over 16 prompts x 36 layers")
+rows.append(f"O\tc\tall\tfar_mean_mass\tfrac\t{far_mean:.4f}\te6b_near_far_profiles.json\tmean over 16 prompts x 36 layers")
+rows.append(f"O\tc\tall\tnear_mean_mass\tfrac\t{near_mean:.4f}\te6b_near_far_profiles.json\tmean over 16 prompts x 36 layers")
 rows.append(f"O\tc\tall\tlayers_median_lt_0.01\tcount\t{n_light}\te6b_far_profiles.json\t-")
 rows.append(f"O\tc\tall\tlayers_lt_0.01_per_prompt\trange\t{int(skip_rng.min())}-{int(skip_rng.max())}\te6b_far_profiles.json\trecomputed per-row from the same 16x36 heatmap (single source; GPT-review fix: e6_layer_skip.json 10-prompt summary withdrawn)")
 if not ZH:  # TSV 仅英文渲染时写（内容语言无关，避免双写）
