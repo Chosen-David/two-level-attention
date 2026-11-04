@@ -1,4 +1,4 @@
-# Top-K 候选 32K/128K 生产验收与 selector 测试补充
+# Top-K 候选 32K/64K/128K 生产验收与 selector 测试补充
 
 本文是 `2026-11-05_full_stack_efficiency_response_by_claude.md` 的增量记录，不改写此前结论。候选仍为 `7198002c95e31e547890deaf71387c0fd06bf63d`，基线为 `62d39d8de61fe5a96d728a298148de554a00735e`；本补充不构成候选合入 main。
 
@@ -28,7 +28,41 @@
 
 因此候选在 128K Graph 的完整 `GraphRunner.step` 口径下取得 1.153542×，不是 replay-only 或 post-selection proxy；eager 仍慢于 FlashInfer。`token_identity_128k.json` 显示 base/opt 的同执行 A/B 与跨源码四臂均逐 token 一致。base 与 opt 的 eager/Graph 都在第 87 个 token 首次分叉，该既有跨执行问题仍未修复。
 
-## 3. main selector 测试契约修复已完整复验
+## 3. 64K B2/B4：Graph 均超过 FlashInfer，同执行逐 token 一致
+
+64K 批量回归使用同一真实 prompt 复制到每个 batch row，仍运行完整 decode step、ABBA、3 warmup + 2 个测量 repeat，全部臂 hygiene clean。每个请求的每层自然 gate 均为 3 个 near-skip 层，far/both-skip 为 0。
+
+| Batch | 源码 | 执行 | NFA 稳态 TPOT (ms) | FlashInfer 稳态 TPOT (ms) | FI/NFA |
+|---:|---|---|---:|---:|---:|
+| B2 | base | eager | 31.898031 | 20.877272 | 0.654500× |
+| B2 | opt | eager | 24.690248 | 20.847352 | 0.844356× |
+| B2 | base | Graph | 26.500944 | 14.551680 | 0.549100× |
+| B2 | opt | Graph | 13.012152 | 14.494168 | **1.113895×** |
+| B4 | base | eager | 33.279312 | 24.697737 | 0.742135× |
+| B4 | opt | eager | 25.155648 | 24.812696 | 0.986367× |
+| B4 | base | Graph | 27.765312 | 21.497240 | 0.774248× |
+| B4 | opt | Graph | 15.428904 | 21.253128 | **1.377488×** |
+
+`token_identity_64k_b24.json` 逐请求对拍全部原始 token：B2/B4 的 base/opt 在 eager 与 Graph 下，A/B 重复及跨源码的所有请求、所有 512 token 均一致。跨执行的既有分叉仍存在：B2 与 B4 的 base/opt 都在 batch 0 的第 34 个 token 首次分叉。B4 eager 已接近 FlashInfer，但仍未达到 1×；Graph 收益不能外推为 eager 收益。
+
+## 4. 32K B2/B4：无回退，Graph 随 batch 出现既有优势
+
+32K B2/B4 的全部臂同样 hygiene clean，每个请求均保持第 11、14 层 far-skip。候选相对基线的 TPOT 和 FI/NFA 基本一致，没有观察到 int32 路径回退，也没有新增加速主张。
+
+| Batch | 源码 | 执行 | NFA 稳态 TPOT (ms) | FlashInfer 稳态 TPOT (ms) | FI/NFA |
+|---:|---|---|---:|---:|---:|
+| B2 | base | eager | 24.665240 | 20.551824 | 0.833230× |
+| B2 | opt | eager | 24.825704 | 20.668296 | 0.832536× |
+| B2 | base | Graph | 11.732800 | 11.528880 | 0.982620× |
+| B2 | opt | Graph | 11.725536 | 11.526536 | 0.983028× |
+| B4 | base | eager | 24.769336 | 20.994520 | 0.847601× |
+| B4 | opt | eager | 25.009976 | 20.559472 | 0.822051× |
+| B4 | base | Graph | 13.663080 | 15.156296 | 1.109288× |
+| B4 | opt | Graph | 13.685728 | 15.122424 | 1.104978× |
+
+`token_identity_32k_b24.json` 显示 B2/B4 的同执行 A/B 与跨源码全部请求、全部 512 token 一致。base/opt 的 eager/Graph 都在 batch 0 的第 25 个 token 首次分叉。B4 Graph 的 1.1× 是基线已有的批量执行结果，不能归因于本次 Top-K 候选。
+
+## 5. main selector 测试契约修复已完整复验
 
 `tests/test_nfa_current_query_selector.py` 的三处修复均只更新陈旧测试契约，不改变生产代码：
 
@@ -43,11 +77,11 @@ test_tiled_filtered_topk_bit_exact_with_quota_and_ties: 1 passed in 4.77s
 tests/test_nfa_current_query_selector.py: 19 passed in 4.21s
 ```
 
-## 4. 尚未关闭的门禁
+## 6. 尚未关闭的门禁
 
-- 64K B2/B4 base 验收仍在运行，opt B2/B4 尚未完成；不得外推 B1 结论。
+- 128K B2/B4 base 正在运行，opt 尚未完成，不得虚构完整网格。
 - eager/Graph 跨执行 token 分叉仍存在。
 - eager host/runtime 开销、128K niah L1 上涨，以及此前 response 中的异步、padding、短序列 union、full 子空间等问题仍未关闭。
-- tiled partial 与 fine-score 直接编码仍是组合候选；完成剩余 batch 回归并重基到含 PR40 的 main 后，才评估合入。
+- tiled partial 与 fine-score 直接编码仍是组合候选；候选已重基到含 PR40 的 main，三档 Top-K focused 测试 `3 passed`、完整 selector `21 passed`，仍需完成重基后的生产验收再评估合入。
 
 原始 arms、逐步 TPOT、生成 token、skip receipt、源码 diff 与 GPU hygiene 均归档在 `benchmark/efficiency/results/nfa_flashinfer_20261104/e2e_topk64/`。

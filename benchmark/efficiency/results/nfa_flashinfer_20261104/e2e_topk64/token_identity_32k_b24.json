@@ -1,0 +1,106 @@
+{
+  "schema": "nfa-topk64-e2e-batch-token-identity-v1",
+  "context_length": 32768,
+  "batch_size": [2, 4],
+  "max_new_tokens": 512,
+  "task": "niah_multikey_1",
+  "sample_index": 0,
+  "checks": {
+    "B2/eager:base32k/a vs base32k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [512, 512]
+    },
+    "B2/eager:base32k/a vs opt32k/a": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [512, 512]
+    },
+    "B2/eager:base32k/a vs opt32k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [512, 512]
+    },
+    "B2/graph:base32k/a vs base32k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [512, 512]
+    },
+    "B2/graph:base32k/a vs opt32k/a": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [512, 512]
+    },
+    "B2/graph:base32k/a vs opt32k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [512, 512]
+    },
+    "B2/base32k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": {"batch": 0, "token": 25},
+      "requests": 2,
+      "tokens_per_request": [512, 512]
+    },
+    "B2/opt32k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": {"batch": 0, "token": 25},
+      "requests": 2,
+      "tokens_per_request": [512, 512]
+    },
+    "B4/eager:base32k/a vs base32k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [512, 512, 512, 512]
+    },
+    "B4/eager:base32k/a vs opt32k/a": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [512, 512, 512, 512]
+    },
+    "B4/eager:base32k/a vs opt32k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [512, 512, 512, 512]
+    },
+    "B4/graph:base32k/a vs base32k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [512, 512, 512, 512]
+    },
+    "B4/graph:base32k/a vs opt32k/a": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [512, 512, 512, 512]
+    },
+    "B4/graph:base32k/a vs opt32k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [512, 512, 512, 512]
+    },
+    "B4/base32k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": {"batch": 0, "token": 25},
+      "requests": 4,
+      "tokens_per_request": [512, 512, 512, 512]
+    },
+    "B4/opt32k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": {"batch": 0, "token": 25},
+      "requests": 4,
+      "tokens_per_request": [512, 512, 512, 512]
+    }
+  }
+}
