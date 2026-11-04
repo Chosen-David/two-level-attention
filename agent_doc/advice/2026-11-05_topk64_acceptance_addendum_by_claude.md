@@ -77,11 +77,33 @@ test_tiled_filtered_topk_bit_exact_with_quota_and_ties: 1 passed in 4.77s
 tests/test_nfa_current_query_selector.py: 19 passed in 4.21s
 ```
 
-## 6. 尚未关闭的门禁
+## 6. 重基到含 PR40 的 main：源码与生产身份均通过
 
-- 128K B2/B4 base 正在运行，opt 尚未完成，不得虚构完整网格。
+候选源码提交已单独重基到 main `b629dc29`，并补入三档 capacity 的 Top-K 测试，重基候选为 `264038d7be94cf0a862179764b49ce3fb409a59a`。pc02 GPU0 在 `used=1 MiB`、无 compute apps 时实测：
+
+```text
+三档 capacity Top-K focused: 3 passed in 90.13s
+完整 selector: 21 passed in 41.86s
+```
+
+随后在当前 main 与重基候选上分别完成 64K B1 全生产 ABBA，全部 hygiene clean：
+
+| 源码 | 执行 | NFA 稳态 TPOT (ms) | FlashInfer 稳态 TPOT (ms) | FI/NFA |
+|---|---|---:|---:|---:|
+| current main | eager | 29.565008 | 20.844625 | 0.705044× |
+| rebased opt | eager | 23.963552 | 21.088768 | 0.880035× |
+| current main | Graph | 24.756880 | 11.303472 | 0.456579× |
+| rebased opt | Graph | 10.674168 | 11.303240 | **1.058934×** |
+
+`token_identity_64k_rebased.json` 同时证明：current main/base 与 rebased opt 的同执行 A/B、跨源码全部 512 token 一致；原始 base/opt 与 current main/rebased opt 也分别逐 token 一致。因此 PR40 与重基没有改变该样本的生成结果。eager/Graph 仍都在第 30 个 token 分叉，不能把同执行通过写成跨执行通过。
+
+重基候选的 128K B1 复核同样 hygiene clean：eager NFA/FlashInfer 为 24.218104/20.802984 ms（0.858985×），Graph 为 12.107944/14.022944 ms（**1.158161×**）。`token_identity_128k_rebased.json` 显示原始 base/opt 与重基候选在同执行下全部 512 token 一致；三者的 eager/Graph 均在第 87 个 token 分叉。
+
+## 7. 尚未关闭的门禁
+
+- 128K B2/B4 base 已完成且 hygiene clean，opt 正在运行；其跨源码身份与完整网格尚未形成。
 - eager/Graph 跨执行 token 分叉仍存在。
 - eager host/runtime 开销、128K niah L1 上涨，以及此前 response 中的异步、padding、短序列 union、full 子空间等问题仍未关闭。
-- tiled partial 与 fine-score 直接编码仍是组合候选；候选已重基到含 PR40 的 main，三档 Top-K focused 测试 `3 passed`、完整 selector `21 passed`，仍需完成重基后的生产验收再评估合入。
+- tiled partial 与 fine-score 直接编码仍是组合候选；同执行生产身份、批量回归、重基和三档 selector 测试已通过，128K 批量验收完成后再做最终合入判决。
 
 原始 arms、逐步 TPOT、生成 token、skip receipt、源码 diff 与 GPU hygiene 均归档在 `benchmark/efficiency/results/nfa_flashinfer_20261104/e2e_topk64/`。

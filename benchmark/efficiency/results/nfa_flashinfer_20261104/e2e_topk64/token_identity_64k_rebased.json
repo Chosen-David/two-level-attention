@@ -1,0 +1,72 @@
+{
+  "schema": "nfa-topk64-e2e-token-identity-v1",
+  "context_length": 65536,
+  "batch_size": 1,
+  "max_new_tokens": 512,
+  "task": "niah_multikey_1",
+  "sample_index": 0,
+  "base_source": "b629dc294214dcb3103f3b9986689fff3e480b21",
+  "candidate_source": "264038d7",
+  "checks": {
+    "eager:main/a vs main64k_b629/b": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "eager:main/a vs rebased64k_264038/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "eager:main/a vs rebased64k_264038/b": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:main/a vs main64k_b629/b": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:main/a vs rebased64k_264038/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:main/a vs rebased64k_264038/b": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "eager:original-base64k/a vs main64k_b629/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "eager:original-opt64k/a vs rebased64k_264038/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:original-base64k/a vs main64k_b629/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:original-opt64k/a vs rebased64k_264038/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "main64k_b629:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": 30,
+      "tokens_per_request": 512
+    },
+    "rebased64k_264038:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": 30,
+      "tokens_per_request": 512
+    }
+  }
+}

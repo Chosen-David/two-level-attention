@@ -1,0 +1,56 @@
+{
+  "schema": "nfa-topk64-e2e-token-identity-v1",
+  "context_length": 131072,
+  "batch_size": 1,
+  "max_new_tokens": 512,
+  "task": "niah_multikey_1",
+  "sample_index": 0,
+  "candidate_source": "264038d7be94cf0a862179764b49ce3fb409a59a",
+  "checks": {
+    "eager:original-base/a vs rebased/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "eager:original-base/a vs rebased/b": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "eager:original-opt/a vs rebased/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:original-base/a vs rebased/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:original-base/a vs rebased/b": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "graph:original-opt/a vs rebased/a": {
+      "identical": true,
+      "first_divergence": null,
+      "tokens_per_request": 512
+    },
+    "base128k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": 87,
+      "tokens_per_request": 512
+    },
+    "opt128k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": 87,
+      "tokens_per_request": 512
+    },
+    "rebased128k_264038:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": 87,
+      "tokens_per_request": 512
+    }
+  }
+}

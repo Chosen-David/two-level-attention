@@ -1,0 +1,61 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 176.61it/s]
+{
+  "decode_steps": 511,
+  "tpot_ms_median": 11.302559852600098,
+  "steady_tpot_ms_median": 11.302527904510498,
+  "throughput_tokens_per_second": 88.47578244871487,
+  "warmup_steps_excluded_from_steady": 3,
+  "prefill_seconds": 21.687273539602757,
+  "prefill_cpu_offload": false,
+  "graph_replays": 511,
+  "flashinfer_runtime": {
+    "version": "0.6.14",
+    "decode_attention": "FlashInfer paged KV decode wrapper",
+    "wrapper": "CUDAGraphBatchDecodeWithPagedKVCacheWrapper",
+    "kv_layout": "NHD",
+    "paged_cache_shape_per_layer": [
+      4107,
+      2,
+      16,
+      8,
+      128
+    ],
+    "page_size": 16,
+    "use_tensor_cores": true,
+    "fixed_split_size_pages": 217,
+    "fixed_split_size_tokens": 3472,
+    "max_plan_seq_len": 65709,
+    "physical_pages_per_request": 4107,
+    "page_table_update": "fixed physical pages; compact CSR indices updated at page boundaries; indptr/last_page_len and current-token slot mapping updated every step",
+    "prefill_attention": "HF SDPA with original Qwen3 RoPE"
+  },
+  "method": "flashinfer",
+  "execution": "graph",
+  "batch_size": 1,
+  "context_length": 65536,
+  "max_new_tokens": 512,
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "input": {
+    "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+    "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 65198,
+    "provenance": "native-ruler",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "measurement_mode": "latency",
+  "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+  "prefill_batch_execution": "serial one-request prefills",
+  "prefill_timing_scope": "model prefill, first-token argmax/readback, and request/cache setup; FA2 optional KV restore included; FlashInfer paged KV append included",
+  "timing_scope": "CUDA events around complete decode step: input/position updates, scheduler/cache planning where applicable, model/selector, and argmax",
+  "timing_quality": "clean-device-history",
+  "host_readback_in_decode_loop": false,
+  "gpu_hygiene": {
+    "status": "requires external process monitor"
+  },
+  "transformers_version": "4.56.2",
+  "torch_version": "2.8.0+cu128"
+}
+saved -> /tmp/nfa_topk64_e2e/main64k_b629/arms/flashinfer_b_ruler64k_b1_graph_attempt0.json
