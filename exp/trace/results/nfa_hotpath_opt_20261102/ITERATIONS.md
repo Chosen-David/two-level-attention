@@ -925,3 +925,9 @@
 - 安全与微基准：5/5 个 B3×HKV8 seed 全部 int32 key 逐位一致，独立 memcheck `ERROR SUMMARY=0`。真实 B1 R=8452、32 维下 eager 0.0246751→0.0233891 ms（1.054982×），Graph 0.0181465→0.0177921 ms（**1.019920×**），Graph bit-exact=True；Graph 每层仅节省约 0.000354 ms，36 层理论收益约 0.01276 ms，必须经完整生产 ABBA 判定，不把 eager launch 微基准收益误算到未修改的生产 eager。
 - 完整生产与 identity：pc40 GPU0、同一 RULER 32K sample 0、128 tokens、latency-only，iter108 Graph 单跑 steady TPOT=9.929856 ms（127 replays），eager=25.268144 ms（生产代码未改）。iter107↔iter108 Graph、iter107↔iter108 eager、iter108 eager↔Graph 均为 128/128 token 完全一致；输入 SHA 和 selector 配置不变。
 - Graph ABBA 正式判决：iter107 A1/A2=9.969248/10.009664 ms，iter108 B1/B2=9.937472/9.920096 ms，均值 9.989456→**9.928784 ms**，加速 **1.006111×**，四臂 token 全一致；提升很小但两臂方向一致，接受为 Graph 新 best。FA2/NFA=12.595712/9.928784=**1.268606×**，距 2× 门槛 6.297856 ms 仍差 3.630928 ms；eager 历史 best 23.982288 ms 不变，双口径均未达标。微基准、memcheck、生产单跑、ABBA 与旁路 hygiene 均归档到 `iter108_fine2/`，任意采样最多 1 个计算进程，不推送 main。
+
+## Iter 109：16 warp 下复验 4096-token partial tile（回退）
+
+- 实验：不改变生产源码，直接以当前 16-warp partial + iter104 merge 组成完整 Top-K 微基准，对比 tile=2048/5-run 与 tile=4096/3-run。此前旧 warp/merge 口径已拒绝大 tile，本轮只验证新代价结构是否改变最优点。
+- 正确性：10/10 个 B3×HKV8 seed 的 middle indices/counts 全部逐位一致，独立 memcheck `ERROR SUMMARY=0`，Graph bit-exact=True。
+- 判决：B1 R=8452/K=1024 下 eager 0.0284054→0.0548709 ms（0.517677×），Graph 0.0232270→0.0498956 ms（**0.465512×**）。大 partial 的局部 Top-K 成本远超少两轮 merge 的收益，明确拒绝；生产 tile=2048 不变，不运行完整生产 ABBA、不更新 best。基准与日志归档为 `benchmark_nfa_topk_tile.py` 和 `iter109_topk4096/`。
