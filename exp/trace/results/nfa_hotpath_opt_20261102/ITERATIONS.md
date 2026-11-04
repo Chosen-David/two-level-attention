@@ -944,3 +944,10 @@
 - 实验：不修改生产代码，新增独立基准直接读取 Qwen3-8B 第 0/1/17/35 层真实 K/V 权重，对 B1 `[1,1,4096]` BF16 输入比较原两次 `[1024,4096]` 投影与一次 `[2048,4096]` KV 投影；Q 完全保持原路径。若 K/V 不逐位一致则立即拒绝，不运行完整生产或性能计时。
 - 正确性判决：4 层×4 个输入共 **16/16 用例失败**，K 或 V 每次有 1–3 个 BF16 元素不同，观测 max_abs 从约 2.38e-7 到 0.015625；说明 N=2048 改变了 cuBLAS 数值路径，不能假定 iter94 探针中 K/V 曾逐位一致会稳定复现。根据硬门直接拒绝，未采集融合臂延迟、未改 `qwen3_attn_patch.py`、未运行生产 ABBA。
 - 当前状态：Graph 正式 best 仍为 **9.911680 ms / FA2-NFA=1.270795×**，eager 历史 best 仍为 23.982288 ms / FA2-NFA=0.957725×，双口径 2× 均未达到，不推送 main。微基准与 hygiene 归档为 `benchmark_nfa_kv_projection.py` 和 `iter111_kv/`。
+
+## Iter 112：原形状 Q/KV 与 gate/up 跨 stream 并行微基准
+
+- 修改：保持 Q/K/V 和 gate/up 每次 `F.linear` 的形状、权重、归约算法不变，只用 fork/join side stream 让 attention 的 K/V 与主 stream 的 Q 并行、MLP 的 up 与主 stream 的 gate 并行；不拼接权重、不改变任何 GEMM N 维。生产代码本轮尚未修改。
+- 正确性：真实 Qwen3-8B 第 0/1/17/35 层×4 个输入共 **16/16 用例**的 Q/K/V/gate/up 全部逐位一致，两个 Graph capture/replay 臂也全部逐位一致。首次命令因脚本路径下缺少 `PYTHONPATH=.` 在 import 阶段退出，未启动 CUDA；补齐环境后原基准成功，失败日志保留在同一文件。
+- 微基准：attention eager 0.0406867→0.0419733 ms（0.969346×），Graph 0.0261149→0.0200240 ms（**1.304180×**）；MLP eager 0.0801487→0.0692585 ms（1.157240×），Graph 0.0668321→0.0577948 ms（**1.156368×**）。Graph 两项按 36 层推导合计节省约 **0.544614 ms/step**，仅为候选排序信号，生产 TPOT 仍需完整验收。
+- 下一轮边界：eager attention 已出现回退，因此并行路径只允许 Graph capture/replay；eager 保持当前独立顺序投影。生产还需验证 side stream 生命周期、Graph 私有池、完整 128-token identity 和 ABBA，不能把局部估算直接记为正式 best。证据归档为 `benchmark_nfa_parallel_projections.py` 与 `iter112_parallel_proj/`。
