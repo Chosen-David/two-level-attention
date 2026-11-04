@@ -156,14 +156,29 @@ arm3_val = {
 }
 xpos = {"far": 0, "near": 1}
 width = 0.26
+# 区域背景色带：far→minmax 高亮色、near→avg 主色，建立「区域→打分方法」的
+# 视觉映射，让「minmax 多选远区、avg 多选近区」一眼可读。
+ax_a.axvspan(xpos["far"] - 0.5, xpos["far"] + 0.5,
+             color=C_HL, alpha=0.10, lw=0, zorder=0)
+ax_a.axvspan(xpos["near"] - 0.5, xpos["near"] + 0.5,
+             color=C_MAIN, alpha=0.10, lw=0, zorder=0)
 for ri, reg in enumerate(regions):
     for ai, arm in enumerate(arms3):
         v = arm3_val[arm][reg]
         x = xpos[reg] + (ai - 1) * width
+        # 关键柱 = 该区域「正确一方」（far 归 minmax、near 归 avg），加粗黑边；
+        # oracle 是质量参考（半透明弱化），其余为对照臂。
+        is_key = (reg == "far" and arm == "minmax") or (reg == "near" and arm == "avg")
+        is_ref = (arm == "oracle")
+        lw = 2.6 if is_key else 1.0
+        alpha = 0.65 if is_ref else 1.0
+        ec = "black"
+        ls = "dashed" if is_ref else "solid"
         ax_a.bar([x], [v], width=width * 0.92, color=arm3_col[arm],
-                 edgecolor="black", linewidth=1.0)
+                 edgecolor=ec, linewidth=lw, alpha=alpha, linestyle=ls)
         ax_a.text(x, v + 0.6, f"{v}", ha="center", va="bottom",
-                  fontsize=AN, fontweight="bold")
+                  fontsize=AN, fontweight="bold",
+                  color=arm3_col[arm] if is_key else "black")
 ax_a.set_xticks([xpos[r] for r in regions])
 ax_a.set_xticklabels([region_lab[r] for r in regions], fontsize=TK)
 ax_a.set_ylabel("选中页数" if ZH else "selected pages", fontsize=L)
@@ -179,7 +194,7 @@ ax_a.legend(handles=leg_a, loc="upper right", bbox_to_anchor=(0.995, 1.01),
             fontsize=LG - 4, framealpha=0.92, handlelength=1.0,
             borderpad=0.30, labelspacing=0.9, ncol=3, columnspacing=0.55)
 ax_a.set_title("(a) 极值偏远端；均值偏近端" if ZH
-               else "(a) Minmax favors far; avg near",
+               else "(a) Minmax\u2192far; avg\u2192near",
                loc="left", pad=10, fontsize=T, fontweight="bold")
 ax_a.tick_params(labelsize=TK)
 
