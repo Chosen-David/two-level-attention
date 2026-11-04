@@ -959,3 +959,9 @@
 - 当前边界：本提交固化生产首跑证据，token identity 和 ABBA 尚未判定；即使后续 identity 通过，也需先解释生产回退，不会以微基准加速比替代完整 TPOT。原始 receipt/stdout/hygiene 位于 `iter113_parallel_proj/`。
 - 正确性与画像：iter113 Graph 与 iter110 Graph **128/128 token 完全一致**。单步 self-device 合计 9.230→9.817 ms；并发下 GEMM 自身耗时增加约 0.50 ms，说明资源争用明显，不能仅按串行臂时间差推导重叠收益。该画像 run 不作 TPOT verdict。
 - ABBA 正式判决：iter110 A1/A2=9.928288/9.893776 ms，iter113 B1/B2=10.228464/10.257248 ms，均值 9.911032→**10.242856 ms**，reference/candidate=**0.967604×**，稳定回退 0.331824 ms。四臂 128-token 全一致，hygiene=clean、最多 1 个计算进程；FA2/NFA 降为 1.229707×。拒绝组合候选，下一提交恢复 iter110 生产路径；后续若继续该方向，必须将 attention 与 MLP 分开独立验收，不允许互相掩盖回退。判决为 `iter113_parallel_proj/iter113_parallel_proj_verdict.json`。
+
+## Iter 114：仅 MLP gate/up 原形状跨 stream 并行
+
+- 修改：隔离 iter113 的 MLP 半边，attention 完全恢复并保持 iter110。`register_patch` 新增默认关闭的 `parallel_mlp_decode`，真实 runner 仅 Graph 开启；所有 Qwen3MLP 共享一条 side stream，仅 B1 decode 让原形状 up 与主 stream 的 gate 并行，join 后 `record_stream`。eager、prefill、B>1 和其他非生产几何保持顺序路径。
+- 静态检查与首跑：三个修改文件 `py_compile` 和 `git diff --check` 通过；pc40 GPU0、RULER 32K sample 0、128 tokens、latency-only，Graph 正常 capture 并完成 127 次 replay，steady TPOT=**10.280992 ms**，比 iter110 正式 best 9.911680 ms 高 0.369312 ms，未复现 iter112 的 MLP 局部收益。decode-ready allocated 增加 33,554,432 bytes，candidate 暂定回退，不能更新 best。
+- 当前边界：本提交固化生产首跑证据，token identity 和 ABBA 尚未判定；即使 identity 通过，也必须由完整生产 ABBA 决定是否拒绝。旁路日志未观察到他方进程，但也未显示本轮自身进程，因此该首跑不据此宣称 hygiene clean；正式判决需复核监控证据。原始 receipt/stdout/hygiene 位于 `iter114_mlp_parallel/`。

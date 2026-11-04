@@ -104,7 +104,8 @@ def _load_model(args, max_new_tokens):
         patched = register_patch(
             model, patch_args, resolve_treatment_snapshot(patch_args),
             rmsnorm_decode=args.execution == 'graph',
-            mlp_silu_decode=args.execution == 'graph')
+            mlp_silu_decode=args.execution == 'graph',
+            parallel_mlp_decode=args.execution == 'graph')
         if patched != config.num_hidden_layers:
             raise RuntimeError(f'NFA patched {patched}/{config.num_hidden_layers} layers')
     return model
