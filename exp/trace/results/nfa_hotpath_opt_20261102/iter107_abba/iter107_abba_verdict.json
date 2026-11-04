@@ -1,0 +1,61 @@
+{
+  "iteration": 107,
+  "candidate": "partial Top-K num_warps 8 -> 16",
+  "reference": "iter104",
+  "input": {
+    "model": "Qwen3-8B",
+    "task": "niah_single_1",
+    "sample_index": 0,
+    "context_length": 32768,
+    "actual_prompt_tokens": 32612,
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "batch_size": 1,
+    "generated_tokens": 128,
+    "measurement_mode": "latency"
+  },
+  "graph": {
+    "iter104_ms": [10.183712005615234, 10.138768196105957],
+    "iter107_ms": [10.0032958984375, 9.969759941101074],
+    "iter104_mean_ms": 10.161240100860596,
+    "iter107_mean_ms": 9.986527919769287,
+    "delta_ms": 0.1747121810913086,
+    "speedup": 1.0174947872268447,
+    "all_arms_token_identical": true,
+    "fa2_ms": 12.595712,
+    "fa2_over_nfa": 1.2612703935935115,
+    "double_speed_threshold_ms": 6.297856,
+    "double_speed_reached": false
+  },
+  "eager": {
+    "iter104_ms": [25.20516872406006, 25.827375411987305],
+    "iter107_ms": [25.253568649291992, 25.614144325256348],
+    "iter104_mean_ms": 25.51627206802368,
+    "iter107_mean_ms": 25.43385648727417,
+    "delta_ms": 0.08241558074951172,
+    "speedup": 1.0032403886839083,
+    "all_arms_token_identical": true,
+    "fa2_ms": 22.968448,
+    "fa2_over_nfa_abba": 0.9030658803745417,
+    "historical_best_ms": 23.982288,
+    "fa2_over_nfa_historical_best": 0.9577254680620965,
+    "double_speed_threshold_ms": 11.484224,
+    "double_speed_reached": false
+  },
+  "microbenchmark": {
+    "memcheck_w8_errors": 0,
+    "memcheck_w16_errors": 0,
+    "pytorch_topk_value_mismatches": 0,
+    "guard_changes": 0,
+    "partial_eager_speedup": 1.2973013183186803,
+    "partial_graph_speedup": 1.3795737930852907
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "device": "pc40 GPU0",
+    "pre_run_used_mib": 1,
+    "unique_compute_pids": [1556368, 1561217, 1562882, 1565352, 1567305, 1569262, 1571931, 1573979],
+    "max_concurrent_compute_processes": 1
+  },
+  "decision": "accept for Graph; eager change is neutral within this ABBA and does not replace the historical eager best",
+  "main_pushed": false
+}
