@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-04
+
+- [ ] [TL-DECODE-PAGE-STAGING-20261104] 新 append-only main 的 decode 跨页复用增量 CPU 页表；主机回归普通/-O各3项通过，128K/36层赋值计数73842→78。归档Graph周期性长尾已定位，真实Torch/GPU配对验证待完成。([详情](task_details/TL-DECODE-PAGE-STAGING-20261104.md))
+
 ## 2026-11-01
 - [x] [TL-STATIC-GATE-MAIN-20261101] 静态 near/far gate 接入 main，GLM 静态 artifact 随仓发布；Qwen3-8B 远端动态标定→freeze→decode 烟测通过。([详情](task_details/TL-STATIC-GATE-MAIN-20261101.md))
 
@@ -278,3 +282,4 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 ## 2026-10-31 paged batch admission
 
 - [ ] [TL-PAGED-DUPLICATE-20261031] 拒绝重复活跃请求，防止同槽覆盖与长度重复递增；host修前复现、修后通过，native/GPU待验。[详情](task_details/TL-PAGED-DUPLICATE-20261031.md)。
+

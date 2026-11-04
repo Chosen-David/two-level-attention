@@ -917,7 +917,8 @@ class GraphReadyPagedRegionCache:
             # 只追加本步新到达的逻辑页，不推进 state.logical_length。
             self._sync_block_table(state, planned_length, request_id=request_id)
             self.pending_lengths[request_id] = planned_length
-            self._write_block_table_row(request_id, state)
+            # Existing rows are initialized by prefill/freeze; _sync_block_table
+            # writes each appended page into staging. Do not rebuild the prefix.
             self.block_table_buf[:, request_id].copy_(
                 self._cpu_block_table_staging[:, request_id],
                 non_blocking=True)
@@ -1149,3 +1150,4 @@ class GraphReadyPagedRegionCache:
                 for layer in self.layers
             ],
         }
+

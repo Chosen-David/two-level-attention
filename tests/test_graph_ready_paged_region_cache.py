@@ -99,6 +99,39 @@ class GraphReadyPagedRegionCacheTest(unittest.TestCase):
             cache.commit_step()
         self.assertEqual(full_prepare_calls, [24])
 
+    def test_decode_uses_incremental_staging_after_freeze_and_slot_reuse(self):
+        from unittest.mock import patch
+
+        cache = self._make_cache(n_layers=4)
+        for lifetime in range(2):
+            for req, length in ((1, 8 + lifetime), (3, 5)):
+                cache.add_request(req)
+                for layer in range(4):
+                    k = torch.full((1, 2, length, 4), float(req + layer))
+                    cache.write_prefill(layer, req, k, k + 1)
+                cache.freeze(req, [False, True, False, True],
+                             [False, False, True, True])
+            with patch.object(cache, '_write_block_table_row',
+                              side_effect=AssertionError('redundant row rebuild')):
+                for step in range(12):
+                    ids = [1, 3, -1] if step % 2 else [3, 1, -1]
+                    cache.new_step(ids)
+                    cache.plan_common(ids)
+                    for b, req in enumerate(ids[:2]):
+                        state = cache.states[req]
+                        pos = state.logical_length
+                        for layer, table in enumerate(state.block_tables):
+                            expected = torch.full_like(cache.block_table_buf[layer, req],
+                                                       cache.layers[0].PAD_PAGE_ID)
+                            for logical, physical in table.items():
+                                expected[logical] = physical
+                            self.assertTrue(torch.equal(cache.block_table_buf[layer, req], expected))
+                            self.assertEqual(cache.slot_mapping_for_layer(layer)[b].item(),
+                                             table[pos // 4] * 4 + pos % 4)
+                    cache.commit_step()
+            for req in (1, 3):
+                cache.remove_request(req)
+
     def test_far_seed_consumption_does_not_change_physical_pages(self):
         from sparse_attn.indexer.nfa_layer_batch_selector import (
             mark_first_decode_seeded)
@@ -371,3 +404,4 @@ class GraphReadyPagedRegionCacheTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
