@@ -1,0 +1,68 @@
+{
+  "iteration": 108,
+  "candidate": "Graph fine-score num_warps 1 -> 2; eager remains 4",
+  "reference": "iter107",
+  "input": {
+    "model": "Qwen3-8B",
+    "task": "niah_single_1",
+    "sample_index": 0,
+    "context_length": 32768,
+    "actual_prompt_tokens": 32612,
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "batch_size": 1,
+    "generated_tokens": 128,
+    "measurement_mode": "latency"
+  },
+  "microbenchmark": {
+    "correctness_cases": 5,
+    "bit_exact_cases": 5,
+    "memcheck_errors": 0,
+    "eager_reference_ms": 0.024675117130362592,
+    "eager_candidate_ms": 0.023389126434792303,
+    "eager_speedup": 1.0549824166864703,
+    "graph_reference_ms": 0.01814653992652893,
+    "graph_candidate_ms": 0.017792119979858398,
+    "graph_speedup": 1.0199200515212214,
+    "graph_bit_exact": true
+  },
+  "production_single": {
+    "iter108_graph_ms": 9.929855823516846,
+    "iter108_eager_ms": 25.26814365386963,
+    "graph_replays": 127,
+    "eager_replays": 0,
+    "iter107_graph_vs_iter108_graph_token_identical": true,
+    "iter107_eager_vs_iter108_eager_token_identical": true,
+    "iter108_eager_vs_graph_token_identical": true
+  },
+  "graph_abba": {
+    "iter107_ms": [9.969247817993164, 10.009664058685303],
+    "iter108_ms": [9.937471866607666, 9.920096397399902],
+    "iter107_mean_ms": 9.989455938339233,
+    "iter108_mean_ms": 9.928784132003784,
+    "delta_ms": 0.06067180633544922,
+    "speedup": 1.0061106985033428,
+    "all_arms_token_identical": true,
+    "fa2_ms": 12.595712,
+    "fa2_over_nfa": 1.2686056855038088,
+    "double_speed_threshold_ms": 6.297856,
+    "double_speed_reached": false
+  },
+  "eager": {
+    "production_code_changed": false,
+    "historical_best_ms": 23.982288,
+    "fa2_ms": 22.968448,
+    "fa2_over_nfa_historical_best": 0.9577254680620965,
+    "double_speed_reached": false
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "device": "pc40 GPU0",
+    "pre_run_used_mib": 1,
+    "micro_pids": [1662487],
+    "production_pids": [1675910, 1678817],
+    "abba_pids": [1695627, 1697216, 1700030, 1701954],
+    "max_concurrent_compute_processes": 1
+  },
+  "decision": "accept small Graph improvement; eager production path and historical best unchanged",
+  "main_pushed": false
+}

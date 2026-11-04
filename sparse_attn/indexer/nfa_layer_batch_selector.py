@@ -1761,7 +1761,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     logits = _fused_fine_scores_paged(
         cache, valid_req_t, n_layers, dims, b_q_fine,
         cand_idx2, keep2, owners, generations, s_cap, lower, upper, quota,
-        tile=128, num_warps=1 if capturing else 4,
+        tile=128, num_warps=2 if capturing else 4,
         layer_offset=layer_offset, workspace=workspace)
     middle = _nfa_filtered_topk(
         logits, cand_idx2, lower, upper, quota, s_cap, width,
