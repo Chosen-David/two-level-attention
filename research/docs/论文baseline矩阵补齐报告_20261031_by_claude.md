@@ -404,6 +404,9 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ## 7. 更新记录
 
+- 2026-11-04 12:23:
+  - 本轮仅复核、不重复 eval：Q32B FullKV `passage_count`/`trec`/`samsum` 均为 200 行、200 个唯一 ID，16 任务均值重算仍为 **AVG16=42.37**。Q32B Quest RULER 11×100 行、LongBench 16/16 全量行数，逐任务来源 SHA256、RULER pointer/receipt、LongBench runcap/input identity 均闭环；两套 driver 均为逐任务 `rc=0`、`ALL_DONE FAILED=0`，正式分数保持 **AVG11=41.02 / AVG16=38.26**。
+  - 补齐两个既有正式结果的 Git 归档：`qwen3_32b_longbench_fullkv.json` 与 `glm_4_7_flash_ruler32k_jssa_vendor.json`。后者归档前复核 GLM JSSA RULER 11×100 行、receipt/SHA 与 driver 终态全部通过，分数保持 **AVG11=2.52**。本轮无新增矩阵分数、无重复派单，未推进 FASA/AsyncTLS/HISA；Task #10/#30 均保持 completed。
 - 2026-11-04 00:25:
   - **Q32B Quest RULER 32K 完整套件正式发布**：11/11 全部 `rc=0`、每任务 100 行，driver `ALL_DONE FAILED=0`，按 TS=`11021713` 同代 `.tli_gen` 指针打分并记录 SHA256，**AVG11=41.02**（FullKV 52.22，Δ=-11.20）；`niah_multiquery=13.00`/`niah_multivalue=16.00` 高于 FullKV，但 `vt=0.40` 对比 FullKV 96.40 存在显著缺口。结果落盘 `qwen3_32b_ruler32k_quest_vendor.json`。
   - **Q32B Quest LongBench 完整套件正式发布**：16/16 全部 `rc=0`，`repobench-p` 于 00:18:38 完成且 500 行完整，driver `ALL_DONE FAILED=0`；隔离目录 `strict runcap=16`、输入身份 `v2_validated=16`，逐任务行数与参考数据一致，**AVG16=38.26**（FullKV 42.37，Δ=-4.11；JSSA 43.09，低 4.83）。结果落盘 `qwen3_32b_longbench_quest_vendor.json`。至此 Q32B/GLM 的 Quest/JSSA 共 8 套矩阵全部闭环，Task #30 完成，远程 GPU 全部空闲；FullKV AVG16=42.37 保持不变，未重复 eval，未推进 FASA/AsyncTLS/HISA。
