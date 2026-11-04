@@ -937,3 +937,10 @@
 - 微基准与正确性：保持 2048 partial、5-run、iter104 merge 代数和 finish 不变，仅扫描 merge 4/8/16 warp。4/16 warp 各 10/10 个 B3 seed 的 indices/counts 全部逐位一致，memcheck=0。B1 Graph 4/8/16 warp=0.0119603/0.0093173/0.0084976 ms，16 相对 8 加速 **1.096470×**；eager=0.0175908/0.0145385/0.0138246 ms，16 相对 8 加速 **1.051641×**。4 warp 双口径均明显回退，因此只提升 16-warp 生产配置。
 - 完整生产 ABBA：pc40 GPU0、同一 RULER 32K sample 0、128 tokens、latency-only，Graph iter108 A1/A2=9.934208/9.932096 ms，iter110 B1/B2=9.913872/9.909488 ms，均值 9.933152→**9.911680 ms**、**1.002166×**；eager iter108 A1/A2=25.236688/25.617232 ms，iter110 B1/B2=25.511105/25.074881 ms，均值 25.426960→25.292993 ms、1.005297×。八臂 128-token 全一致，hygiene=clean、任意采样最多 1 个计算进程。
 - 判决：Graph 收益方向与微基准每层约 0.000820 ms 的节省一致但端到端很小，接受为 Graph 新 best；FA2/NFA=12.595712/9.911680=**1.270795×**，距 2× 门槛仍差 3.613824 ms。eager 差异仍是噪声级，不替代历史 best 23.982288 ms；双口径未达标，不推送 main。证据和 verdict 归档到 `iter110_merge16/`。
+
+## Iter 111：B1 decode 仅融合 K/V skinny GEMM（拒绝）
+
+- 停滞复评：iter108/109/110 连续三轮未达到 3% 端到端改善，暂停 selector warp 微调。iter110 真实 Graph 单步 self-device 合计 9.230 ms，其中 skinny GEMM 与 splitK reduce 约 4.59 ms、selector 约 2.35 ms、gather-attend 1.021 ms；即使删除全部 selector 也不足以达到 Graph 2×。pc40 的 NCU 采集返回 `ERR_NVGPUCTRPERM`，后续按既定协议使用 torch profiler 和解析证据，不重复探测。
+- 实验：不修改生产代码，新增独立基准直接读取 Qwen3-8B 第 0/1/17/35 层真实 K/V 权重，对 B1 `[1,1,4096]` BF16 输入比较原两次 `[1024,4096]` 投影与一次 `[2048,4096]` KV 投影；Q 完全保持原路径。若 K/V 不逐位一致则立即拒绝，不运行完整生产或性能计时。
+- 正确性判决：4 层×4 个输入共 **16/16 用例失败**，K 或 V 每次有 1–3 个 BF16 元素不同，观测 max_abs 从约 2.38e-7 到 0.015625；说明 N=2048 改变了 cuBLAS 数值路径，不能假定 iter94 探针中 K/V 曾逐位一致会稳定复现。根据硬门直接拒绝，未采集融合臂延迟、未改 `qwen3_attn_patch.py`、未运行生产 ABBA。
+- 当前状态：Graph 正式 best 仍为 **9.911680 ms / FA2-NFA=1.270795×**，eager 历史 best 仍为 23.982288 ms / FA2-NFA=0.957725×，双口径 2× 均未达到，不推送 main。微基准与 hygiene 归档为 `benchmark_nfa_kv_projection.py` 和 `iter111_kv/`。
