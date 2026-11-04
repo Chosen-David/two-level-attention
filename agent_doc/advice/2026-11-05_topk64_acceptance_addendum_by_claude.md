@@ -99,11 +99,29 @@ tests/test_nfa_current_query_selector.py: 19 passed in 4.21s
 
 重基候选的 128K B1 复核同样 hygiene clean：eager NFA/FlashInfer 为 24.218104/20.802984 ms（0.858985×），Graph 为 12.107944/14.022944 ms（**1.158161×**）。`token_identity_128k_rebased.json` 显示原始 base/opt 与重基候选在同执行下全部 512 token 一致；三者的 eager/Graph 均在第 87 个 token 分叉。
 
-## 7. 尚未关闭的门禁
+## 7. 128K B2/B4：候选批量验收完成，Graph 最高 2.095558×
 
-- 128K B2/B4 base 已完成且 hygiene clean，opt 正在运行；其跨源码身份与完整网格尚未形成。
+128K B2/B4 的 base/opt 四组执行均已完成完整生产 ABBA，全部臂 hygiene clean。每个请求均有 13 个 near-skip 层，far/both-skip 为 0。
+
+| Batch | 源码 | 执行 | NFA 稳态 TPOT (ms) | FlashInfer 稳态 TPOT (ms) | FI/NFA |
+|---:|---|---|---:|---:|---:|
+| B2 | base | eager | 33.123241 | 23.532168 | 0.710443× |
+| B2 | opt | eager | 24.800848 | 23.514384 | 0.948128× |
+| B2 | base | Graph | 27.918128 | 20.371176 | 0.729676× |
+| B2 | opt | Graph | 14.438248 | 20.368832 | **1.410755×** |
+| B4 | base | eager | 34.602328 | 37.333471 | 1.078929× |
+| B4 | opt | eager | 25.079688 | 37.331440 | **1.488513×** |
+| B4 | base | Graph | 29.180824 | 34.982240 | 1.198809× |
+| B4 | opt | Graph | 16.704184 | 35.004584 | **2.095558×** |
+
+`token_identity_128k_b24.json` 逐请求对拍全部原始 token：B2/B4 的 base/opt 在 eager 与 Graph 下，A/B 重复及跨源码的所有请求、所有 512 token 均一致。B2/B4 的 base/opt eager/Graph 也都在 batch 0 的第 10 个 token 首次分叉，因此仍只宣称同执行身份。B4 eager 在该批量下超过 FlashInfer，但 B2 eager 仍未达到 1×；不能用 B4 或 Graph 结果替代其他口径。
+
+至此 32K/64K/128K 的 B1/B2/B4 生产验收网格已全部形成。Top-K 候选的同执行生产身份、三档 selector 测试、批量回归和重基验收均已通过，具备合入条件。
+
+## 8. 尚未关闭的问题
+
 - eager/Graph 跨执行 token 分叉仍存在。
 - eager host/runtime 开销、128K niah L1 上涨，以及此前 response 中的异步、padding、短序列 union、full 子空间等问题仍未关闭。
-- tiled partial 与 fine-score 直接编码仍是组合候选；同执行生产身份、批量回归、重基和三档 selector 测试已通过，128K 批量验收完成后再做最终合入判决。
+- tiled partial 与 fine-score 直接编码仍是组合候选，未严格拆成两个单变量实验；这不影响上述组合候选的同执行身份与生产验收结论。
 
 原始 arms、逐步 TPOT、生成 token、skip receipt、源码 diff 与 GPU hygiene 均归档在 `benchmark/efficiency/results/nfa_flashinfer_20261104/e2e_topk64/`。

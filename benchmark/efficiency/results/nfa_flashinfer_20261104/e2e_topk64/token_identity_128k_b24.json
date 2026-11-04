@@ -1,0 +1,187 @@
+{
+  "schema": "nfa-topk64-e2e-batch-token-identity-v1",
+  "context_length": 131072,
+  "batch_size": [
+    2,
+    4
+  ],
+  "max_new_tokens": 512,
+  "task": "niah_multikey_1",
+  "sample_index": 0,
+  "base_source": "62d39d8de61fe5a96d728a298148de554a00735e",
+  "candidate_source": "7198002c95e31e547890deaf71387c0fd06bf63d",
+  "checks": {
+    "B2/eager:base128k/a vs base128k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [
+        512,
+        512
+      ]
+    },
+    "B2/eager:base128k/a vs opt128k/a": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [
+        512,
+        512
+      ]
+    },
+    "B2/eager:base128k/a vs opt128k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [
+        512,
+        512
+      ]
+    },
+    "B2/graph:base128k/a vs base128k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [
+        512,
+        512
+      ]
+    },
+    "B2/graph:base128k/a vs opt128k/a": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [
+        512,
+        512
+      ]
+    },
+    "B2/graph:base128k/a vs opt128k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 2,
+      "tokens_per_request": [
+        512,
+        512
+      ]
+    },
+    "B2/base128k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": {
+        "batch": 0,
+        "token": 10
+      },
+      "requests": 2,
+      "tokens_per_request": [
+        512,
+        512
+      ]
+    },
+    "B2/opt128k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": {
+        "batch": 0,
+        "token": 10
+      },
+      "requests": 2,
+      "tokens_per_request": [
+        512,
+        512
+      ]
+    },
+    "B4/eager:base128k/a vs base128k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [
+        512,
+        512,
+        512,
+        512
+      ]
+    },
+    "B4/eager:base128k/a vs opt128k/a": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [
+        512,
+        512,
+        512,
+        512
+      ]
+    },
+    "B4/eager:base128k/a vs opt128k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [
+        512,
+        512,
+        512,
+        512
+      ]
+    },
+    "B4/graph:base128k/a vs base128k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [
+        512,
+        512,
+        512,
+        512
+      ]
+    },
+    "B4/graph:base128k/a vs opt128k/a": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [
+        512,
+        512,
+        512,
+        512
+      ]
+    },
+    "B4/graph:base128k/a vs opt128k/b": {
+      "identical": true,
+      "first_divergence": null,
+      "requests": 4,
+      "tokens_per_request": [
+        512,
+        512,
+        512,
+        512
+      ]
+    },
+    "B4/base128k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": {
+        "batch": 0,
+        "token": 10
+      },
+      "requests": 4,
+      "tokens_per_request": [
+        512,
+        512,
+        512,
+        512
+      ]
+    },
+    "B4/opt128k:eager/a vs graph/a": {
+      "identical": false,
+      "first_divergence": {
+        "batch": 0,
+        "token": 10
+      },
+      "requests": 4,
+      "tokens_per_request": [
+        512,
+        512,
+        512,
+        512
+      ]
+    }
+  }
+}
