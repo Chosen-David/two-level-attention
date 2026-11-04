@@ -551,8 +551,10 @@ def paged_write_decode(cache_layer, key_states, value_states, slot_mapping, *,
         from ..indexer.selection.unique_ranking import _fast_launch
         _fast_launch(
             workspace, 'paged_write', _paged_write_kernel, (B,),
-            key_states,
-            value_states,
+            # The kernel uses packed [B, HK, D] offsets.  GLM's V is a
+            # strided split view of the joint K/V projection, even at T=1.
+            key_states.contiguous(),
+            value_states.contiguous(),
             slot_mapping.contiguous(),
             cache_layer.kv_pool_k,
             cache_layer.kv_pool_v,
@@ -805,3 +807,4 @@ def sparse_paged_attention_gather(
             if z != 0:
                 out[q_idx, h] = (acc / z).to(q.dtype)
     return out
+
