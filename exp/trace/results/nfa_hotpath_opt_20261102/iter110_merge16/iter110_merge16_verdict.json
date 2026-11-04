@@ -1,0 +1,62 @@
+{
+  "iteration": 110,
+  "candidate": "ordered Top-K merge num_warps 8 -> 16",
+  "reference": "iter108",
+  "input": {
+    "model": "Qwen3-8B",
+    "task": "niah_single_1",
+    "sample_index": 0,
+    "context_length": 32768,
+    "actual_prompt_tokens": 32612,
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "batch_size": 1,
+    "generated_tokens": 128,
+    "measurement_mode": "latency"
+  },
+  "microbenchmark": {
+    "correctness_cases_per_candidate": 10,
+    "warps_4_graph_ms": 0.011960259675979613,
+    "warps_8_graph_ms": 0.009317319989204407,
+    "warps_16_graph_ms": 0.008497560024261474,
+    "warps_4_eager_ms": 0.017590781451751854,
+    "warps_8_eager_ms": 0.014538534766515081,
+    "warps_16_eager_ms": 0.013824614895927182,
+    "graph_speedup_8_over_16": 1.096470041117971,
+    "eager_speedup_8_over_16": 1.0516412121395313,
+    "memcheck_errors": 0,
+    "all_bit_exact": true
+  },
+  "graph": {
+    "iter108_ms": [9.934207916259766, 9.932096004486084],
+    "iter110_ms": [9.913871765136719, 9.909488201141357],
+    "iter108_mean_ms": 9.933151960372925,
+    "iter110_mean_ms": 9.911679983139038,
+    "delta_ms": 0.02147197723388672,
+    "speedup": 1.0021663307603164,
+    "fa2_ms": 12.595712,
+    "fa2_over_nfa": 1.2707948623671088,
+    "double_speed_threshold_ms": 6.297856,
+    "double_speed_reached": false
+  },
+  "eager": {
+    "iter108_ms": [25.236687660217285, 25.61723232269287],
+    "iter110_ms": [25.511104583740234, 25.074880599975586],
+    "iter108_mean_ms": 25.426959991455078,
+    "iter110_mean_ms": 25.29299259185791,
+    "delta_ms": 0.13396739959716797,
+    "speedup": 1.0052966211534926,
+    "historical_best_ms": 23.982288,
+    "historical_best_replaced": false,
+    "double_speed_reached": false
+  },
+  "all_8_arms_token_identical": true,
+  "gpu_hygiene": {
+    "status": "clean",
+    "device": "pc40 GPU0",
+    "pre_run_used_mib": 1,
+    "abba_pids": [1783139, 1785604, 1788204, 1789811, 1792618, 1794432, 1797180, 1799028],
+    "max_concurrent_compute_processes": 1
+  },
+  "decision": "accept small Graph improvement; eager change is neutral within this ABBA and does not replace historical best",
+  "main_pushed": false
+}

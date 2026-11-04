@@ -1258,7 +1258,7 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
             LOG2_K=width.bit_length() - 1,
             S=capacity, K=width, SINK=sink,
             META_GROUP=hkv, TOKEN_BITS=token_bits,
-            num_warps=8,
+            num_warps=16,
         )
     else:
         _fast_launch(workspace, ('filtered_topk', layer_offset),

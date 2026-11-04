@@ -931,3 +931,9 @@
 - 实验：不改变生产源码，直接以当前 16-warp partial + iter104 merge 组成完整 Top-K 微基准，对比 tile=2048/5-run 与 tile=4096/3-run。此前旧 warp/merge 口径已拒绝大 tile，本轮只验证新代价结构是否改变最优点。
 - 正确性：10/10 个 B3×HKV8 seed 的 middle indices/counts 全部逐位一致，独立 memcheck `ERROR SUMMARY=0`，Graph bit-exact=True。
 - 判决：B1 R=8452/K=1024 下 eager 0.0284054→0.0548709 ms（0.517677×），Graph 0.0232270→0.0498956 ms（**0.465512×**）。大 partial 的局部 Top-K 成本远超少两轮 merge 的收益，明确拒绝；生产 tile=2048 不变，不运行完整生产 ABBA、不更新 best。基准与日志归档为 `benchmark_nfa_topk_tile.py` 和 `iter109_topk4096/`。
+
+## Iter 110：有序 merge 提升为 16 warp
+
+- 微基准与正确性：保持 2048 partial、5-run、iter104 merge 代数和 finish 不变，仅扫描 merge 4/8/16 warp。4/16 warp 各 10/10 个 B3 seed 的 indices/counts 全部逐位一致，memcheck=0。B1 Graph 4/8/16 warp=0.0119603/0.0093173/0.0084976 ms，16 相对 8 加速 **1.096470×**；eager=0.0175908/0.0145385/0.0138246 ms，16 相对 8 加速 **1.051641×**。4 warp 双口径均明显回退，因此只提升 16-warp 生产配置。
+- 完整生产 ABBA：pc40 GPU0、同一 RULER 32K sample 0、128 tokens、latency-only，Graph iter108 A1/A2=9.934208/9.932096 ms，iter110 B1/B2=9.913872/9.909488 ms，均值 9.933152→**9.911680 ms**、**1.002166×**；eager iter108 A1/A2=25.236688/25.617232 ms，iter110 B1/B2=25.511105/25.074881 ms，均值 25.426960→25.292993 ms、1.005297×。八臂 128-token 全一致，hygiene=clean、任意采样最多 1 个计算进程。
+- 判决：Graph 收益方向与微基准每层约 0.000820 ms 的节省一致但端到端很小，接受为 Graph 新 best；FA2/NFA=12.595712/9.911680=**1.270795×**，距 2× 门槛仍差 3.613824 ms。eager 差异仍是噪声级，不替代历史 best 23.982288 ms；双口径未达标，不推送 main。证据和 verdict 归档到 `iter110_merge16/`。
