@@ -283,3 +283,6 @@ E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁
 
 - [ ] [TL-PAGED-DUPLICATE-20261031] 拒绝重复活跃请求，防止同槽覆盖与长度重复递增；host修前复现、修后通过，native/GPU待验。[详情](task_details/TL-PAGED-DUPLICATE-20261031.md)。
 
+## 2026-11-04 paged decode input layout
+
+- [ ] [TL-PAGED-WRITE-LAYOUT-20261104] GLM split V 的非连续 head stride 与 packed writer ABI 不符；源绑定 host 修前复现、修后81布局通过，native eager/Graph 与实模待验。[详情](task_details/TL-PAGED-WRITE-LAYOUT-20261104.md)。
