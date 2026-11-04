@@ -951,3 +951,9 @@
 - 正确性：真实 Qwen3-8B 第 0/1/17/35 层×4 个输入共 **16/16 用例**的 Q/K/V/gate/up 全部逐位一致，两个 Graph capture/replay 臂也全部逐位一致。首次命令因脚本路径下缺少 `PYTHONPATH=.` 在 import 阶段退出，未启动 CUDA；补齐环境后原基准成功，失败日志保留在同一文件。
 - 微基准：attention eager 0.0406867→0.0419733 ms（0.969346×），Graph 0.0261149→0.0200240 ms（**1.304180×**）；MLP eager 0.0801487→0.0692585 ms（1.157240×），Graph 0.0668321→0.0577948 ms（**1.156368×**）。Graph 两项按 36 层推导合计节省约 **0.544614 ms/step**，仅为候选排序信号，生产 TPOT 仍需完整验收。
 - 下一轮边界：eager attention 已出现回退，因此并行路径只允许 Graph capture/replay；eager 保持当前独立顺序投影。生产还需验证 side stream 生命周期、Graph 私有池、完整 128-token identity 和 ABBA，不能把局部估算直接记为正式 best。证据归档为 `benchmark_nfa_parallel_projections.py` 与 `iter112_parallel_proj/`。
+
+## Iter 113：Graph B1 原形状投影并行生产候选
+
+- 修改：`register_patch` 新增默认关闭的 `parallel_projections`，真实 runner 仅 Graph 开启并为所有 Qwen3 层共享一条 side stream。attention B1 decode 让原形状 K/V 与 Q 并行，MLP B1 decode 让原形状 up 与 gate 并行；join 后 `record_stream`，eager、prefill、B>1 和非 BF16 contiguous 输入保持原路径。
+- 完整生产首跑：pc40 GPU0、RULER 32K sample 0、128 tokens、latency-only，Graph 正常完成 capture 和 127 次 replay，steady TPOT=**10.242016 ms**，比 iter110 正式 best 9.911680 ms 高 0.330336 ms，未复现 iter112 推导的 0.544614 ms 收益。decode-ready allocated 由 iter110 同口径 21,485,716,480 增至 21,519,270,912 bytes（+33,554,432），candidate 暂定回退，不能更新 best。
+- 当前边界：本提交固化生产首跑证据，token identity 和 ABBA 尚未判定；即使后续 identity 通过，也需先解释生产回退，不会以微基准加速比替代完整 TPOT。原始 receipt/stdout/hygiene 位于 `iter113_parallel_proj/`。

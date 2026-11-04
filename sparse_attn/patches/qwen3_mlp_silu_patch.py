@@ -44,9 +44,19 @@ def _iter97_mlp_silu_forward(self, x):
     if not _can_use_fused_elementwise(self, x):
         return getattr(self, _ORIG_ATTR)(x)
 
-    # 与 HF Qwen3MLP 相同的 gate/up 调用顺序；不在此融合或改写 GEMM。
-    gate = self.gate_proj(x)
-    up = self.up_proj(x)
+    projection_stream = getattr(self, '_nfa_parallel_projection_stream', None)
+    if projection_stream is not None and x.dim() == 3 and x.shape[0] == 1:
+        # iter113：仅 B1 decode 并行原形状 gate/up GEMM；B4 等几何保持顺序。
+        current = torch.cuda.current_stream()
+        projection_stream.wait_stream(current)
+        with torch.cuda.stream(projection_stream):
+            up = self.up_proj(x)
+        gate = self.gate_proj(x)
+        current.wait_stream(projection_stream)
+        up.record_stream(current)
+    else:
+        gate = self.gate_proj(x)
+        up = self.up_proj(x)
     if is_fusable(gate, up):
         activated = fused_silu_mul_decode(gate, up)
     else:
@@ -56,13 +66,16 @@ def _iter97_mlp_silu_forward(self, x):
     return self.down_proj(activated)
 
 
-def register_mlp_silu_patch(model, expected: int = None, verbose: bool = True) -> int:
+def register_mlp_silu_patch(model, expected: int = None, verbose: bool = True,
+                            projection_stream=None) -> int:
     """注册 Qwen3MLP patch；expected 不符即拒绝静默半 patch。"""
     n_patched = 0
     for name, module in model.named_modules():
         if isinstance(module, Qwen3MLP):
             if not hasattr(module, _ORIG_ATTR):
                 setattr(module, _ORIG_ATTR, module.forward)
+            if projection_stream is not None:
+                module._nfa_parallel_projection_stream = projection_stream
             module.forward = MethodType(_iter97_mlp_silu_forward, module)
             n_patched += 1
             if verbose and name.endswith(".0.mlp"):
