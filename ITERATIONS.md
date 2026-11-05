@@ -36,3 +36,15 @@
 - 回归：新增直接调用 fused candidate kernel 的 mono/tiled 对拍，除 `i_f/i_n` 外覆盖 candidate IDs、valid mask、lower/upper/quota、owners 和 generations；该用例覆盖 Iter 2 独立 merge 测试遗漏的指针语义。
 - CUDA 结果：`tests/ops/test_l1_topk_tiled_cuda.py` 2/2 通过（含原 7 组索引/顺序用例与新 fused 用例）。
 - 下一步：重跑真实 128K eager/Graph 512-token 四方身份与分叉步 selected IDs，再测修复后的纯 kernel 性能；Iter 2 性能数字不得直接当作 Iter 3 正式 verdict。
+- 正式 128K 512-token 四方 ABBA：Graph candidate/baseline=10.438656/12.083000 ms，1.157525×；eager=26.715592/26.196760 ms，0.980579×。全部 repeat/cross/eager-Graph token identity 通过，gpu_hygiene=clean；eager 回退另由 host/device profile 定位为每层多一次 launch，而非 device kernel 变慢。
+
+## Iter 4 — eager 保留单 kernel，Graph 保留 tiled partial + merge
+
+- 修改：`_candidate_pack_batched` 仅在 `kt > 512 and parallel_expand` 时启用 tiled Top-K；eager 恢复原单 fused kernel，Graph 继续并行 partial + exact merge。packed key、K、tie 规则和选中集合不变。
+- CUDA 对拍：pc31 GPU1，`tests/ops/test_l1_topk_tiled_cuda.py` 2/2 通过，覆盖 7 组索引/顺序形状及 fused candidate 全输出对拍。
+- 真实 Qwen3-8B、原生 RULER 128K `niah_multikey_1` sample 0、B1、512-token、3 warmup、完整 `GraphRunner.step` 四方 ABBA，pc31 GPU1，八腿均 clean：
+  - Graph：candidate 两臂 10.516752/10.508272 ms，baseline 12.159392/12.163376 ms；臂中位数再取中位数为 10.512512/12.161384 ms，baseline/candidate=**1.156849×**。
+  - eager：candidate 26.528576/25.945504 ms，baseline 29.247456/26.468400 ms；对应中位数 26.237040/27.857928 ms，baseline/candidate=**1.061779×**。baseline b1 明显偏高，故该比值如实保留但不宣称稳定 6.2% 收益；候选两臂及典型 baseline 约 26 ms，Iter 3 的 eager 回退已消除。
+  - Graph/eager 的 candidate repeat、baseline repeat、candidate/baseline cross、两 variant eager/Graph token identity 全部为 true；输入 SHA256=`4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5`，自然触发 13 层 near skip。
+- 证据：pc31 `/tmp/nfa-l1-iter4-e2e-results/summary.json`、`source_identities.json` 与八腿原始 JSON/log；候选 HEAD=`9a78d812ccd5fd3f61a891d8dccd6b6f0afdcb3f`，工作 diff SHA256=`bc39cf4a06da99e4c55843ed9d9b84cd4aca7ca1052f6afb4ac87864ee0fc456`。
+- 口径限制：这是相对 Iter 3 基线的 candidate/baseline 验收，不是相对 FA2 的 2× verdict；Graph 的 device 收益不得记作 eager device 收益。

@@ -1438,7 +1438,9 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
         k_n_pad = triton.next_power_of_2(max(1, k_n))
         # 长行整行 Top-K 每个 KV head 只有一个 CTA，SM 覆盖不足。
         # 512 项局部排序保持相同 packed key，随后精确归并；短行仍走旧路径。
-        tiled = kt > 512
+        # eager 每层多一次 launch 的 host 成本会超过 device 收益，保留单 kernel；
+        # Graph/parallel_expand 路径通过 capture 消除 launch 成本，再启用 tiled。
+        tiled = kt > 512 and parallel_expand
         ntiles = triton.cdiv(kt, 512) if tiled else 1
         if tiled:
             far_topk = _workspace_empty(
