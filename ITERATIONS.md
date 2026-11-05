@@ -17,3 +17,14 @@
   - mono/tiled：6.378336×。
 - 口径限制：该计时隔离 Top-K，candidate 输入 packed key 已物化；不包含 fine-score pack 的增量成本，不是完整 selector 或 decode TPOT verdict。
 - 下一步：完整 selector、Graph/eager token identity 与生产 decode 配对验收。
+
+## Iter 2 — 128K L1 512-wide partial + exact merge
+
+- 源码基点：`origin/main=8807738ffd6e3fc32385a7c6da4e223de9ee1a99`；正式基线测量快照为 `11695f98d203cb553ce3a78597f365d0ed64d72a`。
+- 问题：真实 Qwen3-8B、RULER 128K `niah_multikey_1` sample 0 中，原整行 L1 Top-K 在 36 层均稳定回退；Graph/eager L1 分别为 2.380720/2.568628 ms，NFA 纯算子总耗时为 5.624544/5.882530 ms。
+- 修改：`KT>512` 时按 512 项并行生成 signed packed-int32 局部 Top-K，再以有序 run merge 精确保留全局 Top-K 和 tie 顺序；短上下文保留原 mono kernel，far/near 两路仍共用 launch。
+- CUDA 对拍：`tests/ops/test_l1_topk_tiled_cuda.py` 覆盖 7 组形状、同分、NaN/±Inf、非整块长度及 K=0/1 边界，far/near 索引与顺序逐元素一致，1/1 通过。
+- 真实 Qwen niah 128K 纯 kernel（3 warmup、5 repeat，Graph/eager 顺序 direct run）：
+  - Graph：L1 0.764162 ms，L2 2.231276 ms，Attention 1.036390 ms，总计 4.031538 ms；相对基线总耗时加速 1.395×，同批 FlashInfer 基线 10.875715 ms，对应 2.698×。
+  - eager：L1 0.902237 ms，L2 2.305446 ms，Attention 1.023746 ms，总计 4.229929 ms；相对基线总耗时加速 1.391×，同批 FlashInfer 基线 10.876654 ms，对应 2.571×。
+- 口径限制：候选 direct run 无旁路监控，不冒充 hygiene-clean 正式 ABBA 臂；纯 operator chain 不是完整 decode TPOT。真实 selected IDs、生成 token identity、其余长度回归与干净 ABBA 尚未验收。
