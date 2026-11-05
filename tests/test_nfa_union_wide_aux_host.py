@@ -57,15 +57,16 @@ def gather(values, indices, axis=0):
     return ar(np.take(values, indices, axis=axis))
 
 
-def kernel_ast(path):
+def kernel_ast(path, strip_annotations=True):
     tree = ast.parse(Path(path).read_text())
     function = next(
         node for node in ast.walk(tree)
         if isinstance(node, ast.FunctionDef)
         and node.name == '_final_union_physical_kernel')
     function.decorator_list = []
-    for argument in function.args.args:
-        argument.annotation = None
+    if strip_annotations:
+        for argument in function.args.args:
+            argument.annotation = None
     return function
 
 
@@ -99,11 +100,11 @@ def native_build(path):
 
     if not torch.cuda.is_available():
         raise RuntimeError('CUDA is required; no silent host fallback')
-    function = kernel_ast(path)
+    function = kernel_ast(path, strip_annotations=False)
     temporary = tempfile.TemporaryDirectory()
     file = Path(temporary.name) / 'union_kernel.py'
     file.write_text(
-        'import triton\nimport triton.language as tl\n'
+        'import triton\nimport triton.language as tl\n@triton.jit\n'
         + ast.unparse(function) + '\n')
     spec = importlib.util.spec_from_file_location('union_kernel', file)
     module = importlib.util.module_from_spec(spec)
