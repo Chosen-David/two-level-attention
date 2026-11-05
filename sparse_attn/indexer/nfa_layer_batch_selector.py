@@ -1563,10 +1563,12 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     kt_cap = cache.max_blocks
     s_cap = pad
 
-    dims = indexer._subspace_indices(device).long()
     if indexer.enable_subspace:
+        dims = indexer._subspace_indices(device).long()
         q_dims = dims
     else:
+        # full 口径的 L1/L2 都使用完整 head 维，不能复用 tail 投影索引。
+        dims = torch.arange(query_states.shape[-1], dtype=torch.int64, device=device)
         q_dims = None
 
     # PAD 行使用 request 0 的安全页表地址，但 length=0 且不消费 seed。
@@ -1709,6 +1711,8 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
 
     if indexer.l2_subspace == "full":
         fine_dims = torch.arange(d_full, dtype=torch.int64, device=device)
+    elif not indexer.enable_subspace:
+        fine_dims = dims
     elif q_dims is not None:
         fine_dims = dims
     else:
