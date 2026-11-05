@@ -1497,7 +1497,8 @@ def select_topk_for_layer_batched(cache, layer_idx, req_ids,
             q_geometry = (q_src.dtype, q_src.data_ptr() % 16,
                           q_src.stride(0), q_src.stride(1), q_src.stride(2))
             if (q_geometry == geometry[27:32]
-                    and protected_only == geometry[32]):
+                    and protected_only == geometry[32]
+                    and (decode_write is not None) == geometry[33]):
                 if geometry[32] and decode_write is not None:
                     # both-skip 轻路径没有 page-stats/Q fused kernel 可携带
                     # decode 写入，重放 final union 前必须显式写当前 K/V。
@@ -1612,7 +1613,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         indexer.args.tia_level2_topk, indexer.sink_tokens,
         indexer.sliding_window_size, indexer._sink_pool_lo_blk,
         q_src.dtype, q_src.data_ptr() % 16, s0, s1, s2,
-        protected_only,
+        protected_only, decode_write is not None,
     )
     previous_geometry = workspace.get('_nfa_launch_geometry')
     if previous_geometry == geometry:
@@ -1623,6 +1624,9 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     plan_key = ('eager_selector_call_plan', layer_offset)
     call_plan = workspace.get(plan_key)
     if not capturing and call_plan is not None and call_plan[0] is geometry:
+        if protected_only and decode_write is not None:
+            # 公共入口因 request 元数据变化而未接管时，轻路径仍须先写当前 KV。
+            cache.write_decode(layer_offset, *decode_write)
         _replay_eager_selector_call_plan(
             workspace, call_plan, q_src, decode_write)
         return
@@ -1803,7 +1807,9 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     )
 
     record = workspace.get('_nfa_eager_record')
-    if record is not None:
+    # 非 fused 的独立 prepare-Q 在无写入时可安全重绑；一旦携带 decode_write，
+    # paged_write 会保留首步 K/V，必须继续走正常 dispatch，不能存 whole-call plan。
+    if record is not None and (fuse_prepare_q or decode_write is None):
         _store_eager_selector_call_plan(workspace, plan_key, geometry)
     else:
         workspace.pop('_nfa_eager_record', None)

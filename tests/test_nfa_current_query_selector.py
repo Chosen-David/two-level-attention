@@ -23,19 +23,21 @@ GEOMETRY = RegionGeometry(
     sink=4, near=128, window=64, page=PAGE, max_new_tokens=8)
 
 
-def _indexer(k1=4, near_pages=2):
-    args = nfa_args()
+def _indexer(k1=4, near_pages=2, subspace='tail', l2_subspace='same'):
+    args = nfa_args(subspace=subspace)
     args.tia_level1_topk = k1
     args.tia_level2_topk = 128
     args.nfa_near_pages = near_pages
     args.nfa_swa_size = GEOMETRY.window
     args.nfa_near_len = GEOMETRY.near
+    args.nfa_l2_subspace = l2_subspace
     return NFAIndexer(args)
 
 
 def _make_cache(req_ids, lengths, skip_states, *, seeds=None, k1=4,
                 near_pages=2, num_kv_heads=1, max_physical_pages=64,
-                max_blocks=16, max_visible_len=640):
+                max_blocks=16, max_visible_len=640, subspace='tail',
+                l2_subspace='same'):
     cache = GraphReadyPagedRegionCache(
         1, GEOMETRY, max_requests=8, max_physical_pages=max_physical_pages,
         max_blocks=max_blocks,
@@ -54,7 +56,8 @@ def _make_cache(req_ids, lengths, skip_states, *, seeds=None, k1=4,
         layer_seeds = None if seeds is None else {0: seeds[request_id]}
         cache.freeze(
             request_id, [skip_far], [skip_near], layer_seeds)
-    attention = SimpleNamespace(indexer=_indexer(k1, near_pages), scaling=1.0)
+    attention = SimpleNamespace(
+        indexer=_indexer(k1, near_pages, subspace, l2_subspace), scaling=1.0)
     return cache, attention, generator
 
 
@@ -360,6 +363,41 @@ def test_fixed_stats_grid_owner_writes_and_refreshes_latest_block():
             torch.testing.assert_close(
                 cache.layers[0].kv_pool_v[physical, 0, 0, offset],
                 decode_write[1][0, 0, 0], rtol=0, atol=0)
+        if step == 0:
+            mark_first_decode_seeded(cache, [2])
+            cache.commit_step()
+
+
+@pytest.mark.parametrize('subspace,l2_subspace', [('full', 'same'), ('tail', 'full')])
+def test_nonfused_eager_replay_writes_live_decode_kv(subspace, l2_subspace):
+    cache, attention, generator = _make_cache(
+        [2], [448], [(False, False)], subspace=subspace,
+        l2_subspace=l2_subspace)
+    query = torch.randn(
+        1, 2, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+
+    for step in range(2):
+        cache.new_step([2])
+        cache.plan_common([2])
+        keys = torch.randn(
+            1, 1, 1, HEAD_DIM, generator=generator,
+            dtype=torch.bfloat16, device='cuda')
+        values = torch.randn_like(keys)
+        slots = cache.slot_mapping_for_layer(0)[:1]
+        select_topk_for_layer_batched(
+            cache, 0, [2], query, attention=attention,
+            decode_write=(keys, values, slots))
+
+        # 非 fused whole-call 计划无法重绑独立 paged-write；第二步必须正常
+        # dispatch，并把本步而非首步 K/V 写入本步 slot。
+        assert ('eager_selector_call_plan', 0) not in cache._nfa_selector_workspace
+        slot = int(slots[0])
+        physical, offset = slot // PAGE, slot % PAGE
+        torch.testing.assert_close(
+            cache.layers[0].kv_pool_k[physical, 0, 0, offset], keys[0, 0, 0])
+        torch.testing.assert_close(
+            cache.layers[0].kv_pool_v[physical, 0, 0, offset], values[0, 0, 0])
         if step == 0:
             mark_first_decode_seeded(cache, [2])
             cache.commit_step()
