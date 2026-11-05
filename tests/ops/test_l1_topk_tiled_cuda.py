@@ -7,6 +7,7 @@ import triton.language as tl
 
 from sparse_attn.indexer.nfa_layer_batch_selector import (
     _l1_topk_partial_kernel,
+    _topk_candidate_batched_kernel,
     _topk_indices_body,
     _topk_indices_merge_body,
 )
@@ -93,6 +94,77 @@ class L1TopKTiledTest(unittest.TestCase):
                 torch.cuda.synchronize()
                 self.assertTrue(torch.equal(ref_f, out_f), "far 索引或顺序不同")
                 self.assertTrue(torch.equal(ref_n, out_n), "near 索引或顺序不同")
+
+    @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
+    def test_fused_candidate_preserves_original_score_inputs(self):
+        """tiled Top-K 的 int32 partial 不得覆盖后续 BF16 分数指针。"""
+        rows, hkv, kt = 8, 8, 513
+        k_f, k_n, bs = 96, 32, 64
+        sink, swa = 4, 128
+        capacity = kt * bs
+        torch.manual_seed(20261106)
+        far = torch.randn((rows, kt), device="cuda", dtype=torch.bfloat16)
+        near = torch.randn((rows, kt), device="cuda", dtype=torch.bfloat16)
+        far[0, 0] = float("nan")
+        near[1, 1] = float("-inf")
+        lengths = torch.tensor([capacity], dtype=torch.int64, device="cuda")
+        skip_far = torch.zeros(1, dtype=torch.bool, device="cuda")
+        skip_near = torch.zeros_like(skip_far)
+        valid_req = torch.zeros(1, dtype=torch.int64, device="cuda")
+        k_f_pad = triton.next_power_of_2(k_f)
+        k_n_pad = triton.next_power_of_2(k_n)
+        ntiles = triton.cdiv(kt, 512)
+        r = (k_f + k_n + 2) * bs
+        width = r + sink + swa
+
+        def allocate():
+            return {
+                "i_f": torch.empty((rows, k_f), dtype=torch.int64, device="cuda"),
+                "i_n": torch.empty((rows, k_n), dtype=torch.int64, device="cuda"),
+                "out": torch.empty((rows, width), dtype=torch.int64, device="cuda"),
+                "valid": torch.empty((rows, width), dtype=torch.bool, device="cuda"),
+                "lower": torch.empty(1, dtype=torch.int64, device="cuda"),
+                "upper": torch.empty(1, dtype=torch.int64, device="cuda"),
+                "quota": torch.empty(1, dtype=torch.int64, device="cuda"),
+                "owners": torch.zeros((rows, capacity), dtype=torch.int32, device="cuda"),
+                "generations": torch.zeros(rows, dtype=torch.int32, device="cuda"),
+            }
+
+        ref = allocate()
+        out = allocate()
+        common = dict(
+            KT=kt, KT_PAD=triton.next_power_of_2(kt),
+            K_F=k_f, K_N=k_n, K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+            R=r, HEAD=sink, TAIL=swa, SINK=sink, SWA=swa, CAP=capacity,
+            SINK_POOL_LO=0, BS=bs, PAGE=64, NEAR_LEN=4096, K2=1024,
+            HKV=hkv, B=1, MAX_REQ=1, LAYER_OFFSET=0,
+            LOG2_F=k_f_pad.bit_length() - 1,
+            LOG2_N=k_n_pad.bit_length() - 1,
+            num_warps=8)
+        _topk_candidate_batched_kernel[(rows,)](
+            far, near, far, near,
+            ref["i_f"], ref["i_n"], lengths, skip_far, skip_near, valid_req,
+            ref["out"], ref["valid"], ref["lower"], ref["upper"], ref["quota"],
+            ref["owners"], ref["generations"],
+            TILED=False, NTILES=1, NTILES_PAD=1, **common)
+        partial_f = torch.empty(
+            (rows, ntiles, k_f_pad), dtype=torch.int32, device="cuda")
+        partial_n = torch.empty(
+            (rows, ntiles, k_n_pad), dtype=torch.int32, device="cuda")
+        _l1_topk_partial_kernel[(rows, ntiles)](
+            far, near, partial_f, partial_n,
+            KT=kt, TILE=512, NTILES=ntiles,
+            K_F_PAD=k_f_pad, K_N_PAD=k_n_pad, num_warps=8)
+        _topk_candidate_batched_kernel[(rows,)](
+            partial_f, partial_n, far, near,
+            out["i_f"], out["i_n"], lengths, skip_far, skip_near, valid_req,
+            out["out"], out["valid"], out["lower"], out["upper"], out["quota"],
+            out["owners"], out["generations"],
+            TILED=True, NTILES=ntiles, NTILES_PAD=triton.next_power_of_2(ntiles),
+            **common)
+        torch.cuda.synchronize()
+        for name in ref:
+            self.assertTrue(torch.equal(ref[name], out[name]), f"{name} 不一致")
 
 
 if __name__ == "__main__":

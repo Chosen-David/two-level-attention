@@ -1006,7 +1006,7 @@ if _has_triton():
 
     @triton.jit
     def _topk_candidate_batched_kernel(
-        FAR_SCORES, NEAR_SCORES, I_F, I_N, LENGTHS,
+        FAR_TOPK, NEAR_TOPK, FAR_SCORES, NEAR_SCORES, I_F, I_N, LENGTHS,
         SKIP_FAR, SKIP_NEAR, VALID_REQ,
         OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS,
         KT: tl.constexpr, KT_PAD: tl.constexpr,
@@ -1024,16 +1024,16 @@ if _has_triton():
         """eager 单 CTA 顺序完成两路 Top-K 与 candidate expansion。"""
         if TILED:
             _topk_indices_merge_body(
-                FAR_SCORES, I_F, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
+                FAR_TOPK, I_F, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
                 K=K_F, K_PAD=K_F_PAD, LOG2_K=LOG2_F)
             _topk_indices_merge_body(
-                NEAR_SCORES, I_N, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
+                NEAR_TOPK, I_N, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
                 K=K_N, K_PAD=K_N_PAD, LOG2_K=LOG2_N)
         else:
             _topk_indices_body(
-                FAR_SCORES, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
+                FAR_TOPK, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
             _topk_indices_body(
-                NEAR_SCORES, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
+                NEAR_TOPK, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
         tl.debug_barrier()
         _candidate_pack_batched_kernel(
             I_F, I_N, FAR_SCORES, NEAR_SCORES, LENGTHS,
@@ -1490,7 +1490,7 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
             # 避免再拆一个 candidate kernel 的 host 开销。
             _fast_launch(workspace, ('topk_candidate', layer_offset),
                          _topk_candidate_batched_kernel, (m * hkv,),
-                far_topk, near_topk, i_f, i_n, lengths_t,
+                far_topk, near_topk, far_scored, near_scored, i_f, i_n, lengths_t,
                 cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
                 out, valid, lower, upper, quota, owners, generations,
                 **common, num_warps=8)

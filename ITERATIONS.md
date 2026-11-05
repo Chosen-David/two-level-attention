@@ -28,3 +28,11 @@
   - Graph：L1 0.764162 ms，L2 2.231276 ms，Attention 1.036390 ms，总计 4.031538 ms；相对基线总耗时加速 1.395×，同批 FlashInfer 基线 10.875715 ms，对应 2.698×。
   - eager：L1 0.902237 ms，L2 2.305446 ms，Attention 1.023746 ms，总计 4.229929 ms；相对基线总耗时加速 1.391×，同批 FlashInfer 基线 10.876654 ms，对应 2.571×。
 - 口径限制：候选 direct run 无旁路监控，不冒充 hygiene-clean 正式 ABBA 臂；纯 operator chain 不是完整 decode TPOT。真实 selected IDs、生成 token identity、其余长度回归与干净 ABBA 尚未验收。
+- 后续硬门：真实 128K 512-token 验收中 Graph 与基线完全一致，但 eager 在第 36 个生成位置首次分叉；代码审查确认 fused eager 将 int32 partial 指针误传给后续 BF16 candidate completion，Graph 拆分路径不受此影响。
+
+## Iter 3 — 分离 eager Top-K partial 与原始分数指针
+
+- 修改：`_topk_candidate_batched_kernel` 显式接收 `FAR_TOPK/NEAR_TOPK` 与 `FAR_SCORES/NEAR_SCORES` 两组指针；前者用于 mono/tiled Top-K，后者仅供 candidate completion 读取，非 tiled 路径仍传同一 BF16 缓冲。
+- 回归：新增直接调用 fused candidate kernel 的 mono/tiled 对拍，除 `i_f/i_n` 外覆盖 candidate IDs、valid mask、lower/upper/quota、owners 和 generations；该用例覆盖 Iter 2 独立 merge 测试遗漏的指针语义。
+- CUDA 结果：`tests/ops/test_l1_topk_tiled_cuda.py` 2/2 通过（含原 7 组索引/顺序用例与新 fused 用例）。
+- 下一步：重跑真实 128K eager/Graph 512-token 四方身份与分叉步 selected IDs，再测修复后的纯 kernel 性能；Iter 2 性能数字不得直接当作 Iter 3 正式 verdict。
