@@ -1,8 +1,8 @@
 # TLI 论文 Baseline 矩阵补齐 — 数据审计报告
 
-**日期**: 2026-11-03（继承 2026-10-31 版本）
+**日期**: 2026-11-06（继承 2026-10-31 版本）
 **作者**: Claude (session continuation)
-**范围**: Qwen3-8B + Qwen3-32B + GLM-4.7-Flash，RULER 32K + LongBench
+**范围**: Qwen3-8B + Qwen3-32B + Llama-3.1-8B base + GLM-4.7-Flash，RULER 32K + LongBench
 
 ---
 
@@ -173,16 +173,54 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 16 任务均使用 TS=`11021713` 的正式产物，逐任务 `rc=0`，driver `ALL_DONE FAILED=0`；隔离目录打分避免混入 JSSA，`strict runcap=16`、`input_identity v2_validated=16`，逐任务行数与参考数据一致，并记录源文件 SHA256。正式结果：`exp/trace/results/qwen3_32b_longbench_quest_vendor.json`。
 
-### 2.5 状态（更新 2026-11-04 00:25）
+### 2.4.2 LongBench NFA 三项补缺（✅ 3/3 已正式评分）
+
+| Task | NFA (champion) | n |
+|------|---------------:|---:|
+| passage_count | 15.50 | 200 |
+| samsum | 37.28 | 200 |
+| trec | 73.50 | 200 |
+
+三项均使用 TS=`11052030` 的 NFA 冠军几何（`np32/ntoff/nl4096`），逐任务 200 行与完整源 JSONL 一致，runcap `status=complete`、结果 SHA256、派生 `_id` 与源 answers/length/all_classes 均闭环；正式评分 `strict_validated=3`、`input_identity.v2_validated=3`。结果位于 `/home/wangyuanshuo02/lb_v1_fill_20261105/formal/qwen3_32b_nfa/pred_official/result.json`。既有 13 任务与本轮 3 项补缺至此数据齐全，但未把不同 generation 直接拼接发布新的 AVG16。
+
+### 2.5 状态（更新 2026-11-06）
 
 | 数据集 | 状态 |
 |--------|------|
 | RULER 32K TLI | ✅ 完成，AVG11 = 50.70 |
 | RULER 32K FullKV | ✅ 完成，AVG11 = 52.22 |
 | LongBench FullKV | ✅ 16/16，AVG16 = 42.37 |
-| LongBench TIA（既有口径） | 13/16，待补 3 任务 |
+| LongBench TIA/NFA | ✅ 既有 13 + 新补 3，16/16 数据齐全；补缺三项正式评分见 §2.4.2，未跨 generation 合并发布 AVG16 |
 | RULER/LongBench Quest + JSSA | ✅ Quest RULER 11/11（AVG11=41.02）、LongBench 16/16（AVG16=38.26）；JSSA RULER 11/11（AVG11=54.06）、LongBench 16/16（AVG16=43.09） |
 | FASA/AsyncTLS/HISA | 按用户 2026-11-03 指令不再推进；后续仅保留 JSSA、Quest |
+
+---
+
+## 2A. Llama-3.1-8B base（LongBench v1 补缺）
+
+**FullKV AVG16 = 38.43 / NFA AVG16 = 38.49 / Δ(NFA-FullKV) = +0.06**。FullKV 使用 `none`，NFA 使用与 Qwen 冠军一致的 `tli` 语义链及 `np32/ntoff/nl4096` 固定配额几何，两臂 TS=`11052030`。
+
+| Task | FullKV | NFA | n |
+|------|-------:|----:|---:|
+| narrativeqa | 22.14 | 23.36 | 200 |
+| qasper | 13.06 | 12.61 | 200 |
+| multifieldqa_en | 26.64 | 27.39 | 150 |
+| hotpotqa | 17.30 | 16.06 | 200 |
+| 2wikimqa | 16.63 | 16.26 | 200 |
+| musique | 11.46 | 11.33 | 200 |
+| gov_report | 29.83 | 29.15 | 200 |
+| qmsum | 25.38 | 24.52 | 200 |
+| multi_news | 2.52 | 3.50 | 200 |
+| trec | 74.00 | 71.50 | 200 |
+| triviaqa | 91.48 | 91.68 | 200 |
+| samsum | 43.09 | 46.30 | 200 |
+| passage_count | 6.31 | 7.41 | 200 |
+| passage_retrieval_en | 98.07 | 98.30 | 200 |
+| lcc | 69.44 | 69.54 | 500 |
+| repobench-p | 67.53 | 66.94 | 500 |
+| **AVG16** | **38.43** | **38.49** | — |
+
+两臂各 16/16 任务均通过完整源 JSONL 行数、runcap receipt/SHA256、派生 `_id` 和 answers/length/all_classes 审计；正式评分各为 `strict_validated=16`、`legacy_no_sidecar=0`、`input_identity.v2_validated=16`、`cap_effective=31500`。逐任务 source fingerprint、prompt template SHA 和 actual input ids SHA 在 FullKV/NFA 间 **16/16 完全一致**。35 格总审计（Llama 32 格 + Qwen3-32B NFA 3 格）为 `status=complete`、`cells=35`、无错误。正式结果：`/home/wangyuanshuo02/lb_v1_fill_20261105/formal/{llama31_fullkv,llama31_nfa}/pred_official/result.json`，总审计：`/home/wangyuanshuo02/lb_v1_fill_20261105/formal/audit_35.json`。
 
 ---
 
@@ -253,6 +291,27 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 11 任务均 `rc=0`、每任务 100 样本，按 TS=`11021635` 的同代 `.tli_gen` 指针解析并记录源文件 SHA256；打分结果：`exp/trace/results/glm_4_7_flash_ruler32k_quest_vendor.json`。Quest 总分比 JSSA 2.52 高 19.14，但仍低于 FullKV；`niah_multiquery`/`niah_multivalue` 分别反超 FullKV 41.00/35.25，`cwe`/`vt` 则存在明显质量缺口。这是 **Quest vendor baseline** 结果，不是 TLI 主方法结果。
 
+### 3.3.1 RULER 32K NFA full/dual（✅ 两臂 11/11 已正式发布）
+
+**NFA full AVG11 = 35.01 / dual AVG11 = 34.82**，对比 FullKV 26.58 分别为 **+8.43 / +8.24**。
+
+| Task | NFA full | NFA dual | n |
+|------|---------:|---------:|---:|
+| niah_single_1 | 31.00 | 36.00 | 100 |
+| niah_single_2 | 5.00 | 3.00 | 100 |
+| niah_single_3 | 4.00 | 3.00 | 100 |
+| niah_multikey_1 | 6.00 | 5.00 | 100 |
+| niah_multikey_2 | 45.00 | 46.00 | 100 |
+| niah_multikey_3 | 36.00 | 28.00 | 100 |
+| niah_multiquery | 90.25 | 93.25 | 100 |
+| niah_multivalue | 56.50 | 57.00 | 100 |
+| cwe | 39.00 | 37.10 | 100 |
+| fwe | 72.33 | 74.67 | 100 |
+| vt | 0.00 | 0.00 | 100 |
+| **AVG11** | **35.01** | **34.82** | — |
+
+两臂各自 11 任务 × 100 行，原始 `.nfa_gen` pointer、complete receipt、prediction basename/SHA256 和 `yarn_enabled=false` 全部通过；正式 generation 的公开 JSON/MD/manifest/receipt、派生预测、来源 SHA 与 producer binding 再次审计均为 `ALL_GLM_FORMAL_AUDITS_PASS`。正式评分严格保持 `--expect-tasks 11 --min-samples 100`，未发布部分均值。独立评分快照只规范化 RULER 官方逐任务 `max_new_tokens`（NIAH=128/cwe=120/fwe=50/vt=30）及对应 treatment geometry 的 method identity，其他配置和 treatment 漂移仍 fail-closed；评分器 SHA256=`75398f4e49584020abde7786b5e9fdcd1c6bf81321fb0b0f2beb5599ef16453a`。结果位于 pc02 `/home/wangyuanshuo02/ak_verify_results/glm_nfa_ruler32k_20261105/{full,dual}_formal.json`；full/dual result SHA256 分别为 `058728e3cc55125e8a5c4bb138d5382b9a3fcda769d63f2c6427dd793f7e488e` / `0c1fc06cc9d2656e607ffa414d85c0d84df46308b48e38eab53aed6eea404397`。Task #24 已完成，指定监督 cron `3c42bf10` 已删除。
+
 ### 3.4 LongBench FullKV
 
 ✅ 已完成（task #11）。
@@ -309,13 +368,13 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 16 任务均使用 TS=`11021635` 的正式产物，driver `ALL_DONE FAILED=0`，逐任务行数与全量参考数据一致，并记录源文件 SHA256；打分结果落盘 `exp/trace/results/glm_4_7_flash_longbench_quest_vendor.json`。这是 **Quest vendor baseline** 结果，不是 TLI 主方法结果。
 
-### 3.7 状态（更新 2026-11-03 09:10）
+### 3.7 状态（更新 2026-11-06）
 
 | 数据集 | 状态 |
 |--------|------|
 | RULER 32K FullKV | ✅ 完成，AVG11 = 26.58 |
 | LongBench FullKV | ✅ 完成 |
-| TLI 跑分 | 未派单 |
+| RULER 32K NFA full/dual | ✅ 两臂各 11/11 × 100，AVG11 = 35.01 / 34.82，正式发布审计通过 |
 | Vendor baselines | ✅ TS=11021635；Quest RULER 11/11（AVG11=21.66）、LongBench 16/16（AVG16=40.95）；JSSA RULER 11/11（AVG11=2.52）、LongBench 16/16（AVG16=31.89）；全部任务 rc=0 且产物行数完整 |
 
 ---
@@ -332,7 +391,8 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ### 补充材料
 - Qwen3-32B RULER 32K：JSSA 54.06 / FullKV 52.22 / TLI 50.70；JSSA 总分领先但 `vt=0`，TLI 与 FullKV 的 fwe 差距仍是 TLI 落后主因
-- GLM-4.7-Flash RULER 32K：FullKV 26.58（grass-is-green 退化），Quest 21.66（Δ=-4.92），JSSA 2.52（Δ=-24.06，质量缺口待归因），TLI 待跑
+- Llama-3.1-8B base LongBench v1：FullKV 38.43 / NFA 38.49（Δ=+0.06），两臂均 16/16，配对输入身份完全一致
+- GLM-4.7-Flash RULER 32K：NFA full 35.01 / dual 34.82 / FullKV 26.58，Quest 21.66，JSSA 2.52（质量缺口待归因）；NFA 两臂均完整正式发布
 - GLM-4.7-Flash LongBench：Quest 40.95 / JSSA 31.89，均为 16/16 完整结果
 
 ### 不在主表
@@ -364,6 +424,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 - Quest 打分汇总: `exp/trace/results/glm_4_7_flash_ruler32k_quest_vendor.json`
 - JSSA 打分汇总: `exp/trace/results/glm_4_7_flash_ruler32k_jssa_vendor.json`
 - Quest/JSSA 同代产物: 远程 `/tmp/tli-baseline-jssa-quest/exp/results_ruler/GLM-4.7-Flash/L32768/pred/`（TS=11021635，逐任务 `.tli_gen` 指针）
+- NFA full/dual 正式发布: pc02 `/home/wangyuanshuo02/ak_verify_results/glm_nfa_ruler32k_20261105/{full,dual}_formal.json` 及各自 manifest/receipt/generation
 
 ### LongBench (Qwen3-8B)
 - 打分汇总: `exp/trace/results/qwen3_8b_longbench_*.json`（6 文件）
@@ -376,6 +437,11 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 - Quest/JSSA 正式产物: 远程 `/tmp/tli-baseline-jssa-quest/exp/results_longbench/Qwen3-32B/pred/`（Quest TS=11021713；JSSA TS=11021830）
 - 既有 13 任务 pred: `exp/results_longbench/Qwen3-32B/pred_1024/`
 - 补跑 3 任务 pred: `exp/results_longbench/Qwen3-32B/pred_e141_lb_fullkv/`（TS=20261102081500）
+- NFA 三项补缺正式评分: `/home/wangyuanshuo02/lb_v1_fill_20261105/formal/qwen3_32b_nfa/pred_official/result.json`
+
+### LongBench (Llama-3.1-8B base)
+- FullKV/NFA 正式评分: `/home/wangyuanshuo02/lb_v1_fill_20261105/formal/{llama31_fullkv,llama31_nfa}/pred_official/result.json`
+- 35 格跨机源身份/runcap/SHA 总审计: `/home/wangyuanshuo02/lb_v1_fill_20261105/formal/audit_35.json`
 
 ### LongBench (GLM-4.7-Flash)
 - Quest 16 任务打分汇总: `exp/trace/results/glm_4_7_flash_longbench_quest_vendor.json`
@@ -384,7 +450,7 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 
 ---
 
-## 6. 下一步行动（更新 2026-11-04 00:25）
+## 6. 下一步行动（更新 2026-11-06）
 
 | 优先级 | 行动 | 状态 |
 |--------|------|------|
@@ -395,7 +461,8 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 | P0 | Qwen3-32B LongBench FullKV 16 任务完整打分 | ✅ 完成（AVG16=42.37） |
 | P1 | Qwen3-32B + GLM Quest/JSSA RULER 32K + LongBench | ✅ 两模型、两方法、两套数据集共 8 套矩阵全部完成 |
 | P1 | Vendor 矩阵完成后打分、汇总并核验论文 | ✅ Q32B JSSA 54.06/43.09、Quest 41.02/38.26；GLM Quest 21.66/40.95、JSSA 2.52/31.89（RULER AVG11/LongBench AVG16），全部正式结果已落盘 |
-| P1 | GLM-4.7-Flash TLI 跑分 | 待 GPU 空闲派单 |
+| P1 | GLM-4.7-Flash NFA full/dual RULER 32K | ✅ 两臂各 11/11 × 100，AVG11=35.01/34.82，正式发布与原始 generation 闭包通过 |
+| P1 | LongBench v1 35 格补缺 | ✅ Qwen3-32B NFA 3 项 + Llama FullKV/NFA 各 16 项；35/35 审计与正式评分完成 |
 | N/A | FASA/AsyncTLS/HISA for Q32B/GLM | 按用户 2026-11-03 指令不再推进，仅保留 JSSA、Quest |
 | N/A | DuoAttention → 论文脚注说明 | 用户已确认 |
 | N/A | HISA LongBench (Qwen3-8B) | 暂缓 |
@@ -403,6 +470,10 @@ TLI 领先最接近对手 HISA +1.08，领先 JSSA +1.64，领先 FullKV +1.39�
 ---
 
 ## 7. 更新记录
+
+- 2026-11-06:
+  - **LongBench v1 35 格补缺全部闭环**：Qwen3-32B NFA 的 `passage_count=15.50`、`samsum=37.28`、`trec=73.50` 各 200 行；Llama-3.1-8B base FullKV/NFA 各 16/16，AVG16=38.43/38.49（Δ=+0.06）。35/35 worker complete，完整源 JSONL、派生 `_id`、runcap、producer/result/source SHA256 均通过；Llama 配对输入身份 16/16 完全一致。正式结果与 `audit_35.json` 均位于 `/home/wangyuanshuo02/lb_v1_fill_20261105/formal/`，Task #32 完成。
+  - **GLM-4.7-Flash NFA RULER 32K full/dual 正式发布**：两臂各 11/11 × 100，AVG11=35.01/34.82，`yarn_enabled=false`；原始 generation 与正式发布 SHA/receipt/producer binding 审计全部通过。官方逐任务输出预算的 canonicalization 只在独立评分快照实施，真实配置/treatment 漂移仍拒绝；Task #24 完成，指定 cron `3c42bf10` 已删除。本轮不重复 eval 已闭环的 FullKV/Quest/JSSA/LBv2，不推进 FASA/AsyncTLS/HISA 或 DuoAttention。
 
 - 2026-11-04 12:23:
   - 本轮仅复核、不重复 eval：Q32B FullKV `passage_count`/`trec`/`samsum` 均为 200 行、200 个唯一 ID，16 任务均值重算仍为 **AVG16=42.37**。Q32B Quest RULER 11×100 行、LongBench 16/16 全量行数，逐任务来源 SHA256、RULER pointer/receipt、LongBench runcap/input identity 均闭环；两套 driver 均为逐任务 `rc=0`、`ALL_DONE FAILED=0`，正式分数保持 **AVG11=41.02 / AVG16=38.26**。
