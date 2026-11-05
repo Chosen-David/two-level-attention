@@ -1,6 +1,6 @@
 {
   "schema": "nfa-pure-kernel-stages-v2",
-  "repo_head": "7198002c95e31e547890deaf71387c0fd06bf63d",
+  "repo_head": "11695f98d203cb553ce3a78597f365d0ed64d72a",
   "repo_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "method": "flashinfer",
   "execution": "eager",
@@ -35,90 +35,90 @@
   "summary": {
     "flashinfer_dense_ms": {
       "values_ms": [
-        8.253922999999995,
-        8.260679000000009,
-        8.254295000000006,
-        8.252353999999992,
-        8.225821000000003
+        8.257827999999991,
+        8.260933000000001,
+        8.256018000000001,
+        8.226216999999998,
+        8.220927000000003
       ],
-      "median_ms": 8.253922999999995,
-      "min_ms": 8.225821000000003,
-      "max_ms": 8.260679000000009
+      "median_ms": 8.256018000000001,
+      "min_ms": 8.220927000000003,
+      "max_ms": 8.260933000000001
     }
   },
   "repeats": [
     {
       "stages": {
-        "flashinfer_dense_ms": 8.253922999999995
+        "flashinfer_dense_ms": 8.257827999999991
       },
       "kernels": {
         "void flashinfer::MergeStatesLargeNumIndexSetsKernel<8u, 16u, 8u, 4u, __nv_bfloat16, __nv_bfloat16>(__nv_bfloat16*, float*, __nv_bfloat16*, float*, unsigned int, unsigned int)": {
           "calls": 36,
-          "device_ms": 0.14249499999999898
+          "device_ms": 0.14585799999999377
         },
         "void flashinfer::SingleDecodeWithKVCacheKernel<(flashinfer::PosEncodingMode)0, 2u, 1u, 8u, 16u, 4u, 2u, flashinfer::DefaultAttention<false, false, false, false>, Params>(Params)": {
           "calls": 36,
-          "device_ms": 8.111427999999997
+          "device_ms": 8.111969999999998
         }
       }
     },
     {
       "stages": {
-        "flashinfer_dense_ms": 8.260679000000009
+        "flashinfer_dense_ms": 8.260933000000001
       },
       "kernels": {
         "void flashinfer::MergeStatesLargeNumIndexSetsKernel<8u, 16u, 8u, 4u, __nv_bfloat16, __nv_bfloat16>(__nv_bfloat16*, float*, __nv_bfloat16*, float*, unsigned int, unsigned int)": {
           "calls": 36,
-          "device_ms": 0.14624000000000434
+          "device_ms": 0.14524799999999777
         },
         "void flashinfer::SingleDecodeWithKVCacheKernel<(flashinfer::PosEncodingMode)0, 2u, 1u, 8u, 16u, 4u, 2u, flashinfer::DefaultAttention<false, false, false, false>, Params>(Params)": {
           "calls": 36,
-          "device_ms": 8.114439000000004
+          "device_ms": 8.115685000000004
         }
       }
     },
     {
       "stages": {
-        "flashinfer_dense_ms": 8.254295000000006
+        "flashinfer_dense_ms": 8.256018000000001
       },
       "kernels": {
         "void flashinfer::MergeStatesLargeNumIndexSetsKernel<8u, 16u, 8u, 4u, __nv_bfloat16, __nv_bfloat16>(__nv_bfloat16*, float*, __nv_bfloat16*, float*, unsigned int, unsigned int)": {
           "calls": 36,
-          "device_ms": 0.14345900000000497
+          "device_ms": 0.14364800000000194
         },
         "void flashinfer::SingleDecodeWithKVCacheKernel<(flashinfer::PosEncodingMode)0, 2u, 1u, 8u, 16u, 4u, 2u, flashinfer::DefaultAttention<false, false, false, false>, Params>(Params)": {
           "calls": 36,
-          "device_ms": 8.110836
+          "device_ms": 8.112369999999999
         }
       }
     },
     {
       "stages": {
-        "flashinfer_dense_ms": 8.252353999999992
+        "flashinfer_dense_ms": 8.226216999999998
       },
       "kernels": {
         "void flashinfer::MergeStatesLargeNumIndexSetsKernel<8u, 16u, 8u, 4u, __nv_bfloat16, __nv_bfloat16>(__nv_bfloat16*, float*, __nv_bfloat16*, float*, unsigned int, unsigned int)": {
           "calls": 36,
-          "device_ms": 0.14371299999999748
+          "device_ms": 0.14364899999999853
         },
         "void flashinfer::SingleDecodeWithKVCacheKernel<(flashinfer::PosEncodingMode)0, 2u, 1u, 8u, 16u, 4u, 2u, flashinfer::DefaultAttention<false, false, false, false>, Params>(Params)": {
           "calls": 36,
-          "device_ms": 8.108640999999993
+          "device_ms": 8.082568
         }
       }
     },
     {
       "stages": {
-        "flashinfer_dense_ms": 8.225821000000003
+        "flashinfer_dense_ms": 8.220927000000003
       },
       "kernels": {
         "void flashinfer::MergeStatesLargeNumIndexSetsKernel<8u, 16u, 8u, 4u, __nv_bfloat16, __nv_bfloat16>(__nv_bfloat16*, float*, __nv_bfloat16*, float*, unsigned int, unsigned int)": {
           "calls": 36,
-          "device_ms": 0.1439380000000016
+          "device_ms": 0.1447370000000034
         },
         "void flashinfer::SingleDecodeWithKVCacheKernel<(flashinfer::PosEncodingMode)0, 2u, 1u, 8u, 16u, 4u, 2u, flashinfer::DefaultAttention<false, false, false, false>, Params>(Params)": {
           "calls": 36,
-          "device_ms": 8.081883000000001
+          "device_ms": 8.07619
         }
       }
     }

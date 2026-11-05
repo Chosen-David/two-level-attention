@@ -1,0 +1,51 @@
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 184.18it/s]
+{
+  "schema": "nfa-pure-kernel-stages-v2",
+  "repo_head": "11695f98d203cb553ce3a78597f365d0ed64d72a",
+  "repo_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "method": "flashinfer",
+  "execution": "eager",
+  "batch_size": 1,
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "input": {
+    "path": "/tmp/nfa_kernel_inputs/98304/cwe.jsonl",
+    "sha256": "64b92ed39dcbe3d4dbc74ffbd04e9be86914b966463fcc5e5adb45fbfabbe904",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 97531,
+    "provenance": "repeated-needle-body-extension",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "input_provenance": "repeated-needle-body-extension",
+  "warmup_steps": 3,
+  "repeat": 5,
+  "gate_epsilon": null,
+  "stage_definitions": {
+    "l1": "page stats/Q prepare + L1 scores + L1 Top-K/candidate pack",
+    "l2": "fine Q/scores + filtered Top-K + final union/physical mapping",
+    "main_attention": "gather_attend kernels only",
+    "total": "L1 + L2 + main Attention; no host/other model kernels"
+  },
+  "metadata": {
+    "profile_start_kv_tokens": 97534,
+    "flashinfer_version": "0.6.14",
+    "dense_layers": 36,
+    "kv_layout": "HND",
+    "prefill_attention": "sdpa"
+  },
+  "summary": {
+    "flashinfer_dense_ms": {
+      "values_ms": [
+        8.142794000000004,
+        8.145650000000003,
+        8.144899999999998,
+        8.152281,
+        8.194342999999998
+      ],
+      "median_ms": 8.145650000000003,
+      "min_ms": 8.142794000000004,
+      "max_ms": 8.194342999999998
+    }
+  }
+}
+saved -> /tmp/nfa_kernel_matrix_main11695_cwe_noskip/cwe_s0_98304_eager_b1.json

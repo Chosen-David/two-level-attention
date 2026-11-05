@@ -9,7 +9,7 @@ import threading
 import time
 
 PYTHON = '/home/wangyuanshuo02/two-level-attention/.venv/bin/python'
-REPO = '/tmp/nfa-topk64-opt'
+REPO = os.environ.get('NFA_BENCH_REPO', '/tmp/nfa-bench-snapshot')
 MODEL = '/home/wangyuanshuo02/Qwen3-8B'
 DATA = '/tmp/nfa_kernel_inputs'
 MEASURE = '/tmp/nfa_kernel_audit/measure_nfa_kernels.py'
@@ -53,8 +53,6 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     base_env = os.environ.copy()
-    # 128K SDPA prefill 需要额外大块临时显存；扩展段避免 reserved 碎片阻塞分配。
-    base_env['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
     base_env['NFA_REPO'] = REPO
     python_paths = ['/tmp/nfa-fi-no-deps', REPO]
     if base_env.get('PYTHONPATH'):

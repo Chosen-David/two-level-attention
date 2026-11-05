@@ -1,0 +1,235 @@
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 179.09it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+{
+  "schema": "nfa-pure-kernel-stages-v2",
+  "repo_head": "11695f98d203cb553ce3a78597f365d0ed64d72a",
+  "repo_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "method": "nfa",
+  "execution": "eager",
+  "batch_size": 1,
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "input": {
+    "path": "/tmp/nfa_kernel_inputs/98304/cwe.jsonl",
+    "sha256": "64b92ed39dcbe3d4dbc74ffbd04e9be86914b966463fcc5e5adb45fbfabbe904",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 97531,
+    "provenance": "repeated-needle-body-extension",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "input_provenance": "repeated-needle-body-extension",
+  "warmup_steps": 3,
+  "repeat": 5,
+  "gate_epsilon": 0.0,
+  "stage_definitions": {
+    "l1": "page stats/Q prepare + L1 scores + L1 Top-K/candidate pack",
+    "l2": "fine Q/scores + filtered Top-K + final union/physical mapping",
+    "main_attention": "gather_attend kernels only",
+    "total": "L1 + L2 + main Attention; no host/other model kernels"
+  },
+  "metadata": {
+    "skip": {
+      "near_layers": [],
+      "far_layers": [],
+      "both_layers": []
+    },
+    "prefill_decisions": {
+      "0": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "1": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "2": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "3": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "4": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "5": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "6": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "7": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "8": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "9": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "10": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "11": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "12": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "13": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "14": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "15": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "16": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "17": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "18": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "19": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "20": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "21": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "22": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "23": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "24": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "25": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "26": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "27": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "28": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "29": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "30": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "31": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "32": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "33": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "34": {
+        "skip_near": false,
+        "skip_far": false
+      },
+      "35": {
+        "skip_near": false,
+        "skip_far": false
+      }
+    },
+    "profile_start_kv_tokens": 97534
+  },
+  "summary": {
+    "l1_ms": {
+      "values_ms": [
+        1.1865689999999876,
+        1.191590000000001,
+        1.1357199999999767,
+        1.153410999999997,
+        1.1542129999999902
+      ],
+      "median_ms": 1.1542129999999902,
+      "min_ms": 1.1357199999999767,
+      "max_ms": 1.191590000000001
+    },
+    "l2_ms": {
+      "values_ms": [
+        2.29565400000003,
+        2.2980570000000236,
+        2.295437999999995,
+        2.296905000000017,
+        2.297773000000014
+      ],
+      "median_ms": 2.296905000000017,
+      "min_ms": 2.295437999999995,
+      "max_ms": 2.2980570000000236
+    },
+    "main_attention_ms": {
+      "values_ms": [
+        1.0227550000000163,
+        1.0240349999999854,
+        1.0227909999999725,
+        1.0252510000000108,
+        1.0241960000000172
+      ],
+      "median_ms": 1.0240349999999854,
+      "min_ms": 1.0227550000000163,
+      "max_ms": 1.0252510000000108
+    },
+    "nfa_operator_total_ms": {
+      "values_ms": [
+        4.504978000000034,
+        4.51368200000001,
+        4.453948999999944,
+        4.475567000000025,
+        4.476182000000021
+      ],
+      "median_ms": 4.476182000000021,
+      "min_ms": 4.453948999999944,
+      "max_ms": 4.51368200000001
+    }
+  }
+}
+saved -> /tmp/nfa_kernel_matrix_main11695_cwe_noskip/cwe_s0_98304_eager_a2.json

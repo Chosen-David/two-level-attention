@@ -4,6 +4,7 @@ STAGE_TOKENS = {
     'l1_ms': (
         '_nfa_page_stats_kernel', '_nfa_page_stats_prepare_q_kernel',
         '_nfa_l1_scores_kernel', '_prepare_q_kernel',
+        '_l1_topk_partial_kernel',
         '_topk_candidate_prepare_kernel', '_topk_candidate_batched_kernel',
         '_candidate_expand_batched_kernel', '_candidate_pack_batched_kernel',
     ),
