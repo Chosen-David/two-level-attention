@@ -870,21 +870,31 @@ if _has_triton():
                           aux_id, CAP)
         aux_sorted = tl.sort(aux_id, descending=False)
 
-        reverse_idx = 2 * W - 1 - offs
-        # N_PAD 尾部 lane 的 reverse_idx 可能为负；where 的掩码不能撤销
-        # tl.gather 本身，因此索引必须先夹到合法范围再按原条件丢弃。
-        aux_gather_idx = tl.maximum(
-            tl.minimum(reverse_idx, A_PAD - 1), 0)
-        aux_reverse = tl.gather(aux_sorted, aux_gather_idx, 0)
-        aux_reverse = tl.where(
-            (offs >= W) & (reverse_idx < A_PAD), aux_reverse, CAP)
-        ordered = tl.where(offs < W, middle_id, aux_reverse)
-        for bit in tl.static_range(MERGE_BITS - 1, -1, -1):
-            stride = 1 << bit
-            peer = tl.gather(ordered, offs ^ stride, axis=0)
-            ordered = tl.where((offs & stride) == 0,
-                               tl.minimum(ordered, peer),
-                               tl.maximum(ordered, peer))
+        if A_PAD > W:
+            # 两路 bitonic merge 要求每个有序 run 不超过 W。保护集与 seed
+            # 更宽时 reversing 只会装载前 W 个 aux，必须保留完整 union 后排序。
+            aux_idx = tl.minimum(tl.maximum(offs - W, 0), A_PAD - 1)
+            aux_forward = tl.gather(aux_sorted, aux_idx, 0)
+            combined = tl.where(
+                offs < W, middle_id,
+                tl.where(offs - W < A_PAD, aux_forward, CAP))
+            ordered = tl.sort(combined, descending=False)
+        else:
+            reverse_idx = 2 * W - 1 - offs
+            # N_PAD 尾部 lane 的 reverse_idx 可能为负；where 的掩码不能撤销
+            # tl.gather 本身，因此索引必须先夹到合法范围再按原条件丢弃。
+            aux_gather_idx = tl.maximum(
+                tl.minimum(reverse_idx, A_PAD - 1), 0)
+            aux_reverse = tl.gather(aux_sorted, aux_gather_idx, 0)
+            aux_reverse = tl.where(
+                (offs >= W) & (reverse_idx < A_PAD), aux_reverse, CAP)
+            ordered = tl.where(offs < W, middle_id, aux_reverse)
+            for bit in tl.static_range(MERGE_BITS - 1, -1, -1):
+                stride = 1 << bit
+                peer = tl.gather(ordered, offs ^ stride, axis=0)
+                ordered = tl.where((offs & stride) == 0,
+                                   tl.minimum(ordered, peer),
+                                   tl.maximum(ordered, peer))
         prev_idx = tl.maximum(offs - 1, 0)
         previous = tl.gather(ordered, prev_idx, 0)
         previous = tl.where(offs == 0, -1, previous)
