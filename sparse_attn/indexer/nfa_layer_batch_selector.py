@@ -1011,7 +1011,14 @@ if _has_triton():
         # 未进入局部 Top-K 的其它省略项也全是 -inf，且同分顺序低于此前缀。
         fill_offs = tl.arange(0, K_PAD)
         fill_idx = KT - 1 - fill_offs
-        fill = (-32641 << 16) | (fill_idx & 0xFFFF)
+        fill_s = tl.full((K_PAD,), float("-inf"), SCORES.dtype.element_ty)
+        fill_bits = (fill_s.to(tl.uint16, bitcast=True).to(tl.int32)
+                     & 0xFFFF)
+        fill_sign = fill_bits & 0x8000
+        fill_key = tl.where(
+            fill_sign != 0, (~fill_bits) & 0xFFFF, fill_bits | 0x8000)
+        fill_key_signed = fill_key - 0x8000
+        fill = (fill_key_signed << 16) | (fill_idx & 0xFFFF)
         fill = tl.where(fill_offs < K, fill, -0x80000000)
         if K_PAD == 1:
             top = tl.maximum(top, fill)

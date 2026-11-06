@@ -497,6 +497,120 @@ class L1TopKTiledTest(unittest.TestCase):
                                         f"{name} 不一致")
 
     @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
+    def test_compact_topk_dtype_and_prefix_boundaries(self):
+        """FP16/BF16 的全局 -inf 前缀与 compact 边界必须逐位一致。"""
+        rows = hkv = batch = 1
+        kt, bs = 8, 1
+        capacity = kt * bs
+        cases = (
+            # 空 near 池使 K=1 的唯一结果来自全局 -inf 前缀。
+            dict(k_n=1, length=1, pool_near_len=1, sink_pool_lo=1,
+                 signed_zero=False),
+            # near_start=KT 时局部区间完全无效，前缀提供全部 K=KT 项。
+            dict(k_n=kt, length=1, pool_near_len=1, sink_pool_lo=kt,
+                 signed_zero=False),
+            # compact 内的 +/-0 与 -inf 同分前缀共同进入最终 Top-K。
+            dict(k_n=4, length=8, pool_near_len=4, sink_pool_lo=4,
+                 signed_zero=True),
+        )
+        for dtype in (torch.bfloat16, torch.float16):
+            for case in cases:
+                for tiled in (False, True):
+                    with self.subTest(dtype=dtype, tiled=tiled, **case):
+                        k_f = 0
+                        k_n = case["k_n"]
+                        k_f_pad, k_n_pad = 1, triton.next_power_of_2(k_n)
+                        far = torch.full(
+                            (rows, kt), float("-inf"), device="cuda", dtype=dtype)
+                        near = torch.full_like(far, float("-inf"))
+                        if case["signed_zero"]:
+                            near[0, 4] = 0.0
+                            near[0, 5] = -0.0
+                        lengths = torch.tensor(
+                            [case["length"]], dtype=torch.int64, device="cuda")
+                        valid_req = torch.zeros(
+                            1, dtype=torch.int64, device="cuda")
+                        skip_far = torch.zeros(1, dtype=torch.bool, device="cuda")
+                        skip_near = torch.zeros_like(skip_far)
+                        r = (k_n + 2) * bs
+
+                        def allocate():
+                            return {
+                                "i_f": torch.empty(
+                                    (rows, 0), dtype=torch.int64, device="cuda"),
+                                "i_n": torch.empty(
+                                    (rows, k_n), dtype=torch.int64, device="cuda"),
+                                "out": torch.empty(
+                                    (rows, r), dtype=torch.int64, device="cuda"),
+                                "valid": torch.empty(
+                                    (rows, r), dtype=torch.bool, device="cuda"),
+                                "lower": torch.empty(
+                                    1, dtype=torch.int64, device="cuda"),
+                                "upper": torch.empty(
+                                    1, dtype=torch.int64, device="cuda"),
+                                "quota": torch.empty(
+                                    1, dtype=torch.int64, device="cuda"),
+                                "owners": torch.zeros(
+                                    (rows, capacity), dtype=torch.int32,
+                                    device="cuda"),
+                                "generations": torch.zeros(
+                                    rows, dtype=torch.int32, device="cuda"),
+                            }
+
+                        common = dict(
+                            KT=kt, KT_PAD=kt, K_F=k_f, K_N=k_n,
+                            K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+                            **_near_geometry(
+                                True, bs, 0, case["pool_near_len"]),
+                            R=r, HEAD=0, TAIL=0, SINK=0, SWA=0, CAP=capacity,
+                            SINK_POOL_LO=case["sink_pool_lo"], BS=bs, PAGE=64,
+                            NEAR_LEN=0, K2=1024, HKV=hkv, B=batch, MAX_REQ=1,
+                            LAYER_OFFSET=0, num_warps=8)
+                        ref = allocate()
+                        _reference_candidate[(rows,)](
+                            far, near, ref["i_f"], ref["i_n"], lengths,
+                            skip_far, skip_near, valid_req, ref["out"],
+                            ref["valid"], ref["lower"], ref["upper"],
+                            ref["quota"], ref["owners"], ref["generations"],
+                            **common)
+                        if tiled:
+                            partial_f = torch.full(
+                                (rows, 1, k_f_pad), 0x12345678,
+                                dtype=torch.int32, device="cuda")
+                            partial_n = torch.full(
+                                (rows, 1, k_n_pad), 0x12345678,
+                                dtype=torch.int32, device="cuda")
+                            _l1_topk_partial_kernel[(rows, 1)](
+                                far, near, partial_f, partial_n,
+                                skip_far, skip_near, valid_req, lengths,
+                                KT=kt, TILE=512, NTILES=1,
+                                K_F_PAD=k_f_pad, K_N=k_n, K_N_PAD=k_n_pad,
+                                LOG2_N=k_n_pad.bit_length() - 1,
+                                BS=bs, SINK_POOL_LO=case["sink_pool_lo"],
+                                **_near_geometry(
+                                    True, bs, 0, case["pool_near_len"]),
+                                HKV=hkv, B=batch, MAX_REQ=1, LAYER_OFFSET=0,
+                                num_warps=8)
+                            far_topk, near_topk = partial_f, partial_n
+                        else:
+                            far_topk, near_topk = far, near
+                        actual = allocate()
+                        _topk_candidate_batched_kernel[(rows,)](
+                            far_topk, near_topk, far, near,
+                            actual["i_f"], actual["i_n"], lengths,
+                            skip_far, skip_near, valid_req, actual["out"],
+                            actual["valid"], actual["lower"], actual["upper"],
+                            actual["quota"], actual["owners"],
+                            actual["generations"], TILED=tiled, NTILES=1,
+                            NTILES_PAD=1, LOG2_F=0,
+                            LOG2_N=k_n_pad.bit_length() - 1, **common)
+                        torch.cuda.synchronize()
+                        for name in ref:
+                            self.assertTrue(
+                                torch.equal(ref[name], actual[name]),
+                                f"{name} 不一致: ref={ref[name]}, actual={actual[name]}")
+
+    @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
     def test_skipped_pool_does_not_read_scores_or_partial(self):
         rows, hkv, k_f, k_n, bs = 8, 8, 16, 8, 64
         for tiled, kt in ((False, 256), (True, 513)):

@@ -79,3 +79,15 @@
 - CPU 回归：strict/cache 18 passed、5 subtests passed；扩展 selector/strict 套件 99 passed、5 subtests passed。
 - 性能：本轮尚未测量，不宣称加速。
 - 下一步：独立静态复核、B1/B4 eager/Graph 真实 token identity、128K 纯算子 ABBA 与 32K/64K/128K 完整 decode ABBA。
+
+## Iter 7 — 修复 compact 全局 `-inf` 前缀的 dtype 假设
+
+- 日期：2026-11-07。
+- 基线：`2925c90526207bab64a6189e7c14dc064db03311`。
+- 独立静态复核：发现 compact 归并把 BF16 `-inf` 的 packed key `-32641` 写死；FP16 `-inf` 的正确 key 为 `-31745`。FP16 compact 行若让 `-inf` 进入 Top-K，会把 near 局部索引错误排在全局 `0..K-1` 前缀之前，eager/Graph 与 tiled/non-tiled 均受影响。BF16 主路径未发现其他可达索引、顺序或越界问题。
+- 修改：全局 `-inf` 前缀按 `SCORES.dtype.element_ty` 生成，并复用原输入位模式的保序映射；不改变 compact 区间、归并结构、tie/NaN 规则或生产 BF16 数值。该轮是独立正确性修复，不宣称加速。
+- 新增对拍：FP16/BF16 × eager/tiled × `K=1` 空 near 池、非 2 次幂 `KT=8` 的 `K=KT`、compact signed zero/`-inf` 前缀共 12 个子测试，indices 与完整 candidate 输出逐元素一致；tiled partial 预先填入 poison。首次运行 12 个 error 均为测试驱动向 reference 误传 `LOG2_F/LOG2_N`，修正调用后通过，不是候选 kernel 回归。
+- CUDA 回归：pc40 GPU1，`tests/ops/test_l1_topk_tiled_cuda.py -v` 6/6 通过。
+- CPU 回归：strict/selector 扩展套件 99 passed、5 subtests passed。首次本地命令缺少仓库 `PYTHONPATH` 导致 collection import error，修正工作目录与环境后通过，不是代码回归。
+- 性能：本轮尚未测量，不宣称加速。
+- 下一步：建立修复后的干净源码回执，运行 B1/B4 eager/Graph token identity，再执行 128K 纯算子 ABBA。
