@@ -97,4 +97,5 @@
 - 口径：仅报告 L1/L2/main Attention 纯 GPU 算子，不包含其他模型工作，不是完整 TPOT verdict；L2 与 Attention 的微小变化不作收益宣称。dtype 修复不改变生产 BF16 数值，上述收益来自 Iter 6 的 near 固定区间 Top-K。
 - 完整 decode ABBA（同一 `333af802`→`cc7d6aa4` 代码对照，512 tokens，逐格 8/8 run、`gpu_hygiene=clean`，baseline/candidate 与 repeat token identity 均通过）：
   - 32K B1 eager：26.523784 → 26.192128 ms，1.012662×；Graph：9.844800 → 9.835896 ms，1.000905×。两臂均 2 个 far-skip 层、0 个 near-skip/both-skip 层，输入 SHA256=`530af358…f53d8df23`。
+  - 64K B1 eager：26.820064 → 26.928008 ms，0.995991×（负面格子）；Graph：10.339744 → 10.330152 ms，1.000929×。两臂均 3 个 near-skip 层、0 个 far-skip/both-skip 层，输入 SHA256=`6b10ff16…160b44663f`。
 - 下一步：继续 64K/128K、B1/B4、eager/Graph 完整 512-token decode ABBA，胜出候选补 B2；保留所有负面格子。
