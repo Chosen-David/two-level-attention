@@ -98,4 +98,5 @@
 - 完整 decode ABBA（同一 `333af802`→`cc7d6aa4` 代码对照，512 tokens，逐格 8/8 run、`gpu_hygiene=clean`，baseline/candidate 与 repeat token identity 均通过）：
   - 32K B1 eager：26.523784 → 26.192128 ms，1.012662×；Graph：9.844800 → 9.835896 ms，1.000905×。两臂均 2 个 far-skip 层、0 个 near-skip/both-skip 层，输入 SHA256=`530af358…f53d8df23`。
   - 64K B1 eager：26.820064 → 26.928008 ms，0.995991×（负面格子）；Graph：10.339744 → 10.330152 ms，1.000929×。两臂均 3 个 near-skip 层、0 个 far-skip/both-skip 层，输入 SHA256=`6b10ff16…160b44663f`。
+  - 128K B1 eager：26.751800 → 26.632064 ms，1.004496×；Graph：10.403416 → 10.392616 ms，1.001039×。两臂均 13 个 near-skip 层、0 个 far-skip/both-skip 层，输入 SHA256=`4078e45e…24eaec15dab5`。完整 TPOT 收益显著小于纯算子收益，不以 kernel 降幅替代 TPOT。
 - 下一步：继续 64K/128K、B1/B4、eager/Graph 完整 512-token decode ABBA，胜出候选补 B2；保留所有负面格子。
