@@ -1,0 +1,236 @@
+{
+  "schema": "nfa-strict-skip-seed-removal-verdict-v1",
+  "date": "2026-11-07",
+  "valid": true,
+  "source": {
+    "repository": "Chosen-David/two-level-attention",
+    "baseline_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+    "candidate_head": "2f702c222186bdf17de996e981c52af467957ee5",
+    "feature_commit": "4dbb942e6620153ce7f206dda68a61123b4ff755",
+    "receipt_commit": "2f702c222186bdf17de996e981c52af467957ee5",
+    "measured_worktrees_clean": true
+  },
+  "semantic_contract": {
+    "dense_prefill_reads_full_valid_prefix": true,
+    "strict_from_first_sparse_forward": true,
+    "prefill_seed_and_core_token_compensation_removed": true,
+    "protected_sink_swa_retained": true,
+    "gate_threshold_freeze_timing_subspace_k1_k2_and_region_geometry_unchanged": true,
+    "physical_kv_policy": "retain",
+    "independent_oracle": "P/R/X/A set checks plus request-owned logical-token to physical-gather-slot inversion",
+    "required_invariants": [
+      "A intersection X is empty",
+      "P is a subset of A",
+      "no future, invalid, PAD, cross-request or duplicate logical token",
+      "logical ID, physical gather slot and attention address agree"
+    ]
+  },
+  "regression": {
+    "command": "PYTHONPATH=/tmp/nfa-strict-skip-20261106 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -m pytest -q tests/test_strict_skip_receipt.py tests/test_nfa_current_query_selector.py tests/test_frozen_gate_profile.py tests/test_graph_ready_paged_region_cache.py tests/test_multi_request_graph_runner.py tests/test_frozen_region_runtime.py tests/test_ruler_frozen_regions.py tests/test_ruler_batch_treatment_snapshot.py",
+    "passed": 99,
+    "subtests_passed": 5,
+    "failed": 0
+  },
+  "correctness": {
+    "ruler32k_b4": {
+      "task": "niah_multikey_1",
+      "sample_index": 0,
+      "decode_steps": 16,
+      "input_sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+      "actual_prompt_tokens": 32621,
+      "eager_strict_valid": true,
+      "graph_strict_valid": true,
+      "violations_per_arm": 0,
+      "eager_graph_token_identity": true,
+      "generated_token_ids_sha256_compact_json": "3b35092121c20e9a7888b352ef9ec87a9286fb9578b0b6000f859a199611d673",
+      "skip_policy_per_request": {
+        "far": 2,
+        "near": 0,
+        "both": 0
+      },
+      "large_raw_evidence": {
+        "pc40:/tmp/nfa_strict_2f_pc40_multikey_b4_eager_32k.json": "a1cbbbe305c035559a3aded3d7236bc7a36043cd8206d564c52697db2da21b94",
+        "pc40:/tmp/nfa_strict_2f_pc40_multikey_b4_graph_32k.json": "e96f67979b739a4e1415aae180dcd74b2277449ce82d88b2906b8a33d8f0352d"
+      }
+    },
+    "ruler32k_b1_smoke": {
+      "task": "niah_multikey_1",
+      "sample_index": 0,
+      "max_new_tokens": 32,
+      "decode_steps": 31,
+      "input_sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+      "eager_host_gpu": "pc40 GPU1",
+      "graph_host_gpu": "pc31 GPU1",
+      "eager_strict_valid": true,
+      "graph_strict_valid": true,
+      "violations_per_arm": 0,
+      "eager_graph_token_identity": true,
+      "generated_token_ids": [
+        576,
+        3281,
+        10963,
+        1372,
+        369,
+        16585,
+        12,
+        4469,
+        9733,
+        304,
+        279,
+        1467,
+        374,
+        220,
+        17,
+        21,
+        17,
+        21,
+        17,
+        17,
+        24,
+        13,
+        4710,
+        785,
+        1372,
+        374,
+        24784,
+        304,
+        279,
+        3772,
+        24849,
+        330
+      ],
+      "generated_token_ids_sha256_compact_json": "c8e3b8773f735e082dc551bd338af0efbb1ac6cddb33bf5d643b51e84864c204",
+      "gpu_hygiene": "clean",
+      "large_raw_evidence": {
+        "pc40:/tmp/nfa-strict-results/nfa32k_eager_smoke.json": "4db1954789999b8229d4e5b3cd1469827351bad0f5599d5628740f009ce32f1b",
+        "pc31:/tmp/nfa-strict-results/nfa32k_graph_smoke.json": "d18f0fe2991e82f20b7b22bab47f8c722664c1c6b140f1afaa67f1ed0d268621"
+      }
+    }
+  },
+  "performance": {
+    "protocol": "Qwen3-8B BF16, native RULER 32K niah_multikey_1 sample 0, B1, 512 new tokens, three warmup steps, independent processes, ABBA, latency-only measurement",
+    "input_sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+    "actual_prompt_tokens": 32621,
+    "host_gpu": "pc40 GPU1",
+    "gpu_hygiene": "clean",
+    "eager": {
+      "baseline_tpot_ms": [
+        26.939167976379395,
+        26.869248390197754
+      ],
+      "candidate_tpot_ms": [
+        26.27999973297119,
+        26.861663818359375
+      ],
+      "baseline_paired_median_ms": 26.904208183288574,
+      "candidate_paired_median_ms": 26.570831775665283,
+      "baseline_over_candidate": 1.0125467057425206
+    },
+    "graph": {
+      "baseline_tpot_ms": [
+        9.851856231689453,
+        9.85588788986206
+      ],
+      "candidate_tpot_ms": [
+        9.81604814529419,
+        9.806272029876709
+      ],
+      "baseline_paired_median_ms": 9.853872060775757,
+      "candidate_paired_median_ms": 9.81116008758545,
+      "baseline_over_candidate": 1.004353407019049
+    },
+    "baseline_candidate_token_identity": false,
+    "token_difference_interpretation": "Expected strict-skip semantic change after removing first-step seed compensation; repeat identity within each arm passed.",
+    "archived_manifest": "exp/trace/results/nfa_strict_skip_seed_removal/performance_abba_manifest.json",
+    "archived_manifest_sha256": "fe9737b1fe5a0fad35c258bf7aaa30ab578c1310c4e13a85b75561bdff382756"
+  },
+  "quality": {
+    "scope_note": "Paired smoke-quality acceptance on five samples per task, not a full-dataset quality claim.",
+    "longbench": {
+      "task": "hotpotqa",
+      "samples": 5,
+      "selected_rows": [
+        152,
+        26,
+        115,
+        46,
+        38
+      ],
+      "max_new_tokens": 32,
+      "dataset_sha256": "a0005ab2a1bc2ac3a70352dccbf96cccc4e0aac6bb677f6a55180fa51b92ef6f",
+      "valid": true,
+      "arms": {
+        "full": {
+          "baseline_mean": 0.56,
+          "candidate_mean": 0.56,
+          "delta": 0.0,
+          "changed_token_sequences": 0,
+          "changed_predictions": 0
+        },
+        "far_0.05": {
+          "baseline_mean": 0.56,
+          "candidate_mean": 0.56,
+          "delta": 0.0,
+          "changed_token_sequences": 0,
+          "changed_predictions": 0
+        },
+        "dual_0.05": {
+          "baseline_mean": 0.56,
+          "candidate_mean": 0.56,
+          "delta": 0.0,
+          "changed_token_sequences": 0,
+          "changed_predictions": 0
+        }
+      },
+      "comparison": "exp/trace/results/nfa_strict_skip_seed_removal/longbench_comparison.json",
+      "comparison_sha256": "f37b76f4e55305e294852436f741d861183b7096c6aaf1e5b93fdb8b958ac53e"
+    },
+    "ruler": {
+      "context_length": 32768,
+      "samples_per_task": 5,
+      "formal_scorer": "benchmark/RULER/score_ruler_formal.py",
+      "formal_scoring_isolated_per_task": true,
+      "task_isolation_reason": "niah_multikey_1 max_gen=128 and cwe max_gen=120; generation was reused read-only and each task was scored in an isolated derived root.",
+      "valid": true,
+      "dense_prefill_first_token_identity_all_rows": true,
+      "gate_counts_identity_all_rows": true,
+      "no_skip_row_full_token_identity": true,
+      "tasks": {
+        "niah_multikey_1": {
+          "source_data_sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+          "baseline_score": 100.0,
+          "candidate_score": 100.0,
+          "delta": 0.0,
+          "changed_token_sequences": 3,
+          "changed_predictions": 3,
+          "natural_skip_rows": 5
+        },
+        "cwe": {
+          "source_data_sha256": "07fcda888ce6d9f834639abafa23c8fd726a352227432a26175bc3c3ff2e0051",
+          "baseline_score": 70.0,
+          "candidate_score": 70.0,
+          "delta": 0.0,
+          "changed_token_sequences": 0,
+          "changed_predictions": 0,
+          "natural_skip_rows": 0
+        }
+      },
+      "comparison": "exp/trace/results/nfa_strict_skip_seed_removal/ruler/comparison.json",
+      "comparison_sha256": "fd74ad815dc6bf221acc6e083fedeb2a0c19753d56987d7b3a2e409dd6465e20"
+    }
+  },
+  "reproduction_scripts": [
+    "exp/trace/results/nfa_strict_skip_seed_removal/scripts/run_strict_skip_pair.py",
+    "exp/trace/results/nfa_strict_skip_seed_removal/scripts/run_strict_smoke.py",
+    "exp/trace/results/nfa_strict_skip_seed_removal/scripts/run_strict_ruler_arm.sh",
+    "exp/trace/results/nfa_strict_skip_seed_removal/scripts/score_strict_ruler_tasks.py",
+    "exp/trace/results/nfa_strict_skip_seed_removal/scripts/compare_strict_longbench.py",
+    "exp/trace/results/nfa_strict_skip_seed_removal/scripts/compare_strict_ruler.py"
+  ],
+  "limitations": [
+    "Strict-skip changes the logical attention set; baseline seed-on output is not used as the correctness oracle.",
+    "The quality results cover only the disclosed five-sample paired sets and must not be extrapolated to full LongBench or RULER.",
+    "Physical KV remains resident; this verdict does not claim KV eviction or memory savings.",
+    "The measured TPOT improvement is small and is not a FlashAttention-2 or FlashInfer speedup claim."
+  ]
+}
