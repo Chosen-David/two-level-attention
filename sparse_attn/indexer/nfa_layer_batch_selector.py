@@ -962,6 +962,97 @@ if _has_triton():
         tl.store(OUT + (row * NTILES + tile) * K_PAD + top_idx, top)
 
     @triton.jit
+    def _l1_near_compact_bounds(
+        LENGTHS, row,
+        KT: tl.constexpr, K: tl.constexpr,
+        BS: tl.constexpr, WINDOW: tl.constexpr,
+        POOL_NEAR_LEN: tl.constexpr, SINK_POOL_LO: tl.constexpr,
+        NEAR_WIDTH: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
+    ):
+        """返回动态 near 页起点；覆盖不足时由调用方回退整行 Top-K。"""
+        req = (row // HKV) % B
+        length = tl.load(LENGTHS + req).to(tl.int32)
+        near_start = tl.maximum(
+            (length - WINDOW - POOL_NEAR_LEN) // BS, SINK_POOL_LO)
+        kt_eff = (length + BS - 1) // BS
+        near_end = tl.maximum(
+            near_start, kt_eff - tl.maximum(1, WINDOW // BS))
+        compact = ((near_start >= K)
+                   & (near_start + NEAR_WIDTH >= near_end)
+                   & (near_start + NEAR_WIDTH > near_start))
+        return near_start, compact
+
+    @triton.jit
+    def _l1_near_compact_packed_body(
+        SCORES, row, near_start,
+        KT: tl.constexpr, K: tl.constexpr, K_PAD: tl.constexpr,
+        NEAR_WIDTH: tl.constexpr, NEAR_WIDTH_PAD: tl.constexpr,
+        LOG2_K: tl.constexpr,
+    ):
+        """near 小区间与前 K 个全局 -inf 位置做精确二路归并。"""
+        local = tl.arange(0, NEAR_WIDTH_PAD)
+        offs = near_start + local
+        mask = (local < NEAR_WIDTH) & (offs < KT)
+        s = tl.load(SCORES + row * KT + offs,
+                    mask=mask, other=float("-inf"))
+        bits = s.to(tl.uint16, bitcast=True).to(tl.int32) & 0xFFFF
+        sign = bits & 0x8000
+        key = tl.where(sign != 0, (~bits) & 0xFFFF, bits | 0x8000)
+        key_signed = key - 0x8000
+        idx = KT - 1 - offs
+        packed = (key_signed << 16) | (idx & 0xFFFF)
+        packed = tl.where(mask, packed, -0x80000000)
+        if K_PAD == 1:
+            top = tl.max(packed, axis=0, keep_dims=True)
+        else:
+            top = tl.topk(packed, K_PAD)
+
+        # near_start>=K 时，0..K-1 均在 near 池外且分数必为 -inf。
+        # 未进入局部 Top-K 的其它省略项也全是 -inf，且同分顺序低于此前缀。
+        fill_offs = tl.arange(0, K_PAD)
+        fill_idx = KT - 1 - fill_offs
+        fill = (-32641 << 16) | (fill_idx & 0xFFFF)
+        fill = tl.where(fill_offs < K, fill, -0x80000000)
+        if K_PAD == 1:
+            top = tl.maximum(top, fill)
+        else:
+            i = tl.arange(0, K_PAD)
+            incoming = tl.gather(fill, K_PAD - 1 - i, axis=0)
+            top = tl.maximum(top, incoming)
+            for bit in tl.static_range(LOG2_K - 1, -1, -1):
+                stride = 1 << bit
+                peer = tl.gather(top, i ^ stride, axis=0)
+                top = tl.where(
+                    (i & stride) == 0,
+                    tl.maximum(top, peer), tl.minimum(top, peer))
+        return top
+
+    @triton.jit
+    def _l1_near_compact_topk_body(
+        SCORES, OUT, row, near_start,
+        KT: tl.constexpr, K: tl.constexpr, K_PAD: tl.constexpr,
+        NEAR_WIDTH: tl.constexpr, NEAR_WIDTH_PAD: tl.constexpr,
+        LOG2_K: tl.constexpr,
+    ):
+        top = _l1_near_compact_packed_body(
+            SCORES, row, near_start, KT=KT, K=K, K_PAD=K_PAD,
+            NEAR_WIDTH=NEAR_WIDTH, NEAR_WIDTH_PAD=NEAR_WIDTH_PAD,
+            LOG2_K=LOG2_K)
+        top_idx = tl.arange(0, K_PAD)
+        out_idx = (KT - 1 - (top & 0xFFFF)).to(OUT.dtype.element_ty)
+        tl.store(OUT + row * K + top_idx, out_idx, mask=top_idx < K)
+
+    @triton.jit
+    def _l1_packed_topk_decode_body(
+        PACKED, OUT, row, stride,
+        KT: tl.constexpr, K: tl.constexpr, K_PAD: tl.constexpr,
+    ):
+        top_idx = tl.arange(0, K_PAD)
+        top = tl.load(PACKED + row * stride + top_idx)
+        out_idx = (KT - 1 - (top & 0xFFFF)).to(OUT.dtype.element_ty)
+        tl.store(OUT + row * K + top_idx, out_idx, mask=top_idx < K)
+
+    @triton.jit
     def _l1_row_skip_flags(
         SKIP_FAR, SKIP_NEAR, VALID_REQ, row,
         HKV: tl.constexpr, B: tl.constexpr,
@@ -980,9 +1071,13 @@ if _has_triton():
     @triton.jit
     def _l1_topk_partial_kernel(
         FAR_SCORES, NEAR_SCORES, FAR_PARTIAL, NEAR_PARTIAL,
-        SKIP_FAR, SKIP_NEAR, VALID_REQ,
+        SKIP_FAR, SKIP_NEAR, VALID_REQ, LENGTHS,
         KT: tl.constexpr, TILE: tl.constexpr, NTILES: tl.constexpr,
-        K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
+        K_F_PAD: tl.constexpr, K_N: tl.constexpr, K_N_PAD: tl.constexpr,
+        NEAR_COMPACT: tl.constexpr, NEAR_WIDTH: tl.constexpr,
+        NEAR_WIDTH_PAD: tl.constexpr, LOG2_N: tl.constexpr,
+        BS: tl.constexpr, WINDOW: tl.constexpr,
+        POOL_NEAR_LEN: tl.constexpr, SINK_POOL_LO: tl.constexpr,
         HKV: tl.constexpr, B: tl.constexpr,
         MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
     ):
@@ -996,9 +1091,23 @@ if _has_triton():
                 FAR_SCORES, FAR_PARTIAL, row, tile,
                 KT=KT, TILE=TILE, NTILES=NTILES, K_PAD=K_F_PAD)
         if skip_near == 0:
-            _l1_topk_partial_body(
-                NEAR_SCORES, NEAR_PARTIAL, row, tile,
-                KT=KT, TILE=TILE, NTILES=NTILES, K_PAD=K_N_PAD)
+            near_start, compact = _l1_near_compact_bounds(
+                LENGTHS, row, KT=KT, K=K_N, BS=BS, WINDOW=WINDOW,
+                POOL_NEAR_LEN=POOL_NEAR_LEN, SINK_POOL_LO=SINK_POOL_LO,
+                NEAR_WIDTH=NEAR_WIDTH, HKV=HKV, B=B)
+            if NEAR_COMPACT and compact:
+                if tile == 0:
+                    top = _l1_near_compact_packed_body(
+                        NEAR_SCORES, row, near_start, KT=KT, K=K_N,
+                        K_PAD=K_N_PAD, NEAR_WIDTH=NEAR_WIDTH,
+                        NEAR_WIDTH_PAD=NEAR_WIDTH_PAD, LOG2_K=LOG2_N)
+                    top_idx = tl.arange(0, K_N_PAD)
+                    tl.store(NEAR_PARTIAL + row * NTILES * K_N_PAD + top_idx,
+                             top)
+            else:
+                _l1_topk_partial_body(
+                    NEAR_SCORES, NEAR_PARTIAL, row, tile,
+                    KT=KT, TILE=TILE, NTILES=NTILES, K_PAD=K_N_PAD)
 
     @triton.jit
     def _topk_indices_merge_body(
@@ -1042,12 +1151,16 @@ if _has_triton():
 
     @triton.jit
     def _l1_candidate_topk_body(
-        FAR_TOPK, NEAR_TOPK, I_F, I_N, skip_far, skip_near,
+        FAR_TOPK, NEAR_TOPK, I_F, I_N, LENGTHS, skip_far, skip_near,
         KT: tl.constexpr, KT_PAD: tl.constexpr,
         K_F: tl.constexpr, K_N: tl.constexpr,
         K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
         TILED: tl.constexpr, NTILES: tl.constexpr, NTILES_PAD: tl.constexpr,
         LOG2_F: tl.constexpr, LOG2_N: tl.constexpr,
+        NEAR_COMPACT: tl.constexpr, NEAR_WIDTH: tl.constexpr,
+        NEAR_WIDTH_PAD: tl.constexpr, BS: tl.constexpr, WINDOW: tl.constexpr,
+        POOL_NEAR_LEN: tl.constexpr, SINK_POOL_LO: tl.constexpr,
+        HKV: tl.constexpr, B: tl.constexpr,
     ):
         row = tl.program_id(0)
         if skip_far:
@@ -1059,8 +1172,23 @@ if _has_triton():
         else:
             _topk_indices_body(
                 FAR_TOPK, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
+        near_start, compact = _l1_near_compact_bounds(
+            LENGTHS, row, KT=KT, K=K_N, BS=BS, WINDOW=WINDOW,
+            POOL_NEAR_LEN=POOL_NEAR_LEN, SINK_POOL_LO=SINK_POOL_LO,
+            NEAR_WIDTH=NEAR_WIDTH, HKV=HKV, B=B)
         if skip_near:
             _l1_skipped_topk_body(I_N, row, K=K_N, K_PAD=K_N_PAD)
+        elif NEAR_COMPACT and compact:
+            if TILED:
+                _l1_packed_topk_decode_body(
+                    NEAR_TOPK, I_N, row, NTILES * K_N_PAD,
+                    KT=KT, K=K_N, K_PAD=K_N_PAD)
+            else:
+                _l1_near_compact_topk_body(
+                    NEAR_TOPK, I_N, row, near_start,
+                    KT=KT, K=K_N, K_PAD=K_N_PAD,
+                    NEAR_WIDTH=NEAR_WIDTH, NEAR_WIDTH_PAD=NEAR_WIDTH_PAD,
+                    LOG2_K=LOG2_N)
         elif TILED:
             _topk_indices_merge_body(
                 NEAR_TOPK, I_N, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
@@ -1079,6 +1207,9 @@ if _has_triton():
         K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
         TILED: tl.constexpr, NTILES: tl.constexpr, NTILES_PAD: tl.constexpr,
         LOG2_F: tl.constexpr, LOG2_N: tl.constexpr,
+        NEAR_COMPACT: tl.constexpr, NEAR_WIDTH: tl.constexpr,
+        NEAR_WIDTH_PAD: tl.constexpr, WINDOW: tl.constexpr,
+        POOL_NEAR_LEN: tl.constexpr,
         R: tl.constexpr, HEAD: tl.constexpr, TAIL: tl.constexpr,
         SINK: tl.constexpr, SWA: tl.constexpr, CAP: tl.constexpr,
         SINK_POOL_LO: tl.constexpr, BS: tl.constexpr, PAGE: tl.constexpr,
@@ -1092,11 +1223,15 @@ if _has_triton():
             SKIP_FAR, SKIP_NEAR, VALID_REQ, row,
             HKV=HKV, B=B, MAX_REQ=MAX_REQ, LAYER_OFFSET=LAYER_OFFSET)
         _l1_candidate_topk_body(
-            FAR_TOPK, NEAR_TOPK, I_F, I_N, skip_far, skip_near,
+            FAR_TOPK, NEAR_TOPK, I_F, I_N, LENGTHS, skip_far, skip_near,
             KT=KT, KT_PAD=KT_PAD, K_F=K_F, K_N=K_N,
             K_F_PAD=K_F_PAD, K_N_PAD=K_N_PAD, TILED=TILED,
             NTILES=NTILES, NTILES_PAD=NTILES_PAD,
-            LOG2_F=LOG2_F, LOG2_N=LOG2_N)
+            LOG2_F=LOG2_F, LOG2_N=LOG2_N,
+            NEAR_COMPACT=NEAR_COMPACT, NEAR_WIDTH=NEAR_WIDTH,
+            NEAR_WIDTH_PAD=NEAR_WIDTH_PAD, BS=BS, WINDOW=WINDOW,
+            POOL_NEAR_LEN=POOL_NEAR_LEN, SINK_POOL_LO=SINK_POOL_LO,
+            HKV=HKV, B=B)
         tl.debug_barrier()
         _candidate_pack_batched_kernel(
             I_F, I_N, FAR_SCORES, NEAR_SCORES, LENGTHS,
@@ -1117,6 +1252,9 @@ if _has_triton():
         K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
         TILED: tl.constexpr, NTILES: tl.constexpr, NTILES_PAD: tl.constexpr,
         LOG2_F: tl.constexpr, LOG2_N: tl.constexpr,
+        NEAR_COMPACT: tl.constexpr, NEAR_WIDTH: tl.constexpr,
+        NEAR_WIDTH_PAD: tl.constexpr, WINDOW: tl.constexpr,
+        POOL_NEAR_LEN: tl.constexpr,
         R: tl.constexpr, HEAD: tl.constexpr, TAIL: tl.constexpr,
         SINK: tl.constexpr, SWA: tl.constexpr, CAP: tl.constexpr,
         SINK_POOL_LO: tl.constexpr, BS: tl.constexpr, PAGE: tl.constexpr,
@@ -1130,11 +1268,15 @@ if _has_triton():
             SKIP_FAR, SKIP_NEAR, VALID_REQ, row,
             HKV=HKV, B=B, MAX_REQ=MAX_REQ, LAYER_OFFSET=LAYER_OFFSET)
         _l1_candidate_topk_body(
-            FAR_SCORES, NEAR_SCORES, I_F, I_N, skip_far, skip_near,
+            FAR_SCORES, NEAR_SCORES, I_F, I_N, LENGTHS, skip_far, skip_near,
             KT=KT, KT_PAD=KT_PAD, K_F=K_F, K_N=K_N,
             K_F_PAD=K_F_PAD, K_N_PAD=K_N_PAD, TILED=TILED,
             NTILES=NTILES, NTILES_PAD=NTILES_PAD,
-            LOG2_F=LOG2_F, LOG2_N=LOG2_N)
+            LOG2_F=LOG2_F, LOG2_N=LOG2_N,
+            NEAR_COMPACT=NEAR_COMPACT, NEAR_WIDTH=NEAR_WIDTH,
+            NEAR_WIDTH_PAD=NEAR_WIDTH_PAD, BS=BS, WINDOW=WINDOW,
+            POOL_NEAR_LEN=POOL_NEAR_LEN, SINK_POOL_LO=SINK_POOL_LO,
+            HKV=HKV, B=B)
 
         m = row // HKV
         h = row % HKV
@@ -1496,6 +1638,14 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
         # Graph/parallel_expand 路径通过 capture 消除 launch 成本，再启用 tiled。
         tiled = kt > 512 and parallel_expand
         ntiles = triton.cdiv(kt, 512) if tiled else 1
+        pool_near_len = max(bs, int(indexer.nt_near_len))
+        # near 页数只由固定 near 配置决定；额外两项覆盖非对齐 SWA 边界，
+        # 运行时仍检查完整覆盖，不足则回退原整行 Top-K。
+        near_width = triton.cdiv(pool_near_len, bs) + 2
+        near_common = dict(
+            NEAR_COMPACT=k_n > 0, NEAR_WIDTH=near_width,
+            NEAR_WIDTH_PAD=triton.next_power_of_2(near_width),
+            WINDOW=cache.geometry.window, POOL_NEAR_LEN=pool_near_len)
         if tiled:
             far_topk = _workspace_empty(
                 workspace, 'l1_far_topk_partial',
@@ -1507,9 +1657,12 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
                          _l1_topk_partial_kernel, (m * hkv, ntiles),
                 far_scored, near_scored, far_topk, near_topk,
                 cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
+                lengths_t,
                 KT=kt, TILE=512, NTILES=ntiles,
-                K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
-                HKV=hkv, B=b, MAX_REQ=cache.max_requests,
+                K_F_PAD=k_f_pad, K_N=k_n, K_N_PAD=k_n_pad,
+                LOG2_N=k_n_pad.bit_length() - 1,
+                BS=bs, SINK_POOL_LO=int(indexer._sink_pool_lo_blk),
+                **near_common, HKV=hkv, B=b, MAX_REQ=cache.max_requests,
                 LAYER_OFFSET=layer_offset, num_warps=8)
         else:
             far_topk, near_topk = far_scored, near_scored
@@ -1520,6 +1673,7 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
             NTILES_PAD=triton.next_power_of_2(ntiles),
             LOG2_F=k_f_pad.bit_length() - 1,
             LOG2_N=k_n_pad.bit_length() - 1,
+            **near_common,
             R=r, HEAD=head, TAIL=tail, SINK=sink, SWA=swa, CAP=capacity,
             SINK_POOL_LO=int(indexer._sink_pool_lo_blk), BS=bs,
             PAGE=cache.geometry.page, NEAR_LEN=cache.geometry.near,

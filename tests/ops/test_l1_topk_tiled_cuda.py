@@ -16,6 +16,55 @@ from sparse_attn.indexer.nfa_layer_batch_selector import (
 )
 
 
+def _near_geometry(compact, bs, window, pool_near_len):
+    width = triton.cdiv(pool_near_len, bs) + 2 if compact else 1
+    return dict(
+        NEAR_COMPACT=compact, NEAR_WIDTH=width,
+        NEAR_WIDTH_PAD=triton.next_power_of_2(width),
+        WINDOW=window, POOL_NEAR_LEN=pool_near_len)
+
+
+def _production_near_scores(rows, hkv, batch, lengths, kt, bs, sink, swa,
+                            page, near_len, pool_near_len, sink_pool_lo):
+    """按 L1 生产掩码生成 near 分数，池外严格为 -inf。"""
+    scores = (torch.randint(-32, 33, (rows, kt), device="cuda")
+              .to(torch.bfloat16) / 8)
+    near = torch.full_like(scores, float("-inf"))
+    pool = torch.zeros((rows, kt), dtype=torch.bool, device="cuda")
+    offs = torch.arange(kt, device="cuda")
+    block_lo = offs * bs
+    block_hi = block_lo + bs
+    lengths_cpu = lengths.cpu().tolist()
+    for row in range(rows):
+        req = (row // hkv) % batch
+        length = lengths_cpu[req]
+        sink_hi = min(sink, length)
+        swa_hi = max(sink_hi, length - swa)
+        far_blk = (length - swa - near_len) // page
+        far_hi = min(swa_hi, max(sink_hi, far_blk * page))
+        near_start = max((length - swa - pool_near_len) // bs, sink_pool_lo)
+        kt_eff = (length + bs - 1) // bs
+        near_end = max(near_start, kt_eff - max(1, swa // bs))
+        swa_lo_tok = max(length - swa, 0)
+        bypass_blk = swa_lo_tok // bs
+        bypass = (swa_lo_tok % bs != 0) and (bypass_blk >= sink_pool_lo)
+        if sink % bs:
+            bypass = bypass and bypass_blk != sink_pool_lo
+        has_sink = block_lo < sink_hi
+        has_far = (block_hi > sink_hi) & (block_lo < far_hi)
+        has_near = (block_hi > far_hi) & (block_lo < swa_hi)
+        has_swa = (block_hi > swa_hi) & (block_lo < length)
+        block_valid = (block_lo < length) & (
+            has_sink | has_far | has_near | has_swa)
+        mask = ((offs >= near_start) & (offs < near_end) & block_valid)
+        mask &= ~((offs == bypass_blk) & bypass)
+        if sink % bs:
+            mask &= offs != sink_pool_lo
+        pool[row] = mask
+        near[row] = torch.where(mask, scores[row], near[row])
+    return near, pool
+
+
 @triton.jit
 def _reference_topk(
     FAR, NEAR, I_F, I_N,
@@ -50,6 +99,9 @@ def _reference_candidate(
     KT: tl.constexpr, KT_PAD: tl.constexpr,
     K_F: tl.constexpr, K_N: tl.constexpr,
     K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
+    NEAR_COMPACT: tl.constexpr, NEAR_WIDTH: tl.constexpr,
+    NEAR_WIDTH_PAD: tl.constexpr, WINDOW: tl.constexpr,
+    POOL_NEAR_LEN: tl.constexpr,
     R: tl.constexpr, HEAD: tl.constexpr, TAIL: tl.constexpr,
     SINK: tl.constexpr, SWA: tl.constexpr, CAP: tl.constexpr,
     SINK_POOL_LO: tl.constexpr, BS: tl.constexpr, PAGE: tl.constexpr,
@@ -116,8 +168,12 @@ class L1TopKTiledTest(unittest.TestCase):
                 _l1_topk_partial_kernel[(rows, ntiles)](
                     far, near, partial_f, partial_n,
                     skip_far, skip_near, valid_req,
+                    torch.full((1,), kt * 64, dtype=torch.int64, device="cuda"),
                     KT=kt, TILE=512, NTILES=ntiles,
-                    K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+                    K_F_PAD=k_f_pad, K_N=k_n, K_N_PAD=k_n_pad,
+                    LOG2_N=k_n_pad.bit_length() - 1,
+                    BS=64, SINK_POOL_LO=0,
+                    **_near_geometry(False, 64, 128, 2048),
                     HKV=rows, B=1, MAX_REQ=1, LAYER_OFFSET=0, num_warps=8)
                 _merge_topk[(rows,)](
                     partial_f, partial_n, out_f, out_n,
@@ -170,6 +226,7 @@ class L1TopKTiledTest(unittest.TestCase):
         common = dict(
             KT=kt, KT_PAD=triton.next_power_of_2(kt),
             K_F=k_f, K_N=k_n, K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+            **_near_geometry(False, bs, swa, 2048),
             R=r, HEAD=sink, TAIL=swa, SINK=sink, SWA=swa, CAP=capacity,
             SINK_POOL_LO=0, BS=bs, PAGE=64, NEAR_LEN=4096, K2=1024,
             HKV=hkv, B=1, MAX_REQ=1, LAYER_OFFSET=0,
@@ -188,9 +245,11 @@ class L1TopKTiledTest(unittest.TestCase):
             (rows, ntiles, k_n_pad), dtype=torch.int32, device="cuda")
         _l1_topk_partial_kernel[(rows, ntiles)](
             far, near, partial_f, partial_n,
-            skip_far, skip_near, valid_req,
+            skip_far, skip_near, valid_req, lengths,
             KT=kt, TILE=512, NTILES=ntiles,
-            K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+            K_F_PAD=k_f_pad, K_N=k_n, K_N_PAD=k_n_pad,
+            LOG2_N=k_n_pad.bit_length() - 1,
+            BS=bs, SINK_POOL_LO=0, **_near_geometry(False, bs, swa, 2048),
             HKV=hkv, B=1, MAX_REQ=1, LAYER_OFFSET=0, num_warps=8)
         _topk_candidate_batched_kernel[(rows,)](
             partial_f, partial_n, far, near,
@@ -205,19 +264,48 @@ class L1TopKTiledTest(unittest.TestCase):
 
     @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
     def test_skip_states_preserve_fused_and_parallel_outputs(self):
-        rows, hkv, batch, layers, kt = 16, 2, 4, 2, 513
-        k_f, k_n, bs = 16, 8, 64
+        rows, hkv, batch, layers, kt = 16, 2, 4, 2, 2055
+        k_f, k_n, bs = 96, 32, 64
         sink, swa = 4, 128
         capacity = kt * bs
         m = layers * batch
         torch.manual_seed(20261107)
         far = torch.randn((rows, kt), device="cuda", dtype=torch.bfloat16)
-        near = torch.randn((rows, kt), device="cuda", dtype=torch.bfloat16)
-        far[0, 0] = float("nan")
-        near[1, 1] = float("-inf")
         lengths = torch.tensor(
             [capacity, capacity - 65, 1003, 1280],
             dtype=torch.int64, device="cuda")
+        near, near_pool = _production_near_scores(
+            rows, hkv, batch, lengths, kt, bs, sink, swa,
+            64, 4096, 2048, 0)
+        far[0, 0] = float("nan")
+        negative_nan = torch.tensor(
+            [-63], dtype=torch.int16, device="cuda").view(torch.bfloat16)[0]
+        for row in range(rows):
+            valid = torch.nonzero(near_pool[row]).flatten()
+            if valid.numel() == 0:
+                continue
+            case = row % 8
+            if case == 0:
+                near[row, valid[0]] = float("nan")
+            elif case == 1:
+                near[row, valid[0]] = negative_nan
+            elif case == 2:
+                near[row, valid[0]] = float("inf")
+            elif case == 3:
+                near[row, valid[0]] = float("-inf")
+            elif case == 4:
+                near[row, valid[0]] = 0.0
+            elif case == 5:
+                near[row, valid[0]] = -0.0
+            elif case == 6:
+                near[row].fill_(float("-inf"))
+            else:
+                near[row] = torch.where(
+                    near_pool[row], torch.full_like(near[row], float("-inf")),
+                    near[row])
+                near[row, valid[-1]] = 1.0
+                if valid.numel() > 1:
+                    near[row, valid[0]] = negative_nan
         valid_req = torch.tensor([5, 1, 4, 0], dtype=torch.int64, device="cuda")
         layer_offset = 2
         skip_far = torch.zeros(
@@ -237,7 +325,7 @@ class L1TopKTiledTest(unittest.TestCase):
                 far[row] = float("-inf")
             if bool(skip_near[layer + layer_offset, req_id]):
                 near[row] = float("-inf")
-        k_f_pad, k_n_pad = 16, 8
+        k_f_pad, k_n_pad = 128, 32
         ntiles = triton.cdiv(kt, 512)
         r = (k_f + k_n + 2) * bs
         width = r + sink + swa
@@ -259,6 +347,7 @@ class L1TopKTiledTest(unittest.TestCase):
         common = dict(
             KT=kt, KT_PAD=triton.next_power_of_2(kt),
             K_F=k_f, K_N=k_n, K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+            **_near_geometry(True, bs, swa, 2048),
             R=r, HEAD=sink, TAIL=swa, SINK=sink, SWA=swa, CAP=capacity,
             SINK_POOL_LO=0, BS=bs, PAGE=64, NEAR_LEN=4096, K2=1024,
             HKV=hkv, B=batch, MAX_REQ=6, LAYER_OFFSET=layer_offset, num_warps=8)
@@ -276,7 +365,7 @@ class L1TopKTiledTest(unittest.TestCase):
             eager["lower"], eager["upper"], eager["quota"],
             eager["owners"], eager["generations"],
             TILED=False, NTILES=1, NTILES_PAD=1,
-            LOG2_F=4, LOG2_N=3, **common)
+            LOG2_F=7, LOG2_N=5, **common)
 
         partial_f = torch.empty(
             (rows, ntiles, k_f_pad), dtype=torch.int32, device="cuda")
@@ -284,8 +373,11 @@ class L1TopKTiledTest(unittest.TestCase):
             (rows, ntiles, k_n_pad), dtype=torch.int32, device="cuda")
         _l1_topk_partial_kernel[(rows, ntiles)](
             far, near, partial_f, partial_n, skip_far, skip_near, valid_req,
+            lengths,
             KT=kt, TILE=512, NTILES=ntiles,
-            K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+            K_F_PAD=k_f_pad, K_N=k_n, K_N_PAD=k_n_pad,
+            LOG2_N=k_n_pad.bit_length() - 1,
+            BS=bs, SINK_POOL_LO=0, **_near_geometry(True, bs, swa, 2048),
             HKV=hkv, B=batch, MAX_REQ=6, LAYER_OFFSET=layer_offset, num_warps=8)
         tiled = allocate()
         _topk_candidate_batched_kernel[(rows,)](
@@ -294,16 +386,16 @@ class L1TopKTiledTest(unittest.TestCase):
             skip_far, skip_near, valid_req, tiled["out"], tiled["valid"],
             tiled["lower"], tiled["upper"], tiled["quota"],
             tiled["owners"], tiled["generations"],
-            TILED=True, NTILES=ntiles, NTILES_PAD=2,
-            LOG2_F=4, LOG2_N=3, **common)
+            TILED=True, NTILES=ntiles, NTILES_PAD=triton.next_power_of_2(ntiles),
+            LOG2_F=7, LOG2_N=5, **common)
         parallel = allocate()
         _topk_candidate_prepare_kernel[(rows,)](
             partial_f, partial_n, parallel["i_f"], parallel["i_n"], lengths,
             skip_far, skip_near, valid_req,
             parallel["lower"], parallel["upper"], parallel["quota"],
             parallel["owners"], parallel["generations"],
-            TILED=True, NTILES=ntiles, NTILES_PAD=2,
-            LOG2_F=4, LOG2_N=3, **common)
+            TILED=True, NTILES=ntiles, NTILES_PAD=triton.next_power_of_2(ntiles),
+            LOG2_F=7, LOG2_N=5, **common)
         expand_common = {
             k: v for k, v in common.items()
             if k in ("K_F", "K_N", "KT", "R", "HEAD", "TAIL", "SINK",
@@ -362,6 +454,7 @@ class L1TopKTiledTest(unittest.TestCase):
                     common = dict(
                         KT=kt, KT_PAD=kt, K_F=k_f, K_N=k_n,
                         K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+                        **_near_geometry(False, bs, 0, 1),
                         R=r, HEAD=0, TAIL=0, SINK=0, SWA=0, CAP=capacity,
                         SINK_POOL_LO=0, BS=bs, PAGE=64, NEAR_LEN=4096, K2=1024,
                         HKV=hkv, B=1, MAX_REQ=1, LAYER_OFFSET=1, num_warps=8)
@@ -378,9 +471,12 @@ class L1TopKTiledTest(unittest.TestCase):
                             (rows, 1, k_n_pad), dtype=torch.int32, device="cuda")
                         _l1_topk_partial_kernel[(rows, 1)](
                             far, near, far_topk, near_topk,
-                            skip_far, skip_near, valid_req,
+                            skip_far, skip_near, valid_req, lengths,
                             KT=kt, TILE=512, NTILES=1,
-                            K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+                            K_F_PAD=k_f_pad, K_N=k_n, K_N_PAD=k_n_pad,
+                            LOG2_N=k_n_pad.bit_length() - 1,
+                            BS=bs, SINK_POOL_LO=0,
+                            **_near_geometry(False, bs, 0, 1),
                             HKV=hkv, B=1, MAX_REQ=1, LAYER_OFFSET=1, num_warps=8)
                     else:
                         far_topk, near_topk = far, near
@@ -452,6 +548,7 @@ class L1TopKTiledTest(unittest.TestCase):
                     common = dict(
                         KT=kt, KT_PAD=triton.next_power_of_2(kt),
                         K_F=k_f, K_N=k_n, K_F_PAD=16, K_N_PAD=8,
+                        **_near_geometry(False, bs, 128, 64),
                         R=0, HEAD=1, TAIL=0, SINK=1, SWA=128, CAP=capacity,
                         SINK_POOL_LO=0, BS=bs, PAGE=64, NEAR_LEN=4096, K2=1024,
                         HKV=hkv, B=1, MAX_REQ=1, LAYER_OFFSET=0, num_warps=8)
@@ -470,9 +567,11 @@ class L1TopKTiledTest(unittest.TestCase):
                             far_arg, near_arg,
                             tiny_partial if sf else partial_f,
                             tiny_partial if sn else partial_n,
-                            skip_far, skip_near, valid_req,
+                            skip_far, skip_near, valid_req, lengths,
                             KT=kt, TILE=512, NTILES=ntiles,
-                            K_F_PAD=16, K_N_PAD=8,
+                            K_F_PAD=16, K_N=k_n, K_N_PAD=8,
+                            LOG2_N=3, BS=bs, SINK_POOL_LO=0,
+                            **_near_geometry(False, bs, 128, 64),
                             HKV=hkv, B=1, MAX_REQ=1, LAYER_OFFSET=0, num_warps=8)
                         far_topk = tiny_partial if sf else partial_f
                         near_topk = tiny_partial if sn else partial_n

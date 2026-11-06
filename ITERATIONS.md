@@ -69,3 +69,13 @@
 - 静态成本：tiled partial workspace 为 `m*HKV*NTILES*(K_F_PAD+K_N_PAD)*4` bytes；B1、HKV=8、K1=128、near=32 时，64K 为 15360 bytes、128K 为 25600 bytes，B4 分别为 61440/102400 bytes，16K 不启用 tiled。Graph 每层较原 parallel prepare+expand 多一次 partial launch，eager launch 数不变；均为形状推导，不是独立显存实测。
 - 口径：仅报告 L1/L2/main Attention 纯 GPU 算子，不包含其他模型工作，不是完整 TPOT verdict；L2 与 Attention 的微小变化不作收益宣称。
 - 下一步：非 skip near Top-K 仍扫描全 KT；改为只对动态 near 页区间做固定宽度精确 Top-K，并保留全局 `-inf`/NaN/tie 补洞语义，随后重做身份、CUDA 对拍和完整 decode ABBA。
+
+## Iter 6 — 非 skip near 固定区间 Top-K
+
+- 日期：2026-11-07。
+- 基线：`333af802`（Iter 5 正式算子结果）。
+- 修改：从 `LENGTHS` 计算每行动态 near 页区间，仅对该固定配置宽度区间做 Top-K；再与原 near 池外的前 `K` 个全 `-inf` 位置做精确二路归并。全局 packed index、NaN/±Inf/signed zero、同分逆序索引和补洞规则不变。`near_start<K` 或固定区间未完整覆盖 near 池时逐行回退原整行/tiled 路径。eager 直接输出索引；Graph 仅在 tile 0 物化 near 最终 packed run，其余 near tiles 不再排序，far 路径不变。
+- 正确性：pc40 GPU1，`tests/ops/test_l1_topk_tiled_cuda.py -v` 5/5 通过。四态 gate 用例提升为 KT=2055、K1=128、near=32 的 128K 生产形状，覆盖非连续 request slot、非零 layer offset、长行紧缩、短行回退、ties、正/负 NaN、±Inf、signed zero、全 `-inf` 补洞，以及 eager、tiled、prepare+生产 expansion 全输出逐位一致。通用非生产掩码用例显式保留原路径，避免以池外随机分数违反紧凑算法前提。
+- CPU 回归：strict/cache 18 passed、5 subtests passed；扩展 selector/strict 套件 99 passed、5 subtests passed。
+- 性能：本轮尚未测量，不宣称加速。
+- 下一步：独立静态复核、B1/B4 eager/Graph 真实 token identity、128K 纯算子 ABBA 与 32K/64K/128K 完整 decode ABBA。
