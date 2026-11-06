@@ -1,0 +1,139 @@
+{
+  "schema": "nfa-pure-kernel-stages-v2",
+  "repo_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+  "repo_diff_sha256": "557fb3693b12965c586e85fca3be8c9abb1e2ad8f097cfae553c8bc6f4da0bd4",
+  "measure_script_sha256": "ab48a621a7796f5d6ddbbd26f45b9aa87e945be62170ece39674106ae9753c4b",
+  "environment": {
+    "python": "3.11.12",
+    "torch": "2.8.0+cu128",
+    "cuda": "12.8",
+    "transformers": "4.56.2",
+    "triton": "3.4.0",
+    "gpu": "NVIDIA H20-3e"
+  },
+  "method": "flashinfer",
+  "execution": "graph",
+  "batch_size": 1,
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "input": {
+    "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+    "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 523812,
+    "provenance": "repeated-needle-body-extension",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "input_provenance": "repeated-needle-body-extension",
+  "warmup_steps": 3,
+  "repeat": 5,
+  "gate_epsilon": null,
+  "subspace": null,
+  "stage_definitions": {
+    "l1": "page stats/Q prepare + L1 scores + L1 Top-K/candidate pack",
+    "l2": "fine Q/scores + filtered Top-K + final union/physical mapping",
+    "main_attention": "gather_attend kernels only",
+    "total": "L1 + L2 + main Attention; no host/other model kernels"
+  },
+  "metadata": {
+    "profile_start_kv_tokens": 523815,
+    "flashinfer_version": "0.6.14",
+    "dense_layers": 36,
+    "kv_layout": "HND",
+    "prefill_attention": "sdpa-flash"
+  },
+  "summary": {
+    "flashinfer_dense_ms": {
+      "values_ms": [
+        42.77744499999999,
+        42.505050000000004,
+        42.51770100000001,
+        42.550523999999996,
+        42.63460900000002
+      ],
+      "median_ms": 42.550523999999996,
+      "min_ms": 42.505050000000004,
+      "max_ms": 42.77744499999999
+    }
+  },
+  "repeats": [
+    {
+      "stages": {
+        "flashinfer_dense_ms": 42.77744499999999
+      },
+      "kernels": {
+        "void flashinfer::MergeStatesLargeNumIndexSetsKernel<8u, 16u, 8u, 4u, __nv_bfloat16, __nv_bfloat16>(__nv_bfloat16*, float*, __nv_bfloat16*, float*, unsigned int, unsigned int)": {
+          "calls": 36,
+          "device_ms": 0.1375339999999851
+        },
+        "void flashinfer::SingleDecodeWithKVCacheKernel<(flashinfer::PosEncodingMode)0, 2u, 1u, 8u, 16u, 4u, 2u, flashinfer::DefaultAttention<false, false, false, false>, Params>(Params)": {
+          "calls": 36,
+          "device_ms": 42.639911000000005
+        }
+      }
+    },
+    {
+      "stages": {
+        "flashinfer_dense_ms": 42.505050000000004
+      },
+      "kernels": {
+        "void flashinfer::MergeStatesLargeNumIndexSetsKernel<8u, 16u, 8u, 4u, __nv_bfloat16, __nv_bfloat16>(__nv_bfloat16*, float*, __nv_bfloat16*, float*, unsigned int, unsigned int)": {
+          "calls": 36,
+          "device_ms": 0.13747299999999357
+        },
+        "void flashinfer::SingleDecodeWithKVCacheKernel<(flashinfer::PosEncodingMode)0, 2u, 1u, 8u, 16u, 4u, 2u, flashinfer::DefaultAttention<false, false, false, false>, Params>(Params)": {
+          "calls": 36,
+          "device_ms": 42.36757700000001
+        }
+      }
+    },
+    {
+      "stages": {
+        "flashinfer_dense_ms": 42.51770100000001
+      },
+      "kernels": {
+        "void flashinfer::MergeStatesLargeNumIndexSetsKernel<8u, 16u, 8u, 4u, __nv_bfloat16, __nv_bfloat16>(__nv_bfloat16*, float*, __nv_bfloat16*, float*, unsigned int, unsigned int)": {
+          "calls": 36,
+          "device_ms": 0.13772499999999535
+        },
+        "void flashinfer::SingleDecodeWithKVCacheKernel<(flashinfer::PosEncodingMode)0, 2u, 1u, 8u, 16u, 4u, 2u, flashinfer::DefaultAttention<false, false, false, false>, Params>(Params)": {
+          "calls": 36,
+          "device_ms": 42.37997600000001
+        }
+      }
+    },
+    {
+      "stages": {
+        "flashinfer_dense_ms": 42.550523999999996
+      },
+      "kernels": {
+        "void flashinfer::MergeStatesLargeNumIndexSetsKernel<8u, 16u, 8u, 4u, __nv_bfloat16, __nv_bfloat16>(__nv_bfloat16*, float*, __nv_bfloat16*, float*, unsigned int, unsigned int)": {
+          "calls": 36,
+          "device_ms": 0.139679999999988
+        },
+        "void flashinfer::SingleDecodeWithKVCacheKernel<(flashinfer::PosEncodingMode)0, 2u, 1u, 8u, 16u, 4u, 2u, flashinfer::DefaultAttention<false, false, false, false>, Params>(Params)": {
+          "calls": 36,
+          "device_ms": 42.410844000000004
+        }
+      }
+    },
+    {
+      "stages": {
+        "flashinfer_dense_ms": 42.63460900000002
+      },
+      "kernels": {
+        "void flashinfer::MergeStatesLargeNumIndexSetsKernel<8u, 16u, 8u, 4u, __nv_bfloat16, __nv_bfloat16>(__nv_bfloat16*, float*, __nv_bfloat16*, float*, unsigned int, unsigned int)": {
+          "calls": 36,
+          "device_ms": 0.13689899999999808
+        },
+        "void flashinfer::SingleDecodeWithKVCacheKernel<(flashinfer::PosEncodingMode)0, 2u, 1u, 8u, 16u, 4u, 2u, flashinfer::DefaultAttention<false, false, false, false>, Params>(Params)": {
+          "calls": 36,
+          "device_ms": 42.49771000000002
+        }
+      }
+    }
+  ],
+  "gpu_hygiene": "clean",
+  "abba": "b2",
+  "attempt": 1
+}

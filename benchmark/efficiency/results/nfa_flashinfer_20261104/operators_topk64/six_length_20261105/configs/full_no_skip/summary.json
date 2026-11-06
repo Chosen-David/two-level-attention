@@ -1,0 +1,428 @@
+{
+  "schema": "nfa-pure-kernel-abba-summary-v1",
+  "task": "niah_multikey_1",
+  "sample_index": 0,
+  "context_length": 524288,
+  "actual_prompt_tokens": 523812,
+  "batch_size": 1,
+  "config": {
+    "name": "full_no_skip",
+    "subspace": "full",
+    "gate_epsilon": 0
+  },
+  "input_provenance": "repeated-needle-body-extension",
+  "warmup_steps": 3,
+  "repeat": 5,
+  "aggregation": "within each repeat sum L1+L2+main Attention, then median; ABBA aggregate is mean of the two arm medians",
+  "quality_scope": "pure CUDA kernel timing only; not end-to-end TPOT or task accuracy",
+  "gpu_hygiene": "clean",
+  "machine": "pc31",
+  "results": {
+    "graph": {
+      "arms": {
+        "a1": {
+          "method": "nfa",
+          "path": "/tmp/nfa-pc31-full-no-skip-512-results/niah_multikey_1_s0_524288_graph_a1.json",
+          "sha256": "6eafdb4d1a35ba2bacdc9cdc51af281ad2023715f625eb346fbf277c566ad112",
+          "repo_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "repo_diff_sha256": "557fb3693b12965c586e85fca3be8c9abb1e2ad8f097cfae553c8bc6f4da0bd4",
+          "measure_script_sha256": "ab48a621a7796f5d6ddbbd26f45b9aa87e945be62170ece39674106ae9753c4b",
+          "environment": {
+            "python": "3.11.12",
+            "torch": "2.8.0+cu128",
+            "cuda": "12.8",
+            "transformers": "4.56.2",
+            "triton": "3.4.0",
+            "gpu": "NVIDIA H20-3e"
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+            "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 523812,
+            "provenance": "repeated-needle-body-extension",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "total_values_ms": [
+            30.966933999999956,
+            30.902861999999963,
+            30.908911000000053,
+            30.97263399999998,
+            30.913867999999997
+          ],
+          "total_median_ms": 30.913867999999997,
+          "stage_values_ms": {
+            "l1_ms": [
+              11.131120999999977,
+              11.118333000000009,
+              11.126681000000051,
+              11.134577999999982,
+              11.12888800000002
+            ],
+            "l2_ms": [
+              18.81034200000001,
+              18.762097999999952,
+              18.756341000000013,
+              18.809800999999993,
+              18.760207999999977
+            ],
+            "main_attention_ms": [
+              1.0254709999999707,
+              1.022431000000005,
+              1.02588899999999,
+              1.0282550000000057,
+              1.024772000000003
+            ]
+          },
+          "gpu_hygiene": "clean"
+        },
+        "b1": {
+          "method": "flashinfer",
+          "path": "/tmp/nfa-pc31-full-no-skip-512-results/niah_multikey_1_s0_524288_graph_b1.json",
+          "sha256": "f120e559197085bede780ad3f7c00ca0fb6145fdba317fad94d8915367876364",
+          "repo_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "repo_diff_sha256": "557fb3693b12965c586e85fca3be8c9abb1e2ad8f097cfae553c8bc6f4da0bd4",
+          "measure_script_sha256": "ab48a621a7796f5d6ddbbd26f45b9aa87e945be62170ece39674106ae9753c4b",
+          "environment": {
+            "python": "3.11.12",
+            "torch": "2.8.0+cu128",
+            "cuda": "12.8",
+            "transformers": "4.56.2",
+            "triton": "3.4.0",
+            "gpu": "NVIDIA H20-3e"
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+            "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 523812,
+            "provenance": "repeated-needle-body-extension",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "total_values_ms": [
+            42.62546999999999,
+            42.485746,
+            42.592501999999975,
+            42.624145000000006,
+            42.50739500000003
+          ],
+          "total_median_ms": 42.592501999999975,
+          "stage_values_ms": null,
+          "gpu_hygiene": "clean"
+        },
+        "b2": {
+          "method": "flashinfer",
+          "path": "/tmp/nfa-pc31-full-no-skip-512-results/niah_multikey_1_s0_524288_graph_b2.json",
+          "sha256": "49153c828af5106366fc0ab02e8f12030d24890afb4d38da06a76e1f3b4db2c3",
+          "repo_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "repo_diff_sha256": "557fb3693b12965c586e85fca3be8c9abb1e2ad8f097cfae553c8bc6f4da0bd4",
+          "measure_script_sha256": "ab48a621a7796f5d6ddbbd26f45b9aa87e945be62170ece39674106ae9753c4b",
+          "environment": {
+            "python": "3.11.12",
+            "torch": "2.8.0+cu128",
+            "cuda": "12.8",
+            "transformers": "4.56.2",
+            "triton": "3.4.0",
+            "gpu": "NVIDIA H20-3e"
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+            "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 523812,
+            "provenance": "repeated-needle-body-extension",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "total_values_ms": [
+            42.77744499999999,
+            42.505050000000004,
+            42.51770100000001,
+            42.550523999999996,
+            42.63460900000002
+          ],
+          "total_median_ms": 42.550523999999996,
+          "stage_values_ms": null,
+          "gpu_hygiene": "clean"
+        },
+        "a2": {
+          "method": "nfa",
+          "path": "/tmp/nfa-pc31-full-no-skip-512-results/niah_multikey_1_s0_524288_graph_a2.json",
+          "sha256": "31413c849dd43b1727006bd58e059c5f3f23a8d1aeb8f40953f6b02920141316",
+          "repo_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "repo_diff_sha256": "557fb3693b12965c586e85fca3be8c9abb1e2ad8f097cfae553c8bc6f4da0bd4",
+          "measure_script_sha256": "ab48a621a7796f5d6ddbbd26f45b9aa87e945be62170ece39674106ae9753c4b",
+          "environment": {
+            "python": "3.11.12",
+            "torch": "2.8.0+cu128",
+            "cuda": "12.8",
+            "transformers": "4.56.2",
+            "triton": "3.4.0",
+            "gpu": "NVIDIA H20-3e"
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+            "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 523812,
+            "provenance": "repeated-needle-body-extension",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "total_values_ms": [
+            30.96378200000005,
+            30.921468999999988,
+            30.950416000000025,
+            30.985144000000066,
+            30.918002999999985
+          ],
+          "total_median_ms": 30.950416000000025,
+          "stage_values_ms": {
+            "l1_ms": [
+              11.123766000000014,
+              11.124181999999978,
+              11.133469000000009,
+              11.147989000000015,
+              11.124400000000017
+            ],
+            "l2_ms": [
+              18.81547500000003,
+              18.776163999999998,
+              18.794967,
+              18.813795000000038,
+              18.77539399999997
+            ],
+            "main_attention_ms": [
+              1.024541000000005,
+              1.021123000000009,
+              1.021980000000016,
+              1.0233600000000158,
+              1.0182089999999973
+            ]
+          },
+          "gpu_hygiene": "clean"
+        }
+      },
+      "abba_pairs": [
+        {
+          "nfa": "a1",
+          "flashinfer": "b1",
+          "speedup": 1.3777797718486726
+        },
+        {
+          "nfa": "a2",
+          "flashinfer": "b2",
+          "speedup": 1.374796513235879
+        }
+      ],
+      "nfa_abba_mean_of_arm_medians_ms": 30.932142000000013,
+      "flashinfer_abba_mean_of_arm_medians_ms": 42.57151299999998,
+      "flashinfer_over_nfa_speedup": 1.376287261321895
+    },
+    "eager": {
+      "arms": {
+        "a1": {
+          "method": "nfa",
+          "path": "/tmp/nfa-pc31-full-no-skip-512-results/niah_multikey_1_s0_524288_eager_a1.json",
+          "sha256": "c65ac9ca2b69d52b2a01a5908d080724dc463e07cfa610906b96e33a81bc9a0d",
+          "repo_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "repo_diff_sha256": "557fb3693b12965c586e85fca3be8c9abb1e2ad8f097cfae553c8bc6f4da0bd4",
+          "measure_script_sha256": "ab48a621a7796f5d6ddbbd26f45b9aa87e945be62170ece39674106ae9753c4b",
+          "environment": {
+            "python": "3.11.12",
+            "torch": "2.8.0+cu128",
+            "cuda": "12.8",
+            "transformers": "4.56.2",
+            "triton": "3.4.0",
+            "gpu": "NVIDIA H20-3e"
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+            "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 523812,
+            "provenance": "repeated-needle-body-extension",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "total_values_ms": [
+            30.976148000000002,
+            30.998864000000008,
+            31.004591999999956,
+            31.020950000000028,
+            31.017152000000024
+          ],
+          "total_median_ms": 31.004591999999956,
+          "stage_values_ms": {
+            "l1_ms": [
+              11.346806000000024,
+              11.356688999999976,
+              11.358325999999963,
+              11.370427000000033,
+              11.361655000000034
+            ],
+            "l2_ms": [
+              18.596762999999974,
+              18.60918200000003,
+              18.614999999999988,
+              18.616118999999998,
+              18.624295000000007
+            ],
+            "main_attention_ms": [
+              1.032579000000004,
+              1.0329930000000012,
+              1.0312660000000051,
+              1.0344039999999963,
+              1.0312019999999844
+            ]
+          },
+          "gpu_hygiene": "clean"
+        },
+        "b1": {
+          "method": "flashinfer",
+          "path": "/tmp/nfa-pc31-full-no-skip-512-results/niah_multikey_1_s0_524288_eager_b1.json",
+          "sha256": "306ea1d5f11923ce397523e4b22565c51f04edb1f59285ca6c850ffd5b73edc8",
+          "repo_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "repo_diff_sha256": "557fb3693b12965c586e85fca3be8c9abb1e2ad8f097cfae553c8bc6f4da0bd4",
+          "measure_script_sha256": "ab48a621a7796f5d6ddbbd26f45b9aa87e945be62170ece39674106ae9753c4b",
+          "environment": {
+            "python": "3.11.12",
+            "torch": "2.8.0+cu128",
+            "cuda": "12.8",
+            "transformers": "4.56.2",
+            "triton": "3.4.0",
+            "gpu": "NVIDIA H20-3e"
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+            "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 523812,
+            "provenance": "repeated-needle-body-extension",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "total_values_ms": [
+            42.86362800000001,
+            42.50369900000001,
+            42.558274,
+            42.54741199999998,
+            42.502323000000004
+          ],
+          "total_median_ms": 42.54741199999998,
+          "stage_values_ms": null,
+          "gpu_hygiene": "clean"
+        },
+        "b2": {
+          "method": "flashinfer",
+          "path": "/tmp/nfa-pc31-full-no-skip-512-results/niah_multikey_1_s0_524288_eager_b2.json",
+          "sha256": "a00dda375859cd48afc538f59d1feef2df0a98699675356da55e5ed48a654879",
+          "repo_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "repo_diff_sha256": "557fb3693b12965c586e85fca3be8c9abb1e2ad8f097cfae553c8bc6f4da0bd4",
+          "measure_script_sha256": "ab48a621a7796f5d6ddbbd26f45b9aa87e945be62170ece39674106ae9753c4b",
+          "environment": {
+            "python": "3.11.12",
+            "torch": "2.8.0+cu128",
+            "cuda": "12.8",
+            "transformers": "4.56.2",
+            "triton": "3.4.0",
+            "gpu": "NVIDIA H20-3e"
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+            "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 523812,
+            "provenance": "repeated-needle-body-extension",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "total_values_ms": [
+            43.015343,
+            42.50675000000003,
+            42.575111,
+            42.55443900000001,
+            42.61767000000001
+          ],
+          "total_median_ms": 42.575111,
+          "stage_values_ms": null,
+          "gpu_hygiene": "clean"
+        },
+        "a2": {
+          "method": "nfa",
+          "path": "/tmp/nfa-pc31-full-no-skip-512-results/niah_multikey_1_s0_524288_eager_a2.json",
+          "sha256": "7ee3aa4e2fbcd6ff3b19eba23220b796068d15ea49a93b9402577c8f95fe3dcc",
+          "repo_head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+          "repo_diff_sha256": "557fb3693b12965c586e85fca3be8c9abb1e2ad8f097cfae553c8bc6f4da0bd4",
+          "measure_script_sha256": "ab48a621a7796f5d6ddbbd26f45b9aa87e945be62170ece39674106ae9753c4b",
+          "environment": {
+            "python": "3.11.12",
+            "torch": "2.8.0+cu128",
+            "cuda": "12.8",
+            "transformers": "4.56.2",
+            "triton": "3.4.0",
+            "gpu": "NVIDIA H20-3e"
+          },
+          "input": {
+            "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+            "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+            "sample_index": 0,
+            "sample_id": 0,
+            "actual_prompt_tokens": 523812,
+            "provenance": "repeated-needle-body-extension",
+            "performance_input_mode": "replicate one prompt across all batch rows"
+          },
+          "total_values_ms": [
+            31.061901000000027,
+            31.000893999999963,
+            31.001764999999917,
+            31.002986999999955,
+            30.989574000000054
+          ],
+          "total_median_ms": 31.001764999999917,
+          "stage_values_ms": {
+            "l1_ms": [
+              11.364137000000047,
+              11.356102999999992,
+              11.364197999999973,
+              11.361925999999977,
+              11.359878000000046
+            ],
+            "l2_ms": [
+              18.659742999999978,
+              18.610483999999982,
+              18.60501999999995,
+              18.605925,
+              18.594587000000004
+            ],
+            "main_attention_ms": [
+              1.0380210000000014,
+              1.034306999999987,
+              1.0325469999999937,
+              1.0351359999999796,
+              1.0351090000000047
+            ]
+          },
+          "gpu_hygiene": "clean"
+        }
+      },
+      "abba_pairs": [
+        {
+          "nfa": "a1",
+          "flashinfer": "b1",
+          "speedup": 1.372293884725206
+        },
+        {
+          "nfa": "a2",
+          "flashinfer": "b2",
+          "speedup": 1.3733124872083933
+        }
+      ],
+      "nfa_abba_mean_of_arm_medians_ms": 31.003178499999937,
+      "flashinfer_abba_mean_of_arm_medians_ms": 42.561261499999986,
+      "flashinfer_over_nfa_speedup": 1.3728031627466866
+    }
+  }
+}

@@ -1,0 +1,1571 @@
+{
+  "schema": "nfa-four-config-six-length-operator-summary-v1",
+  "scope": "pure CUDA operator chain; not end-to-end decode TPOT",
+  "task": "niah_multikey_1",
+  "sample_index": 0,
+  "configs": {
+    "full_no_skip": {
+      "summary_path": "/tmp/nfa-pc31-full-no-skip-512-results/full_no_skip_six_length_summary.json",
+      "summary_sha256": "91338f5f59697e116bf2bfd30e436f81abe69a1d5dfd9ecb9a1cfcbc4dc9042e",
+      "source": {
+        "head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "diff_sha256_by_machine": {
+          "pc33": "59c85bbd7aaad0706357a1d7f7fb04bb4bdc949b32f0ba772a8b136499eb1516",
+          "pc31": "557fb3693b12965c586e85fca3be8c9abb1e2ad8f097cfae553c8bc6f4da0bd4"
+        },
+        "content_equivalence": "identical after removing only git diff index abbreviation lines",
+        "normalized_diff_sha256": "c88f044d50137ca79b346aeee3b6b810d62f0d331859f7d5cf30b702172dc340"
+      },
+      "gate_epsilon": 0,
+      "subspace": "full"
+    },
+    "tail_no_skip": {
+      "summary_path": "/tmp/nfa-pc40-512-results/tail_no_skip/tail_no_skip_six_length_summary.json",
+      "summary_sha256": "0c0ab73054e92b81b095780528a7b03f2a91af2bab6ec1dbc34074a0d6ebe519",
+      "source": {
+        "head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+      },
+      "gate_epsilon": 0.0,
+      "subspace": "tail"
+    },
+    "full_natural_skip": {
+      "summary_path": "/tmp/nfa-pc40-512-results/full_natural_skip/full_natural_skip_six_length_summary.json",
+      "summary_sha256": "c5a235ab39e828c15c82aebf3c5f7b9ec07039a9ad204482223ce43c31d7f351",
+      "source": {
+        "head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "diff_sha256": "25bbd9a93bf191e4459878517d9750b30dad18a3c528af9ef04b69c2ff6e8787"
+      },
+      "gate_epsilon": 0.05,
+      "subspace": "full"
+    },
+    "tail_natural_skip": {
+      "summary_path": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/tail_natural_skip_six_length_summary.json",
+      "summary_sha256": "ab5a9737400a0889991f63d83f47027477ef05f66666bcd66d08c82579e8134a",
+      "source": {
+        "head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+        "diff_sha256": "7985cb6f608aff2d43ed6d31b9fdcf7a3ddcb42487aebcdda4c634697050a81f"
+      },
+      "gate_epsilon": 0.05,
+      "subspace": "tail"
+    }
+  },
+  "records": [
+    {
+      "config": "full_no_skip",
+      "context_length": 32768,
+      "execution": "eager",
+      "nfa_operator_total_ms": 6.348834000000029,
+      "flashinfer_dense_ms": 2.913276000000004,
+      "flashinfer_over_nfa_operator": 0.4588678803068391,
+      "l1_ms": 1.286083000000009,
+      "l2_ms": 4.037628999999998,
+      "main_attention_ms": 1.0258894999999937,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+        "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 32621,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 32768,
+      "execution": "graph",
+      "nfa_operator_total_ms": 6.33947100000001,
+      "flashinfer_dense_ms": 2.8965675,
+      "flashinfer_over_nfa_operator": 0.4569099693018543,
+      "l1_ms": 1.1158130000000053,
+      "l2_ms": 4.202583000000001,
+      "main_attention_ms": 1.0195224999999992,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+        "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 32621,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 65536,
+      "execution": "eager",
+      "nfa_operator_total_ms": 21.308744500000017,
+      "flashinfer_dense_ms": 5.540312499999999,
+      "flashinfer_over_nfa_operator": 0.2600018269494946,
+      "l1_ms": 1.6993064999999876,
+      "l2_ms": 18.58566400000003,
+      "main_attention_ms": 1.0206454999999954,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+        "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 65198,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 65536,
+      "execution": "graph",
+      "nfa_operator_total_ms": 21.318429500000015,
+      "flashinfer_dense_ms": 5.546238999999998,
+      "flashinfer_over_nfa_operator": 0.2601617065647352,
+      "l1_ms": 1.5206505000000108,
+      "l2_ms": 18.783513000000013,
+      "main_attention_ms": 1.017908999999992,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+        "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 65198,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 98304,
+      "execution": "eager",
+      "nfa_operator_total_ms": 21.51880050000001,
+      "flashinfer_dense_ms": 8.235941500000001,
+      "flashinfer_over_nfa_operator": 0.3827323693065511,
+      "l1_ms": 1.956108000000008,
+      "l2_ms": 18.540398999999994,
+      "main_attention_ms": 1.0221000000000016,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+        "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 98227,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 98304,
+      "execution": "graph",
+      "nfa_operator_total_ms": 21.49214699999998,
+      "flashinfer_dense_ms": 8.245218999999999,
+      "flashinfer_over_nfa_operator": 0.3836386843994695,
+      "l1_ms": 1.791269499999991,
+      "l2_ms": 18.683905499999973,
+      "main_attention_ms": 1.0190594999999967,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+        "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 98227,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 131072,
+      "execution": "eager",
+      "nfa_operator_total_ms": 22.970215999999972,
+      "flashinfer_dense_ms": 10.861598499999985,
+      "flashinfer_over_nfa_operator": 0.4728557406686989,
+      "l1_ms": 3.3360799999999884,
+      "l2_ms": 18.613305500000003,
+      "main_attention_ms": 1.0238119999999984,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+        "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 130986,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 131072,
+      "execution": "graph",
+      "nfa_operator_total_ms": 22.845488999999972,
+      "flashinfer_dense_ms": 10.881478,
+      "flashinfer_over_nfa_operator": 0.47630751086133516,
+      "l1_ms": 3.130141500000001,
+      "l2_ms": 18.693934999999993,
+      "main_attention_ms": 1.0191730000000083,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+        "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 130986,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 262144,
+      "execution": "eager",
+      "nfa_operator_total_ms": 25.57879600000001,
+      "flashinfer_dense_ms": 21.493857500000004,
+      "flashinfer_over_nfa_operator": 0.8402998131733798,
+      "l1_ms": 5.995722000000015,
+      "l2_ms": 18.567436500000007,
+      "main_attention_ms": 1.0247885000000114,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_1.jsonl",
+        "sha256": "3ec22d20ef12136f00fa285cef380d97049da16a082c24e4eb56b9f629e73577",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 261928,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 262144,
+      "execution": "graph",
+      "nfa_operator_total_ms": 25.555758500000014,
+      "flashinfer_dense_ms": 21.493314499999997,
+      "flashinfer_over_nfa_operator": 0.8410360623810084,
+      "l1_ms": 5.796058000000011,
+      "l2_ms": 18.743108000000007,
+      "main_attention_ms": 1.0185154999999961,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_1.jsonl",
+        "sha256": "3ec22d20ef12136f00fa285cef380d97049da16a082c24e4eb56b9f629e73577",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 261928,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 524288,
+      "execution": "eager",
+      "nfa_operator_total_ms": 31.003178499999937,
+      "flashinfer_dense_ms": 42.561261499999986,
+      "flashinfer_over_nfa_operator": 1.3728031627466866,
+      "l1_ms": 11.360125999999969,
+      "l2_ms": 18.610462499999993,
+      "main_attention_ms": 1.0338440000000042,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+        "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 523812,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_no_skip",
+      "context_length": 524288,
+      "execution": "graph",
+      "nfa_operator_total_ms": 30.932142000000013,
+      "flashinfer_dense_ms": 42.57151299999998,
+      "flashinfer_over_nfa_operator": 1.376287261321895,
+      "l1_ms": 11.126644000000018,
+      "l2_ms": 18.778532499999976,
+      "main_attention_ms": 1.0237254999999934,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+        "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 523812,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 32768,
+      "execution": "graph",
+      "nfa_operator_total_ms": 3.4289294999999926,
+      "flashinfer_dense_ms": 2.9011124999999995,
+      "flashinfer_over_nfa_operator": 0.8460694511217002,
+      "l1_ms": 0.6382709999999914,
+      "l2_ms": 1.771713000000008,
+      "main_attention_ms": 1.0205289999999998,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+        "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 32621,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 32768,
+      "execution": "eager",
+      "nfa_operator_total_ms": 3.631507500000013,
+      "flashinfer_dense_ms": 2.9169129999999974,
+      "flashinfer_over_nfa_operator": 0.8032237300900485,
+      "l1_ms": 0.7940029999999937,
+      "l2_ms": 1.8135374999999954,
+      "main_attention_ms": 1.0241125000000033,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+        "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 32621,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 65536,
+      "execution": "graph",
+      "nfa_operator_total_ms": 18.28085149999999,
+      "flashinfer_dense_ms": 5.5379594999999995,
+      "flashinfer_over_nfa_operator": 0.30293772147320397,
+      "l1_ms": 1.0015345000000133,
+      "l2_ms": 16.255409999999994,
+      "main_attention_ms": 1.0232665000000003,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+        "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 65198,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 65536,
+      "execution": "eager",
+      "nfa_operator_total_ms": 18.432618500000025,
+      "flashinfer_dense_ms": 5.544401999999999,
+      "flashinfer_over_nfa_operator": 0.3007929665554566,
+      "l1_ms": 1.1524984999999848,
+      "l2_ms": 16.26298550000002,
+      "main_attention_ms": 1.0183530000000005,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+        "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 65198,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 98304,
+      "execution": "graph",
+      "nfa_operator_total_ms": 18.32793500000001,
+      "flashinfer_dense_ms": 8.212263499999999,
+      "flashinfer_over_nfa_operator": 0.4480735827576862,
+      "l1_ms": 1.047965999999992,
+      "l2_ms": 16.2603665,
+      "main_attention_ms": 1.019518500000001,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+        "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 98227,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 98304,
+      "execution": "eager",
+      "nfa_operator_total_ms": 18.477710500000008,
+      "flashinfer_dense_ms": 8.2306895,
+      "flashinfer_over_nfa_operator": 0.44543881667590784,
+      "l1_ms": 1.2008150000000086,
+      "l2_ms": 16.254491000000016,
+      "main_attention_ms": 1.022256499999999,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+        "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 98227,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 131072,
+      "execution": "graph",
+      "nfa_operator_total_ms": 19.746724000000007,
+      "flashinfer_dense_ms": 10.824743500000004,
+      "flashinfer_over_nfa_operator": 0.548179206839575,
+      "l1_ms": 2.3833864999999888,
+      "l2_ms": 16.335206000000007,
+      "main_attention_ms": 1.0252315000000092,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+        "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 130986,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 131072,
+      "execution": "eager",
+      "nfa_operator_total_ms": 20.009720999999963,
+      "flashinfer_dense_ms": 10.843655499999995,
+      "flashinfer_over_nfa_operator": 0.5419193750877394,
+      "l1_ms": 2.5695249999999934,
+      "l2_ms": 16.423378999999983,
+      "main_attention_ms": 1.0192159999999948,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+        "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 130986,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 262144,
+      "execution": "graph",
+      "nfa_operator_total_ms": 21.99149299999998,
+      "flashinfer_dense_ms": 21.490257999999997,
+      "flashinfer_over_nfa_operator": 0.9772077775710825,
+      "l1_ms": 4.684218999999988,
+      "l2_ms": 16.288126,
+      "main_attention_ms": 1.0199699999999994,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_1.jsonl",
+        "sha256": "3ec22d20ef12136f00fa285cef380d97049da16a082c24e4eb56b9f629e73577",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 261928,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 262144,
+      "execution": "eager",
+      "nfa_operator_total_ms": 22.269187500000015,
+      "flashinfer_dense_ms": 21.519655,
+      "flashinfer_over_nfa_operator": 0.9663421712175169,
+      "l1_ms": 4.864804499999988,
+      "l2_ms": 16.384209,
+      "main_attention_ms": 1.0213020000000124,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_1.jsonl",
+        "sha256": "3ec22d20ef12136f00fa285cef380d97049da16a082c24e4eb56b9f629e73577",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 261928,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 524288,
+      "execution": "graph",
+      "nfa_operator_total_ms": 26.72121650000001,
+      "flashinfer_dense_ms": 43.2193885,
+      "flashinfer_over_nfa_operator": 1.6174184472477136,
+      "l1_ms": 9.419640000000019,
+      "l2_ms": 16.281325000000002,
+      "main_attention_ms": 1.0190554999999974,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+        "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 523812,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_no_skip",
+      "context_length": 524288,
+      "execution": "eager",
+      "nfa_operator_total_ms": 26.971751499999993,
+      "flashinfer_dense_ms": 43.17417950000001,
+      "flashinfer_over_nfa_operator": 1.60071842201275,
+      "l1_ms": 9.645150000000012,
+      "l2_ms": 16.30365599999999,
+      "main_attention_ms": 1.026113,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+        "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 523812,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 32768,
+      "execution": "graph",
+      "nfa_operator_total_ms": 6.247916499999995,
+      "flashinfer_dense_ms": 2.8943050000000015,
+      "flashinfer_over_nfa_operator": 0.46324322676207397,
+      "l1_ms": 1.1109094999999929,
+      "l2_ms": 4.120646500000013,
+      "main_attention_ms": 1.0151855000000012,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [
+          11,
+          14
+        ],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+        "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 32621,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 32768,
+      "execution": "eager",
+      "nfa_operator_total_ms": 6.22762200000008,
+      "flashinfer_dense_ms": 2.9089444999999987,
+      "flashinfer_over_nfa_operator": 0.4671035750082393,
+      "l1_ms": 1.2812720000000075,
+      "l2_ms": 3.9263535000000385,
+      "main_attention_ms": 1.0217115000000077,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [
+          11,
+          14
+        ],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+        "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 32621,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 65536,
+      "execution": "graph",
+      "nfa_operator_total_ms": 21.245646000000004,
+      "flashinfer_dense_ms": 5.520296500000002,
+      "flashinfer_over_nfa_operator": 0.2598318968507713,
+      "l1_ms": 1.522387000000022,
+      "l2_ms": 18.707679500000012,
+      "main_attention_ms": 1.015951000000004,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          29,
+          30
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+        "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 65198,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 65536,
+      "execution": "eager",
+      "nfa_operator_total_ms": 21.17037099999998,
+      "flashinfer_dense_ms": 5.550545500000002,
+      "flashinfer_over_nfa_operator": 0.26218461169150065,
+      "l1_ms": 1.698304,
+      "l2_ms": 18.448271,
+      "main_attention_ms": 1.0209289999999942,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          29,
+          30
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+        "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 65198,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 98304,
+      "execution": "graph",
+      "nfa_operator_total_ms": 21.51077799999998,
+      "flashinfer_dense_ms": 8.2343615,
+      "flashinfer_over_nfa_operator": 0.3828016587777535,
+      "l1_ms": 1.7882389999999875,
+      "l2_ms": 18.703700499999993,
+      "main_attention_ms": 1.017104000000002,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          28,
+          29,
+          30,
+          31,
+          33
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+        "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 98227,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 98304,
+      "execution": "eager",
+      "nfa_operator_total_ms": 21.311030000000017,
+      "flashinfer_dense_ms": 8.231938000000001,
+      "flashinfer_over_nfa_operator": 0.3862759331670029,
+      "l1_ms": 1.9516350000000133,
+      "l2_ms": 18.342077500000023,
+      "main_attention_ms": 1.0174414999999963,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          28,
+          29,
+          30,
+          31,
+          33
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+        "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 98227,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 131072,
+      "execution": "graph",
+      "nfa_operator_total_ms": 22.85753399999999,
+      "flashinfer_dense_ms": 10.822089499999997,
+      "flashinfer_over_nfa_operator": 0.4734583135696091,
+      "l1_ms": 3.1235675000000156,
+      "l2_ms": 18.718469500000005,
+      "main_attention_ms": 1.0154549999999938,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+        "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 130986,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 131072,
+      "execution": "eager",
+      "nfa_operator_total_ms": 22.60918400000002,
+      "flashinfer_dense_ms": 10.847710999999997,
+      "flashinfer_over_nfa_operator": 0.47979223841072666,
+      "l1_ms": 3.3307924999999976,
+      "l2_ms": 18.256296000000006,
+      "main_attention_ms": 1.0197454999999889,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+        "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 130986,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 262144,
+      "execution": "graph",
+      "nfa_operator_total_ms": 25.494738999999996,
+      "flashinfer_dense_ms": 21.48690250000001,
+      "flashinfer_over_nfa_operator": 0.8427975081447201,
+      "l1_ms": 5.792343000000016,
+      "l2_ms": 18.685675000000003,
+      "main_attention_ms": 1.0157485000000026,
+      "nfa_skip": {
+        "near_layers": [
+          0,
+          7,
+          9,
+          10,
+          17,
+          19,
+          20,
+          21,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_1.jsonl",
+        "sha256": "3ec22d20ef12136f00fa285cef380d97049da16a082c24e4eb56b9f629e73577",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 261928,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 262144,
+      "execution": "eager",
+      "nfa_operator_total_ms": 25.05772650000001,
+      "flashinfer_dense_ms": 21.526419999999998,
+      "flashinfer_over_nfa_operator": 0.8590731485555959,
+      "l1_ms": 5.985655500000011,
+      "l2_ms": 18.050105000000016,
+      "main_attention_ms": 1.0158260000000032,
+      "nfa_skip": {
+        "near_layers": [
+          0,
+          7,
+          9,
+          10,
+          17,
+          19,
+          20,
+          21,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_1.jsonl",
+        "sha256": "3ec22d20ef12136f00fa285cef380d97049da16a082c24e4eb56b9f629e73577",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 261928,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 524288,
+      "execution": "graph",
+      "nfa_operator_total_ms": 30.734740000000027,
+      "flashinfer_dense_ms": 42.89554699999999,
+      "flashinfer_over_nfa_operator": 1.3956697535101958,
+      "l1_ms": 11.089888000000006,
+      "l2_ms": 18.62954200000002,
+      "main_attention_ms": 1.0152804999999971,
+      "nfa_skip": {
+        "near_layers": [
+          0,
+          1,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          17,
+          19,
+          20,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+        "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 523812,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "full_natural_skip",
+      "context_length": 524288,
+      "execution": "eager",
+      "nfa_operator_total_ms": 30.19104250000003,
+      "flashinfer_dense_ms": 42.627352999999985,
+      "flashinfer_over_nfa_operator": 1.4119205390141776,
+      "l1_ms": 11.337541500000011,
+      "l2_ms": 17.833197000000016,
+      "main_attention_ms": 1.0190114999999942,
+      "nfa_skip": {
+        "near_layers": [
+          0,
+          1,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          17,
+          19,
+          20,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+        "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 523812,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 32768,
+      "execution": "graph",
+      "nfa_operator_total_ms": 3.4065035000000137,
+      "flashinfer_dense_ms": 2.8979834999999987,
+      "flashinfer_over_nfa_operator": 0.8507208344274377,
+      "l1_ms": 0.6382100000000002,
+      "l2_ms": 1.7492990000000002,
+      "main_attention_ms": 1.0184985000000024,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [
+          11,
+          14
+        ],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+        "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 32621,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 32768,
+      "execution": "eager",
+      "nfa_operator_total_ms": 3.6055824999999495,
+      "flashinfer_dense_ms": 2.917633000000002,
+      "flashinfer_over_nfa_operator": 0.809198791041404,
+      "l1_ms": 0.7899884999999996,
+      "l2_ms": 1.7952239999999766,
+      "main_attention_ms": 1.0211729999999934,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [
+          11,
+          14
+        ],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_1.jsonl",
+        "sha256": "530af35848867e9908b5cfa8251363b366c12d6ab20b5aee7445c11f53d8df23",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 32621,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 65536,
+      "execution": "graph",
+      "nfa_operator_total_ms": 18.312272999999998,
+      "flashinfer_dense_ms": 5.563579500000001,
+      "flashinfer_over_nfa_operator": 0.303816981103329,
+      "l1_ms": 1.0044385000000022,
+      "l2_ms": 16.2852425,
+      "main_attention_ms": 1.0221325,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          29,
+          30
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+        "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 65198,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 65536,
+      "execution": "eager",
+      "nfa_operator_total_ms": 18.5104665,
+      "flashinfer_dense_ms": 5.546421999999998,
+      "flashinfer_over_nfa_operator": 0.29963707289602876,
+      "l1_ms": 1.1564879999999904,
+      "l2_ms": 16.33083750000001,
+      "main_attention_ms": 1.0238000000000034,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          29,
+          30
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_1.jsonl",
+        "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 65198,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 98304,
+      "execution": "graph",
+      "nfa_operator_total_ms": 18.30248050000003,
+      "flashinfer_dense_ms": 8.2570935,
+      "flashinfer_over_nfa_operator": 0.4511461438246027,
+      "l1_ms": 1.0466315000000046,
+      "l2_ms": 16.236223499999994,
+      "main_attention_ms": 1.0195265000000138,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          28,
+          29,
+          30,
+          31,
+          33
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+        "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 98227,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 98304,
+      "execution": "eager",
+      "nfa_operator_total_ms": 18.422819000000004,
+      "flashinfer_dense_ms": 8.257195999999997,
+      "flashinfer_over_nfa_operator": 0.44820480513867045,
+      "l1_ms": 1.1993699999999876,
+      "l2_ms": 16.200362500000004,
+      "main_attention_ms": 1.0241340000000005,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          28,
+          29,
+          30,
+          31,
+          33
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/98304/niah_multikey_1.jsonl",
+        "sha256": "bf79ca8c2c5ae430baa9071dbd60fd4c63f6f3d95d450c49f885cd5026778cb1",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 98227,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 131072,
+      "execution": "graph",
+      "nfa_operator_total_ms": 19.654745000000013,
+      "flashinfer_dense_ms": 10.849076499999997,
+      "flashinfer_over_nfa_operator": 0.5519825619716761,
+      "l1_ms": 2.3826730000000156,
+      "l2_ms": 16.248962,
+      "main_attention_ms": 1.0269064999999982,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+        "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 130986,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 131072,
+      "execution": "eager",
+      "nfa_operator_total_ms": 19.908507,
+      "flashinfer_dense_ms": 10.870402,
+      "flashinfer_over_nfa_operator": 0.5460179409736753,
+      "l1_ms": 2.564725500000012,
+      "l2_ms": 16.322049499999977,
+      "main_attention_ms": 1.022374500000001,
+      "nfa_skip": {
+        "near_layers": [
+          7,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_1.jsonl",
+        "sha256": "4078e45e1b76f5fd31a92884ab6d1c20bacd5647464e2e5bed7c24eaec15dab5",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 130986,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 262144,
+      "execution": "graph",
+      "nfa_operator_total_ms": 21.9630875,
+      "flashinfer_dense_ms": 21.383283,
+      "flashinfer_over_nfa_operator": 0.973600956605031,
+      "l1_ms": 4.684745500000002,
+      "l2_ms": 16.256141,
+      "main_attention_ms": 1.0210784999999922,
+      "nfa_skip": {
+        "near_layers": [
+          0,
+          7,
+          9,
+          10,
+          17,
+          19,
+          20,
+          21,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_1.jsonl",
+        "sha256": "3ec22d20ef12136f00fa285cef380d97049da16a082c24e4eb56b9f629e73577",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 261928,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 262144,
+      "execution": "eager",
+      "nfa_operator_total_ms": 22.172585500000025,
+      "flashinfer_dense_ms": 21.540441499999993,
+      "flashinfer_over_nfa_operator": 0.9714898382058317,
+      "l1_ms": 4.858599000000005,
+      "l2_ms": 16.291149,
+      "main_attention_ms": 1.0231445000000035,
+      "nfa_skip": {
+        "near_layers": [
+          0,
+          7,
+          9,
+          10,
+          17,
+          19,
+          20,
+          21,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_1.jsonl",
+        "sha256": "3ec22d20ef12136f00fa285cef380d97049da16a082c24e4eb56b9f629e73577",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 261928,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 524288,
+      "execution": "graph",
+      "nfa_operator_total_ms": 26.632958000000023,
+      "flashinfer_dense_ms": 42.8814935,
+      "flashinfer_over_nfa_operator": 1.6100912823877829,
+      "l1_ms": 9.412980000000012,
+      "l2_ms": 16.198548500000015,
+      "main_attention_ms": 1.021765500000002,
+      "nfa_skip": {
+        "near_layers": [
+          0,
+          1,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          17,
+          19,
+          20,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+        "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 523812,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    },
+    {
+      "config": "tail_natural_skip",
+      "context_length": 524288,
+      "execution": "eager",
+      "nfa_operator_total_ms": 26.879555000000003,
+      "flashinfer_dense_ms": 42.63985000000001,
+      "flashinfer_over_nfa_operator": 1.5863302052433534,
+      "l1_ms": 9.64591300000001,
+      "l2_ms": 16.205688999999982,
+      "main_attention_ms": 1.0268705000000082,
+      "nfa_skip": {
+        "near_layers": [
+          0,
+          1,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          17,
+          19,
+          20,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35
+        ],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+        "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 523812,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      }
+    }
+  ]
+}

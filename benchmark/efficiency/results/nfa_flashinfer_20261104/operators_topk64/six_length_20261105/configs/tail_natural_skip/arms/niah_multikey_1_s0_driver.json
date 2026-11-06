@@ -1,0 +1,3687 @@
+{
+  "gpu": 1,
+  "task": "niah_multikey_1",
+  "sample_index": 0,
+  "gate_epsilon": 0.05,
+  "subspace": "tail",
+  "runtime": {
+    "python": "/home/fluentllmenv/bin/python3",
+    "repo": "/tmp/nfa-kernel-longctx-runtime-20261105",
+    "model": "/home/wangyuanshuo02/Qwen3-8B",
+    "data": "/tmp/nfa_kernel_inputs",
+    "measure": "/tmp/nfa-longctx-measure-20261105/measure_nfa_kernels.py",
+    "fi_pythonpath": "/tmp/nfa-operator-sitecustomize-20261105:/tmp/nfa-fi-cutlass45-20261105/nvidia_cutlass_dsl/python_packages:/tmp/nfa-fi-no-deps"
+  },
+  "baseline": {
+    "used_mib": 1,
+    "utilization_percent": 0,
+    "compute_process_rows": []
+  },
+  "arms": [
+    {
+      "length": 131072,
+      "execution": "graph",
+      "method": "flashinfer",
+      "abba": "b1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 0,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 48282,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2459253, 48272 MiB"
+          ]
+        },
+        {
+          "used_mib": 48282,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2459253, 48272 MiB"
+          ]
+        },
+        {
+          "used_mib": 35558,
+          "utilization_percent": 26,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2459253, 35562 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 44,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_graph_b1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_graph_b1.log"
+    },
+    {
+      "length": 131072,
+      "execution": "graph",
+      "method": "flashinfer",
+      "abba": "b2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 44,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 48282,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2470916, 48272 MiB"
+          ]
+        },
+        {
+          "used_mib": 48282,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2470916, 48272 MiB"
+          ]
+        },
+        {
+          "used_mib": 48352,
+          "utilization_percent": 6,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2470916, 48342 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 25,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_graph_b2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_graph_b2.log"
+    },
+    {
+      "length": 131072,
+      "execution": "graph",
+      "method": "nfa",
+      "abba": "a2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 25,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 50496,
+          "utilization_percent": 99,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2481600, 50486 MiB"
+          ]
+        },
+        {
+          "used_mib": 50496,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2481600, 50486 MiB"
+          ]
+        },
+        {
+          "used_mib": 50496,
+          "utilization_percent": 99,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2481600, 50486 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 0,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_graph_a2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_graph_a2.log"
+    },
+    {
+      "length": 131072,
+      "execution": "eager",
+      "method": "nfa",
+      "abba": "a1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 43,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 50496,
+          "utilization_percent": 99,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2494251, 50486 MiB"
+          ]
+        },
+        {
+          "used_mib": 50496,
+          "utilization_percent": 99,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2494251, 50486 MiB"
+          ]
+        },
+        {
+          "used_mib": 50496,
+          "utilization_percent": 91,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2494251, 50486 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 49,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_eager_a1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_eager_a1.log"
+    },
+    {
+      "length": 131072,
+      "execution": "eager",
+      "method": "flashinfer",
+      "abba": "b1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 49,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 48282,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2507115, 48272 MiB"
+          ]
+        },
+        {
+          "used_mib": 48282,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2507115, 48272 MiB"
+          ]
+        },
+        {
+          "used_mib": 48294,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2507115, 48284 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 0,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_eager_b1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_eager_b1.log"
+    },
+    {
+      "length": 131072,
+      "execution": "eager",
+      "method": "flashinfer",
+      "abba": "b2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 60,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 48282,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2517475, 48272 MiB"
+          ]
+        },
+        {
+          "used_mib": 48282,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2517475, 48272 MiB"
+          ]
+        },
+        {
+          "used_mib": 48294,
+          "utilization_percent": 11,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2517475, 48284 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 20,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_eager_b2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_eager_b2.log"
+    },
+    {
+      "length": 131072,
+      "execution": "eager",
+      "method": "nfa",
+      "abba": "a2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 20,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 50496,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2529666, 50486 MiB"
+          ]
+        },
+        {
+          "used_mib": 50496,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2529666, 50486 MiB"
+          ]
+        },
+        {
+          "used_mib": 50496,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2529666, 50486 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 0,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_eager_a2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_131072_eager_a2.log"
+    },
+    {
+      "length": 262144,
+      "execution": "graph",
+      "method": "nfa",
+      "abba": "a1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 0,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84632,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84622 MiB"
+          ]
+        },
+        {
+          "used_mib": 84634,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84624 MiB"
+          ]
+        },
+        {
+          "used_mib": 84634,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84624 MiB"
+          ]
+        },
+        {
+          "used_mib": 84636,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84626 MiB"
+          ]
+        },
+        {
+          "used_mib": 84636,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84626 MiB"
+          ]
+        },
+        {
+          "used_mib": 84636,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84626 MiB"
+          ]
+        },
+        {
+          "used_mib": 84638,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84628 MiB"
+          ]
+        },
+        {
+          "used_mib": 84638,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84628 MiB"
+          ]
+        },
+        {
+          "used_mib": 84640,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84630 MiB"
+          ]
+        },
+        {
+          "used_mib": 84642,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84632 MiB"
+          ]
+        },
+        {
+          "used_mib": 84642,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84632 MiB"
+          ]
+        },
+        {
+          "used_mib": 84642,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84632 MiB"
+          ]
+        },
+        {
+          "used_mib": 84646,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84636 MiB"
+          ]
+        },
+        {
+          "used_mib": 84646,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 84636 MiB"
+          ]
+        },
+        {
+          "used_mib": 53594,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53584 MiB"
+          ]
+        },
+        {
+          "used_mib": 53596,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53586 MiB"
+          ]
+        },
+        {
+          "used_mib": 53596,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53586 MiB"
+          ]
+        },
+        {
+          "used_mib": 53596,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53586 MiB"
+          ]
+        },
+        {
+          "used_mib": 53600,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53590 MiB"
+          ]
+        },
+        {
+          "used_mib": 53600,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53590 MiB"
+          ]
+        },
+        {
+          "used_mib": 53600,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53590 MiB"
+          ]
+        },
+        {
+          "used_mib": 53602,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53592 MiB"
+          ]
+        },
+        {
+          "used_mib": 53602,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53592 MiB"
+          ]
+        },
+        {
+          "used_mib": 53604,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53594 MiB"
+          ]
+        },
+        {
+          "used_mib": 53606,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2541132, 53596 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 1,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_graph_a1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_graph_a1.log"
+    },
+    {
+      "length": 262144,
+      "execution": "graph",
+      "method": "flashinfer",
+      "abba": "b1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 67,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2674296, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2674296, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2674296, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2674296, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2674296, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2674296, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2674296, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2674296, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80302,
+          "utilization_percent": 77,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2674296, 80292 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 8,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_graph_b1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_graph_b1.log"
+    },
+    {
+      "length": 262144,
+      "execution": "graph",
+      "method": "flashinfer",
+      "abba": "b2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 8,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2706979, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2706979, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2706979, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2706979, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2706979, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2706979, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2706979, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2706979, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2706979, 80290 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 6,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_graph_b2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_graph_b2.log"
+    },
+    {
+      "length": 262144,
+      "execution": "graph",
+      "method": "nfa",
+      "abba": "a2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 6,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2743082, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2743082, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2743082, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 76,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2743082, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2743082, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2743082, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2743082, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2743082, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2743082, 84552 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 40,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_graph_a2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_graph_a2.log"
+    },
+    {
+      "length": 262144,
+      "execution": "eager",
+      "method": "nfa",
+      "abba": "a1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 40,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2780593, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2780593, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2780593, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2780593, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2780593, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2780593, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 77,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2780593, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2780593, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2780593, 84552 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 59,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_eager_a1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_eager_a1.log"
+    },
+    {
+      "length": 262144,
+      "execution": "eager",
+      "method": "flashinfer",
+      "abba": "b1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 59,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2815413, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2815413, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2815413, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2815413, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2815413, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 95,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2815413, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2815413, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2815413, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2815413, 80290 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 0,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_eager_b1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_eager_b1.log"
+    },
+    {
+      "length": 262144,
+      "execution": "eager",
+      "method": "flashinfer",
+      "abba": "b2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 37,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2848065, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2848065, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2848065, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2848065, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2848065, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2848065, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2848065, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2848065, 80290 MiB"
+          ]
+        },
+        {
+          "used_mib": 80300,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2848065, 80290 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 16,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_eager_b2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_eager_b2.log"
+    },
+    {
+      "length": 262144,
+      "execution": "eager",
+      "method": "nfa",
+      "abba": "a2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 100,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2881490, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2881490, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2881490, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2881490, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2881490, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2881490, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2881490, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2881490, 84552 MiB"
+          ]
+        },
+        {
+          "used_mib": 84562,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2881490, 84552 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 56,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_eager_a2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_262144_eager_a2.log"
+    },
+    {
+      "length": 524288,
+      "execution": "graph",
+      "method": "nfa",
+      "abba": "a1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 56,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 140412,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 140402 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135492,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135482 MiB"
+          ]
+        },
+        {
+          "used_mib": 135492,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135482 MiB"
+          ]
+        },
+        {
+          "used_mib": 135494,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135484 MiB"
+          ]
+        },
+        {
+          "used_mib": 135494,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135484 MiB"
+          ]
+        },
+        {
+          "used_mib": 135494,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135484 MiB"
+          ]
+        },
+        {
+          "used_mib": 135494,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135484 MiB"
+          ]
+        },
+        {
+          "used_mib": 135494,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135484 MiB"
+          ]
+        },
+        {
+          "used_mib": 135496,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135486 MiB"
+          ]
+        },
+        {
+          "used_mib": 135496,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135486 MiB"
+          ]
+        },
+        {
+          "used_mib": 135496,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135486 MiB"
+          ]
+        },
+        {
+          "used_mib": 135496,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135486 MiB"
+          ]
+        },
+        {
+          "used_mib": 135498,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135488 MiB"
+          ]
+        },
+        {
+          "used_mib": 135500,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135490 MiB"
+          ]
+        },
+        {
+          "used_mib": 135500,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135490 MiB"
+          ]
+        },
+        {
+          "used_mib": 135500,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135490 MiB"
+          ]
+        },
+        {
+          "used_mib": 135502,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135492 MiB"
+          ]
+        },
+        {
+          "used_mib": 135502,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135492 MiB"
+          ]
+        },
+        {
+          "used_mib": 135502,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135492 MiB"
+          ]
+        },
+        {
+          "used_mib": 135502,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135492 MiB"
+          ]
+        },
+        {
+          "used_mib": 135504,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135494 MiB"
+          ]
+        },
+        {
+          "used_mib": 135504,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135494 MiB"
+          ]
+        },
+        {
+          "used_mib": 135504,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135494 MiB"
+          ]
+        },
+        {
+          "used_mib": 135504,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135494 MiB"
+          ]
+        },
+        {
+          "used_mib": 135506,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135496 MiB"
+          ]
+        },
+        {
+          "used_mib": 135508,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135498 MiB"
+          ]
+        },
+        {
+          "used_mib": 135508,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135498 MiB"
+          ]
+        },
+        {
+          "used_mib": 135508,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135498 MiB"
+          ]
+        },
+        {
+          "used_mib": 135508,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135498 MiB"
+          ]
+        },
+        {
+          "used_mib": 135510,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135500 MiB"
+          ]
+        },
+        {
+          "used_mib": 135510,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135500 MiB"
+          ]
+        },
+        {
+          "used_mib": 135510,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135500 MiB"
+          ]
+        },
+        {
+          "used_mib": 135510,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135500 MiB"
+          ]
+        },
+        {
+          "used_mib": 135512,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135502 MiB"
+          ]
+        },
+        {
+          "used_mib": 135512,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135502 MiB"
+          ]
+        },
+        {
+          "used_mib": 135514,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135504 MiB"
+          ]
+        },
+        {
+          "used_mib": 135514,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 135504 MiB"
+          ]
+        },
+        {
+          "used_mib": 94624,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94614 MiB"
+          ]
+        },
+        {
+          "used_mib": 94624,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94614 MiB"
+          ]
+        },
+        {
+          "used_mib": 94624,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94614 MiB"
+          ]
+        },
+        {
+          "used_mib": 94624,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94614 MiB"
+          ]
+        },
+        {
+          "used_mib": 94624,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94614 MiB"
+          ]
+        },
+        {
+          "used_mib": 94626,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94616 MiB"
+          ]
+        },
+        {
+          "used_mib": 94626,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94616 MiB"
+          ]
+        },
+        {
+          "used_mib": 94626,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94616 MiB"
+          ]
+        },
+        {
+          "used_mib": 94626,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94616 MiB"
+          ]
+        },
+        {
+          "used_mib": 94628,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94618 MiB"
+          ]
+        },
+        {
+          "used_mib": 94628,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94618 MiB"
+          ]
+        },
+        {
+          "used_mib": 94628,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94618 MiB"
+          ]
+        },
+        {
+          "used_mib": 94628,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94618 MiB"
+          ]
+        },
+        {
+          "used_mib": 94630,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94620 MiB"
+          ]
+        },
+        {
+          "used_mib": 94632,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94622 MiB"
+          ]
+        },
+        {
+          "used_mib": 94632,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94622 MiB"
+          ]
+        },
+        {
+          "used_mib": 94632,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94622 MiB"
+          ]
+        },
+        {
+          "used_mib": 94632,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94622 MiB"
+          ]
+        },
+        {
+          "used_mib": 94634,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94624 MiB"
+          ]
+        },
+        {
+          "used_mib": 94634,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94624 MiB"
+          ]
+        },
+        {
+          "used_mib": 94634,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94624 MiB"
+          ]
+        },
+        {
+          "used_mib": 94634,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94624 MiB"
+          ]
+        },
+        {
+          "used_mib": 94636,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94626 MiB"
+          ]
+        },
+        {
+          "used_mib": 94636,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94626 MiB"
+          ]
+        },
+        {
+          "used_mib": 94636,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94626 MiB"
+          ]
+        },
+        {
+          "used_mib": 94636,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94626 MiB"
+          ]
+        },
+        {
+          "used_mib": 94638,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94628 MiB"
+          ]
+        },
+        {
+          "used_mib": 94640,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94630 MiB"
+          ]
+        },
+        {
+          "used_mib": 94640,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94630 MiB"
+          ]
+        },
+        {
+          "used_mib": 94640,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94630 MiB"
+          ]
+        },
+        {
+          "used_mib": 94640,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 2916761, 94630 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 54,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_graph_a1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_graph_a1.log"
+    },
+    {
+      "length": 524288,
+      "execution": "graph",
+      "method": "flashinfer",
+      "abba": "b1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 54,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 132058,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 132048 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 55,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3285733, 135246 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 1,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_graph_b1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_graph_b1.log"
+    },
+    {
+      "length": 524288,
+      "execution": "graph",
+      "method": "flashinfer",
+      "abba": "b2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 93,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 132058,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 132048 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 68,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3402406, 135246 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 47,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_graph_b2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_graph_b2.log"
+    },
+    {
+      "length": 524288,
+      "execution": "graph",
+      "method": "nfa",
+      "abba": "a2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 69,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 140412,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 140402 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3519964, 135412 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 2,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_graph_a2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_graph_a2.log"
+    },
+    {
+      "length": 524288,
+      "execution": "eager",
+      "method": "nfa",
+      "abba": "a1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 15,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 140412,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 140402 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3645091, 135412 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 1,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_eager_a1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_eager_a1.log"
+    },
+    {
+      "length": 524288,
+      "execution": "eager",
+      "method": "flashinfer",
+      "abba": "b1",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 79,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 132058,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 132048 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 91,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3771129, 135246 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 25,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_eager_b1.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_eager_b1.log"
+    },
+    {
+      "length": 524288,
+      "execution": "eager",
+      "method": "flashinfer",
+      "abba": "b2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 25,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 132058,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 132048 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 71,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        },
+        {
+          "used_mib": 135256,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 3887876, 135246 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 1,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_eager_b2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_eager_b2.log"
+    },
+    {
+      "length": 524288,
+      "execution": "eager",
+      "method": "nfa",
+      "abba": "a2",
+      "attempt": 1,
+      "returncode": 0,
+      "before": {
+        "used_mib": 1,
+        "utilization_percent": 60,
+        "compute_process_rows": []
+      },
+      "samples": [
+        {
+          "used_mib": 140412,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 140402 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135422,
+          "utilization_percent": 100,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135412 MiB"
+          ]
+        },
+        {
+          "used_mib": 135522,
+          "utilization_percent": 0,
+          "compute_process_rows": [
+            "GPU-a9292656-54e2-7d03-d327-b307c5381cc1, 4003187, 135512 MiB"
+          ]
+        }
+      ],
+      "after": {
+        "used_mib": 1,
+        "utilization_percent": 31,
+        "compute_process_rows": []
+      },
+      "gpu_hygiene": "clean",
+      "output": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_eager_a2.json",
+      "log": "/tmp/nfa-kernel-longctx-runtime-20261105/benchmark/efficiency/results/nfa_flashinfer_20261104/operators_topk64/formal_2x2/tail_natural_skip/niah_multikey_1_s0_524288_eager_a2.log"
+    }
+  ]
+}

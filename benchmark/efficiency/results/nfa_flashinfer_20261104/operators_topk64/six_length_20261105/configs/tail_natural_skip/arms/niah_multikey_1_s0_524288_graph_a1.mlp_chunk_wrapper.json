@@ -1,0 +1,16 @@
+{
+  "schema": "nfa-qwen3-mlp-chunk-wrapper-v1",
+  "wrapper_enabled": true,
+  "mechanism": "sitecustomize + Qwen3MLP.forward class patch",
+  "wrapper_script": "/tmp/nfa-operator-sitecustomize-20261105/sitecustomize.py",
+  "wrapper_script_sha256": "cd2a8d818f8c15ad4b57bfdd68d34adb641254f0ebfd3286467f7dfaa3796af3",
+  "patched_class": "transformers.models.qwen3.modeling_qwen3.Qwen3MLP",
+  "threshold_seq": 32768,
+  "chunk_tokens": 64,
+  "activated_forward_calls": 36,
+  "original_forward_calls": 72,
+  "max_seq_seen": 523812,
+  "decode_uses_original_for_seq1": true,
+  "orig_forward_restored": true,
+  "numerics": "full GEMMs; chunked elementwise activation and multiply in up buffer"
+}

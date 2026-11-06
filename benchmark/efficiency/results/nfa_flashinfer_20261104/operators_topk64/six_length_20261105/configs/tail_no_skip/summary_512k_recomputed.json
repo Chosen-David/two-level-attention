@@ -1,0 +1,170 @@
+{
+  "schema": "nfa-pure-kernel-abba-summary-v2",
+  "task": "niah_multikey_1",
+  "sample_index": 0,
+  "gate_epsilon": 0.0,
+  "subspace": "tail",
+  "source": {
+    "head": "c597e36e0c8979201cb4c56cafbb61795bf460f3",
+    "diff_sha256": "3ed3a43e3aff0f8dc4c70c9e30d4b109155e564d687968b52dea72ec702e105f"
+  },
+  "source_schemas": [
+    "nfa-pure-kernel-stages-v2"
+  ],
+  "accounting": {
+    "kernel_time": "CUDA self-device time",
+    "coverage": "every NFA-related kernel exactly once; unknown/missing stages fail",
+    "repeat_aggregation": "sum L1+L2+Attention within each repeat, then median",
+    "abba_aggregation": "median of per-arm medians; total is not a sum of stage medians",
+    "scope": "pure operator chain, not end-to-end decode TPOT"
+  },
+  "records": [
+    {
+      "context_length": 524288,
+      "execution": "graph",
+      "l1_ms": 9.419640000000019,
+      "l1_ms_arm_medians_ms": [
+        9.421124000000031,
+        9.418156000000005
+      ],
+      "l2_ms": 16.281325000000002,
+      "l2_ms_arm_medians_ms": [
+        16.283518000000004,
+        16.279132
+      ],
+      "main_attention_ms": 1.0190554999999974,
+      "main_attention_ms_arm_medians_ms": [
+        1.0175979999999931,
+        1.0205130000000018
+      ],
+      "nfa_operator_total_ms": 26.72121650000001,
+      "nfa_operator_total_ms_arm_medians_ms": [
+        26.72212699999999,
+        26.720306000000033
+      ],
+      "flashinfer_dense_ms": 43.2193885,
+      "flashinfer_dense_ms_arm_medians_ms": [
+        43.145994000000016,
+        43.292782999999986
+      ],
+      "flashinfer_over_nfa_operator": 1.6174184472477136,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "nfa_skip_by_arm": {
+        "a1": {
+          "near_layers": [],
+          "far_layers": [],
+          "both_layers": []
+        },
+        "a2": {
+          "near_layers": [],
+          "far_layers": [],
+          "both_layers": []
+        }
+      },
+      "kernel_coverage": {
+        "l1_ms": [
+          "_candidate_expand_batched_kernel",
+          "_nfa_l1_scores_kernel",
+          "_nfa_page_stats_prepare_q_kernel",
+          "_topk_candidate_prepare_kernel"
+        ],
+        "l2_ms": [
+          "_final_union_physical_kernel",
+          "_nfa_filtered_topk_kernel",
+          "_nfa_fine_scores_paged_kernel",
+          "_prepare_q_grouped_kernel"
+        ],
+        "main_attention_ms": [
+          "_gather_attend_grouped_kernel"
+        ]
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+        "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 523812,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "gpu_hygiene": "clean"
+    },
+    {
+      "context_length": 524288,
+      "execution": "eager",
+      "l1_ms": 9.645150000000012,
+      "l1_ms_arm_medians_ms": [
+        9.643601999999998,
+        9.646698000000026
+      ],
+      "l2_ms": 16.30365599999999,
+      "l2_ms_arm_medians_ms": [
+        16.301656999999995,
+        16.305654999999987
+      ],
+      "main_attention_ms": 1.026113,
+      "main_attention_ms_arm_medians_ms": [
+        1.026050000000001,
+        1.026175999999999
+      ],
+      "nfa_operator_total_ms": 26.971751499999993,
+      "nfa_operator_total_ms_arm_medians_ms": [
+        26.971308999999994,
+        26.97219399999999
+      ],
+      "flashinfer_dense_ms": 43.17417950000001,
+      "flashinfer_dense_ms_arm_medians_ms": [
+        43.318085000000025,
+        43.030273999999984
+      ],
+      "flashinfer_over_nfa_operator": 1.60071842201275,
+      "nfa_skip": {
+        "near_layers": [],
+        "far_layers": [],
+        "both_layers": []
+      },
+      "nfa_skip_by_arm": {
+        "a1": {
+          "near_layers": [],
+          "far_layers": [],
+          "both_layers": []
+        },
+        "a2": {
+          "near_layers": [],
+          "far_layers": [],
+          "both_layers": []
+        }
+      },
+      "kernel_coverage": {
+        "l1_ms": [
+          "_nfa_l1_scores_kernel",
+          "_nfa_page_stats_prepare_q_kernel",
+          "_topk_candidate_batched_kernel"
+        ],
+        "l2_ms": [
+          "_final_union_physical_kernel",
+          "_nfa_filtered_topk_kernel",
+          "_nfa_fine_scores_paged_kernel",
+          "_prepare_q_grouped_kernel"
+        ],
+        "main_attention_ms": [
+          "_gather_attend_grouped_kernel"
+        ]
+      },
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_1.jsonl",
+        "sha256": "3c6e2c4f330e68832111d67547761578c21a58179c6ef8b34f993ce0f054a73f",
+        "sample_index": 0,
+        "sample_id": 0,
+        "actual_prompt_tokens": 523812,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "gpu_hygiene": "clean"
+    }
+  ]
+}
