@@ -1759,7 +1759,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         workspace=workspace)
 
     # ---- final canonical union + physical mapping ------------------------
-    # 每个 KV group 独立合并 middle、保护集与 seed，并按真实 request slot 写回。
+    # 每个 KV group 独立合并 middle 与保护集，并按真实 request slot 写回。
     gather_out = cache.gather_indices_for_layer(layer_offset).unsqueeze(0)
     vis_out = cache.visible_lens_for_layer(layer_offset).unsqueeze(0)
     output_width = gather_out.shape[-1]

@@ -175,6 +175,103 @@ def _summary(step_ms, warmup):
     }
 
 
+def _strict_region_sets(length, geometry):
+    """独立计算首步 P/R/X；不得调用 cache 或 selector 的区间实现。"""
+    sink_hi = min(geometry.sink, length)
+    near_hi = max(sink_hi, length - geometry.window)
+    far_hi = min(near_hi, max(
+        sink_hi,
+        ((length - geometry.window - geometry.near) // geometry.page)
+        * geometry.page))
+    protected = set(range(sink_hi)) | set(range(near_hi, length))
+    far = set(range(sink_hi, far_hi))
+    near = set(range(far_hi, near_hi))
+    return protected, far, near
+
+
+def _strict_skip_receipt(cache, geometry, req_ids, gather, visible, planned_length):
+    """把首步物理 gather 反解为逻辑 ID，并独立检查 strict-skip 集合合同。"""
+    gather = gather.detach().cpu()
+    visible = visible.detach().cpu()
+    block_tables = cache.block_table_buf.detach().cpu()
+    page = geometry.page
+    reports = []
+    violations = []
+
+    def violation(layer, request_id, kv_head, message):
+        violations.append({
+            'layer': layer, 'request_id': request_id,
+            'kv_head': kv_head, 'message': message,
+        })
+
+    for layer in range(cache.n_layers):
+        for row, request_id in enumerate(req_ids):
+            state = cache.states[request_id]
+            skip_far = bool(state.skip_far_by_layer[layer])
+            skip_near = bool(state.skip_near_by_layer[layer])
+            protected, far, near = _strict_region_sets(planned_length, geometry)
+            excluded = (far if skip_far else set()) | (near if skip_near else set())
+            allowed = protected | far | near
+            table = block_tables[layer, request_id].tolist()
+            pages = (planned_length + page - 1) // page
+            inverse = {
+                int(physical): logical
+                for logical, physical in enumerate(table[:pages])
+                if int(physical) != cache.layers[layer].PAD_PAGE_ID
+            }
+            logical_by_kv = []
+            physical_by_kv = []
+            for kv_head in range(gather.shape[2]):
+                count = int(visible[layer, row, kv_head])
+                slots = [int(slot) for slot in gather[layer, row, kv_head, :count]]
+                logical_ids = []
+                if len(slots) != len(set(slots)):
+                    violation(layer, request_id, kv_head, 'duplicate physical gather slots')
+                for slot in slots:
+                    if slot < 0:
+                        violation(layer, request_id, kv_head, f'invalid gather slot {slot}')
+                        continue
+                    physical_page, offset = divmod(slot, page)
+                    logical_page = inverse.get(physical_page)
+                    if logical_page is None:
+                        violation(layer, request_id, kv_head,
+                                  f'physical page {physical_page} is not owned by request')
+                        continue
+                    logical_id = logical_page * page + offset
+                    logical_ids.append(logical_id)
+                    if table[logical_page] * page + offset != slot:
+                        violation(layer, request_id, kv_head,
+                                  f'logical/physical mapping mismatch at {logical_id}')
+                attended = set(logical_ids)
+                if len(logical_ids) != len(attended):
+                    violation(layer, request_id, kv_head, 'duplicate logical token IDs')
+                if not protected <= attended:
+                    violation(layer, request_id, kv_head, 'protected tokens are missing')
+                if attended & excluded:
+                    violation(layer, request_id, kv_head,
+                              f'frozen tokens re-entered: {sorted(attended & excluded)}')
+                if not attended <= allowed:
+                    violation(layer, request_id, kv_head, 'token outside P/R or current length')
+                if skip_far and skip_near and attended != protected:
+                    violation(layer, request_id, kv_head, 'both-skip set is not exactly protected')
+                logical_by_kv.append(logical_ids)
+                physical_by_kv.append(slots)
+            reports.append({
+                'layer': layer, 'request_id': request_id,
+                'skip_far': skip_far, 'skip_near': skip_near,
+                'block_table': table[:pages],
+                'logical_ids_by_kv_head': logical_by_kv,
+                'physical_slots_by_kv_head': physical_by_kv,
+            })
+    return {
+        'valid': not violations,
+        'planned_length': planned_length,
+        'oracle': 'independent P/R/X plus logical-to-physical address inversion',
+        'layers': reports,
+        'violations': violations,
+    }
+
+
 def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
     batch = args.batch_size
     patch_args = nfa_args()
@@ -221,6 +318,14 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
     token_history = (torch.empty(
         (decode_steps, batch), dtype=torch.long, device=prompt.device)
         if clean_decode else None)
+    capture_strict = args.measurement_mode == 'correctness'
+    first_gather = (torch.empty(
+        (cache.n_layers, batch, cache.num_kv_heads, cache.active_visible_bucket),
+        dtype=cache.gather_indices_buf.dtype, device=prompt.device)
+        if capture_strict else None)
+    first_visible = (torch.empty(
+        (cache.n_layers, batch, cache.num_kv_heads), dtype=torch.int32,
+        device=prompt.device) if capture_strict else None)
     for step in range(decode_steps):
         if clean_decode:
             counts = [step + 1] * batch
@@ -233,6 +338,12 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
             model, cache, generated_counts=counts, min_new_tokens=1,
             return_next_tokens=True, stop_on_eos=False)
         end.record()
+        if capture_strict and step == 0:
+            for layer in range(cache.n_layers):
+                first_gather[layer].copy_(
+                    cache.gather_indices_for_layer(layer)[req_ids])
+                first_visible[layer].copy_(
+                    cache.visible_lens_for_layer(layer)[req_ids])
         if clean_decode:
             token_history[step].copy_(tokens)
         else:
@@ -262,6 +373,9 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
         cache.visible_lens_for_layer(layer)
         for layer in range(cache.n_layers)
     ])[:, req_ids].detach().cpu().tolist()
+    strict_receipt = (_strict_skip_receipt(
+        cache, geometry, req_ids, first_gather, first_visible,
+        planned_length=prompt.numel() + 1) if capture_strict else None)
     result.update(prefill_seconds=prefill_seconds,
                   generated_token_ids=[generated[request_id] for request_id in req_ids],
                   skip_policy_counts={
@@ -280,6 +394,8 @@ def _run_nfa(args, model, prompt, max_new_tokens, eos_ids):
                   },
                   gate_mode='dynamic', gate_epsilon=args.gate_epsilon,
                   graph_replays=(len(step_ms) if args.execution == 'graph' else 0))
+    if strict_receipt is not None:
+        result['strict_skip_first_step'] = strict_receipt
     return result
 
 
@@ -576,8 +692,13 @@ def main():
     with open(args.output, 'w', encoding='utf-8') as handle:
         json.dump(result, handle, indent=2)
     print(json.dumps({key: value for key, value in result.items()
-                      if key not in ('generated_token_ids', 'tpot_ms_all')}, indent=2))
+                      if key not in ('generated_token_ids', 'tpot_ms_all',
+                                     'strict_skip_first_step')}, indent=2))
     print(f"saved -> {args.output}")
+    strict_receipt = result.get('strict_skip_first_step')
+    if strict_receipt is not None and not strict_receipt['valid']:
+        raise RuntimeError(
+            f"strict-skip first-step violations: {strict_receipt['violations']}")
 
 
 if __name__ == '__main__':
