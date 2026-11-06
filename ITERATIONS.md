@@ -100,4 +100,5 @@
   - 64K B1 eager：26.820064 → 26.928008 ms，0.995991×（负面格子）；Graph：10.339744 → 10.330152 ms，1.000929×。两臂均 3 个 near-skip 层、0 个 far-skip/both-skip 层，输入 SHA256=`6b10ff16…160b44663f`。
   - 128K B1 eager：26.751800 → 26.632064 ms，1.004496×；Graph：10.403416 → 10.392616 ms，1.001039×。两臂均 13 个 near-skip 层、0 个 far-skip/both-skip 层，输入 SHA256=`4078e45e…24eaec15dab5`。完整 TPOT 收益显著小于纯算子收益，不以 kernel 降幅替代 TPOT。
   - 32K B4 eager：28.546112 → 28.880896 ms，0.988408×（负面格子）；Graph：13.668768 → 13.656592 ms，1.000892×。每请求两臂均 2 个 far-skip 层、0 个 near-skip/both-skip 层，输入同 32K B1。
-- 下一步：继续 64K/128K、B1/B4、eager/Graph 完整 512-token decode ABBA，胜出候选补 B2；保留所有负面格子。
+- 原始分步补充诊断：对每格 steady 的 507 个 decode step 分别计算 `candidate_a-baseline_a`、`candidate_b-baseline_b`，再对两腿差值逐位置取平均；这不是新增性能格子，也不替代上述 run-level 正式汇总。32K B1 eager/Graph 的 ABBA step median 为 -0.333600/-0.002752 ms，64K B1 为 +0.144896/-0.011904 ms，128K B1 为 -0.089744/-0.012368 ms，32K B4 为 +0.330816/-0.014864 ms（负值表示候选更快）。64K B1 eager 两腿 median 均为正（+0.175423/+0.119265 ms），32K B4 eager 也均为正（+0.175104/+0.507904 ms）；128K B1 eager 两腿方向相反（+0.034721/-0.271936 ms），其小幅收益不确定性高于单向格子。
+- 下一步：继续 64K/128K、B1/B4、eager/Graph 完整 512-token decode ABBA，胜出候选补 B2；保留所有负面格子。当前 pc40/pc31/本机 GPU 均有他方计算进程，64K B4 在 preflight 前被干净门禁阻止、没有启动任何 run；不杀进程、不抢卡，也不凭上述子集提前调整 compact 门槛。
