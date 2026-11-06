@@ -8,8 +8,7 @@ import triton
 import sparse_attn.indexer.nfa_layer_batch_selector as selector_ops
 from sparse_attn.cache import GraphReadyPagedRegionCache
 from sparse_attn.indexer.nfa_indexer import NFAIndexer
-from sparse_attn.indexer.nfa_layer_batch_selector import (
-    mark_first_decode_seeded, select_topk_for_layer_batched)
+from sparse_attn.indexer.nfa_layer_batch_selector import select_topk_for_layer_batched
 from sparse_attn.ops.paged_region_kernels import sparse_paged_attention_gather
 from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
 from sparse_attn.policies.region_geometry import RegionGeometry
@@ -33,7 +32,7 @@ def _indexer(k1=4, near_pages=2):
     return NFAIndexer(args)
 
 
-def _make_cache(req_ids, lengths, skip_states, *, seeds=None, k1=4,
+def _make_cache(req_ids, lengths, skip_states, *, k1=4,
                 near_pages=2, num_kv_heads=1, max_physical_pages=64,
                 max_blocks=16, max_visible_len=640):
     cache = GraphReadyPagedRegionCache(
@@ -51,9 +50,7 @@ def _make_cache(req_ids, lengths, skip_states, *, seeds=None, k1=4,
             dtype=torch.bfloat16, device='cuda')
         values = torch.randn_like(keys)
         cache.write_prefill(0, request_id, keys, values)
-        layer_seeds = None if seeds is None else {0: seeds[request_id]}
-        cache.freeze(
-            request_id, [skip_far], [skip_near], layer_seeds)
+        cache.freeze(request_id, [skip_far], [skip_near])
     attention = SimpleNamespace(indexer=_indexer(k1, near_pages), scaling=1.0)
     return cache, attention, generator
 
@@ -193,60 +190,95 @@ def test_batched_rows_match_isolated_noncontiguous_requests_and_skip_states(
             _logical_ids(cache, request_id, row, kv_head=kv)
             for kv in range(num_kv_heads)]
         assert actual == expected[request_id]
-        sink_hi, far_hi, near_hi = GEOMETRY.bounds(length+1)
-        flat_actual = [token for group in actual for token in group]
-        if skip_far:
-            assert not any(sink_hi <= token < far_hi for token in flat_actual)
-        if skip_near:
-            assert not any(far_hi <= token < near_hi for token in flat_actual)
+        protected, selectable, excluded = _strict_region_oracle(
+            length + 1, skip_far, skip_near)
+        for group in actual:
+            attended = set(group)
+            assert len(group) == len(attended)
+            assert protected <= attended
+            assert attended <= protected | selectable
+            assert not attended & excluded
+            assert all(0 <= token < length + 1 for token in attended)
         if skip_far and skip_near:
-            assert all(len(group) == GEOMETRY.sink + GEOMETRY.window
-                       for group in actual)
+            assert all(set(group) == protected for group in actual)
 
 
-def test_first_decode_seed_union_is_deduplicated_and_consumed_once():
+def _strict_region_oracle(length, skip_far, skip_near):
+    """独立计算 P/R/X；不复用 cache 的区间或 selector 的 union 实现。"""
+    sink_hi = min(GEOMETRY.sink, length)
+    near_hi = max(sink_hi, length - GEOMETRY.window)
+    far_hi = min(near_hi, max(
+        sink_hi,
+        ((length - GEOMETRY.window - GEOMETRY.near) // PAGE) * PAGE))
+    protected = set(range(sink_hi)) | set(range(near_hi, length))
+    selectable = set(range(sink_hi, far_hi)) | set(range(far_hi, near_hi))
+    excluded = set()
+    if skip_far:
+        excluded.update(range(sink_hi, far_hi))
+    if skip_near:
+        excluded.update(range(far_hi, near_hi))
+    return protected, selectable, excluded
+
+
+def _strict_both_skip_oracle(length):
+    protected, _, excluded = _strict_region_oracle(length, True, True)
+    return protected, excluded
+
+
+def test_first_sparse_forward_both_skip_matches_independent_set_and_addresses():
     req_ids = [1, 3]
-    seeds = {
-        1: [2, 64, 65, 191],       # 2 与 sink 重叠，其余位于被跳过的 far。
-        3: [3, 192, 300, 449],    # 3/449 与保护集重叠，300 位于 near。
-    }
     cache, attention, generator = _make_cache(
-        req_ids, [448, 449], [(True, True), (True, True)], seeds=seeds)
-    _plan_and_write(cache, req_ids, generator)
+        req_ids, [448, 449], [(True, True), (True, True)])
     query = torch.randn(
         2, 2, HEAD_DIM, generator=generator,
         dtype=torch.bfloat16, device='cuda')
-    select_topk_for_layer_batched(
-        cache, 0, req_ids, query, attention=attention)
 
-    first = {rid: _logical_ids(cache, rid, row)
-             for row, rid in enumerate(req_ids)}
-    assert set(seeds[1]) <= set(first[1])
-    assert set(seeds[3]) <= set(first[3])
-    assert len(first[1]) == GEOMETRY.sink + GEOMETRY.window + 3
-    assert len(first[3]) == GEOMETRY.sink + GEOMETRY.window + 2
+    # 第一稀疏 forward 与后续稳态必须使用同一 strict-skip 集合合同。
+    for step in range(2):
+        _plan_and_write(cache, req_ids, generator)
+        select_topk_for_layer_batched(
+            cache, 0, req_ids, query, attention=attention)
+        actual_attention = sparse_paged_attention_gather(
+            cache.layers[0], query, cache.gather_indices_for_layer(0),
+            cache.visible_lens_for_layer(0),
+            torch.arange(len(req_ids), dtype=torch.int32, device='cuda'),
+            scale=1.0, split_kv=False)
+        for row, request_id in enumerate(req_ids):
+            length = cache.states[request_id].logical_length + 1
+            protected, excluded = _strict_both_skip_oracle(length)
+            actual = _logical_ids(cache, request_id, row)
+            assert len(actual) == len(set(actual))
+            assert set(actual) == protected
+            assert not set(actual) & excluded
 
-    # 与 GraphRunner 一致：整步所有层完成后才统一消费 seed。
-    # 当前契约为全量 KV 驻留；消费 seed 只改变可见集，不释放物理页。
-    global_free_before = len(cache.layers[0].free_ids)
-    block_tables_before = {
-        rid: dict(cache.states[rid].block_tables[0]) for rid in req_ids}
-    mark_first_decode_seeded(cache, req_ids)
-    cache.commit_step()
-    torch.cuda.synchronize()
-    assert len(cache.layers[0].free_ids) == global_free_before
-    for rid in req_ids:
-        assert cache.states[rid].block_tables[0] == block_tables_before[rid]
-    _plan_and_write(cache, req_ids, generator)
-    select_topk_for_layer_batched(
-        cache, 0, req_ids, query, attention=attention)
-    for row, request_id in enumerate(req_ids):
-        steady = _logical_ids(cache, request_id, row)
-        assert len(steady) == GEOMETRY.sink + GEOMETRY.window
-        assert not (set(seeds[request_id])-set(range(4))) & set(steady) & {
-            64, 65, 191, 192, 300}
-        assert cache.states[request_id].first_decode_seeded
-    assert cache.first_decode_seeded_buf[req_ids].tolist() == [1, 1]
+            # 每个最终 gather 物理槽必须反解到同一请求的有效逻辑 token。
+            count = int(cache.visible_lens_for_layer(0)[row, 0])
+            slots = cache.gather_indices_for_layer(0)[row, 0, :count].cpu().tolist()
+            inverse = {
+                physical: logical
+                for logical, physical in cache.states[request_id].block_tables[0].items()}
+            assert len(slots) == len(protected)
+            for slot in slots:
+                assert slot // PAGE in inverse
+                logical = inverse[slot // PAGE] * PAGE + slot % PAGE
+                assert logical in protected
+                assert 0 <= logical < length
+
+            # attention reference 直接使用独立 P 集合构造物理地址，不读 gather。
+            table = cache.states[request_id].block_tables[0]
+            reference_slots = torch.tensor(
+                [table[token // PAGE] * PAGE + token % PAGE
+                 for token in sorted(protected)], device='cuda')
+            phys, offset = reference_slots // PAGE, reference_slots % PAGE
+            k = cache.layers[0].kv_pool_k[phys, 0, 0, offset].float()
+            v = cache.layers[0].kv_pool_v[phys, 0, 0, offset].float()
+            probabilities = torch.softmax(k @ query[row, :2].float().T, dim=0)
+            expected_attention = probabilities.T @ v
+            torch.testing.assert_close(
+                actual_attention[row], expected_attention.to(actual_attention.dtype),
+                atol=.03, rtol=.03)
+        cache.commit_step()
+        torch.cuda.synchronize()
 
 
 def test_near_skip_reentry_incremental_stats_match_rebuild_and_slot_reuse_invalidates():
@@ -274,8 +306,6 @@ def test_near_skip_reentry_incremental_stats_match_rebuild_and_slot_reuse_invali
             reference, 0, [2], queries[step:step+1],
             attention=reference_attention)
         assert _logical_ids(incremental, 2, 0) == _logical_ids(reference, 2, 0)
-        mark_first_decode_seeded(incremental, [2])
-        mark_first_decode_seeded(reference, [2])
         incremental.commit_step()
         reference.commit_step()
 
@@ -361,13 +391,12 @@ def test_fixed_stats_grid_owner_writes_and_refreshes_latest_block():
                 cache.layers[0].kv_pool_v[physical, 0, 0, offset],
                 decode_write[1][0, 0, 0], rtol=0, atol=0)
         if step == 0:
-            mark_first_decode_seeded(cache, [2])
             cache.commit_step()
 
 
 def test_both_skip_light_path_replay_writes_decode_kv():
     cache, attention, generator = _make_cache(
-        [2], [448], [(True, True)], seeds={2: [64, 300]})
+        [2], [448], [(True, True)])
     _plan_and_write(cache, [2], generator)
     query = torch.randn(
         1, 2, HEAD_DIM, generator=generator,
@@ -380,12 +409,11 @@ def test_both_skip_light_path_replay_writes_decode_kv():
         cache, 0, [2], query, attention=attention,
         decode_write=(first_keys, first_values,
                       cache.slot_mapping_for_layer(0)[:1]))
-    assert set((64, 300)) <= set(_logical_ids(cache, 2, 0))
+    assert set(_logical_ids(cache, 2, 0)) == _strict_both_skip_oracle(449)[0]
 
     call_plan = cache._nfa_selector_workspace[
         ('eager_selector_call_plan', 0)]
     assert [item[0][0] for item in call_plan[1]] == ['final_union']
-    mark_first_decode_seeded(cache, [2])
     cache.commit_step()
 
     # 第二次调用走固定 eager launch 计划；轻路径没有 fused stats/Q kernel，
@@ -407,8 +435,7 @@ def test_both_skip_light_path_replay_writes_decode_kv():
     torch.testing.assert_close(
         cache.layers[0].kv_pool_v[physical, 0, 0, offset], values[0, 0, 0])
     steady = _logical_ids(cache, 2, 0)
-    assert len(steady) == GEOMETRY.sink + GEOMETRY.window
-    assert not {64, 300} & set(steady)
+    assert set(steady) == _strict_both_skip_oracle(450)[0]
 
 
 def test_both_skip_light_path_real_gqa_geometry():
@@ -432,7 +459,7 @@ def test_both_skip_light_path_real_gqa_geometry():
 
 def test_both_skip_light_path_capture_replay_writes_live_decode_kv():
     cache, attention, generator = _make_cache(
-        [2], [448], [(True, True)], seeds={2: [64, 300]})
+        [2], [448], [(True, True)])
     _plan_and_write(cache, [2], generator)
     query = torch.randn(
         1, 2, HEAD_DIM, generator=generator,
@@ -457,8 +484,7 @@ def test_both_skip_light_path_capture_replay_writes_live_decode_kv():
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):
         run()
-    assert set((64, 300)) <= set(_logical_ids(cache, 2, 0))
-    mark_first_decode_seeded(cache, [2])
+    assert set(_logical_ids(cache, 2, 0)) == _strict_both_skip_oracle(449)[0]
     cache.commit_step()
 
     cache.new_step([2])
@@ -476,8 +502,7 @@ def test_both_skip_light_path_capture_replay_writes_live_decode_kv():
     replay_ids = _logical_ids(cache, 2, 0)
     run()
     assert replay_ids == _logical_ids(cache, 2, 0)
-    assert len(replay_ids) == GEOMETRY.sink + GEOMETRY.window
-    assert not {64, 300} & set(replay_ids)
+    assert set(replay_ids) == _strict_both_skip_oracle(450)[0]
 
 
 def test_selector_capture_replay_uses_live_current_query():

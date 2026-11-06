@@ -52,8 +52,6 @@ class RequestState:
     block_tables: list = field(default_factory=list)
     skip_far_by_layer: list = field(default_factory=list)
     skip_near_by_layer: list = field(default_factory=list)
-    prefill_topk_ids_by_layer: dict = field(default_factory=dict)
-    first_decode_seeded: bool = False
     frozen: bool = False
     active: bool = True
     skip_policy_groups: tuple = ()
@@ -144,7 +142,6 @@ class GraphReadyPagedRegionCache:
         dtype,
         device,
         visible_buckets=None,
-        max_prefill_seed_len=128,
     ):
         device = torch.device(device)
         self.geometry = geometry
@@ -153,7 +150,6 @@ class GraphReadyPagedRegionCache:
         self.max_blocks = max_blocks
         self.max_visible_len = max_visible_len
         self.max_query_tokens = max_query_tokens
-        self.max_prefill_seed_len = max_prefill_seed_len
         self.num_kv_heads = num_kv_heads
         self.num_query_heads = num_kv_heads if num_query_heads is None else num_query_heads
 
@@ -304,53 +300,6 @@ class GraphReadyPagedRegionCache:
             self._cpu_planned_lengths_staging = self._cpu_planned_lengths_staging.pin_memory()
             self._cpu_skip_far_layer_staging = self._cpu_skip_far_layer_staging.pin_memory()
             self._cpu_skip_near_layer_staging = self._cpu_skip_near_layer_staging.pin_memory()
-        # 固定 prefill seed buffer：freeze 时一次性写入，decode 热路径不再
-        # 遍历 Python lists。seed 在 Top-K 完成后与 selection 做 canonical union。
-        self.prefill_seed_ids_buf = torch.full(
-            (n_layers, max_requests, max_prefill_seed_len),
-            -1,
-            dtype=torch.int32,
-            device=device,
-        )
-        self.prefill_seed_counts_buf = torch.zeros(
-            (n_layers, max_requests),
-            dtype=torch.int32,
-            device=device,
-        )
-        # 每个请求是否已完成首个 decode 步的 seed 合并。0=未合并（下次选择需
-        # 并入 prefill seed），1=已合并。整批所有层成功后统一置 1。
-        self.first_decode_seeded_buf = torch.zeros(
-            (max_requests,),
-            dtype=torch.int32,
-            device=device,
-        )
-        self._cpu_first_decode_seeded_staging = torch.zeros(
-            (max_requests,),
-            dtype=torch.int32,
-            device='cpu',
-        )
-        # 首步 seed 消费使用固定 request-id staging，避免每步创建 GPU 张量。
-        self.first_decode_seed_reqs_buf = torch.zeros(
-            (max_requests,), dtype=torch.int64, device=device)
-        self._cpu_first_decode_seed_reqs_staging = torch.zeros(
-            (max_requests,), dtype=torch.int64, device='cpu')
-        self._cpu_prefill_seed_ids_staging = torch.full(
-            (n_layers, max_requests, max_prefill_seed_len),
-            -1,
-            dtype=torch.int32,
-            device='cpu',
-        )
-        self._cpu_prefill_seed_counts_staging = torch.zeros(
-            (n_layers, max_requests),
-            dtype=torch.int32,
-            device='cpu',
-        )
-        if device.type == 'cuda':
-            self._cpu_prefill_seed_ids_staging = self._cpu_prefill_seed_ids_staging.pin_memory()
-            self._cpu_prefill_seed_counts_staging = self._cpu_prefill_seed_counts_staging.pin_memory()
-            self._cpu_first_decode_seeded_staging = self._cpu_first_decode_seeded_staging.pin_memory()
-            self._cpu_first_decode_seed_reqs_staging = self._cpu_first_decode_seed_reqs_staging.pin_memory()
-
         # Optional visible-length graph buckets.  ``max_visible_len`` itself is
         # always served by the primary contiguous buffers; smaller buckets own
         # contiguous scratch tensors so graph capture can select a tighter
@@ -438,7 +387,7 @@ class GraphReadyPagedRegionCache:
                     (new - old for new, old in zip(current_lengths, old_lengths)),
                     default=0)
                 # 每个请求的 coarse 区间总长度随 logical length 的增长量
-                # 不超过长度增量；seed 消失只会缩小支持集。
+                # 不超过长度增量。
                 if old_max + max_delta <= old_width:
                     return old_width
 
@@ -446,14 +395,11 @@ class GraphReadyPagedRegionCache:
         for state, length in zip(states, lengths):
             if state is None:
                 continue
-            seed_max = max(
-                (len(ids) for ids in state.prefill_topk_ids_by_layer.values()),
-                default=0)
             groups = (state.skip_policy_groups
                       or self._build_skip_policy_groups(state))
             for _key, layer_idx in groups:
                 intervals = self._intervals_for_layer(state, layer_idx, length)
-                total = sum(b - a for a, b in intervals) + seed_max
+                total = sum(b - a for a, b in intervals)
                 max_total = max(max_total, total)
         width = self.max_visible_len
         for candidate in sorted(visible_buckets):
@@ -584,8 +530,7 @@ class GraphReadyPagedRegionCache:
             layer, keys, values, self.block_table_buf[layer_idx, request_id],
             workspace=workspace)
 
-    def freeze(self, request_id, skip_far_list, skip_near_list,
-               prefill_topk_by_layer=None):
+    def freeze(self, request_id, skip_far_list, skip_near_list):
         state = self.states[request_id]
         if len(skip_far_list) != self.n_layers or len(skip_near_list) != self.n_layers:
             raise ValueError('freeze expects per-layer skip decisions')
@@ -609,32 +554,6 @@ class GraphReadyPagedRegionCache:
         # request slot 复用时强制下一步全量重建 NFA 持久页统计。
         if hasattr(self, '_nfa_page_stats_lengths'):
             self._nfa_page_stats_lengths[:, request_id].zero_()
-        if prefill_topk_by_layer is not None:
-            state.prefill_topk_ids_by_layer = {
-                layer_idx: [int(x) for x in prefill_topk_by_layer.get(layer_idx, [])]
-                for layer_idx in range(self.n_layers)
-            }
-            # 一次性把 Python seed lists 固化到 GPU buffer，decode 热路径零遍历。
-            for layer_idx in range(self.n_layers):
-                seed_ids = state.prefill_topk_ids_by_layer[layer_idx]
-                if len(seed_ids) > self.max_prefill_seed_len:
-                    raise ValueError(
-                        f'prefill seed length {len(seed_ids)} exceeds capacity '
-                        f'{self.max_prefill_seed_len} at layer {layer_idx}')
-                self._cpu_prefill_seed_counts_staging[layer_idx, request_id] = len(seed_ids)
-                if seed_ids:
-                    self._cpu_prefill_seed_ids_staging[layer_idx, request_id, :len(seed_ids)] = \
-                        torch.as_tensor(seed_ids, dtype=torch.int32)
-                    self._cpu_prefill_seed_ids_staging[layer_idx, request_id, len(seed_ids):] = -1
-                else:
-                    self._cpu_prefill_seed_ids_staging[layer_idx, request_id, :] = -1
-            self.prefill_seed_ids_buf[:, request_id].copy_(
-                self._cpu_prefill_seed_ids_staging[:, request_id],
-                non_blocking=non_blocking)
-            self.prefill_seed_counts_buf[:, request_id].copy_(
-                self._cpu_prefill_seed_counts_staging[:, request_id],
-                non_blocking=non_blocking)
-
         # 所有 skip 策略共用 prompt + max_new_tokens 的物理容量上限；实际页
         # 已在 prefill 分配，后续 decode 仅在跨入新逻辑页时追加分配。
         page = self.geometry.page
@@ -644,7 +563,6 @@ class GraphReadyPagedRegionCache:
             raise ValueError(
                 'prompt + max_new_tokens exceeds fixed block-table capacity')
 
-        state.first_decode_seeded = False
         self._write_block_table_row(request_id, state)
         self.block_table_buf[:, request_id].copy_(
             self._cpu_block_table_staging[:, request_id],
@@ -652,11 +570,6 @@ class GraphReadyPagedRegionCache:
         self.common_dirty = True
         state.frozen = True
         self.transition_request(request_id, RequestPhase.FREEZE)
-        state.first_decode_seeded = False
-        self._cpu_first_decode_seeded_staging[request_id] = 0
-        self.first_decode_seeded_buf[request_id].copy_(
-            self._cpu_first_decode_seeded_staging[request_id],
-            non_blocking=non_blocking)
 
     # ------------------------------------------------------------------
     # Region helpers

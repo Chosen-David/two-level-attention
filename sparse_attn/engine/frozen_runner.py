@@ -7,8 +7,7 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
 from sparse_attn.cache.paged_region_cache import (
     GraphReadyPagedRegionCache, RequestPhase)
-from sparse_attn.policies.frozen_gate import (
-    decide_regions, profile_core_tokens, profile_regions_and_core_tokens)
+from sparse_attn.policies.frozen_gate import decide_regions, profile_regions
 from sparse_attn.policies.static_gate import StaticGateDecision
 from sparse_attn.scheduler.scheduler import greedy_next_tokens
 
@@ -23,7 +22,7 @@ def capture_profiles(cache, geometry, config):
         layer_idx = module.layer_idx
         if layer_idx in profiles:
             raise ValueError('multiple prefill chunks unsupported')
-        profile = profile_regions_and_core_tokens(
+        profile = profile_regions(
             query, key, geometry, rows=config.rows,
             scale=kwargs.get('scaling', module.scaling))
         profiles[layer_idx] = profile
@@ -32,28 +31,6 @@ def capture_profiles(cache, geometry, config):
     ALL_ATTENTION_FUNCTIONS['sdpa'] = profiled
     try:
         yield profiles
-    finally:
-        ALL_ATTENTION_FUNCTIONS['sdpa'] = original
-
-
-@contextmanager
-def capture_core_tokens(cache, geometry, config):
-    """Capture only first-decode seed tokens without running gate profiling."""
-    original = ALL_ATTENTION_FUNCTIONS['sdpa']
-    core = {}
-
-    def profiled(module, query, key, value, *args, **kwargs):
-        layer_idx = module.layer_idx
-        if layer_idx in core:
-            raise ValueError('multiple prefill chunks unsupported')
-        core[layer_idx] = profile_core_tokens(
-            query, key, geometry, rows=config.rows,
-            scale=kwargs.get('scaling', module.scaling))
-        return original(module, query, key, value, *args, **kwargs)
-
-    ALL_ATTENTION_FUNCTIONS['sdpa'] = profiled
-    try:
-        yield core
     finally:
         ALL_ATTENTION_FUNCTIONS['sdpa'] = original
 
@@ -110,7 +87,6 @@ def build_frozen_cache(model, geometry, sequence_capacity, *, max_requests=1,
         head_dim_v=head_dim_v,
         dtype=model.dtype,
         device=next(model.parameters()).device,
-        max_prefill_seed_len=128,
     )
 
 
@@ -119,10 +95,9 @@ def prefill_frozen_request(model, input_ids, config, geometry, static_gate=None,
     """Run one-shot dense prefill directly inside GraphReadyPagedRegionCache.
 
     When ``static_gate`` is None the original request-time calibration runs
-    (dynamic frozen gate).  When provided, only the first-decode seed tokens
-    are profiled and the per-layer near/far skip decisions are read from the
-    precomputed artifact.  调用方可传入共享 Cache，逐请求 prefill 后统一批量
-    decode；缺省仍创建独立 B1 Cache。
+    (dynamic frozen gate).  When provided, the per-layer near/far skip decisions
+    are read directly from the precomputed artifact.  调用方可传入共享 Cache，
+    逐请求 prefill 后统一批量 decode；缺省仍创建独立 B1 Cache。
     """
     n_layers = model.config.num_hidden_layers
     prompt_length = int(input_ids.shape[-1])
@@ -159,22 +134,11 @@ def prefill_frozen_request(model, input_ids, config, geometry, static_gate=None,
             }
             skip_far = [decisions[layer_idx]['skip_far'] for layer_idx in range(n_layers)]
             skip_near = [decisions[layer_idx]['skip_near'] for layer_idx in range(n_layers)]
-            prefill_topk_by_layer = {}
-            for layer_idx, profile in profiles.items():
-                ids = []
-                if decisions[layer_idx]['skip_far']:
-                    ids.extend(profile['core'].get('far', []))
-                if decisions[layer_idx]['skip_near']:
-                    ids.extend(profile['core'].get('near', []))
-                prefill_topk_by_layer[layer_idx] = sorted(set(ids))
         else:
             _validate_static_gate(
                 static_gate, n_layers, getattr(model.config, 'model_type', None))
-            with capture_core_tokens(cache, geometry, config) as core:
-                output = model(input_ids, past_key_values=cache, use_cache=True,
-                               logits_to_keep=1)
-            if len(core) != model.config.num_hidden_layers:
-                raise ValueError('incomplete native layer core-token profiling')
+            output = model(input_ids, past_key_values=cache, use_cache=True,
+                           logits_to_keep=1)
             skip_far = list(static_gate.skip_far)
             skip_near = list(static_gate.skip_near)
             decisions = {
@@ -182,16 +146,8 @@ def prefill_frozen_request(model, input_ids, config, geometry, static_gate=None,
                             'skip_far': skip_far[layer_idx]}
                 for layer_idx in range(n_layers)
             }
-            prefill_topk_by_layer = {}
-            for layer_idx in range(n_layers):
-                ids = []
-                if skip_far[layer_idx]:
-                    ids.extend(core[layer_idx].get('far', []))
-                if skip_near[layer_idx]:
-                    ids.extend(core[layer_idx].get('near', []))
-                prefill_topk_by_layer[layer_idx] = sorted(set(ids))
 
-        cache.freeze(request_id, skip_far, skip_near, prefill_topk_by_layer)
+        cache.freeze(request_id, skip_far, skip_near)
         return output, dict(profiles=None if static_gate is not None else profiles,
                             decisions=decisions,
                             request_id=request_id,

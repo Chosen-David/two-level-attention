@@ -67,17 +67,13 @@ class GraphReadyPagedRegionCacheTest(unittest.TestCase):
                 torch.full((2, 4), float(value))))
 
     def test_block_table_h2d_only_when_sequence_enters_new_page(self):
-        from sparse_attn.indexer.nfa_layer_batch_selector import (
-            mark_first_decode_seeded)
-
         cache = self._make_cache(n_layers=1)
         req = cache.add_request()
         cache.write_prefill(0, req, torch.randn(1, 2, 20, 4),
                             torch.randn(1, 2, 20, 4))
-        cache.freeze(req, [True], [True], {0: [8]})
+        cache.freeze(req, [True], [True])
         cache.new_step([req])
         cache.plan_common([req])
-        mark_first_decode_seeded(cache, [req])
         cache.commit_step()
 
         original_prepare = cache._prepare_common
@@ -132,26 +128,22 @@ class GraphReadyPagedRegionCacheTest(unittest.TestCase):
             for req in (1, 3):
                 cache.remove_request(req)
 
-    def test_far_seed_consumption_does_not_change_physical_pages(self):
-        from sparse_attn.indexer.nfa_layer_batch_selector import (
-            mark_first_decode_seeded)
-
+    def test_decode_commit_does_not_change_physical_pages(self):
         cache = self._make_cache(n_layers=1)
         req = cache.add_request()
         cache.write_prefill(0, req, torch.randn(1, 2, 40, 4),
                             torch.randn(1, 2, 40, 4))
-        cache.freeze(req, [True], [True], {0: [16, 20, 24]})
+        cache.freeze(req, [True], [True])
         state = cache.states[req]
         before = dict(state.block_tables[0])
         self.assertTrue({4, 5, 6}.issubset(before))
 
         cache.new_step([req])
         cache.plan_common([req])
-        # 长度 40 位于页边界，本步正常追加一页；此后的 seed 消费不再改页表。
+        # 长度 40 位于页边界，本步正常追加一页；commit 不再改页表。
         before = dict(state.block_tables[0])
         global_free = len(cache.layers[0].free_ids)
         block_table_before = cache.block_table_buf.clone()
-        mark_first_decode_seeded(cache, [req])
         cache.commit_step()
         self.assertEqual(state.block_tables[0], before)
         self.assertTrue(torch.equal(cache.block_table_buf, block_table_before))

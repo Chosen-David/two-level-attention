@@ -160,9 +160,6 @@ class GraphRunner:
         # 回执只在 step 边界记录一次；具体设备数据延迟到请求结束时读取，
         # 不在各层 forward 中更新 Python 对象或触发 D2H。
         cache.nfa_decode_steps += 1
-        # 所有层均完成当前 Q 选择后，才统一消费 first-decode seed。
-        from ..indexer.nfa_layer_batch_selector import mark_first_decode_seeded
-        mark_first_decode_seeded(cache, padded_ids)
         cache.commit_step()
         next_tokens = self.scheduler.record_next_tokens(
             padded_ids, logits, generated_counts=generated_counts,

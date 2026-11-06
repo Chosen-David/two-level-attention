@@ -809,10 +809,9 @@ if _has_triton():
 
     @triton.jit
     def _final_union_physical_kernel(
-        MIDDLE, MIDDLE_COUNTS, LENGTHS, ACTIVE_REQ, VALID_REQ,
-        FIRST_DECODE_SEEDED, SEED_IDS, SEED_COUNTS, BLOCK_TABLE,
+        MIDDLE, MIDDLE_COUNTS, LENGTHS, VALID_REQ, BLOCK_TABLE,
         GATHER, VIS_LENS,
-        W: tl.constexpr, PROT: tl.constexpr, MAX_SEED: tl.constexpr,
+        W: tl.constexpr, PROT: tl.constexpr,
         N: tl.constexpr, N_PAD: tl.constexpr, A_PAD: tl.constexpr,
         MERGE_BITS: tl.constexpr,
         SINK: tl.constexpr, SWA: tl.constexpr, CAP: tl.constexpr,
@@ -821,7 +820,7 @@ if _has_triton():
         INVALID: tl.constexpr, HKV: tl.constexpr, B: tl.constexpr,
         LAYER_OFFSET: tl.constexpr, EMPTY: tl.constexpr,
     ):
-        """逐 KV group 做 middle ∪ protected ∪ seed 并写物理槽。"""
+        """逐 KV group 做 middle ∪ protected 并写物理槽。"""
         row = tl.program_id(0)
         m = row // HKV
         kv = row % HKV
@@ -833,7 +832,7 @@ if _has_triton():
         in_n = offs < N
 
         # ranking 的 middle 已经按逻辑 token 升序；只需排序较短的
-        # protected+seed，再把第二路反转后与 middle 做 bitonic merge。
+        # protected，再把第二路反转后与 middle 做 bitonic merge。
         if EMPTY:
             middle_count = 0
             middle_id = tl.full(offs.shape, CAP, tl.int32)
@@ -853,21 +852,8 @@ if _has_triton():
         swa_id = length - SWA + aux_offs - sink_count
         protected_id = tl.where(in_sink, aux_offs, swa_id)
 
-        seed_col = aux_offs - PROT
-        seed_count = tl.load(
-            SEED_COUNTS + (layer + LAYER_OFFSET) * MAX_REQ + req_id)
-        seed_needed = ((tl.load(FIRST_DECODE_SEEDED + req_id) == 0)
-                       & (tl.load(ACTIVE_REQ + req) >= 0))
-        seed = ((seed_col >= 0) & (seed_col < MAX_SEED)
-                & (seed_col < seed_count) & seed_needed)
-        seed_id = tl.load(
-            SEED_IDS + ((layer + LAYER_OFFSET) * MAX_REQ + req_id) * MAX_SEED
-            + seed_col,
-            mask=seed, other=CAP)
-        aux_id = tl.where(prot, protected_id, seed_id)
-        aux_valid = in_sink | in_swa | seed
-        aux_id = tl.where(aux_valid & (aux_id >= 0) & (aux_id < CAP),
-                          aux_id, CAP)
+        aux_id = tl.where((in_sink | in_swa) & (protected_id >= 0)
+                          & (protected_id < CAP), protected_id, CAP)
         aux_sorted = tl.sort(aux_id, descending=False)
 
         reverse_idx = 2 * W - 1 - offs
@@ -1496,9 +1482,9 @@ def select_topk_for_layer_batched(cache, layer_idx, req_ids,
             q_src = query_states.unsqueeze(0)
             q_geometry = (q_src.dtype, q_src.data_ptr() % 16,
                           q_src.stride(0), q_src.stride(1), q_src.stride(2))
-            if (q_geometry == geometry[27:32]
-                    and protected_only == geometry[32]):
-                if geometry[32] and decode_write is not None:
+            if (q_geometry == geometry[26:31]
+                    and protected_only == geometry[31]):
+                if geometry[31] and decode_write is not None:
                     # both-skip 轻路径没有 page-stats/Q fused kernel 可携带
                     # decode 写入，重放 final union 前必须显式写当前 K/V。
                     cache.write_decode(layer_idx, *decode_write)
@@ -1568,7 +1554,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     else:
         q_dims = None
 
-    # PAD 行使用 request 0 的安全页表地址，但 length=0 且不消费 seed。
+    # PAD 行使用 request 0 的安全页表地址，但 length=0，因而不产生可见 token。
     active_req_t = cache.active_req_ids_buf[:b]
     valid_req_t = cache.valid_req_ids_buf[:b]
     scale_bufs = getattr(cache, '_attention_scale_bufs', None)
@@ -1604,8 +1590,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     geometry = (
         b, n_layers, hq, hkv, group_size, bs, page, pad, kt_cap, s_cap,
         capturing,
-        cache.max_requests, cache.active_visible_bucket,
-        cache.prefill_seed_ids_buf.shape[-1], dims.numel(),
+        cache.max_requests, cache.active_visible_bucket, dims.numel(),
         indexer.enable_subspace, indexer.l2_subspace, indexer.cmp_ratio,
         indexer.far_method, indexer.near_method, indexer.nt_near_pages,
         indexer.nt_near_len, indexer.args.tia_level1_topk,
@@ -1631,7 +1616,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
 
     if protected_only:
         # middle quota 恒为 0：跳过页统计、L1/L2、candidate 与 ranking，
-        # 但仍复用 canonical union，保证保护集、seed 去重和物理映射一致。
+        # 但仍复用 canonical union，保证保护集去重和物理映射一致。
         if decode_write is not None:
             # paged write 由公共 eager replay 入口显式执行，不能录进本层
             # selector 计划，否则旧 K/V 会在当前写入之后再次覆盖同一 slot。
@@ -1644,8 +1629,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         output_width = gather_out.shape[-1]
         prot_width = min(
             s_cap, int(indexer.sink_tokens + indexer.sliding_window_size))
-        max_seed = cache.prefill_seed_ids_buf.shape[-1]
-        aux_width = prot_width + max_seed
+        aux_width = prot_width
         empty_middle = _workspace_empty(
             workspace, 'empty_middle', (m * hkv, aux_width), torch.int32, device)
         empty_counts = _workspace_empty(
@@ -1655,13 +1639,11 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         union_width = 2 * aux_width
         _fast_launch(workspace, ('final_union', layer_offset, 'empty'),
                      _final_union_physical_kernel, (m * hkv,),
-            empty_middle, empty_counts, lengths, active_req_t, valid_req_t,
-            cache.first_decode_seeded_buf, cache.prefill_seed_ids_buf,
-            cache.prefill_seed_counts_buf, cache.block_table_buf,
+            empty_middle, empty_counts, lengths, valid_req_t, cache.block_table_buf,
             gather_out, vis_out,
-            W=aux_width, PROT=prot_width, MAX_SEED=max_seed,
+            W=aux_width, PROT=prot_width,
             N=union_width, N_PAD=triton.next_power_of_2(union_width),
-            A_PAD=triton.next_power_of_2(prot_width + max_seed),
+            A_PAD=triton.next_power_of_2(prot_width),
             MERGE_BITS=(triton.next_power_of_2(union_width)).bit_length() - 1,
             SINK=int(indexer.sink_tokens), SWA=int(indexer.sliding_window_size),
             CAP=s_cap, MAX_BLOCKS=cache.max_blocks, PAGE=page,
@@ -1783,17 +1765,14 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     output_width = gather_out.shape[-1]
     prot_width = min(
         s_cap, int(indexer.sink_tokens + indexer.sliding_window_size))
-    max_seed = cache.prefill_seed_ids_buf.shape[-1]
-    union_width = middle.indices.shape[-1] + prot_width + max_seed
+    union_width = middle.indices.shape[-1] + prot_width
     _fast_launch(workspace, ('final_union', layer_offset),
                  _final_union_physical_kernel, (m * hkv,),
-        middle.indices, middle.counts, lengths, active_req_t, valid_req_t,
-        cache.first_decode_seeded_buf, cache.prefill_seed_ids_buf,
-        cache.prefill_seed_counts_buf, cache.block_table_buf,
+        middle.indices, middle.counts, lengths, valid_req_t, cache.block_table_buf,
         gather_out, vis_out,
-        W=middle.indices.shape[-1], PROT=prot_width, MAX_SEED=max_seed,
+        W=middle.indices.shape[-1], PROT=prot_width,
         N=union_width, N_PAD=triton.next_power_of_2(union_width),
-        A_PAD=triton.next_power_of_2(prot_width + max_seed),
+        A_PAD=triton.next_power_of_2(prot_width),
         MERGE_BITS=(triton.next_power_of_2(union_width)).bit_length() - 1,
         SINK=int(indexer.sink_tokens), SWA=int(indexer.sliding_window_size),
         CAP=s_cap, MAX_BLOCKS=cache.max_blocks, PAGE=page,
@@ -1807,23 +1786,3 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         _store_eager_selector_call_plan(workspace, plan_key, geometry)
     else:
         workspace.pop('_nfa_eager_record', None)
-
-
-def mark_first_decode_seeded(cache, req_ids):
-    """Consume prefill seeds once, after all layers completed selection."""
-    valid_req_ids = [
-        rid for rid in req_ids
-        if rid is not None and rid >= 0 and rid in cache.states
-        and not cache.states[rid].first_decode_seeded
-    ]
-    if not valid_req_ids:
-        return
-    count = len(valid_req_ids)
-    for row, rid in enumerate(valid_req_ids):
-        cache._cpu_first_decode_seed_reqs_staging[row] = rid
-    cache.first_decode_seed_reqs_buf[:count].copy_(
-        cache._cpu_first_decode_seed_reqs_staging[:count], non_blocking=True)
-    cache.first_decode_seeded_buf[
-        cache.first_decode_seed_reqs_buf[:count]] = 1
-    for rid in valid_req_ids:
-        cache.states[rid].first_decode_seeded = True

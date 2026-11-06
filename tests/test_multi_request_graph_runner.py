@@ -62,8 +62,7 @@ def _prefill_cache(model, req_ids):
         cache.freeze(
             request_id,
             [request_id % 2 == 0] * 2,
-            [request_id % 3 == 0] * 2,
-            {0: [], 1: []})
+            [request_id % 3 == 0] * 2)
     return cache, first_tokens
 
 
@@ -143,7 +142,7 @@ def test_dynamic_eos_completion_and_request_admission(capture_graph):
             output = model(
                 _input_ids(request_id), past_key_values=cache,
                 use_cache=True, logits_to_keep=1)
-            cache.freeze(request_id, [True] * 2, [True] * 2, {0: [], 1: []})
+            cache.freeze(request_id, [True] * 2, [True] * 2)
             scheduler.add_request(request_id)
             scheduler.next_tokens[request_id] = int(output.logits[0, -1].argmax())
             cache.transition_request(request_id, RequestPhase.GENERATE)
@@ -195,7 +194,7 @@ def test_eager_request_admission_invalidates_protected_only_plan():
     output = model(
         _input_ids(1), past_key_values=cache, use_cache=True,
         logits_to_keep=1)
-    cache.freeze(1, [False] * 2, [False] * 2, {0: [], 1: []})
+    cache.freeze(1, [False] * 2, [False] * 2)
     scheduler.add_request(1)
     scheduler.next_tokens[1] = int(output.logits[0, -1].argmax())
     cache.transition_request(1, RequestPhase.GENERATE)
