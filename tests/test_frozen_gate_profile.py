@@ -100,3 +100,33 @@ def test_streaming_profile_matches_legacy_on_cuda(length):
             assert actual[name][statistic] == pytest.approx(
                 expected[name][statistic], abs=1e-6, rel=0)
     assert actual['core'] == expected['core']
+
+
+@pytest.mark.parametrize('device', [
+    'cpu',
+    pytest.param('cuda', marks=pytest.mark.skipif(
+        not torch.cuda.is_available(), reason='requires CUDA')),
+])
+@pytest.mark.parametrize('kind', ['random', 'ties', 'zeros'])
+@pytest.mark.parametrize('topk', [0, 1, 64])
+@pytest.mark.parametrize('length', [1, 7, 64, 257])
+def test_contiguous_core_selection_matches_legacy(
+        device, kind, topk, length):
+    torch.manual_seed(20261106 + length + topk)
+    geometry = RegionGeometry(
+        sink=4, near=16, window=8, page=4, max_new_tokens=3)
+    if kind == 'random':
+        q = torch.randn(1, 4, length, 32, device=device)
+        k = torch.randn(1, 2, length, 32, device=device)
+    elif kind == 'ties':
+        q = torch.ones(1, 4, length, 32, device=device)
+        k = torch.ones(1, 2, length, 32, device=device)
+    else:
+        q = torch.zeros(1, 4, length, 32, device=device)
+        k = torch.zeros(1, 2, length, 32, device=device)
+    rows, chunk, scale = 17, 5, .7
+    expected = _legacy_profile(
+        q, k, geometry, rows, chunk, topk, scale)['core']
+    actual = profile_regions_and_core_tokens(
+        q, k, geometry, rows=rows, chunk=chunk, topk=topk, scale=scale)
+    assert actual['core'] == expected
