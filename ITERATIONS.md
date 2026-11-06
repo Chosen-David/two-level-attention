@@ -25,8 +25,15 @@
 - 候选来源：`8807738f..e1e58733`，仅移植 selector 与 CUDA 对拍测试。
 - 修改：`KT > 512` 且并行 candidate expansion 时，以 512-wide partial Top-K 加精确归并替代整行单 CTA Top-K；eager 保留原 fused kernel。原始 BF16 分数与 int32 partial 使用独立指针。
 - 正确性：pc40 GPU1，`tests/ops/test_l1_topk_tiled_cuda.py -v` 2/2 通过，7 组索引子测试及 fused candidate 全输出逐位一致；覆盖 ties、NaN、±Inf、非整块、K=0/1。
-- 性能：本轮尚未测量，不引用旧分支加速比。
-- 下一步：strict 回归、真实模型 eager/Graph 身份门禁与 32K/64K/128K ABBA。
+- 性能：B1、原生 RULER `niah_multikey_1` sample 0、512 new tokens、3 warmup、独立进程 ABBA；baseline=`eb4677a2`，candidate=`53ec0888`，8 runs/格均完成且 `gpu_hygiene=clean`，repeat 与 baseline/candidate token identity 全部通过。
+  - 32K eager：26.868000 → 26.739632 ms，1.004801×（far=2）。
+  - 32K Graph：9.856648 → 9.953856 ms，0.990234×（far=2，负面格子）。
+  - 64K eager：26.448864 → 26.605808 ms，0.994101×（near=3，负面格子）。
+  - 64K Graph：10.725512 → 10.407408 ms，1.030565×（near=3）。
+  - 128K eager：26.667720 → 26.345000 ms，1.012250×（near=13）。
+  - 128K Graph：12.055552 → 10.441184 ms，1.154615×（near=13）。
+- 口径：128K Graph 收益在当前 strict 基线复现；32K Graph 与 64K eager 为负面结果，不宣称全长度加速。
+- 下一步：与 L2 load 前过滤、L1 按需统计组合后重新做身份门禁与完整 decode ABBA。
 
 ## Iter 3 — L2 middle 候选在物理页与低维 K 读取前过滤
 
@@ -47,3 +54,12 @@
 - CPU 回归：`test_strict_skip_receipt.py` 7/7 通过。
 - 性能：本轮尚未测量，不宣称加速。
 - 下一步：合并候选做真实模型身份、纯算子和完整 decode ABBA。
+
+## Iter 5 — skipped L1 池跳过 Top-K 局部排序与归并
+
+- 日期：2026-11-07。
+- 基线：`f313e725d2ac1d46e60450c5462554bc37185967`（L1 tiled + L2 load 前过滤 + L1 按需统计）。
+- 修改：从设备 skip flags 推导每行 far/near gate；skipped pool 的 partial kernel 不读取 score、不执行局部排序，candidate Top-K 不读取 partial、不执行归并，直接生成与原全 `-inf` packed-key Top-K 相同的 `0..K-1` 索引。eager fused 与 Graph parallel prepare 共用 `_l1_candidate_topk_body`；非 skip 路径、候选展开及最终集合语义不变。
+- 正确性：CPU strict/cache 回归 18 passed、5 subtests passed；pc40 GPU1 `tests/ops/test_l1_topk_tiled_cuda.py -v` 4/4 通过，覆盖四态 gate、tiled/non-tiled、非连续 request slot、ties/NaN/±Inf，以及单元素 skipped score/partial 存储的不读取验证；fused candidate 与 parallel prepare 均和修改前 oracle 逐位一致。
+- 性能：本轮尚未测量，不宣称加速。
+- 下一步：独立静态复核后同步干净提交，执行真实模型 eager/Graph token identity、纯算子和完整 decode ABBA。

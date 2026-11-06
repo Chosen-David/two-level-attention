@@ -962,19 +962,43 @@ if _has_triton():
         tl.store(OUT + (row * NTILES + tile) * K_PAD + top_idx, top)
 
     @triton.jit
+    def _l1_row_skip_flags(
+        SKIP_FAR, SKIP_NEAR, VALID_REQ, row,
+        HKV: tl.constexpr, B: tl.constexpr,
+        MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
+    ):
+        m = row // HKV
+        layer = m // B
+        req = m % B
+        req_id = tl.load(VALID_REQ + req).to(tl.int32)
+        skip_far = tl.load(
+            SKIP_FAR + (layer + LAYER_OFFSET) * MAX_REQ + req_id) != 0
+        skip_near = tl.load(
+            SKIP_NEAR + (layer + LAYER_OFFSET) * MAX_REQ + req_id) != 0
+        return skip_far, skip_near
+
+    @triton.jit
     def _l1_topk_partial_kernel(
         FAR_SCORES, NEAR_SCORES, FAR_PARTIAL, NEAR_PARTIAL,
+        SKIP_FAR, SKIP_NEAR, VALID_REQ,
         KT: tl.constexpr, TILE: tl.constexpr, NTILES: tl.constexpr,
         K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
+        HKV: tl.constexpr, B: tl.constexpr,
+        MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
     ):
         row = tl.program_id(0)
         tile = tl.program_id(1)
-        _l1_topk_partial_body(
-            FAR_SCORES, FAR_PARTIAL, row, tile,
-            KT=KT, TILE=TILE, NTILES=NTILES, K_PAD=K_F_PAD)
-        _l1_topk_partial_body(
-            NEAR_SCORES, NEAR_PARTIAL, row, tile,
-            KT=KT, TILE=TILE, NTILES=NTILES, K_PAD=K_N_PAD)
+        skip_far, skip_near = _l1_row_skip_flags(
+            SKIP_FAR, SKIP_NEAR, VALID_REQ, row,
+            HKV=HKV, B=B, MAX_REQ=MAX_REQ, LAYER_OFFSET=LAYER_OFFSET)
+        if skip_far == 0:
+            _l1_topk_partial_body(
+                FAR_SCORES, FAR_PARTIAL, row, tile,
+                KT=KT, TILE=TILE, NTILES=NTILES, K_PAD=K_F_PAD)
+        if skip_near == 0:
+            _l1_topk_partial_body(
+                NEAR_SCORES, NEAR_PARTIAL, row, tile,
+                KT=KT, TILE=TILE, NTILES=NTILES, K_PAD=K_N_PAD)
 
     @triton.jit
     def _topk_indices_merge_body(
@@ -1007,6 +1031,45 @@ if _has_triton():
         tl.store(OUT + row * K + top_idx, out_idx, mask=top_idx < K)
 
     @triton.jit
+    def _l1_skipped_topk_body(
+        OUT, row, K: tl.constexpr, K_PAD: tl.constexpr,
+    ):
+        # host 已保证 K<=KT；被 skip 的池由 L1 score 置为全 -inf，
+        # 原 packed-key Top-K 的逆序索引恰好产生 0..K-1。
+        offs = tl.arange(0, K_PAD)
+        tl.store(OUT + row * K + offs, offs.to(OUT.dtype.element_ty),
+                 mask=offs < K)
+
+    @triton.jit
+    def _l1_candidate_topk_body(
+        FAR_TOPK, NEAR_TOPK, I_F, I_N, skip_far, skip_near,
+        KT: tl.constexpr, KT_PAD: tl.constexpr,
+        K_F: tl.constexpr, K_N: tl.constexpr,
+        K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
+        TILED: tl.constexpr, NTILES: tl.constexpr, NTILES_PAD: tl.constexpr,
+        LOG2_F: tl.constexpr, LOG2_N: tl.constexpr,
+    ):
+        row = tl.program_id(0)
+        if skip_far:
+            _l1_skipped_topk_body(I_F, row, K=K_F, K_PAD=K_F_PAD)
+        elif TILED:
+            _topk_indices_merge_body(
+                FAR_TOPK, I_F, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
+                K=K_F, K_PAD=K_F_PAD, LOG2_K=LOG2_F)
+        else:
+            _topk_indices_body(
+                FAR_TOPK, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
+        if skip_near:
+            _l1_skipped_topk_body(I_N, row, K=K_N, K_PAD=K_N_PAD)
+        elif TILED:
+            _topk_indices_merge_body(
+                NEAR_TOPK, I_N, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
+                K=K_N, K_PAD=K_N_PAD, LOG2_K=LOG2_N)
+        else:
+            _topk_indices_body(
+                NEAR_TOPK, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
+
+    @triton.jit
     def _topk_candidate_batched_kernel(
         FAR_TOPK, NEAR_TOPK, FAR_SCORES, NEAR_SCORES, I_F, I_N, LENGTHS,
         SKIP_FAR, SKIP_NEAR, VALID_REQ,
@@ -1024,18 +1087,16 @@ if _has_triton():
         MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
     ):
         """eager 单 CTA 顺序完成两路 Top-K 与 candidate expansion。"""
-        if TILED:
-            _topk_indices_merge_body(
-                FAR_TOPK, I_F, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
-                K=K_F, K_PAD=K_F_PAD, LOG2_K=LOG2_F)
-            _topk_indices_merge_body(
-                NEAR_TOPK, I_N, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
-                K=K_N, K_PAD=K_N_PAD, LOG2_K=LOG2_N)
-        else:
-            _topk_indices_body(
-                FAR_TOPK, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
-            _topk_indices_body(
-                NEAR_TOPK, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
+        row = tl.program_id(0)
+        skip_far, skip_near = _l1_row_skip_flags(
+            SKIP_FAR, SKIP_NEAR, VALID_REQ, row,
+            HKV=HKV, B=B, MAX_REQ=MAX_REQ, LAYER_OFFSET=LAYER_OFFSET)
+        _l1_candidate_topk_body(
+            FAR_TOPK, NEAR_TOPK, I_F, I_N, skip_far, skip_near,
+            KT=KT, KT_PAD=KT_PAD, K_F=K_F, K_N=K_N,
+            K_F_PAD=K_F_PAD, K_N_PAD=K_N_PAD, TILED=TILED,
+            NTILES=NTILES, NTILES_PAD=NTILES_PAD,
+            LOG2_F=LOG2_F, LOG2_N=LOG2_N)
         tl.debug_barrier()
         _candidate_pack_batched_kernel(
             I_F, I_N, FAR_SCORES, NEAR_SCORES, LENGTHS,
@@ -1064,20 +1125,17 @@ if _has_triton():
         MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
     ):
         """完成两路精确 Top-K，并在并行展开前稳定 generation/metadata。"""
-        if TILED:
-            _topk_indices_merge_body(
-                FAR_SCORES, I_F, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
-                K=K_F, K_PAD=K_F_PAD, LOG2_K=LOG2_F)
-            _topk_indices_merge_body(
-                NEAR_SCORES, I_N, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
-                K=K_N, K_PAD=K_N_PAD, LOG2_K=LOG2_N)
-        else:
-            _topk_indices_body(
-                FAR_SCORES, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
-            _topk_indices_body(
-                NEAR_SCORES, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
-
         row = tl.program_id(0)
+        skip_far, skip_near = _l1_row_skip_flags(
+            SKIP_FAR, SKIP_NEAR, VALID_REQ, row,
+            HKV=HKV, B=B, MAX_REQ=MAX_REQ, LAYER_OFFSET=LAYER_OFFSET)
+        _l1_candidate_topk_body(
+            FAR_SCORES, NEAR_SCORES, I_F, I_N, skip_far, skip_near,
+            KT=KT, KT_PAD=KT_PAD, K_F=K_F, K_N=K_N,
+            K_F_PAD=K_F_PAD, K_N_PAD=K_N_PAD, TILED=TILED,
+            NTILES=NTILES, NTILES_PAD=NTILES_PAD,
+            LOG2_F=LOG2_F, LOG2_N=LOG2_N)
+
         m = row // HKV
         h = row % HKV
         req = m % B
@@ -1099,12 +1157,6 @@ if _has_triton():
         tl.store(GENERATIONS + row, generation)
 
         if h == 0:
-            layer = m // B
-            req_id = tl.load(VALID_REQ + req).to(tl.int32)
-            skip_far = tl.load(
-                SKIP_FAR + (layer + LAYER_OFFSET) * MAX_REQ + req_id) != 0
-            skip_near = tl.load(
-                SKIP_NEAR + (layer + LAYER_OFFSET) * MAX_REQ + req_id) != 0
             lower = SINK_POOL_LO * BS
             upper = tl.maximum(lower, lo)
             quota = tl.maximum(
@@ -1454,8 +1506,11 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
             _fast_launch(workspace, ('l1_topk_partial', layer_offset),
                          _l1_topk_partial_kernel, (m * hkv, ntiles),
                 far_scored, near_scored, far_topk, near_topk,
+                cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
                 KT=kt, TILE=512, NTILES=ntiles,
-                K_F_PAD=k_f_pad, K_N_PAD=k_n_pad, num_warps=8)
+                K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+                HKV=hkv, B=b, MAX_REQ=cache.max_requests,
+                LAYER_OFFSET=layer_offset, num_warps=8)
         else:
             far_topk, near_topk = far_scored, near_scored
         common = dict(
