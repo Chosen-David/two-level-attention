@@ -60,6 +60,7 @@
 - 日期：2026-11-07。
 - 基线：`f313e725d2ac1d46e60450c5462554bc37185967`（L1 tiled + L2 load 前过滤 + L1 按需统计）。
 - 修改：从设备 skip flags 推导每行 far/near gate；skipped pool 的 partial kernel 不读取 score、不执行局部排序，candidate Top-K 不读取 partial、不执行归并，直接生成与原全 `-inf` packed-key Top-K 相同的 `0..K-1` 索引。eager fused 与 Graph parallel prepare 共用 `_l1_candidate_topk_body`；非 skip 路径、候选展开及最终集合语义不变。
-- 正确性：CPU strict/cache 回归 18 passed、5 subtests passed；pc40 GPU1 `tests/ops/test_l1_topk_tiled_cuda.py -v` 4/4 通过，覆盖四态 gate、tiled/non-tiled、非连续 request slot、ties/NaN/±Inf，以及单元素 skipped score/partial 存储的不读取验证；fused candidate 与 parallel prepare 均和修改前 oracle 逐位一致。
+- 正确性：CPU strict/cache 回归 18 passed、5 subtests passed；pc40 GPU1 `tests/ops/test_l1_topk_tiled_cuda.py -v` 最终 5/5 通过，覆盖四态 gate、tiled/non-tiled、非连续 request slot、非零 layer offset、skipped K=0/1/K=KT、ties/NaN/±Inf、单元素 skipped score/partial 不读取，以及 fused 和 prepare+生产 expansion 的全输出逐位一致。独立静态审查未发现可达正确性问题。
+- 真实身份：B1/B4 eager/Graph strict oracle 均 `valid=true`、`violations=[]`、`gpu_hygiene=clean`；B1 token SHA256=`c8e3b877…64c204`，B4=`3ac6583a…b5738`，候选与 `f313e725` 基线逐 token 一致，且 eager/Graph 一致。
 - 性能：本轮尚未测量，不宣称加速。
 - 下一步：独立静态复核后同步干净提交，执行真实模型 eager/Graph token identity、纯算子和完整 decode ABBA。
