@@ -62,5 +62,10 @@
 - 修改：从设备 skip flags 推导每行 far/near gate；skipped pool 的 partial kernel 不读取 score、不执行局部排序，candidate Top-K 不读取 partial、不执行归并，直接生成与原全 `-inf` packed-key Top-K 相同的 `0..K-1` 索引。eager fused 与 Graph parallel prepare 共用 `_l1_candidate_topk_body`；非 skip 路径、候选展开及最终集合语义不变。
 - 正确性：CPU strict/cache 回归 18 passed、5 subtests passed；pc40 GPU1 `tests/ops/test_l1_topk_tiled_cuda.py -v` 最终 5/5 通过，覆盖四态 gate、tiled/non-tiled、非连续 request slot、非零 layer offset、skipped K=0/1/K=KT、ties/NaN/±Inf、单元素 skipped score/partial 不读取，以及 fused 和 prepare+生产 expansion 的全输出逐位一致。独立静态审查未发现可达正确性问题。
 - 真实身份：B1/B4 eager/Graph strict oracle 均 `valid=true`、`violations=[]`、`gpu_hygiene=clean`；B1 token SHA256=`c8e3b877…64c204`，B4=`3ac6583a…b5738`，候选与 `f313e725` 基线逐 token 一致，且 eager/Graph 一致。
-- 性能：本轮尚未测量，不宣称加速。
-- 下一步：独立静态复核后同步干净提交，执行真实模型 eager/Graph token identity、纯算子和完整 decode ABBA。
+- 纯算子性能：pc40 GPU1，B1、原生 RULER 128K `niah_multikey_1` sample 0、3 warmup、5 repeats、独立进程 ABBA；8/8 run returncode=0，`gpu_hygiene=clean`，baseline/candidate source receipt 分别为 `f313e725`/`7f18437a` 且 diff SHA256 均为空。输入 SHA256=`4078e45e…24eaec15dab5`，两臂均为 13 个 near-skip 层、0 个 far-skip/both-skip 层。数值为两臂 median 的 median，单位 ms/step：
+  - eager L1：2.559130 → 2.264135，1.130291×；L2：2.239222 → 2.234864，1.001950×；main Attention：1.027152 → 1.027873，0.999298×；exactly-once 合计：5.825114 → 5.526965，1.053945×。
+  - Graph L1：0.754053 → 0.737982，1.021776×；L2：2.193801 → 2.197059，0.998517×；main Attention：1.019745 → 1.023396，0.996433×；exactly-once 合计：3.968891 → 3.958040，1.002741×。
+  - eager `_topk_candidate_batched_kernel`：2.189653 → 1.895574 ms，减少 0.294080 ms；Graph `_l1_topk_partial_kernel`：0.164160 → 0.156481 ms，`_topk_candidate_prepare_kernel`：0.154544 → 0.145777 ms。Graph 总收益较小，不宣称全 selector 或完整 decode 同比例加速。
+- 静态成本：tiled partial workspace 为 `m*HKV*NTILES*(K_F_PAD+K_N_PAD)*4` bytes；B1、HKV=8、K1=128、near=32 时，64K 为 15360 bytes、128K 为 25600 bytes，B4 分别为 61440/102400 bytes，16K 不启用 tiled。Graph 每层较原 parallel prepare+expand 多一次 partial launch，eager launch 数不变；均为形状推导，不是独立显存实测。
+- 口径：仅报告 L1/L2/main Attention 纯 GPU 算子，不包含其他模型工作，不是完整 TPOT verdict；L2 与 Attention 的微小变化不作收益宣称。
+- 下一步：非 skip near Top-K 仍扫描全 KT；改为只对动态 near 页区间做固定宽度精确 Top-K，并保留全局 `-inf`/NaN/tie 补洞语义，随后重做身份、CUDA 对拍和完整 decode ABBA。
