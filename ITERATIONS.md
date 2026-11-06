@@ -17,3 +17,13 @@
   - mono/tiled：6.378336×。
 - 口径限制：该计时隔离 Top-K，candidate 输入 packed key 已物化；不包含 fine-score pack 的增量成本，不是完整 selector 或 decode TPOT verdict。
 - 下一步：完整 selector、Graph/eager token identity 与生产 decode 配对验收。
+
+## Iter 2 — strict-skip 上移植 Graph-only L1 分块 Top-K
+
+- 日期：2026-11-07。
+- 基线：`eb4677a2b817bb18f53b2edd57f7d54673cac10f`（strict-skip）。
+- 候选来源：`8807738f..e1e58733`，仅移植 selector 与 CUDA 对拍测试。
+- 修改：`KT > 512` 且并行 candidate expansion 时，以 512-wide partial Top-K 加精确归并替代整行单 CTA Top-K；eager 保留原 fused kernel。原始 BF16 分数与 int32 partial 使用独立指针。
+- 正确性：pc40 GPU1，`tests/ops/test_l1_topk_tiled_cuda.py -v` 2/2 通过，7 组索引子测试及 fused candidate 全输出逐位一致；覆盖 ties、NaN、±Inf、非整块、K=0/1。
+- 性能：本轮尚未测量，不引用旧分支加速比。
+- 下一步：strict 回归、真实模型 eager/Graph 身份门禁与 32K/64K/128K ABBA。

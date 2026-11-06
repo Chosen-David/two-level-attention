@@ -922,13 +922,84 @@ if _has_triton():
         tl.store(OUT + row * K + top_idx, out_idx, mask=top_idx < K)
 
     @triton.jit
+    def _l1_topk_partial_body(
+        SCORES, OUT, row, tile,
+        KT: tl.constexpr, TILE: tl.constexpr, NTILES: tl.constexpr,
+        K_PAD: tl.constexpr,
+    ):
+        """每个 CTA 只排序 512 项；packed key 与整行实现逐位一致。"""
+        offs = tile * TILE + tl.arange(0, TILE)
+        mask = offs < KT
+        s = tl.load(SCORES + row * KT + offs, mask=mask, other=float("-inf"))
+        bits = s.to(tl.uint16, bitcast=True).to(tl.int32) & 0xFFFF
+        sign = bits & 0x8000
+        key = tl.where(sign != 0, (~bits) & 0xFFFF, bits | 0x8000)
+        key_signed = key - 0x8000
+        idx = KT - 1 - offs
+        packed = (key_signed << 16) | (idx & 0xFFFF)
+        packed = tl.where(mask, packed, -0x80000000)
+        if K_PAD == 1:
+            top = tl.max(packed, axis=0, keep_dims=True)
+        else:
+            top = tl.topk(packed, K_PAD)
+        top_idx = tl.arange(0, K_PAD)
+        tl.store(OUT + (row * NTILES + tile) * K_PAD + top_idx, top)
+
+    @triton.jit
+    def _l1_topk_partial_kernel(
+        FAR_SCORES, NEAR_SCORES, FAR_PARTIAL, NEAR_PARTIAL,
+        KT: tl.constexpr, TILE: tl.constexpr, NTILES: tl.constexpr,
+        K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
+    ):
+        row = tl.program_id(0)
+        tile = tl.program_id(1)
+        _l1_topk_partial_body(
+            FAR_SCORES, FAR_PARTIAL, row, tile,
+            KT=KT, TILE=TILE, NTILES=NTILES, K_PAD=K_F_PAD)
+        _l1_topk_partial_body(
+            NEAR_SCORES, NEAR_PARTIAL, row, tile,
+            KT=KT, TILE=TILE, NTILES=NTILES, K_PAD=K_N_PAD)
+
+    @triton.jit
+    def _topk_indices_merge_body(
+        PARTIAL, OUT,
+        KT: tl.constexpr, NTILES: tl.constexpr, NTILES_PAD: tl.constexpr,
+        K: tl.constexpr, K_PAD: tl.constexpr, LOG2_K: tl.constexpr,
+    ):
+        """归并已排序的局部 run，精确保留全局 Top-K 与同分顺序。"""
+        row = tl.program_id(0)
+        if K_PAD == 1:
+            offs = tl.arange(0, NTILES_PAD)
+            key = tl.load(PARTIAL + row * NTILES + offs,
+                          mask=offs < NTILES, other=-0x80000000)
+            top = tl.max(key, axis=0, keep_dims=True)
+        else:
+            i = tl.arange(0, K_PAD)
+            top = tl.load(PARTIAL + row * NTILES * K_PAD + i)
+            for tile in tl.static_range(1, NTILES):
+                incoming = tl.load(
+                    PARTIAL + (row * NTILES + tile) * K_PAD + (K_PAD - 1 - i))
+                top = tl.maximum(top, incoming)
+                for bit in tl.static_range(LOG2_K - 1, -1, -1):
+                    stride = 1 << bit
+                    peer = tl.gather(top, i ^ stride, axis=0)
+                    top = tl.where(
+                        (i & stride) == 0,
+                        tl.maximum(top, peer), tl.minimum(top, peer))
+        top_idx = tl.arange(0, K_PAD)
+        out_idx = (KT - 1 - (top & 0xFFFF)).to(OUT.dtype.element_ty)
+        tl.store(OUT + row * K + top_idx, out_idx, mask=top_idx < K)
+
+    @triton.jit
     def _topk_candidate_batched_kernel(
-        FAR_SCORES, NEAR_SCORES, I_F, I_N, LENGTHS,
+        FAR_TOPK, NEAR_TOPK, FAR_SCORES, NEAR_SCORES, I_F, I_N, LENGTHS,
         SKIP_FAR, SKIP_NEAR, VALID_REQ,
         OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS,
         KT: tl.constexpr, KT_PAD: tl.constexpr,
         K_F: tl.constexpr, K_N: tl.constexpr,
         K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
+        TILED: tl.constexpr, NTILES: tl.constexpr, NTILES_PAD: tl.constexpr,
+        LOG2_F: tl.constexpr, LOG2_N: tl.constexpr,
         R: tl.constexpr, HEAD: tl.constexpr, TAIL: tl.constexpr,
         SINK: tl.constexpr, SWA: tl.constexpr, CAP: tl.constexpr,
         SINK_POOL_LO: tl.constexpr, BS: tl.constexpr, PAGE: tl.constexpr,
@@ -937,10 +1008,18 @@ if _has_triton():
         MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
     ):
         """eager 单 CTA 顺序完成两路 Top-K 与 candidate expansion。"""
-        _topk_indices_body(
-            FAR_SCORES, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
-        _topk_indices_body(
-            NEAR_SCORES, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
+        if TILED:
+            _topk_indices_merge_body(
+                FAR_TOPK, I_F, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
+                K=K_F, K_PAD=K_F_PAD, LOG2_K=LOG2_F)
+            _topk_indices_merge_body(
+                NEAR_TOPK, I_N, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
+                K=K_N, K_PAD=K_N_PAD, LOG2_K=LOG2_N)
+        else:
+            _topk_indices_body(
+                FAR_TOPK, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
+            _topk_indices_body(
+                NEAR_TOPK, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
         tl.debug_barrier()
         _candidate_pack_batched_kernel(
             I_F, I_N, FAR_SCORES, NEAR_SCORES, LENGTHS,
@@ -959,6 +1038,8 @@ if _has_triton():
         KT: tl.constexpr, KT_PAD: tl.constexpr,
         K_F: tl.constexpr, K_N: tl.constexpr,
         K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
+        TILED: tl.constexpr, NTILES: tl.constexpr, NTILES_PAD: tl.constexpr,
+        LOG2_F: tl.constexpr, LOG2_N: tl.constexpr,
         R: tl.constexpr, HEAD: tl.constexpr, TAIL: tl.constexpr,
         SINK: tl.constexpr, SWA: tl.constexpr, CAP: tl.constexpr,
         SINK_POOL_LO: tl.constexpr, BS: tl.constexpr, PAGE: tl.constexpr,
@@ -967,10 +1048,18 @@ if _has_triton():
         MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
     ):
         """完成两路精确 Top-K，并在并行展开前稳定 generation/metadata。"""
-        _topk_indices_body(
-            FAR_SCORES, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
-        _topk_indices_body(
-            NEAR_SCORES, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
+        if TILED:
+            _topk_indices_merge_body(
+                FAR_SCORES, I_F, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
+                K=K_F, K_PAD=K_F_PAD, LOG2_K=LOG2_F)
+            _topk_indices_merge_body(
+                NEAR_SCORES, I_N, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
+                K=K_N, K_PAD=K_N_PAD, LOG2_K=LOG2_N)
+        else:
+            _topk_indices_body(
+                FAR_SCORES, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
+            _topk_indices_body(
+                NEAR_SCORES, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
 
         row = tl.program_id(0)
         m = row // HKV
@@ -1330,12 +1419,36 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
     lengths_t = (lengths if torch.is_tensor(lengths) else
                  torch.as_tensor(lengths, dtype=torch.int64, device=device))
     if fuse_topk:
+        kt = far_scored.shape[-1]
+        k_f_pad = triton.next_power_of_2(max(1, k_f))
+        k_n_pad = triton.next_power_of_2(max(1, k_n))
+        # 长行整行 Top-K 每个 KV head 只有一个 CTA，SM 覆盖不足。
+        # 512 项局部排序保持相同 packed key，随后精确归并；短行仍走旧路径。
+        # eager 每层多一次 launch 的 host 成本会超过 device 收益，保留单 kernel；
+        # Graph/parallel_expand 路径通过 capture 消除 launch 成本，再启用 tiled。
+        tiled = kt > 512 and parallel_expand
+        ntiles = triton.cdiv(kt, 512) if tiled else 1
+        if tiled:
+            far_topk = _workspace_empty(
+                workspace, 'l1_far_topk_partial',
+                (m, hkv, ntiles, k_f_pad), torch.int32, device)
+            near_topk = _workspace_empty(
+                workspace, 'l1_near_topk_partial',
+                (m, hkv, ntiles, k_n_pad), torch.int32, device)
+            _fast_launch(workspace, ('l1_topk_partial', layer_offset),
+                         _l1_topk_partial_kernel, (m * hkv, ntiles),
+                far_scored, near_scored, far_topk, near_topk,
+                KT=kt, TILE=512, NTILES=ntiles,
+                K_F_PAD=k_f_pad, K_N_PAD=k_n_pad, num_warps=8)
+        else:
+            far_topk, near_topk = far_scored, near_scored
         common = dict(
-            KT=far_scored.shape[-1],
-            KT_PAD=triton.next_power_of_2(far_scored.shape[-1]),
-            K_F=k_f, K_N=k_n,
-            K_F_PAD=triton.next_power_of_2(max(1, k_f)),
-            K_N_PAD=triton.next_power_of_2(max(1, k_n)),
+            KT=kt, KT_PAD=triton.next_power_of_2(kt),
+            K_F=k_f, K_N=k_n, K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+            TILED=tiled, NTILES=ntiles,
+            NTILES_PAD=triton.next_power_of_2(ntiles),
+            LOG2_F=k_f_pad.bit_length() - 1,
+            LOG2_N=k_n_pad.bit_length() - 1,
             R=r, HEAD=head, TAIL=tail, SINK=sink, SWA=swa, CAP=capacity,
             SINK_POOL_LO=int(indexer._sink_pool_lo_blk), BS=bs,
             PAGE=cache.geometry.page, NEAR_LEN=cache.geometry.near,
@@ -1343,13 +1456,11 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
             HKV=hkv, B=b,
             MAX_REQ=cache.max_requests, LAYER_OFFSET=layer_offset)
         if parallel_expand:
-            # Graph 的关键是 device time：Top-K/metadata 只由每行一个 CTA 完成，
-            # 相互独立的 candidate chunk 则在下一 kernel 并行展开。生产 R=8320、
-            # protected=132 时每行由 1 路串行 9 chunk 变为 9 路并行；多一次
-            # launch 换取更高 SM 覆盖，不改变任何排序、打分或去重语义。
+            # 相互独立的 candidate chunk 在下一 kernel 并行展开；多一次
+            # launch 换取更高 SM 覆盖，不改变排序、打分或去重语义。
             _fast_launch(workspace, ('topk_candidate_prepare', layer_offset),
                          _topk_candidate_prepare_kernel, (m * hkv,),
-                far_scored, near_scored, i_f, i_n, lengths_t,
+                far_topk, near_topk, i_f, i_n, lengths_t,
                 cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
                 lower, upper, quota, owners, generations,
                 **common, num_warps=8)
@@ -1363,11 +1474,11 @@ def _candidate_pack_batched(i_f, i_n, far_scored, near_scored, lengths,
                 SINK_POOL_LO=int(indexer._sink_pool_lo_blk), BS=bs,
                 HKV=hkv, B=b, num_warps=4)
         else:
-            # eager 中第二个 Python/Triton launch 的 host 开销高于并行收益，
-            # 保留单 fused kernel；两种路径使用同一 Top-K 与 owner 语义。
+            # eager 仍由单 fused kernel 完成归并、metadata 与 expansion，
+            # 避免再拆一个 candidate kernel 的 host 开销。
             _fast_launch(workspace, ('topk_candidate', layer_offset),
                          _topk_candidate_batched_kernel, (m * hkv,),
-                far_scored, near_scored, i_f, i_n, lengths_t,
+                far_topk, near_topk, far_scored, near_scored, i_f, i_n, lengths_t,
                 cache.skip_far_layer_buf, cache.skip_near_layer_buf, valid_req,
                 out, valid, lower, upper, quota, owners, generations,
                 **common, num_warps=8)
