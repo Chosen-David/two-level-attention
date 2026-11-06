@@ -37,3 +37,13 @@
 - CPU 回归：候选修改后 strict 套件 99 passed、5 subtests passed。
 - 性能：本轮尚未测量，不宣称加速。
 - 下一步：真实模型 eager/Graph 身份门禁、纯算子与完整 decode ABBA。
+
+## Iter 4 — L1 按实际候选池读取 Min/Max/Sum
+
+- 日期：2026-11-07。
+- 基线：`8db999fc07b74916db5965c298509744f572325e`。
+- 修改：Min/Max 仅由使用 MinMax 的 far/near 候选池读取，Sum 仅由使用 Avg 的候选池读取；skip、bypass 和保护区在 load 前排除。两种区域都为 Avg 时在编译期删除 MinMax load 与点积，其余组合保持原 BF16 中间舍入和 GQA 累加顺序。
+- 正确性：pc31 GPU1，`tests/ops/test_l1_scores_demand_load_cuda.py -v` 1/1 通过；四种 far/near 方法、四态 skip、非对齐 sink/SWA、不等长和非连续 request slot 的全部输出逐位一致，覆盖 NaN/Inf。both-Avg 使用单元素 Min/Max 存储配合原大 stride，未发生越界且输出不变。
+- CPU 回归：`test_strict_skip_receipt.py` 7/7 通过。
+- 性能：本轮尚未测量，不宣称加速。
+- 下一步：合并候选做真实模型身份、纯算子和完整 decode ABBA。

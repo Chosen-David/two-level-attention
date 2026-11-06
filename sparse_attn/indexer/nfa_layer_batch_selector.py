@@ -201,46 +201,59 @@ if _has_triton():
         if HAS_AVG:
             KSUM += layer * STRIDE_KS + req_id * STRIDE_KRS
         offs_d = tl.arange(0, D)
-        kmin = tl.load(
-            KMIN + offs_t[:, None] * stride_kt + kv * stride_kh
-            + offs_d[None, :],
-            mask=mask_t[:, None], other=0.0).to(tl.float32)
-        kmax = tl.load(
-            KMAX + offs_t[:, None] * stride_kt2 + kv * stride_kh2
-            + offs_d[None, :],
-            mask=mask_t[:, None], other=0.0).to(tl.float32)
+        # 每种统计只服务实际消费它的候选池；skip、bypass 和保护区
+        # 在 load 前排除，避免先读取 Min/Max/Sum 再把分数置为 -inf。
+        mm_pool = mask_t & ((far_pool & (not FAR_AVG))
+                            | (near_pool & (not NEAR_AVG)))
+        if not FAR_AVG or not NEAR_AVG:
+            kmin = tl.load(
+                KMIN + offs_t[:, None] * stride_kt + kv * stride_kh
+                + offs_d[None, :],
+                mask=mm_pool[:, None], other=0.0).to(tl.float32)
+            kmax = tl.load(
+                KMAX + offs_t[:, None] * stride_kt2 + kv * stride_kh2
+                + offs_d[None, :],
+                mask=mm_pool[:, None], other=0.0).to(tl.float32)
         if HAS_AVG:
+            avg_pool = mask_t & ((far_pool & FAR_AVG)
+                                 | (near_pool & NEAR_AVG))
             ksum = tl.load(
                 KSUM + offs_t[:, None] * stride_kts + kv * stride_khs
                 + offs_d[None, :],
-                mask=mask_t[:, None], other=0.0)
+                mask=avg_pool[:, None], other=0.0)
             # 保持旧 OUT_AVG 的 BF16 中间舍入，再参与 FP32 点积。
             kavg = (ksum.to(tl.float32) / BS).to(
                 FAR_OUT.dtype.element_ty).to(tl.float32)
 
-        mm_acc = tl.zeros((BT,), dtype=tl.float32)
-        avg_acc = tl.zeros((BT,), dtype=tl.float32)
+        if not FAR_AVG or not NEAR_AVG:
+            mm_acc = tl.zeros((BT,), dtype=tl.float32)
+        if HAS_AVG:
+            avg_acc = tl.zeros((BT,), dtype=tl.float32)
         for j in tl.static_range(G):
             h = pid_h.to(tl.int64) * G + j
             q = tl.load(Q + h * stride_qh + offs_d)
-            q_low = tl.minimum(q, 0.0)
-            q_high = tl.maximum(q, 0.0)
-            mm = (tl.sum(kmin * q_low[None, :], axis=1)
-                  + tl.sum(kmax * q_high[None, :], axis=1))
-            # 旧路径先逐 query head 转 BF16/FP16，再对 GQA 求均值。
-            mm_acc += mm.to(FAR_OUT.dtype.element_ty).to(tl.float32)
+            if not FAR_AVG or not NEAR_AVG:
+                q_low = tl.minimum(q, 0.0)
+                q_high = tl.maximum(q, 0.0)
+                mm = (tl.sum(kmin * q_low[None, :], axis=1)
+                      + tl.sum(kmax * q_high[None, :], axis=1))
+                # 旧路径先逐 query head 转 BF16/FP16，再对 GQA 求均值。
+                mm_acc += mm.to(FAR_OUT.dtype.element_ty).to(tl.float32)
             if HAS_AVG:
                 avg = tl.sum(kavg * q[None, :], axis=1)
                 avg_acc += avg.to(FAR_OUT.dtype.element_ty).to(tl.float32)
-        mm_score = (mm_acc / G).to(FAR_OUT.dtype.element_ty)
-        far_score = mm_score
-        near_score = mm_score
+        if not FAR_AVG or not NEAR_AVG:
+            mm_score = (mm_acc / G).to(FAR_OUT.dtype.element_ty)
         if HAS_AVG:
             avg_score = (avg_acc / G).to(FAR_OUT.dtype.element_ty)
-            if FAR_AVG:
-                far_score = avg_score
-            if NEAR_AVG:
-                near_score = avg_score
+        if FAR_AVG:
+            far_score = avg_score
+        else:
+            far_score = mm_score
+        if NEAR_AVG:
+            near_score = avg_score
+        else:
+            near_score = mm_score
         far_score = tl.where(far_pool, far_score, float("-inf"))
         near_score = tl.where(near_pool, near_score, float("-inf"))
         out_offs = pid_h.to(tl.int64) * T + offs_t
