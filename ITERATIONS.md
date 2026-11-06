@@ -27,3 +27,13 @@
 - 正确性：pc40 GPU1，`tests/ops/test_l1_topk_tiled_cuda.py -v` 2/2 通过，7 组索引子测试及 fused candidate 全输出逐位一致；覆盖 ties、NaN、±Inf、非整块、K=0/1。
 - 性能：本轮尚未测量，不引用旧分支加速比。
 - 下一步：strict 回归、真实模型 eager/Graph 身份门禁与 32K/64K/128K ABBA。
+
+## Iter 3 — L2 middle 候选在物理页与低维 K 读取前过滤
+
+- 日期：2026-11-07。
+- 基线：`53ec08882091ccfb52d3a4d9f1b50f562c89e6ab`。
+- 修改：将已有的 `unique + LOW/HIGH + quota + 页表有效` 条件合并为 `load_r`，前移为物理页表和低维 K 的 load mask；protected、越界、非 owner 与 quota=0 候选不再先读 K 再丢弃。NaN 仍在打分后按原规则排除，BF16 舍入、packed key、同分顺序和补洞逻辑不变。
+- 正确性：pc40 GPU1，`tests/ops/test_fine_scores_preload_mask_cuda.py -v` 1/1 通过；修改前独立 oracle 与候选 packed logits 逐元素一致。将被丢弃候选的物理页改为 `0x3FFFFFF` 后输出不变，quota=0 且整表非法时也不读 K。首次运行发现测试把 CPU keys 地址写入设备指针表，修正为直接分配设备 keys 后通过；该失败不是候选 kernel 回归。
+- CPU 回归：候选修改后 strict 套件 99 passed、5 subtests passed。
+- 性能：本轮尚未测量，不宣称加速。
+- 下一步：真实模型 eager/Graph 身份门禁、纯算子与完整 decode ABBA。

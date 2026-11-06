@@ -289,17 +289,24 @@ if _has_triton():
         lp = safe // PAGE
         off = safe % PAGE
         lp_valid = lp < MAX_BLOCKS
+        low = tl.load(LOW + m)
+        high = tl.load(HIGH + m)
+        quota = tl.load(QUOTA + m)
+        # protected、越界、非 owner 与 quota=0 的候选不参与 middle 竞争，
+        # 在物理页表和低维 K 读取之前过滤；NaN 仍在打分后按原规则排除。
+        load_r = (unique & lp_valid & (cand >= low) & (cand < high)
+                  & (quota > 0))
         phys = tl.load(
             BLOCK_TABLE + (layer + LAYER_OFFSET) * MAX_REQ * MAX_BLOCKS
             + req_id * MAX_BLOCKS + lp,
-            mask=read_r & lp_valid, other=0).to(tl.int64)
+            mask=load_r, other=0).to(tl.int64)
         src = (kv_ptr
                + phys[:, None] * HK * PAGE * HEAD_DIM
                + kv * PAGE * HEAD_DIM
                + off[:, None] * HEAD_DIM
                + dim[None, :])
         k = tl.load(
-            src, mask=(read_r & lp_valid)[:, None] & dim_mask[None, :],
+            src, mask=load_r[:, None] & dim_mask[None, :],
             other=0.0)
         q = tl.load(
             Q + m * stride_qm + kv * stride_qh + offs_d,
@@ -307,11 +314,7 @@ if _has_triton():
         score = tl.sum(k.to(tl.float32) * q[None, :], axis=1)
         score_bf16 = score.to(tl.bfloat16)
         score = score_bf16.to(tl.float32)
-        good = (unique & lp_valid
-                & (cand >= tl.load(LOW + m))
-                & (cand < tl.load(HIGH + m))
-                & (tl.load(QUOTA + m) > 0)
-                & (score == score))
+        good = load_r & (score == score)
         score = tl.where(good, score, float("-inf"))
         if TOKEN_BITS:
             # 与原 mono Top-K 完全相同的 signed-BF16 ordered key 和
