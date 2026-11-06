@@ -89,5 +89,10 @@
 - 新增对拍：FP16/BF16 × eager/tiled × `K=1` 空 near 池、非 2 次幂 `KT=8` 的 `K=KT`、compact signed zero/`-inf` 前缀共 12 个子测试，indices 与完整 candidate 输出逐元素一致；tiled partial 预先填入 poison。首次运行 12 个 error 均为测试驱动向 reference 误传 `LOG2_F/LOG2_N`，修正调用后通过，不是候选 kernel 回归。
 - CUDA 回归：pc40 GPU1，`tests/ops/test_l1_topk_tiled_cuda.py -v` 6/6 通过。
 - CPU 回归：strict/selector 扩展套件 99 passed、5 subtests passed。首次本地命令缺少仓库 `PYTHONPATH` 导致 collection import error，修正工作目录与环境后通过，不是代码回归。
-- 性能：本轮尚未测量，不宣称加速。
-- 下一步：建立修复后的干净源码回执，运行 B1/B4 eager/Graph token identity，再执行 128K 纯算子 ABBA。
+- 真实身份：修复提交 `cc7d6aa45c791d610e4d8365131962f1e30622c0`，B1/B4 eager/Graph strict oracle 均 `valid=true`、`violations=[]`、`gpu_hygiene=clean`；B1 token SHA256=`c8e3b877…64c204`，B4=`3ac6583a…b5738`，与 Iter 5 基线逐 token 一致，且 eager/Graph 一致。
+- 纯算子性能：pc40 GPU1，B1、原生 RULER 128K `niah_multikey_1` sample 0、3 warmup、5 repeats、独立进程 ABBA；8/8 run returncode=0，`gpu_hygiene=clean`，baseline/candidate HEAD 分别为 `333af802021c424b36bea56703ff2a430752a23b`/`cc7d6aa45c791d610e4d8365131962f1e30622c0`，diff SHA256 均为空。输入 SHA256=`4078e45e…24eaec15dab5`，两臂均为 13 个 near-skip 层、0 个 far-skip/both-skip 层。数值为两臂 median 的 median，单位 ms/step：
+  - eager L1：2.263397 → 1.836181，1.232666×；L2：2.234325 → 2.236119，0.999198×；main Attention：1.028258 → 1.029842，0.998463×；exactly-once 合计：5.526958 → 5.102082，1.083275×。
+  - Graph L1：0.737443 → 0.723665，1.019039×；L2：2.194772 → 2.193318，1.000663×；main Attention：1.021202 → 1.023267，0.997982×；exactly-once 合计：3.953300 → 3.940119，1.003345×。
+  - eager `_topk_candidate_batched_kernel`：1.893961 → 1.467759 ms，减少 0.426202 ms；Graph `_l1_topk_partial_kernel`：0.156209 → 0.144594 ms，`_topk_candidate_prepare_kernel`：0.145808 → 0.141412 ms。Graph 总收益较小，不宣称全 selector 或完整 decode 同比例加速。
+- 口径：仅报告 L1/L2/main Attention 纯 GPU 算子，不包含其他模型工作，不是完整 TPOT verdict；L2 与 Attention 的微小变化不作收益宣称。dtype 修复不改变生产 BF16 数值，上述收益来自 Iter 6 的 near 固定区间 Top-K。
+- 下一步：32K/64K/128K、B1/B4、eager/Graph 完整 512-token decode ABBA，胜出候选补 B2；保留所有负面格子。
