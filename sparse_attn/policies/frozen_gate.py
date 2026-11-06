@@ -87,14 +87,12 @@ def _stream_tail_profile(q, k, geometry, rows, chunk, topk, scale,
     if need_core:
         token_scores = token_score_rows.mean(dim=0)
         sink_hi, far_hi, near_hi = geometry.bounds(length)
-        ids = torch.arange(length, device=q.device)
         selected = {}
         for name, lo, hi in (
                 ('far', sink_hi, far_hi), ('near', far_hi, near_hi)):
-            positions = ids[(ids >= lo) & (ids < hi)]
-            count = min(topk, positions.numel())
-            selected[name] = positions[
-                torch.topk(token_scores[positions], count).indices]
+            count = min(topk, hi - lo)
+            selected[name] = torch.topk(
+                token_scores[lo:hi], count).indices + lo
         counts = {name: int(value.numel()) for name, value in selected.items()}
         selected_values = torch.cat([
             selected['far'], selected['near']]).cpu().tolist()
