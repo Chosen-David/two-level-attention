@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 import triton
+import triton.language as tl
 
 import sparse_attn.indexer.nfa_layer_batch_selector as selector_ops
 from sparse_attn.cache import GraphReadyPagedRegionCache
@@ -20,6 +21,45 @@ PAGE = 64
 HEAD_DIM = 128
 GEOMETRY = RegionGeometry(
     sink=4, near=128, window=64, page=PAGE, max_new_tokens=8)
+
+
+@triton.jit
+def _reference_filtered_topk_partial_kernel(
+    LOGITS, PARTIAL, R,
+    TILE: tl.constexpr, NTILES: tl.constexpr,
+    S: tl.constexpr, K: tl.constexpr, META_GROUP: tl.constexpr,
+    TOKEN_BITS: tl.constexpr,
+):
+    """修改前的全宽度 partial Top-K，作为独立逐位 reference。"""
+    h = tl.program_id(0)
+    tile = tl.program_id(1)
+    offs = tile * TILE + tl.arange(0, TILE)
+    invalid = -32768 << TOKEN_BITS
+    key = tl.load(LOGITS + h * R + offs, mask=offs < R, other=invalid)
+    if K == 1:
+        key = tl.max(key, axis=0, keep_dims=True)
+    else:
+        key = tl.topk(key, K)
+    tl.store(PARTIAL + (h * NTILES + tile) * K + tl.arange(0, K), key)
+
+
+def _assert_filtered_partial_bit_exact(packed, width, capacity):
+    m, hkv, r = packed.shape
+    token_bits = 32 if capacity >= 65536 else 16
+    ntiles = triton.cdiv(r, 2048)
+    tail = r - (ntiles - 1) * 2048
+    shape = (m, hkv, ntiles, width)
+    reference = torch.empty(shape, dtype=packed.dtype, device='cuda')
+    candidate = torch.empty_like(reference)
+    common = dict(
+        TILE=2048, NTILES=ntiles, S=capacity, K=width,
+        META_GROUP=hkv, TOKEN_BITS=token_bits, num_warps=16)
+    _reference_filtered_topk_partial_kernel[(m * hkv, ntiles)](
+        packed, reference, r, **common)
+    selector_ops._nfa_filtered_topk_partial_kernel[(m * hkv, ntiles)](
+        packed, candidate, r, TAIL=tail,
+        TAIL_PAD=triton.next_power_of_2(tail), **common)
+    torch.testing.assert_close(candidate, reference, rtol=0, atol=0)
 
 
 def _indexer(k1=4, near_pages=2):
@@ -612,8 +652,9 @@ def test_per_kv_group_selection_and_attention_consumer(split_kv):
 
 
 @pytest.mark.parametrize('capacity', [16384, 65728, 131520])
-def test_tiled_filtered_topk_bit_exact_with_quota_and_ties(capacity):
-    m, hkv, r, width = 3, 2, 8452, 1024
+@pytest.mark.parametrize('r', [2080, 8452])
+def test_tiled_filtered_topk_bit_exact_with_quota_and_ties(capacity, r):
+    m, hkv, width = 3, 2, 1024
     token_bits = 32 if capacity >= 65536 else 16
     generator = torch.Generator(device='cuda').manual_seed(20261103)
     cand = torch.stack([
@@ -657,7 +698,32 @@ def test_tiled_filtered_topk_bit_exact_with_quota_and_ties(capacity):
     packed = torch.where(
         good, (ordered.to(dtype) << token_bits) + delta,
         torch.full((), invalid, dtype=dtype, device='cuda')).contiguous()
+    _assert_filtered_partial_bit_exact(packed, width, capacity)
     actual = selector_ops._nfa_filtered_topk(
         packed, cand, lower, upper, quota, capacity, width, sink=4)
     torch.testing.assert_close(actual.indices, reference_out, rtol=0, atol=0)
     torch.testing.assert_close(actual.counts, reference_count, rtol=0, atol=0)
+
+
+@pytest.mark.parametrize('capacity', [16384, 65728])
+@pytest.mark.parametrize('r,width', [
+    (1, 1), (2049, 1), (32, 1024), (1024, 1024),
+    (2048, 1024), (2049, 1024), (2079, 1024), (4097, 32),
+])
+def test_filtered_topk_ragged_partial_shapes_bit_exact(capacity, r, width):
+    token_bits = 32 if capacity >= 65536 else 16
+    dtype = torch.int64 if token_bits == 32 else torch.int32
+    generator = torch.Generator(device='cuda').manual_seed(20261107 + r + width)
+    ordered = torch.randint(
+        -32768, 32768, (2, 2, r), generator=generator,
+        dtype=torch.int32, device='cuda').to(dtype)
+    delta = torch.randint(
+        0, capacity, (2, 2, r), generator=generator,
+        dtype=dtype, device='cuda')
+    packed = ((ordered << token_bits) + delta).contiguous()
+    packed[..., :min(128, r)] = packed[..., :1]
+    invalid = torch.full(
+        (), -32768 << token_bits, dtype=dtype, device='cuda')
+    if r > 128:
+        packed[..., 128:min(256, r)] = invalid
+    _assert_filtered_partial_bit_exact(packed, width, capacity)

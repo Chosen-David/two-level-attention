@@ -41,8 +41,10 @@ def _make_logits(seed, m=3, hkv=8, r=8452, capacity=32768):
 def _launch(logits, out, capacity, warps):
     m, hkv, r = logits.shape
     ntiles = triton.cdiv(r, 2048)
+    tail = r - (ntiles - 1) * 2048
     ops._nfa_filtered_topk_partial_kernel[(m * hkv, ntiles)](
         logits, out, r, TILE=2048, NTILES=ntiles,
+        TAIL=tail, TAIL_PAD=triton.next_power_of_2(tail),
         S=capacity, K=1024, META_GROUP=hkv, num_warps=warps)
 
 

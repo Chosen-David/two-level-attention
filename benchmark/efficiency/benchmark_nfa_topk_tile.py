@@ -22,8 +22,10 @@ def _metadata(m):
 def _launch(logits, partial, lower, upper, quota, out, count, capacity, tile):
     m, hkv, r = logits.shape
     ntiles = triton.cdiv(r, tile)
+    tail = r - (ntiles - 1) * tile
     ops._nfa_filtered_topk_partial_kernel[(m * hkv, ntiles)](
         logits, partial, r, TILE=tile, NTILES=ntiles,
+        TAIL=tail, TAIL_PAD=triton.next_power_of_2(tail),
         S=capacity, K=1024, META_GROUP=hkv, num_warps=16)
     ops._nfa_filtered_topk_merge_kernel[(m * hkv,)](
         partial, lower, upper, quota, out, count,

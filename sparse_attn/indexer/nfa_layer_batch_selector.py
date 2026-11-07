@@ -518,15 +518,33 @@ if _has_triton():
     def _nfa_filtered_topk_partial_kernel(
         LOGITS, PARTIAL, R,
         TILE: tl.constexpr, NTILES: tl.constexpr,
+        TAIL: tl.constexpr, TAIL_PAD: tl.constexpr,
         S: tl.constexpr, K: tl.constexpr, META_GROUP: tl.constexpr,
         TOKEN_BITS: tl.constexpr,
     ):
         """直接对 fine-score 阶段生成的 packed key 做局部 Top-K。"""
         h = tl.program_id(0)
         tile = tl.program_id(1)
+        invalid = -32768 << TOKEN_BITS
+        # 末块不足 K 个候选时，原结果的其余位置必然都是同一个 invalid key。
+        # 只排序实际尾块并补 invalid，避免例如 32 个有效候选仍做 2048→1024
+        # 排序；输出 packed run 与原大宽度 Top-K 逐位一致。
+        if TAIL <= K and tile == NTILES - 1:
+            tail_offs = (NTILES - 1) * TILE + tl.arange(0, TAIL_PAD)
+            tail_key = tl.load(LOGITS + h * R + tail_offs,
+                               mask=tail_offs < R, other=invalid)
+            if TAIL_PAD == 1:
+                tail_key = tl.max(tail_key, axis=0, keep_dims=True)
+            else:
+                tail_key = tl.topk(tail_key, TAIL_PAD)
+            out_offs = tl.arange(0, K)
+            gather_offs = tl.minimum(out_offs, TAIL_PAD - 1)
+            gathered = tl.gather(tail_key, gather_offs, axis=0)
+            key = tl.where(out_offs < TAIL, gathered, invalid)
+            tl.store(PARTIAL + (h * NTILES + tile) * K + out_offs, key)
+            return
         offs = tile * TILE + tl.arange(0, TILE)
         mask = offs < R
-        invalid = -32768 << TOKEN_BITS
         key = tl.load(LOGITS + h * R + offs, mask=mask, other=invalid)
         if K == 1:
             key = tl.max(key, axis=0, keep_dims=True)
@@ -1539,6 +1557,7 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
     # 保留为 bit-exact reference，避免长序列退化为单 CTA 的 16384-wide 排序。
     tile = 2048
     ntiles = triton.cdiv(r, tile)
+    tail = r - (ntiles - 1) * tile
     partial = _workspace_empty(
         workspace, 'filtered_topk_partial', (m, hkv, ntiles, width),
         logits.dtype, logits.device)
@@ -1546,6 +1565,7 @@ def _nfa_filtered_topk(logits, cand_idx2, lower, upper, quota, capacity, width,
                  _nfa_filtered_topk_partial_kernel, (m * hkv, ntiles),
         logits, partial, r,
         TILE=tile, NTILES=ntiles,
+        TAIL=tail, TAIL_PAD=triton.next_power_of_2(tail),
         S=capacity, K=width, META_GROUP=hkv, TOKEN_BITS=token_bits,
         num_warps=16,
     )

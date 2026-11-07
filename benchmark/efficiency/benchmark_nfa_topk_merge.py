@@ -81,9 +81,11 @@ def _make_partial(seed, m=3, hkv=8, r=8452, width=1024, capacity=32768):
         good, (ordered << 16) + capacity - cand.to(torch.int32), invalid)
     packed = packed.contiguous()
     ntiles = triton.cdiv(r, 2048)
+    tail = r - (ntiles - 1) * 2048
     partial = torch.empty(m, hkv, ntiles, width, dtype=torch.int32, device='cuda')
     ops._nfa_filtered_topk_partial_kernel[(m * hkv, ntiles)](
         packed, partial, r, TILE=2048, NTILES=ntiles,
+        TAIL=tail, TAIL_PAD=triton.next_power_of_2(tail),
         S=capacity, K=width, META_GROUP=hkv, num_warps=8)
     return partial, lower, upper, quota, capacity
 
