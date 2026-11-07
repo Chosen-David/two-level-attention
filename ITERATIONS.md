@@ -108,3 +108,12 @@
   - NFA 主要扩展项 B1/B4：fine-score 0.653726/2.661576 ms，filtered partial Top-K 0.896193/2.527045 ms，filtered merge 0.401508/0.403840 ms，gather-attend 1.026528/1.033380 ms。B4 的 15 ms 完整 TPOT 与 14.43 ms device time 相符，主要是 L2 fine-score 和 partial Top-K 扩展，不是 Graph 失效。
   - FlashInfer B1/B4：全部 CUDA kernel 11.104768/21.305991 ms，paged attention 3.086504/12.881709 ms，merge states 0.111134/0.106433 ms。按同 profile 全 kernel device time，FI/NFA 为 1.140×/1.477×，优势随 batch 增大；完整 512-token 干净 TPOT 比值另行验收，不能用 profiler TPOT 替代。
 - L2 ragged-tail 定位：生产 64K 几何为 `R=(K_F+K_N+2)*page=(128+2)*16=2080`、`K=1024`、`TILE=2048`、`NTILES=2`。第二个 partial tile 只有 32 个有效候选，却仍执行完整 `2048→1024` Top-K；问题不是扫描全部历史容量。下一步以原 partial+merge 为 reference，建立 `R=2080` 的 bit-exact 对拍，再消除尾块无效大排序；128K B4 在异常解释和干净 TPOT 核对完成前保持暂停。
+
+## Iter 8 — L2 ragged tail 小宽度精确 Top-K
+
+- 日期：2026-11-07。
+- 基线：`cc7d6aa45c791d610e4d8365131962f1e30622c0`；候选实现：`c5be4f69262a7eb2287e396589e18d8a91fd79ff`。
+- 修改：当末块 `TAIL<=K` 时只排序 `TAIL_PAD` 个 packed key，再在固定 K-wide partial run 的其余位置补同一个 invalid key；其他 tile、merge、最终 token 映射和 tie 规则不变。该路径由通用形状决定，不硬编码 64K；生产 `R=2080` 在 32K/64K/128K 都相同，B4 只是增加行数，因此浪费不是小数据或单一长度特有。
+- 正确性：pc02 GPU0 干净起跑门禁通过，`tests/test_nfa_current_query_selector.py -k filtered_topk` 22/22 通过。以修改前全宽度 partial kernel 为独立 reference，partial 输出逐位一致，且 mono 最终 indices/counts 一致；覆盖 int32/int64、`R=2080/8452`、`R=1/32/1024/2048/2049/2079/4097`、K=1/32/1024、ties、NaN、±Inf、signed zero 来源的 packed key、quota=0、无效项和补洞。首次测试命令因 pc02 缺 pytest 未执行，依赖安装到 `/tmp/nfa-pytest-deps` 后通过，不是 kernel 失败。
+- 性能：本轮尚未测量，不宣称加速。
+- 下一步：B1/B4、32K/64K/128K 的纯算子与同真实 forward profile，随后 eager/Graph token identity 和完整 512-token decode ABBA；验证后再决定是否合入并推送 main。
