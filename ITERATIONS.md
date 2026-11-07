@@ -140,4 +140,8 @@
     partial eager 六格为 1.783551–1.921253×。64K/128K 的 int64 结果几乎相同，且 B4 绝对节省大于 B1，证明该浪费和算子收益都不是小数据或单一长度特有。
   - 其他尾块 `R=8452`：B1 partial eager/Graph 为 1.243312/1.247165×、full eager/Graph 为 1.218694/1.220249×；B4 分别为 1.219985/1.220652×、1.196848/1.196156×，全部 bit-exact。
   - 口径：synthetic packed-key 纯算子信号，不是完整 decode TPOT；完整收益仍以真实 512-token ABBA 为准。
-- 下一步：完成 32K B1 与 128K B4 完整 decode，验证后合入并推送 main；不把上述纯算子倍率替代 TPOT。
+- 32K B1 完整 decode ABBA：pc31 GPU0，同 `cc7d6aa4`→`c5be4f69` 对照，512 tokens、3 warmup、独立进程 ABBA；eager/Graph 合计 8/8 run returncode=0，`gpu_hygiene=clean`，两种 execution 的 repeat 与 baseline/candidate token identity 均通过。两臂均 2 个 far-skip 层、0 个 near-skip/both-skip 层，输入 SHA256=`530af358…f53d8df23`、32621 tokens：
+  - eager：26.047992 → 27.610776 ms，0.943400×（负面格子）；baseline 两腿为 25.888817/26.207168 ms，candidate 为 29.060544/26.161008 ms。candidate_a 相对其余三臂出现约 3 ms 单臂抬升，不能直接把两腿 median 当作稳定回退，须检查分步数据并独立重跑。
+  - Graph：9.787616 → 9.841296 ms，0.994545×（负面格子）；baseline 两腿为 9.789792/9.785440 ms，candidate 为 9.775552/9.907040 ms，方向相反，不宣称 Graph 收益或稳定回退。
+  - 独立静态复核未发现尾块 kernel 的可达正确性问题；复核同时发现三个本次触及的直接 partial benchmark 缺少既有 `TOKEN_BITS` 参数，已补齐但尚待空卡实际运行，不作为 kernel 回归。
+- 下一步：先诊断并重跑 32K B1 eager 单臂抬升，实际运行三个直接 benchmark，再完成 128K B4 完整 decode；保留上述原始负面格子，不凭纯算子倍率替代 TPOT。
