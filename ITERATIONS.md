@@ -107,6 +107,7 @@
   - NFA B1/B4：L1 0.677219/0.842210 ms，L2 2.221859/5.865421 ms，main Attention 1.026528/1.033380 ms，NFA 算子合计 3.925835/7.737045 ms，全部 CUDA kernel 9.739832/14.429129 ms。
   - NFA 主要扩展项 B1/B4：fine-score 0.653726/2.661576 ms，filtered partial Top-K 0.896193/2.527045 ms，filtered merge 0.401508/0.403840 ms，gather-attend 1.026528/1.033380 ms。B4 的 15 ms 完整 TPOT 与 14.43 ms device time 相符，主要是 L2 fine-score 和 partial Top-K 扩展，不是 Graph 失效。
   - FlashInfer B1/B4：全部 CUDA kernel 11.104768/21.305991 ms，paged attention 3.086504/12.881709 ms，merge states 0.111134/0.106433 ms。按同 profile 全 kernel device time，FI/NFA 为 1.140×/1.477×，优势随 batch 增大；完整 512-token 干净 TPOT 比值另行验收，不能用 profiler TPOT 替代。
+  - 同 candidate、同输入的独立 512-token 干净 ABBA 已完成：64K Graph B1 NFA/FlashInfer=10.2848/11.3491 ms，FI/NFA=1.103×；B4=15.0704/21.3959 ms，FI/NFA=1.420×。每格 8/8 run returncode=0、NFA repeat identity=true、`gpu_hygiene=clean`；NFA/FlashInfer 稀疏近似 token 不同按预期单列，不作为 NFA 优化前后身份门。干净 TPOT 与 profile 的 B4 优势扩大趋势一致，异常排查完成，128K B4 可以恢复验收。
 - L2 ragged-tail 定位：生产 64K 几何为 `R=(K_F+K_N+2)*page=(128+2)*16=2080`、`K=1024`、`TILE=2048`、`NTILES=2`。第二个 partial tile 只有 32 个有效候选，却仍执行完整 `2048→1024` Top-K；问题不是扫描全部历史容量。下一步以原 partial+merge 为 reference，建立 `R=2080` 的 bit-exact 对拍，再消除尾块无效大排序；128K B4 在异常解释和干净 TPOT 核对完成前保持暂停。
 
 ## Iter 8 — L2 ragged tail 小宽度精确 Top-K
