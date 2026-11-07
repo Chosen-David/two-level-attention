@@ -124,4 +124,20 @@
 - 64K B4 完整 decode ABBA：pc31 GPU0，同 `cc7d6aa4`→`c5be4f69` 对照，512 tokens、3 warmup、独立进程 ABBA；eager/Graph 合计 8/8 run returncode=0，`gpu_hygiene=clean`，两种 execution 的 repeat 与 baseline/candidate token identity 均通过。每请求两臂均 3 个 near-skip 层、0 个 far-skip/both-skip 层，输入 SHA256=`6b10ff16…160b44663f`、65198 tokens：
   - eager：28.096464 → 28.247200 ms，0.994664×（负面格子）；两腿 baseline 为 27.849729/28.343200 ms、candidate 为 28.296384/28.198016 ms，方向不一致，不宣称 eager 收益。
   - Graph：15.090384 → 14.270112 ms，1.057482×；两腿 baseline 为 15.077280/15.103488 ms、candidate 为 14.277744/14.262480 ms，方向一致。Graph 的完整 TPOT 收益与完整 forward device-time 改善相符，但不外推到 eager 或其他长度。
-- 下一步：完成跨长度/B1/B4 纯算子矩阵及 32K/128K 完整 decode，补查 eager/Graph 跨执行 token identity；保留所有负面格子，验证后再合入并推送 main。
+- 身份补充：64K B4 baseline 与 candidate 各自的 eager/Graph 生成 token 均逐元素一致；Graph candidate 每臂 511 次 replay，`host_readback_in_decode_loop=false`。
+- 跨规模纯算子 ABBA：pc31 GPU0，`cc7d6aa4`→`c5be4f69`，8 形状 × 4 独立进程共 32/32 run returncode=0，`gpu_hygiene=clean`，两臂 source diff SHA256 均为空；每格四臂 partial、indices、counts SHA256 全部一致。下表数值为两臂 median 的 median，单位 ms；`partial` 和 `full` 分别为局部 Top-K、partial+精确 merge：
+  - 生产 `R=2080`：
+
+    | capacity | batch | partial Graph 前→后（倍率） | full eager 前→后（倍率） | full Graph 前→后（倍率） |
+    |---|---:|---:|---:|---:|
+    | 32768 | 1 | 0.065988→0.035090（1.880536×） | 0.094372→0.063206（1.493092×） | 0.088720→0.057818（1.534456×） |
+    | 32768 | 4 | 0.237627→0.123644（1.921857×） | 0.326881→0.212979（1.534801×） | 0.320578→0.206482（1.552571×） |
+    | 65728 | 1 | 0.139933→0.071902（1.946165×） | 0.172086→0.103775（1.658263×） | 0.165828→0.097804（1.695509×） |
+    | 65728 | 4 | 0.518573→0.266637（1.944860×） | 0.621173→0.368894（1.683878×） | 0.614094→0.362660（1.693307×） |
+    | 131520 | 1 | 0.139933→0.071905（1.946080×） | 0.171820→0.103530（1.659620×） | 0.165831→0.097806（1.695508×） |
+    | 131520 | 4 | 0.518509→0.266635（1.944639×） | 0.620118→0.369093（1.680115×） | 0.614101→0.362662（1.693317×） |
+
+    partial eager 六格为 1.783551–1.921253×。64K/128K 的 int64 结果几乎相同，且 B4 绝对节省大于 B1，证明该浪费和算子收益都不是小数据或单一长度特有。
+  - 其他尾块 `R=8452`：B1 partial eager/Graph 为 1.243312/1.247165×、full eager/Graph 为 1.218694/1.220249×；B4 分别为 1.219985/1.220652×、1.196848/1.196156×，全部 bit-exact。
+  - 口径：synthetic packed-key 纯算子信号，不是完整 decode TPOT；完整收益仍以真实 512-token ABBA 为准。
+- 下一步：完成 32K B1 与 128K B4 完整 decode，验证后合入并推送 main；不把上述纯算子倍率替代 TPOT。
