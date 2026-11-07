@@ -116,5 +116,9 @@
 - 基线：`cc7d6aa45c791d610e4d8365131962f1e30622c0`；候选实现：`c5be4f69262a7eb2287e396589e18d8a91fd79ff`。
 - 修改：当末块 `TAIL<=K` 时只排序 `TAIL_PAD` 个 packed key，再在固定 K-wide partial run 的其余位置补同一个 invalid key；其他 tile、merge、最终 token 映射和 tie 规则不变。该路径由通用形状决定，不硬编码 64K；生产 `R=2080` 在 32K/64K/128K 都相同，B4 只是增加行数，因此浪费不是小数据或单一长度特有。
 - 正确性：pc02 GPU0 干净起跑门禁通过，`tests/test_nfa_current_query_selector.py -k filtered_topk` 22/22 通过。以修改前全宽度 partial kernel 为独立 reference，partial 输出逐位一致，且 mono 最终 indices/counts 一致；覆盖 int32/int64、`R=2080/8452`、`R=1/32/1024/2048/2049/2079/4097`、K=1/32/1024、ties、NaN、±Inf、signed zero 来源的 packed key、quota=0、无效项和补洞。首次测试命令因 pc02 缺 pytest 未执行，依赖安装到 `/tmp/nfa-pytest-deps` 后通过，不是 kernel 失败。
-- 性能：本轮尚未测量，不宣称加速。
-- 下一步：B1/B4、32K/64K/128K 的纯算子与同真实 forward profile，随后 eager/Graph token identity 和完整 512-token decode ABBA；验证后再决定是否合入并推送 main。
+- 同真实完整 forward profile：pc31 GPU0，64K B4 Graph，`cc7d6aa4`→`c5be4f69`，原生 RULER `niah_multikey_1` sample 0、65198 tokens、3 warmup + 5 steady repeats，独立进程 ABBA；4/4 run returncode=0，`gpu_hygiene=clean`，四臂生成 token identity=true，两臂 source diff SHA256 均为空。数值为两臂 median 的 median，单位 ms/step：
+  - filtered partial Top-K：2.532682 → 1.730181，1.463823×；fine-score：2.666587 → 2.665407，基本不变；filtered merge：0.404769 → 0.403491，基本不变。
+  - L1：0.845270 → 0.846256，0.998834×；L2：5.877542 → 5.072658，1.158672×；main Attention：1.040819 → 1.037106，1.003581×；NFA 算子合计：7.764542 → 6.957602，1.115981×。
+  - 全部 CUDA kernel device time：14.482043 → 13.659150，1.060245×。该口径包含输入/位置更新、KV append/页表、全部 36 层及 argmax，不包含 prefill/capture；profiler run 的 TPOT 不作为干净性能 verdict。
+- 跨规模解释：生产 `R=2080` 不随 32K/64K/128K 改变，B4 仅增加行数；当前 B4 profile 证实收益不是小数据特有，但其他长度与 B1 的纯算子矩阵、完整 512-token TPOT 仍须分别实测，不能由本格外推。
+- 下一步：完成 64K B4 eager/Graph 完整 512-token decode ABBA、跨长度/B1/B4 纯算子矩阵及必要的跨长度完整 decode；保留所有负面格子，验证后再合入并推送 main。
