@@ -86,7 +86,7 @@ def _make_partial(seed, m=3, hkv=8, r=8452, width=1024, capacity=32768):
     ops._nfa_filtered_topk_partial_kernel[(m * hkv, ntiles)](
         packed, partial, r, TILE=2048, NTILES=ntiles,
         TAIL=tail, TAIL_PAD=triton.next_power_of_2(tail),
-        S=capacity, K=width, META_GROUP=hkv, num_warps=8)
+        S=capacity, K=width, META_GROUP=hkv, TOKEN_BITS=16, num_warps=8)
     return partial, lower, upper, quota, capacity
 
 

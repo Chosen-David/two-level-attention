@@ -45,7 +45,7 @@ def _launch(logits, out, capacity, warps):
     ops._nfa_filtered_topk_partial_kernel[(m * hkv, ntiles)](
         logits, out, r, TILE=2048, NTILES=ntiles,
         TAIL=tail, TAIL_PAD=triton.next_power_of_2(tail),
-        S=capacity, K=1024, META_GROUP=hkv, num_warps=warps)
+        S=capacity, K=1024, META_GROUP=hkv, TOKEN_BITS=16, num_warps=warps)
 
 
 def main():

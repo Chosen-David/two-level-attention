@@ -143,5 +143,6 @@
 - 32K B1 完整 decode ABBA：pc31 GPU0，同 `cc7d6aa4`→`c5be4f69` 对照，512 tokens、3 warmup、独立进程 ABBA；eager/Graph 合计 8/8 run returncode=0，`gpu_hygiene=clean`，两种 execution 的 repeat 与 baseline/candidate token identity 均通过。两臂均 2 个 far-skip 层、0 个 near-skip/both-skip 层，输入 SHA256=`530af358…f53d8df23`、32621 tokens：
   - eager：26.047992 → 27.610776 ms，0.943400×（负面格子）；baseline 两腿为 25.888817/26.207168 ms，candidate 为 29.060544/26.161008 ms。candidate_a 相对其余三臂出现约 3 ms 单臂抬升，不能直接把两腿 median 当作稳定回退，须检查分步数据并独立重跑。
   - Graph：9.787616 → 9.841296 ms，0.994545×（负面格子）；baseline 两腿为 9.789792/9.785440 ms，candidate 为 9.775552/9.907040 ms，方向相反，不宣称 Graph 收益或稳定回退。
-  - 独立静态复核未发现尾块 kernel 的可达正确性问题；复核同时发现三个本次触及的直接 partial benchmark 缺少既有 `TOKEN_BITS` 参数，已补齐但尚待空卡实际运行，不作为 kernel 回归。
-- 下一步：先诊断并重跑 32K B1 eager 单臂抬升，实际运行三个直接 benchmark，再完成 128K B4 完整 decode；保留上述原始负面格子，不凭纯算子倍率替代 TPOT。
+  - 独立静态复核未发现尾块 kernel 的可达正确性问题；复核同时发现三个本次触及的直接 partial benchmark 缺少既有 `TOKEN_BITS` 参数。补齐后 pc31 GPU0 干净监控下 `benchmark_nfa_topk_merge.py`、`benchmark_nfa_topk_partial.py`、`benchmark_nfa_topk_tile.py` 均实际运行成功，3/3 returncode=0、`gpu_hygiene=clean`，各 10 个 seed 及 Graph 对拍均 `bit_exact=true`、`all_ok=true`。这些脚本内部的 warp/tile/merge 性能对照不是本轮生产 TPOT verdict。
+- 32K eager 分步诊断：原 candidate_a 相对 baseline_a 的 steady 配对 median/mean 为 +3.168752/+2.718094 ms，candidate_b 相对 baseline_b 为 -0.055184/-0.043684 ms；前者整臂 platform-like 抬升、后者方向相反，不能归因为稳定 kernel 回退。保留原始格子并追加独立 ABBA 复跑，不用事后诊断覆盖原数据。
+- 下一步：重跑 32K B1 eager，再完成 128K B4 完整 decode；保留上述原始负面格子，不凭纯算子倍率替代 TPOT。
