@@ -121,4 +121,7 @@
   - L1：0.845270 → 0.846256，0.998834×；L2：5.877542 → 5.072658，1.158672×；main Attention：1.040819 → 1.037106，1.003581×；NFA 算子合计：7.764542 → 6.957602，1.115981×。
   - 全部 CUDA kernel device time：14.482043 → 13.659150，1.060245×。该口径包含输入/位置更新、KV append/页表、全部 36 层及 argmax，不包含 prefill/capture；profiler run 的 TPOT 不作为干净性能 verdict。
 - 跨规模解释：生产 `R=2080` 不随 32K/64K/128K 改变，B4 仅增加行数；当前 B4 profile 证实收益不是小数据特有，但其他长度与 B1 的纯算子矩阵、完整 512-token TPOT 仍须分别实测，不能由本格外推。
-- 下一步：完成 64K B4 eager/Graph 完整 512-token decode ABBA、跨长度/B1/B4 纯算子矩阵及必要的跨长度完整 decode；保留所有负面格子，验证后再合入并推送 main。
+- 64K B4 完整 decode ABBA：pc31 GPU0，同 `cc7d6aa4`→`c5be4f69` 对照，512 tokens、3 warmup、独立进程 ABBA；eager/Graph 合计 8/8 run returncode=0，`gpu_hygiene=clean`，两种 execution 的 repeat 与 baseline/candidate token identity 均通过。每请求两臂均 3 个 near-skip 层、0 个 far-skip/both-skip 层，输入 SHA256=`6b10ff16…160b44663f`、65198 tokens：
+  - eager：28.096464 → 28.247200 ms，0.994664×（负面格子）；两腿 baseline 为 27.849729/28.343200 ms、candidate 为 28.296384/28.198016 ms，方向不一致，不宣称 eager 收益。
+  - Graph：15.090384 → 14.270112 ms，1.057482×；两腿 baseline 为 15.077280/15.103488 ms、candidate 为 14.277744/14.262480 ms，方向一致。Graph 的完整 TPOT 收益与完整 forward device-time 改善相符，但不外推到 eager 或其他长度。
+- 下一步：完成跨长度/B1/B4 纯算子矩阵及 32K/128K 完整 decode，补查 eager/Graph 跨执行 token identity；保留所有负面格子，验证后再合入并推送 main。
