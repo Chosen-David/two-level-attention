@@ -150,4 +150,4 @@
 - 128K B4 完整 decode ABBA：pc31 GPU0，`cc7d6aa4`→最终代码快照 `4bc6aa98730e060489f742bfe1875d687237e422`，512 tokens、3 warmup、独立进程 ABBA；eager/Graph 合计 8/8 run returncode=0，`gpu_hygiene=clean`，两种 execution 的 repeat 与 baseline/candidate token identity 均通过。每请求两臂均 13 个 near-skip 层、0 个 far-skip/both-skip 层，输入 SHA256=`4078e45e…24eaec15dab5`、130986 tokens：
   - eager：28.612872 → 28.355448 ms，1.009078×；baseline 两腿为 28.893792/28.331952 ms、candidate 为 28.183375/28.527520 ms，两腿方向相反，不宣称稳定 eager 收益。
   - Graph：15.050712 → 14.242632 ms，1.056737×；baseline 两腿为 15.065024/15.036400 ms、candidate 为 14.248704/14.236560 ms，方向一致。与 64K B4 Graph 的 1.057482× 相符，证明完整 TPOT 收益不是小数据或单一长度特有；eager 仍按噪声/负面口径保留，不泛化。
-- 下一步：补查 128K eager/Graph 跨执行 token identity，核对最终工作树和远端 main 后普通推送；不凭纯算子倍率替代 TPOT。
+- 128K B4 身份补充：baseline 与 candidate 各自的 eager/Graph 生成 token 均逐元素一致；Graph candidate 每臂 511 次 replay，热循环 `host_readback_in_decode_loop=false`。全部身份、正确性和性能门禁完成，保留上述 eager/Graph 噪声及负面口径，不凭纯算子倍率替代 TPOT。
