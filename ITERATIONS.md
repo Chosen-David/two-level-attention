@@ -147,4 +147,7 @@
 - 32K eager 分步诊断：原 candidate_a 相对 baseline_a 的 steady 配对 median/mean 为 +3.168752/+2.718094 ms，candidate_b 相对 baseline_b 为 -0.055184/-0.043684 ms；前者整臂 platform-like 抬升、后者方向相反，不能归因为稳定 kernel 回退。保留原始格子并追加独立 ABBA 复跑，不用事后诊断覆盖原数据。
 - 32K B1 eager 独立复跑：pc31 GPU0，最终候选 `4bc6aa98730e060489f742bfe1875d687237e422`（生产 kernel 与 `c5be4f69` 相同，仅补直接 benchmark 参数与记录），4/4 run returncode=0、`gpu_hygiene=clean`，repeat 与 baseline/candidate token identity 均通过。baseline 两腿 25.880177/26.528720 ms、candidate 25.768448/26.732464 ms，median 26.204448→26.250456 ms、0.998247×；两腿方向相反且接近噪声。原来的约 3 ms 单臂抬升未复现，不宣称稳定 eager 回退，也不删除原始负面格子。
 - 最终 CPU 回归：`test_strict_skip_receipt.py`、`test_graph_ready_paged_region_cache.py`、`test_frozen_skip_request_guard.py` 共 40 passed、5 subtests passed。
-- 下一步：以最终干净候选快照完成 128K B4 eager/Graph 完整 decode，再核对远端并推送 main；不凭纯算子倍率替代 TPOT。
+- 128K B4 完整 decode ABBA：pc31 GPU0，`cc7d6aa4`→最终代码快照 `4bc6aa98730e060489f742bfe1875d687237e422`，512 tokens、3 warmup、独立进程 ABBA；eager/Graph 合计 8/8 run returncode=0，`gpu_hygiene=clean`，两种 execution 的 repeat 与 baseline/candidate token identity 均通过。每请求两臂均 13 个 near-skip 层、0 个 far-skip/both-skip 层，输入 SHA256=`4078e45e…24eaec15dab5`、130986 tokens：
+  - eager：28.612872 → 28.355448 ms，1.009078×；baseline 两腿为 28.893792/28.331952 ms、candidate 为 28.183375/28.527520 ms，两腿方向相反，不宣称稳定 eager 收益。
+  - Graph：15.050712 → 14.242632 ms，1.056737×；baseline 两腿为 15.065024/15.036400 ms、candidate 为 14.248704/14.236560 ms，方向一致。与 64K B4 Graph 的 1.057482× 相符，证明完整 TPOT 收益不是小数据或单一长度特有；eager 仍按噪声/负面口径保留，不泛化。
+- 下一步：补查 128K eager/Graph 跨执行 token identity，核对最终工作树和远端 main 后普通推送；不凭纯算子倍率替代 TPOT。
