@@ -1,0 +1,15 @@
+{
+  "units": "all token counts are Qwen3 tokenizer token counts, not characters or words",
+  "raw_prompt_tokens": "official 0-shot prompt before middle truncation and before Qwen3 chat wrapping",
+  "post_truncation_prompt_tokens": "re-tokenized prompt after token-slice/decode middle truncation, before chat wrapping",
+  "actual_input_tokens": "material + question token IDs after chat wrapping and the production Choices: split; this is the final model-input length",
+  "actual_input_ids_sha256": "signed-int64 little-endian IDs, using benchmark/LongBench/run_cap_manifest.py:input_ids_sha256",
+  "source_length_label": "dataset-provided coarse label; never used as a numeric token length",
+  "limitations": [
+    "Historical prediction JSONL did not store per-sample input IDs or token counts; this package deterministically reconstructs them from the frozen source, tokenizer and archived production functions.",
+    "The historical model revision is not inferred from the local tokenizer directory; tokenizer/config file SHA256 values are the identity used here.",
+    "This is not the official LongBench v2 120K protocol. The historical internal cap is 31500, so scores must not be compared directly with the official leaderboard.",
+    "Length reconstruction does not rerun or alter any of the 503 generations and does not convert legacy predictions into token-level generation evidence."
+  ],
+  "quality_scope": "E109 FullKV/mavg/aavg raw is archived only to close row identity and parser checks; E145d shares the 503-row source and 31500 cap but is not rescored or replaced here."
+}

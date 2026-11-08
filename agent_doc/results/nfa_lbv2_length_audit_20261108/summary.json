@@ -1,0 +1,159 @@
+{
+  "schema": "nfa-lbv2-length-audit-v1",
+  "status": "complete",
+  "classification": "B",
+  "rows": 503,
+  "unique_ids": 503,
+  "cap_effective": 31500,
+  "truncation": "tokenized prompt mid-truncation: first 15750 + last 15750 tokens, decode with skip_special_tokens=True, then chat template and question split",
+  "truncated_rows": 389,
+  "untruncated_rows": 114,
+  "raw_prompt_tokens": {
+    "count": 503,
+    "min": 10142,
+    "p25": 37576.0,
+    "p50": 99515.0,
+    "p75": 208464.0,
+    "p90": 520239.6000000001,
+    "p95": 1148368.7,
+    "p99": 3327105.200000001,
+    "max": 4163915,
+    "mean": 260612.30815109343
+  },
+  "actual_input_tokens": {
+    "count": 503,
+    "min": 10155,
+    "p25": 31512.0,
+    "p50": 31513.0,
+    "p75": 31513.0,
+    "p90": 31513.0,
+    "p95": 31513.0,
+    "p99": 31513.0,
+    "max": 31515,
+    "mean": 29193.13121272366
+  },
+  "post_truncation_prompt_tokens": {
+    "count": 503,
+    "min": 10142,
+    "p25": 31499.0,
+    "p50": 31500.0,
+    "p75": 31500.0,
+    "p90": 31500.0,
+    "p95": 31500.0,
+    "p99": 31500.0,
+    "max": 31502,
+    "mean": 29180.13121272366
+  },
+  "by_source_length_label": {
+    "long": {
+      "rows": 108,
+      "truncated_rows": 108,
+      "raw_prompt_tokens": {
+        "count": 108,
+        "min": 167236,
+        "p25": 284088.25,
+        "p50": 461973.5,
+        "p75": 1148291.75,
+        "p90": 2041305.9,
+        "p95": 3307176.4999999995,
+        "p99": 3620650.2099999995,
+        "max": 4163915,
+        "mean": 880632.824074074
+      },
+      "actual_input_tokens": {
+        "count": 108,
+        "min": 31489,
+        "p25": 31513.0,
+        "p50": 31513.0,
+        "p75": 31513.0,
+        "p90": 31513.0,
+        "p95": 31513.0,
+        "p99": 31514.0,
+        "max": 31515,
+        "mean": 31512.777777777777
+      }
+    },
+    "medium": {
+      "rows": 215,
+      "truncated_rows": 215,
+      "raw_prompt_tokens": {
+        "count": 215,
+        "min": 42038,
+        "p25": 92816.0,
+        "p50": 119958.0,
+        "p75": 157974.0,
+        "p90": 208959.79999999996,
+        "p95": 259576.5999999997,
+        "p99": 424000.55999999994,
+        "max": 548348,
+        "mean": 136733.86976744185
+      },
+      "actual_input_tokens": {
+        "count": 215,
+        "min": 31512,
+        "p25": 31513.0,
+        "p50": 31513.0,
+        "p75": 31513.0,
+        "p90": 31513.0,
+        "p95": 31513.0,
+        "p99": 31513.0,
+        "max": 31515,
+        "mean": 31512.967441860466
+      }
+    },
+    "short": {
+      "rows": 180,
+      "truncated_rows": 66,
+      "raw_prompt_tokens": {
+        "count": 180,
+        "min": 10142,
+        "p25": 19014.0,
+        "p50": 26361.0,
+        "p75": 41286.0,
+        "p90": 53123.199999999975,
+        "p95": 64887.04999999993,
+        "p99": 121156.88000000101,
+        "max": 806475,
+        "mean": 36565.91111111111
+      },
+      "actual_input_tokens": {
+        "count": 180,
+        "min": 10155,
+        "p25": 19027.0,
+        "p50": 26374.0,
+        "p75": 31513.0,
+        "p90": 31513.0,
+        "p95": 31513.0,
+        "p99": 31513.0,
+        "max": 31513,
+        "mean": 25030.42777777778
+      }
+    }
+  },
+  "quality_identity_check": {
+    "FullKV": {
+      "raw_path": "agent_doc/results/nfa_lbv2_length_audit_20261108/raw/fullkv.jsonl",
+      "raw_sha256": "67665479cd50a464d4f82ab7263ea64841d6326a09dc9868810c5e5ddf4c231c",
+      "rows": 503,
+      "official_parser": "official-strict-v1",
+      "official_correct": 162,
+      "official_score": 32.21
+    },
+    "mavg": {
+      "raw_path": "agent_doc/results/nfa_lbv2_length_audit_20261108/raw/mavg.jsonl",
+      "raw_sha256": "da2719cd8350b88967c92f9f67449ae685d1cac10c3b64f009860b33b18dc141",
+      "rows": 503,
+      "official_parser": "official-strict-v1",
+      "official_correct": 161,
+      "official_score": 32.01
+    },
+    "aavg": {
+      "raw_path": "agent_doc/results/nfa_lbv2_length_audit_20261108/raw/aavg.jsonl",
+      "raw_sha256": "1896ad19c04860351f06740e7d86790c6b94fb3aa02c36b967b36bdcd52da218",
+      "rows": 503,
+      "official_parser": "official-strict-v1",
+      "official_correct": 160,
+      "official_score": 31.81
+    }
+  }
+}

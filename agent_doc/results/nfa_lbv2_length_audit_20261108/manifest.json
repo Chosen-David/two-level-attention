@@ -1,0 +1,67 @@
+{
+  "schema": "nfa-lbv2-length-audit-manifest-v1",
+  "package_date": "2026-11-08",
+  "classification": "B",
+  "status": "complete",
+  "scope": "CPU-only reconstruction of LongBench v2 input lengths and identities; no generation or GPU execution",
+  "evidence_base_commit": "260f88b852e566e337d17abd182bfa40df71698b",
+  "model_name": "Qwen3-8B",
+  "source_json": "/home/wangyuanshuo02/datasets/LongBench/data/lbv2.json",
+  "source_sha256": "15d61c22d92c96900b3c4948b6aeea218d3214b676a65df48e7b8555604c7fe2",
+  "tokenizer_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "tokenizer_sha256": {
+    "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+    "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+    "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+    "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+    "config.json": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+    "generation_config.json": "2325da0f15bb848e018c5ae071b7943332e9f871d6b60e2ed22ca97d4cb993d2"
+  },
+  "tokenizer_class": "Qwen2TokenizerFast",
+  "tokenizer_is_fast": true,
+  "transformers_version": "4.56.2",
+  "source_code_sha256": {
+    "benchmark/LongBench/pred.py": "ad635384f21c6eb8b32b9750f966e4aed261a235aa0e102ba1c34edb2e3402bf",
+    "benchmark/LongBench/lbv2_choice.py": "c733878ce1824755a80e0e79ab3e72c2751cd6a9d93c53ad4731e32f002e63f9",
+    "benchmark/LongBench/run_cap_manifest.py": "527db456d30d92e259cfc1a4e054a8867b8e52bbaf7807e32ee61582466144a7",
+    "benchmark/LongBench/config/dataset2prompt.json": "ac8056e8542bf4ad42b549d9ba450ef18819b6b2987f65973e20e7eeff6bbd1a",
+    "benchmark/LongBench/config/model2maxlen.json": "a279b2d28f3062c04462baf46e53c1ee84d47da6be5c288b8b9c1231845b2948",
+    "agent_doc/results/nfa_lbv2_length_audit_20261108/build_length_audit.py": "7de5901cc9e2affbdc9b7abd18064026dd8b07ec72bd530ae3929a6b3e1b38fb"
+  },
+  "raw_predictions": {
+    "FullKV": {
+      "raw_path": "agent_doc/results/nfa_lbv2_length_audit_20261108/raw/fullkv.jsonl",
+      "raw_sha256": "67665479cd50a464d4f82ab7263ea64841d6326a09dc9868810c5e5ddf4c231c",
+      "rows": 503,
+      "official_parser": "official-strict-v1",
+      "official_correct": 162,
+      "official_score": 32.21
+    },
+    "mavg": {
+      "raw_path": "agent_doc/results/nfa_lbv2_length_audit_20261108/raw/mavg.jsonl",
+      "raw_sha256": "da2719cd8350b88967c92f9f67449ae685d1cac10c3b64f009860b33b18dc141",
+      "rows": 503,
+      "official_parser": "official-strict-v1",
+      "official_correct": 161,
+      "official_score": 32.01
+    },
+    "aavg": {
+      "raw_path": "agent_doc/results/nfa_lbv2_length_audit_20261108/raw/aavg.jsonl",
+      "raw_sha256": "1896ad19c04860351f06740e7d86790c6b94fb3aa02c36b967b36bdcd52da218",
+      "rows": 503,
+      "official_parser": "official-strict-v1",
+      "official_correct": 160,
+      "official_score": 31.81
+    }
+  },
+  "sample_count": 503,
+  "cap_effective": 31500,
+  "max_new_tokens_historical": 128,
+  "command": "python3 agent_doc/results/nfa_lbv2_length_audit_20261108/build_length_audit.py",
+  "environment_overrides": {
+    "NFA_LBV2_SOURCE_JSON": "optional path to the byte-identical lbv2.json",
+    "NFA_QWEN3_TOKENIZER": "optional path to the byte-identical Qwen3-8B tokenizer/config snapshot"
+  },
+  "gpu_used": false,
+  "generation_rerun": false
+}

@@ -1,0 +1,12 @@
+{
+  "status_definitions": {
+    "archived-complete": "result/manifest/receipt 均在当前快照，任务数完整，receipt success 且结果与 manifest SHA 回指一致",
+    "archived-partial": "结果存在，但任务、sidecar 或 SHA 回指未全部闭合",
+    "legacy-partial": "历史结果可登记，但不满足当前 formal 完整证据契约",
+    "reported-not-archived": "研究报告引用了该结果，但当前发布快照没有对应文件；动作是找回同步，不是直接重跑",
+    "not-run": "报告明确的实验缺口，与文件未同步不同"
+  },
+  "identity_rule": "所有 SHA 均由本脚本从当前文件实时计算；历史 run 的 SHA 仅从对应 sidecar 读取，不以当前脚本或当前 scorer 替代",
+  "score_policy": "本包不生成新的质量均值，也不把不同 generation、预算或模型口径拼接成新表格",
+  "coverage_note": "RULER 使用 11 任务；LongBench v1 使用 16 任务。样本数从结果 JSON 的 n 字段提取，不从报告文字复制"
+}

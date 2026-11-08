@@ -1,0 +1,89 @@
+{
+  "schema": "nfa-baseline-reproducibility-index-v1",
+  "status": "index-complete; recovery and experimental gaps remain explicit",
+  "classification": "B",
+  "model_scope": "Qwen3-8B baseline quality evidence; source-only candidates retained with limits",
+  "methods": 10,
+  "evidence_units": 17,
+  "status_counts": {
+    "archived-complete": 7,
+    "archived-partial": 1,
+    "legacy-partial": 2,
+    "not-run": 1,
+    "reported-not-archived": 6
+  },
+  "archived_complete_by_method": {
+    "AsyncTLS": 1,
+    "FullKV": 3,
+    "JSSA": 1,
+    "Quest": 2
+  },
+  "integration_only_methods": [
+    "MInference",
+    "SparQ",
+    "ClusterKV"
+  ],
+  "unsupported_qwen3_methods": [
+    "FFD"
+  ],
+  "official_source_unavailable_methods": [
+    "AsyncTLS"
+  ],
+  "complete_units_with_closed_hf_revision": 0,
+  "complete_units_with_generation_command": 0,
+  "complete_units_scorer_matches_current_snapshot": 0,
+  "recovery_units": [
+    {
+      "evidence_id": "quest-ruler-128k",
+      "status": "archived-partial",
+      "action": "recover missing identity/sidecars or rescore from validated raw; do not treat this row as a complete formal unit"
+    },
+    {
+      "evidence_id": "fasa-ruler-32k-legacy",
+      "status": "legacy-partial",
+      "action": "recover missing identity/sidecars or rescore from validated raw; do not treat this row as a complete formal unit"
+    },
+    {
+      "evidence_id": "fasa-longbench-v1-legacy",
+      "status": "legacy-partial",
+      "action": "recover missing identity/sidecars or rescore from validated raw; do not treat this row as a complete formal unit"
+    },
+    {
+      "evidence_id": "hisa-ruler-32k-reported",
+      "status": "reported-not-archived",
+      "action": "recover or synchronize the referenced artifact; do not rerun solely because this snapshot lacks it"
+    },
+    {
+      "evidence_id": "fullkv-longbench-v1-reported",
+      "status": "reported-not-archived",
+      "action": "recover or synchronize the referenced artifact; do not rerun solely because this snapshot lacks it"
+    },
+    {
+      "evidence_id": "quest-longbench-v1-reported",
+      "status": "reported-not-archived",
+      "action": "recover or synchronize the referenced artifact; do not rerun solely because this snapshot lacks it"
+    },
+    {
+      "evidence_id": "fasa-longbench-v1-reported",
+      "status": "reported-not-archived",
+      "action": "recover or synchronize the referenced artifact; do not rerun solely because this snapshot lacks it"
+    },
+    {
+      "evidence_id": "jssa-longbench-v1-reported",
+      "status": "reported-not-archived",
+      "action": "recover or synchronize the referenced artifact; do not rerun solely because this snapshot lacks it"
+    },
+    {
+      "evidence_id": "asynctls-longbench-v1-reported",
+      "status": "reported-not-archived",
+      "action": "recover or synchronize the referenced artifact; do not rerun solely because this snapshot lacks it"
+    }
+  ],
+  "limitations": [
+    "报告中的完成状态与当前快照的文件存在性分开记录；reported-not-archived 不表示实验未执行。",
+    "formal sidecar 的本地模型路径不等于 Hugging Face revision；未闭合字段保持 null。",
+    "历史 scorer/formal script SHA 与当前快照不同只能表示需找回运行时 blob，不能改写成当前哈希。",
+    "语义复现、修改版 quality adapter、官方 kernel 直跑是不同证据等级，不在本索引中混称。",
+    "本包只建立索引和文件身份，不重评分、不运行生成、不启动 GPU，也不修改论文、图或 Overleaf。"
+  ]
+}
