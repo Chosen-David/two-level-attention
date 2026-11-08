@@ -1,0 +1,124 @@
+{
+  "schema": "nfa-selection-trace-independent-validation-v1",
+  "status": "PASS",
+  "production_scope_checked": true,
+  "selection_trace_sha256": "20a284417f11917b0a7c8ae14b392e992f24dbc434a66727af12bb361c98673f",
+  "manifest_sha256": "a1d42a9cb470ba3af34268beb478807e5ce0e6b91067b735d7f83538390468cc",
+  "layers": [
+    {
+      "layer": 0,
+      "visible_counts": [
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "middle_counts": [
+        [
+          892,
+          892,
+          892,
+          892,
+          892,
+          892,
+          892,
+          892
+        ]
+      ],
+      "candidate_slots": 17696,
+      "valid_l2_scores": 16552,
+      "checks": [
+        "logical-to-physical roundtrip",
+        "strict region and final union",
+        "packed L2 score/token decode",
+        "candidate source and region",
+        "Gather/native K/V bit equality"
+      ]
+    },
+    {
+      "layer": 17,
+      "visible_counts": [
+        1020,
+        1020,
+        1020,
+        1020,
+        1020,
+        1020,
+        1020,
+        1020
+      ],
+      "middle_counts": [
+        [
+          888,
+          888,
+          888,
+          888,
+          888,
+          888,
+          888,
+          888
+        ]
+      ],
+      "candidate_slots": 17696,
+      "valid_l2_scores": 16552,
+      "checks": [
+        "logical-to-physical roundtrip",
+        "strict region and final union",
+        "packed L2 score/token decode",
+        "candidate source and region",
+        "Gather/native K/V bit equality"
+      ]
+    },
+    {
+      "layer": 35,
+      "visible_counts": [
+        1023,
+        1023,
+        1020,
+        1020,
+        1023,
+        1023,
+        1022,
+        1023
+      ],
+      "middle_counts": [
+        [
+          891,
+          891,
+          888,
+          888,
+          891,
+          891,
+          890,
+          891
+        ]
+      ],
+      "candidate_slots": 17696,
+      "valid_l2_scores": 16552,
+      "checks": [
+        "logical-to-physical roundtrip",
+        "strict region and final union",
+        "packed L2 score/token decode",
+        "candidate source and region",
+        "Gather/native K/V bit equality"
+      ]
+    }
+  ],
+  "scope": {
+    "requests": 1,
+    "decode_steps": 1,
+    "execution": "eager",
+    "layers": [
+      0,
+      17,
+      35
+    ],
+    "not_a_performance_measurement": true,
+    "not_a_dataset_wide_quality_result": true
+  },
+  "note": "独立读取 NPZ；未加载模型、未导入生产 selector 或导出器。"
+}

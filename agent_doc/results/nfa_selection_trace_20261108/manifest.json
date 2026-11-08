@@ -1,0 +1,1092 @@
+{
+  "schema": "nfa-selection-trace-v1",
+  "status": "complete-real-model-eager-trace",
+  "classification": "A-within-single-request-diagnostic-scope",
+  "scope": {
+    "requests": 1,
+    "decode_steps": 1,
+    "execution": "eager",
+    "layers": [
+      0,
+      17,
+      35
+    ],
+    "not_a_performance_measurement": true,
+    "not_a_dataset_wide_quality_result": true
+  },
+  "coordinates": {
+    "request_id": 0,
+    "decode_step": 0,
+    "planned_length": 32613,
+    "token_coordinate": "zero-based logical token ID",
+    "physical_slot": "physical_page * page_size + page_offset",
+    "layer_key_prefix": "layer_XXX/"
+  },
+  "model": {
+    "declared_local_path": "/home/wangyuanshuo02/models/Qwen3-8B",
+    "hf_revision": null,
+    "hf_revision_status": "本地路径不冒充 HF revision；权重与配置逐文件 SHA 闭合",
+    "files": {
+      "config.json": {
+        "sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+        "bytes": 728
+      },
+      "generation_config.json": {
+        "sha256": "2325da0f15bb848e018c5ae071b7943332e9f871d6b60e2ed22ca97d4cb993d2",
+        "bytes": 239
+      },
+      "tokenizer_config.json": {
+        "sha256": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+        "bytes": 9732
+      },
+      "tokenizer.json": {
+        "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "bytes": 11422654
+      },
+      "model.safetensors.index.json": {
+        "sha256": "f9fdbcb91c23971c13ec5d5f2573d2349e8f61f2f049371ec699281748fdb1bc",
+        "bytes": 32878
+      }
+    },
+    "weight_files": [
+      {
+        "name": "model-00001-of-00005.safetensors",
+        "bytes": 3996250744,
+        "sha256": "31d6a825ae35f11fb85b195b4c42c146c051e446433125a215336abdf95cbf5f"
+      },
+      {
+        "name": "model-00002-of-00005.safetensors",
+        "bytes": 3993160032,
+        "sha256": "5991236cea6fe21f3d43cab0f0e84448734fbbe0789816202989f2ddc9d18282"
+      },
+      {
+        "name": "model-00003-of-00005.safetensors",
+        "bytes": 3959604768,
+        "sha256": "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836"
+      },
+      {
+        "name": "model-00004-of-00005.safetensors",
+        "bytes": 3187841392,
+        "sha256": "b5ee7de71fbf17db3d5704e0c8f2bc7d005ca9e1d7ca2aeb19827b0cfcaa917a"
+      },
+      {
+        "name": "model-00005-of-00005.safetensors",
+        "bytes": 1244659840,
+        "sha256": "20c2d6366ab85c90786ccdd829cd2b9e7d30ef3b2ebbb998280e7e4014b542ff"
+      }
+    ]
+  },
+  "input": {
+    "path": "/home/wangyuanshuo02/datasets/RULER/32768/niah_single_1.jsonl",
+    "sha256": "e851c310be0cc7d1fa32469c9443f8fb2dd65ab6b3b28d8f2d700db86399c2db",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 32612,
+    "provenance": "native-ruler",
+    "performance_input_mode": "replicate one prompt across all batch rows",
+    "input_ids_sha256": "db96ef119fc1815ce43912b85b17180f6b33a5ae2eca2dbae6056643c2008999"
+  },
+  "nfa_config": {
+    "nfa_far_method": "minmax",
+    "nfa_near_method": "avg",
+    "nfa_near_pages": 32,
+    "nfa_near_tokens": "off",
+    "nfa_near_len": 4096,
+    "nfa_subspace": "tail",
+    "tia_level2_cmp_ratio": 4,
+    "nfa_sink_tokens": 4,
+    "nfa_swa_size": 128,
+    "tia_level1_topk": 128,
+    "tia_level2_topk": 1024,
+    "tia_block_size": 16,
+    "nfa_enable_layer_skip": false,
+    "nfa_far_skip_cache": "retain"
+  },
+  "gate": {
+    "mode": "dynamic-frozen",
+    "epsilon": 0.05
+  },
+  "source": {
+    "head": "c4edd7f525c4a4dd50c4e8f83661c1213f2fda04",
+    "worktree_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "staged_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "script": "agent_doc/results/nfa_selection_trace_20261108/export_selection_trace.py",
+    "script_sha256": "8fc9c8fb65f271a830bfba4e3799c63fd75af939ced1be6a59ad313571cea680",
+    "note": "脚本自身 SHA 单独闭合；HEAD+diff 不表示未跟踪脚本已进入该提交。"
+  },
+  "array_conventions": {
+    "bf16_bits": "uint16 raw BF16 payload；按 little-endian uint16 还原，不是 FP16",
+    "l2_scores": "从生产 packed key 解码的 BF16 分数，以 FP32 数组无损表示；无效项 NaN",
+    "l2_score_bf16_bits": "与 l2_scores 对应的原始 BF16 位；无效项位模式不用于打分",
+    "candidate_source_labels": {
+      "0": "invalid",
+      "1": "l1_far_page",
+      "2": "l1_near_page",
+      "3": "sink_boundary_bypass",
+      "4": "swa_boundary_bypass",
+      "5": "sink_protected",
+      "6": "swa_protected"
+    },
+    "region_labels": {
+      "0": "invalid",
+      "1": "sink",
+      "2": "far",
+      "3": "near",
+      "4": "swa"
+    },
+    "candidate_source": "由 virtual slot 布局直接生成，不从最终集合反推",
+    "native_source": "原生 prefill K/V 加第一步 decode 当前 K/V，按逻辑 ID 重建"
+  },
+  "arrays": {
+    "layer_000/block_table": {
+      "shape": [
+        2047
+      ],
+      "dtype": "int32"
+    },
+    "layer_000/candidate_ids": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "int64"
+    },
+    "layer_000/candidate_lower": {
+      "shape": [
+        1
+      ],
+      "dtype": "int64"
+    },
+    "layer_000/candidate_quota": {
+      "shape": [
+        1
+      ],
+      "dtype": "int64"
+    },
+    "layer_000/candidate_region": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "uint8"
+    },
+    "layer_000/candidate_source": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "uint8"
+    },
+    "layer_000/candidate_upper": {
+      "shape": [
+        1
+      ],
+      "dtype": "int64"
+    },
+    "layer_000/candidate_valid": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "bool"
+    },
+    "layer_000/final_logical_ids": {
+      "shape": [
+        8,
+        1024
+      ],
+      "dtype": "int32"
+    },
+    "layer_000/final_region": {
+      "shape": [
+        8,
+        1024
+      ],
+      "dtype": "uint8"
+    },
+    "layer_000/fine_owner_generations": {
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "int32"
+    },
+    "layer_000/gather_physical_slots": {
+      "shape": [
+        8,
+        1024
+      ],
+      "dtype": "int32"
+    },
+    "layer_000/gathered_k_bf16_bits": {
+      "shape": [
+        8,
+        1024,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_000/gathered_v_bf16_bits": {
+      "shape": [
+        8,
+        1024,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_000/l1_far_pages": {
+      "shape": [
+        1,
+        8,
+        96
+      ],
+      "dtype": "int64"
+    },
+    "layer_000/l1_far_scores": {
+      "shape": [
+        1,
+        8,
+        2047
+      ],
+      "dtype": "float32"
+    },
+    "layer_000/l1_near_pages": {
+      "shape": [
+        1,
+        8,
+        32
+      ],
+      "dtype": "int64"
+    },
+    "layer_000/l1_near_scores": {
+      "shape": [
+        1,
+        8,
+        2047
+      ],
+      "dtype": "float32"
+    },
+    "layer_000/l2_packed_keys": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "int32"
+    },
+    "layer_000/l2_score_bf16_bits": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "uint16"
+    },
+    "layer_000/l2_scores": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "float32"
+    },
+    "layer_000/l2_token_ids": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "int64"
+    },
+    "layer_000/middle_counts": {
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "int32"
+    },
+    "layer_000/middle_ids": {
+      "shape": [
+        1,
+        8,
+        1024
+      ],
+      "dtype": "int32"
+    },
+    "layer_000/middle_region": {
+      "shape": [
+        1,
+        8,
+        1024
+      ],
+      "dtype": "uint8"
+    },
+    "layer_000/native_source_k_bf16_bits": {
+      "shape": [
+        8,
+        1024,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_000/native_source_v_bf16_bits": {
+      "shape": [
+        8,
+        1024,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_000/page_max": {
+      "shape": [
+        1,
+        1,
+        2047,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_000/page_min": {
+      "shape": [
+        1,
+        1,
+        2047,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_000/page_stats_lengths": {
+      "shape": [
+        1
+      ],
+      "dtype": "int32"
+    },
+    "layer_000/page_sum": {
+      "shape": [
+        1,
+        1,
+        2047,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_000/query_l1_scaled": {
+      "shape": [
+        1,
+        32,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_000/query_l2_grouped_scaled": {
+      "shape": [
+        1,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_000/query_post_rope": {
+      "shape": [
+        1,
+        32,
+        128
+      ],
+      "dtype": "float32"
+    },
+    "layer_000/subspace_coordinates": {
+      "shape": [
+        32
+      ],
+      "dtype": "int64"
+    },
+    "layer_000/visible_counts": {
+      "shape": [
+        8
+      ],
+      "dtype": "int32"
+    },
+    "layer_017/block_table": {
+      "shape": [
+        2047
+      ],
+      "dtype": "int32"
+    },
+    "layer_017/candidate_ids": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "int64"
+    },
+    "layer_017/candidate_lower": {
+      "shape": [
+        1
+      ],
+      "dtype": "int64"
+    },
+    "layer_017/candidate_quota": {
+      "shape": [
+        1
+      ],
+      "dtype": "int64"
+    },
+    "layer_017/candidate_region": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "uint8"
+    },
+    "layer_017/candidate_source": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "uint8"
+    },
+    "layer_017/candidate_upper": {
+      "shape": [
+        1
+      ],
+      "dtype": "int64"
+    },
+    "layer_017/candidate_valid": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "bool"
+    },
+    "layer_017/final_logical_ids": {
+      "shape": [
+        8,
+        1020
+      ],
+      "dtype": "int32"
+    },
+    "layer_017/final_region": {
+      "shape": [
+        8,
+        1020
+      ],
+      "dtype": "uint8"
+    },
+    "layer_017/fine_owner_generations": {
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "int32"
+    },
+    "layer_017/gather_physical_slots": {
+      "shape": [
+        8,
+        1020
+      ],
+      "dtype": "int32"
+    },
+    "layer_017/gathered_k_bf16_bits": {
+      "shape": [
+        8,
+        1020,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_017/gathered_v_bf16_bits": {
+      "shape": [
+        8,
+        1020,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_017/l1_far_pages": {
+      "shape": [
+        1,
+        8,
+        96
+      ],
+      "dtype": "int64"
+    },
+    "layer_017/l1_far_scores": {
+      "shape": [
+        1,
+        8,
+        2047
+      ],
+      "dtype": "float32"
+    },
+    "layer_017/l1_near_pages": {
+      "shape": [
+        1,
+        8,
+        32
+      ],
+      "dtype": "int64"
+    },
+    "layer_017/l1_near_scores": {
+      "shape": [
+        1,
+        8,
+        2047
+      ],
+      "dtype": "float32"
+    },
+    "layer_017/l2_packed_keys": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "int32"
+    },
+    "layer_017/l2_score_bf16_bits": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "uint16"
+    },
+    "layer_017/l2_scores": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "float32"
+    },
+    "layer_017/l2_token_ids": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "int64"
+    },
+    "layer_017/middle_counts": {
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "int32"
+    },
+    "layer_017/middle_ids": {
+      "shape": [
+        1,
+        8,
+        1024
+      ],
+      "dtype": "int32"
+    },
+    "layer_017/middle_region": {
+      "shape": [
+        1,
+        8,
+        1024
+      ],
+      "dtype": "uint8"
+    },
+    "layer_017/native_source_k_bf16_bits": {
+      "shape": [
+        8,
+        1020,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_017/native_source_v_bf16_bits": {
+      "shape": [
+        8,
+        1020,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_017/page_max": {
+      "shape": [
+        1,
+        1,
+        2047,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_017/page_min": {
+      "shape": [
+        1,
+        1,
+        2047,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_017/page_stats_lengths": {
+      "shape": [
+        1
+      ],
+      "dtype": "int32"
+    },
+    "layer_017/page_sum": {
+      "shape": [
+        1,
+        1,
+        2047,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_017/query_l1_scaled": {
+      "shape": [
+        1,
+        32,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_017/query_l2_grouped_scaled": {
+      "shape": [
+        1,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_017/query_post_rope": {
+      "shape": [
+        1,
+        32,
+        128
+      ],
+      "dtype": "float32"
+    },
+    "layer_017/subspace_coordinates": {
+      "shape": [
+        32
+      ],
+      "dtype": "int64"
+    },
+    "layer_017/visible_counts": {
+      "shape": [
+        8
+      ],
+      "dtype": "int32"
+    },
+    "layer_035/block_table": {
+      "shape": [
+        2047
+      ],
+      "dtype": "int32"
+    },
+    "layer_035/candidate_ids": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "int64"
+    },
+    "layer_035/candidate_lower": {
+      "shape": [
+        1
+      ],
+      "dtype": "int64"
+    },
+    "layer_035/candidate_quota": {
+      "shape": [
+        1
+      ],
+      "dtype": "int64"
+    },
+    "layer_035/candidate_region": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "uint8"
+    },
+    "layer_035/candidate_source": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "uint8"
+    },
+    "layer_035/candidate_upper": {
+      "shape": [
+        1
+      ],
+      "dtype": "int64"
+    },
+    "layer_035/candidate_valid": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "bool"
+    },
+    "layer_035/final_logical_ids": {
+      "shape": [
+        8,
+        1023
+      ],
+      "dtype": "int32"
+    },
+    "layer_035/final_region": {
+      "shape": [
+        8,
+        1023
+      ],
+      "dtype": "uint8"
+    },
+    "layer_035/fine_owner_generations": {
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "int32"
+    },
+    "layer_035/gather_physical_slots": {
+      "shape": [
+        8,
+        1023
+      ],
+      "dtype": "int32"
+    },
+    "layer_035/gathered_k_bf16_bits": {
+      "shape": [
+        8,
+        1023,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_035/gathered_v_bf16_bits": {
+      "shape": [
+        8,
+        1023,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_035/l1_far_pages": {
+      "shape": [
+        1,
+        8,
+        96
+      ],
+      "dtype": "int64"
+    },
+    "layer_035/l1_far_scores": {
+      "shape": [
+        1,
+        8,
+        2047
+      ],
+      "dtype": "float32"
+    },
+    "layer_035/l1_near_pages": {
+      "shape": [
+        1,
+        8,
+        32
+      ],
+      "dtype": "int64"
+    },
+    "layer_035/l1_near_scores": {
+      "shape": [
+        1,
+        8,
+        2047
+      ],
+      "dtype": "float32"
+    },
+    "layer_035/l2_packed_keys": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "int32"
+    },
+    "layer_035/l2_score_bf16_bits": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "uint16"
+    },
+    "layer_035/l2_scores": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "float32"
+    },
+    "layer_035/l2_token_ids": {
+      "shape": [
+        1,
+        8,
+        2212
+      ],
+      "dtype": "int64"
+    },
+    "layer_035/middle_counts": {
+      "shape": [
+        1,
+        8
+      ],
+      "dtype": "int32"
+    },
+    "layer_035/middle_ids": {
+      "shape": [
+        1,
+        8,
+        1024
+      ],
+      "dtype": "int32"
+    },
+    "layer_035/middle_region": {
+      "shape": [
+        1,
+        8,
+        1024
+      ],
+      "dtype": "uint8"
+    },
+    "layer_035/native_source_k_bf16_bits": {
+      "shape": [
+        8,
+        1023,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_035/native_source_v_bf16_bits": {
+      "shape": [
+        8,
+        1023,
+        128
+      ],
+      "dtype": "uint16"
+    },
+    "layer_035/page_max": {
+      "shape": [
+        1,
+        1,
+        2047,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_035/page_min": {
+      "shape": [
+        1,
+        1,
+        2047,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_035/page_stats_lengths": {
+      "shape": [
+        1
+      ],
+      "dtype": "int32"
+    },
+    "layer_035/page_sum": {
+      "shape": [
+        1,
+        1,
+        2047,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_035/query_l1_scaled": {
+      "shape": [
+        1,
+        32,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_035/query_l2_grouped_scaled": {
+      "shape": [
+        1,
+        8,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "layer_035/query_post_rope": {
+      "shape": [
+        1,
+        32,
+        128
+      ],
+      "dtype": "float32"
+    },
+    "layer_035/subspace_coordinates": {
+      "shape": [
+        32
+      ],
+      "dtype": "int64"
+    },
+    "layer_035/visible_counts": {
+      "shape": [
+        8
+      ],
+      "dtype": "int32"
+    }
+  },
+  "validation": [
+    {
+      "layer": 0,
+      "request_id": 0,
+      "decode_step": 0,
+      "planned_length": 32613,
+      "skip_far": false,
+      "skip_near": false,
+      "visible_counts": [
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "middle_counts": [
+        [
+          892,
+          892,
+          892,
+          892,
+          892,
+          892,
+          892,
+          892
+        ]
+      ],
+      "valid_l2_scores": 16552,
+      "logical_physical_address_roundtrip": true,
+      "final_union_matches_middle_plus_protected": true,
+      "gather_kv_matches_native_prefill_and_current_decode_bit_exact": true
+    },
+    {
+      "layer": 17,
+      "request_id": 0,
+      "decode_step": 0,
+      "planned_length": 32613,
+      "skip_far": false,
+      "skip_near": false,
+      "visible_counts": [
+        1020,
+        1020,
+        1020,
+        1020,
+        1020,
+        1020,
+        1020,
+        1020
+      ],
+      "middle_counts": [
+        [
+          888,
+          888,
+          888,
+          888,
+          888,
+          888,
+          888,
+          888
+        ]
+      ],
+      "valid_l2_scores": 16552,
+      "logical_physical_address_roundtrip": true,
+      "final_union_matches_middle_plus_protected": true,
+      "gather_kv_matches_native_prefill_and_current_decode_bit_exact": true
+    },
+    {
+      "layer": 35,
+      "request_id": 0,
+      "decode_step": 0,
+      "planned_length": 32613,
+      "skip_far": false,
+      "skip_near": false,
+      "visible_counts": [
+        1023,
+        1023,
+        1020,
+        1020,
+        1023,
+        1023,
+        1022,
+        1023
+      ],
+      "middle_counts": [
+        [
+          891,
+          891,
+          888,
+          888,
+          891,
+          891,
+          890,
+          891
+        ]
+      ],
+      "valid_l2_scores": 16552,
+      "logical_physical_address_roundtrip": true,
+      "final_union_matches_middle_plus_protected": true,
+      "gather_kv_matches_native_prefill_and_current_decode_bit_exact": true
+    }
+  ],
+  "generated_token_ids": [
+    576,
+    1372
+  ],
+  "environment": {
+    "torch": "2.8.0+cu128",
+    "transformers": "4.56.2",
+    "numpy": "2.0.2",
+    "cuda_device": "NVIDIA H20-3e"
+  },
+  "command": [
+    "/usr/bin/python3",
+    "/home/wangyuanshuo02/wt-nfa-1108/agent_doc/results/nfa_selection_trace_20261108/export_selection_trace.py",
+    "--execute",
+    "--model-path",
+    "/home/wangyuanshuo02/models/Qwen3-8B",
+    "--data-root",
+    "/home/wangyuanshuo02/datasets/RULER",
+    "--layers",
+    "0,17,35"
+  ]
+}
