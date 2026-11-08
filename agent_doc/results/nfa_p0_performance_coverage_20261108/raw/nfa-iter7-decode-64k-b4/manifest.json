@@ -1,0 +1,474 @@
+{
+  "config": {
+    "baseline_repo": "/tmp/nfa-skip-topk-333af802",
+    "candidate_repo": "/tmp/nfa-near-compact-cc7d6aa4",
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+    "task": "niah_multikey_1",
+    "context_length": 65536,
+    "batch_size": 4,
+    "executions": [
+      "eager",
+      "graph"
+    ],
+    "sample_index": 0,
+    "max_new_tokens": 512,
+    "warmup_steps": 3,
+    "gpu_id": 0,
+    "output_dir": "/tmp/nfa-iter7-decode-64k-b4"
+  },
+  "sources": {
+    "baseline": {
+      "repo": "/tmp/nfa-skip-topk-333af802",
+      "head": "333af802021c424b36bea56703ff2a430752a23b",
+      "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "candidate": {
+      "repo": "/tmp/nfa-near-compact-cc7d6aa4",
+      "head": "cc7d6aa45c791d610e4d8365131962f1e30622c0",
+      "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "runs": [
+    {
+      "execution": "eager",
+      "method": "baseline",
+      "leg": "a",
+      "pid": 53968,
+      "returncode": 0,
+      "json": "/tmp/nfa-iter7-decode-64k-b4/eager_baseline_a.json",
+      "log": "/tmp/nfa-iter7-decode-64k-b4/eager_baseline_a.log",
+      "command": [
+        "/home/fluentllmenv/bin/python3",
+        "/tmp/nfa-skip-topk-333af802/benchmark/efficiency/benchmark_nfa_end_to_end.py",
+        "--model-path",
+        "/home/wangyuanshuo02/Qwen3-8B",
+        "--data-root",
+        "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+        "--output",
+        "/tmp/nfa-iter7-decode-64k-b4/eager_baseline_a.json",
+        "--task",
+        "niah_multikey_1",
+        "--context-length",
+        "65536",
+        "--batch-size",
+        "4",
+        "--method",
+        "nfa",
+        "--execution",
+        "eager",
+        "--sample-index",
+        "0",
+        "--input-provenance",
+        "native-ruler",
+        "--max-new-tokens",
+        "512",
+        "--warmup-steps",
+        "3",
+        "--measurement-mode",
+        "latency"
+      ]
+    },
+    {
+      "execution": "eager",
+      "method": "candidate",
+      "leg": "a",
+      "pid": 58279,
+      "returncode": 0,
+      "json": "/tmp/nfa-iter7-decode-64k-b4/eager_candidate_a.json",
+      "log": "/tmp/nfa-iter7-decode-64k-b4/eager_candidate_a.log",
+      "command": [
+        "/home/fluentllmenv/bin/python3",
+        "/tmp/nfa-near-compact-cc7d6aa4/benchmark/efficiency/benchmark_nfa_end_to_end.py",
+        "--model-path",
+        "/home/wangyuanshuo02/Qwen3-8B",
+        "--data-root",
+        "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+        "--output",
+        "/tmp/nfa-iter7-decode-64k-b4/eager_candidate_a.json",
+        "--task",
+        "niah_multikey_1",
+        "--context-length",
+        "65536",
+        "--batch-size",
+        "4",
+        "--method",
+        "nfa",
+        "--execution",
+        "eager",
+        "--sample-index",
+        "0",
+        "--input-provenance",
+        "native-ruler",
+        "--max-new-tokens",
+        "512",
+        "--warmup-steps",
+        "3",
+        "--measurement-mode",
+        "latency"
+      ]
+    },
+    {
+      "execution": "eager",
+      "method": "candidate",
+      "leg": "b",
+      "pid": 60093,
+      "returncode": 0,
+      "json": "/tmp/nfa-iter7-decode-64k-b4/eager_candidate_b.json",
+      "log": "/tmp/nfa-iter7-decode-64k-b4/eager_candidate_b.log",
+      "command": [
+        "/home/fluentllmenv/bin/python3",
+        "/tmp/nfa-near-compact-cc7d6aa4/benchmark/efficiency/benchmark_nfa_end_to_end.py",
+        "--model-path",
+        "/home/wangyuanshuo02/Qwen3-8B",
+        "--data-root",
+        "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+        "--output",
+        "/tmp/nfa-iter7-decode-64k-b4/eager_candidate_b.json",
+        "--task",
+        "niah_multikey_1",
+        "--context-length",
+        "65536",
+        "--batch-size",
+        "4",
+        "--method",
+        "nfa",
+        "--execution",
+        "eager",
+        "--sample-index",
+        "0",
+        "--input-provenance",
+        "native-ruler",
+        "--max-new-tokens",
+        "512",
+        "--warmup-steps",
+        "3",
+        "--measurement-mode",
+        "latency"
+      ]
+    },
+    {
+      "execution": "eager",
+      "method": "baseline",
+      "leg": "b",
+      "pid": 60535,
+      "returncode": 0,
+      "json": "/tmp/nfa-iter7-decode-64k-b4/eager_baseline_b.json",
+      "log": "/tmp/nfa-iter7-decode-64k-b4/eager_baseline_b.log",
+      "command": [
+        "/home/fluentllmenv/bin/python3",
+        "/tmp/nfa-skip-topk-333af802/benchmark/efficiency/benchmark_nfa_end_to_end.py",
+        "--model-path",
+        "/home/wangyuanshuo02/Qwen3-8B",
+        "--data-root",
+        "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+        "--output",
+        "/tmp/nfa-iter7-decode-64k-b4/eager_baseline_b.json",
+        "--task",
+        "niah_multikey_1",
+        "--context-length",
+        "65536",
+        "--batch-size",
+        "4",
+        "--method",
+        "nfa",
+        "--execution",
+        "eager",
+        "--sample-index",
+        "0",
+        "--input-provenance",
+        "native-ruler",
+        "--max-new-tokens",
+        "512",
+        "--warmup-steps",
+        "3",
+        "--measurement-mode",
+        "latency"
+      ]
+    },
+    {
+      "execution": "graph",
+      "method": "baseline",
+      "leg": "a",
+      "pid": 60974,
+      "returncode": 0,
+      "json": "/tmp/nfa-iter7-decode-64k-b4/graph_baseline_a.json",
+      "log": "/tmp/nfa-iter7-decode-64k-b4/graph_baseline_a.log",
+      "command": [
+        "/home/fluentllmenv/bin/python3",
+        "/tmp/nfa-skip-topk-333af802/benchmark/efficiency/benchmark_nfa_end_to_end.py",
+        "--model-path",
+        "/home/wangyuanshuo02/Qwen3-8B",
+        "--data-root",
+        "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+        "--output",
+        "/tmp/nfa-iter7-decode-64k-b4/graph_baseline_a.json",
+        "--task",
+        "niah_multikey_1",
+        "--context-length",
+        "65536",
+        "--batch-size",
+        "4",
+        "--method",
+        "nfa",
+        "--execution",
+        "graph",
+        "--sample-index",
+        "0",
+        "--input-provenance",
+        "native-ruler",
+        "--max-new-tokens",
+        "512",
+        "--warmup-steps",
+        "3",
+        "--measurement-mode",
+        "latency"
+      ]
+    },
+    {
+      "execution": "graph",
+      "method": "candidate",
+      "leg": "a",
+      "pid": 63526,
+      "returncode": 0,
+      "json": "/tmp/nfa-iter7-decode-64k-b4/graph_candidate_a.json",
+      "log": "/tmp/nfa-iter7-decode-64k-b4/graph_candidate_a.log",
+      "command": [
+        "/home/fluentllmenv/bin/python3",
+        "/tmp/nfa-near-compact-cc7d6aa4/benchmark/efficiency/benchmark_nfa_end_to_end.py",
+        "--model-path",
+        "/home/wangyuanshuo02/Qwen3-8B",
+        "--data-root",
+        "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+        "--output",
+        "/tmp/nfa-iter7-decode-64k-b4/graph_candidate_a.json",
+        "--task",
+        "niah_multikey_1",
+        "--context-length",
+        "65536",
+        "--batch-size",
+        "4",
+        "--method",
+        "nfa",
+        "--execution",
+        "graph",
+        "--sample-index",
+        "0",
+        "--input-provenance",
+        "native-ruler",
+        "--max-new-tokens",
+        "512",
+        "--warmup-steps",
+        "3",
+        "--measurement-mode",
+        "latency"
+      ]
+    },
+    {
+      "execution": "graph",
+      "method": "candidate",
+      "leg": "b",
+      "pid": 65344,
+      "returncode": 0,
+      "json": "/tmp/nfa-iter7-decode-64k-b4/graph_candidate_b.json",
+      "log": "/tmp/nfa-iter7-decode-64k-b4/graph_candidate_b.log",
+      "command": [
+        "/home/fluentllmenv/bin/python3",
+        "/tmp/nfa-near-compact-cc7d6aa4/benchmark/efficiency/benchmark_nfa_end_to_end.py",
+        "--model-path",
+        "/home/wangyuanshuo02/Qwen3-8B",
+        "--data-root",
+        "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+        "--output",
+        "/tmp/nfa-iter7-decode-64k-b4/graph_candidate_b.json",
+        "--task",
+        "niah_multikey_1",
+        "--context-length",
+        "65536",
+        "--batch-size",
+        "4",
+        "--method",
+        "nfa",
+        "--execution",
+        "graph",
+        "--sample-index",
+        "0",
+        "--input-provenance",
+        "native-ruler",
+        "--max-new-tokens",
+        "512",
+        "--warmup-steps",
+        "3",
+        "--measurement-mode",
+        "latency"
+      ]
+    },
+    {
+      "execution": "graph",
+      "method": "baseline",
+      "leg": "b",
+      "pid": 65922,
+      "returncode": 0,
+      "json": "/tmp/nfa-iter7-decode-64k-b4/graph_baseline_b.json",
+      "log": "/tmp/nfa-iter7-decode-64k-b4/graph_baseline_b.log",
+      "command": [
+        "/home/fluentllmenv/bin/python3",
+        "/tmp/nfa-skip-topk-333af802/benchmark/efficiency/benchmark_nfa_end_to_end.py",
+        "--model-path",
+        "/home/wangyuanshuo02/Qwen3-8B",
+        "--data-root",
+        "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+        "--output",
+        "/tmp/nfa-iter7-decode-64k-b4/graph_baseline_b.json",
+        "--task",
+        "niah_multikey_1",
+        "--context-length",
+        "65536",
+        "--batch-size",
+        "4",
+        "--method",
+        "nfa",
+        "--execution",
+        "graph",
+        "--sample-index",
+        "0",
+        "--input-provenance",
+        "native-ruler",
+        "--max-new-tokens",
+        "512",
+        "--warmup-steps",
+        "3",
+        "--measurement-mode",
+        "latency"
+      ]
+    }
+  ],
+  "status": "complete",
+  "summary": {
+    "eager": {
+      "baseline_tpot_ms": [
+        28.806960105895996,
+        28.277440071105957
+      ],
+      "candidate_tpot_ms": [
+        28.155664443969727,
+        28.234560012817383
+      ],
+      "baseline_median_ms": 28.542200088500977,
+      "candidate_median_ms": 28.195112228393555,
+      "baseline_over_candidate": 1.012310213816347,
+      "baseline_repeat_token_identity": true,
+      "candidate_repeat_token_identity": true,
+      "baseline_candidate_token_identity": true,
+      "baseline_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "1": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "2": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "3": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      },
+      "candidate_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "1": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "2": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "3": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      },
+      "input_sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+      "actual_prompt_tokens": 65198
+    },
+    "graph": {
+      "baseline_tpot_ms": [
+        15.132879734039307,
+        15.261280059814453
+      ],
+      "candidate_tpot_ms": [
+        15.099776268005371,
+        15.090831756591797
+      ],
+      "baseline_median_ms": 15.19707989692688,
+      "candidate_median_ms": 15.095304012298584,
+      "baseline_over_candidate": 1.0067422215905937,
+      "baseline_repeat_token_identity": true,
+      "candidate_repeat_token_identity": true,
+      "baseline_candidate_token_identity": true,
+      "baseline_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "1": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "2": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "3": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      },
+      "candidate_skip_policy_counts": {
+        "0": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "1": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "2": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        },
+        "3": {
+          "far": 0,
+          "near": 3,
+          "both": 0
+        }
+      },
+      "input_sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+      "actual_prompt_tokens": 65198
+    }
+  },
+  "gpu_hygiene": "clean"
+}

@@ -1,0 +1,71 @@
+{
+  "audit_base": "41e7c38d42cd69b94d8e0cf4747fafb4c2032315",
+  "outputs": [
+    "coverage.csv",
+    "coverage.jsonl",
+    "run_inventory.jsonl",
+    "source_lineage.json",
+    "audit_summary.json",
+    "metadata.json"
+  ],
+  "raw_origin": {
+    "note": "原目录下 manifest、逐 run JSON/log 和 gpu_monitor 已原样复制到 raw/；路径字符串保留生成时绝对路径",
+    "pc31": [
+      "nfa-iter7-decode-64k-b4",
+      "nfa-ragged-decode-32k-b1",
+      "nfa-ragged-decode-32k-b1-eager-repeat",
+      "nfa-ragged-decode-64k-b4",
+      "nfa-ragged-decode-128k-b4"
+    ],
+    "pc40": [
+      "nfa-iter7-decode-32k-b1",
+      "nfa-iter7-decode-64k-b1",
+      "nfa-iter7-decode-128k-b1",
+      "nfa-iter7-decode-32k-b4"
+    ]
+  },
+  "schema": "nfa-p0-performance-manifest-v1",
+  "source_anchors": {
+    "current_production": "4bc6aa98730e060489f742bfe1875d687237e422",
+    "graph_ready": "40756b6c925ad0caa5741ccbc305299fb8189567",
+    "iter7_candidate": "cc7d6aa45c791d610e4d8365131962f1e30622c0",
+    "ragged_candidate": "c5be4f69262a7eb2287e396589e18d8a91fd79ff",
+    "strict_skip_functional": "2f702c222186bdf17de996e981c52af467957ee5"
+  },
+  "source_evidence_sha256": {
+    "ITERATIONS.md": "1a40d18e7555fbf520a2db04864684890f23ead599dc3bfc58faa8171f0eaaaa",
+    "benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler32k.json": "ba4d864f9221a973704740f11909ea82f4e67079891929733efb34f9b249e7c5",
+    "exp/trace/results/nfa_decode_main_20261102/nfa_decode_main_verdict.json": "0223f7ddebec915bb2ac5b62da2fe3aef315470b496d0737e5a13bfdf742e7cc"
+  },
+  "target_protocol": {
+    "batch_sizes": [
+      1,
+      4
+    ],
+    "executions": [
+      "eager",
+      "graph"
+    ],
+    "fixed_inputs": 5,
+    "independent_repeats": 3,
+    "lengths": [
+      32768,
+      65536,
+      131072
+    ],
+    "max_new_tokens": 512,
+    "methods": [
+      "nfa",
+      "fa2"
+    ],
+    "model": "Qwen3-8B",
+    "pairing": "same-input ABBA; independent subprocesses",
+    "required_receipts": [
+      "per-step TPOT",
+      "complete generated token IDs",
+      "input/model/source identity",
+      "gpu_hygiene"
+    ],
+    "warmup_steps": 3
+  }
+}

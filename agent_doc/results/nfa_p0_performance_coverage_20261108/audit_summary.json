@@ -1,0 +1,30 @@
+{
+  "archived_abba_manifests": 9,
+  "archived_run_returncodes": {
+    "success": 68
+  },
+  "archived_runs": 68,
+  "classification_counts": {
+    "C": 24
+  },
+  "current_nfa_512_sanity_units": 6,
+  "excluded_method_mismatch": {
+    "path": "benchmark/efficiency/results/nfa_flashinfer_20261104/e2e/ruler32k.json",
+    "reason": "FlashInfer 不是 dense FA2；32K 单输入结果不能填入本表",
+    "sha256": "ba4d864f9221a973704740f11909ea82f4e67079891929733efb34f9b249e7c5"
+  },
+  "formal_reuse_units": 0,
+  "iter7_only_nfa_512_sanity_units": 6,
+  "limitations": [
+    "所有正式单元都要求同一输入的 NFA/FA2 ABBA、5 个固定输入和 3 次独立重复；现有 NFA-vs-NFA 不折抵正式配对。",
+    "c5be4f69/4bc6aa98 只在限定生产路径和 e2e 入口上与审计基线一致，不表示整个 Git 树逐字节相同。",
+    "旧 128-token FA2/NFA 汇总保留为历史参考，不与 512-token 数字拼接成新倍率。",
+    "本审计只复制和校验既有 raw；没有执行 GPU、修改生产代码、论文、图或 Overleaf。"
+  ],
+  "nfa_512_single_input_units": 12,
+  "rerun_units": 24,
+  "schema": "nfa-p0-performance-coverage-v1",
+  "status": "coverage-audit-complete; formal 5x3 NFA/FA2 matrix incomplete",
+  "target_comparison_cells": 12,
+  "target_method_units": 24
+}

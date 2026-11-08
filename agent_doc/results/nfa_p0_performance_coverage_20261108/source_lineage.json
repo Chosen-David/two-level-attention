@@ -1,0 +1,66 @@
+{
+  "ancestry": [
+    {
+      "ancestor": "40756b6c925ad0caa5741ccbc305299fb8189567",
+      "descendant": "4bc6aa98730e060489f742bfe1875d687237e422",
+      "result": true
+    },
+    {
+      "ancestor": "4bc6aa98730e060489f742bfe1875d687237e422",
+      "descendant": "40756b6c925ad0caa5741ccbc305299fb8189567",
+      "result": false
+    },
+    {
+      "ancestor": "cc7d6aa45c791d610e4d8365131962f1e30622c0",
+      "descendant": "c5be4f69262a7eb2287e396589e18d8a91fd79ff",
+      "result": true
+    },
+    {
+      "ancestor": "c5be4f69262a7eb2287e396589e18d8a91fd79ff",
+      "descendant": "4bc6aa98730e060489f742bfe1875d687237e422",
+      "result": true
+    },
+    {
+      "ancestor": "2f702c222186bdf17de996e981c52af467957ee5",
+      "descendant": "cc7d6aa45c791d610e4d8365131962f1e30622c0",
+      "result": true
+    },
+    {
+      "ancestor": "4bc6aa98730e060489f742bfe1875d687237e422",
+      "descendant": "41e7c38d42cd69b94d8e0cf4747fafb4c2032315",
+      "result": true
+    },
+    {
+      "ancestor": "c5be4f69262a7eb2287e396589e18d8a91fd79ff",
+      "descendant": "41e7c38d42cd69b94d8e0cf4747fafb4c2032315",
+      "result": true
+    },
+    {
+      "ancestor": "cc7d6aa45c791d610e4d8365131962f1e30622c0",
+      "descendant": "41e7c38d42cd69b94d8e0cf4747fafb4c2032315",
+      "result": true
+    },
+    {
+      "ancestor": "2f702c222186bdf17de996e981c52af467957ee5",
+      "descendant": "41e7c38d42cd69b94d8e0cf4747fafb4c2032315",
+      "result": true
+    },
+    {
+      "ancestor": "40756b6c925ad0caa5741ccbc305299fb8189567",
+      "descendant": "41e7c38d42cd69b94d8e0cf4747fafb4c2032315",
+      "result": true
+    }
+  ],
+  "audit_base": "41e7c38d42cd69b94d8e0cf4747fafb4c2032315",
+  "current_to_audit_base_production_diff": [],
+  "iter7_to_ragged_production_diff": [
+    "sparse_attn/indexer/nfa_layer_batch_selector.py"
+  ],
+  "production_paths": [
+    "sparse_attn",
+    "benchmark/efficiency/benchmark_nfa_end_to_end.py",
+    "benchmark/efficiency/benchmark_nfa_vs_fa2.py"
+  ],
+  "ragged_to_current_production_diff": [],
+  "scope": "c5be4f69/4bc6aa98 与审计基线的 NFA 生产和 e2e 入口一致；cc7d6aa4 的 selector 不同"
+}
