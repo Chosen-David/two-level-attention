@@ -1,0 +1,48 @@
+{
+  "arm_actions": {
+    "dense_fullkv": {
+      "quality_rescore": 500,
+      "token_bridge_rerun": 500,
+      "token_bridge_reuse": 0
+    },
+    "seed_on_nfa": {
+      "quality_token_rerun": 495,
+      "quality_token_reuse": 5,
+      "source_git_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab"
+    },
+    "strict_skip_nfa": {
+      "quality_token_rerun": 495,
+      "quality_token_reuse": 5,
+      "source_git_head": "2f702c222186bdf17de996e981c52af467957ee5"
+    }
+  },
+  "fullkv_identity_checks": {
+    "longbench_answers_length": 400,
+    "ruler_id_answers_length": 100
+  },
+  "fullkv_official_rescore_means_percent": {
+    "gov_report": 33.17370668024226,
+    "hotpotqa": 53.47847678754937,
+    "niah_multikey_2": 50.0
+  },
+  "limitations": [
+    "FullKV quality reuse is legacy-partial, not proof of exact source prompt/token identity or effective producer cap/model revision.",
+    "FullKV raw has no generated token IDs; text predictions cannot reconstruct token-level first divergence.",
+    "Five HotpotQA seed-on/strict-skip rows are smoke evidence, not a full 500-sample quality conclusion.",
+    "B_final supplies target input identity only; its gate=full, reclaim=true and GovReport 32-token outputs are not reused as current strict-skip or official GovReport quality results.",
+    "No GPU execution, paper, figure or Overleaf modification is part of this audit."
+  ],
+  "schema": "nfa-q0-reuse-audit-v1",
+  "status": "reuse-audit-complete; target three-arm token bridge incomplete",
+  "target_count": 500,
+  "target_max_new_tokens": {
+    "gov_report": 512,
+    "hotpotqa": 32,
+    "niah_multikey_2": 128
+  },
+  "targets_per_dataset": {
+    "gov_report": 200,
+    "hotpotqa": 200,
+    "niah_multikey_2": 100
+  }
+}

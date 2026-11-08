@@ -1,0 +1,47 @@
+{
+  "outputs": {
+    "audit_summary": "audit_summary.json",
+    "fullkv_quality": "fullkv_quality.jsonl",
+    "reuse_decisions": "reuse_decisions.jsonl",
+    "target_inputs": "target_inputs.jsonl"
+  },
+  "schema": "nfa-q0-target-manifest-v1",
+  "source_sha256": {
+    "/home/wangyuanshuo02/datasets/LongBench/data/gov_report.jsonl": "d28112beb3a9b41d80aa390837fa1a31c9e3da84a5262009c97585cc49f597c4",
+    "/home/wangyuanshuo02/datasets/LongBench/data/hotpotqa.jsonl": "a0005ab2a1bc2ac3a70352dccbf96cccc4e0aac6bb677f6a55180fa51b92ef6f",
+    "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_2.jsonl": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+    "benchmark/LongBench/config/dataset2maxlen.json": "77e621d722647fc8d5293202cea5fbf0d06568848fac86de2b45cab122455391",
+    "benchmark/LongBench/eval.py": "dd945b78e93c0f267efa9099e4834b2081fd32268fe554f763f5372a0124f325",
+    "benchmark/LongBench/metrics.py": "9b1f7a7dae6180d4ed99f89be43c5b94b30f2653a9f468ba80279f850d7c16f0",
+    "benchmark/RULER/pred_ruler.py": "6c683763de4f92537b06d819db6bc4aae3b9e39ff81b4a33426701d094dfb82b",
+    "benchmark/RULER/score_ruler.py": "cb5dbef5e7410297f92f56dd325faed675120a102964250eab1f3b5f4c9c4584",
+    "exp/results_longbench/Qwen3-8B/pred_1024/gov_report-none-01161806.jsonl": "199d43b84d4df13a52ae6d61cfc8af34d94461f47191921b9cb2dd5cd697aa62",
+    "exp/results_longbench/Qwen3-8B/pred_1024/hotpotqa-none-01161806.jsonl": "ec4e3342780b563c415f53fdb52b5d481a6f7ee4dfdcc3083ff85bb9aca61797",
+    "exp/trace/results/e109_lbv1_manifest.json": "05a4c55acf6d3ad6aa3f62344e6e9617c10ebfd03b31b5af7dcb588e41845bbe",
+    "exp/trace/results/e116b_ruler65536k_formal_fullkv.json.manifest.json": "5f5232aed6ec418bafa6af936583bed6c138dbbd366a5458ae004aed4bbc8e72",
+    "exp/trace/results/e116b_ruler65536k_formal_fullkv.json.receipt.json": "26015b40cf1347f045a6bd51bfaa80f76fdadbec804a7b59252a4b1a18eccf97",
+    "exp/trace/results/e116b_ruler65536k_formal_fullkv.json.run-20261011200053-2710075-5192/pred_root/L65536/pred_1024/niah_multikey_2-none-merged.jsonl": "1d0a707d667d7d76d9894f34996572d722afe0c08331302daa7b9458debc1529",
+    "exp/trace/results/nfa_strict_skip_seed_removal/longbench_comparison.json": "f37b76f4e55305e294852436f741d861183b7096c6aaf1e5b93fdb8b958ac53e"
+  },
+  "target_protocol": {
+    "arms": [
+      "dense_fullkv",
+      "seed_on_nfa",
+      "strict_skip_nfa"
+    ],
+    "datasets": {
+      "gov_report": 200,
+      "hotpotqa": 200,
+      "ruler_65536_niah_multikey_2": 100
+    },
+    "generation": "greedy; complete generated token IDs, prediction, score and first divergence required",
+    "max_new_tokens": {
+      "gov_report": 512,
+      "hotpotqa": 32,
+      "niah_multikey_2": 128
+    },
+    "model": "Qwen3-8B",
+    "seed_on": "reproduce old first-step seed/core-token compensation at f5f3df3c; do not relabel old cache semantics as current strict-skip",
+    "strict_skip": "sink4/SWA128/K1=128/K2=1024/near_pages32/near4096/page16; gate active and frozen from first decode forward; KV retain; no first-step seed/core-token compensation"
+  }
+}
