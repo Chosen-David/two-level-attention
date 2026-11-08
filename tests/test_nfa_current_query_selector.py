@@ -62,19 +62,21 @@ def _assert_filtered_partial_bit_exact(packed, width, capacity):
     torch.testing.assert_close(candidate, reference, rtol=0, atol=0)
 
 
-def _indexer(k1=4, near_pages=2):
-    args = nfa_args()
+def _indexer(k1=4, near_pages=2, subspace='tail', l2_subspace='same'):
+    args = nfa_args(subspace=subspace)
     args.tia_level1_topk = k1
     args.tia_level2_topk = 128
     args.nfa_near_pages = near_pages
     args.nfa_swa_size = GEOMETRY.window
     args.nfa_near_len = GEOMETRY.near
+    args.nfa_l2_subspace = l2_subspace
     return NFAIndexer(args)
 
 
 def _make_cache(req_ids, lengths, skip_states, *, k1=4,
                 near_pages=2, num_kv_heads=1, max_physical_pages=64,
-                max_blocks=16, max_visible_len=640):
+                max_blocks=16, max_visible_len=640, subspace='tail',
+                l2_subspace='same'):
     cache = GraphReadyPagedRegionCache(
         1, GEOMETRY, max_requests=8, max_physical_pages=max_physical_pages,
         max_blocks=max_blocks,
@@ -91,7 +93,8 @@ def _make_cache(req_ids, lengths, skip_states, *, k1=4,
         values = torch.randn_like(keys)
         cache.write_prefill(0, request_id, keys, values)
         cache.freeze(request_id, [skip_far], [skip_near])
-    attention = SimpleNamespace(indexer=_indexer(k1, near_pages), scaling=1.0)
+    attention = SimpleNamespace(
+        indexer=_indexer(k1, near_pages, subspace, l2_subspace), scaling=1.0)
     return cache, attention, generator
 
 
@@ -161,6 +164,64 @@ def test_current_query_not_previous_frame_query():
     assert sum(192 <= token < 256 for token in previous_ids) == 60
     assert not any(64 <= token < 128 for token in previous_ids)
     assert current_ids != previous_ids
+
+
+@pytest.mark.parametrize('subspace,l2_subspace,l1_dim,fine_dim,selected_block', [
+    ('full', 'same', 128, 32, 1),
+    ('tail', 'same', 32, 32, 3),
+    ('tail', 'full', 32, 128, 3),
+])
+def test_real_decode_l1_l2_dimensions_and_counterfactual_selection(
+        monkeypatch, subspace, l2_subspace, l1_dim, fine_dim, selected_block):
+    cache, attention, generator = _make_cache(
+        [2], [448], [(False, False)], k1=1, near_pages=0,
+        subspace=subspace, l2_subspace=l2_subspace)
+    cache.remove_request(2)
+    cache.add_request(2)
+    keys = torch.zeros(1, 1, 448, HEAD_DIM, dtype=torch.bfloat16, device='cuda')
+    # 全维 Q 同时看见 dim0/dim48，应选块 1；tail32 只看 dim48，应选块 3。
+    keys[:, :, 64:128, 0] = 16
+    keys[:, :, 64:128, 48] = 1
+    keys[:, :, 192:256, 48] = 8
+    cache.write_prefill(0, 2, keys, torch.randn_like(keys))
+    cache.freeze(2, [False], [False])
+    _plan_and_write(cache, [2], generator)
+    query = torch.zeros(1, 2, HEAD_DIM, dtype=torch.bfloat16, device='cuda')
+    query[..., 0] = 1
+    query[..., 48] = 1
+
+    original_fine_scores = selector_ops._fused_fine_scores_paged
+    observed = {}
+
+    def capture_fine_dims(cache, req_ids, n_layers, dims, *args, **kwargs):
+        observed['fine_dims'] = dims.detach().cpu()
+        return original_fine_scores(cache, req_ids, n_layers, dims, *args, **kwargs)
+
+    monkeypatch.setattr(
+        selector_ops, '_fused_fine_scores_paged', capture_fine_dims)
+    select_topk_for_layer_batched(
+        cache, 0, [2], query, attention=attention)
+    torch.cuda.synchronize()
+
+    stats = next(iter(cache._nfa_page_stats_persistent.values()))
+    assert all(buffer.shape[-1] == l1_dim for buffer in stats)
+
+    def workspace_buffer(name):
+        return next(value for key, value in cache._nfa_selector_workspace.items()
+                    if isinstance(key, tuple) and key[0] == name)
+
+    assert workspace_buffer('q_full').shape[-1] == l1_dim
+    assert workspace_buffer('q_fine_grouped').shape[-1] == fine_dim
+    expected_fine_dims = (list(range(HEAD_DIM)) if fine_dim == HEAD_DIM else
+                          attention.indexer._subspace_indices(query.device).cpu().tolist())
+    assert observed['fine_dims'].numel() == fine_dim
+    assert observed['fine_dims'].tolist() == expected_fine_dims
+
+    selected = _logical_ids(cache, 2, 0)
+    lo = selected_block * PAGE
+    other_lo = 192 if selected_block == 1 else 64
+    assert sum(lo <= token < lo + PAGE for token in selected) == 60
+    assert not any(other_lo <= token < other_lo + PAGE for token in selected)
 
 
 def test_owner_generation_wrap_rebuilds_int32_dedup_table():

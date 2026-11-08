@@ -1936,6 +1936,9 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     q_src = query_states.unsqueeze(0)
     q_req_ids = cache.query_req_ids_buf[:b]
     d_full = q_src.shape[-1]
+    full_dims = (torch.arange(d_full, dtype=torch.int64, device=device)
+                 if q_dims is None or indexer.l2_subspace == 'full' else None)
+    l1_dims = dims if q_dims is not None else full_dims
     s0, s1, s2 = q_src.stride(0), q_src.stride(1), q_src.stride(2)
     # 所有有效请求都跳过 far/near 时 middle 恒为空；无效 padding 行不参与
     # 判定。全 padding 的 Graph capture 必须走通用路径，否则会把真实 replay
@@ -2045,11 +2048,10 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
         b_q_full = _prepare_q(
             dims, dims.numel(), 'q_full', launch=not fuse_prepare_q)
     else:
-        full_dims = torch.arange(d_full, dtype=torch.int64, device=device)
         b_q_full = _prepare_q(full_dims, d_full, 'q_full')
 
     if indexer.l2_subspace == "full":
-        fine_dims = torch.arange(d_full, dtype=torch.int64, device=device)
+        fine_dims = full_dims
     elif q_dims is not None:
         fine_dims = dims
     else:
@@ -2080,7 +2082,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     # ``valid_req_t``；不再逐层收集 Python data_ptr 或复制列。
     # ---- one launch: in-place paged block stats, no projection -----------
     k_min, k_max, k_sum = _page_stats_all_layers(
-        cache, valid_req_t, n_layers, dims, bs, pad,
+        cache, valid_req_t, n_layers, l1_dims, bs, pad,
         lengths, layer_offset=layer_offset, workspace=workspace,
         q_job=q_job, write_job=write_job)  # [L,max_req,kt_cap,Hkv,d]
 
@@ -2112,7 +2114,7 @@ def _layer_batched_select_impl(cache, req_ids, layer_indices,
     # ---- grouped-Q Logits + signed packed-key Top-K ----------------------
     width = 1024
     logits = _fused_fine_scores_paged(
-        cache, valid_req_t, n_layers, dims, b_q_fine,
+        cache, valid_req_t, n_layers, fine_dims, b_q_fine,
         cand_idx2, keep2, owners, generations, s_cap, lower, upper, quota,
         tile=128, num_warps=2 if capturing else 4,
         layer_offset=layer_offset, workspace=workspace)
