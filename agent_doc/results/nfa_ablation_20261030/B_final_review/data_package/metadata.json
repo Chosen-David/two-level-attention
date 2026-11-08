@@ -1,0 +1,8 @@
+{
+  "baseline": "2d2a466b4e9a 是 NFA tail32 + Avg/MinMax，不是 dense FullKV",
+  "near_far_order": "plot_data.csv 分列保存 near_score/far_score，论文 Near/Far 顺序不得反写",
+  "official_rescoring": "2000/2000，最大绝对误差 0；详见 ../completeness_checks.json",
+  "reuse_boundary": "配置与当前 sink4/SWA128/K1=128/K2=1024/near4096/no-skip 工作点匹配；旧源码语义与 reclaim=true 原样保留，不改称当前 strict-skip 实测",
+  "scope": "HotpotQA/GovReport 各 200 行、5 个区域选择配置；旧 GraphReady 之前的质量路径，gate mode=full（关闭 skip）",
+  "statistics": "单次自然生成；独立 paired bootstrap B=10000、seed=20261031；未校正多重比较；CI 含 0 不证明等价"
+}
