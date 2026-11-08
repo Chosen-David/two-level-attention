@@ -1,0 +1,22 @@
+{
+  "source_commit": "42821f81a4739d05d8bc81e1d4cc58307e34bb7e",
+  "screen": {"ruler_limit": 24, "per_task": 20, "note": "first-N rows; finalists will be full-run"},
+  "gate_full_isolate": {"mode": "full", "epsilon": 0.05, "statistic": "mean"},
+  "configs": [
+    {"label": "full256", "schema": "glm-full256-screen-v1", "dims": "0-255"},
+    {"label": "nope-all192", "schema": "glm-nope-all192-screen-v1", "dims": "0-191"},
+    {"label": "nope-first128", "schema": "glm-nope-first128-screen-v1", "dims": "0-127"},
+    {"label": "nope-last128", "schema": "glm-nope-last128-screen-v1", "dims": "64-191"},
+    {"label": "nope-first64", "schema": "glm-nope-first64-screen-v1", "dims": "0-63"},
+    {"label": "nope-last64", "schema": "glm-nope-last64-screen-v1", "dims": "128-191"},
+    {"label": "nope-first32", "schema": "glm-nope-first32-screen-v1", "dims": "0-31"},
+    {"label": "nope-last32", "schema": "glm-nope-last32-screen-v1", "dims": "160-191"},
+    {"label": "rope-all64", "schema": "glm-rope-all64-screen-v1", "dims": "192-255"},
+    {"label": "rope-low32", "schema": "glm-rope-low32-screen-v1", "dims": "208-223,240-255"},
+    {"label": "rope-high32", "schema": "glm-rope-high32-screen-v1", "dims": "192-207,224-239"},
+    {"label": "mixed32-16n16r", "schema": "glm-mixed32-16n16r-screen-v1", "dims": "176-191,208-223"},
+    {"label": "mixed64-32n32r", "schema": "glm-mixed64-32n32r-screen-v1", "dims": "160-191,208-223,240-255"},
+    {"label": "mixed128-96n32r", "schema": "glm-mixed128-96n32r-screen-v1", "dims": "96-191,208-223,240-255"},
+    {"label": "mixed128-64n64r", "schema": "glm-mixed128-64n64r-screen-v1", "dims": "128-191,192-255"}
+  ]
+}

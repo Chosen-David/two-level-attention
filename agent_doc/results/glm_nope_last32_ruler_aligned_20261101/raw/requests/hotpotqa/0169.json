@@ -1,0 +1,61 @@
+{
+  "identity": "2f05999e6f2b304fb764184b19703b1140502ec36be58f436eb63637f5fa3fb7",
+  "task": "hotpotqa",
+  "row": 169,
+  "source_index": 169,
+  "input": {
+    "raw_tokens": 14414,
+    "input_tokens": 14419,
+    "truncated": false,
+    "input_sha256": "b42b7498fc3dff71e44ced65cad4882ec08c2377aa3a3ad6e1b6552229adcd4e"
+  },
+  "answers": [
+    "Claire is a married World War II nurse"
+  ],
+  "arms": {
+    "dense": {
+      "generated_ids": [
+        68967,
+        4741,
+        4337,
+        5004,
+        7946,
+        28001,
+        11,
+        2937,
+        44732,
+        154827
+      ],
+      "generated_tokens": 10,
+      "prediction": "married former World War II nurse, later surgeon",
+      "raw_text": "married former World War II nurse, later surgeon<|user|>",
+      "score_pct": 66.66666666666666,
+      "route": "native_dense_sdpa"
+    },
+    "selected": {
+      "generated_ids": [
+        68967,
+        4337,
+        5004,
+        7946,
+        28001,
+        154827
+      ],
+      "generated_tokens": 6,
+      "prediction": "married World War II nurse",
+      "raw_text": "married World War II nurse<|user|>",
+      "score_pct": 83.33333333333333,
+      "route": "glm_nope_last32_tli_paged_origin_main",
+      "tli_audit_summary": {
+        "gate_counts": {
+          "keep": 47,
+          "near": 0,
+          "far": 0,
+          "both": 0
+        },
+        "status": "complete"
+      }
+    }
+  },
+  "status": "complete"
+}

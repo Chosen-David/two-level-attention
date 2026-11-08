@@ -1,0 +1,113 @@
+{
+  "identity": "2f05999e6f2b304fb764184b19703b1140502ec36be58f436eb63637f5fa3fb7",
+  "task": "qasper",
+  "row": 182,
+  "source_index": 182,
+  "input": {
+    "raw_tokens": 5156,
+    "input_tokens": 5161,
+    "truncated": false,
+    "input_sha256": "6261a61ff0621734f3e2d8c7b80536fcce83394121d043ac0a4b9575759a2105"
+  },
+  "answers": [
+    "pays attentions to adjacent characters and casts a localness relationship between the characters as a fixed Gaussian weight assuming the weight relies on the distance between characters",
+    "Gaussian-masked directional attention can be described as a function to map queries and key-value pairs to the representation of input, Gaussian-masked directional attention expects to pay attention to the adjacent characters of each positions and cast the localness relationship between characters as a fix Gaussian weight for attention, Gaussian weight only relys on the distance between characters"
+  ],
+  "arms": {
+    "dense": {
+      "generated_ids": [
+        38,
+        46682,
+        75452,
+        291,
+        72285,
+        7299,
+        26305,
+        6529,
+        32265,
+        30570,
+        12750,
+        28543,
+        6529,
+        448,
+        264,
+        48264,
+        4680,
+        6172,
+        311,
+        45656,
+        279,
+        5025,
+        1948,
+        23875,
+        5766,
+        11,
+        1393,
+        1667,
+        65017,
+        26054,
+        311,
+        5244,
+        389,
+        2155,
+        17934,
+        13,
+        154827
+      ],
+      "generated_tokens": 37,
+      "prediction": "Gaussian-masked directional multi-head attention combines scaled dot-product attention with a Gaussian weight matrix to emphasize the relationship between adjacent characters, while using triangular masks to focus on different directions.",
+      "raw_text": "Gaussian-masked directional multi-head attention combines scaled dot-product attention with a Gaussian weight matrix to emphasize the relationship between adjacent characters, while using triangular masks to focus on different directions.<|user|>",
+      "score_pct": 33.33333333333333,
+      "route": "native_dense_sdpa"
+    },
+    "selected": {
+      "generated_ids": [
+        38,
+        46682,
+        75452,
+        291,
+        72285,
+        7299,
+        26305,
+        6529,
+        5711,
+        264,
+        48264,
+        4680,
+        6172,
+        311,
+        45656,
+        279,
+        12644,
+        315,
+        23875,
+        5766,
+        323,
+        65017,
+        26054,
+        311,
+        5244,
+        389,
+        2155,
+        17934,
+        13,
+        154827
+      ],
+      "generated_tokens": 30,
+      "prediction": "Gaussian-masked directional multi-head attention uses a Gaussian weight matrix to emphasize the importance of adjacent characters and triangular masks to focus on different directions.",
+      "raw_text": "Gaussian-masked directional multi-head attention uses a Gaussian weight matrix to emphasize the importance of adjacent characters and triangular masks to focus on different directions.<|user|>",
+      "score_pct": 32.87671232876712,
+      "route": "glm_nope_last32_tli_paged_origin_main",
+      "tli_audit_summary": {
+        "gate_counts": {
+          "keep": 47,
+          "near": 0,
+          "far": 0,
+          "both": 0
+        },
+        "status": "complete"
+      }
+    }
+  },
+  "status": "complete"
+}

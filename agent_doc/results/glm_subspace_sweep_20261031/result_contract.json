@@ -1,0 +1,21 @@
+{
+  "result_id": "glm_subspace_sweep_20261031",
+  "created_utc": "2026-10-31",
+  "project_root": "/home/wangyuanshuo02/two-level-attention",
+  "host": "33.253.189.125",
+  "source_commit": "0a72672f3aa3d37f12545eeb8f397bbcc4c91d0b",
+  "script_sha256": "cceabfcf82076008154caacb151721cd95e9b934d473236c9a4088b0cc969337",
+  "dataset_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+  "model_manifest_sha256": "3cab68a01d342f57d1fe7f62fce35f7c756164517779c9ed8d8feb3d04d57aa8",
+  "scope": "Same-host 33.253.189.125 eight-variant GLM subspace diagnostic on first 10 RULER MultiKey2 64K rows; dense and selected arms. Raw outputs only; not benchmark/paper-method acceptance.",
+  "variants": ["rope_low32", "rope64", "nope32", "nope64", "mixed32", "mixed64", "full256", "alltoken_control"],
+  "rows": [0,1,2,3,4,5,6,7,8,9],
+  "arms": ["dense", "selected"],
+  "raw_paths": {
+    "new_missing_variants": "raw125_full/{nope32,alltoken_control,rope64,mixed32}",
+    "prior_same_host_variants": "raw125_prior/{nope64,mixed64,rope_low32,full256}"
+  },
+  "gpu_reservation_note": "GPU6 on 33.253.189.125 was reserved by TL-OPERATOR-COMPLETE-20261029 and was not used. GPUs 0-3 were used for new variants.",
+  "independent_check": "validation/checks_same_host.json",
+  "independent_review_required": true
+}

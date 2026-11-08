@@ -1,0 +1,102 @@
+{
+  "identity": "9a3e2e5e7f5ac5a5345531c0bebfa9e86079be9a7d6359e08856a91b8aeac63d",
+  "task": "qasper",
+  "row": 21,
+  "source_index": 21,
+  "input": {
+    "raw_tokens": 7818,
+    "input_tokens": 7823,
+    "truncated": false,
+    "input_sha256": "a9c9766dd3567dcc5c95fb73a54f80d83200912f9ce71bb900cde619edfabd3e"
+  },
+  "answers": [
+    "the attention heads in the proposed adaptively sparse Transformer can specialize more and with higher confidence",
+    "We introduce sparse attention into the Transformer architecture"
+  ],
+  "arms": {
+    "dense": {
+      "generated_ids": [
+        785,
+        1614,
+        34776,
+        14189,
+        2897,
+        553,
+        10688,
+        6529,
+        14619,
+        311,
+        3960,
+        33284,
+        42441,
+        11,
+        892,
+        20041,
+        48076,
+        21839,
+        315,
+        1968,
+        3281,
+        8039,
+        323,
+        803,
+        16491,
+        43363,
+        13,
+        154827
+      ],
+      "generated_tokens": 28,
+      "prediction": "The model improves interpretability by allowing attention heads to learn sparse distributions, which enables clearer identification of head specializations and more confident representations.",
+      "raw_text": "The model improves interpretability by allowing attention heads to learn sparse distributions, which enables clearer identification of head specializations and more confident representations.<|user|>",
+      "score_pct": 27.77777777777778,
+      "route": "native_dense_sdpa"
+    },
+    "selected": {
+      "generated_ids": [
+        785,
+        1614,
+        34776,
+        14189,
+        2897,
+        553,
+        10688,
+        6529,
+        14619,
+        311,
+        9788,
+        7168,
+        4680,
+        311,
+        39500,
+        4244,
+        11,
+        6388,
+        311,
+        978,
+        10420,
+        323,
+        803,
+        16491,
+        6529,
+        42441,
+        13,
+        154827
+      ],
+      "generated_tokens": 28,
+      "prediction": "The model improves interpretability by allowing attention heads to assign zero weight to irrelevant words, leading to sparser and more confident attention distributions.",
+      "raw_text": "The model improves interpretability by allowing attention heads to assign zero weight to irrelevant words, leading to sparser and more confident attention distributions.<|user|>",
+      "score_pct": 22.22222222222222,
+      "route": "glm_full256_tli_paged_origin_main",
+      "tli_audit_summary": {
+        "gate_counts": {
+          "keep": 47,
+          "near": 0,
+          "far": 0,
+          "both": 0
+        },
+        "status": "complete"
+      }
+    }
+  },
+  "status": "complete"
+}

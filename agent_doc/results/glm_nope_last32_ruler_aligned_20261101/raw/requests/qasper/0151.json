@@ -1,0 +1,95 @@
+{
+  "identity": "2f05999e6f2b304fb764184b19703b1140502ec36be58f436eb63637f5fa3fb7",
+  "task": "qasper",
+  "row": 151,
+  "source_index": 151,
+  "input": {
+    "raw_tokens": 5601,
+    "input_tokens": 5606,
+    "truncated": false,
+    "input_sha256": "bfcec04b2afe9a18570045afdabad67eab67f417f4f2ea25e8d7ff1e473d9225"
+  },
+  "answers": [
+    "One can think $(1-p_{i1})$ as a weight associated with each example, which changes as training proceeds. The intuition of changing $p_{i1}$ to $(1-p_{i1}) p_{i1}$ is to push down the weight of easy examples. For easy examples whose probability are approaching 0 or 1, $(1-p_{i1}) p_{i1}$ makes the model attach significantly less focus to them. Figure FIGREF23 gives gives an explanation from the perspective in derivative: the derivative of $\\frac{(1-p)p}{1+(1-p)p}$ with respect to $p$ approaches 0 immediately after $p$ approaches 0, which means the model attends less to examples once they are correctly classified.",
+    "associates each training example with a weight in proportion to $(1-p)$, and this weight dynamically changes as training proceeds"
+  ],
+  "arms": {
+    "dense": {
+      "generated_ids": [
+        785,
+        14314,
+        525,
+        5815,
+        448,
+        1817,
+        4862,
+        3110,
+        304,
+        21070,
+        311,
+        4930,
+        16,
+        2268,
+        15075,
+        323,
+        41774,
+        2297,
+        438,
+        4862,
+        33294,
+        13,
+        154827
+      ],
+      "generated_tokens": 23,
+      "prediction": "The weights are associated with each training example in proportion to $(1-p)$ and dynamically change as training proceeds.",
+      "raw_text": "The weights are associated with each training example in proportion to $(1-p)$ and dynamically change as training proceeds.<|user|>",
+      "score_pct": 74.28571428571428,
+      "route": "native_dense_sdpa"
+    },
+    "selected": {
+      "generated_ids": [
+        785,
+        14314,
+        525,
+        5815,
+        448,
+        1817,
+        4862,
+        3110,
+        304,
+        21070,
+        311,
+        4930,
+        16,
+        2268,
+        15075,
+        11,
+        323,
+        419,
+        4680,
+        41774,
+        4344,
+        438,
+        4862,
+        33294,
+        13,
+        154827
+      ],
+      "generated_tokens": 26,
+      "prediction": "The weights are associated with each training example in proportion to $(1-p)$, and this weight dynamically changes as training proceeds.",
+      "raw_text": "The weights are associated with each training example in proportion to $(1-p)$, and this weight dynamically changes as training proceeds.<|user|>",
+      "score_pct": 86.48648648648648,
+      "route": "glm_nope_last32_tli_paged_origin_main",
+      "tli_audit_summary": {
+        "gate_counts": {
+          "keep": 47,
+          "near": 0,
+          "far": 0,
+          "both": 0
+        },
+        "status": "complete"
+      }
+    }
+  },
+  "status": "complete"
+}

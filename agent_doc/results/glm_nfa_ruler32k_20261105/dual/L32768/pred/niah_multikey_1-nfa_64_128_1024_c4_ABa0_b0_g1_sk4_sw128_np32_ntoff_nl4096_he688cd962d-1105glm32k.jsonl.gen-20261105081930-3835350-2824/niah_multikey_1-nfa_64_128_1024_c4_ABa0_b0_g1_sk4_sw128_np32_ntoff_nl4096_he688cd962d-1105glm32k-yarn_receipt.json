@@ -1,0 +1,67 @@
+{
+ "receipt_version": "producer-yarn-config-v2",
+ "audit_ref": "TL-E119-YARN-IDENTITY-057",
+ "produced_at": "2026-11-05T08:57:01.117941",
+ "yarn_enabled": false,
+ "effective_yarn_factor": null,
+ "yarn_factor_source": "off",
+ "rope_scaling": null,
+ "context_length": 32768,
+ "native_max_position_embeddings": 202752,
+ "task": "niah_multikey_1",
+ "model_path": "/home/wangyuanshuo02/models/huggingface.co/zai-org/GLM-4.7-Flash",
+ "model_config_sha256": "dc9b97c7c9bed726a2e6939da4234d5c43abb3edec8812068c9a1af1dbc13acb",
+ "generation_params": {
+  "max_gen": 128,
+  "min_new_tokens": 1,
+  "eos_token_ids": [
+   154820,
+   154827,
+   154829
+  ],
+  "max_num": 100,
+  "seed": 42,
+  "method": "nfa",
+  "pred_postfix": "",
+  "t": "1105glm32k",
+  "graph_policy": "auto",
+  "operator_mode": "off"
+ },
+ "producer_script": {
+  "path": "benchmark/RULER/pred_ruler.py",
+  "sha256": "dfba4fcf1ccb4d0009557e650c9f5b9f6858412c369e2584d096b52ddfdcead8"
+ },
+ "rope_original_max_position_embeddings": null,
+ "treatment_manifest": {
+  "sha256": "e688cd962dc4ac4d5e6aaebe070b61d47bb130e8c2cf23965446edaa42742897",
+  "json": "{\"nfa_alpha\": 0.0, \"nfa_beta\": 0.0, \"nfa_boundary_bypass\": true, \"nfa_decode_dense\": false, \"nfa_dyn_dgate\": false, \"nfa_dyn_dgate_eps\": 0.05, \"nfa_dyn_dgate_rows\": 256, \"nfa_enable_kmeans\": true, \"nfa_enable_layer_skip\": false, \"nfa_enable_static_gate\": false, \"nfa_enable_subspace\": true, \"nfa_far_blocks\": 16, \"nfa_far_clusters\": 256, \"nfa_far_method\": \"minmax\", \"nfa_far_niter\": 10, \"nfa_far_select\": \"4bit\", \"nfa_far_tokens\": 512, \"nfa_gamma\": 1.0, \"nfa_l2_quant\": false, \"nfa_l2_subspace\": \"same\", \"nfa_layer_skip_path\": null, \"nfa_moba\": false, \"nfa_near_len\": 4096, \"nfa_near_method\": \"avg\", \"nfa_near_pages\": 32, \"nfa_near_select\": \"4bit\", \"nfa_near_tokens\": \"off\", \"nfa_per_q_head\": false, \"nfa_prefill_frozen_regions\": {\"gate\": {\"epsilon\": 0.05, \"mode\": \"dual\", \"rows\": 256, \"statistic\": \"mean\"}, \"geometry\": {\"max_new_tokens\": 128, \"near\": 4096, \"page\": 64, \"sink\": 4, \"window\": 128}}, \"nfa_proj_basis\": null, \"nfa_sigma\": 8.0, \"nfa_sigma_select\": \"none\", \"nfa_sim\": 0.9, \"nfa_sim_dims\": \"subspace\", \"nfa_sink_tokens\": 4, \"nfa_sinkswa_only\": false, \"nfa_sparse_prefill\": false, \"nfa_static_pair\": false, \"nfa_subspace\": \"nope\", \"nfa_swa_size\": 128, \"tia_block_size\": 64, \"tia_enable_async_topk\": false, \"tia_level1_topk\": 128, \"tia_level2_cmp_ratio\": 4, \"tia_level2_topk\": 1024}"
+ },
+ "status": "complete",
+ "run_id": "20261105081930-3835350-2824",
+ "prediction_basename": "niah_multikey_1-nfa_64_128_1024_c4_ABa0_b0_g1_sk4_sw128_np32_ntoff_nl4096_he688cd962d-1105glm32k.jsonl",
+ "prediction_sha256": "c8a87e7bc428b3b16f92d6b2b1df8e157faf32a5c18881202c81308ca7621ffb",
+ "prediction_lines": 100,
+ "rope_policy": {
+  "policy": "near-far-rope-32768-v1",
+  "model_type": "glm4_moe_lite",
+  "snapshot_preserved": true,
+  "snapshot_max_position_embeddings": 202752,
+  "runtime_max_position_embeddings": 202752,
+  "rope_scaling": {
+   "rope_theta": 1000000,
+   "partial_rotary_factor": 1.0,
+   "rope_type": "default"
+  },
+  "rope_parameters": {
+   "rope_theta": 1000000,
+   "partial_rotary_factor": 1.0,
+   "rope_type": "default"
+  }
+ },
+ "runtime_rope_verification": {
+  "policy": "near-far-rope-32768-v1",
+  "model_type": "glm4_moe_lite",
+  "status": "snapshot-preserved-no-qwen-override",
+  "transformers": "5.12.1"
+ }
+}

@@ -1,0 +1,937 @@
+{
+  "schema_version": "independent-review-candidates/v1",
+  "result_directory": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/glm_subspace_sweep_20261031/candidates",
+  "reviewed_at_utc": "2026-10-31T11:13:59.024068+00:00",
+  "status": "pass",
+  "blocking_issues": [],
+  "non_blocking_notes": [
+    "protocol transformers=5.12.1; local review tokenizer transformers=4.56.2. Tokenization matched recorded hashes, so this is informational only."
+  ],
+  "scope": "Same-host extended 32D candidate search; fixed-10-case recorded-output diagnostic only, not benchmark/paper-method acceptance.",
+  "checks": {
+    "cell_grid": {
+      "expected_records": 150,
+      "observed_records": 150,
+      "expected_variants": 15,
+      "observed_variants": 15,
+      "expected_rows_per_variant": 10,
+      "all_status_complete": true,
+      "no_duplicate_cells": true
+    },
+    "identity": {
+      "protocol_identities_checked": 15,
+      "record_identity_matches": true,
+      "worker_done_identity_matches": true
+    },
+    "protocol_consistency": {
+      "common_protocol_fields_checked": [
+        "dataset_sha256",
+        "gpu",
+        "heldout_rows",
+        "k1",
+        "k2",
+        "known_rows",
+        "max_new_tokens",
+        "min_new_tokens",
+        "model_manifest",
+        "near_len",
+        "prompt",
+        "rebuild_each_step",
+        "rows",
+        "scope",
+        "scoring_backend",
+        "script_sha256",
+        "seed",
+        "sink",
+        "skip",
+        "source",
+        "source_commit",
+        "swa",
+        "torch",
+        "transformers"
+      ],
+      "all_common_fields_equal": true,
+      "variant_dimensions_expected": true,
+      "known_rows": [
+        0,
+        1,
+        2
+      ],
+      "heldout_rows": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    "source_checkout": {
+      "expected_commit": "0a72672f3aa3d37f12545eeb8f397bbcc4c91d0b",
+      "observed_commit": "0a72672f3aa3d37f12545eeb8f397bbcc4c91d0b",
+      "clean": true,
+      "unique_source_files_hashed": 119,
+      "source_hash_mismatches": 0
+    },
+    "hashes": {
+      "actual_script_sha256": "eb9e5aa2e4c1737293601290fda43fd8f52567035dfac6c1a320025ac92714ad",
+      "actual_dataset_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "status_script_sha256_matches": true
+    },
+    "input_rows": {
+      "rows_checked": 10,
+      "input_methods_equal": true,
+      "record_input_identity_errors": 0,
+      "answers_matched": true,
+      "source_index_matched": true
+    },
+    "decoding": {
+      "arms_checked": 300,
+      "prediction_decode_errors": 0,
+      "answer_hits_recomputed": true,
+      "token_length_bounds": "2..64"
+    },
+    "dense_parity": {
+      "rows": 10,
+      "variants_per_row": 15,
+      "total_dense_comparisons": 150,
+      "mismatches": 0
+    },
+    "candidate_scores_recomputed": {
+      "file_entries": 15,
+      "file_errors": [],
+      "file_total_records": 150,
+      "all_selected_scores_match": true,
+      "comparison": [
+        {
+          "variant": "mixed_nope16_rope_high16",
+          "file": {
+            "variant": "mixed_nope16_rope_high16",
+            "known": "0/3",
+            "heldout": "2/7",
+            "all": "2/10",
+            "hits": 2
+          },
+          "recomputed": {
+            "known": "0/3",
+            "heldout": "2/7",
+            "all": "2/10",
+            "hits": 2
+          },
+          "match": true
+        },
+        {
+          "variant": "mixed_nope16_rope_low8_high8",
+          "file": {
+            "variant": "mixed_nope16_rope_low8_high8",
+            "known": "3/3",
+            "heldout": "5/7",
+            "all": "8/10",
+            "hits": 8
+          },
+          "recomputed": {
+            "known": "3/3",
+            "heldout": "5/7",
+            "all": "8/10",
+            "hits": 8
+          },
+          "match": true
+        },
+        {
+          "variant": "mixed_nope24_rope_low8",
+          "file": {
+            "variant": "mixed_nope24_rope_low8",
+            "known": "2/3",
+            "heldout": "5/7",
+            "all": "7/10",
+            "hits": 7
+          },
+          "recomputed": {
+            "known": "2/3",
+            "heldout": "5/7",
+            "all": "7/10",
+            "hits": 7
+          },
+          "match": true
+        },
+        {
+          "variant": "nope_even32",
+          "file": {
+            "variant": "nope_even32",
+            "known": "2/3",
+            "heldout": "6/7",
+            "all": "8/10",
+            "hits": 8
+          },
+          "recomputed": {
+            "known": "2/3",
+            "heldout": "6/7",
+            "all": "8/10",
+            "hits": 8
+          },
+          "match": true
+        },
+        {
+          "variant": "nope_first16_last16",
+          "file": {
+            "variant": "nope_first16_last16",
+            "known": "3/3",
+            "heldout": "4/7",
+            "all": "7/10",
+            "hits": 7
+          },
+          "recomputed": {
+            "known": "3/3",
+            "heldout": "4/7",
+            "all": "7/10",
+            "hits": 7
+          },
+          "match": true
+        },
+        {
+          "variant": "nope_first16_mid16",
+          "file": {
+            "variant": "nope_first16_mid16",
+            "known": "1/3",
+            "heldout": "4/7",
+            "all": "5/10",
+            "hits": 5
+          },
+          "recomputed": {
+            "known": "1/3",
+            "heldout": "4/7",
+            "all": "5/10",
+            "hits": 5
+          },
+          "match": true
+        },
+        {
+          "variant": "nope_last32",
+          "file": {
+            "variant": "nope_last32",
+            "known": "3/3",
+            "heldout": "6/7",
+            "all": "9/10",
+            "hits": 9
+          },
+          "recomputed": {
+            "known": "3/3",
+            "heldout": "6/7",
+            "all": "9/10",
+            "hits": 9
+          },
+          "match": true
+        },
+        {
+          "variant": "nope_mid32_128",
+          "file": {
+            "variant": "nope_mid32_128",
+            "known": "3/3",
+            "heldout": "4/7",
+            "all": "7/10",
+            "hits": 7
+          },
+          "recomputed": {
+            "known": "3/3",
+            "heldout": "4/7",
+            "all": "7/10",
+            "hits": 7
+          },
+          "match": true
+        },
+        {
+          "variant": "nope_mid32_64",
+          "file": {
+            "variant": "nope_mid32_64",
+            "known": "3/3",
+            "heldout": "5/7",
+            "all": "8/10",
+            "hits": 8
+          },
+          "recomputed": {
+            "known": "3/3",
+            "heldout": "5/7",
+            "all": "8/10",
+            "hits": 8
+          },
+          "match": true
+        },
+        {
+          "variant": "nope_mid32_96",
+          "file": {
+            "variant": "nope_mid32_96",
+            "known": "2/3",
+            "heldout": "5/7",
+            "all": "7/10",
+            "hits": 7
+          },
+          "recomputed": {
+            "known": "2/3",
+            "heldout": "5/7",
+            "all": "7/10",
+            "hits": 7
+          },
+          "match": true
+        },
+        {
+          "variant": "nope_odd32",
+          "file": {
+            "variant": "nope_odd32",
+            "known": "1/3",
+            "heldout": "6/7",
+            "all": "7/10",
+            "hits": 7
+          },
+          "recomputed": {
+            "known": "1/3",
+            "heldout": "6/7",
+            "all": "7/10",
+            "hits": 7
+          },
+          "match": true
+        },
+        {
+          "variant": "rope_even32",
+          "file": {
+            "variant": "rope_even32",
+            "known": "0/3",
+            "heldout": "0/7",
+            "all": "0/10",
+            "hits": 0
+          },
+          "recomputed": {
+            "known": "0/3",
+            "heldout": "0/7",
+            "all": "0/10",
+            "hits": 0
+          },
+          "match": true
+        },
+        {
+          "variant": "rope_high32",
+          "file": {
+            "variant": "rope_high32",
+            "known": "0/3",
+            "heldout": "0/7",
+            "all": "0/10",
+            "hits": 0
+          },
+          "recomputed": {
+            "known": "0/3",
+            "heldout": "0/7",
+            "all": "0/10",
+            "hits": 0
+          },
+          "match": true
+        },
+        {
+          "variant": "rope_mid32",
+          "file": {
+            "variant": "rope_mid32",
+            "known": "0/3",
+            "heldout": "0/7",
+            "all": "0/10",
+            "hits": 0
+          },
+          "recomputed": {
+            "known": "0/3",
+            "heldout": "0/7",
+            "all": "0/10",
+            "hits": 0
+          },
+          "match": true
+        },
+        {
+          "variant": "tail32",
+          "file": {
+            "variant": "tail32",
+            "known": "0/3",
+            "heldout": "0/7",
+            "all": "0/10",
+            "hits": 0
+          },
+          "recomputed": {
+            "known": "0/3",
+            "heldout": "0/7",
+            "all": "0/10",
+            "hits": 0
+          },
+          "match": true
+        }
+      ]
+    },
+    "observed_scores": [
+      {
+        "variant": "mixed_nope16_rope_high16",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "mixed_nope16_rope_high16",
+        "arm": "selected",
+        "known": {
+          "hits": 0,
+          "n": 3,
+          "score_percent": 0.0
+        },
+        "heldout": {
+          "hits": 2,
+          "n": 7,
+          "score_percent": 28.571428571428573
+        },
+        "all": {
+          "hits": 2,
+          "n": 10,
+          "score_percent": 20.0
+        }
+      },
+      {
+        "variant": "mixed_nope16_rope_low8_high8",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "mixed_nope16_rope_low8_high8",
+        "arm": "selected",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 5,
+          "n": 7,
+          "score_percent": 71.42857142857143
+        },
+        "all": {
+          "hits": 8,
+          "n": 10,
+          "score_percent": 80.0
+        }
+      },
+      {
+        "variant": "mixed_nope24_rope_low8",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "mixed_nope24_rope_low8",
+        "arm": "selected",
+        "known": {
+          "hits": 2,
+          "n": 3,
+          "score_percent": 66.66666666666667
+        },
+        "heldout": {
+          "hits": 5,
+          "n": 7,
+          "score_percent": 71.42857142857143
+        },
+        "all": {
+          "hits": 7,
+          "n": 10,
+          "score_percent": 70.0
+        }
+      },
+      {
+        "variant": "nope_even32",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "nope_even32",
+        "arm": "selected",
+        "known": {
+          "hits": 2,
+          "n": 3,
+          "score_percent": 66.66666666666667
+        },
+        "heldout": {
+          "hits": 6,
+          "n": 7,
+          "score_percent": 85.71428571428571
+        },
+        "all": {
+          "hits": 8,
+          "n": 10,
+          "score_percent": 80.0
+        }
+      },
+      {
+        "variant": "nope_first16_last16",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "nope_first16_last16",
+        "arm": "selected",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 4,
+          "n": 7,
+          "score_percent": 57.142857142857146
+        },
+        "all": {
+          "hits": 7,
+          "n": 10,
+          "score_percent": 70.0
+        }
+      },
+      {
+        "variant": "nope_first16_mid16",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "nope_first16_mid16",
+        "arm": "selected",
+        "known": {
+          "hits": 1,
+          "n": 3,
+          "score_percent": 33.333333333333336
+        },
+        "heldout": {
+          "hits": 4,
+          "n": 7,
+          "score_percent": 57.142857142857146
+        },
+        "all": {
+          "hits": 5,
+          "n": 10,
+          "score_percent": 50.0
+        }
+      },
+      {
+        "variant": "nope_last32",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "nope_last32",
+        "arm": "selected",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 6,
+          "n": 7,
+          "score_percent": 85.71428571428571
+        },
+        "all": {
+          "hits": 9,
+          "n": 10,
+          "score_percent": 90.0
+        }
+      },
+      {
+        "variant": "nope_mid32_128",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "nope_mid32_128",
+        "arm": "selected",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 4,
+          "n": 7,
+          "score_percent": 57.142857142857146
+        },
+        "all": {
+          "hits": 7,
+          "n": 10,
+          "score_percent": 70.0
+        }
+      },
+      {
+        "variant": "nope_mid32_64",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "nope_mid32_64",
+        "arm": "selected",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 5,
+          "n": 7,
+          "score_percent": 71.42857142857143
+        },
+        "all": {
+          "hits": 8,
+          "n": 10,
+          "score_percent": 80.0
+        }
+      },
+      {
+        "variant": "nope_mid32_96",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "nope_mid32_96",
+        "arm": "selected",
+        "known": {
+          "hits": 2,
+          "n": 3,
+          "score_percent": 66.66666666666667
+        },
+        "heldout": {
+          "hits": 5,
+          "n": 7,
+          "score_percent": 71.42857142857143
+        },
+        "all": {
+          "hits": 7,
+          "n": 10,
+          "score_percent": 70.0
+        }
+      },
+      {
+        "variant": "nope_odd32",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "nope_odd32",
+        "arm": "selected",
+        "known": {
+          "hits": 1,
+          "n": 3,
+          "score_percent": 33.333333333333336
+        },
+        "heldout": {
+          "hits": 6,
+          "n": 7,
+          "score_percent": 85.71428571428571
+        },
+        "all": {
+          "hits": 7,
+          "n": 10,
+          "score_percent": 70.0
+        }
+      },
+      {
+        "variant": "rope_even32",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "rope_even32",
+        "arm": "selected",
+        "known": {
+          "hits": 0,
+          "n": 3,
+          "score_percent": 0.0
+        },
+        "heldout": {
+          "hits": 0,
+          "n": 7,
+          "score_percent": 0.0
+        },
+        "all": {
+          "hits": 0,
+          "n": 10,
+          "score_percent": 0.0
+        }
+      },
+      {
+        "variant": "rope_high32",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "rope_high32",
+        "arm": "selected",
+        "known": {
+          "hits": 0,
+          "n": 3,
+          "score_percent": 0.0
+        },
+        "heldout": {
+          "hits": 0,
+          "n": 7,
+          "score_percent": 0.0
+        },
+        "all": {
+          "hits": 0,
+          "n": 10,
+          "score_percent": 0.0
+        }
+      },
+      {
+        "variant": "rope_mid32",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "rope_mid32",
+        "arm": "selected",
+        "known": {
+          "hits": 0,
+          "n": 3,
+          "score_percent": 0.0
+        },
+        "heldout": {
+          "hits": 0,
+          "n": 7,
+          "score_percent": 0.0
+        },
+        "all": {
+          "hits": 0,
+          "n": 10,
+          "score_percent": 0.0
+        }
+      },
+      {
+        "variant": "tail32",
+        "arm": "dense",
+        "known": {
+          "hits": 3,
+          "n": 3,
+          "score_percent": 100.0
+        },
+        "heldout": {
+          "hits": 7,
+          "n": 7,
+          "score_percent": 100.0
+        },
+        "all": {
+          "hits": 10,
+          "n": 10,
+          "score_percent": 100.0
+        }
+      },
+      {
+        "variant": "tail32",
+        "arm": "selected",
+        "known": {
+          "hits": 0,
+          "n": 3,
+          "score_percent": 0.0
+        },
+        "heldout": {
+          "hits": 0,
+          "n": 7,
+          "score_percent": 0.0
+        },
+        "all": {
+          "hits": 0,
+          "n": 10,
+          "score_percent": 0.0
+        }
+      }
+    ]
+  }
+}

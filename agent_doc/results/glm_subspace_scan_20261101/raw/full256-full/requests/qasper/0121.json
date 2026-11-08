@@ -1,0 +1,112 @@
+{
+  "identity": "9a3e2e5e7f5ac5a5345531c0bebfa9e86079be9a7d6359e08856a91b8aeac63d",
+  "task": "qasper",
+  "row": 121,
+  "source_index": 121,
+  "input": {
+    "raw_tokens": 3908,
+    "input_tokens": 3913,
+    "truncated": false,
+    "input_sha256": "5f7ca24c00c0460541e24e6e6e0c22e239d4ca4566819f349acd77a4e8b6317b"
+  },
+  "answers": [
+    "A new tagging scheme that tags the words before and after the pun as well as the pun words.",
+    "a new tagging scheme consisting of three tags, namely { INLINEFORM0 }"
+  ],
+  "arms": {
+    "dense": {
+      "generated_ids": [
+        785,
+        77525,
+        12852,
+        19409,
+        374,
+        264,
+        11509,
+        2326,
+        38001,
+        12852,
+        30486,
+        315,
+        314,
+        14790,
+        11,
+        8309,
+        11,
+        1283,
+        7810,
+        154827
+      ],
+      "generated_tokens": 20,
+      "prediction": "The tagging scheme employed is a novel three-tag scheme consisting of {before, pun, after}.",
+      "raw_text": "The tagging scheme employed is a novel three-tag scheme consisting of {before, pun, after}.<|user|>",
+      "score_pct": 38.0952380952381,
+      "route": "native_dense_sdpa"
+    },
+    "selected": {
+      "generated_ids": [
+        785,
+        77525,
+        12852,
+        19409,
+        374,
+        264,
+        11509,
+        2326,
+        38001,
+        12852,
+        30486,
+        315,
+        314,
+        33,
+        11,
+        393,
+        11,
+        362,
+        92,
+        9488,
+        11,
+        1380,
+        425,
+        14796,
+        264,
+        3409,
+        1573,
+        279,
+        8309,
+        11,
+        393,
+        14796,
+        279,
+        8309,
+        5086,
+        11,
+        323,
+        362,
+        14796,
+        264,
+        3409,
+        1283,
+        279,
+        8309,
+        13,
+        154827
+      ],
+      "generated_tokens": 46,
+      "prediction": "The tagging scheme employed is a novel three-tag scheme consisting of {B, P, A} tags, where B indicates a word before the pun, P indicates the pun itself, and A indicates a word after the pun.",
+      "raw_text": "The tagging scheme employed is a novel three-tag scheme consisting of {B, P, A} tags, where B indicates a word before the pun, P indicates the pun itself, and A indicates a word after the pun.<|user|>",
+      "score_pct": 38.095238095238095,
+      "route": "glm_full256_tli_paged_origin_main",
+      "tli_audit_summary": {
+        "gate_counts": {
+          "keep": 47,
+          "near": 0,
+          "far": 0,
+          "both": 0
+        },
+        "status": "complete"
+      }
+    }
+  },
+  "status": "complete"
+}

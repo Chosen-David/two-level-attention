@@ -1,0 +1,72 @@
+{
+  "identity": "2f05999e6f2b304fb764184b19703b1140502ec36be58f436eb63637f5fa3fb7",
+  "task": "qasper",
+  "row": 61,
+  "source_index": 61,
+  "input": {
+    "raw_tokens": 4368,
+    "input_tokens": 4373,
+    "truncated": false,
+    "input_sha256": "7e5ecb3ac846a81729352aaa109899f34182498db4b99037e127faa9eb18a872"
+  },
+  "answers": [
+    "combines the information from these sources using a feed-forward neural model",
+    "encodes the information from audio and text sequences using dual RNNs and then combines the information from these sources using a feed-forward neural model"
+  ],
+  "arms": {
+    "dense": {
+      "generated_ids": [
+        6865,
+        77161,
+        279,
+        7699,
+        11165,
+        4621,
+        323,
+        279,
+        1467,
+        11165,
+        4621,
+        13,
+        154827
+      ],
+      "generated_tokens": 13,
+      "prediction": "They concatenate the audio encoding vector and the text encoding vector.",
+      "raw_text": "They concatenate the audio encoding vector and the text encoding vector.<|user|>",
+      "score_pct": 20.0,
+      "route": "native_dense_sdpa"
+    },
+    "selected": {
+      "generated_ids": [
+        6865,
+        77161,
+        279,
+        7699,
+        11165,
+        4621,
+        323,
+        279,
+        1467,
+        11165,
+        4621,
+        13,
+        154827
+      ],
+      "generated_tokens": 13,
+      "prediction": "They concatenate the audio encoding vector and the text encoding vector.",
+      "raw_text": "They concatenate the audio encoding vector and the text encoding vector.<|user|>",
+      "score_pct": 20.0,
+      "route": "glm_nope_last32_tli_paged_origin_main",
+      "tli_audit_summary": {
+        "gate_counts": {
+          "keep": 47,
+          "near": 0,
+          "far": 0,
+          "both": 0
+        },
+        "status": "complete"
+      }
+    }
+  },
+  "status": "complete"
+}
