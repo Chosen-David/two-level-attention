@@ -1,0 +1,158 @@
+"""Batched GQA scoring. Grid is (token tile, batch*KV head), not B launches.
+
+Reduction follows the repository's scalar Triton scoring kernels: FP32 sums,
+then rounding to the query dtype before the separate GQA mean. GPU validation
+is still required; the interpreter/offline compiler do not establish speed.
+"""
+import torch
+import triton
+import triton.language as tl
+
+
+@triton.jit(do_not_specialize=['N'])
+def _score(K, KMAX, Q, IDS, KEEP, OUT, N,
+           KB: tl.constexpr, KT: tl.constexpr, KH: tl.constexpr,
+           QB: tl.constexpr, QH: tl.constexpr, QG: tl.constexpr,
+           H: tl.constexpr, G: tl.constexpr, D: tl.constexpr,
+           MODE: tl.constexpr, TILE: tl.constexpr):
+    n = tl.program_id(0)*TILE+tl.arange(0,TILE)
+    bh = tl.program_id(1)
+    b, h = bh//H, bh%H
+    d = tl.arange(0,D)
+    live = n < N
+    if MODE == 2:
+        pos = tl.load(IDS+bh*N+n,live,other=0)
+        live &= tl.load(KEEP+bh*N+n,n < N,other=0)
+    else:
+        pos = n
+    x = tl.load(K+b*KB+pos[:,None]*KT+h*KH+d[None,:],
+                live[:,None],other=0).to(tl.float32)
+    if MODE == 1:
+        hi = tl.load(KMAX+b*KB+pos[:,None]*KT+h*KH+d[None,:],
+                     live[:,None],other=0).to(tl.float32)
+    for g in tl.static_range(G):
+        q = tl.load(Q+b*QB+h*QH+g*QG+d)
+        if MODE == 1:
+            s = tl.sum(x*tl.minimum(q[None,:],0),1)+tl.sum(hi*tl.maximum(q[None,:],0),1)
+        else:
+            s = tl.sum(x*q[None,:],1)
+        s = tl.where(live,s,float('-inf'))
+        tl.store(OUT+(bh*G+g)*N+n,s,n < N)
+
+
+def score(k, q, dtype, *, kmax=None, ids=None, keep=None):
+    # Private checked caller: cached features contiguous, q compact and FP32.
+    B,T,H,D=k.shape
+    q=q.contiguous()
+    G=q.shape[2]
+    n=T if ids is None else ids.shape[-1]
+    out=torch.empty((B,H,G,n),dtype=dtype,device=k.device)
+    mode=2 if ids is not None else 1 if kmax is not None else 0
+    _score[(triton.cdiv(n,32), B*H)](
+        k, k if kmax is None else kmax, q,
+        k if ids is None else ids, k if keep is None else keep, out,n,
+        *k.stride()[:3],*q.stride()[:3],H,G,D,mode,32,
+        num_warps=4,enable_fp_fusion=False)
+    return out
+
+
+@triton.jit(do_not_specialize=['R'])
+def _compact(IDS, KEEP, OIDS, OKEEP, R, BLOCK: tl.constexpr):
+    row = tl.program_id(0)
+    ar = tl.arange(0,BLOCK)
+    total = tl.full((),0,tl.int32)
+    for chunk in range(tl.cdiv(R,BLOCK)):
+        n = chunk*BLOCK+ar
+        flag = tl.load(KEEP+row*R+n,n<R,other=0).to(tl.int32)
+        total += tl.sum(flag,0)
+    before = tl.full((),0,tl.int32)
+    for chunk in range(tl.cdiv(R,BLOCK)):
+        n = chunk*BLOCK+ar
+        flag = tl.load(KEEP+row*R+n,n<R,other=0).to(tl.int32)
+        prefix = before+tl.cumsum(flag,0)
+        dest = tl.where(flag != 0,prefix-1,total+n-prefix)
+        value = tl.load(IDS+row*R+n,n<R,other=0)
+        tl.store(OIDS+row*R+dest,value,n<R)
+        tl.store(OKEEP+row*R+dest,flag != 0,n<R)
+        before += tl.sum(flag,0)
+
+
+def compact(ids, keep):
+    ids,keep=ids.contiguous(),keep.contiguous()
+    out=torch.empty_like(ids);valid=torch.empty_like(keep)
+    r=ids.shape[-1]
+    _compact[(ids.numel()//r,)](ids,keep,out,valid,r,256,num_warps=4)
+    return out,valid
+
+
+@triton.jit(do_not_specialize=['S'])
+def _mask_base(LENGTHS, OUT, S, B: tl.constexpr, H: tl.constexpr,
+               SINK: tl.constexpr, SWA: tl.constexpr, BLOCK: tl.constexpr):
+    n=tl.program_id(0)*BLOCK+tl.arange(0,BLOCK)
+    b=(n//S)//H
+    token=n%S
+    length=tl.load(LENGTHS+b,n<B*H*S,other=0)
+    force=((token<SINK) | (token>=tl.maximum(length-SWA,0))) & (token<length)
+    tl.store(OUT+n,force,n<B*H*S)
+
+
+@triton.jit(do_not_specialize=['S','R'])
+def _mask_selected(IDS, VALID, OUT, S, R, BLOCK: tl.constexpr):
+    row=tl.program_id(1)
+    n=tl.program_id(0)*BLOCK+tl.arange(0,BLOCK)
+    ids=tl.load(IDS+row*R+n,n<R,other=0)
+    valid=tl.load(VALID+row*R+n,n<R,other=0)
+    tl.store(OUT+row*S+ids,True,(n<R) & valid)
+
+
+def assemble_mask(ids, valid, lengths, capacity, sink, swa):
+    # Valid IDs are unique in each row: L1 pools exclude boundary bypass,
+    # duplicate bypass pages are removed, and top-k returns distinct slots.
+    B,H,R=ids.shape
+    ids,valid=ids.contiguous(),valid.contiguous()
+    out=torch.empty((B,H,capacity),dtype=torch.bool,device=ids.device)
+    _mask_base[(triton.cdiv(B*H*capacity,256),)](
+        lengths,out,capacity,B,H,sink,swa,256,num_warps=4)
+    if R:
+        _mask_selected[(triton.cdiv(R,256),B*H)](ids,valid,out,capacity,R,256,num_warps=4)
+    return out
+
+
+@triton.jit
+def _gather_update(K, LENGTHS, CDIMS, FDIMS, PAGE, FINE,
+                   KB: tl.constexpr, KT: tl.constexpr, KH: tl.constexpr,
+                   KD: tl.constexpr, H: tl.constexpr, BS: tl.constexpr,
+                   DC: tl.constexpr, DF: tl.constexpr,
+                   HAS_C: tl.constexpr, HAS_F: tl.constexpr,
+                   BLOCK: tl.constexpr):
+    bh=tl.program_id(1)
+    b,h=bh//H,bh%H
+    n=tl.program_id(0)*BLOCK+tl.arange(0,BLOCK)
+    last=tl.load(LENGTHS+b)-1
+    token=(last//BS)*BS+n//DC
+    dim=n%DC
+    if HAS_C:
+        dim=tl.load(CDIMS+dim)
+    value=tl.load(K+b*KB+token*KT+h*KH+dim*KD,
+                  (n<BS*DC) & (token<=last),other=0)
+    tl.store(PAGE+b*BS*H*DC+(n//DC)*H*DC+h*DC+n%DC,value,n<BS*DC)
+    fd=n
+    if HAS_F:
+        fd=tl.load(FDIMS+n,n<DF,other=0)
+    value_f=tl.load(K+b*KB+last*KT+h*KH+fd*KD,n<DF,other=0)
+    tl.store(FINE+bh*DF+n,value_f,n<DF)
+
+
+def gather_update(k, lengths, coarse_dims, fine_dims, block_size):
+    B,_,H,D=k.shape
+    coarse_dims = None if coarse_dims is None else coarse_dims.contiguous()
+    fine_dims = None if fine_dims is None else fine_dims.contiguous()
+    dc=D if coarse_dims is None else coarse_dims.numel()
+    df=D if fine_dims is None else fine_dims.numel()
+    page=torch.empty((B,block_size,H,dc),dtype=k.dtype,device=k.device)
+    fine=torch.empty((B,H,df),dtype=k.dtype,device=k.device)
+    _gather_update[(triton.cdiv(max(block_size*dc,df),256),B*H)](
+        k,lengths,k if coarse_dims is None else coarse_dims,
+        k if fine_dims is None else fine_dims,page,fine,*k.stride(),H,block_size,dc,df,
+        coarse_dims is not None,fine_dims is not None,256,num_warps=4)
+    return page,fine

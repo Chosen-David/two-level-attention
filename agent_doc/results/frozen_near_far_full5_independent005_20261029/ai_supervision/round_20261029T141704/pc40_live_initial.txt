@@ -1,0 +1,8 @@
+    PID    PPID     ELAPSED STAT COMMAND
+1744917       1       24:59 Ss   bash /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029/scripts/run_remote_frozen_queue.sh /usr/bin/python /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029 /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029/dispatch_plan.json pc40
+1744918 1744917       24:59 S    /usr/bin/python /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029/scripts/remote_frozen_queue.py /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029/dispatch_plan.json --host pc40
+1746606 1744918       09:38 Rsl  /usr/bin/python -m benchmark.LongBench.prefill_frozen_skip --attention tli --thresholds 0.05 --samples 0 --datasets qasper,hotpotqa,musique,gov_report,repobench-p --world-size 64 --rank 12 --device cuda:0 --context-cap 31500 --verify-native-full --out /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029
+1746607 1744918       09:38 Rsl  /usr/bin/python -m benchmark.LongBench.prefill_frozen_skip --attention tli --thresholds 0.05 --samples 0 --datasets qasper,hotpotqa,musique,gov_report,repobench-p --world-size 64 --rank 13 --device cuda:1 --context-cap 31500 --verify-native-full --out /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029
+0, 19994 MiB, 46 %
+1, 19446 MiB, 44 %
+3e4a6885604ac3e719ee92a4906f87b532535314

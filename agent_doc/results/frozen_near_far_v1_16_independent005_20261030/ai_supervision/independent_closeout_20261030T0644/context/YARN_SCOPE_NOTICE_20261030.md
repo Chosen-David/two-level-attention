@@ -1,0 +1,1 @@
+本轮RULER64K原始manifest使用original_max_position_embeddings=40960，factor=2。2026-10-30用户目标明确original32768；实际TF4.56.2/5.12.1频率探针确认两者计算不同。因此本轮100条保留为旧配置历史结果，不能当作修正配置主表；质量比较须统一修正配置重新生成，包括dense和相应baseline。Qasper/无YaRNLongBench不因本项问题自动重测。详见evaluation_blueprint_audit_20261030，勿改写旧manifest/分数冒充新结果。

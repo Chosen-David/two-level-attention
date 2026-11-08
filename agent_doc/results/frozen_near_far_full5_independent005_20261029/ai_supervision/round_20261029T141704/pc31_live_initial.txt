@@ -1,0 +1,8 @@
+    PID    PPID     ELAPSED STAT COMMAND
+ 906529       1       24:59 Ss   bash /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029/scripts/run_remote_frozen_queue.sh /home/wangyuanshuo02/frozen005_python /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029 /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029/dispatch_plan.json pc31
+ 906530  906529       24:59 S    /home/fluentllmenv/bin/python /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029/scripts/remote_frozen_queue.py /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029/dispatch_plan.json --host pc31
+ 908092  906530       09:48 Rsl  /home/fluentllmenv/bin/python -m benchmark.LongBench.prefill_frozen_skip --attention tli --thresholds 0.05 --samples 0 --datasets qasper,hotpotqa,musique,gov_report,repobench-p --world-size 64 --rank 10 --device cuda:0 --context-cap 31500 --verify-native-full --out /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029
+ 908093  906530       09:48 Rsl  /home/fluentllmenv/bin/python -m benchmark.LongBench.prefill_frozen_skip --attention tli --thresholds 0.05 --samples 0 --datasets qasper,hotpotqa,musique,gov_report,repobench-p --world-size 64 --rank 11 --device cuda:1 --context-cap 31500 --verify-native-full --out /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029
+0, 17406 MiB, 45 %
+1, 17590 MiB, 42 %
+3e4a6885604ac3e719ee92a4906f87b532535314

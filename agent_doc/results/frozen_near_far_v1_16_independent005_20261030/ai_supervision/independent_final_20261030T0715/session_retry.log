@@ -1,0 +1,514 @@
+OpenAI Codex v0.165.0
+--------
+workdir: /home/wangyuanshuo02/two-level-attention-frozen-main
+model: gpt-6-astra
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a18ba9-1ca8-7cc1-a41d-89819b72673e
+--------
+user
+继续本次独立验收。上次因model capacity退出1，真实已3750文件和128 done回执，原daemon正自动汇总。复用已读上下文与已备工具，不重复全文读。时间上限本轮07:40UTC；当前07:27。尽快全量真实核查/封存/报告，若不足明确pending，禁止伪造。主控继续处理健康和汇总。
+codex
+继续沿用本轮工具和已读上下文。我马上核对 `FINISHED.json` 与生产导出；门禁满足就启动全量独验，07:40 前按实际完成范围落报告，未完成项明确保留 pending。
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import json,collections,datetime
+v=Path('../..');q=json.loads((v/'queue.json').read_text());print(datetime.datetime.now(datetime.timezone.utc).isoformat(),dict(collections.Counter(x['status'] for x in q['jobs'])),'FINISHED',(v/'FINISHED.json').exists());print('requests',len(list(v.glob('requests/*/*.json'))),'done receipts',len(list(v.glob('worker_done_rank*.json'))));print('production artifacts',{n:(v/n).exists() for n in ['validation.json','summary.json','raw_index.json','scores.tsv']})
+if (v/'FINISHED.json').exists():print((v/'FINISHED.json').read_text())
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2915ms:
+2026-10-30T07:27:46.119445+00:00 {'done': 128} FINISHED False
+requests 3750 done receipts 128
+production artifacts {'validation.json': False, 'summary.json': False, 'raw_index.json': False, 'scores.tsv': False}
+
+exec
+/usr/bin/bash -c 'ls -lt ../../ai_supervision/round_20261030T071*/ | head -14; ls -lt ../../ | head -20; cat ../../ai_supervision/round_20261030T071*/ROUND_STATUS.json' in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 3326ms:
+total 21
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02   10293 Oct 30 15:27 20261030T072743_corrected.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02    1472 Oct 30 15:26 consumed_qasper_evidence.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02    1198 Oct 30 15:26 consume_qasper.py
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02   10224 Oct 30 15:23 20261030T072314_corrected.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02  243914 Oct 30 15:21 20261030T072130_health.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02   10220 Oct 30 15:21 20261030T072130_corrected.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02     877 Oct 30 15:20 ROUND_STATUS.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02  244384 Oct 30 15:20 20261030T071955_health.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02   10234 Oct 30 15:18 20261030T071853_corrected.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02   39405 Oct 30 15:18 production_source_binding.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02  244333 Oct 30 15:18 20261030T071822_health.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02 1522033 Oct 30 15:17 source_binding.json
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02  244350 Oct 30 15:17 20261030T071654_health.json
+total 1342
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02    146 Oct 30 15:27 daemon_pc31_console.log
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02    282 Oct 30 15:27 daemon_pc31.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02    488 Oct 30 15:27 daemon_pc02.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02     62 Oct 30 15:27 finalize.lock.d.owner.cfc22f25785546b1a4ddb00d8257922b.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02 157350 Oct 30 15:27 queue.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02  10135 Oct 30 15:27 daemon_pc31_history.jsonl
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02    360 Oct 30 15:27 daemon_pc40.json
+lrwxrwxrwx  1 wangyuanshuo02 wangyuanshuo02    170 Oct 30 15:27 finalize.lock.d -> /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/finalize.lock.d.owner.27d41be489f0420ea892e3a0dca6629f.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02     62 Oct 30 15:27 finalize.lock.d.owner.27d41be489f0420ea892e3a0dca6629f.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02    116 Oct 30 15:24 heartbeat_rank127.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02    132 Oct 30 15:24 worker_done_rank127.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02   8822 Oct 30 15:24 worker_rank127_attempt1.log
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02    117 Oct 30 15:21 heartbeat_rank126.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02    133 Oct 30 15:21 worker_done_rank126.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02   8835 Oct 30 15:21 worker_rank126_attempt1.log
+drwxrwxr-x 24 wangyuanshuo02 wangyuanshuo02     52 Oct 30 15:14 ai_supervision
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02    117 Oct 30 15:12 heartbeat_rank125.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02    133 Oct 30 15:12 worker_done_rank125.json
+-rw-rw-r--  1 wangyuanshuo02 wangyuanshuo02   8801 Oct 30 15:12 worker_rank125_attempt1.log
+{
+  "utc": "2026-10-30T07:20:16.922058+00:00",
+  "project_root": "/home/wangyuanshuo02/two-level-attention",
+  "v1_health": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/round_20261030T071211/20261030T071955_health.json",
+  "corrected_health": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/round_20261030T071211/20261030T071853_corrected.json",
+  "v1_complete": 3736,
+  "v1_queue": {
+    "done": 126,
+    "running": 2
+  },
+  "corrected_complete": 8,
+  "independent_sessions": {
+    "v1": "independent_final_20261030T0715",
+    "qasper": "independent_final_20261030T0716"
+  },
+  "decision": "Keep original live queues; await full mechanical and independent acceptance. No duplicate launch.",
+  "complete_marker_allowed": false
+}
+codex
+已核到 3750 个请求文件、128 份 done 回执，队列也已全部 done。07:27:46 时 `FINISHED.json` 和生产汇总仍未出现；我继续等既定门禁，不把生成齐全当成验收完成。
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import datetime,json
+v=Path('../..');print(datetime.datetime.now(datetime.timezone.utc).isoformat());print({n:(v/n).exists() for n in ['FINISHED.json','validation.json','summary.json','raw_index.json','scores.tsv']});print((v/'daemon_pc31_console.log').read_text()[-1500:])
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2984ms:
+2026-10-30T07:28:53.589733+00:00
+{'FINISHED.json': False, 'validation.json': False, 'summary.json': False, 'raw_index.json': False, 'scores.tsv': False}
+BlockingIOError('/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/finalize.lock.d')
+
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import json,datetime,collections
+b=Path('.');v=b.resolve().parent.parent;q=json.loads((v/'queue.json').read_bytes());r=dict(utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),request_files=len(list(v.glob('requests/*/*.json'))),done_receipts=len(list(v.glob('worker_done_rank*.json'))),queue=dict(collections.Counter(j['status'] for j in q['jobs'])),artifacts={n:(v/n).exists() for n in ['FINISHED.json','validation.json','summary.json','raw_index.json','scores.tsv']},scope='completion inventory, not per-record full acceptance');(b/'AWAIT_PRODUCTION.json').write_text(json.dumps(r,indent=2));(b/'PROGRESS.md').write_text('07:29 UTC:3750 request files,128done receipts and queue128done. FINISHED and production outputs absent; waiting original daemon/main controller.53 CPU tests passed. Full recheck/official/cache/CI/seal not started before required FINISHED.\\n')
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2903ms:
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import datetime
+v=Path('../..');print(datetime.datetime.now(datetime.timezone.utc).isoformat());print({n:(v/n).exists() for n in ['FINISHED.json','validation.json','summary.json','raw_index.json','scores.tsv']})
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2808ms:
+2026-10-30T07:30:01.329895+00:00
+{'FINISHED.json': False, 'validation.json': False, 'summary.json': False, 'raw_index.json': False, 'scores.tsv': False}
+
+codex
+07:30 时生产汇总仍未落盘。daemon 日志可见 `finalize.lock.d` 的 `BlockingIOError`；锁与汇总恢复由主控处理，我未触碰生产链。当前只能确认文件和回执数量齐全，全量科学验收仍 pending。
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import datetime
+v=Path('../..');print(datetime.datetime.now(datetime.timezone.utc).isoformat());print({n:(v/n).exists() for n in ['FINISHED.json','validation.json','summary.json','raw_index.json','scores.tsv']})
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2874ms:
+2026-10-30T07:30:51.031045+00:00
+{'FINISHED.json': False, 'validation.json': False, 'summary.json': False, 'raw_index.json': False, 'scores.tsv': False}
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+b=Path('.')
+(b/'REPORT_DETAIL.md').write_text('''# 独立 verify_experiment_result — V1 全量收官
+
+当前状态：pending。此文件仍在本会话期间更新；最终稳定证据以 EVIDENCE_SHA256.json 为准。
+
+用户明确授权本会话作为独立验收者，与生产主控分离。PROJECT_ROOT=/home/wangyuanshuo02/two-level-attention；源码08ce44d6027a235080e7ff4127754af6b1ae91e0。仅CPU，exec login=false，执行检查时CUDA_VISIBLE_DEVICES空，Python -B。未修改生产源码、原始结果、guide、TASK、NEXT_STEPS或COMPLETE；未启动GPU/重复监督器，未干预生产进程或锁。Qasper专项由另一独立会话负责，本轮不重复。
+
+已读取gpu-experiment-dispatch技能及项目文档治理、结果复用、结果验收、执行规范和收割章节，项目GUIDE、TL-FROZEN-V1-16-20261030、当前合同和验收计划。复用检索限本run指定的0644工具、0313统计工具验证、0415封存规范及历史smoke；不假称遍历全项目。adopt现成成套工具；adapt快照raw_index原始路径检查及FINISHED前置门禁，diff留档；defer全量结论直到真实全量验收。
+
+## 已执行证据
+
+- CPU_SOURCE首次pytest输出捕获遇共享盘临时文件FileNotFoundError，实际没有测试执行；保留失败日志。CPU_SOURCE_RETRY以-s禁用输出捕获后53项通过，覆盖四态缓存/迁移/退化边界、profile参考、tiny Qwen/TLI logits、V1停止规则、请求隔离。不能把CPU测试称作真实GPU重生成。
+- SOURCE_REVIEW.md记录本轮对真实冻结生成、门控、缓存、TLI、统计与评分路径的源码审读。
+- PRIOR_SMOKE_REUSE.json重新读取历史smoke9个绑定文件，全部哈希匹配；仅复用原3请求9臂/native parity记录范围，不对全3750授信。
+- 07:27:46已观察3750请求文件、128done回执、队列128done。07:30:51 FINISHED.json及validation/summary/raw_index/scores.tsv仍不存在。文件数不是每条complete/三臂质量核验，不能擅写11250独立已验。
+- 现成recheck/官方评分/cache/closeout B5000 TSV及六类artifact工具已备齐，等待用户要求的真实FINISHED及生产导出；尚未执行的项目不算通过。
+
+## 六项验收（完整V1范围）
+
+|项目|状态|证据与缺口|
+|---|---|---|
+|implementation|inconclusive|源码审读、53 CPU测试通过；全量实际记录对应检查未完成|
+|reference_boundary|inconclusive|CPU参考与历史smoke限定复用；全量检查未完成|
+|data_integrity|inconclusive|3750文件/128回执盘点；全量输入/原始SHA/导出/六类artifact封存未完成|
+|numerical_sanity|inconclusive|未完成全量官方评分、独立评分、门控缓存及B5000 CI/TSV|
+|measurement_validity|inconclusive|预定三臂同输入、任务等权AVG16和3pp工程门槛；最终结果尚未验证。无性能主张，不以N/A掩盖质量检查缺口|
+|reproducibility|inconclusive|本轮CPU命令及历史smoke字节可追溯；全量独立交叉核查/真实manifest未完成|
+
+## 固定口径与限制
+
+3750配对/11250三臂/128done；Full为TLI gates-off，非dense FullKV。16任务AVG16等权，B5000配对percentile95%CI，seed42、冻结任务顺序与Far−Full/Dual−Full/Dual−Far顺序。逐任务及AVG16以delta>=−3pp判断工程点估计容忍；不称无损/等价，CI含0不证明等价。musique、qasper、passage_retrieval_en、passage_count、SAMSum均必须保留真实下降与完整分母。
+
+未独立GPU重生成；未存Q/K，不能重算真实attention mass；启动后磁盘权重hash不能追认历史内存加载身份。缓存metadata回执不证明每一步GPU张量。Near-only保留staging KV，不能据此声称驻留内存减少；没有性能结论。旧AVG5、旧MK2与Qasper专项B10000不混入V1。
+
+没有真实manifest/完整六项证据就不能标usable-with-scope。原run_contract指dispatch_plan且scope与计划不完全一致，不能把它冒充最终结果manifest。未写FINAL_REPORT_ZH.md或任何完成标记。
+''')
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2854ms:
+codex
+独立详细报告已先写成明确的 pending 版本，逐项列出六类验收缺口，并保留 CPU 测试首次失败和重跑证据。仍会继续等待至本轮时限；若生产导出及时完成，就立即执行现成全量检查。
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import datetime
+v=Path('../..');print(datetime.datetime.now(datetime.timezone.utc).isoformat());print({n:(v/n).exists() for n in ['FINISHED.json','validation.json','summary.json','raw_index.json','scores.tsv']})
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2899ms:
+2026-10-30T07:32:37.349531+00:00
+{'FINISHED.json': False, 'validation.json': False, 'summary.json': False, 'raw_index.json': False, 'scores.tsv': False}
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py PREPARE_PENDING /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B prepare_review.py" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ exited 1 in 2985ms:
+{"command": ["/home/wangyuanshuo02/two-level-attention/.venv/bin/python", "-B", "prepare_review.py"], "cwd": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715", "login": false, "started": "2026-10-30T07:32:51.317363+00:00", "environment": {"CUDA_VISIBLE_DEVICES": "", "PYTHONDONTWRITEBYTECODE": "1", "TOKENIZERS_PARALLELISM": "false", "TMPDIR": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/tmp", "HF_HUB_OFFLINE": "1"}, "exit_code": 1, "ended": "2026-10-30T07:32:51.476895+00:00"}
+
+codex
+07:32:51 实际调用准备入口，已按预期被“真实 FINISHED 必须存在”门禁拒绝，未生成全量快照或质量统计。拒绝日志已保存；目前阻塞仍是生产汇总尚未落盘。
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import datetime
+v=Path('../..');print(datetime.datetime.now(datetime.timezone.utc).isoformat());print({n:(v/n).exists() for n in ['FINISHED.json','validation.json','summary.json','raw_index.json','scores.tsv']});print(Path('PREPARE_PENDING.log').read_text());print('latest main files', [x.name for x in sorted((v/'ai_supervision/round_20261030T071211').glob('*'),key=lambda x:x.stat().st_mtime)[-5:]])
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2976ms:
+2026-10-30T07:33:40.178889+00:00
+{'FINISHED.json': False, 'validation.json': True, 'summary.json': False, 'raw_index.json': False, 'scores.tsv': False}
+Traceback (most recent call last):
+  File "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/prepare_review.py", line 10, in <module>
+    assert (V/'FINISHED.json').is_file(),'real FINISHED required'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: real FINISHED required
+
+latest main files ['20261030T072743_corrected.json', '072942_finalizer.json', '20261030T073047_corrected.json', 'review_dispositions.json', '20261030T073254_corrected.json']
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import datetime
+v=Path('../..');print(datetime.datetime.now(datetime.timezone.utc).isoformat());print({n:(v/n).exists() for n in ['FINISHED.json','validation.json','summary.json','raw_index.json','scores.tsv']})
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2783ms:
+2026-10-30T07:34:18.258261+00:00
+{'FINISHED.json': False, 'validation.json': True, 'summary.json': True, 'raw_index.json': False, 'scores.tsv': True}
+
+codex
+生产链已有进展：07:34:18 已出现 `validation.json`、`summary.json` 和 `scores.tsv`，`raw_index.json` 与 `FINISHED.json` 仍未出现。完整导出到齐后才能固定快照并核对。
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import datetime
+v=Path('../..');print(datetime.datetime.now(datetime.timezone.utc).isoformat());print({n:(v/n).exists() for n in ['FINISHED.json','validation.json','summary.json','raw_index.json','scores.tsv']})
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 3110ms:
+2026-10-30T07:35:00.049618+00:00
+{'FINISHED.json': True, 'validation.json': True, 'summary.json': True, 'raw_index.json': True, 'scores.tsv': True}
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES_DEVICES='' /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py PREPARE /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B prepare_review.py" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+codex
+07:35:00 已确认真实 `FINISHED.json` 和全部所需生产导出出现，已立即启动全量快照捕获。剩余时间约 5 分钟，我会执行能完成的真实检查；六项证据未闭合前不会标为可用。
+
+exec
+/usr/bin/bash -c 'cat ../../FINISHED.json; cat ../../validation.json | head -35; cat PREPARE.log' in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2905ms:
+{
+  "status": "production_complete_pending_independent_review",
+  "time": 1793345668.5436144,
+  "results_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030",
+  "note": "Scores mechanically rechecked. Scientific acceptance requires independent result review."
+}
+{
+  "status": "complete-validated",
+  "identity": "628463dbc68fcb474cd9c77b48f553d832c23983795748689b9748f63575f7e2",
+  "complete_requests": 3750,
+  "expected_requests": 3750,
+  "checked_arms": 11250,
+  "per_task": {
+    "narrativeqa": 200,
+    "qasper": 200,
+    "multifieldqa_en": 150,
+    "hotpotqa": 200,
+    "2wikimqa": 200,
+    "musique": 200,
+    "gov_report": 200,
+    "qmsum": 200,
+    "multi_news": 200,
+    "trec": 200,
+    "triviaqa": 200,
+    "samsum": 200,
+    "passage_count": 200,
+    "passage_retrieval_en": 200,
+    "lcc": 500,
+    "repobench-p": 500
+  },
+  "checked_request_layers": 405000,
+  "near_only_staging_layers": 319,
+  "near_only_layers_with_far_growth": 68,
+  "native_full_generation_checks": 128,
+  "max_prefill_profile_difference": 0.0,
+  "scorer_backend": "difflib:stdlib",
+  "scope": "Executable local self-validation, not independent reviewer admission. Verifies logged invariants and official score recomputation; actual values/migration also covered by native-model regression tests."
+}
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import datetime
+print(datetime.datetime.now(datetime.timezone.utc).isoformat(),len(list(Path('fixed/v1/requests').glob('*/*.json'))))
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 3102ms:
+2026-10-30T07:35:40.929291+00:00 1488
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py FULL_RECHECK /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B tools/recheck.py --run /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030 --source /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_v1_16_source_20261030 --output v1_checked --require-full --no-snapshot" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py CACHE /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B tools/cache_receipts_check.py --snapshot /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030 --output tools/results/v1_cache.json" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import datetime
+print(datetime.datetime.now(datetime.timezone.utc).isoformat(),len(list(Path('fixed/v1/requests').glob('*/*.json'))))
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 3115ms:
+2026-10-30T07:36:24.773542+00:00 3744
+
+ succeeded in 79352ms:
+{"command": ["/home/wangyuanshuo02/two-level-attention/.venv/bin/python", "-B", "prepare_review.py"], "cwd": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715", "login": false, "started": "2026-10-30T07:35:11.130083+00:00", "environment": {"CUDA_VISIBLE_DEVICES": "", "PYTHONDONTWRITEBYTECODE": "1", "TOKENIZERS_PARALLELISM": "false", "TMPDIR": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/tmp", "HF_HUB_OFFLINE": "1"}, "exit_code": 0, "ended": "2026-10-30T07:36:27.623985+00:00"}
+
+codex
+已启动真实全量输入/评分/门控 recheck，以及全部缓存回执检查。为节省时间，两项只读检查直接读取已完成的生产目录，同时继续固定副本；后续将核对哈希一致性，避免把读取期间变化遗漏掉。
+
+exec
+/usr/bin/bash -c 'ls SNAPSHOT.json CAPTURE_BINDINGS.json; tail -3 FULL_RECHECK.log; tail -3 CACHE.log' in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2754ms:
+CAPTURE_BINDINGS.json
+SNAPSHOT.json
+
+ succeeded in 34404ms:
+{"command": ["/home/wangyuanshuo02/two-level-attention/.venv/bin/python", "-B", "tools/cache_receipts_check.py", "--snapshot", "/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030", "--output", "tools/results/v1_cache.json"], "cwd": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715", "login": false, "started": "2026-10-30T07:36:12.842611+00:00", "environment": {"CUDA_VISIBLE_DEVICES": "", "PYTHONDONTWRITEBYTECODE": "1", "TOKENIZERS_PARALLELISM": "false", "TMPDIR": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/tmp", "HF_HUB_OFFLINE": "1"}, "exit_code": 0, "ended": "2026-10-30T07:36:43.110460+00:00"}
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py CLOSEOUT /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B tools/closeout_check_v2.py --run fixed/v1 --output tools/results/closeout" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py OFFICIAL /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B official_scores_verified.py" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py AUDIT_SCOPE /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B audit_scope.py" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+exec
+/usr/bin/bash -c 'date -u; tail -3 CACHE.log; tail -3 OFFICIAL.log; tail -3 CLOSEOUT.log; tail -3 FULL_RECHECK.log; tail -3 AUDIT_SCOPE.log; ls *.command.json' in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 3168ms:
+Fri Oct 30 07:37:04 AM UTC 2026
+{"status": "scoped_cache_receipts_pass", "full_acceptance": "pending", "requests": 3750, "errors": [], "changed": [], "limitations": ["No Q/K mass recomputation", "Must accompany full recheck.py; this is only supplemental cache metadata"]}
+CACHE.command.json
+CPU_SOURCE.command.json
+CPU_SOURCE_RETRY.command.json
+PREPARE.command.json
+PREPARE_PENDING.command.json
+
+exec
+/usr/bin/bash -c "ps -eo pid,ppid,etime,time,args | rg 'independent_final_20261030T0715|tools/recheck.py|tools/closeout_check_v2.py|official_scores_verified.py|audit_scope.py'" in /home/wangyuanshuo02/two-level-attention
+ succeeded in 307ms:
+2756536 2709949       09:58 00:00:00 /usr/bin/bash -c CUDA_VISIBLE_DEVICES='' codex exec resume --dangerously-bypass-approvals-and-sandbox -o /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/CLI_FINAL_RETRY.md 01a18ba9-1ca8-7cc1-a41d-89819b72673e '继续本次独立验收。上次因model capacity退出1，真实已3750文件和128 done回执，原daemon正自动汇总。复用已读上下文与已备工具，不重复全文读。时间上限本轮07:40UTC；当前07:27。尽快全量真实核查/封存/报告，若不足明确pending，禁止伪造。主控继续处理健康和汇总。' > /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/session_retry.log 2>&1
+2756654 2756536       09:57 00:00:00 /usr/bin/bash -c CUDA_VISIBLE_DEVICES='' codex exec resume --dangerously-bypass-approvals-and-sandbox -o /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/CLI_FINAL_RETRY.md 01a18ba9-1ca8-7cc1-a41d-89819b72673e '继续本次独立验收。上次因model capacity退出1，真实已3750文件和128 done回执，原daemon正自动汇总。复用已读上下文与已备工具，不重复全文读。时间上限本轮07:40UTC；当前07:27。尽快全量真实核查/封存/报告，若不足明确pending，禁止伪造。主控继续处理健康和汇总。' > /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/session_retry.log 2>&1
+2756656 2756654       09:57 00:00:00 node /workdir/node-v22.9.0-linux-x64-glibc-217/bin/codex exec resume --dangerously-bypass-approvals-and-sandbox -o /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/CLI_FINAL_RETRY.md 01a18ba9-1ca8-7cc1-a41d-89819b72673e 继续本次独立验收。上次因model capacity退出1，真实已3750文件和128 done回执，原daemon正自动汇总。复用已读上下文与已备工具，不重复全文读。时间上限本轮07:40UTC；当前07:27。尽快全量真实核查/封存/报告，若不足明确pending，禁止伪造。主控继续处理健康和汇总。
+2756669 2756656       09:57 00:00:03 /workdir/node-v22.9.0-linux-x64-glibc-217/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex exec resume --dangerously-bypass-approvals-and-sandbox -o /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/CLI_FINAL_RETRY.md 01a18ba9-1ca8-7cc1-a41d-89819b72673e 继续本次独立验收。上次因model capacity退出1，真实已3750文件和128 done回执，原daemon正自动汇总。复用已读上下文与已备工具，不重复全文读。时间上限本轮07:40UTC；当前07:27。尽快全量真实核查/封存/报告，若不足明确pending，禁止伪造。主控继续处理健康和汇总。
+2777392 2756669       01:13 00:00:00 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py FULL_RECHECK /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B tools/recheck.py --run /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030 --source /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_v1_16_source_20261030 --output v1_checked --require-full --no-snapshot
+2777596 2777392       01:09 00:01:08 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B tools/recheck.py --run /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030 --source /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_v1_16_source_20261030 --output v1_checked --require-full --no-snapshot
+2778490 2756669       00:31 00:00:00 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py CLOSEOUT /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B tools/closeout_check_v2.py --run fixed/v1 --output tools/results/closeout
+2778491 2756669       00:31 00:00:00 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py OFFICIAL /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B official_scores_verified.py
+2778492 2756669       00:31 00:00:00 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B run_logged.py AUDIT_SCOPE /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B audit_scope.py
+2778915 2778492       00:23 00:00:06 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B audit_scope.py
+2778917 2778491       00:23 00:00:24 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B official_scores_verified.py
+2778918 2778490       00:23 00:00:13 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B tools/closeout_check_v2.py --run fixed/v1 --output tools/results/closeout
+2779387 2756669       00:00 00:00:00 /usr/bin/bash -c ps -eo pid,ppid,etime,time,args | rg 'independent_final_20261030T0715|tools/recheck.py|tools/closeout_check_v2.py|official_scores_verified.py|audit_scope.py'
+2779507 2779387       00:00 00:00:00 rg independent_final_20261030T0715|tools/recheck.py|tools/closeout_check_v2.py|official_scores_verified.py|audit_scope.py
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+p=Path('seal_review.py');s=p.read_text().replace(\"'session.log','CLI_FINAL.md','EVIDENCE_SHA256.json'\",\"'session.log','session_retry.log','CLI_FINAL.md','CLI_FINAL_RETRY.md','EVIDENCE_SHA256.json'\");p.write_text(s)
+print('Exclude current live retry session/CLI in evidence manifest')
+PY
+tail -3 CLOSEOUT.log
+tail -3 OFFICIAL.log
+tail -3 AUDIT_SCOPE.log
+tail -3 FULL_RECHECK.log" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2908ms:
+Exclude current live retry session/CLI in evidence manifest
+
+codex
+3750 条缓存回执已全部通过，错误和前后哈希变化均为 0。全量输入重建、官方评分、B5000 CI/TSV 和源码范围检查仍在运行；缓存单项通过不代表完整验收通过。
+
+exec
+/usr/bin/bash -c 'date -u; ls *.command.json; tail -3 FULL_RECHECK.log; tail -3 CLOSEOUT.log; tail -3 OFFICIAL.log; tail -3 AUDIT_SCOPE.log' in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 65889ms:
+{"command": ["/home/wangyuanshuo02/two-level-attention/.venv/bin/python", "-B", "audit_scope.py"], "cwd": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715", "login": false, "started": "2026-10-30T07:36:57.526814+00:00", "environment": {"CUDA_VISIBLE_DEVICES": "", "PYTHONDONTWRITEBYTECODE": "1", "TOKENIZERS_PARALLELISM": "false", "TMPDIR": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/tmp", "HF_HUB_OFFLINE": "1"}, "exit_code": 0, "ended": "2026-10-30T07:37:55.755255+00:00"}
+
+ succeeded in 2896ms:
+Fri Oct 30 07:37:56 AM UTC 2026
+AUDIT_SCOPE.command.json
+CACHE.command.json
+CPU_SOURCE.command.json
+CPU_SOURCE_RETRY.command.json
+PREPARE.command.json
+PREPARE_PENDING.command.json
+{"status": "scoped_closeout_pass", "errors": [], "full_acceptance": "pending"}
+  },
+  "prior_scope": "0514 V1 2296 full CPU records. MK2 not rechecked this round. 0313/0343/0355/0415 tool or inventory reports do not grant newer record admission."
+}
+
+ succeeded in 68177ms:
+{"command": ["/home/wangyuanshuo02/two-level-attention/.venv/bin/python", "-B", "tools/closeout_check_v2.py", "--run", "fixed/v1", "--output", "tools/results/closeout"], "cwd": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715", "login": false, "started": "2026-10-30T07:36:57.554698+00:00", "environment": {"CUDA_VISIBLE_DEVICES": "", "PYTHONDONTWRITEBYTECODE": "1", "TOKENIZERS_PARALLELISM": "false", "TMPDIR": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/tmp", "HF_HUB_OFFLINE": "1"}, "exit_code": 0, "ended": "2026-10-30T07:37:58.041787+00:00"}
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import json,datetime
+b=Path('.');print(datetime.datetime.now(datetime.timezone.utc).isoformat())
+for n in ['FULL_RECHECK','OFFICIAL','CLOSEOUT','AUDIT_SCOPE']:
+ p=b/(n+'.command.json');print(n,json.loads(p.read_text())['exit_code'] if p.exists() else 'running')
+for n in ['v1_checked/cpu_checks.json','OFFICIAL_SCORES_VERIFIED.json','tools/results/closeout/closeout_checks.json','SCOPE_AUDIT.json']:
+ p=b/n
+ if p.exists():
+  x=json.loads(p.read_text());print(n,'errors',len(x.get('errors',[])),{k:x.get(k) for k in ['status','outputs_checked','completed_requests_checked','v1_total','manifest_count','done_count'] if k in x})
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2919ms:
+2026-10-30T07:38:11.175868+00:00
+FULL_RECHECK running
+OFFICIAL running
+CLOSEOUT 0
+AUDIT_SCOPE 0
+tools/results/closeout/closeout_checks.json errors 0 {'status': 'scoped_closeout_pass'}
+SCOPE_AUDIT.json errors 0 {'v1_total': 3750, 'manifest_count': 128, 'done_count': 128}
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import json,hashlib,datetime
+b=Path('.');cap=json.loads((b/'CAPTURE_BINDINGS.json').read_text());cache=json.loads((b/'tools/results/v1_cache.json').read_text());errors=[];n=0
+for rel,ref in cap.items():
+ if rel.startswith('fixed/v1/requests/'):
+  if cache['bindings'].get(str(Path(ref['origin']).resolve()))"'!=ref['"'sha256']:errors.append(rel)
+  n+=1
+x=dict(utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),requests=n,errors=errors,scope='Captured snapshot raw hashes equal successful full cache before/after production hashes');(b/'SNAPSHOT_CACHE_BINDINGS.json').write_text(json.dumps(x,indent=2));print(x)
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 6330ms:
+{'utc': '2026-10-30T07:38:23.568365+00:00', 'requests': 3750, 'errors': [], 'scope': 'Captured snapshot raw hashes equal successful full cache before/after production hashes'}
+
+codex
+全量 closeout 已通过：三组比较的逐任务及等权 AVG16、B5000 CI、3pp 点估计门槛、五份 TSV 和派生门控统计均无错误。源码/覆盖检查也通过，3750 条快照哈希与缓存检查读取的生产记录一致。输入重建与评分仍在运行，六类 artifact 最终封存尚未完成。
+
+ succeeded in 100861ms:
+{"command": ["/home/wangyuanshuo02/two-level-attention/.venv/bin/python", "-B", "official_scores_verified.py"], "cwd": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715", "login": false, "started": "2026-10-30T07:36:57.552399+00:00", "environment": {"CUDA_VISIBLE_DEVICES": "", "PYTHONDONTWRITEBYTECODE": "1", "TOKENIZERS_PARALLELISM": "false", "TMPDIR": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/tmp", "HF_HUB_OFFLINE": "1"}, "exit_code": 0, "ended": "2026-10-30T07:38:30.726627+00:00"}
+
+exec
+/usr/bin/bash -c 'date -u; ls *.command.json; tail -2 FULL_RECHECK.log; tail -2 OFFICIAL.log; ps -p 2777596,2778917 -o pid,ppid,etime,time,args' in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 3051ms:
+Fri Oct 30 07:38:34 AM UTC 2026
+AUDIT_SCOPE.command.json
+CACHE.command.json
+CLOSEOUT.command.json
+CPU_SOURCE.command.json
+CPU_SOURCE_RETRY.command.json
+OFFICIAL.command.json
+PREPARE.command.json
+PREPARE_PENDING.command.json
+  "scope": "Official frozen scorer cross-check; independent recheck score path separately required"
+}
+    PID    PPID     ELAPSED     TIME COMMAND
+2777596 2777392       02:23 00:02:18 /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B tools/recheck.py --run /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030 --source /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_v1_16_source_20261030 --output v1_checked --require-full --no-snapshot
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import json,datetime
+b=Path('.');x=json.loads((b/'OFFICIAL_SCORES_VERIFIED.json').read_text());print('official',x['outputs_checked'],'errors',len(x['errors']))
+p=b/'REPORT_DETAIL.md';s=p.read_text();s=s.replace('此文件仍在本会话期间更新；最终稳定证据以 EVIDENCE_SHA256.json 为准。','最终稳定证据以 EVIDENCE_SHA256.json 为准。')
+s+='''\\n## 收官实际进展（以本段覆盖上文等待期间状态）\\n\\n07:35:00观察到真实FINISHED与生产validation/analyze/export。PREPARE于07:36:27退出0，固定3750完整配对及生产产物，CAPTURE_BINDINGS/SNAPSHOT绑定。FULL_RECHECK按用户门禁后启动，直接只读完整生产目录；CACHE同样读取完整生产目录，其余检查读取固定副本。\\n\\nCACHE实际3750条通过、errors=[]、changed=[]。SNAPSHOT_CACHE_BINDINGS逐一核对全部3750快照SHA与缓存检查前后稳定的生产SHA一致。AUDIT_SCOPE完整3750/128manifest/128done通过，源码与git对象核对及历史2296交集一致，无错误。CLOSEOUT实际完整B5000三比较、48逐任务+3AVG16 CI、任务等权、工程3pp及五份TSV、predictions/index/门控派生字段全部通过，errors=[]。OFFICIAL实际11250臂官方冻结评分交叉检查通过，errors=[]。这些是实际执行结果，未将生产者pass当独立验收。\\n\\n完整独立tokenizer输入/独立评分/门控几何recheck仍未完成。六类真实artifact与模型全分片重hash封存、统一scope真实manifest及最终报告正文绑定尚未完成，因此整体仍pending；不发布质量结论、不写FINAL_REPORT_ZH.md、不称usable-with-scope。六项总体均inconclusive；numerical_sanity已有完整官方评分与统计/TSV证据，但独立完整recheck尚未闭合；data_integrity已有完整覆盖与快照/缓存SHA连续性，六类artifact仍缺。\\n\\n复跑入口保留FULL_V1_EXECUTION.md；准备及closeout路径适配见diff，所有工具均来自0644套件，未开发新通用工具。后续从此真实3750快照和已有成功检查续验，先重核字节，完成全量recheck后再封存并逐项授信。不能以截止时间放宽标准。\\n'''
+p.write_text(s)
+(b/'PROGRESS.md').write_text('07:38:34 UTC:生产3750/11250/128done且FINISHED真实存在。独立CACHE3750、OFFICIAL11250、CLOSEOUT完整B5000/AVG16/TSV、AUDIT_SCOPE均通过；FULL_RECHECK仍在运行。六类artifact seal/最终报告未完成，整体pending。\\n')
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2785ms:
+official 11250 errors 0
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import os,signal,json,datetime
+b=Path('.');pid=2777596;p=Path('/proc')/str(pid);r=dict(utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),reason='07:40 UTC hard deadline; stop only this session unfinished CPU full recheck before sealing stable evidence',pid=pid)
+if p.exists():
+ cmd=(p/'cmdline').read_bytes().replace(b'\\0',b' ').decode();parent=int((p/'stat').read_text().split()[3]);assert parent==2777392 and 'tools/recheck.py' in cmd and 'v1_checked' in cmd;r.update(command=cmd,parent=parent);os.kill(pid,signal.SIGTERM);r['action']='SIGTERM exact own CPU child; run_logged parent only waits and records exit, never respawns'
+else:r['action']='already exited, no signal'
+(b/'DEADLINE_ACTION.json').write_text(json.dumps(r,indent=2));print(r)
+PY" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 2778ms:
+{'utc': '2026-10-30T07:39:08.247074+00:00', 'reason': '07:40 UTC hard deadline; stop only this session unfinished CPU full recheck before sealing stable evidence', 'pid': 2777596, 'command': '/home/wangyuanshuo02/two-level-attention/.venv/bin/python -B tools/recheck.py --run /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030 --source /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_v1_16_source_20261030 --output v1_checked --require-full --no-snapshot ', 'parent': 2777392, 'action': 'SIGTERM exact own CPU child; run_logged parent only waits and records exit, never respawns'}
+
+ exited 241 in 180761ms:
+{"command": ["/home/wangyuanshuo02/two-level-attention/.venv/bin/python", "-B", "tools/recheck.py", "--run", "/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030", "--source", "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_v1_16_source_20261030", "--output", "v1_checked", "--require-full", "--no-snapshot"], "cwd": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715", "login": false, "started": "2026-10-30T07:36:11.398878+00:00", "environment": {"CUDA_VISIBLE_DEVICES": "", "PYTHONDONTWRITEBYTECODE": "1", "TOKENIZERS_PARALLELISM": "false", "TMPDIR": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/tmp", "HF_HUB_OFFLINE": "1"}, "exit_code": -15, "ended": "2026-10-30T07:39:08.301463+00:00"}
+
+codex
+官方评分 11250 臂也已通过。为遵守 07:40 截止，我在 07:39:08 精确停止了本会话尚未完成的 CPU 全量 recheck，未触碰生产进程。由于该检查及六类 artifact 最终封存未完成，整体保留 pending；现在封存本轮已完成的证据与报告。
+
+exec
+/usr/bin/bash -c "CUDA_VISIBLE_DEVICES='' python -B - <<'PY'
+from pathlib import Path
+import json,datetime
+b=Path('.');p=b/'REPORT_DETAIL.md';s=p.read_text();s+='\\n最终截止处理：07:39:08仅对本会话CPU recheck精确PID2777596发SIGTERM，核对父PID2777392及命令后执行；run_logged实际记exit_code=-15。未产生cpu_checks.json，不算完成或失败的科学判决。父wrapper无重派逻辑并正常记录后退出，未留后台检查。其余CPU检查已退出0。DEADLINE_ACTION.json与FULL_RECHECK.command.json保留真实记录。最终结论pending，后续需重新完成全量recheck，再真实六类artifact封存/重读/六项记录和FINAL_REPORT_ZH正文绑定。\\n';p.write_text(s)
+checks={k:dict(verdict='inconclusive',reason='Full independent recheck deadline-interrupted; real six-class final artifact manifest and prose binding incomplete',evidence=['REPORT_DETAIL.md','FULL_RECHECK.command.json','DEADLINE_ACTION.json']) for k in ['implementation','reference_boundary','data_integrity','numerical_sanity','measurement_validity','reproducibility']}
+(b/'PENDING_VALIDATION.json').write_text(json.dumps(dict(status='pending',utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),checks=checks,completed_checks=['53 CPU reference tests','3750 cache receipts','11250 official scores','3750/128 source coverage audit','B5000 paired per-task/AVG16 CI and five TSV closeout','3750 captured vs cache stable SHA bindings'],limitations=['No independent GPU regeneration','No QK mass reconstruction','No retrospective in-memory weight identity','No performance or equivalence claim','No full artifact manifest/seal acceptance']),indent=2))
+(b/'PROGRESS.md').write_text('FINAL pending. 07:39:08 deadline stopped exact own CPU FULL_RECHECK PID2777596, exit-15. CACHE3750/OFFICIAL11250/CLOSEOUT B5000 TSV/AUDIT_SCOPE passed. Six-class final artifact seal and full recheck/FINAL_REPORT_ZH still pending. REPORT_DETAIL and EVIDENCE_SHA256 contain stable evidence. No COMPLETE.\\n')
+PY
+CUDA_VISIBLE_DEVICES='' /home/wangyuanshuo02/two-level-attention/.venv/bin/python -B seal_review.py" in /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715
+ succeeded in 24661ms:
+{"sealed_files": 4167, "readback": "all hashes matched", "manifest_sha256": "bda06bc627e6d6392d613f344986a6f517181cfc1b525933b03d89e8634aaf05"}
+
+codex
+本轮结论：**pending，未标 usable-with-scope**。
+
+已通过：11250 臂官方评分、3750 缓存回执、完整覆盖/源码检查、B5000 配对 CI、等权 AVG16 与 TSV 核验。
+
+未完成：全量输入 recheck（截止前停止）、六类 artifact 最终封存及最终正文绑定。
+
+独立证据已封存，**4167 文件逐项重读 SHA 全部匹配**。
+
+[REPORT_DETAIL.md](/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/REPORT_DETAIL.md) · [EVIDENCE_SHA256.json](/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/EVIDENCE_SHA256.json)
+
+未独立 GPU 重生成；无性能、无损或等价结论。
+tokens used
+230,274
+本轮结论：**pending，未标 usable-with-scope**。
+
+已通过：11250 臂官方评分、3750 缓存回执、完整覆盖/源码检查、B5000 配对 CI、等权 AVG16 与 TSV 核验。
+
+未完成：全量输入 recheck（截止前停止）、六类 artifact 最终封存及最终正文绑定。
+
+独立证据已封存，**4167 文件逐项重读 SHA 全部匹配**。
+
+[REPORT_DETAIL.md](/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/REPORT_DETAIL.md) · [EVIDENCE_SHA256.json](/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_final_20261030T0715/EVIDENCE_SHA256.json)
+
+未独立 GPU 重生成；无性能、无损或等价结论。

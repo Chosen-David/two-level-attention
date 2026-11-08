@@ -1,0 +1,27 @@
+{
+  "project_root": "/home/wangyuanshuo02/two-level-attention",
+  "task_id": "TL-FROZEN-QASPER-MK2-20261030",
+  "producer_actor": "/root",
+  "verifier_actor": "/root/verify_pool_initial",
+  "chain": [
+    "produce",
+    "verify_experiment_result",
+    "report"
+  ],
+  "scope": "Qwen3-8B current frozen dual .05 vs far .05; Qasper200 existing V1 run and fresh RULER MultiKey2 65536 n100; gates-off auxiliary; no latency claim",
+  "source_worktree": "/home/wangyuanshuo02/two-level-attention-frozen-mk2",
+  "resource": "localGPU0 only; GPU1 reserved; existingV1 pool unchanged",
+  "validation_plan_sha256": "84cab4665ac948b8a419b4587edb2bf6d4c76745053b5dc0dfcf0452cb1212a5",
+  "primary": "dual_0.05 minus far_0.05",
+  "qasper_source": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_v1_16_independent005_20261030",
+  "ruler_samples": 100,
+  "arms": [
+    "full",
+    "far_0.05",
+    "dual_0.05"
+  ],
+  "acceptance": "user accepts <=3pp mean drop; report paired CI and per-request differences; no equivalence claim",
+  "status": "GPU smoke running",
+  "source_commit": "de2a1c1670b82bebcde6c0c3aa02fb8ee1431568",
+  "smoke_pid": 2068330
+}

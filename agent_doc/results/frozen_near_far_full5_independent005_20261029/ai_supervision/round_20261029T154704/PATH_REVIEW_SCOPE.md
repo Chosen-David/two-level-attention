@@ -1,0 +1,4 @@
+# 输入与路径独立验收范围
+独立会话已完成1227配对/3681输出，Qasper/HotpotQA/Musique各200、GovReport183、RepoBench-p444。结论仅usable-with-scope，完整报告见independent_paths/REPORT.md，真实会话证据见session.log，原样批次提取见path_check_evidence_extracted.json。生产继续增长，不把新增样本归入已验收范围。
+下一验收者先复核这些1227文件及204项源码/输入绑定，然后补验剩73；最终必须在同一1300集合上核汇总和评分。Near-only33/44172层请求、19/1227请求；Both2/44172、2/1227，分别HotpotQA135层7与Musique56层11。全量统计重新计算。完整三个QA任务输入已核，但质量分数以独立评分会话报告为准。
+未复现GPU生成/原始张量/逐步索引，完整权重历史与部分kernel环境仍有局限。旧边界396缓存用例、400门控组合、20mean对照按原哈希复用，不另跑无关回归。现有verification_plan是简版，不补造正式历史合同。

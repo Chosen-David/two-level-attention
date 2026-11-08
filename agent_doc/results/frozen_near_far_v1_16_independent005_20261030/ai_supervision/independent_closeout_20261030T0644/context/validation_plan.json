@@ -1,0 +1,36 @@
+{
+  "schema_version": "experiment-validation-plan/v1",
+  "scope": "Qwen3-8B current frozen dual .05 vs far .05; Qasper200 existing V1 run and fresh RULER MultiKey2 65536 n100; gates-off auxiliary; no latency claim",
+  "criteria": {
+    "implementation": {
+      "procedure": "Independently inspect adapter, current source, EOS+newline min2, YaRN2, independent gates, actual indexer/cache receipts.",
+      "acceptance": "No protocol confounds; K1=128/K2=1024/tail32 and skip behavior bound.",
+      "allow_not_applicable": false
+    },
+    "reference_boundary": {
+      "procedure": "One 64K real request full node-cache vs native DynamicCache generated IDs; CPU EOS regression.",
+      "acceptance": "Exact generated IDs; stop behavior matches existing RULER.",
+      "allow_not_applicable": false
+    },
+    "data_integrity": {
+      "procedure": "Rebuild100 IDs/input token hashes from source; verify all300 arms, source hashes and checkpoint identities. Current Qasper200 verified separately.",
+      "acceptance": "No missing/duplicates/mixed identities; all raw data mapped.",
+      "allow_not_applicable": false
+    },
+    "numerical_sanity": {
+      "procedure": "Recompute substring reference scores, decisions at strict .05, profiles, byte/token conservation and paired bootstrap seed42 10000.",
+      "acceptance": "Finite values, correct0-100 units, exact independent score recomputation.",
+      "allow_not_applicable": false
+    },
+    "measurement_validity": {
+      "procedure": "Paired100 same input each arm, same model/rope/stop/config; primary Dual-Far.",
+      "acceptance": "No cherry picking; report activation; user tolerance3pp descriptive, not equivalence.",
+      "allow_not_applicable": false
+    },
+    "reproducibility": {
+      "procedure": "Independent verifier reruns CPU scoring/tokenization and checks smoke native parity, source/model/input hashes and environment.",
+      "acceptance": "Independent scoped review required; explicitly note no second full GPU rerun.",
+      "allow_not_applicable": false
+    }
+  }
+}

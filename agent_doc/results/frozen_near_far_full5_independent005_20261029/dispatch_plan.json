@@ -1,0 +1,66 @@
+{
+  "source": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029",
+  "head": "3e4a6885604ac3e719ee92a4906f87b532535314",
+  "out": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029",
+  "return_path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029",
+  "shards": 64,
+  "datasets": [
+    "qasper",
+    "hotpotqa",
+    "musique",
+    "gov_report",
+    "repobench-p"
+  ],
+  "context_cap": 31500,
+  "poll_seconds": 300,
+  "max_attempts": 4,
+  "stall_seconds": 7200,
+  "idle_memory_mib": 64,
+  "idle_utilization": 5,
+  "after_run": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029",
+  "hosts": {
+    "pc02": {
+      "address": "10.238.122.187",
+      "hostname": "set-hldy-kubernetes-pc02.mt",
+      "python": "/usr/bin/python",
+      "gpus": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "predecessor_ranks": {
+        "0": 0,
+        "1": 1,
+        "2": 2,
+        "3": 3
+      }
+    },
+    "pc40": {
+      "address": "10.238.139.251",
+      "hostname": "set-hldy-kubernetes-pc40.mt",
+      "python": "/usr/bin/python",
+      "gpus": [
+        0,
+        1
+      ],
+      "predecessor_ranks": {
+        "0": 4,
+        "1": 5
+      }
+    },
+    "pc31": {
+      "address": "10.245.58.57",
+      "hostname": "set-hldy-kubernetes-pc31.mt",
+      "python": "/home/wangyuanshuo02/frozen005_python",
+      "gpus": [
+        0,
+        1
+      ],
+      "predecessor_ranks": {
+        "0": 6,
+        "1": 7
+      }
+    }
+  }
+}

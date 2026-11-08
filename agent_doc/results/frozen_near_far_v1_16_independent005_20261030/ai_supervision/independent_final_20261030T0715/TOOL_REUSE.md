@@ -1,0 +1,1 @@
+Reuse 0644 complete tool bundle. Only adaptations: prepare requires real FINISHED and copies it; extra_checks validates raw_index original root against CAPTURE_BINDINGS origin (snapshot path is not producer export root). No production edits. Prior partial results not substituted for full audit. Qasper specialty owned by other session.

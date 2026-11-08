@@ -1,0 +1,7 @@
+本轮独立读取冻结08ce44d的prefill_frozen_skip.prepare_ids/stopping_policy/capture_profiles/generate/generate_native、frozen_region_gate.profile_regions/decide_regions、frozen_region_cache.freeze/update/gather、frozen_region_tli.region_mask/decode以及analyze_frozen_skip.analyze。
+
+V1固定16任务；5类no-chat，SAMSum EOS+newline且min1，其余模型EOS。原始prompt超过31500时头尾截断后chat包装。每请求重置cache/indexer，prefill密集原生SDPA，profile最后256query，按各query因果长度划分Near/Far，各自mean严格小于0.05且非空才触发。Full是TLI gates-off，decode仍走TLI，不是dense。Near-only保留不可见staging及迁Far；不能据此声称驻留KV减少。Far/Both删除节点；compact mask排除不可见位置。
+
+统计源码以任务内配对差计算pp，依次Far−Full、Dual−Full、Dual−Far，逐任务B5000及分层重采样AVG16等权，seed42同一RNG按冻结任务顺序消费。3pp是工程点估计容忍，不是等价检验。独立closeout将实际重算；官方评分和独立评分两条路径均需通过。
+
+CPU_SOURCE初次pytest因共享盘临时捕获文件FileNotFoundError无测试执行；改为-s禁用输出捕获后重跑，保留首次失败。源码未改。历史smoke仅复核已有字节并按原3请求范围复用。没有独立GPU重生成，无QK不能重算真实mass，启动后磁盘hash不追认历史内存权重；回执不证明每一步实际GPU张量。

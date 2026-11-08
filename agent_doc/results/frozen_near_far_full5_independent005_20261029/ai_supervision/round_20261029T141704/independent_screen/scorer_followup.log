@@ -1,0 +1,2433 @@
+OpenAI Codex v0.165.0
+--------
+workdir: /home/wangyuanshuo02/two-level-attention-near-far-skip
+model: gpt-6-astra
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a18811-9c9a-7331-86f2-22ab2d84490c
+--------
+user
+你是独立verify_experiment_result审查者，继续完成旧100配对screen的核验。只读CPU，不用GPU、不写源/数据/脚本、不输出凭据；exec login=false。PROJECT_ROOT=/home/wangyuanshuo02/two-level-attention。先读同目录independent_screen/REPORT_access_retry.md和remote_scorer_probe.json、screen_official_rescore.py/json（主控生成，不能直接当独立pass）。前次本机rouge/jieba缺失已定位：可在pc02通过sshpass -f /tmp/.sshpw ssh -o ConnectTimeout=15 -p8416 wangyuanshuo02@10.238.122.187，进入/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_pool_source_v2_20261029，PYTHONDONTWRITEBYTECODE=1 TLI_SCORER_BACKEND=difflib /usr/bin/python -B，用只读脚本从原始screen重算300个官方评分。该环境原有依赖齐全无需安装，严禁启动任何模型/GPU。旧结果路径/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029，检查当前原始文件与先前哈希绑定，独立执行评分且检验原始答案与dataset，按需tokenizer CPU验证prompt身份。报告补充六项检查剩余缺口和准确usable-with-scope或pending（不得假称缺失事前计划已补齐）。可确认已有实际分数下降但只限100配对screen，明确全量1300仍pending。特别保留Musique下降和Near-only/Both稀少的限制。约5分钟交付最终中文报告，外层保存。目录为/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029/ai_supervision/round_20261029T141704。不要重复做无关全面审计。
+codex
+我会按独立结果核验流程，只读检查已有证据，并在 pc02 用 CPU 从原始 screen 重算评分；结论严格限定于 100 配对 screen，保留全量 1300 和事前计划的未决状态。
+exec
+/usr/bin/bash -c 'cat /home/wangyuanshuo02/.agents/skills/code-reading/SKILL.md' in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 257ms:
+---
+name: code-reading
+description: "只读理解代码库、追踪真实调用链与数据流，核查报告机制和默认/可选配置；以 commit、函数、行号交付证据。适用于代码解释与实现前核查，不自动修改目标。用户授权的审查轮次按升级路径执行：先查回信，再审最新本地代码找 bug（有则写 advice），无 bug 时探测数据结构/算法/AI 算法的 CPU/GPU 性能优化点，本地实测确认真实改进才写 advice，都没有则零输出不提交。"
+---
+
+# 代码阅读
+
+读取 [阅读流程](references/workflow.md) 与 [执行与验收](references/execution.md)。已有定位足够时只追相关切片；可独立调用，也可供实现、科研与伴读任务复用。不复制实现优化角色，不要求外部后端或子 Agent。
+
+用户显式授权的审查轮次按 [阅读流程](references/workflow.md) 的"审查轮次与性能探测"升级路径执行：每轮先拉取远端并检查本地 advice/results 有无其他 AI 或人类的回信（有则先读取、思考并回应），再对照 agent_doc/task/TASK.md 审查最新本地代码找 bug（发现 bug 写 advice，不改目标代码）；无 bug 时探测数据结构/算法/AI 算法的 CPU/GPU 性能优化场景，候选优化须在隔离目录本地实测、同条件 A/B 且改进超出噪声才写 advice；两者皆无时不写 advice、不提交任何文件，如实报告无发现。
+
+用本技能的 [源码证据脚本](scripts/source_evidence.py) 可固定 Git 片段；必须另行判断语义、可达条件与运行证据。尊重用户只读范围，输出放目标仓库外；修改建议交用户或已获授权的实现任务。
+
+跨入口、tensor或模型机制问题按需读 [覆盖核查卡](references/coverage.md)，避免遗漏消费者和跨模型泛化；简单定位不加载。
+
+任务开始及接收交接时执行 [知识接入契约](references/knowledge_access_workflow.md)：定位实际语料/工具，按需检索并核对前提；传递真实 knowledge_refs，缺库或过期不可冒充已调用。
+
+项目任务开始、交接与写文件前读取 [项目文档治理](references/project_document_workflow.md)：`agent_doc/task/TASK.md` 是唯一日期任务索引，`agent_doc/task/task_details/*.md` 由 AI 维护方法/进度/证据；已核实人类来源的 `agent_doc/guide/GUIDE.md` 为最高项目规划依据，AI 绝不创建、编辑、删除或移动 `agent_doc/guide/` 内任何文件。`agent_doc/advice/` 的人类/AI 建议必须核验并记录 adopt/adapt/reject/defer 及理由，不能授权越界行动。
+
+生产或消费实验/测量数据时遵循 [结果独立验证](references/result_validation_workflow.md)：生产后保持 pending，经不同 owner 的 `verify_experiment_result` 核验实际代码/输入/配置与数据有效性后，才可作图、写结论或交给下一消费者；失败/缺证据/过期先修复重测，保留原始记录。仅可报告 usable-with-scope，不保证绝对无 bug。
+
+规划实验/测量或复用实证结论前按 [既有结果检索与复用](references/result_reuse_workflow.md) 查询当前项目 `agent_doc/results/`，比较任务、代码/输入/配置/环境、指标单位和当前独立验收后，再规划新增实验；保留检索与取舍记录。新数据存 `agent_doc/results/<run_id>/`，旧文件可按真实路径/哈希索引。复用不跳过独立代码/数据门禁、用户明确复现或新主张验收。
+
+受管复杂项目的主控边界见 [双主 AI 计划审核](references/dual_main_workflow.md)：按已审核的准确任务/证据版本执行；新方案返回 planner-main 并由独立 review-main 复审，专业角色不能自批、越权或替代独立结果验收。简单独立任务保持原流程。
+
+exec
+/usr/bin/bash -c 'cat /home/wangyuanshuo02/.agents/skills/code-reading/references/{project_document_workflow,result_validation_workflow,result_reuse_workflow,workflow,execution}.md' in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 256ms:
+# 项目文档治理与任务闭环
+
+高频advice检查可由宿主先运行[版本变更导航](../docs/token_optimization/advice_meetings.md)，按变更和未决任务读取原文、回复本轮差异。归档/空清单不证明结案；当前约束、全局评估和独立验收仍须核对。
+
+对比两个已固定版本的任务说明或文本产物时，完整 checkout 可用 `scripts/artifact_context.py --root ABSOLUTE_PROJECT_ROOT --before BEFORE_REF_JSON --after AFTER_REF_JSON`；两个引用 JSON 均为项目相对路径的 path/sha256 绑定。输出始终带完整旧版，新版只有在完整 JSON 更小时才用可恢复的单 splice，否则保留全文；`--full` 可显式查看两版全文。旧版在同一输出内，不依赖磁盘“已读”提示或模型历史仍在。`agent_runtime.artifact_context.restore_comparison` 按独立宿主项目/两个引用核对并恢复；这只是比较显示，不替代当前指南优先级、Plan/Progress 边界、取消/授权或结果验收。当前新版的取消和约束必须保留；输出超预算拒绝，不截断。
+
+工作流专属目录统一为 `agent_doc/`，项目自己的 `doc/` 与 `docs/` 保留原用途。新项目初始化只创建 `agent_doc/`；不因接入而自动改名、覆盖或导入已有 `doc/`。已有旧工作流目录须由用户明确选择后迁移，不能凭目录名判定归属。
+
+本库的旧 `doc/` 已按用户本次明确授权整体更名；已有指南字节原样保留。这是一次性目录迁移，不授予后续编辑指南或通用发布绕过权限。日常写入守卫继续保护新 `agent_doc/guide/` 及遗留 `doc/guide/`。
+
+历史结果保留原始 manifest/record/原始数据字节。项目自身 `agent_doc/legacy-result-paths.json` 只为已登记的旧 `doc/results/<suffix>` 提供同后缀的只读新路径；拒绝碰撞、路径跳转、链接和哈希变化，不把普通 doc 当工作流后备目录。映射不授予验收或恢复旧派发：旧文档快照须新版本重规划，数据使用仍由当前独立验证负责。新写入只用 agent_doc。
+
+此契约适用于通用主 AI、所有专业角色、监督恢复和项目文件管理。它组织当前项目的 `agent_doc/`，不把已有 `docs/` 研究材料批量改名，也不把工作流仓库的历史任务复制到其他项目。简单问答不强制建立项目目录或任务链。
+
+普通低风险本地修复按 result_validation_workflow.md 的轻量回归边界执行；
+不自动新建项目目录、第二任务索引或实验合同，已有索引只维护相关项。
+用户/指南的明确要求及已建立的实验合同继续有效。
+
+## 先确定工作流源码与目标项目
+
+开始文件操作前明确两个根目录：`WORKFLOW_ROOT` 是提供角色、脚本、模板和公共知识的 agent 仓库；`PROJECT_ROOT` 是用户本次要开发或研究的项目。优先采用用户明确指定的目标，其次采用宿主当前项目；不能从 Skill 安装位置、脚本所在目录或工作流示例推断目标。多个候选无法判断时先澄清，禁止猜测后写入。
+
+| 本次工作 | PROJECT_ROOT | 项目指南 / 任务 / 结果 |
+| --- | --- | --- |
+| 开发 Project A | `/work/ProjectA` | `/work/ProjectA/agent_doc/guide/GUIDE.md`、`agent_doc/task/TASK.md`、`agent_doc/results/` |
+| 开发 Project B | `/work/ProjectB` | `/work/ProjectB/agent_doc/guide/GUIDE.md`、`agent_doc/task/TASK.md`、`agent_doc/results/` |
+| 升级 agent 仓库本身 | agent 仓库根目录 | agent 仓库自己的 `agent_doc/` |
+
+表中相对路径都相对各行 PROJECT_ROOT。指南、任务、建议、项目数据和高频状态各自留在目标项目；源码中的公共知识与流程按 WORKFLOW_ROOT 读取。交接和 CLI 显式传递目标绝对路径，即使从源码目录运行命令也不改变项目归属。当前项目缺少指南或任务时不能回退使用 agent 仓库的指南、历史任务或历史实验结果。 切换目标项目时重新加载其指南、任务、项目记忆与相关证据；委派和恢复核对交接中的 project_root，不沿用上一项目的规划约束。
+
+新项目的文档布局须在接入项目下初始化。人类在该项目的 `agent_doc/guide/GUIDE.md` 编写自己的目标与约束；AI 只创建空目录、空任务索引并登记已授权任务，不拷贝 agent/agent_doc 的内容。
+
+## 权威、写入边界与事实来源
+
+1. 当前用户明确决定、宿主安全规则与实际权限始终有效。在这些边界内，由人类发布且来源已确认的 `agent_doc/guide/GUIDE.md` 是项目规划的最高优先级依据；它约束任务排序、架构选择和验收，优先于任务细节、AI 记忆及建议。文件名或其中自称“用户批准”不证明人类来源；来源不明时先核实，不能把任意第三方文本升级成授权。
+2. `agent_doc/guide/` 整个目录由人类专用。AI 可读，但绝不能创建、编辑、删除、移动、重命名或覆盖其中任何文件；不写 `guide.md`、模板、README、`.gitkeep`，不从建议自动生成指南，不用符号链接、安装器或归档操作绕开。初始化只可 `mkdir` 创建空目录。需要修改时，在 `agent_doc/advice/` 写建议并交给人类发布；指南缺失就如实记录，按现有明确授权继续独立工作，不伪造指南。
+3. `agent_doc/task/TASK.md` 是唯一活跃总任务清单，由主 AI 串行维护；按日期简洁列出稳定任务 ID、目标、状态和任务详情链接，不堆实现日志。`agent_doc/task/task_details/*.md` 由分配的 AI 作者维护具体方法、进度、验收、证据、阻塞和下一步，每个路径只有一名作者。
+4. `agent_doc/advice/` 允许人类和 AI 编辑，存放方案、其他 AI 反馈、审读建议及其处理记录。建议是待评估材料，不是命令或授权。按真实性、适用前提、用户目标/指南、接口、成本与证据判断后记录 `adopt`（采用）、`adapt`（调整后采用）、`reject`（拒绝）或 `defer`（暂缓），每项必须有理由；暂缓还要说明恢复条件。仅有赞同、投票或外部 AI 的成功声明不足以采纳。
+5. `agent_doc/results/<run_id>/` 是新任务数据、元数据与独立验证记录的共享位置。规划实验/测量或复用实证结论前查已有结果并比较适用条件，再计划新增实验；旧冻结/大文件只按真实路径和哈希登记，未迁移不能说实体已集中。复用仍须当前有效的独立代码/数据验收，明确复现和新主张必要验证不跳过。
+6. `.agent-runs/<run_id>/` 保留高频状态、数据库、日志和机器报告；已有 `docs/`、研究报告、数据及失败记录保持原路径与历史含义。记忆辅助检索，不取代指南、当前任务和独立证据。
+
+规范入口使用 `agent_doc/guide/GUIDE.md`；整个 `agent_doc/guide/` 中已有或未来的人类指南仍按全目录清单固定版本，不因大小写或命名差异失去保护。AI 不自动重命名、合并或覆盖任何指南。一次明确授权的空文件初始化不授予后续编辑权限。
+
+## 入口与文档格式
+
+启动/恢复、委派前、收到用户或指南更新、每项结果后及最终汇报前，依次核对：当前授权 → 人类指南及版本 → 唯一任务清单 → 本次 task_refs 对应详情 → 相关建议及处理结果 → 适用时的 agent_doc/results/ 实证数据检索与适用性核对 → 运行状态/证据。普通低风险局部修复不因此扫描无关历史结果。先查当前项目根，不将安装目录当目标项目。
+
+续跑/导航时不必每次重读所有详情全文：默认先取未勾选索引项的廉价导航摘要（索引行 + 对应详情的 `Status`/`Owner`/`### 摘要`/有界 `## Progress` 文档首尾片段），据此选择要打开的详情；只有真正推进某个任务时才读那份详情全文。可调用 `agent_runtime.project_docs.task_navigation(root)` 或 `python -m agent_runtime.project_docs --root ABSOLUTE_PROJECT_ROOT nav`。这里的“未勾选”只是索引选择，不等于受管账本 active 状态；输出显式报告总数、选中数和省略的已勾选数，被省略详情不会由默认视图验证。历史详情同时存在进度置顶和尾部追加，首尾片段只表示文档位置，不承诺哪边较新；没有结构化摘要/状态时必须打开详情确认当前状态与下一步。需要核对历史更正、异议、依赖或全部详情时，显式传 `include_checked=True` / `--include-checked` 并按需提高字符预算，或使用完整 snapshot/delta 流程。摘要里的 `Status`/`Owner` 仅作派生态，不替代完整文档审计、受管账本与独立验收。
+
+总清单格式：
+
+```markdown
+# 项目任务
+
+## 2026-10-07
+
+- [ ] [DOC-01] 调整任务文档闭环 ([详情](task_details/DOC-01.md))
+```
+
+详情格式：
+
+```markdown
+# [DOC-01] 调整任务文档闭环
+
+Task-ID: DOC-01
+Date: 2026-10-07
+
+## Plan
+
+### 目标与验收
+保留用户原始要求、硬约束、依赖和可独立核验的完成条件。
+
+### 实现方法
+当前方案、真实接口、允许写入范围、负责人及被拒绝的替代方案。
+
+## Progress
+
+### 进度与证据
+按日期记录实际产物、检查命令/结果、原始数据位置、失败及未验证范围。
+
+### 阻塞与下一步
+剩余工作、责任人、恢复条件和授权边界。
+```
+
+每个 ID 唯一，日期与索引所属日期组一致；Date 是任务来源或组织日期（迁移时取最近的原日期标题，否则使用显式迁移日期），不是凭空推定的完成日期。索引链接解析到项目内 `agent_doc/task/task_details/` 的该任务文件。只保留一份可编辑任务真相；根 `TASK.md` 若保留，只能是无复选框的迁移导航。旧根清单尚未迁移时仅允许兼容读取；出现两份活跃清单必须停止相关编排并核对，不能随意选一份或自动覆盖。
+
+建议文件或其独立处理记录保留来源/作者类别、准确路径、内容哈希/版本、涉及 task_refs、主张、证据、适用条件、决定、理由及恢复条件。对不相关建议也明确暂缓/拒绝的范围理由，不为满足格式强行采纳。主 AI 将已采纳且已获授权的变化落实到详情、索引/DAG 和验收；新权限或重大替代仍遵守决策协议。
+
+## 从文档到执行的具体职责
+
+- 主 AI：解析指南约束与当前用户目标，审查建议，维护日期索引与 task_refs，划定每个详情/产物作者；配置真实宿主适配器、监督、恢复和结果汇报。
+- 专业角色：读取交接固定的指南/详情/建议版本，只写获分配的详情及产物；返回方法、真实进度、证据、未完成项和建议差异，不抢写总清单或指南。
+- 文件管理角色：核对日期、ID、详情链接和单一作者，核对所有 allowed_writes 均排除 `agent_doc/guide/`；维护 CODEMAP 和生产者/消费者，不移动活跃路径或改写历史证据。
+- 独立验收角色：验证方案是否符合人类指南、建议是否有取舍理由、证据是否支撑完成条件；AI 自报完成、目录整齐或哈希匹配都不等于语义通过。
+
+交接至少携带 `project_root`、`task_refs`、索引版本、相关 `document_refs`（路径与哈希）、指南来源/适用约束、建议取舍、允许动作、`allowed_writes`、唯一 owner、输入版本、验收、暂停范围及恢复条件。消费方先核对自己的当前依据，不从生产者自评反向补造用户要求。
+
+## 运行时、更新与恢复
+
+完整 checkout 提供 `agent_runtime.project_docs` 与 `scripts/project_docs.py`；安装的纯 Skill 只携带本契约，不包含或自动部署运行时。
+
+```bash
+python /absolute/agent/scripts/project_docs.py --root /absolute/ProjectA init
+python /absolute/agent/scripts/project_docs.py --root /absolute/ProjectA inspect
+python /absolute/agent/scripts/project_docs.py --root /absolute/ProjectA validate
+python /absolute/agent/scripts/project_docs.py --root /absolute/ProjectA guard-write agent_doc/task/task_details/DOC-01.md agent_doc/advice/DOC-01-v1.md
+```
+
+`init` 要求目标项目目录已存在；预检目录冲突、链接和旧根清单，保留已有文件，不创建任何指南文件。空索引没有虚构任务，必须按用户授权补充日期、ID 与详情后才能通过执行计划检查；`init` 成功不等于可以派发任务。它不安装技能、不启动模型或定时器。Codex 用户可单独调用此入口，Claude 的 `setup.py --target /absolute/ProjectA` 已包含项目文档初始化。
+
+`resolve_task_file(root)` 优先解析 canonical 索引，只有缺少 canonical 时兼容旧根清单；`snapshot_project_docs(root)` 固定任务索引、详情中 `## Progress` 之前的稳定内容及指南清单/版本，并登记建议的可发现版本。计划以 `project_documents` 保存快照，各节点用 `document_refs` 绑定依赖；`guide_reviews` 对每个人类指南记录 path、sha256、origin（owner_authored 或 owner_approved）、authorization_reference、task_refs、disposition（applied 或 not_applicable）和 reason。缺少指南时是空列表，不虚构来源。可信宿主仍核实作者身份和权限，声明与哈希本身不构成授权。
+
+先调用 `bind_guide_reviews(plan, reviews)` 将来源已由可信宿主核实的指南评估绑定到相关节点，再调用建议绑定；仅手填字段不能替代生成对应 document_refs。
+
+`advice_assessments` 按建议 path、sha256、task_refs、disposition（adopt/adapt/reject/defer）和 reason 记录核查。adopt/adapt 还需 `guide_alignment: compatible`；与指南的冲突未解决不得采纳。`bind_advice(plan, assessments)` 将已采用/调整后采用的建议绑定到相关执行依赖；reject/defer 不产生执行依赖，新出现的建议在下一检查点审查。哈希不能证明建议科学有效。
+
+可用 `write_task_progress(root, task_id, progress, expected_plan_sha256=...)` 在校验稳定计划哈希后更新进度；`controlled_remove` / `controlled_rename` 同样执行指南写入边界，不能把普通文件整理当例外。
+
+任务级 `document_refs.advice` 仅保留该节点 adopt/adapt 的来源清单，避免每个节点重复携带全部历史建议；全局 `project_documents.advice` 和全部建议取舍仍完整保留，所有指南与当前节点的稳定任务依赖不减少。这只是引用传输去重，不是意见摘要、建议删除或语义相关性证明。旧持久计划不自动改写；完整计划验证遇到旧的全量节点清单时须显式建立新版本并重新审核。拒绝/暂缓建议和新增建议继续按既有检查点规则评估，不静默改变已执行任务。
+
+启动计划后，tick/outcome 写运行状态；主 AI 在有意义的检查点将结果串行归纳到详情，不每个 tick 改索引。详情的 `## Progress` 之后可追加实际进度/证据，不因此让运行计划失效；目标、验收、方法、约束等稳定输入不得藏进 Progress 来绕过版本校验。索引、详情稳定段、指南清单/内容或已采纳建议发生变化时，暂停受影响的旧派发，核对最新内容与权限，再建立新版本/run_id 并显式关联仍有效证据。未采纳/暂缓建议的变化及新建议不会静默改变当前执行，下一检查点重新评估。不能静默重写快照来让旧验收过关。结束后更新索引勾选与详情时保留旧计划源快照/哈希，并说明是收尾修订，不伪称原报告绑定了新字节。
+
+恢复必须先检查指南/任务/建议是否改变、原任务是否取消、旧作业是否仍运行、哪些证据仍有效，再重启/接续。迁移文档不代表恢复已取消批次；推送失败、发布待核验、宿主未安装等状态原样保留，不能因换目录标完成。
+
+`guard-write` 和集成路径检查用于阻止受支持工具写入指南、越界及链接绕行；它们不是 OS ACL，也不能约束绕过这些入口的任意 shell 或同权限进程。主 AI 与宿主仍必须在所有写入、移动、删除和发布前执行同样边界；不得宣称已获得操作系统级只读保护。
+
+## 迁移、安装与发布
+
+有旧根清单时先 inspect，核查运行中任务/引用、用户改动、ID/日期和写入授权。显式迁移命令：
+
+```bash
+python /absolute/agent/scripts/project_docs.py --root /absolute/ProjectA migrate --date 2026-10-07
+```
+
+迁移应保留原始字节到 `agent_doc/task/legacy/`，拆出详情并生成简洁日期索引，根文件仅留下导航；遇到已有 canonical 或冲突先核对，不混出两份活跃清单。人工核验迁移前后 ID、状态、原始内容、证据链接和取消/阻塞记录，更新仍活跃的调用入口；历史实验快照和引用说明保持原样。不得将旧 `docs/` 整体搬入 `agent_doc/`。
+
+`setup.py` 面向当前项目连接 Claude 入口/角色，并为新项目创建空索引、详情/建议/结果目录和空指南目录；已有任务与人类指南不覆盖。既有旧任务需先显式迁移。Codex 安装器只同步已提交 Skill/受管入口，不从此仓库复制历史任务，也不自动迁移用户项目。两种安装都不启动 Agent、模型、tmux 或后台服务，不改变宿主安全设置。
+
+发布前把每个变更绑定当前任务 ID，重新核对任务文档快照和建议决定，检查候选不含 AI 对 `agent_doc/guide/` 的新增/修改/删除，核验实际独立证据。人类指南由人类维护和发布；不要由 AI 顺带暂存/提交其改动。部署/技能安装与仓库提交是不同结果，真实同步及新会话发现未验证时必须分别说明。
+
+结果复用执行契约是 `workflows/result_reuse_workflow.md`（独立 Skill 使用同目录的 `result_reuse_workflow.md`）。检索记录说明匹配与缺口，不将“已登记”写成“已验证可用”；旧数据重新进入消费者时仍绑定当前独立验证和准确版本。
+
+
+完整 checkout 的共享结果检索接口由 `agent_runtime.result_store.ResultStore` 与 `scripts/result_store.py` 提供。主 AI 从用户最小任务条件构造查询，并实际执行例如 `python scripts/result_store.py --root /absolute/project search QUERY --limit 5 --max-scan 200`，按返回 run ID 读取数据/元数据/验证；有匹配候选后再做条件比较和受信任独立复验。实际 CLI、注册/复用状态与权限边界以 `result_reuse_workflow.md` 为准。安装的纯 Skill 只携带契约；缺少完整 checkout/对应工具时如实记录能力缺口，不假称已调用检索器，也不把公共知识卡当项目历史数据。
+
+## 独立主控计划审核
+
+受管复杂任务执行 `workflows/dual_main_workflow.md`（独立 Skill 使用同目录 `dual_main_workflow.md`）：planner-main 维护方案与唯一 TASK，review-main 由可信宿主独立新上下文审查 intent/guide/assumptions/prior_results/acceptance/risk/resources。新 prepare 默认保护，完整实际 DAG 与指南/采纳建议/证据版本绑定；approve 后仍需工具授权和独立结果验收。无可信回执不派发，revise/reject 版本化返修；Progress 追加不失效。缺宿主接口如实 blocked；旧计划仅宿主明确 legacy-unprotected 兼容，不宣称已全部升级。
+<!-- GENERATED by scripts/sync_plugin_references.py; edit the source workflow instead. -->
+
+# 每轮实验后的代码与数据独立验收
+
+## 先区分本地回归和实证结果
+
+普通、低风险的本地修复或文档整理，若检查只用于确认本次修改的正确性，
+可由主 AI 运行必要回归并直接汇报命令、结果与限制；不自动建立 DAG、
+第二 Agent、实验合同或共享结果 JSON。已有任务索引只维护相关项。
+这种“回归通过”状态汇报不等同于跨消费者复用数值/经验研究结果。
+
+科研、性能、准确率、模型对照、合成测量及供后续消费者复用的实证数据，
+仍执行下文完整独立验收。风险按实际交付影响判断；权限、不可逆或高风险
+逻辑修改仍须相应复核，不能只靠 local 标签或 task_type 字段降格。
+用户/人类指南明确要求的审核，以及已经声明的 experiment_result、
+result_validation、required_result_refs 合同一律保留，不得重新分类绕过。
+需要产生或复用实证结论时，先按 result_reuse_workflow.md 检索适用结果；
+普通本地修复不因流程惯例先扫描整个历史结果库。
+
+每次实验或测量产生数据，主 AI 必须在数据被汇总、画图、比较、写入结论或支持完成声明之前，安排独立代码与结果检查。测完只是取得原始观测，不代表代码正确或数据可用。有限测试只能说明在声明范围内通过，不能保证代码绝对没有 bug。
+
+## 任务链与权限
+
+沿用当前项目唯一 `agent_doc/task/TASK.md` 及相关 `task_details`、人工指南和已评估建议；不创建另一份任务列表，不写 `agent_doc/guide/`。主 AI 在实验前固定需求、允许资源、验收协议、独立验收者与消费依赖。
+
+DAG 必须是 `producer → verify_experiment_result → consumers`。主 AI 将准确率、性能、模型、CPU/GPU、合成以及探索实验都明确分类；数据生产任务用 `task_type: experiment` 或 `produces_data: true` 并声明 `experiment_result`。不能改成 `false`、`synthetic` 或 `derived` 来绕过已声明的消费依赖。纯非实验任务和旧非测量报告保持兼容；程序无法从任意任务自然语言发现全部隐藏实验，可信主 AI/宿主负责完整分类。
+
+生产者的 `experiment_result`、验收节点的 `result_validation`、每个消费者的 `required_result_refs[]` 使用相同合同：
+
+```json
+{
+  "result_id": "unique-result-id",
+  "producer_task_id": "produce",
+  "producer_actor": "implementation-agent",
+  "manifest_path": "results/run-001/manifest.json",
+  "validation_plan": {"path": "configs/validation-plan-v1.json", "sha256": "<actual SHA-256>"},
+  "scope": "exact cases, metrics, hardware and claims being accepted"
+}
+```
+
+每个生产者只有一个直接依赖它的验收节点，节点 action 为 `verify_experiment_result`，owner 与生产者不同。其余全部下游节点必须包含该验收祖先及相同消费合同，包括再次加工数据的消费者。验收节点也可以消费上游已验收结果。实验前不知道结果哈希，不能编造；实验后由独立验收固定实际字节并保存到现有运行证据。
+
+## 验收前固定协议
+
+`validation_plan` 文件使用 `schema_version: experiment-validation-plan/v1`、与合同一致的 `scope` 及 `criteria`。以下六项各包含 `procedure`、`acceptance` 和布尔 `allow_not_applicable`：
+
+1. `implementation`：独立阅读与执行路径核对，检查索引、形状、dtype、精度、分支、异常、状态泄漏和实际运行代码与被测代码一致性。运行单元/回归检查不替代针对性代码检查。
+2. `reference_boundary`：可信参考实现、闭式解、小规模穷举或性质/变形测试；边界、退化、空输入、极端范围和错误条件。参考不能复制相同错误路径。
+3. `data_integrity`：样本 ID、重复/漏项、失败样本、分母、输入/代码/配置/种子/原始日志与输出对应；断点恢复不得混入不同协议。
+4. `numerical_sanity`：NaN/Inf、符号、数量级、单位、误差阈值/容差来源、统计/物理不变量、汇总与原始记录一致性；不能仅凭图形看起来合理。
+5. `measurement_validity`：主张涉及性能时检查计时范围、同步、warmup、单位、分辨率、资源分配/干扰、配对和全部重复样本、离散程度与噪声。准确率检查数据划分、指标分母和协议等价。无计时主张可经预先允许并说明理由后标 N/A。
+6. `reproducibility`：按冻结命令、环境、配置与种子进行独立小规模重跑/交叉检查；足够的重复性、不一致及剩余外部依赖明确记录。
+
+阈值由科学问题和资源条件决定；没有一个通用数字能认证所有实验。需要但未能运行的检查是 `inconclusive`，不能伪装 N/A。协议/范围需要变更时版本化重排，不能看过数据后静默放松条件。合法负结果、变慢、无提升或不支持假设仍可通过数据验收；验收判断测量可信程度，不要求研究假设成功。
+
+## 结果与独立证据
+
+结果 manifest 使用 `schema_version: experiment-result/v1`，绑定合同的身份、范围、验收协议及 `run_id`、`code_revision`、`execution`（command 字符串数组、environment_description、seeds、repeats）。command 仅是复现信息，运行时不把 JSON 字符串作为 shell 命令、模块名或授权执行。
+
+`artifacts` 的 `code`、`inputs`、`config`、`raw_data`、`outputs`、`environment` 均为非空 `{path, sha256}` 列表。环境记录应包含实际硬件/软件版本和相关资源条件；代码哈希覆盖真实影响路径与 dirty 内容，不能只写 Git commit；数据/配置/环境需足以复现。`metrics` 是非空 `{name, value, unit}` 列表，值必须有限，无量纲明确写 `dimensionless`。运行时核对哈希覆盖的文件，宿主独立审查是否遗漏真正依赖。
+
+独立 verifier 是可信宿主显式注入的函数 `verifier(root, manifest, validation_plan)`，返回实际观测或受保护的独立检查记录。它不能从生产者的 pass JSON、reviewer 名称或 `independent: true` 自证身份。宿主必须认证审查者和真实开始/完成事件，确保不是生产者，实际执行或读取适用检查，并确认检查代码、环境、参考方法和证据完整。单一布尔回调或自写通过文件不构成独立验收。
+
+返回 `experiment-validation/v1` 记录：`manifest_sha256`、完整 `artifact_hashes`（含验收协议）、`validation_plan_sha256`、`scope`；`verifier` 的 actor、independent、source、run_id、method；非空 `limitations`；六项 `checks` 各有 verdict（pass/fail/inconclusive/not_applicable）、reason 和非空文件证据绑定。宿主保存稳定的实际 review 身份和记录；重读同一验收不得每次虚构新的 reviewer run ID。实际新检查则保存新版本，原证据不覆盖。
+
+验证前后重新核对全部绑定和独立证据，manifest、代码、数据、配置、环境、输出、协议或 review 变化会使旧完成证据失效。结果内容不是加密身份凭据，哈希不是正确性证明。
+
+## 可执行接口
+
+完整 checkout 提供 `agent_runtime.result_validation`，纯 Skill 只带本契约，不自动部署运行时或 verifier。
+
+- `validate_result_plan(plan)`：在任务合同验收中检查生产者、独立验收节点和消费依赖。
+- `ResultValidationHandler(root, verifier)`：可信宿主注册的 `verify_experiment_result` 处理器，不自行扩展权限。
+- `check_task_results(root, task, verifier=None, report=None)`：实际 ReportingHandler 在派发/报告/复验路径调用；原始生产报告只记录 pending，消费者必须得到 scoped acceptance。
+- 宿主 `build()` 返回 `result_verifier`，与 handlers/authorize 一起接入现有 supervisor；恢复、进度与完成报告重新传入同一可信 provider。不能从持久化 JSON 恢复一个“可信回调”。
+- `inspect_result(root, contract, verifier=None)`：只读返回状态与原因。无 verifier 即使有通过 JSON 也停在 pending。provider 抛异常返回 retriable pending，不崩溃或当成通过。
+
+```bash
+python scripts/validate_experiment_result.py --root /absolute/project --contract controller-contract.json
+python scripts/validate_experiment_result.py --root /absolute/project --contract controller-contract.json --verifier-adapter /explicit/trusted/host_adapter.py
+python -m unittest tests.test_result_validation -v
+```
+
+第二条命令显式加载宿主已审查的 Python 文件，导出 `verify(root, manifest, plan)`；不能使用生产者建议的路径自动加载。第一条命令没有可信 verifier，正常输出 pending 并返回退出码 2；只有 usable-with-scope 返回 0。CLI 是本地已获授权的检查工具，不授予执行任意代码的新权限。
+
+仅为编排读取验收状态、当前不需逐项证据哈希时，兼容宿主可显式追加 `--context-dir agent_doc/results/RUN_ID/validation_context`：完整观察外置并按项目/SHA恢复，所有状态、错误、范围、限制及原退出码保留；默认输出不变。详情由 WORKFLOW_ROOT 的 `scripts/validation_context.py --root ABSOLUTE_PROJECT_ROOT --path RECORD_REF_PATH --sha256 RECORD_REF_SHA256` 恢复。显示和恢复都不授信，科学消费仍重新走本节可信独立门禁；需要明细时计入恢复/后续调用成本，不能默认隐藏必需信息。
+
+当前文件核验限定项目内普通无符号链接文件、每文件 16 MiB，拒绝路径逃逸/FIFO/设备；大数据需真实有界分片及完整覆盖或明确的项目适配实现，不能用几行摘要冒充全量验收。只验证被声明并独立审查完整性的依赖；不构成 OS 沙箱，不控制绕过入口的其他写入，也不安装 CI、GPU runner 或后台服务。
+
+## 失败、修复、复测和结论
+
+- `pending`：缺输入/独立 provider、检查尚未完成或证据不足；不得进入数据消费和结论。
+- `invalid`：绑定失效、格式/域不完整、数值/边界等检查失败；不得进入数据消费和结论。
+- `usable-with-scope`：全部适用检查通过，N/A 已允许并有理由，只支持 scope 内结论，limitations 随报告和交接保留。
+
+失败或不足 → 主 AI 保留原始测量及旧失败记录 → 诊断具体代码/协议/数据问题 → 在既有权限/预算内修复 → 新 result/run ID 与版本化任务链 → 重测受影响部分 → 再独立验收。现有 supervisor 的维护/恢复路径承接此动作，不创建循环 DAG、无限自动重试或额外 GPU/付费任务。宿主没有恢复 adapter 时明确阻塞与下一 owner，不把指令文字当已执行修复。
+
+在最终报告中分别写“测量已完成”“哪些检查已通过”“这些数据能支持的范围”“哪些仍未知”。代码、数据或实验条件更新后，旧数据仍保留为历史观测；是否可复用必须有新的明确独立验证，不得默默把旧 pass 复制到新版本。
+<!-- GENERATED by scripts/sync_plugin_references.py; edit the source workflow instead. -->
+
+# 项目结果归档与先查后测
+
+规划实验/测量或复用实证结论时，先检索当前项目已经得到的数据，判断本题是否已有可信结果、是否只需补差异检查，再安排新的实验。检索是发现候选，不是证明可复用。与 `workflows/result_validation_workflow.md` 的独立验收串联；不以目录、记忆、JSON 的 pass 或相似词命中代替验收。
+
+## 单一结果入口与不可变历史
+
+- 新数据统一放在 `agent_doc/results/<run_id>/`。该轮 `manifest.json`、原始数据 `raw/`、派生数据 `derived/`、验证协议和证据各自保留；`record.json` 是不可变登记记录。实际子目录名可按实验需要调整，manifest/raw_data/outputs 必须属于该 run。
+- 每轮用新的、可用作文件名的 run_id。失败/负结果也保留，修正用新 run 和来源关系；不得覆盖旧数据，不能复用已有 ID。大小写冲突同样拒绝。多个实验生产者须有不同 result run_id，不能把任务链的一个 run_id 当所有结果的 ID。
+- 代码、输入、配置和环境可以保留项目内既有位置，但要记录实际内容哈希和源版本；原始/派生结果固定保存。单位、指标定义、随机种子、重复次数、执行命令及环境描述不得省略或凭空补全。
+- 已有大文件、冻结历史和旧报告不破坏性搬迁：建立明确的 `historical-external-reference` 或运行时兼容 `legacy-contract-reference`，固定原路径/哈希。中央目录保存的是索引，不等于旧文件字节已经全部迁移。项目外不可读数据仍是缺口，不伪造验证。
+- `.agent-runs/` 仍存高频调度状态、报告及日志；`agent_doc/results/` 作为可跨任务发现的稳定结果入口。引用运行区的旧结果时必须明确历史引用，不能把可变日志当冻结原始数据。
+- 应用写入守卫拒绝 `agent_doc/guide/`、别名/符号链接绕行和项目外路径；这不是对任意 shell 或敌对文件系统写入者的沙箱。
+
+## 新命令的具体判断
+
+1. 以任务目的、对象和指标检索结果目录，记录查询、候选 run_id、record_sha256、扫描数量、截断和错误。没命中只表示本次有界查询没找到；部分扫描、损坏记录或词汇不重合不证明没有历史结果。
+2. 读取候选 manifest 和来源数据。逐项比较本次任务与已经执行的 scope、code_revision、代码/输入/配置/环境内容哈希、命令、环境描述、种子/重复次数及指标名/单位。消费者自己提供当前条件；不能从候选结果反向编出“当前需求”。需要时额外检查硬件、dtype、shape、batch、软件版本、基线和测量统计定义，它们应存在已绑定的配置/环境文件中。
+3. 确认文件哈希未变，验证记录仍对应这轮实际数据，并由可信宿主再次提供独立验收回调。已持久化的 pass 或 `usable-with-scope` 不恢复信任；记录的条件必须等于冻结 manifest，不能只改 catalog 标签来假装匹配。
+4. 返回一种明确决定和依据：
+   - `reuse`：已知条件完全匹配，并有当前独立 `usable-with-scope` 验收。主 AI 可以明确选择复用动作，附旧数据来源与适用范围，不冒充新实测。
+   - `verify_delta`：条件有差异、信息未知、历史未独立验证、缺可信验证器，或测量时间不满足用户的新鲜度要求。只补齐未知和有信息增益的最小差异检查；形成新的版本/结果后再验收，不能改旧 proof。
+   - `rerun`：用户明确复现、指定新主张验收、数据/来源已变或验证失败。保留旧证据，修复/重测并独立验证；旧结果只作基线。
+5. 将决定写入任务详情与计划。搜索不自动跳过实验；比较一致也不自动授权任何动作。当前用户要求、指南约束、任务取消和权限边界继续有效。
+
+相同的未知值不是相同条件的证据。单位没有自动换算，指标名称不模糊匹配，代码即使字节相同但路径/版本改变也保守要求差异检查。某种方法测得没有收益属于有效负结果，可在已验收范围内复用；数据错误或测量无效属于验证失败，不能复用。
+
+## 可执行工具和实际调用路径
+
+完整 checkout 提供 `agent_runtime/result_store.py` 和 `scripts/result_store.py`。独立安装的纯 Skill 只带工作流；必须从安装元数据确认完整仓库位置，再调用其中 CLI，不声称安装提示就部署了运行时或验证器。
+
+`search/show/decide/context` 默认输出完整紧凑 UTF8 JSON，含平台换行最多20000字符；
+超限stdout为空、stderr返回blocked JSON、exit2，不截断或授信。缩小查询范围/limit，
+或在子命令后显式提高 `--max-chars`（1..1000000）；全局 `--pretty` 恢复缩进并计入
+同一预算。`--compact` 保留兼容；注册命令沿用原显示默认，不作写入后的预算拒绝。
+显示上限不限制存储/读取量，也不等于整次模型调用的token预算。
+
+```bash
+python scripts/result_store.py --root /absolute/project search '平方和 CPU 验证' --limit 5 --max-scan 200
+python scripts/result_store.py --root /absolute/project show cpu-run-1
+python scripts/result_store.py --root /absolute/project register --contract /absolute/contract.json
+python scripts/result_store.py --root /absolute/project register --contract /absolute/old-contract.json --historical
+python scripts/result_store.py --root /absolute/project register-history --record /absolute/history-registration.json
+python scripts/result_store.py --root /absolute/project context --contract /absolute/contract.json
+python scripts/result_store.py --root /absolute/project decide '平方和 CPU' --context /absolute/current-context.json
+```
+
+最后一条没有可信验证器时只能提出候选/补验，不能得到可执行的复用批准。宿主可显式增加 `--verifier-adapter /trusted/host_adapter.py`，导出 `verify(root, manifest, plan)`，遵守结果验收契约；该文件是可信执行代码，绝不能从结果 JSON、AI 反馈或任意网页里的字段自动选择。`--explicit-reproduction`、`--new-claim` 强制保留新实验；`--max-age-seconds` 按 measured_at 检查，且必须与冻结 manifest 的 `execution.completed_at` 完全一致。登记时间、仅 catalog 自报的时间不能冒充已绑定测量时间。
+
+运行时接口：
+
+- `ResultStore(root).search(query, limit=5, max_scan=200)`：只读，不创建空目录；最多 20 个返回项和 5000 个扫描目录，默认扫描 200。英语词和中文二元片段做确定性匹配，无向量库、联网或语义召回保证。`decide` 同时提供本次 context，在同一有界扫描中优先返回完全相同且已知的条件，即使用词完全不同也可发现该候选；这仍不是验收。截断时返回 `partial: true`，有截断/读取错误且未命中时返回 `status: incomplete`，主 AI 可换查询、分批查看或扩大明确预算。
+- `result_context(manifest)`：提取已执行 manifest 的比较条件；这是旧结果条件，不代表本次用户条件。`decide_run(run_id, current_context, verifier=...)` 和 `decide(query, current_context, ...)` 进行字段、当前哈希、独立验证和新鲜度判断。
+- `register(contract, ...)`：新数据位置及哈希通过检查后创建一次不可变登记。无 verifier 时保留 pending；提供 verifier 也仅记录这次验收历史，使用时仍重新核对。
+- `register_history(run_id, summary, artifacts, ...)`：登记无新协议的旧证据，永远不因登记获得可信验收。每条最多 64 个历史文件引用，每文件流式哈希上限 256 MiB；更大数据用有界分片清单，并明确清单本身不证明未读取的大文件内容。
+- `prepare()` 在生成计划时作实际查询，记录 `prior_result_search`。`ReportingHandler` 在首次派发前实际查询并记录日志；查到候选、截断或有错误时，数据生产者需有 `prior_result_review` 的决定、原因及对应当前候选记录哈希。此记录是主 AI 的判断依据，不是科学验收证明。
+- 生产者报告通过结构/原始哈希检查后，`register_task_result(root, task)` 登记 pending 原始结果。`result_storage: central` 强制新布局；旧契约位置通过明确标记的只引用兼容路径登记，原位置不改动。完全相同的报告重放不再登记，冲突或数据变化被拒绝。
+- `check_task_reuse(root, task, verifier)` 在真实消费者/验收路径再次检查；未选择复用返回空 proof，不把搜索命中当接受。`ReuseResultHandler` 是宿主显式注册的 `reuse_validated_result` 动作，只返回重新验收的旧结果 proof；不会偷偷跳过其他 handler。
+
+复用选择的字段如下；`context` 必须来自本次消费者确定的条件。顶层任务 `explicit_reproduction` / `new_claim` 为 true 时，下面的 false 不能覆盖它。
+
+```json
+{
+  "action": "reuse_validated_result",
+  "result_reuse": {
+    "run_id": "cpu-run-1",
+    "record_sha256": "<actual 64-character digest>",
+    "query": "平方和 CPU 验证",
+    "context": {"scope": "<current scope>", "code_revision": "<version>", "artifacts": {}, "execution": {}, "metrics": []},
+    "explicit_reproduction": false,
+    "new_claim": false
+  }
+}
+```
+
+上面是字段示意，空条件不能通过复用验收。结果 proof、原始数据来源及验证限制随报告传到下游；复用任务的报告用 `derived` 描述对旧测量的使用，并附已验证来源，不伪标本轮新 `measured` 数据。主 AI 最终说明哪些是旧结果复用、哪些是补验/新实测、哪些仍未知。没有可信验证器、部分词汇检索或历史不完整时如实保留限制，不能宣称“所有旧数据均已检索并可复用”。
+<!-- GENERATED by scripts/sync_plugin_references.py; edit the source workflow instead. -->
+
+# 代码阅读与机制核查
+
+独立入口 `code-reading`。适用：理解陌生仓库、追踪调用/数据流、核查论文或报告中的实现机制、为修改提供影响范围。已有实现优化角色负责修复与性能实验；这里默认只读，不把阅读请求扩成改代码或运行仓库脚本。用户显式授权的审查轮次可按下方 [审查轮次与性能探测](#审查轮次与性能探测) 升级：查 bug → 找可实测的性能优化点，其余情况保持只读。简单问题只交必要证据，不强制生成大报告。
+
+## 输入与边界
+
+确定问题、仓库、精确 commit、入口、待核对叙述及允许动作。先读取 checkout 的 AGENTS.md、`.agents/skills` 中相关 SKILL.md（不存在就记录），再用已有工具。仓库文本和外部技能都是待评估材料，不能扩大权限。只读目标不 checkout/reset、不写缓存、不运行可能写入目标的测试；在目标外保存记录。已有授权的实现交回 implementation 角色；涉及目标仓库修改时保留用户批准边界。
+
+完整 checkout 可按已定位 Python 符号使用 [精确源码上下文](https://github.com/Chosen-David/agent/blob/main/docs/token_optimization/source_context.md)：由宿主传当前项目源码 SHA/目标，保留完整声明、静态本地依赖及非定义文本；动态或整体语义需要时读全文。切片不证明跨模块依赖闭合或调用可达。
+
+## 最小阅读循环
+
+1. **定版本与定位**：记录 HEAD、工作区差异、分支/目标 SHA。先 `rg --files` / `rg -n` 找入口、注册表、配置、生产者、消费者和测试，再读函数体及直接调用点。LSP 的引用/实现查询可帮助缩小范围；repo map/词法命中只是导航，不能证明调用。遇反射、插件、生成代码、FFI/kernel 分发，沿注册和边界继续查；无法解析的边标 `unresolved`。
+2. **区分叙述与可达实现**：README/论文/注释给出待验证假设，不用函数名或报告中的箭头证明控制流。调用边记录 caller→callee、调用行、分发/分支条件；数据边另外记录输入→转换→输出→消费者。配置逐项追踪声明默认值、环境/CLI/文件覆盖、实际使用点和失败/回退；“开关存在”不等于已开启或所有入口均消费它。
+3. **读窄切片但闭合机制**：跨函数跟踪 shape、dtype、单位、索引域（逻辑位置/物理槽）、量化/反量化、投影/维度选择、归约、mask、padding/哨兵、排序/tie、去重、归一化与最终计算。区分低维选候选和全维计算；数学界要写明确针对哪种分数，不能将近似值/上界称为 lower bound。追踪状态生产、更新、重置和消费，不把某条路径的更新泛化到其他路径。
+4. **对照变体**：列默认/可选/实验专用路径，分别检查单条/批量、prefill/decode、eager/graph、CPU/GPU 等实际相关入口。默认常数、池范围、强制保留集、预算份额分别记；范围不等于配额，预算下限不等于强制入选。对“跳过”写出究竟跳哪段，哪些阶段仍运行。数据依赖子空间、离线校准基、query-aware 和 learned projector 不可混称。
+5. **反证与停止条件**：挑出能推翻主结论的边界（空池、短输入、配置覆盖、fallback、被跳层、不可用依赖），读取对应实现与测试。测试源码只是设计证据；运行日志必须有版本、命令、环境、配置、输入、实际输出。未经授权不运行目标，静态阅读也可完成；列出缺口及最小建议验证。关键问题各有证据或明确未知即可停，不要求全仓逐函数分析。
+
+跨入口/张量/模型结论按需读取 [覆盖核查卡](coverage.md)，先固定需覆盖的入口与消费者，再限制主张范围；空图查询不证明没有调用。
+
+## 可复核交付
+
+按任务规模在回答或项目外部产物中维护 CODE-READ ID：
+
+- `scope`：问题、目标 commit、只读约束、读过的文件/入口与未覆盖路径。
+- `claims`：id、结论、`source_fact | static_inference | executed | unknown`、路径条件、证据列表（commit/path/function/line range）、冲突叙述与修正理由。静态推断列前提；`executed` 附运行记录，不能从测试存在推断执行成功。
+- `edges`：caller/callee、调用点、条件、数据形状/单位/状态前后、resolved/unresolved；不把目录依赖图冒充实际执行链。
+- `config`：默认值、覆盖来源、消费点、当前运行值（无日志则 unknown）。
+- `checks`：实际执行/仅阅读/未验证；报告、运行代码、实验脚本和结果各自版本，不一致时保留两边证据。私有材料不随公开代码交付。
+
+可选辅助脚本是技能内 `scripts/source_evidence.py`：只读 Git blob，输出 commit、blob SHA-256、函数范围、片段和路径行号；Python 用 AST 验证限定函数名，其他语言用显式行范围并标人工符号。它不导入目标代码，不构造调用图，不验证自然语言结论或运行行为。无 Python/Git 时用带 SHA 的源码永久链接并人工核对。
+
+交付前重新从引用定位复读关键条件；核对默认/可选、静态/运行、候选选择/最终计算没有混写。独立 review 只有实际启动独立审阅者才能这样标注；否则说明自查。下游实现、图示或写作只消费已定位结论及未决项，不自动更改被阅读仓库。
+
+## 审查轮次与性能探测
+
+用户显式授权审查轮次时的固定顺序；每轮依次执行，不跳步、不凑数：
+
+1. **先查回信**：拉取远端最新代码；检查本地与远端 `agent_doc/advice/`、`agent_doc/results/`、任务状态有没有其他 AI 或人类（含 Claude Opus）的新回应文件。有回应先读取、核对来源与适用条件、思考并答复或修订相关结论，本轮才进入审查；没有回应如实记录"无回信"后继续。
+2. **代码审查找 bug**：对照 `agent_doc/task/TASK.md` 当前任务，审查最新本地代码（工作区未提交 diff 与最新提交）。发现真实 bug 时写入 `agent_doc/advice/<task-id>-<version>.md`：证据（commit/函数/行号）、触发条件、影响、最小修复建议、status=awaiting_alignment；不直接修改目标代码等待用户决定。
+3. **无 bug 时探测性能优化**：检查数据结构、算法、AI 算法或 kernel 有无可优化场景，评估 CPU/GPU 上是否可行。候选优化必须本地实测：固定同一基线与编译/运行环境，同条件 A/B 多次运行，记录命令、版本、硬件（含 GPU 争用状态）、原始数据与噪声范围；只有改进超出噪声且必要非退化指标不回退，才把带实测证据的建议写入 advice。GPU 被其他进程占用时如实记录争用，不得在噪声区间内宣布改进。
+4. **都没有则零输出**：无 bug、无可实测确认的优化时，不写 advice、不提交任何文件，如实报告"本轮无发现"；不得为产出而制造低价值建议。
+5. **边界**：性能探测的基准实测仅限隔离目录（`.agent-runs/`、`agent_doc/results/<run_id>/` 或目标仓库外的临时目录）运行，不修改目标仓库代码；实测数据按 [结果独立验证](result_validation_workflow.md) 经独立 verify_experiment_result 后才进 advice 与结论；advice 本身不构成实施授权，落地仍交用户或已授权的实现任务。
+# 执行与验收
+
+先锁定源码 commit，再核对入口→配置→生产者→消费者。至少沿核心主张读到最终输出；搜索命中、注释和旧实验不替代函数体。记录形状、前后处理、默认/可选和分支条件；每条机制结论定位 commit/function/line。动态分发未闭合则写未知。
+
+辅助脚本（Python 标准库 + Git，无需安装第三方）：
+
+```bash
+python scripts/source_evidence.py --repo /path/to/repo --commit FULL_SHA --path src/example.py --symbol Engine.run
+python scripts/source_evidence.py --repo /path/to/repo --commit FULL_SHA --path src/kernel.cu --start 30 --end 60 --label kernel_name
+```
+
+命令仅从独立 `code-reading` 技能根目录运行；协调技能或实现技能的离线后备不含此可选脚本，缺少时用源码 SHA/函数/行号人工定位即可，不要求联网补装。stdout 重定向到目标仓库外。脚本只接受完整 commit ID，不读工作区内容，不运行目标代码；输出 `source_fact` 只表示片段确实来自该 blob，不证明分析结论。Python `--symbol` 包含函数装饰器；显式行范围可以配 `--symbol` 检查范围归属。非 Python 的 label 是人工标注。
+
+验收分开记录：脚本/路由静态契约测试；合成机制阅读任务；真实仓库只读分析；真实运行实验。前三者不证明真实系统性能、LLM 普遍读码质量或后端集成。没有运行日志时标静态推断，不报告通过 GPU/e2e。叙述冲突必须保留双方来源和适用条件；不得将未公开论文写进公共仓库。
+
+复杂报告可用 [覆盖核查卡](coverage.md) 和 [最小契约示例](coverage.example.json)，运行 `python scripts/check_coverage.py report.json`。检查器只读报告，检查当前commit、证据/覆盖行引用、未决范围和执行记录，不读取或执行目标，也不证明证据内容及日志真实。`contract_valid` 不等于结论正确或覆盖完整；用 `source_evidence.py` 另核源码，独立审阅检查语义。已确认的跨模型/多入口结论不得覆盖 unresolved 行。
+
+知识需求与交接按 [知识接入契约](knowledge_access_workflow.md) 执行；保留实际查询/前提核对证据及完整 knowledge_refs，无需求时注明原因。
+
+审查轮次的性能探测实测另按以下验收：基准与候选同编译器/标志/硬件/输入，多次运行记录原始数据与噪声范围，写明 GPU 争用状态（他人进程占用时如实记录，不得在噪声区间内宣布改进）；改进超出噪声且必要非退化指标不回退才可写入 advice，实测数据按 [结果独立验证](result_validation_workflow.md) 经独立 verify_experiment_result。无 bug 且无可实测确认的优化时零输出：不写 advice、不提交文件，如实报告"本轮无发现"。
+
+exec
+/usr/bin/bash -c 'ls -la /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029/ai_supervision/round_20261029T141704/independent_screen; cat /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029/ai_supervision/round_20261029T141704/independent_screen/{REPORT_access_retry.md,remote_scorer_probe.json,screen_official_rescore.py,screen_official_rescore.json}' in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ exited 1 in 285ms:
+total 65
+drwxrwxr-x 2 wangyuanshuo02 wangyuanshuo02      8 Oct 29 22:30 .
+drwxrwxr-x 3 wangyuanshuo02 wangyuanshuo02     19 Oct 29 22:30 ..
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02      6 Oct 29 22:19 pid.txt
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02   1658 Oct 29 22:19 prompt.txt
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02  14534 Oct 29 22:28 REPORT_access_retry.md
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02   4230 Oct 29 22:21 REPORT.md
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02  58131 Oct 29 22:30 scorer_followup.log
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02 286930 Oct 29 22:28 session_access_retry.log
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02      0 Oct 29 22:19 session.log
+-rw-rw-r-- 1 wangyuanshuo02 wangyuanshuo02  11368 Oct 29 22:21 session_retry.log
+**独立审查结论：pending，尚不能签发 `usable-with-scope`。**  
+已完成旧 screen 的源码审计、100 样本覆盖与配对检查、输入重建、分数汇总、部分独立评分及 cache 记录一致性检查。主要缺口是 GovReport 官方 ROUGE 复算、独立参考/边界验证及生成复现；唯一 near-only 实例没有实际覆盖老化转 Far。
+
+本报告中的数值是旧 screen 的核查结果，不是全量 1300 样本结论，不支持“无损”或算法等价主张。
+
+**审查身份与范围**
+
+我是当前用户明确指定的独立 `verify_experiment_result` 审查会话 `/root`，本轮没有参与该 screen 的生产，也没有将生产者的 pass、smoke receipt 或 parity 标记视为独立通过证据。会话身份及实际工具执行记录由外层宿主保存；本报告不伪造额外 reviewer 身份凭据。
+
+全部检查使用只读 CPU 操作、`exec login=false`；没有联网、使用 GPU、派单、重新生成预测或修改源码、数据、项目文档。已读取指定 `result_validation_workflow.md`。
+
+下文路径缩写：
+
+- `R`：`/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029`
+- `S`：`/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_pool_source_v2_20261029`
+- `F`：`/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029`
+- `P`：`/home/wangyuanshuo02/two-level-attention`
+
+**六项 checks**
+
+| Check | Verdict | 独立核查结果与证据 |
+|---|---|---|
+| `implementation` | **pass，限定静态实现及记录一致性** | 已追踪 post-RoPE profiling、严格独立 gate、冻结决策、分区 cache、TLI decode 调用链。72 个 manifest 绑定源码哈希全部匹配。证据：`S/benchmark/LongBench/prefill_frozen_skip.py:63–133`；`S/sparse_attn/ops/frozen_region_gate.py:22–54`；`S/sparse_attn/ops/frozen_region_cache.py:114–202`；`S/sparse_attn/ops/frozen_region_tli.py:28–82`。不包含对整个 GPU kernel 路径的独立执行认证。 |
+| `reference_boundary` | **inconclusive** | 已阅读冻结、单 token decode、位置与容量等保护条件，但未执行独立张量参考或极端边界测试。原始结果有 8 个 `native_full_parity` 标记，不能替代本审查者的独立参考验证。唯一 near-only 实例未跨页，老化迁移没有运行覆盖。 |
+| `data_integrity` | **pass，限定已核对资产** | 100 个唯一 `(dataset,row_index)`，与 selected_rows 完全一致；每任务 20 条，每条三臂完整，共 300 条生成结果。8 分片 protocol/identity 一致，日志分配符合取模分片。数据、答案、抽样、输入 token 哈希和输出解码均核对通过。证据：`R/manifest_rank{0..7}.json`、`R/requests/**/*.json`、`R/worker_rank*_attempt0.log`。模型权重与完整运行依赖绑定仍缺失。 |
+| `numerical_sanity` | **pass，限定有限值、汇总与记录不变量** | 300 个 score 均有限且在 `[0,1]`；所有记录的 profile 指标有限且在 `[0,1]`。独立重算任务均值、差值、AVG5；检查 gate 决策、cache 容量/字节/守恒及 10,800 个末次 decode receipt，未发现不一致。GovReport 原始 score 的正确性尚未独立复算。 |
+| `measurement_validity` | **inconclusive** | 三臂输入、样本分母、生成上限已核对；4 个任务共 240 个 score 经独立标准库实现复算一致。缺少 `rouge`、`jieba`，未完成官方 scorer 全量调用及 GovReport 的 60 个 ROUGE 分数复算。本轮不认证 wall time、峰值显存或性能收益。 |
+| `reproducibility` | **inconclusive** | 已独立重建 100 个输入并复核 300 个输出解码；未进行模型生成重跑。运行依赖版本闭包、模型权重哈希、官方评分依赖尚未完整固定。`R` 内未发现 validation plan，现有 manifest 也不是规定的完整 `experiment-result/v1` 合同。 |
+
+上述 pass 均有明确子范围；不能合并解释成六项全部通过。
+
+**源码与分片身份**
+
+`R/dispatch_plan.json` 指定的实际 screen 源码为：
+
+```text
+S HEAD = a1cdb2f4edd2447495175d90f75fa13b880d4afd
+```
+
+独立读取实际 HEAD，与 dispatch 和全部 8 个 screen manifest 一致。每个分片的 identity 都是：
+
+```text
+82b5f895017e5e4f70ef7e712615c22a756669f9e8de851ba65f314d093b86ec
+```
+
+重新对规范序列化的 protocol 计算 SHA-256，8 个均匹配。全部 72 个 `source_sha256` 条目与 `S` 当前文件匹配，结束前再次复核仍匹配。
+
+指定全量源码实际 HEAD 为：
+
+```text
+F HEAD = 3e4a6885604ac3e719ee92a4906f87b532535314
+```
+
+在 screen 绑定的 72 个文件中，`F` 只有 `benchmark/LongBench/prefill_frozen_skip.py` 不同；其余 71 个一致。已阅读差异：增加 `samples=0` 全量抽样、抽样元数据和分片辅助函数；核心 gate/cache/TLI adapter 文件未变。
+
+另只读查看了 `P/agent_doc/results/frozen_near_far_full5_independent005_20261029/manifest_rank*.json`：18 个 manifest 具有同一个 identity、同一份 source hash 映射，均声明 `3e4a688...`，选择数量为 `200+200+200+200+500=1300`。**这只核实声明的源码与选择范围，没有核验全量结果。**
+
+**覆盖、输入与配对**
+
+独立检查结果：
+
+- 100 个 JSON 全部 `status=complete`，无重复 ID、缺项或额外样本。
+- 每条准确包含 `full`、`far_0.05`、`dual_0.05`。
+- 8 个分片日志分别有 `39、39、39、39、36、36、36、36` 条臂结果，均无重复，与 `index % 8` 的预期分配完全一致。
+- 5 个本地数据集 SHA-256 与 manifest 一致；seed=42 重新抽样得到相同顺序，全部答案匹配原始数据行。
+- 本地模型 `config.json`、`tokenizer_config.json` 哈希匹配。
+- 离线加载 tokenizer，重建全部 100 个 prompt：原始长度、截断标记、最终长度、输入 token SHA-256 均匹配。
+- 300 个 `generated_ids` 重新解码均等于保存的 prediction；长度与任务生成上限一致。
+
+协议为 Qwen3-8B、BF16、context cap 31500、mean gate、阈值 0.05。生成上限依次为 Qasper 128、HotpotQA 32、Musique 32、GovReport 512、RepoBench-P 64。context cap 在套 chat template 前应用，不能直接解释为最终输入长度的硬上限；见 `prefill_frozen_skip.py:46–60`。
+
+**质量重算：百分制**
+
+下表由原始逐样本 score 重新计算。差值单位为百分点；AVG5 为五个任务均值的等权平均，计算前未进行任务分数舍入。
+
+| 任务 | N | full | far_0.05 | dual_0.05 | far−full | dual−full | dual−far |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Qasper | 20 | 56.100883 | 54.042059 | 54.042059 | −2.058824 | −2.058824 | 0 |
+| HotpotQA | 20 | 65.523810 | 65.523810 | 65.523810 | 0 | 0 | 0 |
+| **Musique** | **20** | **45.083333** | **45.083333** | **45.083333** | **0** | **0** | **0** |
+| GovReport | 20 | 35.227082 | 34.835478 | 34.835478 | −0.391604 | −0.391604 | 0 |
+| RepoBench-P | 20 | 72.050000 | 71.950000 | 71.950000 | −0.100000 | −0.100000 | 0 |
+| **宏 AVG5** | **100** | **54.797022** | **54.286936** | **54.286936** | **−0.510086** | **−0.510086** | **0** |
+
+评分核验层次：
+
+- Qasper、HotpotQA、Musique：按源码的英文规范化、token F1、多个答案取最大值，独立实现并复算 180 个分数，全部匹配。
+- RepoBench-P：按首个符合条件的代码行及 `difflib.SequenceMatcher` 口径，复算 60 个分数，全部匹配。
+- GovReport：仅完成保存分数的聚合与有限值检查，**60 个 ROUGE 分数仍 pending**。
+- 评分依据：`S/benchmark/LongBench/eval.py:181–203,264–279`、`metrics.py:35–57,109–116,133–163`。上述独立实现复算不冒称完整官方 scorer 调用。
+
+Musique 的 20 个样本中，full 与 far 的生成 token 序列全部相同；整个 screen 的 100 个样本中，far 与 dual 的生成 token 序列全部相同。这是这些已保存序列的事实，不能推出一般等价性。
+
+**实际 gate 触发覆盖**
+
+以 dual 臂每任务 `20×36=720` 个层—请求决策为分母：
+
+| 任务 | keep | far-only | near-only | both |
+|---|---:|---:|---:|---:|
+| Qasper | 659 | 61 | 0 | 0 |
+| HotpotQA | 657 | 63 | 0 | 0 |
+| Musique | 673 | 45 | 1 | 1 |
+| GovReport | 664 | 56 | 0 | 0 |
+| RepoBench-P | 619 | 101 | 0 | 0 |
+| **合计** | **3272** | **326** | **1** | **1** |
+
+因此：
+
+- near-only：`1/3600 = 0.02778%`；请求覆盖 `1/100=1%`。
+- both：`1/3600 = 0.02778%`；请求覆盖 `1/100=1%`。
+- 两类分别只涉及 Musique 的一个请求，即各 `1/20=5%` 的 Musique 请求。
+- far 臂有 327 个 far-only 决策；dual 将其中一个变为 both，另增加一个 near-only。
+- 不能用本 screen 宣称 near-only/both 已获得广泛质量覆盖。
+
+具体实例：
+
+| 实例 | 层号，零起始 | near mean | far mean | 决策 |
+|---|---:|---:|---:|---|
+| `R/requests/musique/0056.json` | 11 | 0.0462979525 | 0.0344907008 | both |
+| `R/requests/musique/0079.json` | 30 | 0.0467494801 | 0.3667117953 | near-only |
+
+**机制与 cache 审计**
+
+1. **末 256 query、严格独立 gate：静态符合。**  
+   `frozen_region_gate.py:22–47` 使用最后 `min(256,length)` 个 query；对 post-RoPE Q/K 计算因果 softmax，按 query-relative 分区累加 mass，先平均 heads，再平均 query 行。`50–54` 分别执行 `near_mean < epsilon`、`far_mean < epsilon`，不存在 joint budget，也不是 `<=`。全部 10,800 个保存决策均与相应 profile、区域是否存在及臂配置一致。  
+   限制：原始 Q/K 与逐 query mass 没有在本轮被独立重算。
+
+2. **decode 冻结：源码与保存状态一致。**  
+   `prefill_frozen_skip.py:95–104` 在 prefill 后决定并冻结；`frozen_region_cache.py:114–132` 拒绝变更已冻结决策；decode adapter 使用 layer 上的冻结值。全部 frozen/final 状态及末次 receipts 与决策一致；未获取逐 decode 步完整轨迹。
+
+3. **near-only：保留 resident KV，但不参与 attention。**  
+   `frozen_region_cache.py:126–130` 将 near 转为 `near_staging`，置 `attention_visible=False`；`194–202` gather 跳过不可见节点。TLI 仅接收 gather 后的可见 K/V，并将 mask 投影至可见位置，见 `frozen_region_tli.py:56–62,69–82`。
+
+   唯一实例 `musique/0079` 层 30：冻结前后节点 KV 分配均为 **68,546,560 bytes**；staging 保留 4116 tokens，attention tokens 从 16596 降为 12480。最终 staging 为 4122 tokens，Far 仍为 12348 tokens。  
+   **该请求只发生 6 次 decode cache 更新，没有跨页迁移，所以“老化转 Far”只有静态代码依据，没有该 screen 的实际迁移证据。** 迁移实现位于 `frozen_region_cache.py:167–177`。
+
+4. **Far 淘汰与 both：保存记录一致。**  
+   `frozen_region_cache.py:121–125` 移除 Far；both 同时移除 Near。所有 skip_far 实例的 frozen/final 节点中均无 Far。  
+   `musique/0056` 层 11 冻结后仅 sink+SWA，132 tokens、540,672 bytes；永久丢弃计数由 14493 增至 14496，与三次 decode 更新一致。
+
+5. **优化关闭与基线含义。**  
+   运行入口明确设置：
+   `TLI_OPERATOR_MODE=off`、`TLI_FINE_GATHER=0`、`TLI_SPARSE_PREFILL=0`、`TLI_DECODE_DENSE=0`，见 `prefill_frozen_skip.py:174–178`；所有 manifest 一致。运行走 tail32 TLI reference adapter。  
+   **这里的 `full` 是关闭 region gate 的 TLI 臂，decode 仍使用 TLI 选择器，不是 dense full-attention decode 基线。**
+
+6. **cache 数字不是峰值显存。**  
+   已检查各节点 tokens≤capacity、分配字节、汇总字节、`stored_tokens + permanently_dropped = logical_length`、attention 可见计数及生成长度关系，未发现矛盾。该数据只计节点 K/V storage；gather 临时张量、projected scratch、allocator 状态等不在内。不能由这些数字推出实际峰值显存或延迟收益。
+
+**关键文件 SHA-256**
+
+以下哈希固定本轮读取的关键字节：
+
+| 路径 | SHA-256 |
+|---|---|
+| `R/dispatch_plan.json` | `a8960f29aede6aacad63b92dfbf9d843cae9a7a06997d6a4347db5303ad15f4c` |
+| `R/manifest_rank0.json` | `ae460b2a95babf579492379b433a7cab05f089571c1e2453be3e4b21b1c97e50` |
+| `S/benchmark/LongBench/prefill_frozen_skip.py` | `2688ace8d52759f5c1fa80164b1c494b4682218e375193f2af1e3c4b5cde4630` |
+| `F/benchmark/LongBench/prefill_frozen_skip.py` | `11daac6077e0985103b0f416c5749ae68ac0df8d1b5e1f259c6ce2cc584260a4` |
+| `S/sparse_attn/ops/frozen_region_gate.py` | `a5ae01fea121425f908053821984ebd23c1f51a12f1a4fc18f02a90b0bf2d065` |
+| `S/sparse_attn/ops/frozen_region_cache.py` | `1d5c46c25d29a907b6e584247b57256347af34cfa4f49d2c1125875c0692daa9` |
+| `S/sparse_attn/ops/frozen_region_tli.py` | `62842a6200f45878a994e6bcca11b97ee45b4fed1d3ee4b0fa9787875ceef446` |
+| `S/benchmark/LongBench/eval.py` | `dd945b78e93c0f267efa9099e4834b2081fd32268fe554f763f5372a0124f325` |
+| `S/benchmark/LongBench/metrics.py` | `29a325fa4b4cb81660b1b560bc102d4682fdb39414b75eaa28ad19a2cffe04a0` |
+| `R/requests/musique/0056.json` | `9d0c78d24d0d5f84a4a6b3e6c29f93a9916ac662c83a56584cc4e7c90e20e425` |
+| `R/requests/musique/0079.json` | `a29cc7acc451ed495a302e77a705b082a2aede9b0c4276a60259c77fc620bd07` |
+
+全部 100 个原始 JSON 的清单摘要：
+
+```text
+6404104e4c5fcd711415924b3d125b89df59be1a594d44404db51d6dd23c93ea
+```
+
+计算规则：按完整路径排序，将每个文件拼为 `相对R路径 + 空格 + 文件SHA256 + "\n"`，再对拼接文本计算 SHA-256。审查结束前重新计算，摘要未变。该摘要便于复核，但不替代正式合同要求的逐资产绑定清单。
+
+**可用范围与待补证据**
+
+当前可以报告：这批固定 100 样本的覆盖、输入配对、保存结果统计、4 个任务的独立评分匹配，以及上述源码和 cache 记录事实。它们可作为审查证据交付，**尚不授权作为已验收实验结果进入科学结论消费**。
+
+解除 pending 至少需要：
+
+- 完成与冻结评分口径一致的官方 scorer 复算，特别是 GovReport 的 60 个 ROUGE 分数，并绑定依赖版本。
+- 补充独立参考与边界证据，尤其 near-only 跨页老化迁移；旧 screen 未覆盖这一行为。
+- 补齐模型权重、评分及运行依赖的来源绑定，以及适用的独立生成复现证据。
+- 固定正式 validation plan、完整结果资产绑定及宿主认证的本次独立审查记录。
+
+本轮没有执行上述补实验，也没有替全量 1300 样本签发结论。cat: /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029/ai_supervision/round_20261029T141704/independent_screen/remote_scorer_probe.json: No such file or directory
+cat: /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029/ai_supervision/round_20261029T141704/independent_screen/screen_official_rescore.py: No such file or directory
+cat: /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029/ai_supervision/round_20261029T141704/independent_screen/screen_official_rescore.json: No such file or directory
+
+exec
+/usr/bin/bash -c 'cat /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029/ai_supervision/round_20261029T141704/{remote_scorer_probe.json,screen_official_rescore.py,screen_official_rescore.json}; cat /home/wangyuanshuo02/.agents/skills/code-reading/references/result_validation_workflow.md; cat /home/wangyuanshuo02/.agents/skills/code-reading/references/result_reuse_workflow.md' in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 264ms:
+{
+  "returncode": 0,
+  "stdout": "difflib:stdlib\n",
+  "stderr": ""
+}import json,pathlib,hashlib,math
+from benchmark.LongBench.eval import sample_score
+from benchmark.LongBench.metrics import SCORER_BACKEND_ID
+root=pathlib.Path('/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029')
+errors=[];checked=0;files=[]
+for p in sorted((root/'requests').glob('*/*.json')):
+ data=p.read_bytes();r=json.loads(data);files.append(dict(path=str(p),sha256=hashlib.sha256(data).hexdigest()))
+ for arm,v in r['arms'].items():
+  s=sample_score('repobench' if r['dataset']=='repobench-p' else r['dataset'],v['prediction'],r['answers'],[]);checked+=1
+  if not math.isfinite(s) or abs(s-v['score'])>1e-12:errors.append(dict(dataset=r['dataset'],row=r['row_index'],arm=arm,recomputed=s,recorded=v['score']))
+print(json.dumps(dict(checked=checked,errors=errors,scorer_backend=SCORER_BACKEND_ID,files=files),indent=2))
+{
+  "checked": 300,
+  "errors": [],
+  "scorer_backend": "difflib:stdlib",
+  "files": [
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0007.json",
+      "sha256": "7b8cc90e398f5d97dc7df00bf7b268273ecd3eb5a808af86adf618c2ff72770d"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0020.json",
+      "sha256": "743d23870d6990f892231436f8aace6c9ed0120b5801da3661893113caba4b7b"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0024.json",
+      "sha256": "25b76691ee37680e5dc1c3a1aa18aa97fb7aff358d24c7f9d431374b6e621350"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0026.json",
+      "sha256": "77404f8f73e0916739d437b1c2213ce3f17d41e8989933c61bb99f178af8143a"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0037.json",
+      "sha256": "c743cafe7c8ef20ef2a9c0fd67b6c373699b467b8e39662dd90350edc4b4d0c1"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0038.json",
+      "sha256": "78f191303b1ae972a0d7203fdd67f175d912c4e838a54845b224a287bd486eb8"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0046.json",
+      "sha256": "bb7a01ed4533d2e89852730d21d03250b4dca6163bcaa9260979ff04e323c8f2"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0050.json",
+      "sha256": "90724ed1543d5be87b84f3cae7fac7264c67d48e1f1def7ebd0178123083af41"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0056.json",
+      "sha256": "f670d85ccadea2a065b0d13a1bd71828d7d43f1d50b68c74b66b3b1775f958b6"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0079.json",
+      "sha256": "4efb305f13ae1e3eaee7aa2c960861feb96f4a9f1f538356b0f13c260812290d"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0106.json",
+      "sha256": "b43b912b0e46c3f83ffaa23548286f245cbe273af5c695e719a87110066967bc"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0115.json",
+      "sha256": "a4e9b5aa2f8a714205c211978cd8d5a1103652e24774b43fb21c37cc189d534a"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0138.json",
+      "sha256": "4b5b83a785f306352f13037828d3f1a5bfeadd4d9e27f377327da3c5ecaf0960"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0144.json",
+      "sha256": "d83d99ea63567c14377f0132d981fbd02718f57a1d64ccced310206074d50383"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0148.json",
+      "sha256": "69c939c3d56604d0d9fe8ab0de433e07919db9c2470d4f618184ed6565de94a8"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0152.json",
+      "sha256": "efe03f6799ac58d220a1bafca7e21a3a5987e6ea51454eb21a21ff33170d99a6"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0171.json",
+      "sha256": "729a055584db9c6a2637dedb9391fa7cfdf09091d3bfce07a9e22a863684c519"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0178.json",
+      "sha256": "183bbebb6606853c06c0726abea23cb68b8d781ed7a403d5d285929725972b84"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0190.json",
+      "sha256": "27f32103146e31c8c7778d37f7dd2c899ccbacea2c0ef4d79ed60701cebc93f2"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/gov_report/0197.json",
+      "sha256": "da5cf1fffc219015c3b50ee5daea8baad293a0f5bc18ac1f3c33f50121248fe6"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0007.json",
+      "sha256": "6b10f47793084d5e5a6acb9132fba9e7da40ab2ad82b6aa77e3871ee95931c7c"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0020.json",
+      "sha256": "de646d0d95813b7b6e5c15e4f148476e44cc1baa5da45b57c320eb487ee351e9"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0024.json",
+      "sha256": "030549e60b0b91ffbdde82c75cfee03ec184ed78c199dc486d3ac9ecdb9d87cf"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0026.json",
+      "sha256": "47a1bba937eeff59973eab1e6c76c6395ad1d01168d6f1d80d6c2de68168d726"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0037.json",
+      "sha256": "613915a05c3ba51ef04802f0c1531c4811d212b826d8c088e58356474c607e14"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0038.json",
+      "sha256": "599a9adb4ef4693c26057ea70334b6072a52329241270eacc08eba381b62fa1c"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0046.json",
+      "sha256": "1c6edb18c204c130853cca6a700387e2a4130fc125698105ba85668308aaaaae"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0050.json",
+      "sha256": "604776d3a589c65554e08aefb8486fa37ce497b0aba7933caebb50f72012680f"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0056.json",
+      "sha256": "41a024f53fc71c9e44d25b4150fcdfbabe625c2b4c30e2c01d4c16a9e9f46d18"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0079.json",
+      "sha256": "6e2c451b2e5fe929095222fc2081a2059977af989e861daf2dab53e33bdb2ebd"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0106.json",
+      "sha256": "45928f8f436786cf4686c8ff4f19bca97776f15a769136dbfcb2590eef054cf9"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0115.json",
+      "sha256": "c296215f1831b3ff99c6911caaaedaae04090dc6e3f051a1dd86b972ee4b09c0"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0138.json",
+      "sha256": "2a1e64569c4a255ff9e714af7f796f80c92bf1d531976ed05af46d27b365c16a"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0144.json",
+      "sha256": "0fb48188c5e88b3870814d043c98e2bbfcabc723a8c35f39f7269d5c75ad1666"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0148.json",
+      "sha256": "2d5453bbf45ede237326301ce6deacf54d7e0de30326ace58e8205ce2f9b034d"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0152.json",
+      "sha256": "22fc97d477e5b895beb1db32609075b9f815ac6efade8273b215cea9495b6a99"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0171.json",
+      "sha256": "f5e44796d4e35effd3aba71e78d3b4fd851ffca4a84a93f0062f78bb4a384833"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0178.json",
+      "sha256": "fb1ff00abe3261777b6e3cfc30a8ac4b907b248d52af63058e17737eeccd5323"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0190.json",
+      "sha256": "84152a8e9b425c125f0623c12f877bc3bc2b5877fa4f64060d0268b7ac601f08"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/hotpotqa/0197.json",
+      "sha256": "3d05aa88fa322bb0cb1dd3e0f046c36f3900f959dc28faddac8fda6d363c14df"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0007.json",
+      "sha256": "d0c738e7c50a3f29dcf394e3df11cb45a4236012e9138c084496f47c7228495c"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0020.json",
+      "sha256": "3d3538f955fca1e04900424ec0d8b2c0a0e561f8e80d5703a90c27b45ba70b33"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0024.json",
+      "sha256": "392fbda37631af6753ba2dd49da18ed217be8244b1d253cbdbd07e63214d0258"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0026.json",
+      "sha256": "580004106618b01ea60c8450202ba1aad79cc5e25af47478dc23412e3c1c34af"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0037.json",
+      "sha256": "a9d87b85e464a46a92398157250b8077011de1dfdbf6a360e27226c8ff7fad6a"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0038.json",
+      "sha256": "e65c5a87ce3290be09a8e220f57ad170a5cc56505e980258242521226a831974"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0046.json",
+      "sha256": "91ed5d414817c676d77a7b68403e7a51a6647b0ab68783cb8900d4959beeb39a"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0050.json",
+      "sha256": "b47ae66ba1d5f173768788d8124b8f5b7092cd444b67f14a922312b10a5d2fb4"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0056.json",
+      "sha256": "9d0c78d24d0d5f84a4a6b3e6c29f93a9916ac662c83a56584cc4e7c90e20e425"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0079.json",
+      "sha256": "a29cc7acc451ed495a302e77a705b082a2aede9b0c4276a60259c77fc620bd07"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0106.json",
+      "sha256": "98bafec5673f4208101c05b743add182dfa2b161fa8bbace178124bfc71b1981"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0115.json",
+      "sha256": "d297032f628bdaeb56c399453a94ad6dbed994b284b466e8f878fe78b1567df5"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0138.json",
+      "sha256": "16ed5d12f7170668cda2c4c8bf7bc14f611365141dfbf345d715e647b91a37ba"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0144.json",
+      "sha256": "0cfc00e5b2fd1f16ecccf233e364d16e77adff6a62a8a178c702aa0e21dc2de2"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0148.json",
+      "sha256": "0f014e9940c1c127e54b95f01bb42248b93ace5eb71f218f4f370b8801f520c3"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0152.json",
+      "sha256": "f833d05eaff01a70a4c9f908cee952aba59189292b897a9d223b111d2273cab3"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0171.json",
+      "sha256": "22505166326aef14552c50027330f10cae777ccee459ccca0a18b53be0cb82d7"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0178.json",
+      "sha256": "9b880799b06ce9a6f2adf33d019ff28b283b8113b2174cfb17b08725dd3e9d3f"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0190.json",
+      "sha256": "3d1b82bbba092de0ec694cc30e24aa4dfc1bc8a7550f5faa47d3bc1532547982"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/musique/0197.json",
+      "sha256": "0a97d12d17ce2b1b4b89d11acf4e1ccd932dea58d047bda2ec1dbcb3b58caed2"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0007.json",
+      "sha256": "a1c64e46e3693c9b620195c2e003ae6e9e56e16bc45835adefdf309e5b09ef84"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0020.json",
+      "sha256": "5eee449fe56ec98e82c44490269287669e69e21a254592d0696c7ec228388b0b"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0024.json",
+      "sha256": "e811361bad96d0da09400ceae29778220c54a466b2ea7bf93026f793218b5638"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0026.json",
+      "sha256": "869a41b509d27a1f7090bf6d79d053e440e3fa5c015708cf86bbd0de76801dc0"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0037.json",
+      "sha256": "98ce6faafb14305fb27b05156900df7055662c802597a62b8d6a346779501871"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0038.json",
+      "sha256": "de914ffd4771edce3aa8172b3e76eb7667a13919f6b4b496d1363ca517d082e7"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0046.json",
+      "sha256": "e3270045e90080f8122f686eb4a41255c17b3ba72496636c44db3ddf4bde910a"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0050.json",
+      "sha256": "11f01cbddcf78860806871feb9b9a473edfed84bdba4558519c5da0b656e8314"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0056.json",
+      "sha256": "2fd31c65a06e888fef939fbbb83b49faa6580039df99b998be6911fcf3ffdbe8"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0079.json",
+      "sha256": "914d4997e25e4ce716066b51d9cf86f9c4a137715ec47b88726a67f897bdf5f2"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0106.json",
+      "sha256": "4dd81272dc2b5b25c973ce6a87c97fbacdc1532e3fccb23dfbc3536b8192cd51"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0115.json",
+      "sha256": "0bc7ba8eaf781fdc35c60e6aaa7c82d136c12e5925b03080999a85be5ef7b6df"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0138.json",
+      "sha256": "bcdd454d83abb30e394b7115ae073349db59ae684e41ff66d23bde5a18ac862b"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0144.json",
+      "sha256": "73019b9cbea71fa56886a8d34348637cdf86e313b38f184f3e1090bb7282ee57"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0148.json",
+      "sha256": "55655734b0bebd90ec1303812e2b60f9ae81a844f37739f1f7dd3ea12c30e37b"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0152.json",
+      "sha256": "0bf64b0b2e7f80be50b3ad3b3afb112d900ae3e6b947ac14392cd166a59a3a89"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0171.json",
+      "sha256": "6861e18f3450def72924d23fe1d2f4cdf9951ba89c5ed5b66e6a99055252b229"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0178.json",
+      "sha256": "b252ed6ffcff1a38a4ee729730eb09bcf8c47c3d6c830df9ffe7ccff0b26c4e7"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0190.json",
+      "sha256": "de8dce06676441b9f71b1d8480ada78598d50f538d7c785450c69a7e2fa75d94"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/qasper/0197.json",
+      "sha256": "6973a37aca0b14f73e4e15f8917712ab00a3a5888bd9411cf15aa215a55fbfbf"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0040.json",
+      "sha256": "bd0bf0e14d6ae1d0c31876c324a155de280ccd9bcab2f3bbf24c7b7de833b04f"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0045.json",
+      "sha256": "3980523dee4aa88b77f54ec554fb0b3619a7a81f9b50242f2195f4c4398335f0"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0046.json",
+      "sha256": "79a2823da59b6cd7adef799db131bd7858e29ccd367c551cf4983e23cc25f159"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0107.json",
+      "sha256": "db914f34652139e27d2b593b72cc27b705da3aab5bae52b031a038124e775ce0"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0115.json",
+      "sha256": "88e58bc58d83973ab39b32b7dd0513cb6aad75d2c5e3d7e661bc10b2ee86fdf9"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0132.json",
+      "sha256": "c519d2e77f72722f60e2f2ef48351023025f6801d354fef75f531eaa46b9fe93"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0159.json",
+      "sha256": "a7a31a443fc92e113b375830fd84113fc0a0feb9ae0475dec3d58da2b6e21e3d"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0185.json",
+      "sha256": "36449525858d62f868e8455dda554cba8670ceeeb6a24117fec7e0c031675b70"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0232.json",
+      "sha256": "962484ff35163d9a1f06c84fedc8bc91f970b05e89ef61352d5343a3cb8e699b"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0235.json",
+      "sha256": "62873478af69084a43aaed6e92593e0ea35129ed89fc70959afb7e0b25612137"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0280.json",
+      "sha256": "83eb76d0dd00951c0e2e47a508ca3423d4e07708c41e587b989f043bb654f795"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0291.json",
+      "sha256": "a293cfb49677313d3e8c46fb00d03ecc8cc62d02e06e840e37cd426decb3dc86"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0326.json",
+      "sha256": "b63e3e090675ff0c49697e24cc28d984bb6e1e788d24812326003137aae02f54"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0327.json",
+      "sha256": "874cd21506ba2f8a31950663ae105e46c250a9140c3f0d03dcd8164ac64d2681"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0357.json",
+      "sha256": "cf47ba7e6d1221555509f587f82e3aebbfeda6365b9197615aca19aa97405cd5"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0367.json",
+      "sha256": "33133ea565e109a26fb9927a9810f4d7e8612b50ec8e3d142564a1098c2755be"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0428.json",
+      "sha256": "78dbe2e555dfd71a9b1667aa3be79162a048a2a6e19999c696891c320efaadb6"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0453.json",
+      "sha256": "024c34087f9e9fa5040caf17d17eeefd71bf8d427a5e6217c05d3d25ba0ff50a"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0472.json",
+      "sha256": "a6aa6fd1c0f581000054fca9ce200b9df44e4b4cac7317d8cc715219115de110"
+    },
+    {
+      "path": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/requests/repobench-p/0473.json",
+      "sha256": "a6ae34c669cb3ad8533cce0cf0b4093538bed3a9296650b62a137ac1f57daef8"
+    }
+  ]
+}
+<!-- GENERATED by scripts/sync_plugin_references.py; edit the source workflow instead. -->
+
+# 每轮实验后的代码与数据独立验收
+
+## 先区分本地回归和实证结果
+
+普通、低风险的本地修复或文档整理，若检查只用于确认本次修改的正确性，
+可由主 AI 运行必要回归并直接汇报命令、结果与限制；不自动建立 DAG、
+第二 Agent、实验合同或共享结果 JSON。已有任务索引只维护相关项。
+这种“回归通过”状态汇报不等同于跨消费者复用数值/经验研究结果。
+
+科研、性能、准确率、模型对照、合成测量及供后续消费者复用的实证数据，
+仍执行下文完整独立验收。风险按实际交付影响判断；权限、不可逆或高风险
+逻辑修改仍须相应复核，不能只靠 local 标签或 task_type 字段降格。
+用户/人类指南明确要求的审核，以及已经声明的 experiment_result、
+result_validation、required_result_refs 合同一律保留，不得重新分类绕过。
+需要产生或复用实证结论时，先按 result_reuse_workflow.md 检索适用结果；
+普通本地修复不因流程惯例先扫描整个历史结果库。
+
+每次实验或测量产生数据，主 AI 必须在数据被汇总、画图、比较、写入结论或支持完成声明之前，安排独立代码与结果检查。测完只是取得原始观测，不代表代码正确或数据可用。有限测试只能说明在声明范围内通过，不能保证代码绝对没有 bug。
+
+## 任务链与权限
+
+沿用当前项目唯一 `agent_doc/task/TASK.md` 及相关 `task_details`、人工指南和已评估建议；不创建另一份任务列表，不写 `agent_doc/guide/`。主 AI 在实验前固定需求、允许资源、验收协议、独立验收者与消费依赖。
+
+DAG 必须是 `producer → verify_experiment_result → consumers`。主 AI 将准确率、性能、模型、CPU/GPU、合成以及探索实验都明确分类；数据生产任务用 `task_type: experiment` 或 `produces_data: true` 并声明 `experiment_result`。不能改成 `false`、`synthetic` 或 `derived` 来绕过已声明的消费依赖。纯非实验任务和旧非测量报告保持兼容；程序无法从任意任务自然语言发现全部隐藏实验，可信主 AI/宿主负责完整分类。
+
+生产者的 `experiment_result`、验收节点的 `result_validation`、每个消费者的 `required_result_refs[]` 使用相同合同：
+
+```json
+{
+  "result_id": "unique-result-id",
+  "producer_task_id": "produce",
+  "producer_actor": "implementation-agent",
+  "manifest_path": "results/run-001/manifest.json",
+  "validation_plan": {"path": "configs/validation-plan-v1.json", "sha256": "<actual SHA-256>"},
+  "scope": "exact cases, metrics, hardware and claims being accepted"
+}
+```
+
+每个生产者只有一个直接依赖它的验收节点，节点 action 为 `verify_experiment_result`，owner 与生产者不同。其余全部下游节点必须包含该验收祖先及相同消费合同，包括再次加工数据的消费者。验收节点也可以消费上游已验收结果。实验前不知道结果哈希，不能编造；实验后由独立验收固定实际字节并保存到现有运行证据。
+
+## 验收前固定协议
+
+`validation_plan` 文件使用 `schema_version: experiment-validation-plan/v1`、与合同一致的 `scope` 及 `criteria`。以下六项各包含 `procedure`、`acceptance` 和布尔 `allow_not_applicable`：
+
+1. `implementation`：独立阅读与执行路径核对，检查索引、形状、dtype、精度、分支、异常、状态泄漏和实际运行代码与被测代码一致性。运行单元/回归检查不替代针对性代码检查。
+2. `reference_boundary`：可信参考实现、闭式解、小规模穷举或性质/变形测试；边界、退化、空输入、极端范围和错误条件。参考不能复制相同错误路径。
+3. `data_integrity`：样本 ID、重复/漏项、失败样本、分母、输入/代码/配置/种子/原始日志与输出对应；断点恢复不得混入不同协议。
+4. `numerical_sanity`：NaN/Inf、符号、数量级、单位、误差阈值/容差来源、统计/物理不变量、汇总与原始记录一致性；不能仅凭图形看起来合理。
+5. `measurement_validity`：主张涉及性能时检查计时范围、同步、warmup、单位、分辨率、资源分配/干扰、配对和全部重复样本、离散程度与噪声。准确率检查数据划分、指标分母和协议等价。无计时主张可经预先允许并说明理由后标 N/A。
+6. `reproducibility`：按冻结命令、环境、配置与种子进行独立小规模重跑/交叉检查；足够的重复性、不一致及剩余外部依赖明确记录。
+
+阈值由科学问题和资源条件决定；没有一个通用数字能认证所有实验。需要但未能运行的检查是 `inconclusive`，不能伪装 N/A。协议/范围需要变更时版本化重排，不能看过数据后静默放松条件。合法负结果、变慢、无提升或不支持假设仍可通过数据验收；验收判断测量可信程度，不要求研究假设成功。
+
+## 结果与独立证据
+
+结果 manifest 使用 `schema_version: experiment-result/v1`，绑定合同的身份、范围、验收协议及 `run_id`、`code_revision`、`execution`（command 字符串数组、environment_description、seeds、repeats）。command 仅是复现信息，运行时不把 JSON 字符串作为 shell 命令、模块名或授权执行。
+
+`artifacts` 的 `code`、`inputs`、`config`、`raw_data`、`outputs`、`environment` 均为非空 `{path, sha256}` 列表。环境记录应包含实际硬件/软件版本和相关资源条件；代码哈希覆盖真实影响路径与 dirty 内容，不能只写 Git commit；数据/配置/环境需足以复现。`metrics` 是非空 `{name, value, unit}` 列表，值必须有限，无量纲明确写 `dimensionless`。运行时核对哈希覆盖的文件，宿主独立审查是否遗漏真正依赖。
+
+独立 verifier 是可信宿主显式注入的函数 `verifier(root, manifest, validation_plan)`，返回实际观测或受保护的独立检查记录。它不能从生产者的 pass JSON、reviewer 名称或 `independent: true` 自证身份。宿主必须认证审查者和真实开始/完成事件，确保不是生产者，实际执行或读取适用检查，并确认检查代码、环境、参考方法和证据完整。单一布尔回调或自写通过文件不构成独立验收。
+
+返回 `experiment-validation/v1` 记录：`manifest_sha256`、完整 `artifact_hashes`（含验收协议）、`validation_plan_sha256`、`scope`；`verifier` 的 actor、independent、source、run_id、method；非空 `limitations`；六项 `checks` 各有 verdict（pass/fail/inconclusive/not_applicable）、reason 和非空文件证据绑定。宿主保存稳定的实际 review 身份和记录；重读同一验收不得每次虚构新的 reviewer run ID。实际新检查则保存新版本，原证据不覆盖。
+
+验证前后重新核对全部绑定和独立证据，manifest、代码、数据、配置、环境、输出、协议或 review 变化会使旧完成证据失效。结果内容不是加密身份凭据，哈希不是正确性证明。
+
+## 可执行接口
+
+完整 checkout 提供 `agent_runtime.result_validation`，纯 Skill 只带本契约，不自动部署运行时或 verifier。
+
+- `validate_result_plan(plan)`：在任务合同验收中检查生产者、独立验收节点和消费依赖。
+- `ResultValidationHandler(root, verifier)`：可信宿主注册的 `verify_experiment_result` 处理器，不自行扩展权限。
+- `check_task_results(root, task, verifier=None, report=None)`：实际 ReportingHandler 在派发/报告/复验路径调用；原始生产报告只记录 pending，消费者必须得到 scoped acceptance。
+- 宿主 `build()` 返回 `result_verifier`，与 handlers/authorize 一起接入现有 supervisor；恢复、进度与完成报告重新传入同一可信 provider。不能从持久化 JSON 恢复一个“可信回调”。
+- `inspect_result(root, contract, verifier=None)`：只读返回状态与原因。无 verifier 即使有通过 JSON 也停在 pending。provider 抛异常返回 retriable pending，不崩溃或当成通过。
+
+```bash
+python scripts/validate_experiment_result.py --root /absolute/project --contract controller-contract.json
+python scripts/validate_experiment_result.py --root /absolute/project --contract controller-contract.json --verifier-adapter /explicit/trusted/host_adapter.py
+python -m unittest tests.test_result_validation -v
+```
+
+第二条命令显式加载宿主已审查的 Python 文件，导出 `verify(root, manifest, plan)`；不能使用生产者建议的路径自动加载。第一条命令没有可信 verifier，正常输出 pending 并返回退出码 2；只有 usable-with-scope 返回 0。CLI 是本地已获授权的检查工具，不授予执行任意代码的新权限。
+
+仅为编排读取验收状态、当前不需逐项证据哈希时，兼容宿主可显式追加 `--context-dir agent_doc/results/RUN_ID/validation_context`：完整观察外置并按项目/SHA恢复，所有状态、错误、范围、限制及原退出码保留；默认输出不变。详情由 WORKFLOW_ROOT 的 `scripts/validation_context.py --root ABSOLUTE_PROJECT_ROOT --path RECORD_REF_PATH --sha256 RECORD_REF_SHA256` 恢复。显示和恢复都不授信，科学消费仍重新走本节可信独立门禁；需要明细时计入恢复/后续调用成本，不能默认隐藏必需信息。
+
+当前文件核验限定项目内普通无符号链接文件、每文件 16 MiB，拒绝路径逃逸/FIFO/设备；大数据需真实有界分片及完整覆盖或明确的项目适配实现，不能用几行摘要冒充全量验收。只验证被声明并独立审查完整性的依赖；不构成 OS 沙箱，不控制绕过入口的其他写入，也不安装 CI、GPU runner 或后台服务。
+
+## 失败、修复、复测和结论
+
+- `pending`：缺输入/独立 provider、检查尚未完成或证据不足；不得进入数据消费和结论。
+- `invalid`：绑定失效、格式/域不完整、数值/边界等检查失败；不得进入数据消费和结论。
+- `usable-with-scope`：全部适用检查通过，N/A 已允许并有理由，只支持 scope 内结论，limitations 随报告和交接保留。
+
+失败或不足 → 主 AI 保留原始测量及旧失败记录 → 诊断具体代码/协议/数据问题 → 在既有权限/预算内修复 → 新 result/run ID 与版本化任务链 → 重测受影响部分 → 再独立验收。现有 supervisor 的维护/恢复路径承接此动作，不创建循环 DAG、无限自动重试或额外 GPU/付费任务。宿主没有恢复 adapter 时明确阻塞与下一 owner，不把指令文字当已执行修复。
+
+在最终报告中分别写“测量已完成”“哪些检查已通过”“这些数据能支持的范围”“哪些仍未知”。代码、数据或实验条件更新后，旧数据仍保留为历史观测；是否可复用必须有新的明确独立验证，不得默默把旧 pass 复制到新版本。
+<!-- GENERATED by scripts/sync_plugin_references.py; edit the source workflow instead. -->
+
+# 项目结果归档与先查后测
+
+规划实验/测量或复用实证结论时，先检索当前项目已经得到的数据，判断本题是否已有可信结果、是否只需补差异检查，再安排新的实验。检索是发现候选，不是证明可复用。与 `workflows/result_validation_workflow.md` 的独立验收串联；不以目录、记忆、JSON 的 pass 或相似词命中代替验收。
+
+## 单一结果入口与不可变历史
+
+- 新数据统一放在 `agent_doc/results/<run_id>/`。该轮 `manifest.json`、原始数据 `raw/`、派生数据 `derived/`、验证协议和证据各自保留；`record.json` 是不可变登记记录。实际子目录名可按实验需要调整，manifest/raw_data/outputs 必须属于该 run。
+- 每轮用新的、可用作文件名的 run_id。失败/负结果也保留，修正用新 run 和来源关系；不得覆盖旧数据，不能复用已有 ID。大小写冲突同样拒绝。多个实验生产者须有不同 result run_id，不能把任务链的一个 run_id 当所有结果的 ID。
+- 代码、输入、配置和环境可以保留项目内既有位置，但要记录实际内容哈希和源版本；原始/派生结果固定保存。单位、指标定义、随机种子、重复次数、执行命令及环境描述不得省略或凭空补全。
+- 已有大文件、冻结历史和旧报告不破坏性搬迁：建立明确的 `historical-external-reference` 或运行时兼容 `legacy-contract-reference`，固定原路径/哈希。中央目录保存的是索引，不等于旧文件字节已经全部迁移。项目外不可读数据仍是缺口，不伪造验证。
+- `.agent-runs/` 仍存高频调度状态、报告及日志；`agent_doc/results/` 作为可跨任务发现的稳定结果入口。引用运行区的旧结果时必须明确历史引用，不能把可变日志当冻结原始数据。
+- 应用写入守卫拒绝 `agent_doc/guide/`、别名/符号链接绕行和项目外路径；这不是对任意 shell 或敌对文件系统写入者的沙箱。
+
+## 新命令的具体判断
+
+1. 以任务目的、对象和指标检索结果目录，记录查询、候选 run_id、record_sha256、扫描数量、截断和错误。没命中只表示本次有界查询没找到；部分扫描、损坏记录或词汇不重合不证明没有历史结果。
+2. 读取候选 manifest 和来源数据。逐项比较本次任务与已经执行的 scope、code_revision、代码/输入/配置/环境内容哈希、命令、环境描述、种子/重复次数及指标名/单位。消费者自己提供当前条件；不能从候选结果反向编出“当前需求”。需要时额外检查硬件、dtype、shape、batch、软件版本、基线和测量统计定义，它们应存在已绑定的配置/环境文件中。
+3. 确认文件哈希未变，验证记录仍对应这轮实际数据，并由可信宿主再次提供独立验收回调。已持久化的 pass 或 `usable-with-scope` 不恢复信任；记录的条件必须等于冻结 manifest，不能只改 catalog 标签来假装匹配。
+4. 返回一种明确决定和依据：
+   - `reuse`：已知条件完全匹配，并有当前独立 `usable-with-scope` 验收。主 AI 可以明确选择复用动作，附旧数据来源与适用范围，不冒充新实测。
+   - `verify_delta`：条件有差异、信息未知、历史未独立验证、缺可信验证器，或测量时间不满足用户的新鲜度要求。只补齐未知和有信息增益的最小差异检查；形成新的版本/结果后再验收，不能改旧 proof。
+   - `rerun`：用户明确复现、指定新主张验收、数据/来源已变或验证失败。保留旧证据，修复/重测并独立验证；旧结果只作基线。
+5. 将决定写入任务详情与计划。搜索不自动跳过实验；比较一致也不自动授权任何动作。当前用户要求、指南约束、任务取消和权限边界继续有效。
+
+相同的未知值不是相同条件的证据。单位没有自动换算，指标名称不模糊匹配，代码即使字节相同但路径/版本改变也保守要求差异检查。某种方法测得没有收益属于有效负结果，可在已验收范围内复用；数据错误或测量无效属于验证失败，不能复用。
+
+## 可执行工具和实际调用路径
+
+完整 checkout 提供 `agent_runtime/result_store.py` 和 `scripts/result_store.py`。独立安装的纯 Skill 只带工作流；必须从安装元数据确认完整仓库位置，再调用其中 CLI，不声称安装提示就部署了运行时或验证器。
+
+`search/show/decide/context` 默认输出完整紧凑 UTF8 JSON，含平台换行最多20000字符；
+超限stdout为空、stderr返回blocked JSON、exit2，不截断或授信。缩小查询范围/limit，
+或在子命令后显式提高 `--max-chars`（1..1000000）；全局 `--pretty` 恢复缩进并计入
+同一预算。`--compact` 保留兼容；注册命令沿用原显示默认，不作写入后的预算拒绝。
+显示上限不限制存储/读取量，也不等于整次模型调用的token预算。
+
+```bash
+python scripts/result_store.py --root /absolute/project search '平方和 CPU 验证' --limit 5 --max-scan 200
+python scripts/result_store.py --root /absolute/project show cpu-run-1
+python scripts/result_store.py --root /absolute/project register --contract /absolute/contract.json
+python scripts/result_store.py --root /absolute/project register --contract /absolute/old-contract.json --historical
+python scripts/result_store.py --root /absolute/project register-history --record /absolute/history-registration.json
+python scripts/result_store.py --root /absolute/project context --contract /absolute/contract.json
+python scripts/result_store.py --root /absolute/project decide '平方和 CPU' --context /absolute/current-context.json
+```
+
+最后一条没有可信验证器时只能提出候选/补验，不能得到可执行的复用批准。宿主可显式增加 `--verifier-adapter /trusted/host_adapter.py`，导出 `verify(root, manifest, plan)`，遵守结果验收契约；该文件是可信执行代码，绝不能从结果 JSON、AI 反馈或任意网页里的字段自动选择。`--explicit-reproduction`、`--new-claim` 强制保留新实验；`--max-age-seconds` 按 measured_at 检查，且必须与冻结 manifest 的 `execution.completed_at` 完全一致。登记时间、仅 catalog 自报的时间不能冒充已绑定测量时间。
+
+运行时接口：
+
+- `ResultStore(root).search(query, limit=5, max_scan=200)`：只读，不创建空目录；最多 20 个返回项和 5000 个扫描目录，默认扫描 200。英语词和中文二元片段做确定性匹配，无向量库、联网或语义召回保证。`decide` 同时提供本次 context，在同一有界扫描中优先返回完全相同且已知的条件，即使用词完全不同也可发现该候选；这仍不是验收。截断时返回 `partial: true`，有截断/读取错误且未命中时返回 `status: incomplete`，主 AI 可换查询、分批查看或扩大明确预算。
+- `result_context(manifest)`：提取已执行 manifest 的比较条件；这是旧结果条件，不代表本次用户条件。`decide_run(run_id, current_context, verifier=...)` 和 `decide(query, current_context, ...)` 进行字段、当前哈希、独立验证和新鲜度判断。
+- `register(contract, ...)`：新数据位置及哈希通过检查后创建一次不可变登记。无 verifier 时保留 pending；提供 verifier 也仅记录这次验收历史，使用时仍重新核对。
+- `register_history(run_id, summary, artifacts, ...)`：登记无新协议的旧证据，永远不因登记获得可信验收。每条最多 64 个历史文件引用，每文件流式哈希上限 256 MiB；更大数据用有界分片清单，并明确清单本身不证明未读取的大文件内容。
+- `prepare()` 在生成计划时作实际查询，记录 `prior_result_search`。`ReportingHandler` 在首次派发前实际查询并记录日志；查到候选、截断或有错误时，数据生产者需有 `prior_result_review` 的决定、原因及对应当前候选记录哈希。此记录是主 AI 的判断依据，不是科学验收证明。
+- 生产者报告通过结构/原始哈希检查后，`register_task_result(root, task)` 登记 pending 原始结果。`result_storage: central` 强制新布局；旧契约位置通过明确标记的只引用兼容路径登记，原位置不改动。完全相同的报告重放不再登记，冲突或数据变化被拒绝。
+- `check_task_reuse(root, task, verifier)` 在真实消费者/验收路径再次检查；未选择复用返回空 proof，不把搜索命中当接受。`ReuseResultHandler` 是宿主显式注册的 `reuse_validated_result` 动作，只返回重新验收的旧结果 proof；不会偷偷跳过其他 handler。
+
+复用选择的字段如下；`context` 必须来自本次消费者确定的条件。顶层任务 `explicit_reproduction` / `new_claim` 为 true 时，下面的 false 不能覆盖它。
+
+```json
+{
+  "action": "reuse_validated_result",
+  "result_reuse": {
+    "run_id": "cpu-run-1",
+    "record_sha256": "<actual 64-character digest>",
+    "query": "平方和 CPU 验证",
+    "context": {"scope": "<current scope>", "code_revision": "<version>", "artifacts": {}, "execution": {}, "metrics": []},
+    "explicit_reproduction": false,
+    "new_claim": false
+  }
+}
+```
+
+上面是字段示意，空条件不能通过复用验收。结果 proof、原始数据来源及验证限制随报告传到下游；复用任务的报告用 `derived` 描述对旧测量的使用，并附已验证来源，不伪标本轮新 `measured` 数据。主 AI 最终说明哪些是旧结果复用、哪些是补验/新实测、哪些仍未知。没有可信验证器、部分词汇检索或历史不完整时如实保留限制，不能宣称“所有旧数据均已检索并可复用”。
+
+exec
+/usr/bin/bash -c "cat /home/wangyuanshuo02/two-level-attention/agent_doc/guide/GUIDE.md; rg -n 'frozen|screen|005' /home/wangyuanshuo02/two-level-attention/agent_doc/task/TASK.md" in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ exited 1 in 252ms:
+注意：此文件不允许被claude以及其他AI修改，作为本人记录探索进度和设定任务的工具，这点应该写入记忆避免后续误动该文件，自动对于任务编排任务链，当存在任务链的时候设定监督器每隔1h监督一次直到任务链全部完成。本文件产出的文档和可视化结果都放在../results文件夹下面，AI设置的任务链放在../task/TASK.md，每个任务链的子任务的细节放在../task/task_details下面，此外运行一个30 min轮询的建议监督器查看../advice里有没有来自其他AI的建议
+
+
+提示：从10.1晚上12:00开始，运行一个每隔6h自动运行的论文优化轮询监督器，对于已经完成的论文对照一篇顶会论文（不局限于本地，你也可以去网上搜和查找最新的顶会论文）进行润色和逐句对照，不断问自己：
+1. 我的表述是不是可以优化和更合理更贴近论文
+2. 我的架构图能不能更加精致就像这些顶会论文一样
+3. 我的数据可视化之类的能不能更加美观，能不能像这些顶会论文一样把可视化表现的十分精美
+4. 启动一个读者的agent，让他读你生成的论文PDF来看有没有从基础（比如可视化文字拥挤，架构图线条错位，文字表述混乱等问题）到高级（这个图和文字的表述真的对的上吗，比如架构图是不是能真的画的反映出你的设计了呢，这个可视化或者表的结论是不是和文字表述一样呢），然后给出读者意见，然后你再针对读者意见迭代新的版本（必要的话写代码补充实验）
+5. 完成读者审稿后启动一个审稿人agent，让他扮演审稿人以批判的视角结合最新的indexer的论文来看这篇论文的这些创新点并且提出批判性的意见（模型选的怎么样，数据集合理吗，结论合理吗，实验设计的合理吗，是不是有没有分析到的点，难点分析的合理吗等意见）。然后你针对这些意见不断迭代新的版本（必要的话写代码补充实验）
+6. check问题是不是都收尾了，然后保留这次论文优化的结果为独立的文件夹（里面包含源文件以及中英两版本各自的PDF），然后等待下次轮询优化继续，每次完整走完这几步，这个轮询监督器只能我手动kill。
+
+
+提示：有些非性能敏感性的可以并行的任务可以起CPU探索和跑出相关数据也行如果适合在CPU上进行的话。本机有两张GPU也可以每张跑一个探索这样（可以先判断会不会OOM还是说双卡DP可以更快，总之如果只是需要精度数据的话，怎么快怎么来）。每次完成一个任务链的任务记得commit并且push代码避免丢失工作内容，还有pull agent库的最新agent进行agent升级
+
+提示：如果发现bug，fix完代码后记得先验证对不对，是不是fix对了，然后再开始执行编排好的任务链，重测之前错误的数据。如果是代码编写和文件表述上存在偏离先从性能精度各个方面评估一下除非你的方法全面优于我的文件内容表述（可以提出你的idea和我商量）否则按照bug处理
+
+提示：论文放在/home/wangyuanshuo02/sglang/paper下面，记得里面的图不一定真的都需要，然后对于需要的图一定要美化，参考其他顶会论文的作图美学，使用画图（比如架构图等其他原理图，然后记得留draw.io源文件），图表格制作的skill来尽量美观的表述。论文的表述也调用相关的skill来做
+
+提示：不能光看atten mass，不一定代表e2e精度，记得写入记忆，记得实测后再下结论，反正你就老老实实测试就行。不要临时起意偷懒不测试完我这里列的全部
+
+
+
+此外当你跑性能敏感任务的时候（比如优化kernel/测e2e耗时），直接锁住你要用的那些测性能的GPU，也即这个GPU只允许跑你这一个性
+能测试任务保证准确性，完成测到数据后再解锁 
+
+codex
+我已使用 code-reading 技能读取独立验收契约。前次报告中 Musique 的 20 配对分数并未下降，这与本次提示有差异；我会以当前原始文件复算为准，明确区分这批 screen 与其他批次的下降，避免混用。
+
+exec
+/usr/bin/bash -c "sshpass -f /tmp/.sshpw ssh -o ConnectTimeout=15 -p8416 wangyuanshuo02@10.238.122.187 'cd /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_pool_source_v2_20261029 && PYTHONDONTWRITEBYTECODE=1 TLI_SCORER_BACKEND=difflib CUDA_VISIBLE_DEVICES=\"\" /usr/bin/python -B -' <<'PY'
+import json,pathlib
+r=pathlib.Path('/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029')
+m=json.loads((r/'manifest_rank0.json').read_text())
+print(json.dumps(m,ensure_ascii=False))
+x=json.loads(next((r/'requests').glob('*/*.json')).read_text())
+print('REQUEST_SCHEMA', {k:(list(v) if isinstance(v,dict) else type(v).__name__) for k,v in x.items()})
+print('ARM_SCHEMA',{k:type(v).__name__ for k,v in x['arms']['full'].items()})
+PY" in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 1077ms:
+{"identity": "82b5f895017e5e4f70ef7e712615c22a756669f9e8de851ba65f314d093b86ec", "protocol": {"schema": "frozen-near-far-screen-v3-independent-gates", "model": "/home/wangyuanshuo02/Qwen3-8B", "context_cap": 31500, "samples_per_task": 20, "seed": 42, "statistic": "mean", "thresholds": [0.05], "datasets": ["qasper", "hotpotqa", "musique", "gov_report", "repobench-p"], "selected_rows": {"qasper": [152, 26, 115, 46, 38, 7, 79, 171, 148, 56, 20, 178, 106, 24, 144, 197, 190, 37, 138, 50], "hotpotqa": [152, 26, 115, 46, 38, 7, 79, 171, 148, 56, 20, 178, 106, 24, 144, 197, 190, 37, 138, 50], "musique": [152, 26, 115, 46, 38, 7, 79, 171, 148, 56, 20, 178, 106, 24, 144, 197, 190, 37, 138, 50], "gov_report": [152, 26, 115, 46, 38, 7, 79, 171, 148, 56, 20, 178, 106, 24, 144, 197, 190, 37, 138, 50], "repobench-p": [473, 132, 472, 46, 40, 232, 45, 428, 326, 159, 291, 235, 453, 107, 367, 115, 280, 357, 185, 327]}, "max_new_tokens": {"qasper": 128, "hotpotqa": 32, "musique": 32, "gov_report": 512, "repobench-p": 64}, "source_sha256": {"sparse_attn/ops/frozen_region_cache.py": "1d5c46c25d29a907b6e584247b57256347af34cfa4f49d2c1125875c0692daa9", "sparse_attn/ops/frozen_region_gate.py": "a5ae01fea121425f908053821984ebd23c1f51a12f1a4fc18f02a90b0bf2d065", "benchmark/LongBench/prefill_frozen_skip.py": "2688ace8d52759f5c1fa80164b1c494b4682218e375193f2af1e3c4b5cde4630", "benchmark/LongBench/metrics.py": "29a325fa4b4cb81660b1b560bc102d4682fdb39414b75eaa28ad19a2cffe04a0", "benchmark/LongBench/eval.py": "dd945b78e93c0f267efa9099e4834b2081fd32268fe554f763f5372a0124f325", "benchmark/LongBench/config/dataset2prompt.json": "ac8056e8542bf4ad42b549d9ba450ef18819b6b2987f65973e20e7eeff6bbd1a", "benchmark/LongBench/config/dataset2maxlen.json": "77e621d722647fc8d5293202cea5fbf0d06568848fac86de2b45cab122455391", "sparse_attn/arguments.py": "61118d89dd5211aedbf6609393afa33b70f56ded83bf68d0e26bfb4f126e9bca", "sparse_attn/baseline_runtime.py": "8dbaa228b828a2891e7bc02be9ef3f2d130859b65d5c40b1463467b2864c9816", "sparse_attn/indexer/__init__.py": "0993cdd7f60053da3f715e8afa7279142d36c46488bc8cf563d9d824feeaa7ef", "sparse_attn/indexer/base.py": "f3d73fff686f80fd6ab50596c9e9e46487f872f2ca3d867e5f177fb91f731aa8", "sparse_attn/indexer/dyn_controller.py": "63f26353f7928535949ff95ae5cd83ea22cdb84bfd2e3c0fd87586caf68f555e", "sparse_attn/indexer/greedy_triton.py": "228c8ae1d787920f9c852d42a52b0ad06b29ce96916c7d7fbee44e1e4db1078f", "sparse_attn/indexer/quest_indexer.py": "6c76162c3642d901e1d7b8bfa7f952c9c874499ad436c25504fc3b9b5ca12f07", "sparse_attn/indexer/tia_indexer.py": "54e5f9a5fd0a2413d08a47ae89d384bbc6987b937af13325162e23442985b2ea", "sparse_attn/indexer/tli_batch.py": "1afa0ba58f771e26009ec7db3aaf59f4300d73a2e35d1e3b06cc0cb3bf9f8a3a", "sparse_attn/indexer/tli_batch_kernels.py": "de5924c090f80335c052cd10d6843e57d2cefe1c651bccc90e53dfea372e3673", "sparse_attn/indexer/tli_batch_pipeline.py": "d7286d2f66ac4f8bf6ea7a65075df90e9e565b10b53f9545c664897ee118aa5d", "sparse_attn/indexer/tli_indexer.py": "0ec71a64070fe3e9651fc898a287f6a6fb81fd43d659d0f1ab5f2c5bafe80d45", "sparse_attn/indexer/twi_indexer.py": "ec6ce8ebff53e923141df4e02f4611c89a9289f8a9be0725f022510865dcd00f", "sparse_attn/indexer/utils.py": "8a942386c664ff4824280757e7d503fc74510712b73b5b93654430addf6f8e9d", "sparse_attn/info.py": "8e1e9c89f1c32163b557ec103f34193e1284d2d9d9420f897f01a26f47af10dc", "sparse_attn/metrics.py": "e517e58ba18dff92e3cdbf1c67d5dbed55c802c25a3b7d319c0643c302ff7c8a", "sparse_attn/ops/batch_select.py": "88b51aaaee086110988458065d29ebc679e83c46e388860eaf86dab99aaf1610", "sparse_attn/ops/candidate_prefill.py": "e0ef38f83ec38eba521dff0bda2a434c2141b6164bdff94fee52d3726382d1e7", "sparse_attn/ops/cuda_graph_state.py": "f87e867469c9ecebfd7bfe55aabb3de6f9dd6609e349f3afd98863836ec2fd9e", "sparse_attn/ops/eager_decoding.py": "242bd86b3509ec833529a1436dc6ce78cc5af636f0791b6137aef6570397c1ec", "sparse_attn/ops/eager_prefill.py": "bd05914d4e7f6471f2287956b665ba4138d140663e4a83654eafc98be9752352", "sparse_attn/ops/far_skip.py": "396c48fdfd726bad3fd6636552ac2f572bdadf612a9dead6457cc309ee076fb3", "sparse_attn/ops/far_skip_cache.py": "532261eb41cfacd49fd16b05440fa23a724ea38237110accd837c1bca7dc2341", "sparse_attn/ops/far_skip_graph.py": "2a34fe2382c55a13f4f0b91d78cca7a8f07aef00b37604c1353ba1ff271683bf", "sparse_attn/ops/far_skip_runtime.py": "db4ce01af6107ad44bde7d41aeee09323e5aea8a49ad3a93d1cedae942ddb585", "sparse_attn/ops/far_skip_static.py": "94e619e2ee237b34625058a4e72572207506d171ba97ad65292e32683474e938", "sparse_attn/ops/far_skip_subspace.py": "5f0a045cc8e17629945db376365ac585b6b88b5036aa06ed9e588d3c43f3b475", "sparse_attn/ops/far_skip_workspace.py": "5013412bb3890a26b2c39e71f364685d5d50980807b7c4ccd9ecc1a9a8bfb71f", "sparse_attn/ops/frozen_region_tli.py": "62842a6200f45878a994e6bcca11b97ee45b4fed1d3ee4b0fa9787875ceef446", "sparse_attn/ops/fused_attn_triton.py": "cf29e59325215b772b036a16e68f7fabb81bf9d8ddefe30e495268570cb78d3a", "sparse_attn/ops/hybrid_batch_cache.py": "e355301c714034b261da6b28e8205245d5e5cfa6e5a85b9cb6ddd62d9edea7c3", "sparse_attn/ops/hybrid_batch_runner.py": "e8a91ec43adc892aa9bfc9205fe3d171d00f77c1298d1dd8dccf42cd8ef48425", "sparse_attn/ops/operator_pipeline.py": "f6f68801ad3155006076a3c1d862b73c2399b672328c279d21913a69ca8f6a18", "sparse_attn/ops/partial_attention.py": "dda3fdf05b127e7aad061bf287af3b05e45be8642f20f2e89d38044093f6312a", "sparse_attn/ops/prefill_contract.py": "ab9a5bfb051c37c4b00fecb90abf67a2cdefbdce455c3c8c61ee511cf517570c", "sparse_attn/ops/reference_prefill.py": "a742317e98c8356af3b3ece4c778bae24d94e05cc1b9e34ab22199b36e401125", "sparse_attn/ops/selection_contract.py": "e918d128f50447702585f13c38829baaf5497d3e727cf11ae2d3bea71dc2cdb4", "sparse_attn/ops/tests/test_batch_explicit_quota_guard.py": "22124c0df12b382e5ec975c5f1b100153bda56948c53e720b77e5f48e4599114", "sparse_attn/ops/tests/test_batch_sink_guard.py": "1eb3ba4adbd586c089305a4ee9f1db94597a5c503e263566b6e17a3cb47b3b77", "sparse_attn/ops/tests/test_batch_topk_block_size.py": "74095d384b6ae3aa88a531c1a9496e9809727df8491fc711688735766bdd6962", "sparse_attn/ops/tests/test_deepseek_decode_mask.py": "1e63d399db9b0fa17e2c2a67d0dd36b703b01a1c88a39acbc6e0213d5748d75d", "sparse_attn/ops/tests/test_deepseek_request_lifecycle.py": "1d770ccbed0059794b7ffeb17b532cbce95b1719e85fb6ca51c27b82d54d5555", "sparse_attn/ops/tests/test_eager_cu_layout.py": "c473b25c75b024a973b84bd6f2e9b6e09bf1153a079f77ac088b45c74b5895da", "sparse_attn/ops/tests/test_eager_decode_input_contract.py": "91dc9aef8256e2b064d839eac99e50e173c3a3409e5e987ad54dbd5dcd1b5b59", "sparse_attn/ops/tests/test_eager_kv_hetero_dispatch.py": "3ec26acd6d6ac78d10a8ed4d8b97be34026978bc757ccc8354c6e2b1aeb333a1", "sparse_attn/ops/tests/test_eager_mask_extent.py": "81072198613f2c899df010f491dec0c953edb2d8f9d84e0b172c8fa346443fbc", "sparse_attn/ops/tests/test_eager_query_layout.py": "2b00d9ae9fed1e0e040f9e27838ef8438d4213d3738734f2bb706ebda711da45", "sparse_attn/ops/tests/test_graph_cache_schema.py": "43396b0f3e2328b275135b884c4949a68688af5de1dd082017da65469457650f", "sparse_attn/ops/tests/test_graph_required_dispatch.py": "4448c18d25bd9e916723129358a7aa93db697e4893995efe7072f406476fa72f", "sparse_attn/ops/tests/test_prefill_empty_rows.py": "a9e2e25ff59d2f0ddc6df52aefe2aee629b6918cb9208861056b1575b55268fe", "sparse_attn/ops/tests/test_prefill_input_contract.py": "54dd08fe368d5a6318acf283d1de186321c5c458c9076be7034b7696c21bda98", "sparse_attn/ops/tests/test_prefill_mask_contract.py": "0fb806f1dd9202bdf450f03a0c735c381059c60d748d8057eefcb986ae85b977", "sparse_attn/ops/tests/test_prefill_protection.py": "35eda88636494ee32c9528f0808fc573d3ced3afd01a1d350f81a3e01c70107a", "sparse_attn/ops/tests/test_prefill_sigma_capacity.py": "f4634221035029e2e22366d51c56d6c6b421d8c0e08169a6df36f77d0284e8a0", "sparse_attn/ops/tests/test_sparq_request_lifecycle.py": "25a74913156cc4590f5edaaef4611187bd18d56b66e168ccc4cd2bd08f06e861", "sparse_attn/ops/tli_static_cache.py": "ec5989e1485e1cfd50c91ee0fbed1550d6ddbc7cf27af15f1ef66049ff67db5e", "sparse_attn/ops/token_selection.py": "011386450c3e834e173204da1c6b40ff2e2a19e7da623a9a8c04565fc072a746", "sparse_attn/ops/utils.py": "a95b3d2e6218ef03a2621dabeecdb1d742bfd0404cce7704f8238f21709f4c13", "sparse_attn/patches/__init__.py": "b5ef58f3513460e79cc4fb7e16ac3eb881b75f3588c116b77d6a3cca58b03a99", "sparse_attn/patches/deepseek_v2_attn_patch.py": "9b353f557f445793347fa811ed08e938a16ba9d31576e261e4c3700c376654f7", "sparse_attn/patches/glm4_moe_lite_attn_patch.py": "a0e01a39b4e5f1f6ac939595df9d1ff3ea779831213d0572d75cf3727cadf167", "sparse_attn/patches/llama3_attn_patch.py": "d536fd2c6b4c67cad2e3962987f6fa30c400297639e0f3d634adb5bae114a906", "sparse_attn/patches/patch.py": "841f5d224531e281261bf4f278198ce9153588db1900e38b08aa41ce386c14b2", "sparse_attn/patches/qwen3_attn_patch.py": "d94526ffe62571d43574e65b4a83b6c85bcef83b1519eb854e4d19771a2217c9", "sparse_attn/patches/utils.py": "c4d8312f19f463f4c9af1636d74caf7ef8e5f3fa9aa4e74c3bc78b8271af8ede"}, "dataset_sha256": {"qasper": "29aa07d2a63f36f4fb8e8cd200a3428ee3126d750bde6af1c8f9bc41c2366854", "hotpotqa": "a0005ab2a1bc2ac3a70352dccbf96cccc4e0aac6bb677f6a55180fa51b92ef6f", "musique": "4ac69b91281c4ec6b21316cb7282e83fb6b4dda04fc68480bb8d8ed1e19ff7bd", "gov_report": "d28112beb3a9b41d80aa390837fa1a31c9e3da84a5262009c97585cc49f597c4", "repobench-p": "919a4439e2a84ebb25bacc39ac3b3269a7641af6e02ae205ed78d8c53dfe3568"}, "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30", "tokenizer_config_sha256": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101", "torch": "2.8.0+cu128", "transformers": "4.56.2", "dtype": "bfloat16", "world_size": 8, "git_head": "a1cdb2f4edd2447495175d90f75fa13b880d4afd", "eviction": "far-only: evict far; near-only: keep attention-invisible near staging and migrate to far; both: sink+SWA only", "calibration": "query-relative page boundaries, last256 rows; head means; independent near/far mass comparisons, no joint budget", "attention": "tli-tail32-frozen-regions-reference", "tli_args": {"method": "tli", "quest_block_size": 64, "quest_topk": 16, "quest_token_budget": 1024, "quest_chunk_size": 16, "minference_config_path": null, "minference_starting_layer": -1, "fasa_budget": 1024, "fasa_dataset": "qasper", "fasa_threshold_ratio": 0.8, "fasa_min_k": 16, "fasa_max_k": 16, "fasa_mode": "topk", "fasa_agreement_dir": "dimension_rankings", "sparq_k": 1024, "sparq_context_length": null, "baseline_execute": false, "ffd_delta": 5.0, "ffd_cache_length": 131200, "moba_chunk_size": 4096, "moba_topk": null, "moba_budget": 1024, "clusterkv_token_budget": 1024, "clusterkv_sink": 16, "clusterkv_window": 320, "clusterkv_nlist": 400, "clusterkv_fit_iter": 20, "clusterkv_head_sel": "truc", "clusterkv_balance": false, "clusterkv_dist_t": "cosine", "clusterkv_gqa_policy": null, "clusterkv_topk_stat": false, "asynctls_channel_file": null, "asynctls_token_budget": 1024, "asynctls_block_size": 64, "asynctls_top_kb": 128, "hisa_budget": 1024, "hisa_k_block_size": 128, "hisa_block_topk": 64, "jssa_budget": 1024, "jssa_rank": 32, "jssa_basis_path": null, "twi_block_size": 64, "twi_level1_topk": 128, "twi_level2_topp": 0.95, "tia_block_size": 64, "tia_level1_topk": 128, "tia_level2_topk": 1024, "tia_level2_cmp_ratio": 4, "tia_enable_async_topk": false, "tli_enable_subspace": true, "tli_enable_kmeans": true, "tli_far_select": "4bit", "tli_near_select": "4bit", "tli_sim": 0.9, "tli_sim_dims": "subspace", "tli_enable_layer_skip": false, "tli_far_clusters": 256, "tli_far_niter": 10, "tli_far_blocks": 16, "tli_far_tokens": 512, "tli_layer_skip_path": null, "tli_far_method": "minmax", "tli_near_method": "avg", "tli_alpha": null, "tli_beta": null, "tli_gamma": null, "tli_boundary_bypass": true, "tli_l2_quant": false, "tli_subspace": "tail", "tli_l2_subspace": "same", "tli_proj_basis": null, "tli_static_pair": false, "tli_moba": false, "tli_sigma_select": "none", "tli_sigma": 8.0, "tli_per_q_head": false, "tli_sink_tokens": 4, "tli_swa_size": 128, "tli_sinkswa_only": false, "tli_far_skip_backend": "legacy", "tli_far_skip_cache": "retain", "tli_dyn_dgate": false, "tli_dyn_dgate_eps": 0.05, "tli_dyn_dgate_rows": 256, "tli_near_pages": 32, "tli_near_tokens": "off", "tli_near_len": 4096}, "tli_environment": {"TLI_OPERATOR_MODE": "off", "TLI_FINE_GATHER": "0", "TLI_SPARSE_PREFILL": "0", "TLI_DECODE_DENSE": "0"}}, "rank": 0, "device": "cuda:0", "pid": 2475109, "started_at": 1793266105.4023685}
+REQUEST_SCHEMA {'identity': 'str', 'dataset': 'str', 'row_index': 'int', 'input': ['raw_tokens', 'input_tokens', 'truncated', 'input_sha256'], 'answers': 'list', 'arms': ['full', 'far_0.05', 'dual_0.05'], 'status': 'str'}
+ARM_SCHEMA {'generated_ids': 'list', 'prediction': 'str', 'generated_tokens': 'int', 'wall_seconds': 'float', 'profiles': 'dict', 'decisions': 'dict', 'gate_counts': 'dict', 'tli_receipts': 'dict', 'prefill_full_kv': 'dict', 'frozen_kv': 'dict', 'final_kv': 'dict', 'measured_scope': 'str', 'score': 'float'}
+
+exec
+/usr/bin/bash -c 'cat /home/wangyuanshuo02/.agents/skills/code-reading/references/result_validation_workflow.md' in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 251ms:
+<!-- GENERATED by scripts/sync_plugin_references.py; edit the source workflow instead. -->
+
+# 每轮实验后的代码与数据独立验收
+
+## 先区分本地回归和实证结果
+
+普通、低风险的本地修复或文档整理，若检查只用于确认本次修改的正确性，
+可由主 AI 运行必要回归并直接汇报命令、结果与限制；不自动建立 DAG、
+第二 Agent、实验合同或共享结果 JSON。已有任务索引只维护相关项。
+这种“回归通过”状态汇报不等同于跨消费者复用数值/经验研究结果。
+
+科研、性能、准确率、模型对照、合成测量及供后续消费者复用的实证数据，
+仍执行下文完整独立验收。风险按实际交付影响判断；权限、不可逆或高风险
+逻辑修改仍须相应复核，不能只靠 local 标签或 task_type 字段降格。
+用户/人类指南明确要求的审核，以及已经声明的 experiment_result、
+result_validation、required_result_refs 合同一律保留，不得重新分类绕过。
+需要产生或复用实证结论时，先按 result_reuse_workflow.md 检索适用结果；
+普通本地修复不因流程惯例先扫描整个历史结果库。
+
+每次实验或测量产生数据，主 AI 必须在数据被汇总、画图、比较、写入结论或支持完成声明之前，安排独立代码与结果检查。测完只是取得原始观测，不代表代码正确或数据可用。有限测试只能说明在声明范围内通过，不能保证代码绝对没有 bug。
+
+## 任务链与权限
+
+沿用当前项目唯一 `agent_doc/task/TASK.md` 及相关 `task_details`、人工指南和已评估建议；不创建另一份任务列表，不写 `agent_doc/guide/`。主 AI 在实验前固定需求、允许资源、验收协议、独立验收者与消费依赖。
+
+DAG 必须是 `producer → verify_experiment_result → consumers`。主 AI 将准确率、性能、模型、CPU/GPU、合成以及探索实验都明确分类；数据生产任务用 `task_type: experiment` 或 `produces_data: true` 并声明 `experiment_result`。不能改成 `false`、`synthetic` 或 `derived` 来绕过已声明的消费依赖。纯非实验任务和旧非测量报告保持兼容；程序无法从任意任务自然语言发现全部隐藏实验，可信主 AI/宿主负责完整分类。
+
+生产者的 `experiment_result`、验收节点的 `result_validation`、每个消费者的 `required_result_refs[]` 使用相同合同：
+
+```json
+{
+  "result_id": "unique-result-id",
+  "producer_task_id": "produce",
+  "producer_actor": "implementation-agent",
+  "manifest_path": "results/run-001/manifest.json",
+  "validation_plan": {"path": "configs/validation-plan-v1.json", "sha256": "<actual SHA-256>"},
+  "scope": "exact cases, metrics, hardware and claims being accepted"
+}
+```
+
+每个生产者只有一个直接依赖它的验收节点，节点 action 为 `verify_experiment_result`，owner 与生产者不同。其余全部下游节点必须包含该验收祖先及相同消费合同，包括再次加工数据的消费者。验收节点也可以消费上游已验收结果。实验前不知道结果哈希，不能编造；实验后由独立验收固定实际字节并保存到现有运行证据。
+
+## 验收前固定协议
+
+`validation_plan` 文件使用 `schema_version: experiment-validation-plan/v1`、与合同一致的 `scope` 及 `criteria`。以下六项各包含 `procedure`、`acceptance` 和布尔 `allow_not_applicable`：
+
+1. `implementation`：独立阅读与执行路径核对，检查索引、形状、dtype、精度、分支、异常、状态泄漏和实际运行代码与被测代码一致性。运行单元/回归检查不替代针对性代码检查。
+2. `reference_boundary`：可信参考实现、闭式解、小规模穷举或性质/变形测试；边界、退化、空输入、极端范围和错误条件。参考不能复制相同错误路径。
+3. `data_integrity`：样本 ID、重复/漏项、失败样本、分母、输入/代码/配置/种子/原始日志与输出对应；断点恢复不得混入不同协议。
+4. `numerical_sanity`：NaN/Inf、符号、数量级、单位、误差阈值/容差来源、统计/物理不变量、汇总与原始记录一致性；不能仅凭图形看起来合理。
+5. `measurement_validity`：主张涉及性能时检查计时范围、同步、warmup、单位、分辨率、资源分配/干扰、配对和全部重复样本、离散程度与噪声。准确率检查数据划分、指标分母和协议等价。无计时主张可经预先允许并说明理由后标 N/A。
+6. `reproducibility`：按冻结命令、环境、配置与种子进行独立小规模重跑/交叉检查；足够的重复性、不一致及剩余外部依赖明确记录。
+
+阈值由科学问题和资源条件决定；没有一个通用数字能认证所有实验。需要但未能运行的检查是 `inconclusive`，不能伪装 N/A。协议/范围需要变更时版本化重排，不能看过数据后静默放松条件。合法负结果、变慢、无提升或不支持假设仍可通过数据验收；验收判断测量可信程度，不要求研究假设成功。
+
+## 结果与独立证据
+
+结果 manifest 使用 `schema_version: experiment-result/v1`，绑定合同的身份、范围、验收协议及 `run_id`、`code_revision`、`execution`（command 字符串数组、environment_description、seeds、repeats）。command 仅是复现信息，运行时不把 JSON 字符串作为 shell 命令、模块名或授权执行。
+
+`artifacts` 的 `code`、`inputs`、`config`、`raw_data`、`outputs`、`environment` 均为非空 `{path, sha256}` 列表。环境记录应包含实际硬件/软件版本和相关资源条件；代码哈希覆盖真实影响路径与 dirty 内容，不能只写 Git commit；数据/配置/环境需足以复现。`metrics` 是非空 `{name, value, unit}` 列表，值必须有限，无量纲明确写 `dimensionless`。运行时核对哈希覆盖的文件，宿主独立审查是否遗漏真正依赖。
+
+独立 verifier 是可信宿主显式注入的函数 `verifier(root, manifest, validation_plan)`，返回实际观测或受保护的独立检查记录。它不能从生产者的 pass JSON、reviewer 名称或 `independent: true` 自证身份。宿主必须认证审查者和真实开始/完成事件，确保不是生产者，实际执行或读取适用检查，并确认检查代码、环境、参考方法和证据完整。单一布尔回调或自写通过文件不构成独立验收。
+
+返回 `experiment-validation/v1` 记录：`manifest_sha256`、完整 `artifact_hashes`（含验收协议）、`validation_plan_sha256`、`scope`；`verifier` 的 actor、independent、source、run_id、method；非空 `limitations`；六项 `checks` 各有 verdict（pass/fail/inconclusive/not_applicable）、reason 和非空文件证据绑定。宿主保存稳定的实际 review 身份和记录；重读同一验收不得每次虚构新的 reviewer run ID。实际新检查则保存新版本，原证据不覆盖。
+
+验证前后重新核对全部绑定和独立证据，manifest、代码、数据、配置、环境、输出、协议或 review 变化会使旧完成证据失效。结果内容不是加密身份凭据，哈希不是正确性证明。
+
+## 可执行接口
+
+完整 checkout 提供 `agent_runtime.result_validation`，纯 Skill 只带本契约，不自动部署运行时或 verifier。
+
+- `validate_result_plan(plan)`：在任务合同验收中检查生产者、独立验收节点和消费依赖。
+- `ResultValidationHandler(root, verifier)`：可信宿主注册的 `verify_experiment_result` 处理器，不自行扩展权限。
+- `check_task_results(root, task, verifier=None, report=None)`：实际 ReportingHandler 在派发/报告/复验路径调用；原始生产报告只记录 pending，消费者必须得到 scoped acceptance。
+- 宿主 `build()` 返回 `result_verifier`，与 handlers/authorize 一起接入现有 supervisor；恢复、进度与完成报告重新传入同一可信 provider。不能从持久化 JSON 恢复一个“可信回调”。
+- `inspect_result(root, contract, verifier=None)`：只读返回状态与原因。无 verifier 即使有通过 JSON 也停在 pending。provider 抛异常返回 retriable pending，不崩溃或当成通过。
+
+```bash
+python scripts/validate_experiment_result.py --root /absolute/project --contract controller-contract.json
+python scripts/validate_experiment_result.py --root /absolute/project --contract controller-contract.json --verifier-adapter /explicit/trusted/host_adapter.py
+python -m unittest tests.test_result_validation -v
+```
+
+第二条命令显式加载宿主已审查的 Python 文件，导出 `verify(root, manifest, plan)`；不能使用生产者建议的路径自动加载。第一条命令没有可信 verifier，正常输出 pending 并返回退出码 2；只有 usable-with-scope 返回 0。CLI 是本地已获授权的检查工具，不授予执行任意代码的新权限。
+
+仅为编排读取验收状态、当前不需逐项证据哈希时，兼容宿主可显式追加 `--context-dir agent_doc/results/RUN_ID/validation_context`：完整观察外置并按项目/SHA恢复，所有状态、错误、范围、限制及原退出码保留；默认输出不变。详情由 WORKFLOW_ROOT 的 `scripts/validation_context.py --root ABSOLUTE_PROJECT_ROOT --path RECORD_REF_PATH --sha256 RECORD_REF_SHA256` 恢复。显示和恢复都不授信，科学消费仍重新走本节可信独立门禁；需要明细时计入恢复/后续调用成本，不能默认隐藏必需信息。
+
+当前文件核验限定项目内普通无符号链接文件、每文件 16 MiB，拒绝路径逃逸/FIFO/设备；大数据需真实有界分片及完整覆盖或明确的项目适配实现，不能用几行摘要冒充全量验收。只验证被声明并独立审查完整性的依赖；不构成 OS 沙箱，不控制绕过入口的其他写入，也不安装 CI、GPU runner 或后台服务。
+
+## 失败、修复、复测和结论
+
+- `pending`：缺输入/独立 provider、检查尚未完成或证据不足；不得进入数据消费和结论。
+- `invalid`：绑定失效、格式/域不完整、数值/边界等检查失败；不得进入数据消费和结论。
+- `usable-with-scope`：全部适用检查通过，N/A 已允许并有理由，只支持 scope 内结论，limitations 随报告和交接保留。
+
+失败或不足 → 主 AI 保留原始测量及旧失败记录 → 诊断具体代码/协议/数据问题 → 在既有权限/预算内修复 → 新 result/run ID 与版本化任务链 → 重测受影响部分 → 再独立验收。现有 supervisor 的维护/恢复路径承接此动作，不创建循环 DAG、无限自动重试或额外 GPU/付费任务。宿主没有恢复 adapter 时明确阻塞与下一 owner，不把指令文字当已执行修复。
+
+在最终报告中分别写“测量已完成”“哪些检查已通过”“这些数据能支持的范围”“哪些仍未知”。代码、数据或实验条件更新后，旧数据仍保留为历史观测；是否可复用必须有新的明确独立验证，不得默默把旧 pass 复制到新版本。
+
+exec
+/usr/bin/bash -c "sshpass -f /tmp/.sshpw ssh -o ConnectTimeout=15 -p8416 wangyuanshuo02@10.238.122.187 'cd /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_pool_source_v2_20261029 && sed -n \"1,65p;180,270p\" benchmark/LongBench/prefill_frozen_skip.py && sed -n \"1,75p;180,205p\" benchmark/LongBench/eval.py && sed -n \"1,65p;125,175p\" benchmark/LongBench/metrics.py'" in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 1039ms:
+"""Paired screen: far eviction, near staging, and prefill-frozen region gates."""
+import argparse
+from contextlib import contextmanager
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import time
+
+import numpy as np
+import torch
+import transformers
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers.cache_utils import DynamicCache
+from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
+
+from benchmark.LongBench.eval import sample_score
+from sparse_attn.ops.frozen_region_cache import FrozenRegionCache, RegionGeometry
+from sparse_attn.ops.frozen_region_gate import GateConfig, decide_regions, profile_regions
+from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
+
+ROOT = Path(__file__).resolve().parents[2]
+SCREEN_TASKS = ('qasper', 'hotpotqa', 'musique', 'gov_report', 'repobench-p')
+SOURCES = ('sparse_attn/ops/frozen_region_cache.py', 'sparse_attn/ops/frozen_region_gate.py',
+           'benchmark/LongBench/prefill_frozen_skip.py', 'benchmark/LongBench/metrics.py',
+           'benchmark/LongBench/eval.py', 'benchmark/LongBench/config/dataset2prompt.json',
+           'benchmark/LongBench/config/dataset2maxlen.json')
+
+
+def sha_file(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as stream:
+        for block in iter(lambda: stream.read(1024*1024), b''):
+            h.update(block)
+    return h.hexdigest()
+
+
+def atomic_json(path, value):
+    path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name+f'.{os.getpid()}.tmp')
+    temp.write_text(json.dumps(value, ensure_ascii=False, indent=2)+'\n')
+    temp.replace(path)
+
+
+def prepare_ids(tokenizer, row, dataset, prompt, context_cap):
+    text = prompt.format(**row)
+    ids = tokenizer(text, add_special_tokens=False).input_ids
+    original_length = len(ids)
+    if original_length > context_cap:
+        half = context_cap//2
+        text = tokenizer.decode(ids[:half], skip_special_tokens=True)+tokenizer.decode(ids[-(context_cap-half):], skip_special_tokens=True)
+    if dataset != 'repobench-p':
+        text = tokenizer.apply_chat_template([dict(role='user', content=text)], tokenize=False,
+                    add_generation_prompt=True, enable_thinking=False)
+    ids = tokenizer(text, add_special_tokens=False).input_ids
+    if not ids:
+        raise ValueError('empty prompt')
+    return ids, dict(raw_tokens=original_length, input_tokens=len(ids), truncated=original_length>context_cap,
+                     input_sha256=hashlib.sha256(json.dumps(ids).encode()).hexdigest())
+
+
+@contextmanager
+def capture_profiles(cache, geometry, config):
+    original = ALL_ATTENTION_FUNCTIONS['sdpa']
+    if not set(tasks)<=set(SCREEN_TASKS) or len(set(tasks)) != len(tasks):
+        raise ValueError('only the five existing LongBench screen tasks are allowed')
+    if not 0 <= args.rank < args.world_size or args.samples < 1:
+        raise ValueError('invalid shard/samples')
+    thresholds = [float(x) for x in args.thresholds.split(',')]
+    arms = [('full', GateConfig(mode='full', statistic=args.statistic))]
+    for eps in thresholds:
+        for mode in ('far','dual'):
+            config = GateConfig(epsilon=eps, mode=mode, statistic=args.statistic)
+            arms.append((f'{mode}_{eps:g}', config))
+    prompts = json.loads((ROOT/'benchmark/LongBench/config/dataset2prompt.json').read_text())
+    lengths = json.loads((ROOT/'benchmark/LongBench/config/dataset2maxlen.json').read_text())
+    selected, inputs = {}, []
+    for ds in tasks:
+        rows = [json.loads(line) for line in (Path(args.data)/(ds+'.jsonl')).read_text().splitlines()]
+        indices = np.random.default_rng(args.seed).permutation(len(rows))[:args.samples].tolist()
+        selected[ds] = indices
+        inputs.extend((ds,i,rows[i]) for i in indices)
+    protocol = dict(schema='frozen-near-far-screen-v3-independent-gates',model=args.model,context_cap=args.context_cap,
+        samples_per_task=args.samples,seed=args.seed,statistic=args.statistic,thresholds=thresholds,
+        datasets=tasks,selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
+        source_sha256={name:sha_file(ROOT/name) for name in SOURCES},
+        dataset_sha256={ds:sha_file(Path(args.data)/(ds+'.jsonl')) for ds in tasks},
+        model_config_sha256=sha_file(Path(args.model)/'config.json'),
+        tokenizer_config_sha256=sha_file(Path(args.model)/'tokenizer_config.json'),
+        torch=torch.__version__,transformers=transformers.__version__,dtype='bfloat16',world_size=args.world_size,
+        git_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
+        eviction='far-only: evict far; near-only: keep attention-invisible near staging and migrate to far; both: sink+SWA only',
+        calibration='query-relative page boundaries, last256 rows; head means; independent near/far mass comparisons, no joint budget')
+    if args.attention == 'tli':
+        from sparse_attn.ops.frozen_region_tli import tli_args
+        protocol['attention'] = 'tli-tail32-frozen-regions-reference'
+        protocol['tli_args'] = vars(tli_args())
+        protocol['tli_environment'] = {name:os.environ[name] for name in
+            ('TLI_OPERATOR_MODE','TLI_FINE_GATHER','TLI_SPARSE_PREFILL','TLI_DECODE_DENSE')}
+        for path in sorted((ROOT/'sparse_attn').rglob('*.py')):
+            protocol['source_sha256'][str(path.relative_to(ROOT))] = sha_file(path)
+    identity = hashlib.sha256(json.dumps(protocol,sort_keys=True).encode()).hexdigest()
+    outdir = Path(args.out); outdir.mkdir(parents=True,exist_ok=True)
+    import fcntl
+    worker_lock = (outdir/f'worker_rank{args.rank}.lock').open('a+')
+    try: fcntl.flock(worker_lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except BlockingIOError: raise SystemExit('this rank already has a live worker')
+    manifest = outdir/f'manifest_rank{args.rank}.json'
+    if manifest.exists() and json.loads(manifest.read_text())['identity'] != identity:
+        raise ValueError('existing run identity differs; use a new output directory')
+    atomic_json(manifest, dict(identity=identity,protocol=protocol,rank=args.rank,device=args.device,
+                               pid=os.getpid(),started_at=time.time()))
+    torch.set_num_threads(8)
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    model = AutoModelForCausalLM.from_pretrained(args.model,dtype=torch.bfloat16,
+            device_map=args.device,attn_implementation='sdpa').eval()
+    if model.config.model_type != 'qwen3' or any(getattr(m.self_attn,'sliding_window',None) is not None for m in model.model.layers):
+        raise ValueError('only full-attention Qwen3 supported in this exploration')
+    if args.attention == 'tli':
+        from sparse_attn.patches import register_patch
+        from sparse_attn.info import resolve_treatment_snapshot
+        treatment = tli_args()
+        if register_patch(model,treatment,resolve_treatment_snapshot(treatment)) != model.config.num_hidden_layers:
+            raise ValueError('incomplete TLI patch registration')
+        model._frozen_tli = True
+    verified = False
+    for index,(ds,row_index,row) in enumerate(inputs):
+        if index % args.world_size != args.rank: continue
+        path = outdir/'requests'/ds/f'{row_index:04d}.json'
+        ids, input_info = prepare_ids(tokenizer,row,ds,prompts[ds],args.context_cap)
+        if len(ids)+lengths[ds] > model.config.max_position_embeddings:
+            raise ValueError('prompt plus generation exceeds native context')
+        if path.exists():
+            record = json.loads(path.read_text())
+            if record['identity'] != identity or record['input']['input_sha256'] != input_info['input_sha256']:
+                raise ValueError('incompatible checkpoint identity')
+        else:
+            record = dict(identity=identity,dataset=ds,row_index=row_index,input=input_info,
+                          answers=row['answers'],arms={},status='running')
+        for arm, config in arms:
+            if arm in record['arms']: continue
+            atomic_json(outdir/f'heartbeat_rank{args.rank}.json',dict(pid=os.getpid(),time=time.time(),dataset=ds,row=row_index,arm=arm))
+            result = generate(model,tokenizer,ids,lengths[ds],config,args.device)
+            metric_ds = 'repobench' if ds == 'repobench-p' else ds
+            result['score'] = sample_score(metric_ds,result['prediction'],row['answers'],row.get('all_classes',[]))
+            if arm == 'full' and args.verify_native_full and not verified:
+                native = generate_native(model,ids,lengths[ds],args.device)
+                if native != result['generated_ids']:
+                    raise ValueError('full node-cache generation differs from native DynamicCache')
+                result['native_full_parity'] = True
+                verified = True
+            if arm != 'full' and result['generated_ids'][0] != record['arms']['full']['generated_ids'][0]:
+                raise ValueError('dense prefill first prediction changed')
+            record['arms'][arm] = result
+            atomic_json(path,record)
+import os
+import re
+import json
+import argparse
+import hashlib
+import sys
+import numpy as np
+
+from .lbv2_choice import extract_choice_official, LBV2_PARSER_VERSION
+from .metrics import (
+    qa_f1_score,
+    rouge_zh_score,
+    qa_f1_zh_score,
+    rouge_score,
+    classification_score,
+    retrieval_score,
+    retrieval_zh_score,
+    count_score,
+    code_sim_score,
+    SCORER_BACKEND_ID,
+)
+# 102（TL-E096-CAP-CONSUMER-CLOSURE-102，GPT 审计 2026-10-12_0739，P1）：
+# 消费端闭包——打分前强制消费 producer 侧的 run-cap sidecar（096 修复
+# 写了 generating→JSONL→complete 两阶段 manifest，但修复前 eval.py 完全
+# 不读取它：generating/损坏/异 cap/结果 SHA 不匹配的 JSONL 照样打分并
+# 写 result.json，且结果元数据不携带 cap 身份）。run_cap_manifest 只依赖
+# 标准库，eval.py 侧引入零新依赖。
+from .run_cap_manifest import (
+    RUN_CAP_SIDECAR_SUFFIX,
+    read_run_cap_manifest,
+    runcap_gate_lock,
+    cap_comparability_key,
+    validate_input_identity_uniformity,
+)
+
+
+def _runcap_file_sha256(path):
+    """结果文件字节 sha256——与 producer compute_result_binding 同口径。"""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _runcap_file_lines(path):
+    """行数——与 producer compute_result_binding 同口径（按行迭代计数）。"""
+    with open(path, "rb") as f:
+        return sum(1 for _ in f)
+
+
+def validate_runcap_sidecar(jsonl_path, legacy_allowed,
+                            actual_sha=None, actual_lines=None):
+    """102/111/115：打分前对单个 *.jsonl 强制校验 run-cap sidecar。
+
+    返回 cap 身份 dict（strict 通过）或 None（legacy 降级放行）；
+    违规一律 SystemExit（[RUNCAP-FAIL]/[CAP-SCHEMA-FAIL]），调用方不写
+    result.json。校验链（fail-closed）：
+      ① sidecar 存在性：缺失时默认拒绝（新产物必须有 inline manifest，
+         096 producer 侧）；--legacy-no-runcap 显式降级放行并打
+         [RUNCAP-LEGACY] 警告（旧 Qwen E100/E109 复用产物无 sidecar，
+         存量打分路径不炸死，但 cap 身份未知如实记 null）。
+      ② schema：read_run_cap_manifest（损坏/缺键 [CAP-SCHEMA-FAIL]）。
+      ③ status：必须 complete（generating = 生成中断/未回填，拒绝）。
+      ④ result_file 闭包（115）：manifest.result_file 必须就是当前
+         JSONL 的 basename——误拷/错配 backfill 的 sidecar（cap 身份属
+         于另一结果文件）拒绝。
+      ⑤ 绑定：结果文件字节 sha256 == manifest.result_sha256（schema 通过
+         ≠ 绑定通过——篡改在此拦截）；行数 == manifest.n_samples（且
+         manifest.result_lines 非 null 时须一致）。
+      ⑥ cap 身份提取（effective/protocol/identity hash/comparability
+         key/provenance）供聚合 uniformity 检查与 result.json _meta 落盘。
+    【111】actual_sha/actual_lines：调用方在同一 runcap_gate_lock 锁窗口
+    内从**同一字节快照**预计算的 sha256/行数——评分、SHA、行数和
+    provenance 必须绑定同一不可变快照（修复前 eval 先 parse A、后重开同
+
+dataset2metric = {
+    "lbv2": lbv2_choice_score,
+    "narrativeqa": qa_f1_score,
+    "qasper": qa_f1_score,
+    "multifieldqa_en": qa_f1_score,
+    "multifieldqa_zh": qa_f1_zh_score,
+    "hotpotqa": qa_f1_score,
+    "2wikimqa": qa_f1_score,
+    "musique": qa_f1_score,
+    "dureader": rouge_zh_score,
+    "gov_report": rouge_score,
+    "qmsum": rouge_score,
+    "multi_news": rouge_score,
+    "vcsum": rouge_zh_score,
+    "trec": classification_score,
+    "triviaqa": qa_f1_score,
+    "samsum": rouge_score,
+    "lsht": classification_score,
+    "passage_retrieval_en": retrieval_score,
+    "passage_count": count_score,
+    "passage_retrieval_zh": retrieval_zh_score,
+    "lcc": code_sim_score,
+    "repobench": code_sim_score,
+}
+
+import re
+import string
+import os as _os
+
+import jieba
+import difflib
+
+from typing import List
+from collections import Counter
+from rouge import Rouge
+
+# ---- E116a（GPT TL-LBV1-SCORER-BACKEND-025）：代码相似度后端显式固定 ----
+# 历史 bug：fuzzywuzzy.fuzz.ratio 在装了 python-Levenshtein 时走 StringMatcher
+# （indel ratio），没装时走 difflib.SequenceMatcher——同一份预测两任务漂 ~1.5pt，
+# 13 任务宏平均漂 ~0.234。此处显式固定单一后端，禁止可选依赖静默改变语义：
+#   默认 difflib：纯标准库，零依赖，跨环境逐位可复现（canonical 口径）
+#   TLI_SCORER_BACKEND=levenshtein：显式要求 Levenshtein，缺包即启动失败（fail closed）
+# 语义与 fuzzywuzzy 两条历史路径逐一对应（均做 int(round(100*ratio))）。
+_SCORER_BACKEND = _os.environ.get("TLI_SCORER_BACKEND", "difflib").strip().lower()
+if _SCORER_BACKEND not in ("difflib", "levenshtein"):
+    raise ImportError(
+        f"TLI_SCORER_BACKEND={_SCORER_BACKEND!r} 非法（合法值: difflib | levenshtein）"
+    )
+if _SCORER_BACKEND == "levenshtein":
+    try:
+        import Levenshtein as _Lev
+    except ImportError as _e:
+        raise ImportError(
+            "TLI_SCORER_BACKEND=levenshtein 但 python-Levenshtein 未安装——"
+            "拒绝静默回退 difflib（fail closed），请安装或改用默认 difflib"
+        ) from _e
+    def _fuzz_ratio(s1: str, s2: str) -> int:
+        return int(round(100 * _Lev.ratio(s1, s2)))
+    SCORER_BACKEND_ID = "levenshtein:" + getattr(_Lev, "__version__", "?")
+else:
+    def _fuzz_ratio(s1: str, s2: str) -> int:
+        # 等价 fuzzywuzzy 无 Levenshtein 时的 stdlib 路径
+        return int(round(100 * difflib.SequenceMatcher(None, s1, s2).ratio()))
+    SCORER_BACKEND_ID = "difflib:stdlib"
+
+def normalize_answer(s):
+    """Lower text and remove punctuation, articles and extra whitespace."""
+
+    def remove_articles(text):
+        return re.sub(r"\b(a|an|the)\b", " ", text)
+
+    def white_space_fix(text):
+        return " ".join(text.split())
+
+    def remove_punc(text):
+        exclude = set(string.punctuation)
+        return "".join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_articles(remove_punc(lower(s))))
+
+
+def normalize_zh_answer(s):
+    """Lower text and remove punctuation, extra whitespace."""
+
+    def white_space_fix(text):
+        return "".join(text.split())
+
+        if match_term in ground_truth and match_term != ground_truth:
+            em_match_list.remove(match_term)
+    if ground_truth in em_match_list:
+        score = (1.0 / len(em_match_list))
+    else:
+        score = 0.0
+    return score
+    
+def rouge_score(prediction, ground_truth, **kwargs):
+    rouge = Rouge()
+    try:
+        scores = rouge.get_scores([prediction], [ground_truth], avg=True)
+    except:
+        return 0.0
+    return scores["rouge-l"]["f"]
+
+def rouge_zh_score(prediction, ground_truth, **kwargs):
+    prediction = " ".join(list(jieba.cut(prediction, cut_all=False)))
+    ground_truth = " ".join(list(jieba.cut(ground_truth, cut_all=False))) 
+    score = rouge_score(prediction, ground_truth)
+    return score
+
+def f1_score(prediction, ground_truth, **kwargs):
+    common = Counter(prediction) & Counter(ground_truth)
+    num_same = sum(common.values())
+    if num_same == 0:
+        return 0
+    precision = 1.0 * num_same / len(prediction)
+    recall = 1.0 * num_same / len(ground_truth)
+    f1 = (2 * precision * recall) / (precision + recall)
+    return f1
+
+def qa_f1_score(prediction, ground_truth, **kwargs):
+    normalized_prediction = normalize_answer(prediction)
+    normalized_ground_truth = normalize_answer(ground_truth)
+
+    prediction_tokens = normalized_prediction.split()
+    ground_truth_tokens = normalized_ground_truth.split()
+    return f1_score(prediction_tokens, ground_truth_tokens)
+
+
+def qa_f1_zh_score(prediction, ground_truth, **kwargs):
+    prediction_tokens = list(jieba.cut(prediction, cut_all=False))
+    ground_truth_tokens = list(jieba.cut(ground_truth, cut_all=False))
+    prediction_tokens = [normalize_zh_answer(token) for token in prediction_tokens]
+    ground_truth_tokens = [normalize_zh_answer(token) for token in ground_truth_tokens]
+    prediction_tokens = [token for token in prediction_tokens if len(token) > 0]
+    ground_truth_tokens = [token for token in ground_truth_tokens if len(token) > 0]
+    return f1_score(prediction_tokens, ground_truth_tokens)
+
+exec
+/usr/bin/bash -c "sshpass -f /tmp/.sshpw ssh -o ConnectTimeout=15 -p8416 wangyuanshuo02@10.238.122.187 'cd /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_pool_source_v2_20261029 && PYTHONDONTWRITEBYTECODE=1 TLI_SCORER_BACKEND=difflib CUDA_VISIBLE_DEVICES=\"\" /usr/bin/python -B -' <<'PY'
+import pathlib,json,hashlib,math,collections,statistics,sys,importlib.metadata,subprocess
+from benchmark.LongBench.eval import sample_score
+from benchmark.LongBench.metrics import SCORER_BACKEND_ID
+R=pathlib.Path('/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029'); S=pathlib.Path.cwd()
+h=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+m=json.loads((R/'manifest_rank0.json').read_text()); p=m['protocol']
+print('dispatch', (R/'dispatch_plan.json').read_text()[:7000])
+print('source',len(p['source_sha256']),[k for k,v in p['source_sha256'].items() if h(S/k)"'!=v])
+files=sorted((R/'"'requests').glob('*/*.json')); before={str(f.relative_to(R)):h(f) for f in files}
+print('raw_digest',hashlib.sha256(''.join(k+' '+v+'\\n' for k,v in before.items()).encode()).hexdigest())
+errors=[]; vals=collections.defaultdict(lambda:collections.defaultdict(list)); seen=set(); counts=collections.Counter(); gates=collections.Counter()
+for f in files:
+ r=json.loads(f.read_text()); ds=r['dataset']; i=r['row_index']; assert (ds,i) not in seen;seen.add((ds,i)); assert r['status']=='complete' and r['identity']==m['identity']; assert set(r['arms'])=={'full','far_0.05','dual_0.05'}
+ for arm,a in r['arms'].items():
+  score=sample_score('repobench' if ds=='repobench-p' else ds,a['prediction'],r['answers'],[])
+  if not math.isfinite(score) or not 0<=score<=1 or abs(score-a['score'])>1e-12:errors.append([ds,i,arm,score,a['score']])
+  vals[ds][arm].append(score);counts[ds]+=1
+ gates.update(r['arms']['dual_0.05']['gate_counts'])
+assert seen=={(d,i) for d,ii in p['selected_rows'].items() for i in ii}
+print('scorer',SCORER_BACKEND_ID,'python',sys.version.split()[0],'dependencies',{k:importlib.metadata.version(k) for k in ['rouge','jieba','numpy','transformers']})
+print('checked',sum(counts.values()),'per_dataset',dict(counts),'errors',errors,'gates',dict(gates))
+print('means_percent',json.dumps({d:{a:100*statistics.mean(x) for a,x in aa.items()} for d,aa in vals.items()}))
+print('unchanged',all(h(R/k)==v for k,v in before.items()))
+print('data_candidates',[(str(q),q.exists()) for q in [S/'benchmark/LongBench/data',pathlib.Path('/home/wangyuanshuo02/LongBench/data')]])
+PY" in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 10754ms:
+dispatch {
+  "source": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_pool_source_v2_20261029",
+  "head": "a1cdb2f4edd2447495175d90f75fa13b880d4afd",
+  "out": "/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029",
+  "workers": [
+    {
+      "rank": 0,
+      "host": "10.238.122.187",
+      "gpu": 0,
+      "python": "/usr/bin/python"
+    },
+    {
+      "rank": 1,
+      "host": "10.238.122.187",
+      "gpu": 1,
+      "python": "/usr/bin/python"
+    },
+    {
+      "rank": 2,
+      "host": "10.238.122.187",
+      "gpu": 2,
+      "python": "/usr/bin/python"
+    },
+    {
+      "rank": 3,
+      "host": "10.238.122.187",
+      "gpu": 3,
+      "python": "/usr/bin/python"
+    },
+    {
+      "rank": 4,
+      "host": "10.238.139.251",
+      "gpu": 0,
+      "python": "/usr/bin/python"
+    },
+    {
+      "rank": 5,
+      "host": "10.238.139.251",
+      "gpu": 1,
+      "python": "/usr/bin/python"
+    },
+    {
+      "rank": 6,
+      "host": "10.245.58.57",
+      "gpu": 0,
+      "python": "/home/wangyuanshuo02/frozen005_python"
+    },
+    {
+      "rank": 7,
+      "host": "10.245.58.57",
+      "gpu": 1,
+      "python": "/home/wangyuanshuo02/frozen005_python"
+    }
+  ],
+  "interval": 3600,
+  "identity_policy": "fresh guarded source; no unguarded output reused",
+  "verification": "producer outputs pending independent result verification"
+}
+source 72 []
+raw_digest 6404104e4c5fcd711415924b3d125b89df59be1a594d44404db51d6dd23c93ea
+scorer difflib:stdlib python 3.9.9 dependencies {'rouge': '1.0.1', 'jieba': '0.42.1', 'numpy': '2.0.2', 'transformers': '4.56.2'}
+checked 300 per_dataset {'gov_report': 60, 'hotpotqa': 60, 'musique': 60, 'qasper': 60, 'repobench-p': 60} errors [] gates {'keep': 3272, 'near': 1, 'far': 326, 'both': 1}
+means_percent {"gov_report": {"full": 35.22708222133101, "far_0.05": 34.835477827888326, "dual_0.05": 34.835477827888326}, "hotpotqa": {"full": 65.52380952380953, "far_0.05": 65.52380952380953, "dual_0.05": 65.52380952380953}, "musique": {"full": 45.08333333333333, "far_0.05": 45.08333333333333, "dual_0.05": 45.08333333333333}, "qasper": {"full": 56.10088285618245, "far_0.05": 54.04205932677068, "dual_0.05": 54.04205932677068}, "repobench-p": {"full": 72.05, "far_0.05": 71.95, "dual_0.05": 71.95}}
+unchanged True
+data_candidates [('/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_pool_source_v2_20261029/benchmark/LongBench/data', False), ('/home/wangyuanshuo02/LongBench/data', False)]
+
+exec
+/usr/bin/bash -c "rg -n 'Musique|musique|下降' /home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029/ai_supervision/round_20261029T141704/*.md; cat /home/wangyuanshuo02/two-level-attention/agent_doc/task/TASK.md" in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 260ms:
+/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029/ai_supervision/round_20261029T141704/followup_prompt_correction.md:1:后续评分审查启动提示曾误写“保留Musique下降”；首轮实际独立报告为旧screen Musique差值0，本文明确纠正该措辞。所有结果以原始数据和独立复算为准，不预设方向；该笔误不修改任何数据/协议。保存此说明防止交接沿用错误暗示。
+# two-level-attention 项目任务索引（AI 维护）
+
+## 2026-10-29
+
+- [ ] [TL-FROZEN-FULL5-QUEUE-20261029] Qwen3-8B独立Near/Far 0.05全量1300配对，三机8卡自动接力；运行中，独立结果验收与最终质量结论待完成。([详情](task_details/TL-FROZEN-FULL5-QUEUE-20261029.md))
+- **TL-GRAPH-PIPELINE-20261029**：按候选紧凑化→ring算子→跨batch→图外同步顺序持续推进，进行中；[详情](task_details/TL-GRAPH-PIPELINE-20261029.md)。
+
+- [ ] [TL-GRAPH-QUALITY-20261029] 修复batch错误提交，RULER/LongBench精度优先Graph并记录实际路径，GLM单请求动态gate Graph接线与独立验收。([详情](task_details/TL-GRAPH-QUALITY-20261029.md))
+
+- [ ] [TL-OPERATOR-COMPLETE-20261029] 算子蓝图持续实现：selector→32K FA2/serial基线→候选域→backend→batch/ring→Hopper→独立验收与main集成。([详情](task_details/TL-OPERATOR-COMPLETE-20261029.md))
+
+
+- [~] [TL-OPERATOR-OVERLAP-P4-20261029] Phase 4 decode_indexed 接线收官+GPU smoke：compact selection → partial_attention (SIMT) 核心链路 37+7 全绿，commit 61bb7ed + 33188f3 + b784896（e2e 多 run CPU 正确性覆盖 S_cap=16K/24K/32K）。GPU L=16K 4 runs PASS；L≥24K 第二轮 illegal memory access 落库 verdict（Phase 5 follow-up）。
+
+- [ ] [TL-OPERATOR-OVERLAP-P5-20261029] Phase 5 decode_indexed S_cap≥24K CUDA illegal memory access 修复：isdictor state 跨 eager replay 状态污染。CPU mock 已隔离排除 simt kernel 和大 S_cap grid params 路径（partial_attention simt 单测在 S_cap=24576 multi-run OK）；根因定位为 indexer CUDA 状态（_ginc 增量 buffer 或 cuda_graph_state 派生 flag）在 decode_indexed eager 路径跨 run 未重置。修复方案：(a) 单测 partial_attention torch vs simt at S_cap=24576 复现 (b) indexer prepare_index 入口重置增量状态 (c) 修复后 rerun GPU smoke 32K allclose(rtol=1e-2) 对齐 legacy compute_mask_graph+eager_decoding。
+
+- [ ] [TL-E184-DYN-FARSKIP-20261029] 当前 K1=128 冠军配置在 RULER 11 任务×32K/64K/128K 上实测动态 far-skip（eps=0.05、KV retain），与 gate-off/FullKV 逐样本配对，决定是否启用；协议已登记，基线核验与 GPU 派单进行中。([详情](task_details/TL-E184-DYN-FARSKIP-20261029.md))
+
+## 2026-10-28
+
+- [x] [TL-GLM47FLASH-TLI-20261028] 按用户最新“正确接入即可”范围完成：适配39b6e80已合入并推送main（基底8a48cae）；修正RoPE低频配对及动态gate请求隔离边界，单请求无padding/DynamicCache/eager通过独立语义验收；CPU20/20、GPU39/39。不宣称全模型逐位、不掉点或性能提升，原质量矩阵不作为本轮收官门。([详情](task_details/TL-GLM47FLASH-TLI-20261028.md))
+
+## 2026-10-26
+
+- [ ] [TL-HYBRID-CACHE-20261026] PR #9 升级：按请求×层混合 ring/linear、BS=1/2/8/32、不等长/动态 gate/EOS、RULER batch 和 CUDA Graph runner；85 项回归及 178 子用例通过，7 个 CUDA 项跳过，GPU/质量/性能验收待完成。([详情](task_details/TL-HYBRID-CACHE-20261026.md))
+
+## 2026-10-25
+
+- [x] [TL-FAR-SKIP-EAGER-OPT-20261025] 完成 far-off eager 五项优化：环形 KV 原位写入、增量页统计、直接子空间 gather、稳定 top-k、有界 scratch 复用；CPU 配对/正确性证据已归档，GPU/Graph 未验；继续通过 PR #7 交付。([详情](task_details/TL-FAR-SKIP-EAGER-OPT-20261025.md))
+
+- [x] [TL-FAR-SKIP-COMPACT-20261025] 实现 opt-in Qwen3 far-off 的 near-only 选择/attention 与真实 KV 淘汰；CPU 真 Torch/HF 正确性通过，GPU/质量/速度待验；按用户要求通过 PR 交付。([详情](task_details/TL-FAR-SKIP-COMPACT-20261025.md))
+
+## 2026-10-21
+
+- [x] [TL-ASYNC-CANDIDATE-20261021] 候选L2拒绝async组合并回退既有全宽路由，避免当前候选丢掉上一轮L1掩码所需分数；修前2失败，修后普通/-O各16项host回归通过。实际Torch/GPU、质量、性能与显存未验。([详情](task_details/TL-ASYNC-CANDIDATE-20261021.md))
+
+- [x] [TL-TLI-RUNTIME-SHAPE-20261021] TLI 公共入口在增量/快捷分流前显式拒绝多请求、多 query、错误 K 宽度及缺失 MoBA 分数，避免增量路径静默只消费 `k[0]`，且校验不再被 `python -O` 删除；修前普通4失败、-O为3失败1错误，修后普通/-O各13项host回归通过。当前无torch/GPU，生产张量、质量、显存与性能未验。([详情](task_details/TL-TLI-RUNTIME-SHAPE-20261021.md))
+
+- [x] [TL-LB-EMPTY-HANDOFF-20261021] LongBench 手动生成在短 prompt 全部进入 question 时不再向模型提交 0-token material；空 question 的 BOS 归一化也不再越界。修前基线确定触发空输入调用，修后普通/-O各28项相邻回归通过；当前无torch/GPU/真实tokenizer，实模输出和性能未验。([详情](task_details/TL-LB-EMPTY-HANDOFF-20261021.md))
+
+- [x] [TL-LB-SHORT-PROMPT-SPLIT-20261021] LongBench 手动生成入口将无锚点短 prompt 的 `-1` 切片修为零边界，恢复完整问题阶段并保持长输入 100 字符上限/锚点优先级；修前最小复现与新增回归失败，修后普通/-O各22项通过。当前无torch/GPU/真实模型，端到端token、质量与性能未验。([详情](task_details/TL-LB-SHORT-PROMPT-SPLIT-20261021.md))
+
+- [x] [TL-LB-DATASET-BINDING-20261021] 评分文件前缀绑定sidecar数据集，拒绝错集评分/输入身份分组，保留repobench-p前缀兼容；修前3失败，修后普通/-O各26项通过。完整评分依赖、历史重评及GPU未验。([详情](task_details/TL-LB-DATASET-BINDING-20261021.md))
+
+- [x] [TL-LBV1-INPUT-UNIFORMITY-20261021] LBv1 聚合按数据集拒绝跨 method 的源行、模板、实际 token 身份漂移及 v2/legacy strict 混挂；修前入口无门禁，修后普通/-O各7项及相邻各15项通过。当前无jieba/torch/GPU，完整eval、历史重评、质量与性能未验。([详情](task_details/TL-LBV1-INPUT-UNIFORMITY-20261021.md))
+
+- [x] [TL-BATCH-TREATMENT-SNAPSHOT-20261021] RULER batch TLI 的 runtime、输出名与完成回执改为共享模型加载前冻结的唯一 treatment 快照；修前入口级复现证明快照晚于模型且回执无 manifest，修后普通/-O各1项通过。当前无torch/GPU，真实模型、历史产物与性能未验。([详情](task_details/TL-BATCH-TREATMENT-SNAPSHOT-20261021.md))
+
+- [x] [TL-BATCH-ADDITIVE-MASK-20261021] FASA batch decode 的加性 mask 有效长度由统计非零修为统计零值；修前真实契约例把 `[3,4]` 反算为 padding 长 `[2,1]` 并拒绝，修后普通/-O各4项通过并保留bool语义；当前无torch/GPU，实模质量与性能未验。([详情](task_details/TL-BATCH-ADDITIVE-MASK-20261021.md))
+
+- [x] [TL-BATCH-CONTEXT-ISOLATION-20261021] 批量decode请求上下文由进程全局改为ContextVar并用scope恢复owner；修前双线程确定串扰，修后线程/async/嵌套异常普通及-O各3项通过，独立复核无blocker；当前环境缺torch，GPU/实模/性能及显式线程池传播未验。([详情](task_details/TL-BATCH-CONTEXT-ISOLATION-20261021.md))
+
+- [x] [TL-E155D-STAGING-20261021] T2每次打分独占快照，避免重复/并发调用删除前次证据；新增5反例、普通/-O各72项及各24入口对照通过；独立双进程/删源后20预测20manifest及CI通过，发布回读另核，真实T2/GPU未验。([详情](task_details/TL-E155D-STAGING-20261021.md))
+
+- [x] [TL-E155D-ATOMIC-VERDICT-20261021] T2写入中断保留旧判决、避免公开半JSON；修前10项9失败，普通/-O各67项CPU回归通过，独立24入口完整JSON及87几何对照通过；真实T2/GPU/并发staging未验，发布回读另核。([详情](task_details/TL-E155D-ATOMIC-VERDICT-20261021.md))
+
+## 2026-10-20
+
+- [x] [TL-BACKFILL-ID-FORMAT-20261020] 回填旧格式回退前检查全行ID格式，修复首行掩盖后续混行；普通/-O各8方法及旧105各10项通过，独立200行默认计数CLI/sidecar保留通过；非正文/token身份或GPU/性能验收。([详情](task_details/TL-BACKFILL-ID-FORMAT-20261020.md))
+
+- [x] [TL-E155D-GEOMETRY-20261020] T2目录几何绑定冻结manifest/文件名hash；修前8项7失败，普通/-O各57项、87合法producer/51错标签及24组差分与独审通过；仅汇总门禁完成，真实T2/GPU/性能未验。([详情](task_details/TL-E155D-GEOMETRY-20261020.md))
+
+- [ ] [TL-LBV1-INPUT-IDENTITY-20261020] 修前4组实际AST反例；已实现v2完整源行+模板+实际token身份闭环，普通/-O各15/15。真实Qwen3/GPU端到端与历史影响待验。([详情](task_details/TL-LBV1-INPUT-IDENTITY-20261020.md))
+
+- [x] [TL-E155D-SNAPSHOT-20261020] 固定配额排名/CI绑定暂存预测字节，修复源替换造成方向反转；普通/-O各41项及各24组差分通过，独审通过；真实T2/GPU/性能未验，发布回读另核。([详情](task_details/TL-E155D-SNAPSHOT-20261020.md))
+
+- [x] [TL-E155D-SCORE-UNITS-20261020] 固定配额 CI 与 AVG5 统一为分值单位并显式标注；修前5失败，普通/-O各32项、相邻17项及24组基线差分通过；真实T2重评/GPU/性能未验。([详情](task_details/TL-E155D-SCORE-UNITS-20261020.md))
+
+- [x] [TL-E155D-PAIRING-20261020] 固定配额top-N CI拒绝样本ID错配、缺失和重复；修前5失败2错误，普通/-O各25项及17项相邻host回归通过；独立24合法差分和20主入口失败场景通过，真实评分/GPU/性能未验。([详情](task_details/TL-E155D-PAIRING-20261020.md))
+
+- [x] [TL-E155D-ADMISSION-20261020] 固定配额网格汇总拒绝歧义文件和冲突完整副本；修前3失败、修后普通/-O各13项及40项相邻host回归通过；独立87格合法对照与冲突过滤通过，真实快照/GPU/性能未验。([详情](task_details/TL-E155D-ADMISSION-20261020.md))
+
+- [x] [TL-VENDOR-FROZEN-MANIFEST-20261020] 修复E155e重读已冻结源造成vendor结果身份漂移；4反例修复、7项普通/-O host测试及独立32配置身份对照通过；固定配额/kernel未改，GPU未验，发布回读另核。([详情](task_details/TL-VENDOR-FROZEN-MANIFEST-20261020.md))
+
+- [x] [TL-EXPLICIT-ORACLE-20261020] 固定配额拒绝E151c prefill oracle混配；9个错误接受配置修复，普通/-O各25项host测试及212合法状态差分通过；GPU/质量/性能未验。([详情](task_details/TL-EXPLICIT-ORACLE-20261020.md))
+
+- [x] [TL-EXPLICIT-MODES-20261020] 固定配额拒绝sinkswa_only/MoBA/sigma旁路组合；15反例拒绝，普通/-O各21项host测试及181合法构造状态对照通过，GPU/性能未验。([详情](task_details/TL-EXPLICIT-MODES-20261020.md))
+
+- [x] [TL-DEBUG-OFF-20261020] 六处调试关闭契约统一：54次误入→0，普通/-O各24项host测试通过；固定配额与算法未改，实际GPU/性能待验。([详情](task_details/TL-DEBUG-OFF-20261020.md))
+
+- [x] [TL-ENUM-CONTRACT-20261020] 四个选择枚举不再被-O取消校验；32非法构造拒绝，336合法对照不变，普通/-O各21项host测试通过；Torch依赖/GPU/性能未验。([详情](task_details/TL-ENUM-CONTRACT-20261020.md))
+
+## 2026-10-19
+
+- [x] [TL-EXPLICIT-INTEGER-20261019] 固定配额nb/nt/nl禁止小数静默截断；修前21失败3错误，修后普通/-O各19项host回归通过，6反例拒绝、108对照不变；完整依赖/GPU/性能未验。([详情](task_details/TL-EXPLICIT-INTEGER-20261019.md))
+
+- [ ] [TL-EXPLICIT-NEAR-WIDTH-20261019] 固定配额nl<bs仍被旧整页保底放大，与D′标定不一致；210配置host复现，三行候选270错误→0；补丁仅留档、生产源码未改，实际选集/GPU/性能待验。([详情](task_details/TL-EXPLICIT-NEAR-WIDTH-20261019.md))
+
+- [x] [TL-PARTITION-RATIO-20261019] alpha/beta非法比例构造期拒绝；修前普通/-O各28子用例失败，修后各16项host回归通过，独立641构造差分通过；GPU/模型/性能未验，发布回读单独确认。([详情](task_details/TL-PARTITION-RATIO-20261019.md))
+
+- [x] [TL-EXPLICIT-FREE-PROTECTED-20261019] 显式nt=off保护区预算不足构造期拒绝；修前18子用例失败，修后普通/-O各13项host测试通过，独立1080构造差分符合预期。GPU/模型/性能未验。([详情](task_details/TL-EXPLICIT-FREE-PROTECTED-20261019.md))
+
+- [x] [TL-EXPLICIT-L1-BUDGET-20261019] 显式near页配额超K1构造期拒绝，修前24子用例失败，修后普通/-O各4项及相邻6项host测试通过；GPU/模型/性能未验。([详情](task_details/TL-EXPLICIT-L1-BUDGET-20261019.md))
+
+- [ ] [TL-BATCH-EXPLICIT-QUOTA-20261019] E155显式near配额误入batch旧比例公式：入口回退逐组，含最新E155d归一配置，修前25子用例失败，修后普通/-O各6项host测试通过；GPU/模型/性能及历史重测待验。([详情](task_details/TL-BATCH-EXPLICIT-QUOTA-20261019.md))
+
+- [ ] [TL-PREFILL-SCORE-BUDGET-20261019] candidate eager GQA行块预算漏算查询头；源码绑定反例推导单score为928MiB而预算512MiB。仅审计/复现，非GPU峰值或OOM；生产修复待实际张量与GPU验证。([详情](task_details/TL-PREFILL-SCORE-BUDGET-20261019.md))
+
+- [x] [TL-SUMMARY-VALIDATION-20261019] CPU汇总复用单次协议校验/样本索引，逐行门禁不变；普通/-O各34项通过，512样本配对中位4392.28→47.41ms。非GPU/请求收益。([详情](task_details/TL-SUMMARY-VALIDATION-20261019.md))
+
+- [ ] [TL-PREFILL-SIGMA-CAP-20261019] top-σ 可变基数使用真实 mask 容量，修复 candidate 无组截断；普通/-O各108项CPU回归及独立各10case通过，GPU/性能及历史重测未验。([详情](task_details/TL-PREFILL-SIGMA-CAP-20261019.md))
+
+- [ ] [TL-PREFILL-MASK-CONTRACT-20261019] reference/candidate拒绝错误token mask元数据，防止单槽广播、维度截取及块索引误读；ops普通/-O各84项通过，GPU/模型/性能未验。([详情](task_details/TL-PREFILL-MASK-CONTRACT-20261019.md))
+
+- [ ] [TL-DECODE-MASK-EXTENT-20261019] 拒绝覆盖不足的decode选择mask，避免单槽广播扩大选集；普通/-O各25项CPU测试、独立48合法+12非法对照通过；有界修复验收，GPU/性能及真实selector重测未验。([详情](task_details/TL-DECODE-MASK-EXTENT-20261019.md))
+
+- [ ] [TL-BATCH-TOPK-BLOCK-20261019] 非64块保留全宽L2 topk，避免64特化补位错误；CPU回归通过，GPU及历史重测未验。([详情](task_details/TL-BATCH-TOPK-BLOCK-20261019.md))
+
+- [ ] [TL-DECODE-CU-STRIDE-20261019] fused decode 长度数组按需连续化；70项CPU普通/-O及独立30布局通过，GPU/性能未验。([详情](task_details/TL-DECODE-CU-STRIDE-20261019.md))
+
+这是 two-level-attention 主项目的唯一 AI 任务索引（agent_doc 口径），
+由主 AI 串行维护。
+**优先级从属关系：sglang 主仓根目录 `/home/wangyuanshuo02/sglang/TASK.md`
+（用户私人设定，AI 只读）是指南层，本文件是执行索引层**——每项登记的
+任务须能追溯到用户指令或根 TASK.md 条目；两者冲突时以根 TASK.md 为准。
+
+每项任务的方法、进度、证据、阻塞与下一步写 `task_details/<任务ID>.md`，
+不在此堆日志。日期是任务来源/组织日期，不自动表示完成日期。
+
+本索引自 sglang 主仓 `agent_doc/task/TASK.md` 迁移（2026-10-11 主项目
+移交）时只保留**未完成**任务（[ ] 在飞 / [~] 暂停），已收官任务不在此
+重建；其历史详情保留在 sglang 主仓 `agent_doc/task/task_details/`。
+
+两个身份，DeepSeek和opus，分别负责不同的内容，一个是开源其他论文的对比也即我们的对手，opus负责我们的论文的推进和优化
+
+## 现行指令变更登记
+
+- **2026-10-19（用户指令）**：**解除 SGLang 修改冻结**——10-18 advice 中"不要修改 SGLang"的范围限定作废，sglang 主仓可以被修改（E118 复活、生产栈集成等工作不再受此限制）。是否启动仍按优先级与触发条件排期，本条是解锁而非派单。
+
+## 2026-10-08
+
+- [ ] [S-T001] E109 method×(α,β,γ) 海选-全量两级扫描（进行中：AVG5 6 臂
+  入账，榜首 aavg(.125,.125,.375)=46.43；三机 12 卡满载推进；旧口径已被
+  S-T022/E125 新口径取代，剩余臂作排序先验）
+  ([详情](task_details/S-T001.md))
+- [ ] [S-T003] agent 库升级 + 项目 agent_doc 布局建立（2026-10-11 已接入
+  agent 库 39c6d42 并建立本目录；sglang 主仓存档化处理）
+  ([详情](task_details/S-T003.md))
+
+历史任务（E1-E113 全链）的原始记录位于 `exp/trace/` 与 sglang 主仓
+`research/docs/`，不在本索引重建；新任务自此按本格式登记。
+
+## 2026-10-09（补记，主 AI 维护义务恢复）
+
+- [ ] [S-T007] E119 四机 RULER 64K/128K 汇总 + 正式入口收口
+  （**64K 三臂已收口**：mavg 49.42 > FullKV 48.54 > aavg 47.51，
+  bb4cb21ac；128K 在飞四机 20 卡满载，全齐后同口径收口）
+  ([详情](task_details/S-T007.md))
+- [ ] [S-T009] 论文对比口径讨论（dense vs 单级稀疏）+ E120 单级无粗筛
+  方案探索（用户 13:2X 指令；讨论已发起 advice，待 GPT 回复）
+  ([详情](task_details/S-T009.md))
+
+## 2026-10-11（上午）
+
+- [ ] [S-T019] E116b 新口径三件套全量重跑（#167；mavg+aavg 双臂 ×
+  LB v1 16 任务 + LB v2 503 + RULER 32/64/128K；fullkv 复用仅补三缺任务；
+  **四机 20 卡 09:47 全量起跑**；动态主线转向后不停——静态锚点 + fullkv
+  基线 + 动态 vs 静态消融素材）
+  ([详情](task_details/S-T019.md))
+- [~] [S-T021] E124 论文主线转运行时逐序列逐层动态参数（用户 10-11 指令 +
+  GPT Runtime 方案 f304ec979 合流；静态 mavg 留作对照/回退，Observation
+  改每层差距，D' gate 动态版；A0-A7 阶段制）
+  **2026-10-11 15:2X 用户指令：动态线暂停**——E124 全部保留为未验收候选，
+  恢复等用户明确通知；GPT 090/091（seq 身份可移植 + DecisionLog 预检）
+  为恢复前置门。A1 已收官（087/088/089 修复 + v3 sample）。
+  ([详情](task_details/S-T021.md))
+- [ ] [S-T022] E125 静态 method 海选收官 → 冠军选举（用户 15:2X 指令 +
+  GPT 2bbb9a763 优先级切换；E109 海选 31 臂为旧口径，mavg/fullkv 复用
+  E123 新口径数据，4 method 最佳臂 .187 在飞补齐）
+  ([详情](task_details/S-T022.md))
+- [ ] [S-T023] 竞品复现与整请求公平比较：Quest/FASA/SparQ/ClusterKV + MInference，
+  HiP/MoBA条件候选；主表统一整请求质量及实测E2E，各方法保留原生另一阶段。
+  阶段子表仅归因；我方海选/冠军/MLA扩展由Opus独占，DeepSeek仅竞品。
+  sanity核语义/配置/打分/计时，不能强制结果符合论文方向；Quest新版已补dense分支及decode Q/K norm，faithful port与整请求验收仍待完成。
+  本轮文档纠偏不新增跑批矩阵、不启动GPU。([详情](task_details/S-T023.md))
+
+## 2026-10-11（晚间）
+
+- [x] [S-T025] E126 五臂 TLI 选择器分阶段计时 microbench（成本指纹，
+  **优化前基线**；收官。零改动 AST 插桩（生产文件 md5 冻结锚点全程
+  fail-closed）+ 红绿 python±-O 全绿 + H20 正式计时五臂全落袋。
+  关键发现：S3_fine 细筛分为最大选择器成本项（O(S) 线性 0.23→2.67ms）；
+  cavg 系步均建簇摊销额外成本仅 0.03-0.13ms 但冷建簇超线性（64K 需
+  1.7-1.9s，e2e 不可隐藏）；选择器成本对数据分布不敏感。
+  worktree e126-stage-timing（eb308c7+6325bcf）按隔离纪律未 push，
+  E127 验收合入后同协议复测，前后成对进 E128）
+  ([详情](task_details/S-T025.md))
+
+## 待办池（未排期，均有用户指令或审计来源）
+
+- [x] [TL-BATCH-SINK-ZERO-20261019] 零sink批量路径哨兵冲突：入口安全回退，修前3失败；普通/-O每模式92项unittest+8场景通过。GPU/实模/性能与历史格重测未完成。([详情](task_details/TL-BATCH-SINK-ZERO-20261019.md))
+
+- [x] [TL-PREFILL-EMPTY-20261019] reference空行兜底按行/head隔离，避免污染非空选集；普通/-O各67项、相邻21项及独立1324场景通过，发布回读主控闭环，GPU/模型/性能未验。([详情](task_details/TL-PREFILL-EMPTY-20261019.md))
+
+- [x] [TL-E151C-LAYER-20261019] 配额消费点拒绝缺失/非法/未覆盖层号；21项E151c测试及24场景旧实现选集差分普通/-O通过，GPU/模型/性能未验。([详情](task_details/TL-E151C-LAYER-20261019.md))
+
+- [x] [TL-E151C-MODES-20261018] oracle配额与gamma-off/非E64/sinkswa/MoBA/sigma不兼容组合构造期拒绝；普通/-O各41项或场景通过及独立复核，GPU/质量/性能无新增结论。([详情](task_details/TL-E151C-MODES-20261018.md))
+
+- [x] [TL-E151C-INPUT-20261018] quota JSON 构造期拒绝字符/对象键误读、空表及非法数值；保留合法取整，13项普通/-O专项通过。短表/配置支持仍待办。([详情](task_details/TL-E151C-INPUT-20261018.md))
+
+- [ ] [TL-E151C-ROUTE-20261018] prefill 配额路由修复：reference 激活/异常清理，batch 回退逐组；35项/场景普通及-O CPU验证，GPU/实模/性能与历史配额臂重测待办。([详情](task_details/TL-E151C-ROUTE-20261018.md))
+
+- [ ] [TL-DAC-BEST-PAPERS-20261016] DAC 2017–2026 Best Paper PDF 收集：13 篇获奖名单已核实，7 篇有效 PDF 已入 advice/DAC_best_paper，6 篇因全文入口受阻/失效待补；2026-10-16 第三轮 arXiv/作者关键词补查新增 1 篇明确标注的后续期刊 PDF（不计入 7/13），第五轮 arXiv 专项 24 组查询及 v1 版本核查仍缺 6 篇；用户明确不发邮件，已取消发送路线；附来源、版本、页数与 SHA-256。
+  ([详情](task_details/TL-DAC-BEST-PAPERS-20261016.md))
+
+- [x] [TL-E152-STORE-20261016] E152 同路径合作写者锁与原子JSON发布；修前丢记录/中断损坏复现，16项普通/-O通过。LongBench因缺Torch未执行，非GPU提速。([详情](task_details/TL-E152-STORE-20261016.md))
+
+- [x] [TL-E152-TIMING-20261016] E152 连续请求 wall/TTFT、单 token TPOT及 -O 协议门禁修复；专项8项和捕获11项普通/-O通过。GPU路由/低扰动E2仍待验，非提速结果。([详情](task_details/TL-E152-TIMING-20261016.md))
+
+- [x] [TL-SPARQ-LIFECYCLE-20261016] B轨SparQ跨请求V_mean owner/length修复；专项12项、ops62项普通/-O及36场景144次decode逐位对照通过。GPU/真实模型及历史影响重测待办。([详情](task_details/TL-SPARQ-LIFECYCLE-20261016.md))
+
+- [x] [TL-MLA-MASK-20261015] MLA decode非恒等mask在cache更新前拒绝；50项普通/-O CPU回归与24合法路径逐位对照。显式CUDA mask新增归约/同步，性能及真实模型尚未验证。([详情](task_details/TL-MLA-MASK-20261015.md))
+
+- [x] [TL-DECODE-INPUT-20261015] decode公共消费端形状与Q/K宽度守卫，CPU回归41项与48合法路径逐位对照；GPU未验，不代表padding支持。([详情](task_details/TL-DECODE-INPUT-20261015.md))
+
+- [x] [TL-Q-STRIDE-20261015] fused wrapper按需整理Q特征布局，44项CPU回归及独立ABI矩阵通过；GPU/性能尚未验证。([详情](task_details/TL-Q-STRIDE-20261015.md))
+
+- [ ] E118：sglang C1/C2/C3 三源码 bug 修复（SG e2e taskmd+CUDA graph
+  前置门；C3 修复改行为须换 postfix 重跑；sglang 主仓集成相关，后续回归
+  sglang 时处理）
+  - **2026-10-19 用户指令升级（解冻+扩容）**：sglang 可修改（见顶部登记）；
+    集成目标从"修 bug"扩为**四步方案**：① E118 复活修 C1/C2/C3，TLI bs=1
+    在 sglang 跑通 → ② 等价门禁：sglang bs=1 vs HF harness 同任务对拍
+    （噪声带内）→ ③ 批量门禁：bs=1 vs bs=32 对拍，过了 bulk eval 切高 bs
+    （**核心收益 = 质量 eval 产能提升一个数量级**，GPU 队列瓶颈缓解）→
+    ④ 速度主张：sglang 内全员 graph 默认口径测 TPOT，Quest 臂标注栈差异
+    （其原生在 vLLM）。前③步完成即回本，④才进论文。
+- [ ] E120：粗筛阶段价值消融 + 单级方案对比（依赖 S-T009 讨论收敛）
+- [ ] E127：TLI 选择器优化（候选方向：S3_fine 细筛分 O(S) 主成本项 +
+  cavg 系 prefill 建簇/decode 复用分相；验收合入后按 S-T025 协议复测）
+
+## 2026-10-15（GPT 论文工程分支）
+
+- [x] [TL-E140-ASSET-PROVENANCE-20261015] E140 历史图可见诊断警告及旧/新身份分离；CPU 正负回归，不代表科学有效性恢复。
+  ([详情](task_details/TL-E140-ASSET-PROVENANCE-20261015.md))
+
+- [ ] [GPT-PAPER-20261015] 论文运行时、数据门禁与图表薄入口；CPU 回归及独立审查，GPU 实测和科学验收未完成。仅发布独立开发分支。
+  ([详情](task_details/GPT-PAPER-20261015.md))
+
+- [x] [TL-E140-O4-PARTIAL-PAGE-20261015] O4 有效末页修复及面板(d)历史诊断隔离；CPU验收，未重采。
+  ([详情](task_details/TL-E140-O4-PARTIAL-PAGE-20261015.md))
+
+## 2026-10-16（论文论证修订）
+
+- [x] [TL-PAPER-SCHOLARLY-20261016] 实际论文技能与两篇DAC获奖全文学习；双语逐段论证/PPT修订、独立科学与全页读者复核，保留数据及负结果，零新实验。([详情](task_details/TL-PAPER-SCHOLARLY-20261016.md))
+
+- [x] [TL-OBS-PLOT-CORRECTNESS-20261016] 有界修复整箱预算、真实区域、有限配对分母和E6证据标注；CPU独审后仅推原dev。合并裁决（Opus 2026-10-17）：O 图系列保留 main 出版版渲染器（e021281 四带呈现 + e5f5b7e 统计修正已吸收 whole-bin 预算/区域归属修正），GPT 诊断版渲染器与 validity v4 降级主张未采纳——(a)(b)(c)(d) 限定手稿 caption 已如实披露（mass-rank 参考、whole-bin 预算、gate 默认关闭）；诊断资产 O_observation_diagnostic.json 与 record_provenance.py 保留入库。
+  ([详情](task_details/TL-OBS-PLOT-CORRECTNESS-20261016.md))
+
+- [ ] [TL-STATIC-MASK-20261016] 恢复授权：StaticCache mask 精确旁路与 DynamicCache 哨兵修复，105 项指定 CPU 测试普通/-O通过；GPU/实模/性能仍待验。([详情](task_details/TL-STATIC-MASK-20261016.md))
+
+- [x] [TL-DECODE-PADDING-Q-20261019] Qwen3/Llama 单 query decode 仅压紧 K/V，修复合法 2D padding mask 对 Q 的越界形状索引；33 项普通/-O CPU 回归及独立多步/长序列 gather 复核。GPU/真实 selector/性能另待验证，不宣称提速。([详情](task_details/TL-DECODE-PADDING-Q-20261019.md))
+
+## 2026-10-21
+
+E155d 主任务链并轨节（T1–T8/TDS，源自根 TASK.md 字节级归档迁移，见
+`legacy/TASK.7679d9be4f96….md`）。
+
+- [x] [TL-E155D-T1-20261021] E155d 网格监督 87/87 收官（缺口格补跑过门，六机进程清零核实） ([详情](task_details/TL-E155D-T1-20261021.md))
+- [x] [TL-E155D-T2-20261021] E155d 网格打分终版判决：冠军 nb32nt448nl4096 AVG5 48.668（+1.21 vs CTRL 单池；top-3 配对 CI 全含 0，同族几何稳健） ([详情](task_details/TL-E155D-T2-20261021.md))
+- [ ] [TL-E155D-T3-20261021] nl=全mid 退化端点补跑（top-2 几何叙事用，各 1 格，未跑） ([详情](task_details/TL-E155D-T3-20261021.md))
+- [x] [TL-E155D-TG-20261021] eval harness CUDA Graph 化 + 大 bs 化（2026-10-22 收官：门 ② graph_vs_eager 实模 e2e 对拍 PASS 3/3 语义逐字节一致——exp/bench/test_graph_vs_eager_e2e.py，Qwen3-8B L=32768 bs=2 niah_single_1 n=3，唯一差 budget 记账浮点已豁免；门 ① 大 bs vs bs1 锚点对拍走 test_bs1_equiv_e2e.py 协议；TG 门禁 G7a/b/G8/G9/G10 5/5 + E127 7/7 由 TG 会话验证） ([详情](task_details/TL-E155D-TG-20261021.md))
+- [ ] [TL-E155D-T4-20261021] nt 轴可分性 RULER 64K 七臂实验（预登记判定规则；LongBench 先验 nt448 vs ntoff +0.405 排除 0）。进行中 10-21 15:1X 快照：六线（本机/pc31/pc32 各 2）零 FAIL，21/77 job 过行数门（各臂 100+ 行），~6 job/h → ETA 10-22 晨；产物在 `~/tmp_t4_ruler/L65536/pred_<arm>/<task>*.jsonl.gen-*/` 世代目录（行数统计须递归 gen 子目录） ([详情](task_details/TL-E155D-T4-20261021.md))
+- [ ] [TL-E155D-T5-20261021] ablation 论文部分写入（TLI_paper_en.tex / TLI_paper.tex 双语镜像） ([详情](task_details/TL-E155D-T5-20261021.md))
+- [x] [TL-E155D-TDS-20261021] DeepSeek T7 fix 三重独立复跑审查通过（E127 15/15 + batch 门禁 26/26 + E133c 开关对照轮廓逐步全等） ([详情](task_details/TL-E155D-TDS-20261021.md))
+- [ ] [TL-E155D-T6-20261021] 主方法敲定 + 全量测试（用户改序暂缓：等 TG 提速确证；六机派单已预置未启动，零进程零清理） ([详情](task_details/TL-E155D-T6-20261021.md))
+- [ ] [TL-E155D-T7-20261021] 性能浪费点修复（E133c A1-A4/A6 已入库；剩余 .187 独占窗口稳态 bench 同机对照 + 判决 JSON） ([详情](task_details/TL-E155D-T7-20261021.md))
+- [ ] [TL-E155D-T8-20261021] 推送远端 main（全部判决/论文/代码提交后 origin push，含历史挂账） ([详情](task_details/TL-E155D-T8-20261021.md))
+
+
+codex
+已独立完成 300/300 个官方评分复算，包括 GovReport 的 60 个 ROUGE 分数，全部与原始记录一致；100 个原始文件的摘要也与前次绑定一致。确认宏平均下降约 0.510086 个百分点，Musique 差值为 0；目录内另有主控更正说明，确认“保留 Musique 下降”是交接笔误。接下来核对原始答案与数据集绑定。
+
+exec
+/usr/bin/bash -c "sshpass -f /tmp/.sshpw ssh -o ConnectTimeout=15 -p8416 wangyuanshuo02@10.238.122.187 'cd /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_pool_source_v2_20261029 && sed -n \"150,180p\" benchmark/LongBench/prefill_frozen_skip.py && ls /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla && ls /home/wangyuanshuo02'" in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 1040ms:
+    for _ in range(max_new_tokens):
+        token = out.logits[:, -1].argmax(-1, keepdim=True); generated.append(int(token))
+        if int(token) in eos or len(generated) == max_new_tokens: break
+        out = model(token, past_key_values=cache, use_cache=True, logits_to_keep=1)
+    return generated
+
+
+def main():
+    ap = argparse.ArgumentParser(__doc__)
+    ap.add_argument('--model', default='/home/wangyuanshuo02/Qwen3-8B')
+    ap.add_argument('--data', default='/home/wangyuanshuo02/datasets/LongBench/data')
+    ap.add_argument('--out', default='agent_doc/results/frozen_near_far_staging_20261029')
+    ap.add_argument('--samples', type=int, default=20)
+    ap.add_argument('--seed', type=int, default=42)
+    ap.add_argument('--context-cap', type=int, default=31500)
+    ap.add_argument('--thresholds', default='0.05')
+    ap.add_argument('--statistic', choices=['mean','p95'], default='mean')
+    ap.add_argument('--datasets', default=','.join(SCREEN_TASKS))
+    ap.add_argument('--rank', type=int, default=0)
+    ap.add_argument('--world-size', type=int, default=1)
+    ap.add_argument('--device', default='cuda:0')
+    ap.add_argument('--verify-native-full', action='store_true')
+    ap.add_argument('--attention', choices=['sdpa','tli'], default='sdpa')
+    args = ap.parse_args()
+    if args.attention == 'tli':
+        os.environ['TLI_OPERATOR_MODE'] = 'off'
+        os.environ['TLI_FINE_GATHER'] = '0'
+        os.environ['TLI_SPARSE_PREFILL'] = '0'
+        os.environ['TLI_DECODE_DENSE'] = '0'
+    tasks = args.datasets.split(',')
+    if not set(tasks)<=set(SCREEN_TASKS) or len(set(tasks)) != len(tasks):
+frozen005_full_source_20261029
+frozen005_pool_source_20261029
+frozen005_pool_source_v2_20261029
+frozen005_scoring_deps
+results
+two-level-attention.git
+wheels
+datasets
+e140v2_e140_o4_select_trace.py
+e140v2_e140_o_trace.py
+e140v2_out
+e140v2_run.sh
+e140v4_run.sh
+e147_wip_backup_ecfbd4f
+e151_out
+e152_out
+e152v2_dispatch.sh
+e152_v2_latency.py
+e152v2_out
+e164_run
+e165_run
+e168c_gate.sh
+e168c_ruler
+e168k_ruler
+e168n_ruler
+e168n_score_128k.sh
+e168o_ruler
+e168o_score_128k.sh
+e174_32b_iter3_k64_pc02.log
+e174_32b_iter3_k64_pc02.sh
+e174_iter3_k64_formal
+e174_k128_64k_fillin.log
+e174_k128_64k_fillin.sh
+e174_untracked_backup
+e178_qwen_probe.sh
+e178_ruler_q
+e179c_qwen_probe.sh
+e179c_ruler_q
+e179d_k128byp_probe.sh
+e179d_ruler
+e179_score_probe.py
+e180d_32k.log
+e180d_64k.log
+e180d_k96_32k.sh
+e180d_k96_64k.sh
+e180d_ruler
+e184_repo
+e184_run_chain.sh
+glm47flash_ruler_20261028a
+hope_qwen3_14b_clone.log
+huggingface.co
+local_pylibs
+models
+pc02_untracked_backup_20261019
+Qwen3-14B
+Qwen3-8B
+sparse-bench
+t6_champ_tree
+t6_remote_norsv.sh
+t6_remote.sh
+t6_ruler
+tli_ako
+tli-e179-8f213e4
+tli-e180-prefillk2
+tli_indexer.e178pre.bak
+tmp_e145d_lbv2
+tmp_e152v2
+tmp_e152v2_upload
+tmp_e153b_sink4_b0625
+tmp_e153_sink4_e2e
+tmp_e155_grid
+two-level-attention
+wt-direct-prefill-main
+wt_hybrid_gpu
+
+exec
+/usr/bin/bash -c 'cat /home/wangyuanshuo02/two-level-attention/agent_doc/task/task_details/TL-FROZEN-FULL5-QUEUE-20261029.md' in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 248ms:
+# TL-FROZEN-FULL5-QUEUE-20261029
+
+## Plan v1
+用户要求：三台远端各自常驻轮询空闲 GPU 并接力跑完现有 AVG5 全量，无需助手持续监督。保留独立 Near/Far 0.05 prefill 冻结与 decode 分区缓存，不改算子优化。1300 配对样本、3900 次生成、64 分片。结果固定到当前项目 agent_doc/results。
+
+## Progress v1
+实现位于分支 explore/prefill-frozen-near-far-skip，worktree /home/wangyuanshuo02/two-level-attention-near-far-skip。脚本 scripts/remote_frozen_queue.py 与 scripts/run_remote_frozen_queue.sh；说明 docs/frozen_full_queue.md。独立代码审阅和相关 63 项回归已执行；部署跨机 flock 检验发现不互斥，已暂停点火并改为原子文件系统锁，须通过三机验证后启动。
+
+结果入口：[README](../../results/frozen_near_far_full5_independent005_20261029/README.md)。deployment_receipt.json 与 preflight/receipts.json 保存实际点火与环境身份。新全量结果须独立 verify_experiment_result；不得由调度完成推导精度无损。
+
+## Progress v2 — 已部署
+冻结源码 3e4a6885604ac3e719ee92a4906f87b532535314。跨机锁改为预写 owner + 原子 symlink 发布，同机 dead-PID 恢复串行化。实际三机并发 90 次锁内计数全部保留，模型/数据哈希一致；相关 68 项回归通过。三机 watchdog 已启动，PID 见 deployment_receipt.json；实际工作进程/GPU/日志证据见 launch_live_check.json。无需本机监督器或助手在线继续派单，轮询 300 秒，审计 1 小时。
+
+## Progress v3 — 用户改为30分钟AI监督
+已部署 scripts/supervise_frozen_ai.py，每1800秒启动独立 Codex exec 轮次（不并发叠加），读取交接/实况，自主诊断、决策、推进和落盘；远端300秒派单保留，不改冻结被测代码与协议。探针真实成功，调度生命周期检查通过。状态与报告在结果目录 ai_supervision/，NEXT_STEPS.md持续交接，只有全量独立验收及最终报告落盘后结束。创建 ai_supervision/STOP 可停止监督但不停止GPU任务。该监督依赖本机运行与Codex服务可用；AI请求失败下一周期重试。旧固定8rank小时监督只覆盖已结束screen，不重启。
+
+exec
+/usr/bin/bash -c "sshpass -f /tmp/.sshpw ssh -o ConnectTimeout=15 -p8416 wangyuanshuo02@10.238.122.187 'cd /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_pool_source_v2_20261029 && PYTHONDONTWRITEBYTECODE=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=\"\" TLI_SCORER_BACKEND=difflib /usr/bin/python -B -' <<'PY'
+import pathlib,json,hashlib,numpy as np,collections
+from transformers import AutoTokenizer
+R=pathlib.Path('/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029');S=pathlib.Path.cwd();D=pathlib.Path('/home/wangyuanshuo02/datasets/LongBench/data')
+h=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+m=json.loads((R/'manifest_rank0.json').read_text());p=m['protocol'];M=pathlib.Path(p['model'])
+assert h(M/'config.json')==p['model_config_sha256'];assert h(M/'tokenizer_config.json')==p['tokenizer_config_sha256']
+t=AutoTokenizer.from_pretrained(str(M),local_files_only=True); prompts=json.loads((S/'benchmark/LongBench/config/dataset2prompt.json').read_text())
+counts=collections.Counter(); bad=[]
+for ds in p['datasets']:
+ f=D/(ds+'.jsonl');assert h(f)==p['dataset_sha256'][ds]; rows=[json.loads(l) for l in f.read_text().splitlines()];assert np.random.default_rng(p['seed']).permutation(len(rows))[:20].tolist()==p['selected_rows'][ds]
+ for i in p['selected_rows'][ds]:
+  r=json.loads((R/'requests'/ds/f'{i:04d}.json').read_text());row=rows[i];assert r['answers']==row['answers']; counts['answers']+=1
+  txt=prompts[ds].format(**row); ids=t(txt,add_special_tokens=False).input_ids;n=len(ids);cap=p['context_cap']
+  if n>cap:txt=t.decode(ids[:cap//2],skip_special_tokens=True)+t.decode(ids[-(cap-cap//2):],skip_special_tokens=True)
+  if ds"'!='"'repobench-p':txt=t.apply_chat_template([{'role':'user','content':txt}],tokenize=False,add_generation_prompt=True,enable_thinking=False)
+  ids=t(txt,add_special_tokens=False).input_ids
+  expected=dict(raw_tokens=n,input_tokens=len(ids),truncated=n>cap,input_sha256=hashlib.sha256(json.dumps(ids).encode()).hexdigest())
+  if expected"'!=r['"'input']:bad.append([ds,i,'prompt'])
+  counts['prompts']+=1
+  for arm,a in r['arms'].items():
+   if t.decode(a['generated_ids'],skip_special_tokens=True)"'!=a['"'prediction']:bad.append([ds,i,arm,'decode'])
+   counts['decode']+=1
+print('DATA_PROMPT_CHECK',dict(counts),'mismatches',bad,'datasets_hash_match',5)
+files=sorted((R/'requests').glob('*/*.json'));print('final_raw_digest',hashlib.sha256(''.join(str(f.relative_to(R))+' '+h(f)+'\\n' for f in files).encode()).hexdigest())
+print('manifest0',h(R/'manifest_rank0.json'),'dispatch',h(R/'dispatch_plan.json'))
+print('source_final_mismatch',[k for k,v in p['source_sha256'].items() if h(S/k)"'!=v])
+PY' in /home/wangyuanshuo02/two-level-attention-near-far-skip
+exec
+/usr/bin/bash -c "python -B - <<'PY'
+import pathlib,json,hashlib
+p=pathlib.Path('/home/wangyuanshuo02/two-level-attention/agent_doc/results/frozen_near_far_full5_independent005_20261029/ai_supervision/round_20261029T141704')
+j=json.loads((p/'screen_official_rescore.json').read_text()); base='/mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_independent005_pool_v2_20261029/'
+s=''.join(x['path'].removeprefix(base)+' '+x['sha256']+'\\n' for x in sorted(j['files'],key=lambda x:x['path']))
+print('producer_inventory_digest',hashlib.sha256(s.encode()).hexdigest(),'files',len(j['files']))
+for f in ['independent_screen/REPORT_access_retry.md','screen_official_rescore.py','screen_official_rescore.json','remote_scorer_probe.json','followup_prompt_correction.md']:
+ print(f,hashlib.sha256((p/f).read_bytes()).hexdigest())
+PY" in /home/wangyuanshuo02/two-level-attention-near-far-skip
+ succeeded in 296ms:
+producer_inventory_digest 6404104e4c5fcd711415924b3d125b89df59be1a594d44404db51d6dd23c93ea files 100
+independent_screen/REPORT_access_retry.md 534bfc9e9850c09ac84edc2d80bc1bd20de313244ab0e9b99bec14ec285c67a9
+screen_official_rescore.py ed0f2b40557d8f30f08a5feddb84227a125e295658c39b15601e1a0f09810dfa
+screen_official_rescore.json a7e7f8fe80174d92355fcbec813f5d84fb3d8c26de7b967441afb9b8a2169357
+remote_scorer_probe.json ba96d4bb2af0f60e22fb22b2d18d722b3d4ccd206229cd21a029d5799f257ec2
+followup_prompt_correction.md c48ee4249830aa7f1d82dd6f682e9a16f84d050a9a7d74d5b5ba4eaa7c8eab4f
+
+ succeeded in 13121ms:
+DATA_PROMPT_CHECK {'answers': 100, 'prompts': 100, 'decode': 300} mismatches [] datasets_hash_match 5
+final_raw_digest 6404104e4c5fcd711415924b3d125b89df59be1a594d44404db51d6dd23c93ea
+manifest0 ae460b2a95babf579492379b433a7cab05f089571c1e2453be3e4b21b1c97e50 dispatch a8960f29aede6aacad63b92dfbf9d843cae9a7a06997d6a4347db5303ad15f4c
+source_final_mismatch []
+
+codex
+**独立核验补充结论：旧 100 配对 screen 的官方评分缺口已闭合；整体实验验收仍为 `pending`，全量 1300 仍为 `pending`。**
+
+本轮由独立审查者执行，全部 `exec login=false`，仅使用 CPU、只读文件及内存脚本；未启动模型或 GPU，未安装依赖，未写源文件、数据或脚本。本文交外层保存到指定轮次目录。
+
+已读取前次 `independent_screen/REPORT_access_retry.md` 及主控生成的 scorer 脚本、结果和环境探针。主控的 `errors=[]` 未被直接作为通过依据。
+
+本轮实际完成：
+
+- 在 pc02 冻结源码目录独立调用 `sample_score`，重算 **300/300** 个评分，包括 GovReport **60/60** 个 ROUGE 分数；与保存分数的绝对误差均不超过 `1e-12`，全部有限且处于 `[0,1]`。
+- 核对 **100 个唯一样本、每任务 20 个、每样本三臂完整**，与冻结 `selected_rows` 一致。
+- **5 个数据集哈希匹配，100 份原始答案匹配数据行**；seed=42 重新抽样顺序一致。
+- 离线 CPU tokenizer 重建 **100 个 prompt**，长度、截断标记和输入 token 哈希全部一致；**300 个生成序列解码**与保存 prediction 全部一致。
+- 冻结源码 **72 项哈希**在检查前后全部匹配；原始文件摘要与前次报告、主控逐文件清单一致，结束时再次核对未变。
+
+实际评分环境为 Python **3.9.9**、`rouge 1.0.1`、`jieba 0.42.1`、`numpy 2.0.2`、`transformers 4.56.2`，后端为 **`difflib:stdlib`**。这些版本固定本次重评分环境，不代表已补齐历史生成环境闭包。
+
+百分制复算结果如下，差值单位为百分点：
+
+| 任务 | full | far_0.05 | dual_0.05 | far/dual − full |
+|---|---:|---:|---:|---:|
+| Qasper | 56.100883 | 54.042059 | 54.042059 | −2.058824 |
+| HotpotQA | 65.523810 | 65.523810 | 65.523810 | 0 |
+| Musique | 45.083333 | 45.083333 | 45.083333 | 0 |
+| GovReport | 35.227082 | 34.835478 | 34.835478 | −0.391604 |
+| RepoBench-P | 72.050000 | 71.950000 | 71.950000 | −0.100000 |
+| **宏 AVG5** | **54.797022** | **54.286936** | **54.286936** | **−0.510086** |
+
+**这批固定 screen 确有实际评分下降，但 Musique 没有下降。** 目录中的 `followup_prompt_correction.md` 也明确说明“保留 Musique 下降”是交接笔误。本轮依据原始数据纠正该措辞，不预设下降方向，也不推断全量 Musique 的结果。
+
+六项检查的更新判定：
+
+| 检查 | 判定与剩余缺口 |
+|---|---|
+| `implementation` | **限定 pass**：沿用前次静态调用链审查，本轮重新验证 72 项源码绑定；未新增 GPU 执行认证。 |
+| `reference_boundary` | **inconclusive**：独立张量参考及极端边界仍缺；near-only 跨页老化转 Far 尚无该 screen 的运行覆盖。 |
+| `data_integrity` | **限定 pass**：100 样本配对、原始答案、数据集、抽样、prompt 和输出解码均已独立核对；模型权重完整绑定仍缺。 |
+| `numerical_sanity` | **限定 pass**：300 个分数、任务均值和宏平均独立复算一致；前次 cache 不变量检查未在本轮重复执行。 |
+| `measurement_validity` | **评分范围 pass**：官方评分、答案、分母与配对缺口闭合；不认证耗时、峰值显存或性能收益。 |
+| `reproducibility` | **整体 inconclusive**：评分与输入重建可复现；未重跑模型生成，历史依赖闭包和权重绑定仍不完整。 |
+
+Near-only 与 Both 的限制必须随结果保留：dual 臂共 **3600 个层—请求决策**，其中 keep=3272、far-only=326、near-only=1、both=1。后两类各仅占 **0.02778%**，各涉及一个 Musique 请求，不能据此宣称广泛质量覆盖。唯一 near-only 请求未实际覆盖跨页老化迁移。
+
+关键绑定：
+
+```text
+100 个原始请求文件清单 SHA-256：
+6404104e4c5fcd711415924b3d125b89df59be1a594d44404db51d6dd23c93ea
+
+manifest_rank0.json：
+ae460b2a95babf579492379b433a7cab05f089571c1e2453be3e4b21b1c97e50
+
+dispatch_plan.json：
+a8960f29aede6aacad63b92dfbf9d843cae9a7a06997d6a4347db5303ad15f4c
+```
+
+清单摘要计算规则与前次一致：按路径排序，拼接 `相对结果根路径 + 空格 + 文件SHA256 + 换行` 后计算 SHA-256。
+
+**保持 `pending` 的原因**是参考/边界及生成复现仍有缺口，且未取得事前固定的完整 validation plan 和结果合同。本轮事后复算不能补造事前计划，也不能把未执行检查改为 N/A。因此不签发整体 `usable-with-scope`；可以确认上述固定预测的评分核查事实，但不能据此宣称算法无损、普遍等价或全量验收完成。这里的 `full` 仍是关闭 region gate 的 TLI 基线，并非 dense full-attention decode。
+tokens used
+57,992
+**独立核验补充结论：旧 100 配对 screen 的官方评分缺口已闭合；整体实验验收仍为 `pending`，全量 1300 仍为 `pending`。**
+
+本轮由独立审查者执行，全部 `exec login=false`，仅使用 CPU、只读文件及内存脚本；未启动模型或 GPU，未安装依赖，未写源文件、数据或脚本。本文交外层保存到指定轮次目录。
+
+已读取前次 `independent_screen/REPORT_access_retry.md` 及主控生成的 scorer 脚本、结果和环境探针。主控的 `errors=[]` 未被直接作为通过依据。
+
+本轮实际完成：
+
+- 在 pc02 冻结源码目录独立调用 `sample_score`，重算 **300/300** 个评分，包括 GovReport **60/60** 个 ROUGE 分数；与保存分数的绝对误差均不超过 `1e-12`，全部有限且处于 `[0,1]`。
+- 核对 **100 个唯一样本、每任务 20 个、每样本三臂完整**，与冻结 `selected_rows` 一致。
+- **5 个数据集哈希匹配，100 份原始答案匹配数据行**；seed=42 重新抽样顺序一致。
+- 离线 CPU tokenizer 重建 **100 个 prompt**，长度、截断标记和输入 token 哈希全部一致；**300 个生成序列解码**与保存 prediction 全部一致。
+- 冻结源码 **72 项哈希**在检查前后全部匹配；原始文件摘要与前次报告、主控逐文件清单一致，结束时再次核对未变。
+
+实际评分环境为 Python **3.9.9**、`rouge 1.0.1`、`jieba 0.42.1`、`numpy 2.0.2`、`transformers 4.56.2`，后端为 **`difflib:stdlib`**。这些版本固定本次重评分环境，不代表已补齐历史生成环境闭包。
+
+百分制复算结果如下，差值单位为百分点：
+
+| 任务 | full | far_0.05 | dual_0.05 | far/dual − full |
+|---|---:|---:|---:|---:|
+| Qasper | 56.100883 | 54.042059 | 54.042059 | −2.058824 |
+| HotpotQA | 65.523810 | 65.523810 | 65.523810 | 0 |
+| Musique | 45.083333 | 45.083333 | 45.083333 | 0 |
+| GovReport | 35.227082 | 34.835478 | 34.835478 | −0.391604 |
+| RepoBench-P | 72.050000 | 71.950000 | 71.950000 | −0.100000 |
+| **宏 AVG5** | **54.797022** | **54.286936** | **54.286936** | **−0.510086** |
+
+**这批固定 screen 确有实际评分下降，但 Musique 没有下降。** 目录中的 `followup_prompt_correction.md` 也明确说明“保留 Musique 下降”是交接笔误。本轮依据原始数据纠正该措辞，不预设下降方向，也不推断全量 Musique 的结果。
+
+六项检查的更新判定：
+
+| 检查 | 判定与剩余缺口 |
+|---|---|
+| `implementation` | **限定 pass**：沿用前次静态调用链审查，本轮重新验证 72 项源码绑定；未新增 GPU 执行认证。 |
+| `reference_boundary` | **inconclusive**：独立张量参考及极端边界仍缺；near-only 跨页老化转 Far 尚无该 screen 的运行覆盖。 |
+| `data_integrity` | **限定 pass**：100 样本配对、原始答案、数据集、抽样、prompt 和输出解码均已独立核对；模型权重完整绑定仍缺。 |
+| `numerical_sanity` | **限定 pass**：300 个分数、任务均值和宏平均独立复算一致；前次 cache 不变量检查未在本轮重复执行。 |
+| `measurement_validity` | **评分范围 pass**：官方评分、答案、分母与配对缺口闭合；不认证耗时、峰值显存或性能收益。 |
+| `reproducibility` | **整体 inconclusive**：评分与输入重建可复现；未重跑模型生成，历史依赖闭包和权重绑定仍不完整。 |
+
+Near-only 与 Both 的限制必须随结果保留：dual 臂共 **3600 个层—请求决策**，其中 keep=3272、far-only=326、near-only=1、both=1。后两类各仅占 **0.02778%**，各涉及一个 Musique 请求，不能据此宣称广泛质量覆盖。唯一 near-only 请求未实际覆盖跨页老化迁移。
+
+关键绑定：
+
+```text
+100 个原始请求文件清单 SHA-256：
+6404104e4c5fcd711415924b3d125b89df59be1a594d44404db51d6dd23c93ea
+
+manifest_rank0.json：
+ae460b2a95babf579492379b433a7cab05f089571c1e2453be3e4b21b1c97e50
+
+dispatch_plan.json：
+a8960f29aede6aacad63b92dfbf9d843cae9a7a06997d6a4347db5303ad15f4c
+```
+
+清单摘要计算规则与前次一致：按路径排序，拼接 `相对结果根路径 + 空格 + 文件SHA256 + 换行` 后计算 SHA-256。
+
+**保持 `pending` 的原因**是参考/边界及生成复现仍有缺口，且未取得事前固定的完整 validation plan 和结果合同。本轮事后复算不能补造事前计划，也不能把未执行检查改为 N/A。因此不签发整体 `usable-with-scope`；可以确认上述固定预测的评分核查事实，但不能据此宣称算法无损、普遍等价或全量验收完成。这里的 `full` 仍是关闭 region gate 的 TLI 基线，并非 dense full-attention decode。

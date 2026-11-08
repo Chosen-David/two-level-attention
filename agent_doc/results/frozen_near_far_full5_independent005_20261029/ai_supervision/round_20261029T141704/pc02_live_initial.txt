@@ -1,0 +1,12 @@
+    PID    PPID     ELAPSED STAT COMMAND
+2501313       1       24:59 Ss   bash /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029/scripts/run_remote_frozen_queue.sh /usr/bin/python /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029 /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029/dispatch_plan.json pc02
+2501314 2501313       24:59 S    /usr/bin/python /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/frozen005_full_source_20261029/scripts/remote_frozen_queue.py /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029/dispatch_plan.json --host pc02
+2502911 2501314       09:57 Rsl  /usr/bin/python -m benchmark.LongBench.prefill_frozen_skip --attention tli --thresholds 0.05 --samples 0 --datasets qasper,hotpotqa,musique,gov_report,repobench-p --world-size 64 --rank 8 --device cuda:1 --context-cap 31500 --verify-native-full --out /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029
+2502912 2501314       09:57 Rsl  /usr/bin/python -m benchmark.LongBench.prefill_frozen_skip --attention tli --thresholds 0.05 --samples 0 --datasets qasper,hotpotqa,musique,gov_report,repobench-p --world-size 64 --rank 9 --device cuda:3 --context-cap 31500 --verify-native-full --out /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029
+2503465 2501314       04:56 Rsl  /usr/bin/python -m benchmark.LongBench.prefill_frozen_skip --attention tli --thresholds 0.05 --samples 0 --datasets qasper,hotpotqa,musique,gov_report,repobench-p --world-size 64 --rank 14 --device cuda:0 --context-cap 31500 --verify-native-full --out /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029
+2503466 2501314       04:56 Rsl  /usr/bin/python -m benchmark.LongBench.prefill_frozen_skip --attention tli --thresholds 0.05 --samples 0 --datasets qasper,hotpotqa,musique,gov_report,repobench-p --world-size 64 --rank 15 --device cuda:2 --context-cap 31500 --verify-native-full --out /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_full5_independent005_20261029
+0, 20932 MiB, 49 %
+1, 17692 MiB, 41 %
+2, 20776 MiB, 47 %
+3, 19654 MiB, 46 %
+3e4a6885604ac3e719ee92a4906f87b532535314

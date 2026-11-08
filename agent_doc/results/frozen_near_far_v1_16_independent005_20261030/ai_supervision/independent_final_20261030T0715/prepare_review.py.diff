@@ -1,0 +1,19 @@
+--- /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_closeout_20261030T0644/prepare_review.py
++++ prepare_review.py
+@@ -7,6 +7,7 @@
+ bind={}; counts={}; excluded={}
+ q=json.loads((V/'queue.json').read_text());assert len(q['jobs'])==128 and all(j['status']=='done' for j in q['jobs']),'full queue required'
+ assert len(list(V.glob('requests/*/*.json')))==3750,'full3750 required'
++assert (V/'FINISHED.json').is_file(),'real FINISHED required'
+ def cp(p,d):
+  b=p.read_bytes();assert b==p.read_bytes(),str(p)
+  q=B/d;q.parent.mkdir(parents=True,exist_ok=True);q.write_bytes(b)
+@@ -19,7 +20,7 @@
+   if r['status']!='complete':excluded[label].append(str(p));continue
+   assert b==p.read_bytes()
+   cp(p,Path('fixed')/label/p.relative_to(run));counts[label]+=1
+- for pat in (['manifest_rank*.json','worker_done_rank*.json','queue.json','dispatch_plan.json','validation_plan.json','run_contract.json','summary.json','validation.json','predictions.jsonl','raw_index.json','scores.tsv','paired_differences.tsv','activation_storage.tsv','per_task_activation.tsv','per_request_scores.tsv','REPORT.md'] if label=='v1' else ['ruler64k/manifest.json','run_contract.json','validation_plan.json','smoke_verification.md','reuse_decision.json','smoke/manifest.json','smoke/requests/*.json','smoke/validation.json','smoke/summary.json','smoke/GENERATED.json']):
++ for pat in (['FINISHED.json','manifest_rank*.json','worker_done_rank*.json','queue.json','dispatch_plan.json','validation_plan.json','run_contract.json','summary.json','validation.json','predictions.jsonl','raw_index.json','scores.tsv','paired_differences.tsv','activation_storage.tsv','per_task_activation.tsv','per_request_scores.tsv','REPORT.md'] if label=='v1' else ['ruler64k/manifest.json','run_contract.json','validation_plan.json','smoke_verification.md','reuse_decision.json','smoke/manifest.json','smoke/requests/*.json','smoke/validation.json','smoke/summary.json','smoke/GENERATED.json']):
+   for p in run.glob(pat):cp(p,Path('fixed')/label/p.relative_to(run))
+ for name in ['NEXT_STEPS.md','independent_review_20261030T0313/REPORT_DETAIL.md','independent_review_20261030T0213/REPORT_DETAIL.md','independent_manifest_20261030T0415/REPORT_DETAIL.md']:
+  cp(V/'ai_supervision'/name,Path('context/v1')/name)

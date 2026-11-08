@@ -1,0 +1,36 @@
+{
+  "schema_version": "experiment-validation-plan/v1",
+  "scope": "Qwen3-8B full English/code LongBench V1 16 tasks,3750 paired requests,11250 generations, independent0.05 frozen gates, eager quality only",
+  "criteria": {
+    "implementation": {
+      "procedure": "prelaunch review benchmark16 prompt/stop/scoring and unchanged gate/cache; real GPU smoke",
+      "acceptance": "all rows/arms and evidence bound; failures or regression must be reported, not dropped",
+      "allow_not_applicable": false
+    },
+    "reference_boundary": {
+      "procedure": "native gates-off parity; four-state previous main CPU/GPU audit reusable only for unchanged core",
+      "acceptance": "all rows/arms and evidence bound; failures or regression must be reported, not dropped",
+      "allow_not_applicable": false
+    },
+    "data_integrity": {
+      "procedure": "16 datasets hashed on3hosts; unique3750 rows/11250 predictions/128 shards, no mixed oldscreen",
+      "acceptance": "all rows/arms and evidence bound; failures or regression must be reported, not dropped",
+      "allow_not_applicable": false
+    },
+    "numerical_sanity": {
+      "procedure": "official per-task scores independently recomputed, macro AVG16 task-weighted, no NaN",
+      "acceptance": "all rows/arms and evidence bound; failures or regression must be reported, not dropped",
+      "allow_not_applicable": false
+    },
+    "measurement_validity": {
+      "procedure": "paired identical input and generation config; no latency claim; user3pp task-mean tolerance",
+      "acceptance": "all rows/arms and evidence bound; failures or regression must be reported, not dropped",
+      "allow_not_applicable": true
+    },
+    "reproducibility": {
+      "procedure": "independent verification of source/input/scoring/gate/cache artifacts; classify GPUrerun limitations",
+      "acceptance": "all rows/arms and evidence bound; failures or regression must be reported, not dropped",
+      "allow_not_applicable": false
+    }
+  }
+}

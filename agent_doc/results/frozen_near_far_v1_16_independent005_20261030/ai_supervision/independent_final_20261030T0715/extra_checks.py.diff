@@ -1,0 +1,16 @@
+--- /mnt/dolphinfs/ssd_pool/docker/user/hadoop-scale-llm/tla/results/frozen_near_far_v1_16_independent005_20261030/ai_supervision/independent_closeout_20261030T0644/tools/extra_checks.py
++++ tools/extra_checks.py
+@@ -1,3 +1,4 @@
++from pathlib import Path
+ """Independent derived-artifact checks. No producer imports. Requires full raw CPU audit separately."""
+ import csv, io, json, math, hashlib
+ TASKS=['narrativeqa','qasper','multifieldqa_en','hotpotqa','2wikimqa','musique','gov_report','qmsum','multi_news','trec','triviaqa','samsum','passage_count','passage_retrieval_en','lcc','repobench-p']
+@@ -44,7 +45,7 @@
+             work.append(sum(z['attention_tokens'] for z in after['layers'])/sum(z['attention_tokens'] for z in before['layers']))
+         expected=dict(gate_counts=counts,near_active_requests=sum(x['near_active'] for x in ta.values()),far_active_requests=sum(x['far_active'] for x in ta.values()),exact_full_generation=sum(x['exact_full_generation'] for x in ta.values()),per_task_activation=ta,frozen_kv_ratio_mean=avg(ratios),frozen_attention_token_ratio_mean=avg(work),near_only_layer_count=len(nk),near_only_layer_kv_ratio_mean=avg(nk),near_only_layer_attention_ratio_mean=avg(nw),far_decisions_differ_from_far_only=changed)
+         for k,v in expected.items():eq(summary['arms'][arm][k],v,'summary '+arm+'/'+k)
+-    ck(index['identity']==ident and index['root']==str(p.resolve()),'index identity/root')
++    ck(index['identity']==ident and Path(index['root']).resolve()==Path(json.loads((Path(__file__).resolve().parent.parent/'CAPTURE_BINDINGS.json').read_text())['fixed/v1/raw_index.json']['origin']).parent.resolve(),'index identity/root')
+     for x in index['records']:
+         k=(x['dataset'],x['row_index']);path='requests/%s/%04d.json'%k
+         ck(x['path']==path and k in records,'index key/path')
