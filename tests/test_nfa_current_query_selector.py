@@ -128,9 +128,9 @@ def _counterfactual_queries():
     return current, previous
 
 
-def _make_counterfactual_cache():
+def _make_counterfactual_cache(subspace='tail'):
     cache, attention, generator = _make_cache(
-        [2], [448], [(False, False)], k1=1, near_pages=0)
+        [2], [448], [(False, False)], k1=1, near_pages=0, subspace=subspace)
     # 用两组独立尾维构造确定性的远端块偏好：当前 Q 选块 1，上一帧 Q 选块 3。
     request_id = 2
     state = cache.states[request_id]
@@ -441,12 +441,16 @@ def test_near_skip_reentry_incremental_stats_match_rebuild_and_slot_reuse_invali
     assert int(incremental._nfa_page_stats_lengths[0, 2]) == 0
 
 
-def test_fixed_stats_grid_owner_writes_and_refreshes_latest_block():
+@pytest.mark.parametrize('subspace,l2_subspace', [
+    ('tail', 'same'), ('full', 'same'), ('tail', 'full')])
+def test_fixed_stats_grid_owner_writes_and_refreshes_latest_block(
+        subspace, l2_subspace):
     # 80 个逻辑块对应 5 个统计块组，覆盖固定 4 路 grid 不启动绝对
     # owner=4 的情形；第二步直接从当前 KV 计算最新块 min/max 参考。
     cache, attention, generator = _make_cache(
         [2], [4500], [(False, False)], k1=2, near_pages=0,
-        max_blocks=80, max_physical_pages=100)
+        max_blocks=80, max_physical_pages=100, subspace=subspace,
+        l2_subspace=l2_subspace)
     query = torch.randn(
         1, 2, HEAD_DIM, generator=generator,
         dtype=torch.bfloat16, device='cuda')
@@ -467,8 +471,9 @@ def test_fixed_stats_grid_owner_writes_and_refreshes_latest_block():
         last_blk = (logical_length - 1) // PAGE
         valid = logical_length - last_blk * PAGE
         physical = cache.states[2].block_tables[0][last_blk]
-        dims = attention.indexer._subspace_indices(
-            query.device).long()
+        dims = (attention.indexer._subspace_indices(query.device).long()
+                if attention.indexer.enable_subspace else
+                torch.arange(HEAD_DIM, dtype=torch.int64, device=query.device))
         current_k = cache.layers[0].kv_pool_k[
             physical, 0, 0, :valid, :][:, dims].float()
         # 生产 kernel 对末块无效 lane 以 0 参与 min/max/sum，而非只归约
@@ -487,10 +492,12 @@ def test_fixed_stats_grid_owner_writes_and_refreshes_latest_block():
             physical, offset = slot // PAGE, slot % PAGE
             torch.testing.assert_close(
                 cache.layers[0].kv_pool_k[physical, 0, 0, offset],
-                decode_write[0][0, 0, 0], rtol=0, atol=0)
+                decode_write[0][0, 0, 0], rtol=0, atol=0,
+                msg=f'decode key mismatch at step {step}')
             torch.testing.assert_close(
                 cache.layers[0].kv_pool_v[physical, 0, 0, offset],
-                decode_write[1][0, 0, 0], rtol=0, atol=0)
+                decode_write[1][0, 0, 0], rtol=0, atol=0,
+                msg=f'decode value mismatch at step {step}')
         if step == 0:
             cache.commit_step()
 
@@ -636,8 +643,9 @@ def test_selector_capture_replay_uses_live_current_query():
     assert not any(64 <= token < 128 for token in replay_ids)
 
 
-def test_padded_capture_does_not_specialize_non_skip_replay():
-    cache, attention, _ = _make_counterfactual_cache()
+@pytest.mark.parametrize('subspace', ['tail', 'full'])
+def test_padded_capture_does_not_specialize_non_skip_replay(subspace):
+    cache, attention, _ = _make_counterfactual_cache(subspace)
     query, _ = _counterfactual_queries()
 
     # GraphRunner 用全 padding 行 capture；这不代表 replay 请求会 both-skip。

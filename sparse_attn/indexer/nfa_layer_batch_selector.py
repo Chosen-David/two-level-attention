@@ -1768,6 +1768,15 @@ def _replay_eager_selector_call_plan(workspace, call_plan, q_src, decode_write):
             args = (q_src,) + args[1:]
             if run is not None:
                 launch_values = (q_src,) + launch_values[1:]
+        if key == 'paged_write' and decode_write is not None:
+            # 非融合 full-L1/L2 路径把独立 paged_write 也录进计划；必须
+            # 替换当前 K/V，否则 replay 会把首次调用的旧 K/V 写回本步 slot。
+            current_keys = keys.contiguous()
+            current_values = values.contiguous()
+            args = (current_keys, current_values, slots) + args[3:]
+            if run is not None:
+                launch_values = ((current_keys, current_values, slots)
+                                 + launch_values[3:])
         if kernel is _nfa_page_stats_prepare_q_kernel:
             args = args[:10] + (q_src,) + args[11:]
             if run is not None:
