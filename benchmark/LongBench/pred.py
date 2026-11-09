@@ -73,6 +73,7 @@ def parse_args(args=None):
             "vicuna-v1.5-7b-16k",
             "Mistral-7B-Instruct-v0.3",
             "Meta-Llama-3.1-8B-Instruct",
+            'Llama-3.1-8B',
             'Qwen3-8B',
             'Qwen3-14B',
             'Qwen3-32B',
@@ -124,6 +125,10 @@ def parse_args(args=None):
 
 # This is the customized building prompt for chat models
 def build_chat(tokenizer, prompt, model_name):
+    # Base Llama-3.1 没有 chat template；LongBench 非 chat 模型使用原始
+    # task prompt，不能复用 Instruct 的 header/eot 协议。
+    if model_name == "Llama-3.1-8B":
+        return prompt
     if "chatglm3" in model_name:
         prompt = tokenizer.build_chat_input(prompt)
     elif "chatglm" in model_name:
@@ -596,6 +601,8 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
         sys.path.insert(0, vendor_dir)
         if model.config.model_type == "glm4_moe_lite":
             from glm4_moe_lite_quest_patch import enable_quest
+        elif model.config.model_type == "llama":
+            from llama3_quest_patch import enable_quest
         else:
             from qwen3_quest_patch import enable_quest
         n_patched = enable_quest(
@@ -752,7 +759,11 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
         )
         vendor_dir = os.path.join(repo, "exp", "vendor_baselines", "asynctls_vendor")
         sys.path.insert(0, vendor_dir)
-        from qwen3_asynctls_patch import enable_asynctls
+        _atls_model_type = getattr(model.config, "model_type", None)
+        if _atls_model_type == "llama":
+            from llama3_asynctls_patch import enable_asynctls
+        else:
+            from qwen3_asynctls_patch import enable_asynctls
         _atls_chan = getattr(args, "asynctls_channel_file", None)
         if not _atls_chan or not os.path.isfile(_atls_chan):
             raise RuntimeError(
@@ -796,6 +807,8 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
         sys.path.insert(0, vendor_dir)
         if model.config.model_type == "glm4_moe_lite":
             from glm4_moe_lite_jssa_patch import enable_jssa
+        elif model.config.model_type == "llama":
+            from llama3_jssa_patch import enable_jssa
         else:
             from qwen3_jssa_patch import enable_jssa
         n_patched = enable_jssa(
