@@ -1,0 +1,209 @@
+{
+  "schema": "llama-vendor-lbv1-quality-summary-v1",
+  "status": "usable-with-scope",
+  "date": "2026-11-10",
+  "model": "Llama-3.1-8B base",
+  "dataset": "LongBench v1 English 16 tasks",
+  "run_timestamp": "11052030",
+  "effective_cap": 31500,
+  "prompt_protocol": "raw LongBench task prompt; no Instruct chat template",
+  "population": {
+    "requests_per_arm": 3750,
+    "rows": {
+      "narrativeqa": 200,
+      "qasper": 200,
+      "multifieldqa_en": 150,
+      "hotpotqa": 200,
+      "2wikimqa": 200,
+      "musique": 200,
+      "gov_report": 200,
+      "qmsum": 200,
+      "multi_news": 200,
+      "trec": 200,
+      "triviaqa": 200,
+      "samsum": 200,
+      "passage_count": 200,
+      "passage_retrieval_en": 200,
+      "lcc": 500,
+      "repobench-p": 500
+    }
+  },
+  "score_protocol": "Official LongBench sample_score per row, arithmetic mean per task, then unweighted macro average over 16 tasks",
+  "budget_protocol": "Quest/JSSA/AsyncTLS use their native decode selection rules at nominal token budget 1024. NFA uses K2=1024 including sink=4 and SWA=128; no sink/SWA reservation is imposed on vendor arms.",
+  "implementation_scope": {
+    "fullkv": "Previously accepted dense reference; raw predictions independently re-scored here",
+    "nfa": "Previously accepted NFA reference; raw predictions independently re-scored here",
+    "quest_vendor": "Official Quest attention forward; token_budget=1024, chunk_size=16",
+    "jssa_vendor": "JSSA semantic reproduction; budget=1024, rank=32, post-RoPE GQA group-mean query and exact full-dimension attention over selected tokens",
+    "asynctls_vendor": "Paper-semantic reproduction, not official source; token_budget=1024, block_size=64, top_kb=128, dc=32; signed-offset INT4 Key-channel scoring fix included"
+  },
+  "methods": {
+    "fullkv": {
+      "requests": 3750,
+      "macro_avg": 38.43,
+      "recomputed_from_raw_predictions": true
+    },
+    "nfa": {
+      "requests": 3750,
+      "macro_avg": 38.49,
+      "recomputed_from_raw_predictions": true
+    },
+    "quest_vendor": {
+      "requests": 3750,
+      "macro_avg": 31.02,
+      "official_scores_match_recomputed": true,
+      "official_result_sha256": "021d15d084024171054da3f4d176c014c96e681ef363907deb17e00af654f667"
+    },
+    "jssa_vendor": {
+      "requests": 3750,
+      "macro_avg": 33.67,
+      "official_scores_match_recomputed": true,
+      "official_result_sha256": "a378aa2fb249589b11c8faefbe31f01e19e5f9b69935212f67912fb27e5ded78"
+    },
+    "asynctls_vendor": {
+      "requests": 3750,
+      "macro_avg": 31.81,
+      "official_scores_match_recomputed": true,
+      "official_result_sha256": "27d89f7ce26097e793a4a98f22a19b30255a00673456db02a164ba3e5bbdfad3"
+    }
+  },
+  "scores": {
+    "narrativeqa": {
+      "fullkv": 22.14,
+      "nfa": 23.36,
+      "quest_vendor": 11.20,
+      "jssa_vendor": 24.53,
+      "asynctls_vendor": 17.71
+    },
+    "qasper": {
+      "fullkv": 13.06,
+      "nfa": 12.61,
+      "quest_vendor": 11.92,
+      "jssa_vendor": 12.83,
+      "asynctls_vendor": 12.69
+    },
+    "multifieldqa_en": {
+      "fullkv": 26.64,
+      "nfa": 27.39,
+      "quest_vendor": 25.62,
+      "jssa_vendor": 29.03,
+      "asynctls_vendor": 29.84
+    },
+    "hotpotqa": {
+      "fullkv": 17.30,
+      "nfa": 16.06,
+      "quest_vendor": 9.93,
+      "jssa_vendor": 10.78,
+      "asynctls_vendor": 11.41
+    },
+    "2wikimqa": {
+      "fullkv": 16.63,
+      "nfa": 16.26,
+      "quest_vendor": 13.08,
+      "jssa_vendor": 13.22,
+      "asynctls_vendor": 13.23
+    },
+    "musique": {
+      "fullkv": 11.46,
+      "nfa": 11.33,
+      "quest_vendor": 5.93,
+      "jssa_vendor": 8.67,
+      "asynctls_vendor": 7.37
+    },
+    "gov_report": {
+      "fullkv": 29.83,
+      "nfa": 29.15,
+      "quest_vendor": 24.77,
+      "jssa_vendor": 29.55,
+      "asynctls_vendor": 27.73
+    },
+    "qmsum": {
+      "fullkv": 25.38,
+      "nfa": 24.52,
+      "quest_vendor": 18.79,
+      "jssa_vendor": 24.94,
+      "asynctls_vendor": 23.91
+    },
+    "multi_news": {
+      "fullkv": 2.52,
+      "nfa": 3.50,
+      "quest_vendor": 2.17,
+      "jssa_vendor": 2.78,
+      "asynctls_vendor": 2.37
+    },
+    "trec": {
+      "fullkv": 74.00,
+      "nfa": 71.50,
+      "quest_vendor": 69.00,
+      "jssa_vendor": 68.00,
+      "asynctls_vendor": 72.50
+    },
+    "triviaqa": {
+      "fullkv": 91.48,
+      "nfa": 91.68,
+      "quest_vendor": 86.77,
+      "jssa_vendor": 91.47,
+      "asynctls_vendor": 90.72
+    },
+    "samsum": {
+      "fullkv": 43.09,
+      "nfa": 46.30,
+      "quest_vendor": 44.84,
+      "jssa_vendor": 46.90,
+      "asynctls_vendor": 46.05
+    },
+    "passage_count": {
+      "fullkv": 6.31,
+      "nfa": 7.41,
+      "quest_vendor": 0.72,
+      "jssa_vendor": 1.17,
+      "asynctls_vendor": 1.00
+    },
+    "passage_retrieval_en": {
+      "fullkv": 98.07,
+      "nfa": 98.30,
+      "quest_vendor": 43.79,
+      "jssa_vendor": 37.29,
+      "asynctls_vendor": 23.89
+    },
+    "lcc": {
+      "fullkv": 69.44,
+      "nfa": 69.54,
+      "quest_vendor": 68.38,
+      "jssa_vendor": 69.42,
+      "asynctls_vendor": 65.23
+    },
+    "repobench-p": {
+      "fullkv": 67.53,
+      "nfa": 66.94,
+      "quest_vendor": 59.46,
+      "jssa_vendor": 68.07,
+      "asynctls_vendor": 63.37
+    }
+  },
+  "independent_validation": {
+    "status": "PASS",
+    "vendor_runcap_strict_validated_per_arm": 16,
+    "vendor_input_identity_v2_validated_per_arm": 16,
+    "legacy_no_sidecar_per_arm": 0,
+    "identity_cross_check": "All five arms have identical source_fingerprint, prompt_template_sha256 and actual_input_ids_ordered_sha256 for each of 16 tasks",
+    "report": "/home/wangyuanshuo02/ak_verify_results/llama_vendor_lb_v1_20261109/validation/all_vendor_full16_independent.json",
+    "report_sha256": "c157c74cc6ef6e79a71ae40b4ff0106870d43d606a3920d79393c4dc33ee08aa",
+    "validator_sha256": "a29458c8a84ed19fd232424a679731f170ae2a544c74a91b96567065069811a6",
+    "sample_manifest_sha256": "7ab3897bacae740aaa009ed21fbbaa6d7fd47b4722b3136b19bacd7fe955dc49",
+    "source_identity_sha256": "e9efb94c23c617e5fa9db7c92c9afb875c16c983b9c2f71f5e8c38f9b36a581e"
+  },
+  "code_identity": {
+    "harness_base_commit": "d258060b792137a282bd5695d92fabe0f0ee95d1",
+    "vendor_adapter_and_int4_fix_commit": "088cecad",
+    "asynctls_qwen3_patch_sha256": "2807dcd3ef92f7e88d640b49d8e1a6601eaa1136a3abd9d417d12e0d189e7a94",
+    "llama_vendor_adapter_tests_sha256": "5ab9b7179832461be0f3a57888fda7c22f61804dacabe5e0d22cdff4c403d285",
+    "formal_queue_script_sha256": "0e5e2bfbf5fbcd770eeebddf0091443707b4920004f1b503362fd4eed2ee42bb"
+  },
+  "calibration_identity": {
+    "jssa_basis_sha256": "5aacbb5483c5658480e565f315e25127f1c82d09147d39041b20a07d9d001082",
+    "asynctls_channels_sha256": "eeb0c16ff916ff7569a54124f5ac1d31d5ff791094130198a4a5e0a4a2bdb443"
+  },
+  "raw_evidence_root": "/home/wangyuanshuo02/ak_verify_results/llama_vendor_lb_v1_20261109",
+  "delivery_scope": "Only this compact summary and task records are versioned; model weights, calibration tensors and raw prediction JSONL files remain outside git."
+}

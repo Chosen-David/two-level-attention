@@ -2,6 +2,8 @@
 
 ## 2026-11-09
 
+- [x] [TL-LLAMA-VENDOR-LBV1-20261109] Llama-3.1-8B base × LongBench v1 英文16任务 Quest/JSSA/AsyncTLS 精度矩阵收官：每臂16/16、3750请求，AVG16分别31.02/33.67/31.81；FullKV/NFA复用锚38.43/38.49，五臂输入身份与官方逐样本分数独立复核PASS。([详情](task_details/TL-LLAMA-VENDOR-LBV1-20261109.md))
+
 - [~] [TL-GLM-SUBSPACE-SKIP-RETEST-20261109] 用户后续“全部停止”终止剩余重测；已完成 first32/last32 的 full/dual 独立审计（last32=30/27、first32=16/17）全部保留，最终选定 `glm_nope_last32` 进入 LongBench16 全量。([详情](task_details/TL-GLM-SUBSPACE-SKIP-RETEST-20261109.md))
 
 ## 2026-11-08

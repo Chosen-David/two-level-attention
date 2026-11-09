@@ -298,6 +298,13 @@ TPOT 中位数，bit-exact 门禁（graph vs eager gen_tokens 逐位一致）。
   复现锚点：`asynctls_r32k_reverify_verdict.json`。
 - 主表口径下 vendor 对齐原则：token 预算统一 K2=1024（quest/sparq/
   fasa/moba/jssa budget-normalized，见 `benchmark/` 各 runner 头注）。
+- **Llama-3.1-8B base × LongBench v1 英文16任务质量矩阵已收官**
+  （[summary.json](results/llama_vendor_lb_v1_20261109/summary.json)，
+  2026-11-10 独立验收 PASS）：FullKV/NFA=38.43/38.49，Quest/JSSA/
+  AsyncTLS=31.02/33.67/31.81；每臂3750请求，五臂逐任务 source/template/
+  actual-token 身份一致，官方逐样本分数与独立重算完全一致。AsyncTLS
+  使用 `088cecad` 的 signed-offset INT4 修复版；其复现仍属论文语义实现，
+  不冒称官方源码。逐任务数字只引用上述 summary，不引用临时报告。
 - FASA RULER 复现的崩溃诊断与口径（11 任务 × n=100）见
   `e119_ruler32768_formal_fasa_20261021.json` 族（重跑判决落库后更新）。
 
