@@ -146,7 +146,9 @@ def _run_prefill(model, prompt, geometry, calibrated, validate_legacy=False):
             'fused_kernel_calls': len(fused_calls),
             'device_ms_per_layer': device_ms,
             'device_seconds_total': sum(device_ms) / 1000.0,
-            'host_seconds_total': sum(sample[2] for sample in samples),
+            # This wait includes preceding dense SDPA work because the profile
+            # summary synchronizes once per layer; it is not incremental cost.
+            'host_wait_seconds_total': sum(sample[2] for sample in samples),
             'legacy_validation': None,
         },
         'decisions': {
@@ -195,9 +197,11 @@ def _summary(measurements):
     calibrator_device = statistics.median([
         row['fused']['calibrator']['device_seconds_total']
         for row in measurements])
-    calibrator_host = statistics.median([
-        row['fused']['calibrator']['host_seconds_total']
+    calibrator_host_wait = statistics.median([
+        row['fused']['calibrator']['host_wait_seconds_total']
         for row in measurements])
+    paired_increment_median = statistics.median(paired_delta)
+    paired_ratios = [delta / base for delta, base in zip(paired_delta, dense)]
     return {
         'repeat': len(measurements),
         'dense_prefill_seconds': dense,
@@ -207,11 +211,15 @@ def _summary(measurements):
         'fused_prefill_median_seconds': fused_median,
         'increment_over_dense_median_seconds': fused_median - dense_median,
         'increment_over_dense_ratio': (fused_median - dense_median) / dense_median,
-        'paired_increment_median_seconds': statistics.median(paired_delta),
+        'paired_increment_median_seconds': paired_increment_median,
+        'paired_increment_over_dense_ratio': statistics.median(paired_ratios),
+        'paired_increment_median_over_dense_median_ratio': (
+            paired_increment_median / dense_median),
         'calibrator_device_median_seconds': calibrator_device,
-        'calibrator_host_median_seconds': calibrator_host,
         'calibrator_device_over_dense_prefill': calibrator_device / dense_median,
-        'calibrator_host_over_dense_prefill': calibrator_host / dense_median,
+        'calibrator_host_wait_median_seconds': calibrator_host_wait,
+        'host_wait_scope': ('Per-layer synchronization wait including preceding dense '
+                            'work; diagnostic only, not calibrator incremental cost'),
         'all_next_token_identity': all(row['token_identity'] for row in measurements),
     }
 
@@ -241,9 +249,13 @@ def main():
         # Compile Triton and warm both paths before any measured request.  The
         # fused warmup additionally compares every real Qwen layer and gate to
         # the legacy implementation; none of this work enters measured walls.
-        _run_prefill(model, prompt, geometry, calibrated=False)
+        warmup_dense = _run_prefill(model, prompt, geometry, calibrated=False)
         warmup_fused = _run_prefill(
             model, prompt, geometry, calibrated=True, validate_legacy=True)
+        warmup_token_identity = (
+            warmup_dense['next_token'] == warmup_fused['next_token'])
+        if not warmup_token_identity:
+            raise RuntimeError('warmup fused calibration changed dense next token')
         measurements = []
         for repeat in range(args.repeat):
             order = (('dense', False), ('fused', True)) if repeat % 2 == 0 else (
@@ -264,11 +276,14 @@ def main():
         if monitor.pollution:
             raise RuntimeError('GPU hygiene pollution detected; refusing performance verdict')
         result = {
-            'schema': 'nfa-fused-lse-prefill-increment-v1',
+            'schema': 'nfa-fused-lse-prefill-increment-v2',
             'timestamp': datetime.now().isoformat(timespec='seconds'),
             'scope': ('Identical Qwen3 SDPA dense prefill with and without fused-LSE '
                       'calibration; independent requests, alternating order, one warmup '
                       'per arm; no decode time included'),
+            'fusion_boundary': ('Single-pass online-softmax/LSE near/far calibrator '
+                                'followed by the unchanged native dense SDPA; this '
+                                'does not claim reuse of SDPA internal LSE'),
             'arguments': vars(args),
             'source': {
                 'head': subprocess.check_output(
@@ -295,6 +310,7 @@ def main():
             'correctness': {
                 'warmup_fused': warmup_fused['calibrator'],
                 'warmup_next_token': warmup_fused['next_token'],
+                'warmup_next_token_identity': warmup_token_identity,
                 'scope': ('Real Qwen per-layer near/far summaries and gate decisions '
                           'against legacy chunked softmax; fused kernel call count '
                           'checked on every calibrated prefill'),
