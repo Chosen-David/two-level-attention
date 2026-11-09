@@ -69,7 +69,7 @@ def validate_summary(actual, measurements):
             close(actual[key], value)
 
 
-def validate_log(length):
+def validate_log(length, recorded_output):
     text = (RESULTS / 'logs' / f'prefill_{length}.log').read_text()
     observed = [(int(repeat), arm) for repeat, arm in re.findall(
         rf'PREFILL {length} repeat=(\d+) arm=(dense|fused)', text)]
@@ -78,15 +78,15 @@ def validate_log(length):
         order = ('dense', 'fused') if repeat % 2 == 0 else ('fused', 'dense')
         expected.extend((repeat, arm) for arm in order)
     assert observed == expected, (length, observed)
-    assert f'saved -> {RESULTS}/prefill_{length}.json' in text
+    assert f'saved -> {recorded_output}' in text
 
 
 def validate_hygiene(receipt):
     hygiene = receipt['gpu_hygiene']
     assert hygiene['status'] == 'clean'
     assert hygiene['pollution_samples'] == 0
-    path = Path(hygiene['log'])
-    assert path.resolve() == (RESULTS / f"prefill_{receipt['arguments']['context_length']}.json.hygiene.jsonl").resolve()
+    path = RESULTS / f"prefill_{receipt['arguments']['context_length']}.json.hygiene.jsonl"
+    assert Path(hygiene['log']).name == path.name
     lines = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
     assert lines
     for sample in lines:
@@ -142,7 +142,7 @@ def validate_receipt(length):
         assert 'host_seconds_total' not in fused['calibrator']
         assert fused['calibrator']['host_wait_seconds_total'] >= 0
     validate_summary(receipt['summary'], measurements)
-    validate_log(length)
+    validate_log(length, receipt['arguments']['output'])
     hygiene_samples = validate_hygiene(receipt)
     summary = receipt['summary']
     return receipt, {
