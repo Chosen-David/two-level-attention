@@ -84,8 +84,12 @@ def _stream_tail_profile(q, k, geometry, rows, chunk, scale):
 
 def profile_regions(q, k, geometry=RegionGeometry(), rows=256, chunk=16, scale=None):
     scale = _validate_profile_inputs(q, k, rows, chunk, scale)
+    dim = q.shape[-1]
+    group = q.shape[1] // k.shape[1]
+    fused_shape = (16 <= dim <= 128 and not (dim & (dim - 1))
+                   and not (group & (group - 1)))
     if (q.is_cuda and q.dtype in (torch.float16, torch.bfloat16)
-            and q.shape[-1] >= 16):
+            and fused_shape):
         from sparse_attn.ops.frozen_gate_triton import fused_region_profile
         values = fused_region_profile(q.detach(), k.detach(), geometry, rows, scale)
     else:
