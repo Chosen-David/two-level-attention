@@ -61,10 +61,24 @@ def test_streaming_region_profile_matches_legacy(length, kv_heads):
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')
 @pytest.mark.parametrize('length', [64, 257])
-def test_streaming_region_profile_matches_legacy_on_cuda(length):
-    torch.manual_seed(20261103 + length)
+@pytest.mark.parametrize('kv_heads', [1, 2, 4])
+def test_fused_lse_region_profile_matches_legacy_on_cuda(length, kv_heads):
+    torch.manual_seed(20261103 + length + kv_heads)
     geometry = RegionGeometry(
         sink=4, near=16, window=8, page=4, max_new_tokens=3)
-    q = torch.randn(1, 4, length, 32, device='cuda')
-    k = torch.randn(1, 2, length, 32, device='cuda')
-    _assert_region_profile_matches_legacy(q, k, geometry, 17, 5, .7)
+    # Native prefill Q/K are non-contiguous BHLD views of BLHD projections.
+    q = torch.randn(1, length, 4, 32, device='cuda', dtype=torch.bfloat16)
+    k = torch.randn(1, length, kv_heads, 32, device='cuda', dtype=torch.bfloat16)
+    _assert_region_profile_matches_legacy(
+        q.transpose(1, 2), k.transpose(1, 2), geometry, 17, 5, .7)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')
+def test_fused_lse_region_profile_matches_legacy_production_shape():
+    torch.manual_seed(20261109)
+    geometry = RegionGeometry(
+        sink=4, near=64, window=32, page=16, max_new_tokens=3)
+    q = torch.randn(1, 1024, 32, 128, device='cuda', dtype=torch.bfloat16)
+    k = torch.randn(1, 1024, 8, 128, device='cuda', dtype=torch.bfloat16)
+    _assert_region_profile_matches_legacy(
+        q.transpose(1, 2), k.transpose(1, 2), geometry, 33, 5, .7)

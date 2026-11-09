@@ -19,22 +19,36 @@ class GateConfig:
             raise ValueError('invalid gate configuration')
 
 
-def _stream_tail_profile(q, k, geometry, rows, chunk, scale):
-    """逐 query chunk 完整归一化并立即归约，避免物化所有头的尾部概率。"""
-    if q.ndim != 4 or q.shape[0] != 1 or q.shape[2] != k.shape[2]:
-        raise ValueError('one-shot unpadded B=1 prefill required')
+def _validate_profile_inputs(q, k, rows, chunk, scale):
+    if (q.ndim != 4 or k.ndim != 4 or q.shape[0] != 1 or k.shape[0] != 1
+            or q.shape[2] != k.shape[2] or q.shape[-1] != k.shape[-1]
+            or q.shape[1] % k.shape[1]):
+        raise ValueError('one-shot unpadded B=1 prefill with valid GQA required')
+    if rows < 1 or chunk < 1:
+        raise ValueError('profile rows and chunk must be positive')
     scale = q.shape[-1] ** -.5 if scale is None else float(scale)
     if not math.isfinite(scale) or scale <= 0:
         raise ValueError('attention scale must be finite and positive')
-    if chunk < 1:
-        raise ValueError('profile chunk must be positive')
+    return scale
 
+
+def _profile_summary(values):
+    # Both implementations transfer only [near/far, tail_rows] once per layer.
+    values = values.cpu()
+    return {
+        name: {'mean': float(values[index].mean()),
+               'p95': float(torch.quantile(values[index], .95)),
+               'max': float(values[index].max())}
+        for index, name in enumerate(('near', 'far'))}
+
+
+def _stream_tail_profile(q, k, geometry, rows, chunk, scale):
+    """Reference implementation with explicit per-chunk causal probabilities."""
     length = q.shape[2]
     n = min(rows, length)
     heads, dim = q.shape[1], q.shape[-1]
     kv_heads = k.shape[1]
     group = heads // kv_heads
-    # GQA K 只广播而不物化展开；每次仅保留当前 chunk 的完整因果概率。
     qs = q.detach()[:, :, length - n:].float().reshape(
         1, kv_heads, group, n, dim)
     kk = k.detach().float().unsqueeze(2).transpose(-1, -2)
@@ -64,18 +78,19 @@ def _stream_tail_profile(q, k, geometry, rows, chunk, scale):
         for name, mask in masks.items():
             signals[name].append((probs * mask).sum(-1).mean((0, 1)))
 
-    # 所有 chunk 先在 GPU 拼接，只在请求边界做一次 D2H。
-    values = torch.stack([
-        torch.cat(signals[name]) for name in ('near', 'far')]).cpu()
-    return {
-        name: {'mean': float(values[index].mean()),
-               'p95': float(torch.quantile(values[index], .95)),
-               'max': float(values[index].max())}
-        for index, name in enumerate(('near', 'far'))}
+    return torch.stack([
+        torch.cat(signals[name]) for name in ('near', 'far')])
 
 
 def profile_regions(q, k, geometry=RegionGeometry(), rows=256, chunk=16, scale=None):
-    return _stream_tail_profile(q, k, geometry, rows, chunk, scale)
+    scale = _validate_profile_inputs(q, k, rows, chunk, scale)
+    if (q.is_cuda and q.dtype in (torch.float16, torch.bfloat16)
+            and q.shape[-1] >= 16):
+        from sparse_attn.ops.frozen_gate_triton import fused_region_profile
+        values = fused_region_profile(q.detach(), k.detach(), geometry, rows, scale)
+    else:
+        values = _stream_tail_profile(q, k, geometry, rows, chunk, scale)
+    return _profile_summary(values)
 
 
 def decide_regions(profile, config, present_near=True, present_far=True):
