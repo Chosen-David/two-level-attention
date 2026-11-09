@@ -67,6 +67,7 @@
 
 - P0a：32K/64K/128K × B1/B4 × eager/Graph × NFA/FA2，共 24 方法单元，正式 5×3 覆盖。
 - P0b：full/tail × no-skip/natural-skip 的 e2e skip benefit；双臂 page64，NFA vs FlashInfer 同样 page64。
+- 后续长度扩展（2026-11-09 用户指令）：增加 512K 与 1M，只测算子和 e2e 性能，不扩展质量矩阵。
 - 质量任务共享卡不得冒充性能锁卡；Triton JIT 诊断与共享 wall 不进入正式 TPOT。
 
 ## 证据与边界
