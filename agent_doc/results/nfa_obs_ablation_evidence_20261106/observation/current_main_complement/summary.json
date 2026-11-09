@@ -1,0 +1,1001 @@
+{
+  "schema": "nfa-current-main-regional-complement-scan-v1",
+  "status": "usable-with-scope",
+  "independent_validation": "../../validation/current_main_complement_independent_check.json",
+  "scope": "fixed real-Q/K full128 dense-oracle CPU L1 observation; current-main geometry, not production-kernel execution or quality evidence",
+  "current_main_head": "e87c91e5fd2d76a594e2c46000b4427ea2ecce7b",
+  "current_main_file_sha256": {
+    "sparse_attn/indexer/nfa_indexer.py": "d827ecfcf68157154b6e6be38cf54d5075ffe416f52d821fb1f86985294566a4",
+    "sparse_attn/indexer/nfa_layer_batch_selector.py": "35eddf1b20211ed8a8ebe048fbf0741e5b33c8e521d1a669645cec543e471417"
+  },
+  "producer_sha256": "b34282fbd370709c488891378b205922899f02e539f2178a9a61e0051bea2fd9",
+  "config": {
+    "sink_tokens": 4,
+    "swa_tokens": 128,
+    "page_size": 64,
+    "near_pool_len": 4096,
+    "near_page_budget": 32,
+    "far_page_budget": 96,
+    "K1": 128,
+    "K2": 1024,
+    "oracle_K": 892,
+    "selector_coordinates": [
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123,
+      124,
+      125,
+      126,
+      127
+    ],
+    "oracle": "per-Q-head full128 causal softmax, then mean within each four-Q-head KV group",
+    "tie_rule": "score descending, absolute block/token position ascending",
+    "primary_metric": "region-stratified L1 oracle-token hit count; automatic bypass tokens excluded"
+  },
+  "old_o40_geometry_defect": "old replay used near_pages*page=2048 as the near candidate-pool length; main uses nfa_near_len=4096 and a separate fixed 32-page selection budget",
+  "planned": {
+    "documents": 40,
+    "queries": 1280,
+    "group_cells": 10240
+  },
+  "competitive_query_population": {
+    "population": 256,
+    "far_minmax_strictly_better": 99,
+    "near_avg_strictly_better": 244,
+    "strictly_complementary": 93,
+    "strictly_complementary_fraction": 0.36328125,
+    "far_only_strict_advantage": 6,
+    "near_only_strict_advantage": 151,
+    "neither_strict_advantage": 6,
+    "strictly_reverse_both": 6,
+    "far_delta_sign": {
+      "positive": 99,
+      "zero": 5,
+      "negative": 152
+    },
+    "near_delta_sign": {
+      "positive": 244,
+      "zero": 0,
+      "negative": 12
+    },
+    "far_delta_mean": -24.7578125,
+    "near_delta_mean": 310.35546875,
+    "far_delta_median": -8.0,
+    "near_delta_median": 284.0
+  },
+  "competitive_group_population": {
+    "population": 2017,
+    "far_minmax_strictly_better": 777,
+    "near_avg_strictly_better": 1679,
+    "strictly_complementary": 647,
+    "strictly_complementary_fraction": 0.32077342588001984,
+    "far_only_strict_advantage": 130,
+    "near_only_strict_advantage": 1032,
+    "neither_strict_advantage": 208,
+    "strictly_reverse_both": 124,
+    "far_delta_sign": {
+      "positive": 777,
+      "zero": 384,
+      "negative": 856
+    },
+    "near_delta_sign": {
+      "positive": 1679,
+      "zero": 19,
+      "negative": 319
+    },
+    "far_delta_mean": -3.142290530490828,
+    "near_delta_mean": 38.90133862171542,
+    "far_delta_median": 0.0,
+    "near_delta_median": 31.0
+  },
+  "query_slices": {
+    "by_dataset": {
+      "gov_report": {
+        "population": 80,
+        "far_minmax_strictly_better": 20,
+        "near_avg_strictly_better": 77,
+        "strictly_complementary": 18,
+        "strictly_complementary_fraction": 0.225,
+        "far_only_strict_advantage": 2,
+        "near_only_strict_advantage": 59,
+        "neither_strict_advantage": 1,
+        "strictly_reverse_both": 1,
+        "far_delta_sign": {
+          "positive": 20,
+          "zero": 2,
+          "negative": 58
+        },
+        "near_delta_sign": {
+          "positive": 77,
+          "zero": 0,
+          "negative": 3
+        },
+        "far_delta_mean": -53.85,
+        "near_delta_mean": 276.175,
+        "far_delta_median": -13.5,
+        "near_delta_median": 247.5
+      },
+      "hotpotqa": {
+        "population": 176,
+        "far_minmax_strictly_better": 79,
+        "near_avg_strictly_better": 167,
+        "strictly_complementary": 75,
+        "strictly_complementary_fraction": 0.42613636363636365,
+        "far_only_strict_advantage": 4,
+        "near_only_strict_advantage": 92,
+        "neither_strict_advantage": 5,
+        "strictly_reverse_both": 5,
+        "far_delta_sign": {
+          "positive": 79,
+          "zero": 3,
+          "negative": 94
+        },
+        "near_delta_sign": {
+          "positive": 167,
+          "zero": 0,
+          "negative": 9
+        },
+        "far_delta_mean": -11.534090909090908,
+        "near_delta_mean": 325.89204545454544,
+        "far_delta_median": -3.0,
+        "near_delta_median": 303.0
+      }
+    },
+    "by_layer": {
+      "24": {
+        "population": 128,
+        "far_minmax_strictly_better": 28,
+        "near_avg_strictly_better": 117,
+        "strictly_complementary": 23,
+        "strictly_complementary_fraction": 0.1796875,
+        "far_only_strict_advantage": 5,
+        "near_only_strict_advantage": 94,
+        "neither_strict_advantage": 6,
+        "strictly_reverse_both": 6,
+        "far_delta_sign": {
+          "positive": 28,
+          "zero": 1,
+          "negative": 99
+        },
+        "near_delta_sign": {
+          "positive": 117,
+          "zero": 0,
+          "negative": 11
+        },
+        "far_delta_mean": -64.046875,
+        "near_delta_mean": 259.9921875,
+        "far_delta_median": -35.0,
+        "near_delta_median": 240.0
+      },
+      "8": {
+        "population": 128,
+        "far_minmax_strictly_better": 71,
+        "near_avg_strictly_better": 127,
+        "strictly_complementary": 70,
+        "strictly_complementary_fraction": 0.546875,
+        "far_only_strict_advantage": 1,
+        "near_only_strict_advantage": 57,
+        "neither_strict_advantage": 0,
+        "strictly_reverse_both": 0,
+        "far_delta_sign": {
+          "positive": 71,
+          "zero": 4,
+          "negative": 53
+        },
+        "near_delta_sign": {
+          "positive": 127,
+          "zero": 0,
+          "negative": 1
+        },
+        "far_delta_mean": 14.53125,
+        "near_delta_mean": 360.71875,
+        "far_delta_median": 2.0,
+        "near_delta_median": 342.0
+      }
+    },
+    "by_dataset_layer": {
+      "gov_report:L24": {
+        "population": 40,
+        "far_minmax_strictly_better": 8,
+        "near_avg_strictly_better": 37,
+        "strictly_complementary": 6,
+        "strictly_complementary_fraction": 0.15,
+        "far_only_strict_advantage": 2,
+        "near_only_strict_advantage": 31,
+        "neither_strict_advantage": 1,
+        "strictly_reverse_both": 1,
+        "far_delta_sign": {
+          "positive": 8,
+          "zero": 1,
+          "negative": 31
+        },
+        "near_delta_sign": {
+          "positive": 37,
+          "zero": 0,
+          "negative": 3
+        },
+        "far_delta_mean": -98.25,
+        "near_delta_mean": 256.7,
+        "far_delta_median": -45.0,
+        "near_delta_median": 195.5
+      },
+      "gov_report:L8": {
+        "population": 40,
+        "far_minmax_strictly_better": 12,
+        "near_avg_strictly_better": 40,
+        "strictly_complementary": 12,
+        "strictly_complementary_fraction": 0.3,
+        "far_only_strict_advantage": 0,
+        "near_only_strict_advantage": 28,
+        "neither_strict_advantage": 0,
+        "strictly_reverse_both": 0,
+        "far_delta_sign": {
+          "positive": 12,
+          "zero": 1,
+          "negative": 27
+        },
+        "near_delta_sign": {
+          "positive": 40,
+          "zero": 0,
+          "negative": 0
+        },
+        "far_delta_mean": -9.45,
+        "near_delta_mean": 295.65,
+        "far_delta_median": -6.5,
+        "near_delta_median": 275.5
+      },
+      "hotpotqa:L24": {
+        "population": 88,
+        "far_minmax_strictly_better": 20,
+        "near_avg_strictly_better": 80,
+        "strictly_complementary": 17,
+        "strictly_complementary_fraction": 0.19318181818181818,
+        "far_only_strict_advantage": 3,
+        "near_only_strict_advantage": 63,
+        "neither_strict_advantage": 5,
+        "strictly_reverse_both": 5,
+        "far_delta_sign": {
+          "positive": 20,
+          "zero": 0,
+          "negative": 68
+        },
+        "near_delta_sign": {
+          "positive": 80,
+          "zero": 0,
+          "negative": 8
+        },
+        "far_delta_mean": -48.5,
+        "near_delta_mean": 261.4886363636364,
+        "far_delta_median": -30.0,
+        "near_delta_median": 253.0
+      },
+      "hotpotqa:L8": {
+        "population": 88,
+        "far_minmax_strictly_better": 59,
+        "near_avg_strictly_better": 87,
+        "strictly_complementary": 58,
+        "strictly_complementary_fraction": 0.6590909090909091,
+        "far_only_strict_advantage": 1,
+        "near_only_strict_advantage": 29,
+        "neither_strict_advantage": 0,
+        "strictly_reverse_both": 0,
+        "far_delta_sign": {
+          "positive": 59,
+          "zero": 3,
+          "negative": 26
+        },
+        "near_delta_sign": {
+          "positive": 87,
+          "zero": 0,
+          "negative": 1
+        },
+        "far_delta_mean": 25.431818181818183,
+        "near_delta_mean": 390.29545454545456,
+        "far_delta_median": 8.5,
+        "near_delta_median": 377.0
+      }
+    }
+  },
+  "document_macro": {
+    "documents_with_competitive_queries": 27,
+    "mean_document_complementary_fraction": 0.36203703703703705,
+    "documents": [
+      {
+        "dataset": "gov_report",
+        "row_index": 0,
+        "competitive_queries": 2,
+        "complementary_queries": 0,
+        "complementary_fraction": 0.0
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 1,
+        "competitive_queries": 12,
+        "complementary_queries": 3,
+        "complementary_fraction": 0.25
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 2,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 3,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 4,
+        "competitive_queries": 6,
+        "complementary_queries": 0,
+        "complementary_fraction": 0.0
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 5,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 6,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 7,
+        "competitive_queries": 12,
+        "complementary_queries": 2,
+        "complementary_fraction": 0.16666666666666666
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 8,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 9,
+        "competitive_queries": 10,
+        "complementary_queries": 3,
+        "complementary_fraction": 0.3
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 10,
+        "competitive_queries": 16,
+        "complementary_queries": 4,
+        "complementary_fraction": 0.25
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 11,
+        "competitive_queries": 2,
+        "complementary_queries": 1,
+        "complementary_fraction": 0.5
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 12,
+        "competitive_queries": 4,
+        "complementary_queries": 1,
+        "complementary_fraction": 0.25
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 13,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 14,
+        "competitive_queries": 14,
+        "complementary_queries": 3,
+        "complementary_fraction": 0.21428571428571427
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 15,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 16,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 17,
+        "competitive_queries": 2,
+        "complementary_queries": 1,
+        "complementary_fraction": 0.5
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 18,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "gov_report",
+        "row_index": 19,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 0,
+        "competitive_queries": 4,
+        "complementary_queries": 0,
+        "complementary_fraction": 0.0
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 1,
+        "competitive_queries": 14,
+        "complementary_queries": 7,
+        "complementary_fraction": 0.5
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 2,
+        "competitive_queries": 14,
+        "complementary_queries": 4,
+        "complementary_fraction": 0.2857142857142857
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 3,
+        "competitive_queries": 12,
+        "complementary_queries": 6,
+        "complementary_fraction": 0.5
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 4,
+        "competitive_queries": 10,
+        "complementary_queries": 2,
+        "complementary_fraction": 0.2
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 5,
+        "competitive_queries": 12,
+        "complementary_queries": 8,
+        "complementary_fraction": 0.6666666666666666
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 6,
+        "competitive_queries": 12,
+        "complementary_queries": 5,
+        "complementary_fraction": 0.4166666666666667
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 7,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 8,
+        "competitive_queries": 8,
+        "complementary_queries": 3,
+        "complementary_fraction": 0.375
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 9,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 10,
+        "competitive_queries": 12,
+        "complementary_queries": 6,
+        "complementary_fraction": 0.5
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 11,
+        "competitive_queries": 12,
+        "complementary_queries": 6,
+        "complementary_fraction": 0.5
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 12,
+        "competitive_queries": 12,
+        "complementary_queries": 6,
+        "complementary_fraction": 0.5
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 13,
+        "competitive_queries": 2,
+        "complementary_queries": 2,
+        "complementary_fraction": 1.0
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 14,
+        "competitive_queries": 12,
+        "complementary_queries": 6,
+        "complementary_fraction": 0.5
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 15,
+        "competitive_queries": 6,
+        "complementary_queries": 2,
+        "complementary_fraction": 0.3333333333333333
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 16,
+        "competitive_queries": 0,
+        "complementary_queries": 0,
+        "complementary_fraction": null
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 17,
+        "competitive_queries": 12,
+        "complementary_queries": 4,
+        "complementary_fraction": 0.3333333333333333
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 18,
+        "competitive_queries": 10,
+        "complementary_queries": 4,
+        "complementary_fraction": 0.4
+      },
+      {
+        "dataset": "hotpotqa",
+        "row_index": 19,
+        "competitive_queries": 12,
+        "complementary_queries": 4,
+        "complementary_fraction": 0.3333333333333333
+      }
+    ]
+  },
+  "selected_q": {
+    "dataset": "hotpotqa",
+    "row_index": 6,
+    "layer": 8,
+    "q_pos": 12915,
+    "length": 12916,
+    "far_page_count": 134,
+    "near_page_count": 64,
+    "far_oracle_count": 1085,
+    "near_oracle_count": 5621,
+    "far_avg_hits": 692,
+    "far_minmax_hits": 893,
+    "near_avg_hits": 4811,
+    "near_minmax_hits": 4450,
+    "far_avg_mass": 0.08126895320674521,
+    "far_minmax_mass": 0.09051924486266216,
+    "near_avg_mass": 0.6721108946949244,
+    "near_minmax_mass": 0.6185809262096882,
+    "far_delta": 201,
+    "near_delta": 361,
+    "competitive": true,
+    "complementary": true,
+    "far_avg_recall": 0.6377880184331797,
+    "far_minmax_recall": 0.8230414746543778,
+    "near_avg_recall": 0.8558975271304038,
+    "near_minmax_recall": 0.7916740793453122
+  },
+  "sources": [
+    {
+      "dataset": "hotpotqa",
+      "row_index": 0,
+      "npz_sha256": "695c9acc9138d12c4001b99b7639e30ba2c85ab4d15b917c3af33347e44358a2",
+      "manifest_sha256": "31908a4471b6a50bcd4010708e262c0b4cf2fdaa75a7c75377826998db15a183",
+      "input_sha256": "a28c4b160b84a59653c6a589cdd77be590b3c5b55e6a1ab1fd6ee3ca9858eb8e",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 1,
+      "npz_sha256": "d6c39b12ffc3288148bb78da1cfd0ce5067f7a029f81faaaaded09d50c2bfbd4",
+      "manifest_sha256": "27873962ceee0e10c6b60ae249408f3360569cba1820b5fdf3c53b7eaad12b04",
+      "input_sha256": "6c9a38189a46d7ea443183db30764e515ed56cc4f4f70bdd2a29d0ab782650ed",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 2,
+      "npz_sha256": "0985668675299a72d2327ee4d9252d427b2412b2575b9e2f463297b7c5ac6efe",
+      "manifest_sha256": "377b1a2f8ed436bc9b813a86de745792f3895a76a7d35ea0a2524334638d9db2",
+      "input_sha256": "f7bfe5f9563bc5fe4027449aec8baf3482553f9d1dcadc1f134fc52bde1118d6",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 3,
+      "npz_sha256": "e71be62157553d477377d6ed952f5da70a30e9c2310d8a82404f819a7c658457",
+      "manifest_sha256": "bbccd24c9e39b2ffcef3740f921bc94053b1f653b81b08c779481087d64a60fc",
+      "input_sha256": "c48d19abdb1ea7617fb508aae1ed9544176015f026db3c1c122a7a3a18c2e3dc",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 4,
+      "npz_sha256": "b57536ed3f570a116d31cdbc441307211c2b461d8c771d4d6f1fc569db31a61c",
+      "manifest_sha256": "7479198a5fff823267465cbeb32897fe268fb133f2555881d553ff0cb162c777",
+      "input_sha256": "074aaf352ff69ed6032b5f30b6bc18987e3cda1c4f3846f5340e8d8b11191cc8",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 5,
+      "npz_sha256": "bcbfdf51cd01986a6689533449c4f8834bfaac76f70243f6bc5a0af7a1690576",
+      "manifest_sha256": "ad48d3196035b28181179e07a49f277b376e6728aaec58b386b186bb530e549f",
+      "input_sha256": "3a834c30d9e969a03014aa0afab3e9be163028394f1ce858d58503d758257d3f",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 6,
+      "npz_sha256": "e2d9cbf4b8f561782804283d432d0a7d29f59aea46d052014584af0b3debebc7",
+      "manifest_sha256": "9bc9344646d708b048c83bcb291bb1502a6f95eb79371113e5eb887dc8440596",
+      "input_sha256": "822c2f2b65af82434e9cd15947b1c8759d944c3a2d1de95b9d59a105ff8c4977",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 7,
+      "npz_sha256": "f99e3d4492e7f4969014915d8566620bc945abb5e2d54e4007085ec63220aa0d",
+      "manifest_sha256": "12a1bc2550f4ef8d5fa19d3dbf9fa39809858a98d30706b0c6c4622c10fa0484",
+      "input_sha256": "42869ba2fa75d79fff8d26e5e3d4564326e2bcc89aa05d2f921058eda107cf0a",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 8,
+      "npz_sha256": "398529135d39287cb19ab5ff1e87ecd519a6a6b67492d042fbd7cdc8b8c68aee",
+      "manifest_sha256": "486ffc5b0a613eaf8556c8ccaf72fc1dd7263975d01671f76e3ec5ca6fe148dd",
+      "input_sha256": "102c9c60b68560638fa77a6be2f0c5917c559b23dcbbef0a4403ace4c5f23d45",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 9,
+      "npz_sha256": "87827432a2682355a162c762ef5b19b1ed90272f43b9535626b760ecbc24f6ba",
+      "manifest_sha256": "4554f195977aa38d50750065070ffac76921a19fc587503690bf5cca70380bb8",
+      "input_sha256": "9551e057d0d34bdab5708166822a11d6204a9f931ddfc9b845d40870f6863e41",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 10,
+      "npz_sha256": "2b0efbc3aeca3745c94c912527f15102896ecfc2539e6733da150fc9385d4786",
+      "manifest_sha256": "6c5a96ebdd3c406522e70a3c9dc8dd69e4737ad3ecfb98fc2f7cacad4af4d3ab",
+      "input_sha256": "82fd830c7e50a29309cdd03534d9cf92333365c26a327c67fc573c9d7dd773c9",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 11,
+      "npz_sha256": "7307150bcfc3ca0227a23965f2541710b618db6abdbff82a0b6dc725781983f8",
+      "manifest_sha256": "078a72809e87197b1ef3bb60a35c16ac078f6d2a0b324ae0adef6aca76213f9c",
+      "input_sha256": "805c2071fcc07ebd26a99c5d2b1b9578d01a17d1d7152f1746d72fc8da12d1b8",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 12,
+      "npz_sha256": "e57ba948409d63b54f2d5e54d7afe54df9597fd73c2d9dde27c52b3e3f1a75dd",
+      "manifest_sha256": "13e818361710f959d86afea460e58b69fc39ff9725e65ca068048e700fc62e00",
+      "input_sha256": "76f122f38ee942f7c6a7286a7f86bb4808415a363441bb3ff959f5540aafdb83",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 13,
+      "npz_sha256": "86be8ceb75cce397392524c7f4062fb13973f1be738b739f279d94989e38e746",
+      "manifest_sha256": "6a4edc1d45122f6262d6e52a9b02d33b5f9cae09e4cf8a8665ad52a1ca136f1a",
+      "input_sha256": "c873c032f537e716af6ee4bc37d173cde2cee2922c57b534c5d647d6cbf51920",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 14,
+      "npz_sha256": "037da40115cf01498ea0d065e9af3ed89b375e1492763a83a997897fa91879a0",
+      "manifest_sha256": "8f44c33a6d332c9e59067c44e641daf7ce9988cf08a67dbab26af019c313a07f",
+      "input_sha256": "7e7399654dd47df3e674822b13920efbe9db2f37a36709cd86f3284f618a4100",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 15,
+      "npz_sha256": "68c40c09182c890427f1f9b47825c815c040497b9bb647c0e55240376795fc23",
+      "manifest_sha256": "8abd15b03ece9ed00ea8bdc7aa667bb439a6b7b11c08824d3c4922b71e136fa4",
+      "input_sha256": "9333f3c20f098faebc692e99f90226de6d883fe113922d77f3a44f02a753e41d",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 16,
+      "npz_sha256": "536d26577b9a9196a5229f347187eac718f5e6420ac08190e73714bd50270889",
+      "manifest_sha256": "b0dbcf6964e364bdf0dca4c0591449c1df1e3ec092f81b556ac5beca6b0d4554",
+      "input_sha256": "da649b999a9271695dd6ec8177202b0f38b2c1f181ad25baa9151b521a2f5907",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 17,
+      "npz_sha256": "10fd1bdbc1b40ac89cf7cc886993228419d1cc7f79fb069021284948c02ab399",
+      "manifest_sha256": "1ab3b0d0b846d16961b1dc3b91765e70d568c59dae5e05759d9078e059f4de00",
+      "input_sha256": "e5aac31ea1aa730109f3960d7cfbf3763e6191ec0cb32c506761ac8750960617",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 18,
+      "npz_sha256": "7a050079458c4357751e5e203ffbc4d9abbaa872a26ae414df4f3d6dc0f7ee54",
+      "manifest_sha256": "5cd9e560b28c808dc3ac47308636cca4f9e302840e8dfd0f406a9415bd2f633d",
+      "input_sha256": "2789edb0eb9cd2b2b9ddd8cb764708a039f7b55aa622f61335c6a6e7809b906e",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "hotpotqa",
+      "row_index": 19,
+      "npz_sha256": "dbe5bf96bc16d54c9e89a6170667aa317b16137189d4c34e3840114f61172a16",
+      "manifest_sha256": "35c09ffe6393e82607c620d5a4d7cb0c0789c6694242ce326ba6987bff344454",
+      "input_sha256": "bcac68393ca59a622f75fcb67b6c3cff9c829d95fdb409371a1aa6b4872d267a",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 0,
+      "npz_sha256": "172b1eef2c583be90b73d9d0e4f992857c0d0f4f6c0ea9c79262b708899c09fb",
+      "manifest_sha256": "2aa064528652ce7c20eb2c0433b7e5c7ec3f2fc57d0863da423fb3b185249374",
+      "input_sha256": "e80b6f2a940012781ae710519f916e9320bb18f6a378b6dd3ede96f0e87c388b",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 1,
+      "npz_sha256": "def585987eece3723babe12a5bd2e9e0abc47c7a5de2b4552562b5efe382b448",
+      "manifest_sha256": "dbf7cd289958600bb59db29431feb3f309c865b4f197e3ea04864fa8408f506f",
+      "input_sha256": "293c2236f21a2c917404759eac76691082de80bda4abde052752ed0c7d2d65b9",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 2,
+      "npz_sha256": "3ad50b74721f043dd60877ae8842bb722f6a4f2115529ad18fba3bd16a719f0d",
+      "manifest_sha256": "20cabaa1693e8cc204834970a9b54c2f02eeca14a408480a28c38cc3e13b1b60",
+      "input_sha256": "1e1447449d2fe38116a6059fce50e1eb2475519e2a03740d0217929b194fe15e",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 3,
+      "npz_sha256": "66b03a918e426f4fe2cb18873a2cdfdfeb20249ccbbccfb8381fe0915996855e",
+      "manifest_sha256": "36563ebe5f21d72a2cca95b3cfb0075fc6bbcee7b24202d5973788a30acb868a",
+      "input_sha256": "d3f8f607617aeda8a0efed4ad8503528160f1593b7f2e82408f7edf471272232",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 4,
+      "npz_sha256": "64f89b28a4fc70c3bb08c4babd94c884639b4a61ca2910c79bc50f44e1bfd538",
+      "manifest_sha256": "97b4651a5ec08d5164446083e30370879edd9632964a710cf9e9d8f4fe030cca",
+      "input_sha256": "d5a28fdbf3ce66990d066384e62936dabb50c3e72b85675eec28ae0398bc3309",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 5,
+      "npz_sha256": "4851fb7c576c979d6675bf74e8eba965ee700c919fa6447b39e4a9bbf36352d1",
+      "manifest_sha256": "eb42c25040c0c4760ef97237bddb53456671a8c1a1f6319a466d4e486c048739",
+      "input_sha256": "f7e224499254a87f5d2562ec6cb50d81221ba5b86906aeb759e3126984f63c55",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 6,
+      "npz_sha256": "d7e6d8b4abcb2731efcd8c9baa85c627a1d66ea78ec21160297b2b0ce2497f17",
+      "manifest_sha256": "dec767b42283343bda9b7cecc8f2e0b6939ee4ef9ddc58be732a6912c03594bb",
+      "input_sha256": "e42db304b41c47e35a475dbea6998b60e1f7b8eea35391321f56465d837a2569",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 7,
+      "npz_sha256": "1bb183a71f58a7acb7da009492ad82c46e6a17d3c99aaeac99996656c6424828",
+      "manifest_sha256": "0dea56a78c0d89894c433b6e0a4d799b5231f9e700cda633088c09597997963f",
+      "input_sha256": "f552e2583818ea246cea4af7ecc44a2e0aba036da0ce5dd89d0048de73a351c6",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 8,
+      "npz_sha256": "48d96d8ee78c4f06f56e26b7de40a52a6e6dda375aed4b00386b1f08c8fa34b5",
+      "manifest_sha256": "dcd2fcdd0ea5fae840990452b14792c66791c73ebc9d85736c818bdaf4bc3dee",
+      "input_sha256": "8773db31a5ccd5b6225bbacd6b5f4fcf5f390e512a1e06bce0012231fd9f0e4b",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 9,
+      "npz_sha256": "256bc87a0fac4ea73a0175cf4117566e7fbfd92d9666dc6841f2c39cf1383a57",
+      "manifest_sha256": "3ce40e6e40f61aaa3e817643bf34bed696e04fce2108fc175c1060a5417798d5",
+      "input_sha256": "6146d3148a3f1051f9f208b79f0453f6577d63e51eb8e7fbb2fb1f97440834bf",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 10,
+      "npz_sha256": "3b882ae579c021cbdc8cf3f033c1cf624a004cf865648b24b914a2a626012fa0",
+      "manifest_sha256": "2c66a09ad25659c44c71cc5b2aae2e3c2ff3dbab3be323a036e802c8b9968c33",
+      "input_sha256": "517ef89a79943ccc910c1b02a9efe9baf753ceb011a2a2b11db64b5a37857d59",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 11,
+      "npz_sha256": "ed4b8aa0294a001a564e22f35f51aaa07497a091097f887b885145c1df1e82d8",
+      "manifest_sha256": "6575e776c7952fe22836fede3596db1a0767090bdc3f1c554826f4da517dce3b",
+      "input_sha256": "09239e4c2e46a00ab86fc48f1ee4ec333e1ae24a1f1be2e86c1c0fd56e88b50c",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 12,
+      "npz_sha256": "31b492f5693452206a34077d972dc9be4bcbb23b641eeda78f1ac344f95f33f9",
+      "manifest_sha256": "0c90391fc8b1cd5bab60cc20fca4874a418668899d2680a68634562d7376275f",
+      "input_sha256": "136996eeb2cd52eb02823ac607484d0846f2ffe4aa105d156c3a29029425c361",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 13,
+      "npz_sha256": "c826d16b49c624eab3515556e29a1ac7a226f452aefad0a74dc7365bb2e24739",
+      "manifest_sha256": "7ea4657b41ebfbd1d096bc64408cb7026166a9715c669843e49cc887b33d3139",
+      "input_sha256": "56ba0f08b6356afdce710f565792501c3d01227b6654577b123c1b7e9729ca6c",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 14,
+      "npz_sha256": "b70304161c2f72acd18a1c14f5eb86d4bbad777ee86bbd51556a29a47e7b357f",
+      "manifest_sha256": "8ef417c6cb9aed98bf0d96c4505373728ce09453412332567264398bc1eb4dd7",
+      "input_sha256": "03850f4a46b709109e7c740bf6cedf0740a06fa9846d84c754f3398c3d6a7389",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 15,
+      "npz_sha256": "89bddc1c8ec4e158e400a0758c67a44a0772a649d00597a9d80e378672302ad9",
+      "manifest_sha256": "d698f52272a09e4eace7741b54c863a498d789b12e6b2f1bf81aeffdb16b4767",
+      "input_sha256": "1697b932a8536eb06ac1fac04b65f17c190e6354c789d0b0d2ea5140f9ebfaa7",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 16,
+      "npz_sha256": "a3cca37a1dcd94a0f902c7f467655c976f104fb885a2a9292ac2b0f1374dcc51",
+      "manifest_sha256": "359942cfe1f6aaf0062ce825d8b8b6ccf59515e6e42a2d2d53d54bb098bfbcd0",
+      "input_sha256": "9c379a8947f50bca7f8c56f59ad57738fa6ad3f22f3812e1c8fb1c9d23663997",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 17,
+      "npz_sha256": "ab141305b5351f77261ac979b58bd64b465adc982c3f19cd28f1f9cc95af8aee",
+      "manifest_sha256": "dfd63dad94b52d13941b95541c1d561798c7bb4b66b5bfd416730da24d040bdc",
+      "input_sha256": "96c4a31a4c08ad6948c8b89aa33ddff954b621715545dc64e6f3ef7bdccc0680",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 18,
+      "npz_sha256": "d28849c91bd0b7fc0da15896a98a5619ba5d00b9e80435e06c1fdc68727b70bc",
+      "manifest_sha256": "acc2edf1752d0274c6196d0c18b7fd52463c0295500c8d7b383afae150c658cf",
+      "input_sha256": "4062feae7a5c191c57995f7e8ce94f1397e75cbb28248ba0b5ad81e275a3df9b",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    },
+    {
+      "dataset": "gov_report",
+      "row_index": 19,
+      "npz_sha256": "681686c432fb2f28c9718436ae4d2e69721acdec719cd5f6396b8248b025062d",
+      "manifest_sha256": "ed098e543cb5b6d5f10e5233decd4e0f39235a7bb944ff3e8d799b21bde140c2",
+      "input_sha256": "b96248f3a253599a19f6239dfdab5cfc6fe2d2ce087692f941e92f765d89015b",
+      "capture_source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+      "trace_sha256": "7c27180bde998367c7e41cf772e837fecaa647894e192e83f3acaab46f834207"
+    }
+  ],
+  "performance_authorized": false,
+  "generated_at_utc": "2026-11-09T04:03:32.206793+00:00"
+}
