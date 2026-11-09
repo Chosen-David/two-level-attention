@@ -121,8 +121,10 @@ def _static_gate(model):
         source='measure_prefill_lse_calibrator')
 
 
+@torch.inference_mode()
 def _run_prefill(model, prompt, geometry, calibrated, validate_legacy=False):
-    cache = build_frozen_cache(model, geometry, prompt.numel(), max_requests=1)
+    cache = build_frozen_cache(
+        model, geometry, prompt.numel(), max_requests=1, max_visible_len=8192)
     static_gate = None if calibrated else _static_gate(model)
     gate = GateConfig(epsilon=.05, rows=256, statistic='mean', mode='dual')
     torch.cuda.synchronize()
