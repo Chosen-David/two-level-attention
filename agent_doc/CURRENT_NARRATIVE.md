@@ -343,6 +343,7 @@ MLA D=192 不满足增量缓存门（k.shape[-1]==128）→ prepare 全量重建
 
 | 过时结论（出现在 archived 报告/早期叙事中） | 推翻/修正判决 |
 |---|---|
+| 固定 Top892 可与任意 K2 的预算匹配 oracle 混用，或固定 Q/K CPU replay 可证明生产选集一致、质量或性能 | [TL-NFA-OBS-ABLATION-20261106](task/task_details/TL-NFA-OBS-ABLATION-20261106.md)：O-GATE 12 plans/240请求与 B-REPLAY 12 plans/240文档/69952 cells 独立验收通过；低 K2 下 fixed/budget oracle 指标分离，K2=1024 逻辑支持集对照 7248/7248 不相等。结果仅为描述性机制证据，不支持生产 bit-exact、质量或性能主张。 |
 | 将旧 ring/eviction 显存结论直接用于当前 GraphReady 路径，或以 TPOT 中位数排除周期性长尾 | `37a8e5d` 的物理页在请求内 append-only，remove_request 才释放；128K B1 归档存在每64步跨页长尾。见 [TL-DECODE-PAGE-STAGING-20261104](task/task_details/TL-DECODE-PAGE-STAGING-20261104.md)：仅源码/主机验证，补丁GPU收益待验，旧实验结论不因此被追溯修改。 |
 | 保护带（boundary bypass 前的 sink/swa 保护带几何）假设最优 | `e148_sinkswa_verdict.json`（否决） |
 | prefill 稀疏可提速（FS/prefill sparse e2e） | `e149_sink4_verdict.json`（FS 质量 -5.18% → decode-only 叙事）；prefill 性能详见 `e139_prefill_profile_verdict.json` / `e140a_prefill_k1up_verdict.json` |

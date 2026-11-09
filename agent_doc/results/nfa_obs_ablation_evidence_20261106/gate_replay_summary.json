@@ -1,0 +1,183 @@
+{
+  "schema": "nfa-gate-replay-compact-result-v1",
+  "task_id": "TL-NFA-OBS-ABLATION-20261106",
+  "status": "usable-with-scope",
+  "model": "Qwen3-8B",
+  "source_head": "f5f3df3c4fe4c4af39c9074db0baaa5e00770eab",
+  "scope": "12 fixed-trajectory GPU mechanism replays; not quality, production-bit-exact, or performance evidence",
+  "plan_count": 12,
+  "request_count": 240,
+  "validated_trace_entries": 3624,
+  "dual_raw_oracle_qk_files": 60,
+  "datasets": [
+    "hotpotqa",
+    "gov_report",
+    "niah_multikey_2"
+  ],
+  "arms": [
+    "gate-full",
+    "gate-far",
+    "gate-near",
+    "gate-dual"
+  ],
+  "raw_oracle_scope": "Raw dense-oracle Q/K inputs were independently identified; this report does not claim that dense-oracle attention was computed by O-GATE.",
+  "plans": [
+    {
+      "plan_id": "O-GATE:hotpotqa:gate-dual:000-019",
+      "dataset": "hotpotqa",
+      "arm_id": "gate-dual",
+      "request_count": 20,
+      "validated_trace_entries": 206,
+      "validated_dense_oracles": 20,
+      "run_manifest_sha256": "df2672ae45249c405fc9b97588b4e13896942d46c5414d0677c97b031c62d9cb",
+      "result_sha256": "5b6081bcb1b7ca3c2f1ad7cd5cc3bb0823c25987990b490a4bcec134d65d6250",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:hotpotqa:gate-far:000-019",
+      "dataset": "hotpotqa",
+      "arm_id": "gate-far",
+      "request_count": 20,
+      "validated_trace_entries": 206,
+      "validated_dense_oracles": 0,
+      "run_manifest_sha256": "e5ff30b6ff7fc1130d249c1b76c8b87698983f133246e046084dec77ce23d6d2",
+      "result_sha256": "11107a6ecb848a38bc36c124ed81b3f5fa942413583ddfe40981368a233b6db4",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:hotpotqa:gate-full:000-019",
+      "dataset": "hotpotqa",
+      "arm_id": "gate-full",
+      "request_count": 20,
+      "validated_trace_entries": 206,
+      "validated_dense_oracles": 0,
+      "run_manifest_sha256": "a4c0680a753602a51626de053d641fed0a645c4932c0abd04ca0e13d24bef0a0",
+      "result_sha256": "36296952108c37c1aa55e2768ef3838c165f414e530aa3c3f0e137b78d8e521e",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:hotpotqa:gate-near:000-019",
+      "dataset": "hotpotqa",
+      "arm_id": "gate-near",
+      "request_count": 20,
+      "validated_trace_entries": 206,
+      "validated_dense_oracles": 0,
+      "run_manifest_sha256": "72f7fd677d03e3a3998379840b4ed33425666c369f0ba6f5059d8848d47b159f",
+      "result_sha256": "8a05f3bf51a0284f3fc2c69f5b43c15316127545d1a14ef3f705db29103256bb",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:gov_report:gate-dual:000-019",
+      "dataset": "gov_report",
+      "arm_id": "gate-dual",
+      "request_count": 20,
+      "validated_trace_entries": 420,
+      "validated_dense_oracles": 20,
+      "run_manifest_sha256": "b7ca92a296e904c3688c76c20fe363977fd443a8d307266da83331ee67fda7b3",
+      "result_sha256": "a4dcfada1f7ecbc1ad00672775ed3b61025ec84a1adbedc43443705d8d6249e4",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:gov_report:gate-far:000-019",
+      "dataset": "gov_report",
+      "arm_id": "gate-far",
+      "request_count": 20,
+      "validated_trace_entries": 420,
+      "validated_dense_oracles": 0,
+      "run_manifest_sha256": "1be7ae70b950d35ab5d09f248d5dab9b73d495e2b6ad5c47f880cb2c823b8283",
+      "result_sha256": "4cc6a951e4d78f3327a03c5611d42012a1f81eddcc565c31e83dfe1308424643",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:gov_report:gate-full:000-019",
+      "dataset": "gov_report",
+      "arm_id": "gate-full",
+      "request_count": 20,
+      "validated_trace_entries": 420,
+      "validated_dense_oracles": 0,
+      "run_manifest_sha256": "b2b3ad5444b0a4177a3fc487ab04f1d5bbfb62f6061bca5d697989b2a507c3cd",
+      "result_sha256": "39fc8a81d487d2a821db67aadc59d0fad118f36ce29ad1b53d3a144f9e2c815b",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:gov_report:gate-near:000-019",
+      "dataset": "gov_report",
+      "arm_id": "gate-near",
+      "request_count": 20,
+      "validated_trace_entries": 420,
+      "validated_dense_oracles": 0,
+      "run_manifest_sha256": "6d0dda4090e5d4ba0716d2a01486d41a3a88b6ba8044d5a9bbda7e5f21aa1486",
+      "result_sha256": "6b4f1c3f5e134d9682e2e1ffa2dacbe2ab9753215e62b2703399f274e8320594",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:niah_multikey_2:gate-dual:000-019",
+      "dataset": "niah_multikey_2",
+      "arm_id": "gate-dual",
+      "request_count": 20,
+      "validated_trace_entries": 280,
+      "validated_dense_oracles": 20,
+      "run_manifest_sha256": "25bc80596ede6c682cbb66c12f3180ef5658a7735a89824e99c5aeb58390a0c3",
+      "result_sha256": "f68d0eb67b52bd2c340735f17b4fba0b8c07958edc385afdf4a181dd60058759",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:niah_multikey_2:gate-far:000-019",
+      "dataset": "niah_multikey_2",
+      "arm_id": "gate-far",
+      "request_count": 20,
+      "validated_trace_entries": 280,
+      "validated_dense_oracles": 0,
+      "run_manifest_sha256": "b818362e36bb71c5cbc15dccec0e838643f8bdb05035f344bdd00fa004664dd4",
+      "result_sha256": "2a85b42f01908d48a078bb865cbe01611a0c3374eaa078a13ba5ce7617f5baa3",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:niah_multikey_2:gate-full:000-019",
+      "dataset": "niah_multikey_2",
+      "arm_id": "gate-full",
+      "request_count": 20,
+      "validated_trace_entries": 280,
+      "validated_dense_oracles": 0,
+      "run_manifest_sha256": "13d1db95891d64ab88edf23f7230bf6e6ae2883dca5271cbe03e4a270ae8bbe8",
+      "result_sha256": "cf3edd8e1febdf81649195d5d64b443934e4cec5caabb78635738d65d4f54150",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    },
+    {
+      "plan_id": "O-GATE:niah_multikey_2:gate-near:000-019",
+      "dataset": "niah_multikey_2",
+      "arm_id": "gate-near",
+      "request_count": 20,
+      "validated_trace_entries": 280,
+      "validated_dense_oracles": 0,
+      "run_manifest_sha256": "855ceadd780d6650689bdd4463d7f3d9942c08054ba06c46f00c99740abb7c1a",
+      "result_sha256": "f21e5a7ea774e189c7c7fbcac95c47e0816cc8905990f0b374dbb09e998f116f",
+      "producer_sha256": "88bbaabe2c55eaa20ee607843618dbbc428939591fed95ca1b2a3b9e71b8d72f",
+      "runner_sha256": "391cb33f00446468ca07850d40aabe44dfdd7af8775743c2894d87f3a9e45122"
+    }
+  ],
+  "independent_validation": {
+    "verification_actor": "same-ai-owner-separate-implementation-and-process",
+    "producer_or_runner_imported": false,
+    "original_relative_path": "validation/gate_replay_independent_check.json",
+    "sha256": "e523591a472d4fa56ad78c7d5d635b791c6c960641c2989848e7f7536fc930d6"
+  },
+  "raw_artifacts": {
+    "host": "pc02 (10.238.122.187)",
+    "root": "/home/wangyuanshuo02/tla-nfa-evidence-20261106/agent_doc/results/nfa_obs_ablation_evidence_20261106",
+    "included_in_git": false
+  },
+  "performance_authorized": false,
+  "generated_at_utc": "2026-11-09T19:43:47.394113+00:00"
+}

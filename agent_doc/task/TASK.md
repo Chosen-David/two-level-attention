@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-10
+
+- [x] [TL-NFA-OBS-ABLATION-20261106] O-GATE 12 plans/240请求/60份 raw Q/K 与 B-REPLAY 12 plans/240文档/69952 cells 全部独立验收通过；精简结果已入库，明确固定轨迹 CPU replay 非质量、性能或生产 bit-exact 证据，K2=1024 逻辑支持集对照 7248/7248 不相等。([详情](task_details/TL-NFA-OBS-ABLATION-20261106.md))
+
 ## 2026-11-09
 
 - [x] [TL-LLAMA-VENDOR-LBV1-20261109] Llama-3.1-8B base × LongBench v1 英文16任务 Quest/JSSA/AsyncTLS 精度矩阵收官：每臂16/16、3750请求，AVG16分别31.02/33.67/31.81；FullKV/NFA复用锚38.43/38.49，五臂输入身份与官方逐样本分数独立复核PASS。([详情](task_details/TL-LLAMA-VENDOR-LBV1-20261109.md))
