@@ -218,12 +218,14 @@ def main():
     args = parse_args()
     if args.repeat < 1:
         raise ValueError('--repeat must be positive')
-    torch.cuda.set_device(args.gpu_id)
     os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
     monitor = GpuMonitor(args.gpu_id, args.output + '.hygiene.jsonl')
+    # Preflight must run before set_device creates this process's own CUDA
+    # context; registering first lets the monitor recognize that context.
     monitor.start()
     monitor.register(os.getpid())
     try:
+        torch.cuda.set_device(args.gpu_id)
         tokenizer = bench.AutoTokenizer.from_pretrained(args.model_path)
         load_args = SimpleNamespace(
             data_root=args.data_root, task=args.task,
