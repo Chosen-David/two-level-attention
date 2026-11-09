@@ -1,8 +1,16 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-09
+
+- [~] [TL-GLM-SUBSPACE-SKIP-RETEST-20261109] 用户后续“全部停止”终止剩余重测；已完成 first32/last32 的 full/dual 独立审计（last32=30/27、first32=16/17）全部保留，最终选定 `glm_nope_last32` 进入 LongBench16 全量。([详情](task_details/TL-GLM-SUBSPACE-SKIP-RETEST-20261109.md))
+
 ## 2026-11-08
 
 - [ ] [TL-NFA-REVIEW-EVIDENCE-20261108] M1、Q0 与 fused-LSE 标定器三长度增量测量已验收；按用户指令先行交付 LSE 子链，继续 A1a 四格质量及 P0a/P0b 锁卡性能。([详情](task_details/TL-NFA-REVIEW-EVIDENCE-20261108.md))
+
+## 2026-11-05
+
+- [x] [TL-GLM-SUBSPACE-32D-20261105] GLM-4.7-Flash 32 维索引子空间消融与选维：LongBench macro `nope_random32` s1 Δ−0.31 最小，RULER MultiKey2 可比 32 维臂最高 18.0，并发现 NFA full-index 自身 −42 缺口；2026-11-09 first32/last32 复测后最终改选 `glm_nope_last32`。([判决](../results/glm_subspace_selection_20261108/SELECTION.md))
 
 ## 2026-11-04
 
