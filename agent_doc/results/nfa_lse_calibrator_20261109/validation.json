@@ -1,0 +1,67 @@
+{
+  "schema": "nfa-fused-lse-prefill-validation-v1",
+  "status": "PASS",
+  "scope": "Three real Qwen3-8B RULER prefill receipt sets; independent summary recomputation, ABBA logs, model/input hashes, fused call counts, legacy gate identity, and GPU hygiene",
+  "fusion_boundary": "Single-pass fused-LSE calibrator followed by unchanged native dense SDPA; no SDPA-internal LSE reuse claimed",
+  "source_head_at_measurement": "6fd22304ad6dbf0e28c44ad4acf7bddbce5735d4",
+  "implementation_head_at_validation": "dc2a929b9dccf8f9f9b93e2835751b8a5a74bb7d",
+  "production_delta_files_since_measurement": [],
+  "regression": {
+    "status": "PASS",
+    "tests_passed": 57,
+    "test_files": [
+      "tests/test_frozen_gate_profile.py",
+      "tests/test_frozen_region_runtime.py",
+      "tests/test_frozen_skip_request_guard.py"
+    ],
+    "log": "regression.log"
+  },
+  "results": [
+    {
+      "context_length": 32768,
+      "actual_prompt_tokens": 32621,
+      "dense_prefill_median_seconds": 7.177982144057751,
+      "fused_prefill_median_seconds": 7.244604222476482,
+      "paired_increment_median_seconds": 0.06662207841873169,
+      "paired_increment_over_dense_ratio": 0.009281449449394963,
+      "calibrator_device_median_seconds": 0.0655123200416565,
+      "calibrator_device_over_dense_prefill": 0.009126843551135116,
+      "next_token_identity": true,
+      "legacy_gate_identity_layers": 36,
+      "legacy_max_abs_error": 1.7881393432617188e-07,
+      "fused_calls_per_prefill": 36,
+      "hygiene_samples": 3
+    },
+    {
+      "context_length": 65536,
+      "actual_prompt_tokens": 65198,
+      "dense_prefill_median_seconds": 21.1939949542284,
+      "fused_prefill_median_seconds": 21.31217000633478,
+      "paired_increment_median_seconds": 0.11571168899536133,
+      "paired_increment_over_dense_ratio": 0.005459645019509442,
+      "calibrator_device_median_seconds": 0.10957334399223327,
+      "calibrator_device_over_dense_prefill": 0.005170018405160202,
+      "next_token_identity": true,
+      "legacy_gate_identity_layers": 36,
+      "legacy_max_abs_error": 2.384185791015625e-07,
+      "fused_calls_per_prefill": 36,
+      "hygiene_samples": 7
+    },
+    {
+      "context_length": 131072,
+      "actual_prompt_tokens": 130986,
+      "dense_prefill_median_seconds": 70.38630250841379,
+      "fused_prefill_median_seconds": 70.64211343973875,
+      "paired_increment_median_seconds": 0.25188378244638443,
+      "paired_increment_over_dense_ratio": 0.003578590911438698,
+      "calibrator_device_median_seconds": 0.19975852918624878,
+      "calibrator_device_over_dense_prefill": 0.002838031293977549,
+      "next_token_identity": true,
+      "legacy_gate_identity_layers": 36,
+      "legacy_max_abs_error": 4.172325134277344e-07,
+      "fused_calls_per_prefill": 36,
+      "hygiene_samples": 20
+    }
+  ],
+  "data_manifest_sha256": "290cf09b881588cd97bcee11a0a19eff4060d15fbf620010c8f5241c1e00a9e0"
+}

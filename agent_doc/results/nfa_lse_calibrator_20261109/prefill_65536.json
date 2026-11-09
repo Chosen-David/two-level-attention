@@ -1,0 +1,371 @@
+{
+  "schema": "nfa-fused-lse-prefill-increment-v2",
+  "timestamp": "2026-11-09T11:56:18",
+  "scope": "Identical Qwen3 SDPA dense prefill with and without fused-LSE calibration; independent requests, alternating order, one warmup per arm; no decode time included",
+  "fusion_boundary": "Single-pass online-softmax/LSE near/far calibrator followed by the unchanged native dense SDPA; this does not claim reuse of SDPA internal LSE",
+  "arguments": {
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER",
+    "task": "niah_multikey_1",
+    "input_provenance": "native-ruler",
+    "context_length": 65536,
+    "sample_index": 0,
+    "repeat": 3,
+    "gpu_id": 0,
+    "output": "/tmp/nfa-evidence-release-20261108/agent_doc/results/nfa_lse_calibrator_20261109/prefill_65536.json"
+  },
+  "source": {
+    "head": "6fd22304ad6dbf0e28c44ad4acf7bddbce5735d4",
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "model": {
+    "path": "/home/wangyuanshuo02/Qwen3-8B",
+    "metadata_sha256": {
+      "config.json": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+      "model.safetensors.index.json": "f9fdbcb91c23971c13ec5d5f2573d2349e8f61f2f049371ec699281748fdb1bc"
+    }
+  },
+  "input": {
+    "path": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/RULER/65536/niah_multikey_1.jsonl",
+    "sha256": "6b10ff16b08b9c78e8722432b3a79fe22734e343f82a579421023b160b44663f",
+    "sample_index": 0,
+    "sample_id": 0,
+    "actual_prompt_tokens": 65198,
+    "provenance": "native-ruler",
+    "performance_input_mode": "replicate one prompt across all batch rows"
+  },
+  "gpu": {
+    "id": 0,
+    "name": "NVIDIA H20-3e",
+    "driver_version": "550.127.08"
+  },
+  "software": {
+    "torch": "2.8.0+cu128",
+    "transformers": "4.56.2",
+    "triton": "3.4.0"
+  },
+  "gpu_hygiene": {
+    "status": "clean",
+    "pollution_samples": 0,
+    "log": "/tmp/nfa-evidence-release-20261108/agent_doc/results/nfa_lse_calibrator_20261109/prefill_65536.json.hygiene.jsonl"
+  },
+  "correctness": {
+    "warmup_fused": {
+      "calls": 36,
+      "fused_kernel_calls": 36,
+      "device_ms_per_layer": [
+        35.14886474609375,
+        3.0627200603485107,
+        3.2125120162963867,
+        3.0380160808563232,
+        3.081088066101074,
+        3.0342719554901123,
+        3.4074881076812744,
+        3.0427839756011963,
+        3.016832113265991,
+        3.162559986114502,
+        3.4536960124969482,
+        3.065984010696411,
+        3.048799991607666,
+        3.0721280574798584,
+        3.1623361110687256,
+        3.041248083114624,
+        3.0391039848327637,
+        3.015968084335327,
+        3.1436479091644287,
+        3.0146241188049316,
+        3.03385591506958,
+        3.20032000541687,
+        3.1866559982299805,
+        3.2392001152038574,
+        3.1980481147766113,
+        2.986527919769287,
+        3.318943977355957,
+        3.1350080966949463,
+        2.9769599437713623,
+        2.945280075073242,
+        3.2573440074920654,
+        3.1380159854888916,
+        3.0818560123443604,
+        3.214751958847046,
+        3.5097599029541016,
+        3.210207939147949
+      ],
+      "device_seconds_total": 0.1448974094390869,
+      "host_wait_seconds_total": 20.651014164090157,
+      "legacy_validation": {
+        "status": "PASS",
+        "layers": 36,
+        "max_abs_error": 2.384185791015625e-07,
+        "abs_tolerance": 5e-06,
+        "gate_decisions_identity": true
+      }
+    },
+    "warmup_next_token": 576,
+    "warmup_next_token_identity": true,
+    "scope": "Real Qwen per-layer near/far summaries and gate decisions against legacy chunked softmax; fused kernel call count checked on every calibrated prefill"
+  },
+  "measurements": [
+    {
+      "dense": {
+        "wall_seconds": 21.192651487886906,
+        "next_token": 576,
+        "calibrator": {
+          "calls": 0,
+          "fused_kernel_calls": 0,
+          "device_ms_per_layer": [],
+          "device_seconds_total": 0.0,
+          "host_wait_seconds_total": 0,
+          "legacy_validation": null
+        },
+        "decisions": {
+          "far": [],
+          "near": []
+        }
+      },
+      "fused": {
+        "wall_seconds": 21.381467044353485,
+        "next_token": 576,
+        "calibrator": {
+          "calls": 36,
+          "fused_kernel_calls": 36,
+          "device_ms_per_layer": [
+            2.9686079025268555,
+            3.0772480964660645,
+            2.936415910720825,
+            3.144320011138916,
+            3.0767359733581543,
+            2.9357759952545166,
+            3.3760321140289307,
+            3.10646390914917,
+            2.9972479343414307,
+            3.090143918991089,
+            3.1595520973205566,
+            3.0679678916931152,
+            3.2074880599975586,
+            3.094464063644409,
+            3.0920639038085938,
+            2.968735933303833,
+            2.9823999404907227,
+            3.117055892944336,
+            2.9716479778289795,
+            3.21612811088562,
+            3.132352113723755,
+            3.030911922454834,
+            3.0783040523529053,
+            3.0383360385894775,
+            3.1271040439605713,
+            3.015199899673462,
+            3.0107839107513428,
+            3.1567039489746094,
+            3.116863965988159,
+            3.210655927658081,
+            3.1292800903320312,
+            3.0284159183502197,
+            3.137631893157959,
+            3.292383909225464,
+            3.159519910812378,
+            3.0666561126708984
+          ],
+          "device_seconds_total": 0.11131759929656983,
+          "host_wait_seconds_total": 20.619248636066914,
+          "legacy_validation": null
+        },
+        "decisions": {
+          "far": [],
+          "near": [
+            7,
+            29,
+            30
+          ]
+        }
+      },
+      "delta_seconds": 0.18881555646657944,
+      "token_identity": true
+    },
+    {
+      "fused": {
+        "wall_seconds": 21.31217000633478,
+        "next_token": 576,
+        "calibrator": {
+          "calls": 36,
+          "fused_kernel_calls": 36,
+          "device_ms_per_layer": [
+            2.8441920280456543,
+            3.0312960147857666,
+            2.9629759788513184,
+            3.1939520835876465,
+            3.063807964324951,
+            2.9769599437713623,
+            2.9911680221557617,
+            3.018847942352295,
+            2.8867199420928955,
+            3.278752088546753,
+            2.9514238834381104,
+            3.237407922744751,
+            3.098112106323242,
+            2.9724481105804443,
+            3.0212481021881104,
+            2.929919958114624,
+            2.9288320541381836,
+            3.430464029312134,
+            3.1389119625091553,
+            3.170815944671631,
+            3.077984094619751,
+            3.2272961139678955,
+            2.8973119258880615,
+            3.037152051925659,
+            3.0694079399108887,
+            3.043328046798706,
+            2.939136028289795,
+            2.941823959350586,
+            3.02508807182312,
+            3.0228159427642822,
+            2.963007926940918,
+            3.035520076751709,
+            2.9166719913482666,
+            3.0776638984680176,
+            3.1383678913116455,
+            3.0325119495391846
+          ],
+          "device_seconds_total": 0.10957334399223327,
+          "host_wait_seconds_total": 20.618514582514763,
+          "legacy_validation": null
+        },
+        "decisions": {
+          "far": [],
+          "near": [
+            7,
+            29,
+            30
+          ]
+        }
+      },
+      "dense": {
+        "wall_seconds": 21.201631002128124,
+        "next_token": 576,
+        "calibrator": {
+          "calls": 0,
+          "fused_kernel_calls": 0,
+          "device_ms_per_layer": [],
+          "device_seconds_total": 0.0,
+          "host_wait_seconds_total": 0,
+          "legacy_validation": null
+        },
+        "decisions": {
+          "far": [],
+          "near": []
+        }
+      },
+      "delta_seconds": 0.11053900420665741,
+      "token_identity": true
+    },
+    {
+      "dense": {
+        "wall_seconds": 21.1939949542284,
+        "next_token": 576,
+        "calibrator": {
+          "calls": 0,
+          "fused_kernel_calls": 0,
+          "device_ms_per_layer": [],
+          "device_seconds_total": 0.0,
+          "host_wait_seconds_total": 0,
+          "legacy_validation": null
+        },
+        "decisions": {
+          "far": [],
+          "near": []
+        }
+      },
+      "fused": {
+        "wall_seconds": 21.309706643223763,
+        "next_token": 576,
+        "calibrator": {
+          "calls": 36,
+          "fused_kernel_calls": 36,
+          "device_ms_per_layer": [
+            2.989311933517456,
+            3.0378880500793457,
+            2.9018239974975586,
+            3.1738240718841553,
+            3.049567937850952,
+            2.926784038543701,
+            2.929663896560669,
+            2.8743679523468018,
+            2.9775359630584717,
+            2.9020800590515137,
+            2.9180479049682617,
+            3.0819199085235596,
+            3.2455999851226807,
+            2.9378559589385986,
+            2.923072099685669,
+            3.0039360523223877,
+            2.9302399158477783,
+            2.9207680225372314,
+            2.949728012084961,
+            2.8963520526885986,
+            2.992255926132202,
+            2.995136022567749,
+            3.362623929977417,
+            2.950079917907715,
+            2.9721920490264893,
+            2.9293758869171143,
+            2.9951679706573486,
+            2.9802560806274414,
+            2.9449920654296875,
+            2.9030399322509766,
+            2.970720052719116,
+            3.10534405708313,
+            2.971519947052002,
+            3.419167995452881,
+            3.001120090484619,
+            3.080928087234497
+          ],
+          "device_seconds_total": 0.10814428782463073,
+          "host_wait_seconds_total": 20.61859481781721,
+          "legacy_validation": null
+        },
+        "decisions": {
+          "far": [],
+          "near": [
+            7,
+            29,
+            30
+          ]
+        }
+      },
+      "delta_seconds": 0.11571168899536133,
+      "token_identity": true
+    }
+  ],
+  "summary": {
+    "repeat": 3,
+    "dense_prefill_seconds": [
+      21.192651487886906,
+      21.201631002128124,
+      21.1939949542284
+    ],
+    "fused_prefill_seconds": [
+      21.381467044353485,
+      21.31217000633478,
+      21.309706643223763
+    ],
+    "paired_increment_seconds": [
+      0.18881555646657944,
+      0.11053900420665741,
+      0.11571168899536133
+    ],
+    "dense_prefill_median_seconds": 21.1939949542284,
+    "fused_prefill_median_seconds": 21.31217000633478,
+    "increment_over_dense_median_seconds": 0.11817505210638046,
+    "increment_over_dense_ratio": 0.005575874315417982,
+    "paired_increment_median_seconds": 0.11571168899536133,
+    "paired_increment_over_dense_ratio": 0.005459645019509442,
+    "paired_increment_median_over_dense_median_ratio": 0.005459645019509442,
+    "calibrator_device_median_seconds": 0.10957334399223327,
+    "calibrator_device_over_dense_prefill": 0.005170018405160202,
+    "calibrator_host_wait_median_seconds": 20.61859481781721,
+    "host_wait_scope": "Per-layer synchronization wait including preceding dense work; diagnostic only, not calibrator incremental cost",
+    "all_next_token_identity": true
+  }
+}

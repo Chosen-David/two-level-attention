@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-08
+
+- [ ] [TL-NFA-REVIEW-EVIDENCE-20261108] M1、Q0 与 fused-LSE 标定器三长度增量测量已验收；按用户指令先行交付 LSE 子链，继续 A1a 四格质量及 P0a/P0b 锁卡性能。([详情](task_details/TL-NFA-REVIEW-EVIDENCE-20261108.md))
+
 ## 2026-11-04
 
 - [ ] [TL-DECODE-PAGE-STAGING-20261104] 新 append-only main 的 decode 跨页复用增量 CPU 页表；主机回归普通/-O各3项通过，128K/36层赋值计数73842→78。归档Graph周期性长尾已定位，真实Torch/GPU配对验证待完成。([详情](task_details/TL-DECODE-PAGE-STAGING-20261104.md))

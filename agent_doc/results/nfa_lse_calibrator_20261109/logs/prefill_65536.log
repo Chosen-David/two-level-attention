@@ -1,0 +1,96 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 185.30it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+PREFILL 65536 repeat=0 arm=dense
+PREFILL 65536 repeat=0 arm=fused
+{
+  "repeat": 1,
+  "dense_prefill_seconds": [
+    21.192651487886906
+  ],
+  "fused_prefill_seconds": [
+    21.381467044353485
+  ],
+  "paired_increment_seconds": [
+    0.18881555646657944
+  ],
+  "dense_prefill_median_seconds": 21.192651487886906,
+  "fused_prefill_median_seconds": 21.381467044353485,
+  "increment_over_dense_median_seconds": 0.18881555646657944,
+  "increment_over_dense_ratio": 0.008909482448409103,
+  "paired_increment_median_seconds": 0.18881555646657944,
+  "paired_increment_over_dense_ratio": 0.008909482448409103,
+  "paired_increment_median_over_dense_median_ratio": 0.008909482448409103,
+  "calibrator_device_median_seconds": 0.11131759929656983,
+  "calibrator_device_over_dense_prefill": 0.005252650870996283,
+  "calibrator_host_wait_median_seconds": 20.619248636066914,
+  "host_wait_scope": "Per-layer synchronization wait including preceding dense work; diagnostic only, not calibrator incremental cost",
+  "all_next_token_identity": true
+}
+PREFILL 65536 repeat=1 arm=fused
+PREFILL 65536 repeat=1 arm=dense
+{
+  "repeat": 2,
+  "dense_prefill_seconds": [
+    21.192651487886906,
+    21.201631002128124
+  ],
+  "fused_prefill_seconds": [
+    21.381467044353485,
+    21.31217000633478
+  ],
+  "paired_increment_seconds": [
+    0.18881555646657944,
+    0.11053900420665741
+  ],
+  "dense_prefill_median_seconds": 21.197141245007515,
+  "fused_prefill_median_seconds": 21.346818525344133,
+  "increment_over_dense_median_seconds": 0.14967728033661842,
+  "increment_over_dense_ratio": 0.007061201253818666,
+  "paired_increment_median_seconds": 0.14967728033661842,
+  "paired_increment_over_dense_ratio": 0.007061592654539369,
+  "paired_increment_median_over_dense_median_ratio": 0.007061201253818666,
+  "calibrator_device_median_seconds": 0.11044547164440155,
+  "calibrator_device_over_dense_prefill": 0.005210394664441572,
+  "calibrator_host_wait_median_seconds": 20.61888160929084,
+  "host_wait_scope": "Per-layer synchronization wait including preceding dense work; diagnostic only, not calibrator incremental cost",
+  "all_next_token_identity": true
+}
+PREFILL 65536 repeat=2 arm=dense
+PREFILL 65536 repeat=2 arm=fused
+{
+  "repeat": 3,
+  "dense_prefill_seconds": [
+    21.192651487886906,
+    21.201631002128124,
+    21.1939949542284
+  ],
+  "fused_prefill_seconds": [
+    21.381467044353485,
+    21.31217000633478,
+    21.309706643223763
+  ],
+  "paired_increment_seconds": [
+    0.18881555646657944,
+    0.11053900420665741,
+    0.11571168899536133
+  ],
+  "dense_prefill_median_seconds": 21.1939949542284,
+  "fused_prefill_median_seconds": 21.31217000633478,
+  "increment_over_dense_median_seconds": 0.11817505210638046,
+  "increment_over_dense_ratio": 0.005575874315417982,
+  "paired_increment_median_seconds": 0.11571168899536133,
+  "paired_increment_over_dense_ratio": 0.005459645019509442,
+  "paired_increment_median_over_dense_median_ratio": 0.005459645019509442,
+  "calibrator_device_median_seconds": 0.10957334399223327,
+  "calibrator_device_over_dense_prefill": 0.005170018405160202,
+  "calibrator_host_wait_median_seconds": 20.61859481781721,
+  "host_wait_scope": "Per-layer synchronization wait including preceding dense work; diagnostic only, not calibrator incremental cost",
+  "all_next_token_identity": true
+}
+saved -> /tmp/nfa-evidence-release-20261108/agent_doc/results/nfa_lse_calibrator_20261109/prefill_65536.json
