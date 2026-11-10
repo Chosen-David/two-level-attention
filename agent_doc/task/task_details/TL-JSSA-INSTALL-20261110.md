@@ -55,3 +55,25 @@ gate attempted: imports removed sparse_attn.indexer.tli_indexer and fails.
 These gates are not passed. No GPU, real corpus, Graph, performance or memory
 measurement; no speedup claim. Remote CUDA/model tests remain required before
 merging. PR41's AsyncTLS padding repair is separate and not imported.
+
+## 14:10 continuation: merge current main safely
+
+The prior section records the original HF4 run, not current verification.
+PR42 had a TASK.md-only merge conflict with main 65ed618008cccc71e6e24b575d24cb6bb2e9d447.
+Retain both task entries and all main additions/deletions. Production JSSA patch
+and its regression suite are unchanged from the original PR; no other PR is mixed in.
+
+Current environment: Python3.12, Torch2.8.0+cpu, Transformers5.22.2.
+New installer suite on pristine current main reproduces 11 failed/5 passed.
+Candidate installer+JSSA+frozen-manifest tests: 24 passed +4 subtests, 19 deselected,
+normal and -O. Full four suites: 38 passed +4 subtests /5 failed. The five failures
+are the existing AsyncTLS legacy global-channel fixture and Quest/SparQ HF5 API
+mismatch, covered separately by PR43/44. Current main adjacent suite has these
+same five failures; no claim that all repository gates pass.
+
+Required E127: six failures (CPU-only CUDA and deleted indexer/API); retained TLI
+batch gate imports removed sparse_attn.indexer.tli_indexer; README's named
+NFA batch gate does not exist. No GPU, Graph, corpus quality, speed/memory, or
+HF4 rerun in this continuation. No baseline semantics or result data changed.
+Fresh fetch before publication verifies main and PR head unchanged. Independent
+read-only review and publication/tree/CI receipt are recorded with PR metadata.

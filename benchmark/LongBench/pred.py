@@ -446,6 +446,14 @@ def get_pred(
                     eos_token_id=samsum_eos,
                 )[0]
                 generated_content = output[full_ids.shape[-1]:].tolist()
+            elif getattr(model, "_asynctls_full_prompt_prefill", False):
+                # AsyncTLS 论文的稀疏选择只发生在生成 decode；question 后缀与
+                # material 必须作为同一完整 prompt 一次 dense prefill，并初始化
+                # 第一步 decode 所需的 M_{t-1}，不能逐 token 提前进入稀疏路径。
+                full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
+                generated_content = _manual_generate(
+                    model, full_ids, q_input.input_ids[:, :0], max_gen,
+                    tokenizer.eos_token_id, capture)
             elif IS_DSV2:
                 # S-T023 DeepSeek fullkv 修复（2026-10-12）：官方 modeling_deepseek.py
                 # 是旧 transformers 时代代码，手动 prefill/decode 循环在 4.56.2 新
@@ -762,6 +770,8 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
         _atls_model_type = getattr(model.config, "model_type", None)
         if _atls_model_type == "llama":
             from llama3_asynctls_patch import enable_asynctls
+        elif _atls_model_type == "glm4_moe_lite":
+            from glm4_moe_lite_asynctls_patch import enable_asynctls
         else:
             from qwen3_asynctls_patch import enable_asynctls
         _atls_chan = getattr(args, "asynctls_channel_file", None)

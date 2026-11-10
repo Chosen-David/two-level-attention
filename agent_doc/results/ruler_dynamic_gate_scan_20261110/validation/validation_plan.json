@@ -1,0 +1,36 @@
+{
+  "schema_version": "experiment-validation-plan/v1",
+  "scope": "Qwen3-8B; fixed clean source 7798ddb6569071d1238ca21e7ddf925a18d8dcd5; RULER 11 tasks at 32768/65536/131072; sample_index=0 per task; first near/far gate decision after dense prefill; decision-only freeze without physical reclaim or decode; 33 cells and 1188 layer profiles; no generation, quality or performance claim",
+  "criteria": {
+    "implementation": {
+      "procedure": "A separate read-only parser checks fixed source/config identity, deterministic shards, 36-layer schemas and independently recomputes every decision from profiles without importing producer helpers.",
+      "acceptance": "All source/index diffs are empty, all identities match, and all 1188 near/far decisions agree with epsilon=0.05 on the corresponding mean statistic.",
+      "allow_not_applicable": false
+    },
+    "reference_boundary": {
+      "procedure": "Recompute skip_near, skip_far and their intersection directly from each raw layer profile; check min/max and argmin fields.",
+      "acceptance": "All lists, intersections and extrema match raw values; profiles contain exactly layers 0 through 35.",
+      "allow_not_applicable": false
+    },
+    "data_integrity": {
+      "procedure": "Rehash all raw shards, the 33 local RULER source files, their first raw lines, input strings and model config; compare against producer records.",
+      "acceptance": "Exactly 33 unique cells and 1188 profiles; no missing/duplicate task; every hash and deterministic shard assignment matches.",
+      "allow_not_applicable": false
+    },
+    "numerical_sanity": {
+      "procedure": "Recursively check finite profile values and recompute all cell and length totals from raw decisions.",
+      "acceptance": "No NaN/Inf; all counts and histograms match raw decisions.",
+      "allow_not_applicable": false
+    },
+    "measurement_validity": {
+      "procedure": "Confirm the deliverable is a mechanism scan only and carries no timing or full-sample quality claim.",
+      "acceptance": "N/A for performance; scope explicitly restricts interpretation to one first-gate sample per task.",
+      "allow_not_applicable": true
+    },
+    "reproducibility": {
+      "procedure": "Verify detached HEAD and empty source/index diffs; archive producer and driver scripts, environment and commands; compare against old 32K/64K observations and the 22 complete real-freeze 64K/128K cells only as secondary cross-checks.",
+      "acceptance": "Frozen source/config/input identity is complete; legacy comparison is reported without treating it as primary proof; all 22 freeze-mode cross-check cells have identical inputs and skip decisions with zero profile-mean delta.",
+      "allow_not_applicable": false
+    }
+  }
+}
