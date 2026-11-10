@@ -2,7 +2,7 @@
 
 ## 2026-11-10
 
-- [x] [TL-ASYNCTLS-INSTALL-20261110] Qwen3/Llama AsyncTLS 全层安装预检，非法channel与重复安装拒绝且不污染模型；52项CPU普通/-O回归通过，GPU/Graph/性能未验。([详情](task_details/TL-ASYNCTLS-INSTALL-20261110.md))
+- [x] [TL-ASYNCTLS-INSTALL-20261110] Qwen3/Llama/GLM AsyncTLS 全层安装预检，已接续新main的per-KV-group校准与GLM适配；62项CPU普通/-O回归通过，通用baseline另4项HF5兼容失败，GPU/Graph/性能未验。([详情](task_details/TL-ASYNCTLS-INSTALL-20261110.md))
 
 - [x] [TL-RULER-DYNAMIC-GATE-SCAN-20261110] Qwen3-8B × RULER 32K/64K/128K × 11任务 sample0 首个 dynamic-gate 扫描33/33格、1188层完成，独立只读审计与46项 artifact 哈希复核通过；32K far-skip 5任务/9层、64K near-skip 8任务/21层、128K near-skip 11任务/121层，仅限 decision-only 首步机制观测，不作质量、全样本或性能结论。([详情](task_details/TL-RULER-DYNAMIC-GATE-SCAN-20261110.md)；[结果](../results/ruler_dynamic_gate_scan_20261110/record.json))
 
