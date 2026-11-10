@@ -451,9 +451,13 @@ def get_pred(
                 # material 必须作为同一完整 prompt 一次 dense prefill，并初始化
                 # 第一步 decode 所需的 M_{t-1}，不能逐 token 提前进入稀疏路径。
                 full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
+                _atls_eos = tokenizer.eos_token_id
+                if model.config.model_type == "glm4_moe_lite":
+                    _atls_eos = getattr(
+                        model.generation_config, "eos_token_id", _atls_eos)
                 generated_content = _manual_generate(
                     model, full_ids, q_input.input_ids[:, :0], max_gen,
-                    tokenizer.eos_token_id, capture)
+                    _atls_eos, capture)
             elif IS_DSV2:
                 # S-T023 DeepSeek fullkv 修复（2026-10-12）：官方 modeling_deepseek.py
                 # 是旧 transformers 时代代码，手动 prefill/decode 循环在 4.56.2 新
@@ -599,8 +603,8 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
     if args.method == "quest_vendor":
         # B 轨 vendor（官方源码复用）：不走 indexer_type_dict（A 轨
         # quest_indexer 是语义复现），改为把官方 Quest forward 原样绑定
-        # Qwen3Attention——quest_attention_official.py 与官方仓库逐字节
-        # 一致（md5 78e87fb8...），qwen3_quest_patch.py 只做接口胶水。
+        # Qwen3Attention——upstream/evaluation/quest_attention.py 是官方
+        # 原样快照，qwen3_quest_patch.py 只做接口胶水与 Qwen3 q/k norm 注入。
         import sys
         vendor_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),

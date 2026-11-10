@@ -83,8 +83,9 @@ def _glm_dense_attention(self, hidden_states, position_embeddings,
     if past_key_values is not None:
         key_states, value_states = past_key_values.update(
             key_states, value_states, self.layer_idx)
+    impl = self.config._attn_implementation or "sdpa"
     attention_interface = ALL_ATTENTION_FUNCTIONS.get(
-        self.config._attn_implementation, eager_attention_forward)
+        impl, eager_attention_forward)
     attn_output, attn_weights = attention_interface(
         self,
         query_states,
