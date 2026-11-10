@@ -67,9 +67,11 @@ def _qwen3_sparq_wrapper(
         _stats = getattr(self, '_sparq_stats', None)
         if _stats is not None:
             _stats['native_prefill_calls'] = _stats.get('native_prefill_calls', 0) + 1
+        if cache_position is not None:
+            kwargs["cache_position"] = cache_position
         return self.flash_forward(
             hidden_states, position_embeddings, attention_mask,
-            past_key_values, cache_position, **kwargs,
+            past_key_values, **kwargs,
         )
 
     # decode 侧守卫（0fd6cac 契约）：无掩码单序列 + use_cache 必真——
@@ -77,6 +79,18 @@ def _qwen3_sparq_wrapper(
     # 时生效：cache=None 是 B 轨文档化的 V-mean 重建路径（无历史可选，
     # 单 token 重建，见 test_sparq_request_lifecycle），不属误用。
     if past_key_values is not None:
+        # HF 5 supplies position_ids instead of cache_position at attention.
+        # Direct calls without either explicit position remain rejected.
+        if cache_position is None and kwargs.get("position_ids") is not None:
+            position_ids = kwargs["position_ids"]
+            if tuple(position_ids.shape) != (1, q_len):
+                raise ValueError("SparQ requires one explicit position row")
+            previous_length = int(past_key_values.get_seq_length(self.layer_idx))
+            cache_position = torch.arange(
+                previous_length, previous_length + q_len, device=hidden_states.device)
+            if position_ids.dtype not in (torch.int32, torch.int64) or not torch.equal(
+                    position_ids[0], cache_position):
+                raise ValueError("SparQ position_ids must match contiguous cache positions")
         from sparse_attn.baseline_runtime import require_unmasked_decode
         require_unmasked_decode(
             hidden_states, attention_mask, past_key_values, cache_position)
