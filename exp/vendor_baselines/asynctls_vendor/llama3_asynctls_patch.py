@@ -67,9 +67,9 @@ def _llama_asynctls_forward(
     block_size = self.asynctls_block_size
     pad = (block_size - length % block_size) % block_size
     if pad:
-        key_pad = torch.zeros(
-            1, key_states.shape[1], pad, key_states.shape[-1],
-            device=key_states.device, dtype=key_states.dtype)
+        # Preserve the real partial-block extrema, matching the Qwen adapter.
+        # These score-only duplicates never enter the candidate token set.
+        key_pad = key_states[..., -1:, :].expand(-1, -1, pad, -1)
         padded_key = torch.cat([key_states, key_pad], dim=2)
     else:
         padded_key = key_states

@@ -23,8 +23,8 @@
   论文未声明前层 dense，本复现全层稀疏（layer 0 也走稀疏）。
 
 已知近似（语义复现边界，均写入 _baseline_identity）：
-  - GQA 组内平均：Qwen3 每 KV 组 4 个 query head，块打分与细筛均先组内
-    逐 query 算再平均（论文 MQA/MLA 场景无此细节）。
+  - GQA：论文按 KV 组选择；本适配在组内 query 聚合之外进一步跨 KV
+    组聚合块分数和细筛概率，所有头共享选集，是额外的适配约定。
   - INT4 量化-反量化不压缩足迹（只复现精度行为）。
   - channel 校准数据集采用与 FASA 同口径的 held-out 样本（见
     identify_channel.py），非论文原始 Dcal。
@@ -147,11 +147,12 @@ def _qwen3_asynctls_forward(
 
     L = key_states.shape[2]
     B = self.asynctls_block_size
-    # 尾部不足一块：pad 到整块，pad 块分数置 -inf（top-kb 不会选中）
+    # Repeat a real tail key for score-only padding: zeros would change the
+    # partial block extrema (and can promote it over a better real block).
+    # Candidate indices below still exclude every padded position.
     pad = (B - L % B) % B
     if pad:
-        key_pad = torch.zeros(1, key_states.shape[1], pad, key_states.shape[-1],
-                              device=key_states.device, dtype=key_states.dtype)
+        key_pad = key_states[..., -1:, :].expand(-1, -1, pad, -1)
         key_states = torch.cat([key_states, key_pad], dim=2)
     m = key_states.shape[2] // B
 

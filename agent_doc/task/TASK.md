@@ -2,6 +2,8 @@
 
 ## 2026-11-10
 
+- [ ] [TL-ASYNCTLS-PARTIAL-BLOCK-20261110] 修复 Qwen3/Llama AsyncTLS 末页补零改变 min/max 粗筛的问题；真实 CPU Torch 33 项及 128 子用例普通/-O通过，CUDA/语料质量/性能未验，按 draft PR 交付。([详情](task_details/TL-ASYNCTLS-PARTIAL-BLOCK-20261110.md))
+
 - [x] [TL-NFA-OBS-ABLATION-20261106] O-GATE 12 plans/240请求/60份 raw Q/K 与 B-REPLAY 12 plans/240文档/69952 cells 全部独立验收通过；精简结果已入库，明确固定轨迹 CPU replay 非质量、性能或生产 bit-exact 证据，K2=1024 逻辑支持集对照 7248/7248 不相等。([详情](task_details/TL-NFA-OBS-ABLATION-20261106.md))
 
 ## 2026-11-09
