@@ -1,0 +1,42 @@
+{
+  "schema": "ruler-dynamic-gate-freeze-mode-crosscheck-v1",
+  "status": "pass",
+  "method": "Read-only remote comparison of the earlier real-freeze outputs against the final decision-only outputs at the same length/task cells; input_sha256 equality was asserted before comparing skip lists and all 36 near/far profile means.",
+  "command": "ssh pc02 'python3 -' < scripts/compare_freeze_modes.py",
+  "compared_cells": 22,
+  "lengths": [
+    65536,
+    131072
+  ],
+  "cells": [
+    [131072, "cwe"],
+    [131072, "fwe"],
+    [131072, "niah_multikey_1"],
+    [131072, "niah_multikey_2"],
+    [131072, "niah_multikey_3"],
+    [131072, "niah_multiquery"],
+    [131072, "niah_multivalue"],
+    [131072, "niah_single_1"],
+    [131072, "niah_single_2"],
+    [131072, "niah_single_3"],
+    [131072, "vt"],
+    [65536, "cwe"],
+    [65536, "fwe"],
+    [65536, "niah_multikey_1"],
+    [65536, "niah_multikey_2"],
+    [65536, "niah_multikey_3"],
+    [65536, "niah_multiquery"],
+    [65536, "niah_multivalue"],
+    [65536, "niah_single_1"],
+    [65536, "niah_single_2"],
+    [65536, "niah_single_3"],
+    [65536, "vt"]
+  ],
+  "skip_mismatches": [],
+  "max_abs_profile_mean_delta": 0.0,
+  "limitations": [
+    "Only the 22 complete 64K/128K cells from the earlier real-freeze run are compared; 32K real-freeze production was incomplete.",
+    "The earlier real-freeze files remain secondary cross-check evidence and are not part of the primary 33-cell dataset.",
+    "This comparison does not validate physical freeze/reclaim or decode behavior."
+  ]
+}

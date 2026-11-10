@@ -1,3 +1,60 @@
+# Current continuation (2026-11-10, main 65ed618)
+
+PR #41 is updated in place, not superseded by a duplicate PR. The earlier
+implementation and test report below are historical evidence, not the current
+per-group algorithm. Main 9da79f7 introduced per-KV-group channels and selection,
+previous-step M_{t-1}, and GLM, so copying the old patch verbatim would regress it.
+The merge keeps those changes and main's deliberate removed-document state.
+Only the shared Qwen `_padded_key` helper changes production behavior; Llama and
+GLM already call it for both prefill initialization and decode. Repeat a real
+tail key only for score padding. The actual cache and candidate length remain
+unchanged; complete and empty inputs retain the same object. Empty scoring is
+not a newly supported inference mode. No masks, budgets, previous-step choice,
+INT4, projection or group aggregation are changed. The stale GQA comment is
+updated to describe current code, not to claim official-source equivalence.
+
+## Current reproduction and checks
+
+Fresh main: `65ed618008cccc71e6e24b575d24cb6bb2e9d447`.
+Old PR head: `823d9848a4990161e544b86f63c5a61542ca728f`.
+Isolated single writer; root performed independent read-only review.
+Python 3.12, Torch 2.8.0+cpu, Transformers 5.22.2. No GPU/model downloads.
+
+- Actual shared helper vs independent unpadded per-KV-group oracle: pristine
+  main has 28 failing subcases. Candidate passes all 64 signed/dtype/page/GQA
+  subcases plus empty/complete identity checks.
+- All three native tiny models, two layers, prompt lengths 7/8/9/15/16/17 and
+  three decode steps: 18 tests check actual prefill/decode score-padding extrema,
+  unchanged cache contents/real length, and full-budget logits vs native dense.
+  Pristine main fails all 18 at the extrema check. This proves the padding
+  property, not a sparse model-quality improvement.
+- Final focused suite: 22 tests + 64 subtests pass normally and under `python -O`.
+- Adjacent baseline/Llama suites: pristine main and candidate both 15 pass /
+  5 fail. One obsolete global-channel fixture is covered by PR43, four HF5
+  Quest/SparQ API failures by PR44. These PRs are not mixed into this change.
+- E127 attempted: 6 failures (CPU-only CUDA requirement, removed imports/API).
+  README's nfa batch-gate filename remains absent; retained tli batch gate
+  fails on removed `sparse_attn.indexer.tli_indexer`. Not a passing full gate.
+- No HF4 rerun this continuation; prior HF4 results below belong to old source.
+  No GPU/CUDA Graph/corpus-quality/performance test or claim. No paper/Overleaf
+  files changed, no supplemental experiment launched or historical data deleted.
+
+Run focused suite with:
+```
+OMP_NUM_THREADS=1 PYTHONPATH=. python -m pytest -q \
+  tests/test_asynctls_partial_blocks.py tests/test_asynctls_partial_block_forward.py
+# Repeat with python -O. For negative control use ASYNCTLS_SOURCE_ROOT pointing
+# to a main export containing exp/vendor_baselines/asynctls_vendor/.
+```
+
+The current adapter paths for Qwen/Llama/GLM can all encounter this padding bias.
+This is not evidence for a numerical change in any historical result. Existing
+result files are preserved. Acceptance of repaired corpus numbers requires
+paired evidence; the user's no-supplementary-testing instruction remains in force.
+
+---
+# Historical initial PR report (old algorithm/source)
+
 # TL-ASYNCTLS-PARTIAL-BLOCK-20261110
 
 Status: CPU-verified draft fix; GPU, corpus quality and performance pending.

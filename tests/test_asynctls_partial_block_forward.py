@@ -1,83 +1,92 @@
-"""CPU native-forward regression with a deterministic append-only KV cache."""
-import os
-from pathlib import Path
+"""Real CPU request-lifecycle regressions; no GPU/quality/performance claim."""
+import copy
+import json
 import sys
-from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 import torch
+from transformers import (LlamaConfig, LlamaForCausalLM, Qwen3Config, Qwen3ForCausalLM,
+                          )
 
-ROOT = Path(os.environ.get("ASYNCTLS_SOURCE_ROOT", Path(__file__).resolve().parents[1]))
-VENDOR = ROOT / "exp/vendor_baselines/asynctls_vendor"
-sys.path.insert(0, str(VENDOR))
-from qwen3_asynctls_patch import _qwen3_asynctls_forward
-from llama3_asynctls_patch import _llama_asynctls_forward
-
-
-class AppendCache:
-    def __init__(self, keys, values):
-        self.keys, self.values = keys, values
-
-    def get_seq_length(self, layer_idx):
-        return self.keys.shape[2]
-
-    def update(self, keys, values, layer_idx, cache_kwargs):
-        self.keys = torch.cat([self.keys, keys], dim=2)
-        self.values = torch.cat([self.values, values], dim=2)
-        return self.keys, self.values
+import os
+ROOT = Path(os.environ.get('ASYNCTLS_SOURCE_ROOT', Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(ROOT / 'exp/vendor_baselines/asynctls_vendor'))
+from llama3_asynctls_patch import enable_asynctls as enable_llama
+from qwen3_asynctls_patch import enable_asynctls as enable_qwen
+try:
+    from transformers import Glm4MoeLiteConfig, Glm4MoeLiteForCausalLM
+except ImportError:
+    Glm4MoeLiteConfig = None
+if Glm4MoeLiteConfig is not None:
+    from glm4_moe_lite_asynctls_patch import enable_asynctls as enable_glm
 
 
-@pytest.mark.parametrize("forward", [_qwen3_asynctls_forward, _llama_asynctls_forward])
-@pytest.mark.parametrize("sign", [-1., 1.])
-@pytest.mark.parametrize("tail_key,expected_value", [(2., 9.), (-2., 3.)])
-def test_full_decode_selects_only_real_block_extrema(forward, sign, tail_key, expected_value):
-    key = torch.tensor([-sign, 0.]).reshape(1, 1, 1, 2).expand(1, 1, 8, 2).clone()
-    value = torch.full((1, 1, 8, 2), 3.)
-    cache = AppendCache(key, value)
-    config = SimpleNamespace(
-        head_dim=2, layer_idx=0, scaling=1.,
-        q_proj=lambda x: x.new_tensor([[[sign, 0.]]]),
-        k_proj=lambda x: x.new_tensor([[[tail_key * sign, 0.]]]),
-        v_proj=lambda x: x.new_full((1, 1, 2), 9.),
-        q_norm=torch.nn.Identity(), k_norm=torch.nn.Identity(),
-        o_proj=torch.nn.Identity(), asynctls_block_size=8,
-        asynctls_top_kb=1, asynctls_token_budget=1, asynctls_channels=[0, 1])
-    hidden = torch.zeros(1, 1, 2)
-    position = (torch.ones(1, 1, 2), torch.zeros(1, 1, 2))
-    output, weights = forward(config, hidden, position, past_key_values=cache)
-    torch.testing.assert_close(output, torch.full_like(output, expected_value), rtol=0, atol=0)
-    torch.testing.assert_close(weights, torch.ones_like(weights), rtol=0, atol=0)
-    assert cache.keys.shape[2] == 9  # Padding must never enter persistent KV.
-    assert cache.values.shape[2] == 9
+def model_and_enable(family, layers=1):
+    if family == 'glm':
+        if Glm4MoeLiteConfig is None:
+            pytest.skip("GLM requires Transformers 5")
+        cfg = Glm4MoeLiteConfig(vocab_size=32, hidden_size=32,
+            intermediate_size=48, moe_intermediate_size=16, num_hidden_layers=layers,
+            num_attention_heads=2, num_key_value_heads=2, kv_lora_rank=8,
+            q_lora_rank=8, qk_rope_head_dim=4, qk_nope_head_dim=4,
+            v_head_dim=8, n_routed_experts=2, num_experts_per_tok=1,
+            max_position_embeddings=128)
+        cfg._attn_implementation = 'eager'
+        torch.manual_seed(21)
+        return Glm4MoeLiteForCausalLM(cfg).eval(), enable_glm
+    config_cls, model_cls, enable = ((LlamaConfig, LlamaForCausalLM, enable_llama)
+        if family == 'llama' else (Qwen3Config, Qwen3ForCausalLM, enable_qwen))
+    cfg = config_cls(vocab_size=32, hidden_size=32, intermediate_size=48,
+        num_hidden_layers=layers, num_attention_heads=4, num_key_value_heads=2,
+        head_dim=8, max_position_embeddings=128)
+    cfg._attn_implementation = 'eager'
+    torch.manual_seed(21)
+    return model_cls(cfg).eval(), enable
 
 
-@pytest.mark.parametrize("model_type", ["qwen3", "llama"])
-def test_full_budget_tiny_model_matches_dense_across_page_boundary(tmp_path, model_type):
-    import copy
-    import json
-    from transformers import LlamaConfig, LlamaForCausalLM, Qwen3Config, Qwen3ForCausalLM
-    from qwen3_asynctls_patch import enable_asynctls as patch_qwen
-    from llama3_asynctls_patch import enable_asynctls as patch_llama
+def save_channels(tmp_path, values):
+    path = tmp_path / 'channels.json'
+    path.write_text(json.dumps({'channels': [[list(v), list(v)] for v in values]}))
+    return str(path)
 
-    config_type, model_class, patch = (
-        (Qwen3Config, Qwen3ForCausalLM, patch_qwen) if model_type == "qwen3"
-        else (LlamaConfig, LlamaForCausalLM, patch_llama))
-    config = config_type(vocab_size=128, hidden_size=64, intermediate_size=128,
-                         num_hidden_layers=2, num_attention_heads=4,
-                         num_key_value_heads=2, head_dim=16, max_position_embeddings=128)
-    config._attn_implementation = "eager"
-    torch.manual_seed(7)
-    model = model_class(config).eval()
+
+@pytest.mark.parametrize("family", ["qwen", "llama", "glm"])
+@pytest.mark.parametrize("length", [7, 8, 9, 15, 16, 17])
+def test_full_budget_dense_parity_and_shared_padding(tmp_path, family, length, monkeypatch):
+    import qwen3_asynctls_patch as shared
+    module_name = {"qwen": "qwen3", "llama": "llama3", "glm": "glm4_moe_lite"}[family]
+    adapter = sys.modules[module_name + "_asynctls_patch"]
+    model, enable = model_and_enable(family, layers=2)
     dense = copy.deepcopy(model)
-    channels = tmp_path / "channels.json"
-    channels.write_text(json.dumps({"channels": [list(range(8))] * 2}))
-    assert patch(model, str(channels), token_budget=1024, block_size=8, top_kb=128) == 2
-    prefix = torch.arange(15).unsqueeze(0)
+    enable(model, save_channels(tmp_path, [range(4), range(4)]),
+           token_budget=128, block_size=8, top_kb=128)
+    calls = []
+    real_pad = shared._padded_key
+    def checked_pad(keys, block_size):
+        before = keys.clone()
+        padded = real_pad(keys, block_size)
+        torch.testing.assert_close(keys, before, rtol=0, atol=0)
+        n = keys.shape[2]
+        for start in range(0, n, block_size):
+            real = keys[:, :, start:min(start + block_size, n)]
+            padded_block = padded[:, :, start:start + block_size]
+            torch.testing.assert_close(padded_block.amin(2), real.amin(2), rtol=0, atol=0)
+            torch.testing.assert_close(padded_block.amax(2), real.amax(2), rtol=0, atol=0)
+        calls.append(n)
+        return padded
+    monkeypatch.setattr(adapter, "_padded_key", checked_pad)
     with torch.no_grad():
+        prefix = torch.arange(length).reshape(1, -1) % 32
         actual = model(input_ids=prefix, use_cache=True)
         expected = dense(input_ids=prefix, use_cache=True)
-        for token in (17, 18, 19):
-            suffix = torch.tensor([[token]])
-            actual = model(input_ids=suffix, past_key_values=actual.past_key_values, use_cache=True)
-            expected = dense(input_ids=suffix, past_key_values=expected.past_key_values, use_cache=True)
+        torch.testing.assert_close(actual.logits, expected.logits, rtol=3e-5, atol=3e-5)
+        for step in range(3):
+            token = torch.tensor([[step + 18]])
+            actual = model(input_ids=token, past_key_values=actual.past_key_values, use_cache=True)
+            expected = dense(input_ids=token, past_key_values=expected.past_key_values, use_cache=True)
             torch.testing.assert_close(actual.logits, expected.logits, rtol=3e-5, atol=3e-5)
+            for layer in actual.past_key_values.layers:
+                assert layer.keys.shape[2] == length + step + 1
+                assert layer.values.shape[2] == length + step + 1
+    assert calls == [n for n in range(length, length + 4) for _ in range(2)]

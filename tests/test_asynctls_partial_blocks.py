@@ -1,6 +1,6 @@
-"""Actual CPU Torch checks for the adapters' partial-block score prefix.
+"""Actual CPU Torch checks for the shared per-group partial-block scorer.
 
-Extract only the existing Stage-1 statements so this targeted check does not
+Extract only the existing Stage-1 helper definitions so this targeted check does not
 need model downloads, Transformers, CUDA, or import-time optional kernels.
 No Torch operation is mocked. The oracle reduces each unpadded real block.
 """
@@ -17,27 +17,18 @@ VENDOR = ROOT / "exp/vendor_baselines/asynctls_vendor"
 
 
 def load_stage1(adapter):
-    filename = "llama3" if adapter == "llama" else adapter
-    source = ast.parse((VENDOR / f"{filename}_asynctls_patch.py").read_text())
     shared = ast.parse((VENDOR / "qwen3_asynctls_patch.py").read_text())
-    score = next(n for n in shared.body if isinstance(n, ast.FunctionDef)
-                 and n.name == "_qwen3_block_score")
-    forward = next(n for n in source.body if isinstance(n, ast.FunctionDef)
-                   and n.name == f"_{adapter}_asynctls_forward")
-    start_name = "L" if adapter == "qwen3" else "length"
-    start = next(i for i, n in enumerate(forward.body)
-                 if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)
-                 and n.targets[0].id == start_name)
-    stop = next(i for i, n in enumerate(forward.body)
-                if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)
-                and n.targets[0].id == "top_blocks")
-    wrapper = ast.parse("def stage1(self, query_states, key_states):\n pass\n").body[0]
-    wrapper.body = forward.body[start:stop + 1] + ast.parse(
-        "return block_score, top_blocks").body
-    module = ast.fix_missing_locations(ast.Module(body=[score, wrapper], type_ignores=[]))
+    names = {"_padded_key", "_qwen3_block_score", "_select_blocks"}
+    body = [n for n in shared.body if isinstance(n, ast.FunctionDef) and n.name in names]
     namespace = {"torch": torch}
-    exec(compile(module, str(VENDOR / f"{adapter}_asynctls_patch.py"), "exec"), namespace)
-    return namespace["stage1"]
+    exec(compile(ast.fix_missing_locations(ast.Module(body=body, type_ignores=[])),
+                 str(VENDOR / "qwen3_asynctls_patch.py"), "exec"), namespace)
+    def stage1(config, query, key):
+        padded = namespace["_padded_key"](key, config.asynctls_block_size)
+        return (namespace["_qwen3_block_score"](query, padded, config.asynctls_block_size),
+                namespace["_select_blocks"](query, padded, config.asynctls_block_size,
+                                            config.asynctls_top_kb))
+    return stage1
 
 
 def oracle(query, key, block_size):
@@ -51,25 +42,35 @@ def oracle(query, key, block_size):
         # Same accumulation contract, but no fictitious token is ever present.
         per_head = (torch.einsum("hgd,hd->h", grouped.clamp(min=0), hi)
                     + torch.einsum("hgd,hd->h", grouped.clamp(max=0), lo))
-        scores.append(per_head.sum())
-    return torch.stack(scores)
+        scores.append(per_head)
+    return torch.stack(scores, dim=-1)
 
 
 class PartialBlockScores(unittest.TestCase):
+    def test_empty_and_complete_helper_preserve_input_identity(self):
+        shared = ast.parse((VENDOR / "qwen3_asynctls_patch.py").read_text())
+        node = next(n for n in shared.body if isinstance(n, ast.FunctionDef)
+                    and n.name == "_padded_key")
+        namespace = {"torch": torch}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "_padded_key", "exec"), namespace)
+        for length in (0, 8, 16):
+            key = torch.randn(1, 2, length, 4)
+            self.assertIs(namespace["_padded_key"](key, 8), key)
+
     def test_padding_must_not_replace_better_real_block(self):
-        for adapter in ("qwen3", "llama"):
+        for adapter in ("shared",):
             for sign in (-1, 1):
                 with self.subTest(adapter=adapter, sign=sign):
                     query = torch.tensor([[[[float(sign)]]]])
                     key = torch.tensor([-1.0 * sign] * 8 + [-2.0 * sign]).reshape(1, 1, 9, 1)
                     config = SimpleNamespace(asynctls_block_size=8, asynctls_top_kb=1)
                     scores, selected = load_stage1(adapter)(config, query, key)
-                    torch.testing.assert_close(scores, torch.tensor([-1., -2.]), rtol=0, atol=0)
-                    self.assertEqual(selected.tolist(), [0])
+                    torch.testing.assert_close(scores, torch.tensor([[-1., -2.]]), rtol=0, atol=0)
+                    self.assertEqual(selected.tolist(), [[0]])
 
     def test_unpadded_oracle_matrix(self):
         torch.manual_seed(23)
-        for adapter in ("qwen3", "llama"):
+        for adapter in ("shared",):
             stage1 = load_stage1(adapter)
             for dtype in (torch.float32, torch.float16, torch.bfloat16):
                 for block_size in (8, 64):
@@ -88,15 +89,15 @@ class PartialBlockScores(unittest.TestCase):
                                 self.assertEqual(selected.tolist(), torch.topk(expected, 1).indices.tolist())
 
     def test_real_zero_and_best_partial_block_remain_valid(self):
-        for adapter in ("qwen3", "llama"):
+        for adapter in ("shared",):
             for tail in (0., 2.):
                 with self.subTest(adapter=adapter, tail=tail):
                     key = torch.tensor([-1.] * 8 + [tail]).reshape(1, 1, 9, 1)
                     query = torch.ones(1, 1, 1, 1)
                     config = SimpleNamespace(asynctls_block_size=8, asynctls_top_kb=1)
                     scores, selected = load_stage1(adapter)(config, query, key)
-                    torch.testing.assert_close(scores, torch.tensor([-1., tail]), rtol=0, atol=0)
-                    self.assertEqual(selected.tolist(), [1])
+                    torch.testing.assert_close(scores, torch.tensor([[-1., tail]]), rtol=0, atol=0)
+                    self.assertEqual(selected.tolist(), [[1]])
 
 
 if __name__ == "__main__":

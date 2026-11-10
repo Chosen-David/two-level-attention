@@ -23,8 +23,8 @@
   论文未声明前层 dense，本复现全层稀疏（layer 0 也走稀疏）。
 
 已知近似（语义复现边界，均写入 _baseline_identity）：
-  - GQA：论文按 KV 组选择；本适配在组内 query 聚合之外进一步跨 KV
-    组聚合块分数和细筛概率，所有头共享选集，是额外的适配约定。
+  - GQA：每个 KV group 独立选择块和 token；细筛按组内 query 的
+    softmax 概率平均，不在 KV 组间进一步聚合选集。
   - INT4 量化-反量化不压缩足迹（只复现精度行为）。
   - channel 校准数据集采用与 FASA 同口径的 held-out 样本（见
     identify_channel.py），非论文原始 Dcal。
@@ -43,9 +43,7 @@ from transformers.models.qwen3.modeling_qwen3 import (
 
 
 def _load_channels(channel_file: str) -> list:
-    """读取校准 channel 索引。支持三种格式：
-    [ [idx...] x layers ]、{"channels": [[...]xL]}（identify_channel.py
-    输出）、{"layer_0": [...], ...}。"""
+    """读取 ``[layer][kv_group][channel]`` 校准索引，拒绝旧全局格式。"""
     with open(channel_file, "r") as f:
         raw = json.load(f)
     if isinstance(raw, dict):
@@ -55,11 +53,16 @@ def _load_channels(channel_file: str) -> list:
             layers = [raw[k] for k in sorted(raw, key=lambda k: int(k.split("_")[-1]))]
     else:
         layers = list(raw)
-    for idx_list in layers:
-        if not isinstance(idx_list, (list, tuple)) or not all(
-                isinstance(i, int) for i in idx_list):
-            raise ValueError("channel file must hold per-layer integer index lists")
-    return layers
+    for layer in layers:
+        if not isinstance(layer, (list, tuple)) or not layer:
+            raise ValueError("channel file must hold per-layer per-KV-group lists")
+        for idx_list in layer:
+            if (not isinstance(idx_list, (list, tuple)) or not idx_list
+                    or not all(isinstance(i, int) for i in idx_list)):
+                raise ValueError(
+                    "AsyncTLS requires [layer][kv_group][channel] per-KV-group indices; "
+                    "legacy per-layer global channels are not paper-aligned")
+    return [[list(group) for group in layer] for layer in layers]
 
 
 def _int4_quant_dequant(x: torch.Tensor, bits: int = 4) -> torch.Tensor:
@@ -79,26 +82,160 @@ def _int4_quant_dequant(x: torch.Tensor, bits: int = 4) -> torch.Tensor:
 
 
 def _qwen3_block_score(query, key, block_size: int):
-    """Stage-1 块粗筛：GEMM 化符号感知打分，返回每块分数 [m]。
-
-    query: [1, n_qh, 1, d]（n_qh=32，Qwen3 GQA，8 组 × 4）；key: [1, n_kvh, L, d]。
-    按 kv head 分组：第 h 个 kv head 服务 query head h*G..h*G+G-1。
-    """
-    kv_heads, L, d = key.shape[1], key.shape[2], key.shape[-1]
+    """Stage-1：每个 KV group 独立打分，返回 ``[kv_heads, n_blocks]``。"""
+    kv_heads, length, head_dim = key.shape[1], key.shape[2], key.shape[-1]
     groups = query.shape[1] // kv_heads
-    m = L // block_size
-    # 块 min/max：[1, kv_heads, m, d]
-    key_blocks = key[..., : m * block_size, :].reshape(1, kv_heads, m, block_size, d)
+    n_blocks = length // block_size
+    key_blocks = key[..., : n_blocks * block_size, :].reshape(
+        1, kv_heads, n_blocks, block_size, head_dim)
     kmax = key_blocks.amax(dim=3)
     kmin = key_blocks.amin(dim=3)
-    # query 分组成 [1, kv_heads, G, 1, d]
-    q = query[0, :, 0, :].reshape(kv_heads, groups, 1, d)
-    qmax = q.clamp(min=0)
-    qmin = q.clamp(max=0)
-    # s[h] = Σ_g (qmax[h,g]·kmax[h] + qmin[h,g]·kmin[h])，跨组求和后再跨 kv head 求和
-    s_h = torch.einsum("hgd,hmd->hm", qmax[..., 0, :], kmax[0]) \
-        + torch.einsum("hgd,hmd->hm", qmin[..., 0, :], kmin[0])
-    return s_h.sum(dim=0)  # [m]
+    query_grouped = query[0, :, 0, :].reshape(kv_heads, groups, head_dim)
+    qmax = query_grouped.clamp(min=0)
+    qmin = query_grouped.clamp(max=0)
+    return torch.einsum("hgd,hmd->hm", qmax, kmax[0]) \
+        + torch.einsum("hgd,hmd->hm", qmin, kmin[0])
+
+
+def _padded_key(key_states, block_size):
+    pad = (block_size - key_states.shape[2] % block_size) % block_size
+    if not pad:
+        return key_states
+    # Score-only padding must not alter the real partial-block extrema.
+    # Candidate construction still clips IDs to the real cache length.
+    key_pad = key_states[..., -1:, :].expand(-1, -1, pad, -1)
+    return torch.cat([key_states, key_pad], dim=2)
+
+
+def _select_blocks(query_states, padded_key, block_size, top_kb):
+    scores = _qwen3_block_score(query_states, padded_key, block_size)
+    n_blocks = min(top_kb, padded_key.shape[2] // block_size)
+    return torch.topk(scores, k=n_blocks, dim=-1).indices
+
+
+def _candidate_indices(top_blocks, length, block_size):
+    """逐 KV group 取上一步块集，并并入当前 token 后去重排序。"""
+    current = torch.tensor([length - 1], device=top_blocks.device)
+    candidates = []
+    for group_blocks in top_blocks:
+        pieces = [
+            torch.arange(
+                int(block * block_size),
+                min(int((block + 1) * block_size), length),
+                device=top_blocks.device)
+            for block in group_blocks.tolist()
+        ]
+        pieces.append(current)
+        candidates.append(torch.unique(torch.cat(pieces)))
+    return candidates
+
+
+def _pad_candidates(candidates):
+    n_max = max(candidate.numel() for candidate in candidates)
+    indices = torch.zeros(
+        len(candidates), n_max, device=candidates[0].device, dtype=torch.long)
+    valid = torch.zeros(len(candidates), n_max, device=indices.device, dtype=torch.bool)
+    for group, candidate in enumerate(candidates):
+        indices[group, :candidate.numel()] = candidate
+        valid[group, :candidate.numel()] = True
+    return indices, valid
+
+
+def _select_tokens(candidate_idx, candidate_valid, candidate_score, token_budget):
+    """逐组 top-k；当前 token 强制入选，padding 不占有效预算。"""
+    current = candidate_idx.max().item()
+    is_current = candidate_valid & candidate_idx.eq(current)
+    scores = candidate_score.masked_fill(~candidate_valid, -torch.inf)
+    scores = scores.masked_fill(is_current, torch.inf)
+    counts = candidate_valid.sum(dim=1)
+    selected_counts = counts.clamp(max=token_budget)
+    k_max = int(selected_counts.max().item())
+    if k_max <= 0:
+        raise RuntimeError("AsyncTLS 候选为空，无法执行稀疏 decode")
+    selected_local = torch.topk(scores, k=k_max, dim=-1).indices
+    selected_idx = torch.gather(candidate_idx, 1, selected_local)
+    selected_valid = torch.gather(candidate_valid, 1, selected_local)
+    rank = torch.arange(k_max, device=candidate_idx.device).unsqueeze(0)
+    selected_valid &= rank < selected_counts.unsqueeze(1)
+    selected_idx = torch.where(selected_valid, selected_idx, current)
+    selected_idx, order = torch.sort(selected_idx, dim=-1)
+    selected_valid = torch.gather(selected_valid, 1, order)
+    return selected_idx, selected_valid
+
+
+def _asynctls_sparse_attention(module, query_states, key_states, value_states,
+                               previous_blocks):
+    """Stage-2/3：每个 KV group 使用自己的 channel、候选和 token 选集。"""
+    length = key_states.shape[2]
+    kv_heads = key_states.shape[1]
+    query_heads = query_states.shape[1]
+    groups = query_heads // kv_heads
+    head_dim = key_states.shape[-1]
+    candidates = _candidate_indices(
+        previous_blocks, length, module.asynctls_block_size)
+    candidate_idx, candidate_valid = _pad_candidates(candidates)
+
+    channels = torch.tensor(
+        module.asynctls_channels, device=query_states.device, dtype=torch.long)
+    channel_count = channels.shape[1]
+    query_grouped = query_states[0, :, 0, :].reshape(kv_heads, groups, head_dim)
+    query_projected = torch.gather(
+        query_grouped, 2,
+        channels[:, None, :].expand(kv_heads, groups, channel_count))
+    candidate_key = torch.gather(
+        key_states[0], 1,
+        candidate_idx[..., None].expand(kv_heads, candidate_idx.shape[1], head_dim))
+    candidate_key = torch.gather(
+        candidate_key, 2,
+        channels[:, None, :].expand(
+            kv_heads, candidate_idx.shape[1], channel_count))
+    candidate_key = _int4_quant_dequant(candidate_key)
+    logits = torch.einsum("hgc,hjc->hgj", query_projected, candidate_key)
+    logits = logits * module.scaling
+    logits = logits.masked_fill(~candidate_valid[:, None, :], -torch.inf)
+    candidate_score = F.softmax(logits.float(), dim=-1).mean(dim=1)
+
+    selected_idx, selected_valid = _select_tokens(
+        candidate_idx, candidate_valid, candidate_score,
+        module.asynctls_token_budget)
+    selected_count = selected_idx.shape[1]
+    selected_key = torch.gather(
+        key_states[0], 1,
+        selected_idx[..., None].expand(kv_heads, selected_count, head_dim))
+    selected_value = torch.gather(
+        value_states[0], 1,
+        selected_idx[..., None].expand(kv_heads, selected_count, head_dim))
+    attn_weights = torch.matmul(
+        query_grouped, selected_key.transpose(-2, -1)) * module.scaling
+    attn_weights = attn_weights.masked_fill(
+        ~selected_valid[:, None, :], -torch.inf)
+    attn_weights = F.softmax(attn_weights.float(), dim=-1).to(query_states.dtype)
+    attn_output = torch.matmul(attn_weights, selected_value)
+    attn_output = attn_output.reshape(1, query_heads, 1, head_dim)
+    return attn_output, attn_weights.reshape(1, query_heads, 1, selected_count)
+
+
+def _cache_keys(cache, layer_idx):
+    if hasattr(cache, "layers"):
+        return cache.layers[layer_idx].keys
+    return cache[layer_idx][0]
+
+
+def _qwen3_initialize_blocks(module, hidden_states, position_embeddings, cache):
+    """dense prefill 后，用 prompt 最后位置建立第一步 decode 的 M_{t-1}。"""
+    if cache is None:
+        module._asynctls_prev_blocks = None
+        return
+    hidden = hidden_states[:, -1:, :]
+    hidden_shape = (hidden.shape[0], 1, -1, module.head_dim)
+    query = module.q_norm(module.q_proj(hidden).view(hidden_shape)).transpose(1, 2)
+    key = module.k_norm(module.k_proj(hidden).view(hidden_shape)).transpose(1, 2)
+    cos, sin = position_embeddings
+    query, _ = apply_rotary_pos_emb(query, key, cos[:, -1:, :], sin[:, -1:, :])
+    cached_key = _cache_keys(cache, module.layer_idx)
+    padded_key = _padded_key(cached_key, module.asynctls_block_size)
+    module._asynctls_prev_blocks = _select_blocks(
+        query, padded_key, module.asynctls_block_size, module.asynctls_top_kb).detach()
 
 
 def _qwen3_asynctls_forward(
@@ -110,20 +247,20 @@ def _qwen3_asynctls_forward(
     cache_position=None,
     **kwargs,
 ) -> Tuple[torch.Tensor, None]:
-    """Qwen3Attention forward：prefill 走原逻辑；decode 走 AsyncTLS 三级流水。"""
+    """dense prefill 初始化块集；decode 使用 M_{t-1} 并保存当前 M_t。"""
     q_len = hidden_states.shape[1]
     if q_len > 1:
-        # Transformers 5.x 删除了 cache_position 位置参数；原始 prefill
-        # 前向也不需要它（cache_position 仅用于下方 decode cache 更新）。
-        return self.flash_forward(
+        output = self.flash_forward(
             hidden_states, position_embeddings, attention_mask,
             past_key_values, **kwargs,
         )
+        _qwen3_initialize_blocks(self, hidden_states, position_embeddings, past_key_values)
+        return output
 
+    previous_length = (
+        int(past_key_values.get_seq_length(self.layer_idx))
+        if past_key_values is not None else 0)
     if cache_position is None and past_key_values is not None:
-        # Transformers 5.x 不向 attention 透传 cache_position；从现有 cache
-        # 长度恢复同一位置，仅供契约校验和 cache 更新，RoPE 仍用原生输入。
-        previous_length = int(past_key_values.get_seq_length(self.layer_idx))
         cache_position = torch.arange(
             previous_length, previous_length + q_len,
             device=hidden_states.device)
@@ -132,91 +269,30 @@ def _qwen3_asynctls_forward(
     require_unmasked_decode(hidden_states, attention_mask, past_key_values, cache_position)
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
-
     query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
     key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
     value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
-
     cos, sin = position_embeddings
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
-
     if past_key_values is not None:
         cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
         key_states, value_states = past_key_values.update(
             key_states, value_states, self.layer_idx, cache_kwargs)
 
-    L = key_states.shape[2]
-    B = self.asynctls_block_size
-    # Repeat a real tail key for score-only padding: zeros would change the
-    # partial block extrema (and can promote it over a better real block).
-    # Candidate indices below still exclude every padded position.
-    pad = (B - L % B) % B
-    if pad:
-        key_pad = key_states[..., -1:, :].expand(-1, -1, pad, -1)
-        key_states = torch.cat([key_states, key_pad], dim=2)
-    m = key_states.shape[2] // B
-
-    # ---- Stage-1 块粗筛 ----
-    block_score = _qwen3_block_score(query_states, key_states, B)
-    top_kb = self.asynctls_top_kb
-    # 末块（可能含 pad）不整块丢弃：候选构建时 cand_idx 已用
-    # min((b+1)*B, L) 排除 pad 区 token，末块真实 token 仍参与 Stage-2/3。
-    # 2026-10-17 修复：旧逻辑把含 pad 的末块整块置 -inf 并排除，导致每次
-    # decode 丢弃最近一整块真实上下文（短序列破坏问句、长序列每步丢 64
-    # token），RULER 32K 全崩（重复输出）。n_blocks 下限 1 保证超短序列
-    # （m=1，唯一块含 pad）仍以全序列候选交给 Stage-2/3 细筛。
-    n_blocks = min(top_kb, m)
-    top_blocks = torch.topk(block_score, k=n_blocks).indices  # [n_blocks]
-    # 候选 token 索引（选中块内真实 token，排除 pad）
-    cand_idx = torch.cat(
-        [torch.arange(int(b * B), min(int((b + 1) * B), L),
-                      device=key_states.device) for b in top_blocks.tolist()])
-    cand_idx = torch.unique(cand_idx)
-    k_cand = key_states[..., cand_idx, :]      # [1, kv_heads, n_cand, d]
-    v_cand = value_states[..., cand_idx, :]
-
-    # ---- Stage-2 组内 channel 细筛 ----
-    # enable_asynctls 已按层把整份 channel list 存进 asynctls_channels，
-    # 这里直接用（勿再按 layer_idx 索引——list[0] 会取到该层首个 channel）
-    C = torch.tensor(self.asynctls_channels,
-                     device=query_states.device, dtype=torch.long)
-    q_tilde = query_states[..., C]            # [1, n_qh, 1, c]
-    k_tilde = _int4_quant_dequant(k_cand[..., C])  # [1, kv_heads, n_cand, c]
-    # 组内平均 softmax：每组 4 个 query head 对同一 kv head 打分，取平均
-    n_qh, c = q_tilde.shape[1], q_tilde.shape[-1]
-    kv_heads = k_tilde.shape[1]
-    groups = n_qh // kv_heads
-    # [kv_heads, G, c] @ [kv_heads, n_cand, c] -> [kv_heads, G, n_cand]（channel 求和）
-    q_tilde_g = q_tilde[0].reshape(kv_heads, groups, c)
-    logits_g = torch.einsum("hgc,hjc->hgj", q_tilde_g, k_tilde[0]) * self.scaling
-    prob_g = F.softmax(logits_g.float(), dim=-1).to(q_tilde.dtype)  # [kv_heads, G, n_cand]
-    tilde_alpha = prob_g.mean(dim=1)          # [kv_heads, n_cand]，GQA 组内平均
-    # P0 排查（2026-10-24→revert）：max 聚合实验结果=0.40（灾难），mean=19.90。
-    # GQA 跨 head 平均是必要的去噪机制，max 过度放大噪声 → revert 回 mean。
-    # 精度差距根因不在此处，待排查其他候选（scorer口径 / INT4 / Stage-1 参数等）。
-    cand_alpha = tilde_alpha.mean(dim=0)      # [n_cand]，跨 kv head 平均
-
-    # ---- Stage-3 全维 KV 上 top-kt ----
-    kt = min(self.asynctls_token_budget, cand_alpha.numel())
-    if kt <= 0:
-        raise RuntimeError("AsyncTLS 候选为空，无法执行稀疏 decode")
-    sel_local = torch.topk(cand_alpha, k=kt).indices
-    # 保持原始 token 顺序：topk 返回降序索引，若直接用 cand_idx[sel_local] 会
-    # 得到乱序的 k_sel/v_sel。softmax 数学上对 token 排列不变，但 bfloat16
-    # matmul 对排列顺序敏感，乱序在长上下文（数千 key）下累积 36 层可放大到
-    # logits 0.5+ 量级的舍入误差（2026-10-19 锚点验证定位：v3 预算拉满 diff
-    # 0.55 = 重排精度，order 变体 diff 0.000000）。排序仅稳定数值路径，不改变
-    # 选中 token 集合（数学等价）。
-    sel_idx = torch.sort(cand_idx[sel_local])[0]
-
-    k_sel = repeat_kv(key_states[..., sel_idx, :], groups)   # [1, n_qh, kt, d]
-    v_sel = repeat_kv(value_states[..., sel_idx, :], groups)
-    attn_weights = torch.matmul(query_states, k_sel.transpose(-2, -1)) * self.scaling
-    attn_weights = F.softmax(attn_weights.float(), dim=-1).to(query_states.dtype)
-    attn_output = torch.matmul(attn_weights, v_sel)          # [1, n_qh, 1, d]
+    padded_key = _padded_key(key_states, self.asynctls_block_size)
+    current_blocks = _select_blocks(
+        query_states, padded_key, self.asynctls_block_size, self.asynctls_top_kb)
+    if previous_length == 0:
+        previous_blocks = current_blocks
+    else:
+        previous_blocks = getattr(self, "_asynctls_prev_blocks", None)
+        if previous_blocks is None:
+            raise RuntimeError("AsyncTLS decode 缺少 dense prefill 初始化的 M_{t-1}")
+    self._asynctls_prev_blocks = current_blocks.detach()
+    attn_output, attn_weights = _asynctls_sparse_attention(
+        self, query_states, key_states, value_states, previous_blocks)
     attn_output = attn_output.transpose(1, 2).reshape(*input_shape, -1).contiguous()
-    attn_output = self.o_proj(attn_output)
-    return attn_output, attn_weights
+    return self.o_proj(attn_output), attn_weights
 
 
 def enable_asynctls(
@@ -250,10 +326,23 @@ def enable_asynctls(
                         f"({len(channels)} < {layer_id})")
                 module.layer_id = layer_id
                 layer_id += 1
-                module.asynctls_channels = channels[module.layer_id]
+                layer_channels = channels[module.layer_id]
+                expected_groups = int(module.config.num_key_value_heads)
+                if len(layer_channels) != expected_groups:
+                    raise ValueError(
+                        f"AsyncTLS layer {module.layer_id} KV groups "
+                        f"{len(layer_channels)} != {expected_groups}")
+                for group_channels in layer_channels:
+                    if (len(set(group_channels)) != len(group_channels)
+                            or min(group_channels) < 0
+                            or max(group_channels) >= module.head_dim):
+                        raise ValueError(
+                            f"AsyncTLS layer {module.layer_id} channel 索引非法")
+                module.asynctls_channels = layer_channels
                 module.asynctls_token_budget = token_budget
                 module.asynctls_block_size = block_size
                 module.asynctls_top_kb = top_kb
+                module._asynctls_prev_blocks = None
                 module.flash_forward = module.forward
                 module.forward = types.MethodType(_qwen3_asynctls_forward, module)
                 n_patched += 1
@@ -261,6 +350,7 @@ def enable_asynctls(
                 _patch_recursive(module)
 
     _patch_recursive(model)
+    model._asynctls_full_prompt_prefill = True
     if n_patched != len(channels):
         raise ValueError(
             f"patched layers {n_patched} != channel layers {len(channels)}")
