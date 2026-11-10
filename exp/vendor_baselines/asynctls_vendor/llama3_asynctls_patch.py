@@ -12,14 +12,30 @@ import types
 from typing import Tuple
 
 import torch
-import torch.nn.functional as F
 from transformers.models.llama.modeling_llama import (
-    LlamaAttention, apply_rotary_pos_emb, repeat_kv,
+    LlamaAttention, apply_rotary_pos_emb,
 )
 
 from qwen3_asynctls_patch import (
-    _int4_quant_dequant, _load_channels, _qwen3_block_score,
+    _asynctls_sparse_attention, _cache_keys, _load_channels,
+    _padded_key, _select_blocks,
 )
+
+
+def _llama_initialize_blocks(module, hidden_states, position_embeddings, cache):
+    if cache is None:
+        module._asynctls_prev_blocks = None
+        return
+    hidden = hidden_states[:, -1:, :]
+    hidden_shape = (hidden.shape[0], 1, -1, module.head_dim)
+    query = module.q_proj(hidden).view(hidden_shape).transpose(1, 2)
+    key = module.k_proj(hidden).view(hidden_shape).transpose(1, 2)
+    cos, sin = position_embeddings
+    query, _ = apply_rotary_pos_emb(query, key, cos[:, -1:, :], sin[:, -1:, :])
+    cached_key = _cache_keys(cache, module.layer_idx)
+    padded_key = _padded_key(cached_key, module.asynctls_block_size)
+    module._asynctls_prev_blocks = _select_blocks(
+        query, padded_key, module.asynctls_block_size, module.asynctls_top_kb).detach()
 
 
 def _llama_asynctls_forward(
@@ -35,12 +51,16 @@ def _llama_asynctls_forward(
     if q_len > 1:
         if cache_position is not None:
             kwargs["cache_position"] = cache_position
-        return self.flash_forward(
+        output = self.flash_forward(
             hidden_states, position_embeddings, attention_mask,
             past_key_values, **kwargs)
+        _llama_initialize_blocks(self, hidden_states, position_embeddings, past_key_values)
+        return output
 
+    previous_length = (
+        int(past_key_values.get_seq_length(self.layer_idx))
+        if past_key_values is not None else 0)
     if cache_position is None and past_key_values is not None:
-        previous_length = int(past_key_values.get_seq_length(self.layer_idx))
         cache_position = torch.arange(
             previous_length, previous_length + q_len,
             device=hidden_states.device)
@@ -50,68 +70,29 @@ def _llama_asynctls_forward(
         hidden_states, attention_mask, past_key_values, cache_position)
     input_shape = hidden_states.shape[:-1]
     hidden_shape = (*input_shape, -1, self.head_dim)
-
     query_states = self.q_proj(hidden_states).view(hidden_shape).transpose(1, 2)
     key_states = self.k_proj(hidden_states).view(hidden_shape).transpose(1, 2)
     value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
     cos, sin = position_embeddings
     query_states, key_states = apply_rotary_pos_emb(
         query_states, key_states, cos, sin)
-
     if past_key_values is not None:
         cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
         key_states, value_states = past_key_values.update(
             key_states, value_states, self.layer_idx, cache_kwargs)
 
-    length = key_states.shape[2]
-    block_size = self.asynctls_block_size
-    pad = (block_size - length % block_size) % block_size
-    if pad:
-        key_pad = torch.zeros(
-            1, key_states.shape[1], pad, key_states.shape[-1],
-            device=key_states.device, dtype=key_states.dtype)
-        padded_key = torch.cat([key_states, key_pad], dim=2)
+    padded_key = _padded_key(key_states, self.asynctls_block_size)
+    current_blocks = _select_blocks(
+        query_states, padded_key, self.asynctls_block_size, self.asynctls_top_kb)
+    if previous_length == 0:
+        previous_blocks = current_blocks
     else:
-        padded_key = key_states
-
-    block_score = _qwen3_block_score(query_states, padded_key, block_size)
-    n_blocks = min(self.asynctls_top_kb, padded_key.shape[2] // block_size)
-    top_blocks = torch.topk(block_score, k=n_blocks).indices
-    candidate_idx = torch.cat([
-        torch.arange(
-            int(block * block_size),
-            min(int((block + 1) * block_size), length),
-            device=key_states.device)
-        for block in top_blocks.tolist()
-    ])
-    candidate_idx = torch.unique(candidate_idx)
-    candidate_key = key_states[..., candidate_idx, :]
-
-    channels = torch.tensor(
-        self.asynctls_channels, device=query_states.device, dtype=torch.long)
-    projected_query = query_states[..., channels]
-    projected_key = _int4_quant_dequant(candidate_key[..., channels])
-    query_heads, channel_count = projected_query.shape[1], projected_query.shape[-1]
-    kv_heads = projected_key.shape[1]
-    groups = query_heads // kv_heads
-    grouped_query = projected_query[0].reshape(kv_heads, groups, channel_count)
-    logits = torch.einsum(
-        "hgc,hjc->hgj", grouped_query, projected_key[0]) * self.scaling
-    probabilities = F.softmax(logits.float(), dim=-1).to(projected_query.dtype)
-    candidate_score = probabilities.mean(dim=1).mean(dim=0)
-
-    n_selected = min(self.asynctls_token_budget, candidate_score.numel())
-    if n_selected <= 0:
-        raise RuntimeError("AsyncTLS 候选为空，无法执行稀疏 decode")
-    selected_local = torch.topk(candidate_score, k=n_selected).indices
-    selected_idx = torch.sort(candidate_idx[selected_local])[0]
-
-    selected_key = repeat_kv(key_states[..., selected_idx, :], groups)
-    selected_value = repeat_kv(value_states[..., selected_idx, :], groups)
-    attn_weights = torch.matmul(
-        query_states, selected_key.transpose(-2, -1)) * self.scaling
-    attn_weights = F.softmax(attn_weights.float(), dim=-1).to(query_states.dtype)
-    attn_output = torch.matmul(attn_weights, selected_value)
+        previous_blocks = getattr(self, "_asynctls_prev_blocks", None)
+        if previous_blocks is None:
+            raise RuntimeError("AsyncTLS decode 缺少 dense prefill 初始化的 M_{t-1}")
+    self._asynctls_prev_blocks = current_blocks.detach()
+    attn_output, attn_weights = _asynctls_sparse_attention(
+        self, query_states, key_states, value_states, previous_blocks)
     attn_output = attn_output.transpose(1, 2).reshape(
         *input_shape, -1).contiguous()
     return self.o_proj(attn_output), attn_weights
@@ -143,14 +124,22 @@ def enable_asynctls(
             continue
         layer_idx = int(module.layer_idx)
         layer_channels = channels[layer_idx]
-        if (not layer_channels or len(set(layer_channels)) != len(layer_channels)
-                or min(layer_channels) < 0
-                or max(layer_channels) >= module.head_dim):
-            raise ValueError(f"AsyncTLS layer {layer_idx} channel 索引非法")
+        expected_groups = int(module.config.num_key_value_heads)
+        if len(layer_channels) != expected_groups:
+            raise ValueError(
+                f"AsyncTLS layer {layer_idx} KV groups "
+                f"{len(layer_channels)} != {expected_groups}")
+        for group_channels in layer_channels:
+            if (not group_channels
+                    or len(set(group_channels)) != len(group_channels)
+                    or min(group_channels) < 0
+                    or max(group_channels) >= module.head_dim):
+                raise ValueError(f"AsyncTLS layer {layer_idx} channel 索引非法")
         module.asynctls_channels = layer_channels
         module.asynctls_token_budget = token_budget
         module.asynctls_block_size = block_size
         module.asynctls_top_kb = top_kb
+        module._asynctls_prev_blocks = None
         module.flash_forward = module.forward
         module.forward = types.MethodType(_llama_asynctls_forward, module)
         n_patched += 1
@@ -158,4 +147,5 @@ def enable_asynctls(
     if n_patched != expected_layers:
         raise RuntimeError(
             f"AsyncTLS Llama patch 层数 {n_patched} != config 层数 {expected_layers}")
+    model._asynctls_full_prompt_prefill = True
     return n_patched
