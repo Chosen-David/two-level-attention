@@ -25,6 +25,7 @@ from transformers.models.glm4_moe_lite.modeling_glm4_moe_lite import (
 )
 
 from qwen3_asynctls_patch import (
+    _begin_asynctls_step, _commit_asynctls_step,
     _asynctls_sparse_attention,
     _cache_keys,
     _load_channels,
@@ -110,9 +111,10 @@ def _glm_initialize_blocks(self, hidden_states, position_embeddings, cache):
     query_states, _, _ = _glm_project_qkv(self, hidden, last_pos_emb)
     cached_key = _cache_keys(cache, self.layer_idx)
     padded_key = _padded_key(cached_key, self.asynctls_block_size)
-    self._asynctls_prev_blocks = _select_blocks(
+    blocks = _select_blocks(
         query_states, padded_key, self.asynctls_block_size,
         self.asynctls_top_kb).detach()
+    _commit_asynctls_step(self, cache, blocks)
 
 
 def _glm_asynctls_forward(
@@ -125,6 +127,11 @@ def _glm_asynctls_forward(
 ):
     """dense prefill 初始化块集；decode 使用 M_{t-1} 并保存当前 M_t。"""
     q_len = hidden_states.shape[1]
+    previous_length = (
+        int(past_key_values.get_seq_length(self.layer_idx))
+        if past_key_values is not None else 0)
+    previous_blocks, cache_owner = _begin_asynctls_step(
+        self, past_key_values, previous_length, decode=(q_len == 1))
     if q_len > 1:
         output = _glm_dense_attention(
             self, hidden_states, position_embeddings, attention_mask,
@@ -133,9 +140,6 @@ def _glm_asynctls_forward(
             self, hidden_states, position_embeddings, past_key_values)
         return output
 
-    previous_length = (
-        int(past_key_values.get_seq_length(self.layer_idx))
-        if past_key_values is not None else 0)
     cache_position = kwargs.get("cache_position", None)
     if cache_position is None and past_key_values is not None:
         cache_position = torch.arange(
@@ -158,18 +162,15 @@ def _glm_asynctls_forward(
         self.asynctls_top_kb)
     if previous_length == 0:
         previous_blocks = current_blocks
-    else:
-        previous_blocks = getattr(self, "_asynctls_prev_blocks", None)
-        if previous_blocks is None:
-            raise RuntimeError("AsyncTLS decode 缺少 dense prefill 初始化的 M_{t-1}")
-    self._asynctls_prev_blocks = current_blocks.detach()
 
     attn_output, attn_weights = _asynctls_sparse_attention(
         self, query_states, key_states, value_states, previous_blocks)
     batch_size, seq_length = hidden_states.shape[:-1]
     attn_output = attn_output.transpose(1, 2).reshape(
         batch_size, seq_length, -1).contiguous()
-    return self.o_proj(attn_output), attn_weights
+    output = self.o_proj(attn_output)
+    _commit_asynctls_step(self, past_key_values, current_blocks, cache_owner)
+    return output, attn_weights
 
 
 def enable_asynctls(

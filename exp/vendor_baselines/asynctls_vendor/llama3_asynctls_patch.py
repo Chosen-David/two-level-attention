@@ -17,6 +17,7 @@ from transformers.models.llama.modeling_llama import (
 )
 
 from qwen3_asynctls_patch import (
+    _begin_asynctls_step, _commit_asynctls_step,
     _asynctls_sparse_attention, _cache_keys, _load_channels,
     _padded_key, _select_blocks,
 )
@@ -34,8 +35,9 @@ def _llama_initialize_blocks(module, hidden_states, position_embeddings, cache):
     query, _ = apply_rotary_pos_emb(query, key, cos[:, -1:, :], sin[:, -1:, :])
     cached_key = _cache_keys(cache, module.layer_idx)
     padded_key = _padded_key(cached_key, module.asynctls_block_size)
-    module._asynctls_prev_blocks = _select_blocks(
+    blocks = _select_blocks(
         query, padded_key, module.asynctls_block_size, module.asynctls_top_kb).detach()
+    _commit_asynctls_step(module, cache, blocks)
 
 
 def _llama_asynctls_forward(
@@ -48,6 +50,11 @@ def _llama_asynctls_forward(
     **kwargs,
 ):
     q_len = hidden_states.shape[1]
+    previous_length = (
+        int(past_key_values.get_seq_length(self.layer_idx))
+        if past_key_values is not None else 0)
+    previous_blocks, cache_owner = _begin_asynctls_step(
+        self, past_key_values, previous_length, decode=(q_len == 1))
     if q_len > 1:
         if cache_position is not None:
             kwargs["cache_position"] = cache_position
@@ -57,9 +64,6 @@ def _llama_asynctls_forward(
         _llama_initialize_blocks(self, hidden_states, position_embeddings, past_key_values)
         return output
 
-    previous_length = (
-        int(past_key_values.get_seq_length(self.layer_idx))
-        if past_key_values is not None else 0)
     if cache_position is None and past_key_values is not None:
         cache_position = torch.arange(
             previous_length, previous_length + q_len,
@@ -86,16 +90,13 @@ def _llama_asynctls_forward(
         query_states, padded_key, self.asynctls_block_size, self.asynctls_top_kb)
     if previous_length == 0:
         previous_blocks = current_blocks
-    else:
-        previous_blocks = getattr(self, "_asynctls_prev_blocks", None)
-        if previous_blocks is None:
-            raise RuntimeError("AsyncTLS decode 缺少 dense prefill 初始化的 M_{t-1}")
-    self._asynctls_prev_blocks = current_blocks.detach()
     attn_output, attn_weights = _asynctls_sparse_attention(
         self, query_states, key_states, value_states, previous_blocks)
     attn_output = attn_output.transpose(1, 2).reshape(
         *input_shape, -1).contiguous()
-    return self.o_proj(attn_output), attn_weights
+    output = self.o_proj(attn_output)
+    _commit_asynctls_step(self, past_key_values, current_blocks, cache_owner)
+    return output, attn_weights
 
 
 def enable_asynctls(
