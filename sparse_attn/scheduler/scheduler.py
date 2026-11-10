@@ -45,11 +45,14 @@ def greedy_next_tokens(logits, eos_ids, *, generated_counts=0, min_new_tokens=0)
 
 
 class ContinuousBatchScheduler:
-    def __init__(self, *, cache, max_batch, eos_ids, pad_token_id):
+    def __init__(self, *, cache, max_batch, eos_ids, pad_token_id,
+                 track_receipts=False, auto_finish_requests=True):
         self.cache = cache
         self.max_batch = max_batch
         self.eos_ids = set(eos_ids)
         self.pad_token_id = pad_token_id
+        self.track_receipts = track_receipts
+        self.auto_finish_requests = auto_finish_requests
         self.active_req_ids = []
         self.next_tokens = {}
 
@@ -107,6 +110,8 @@ class ContinuousBatchScheduler:
         self._copy_stream = torch.cuda.Stream()
         self._pending_batches = [0, 0]
         self._pending_stop_on_eos = [True, True]
+        self._pending_sequences = [0, 0]
+        self._ready_receipts = []
 
     def add_request(self, request_id):
         if request_id not in self.active_req_ids:
@@ -131,12 +136,12 @@ class ContinuousBatchScheduler:
     def _drain_pending_next_tokens(self):
         # 设备端下一步输入不依赖这份 CPU 回执；拷贝未就绪时直接跳过，
         # 让主调度循环继续提交 GPU 工作。两个槽位独立保存，避免慢回执被覆盖。
+        ready = []
         for idx, batch in enumerate(self._pending_batches):
-            if batch == 0:
-                continue
-            if not self._copy_events[idx].query():
-                continue
-
+            if batch and self._copy_events[idx].query():
+                ready.append((self._pending_sequences[idx], idx, batch))
+        # 双槽都可能就绪时按提交序号消费，不能按槽号重排相邻 token。
+        for _sequence, idx, batch in sorted(ready):
             tokens = self._token_cpu[idx][:batch]
             req_ids = self._token_req_cpu[idx][:batch]
             valid = req_ids >= 0
@@ -145,15 +150,31 @@ class ContinuousBatchScheduler:
                 ids = req_ids[valid].tolist()
                 toks = tokens[valid].tolist()
                 self.next_tokens.update(zip(ids, toks))
+                if self.track_receipts:
+                    self._ready_receipts.extend(zip(ids, toks))
 
             eos = valid & torch.isin(tokens, self._eos_cpu_tensor)
-            if self._pending_stop_on_eos[idx]:
+            if self._pending_stop_on_eos[idx] and self.auto_finish_requests:
                 finished_ids = req_ids[eos].tolist()
                 for request_id in finished_ids:
                     self.finish_request(request_id)
 
             self._pending_batches[idx] = 0
             self._pending_stop_on_eos[idx] = True
+
+    def pop_ready_receipts(self):
+        """非阻塞返回已就绪的 ``(request_id, token)``，保持提交顺序。"""
+        self._drain_pending_next_tokens()
+        receipts = self._ready_receipts
+        self._ready_receipts = []
+        return receipts
+
+    def flush_ready_receipts(self):
+        """请求边界等待未决 D2H，并返回全部尚未消费的回执。"""
+        for idx, batch in enumerate(self._pending_batches):
+            if batch:
+                self._copy_events[idx].synchronize()
+        return self.pop_ready_receipts()
 
     def _seed_new_requests(self, padded):
         if not padded:
@@ -243,6 +264,13 @@ class ContinuousBatchScheduler:
                 raise ValueError('forced token count must match the padded batch')
             next_tokens = torch.as_tensor(
                 forced_tokens, dtype=torch.long, device=logits.device)
+        # 双槽复用前必须先回收该槽的旧回执；仅等待 Event 而不 drain 会让
+        # 新提交覆盖 pending batch，直接丢失两步前的 token。
+        idx = self._step_counter & 1
+        if self._pending_batches[idx]:
+            self._copy_events[idx].synchronize()
+            self._drain_pending_next_tokens()
+
         req_ids_tensor = self._device_req_ids_buf[:batch]
         valid = req_ids_tensor >= 0
         eos_hit = (valid & torch.isin(next_tokens, self._eos_tensor)
@@ -259,7 +287,7 @@ class ContinuousBatchScheduler:
         self._device_req_positions[valid_req_ids] += (
             valid_alive.to(torch.long))
 
-        idx = self._step_counter & 1
+        self._pending_sequences[idx] = self._step_counter
         self._step_counter += 1
         self._token_req_cpu[idx][:batch].copy_(self._cpu_req_staging[:batch])
 

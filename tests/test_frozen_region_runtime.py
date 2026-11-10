@@ -229,12 +229,22 @@ def test_decode_uses_the_same_min_length_policy_for_first_and_graph_tokens(
     class FakeScheduler:
         def __init__(self, **kwargs):
             self.next_tokens = {}
+            self.pending = []
 
         def add_request(self, request_id):
             self.request_id = request_id
 
+        def pop_ready_receipts(self):
+            receipts = self.pending
+            self.pending = []
+            return receipts
+
+        def flush_ready_receipts(self):
+            return self.pop_ready_receipts()
+
     class FakeRunner:
-        def __init__(self, **kwargs):
+        def __init__(self, scheduler, **kwargs):
+            self.scheduler = scheduler
             self.calls = []
 
         def step(self, model, cache, *, generated_counts, min_new_tokens,
@@ -245,13 +255,16 @@ def test_decode_uses_the_same_min_length_policy_for_first_and_graph_tokens(
                 torch.tensor([[[0., 8., 0., 5., 9., 0.]]]), {1, 4},
                 generated_counts=generated_counts,
                 min_new_tokens=min_new_tokens)
+            self.scheduler.pending.append((0, int(tokens[0])))
             return None, tokens
 
     monkeypatch.setattr(
         'sparse_attn.scheduler.scheduler.ContinuousBatchScheduler',
         FakeScheduler)
     monkeypatch.setattr(
-        'sparse_attn.engine.graph_runner.GraphRunner', FakeRunner)
+        'sparse_attn.engine.graph_runner.session_graph_runner',
+        lambda model, cache, scheduler, **kwargs: FakeRunner(
+            scheduler=scheduler, **kwargs))
 
     class FakeModel:
         def parameters(self):
@@ -268,9 +281,19 @@ def test_suffix_is_fully_consumed_and_only_answer_tokens_are_returned(monkeypatc
     class FakeScheduler:
         def __init__(self, **kwargs):
             self.next_tokens = {}
+            self.pending = []
+            self.track_receipts = True
 
         def add_request(self, request_id):
             self.request_id = request_id
+
+        def pop_ready_receipts(self):
+            receipts = self.pending if self.track_receipts else []
+            self.pending = []
+            return receipts
+
+        def flush_ready_receipts(self):
+            return self.pop_ready_receipts()
 
     class FakeRunner:
         instances = []
@@ -289,11 +312,15 @@ def test_suffix_is_fully_consumed_and_only_answer_tokens_are_returned(monkeypatc
             token = next(self.outputs)
             self.scheduler.next_tokens[0] = (
                 forced_tokens[0] if forced_tokens is not None else token)
+            self.scheduler.pending.append((0, token))
             return None, torch.tensor([token])
 
     monkeypatch.setattr(
         'sparse_attn.scheduler.scheduler.ContinuousBatchScheduler', FakeScheduler)
-    monkeypatch.setattr('sparse_attn.engine.graph_runner.GraphRunner', FakeRunner)
+    monkeypatch.setattr(
+        'sparse_attn.engine.graph_runner.session_graph_runner',
+        lambda model, cache, scheduler, **kwargs: FakeRunner(
+            scheduler=scheduler, **kwargs))
 
     class FakeModel:
         def parameters(self):
@@ -321,6 +348,12 @@ def test_decode_failure_marks_request_failed(monkeypatch):
         def add_request(self, request_id):
             pass
 
+        def pop_ready_receipts(self):
+            return []
+
+        def flush_ready_receipts(self):
+            return []
+
     class FakeRunner:
         def __init__(self, **kwargs):
             pass
@@ -330,7 +363,10 @@ def test_decode_failure_marks_request_failed(monkeypatch):
 
     monkeypatch.setattr(
         'sparse_attn.scheduler.scheduler.ContinuousBatchScheduler', FakeScheduler)
-    monkeypatch.setattr('sparse_attn.engine.graph_runner.GraphRunner', FakeRunner)
+    monkeypatch.setattr(
+        'sparse_attn.engine.graph_runner.session_graph_runner',
+        lambda model, cache, scheduler, **kwargs: FakeRunner(
+            scheduler=scheduler, **kwargs))
 
     class FakeModel:
         def parameters(self):
@@ -342,6 +378,70 @@ def test_decode_failure_marks_request_failed(monkeypatch):
             FakeModel(), output, max_new_tokens=2, eos_ids={4},
             capture_graph=False)
     assert output.past_key_values.request_phases[0] == RequestPhase.FAILED
+
+
+def test_decode_reconciles_cache_after_delayed_eos_receipt(monkeypatch):
+    class FakeScheduler:
+        def __init__(self, **kwargs):
+            self.next_tokens = {}
+            self.pending = []
+
+        def add_request(self, request_id):
+            self.request_id = request_id
+
+        def pop_ready_receipts(self):
+            if len(self.pending) < 2:
+                return []
+            return [self.pending.pop(0)]
+
+        def flush_ready_receipts(self):
+            receipts = self.pending
+            self.pending = []
+            return receipts
+
+    class FakeRunner:
+        def __init__(self, scheduler):
+            self.scheduler = scheduler
+            self.outputs = iter([2, 4, 5])
+
+        def step(self, model, cache, **kwargs):
+            token = next(self.outputs)
+            self.scheduler.pending.append((0, token))
+            cache.states[0].logical_length += 1
+            cache.nfa_decode_steps += 1
+            cache.layers[0].nfa_decode_trace.append(
+                {'decode_step': cache.nfa_decode_steps - 1})
+            return None, torch.tensor([token])
+
+    class FakeCache(_LifecycleCache):
+        def __init__(self):
+            super().__init__()
+            self.states = {0: SimpleNamespace(logical_length=7)}
+            self.layers = [SimpleNamespace(nfa_decode_trace=[])]
+            self.nfa_decode_steps = 0
+            self.decode_trace_enabled = True
+
+    monkeypatch.setattr(
+        'sparse_attn.scheduler.scheduler.ContinuousBatchScheduler',
+        FakeScheduler)
+    monkeypatch.setattr(
+        'sparse_attn.engine.graph_runner.session_graph_runner',
+        lambda model, cache, scheduler, **kwargs: FakeRunner(scheduler))
+
+    class FakeModel:
+        def parameters(self):
+            return iter([torch.empty(0)])
+
+    output = _decode_output(3)
+    cache = FakeCache()
+    output.past_key_values = cache
+    generated, _ = decode_frozen_request(
+        FakeModel(), output, max_new_tokens=8, eos_ids={4},
+        capture_graph=False)
+    assert generated == [3, 2, 4]
+    assert cache.states[0].logical_length == 9
+    assert cache.nfa_decode_steps == 2
+    assert [entry['decode_step'] for entry in cache.layers[0].nfa_decode_trace] == [0, 1]
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')
@@ -386,3 +486,37 @@ def test_forced_suffix_eos_survives_async_scheduler_drain():
     assert scheduler.active_req_ids == []
     assert cache.removed == [0]
     assert cache.request_phases[0] == RequestPhase.FINISHED
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')
+def test_receipt_slot_reuse_preserves_submission_order():
+    class FakeCache:
+        def __init__(self):
+            self.layers = [SimpleNamespace(
+                kv_pool_k=SimpleNamespace(device=torch.device('cuda')))]
+            self.states = {0: SimpleNamespace(logical_length=0)}
+            self.request_phases = {0: RequestPhase.GENERATE}
+
+        def new_step(self, req_ids):
+            pass
+
+        def transition_request(self, request_id, phase):
+            self.request_phases[request_id] = RequestPhase(phase)
+
+        def remove_request(self, request_id):
+            pass
+
+    scheduler = ContinuousBatchScheduler(
+        cache=FakeCache(), max_batch=1, eos_ids={4}, pad_token_id=0,
+        track_receipts=True, auto_finish_requests=False)
+    scheduler.add_request(0)
+    scheduler.next_tokens[0] = 2
+    req_ids, _, _ = scheduler.prepare_step()
+    expected = [10, 11, 12, 13, 4]
+    for token in expected:
+        logits = torch.full((1, 1, 16), -10., device='cuda')
+        logits[0, 0, token] = 10.
+        # 不在两次提交之间主动 drain，强制第三个提交复用第零槽。
+        scheduler.record_next_tokens(req_ids, logits)
+    receipts = scheduler.flush_ready_receipts()
+    assert [token for request_id, token in receipts if request_id == 0] == expected

@@ -27,7 +27,9 @@ def configure_rope(config, context_length, max_new_tokens=64, *, yarn=False, fac
                     runtime_max_position_embeddings=original_runtime,
                     rope_scaling=copy.deepcopy(getattr(config,'rope_scaling',None)),
                     rope_parameters=copy.deepcopy(getattr(config,'rope_parameters',None)))
-    required = {65536:2.0,131072:4.0}.get(context_length)
+    required = {
+        65536: 2.0, 131072: 4.0, 262144: 8.0, 524288: 16.0,
+    }.get(context_length)
     if context_length <= QWEN_ORIGINAL_CONTEXT:
         if yarn or factor is not None:
             raise ValueError('32K evaluation must not enable additional YaRN')
@@ -40,7 +42,9 @@ def configure_rope(config, context_length, max_new_tokens=64, *, yarn=False, fac
                     snapshot_max_position_embeddings=original_runtime,
                     runtime_max_position_embeddings=original_runtime,rope_scaling=None)
     if required is None or not yarn or (factor is not None and factor != required):
-        raise ValueError('Qwen long-context main protocol requires 64K factor2 or128K factor4')
+        raise ValueError(
+            'Qwen long-context performance protocol requires a power-of-two '
+            'length from 64K through 512K with the corresponding YaRN factor')
     theta=getattr(config,'rope_theta',None) or config.rope_parameters['rope_theta']
     config.rope_scaling = dict(rope_type='yarn',type='yarn',factor=required,
         original_max_position_embeddings=QWEN_ORIGINAL_CONTEXT,beta_fast=32,beta_slow=1)

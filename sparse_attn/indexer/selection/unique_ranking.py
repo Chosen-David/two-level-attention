@@ -15,9 +15,73 @@ def _workspace_empty(workspace,name,shape,dtype,device):
     return out
 
 
+def _launch_value_signature(values):
+    """按 tensor 指针/shape/stride/dtype 与标量原值构造完整重放签名。"""
+    sig=[]
+    for x in values:
+        if isinstance(x,torch.Tensor):
+            sig.append((x.data_ptr(),tuple(x.shape),tuple(x.stride()),
+                        x.dtype,x.device.index))
+        else:
+            sig.append(x)
+    return tuple(sig)
+
+
+def _raw_replay_launch(workspace,key,kernel,grid,args,kwargs):
+    """无 hook/debug 时直接 run 已缓存 compiled kernel，跳过包装与元数据重算。"""
+    if workspace.get('_nfa_eager_record') is not None:
+        return False
+    context=workspace.get('_nfa_launch_context')
+    if context is None:
+        from triton import knobs
+        stream=None
+        enter_hook=knobs.runtime.launch_enter_hook
+        exit_hook=knobs.runtime.launch_exit_hook
+        runtime_debug=knobs.runtime.debug
+    else:
+        stream,enter_hook,exit_hook,runtime_debug=context
+    if enter_hook is not None or exit_hook is not None or runtime_debug:
+        return False
+    arg_key=tuple((x.dtype,x.device,x.data_ptr()%16)
+                  if isinstance(x,torch.Tensor) else x for x in args)
+    cache_key=('triton_launch',key,arg_key,tuple(sorted(kwargs.items())))
+    entry=workspace.get(cache_key)
+    if entry is None:
+        return False
+    compiled,names=entry
+    grid_1=grid[1] if len(grid)>1 else 1
+    grid_2=grid[2] if len(grid)>2 else 1
+    tail=tuple(kwargs[name] for name in names[len(args):])
+    values=args+tail
+    if stream is None:
+        stream=torch.cuda.current_stream().cuda_stream
+    compiled.run(grid[0],grid_1,grid_2,stream,compiled.function,
+                 compiled.packed_metadata,None,None,None,*values)
+    return True
+
+
+def _cached_launch_metadata(workspace,plan_key,compiled,grid,stream,values):
+    """缓存 launch_metadata；指针/shape/stride 任一变化即自动失效重算。"""
+    sig=_launch_value_signature(values)
+    cache=workspace.get('_nfa_launch_metadata_cache')
+    if cache is None:
+        cache=workspace['_nfa_launch_metadata_cache']={}
+    bucket=cache.get(plan_key)
+    if bucket is not None and bucket[0]==sig:
+        return bucket[1]
+    metadata=compiled.launch_metadata(grid,stream,*values)
+    if len(cache)>=8:
+        cache.pop(next(iter(cache)))
+    cache[plan_key]=(sig,metadata)
+    return metadata
+
+
 def _fast_launch(workspace,key,kernel,grid,*args,**kwargs):
     if workspace is None:
         return kernel[grid](*args,**kwargs)
+    raw_replay=kwargs.pop('raw_replay',False)
+    if raw_replay and _raw_replay_launch(workspace,key,kernel,grid,args,kwargs):
+        return
     record=workspace.get('_nfa_eager_record')
     if record is not None:
         record.append((key,kernel,grid,args,kwargs.copy()))
@@ -68,7 +132,8 @@ def _fast_launch(workspace,key,kernel,grid,*args,**kwargs):
     if stream is None:
         stream=torch.cuda.current_stream().cuda_stream
     launch_metadata=(None if enter_hook is None else
-                     compiled.launch_metadata(grid,stream,*values))
+                     _cached_launch_metadata(
+                         workspace,plan_key,compiled,grid,stream,values))
     run(grid[0],grid_1,grid_2,stream,function,packed_metadata,
         launch_metadata,enter_hook,exit_hook,*values)
 
@@ -314,7 +379,8 @@ def rank_unique(ids,p,valid,lower,upper,quota,*,capacity,width,sink):
 
 def rank_unique_batched(ids,p,valid,lower,upper,quota,*,capacity,width=1024,sink=0,
                         validate=True,workspace=None,score_state=None,
-                        prevalidated=False,fuse_tree=False,fuse_tiles=False):
+                        prevalidated=False,fuse_tree=False,fuse_tiles=False,
+                        raw_replay=False):
     """Rank deduplicated [B,Hkv,R] candidates with live per-request metadata.
 
     Uses the pinned unique-ranking contract; not a replacement for selecting
@@ -356,25 +422,25 @@ def rank_unique_batched(ids,p,valid,lower,upper,quota,*,capacity,width=1024,sink
     current=_workspace_empty(workspace,'rank_tile',(hk,groups,width),packed_dtype,ids.device)
     if fused:
         if not fuse_tiles:
-            _fast_launch(workspace,'rank_tile_scores_launch',_tile_keys_from_scores,(hk,groups),ids.view(hk,r),scores,mstat,lstat,valid.view(hk,r),lower,upper,quota,current,r,capacity,groups,width,h,token_bits,gqa_group,prob_dtype==torch.bfloat16,num_warps=8)
+            _fast_launch(workspace,'rank_tile_scores_launch',_tile_keys_from_scores,(hk,groups),ids.view(hk,r),scores,mstat,lstat,valid.view(hk,r),lower,upper,quota,current,r,capacity,groups,width,h,token_bits,gqa_group,prob_dtype==torch.bfloat16,num_warps=8,raw_replay=raw_replay)
     else:
-        _fast_launch(workspace,'rank_tile_launch',_tile_keys,(hk,groups),ids.view(hk,r),p.view(hk,r),valid.view(hk,r),lower,upper,quota,current,r,capacity,groups,width,h,token_bits,num_warps=8)
+        _fast_launch(workspace,'rank_tile_launch',_tile_keys,(hk,groups),ids.view(hk,r),p.view(hk,r),valid.view(hk,r),lower,upper,quota,current,r,capacity,groups,width,h,token_bits,num_warps=8,raw_replay=raw_replay)
     if fuse_tree and groups>2:
         out=_workspace_empty(workspace,'rank_out',(b,h,width),torch.int32,ids.device)
         counts=_workspace_empty(workspace,'rank_counts',(b,h),torch.int32,ids.device)
         _fast_launch(workspace,'rank_tree_finish_launch',_merge_tree_finish,(hk,),
                      current,lower,upper,quota,out,counts,groups,capacity,width,
-                     sink,h,token_bits,num_warps=8)
+                     sink,h,token_bits,num_warps=8,raw_replay=raw_replay)
         return TokenSelection(out,counts)
     while groups>2:
         following=triton.cdiv(groups,2)
         output=_workspace_empty(workspace,'rank_merge',(hk,following,width),current.dtype,ids.device)
-        _fast_launch(workspace,('rank_merge_launch',following),_merge_topk,(hk,following),current,output,groups,following,width,num_warps=8)
+        _fast_launch(workspace,('rank_merge_launch',following),_merge_topk,(hk,following),current,output,groups,following,width,num_warps=8,raw_replay=raw_replay)
         current=output;groups=following
     out=_workspace_empty(workspace,'rank_out',(b,h,width),torch.int32,ids.device)
     counts=_workspace_empty(workspace,'rank_counts',(b,h),torch.int32,ids.device)
     if groups==2:
-        _fast_launch(workspace,'rank_merge_finish_launch',_merge_finish,(hk,),current,lower,upper,quota,out,counts,capacity,width,sink,h,token_bits,num_warps=8)
+        _fast_launch(workspace,'rank_merge_finish_launch',_merge_finish,(hk,),current,lower,upper,quota,out,counts,capacity,width,sink,h,token_bits,num_warps=8,raw_replay=raw_replay)
     else:
-        _fast_launch(workspace,'rank_finish_launch',_finish,(hk,),current,lower,upper,quota,out,counts,capacity,width,sink,h,token_bits,num_warps=8)
+        _fast_launch(workspace,'rank_finish_launch',_finish,(hk,),current,lower,upper,quota,out,counts,capacity,width,sink,h,token_bits,num_warps=8,raw_replay=raw_replay)
     return TokenSelection(out,counts)

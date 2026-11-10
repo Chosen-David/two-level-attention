@@ -38,7 +38,7 @@ class FlashInferQwen3Runtime:
     """固定物理页、动态逻辑长度的 Qwen3 FlashInfer decode runtime。"""
 
     def __init__(self, model, batch_size, prefill_length, max_new_tokens,
-                 device, page_size=16):
+                 device, page_size=64):
         config = model.config
         self.num_layers = config.num_hidden_layers
         self.num_qo_heads = config.num_attention_heads
@@ -102,6 +102,11 @@ class FlashInferQwen3Runtime:
         self.page_table_updates = {}
         self.active_pages = None
         self.fixed_split_size = None
+        # Graph replay 不经过 Python；这些计数只覆盖 prefill、eager decode、
+        # Graph warmup/capture，用于证明真实 API 调用而非估算 replay 次数。
+        self.prefill_append_calls = 0
+        self.decode_append_calls = 0
+        self.decode_wrapper_calls = 0
         self.set_sequence_length(prefill_length)
 
     def _compact_page_indices(self, pages):
@@ -219,6 +224,7 @@ class FlashInferQwen3Runtime:
             self.prefill_positions, self.paged_kv_cache[layer_idx],
             self.kv_indices, self.kv_indptr, self.kv_last_page_len,
             kv_layout='NHD')
+        self.prefill_append_calls += 1
 
     def decode_attention(self, layer_idx, query_states, key_states, value_states):
         import flashinfer
@@ -231,9 +237,12 @@ class FlashInferQwen3Runtime:
             key, value, self.decode_batch_indices, self.decode_positions,
             self.paged_kv_cache[layer_idx], self.kv_indices,
             self.kv_indptr, self.kv_last_page_len, kv_layout='NHD')
-        return self.wrapper.run(
+        self.decode_append_calls += 1
+        output = self.wrapper.run(
             query_states[:, :, 0], self.paged_kv_cache[layer_idx],
             out=self.decode_output[layer_idx])
+        self.decode_wrapper_calls += 1
+        return output
 
 
 def qwen3_flashinfer_forward(

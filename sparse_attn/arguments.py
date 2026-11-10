@@ -268,6 +268,9 @@ def _add_nfa_args(parser: argparse.ArgumentParser):
                        help='sim_greedy 聚类维度: subspace=与 cluster/kmeans 路径同一子空间(默认,含压缩维) / '
                             'nope=后 64 非旋转维 / tail=低频尾维(cmp_ratio 控宽) / full=全 128 维')
     group.add_argument('--nfa_enable_layer_skip', type=lambda x: str(x).lower() != 'false', default=True)
+    group.add_argument('--nfa_operator_mode', choices=['off', 'serial', 'overlap'],
+                       default='off',
+                       help='decode attention: union / disjoint serial / protected overlap')
     group.add_argument('--nfa_far_clusters', type=int, default=256)
     group.add_argument('--nfa_far_niter', type=int, default=10)
     group.add_argument('--nfa_far_blocks', type=int, default=16)

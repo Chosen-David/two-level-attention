@@ -1,0 +1,1289 @@
+{
+  "schema": "qwen-jssa-official-graph-performance-v1",
+  "validation_status": "pending-independent-verification",
+  "source": {
+    "head": "1c6c955509099973106247d82a8531ee3e3606e1",
+    "diff_sha256": "ba2394ea4dc83802876d63468920e87dac1d3344e54a4a407c9a5e4dcbb819f5",
+    "harness_sha256": "414e1833c7f0cad45540693b278bfd03ddf1d5b9fc756a9754b57e3204b97e63",
+    "jssa_vendor_files_sha256": {
+      "benchmark/efficiency/benchmark_jssa_official.py": "c732e3d7d9aa1ee443aee8bc869d61303edde863f6c6b5e5252b06556f96649a",
+      "exp/vendor_baselines/jssa_vendor/qwen3_jssa_official.py": "d0b5641400dc8c3c0410cbf90d989132d6586ce23ea9cfc93ccaf1f561b77af2",
+      "exp/vendor_baselines/jssa_vendor/upstream/patched_src/vllm/v1/attention/ops/triton_jssa_store.py": "82d1cd0722936ac41906537a8e351bbf6de881bbe1742f549cae0ed25b2b579f",
+      "exp/vendor_baselines/jssa_vendor/upstream/patched_src/vllm/v1/attention/ops/triton_jssa_score_topk.py": "e8fb015a34ae3a2afd239a08bc7b0962ece8c2672e80fd630e4f6d03b96b1190",
+      "exp/vendor_baselines/jssa_vendor/upstream/patched_src/vllm/v1/attention/ops/triton_jssa_indexed_attend.py": "23d4a1dae78a1e5a7f757d111586b276acf1e52a139fba5847e171f1574afa08"
+    }
+  },
+  "matrix_driver_sha256": "5a58e38c28e68f6a6fbb1d643a6ff1274749a71d38dbd911fb2294bbf3c3f15c",
+  "arguments": {
+    "repo": "/home/wangyuanshuo02/two-level-attention",
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/tmp/nfa_kernel_inputs",
+    "basis_path": "/home/wangyuanshuo02/two-level-attention/bases/qwen3_8b.pt",
+    "output_dir": "/tmp/jssa_official_graph_main_20261110",
+    "gpu": 1,
+    "shard_index": 0,
+    "num_shards": 1,
+    "arms": [
+      "jssa-operator-profile",
+      "jssa-clean-e2e"
+    ],
+    "lengths": [
+      524288,
+      262144,
+      131072,
+      65536,
+      32768
+    ],
+    "batches": [
+      1,
+      2,
+      4
+    ],
+    "task": "niah_multikey_2",
+    "sample_index": 2,
+    "visible_len": 8192,
+    "warmup_steps": 3,
+    "profile_repeat": 5,
+    "decode_steps": 32,
+    "budget": 2048,
+    "rank": 32,
+    "page_size": 64,
+    "max_attempts": 2,
+    "summarize_only": true
+  },
+  "semantics": {
+    "implementation": "official vendored Triton store/score/indexed-attend",
+    "budget_per_token_per_kv_head": 2048,
+    "rank": 32,
+    "page_size": 64,
+    "topk": "official torch.topk fallback; vLLM radix unavailable",
+    "local_compatibility_patch": "register-only GQA padding to M>=16 for Triton tl.dot; all padded loads/stores masked",
+    "paper_pdf_verified": false,
+    "source_verified": true
+  },
+  "protocol": {
+    "operator": "separate nsys CUDA Graph node trace process",
+    "clean_e2e": "separate process without nsys or torch.profiler",
+    "host_overhead_derivable_by_subtraction": false,
+    "timing_metric": "end-to-end decode TPOT, not pure attention latency"
+  },
+  "records": [
+    {
+      "length": 524288,
+      "batch": 1,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_2.jsonl",
+        "sha256": "6ca6ca3137fe30ca2925a20641ae7f2e08d964f0bb7628bbc315ea1c29627dc8",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 0,
+        "actual_prompt_tokens": 523827,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 81.38204399999945,
+            "mean_ms_per_step": 16.276408799999892
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.42211199999999954,
+            "mean_ms_per_step": 0.08442239999999991
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 12.180404999999997,
+            "mean_ms_per_step": 2.4360809999999993
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 26.532629000000142,
+            "mean_ms_per_step": 5.306525800000029
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 38.713033999999865,
+            "mean_ms_per_step": 7.742606799999973
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 39.1351459999999,
+            "mean_ms_per_step": 7.82702919999998
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 2.1899610000000074,
+            "mean_ms_per_step": 0.4379922000000015
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 41.32510699999969,
+            "mean_ms_per_step": 8.265021399999938
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l524288_b1_graph.nsys-rep",
+          "report_sha256": "e94b4237d2365c649b7123cb2564b9c072fb41598a9382b0767657eb7c25a233",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l524288_b1_graph.sqlite",
+          "sqlite_sha256": "9f4fbcf95ea970564dda60983a99d5093a15a1824340da6da320264ed9ce4df5",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l524288_b1_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 16.670495986938477,
+        "prefill_seconds": 947.572131305933,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l524288_b1_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 262144,
+      "batch": 2,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_2.jsonl",
+        "sha256": "0f8b39583d1df5e267c1750da44300322a2b5359cf6b2fe89b45b56efe028b30",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 0,
+        "actual_prompt_tokens": 261935,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 83.4924039999996,
+            "mean_ms_per_step": 16.69848079999992
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.43142799999999987,
+            "mean_ms_per_step": 0.08628559999999998
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 12.272741000000003,
+            "mean_ms_per_step": 2.4545482000000005
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 25.474964000000064,
+            "mean_ms_per_step": 5.094992800000012
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 37.74770499999985,
+            "mean_ms_per_step": 7.549540999999969
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 38.17913299999981,
+            "mean_ms_per_step": 7.6358265999999615
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 3.9229120000000197,
+            "mean_ms_per_step": 0.7845824000000039
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 42.10204499999969,
+            "mean_ms_per_step": 8.420408999999939
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l262144_b2_graph.nsys-rep",
+          "report_sha256": "e02d251daf969def1ad0b0166b8e113dea0ff19f839e3eb3f2059a67e8bc43c2",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l262144_b2_graph.sqlite",
+          "sqlite_sha256": "0290bdc863d36a62b19a7c4f00e6492f3aa97f4c37ad8ca1ee6259cc5f79764e",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l262144_b2_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 17.13254451751709,
+        "prefill_seconds": 504.822047136724,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l262144_b2_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 262144,
+      "batch": 1,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_2.jsonl",
+        "sha256": "0f8b39583d1df5e267c1750da44300322a2b5359cf6b2fe89b45b56efe028b30",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 0,
+        "actual_prompt_tokens": 261935,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 67.97418699999959,
+            "mean_ms_per_step": 13.594837399999918
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.42137899999999984,
+            "mean_ms_per_step": 0.08427579999999997
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 6.286326000000005,
+            "mean_ms_per_step": 1.257265200000001
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 19.013622999999935,
+            "mean_ms_per_step": 3.802724599999987
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 25.299948999999582,
+            "mean_ms_per_step": 5.059989799999917
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 25.721327999999623,
+            "mean_ms_per_step": 5.144265599999924
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 2.1806620000000096,
+            "mean_ms_per_step": 0.4361324000000019
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 27.901989999999547,
+            "mean_ms_per_step": 5.580397999999909
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l262144_b1_graph.nsys-rep",
+          "report_sha256": "e5536955392ba1d7a1731db774169cf4ebc19e843ed3dc5a3cafa11eb1b5396b",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l262144_b1_graph.sqlite",
+          "sqlite_sha256": "b668bd536a092b2f0f907ea5538dd94a06458a119bc9d91c770bc9fc075c4de0",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l262144_b1_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 14.02124834060669,
+        "prefill_seconds": 253.5231165662408,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l262144_b1_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 131072,
+      "batch": 4,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_2.jsonl",
+        "sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 130989,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 86.99144299999976,
+            "mean_ms_per_step": 17.39828859999995
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.4210279999999998,
+            "mean_ms_per_step": 0.08420559999999996
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 12.116951999999992,
+            "mean_ms_per_step": 2.4233903999999984
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 25.13589899999996,
+            "mean_ms_per_step": 5.027179799999992
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 37.2528509999998,
+            "mean_ms_per_step": 7.4505701999999605
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 37.673878999999864,
+            "mean_ms_per_step": 7.534775799999973
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 6.815705000000042,
+            "mean_ms_per_step": 1.3631410000000084
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 44.489583999999894,
+            "mean_ms_per_step": 8.89791679999998
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l131072_b4_graph.nsys-rep",
+          "report_sha256": "079ed65d3e88958b1cb4566f9a4515c2693124f0c4d9d522173fdf1a89cec105",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l131072_b4_graph.sqlite",
+          "sqlite_sha256": "d43a1c45a17c897e7ded9b78702f633c4ce30016be011c96e031d20a1186a452",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l131072_b4_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 17.907760620117188,
+        "prefill_seconds": 284.58591963350773,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l131072_b4_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 131072,
+      "batch": 2,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_2.jsonl",
+        "sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 130989,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 69.94674599999976,
+            "mean_ms_per_step": 13.989349199999953
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.432386,
+            "mean_ms_per_step": 0.0864772
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 6.273678000000004,
+            "mean_ms_per_step": 1.2547356000000007
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 17.922908000000078,
+            "mean_ms_per_step": 3.5845816000000155
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 24.196585999999833,
+            "mean_ms_per_step": 4.839317199999966
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 24.628971999999887,
+            "mean_ms_per_step": 4.925794399999978
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 3.9024250000000253,
+            "mean_ms_per_step": 0.7804850000000051
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 28.531396999999853,
+            "mean_ms_per_step": 5.70627939999997
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l131072_b2_graph.nsys-rep",
+          "report_sha256": "1cfd1695e4f61595a454591ecc9b2b26a1b343829b73ab75925e4fa1bf81eb7e",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l131072_b2_graph.sqlite",
+          "sqlite_sha256": "3f7f0ed1b6c018a12513e8b1ffb966ab61e283748642d9c83063ffa60ff65923",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l131072_b2_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 14.428800106048584,
+        "prefill_seconds": 142.5100167170167,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l131072_b2_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_2.jsonl",
+        "sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 130989,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 61.54609799999963,
+            "mean_ms_per_step": 12.309219599999926
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.4258249999999997,
+            "mean_ms_per_step": 0.08516499999999994
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 3.2453029999999985,
+            "mean_ms_per_step": 0.6490605999999997
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 15.437036000000003,
+            "mean_ms_per_step": 3.0874072000000004
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 18.682338999999935,
+            "mean_ms_per_step": 3.736467799999987
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 19.108163999999938,
+            "mean_ms_per_step": 3.8216327999999877
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 2.1634740000000057,
+            "mean_ms_per_step": 0.43269480000000116
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 21.271637999999836,
+            "mean_ms_per_step": 4.254327599999967
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l131072_b1_graph.nsys-rep",
+          "report_sha256": "df0c79357ede09ce1dc858952571131d04a922f9e40c528c054bedd14b33f194",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l131072_b1_graph.sqlite",
+          "sqlite_sha256": "8fdad196d53bbca8b4fec67ca892a024df8b8ed6e27cb6efb9f989bed9a72d5c",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l131072_b1_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 12.71281623840332,
+        "prefill_seconds": 71.45162858068943,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l131072_b1_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 65536,
+      "batch": 4,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_2.jsonl",
+        "sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 65462,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 74.16793199999961,
+            "mean_ms_per_step": 14.833586399999922
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.41561799999999965,
+            "mean_ms_per_step": 0.08312359999999994
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 6.3135470000000025,
+            "mean_ms_per_step": 1.2627094000000005
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 18.349253999999927,
+            "mean_ms_per_step": 3.6698507999999856
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 24.66280099999987,
+            "mean_ms_per_step": 4.932560199999974
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 25.078418999999904,
+            "mean_ms_per_step": 5.015683799999981
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 6.809600000000043,
+            "mean_ms_per_step": 1.3619200000000087
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 31.88801899999991,
+            "mean_ms_per_step": 6.377603799999982
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l65536_b4_graph.nsys-rep",
+          "report_sha256": "c3f6e6ba6f7e8e0d71d406a3a4e846aec2296fb485613ef08fc3a216defff7ef",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l65536_b4_graph.sqlite",
+          "sqlite_sha256": "ebcb5213a3fff13d251eec81dbb1b561f82abc7b629b959474b5b300f36b1253",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l65536_b4_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 15.262320041656494,
+        "prefill_seconds": 86.49192108213902,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l65536_b4_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 65536,
+      "batch": 2,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_2.jsonl",
+        "sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 65462,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 63.389544999999934,
+            "mean_ms_per_step": 12.677908999999987
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.4314319999999997,
+            "mean_ms_per_step": 0.08628639999999994
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 3.322071999999998,
+            "mean_ms_per_step": 0.6644143999999996
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 14.412293000000131,
+            "mean_ms_per_step": 2.8824586000000263
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 17.73436499999991,
+            "mean_ms_per_step": 3.5468729999999824
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 18.16579699999995,
+            "mean_ms_per_step": 3.6331593999999905
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 3.8939440000000207,
+            "mean_ms_per_step": 0.7787888000000042
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 22.059740999999903,
+            "mean_ms_per_step": 4.411948199999981
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l65536_b2_graph.nsys-rep",
+          "report_sha256": "37972419a506dabfaf6955620c5d6c89ba38f9644e48d113b128e6828475a31d",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l65536_b2_graph.sqlite",
+          "sqlite_sha256": "de792c94bec667724ef02561df4c6f300a5c5c4bee750c506dd7044d91a082f4",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l65536_b2_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 13.129535675048828,
+        "prefill_seconds": 43.3089145347476,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l65536_b2_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_2.jsonl",
+        "sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 65462,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 58.15994499999949,
+            "mean_ms_per_step": 11.631988999999898
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.4258599999999999,
+            "mean_ms_per_step": 0.08517199999999998
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 1.9334809999999991,
+            "mean_ms_per_step": 0.3866961999999998
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 13.471546000000197,
+            "mean_ms_per_step": 2.6943092000000393
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 15.405026999999961,
+            "mean_ms_per_step": 3.0810053999999925
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 15.830886999999981,
+            "mean_ms_per_step": 3.166177399999996
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 2.1094820000000003,
+            "mean_ms_per_step": 0.42189640000000006
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 17.940368999999937,
+            "mean_ms_per_step": 3.588073799999987
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l65536_b1_graph.nsys-rep",
+          "report_sha256": "35a0fa6f71c682b58ff9a938a0d67eed528d32f482697a01becd9b1c190c1766",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l65536_b1_graph.sqlite",
+          "sqlite_sha256": "848202060506eece79133700d883597c897b0698224f9002c7f124a965eeb9bf",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l65536_b1_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 12.07262372970581,
+        "prefill_seconds": 21.917385824024677,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l65536_b1_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 32768,
+      "batch": 4,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_2.jsonl",
+        "sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 32622,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 67.69855999999945,
+            "mean_ms_per_step": 13.53971199999989
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.4226249999999998,
+            "mean_ms_per_step": 0.08452499999999996
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 3.324147,
+            "mean_ms_per_step": 0.6648294
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 14.731006000000042,
+            "mean_ms_per_step": 2.9462012000000084
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 18.05515299999993,
+            "mean_ms_per_step": 3.611030599999986
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 18.477777999999947,
+            "mean_ms_per_step": 3.6955555999999894
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 6.729243000000031,
+            "mean_ms_per_step": 1.3458486000000063
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 25.20702099999992,
+            "mean_ms_per_step": 5.041404199999984
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l32768_b4_graph.nsys-rep",
+          "report_sha256": "c6c4ca601fb1a8dd4a1a4e33a2d464e7cae5131ad379687a0126eb70e3fc163c",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l32768_b4_graph.sqlite",
+          "sqlite_sha256": "03b83f5600eb0c730946635fc94e3ad5958fda0e542e26d5c797f470e9cf2d53",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l32768_b4_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 13.981488227844238,
+        "prefill_seconds": 29.334511682391167,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l32768_b4_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 32768,
+      "batch": 2,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_2.jsonl",
+        "sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 32622,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 60.4123509999999,
+            "mean_ms_per_step": 12.08247019999998
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.4365149999999999,
+            "mean_ms_per_step": 0.08730299999999998
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 1.9769080000000008,
+            "mean_ms_per_step": 0.39538160000000017
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 12.732544000000122,
+            "mean_ms_per_step": 2.546508800000024
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 14.709451999999967,
+            "mean_ms_per_step": 2.9418903999999935
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 15.145966999999994,
+            "mean_ms_per_step": 3.0291933999999987
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 3.8947730000000265,
+            "mean_ms_per_step": 0.7789546000000053
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 19.040739999999914,
+            "mean_ms_per_step": 3.8081479999999828
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l32768_b2_graph.nsys-rep",
+          "report_sha256": "40842c0ee14187b911b0ede8982be8c6500e95b87669a1295b11088915e1c1a3",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l32768_b2_graph.sqlite",
+          "sqlite_sha256": "4b87783982a7f4ac1c9d8033b801a3819450899591d56a8ce8e6b4327f355216",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l32768_b2_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 12.509136199951172,
+        "prefill_seconds": 14.919085025787354,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l32768_b2_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_2.jsonl",
+        "sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 32622,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 14725,
+            "mean_calls_per_step": 2945.0,
+            "total_ms": 55.02387399999975,
+            "mean_ms_per_step": 11.00477479999995
+          },
+          "store_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 0.42284899999999964,
+            "mean_ms_per_step": 0.08456979999999993
+          },
+          "score_ms": {
+            "calls_total": 180,
+            "mean_calls_per_step": 36.0,
+            "total_ms": 1.1704379999999999,
+            "mean_ms_per_step": 0.23408759999999998
+          },
+          "topk_ms": {
+            "calls_total": 2880,
+            "mean_calls_per_step": 576.0,
+            "total_ms": 11.157120000000072,
+            "mean_ms_per_step": 2.2314240000000143
+          },
+          "score_topk_ms": {
+            "calls_total": 3060,
+            "mean_calls_per_step": 612.0,
+            "total_ms": 12.32755800000014,
+            "mean_ms_per_step": 2.465511600000028
+          },
+          "selection_with_store_ms": {
+            "calls_total": 3240,
+            "mean_calls_per_step": 648.0,
+            "total_ms": 12.750407000000157,
+            "mean_ms_per_step": 2.5500814000000314
+          },
+          "selected_attention_ms": {
+            "calls_total": 360,
+            "mean_calls_per_step": 72.0,
+            "total_ms": 2.121099,
+            "mean_ms_per_step": 0.42421980000000004
+          },
+          "official_named_operator_total_ms": {
+            "calls_total": 3600,
+            "mean_calls_per_step": 720.0,
+            "total_ms": 14.871506000000048,
+            "mean_ms_per_step": 2.9743012000000095
+          },
+          "scope": "Official named store/score/indexed-attend plus the complete observed torch.topk kernel family. Query group-mean/projection/scale kernels remain in kernel_summary but are not attributed to named totals.",
+          "topk_implementation": "official torch.topk fallback; not vLLM radix",
+          "topk_members": [
+            "void at::native::mbtopk::computeBlockwiseKthCounts<unsigned int>(T1 *, short *, unsigned int, unsigned int, unsigned int *)",
+            "void at::native::mbtopk::computeBlockwiseWithinKCounts<unsigned int, float>(T1 *, short *, unsigned int *, unsigned int, int, bool, unsigned int *, T2 *, unsigned int *, T1 *, unsigned int)",
+            "void at::native::mbtopk::fill<unsigned int, unsigned int>(T1 *, T1, T2)",
+            "void at::native::mbtopk::gatherTopK<float, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, unsigned int, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, unsigned int, unsigned int, T1 *, unsigned int *, unsigned int *, unsigned int)",
+            "void at::native::mbtopk::radixFindKthValues<float, unsigned int, unsigned int, (int)2>(at::cuda::detail::TensorInfo<const T1, T2>, unsigned int, unsigned int *, unsigned int, T2, int, int, unsigned int, T3, T3 *, short *)",
+            "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)64, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+            "void at_cuda_detail::cub::DeviceScanByKeyInitKernel<at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>>(T1, T2, std::iterator_traits<T2>::value_type *, unsigned int, int)",
+            "void at_cuda_detail::cub::DeviceScanByKeyKernel<at_cuda_detail::cub::DeviceScanByKeyPolicy<at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int, unsigned int, cuda::std::__4::plus<void>>::Policy900, at_cuda_detail::cub::TransformInputIterator<unsigned int, at::native::mbtopk::BlockIdxToKey, at_cuda_detail::cub::CountingInputIterator<unsigned int, unsigned int>, long>, unsigned int *, unsigned int *, at_cuda_detail::cub::ReduceByKeyScanTileState<unsigned int, int, (bool)1>, cuda::std::__4::equal_to<void>, cuda::std::__4::plus<void>, at_cuda_detail::cub::NullType, int, unsigned int, unsigned int>(T2, T11 *, T3, T4, T5, int, T6, T7, T8, T9)"
+          ]
+        },
+        "profiled_decode_steps": 5,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l32768_b1_graph.nsys-rep",
+          "report_sha256": "69a1ba7844d9b6fda02b74984ee1ce416a8243a97586811ce6f0de4d2dbe7ba1",
+          "sqlite_path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l32768_b1_graph.sqlite",
+          "sqlite_sha256": "a54b5c731402684a9612d602a1f255bbcc29284def38e500616b7851618c5b92",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-operator-profile/jssa-operator-profile_l32768_b1_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 11.429935932159424,
+        "prefill_seconds": 7.71939854323864,
+        "path": "/tmp/jssa_official_graph_main_20261110/jssa-clean-e2e/jssa-clean-e2e_l32768_b1_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true
+    }
+  ],
+  "infeasible_memory_cells": [
+    {
+      "length": 524288,
+      "batch": 4,
+      "memory": {
+        "batch": 4,
+        "kv_gib": 288.02032470703125,
+        "weights_and_runtime_reserve_gib": 20.0,
+        "required_lower_bound_gib": 308.02032470703125,
+        "gpu_total_gib": 140.4013671875,
+        "feasible": false,
+        "note": "paged frozen skip \u4e0e FlashInfer \u90fd\u4fdd\u7559\u5168\u90e8\u7269\u7406 KV\uff1b\u8fd9\u662f\u5bb9\u91cf\u4e0b\u754c\uff0c\u4e0d\u662f\u5b9e\u6d4b\u663e\u5b58"
+      }
+    },
+    {
+      "length": 524288,
+      "batch": 2,
+      "memory": {
+        "batch": 2,
+        "kv_gib": 144.01016235351562,
+        "weights_and_runtime_reserve_gib": 20.0,
+        "required_lower_bound_gib": 164.01016235351562,
+        "gpu_total_gib": 140.4013671875,
+        "feasible": false,
+        "note": "paged frozen skip \u4e0e FlashInfer \u90fd\u4fdd\u7559\u5168\u90e8\u7269\u7406 KV\uff1b\u8fd9\u662f\u5bb9\u91cf\u4e0b\u754c\uff0c\u4e0d\u662f\u5b9e\u6d4b\u663e\u5b58"
+      }
+    },
+    {
+      "length": 262144,
+      "batch": 4,
+      "memory": {
+        "batch": 4,
+        "kv_gib": 144.02032470703125,
+        "weights_and_runtime_reserve_gib": 20.0,
+        "required_lower_bound_gib": 164.02032470703125,
+        "gpu_total_gib": 140.4013671875,
+        "feasible": false,
+        "note": "paged frozen skip \u4e0e FlashInfer \u90fd\u4fdd\u7559\u5168\u90e8\u7269\u7406 KV\uff1b\u8fd9\u662f\u5bb9\u91cf\u4e0b\u754c\uff0c\u4e0d\u662f\u5b9e\u6d4b\u663e\u5b58"
+      }
+    }
+  ]
+}

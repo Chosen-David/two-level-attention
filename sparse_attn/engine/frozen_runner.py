@@ -159,7 +159,7 @@ def decode_frozen_request(model, output, *, max_new_tokens, eos_ids,
                           pad_token_id=0, capture_graph=True,
                           min_new_tokens=0, suffix_ids=None):
     """逐 token 消费完整 suffix，随后只把答案新增 token 交给调用方。"""
-    from sparse_attn.engine.graph_runner import GraphRunner
+    from sparse_attn.engine.graph_runner import session_graph_runner
     from sparse_attn.scheduler.scheduler import ContinuousBatchScheduler
 
     if max_new_tokens < 0:
@@ -186,6 +186,7 @@ def decode_frozen_request(model, output, *, max_new_tokens, eos_ids,
             first_token = greedy_next_tokens(
                 output.logits, eos_ids, generated_counts=0,
                 min_new_tokens=min_new_tokens)
+            # 首 token 是请求边界允许的一次同步；后续只消费 pinned CPU 回执。
             generated.append(int(first_token[0]))
             if (len(generated) >= max_new_tokens
                     or (len(generated) >= min_new_tokens and generated[-1] in eos_ids)):
@@ -194,40 +195,78 @@ def decode_frozen_request(model, output, *, max_new_tokens, eos_ids,
 
         scheduler = ContinuousBatchScheduler(
             cache=cache, max_batch=1, eos_ids=eos_ids,
-            pad_token_id=pad_token_id)
+            pad_token_id=pad_token_id, track_receipts=True,
+            auto_finish_requests=False)
         scheduler.add_request(request_id)
-        runner = GraphRunner(
-            scheduler=scheduler, buckets=(1,), device=next(model.parameters()).device)
-        if capture_graph:
-            runner.capture_all(model, cache)
+        runner = session_graph_runner(
+            model, cache, scheduler, buckets=(1,),
+            device=next(model.parameters()).device, capture=capture_graph)
+        if not hasattr(scheduler, 'pop_ready_receipts'):
+            raise RuntimeError('frozen decode requires async D2H receipts')
+        submitted = 1  # prefill 首 token，或最后一个 suffix forward 的答案候选
+        stopped = False
 
-        if suffix_ids:
-            scheduler.next_tokens[request_id] = suffix_ids[0]
-            for index in range(len(suffix_ids)):
-                forced = ([suffix_ids[index + 1]]
-                          if index + 1 < len(suffix_ids) else None)
-                _, tokens = runner.step(
-                    model, cache, generated_counts=0,
-                    min_new_tokens=min_new_tokens, return_next_tokens=True,
-                    forced_tokens=forced, stop_on_eos=forced is None)
-            generated.append(int(tokens[0]))
-            if (len(generated) >= max_new_tokens
-                    or (len(generated) >= min_new_tokens and generated[-1] in eos_ids)):
-                cache.transition_request(request_id, RequestPhase.FINISHED)
-                return generated, cache
-            cache.transition_request(request_id, RequestPhase.GENERATE)
-        else:
-            scheduler.next_tokens[request_id] = generated[0]
+        def consume(receipts):
+            nonlocal stopped
+            for receipt_request_id, token in receipts:
+                if receipt_request_id != request_id or stopped:
+                    continue
+                if len(generated) >= max_new_tokens:
+                    stopped = True
+                    break
+                generated.append(int(token))
+                if (len(generated) >= min_new_tokens
+                        and generated[-1] in eos_ids):
+                    stopped = True
 
-        while len(generated) < max_new_tokens:
-            _, tokens = runner.step(
-                model, cache, generated_counts=len(generated),
-                min_new_tokens=min_new_tokens, return_next_tokens=True)
-            generated.append(int(tokens[0]))
-            if len(generated) >= min_new_tokens and generated[-1] in eos_ids:
-                break
-        cache.transition_request(request_id, RequestPhase.FINISHED)
-        return generated, cache
+        try:
+            if suffix_ids:
+                scheduler.next_tokens[request_id] = suffix_ids[0]
+                for index in range(len(suffix_ids)):
+                    forced = ([suffix_ids[index + 1]]
+                              if index + 1 < len(suffix_ids) else None)
+                    runner.step(
+                        model, cache, generated_counts=0,
+                        min_new_tokens=min_new_tokens, return_next_tokens=True,
+                        forced_tokens=forced, stop_on_eos=forced is None)
+                    # suffix forward 的 forced 输出不是答案；只有这些步需要
+                    # 丢弃回执，最后一个 suffix 的答案候选保留给后续统一消费。
+                    if forced is not None:
+                        scheduler.track_receipts = False
+                        scheduler.pop_ready_receipts()
+                scheduler.track_receipts = True
+                cache.transition_request(request_id, RequestPhase.GENERATE)
+            else:
+                scheduler.next_tokens[request_id] = generated[0]
+
+            while submitted < max_new_tokens and not stopped:
+                runner.step(
+                    model, cache, generated_counts=submitted,
+                    min_new_tokens=min_new_tokens, return_next_tokens=True)
+                submitted += 1
+                consume(scheduler.pop_ready_receipts())
+            # 仅在请求返回前等待未决 Event；慢回执造成的 EOS 后候选会被
+            # consume 截断，不会混入调用方输出。
+            consume(scheduler.flush_ready_receipts())
+            # 慢回执下可能已经多提交了 EOS 后的 forward。这些物理写入位于
+            # 逻辑长度之外，请求返回前回滚其可观察状态，保持与同步 decode
+            # 完全相同的最终长度、decode 步数和 trace 范围。
+            extra_steps = max(0, submitted - len(generated))
+            if extra_steps:
+                cache.states[request_id].logical_length -= extra_steps
+                cache.nfa_decode_steps = max(
+                    0, cache.nfa_decode_steps - extra_steps)
+                if getattr(cache, 'decode_trace_enabled', False):
+                    expected_steps = (len(suffix_ids)
+                                      + max(0, len(generated) - 1))
+                    for layer in cache.layers:
+                        del layer.nfa_decode_trace[expected_steps:]
+            cache.transition_request(request_id, RequestPhase.FINISHED)
+            return generated, cache
+        finally:
+            pool = getattr(model, '_nfa_graph_session_pool', None)
+            if pool is not None:
+                pool.release(runner)
 
 
 def _region_present(layer, geometry):

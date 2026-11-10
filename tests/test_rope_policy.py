@@ -13,7 +13,8 @@ from benchmark.RULER.yarn_receipt import resolve_yarn_config
 MODEL='/home/wangyuanshuo02/Qwen3-8B'
 
 
-@pytest.mark.parametrize('length,factor',[(65536,2.),(131072,4.)])
+@pytest.mark.parametrize('length,factor',[
+    (65536,2.),(131072,4.),(262144,8.),(524288,16.)])
 def test_runtime_frequencies_and_position_capacity(length,factor):
     config=AutoConfig.from_pretrained(MODEL)
     snapshot=config.max_position_embeddings

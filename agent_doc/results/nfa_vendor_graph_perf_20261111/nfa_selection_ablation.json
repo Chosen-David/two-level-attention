@@ -1,0 +1,2073 @@
+{
+  "schema": "nfa-selection-tail-full-skip-ablation-v1",
+  "validation_status": "pending-independent-verification",
+  "source": {
+    "head": "1c6c955509099973106247d82a8531ee3e3606e1",
+    "diff_sha256": "ba2394ea4dc83802876d63468920e87dac1d3344e54a4a407c9a5e4dcbb819f5",
+    "harness_sha256": "22d65afa8e1a755fa7c088c701feabed51f4040689d82eaf34d4920ed9887870"
+  },
+  "combiner_sha256": "a54e3f4c4637d367ea523e10ae0d699596485c6a7b05d136f1968b1655a453c7",
+  "semantics": {
+    "tail_skip": "tail32 subspace + dynamic gate epsilon 0.05",
+    "tail_noskip": "tail32 subspace + gate epsilon 0",
+    "full_skip": "full-dimensional index + dynamic gate epsilon 0.05",
+    "full_noskip": "full-dimensional index + gate epsilon 0",
+    "tail_vs_full_speedup": "full time / tail time; >1 means tail is faster",
+    "skip_vs_noskip_speedup": "no-skip time / skip time; >1 means skip is faster",
+    "negative_results_retained": true,
+    "operator_observer_effect": "nsys Graph node tracing may perturb kernel time; never subtract profiled operator total from clean TPOT to infer host overhead"
+  },
+  "source_summaries": {
+    "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/summary.json",
+    "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/summary.json",
+    "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/summary.json",
+    "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/summary.json"
+  },
+  "infeasible_memory_cells": [
+    {
+      "length": 524288,
+      "batch": 4,
+      "memory": {
+        "batch": 4,
+        "kv_gib": 288.02032470703125,
+        "weights_and_runtime_reserve_gib": 20.0,
+        "required_lower_bound_gib": 308.02032470703125,
+        "gpu_total_gib": 140.4013671875,
+        "feasible": false,
+        "note": "paged frozen skip \u4e0e FlashInfer \u90fd\u4fdd\u7559\u5168\u90e8\u7269\u7406 KV\uff1b\u8fd9\u662f\u5bb9\u91cf\u4e0b\u754c\uff0c\u4e0d\u662f\u5b9e\u6d4b\u663e\u5b58"
+      }
+    },
+    {
+      "length": 524288,
+      "batch": 2,
+      "memory": {
+        "batch": 2,
+        "kv_gib": 144.01016235351562,
+        "weights_and_runtime_reserve_gib": 20.0,
+        "required_lower_bound_gib": 164.01016235351562,
+        "gpu_total_gib": 140.4013671875,
+        "feasible": false,
+        "note": "paged frozen skip \u4e0e FlashInfer \u90fd\u4fdd\u7559\u5168\u90e8\u7269\u7406 KV\uff1b\u8fd9\u662f\u5bb9\u91cf\u4e0b\u754c\uff0c\u4e0d\u662f\u5b9e\u6d4b\u663e\u5b58"
+      }
+    },
+    {
+      "length": 262144,
+      "batch": 4,
+      "memory": {
+        "batch": 4,
+        "kv_gib": 144.02032470703125,
+        "weights_and_runtime_reserve_gib": 20.0,
+        "required_lower_bound_gib": 164.02032470703125,
+        "gpu_total_gib": 140.4013671875,
+        "feasible": false,
+        "note": "paged frozen skip \u4e0e FlashInfer \u90fd\u4fdd\u7559\u5168\u90e8\u7269\u7406 KV\uff1b\u8fd9\u662f\u5bb9\u91cf\u4e0b\u754c\uff0c\u4e0d\u662f\u5b9e\u6d4b\u663e\u5b58"
+      }
+    }
+  ],
+  "records": [
+    {
+      "length": 524288,
+      "batch": 1,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.5801353999999999,
+          "l1_topk_ms": 0.4941898000000001,
+          "candidate_ms": 0.1976646,
+          "l1_ms": 1.2719898,
+          "l2_score_ms": 0.6940108000000001,
+          "l2_topk_ms": 1.3378903999999991,
+          "selection_union_ms": 0.2369217999999999,
+          "l2_ms": 2.2688229999999994,
+          "topk_total_ms": 1.8320801999999994,
+          "selected_attention_ms": 1.0244695999999998,
+          "nfa_operator_total_ms": 4.565282399999999
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.5789073999999997,
+          "l1_topk_ms": 0.5160409999999997,
+          "candidate_ms": 0.2303939999999999,
+          "l1_ms": 1.3253423999999994,
+          "l2_score_ms": 0.7804706000000005,
+          "l2_topk_ms": 1.3359089999999996,
+          "selection_union_ms": 0.23676899999999992,
+          "l2_ms": 2.3531486,
+          "topk_total_ms": 1.8519499999999993,
+          "selected_attention_ms": 1.014608799999999,
+          "nfa_operator_total_ms": 4.693099799999998
+        },
+        "full_skip": {
+          "l1_score_ms": 2.0272790000000014,
+          "l1_topk_ms": 0.5017368000000001,
+          "candidate_ms": 0.1997569999999999,
+          "l1_ms": 2.7287728000000016,
+          "l2_score_ms": 0.689322,
+          "l2_topk_ms": 1.3389815999999997,
+          "selection_union_ms": 0.23752420000000002,
+          "l2_ms": 2.2658277999999994,
+          "topk_total_ms": 1.8407183999999996,
+          "selected_attention_ms": 1.0201327999999996,
+          "nfa_operator_total_ms": 6.014733400000001
+        },
+        "full_noskip": {
+          "l1_score_ms": 2.024433400000001,
+          "l1_topk_ms": 0.5237385999999999,
+          "candidate_ms": 0.23492619999999992,
+          "l1_ms": 2.783098200000001,
+          "l2_score_ms": 0.7758576000000003,
+          "l2_topk_ms": 1.3365127999999993,
+          "selection_union_ms": 0.23745979999999994,
+          "l2_ms": 2.3498301999999995,
+          "topk_total_ms": 1.8602513999999992,
+          "selected_attention_ms": 1.0197885999999998,
+          "nfa_operator_total_ms": 6.152717
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 3.494492837361764,
+          "l1_topk_ms": 1.0152714604793542,
+          "candidate_ms": 1.0105856081463243,
+          "l1_ms": 2.1452788379277896,
+          "l2_score_ms": 0.9932439091725948,
+          "l2_topk_ms": 1.0008156123999399,
+          "selection_union_ms": 1.0025426111062812,
+          "l2_ms": 0.9986798441306352,
+          "topk_total_ms": 1.004714968263944,
+          "selected_attention_ms": 0.9957667850759064,
+          "nfa_operator_total_ms": 1.3174942693577951
+        },
+        "noskip": {
+          "l1_score_ms": 3.4969900194746204,
+          "l1_topk_ms": 1.0149166442201303,
+          "candidate_ms": 1.019671519223591,
+          "l1_ms": 2.0999088235613694,
+          "l2_score_ms": 0.9940894634596099,
+          "l2_topk_ms": 1.0004519768936355,
+          "selection_union_ms": 1.0029176116805834,
+          "l2_ms": 0.9985898043158004,
+          "topk_total_ms": 1.0044825184265234,
+          "selected_attention_ms": 1.0051052188784493,
+          "nfa_operator_total_ms": 1.3110134585247906
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 0.9978832527716803,
+          "l1_topk_ms": 1.044216210047232,
+          "candidate_ms": 1.165580483303535,
+          "l1_ms": 1.041944204269562,
+          "l2_score_ms": 1.124579905672938,
+          "l2_topk_ms": 0.9985190117217377,
+          "selection_union_ms": 0.9993550614590976,
+          "l2_ms": 1.0371671126394613,
+          "topk_total_ms": 1.01084548591268,
+          "selected_attention_ms": 0.9903747265902271,
+          "nfa_operator_total_ms": 1.027997698455631
+        },
+        "full": {
+          "l1_score_ms": 0.9985963451503219,
+          "l1_topk_ms": 1.043851278200044,
+          "candidate_ms": 1.176059912794045,
+          "l1_ms": 1.019908363202682,
+          "l2_score_ms": 1.125537267053714,
+          "l2_topk_ms": 0.9981562106604002,
+          "selection_union_ms": 0.9997288697320101,
+          "l2_ms": 1.0370736028571987,
+          "topk_total_ms": 1.0106116177249054,
+          "selected_attention_ms": 0.999662592948683,
+          "nfa_operator_total_ms": 1.022940933674633
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.nsys-rep",
+          "report_sha256": "d966833622400960e82e6089c2431c0a7468f48ccc9caede6eef6d296339aa58",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.sqlite",
+          "sqlite_sha256": "1279ec441f543ef2d86fca4c746db9a4feb619d1da26178987ce3d33779201bb",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.nsys-rep",
+          "report_sha256": "f5e723280411b86acad23766233dc7377db39676b0911817acd29763eddfaada",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.sqlite",
+          "sqlite_sha256": "9c9e06bdc82d82fc4b5f5be8ef9abaa8a9b8b75920b69cd3e1fe30e844bc7de7",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.nsys-rep",
+          "report_sha256": "8b32aa35c61e364bf1736b8d389e31dce858a7e5e8eae7793cece63e4d5356e1",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.sqlite",
+          "sqlite_sha256": "4ff3d7dacca033bdd6e7a1b050755ac89ed4d69b748f75c53ed8fe51511542fb",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.nsys-rep",
+          "report_sha256": "812b212ae17860dba145419fc6908729235384c41be97f16f5f9b3390c328f28",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l524288_b1_graph.sqlite",
+          "sqlite_sha256": "3c5af8e417c16acefcb5b4b7cebe508445a6b0849d5477d1c3104d9e012d9367",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 262144,
+      "batch": 1,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.45464319999999986,
+          "l1_topk_ms": 0.34246379999999993,
+          "candidate_ms": 0.20762879999999995,
+          "l1_ms": 1.0047357999999997,
+          "l2_score_ms": 0.7284799999999998,
+          "l2_topk_ms": 1.3350271999999996,
+          "selection_union_ms": 0.2383102,
+          "l2_ms": 2.3018173999999996,
+          "topk_total_ms": 1.6774909999999994,
+          "selected_attention_ms": 1.0231358000000008,
+          "nfa_operator_total_ms": 4.329689
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.4550308000000003,
+          "l1_topk_ms": 0.36126479999999994,
+          "candidate_ms": 0.208373,
+          "l1_ms": 1.0246686000000005,
+          "l2_score_ms": 0.7819326000000008,
+          "l2_topk_ms": 1.3336629999999996,
+          "selection_union_ms": 0.23787120000000006,
+          "l2_ms": 2.3534668000000005,
+          "topk_total_ms": 1.6949277999999997,
+          "selected_attention_ms": 1.0213208000000005,
+          "nfa_operator_total_ms": 4.399456200000001
+        },
+        "full_skip": {
+          "l1_score_ms": 1.3516623999999997,
+          "l1_topk_ms": 0.34434260000000005,
+          "candidate_ms": 0.2012306,
+          "l1_ms": 1.8972355999999995,
+          "l2_score_ms": 0.7213764000000001,
+          "l2_topk_ms": 1.3333262000000008,
+          "selection_union_ms": 0.23544639999999978,
+          "l2_ms": 2.2901490000000004,
+          "topk_total_ms": 1.6776688000000006,
+          "selected_attention_ms": 1.0208287999999992,
+          "nfa_operator_total_ms": 5.2082134
+        },
+        "full_noskip": {
+          "l1_score_ms": 1.3515554,
+          "l1_topk_ms": 0.36354799999999987,
+          "candidate_ms": 0.20335500000000004,
+          "l1_ms": 1.9184584,
+          "l2_score_ms": 0.7755688000000004,
+          "l2_topk_ms": 1.3323806000000005,
+          "selection_union_ms": 0.23512439999999984,
+          "l2_ms": 2.3430738000000004,
+          "topk_total_ms": 1.6959286000000002,
+          "selected_attention_ms": 1.0151942000000003,
+          "nfa_operator_total_ms": 5.276726400000001
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 2.973017962217405,
+          "l1_topk_ms": 1.0054861272928703,
+          "candidate_ms": 0.9691844291350721,
+          "l1_ms": 1.8882930219068534,
+          "l2_score_ms": 0.9902487370964204,
+          "l2_topk_ms": 0.9987258686564597,
+          "selection_union_ms": 0.9879828895280176,
+          "l2_ms": 0.9949307881676457,
+          "topk_total_ms": 1.0001059916267814,
+          "selected_attention_ms": 0.997745167357059,
+          "nfa_operator_total_ms": 1.2029070448246975
+        },
+        "noskip": {
+          "l1_score_ms": 2.9702503654697643,
+          "l1_topk_ms": 1.0063200178926923,
+          "candidate_ms": 0.9759181851775424,
+          "l1_ms": 1.87227206923292,
+          "l2_score_ms": 0.9918614468817385,
+          "l2_topk_ms": 0.9990384377462679,
+          "selection_union_ms": 0.9884525743343447,
+          "l2_ms": 0.9955839614988408,
+          "topk_total_ms": 1.0005904676293589,
+          "selected_attention_ms": 0.9940012971438551,
+          "nfa_operator_total_ms": 1.199404235459828
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 1.0008525366705152,
+          "l1_topk_ms": 1.0548992331452258,
+          "candidate_ms": 1.0035842811787192,
+          "l1_ms": 1.0198388471874902,
+          "l2_score_ms": 1.0733755216340888,
+          "l2_topk_ms": 0.9989781481605767,
+          "selection_union_ms": 0.9981578631548296,
+          "l2_ms": 1.0224385305280954,
+          "topk_total_ms": 1.0103945714164786,
+          "selected_attention_ms": 0.9982260419389094,
+          "nfa_operator_total_ms": 1.016113674677327
+        },
+        "full": {
+          "l1_score_ms": 0.9999208382211419,
+          "l1_topk_ms": 1.0557741040463766,
+          "candidate_ms": 1.0105570425173906,
+          "l1_ms": 1.0111861700254836,
+          "l2_score_ms": 1.0751236109193485,
+          "l2_topk_ms": 0.9992907962057594,
+          "selection_union_ms": 0.9986323851203504,
+          "l2_ms": 1.0231097627272288,
+          "topk_total_ms": 1.0108840314607983,
+          "selected_attention_ms": 0.9944803673250608,
+          "nfa_operator_total_ms": 1.013154798918186
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.nsys-rep",
+          "report_sha256": "ff98e3761b1d09c0a0fcbdc4025fcaf2ff124a04ea92314be0b7c46557ca5707",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.sqlite",
+          "sqlite_sha256": "838c582a2e3a7b4cf75968c31ab0f68a4370e92ac2a4c873f1849db0ddecc96b",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.nsys-rep",
+          "report_sha256": "a7d0ee8541fc8a56ba6f9459a9f41f7852b3b45f0a190d6e1da2deeb3820aeab",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.sqlite",
+          "sqlite_sha256": "7f3dcb91c78b34676747720bff17ae777df11c270773c01178fa6572a7c6a92a",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.nsys-rep",
+          "report_sha256": "1c2c6879897f9ad29826f18c0cc4869e845897863ef3a2492f84d3500652db26",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.sqlite",
+          "sqlite_sha256": "23a96bb6792a55f6e0ee3f9df073cd88a204c733c01f848ad82f5c4b8cd93e7d",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.nsys-rep",
+          "report_sha256": "d70c40aeacf775b1887517ade2b003bc556f9bdf5499f32c77f8e03d81806e4d",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b1_graph.sqlite",
+          "sqlite_sha256": "3bec679efdd6cced47985bae09e36f1fcba271db84ffca68c0a5f076b984a91a",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 262144,
+      "batch": 2,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.5829065999999999,
+          "l1_topk_ms": 0.3816324000000001,
+          "candidate_ms": 0.2582278,
+          "l1_ms": 1.2227668,
+          "l2_score_ms": 1.4664006000000005,
+          "l2_topk_ms": 1.4036572000000005,
+          "selection_union_ms": 0.2403972000000001,
+          "l2_ms": 3.110455000000001,
+          "topk_total_ms": 1.7852896000000005,
+          "selected_attention_ms": 1.0328974000000017,
+          "nfa_operator_total_ms": 5.366119200000003
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.5826401999999999,
+          "l1_topk_ms": 0.3972824,
+          "candidate_ms": 0.2703318,
+          "l1_ms": 1.2502543999999998,
+          "l2_score_ms": 1.754230200000001,
+          "l2_topk_ms": 1.4058778000000003,
+          "selection_union_ms": 0.24175519999999992,
+          "l2_ms": 3.401863200000001,
+          "topk_total_ms": 1.8031602000000002,
+          "selected_attention_ms": 1.0244929999999999,
+          "nfa_operator_total_ms": 5.676610600000001
+        },
+        "full_skip": {
+          "l1_score_ms": 2.0279598,
+          "l1_topk_ms": 0.3794233999999999,
+          "candidate_ms": 0.2564604000000001,
+          "l1_ms": 2.6638436,
+          "l2_score_ms": 1.4659543999999993,
+          "l2_topk_ms": 1.4023217999999997,
+          "selection_union_ms": 0.24282240000000005,
+          "l2_ms": 3.111098599999999,
+          "topk_total_ms": 1.7817451999999996,
+          "selected_attention_ms": 1.0237174000000002,
+          "nfa_operator_total_ms": 6.798659599999999
+        },
+        "full_noskip": {
+          "l1_score_ms": 2.0280471999999996,
+          "l1_topk_ms": 0.3955780000000001,
+          "candidate_ms": 0.2713156000000002,
+          "l1_ms": 2.6949408,
+          "l2_score_ms": 1.7526634000000008,
+          "l2_topk_ms": 1.4046293999999993,
+          "selection_union_ms": 0.24449919999999986,
+          "l2_ms": 3.4017919999999995,
+          "topk_total_ms": 1.8002073999999992,
+          "selected_attention_ms": 1.0291798000000012,
+          "nfa_operator_total_ms": 7.125912600000001
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 3.4790475866974235,
+          "l1_topk_ms": 0.9942117073917199,
+          "candidate_ms": 0.9931556555878185,
+          "l1_ms": 2.178537722810269,
+          "l2_score_ms": 0.9996957175276653,
+          "l2_topk_ms": 0.9990486281123334,
+          "selection_union_ms": 1.0100883038571162,
+          "l2_ms": 1.0002069150654802,
+          "topk_total_ms": 0.9980146638394124,
+          "selected_attention_ms": 0.991112379603239,
+          "nfa_operator_total_ms": 1.266960227048254
+        },
+        "noskip": {
+          "l1_score_ms": 3.4807883149841015,
+          "l1_topk_ms": 0.9957098527395125,
+          "candidate_ms": 1.003639231492559,
+          "l1_ms": 2.155513949800937,
+          "l2_score_ms": 0.9991068447003134,
+          "l2_topk_ms": 0.9991120138606634,
+          "selection_union_ms": 1.0113503246259024,
+          "l2_ms": 0.9999790702930084,
+          "topk_total_ms": 0.9983624305815972,
+          "selected_attention_ms": 1.0045747506327534,
+          "nfa_operator_total_ms": 1.2553111534548451
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 0.9995429799559655,
+          "l1_topk_ms": 1.0410080485828768,
+          "candidate_ms": 1.046873342064642,
+          "l1_ms": 1.0224798383469356,
+          "l2_score_ms": 1.196283062077307,
+          "l2_topk_ms": 1.0015820101945117,
+          "selection_union_ms": 1.005648984264375,
+          "l2_ms": 1.093686679280041,
+          "topk_total_ms": 1.0100099165984049,
+          "selected_attention_ms": 0.991863277030224,
+          "nfa_operator_total_ms": 1.057861442958628
+        },
+        "full": {
+          "l1_score_ms": 1.0000430975012422,
+          "l1_topk_ms": 1.0425767098181087,
+          "candidate_ms": 1.0579239523918706,
+          "l1_ms": 1.0116738084773444,
+          "l2_score_ms": 1.1955783890685834,
+          "l2_topk_ms": 1.0016455566760778,
+          "selection_union_ms": 1.006905458475,
+          "l2_ms": 1.0934375400381076,
+          "topk_total_ms": 1.0103618631889675,
+          "selected_attention_ms": 1.005335847568871,
+          "nfa_operator_total_ms": 1.0481349294204996
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.nsys-rep",
+          "report_sha256": "6ad61262725fba7ad8b082d4dbd6b9e2b926a8d935fd7315ce0087dbe1b4ea6b",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.sqlite",
+          "sqlite_sha256": "e6afe707bfb0dccc3325b39782cd1fd8e858228f64667aedd29e5ad3b4114f7a",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.nsys-rep",
+          "report_sha256": "9383a8b7208ed0a0d5e8efb85fe7c12122b476533f41be2c0b02a54bcda25fdf",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.sqlite",
+          "sqlite_sha256": "648a196438c4388bafbccc83e64e4fa700dc819b502d414610288a1fe5efd950",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.nsys-rep",
+          "report_sha256": "acc8f7bfda4f3cc3dea6cf67c0b8dba7c8c8b8630d7f9f6fa9be405b17ac8911",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.sqlite",
+          "sqlite_sha256": "86f71c71b93a12028315a8da5de3b361c2a6a5551bc5dc8de9ce5932ec3e66ec",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.nsys-rep",
+          "report_sha256": "22517ecd132b0c395157eb6adbb0afeb2dcaf54d4b5b9e90e2c4a93bf498c0f3",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l262144_b2_graph.sqlite",
+          "sqlite_sha256": "eb937a245b4caee1947195180874115feed3113ab8a0fb7f5cdd7f1a8949b7c3",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.3748422000000001,
+          "l1_topk_ms": 0.30815360000000014,
+          "candidate_ms": 0.22988160000000013,
+          "l1_ms": 0.9128774000000004,
+          "l2_score_ms": 0.7656714000000006,
+          "l2_topk_ms": 1.3397326000000007,
+          "selection_union_ms": 0.23276199999999997,
+          "l2_ms": 2.338166000000001,
+          "topk_total_ms": 1.6478862000000007,
+          "selected_attention_ms": 1.0232644,
+          "nfa_operator_total_ms": 4.274307800000002
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.37355079999999996,
+          "l1_topk_ms": 0.31389580000000017,
+          "candidate_ms": 0.23392139999999997,
+          "l1_ms": 0.921368,
+          "l2_score_ms": 0.7830820000000006,
+          "l2_topk_ms": 1.3398203999999998,
+          "selection_union_ms": 0.2329935999999999,
+          "l2_ms": 2.3558960000000004,
+          "topk_total_ms": 1.6537161999999999,
+          "selected_attention_ms": 1.0206572,
+          "nfa_operator_total_ms": 4.2979212
+        },
+        "full_skip": {
+          "l1_score_ms": 0.9308775999999994,
+          "l1_topk_ms": 0.2968131999999998,
+          "candidate_ms": 0.22531940000000011,
+          "l1_ms": 1.4530101999999991,
+          "l2_score_ms": 0.7632986000000008,
+          "l2_topk_ms": 1.3366574,
+          "selection_union_ms": 0.23433719999999983,
+          "l2_ms": 2.3342932000000007,
+          "topk_total_ms": 1.6334705999999997,
+          "selected_attention_ms": 1.0206114000000004,
+          "nfa_operator_total_ms": 4.807914800000001
+        },
+        "full_noskip": {
+          "l1_score_ms": 0.9296549999999992,
+          "l1_topk_ms": 0.30327059999999983,
+          "candidate_ms": 0.22972880000000004,
+          "l1_ms": 1.462654399999999,
+          "l2_score_ms": 0.7785630000000003,
+          "l2_topk_ms": 1.3359792,
+          "selection_union_ms": 0.23456779999999994,
+          "l2_ms": 2.3491100000000005,
+          "topk_total_ms": 1.6392497999999995,
+          "selected_attention_ms": 1.0162594000000003,
+          "nfa_operator_total_ms": 4.8280237999999995
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 2.4833852751904644,
+          "l1_topk_ms": 0.9631988722507205,
+          "candidate_ms": 0.980154131518138,
+          "l1_ms": 1.5916816431209695,
+          "l2_score_ms": 0.9969010204638704,
+          "l2_topk_ms": 0.9977046165779644,
+          "selection_union_ms": 1.0067674276729013,
+          "l2_ms": 0.998343659090073,
+          "topk_total_ms": 0.9912520658283315,
+          "selected_attention_ms": 0.9974073172095115,
+          "nfa_operator_total_ms": 1.12484056482783
+        },
+        "noskip": {
+          "l1_score_ms": 2.4886976550445064,
+          "l1_topk_ms": 0.9661505505967256,
+          "candidate_ms": 0.9820768856547544,
+          "l1_ms": 1.5874812235719051,
+          "l2_score_ms": 0.9942292122664035,
+          "l2_topk_ms": 0.9971330485787498,
+          "selection_union_ms": 1.0067564087597256,
+          "l2_ms": 0.9971195672474507,
+          "topk_total_ms": 0.9912521870439436,
+          "selected_attention_ms": 0.9956912075866414,
+          "nfa_operator_total_ms": 1.1233393018001352
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 0.9965548169336319,
+          "l1_topk_ms": 1.0186342135869906,
+          "candidate_ms": 1.0175733943038496,
+          "l1_ms": 1.0093009203645522,
+          "l2_score_ms": 1.0227389974341474,
+          "l2_topk_ms": 1.000065535465808,
+          "selection_union_ms": 1.000995007776183,
+          "l2_ms": 1.0075828662293436,
+          "topk_total_ms": 1.0035378656608684,
+          "selected_attention_ms": 0.9974520759248539,
+          "nfa_operator_total_ms": 1.0055244968553736
+        },
+        "full": {
+          "l1_score_ms": 0.9986866157269224,
+          "l1_topk_ms": 1.021755770969755,
+          "candidate_ms": 1.0195695532652755,
+          "l1_ms": 1.00663739318554,
+          "l2_score_ms": 1.019997940517642,
+          "l2_topk_ms": 0.9994926149363329,
+          "selection_union_ms": 1.000984052041247,
+          "l2_ms": 1.0063474459849344,
+          "topk_total_ms": 1.0035379883788542,
+          "selected_attention_ms": 0.995735889291458,
+          "nfa_operator_total_ms": 1.0041824784415894
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.nsys-rep",
+          "report_sha256": "f415de53b3d20cb5ffadd539e9090d707b950aa268029c505d8bd047e8fa2c26",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.sqlite",
+          "sqlite_sha256": "3a7ae8fcd797cae8622eb4b3db5196dd7a6a3e9339a93e8c1ccec4e623550385",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.nsys-rep",
+          "report_sha256": "425313e559e505ae3beaa2ae794beb5bbc13ea9792e27ffeefdb3ba8188def39",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.sqlite",
+          "sqlite_sha256": "5786950fad9191bdad229d5b75832be4fa2710596826a8a7c007ab433765089e",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.nsys-rep",
+          "report_sha256": "528e4a7936df7977b5bce92ff5530bf9eb5c33c3e1f957fe68d77313d3cbc307",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.sqlite",
+          "sqlite_sha256": "101f7d11d48ee3d192a91766e9adafe3068a5323a71513ac20bb574fe665d507",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.nsys-rep",
+          "report_sha256": "9e9e6343df0f0db4e544b89498167f5b9d76ed58b24d7696377bf2194b19f4c8",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.sqlite",
+          "sqlite_sha256": "3bbe8c3c7bc4cadd984d36e000678fbd499717c1b062d038a0ba6aedb6c2ed44",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 2,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.4674325999999997,
+          "l1_topk_ms": 0.29779959999999994,
+          "candidate_ms": 0.259853,
+          "l1_ms": 1.0250851999999997,
+          "l2_score_ms": 1.5516136000000018,
+          "l2_topk_ms": 1.3985278000000005,
+          "selection_union_ms": 0.24343139999999988,
+          "l2_ms": 3.1935728000000028,
+          "topk_total_ms": 1.6963274000000006,
+          "selected_attention_ms": 1.027984800000001,
+          "nfa_operator_total_ms": 5.246642800000003
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.46815039999999986,
+          "l1_topk_ms": 0.30331119999999995,
+          "candidate_ms": 0.2620817999999999,
+          "l1_ms": 1.0335433999999997,
+          "l2_score_ms": 1.6109276000000012,
+          "l2_topk_ms": 1.3991580000000003,
+          "selection_union_ms": 0.2437972,
+          "l2_ms": 3.2538828000000017,
+          "topk_total_ms": 1.7024692000000001,
+          "selected_attention_ms": 1.028679200000001,
+          "nfa_operator_total_ms": 5.316105400000002
+        },
+        "full_skip": {
+          "l1_score_ms": 1.3504791999999999,
+          "l1_topk_ms": 0.2992211999999999,
+          "candidate_ms": 0.26603740000000015,
+          "l1_ms": 1.9157377999999998,
+          "l2_score_ms": 1.5658004000000014,
+          "l2_topk_ms": 1.3998880000000011,
+          "selection_union_ms": 0.24542919999999993,
+          "l2_ms": 3.211117600000003,
+          "topk_total_ms": 1.699109200000001,
+          "selected_attention_ms": 1.0304716000000012,
+          "nfa_operator_total_ms": 6.157327000000004
+        },
+        "full_noskip": {
+          "l1_score_ms": 1.3471754,
+          "l1_topk_ms": 0.3054921999999999,
+          "candidate_ms": 0.2694916000000002,
+          "l1_ms": 1.9221592,
+          "l2_score_ms": 1.6298806000000012,
+          "l2_topk_ms": 1.3987903999999998,
+          "selection_union_ms": 0.24528820000000007,
+          "l2_ms": 3.273959200000001,
+          "topk_total_ms": 1.7042825999999995,
+          "selected_attention_ms": 1.0245853999999999,
+          "nfa_operator_total_ms": 6.220703800000002
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 2.889142092357274,
+          "l1_topk_ms": 1.0047736800183746,
+          "candidate_ms": 1.0237996097793758,
+          "l1_ms": 1.868857144752456,
+          "l2_score_ms": 1.0091432557693485,
+          "l2_topk_ms": 1.000972594180824,
+          "selection_union_ms": 1.008206829521582,
+          "l2_ms": 1.0054937842656977,
+          "topk_total_ms": 1.001639895694664,
+          "selected_attention_ms": 1.0024191019166822,
+          "nfa_operator_total_ms": 1.1735746523472117
+        },
+        "noskip": {
+          "l1_score_ms": 2.8776551296335544,
+          "l1_topk_ms": 1.0071906345693793,
+          "candidate_ms": 1.0282728522163702,
+          "l1_ms": 1.8597759900551836,
+          "l2_score_ms": 1.0117652711394354,
+          "l2_topk_ms": 0.9997372705584354,
+          "selection_union_ms": 1.0061157388189859,
+          "l2_ms": 1.006169982520575,
+          "topk_total_ms": 1.0010651587705666,
+          "selected_attention_ms": 0.9960203336472624,
+          "nfa_operator_total_ms": 1.1701618632316806
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 1.0015356224619338,
+          "l1_topk_ms": 1.01850774816353,
+          "candidate_ms": 1.0085771570849669,
+          "l1_ms": 1.008251216581802,
+          "l2_score_ms": 1.0382273009207958,
+          "l2_topk_ms": 1.000450616712803,
+          "selection_union_ms": 1.0015026820697746,
+          "l2_ms": 1.0188848051311055,
+          "topk_total_ms": 1.0036206454013532,
+          "selected_attention_ms": 1.000675496369207,
+          "nfa_operator_total_ms": 1.0132394376076068
+        },
+        "full": {
+          "l1_score_ms": 0.9975536091188966,
+          "l1_topk_ms": 1.0209577396254008,
+          "candidate_ms": 1.0129838887314342,
+          "l1_ms": 1.0033519200800862,
+          "l2_score_ms": 1.0409248841678669,
+          "l2_topk_ms": 0.999215937274981,
+          "selection_union_ms": 0.9994254962327227,
+          "l2_ms": 1.0195700088965904,
+          "topk_total_ms": 1.0030447719310793,
+          "selected_attention_ms": 0.9942878581030266,
+          "nfa_operator_total_ms": 1.0102929079452818
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.nsys-rep",
+          "report_sha256": "8952cfa58eb9b9205c382f9c447932279b3b4de627c3ae4186f0ad3486624a64",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.sqlite",
+          "sqlite_sha256": "b42ff5a15144ba7556ba957d025d91227e4a3a1ec0e1d9e2cc28b8fbd7e827d3",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.nsys-rep",
+          "report_sha256": "090baeb7d10e9744f4a6f70187b4c20950c56a3e30c404d77777cbd4420ce23e",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.sqlite",
+          "sqlite_sha256": "f739efc959b9b37b5d1b4e05a248643b46e860078d7b935844ecce5513ffe63e",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.nsys-rep",
+          "report_sha256": "508c5076c065c98301545da21c3bcd288fcd12a226598f24b888adb1453e28b3",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.sqlite",
+          "sqlite_sha256": "f3f758cc4a6d0faa765a27792b7672528ad343e2f40c6d55dc7e303032bf44ab",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.nsys-rep",
+          "report_sha256": "a88fecaa618265d0fe495e1952646b4005e447de4576578d888b2bcc47358e01",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b2_graph.sqlite",
+          "sqlite_sha256": "a38d439e5496d4ce0f015c00e064a13b2eda4cf6382a5a7c426edbef59533a6b",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 4,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.583465,
+          "l1_topk_ms": 0.3269318,
+          "candidate_ms": 0.34985120000000003,
+          "l1_ms": 1.260248,
+          "l2_score_ms": 2.503551,
+          "l2_topk_ms": 2.179095599999997,
+          "selection_union_ms": 0.252212,
+          "l2_ms": 4.9348585999999965,
+          "topk_total_ms": 2.506027399999997,
+          "selected_attention_ms": 1.0387811999999994,
+          "nfa_operator_total_ms": 7.233887799999996
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.5820898000000001,
+          "l1_topk_ms": 0.33187279999999997,
+          "candidate_ms": 0.3552160000000001,
+          "l1_ms": 1.2691786,
+          "l2_score_ms": 2.5796220000000014,
+          "l2_topk_ms": 2.175516799999999,
+          "selection_union_ms": 0.2514772000000002,
+          "l2_ms": 5.006616,
+          "topk_total_ms": 2.507389599999999,
+          "selected_attention_ms": 1.0274164000000003,
+          "nfa_operator_total_ms": 7.303211
+        },
+        "full_skip": {
+          "l1_score_ms": 2.028627200000001,
+          "l1_topk_ms": 0.3266940000000001,
+          "candidate_ms": 0.36385439999999997,
+          "l1_ms": 2.719175600000001,
+          "l2_score_ms": 2.5032002,
+          "l2_topk_ms": 2.176887199999999,
+          "selection_union_ms": 0.25209080000000006,
+          "l2_ms": 4.932178199999999,
+          "topk_total_ms": 2.5035811999999993,
+          "selected_attention_ms": 1.0276066000000008,
+          "nfa_operator_total_ms": 8.678960400000003
+        },
+        "full_noskip": {
+          "l1_score_ms": 2.029932999999999,
+          "l1_topk_ms": 0.33145020000000025,
+          "candidate_ms": 0.3728531999999999,
+          "l1_ms": 2.734236399999999,
+          "l2_score_ms": 2.5760574000000007,
+          "l2_topk_ms": 2.1762693999999994,
+          "selection_union_ms": 0.2525382,
+          "l2_ms": 5.004865000000001,
+          "topk_total_ms": 2.5077195999999993,
+          "selected_attention_ms": 1.0323502000000009,
+          "nfa_operator_total_ms": 8.771451599999999
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 3.476861851182164,
+          "l1_topk_ms": 0.999272631172618,
+          "candidate_ms": 1.0400261596930351,
+          "l1_ms": 2.1576511924637063,
+          "l2_score_ms": 0.999859879027829,
+          "l2_topk_ms": 0.9989865520356253,
+          "selection_union_ms": 0.9995194518896804,
+          "l2_ms": 0.9994568436064212,
+          "topk_total_ms": 0.9990238734021831,
+          "selected_attention_ms": 0.9892425854453291,
+          "nfa_operator_total_ms": 1.1997643093109638
+        },
+        "noskip": {
+          "l1_score_ms": 3.487319310525624,
+          "l1_topk_ms": 0.9987266205606494,
+          "candidate_ms": 1.0496520427007787,
+          "l1_ms": 2.154335410319713,
+          "l2_score_ms": 0.9986181696388072,
+          "l2_topk_ms": 1.0003459407897932,
+          "selection_union_ms": 1.0042190703570735,
+          "l2_ms": 0.9996502627722997,
+          "topk_total_ms": 1.000131610979004,
+          "selected_attention_ms": 1.0048021425392863,
+          "nfa_operator_total_ms": 1.2010404190704607
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 0.9976430462838389,
+          "l1_topk_ms": 1.0151132438019181,
+          "candidate_ms": 1.0153345193613743,
+          "l1_ms": 1.0070863829976322,
+          "l2_score_ms": 1.0303852408039627,
+          "l2_topk_ms": 0.9983576672817852,
+          "selection_union_ms": 0.9970865779582263,
+          "l2_ms": 1.0145409232191585,
+          "topk_total_ms": 1.0005435694757374,
+          "selected_attention_ms": 0.9890594862517736,
+          "nfa_operator_total_ms": 1.0095831179466184
+        },
+        "full": {
+          "l1_score_ms": 1.0006436865285044,
+          "l1_topk_ms": 1.014558577751658,
+          "candidate_ms": 1.024731870770286,
+          "l1_ms": 1.0055387375497182,
+          "l2_score_ms": 1.0291056224747828,
+          "l2_topk_ms": 0.9997162002698167,
+          "selection_union_ms": 1.0017747573493359,
+          "l2_ms": 1.0147372615206809,
+          "topk_total_ms": 1.0016529921218453,
+          "selected_attention_ms": 1.0046161634228508,
+          "nfa_operator_total_ms": 1.010656944580597
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.nsys-rep",
+          "report_sha256": "e4513a5dc837568a49142bebc55d2c19ded30832b7a9bd4a77e33eae72202247",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.sqlite",
+          "sqlite_sha256": "bbcc834e388f4e87d7026c771404d8dbdb5240cc1cc5510b8b54f86b118b8c85",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.nsys-rep",
+          "report_sha256": "fe0a6d4326ee3a45f45aac7420bd259bfadc9537f5289ca0c1d047a7d4687f90",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.sqlite",
+          "sqlite_sha256": "d2f9fd44cb06baecc6b1fca77fb811839bf8f2c24fc0972e8127246a83b15145",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.nsys-rep",
+          "report_sha256": "1dc396aeb98aca8f35f73f9ea78486e3285ce4ca18f0f2c31e49d81acebdcf4c",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.sqlite",
+          "sqlite_sha256": "f65bf067fea5f6543a56c4b9ca086fa19adb1e6370af0b168e9351133eb93c20",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.nsys-rep",
+          "report_sha256": "193ca29226bb2dc42b975a215ccdf3b660f3af8309a760e7d00f1b5d7ea2e7fa",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l131072_b4_graph.sqlite",
+          "sqlite_sha256": "9589fe399bd7d13045faa44743463a0091438792721284f96f947cdae452e47f",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.35027339999999996,
+          "l1_topk_ms": 0.2664711999999999,
+          "candidate_ms": 0.23030600000000012,
+          "l1_ms": 0.8470506,
+          "l2_score_ms": 0.7783774000000004,
+          "l2_topk_ms": 1.3331836000000001,
+          "selection_union_ms": 0.23746720000000004,
+          "l2_ms": 2.3490282000000002,
+          "topk_total_ms": 1.5996548000000002,
+          "selected_attention_ms": 1.0226415999999998,
+          "nfa_operator_total_ms": 4.2187204000000005
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.34962759999999987,
+          "l1_topk_ms": 0.26768239999999993,
+          "candidate_ms": 0.23136779999999996,
+          "l1_ms": 0.8486777999999997,
+          "l2_score_ms": 0.7831606000000004,
+          "l2_topk_ms": 1.333256800000001,
+          "selection_union_ms": 0.23771100000000017,
+          "l2_ms": 2.3541284000000013,
+          "topk_total_ms": 1.600939200000001,
+          "selected_attention_ms": 1.0189183999999993,
+          "nfa_operator_total_ms": 4.2217246
+        },
+        "full_skip": {
+          "l1_score_ms": 0.7258764,
+          "l1_topk_ms": 0.26429519999999984,
+          "candidate_ms": 0.2189762,
+          "l1_ms": 1.2091477999999998,
+          "l2_score_ms": 0.7753676000000007,
+          "l2_topk_ms": 1.3391196000000012,
+          "selection_union_ms": 0.23902780000000018,
+          "l2_ms": 2.3535150000000025,
+          "topk_total_ms": 1.6034148000000008,
+          "selected_attention_ms": 1.0162447999999988,
+          "nfa_operator_total_ms": 4.578907600000001
+        },
+        "full_noskip": {
+          "l1_score_ms": 0.7241062000000003,
+          "l1_topk_ms": 0.26539039999999986,
+          "candidate_ms": 0.218561,
+          "l1_ms": 1.2080576,
+          "l2_score_ms": 0.7790702000000007,
+          "l2_topk_ms": 1.339104600000001,
+          "selection_union_ms": 0.23938720000000005,
+          "l2_ms": 2.3575620000000024,
+          "topk_total_ms": 1.6044950000000011,
+          "selected_attention_ms": 1.0161847999999996,
+          "nfa_operator_total_ms": 4.581804400000001
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 2.0723137983072655,
+          "l1_topk_ms": 0.9918340143325055,
+          "candidate_ms": 0.9508054501402478,
+          "l1_ms": 1.4274800112295531,
+          "l2_score_ms": 0.9961332381952511,
+          "l2_topk_ms": 1.0044525000157525,
+          "selection_union_ms": 1.0065718549761826,
+          "l2_ms": 1.0019100664691902,
+          "topk_total_ms": 1.0023505071219119,
+          "selected_attention_ms": 0.9937448271222283,
+          "nfa_operator_total_ms": 1.0853783057061568
+        },
+        "noskip": {
+          "l1_score_ms": 2.071078484650527,
+          "l1_topk_ms": 0.991437614127787,
+          "candidate_ms": 0.944647440136441,
+          "l1_ms": 1.42345846680566,
+          "l2_score_ms": 0.9947770610523566,
+          "l2_topk_ms": 1.0043861017622413,
+          "selection_union_ms": 1.0070514195809193,
+          "l2_ms": 1.0014585440624229,
+          "topk_total_ms": 1.0022210712311874,
+          "selected_attention_ms": 0.9973171551323444,
+          "nfa_operator_total_ms": 1.085292110243288
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 0.998156297338022,
+          "l1_topk_ms": 1.0045453317281567,
+          "candidate_ms": 1.0046103879186814,
+          "l1_ms": 1.001921018649889,
+          "l2_score_ms": 1.0061450910573715,
+          "l2_topk_ms": 1.000054906165963,
+          "selection_union_ms": 1.0010266681040587,
+          "l2_ms": 1.0021711957310693,
+          "topk_total_ms": 1.0008029232306874,
+          "selected_attention_ms": 0.9963592327947538,
+          "nfa_operator_total_ms": 1.000712111663053
+        },
+        "full": {
+          "l1_score_ms": 0.9975612928041196,
+          "l1_topk_ms": 1.0041438512693384,
+          "candidate_ms": 0.9981039035292419,
+          "l1_ms": 0.9990983732509792,
+          "l2_score_ms": 1.004775283362369,
+          "l2_topk_ms": 0.9999887986106692,
+          "selection_union_ms": 1.0015035907957144,
+          "l2_ms": 1.0017195556433673,
+          "topk_total_ms": 1.0006736871831297,
+          "selected_attention_ms": 0.9999409591074914,
+          "nfa_operator_total_ms": 1.0006326399772731
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.nsys-rep",
+          "report_sha256": "af43dfe77c9d26cfc6fcbefac096e3071f4815c0e976bb3e8755849f29b88696",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.sqlite",
+          "sqlite_sha256": "34f38de9e26da1f40fbfa69ab743fb748892d895b29bf209f3c01144d9ee0fb7",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.nsys-rep",
+          "report_sha256": "33c168f320f1926a386820f091ba04d10bbaa96efd4e46648be32c3b032c0ff2",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.sqlite",
+          "sqlite_sha256": "82577e66814e7ab754ebb2c4e66cf99fc529f792f5d5e0d3320f9f9dd212b236",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.nsys-rep",
+          "report_sha256": "6e384d60c49ec2de8ed5a951daf6d404716e98f8f7b2e272636a6c98456f9195",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.sqlite",
+          "sqlite_sha256": "e0b7b3839a3978d8f0223199ace28fc2a1cbb1d083a6a5b501a26cea5ad0368e",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.nsys-rep",
+          "report_sha256": "68d8eca15df0474b710329d59b01ec0cbbcd71886e80802eafe7360ff7f9edf8",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.sqlite",
+          "sqlite_sha256": "88efe7c22d334680fa94cd04caef2c0ed8097c45bbb436286b6c833a30cba991",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 2,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.3833551999999999,
+          "l1_topk_ms": 0.26821259999999997,
+          "candidate_ms": 0.28419919999999993,
+          "l1_ms": 0.9357669999999999,
+          "l2_score_ms": 1.6077230000000007,
+          "l2_topk_ms": 1.4072954,
+          "selection_union_ms": 0.24160759999999995,
+          "l2_ms": 3.2566260000000007,
+          "topk_total_ms": 1.675508,
+          "selected_attention_ms": 1.030756200000002,
+          "nfa_operator_total_ms": 5.223149200000003
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.3834823999999999,
+          "l1_topk_ms": 0.26942159999999993,
+          "candidate_ms": 0.2861260000000001,
+          "l1_ms": 0.93903,
+          "l2_score_ms": 1.6273780000000002,
+          "l2_topk_ms": 1.4070188000000012,
+          "selection_union_ms": 0.24149859999999998,
+          "l2_ms": 3.275895400000002,
+          "topk_total_ms": 1.6764404000000013,
+          "selected_attention_ms": 1.0252846000000009,
+          "nfa_operator_total_ms": 5.240210000000002
+        },
+        "full_skip": {
+          "l1_score_ms": 0.9597606000000004,
+          "l1_topk_ms": 0.270747,
+          "candidate_ms": 0.29163640000000013,
+          "l1_ms": 1.5221440000000006,
+          "l2_score_ms": 1.6232438000000013,
+          "l2_topk_ms": 1.4113467999999991,
+          "selection_union_ms": 0.2418892,
+          "l2_ms": 3.2764798000000006,
+          "topk_total_ms": 1.6820937999999992,
+          "selected_attention_ms": 1.0277814000000003,
+          "nfa_operator_total_ms": 5.826405200000001
+        },
+        "full_noskip": {
+          "l1_score_ms": 0.9589884000000005,
+          "l1_topk_ms": 0.2729088,
+          "candidate_ms": 0.29299200000000014,
+          "l1_ms": 1.5248892000000007,
+          "l2_score_ms": 1.6391270000000002,
+          "l2_topk_ms": 1.410514599999999,
+          "selection_union_ms": 0.24264959999999997,
+          "l2_ms": 3.292291199999999,
+          "topk_total_ms": 1.6834233999999992,
+          "selected_attention_ms": 1.0321850000000008,
+          "nfa_operator_total_ms": 5.849365400000001
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 2.503580491408492,
+          "l1_topk_ms": 1.0094492205064194,
+          "candidate_ms": 1.0261689688077946,
+          "l1_ms": 1.6266271411580027,
+          "l2_score_ms": 1.0096539018226403,
+          "l2_topk_ms": 1.0028788554272252,
+          "selection_union_ms": 1.0011655262500023,
+          "l2_ms": 1.0060964323198305,
+          "topk_total_ms": 1.0039306288003396,
+          "selected_attention_ms": 0.9971139635153282,
+          "nfa_operator_total_ms": 1.1154966049983788
+        },
+        "noskip": {
+          "l1_score_ms": 2.5007364092850173,
+          "l1_topk_ms": 1.012943282943907,
+          "candidate_ms": 1.0239964211571126,
+          "l1_ms": 1.623898278010288,
+          "l2_score_ms": 1.0072195888109585,
+          "l2_topk_ms": 1.0024845439165404,
+          "selection_union_ms": 1.0047660731780639,
+          "l2_ms": 1.005004982759827,
+          "topk_total_ms": 1.004165373251562,
+          "selected_attention_ms": 1.0067302288554807,
+          "nfa_operator_total_ms": 1.1162463718057098
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 1.000331807159522,
+          "l1_topk_ms": 1.00450761821033,
+          "candidate_ms": 1.006779751667141,
+          "l1_ms": 1.0034869791304888,
+          "l2_score_ms": 1.0122253646927981,
+          "l2_topk_ms": 0.9998034527789981,
+          "selection_union_ms": 0.9995488552512423,
+          "l2_ms": 1.0059169827913923,
+          "topk_total_ms": 1.000556487942762,
+          "selected_attention_ms": 0.9946916642364111,
+          "nfa_operator_total_ms": 1.0032663818984913
+        },
+        "full": {
+          "l1_score_ms": 0.9991954243589496,
+          "l1_topk_ms": 1.0079845760063824,
+          "candidate_ms": 1.004648253784507,
+          "l1_ms": 1.0018035087350474,
+          "l2_score_ms": 1.0097848517887447,
+          "l2_topk_ms": 0.9994103504539068,
+          "selection_union_ms": 1.0031435880560189,
+          "l2_ms": 1.0048257279046855,
+          "topk_total_ms": 1.0007904434342485,
+          "selected_attention_ms": 1.0042845686835746,
+          "nfa_operator_total_ms": 1.0039407145936228
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.nsys-rep",
+          "report_sha256": "c0d9db331b736b1b545b3a2f78727743555a1c712fc876c0ef5fc778f915d672",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.sqlite",
+          "sqlite_sha256": "aa1f619eb888183d4ba30bbf49a208eb6404a970fee3d8629c99a17df4d061ef",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.nsys-rep",
+          "report_sha256": "2bab58a794eb62dd52c184dbc4ff08e94ed9ff7520c732f361db3e285682f3c8",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.sqlite",
+          "sqlite_sha256": "0bd30432e82ed6ac590ee086ab95b38f3f036e641d7997a2da5376e57850b645",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.nsys-rep",
+          "report_sha256": "2d20ebdfe0e6d13d726fcfd21a6530066a2a859c8c23a75b5c6fdfa16326db39",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.sqlite",
+          "sqlite_sha256": "cb23f3d279fd8993c6809032e3ed8490e8dabab04331bcf87fa0c6a176387b1b",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.nsys-rep",
+          "report_sha256": "43abde8cc143bc11dffb81ff009e419ce408c1de2ff2cf8c7c1b6cf88495def9",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b2_graph.sqlite",
+          "sqlite_sha256": "fe7adef9ab60303d4a704a22543e1dd2ac4fd4125797b790c2dca7e026815839",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 4,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.4707155999999998,
+          "l1_topk_ms": 0.2769484,
+          "candidate_ms": 0.3595982,
+          "l1_ms": 1.1072621999999996,
+          "l2_score_ms": 2.5548192,
+          "l2_topk_ms": 2.1752779999999987,
+          "selection_union_ms": 0.24741259999999993,
+          "l2_ms": 4.977509799999998,
+          "topk_total_ms": 2.4522263999999985,
+          "selected_attention_ms": 1.0373414000000003,
+          "nfa_operator_total_ms": 7.122113399999998
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.47231539999999994,
+          "l1_topk_ms": 0.27679439999999994,
+          "candidate_ms": 0.3638924,
+          "l1_ms": 1.1130022,
+          "l2_score_ms": 2.5736783999999995,
+          "l2_topk_ms": 2.1753138000000023,
+          "selection_union_ms": 0.2464906,
+          "l2_ms": 4.995482800000002,
+          "topk_total_ms": 2.4521082000000023,
+          "selected_attention_ms": 1.0360296000000009,
+          "nfa_operator_total_ms": 7.144514600000003
+        },
+        "full_skip": {
+          "l1_score_ms": 1.3696583999999992,
+          "l1_topk_ms": 0.2753295999999999,
+          "candidate_ms": 0.39628380000000024,
+          "l1_ms": 2.041271799999999,
+          "l2_score_ms": 2.5498242,
+          "l2_topk_ms": 2.1739972000000014,
+          "selection_union_ms": 0.24770659999999997,
+          "l2_ms": 4.971528000000001,
+          "topk_total_ms": 2.449326800000001,
+          "selected_attention_ms": 1.031346600000001,
+          "nfa_operator_total_ms": 8.044146399999999
+        },
+        "full_noskip": {
+          "l1_score_ms": 1.3714306000000003,
+          "l1_topk_ms": 0.27689719999999995,
+          "candidate_ms": 0.39929140000000013,
+          "l1_ms": 2.0476192000000006,
+          "l2_score_ms": 2.5672828,
+          "l2_topk_ms": 2.175913599999998,
+          "selection_union_ms": 0.24804579999999987,
+          "l2_ms": 4.991242199999998,
+          "topk_total_ms": 2.452810799999998,
+          "selected_attention_ms": 1.031391000000001,
+          "nfa_operator_total_ms": 8.0702524
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 2.909736579794678,
+          "l1_topk_ms": 0.9941548678381963,
+          "candidate_ms": 1.1020183082117772,
+          "l1_ms": 1.8435306470319315,
+          "l2_score_ms": 0.9980448714335638,
+          "l2_topk_ms": 0.9994112016946812,
+          "selection_union_ms": 1.001188298413258,
+          "l2_ms": 0.9987982344103075,
+          "topk_total_ms": 0.9988175643162485,
+          "selected_attention_ms": 0.9942209960963677,
+          "nfa_operator_total_ms": 1.1294605896053271
+        },
+        "noskip": {
+          "l1_score_ms": 2.9036330384315234,
+          "l1_topk_ms": 1.0003713947970045,
+          "candidate_ms": 1.0972787560278812,
+          "l1_ms": 1.8397261029672725,
+          "l2_score_ms": 0.9975149964346752,
+          "l2_topk_ms": 1.000275730333709,
+          "selection_union_ms": 1.0063093683897069,
+          "l2_ms": 0.9991511130816015,
+          "topk_total_ms": 1.0002865289549605,
+          "selected_attention_ms": 0.9955227147950215,
+          "nfa_operator_total_ms": 1.1295732253105055
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 1.0033986551539829,
+          "l1_topk_ms": 0.9994439397375106,
+          "candidate_ms": 1.0119416615544794,
+          "l1_ms": 1.005183957331877,
+          "l2_score_ms": 1.007381813945973,
+          "l2_topk_ms": 1.000016457666562,
+          "selection_union_ms": 0.9962734315067223,
+          "l2_ms": 1.0036108417104481,
+          "topk_total_ms": 0.9999517989040505,
+          "selected_attention_ms": 0.9987354211448618,
+          "nfa_operator_total_ms": 1.0031453023480368
+        },
+        "full": {
+          "l1_score_ms": 1.0012938992671465,
+          "l1_topk_ms": 1.0056935396702718,
+          "candidate_ms": 1.007589510345868,
+          "l1_ms": 1.003109532008428,
+          "l2_score_ms": 1.006846981842905,
+          "l2_topk_ms": 1.0008815098749881,
+          "selection_union_ms": 1.0013693619790507,
+          "l2_ms": 1.0039654206915856,
+          "topk_total_ms": 1.001422431665712,
+          "selected_attention_ms": 1.0000430505127957,
+          "nfa_operator_total_ms": 1.0032453412334714
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.nsys-rep",
+          "report_sha256": "6c81c0653bac63f38e32d4883ceee45a32a78c3665b815739a8ed102ba1983ff",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.sqlite",
+          "sqlite_sha256": "2d5fd77782111bd53c9f06b64dc8d3017bcf870b70834cf5400349d7b0d799f1",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.nsys-rep",
+          "report_sha256": "e846ce7a25317283108f02f9195dff57fd015bfdcb7189737a2433df77a5236a",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.sqlite",
+          "sqlite_sha256": "ee0cab80a5a97af1878a30170ce647a33030147cf93950d17e7d1ce0ee08819a",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.nsys-rep",
+          "report_sha256": "097703877cd29e5cb6b9024a3b65a43782faa175e3358baaa194ec000965e92c",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.sqlite",
+          "sqlite_sha256": "574395654db7c2e313621a1292d7f599495c0a53d80f98798484282b1afaee47",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.nsys-rep",
+          "report_sha256": "b246fa93c1e02b0591ae9bb7a5c989c37161de593ca0e4fac6bd050265e8d369",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l65536_b4_graph.sqlite",
+          "sqlite_sha256": "4d0b45470d2f414dcd98486090f405c5d558e58067c297d83d126ac6c020eb36",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.33809479999999975,
+          "l1_topk_ms": 0.23603880000000005,
+          "candidate_ms": 0.22803339999999986,
+          "l1_ms": 0.8021669999999996,
+          "l2_score_ms": 0.7778334000000009,
+          "l2_topk_ms": 0.8541988000000004,
+          "selection_union_ms": 0.23329379999999994,
+          "l2_ms": 1.865326000000001,
+          "topk_total_ms": 1.0902376000000005,
+          "selected_attention_ms": 1.0172331999999997,
+          "nfa_operator_total_ms": 3.6847262
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.33781119999999987,
+          "l1_topk_ms": 0.23765780000000003,
+          "candidate_ms": 0.22741760000000003,
+          "l1_ms": 0.8028865999999999,
+          "l2_score_ms": 0.7825474000000007,
+          "l2_topk_ms": 0.8556422000000004,
+          "selection_union_ms": 0.2330114000000001,
+          "l2_ms": 1.8712010000000014,
+          "topk_total_ms": 1.0933000000000004,
+          "selected_attention_ms": 1.0176642,
+          "nfa_operator_total_ms": 3.6917518000000014
+        },
+        "full_skip": {
+          "l1_score_ms": 0.6541276000000001,
+          "l1_topk_ms": 0.24053820000000017,
+          "candidate_ms": 0.20508860000000007,
+          "l1_ms": 1.0997544000000004,
+          "l2_score_ms": 0.7754526000000005,
+          "l2_topk_ms": 0.8572636000000001,
+          "selection_union_ms": 0.23722979999999994,
+          "l2_ms": 1.8699460000000006,
+          "topk_total_ms": 1.0978018000000003,
+          "selected_attention_ms": 1.0197665999999992,
+          "nfa_operator_total_ms": 3.989467
+        },
+        "full_noskip": {
+          "l1_score_ms": 0.6547008000000001,
+          "l1_topk_ms": 0.2413120000000001,
+          "candidate_ms": 0.20358400000000004,
+          "l1_ms": 1.0995968,
+          "l2_score_ms": 0.7774276000000008,
+          "l2_topk_ms": 0.8567104000000002,
+          "selection_union_ms": 0.23711360000000004,
+          "l2_ms": 1.8712516000000008,
+          "topk_total_ms": 1.0980224000000003,
+          "selected_attention_ms": 1.0235904000000002,
+          "nfa_operator_total_ms": 3.994438800000002
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 1.9347461126287675,
+          "l1_topk_ms": 1.0190621202954773,
+          "candidate_ms": 0.8993796522790091,
+          "l1_ms": 1.3709793596595234,
+          "l2_score_ms": 0.9969391903201889,
+          "l2_topk_ms": 1.0035879235606509,
+          "selection_union_ms": 1.0168714299308426,
+          "l2_ms": 1.002476778857958,
+          "topk_total_ms": 1.0069381206445271,
+          "selected_attention_ms": 1.0024904810421047,
+          "nfa_operator_total_ms": 1.082703784069492
+        },
+        "noskip": {
+          "l1_score_ms": 1.9380671807210665,
+          "l1_topk_ms": 1.0153758891986717,
+          "candidate_ms": 0.8951989643721507,
+          "l1_ms": 1.369554305676543,
+          "l2_score_ms": 0.9934575209118325,
+          "l2_topk_ms": 1.001248419023746,
+          "selection_union_ms": 1.0176051472159728,
+          "l2_ms": 1.0000270414562622,
+          "topk_total_ms": 1.0043193999817066,
+          "selected_attention_ms": 1.0058233354381536,
+          "nfa_operator_total_ms": 1.0819900731137995
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 0.9991611820116728,
+          "l1_topk_ms": 1.0068590418185484,
+          "candidate_ms": 0.9972995184038836,
+          "l1_ms": 1.0008970700614712,
+          "l2_score_ms": 1.0060604237359823,
+          "l2_topk_ms": 1.0016897705779966,
+          "selection_union_ms": 0.9987895091939869,
+          "l2_ms": 1.0031495835044386,
+          "topk_total_ms": 1.002808928989424,
+          "selected_attention_ms": 1.0004236983220762,
+          "nfa_operator_total_ms": 1.0019066816959157
+        },
+        "full": {
+          "l1_score_ms": 1.0008762816306787,
+          "l1_topk_ms": 1.003216952650348,
+          "candidate_ms": 0.9926636585358717,
+          "l1_ms": 0.9998566952766906,
+          "l2_score_ms": 1.0025468997073455,
+          "l2_topk_ms": 0.9993546909025416,
+          "selection_union_ms": 0.9995101795811492,
+          "l2_ms": 1.0006982019801642,
+          "topk_total_ms": 1.0002009470197626,
+          "selected_attention_ms": 1.003749681544778,
+          "nfa_operator_total_ms": 1.0012462316394652
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.nsys-rep",
+          "report_sha256": "b2232c0f84f062990993a9bfeaed6242a9620dcb20f0e0b55047b2a0643c720f",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.sqlite",
+          "sqlite_sha256": "3dee7c9c60ad67c78c143592cbc3db2dc40337f8093caaa2ae3592cef4b3063a",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.nsys-rep",
+          "report_sha256": "cb357eaa356dfd034ec89b22141982295648990f2f4d739d35f7c3c19f4f9ce9",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.sqlite",
+          "sqlite_sha256": "e09c5a10dec3573ece263c5d688b43d54b5907a96dab916fc7ce5efad7b807b7",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.nsys-rep",
+          "report_sha256": "42afb450fc179db7599b8d7ec52885008f34ba4c8708fb44e67284396d608146",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.sqlite",
+          "sqlite_sha256": "1253dd5732599c709e3be9459aded98be7d9c4b750b1bdb8be3451245497123b",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.nsys-rep",
+          "report_sha256": "455161677e66ab4325adf64d48222c27d570a4e7c140b6ba01347915c3e74fe4",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.sqlite",
+          "sqlite_sha256": "64b8036fa5ab24cec86cf68826dd39c5529eb5534e0a37770c1be2365050a80e",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 2,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.367867,
+          "l1_topk_ms": 0.24240780000000012,
+          "candidate_ms": 0.2829258000000002,
+          "l1_ms": 0.8932006000000003,
+          "l2_score_ms": 1.5928114000000009,
+          "l2_topk_ms": 0.8949545999999995,
+          "selection_union_ms": 0.23829859999999994,
+          "l2_ms": 2.7260646000000004,
+          "topk_total_ms": 1.1373623999999996,
+          "selected_attention_ms": 1.0288498000000013,
+          "nfa_operator_total_ms": 4.648115000000002
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.36767559999999994,
+          "l1_topk_ms": 0.24350820000000023,
+          "candidate_ms": 0.2835274000000002,
+          "l1_ms": 0.8947112000000004,
+          "l2_score_ms": 1.6055732000000007,
+          "l2_topk_ms": 0.8954277999999996,
+          "selection_union_ms": 0.2382091999999998,
+          "l2_ms": 2.7392101999999996,
+          "topk_total_ms": 1.1389359999999997,
+          "selected_attention_ms": 1.0228848,
+          "nfa_operator_total_ms": 4.6568062
+        },
+        "full_skip": {
+          "l1_score_ms": 0.7138568,
+          "l1_topk_ms": 0.24306780000000003,
+          "candidate_ms": 0.2780258,
+          "l1_ms": 1.2349504,
+          "l2_score_ms": 1.5968400000000005,
+          "l2_topk_ms": 0.8989117999999996,
+          "selection_union_ms": 0.23858859999999985,
+          "l2_ms": 2.7343404,
+          "topk_total_ms": 1.1419795999999995,
+          "selected_attention_ms": 1.0253276,
+          "nfa_operator_total_ms": 4.9946184
+        },
+        "full_noskip": {
+          "l1_score_ms": 0.7130454000000002,
+          "l1_topk_ms": 0.2446660000000001,
+          "candidate_ms": 0.27945060000000016,
+          "l1_ms": 1.2371620000000005,
+          "l2_score_ms": 1.605542600000002,
+          "l2_topk_ms": 0.8969979999999989,
+          "selection_union_ms": 0.23853479999999977,
+          "l2_ms": 2.7410754000000006,
+          "topk_total_ms": 1.1416639999999991,
+          "selected_attention_ms": 1.0234100000000002,
+          "nfa_operator_total_ms": 5.001647400000001
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 1.940529593575939,
+          "l1_topk_ms": 1.002722684666087,
+          "candidate_ms": 0.9826809714773265,
+          "l1_ms": 1.3826125956476065,
+          "l2_score_ms": 1.002529238552662,
+          "l2_topk_ms": 1.0044216768090808,
+          "selection_union_ms": 1.001216960569638,
+          "l2_ms": 1.0030358048008103,
+          "topk_total_ms": 1.0040595679969726,
+          "selected_attention_ms": 0.9965765654034231,
+          "nfa_operator_total_ms": 1.0745470798377401
+        },
+        "noskip": {
+          "l1_score_ms": 1.9393329337056913,
+          "l1_topk_ms": 1.0047546653459714,
+          "candidate_ms": 0.9856211427890212,
+          "l1_ms": 1.3827500985792958,
+          "l2_score_ms": 0.9999809413859183,
+          "l2_topk_ms": 1.001753575218459,
+          "selection_union_ms": 1.001366865763371,
+          "l2_ms": 1.000680926202743,
+          "topk_total_ms": 1.0023952179929332,
+          "selected_attention_ms": 1.0005134498039272,
+          "nfa_operator_total_ms": 1.0740510094665312
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 0.9994797032623202,
+          "l1_topk_ms": 1.0045394578887317,
+          "candidate_ms": 1.0021263525631101,
+          "l1_ms": 1.0016912214344684,
+          "l2_score_ms": 1.0080121224647185,
+          "l2_topk_ms": 1.0005287419048967,
+          "selection_union_ms": 0.9996248404312902,
+          "l2_ms": 1.004822189466823,
+          "topk_total_ms": 1.0013835519795626,
+          "selected_attention_ms": 0.9942022635373975,
+          "nfa_operator_total_ms": 1.0018698332549856
+        },
+        "full": {
+          "l1_score_ms": 0.9988633574688932,
+          "l1_topk_ms": 1.0065751201928026,
+          "candidate_ms": 1.0051247042540663,
+          "l1_ms": 1.0017908411544305,
+          "l2_score_ms": 1.0054498885298473,
+          "l2_topk_ms": 0.9978709813354316,
+          "selection_union_ms": 0.9997745072480408,
+          "l2_ms": 1.0024631168818632,
+          "topk_total_ms": 0.9997236377952807,
+          "selected_attention_ms": 0.9981297684759487,
+          "nfa_operator_total_ms": 1.0014073147209808
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.nsys-rep",
+          "report_sha256": "85a4d08436bad5aff2856be6bf06d44e357d87a3b87f7480cf6752bb50093a99",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.sqlite",
+          "sqlite_sha256": "a663bac7017feeb7c00703e5ef8d04a2160143e6f14c39c72656050e01ea0e2c",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.nsys-rep",
+          "report_sha256": "ba8ce4b0a75f952bb7855525060b910dcefafc0a0c8af7fdb11163b8ee920a9a",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.sqlite",
+          "sqlite_sha256": "c43da4e698d48f908f12814fb99a44ee4b69da108d925ca734a6c8ab7f6ac4a5",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.nsys-rep",
+          "report_sha256": "3aa9732253bd27619396fffcfc3b6250a7a33681c7237ed456f706ef05d6832b",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.sqlite",
+          "sqlite_sha256": "d24f44d34428c641df576634482d82f1a8dc287b4c1fc1fc83c6b9e8f3625821",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.nsys-rep",
+          "report_sha256": "5ccfaa50b956f4dd8c0bf3bb87fffafb8d33fc29b7ab10e1cf21c0c12656377c",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b2_graph.sqlite",
+          "sqlite_sha256": "c51935238348a9f14b5e8b9d3b938c0b9cde57baabf956fdab7671d8f86b6a1d",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 4,
+      "execution": "graph",
+      "stages_ms_per_step": {
+        "tail_skip": {
+          "l1_score_ms": 0.40054619999999985,
+          "l1_topk_ms": 0.24474359999999998,
+          "candidate_ms": 0.3632787999999999,
+          "l1_ms": 1.0085685999999998,
+          "l2_score_ms": 2.544405199999999,
+          "l2_topk_ms": 1.3077541999999995,
+          "selection_union_ms": 0.2453264,
+          "l2_ms": 4.0974857999999985,
+          "topk_total_ms": 1.5524977999999996,
+          "selected_attention_ms": 1.030162200000001,
+          "nfa_operator_total_ms": 6.136216599999999
+        },
+        "tail_noskip": {
+          "l1_score_ms": 0.4017666000000001,
+          "l1_topk_ms": 0.2464768,
+          "candidate_ms": 0.3640066000000002,
+          "l1_ms": 1.0122500000000003,
+          "l2_score_ms": 2.5585045999999996,
+          "l2_topk_ms": 1.3100132,
+          "selection_union_ms": 0.2453184,
+          "l2_ms": 4.1138362,
+          "topk_total_ms": 1.55649,
+          "selected_attention_ms": 1.0306944000000016,
+          "nfa_operator_total_ms": 6.156780600000001
+        },
+        "full_skip": {
+          "l1_score_ms": 0.9401759999999992,
+          "l1_topk_ms": 0.24494899999999994,
+          "candidate_ms": 0.4065226,
+          "l1_ms": 1.5916475999999993,
+          "l2_score_ms": 2.5394074,
+          "l2_topk_ms": 1.3101146000000004,
+          "selection_union_ms": 0.24495400000000003,
+          "l2_ms": 4.094476,
+          "topk_total_ms": 1.5550636000000002,
+          "selected_attention_ms": 1.031114400000001,
+          "nfa_operator_total_ms": 6.717238
+        },
+        "full_noskip": {
+          "l1_score_ms": 0.9408171999999997,
+          "l1_topk_ms": 0.24633699999999994,
+          "candidate_ms": 0.4061136,
+          "l1_ms": 1.5932677999999996,
+          "l2_score_ms": 2.5600346000000003,
+          "l2_topk_ms": 1.3098916000000003,
+          "selection_union_ms": 0.24540279999999998,
+          "l2_ms": 4.115329000000001,
+          "topk_total_ms": 1.5562286000000003,
+          "selected_attention_ms": 1.037380800000001,
+          "nfa_operator_total_ms": 6.745977600000001
+        }
+      },
+      "tail_vs_full_speedup": {
+        "skip": {
+          "l1_score_ms": 2.3472348508112164,
+          "l1_topk_ms": 1.0008392456431954,
+          "candidate_ms": 1.1190374995733308,
+          "l1_ms": 1.5781252757621045,
+          "l2_score_ms": 0.9980357688311599,
+          "l2_topk_ms": 1.0018049263386046,
+          "selection_union_ms": 0.9984820223180222,
+          "l2_ms": 0.9992654519998585,
+          "topk_total_ms": 1.001652691552929,
+          "selected_attention_ms": 1.0009243204613798,
+          "nfa_operator_total_ms": 1.0946872377353827
+        },
+        "noskip": {
+          "l1_score_ms": 2.3417008780719937,
+          "l1_topk_ms": 0.999432806657665,
+          "candidate_ms": 1.1156764739979985,
+          "l1_ms": 1.5739864657940223,
+          "l2_score_ms": 1.0005980055693473,
+          "l2_topk_ms": 0.99990717650784,
+          "selection_union_ms": 1.0003440426808587,
+          "l2_ms": 1.0003628729797267,
+          "topk_total_ms": 0.9998320580279991,
+          "selected_attention_ms": 1.0064872769270887,
+          "nfa_operator_total_ms": 1.0956988787289252
+        }
+      },
+      "skip_vs_noskip_speedup": {
+        "tail": {
+          "l1_score_ms": 1.0030468395406078,
+          "l1_topk_ms": 1.0070816969269065,
+          "candidate_ms": 1.0020034199628503,
+          "l1_ms": 1.0036501235513384,
+          "l2_score_ms": 1.0055413343755155,
+          "l2_topk_ms": 1.0017273888319382,
+          "selection_union_ms": 0.9999673903827716,
+          "l2_ms": 1.0039903493991367,
+          "topk_total_ms": 1.0025714690223717,
+          "selected_attention_ms": 1.0005166176743823,
+          "nfa_operator_total_ms": 1.0033512506713016
+        },
+        "full": {
+          "l1_score_ms": 1.0006819999659644,
+          "l1_topk_ms": 1.0056664856766102,
+          "candidate_ms": 0.9989939058738678,
+          "l1_ms": 1.0010179388955196,
+          "l2_score_ms": 1.0081228399980249,
+          "l2_topk_ms": 0.9998297858828532,
+          "selection_union_ms": 1.0018321807359747,
+          "l2_ms": 1.0050929593921178,
+          "topk_total_ms": 1.0007491655003693,
+          "selected_attention_ms": 1.0060773082016894,
+          "nfa_operator_total_ms": 1.0042784846986217
+        }
+      },
+      "paths": {
+        "tail_skip": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.json",
+        "tail_noskip": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.json",
+        "full_skip": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.json",
+        "full_noskip": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.json"
+      },
+      "nsys_receipts": {
+        "tail_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.nsys-rep",
+          "report_sha256": "2ffa61e70b83c2fc1e9863650a220578fda696ca766b25b0dad29965155d0a57",
+          "sqlite_path": "/tmp/nfa_flashinfer_graph_main_20261110/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.sqlite",
+          "sqlite_sha256": "8689f6ed7c98a43320eec11adaf46ac109d40bc1397a8752247f94297aa07242",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "tail_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.nsys-rep",
+          "report_sha256": "06cdc328a1e423f88b2453895ffe9f112d8d49b5ef7879d01dca932a6b01fe49",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/tail_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.sqlite",
+          "sqlite_sha256": "388bd1bfa4b522ca740ffc7c13d587ad7594c2b2896e421a3d73400bd89af79b",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_skip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.nsys-rep",
+          "report_sha256": "973a9024caf58dbfbd8883d4d0a7516b8325c045725dd241464c50887bfbb238",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_skip/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.sqlite",
+          "sqlite_sha256": "a792f787b875de77f46c3268a64e144b2ad0ac6f829472080e4a4d119b2c3864",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "full_noskip": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.nsys-rep",
+          "report_sha256": "e60dbbfcd25afe195ee6d16b27065a2956614188646581db036c58c42dfcd93d",
+          "sqlite_path": "/tmp/nfa_selection_ablation_20261110/full_noskip/nfa-operator-profile/nfa-operator-profile_l32768_b4_graph.sqlite",
+          "sqlite_sha256": "0329aecba3adb605f1aad2873aca080882821f48e7e1af47b7ba4de50270cdf7",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may significantly perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        }
+      }
+    }
+  ]
+}

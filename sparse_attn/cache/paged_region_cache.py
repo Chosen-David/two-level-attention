@@ -180,6 +180,13 @@ class GraphReadyPagedRegionCache:
         self.common_dirty = True
         self._common_active_req_ids = ()
         self._common_state_refs = ()
+        self._common_layout_revision = -1
+        # request/state 布局只在 step 边界做 canonical 比较；各层 selector
+        # 复用该单调版本，不再重复构造 tuple 或逐元素比较 request state。
+        self.request_layout_revision = 0
+        self._layout_req_ids = ()
+        self._layout_state_refs = ()
+        self._layout_source = None
         self._visible_bucket_cache = {}
         # 仅由 GraphRunner 在完整 decode step 后递增；请求结束回执据此
         # fail-closed，避免把只完成 prefill 的 Cache 误认为已跑过 NFA decode。
@@ -554,6 +561,7 @@ class GraphReadyPagedRegionCache:
         # request slot 复用时强制下一步全量重建 NFA 持久页统计。
         if hasattr(self, '_nfa_page_stats_lengths'):
             self._nfa_page_stats_lengths[:, request_id].zero_()
+        self._nfa_stats_dirty = True
         # 所有 skip 策略共用 prompt + max_new_tokens 的物理容量上限；实际页
         # 已在 prefill 分配，后续 decode 仅在跨入新逻辑页时追加分配。
         page = self.geometry.page
@@ -568,6 +576,10 @@ class GraphReadyPagedRegionCache:
             self._cpu_block_table_staging[:, request_id],
             non_blocking=non_blocking)
         self.common_dirty = True
+        # freeze 可改变 both-skip 计划；即使 request/state 引用未变，也必须
+        # 使按 layout revision 缓存的 selector eager plan 失效。
+        self.request_layout_revision += 1
+        self._layout_source = None
         state.frozen = True
         self.transition_request(request_id, RequestPhase.FREEZE)
 
@@ -729,10 +741,15 @@ class GraphReadyPagedRegionCache:
             self.states.get(rid) if rid is not None and rid >= 0 else None
             for rid in req_ids)
         active_changed = (
-            req_ids != self._common_active_req_ids
-            or len(state_refs) != len(self._common_state_refs)
+            req_ids != self._layout_req_ids
+            or len(state_refs) != len(self._layout_state_refs)
             or any(new is not old for new, old in zip(
-                state_refs, self._common_state_refs)))
+                state_refs, self._layout_state_refs)))
+        if active_changed:
+            self.request_layout_revision += 1
+            self._layout_req_ids = req_ids
+            self._layout_state_refs = state_refs
+        self._layout_source = active_req_ids
         page = self.geometry.page
         needs_full = active_changed
         for state in state_refs:
@@ -746,6 +763,10 @@ class GraphReadyPagedRegionCache:
 
     def plan_common(self, active_req_ids, query_lengths=None):
         """准备公共元数据；稳态单 token decode 只推进计划长度。"""
+        # Scheduler/GraphRunner 已在同一步调用 new_step 时，同一 list 对象
+        # 直接复用其 layout revision；独立调用方仍走完整 canonical 检测。
+        if active_req_ids is not self._layout_source:
+            self.new_step(active_req_ids)
         if query_lengths is None:
             query_lengths = [
                 1 if (rid >= 0 and rid in self.states) else 0
@@ -759,17 +780,11 @@ class GraphReadyPagedRegionCache:
 
     def _prepare_decode_common_fast(self, req_ids, query_lengths):
         """复用未变化的页表/query 映射，并推进计划长度和页内写入位置。"""
-        req_ids = tuple(req_ids)
-        if req_ids != self._common_active_req_ids:
+        if self.request_layout_revision != self._common_layout_revision:
             return False
+        req_ids = self._layout_req_ids
+        state_refs = self._layout_state_refs
         batch = len(req_ids)
-        state_refs = tuple(
-            self.states.get(rid) if rid is not None and rid >= 0 else None
-            for rid in req_ids)
-        if len(state_refs) != len(self._common_state_refs) or any(
-                new is not old for new, old in zip(
-                    state_refs, self._common_state_refs)):
-            return False
         planned = []
         for row, (request_id, state) in enumerate(zip(req_ids, state_refs)):
             qlen = int(query_lengths[row]) if row < len(query_lengths) else 0
@@ -867,6 +882,7 @@ class GraphReadyPagedRegionCache:
         self._common_state_refs = tuple(
             self.states.get(rid) if rid is not None and rid >= 0 else None
             for rid in req_ids)
+        self._common_layout_revision = self.request_layout_revision
         self.common_dirty = False
 
     def _prepare_layer_gather(self, layer_idx, req_ids, selected_ids_by_req=None):

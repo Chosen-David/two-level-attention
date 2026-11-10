@@ -141,9 +141,9 @@ class L1ScoresDemandLoadTest(unittest.TestCase):
         skip_near = torch.tensor([0, 0, 1, 1], dtype=torch.bool, device=device)
 
         def run(kernel, far_avg, near_avg, min_arg=None, max_arg=None):
-            far = torch.empty((layers * batch, hkv, t),
-                              dtype=torch.bfloat16, device=device)
-            near = torch.empty_like(far)
+            far = torch.full((layers * batch, hkv, t), 13.25,
+                             dtype=torch.bfloat16, device=device)
+            near = torch.full_like(far, 13.25)
             stats_len = torch.zeros((layers, batch), dtype=torch.int64, device=device)
             has_avg = far_avg or near_avg
             sum_arg = ksum if has_avg else kmin
@@ -166,25 +166,35 @@ class L1ScoresDemandLoadTest(unittest.TestCase):
             torch.cuda.synchronize()
             return far, near, stats_len
 
+        def assert_active_and_poison_tail(reference, actual):
+            lengths_host = lengths.cpu().tolist()
+            for row in range(layers * batch):
+                active = triton.cdiv(lengths_host[row % batch], bs)
+                for ref, out in zip(reference[:2], actual[:2]):
+                    torch.testing.assert_close(
+                        ref[row, :, :active].view(torch.int16),
+                        out[row, :, :active].view(torch.int16),
+                        rtol=0, atol=0)
+                    if active < t:
+                        torch.testing.assert_close(
+                            out[row, :, active:],
+                            torch.full_like(out[row, :, active:], 13.25),
+                            rtol=0, atol=0)
+            torch.testing.assert_close(reference[2], actual[2], rtol=0, atol=0)
+
         for far_avg, near_avg in ((False, True), (False, False),
                                   (True, False), (True, True)):
             with self.subTest(far_avg=far_avg, near_avg=near_avg):
                 reference = run(_reference_l1_scores_kernel, far_avg, near_avg)
                 actual = run(_nfa_l1_scores_kernel, far_avg, near_avg)
-                for ref, out in zip(reference, actual):
-                    if ref.dtype == torch.bfloat16:
-                        ref, out = ref.view(torch.int16), out.view(torch.int16)
-                    self.assertTrue(torch.equal(ref, out), "L1 输出不一致")
+                assert_active_and_poison_tail(reference, actual)
 
         # both-avg 完全不消费 Min/Max；用单元素存储配合原大 stride，
         # 任何遗漏的 Min/Max load 都会越界并使本测试失败。
         tiny = torch.empty(1, dtype=torch.bfloat16, device=device)
         reference = run(_reference_l1_scores_kernel, True, True)
         actual = run(_nfa_l1_scores_kernel, True, True, tiny, tiny)
-        for ref, out in zip(reference, actual):
-            if ref.dtype == torch.bfloat16:
-                ref, out = ref.view(torch.int16), out.view(torch.int16)
-            self.assertTrue(torch.equal(ref, out), "未使用 Min/Max 仍影响输出")
+        assert_active_and_poison_tail(reference, actual)
 
 
 if __name__ == "__main__":

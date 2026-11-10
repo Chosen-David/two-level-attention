@@ -1,6 +1,7 @@
 """GraphReady NFA 的保护集和 gather attention 入口。"""
 import argparse
 import torch
+import triton
 from sparse_attn.arguments import add_sparse_attn_args
 
 INVALID_GATHER_IDX = -1
@@ -55,6 +56,67 @@ def _protected_selection_batch(lengths, indexer, capacity):
         col[None, :].expand(batch, -1),
         torch.where(in_swa, swa_id, torch.zeros_like(swa_id)))
     return ids.to(torch.int32), total_count.to(torch.int32)
+
+
+def split_gather_buffers(cache, layer_idx, batch):
+    """返回固定地址的 protected/middle 物理槽，capture 期间不分配。"""
+    workspace = getattr(cache, '_nfa_selector_workspace', None)
+    if workspace is None:
+        workspace = cache._nfa_selector_workspace = {}
+    key = ('split_gather_buffers', layer_idx, batch,
+           cache.active_visible_bucket)
+    buffers = workspace.get(key)
+    if buffers is None:
+        if torch.cuda.is_current_stream_capturing():
+            raise RuntimeError('split gather buffers must be warmed before capture')
+        layer = cache.layers[layer_idx]
+        device = layer.kv_pool_k.device
+        shape = (batch, layer.num_kv_heads, cache.active_visible_bucket)
+        buffers = (
+            torch.empty((2,) + shape, dtype=torch.int32, device=device),
+            torch.empty((2, batch, layer.num_kv_heads),
+                        dtype=torch.int32, device=device),
+        )
+        workspace[key] = buffers
+    return buffers[0][0], buffers[1][0], buffers[0][1], buffers[1][1]
+
+
+def build_protected_gather(cache, layer_idx, indexer, gather_out, vis_out):
+    """用原 canonical union 的空 middle 特化生成独立保护集。"""
+    from ..indexer.nfa_layer_batch_selector import (
+        _final_union_physical_kernel, _workspace_empty)
+    from ..indexer.selection.unique_ranking import _fast_launch
+
+    workspace = cache._nfa_selector_workspace
+    batch = gather_out.shape[0]
+    hkv = gather_out.shape[1]
+    output_width = gather_out.shape[-1]
+    lengths = cache.planned_lengths_buf[:batch]
+    valid_req = cache.valid_req_ids_buf[:batch]
+    capacity = cache.max_blocks * int(indexer.args.tia_block_size)
+    prot_width = min(
+        capacity, int(indexer.sink_tokens + indexer.sliding_window_size))
+    empty_middle = _workspace_empty(
+        workspace, 'empty_middle', (batch * hkv, prot_width),
+        torch.int32, gather_out.device)
+    empty_counts = _workspace_empty(
+        workspace, 'empty_middle_counts', (batch * hkv,),
+        torch.int32, gather_out.device)
+    union_width = 2 * prot_width
+    _fast_launch(
+        workspace, ('final_union', layer_idx, 'empty', 'disjoint'),
+        _final_union_physical_kernel, (batch * hkv,),
+        empty_middle, empty_counts, lengths, valid_req, cache.block_table_buf,
+        gather_out, vis_out,
+        W=prot_width, PROT=prot_width,
+        N=union_width, N_PAD=triton.next_power_of_2(union_width),
+        A_PAD=triton.next_power_of_2(prot_width),
+        MERGE_BITS=triton.next_power_of_2(union_width).bit_length() - 1,
+        SINK=int(indexer.sink_tokens), SWA=int(indexer.sliding_window_size),
+        CAP=capacity, MAX_BLOCKS=cache.max_blocks, PAGE=cache.geometry.page,
+        MAX_REQ=cache.max_requests, MAX_VIS=output_width,
+        INVALID=INVALID_GATHER_IDX, HKV=hkv, B=batch,
+        LAYER_OFFSET=layer_idx, EMPTY=True, num_warps=8)
 
 
 def decode_graph_ready(module, q, cache, *, gather_indices=None,

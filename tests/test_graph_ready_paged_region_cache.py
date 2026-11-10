@@ -350,6 +350,35 @@ class GraphReadyPagedRegionCacheTest(unittest.TestCase):
         cache.remove_request(reused_req)
         self.assertEqual([len(layer.free_ids) for layer in cache.layers], [64, 64])
 
+    def test_layout_revision_tracks_in_place_requests_states_and_freeze(self):
+        import copy
+
+        cache = self._make_cache(n_layers=1)
+        req = cache.add_request()
+        cache.write_prefill(0, req, torch.randn(1, 2, 5, 4),
+                            torch.randn(1, 2, 5, 4))
+        cache.freeze(req, [False], [False])
+        ids = [req]
+        cache.new_step(ids)
+        cache.plan_common(ids)
+        revision = cache.request_layout_revision
+        self.assertEqual(cache._common_layout_revision, revision)
+
+        cache.new_step(ids)
+        self.assertEqual(cache.request_layout_revision, revision)
+        ids.append(-1)
+        cache.new_step(ids)
+        self.assertGreater(cache.request_layout_revision, revision)
+        revision = cache.request_layout_revision
+
+        cache.states[req] = copy.copy(cache.states[req])
+        cache.new_step(ids)
+        self.assertGreater(cache.request_layout_revision, revision)
+        revision = cache.request_layout_revision
+        cache.freeze(req, [True], [True])
+        self.assertGreater(cache.request_layout_revision, revision)
+        self.assertIsNone(cache._layout_source)
+
     @unittest.skipUnless(torch.cuda.is_available(), 'requires CUDA')
     def test_prefill_batched_scatter_matches_cpu_reference(self):
         def make_cache(device):

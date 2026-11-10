@@ -5,7 +5,7 @@ from transformers import Qwen3Config, Qwen3ForCausalLM
 
 from sparse_attn.cache import GraphReadyPagedRegionCache
 from sparse_attn.cache.paged_region_cache import RequestPhase
-from sparse_attn.engine.graph_runner import GraphRunner
+from sparse_attn.engine.graph_runner import GraphRunner, session_graph_runner
 from sparse_attn.info import resolve_treatment_snapshot
 from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
 from sparse_attn.patches import register_patch
@@ -19,7 +19,7 @@ LENGTHS = {0: 40, 1: 55, 2: 73, 3: 96}
 REQUEST_ORDER = [1, 3, 0, 2]
 
 
-def _model():
+def _model(operator_mode='off'):
     torch.manual_seed(20261102)
     config = Qwen3Config(
         vocab_size=128, hidden_size=256, intermediate_size=512,
@@ -28,6 +28,7 @@ def _model():
     config._attn_implementation = 'sdpa'
     model = Qwen3ForCausalLM(config).to(device='cuda', dtype=torch.bfloat16).eval()
     args = nfa_args()
+    args.nfa_operator_mode = operator_mode
     args.nfa_near_len = GEOMETRY.near
     args.nfa_swa_size = GEOMETRY.window
     args.nfa_sink_tokens = GEOMETRY.sink
@@ -103,6 +104,16 @@ def test_multi_request_matches_isolated_b1_eager_and_graph(batch, capture_graph)
     for request_id in req_ids:
         isolated = _decode(model, [request_id], capture_graph=capture_graph)
         assert batched[request_id] == isolated[request_id]
+
+
+@pytest.mark.parametrize('capture_graph', [False, True])
+@pytest.mark.parametrize('batch', [1, 4])
+@torch.inference_mode()
+def test_disjoint_serial_and_overlap_are_bit_exact(batch, capture_graph):
+    req_ids = REQUEST_ORDER[:batch]
+    serial = _decode(_model('serial'), req_ids, capture_graph=capture_graph)
+    overlap = _decode(_model('overlap'), req_ids, capture_graph=capture_graph)
+    assert serial == overlap
 
 
 @pytest.mark.parametrize('capture_graph', [False, True])
@@ -227,3 +238,86 @@ def test_capture_reuses_fixed_bucket_graph():
     second = runner.capture(model, cache, 1, 64)
     assert first is second
     assert len(calls) == 2
+
+
+@pytest.mark.parametrize('req_ids', [(0,), (1,), REQUEST_ORDER[:3], REQUEST_ORDER])
+@torch.inference_mode()
+def test_disjoint_matches_union_within_reduction_tolerance(req_ids):
+    def first_decode_logits(mode):
+        model = _model(mode)
+        cache, first_tokens = _prefill_cache(model, req_ids)
+        scheduler = ContinuousBatchScheduler(
+            cache=cache, max_batch=cache.max_requests, eos_ids={127}, pad_token_id=0)
+        for request_id in req_ids:
+            scheduler.add_request(request_id)
+            scheduler.next_tokens[request_id] = first_tokens[request_id]
+        runner = GraphRunner(
+            scheduler=scheduler, buckets=(1, 2, 4), device='cuda')
+        bucket = runner.bucket_for(len(req_ids), cache.max_requests)
+        logits, _ = runner.step(
+            model, cache, generated_counts=[0] * bucket, min_new_tokens=1,
+            return_next_tokens=True, stop_on_eos=False)
+        return logits.logits.detach().float().cpu()
+
+    union = first_decode_logits('off')
+    split = first_decode_logits('serial')
+    # split 归约分组不同；BF16 logits 的实测绝对误差约 0.0054。
+    torch.testing.assert_close(split, union, rtol=2e-2, atol=8e-3)
+
+
+@torch.inference_mode()
+def test_session_pool_reuses_only_matching_graph_descriptor():
+    from types import SimpleNamespace
+
+    model = _model()
+    cache, _ = _prefill_cache(model, [1])
+    scheduler1 = SimpleNamespace(name='first')
+    runner1 = session_graph_runner(
+        model, cache, scheduler1, buckets=(1,), visible_buckets=(192,),
+        device='cuda', capture=True)
+    assert runner1.capture_count == 1
+    pool = model._nfa_graph_session_pool
+    pool.release(runner1)
+
+    scheduler2 = SimpleNamespace(name='second')
+    runner2 = session_graph_runner(
+        model, cache, scheduler2, buckets=(1,), visible_buckets=(192,),
+        device='cuda', capture=True)
+    assert runner2 is runner1
+    assert runner2.scheduler is scheduler2
+    assert runner2.capture_count == 1
+    assert pool.hit_count == 1
+
+    other_config = session_graph_runner(
+        model, cache, scheduler2, buckets=(1, 2), visible_buckets=(192,),
+        device='cuda', capture=False)
+    assert other_config is not runner1
+    other_cache, _ = _prefill_cache(model, [1])
+    other_arena = session_graph_runner(
+        model, other_cache, scheduler2, buckets=(1,), visible_buckets=(192,),
+        device='cuda', capture=False)
+    assert other_arena is not runner1
+
+
+@torch.inference_mode()
+def test_session_pool_discards_failed_capture(monkeypatch):
+    model = _model()
+    cache, _ = _prefill_cache(model, [1])
+
+    def fail_capture(self, model, cache):
+        raise RuntimeError('synthetic capture failure')
+
+    monkeypatch.setattr(GraphRunner, 'capture_all', fail_capture)
+    with pytest.raises(RuntimeError, match='synthetic capture failure'):
+        session_graph_runner(
+            model, cache, None, buckets=(1,), visible_buckets=(192,),
+            device='cuda', capture=True)
+    pool = model._nfa_graph_session_pool
+    assert not pool._entries
+
+    monkeypatch.undo()
+    runner = session_graph_runner(
+        model, cache, None, buckets=(1,), visible_buckets=(192,),
+        device='cuda', capture=False)
+    assert runner.capture_count == 0
+    assert pool.miss_count == 2

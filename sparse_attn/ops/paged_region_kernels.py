@@ -530,6 +530,51 @@ if triton is not None:
 
 
     @triton.jit
+    def _gather_attend_regions_combine_kernel(
+        PROT_ACC, PROT_M, PROT_Z, MIDDLE_ACC, MIDDLE_M, MIDDLE_Z,
+        OUT, TOTAL_QUERIES,
+        HQ: tl.constexpr, DV: tl.constexpr, BV: tl.constexpr,
+        PROT_NSPLIT: tl.constexpr, MIDDLE_NSPLIT: tl.constexpr,
+    ):
+        """按 protected→middle 固定顺序合并两路 online-softmax 状态。"""
+        q_idx = tl.program_id(0)
+        head = tl.program_id(1)
+        if q_idx >= TOTAL_QUERIES:
+            return
+        vd = tl.arange(0, BV)
+        mask = vd < DV
+        acc = tl.zeros((BV,), tl.float32)
+        m = float('-inf')
+        z = 0.0
+        for split in tl.static_range(PROT_NSPLIT):
+            part = (split * TOTAL_QUERIES + q_idx) * HQ + head
+            part_m = tl.load(PROT_M + part)
+            part_z = tl.load(PROT_Z + part)
+            part_acc = tl.load(PROT_ACC + part * DV + vd, mask=mask, other=0.0)
+            new_m = tl.maximum(m, part_m)
+            safe_m = tl.where(new_m == float('-inf'), 0.0, new_m)
+            alpha = tl.exp(m - safe_m)
+            beta = tl.exp(part_m - safe_m)
+            acc = acc * alpha + part_acc * beta
+            z = z * alpha + part_z * beta
+            m = new_m
+        for split in tl.static_range(MIDDLE_NSPLIT):
+            part = (split * TOTAL_QUERIES + q_idx) * HQ + head
+            part_m = tl.load(MIDDLE_M + part)
+            part_z = tl.load(MIDDLE_Z + part)
+            part_acc = tl.load(MIDDLE_ACC + part * DV + vd, mask=mask, other=0.0)
+            new_m = tl.maximum(m, part_m)
+            safe_m = tl.where(new_m == float('-inf'), 0.0, new_m)
+            alpha = tl.exp(m - safe_m)
+            beta = tl.exp(part_m - safe_m)
+            acc = acc * alpha + part_acc * beta
+            z = z * alpha + part_z * beta
+            m = new_m
+        out = tl.where(z == 0.0, 0.0, acc / z)
+        tl.store(OUT + (q_idx * HQ + head) * DV + vd,
+                 out.to(OUT.dtype.element_ty), mask=mask)
+
+    @triton.jit
     def _gather_attend_split_combine_kernel(
         PART_ACC, PART_M, PART_Z, OUT, TOTAL_QUERIES,
         HQ: tl.constexpr, DV: tl.constexpr, BV: tl.constexpr,
@@ -677,6 +722,79 @@ def paged_write_decode(cache_layer, key_states, value_states, slot_mapping, *,
         cache_layer.kv_pool_k[physical_id, 0, :, offset, :] = key_states[b, :, 0, :]
         cache_layer.kv_pool_v[physical_id, 0, :, offset, :] = value_states[b, :, 0, :]
     return key_states, value_states
+
+
+def sparse_paged_attention_gather_partial(
+    cache_layer, q, gather_indices, visible_lens, query_to_req, *,
+    scale, workspace, name, nsplit,
+):
+    """只写一个区域的 FP32 split 状态，不执行区域间归并。"""
+    if not q.is_cuda or triton is None:
+        raise RuntimeError('split regions require CUDA Triton')
+    if q.ndim != 3 or q.shape[-1] != cache_layer.head_dim_k:
+        raise ValueError('split regions expect flat [T,HQ,D] query')
+    hq = q.shape[1]
+    hk = cache_layer.num_kv_heads
+    if hq % hk != 0:
+        raise ValueError('GQA requires HQ % HK == 0')
+    total_q = q.shape[0]
+    max_visible = gather_indices.shape[-1]
+    page = cache_layer.geometry.page
+    if (page & (page - 1)) != 0:
+        raise ValueError('split regions require power-of-two page size')
+    head_group = hq // hk
+    head_tile = max(16, triton.next_power_of_2(head_group))
+    if (cache_layer.head_dim_k < 16 or cache_layer.head_dim_v < 16
+            or head_group > head_tile):
+        raise RuntimeError('split regions require grouped attention geometry')
+    if cache_layer.head_dim_k >= 256 or cache_layer.head_dim_v >= 256:
+        block_tokens = 64
+        kernel_kwargs = {'num_stages': 1}
+    else:
+        block_tokens = 128 if total_q <= 8 else 64
+        kernel_kwargs = {}
+    from ..indexer.selection.unique_ranking import _fast_launch, _workspace_empty
+    part_acc = _workspace_empty(
+        workspace, f'gather_split_{name}_acc',
+        (nsplit, total_q, hq, cache_layer.head_dim_v), torch.float32, q.device)
+    part_m = _workspace_empty(
+        workspace, f'gather_split_{name}_m', (nsplit, total_q, hq),
+        torch.float32, q.device)
+    part_z = _workspace_empty(
+        workspace, f'gather_split_{name}_z', (nsplit, total_q, hq),
+        torch.float32, q.device)
+    q_arg = q if q.is_contiguous() else q.contiguous()
+    _fast_launch(
+        workspace, ('gather_attend_region_split', name),
+        _gather_attend_grouped_split_kernel, (total_q, hk, nsplit),
+        q_arg, cache_layer.kv_pool_k, cache_layer.kv_pool_v,
+        gather_indices, visible_lens, query_to_req, q_arg,
+        part_acc, part_m, part_z, total_q,
+        hq, hk, cache_layer.head_dim_k, cache_layer.head_dim_v,
+        page, page.bit_length() - 1, max_visible, visible_lens.shape[0],
+        block_tokens, scale,
+        triton.next_power_of_2(cache_layer.head_dim_k),
+        triton.next_power_of_2(cache_layer.head_dim_v),
+        head_group, head_tile, cache_layer.kv_pool_k.dtype == torch.bfloat16,
+        nsplit, True, **kernel_kwargs)
+    return part_acc, part_m, part_z
+
+
+def sparse_paged_attention_regions_combine(
+    q, protected_parts, middle_parts, *, workspace,
+):
+    """合并 disjoint 区域；serial 与 overlap 共用完全相同的归并顺序。"""
+    from ..indexer.selection.unique_ranking import _fast_launch
+    total_q, hq = q.shape[:2]
+    dv = protected_parts[0].shape[-1]
+    out = q.new_empty((total_q, hq, dv))
+    _fast_launch(
+        workspace, 'gather_attend_regions_combine',
+        _gather_attend_regions_combine_kernel, (total_q, hq),
+        *protected_parts, *middle_parts, out, total_q,
+        hq, dv, triton.next_power_of_2(dv),
+        protected_parts[0].shape[0], middle_parts[0].shape[0])
+    return out
 
 
 def sparse_paged_attention_gather(

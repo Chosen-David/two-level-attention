@@ -1,0 +1,1077 @@
+{
+  "schema": "qwen-asynctls-semantic-graph-performance-v1",
+  "validation_status": "pending-independent-verification",
+  "source": {
+    "head": "1c6c955509099973106247d82a8531ee3e3606e1",
+    "diff_sha256": "ba2394ea4dc83802876d63468920e87dac1d3344e54a4a407c9a5e4dcbb819f5",
+    "harness_sha256": "414e1833c7f0cad45540693b278bfd03ddf1d5b9fc756a9754b57e3204b97e63",
+    "asynctls_vendor_files_sha256": {
+      "benchmark/efficiency/benchmark_asynctls_graph.py": "e6cae7bb2ec18ac740f5e617732010c0fc907cfcae45805e50b1120b2bc43f3e",
+      "exp/vendor_baselines/asynctls_vendor/qwen3_asynctls_graph.py": "f33bfcb8f18aa8405c44449d9f619c358638b9f7cdd6cf862ded1e0b3dda56e6",
+      "exp/vendor_baselines/asynctls_vendor/qwen3_asynctls_patch.py": "26ce689acfada974b9a8d0b37bc64956e9f5a46b183485b2a4d4f6fd19d48e21"
+    }
+  },
+  "matrix_driver_sha256": "6fd006908683ac12acc9e780bf47eebd783670e63023fef86b61c412a3dcecd7",
+  "arguments": {
+    "repo": "/home/wangyuanshuo02/two-level-attention",
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/tmp/nfa_kernel_inputs",
+    "channel_file": "/home/wangyuanshuo02/two-level-attention/dimension_channels/qwen3-8b/qasper_channels_per_group.json",
+    "output_dir": "/tmp/asynctls_semantic_graph_equal_steps_20261111",
+    "gpu": 0,
+    "shard_index": 0,
+    "num_shards": 1,
+    "arms": [
+      "asynctls-operator-profile",
+      "asynctls-clean-e2e"
+    ],
+    "lengths": [
+      524288,
+      262144,
+      131072,
+      65536,
+      32768
+    ],
+    "batches": [
+      1,
+      2,
+      4
+    ],
+    "task": "niah_multikey_2",
+    "sample_index": 2,
+    "visible_len": 8192,
+    "warmup_steps": 3,
+    "decode_steps": 32,
+    "budget": 512,
+    "block_size": 64,
+    "top_kb": 128,
+    "max_attempts": 2,
+    "summarize_only": true
+  },
+  "semantics": {
+    "implementation": "independent PyTorch semantic reimplementation",
+    "official_tilelang": false,
+    "source_verified_official": false,
+    "paper_pdf_verified": true,
+    "real_async_offload": false,
+    "int4": "per-token quantize-dequantize; BF16 storage remains",
+    "budget": 512,
+    "block_size": 64,
+    "top_kb": 128,
+    "channels_per_kv_group": 32,
+    "pipeline": "Stage2 uses previous-step coarse blocks M_(t-1)"
+  },
+  "protocol": {
+    "operator": "separate nsys CUDA Graph node trace process; identical max_new_tokens/cache geometry and decode-step count as clean",
+    "clean_e2e": "separate process without nsys or torch.profiler",
+    "host_overhead_derivable_by_subtraction": false,
+    "timing_metric": "end-to-end decode TPOT, not pure attention latency",
+    "operator_scope": "index-family kernels only; no fabricated stage totals for ambiguous PyTorch GEMM/softmax/reduction names"
+  },
+  "records": [
+    {
+      "length": 524288,
+      "batch": 1,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/524288/niah_multikey_2.jsonl",
+        "sha256": "6ca6ca3137fe30ca2925a20641ae7f2e08d964f0bb7628bbc315ea1c29627dc8",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 0,
+        "actual_prompt_tokens": 523827,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 523827,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 810.9863330000113,
+            "mean_ms_per_step": 25.343322906250354
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.16505200000024,
+            "mean_ms_per_step": 1.7864078750000074
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 189.12815999999876,
+            "mean_ms_per_step": 5.910254999999961
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 246.29321199999876,
+            "mean_ms_per_step": 7.696662874999961
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l524288_b1_graph.nsys-rep",
+          "report_sha256": "de7056644cedeba3327f0ad445a8408a3ebee81477fcb7283108b1f863947e83",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l524288_b1_graph.sqlite",
+          "sqlite_sha256": "d26bad1d207cee90e247502757e898cc096547bd35b97567c17958d7d6fd93b1",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l524288_b1_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 25.589263916015625,
+        "prefill_seconds": 940.7286891713738,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l524288_b1_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 262144,
+      "batch": 2,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_2.jsonl",
+        "sha256": "0f8b39583d1df5e267c1750da44300322a2b5359cf6b2fe89b45b56efe028b30",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 0,
+        "actual_prompt_tokens": 261935,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 261935,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 1035.7867930000007,
+            "mean_ms_per_step": 32.36833728125002
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.03956600000012,
+            "mean_ms_per_step": 1.7824864375000038
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 267.0082499999991,
+            "mean_ms_per_step": 8.344007812499973
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 324.0478159999991,
+            "mean_ms_per_step": 10.126494249999972
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l262144_b2_graph.nsys-rep",
+          "report_sha256": "829dd26464cdcd7ec3d6df53dc4dfacb42536fd46a17a827798f89e257711787",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l262144_b2_graph.sqlite",
+          "sqlite_sha256": "fe48fc4fce6070aa7d8911d8fc29867e43efd0658300db4965cfa8c2c1346b6e",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l262144_b2_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 32.37798309326172,
+        "prefill_seconds": 503.88523841649294,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l262144_b2_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 262144,
+      "batch": 1,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_2.jsonl",
+        "sha256": "0f8b39583d1df5e267c1750da44300322a2b5359cf6b2fe89b45b56efe028b30",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 0,
+        "actual_prompt_tokens": 261935,
+        "provenance": "repeated-needle-body-extension",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 261935,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 780.2971999999162,
+            "mean_ms_per_step": 24.38428749999738
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.37575700000016,
+            "mean_ms_per_step": 1.792992406250005
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 174.0592399999985,
+            "mean_ms_per_step": 5.4393512499999535
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 231.43499699999933,
+            "mean_ms_per_step": 7.232343656249979
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l262144_b1_graph.nsys-rep",
+          "report_sha256": "b1ec4f450c1aa4ef5c32008f94fc1c758267bde82dac3c78729dc2a0f206fa09",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l262144_b1_graph.sqlite",
+          "sqlite_sha256": "7c7a21e089d58b4ca82a424fd5a1015e548cdf8bfdae8d202f837999f9171843",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l262144_b1_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 24.595552444458008,
+        "prefill_seconds": 252.15427201241255,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l262144_b1_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 131072,
+      "batch": 4,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_2.jsonl",
+        "sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 130989,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 130989,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 1451.116792000045,
+            "mean_ms_per_step": 45.34739975000141
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.158057000000376,
+            "mean_ms_per_step": 1.7861892812500118
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 417.7292779999979,
+            "mean_ms_per_step": 13.054039937499935
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 474.88733499999717,
+            "mean_ms_per_step": 14.840229218749911
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l131072_b4_graph.nsys-rep",
+          "report_sha256": "302936fb7fc949a061da76c68cc7c3e44b08120ca22dfd4186880d0f536c8fe3",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l131072_b4_graph.sqlite",
+          "sqlite_sha256": "fe1a6fc65026454ae8d045f1061a4ee7d696af7e816b95c59448147006c16fd8",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l131072_b4_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 45.00532913208008,
+        "prefill_seconds": 280.38471888005733,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l131072_b4_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 131072,
+      "batch": 2,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_2.jsonl",
+        "sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 130989,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 130989,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 1005.8657970000467,
+            "mean_ms_per_step": 31.433306156251458
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.06700600000013,
+            "mean_ms_per_step": 1.783343937500004
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 259.4387680000004,
+            "mean_ms_per_step": 8.107461500000012
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 316.50577400000014,
+            "mean_ms_per_step": 9.890805437500005
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l131072_b2_graph.nsys-rep",
+          "report_sha256": "cb37f67f30af63d1239b5cf461571a352d06dde6e825607acedfc0a53e1990a6",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l131072_b2_graph.sqlite",
+          "sqlite_sha256": "d6839fb2677924e6bd9b4fb85154d85d3f08661162b7926aee1a73ab199fd6ea",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l131072_b2_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 31.50604820251465,
+        "prefill_seconds": 140.4118095189333,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l131072_b2_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/131072/niah_multikey_2.jsonl",
+        "sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 130989,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 130989,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 759.2239649999699,
+            "mean_ms_per_step": 23.72574890624906
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.13282100000056,
+            "mean_ms_per_step": 1.7854006562500175
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 166.50651599999577,
+            "mean_ms_per_step": 5.203328624999868
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 223.63933699999768,
+            "mean_ms_per_step": 6.9887292812499275
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l131072_b1_graph.nsys-rep",
+          "report_sha256": "48c2587c6e9c4bac12d35be668371df976c3167129a7a1557000b8378c6deb2a",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l131072_b1_graph.sqlite",
+          "sqlite_sha256": "0ff5c1b68b61d5f092665619a28195084a5d16506cf5ed6433b63ae228fed499",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l131072_b1_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 23.935535430908203,
+        "prefill_seconds": 70.58064652979374,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l131072_b1_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 65536,
+      "batch": 4,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_2.jsonl",
+        "sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 65462,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 65462,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 1443.3652440000074,
+            "mean_ms_per_step": 45.10516387500023
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.25162700000066,
+            "mean_ms_per_step": 1.7891133437500206
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 413.5009359999975,
+            "mean_ms_per_step": 12.921904249999923
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 470.7525629999983,
+            "mean_ms_per_step": 14.711017593749947
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l65536_b4_graph.nsys-rep",
+          "report_sha256": "2bde19f13d5b13fb478734463fd7d2d6cc25f2546de8d39156a35d7ace87e2ff",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l65536_b4_graph.sqlite",
+          "sqlite_sha256": "803ff3a3b76f4b834c18001eac9e1822eaa2990287c0a478b4d573705b3d09f9",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l65536_b4_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 44.767648696899414,
+        "prefill_seconds": 85.64094373583794,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l65536_b4_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 65536,
+      "batch": 2,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_2.jsonl",
+        "sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 65462,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 65462,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 994.6514890000633,
+            "mean_ms_per_step": 31.082859031251978
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.023242000000096,
+            "mean_ms_per_step": 1.781976312500003
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 254.92848999999902,
+            "mean_ms_per_step": 7.966515312499969
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 311.9517320000003,
+            "mean_ms_per_step": 9.748491625000009
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l65536_b2_graph.nsys-rep",
+          "report_sha256": "3062013929a1057cb940c12c6cf755eb9de73bbb82ff3efcc9c8cf3f43f71d85",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l65536_b2_graph.sqlite",
+          "sqlite_sha256": "9ba2bac7416c6c0c42255d5fd2255d8a0d10631bc35cadbc57a5ca8fcd2b06c9",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l65536_b2_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 31.054335594177246,
+        "prefill_seconds": 43.059985890984535,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l65536_b2_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/65536/niah_multikey_2.jsonl",
+        "sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 65462,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 65462,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 754.5383790000525,
+            "mean_ms_per_step": 23.57932434375164
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.22737100000008,
+            "mean_ms_per_step": 1.7883553437500026
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 161.79303599999798,
+            "mean_ms_per_step": 5.056032374999937
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 219.02040699999824,
+            "mean_ms_per_step": 6.844387718749945
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l65536_b1_graph.nsys-rep",
+          "report_sha256": "ac2c5c2b6f6caae04ce3354376ea76db1f72fbcc0867d34bdc777469ed22fe83",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l65536_b1_graph.sqlite",
+          "sqlite_sha256": "c4fd7b649a3b305b5d23134f92bc80d2bb56d83f3461e175714b105807140f38",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l65536_b1_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 23.8374080657959,
+        "prefill_seconds": 21.682567343115807,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l65536_b1_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 32768,
+      "batch": 4,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_2.jsonl",
+        "sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 32622,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 32622,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 1442.0751359999865,
+            "mean_ms_per_step": 45.06484799999958
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.326230000000706,
+            "mean_ms_per_step": 1.791444687500022
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 410.03134099999875,
+            "mean_ms_per_step": 12.81347940624996
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 467.35757099999796,
+            "mean_ms_per_step": 14.604924093749936
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l32768_b4_graph.nsys-rep",
+          "report_sha256": "b1309f8624e0836f6d7a20610b64038e38ae93d534bf01c0c4a1a880ec69a537",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l32768_b4_graph.sqlite",
+          "sqlite_sha256": "bc9c4f6f134f5bf8d956101915f6c5017ab7b0381886bf860133743cb57e39b2",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l32768_b4_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 44.59566307067871,
+        "prefill_seconds": 29.126036509871483,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l32768_b4_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 32768,
+      "batch": 2,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_2.jsonl",
+        "sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 32622,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 32622,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 995.585482000013,
+            "mean_ms_per_step": 31.112046312500407
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.099851000000115,
+            "mean_ms_per_step": 1.7843703437500036
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 251.9485820000004,
+            "mean_ms_per_step": 7.873393187500013
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 309.04843299999857,
+            "mean_ms_per_step": 9.657763531249955
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l32768_b2_graph.nsys-rep",
+          "report_sha256": "18ccba5ac6b16b0c8f0a7ad203d24ce9da3c35dc78f912fd320d82ba358b9d9a",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l32768_b2_graph.sqlite",
+          "sqlite_sha256": "4013b4fd6f41606d92636bb936a43ae9adb1cdf1f625c42f94d83ea3658f2fc0",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l32768_b2_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 31.113120079040527,
+        "prefill_seconds": 14.676677510142326,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l32768_b2_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "input": {
+        "path": "/tmp/nfa_kernel_inputs/32768/niah_multikey_2.jsonl",
+        "sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+        "sample_index": 2,
+        "sample_id": 2,
+        "file_row_index": 2,
+        "actual_prompt_tokens": 32622,
+        "provenance": "native-ruler",
+        "performance_input_mode": "replicate one prompt across all batch rows"
+      },
+      "actual_prefill_length": 32622,
+      "operator": {
+        "summary": {
+          "all_observed_model_kernels_ms": {
+            "calls_total": 147264,
+            "mean_calls_per_step": 4602.0,
+            "total_ms": 750.4163520000014,
+            "mean_ms_per_step": 23.450511000000045
+          },
+          "topk_sort_family_ms": {
+            "calls_total": 3456,
+            "mean_calls_per_step": 108.0,
+            "total_ms": 57.19638200000015,
+            "mean_ms_per_step": 1.7873869375000047
+          },
+          "gather_family_ms": {
+            "calls_total": 9248,
+            "mean_calls_per_step": 289.0,
+            "total_ms": 158.51017799999835,
+            "mean_ms_per_step": 4.953443062499948
+          },
+          "index_family_ms": {
+            "calls_total": 12704,
+            "mean_calls_per_step": 397.0,
+            "total_ms": 215.70655999999894,
+            "mean_ms_per_step": 6.740829999999967
+          },
+          "scope": "Only kernel names uniquely attributable to PyTorch Top-K/sort and gather are included in index_family_ms. Block scoring, INT4 quantize-dequantize, projected QK, softmax and exact selected attention use kernels that cannot be separated reliably from other model kernels by name; they remain in kernel_summary and are not assigned fabricated stage totals.",
+          "implementation": "independent PyTorch semantic reimplementation; not official TileLang and no real asynchronous offload",
+          "members": {
+            "gather": [
+              "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::detail::TensorInfo<const T1, T3>, at::cuda::detail::TensorInfo<const T2, T3>, int, int, T3, long)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)2>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::_scatter_gather_elementwise_kernel<(int)128, (int)8, void at::native::_cuda_scatter_gather_internal_kernel<(bool)0, at::native::OpaqueType<(int)8>, long>::operator ()<at::native::TensorAssign>(at::TensorIterator &, long, long, long, const T1 &)::[lambda(int) (instance 1)]>(int, T3)",
+              "void at::native::sbtopk::gatherTopK<c10::BFloat16, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)",
+              "void at::native::sbtopk::gatherTopK<float, unsigned int, (int)2, (bool)0>(at::cuda::detail::TensorInfo<const T1, T2>, T2, T2, bool, T2, T2, at::cuda::detail::TensorInfo<T1, T2>, T2, at::cuda::detail::TensorInfo<long, T2>, T2, T1 *)"
+            ],
+            "topk_sort": [
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, float, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)32, long, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)",
+              "void at::native::radixSortKVInPlace<(int)2, (int)-1, (int)32, (int)4, c10::BFloat16, long, unsigned int>(at::cuda::detail::TensorInfo<T5, T7>, T7, T7, T7, at::cuda::detail::TensorInfo<T6, T7>, T7, bool)"
+            ]
+          }
+        },
+        "profiled_decode_steps": 32,
+        "nsys_receipt": {
+          "version": "NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0",
+          "report_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l32768_b1_graph.nsys-rep",
+          "report_sha256": "8168c83d8b91ff249205336b66c451c76ce9f1635a8d084d5f957073cdb437c1",
+          "sqlite_path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l32768_b1_graph.sqlite",
+          "sqlite_sha256": "9109961a816bd4f5942fc14ae9dd89abf9f5659447256fbedf3d269ddf7c5b32",
+          "trace": "cuda",
+          "cuda_graph_trace": "node",
+          "capture_range": "cudaProfilerApi around steady decode only",
+          "observer_effect": "Graph node tracing may perturb runtime; values are observed kernel times, not zero-overhead ground truth"
+        },
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-operator-profile/asynctls-operator-profile_l32768_b1_graph.json"
+      },
+      "clean_e2e": {
+        "tpot_ms": 23.659008026123047,
+        "prefill_seconds": 7.5116793885827065,
+        "path": "/tmp/asynctls_semantic_graph_equal_steps_20261111/asynctls-clean-e2e/asynctls-clean-e2e_l32768_b1_graph.json"
+      },
+      "profile_clean_token_identity_common_prefix": true,
+      "profile_clean_token_identity_full": true
+    }
+  ],
+  "infeasible_memory_cells": [
+    {
+      "length": 524288,
+      "batch": 4,
+      "memory": {
+        "batch": 4,
+        "kv_gib": 288.02032470703125,
+        "weights_and_runtime_reserve_gib": 20.0,
+        "required_lower_bound_gib": 312.5206422805786,
+        "gpu_total_gib": 140.4013671875,
+        "feasible": false,
+        "note": "BF16 K/V plus BF16 per-block K min/max lower bound; fixed candidate workspace and runtime reserve are not a measured peak-memory claim.",
+        "asynctls_block_metadata_lower_bound_gib": 4.500317573547363
+      }
+    },
+    {
+      "length": 524288,
+      "batch": 2,
+      "memory": {
+        "batch": 2,
+        "kv_gib": 144.01016235351562,
+        "weights_and_runtime_reserve_gib": 20.0,
+        "required_lower_bound_gib": 166.2603211402893,
+        "gpu_total_gib": 140.4013671875,
+        "feasible": false,
+        "note": "BF16 K/V plus BF16 per-block K min/max lower bound; fixed candidate workspace and runtime reserve are not a measured peak-memory claim.",
+        "asynctls_block_metadata_lower_bound_gib": 2.2501587867736816
+      }
+    },
+    {
+      "length": 262144,
+      "batch": 4,
+      "memory": {
+        "batch": 4,
+        "kv_gib": 144.02032470703125,
+        "weights_and_runtime_reserve_gib": 20.0,
+        "required_lower_bound_gib": 166.2706422805786,
+        "gpu_total_gib": 140.4013671875,
+        "feasible": false,
+        "note": "BF16 K/V plus BF16 per-block K min/max lower bound; fixed candidate workspace and runtime reserve are not a measured peak-memory claim.",
+        "asynctls_block_metadata_lower_bound_gib": 2.2503175735473633
+      }
+    }
+  ]
+}

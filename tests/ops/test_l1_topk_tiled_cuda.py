@@ -67,13 +67,27 @@ def _production_near_scores(rows, hkv, batch, lengths, kt, bs, sink, swa,
 
 @triton.jit
 def _reference_topk(
-    FAR, NEAR, I_F, I_N,
+    FAR, NEAR, I_F, I_N, LENGTHS,
     KT: tl.constexpr, KT_PAD: tl.constexpr,
     K_F: tl.constexpr, K_N: tl.constexpr,
     K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
+    WINDOW: tl.constexpr, POOL_NEAR_LEN: tl.constexpr,
+    SINK_POOL_LO: tl.constexpr, BS: tl.constexpr,
+    HKV: tl.constexpr, B: tl.constexpr,
 ):
-    _topk_indices_body(FAR, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
-    _topk_indices_body(NEAR, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
+    row = tl.program_id(0)
+    req = (row // HKV) % B
+    length = tl.load(LENGTHS + req).to(tl.int32)
+    near_start = tl.maximum(
+        (length - WINDOW - POOL_NEAR_LEN) // BS, SINK_POOL_LO)
+    kt_eff = (length + BS - 1) // BS
+    near_end = tl.maximum(
+        near_start, kt_eff - tl.maximum(1, WINDOW // BS))
+    far_end = tl.minimum(kt_eff, near_start)
+    _topk_indices_body(FAR, I_F, 0, far_end, KT=KT, KT_PAD=KT_PAD,
+                       K=K_F, K_PAD=K_F_PAD)
+    _topk_indices_body(NEAR, I_N, near_start, near_end,
+                       KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
 
 
 @triton.jit
@@ -95,7 +109,7 @@ def _merge_topk(
 @triton.jit
 def _reference_candidate(
     FAR, NEAR, I_F, I_N, LENGTHS, SKIP_FAR, SKIP_NEAR, VALID_REQ,
-    OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS,
+    OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS, EXTENTS,
     KT: tl.constexpr, KT_PAD: tl.constexpr,
     K_F: tl.constexpr, K_N: tl.constexpr,
     K_F_PAD: tl.constexpr, K_N_PAD: tl.constexpr,
@@ -109,13 +123,24 @@ def _reference_candidate(
     HKV: tl.constexpr, B: tl.constexpr,
     MAX_REQ: tl.constexpr, LAYER_OFFSET: tl.constexpr,
 ):
-    """skip-aware 修改前的整行 Top-K + candidate，作为独立 oracle。"""
-    _topk_indices_body(FAR, I_F, KT=KT, KT_PAD=KT_PAD, K=K_F, K_PAD=K_F_PAD)
-    _topk_indices_body(NEAR, I_N, KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
+    """整行 active-range Top-K + candidate，作为 tiled 路径独立 oracle。"""
+    row = tl.program_id(0)
+    req = (row // HKV) % B
+    length = tl.load(LENGTHS + req).to(tl.int32)
+    near_start = tl.maximum(
+        (length - WINDOW - POOL_NEAR_LEN) // BS, SINK_POOL_LO)
+    kt_eff = (length + BS - 1) // BS
+    near_end = tl.maximum(
+        near_start, kt_eff - tl.maximum(1, WINDOW // BS))
+    far_end = tl.minimum(kt_eff, near_start)
+    _topk_indices_body(FAR, I_F, 0, far_end, KT=KT, KT_PAD=KT_PAD,
+                       K=K_F, K_PAD=K_F_PAD)
+    _topk_indices_body(NEAR, I_N, near_start, near_end,
+                       KT=KT, KT_PAD=KT_PAD, K=K_N, K_PAD=K_N_PAD)
     tl.debug_barrier()
     _candidate_pack_batched_kernel(
         I_F, I_N, FAR, NEAR, LENGTHS, SKIP_FAR, SKIP_NEAR, VALID_REQ,
-        OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS,
+        OUT, VALID, LOWER, UPPER, QUOTA, OWNERS, GENERATIONS, EXTENTS,
         K_F=K_F, K_N=K_N, KT=KT, R=R, HEAD=HEAD, TAIL=TAIL,
         SINK=SINK, SWA=SWA, CAP=CAP, SINK_POOL_LO=SINK_POOL_LO,
         BS=BS, PAGE=PAGE, NEAR_LEN=NEAR_LEN, K2=K2, HKV=HKV, B=B,
@@ -146,8 +171,8 @@ class L1TopKTiledTest(unittest.TestCase):
                 far[1, 1] = float("-inf")
                 near[2, 2] = float("inf")
                 near[3, -1] = float("nan")
-                ref_f = torch.empty((rows, k_f), dtype=torch.int64, device="cuda")
-                ref_n = torch.empty((rows, k_n), dtype=torch.int64, device="cuda")
+                ref_f = torch.empty((rows, k_f), dtype=torch.int32, device="cuda")
+                ref_n = torch.empty((rows, k_n), dtype=torch.int32, device="cuda")
                 out_f = torch.empty_like(ref_f)
                 out_n = torch.empty_like(ref_n)
                 k_f_pad = triton.next_power_of_2(max(1, k_f))
@@ -156,11 +181,14 @@ class L1TopKTiledTest(unittest.TestCase):
                 skip_far = torch.zeros(1, dtype=torch.bool, device="cuda")
                 skip_near = torch.zeros_like(skip_far)
                 valid_req = torch.zeros(1, dtype=torch.int64, device="cuda")
+                lengths = torch.full(
+                    (1,), kt * 64, dtype=torch.int64, device="cuda")
                 _reference_topk[(rows,)](
-                    far, near, ref_f, ref_n,
+                    far, near, ref_f, ref_n, lengths,
                     KT=kt, KT_PAD=triton.next_power_of_2(kt),
                     K_F=k_f, K_N=k_n, K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
-                    num_warps=8)
+                    WINDOW=128, POOL_NEAR_LEN=2048, SINK_POOL_LO=0,
+                    BS=64, HKV=rows, B=1, num_warps=8)
                 partial_f = torch.empty(
                     (rows, ntiles, k_f_pad), dtype=torch.int32, device="cuda")
                 partial_n = torch.empty(
@@ -198,7 +226,7 @@ class L1TopKTiledTest(unittest.TestCase):
         near = torch.randn((rows, kt), device="cuda", dtype=torch.bfloat16)
         far[0, 0] = float("nan")
         near[1, 1] = float("-inf")
-        lengths = torch.tensor([capacity], dtype=torch.int64, device="cuda")
+        lengths = torch.tensor([capacity - 65], dtype=torch.int64, device="cuda")
         skip_far = torch.zeros(1, dtype=torch.bool, device="cuda")
         skip_near = torch.zeros_like(skip_far)
         valid_req = torch.zeros(1, dtype=torch.int64, device="cuda")
@@ -210,15 +238,17 @@ class L1TopKTiledTest(unittest.TestCase):
 
         def allocate():
             return {
-                "i_f": torch.empty((rows, k_f), dtype=torch.int64, device="cuda"),
-                "i_n": torch.empty((rows, k_n), dtype=torch.int64, device="cuda"),
-                "out": torch.empty((rows, width), dtype=torch.int64, device="cuda"),
+                "i_f": torch.empty((rows, k_f), dtype=torch.int32, device="cuda"),
+                "i_n": torch.empty((rows, k_n), dtype=torch.int32, device="cuda"),
+                "out": torch.empty((rows, width), dtype=torch.int32, device="cuda"),
                 "valid": torch.empty((rows, width), dtype=torch.bool, device="cuda"),
                 "lower": torch.empty(1, dtype=torch.int64, device="cuda"),
                 "upper": torch.empty(1, dtype=torch.int64, device="cuda"),
                 "quota": torch.empty(1, dtype=torch.int64, device="cuda"),
-                "owners": torch.zeros((rows, capacity), dtype=torch.int32, device="cuda"),
+                "owners": torch.full((rows, capacity), 0x12345678,
+                                      dtype=torch.int32, device="cuda"),
                 "generations": torch.zeros(rows, dtype=torch.int32, device="cuda"),
+                "extents": torch.zeros(rows, dtype=torch.int32, device="cuda"),
             }
 
         ref = allocate()
@@ -237,12 +267,14 @@ class L1TopKTiledTest(unittest.TestCase):
             far, near, far, near,
             ref["i_f"], ref["i_n"], lengths, skip_far, skip_near, valid_req,
             ref["out"], ref["valid"], ref["lower"], ref["upper"], ref["quota"],
-            ref["owners"], ref["generations"],
+            ref["owners"], ref["generations"], ref["extents"],
             TILED=False, NTILES=1, NTILES_PAD=1, **common)
-        partial_f = torch.empty(
-            (rows, ntiles, k_f_pad), dtype=torch.int32, device="cuda")
-        partial_n = torch.empty(
-            (rows, ntiles, k_n_pad), dtype=torch.int32, device="cuda")
+        partial_f = torch.full(
+            (rows, ntiles, k_f_pad), 0x12345678,
+            dtype=torch.int32, device="cuda")
+        partial_n = torch.full(
+            (rows, ntiles, k_n_pad), 0x12345678,
+            dtype=torch.int32, device="cuda")
         _l1_topk_partial_kernel[(rows, ntiles)](
             far, near, partial_f, partial_n,
             skip_far, skip_near, valid_req, lengths,
@@ -255,7 +287,7 @@ class L1TopKTiledTest(unittest.TestCase):
             partial_f, partial_n, far, near,
             out["i_f"], out["i_n"], lengths, skip_far, skip_near, valid_req,
             out["out"], out["valid"], out["lower"], out["upper"], out["quota"],
-            out["owners"], out["generations"],
+            out["owners"], out["generations"], out["extents"],
             TILED=True, NTILES=ntiles, NTILES_PAD=triton.next_power_of_2(ntiles),
             **common)
         torch.cuda.synchronize()
@@ -332,9 +364,9 @@ class L1TopKTiledTest(unittest.TestCase):
 
         def allocate():
             return {
-                "i_f": torch.empty((rows, k_f), dtype=torch.int64, device="cuda"),
-                "i_n": torch.empty((rows, k_n), dtype=torch.int64, device="cuda"),
-                "out": torch.empty((rows, width), dtype=torch.int64, device="cuda"),
+                "i_f": torch.empty((rows, k_f), dtype=torch.int32, device="cuda"),
+                "i_n": torch.empty((rows, k_n), dtype=torch.int32, device="cuda"),
+                "out": torch.empty((rows, width), dtype=torch.int32, device="cuda"),
                 "valid": torch.empty((rows, width), dtype=torch.bool, device="cuda"),
                 "lower": torch.empty(m, dtype=torch.int64, device="cuda"),
                 "upper": torch.empty(m, dtype=torch.int64, device="cuda"),
@@ -342,6 +374,7 @@ class L1TopKTiledTest(unittest.TestCase):
                 "owners": torch.zeros(
                     (rows, capacity), dtype=torch.int32, device="cuda"),
                 "generations": torch.zeros(rows, dtype=torch.int32, device="cuda"),
+                "extents": torch.zeros(rows, dtype=torch.int32, device="cuda"),
             }
 
         common = dict(
@@ -356,21 +389,23 @@ class L1TopKTiledTest(unittest.TestCase):
             far, near, ref["i_f"], ref["i_n"], lengths,
             skip_far, skip_near, valid_req, ref["out"], ref["valid"],
             ref["lower"], ref["upper"], ref["quota"],
-            ref["owners"], ref["generations"], **common)
+            ref["owners"], ref["generations"], ref["extents"], **common)
 
         eager = allocate()
         _topk_candidate_batched_kernel[(rows,)](
             far, near, far, near, eager["i_f"], eager["i_n"], lengths,
             skip_far, skip_near, valid_req, eager["out"], eager["valid"],
             eager["lower"], eager["upper"], eager["quota"],
-            eager["owners"], eager["generations"],
+            eager["owners"], eager["generations"], eager["extents"],
             TILED=False, NTILES=1, NTILES_PAD=1,
             LOG2_F=7, LOG2_N=5, **common)
 
-        partial_f = torch.empty(
-            (rows, ntiles, k_f_pad), dtype=torch.int32, device="cuda")
-        partial_n = torch.empty(
-            (rows, ntiles, k_n_pad), dtype=torch.int32, device="cuda")
+        partial_f = torch.full(
+            (rows, ntiles, k_f_pad), 0x12345678,
+            dtype=torch.int32, device="cuda")
+        partial_n = torch.full(
+            (rows, ntiles, k_n_pad), 0x12345678,
+            dtype=torch.int32, device="cuda")
         _l1_topk_partial_kernel[(rows, ntiles)](
             far, near, partial_f, partial_n, skip_far, skip_near, valid_req,
             lengths,
@@ -385,7 +420,7 @@ class L1TopKTiledTest(unittest.TestCase):
             tiled["i_f"], tiled["i_n"], lengths,
             skip_far, skip_near, valid_req, tiled["out"], tiled["valid"],
             tiled["lower"], tiled["upper"], tiled["quota"],
-            tiled["owners"], tiled["generations"],
+            tiled["owners"], tiled["generations"], tiled["extents"],
             TILED=True, NTILES=ntiles, NTILES_PAD=triton.next_power_of_2(ntiles),
             LOG2_F=7, LOG2_N=5, **common)
         parallel = allocate()
@@ -393,7 +428,7 @@ class L1TopKTiledTest(unittest.TestCase):
             partial_f, partial_n, parallel["i_f"], parallel["i_n"], lengths,
             skip_far, skip_near, valid_req,
             parallel["lower"], parallel["upper"], parallel["quota"],
-            parallel["owners"], parallel["generations"],
+            parallel["owners"], parallel["generations"], parallel["extents"],
             TILED=True, NTILES=ntiles, NTILES_PAD=triton.next_power_of_2(ntiles),
             LOG2_F=7, LOG2_N=5, **common)
         expand_common = {
@@ -402,6 +437,7 @@ class L1TopKTiledTest(unittest.TestCase):
                      "SWA", "CAP", "SINK_POOL_LO", "BS", "HKV", "B")}
         _candidate_expand_batched_kernel[(rows, triton.cdiv(width, 1024))](
             parallel["i_f"], parallel["i_n"], far, near, lengths,
+            parallel["lower"], parallel["upper"],
             parallel["out"], parallel["valid"],
             parallel["owners"], parallel["generations"],
             **expand_common, num_warps=8)
@@ -435,11 +471,11 @@ class L1TopKTiledTest(unittest.TestCase):
                     def allocate():
                         return {
                             "i_f": torch.empty(
-                                (rows, k_f), dtype=torch.int64, device="cuda"),
+                                (rows, k_f), dtype=torch.int32, device="cuda"),
                             "i_n": torch.empty(
-                                (rows, k_n), dtype=torch.int64, device="cuda"),
+                                (rows, k_n), dtype=torch.int32, device="cuda"),
                             "out": torch.empty(
-                                (rows, r), dtype=torch.int64, device="cuda"),
+                                (rows, r), dtype=torch.int32, device="cuda"),
                             "valid": torch.empty(
                                 (rows, r), dtype=torch.bool, device="cuda"),
                             "lower": torch.empty(1, dtype=torch.int64, device="cuda"),
@@ -448,6 +484,8 @@ class L1TopKTiledTest(unittest.TestCase):
                             "owners": torch.zeros(
                                 (rows, capacity), dtype=torch.int32, device="cuda"),
                             "generations": torch.zeros(
+                                rows, dtype=torch.int32, device="cuda"),
+                            "extents": torch.zeros(
                                 rows, dtype=torch.int32, device="cuda"),
                         }
 
@@ -463,7 +501,7 @@ class L1TopKTiledTest(unittest.TestCase):
                         far, near, ref["i_f"], ref["i_n"], lengths,
                         skip_far, skip_near, valid_req, ref["out"], ref["valid"],
                         ref["lower"], ref["upper"], ref["quota"],
-                        ref["owners"], ref["generations"], **common)
+                        ref["owners"], ref["generations"], ref["extents"], **common)
                     if tiled:
                         far_topk = torch.empty(
                             (rows, 1, k_f_pad), dtype=torch.int32, device="cuda")
@@ -487,7 +525,7 @@ class L1TopKTiledTest(unittest.TestCase):
                         skip_far, skip_near, valid_req,
                         actual["out"], actual["valid"],
                         actual["lower"], actual["upper"], actual["quota"],
-                        actual["owners"], actual["generations"],
+                        actual["owners"], actual["generations"], actual["extents"],
                         TILED=tiled, NTILES=1, NTILES_PAD=1,
                         LOG2_F=k_f_pad.bit_length() - 1,
                         LOG2_N=k_n_pad.bit_length() - 1, **common)
@@ -537,11 +575,11 @@ class L1TopKTiledTest(unittest.TestCase):
                         def allocate():
                             return {
                                 "i_f": torch.empty(
-                                    (rows, 0), dtype=torch.int64, device="cuda"),
+                                    (rows, 0), dtype=torch.int32, device="cuda"),
                                 "i_n": torch.empty(
-                                    (rows, k_n), dtype=torch.int64, device="cuda"),
+                                    (rows, k_n), dtype=torch.int32, device="cuda"),
                                 "out": torch.empty(
-                                    (rows, r), dtype=torch.int64, device="cuda"),
+                                    (rows, r), dtype=torch.int32, device="cuda"),
                                 "valid": torch.empty(
                                     (rows, r), dtype=torch.bool, device="cuda"),
                                 "lower": torch.empty(
@@ -554,6 +592,8 @@ class L1TopKTiledTest(unittest.TestCase):
                                     (rows, capacity), dtype=torch.int32,
                                     device="cuda"),
                                 "generations": torch.zeros(
+                                    rows, dtype=torch.int32, device="cuda"),
+                                "extents": torch.zeros(
                                     rows, dtype=torch.int32, device="cuda"),
                             }
 
@@ -572,7 +612,7 @@ class L1TopKTiledTest(unittest.TestCase):
                             skip_far, skip_near, valid_req, ref["out"],
                             ref["valid"], ref["lower"], ref["upper"],
                             ref["quota"], ref["owners"], ref["generations"],
-                            **common)
+                            ref["extents"], **common)
                         if tiled:
                             partial_f = torch.full(
                                 (rows, 1, k_f_pad), 0x12345678,
@@ -601,7 +641,8 @@ class L1TopKTiledTest(unittest.TestCase):
                             skip_far, skip_near, valid_req, actual["out"],
                             actual["valid"], actual["lower"], actual["upper"],
                             actual["quota"], actual["owners"],
-                            actual["generations"], TILED=tiled, NTILES=1,
+                            actual["generations"], actual["extents"],
+                            TILED=tiled, NTILES=1,
                             NTILES_PAD=1, LOG2_F=0,
                             LOG2_N=k_n_pad.bit_length() - 1, **common)
                         torch.cuda.synchronize()
@@ -641,13 +682,13 @@ class L1TopKTiledTest(unittest.TestCase):
                     def allocate():
                         return {
                             "i_f": torch.empty(
-                                (rows, k_f), dtype=torch.int64, device="cuda"),
+                                (rows, k_f), dtype=torch.int32, device="cuda"),
                             "i_n": torch.empty(
-                                (rows, k_n), dtype=torch.int64, device="cuda"),
+                                (rows, k_n), dtype=torch.int32, device="cuda"),
                             # Top-K 使用 tiny skipped 指针；candidate expansion
                             # 仍使用完整原始分数，符合生产路径的读取边界。
                             "out": torch.empty(
-                                (rows, 1), dtype=torch.int64, device="cuda"),
+                                (rows, 1), dtype=torch.int32, device="cuda"),
                             "valid": torch.empty(
                                 (rows, 1), dtype=torch.bool, device="cuda"),
                             "lower": torch.empty(1, dtype=torch.int64, device="cuda"),
@@ -656,6 +697,8 @@ class L1TopKTiledTest(unittest.TestCase):
                             "owners": torch.zeros(
                                 (rows, capacity), dtype=torch.int32, device="cuda"),
                             "generations": torch.zeros(
+                                rows, dtype=torch.int32, device="cuda"),
+                            "extents": torch.zeros(
                                 rows, dtype=torch.int32, device="cuda"),
                         }
 
@@ -671,7 +714,7 @@ class L1TopKTiledTest(unittest.TestCase):
                         far, near, ref["i_f"], ref["i_n"], lengths,
                         skip_far, skip_near, valid_req, ref["out"], ref["valid"],
                         ref["lower"], ref["upper"], ref["quota"],
-                        ref["owners"], ref["generations"], **common)
+                        ref["owners"], ref["generations"], ref["extents"], **common)
                     if tiled:
                         partial_f = torch.empty(
                             (rows, ntiles, 16), dtype=torch.int32, device="cuda")
@@ -698,7 +741,7 @@ class L1TopKTiledTest(unittest.TestCase):
                         skip_far, skip_near, valid_req,
                         actual["out"], actual["valid"],
                         actual["lower"], actual["upper"], actual["quota"],
-                        actual["owners"], actual["generations"],
+                        actual["owners"], actual["generations"], actual["extents"],
                         TILED=tiled, NTILES=ntiles,
                         NTILES_PAD=triton.next_power_of_2(ntiles),
                         LOG2_F=4, LOG2_N=3, **common)
@@ -708,7 +751,7 @@ class L1TopKTiledTest(unittest.TestCase):
                         lengths, skip_far, skip_near, valid_req,
                         parallel["lower"], parallel["upper"], parallel["quota"],
                         parallel["owners"], parallel["generations"],
-                        TILED=tiled, NTILES=ntiles,
+                        parallel["extents"], TILED=tiled, NTILES=ntiles,
                         NTILES_PAD=triton.next_power_of_2(ntiles),
                         LOG2_F=4, LOG2_N=3, **common)
                     torch.cuda.synchronize()
@@ -716,7 +759,7 @@ class L1TopKTiledTest(unittest.TestCase):
                         self.assertTrue(torch.equal(ref[name], actual[name]),
                                         f"fused {name} 不一致")
                     for name in ("i_f", "i_n", "lower", "upper", "quota",
-                                 "generations"):
+                                 "generations", "extents"):
                         self.assertTrue(torch.equal(ref[name], parallel[name]),
                                         f"prepare {name} 不一致")
 

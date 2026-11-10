@@ -1,4 +1,6 @@
 """CUDA Graph capture/replay for batch-size and visible-length buckets."""
+import weakref
+
 import torch
 
 
@@ -19,6 +21,9 @@ class GraphRunner:
         self.device = torch.device(device)
         self.input_ids_buf = {}
         self.position_ids_buf = {}
+        self.capture_count = 0
+        self.replay_count = 0
+        self.eager_fallback_count = 0
         for bucket in buckets:
             self.input_ids_buf[bucket] = torch.empty(
                 (bucket, 1), dtype=torch.long, device=self.device)
@@ -104,6 +109,7 @@ class GraphRunner:
             )
         self.graphs[key] = graph
         self.static_logits[key] = static_logits
+        self.capture_count += 1
         return graph
 
     def capture_all(self, model, cache):
@@ -129,11 +135,11 @@ class GraphRunner:
              return_next_tokens=False, forced_tokens=None, stop_on_eos=True):
         req_ids, input_ids, position_ids = self.scheduler.prepare_step()
         bucket = self.bucket_for(len(req_ids), cache.max_requests)
-        padded_ids = req_ids + [-1] * (bucket - len(req_ids))
+        padded_ids = (req_ids if len(req_ids) == bucket else
+                      req_ids + [-1] * (bucket - len(req_ids)))
 
-        # _prepare_metadata 统一准备本步页表/长度，避免同一 step 重复
-        # plan_common；selector 看到的就是本步 planned decode length。
-        cache.new_step(padded_ids)
+        # Scheduler.prepare_step 已在同一 padded list 上调用 new_step；
+        # _prepare_metadata 复用其 layout revision，不再重复 canonical 比较。
 
         # selector 不能放在整步 forward 前：各层必须在 post-RoPE 当前 Q 上
         # 独立选择。这里只刷新固定元数据和本图使用的 visible bucket。
@@ -145,8 +151,10 @@ class GraphRunner:
         graph = self.graphs.get(key)
         if graph is not None:
             graph.replay()
+            self.replay_count += 1
             logits = self.static_logits[key]
         else:
+            self.eager_fallback_count += 1
             logits = model(
                 input_ids=self.input_ids_buf[bucket],
                 position_ids=self.position_ids_buf[bucket],
@@ -168,3 +176,105 @@ class GraphRunner:
         if return_next_tokens:
             return logits, next_tokens
         return logits
+
+
+class GraphSessionPool:
+    """Session 级 GraphRunner 池；描述符之外的对象绝不共享 CUDA Graph。"""
+
+    def __init__(self):
+        self._entries = {}
+        self.hit_count = 0
+        self.miss_count = 0
+        self.warmup_seconds = 0.0
+
+    @staticmethod
+    def _descriptor(model, cache, buckets, visible_buckets, device):
+        buffer_ptrs = [
+            cache.layer_kv_ptrs_buf.data_ptr(),
+            cache.block_table_buf.data_ptr(),
+            cache.slot_mapping_buf.data_ptr(),
+            cache.query_to_req_buf.data_ptr(),
+            cache.active_req_ids_buf.data_ptr(),
+            cache.valid_req_ids_buf.data_ptr(),
+            cache.planned_lengths_buf.data_ptr(),
+            cache.skip_far_layer_buf.data_ptr(),
+            cache.skip_near_layer_buf.data_ptr(),
+            cache.gather_indices_buf.data_ptr(),
+            cache.visible_lens_buf.data_ptr(),
+        ]
+        buffer_ptrs.extend(
+            layer.kv_pool_k.data_ptr() for layer in cache.layers)
+        buffer_ptrs.extend(
+            layer.kv_pool_v.data_ptr() for layer in cache.layers)
+        buffer_ptrs.extend(
+            tensor.data_ptr()
+            for width, tensor in sorted(cache._gather_indices_by_vis.items()))
+        buffer_ptrs.extend(
+            tensor.data_ptr()
+            for width, tensor in sorted(cache._visible_lens_by_vis.items()))
+        return (
+            id(model), id(cache), str(torch.device(device)),
+            tuple(buckets), tuple(visible_buckets),
+            cache.max_requests, cache.max_visible_len, cache.max_blocks,
+            cache.n_layers, cache.num_kv_heads, cache.num_query_heads,
+            tuple(buffer_ptrs),
+        )
+
+    def get_runner(self, model, cache, scheduler, *, buckets=(1,),
+                   visible_buckets=(512, 1024, 2048, 4096),
+                   device='cuda', capture=False):
+        # 在计算描述符前物化所有将参与 capture 的 bucket，避免 warmup 后
+        # 地址集合变化造成下一次请求误判为另一执行配置。
+        cache.ensure_visible_buckets(
+            width for width in visible_buckets if width <= cache.max_visible_len)
+        descriptor = self._descriptor(
+            model, cache, buckets, visible_buckets, device)
+        entry = self._entries.get(descriptor)
+        runner = None
+        if entry is not None:
+            cache_ref, candidate = entry
+            if cache_ref() is cache:
+                runner = candidate
+            else:
+                self._entries.pop(descriptor, None)
+        if runner is None:
+            self.miss_count += 1
+            runner = GraphRunner(
+                scheduler=scheduler, buckets=buckets,
+                visible_buckets=visible_buckets, device=device)
+            self._entries[descriptor] = (weakref.ref(cache), runner)
+        else:
+            self.hit_count += 1
+            runner.scheduler = scheduler
+
+        if capture:
+            import time
+            started = time.perf_counter()
+            try:
+                runner.capture_all(model, cache)
+            except Exception:
+                # capture 失败可能留下半初始化私有池；该描述符必须重新 warmup，
+                # 不能让后续请求误用异常现场。
+                self._entries.pop(descriptor, None)
+                runner.scheduler = None
+                self.warmup_seconds += time.perf_counter() - started
+                raise
+            self.warmup_seconds += time.perf_counter() - started
+        return runner
+
+    @staticmethod
+    def release(runner):
+        # 不让空闲 runner 通过旧 scheduler 强引用整个 Cache arena。
+        runner.scheduler = None
+
+
+def session_graph_runner(model, cache, scheduler, *, buckets=(1,),
+                         visible_buckets=(512, 1024, 2048, 4096),
+                         device='cuda', capture=False):
+    pool = getattr(model, '_nfa_graph_session_pool', None)
+    if pool is None:
+        pool = GraphSessionPool()
+        model._nfa_graph_session_pool = pool
+    return pool.get_runner(
+        model, cache, scheduler, buckets=buckets,
+        visible_buckets=visible_buckets, device=device, capture=capture)

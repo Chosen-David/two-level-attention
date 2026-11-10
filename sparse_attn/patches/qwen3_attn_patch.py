@@ -103,18 +103,94 @@ def qwen3_attn_forward(
     # 整步 forward 前读取上一帧 Q。生产子空间路径由 selector 的页统计 owner
     # 同步写入当前 K/V；其他几何在 selector 内保留原独立写入。
     from ..indexer.nfa_layer_batch_selector import select_topk_for_layer_batched
-    select_topk_for_layer_batched(
-        past_key_values, self.layer_idx,
-        past_key_values.active_req_ids, query_states[:, :, 0], attention=self,
-        decode_write=(key_states, value_states, slot_mapping))
+    from ..ops.paged_region_kernels_nfa import (
+        build_protected_gather, decode_graph_ready, split_gather_buffers)
 
-    from ..ops.paged_region_kernels_nfa import decode_graph_ready
-    result = decode_graph_ready(
-        self,
-        query_states,
-        past_key_values,
-        gather_indices=past_key_values.gather_indices_for_layer(self.layer_idx),
-        visible_lens=past_key_values.visible_lens_for_layer(self.layer_idx),
-        query_to_req=past_key_values.query_to_req_buf,
-    )
+    operator_mode = getattr(self.indexer.args, 'nfa_operator_mode', 'off')
+    if operator_mode == 'off':
+        select_topk_for_layer_batched(
+            past_key_values, self.layer_idx,
+            past_key_values.active_req_ids, query_states[:, :, 0], attention=self,
+            decode_write=(key_states, value_states, slot_mapping))
+        result = decode_graph_ready(
+            self,
+            query_states,
+            past_key_values,
+            gather_indices=past_key_values.gather_indices_for_layer(self.layer_idx),
+            visible_lens=past_key_values.visible_lens_for_layer(self.layer_idx),
+            query_to_req=past_key_values.query_to_req_buf,
+        )
+    else:
+        # disjoint 两臂先显式写当前 K/V，保护集与 selector 随后都只读同一
+        # 已提交 arena；serial 与 overlap 仅执行流不同，归并顺序完全一致。
+        from ..ops.paged_region_kernels import (
+            sparse_paged_attention_gather_partial,
+            sparse_paged_attention_regions_combine,
+        )
+        past_key_values.write_decode(
+            self.layer_idx, key_states, value_states, slot_mapping)
+        protected_gather, protected_lens, middle_gather, middle_lens = (
+            split_gather_buffers(past_key_values, self.layer_idx, input_shape[0]))
+        workspace = past_key_values._nfa_selector_workspace
+        q_flat = query_states[:, :, 0]
+        q_flat = q_flat if q_flat.is_contiguous() else q_flat.contiguous()
+
+        def _protected_partial():
+            build_protected_gather(
+                past_key_values, self.layer_idx, self.indexer,
+                protected_gather, protected_lens)
+            return sparse_paged_attention_gather_partial(
+                past_key_values.layers[self.layer_idx], q_flat,
+                protected_gather, protected_lens,
+                past_key_values.query_to_req_buf,
+                scale=self.scaling, workspace=workspace,
+                name='protected', nsplit=1)
+
+        if operator_mode == 'overlap':
+            primitives_key = 'nfa_overlap_primitives'
+            primitives = workspace.get(primitives_key)
+            if primitives is None:
+                if torch.cuda.is_current_stream_capturing():
+                    raise RuntimeError('overlap streams must be warmed before capture')
+                primitives = (torch.cuda.Stream(), torch.cuda.Event(),
+                              torch.cuda.Event())
+                workspace[primitives_key] = primitives
+            side_stream, fork_event, join_event = primitives
+            main_stream = torch.cuda.current_stream()
+            fork_event.record(main_stream)
+            side_stream.wait_event(fork_event)
+            context = workspace['_nfa_launch_context']
+            try:
+                workspace['_nfa_launch_context'] = (
+                    side_stream.cuda_stream, context[1], context[2], context[3])
+                with torch.cuda.stream(side_stream):
+                    protected_parts = _protected_partial()
+                    join_event.record(side_stream)
+            finally:
+                workspace['_nfa_launch_context'] = context
+            select_topk_for_layer_batched(
+                past_key_values, self.layer_idx,
+                past_key_values.active_req_ids, q_flat, attention=self,
+                middle_only=True,
+                selection_output=(middle_gather, middle_lens))
+            middle_parts = sparse_paged_attention_gather_partial(
+                past_key_values.layers[self.layer_idx], q_flat,
+                middle_gather, middle_lens, past_key_values.query_to_req_buf,
+                scale=self.scaling, workspace=workspace, name='middle', nsplit=4)
+            main_stream.wait_event(join_event)
+        elif operator_mode == 'serial':
+            protected_parts = _protected_partial()
+            select_topk_for_layer_batched(
+                past_key_values, self.layer_idx,
+                past_key_values.active_req_ids, q_flat, attention=self,
+                middle_only=True,
+                selection_output=(middle_gather, middle_lens))
+            middle_parts = sparse_paged_attention_gather_partial(
+                past_key_values.layers[self.layer_idx], q_flat,
+                middle_gather, middle_lens, past_key_values.query_to_req_buf,
+                scale=self.scaling, workspace=workspace, name='middle', nsplit=4)
+        else:
+            raise ValueError(f'unknown NFA operator mode: {operator_mode}')
+        result = sparse_paged_attention_regions_combine(
+            q_flat, protected_parts, middle_parts, workspace=workspace)
     return self.o_proj(result.reshape(*input_shape, -1).contiguous()), None

@@ -43,23 +43,33 @@ def _reference_filtered_topk_partial_kernel(
     tl.store(PARTIAL + (h * NTILES + tile) * K + tl.arange(0, K), key)
 
 
-def _assert_filtered_partial_bit_exact(packed, width, capacity):
+def _assert_filtered_partial_bit_exact(packed, logits, cand, width, capacity):
     m, hkv, r = packed.shape
     token_bits = 32 if capacity >= 65536 else 16
     ntiles = triton.cdiv(r, 2048)
     tail = r - (ntiles - 1) * 2048
     shape = (m, hkv, ntiles, width)
     reference = torch.empty(shape, dtype=packed.dtype, device='cuda')
-    candidate = torch.empty_like(reference)
+    candidate_score = torch.empty(shape, dtype=torch.bfloat16, device='cuda')
+    candidate_token = torch.empty(shape, dtype=torch.int32, device='cuda')
     common = dict(
         TILE=2048, NTILES=ntiles, S=capacity, K=width,
         META_GROUP=hkv, TOKEN_BITS=token_bits, num_warps=16)
     _reference_filtered_topk_partial_kernel[(m * hkv, ntiles)](
         packed, reference, r, **common)
     selector_ops._nfa_filtered_topk_partial_kernel[(m * hkv, ntiles)](
-        packed, candidate, r, TAIL=tail,
+        logits, cand, candidate_score, candidate_token, r, TAIL=tail,
         TAIL_PAD=triton.next_power_of_2(tail), **common)
+    bits = candidate_score.view(torch.int16).to(torch.int32) & 0xFFFF
+    negative = (bits & 0x8000) != 0
+    ordered = torch.where(
+        negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
+    dtype = torch.int64 if token_bits == 32 else torch.int32
+    delta = capacity - candidate_token.to(dtype)
+    candidate = (ordered.to(dtype) << token_bits) + delta
     torch.testing.assert_close(candidate, reference, rtol=0, atol=0)
+    assert candidate_score.dtype == torch.bfloat16
+    assert candidate_token.dtype == torch.int32
 
 
 def _indexer(k1=4, near_pages=2, subspace='tail', l2_subspace='same'):
@@ -242,6 +252,9 @@ def test_owner_generation_wrap_rebuilds_int32_dedup_table():
     candidate = buffer('candidate_ids')
     owners = buffer('fine_owners')
     generations = buffer('fine_owner_generations')
+    extents = buffer('fine_owner_extents')
+    extent_before = extents.clone()
+    assert candidate.dtype == torch.int32
     assert owners.dtype == torch.int32
     assert generations.dtype == torch.int32
     owners.fill_(2147483647)
@@ -253,6 +266,7 @@ def test_owner_generation_wrap_rebuilds_int32_dedup_table():
         reference, 0, [2], query, attention=reference_attention)
     assert _logical_ids(wrapped, 2, 0) == _logical_ids(reference, 2, 0)
     assert generations.tolist() == [[1]]
+    torch.testing.assert_close(extents, extent_before, rtol=0, atol=0)
 
 
 @pytest.mark.parametrize('batch', [1, 2, 4])
@@ -729,7 +743,7 @@ def test_tiled_filtered_topk_bit_exact_with_quota_and_ties(capacity, r):
     cand = torch.stack([
         torch.randperm(capacity, generator=generator, device='cuda')[:r]
         for _ in range(m * hkv)
-    ]).view(m, hkv, r).to(torch.int64).contiguous()
+    ]).view(m, hkv, r).to(torch.int32).contiguous()
     logits = torch.randn(
         m, hkv, r, generator=generator, dtype=torch.bfloat16,
         device='cuda').contiguous()
@@ -752,24 +766,28 @@ def test_tiled_filtered_topk_bit_exact_with_quota_and_ties(capacity, r):
         R_PAD=triton.next_power_of_2(max(r, width)), S=capacity, K=width,
         SINK=4, META_GROUP=hkv, TOKEN_BITS=token_bits, num_warps=8)
 
-    # 模拟 fine-score kernel 的 packed-key 输出，与 mono reference 逐位同构。
-    bits = logits.view(torch.int16).to(torch.int32) & 0xFFFF
-    negative = (bits & 0x8000) != 0
-    ordered = torch.where(negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
+    # fine-score 已把区间外、零 quota、NaN 与 -inf 统一写成 -inf；
+    # tiled partial 的输入必须遵守这一生产契约。
     score = logits.float()
     good = (
         (cand >= lower[:, None, None]) & (cand < upper[:, None, None])
         & (quota[:, None, None] > 0) & (score == score)
         & (score != float('-inf')))
+    filtered_logits = torch.where(
+        good, logits, torch.full_like(logits, float('-inf'))).contiguous()
+    bits = filtered_logits.view(torch.int16).to(torch.int32) & 0xFFFF
+    negative = (bits & 0x8000) != 0
+    ordered = torch.where(negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
     dtype = torch.int64 if token_bits == 32 else torch.int32
     delta = capacity - cand.to(dtype)
     invalid = -32768 << token_bits
     packed = torch.where(
         good, (ordered.to(dtype) << token_bits) + delta,
         torch.full((), invalid, dtype=dtype, device='cuda')).contiguous()
-    _assert_filtered_partial_bit_exact(packed, width, capacity)
+    _assert_filtered_partial_bit_exact(
+        packed, filtered_logits, cand, width, capacity)
     actual = selector_ops._nfa_filtered_topk(
-        packed, cand, lower, upper, quota, capacity, width, sink=4)
+        filtered_logits, cand, lower, upper, quota, capacity, width, sink=4)
     torch.testing.assert_close(actual.indices, reference_out, rtol=0, atol=0)
     torch.testing.assert_close(actual.counts, reference_count, rtol=0, atol=0)
 
@@ -783,16 +801,30 @@ def test_filtered_topk_ragged_partial_shapes_bit_exact(capacity, r, width):
     token_bits = 32 if capacity >= 65536 else 16
     dtype = torch.int64 if token_bits == 32 else torch.int32
     generator = torch.Generator(device='cuda').manual_seed(20261107 + r + width)
-    ordered = torch.randint(
-        -32768, 32768, (2, 2, r), generator=generator,
-        dtype=torch.int32, device='cuda').to(dtype)
-    delta = torch.randint(
+    logits = torch.randn(
+        (2, 2, r), generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+    logits[..., :min(128, r)] = 0.25
+    logits[..., :min(8, r)] = 0.0
+    if r > 8:
+        logits[..., 4:8] = -0.0
+    cand = torch.randint(
         0, capacity, (2, 2, r), generator=generator,
-        dtype=dtype, device='cuda')
-    packed = ((ordered << token_bits) + delta).contiguous()
-    packed[..., :min(128, r)] = packed[..., :1]
+        dtype=torch.int32, device='cuda')
+    cand[..., :min(32, r)] = capacity - 1
+    good = (logits.float() == logits.float()) & (logits.float() != float('-inf'))
+    if r > 128:
+        logits[..., 128:min(192, r)] = float('-inf')
+        logits[..., 192:min(256, r)] = float('nan')
+        good = (logits.float() == logits.float()) & (
+            logits.float() != float('-inf'))
+    bits = logits.view(torch.int16).to(torch.int32) & 0xFFFF
+    negative = (bits & 0x8000) != 0
+    ordered = torch.where(
+        negative, (~bits) & 0xFFFF, bits | 0x8000) - 0x8000
+    delta = capacity - cand.to(dtype)
     invalid = torch.full(
         (), -32768 << token_bits, dtype=dtype, device='cuda')
-    if r > 128:
-        packed[..., 128:min(256, r)] = invalid
-    _assert_filtered_partial_bit_exact(packed, width, capacity)
+    packed = torch.where(
+        good, (ordered.to(dtype) << token_bits) + delta, invalid).contiguous()
+    _assert_filtered_partial_bit_exact(packed, logits, cand, width, capacity)

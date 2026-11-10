@@ -1,0 +1,48 @@
+{
+  "schema": "nfa-vendor-graph-performance-evidence-v1",
+  "date": "2026-11-11",
+  "validation_status": "pending-independent-verification",
+  "source": {
+    "head": "1c6c955509099973106247d82a8531ee3e3606e1",
+    "diff_sha256": "ba2394ea4dc83802876d63468920e87dac1d3344e54a4a407c9a5e4dcbb819f5",
+    "harness_sha256": "22d65afa8e1a755fa7c088c701feabed51f4040689d82eaf34d4920ed9887870"
+  },
+  "raw_archive": {
+    "path": "/home/wangyuanshuo02/ak_verify_results/nfa_vendor_graph_perf_20261111",
+    "manifest": "MANIFEST.sha256",
+    "manifest_sha256": "3b2af3d8d4de06ae0fe53e7c8d834f860f1d980aae5879244bce8fd8acfd5246",
+    "files_excluding_manifest": 801,
+    "manifest_recheck": "800/800 raw result files plus the focused regression log matched SHA256; repository summary copies also matched their /tmp sources",
+    "archive_metadata_sha256": "07edef91c2fe08e45eb29c47e4553505b77d31a86b52c7f5d0b7c54b87e6409f"
+  },
+  "matrix": {
+    "model": "Qwen3-8B",
+    "task": "RULER niah_multikey_2 sample_index=2",
+    "lengths": [32768, 65536, 131072, 262144, 524288],
+    "batches": [1, 2, 4],
+    "feasible_cells": 12,
+    "infeasible_memory_cells": 3,
+    "execution": "CUDA Graph only",
+    "decode_steps": 32,
+    "clean_e2e": "separate process without nsys or torch.profiler",
+    "operator_profile": "separate nsys CUDA Graph node trace process",
+    "extended_input": "256K/512K use repeated-needle-body-extension and are performance-only",
+    "flashinfer_page_size": 64
+  },
+  "correctness_receipts": {
+    "focused_regression": "105 passed, 46 subtests passed in 24.83s",
+    "regression_log": "/tmp/nfa_vendor_focused_regression_gpu1_20261111_rerun.log",
+    "asynctls_profile_clean_full_token_identity": "12/12 feasible cells",
+    "quest_profile_clean_common_prefix_identity": "12/12 feasible cells",
+    "nfa_flashinfer_token_identity": "not required: different dense/sparse numerics; retained per-cell flag in vendor_comparison.json"
+  },
+  "interpretation_limits": [
+    "纯 attention、含 NFA 选择路径的 attention、干净完整 decode TPOT 三种加速比分别报告，不得互相替代。",
+    "nsys 存在观察者效应，不得用 profiled operator total 与 clean TPOT 相减推导 host overhead。",
+    "跨方法只比较干净完整 TPOT；各方法可识别 kernel family 的划分不同，operator total 不作跨方法排名。",
+    "NFA 对 FlashInfer 在 32K B1/B2 的完整 TPOT 加速小于 1，负结果保留。",
+    "JSSA 使用官方 Triton store/score/indexed-attend，但 Top-K 是官方 torch.topk fallback，不是不可用的 vLLM radix 实现。",
+    "Quest 与 AsyncTLS 是独立 PyTorch Graph 语义复现，不是官方 optimized CUDA/TileLang；AsyncTLS 没有真实异步 offload，INT4 为量化-反量化且 BF16 存储。",
+    "所有性能结论在独立验收前均为 pending-independent-verification。"
+  ]
+}
