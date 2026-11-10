@@ -2,6 +2,8 @@
 
 ## 2026-11-10
 
+- [x] [TL-JSSA-INSTALL-20261110] JSSA Qwen3/Llama 安装前完整校验，失败不部分改写模型，重复安装拒绝；CPU 普通/-O 43 tests+4 subtests通过，GPU未验。([详情](task_details/TL-JSSA-INSTALL-20261110.md))
+
 - [x] [TL-NFA-OBS-ABLATION-20261106] O-GATE 12 plans/240请求/60份 raw Q/K 与 B-REPLAY 12 plans/240文档/69952 cells 全部独立验收通过；精简结果已入库，明确固定轨迹 CPU replay 非质量、性能或生产 bit-exact 证据，K2=1024 逻辑支持集对照 7248/7248 不相等。([详情](task_details/TL-NFA-OBS-ABLATION-20261106.md))
 
 ## 2026-11-09

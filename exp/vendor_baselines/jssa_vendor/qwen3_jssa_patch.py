@@ -23,7 +23,7 @@ Qwen3 适配要点（差异披露）：
     语义等价；存储优化留作后续）。
   - radix top-k 用 torch.topk 精确替代（近似→精确，identity 标注）。
   - 无 sink/swa 强制区（官方 JSSA 无强制保留，同 Quest 口径，全预算自由竞争）。
-  - 全层稀疏（basis 缺失层回退 dense，同官方 backend 行为）。
+  - 全层稀疏；安装前检查完整 basis，缺层时拒绝安装，不静默混入 dense。
 """
 import os
 import types
@@ -44,8 +44,30 @@ def _load_basis(basis_path: str, device, dtype) -> dict:
     ckpt = torch.load(basis_path, map_location="cpu", weights_only=False)
     M = ckpt["M"] if isinstance(ckpt, dict) and "M" in ckpt else ckpt
     if not isinstance(M, dict):
-        raise ValueError(f"JSSA basis {basis_path} 不含 {'M': {layer_idx: tensor}} dict")
+        raise ValueError(f"JSSA basis {basis_path} must contain a layer-indexed tensor dict")
     return {int(k): v.to(device=device, dtype=dtype).contiguous() for k, v in M.items()}
+
+
+def _validate_basis_for_modules(modules, basis_dict, rank, expected_layers):
+    """Preflight the all-layer adapter without mutating any attention module."""
+    layer_ids = [int(module.layer_idx) for module in modules]
+    if (len(modules) != expected_layers
+            or set(layer_ids) != set(range(expected_layers))):
+        raise ValueError("JSSA attention layers must uniquely cover config layers")
+    missing = sorted(set(layer_ids) - set(basis_dict))
+    if missing:
+        raise ValueError(f"JSSA basis missing layers: {missing}")
+    for module in modules:
+        if hasattr(module, "jssa_M"):
+            raise ValueError("JSSA adapter already installed; use an unpatched model")
+        layer_id = int(module.layer_idx)
+        basis = basis_dict[layer_id]
+        kv_heads = module.k_proj.weight.shape[0] // module.head_dim
+        expected = (kv_heads, rank, module.head_dim)
+        if tuple(basis.shape) != expected:
+            raise ValueError(
+                f"JSSA basis M[{layer_id}] shape {tuple(basis.shape)} "
+                f"!= expected {expected}")
 
 
 def _qwen3_jssa_forward(
@@ -157,35 +179,17 @@ def enable_jssa(
         raise ValueError("model 中未找到 Qwen3Attention")
     M_dict = _load_basis(basis_path, probe.q_proj.weight.device, probe.q_proj.weight.dtype)
 
-    n_patched = 0
-    layer_id = 0
-
-    def _patch_recursive(container):
-        nonlocal n_patched, layer_id
-        for name, module in list(container._modules.items()):
-            if isinstance(module, Qwen3Attention):
-                module.layer_id = layer_id
-                layer_id += 1
-                module.jssa_budget = budget
-                module.jssa_rank = rank
-                M = M_dict.get(module.layer_id)
-                if M is None:
-                    module.jssa_M = None
-                else:
-                    # HF Qwen3Attention 无 num_heads/num_key_value_heads 属性；
-                    # H_kv 从 k_proj 权重行数推断（[H_kv*head_dim, hidden]）。
-                    H_kv = module.k_proj.weight.shape[0] // module.head_dim
-                    expected = (H_kv, rank, module.head_dim)
-                    if tuple(M.shape) != expected:
-                        raise ValueError(
-                            f"JSSA basis M[{module.layer_id}] shape {tuple(M.shape)} "
-                            f"!= expected {expected}")
-                    module.jssa_M = M
-                module.flash_forward = module.forward
-                module.forward = types.MethodType(_qwen3_jssa_forward, module)
-                n_patched += 1
-            elif len(list(module._modules.items())) > 0:
-                _patch_recursive(module)
-
-    _patch_recursive(model)
-    return n_patched
+    modules = [module for module in model.modules()
+               if isinstance(module, Qwen3Attention)]
+    _validate_basis_for_modules(modules, M_dict, rank,
+                                int(model.config.num_hidden_layers))
+    # Validate every layer before changing any forward: failed installation
+    # must leave the original model usable, including its dense prefill path.
+    for module in modules:
+        module.layer_id = int(module.layer_idx)
+        module.jssa_budget = budget
+        module.jssa_rank = rank
+        module.jssa_M = M_dict[module.layer_id]
+        module.flash_forward = module.forward
+        module.forward = types.MethodType(_qwen3_jssa_forward, module)
+    return len(modules)
