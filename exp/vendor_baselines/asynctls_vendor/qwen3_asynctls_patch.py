@@ -52,14 +52,42 @@ def _load_channels(channel_file: str) -> list:
         if isinstance(raw.get("channels"), list):
             layers = raw["channels"]
         else:
-            layers = [raw[k] for k in sorted(raw, key=lambda k: int(k.split("_")[-1]))]
+            # Preserve legacy numeric-suffix keys, but do not silently compact
+            # a missing layer or accept two spellings for the same layer ID.
+            try:
+                entries = [(int(key.split("_")[-1]), value)
+                           for key, value in raw.items()]
+            except (AttributeError, ValueError) as error:
+                raise ValueError("channel keys must end in integer layer IDs") from error
+            if {idx for idx, _ in entries} != set(range(len(entries))):
+                raise ValueError("channel layer IDs must uniquely cover 0..N-1")
+            layers = [value for _, value in sorted(entries)]
     else:
         layers = list(raw)
     for idx_list in layers:
         if not isinstance(idx_list, (list, tuple)) or not all(
-                isinstance(i, int) for i in idx_list):
+                type(i) is int for i in idx_list):
             raise ValueError("channel file must hold per-layer integer index lists")
     return layers
+
+
+def _validate_channels_for_modules(modules, channels, expected_layers):
+    """Validate the complete calibration before mutating attention modules."""
+    layer_ids = [int(module.layer_idx) for module in modules]
+    if (len(modules) != expected_layers
+            or set(layer_ids) != set(range(expected_layers))):
+        raise ValueError("AsyncTLS attention layers must uniquely cover config layers")
+    if len(channels) != expected_layers:
+        raise ValueError(
+            f"channel layers {len(channels)} != model layers {expected_layers}")
+    for module in modules:
+        if hasattr(module, "asynctls_channels"):
+            raise ValueError("AsyncTLS adapter already installed; use an unpatched model")
+        layer_id = int(module.layer_idx)
+        indices = channels[layer_id]
+        if (not indices or len(set(indices)) != len(indices)
+                or min(indices) < 0 or max(indices) >= module.head_dim):
+            raise ValueError(f"AsyncTLS layer {layer_id} channel indices are invalid")
 
 
 def _int4_quant_dequant(x: torch.Tensor, bits: int = 4) -> torch.Tensor:
@@ -236,31 +264,16 @@ def enable_asynctls(
     if type(top_kb) is not int or top_kb <= 0:
         raise ValueError("AsyncTLS top_kb must be a positive integer")
     channels = _load_channels(channel_file)
-    n_patched = 0
-    layer_id = 0
-
-    def _patch_recursive(container):
-        nonlocal n_patched, layer_id
-        for name, module in list(container._modules.items()):
-            if isinstance(module, Qwen3Attention):
-                if layer_id >= len(channels):
-                    raise ValueError(
-                        "channel file layer count < model layers "
-                        f"({len(channels)} < {layer_id})")
-                module.layer_id = layer_id
-                layer_id += 1
-                module.asynctls_channels = channels[module.layer_id]
-                module.asynctls_token_budget = token_budget
-                module.asynctls_block_size = block_size
-                module.asynctls_top_kb = top_kb
-                module.flash_forward = module.forward
-                module.forward = types.MethodType(_qwen3_asynctls_forward, module)
-                n_patched += 1
-            elif len(list(module._modules.items())) > 0:
-                _patch_recursive(module)
-
-    _patch_recursive(model)
-    if n_patched != len(channels):
-        raise ValueError(
-            f"patched layers {n_patched} != channel layers {len(channels)}")
-    return n_patched
+    modules = [module for module in model.modules()
+               if isinstance(module, Qwen3Attention)]
+    _validate_channels_for_modules(
+        modules, channels, int(model.config.num_hidden_layers))
+    for module in modules:
+        module.layer_id = int(module.layer_idx)
+        module.asynctls_channels = channels[module.layer_id]
+        module.asynctls_token_budget = token_budget
+        module.asynctls_block_size = block_size
+        module.asynctls_top_kb = top_kb
+        module.flash_forward = module.forward
+        module.forward = types.MethodType(_qwen3_asynctls_forward, module)
+    return len(modules)

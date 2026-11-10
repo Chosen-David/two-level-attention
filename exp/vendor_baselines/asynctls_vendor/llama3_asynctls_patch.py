@@ -19,6 +19,7 @@ from transformers.models.llama.modeling_llama import (
 
 from qwen3_asynctls_patch import (
     _int4_quant_dequant, _load_channels, _qwen3_block_score,
+    _validate_channels_for_modules,
 )
 
 
@@ -132,30 +133,15 @@ def enable_asynctls(
         raise ValueError("AsyncTLS top_kb must be a positive integer")
 
     channels = _load_channels(channel_file)
-    expected_layers = int(model.config.num_hidden_layers)
-    if len(channels) != expected_layers:
-        raise ValueError(
-            f"channel layers {len(channels)} != model layers {expected_layers}")
-
-    n_patched = 0
-    for module in model.modules():
-        if not isinstance(module, LlamaAttention):
-            continue
-        layer_idx = int(module.layer_idx)
-        layer_channels = channels[layer_idx]
-        if (not layer_channels or len(set(layer_channels)) != len(layer_channels)
-                or min(layer_channels) < 0
-                or max(layer_channels) >= module.head_dim):
-            raise ValueError(f"AsyncTLS layer {layer_idx} channel 索引非法")
-        module.asynctls_channels = layer_channels
+    modules = [module for module in model.modules()
+               if isinstance(module, LlamaAttention)]
+    _validate_channels_for_modules(
+        modules, channels, int(model.config.num_hidden_layers))
+    for module in modules:
+        module.asynctls_channels = channels[int(module.layer_idx)]
         module.asynctls_token_budget = token_budget
         module.asynctls_block_size = block_size
         module.asynctls_top_kb = top_kb
         module.flash_forward = module.forward
         module.forward = types.MethodType(_llama_asynctls_forward, module)
-        n_patched += 1
-
-    if n_patched != expected_layers:
-        raise RuntimeError(
-            f"AsyncTLS Llama patch 层数 {n_patched} != config 层数 {expected_layers}")
-    return n_patched
+    return len(modules)
