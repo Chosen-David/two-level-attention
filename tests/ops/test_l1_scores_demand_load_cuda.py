@@ -5,7 +5,11 @@ import torch
 import triton
 import triton.language as tl
 
-from sparse_attn.indexer.nfa_layer_batch_selector import _nfa_l1_scores_kernel
+from sparse_attn.indexer.nfa_layer_batch_selector import (
+    _nfa_l1_far_scores_kernel,
+    _nfa_l1_near_scores_kernel,
+    _nfa_l1_scores_kernel,
+)
 
 
 @triton.jit
@@ -195,6 +199,98 @@ class L1ScoresDemandLoadTest(unittest.TestCase):
         reference = run(_reference_l1_scores_kernel, True, True)
         actual = run(_nfa_l1_scores_kernel, True, True, tiny, tiny)
         assert_active_and_poison_tail(reference, actual)
+
+    @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
+    def test_region_wrappers_cover_candidates_with_reduced_grids(self):
+        """独立 near/far 入口的小 grid 不得漏掉非对齐区域尾部。"""
+        batch, hkv, group, d = 4, 1, 2, 32
+        t, bs, bt = 128, 16, 16
+        window, pool_near_len = 64, 256
+        device = "cuda"
+        torch.manual_seed(20261112)
+        shape = (1, batch, t, hkv, d)
+        kmin = torch.randn(shape, dtype=torch.bfloat16, device=device)
+        kmax = torch.randn(shape, dtype=torch.bfloat16, device=device)
+        ksum = torch.randn(shape, dtype=torch.bfloat16, device=device)
+        q = torch.randn((batch * hkv * group, d),
+                        dtype=torch.bfloat16, device=device)
+        lengths_host = [1536, 1553, 1655, 1783]
+        lengths = torch.tensor(lengths_host, dtype=torch.int64, device=device)
+        active_req = torch.arange(batch, dtype=torch.int64, device=device)
+        valid_req = torch.tensor([3, 1, 2, 0], dtype=torch.int64, device=device)
+        near_width = triton.cdiv(pool_near_len, bs) + 2
+        near_grid = triton.cdiv(near_width + bt - 1, bt)
+        far_width = max((length - window - pool_near_len) // bs
+                        for length in lengths_host)
+        far_grid = triton.cdiv(far_width, bt)
+
+        def run(kernel, grid, skip_far_value, skip_near_value, far_avg, near_avg):
+            far = torch.full((batch, hkv, t), 13.25,
+                             dtype=torch.bfloat16, device=device)
+            near = torch.full_like(far, 13.25)
+            stats_len = torch.zeros((1, batch), dtype=torch.int64, device=device)
+            skip_far = torch.full(
+                (batch,), skip_far_value, dtype=torch.bool, device=device)
+            skip_near = torch.full(
+                (batch,), skip_near_value, dtype=torch.bool, device=device)
+            has_avg = far_avg or near_avg
+            sum_arg = ksum if has_avg else kmin
+            kernel[(grid, batch * hkv)](
+                kmin, kmax, sum_arg, q, lengths, active_req,
+                skip_far, skip_near, valid_req, stats_len, far, near, t,
+                kmin.stride(2), kmin.stride(3), kmax.stride(2), kmax.stride(3),
+                sum_arg.stride(2), sum_arg.stride(3), q.stride(0),
+                PAGE=bs, BS=bs, SINK=4, NEAR_LEN=256, WINDOW=window,
+                POOL_NEAR_LEN=pool_near_len, SINK_POOL_LO=0,
+                Hkv=hkv, G=group, D=d, BT=bt, B=batch,
+                STRIDE_KB=kmin.stride(0), STRIDE_KB2=kmax.stride(0),
+                STRIDE_KS=sum_arg.stride(0), STRIDE_KR=kmin.stride(1),
+                STRIDE_KR2=kmax.stride(1), STRIDE_KRS=sum_arg.stride(1),
+                HAS_AVG=has_avg, FAR_AVG=far_avg, NEAR_AVG=near_avg,
+                MAX_REQ=batch, LAYER_OFFSET=0, num_warps=4)
+            torch.cuda.synchronize()
+            return far, near, stats_len
+
+        for far_avg, near_avg in ((False, False), (False, True), (True, True)):
+            for region, kernel, grid in (
+                    (1, _nfa_l1_near_scores_kernel, near_grid),
+                    (2, _nfa_l1_far_scores_kernel, far_grid)):
+                with self.subTest(region=region, far_avg=far_avg,
+                                  near_avg=near_avg):
+                    reference = run(_nfa_l1_scores_kernel, triton.cdiv(t, bt),
+                                    region == 1, region == 2, far_avg, near_avg)
+                    actual = run(kernel, grid, region == 1, region == 2,
+                                 far_avg, near_avg)
+                    for row, length in enumerate(lengths_host):
+                        kt_eff = triton.cdiv(length, bs)
+                        near_start = max(
+                            (length - window - pool_near_len) // bs, 0)
+                        near_end = max(
+                            near_start, kt_eff - max(1, window // bs))
+                        if region == 1:
+                            start = (near_start // bt) * bt
+                            stop = min(kt_eff, start + grid * bt)
+                            self.assertLessEqual(near_end, stop)
+                        else:
+                            start = 0
+                            stop = min(kt_eff, triton.cdiv(near_start, bt) * bt)
+                        for ref, out in zip(reference[:2], actual[:2]):
+                            torch.testing.assert_close(
+                                ref[row, :, start:stop].view(torch.int16),
+                                out[row, :, start:stop].view(torch.int16),
+                                rtol=0, atol=0)
+                            if start:
+                                torch.testing.assert_close(
+                                    out[row, :, :start],
+                                    torch.full_like(out[row, :, :start], 13.25),
+                                    rtol=0, atol=0)
+                            if stop < t:
+                                torch.testing.assert_close(
+                                    out[row, :, stop:],
+                                    torch.full_like(out[row, :, stop:], 13.25),
+                                    rtol=0, atol=0)
+                    torch.testing.assert_close(
+                        reference[2], actual[2], rtol=0, atol=0)
 
 
 if __name__ == "__main__":

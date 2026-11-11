@@ -31,8 +31,17 @@ class GraphRunner:
                 (bucket, 1), dtype=torch.long, device=self.device)
 
     @staticmethod
-    def _key(bucket, visible_bucket):
-        return (int(bucket), int(visible_bucket))
+    def _key(bucket, visible_bucket, skip_signature=()):
+        return (int(bucket), int(visible_bucket), skip_signature)
+
+    def _capture_request_ids(self, cache, bucket):
+        active = list(getattr(self.scheduler, 'active_req_ids', ()) or ())
+        if not active:
+            active = [rid for rid in getattr(cache, 'active_req_ids', ())
+                      if rid is not None and rid >= 0 and rid in cache.states]
+        if len(active) > bucket:
+            raise ValueError('capture bucket is smaller than the frozen batch')
+        return active + [-1] * (bucket - len(active))
 
     def bucket_for(self, batch, max_requests=None):
         for bucket in self.buckets:
@@ -75,11 +84,13 @@ class GraphRunner:
             raise ValueError(
                 f'visible bucket {visible_bucket} exceeds cache {cache.max_visible_len}')
 
-        key = self._key(bucket, visible_bucket)
+        capture_req_ids = self._capture_request_ids(cache, bucket)
+        skip_signature = cache.nfa_skip_signature(capture_req_ids)
+        key = self._key(bucket, visible_bucket, skip_signature)
         if key in self.graphs:
-            # 图只依赖固定 bucket 与设备 buffer 地址；真实 request/length 均由
-            # replay 前的 metadata 刷新，重复 capture 只会增加私有池与 JIT 开销。
             return self.graphs[key]
+        # metadata 仍使用全 padding，避免 warmup 改写真实请求长度；selector
+        # 通过临时 override 看到实际冻结签名，从而 capture 正确的区域特化。
         padded_ids = [-1] * bucket
         cache.ensure_visible_buckets((visible_bucket,))
         cache.new_step(padded_ids)
@@ -89,24 +100,33 @@ class GraphRunner:
         self.position_ids_buf[bucket].zero_()
 
         attention_mask = self._attention_mask_arg(model)
-        model(
-            input_ids=self.input_ids_buf[bucket],
-            position_ids=self.position_ids_buf[bucket],
-            past_key_values=cache,
-            use_cache=True,
-            attention_mask=attention_mask,
-        )
-        torch.cuda.synchronize()
-
-        graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(graph):
-            static_logits = model(
+        missing = object()
+        previous = getattr(cache, '_nfa_capture_skip_signature', missing)
+        cache._nfa_capture_skip_signature = skip_signature
+        try:
+            model(
                 input_ids=self.input_ids_buf[bucket],
                 position_ids=self.position_ids_buf[bucket],
                 past_key_values=cache,
                 use_cache=True,
                 attention_mask=attention_mask,
             )
+            torch.cuda.synchronize()
+
+            graph = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(graph):
+                static_logits = model(
+                    input_ids=self.input_ids_buf[bucket],
+                    position_ids=self.position_ids_buf[bucket],
+                    past_key_values=cache,
+                    use_cache=True,
+                    attention_mask=attention_mask,
+                )
+        finally:
+            if previous is missing:
+                del cache._nfa_capture_skip_signature
+            else:
+                cache._nfa_capture_skip_signature = previous
         self.graphs[key] = graph
         self.static_logits[key] = static_logits
         self.capture_count += 1
@@ -120,8 +140,9 @@ class GraphRunner:
             width for width in self.visible_buckets
             if width <= cache.max_visible_len)
         cache.ensure_visible_buckets(valid_visible_buckets)
+        active_count = len(getattr(self.scheduler, 'active_req_ids', ()) or ())
         for bucket in self.buckets:
-            if bucket > cache.max_requests:
+            if bucket > cache.max_requests or bucket < active_count:
                 continue
             for visible_bucket in valid_visible_buckets:
                 self.capture(model, cache, bucket, visible_bucket)
@@ -147,7 +168,8 @@ class GraphRunner:
         self._prepare_metadata(cache, padded_ids, visible_bucket)
         self._copy_inputs(bucket, input_ids, position_ids)
 
-        key = self._key(bucket, visible_bucket)
+        skip_signature = cache.nfa_skip_signature(padded_ids)
+        key = self._key(bucket, visible_bucket, skip_signature)
         graph = self.graphs.get(key)
         if graph is not None:
             graph.replay()

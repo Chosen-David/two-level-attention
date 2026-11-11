@@ -43,8 +43,11 @@ def _reference_filtered_topk_partial_kernel(
     tl.store(PARTIAL + (h * NTILES + tile) * K + tl.arange(0, K), key)
 
 
-def _assert_filtered_partial_bit_exact(packed, logits, cand, width, capacity):
+def _assert_filtered_partial_bit_exact(
+        packed, logits, cand, width, capacity, quota=None):
     m, hkv, r = packed.shape
+    if quota is None:
+        quota = torch.ones(m, dtype=torch.int64, device='cuda')
     token_bits = 32 if capacity >= 65536 else 16
     ntiles = triton.cdiv(r, 2048)
     tail = r - (ntiles - 1) * 2048
@@ -58,7 +61,7 @@ def _assert_filtered_partial_bit_exact(packed, logits, cand, width, capacity):
     _reference_filtered_topk_partial_kernel[(m * hkv, ntiles)](
         packed, reference, r, **common)
     selector_ops._nfa_filtered_topk_partial_kernel[(m * hkv, ntiles)](
-        logits, cand, candidate_score, candidate_token, r, TAIL=tail,
+        logits, cand, candidate_score, candidate_token, quota, r, TAIL=tail,
         TAIL_PAD=triton.next_power_of_2(tail), **common)
     bits = candidate_score.view(torch.int16).to(torch.int32) & 0xFFFF
     negative = (bits & 0x8000) != 0
@@ -86,9 +89,9 @@ def _indexer(k1=4, near_pages=2, subspace='tail', l2_subspace='same'):
 def _make_cache(req_ids, lengths, skip_states, *, k1=4,
                 near_pages=2, num_kv_heads=1, max_physical_pages=64,
                 max_blocks=16, max_visible_len=640, subspace='tail',
-                l2_subspace='same'):
+                l2_subspace='same', n_layers=1):
     cache = GraphReadyPagedRegionCache(
-        1, GEOMETRY, max_requests=8, max_physical_pages=max_physical_pages,
+        n_layers, GEOMETRY, max_requests=8, max_physical_pages=max_physical_pages,
         max_blocks=max_blocks,
         max_visible_len=max_visible_len, max_query_tokens=8, num_kv_heads=num_kv_heads,
         num_query_heads=2 * num_kv_heads, head_dim_k=HEAD_DIM, head_dim_v=HEAD_DIM,
@@ -97,12 +100,14 @@ def _make_cache(req_ids, lengths, skip_states, *, k1=4,
     for request_id, length, (skip_far, skip_near) in zip(
             req_ids, lengths, skip_states):
         cache.add_request(request_id)
-        keys = torch.randn(
-            1, num_kv_heads, length, HEAD_DIM, generator=generator,
-            dtype=torch.bfloat16, device='cuda')
-        values = torch.randn_like(keys)
-        cache.write_prefill(0, request_id, keys, values)
-        cache.freeze(request_id, [skip_far], [skip_near])
+        for layer_idx in range(n_layers):
+            keys = torch.randn(
+                1, num_kv_heads, length, HEAD_DIM, generator=generator,
+                dtype=torch.bfloat16, device='cuda')
+            values = torch.randn_like(keys)
+            cache.write_prefill(layer_idx, request_id, keys, values)
+        cache.freeze(
+            request_id, [skip_far] * n_layers, [skip_near] * n_layers)
     attention = SimpleNamespace(
         indexer=_indexer(k1, near_pages, subspace, l2_subspace), scaling=1.0)
     return cache, attention, generator
@@ -407,21 +412,54 @@ def test_near_skip_reentry_incremental_stats_match_rebuild_and_slot_reuse_invali
         8, 2, HEAD_DIM, generator=generator,
         dtype=torch.bfloat16, device='cuda')
 
+    incremental_buffers = reference_buffers = None
+
     for step in range(8):
         _plan_and_write(incremental, [2], incremental_generator)
         _plan_and_write(reference, [2], reference_generator)
         if step == 7:
-            # 长度 512 时逻辑页 4 从 near 进入 far。统计内容不依赖区域归属，
-            # 应继续走增量路径，并由下方全量重建 reference 验证数值等价。
+            # 跨区域 reentry 不使增量统计失效；全量重建 reference 只重算
+            # 当前 far，已经写入的其它页保持增量路径的结果。
             assert int(incremental._nfa_page_stats_lengths[0, 2]) == 511
         if hasattr(reference, '_nfa_page_stats_lengths'):
             reference._nfa_page_stats_lengths.zero_()
+        # poison 可区分“没有重算 skipped near”与“重算后恰好得到相同值”。
+        poisoned = reference_buffers is not None
+        if poisoned:
+            for buffer in reference_buffers:
+                buffer.fill_(13.25)
         select_topk_for_layer_batched(
             incremental, 0, [2], queries[step:step+1], attention=attention)
         select_topk_for_layer_batched(
             reference, 0, [2], queries[step:step+1],
             attention=reference_attention)
         assert _logical_ids(incremental, 2, 0) == _logical_ids(reference, 2, 0)
+        if incremental_buffers is None:
+            incremental_buffers = next(iter(
+                incremental._nfa_page_stats_persistent.values()))
+            reference_buffers = next(iter(
+                reference._nfa_page_stats_persistent.values()))
+
+        length = int(reference.planned_lengths_buf[0])
+        logical_pages = (length + PAGE - 1) // PAGE
+        pool_near_len = max(PAGE, int(reference_attention.indexer.nt_near_len))
+        near_start = min(logical_pages, max(
+            (length - reference.geometry.window - pool_near_len) // PAGE,
+            int(reference_attention.indexer._sink_pool_lo_blk)))
+        for logical_page in range(logical_pages):
+            for stat_idx, (actual, expected) in enumerate(zip(
+                    incremental_buffers, reference_buffers)):
+                if logical_page < near_start:
+                    torch.testing.assert_close(
+                        actual[:, 2:3, logical_page],
+                        expected[:, 2:3, logical_page], rtol=0, atol=0,
+                        msg=f'step={step} page={logical_page} stat={stat_idx}')
+                elif poisoned:
+                    torch.testing.assert_close(
+                        expected[:, 2:3, logical_page],
+                        torch.full_like(expected[:, 2:3, logical_page], 13.25),
+                        rtol=0, atol=0,
+                        msg=f'poison step={step} page={logical_page} stat={stat_idx}')
         incremental.commit_step()
         reference.commit_step()
 
@@ -434,17 +472,6 @@ def test_near_skip_reentry_incremental_stats_match_rebuild_and_slot_reuse_invali
             incremental.layers[0].kv_pool_k[physical_page, 0, :, :valid],
             reference.layers[0].kv_pool_k[physical_page, 0, :, :valid],
             rtol=0, atol=0)
-    incremental_buffers = next(iter(
-        incremental._nfa_page_stats_persistent.values()))
-    reference_buffers = next(iter(
-        reference._nfa_page_stats_persistent.values()))
-    # 全量 KV 驻留下，对请求的全部逻辑页比较增量与全量重建统计。
-    for logical_page in incremental.states[2].block_tables[0]:
-        for actual, expected in zip(incremental_buffers, reference_buffers):
-            torch.testing.assert_close(
-                actual[:, 2:3, logical_page], expected[:, 2:3, logical_page],
-                rtol=0, atol=0)
-
     incremental.remove_request(2)
     torch.cuda.synchronize()
     incremental.add_request(2)
@@ -515,6 +542,43 @@ def test_fixed_stats_grid_owner_writes_and_refreshes_latest_block(
                 msg=f'decode value mismatch at step {step}')
         if step == 0:
             cache.commit_step()
+
+
+def test_eager_launch_plan_survives_alternating_region_modes(monkeypatch):
+    cache, attention, generator = _make_cache(
+        [2], [448], [(False, False)], n_layers=2)
+    # 相邻层使用不同 region；下一步 layer0 会继承上一层 region1 的全局
+    # geometry，不能因此把 layer0/1 的固定 launch-plan 全部重建。
+    cache.states[2].skip_far_by_layer[1] = True
+    query = torch.randn(
+        1, 2, HEAD_DIM, generator=generator,
+        dtype=torch.bfloat16, device='cuda')
+
+    def run_layers():
+        cache.new_step([2])
+        cache.plan_common([2])
+        for layer_idx in range(2):
+            select_topk_for_layer_batched(
+                cache, layer_idx, [2], query, attention=attention)
+
+    run_layers()
+    workspace = cache._nfa_selector_workspace
+    plans = [workspace[('eager_selector_call_plan', layer)] for layer in range(2)]
+    assert plans[0][0][31] == 0 and plans[1][0][31] == 1
+    cache.commit_step()
+
+    original_impl = selector_ops._layer_batched_select_impl
+    impl_calls = []
+
+    def tracked_impl(*args, **kwargs):
+        impl_calls.append(kwargs['layer_indices'])
+        return original_impl(*args, **kwargs)
+
+    monkeypatch.setattr(selector_ops, '_layer_batched_select_impl', tracked_impl)
+    run_layers()
+    assert impl_calls == []
+    assert workspace[('eager_selector_call_plan', 0)] is plans[0]
+    assert workspace[('eager_selector_call_plan', 1)] is plans[1]
 
 
 def test_both_skip_light_path_replay_writes_decode_kv():
@@ -786,7 +850,7 @@ def test_tiled_filtered_topk_bit_exact_with_quota_and_ties(capacity, r):
         good, (ordered.to(dtype) << token_bits) + delta,
         torch.full((), invalid, dtype=dtype, device='cuda')).contiguous()
     _assert_filtered_partial_bit_exact(
-        packed, filtered_logits, cand, width, capacity)
+        packed, filtered_logits, cand, width, capacity, quota=quota)
     actual = selector_ops._nfa_filtered_topk(
         filtered_logits, cand, lower, upper, quota, capacity, width, sink=4)
     torch.testing.assert_close(actual.indices, reference_out, rtol=0, atol=0)

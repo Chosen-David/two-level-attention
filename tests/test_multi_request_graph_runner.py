@@ -321,3 +321,54 @@ def test_session_pool_discards_failed_capture(monkeypatch):
         device='cuda', capture=False)
     assert runner.capture_count == 0
     assert pool.miss_count == 2
+
+
+@torch.inference_mode()
+def test_graph_skip_signature_miss_falls_back_then_replays_new_graph():
+    model = _model()
+    cache, first_tokens = _prefill_cache(model, [1])
+    scheduler = ContinuousBatchScheduler(
+        cache=cache, max_batch=cache.max_requests,
+        eos_ids=set(), pad_token_id=0)
+    scheduler.add_request(1)
+    scheduler.next_tokens[1] = first_tokens[1]
+    cache.transition_request(1, RequestPhase.GENERATE)
+    runner = GraphRunner(
+        scheduler=scheduler, buckets=(1,), visible_buckets=(192,), device='cuda')
+    runner.capture_all(model, cache)
+    assert runner.capture_count == 1
+    assert not hasattr(cache, '_nfa_capture_skip_signature')
+
+    for step in range(2):
+        runner.step(
+            model, cache, generated_counts=[step + 1], min_new_tokens=1,
+            return_next_tokens=True, stop_on_eos=False)
+    assert runner.replay_count == 2
+    assert runner.eager_fallback_count == 0
+
+    # 同一 bucket/buffer 换成相反单侧签名的新请求：不得重放旧区域图。
+    scheduler.prepare_step()
+    scheduler.finish_request(1)
+    cache.add_request(1)
+    cache.set_active_request(1)
+    output = model(
+        _input_ids(1), past_key_values=cache, use_cache=True, logits_to_keep=1)
+    cache.freeze(1, [False] * 2, [True] * 2)
+    scheduler.add_request(1)
+    scheduler.next_tokens[1] = int(output.logits[0, -1].argmax())
+    cache.transition_request(1, RequestPhase.GENERATE)
+    runner.step(
+        model, cache, generated_counts=[3], min_new_tokens=1,
+        return_next_tokens=True, stop_on_eos=False)
+    assert runner.replay_count == 2
+    assert runner.eager_fallback_count == 1
+
+    runner.capture_all(model, cache)
+    assert runner.capture_count == 2
+    runner.step(
+        model, cache, generated_counts=[4], min_new_tokens=1,
+        return_next_tokens=True, stop_on_eos=False)
+    assert runner.replay_count == 3
+    assert runner.eager_fallback_count == 1
+    assert len(runner.graphs) == 2
+    assert len({key[2] for key in runner.graphs}) == 2

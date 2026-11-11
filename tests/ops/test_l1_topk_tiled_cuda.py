@@ -8,6 +8,7 @@ import triton.language as tl
 from sparse_attn.indexer.nfa_layer_batch_selector import (
     _candidate_expand_batched_kernel,
     _candidate_pack_batched_kernel,
+    _l1_far_compact_topk_body,
     _l1_topk_partial_kernel,
     _topk_candidate_batched_kernel,
     _topk_candidate_prepare_kernel,
@@ -22,6 +23,18 @@ def _near_geometry(compact, bs, window, pool_near_len):
         NEAR_COMPACT=compact, NEAR_WIDTH=width,
         NEAR_WIDTH_PAD=triton.next_power_of_2(width),
         WINDOW=window, POOL_NEAR_LEN=pool_near_len)
+
+
+def _far_geometry(width, compact=False):
+    return dict(
+        FAR_COMPACT=compact, FAR_WIDTH=width,
+        FAR_WIDTH_PAD=triton.next_power_of_2(width))
+
+
+def _reference_kwargs(common):
+    """独立 reference 不接收仅用于 compact actual 的 constexpr。"""
+    return {k: v for k, v in common.items()
+            if k not in ("FAR_COMPACT", "FAR_WIDTH", "FAR_WIDTH_PAD")}
 
 
 def _production_near_scores(rows, hkv, batch, lengths, kt, bs, sink, swa,
@@ -104,6 +117,33 @@ def _merge_topk(
     _topk_indices_merge_body(
         NEAR, I_N, KT=KT, NTILES=NTILES, NTILES_PAD=NTILES_PAD,
         K=K_N, K_PAD=K_N_PAD, LOG2_K=LOG2_N)
+
+
+@triton.jit
+def _far_compact_test_kernel(
+    SCORES, OUT, FAR_END,
+    KT: tl.constexpr, K: tl.constexpr, K_PAD: tl.constexpr,
+    FAR_WIDTH: tl.constexpr, FAR_WIDTH_PAD: tl.constexpr,
+    LOG2_K: tl.constexpr,
+):
+    row = tl.program_id(0)
+    far_end = tl.load(FAR_END + row)
+    _l1_far_compact_topk_body(
+        SCORES, OUT, row, far_end, KT=KT, K=K, K_PAD=K_PAD,
+        FAR_WIDTH=FAR_WIDTH, FAR_WIDTH_PAD=FAR_WIDTH_PAD, LOG2_K=LOG2_K)
+
+
+@triton.jit
+def _far_full_test_kernel(
+    SCORES, OUT, FAR_END,
+    KT: tl.constexpr, KT_PAD: tl.constexpr,
+    K: tl.constexpr, K_PAD: tl.constexpr,
+):
+    row = tl.program_id(0)
+    far_end = tl.load(FAR_END + row)
+    _topk_indices_body(
+        SCORES, OUT, 0, far_end, KT=KT, KT_PAD=KT_PAD,
+        K=K, K_PAD=K_PAD)
 
 
 @triton.jit
@@ -257,6 +297,7 @@ class L1TopKTiledTest(unittest.TestCase):
             KT=kt, KT_PAD=triton.next_power_of_2(kt),
             K_F=k_f, K_N=k_n, K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
             **_near_geometry(False, bs, swa, 2048),
+            **_far_geometry(kt),
             R=r, HEAD=sink, TAIL=swa, SINK=sink, SWA=swa, CAP=capacity,
             SINK_POOL_LO=0, BS=bs, PAGE=64, NEAR_LEN=4096, K2=1024,
             HKV=hkv, B=1, MAX_REQ=1, LAYER_OFFSET=0,
@@ -381,6 +422,7 @@ class L1TopKTiledTest(unittest.TestCase):
             KT=kt, KT_PAD=triton.next_power_of_2(kt),
             K_F=k_f, K_N=k_n, K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
             **_near_geometry(True, bs, swa, 2048),
+            **_far_geometry(kt),
             R=r, HEAD=sink, TAIL=swa, SINK=sink, SWA=swa, CAP=capacity,
             SINK_POOL_LO=0, BS=bs, PAGE=64, NEAR_LEN=4096, K2=1024,
             HKV=hkv, B=batch, MAX_REQ=6, LAYER_OFFSET=layer_offset, num_warps=8)
@@ -389,7 +431,7 @@ class L1TopKTiledTest(unittest.TestCase):
             far, near, ref["i_f"], ref["i_n"], lengths,
             skip_far, skip_near, valid_req, ref["out"], ref["valid"],
             ref["lower"], ref["upper"], ref["quota"],
-            ref["owners"], ref["generations"], ref["extents"], **common)
+            ref["owners"], ref["generations"], ref["extents"], **_reference_kwargs(common))
 
         eager = allocate()
         _topk_candidate_batched_kernel[(rows,)](
@@ -451,6 +493,151 @@ class L1TopKTiledTest(unittest.TestCase):
                             f"parallel {name} 不一致")
 
     @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
+    def test_region_compact_matches_full_pack_and_owner_tags(self):
+        """单侧 skip 的紧凑 pack 必须逐位等于 full-pack 的对应切片。"""
+        rows, hkv, batch, kt = 8, 2, 4, 513
+        k_f, k_n, bs = 96, 32, 64
+        sink, swa = 4, 128
+        capacity = kt * bs
+        m = batch
+        torch.manual_seed(20261111)
+        far = torch.randn((rows, kt), device="cuda", dtype=torch.bfloat16)
+        lengths = torch.tensor(
+            [capacity, capacity - 65, 8193, 16385],
+            dtype=torch.int64, device="cuda")
+        near, _ = _production_near_scores(
+            rows, hkv, batch, lengths, kt, bs, sink, swa,
+            64, 4096, 2048, 0)
+        valid_req = torch.tensor([3, 1, 2, 0], dtype=torch.int64, device="cuda")
+        full_r = (k_f + k_n + 2) * bs
+        full_width = full_r + sink + swa
+        k_f_pad, k_n_pad = 128, 32
+        ntiles = triton.cdiv(kt, 512)
+
+        def allocate(width, compact):
+            return {
+                "i_f": torch.empty((rows, k_f), dtype=torch.int32, device="cuda"),
+                "i_n": torch.empty((rows, k_n), dtype=torch.int32, device="cuda"),
+                "out": torch.full((rows, width), 0x1234567,
+                                  dtype=torch.int32, device="cuda"),
+                "valid": torch.empty((rows, width), dtype=torch.bool, device="cuda"),
+                "lower": torch.empty(m, dtype=torch.int64, device="cuda"),
+                "upper": torch.empty(m, dtype=torch.int64, device="cuda"),
+                "quota": torch.empty(m, dtype=torch.int64, device="cuda"),
+                "owners": torch.full((rows, capacity), 0x1234567,
+                                     dtype=torch.int32, device="cuda"),
+                "generations": torch.zeros(rows, dtype=torch.int32, device="cuda"),
+                "extents": torch.zeros(rows, dtype=torch.int32, device="cuda"),
+            }
+
+        base_common = dict(
+            KT=kt, KT_PAD=triton.next_power_of_2(kt),
+            K_F=k_f, K_N=k_n, K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
+            **_near_geometry(True, bs, swa, 2048),
+            **_far_geometry(kt),
+            HEAD=sink, TAIL=swa, SINK=sink, SWA=swa, CAP=capacity,
+            SINK_POOL_LO=0, BS=bs, PAGE=64, NEAR_LEN=4096, K2=1024,
+            HKV=hkv, B=batch, MAX_REQ=4, LAYER_OFFSET=0,
+            LOG2_F=7, LOG2_N=5, num_warps=8)
+        ref_common = {k: v for k, v in _reference_kwargs(base_common).items()
+                      if k not in ("LOG2_F", "LOG2_N")}
+        for region, (skip_far_value, skip_near_value) in enumerate(
+                ((False, False), (True, False), (False, True))):
+            with self.subTest(region=region):
+                skip_far = torch.full(
+                    (1, 4), skip_far_value, dtype=torch.bool, device="cuda")
+                skip_near = torch.full(
+                    (1, 4), skip_near_value, dtype=torch.bool, device="cuda")
+                region_far = (far if region != 1 else
+                              torch.full_like(far, float("-inf")))
+                region_near = (near if region != 2 else
+                               torch.full_like(near, float("-inf")))
+                ref = allocate(full_width, False)
+                _reference_candidate[(rows,)](
+                    region_far, region_near, ref["i_f"], ref["i_n"], lengths,
+                    skip_far, skip_near, valid_req, ref["out"], ref["valid"],
+                    ref["lower"], ref["upper"], ref["quota"], ref["owners"],
+                    ref["generations"], ref["extents"], R=full_r, **ref_common)
+                if region == 0:
+                    expected_out = ref["out"]
+                    expected_valid = ref["valid"]
+                    compact_r = full_r
+                elif region == 1:
+                    expected_out = ref["out"][:, k_f * bs:]
+                    expected_valid = ref["valid"][:, k_f * bs:]
+                    compact_r = (k_n + 2) * bs
+                else:
+                    split = (k_f + k_n) * bs
+                    expected_out = torch.cat(
+                        (ref["out"][:, :k_f * bs], ref["out"][:, split:]), dim=1)
+                    expected_valid = torch.cat(
+                        (ref["valid"][:, :k_f * bs], ref["valid"][:, split:]), dim=1)
+                    compact_r = (k_f + 2) * bs
+                compact_width = compact_r + sink + swa
+                common = dict(base_common, R=compact_r, PACK_R=full_r,
+                              REGION=region)
+                partial_f = torch.empty(
+                    (rows, ntiles, k_f_pad), dtype=torch.int32, device="cuda")
+                partial_n = torch.empty(
+                    (rows, ntiles, k_n_pad), dtype=torch.int32, device="cuda")
+                _l1_topk_partial_kernel[(rows, ntiles)](
+                    region_far, region_near, partial_f, partial_n,
+                    skip_far, skip_near, valid_req, lengths,
+                    KT=kt, TILE=512, NTILES=ntiles,
+                    K_F_PAD=k_f_pad, K_N=k_n, K_N_PAD=k_n_pad,
+                    LOG2_N=5, BS=bs, SINK_POOL_LO=0,
+                    **_near_geometry(True, bs, swa, 2048),
+                    HKV=hkv, B=batch, MAX_REQ=4, LAYER_OFFSET=0,
+                    REGION=region, num_warps=8)
+                for parallel in (False, True):
+                    actual = allocate(compact_width, True)
+                    if parallel:
+                        _topk_candidate_prepare_kernel[(rows,)](
+                            partial_f, partial_n, actual["i_f"], actual["i_n"],
+                            lengths, skip_far, skip_near, valid_req,
+                            actual["lower"], actual["upper"], actual["quota"],
+                            actual["owners"], actual["generations"], actual["extents"],
+                            TILED=True, NTILES=ntiles,
+                            NTILES_PAD=triton.next_power_of_2(ntiles), **common)
+                        _candidate_expand_batched_kernel[
+                            (rows, triton.cdiv(compact_width, 1024))](
+                            actual["i_f"], actual["i_n"], region_far, region_near,
+                            lengths, actual["lower"], actual["upper"],
+                            actual["out"], actual["valid"], actual["owners"],
+                            actual["generations"],
+                            K_F=k_f, K_N=k_n, KT=kt, R=compact_r,
+                            HEAD=sink, TAIL=swa, SINK=sink, SWA=swa,
+                            CAP=capacity, SINK_POOL_LO=0, BS=bs, HKV=hkv,
+                            B=batch, PACK_R=full_r, REGION=region, num_warps=8)
+                    else:
+                        _topk_candidate_batched_kernel[(rows,)](
+                            partial_f, partial_n, region_far, region_near,
+                            actual["i_f"], actual["i_n"], lengths,
+                            skip_far, skip_near, valid_req, actual["out"],
+                            actual["valid"], actual["lower"], actual["upper"],
+                            actual["quota"], actual["owners"], actual["generations"],
+                            actual["extents"], TILED=True, NTILES=ntiles,
+                            NTILES_PAD=triton.next_power_of_2(ntiles), **common)
+                    torch.cuda.synchronize()
+                    torch.testing.assert_close(
+                        actual["out"], expected_out, rtol=0, atol=0,
+                        msg=f"region={region} parallel={parallel} candidate")
+                    torch.testing.assert_close(
+                        actual["valid"], expected_valid, rtol=0, atol=0,
+                        msg=f"region={region} parallel={parallel} valid")
+                    for name in ("lower", "upper", "quota", "owners",
+                                 "generations", "extents"):
+                        torch.testing.assert_close(
+                            actual[name], ref[name], rtol=0, atol=0,
+                            msg=f"region={region} parallel={parallel} {name}")
+                    if region != 1:
+                        torch.testing.assert_close(
+                            actual["i_f"], ref["i_f"], rtol=0, atol=0)
+                    if region != 2:
+                        torch.testing.assert_close(
+                            actual["i_n"], ref["i_n"], rtol=0, atol=0)
+
+    @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
     def test_skipped_topk_k_boundaries(self):
         rows, hkv, kt, bs = 2, 2, 8, 1
         capacity = kt * bs
@@ -493,6 +680,7 @@ class L1TopKTiledTest(unittest.TestCase):
                         KT=kt, KT_PAD=kt, K_F=k_f, K_N=k_n,
                         K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
                         **_near_geometry(False, bs, 0, 1),
+                        **_far_geometry(kt),
                         R=r, HEAD=0, TAIL=0, SINK=0, SWA=0, CAP=capacity,
                         SINK_POOL_LO=0, BS=bs, PAGE=64, NEAR_LEN=4096, K2=1024,
                         HKV=hkv, B=1, MAX_REQ=1, LAYER_OFFSET=1, num_warps=8)
@@ -501,7 +689,7 @@ class L1TopKTiledTest(unittest.TestCase):
                         far, near, ref["i_f"], ref["i_n"], lengths,
                         skip_far, skip_near, valid_req, ref["out"], ref["valid"],
                         ref["lower"], ref["upper"], ref["quota"],
-                        ref["owners"], ref["generations"], ref["extents"], **common)
+                        ref["owners"], ref["generations"], ref["extents"], **_reference_kwargs(common))
                     if tiled:
                         far_topk = torch.empty(
                             (rows, 1, k_f_pad), dtype=torch.int32, device="cuda")
@@ -602,6 +790,7 @@ class L1TopKTiledTest(unittest.TestCase):
                             K_F_PAD=k_f_pad, K_N_PAD=k_n_pad,
                             **_near_geometry(
                                 True, bs, 0, case["pool_near_len"]),
+                            **_far_geometry(kt),
                             R=r, HEAD=0, TAIL=0, SINK=0, SWA=0, CAP=capacity,
                             SINK_POOL_LO=case["sink_pool_lo"], BS=bs, PAGE=64,
                             NEAR_LEN=0, K2=1024, HKV=hkv, B=batch, MAX_REQ=1,
@@ -612,7 +801,7 @@ class L1TopKTiledTest(unittest.TestCase):
                             skip_far, skip_near, valid_req, ref["out"],
                             ref["valid"], ref["lower"], ref["upper"],
                             ref["quota"], ref["owners"], ref["generations"],
-                            ref["extents"], **common)
+                            ref["extents"], **_reference_kwargs(common))
                         if tiled:
                             partial_f = torch.full(
                                 (rows, 1, k_f_pad), 0x12345678,
@@ -650,6 +839,49 @@ class L1TopKTiledTest(unittest.TestCase):
                             self.assertTrue(
                                 torch.equal(ref[name], actual[name]),
                                 f"{name} 不一致: ref={ref[name]}, actual={actual[name]}")
+
+    @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
+    def test_far_compact_topk_matches_full_width_and_ignores_suffix(self):
+        """far 局部排序不得重复补洞位置，也不得读取省略后缀。"""
+        rows, kt, far_width = 8, 517, 500
+        far_end = torch.tensor(
+            [0, 1, 3, 7, 31, 65, 127, 499],
+            dtype=torch.int32, device="cuda")
+        torch.manual_seed(20261112)
+        scores = torch.randint(
+            -32, 33, (rows, kt), device="cuda").to(torch.bfloat16) / 8
+        scores[0] = float("-inf")
+        scores[1, 0] = float("nan")
+        scores[2, 1] = float("inf")
+        scores[3, 2] = float("-inf")
+        scores[4, 3] = 0.0
+        scores[4, 4] = -0.0
+        scores[5, 5] = torch.tensor(
+            [-63], dtype=torch.int16, device="cuda").view(torch.bfloat16)[0]
+        # 所有省略位置都是 poison；全宽 reference 的 active mask 也不读它们。
+        poison = torch.full_like(scores, float("nan"))
+        for row in range(rows):
+            end = int(far_end[row])
+            poison[row, :end] = scores[row, :end]
+        scores = poison
+        for k in (1, 4, 96, 128):
+            with self.subTest(k=k):
+                k_pad = triton.next_power_of_2(k)
+                reference = torch.empty(
+                    (rows, k), dtype=torch.int32, device="cuda")
+                actual = torch.empty_like(reference)
+                _far_full_test_kernel[(rows,)](
+                    scores, reference, far_end, KT=kt,
+                    KT_PAD=triton.next_power_of_2(kt), K=k, K_PAD=k_pad,
+                    num_warps=8)
+                _far_compact_test_kernel[(rows,)](
+                    scores, actual, far_end, KT=kt, K=k, K_PAD=k_pad,
+                    FAR_WIDTH=far_width,
+                    FAR_WIDTH_PAD=triton.next_power_of_2(far_width),
+                    LOG2_K=k_pad.bit_length() - 1, num_warps=8)
+                torch.cuda.synchronize()
+                self.assertTrue(torch.equal(reference, actual),
+                                f"far compact K={k} 索引或顺序不同")
 
     @unittest.skipUnless(torch.cuda.is_available(), "需要 CUDA")
     def test_skipped_pool_does_not_read_scores_or_partial(self):
@@ -706,6 +938,7 @@ class L1TopKTiledTest(unittest.TestCase):
                         KT=kt, KT_PAD=triton.next_power_of_2(kt),
                         K_F=k_f, K_N=k_n, K_F_PAD=16, K_N_PAD=8,
                         **_near_geometry(False, bs, 128, 64),
+                        **_far_geometry(kt),
                         R=0, HEAD=1, TAIL=0, SINK=1, SWA=128, CAP=capacity,
                         SINK_POOL_LO=0, BS=bs, PAGE=64, NEAR_LEN=4096, K2=1024,
                         HKV=hkv, B=1, MAX_REQ=1, LAYER_OFFSET=0, num_warps=8)
@@ -714,7 +947,7 @@ class L1TopKTiledTest(unittest.TestCase):
                         far, near, ref["i_f"], ref["i_n"], lengths,
                         skip_far, skip_near, valid_req, ref["out"], ref["valid"],
                         ref["lower"], ref["upper"], ref["quota"],
-                        ref["owners"], ref["generations"], ref["extents"], **common)
+                        ref["owners"], ref["generations"], ref["extents"], **_reference_kwargs(common))
                     if tiled:
                         partial_f = torch.empty(
                             (rows, ntiles, 16), dtype=torch.int32, device="cuda")

@@ -4,6 +4,8 @@
 
 - [x] [TL-NFA-EPS010-PERF-20261111] Qwen3-8B × RULER MultiKey2 sample2 的 attention-mass epsilon=0.10 性能补测完成：严格 tail=32/32、full=128/128，12 个 CUDA Graph 配对格与108份原始回执内部审计通过；总 skip 111→532，重算 tail/full、skip/no-skip 与 NFA/FlashInfer 加速比并保留负结果。数据仍为 pending-independent-verification。([详情](task_details/TL-NFA-EPS010-PERF-20261111.md)；[结果](../results/nfa_eps010_graph_performance_20261111.json))
 
+- [x] [TL-NFA-REGION-SKIP-20261111] 实现并验收 near/far 单侧与 both-skip 的真实选择器区域跳过、Top-K/candidate 实际缩容及 Graph skip-signature 多图；32K–512K × B1/B2/B4 × tail/full × skip/no-skip × eager/Graph 全量重测完成，208份 NFA 回执、104对 nsys 与24份 FlashInfer Graph 参考回执内部审计 PASS；Graph 24/24 skip 与12/12 tail/full clean TPOT 比值均>1，eager host plan 抖动已修复且负结果保留。数据保持 pending-independent-verification。([详情](task_details/TL-NFA-REGION-SKIP-20261111.md)；[结果](../results/nfa_region_skip_performance_20261111.json))
+
 ## 2026-11-10
 
 - [x] [TL-RULER-DYNAMIC-GATE-SCAN-20261110] Qwen3-8B × RULER 32K/64K/128K × 11任务 sample0 首个 dynamic-gate 扫描33/33格、1188层完成，独立只读审计与46项 artifact 哈希复核通过；32K far-skip 5任务/9层、64K near-skip 8任务/21层、128K near-skip 11任务/121层，仅限 decision-only 首步机制观测，不作质量、全样本或性能结论。([详情](task_details/TL-RULER-DYNAMIC-GATE-SCAN-20261110.md)；[结果](../results/ruler_dynamic_gate_scan_20261110/record.json))

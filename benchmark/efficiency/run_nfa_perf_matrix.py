@@ -1,7 +1,7 @@
-"""双卡断点续跑：NFA Graph 算子、干净 decode E2E 与 FlashInfer 单次缓存。
+"""双卡断点续跑：NFA eager/Graph 算子、干净 decode E2E 与 FlashInfer 缓存。
 
-长度固定从大到小。NFA 算子使用独立 nsys Graph-node 进程；干净 E2E 不使用
-任何 profiler。不同观测口径不得相减推导 host 开销。
+长度固定从大到小。NFA 算子使用独立 nsys 进程；干净 E2E 不使用任何 profiler。
+不同观测口径不得相减推导 host 开销。FlashInfer 目前只支持 Graph 矩阵。
 """
 import argparse
 import hashlib
@@ -43,6 +43,7 @@ def parse_args():
     parser.add_argument('--lengths', type=int, nargs='+',
                         default=[524288, 262144, 131072, 65536, 32768])
     parser.add_argument('--batches', type=int, nargs='+', default=[1, 2, 4])
+    parser.add_argument('--execution', choices=('eager', 'graph'), default='graph')
     parser.add_argument('--warmup-steps', type=int, default=3)
     parser.add_argument('--profile-repeat', type=int, default=5)
     parser.add_argument('--decode-steps', type=int, default=32)
@@ -50,6 +51,9 @@ def parse_args():
     parser.add_argument('--subspace', choices=('full', 'tail'), default='tail')
     parser.add_argument('--l2-subspace', choices=('same', 'full'), default='same')
     parser.add_argument('--gate-epsilon', type=float, default=0.05)
+    parser.add_argument(
+        '--force-skip-mode', default='natural',
+        choices=('natural', 'no-skip', 'near-only', 'far-only', 'both-skip'))
     parser.add_argument('--max-attempts', type=int, default=2)
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--summarize-only', action='store_true')
@@ -264,14 +268,14 @@ def cells(args):
 
 
 def arm_path(args, length, batch, arm):
-    return args.output_dir / arm / f'{arm}_l{length}_b{batch}_graph.json'
+    return args.output_dir / arm / f'{arm}_l{length}_b{batch}_{args.execution}.json'
 
 
 def expected_fields(args, length, batch, arm):
     common = {
         'context_length': length,
         'batch_size': batch,
-        'execution': 'graph',
+        'execution': args.execution,
         'task': args.task,
         'sample_index': args.sample_index,
         'input_provenance': input_provenance(args, length),
@@ -294,6 +298,7 @@ def expected_fields(args, length, batch, arm):
         'subspace': args.subspace,
         'l2_subspace': args.l2_subspace,
         'gate_epsilon': args.gate_epsilon,
+        'force_skip_mode': args.force_skip_mode,
         'operator_mode': 'off',
         'profile_repeat': args.profile_repeat,
         'decode_steps': args.decode_steps,
@@ -318,12 +323,13 @@ def valid_existing(args, path, length, batch, arm, source):
     source_input_path = input_path(args, length)
     if row.get('input', {}).get('sha256') != sha256(source_input_path):
         return False
-    if row.get('graph_eager_fallbacks') != 0:
+    if args.execution == 'graph' and row.get('graph_eager_fallbacks') != 0:
         return False
+    expected_captures = 1 if args.execution == 'graph' else 0
     if arm.startswith('flashinfer-'):
         runtime = row.get('flashinfer_runtime', {})
         if not (
-                row.get('graph_capture_count') == 1
+                row.get('graph_capture_count') == expected_captures
                 and runtime.get('page_size') == 64
                 and runtime.get('page_size_matches_nfa') is True
                 and runtime.get('wrapper')
@@ -331,7 +337,7 @@ def valid_existing(args, path, length, batch, arm, source):
             return False
         if arm == 'flashinfer-e2e':
             return row.get('steady_tpot_ms_median', 0) > 0
-    elif row.get('graph_capture_count') != 1 or 'skip_validation' not in row:
+    elif row.get('graph_capture_count') != expected_captures or 'skip_validation' not in row:
         return False
     if arm == 'nfa-clean-e2e':
         return row.get('timing') is not None
@@ -353,7 +359,7 @@ def measure_command(args, length, batch, arm, output):
         '--task', args.task,
         '--context-length', str(length),
         '--batch-size', str(batch),
-        '--execution', 'graph',
+        '--execution', args.execution,
         '--sample-index', str(args.sample_index),
         '--input-provenance', input_provenance(args, length),
         '--visible-len', str(args.visible_len),
@@ -378,6 +384,7 @@ def measure_command(args, length, batch, arm, output):
             '--subspace', args.subspace,
             '--l2-subspace', args.l2_subspace,
             '--gate-epsilon', str(args.gate_epsilon), '--operator-mode', 'off',
+            '--force-skip-mode', args.force_skip_mode,
             '--profile-repeat', str(args.profile_repeat),
             '--decode-steps', str(args.decode_steps),
             '--longbench-data', str(args.longbench_data),
@@ -488,8 +495,8 @@ def run_arm(args, length, batch, arm, source):
                 'trace': 'cuda', 'cuda_graph_trace': 'node',
                 'capture_range': 'cudaProfilerApi around steady decode only',
                 'observer_effect': (
-                    'Graph node tracing may significantly perturb runtime; values '
-                    'are observed kernel times, not zero-overhead ground truth'),
+                    f'{args.execution} kernel tracing may significantly perturb runtime; '
+                    'values are observed kernel times, not zero-overhead ground truth'),
             }
         write_json(output, row)
         if not monitor.pollution:
@@ -544,7 +551,9 @@ def summarize(args):
             rows[arm] = json.loads(path.read_text(encoding='utf-8'))
         if len(rows) != len(args.arms):
             continue
-        record = {'length': length, 'batch': batch, 'execution': 'graph', 'arms': {}}
+        record = {
+            'length': length, 'batch': batch,
+            'execution': args.execution, 'arms': {}}
         profile = rows.get('nfa-operator-profile')
         clean = rows.get('nfa-clean-e2e')
         flashinfer_profile = rows.get('flashinfer-operator-profile')
@@ -646,7 +655,7 @@ def summarize(args):
     if missing:
         raise RuntimeError('矩阵尚缺臂或回执无效:\n' + '\n'.join(missing[:30]))
     result = {
-        'schema': 'nfa-flashinfer-graph-performance-v3',
+        'schema': 'nfa-flashinfer-execution-performance-v4',
         'validation_status': 'pending-independent-verification',
         'source_by_arm': sources,
         'matrix_driver_sha256': sha256(Path(__file__)),
@@ -655,8 +664,8 @@ def summarize(args):
                       for key, value in vars(args).items()},
         'protocol': {
             'length_order': 'descending',
-            'execution': 'CUDA Graph only',
-            'nfa_operator': 'separate nsys CUDA Graph node trace process',
+            'execution': args.execution,
+            'nfa_operator': f'separate nsys {args.execution} kernel trace process',
             'nfa_clean_e2e': 'separate process without nsys or torch.profiler',
             'flashinfer_operator': (
                 'separate nsys CUDA Graph node trace process; dense attention '
@@ -671,7 +680,7 @@ def summarize(args):
                 'end-to-end decode TPOT / NFA clean end-to-end decode TPOT'),
             'host_overhead_derivable_by_subtraction': False,
             'observer_effect': (
-                'nsys Graph node tracing may perturb kernel time; never subtract '
+                f'nsys {args.execution} tracing may perturb kernel time; never subtract '
                 'profiled operator total from clean TPOT to infer host overhead'),
             'timing_metric': 'end-to-end decode TPOT, not pure attention latency',
         },
@@ -689,6 +698,9 @@ def main():
     args.repo = args.repo.resolve()
     args.output_dir = args.output_dir.resolve()
     sys.path.insert(0, str(args.repo))
+    if (args.execution != 'graph'
+            and any(arm.startswith('flashinfer-') for arm in args.arms)):
+        raise ValueError('FlashInfer operator profile 当前只支持 graph；eager 请只选 NFA arms')
     if not 0 <= args.shard_index < args.num_shards:
         raise ValueError('invalid shard')
     for length in args.lengths:

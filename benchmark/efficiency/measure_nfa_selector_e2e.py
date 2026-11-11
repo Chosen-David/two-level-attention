@@ -1,6 +1,6 @@
 """NFA 算子 profiling 与干净 decode TPOT 的独立进程测量。
 
-operator-profile 由外部 nsys 以 CUDA Graph node 粒度采集，存在观察者效应，
+operator-profile 由外部 nsys 采集 eager 或 CUDA Graph kernel，存在观察者效应，
 只能解释为 profiling 条件下的 kernel 时间；clean-e2e 不启用任何 profiler。
 两者不得相减推导 Python/host 开销，也不得把 profiled operator total 当作
 无扰动 device busy time。
@@ -47,7 +47,8 @@ from sparse_attn.scheduler.scheduler import ContinuousBatchScheduler, greedy_nex
 STAGE_TOKENS = {
     'l1_score_ms': (
         '_nfa_page_stats_kernel', '_nfa_page_stats_prepare_q_kernel',
-        '_nfa_l1_scores_kernel', '_prepare_q_kernel',
+        '_nfa_l1_scores_kernel', '_nfa_l1_near_scores_kernel',
+        '_nfa_l1_far_scores_kernel', '_prepare_q_kernel',
     ),
     'l1_topk_ms': (
         '_l1_topk_partial_kernel', '_topk_candidate_prepare_kernel',
@@ -96,6 +97,10 @@ def parse_args():
     parser.add_argument('--subspace', required=True, choices=('full', 'tail'))
     parser.add_argument('--l2-subspace', required=True, choices=('same', 'full'))
     parser.add_argument('--gate-epsilon', type=float, required=True)
+    parser.add_argument(
+        '--force-skip-mode', default='natural',
+        choices=('natural', 'no-skip', 'near-only', 'far-only', 'both-skip'),
+        help='验收用强制冻结区域；natural 保留 prefill 标定的逐层决策')
     parser.add_argument('--operator-mode', required=True,
                         choices=('off', 'serial', 'overlap'))
     parser.add_argument('--sample-index', type=int, default=0)
@@ -204,7 +209,7 @@ def score_dimensions(model):
     }
 
 
-def classify_nfa(kernels):
+def classify_nfa(kernels, *, required_stages=None):
     stages = {name: 0.0 for name in STAGE_TOKENS}
     memberships = {}
     for name, row in kernels.items():
@@ -220,7 +225,8 @@ def classify_nfa(kernels):
             memberships[name] = stage
         elif any(token in name.lower() for token in AUDIT_TOKENS):
             raise ValueError(f'未分类的 NFA 相关 kernel: {name}')
-    missing = [stage for stage in STAGE_TOKENS if stage not in memberships.values()]
+    required = tuple(STAGE_TOKENS) if required_stages is None else required_stages
+    missing = [stage for stage in required if stage not in memberships.values()]
     if missing:
         raise ValueError(f'NFA 算子链缺少阶段: {missing}')
     operator_total = sum(stages.values())
@@ -233,6 +239,78 @@ def classify_nfa(kernels):
     stages['main_attention_ms'] = stages['selected_attention_ms']
     stages['nfa_operator_total_ms'] = operator_total
     return stages, memberships
+
+
+def _region_kernel_call_audit(result, kernels):
+    """按冻结逐层签名核对区域入口；零实例不能由空 CTA 或耗时近似。"""
+    expected = {
+        'generic_l1': 0, 'near_only_l1': 0, 'far_only_l1': 0,
+        'active_page_stats': 0, 'active_candidate': 0, 'active_fine_score': 0,
+    }
+    requests = list(result['skip'].values())
+    n_layers = requests[0]['n_layers']
+    for request in requests:
+        near = set(request['near_layers'])
+        far = set(request['far_layers'])
+        both = set(request['both_layers'])
+        if near & far != both:
+            raise ValueError('skip receipt 的 both 集合与 near/far 交集不一致')
+        if request['n_layers'] != n_layers:
+            raise ValueError('同一 batch 的层数不一致')
+    # selector 按层对整个 batch 发射一次 kernel，而不是每请求发射一次。
+    # 只有本层所有请求模式一致才走 compact；mixed batch 统一走 generic。
+    for layer in range(n_layers):
+        modes = [
+            (layer in request['far_layers'], layer in request['near_layers'])
+            for request in requests]
+        uniform = all(mode == modes[0] for mode in modes[1:])
+        if not uniform:
+            region = 0
+        else:
+            skip_far, skip_near = modes[0]
+            region = (3 if skip_far and skip_near else
+                      1 if skip_far else 2 if skip_near else 0)
+        if region == 0:
+            expected['generic_l1'] += 1
+        elif region == 1:
+            expected['near_only_l1'] += 1
+        elif region == 2:
+            expected['far_only_l1'] += 1
+        if region != 3:
+            expected['active_page_stats'] += 1
+            expected['active_candidate'] += 1
+            expected['active_fine_score'] += 1
+    tokens = {
+        'generic_l1': ('_nfa_l1_scores_kernel',),
+        'near_only_l1': ('_nfa_l1_near_scores_kernel',),
+        'far_only_l1': ('_nfa_l1_far_scores_kernel',),
+        'active_page_stats': (
+            '_nfa_page_stats_kernel', '_nfa_page_stats_prepare_q_kernel'),
+        'active_candidate': (
+            '_topk_candidate_batched_kernel', '_topk_candidate_prepare_kernel'),
+        'active_fine_score': ('_nfa_fine_scores_paged_kernel',),
+    }
+
+    def calls(names):
+        return sum(row['calls'] for name, row in kernels.items()
+                   if any(token in name for token in names))
+
+    repeat = result['profile_repeat']
+    observed = {name: calls(names) / repeat for name, names in tokens.items()}
+    passed = observed == expected
+    audit = {
+        'expected_calls_per_step': expected,
+        'observed_calls_per_step': observed,
+        'passed': passed,
+        'interpretation': (
+            'calls are per layer for the whole batch, not per request; '
+            'generic=non-skip or mixed-batch, near_only=skip-far, '
+            'far_only=skip-near; uniform both-skip contributes zero to '
+            'every active selector entry'),
+    }
+    if not passed:
+        raise ValueError(f'区域 kernel 实例数与冻结签名不一致: {audit}')
+    return audit
 
 
 def finalize_nsys_profile(result, sqlite_path):
@@ -249,7 +327,9 @@ def finalize_nsys_profile(result, sqlite_path):
                         if name in columns]
         if not name_columns or not {'start', 'end'} <= set(columns):
             raise RuntimeError(f'nsys kernel 表缺少时间或名称列: {columns}')
-        query = f"SELECT start, end, {', '.join(name_columns)} FROM {table}"
+        grid_columns = [name for name in ('gridX', 'gridY', 'gridZ') if name in columns]
+        selected = ['start', 'end'] + grid_columns + name_columns
+        query = f"SELECT {', '.join(selected)} FROM {table}"
         records = connection.execute(query).fetchall()
         strings = dict(connection.execute('SELECT id, value FROM StringIds'))
     finally:
@@ -258,20 +338,45 @@ def finalize_nsys_profile(result, sqlite_path):
         raise RuntimeError(f'nsys 采集区间没有 CUDA kernel: {sqlite_path}')
 
     instances = defaultdict(list)
+    grid_instances = defaultdict(list)
     for record in records:
         start, end = record[:2]
-        name = next((strings.get(value) for value in record[2:]
+        grid = record[2:2 + len(grid_columns)]
+        name_values = record[2 + len(grid_columns):]
+        name = next((strings.get(value) for value in name_values
                      if strings.get(value)), None)
         if name is None:
             raise RuntimeError(f'nsys kernel 名称无法解析: {record}')
         duration_ms = (end - start) / 1e6
         if duration_ms > 0:
             instances[name].append(duration_ms)
+            grid_instances[name].append(grid)
     totals = {
         name: {'calls': len(values), 'device_ms': sum(values)}
         for name, values in instances.items()
     }
-    stages, memberships = classify_nfa(totals)
+    selector_stages = {
+        'l1_score_ms', 'l1_topk_ms', 'candidate_ms',
+        'l2_score_ms', 'l2_topk_ms',
+    }
+    all_both_skip = all(
+        request['n_layers'] == len(request['both_layers'])
+        for request in result['skip'].values())
+    required_stages = [
+        stage for stage in STAGE_TOKENS
+        if not (all_both_skip and stage in selector_stages)]
+    # 单 CTA 快路把 L1 Top-K 与 candidate expansion 融在同一个 kernel；
+    # 此时没有独立 candidate 实例，时间已完整计入 l1_topk_ms，不能误报缺阶段。
+    fused_candidate = any(
+        '_topk_candidate_batched_kernel' in name for name in totals)
+    separate_candidate = any(
+        token in name for name in totals
+        for token in STAGE_TOKENS['candidate_ms'])
+    if fused_candidate and not separate_candidate:
+        required_stages.remove('candidate_ms')
+    stages, memberships = classify_nfa(
+        totals, required_stages=required_stages)
+    result['region_kernel_audit'] = _region_kernel_call_audit(result, totals)
     repeat = result['profile_repeat']
     result['operator_summary'] = {
         name: {
@@ -279,6 +384,12 @@ def finalize_nsys_profile(result, sqlite_path):
             'mean_ms_per_step': value / repeat,
         } for name, value in stages.items()
     }
+    def grid_values(name, axis):
+        if axis not in grid_columns:
+            return []
+        position = grid_columns.index(axis)
+        return sorted({item[position] for item in grid_instances.get(name, ())})
+
     result['kernel_summary'] = {
         name: {
             'calls_total': len(values),
@@ -289,13 +400,17 @@ def finalize_nsys_profile(result, sqlite_path):
             'median_instance_ms': statistics.median(values),
             'min_instance_ms': min(values),
             'max_instance_ms': max(values),
+            'grid_x_values': grid_values(name, 'gridX'),
+            'grid_y_values': grid_values(name, 'gridY'),
+            'grid_z_values': grid_values(name, 'gridZ'),
             'stage': memberships.get(name),
         } for name, values in sorted(instances.items())
     }
     result['nsys_profile_finalized'] = True
     result['profile_aggregation'] = (
-        f'aggregate {repeat} Graph replay steps; total and arithmetic mean per '
-        'step; kernel instance min/median/max are not per-step distributions')
+        f"aggregate {repeat} {result['execution']} decode steps; total and "
+        'arithmetic mean per step; kernel instance min/median/max are not '
+        'per-step distributions')
     return result
 
 
@@ -321,6 +436,7 @@ def source_receipt():
 def skip_receipt(cache, request_id):
     state = cache.states[request_id]
     return {
+        'n_layers': len(state.skip_near_by_layer),
         'near_layers': [i for i, flag in enumerate(state.skip_near_by_layer) if flag],
         'far_layers': [i for i, flag in enumerate(state.skip_far_by_layer) if flag],
         'both_layers': [i for i, (near, far) in enumerate(zip(
@@ -361,6 +477,17 @@ def run(args):
                 output.logits, set(), generated_counts=0, min_new_tokens=1)
             first_tokens[request_id] = int(first[0])
             prefill_decisions[request_id] = audit['decisions']
+            if args.force_skip_mode != 'natural':
+                skip_far, skip_near = {
+                    'no-skip': (False, False),
+                    'near-only': (True, False),
+                    'far-only': (False, True),
+                    'both-skip': (True, True),
+                }[args.force_skip_mode]
+                cache.freeze(
+                    request_id,
+                    [skip_far] * model.config.num_hidden_layers,
+                    [skip_near] * model.config.num_hidden_layers)
             cache.transition_request(request_id, 'GENERATE')
             del output
     torch.cuda.synchronize()
@@ -430,6 +557,7 @@ def run(args):
         'l2_subspace': args.l2_subspace,
         'score_dimensions': score_dimensions(model),
         'gate_epsilon': args.gate_epsilon,
+        'force_skip_mode': args.force_skip_mode,
         'operator_mode': args.operator_mode,
         'task': args.task,
         'sample_index': args.sample_index,
@@ -445,12 +573,12 @@ def run(args):
             if args.measurement_mode == 'operator-profile' else 0),
         'profiler_clean_e2e_isolated': True,
         'profile_backend': (
-            'nsys-cuda-graph-node-external'
+            f"nsys-{args.execution}-external"
             if args.measurement_mode == 'operator-profile' else None),
         'nsys_profile_finalized': (
             False if args.measurement_mode == 'operator-profile' else None),
         'operator_time_basis': (
-            'nsys/CUPTI CUDA Graph node trace observed kernel time; node tracing '
+            f'nsys/CUPTI {args.execution} kernel trace observed time; tracing '
             'may significantly perturb short kernels and runtime scheduling'),
         'host_overhead_derivable_by_subtraction': False,
         'cross_mode_comparison_rule': (
@@ -472,6 +600,7 @@ def run(args):
                  for request_id in range(args.batch_size)},
         'operator_summary': None,
         'kernel_summary': None,
+        'region_kernel_audit': None,
         'timing': timing,
         'generated_token_ids': generated,
         'graph_capture_count': getattr(runner, 'capture_count', None),
@@ -501,6 +630,7 @@ def main():
         'l2_subspace': args.l2_subspace,
         'score_dimensions': result['score_dimensions'],
         'gate_epsilon': args.gate_epsilon,
+        'force_skip_mode': args.force_skip_mode,
         'operator_mode': args.operator_mode,
         'operator_summary': result['operator_summary'],
         'steady_tpot_ms_median': (

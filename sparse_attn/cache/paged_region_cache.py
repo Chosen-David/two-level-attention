@@ -586,6 +586,37 @@ class GraphReadyPagedRegionCache:
     # ------------------------------------------------------------------
     # Region helpers
     # ------------------------------------------------------------------
+    def nfa_skip_signature(self, req_ids):
+        """返回逐 batch 行、逐层冻结的 ``(skip_far, skip_near)`` 签名。"""
+        override = getattr(self, '_nfa_capture_skip_signature', None)
+        if override is not None:
+            return override
+        signature = []
+        for request_id in req_ids:
+            state = (self.states.get(request_id)
+                     if request_id is not None and request_id >= 0 else None)
+            if state is None:
+                signature.append(None)
+            else:
+                signature.append(tuple(zip(
+                    state.skip_far_by_layer, state.skip_near_by_layer)))
+        return tuple(signature)
+
+    @staticmethod
+    def nfa_region_mode(signature, layer_idx):
+        """仅当所有活跃请求同模式时启用区域紧凑路径。"""
+        modes = [item[layer_idx] for item in signature if item is not None]
+        if not modes or any(mode != modes[0] for mode in modes[1:]):
+            return 0
+        skip_far, skip_near = modes[0]
+        if skip_far and skip_near:
+            return 3
+        if skip_far:
+            return 1
+        if skip_near:
+            return 2
+        return 0
+
     def _intervals_for_layer(self, state, layer_idx, length):
         sink_hi, far_hi, near_hi = self.geometry.bounds(length)
         spans = [(0, sink_hi), (near_hi, length)]
