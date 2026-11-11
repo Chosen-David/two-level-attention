@@ -459,9 +459,9 @@ def main():
     # ---- Quest vendor（B 轨官方源码复用，主表口径）----
     # 不走 register_patch 的 indexer_type_dict（A 轨 quest_indexer 是语义
     # 复现），改为绑定官方 Quest forward 到 Qwen3Attention——与 LongBench
-    # pred.py 同口径：quest_attention_official.py 与官方仓库逐字节一致，
-    # qwen3_quest_patch.py 仅接口胶水。RULER 长上下文预算独立设定（默认
-    # 1024，派单时按 Quest 论文口径显式传 --quest_token_budget）。
+    # pred.py 同口径：upstream/evaluation/quest_attention.py 是官方原样
+    # 快照，qwen3_quest_patch.py 仅接口胶水。RULER 长上下文预算独立设定
+    # （默认 1024，派单时按 Quest 论文口径显式传 --quest_token_budget）。
     if args.method == "ffd_vendor":
         n_patched = model.config.num_hidden_layers
     elif args.method == "quest_vendor":

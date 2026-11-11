@@ -1,6 +1,8 @@
 # JSSA 校准脚本 transformers 4.56.2 兼容补丁（2026-10-18 Opus）
 
-`third_party/JSSA/`（vendored，gitignore 不入库）下两处本地兼容修改，记录于此可追溯：
+`upstream/`（官方 vendored 快照，commit ff65a6a，见 UPSTREAM.json）下两处
+本地兼容修改，记录于此可追溯。原历史路径 `third_party/JSSA/` 已由官方快照
+迁移到 `upstream/`。
 
 ## 1. calibration/chunked_moe.py —— MoE 导入容错
 
@@ -26,7 +28,7 @@ except ImportError:
 
 ## 校准产物（不入库，路径记录）
 
-- `third_party/JSSA/bases/qwen3_8b_32k.pt`：8×~32K LongBench 拼接序列
+- `bases/qwen3_8b_32k.pt`：8×~32K LongBench 拼接序列
   （calibration/data/longalign_calib.jsonl，DeepSeek 轨 prepare_longbench_calib.py
   产出，LongAlign-10k 网络不可得的离线替代）prefill 累积 G_Qm/G_K，
   M = TopEig_32(G_Qm/tr + G_K/tr)，36 层全，M[0] 形状 (8, 32, 128)。

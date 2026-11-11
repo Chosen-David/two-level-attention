@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """JSSA 官方 vLLM backend 语义的 Qwen3 适配层（B 轨官方源码语义，torch 等价）。
 
-边界（2026-10-18，deepseek 轨）：
-  JSSA = Joint Subspace Sparse Attention（arXiv:2610.19026v1）。官方无独立
-  开源仓库，实现以 vLLM patch 形式提供（third_party/JSSA/vllm_patch/
-  jssa_vllm.patch，vLLM v1 attention backend jssa_attn.py + 三个 Triton ops）。
-  语义已在 research/docs/JSSA_子空间对比分析_20261017_by_deepseek.md §2/§4
-  精读确认可提取：
+边界（2026-10-18 deepseek 轨；2026-11-10 官方源码直连更新）：
+  JSSA = Joint Subspace Sparse Attention（arXiv:2610.19026v1）。官方仓库已
+  vendored 于 upstream/（commit ff65a6a，见 UPSTREAM.json）。官方 decode 后端
+  在 upstream/vllm_patch/jssa_vllm.patch，还原后的官方源文件位于
+  upstream/patched_src/vllm/v1/attention/backends/jssa_attn.py
+  （_sparse_decode_forward）与 triton_jssa_*.py。官方后端依赖 vLLM 内部 API，
+  无法直接在 HF transformers 内 import；本 HF 适配层是官方
+  _sparse_decode_forward 选择语义的忠实 torch 移植，不冒称 vLLM 原生 kernel
+  （真跑官方 kernel 需走 L3 vLLM 集成）。语义要点：
     - 校准基 M = TopEig_r(G_Qm/tr + G_K/tr)（r=32，jssa_calibrate.py 产出
       {'M': {layer_idx: [H_kv, r, d]}} .pt）
     - decode 单级 token 稀疏：GQA 组平均 q → proj_q = q_kv·M^T → 对全 K 投影
@@ -39,7 +42,7 @@ def _load_basis(basis_path: str, device, dtype) -> dict:
     """加载校准基 {'M': {layer_idx: [H_kv, r, d]}}；无 basis_path 时抛错。"""
     if not basis_path or not os.path.exists(basis_path):
         raise ValueError(
-            f"JSSA basis 文件不存在: {basis_path!r}（先跑 third_party/JSSA/calibration/"
+            f"JSSA basis 文件不存在: {basis_path!r}（先跑 upstream/calibration/"
             f"jssa_calibrate.py 产出，或传 --jssa_basis_path）")
     ckpt = torch.load(basis_path, map_location="cpu", weights_only=False)
     M = ckpt["M"] if isinstance(ckpt, dict) and "M" in ckpt else ckpt

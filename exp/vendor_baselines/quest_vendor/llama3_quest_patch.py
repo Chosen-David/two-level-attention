@@ -13,8 +13,11 @@ from typing import Tuple
 import torch
 from transformers.models.llama.modeling_llama import LlamaAttention
 
-import quest_attention_official as quest_official
-from quest_attention_official import forward as quest_official_forward
+from _upstream_loader import load_official_module
+
+
+quest_official = load_official_module()
+quest_official_forward = quest_official.forward
 
 
 def _install_rotary_signature_compat() -> None:

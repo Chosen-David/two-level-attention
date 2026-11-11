@@ -20,9 +20,35 @@ import types
 from typing import Tuple
 
 import torch
+import torch.nn as nn
 from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention
 
-from quest_attention_official import forward as quest_official_forward
+from _upstream_loader import load_official_module
+
+
+quest_official_forward = load_official_module().forward
+
+
+class _QKNormProjection(nn.Module):
+    """Apply Qwen3 per-head q/k norm after projection, without touching the
+    official Quest forward. The official file projects, then reshapes and
+    transposes; Qwen3 requires q_norm/k_norm on the head dimension. We wrap the
+    projection so the official forward sees already-normalized values while the
+    unmodified official algorithm remains byte-for-byte upstream."""
+
+    def __init__(self, proj, norm, num_heads, head_dim):
+        super().__init__()
+        self.proj = proj
+        self.norm = norm
+        self.num_heads = num_heads
+        self.head_dim = head_dim
+
+    def forward(self, x):
+        y = self.proj(x)
+        bsz, q_len, _ = y.shape
+        return self.norm(
+            y.view(bsz, q_len, self.num_heads, self.head_dim)
+        ).reshape(bsz, q_len, self.num_heads * self.head_dim)
 
 
 def _qwen3_quest_wrapper(
@@ -67,15 +93,26 @@ def _qwen3_quest_wrapper(
     kwargs.pop("use_cache", None)
     # 官方 forward 返回 3 元组 (attn_output, attn_weights, past_key_value)；
     # Qwen3DecoderLayer 期望 self_attn 返回 2 元组 (hidden_states, _)。
-    attn_output, _, new_past_key_value = self._official_forward(
-        hidden_states,
-        attention_mask=attention_mask,
-        position_ids=position_ids,
-        past_key_value=past_key_values,
-        output_attentions=False,
-        use_cache=True,
-        **kwargs,
-    )
+    orig_q_proj = self.q_proj
+    orig_k_proj = self.k_proj
+    if getattr(self, "q_norm", None) is not None:
+        self.q_proj = _QKNormProjection(
+            orig_q_proj, self.q_norm, self.num_heads, self.head_dim)
+        self.k_proj = _QKNormProjection(
+            orig_k_proj, self.k_norm, self.num_key_value_heads, self.head_dim)
+    try:
+        attn_output, _, new_past_key_value = self._official_forward(
+            hidden_states,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_value=past_key_values,
+            output_attentions=False,
+            use_cache=True,
+            **kwargs,
+        )
+    finally:
+        self.q_proj = orig_q_proj
+        self.k_proj = orig_k_proj
     return attn_output, new_past_key_value
 
 
