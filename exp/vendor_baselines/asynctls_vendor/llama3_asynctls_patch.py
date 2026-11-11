@@ -17,6 +17,7 @@ from transformers.models.llama.modeling_llama import (
 )
 
 from qwen3_asynctls_patch import (
+    _validate_channels_for_modules,
     _asynctls_sparse_attention, _cache_keys, _load_channels,
     _padded_key, _select_blocks,
 )
@@ -113,39 +114,17 @@ def enable_asynctls(
         raise ValueError("AsyncTLS top_kb must be a positive integer")
 
     channels = _load_channels(channel_file)
-    expected_layers = int(model.config.num_hidden_layers)
-    if len(channels) != expected_layers:
-        raise ValueError(
-            f"channel layers {len(channels)} != model layers {expected_layers}")
-
-    n_patched = 0
-    for module in model.modules():
-        if not isinstance(module, LlamaAttention):
-            continue
-        layer_idx = int(module.layer_idx)
-        layer_channels = channels[layer_idx]
-        expected_groups = int(module.config.num_key_value_heads)
-        if len(layer_channels) != expected_groups:
-            raise ValueError(
-                f"AsyncTLS layer {layer_idx} KV groups "
-                f"{len(layer_channels)} != {expected_groups}")
-        for group_channels in layer_channels:
-            if (not group_channels
-                    or len(set(group_channels)) != len(group_channels)
-                    or min(group_channels) < 0
-                    or max(group_channels) >= module.head_dim):
-                raise ValueError(f"AsyncTLS layer {layer_idx} channel 索引非法")
-        module.asynctls_channels = layer_channels
+    modules = [module for module in model.modules()
+               if isinstance(module, LlamaAttention)]
+    _validate_channels_for_modules(
+        modules, channels, int(model.config.num_hidden_layers), "head_dim")
+    for module in modules:
+        module.asynctls_channels = channels[int(module.layer_idx)]
         module.asynctls_token_budget = token_budget
         module.asynctls_block_size = block_size
         module.asynctls_top_kb = top_kb
         module._asynctls_prev_blocks = None
         module.flash_forward = module.forward
         module.forward = types.MethodType(_llama_asynctls_forward, module)
-        n_patched += 1
-
-    if n_patched != expected_layers:
-        raise RuntimeError(
-            f"AsyncTLS Llama patch 层数 {n_patched} != config 层数 {expected_layers}")
     model._asynctls_full_prompt_prefill = True
-    return n_patched
+    return len(modules)

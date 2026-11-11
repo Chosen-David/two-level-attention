@@ -114,7 +114,7 @@ def test_llama_asynctls_full_budget_matches_dense_and_sparse_shape(tmp_path):
     suffix = torch.tensor([[17]])
     channel_path = tmp_path / "channels.json"
     channel_path.write_text(json.dumps({
-        "channels": [list(range(8)) for _ in range(3)]
+        "channels": [[list(range(8)) for _ in range(2)] for _ in range(3)]
     }))
 
     _run_pair(

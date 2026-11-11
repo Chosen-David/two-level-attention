@@ -50,7 +50,15 @@ def _load_channels(channel_file: str) -> list:
         if isinstance(raw.get("channels"), list):
             layers = raw["channels"]
         else:
-            layers = [raw[k] for k in sorted(raw, key=lambda k: int(k.split("_")[-1]))]
+            # Keep legacy numeric-suffix keys, but require complete native IDs.
+            try:
+                entries = [(int(key.split("_")[-1]), value)
+                           for key, value in raw.items()]
+            except (AttributeError, ValueError) as error:
+                raise ValueError("channel keys must end in integer layer IDs") from error
+            if {idx for idx, _ in entries} != set(range(len(entries))):
+                raise ValueError("channel layer IDs must uniquely cover 0..N-1")
+            layers = [value for _, value in sorted(entries)]
     else:
         layers = list(raw)
     for layer in layers:
@@ -58,11 +66,38 @@ def _load_channels(channel_file: str) -> list:
             raise ValueError("channel file must hold per-layer per-KV-group lists")
         for idx_list in layer:
             if (not isinstance(idx_list, (list, tuple)) or not idx_list
-                    or not all(isinstance(i, int) for i in idx_list)):
+                    or not all(type(i) is int for i in idx_list)):
                 raise ValueError(
                     "AsyncTLS requires [layer][kv_group][channel] per-KV-group indices; "
                     "legacy per-layer global channels are not paper-aligned")
     return [[list(group) for group in layer] for layer in layers]
+
+
+def _validate_channels_for_modules(modules, channels, expected_layers,
+                                   dimension_attr="head_dim"):
+    """Preflight nested per-KV-group calibration without mutating the model."""
+    layer_ids = [int(module.layer_idx) for module in modules]
+    if (len(modules) != expected_layers
+            or set(layer_ids) != set(range(expected_layers))):
+        raise ValueError("AsyncTLS attention layers must uniquely cover config layers")
+    if len(channels) != expected_layers:
+        raise ValueError(
+            f"channel layers {len(channels)} != model layers {expected_layers}")
+    for module in modules:
+        if hasattr(module, "asynctls_channels"):
+            raise ValueError("AsyncTLS adapter already installed; use an unpatched model")
+        layer_id = int(module.layer_idx)
+        groups = channels[layer_id]
+        if len(groups) != int(module.config.num_key_value_heads):
+            raise ValueError(f"AsyncTLS layer {layer_id} KV group count is invalid")
+        widths = {len(indices) for indices in groups}
+        if len(widths) != 1:
+            raise ValueError(f"AsyncTLS layer {layer_id} channel widths must match across groups")
+        for indices in groups:
+            if (not indices or len(set(indices)) != len(indices)
+                    or min(indices) < 0
+                    or max(indices) >= getattr(module, dimension_attr)):
+                raise ValueError(f"AsyncTLS layer {layer_id} channel indices are invalid")
 
 
 def _int4_quant_dequant(x: torch.Tensor, bits: int = 4) -> torch.Tensor:
@@ -313,45 +348,18 @@ def enable_asynctls(
     if type(top_kb) is not int or top_kb <= 0:
         raise ValueError("AsyncTLS top_kb must be a positive integer")
     channels = _load_channels(channel_file)
-    n_patched = 0
-    layer_id = 0
-
-    def _patch_recursive(container):
-        nonlocal n_patched, layer_id
-        for name, module in list(container._modules.items()):
-            if isinstance(module, Qwen3Attention):
-                if layer_id >= len(channels):
-                    raise ValueError(
-                        "channel file layer count < model layers "
-                        f"({len(channels)} < {layer_id})")
-                module.layer_id = layer_id
-                layer_id += 1
-                layer_channels = channels[module.layer_id]
-                expected_groups = int(module.config.num_key_value_heads)
-                if len(layer_channels) != expected_groups:
-                    raise ValueError(
-                        f"AsyncTLS layer {module.layer_id} KV groups "
-                        f"{len(layer_channels)} != {expected_groups}")
-                for group_channels in layer_channels:
-                    if (len(set(group_channels)) != len(group_channels)
-                            or min(group_channels) < 0
-                            or max(group_channels) >= module.head_dim):
-                        raise ValueError(
-                            f"AsyncTLS layer {module.layer_id} channel 索引非法")
-                module.asynctls_channels = layer_channels
-                module.asynctls_token_budget = token_budget
-                module.asynctls_block_size = block_size
-                module.asynctls_top_kb = top_kb
-                module._asynctls_prev_blocks = None
-                module.flash_forward = module.forward
-                module.forward = types.MethodType(_qwen3_asynctls_forward, module)
-                n_patched += 1
-            elif len(list(module._modules.items())) > 0:
-                _patch_recursive(module)
-
-    _patch_recursive(model)
+    modules = [module for module in model.modules()
+               if isinstance(module, Qwen3Attention)]
+    _validate_channels_for_modules(
+        modules, channels, int(model.config.num_hidden_layers))
+    for module in modules:
+        module.layer_id = int(module.layer_idx)
+        module.asynctls_channels = channels[module.layer_id]
+        module.asynctls_token_budget = token_budget
+        module.asynctls_block_size = block_size
+        module.asynctls_top_kb = top_kb
+        module._asynctls_prev_blocks = None
+        module.flash_forward = module.forward
+        module.forward = types.MethodType(_qwen3_asynctls_forward, module)
     model._asynctls_full_prompt_prefill = True
-    if n_patched != len(channels):
-        raise ValueError(
-            f"patched layers {n_patched} != channel layers {len(channels)}")
-    return n_patched
+    return len(modules)
