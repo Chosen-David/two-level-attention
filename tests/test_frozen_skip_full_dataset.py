@@ -78,11 +78,28 @@ def test_longbench_material_and_generation_suffix_preserve_full_token_identity()
     assert info['input_tokens'] == len(material) + len(suffix)
     assert info['material_tokens'] == len(material)
     assert info['suffix_tokens'] == len(suffix)
+    assert 'construction' not in info
 
     material, suffix, _ = prepare_ids(
         tokenizer, {'context': 'abc'}, 'repobench-p', '{context}', 100)
     assert tokenizer.decode(material, True) == 'abc'
     assert suffix == []
+
+
+def test_deterministic_context_extension_preserves_suffix_and_marks_provenance():
+    tokenizer = _ChatTokenizer()
+    material, suffix, info = prepare_ids(
+        tokenizer, {'context': 'abc'}, 'qasper', '{context}', 12,
+        repeat_context_to_cap=True)
+    assert info['raw_tokens'] == 3
+    assert info['construction']['native_input'] is False
+    assert info['construction']['context_repetitions'] >= 4
+    assert info['construction']['constructed_raw_tokens'] >= 12
+    assert info['construction']['raw_target_tokens'] == 12
+    assert tokenizer.decode(material, True).startswith('<user>')
+    assert tokenizer.decode(material, True).endswith('</user>')
+    assert tokenizer.decode(suffix, True) == '<assistant>'
+    assert info['input_tokens'] == len(material) + len(suffix)
 
 
 def test_non_suffix_chat_template_fails_closed():

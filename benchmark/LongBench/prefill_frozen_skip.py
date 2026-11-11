@@ -15,6 +15,9 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from transformers.cache_utils import DynamicCache
 
 from benchmark.LongBench.eval import sample_score
+from benchmark.efficiency.benchmark_nfa_end_to_end import (
+    LONG_PREFILL_MLP_CHUNK, _enable_long_prefill_mlp_chunk)
+from benchmark.rope_policy import configure_rope, verify_runtime_rope
 from sparse_attn.policies.region_geometry import RegionGeometry
 from sparse_attn.policies.frozen_gate import GateConfig
 from sparse_attn.engine.frozen_runner import (
@@ -49,11 +52,31 @@ def atomic_json(path, value):
     temp.replace(path)
 
 
-def prepare_ids(tokenizer, row, dataset, prompt, context_cap):
+def prepare_ids(tokenizer, row, dataset, prompt, context_cap, *,
+                repeat_context_to_cap=False):
     text = prompt.format(**row)
     ids = tokenizer(text, add_special_tokens=False).input_ids
     original_length = len(ids)
-    if original_length > context_cap:
+    construction = None
+    if repeat_context_to_cap:
+        # 仅重复 context，question/answers 不变；达到档位后沿用既有 head/tail
+        # 截断。该输入是构造长上下文，不得标记为原生 LongBench 长度。
+        repetitions = max(1, (context_cap + original_length - 1) // original_length)
+        while True:
+            extended = dict(row)
+            extended['context'] = '\n\n'.join([row['context']] * repetitions)
+            text = prompt.format(**extended)
+            ids = tokenizer(text, add_special_tokens=False).input_ids
+            if len(ids) >= context_cap:
+                break
+            repetitions += 1
+        construction = dict(
+            protocol='deterministic-context-repetition-with-existing-head-tail-cap',
+            native_raw_tokens=original_length, context_repetitions=repetitions,
+            constructed_raw_tokens=len(ids), raw_target_tokens=context_cap,
+            native_input=False)
+    working_length = len(ids)
+    if working_length > context_cap:
         half = context_cap//2
         text = tokenizer.decode(ids[:half], skip_special_tokens=True)+tokenizer.decode(ids[-(context_cap-half):], skip_special_tokens=True)
     material_text = text
@@ -74,15 +97,18 @@ def prepare_ids(tokenizer, row, dataset, prompt, context_cap):
     if not ids or ids[:len(material_ids)] != material_ids:
         raise ValueError('material tokenization is not a prefix of the full prompt')
     suffix_ids = ids[len(material_ids):]
-    return material_ids, suffix_ids, dict(
+    info = dict(
         raw_tokens=original_length, input_tokens=len(ids),
         material_tokens=len(material_ids), suffix_tokens=len(suffix_ids),
-        truncated=original_length>context_cap,
+        truncated=working_length>context_cap,
         input_sha256=hashlib.sha256(json.dumps(ids).encode()).hexdigest(),
         material_sha256=hashlib.sha256(
             json.dumps(material_ids).encode()).hexdigest(),
         suffix_sha256=hashlib.sha256(
             json.dumps(suffix_ids).encode()).hexdigest())
+    if construction is not None:
+        info['construction'] = construction
+    return material_ids, suffix_ids, info
 
 
 @torch.inference_mode()
@@ -96,6 +122,9 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device, suffix_ids=(
         out, audit = prefill_frozen_request(
             model, torch.tensor([ids], device=device), config, geometry,
             suffix_length=len(suffix_ids))
+        # suffix 后的答案首 token 会受到区域跳过影响；dense-prefill 一致性
+        # 必须直接检查 prefill logits 的候选，而不是 generated_ids[0]。
+        dense_prefill_first_token = int(out.logits[:, -1].argmax(-1)[0])
         generated, cache = decode_frozen_request(
             model, out, max_new_tokens=max_new_tokens, eos_ids=eos,
             pad_token_id=getattr(model.config, 'pad_token_id', None) or 0,
@@ -103,7 +132,8 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device, suffix_ids=(
             suffix_ids=suffix_ids)
         audit = complete_frozen_request(model, cache, len(generated), audit)
     result = dict(generated_ids=generated, prediction=tokenizer.decode(generated, skip_special_tokens=True),
-        generated_tokens=len(generated), wall_seconds=time.time()-start, **audit,
+        generated_tokens=len(generated), wall_seconds=time.time()-start,
+        dense_prefill_first_token=dense_prefill_first_token, **audit,
         measured_scope='physical node KV storage; eager gather temporaries excluded, no latency claim')
     del out, cache
     return result
@@ -178,7 +208,12 @@ def main():
     ap.add_argument('--samples', type=int, default=20, help='rows per task; 0 selects every row')
     ap.add_argument('--seed', type=int, default=42)
     ap.add_argument('--context-cap', type=int, default=31500)
+    ap.add_argument('--repeat-context-to-target', action='store_true',
+                    help='构造输入：重复 context 到 raw target，再沿用 head/tail 截断')
+    ap.add_argument('--row-index', type=int, default=None,
+                    help='每个任务固定使用该行；默认保持历史 seed 采样')
     ap.add_argument('--thresholds', default='0.05')
+    ap.add_argument('--gate-modes', default='far,dual')
     ap.add_argument('--statistic', choices=['mean','p95'], default='mean')
     ap.add_argument('--datasets', default=','.join(SCREEN_TASKS))
     ap.add_argument('--rank', type=int, default=0)
@@ -198,9 +233,12 @@ def main():
     if not 0 <= args.rank < args.world_size or args.samples < 0:
         raise ValueError('invalid shard/samples')
     thresholds = [float(x) for x in args.thresholds.split(',')]
+    gate_modes = args.gate_modes.split(',')
+    if not gate_modes or not set(gate_modes) <= {'far', 'dual'}:
+        raise ValueError('gate modes must be a nonempty subset of far,dual')
     arms = [('full', GateConfig(mode='full', statistic=args.statistic))]
     for eps in thresholds:
-        for mode in ('far','dual'):
+        for mode in gate_modes:
             config = GateConfig(epsilon=eps, mode=mode, statistic=args.statistic)
             arms.append((f'{mode}_{eps:g}', config))
     prompts = json.loads((ROOT/'benchmark/LongBench/config/dataset2prompt.json').read_text())
@@ -210,11 +248,18 @@ def main():
         rows = [json.loads(line) for line in (Path(args.data)/(ds+'.jsonl')).read_text().splitlines()]
         dataset_counts[ds] = len(rows)
         indices = select_row_indices(len(rows), args.samples, args.seed)
+        if args.row_index is not None:
+            if not 0 <= args.row_index < len(rows):
+                raise ValueError(f'row index out of range for {ds}: {args.row_index}')
+            indices = [args.row_index]
         selected[ds] = indices
         inputs.extend((ds,i,rows[i]) for i in indices)
     protocol = dict(schema='frozen-near-far-screen-v4-material-suffix',model=args.model,context_cap=args.context_cap,
         **sampling_metadata(args.samples, dataset_counts),
         seed=args.seed,statistic=args.statistic,thresholds=thresholds,
+        gate_modes=gate_modes,row_index=args.row_index,
+        input_provenance=('deterministic-longbench-context-repetition'
+                          if args.repeat_context_to_target else 'native-longbench-with-cap'),
         datasets=tasks,selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
         source_sha256={name:sha_file(ROOT/name) for name in SOURCES},
         dataset_sha256={ds:sha_file(Path(args.data)/(ds+'.jsonl')) for ds in tasks},
@@ -238,6 +283,15 @@ def main():
             ('NFA_OPERATOR_MODE','NFA_FINE_GATHER','NFA_SPARSE_PREFILL','NFA_DECODE_DENSE')}
         for path in sorted((ROOT/'sparse_attn').rglob('*.py')):
             protocol['source_sha256'][str(path.relative_to(ROOT))] = sha_file(path)
+    model_config = AutoConfig.from_pretrained(args.model)
+    if args.repeat_context_to_target:
+        protocol['rope'] = configure_rope(
+            model_config, args.context_cap + 128,
+            max(lengths[ds] for ds in tasks),
+            yarn=args.context_cap + 128 > 32768,
+            factor={65536: 2.0, 131072: 4.0}.get(args.context_cap + 128))
+        if args.context_cap + 128 > LONG_PREFILL_MLP_CHUNK:
+            protocol['long_prefill_mlp_chunk_tokens'] = LONG_PREFILL_MLP_CHUNK
     identity = hashlib.sha256(json.dumps(protocol,sort_keys=True).encode()).hexdigest()
     outdir = Path(args.out); outdir.mkdir(parents=True,exist_ok=True)
     import fcntl
@@ -251,8 +305,12 @@ def main():
                                pid=os.getpid(),started_at=time.time()))
     torch.set_num_threads(8)
     tokenizer = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForCausalLM.from_pretrained(args.model,dtype=torch.bfloat16,
-            device_map=args.device,attn_implementation='sdpa').eval()
+    model = AutoModelForCausalLM.from_pretrained(args.model,config=model_config,
+            dtype=torch.bfloat16,device_map=args.device,attn_implementation='sdpa').eval()
+    if args.repeat_context_to_target:
+        verify_runtime_rope(model)
+        if args.context_cap + 128 > LONG_PREFILL_MLP_CHUNK:
+            _enable_long_prefill_mlp_chunk(model)
     if model.config.model_type not in ('qwen3', 'glm4_moe_lite') or any(getattr(m.self_attn,'sliding_window',None) is not None for m in model.model.layers):
         raise ValueError('only full-attention Qwen3 or GLM-4.7-Flash supported')
     if model.config.model_type == 'glm4_moe_lite' and args.attention != 'nfa':
@@ -267,7 +325,8 @@ def main():
     for ds,row_index,row in shard_inputs(inputs, args.rank, args.world_size):
         path = outdir/'requests'/ds/f'{row_index:04d}.json'
         material_ids, suffix_ids, input_info = prepare_ids(
-            tokenizer,row,ds,prompts[ds],args.context_cap)
+            tokenizer,row,ds,prompts[ds],args.context_cap,
+            repeat_context_to_cap=args.repeat_context_to_target)
         ids = material_ids + suffix_ids
         if len(ids)+lengths[ds] > model.config.max_position_embeddings:
             raise ValueError('prompt plus generation exceeds native context')
@@ -291,8 +350,9 @@ def main():
                     raise ValueError('full node-cache generation differs from native DynamicCache')
                 result['native_full_parity'] = True
                 verified = True
-            if arm != 'full' and result['generated_ids'][0] != record['arms']['full']['generated_ids'][0]:
-                raise ValueError('dense prefill first prediction changed')
+            if (arm != 'full' and result['dense_prefill_first_token']
+                    != record['arms']['full']['dense_prefill_first_token']):
+                raise ValueError('dense prefill logits first prediction changed')
             record['arms'][arm] = result
             atomic_json(path,record)
             print(f'rank={args.rank} {ds}:{row_index} {arm} score={result["score"]:.4f} gates={result["gate_counts"]}',flush=True)

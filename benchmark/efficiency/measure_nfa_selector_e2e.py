@@ -27,7 +27,7 @@ from benchmark.rope_policy import configure_rope, verify_runtime_rope
 from benchmark.efficiency.benchmark_nfa_end_to_end import (
     LONG_PREFILL_MLP_CHUNK,
     _enable_long_prefill_mlp_chunk,
-    _load_input,
+    _load_input as _load_ruler_input,
     _summary,
 )
 from sparse_attn.engine.frozen_runner import build_frozen_cache, prefill_frozen_request
@@ -94,18 +94,67 @@ def parse_args():
     parser.add_argument('--measurement-mode', required=True,
                         choices=('operator-profile', 'clean-e2e'))
     parser.add_argument('--subspace', required=True, choices=('full', 'tail'))
+    parser.add_argument('--l2-subspace', required=True, choices=('same', 'full'))
     parser.add_argument('--gate-epsilon', type=float, required=True)
     parser.add_argument('--operator-mode', required=True,
                         choices=('off', 'serial', 'overlap'))
     parser.add_argument('--sample-index', type=int, default=0)
     parser.add_argument('--input-provenance', required=True,
-                        choices=('native-ruler', 'repeated-needle-body-extension'))
+                        choices=('native-ruler', 'repeated-needle-body-extension',
+                                 'deterministic-longbench-context-repetition'))
+    parser.add_argument(
+        '--longbench-data',
+        default='/home/wangyuanshuo02/datasets/LongBench/data')
     parser.add_argument('--visible-len', type=int, default=8192)
     parser.add_argument('--warmup-steps', type=int, default=3)
     parser.add_argument('--profile-repeat', type=int, default=5)
     parser.add_argument('--decode-steps', type=int, default=32)
     parser.add_argument('--output', required=True)
     return parser.parse_args()
+
+
+def _load_input(args, tokenizer):
+    if args.input_provenance != 'deterministic-longbench-context-repetition':
+        return _load_ruler_input(args, tokenizer)
+    if args.task not in ('hotpotqa', 'gov_report'):
+        raise ValueError('LongBench performance input requires hotpotqa or gov_report')
+    if args.context_length <= 128:
+        raise ValueError('LongBench performance context must exceed suffix reserve')
+    # 与精度链共享同一 material 构造；生成 suffix 只记录身份，不进入性能 prompt。
+    from benchmark.LongBench.prefill_frozen_skip import prepare_ids
+
+    path = Path(args.longbench_data) / f'{args.task}.jsonl'
+    data_bytes = path.read_bytes()
+    rows = [json.loads(line) for line in data_bytes.splitlines()]
+    if not 0 <= args.sample_index < len(rows):
+        raise ValueError(f'LongBench row out of range: {args.sample_index}')
+    row = rows[args.sample_index]
+    prompts = json.loads(
+        (REPO / 'benchmark/LongBench/config/dataset2prompt.json').read_text())
+    material_ids, suffix_ids, info = prepare_ids(
+        tokenizer, row, args.task, prompts[args.task], args.context_length - 128,
+        repeat_context_to_cap=True)
+    prompt_tokens = len(material_ids)
+    if not 0.95 * args.context_length <= prompt_tokens <= args.context_length:
+        raise ValueError(
+            f'LongBench material length mismatch: requested {args.context_length}, '
+            f'got {prompt_tokens} tokens from {path} row {args.sample_index}')
+    receipt = {
+        'path': str(path.resolve()),
+        'sha256': hashlib.sha256(data_bytes).hexdigest(),
+        'sample_index': args.sample_index,
+        'sample_id': row.get('_id', row.get('index')),
+        'file_row_index': args.sample_index,
+        'actual_prompt_tokens': prompt_tokens,
+        'provenance': args.input_provenance,
+        'performance_input_mode': 'replicate one material prompt across all batch rows',
+        'material_sha256': info['material_sha256'],
+        'suffix_sha256': info['suffix_sha256'],
+        'suffix_tokens': len(suffix_ids),
+        'chat_generation_suffix_excluded_from_performance_prompt': True,
+        'construction': info['construction'],
+    }
+    return torch.tensor(material_ids, dtype=torch.long, device='cuda'), receipt
 
 
 def load_model(args, max_new_tokens):
@@ -122,6 +171,7 @@ def load_model(args, max_new_tokens):
         args.model_path, config=config, torch_dtype=torch.bfloat16).cuda().eval()
     verify_runtime_rope(model)
     patch_args = nfa_args(args.subspace)
+    patch_args.nfa_l2_subspace = args.l2_subspace
     patch_args.nfa_operator_mode = args.operator_mode
     patched = register_patch(
         model, patch_args, resolve_treatment_snapshot(patch_args),
@@ -131,6 +181,27 @@ def load_model(args, max_new_tokens):
     if args.context_length > LONG_PREFILL_MLP_CHUNK:
         _enable_long_prefill_mlp_chunk(model)
     return model, patch_args
+
+
+def score_dimensions(model):
+    """记录生产 selector 实际采用的 L1/L2 维度，而非仅从臂名推断。"""
+    indexer = model.model.layers[0].self_attn.indexer
+    device = next(model.parameters()).device
+    if indexer.enable_subspace:
+        l1_dims = indexer._subspace_indices(device).numel()
+    else:
+        l1_dims = indexer.head_dim
+    if indexer.l2_subspace == 'full':
+        l2_dims = indexer.head_dim
+    elif indexer.enable_subspace:
+        l2_dims = l1_dims
+    else:
+        l2_dims = indexer._qat_indices(device).numel()
+    return {
+        'head_dim': indexer.head_dim,
+        'l1_score_dims': l1_dims,
+        'l2_score_dims': l2_dims,
+    }
 
 
 def classify_nfa(kernels):
@@ -233,6 +304,8 @@ def source_receipt():
         'sparse_attn', 'benchmark/rope_policy.py',
         'benchmark/efficiency/benchmark_nfa_end_to_end.py',
         'benchmark/efficiency/measure_nfa_selector_e2e.py',
+        'benchmark/LongBench/prefill_frozen_skip.py',
+        'benchmark/LongBench/config/dataset2prompt.json',
     )
     diff = subprocess.check_output(
         ['git', '-C', str(REPO), 'diff', 'HEAD', '--binary', '--', *paths])
@@ -354,6 +427,8 @@ def run(args):
         'batch_size': args.batch_size,
         'execution': args.execution,
         'subspace': args.subspace,
+        'l2_subspace': args.l2_subspace,
+        'score_dimensions': score_dimensions(model),
         'gate_epsilon': args.gate_epsilon,
         'operator_mode': args.operator_mode,
         'task': args.task,
@@ -423,6 +498,8 @@ def main():
         'execution': args.execution,
         'measurement_mode': args.measurement_mode,
         'subspace': args.subspace,
+        'l2_subspace': args.l2_subspace,
+        'score_dimensions': result['score_dimensions'],
         'gate_epsilon': args.gate_epsilon,
         'operator_mode': args.operator_mode,
         'operator_summary': result['operator_summary'],

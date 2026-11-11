@@ -178,6 +178,7 @@ def test_current_query_not_previous_frame_query():
 
 @pytest.mark.parametrize('subspace,l2_subspace,l1_dim,fine_dim,selected_block', [
     ('full', 'same', 128, 32, 1),
+    ('full', 'full', 128, 128, 1),
     ('tail', 'same', 32, 32, 3),
     ('tail', 'full', 32, 128, 3),
 ])

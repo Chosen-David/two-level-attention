@@ -1,10 +1,18 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-11
+
+- [x] [TL-NFA-EPS010-PERF-20261111] Qwen3-8B × RULER MultiKey2 sample2 的 attention-mass epsilon=0.10 性能补测完成：严格 tail=32/32、full=128/128，12 个 CUDA Graph 配对格与108份原始回执内部审计通过；总 skip 111→532，重算 tail/full、skip/no-skip 与 NFA/FlashInfer 加速比并保留负结果。数据仍为 pending-independent-verification。([详情](task_details/TL-NFA-EPS010-PERF-20261111.md)；[结果](../results/nfa_eps010_graph_performance_20261111.json))
+
 ## 2026-11-10
 
 - [x] [TL-RULER-DYNAMIC-GATE-SCAN-20261110] Qwen3-8B × RULER 32K/64K/128K × 11任务 sample0 首个 dynamic-gate 扫描33/33格、1188层完成，独立只读审计与46项 artifact 哈希复核通过；32K far-skip 5任务/9层、64K near-skip 8任务/21层、128K near-skip 11任务/121层，仅限 decision-only 首步机制观测，不作质量、全样本或性能结论。([详情](task_details/TL-RULER-DYNAMIC-GATE-SCAN-20261110.md)；[结果](../results/ruler_dynamic_gate_scan_20261110/record.json))
 
 - [x] [TL-NFA-OBS-ABLATION-20261106] O-GATE 12 plans/240请求/60份 raw Q/K 与 B-REPLAY 12 plans/240文档/69952 cells 全部独立验收通过；精简结果已入库，明确固定轨迹 CPU replay 非质量、性能或生产 bit-exact 证据，K2=1024 逻辑支持集对照 7248/7248 不相等。([详情](task_details/TL-NFA-OBS-ABLATION-20261106.md))
+
+- [ ] [TL-ASYNCTLS-PAPER-QWEN32B-LBV1-20261110] 修正 AsyncTLS 每 KV group 独立选择、上一步块选集与完整 prompt dense prefill 语义；完成回归和 Qwen3-32B 新校准后运行 LongBench v1，结果独立验收前保持 pending。([详情](task_details/TL-ASYNCTLS-PAPER-QWEN32B-LBV1-20261110.md))
+
+- [ ] [TL-RULER-REGION-SELECTOR-20261110] Qwen3-8B × RULER 32K/64K/128K × 11任务×100条，统一当前无 skip、K1→K2 协议重测 FullKV/Single-pool Avg/Single-pool MinMax/NFA 联合 L2 四臂；旧协议结果只作交叉核对，独立验收前保持 pending。([详情](task_details/TL-RULER-REGION-SELECTOR-20261110.md))
 
 ## 2026-11-09
 

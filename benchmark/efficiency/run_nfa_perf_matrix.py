@@ -31,6 +31,10 @@ def parse_args():
     parser.add_argument('--data-root', type=Path, default=Path('/tmp/nfa_kernel_inputs'))
     parser.add_argument('--task', default='niah_multikey_2')
     parser.add_argument('--sample-index', type=int, default=2)
+    parser.add_argument('--input-provenance', default=None, choices=(
+        'native-ruler', 'repeated-needle-body-extension',
+        'deterministic-longbench-context-repetition'))
+    parser.add_argument('--longbench-data', default='/home/wangyuanshuo02/datasets/LongBench/data')
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--gpu', type=int, required=True)
     parser.add_argument('--shard-index', type=int, default=0)
@@ -44,6 +48,7 @@ def parse_args():
     parser.add_argument('--decode-steps', type=int, default=32)
     parser.add_argument('--visible-len', type=int, default=8192)
     parser.add_argument('--subspace', choices=('full', 'tail'), default='tail')
+    parser.add_argument('--l2-subspace', choices=('same', 'full'), default='same')
     parser.add_argument('--gate-epsilon', type=float, default=0.05)
     parser.add_argument('--max-attempts', type=int, default=2)
     parser.add_argument('--prepare-only', action='store_true')
@@ -71,6 +76,8 @@ def source_receipt(repo, harness):
         'sparse_attn', 'benchmark/rope_policy.py',
         'benchmark/efficiency/benchmark_nfa_end_to_end.py',
         'benchmark/efficiency/measure_nfa_selector_e2e.py',
+        'benchmark/LongBench/prefill_frozen_skip.py',
+        'benchmark/LongBench/config/dataset2prompt.json',
     )
     diff = subprocess.check_output(
         ['git', '-C', str(repo), 'diff', 'HEAD', '--binary', '--', *paths])
@@ -156,6 +163,18 @@ def prepare_extended_input(args, length):
         'last_body_characters': low,
         'provenance': 'repeated-needle-body-extension',
     })
+
+
+def input_provenance(args, length):
+    return args.input_provenance or (
+        'native-ruler' if length <= 131072
+        else 'repeated-needle-body-extension')
+
+
+def input_path(args, length):
+    if input_provenance(args, length) == 'deterministic-longbench-context-repetition':
+        return Path(args.longbench_data) / f'{args.task}.jsonl'
+    return args.data_root / str(length) / f'{args.task}.jsonl'
 
 
 def gpu_state(gpu):
@@ -255,9 +274,7 @@ def expected_fields(args, length, batch, arm):
         'execution': 'graph',
         'task': args.task,
         'sample_index': args.sample_index,
-        'input_provenance': (
-            'native-ruler' if length <= 131072
-            else 'repeated-needle-body-extension'),
+        'input_provenance': input_provenance(args, length),
         'visible_len': args.visible_len,
         'warmup_steps': args.warmup_steps,
     }
@@ -275,6 +292,7 @@ def expected_fields(args, length, batch, arm):
         'measurement_mode': (
             'operator-profile' if arm == 'nfa-operator-profile' else 'clean-e2e'),
         'subspace': args.subspace,
+        'l2_subspace': args.l2_subspace,
         'gate_epsilon': args.gate_epsilon,
         'operator_mode': 'off',
         'profile_repeat': args.profile_repeat,
@@ -297,8 +315,8 @@ def valid_existing(args, path, length, batch, arm, source):
             or any(row.get(key) != value for key, value in
                    expected_fields(args, length, batch, arm).items())):
         return False
-    input_path = args.data_root / str(length) / f'{args.task}.jsonl'
-    if row.get('input', {}).get('sha256') != sha256(input_path):
+    source_input_path = input_path(args, length)
+    if row.get('input', {}).get('sha256') != sha256(source_input_path):
         return False
     if row.get('graph_eager_fallbacks') != 0:
         return False
@@ -337,8 +355,7 @@ def measure_command(args, length, batch, arm, output):
         '--batch-size', str(batch),
         '--execution', 'graph',
         '--sample-index', str(args.sample_index),
-        '--input-provenance',
-        'native-ruler' if length <= 131072 else 'repeated-needle-body-extension',
+        '--input-provenance', input_provenance(args, length),
         '--visible-len', str(args.visible_len),
         '--warmup-steps', str(args.warmup_steps),
         '--output', str(output),
@@ -359,9 +376,11 @@ def measure_command(args, length, batch, arm, output):
             *common,
             '--measurement-mode', mode,
             '--subspace', args.subspace,
+            '--l2-subspace', args.l2_subspace,
             '--gate-epsilon', str(args.gate_epsilon), '--operator-mode', 'off',
             '--profile-repeat', str(args.profile_repeat),
             '--decode-steps', str(args.decode_steps),
+            '--longbench-data', str(args.longbench_data),
         ]
         if arm != 'nfa-operator-profile':
             return command
