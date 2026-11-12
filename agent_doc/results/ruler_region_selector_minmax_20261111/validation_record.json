@@ -1,0 +1,99 @@
+{
+  "artifact_hashes": {
+    "artifact_manifest": "763e28218f3cbc3d82e030ba9321df6c5f602724ae5d5037bb36d44f435dd308",
+    "independent_verify": "6f475f0ac4baf267b9339d959ec4570d6f6acb34a1aed2068df491636195efb9",
+    "per_sample_scores": "65985ac89702929c4b9dd13ceea02d88f5aa6a08ff2e196aa9d2805e5cf282a7",
+    "validation_plan": "ce1ca703e3ec3fc1f8f28ba7c35e92dab5309353142326b871706640c5d782a4"
+  },
+  "checks": {
+    "data_integrity": {
+      "evidence": [
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/artifact_manifest.json",
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/per_sample_scores.jsonl"
+      ],
+      "reason": "33 个源输入、3300 个唯一样本、答案/length/token/decode、prediction/receipt/status/log SHA 全部闭合。",
+      "verdict": "pass"
+    },
+    "implementation": {
+      "evidence": [
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/artifact_manifest.json",
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/per_sample_scores.jsonl"
+      ],
+      "reason": "33 格 GraphReady、36 层全 keep、MinMax 单池、K1/K2、预算/EOS/YaRN 和双 config 身份全部闭合。",
+      "verdict": "pass"
+    },
+    "measurement_validity": {
+      "evidence": [
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/artifact_manifest.json",
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/per_sample_scores.jsonl"
+      ],
+      "reason": "每格前 100 条和任务级预算闭合，AVG 为 11 任务等权；无性能主张。",
+      "verdict": "pass"
+    },
+    "numerical_sanity": {
+      "evidence": [
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/artifact_manifest.json",
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/per_sample_scores.jsonl"
+      ],
+      "reason": "全部逐样本/逐格分数有限且在 [0,100]，三长度宏平均由 3300 条原始分数独立重建。",
+      "verdict": "pass"
+    },
+    "reference_boundary": {
+      "evidence": [
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/artifact_manifest.json",
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/per_sample_scores.jsonl"
+      ],
+      "reason": "3300 条及 4 组合成边界的独立逐样本分数与官方 string_match_all 在零相对容差、1e-12 绝对容差内一致。",
+      "verdict": "pass"
+    },
+    "reproducibility": {
+      "evidence": [
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/artifact_manifest.json",
+        "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/per_sample_scores.jsonl"
+      ],
+      "reason": "两套 1195 源文件及模型/输入 SHA 全闭合；真实 fwe:69 截断可重建，旧 30 格保持原 config。",
+      "verdict": "pass"
+    }
+  },
+  "environment": {
+    "official_metric_sha256": "cb5dbef5e7410297f92f56dd325faed675120a102964250eab1f3b5f4c9c4584",
+    "official_metric_source": "/tmp/ruler-region-selector-src-84d6110c/benchmark/RULER/score_ruler.py",
+    "platform": "Linux-5.10.0-136.71.0.mt20240613.547.mt2203sp1.x86_64-x86_64-with-glibc2.34",
+    "python": "3.11.12",
+    "tokenizer_class": "Qwen2TokenizerFast",
+    "transformers": "4.56.2"
+  },
+  "limitations": [
+    "独立验收是不同实现的只读进程，不冒充第二位人类 reviewer。",
+    "不重新执行 3300 条 GPU 生成；可复现性检查限于冻结身份、真实 tokenizer 变换、官方指标和原始证据交叉核对。",
+    "结果只支持本次 Qwen3-8B、Single-pool MinMax、RULER 三长度准确率口径；不支持性能主张，也不外推到其他模型、任务或稀疏臂。"
+  ],
+  "manifest_sha256": "763e28218f3cbc3d82e030ba9321df6c5f602724ae5d5037bb36d44f435dd308",
+  "population": {
+    "cells": 33,
+    "per_cell": 100,
+    "samples": 3300
+  },
+  "result_id": "ruler-region-selector-minmax-20261111",
+  "schema_version": "experiment-validation/v1",
+  "status": "usable-with-scope",
+  "truncated_samples": [
+    {
+      "dropped_left_tokens": 6,
+      "original_input_sha256": "d5b2a747bcfb0bdb478188df15a5195754971d044b9098d81d454984d2edaa09",
+      "original_tokens": 131078,
+      "policy": "left-to-nominal-context-v1",
+      "retained_token_ids_sha256": "028b296c609da7e8882b7725bdb9152d767d99be3ac89e16651f336dbf8ba283",
+      "retained_tokens": 131072,
+      "sample_id": "fwe:69"
+    }
+  ],
+  "validation_plan_sha256": "ce1ca703e3ec3fc1f8f28ba7c35e92dab5309353142326b871706640c5d782a4",
+  "verifier": {
+    "actor": "independent-readonly-process",
+    "independent": true,
+    "method": "different implementation; official metric cross-check only",
+    "run_id": "rsel20261111-independent-readonly-v1",
+    "source": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/ruler_region_selector_minmax_20261111/independent_verify.py"
+  }
+}

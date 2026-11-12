@@ -22,7 +22,7 @@
 
 - [ ] [TL-ASYNCTLS-PAPER-QWEN32B-LBV1-20261110] 修正 AsyncTLS 每 KV group 独立选择、上一步块选集与完整 prompt dense prefill 语义；完成回归和 Qwen3-32B 新校准后运行 LongBench v1，结果独立验收前保持 pending。([详情](task_details/TL-ASYNCTLS-PAPER-QWEN32B-LBV1-20261110.md))
 
-- [ ] [TL-RULER-REGION-SELECTOR-20261110] Qwen3-8B × RULER 32K/64K/128K × 11任务×100条，统一当前无 skip、K1→K2 协议重测 FullKV/Single-pool Avg/Single-pool MinMax/NFA 联合 L2 四臂；旧协议结果只作交叉核对，独立验收前保持 pending。([详情](task_details/TL-RULER-REGION-SELECTOR-20261110.md))
+- [x] [TL-RULER-REGION-SELECTOR-20261110] 按用户收窄范围仅交付 Qwen3-8B Single-pool MinMax × RULER 32K/64K/128K × 11任务×100条；33/33 cells、3300条预测及六项独立只读验收全部通过，AVG11=40.1333/36.1909/24.3212，状态 `usable-with-scope`，不作性能或跨臂结论。([详情](task_details/TL-RULER-REGION-SELECTOR-20261110.md))
 
 ## 2026-11-09
 

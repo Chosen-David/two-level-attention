@@ -1,0 +1,44 @@
+{
+  "schema_version": "experiment-validation-plan/v1",
+  "result_id": "ruler-region-selector-minmax-20261111",
+  "producer_task_id": "17",
+  "verifier_task_id": "18",
+  "scope": "Qwen3-8B Single-pool MinMax，RULER 11 任务×3 长度×每任务前 100 条；只验收准确率协议、生成与治疗身份、输入截断和逐样本官方 string_match_all 分数，不支持性能或跨臂优劣结论。",
+  "criteria": {
+    "implementation": {
+      "procedure": "独立只读实现自行解析 generation 指针和 receipt，不导入 producer 的汇总、完成判定或指针解析；核对 GraphReady、36 层全 keep、K1/K2、单池 MinMax、预算/EOS/YaRN 及原/leftcap 源码身份。",
+      "acceptance": "33 格均满足冻结治疗和执行语义；30 格绑定原 config，pc31 补跑 3 格绑定 leftcap config，其他源码/模型/输入身份一致。",
+      "allow_not_applicable": false
+    },
+    "reference_boundary": {
+      "procedure": "自行逐样本实现大小写不敏感 string_match_all，并仅调用官方 score_ruler.string_match_all 作逐样本对照；另用大小写、部分命中、空预测、空答案列表合成边界做交叉检查。浮点比较使用零相对容差、1e-12 绝对容差，只允许乘法/除法结合顺序造成的末位差。",
+      "acceptance": "3300 条及合成边界的独立分数与官方实现在 1e-12 绝对容差内一致；汇总不调用 producer/formal scorer。",
+      "allow_not_applicable": false
+    },
+    "data_integrity": {
+      "procedure": "重读 33 个源输入文件和前 100 行，逐行核对样本 ID、答案及哈希、length、生成 token、tokenizer decode、prediction/receipt SHA 和行数；核对九条成功 driver 链的互斥 33 格人口。",
+      "acceptance": "恰好 33 cells、3300 条、每格 100 个唯一样本，无 partial、重复、漏项或跨 config 混代；仅 fwe:69 有规定的左截断记录。",
+      "allow_not_applicable": false
+    },
+    "numerical_sanity": {
+      "procedure": "逐样本和逐格检查分数有限且位于 [0,100]，由 3300 条原始分数独立重建 33 格及三长度宏平均。",
+      "acceptance": "无 NaN/Inf、错误分母或越界分数；汇总与逐样本记录算术闭合。",
+      "allow_not_applicable": false
+    },
+    "measurement_validity": {
+      "procedure": "检查准确率数据划分、任务级生成预算、EOS、seed、样本分母和官方指标；不读取或生成任何计时/性能主张。",
+      "acceptance": "每格使用相同任务的前 100 条、既定预算和官方逐样本指标；三长度 AVG 均为 11 任务等权宏平均。",
+      "allow_not_applicable": false
+    },
+    "reproducibility": {
+      "procedure": "逐文件复核两套 run config 的源码、模型和输入 SHA256；用真实 fwe:69 重新 tokenize 并复算左截断 token IDs 哈希，对另外两个 leftcap 格确认截断清单为空；保留源码 diff、driver/wrapper 身份和环境记录。",
+      "acceptance": "所有冻结文件哈希闭合，截断记录可独立重建；旧 30 格均由原 producer 生成，不被 leftcap 改写。",
+      "allow_not_applicable": false
+    }
+  },
+  "limitations": [
+    "独立验收是不同实现的只读进程，不冒充第二位人类 reviewer。",
+    "不重新执行 3300 条 GPU 生成；可复现性检查限于冻结身份、真实 tokenizer 变换、官方指标和原始证据交叉核对。",
+    "结果只支持本次 Qwen3-8B、Single-pool MinMax、RULER 三长度准确率口径；不支持性能主张，也不外推到其他模型、任务或稀疏臂。"
+  ]
+}
