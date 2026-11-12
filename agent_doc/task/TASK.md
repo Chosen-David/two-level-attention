@@ -2,7 +2,7 @@
 
 ## 2026-11-12
 
-- [ ] [TL-GLM-FULLKV-FI-LBV1-20261112] 新增 GLM-4.7-Flash FullKV 的 SDPA prefill + FlashInfer page64 decode 路径与 LongBench v1 英文16任务 runner；非本机真实 smoke 已覆盖47层调用计数、23K chat 输入和411-token长生成，数值并列可导致贪心轨迹分歧，单样本耗时不外推。聚焦回归、固定提交部署、3750请求全量与独立验收继续推进。([详情](task_details/TL-GLM-FULLKV-FI-LBV1-20261112.md))
+- [x] [TL-GLM-FULLKV-FI-LBV1-20261112] GLM-4.7-Flash FullKV 已使用 SDPA prefill + FlashInfer page64 eager decode，在非本机五分片完成 LongBench v1 英文16任务3750/3750请求；生产侧审计重算3750输入与官方分数、47层调用计数全PASS，macro AVG16=49.7245，结果 pending-independent-verification；无同协议全量SDPA/clean TPOT臂，不宣称全量加速。([详情](task_details/TL-GLM-FULLKV-FI-LBV1-20261112.md))
 
 - [x] [TL-NFA-REGION-SKIP-20261111] 从同一批24份已审计回执提取纯 L1/L2 打分 kernel 的24格单层等效数据，排除 Q 准备、页统计、Top-K、candidate、union 与 attention；Graph skip far 的 L2 在三长度加速3.4972/3.5145/3.5657×，L1仅1.1629/1.1899/1.3637×且grid缩容不冒充等比时延收益，both-skip两项真实为0。24格数值、24对 nsys、grid缩容与文件哈希内部复核 PASS，数据保持 pending-independent-verification。([详情](task_details/TL-NFA-REGION-SKIP-20261111.md#三长度单层等效纯-l1l2-打分-kernel2026-11-12内部审计-pass独立验收-pending)；[结果](../results/nfa_region_pure_score_per_layer_20261112.json)；[构建与审计脚本](../results/build_nfa_region_pure_score_per_layer_20261112.py))
 
