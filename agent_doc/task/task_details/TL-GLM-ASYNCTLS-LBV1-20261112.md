@@ -32,6 +32,9 @@ Date: 2026-11-12
 - LongBench v1 已支持 `source_order[rank::world_size]`：先对完整有序源行计算 identity，再切分；输出 `_id` 使用完整源行号，runcap 同时绑定完整源人口、选中人口、source/selected SHA256。默认 rank0/world1 的源行 ID 与旧口径一致。
 - pc02 transformers 5.12.1 环境聚焦回归 `19 passed, 12 subtests passed`，覆盖 LongBench v1/v2 分片、runcap、防重复源 ID 及既有6项 GLM AsyncTLS 语义。真实双卡四样本 smoke 每片2请求，complete ID 分别为0/2与1/3，完整源 `sample_count=4`、每片 `actual_input_ids.count=2`，证明多请求与分片身份闭包。
 - 新增 `run_longbench_glm_asynctls.sh`，固定16任务人口、K2=1024/block64/K1=128、channel 文件、NFA layer-skip=false、互斥输出目录和 complete-only SKIP；4样本 smoke 用全量 runner 重跑时被 source=200 人口门禁拒绝，属于预期 fail-closed，未冒充幂等通过。
+- 实现提交 `a0b086850ba7d290fda47c1c27833e7057e774bb` 已推送 `origin/main`；只包含本任务9个文件，未带入其他会话的 NFA 文档或 sqlite。pc02 内部 origin 无新提交且 GitHub fetch 阻塞，改用本地 `git bundle`（基元 `482911be`）离线部署到 `/tmp/glm-atls-release-a0b08685`，HEAD、pred/runcap/adapter/calibrator/channel SHA 均与本地一致。
+- 固定提交部署后复跑 GLM/LongBench pytest `12 passed`，runcap unittest `7 tests OK`，runner 与双分片链脚本 `bash -n` 通过。新增生产侧 `agent_doc/results/glm_asynctls_lb_v1_20261112/collect.py`，将校验完整源身份、双分片 selected IDs、treatment/channel/commit、结果 SHA、官方逐样本评分与文件 manifest；合成4样本双分片闭集、源顺序与官方 scorer 测试 PASS。
+- 2026-11-12 22:26 +08:00 正式点火：点火前 pc02 GPU2/3 各1MiB、MemAvailable=154250324kB，其他远端机器均有既有计算进程，未混卡。world=2，rank0/GPU2 runner=4105983、pred=4106005；rank1/GPU3 runner=4105984、pred=4106006；输出 `~/ak_verify_results/glm_asynctls_lb_v1_20261112`。点火后两卡显存约59GB，日志均进入 lcc `selected 250/500`，随后持续推进；完成前没有全量分数。
 
 ### 阻塞与下一步
 
