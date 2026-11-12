@@ -100,6 +100,22 @@ class FakeCapture:
         self.completed = True
 
 
+class FakeTiming:
+    def __init__(self):
+        self.events = []
+        self.receipt = None
+
+    def start(self):
+        self.events.append("start")
+
+    def token_ready(self, token):
+        self.events.append(("token", token))
+
+    def finish(self):
+        self.events.append("finish")
+        self.receipt = {"complete": True}
+
+
 class LongBenchEmptyHandoffTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -143,6 +159,23 @@ class LongBenchEmptyHandoffTests(unittest.TestCase):
         self.generate(model, FakeIds([3, 4]), FakeIds([11]), 1, None, capture)
         self.assertEqual(model.input_widths, [2, 1])
         self.assertEqual(capture.phases, ["material", "question"])
+
+    def test_fixed_length_generation_records_eos_without_stopping(self):
+        model = RejectEmptyModel()
+        timing = FakeTiming()
+        generated = self.generate(
+            model, FakeIds([3, 4]), FakeIds([]), 3, 7,
+            timing=timing, stop_on_eos=False,
+        )
+        self.assertEqual(generated, [7, 7, 7])
+        self.assertEqual(timing.events, [
+            "start", ("token", 7), ("token", 7), ("token", 7), "finish",
+        ])
+
+        default_model = RejectEmptyModel()
+        default_generated = self.generate(
+            default_model, FakeIds([3, 4]), FakeIds([]), 3, 7)
+        self.assertEqual(default_generated, [7])
 
     def test_producer_uses_bos_helper_once(self):
         tree = ast.parse(PRED.read_text(encoding="utf-8"), filename=str(PRED))

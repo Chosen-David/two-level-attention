@@ -239,9 +239,10 @@ def _drop_leading_bos(input_ids, bos_token_id):
 
 
 def _manual_generate(
-    model, material_ids, question_ids, max_gen, eos_token_id, capture=None
+    model, material_ids, question_ids, max_gen, eos_token_id, capture=None,
+    timing=None, stop_on_eos=True,
 ):
-    """Existing LongBench greedy loop, instrumented only when capture is enabled."""
+    """Existing LongBench greedy loop with optional request-wall observation."""
     if type(max_gen) is not int or max_gen<1:raise ValueError('max_gen must be positive')
     eos_ids = frozenset(eos_token_id) if isinstance(
         eos_token_id, (list, tuple, set, frozenset)) else frozenset((eos_token_id,))
@@ -249,6 +250,8 @@ def _manual_generate(
         capture.generation_policy=dict(max_new_tokens=max_gen,eos_token_id=eos_token_id,decoding='greedy')
     def invoke(phase,**kwargs):
         return model(**kwargs) if capture is None else capture.call(phase,model,**kwargs)
+    if timing is not None:
+        timing.start()
     with torch.no_grad():
         if material_ids.shape[-1] > 0:
             output=invoke(
@@ -272,15 +275,18 @@ def _manual_generate(
         generated=[token.item()]
         del output
         if capture is not None:capture.token_ready(generated[-1])
-        if generated[-1] not in eos_ids:
+        if timing is not None:timing.token_ready(generated[-1])
+        if not stop_on_eos or generated[-1] not in eos_ids:
             for _ in range(max_gen-1):
                 output=invoke('decode',input_ids=token,past_key_values=cache,use_cache=True)
                 cache=output.past_key_values
                 token=output.logits[:,-1,:].argmax(dim=-1).unsqueeze(1)
                 generated.append(token.item())
                 if capture is not None:capture.token_ready(generated[-1])
-                if generated[-1] in eos_ids:break
+                if timing is not None:timing.token_ready(generated[-1])
+                if stop_on_eos and generated[-1] in eos_ids:break
         if capture is not None:capture.generation_complete()
+        if timing is not None:timing.finish()
         return generated
 
 
@@ -308,6 +314,8 @@ def get_pred(
     data_fp="",
     run_stats=None,  # 096：每样本实际输入 token 数 / 截断标记（run-cap manifest）
     paper_capture_mode="off",
+    request_timing_factory=None,
+    stop_on_eos=True,
 ):
     from sparse_attn.baseline_runtime import baseline_request
     preds = []
@@ -441,36 +449,52 @@ def get_pred(
         capture_context,capture = _paper_capture_request(
             paper_capture_mode,model,input.input_ids,q_input.input_ids,dataset,model_name)
         jssa_runtime_receipt = None
+        request_timing = (
+            request_timing_factory() if request_timing_factory is not None else None)
+        use_jssa_official = getattr(model, "_jssa_official_options", None) is not None
+        use_asynctls_full_prompt = getattr(
+            model, "_asynctls_full_prompt_prefill", False)
         with baseline_request(model) as baseline_receipt, capture_context, eager_decoding_request_guard():
             if (
                 dataset == "samsum"
+                and not (use_jssa_official or use_asynctls_full_prompt)
             ):  # prevent illegal output on samsum (model endlessly repeat "\nDialogue"), might be a prompting issue
                 # B03 修复（GPT 审查 2026-10-08）：原版 model.generate(**input) 缺两件事——
                 # ① q_input 切出的 question 没接回，只喂了 prefix；② output 赋值后
                 # generated_content 从未赋值，下方共用 decode 必 UnboundLocalError。
                 # 修法：拼接完整输入（与 else 分支同协议），generate 后取新增 token。
                 full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
-                samsum_eos = [tokenizer.eos_token_id]
-                if model.config.model_type == "glm4_moe_lite":
-                    configured_eos = getattr(
-                        model.generation_config, "eos_token_id", None)
-                    if configured_eos is not None:
-                        samsum_eos = list(configured_eos) if isinstance(
-                            configured_eos, (list, tuple)) else [configured_eos]
-                samsum_eos.append(
-                    tokenizer.encode("\n", add_special_tokens=False)[-1])
-                output = model.generate(
-                    input_ids=full_ids,
-                    attention_mask=torch.ones_like(full_ids),
-                    max_new_tokens=max_gen,
-                    num_beams=1,
-                    do_sample=False,
-                    temperature=1.0,
-                    min_length=full_ids.shape[-1] + 1,
-                    eos_token_id=samsum_eos,
-                )[0]
-                generated_content = output[full_ids.shape[-1]:].tolist()
-            elif getattr(model, "_jssa_official_options", None) is not None:
+                if not stop_on_eos:
+                    # 性能口径与 generate 同为 greedy，但使用公共逐 token 观察钩子，
+                    # 保证 EOS 只记录、不提前结束，且 TTFT/TPOT 边界与其他任务一致。
+                    generated_content = _manual_generate(
+                        model, full_ids, q_input.input_ids[:, :0], max_gen,
+                        tokenizer.eos_token_id, capture, timing=request_timing,
+                        stop_on_eos=False)
+                else:
+                    if request_timing is not None:
+                        raise ValueError("samsum request timing requires fixed-length generation")
+                    samsum_eos = [tokenizer.eos_token_id]
+                    if model.config.model_type == "glm4_moe_lite":
+                        configured_eos = getattr(
+                            model.generation_config, "eos_token_id", None)
+                        if configured_eos is not None:
+                            samsum_eos = list(configured_eos) if isinstance(
+                                configured_eos, (list, tuple)) else [configured_eos]
+                    samsum_eos.append(
+                        tokenizer.encode("\n", add_special_tokens=False)[-1])
+                    output = model.generate(
+                        input_ids=full_ids,
+                        attention_mask=torch.ones_like(full_ids),
+                        max_new_tokens=max_gen,
+                        num_beams=1,
+                        do_sample=False,
+                        temperature=1.0,
+                        min_length=full_ids.shape[-1] + 1,
+                        eos_token_id=samsum_eos,
+                    )[0]
+                    generated_content = output[full_ids.shape[-1]:].tolist()
+            elif use_jssa_official:
                 # 与 AsyncTLS 相同，question 是完整 prompt 的一部分；官方 JSSA
                 # 只在后续 decode 做稀疏选择。runtime 回执绑定实际调用路径。
                 from exp.vendor_baselines.jssa_vendor.qwen3_jssa_official import (
@@ -479,8 +503,9 @@ def get_pred(
                 full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
                 generated_content, jssa_runtime_receipt = generate_jssa_official(
                     model, full_ids, max_gen, tokenizer.eos_token_id,
-                    **model._jssa_official_options)
-            elif getattr(model, "_asynctls_full_prompt_prefill", False):
+                    **model._jssa_official_options,
+                    timing=request_timing, stop_on_eos=stop_on_eos)
+            elif use_asynctls_full_prompt:
                 # AsyncTLS 论文的稀疏选择只发生在生成 decode；question 后缀与
                 # material 必须作为同一完整 prompt 一次 dense prefill，并初始化
                 # 第一步 decode 所需的 M_{t-1}，不能逐 token 提前进入稀疏路径。
@@ -491,7 +516,8 @@ def get_pred(
                         model.generation_config, "eos_token_id", _atls_eos)
                 generated_content = _manual_generate(
                     model, full_ids, q_input.input_ids[:, :0], max_gen,
-                    _atls_eos, capture)
+                    _atls_eos, capture, timing=request_timing,
+                    stop_on_eos=stop_on_eos)
             elif IS_DSV2:
                 # S-T023 DeepSeek fullkv 修复（2026-10-12）：官方 modeling_deepseek.py
                 # 是旧 transformers 时代代码，手动 prefill/decode 循环在 4.56.2 新
@@ -520,7 +546,9 @@ def get_pred(
                     eos_token_id = getattr(
                         model.generation_config, "eos_token_id", eos_token_id)
                 generated_content = _manual_generate(
-                    model,input.input_ids,q_input.input_ids,max_gen,eos_token_id,capture)
+                    model, input.input_ids, q_input.input_ids, max_gen,
+                    eos_token_id, capture, timing=request_timing,
+                    stop_on_eos=stop_on_eos)
 
         pred = tokenizer.decode(generated_content, skip_special_tokens=True)
         # pred = tokenizer.decode(output[context_length:], skip_special_tokens=True)
@@ -558,6 +586,10 @@ def get_pred(
         if capture is not None:
             if capture.receipt is None:raise ValueError('request capture incomplete')
             record['paper_request_capture']=capture.receipt
+        if request_timing is not None:
+            if request_timing.receipt is None:
+                raise ValueError("request timing incomplete")
+            record["request_timing"] = request_timing.receipt
         if dataset == "lbv2":
             # LongBench-v2：额外落盘解析字母与样本 _id（打分口径 accuracy = pred_choice == answer）
             record["pred_choice"] = extract_choice_letter(pred)

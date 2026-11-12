@@ -431,7 +431,8 @@ def clear_jssa_official_runtime(model):
 @torch.inference_mode()
 def generate_jssa_official(
         model, input_ids, max_new_tokens, eos_token_id, *,
-        basis_path, budget=1024, rank=32, page_size=64):
+        basis_path, budget=1024, rank=32, page_size=64,
+        timing=None, stop_on_eos=True):
     """完整 prompt dense prefill + 官方 JSSA eager decode 的逐请求生成接口。"""
     if input_ids.ndim != 2 or input_ids.shape[0] != 1 or input_ids.shape[1] < 1:
         raise ValueError("JSSA LongBench generation requires one non-empty prompt")
@@ -442,6 +443,8 @@ def generate_jssa_official(
         else frozenset((eos_token_id,)))
     device = input_ids.device
     length = input_ids.shape[1]
+    if timing is not None:
+        timing.start()
     runtime = JSSAQwen3Runtime(
         model, batch_size=1, prefill_length=length,
         max_new_tokens=max_new_tokens, device=device,
@@ -456,9 +459,12 @@ def generate_jssa_official(
             use_cache=True, logits_to_keep=1)
         token = output.logits[:, -1, :].argmax(dim=-1, keepdim=True)
         generated = [int(token)]
+        if timing is not None:
+            timing.token_ready(generated[-1])
         runtime.prepare_decode("eager", max_new_tokens - 1)
         step = 0
-        while len(generated) < max_new_tokens and generated[-1] not in eos_ids:
+        while (len(generated) < max_new_tokens
+               and (not stop_on_eos or generated[-1] not in eos_ids)):
             runtime.prepare_decode_step(step)
             position = torch.tensor([[length + step]], device=device)
             output = model(
@@ -468,6 +474,8 @@ def generate_jssa_official(
                 use_cache=True, logits_to_keep=1)
             token = output.logits[:, -1, :].argmax(dim=-1, keepdim=True)
             generated.append(int(token))
+            if timing is not None:
+                timing.token_ready(generated[-1])
             step += 1
         decode_steps = len(generated) - 1
         layers = runtime.num_layers
@@ -484,9 +492,11 @@ def generate_jssa_official(
             decode_attention_calls=runtime.decode_attention_calls,
             decode_steps=decode_steps,
             generated_tokens=len(generated),
-            eos_early_stop=generated[-1] in eos_ids,
+            eos_early_stop=stop_on_eos and generated[-1] in eos_ids,
         )
-        return generated, receipt
     finally:
         clear_jssa_official_runtime(model)
         del runtime
+    if timing is not None:
+        timing.finish()
+    return generated, receipt

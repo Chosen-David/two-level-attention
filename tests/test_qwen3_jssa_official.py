@@ -215,3 +215,13 @@ def test_generate_jssa_official_counts_eos_and_request_unbinding(tmp_path):
     assert eos_receipt["decode_steps"] == 0
     assert eos_receipt["decode_store_calls"] == 0
     assert eos_receipt["decode_attention_calls"] == 0
+
+    fixed_generated, fixed_receipt = generate_jssa_official(
+        model, input_ids, 3, generated[0], basis_path=str(basis_path),
+        budget=64, rank=32, page_size=64, stop_on_eos=False)
+    assert fixed_generated == generated
+    assert len(fixed_generated) == 3
+    assert not fixed_receipt["eos_early_stop"]
+    assert fixed_receipt["decode_steps"] == 2
+    assert fixed_receipt["decode_store_calls"] == 2
+    assert fixed_receipt["decode_attention_calls"] == 2
