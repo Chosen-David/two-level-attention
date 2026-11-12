@@ -1,0 +1,3083 @@
+{
+  "schema": "nfa-region-four-state-per-layer-v1",
+  "validation_status": "pending-independent-verification",
+  "internal_audit": {
+    "status": "PASS",
+    "raw_receipts_checked": 24,
+    "nsys_report_sqlite_pairs_checked": 24,
+    "input_sha256": "PASS",
+    "source_identity": "PASS",
+    "gpu_hygiene": "PASS",
+    "graph_capture_replay_fallback": "PASS",
+    "region_kernel_instances": "PASS",
+    "graph_grid_shrinkage": "PASS",
+    "independent_verification": "PENDING"
+  },
+  "protocol": {
+    "model": "Qwen3-8B",
+    "task": "niah_multikey_2",
+    "sample_index": 2,
+    "lengths": [
+      32768,
+      65536,
+      131072
+    ],
+    "batch": 1,
+    "subspace": "tail=32/32",
+    "gate_epsilon": 0.1,
+    "force_modes": [
+      "no-skip",
+      "near-only",
+      "far-only",
+      "both-skip"
+    ],
+    "executions": [
+      "graph",
+      "eager"
+    ],
+    "warmup_steps": 3,
+    "profiled_decode_steps": 5,
+    "single_layer_equivalent": "Every one of 36 layers is forced to the same mode; divide the whole-model per-decode-step stage total by 36. This is an arithmetic mean equivalent layer, not a measurement attributed to one layer index.",
+    "both_skip_boundary": "L1/L2 score, candidate and Top-K are truly zero; protected-only selection union and selected attention are non-zero and reported separately.",
+    "operator_measurement": "nsys/CUPTI observed kernel time over five profiled decode steps; observer effect remains; no clean TPOT or host-overhead claim.",
+    "source_scope": "32K reuses audited pc31 receipts from 84bd19ee+0ab60bf source diff; 64K/128K are new clean pc33 receipts at b97af7ef. Harness SHA256 is identical. Use within-length mode ratios; do not treat cross-host absolute values as a controlled length scaling study.",
+    "zero_stage_speedup": "null when the measured stage is fully eliminated (0 ms); no Infinity or 1x is fabricated."
+  },
+  "records": [
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "no-skip",
+      "mode_semantics": "compute near and far",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.36747640000000004,
+        "l1_topk_ms": 0.23843319999999996,
+        "candidate_ms": 0.22857779999999997,
+        "l1_ms": 0.8344874000000001,
+        "l2_score_ms": 0.9899827999999993,
+        "l2_topk_ms": 0.8639074000000004,
+        "selection_union_ms": 0.23243000000000008,
+        "l2_ms": 2.0863202,
+        "topk_total_ms": 1.1023406000000004,
+        "main_attention_ms": 1.0148986000000007,
+        "nfa_operator_total_ms": 3.9357062000000007
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.207677777777779,
+        "l1_topk_ms": 6.623144444444443,
+        "candidate_ms": 6.349383333333332,
+        "l1_ms": 23.18020555555556,
+        "l2_score_ms": 27.499522222222204,
+        "l2_topk_ms": 23.997427777777787,
+        "selection_union_ms": 6.456388888888892,
+        "l2_ms": 57.95333888888888,
+        "topk_total_ms": 30.620572222222236,
+        "main_attention_ms": 28.191627777777796,
+        "nfa_operator_total_ms": 109.32517222222224
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 36,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 36.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            5
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_l1_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            2
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_candidate_expand_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            9
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            5
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            34
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "bytes": 41872,
+        "sha256": "226aad46f4b6c168ef650eaf188eb0f026b0dfa3761e7220f516d02970952c18"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.nsys-rep",
+          "bytes": 482443,
+          "sha256": "64034890ab16d285cf93412fcf434fa537a508fb9787c5ed282d606bf292988f"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.sqlite",
+          "bytes": 1679360,
+          "sha256": "e9759182b04e8150803c285e1d09e87db487b8282616fd5c5aff6132be88b285"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.0,
+        "l2_ms": 1.0,
+        "topk_total_ms": 1.0,
+        "main_attention_ms": 1.0,
+        "nfa_operator_total_ms": 1.0
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "near-only",
+      "mode_semantics": "skip far; compute near only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.34708519999999987,
+        "l1_topk_ms": 0.16118400000000005,
+        "candidate_ms": 0.1482176000000001,
+        "l1_ms": 0.6564868,
+        "l2_score_ms": 0.3239620000000001,
+        "l2_topk_ms": 0.7512322000000008,
+        "selection_union_ms": 0.23896980000000007,
+        "l2_ms": 1.314164000000001,
+        "topk_total_ms": 0.9124162000000009,
+        "main_attention_ms": 1.015846999999999,
+        "nfa_operator_total_ms": 2.9864978
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 9.641255555555553,
+        "l1_topk_ms": 4.477333333333335,
+        "candidate_ms": 4.117155555555558,
+        "l1_ms": 18.235744444444446,
+        "l2_score_ms": 8.998944444444447,
+        "l2_topk_ms": 20.867561111111133,
+        "selection_union_ms": 6.6380500000000024,
+        "l2_ms": 36.504555555555584,
+        "topk_total_ms": 25.34489444444447,
+        "main_attention_ms": 28.217972222222198,
+        "nfa_operator_total_ms": 82.95827222222222
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 36,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 36.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_near_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            2
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_l1_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_candidate_expand_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            3
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            2
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            10
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "bytes": 42396,
+        "sha256": "f9e19653190b35d34e51537c2857933215c0b975aaad518102afcd86261d7052"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.nsys-rep",
+          "bytes": 483199,
+          "sha256": "2425d80c16b17e5e5af767548bce989e7c7a61857b61ec13b535ef2feb1733a1"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.sqlite",
+          "bytes": 1679360,
+          "sha256": "4c9d1d68cb1fa188f43db8f47cbf525186016b0a37598f0ac0a9fa6a7d54e059"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.2711411714599594,
+        "l2_ms": 1.5875645657619584,
+        "topk_total_ms": 1.2081554448507155,
+        "main_attention_ms": 0.9990663948409569,
+        "nfa_operator_total_ms": 1.3178332828505686
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "far-only",
+      "mode_semantics": "skip near; compute far only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.3642261999999999,
+        "l1_topk_ms": 0.18583140000000015,
+        "candidate_ms": 0.2100038000000001,
+        "l1_ms": 0.7600614000000002,
+        "l2_score_ms": 0.6360924000000006,
+        "l2_topk_ms": 0.8103204000000005,
+        "selection_union_ms": 0.23315319999999992,
+        "l2_ms": 1.6795660000000008,
+        "topk_total_ms": 0.9961518000000007,
+        "main_attention_ms": 1.0168109999999995,
+        "nfa_operator_total_ms": 3.4564384000000006
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.117394444444441,
+        "l1_topk_ms": 5.161983333333337,
+        "candidate_ms": 5.8334388888888915,
+        "l1_ms": 21.112816666666674,
+        "l2_score_ms": 17.66923333333335,
+        "l2_topk_ms": 22.508900000000015,
+        "selection_union_ms": 6.476477777777776,
+        "l2_ms": 46.65461111111113,
+        "topk_total_ms": 27.67088333333335,
+        "main_attention_ms": 28.244749999999986,
+        "nfa_operator_total_ms": 96.0121777777778
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 36,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 36.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_far_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            4
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_l1_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_candidate_expand_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            7
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            4
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            26
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "bytes": 42418,
+        "sha256": "bf06d81295fd1bed4c7dcf5248b57ebad8f13bc87668d5477a2d0d6109308cba"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.nsys-rep",
+          "bytes": 484855,
+          "sha256": "239a2bfdff324445b4744d7bd0f3fa5469640371611cfe919a60d5e69dbb07b0"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.sqlite",
+          "bytes": 1699840,
+          "sha256": "604c1ab6bc6089e81ee9c464c4046f870edc83977b57a03368a60a9a308282c6"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.0979210363794292,
+        "l2_ms": 1.2421781579288929,
+        "topk_total_ms": 1.1065990143269326,
+        "main_attention_ms": 0.9981192178290765,
+        "nfa_operator_total_ms": 1.138659436256697
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "both-skip",
+      "mode_semantics": "skip near and far; protected-only union/attention remains",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 0.12156919999999982,
+        "l2_ms": 0.12156919999999982,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 0.34591099999999997,
+        "nfa_operator_total_ms": 0.4674801999999998
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 3.3769222222222175,
+        "l2_ms": 3.3769222222222175,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 9.608638888888887,
+        "nfa_operator_total_ms": 12.985561111111105
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 0,
+          "active_candidate": 0,
+          "active_fine_score": 0
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 0.0,
+          "active_candidate": 0.0,
+          "active_fine_score": 0.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {},
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "bytes": 38299,
+        "sha256": "979e56d97a9487dadab1fa04849b5f30c51c77758002adb1b3a39d8aeb1298b5"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.nsys-rep",
+          "bytes": 422253,
+          "sha256": "5005b92e3ddbaee23ba4834140d5d3844591a2c6625983b1db84bbc05a73618b"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.sqlite",
+          "bytes": 1536000,
+          "sha256": "1f471f7a2ddf32b88dfbab9caf0a8af360cc0226a23f68d39b568427874f9619"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": null,
+        "l2_ms": 17.161585335759412,
+        "topk_total_ms": null,
+        "main_attention_ms": 2.9339876442206254,
+        "nfa_operator_total_ms": 8.418979456242216
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "no-skip",
+      "mode_semantics": "compute near and far",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.37507,
+        "l1_topk_ms": 0.5239977999999998,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.8990677999999999,
+        "l2_score_ms": 0.9909389999999993,
+        "l2_topk_ms": 0.8806092,
+        "selection_union_ms": 0.24591579999999996,
+        "l2_ms": 2.117463999999999,
+        "topk_total_ms": 1.404607,
+        "main_attention_ms": 1.0242831999999997,
+        "nfa_operator_total_ms": 4.0408149999999985
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.418611111111112,
+        "l1_topk_ms": 14.555494444444442,
+        "candidate_ms": 0.0,
+        "l1_ms": 24.97410555555555,
+        "l2_score_ms": 27.526083333333318,
+        "l2_topk_ms": 24.461366666666667,
+        "selection_union_ms": 6.8309944444444435,
+        "l2_ms": 58.81844444444442,
+        "topk_total_ms": 39.01686111111111,
+        "main_attention_ms": 28.4523111111111,
+        "nfa_operator_total_ms": 112.24486111111108
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 36,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 36.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            5
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_topk_candidate_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            5
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            34
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.json",
+        "bytes": 40753,
+        "sha256": "297aca826ee21d30d6692a34221aa8a76af61447d11f2f69032805f8702c56b3"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.nsys-rep",
+          "bytes": 539423,
+          "sha256": "24e117c687eb0a7af90098aa066c61b99c433afb15d0b255c03c84213ee64bc9"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.sqlite",
+          "bytes": 1789952,
+          "sha256": "70fb19ed12663783042fb79fb181ce03f9a60808d5a10045f69d8b37feeb72c5"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.0,
+        "l2_ms": 1.0,
+        "topk_total_ms": 1.0,
+        "main_attention_ms": 1.0,
+        "nfa_operator_total_ms": 1.0
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "near-only",
+      "mode_semantics": "skip far; compute near only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.35343480000000005,
+        "l1_topk_ms": 0.2234508,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.5768856,
+        "l2_score_ms": 0.3360525999999999,
+        "l2_topk_ms": 0.7658323999999995,
+        "selection_union_ms": 0.2502666000000001,
+        "l2_ms": 1.3521515999999996,
+        "topk_total_ms": 0.9892831999999995,
+        "main_attention_ms": 1.024618400000001,
+        "nfa_operator_total_ms": 2.9536556000000003
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 9.817633333333335,
+        "l1_topk_ms": 6.206966666666667,
+        "candidate_ms": 0.0,
+        "l1_ms": 16.0246,
+        "l2_score_ms": 9.334794444444443,
+        "l2_topk_ms": 21.27312222222221,
+        "selection_union_ms": 6.951850000000004,
+        "l2_ms": 37.559766666666654,
+        "topk_total_ms": 27.480088888888876,
+        "main_attention_ms": 28.46162222222225,
+        "nfa_operator_total_ms": 82.04598888888889
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 36,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 36.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_near_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            2
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_topk_candidate_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            2
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            10
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.json",
+        "bytes": 41291,
+        "sha256": "9741b6e5a0cd7c9f011e51fa54b00fe081dda7aa149715dadb1b3acdee1b9317"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.nsys-rep",
+          "bytes": 538938,
+          "sha256": "677447dabdfe34b0e547a15ed880e280ed2ff2596eaea5335d3a42e3d6524872"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.sqlite",
+          "bytes": 1789952,
+          "sha256": "793d86600cce92e0101c3fd056c61a80f8acda5f2ac30ee41078b87106ba1cca"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.5584854258799317,
+        "l2_ms": 1.5659960022234192,
+        "topk_total_ms": 1.4198229586836213,
+        "main_attention_ms": 0.9996728538156242,
+        "nfa_operator_total_ms": 1.368072499718653
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "far-only",
+      "mode_semantics": "skip near; compute far only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.36949259999999995,
+        "l1_topk_ms": 0.39803060000000035,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.7675232000000003,
+        "l2_score_ms": 0.6513617999999992,
+        "l2_topk_ms": 0.8263522000000002,
+        "selection_union_ms": 0.24565240000000016,
+        "l2_ms": 1.7233663999999997,
+        "topk_total_ms": 1.2243828000000003,
+        "main_attention_ms": 1.0240613999999997,
+        "nfa_operator_total_ms": 3.514950999999999
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.263683333333331,
+        "l1_topk_ms": 11.056405555555564,
+        "candidate_ms": 0.0,
+        "l1_ms": 21.320088888888897,
+        "l2_score_ms": 18.09338333333331,
+        "l2_topk_ms": 22.95422777777778,
+        "selection_union_ms": 6.823677777777783,
+        "l2_ms": 47.87128888888888,
+        "topk_total_ms": 34.010633333333345,
+        "main_attention_ms": 28.44614999999999,
+        "nfa_operator_total_ms": 97.63752777777775
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 36,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 36.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_far_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            4
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_topk_candidate_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            4
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            26
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.json",
+        "bytes": 41404,
+        "sha256": "02f346d827d5e8951b9139ebde3f7808d32431e786ec185d892d2bf12e6445a4"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.nsys-rep",
+          "bytes": 539800,
+          "sha256": "823887abafc04c70f072366683dfba0f2316a955ead0a2fca6cf6ea4c3e30798"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.sqlite",
+          "bytes": 1789952,
+          "sha256": "7bb96c216c769d6099e109c3b7afa48a7645bc96b65cf916a5455de22a2e5201"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.1713884349033352,
+        "l2_ms": 1.2286789390810913,
+        "topk_total_ms": 1.147195958649533,
+        "main_attention_ms": 1.000216588575646,
+        "nfa_operator_total_ms": 1.1496077754711231
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "both-skip",
+      "mode_semantics": "skip near and far; protected-only union/attention remains",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 0.12510699999999997,
+        "l2_ms": 0.12510699999999997,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 0.35285120000000003,
+        "nfa_operator_total_ms": 0.47795820000000006
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 3.4751944444444436,
+        "l2_ms": 3.4751944444444436,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 9.801422222222222,
+        "nfa_operator_total_ms": 13.276616666666667
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 0,
+          "active_candidate": 0,
+          "active_fine_score": 0
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 0.0,
+          "active_candidate": 0.0,
+          "active_fine_score": 0.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {},
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.json",
+        "bytes": 38364,
+        "sha256": "e9269786442f488b16bc99f252774dbcf522ce20a38a92087df139e5ae9d4e8a"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.nsys-rep",
+          "bytes": 480659,
+          "sha256": "c2861e87c9e138978840a09ef39899ee0c7cbd6b89890a63e70e2b0759efbd10"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.sqlite",
+          "bytes": 1646592,
+          "sha256": "8bb6a68f2ac00b390ac4179a829d5d83cda1af87a5910e4eb1cfdb086ea4497c"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": null,
+        "l2_ms": 16.925224008248936,
+        "topk_total_ms": null,
+        "main_attention_ms": 2.902875773130429,
+        "nfa_operator_total_ms": 8.454327177564895
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "no-skip",
+      "mode_semantics": "compute near and far",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.3786502,
+        "l1_topk_ms": 0.26757159999999985,
+        "candidate_ms": 0.23060519999999998,
+        "l1_ms": 0.8768269999999998,
+        "l2_score_ms": 0.9902227999999992,
+        "l2_topk_ms": 1.3440405999999996,
+        "selection_union_ms": 0.23746,
+        "l2_ms": 2.571723399999999,
+        "topk_total_ms": 1.6116121999999993,
+        "main_attention_ms": 1.0267598000000009,
+        "nfa_operator_total_ms": 4.475310199999999
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.51806111111111,
+        "l1_topk_ms": 7.432544444444441,
+        "candidate_ms": 6.4056999999999995,
+        "l1_ms": 24.35630555555555,
+        "l2_score_ms": 27.506188888888868,
+        "l2_topk_ms": 37.334461111111096,
+        "selection_union_ms": 6.596111111111111,
+        "l2_ms": 71.43676111111108,
+        "topk_total_ms": 44.767005555555535,
+        "main_attention_ms": 28.521105555555582,
+        "nfa_operator_total_ms": 124.3141722222222
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 36,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 36.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            9
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_l1_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            3
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_candidate_expand_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            9
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            5
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            34
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "bytes": 41868,
+        "sha256": "471f42747b514643d9b10b60bd1f540c644f6a86d0ebffad97a9a890ca00b9a0"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.nsys-rep",
+          "bytes": 642725,
+          "sha256": "d0ec6bcacbf50f2baee475b880dcd0c601e22b75b491feb7e50791d4dc2f7787"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.sqlite",
+          "bytes": 3112960,
+          "sha256": "6e49c18b5e6a8421fbe1d5d974f51a2a97ce4f245425fa539f57b12fd828539f"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.0,
+        "l2_ms": 1.0,
+        "topk_total_ms": 1.0,
+        "main_attention_ms": 1.0,
+        "nfa_operator_total_ms": 1.0
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "near-only",
+      "mode_semantics": "skip far; compute near only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.35562960000000016,
+        "l1_topk_ms": 0.16046079999999996,
+        "candidate_ms": 0.1910278,
+        "l1_ms": 0.7071182000000001,
+        "l2_score_ms": 0.3228616000000001,
+        "l2_topk_ms": 1.1783262000000003,
+        "selection_union_ms": 0.23622419999999983,
+        "l2_ms": 1.7374120000000002,
+        "topk_total_ms": 1.3387870000000002,
+        "main_attention_ms": 1.0256978,
+        "nfa_operator_total_ms": 3.470228
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 9.878600000000004,
+        "l1_topk_ms": 4.457244444444443,
+        "candidate_ms": 5.306327777777778,
+        "l1_ms": 19.642172222222225,
+        "l2_score_ms": 8.96837777777778,
+        "l2_topk_ms": 32.731283333333344,
+        "selection_union_ms": 6.561783333333328,
+        "l2_ms": 48.26144444444445,
+        "topk_total_ms": 37.188527777777786,
+        "main_attention_ms": 28.49160555555556,
+        "nfa_operator_total_ms": 96.39522222222223
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 36,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 36.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_near_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            2
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_l1_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_candidate_expand_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            3
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            2
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            10
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "bytes": 42258,
+        "sha256": "bea8d3c1d576cbe266a895d7eb2bdfaa4b4d56dc56021ad622ac4fb7fd6f9027"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.nsys-rep",
+          "bytes": 640554,
+          "sha256": "79cb380e50462e037d1437b6d6d7fcd854f153c9abb2845b81200697a3995bab"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.sqlite",
+          "bytes": 3100672,
+          "sha256": "d497ca976cf1a5a23df3635dd847254fffb47a907a75c4dbc8077143dac4b551"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.2400006109303927,
+        "l2_ms": 1.480203544121946,
+        "topk_total_ms": 1.2037853669030243,
+        "main_attention_ms": 1.0010353926858386,
+        "nfa_operator_total_ms": 1.2896300185463316
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "far-only",
+      "mode_semantics": "skip near; compute far only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.37079720000000005,
+        "l1_topk_ms": 0.20094099999999995,
+        "candidate_ms": 0.17939299999999997,
+        "l1_ms": 0.7511312,
+        "l2_score_ms": 0.6367444000000005,
+        "l2_topk_ms": 1.2792291999999985,
+        "selection_union_ms": 0.2372104,
+        "l2_ms": 2.153183999999999,
+        "topk_total_ms": 1.4801701999999985,
+        "main_attention_ms": 1.0261980000000004,
+        "nfa_operator_total_ms": 3.930513199999999
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.299922222222223,
+        "l1_topk_ms": 5.581694444444443,
+        "candidate_ms": 4.983138888888888,
+        "l1_ms": 20.864755555555558,
+        "l2_score_ms": 17.68734444444446,
+        "l2_topk_ms": 35.5341444444444,
+        "selection_union_ms": 6.589177777777778,
+        "l2_ms": 59.81066666666665,
+        "topk_total_ms": 41.11583888888885,
+        "main_attention_ms": 28.50550000000001,
+        "nfa_operator_total_ms": 109.1809222222222
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 36,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 36.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_far_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_l1_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            2
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_candidate_expand_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            7
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            4
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            26
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "bytes": 42332,
+        "sha256": "9f9fd165b0f86472217ca6f6a18f1fe6421c921ea2e252ac5a29b84a16e3beca"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.nsys-rep",
+          "bytes": 633817,
+          "sha256": "678a729b5f4fa810ca6f9424715827305b410690a30d78a12a7f0dc8b588ca5b"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.sqlite",
+          "bytes": 3055616,
+          "sha256": "b6a8f1e5a99d0a31362fcb3fc3dfe93237914c6ceb49fc78098bf3068704b4f9"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.1673420036339854,
+        "l2_ms": 1.1943816227503083,
+        "topk_total_ms": 1.0888019499379198,
+        "main_attention_ms": 1.0005474577030948,
+        "nfa_operator_total_ms": 1.1386070907992372
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "both-skip",
+      "mode_semantics": "skip near and far; protected-only union/attention remains",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 0.12216379999999996,
+        "l2_ms": 0.12216379999999996,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 0.34777680000000005,
+        "nfa_operator_total_ms": 0.4699406
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 3.393438888888888,
+        "l2_ms": 3.393438888888888,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 9.660466666666668,
+        "nfa_operator_total_ms": 13.053905555555554
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 0,
+          "active_candidate": 0,
+          "active_fine_score": 0
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 0.0,
+          "active_candidate": 0.0,
+          "active_fine_score": 0.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {},
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "bytes": 38358,
+        "sha256": "e3a758e550a5aa348d473150b8d808ddc60f65bf9f9a882d1434de21898e7f24"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.nsys-rep",
+          "bytes": 577140,
+          "sha256": "31e728f28dde66d194806d3a5b8710864e8e8e2919567e8b2675ea0f88d79675"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.sqlite",
+          "bytes": 2936832,
+          "sha256": "51f9306f4953482b590f72f9bf8766c05ec4e84d86ba8e01e8318f3c90f340e3"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": null,
+        "l2_ms": 21.051435859067904,
+        "topk_total_ms": null,
+        "main_attention_ms": 2.9523527733879913,
+        "nfa_operator_total_ms": 9.523140158564718
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "no-skip",
+      "mode_semantics": "compute near and far",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.38571620000000006,
+        "l1_topk_ms": 0.7852438000000002,
+        "candidate_ms": 0.0,
+        "l1_ms": 1.1709600000000002,
+        "l2_score_ms": 0.9856619999999993,
+        "l2_topk_ms": 1.3558245999999994,
+        "selection_union_ms": 0.2499020000000002,
+        "l2_ms": 2.591388599999999,
+        "topk_total_ms": 2.1410683999999995,
+        "main_attention_ms": 1.0282648000000008,
+        "nfa_operator_total_ms": 4.7906134
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.714338888888891,
+        "l1_topk_ms": 21.81232777777778,
+        "candidate_ms": 0.0,
+        "l1_ms": 32.52666666666667,
+        "l2_score_ms": 27.37949999999998,
+        "l2_topk_ms": 37.66179444444443,
+        "selection_union_ms": 6.941722222222229,
+        "l2_ms": 71.98301666666663,
+        "topk_total_ms": 59.47412222222221,
+        "main_attention_ms": 28.562911111111134,
+        "nfa_operator_total_ms": 133.07259444444446
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 36,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 36.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            9
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_topk_candidate_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            5
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            34
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.json",
+        "bytes": 40945,
+        "sha256": "4ae61b1b6629f7c5cd36603b8583d0432f25cdf4fb4ebd6fbf1336c740c5b198"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.nsys-rep",
+          "bytes": 691834,
+          "sha256": "eeb79ca9e37302620137d9e28a7b4eeaa9c6b3d727a3f63e04e3b197e8ad41e7"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.sqlite",
+          "bytes": 3125248,
+          "sha256": "cf4bacc5ad536034c7e81197101a61e070cd061f2c9ff0083dc2a517c2c1dce7"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.0,
+        "l2_ms": 1.0,
+        "topk_total_ms": 1.0,
+        "main_attention_ms": 1.0,
+        "nfa_operator_total_ms": 1.0
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "near-only",
+      "mode_semantics": "skip far; compute near only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.3584065999999999,
+        "l1_topk_ms": 0.22430160000000007,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.5827082,
+        "l2_score_ms": 0.33646160000000025,
+        "l2_topk_ms": 1.188766,
+        "selection_union_ms": 0.24982520000000008,
+        "l2_ms": 1.7750528000000003,
+        "topk_total_ms": 1.4130676000000002,
+        "main_attention_ms": 1.0310694,
+        "nfa_operator_total_ms": 3.3888304000000007
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 9.955738888888886,
+        "l1_topk_ms": 6.230600000000002,
+        "candidate_ms": 0.0,
+        "l1_ms": 16.18633888888889,
+        "l2_score_ms": 9.346155555555562,
+        "l2_topk_ms": 33.02127777777778,
+        "selection_union_ms": 6.939588888888891,
+        "l2_ms": 49.30702222222223,
+        "topk_total_ms": 39.251877777777786,
+        "main_attention_ms": 28.64081666666667,
+        "nfa_operator_total_ms": 94.1341777777778
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 36,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 36.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_near_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            2
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_topk_candidate_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            2
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            10
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.json",
+        "bytes": 41163,
+        "sha256": "3dd8fb8e5081faf648b94207c5e5616030699cc62c6847658ed2ec3af598d6fa"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.nsys-rep",
+          "bytes": 690351,
+          "sha256": "b626560b48b7d1c0cecce93a6d8d6619cecebd3b54e1ca3be7cf4eba5df5fbfe"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.sqlite",
+          "bytes": 3137536,
+          "sha256": "cb3ec28f7a87777b6ffb3d8ecb45d94c901b9289d25445c97f20749ba37c36f0"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 2.0095135095061307,
+        "l2_ms": 1.4598938127361611,
+        "topk_total_ms": 1.515191771434006,
+        "main_attention_ms": 0.997279911517111,
+        "nfa_operator_total_ms": 1.4136480244039356
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "far-only",
+      "mode_semantics": "skip near; compute far only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.3733358000000001,
+        "l1_topk_ms": 0.41923020000000016,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.7925660000000002,
+        "l2_score_ms": 0.6447074,
+        "l2_topk_ms": 1.2891778,
+        "selection_union_ms": 0.24954120000000007,
+        "l2_ms": 2.1834264000000005,
+        "topk_total_ms": 1.708408,
+        "main_attention_ms": 1.0279376000000011,
+        "nfa_operator_total_ms": 4.003930000000002
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.370438888888891,
+        "l1_topk_ms": 11.645283333333337,
+        "candidate_ms": 0.0,
+        "l1_ms": 22.01572222222223,
+        "l2_score_ms": 17.908538888888888,
+        "l2_topk_ms": 35.810494444444444,
+        "selection_union_ms": 6.931700000000002,
+        "l2_ms": 60.650733333333356,
+        "topk_total_ms": 47.455777777777776,
+        "main_attention_ms": 28.55382222222225,
+        "nfa_operator_total_ms": 111.22027777777784
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 36,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 36.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_far_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_topk_candidate_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            4
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            26
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.json",
+        "bytes": 41225,
+        "sha256": "77e543ac531d08d5ca3cabc1569f858d9da8b6ec77a36e33d1a5e1cdf7a2821f"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.nsys-rep",
+          "bytes": 693999,
+          "sha256": "154b5a98ad5beb1a32fd17109eecbe634c8fc6483b67717761331806b7885904"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.sqlite",
+          "bytes": 3186688,
+          "sha256": "6316961ff7e369c36b4c08bc5df7b0f79f043fbb382494b3c1d95519d652a500"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.4774290090667528,
+        "l2_ms": 1.186844951586185,
+        "topk_total_ms": 1.2532535553567998,
+        "main_attention_ms": 1.0003183072591173,
+        "nfa_operator_total_ms": 1.196477810551133
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "both-skip",
+      "mode_semantics": "skip near and far; protected-only union/attention remains",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 0.12542799999999996,
+        "l2_ms": 0.12542799999999996,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 0.35077239999999993,
+        "nfa_operator_total_ms": 0.4762003999999999
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 3.48411111111111,
+        "l2_ms": 3.48411111111111,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 9.743677777777776,
+        "nfa_operator_total_ms": 13.227788888888886
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 0,
+          "active_candidate": 0,
+          "active_fine_score": 0
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 0.0,
+          "active_candidate": 0.0,
+          "active_fine_score": 0.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {},
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.json",
+        "bytes": 38378,
+        "sha256": "0b42392c1ffd4a78b91e67ec4d5e1315ccf53c421bbb8ad6e1ea6363a58c4c3a"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.nsys-rep",
+          "bytes": 666539,
+          "sha256": "dd51b8610388e4421441b7bb2f064a88393f6df95bbda9dfb489a6049b385eca"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.sqlite",
+          "bytes": 3043328,
+          "sha256": "4429f7b35cb22be13ee3c881bebbe6c45fe1e73afa296682d49bf323305c7b41"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": null,
+        "l2_ms": 20.660367700991802,
+        "topk_total_ms": null,
+        "main_attention_ms": 2.931430180937842,
+        "nfa_operator_total_ms": 10.060078487964311
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "no-skip",
+      "mode_semantics": "compute near and far",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.3957133999999999,
+        "l1_topk_ms": 0.31318440000000025,
+        "candidate_ms": 0.23409359999999985,
+        "l1_ms": 0.9429914,
+        "l2_score_ms": 1.0040784,
+        "l2_topk_ms": 1.3458523999999996,
+        "selection_union_ms": 0.2341193999999999,
+        "l2_ms": 2.5840501999999996,
+        "topk_total_ms": 1.6590367999999998,
+        "main_attention_ms": 1.0250898000000006,
+        "nfa_operator_total_ms": 4.5521314
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.992038888888885,
+        "l1_topk_ms": 8.699566666666675,
+        "candidate_ms": 6.502599999999996,
+        "l1_ms": 26.194205555555556,
+        "l2_score_ms": 27.891066666666667,
+        "l2_topk_ms": 37.38478888888888,
+        "selection_union_ms": 6.503316666666664,
+        "l2_ms": 71.77917222222221,
+        "topk_total_ms": 46.084355555555554,
+        "main_attention_ms": 28.474716666666684,
+        "nfa_operator_total_ms": 126.44809444444445
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 36,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 36.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            17
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_l1_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            5
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_candidate_expand_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            9
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            5
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            34
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "bytes": 41931,
+        "sha256": "00801cbb8ffbe5bb6d279efa8cfe4e763116167383f3c81a7f9129f5d18c3e25"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.nsys-rep",
+          "bytes": 635353,
+          "sha256": "56cc85d80e4c8c54d88721de17124550bc67d21acafa41e26290a539c8955a3d"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.sqlite",
+          "bytes": 3117056,
+          "sha256": "916489f2a497479ccff52a09ed99641b2b4a6687346af2beb33a0ff19e2cd4ce"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.0,
+        "l2_ms": 1.0,
+        "topk_total_ms": 1.0,
+        "main_attention_ms": 1.0,
+        "nfa_operator_total_ms": 1.0
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "near-only",
+      "mode_semantics": "skip far; compute near only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.35031139999999994,
+        "l1_topk_ms": 0.15913619999999992,
+        "candidate_ms": 0.14217620000000006,
+        "l1_ms": 0.6516238,
+        "l2_score_ms": 0.3239242000000001,
+        "l2_topk_ms": 1.1802076,
+        "selection_union_ms": 0.23748500000000003,
+        "l2_ms": 1.7416167999999999,
+        "topk_total_ms": 1.3393438,
+        "main_attention_ms": 1.0254618000000004,
+        "nfa_operator_total_ms": 3.418702400000001
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 9.73087222222222,
+        "l1_topk_ms": 4.420449999999998,
+        "candidate_ms": 3.9493388888888905,
+        "l1_ms": 18.10066111111111,
+        "l2_score_ms": 8.997894444444448,
+        "l2_topk_ms": 32.783544444444445,
+        "selection_union_ms": 6.596805555555557,
+        "l2_ms": 48.37824444444444,
+        "topk_total_ms": 37.20399444444444,
+        "main_attention_ms": 28.485050000000015,
+        "nfa_operator_total_ms": 94.96395555555559
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 36,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 36.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_near_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            2
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_l1_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_candidate_expand_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            3
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            2
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            10
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "bytes": 42240,
+        "sha256": "a00716c12d4a5438059028bab09ec2c22d21dc866812962b3b3d650cc2ed2a27"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.nsys-rep",
+          "bytes": 638989,
+          "sha256": "0cc4d04c43da4db371496636a329c5e93ead3c1fccbcb1d8d612db0f916bbab1"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.sqlite",
+          "bytes": 3043328,
+          "sha256": "69ce2ac4d28358a6ca65b8f3989b92101f0bd626a432e5b4e2c3c9c78dad073d"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.447140819595601,
+        "l2_ms": 1.4837076674960874,
+        "topk_total_ms": 1.2386937543594108,
+        "main_attention_ms": 0.9996372366089114,
+        "nfa_operator_total_ms": 1.3315377787782872
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "far-only",
+      "mode_semantics": "skip near; compute far only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.3822984000000002,
+        "l1_topk_ms": 0.2330245999999999,
+        "candidate_ms": 0.18725179999999997,
+        "l1_ms": 0.8025748,
+        "l2_score_ms": 0.6399960000000006,
+        "l2_topk_ms": 1.2751843999999997,
+        "selection_union_ms": 0.23274919999999985,
+        "l2_ms": 2.1479296000000003,
+        "topk_total_ms": 1.5082089999999995,
+        "main_attention_ms": 1.0235602,
+        "nfa_operator_total_ms": 3.9740645999999997
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.619400000000006,
+        "l1_topk_ms": 6.472905555555553,
+        "candidate_ms": 5.201438888888888,
+        "l1_ms": 22.293744444444442,
+        "l2_score_ms": 17.777666666666683,
+        "l2_topk_ms": 35.42178888888888,
+        "selection_union_ms": 6.465255555555552,
+        "l2_ms": 59.664711111111124,
+        "topk_total_ms": 41.894694444444426,
+        "main_attention_ms": 28.432227777777776,
+        "nfa_operator_total_ms": 110.39068333333333
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 36,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 36.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_far_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            16
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_l1_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            4
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_candidate_expand_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            7
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            4
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            26
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "bytes": 42195,
+        "sha256": "e975d82346376f68f64d20b6734dd4c43e085ec79d715155d7b76a8aac53f3ab"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.nsys-rep",
+          "bytes": 641229,
+          "sha256": "4f0fec37657ec6e48bdcd0a0488f606f255076b74335128a1202b4b82edea265"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.sqlite",
+          "bytes": 3100672,
+          "sha256": "46f0b62046f98be94afa7480186a713bb4fcb5f8bc16e596d909d0c2a0501178"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.1749576488073137,
+        "l2_ms": 1.2030423157258037,
+        "topk_total_ms": 1.100004574962754,
+        "main_attention_ms": 1.0014943918296166,
+        "nfa_operator_total_ms": 1.1454598397821718
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "both-skip",
+      "mode_semantics": "skip near and far; protected-only union/attention remains",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 0.12244519999999995,
+        "l2_ms": 0.12244519999999995,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 0.3469968,
+        "nfa_operator_total_ms": 0.4694419999999999
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 3.401255555555554,
+        "l2_ms": 3.401255555555554,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 9.6388,
+        "nfa_operator_total_ms": 13.040055555555552
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 0,
+          "active_candidate": 0,
+          "active_fine_score": 0
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 0.0,
+          "active_candidate": 0.0,
+          "active_fine_score": 0.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {},
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "bytes": 38467,
+        "sha256": "f1f728d8b556e9d7582b8d7cd42c1c18865965ae05c04b745e062c785467ecb7"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.nsys-rep",
+          "bytes": 563596,
+          "sha256": "f254660c0d4c398cbfcabc102cba1ffa0b1c737264bb9eb2052e9cf4c5e6b54c"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.sqlite",
+          "bytes": 2867200,
+          "sha256": "0ce6b6ca320ca38f8cde16e309e3955d8dbd5e9393f57fc2be06b2711f3aba42"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": null,
+        "l2_ms": 21.10372803507202,
+        "topk_total_ms": null,
+        "main_attention_ms": 2.9541765226653407,
+        "nfa_operator_total_ms": 9.696898445388356
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "no-skip",
+      "mode_semantics": "compute near and far",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.4020043999999999,
+        "l1_topk_ms": 1.5945681999999992,
+        "candidate_ms": 0.0,
+        "l1_ms": 1.996572599999999,
+        "l2_score_ms": 0.9945253999999994,
+        "l2_topk_ms": 1.3589113999999978,
+        "selection_union_ms": 0.2473166,
+        "l2_ms": 2.600753399999997,
+        "topk_total_ms": 2.953479599999997,
+        "main_attention_ms": 1.0292262,
+        "nfa_operator_total_ms": 5.626552199999996
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 11.166788888888885,
+        "l1_topk_ms": 44.29356111111109,
+        "candidate_ms": 0.0,
+        "l1_ms": 55.46034999999998,
+        "l2_score_ms": 27.62570555555554,
+        "l2_topk_ms": 37.747538888888826,
+        "selection_union_ms": 6.8699055555555555,
+        "l2_ms": 72.24314999999993,
+        "topk_total_ms": 82.04109999999991,
+        "main_attention_ms": 28.589616666666668,
+        "nfa_operator_total_ms": 156.29311666666658
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 36,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 36.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            17
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_topk_candidate_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            5
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            34
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.json",
+        "bytes": 40929,
+        "sha256": "377d89f4108903e0ba904677ba5a4d74a9323e6e31aad6adbfa1f6c565939dfe"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.nsys-rep",
+          "bytes": 700027,
+          "sha256": "81ab651a96ee384028ca060dd9bcef6b7b77181e750923cf4acd10eb06f492f0"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.sqlite",
+          "bytes": 3215360,
+          "sha256": "df5a14d4805c9c7d4b4f4b32cfe897457ad40dcd4048d31ca98953064de39a72"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.0,
+        "l2_ms": 1.0,
+        "topk_total_ms": 1.0,
+        "main_attention_ms": 1.0,
+        "nfa_operator_total_ms": 1.0
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "near-only",
+      "mode_semantics": "skip far; compute near only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.35808079999999987,
+        "l1_topk_ms": 0.20747580000000004,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.5655566,
+        "l2_score_ms": 0.33375460000000035,
+        "l2_topk_ms": 1.1883106,
+        "selection_union_ms": 0.2498584000000001,
+        "l2_ms": 1.7719236000000005,
+        "topk_total_ms": 1.3957864000000002,
+        "main_attention_ms": 1.027645600000001,
+        "nfa_operator_total_ms": 3.3651258000000013
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 9.946688888888884,
+        "l1_topk_ms": 5.763216666666668,
+        "candidate_ms": 0.0,
+        "l1_ms": 15.709905555555556,
+        "l2_score_ms": 9.27096111111112,
+        "l2_topk_ms": 33.008627777777775,
+        "selection_union_ms": 6.940511111111114,
+        "l2_ms": 49.220100000000016,
+        "topk_total_ms": 38.77184444444445,
+        "main_attention_ms": 28.54571111111114,
+        "nfa_operator_total_ms": 93.4757166666667
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 36,
+          "far_only_l1": 0,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 36.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_near_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            2
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_topk_candidate_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            2
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            10
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.json",
+        "bytes": 41362,
+        "sha256": "4758b9f1dfca4d96d95a5714e00ec6441688eb1db8c79e744d79406994a18b4a"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.nsys-rep",
+          "bytes": 693834,
+          "sha256": "cabc88989057b96239c2d28cec9ccaf74a0cb79e4969b430248f2e034c2de860"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.sqlite",
+          "bytes": 3194880,
+          "sha256": "44f7f9b85846576cda604ef7f216a42b5df82b4ef79e5daec3ebd2853edfd0b7"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 3.5302790207027894,
+        "l2_ms": 1.467757074853564,
+        "topk_total_ms": 2.1159968316068967,
+        "main_attention_ms": 1.001538078886339,
+        "nfa_operator_total_ms": 1.6720183833840607
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "far-only",
+      "mode_semantics": "skip near; compute far only",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.387765,
+        "l1_topk_ms": 0.6955372000000002,
+        "candidate_ms": 0.0,
+        "l1_ms": 1.0833022,
+        "l2_score_ms": 0.6448596000000002,
+        "l2_topk_ms": 1.292758999999998,
+        "selection_union_ms": 0.24627220000000002,
+        "l2_ms": 2.183890799999998,
+        "topk_total_ms": 1.9882961999999982,
+        "main_attention_ms": 1.0288766000000011,
+        "nfa_operator_total_ms": 4.296069599999999
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 10.771250000000002,
+        "l1_topk_ms": 19.320477777777782,
+        "candidate_ms": 0.0,
+        "l1_ms": 30.09172777777778,
+        "l2_score_ms": 17.912766666666673,
+        "l2_topk_ms": 35.909972222222166,
+        "selection_union_ms": 6.840894444444445,
+        "l2_ms": 60.66363333333329,
+        "topk_total_ms": 55.23044999999995,
+        "main_attention_ms": 28.579905555555587,
+        "nfa_operator_total_ms": 119.33526666666664
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 36,
+          "active_page_stats": 36,
+          "active_candidate": 36,
+          "active_fine_score": 36
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 36.0,
+          "active_page_stats": 36.0,
+          "active_candidate": 36.0,
+          "active_fine_score": 36.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {
+        "_nfa_l1_far_scores_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            16
+          ],
+          "grid_y_values": [
+            8
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_topk_candidate_batched_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            1
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_filtered_topk_partial_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            4
+          ],
+          "grid_z_values": [
+            1
+          ]
+        },
+        "_nfa_fine_scores_paged_kernel": {
+          "mean_calls_per_step": 36.0,
+          "grid_x_values": [
+            8
+          ],
+          "grid_y_values": [
+            26
+          ],
+          "grid_z_values": [
+            1
+          ]
+        }
+      },
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.json",
+        "bytes": 41353,
+        "sha256": "cdcb069fa907ebcdd719d62a900fca0f51ebfdbbc4710c3a8bec4ac88fcb0237"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.nsys-rep",
+          "bytes": 692643,
+          "sha256": "03ca0b6c63d5b8c4fd1f2278beccc355887c95613f5c51c40810f9b36592fd05"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.sqlite",
+          "bytes": 3186688,
+          "sha256": "04506d8f27f6107d63d59b88967a7586e002844668229afba28c9dfff21298e9"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": 1.8430430585297426,
+        "l2_ms": 1.1908806978810476,
+        "topk_total_ms": 1.4854324018725176,
+        "main_attention_ms": 1.0003397880756535,
+        "nfa_operator_total_ms": 1.3096976361835473
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "both-skip",
+      "mode_semantics": "skip near and far; protected-only union/attention remains",
+      "uniform_layers": 36,
+      "whole_model_ms_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 0.12553639999999994,
+        "l2_ms": 0.12553639999999994,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 0.34894359999999974,
+        "nfa_operator_total_ms": 0.4744799999999997
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_ms": 0.0,
+        "l1_topk_ms": 0.0,
+        "candidate_ms": 0.0,
+        "l1_ms": 0.0,
+        "l2_score_ms": 0.0,
+        "l2_topk_ms": 0.0,
+        "selection_union_ms": 3.4871222222222205,
+        "l2_ms": 3.4871222222222205,
+        "topk_total_ms": 0.0,
+        "main_attention_ms": 9.69287777777777,
+        "nfa_operator_total_ms": 13.17999999999999
+      },
+      "region_kernel_audit": {
+        "expected_calls_per_step": {
+          "generic_l1": 0,
+          "near_only_l1": 0,
+          "far_only_l1": 0,
+          "active_page_stats": 0,
+          "active_candidate": 0,
+          "active_fine_score": 0
+        },
+        "observed_calls_per_step": {
+          "generic_l1": 0.0,
+          "near_only_l1": 0.0,
+          "far_only_l1": 0.0,
+          "active_page_stats": 0.0,
+          "active_candidate": 0.0,
+          "active_fine_score": 0.0
+        },
+        "passed": true,
+        "interpretation": "calls are per layer for the whole batch, not per request; generic=non-skip or mixed-batch, near_only=skip-far, far_only=skip-near; uniform both-skip contributes zero to every active selector entry"
+      },
+      "grid_evidence": {},
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.json",
+        "bytes": 38395,
+        "sha256": "85fa880011c6ef5cd2360896bda9e25e85325d63e11d842c240ed1205e2d5291"
+      },
+      "nsys": {
+        "report": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.nsys-rep",
+          "bytes": 639790,
+          "sha256": "f05c1c48e50d13bb57fb3c7533cca9560cb0211c7bc0d7d94eb8972937504767"
+        },
+        "sqlite": {
+          "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.sqlite",
+          "bytes": 3022848,
+          "sha256": "af9a9e32ecd0912c0331b57b96235c5e61acfd29dbfe08fdad9980ea7164dc0e"
+        }
+      },
+      "speedup_vs_no_skip": {
+        "l1_ms": null,
+        "l2_ms": 20.717125869468923,
+        "topk_total_ms": null,
+        "main_attention_ms": 2.949548866922909,
+        "nfa_operator_total_ms": 11.85835483055134
+      }
+    }
+  ],
+  "raw_receipt_manifest": {
+    "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/nfa_region_four_state_per_layer_raw_manifest_20261112.json",
+    "bytes": 21954,
+    "sha256": "829d50a39ce2f6af12f76da442f1780419ead54259a296c7f3d5bc69c3b63d63"
+  }
+}

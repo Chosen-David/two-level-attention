@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-12
+
+- [x] [TL-NFA-REGION-SKIP-20261111] 补齐并汇总 32K/64K/128K × eager/Graph × no-skip/near-only/far-only/both-skip 的24格单层等效算子数据：全36层强制同一模式，整模型每步阶段耗时÷36；24份回执、24对 nsys 与72个文件哈希内部审计 PASS，Graph 单侧 skip 的四类 kernel grid 缩容成立，both-skip 的 score/candidate/TopK 真实为0而 protected-only union/attention 保留。数据保持 pending-independent-verification。([详情](task_details/TL-NFA-REGION-SKIP-20261111.md#三长度单层等效四态算子2026-11-12内部审计-pass独立验收-pending)；[结果](../results/nfa_region_four_state_per_layer_20261112.json)；[manifest](../results/nfa_region_four_state_per_layer_raw_manifest_20261112.json))
+
 ## 2026-11-11
 
 - [x] [TL-NFA-EPS010-PERF-20261111] Qwen3-8B × RULER MultiKey2 sample2 的 attention-mass epsilon=0.10 性能补测完成：严格 tail=32/32、full=128/128，12 个 CUDA Graph 配对格与108份原始回执内部审计通过；总 skip 111→532，重算 tail/full、skip/no-skip 与 NFA/FlashInfer 加速比并保留负结果。数据仍为 pending-independent-verification。([详情](task_details/TL-NFA-EPS010-PERF-20261111.md)；[结果](../results/nfa_eps010_graph_performance_20261111.json))

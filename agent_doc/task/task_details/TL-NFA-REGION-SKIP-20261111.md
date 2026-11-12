@@ -124,3 +124,47 @@
 
 - eager 仍由 host 调度主导，算子消除不会等比例转化为 TPOT；tail 有 7 格、full 有 2 格 skip/no-skip 小于 1，全部保留，不宣称 eager 全格正收益。host 修复消除了旧实现的异常大幅反向开销，例如 256K B2 tail/full 从旧 50.360401/52.775167 ms 降至 32.823105/32.924112 ms；新 32K B1 tail-skip/no-skip=31.088912/31.272144 ms，full-skip/no-skip=32.185007/31.232832 ms，full 格仍为负结果。
 - 最终综合聚焦回归为 **85 passed、54 subtests passed**，`git diff --check` 与生产/审计 Python 静态编译通过。性能结论严格区分区域 kernel 消失、grid 缩容、Graph clean TPOT、eager clean TPOT 与旧 host 缺陷失败代。
+
+## 三长度单层等效四态算子（2026-11-12，内部审计 PASS，独立验收 pending）
+
+- 用户要求的口径是强制全 36 层处于同一模式，再以“整模型每个 decode step 的阶段总耗时 ÷ 36”得到**单层等效算术均值**，不是自然 gate 混合层 trace，也不是对某个具体 layer index 的单独归因。32K 复用上述 pc31 已审计强制四态回执；64K/128K 在 pc33 clean `b97af7ef909957e69b194e10ce4c97f5b1089be2` 上补测 16 份 operator 回执，不新增 clean TPOT 回执。
+- 输入统一为 Qwen3-8B × RULER `niah_multikey_2` sample2、native 32K/64K/128K、B1、tail=32/32、epsilon=0.10，3 warmup + 5 nsys profiled decode steps。Graph 每格 capture=1、replay=8、fallback=0，eager capture=0。32K 与 64K/128K 的测量主机和源码代次已在每份记录中显式保存；优先使用同长度四态比值，不把跨主机绝对值解释为受控长度扩展。
+- 下表单位均为 **µs/层/decode step**。`near-only` 表示 skip far、只算 near；`far-only` 表示 skip near、只算 far。TopK 为 L1/L2 ranking 合计且不与 L1/L2 再相加；NFA total = L1 + L2 + selected attention。eager 的单 CTA 快路把 candidate 融进 L1 TopK，因此其独立 candidate 为 0 并不代表未执行 candidate。
+
+### CUDA Graph
+
+| 长度 | 强制模式 | L1 | L2 | TopK 合计 | selected attention | NFA total | total/no-skip 加速比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 32K | no-skip | 23.180206 | 57.953339 | 30.620572 | 28.191628 | 109.325172 | 1.0000 |
+| 32K | near-only | 18.235744 | 36.504556 | 25.344894 | 28.217972 | 82.958272 | 1.3178 |
+| 32K | far-only | 21.112817 | 46.654611 | 27.670883 | 28.244750 | 96.012178 | 1.1387 |
+| 32K | both-skip | 0.000000 | 3.376922 | 0.000000 | 9.608639 | 12.985561 | 8.4190 |
+| 64K | no-skip | 24.356306 | 71.436761 | 44.767006 | 28.521106 | 124.314172 | 1.0000 |
+| 64K | near-only | 19.642172 | 48.261444 | 37.188528 | 28.491606 | 96.395222 | 1.2896 |
+| 64K | far-only | 20.864756 | 59.810667 | 41.115839 | 28.505500 | 109.180922 | 1.1386 |
+| 64K | both-skip | 0.000000 | 3.393439 | 0.000000 | 9.660467 | 13.053906 | 9.5231 |
+| 128K | no-skip | 26.194206 | 71.779172 | 46.084356 | 28.474717 | 126.448094 | 1.0000 |
+| 128K | near-only | 18.100661 | 48.378244 | 37.203994 | 28.485050 | 94.963956 | 1.3315 |
+| 128K | far-only | 22.293744 | 59.664711 | 41.894694 | 28.432228 | 110.390683 | 1.1455 |
+| 128K | both-skip | 0.000000 | 3.401256 | 0.000000 | 9.638800 | 13.040056 | 9.6969 |
+
+### eager
+
+| 长度 | 强制模式 | L1 | L2 | TopK 合计 | selected attention | NFA total | total/no-skip 加速比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 32K | no-skip | 24.974106 | 58.818444 | 39.016861 | 28.452311 | 112.244861 | 1.0000 |
+| 32K | near-only | 16.024600 | 37.559767 | 27.480089 | 28.461622 | 82.045989 | 1.3681 |
+| 32K | far-only | 21.320089 | 47.871289 | 34.010633 | 28.446150 | 97.637528 | 1.1496 |
+| 32K | both-skip | 0.000000 | 3.475194 | 0.000000 | 9.801422 | 13.276617 | 8.4543 |
+| 64K | no-skip | 32.526667 | 71.983017 | 59.474122 | 28.562911 | 133.072594 | 1.0000 |
+| 64K | near-only | 16.186339 | 49.307022 | 39.251878 | 28.640817 | 94.134178 | 1.4136 |
+| 64K | far-only | 22.015722 | 60.650733 | 47.455778 | 28.553822 | 111.220278 | 1.1965 |
+| 64K | both-skip | 0.000000 | 3.484111 | 0.000000 | 9.743678 | 13.227789 | 10.0601 |
+| 128K | no-skip | 55.460350 | 72.243150 | 82.041100 | 28.589617 | 156.293117 | 1.0000 |
+| 128K | near-only | 15.709906 | 49.220100 | 38.771844 | 28.545711 | 93.475717 | 1.6720 |
+| 128K | far-only | 30.091728 | 60.663633 | 55.230450 | 28.579906 | 119.335267 | 1.3097 |
+| 128K | both-skip | 0.000000 | 3.487122 | 0.000000 | 9.692878 | 13.180000 | 11.8584 |
+
+- both-skip 的 L1、L2 score、candidate 与全部 TopK 都是真实 0；表中非零 L2 仅为 protected-only `selection_union`，另有 selected attention，所以整层 NFA total 不为 0。相应零分母加速比在 JSON 中记为 `null`，不伪造 Infinity 或 1×。单侧 skip 的 selected attention 基本不变，围绕 1 的微小比值不作收益主张。
+- 24 份 JSON + 24 对 nsys report/sqlite 共 72 个文件的 SHA256、字节数、输入身份、源码身份、GPU hygiene、Graph capture/replay/fallback、四态层签名和区域 kernel 实例全部通过审计。Graph 三长度的 `_l1_topk_partial_kernel`、`_candidate_expand_batched_kernel`、`_nfa_filtered_topk_partial_kernel`、`_nfa_fine_scores_paged_kernel` 在两种单侧 skip 下均有真实 `gridY` 缩容；eager 不伪造单 CTA 快路的同类 grid 结论。
+- 汇总与 fail-closed 审计脚本：[`agent_doc/results/build_nfa_region_four_state_per_layer_20261112.py`](../../results/build_nfa_region_four_state_per_layer_20261112.py)。结果：[`agent_doc/results/nfa_region_four_state_per_layer_20261112.json`](../../results/nfa_region_four_state_per_layer_20261112.json)，SHA256=`f297815d568f770d09acb0037e057b7c1def48ca6928b0bbe149542756c01f1d`；manifest：[`agent_doc/results/nfa_region_four_state_per_layer_raw_manifest_20261112.json`](../../results/nfa_region_four_state_per_layer_raw_manifest_20261112.json)，SHA256=`829d50a39ce2f6af12f76da442f1780419ead54259a296c7f3d5bc69c3b63d63`。另以独立只读小程序复核 72/72 文件哈希、24 个唯一配置格和 264 项单层换算，均 PASS；这不替代不同 owner 的正式独立验收。双卡测量结束后均回落至 1 MiB、0%。
