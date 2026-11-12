@@ -27,6 +27,8 @@ def _add_quest_args(parser: argparse.ArgumentParser):
     # 官方 local_heavy_hitter_mask 内部按 chunk_size 分组选 topk chunk。
     group.add_argument('--quest_token_budget', type=int, default=1024)
     group.add_argument('--quest_chunk_size', type=int, default=16)
+    group.add_argument('--quest_max_seq_len', type=int, default=None)
+    group.add_argument('--quest_page_size', type=int, default=16)
     return parser
 
 def _add_minference_args(parser: argparse.ArgumentParser):
@@ -397,7 +399,7 @@ def _add_nfa_args(parser: argparse.ArgumentParser):
 def parse_args():
     parser = argparse.ArgumentParser(description='Sparse Attention Arguments',
                                      allow_abbrev=False)
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'tia', 'twi', 'nfa', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'quest_vendor_kernel', 'tia', 'twi', 'nfa', 'none'])
     parser = _add_quest_args(parser)
     _add_twilight_args(parser)
     parser = _add_tia_args(parser)
@@ -405,7 +407,7 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'moba_vendor', 'clusterkv_vendor', 'asynctls_vendor', 'hisa_vendor', 'jssa_vendor', 'tia', 'twi', 'nfa', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'quest_vendor_kernel', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'moba_vendor', 'clusterkv_vendor', 'asynctls_vendor', 'hisa_vendor', 'jssa_vendor', 'tia', 'twi', 'nfa', 'none'])
     parser = _add_quest_args(parser)
     parser = _add_minference_args(parser)
     parser = _add_fasa_args(parser)

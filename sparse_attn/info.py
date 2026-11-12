@@ -1002,6 +1002,18 @@ def get_method_name_with_info(args, snapshot=None):
             args,
             f"quest_vendor_{args.quest_token_budget}_"
             f"{args.quest_chunk_size}", snapshot)
+    elif args.method == "quest_vendor_kernel":
+        # Quest 官方高性能 CUDA kernel 路径（fp16 + paged KV +
+        # FlashInfer-style decode），区别于 quest_vendor 的 PyTorch
+        # reference。page_size/max_seq_len 参与命名，避免不同 paged 配置
+        # 互覆。
+        return _vendor_name_with_hash(
+            args,
+            f"quest_vendor_kernel_{args.quest_token_budget}_"
+            f"{args.quest_chunk_size}_p{args.quest_page_size}"
+            f"_l{args.quest_max_seq_len}",
+            snapshot,
+        )
     elif args.method == "minference_vendor":
         # B 轨 vendor（官方源码复用）：MInference prefill 动态稀疏 + decode dense。
         # pattern 文件（config_path）不同 = treatment 不同（不同模型/搜索口径），

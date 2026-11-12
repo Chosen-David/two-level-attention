@@ -307,6 +307,11 @@ def get_pred(
 
     for row_idx, json_obj in enumerate(tqdm(data)):
         torch.cuda.empty_cache()
+        # Quest 官方高性能 kernel 的 paged KV/metadata cache 是单序列资源，
+        # 手动生成循环会在同进程内处理多个样本；进入下一样本前必须复位，
+        # 否则 pool 耗尽（`pop from an empty set`）。
+        if hasattr(model, "reset_quest_controller"):
+            model.reset_quest_controller()
         prompt = prompt_format.format(**json_obj)
         # truncate to fit max_length (we suggest truncate in the middle, since the left and right side may contain crucial instructions)
         tokenized_prompt = tokenizer(
@@ -590,9 +595,18 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
     if "DeepSeek-V2" in model_name:
         _patch_deepseek_dynamic_cache_compat()
     tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        path, trust_remote_code=True, torch_dtype=torch.bfloat16, device_map="auto"
-    )
+    if args.method == 'quest_vendor_kernel':
+        # 官方 Quest CUDA 扩展只 dispatch torch.float16，且 batch=1；单卡
+        # 加载（每进程 CUDA_VISIBLE_DEVICES 选定实际卡）避免 device_map=auto
+        # 把模型切到多卡导致 official controller 状态/内存跨设备。
+        model = AutoModelForCausalLM.from_pretrained(
+            path, trust_remote_code=True, torch_dtype=torch.float16,
+            device_map="cuda:0",
+        )
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            path, trust_remote_code=True, torch_dtype=torch.bfloat16, device_map="auto"
+        )
     model = model.eval()
 
     # 【B3 修复（kimi3 清单 F3，2026-10-08）】patch 计数显式校验：
@@ -621,6 +635,37 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
             model,
             token_budget=getattr(args, "quest_token_budget", 1024),
             chunk_size=getattr(args, "quest_chunk_size", 16),
+        )
+    elif args.method == "quest_vendor_kernel":
+        # 官方高性能算子路径：调用 upstream/quest/utils + 编译产物
+        # quest/_kernels*.so（fp16 + paged KV + FlashInfer-style decode）。
+        # 当前官方 CUDA 内核只支持 Llama/Qwen3 的非 GQA 形状；Qwen3 GQA
+        # 在 adapter 内 repeat KV heads，不修改官方选择算法。
+        import sys
+        vendor_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "..", "exp", "vendor_baselines", "quest_vendor",
+        )
+        sys.path.insert(0, vendor_dir)
+        if model.config.model_type == "qwen3":
+            from qwen3_quest_kernel_patch import enable_quest
+        elif model.config.model_type == "llama":
+            raise RuntimeError(
+                "quest_vendor_kernel 尚未接入 Llama adapter；当前先支持 Qwen3"
+            )
+        else:
+            raise RuntimeError(
+                f"quest_vendor_kernel 不支持 model_type={model.config.model_type}"
+            )
+        max_seq_len = getattr(args, "quest_max_seq_len", None)
+        if max_seq_len is None:
+            max_seq_len = int(model.config.max_position_embeddings)
+        n_patched = enable_quest(
+            model,
+            token_budget=getattr(args, "quest_token_budget", 1024),
+            chunk_size=getattr(args, "quest_chunk_size", 16),
+            max_seq_len=max_seq_len,
+            page_size=getattr(args, "quest_page_size", 16),
         )
     elif args.method == "minference_vendor":
         # B 轨 vendor（官方源码复用）：MInference（微软 NeurIPS 2024）动态稀疏
