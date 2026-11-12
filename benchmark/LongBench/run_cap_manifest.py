@@ -594,8 +594,8 @@ def validate_run_cap_manifest(manifest):
             _fail("input_identity.prompt_template_sha256 不是小写 SHA-256")
         sample_count = contract["sample_count"]
         if (isinstance(sample_count, bool) or not isinstance(sample_count, int)
-                or sample_count < 0 or sample_count != manifest["n_samples"]):
-            _fail("input_identity.sample_count 必须等于 n_samples")
+                or sample_count < 0):
+            _fail("input_identity.sample_count 必须是非负整数")
         actual = manifest_identity.get("actual_input_ids")
         if (manifest.get("provenance") == "inline"
                 and not isinstance(actual, dict)):
@@ -617,6 +617,45 @@ def validate_run_cap_manifest(manifest):
                 _fail("actual_input_ids 含非法 SHA-256")
             if actual.get("ordered_sha256") != _ordered_digest_hash(hashes):
                 _fail("actual_input_ids ordered_sha256 与逐样本列表不一致")
+    sharding = manifest.get("sample_sharding")
+    if sharding is None:
+        if (manifest_identity is not None
+                and contract["sample_count"] != manifest["n_samples"]):
+            _fail("未分片 v1 manifest 的 input_identity.sample_count 必须等于 n_samples")
+    else:
+        if not isinstance(sharding, dict):
+            _fail("sample_sharding 须为对象")
+        required = (
+            "algorithm", "rank", "world_size", "source_samples",
+            "selected_samples", "source_sha256", "selected_ids_sha256",
+        )
+        if any(key not in sharding for key in required):
+            _fail("sample_sharding 缺少必填字段")
+        if sharding["algorithm"] != "source_order[rank::world_size]":
+            _fail("sample_sharding.algorithm 非法")
+        for key in ("rank", "world_size", "source_samples", "selected_samples"):
+            value = sharding[key]
+            if isinstance(value, bool) or not isinstance(value, int):
+                _fail(f"sample_sharding.{key} 必须是整数")
+        rank = sharding["rank"]
+        world = sharding["world_size"]
+        source_samples = sharding["source_samples"]
+        selected_samples = sharding["selected_samples"]
+        if world < 1 or not 0 <= rank < world or source_samples < 0:
+            _fail("sample_sharding rank/world/source_samples 域非法")
+        expected = len(range(rank, source_samples, world))
+        if selected_samples != expected or manifest["n_samples"] != expected:
+            _fail("sample_sharding.selected_samples/n_samples 与完整源人口不自洽")
+        for key in ("source_sha256", "selected_ids_sha256"):
+            value = sharding[key]
+            if (not isinstance(value, str) or len(value) != 64
+                    or any(c not in "0123456789abcdef" for c in value)):
+                _fail(f"sample_sharding.{key} 不是小写 SHA-256")
+        if manifest_identity is not None:
+            if source_samples != contract["sample_count"]:
+                _fail("分片 source_samples 必须等于完整源 input_identity.sample_count")
+            if sharding["source_sha256"] != contract["source_sha256"]:
+                _fail("分片 source_sha256 与完整源 input_identity 不一致")
     prov = manifest["provenance"]
     if manifest["effective_cap"] is None and prov != "provenance_incomplete":
         _fail("effective_cap=null 仅允许 provenance_incomplete")

@@ -145,6 +145,45 @@ class Lbv1InputIdentityV2Tests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(SystemExit):
                 validate_run_cap_manifest(bad)
 
+    def test_v1_shard_binds_full_source_and_selected_population(self):
+        identity = build_lbv1_input_identity(ROWS, PROMPT)
+        core = _core(identity)
+        selected_id = f"qasper:{identity['source_fingerprint']}:1"
+        core["sample_sharding"] = {
+            "algorithm": "source_order[rank::world_size]",
+            "rank": 1,
+            "world_size": 2,
+            "source_samples": 2,
+            "selected_samples": 1,
+            "source_sha256": identity["source_sha256"],
+            "selected_ids_sha256": hashlib.sha256(
+                selected_id.encode("utf-8")).hexdigest(),
+        }
+        manifest = finalize_run_cap_manifest(
+            core, status="complete", n_samples=1,
+            input_tokens=[2], truncated_flags=[False],
+            result_file="qasper-r1of2.jsonl", result_sha256="d" * 64,
+            result_lines=1, input_ids_sha256=[input_ids_sha256([3, 4])],
+        )
+        self.assertTrue(validate_run_cap_manifest(manifest))
+        self.assertEqual(manifest["input_identity"]["sample_count"], 2)
+        self.assertEqual(manifest["sample_sharding"]["selected_samples"], 1)
+
+        for key, value in (
+            ("source_samples", 3),
+            ("selected_samples", 0),
+            ("source_sha256", "0" * 64),
+            ("selected_ids_sha256", "not-a-sha"),
+        ):
+            bad = copy.deepcopy(manifest)
+            bad["sample_sharding"][key] = value
+            with self.subTest(key=key), self.assertRaises(SystemExit):
+                validate_run_cap_manifest(bad)
+        bad = copy.deepcopy(manifest)
+        del bad["sample_sharding"]
+        with self.assertRaises(SystemExit):
+            validate_run_cap_manifest(bad)
+
     def test_legacy_manifest_remains_legacy_not_reinterpreted_as_v2(self):
         core = build_run_cap_core(
             model_name="Qwen3-8B", model_path="/model", method="none",

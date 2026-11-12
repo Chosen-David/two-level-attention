@@ -4,7 +4,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from benchmark.LongBench.pred import parse_args, shard_longbench_v2
+from benchmark.LongBench.pred import (
+    longbench_sample_id,
+    parse_args,
+    shard_longbench,
+)
 from sparse_attn.info import get_method_name_with_info, get_treatment_manifest_json
 
 
@@ -12,7 +16,7 @@ def test_longbench_v2_shards_are_deterministic_disjoint_and_complete():
     data = [{"_id": f"sample-{i}"} for i in range(503)]
     for world_size in (1, 2, 3, 7, 16, 32):
         shards = [
-            shard_longbench_v2(data, "lbv2", rank, world_size)
+            shard_longbench(data, rank, world_size)
             for rank in range(world_size)
         ]
         merged = [row["_id"] for shard in shards for row in shard]
@@ -24,13 +28,31 @@ def test_longbench_v2_shards_are_deterministic_disjoint_and_complete():
             assert len(shard) == len(range(rank, 503, world_size))
 
 
-def test_longbench_v2_shard_rejects_bad_rank_and_other_tasks():
+def test_longbench_shard_rejects_bad_rank():
     data = [{"_id": "x"}]
     for rank, world_size in ((-1, 1), (1, 1), (0, 0), (2, 2)):
         with pytest.raises(ValueError):
-            shard_longbench_v2(data, "lbv2", rank, world_size)
-    with pytest.raises(ValueError):
-        shard_longbench_v2(data, "qasper", 1, 2)
+            shard_longbench(data, rank, world_size)
+
+
+def test_longbench_v1_shards_keep_full_source_ids():
+    data = [
+        {"_longbench_source_row_idx": index, "value": f"row-{index}"}
+        for index in range(11)
+    ]
+    data_fp = "v2-" + "a" * 64
+    shards = [shard_longbench(data, rank, 4) for rank in range(4)]
+    ids = [
+        longbench_sample_id("qasper", data_fp, row, row_idx)
+        for shard in shards
+        for row_idx, row in enumerate(shard)
+    ]
+    assert len(ids) == len(set(ids)) == len(data)
+    assert sorted(ids, key=lambda value: int(value.rsplit(":", 1)[1])) == [
+        f"qasper:{data_fp}:{index}" for index in range(11)
+    ]
+    assert shards[1] == data[1::4]
+    assert longbench_sample_id("lbv2", "", {"_id": 7}, 0) == "7"
 
 
 def test_longbench_v2_shard_cli_defaults_and_explicit_values():
@@ -42,6 +64,11 @@ def test_longbench_v2_shard_cli_defaults_and_explicit_values():
         "--sample-world-size", "7", "--pred_postfix", "_r2of7",
     ])
     assert (args.sample_rank, args.sample_world_size) == (2, 7)
+    args = parse_args([
+        "--task", "qasper", "--sample-rank", "1",
+        "--sample-world-size", "2", "--pred_postfix", "_r1of2",
+    ])
+    assert (args.sample_rank, args.sample_world_size) == (1, 2)
 
 
 def test_jssa_official_and_quest_kernel_treatment_identity(tmp_path):

@@ -102,10 +102,10 @@ def parse_args(args=None):
     parser.add_argument('--pred_postfix', type=str, default="")
     parser.add_argument(
         '--sample-rank', type=int, default=0,
-        help='LongBench v2 确定性样本分片 rank；其他任务禁止使用')
+        help='LongBench 确定性样本分片 rank')
     parser.add_argument(
         '--sample-world-size', type=int, default=1,
-        help='LongBench v2 确定性样本分片总数；按 data[rank::world_size] 切分')
+        help='LongBench 确定性样本分片总数；按 data[rank::world_size] 切分')
     # 稀疏 prefill（用户 2026-10-08 指令，MoBA/NSA/DSA 口径）：设
     # NFA_SPARSE_PREFILL=1 环境变量（须在模型加载/patch 挂载前；patch 层
     # 逐 forward 读 env，此处 parse 后立即设置即可）。默认不传 = 0 =
@@ -130,15 +130,21 @@ def parse_args(args=None):
     return parser.parse_args(args)
 
 
-def shard_longbench_v2(data, dataset, rank, world_size):
-    """LongBench v2 的确定性互斥分片；其他任务默认只能单分片。"""
+def shard_longbench(data, rank, world_size):
+    """按完整源顺序做确定性互斥分片。"""
     if type(rank) is not int or type(world_size) is not int:
         raise ValueError("sample rank/world size must be integers")
     if world_size < 1 or not 0 <= rank < world_size:
         raise ValueError("sample sharding requires 0 <= rank < world_size")
-    if dataset != "lbv2" and (rank != 0 or world_size != 1):
-        raise ValueError("sample sharding is supported only for LongBench v2")
     return list(data)[rank::world_size]
+
+
+def longbench_sample_id(dataset, data_fp, json_obj, row_idx):
+    """v1 分片后仍使用完整源行号，避免各 rank 从 0 重新编号。"""
+    if dataset == "lbv2":
+        return str(json_obj["_id"])
+    source_idx = json_obj.get("_longbench_source_row_idx", row_idx)
+    return f"{dataset}:{data_fp}:{source_idx}"
 
 
 # This is the customized building prompt for chat models
@@ -593,12 +599,11 @@ def get_pred(
         if dataset == "lbv2":
             # LongBench-v2：额外落盘解析字母与样本 _id（打分口径 accuracy = pred_choice == answer）
             record["pred_choice"] = extract_choice_letter(pred)
-            record["_id"] = json_obj["_id"]
-        else:
-            # E116a（GPT TL-LBV1-SAMPLE-GATE-024）：v1 记录补稳定 sample_id，
-            # 绑定 任务名 + 数据指纹 + 源行 index——评分端据此做 fail-closed
-            # 完整性门禁（无重复/与 manifest 集合相等），缺行混行不再静默通过。
-            record["_id"] = f"{dataset}:{data_fp}:{row_idx}"
+        # E116a（GPT TL-LBV1-SAMPLE-GATE-024）：v1 记录补稳定 sample_id，
+        # 绑定任务名 + 完整源数据指纹 + 完整源行 index。分片场景的 row_idx
+        # 只是片内序号，必须读取切分前写入的 _longbench_source_row_idx。
+        record["_id"] = longbench_sample_id(
+            dataset, data_fp, json_obj, row_idx)
         preds.append(record)
     return preds
 
@@ -1005,8 +1010,6 @@ if __name__ == "__main__":
     if (args.sample_world_size < 1
             or not 0 <= args.sample_rank < args.sample_world_size):
         raise SystemExit("[GATE-FAIL] 要求 0 <= sample-rank < sample-world-size")
-    if args.task != "lbv2" and (args.sample_rank != 0 or args.sample_world_size != 1):
-        raise SystemExit("[GATE-FAIL] 样本分片仅支持 task=lbv2")
     if args.sample_world_size > 1 and not args.pred_postfix:
         raise SystemExit("[GATE-FAIL] 多样本分片必须用 --pred_postfix 隔离输出目录")
     if args.paper_capture=='plan':
@@ -1123,12 +1126,6 @@ if __name__ == "__main__":
                 obj["all_classes"] = ["A", "B", "C", "D"]
                 data.append(obj)
             print(f"lbv2: loaded {len(data)} examples from {v2_path}", flush=True)
-            source_sample_count = len(data)
-            data = shard_longbench_v2(
-                data, dataset, args.sample_rank, args.sample_world_size)
-            print(
-                f"lbv2: selected {len(data)}/{source_sample_count} examples "
-                f"at rank {args.sample_rank}/{args.sample_world_size}", flush=True)
         elif args.e:
             if not has_local_data_set:
                 data = load_dataset("THUDM/LongBench", f"{dataset}_e", split="test")
@@ -1153,12 +1150,26 @@ if __name__ == "__main__":
         # 并把 prompt template 单独绑定进 run identity。旧 E116a 仅哈希
         # answers+length，会让 context/question 改写后仍沿用同一 _id/run-cap。
         # lbv2 有官方 _id，继续沿用其独立口径。
+        source_sample_count = len(data)
         if dataset == "lbv2":
             data_fp = ""
             input_identity = None
+            source_sha256 = v2_source_sha256
         else:
+            # 先对完整有序源行建立身份，再切分；不能把某个 shard 的指纹
+            # 冒充完整任务身份。内部源行号只用于稳定 _id，不参与源哈希。
             input_identity = build_lbv1_input_identity(data, prompt_format)
             data_fp = input_identity["source_fingerprint"]
+            source_sha256 = input_identity["source_sha256"]
+            data = [
+                dict(row, _longbench_source_row_idx=source_idx)
+                for source_idx, row in enumerate(data)
+            ]
+        data = shard_longbench(
+            data, args.sample_rank, args.sample_world_size)
+        print(
+            f"{dataset}: selected {len(data)}/{source_sample_count} examples "
+            f"at rank {args.sample_rank}/{args.sample_world_size}", flush=True)
 
         # 096（TL-DSV2-CAP-PROVENANCE-096）：method_name/out_fn/out_path 从
         # get_pred 之后上移到此处——run-cap 写门的早期 [CAP-CLASH] 检测在
@@ -1207,18 +1218,20 @@ if __name__ == "__main__":
             producer=resolve_producer_identity(__file__),
             input_identity=input_identity,
         )
-        if dataset == "lbv2":
-            selected_ids = [str(obj["_id"]) for obj in data]
-            runcap_core["sample_sharding"] = {
-                "algorithm": "source_order[rank::world_size]",
-                "rank": args.sample_rank,
-                "world_size": args.sample_world_size,
-                "source_samples": source_sample_count,
-                "selected_samples": len(data),
-                "source_sha256": v2_source_sha256,
-                "selected_ids_sha256": hashlib.sha256(
-                    "\n".join(selected_ids).encode("utf-8")).hexdigest(),
-            }
+        selected_ids = [
+            longbench_sample_id(dataset, data_fp, obj, row_idx)
+            for row_idx, obj in enumerate(data)
+        ]
+        runcap_core["sample_sharding"] = {
+            "algorithm": "source_order[rank::world_size]",
+            "rank": args.sample_rank,
+            "world_size": args.sample_world_size,
+            "source_samples": source_sample_count,
+            "selected_samples": len(data),
+            "source_sha256": source_sha256,
+            "selected_ids_sha256": hashlib.sha256(
+                "\n".join(selected_ids).encode("utf-8")).hexdigest(),
+        }
         # 103（TL-E096-CAP-GATE-TOCTOU-103，GPT 审计 2026-10-12_0739）：
         # gate 与发布间的跨进程独占锁（fcntl.flock，锁文件 = 输出目录下
         # .runcap_gate.lock）——修复前两进程可在 sidecar 尚不存在时同时

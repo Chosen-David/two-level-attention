@@ -2,6 +2,8 @@
 
 ## 2026-11-12
 
+- [ ] [TL-GLM-ASYNCTLS-LBV1-20261112] 优先完成 GLM-4.7-Flash × AsyncTLS × LongBench v1 英文16任务全量精度：K2=1024、K1=128×64、逐KV group校准、上一步块集与完整prompt dense prefill；真实47层校准、qasper/samsum及双分片多请求smoke已完成，聚焦回归19 passed+12 subtests；3750请求、官方评分和独立验收待完成，分数保持pending。([详情](task_details/TL-GLM-ASYNCTLS-LBV1-20261112.md))
+
 - [x] [TL-QWEN3-LBV2-VENDOR-20261112] Qwen3-8B × LongBench v2 三臂统一 K2=1024、AsyncTLS K1=128×64、确定性503题分片与 runcap 身份；Quest/JSSA 执行官方算子，AsyncTLS 按论文语义复现。三臂原始分片均收回并通过生产侧闭集、源顺序、答案与 official-strict 重算，Quest/JSSA/AsyncTLS=161/165/162/503，33项 manifest 哈希复核 PASS；全部分数独立验收前保持 pending。([详情](task_details/TL-QWEN3-LBV2-VENDOR-20261112.md)；[结果](../results/qwen3_lbv2_vendor_20261112/summary.json))
 
 - [x] [TL-QWEN3-LBV1-VENDOR-PERF-20261112] 本机双 H20 独占完成 Qwen3-8B × LongBench v1 英文16任务三 baseline 性能：B1 eager、sample0、1 warmup、3 repeats、定长33 token，共144/144 clean cells；三份独立 nsys、跨臂输入身份、源码/校准哈希与14项 manifest 复核 PASS。macro TPOT Quest/JSSA/AsyncTLS=26.0379/39.9628/305.2039ms，clean e2e 与 profiler 分离，数据独立验收前保持 pending。([详情](task_details/TL-QWEN3-LBV1-VENDOR-PERF-20261112.md)；[结果](../results/qwen3_lbv1_vendor_perf_20261112T01/summary.json))
