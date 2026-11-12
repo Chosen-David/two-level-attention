@@ -25,9 +25,14 @@ class _FlashInferMaskMetadata:
         self.is_sliding = [False] * num_layers
         self.is_compileable = False
         self.max_seq_len = max_seq_len
+        self.seq_length = 0
+
+    def get_seq_length(self):
+        return self.seq_length
 
     def get_mask_sizes(self, cache_position, layer_idx):
-        query_length = cache_position.shape[0]
+        query_length = (cache_position if isinstance(cache_position, int)
+                        else cache_position.shape[0])
         # prefill 必须得到严格 [L, L] causal mask；单 token decode 使用
         # 固定最大长度使 SDPA 走 None-mask 快路径，且避免 HF packed 误判。
         kv_length = self.max_seq_len if query_length == 1 else query_length
@@ -38,14 +43,14 @@ class FlashInferQwen3Runtime:
     """固定物理页、动态逻辑长度的 Qwen3 FlashInfer decode runtime。"""
 
     def __init__(self, model, batch_size, prefill_length, max_new_tokens,
-                 device, page_size=64):
+                 device, page_size=64, head_dim=None):
         config = model.config
         self.num_layers = config.num_hidden_layers
         self.num_qo_heads = config.num_attention_heads
         self.num_kv_heads = config.num_key_value_heads
-        self.head_dim = getattr(
-            config, 'head_dim', config.hidden_size // self.num_qo_heads)
-        if any(layer.self_attn.sliding_window is not None
+        self.head_dim = (head_dim if head_dim is not None else getattr(
+            config, 'head_dim', config.hidden_size // self.num_qo_heads))
+        if any(getattr(layer.self_attn, 'sliding_window', None) is not None
                for layer in model.model.layers):
             raise ValueError(
                 'FlashInfer canonical full-model path requires full-attention '
@@ -210,6 +215,7 @@ class FlashInferQwen3Runtime:
         self.kv_indptr.copy_(self.indptr_history[step])
         self.kv_last_page_len.copy_(self.last_page_len_history[step])
         self.decode_positions.fill_(self.prefill_length + step)
+        self.mask_metadata.seq_length = self.prefill_length + step
 
     def append_prefill(self, layer_idx, key_states, value_states):
         import flashinfer
