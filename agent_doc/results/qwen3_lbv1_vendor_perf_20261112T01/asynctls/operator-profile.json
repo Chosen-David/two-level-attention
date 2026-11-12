@@ -1,0 +1,206 @@
+{
+  "identity": {
+    "schema": "longbench-v1-vendor-performance-identity-v1",
+    "treatment": {
+      "method": "asynctls_vendor",
+      "model": "Qwen3-8B",
+      "effective_cap": 31500,
+      "max_new_tokens": 9,
+      "execution": "eager",
+      "batch_size": 1,
+      "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+      "token_budget": 1024,
+      "block_size": 64,
+      "top_kb": 128,
+      "implementation": "AsyncTLS paper-semantic reproduction"
+    },
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/LongBench",
+    "tasks": [
+      "narrativeqa",
+      "qasper",
+      "samsum"
+    ],
+    "sample_indices": [
+      0
+    ],
+    "warmup_requests": 1,
+    "repeats": 1,
+    "measurement_mode": "operator-profile",
+    "producer": {
+      "script_path": "/home/wangyuanshuo02/two-level-attention/benchmark/LongBench/perf_vendor.py",
+      "script_sha256": "8d5f25a3530d3230bbfb194b911cbb418e258404eaf95e83d19d17905fd7b9ec",
+      "git_commit": "cc1eca728aaf10e02553cb4b7efa1c1eab753718"
+    },
+    "source_files_sha256": {
+      "benchmark/LongBench/perf_vendor.py": "8d5f25a3530d3230bbfb194b911cbb418e258404eaf95e83d19d17905fd7b9ec",
+      "benchmark/LongBench/pred.py": "47d40b5998c6d0f3f46cf9ba34f3fca7d5b9f9aeadfbdf56f7c9017fad5c8b05",
+      "exp/vendor_baselines/asynctls_vendor/qwen3_asynctls_patch.py": "26ce689acfada974b9a8d0b37bc64956e9f5a46b183485b2a4d4f6fd19d48e21"
+    },
+    "calibration": {
+      "asynctls_channel_file_sha256": "613a971cbc36d8e312a76af5ff2ee85bcd1bb0959c333ebd8e0605afd1524da4"
+    }
+  },
+  "cells": [
+    {
+      "task": "narrativeqa",
+      "sample_index": 0,
+      "repeat": 0,
+      "source_sha256": "0fb8d08ba5cdad4b74244224b0dc2e8b41ee6b850d954a13eb2d282621ce2f71",
+      "source_fingerprint": "v2-6e5f045c9865a76b8722c0ae1635a3aabf994bb513361e9db1a70bc8effd77c2",
+      "input": {
+        "input_tokens": 31399,
+        "input_ids_sha256": "65cc77b75dccd2d66903d87df401db31198ba2b6f2b80fcac6afc9c983ef316d",
+        "truncated": false
+      },
+      "jssa_runtime": null,
+      "request_timing": {
+        "schema": "longbench-v1-request-wall-v1",
+        "ttft_ms": 7223.722442984581,
+        "decode_after_first_wall_ms": 4366.357587277889,
+        "tpot_ms": 545.7946984097362,
+        "request_wall_ms": 11590.1505574584,
+        "actual_generated_tokens": 9,
+        "generated_token_ids": [
+          44505,
+          448,
+          279,
+          29351,
+          85,
+          30255,
+          13,
+          151645,
+          271
+        ],
+        "eos_positions": [
+          7
+        ],
+        "eos_early_stop": false,
+        "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+        "timing_scope": "generation context including cache/index work, greedy argmax, per-token host readback and boundary synchronization",
+        "timing_metric": "complete request host wall, not kernel-only latency",
+        "host_readback_in_decode_loop": true
+      }
+    },
+    {
+      "task": "qasper",
+      "sample_index": 0,
+      "repeat": 0,
+      "source_sha256": "29aa07d2a63f36f4fb8e8cd200a3428ee3126d750bde6af1c8f9bc41c2366854",
+      "source_fingerprint": "v2-5e2bf8729da651892986ab459ddc16b1d810e0f8fca9c6245012a7bd7b7308d9",
+      "input": {
+        "input_tokens": 4085,
+        "input_ids_sha256": "1b9fc0cf04b62cf27e5a2803d5ad8fe2bd69383c7853909d0264e46872f30d78",
+        "truncated": false
+      },
+      "jssa_runtime": null,
+      "request_timing": {
+        "schema": "longbench-v1-request-wall-v1",
+        "ttft_ms": 592.6662981510162,
+        "decode_after_first_wall_ms": 2798.8909780979156,
+        "tpot_ms": 349.86137226223946,
+        "request_wall_ms": 3391.6123509407043,
+        "actual_generated_tokens": 9,
+        "generated_token_ids": [
+          785,
+          4910,
+          8046,
+          369,
+          12418,
+          3669,
+          374,
+          9555,
+          1526
+        ],
+        "eos_positions": [],
+        "eos_early_stop": false,
+        "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+        "timing_scope": "generation context including cache/index work, greedy argmax, per-token host readback and boundary synchronization",
+        "timing_metric": "complete request host wall, not kernel-only latency",
+        "host_readback_in_decode_loop": true
+      }
+    },
+    {
+      "task": "samsum",
+      "sample_index": 0,
+      "repeat": 0,
+      "source_sha256": "d435a4c7a05d2006872da8dd0c44c0a48648baa1ce4f62a4084d07aa7883f0cc",
+      "source_fingerprint": "v2-733c9d56a21765f2966d38cd82088e7a391e279826b42a442c19e6c3bf347680",
+      "input": {
+        "input_tokens": 9508,
+        "input_ids_sha256": "4c1159037bcc59fb4addfd03e58e1564d6b51c253a2c00518763a6e677b8be7f",
+        "truncated": false
+      },
+      "jssa_runtime": null,
+      "request_timing": {
+        "schema": "longbench-v1-request-wall-v1",
+        "ttft_ms": 1523.1194719672203,
+        "decode_after_first_wall_ms": 4307.262763381004,
+        "tpot_ms": 538.4078454226255,
+        "request_wall_ms": 5830.463074147701,
+        "actual_generated_tokens": 9,
+        "generated_token_ids": [
+          5748,
+          24078,
+          374,
+          2058,
+          18514,
+          448,
+          12375,
+          624,
+          82890
+        ],
+        "eos_positions": [],
+        "eos_early_stop": false,
+        "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+        "timing_scope": "generation context including cache/index work, greedy argmax, per-token host readback and boundary synchronization",
+        "timing_metric": "complete request host wall, not kernel-only latency",
+        "host_readback_in_decode_loop": true
+      }
+    }
+  ],
+  "device": {
+    "name": "NVIDIA H20-3e",
+    "capability": [
+      9,
+      0
+    ],
+    "torch_version": "2.8.0+cu128"
+  },
+  "profiler_clean_e2e_isolated": true,
+  "host_overhead_derivable_by_subtraction": false,
+  "status": "complete",
+  "verification": "pending-independent-verification",
+  "summary": {
+    "per_task": {
+      "narrativeqa": {
+        "ttft_ms": 7223.722442984581,
+        "tpot_ms": 545.7946984097362,
+        "request_wall_ms": 11590.1505574584,
+        "requests": 1
+      },
+      "qasper": {
+        "ttft_ms": 592.6662981510162,
+        "tpot_ms": 349.86137226223946,
+        "request_wall_ms": 3391.6123509407043,
+        "requests": 1
+      },
+      "samsum": {
+        "ttft_ms": 1523.1194719672203,
+        "tpot_ms": 538.4078454226255,
+        "request_wall_ms": 5830.463074147701,
+        "requests": 1
+      }
+    },
+    "macro_task_mean": {
+      "ttft_ms": 3113.1694043676057,
+      "tpot_ms": 478.02130536486703,
+      "request_wall_ms": 6937.408660848935
+    },
+    "all_request_median": {
+      "ttft_ms": 1523.1194719672203,
+      "tpot_ms": 538.4078454226255,
+      "request_wall_ms": 5830.463074147701
+    }
+  }
+}

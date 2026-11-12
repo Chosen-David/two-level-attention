@@ -1,0 +1,290 @@
+{
+  "identity": {
+    "schema": "longbench-v1-vendor-performance-identity-v1",
+    "treatment": {
+      "method": "jssa_official",
+      "model": "Qwen3-8B",
+      "effective_cap": 31500,
+      "max_new_tokens": 9,
+      "execution": "eager",
+      "batch_size": 1,
+      "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+      "budget": 1024,
+      "rank": 32,
+      "page_size": 64,
+      "implementation": "official vendored Triton store/score/indexed-attend"
+    },
+    "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+    "data_root": "/home/wangyuanshuo02/sparse-bench/third_party/KVCache-Factory/data/LongBench",
+    "tasks": [
+      "narrativeqa",
+      "qasper",
+      "samsum"
+    ],
+    "sample_indices": [
+      0
+    ],
+    "warmup_requests": 1,
+    "repeats": 1,
+    "measurement_mode": "operator-profile",
+    "producer": {
+      "script_path": "/home/wangyuanshuo02/two-level-attention/benchmark/LongBench/perf_vendor.py",
+      "script_sha256": "8d5f25a3530d3230bbfb194b911cbb418e258404eaf95e83d19d17905fd7b9ec",
+      "git_commit": "482911be08df9e4e2cc9bf2f9025fb52f9d9b547"
+    },
+    "source_files_sha256": {
+      "benchmark/LongBench/perf_vendor.py": "8d5f25a3530d3230bbfb194b911cbb418e258404eaf95e83d19d17905fd7b9ec",
+      "benchmark/LongBench/pred.py": "47d40b5998c6d0f3f46cf9ba34f3fca7d5b9f9aeadfbdf56f7c9017fad5c8b05",
+      "exp/vendor_baselines/jssa_vendor/qwen3_jssa_official.py": "4901a85bc38012b2820397e76cbc340a0e2e9432553d707048b016bd59ea5459"
+    },
+    "calibration": {
+      "jssa_basis_sha256": "c0642d54a676d94f9e0f2227f364eda24c3655382f7e0c2c3b9199f19e315a22"
+    }
+  },
+  "cells": [
+    {
+      "task": "narrativeqa",
+      "sample_index": 0,
+      "repeat": 0,
+      "source_sha256": "0fb8d08ba5cdad4b74244224b0dc2e8b41ee6b850d954a13eb2d282621ce2f71",
+      "source_fingerprint": "v2-6e5f045c9865a76b8722c0ae1635a3aabf994bb513361e9db1a70bc8effd77c2",
+      "input": {
+        "input_tokens": 31399,
+        "input_ids_sha256": "65cc77b75dccd2d66903d87df401db31198ba2b6f2b80fcac6afc9c983ef316d",
+        "truncated": false
+      },
+      "jssa_runtime": {
+        "implementation": "official vendored Triton store/score/indexed-attend",
+        "basis_path_independent_artifact": true,
+        "budget": 1024,
+        "rank": 32,
+        "page_size": 64,
+        "kv_cache_layout": "[layer, block, position, H_kv, K|V] BF16",
+        "projected_key_cache": "separate contiguous FP8 E4M3 [layer, block, position, H_kv, rank]",
+        "projected_key_scale": "per-(KV-head,channel) basis row norm folded into proj_q",
+        "score_kernel": "_jssa_score_contig_kernel",
+        "attention_kernel": "official gather-free online-softmax indexed-attend",
+        "local_compatibility_patch": "pad GQA rows to at least 16 in registers for Triton tl.dot; all padded loads/stores are masked",
+        "topk": "official torch.topk fallback with preallocated int64 Graph-safe output",
+        "radix_topk_available": false,
+        "prefill_attention": "HF SDPA with original Qwen3 RoPE",
+        "prefill_store": "official fused project+store for every post-RoPE K/V token",
+        "decode_store_calls_warmup_and_capture": 288,
+        "decode_attention_calls_warmup_and_capture": 288,
+        "decode_indexed_attention_calls": 288,
+        "decode_partial_attention_calls": 0,
+        "short_sequence_policy": "official eager partial: stable-compact valid Top-K rows, then exact dense attention over min(seq_len,budget) real tokens",
+        "execution": "eager",
+        "prefill_store_calls": 36,
+        "decode_store_calls": 288,
+        "decode_attention_calls": 288,
+        "decode_steps": 8,
+        "generated_tokens": 9,
+        "eos_early_stop": false
+      },
+      "request_timing": {
+        "schema": "longbench-v1-request-wall-v1",
+        "ttft_ms": 6905.830539762974,
+        "decode_after_first_wall_ms": 443.5577020049095,
+        "tpot_ms": 55.44471275061369,
+        "request_wall_ms": 7350.028596818447,
+        "actual_generated_tokens": 9,
+        "generated_token_ids": [
+          44505,
+          448,
+          279,
+          29351,
+          85,
+          30255,
+          13,
+          151645,
+          271
+        ],
+        "eos_positions": [
+          7
+        ],
+        "eos_early_stop": false,
+        "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+        "timing_scope": "generation context including cache/index work, greedy argmax, per-token host readback and boundary synchronization",
+        "timing_metric": "complete request host wall, not kernel-only latency",
+        "host_readback_in_decode_loop": true
+      }
+    },
+    {
+      "task": "qasper",
+      "sample_index": 0,
+      "repeat": 0,
+      "source_sha256": "29aa07d2a63f36f4fb8e8cd200a3428ee3126d750bde6af1c8f9bc41c2366854",
+      "source_fingerprint": "v2-5e2bf8729da651892986ab459ddc16b1d810e0f8fca9c6245012a7bd7b7308d9",
+      "input": {
+        "input_tokens": 4085,
+        "input_ids_sha256": "1b9fc0cf04b62cf27e5a2803d5ad8fe2bd69383c7853909d0264e46872f30d78",
+        "truncated": false
+      },
+      "jssa_runtime": {
+        "implementation": "official vendored Triton store/score/indexed-attend",
+        "basis_path_independent_artifact": true,
+        "budget": 1024,
+        "rank": 32,
+        "page_size": 64,
+        "kv_cache_layout": "[layer, block, position, H_kv, K|V] BF16",
+        "projected_key_cache": "separate contiguous FP8 E4M3 [layer, block, position, H_kv, rank]",
+        "projected_key_scale": "per-(KV-head,channel) basis row norm folded into proj_q",
+        "score_kernel": "_jssa_score_contig_kernel",
+        "attention_kernel": "official gather-free online-softmax indexed-attend",
+        "local_compatibility_patch": "pad GQA rows to at least 16 in registers for Triton tl.dot; all padded loads/stores are masked",
+        "topk": "official torch.topk fallback with preallocated int64 Graph-safe output",
+        "radix_topk_available": false,
+        "prefill_attention": "HF SDPA with original Qwen3 RoPE",
+        "prefill_store": "official fused project+store for every post-RoPE K/V token",
+        "decode_store_calls_warmup_and_capture": 288,
+        "decode_attention_calls_warmup_and_capture": 288,
+        "decode_indexed_attention_calls": 288,
+        "decode_partial_attention_calls": 0,
+        "short_sequence_policy": "official eager partial: stable-compact valid Top-K rows, then exact dense attention over min(seq_len,budget) real tokens",
+        "execution": "eager",
+        "prefill_store_calls": 36,
+        "decode_store_calls": 288,
+        "decode_attention_calls": 288,
+        "decode_steps": 8,
+        "generated_tokens": 9,
+        "eos_early_stop": false
+      },
+      "request_timing": {
+        "schema": "longbench-v1-request-wall-v1",
+        "ttft_ms": 552.4735972285271,
+        "decode_after_first_wall_ms": 403.3011123538017,
+        "tpot_ms": 50.412639044225216,
+        "request_wall_ms": 956.308975815773,
+        "actual_generated_tokens": 9,
+        "generated_token_ids": [
+          785,
+          4910,
+          8046,
+          369,
+          12418,
+          3669,
+          374,
+          9555,
+          1526
+        ],
+        "eos_positions": [],
+        "eos_early_stop": false,
+        "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+        "timing_scope": "generation context including cache/index work, greedy argmax, per-token host readback and boundary synchronization",
+        "timing_metric": "complete request host wall, not kernel-only latency",
+        "host_readback_in_decode_loop": true
+      }
+    },
+    {
+      "task": "samsum",
+      "sample_index": 0,
+      "repeat": 0,
+      "source_sha256": "d435a4c7a05d2006872da8dd0c44c0a48648baa1ce4f62a4084d07aa7883f0cc",
+      "source_fingerprint": "v2-733c9d56a21765f2966d38cd82088e7a391e279826b42a442c19e6c3bf347680",
+      "input": {
+        "input_tokens": 9508,
+        "input_ids_sha256": "4c1159037bcc59fb4addfd03e58e1564d6b51c253a2c00518763a6e677b8be7f",
+        "truncated": false
+      },
+      "jssa_runtime": {
+        "implementation": "official vendored Triton store/score/indexed-attend",
+        "basis_path_independent_artifact": true,
+        "budget": 1024,
+        "rank": 32,
+        "page_size": 64,
+        "kv_cache_layout": "[layer, block, position, H_kv, K|V] BF16",
+        "projected_key_cache": "separate contiguous FP8 E4M3 [layer, block, position, H_kv, rank]",
+        "projected_key_scale": "per-(KV-head,channel) basis row norm folded into proj_q",
+        "score_kernel": "_jssa_score_contig_kernel",
+        "attention_kernel": "official gather-free online-softmax indexed-attend",
+        "local_compatibility_patch": "pad GQA rows to at least 16 in registers for Triton tl.dot; all padded loads/stores are masked",
+        "topk": "official torch.topk fallback with preallocated int64 Graph-safe output",
+        "radix_topk_available": false,
+        "prefill_attention": "HF SDPA with original Qwen3 RoPE",
+        "prefill_store": "official fused project+store for every post-RoPE K/V token",
+        "decode_store_calls_warmup_and_capture": 288,
+        "decode_attention_calls_warmup_and_capture": 288,
+        "decode_indexed_attention_calls": 288,
+        "decode_partial_attention_calls": 0,
+        "short_sequence_policy": "official eager partial: stable-compact valid Top-K rows, then exact dense attention over min(seq_len,budget) real tokens",
+        "execution": "eager",
+        "prefill_store_calls": 36,
+        "decode_store_calls": 288,
+        "decode_attention_calls": 288,
+        "decode_steps": 8,
+        "generated_tokens": 9,
+        "eos_early_stop": false
+      },
+      "request_timing": {
+        "schema": "longbench-v1-request-wall-v1",
+        "ttft_ms": 1427.3526221513748,
+        "decode_after_first_wall_ms": 407.16077387332916,
+        "tpot_ms": 50.895096734166145,
+        "request_wall_ms": 1835.080824792385,
+        "actual_generated_tokens": 9,
+        "generated_token_ids": [
+          5748,
+          24078,
+          374,
+          2058,
+          18514,
+          448,
+          12375,
+          624,
+          82890
+        ],
+        "eos_positions": [],
+        "eos_early_stop": false,
+        "decode_protocol": "fixed length; EOS recorded but not used for early stop",
+        "timing_scope": "generation context including cache/index work, greedy argmax, per-token host readback and boundary synchronization",
+        "timing_metric": "complete request host wall, not kernel-only latency",
+        "host_readback_in_decode_loop": true
+      }
+    }
+  ],
+  "device": {
+    "name": "NVIDIA H20-3e",
+    "capability": [
+      9,
+      0
+    ],
+    "torch_version": "2.8.0+cu128"
+  },
+  "profiler_clean_e2e_isolated": true,
+  "host_overhead_derivable_by_subtraction": false,
+  "status": "complete",
+  "verification": "pending-independent-verification",
+  "summary": {
+    "per_task": {
+      "narrativeqa": {
+        "ttft_ms": 6905.830539762974,
+        "tpot_ms": 55.44471275061369,
+        "request_wall_ms": 7350.028596818447,
+        "requests": 1
+      },
+      "qasper": {
+        "ttft_ms": 552.4735972285271,
+        "tpot_ms": 50.412639044225216,
+        "request_wall_ms": 956.308975815773,
+        "requests": 1
+      },
+      "samsum": {
+        "ttft_ms": 1427.3526221513748,
+        "tpot_ms": 50.895096734166145,
+        "request_wall_ms": 1835.080824792385,
+        "requests": 1
+      }
+    },
+    "macro_task_mean": {
+      "ttft_ms": 2961.8855863809586,
+      "tpot_ms": 52.250816176335015,
+      "request_wall_ms": 3380.472799142202
+    },
+    "all_request_median": {
+      "ttft_ms": 1427.3526221513748,
+      "tpot_ms": 50.895096734166145,
+      "request_wall_ms": 1835.080824792385
+    }
+  }
+}

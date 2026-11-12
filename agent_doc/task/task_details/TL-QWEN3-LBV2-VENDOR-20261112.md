@@ -33,11 +33,12 @@ Date: 2026-11-12
 - 校准身份：JSSA basis SHA256=`c0642d54a676d94f9e0f2227f364eda24c3655382f7e0c2c3b9199f19e315a22`；AsyncTLS per-group channel SHA256=`613a971cbc36d8e312a76af5ff2ee85bcd1bb0959c333ebd8e0605afd1524da4`。
 - 回归：`tests/test_qwen3_jssa_official.py` CUDA 4 passed；`tests/test_longbench_v2_baselines.py`、`test_longbench_prompt_split.py`、`test_longbench_empty_handoff.py`、`test_qwen3_quest_graph.py` 合计17 passed + 4 subtests；runner `bash -n` 与 `git diff --check` 通过。
 - 排障：tiny-Qwen 完整生成暴露 prefill 前未调用 `begin_prefill_request(0)` 导致未初始化槽，已修复并覆盖第二请求/EOS；初版 runner 未关闭 NFA layer-skip 导致缺省掩码门禁，已仅在 vendor runner 显式关闭，不改变既有全局 snapshot 语义。
-- 全量 Quest/JSSA 原始分片已收回本地 `agent_doc/results/qwen3_lbv2_vendor_20261112/raw/`；`collect.py` 逐分片校验 runcap 字节SHA/行数、rank/world、源ID顺序、答案和 official-strict parser 后合并为503闭集。Quest=161/503（accuracy 0.3200795229，parsed 480），JSSA=165/503（0.3280318091，parsed 482）；两者仍 `pending-independent-verification`，不是最终独立验收结论。
-- AsyncTLS 三分片仍在 pc31/pc40 运行，最近日志进度为106/168、109/168、96/167；未收回、未合并、未评分。Quest 初次 pc32 OOM 产物保留，正式闭集使用 `quest_retry1` rank0/1 与 pc02 `quest` rank2。
+- 三臂原始 JSONL/runcap 已全部收回本地 `agent_doc/results/qwen3_lbv2_vendor_20261112/raw/`；AsyncTLS 三分片均 complete，行数168/168/167，结果 SHA256 分别为 `4dbda70e…`、`b2fe1b6a…`、`e123aafbd…`。Quest 初次 pc32 OOM 产物保留，正式闭集使用 `quest_retry1` rank0/1 与 pc02 `quest` rank2。
+- `collect.py` 对三臂逐分片校验 runcap 字节SHA/行数、rank/world、源ID顺序、答案和 official-strict parser，均合并为完整503闭集并重算：Quest=161/503（accuracy 0.3200795229，parsed 480，unparsed 23），JSSA=165/503（0.3280318091，parsed 482，unparsed 21），AsyncTLS=162/503（0.3220675944，parsed 479，unparsed 24）。结果=`agent_doc/results/qwen3_lbv2_vendor_20261112/summary.json`，SHA256=`4c1dec6b1dfe44c9bb3f8ea62d4620a7fd6465381050183869d7554b66dea500`。
+- 全文件 manifest 共33项，本地逐文件 SHA256 复核 `sha_mismatch=[]`；manifest SHA256=`fe197f6689aad076933ca751586b6e62adec386e1b2ab3efe0f722928dd3b7f9`。三臂仍全部 `pending-independent-verification`，生产侧校验不冒充不同 owner 独立验收。
 
 ### 阻塞与下一步
 
-- 继续监控 AsyncTLS 三分片；完成后收回原始 JSONL/runcap，运行同一 `collect.py` 校验合并并生成三臂 `summary.json` 与全文件 SHA256 manifest。
-- 本机两张 H20 专用于 `TL-QWEN3-LBV1-VENDOR-PERF-20261112`，不与本精度矩阵混卡。
+- 测量、原始证据归档和生产侧重算已收官；后续仅需不同 owner 独立验收，不重跑已闭集的503请求。
+- 本机两张 H20 的 LongBench v1 性能任务 `TL-QWEN3-LBV1-VENDOR-PERF-20261112` 亦已完成测量和闭集校验，未与本精度矩阵混卡。
 - 全部分数在不同 owner 独立验收前保持 pending；不得把生产侧校验通过表述为独立验收完成。

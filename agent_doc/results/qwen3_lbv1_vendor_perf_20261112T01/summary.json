@@ -1,0 +1,459 @@
+{
+  "schema": "qwen3-lbv1-vendor-performance-v1",
+  "status": "complete",
+  "verification": "pending-independent-verification",
+  "scope": "B1 eager English16 sample0; one warmup and three measured requests; 33 generated tokens per clean request; macro task mean and all-request median",
+  "not_inferred": [
+    "not a 3750-request distribution",
+    "no kernel-only to complete-request substitution",
+    "no clean-e2e versus profiler subtraction"
+  ],
+  "cross_arm_input_identity": "16/16 matched",
+  "clean_cells": 144,
+  "provenance": {
+    "recorded_producer_commit": "482911be08df9e4e2cc9bf2f9025fb52f9d9b547",
+    "implementation_commit": "cc1eca728aaf10e02553cb4b7efa1c1eab753718",
+    "profile_producer_commits": {
+      "quest": "cc1eca728aaf10e02553cb4b7efa1c1eab753718",
+      "jssa": "482911be08df9e4e2cc9bf2f9025fb52f9d9b547",
+      "asynctls": "cc1eca728aaf10e02553cb4b7efa1c1eab753718"
+    },
+    "mapping": "recorded old HEAD plus verified source hashes identifies the measured code",
+    "current_source_hashes_match_receipts": true,
+    "source_files_sha256": {
+      "quest": {
+        "benchmark/LongBench/perf_vendor.py": "8d5f25a3530d3230bbfb194b911cbb418e258404eaf95e83d19d17905fd7b9ec",
+        "benchmark/LongBench/pred.py": "47d40b5998c6d0f3f46cf9ba34f3fca7d5b9f9aeadfbdf56f7c9017fad5c8b05",
+        "exp/vendor_baselines/quest_vendor/qwen3_quest_kernel_patch.py": "b87c53bca3d03b262ea5541116180b83220a71d4760578c2de447230e59d0d26"
+      },
+      "jssa": {
+        "benchmark/LongBench/perf_vendor.py": "8d5f25a3530d3230bbfb194b911cbb418e258404eaf95e83d19d17905fd7b9ec",
+        "benchmark/LongBench/pred.py": "47d40b5998c6d0f3f46cf9ba34f3fca7d5b9f9aeadfbdf56f7c9017fad5c8b05",
+        "exp/vendor_baselines/jssa_vendor/qwen3_jssa_official.py": "4901a85bc38012b2820397e76cbc340a0e2e9432553d707048b016bd59ea5459"
+      },
+      "asynctls": {
+        "benchmark/LongBench/perf_vendor.py": "8d5f25a3530d3230bbfb194b911cbb418e258404eaf95e83d19d17905fd7b9ec",
+        "benchmark/LongBench/pred.py": "47d40b5998c6d0f3f46cf9ba34f3fca7d5b9f9aeadfbdf56f7c9017fad5c8b05",
+        "exp/vendor_baselines/asynctls_vendor/qwen3_asynctls_patch.py": "26ce689acfada974b9a8d0b37bc64956e9f5a46b183485b2a4d4f6fd19d48e21"
+      }
+    }
+  },
+  "arms": {
+    "quest": {
+      "method": "quest_vendor_kernel",
+      "clean_e2e": {
+        "path": "quest/clean-e2e.json",
+        "sha256": "162a5cf95aeb787f8b615f8e61855b0afc609046523a19bfd58122a831706349",
+        "cells": 48,
+        "summary": {
+          "per_task": {
+            "2wikimqa": {
+              "ttft_ms": 1636.8092596530914,
+              "tpot_ms": 21.486664656549692,
+              "request_wall_ms": 2324.4318142533302,
+              "requests": 3
+            },
+            "gov_report": {
+              "ttft_ms": 2349.8204573988914,
+              "tpot_ms": 25.14827181585133,
+              "request_wall_ms": 3154.610924422741,
+              "requests": 3
+            },
+            "hotpotqa": {
+              "ttft_ms": 2561.017669737339,
+              "tpot_ms": 26.016636984422803,
+              "request_wall_ms": 3392.5835713744164,
+              "requests": 3
+            },
+            "lcc": {
+              "ttft_ms": 2926.5973940491676,
+              "tpot_ms": 25.66495817154646,
+              "request_wall_ms": 3747.922919690609,
+              "requests": 3
+            },
+            "multi_news": {
+              "ttft_ms": 830.0773724913597,
+              "tpot_ms": 21.179966162890196,
+              "request_wall_ms": 1507.0744454860687,
+              "requests": 3
+            },
+            "multifieldqa_en": {
+              "ttft_ms": 683.5001185536385,
+              "tpot_ms": 20.97977907396853,
+              "request_wall_ms": 1363.6559396982193,
+              "requests": 3
+            },
+            "musique": {
+              "ttft_ms": 3748.511962592602,
+              "tpot_ms": 31.57217870466411,
+              "request_wall_ms": 4758.8681653141975,
+              "requests": 3
+            },
+            "narrativeqa": {
+              "ttft_ms": 8451.28320157528,
+              "tpot_ms": 49.23298815265298,
+              "request_wall_ms": 10026.881091296673,
+              "requests": 3
+            },
+            "passage_count": {
+              "ttft_ms": 3934.658609330654,
+              "tpot_ms": 31.377408420667052,
+              "request_wall_ms": 4938.463069498539,
+              "requests": 3
+            },
+            "passage_retrieval_en": {
+              "ttft_ms": 2600.4434004426003,
+              "tpot_ms": 25.635776109993458,
+              "request_wall_ms": 3423.5208928585052,
+              "requests": 3
+            },
+            "qasper": {
+              "ttft_ms": 973.5529273748398,
+              "tpot_ms": 21.345475455746055,
+              "request_wall_ms": 1658.5044711828232,
+              "requests": 3
+            },
+            "qmsum": {
+              "ttft_ms": 2096.4594036340714,
+              "tpot_ms": 23.97406962700188,
+              "request_wall_ms": 2864.078901708126,
+              "requests": 3
+            },
+            "repobench-p": {
+              "ttft_ms": 2856.0187444090843,
+              "tpot_ms": 27.103278087452054,
+              "request_wall_ms": 3724.9277606606483,
+              "requests": 3
+            },
+            "samsum": {
+              "ttft_ms": 1557.3356300592422,
+              "tpot_ms": 23.389281006529927,
+              "request_wall_ms": 2305.8892861008644,
+              "requests": 3
+            },
+            "trec": {
+              "ttft_ms": 1201.3947814702988,
+              "tpot_ms": 21.161228884011507,
+              "request_wall_ms": 1880.5150911211967,
+              "requests": 3
+            },
+            "triviaqa": {
+              "ttft_ms": 1407.3757603764534,
+              "tpot_ms": 21.338310791179538,
+              "request_wall_ms": 2090.039223432541,
+              "requests": 3
+            }
+          },
+          "macro_task_mean": {
+            "ttft_ms": 2488.4285433217883,
+            "tpot_ms": 26.037892006570473,
+            "request_wall_ms": 3322.6229730062187
+          },
+          "all_request_median": {
+            "ttft_ms": 2259.960386902094,
+            "tpot_ms": 24.56333755981177,
+            "request_wall_ms": 3046.8013621866703
+          }
+        },
+        "device": {
+          "name": "NVIDIA H20-3e",
+          "capability": [
+            9,
+            0
+          ],
+          "torch_version": "2.8.0+cu128"
+        }
+      },
+      "operator_profile": {
+        "path": "quest/operator-profile.json",
+        "sha256": "9fdc29a0076a430e42aa4b755fdc3cdd4470a179551c6deed2d97974c4a1fd04",
+        "cells": 3,
+        "generated_tokens_per_cell": 9,
+        "nsys_receipt": "quest/operator-profile.nsys-rep",
+        "kernel_report": "quest/operator-profile.kernels.txt",
+        "kernel_markers_observed": [
+          "MaxPossibleSampleWithPagedKVCacheKernel",
+          "BatchDecodeWithPagedKVCacheKernel",
+          "radix_topk_one_block_kernel"
+        ],
+        "note": "profiler observations are separate; no host-time subtraction"
+      }
+    },
+    "jssa": {
+      "method": "jssa_official",
+      "clean_e2e": {
+        "path": "jssa/clean-e2e.json",
+        "sha256": "a9af9bfd1c70d665ba3886a60e487ee63438ccf3d6b0750d336805630ca976bb",
+        "cells": 48,
+        "summary": {
+          "per_task": {
+            "2wikimqa": {
+              "ttft_ms": 1054.6951815485954,
+              "tpot_ms": 39.672630839049816,
+              "request_wall_ms": 2326.258361339569,
+              "requests": 3
+            },
+            "gov_report": {
+              "ttft_ms": 1701.7527669668198,
+              "tpot_ms": 40.058214450255036,
+              "request_wall_ms": 2984.671674668789,
+              "requests": 3
+            },
+            "hotpotqa": {
+              "ttft_ms": 1832.2022035717964,
+              "tpot_ms": 39.93254154920578,
+              "request_wall_ms": 3110.5893701314926,
+              "requests": 3
+            },
+            "lcc": {
+              "ttft_ms": 1785.766638815403,
+              "tpot_ms": 40.42324027977884,
+              "request_wall_ms": 3094.5450514554977,
+              "requests": 3
+            },
+            "multi_news": {
+              "ttft_ms": 354.8361212015152,
+              "tpot_ms": 38.82783395238221,
+              "request_wall_ms": 1601.2570708990097,
+              "requests": 3
+            },
+            "multifieldqa_en": {
+              "ttft_ms": 229.8704832792282,
+              "tpot_ms": 38.792212726548314,
+              "request_wall_ms": 1471.4056849479675,
+              "requests": 3
+            },
+            "musique": {
+              "ttft_ms": 2815.422162413597,
+              "tpot_ms": 40.88276671245694,
+              "request_wall_ms": 4124.615602195263,
+              "requests": 3
+            },
+            "narrativeqa": {
+              "ttft_ms": 6875.645808875561,
+              "tpot_ms": 41.594738606363535,
+              "request_wall_ms": 8207.311525940895,
+              "requests": 3
+            },
+            "passage_count": {
+              "ttft_ms": 2782.361939549446,
+              "tpot_ms": 40.964496321976185,
+              "request_wall_ms": 4104.659728705883,
+              "requests": 3
+            },
+            "passage_retrieval_en": {
+              "ttft_ms": 1784.5233008265495,
+              "tpot_ms": 40.19925813190639,
+              "request_wall_ms": 3071.794018149376,
+              "requests": 3
+            },
+            "qasper": {
+              "ttft_ms": 548.9739924669266,
+              "tpot_ms": 38.852872559800744,
+              "request_wall_ms": 1792.7748039364815,
+              "requests": 3
+            },
+            "qmsum": {
+              "ttft_ms": 1509.581871330738,
+              "tpot_ms": 39.81524263508618,
+              "request_wall_ms": 2784.190647304058,
+              "requests": 3
+            },
+            "repobench-p": {
+              "ttft_ms": 2034.2157557606697,
+              "tpot_ms": 40.33839446492493,
+              "request_wall_ms": 3327.0273581147194,
+              "requests": 3
+            },
+            "samsum": {
+              "ttft_ms": 1421.2212562561035,
+              "tpot_ms": 40.143047692254186,
+              "request_wall_ms": 2706.3671201467514,
+              "requests": 3
+            },
+            "trec": {
+              "ttft_ms": 695.5426782369614,
+              "tpot_ms": 39.43290188908577,
+              "request_wall_ms": 1957.93716609478,
+              "requests": 3
+            },
+            "triviaqa": {
+              "ttft_ms": 787.3933240771294,
+              "tpot_ms": 39.47501257061958,
+              "request_wall_ms": 2055.88199198246,
+              "requests": 3
+            }
+          },
+          "macro_task_mean": {
+            "ttft_ms": 1763.375342823565,
+            "tpot_ms": 39.9628378363559,
+            "request_wall_ms": 3045.080448500812
+          },
+          "all_request_median": {
+            "ttft_ms": 1634.182833135128,
+            "tpot_ms": 39.996972191147506,
+            "request_wall_ms": 2914.9928092956543
+          }
+        },
+        "device": {
+          "name": "NVIDIA H20-3e",
+          "capability": [
+            9,
+            0
+          ],
+          "torch_version": "2.8.0+cu128"
+        }
+      },
+      "operator_profile": {
+        "path": "jssa/operator-profile.json",
+        "sha256": "534b9576f5dba884f04be7e03caae2028db90f8afb17c42035091517d28ef546",
+        "cells": 3,
+        "generated_tokens_per_cell": 9,
+        "nsys_receipt": "jssa/operator-profile.nsys-rep",
+        "kernel_report": "jssa/operator-profile.kernels.txt",
+        "kernel_markers_observed": [
+          "_jssa_project_store_contig_fp8_kernel",
+          "_jssa_score_contig_kernel",
+          "_split_attend_kernel"
+        ],
+        "note": "profiler observations are separate; no host-time subtraction"
+      }
+    },
+    "asynctls": {
+      "method": "asynctls_vendor",
+      "clean_e2e": {
+        "path": "asynctls/clean-e2e.json",
+        "sha256": "c491ceff93097f95f9187464f41d28b8fbc75eb9248251167eff42e819734ccd",
+        "cells": 48,
+        "summary": {
+          "per_task": {
+            "2wikimqa": {
+              "ttft_ms": 1118.7324076890945,
+              "tpot_ms": 321.6144600883126,
+              "request_wall_ms": 11417.405977845192,
+              "requests": 3
+            },
+            "gov_report": {
+              "ttft_ms": 1800.8090630173683,
+              "tpot_ms": 349.44321494549513,
+              "request_wall_ms": 12978.424839675426,
+              "requests": 3
+            },
+            "hotpotqa": {
+              "ttft_ms": 1950.7612138986588,
+              "tpot_ms": 344.61677609942853,
+              "request_wall_ms": 13028.716392815113,
+              "requests": 3
+            },
+            "lcc": {
+              "ttft_ms": 1935.9331876039505,
+              "tpot_ms": 347.48681425116956,
+              "request_wall_ms": 13043.751247227192,
+              "requests": 3
+            },
+            "multi_news": {
+              "ttft_ms": 382.63967633247375,
+              "tpot_ms": 190.112677635625,
+              "request_wall_ms": 6469.571799039841,
+              "requests": 3
+            },
+            "multifieldqa_en": {
+              "ttft_ms": 243.34876239299774,
+              "tpot_ms": 139.30841046385467,
+              "request_wall_ms": 4709.141746163368,
+              "requests": 3
+            },
+            "musique": {
+              "ttft_ms": 2959.623411297798,
+              "tpot_ms": 346.81874536909163,
+              "request_wall_ms": 14051.257632672787,
+              "requests": 3
+            },
+            "narrativeqa": {
+              "ttft_ms": 7129.93323802948,
+              "tpot_ms": 356.83770128525794,
+              "request_wall_ms": 18545.267693698406,
+              "requests": 3
+            },
+            "passage_count": {
+              "ttft_ms": 2948.057748377323,
+              "tpot_ms": 350.3041847143322,
+              "request_wall_ms": 14179.677814245224,
+              "requests": 3
+            },
+            "passage_retrieval_en": {
+              "ttft_ms": 1911.5803465247154,
+              "tpot_ms": 347.95221383683383,
+              "request_wall_ms": 13050.70098489523,
+              "requests": 3
+            },
+            "qasper": {
+              "ttft_ms": 585.0981920957565,
+              "tpot_ms": 226.3663576450199,
+              "request_wall_ms": 7826.8424570560455,
+              "requests": 3
+            },
+            "qmsum": {
+              "ttft_ms": 1632.3421597480774,
+              "tpot_ms": 344.56924675032496,
+              "request_wall_ms": 12668.687142431736,
+              "requests": 3
+            },
+            "repobench-p": {
+              "ttft_ms": 2168.9824610948563,
+              "tpot_ms": 348.5699603334069,
+              "request_wall_ms": 13337.694935500622,
+              "requests": 3
+            },
+            "samsum": {
+              "ttft_ms": 1517.6678150892258,
+              "tpot_ms": 344.88982055336237,
+              "request_wall_ms": 12571.80156558752,
+              "requests": 3
+            },
+            "trec": {
+              "ttft_ms": 741.0121262073517,
+              "tpot_ms": 253.71760851703584,
+              "request_wall_ms": 8873.338960111141,
+              "requests": 3
+            },
+            "triviaqa": {
+              "ttft_ms": 841.720461845398,
+              "tpot_ms": 270.6538827624172,
+              "request_wall_ms": 9502.690359950066,
+              "requests": 3
+            }
+          },
+          "macro_task_mean": {
+            "ttft_ms": 1866.7651419527829,
+            "tpot_ms": 305.2038797031855,
+            "request_wall_ms": 11640.935721807182
+          },
+          "all_request_median": {
+            "ttft_ms": 1719.2956544458866,
+            "tpot_ms": 345.22371366620064,
+            "request_wall_ms": 12764.480322599411
+          }
+        },
+        "device": {
+          "name": "NVIDIA H20-3e",
+          "capability": [
+            9,
+            0
+          ],
+          "torch_version": "2.8.0+cu128"
+        }
+      },
+      "operator_profile": {
+        "path": "asynctls/operator-profile.json",
+        "sha256": "5e4b39306dde14cd0d2bcdbfc9abc54dd1648beff9c4aaf60b068a5f74c03ad5",
+        "cells": 3,
+        "generated_tokens_per_cell": 9,
+        "nsys_receipt": "asynctls/operator-profile.nsys-rep",
+        "kernel_report": "asynctls/operator-profile.kernels.txt",
+        "kernel_markers_observed": [],
+        "note": "profiler observations are separate; no host-time subtraction"
+      }
+    }
+  }
+}

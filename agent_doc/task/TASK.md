@@ -2,9 +2,9 @@
 
 ## 2026-11-12
 
-- [ ] [TL-QWEN3-LBV2-VENDOR-20261112] Qwen3-8B × LongBench v2 的 Quest/JSSA/AsyncTLS 已统一 K2=1024、确定性503题分片与 runcap 身份，Quest/JSSA 官方算子及 AsyncTLS 论文语义三臂真实 smoke 和聚焦回归通过；待提交推送后在非本机空闲 GPU 并行跑全量精度，分数独立验收前保持 pending。([详情](task_details/TL-QWEN3-LBV2-VENDOR-20261112.md))
+- [x] [TL-QWEN3-LBV2-VENDOR-20261112] Qwen3-8B × LongBench v2 三臂统一 K2=1024、AsyncTLS K1=128×64、确定性503题分片与 runcap 身份；Quest/JSSA 执行官方算子，AsyncTLS 按论文语义复现。三臂原始分片均收回并通过生产侧闭集、源顺序、答案与 official-strict 重算，Quest/JSSA/AsyncTLS=161/165/162/503，33项 manifest 哈希复核 PASS；全部分数独立验收前保持 pending。([详情](task_details/TL-QWEN3-LBV2-VENDOR-20261112.md)；[结果](../results/qwen3_lbv2_vendor_20261112/summary.json))
 
-- [ ] [TL-QWEN3-LBV1-VENDOR-PERF-20261112] 使用本机两张 H20 补齐 Qwen3-8B × LongBench v1 英文16任务的三 baseline 同预算性能；逐卡独占，分别报告 micro 与完整 TPOT/e2e，不与远端精度任务混卡，数据独立验收前保持 pending。([详情](task_details/TL-QWEN3-LBV1-VENDOR-PERF-20261112.md))
+- [x] [TL-QWEN3-LBV1-VENDOR-PERF-20261112] 本机双 H20 独占完成 Qwen3-8B × LongBench v1 英文16任务三 baseline 性能：B1 eager、sample0、1 warmup、3 repeats、定长33 token，共144/144 clean cells；三份独立 nsys、跨臂输入身份、源码/校准哈希与14项 manifest 复核 PASS。macro TPOT Quest/JSSA/AsyncTLS=26.0379/39.9628/305.2039ms，clean e2e 与 profiler 分离，数据独立验收前保持 pending。([详情](task_details/TL-QWEN3-LBV1-VENDOR-PERF-20261112.md)；[结果](../results/qwen3_lbv1_vendor_perf_20261112T01/summary.json))
 
 - [x] [TL-GLM-LONGBENCH16-LAST32-20261109] GLM-4.7-Flash `glm_nope_last32` seed=0 的 LongBench v1 英文16任务 full-region 质量臂完成六分片3750/3750请求、7500次双臂生成；独立只读重算核验identity、全部SHA、官方逐样本分数与47层no-skip回执 PASS，NFA/native macro AVG16=49.2896/49.8618。该口径 `thresholds=[]` 且near/far/both=0，不冒充threshold=0.1真实skip新实验或性能证据；不同owner验收保持pending。([详情](task_details/TL-GLM-LONGBENCH16-LAST32-20261109.md)；[结果](../results/glm_longbench_16en_nope_last32_20261109/summary.json))
 

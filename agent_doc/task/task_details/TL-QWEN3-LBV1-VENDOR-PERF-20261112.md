@@ -27,9 +27,12 @@ Date: 2026-11-12
 - 聚焦回归：`tests/test_longbench_empty_handoff.py` + `tests/test_longbench_vendor_perf.py` 共12 passed；`tests/test_qwen3_jssa_official.py` CUDA 4 passed，覆盖真实 EOS 下 `stop_on_eos=False` 仍生成完整3 token。
 - 真实 Qwen3-8B 三臂均在 qasper/samsum 完成 warmup+定长3 token smoke，输入身份与计时回执完整；smoke 产物 `/tmp/qwen3_lbv1_perf_smoke_20261112/{quest,jssa,asynctls}.json`，不作为正式性能结果。
 - 既有 `agent_doc/results/nfa_vendor_graph_perf_20261111/` 是 RULER `niah_multikey_2` Graph 性能矩阵，且其中 Quest/AsyncTLS 是独立 PyTorch Graph 语义复现，不能替代本任务的官方 Quest kernel 与 LongBench v1 完整请求测量。
-- 正式 clean-e2e 已按 GPU0=Quest→AsyncTLS、GPU1=JSSA 串行独占启动，输出 `agent_doc/results/qwen3_lbv1_vendor_perf_20261112T01/`；尚未收官，当前数字不得作为最终结论。
+- 三臂 clean-e2e 均完成48/48 cells，共144个正式测量请求；三份独立 nsys 也均完成 narrativeqa/qasper/samsum 三任务、每任务9个定长 token，测量后本机双卡各1MiB且无 compute process。结果目录=`agent_doc/results/qwen3_lbv1_vendor_perf_20261112T01/`。
+- `collect.py` 已校验144个 clean cells、9个 profile cells、33/9-token 定长协议、EOS不早停、源文件与校准哈希、16/16跨臂输入身份、profile/clean 输入一致及 nsys/kernel 证据，独立重算汇总一致。Quest/JSSA 分别观察到官方 CUDA/Triton kernel markers；AsyncTLS 明确为论文语义复现。manifest 共14项（排除可由 nsys-rep 重建的 SQLite），逐文件复核 `sha_mismatch=[]`。
+- macro-task mean（TTFT / TPOT / complete request wall，ms）：Quest=2488.4285 / 26.0379 / 3322.6230；JSSA=1763.3753 / 39.9628 / 3045.0804；AsyncTLS=1866.7651 / 305.2039 / 11640.9357。范围仅为 B1 eager、英文16任务 sample0 的确定性16请求矩阵，不是3750请求分布，不用 profiler 数字扣减或替代 clean e2e。
+- 结果=`agent_doc/results/qwen3_lbv1_vendor_perf_20261112T01/summary.json`，SHA256=`86659d309c2a22e8859c5ee4e2a21dfe915df1d5752c813ad62b2f8f20e02f98`；manifest SHA256=`30cfc4c35e58b8301a0b807c2e5b2985eb937c68e59c8b519f795cc3fb9692a1`。计时实现已推送 `cc1eca728aaf10e02553cb4b7efa1c1eab753718`；clean 回执记录旧 HEAD `482911be`，Quest/AsyncTLS profile 记录 `cc1eca72`，collector 用实际源码 SHA 显式绑定到实现提交，未把旧 HEAD 单独冒充计时代码。
 
 ### 阻塞与下一步
 
-- 等三臂48个测量请求全部完成后，核对48/48 cells、输入身份、generated_tokens=33、EOS不早停与哈希，再汇总正式结果；随后只在空闲独占卡上运行代表性外部 nsys profile。
+- 测量、profile、原始证据归档与生产侧闭集校验已收官；后续仅需不同 owner 独立验收，不重复运行已完成的144个 clean cells。
 - 所有正式性能数据在不同 owner 独立验收前保持 `pending-independent-verification`，不以 smoke 或 kernel 局部收益推断完整请求加速比。
