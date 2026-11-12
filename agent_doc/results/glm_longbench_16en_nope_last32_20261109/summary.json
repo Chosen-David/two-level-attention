@@ -1,0 +1,154 @@
+{
+  "schema": "glm-last32-lbv1-full-region-quality-summary-v1",
+  "status": "pending-independent-verification",
+  "date": "2026-11-12",
+  "model": "GLM-4.7-Flash",
+  "dataset": "LongBench v1 English 16 tasks",
+  "run_identity": "e477ffa900372d6adb1ab2c7160e12cb2574db566057a64c2eb266f1430f3087",
+  "code_revision": "6760cc495f554ffa85e8eb6d6e552ce02911f457",
+  "code_snapshot": "/tmp/tli-glm-jssa-prod-20261106",
+  "method_scope": {
+    "nfa_full_region": "glm_nope_last32 seed=0; thresholds=[]; 47 layers keep; near/far/both skip=0; CUDA Graph decode; BS=1",
+    "native_full": "HF SDPA prefill/decode with DynamicCache; eager; BS=1",
+    "not_in_scope": "This is not the threshold=0.1 near/far-skip NFA arm. Request wall_seconds includes quality-audit and per-request graph setup; native_full wall_seconds is NaN. No TPOT or speedup claim."
+  },
+  "population": {
+    "requests": 3750,
+    "requests_per_rank": 625,
+    "rows": {
+      "narrativeqa": 200,
+      "qasper": 200,
+      "multifieldqa_en": 150,
+      "hotpotqa": 200,
+      "2wikimqa": 200,
+      "musique": 200,
+      "gov_report": 200,
+      "qmsum": 200,
+      "multi_news": 200,
+      "trec": 200,
+      "triviaqa": 200,
+      "samsum": 200,
+      "passage_count": 200,
+      "passage_retrieval_en": 200,
+      "lcc": 500,
+      "repobench-p": 500
+    },
+    "arms_per_request": [
+      "full",
+      "native_full"
+    ]
+  },
+  "score_protocol": "Official LongBench sample_score per row and arm; arithmetic mean per task, then unweighted macro average over 16 tasks; seed=42, context_cap=31500",
+  "execution": {
+    "rank0": "pc40 GPU0",
+    "rank1": "pc40 GPU1",
+    "rank2": "pc31 GPU0",
+    "rank3": "pc31 GPU1",
+    "rank4": "pc32 GPU0",
+    "rank5": "pc32 GPU1",
+    "hardware": "H20-3e"
+  },
+  "scores": {
+    "2wikimqa": {
+      "nfa_full_region": 44.877813852814,
+      "native_full": 44.578571428571
+    },
+    "gov_report": {
+      "nfa_full_region": 32.620659716132,
+      "native_full": 33.420051039354
+    },
+    "hotpotqa": {
+      "nfa_full_region": 59.264393041599,
+      "native_full": 62.49852133161
+    },
+    "lcc": {
+      "nfa_full_region": 66.596,
+      "native_full": 66.85
+    },
+    "multi_news": {
+      "nfa_full_region": 26.479721124694,
+      "native_full": 26.647082076556
+    },
+    "multifieldqa_en": {
+      "nfa_full_region": 58.062232971033,
+      "native_full": 57.585667255552
+    },
+    "musique": {
+      "nfa_full_region": 32.910603122368,
+      "native_full": 35.359837092732
+    },
+    "narrativeqa": {
+      "nfa_full_region": 29.369043412118,
+      "native_full": 27.94303792183
+    },
+    "passage_count": {
+      "nfa_full_region": 5.5,
+      "native_full": 5.0
+    },
+    "passage_retrieval_en": {
+      "nfa_full_region": 100.0,
+      "native_full": 100.0
+    },
+    "qasper": {
+      "nfa_full_region": 36.519676700217,
+      "native_full": 38.013169091796
+    },
+    "qmsum": {
+      "nfa_full_region": 23.506666152409,
+      "native_full": 24.296360972497
+    },
+    "repobench-p": {
+      "nfa_full_region": 60.5,
+      "native_full": 63.436
+    },
+    "samsum": {
+      "nfa_full_region": 42.519204869242,
+      "native_full": 43.168479720938
+    },
+    "trec": {
+      "nfa_full_region": 78.0,
+      "native_full": 77.0
+    },
+    "triviaqa": {
+      "nfa_full_region": 91.908333333333,
+      "native_full": 91.991666666667
+    }
+  },
+  "macro_avg16": {
+    "nfa_full_region": 49.28964676849746,
+    "native_full": 49.861777787381385,
+    "delta_nfa_minus_native": -0.5721310188839202
+  },
+  "micro_avg3750": {
+    "nfa_full_region": 51.4540154695042,
+    "native_full": 52.20378814849154,
+    "delta_nfa_minus_native": -0.7497726789873371
+  },
+  "producer_side_audit": {
+    "status": "PASS",
+    "closed_set_requests": 3750,
+    "datasets": 16,
+    "rank_request_counts": {
+      "0": 625,
+      "1": 625,
+      "2": 625,
+      "3": 625,
+      "4": 625,
+      "5": 625
+    },
+    "official_arm_scores_recomputed": 7500,
+    "tokenizer_inputs_recomputed": 3750,
+    "nfa_47_layer_no_skip_receipts_checked": 3750,
+    "failures": [],
+    "scope": "Independent read-only recomputation by the producer session; different-owner acceptance remains pending",
+    "audit_sha256": "9449efaa204a2197eb7c6c66b26bda8687c94c3977ec379d6a7d9348ab082b35",
+    "audit_script_sha256": "5d59f29cd950199e91f35744a9ee180c9443896ef5a3ec5ff575e29c0289e326",
+    "request_manifest_sha256": "a14eee4ed6a5f5983390df1d95a419a8010d585a24d6e67bb8b668161b144b5f",
+    "harvest_manifest_sha256": "11c73464c02986587d521c2037e9b52f0e071cc760597eec54ab75afa079d74c",
+    "launcher_sha256": "5bcca04570e7a49a6dc87eb447cb9fded23135b822b6c81c56f3e9aa6130ebaf",
+    "worker_wrapper_sha256": "95fcf6ca29f3f41264c3f9acce79b05f596060bb7452fc258571cc074e92b621",
+    "build_script_sha256": "b7f4f8dfa4e9aa1a75f803f4838fab8818c02a5bd7e66a0b8dc74555c33d06ea"
+  },
+  "raw_evidence_root": "/home/wangyuanshuo02/ak_verify_results/glm_longbench_16en_nope_last32_20261109_merged",
+  "delivery_scope": "Versioned artifacts contain the compact summary, complete audit, six run manifests, completion/heartbeat receipts, per-file SHA256 manifests and reproduction scripts. Raw per-request JSON remains at raw_evidence_root."
+}

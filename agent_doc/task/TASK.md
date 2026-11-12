@@ -2,6 +2,8 @@
 
 ## 2026-11-12
 
+- [x] [TL-GLM-LONGBENCH16-LAST32-20261109] GLM-4.7-Flash `glm_nope_last32` seed=0 的 LongBench v1 英文16任务 full-region 质量臂完成六分片3750/3750请求、7500次双臂生成；独立只读重算核验identity、全部SHA、官方逐样本分数与47层no-skip回执 PASS，NFA/native macro AVG16=49.2896/49.8618。该口径 `thresholds=[]` 且near/far/both=0，不冒充threshold=0.1真实skip新实验或性能证据；不同owner验收保持pending。([详情](task_details/TL-GLM-LONGBENCH16-LAST32-20261109.md)；[结果](../results/glm_longbench_16en_nope_last32_20261109/summary.json))
+
 - [x] [TL-GLM-FULLKV-FI-LBV1-20261112] GLM-4.7-Flash FullKV 已使用 SDPA prefill + FlashInfer page64 eager decode，在非本机五分片完成 LongBench v1 英文16任务3750/3750请求；生产侧审计重算3750输入与官方分数、47层调用计数全PASS，macro AVG16=49.7245，结果 pending-independent-verification；无同协议全量SDPA/clean TPOT臂，不宣称全量加速。([详情](task_details/TL-GLM-FULLKV-FI-LBV1-20261112.md))
 
 - [x] [TL-NFA-REGION-SKIP-20261111] 从同一批24份已审计回执提取纯 L1/L2 打分 kernel 的24格单层等效数据，排除 Q 准备、页统计、Top-K、candidate、union 与 attention；Graph skip far 的 L2 在三长度加速3.4972/3.5145/3.5657×，L1仅1.1629/1.1899/1.3637×且grid缩容不冒充等比时延收益，both-skip两项真实为0。24格数值、24对 nsys、grid缩容与文件哈希内部复核 PASS，数据保持 pending-independent-verification。([详情](task_details/TL-NFA-REGION-SKIP-20261111.md#三长度单层等效纯-l1l2-打分-kernel2026-11-12内部审计-pass独立验收-pending)；[结果](../results/nfa_region_pure_score_per_layer_20261112.json)；[构建与审计脚本](../results/build_nfa_region_pure_score_per_layer_20261112.py))
