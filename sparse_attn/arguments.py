@@ -399,7 +399,7 @@ def _add_nfa_args(parser: argparse.ArgumentParser):
 def parse_args():
     parser = argparse.ArgumentParser(description='Sparse Attention Arguments',
                                      allow_abbrev=False)
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'quest_vendor_kernel', 'tia', 'twi', 'nfa', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'quest_vendor_kernel', 'jssa_official', 'tia', 'twi', 'nfa', 'none'])
     parser = _add_quest_args(parser)
     _add_twilight_args(parser)
     parser = _add_tia_args(parser)
@@ -407,7 +407,7 @@ def parse_args():
     return parser.parse_args()
 
 def add_sparse_attn_args(parser: argparse.ArgumentParser):
-    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'quest_vendor_kernel', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'moba_vendor', 'clusterkv_vendor', 'asynctls_vendor', 'hisa_vendor', 'jssa_vendor', 'tia', 'twi', 'nfa', 'none'])
+    parser.add_argument('--method', type=str, choices=['quest', 'quest_vendor', 'quest_vendor_kernel', 'minference_vendor', 'fasa_vendor', 'sparq_vendor', 'ffd_vendor', 'moba_vendor', 'clusterkv_vendor', 'asynctls_vendor', 'hisa_vendor', 'jssa_vendor', 'jssa_official', 'tia', 'twi', 'nfa', 'none'])
     parser = _add_quest_args(parser)
     parser = _add_minference_args(parser)
     parser = _add_fasa_args(parser)

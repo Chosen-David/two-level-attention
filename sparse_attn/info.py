@@ -172,6 +172,10 @@ _FILE_IDENTITY_FIELDS = ("nfa_proj_basis", "nfa_layer_skip_path")
 # none 可读段本就全参数编码，维持 076 旧口径不动。
 _VENDOR_TREATMENT_FIELDS = {
     "quest_vendor": {"quest_token_budget": 1024, "quest_chunk_size": 16},
+    "quest_vendor_kernel": {
+        "quest_token_budget": 1024, "quest_chunk_size": 16,
+        "quest_page_size": 16, "quest_max_seq_len": None},
+
     "minference_vendor": {"minference_starting_layer": -1,
                           "minference_config_path": None},
     "sparq_vendor": {"sparq_k": 1024, "sparq_context_length": None},
@@ -190,6 +194,8 @@ _VENDOR_TREATMENT_FIELDS = {
                     "hisa_block_topk": 64},
     "jssa_vendor": {"jssa_budget": 1024, "jssa_rank": 32,
                     "jssa_basis_path": None},
+    "jssa_official": {"jssa_budget": 1024, "jssa_rank": 32,
+                      "jssa_basis_path": None},
     "fasa_vendor": {"fasa_budget": 1024, "fasa_dataset": "qasper",
                     "fasa_threshold_ratio": 0.8, "fasa_min_k": 16,
                     "fasa_max_k": 16, "fasa_mode": "topk"},
@@ -1118,16 +1124,17 @@ def get_method_name_with_info(args, snapshot=None):
         _htk = getattr(args, "hisa_block_topk", 64)
         return _vendor_name_with_hash(
             args, f"hisa_vendor_k{_hb}_b{_hbs}_kb{_htk}", snapshot)
-    elif args.method == "jssa_vendor":
-        # B 轨官方 vLLM patch 语义 torch 等价（arXiv:2610.19026v1）。budget/rank
-        # 全编码（basis 文件名段含校准内容身份，rank 影响子空间维度），防互覆。
+    elif args.method in ("jssa_vendor", "jssa_official"):
+        # jssa_vendor 是官方 vLLM patch 的 torch 语义移植；jssa_official 直接
+        # 执行官方 Triton store/score/indexed-attend。两者都绑定 budget/rank 和
+        # basis 内容身份，不能用同一 treatment 名混装。
         import os as _os
         _jp = getattr(args, "jssa_basis_path", None)
         _jtag = _os.path.splitext(_os.path.basename(_jp))[0] if _jp else "nobasis"
         _jb = getattr(args, "jssa_budget", 1024)
         _jr = getattr(args, "jssa_rank", 32)
         return _vendor_name_with_hash(
-            args, f"jssa_vendor_{_jtag}_k{_jb}_r{_jr}", snapshot)
+            args, f"{args.method}_{_jtag}_k{_jb}_r{_jr}", snapshot)
     elif args.method == "twi":
         return f"twi_{args.twi_block_size}_{args.twi_level1_topk}_{args.twi_level2_topp}"
     elif args.method == "tia":

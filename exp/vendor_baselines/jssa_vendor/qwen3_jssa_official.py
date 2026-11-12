@@ -196,9 +196,12 @@ class JSSAQwen3Runtime:
         self._sm_count = torch.cuda.get_device_properties(device).multi_processor_count
         self.radix_topk_available = self.ops.score._radix_topk_available()
         self.execution = None
+        self.current_seq_len = prefill_length
         self.prefill_store_calls = 0
         self.decode_store_calls = 0
         self.decode_attention_calls = 0
+        self.decode_indexed_attention_calls = 0
+        self.decode_partial_attention_calls = 0
 
     def _scratch(self, name, shape, dtype, device):
         key = (name, tuple(shape), dtype, device)
@@ -228,20 +231,56 @@ class JSSAQwen3Runtime:
 
     def prepare_decode(self, execution, decode_steps):
         self.execution = execution
-        if self.prefill_length + 1 < min(self.budget, self.max_kv_len):
-            raise ValueError("official indexed decode benchmark requires seq_len >= budget")
+        if (execution != "eager"
+                and self.prefill_length + 1 < min(self.budget, self.max_kv_len)):
+            raise ValueError(
+                "official Graph indexed decode requires seq_len >= budget; "
+                "eager requests use the official exact partial branch")
         if decode_steps:
             self.prepare_decode_step(0)
         else:
+            self.current_seq_len = self.prefill_length
             self.seq_lens.fill_(self.prefill_length)
+            self.mask_metadata.seq_length = self.prefill_length
 
     def prepare_decode_step(self, step):
         position = self.prefill_length + step
+        self.current_seq_len = position + 1
         self.seq_lens.fill_(position + 1)
         self.decode_slots.copy_(self.request_slot_bases)
         self.decode_slots.add_(position)
+        self.mask_metadata.seq_length = position
 
-    def decode_attention(self, layer_idx, query_states, key_states, value_states):
+    def _partial_attention(
+            self, layer_idx, attention_module, query, top_idx):
+        """官方 eager seq_len<B 分支：有效选择紧凑后做精确 dense attention。"""
+        n_fac_eff = top_idx.shape[-1]
+        invalid = top_idx.long() >= self.seq_lens.view(self.batch_size, 1, 1)
+        order = torch.argsort(invalid.to(torch.uint8), dim=-1, stable=True)
+        top_idx = torch.gather(top_idx, -1, order)
+
+        # 本 runtime 的物理页按 request 连续分配，与官方 block_table 的
+        # logical-token 编址一致。仅保留每行有效前缀，避免读取未初始化尾槽；
+        # 这与官方 seqused_k=min(seq_len,B) 的 FlashAttention 分支等价。
+        valid_len = min(self.current_seq_len, n_fac_eff)
+        cache = self.kv_cache[layer_idx].view(
+            self.batch_size, -1, self.num_kv_heads, 2 * self.head_dim)
+        keys = cache[..., :self.head_dim].permute(0, 2, 1, 3)
+        values = cache[..., self.head_dim:].permute(0, 2, 1, 3)
+        gather_idx = top_idx.long().unsqueeze(-1).expand(
+            -1, -1, -1, self.head_dim)
+        selected_k = torch.gather(keys, 2, gather_idx)[:, :, :valid_len]
+        selected_v = torch.gather(values, 2, gather_idx)[:, :, :valid_len]
+        output, _ = eager_attention_forward(
+            attention_module, query, selected_k, selected_v, None,
+            dropout=0.0, scaling=self.scaling(layer_idx), sliding_window=None)
+        self.decode_partial_attention_calls += 1
+        self.decode_attention_calls += 1
+        return output
+
+    def decode_attention(
+            self, layer_idx, query_states, key_states, value_states,
+            attention_module=None):
         key = key_states[:, :, 0]
         value = value_states[:, :, 0]
         self.ops.store.jssa_project_and_store_contig_fp8(
@@ -266,11 +305,18 @@ class JSSAQwen3Runtime:
             scores_out=self.scores, top_idx_out=self.top_idx,
             top_scores_out=self.top_scores, use_radix=True,
             projk_cache=self.projk_cache[layer_idx])
+        if (not torch.cuda.is_current_stream_capturing()
+                and bool((self.seq_lens < top_idx.shape[-1]).any().item())):
+            if attention_module is None:
+                raise ValueError("official eager partial attention requires its Qwen3 module")
+            return self._partial_attention(
+                layer_idx, attention_module, query_states, top_idx)
         output = self.ops.attend.jssa_indexed_attend(
             query, self.kv_cache[layer_idx], self.block_table, top_idx,
             head_size=self.head_dim, scale=self.scaling(layer_idx),
             out=self.decode_output[layer_idx], scratch=self._scratch,
             sm_count=self._sm_count)
+        self.decode_indexed_attention_calls += 1
         self.decode_attention_calls += 1
         return output
 
@@ -301,6 +347,11 @@ class JSSAQwen3Runtime:
             "prefill_store": "official fused project+store for every post-RoPE K/V token",
             "decode_store_calls_warmup_and_capture": self.decode_store_calls,
             "decode_attention_calls_warmup_and_capture": self.decode_attention_calls,
+            "decode_indexed_attention_calls": self.decode_indexed_attention_calls,
+            "decode_partial_attention_calls": self.decode_partial_attention_calls,
+            "short_sequence_policy": (
+                "official eager partial: stable-compact valid Top-K rows, then "
+                "exact dense attention over min(seq_len,budget) real tokens"),
         }
 
 
@@ -340,7 +391,8 @@ def qwen3_jssa_official_forward(
             attn_output.reshape(*input_shape, -1).contiguous()), attn_weights
 
     attn_output = runtime.decode_attention(
-        self.layer_idx, query_states, key_states, value_states)
+        self.layer_idx, query_states, key_states, value_states,
+        attention_module=self)
     return self.o_proj(
         attn_output.reshape(*input_shape, -1).contiguous()), None
 
@@ -367,3 +419,74 @@ def bind_jssa_official_runtime(model, runtime):
     if patched != runtime.num_layers:
         raise RuntimeError(
             f"JSSA official bound {patched}/{runtime.num_layers} Qwen3 layers")
+
+
+def clear_jssa_official_runtime(model):
+    """解除请求级 cache 绑定；attention patch 保留给下一请求重新绑定。"""
+    for module in model.modules():
+        if isinstance(module, Qwen3Attention):
+            module.__dict__.pop("_jssa_official_runtime", None)
+
+
+@torch.inference_mode()
+def generate_jssa_official(
+        model, input_ids, max_new_tokens, eos_token_id, *,
+        basis_path, budget=1024, rank=32, page_size=64):
+    """完整 prompt dense prefill + 官方 JSSA eager decode 的逐请求生成接口。"""
+    if input_ids.ndim != 2 or input_ids.shape[0] != 1 or input_ids.shape[1] < 1:
+        raise ValueError("JSSA LongBench generation requires one non-empty prompt")
+    if type(max_new_tokens) is not int or max_new_tokens < 1:
+        raise ValueError("max_new_tokens must be a positive integer")
+    eos_ids = (frozenset(eos_token_id) if isinstance(
+        eos_token_id, (list, tuple, set, frozenset))
+        else frozenset((eos_token_id,)))
+    device = input_ids.device
+    length = input_ids.shape[1]
+    runtime = JSSAQwen3Runtime(
+        model, batch_size=1, prefill_length=length,
+        max_new_tokens=max_new_tokens, device=device,
+        basis_path=basis_path, budget=budget, rank=rank, page_size=page_size)
+    bind_jssa_official_runtime(model, runtime)
+    try:
+        runtime.begin_prefill_request(0)
+        cache_position = torch.arange(length, device=device)
+        output = model(
+            input_ids=input_ids, position_ids=cache_position.unsqueeze(0),
+            cache_position=cache_position, past_key_values=runtime.mask_metadata,
+            use_cache=True, logits_to_keep=1)
+        token = output.logits[:, -1, :].argmax(dim=-1, keepdim=True)
+        generated = [int(token)]
+        runtime.prepare_decode("eager", max_new_tokens - 1)
+        step = 0
+        while len(generated) < max_new_tokens and generated[-1] not in eos_ids:
+            runtime.prepare_decode_step(step)
+            position = torch.tensor([[length + step]], device=device)
+            output = model(
+                input_ids=token, position_ids=position,
+                cache_position=position[0],
+                past_key_values=runtime.mask_metadata,
+                use_cache=True, logits_to_keep=1)
+            token = output.logits[:, -1, :].argmax(dim=-1, keepdim=True)
+            generated.append(int(token))
+            step += 1
+        decode_steps = len(generated) - 1
+        layers = runtime.num_layers
+        if runtime.prefill_store_calls != layers:
+            raise RuntimeError("JSSA official prefill store call count mismatch")
+        if (runtime.decode_store_calls != layers * decode_steps
+                or runtime.decode_attention_calls != layers * decode_steps):
+            raise RuntimeError("JSSA official decode call count mismatch")
+        receipt = runtime.receipt()
+        receipt.update(
+            execution="eager",
+            prefill_store_calls=runtime.prefill_store_calls,
+            decode_store_calls=runtime.decode_store_calls,
+            decode_attention_calls=runtime.decode_attention_calls,
+            decode_steps=decode_steps,
+            generated_tokens=len(generated),
+            eos_early_stop=generated[-1] in eos_ids,
+        )
+        return generated, receipt
+    finally:
+        clear_jssa_official_runtime(model)
+        del runtime

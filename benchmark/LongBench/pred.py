@@ -17,6 +17,7 @@ from tqdm import tqdm
 import numpy as np
 import random
 import argparse
+import hashlib
 
 from benchmark.LongBench.lbv2_choice import extract_choice_official
 from benchmark.LongBench.context_capability_gate import (
@@ -99,6 +100,12 @@ def parse_args(args=None):
         help="Algorithm config path",
     )
     parser.add_argument('--pred_postfix', type=str, default="")
+    parser.add_argument(
+        '--sample-rank', type=int, default=0,
+        help='LongBench v2 确定性样本分片 rank；其他任务禁止使用')
+    parser.add_argument(
+        '--sample-world-size', type=int, default=1,
+        help='LongBench v2 确定性样本分片总数；按 data[rank::world_size] 切分')
     # 稀疏 prefill（用户 2026-10-08 指令，MoBA/NSA/DSA 口径）：设
     # NFA_SPARSE_PREFILL=1 环境变量（须在模型加载/patch 挂载前；patch 层
     # 逐 forward 读 env，此处 parse 后立即设置即可）。默认不传 = 0 =
@@ -121,6 +128,17 @@ def parse_args(args=None):
     add_sparse_attn_args(parser)
 
     return parser.parse_args(args)
+
+
+def shard_longbench_v2(data, dataset, rank, world_size):
+    """LongBench v2 的确定性互斥分片；其他任务默认只能单分片。"""
+    if type(rank) is not int or type(world_size) is not int:
+        raise ValueError("sample rank/world size must be integers")
+    if world_size < 1 or not 0 <= rank < world_size:
+        raise ValueError("sample sharding requires 0 <= rank < world_size")
+    if dataset != "lbv2" and (rank != 0 or world_size != 1):
+        raise ValueError("sample sharding is supported only for LongBench v2")
+    return list(data)[rank::world_size]
 
 
 # This is the customized building prompt for chat models
@@ -422,6 +440,7 @@ def get_pred(
         # 误杀本样本（guard 语义/并发限制见其 docstring）。
         capture_context,capture = _paper_capture_request(
             paper_capture_mode,model,input.input_ids,q_input.input_ids,dataset,model_name)
+        jssa_runtime_receipt = None
         with baseline_request(model) as baseline_receipt, capture_context, eager_decoding_request_guard():
             if (
                 dataset == "samsum"
@@ -451,6 +470,16 @@ def get_pred(
                     eos_token_id=samsum_eos,
                 )[0]
                 generated_content = output[full_ids.shape[-1]:].tolist()
+            elif getattr(model, "_jssa_official_options", None) is not None:
+                # 与 AsyncTLS 相同，question 是完整 prompt 的一部分；官方 JSSA
+                # 只在后续 decode 做稀疏选择。runtime 回执绑定实际调用路径。
+                from exp.vendor_baselines.jssa_vendor.qwen3_jssa_official import (
+                    generate_jssa_official,
+                )
+                full_ids = torch.cat([input.input_ids, q_input.input_ids], dim=-1)
+                generated_content, jssa_runtime_receipt = generate_jssa_official(
+                    model, full_ids, max_gen, tokenizer.eos_token_id,
+                    **model._jssa_official_options)
             elif getattr(model, "_asynctls_full_prompt_prefill", False):
                 # AsyncTLS 论文的稀疏选择只发生在生成 decode；question 后缀与
                 # material 必须作为同一完整 prompt 一次 dense prefill，并初始化
@@ -524,6 +553,8 @@ def get_pred(
         }
         if baseline_receipt:
             record['baseline_receipt'] = baseline_receipt
+        if jssa_runtime_receipt is not None:
+            record['jssa_runtime'] = jssa_runtime_receipt
         if capture is not None:
             if capture.receipt is None:raise ValueError('request capture incomplete')
             record['paper_request_capture']=capture.receipt
@@ -853,6 +884,22 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
             k_block_size=getattr(args, "hisa_k_block_size", 128),
             block_topk=getattr(args, "hisa_block_topk", 64),
         )
+    elif args.method == "jssa_official":
+        # 直接执行 vendored 官方 Triton store/score/indexed-attend；请求级
+        # paged cache 由 generate_jssa_official 显式创建、绑定并释放。
+        if model.config.model_type != "qwen3":
+            raise RuntimeError(
+                f"jssa_official 当前仅支持 Qwen3，实际为 {model.config.model_type}")
+        from exp.vendor_baselines.jssa_vendor.qwen3_jssa_official import (
+            register_jssa_official_patch,
+        )
+        n_patched = register_jssa_official_patch(model)
+        model._jssa_official_options = {
+            "basis_path": getattr(args, "jssa_basis_path", None),
+            "budget": getattr(args, "jssa_budget", 1024),
+            "rank": getattr(args, "jssa_rank", 32),
+            "page_size": 64,
+        }
     elif args.method == "jssa_vendor":
         # JSSA（arXiv:2610.19026v1）B 轨官方 vLLM patch 语义 torch 等价——
         # decode 单级 token 稀疏，校准基 M=TopEig_r(G_Qm/tr+G_K/tr) 投影打分
@@ -923,6 +970,13 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
 
 if __name__ == "__main__":
     args = parse_args()
+    if (args.sample_world_size < 1
+            or not 0 <= args.sample_rank < args.sample_world_size):
+        raise SystemExit("[GATE-FAIL] 要求 0 <= sample-rank < sample-world-size")
+    if args.task != "lbv2" and (args.sample_rank != 0 or args.sample_world_size != 1):
+        raise SystemExit("[GATE-FAIL] 样本分片仅支持 task=lbv2")
+    if args.sample_world_size > 1 and not args.pred_postfix:
+        raise SystemExit("[GATE-FAIL] 多样本分片必须用 --pred_postfix 隔离输出目录")
     if args.paper_capture=='plan':
         print(json.dumps({'schema':'longbench-paper-capture-plan-v1','gpu_started':False,
             'supported':'Qwen3 manual greedy path only','unsupported':['samsum generate','DeepSeek generate','unknown attention forwards'],
@@ -1025,6 +1079,8 @@ if __name__ == "__main__":
                 raise FileNotFoundError(
                     f"lbv2 需要 --dataset-path 指向 LongBench-v2 data.json（或含它的目录），当前路径不存在: {v2_path}"
                 )
+            with open(v2_path, "rb") as f:
+                v2_source_sha256 = hashlib.sha256(f.read()).hexdigest()
             with open(v2_path, "r", encoding="utf-8") as f:
                 raw = json.load(f)
             # 归一化到 v1 管线字段约定：answers 列表 + all_classes（打分走 eval.py 的 lbv2 scorer）
@@ -1035,6 +1091,12 @@ if __name__ == "__main__":
                 obj["all_classes"] = ["A", "B", "C", "D"]
                 data.append(obj)
             print(f"lbv2: loaded {len(data)} examples from {v2_path}", flush=True)
+            source_sample_count = len(data)
+            data = shard_longbench_v2(
+                data, dataset, args.sample_rank, args.sample_world_size)
+            print(
+                f"lbv2: selected {len(data)}/{source_sample_count} examples "
+                f"at rank {args.sample_rank}/{args.sample_world_size}", flush=True)
         elif args.e:
             if not has_local_data_set:
                 data = load_dataset("THUDM/LongBench", f"{dataset}_e", split="test")
@@ -1113,6 +1175,18 @@ if __name__ == "__main__":
             producer=resolve_producer_identity(__file__),
             input_identity=input_identity,
         )
+        if dataset == "lbv2":
+            selected_ids = [str(obj["_id"]) for obj in data]
+            runcap_core["sample_sharding"] = {
+                "algorithm": "source_order[rank::world_size]",
+                "rank": args.sample_rank,
+                "world_size": args.sample_world_size,
+                "source_samples": source_sample_count,
+                "selected_samples": len(data),
+                "source_sha256": v2_source_sha256,
+                "selected_ids_sha256": hashlib.sha256(
+                    "\n".join(selected_ids).encode("utf-8")).hexdigest(),
+            }
         # 103（TL-E096-CAP-GATE-TOCTOU-103，GPT 审计 2026-10-12_0739）：
         # gate 与发布间的跨进程独占锁（fcntl.flock，锁文件 = 输出目录下
         # .runcap_gate.lock）——修复前两进程可在 sidecar 尚不存在时同时
