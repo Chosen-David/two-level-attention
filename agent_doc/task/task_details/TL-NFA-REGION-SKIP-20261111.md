@@ -168,3 +168,27 @@
 - both-skip 的 L1、L2 score、candidate 与全部 TopK 都是真实 0；表中非零 L2 仅为 protected-only `selection_union`，另有 selected attention，所以整层 NFA total 不为 0。相应零分母加速比在 JSON 中记为 `null`，不伪造 Infinity 或 1×。单侧 skip 的 selected attention 基本不变，围绕 1 的微小比值不作收益主张。
 - 24 份 JSON + 24 对 nsys report/sqlite 共 72 个文件的 SHA256、字节数、输入身份、源码身份、GPU hygiene、Graph capture/replay/fallback、四态层签名和区域 kernel 实例全部通过审计。Graph 三长度的 `_l1_topk_partial_kernel`、`_candidate_expand_batched_kernel`、`_nfa_filtered_topk_partial_kernel`、`_nfa_fine_scores_paged_kernel` 在两种单侧 skip 下均有真实 `gridY` 缩容；eager 不伪造单 CTA 快路的同类 grid 结论。
 - 汇总与 fail-closed 审计脚本：[`agent_doc/results/build_nfa_region_four_state_per_layer_20261112.py`](../../results/build_nfa_region_four_state_per_layer_20261112.py)。结果：[`agent_doc/results/nfa_region_four_state_per_layer_20261112.json`](../../results/nfa_region_four_state_per_layer_20261112.json)，SHA256=`f297815d568f770d09acb0037e057b7c1def48ca6928b0bbe149542756c01f1d`；manifest：[`agent_doc/results/nfa_region_four_state_per_layer_raw_manifest_20261112.json`](../../results/nfa_region_four_state_per_layer_raw_manifest_20261112.json)，SHA256=`829d50a39ce2f6af12f76da442f1780419ead54259a296c7f3d5bc69c3b63d63`。另以独立只读小程序复核 72/72 文件哈希、24 个唯一配置格和 264 项单层换算，均 PASS；这不替代不同 owner 的正式独立验收。双卡测量结束后均回落至 1 MiB、0%。
+
+## 三长度单层等效纯 L1/L2 打分 kernel（2026-11-12，内部审计 PASS，独立验收 pending）
+
+- 上节的 `operator_summary.l1_score_ms/l2_score_ms` 是**较宽阶段桶**：L1 桶还含页统计/Q 准备，L2 桶还含 grouped Q 准备。本节按用户口径只提取真正的打分 kernel，不使用阶段桶代替纯 kernel 时间，也不改写上一节结果或其哈希。
+- L1 仅包含 no-skip 的 `_nfa_l1_scores_kernel`、near-only 的 `_nfa_l1_near_scores_kernel`、far-only 的 `_nfa_l1_far_scores_kernel`；L2 仅包含 `_nfa_fine_scores_paged_kernel`。排除 Q 准备、页统计、L1/L2 Top-K、candidate、selection union、selected attention 和所有非选择器模型工作。单位仍为 **µs/层/decode step**，由对应 kernel 的整模型 `mean_ms_per_step × 1000 ÷ 36` 得到。
+
+| 长度 | 强制模式 | Graph L1 | Graph L2 | eager L1 | eager L2 |
+|---:|---|---:|---:|---:|---:|
+| 32K | no-skip | 4.026506 | 25.909461 | 4.199344 | 25.760567 |
+| 32K | near-only | 3.462578 | 7.408722 | 3.553250 | 7.580300 |
+| 32K | far-only | 3.911667 | 16.084522 | 3.994156 | 16.317022 |
+| 32K | both-skip | 0.000000 | 0.000000 | 0.000000 | 0.000000 |
+| 64K | no-skip | 4.204100 | 25.916489 | 4.314139 | 25.599944 |
+| 64K | near-only | 3.533156 | 7.374233 | 3.615289 | 7.564461 |
+| 64K | far-only | 3.948983 | 16.101917 | 4.016856 | 16.141083 |
+| 64K | both-skip | 0.000000 | 0.000000 | 0.000000 | 0.000000 |
+| 128K | no-skip | 4.753806 | 26.284489 | 4.845178 | 25.852722 |
+| 128K | near-only | 3.485883 | 7.371578 | 3.588094 | 7.510067 |
+| 128K | far-only | 4.368367 | 16.186367 | 4.433617 | 16.140500 |
+| 128K | both-skip | 0.000000 | 0.000000 | 0.000000 | 0.000000 |
+
+- `near-only` 即 skip far。Graph 纯 L1 的 no-skip/near-only 加速比在 32K/64K/128K 分别为 **1.1629/1.1899/1.3637×**，纯 L2 分别为 **3.4972/3.5145/3.5657×**；skip near 的 Graph 纯 L2 加速比约为 **1.611/1.610/1.624×**。L2 收益显著且与 candidate 缩容一致；L1 虽观察到 `gridX=5/9/17→2`，但短 kernel 固定成本、Q 读取和写回等使其时延没有同比下降，不能包装成大幅加速，也不能据此反推 skip 未生效。
+- both-skip 的四种 L1/L2 score kernel 均无实例，因此两项严格为 0，零分母加速比记为 `null`。单侧 skip 的 L1 `gridX` 与 L2 `gridY` 缩容断言全部通过。32K 仍复用 pc31 回执，64K/128K 使用 pc33 回执；只解释同长度模式比值，不把跨主机绝对值当作受控长度扩展。nsys/CUPTI 观察者效应保留，本表不是 clean TPOT 或 host-overhead 结论。
+- 汇总与 fail-closed 审计脚本：[`agent_doc/results/build_nfa_region_pure_score_per_layer_20261112.py`](../../results/build_nfa_region_pure_score_per_layer_20261112.py)，SHA256=`56d0ffd76b4abd5025405ddbab0a1d99483fe00b5d5a26fb3fcba0dc9db0cbc7`。结果：[`agent_doc/results/nfa_region_pure_score_per_layer_20261112.json`](../../results/nfa_region_pure_score_per_layer_20261112.json)，SHA256=`1808fd38634e2e7e65e4aa40d663c780cb42dfcaecd7930f9f82e0898f20f738`；继续引用上述原始 manifest，SHA256=`829d50a39ce2f6af12f76da442f1780419ead54259a296c7f3d5bc69c3b63d63`。构建器重新核验 24 份回执、24 对 nsys report/sqlite、源码/输入身份、GPU hygiene、kernel 实例和 grid 缩容，全部 PASS；另以独立只读程序复核 24 个唯一配置格、表中全部数值、both-skip 零值以及旧结果/manifest 哈希，均 PASS。这不替代不同 owner 的正式独立验收，状态保持 `pending-independent-verification`。

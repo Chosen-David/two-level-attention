@@ -1,0 +1,1265 @@
+{
+  "schema": "nfa-region-pure-score-per-layer-v1",
+  "validation_status": "pending-independent-verification",
+  "internal_audit": {
+    "status": "PASS",
+    "raw_receipts_checked": 24,
+    "nsys_report_sqlite_pairs_checked": 24,
+    "unique_cells": 24,
+    "source_identity": "PASS",
+    "input_sha256": "PASS",
+    "gpu_hygiene": "PASS",
+    "region_kernel_instances": "PASS",
+    "pure_score_grid_shrinkage": "PASS",
+    "independent_verification": "PENDING"
+  },
+  "protocol": {
+    "model": "Qwen3-8B",
+    "task": "niah_multikey_2",
+    "sample_index": 2,
+    "lengths": [
+      32768,
+      65536,
+      131072
+    ],
+    "batch": 1,
+    "subspace": "tail=32/32",
+    "gate_epsilon": 0.1,
+    "force_modes": [
+      "no-skip",
+      "near-only",
+      "far-only",
+      "both-skip"
+    ],
+    "executions": [
+      "graph",
+      "eager"
+    ],
+    "warmup_steps": 3,
+    "profiled_decode_steps": 5,
+    "units": "microseconds per equivalent layer per decode step",
+    "single_layer_equivalent": "All 36 layers are forced to the same mode. Divide each named kernel whole-model mean_ms_per_step by 36 and multiply by 1000.",
+    "included_kernels": {
+      "l1": {
+        "no-skip": "_nfa_l1_scores_kernel",
+        "near-only": "_nfa_l1_near_scores_kernel",
+        "far-only": "_nfa_l1_far_scores_kernel"
+      },
+      "l2": "_nfa_fine_scores_paged_kernel"
+    },
+    "excluded_work": [
+      "Q preparation",
+      "page statistics",
+      "L1/L2 Top-K",
+      "candidate preparation/expansion",
+      "selection union",
+      "selected attention",
+      "all model non-selector work"
+    ],
+    "stage_bucket_boundary": "operator_summary.l1_score_ms/l2_score_ms are broader stage buckets and are not used as pure score-kernel timings.",
+    "both_skip_boundary": "No L1/L2 score kernel is launched; both timings are exactly zero.",
+    "source_scope": "32K reuses audited pc31 receipts; 64K/128K use clean pc33 receipts. Use within-length mode ratios; do not interpret cross-host absolute values as controlled length scaling.",
+    "operator_measurement": "nsys/CUPTI kernel observations over five profiled decode steps; observer effect remains; no clean TPOT or host-overhead claim.",
+    "zero_stage_speedup": "null when the measured kernel is fully eliminated; no Infinity or 1x is fabricated."
+  },
+  "records": [
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "no-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "bytes": 41872,
+        "sha256": "226aad46f4b6c168ef650eaf188eb0f026b0dfa3761e7220f516d02970952c18"
+      },
+      "l1_kernel": "_nfa_l1_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.14495420000000014,
+        "single_layer_equivalent_us_per_decode_step": 4.02650555555556,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          5
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.9327405999999993,
+        "single_layer_equivalent_us_per_decode_step": 25.909461111111092,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          34
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 4.02650555555556,
+        "l2_score_kernel": 25.909461111111092
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.0,
+        "l2_score_kernel": 1.0
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "near-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "bytes": 42396,
+        "sha256": "f9e19653190b35d34e51537c2857933215c0b975aaad518102afcd86261d7052"
+      },
+      "l1_kernel": "_nfa_l1_near_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.12465280000000004,
+        "single_layer_equivalent_us_per_decode_step": 3.462577777777779,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          2
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.266714,
+        "single_layer_equivalent_us_per_decode_step": 7.408722222222222,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          10
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 3.462577777777779,
+        "l2_score_kernel": 7.408722222222222
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.1628635698516208,
+        "l2_score_kernel": 3.49715650472041
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "far-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "bytes": 42418,
+        "sha256": "bf06d81295fd1bed4c7dcf5248b57ebad8f13bc87668d5477a2d0d6109308cba"
+      },
+      "l1_kernel": "_nfa_l1_far_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.14081999999999992,
+        "single_layer_equivalent_us_per_decode_step": 3.911666666666664,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          4
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.5790428000000005,
+        "single_layer_equivalent_us_per_decode_step": 16.084522222222237,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          26
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 3.911666666666664,
+        "l2_score_kernel": 16.084522222222237
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.029358045732142,
+        "l2_score_kernel": 1.6108318763310734
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "both-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l32768_b1_graph.json",
+        "bytes": 38299,
+        "sha256": "979e56d97a9487dadab1fa04849b5f30c51c77758002adb1b3a39d8aeb1298b5"
+      },
+      "l1_kernel": null,
+      "l2_kernel": null,
+      "l1_score": null,
+      "l2_score": null,
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 0.0,
+        "l2_score_kernel": 0.0
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": null,
+        "l2_score_kernel": null
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "no-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.json",
+        "bytes": 40753,
+        "sha256": "297aca826ee21d30d6692a34221aa8a76af61447d11f2f69032805f8702c56b3"
+      },
+      "l1_kernel": "_nfa_l1_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.15117640000000004,
+        "single_layer_equivalent_us_per_decode_step": 4.199344444444446,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          5
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.9273803999999993,
+        "single_layer_equivalent_us_per_decode_step": 25.760566666666648,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          34
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 4.199344444444446,
+        "l2_score_kernel": 25.760566666666648
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.0,
+        "l2_score_kernel": 1.0
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "near-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.json",
+        "bytes": 41291,
+        "sha256": "9741b6e5a0cd7c9f011e51fa54b00fe081dda7aa149715dadb1b3acdee1b9317"
+      },
+      "l1_kernel": "_nfa_l1_near_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.127917,
+        "single_layer_equivalent_us_per_decode_step": 3.5532500000000002,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          2
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.27289079999999993,
+        "single_layer_equivalent_us_per_decode_step": 7.5802999999999985,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          10
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 3.5532500000000002,
+        "l2_score_kernel": 7.5802999999999985
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.1818319691675072,
+        "l2_score_kernel": 3.3983571450558228
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "far-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.json",
+        "bytes": 41404,
+        "sha256": "02f346d827d5e8951b9139ebde3f7808d32431e786ec185d892d2bf12e6445a4"
+      },
+      "l1_kernel": "_nfa_l1_far_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.14378960000000002,
+        "single_layer_equivalent_us_per_decode_step": 3.994155555555556,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          4
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.5874127999999993,
+        "single_layer_equivalent_us_per_decode_step": 16.317022222222203,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          26
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 3.994155555555556,
+        "l2_score_kernel": 16.317022222222203
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.0513722828354766,
+        "l2_score_kernel": 1.578754157212782
+      }
+    },
+    {
+      "length": 32768,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "both-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "84bd19ee947c2498db7c988a9fa2ca766caf1267",
+        "diff_sha256": "0ab60bfca394f1c2f1c52cbf9ba31f06cf3aa56bbb05b3ac8da5dffd826ba53f",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "073bae295bd94baa1880f33c4b0ccaec3a4d510dac2b31935b3ce488ad698fe8",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_full_20261111/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l32768_b1_eager.json",
+        "bytes": 38364,
+        "sha256": "e9269786442f488b16bc99f252774dbcf522ce20a38a92087df139e5ae9d4e8a"
+      },
+      "l1_kernel": null,
+      "l2_kernel": null,
+      "l1_score": null,
+      "l2_score": null,
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 0.0,
+        "l2_score_kernel": 0.0
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": null,
+        "l2_score_kernel": null
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "no-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "bytes": 41868,
+        "sha256": "471f42747b514643d9b10b60bd1f540c644f6a86d0ebffad97a9a890ca00b9a0"
+      },
+      "l1_kernel": "_nfa_l1_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.15134760000000003,
+        "single_layer_equivalent_us_per_decode_step": 4.2041,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          9
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.9329935999999991,
+        "single_layer_equivalent_us_per_decode_step": 25.916488888888864,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          34
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 4.2041,
+        "l2_score_kernel": 25.916488888888864
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.0,
+        "l2_score_kernel": 1.0
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "near-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "bytes": 42258,
+        "sha256": "bea8d3c1d576cbe266a895d7eb2bdfaa4b4d56dc56021ad622ac4fb7fd6f9027"
+      },
+      "l1_kernel": "_nfa_l1_near_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.12719360000000007,
+        "single_layer_equivalent_us_per_decode_step": 3.533155555555558,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          2
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.26547240000000005,
+        "single_layer_equivalent_us_per_decode_step": 7.3742333333333345,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          10
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 3.533155555555558,
+        "l2_score_kernel": 7.3742333333333345
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.1898994917983288,
+        "l2_score_kernel": 3.514465533893538
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "far-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "bytes": 42332,
+        "sha256": "9f9fd165b0f86472217ca6f6a18f1fe6421c921ea2e252ac5a29b84a16e3beca"
+      },
+      "l1_kernel": "_nfa_l1_far_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.1421634000000001,
+        "single_layer_equivalent_us_per_decode_step": 3.948983333333336,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.5796690000000004,
+        "single_layer_equivalent_us_per_decode_step": 16.10191666666668,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          26
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 3.948983333333336,
+        "l2_score_kernel": 16.10191666666668
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.064603125699019,
+        "l2_score_kernel": 1.6095281962637271
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "both-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l65536_b1_graph.json",
+        "bytes": 38358,
+        "sha256": "e3a758e550a5aa348d473150b8d808ddc60f65bf9f9a882d1434de21898e7f24"
+      },
+      "l1_kernel": null,
+      "l2_kernel": null,
+      "l1_score": null,
+      "l2_score": null,
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 0.0,
+        "l2_score_kernel": 0.0
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": null,
+        "l2_score_kernel": null
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "no-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.json",
+        "bytes": 40945,
+        "sha256": "4ae61b1b6629f7c5cd36603b8583d0432f25cdf4fb4ebd6fbf1336c740c5b198"
+      },
+      "l1_kernel": "_nfa_l1_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.15530900000000006,
+        "single_layer_equivalent_us_per_decode_step": 4.31413888888889,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          9
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.9215979999999993,
+        "single_layer_equivalent_us_per_decode_step": 25.599944444444425,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          34
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 4.31413888888889,
+        "l2_score_kernel": 25.599944444444425
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.0,
+        "l2_score_kernel": 1.0
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "near-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.json",
+        "bytes": 41163,
+        "sha256": "3dd8fb8e5081faf648b94207c5e5616030699cc62c6847658ed2ec3af598d6fa"
+      },
+      "l1_kernel": "_nfa_l1_near_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.13015039999999994,
+        "single_layer_equivalent_us_per_decode_step": 3.615288888888887,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          2
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.27232060000000025,
+        "single_layer_equivalent_us_per_decode_step": 7.564461111111118,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          10
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 3.615288888888887,
+        "l2_score_kernel": 7.564461111111118
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.193304054386311,
+        "l2_score_kernel": 3.3842390182747777
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "far-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.json",
+        "bytes": 41225,
+        "sha256": "77e543ac531d08d5ca3cabc1569f858d9da8b6ec77a36e33d1a5e1cdf7a2821f"
+      },
+      "l1_kernel": "_nfa_l1_far_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.1446068000000001,
+        "single_layer_equivalent_us_per_decode_step": 4.016855555555558,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.5810790000000001,
+        "single_layer_equivalent_us_per_decode_step": 16.141083333333338,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          26
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 4.016855555555558,
+        "l2_score_kernel": 16.141083333333338
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.0740089677663842,
+        "l2_score_kernel": 1.5860115405994692
+      }
+    },
+    {
+      "length": 65536,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "both-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "52b587a924defa07d36091824e3128310f657bca34a4f011c062879e757c5063",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l65536_b1_eager.json",
+        "bytes": 38378,
+        "sha256": "0b42392c1ffd4a78b91e67ec4d5e1315ccf53c421bbb8ad6e1ea6363a58c4c3a"
+      },
+      "l1_kernel": null,
+      "l2_kernel": null,
+      "l1_score": null,
+      "l2_score": null,
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 0.0,
+        "l2_score_kernel": 0.0
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": null,
+        "l2_score_kernel": null
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "no-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "bytes": 41931,
+        "sha256": "00801cbb8ffbe5bb6d279efa8cfe4e763116167383f3c81a7f9129f5d18c3e25"
+      },
+      "l1_kernel": "_nfa_l1_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.17113699999999993,
+        "single_layer_equivalent_us_per_decode_step": 4.753805555555553,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          17
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.9462415999999999,
+        "single_layer_equivalent_us_per_decode_step": 26.284488888888887,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          34
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 4.753805555555553,
+        "l2_score_kernel": 26.284488888888887
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.0,
+        "l2_score_kernel": 1.0
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "near-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "bytes": 42240,
+        "sha256": "a00716c12d4a5438059028bab09ec2c22d21dc866812962b3b3d650cc2ed2a27"
+      },
+      "l1_kernel": "_nfa_l1_near_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.12549180000000004,
+        "single_layer_equivalent_us_per_decode_step": 3.4858833333333346,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          2
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.2653768000000001,
+        "single_layer_equivalent_us_per_decode_step": 7.371577777777779,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          10
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 3.4858833333333346,
+        "l2_score_kernel": 7.371577777777779
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.3637305385690528,
+        "l2_score_kernel": 3.565653063869938
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "far-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "bytes": 42195,
+        "sha256": "e975d82346376f68f64d20b6734dd4c43e085ec79d715155d7b76a8aac53f3ab"
+      },
+      "l1_kernel": "_nfa_l1_far_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.15726120000000013,
+        "single_layer_equivalent_us_per_decode_step": 4.36836666666667,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          16
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.5827092000000005,
+        "single_layer_equivalent_us_per_decode_step": 16.18636666666668,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          26
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 4.36836666666667,
+        "l2_score_kernel": 16.18636666666668
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.0882340971581024,
+        "l2_score_kernel": 1.6238659008644436
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "graph",
+      "mode": "both-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_graph/nfa-operator-profile/nfa-operator-profile_l131072_b1_graph.json",
+        "bytes": 38467,
+        "sha256": "f1f728d8b556e9d7582b8d7cd42c1c18865965ae05c04b745e062c785467ecb7"
+      },
+      "l1_kernel": null,
+      "l2_kernel": null,
+      "l1_score": null,
+      "l2_score": null,
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 0.0,
+        "l2_score_kernel": 0.0
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": null,
+        "l2_score_kernel": null
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "no-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_no-skip_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.json",
+        "bytes": 40929,
+        "sha256": "377d89f4108903e0ba904677ba5a4d74a9323e6e31aad6adbfa1f6c565939dfe"
+      },
+      "l1_kernel": "_nfa_l1_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.17442639999999987,
+        "single_layer_equivalent_us_per_decode_step": 4.845177777777774,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          17
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.9306979999999994,
+        "single_layer_equivalent_us_per_decode_step": 25.852722222222205,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          34
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 4.845177777777774,
+        "l2_score_kernel": 25.852722222222205
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.0,
+        "l2_score_kernel": 1.0
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "near-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_near-only_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.json",
+        "bytes": 41362,
+        "sha256": "4758b9f1dfca4d96d95a5714e00ec6441688eb1db8c79e744d79406994a18b4a"
+      },
+      "l1_kernel": "_nfa_l1_near_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.12917140000000008,
+        "single_layer_equivalent_us_per_decode_step": 3.588094444444446,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          2
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.27036240000000034,
+        "single_layer_equivalent_us_per_decode_step": 7.510066666666676,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          10
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 3.588094444444446,
+        "l2_score_kernel": 7.510066666666676
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.350348451747057,
+        "l2_score_kernel": 3.4424091515684068
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "far-only",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_far-only_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.json",
+        "bytes": 41353,
+        "sha256": "cdcb069fa907ebcdd719d62a900fca0f51ebfdbbc4710c3a8bec4ac88fcb0237"
+      },
+      "l1_kernel": "_nfa_l1_far_scores_kernel",
+      "l2_kernel": "_nfa_fine_scores_paged_kernel",
+      "l1_score": {
+        "whole_model_ms_per_decode_step": 0.1596102000000001,
+        "single_layer_equivalent_us_per_decode_step": 4.433616666666669,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          16
+        ],
+        "grid_y_values": [
+          8
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "l2_score": {
+        "whole_model_ms_per_decode_step": 0.5810580000000002,
+        "single_layer_equivalent_us_per_decode_step": 16.140500000000007,
+        "mean_calls_per_step": 36.0,
+        "grid_x_values": [
+          8
+        ],
+        "grid_y_values": [
+          26
+        ],
+        "grid_z_values": [
+          1
+        ]
+      },
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 4.433616666666669,
+        "l2_score_kernel": 16.140500000000007
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": 1.0928274007550882,
+        "l2_score_kernel": 1.601729947784901
+      }
+    },
+    {
+      "length": 131072,
+      "batch": 1,
+      "execution": "eager",
+      "mode": "both-skip",
+      "uniform_layers": 36,
+      "source": {
+        "head": "b97af7ef909957e69b194e10ce4c97f5b1089be2",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_sha256": "8bfa80e38d88995fa8902fd00dd34ec86acdb726a757eda6ff7a1fe9b0299aef"
+      },
+      "input_sha256": "8eb137ac247e120f77810068866c37d70e6b098aff45ce730108e8268e9e0f02",
+      "raw_receipt": {
+        "path": "/home/wangyuanshuo02/ak_verify_results/nfa_region_skip_forced_64_128_20261112/acceptance_both-skip_eager/nfa-operator-profile/nfa-operator-profile_l131072_b1_eager.json",
+        "bytes": 38395,
+        "sha256": "85fa880011c6ef5cd2360896bda9e25e85325d63e11d842c240ed1205e2d5291"
+      },
+      "l1_kernel": null,
+      "l2_kernel": null,
+      "l1_score": null,
+      "l2_score": null,
+      "single_layer_equivalent_us_per_decode_step": {
+        "l1_score_kernel": 0.0,
+        "l2_score_kernel": 0.0
+      },
+      "speedup_vs_no_skip": {
+        "l1_score_kernel": null,
+        "l2_score_kernel": null
+      }
+    }
+  ],
+  "parent_stage_result": {
+    "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/nfa_region_four_state_per_layer_20261112.json",
+    "bytes": 109808,
+    "sha256": "f297815d568f770d09acb0037e057b7c1def48ca6928b0bbe149542756c01f1d"
+  },
+  "raw_receipt_manifest": {
+    "path": "/home/wangyuanshuo02/two-level-attention/agent_doc/results/nfa_region_four_state_per_layer_raw_manifest_20261112.json",
+    "bytes": 21954,
+    "sha256": "829d50a39ce2f6af12f76da442f1780419ead54259a296c7f3d5bc69c3b63d63"
+  }
+}
