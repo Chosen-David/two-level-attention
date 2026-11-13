@@ -922,43 +922,15 @@ def load_model_and_tokenizer(path, model_name, device, args, snapshot=None):
             block_topk=getattr(args, "hisa_block_topk", 64),
         )
     elif args.method == "jssa_official":
-        # 直接执行 vendored 官方 Triton store/score/indexed-attend；请求级
-        # paged cache 由 generate_jssa_official 显式创建、绑定并释放。
-        if model.config.model_type != "qwen3":
-            raise RuntimeError(
-                f"jssa_official 当前仅支持 Qwen3，实际为 {model.config.model_type}")
-        from exp.vendor_baselines.jssa_vendor.qwen3_jssa_official import (
-            register_jssa_official_patch,
+        raise RuntimeError(
+            "JSSA has been moved to the independent vLLM backend; "
+            "run benchmark/official_baselines/longbench_official.py --method jssa instead of "
+            "benchmark/LongBench/pred.py --method jssa_official"
         )
-        n_patched = register_jssa_official_patch(model)
-        model._jssa_official_options = {
-            "basis_path": getattr(args, "jssa_basis_path", None),
-            "budget": getattr(args, "jssa_budget", 1024),
-            "rank": getattr(args, "jssa_rank", 32),
-            "page_size": 64,
-        }
     elif args.method == "jssa_vendor":
-        # JSSA（arXiv:2610.19026v1）B 轨官方 vLLM patch 语义 torch 等价——
-        # decode 单级 token 稀疏，校准基 M=TopEig_r(G_Qm/tr+G_K/tr) 投影打分
-        # top-budget/head + 精确注意力，prefill dense。qwen3_jssa_patch.py
-        # 按官方语义纯 torch 等价（identity 标注）。basis_path 必填。
-        import sys
-        repo = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", ".."
-        )
-        vendor_dir = os.path.join(repo, "exp", "vendor_baselines", "jssa_vendor")
-        sys.path.insert(0, vendor_dir)
-        if model.config.model_type == "glm4_moe_lite":
-            from glm4_moe_lite_jssa_patch import enable_jssa
-        elif model.config.model_type == "llama":
-            from llama3_jssa_patch import enable_jssa
-        else:
-            from qwen3_jssa_patch import enable_jssa
-        n_patched = enable_jssa(
-            model,
-            basis_path=getattr(args, "jssa_basis_path", None),
-            budget=getattr(args, "jssa_budget", 1024),
-            rank=getattr(args, "jssa_rank", 32),
+        raise RuntimeError(
+            "JSSA torch-semantics fallback has been disabled; "
+            "run benchmark/official_baselines/longbench_official.py --method jssa for the official backend"
         )
     elif args.method == "clusterkv_vendor":
         # ClusterKV（KMeans 聚类稀疏）B 轨官方源码复用——官方语义：

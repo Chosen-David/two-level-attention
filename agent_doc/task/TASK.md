@@ -1,5 +1,9 @@
 # two-level-attention 项目任务索引（AI 维护）
 
+## 2026-11-13
+
+- [ ] [TL-QWEN3-OFFICIAL-BASELINE-20261113] 切断 Quest/JSSA 旧 vendor/NFA 接入，直接使用 `third-party` 官方克隆的 Quest CUDA `_kernels` 与 JSSA patched-vLLM FP8/indexed-attend，统一 K2=1024 重跑 Qwen3-8B × LongBench v1 英文16任务精度和完整请求性能；独立入口与3项回归已完成，官方扩展/环境 smoke、旧路由删除、全量跑批与独立验收尚未完成，任何回退均 fail-closed。([详情](task_details/TL-QWEN3-OFFICIAL-BASELINE-20261113.md))
+
 ## 2026-11-12
 
 - [ ] [TL-GLM-ASYNCTLS-LBV1-20261112] 优先完成 GLM-4.7-Flash × AsyncTLS × LongBench v1 英文16任务全量精度：K2=1024、K1=128×64、逐KV group校准、上一步块集与完整prompt dense prefill；真实47层校准、qasper/samsum及双分片多请求smoke已完成，聚焦回归19 passed+12 subtests；3750请求、官方评分和独立验收待完成，分数保持pending。([详情](task_details/TL-GLM-ASYNCTLS-LBV1-20261112.md))

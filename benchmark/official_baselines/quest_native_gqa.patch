@@ -1,0 +1,461 @@
+diff --git a/kernels/include/decode/decode_attn.cuh b/kernels/include/decode/decode_attn.cuh
+index b180d59..d89ec83 100644
+--- a/kernels/include/decode/decode_attn.cuh
++++ b/kernels/include/decode/decode_attn.cuh
+@@ -452,9 +452,9 @@ BatchDecodeWithPagedKVCacheKernel(DTypeIn* __restrict__ q,
+ 
+ 	constexpr uint32_t head_dim = bdx * vec_size;
+ 	const uint32_t batch_idx = blockIdx.x;
++	const uint32_t qo_head_idx = blockIdx.y * bdy + threadIdx.y;
+ 	const uint32_t kv_head_idx =
+-		blockIdx.y; // Use kv_head_idx as another dimention in page indices.
+-	const uint32_t qo_head_idx = kv_head_idx * bdy + threadIdx.y;
++		qo_head_idx / (paged_kv.num_qo_heads / paged_kv.num_heads);
+ 	const uint32_t num_qo_heads = gridDim.y * bdy;
+ 	// Number of pages is identical since all heads share same latency budget.
+ 	const uint32_t cur_page_indptr_begin = paged_kv.indptr[batch_idx],
+@@ -512,6 +512,7 @@ BatchDecodeWithPagedKVCacheKernel(DTypeIn* __restrict__ q,
+ 		k_ptrs_smem[((j * bdz + tz) * bdy + ty) * bdx + tx] = paged_kv.protective_get_k_ptr_heads(
+ 			cur_page_indptr_begin + (((j * bdz + tz) * bdy + ty) * bdx + tx) / paged_kv.page_size,
+ 			kv_head_idx,
++			qo_head_idx,
+ 			(((j * bdz + tz) * bdy + ty) * bdx + tx) % paged_kv.page_size,
+ 			0,
+ 			last_indptr);
+@@ -563,6 +564,7 @@ BatchDecodeWithPagedKVCacheKernel(DTypeIn* __restrict__ q,
+ 							 ((j * bdz + tz) * bdy + ty) * bdx + tx) /
+ 								paged_kv.page_size,
+ 						kv_head_idx,
++						qo_head_idx,
+ 						((iter + num_stages_smem) * tile_size_per_bdx * bdy * bdz +
+ 						 ((j * bdz + tz) * bdy + ty) * bdx + tx) %
+ 							paged_kv.page_size,
+@@ -915,7 +917,7 @@ BatchDecodeWithPagedKVCacheDispatched(DTypeIn* q,
+ 	const float rope_rcp_theta = 1.f / rope_theta;
+ 	const uint32_t num_kv_heads = paged_kv.num_heads;
+ 	const uint32_t batch_size = paged_kv.batch_size;
+-	const uint32_t num_qo_heads = num_kv_heads * GROUP_SIZE;
++	const uint32_t num_qo_heads = paged_kv.num_qo_heads;
+ 
+ 	constexpr uint32_t vec_size = std::max(16UL / sizeof(DTypeIn), HEAD_DIM / 32UL);
+ 	constexpr uint32_t num_stages_smem = 2U;
+@@ -931,7 +933,7 @@ BatchDecodeWithPagedKVCacheDispatched(DTypeIn* q,
+ 
+ 	if(tmp == nullptr) {
+ 		// do not use partition-kv kernel
+-		dim3 nblks(batch_size, num_kv_heads);
++		dim3 nblks(batch_size, num_qo_heads / GROUP_SIZE);
+ 		dim3 nthrs(bdx, bdy, bdz);
+ 		auto kernel = BatchDecodeWithPagedKVCacheKernel</*partition_kv=*/false,
+ 														ROTARY_MODE,
+@@ -985,7 +987,7 @@ BatchDecodeWithPagedKVCacheDispatched(DTypeIn* q,
+ 						(void*)&sm_scale,
+ 						(void*)&rope_rcp_scale,
+ 						(void*)&rope_rcp_theta};
+-		dim3 nblks(batch_size, num_kv_heads);
++		dim3 nblks(batch_size, num_qo_heads / GROUP_SIZE);
+ 		dim3 nthrs(bdx, bdy, bdz);
+ 		FLASHINFER_CUDA_CALL(
+ 			cudaLaunchKernel((void*)partition_kv_kernel, nblks, nthrs, args, smem_size, stream));
+@@ -1049,8 +1051,12 @@ BatchDecodeWithPagedKVCache(DTypeIn* q,
+ 		throw std::invalid_argument(err_msg.str());
+ 	}
+ 
++	paged_kv.num_qo_heads = num_qo_heads;
++
++	// Quest selects pages independently for every query head. Use one query
++	// head per CTA and map it to the shared physical KV head at runtime.
+ 	SWITCH_GQA_GROUP_SIZE(
+-		num_qo_heads / num_kv_heads,
++		1,
+ 		GROUP_SIZE,
+ 		{SWITCH_HEAD_DIM(
+ 			head_dim, HEAD_DIM, {SWITCH_ROTARY_MODE(rotary_mode, ROTARY_MODE, {
+diff --git a/kernels/include/decode/decode_handler.cuh b/kernels/include/decode/decode_handler.cuh
+index 93ac3e1..fdfb8f4 100644
+--- a/kernels/include/decode/decode_handler.cuh
++++ b/kernels/include/decode/decode_handler.cuh
+@@ -80,7 +80,7 @@ public:
+ 		// TODO: Support more general cases.
+ 		static_assert(page_storage == PageStorage::kIndices,
+ 					  "Only support PageStorage::kIndices for now.");
+-		assert(num_qo_heads == num_kv_heads); // Need to modify page layout for general cases.
++		assert(num_qo_heads % num_kv_heads == 0);
+ 		batch_size_before_partition_ = batch_size;
+ 		uint32_t tmp_size, max_grid_size, max_num_pages_per_batch, new_batch_size;
+ 		auto work_estimation_func = BatchDecodeWithPagedKVCacheWorkEstimation<page_storage,
+diff --git a/kernels/include/decode/decode_page.cuh b/kernels/include/decode/decode_page.cuh
+index f4b07ce..e889d6e 100644
+--- a/kernels/include/decode/decode_page.cuh
++++ b/kernels/include/decode/decode_page.cuh
+@@ -79,6 +79,7 @@ struct kv_partition_info_t {
+ template <PageStorage page_storage, QKVLayout layout, typename DType, typename IdType>
+ struct paged_kv_t {
+ 	uint32_t num_heads;
++	uint32_t num_qo_heads;
+ 	uint32_t page_size;
+ 	uint32_t head_dim;
+ 	uint32_t batch_size;
+@@ -114,6 +115,7 @@ struct paged_kv_t {
+    */
+ 	__host__ __device__ __forceinline__ paged_kv_t()
+ 		: num_heads(0)
++		, num_qo_heads(0)
+ 		, page_size(0)
+ 		, head_dim(0)
+ 		, batch_size(0)
+@@ -148,6 +150,7 @@ struct paged_kv_t {
+ 												   IdType* indices,
+ 												   IdType* indptr)
+ 		: num_heads(num_heads)
++		, num_qo_heads(num_heads)
+ 		, page_size(page_size)
+ 		, head_dim(head_dim)
+ 		, batch_size(batch_size)
+@@ -178,6 +181,7 @@ struct paged_kv_t {
+ 												   IdType* indptr,
+ 												   IdType* last_page_len)
+ 		: num_heads(num_heads)
++		, num_qo_heads(num_heads)
+ 		, page_size(page_size)
+ 		, head_dim(head_dim)
+ 		, batch_size(batch_size)
+@@ -324,6 +328,7 @@ struct paged_kv_t {
+ 
+ 	__device__ __forceinline__ DType* protective_get_k_ptr_heads(IdType page_iter,
+ 																 uint32_t head_idx,
++																 uint32_t index_head_idx,
+ 																 uint32_t entry_idx,
+ 																 uint32_t feat_idx,
+ 																 IdType last_indptr) const {
+@@ -337,7 +342,7 @@ struct paged_kv_t {
+ 				// Therefore, boundary check is last_indptr - 1 (since last_indptr is the last page index).
+ 				if(page_iter < last_indptr - 1) {
+ 					return data +
+-						   get_k_elem_offset(__ldg(indices + page_iter + head_idx * page_budget),
++						   get_k_elem_offset(__ldg(indices + page_iter + index_head_idx * page_budget),
+ 											 head_idx,
+ 											 entry_idx,
+ 											 feat_idx);
+@@ -401,9 +406,12 @@ AppendPagedKVCacheDecodeKernel(paged_kv_t<page_storage, layout, DType, IdType> p
+ 							   DType* __restrict__ key,
+ 							   DType* __restrict__ value) {
+ 	uint32_t tx = threadIdx.x, ty = threadIdx.y;
+-	uint32_t num_heads = blockDim.y;
++	uint32_t num_kv_heads = paged_kv.num_heads;
++	uint32_t num_qo_heads = candidate_kv.num_heads;
++	uint32_t group_size = num_qo_heads / num_kv_heads;
+ 	uint32_t batch_idx = blockIdx.x;
+-	uint32_t head_idx = ty;
++	uint32_t qo_head_idx = ty;
++	uint32_t kv_head_idx = qo_head_idx / group_size;
+ 
+ 	uint32_t seq_len =
+ 		(paged_kv.indptr[batch_idx + 1] - paged_kv.indptr[batch_idx] - 1) * paged_kv.page_size +
+@@ -423,29 +431,31 @@ AppendPagedKVCacheDecodeKernel(paged_kv_t<page_storage, layout, DType, IdType> p
+ 	// We do not want initialize before kernel.
+ 	if(entry_idx > 0) {
+ 		local_max.cast_load(
+-			candidate_kv.get_k_ptr(candidate_ptr, head_idx, candidate_entry_idx, tx * vec_size));
++			candidate_kv.get_k_ptr(candidate_ptr, qo_head_idx, candidate_entry_idx, tx * vec_size));
+ 		local_min.cast_load(
+-			candidate_kv.get_v_ptr(candidate_ptr, head_idx, candidate_entry_idx, tx * vec_size));
++			candidate_kv.get_v_ptr(candidate_ptr, qo_head_idx, candidate_entry_idx, tx * vec_size));
+ 	} else {
+ 		local_max.fill(-CUDART_MAX_NORMAL_FP16);
+ 		local_min.fill(CUDART_MAX_NORMAL_FP16);
+ 	}
+ 
+-	// load the append value
++	// load the append value; grouped query heads share one physical KV head.
+ 	vec_t<DType, vec_size> local_k;
+-	DType* k_ptr = paged_kv.get_k_ptr(page_iter, head_idx, entry_idx, tx * vec_size);
++	DType* k_ptr = paged_kv.get_k_ptr(page_iter, kv_head_idx, entry_idx, tx * vec_size);
+ 	DType* v_ptr = k_ptr + paged_kv.kv_offset_delta();
+-	local_k.cast_load(key + (batch_idx * num_heads + head_idx) * head_dim +
++	local_k.cast_load(key + (batch_idx * num_kv_heads + kv_head_idx) * head_dim +
+ 					  tx * vec_size); // Default NHD
+ 	vec_reduct<vec_size, true>(local_max, local_k);
+ 	vec_reduct<vec_size, false>(local_min, local_k);
+-	local_k.cast_store(k_ptr);
++	if(qo_head_idx % group_size == 0) {
++		local_k.cast_store(k_ptr);
++		vec_t<DType, vec_size>::memcpy(
++			v_ptr, value + (batch_idx * num_kv_heads + kv_head_idx) * head_dim + tx * vec_size);
++	}
+ 	local_max.cast_store(
+-		candidate_kv.get_k_ptr(candidate_ptr, head_idx, candidate_entry_idx, tx * vec_size));
++		candidate_kv.get_k_ptr(candidate_ptr, qo_head_idx, candidate_entry_idx, tx * vec_size));
+ 	local_min.cast_store(
+-		candidate_kv.get_v_ptr(candidate_ptr, head_idx, candidate_entry_idx, tx * vec_size));
+-	vec_t<DType, vec_size>::memcpy(
+-		v_ptr, value + (batch_idx * num_heads + head_idx) * head_dim + tx * vec_size);
++		candidate_kv.get_v_ptr(candidate_ptr, qo_head_idx, candidate_entry_idx, tx * vec_size));
+ }
+ 
+ /*!
+@@ -474,9 +484,12 @@ AppendPagedKVCachePrefillKernel(paged_kv_t<page_storage, layout, DType, IdType>
+ 								DType* __restrict__ key,
+ 								DType* __restrict__ value,
+ 								IdType* __restrict__ append_indptr) {
+-	int32_t num_heads = gridDim.y;
++	int32_t num_kv_heads = paged_kv.num_heads;
++	int32_t num_qo_heads = candidate_kv.num_heads;
++	int32_t group_size = num_qo_heads / num_kv_heads;
+ 	int32_t batch_idx = blockIdx.x;
+-	int32_t head_idx = blockIdx.y;
++	int32_t qo_head_idx = blockIdx.y;
++	int32_t kv_head_idx = qo_head_idx / group_size;
+ 	int32_t tx = threadIdx.x, ty = threadIdx.y;
+ 	// bdy: page stride. bdx will iterate on continous seq dim.
+ 	int32_t bdy = blockDim.y;
+@@ -509,12 +522,12 @@ AppendPagedKVCachePrefillKernel(paged_kv_t<page_storage, layout, DType, IdType>
+ 		if(start_entry_idx > 0) {
+ 			local_max.cast_load(
+ 				candidate_kv.get_k_ptr(candidate_kv.indptr[batch_idx] + candidate_page_idx,
+-									   head_idx,
++									   qo_head_idx,
+ 									   candidate_entry_idx,
+ 									   tx * vec_size));
+ 			local_min.cast_load(
+ 				candidate_kv.get_v_ptr(candidate_kv.indptr[batch_idx] + candidate_page_idx,
+-									   head_idx,
++									   qo_head_idx,
+ 									   candidate_entry_idx,
+ 									   tx * vec_size));
+ 		} else {
+@@ -523,39 +536,40 @@ AppendPagedKVCachePrefillKernel(paged_kv_t<page_storage, layout, DType, IdType>
+ 		}
+ 
+ 		for(int32_t entry_idx = start_entry_idx; entry_idx < end_entry_idx; ++entry_idx) {
+-			DType* k_ptr = paged_kv.get_k_ptr(page_iter, head_idx, entry_idx, tx * vec_size);
++			DType* k_ptr = paged_kv.get_k_ptr(page_iter, kv_head_idx, entry_idx, tx * vec_size);
+ 			DType* v_ptr = k_ptr + paged_kv.kv_offset_delta();
+ 			// Reduction on K value
+ 			vec_t<DType, vec_size> local_k;
+ 			local_k.cast_load(key +
+ 							  ((append_indptr[batch_idx] + page_offset_bdx * paged_kv.page_size +
+ 								entry_idx - append_start_seq) *
+-								   num_heads +
+-							   head_idx) *
++								   num_kv_heads +
++							   kv_head_idx) *
+ 								  head_dim +
+ 							  tx * vec_size);
+ 			vec_reduct<vec_size, true>(local_max, local_k);
+ 			vec_reduct<vec_size, false>(local_min, local_k);
+-			local_k.cast_store(k_ptr);
+-			// Only memcpy V value
+-			vec_t<DType, vec_size>::memcpy(
+-				v_ptr,
+-				value +
+-					((append_indptr[batch_idx] + page_offset_bdx * paged_kv.page_size + entry_idx -
+-					  append_start_seq) *
+-						 num_heads +
+-					 head_idx) *
+-						head_dim +
+-					tx * vec_size);
++			if(qo_head_idx % group_size == 0) {
++				local_k.cast_store(k_ptr);
++				vec_t<DType, vec_size>::memcpy(
++					v_ptr,
++					value +
++						((append_indptr[batch_idx] + page_offset_bdx * paged_kv.page_size + entry_idx -
++						  append_start_seq) *
++							 num_kv_heads +
++						 kv_head_idx) *
++							head_dim +
++						tx * vec_size);
++			}
+ 		}
+ 		local_max.cast_store(
+ 			candidate_kv.get_k_ptr(candidate_kv.indptr[batch_idx] + candidate_page_idx,
+-								   head_idx,
++								   qo_head_idx,
+ 								   candidate_entry_idx,
+ 								   tx * vec_size));
+ 		local_min.cast_store(
+ 			candidate_kv.get_v_ptr(candidate_kv.indptr[batch_idx] + candidate_page_idx,
+-								   head_idx,
++								   qo_head_idx,
+ 								   candidate_entry_idx,
+ 								   tx * vec_size));
+ 	}
+@@ -581,11 +595,11 @@ cudaError_t AppendPagedKVCacheDecode(paged_kv_t<page_storage, layout, DType, IdT
+ 									 cudaStream_t stream = nullptr) {
+ 	uint32_t head_dim = paged_kv.head_dim;
+ 	uint32_t batch_size = paged_kv.batch_size;
+-	uint32_t num_heads = paged_kv.num_heads;
++	uint32_t num_qo_heads = candidate_kv.num_heads;
+ 	SWITCH_HEAD_DIM(head_dim, HEAD_DIM, {
+ 		constexpr uint32_t vec_size = std::max(16 / sizeof(DType), HEAD_DIM / 32);
+ 		uint32_t bdx = HEAD_DIM / vec_size;
+-		uint32_t bdy = num_heads;
++		uint32_t bdy = num_qo_heads;
+ 		dim3 nblks(batch_size);
+ 		dim3 nthrs(bdx, bdy);
+ 		auto kernel =
+@@ -618,12 +632,12 @@ cudaError_t AppendPagedKVCachePrefill(paged_kv_t<page_storage, layout, DType, Id
+ 									  cudaStream_t stream = nullptr) {
+ 	uint32_t head_dim = paged_kv.head_dim;
+ 	uint32_t batch_size = paged_kv.batch_size;
+-	uint32_t num_heads = paged_kv.num_heads;
++	uint32_t num_qo_heads = candidate_kv.num_heads;
+ 	SWITCH_HEAD_DIM(head_dim, HEAD_DIM, {
+ 		constexpr uint32_t vec_size = std::max(16 / sizeof(DType), HEAD_DIM / 32);
+ 		uint32_t bdx = HEAD_DIM / vec_size;
+ 		uint32_t bdy = 512 / bdx; // page stride
+-		dim3 nblks(batch_size, num_heads);
++		dim3 nblks(batch_size, num_qo_heads);
+ 		dim3 nthrs(bdx, bdy);
+ 		auto kernel = AppendPagedKVCachePrefillKernel<HEAD_DIM,
+ 													  vec_size,
+diff --git a/quest/ops/csrc/approx_attn.cu b/quest/ops/csrc/approx_attn.cu
+index 314f6f9..435bfab 100644
+--- a/quest/ops/csrc/approx_attn.cu
++++ b/quest/ops/csrc/approx_attn.cu
+@@ -123,6 +123,7 @@ BatchDecodeWithPagedKVCachePyTorchWrapper::Forward(torch::Tensor q,
+ 				static_cast<c_type*>(paged_kv_data.data_ptr()),
+ 				static_cast<int32_t*>(paged_kv_indices.data_ptr()),
+ 				static_cast<int32_t*>(paged_kv_indptr.data_ptr()));
++			paged_kv.num_qo_heads = num_qo_heads;
+ 
+ 			cudaError_t status =
+ 				BatchDecodeWithPagedKVCacheWrapper<PageStorage::kIndices,
+diff --git a/quest/ops/csrc/page.cu b/quest/ops/csrc/page.cu
+index a43b0aa..4be800c 100644
+--- a/quest/ops/csrc/page.cu
++++ b/quest/ops/csrc/page.cu
+@@ -43,16 +43,21 @@ void append_kv_cache_decode(torch::Tensor k,
+ 	size_t num_heads = k.size(1);
+ 	size_t head_dim = k.size(2);
+ 	size_t page_size;
++	size_t metadata_num_heads;
+ 	QKVLayout kv_layout = static_cast<QKVLayout>(layout);
+ 	if(kv_layout == QKVLayout::kHND) {
+ 		page_size = kv_data.size(3);
++		metadata_num_heads = metadata_data.size(2);
+ 		CHECK_EQ(kv_data.size(2), num_heads);
+ 		CHECK_EQ(kv_data.size(4), head_dim);
+ 	} else {
+ 		page_size = kv_data.size(2);
++		metadata_num_heads = metadata_data.size(3);
+ 		CHECK_EQ(kv_data.size(3), num_heads);
+ 		CHECK_EQ(kv_data.size(4), head_dim);
+ 	}
++	CHECK_EQ(v.size(1), num_heads);
++	CHECK_EQ(metadata_num_heads % num_heads, 0);
+ 
+ 	bool success = DISPATCH_PYTORCH_DTYPE_TO_CTYPE(k.scalar_type(), c_type, [&] {
+ 		SWITCH_LAYOUT(kv_layout, KV_LAYOUT, {
+@@ -69,7 +74,7 @@ void append_kv_cache_decode(torch::Tensor k,
+ 				static_cast<int32_t*>(kv_indptr.data_ptr()));
+ 
+ 			paged_kv_t<PageStorage::kIndices, KV_LAYOUT, c_type, int32_t> paged_metadata(
+-				num_heads,
++				metadata_num_heads,
+ 				page_size,
+ 				head_dim,
+ 				batch_size,
+@@ -142,20 +147,25 @@ void append_kv_cache_prefill(torch::Tensor k,
+ 	size_t num_heads = k.size(1);
+ 	size_t head_dim = k.size(2);
+ 	size_t page_size;
++	size_t metadata_num_heads;
+ 	QKVLayout kv_layout = static_cast<QKVLayout>(layout);
+ 	if(kv_layout == QKVLayout::kHND) {
+ 		page_size = kv_data.size(3);
++		metadata_num_heads = metadata_data.size(2);
+ #ifdef BSK_TORCH_CHECK
+ 		CHECK_EQ(kv_data.size(2), num_heads);
+ 		CHECK_EQ(kv_data.size(4), head_dim);
+ #endif
+ 	} else {
+ 		page_size = kv_data.size(2);
++		metadata_num_heads = metadata_data.size(3);
+ #ifdef BSK_TORCH_CHECK
+ 		CHECK_EQ(kv_data.size(3), num_heads);
+ 		CHECK_EQ(kv_data.size(4), head_dim);
+ #endif
+ 	}
++	CHECK_EQ(v.size(1), num_heads);
++	CHECK_EQ(metadata_num_heads % num_heads, 0);
+ 
+ #ifdef BSK_TORCH_CHECK
+ 	CHECK_EQ(seq_len, v.size(0));
+@@ -179,7 +189,7 @@ void append_kv_cache_prefill(torch::Tensor k,
+ 				static_cast<int32_t*>(kv_indptr.data_ptr()));
+ 
+ 			paged_kv_t<PageStorage::kIndices, KV_LAYOUT, c_type, int32_t> paged_metadata(
+-				num_heads,
++				metadata_num_heads,
+ 				page_size,
+ 				head_dim,
+ 				batch_size,
+@@ -223,12 +233,12 @@ void apply_rope_in_place(torch::Tensor q,
+ 	CHECK_DIM(3, k);
+ 
+ 	CHECK_EQ(q.size(0), k.size(0));
+-	CHECK_EQ(q.size(1), k.size(1));
+ 	CHECK_EQ(q.size(2), k.size(2));
+ #endif
+ 
+ 	size_t seq_len = q.size(0);
+-	size_t num_heads = q.size(1);
++	size_t num_qo_heads = q.size(1);
++	size_t num_kv_heads = k.size(1);
+ 	size_t head_dim = q.size(2);
+ 
+ 	bool success = DISPATCH_PYTORCH_DTYPE_TO_CTYPE(q.scalar_type(), c_type, [&] {
+@@ -236,8 +246,8 @@ void apply_rope_in_place(torch::Tensor q,
+ 														  static_cast<c_type*>(k.data_ptr()),
+ 														  seq_len,
+ 														  past_kv_len,
+-														  num_heads,
+-														  num_heads,
++														  num_qo_heads,
++														  num_kv_heads,
+ 														  head_dim,
+ 														  rope_scale,
+ 														  rope_theta,
+diff --git a/quest/utils/controller.py b/quest/utils/controller.py
+index 135b8d2..0730792 100644
+--- a/quest/utils/controller.py
++++ b/quest/utils/controller.py
+@@ -14,12 +14,17 @@ class InferenceController:
+         page_budget, # Real page budget including the last page
+         max_seq_len, # Real max for allocating kv / metadata
+         dtype,
+-        device,      
++        device,
++        num_kv_heads=None,
+     ):
+         max_kv_pages_num = (max_seq_len + page_size - 1) // page_size
++        if num_kv_heads is None:
++            num_kv_heads = num_heads
++        if num_heads % num_kv_heads != 0:
++            raise ValueError("num_heads must be divisible by num_kv_heads")
+         self.kv_cache = KvCache(
+             num_layers=num_layers,
+-            num_heads=num_heads,
++            num_heads=num_kv_heads,
+             head_dim=head_dim,
+             max_seq_len=max_seq_len,
+             page_size=page_size,
+@@ -40,6 +45,7 @@ class InferenceController:
+         self.dtype = dtype
+ 
+         self.num_heads = num_heads
++        self.num_kv_heads = num_kv_heads
+         self.head_dim = head_dim
+         self.page_size = page_size
+ 
+@@ -122,7 +128,7 @@ class InferenceController:
+             self._decode_handler.begin_forward(
+                 self.kv_indptr_for_approx_decode,
+                 self.num_heads,
+-                self.num_heads,
++                self.num_kv_heads,
+                 self.head_dim,
+                 self.page_size,
+                 self.dtype

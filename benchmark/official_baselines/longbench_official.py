@@ -1,0 +1,576 @@
+"""LongBench v1 英文16任务的纯官方 Quest/JSSA 独立入口。
+
+Quest 使用本地官方克隆的 CUDA ``_kernels``；JSSA 使用指定提交加官方补丁的
+vLLM/Triton backend。本文件不导入 NFA、``sparse_attn`` 或旧 vendor runner。
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import statistics
+import subprocess
+import time
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+ENGLISH16 = [
+    "narrativeqa", "qasper", "multifieldqa_en", "hotpotqa",
+    "2wikimqa", "musique", "gov_report", "qmsum", "multi_news",
+    "trec", "triviaqa", "samsum", "passage_count",
+    "passage_retrieval_en", "lcc", "repobench-p",
+]
+RAW_TASKS = {"trec", "triviaqa", "samsum", "lsht", "lcc", "repobench-p"}
+QUEST_COMMIT = "01c1623bf9395009520874e989e29f683203b357"
+JSSA_COMMIT = "34ce5abd82453b16ca6d5f16a1a8ae50fac5b920"
+VLLM_COMMIT = "39910f2b25aacc09f5e7f166cdf0030b19f8b9e8"
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--method", choices=("quest", "jssa"), required=True)
+    parser.add_argument("--mode", choices=("quality", "perf"), default="quality")
+    parser.add_argument("--model-path", default="/home/wangyuanshuo02/Qwen3-8B")
+    parser.add_argument("--model-name", default="Qwen3-8B")
+    parser.add_argument("--data-root", required=True)
+    parser.add_argument("--config-path", default=str(REPO / "benchmark/LongBench/config"))
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--tasks", nargs="+", default=ENGLISH16)
+    parser.add_argument("--sample-indices", nargs="+", type=int, default=None)
+    parser.add_argument("--shard-index", type=int, default=0)
+    parser.add_argument("--num-shards", type=int, default=1)
+    parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--budget", type=int, default=1024)
+    parser.add_argument("--quest-page-size", type=int, default=16)
+    parser.add_argument("--quest-max-seq-len", type=int, default=40960)
+    parser.add_argument("--jssa-rank", type=int, default=32)
+    parser.add_argument("--jssa-basis-path", default=str(REPO / "bases/qwen3_8b.pt"))
+    parser.add_argument("--jssa-gpu-memory-utilization", type=float, default=0.85)
+    parser.add_argument("--enforce-eager", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--warmup-requests", type=int, default=1)
+    parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--max-new-tokens", type=int, default=33,
+                        help="perf 固定生成长度；quality 默认读 dataset2maxlen")
+    return parser.parse_args()
+
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def sha256_ids(ids):
+    return hashlib.sha256(json.dumps(ids, separators=(",", ":")).encode()).hexdigest()
+
+
+def load_json(path):
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def load_rows(data_root, task):
+    path = Path(data_root) / f"{task}.jsonl"
+    if not path.is_file():
+        raise FileNotFoundError(f"本地 LongBench 数据不存在: {path}")
+    raw = path.read_bytes()
+    rows = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line]
+    return rows, hashlib.sha256(raw).hexdigest()
+
+
+def qwen3_chat_prompt(prompt):
+    return (
+        f"<|im_start|>user\n{prompt}<|im_end|>\n"
+        "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    )
+
+
+def build_input(row, task, prompt_format, max_length, tokenizer):
+    prompt = prompt_format.format(**row)
+    raw_ids = tokenizer(prompt, truncation=False, return_tensors="pt").input_ids[0]
+    truncated = len(raw_ids) > max_length
+    if truncated:
+        half = max_length // 2
+        prompt = (
+            tokenizer.decode(raw_ids[:half], skip_special_tokens=True)
+            + tokenizer.decode(raw_ids[-half:], skip_special_tokens=True)
+        )
+    if task not in RAW_TASKS:
+        prompt = qwen3_chat_prompt(prompt)
+    ids = tokenizer(prompt, return_tensors="pt").input_ids[0].tolist()
+    if len(ids) > max_length + 64:
+        raise RuntimeError(f"chat 后输入异常超长: {len(ids)} > {max_length}+64")
+    return ids, {
+        "input_tokens": len(ids),
+        "input_ids_sha256": sha256_ids(ids),
+        "truncated": truncated,
+    }
+
+
+def line_count(path):
+    if not path.exists():
+        return 0
+    raw = path.read_bytes()
+    return raw.count(b"\n") + int(bool(raw) and not raw.endswith(b"\n"))
+
+
+def git_identity(path, expected_commit):
+    actual = subprocess.check_output(
+        ["git", "-C", str(path), "rev-parse", "HEAD"], text=True
+    ).strip()
+    if actual != expected_commit:
+        raise RuntimeError(f"{path} HEAD={actual}，预期 {expected_commit}")
+    diff = subprocess.check_output(["git", "-C", str(path), "diff", "--binary"])
+    return {
+        "path": str(path),
+        "commit": actual,
+        "uncommitted_diff_sha256": hashlib.sha256(diff).hexdigest(),
+    }
+
+
+class OfficialEngine:
+    def __init__(self, args, max_model_len):
+        self.args = args
+        self.runtime = {}
+        if args.method == "quest":
+            self._init_quest(max_model_len)
+        else:
+            self._init_jssa(max_model_len)
+
+    def _init_quest(self, max_model_len):
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from benchmark.official_baselines.qwen3_quest_kernel import (
+            enable_quest,
+            quest_kernels,
+        )
+
+        args = self.args
+        self.torch = torch
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+        # 所有 36 层随后都由官方 Quest prefill/decode 接管。这里只让 HF 的
+        # mask interface 走 SDPA 的 is-causal 快路，避免 eager 在 256K/512K
+        # 先物化 [1,1,L,L] 的 64/256GiB 布尔 mask；不执行 SDPA attention。
+        self.model = AutoModelForCausalLM.from_pretrained(
+            args.model_path,
+            torch_dtype=torch.float16,
+            attn_implementation="sdpa",
+            trust_remote_code=True,
+        ).to(args.device).eval()
+        n_patched = enable_quest(
+            self.model,
+            token_budget=args.budget,
+            chunk_size=args.quest_page_size,
+            page_size=args.quest_page_size,
+            max_seq_len=max(args.quest_max_seq_len, max_model_len),
+        )
+        extension = Path(quest_kernels.__file__).resolve()
+        self.runtime = {
+            "implementation": "official Quest CUDA _kernels and paged runtime",
+            "patched_layers": n_patched,
+            "budget": args.budget,
+            "page_size": args.quest_page_size,
+            "page_budget": args.budget // args.quest_page_size,
+            "query_and_metadata_heads": int(self.model.config.num_attention_heads),
+            "physical_kv_heads": int(self.model.config.num_key_value_heads),
+            "hf_length_cache_layers": 1,
+            "prefill_tokenwise_chunk": 65536,
+            "quest": git_identity(REPO / "third-party/Quest", QUEST_COMMIT),
+            "kernel_extension": str(extension),
+            "kernel_extension_sha256": sha256_file(extension),
+            "dense_or_torch_fallback": False,
+        }
+
+    def _init_jssa(self, max_model_len):
+        os.environ.setdefault("VLLM_USE_FLASHINFER_SAMPLER", "0")
+        os.environ.setdefault("VLLM_ENABLE_V1_MULTIPROCESSING", "0")
+        import torch
+        from transformers import AutoTokenizer
+        import vllm
+        from vllm import LLM, SamplingParams
+
+        args = self.args
+        vllm_root = REPO / "third-party/JSSA/vllm-jssa"
+        vllm_file = Path(vllm.__file__).resolve()
+        if not vllm_file.is_relative_to(vllm_root.resolve()):
+            raise RuntimeError(f"vLLM 并非来自 JSSA 官方补丁树: {vllm_file}")
+        backend = vllm_root / "vllm/v1/attention/backends/jssa_attn.py"
+        if not backend.is_file():
+            raise RuntimeError(f"JSSA 官方 backend 缺失: {backend}")
+        if not Path(args.jssa_basis_path).is_file():
+            raise FileNotFoundError(args.jssa_basis_path)
+
+        import vllm.v1.attention.backends.jssa_attn as jssa_backend
+        import vllm.v1.attention.ops.triton_jssa_indexed_attend as indexed_ops
+        from vllm.v1.attention.ops.triton_jssa_score_topk import _radix_topk_available
+
+        if not _radix_topk_available():
+            raise RuntimeError("JSSA 官方 radix Top-K binding 缺失，禁止退回 torch.topk")
+
+        # 只包装官方函数入口做验收计数，不替换任何算子实现。CUDA Graph 下计数
+        # 表示 capture 时的真实分支证据；eager 下还表示逐次 Python 调用。
+        self._jssa_calls = {
+            "radix_score_topk": 0,
+            "fp8_projected_store": 0,
+            "indexed_attend": 0,
+            "gather_fallback": 0,
+            "bf16_projected_store_fallback": 0,
+            "unprojected_store_fallback": 0,
+        }
+
+        def counted_score_topk(*call_args, **call_kwargs):
+            if not _radix_topk_available():
+                raise RuntimeError("JSSA radix Top-K 在运行中失效")
+            self._jssa_calls["radix_score_topk"] += 1
+            return official_score_topk(*call_args, **call_kwargs)
+
+        def counted_fp8_store(*call_args, **call_kwargs):
+            self._jssa_calls["fp8_projected_store"] += 1
+            return official_fp8_store(*call_args, **call_kwargs)
+
+        def counted_indexed_attend(*call_args, **call_kwargs):
+            self._jssa_calls["indexed_attend"] += 1
+            return official_indexed_attend(*call_args, **call_kwargs)
+
+        def forbidden_fallback(name):
+            def reject(*call_args, **call_kwargs):
+                self._jssa_calls[name] += 1
+                raise RuntimeError(f"JSSA 触发禁止的低性能/非 FP8 路径: {name}")
+            return reject
+
+        official_score_topk = jssa_backend.jssa_score_topk
+        official_fp8_store = jssa_backend.jssa_project_and_store_contig_fp8
+        official_indexed_attend = indexed_ops.jssa_indexed_attend
+        jssa_backend.jssa_score_topk = counted_score_topk
+        jssa_backend.jssa_project_and_store_contig_fp8 = counted_fp8_store
+        jssa_backend.jssa_gather = forbidden_fallback("gather_fallback")
+        jssa_backend.jssa_project_and_store = forbidden_fallback(
+            "bf16_projected_store_fallback"
+        )
+        jssa_backend.jssa_store = forbidden_fallback("unprojected_store_fallback")
+        indexed_ops.jssa_indexed_attend = counted_indexed_attend
+
+        self.torch = torch
+        self.SamplingParams = SamplingParams
+        from vllm.inputs import TokensPrompt
+        self.TokensPrompt = TokensPrompt
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+        self.model = LLM(
+            model=args.model_path,
+            max_model_len=max_model_len,
+            gpu_memory_utilization=args.jssa_gpu_memory_utilization,
+            enforce_eager=args.enforce_eager,
+            enable_prefix_caching=False,
+            enable_chunked_prefill=False,
+            max_num_seqs=1,
+            trust_remote_code=True,
+            kv_cache_dtype="jssa",
+            attention_config={
+                "backend": "JSSA",
+                "jssa_basis_path": args.jssa_basis_path,
+                "jssa_budget": args.budget,
+                "jssa_rank": args.jssa_rank,
+                "jssa_fp8_projk": True,
+                "jssa_indexed_attend": True,
+            },
+        )
+        self.runtime = {
+            "implementation": "official JSSA patched-vLLM Triton FP8/indexed-attend",
+            "budget": args.budget,
+            "rank": args.jssa_rank,
+            "fp8_projk": True,
+            "indexed_attend": True,
+            "enforce_eager": args.enforce_eager,
+            "jssa": git_identity(REPO / "third-party/JSSA", JSSA_COMMIT),
+            "patched_vllm": git_identity(vllm_root, VLLM_COMMIT),
+            "backend_file": str(backend),
+            "backend_file_sha256": sha256_file(backend),
+            "basis_sha256": sha256_file(args.jssa_basis_path),
+            "radix_topk_binding": "torch.ops._C.top_k_per_row_decode",
+            "fallback_policy": "fail_closed",
+            "jssa_call_counts": self._jssa_calls,
+            "call_counts_scope": "eager calls plus CUDA Graph capture branches",
+            "torch_or_hf_fallback": False,
+        }
+
+    def generate(self, ids, max_new_tokens, ignore_eos):
+        if self.args.method == "quest":
+            return self._generate_quest(ids, max_new_tokens, ignore_eos)
+        return self._generate_jssa(ids, max_new_tokens, ignore_eos)
+
+    def _generate_quest(self, ids, max_new_tokens, ignore_eos):
+        torch = self.torch
+        inputs = torch.tensor([ids], dtype=torch.long, device=self.args.device)
+        try:
+            torch.cuda.synchronize()
+            started = time.perf_counter()
+            with torch.no_grad():
+                output = self.model.generate(
+                    input_ids=inputs,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=False,
+                    temperature=1.0,
+                    pad_token_id=self.tokenizer.eos_token_id,
+                    eos_token_id=None if ignore_eos else self.tokenizer.eos_token_id,
+                )[0]
+            torch.cuda.synchronize()
+            elapsed = time.perf_counter() - started
+        finally:
+            self.model.reset_quest_controller()
+        generated = output[len(ids):].tolist()
+        return generated, elapsed
+
+    def _generate_jssa(self, ids, max_new_tokens, ignore_eos):
+        params = self.SamplingParams(
+            temperature=0.0,
+            max_tokens=max_new_tokens,
+            ignore_eos=ignore_eos,
+        )
+        prompt = self.TokensPrompt(prompt_token_ids=ids)
+        self.torch.cuda.synchronize()
+        started = time.perf_counter()
+        outputs = self.model.generate([prompt], params, use_tqdm=False)
+        self.torch.cuda.synchronize()
+        elapsed = time.perf_counter() - started
+        if len(outputs) != 1 or len(outputs[0].outputs) != 1:
+            raise RuntimeError("JSSA 单请求生成返回了异常输出数")
+        if self._jssa_calls["fp8_projected_store"] == 0:
+            raise RuntimeError("JSSA 未执行官方 FP8 projected-key store")
+        if max_new_tokens > 1 and (
+            self._jssa_calls["radix_score_topk"] == 0
+            or self._jssa_calls["indexed_attend"] == 0
+        ):
+            raise RuntimeError("JSSA 未捕获/调用官方 radix Top-K 与 indexed-attend")
+        return list(outputs[0].outputs[0].token_ids), elapsed
+
+
+def timed_pair(engine, ids, max_new_tokens):
+    first_ids, ttft = engine.generate(ids, 1, ignore_eos=True)
+    generated, request_wall = engine.generate(ids, max_new_tokens, ignore_eos=True)
+    if len(first_ids) != 1 or len(generated) != max_new_tokens:
+        raise RuntimeError(
+            f"固定长度生成失败: first={len(first_ids)}, full={len(generated)}"
+        )
+    decode_wall = request_wall - ttft
+    if decode_wall <= 0:
+        raise RuntimeError(f"两点法 decode 时间非正: {decode_wall}")
+    return generated, {
+        "schema": "longbench-official-request-two-point-v1",
+        "ttft_ms": ttft * 1000.0,
+        "decode_after_first_wall_ms": decode_wall * 1000.0,
+        "tpot_ms": decode_wall * 1000.0 / (max_new_tokens - 1),
+        "request_wall_ms": request_wall * 1000.0,
+        "actual_generated_tokens": len(generated),
+        "generated_token_ids": generated,
+        "eos_positions": [
+            i for i, token in enumerate(generated)
+            if token == engine.tokenizer.eos_token_id
+        ],
+        "eos_early_stop": False,
+        "decode_protocol": "T(1+D)-T(1), fixed 1+D tokens; EOS ignored",
+        "timing_metric": "complete request host wall including official runtime scheduling",
+    }
+
+
+def median(values):
+    return statistics.median(values) if values else None
+
+
+def perf_summary(cells):
+    metrics = ("ttft_ms", "tpot_ms", "request_wall_ms")
+    per_task = {}
+    for task in sorted({cell["task"] for cell in cells}):
+        selected = [cell for cell in cells if cell["task"] == task]
+        per_task[task] = {
+            metric: median([c["request_timing"][metric] for c in selected])
+            for metric in metrics
+        }
+        per_task[task]["requests"] = len(selected)
+    return {
+        "per_task": per_task,
+        "macro_task_mean": {
+            metric: statistics.mean([v[metric] for v in per_task.values()])
+            if per_task else None
+            for metric in metrics
+        },
+        "all_request_median": {
+            metric: median([c["request_timing"][metric] for c in cells])
+            for metric in metrics
+        },
+    }
+
+
+def atomic_json(path, payload):
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def quality_manifest_path(output_dir, shard_index, num_shards):
+    return Path(output_dir) / f"quality_manifest_s{shard_index}of{num_shards}.json"
+
+
+def run_quality(args, engine, prompt_cfg, maxgen_cfg, max_length):
+    out_dir = Path(args.output_dir) / "pred"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "schema": "longbench-official-quality-manifest-v1",
+        "verification": "pending-independent-verification",
+        "method": args.method,
+        "model_path": str(Path(args.model_path).resolve()),
+        "max_length": max_length,
+        "shard_index": args.shard_index,
+        "num_shards": args.num_shards,
+        "runtime": engine.runtime,
+        "tasks": {},
+    }
+    for task in args.tasks:
+        rows, data_sha = load_rows(args.data_root, task)
+        selected = [
+            (source_idx, row)
+            for source_idx, row in enumerate(rows)
+            if source_idx % args.num_shards == args.shard_index
+            and (args.sample_indices is None or source_idx in args.sample_indices)
+        ]
+        prefix = task.split("-")[0]
+        label = (
+            f"quest_official_b{args.budget}_p{args.quest_page_size}"
+            if args.method == "quest"
+            else f"jssa_official_vllm_b{args.budget}_r{args.jssa_rank}"
+        )
+        out_path = out_dir / (
+            f"{prefix}-{label}_s{args.shard_index}of{args.num_shards}.jsonl"
+        )
+        if not selected:
+            out_path.write_text("", encoding="utf-8")
+        elif line_count(out_path) == len(selected):
+            print(f"[SKIP] {task}: {len(selected)} 条已完成", flush=True)
+        else:
+            with out_path.open("w", encoding="utf-8") as handle:
+                for source_idx, row in selected:
+                    ids, identity = build_input(
+                        row, task, prompt_cfg[task], max_length, engine.tokenizer
+                    )
+                    generated, _ = engine.generate(
+                        ids, maxgen_cfg[task], ignore_eos=False
+                    )
+                    pred = engine.tokenizer.decode(generated, skip_special_tokens=True)
+                    handle.write(json.dumps({
+                        "pred": pred,
+                        "answers": row["answers"],
+                        "all_classes": row["all_classes"],
+                        "length": row["length"],
+                        "_id": f"{task}:{source_idx}",
+                        "input": identity,
+                        "implementation": args.method + "_official",
+                    }, ensure_ascii=False) + "\n")
+                    handle.flush()
+                    print(
+                        f"[{args.method}:{task}] {source_idx} "
+                        f"in={len(ids)} out={len(generated)}", flush=True
+                    )
+        manifest["tasks"][task] = {
+            "path": str(out_path.relative_to(Path(args.output_dir))),
+            "rows": len(selected),
+            "data_sha256": data_sha,
+            "prediction_sha256": sha256_file(out_path),
+        }
+    if args.method == "quest":
+        manifest["quest_call_counts"] = engine.model.quest_runtime_stats
+        if manifest["quest_call_counts"]["decode_sparse_attn"] == 0:
+            raise RuntimeError("Quest 未执行官方 decode_sparse_attn")
+    atomic_json(
+        quality_manifest_path(args.output_dir, args.shard_index, args.num_shards),
+        manifest,
+    )
+    print(f"[ALL DONE] {args.output_dir}", flush=True)
+
+
+def run_perf(args, engine, prompt_cfg, max_length):
+    if args.max_new_tokens < 2:
+        raise ValueError("perf 要求 max-new-tokens>=2")
+    samples = args.sample_indices or [0]
+    output = Path(args.output_dir) / f"{args.method}_performance.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema": "longbench-official-performance-v1",
+        "verification": "pending-independent-verification",
+        "method": args.method,
+        "model_path": str(Path(args.model_path).resolve()),
+        "max_length": max_length,
+        "tasks": args.tasks,
+        "sample_indices": samples,
+        "warmup_requests": args.warmup_requests,
+        "repeats": args.repeats,
+        "runtime": engine.runtime,
+        "cells": [],
+    }
+    expected = {
+        (task, sample, repeat)
+        for task in args.tasks for sample in samples for repeat in range(args.repeats)
+    }
+    for task in args.tasks:
+        rows, data_sha = load_rows(args.data_root, task)
+        for sample in samples:
+            row = rows[sample]
+            ids, identity = build_input(
+                row, task, prompt_cfg[task], max_length, engine.tokenizer
+            )
+            for _ in range(args.warmup_requests):
+                timed_pair(engine, ids, args.max_new_tokens)
+            for repeat in range(args.repeats):
+                generated, timing = timed_pair(engine, ids, args.max_new_tokens)
+                payload["cells"].append({
+                    "task": task,
+                    "sample_index": sample,
+                    "repeat": repeat,
+                    "input": identity,
+                    "data_sha256": data_sha,
+                    "request_timing": timing,
+                    "output_ids_sha256": sha256_ids(generated),
+                })
+                complete = {
+                    (c["task"], c["sample_index"], c["repeat"])
+                    for c in payload["cells"]
+                } == expected
+                payload["status"] = "complete" if complete else "in_progress"
+                payload["summary"] = perf_summary(payload["cells"])
+                if args.method == "quest":
+                    payload["quest_call_counts"] = engine.model.quest_runtime_stats
+                atomic_json(output, payload)
+                print(
+                    f"[PERF] {args.method} {task} sample={sample} repeat={repeat} "
+                    f"TPOT={timing['tpot_ms']:.3f}ms", flush=True
+                )
+    print(f"[PERF DONE] {output}", flush=True)
+
+
+def main():
+    args = parse_args()
+    if len(set(args.tasks)) != len(args.tasks) or any(t not in ENGLISH16 for t in args.tasks):
+        raise ValueError("tasks 必须是唯一的 LongBench 英文16任务")
+    if not (0 <= args.shard_index < args.num_shards):
+        raise ValueError("要求 0<=shard-index<num-shards")
+    if args.budget <= 0 or args.jssa_rank <= 0 or args.repeats <= 0:
+        raise ValueError("budget/rank/repeats 必须为正")
+    if args.method == "quest" and args.budget % args.quest_page_size:
+        raise ValueError("Quest budget 必须整除 page-size")
+    prompt_cfg = load_json(Path(args.config_path) / "dataset2prompt.json")
+    maxgen_cfg = load_json(Path(args.config_path) / "dataset2maxlen.json")
+    model_len_cfg = load_json(Path(args.config_path) / "model2maxlen.json")
+    max_length = int(model_len_cfg[args.model_name])
+    if args.model_name != "Qwen3-8B" or max_length != 31500:
+        raise ValueError("当前独立入口仅验收 Qwen3-8B 的 31500 对齐口径")
+    max_new = args.max_new_tokens if args.mode == "perf" else max(maxgen_cfg[t] for t in args.tasks)
+    engine = OfficialEngine(args, max_length + max_new + 16)
+    if args.mode == "quality":
+        run_quality(args, engine, prompt_cfg, maxgen_cfg, max_length)
+    else:
+        run_perf(args, engine, prompt_cfg, max_length)
+
+
+if __name__ == "__main__":
+    main()
