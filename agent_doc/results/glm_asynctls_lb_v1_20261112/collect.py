@@ -1,4 +1,4 @@
-"""校验 GLM AsyncTLS LongBench v1 双分片并用官方 scorer 重算。"""
+"""校验 GLM AsyncTLS LongBench v1 混合确定性分片并用官方 scorer 重算。"""
 import hashlib
 import json
 from pathlib import Path
@@ -33,6 +33,13 @@ TASK_SIZES = {
 PRODUCER_COMMIT = "a0b086850ba7d290fda47c1c27833e7057e774bb"
 PRED_SHA256 = "cd155d8591591576c3723db65d1a31034ee9a3968dec5d73ed3a39a59e115f14"
 CHANNEL_SHA256 = "87b28849a4ec034c6c52df4a0b1d35ef58c04d88a8557327d967140c1dc8058a"
+TASK_WORLDS = {"narrativeqa": 2, "lcc": 2, "repobench-p": 2}
+# 固定提交对非 NFA 只在文件名编码 treatment hash，未写 sidecar。此字节串由
+# a0b08685 的 parse_args + get_treatment_manifest_json 对同一 CLI 重建；
+# SHA256 前10位必须等于所有结果文件名中的 h9547befd1f。
+CANONICAL_TREATMENT_RAW = b'{"asynctls_block_size": 64, "asynctls_channel_file": {"basename": "glm-4.7-flash_qasper_channels.json", "sha256": "87b28849a4ec034c6c52df4a0b1d35ef58c04d88a8557327d967140c1dc8058a"}, "asynctls_token_budget": 1024, "asynctls_top_kb": 128, "method": "asynctls_vendor", "nfa_alpha": 0.0, "nfa_beta": 0.0, "nfa_boundary_bypass": true, "nfa_decode_dense": false, "nfa_dyn_dgate": false, "nfa_dyn_dgate_eps": 0.05, "nfa_dyn_dgate_rows": 256, "nfa_enable_kmeans": true, "nfa_enable_layer_skip": false, "nfa_enable_static_gate": false, "nfa_enable_subspace": true, "nfa_far_blocks": 16, "nfa_far_clusters": 256, "nfa_far_method": "minmax", "nfa_far_niter": 10, "nfa_far_select": "4bit", "nfa_far_tokens": 512, "nfa_gamma": 1.0, "nfa_l2_quant": false, "nfa_l2_subspace": "same", "nfa_layer_skip_path": null, "nfa_moba": false, "nfa_near_len": null, "nfa_near_method": "avg", "nfa_near_pages": null, "nfa_near_select": "4bit", "nfa_near_tokens": null, "nfa_per_q_head": false, "nfa_proj_basis": null, "nfa_sigma": 8.0, "nfa_sigma_select": "none", "nfa_sim": 0.9, "nfa_sim_dims": "subspace", "nfa_sink_tokens": 128, "nfa_sinkswa_only": false, "nfa_sparse_prefill": false, "nfa_static_pair": false, "nfa_subspace": "full", "nfa_swa_size": 128, "tia_block_size": 64, "tia_enable_async_topk": false, "tia_level1_topk": 128, "tia_level2_cmp_ratio": 2, "tia_level2_topk": 1024}'
+if hashlib.sha256(CANONICAL_TREATMENT_RAW).hexdigest()[:10] != "9547befd1f":
+    raise RuntimeError("canonical AsyncTLS treatment identity mismatch")
 
 
 def sha256_bytes(raw):
@@ -60,10 +67,11 @@ def collect_task(task, source_count, prompts, maxlens):
     identity = build_lbv1_input_identity(source, prompts[task])
     fingerprint = identity["source_fingerprint"]
     expected_ids = [selected_id(task, fingerprint, i) for i in range(source_count)]
+    world = TASK_WORLDS.get(task, 3)
     rows_by_id = {}
     receipts = []
-    for rank in range(2):
-        shard_dir = ROOT / "raw" / task / f"pred_r{rank}of2"
+    for rank in range(world):
+        shard_dir = ROOT / "raw" / task / f"pred_r{rank}of{world}"
         paths = sorted(shard_dir.glob("*.jsonl"))
         if len(paths) != 1:
             raise ValueError(f"{task} rank{rank}: expected one JSONL, got {paths}")
@@ -90,11 +98,11 @@ def collect_task(task, source_count, prompts, maxlens):
                     "source_fingerprint", "sample_count", "prompt_template_sha256"):
             if cap_identity[key] != identity[key]:
                 raise ValueError(f"{task} rank{rank}: full-source {key} mismatch")
-        expected_shard_ids = expected_ids[rank::2]
+        expected_shard_ids = expected_ids[rank::world]
         sharding = {
             "algorithm": "source_order[rank::world_size]",
             "rank": rank,
-            "world_size": 2,
+            "world_size": world,
             "source_samples": source_count,
             "selected_samples": len(expected_shard_ids),
             "source_sha256": identity["source_sha256"],
@@ -110,7 +118,12 @@ def collect_task(task, source_count, prompts, maxlens):
             raise ValueError(f"{task} rank{rank}: realized input count mismatch")
 
         treatment_path = path.with_name(path.name + ".nfa_manifest.json")
+        treatment_reconstructed = not treatment_path.exists()
+        if treatment_reconstructed:
+            treatment_path.write_bytes(CANONICAL_TREATMENT_RAW)
         treatment_raw = treatment_path.read_bytes()
+        if treatment_raw != CANONICAL_TREATMENT_RAW:
+            raise ValueError(f"{task} rank{rank}: non-canonical treatment sidecar")
         treatment = json.loads(treatment_raw)
         expected_vendor = {
             "method": "asynctls_vendor",
@@ -133,7 +146,7 @@ def collect_task(task, source_count, prompts, maxlens):
                 or not path.name.startswith(task.split("-")[0] + "-")):
             raise ValueError(f"{task} rank{rank}: treatment/result filename mismatch")
 
-        for row, source_row in zip(rows, source[rank::2]):
+        for row, source_row in zip(rows, source[rank::world]):
             sample_id = row["_id"]
             if sample_id in rows_by_id:
                 raise ValueError(f"{task}: duplicate {sample_id}")
@@ -146,11 +159,13 @@ def collect_task(task, source_count, prompts, maxlens):
             rows_by_id[sample_id] = row
         receipts.append({
             "rank": rank,
+            "world_size": world,
             "path": str(path.relative_to(ROOT)),
             "rows": len(rows),
             "result_sha256": sha256_bytes(raw),
             "runcap_sha256": sha256_file(cap_path),
             "treatment_sha256": sha256_bytes(treatment_raw),
+            "treatment_reconstructed_from_fixed_cli": treatment_reconstructed,
             "cap_identity_hash": binding["cap_identity_hash"],
             "actual_input_ids_ordered_sha256": actual["ordered_sha256"],
         })
@@ -211,6 +226,11 @@ def main():
         "macro_avg16_100": sum(t["score_100"] for t in tasks.values()) / len(tasks),
         "micro_avg3750_100": 100.0 * sum(all_scores) / total,
         "scorer": "benchmark.LongBench.eval.sample_score",
+        "sharding": {"completed_1200_world": 2, "remaining_2550_world": 3},
+        "treatment_provenance": (
+            "缺失sidecar由固定commit a0b08685的同一CLI确定性重建；"
+            "canonical SHA256=9547befd1fe3040e3d964cad7312e609e567988f31cfaecaaf2e2e777f532d4f，"
+            "JSONL/runcap字节不修改。"),
         "note": "生产侧重算与闭集校验，不冒充不同 owner 独立验收。",
     }
     output = ROOT / "summary.json"

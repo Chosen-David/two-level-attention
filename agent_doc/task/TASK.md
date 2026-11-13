@@ -2,11 +2,13 @@
 
 ## 2026-11-13
 
-- [ ] [TL-QWEN3-OFFICIAL-BASELINE-20261113] 切断 Quest/JSSA 旧 vendor/NFA 接入，直接使用 `third-party` 官方克隆的 Quest CUDA `_kernels` 与 JSSA patched-vLLM FP8/indexed-attend，统一 K2=1024 重跑 Qwen3-8B × LongBench v1 英文16任务精度和完整请求性能；独立入口与3项回归已完成，官方扩展/环境 smoke、旧路由删除、全量跑批与独立验收尚未完成，任何回退均 fail-closed。([详情](task_details/TL-QWEN3-OFFICIAL-BASELINE-20261113.md))
+- [ ] [TL-QWEN3-OFFICIAL-BASELINE-20261113] 切断 Quest/JSSA 旧 vendor/NFA 接入，直接使用 `third-party` 官方克隆，统一 K2=1024 重跑 Qwen3-8B × LongBench v1 英文16任务。Quest 48/48 clean性能格已闭集，macro TPOT=19.3653ms；256K/512K正式性能中位TPOT=29.1229/83.8234ms；全量精度world=4已在本机/pc40/pc31完成，16/16任务、3750/3750请求按源顺序完成canonical合并及官方eval严格评分，macro AVG16=49.270625（pending），16份runcap/v2输入身份全部通过；合并器普通/-O各23 tests通过，含input-hash漂移拒绝。NFA/FlashInfer同two-point入口普通/-O各13 tests通过；旧256K smoke均已完成，FlashInfer协议通过，NFA逐请求重复capture已用固定arena/Graph池修复且二次smoke的正式请求capture0/replay32/fallback0；256K正式3 repeats已闭集且结构复核PASS，NFA/FlashInfer中位TPOT=26.2036/26.9315ms，512K正式双臂在跑（任务bnbmqxr0k/b7gjak5je）；JSSA固定cu129 wheel仍阻塞，任何回退均fail-closed；所有结果保持pending-independent-verification。([详情](task_details/TL-QWEN3-OFFICIAL-BASELINE-20261113.md))
 
 ## 2026-11-12
 
-- [ ] [TL-GLM-ASYNCTLS-LBV1-20261112] 优先完成 GLM-4.7-Flash × AsyncTLS × LongBench v1 英文16任务全量精度：K2=1024、K1=128×64、逐KV group校准、上一步块集与完整prompt dense prefill；真实47层校准、qasper/samsum及双分片多请求smoke已完成，聚焦回归19 passed+12 subtests；3750请求、官方评分和独立验收待完成，分数保持pending。([详情](task_details/TL-GLM-ASYNCTLS-LBV1-20261112.md))
+- [x] [TL-GLM-ASYNCTLS-LBV1-20261112] GLM-4.7-Flash × AsyncTLS × LongBench v1 英文16任务全量精度完成：K2=1024、K1=128×64、逐KV group校准、上一步块集与完整prompt dense prefill，输入cap/chat/greedy/max-new与NFA同为31500及官方配置；旧3任务1200条world=2 complete保持不动，其余13任务按world=3补齐，16/16任务、3750/3750请求均通过完整源ID闭集、runcap、输入身份、treatment与答案metadata校验。生产侧官方逐样本重算macro AVG16=49.1203312440、micro AVG3750=51.4903546562，另一新进程复算人口/分数及153项manifest哈希PASS；不同owner独立验收待完成，分数保持pending。([详情](task_details/TL-GLM-ASYNCTLS-LBV1-20261112.md)；[结果](../results/glm_asynctls_lb_v1_20261112/summary.json))
+
+- [ ] [TL-GLM-NFA-EPS010-GRAPH-20261112] GLM-4.7-Flash × LongBench v1 英文16任务3750请求、BS=1、`glm_nope_last32` seed=0、`dual_0.1`真实near/far skip与CUDA Graph全量重跑；r1落盘18请求后八分片均因session pool跨请求强引用Graph/KV而OOM，已保留失败证据并在r2请求边界修复生命周期，真实六请求回归通过前不扩回正式分片，r1/r2绝不混池，分数独立验收前保持pending。([详情](task_details/TL-GLM-NFA-EPS010-GRAPH-20261112.md))
 
 - [x] [TL-QWEN3-LBV2-VENDOR-20261112] Qwen3-8B × LongBench v2 三臂统一 K2=1024、AsyncTLS K1=128×64、确定性503题分片与 runcap 身份；Quest/JSSA 执行官方算子，AsyncTLS 按论文语义复现。三臂原始分片均收回并通过生产侧闭集、源顺序、答案与 official-strict 重算，Quest/JSSA/AsyncTLS=161/165/162/503，33项 manifest 哈希复核 PASS；全部分数独立验收前保持 pending。([详情](task_details/TL-QWEN3-LBV2-VENDOR-20261112.md)；[结果](../results/qwen3_lbv2_vendor_20261112/summary.json))
 
