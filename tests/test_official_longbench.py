@@ -29,6 +29,7 @@ from benchmark.official_baselines.longbench_official import (
     sha256_file,
     sha256_ids,
     timed_pair,
+    validate_model_contract,
     validate_official_batch_size,
 )
 
@@ -343,6 +344,15 @@ class OfficialLongBenchIndependenceTest(unittest.TestCase):
         self.assertTrue(torch.equal(
             _tokenwise_prefill_chunk(norm.forward, heads, 17), norm(heads)
         ))
+
+    def test_qwen32b_uses_the_same_longbench_alignment_contract(self):
+        for model_name in ("Qwen3-8B", "Qwen3-32B"):
+            with self.subTest(model_name=model_name):
+                validate_model_contract(model_name, 31500)
+                with self.assertRaisesRegex(ValueError, "31500 对齐口径"):
+                    validate_model_contract(model_name, 32768)
+        with self.assertRaisesRegex(ValueError, "Qwen3-8B/Qwen3-32B"):
+            validate_model_contract("Llama-3.1-8B", 31500)
 
     def test_official_batch_greater_than_one_fails_before_model_construction(self):
         for method in ("quest", "jssa"):

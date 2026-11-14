@@ -44,6 +44,14 @@ RAW_TASKS = {"trec", "triviaqa", "samsum", "lsht", "lcc", "repobench-p"}
 QUEST_COMMIT = "01c1623bf9395009520874e989e29f683203b357"
 JSSA_COMMIT = "34ce5abd82453b16ca6d5f16a1a8ae50fac5b920"
 VLLM_COMMIT = "39910f2b25aacc09f5e7f166cdf0030b19f8b9e8"
+SUPPORTED_QWEN3_MODELS = {"Qwen3-8B", "Qwen3-32B"}
+
+
+def validate_model_contract(model_name, max_length):
+    if model_name not in SUPPORTED_QWEN3_MODELS or max_length != 31500:
+        raise ValueError(
+            "当前独立入口仅验收 Qwen3-8B/Qwen3-32B 的 31500 对齐口径"
+        )
 
 
 def parse_args():
@@ -944,8 +952,7 @@ def main():
     maxgen_cfg = load_json(Path(args.config_path) / "dataset2maxlen.json")
     model_len_cfg = load_json(Path(args.config_path) / "model2maxlen.json")
     max_length = int(model_len_cfg[args.model_name])
-    if args.model_name != "Qwen3-8B" or max_length != 31500:
-        raise ValueError("当前独立入口仅验收 Qwen3-8B 的 31500 对齐口径")
+    validate_model_contract(args.model_name, max_length)
     max_new = args.max_new_tokens if args.mode == "perf" else max(maxgen_cfg[t] for t in args.tasks)
     cap_gate_info = enforce_context_capability_gate(
         args.model_name, args.model_path, max_length, args.config_path
