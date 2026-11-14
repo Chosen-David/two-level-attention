@@ -1,4 +1,4 @@
-"""复核并评分 2026-11-14 Llama/GLM LongBench v2 FullKV 单分片结果。"""
+"""复核并评分 2026-11-14 Qwen32B/Llama/GLM LongBench v2 FullKV 单分片结果。"""
 from __future__ import annotations
 
 import hashlib
@@ -20,6 +20,11 @@ from benchmark.LongBench.lbv2_choice import (
 RESULTS = REPO / "agent_doc/results"
 SOURCE = Path("/home/wangyuanshuo02/datasets/LongBench/data/lbv2.json")
 ARMS = {
+    "qwen32b": {
+        "root": RESULTS / "qwen32b_fullkv_lbv2_20261114",
+        "model": "Qwen3-32B",
+        "producer": "4381d92edf1df9a16b13872621ea81bbb6fe9cf8",
+    },
     "llama": {
         "root": RESULTS / "llama_fullkv_lbv2_20261114",
         "model": "Llama-3.1-8B",
