@@ -530,7 +530,10 @@ def test_forced_suffix_eos_survives_async_scheduler_drain():
         req_ids, logits, forced_tokens=[4], stop_on_eos=False)
 
     # 上一步的 EOS 是 forced suffix 输入，异步 drain 不得结束请求。
+    # prepare_step 只做非阻塞 query；检查 CPU token 镜像前必须显式等待回执，
+    # 不能要求生产热路径为该主机断言退化成逐步同步。
     req_ids, _, _ = scheduler.prepare_step()
+    scheduler.flush_ready_receipts()
     assert scheduler.active_req_ids == [0]
     assert scheduler.next_tokens[0] == 4
     assert cache.removed == []
@@ -539,6 +542,7 @@ def test_forced_suffix_eos_survives_async_scheduler_drain():
     logits[0, 0, 4] = 10.
     scheduler.record_next_tokens(req_ids, logits)
     scheduler.prepare_step()
+    scheduler.flush_ready_receipts()
     assert scheduler.active_req_ids == []
     assert cache.removed == [0]
     assert cache.request_phases[0] == RequestPhase.FINISHED

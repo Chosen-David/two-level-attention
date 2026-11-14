@@ -425,33 +425,57 @@ class OfficialEngine:
         return list(outputs[0].outputs[0].token_ids), elapsed
 
 
+def _generated_rows(value, expected_length, label):
+    """统一核验 B1 扁平输出与 B>1 batch-major 输出，拒绝混合/参差行。"""
+    if not isinstance(value, list) or not value:
+        raise RuntimeError(f"{label} 必须是非空 token 列表")
+    batched = isinstance(value[0], list)
+    if batched and not all(isinstance(row, list) for row in value):
+        raise RuntimeError(f"{label} 不允许混合扁平和 batch-major 行")
+    rows = value if batched else [value]
+    lengths = [len(row) for row in rows]
+    if any(length != expected_length for length in lengths):
+        raise RuntimeError(
+            f"固定长度生成失败: {label} 每行应为 {expected_length}，实际 {lengths}")
+    if any(not all(isinstance(token, int) for token in row) for row in rows):
+        raise RuntimeError(f"{label} 含非整数 token")
+    return rows, batched
+
+
 def timed_pair(engine, ids, max_new_tokens, require_positive=True):
     first_ids, ttft = engine.generate(ids, 1, ignore_eos=True)
     generated, request_wall = engine.generate(ids, max_new_tokens, ignore_eos=True)
-    if len(first_ids) != 1 or len(generated) != max_new_tokens:
-        raise RuntimeError(
-            f"固定长度生成失败: first={len(first_ids)}, full={len(generated)}"
-        )
+    first_rows, first_batched = _generated_rows(first_ids, 1, "T(1)")
+    generated_rows, generated_batched = _generated_rows(
+        generated, max_new_tokens, f"T({max_new_tokens})")
+    if first_batched != generated_batched or len(first_rows) != len(generated_rows):
+        raise RuntimeError("T(1) 与 T(N) 的 batch 布局或行数不一致")
     decode_wall = request_wall - ttft
     if require_positive and decode_wall <= 0:
         raise RuntimeError(
             f"两点法 decode 时间非正: {decode_wall}; "
             f"T(1)={ttft}, T({max_new_tokens})={request_wall}"
         )
+    eos_rows = [
+        [i for i, token in enumerate(row)
+         if token == engine.tokenizer.eos_token_id]
+        for row in generated_rows
+    ]
     return generated, {
         "schema": "longbench-official-request-two-point-v1",
         "ttft_ms": ttft * 1000.0,
         "decode_after_first_wall_ms": decode_wall * 1000.0,
+        # 每个 batched decode step 的 host-wall；不按 B 归一化，也不冒充吞吐。
         "tpot_ms": decode_wall * 1000.0 / (max_new_tokens - 1),
         "request_wall_ms": request_wall * 1000.0,
-        "actual_generated_tokens": len(generated),
+        "batch_size": len(generated_rows),
+        "output_layout": "batch-major" if generated_batched else "flat-b1",
+        "actual_generated_tokens": sum(map(len, generated_rows)),
+        "actual_generated_tokens_per_request": list(map(len, generated_rows)),
         "generated_token_ids": generated,
-        "eos_positions": [
-            i for i, token in enumerate(generated)
-            if token == engine.tokenizer.eos_token_id
-        ],
+        "eos_positions": eos_rows if generated_batched else eos_rows[0],
         "eos_early_stop": False,
-        "decode_protocol": "T(1+D)-T(1), fixed 1+D tokens; EOS ignored",
+        "decode_protocol": "T(1+D)-T(1), fixed 1+D tokens per request; EOS ignored",
         "timing_metric": "complete request host wall including official runtime scheduling",
     }
 

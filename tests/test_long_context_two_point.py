@@ -13,10 +13,12 @@ from benchmark.efficiency.benchmark_long_context_two_point import (
 )
 
 
-def _nfa_receipt(tokens=33, *, initial_capture=False):
+def _nfa_receipt(tokens=33, *, initial_capture=False, batch_size=1):
     steps = tokens - 1
     return {
-        "generated_tokens": tokens,
+        "batch_size": batch_size,
+        "generated_tokens": tokens * batch_size,
+        "generated_tokens_per_request": [tokens] * batch_size,
         "nfa_decode_steps": steps,
         "graph_capture_count": int(steps > 0 and initial_capture),
         "graph_replays": steps,
@@ -44,6 +46,34 @@ def test_nfa_graph_receipt_accepts_zero_decode_and_fixed_decode(tokens):
     validate_request_receipt("nfa", "graph", 36, tokens, _nfa_receipt(tokens))
 
 
+@pytest.mark.parametrize("batch_size", [2, 4])
+def test_nfa_batched_receipt_counts_tokens_per_row_but_steps_per_batch(batch_size):
+    receipt = _nfa_receipt(batch_size=batch_size)
+    validate_request_receipt("nfa", "graph", 36, 33, receipt)
+    assert receipt["generated_tokens"] == 33 * batch_size
+    assert receipt["nfa_decode_steps"] == 32
+
+
+def test_nfa_batched_receipt_rejects_ragged_or_wrong_total():
+    receipt = _nfa_receipt(batch_size=2)
+    receipt["generated_tokens_per_request"] = [33, 32]
+    with pytest.raises(RuntimeError, match="逐请求固定长度"):
+        validate_request_receipt("nfa", "graph", 36, 33, receipt)
+    receipt = _nfa_receipt(batch_size=2)
+    receipt["generated_tokens"] = 33
+    with pytest.raises(RuntimeError, match="生成总数"):
+        validate_request_receipt("nfa", "graph", 36, 33, receipt)
+
+
+def test_flashinfer_batch_greater_than_one_is_fail_closed():
+    args = SimpleNamespace(
+        method="flashinfer", execution="graph", batch_size=2)
+    model = SimpleNamespace(
+        dtype=torch.bfloat16, config=SimpleNamespace(num_hidden_layers=36))
+    with pytest.raises(ValueError, match="仅支持 B1"):
+        RequestTwoPointEngine(args, model, None, ())
+
+
 def test_nfa_graph_receipt_allows_only_initial_cold_capture():
     validate_request_receipt(
         "nfa", "graph", 36, 33, _nfa_receipt(initial_capture=True),
@@ -67,8 +97,9 @@ def test_nfa_graph_fallback_is_fail_closed():
         validate_request_receipt("nfa", "graph", 36, 33, receipt)
 
 
-def test_nfa_two_point_pairs_reuse_fixed_cache_and_captured_graph(monkeypatch):
-    """T(1)→T(33)→T(1)→T(33) 只允许首个 decode 请求冷 capture。"""
+@pytest.mark.parametrize("batch", [1, 2, 4])
+def test_nfa_two_point_pairs_reuse_fixed_cache_and_captured_graph(monkeypatch, batch):
+    """T(1)→T(33)→T(1)→T(33) 只允许首个 batched decode 冷 capture。"""
 
     class FakeCache:
         def __init__(self):
@@ -86,11 +117,14 @@ def test_nfa_two_point_pairs_reuse_fixed_cache_and_captured_graph(monkeypatch):
 
     class FakeScheduler:
         def __init__(self, cache, **kwargs):
+            if kwargs["max_batch"] != batch:
+                raise AssertionError("scheduler max_batch 未对齐命令行 batch")
             self.cache = cache
+            self.active_req_ids = []
             self.next_tokens = {}
 
         def add_request(self, request_id):
-            self.request_id = request_id
+            self.active_req_ids.append(request_id)
 
         def prepare_step(self):
             self.prepared = True
@@ -112,7 +146,9 @@ def test_nfa_two_point_pairs_reuse_fixed_cache_and_captured_graph(monkeypatch):
             else:
                 self.eager_fallback_count += 1
             token = 8 + self.replay_count + self.eager_fallback_count
-            return None, torch.tensor([token], dtype=torch.long)
+            return None, torch.tensor(
+                [token + row for row in range(len(self.scheduler.active_req_ids))],
+                dtype=torch.long)
 
     class FakePool:
         def __init__(self):
@@ -161,15 +197,18 @@ def test_nfa_two_point_pairs_reuse_fixed_cache_and_captured_graph(monkeypatch):
     monkeypatch.setattr(
         harness, "greedy_next_tokens",
         lambda *args, **kwargs: torch.tensor([7], dtype=torch.long))
-    monkeypatch.setattr(
-        harness, "session_graph_runner",
-        lambda model, cache, scheduler, **kwargs: pool.acquire(
-            scheduler, kwargs["capture"]))
+    runner_options = []
+
+    def fake_session_runner(model, cache, scheduler, **kwargs):
+        runner_options.append(kwargs)
+        return pool.acquire(scheduler, kwargs["capture"])
+
+    monkeypatch.setattr(harness, "session_graph_runner", fake_session_runner)
     monkeypatch.setattr(harness.torch.cuda, "synchronize", lambda: None)
 
     args = SimpleNamespace(
         method="nfa", execution="graph", device="cpu", visible_len=8192,
-        max_new_tokens=33, warmup_requests=1)
+        max_new_tokens=33, warmup_requests=1, batch_size=batch)
     model = SimpleNamespace(
         dtype=torch.bfloat16,
         config=SimpleNamespace(num_hidden_layers=36),
@@ -177,8 +216,9 @@ def test_nfa_two_point_pairs_reuse_fixed_cache_and_captured_graph(monkeypatch):
     engine = RequestTwoPointEngine(args, model, None, ())
     for max_new_tokens in (1, 33, 1, 33):
         generated, _ = engine.generate(list(range(16)), max_new_tokens, True)
-        if len(generated) != max_new_tokens:
-            raise AssertionError("固定长度生成在主机回归中不完整")
+        rows = generated if batch > 1 else [generated]
+        if len(rows) != batch or any(len(row) != max_new_tokens for row in rows):
+            raise AssertionError("固定长度 batched 生成在主机回归中不完整")
 
     fields = (
         "generated_tokens", "graph_capture_count", "graph_replays",
@@ -187,18 +227,23 @@ def test_nfa_two_point_pairs_reuse_fixed_cache_and_captured_graph(monkeypatch):
     actual = [tuple(receipt[field] for field in fields)
               for receipt in engine.request_receipts]
     expected = [
-        (1, 0, 0, 0, 0, 0, 0),
-        (33, 1, 32, 0, 0, 1, 32),
-        (1, 0, 0, 0, 0, 0, 0),
-        (33, 0, 32, 0, 1, 0, 32),
+        (batch, 0, 0, 0, 0, 0, 0),
+        (33 * batch, 1, 32, 0, 0, 1, 32),
+        (batch, 0, 0, 0, 0, 0, 0),
+        (33 * batch, 0, 32, 0, 1, 0, 32),
     ]
     if actual != expected:
         raise AssertionError(f"请求级 Graph 增量不正确: {actual} != {expected}")
     prepare_ms = [receipt["graph_prepare_ms"] for receipt in engine.request_receipts]
     if prepare_ms != [0.0, 250.0, 0.0, 0.0]:
         raise AssertionError(f"Graph prepare 增量不正确: {prepare_ms}")
-    if len(build_calls) != 1 or cache.states or cache.removed != [0, 0, 0, 0]:
-        raise AssertionError("固定 cache arena 构建或请求清理不正确")
+    if len(build_calls) != 1 or build_calls[0][2]["max_requests"] != batch:
+        raise AssertionError("固定 cache arena 的 max_requests 未对齐 batch")
+    if cache.states or cache.removed != list(range(batch)) * 4:
+        raise AssertionError("固定 cache arena 的逐行请求清理不正确")
+    if len(runner_options) != 2 or any(
+            options["buckets"] != (batch,) for options in runner_options):
+        raise AssertionError("Graph bucket 未使用真实 batch")
     if pool.releases != 2 or pool.runner.scheduler is not None:
         raise AssertionError("decode 请求边界未释放 scheduler")
     if engine._nfa_decode_requests != 2:

@@ -1,8 +1,9 @@
-"""Qwen3-8B 256K/512K NFA/FlashInfer 完整请求两点法性能入口。
+"""Qwen3-8B 32K–512K NFA/FlashInfer 完整请求两点法性能入口。
 
 与官方 Quest/JSSA 共用输入、warmup、固定33 token 和 T(33)-T(1) host-wall
 协议；不创建逐步 CUDA Event，不在 decode 循环中读取 GPU token，不运行 profiler。
-每个进程只测一个方法、长度和执行模式，B1 与官方 Quest 当前真实路径对齐。
+每个进程只测一个方法、长度、batch 和执行模式。NFA 支持真实 B1/2/4 batched
+decode；FlashInfer 当前仅接受 B1，不以串行 B1 冒充 batch。
 """
 from __future__ import annotations
 
@@ -52,7 +53,8 @@ def parse_args():
     parser.add_argument("--output", required=True)
     parser.add_argument("--task", default="niah_multikey_2")
     parser.add_argument("--context-length", type=int, required=True,
-                        choices=(262144, 524288))
+                        choices=(32768, 65536, 131072, 262144, 524288))
+    parser.add_argument("--batch-size", type=int, choices=(1, 2, 4), default=1)
     parser.add_argument("--sample-index", type=int, default=2)
     parser.add_argument("--input-provenance", default="repeated-needle-body-extension",
                         choices=("repeated-needle-body-extension",))
@@ -88,8 +90,14 @@ def validate_request_receipt(method, execution, num_layers, max_new_tokens, rece
                              *, allow_initial_nfa_capture=False):
     """在请求边界核验真实 decode/Graph/backend 计数，失败则不发布计时格。"""
     steps = max_new_tokens - 1
-    if receipt["generated_tokens"] != max_new_tokens:
-        raise RuntimeError("固定长度生成计数与回执不一致")
+    batch_size = receipt.get("batch_size", 1)
+    if batch_size not in (1, 2, 4):
+        raise RuntimeError(f"回执 batch_size 非法: {batch_size}")
+    if receipt["generated_tokens"] != max_new_tokens * batch_size:
+        raise RuntimeError("固定长度生成总数与回执不一致")
+    per_request = receipt.get("generated_tokens_per_request")
+    if per_request is not None and per_request != [max_new_tokens] * batch_size:
+        raise RuntimeError("逐请求固定长度生成计数与回执不一致")
     if method == "nfa":
         if receipt["nfa_decode_steps"] != steps:
             raise RuntimeError("NFA 实际 decode 步数与固定长度协议不一致")
@@ -132,6 +140,10 @@ class RequestTwoPointEngine:
         self.model = model
         self.tokenizer = tokenizer
         self.eos_ids = tuple(eos_ids)
+        self.batch_size = getattr(args, "batch_size", 1)
+        if args.method != "nfa" and self.batch_size != 1:
+            raise ValueError(
+                f"{args.method} 两点入口当前仅支持 B1；拒绝用串行 B1 冒充 batch")
         self.request_receipts = []
         self._nfa_cache = None
         self._nfa_geometry = None
@@ -143,7 +155,10 @@ class RequestTwoPointEngine:
                 if args.method == "nfa" else
                 "HF SDPA prefill + FlashInfer page64 paged decode"),
             "execution": args.execution,
-            "batch_size": 1,
+            "batch_size": self.batch_size,
+            "prefill_mode": (
+                "serial B1 prefill per row into one fixed cache arena"
+                if self.batch_size > 1 else "single-request prefill"),
             "dtype": str(model.dtype),
             "num_layers": model.config.num_hidden_layers,
             "dense_or_torch_decode_fallback": False,
@@ -178,6 +193,7 @@ class RequestTwoPointEngine:
     def _generate_nfa(self, prompt, max_new_tokens):
         args = self.args
         patch_args = nfa_args()
+        batch = self.batch_size
         torch.cuda.synchronize()
         started = time.perf_counter()
         if self._nfa_cache is None:
@@ -187,7 +203,7 @@ class RequestTwoPointEngine:
                 window=patch_args.nfa_swa_size, page=patch_args.tia_block_size,
                 max_new_tokens=args.max_new_tokens)
             self._nfa_cache = build_frozen_cache(
-                self.model, self._nfa_geometry, prompt.numel(), max_requests=1,
+                self.model, self._nfa_geometry, prompt.numel(), max_requests=batch,
                 max_visible_len=args.visible_len)
             self._nfa_prompt_length = prompt.numel()
         cache = self._nfa_cache
@@ -197,7 +213,8 @@ class RequestTwoPointEngine:
         if cache.states:
             raise RuntimeError("上一 NFA 请求尚未释放，拒绝复用固定 arena")
 
-        request_id = 0
+        request_ids = []
+        first_tokens = {}
         runner = None
         request_index = len(self.request_receipts)
         cache_steps_before = cache.nfa_decode_steps
@@ -207,39 +224,50 @@ class RequestTwoPointEngine:
         pool_misses_before = pool.miss_count if pool is not None else 0
         pool_warmup_before = pool.warmup_seconds if pool is not None else 0.0
         try:
-            output, audit = prefill_frozen_request(
-                self.model, prompt.unsqueeze(0), GateConfig(), geometry,
-                cache=cache, request_id=request_id)
-            request_id = audit["request_id"]
-            first = greedy_next_tokens(
-                output.logits, (), generated_counts=0, min_new_tokens=1)
-            first_token = int(first[0])
-            cache.transition_request(request_id, "GENERATE")
-            del output
+            # 生产 prefill 是 B1 语义；B>1 逐行写入同一 arena，decode 才真实合批。
+            for request_id in range(batch):
+                output, audit = prefill_frozen_request(
+                    self.model, prompt.unsqueeze(0), GateConfig(), geometry,
+                    cache=cache, request_id=request_id)
+                if audit["request_id"] != request_id:
+                    raise RuntimeError("NFA prefill 返回了非预期 request_id")
+                request_ids.append(request_id)
+                first = greedy_next_tokens(
+                    output.logits, (), generated_counts=0, min_new_tokens=1)
+                first_tokens[request_id] = int(first[0])
+                cache.transition_request(request_id, "GENERATE")
+                del output
 
             decode_steps = max_new_tokens - 1
             token_history = torch.empty(
-                (decode_steps, 1), dtype=torch.long, device=prompt.device)
+                (decode_steps, batch), dtype=torch.long, device=prompt.device)
             if decode_steps:
                 scheduler = ContinuousBatchScheduler(
-                    cache=cache, max_batch=1, eos_ids=(), pad_token_id=0)
-                scheduler.add_request(request_id)
-                scheduler.next_tokens[request_id] = first_token
+                    cache=cache, max_batch=batch, eos_ids=(), pad_token_id=0)
+                for request_id in request_ids:
+                    scheduler.add_request(request_id)
+                    scheduler.next_tokens[request_id] = first_tokens[request_id]
                 runner = session_graph_runner(
-                    self.model, cache, scheduler, buckets=(1,),
+                    self.model, cache, scheduler, buckets=(batch,),
                     visible_buckets=(args.visible_len,), device=prompt.device,
                     capture=args.execution == "graph")
                 for step in range(decode_steps):
                     _, tokens = runner.step(
-                        self.model, cache, generated_counts=[step + 1],
+                        self.model, cache,
+                        generated_counts=[step + 1] * batch,
                         min_new_tokens=1, return_next_tokens=True, stop_on_eos=False)
                     token_history[step].copy_(tokens)
                 scheduler.prepare_step()
             torch.cuda.synchronize()
             elapsed = time.perf_counter() - started
 
-            generated = [first_token]
-            generated.extend(row[0] for row in token_history.cpu().tolist())
+            history = token_history.cpu().tolist()
+            generated_rows = [
+                [first_tokens[request_id]]
+                + [history[step][row] for step in range(decode_steps)]
+                for row, request_id in enumerate(request_ids)
+            ]
+            generated = generated_rows[0] if batch == 1 else generated_rows
             if runner is None:
                 current_graph = dict(graph_before)
             else:
@@ -255,7 +283,11 @@ class RequestTwoPointEngine:
                     "warmup" if request_index < 2 * args.warmup_requests
                     else "measured"),
                 "cache_reused": request_index > 0,
-                "generated_tokens": len(generated),
+                "batch_size": batch,
+                "request_ids": list(request_ids),
+                "generated_tokens": sum(map(len, generated_rows)),
+                "generated_tokens_per_request": list(map(len, generated_rows)),
+                # 一次 runner.step 是整个 batch 的一次 forward，不能乘以 B。
                 "nfa_decode_steps": cache.nfa_decode_steps - cache_steps_before,
                 "graph_capture_count": (
                     current_graph["capture"] - graph_before.get("capture", 0)),
@@ -294,7 +326,8 @@ class RequestTwoPointEngine:
                     pool.release(runner)
                 else:
                     runner.scheduler = None
-            cache.remove_request(request_id)
+            for request_id in range(batch):
+                cache.remove_request(request_id)
 
     def _generate_flashinfer(self, prompt, max_new_tokens):
         args = self.args
@@ -409,12 +442,12 @@ def main():
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "schema": "qwen-nfa-flashinfer-long-context-two-point-v1",
+        "schema": "qwen-nfa-flashinfer-long-context-two-point-v2",
         "verification": "pending-independent-verification",
         "status": "in_progress",
         "method": args.method,
         "execution": args.execution,
-        "batch_size": 1,
+        "batch_size": args.batch_size,
         "model_path": str(Path(args.model_path).resolve()),
         "source": source_receipt(),
         "context_length": args.context_length,
@@ -425,7 +458,10 @@ def main():
         "repeats": args.repeats,
         "max_new_tokens": args.max_new_tokens,
         "measurement_mode": "clean-e2e-no-profiler-no-per-step-cuda-events",
-        "timing_protocol": "T(33)-T(1) two-point complete request host wall; EOS ignored",
+        "timing_protocol": (
+            "T(33)-T(1) two-point complete batched-request host wall; EOS ignored; "
+            "TPOT is per batched decode step and is not divided by batch"),
+        "batch_input_mode": "identical input IDs replicated across batch rows",
         "host_readback_in_decode_loop": False,
         "final_token_readback": "one D2H after request-wall timer stops",
         "runtime_rope_verification": rope_receipt,
@@ -451,7 +487,7 @@ def main():
             atomic_json(output, payload)
             print(
                 f"[LONG PERF] {args.method}-{args.execution} "
-                f"L={args.context_length} repeat={repeat} "
+                f"L={args.context_length} B={args.batch_size} repeat={repeat} "
                 f"TPOT={timing['tpot_ms']:.3f}ms", flush=True)
     print(f"[LONG PERF DONE] {output}", flush=True)
 

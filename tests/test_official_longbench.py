@@ -133,6 +133,39 @@ class OfficialLongBenchIndependenceTest(unittest.TestCase):
         self.assertAlmostEqual(timing["request_wall_ms"], 3300.0)
         self.assertFalse(timing["eos_early_stop"])
 
+    def test_two_point_timing_accepts_only_complete_batch_major_rows(self):
+        class Tokenizer:
+            eos_token_id = 99
+
+        class Engine:
+            tokenizer = Tokenizer()
+
+            def generate(self, ids, max_new_tokens, ignore_eos):
+                elapsed = 0.1 if max_new_tokens == 1 else 3.3
+                rows = [
+                    list(range(max_new_tokens)),
+                    list(range(100, 100 + max_new_tokens)),
+                ]
+                return rows, elapsed
+
+        generated, timing = timed_pair(Engine(), [5, 6], 33)
+        self.assertEqual(len(generated), 2)
+        self.assertEqual(timing["batch_size"], 2)
+        self.assertEqual(timing["output_layout"], "batch-major")
+        self.assertEqual(timing["actual_generated_tokens"], 66)
+        self.assertEqual(timing["actual_generated_tokens_per_request"], [33, 33])
+        self.assertEqual(timing["eos_positions"], [[], []])
+        self.assertAlmostEqual(timing["tpot_ms"], 100.0)
+
+        class RaggedEngine(Engine):
+            def generate(self, ids, max_new_tokens, ignore_eos):
+                generated, elapsed = super().generate(ids, max_new_tokens, ignore_eos)
+                generated[1] = generated[1][:-1]
+                return generated, elapsed
+
+        with self.assertRaisesRegex(RuntimeError, "每行应为"):
+            timed_pair(RaggedEngine(), [5, 6], 33)
+
     def test_warmup_pair_excludes_cold_negative_delta_but_formal_rejects(self):
         class Tokenizer:
             eos_token_id = 99
