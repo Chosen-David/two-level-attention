@@ -406,11 +406,47 @@ Date: 2026-11-13
 - 实测本机双卡各1MiB且无compute app后，rank0/1仅FI已重新点火；30秒内真实Python PID=1112912/1112913，双卡显存约24868/24832MiB并各有唯一compute app，日志已产生新预测，三重验证PASS。旧failed标记只在完整验收成功后由runner清除，当前运行中不把它误报为新的失败。
 - 01:03 pc31/pc32真实日志、进程、显存和人口复核：rank4/5 NFA分别357/358且继续运行，合计NFA **3637/3750**；rank2/3与rank6–8保持既有完整FI，rank0/1重跑、rank4/5等待NFA后串行接力。未重复生成Quest 503题或rank2/3/6–8已验收分片，九rank canonical与AVG16仍未登记。
 
+### 2026-11-15 01:38：本机 NFA 逐任务身份纠偏、FI 十六任务审计与固定源码重跑
+
+- 本轮再次核对Quest历史证据：256K `decode_estimate` 与512K `decode_sparse_attn` 的illegal memory access已经由RAFT Top-K动态workspace修复，新YaRN下两个长度的1 warmup+3 repeats正式性能也已闭集并通过结构复核，因此没有重复启动这些测量。JSSA固定cu129 wheel继续阻塞，不换版本或fallback，其他AI的GLM AsyncTLS/NFA保持不动。
+- 对本机已完成任务做逐任务早期审计时发现，rank0/1 NFA虽然quality manifest均记录 `cbfd70da`，但每臂16份runcap实际出现 **5个不同git HEAD**：`cbfd70da`、`4381d92e`、`409f4b86`、`84a16f12`、`8a2673d4`，script path也都指向运行期间前进的主仓而非固定worktree。根因与此前FI相同：旧runner从主仓cwd执行 `python -m`，主仓模块遮蔽固定 `PYTHONPATH`；runcap的producer又会读取任务结束时的实时HEAD，因此仅凭最终manifest不能证明逐任务固定源码身份。两臂旧NFA共856行已全部移至 `_quarantine/rank{0,1}_nfa_mixed_source_runcaps`，对应旧log和done标记一并隔离，不进入canonical闭集；失败证据=`_dispatch/ranks0_1_nfa_mixed_source_audit.json`，SHA256=`7c1e5e81e59640b3573e1a825776978486632357c96b0ab25d09bf5a9e1443e6`。
+- 本机重跑的FlashInfer则通过更严格复核：rank0/1各16/16任务、428/428请求，32份runcap的producer HEAD全部为固定 `7fac274fda9df13e82caadd95f3cca5c8374a1a3`，script path全部位于 `/tmp/qwen3-nfa-fi-quality-7fac274f-20261114`，逐任务runcap/result/receipt SHA、round-robin源索引、真实停止和eager FlashInfer调用计数均PASS。聚合证据=`_dispatch/ranks0_1_flashinfer16_early_audit.json`，SHA256=`589fe0eba0e287a63d9f20983b3f96466688c3fd02b143e295522ae7e31d822a`；该856行FI保留，不重复生成。
+- runner已增加逐任务runcap的 `producer.git_commit`、`script_sha256`、`script_path` 固定身份门禁，`SKIP_NFA=1` 重验也传入固定NFA worktree；新增 `SKIP_FLASHINFER=1` 仅重验既有FI，用于只重跑未通过身份验收的NFA。`bash -n` 和FI 32份runcap身份检查PASS，修复runner SHA256=`f72df5f18d1f10f73b661cbb7e274baa1700e806c76a0c6aa36ed753eaccf155`。
+- 本机双卡实测各1MiB且无compute app后，rank0/1 NFA已用 `SKIP_FLASHINFER=1` 重新点火。真实Python PID=`1121872/1121874`，`/proc/<pid>/cwd` 均为 `/tmp/qwen3-nfa-fi-quality-cbfd70da-20261114`；点火后双卡显存约24980/24960MiB、各有唯一compute app，日志已产生真实narrativeqa预测，进程+显存+log三重验证PASS。旧NFA不被SKIP复用，FI只在新NFA完成后做固定身份重验。
+- 01:38五机快照=`_dispatch/progress_20261115T013808.json`，SHA256=`58d4fc2475736a7ae8089524fa0b6fc976ecea8d9a80a8abfdd04b4183592487`。当前raw NFA合计 **2963/3750**：本机重跑128、pc40 rank2/3完整830、pc31 rank4=385、pc32 rank5=384、pc02 rank6–8完整1236；FI合计 **2922/3750**，来自已完成并验收的rank0/1/2/3/6/7/8，rank4/5仍等待NFA结束后串行接力。raw人口不是canonical闭集，九rank两臂未完成前不登记AVG16。pc40双卡和pc02四卡空闲，但没有为铺满卡而重复运行已闭集Quest或质量分片。
+
+### 2026-11-15 01:56：最终审计逐任务身份门禁与 3253/2922 真实进度
+
+- 最终 `_dispatch/audit_full.py` 已补齐与runner一致的固定源码身份门禁：manifest除HEAD/SHA外还必须记录固定worktree的quality harness绝对路径；每份逐任务runcap强制核验 `producer.git_commit`、`producer.script_sha256`、`producer.script_path`，因此主仓cwd遮蔽或长链期间HEAD漂移不能再凭最终manifest混入canonical。脚本SHA256=`e13a8b3ed0844aaad89d90fb113358d3f03a7c65b3bb5432a63a37423c0ae152`。
+- 聚焦正负回归均PASS：`py_compile`通过；固定FI的manifest+runcap被接受；quarantine内rank0 `gov_report` 混合HEAD NFA runcap被拒绝；保持HEAD/SHA不变但篡改runcap或manifest harness path的两个负例也均被拒绝。证据=`_dispatch/audit_source_identity_gate_20261115T015552.json`，SHA256=`b3eca300f070523a9d40fc09c4dc5bd060a4db7937fa62cbc4781055098c7c74`。该PASS只覆盖源码身份helper，不冒充尚未可执行的九rank全量审计。
+- 01:55五机真实快照：raw NFA **3253/3750**，本机rank0/1各198且运行到multi_news，rank4=394、rank5=397且均运行到repobench-p，rank2/3完整830、rank6–8完整1236；FI仍 **2922/3750**，来自已完成的rank0/1/2/3/6/7/8。本机新NFA Python PID=`1121872/1121874`，pc31/pc32分别为`3381428/579089`，真实日志继续产生预测；pc40双卡、pc02四卡均各1MiB且无compute app。快照=`_dispatch/progress_20261115T015552.json`，SHA256=`82f14cc596064ffe5ce1b79ae0b4a8527a7798286ac01d445f720b7ae7ae453c`。
+- 本轮没有启动新GPU测量或重复任何已闭集配置；rank4/5继续NFA后串行接力FI，九rank两臂有效完成前不运行 `close_full.py`、不登记AVG16。
+- 早期审计器也补上固定 `script_path` 门禁（SHA256=`4daa1ce02ccd7806f36a232194dba11b787fc9982bfefef36ef7c4c543e1bd73`），随后实测本机新NFA `trec` rank0/1共46行、pc31 `lcc` rank4=56行、pc32 `lcc` rank5=55行全部PASS；逐任务producer HEAD/SHA/path、prediction/runcap/receipt SHA、输入身份、真实停止和eager NFA计数均通过。聚合证据=`_dispatch/ranks0_1_4_5_nfa_trec_lcc_early_audit_20261115T020006.json`，SHA256=`510df9eb93886d871a881c95e7f2f5a4f4e8c5a479b4d210d18ad29d780a8b0c`。
+
+### 2026-11-15 02:14：NFA 九路生成完成，本机与 rank4/5 十六任务审计通过
+
+- 本机新NFA rank0/1已于02:06自然完成，各16/16任务、428/428请求；逐任务审计覆盖全部32份runcap，固定HEAD=`cbfd70da`、harness SHA/path、prediction/runcap/receipt SHA、输入身份、真实EOS/stop-string/max-new及eager NFA计数全部PASS，共856行。证据=`_dispatch/ranks0_1_nfa16_fixed_source_early_audit.json`，SHA256=`1094d14185d77063e0240329f256403e56dc98c2ee18b1f982b25ccf86765f26`；本机双卡已实测各1MiB且无compute app。
+- pc31 rank4=415、pc32 rank5=413也已完成全部16任务NFA生成，32份runcap及逐请求审计全部PASS，共828行。证据=`_dispatch/ranks4_5_nfa16_fixed_source_early_audit.json`，SHA256=`cec8cecf1bd59c10cbddfe24f472f4683a05b7260e55e9378a62f805e4051de1`。连同已完整rank2/3/6–8，NFA原始人口现达 **3750/3750**；这只是生成与分片早期审计完成，仍须等待FI后执行跨机harvest和 `audit_full.py`，不提前冒充canonical闭集或登记AVG16。
+- 两臂runner已正常串行接力：rank4 FI真实Python PID=`3808190`，rank5 FI PID=`1014191`，分别位于固定 `7fac274f` worktree；快照时rank4/5 FI已产生7/67行且日志继续推进，显存约24832/20852MiB并各有唯一compute app。当前FI raw合计约 **2996/3750**，仅剩rank4/5在跑；未重复生成任何已完成FI分片。
+
+### 2026-11-15 02:40：NFA/FlashInfer LongBench16 九 rank 生产侧闭集与官方评分
+
+- rank4/5 FI分别于02:33:33/02:32:35自然完成，415/415与413/413、各16/16任务，两机进程退出且显存释放。至此NFA与FlashInfer两臂九rank原始人口均为 **3750/3750**；此前rank4/5 `trec` 各22行早期审计也通过固定producer HEAD/SHA/path、输入身份、真实停止及eager backend计数，没有重复生成任何已完成分片。
+- 跨机 `harvest_full.py` 完成四机及本机产物收割，共登记1200个文件，manifest SHA256=`a166a69c41783de71838de2feb7fcd1c92252d461ca6d75c628029468cc3c3f4`。随后 `audit_full.py` 全量PASS：两臂各3750行、16任务、九rank人口、逐任务manifest+runcap固定源码身份、prediction/runcap/receipt SHA、跨臂输入身份、真实EOS/stop-string/max-new与eager backend计数全部通过；NFA停止原因=eos/max-new/stop-string=1847/1703/200，FI=1770/1780/200。`rank_audit.json` SHA256=`76e3e643111b352ee6e87b3cb45d5e06c1cdce7f19dda1fe3e11b5fc820199b3`。
+- 首次 `close_full.py` 在narrativeqa合并处失败，真实日志显示主仓cwd再次遮蔽固定 `PYTHONPATH`，且合并器要求canonical输出与所有分片同目录。最小修复为：所有子进程显式 `cwd=REPO`；先在 `shards/<method>/pred` 严格合并，再将canonical prediction及runcap复制到评分目录。`py_compile`与完整重跑PASS，未修改评分标准或放宽任何runcap门禁；修复后脚本SHA256=`e2e7c0b025d37cba0660d172324dd03af436d7ffcb73372ca678db2faf1f249e`。
+- 官方严格评分与canonical runcap门禁PASS：**NFA macro AVG16=48.306875，FlashInfer=49.413125**，均为3750行、16/16任务；NFA/FI `passage_count`=0.5/2.0低分如实保留。结果=`quality_summary.json`，SHA256=`8aa4f3ed2d3ffad6b29410ed47dbc0aa039902916dd7ea84034f29352ad47c1f`；official result SHA256分别为`a9a2d28313899cc4696c710b0b90313423e577ef4dba33b7a3573fddd4ed8a0a`与`db778f6960b8dfce9c043bcf57a82e25e5f7f7bedfca1c9ea287f731932e362b`。这是生产侧闭集，不冒充不同owner独立验收；数据继续保持 `pending-independent-verification`。
+- 本机质量链已真实结束，GPU0/1各1MiB且无compute app。下一门为NFA B2/B4 eager/Graph与AsyncTLS B1/2/4 Graph真实Qwen3 smoke，通过后才启动RULER MultiKey2四长度性能矩阵。
+
+### 2026-11-15 03:11：真实 batch smoke 全通过，RULER MultiKey2 正式性能点火
+
+- NFA B2/B4 eager/Graph 与 AsyncTLS B1/B2/B4 Graph 的32K真实Qwen3 smoke均已完成，统一审计 **7/7 PASS**。NFA每行固定3 token、T(3) decode=2；eager capture/replay=0/0、fallback=2，Graph capture/replay/fallback=1/2/0。AsyncTLS每行3 token、prefill=`B×36`、capture/replay/fallback=1/2/0，Python decode仅出现在capture/warmup计数，channel SHA256=`613a971c...`、K2=1024、block64、K1=128，且明确 `official_tilelang=False`、`real_async_offload=False`、无dense/Torch decode fallback。七份回执均为固定HEAD `19edfebd`、空生产源码diff、同一input IDs SHA=`2bf914fe...`。审计器=`~/ak_verify_results/qwen3_official_ruler_smoke_19edfebd_20261115/audit_smoke.py`，SHA256=`95b5580fa0df3301ca989c1669641cb0b88d095289aeb10baec8ced994314b68`；结果=`smoke_audit.json`，SHA256=`b013d0bb52281705fbdd0824e58ca561c83ef13d62c41f1bb814f75a6efd5f20`。
+- smoke采用warmup0/max-new3，NFA首次Triton JIT或Graph capture进入冷计时，故日志中约78–83秒/步以及AsyncTLS冷TPOT只登记为功能smoke异常成本，**不是正式TPOT，不用于排序**。正式测量保持1 warmup pair+3 repeats、固定33 token、`T(33)-T(1)`完整batched-request host-wall，B>1不除以batch。
+- 既有Quest与NFA 256K B1结果与本矩阵同为 `niah_multikey_2`、sample-index2、同一261935-token输入及1 warmup+3 repeats，列作复用，不重复点火；Quest扩展及NFA Graph计数已在此前的结构复核中闭环。Quest官方适配仍只支持B1，B2/B4 fail-closed；JSSA固定cu129 wheel仍阻塞，四长度B1及不支持的B2/B4均不得用fallback补格。
+- 新正式证据根=`~/ak_verify_results/qwen3_official_ruler_perf_19edfebd_20261115`。GPU0任务 `bx4rk1r3c` 跑NFA Graph其余11格，GPU1任务 `b3y1ro3ji` 跑AsyncTLS Graph 12格，均按256K→32K重任务优先、失败即停链；Quest B1的32K/64K/128K缺口随后补位。runner SHA256：NFA=`0715dd7a7a27f766d560e4f9ce97f509d574dd6951d694557c6d843f3a03ae08`，AsyncTLS=`4890e598dc83e264f3f95ff6771ecb5bb5aea1cad6973e170e71ca9e6fe891f3`。点火前双卡各1MiB/143771MiB且无compute app；30秒内复核真实Python PID=`1154024/1154025`，GPU0/1显存=109286/72670MiB、util均100%，compute PID=`3929167/3929168`，模型加载日志完整。当前只登记在跑，未生成任何正式TPOT结论。
+
 ### 阻塞与下一步
 
-1. Quest/NFA/FlashInfer 256K/512K正式3 repeats及LongBench16 clean性能均已闭集并通过结构复核，不重复测量；512K中位TPOT=83.8234/61.0523/40.1419ms，FlashInfer快于NFA的负排序保留，LongBench16 macro TPOT=11.3192/15.4917ms。
-2. 持续监督修复版九rank，失败必须先读真实日志并精确定位；rank0–5的NFA正常完成后由同一runner串行接力FlashInfer，点火前继续核验同卡无其他compute进程，不改变九分片或重复生成rank6–8的1236条完整FI结果。
-3. 两臂九rank全部有效完成后，依次运行新根 `_dispatch/harvest_full.py`、`audit_full.py`，只有 `rank_audit.json.status=PASS` 才能运行 `close_full.py` 做canonical合并和官方严格评分；最终重算16/16任务、3750/3750请求/臂、输入身份、真实停止、eager backend计数和逐文件SHA，当前不登记AVG16。
-4. 取得同一 vLLM 提交的官方 cu129 预编译 wheel，完成 patched-vLLM editable 安装并运行官方 JSSA kernel tests；若官方运行时无法获得或550驱动不支持，如实记录阻塞，不退回Torch，也不换不匹配wheel。
-5. 官方链收尾后清理旧Quest/JSSA vendor路由和文件，保留AsyncTLS；其他AI的GLM AsyncTLS/NFA保持不动。所有新结果落盘、官方评分、哈希manifest和不同owner独立验收前不宣称收官。
-6. 官方Quest/JSSA四长度RoPE/batch边界与AsyncTLS K2=1024两点入口已完成主机验收；待本机质量链正常结束且双卡实测释放后，先做NFA B2/B4 eager/Graph和AsyncTLS B1/2/4 Graph真实模型smoke，核验逐行token、Graph capture/replay/fallback和receipt，再独占测量RULER MultiKey2四长度性能，不生成虚构TPOT。
+1. 收割 `bx4rk1r3c` 与 `b3y1ro3ji` 的真实日志和逐格JSON；若失败先定位并最小修复，不以smoke或partial repeat冒充正式性能。随后在本机空闲卡补Quest B1的32K/64K/128K，256K B1复用既有闭集。
+2. 汇总48格矩阵：NFA/AsyncTLS各12格，Quest仅4个B1格，JSSA四长度B1因固定wheel阻塞、Quest/JSSA B2/B4因无官方高性能batch路径fail-closed；所有实际格核验输入、RoPE、33 token、repeats、Graph/backend计数及SHA256，保持 `pending-independent-verification`。
+3. 已完成的NFA/FlashInfer LongBench16 canonical结果保持生产侧闭集，提交时只stage本轮归档与任务文档，不包含三份旧profiler SQLite或第三方工作树改动。
+4. 取得同一vLLM提交的官方cu129预编译wheel后再验收JSSA；不换提交、不换CUDA变体、不退回Torch。其他AI的GLM AsyncTLS/NFA保持不动，旧P0a/P0b及256K/512K/1M扩展任务不得提前标完成。
