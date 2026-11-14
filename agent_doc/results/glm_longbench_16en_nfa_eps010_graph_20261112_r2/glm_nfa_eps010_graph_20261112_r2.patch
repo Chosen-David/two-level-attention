@@ -1,0 +1,425 @@
+diff --git a/benchmark/LongBench/prefill_frozen_skip.py b/benchmark/LongBench/prefill_frozen_skip.py
+index 76983318..95fb0edb 100644
+--- a/benchmark/LongBench/prefill_frozen_skip.py
++++ b/benchmark/LongBench/prefill_frozen_skip.py
+@@ -26,6 +26,11 @@ from sparse_attn.ops.eager_decoding import eager_decoding_request_guard
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ SCREEN_TASKS = ('qasper', 'hotpotqa', 'musique', 'gov_report', 'repobench-p')
++LONGBENCH_TASKS = (
++    'narrativeqa', 'qasper', 'multifieldqa_en', 'hotpotqa', '2wikimqa', 'musique',
++    'gov_report', 'qmsum', 'multi_news', 'trec', 'triviaqa', 'samsum',
++    'passage_count', 'passage_retrieval_en', 'lcc', 'repobench-p')
++NO_CHAT_TASKS = frozenset(('trec', 'triviaqa', 'samsum', 'lcc', 'repobench-p'))
+ SOURCES = ('sparse_attn/patches/qwen3_attn_patch.py',
+            'sparse_attn/ops/paged_region_kernels_nfa.py',
+            'sparse_attn/cache/paged_region_cache.py', 'sparse_attn/ops/paged_region_kernels.py',
+@@ -80,7 +85,7 @@ def prepare_ids(tokenizer, row, dataset, prompt, context_cap, *,
+         half = context_cap//2
+         text = tokenizer.decode(ids[:half], skip_special_tokens=True)+tokenizer.decode(ids[-(context_cap-half):], skip_special_tokens=True)
+     material_text = text
+-    if dataset != 'repobench-p':
++    if dataset not in NO_CHAT_TASKS:
+         messages = [dict(role='user', content=text)]
+         material_text = tokenizer.apply_chat_template(
+             messages, tokenize=False, add_generation_prompt=False,
+@@ -111,12 +116,60 @@ def prepare_ids(tokenizer, row, dataset, prompt, context_cap, *,
+     return material_ids, suffix_ids, info
+ 
+ 
++def greedy_token(logits, generated_count, eos, min_new_tokens=0):
++    if generated_count < min_new_tokens:
++        logits = logits.clone()
++        logits[:, eos] = -torch.inf
++    return logits.argmax(-1, keepdim=True)
++
++
++def stopping_policy(model, tokenizer, dataset):
++    eos = model.generation_config.eos_token_id
++    eos = list(eos) if isinstance(eos, list) else [eos]
++    if dataset == 'samsum':
++        return list(dict.fromkeys([
++            tokenizer.eos_token_id,
++            tokenizer.encode('\n', add_special_tokens=False)[-1]
++        ])), 1
++    return eos, 0
++
++
++def parse_tasks(value):
++    tasks = value.split(',')
++    if not set(tasks) <= set(LONGBENCH_TASKS) or len(set(tasks)) != len(tasks):
++        raise ValueError('datasets must be unique LongBench v1 task names')
++    return tasks
++
++
++def build_arms(thresholds, gate_modes, statistic, include_full=True):
++    arms = ([('full', GateConfig(mode='full', statistic=statistic))]
++            if include_full else [])
++    for eps in thresholds:
++        for mode in gate_modes:
++            arms.append((f'{mode}_{eps:g}',
++                         GateConfig(epsilon=eps, mode=mode, statistic=statistic)))
++    if not arms:
++        raise ValueError('at least one generation arm is required')
++    return arms
++
++
++def _graph_pool_stats(model):
++    pool = getattr(model, '_nfa_graph_session_pool', None)
++    runners = ([] if pool is None else
++               [runner for _, runner in pool._entries.values()])
++    return {name: sum(getattr(runner, name) for runner in runners)
++            for name in ('capture_count', 'replay_count', 'eager_fallback_count')}
++
++
+ @torch.inference_mode()
+ @eager_decoding_request_guard()
+-def generate(model, tokenizer, ids, max_new_tokens, config, device, suffix_ids=()):
++def generate(model, tokenizer, ids, max_new_tokens, config, device, suffix_ids=(),
++             stop_ids=None, min_new_tokens=0):
+     geometry = RegionGeometry(max_new_tokens=max_new_tokens)
+-    eos = model.generation_config.eos_token_id
++    eos = model.generation_config.eos_token_id if stop_ids is None else stop_ids
+     eos = eos if isinstance(eos, list) else [eos]
++    capture_graph = torch.device(device).type == 'cuda'
++    graph_before = _graph_pool_stats(model)
+     start = time.time()
+     with torch.inference_mode():
+         out, audit = prefill_frozen_request(
+@@ -128,14 +181,25 @@ def generate(model, tokenizer, ids, max_new_tokens, config, device, suffix_ids=(
+         generated, cache = decode_frozen_request(
+             model, out, max_new_tokens=max_new_tokens, eos_ids=eos,
+             pad_token_id=getattr(model.config, 'pad_token_id', None) or 0,
+-            capture_graph=torch.device(device).type == 'cuda',
++            capture_graph=capture_graph, min_new_tokens=min_new_tokens,
+             suffix_ids=suffix_ids)
++        graph_after = _graph_pool_stats(model)
++        graph_receipt = dict(requested=capture_graph, **{
++            name: graph_after[name] - graph_before[name] for name in graph_before})
++        expected_graph_steps = len(suffix_ids) + max(0, len(generated) - 1)
++        if capture_graph and expected_graph_steps:
++            if graph_receipt['replay_count'] < 1 or graph_receipt['eager_fallback_count']:
++                raise RuntimeError(f'CUDA Graph receipt failed: {graph_receipt}')
+         audit = complete_frozen_request(model, cache, len(generated), audit)
+     result = dict(generated_ids=generated, prediction=tokenizer.decode(generated, skip_special_tokens=True),
+         generated_tokens=len(generated), wall_seconds=time.time()-start,
+-        dense_prefill_first_token=dense_prefill_first_token, **audit,
++        dense_prefill_first_token=dense_prefill_first_token,
++        cuda_graph=graph_receipt, **audit,
+         measured_scope='physical node KV storage; eager gather temporaries excluded, no latency claim')
+     del out, cache
++    # 每次请求使用独立 Cache；保留 session pool 会通过 Graph/static_logits
++    # 强引用整套 KV arena，跨请求累积直至 OOM。统计回执已在上方取差分。
++    model._nfa_graph_session_pool = None
+     return result
+ 
+ 
+@@ -157,18 +221,21 @@ def _native_attention_modules(model):
+ 
+ @torch.inference_mode()
+ @eager_decoding_request_guard()
+-def generate_native(model, ids, max_new_tokens, device):
++def generate_native(model, ids, max_new_tokens, device, stop_ids=None,
++                    min_new_tokens=0):
+     cache = DynamicCache(config=model.config)
+     with _native_attention_modules(model):
+         out = model(torch.tensor([ids], device=device), past_key_values=cache,
+                     use_cache=True, logits_to_keep=1)
+-        eos = model.generation_config.eos_token_id
++        eos = model.generation_config.eos_token_id if stop_ids is None else stop_ids
+         eos = eos if isinstance(eos,list) else [eos]
+         generated = []
+         for _ in range(max_new_tokens):
+-            token = out.logits[:, -1].argmax(-1, keepdim=True)
++            token = greedy_token(
++                out.logits[:, -1], len(generated), eos, min_new_tokens)
+             generated.append(int(token))
+-            if int(token) in eos or len(generated) == max_new_tokens:
++            if ((len(generated) >= min_new_tokens and int(token) in eos)
++                    or len(generated) == max_new_tokens):
+                 break
+             out = model(token, past_key_values=cache, use_cache=True,
+                         logits_to_keep=1)
+@@ -213,34 +280,41 @@ def main():
+     ap.add_argument('--row-index', type=int, default=None,
+                     help='每个任务固定使用该行；默认保持历史 seed 采样')
+     ap.add_argument('--thresholds', default='0.05')
+-    ap.add_argument('--gate-modes', default='far,dual')
++    ap.add_argument('--gate-modes', default='far,dual',
++                    help='comma separated gate modes applied at each epsilon')
++    ap.add_argument('--skip-full-arm', action='store_true',
++                    help='省略 NFA full-region 臂，仅运行显式 threshold/gate 臂')
+     ap.add_argument('--statistic', choices=['mean','p95'], default='mean')
+     ap.add_argument('--datasets', default=','.join(SCREEN_TASKS))
+     ap.add_argument('--rank', type=int, default=0)
+     ap.add_argument('--world-size', type=int, default=1)
+     ap.add_argument('--device', default='cuda:0')
+     ap.add_argument('--verify-native-full', action='store_true')
++    ap.add_argument('--native-full-arm', action='store_true',
++                    help='额外输出 native full KV 精度参考臂')
+     ap.add_argument('--attention', choices=['sdpa','nfa'], default='sdpa')
++    ap.add_argument('--nfa-subspace', default=None,
++                    help='显式 NFA 子空间；GLM 完整 NFA 使用 glm_nope_last32')
++    ap.add_argument('--nfa-subspace-seed', type=int, default=0)
+     args = ap.parse_args()
+     if args.attention == 'nfa':
+         os.environ['NFA_OPERATOR_MODE'] = 'off'
+         os.environ['NFA_FINE_GATHER'] = '0'
+         os.environ['NFA_SPARSE_PREFILL'] = '0'
+         os.environ['NFA_DECODE_DENSE'] = '0'
+-    tasks = args.datasets.split(',')
+-    if not set(tasks)<=set(SCREEN_TASKS) or len(set(tasks)) != len(tasks):
+-        raise ValueError('only the five existing LongBench screen tasks are allowed')
++    tasks = parse_tasks(args.datasets)
+     if not 0 <= args.rank < args.world_size or args.samples < 0:
+         raise ValueError('invalid shard/samples')
+-    thresholds = [float(x) for x in args.thresholds.split(',')]
+-    gate_modes = args.gate_modes.split(',')
+-    if not gate_modes or not set(gate_modes) <= {'far', 'dual'}:
++    thresholds = ([float(x) for x in args.thresholds.split(',')]
++                  if args.thresholds.strip() else [])
++    gate_modes = ([m.strip() for m in args.gate_modes.split(',') if m.strip()]
++                  if args.gate_modes.strip() else [])
++    if thresholds and (not gate_modes or not set(gate_modes) <= {'far', 'dual'}):
+         raise ValueError('gate modes must be a nonempty subset of far,dual')
+-    arms = [('full', GateConfig(mode='full', statistic=args.statistic))]
+-    for eps in thresholds:
+-        for mode in gate_modes:
+-            config = GateConfig(epsilon=eps, mode=mode, statistic=args.statistic)
+-            arms.append((f'{mode}_{eps:g}', config))
++    arms = build_arms(thresholds, gate_modes, args.statistic,
++                      include_full=not args.skip_full_arm)
++    if args.native_full_arm:
++        arms.append(('native_full', None))
+     prompts = json.loads((ROOT/'benchmark/LongBench/config/dataset2prompt.json').read_text())
+     lengths = json.loads((ROOT/'benchmark/LongBench/config/dataset2maxlen.json').read_text())
+     selected, inputs, dataset_counts = {}, [], {}
+@@ -254,10 +328,19 @@ def main():
+             indices = [args.row_index]
+         selected[ds] = indices
+         inputs.extend((ds,i,rows[i]) for i in indices)
++    git_head = (os.environ.get('GIT_HEAD') or subprocess.check_output(
++        ['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip())
++    diff_sha256 = os.environ.get('CODE_DIFF_SHA256')
++    if diff_sha256 is None:
++        diff = subprocess.check_output(['git','diff','--binary','HEAD'],cwd=ROOT)
++        diff_sha256 = hashlib.sha256(diff).hexdigest()
+     protocol = dict(schema='frozen-near-far-screen-v4-material-suffix',model=args.model,context_cap=args.context_cap,
+         **sampling_metadata(args.samples, dataset_counts),
+         seed=args.seed,statistic=args.statistic,thresholds=thresholds,
+         gate_modes=gate_modes,row_index=args.row_index,
++        arms=[name for name, _ in arms],batch_size=1,
++        cuda_graph_protocol='capture on CUDA; per-request capture/replay/eager-fallback deltas; fallback is fatal',
++        prompt_protocol='material/suffix token identity; no-chat for trec/triviaqa/samsum/lcc/repobench-p; samsum EOS+newline min1',
+         input_provenance=('deterministic-longbench-context-repetition'
+                           if args.repeat_context_to_target else 'native-longbench-with-cap'),
+         datasets=tasks,selected_rows=selected,max_new_tokens={ds:lengths[ds] for ds in tasks},
+@@ -266,18 +349,18 @@ def main():
+         model_config_sha256=sha_file(Path(args.model)/'config.json'),
+         tokenizer_config_sha256=sha_file(Path(args.model)/'tokenizer_config.json'),
+         torch=torch.__version__,transformers=transformers.__version__,dtype='bfloat16',world_size=args.world_size,
+-        git_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
++        git_head=git_head,worktree_diff_sha256=diff_sha256,
+         eviction='far-only: evict far; near-only: keep attention-invisible near staging and migrate to far; both: sink+SWA only',
+         generation_protocol='material prefill; complete chat generation suffix consumed token-by-token; output contains answer tokens only',
+         calibration='query-relative page boundaries, last256 rows; head means; independent near/far mass comparisons, no joint budget')
+     if args.attention == 'nfa':
+         from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
+         model_type = AutoConfig.from_pretrained(args.model).model_type
+-        treatment = nfa_args(
+-            subspace='nope' if model_type == 'glm4_moe_lite' else 'tail')
+-        protocol['attention'] = ('nfa-nope64-frozen-regions-reference'
+-                                 if model_type == 'glm4_moe_lite' else
+-                                 'nfa-tail32-frozen-regions-reference')
++        subspace = args.nfa_subspace or (
++            'nope' if model_type == 'glm4_moe_lite' else 'tail')
++        treatment = nfa_args(subspace=subspace)
++        treatment.nfa_subspace_seed = args.nfa_subspace_seed
++        protocol['attention'] = f'nfa-{subspace}-frozen-regions-reference'
+         protocol['nfa_args'] = vars(treatment)
+         protocol['nfa_environment'] = {name:os.environ[name] for name in
+             ('NFA_OPERATOR_MODE','NFA_FINE_GATHER','NFA_SPARSE_PREFILL','NFA_DECODE_DENSE')}
+@@ -323,6 +406,7 @@ def main():
+         model._frozen_nfa = True
+     verified = False
+     for ds,row_index,row in shard_inputs(inputs, args.rank, args.world_size):
++        stop_ids, min_new_tokens = stopping_policy(model, tokenizer, ds)
+         path = outdir/'requests'/ds/f'{row_index:04d}.json'
+         material_ids, suffix_ids, input_info = prepare_ids(
+             tokenizer,row,ds,prompts[ds],args.context_cap,
+@@ -340,22 +424,33 @@ def main():
+         for arm, config in arms:
+             if arm in record['arms']: continue
+             atomic_json(outdir/f'heartbeat_rank{args.rank}.json',dict(pid=os.getpid(),time=time.time(),dataset=ds,row=row_index,arm=arm))
+-            result = generate(model,tokenizer,material_ids,lengths[ds],config,args.device,
+-                              suffix_ids=suffix_ids)
++            if arm == 'native_full':
++                generated = generate_native(
++                    model, ids, lengths[ds], args.device, stop_ids, min_new_tokens)
++                result = dict(generated_ids=generated,
++                    prediction=tokenizer.decode(generated, skip_special_tokens=True),
++                    generated_tokens=len(generated), wall_seconds=float('nan'),
++                    native_full=True)
++            else:
++                result = generate(model,tokenizer,material_ids,lengths[ds],config,args.device,
++                                  suffix_ids=suffix_ids,stop_ids=stop_ids,
++                                  min_new_tokens=min_new_tokens)
+             metric_ds = 'repobench' if ds == 'repobench-p' else ds
+             result['score'] = sample_score(metric_ds,result['prediction'],row['answers'],row.get('all_classes',[]))
+             if arm == 'full' and args.verify_native_full and not verified:
+-                native = generate_native(model,ids,lengths[ds],args.device)
++                native = generate_native(model,ids,lengths[ds],args.device,
++                                         stop_ids,min_new_tokens)
+                 if native != result['generated_ids']:
+                     raise ValueError('full node-cache generation differs from native DynamicCache')
+                 result['native_full_parity'] = True
+                 verified = True
+-            if (arm != 'full' and result['dense_prefill_first_token']
++            if (arm not in ('full', 'native_full') and 'full' in record['arms']
++                    and result['dense_prefill_first_token']
+                     != record['arms']['full']['dense_prefill_first_token']):
+                 raise ValueError('dense prefill logits first prediction changed')
+             record['arms'][arm] = result
+             atomic_json(path,record)
+-            print(f'rank={args.rank} {ds}:{row_index} {arm} score={result["score"]:.4f} gates={result["gate_counts"]}',flush=True)
++            print(f'rank={args.rank} {ds}:{row_index} {arm} score={result["score"]:.4f} gates={result.get("gate_counts", {})} graph={result.get("cuda_graph", {})}',flush=True)
+             torch.cuda.empty_cache()
+         record['status'] = 'complete'; atomic_json(path,record)
+         atomic_json(outdir/f'heartbeat_rank{args.rank}.json',dict(pid=os.getpid(),time=time.time(),dataset=ds,row=row_index,status='complete'))
+diff --git a/sparse_attn/arguments.py b/sparse_attn/arguments.py
+index a72d472d..d39fddff 100644
+--- a/sparse_attn/arguments.py
++++ b/sparse_attn/arguments.py
+@@ -324,9 +324,13 @@ def _add_nfa_args(parser: argparse.ArgumentParser):
+                             'retained mass 数值罚（E140）+ 每步 ~10 个小 kernel launch（launch-bound decode 为'
+                             '负收益）。关 = 细筛直接用原始子空间切片；true 逐位回旧口径（对拍/消融臂）')
+     group.add_argument('--nfa_subspace', type=str, default='full',
+-                       choices=['full', 'rope', 'nope', 'tail', 'random', 'highfreq', 'mla_rope'],
++                       choices=['full', 'rope', 'nope', 'tail', 'random', 'highfreq', 'mla_rope',
++                                'glm_nope_last32'],
+                        help='子空间选择: full=全128维(默认) / rope=前64旋转维 / nope=后64非旋转维 / tail=旧口径低频尾维32(E71/B7/C0复现) / '
+-                            'mla_rope=DeepSeek MLA 192维布局尾段rope 64维(E142a，E141判决:rope-only与full192持平)')
++                            'mla_rope=DeepSeek MLA 192维布局尾段rope 64维(E142a，E141判决:rope-only与full192持平) / '
++                            'glm_nope_last32=GLM NoPE 192 维的最后 32 维[160,192)')
++    group.add_argument('--nfa_subspace_seed', type=int, default=0,
++                       help='GLM 子空间协议种子；last32 为确定性映射，seed 仅作身份记录')
+     group.add_argument('--nfa_l2_subspace', type=str, default='same',
+                        choices=['same', 'full'],
+                        help='L2 细筛子空间选择（E134 子空间矩阵第三臂 sub+full）: '
+diff --git a/sparse_attn/indexer/nfa_indexer.py b/sparse_attn/indexer/nfa_indexer.py
+index b782e0bf..0a9f401b 100644
+--- a/sparse_attn/indexer/nfa_indexer.py
++++ b/sparse_attn/indexer/nfa_indexer.py
+@@ -30,11 +30,12 @@ class NFAIndexer(TIAIndexer):
+         self.layer_idx = None
+         self.subspace = getattr(args, 'nfa_subspace', 'full')
+         if self.subspace not in (
+-                'full', 'rope', 'nope', 'tail', 'random', 'highfreq', 'mla_rope'):
++                'full', 'rope', 'nope', 'tail', 'random', 'highfreq', 'mla_rope',
++                'glm_nope_last32'):
+             raise ValueError(f'nfa_subspace 非法取值: {self.subspace}')
+         self.enable_subspace = bool(
+             getattr(args, 'nfa_enable_subspace', True)) and self.subspace != 'full'
+-        if self.subspace in ('rope', 'nope', 'mla_rope'):
++        if self.subspace in ('rope', 'nope', 'mla_rope', 'glm_nope_last32'):
+             self.enable_subspace = True
+         self.l2_subspace = getattr(args, 'nfa_l2_subspace', 'same')
+         if self.l2_subspace not in ('same', 'full'):
+@@ -130,6 +131,10 @@ class NFAIndexer(TIAIndexer):
+         elif self.subspace == 'nope':
+             out = (torch.arange(0, 64, device=device) if self.head_dim == 256
+                    else torch.arange(64, 128, device=device))
++        elif self.subspace == 'glm_nope_last32':
++            if self.head_dim != 256:
++                raise ValueError('glm_nope_last32 requires GLM expanded head_dim=256')
++            out = torch.arange(160, 192, device=device)
+         elif self.subspace == 'mla_rope':
+             out = torch.arange(128, 192, device=device)
+         elif self.subspace == 'random':
+diff --git a/tests/test_frozen_skip_full_dataset.py b/tests/test_frozen_skip_full_dataset.py
+index 6eac5a57..9d7d3c74 100644
+--- a/tests/test_frozen_skip_full_dataset.py
++++ b/tests/test_frozen_skip_full_dataset.py
+@@ -2,9 +2,12 @@ from types import SimpleNamespace
+ 
+ import numpy as np
+ import pytest
++import torch
+ 
+ from benchmark.LongBench.prefill_frozen_skip import (
+-    SCREEN_TASKS, prepare_ids, select_row_indices, sampling_metadata, shard_inputs,
++    LONGBENCH_TASKS, NO_CHAT_TASKS, SCREEN_TASKS, build_arms, greedy_token,
++    parse_tasks, prepare_ids, select_row_indices, sampling_metadata, shard_inputs,
++    stopping_policy,
+ )
+ from benchmark.LongBench.export_frozen_skip import coverage_text
+ 
+@@ -117,3 +120,68 @@ def test_non_suffix_chat_template_fails_closed():
+ 
+     with pytest.raises(ValueError, match='strict prompt suffix'):
+         prepare_ids(BadTokenizer(), {'context': 'abc'}, 'qasper', '{context}', 100)
++
++
++def test_longbench16_closed_population_has_disjoint_eight_way_shards():
++    counts = {name: 200 for name in LONGBENCH_TASKS}
++    counts.update(multifieldqa_en=150, lcc=500, **{'repobench-p': 500})
++    assert sum(counts.values()) == 3750
++    assert parse_tasks(','.join(LONGBENCH_TASKS)) == list(LONGBENCH_TASKS)
++    inputs = [(ds, row) for ds, size in counts.items()
++              for row in select_row_indices(size, 0, 42)]
++    shards = [list(shard_inputs(inputs, rank, 8)) for rank in range(8)]
++    assert [len(shard) for shard in shards] == [469] * 6 + [468] * 2
++    assert {item for shard in shards for item in shard} == set(inputs)
++    assert sum(map(len, shards)) == len(set(inputs)) == 3750
++    with pytest.raises(ValueError):
++        parse_tasks('qasper,qasper')
++
++
++def test_all_no_chat_tasks_bypass_chat_template():
++    assert NO_CHAT_TASKS == frozenset(
++        ('trec', 'triviaqa', 'samsum', 'lcc', 'repobench-p'))
++    for dataset in NO_CHAT_TASKS:
++        material, suffix, info = prepare_ids(
++            _ChatTokenizer(), {'context': 'abc'}, dataset, '{context}', 100)
++        assert material == [ord(char) for char in 'abc']
++        assert suffix == []
++        assert info['input_tokens'] == 3
++
++
++def test_samsum_stop_policy_and_single_dual_arm():
++    class Tokenizer:
++        eos_token_id = 151
++
++        @staticmethod
++        def encode(text, add_special_tokens):
++            assert text == '\n' and not add_special_tokens
++            return [10]
++
++    model = SimpleNamespace(
++        generation_config=SimpleNamespace(eos_token_id=[151, 152]))
++    assert stopping_policy(model, Tokenizer(), 'qasper') == ([151, 152], 0)
++    assert stopping_policy(model, Tokenizer(), 'samsum') == ([151, 10], 1)
++    logits = torch.tensor([[0., 1., 2., 3.]])
++    assert int(greedy_token(logits, 0, [3], min_new_tokens=1)) == 2
++    assert int(greedy_token(logits, 1, [3], min_new_tokens=1)) == 3
++
++    arms = build_arms([0.1], ['dual'], 'mean', include_full=False)
++    assert [name for name, _ in arms] == ['dual_0.1']
++    assert arms[0][1].epsilon == 0.1
++    assert arms[0][1].mode == 'dual'
++    with pytest.raises(ValueError):
++        build_arms([], [], 'mean', include_full=False)
++
++
++def test_glm_nope_last32_selects_expanded_nope_tail():
++    from sparse_attn.indexer.nfa_indexer import NFAIndexer
++    from sparse_attn.ops.paged_region_kernels_nfa import nfa_args
++
++    indexer = NFAIndexer(nfa_args(subspace='glm_nope_last32'))
++    indexer.head_dim = 256
++    assert indexer.enable_subspace
++    torch.testing.assert_close(
++        indexer._subspace_indices(torch.device('cpu')), torch.arange(160, 192))
++    indexer.head_dim = 128
++    with pytest.raises(ValueError, match='head_dim=256'):
++        indexer._subspace_indices(torch.device('cpu'))

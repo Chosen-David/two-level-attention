@@ -1,0 +1,355 @@
+{
+  "schema": "glm-nfa-eps010-graph-lbv1-quality-summary-v1",
+  "status": "pending-independent-verification",
+  "date": "2026-11-14",
+  "model": "GLM-4.7-Flash",
+  "dataset": "LongBench v1 English 16 tasks",
+  "run_identity": "6e4c432c18e3acc202a6ae27ad8673425840fc7769bce8f323b5d476666ab019",
+  "code_revision": "7a0f6de8fa4eea1d0e216aaef7b5a8c9275a44fb",
+  "worktree_diff_sha256": "cd3d83b1e9c02ebd9b8176e478ae57a2dac640137c8380297b4846c0da3c5b85",
+  "code_snapshot": {
+    "local_producer_audit": "/tmp/tli-glm-nfa-eps010-graph-20261112",
+    "remote_workers": "/tmp/tli-glm-nfa-eps010-graph-20261112-r2"
+  },
+  "method_scope": {
+    "dual_0.1": "glm_nope_last32 seed=0; threshold=0.1; dual near/far gate; real region skip; CUDA Graph decode; BS=1; eager fallback=0",
+    "not_in_scope": "Single NFA arm only; no native FullKV or full-region arm in this run. No TPOT or speedup claim. Producer-side recomputation is not different-owner independent acceptance."
+  },
+  "population": {
+    "requests": 3750,
+    "requests_per_rank": {
+      "0": 469,
+      "1": 469,
+      "2": 469,
+      "3": 469,
+      "4": 469,
+      "5": 469,
+      "6": 468,
+      "7": 468
+    },
+    "rows": {
+      "narrativeqa": 200,
+      "qasper": 200,
+      "multifieldqa_en": 150,
+      "hotpotqa": 200,
+      "2wikimqa": 200,
+      "musique": 200,
+      "gov_report": 200,
+      "qmsum": 200,
+      "multi_news": 200,
+      "trec": 200,
+      "triviaqa": 200,
+      "samsum": 200,
+      "passage_count": 200,
+      "passage_retrieval_en": 200,
+      "lcc": 500,
+      "repobench-p": 500
+    },
+    "arms_per_request": [
+      "dual_0.1"
+    ]
+  },
+  "score_protocol": "Official LongBench sample_score per row; arithmetic mean per task, then unweighted macro average over 16 tasks; seed=42, context_cap=31500",
+  "execution": {
+    "rank0": "pc40 GPU0",
+    "rank1": "pc40 GPU1",
+    "rank2": "pc31 GPU0",
+    "rank3": "pc31 GPU1",
+    "rank4": "pc32 GPU0",
+    "rank5": "pc32 GPU1",
+    "rank6": "pc02 GPU0",
+    "rank7": "pc02 GPU1",
+    "hardware": "H20-3e"
+  },
+  "scores": {
+    "2wikimqa": {
+      "dual_0.1": 42.008333333333,
+      "gate_counts": {
+        "both": 1453,
+        "far": 4505,
+        "keep": 3159,
+        "near": 283
+      },
+      "cuda_graph": {
+        "capture_count": 968,
+        "eager_fallback_count": 0,
+        "replay_count": 1183,
+        "requested": 200
+      }
+    },
+    "gov_report": {
+      "dual_0.1": 30.156803590422,
+      "gate_counts": {
+        "both": 1210,
+        "far": 3222,
+        "keep": 4633,
+        "near": 335
+      },
+      "cuda_graph": {
+        "capture_count": 986,
+        "eager_fallback_count": 0,
+        "replay_count": 89324,
+        "requested": 200
+      }
+    },
+    "hotpotqa": {
+      "dual_0.1": 59.218939883646,
+      "gate_counts": {
+        "both": 1785,
+        "far": 2138,
+        "keep": 4689,
+        "near": 788
+      },
+      "cuda_graph": {
+        "capture_count": 994,
+        "eager_fallback_count": 0,
+        "replay_count": 1027,
+        "requested": 200
+      }
+    },
+    "lcc": {
+      "dual_0.1": 65.896,
+      "gate_counts": {
+        "both": 12,
+        "far": 344,
+        "keep": 22683,
+        "near": 461
+      },
+      "cuda_graph": {
+        "capture_count": 1912,
+        "eager_fallback_count": 0,
+        "replay_count": 31500,
+        "requested": 500
+      }
+    },
+    "multi_news": {
+      "dual_0.1": 26.020007075155,
+      "gate_counts": {
+        "both": 103,
+        "far": 970,
+        "keep": 7476,
+        "near": 851
+      },
+      "cuda_graph": {
+        "capture_count": 782,
+        "eager_fallback_count": 0,
+        "replay_count": 58879,
+        "requested": 200
+      }
+    },
+    "multifieldqa_en": {
+      "dual_0.1": 51.790176198385,
+      "gate_counts": {
+        "both": 834,
+        "far": 1895,
+        "keep": 4008,
+        "near": 313
+      },
+      "cuda_graph": {
+        "capture_count": 702,
+        "eager_fallback_count": 0,
+        "replay_count": 2305,
+        "requested": 150
+      }
+    },
+    "musique": {
+      "dual_0.1": 28.784975808505,
+      "gate_counts": {
+        "both": 2088,
+        "far": 1549,
+        "keep": 4684,
+        "near": 1079
+      },
+      "cuda_graph": {
+        "capture_count": 1000,
+        "eager_fallback_count": 0,
+        "replay_count": 1236,
+        "requested": 200
+      }
+    },
+    "narrativeqa": {
+      "dual_0.1": 28.45520488768,
+      "gate_counts": {
+        "both": 1737,
+        "far": 543,
+        "keep": 4801,
+        "near": 2319
+      },
+      "cuda_graph": {
+        "capture_count": 1000,
+        "eager_fallback_count": 0,
+        "replay_count": 1489,
+        "requested": 200
+      }
+    },
+    "passage_count": {
+      "dual_0.1": 4.5,
+      "gate_counts": {
+        "both": 1517,
+        "far": 1230,
+        "keep": 4986,
+        "near": 1667
+      },
+      "cuda_graph": {
+        "capture_count": 1000,
+        "eager_fallback_count": 0,
+        "replay_count": 600,
+        "requested": 200
+      }
+    },
+    "passage_retrieval_en": {
+      "dual_0.1": 100.0,
+      "gate_counts": {
+        "both": 2060,
+        "far": 1913,
+        "keep": 2976,
+        "near": 2451
+      },
+      "cuda_graph": {
+        "capture_count": 1000,
+        "eager_fallback_count": 0,
+        "replay_count": 1000,
+        "requested": 200
+      }
+    },
+    "qasper": {
+      "dual_0.1": 35.418604020412,
+      "gate_counts": {
+        "both": 689,
+        "far": 2614,
+        "keep": 5768,
+        "near": 329
+      },
+      "cuda_graph": {
+        "capture_count": 930,
+        "eager_fallback_count": 0,
+        "replay_count": 3030,
+        "requested": 200
+      }
+    },
+    "qmsum": {
+      "dual_0.1": 22.840887011946,
+      "gate_counts": {
+        "both": 1633,
+        "far": 1942,
+        "keep": 4629,
+        "near": 1196
+      },
+      "cuda_graph": {
+        "capture_count": 999,
+        "eager_fallback_count": 0,
+        "replay_count": 10909,
+        "requested": 200
+      }
+    },
+    "repobench-p": {
+      "dual_0.1": 59.022,
+      "gate_counts": {
+        "both": 296,
+        "far": 850,
+        "keep": 19804,
+        "near": 2550
+      },
+      "cuda_graph": {
+        "capture_count": 2452,
+        "eager_fallback_count": 0,
+        "replay_count": 31500,
+        "requested": 500
+      }
+    },
+    "samsum": {
+      "dual_0.1": 41.291598326453,
+      "gate_counts": {
+        "both": 49,
+        "far": 189,
+        "keep": 6733,
+        "near": 2429
+      },
+      "cuda_graph": {
+        "capture_count": 963,
+        "eager_fallback_count": 0,
+        "replay_count": 19277,
+        "requested": 200
+      }
+    },
+    "trec": {
+      "dual_0.1": 78.0,
+      "gate_counts": {
+        "both": 0,
+        "far": 314,
+        "keep": 8037,
+        "near": 1049
+      },
+      "cuda_graph": {
+        "capture_count": 954,
+        "eager_fallback_count": 0,
+        "replay_count": 12600,
+        "requested": 200
+      }
+    },
+    "triviaqa": {
+      "dual_0.1": 91.241666666667,
+      "gate_counts": {
+        "both": 24,
+        "far": 151,
+        "keep": 7799,
+        "near": 1426
+      },
+      "cuda_graph": {
+        "capture_count": 971,
+        "eager_fallback_count": 0,
+        "replay_count": 6198,
+        "requested": 200
+      }
+    }
+  },
+  "macro_avg16": {
+    "dual_0.1": 47.7903248001628
+  },
+  "micro_avg3750": {
+    "dual_0.1": 50.08398148016061
+  },
+  "gate_totals": {
+    "both": 15490,
+    "far": 24369,
+    "keep": 116865,
+    "near": 19526
+  },
+  "graph_totals": {
+    "capture_count": 17613,
+    "eager_fallback_count": 0,
+    "replay_count": 272057,
+    "requested": 3750
+  },
+  "producer_side_audit": {
+    "status": "PASS",
+    "closed_set_requests": 3750,
+    "datasets": 16,
+    "rank_request_counts": {
+      "0": 469,
+      "1": 469,
+      "2": 469,
+      "3": 469,
+      "4": 469,
+      "5": 469,
+      "6": 468,
+      "7": 468
+    },
+    "official_scores_recomputed": 3750,
+    "tokenizer_inputs_recomputed": 3750,
+    "nfa_47_layer_receipts_checked": 3750,
+    "gate_decisions_checked": 176250,
+    "failures": [],
+    "scope": "Producer-side read-only recomputation; different-owner verification remains pending. Tokenizer identities and official per-sample scores are recomputed. The arm emits decisions/NFA receipts/final KV but no prefill_full_kv field.",
+    "audit_sha256": "ba3538732cb207c0f81da85195353a33d9f8035fc96e5b6a8ddfe6aaa5d164e8",
+    "audit_script_sha256": "790483c96bfbceb4be1bb74fab3887cbb590c0e5ed036157ff3b1559958da89a",
+    "request_manifest_sha256": "7718ff3125f5a9844960637c94afcbbf3fe43367292ca087c568d93783cda669",
+    "harvest_manifest_sha256": "be304d4d3dae6a13035a043c71dbf6f31b3acb67269c21313825082334822485",
+    "launcher_sha256": "6467ea1921c93d9a954cc0e5794c2622c038ea0a966b2e0598478312a3ad14ca",
+    "worker_wrapper_sha256": "9bf7b209987e295a9771a8e99059bb0aa50b51b17a3a764efc0e7d887c20ac51",
+    "patch_sha256": "cd3d83b1e9c02ebd9b8176e478ae57a2dac640137c8380297b4846c0da3c5b85",
+    "build_script_sha256": "28b7104a2cd3d13f050e6990da84925fb858899e956b207b6f7ddea186d21afc"
+  },
+  "raw_evidence_root": "/home/wangyuanshuo02/ak_verify_results/glm_longbench_16en_nfa_eps010_graph_20261112_r2_merged",
+  "delivery_scope": "Versioned artifacts contain the compact summary, complete audit, eight run manifests, completion/heartbeat receipts, per-file SHA256 manifests and reproduction scripts. Raw per-request JSON remains at raw_evidence_root."
+}
