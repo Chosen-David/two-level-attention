@@ -533,7 +533,8 @@ class OfficialLongBenchIndependenceTest(unittest.TestCase):
             self.assertEqual(prediction.read_bytes(), b"")
 
     def _execute_quality_with_runcap(
-        self, root, sample_indices, shard_index=0, num_shards=1, fail=False
+        self, root, sample_indices, shard_index=0, num_shards=1, fail=False,
+        receipts=False,
     ):
         rows = [
             {
@@ -548,10 +549,17 @@ class OfficialLongBenchIndependenceTest(unittest.TestCase):
         args = SimpleNamespace(
             output_dir=str(root / "out"), data_root=str(root),
             model_path=str(root / "model"), model_name="Qwen3-8B",
-            method="jssa", budget=1024, jssa_rank=32, quest_page_size=16,
+            method="nfa" if receipts else "jssa",
+            budget=1024, jssa_rank=32, quest_page_size=16,
             shard_index=shard_index, num_shards=num_shards,
             tasks=["samsum"], sample_indices=sample_indices,
         )
+        if receipts:
+            args.quality_label = "nfa_graph"
+            args.quality_implementation = "nfa_graph"
+            args.quality_producer_file = str(
+                ROOT / "benchmark/efficiency/benchmark_longbench_quality.py"
+            )
 
         class Engine:
             runtime = {"implementation": "test-official-jssa"}
@@ -559,11 +567,20 @@ class OfficialLongBenchIndependenceTest(unittest.TestCase):
             def __init__(self):
                 self.tokenizer = _QualityTokenizer()
                 self.calls = []
+                if receipts:
+                    self.request_receipts = []
 
             def generate(self, ids, max_new_tokens, **kwargs):
                 self.calls.append((list(ids), max_new_tokens, kwargs))
                 if fail:
                     raise RuntimeError("injected generation interruption")
+                if receipts:
+                    self.request_receipts.append({
+                        "generated_tokens": 1,
+                        "stop_reason": "eos",
+                        "logical_decode_steps": 0,
+                        "submitted_decode_forwards": 0,
+                    })
                 return [7], 0.1
 
         engine = Engine()
@@ -646,6 +663,85 @@ class OfficialLongBenchIndependenceTest(unittest.TestCase):
                 payload["input_identity"]["actual_input_ids"]["count"], 0
             )
             load_runcap_consumer()(str(prediction), False)
+
+    def test_quality_receipts_survive_complete_skip_with_bound_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            args, engine, manifest = self._execute_quality_with_runcap(
+                root, [0, 2], receipts=True
+            )
+            entry = manifest["tasks"]["samsum"]
+            receipt_path = Path(args.output_dir) / entry["receipts"]
+            prediction_path = Path(args.output_dir) / entry["path"]
+            self.assertEqual(entry["receipt_rows"], 2)
+            self.assertEqual(entry["receipts_sha256"], sha256_file(receipt_path))
+            self.assertEqual(len(manifest["request_receipts"]), 2)
+            self.assertEqual(
+                [row["source_index"] for row in manifest["request_receipts"]],
+                [0, 2],
+            )
+            sidecar = json.loads(Path(
+                str(prediction_path) + RUN_CAP_SIDECAR_SUFFIX
+            ).read_text(encoding="utf-8"))
+            self.assertEqual(sidecar["method"], "nfa_graph")
+            self.assertTrue(all(
+                json.loads(line)["implementation"] == "nfa_graph"
+                for line in prediction_path.read_text(encoding="utf-8").splitlines()
+            ))
+
+            args, skipped_engine, skipped = self._execute_quality_with_runcap(
+                root, [0, 2], receipts=True
+            )
+            self.assertEqual(skipped_engine.calls, [])
+            self.assertEqual(skipped["request_receipts"], manifest["request_receipts"])
+            self.assertEqual(len(skipped_engine.request_receipts), 2)
+
+    def test_quality_receipts_skip_fails_closed_when_missing_or_mismatched(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            args, _, manifest = self._execute_quality_with_runcap(
+                root, [0, 2], receipts=True
+            )
+            receipt_path = Path(args.output_dir) / manifest["tasks"]["samsum"]["receipts"]
+            original = receipt_path.read_text(encoding="utf-8")
+            receipt_path.unlink()
+            with self.assertRaisesRegex(RuntimeError, "缺少逐请求回执"):
+                self._execute_quality_with_runcap(root, [0, 2], receipts=True)
+
+            receipt_path.write_text(original, encoding="utf-8")
+            receipts = json.loads(original)
+            receipts[0]["source_index"] = 99
+            receipt_path.write_text(json.dumps(receipts), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "回执与当前输入身份不一致"):
+                self._execute_quality_with_runcap(root, [0, 2], receipts=True)
+
+    def test_partial_prediction_rerun_discards_stale_receipts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            args, _, manifest = self._execute_quality_with_runcap(
+                root, [0, 2], receipts=True
+            )
+            entry = manifest["tasks"]["samsum"]
+            prediction_path = Path(args.output_dir) / entry["path"]
+            receipt_path = Path(args.output_dir) / entry["receipts"]
+            prediction_path.write_text(
+                prediction_path.read_text(encoding="utf-8").splitlines()[0] + "\n",
+                encoding="utf-8",
+            )
+            stale = json.loads(receipt_path.read_text(encoding="utf-8"))
+            stale.append({"stale": True})
+            receipt_path.write_text(json.dumps(stale), encoding="utf-8")
+
+            _, rerun_engine, rerun = self._execute_quality_with_runcap(
+                root, [0, 2], receipts=True
+            )
+            self.assertEqual(len(rerun_engine.calls), 2)
+            self.assertEqual(len(rerun["request_receipts"]), 2)
+            self.assertNotIn("stale", receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                rerun["tasks"]["samsum"]["receipts_sha256"],
+                sha256_file(receipt_path),
+            )
 
     def test_interrupted_generation_leaves_strictly_rejected_runcap(self):
         with tempfile.TemporaryDirectory() as temporary:

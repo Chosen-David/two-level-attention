@@ -5,7 +5,30 @@ never leaves the GPU on the decode hot path; the previous step's tokens are
 copied back through a dedicated stream and drained at the start of the next
 step.
 """
+from collections import deque
+
 import torch
+
+
+class StopStringMatcher:
+    """在 CPU 回执上复用 HF 的跨 token/合并 BPE stop-string 判定。"""
+
+    def __init__(self, tokenizer, stop_strings, prompt_ids=()):
+        from transformers.generation.stopping_criteria import StopStringCriteria
+
+        self.criteria = StopStringCriteria(
+            tokenizer=tokenizer, stop_strings=stop_strings)
+        # HF 每步只读取末尾 maximum_token_len 个 token；保留同一有限窗口，
+        # 避免质量路径每步重新构造完整的长 prompt CPU tensor。
+        self._history = deque(
+            (int(token) for token in prompt_ids),
+            maxlen=self.criteria.maximum_token_len)
+
+    def append_and_match(self, token):
+        self._history.append(int(token))
+        input_ids = torch.tensor(
+            [list(self._history)], dtype=torch.long, device='cpu')
+        return bool(self.criteria(input_ids, None)[0])
 
 
 def greedy_next_tokens(logits, eos_ids, *, generated_counts=0, min_new_tokens=0):

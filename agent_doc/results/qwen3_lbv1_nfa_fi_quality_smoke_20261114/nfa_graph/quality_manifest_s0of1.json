@@ -1,0 +1,78 @@
+{
+  "schema": "longbench-official-quality-manifest-v1",
+  "verification": "pending-independent-verification",
+  "method": "nfa",
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "max_length": 31500,
+  "shard_index": 0,
+  "num_shards": 1,
+  "runtime": {
+    "implementation": "NFA GraphReadyPagedRegionCache and production selector",
+    "execution": "graph",
+    "batch_size": 1,
+    "dtype": "torch.bfloat16",
+    "num_layers": 36,
+    "dense_or_torch_decode_fallback": false,
+    "nfa_selector_config": {
+      "subspace": "tail",
+      "subspace_cmp_ratio": 4,
+      "level1_topk": 128,
+      "level2_topk": 1024,
+      "page_size": 64,
+      "near_pages": 32,
+      "near_tokens": "off",
+      "near_len": 4096,
+      "enable_layer_skip": false,
+      "sink_tokens": 4,
+      "sliding_window_size": 128
+    },
+    "source": {
+      "head": "5eb43ddc428eb15deba5c30433966e50b55cb7a0",
+      "harness": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/benchmark_long_context_two_point.py",
+      "harness_sha256": "62308ee0d29e63c36ab61e985ede1e719b7e3d7c136a956829d4120453a21f4a",
+      "source_diff_sha256": "a2cab381972ecee702078ecf6caecfee82a28c22fc30c40f6578f9bfa3443933",
+      "quality_harness": "/home/wangyuanshuo02/two-level-attention/benchmark/efficiency/benchmark_longbench_quality.py",
+      "quality_harness_sha256": "b312e9947e5a9b1451e0ef36d3112a515b6ecee912598b04f58c3a08f46e00ef",
+      "quality_source_diff_sha256": "c890095c87615c9caa3894a41d4881102413f935b35490407f7c572b6d98fd27"
+    },
+    "quality_protocol": {
+      "fixed_length_performance_receipts_reused": false,
+      "real_eos_min_new_stop_token_stop_string": true,
+      "per_request_independent_cache": true,
+      "graph_session_released_at_request_boundary": true
+    }
+  },
+  "tasks": {
+    "samsum": {
+      "path": "pred/samsum-nfa_graph_s0of1.jsonl",
+      "runcap": "pred/samsum-nfa_graph_s0of1.jsonl.runcap.json",
+      "rows": 1,
+      "data_sha256": "d435a4c7a05d2006872da8dd0c44c0a48648baa1ce4f62a4084d07aa7883f0cc",
+      "prediction_sha256": "c056e4b07a4421447a8e6a9749b63f6678e11ba4b8878d37c0d094efe8d0b5b5",
+      "receipts": "pred/samsum-nfa_graph_s0of1.receipts.json",
+      "receipts_sha256": "efdb47ef9d34ed8ba6108a1ad5f2f0caa7751a597c799189fd0a85df7ba31d91",
+      "receipt_rows": 1
+    }
+  },
+  "request_receipts": [
+    {
+      "generated_tokens": 8,
+      "stop_reason": "stop_string",
+      "logical_decode_steps": 7,
+      "submitted_decode_forwards": 7,
+      "nfa_decode_steps": 7,
+      "graph_capture_count": 5,
+      "graph_replays": 7,
+      "graph_eager_fallbacks": 0,
+      "graph_pool_hits": 0,
+      "graph_pool_misses": 1,
+      "task": "samsum",
+      "source_index": 0,
+      "input": {
+        "input_tokens": 9508,
+        "input_ids_sha256": "df7dbfe0b6402dfbfec00fccbe6b2a48b75f3132cf1bd281a526d302fe49b6b3",
+        "truncated": false
+      }
+    }
+  ]
+}

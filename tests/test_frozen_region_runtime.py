@@ -380,7 +380,33 @@ def test_decode_failure_marks_request_failed(monkeypatch):
     assert output.past_key_values.request_phases[0] == RequestPhase.FAILED
 
 
-def test_decode_reconciles_cache_after_delayed_eos_receipt(monkeypatch):
+def test_decode_stop_string_on_first_token_records_zero_decode_steps(monkeypatch):
+    class FakeMatcher:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def append_and_match(self, token):
+            return token == 4
+
+    monkeypatch.setattr(
+        'sparse_attn.engine.frozen_runner.StopStringMatcher', FakeMatcher)
+    output = _decode_output(4)
+    receipt = {}
+    generated, _ = decode_frozen_request(
+        None, output, max_new_tokens=8, eos_ids=set(), stop_strings=['\n'],
+        tokenizer=object(), prompt_ids=[7], receipt=receipt)
+    assert generated == [4]
+    assert receipt['stop_reason'] == 'stop_string'
+    assert receipt['logical_decode_steps'] == 0
+    assert receipt['submitted_decode_forwards'] == 0
+    assert receipt['graph_capture_count'] == 0
+    assert receipt['graph_replays'] == 0
+    assert receipt['graph_eager_fallbacks'] == 0
+
+
+@pytest.mark.parametrize('use_stop_string', [False, True])
+def test_decode_reconciles_cache_after_delayed_stop_receipt(
+        monkeypatch, use_stop_string):
     class FakeScheduler:
         def __init__(self, **kwargs):
             self.next_tokens = {}
@@ -403,10 +429,14 @@ def test_decode_reconciles_cache_after_delayed_eos_receipt(monkeypatch):
         def __init__(self, scheduler):
             self.scheduler = scheduler
             self.outputs = iter([2, 4, 5])
+            self.capture_count = 0
+            self.replay_count = 0
+            self.eager_fallback_count = 0
 
         def step(self, model, cache, **kwargs):
             token = next(self.outputs)
             self.scheduler.pending.append((0, token))
+            self.eager_fallback_count += 1
             cache.states[0].logical_length += 1
             cache.nfa_decode_steps += 1
             cache.layers[0].nfa_decode_trace.append(
@@ -432,16 +462,42 @@ def test_decode_reconciles_cache_after_delayed_eos_receipt(monkeypatch):
         def parameters(self):
             return iter([torch.empty(0)])
 
+    class FakeMatcher:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def append_and_match(self, token):
+            return token == 4
+
+    monkeypatch.setattr(
+        'sparse_attn.engine.frozen_runner.StopStringMatcher', FakeMatcher)
     output = _decode_output(3)
     cache = FakeCache()
     output.past_key_values = cache
+    receipt = {}
+    stop_options = (dict(
+        stop_strings=['\n'], tokenizer=object(), prompt_ids=[7])
+        if use_stop_string else {})
     generated, _ = decode_frozen_request(
-        FakeModel(), output, max_new_tokens=8, eos_ids={4},
-        capture_graph=False)
+        FakeModel(), output, max_new_tokens=8,
+        eos_ids=set() if use_stop_string else {4},
+        capture_graph=False, receipt=receipt, **stop_options)
     assert generated == [3, 2, 4]
     assert cache.states[0].logical_length == 9
     assert cache.nfa_decode_steps == 2
     assert [entry['decode_step'] for entry in cache.layers[0].nfa_decode_trace] == [0, 1]
+    assert receipt == {
+        'generated_tokens': 3,
+        'stop_reason': 'stop_string' if use_stop_string else 'eos',
+        'logical_decode_steps': 2,
+        'submitted_decode_forwards': 3,
+        'nfa_decode_steps': 2,
+        'graph_capture_count': 0,
+        'graph_replays': 0,
+        'graph_eager_fallbacks': 3,
+        'graph_pool_hits': 0,
+        'graph_pool_misses': 0,
+    }
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')

@@ -9,7 +9,7 @@ from sparse_attn.cache.paged_region_cache import (
     GraphReadyPagedRegionCache, RequestPhase)
 from sparse_attn.policies.frozen_gate import decide_regions, profile_regions
 from sparse_attn.policies.static_gate import StaticGateDecision
-from sparse_attn.scheduler.scheduler import greedy_next_tokens
+from sparse_attn.scheduler.scheduler import StopStringMatcher, greedy_next_tokens
 
 
 @contextmanager
@@ -157,15 +157,21 @@ def prefill_frozen_request(model, input_ids, config, geometry, static_gate=None,
 
 def decode_frozen_request(model, output, *, max_new_tokens, eos_ids,
                           pad_token_id=0, capture_graph=True,
-                          min_new_tokens=0, suffix_ids=None):
+                          min_new_tokens=0, suffix_ids=None,
+                          stop_strings=None, tokenizer=None, prompt_ids=None,
+                          receipt=None):
     """逐 token 消费完整 suffix，随后只把答案新增 token 交给调用方。"""
     from sparse_attn.engine.graph_runner import session_graph_runner
     from sparse_attn.scheduler.scheduler import ContinuousBatchScheduler
 
     if max_new_tokens < 0:
         raise ValueError('max_new_tokens must be non-negative')
-    if min_new_tokens < 0:
-        raise ValueError('min_new_tokens must be non-negative')
+    if not 0 <= min_new_tokens <= max_new_tokens:
+        raise ValueError('min_new_tokens must be in [0, max_new_tokens]')
+    if stop_strings and tokenizer is None:
+        raise ValueError('stop_strings requires tokenizer')
+    if stop_strings and prompt_ids is None:
+        raise ValueError('stop_strings requires prompt_ids for HF tail matching')
     cache = output.past_key_values
     request_id = cache.active_request_id
     if request_id is None:
@@ -173,11 +179,60 @@ def decode_frozen_request(model, output, *, max_new_tokens, eos_ids,
     eos_ids = frozenset(int(token) for token in eos_ids)
     suffix_ids = () if suffix_ids is None else tuple(
         int(token) for token in suffix_ids)
+    matcher = None
+    if stop_strings:
+        matcher = StopStringMatcher(
+            tokenizer, stop_strings,
+            tuple(prompt_ids) + suffix_ids)
 
     with _request_failure_guard(cache, request_id):
         generated = []
-        if max_new_tokens == 0:
+        runner = None
+        submitted = 0
+        stop_reason = None
+        pool = getattr(model, '_nfa_graph_session_pool', None)
+        pool_hits_before = pool.hit_count if pool is not None else 0
+        pool_misses_before = pool.miss_count if pool is not None else 0
+
+        def finish(reason):
             cache.transition_request(request_id, RequestPhase.FINISHED)
+            if receipt is not None:
+                current_pool = getattr(model, '_nfa_graph_session_pool', None)
+                receipt.update(
+                    generated_tokens=len(generated),
+                    stop_reason=reason,
+                    logical_decode_steps=max(0, len(generated) - 1),
+                    submitted_decode_forwards=(
+                        len(suffix_ids) + max(0, submitted - 1)),
+                    nfa_decode_steps=getattr(cache, 'nfa_decode_steps', 0),
+                    graph_capture_count=(
+                        runner.capture_count if runner is not None else 0),
+                    graph_replays=(
+                        runner.replay_count if runner is not None else 0),
+                    graph_eager_fallbacks=(
+                        runner.eager_fallback_count if runner is not None else 0),
+                    graph_pool_hits=(
+                        current_pool.hit_count - pool_hits_before
+                        if current_pool is not None else 0),
+                    graph_pool_misses=(
+                        current_pool.miss_count - pool_misses_before
+                        if current_pool is not None else 0),
+                )
+
+        def observe(token):
+            generated.append(int(token))
+            string_hit = (
+                matcher.append_and_match(token) if matcher is not None else False)
+            if len(generated) >= min_new_tokens and generated[-1] in eos_ids:
+                return 'eos'
+            if string_hit:
+                return 'stop_string'
+            if len(generated) >= max_new_tokens:
+                return 'max_new_tokens'
+            return None
+
+        if max_new_tokens == 0:
+            finish('max_new_tokens')
             return generated, cache
 
         cache.transition_request(
@@ -187,10 +242,9 @@ def decode_frozen_request(model, output, *, max_new_tokens, eos_ids,
                 output.logits, eos_ids, generated_counts=0,
                 min_new_tokens=min_new_tokens)
             # 首 token 是请求边界允许的一次同步；后续只消费 pinned CPU 回执。
-            generated.append(int(first_token[0]))
-            if (len(generated) >= max_new_tokens
-                    or (len(generated) >= min_new_tokens and generated[-1] in eos_ids)):
-                cache.transition_request(request_id, RequestPhase.FINISHED)
+            stop_reason = observe(first_token[0])
+            if stop_reason is not None:
+                finish(stop_reason)
                 return generated, cache
 
         scheduler = ContinuousBatchScheduler(
@@ -207,16 +261,12 @@ def decode_frozen_request(model, output, *, max_new_tokens, eos_ids,
         stopped = False
 
         def consume(receipts):
-            nonlocal stopped
+            nonlocal stopped, stop_reason
             for receipt_request_id, token in receipts:
                 if receipt_request_id != request_id or stopped:
                     continue
-                if len(generated) >= max_new_tokens:
-                    stopped = True
-                    break
-                generated.append(int(token))
-                if (len(generated) >= min_new_tokens
-                        and generated[-1] in eos_ids):
+                stop_reason = observe(token)
+                if stop_reason is not None:
                     stopped = True
 
         try:
@@ -248,6 +298,10 @@ def decode_frozen_request(model, output, *, max_new_tokens, eos_ids,
             # 仅在请求返回前等待未决 Event；慢回执造成的 EOS 后候选会被
             # consume 截断，不会混入调用方输出。
             consume(scheduler.flush_ready_receipts())
+            if not stopped and len(generated) != max_new_tokens:
+                raise RuntimeError(
+                    f'decode returned {len(generated)}/{max_new_tokens} tokens '
+                    'without a stop reason')
             # 慢回执下可能已经多提交了 EOS 后的 forward。这些物理写入位于
             # 逻辑长度之外，请求返回前回滚其可观察状态，保持与同步 decode
             # 完全相同的最终长度、decode 步数和 trace 范围。
@@ -261,7 +315,7 @@ def decode_frozen_request(model, output, *, max_new_tokens, eos_ids,
                                       + max(0, len(generated) - 1))
                     for layer in cache.layers:
                         del layer.nfa_decode_trace[expected_steps:]
-            cache.transition_request(request_id, RequestPhase.FINISHED)
+            finish(stop_reason or 'max_new_tokens')
             return generated, cache
         finally:
             pool = getattr(model, '_nfa_graph_session_pool', None)

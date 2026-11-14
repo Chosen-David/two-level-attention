@@ -1,0 +1,147 @@
+{
+  "schema": "qwen3-longbench-real-quality-smoke-audit-v1",
+  "verification": "pending-independent-verification",
+  "status": "PASS",
+  "source_head": "5eb43ddc428eb15deba5c30433966e50b55cb7a0",
+  "task": "samsum",
+  "source_index": 0,
+  "input_tokens": 9508,
+  "input_ids_sha256": "df7dbfe0b6402dfbfec00fccbe6b2a48b75f3132cf1bd281a526d302fe49b6b3",
+  "prediction": " Emilia is still angry with William.\n",
+  "arms": {
+    "nfa_graph": {
+      "generated_tokens": 8,
+      "stop_reason": "stop_string",
+      "logical_decode_steps": 7,
+      "submitted_decode_forwards": 7,
+      "score": 80.0,
+      "prediction_sha256": "c056e4b07a4421447a8e6a9749b63f6678e11ba4b8878d37c0d094efe8d0b5b5",
+      "receipts_sha256": "efdb47ef9d34ed8ba6108a1ad5f2f0caa7751a597c799189fd0a85df7ba31d91",
+      "runcap_sha256": "b5818491edec4447df89ec10188c1cae09129511875afb50fa06d81054a8c2c9",
+      "result_sha256": "b375729d3743476c6c00acd41d4bed7fbf55602bbda148117cf9d89518027694",
+      "manifest_sha256": "cdb3489f59f7658d307563e6a536c0ddee0107e9d3347e8532627d3209cccf81",
+      "quality_harness_sha256": "b312e9947e5a9b1451e0ef36d3112a515b6ecee912598b04f58c3a08f46e00ef",
+      "receipt": {
+        "generated_tokens": 8,
+        "stop_reason": "stop_string",
+        "logical_decode_steps": 7,
+        "submitted_decode_forwards": 7,
+        "nfa_decode_steps": 7,
+        "graph_capture_count": 5,
+        "graph_replays": 7,
+        "graph_eager_fallbacks": 0,
+        "graph_pool_hits": 0,
+        "graph_pool_misses": 1,
+        "task": "samsum",
+        "source_index": 0,
+        "input": {
+          "input_tokens": 9508,
+          "input_ids_sha256": "df7dbfe0b6402dfbfec00fccbe6b2a48b75f3132cf1bd281a526d302fe49b6b3",
+          "truncated": false
+        }
+      }
+    },
+    "nfa_eager": {
+      "generated_tokens": 8,
+      "stop_reason": "stop_string",
+      "logical_decode_steps": 7,
+      "submitted_decode_forwards": 7,
+      "score": 80.0,
+      "prediction_sha256": "c0c2e31635d356949a3195175d5b49f292eeffbc8bec3d07003535d415232fc3",
+      "receipts_sha256": "fa20460d2595a06b04cd0932d98249ae0a15b0635b84182acfc0741cfd8b52ab",
+      "runcap_sha256": "24543568adfbfb8b0a6e914c7cd646ed9e2a7c08671a684de8e1644aa0156fbe",
+      "result_sha256": "959ecab5c95b912e89c670e589fb178bb3e3c84cbbaf8d35489b7af5d26d15c1",
+      "manifest_sha256": "637fd6cd0c8ba319bce6a19f6b849527cc9175549fcdc57ac6d0d0795e88a6ee",
+      "quality_harness_sha256": "b312e9947e5a9b1451e0ef36d3112a515b6ecee912598b04f58c3a08f46e00ef",
+      "receipt": {
+        "generated_tokens": 8,
+        "stop_reason": "stop_string",
+        "logical_decode_steps": 7,
+        "submitted_decode_forwards": 7,
+        "nfa_decode_steps": 7,
+        "graph_capture_count": 0,
+        "graph_replays": 0,
+        "graph_eager_fallbacks": 7,
+        "graph_pool_hits": 0,
+        "graph_pool_misses": 1,
+        "task": "samsum",
+        "source_index": 0,
+        "input": {
+          "input_tokens": 9508,
+          "input_ids_sha256": "df7dbfe0b6402dfbfec00fccbe6b2a48b75f3132cf1bd281a526d302fe49b6b3",
+          "truncated": false
+        }
+      }
+    },
+    "flashinfer_graph": {
+      "generated_tokens": 8,
+      "stop_reason": "stop_string",
+      "logical_decode_steps": 7,
+      "submitted_decode_forwards": 7,
+      "score": 80.0,
+      "prediction_sha256": "ac7a7d3ce6f2e298e8df87cfc88e0ab8489449e6632906f0a3bfdf55af84f2a6",
+      "receipts_sha256": "0a97428b651daaa82ae3ba764b261c260dc387d5e556c753506e65efd6a6c683",
+      "runcap_sha256": "d83c542bbbee69db28c7efd5fd397fbb7401b42f384ba88b00a4ecef159b08e9",
+      "result_sha256": "f75c6890fe85fc45f3fc4574fa6832316440bb1ec5d271cb9e35df311fc3f536",
+      "manifest_sha256": "f30e5bb08ca440193dbe65529418f2c4fe0f49974836d2b4943655673b92d690",
+      "quality_harness_sha256": "b312e9947e5a9b1451e0ef36d3112a515b6ecee912598b04f58c3a08f46e00ef",
+      "receipt": {
+        "generated_tokens": 8,
+        "stop_reason": "stop_string",
+        "logical_decode_steps": 7,
+        "submitted_decode_forwards": 7,
+        "prefill_append_calls": 36,
+        "python_decode_append_calls": 72,
+        "python_decode_wrapper_calls": 72,
+        "graph_capture_count": 1,
+        "graph_replays": 7,
+        "graph_eager_fallbacks": 0,
+        "wrapper": "CUDAGraphBatchDecodeWithPagedKVCacheWrapper",
+        "page_size": 64,
+        "fixed_split_size_pages": 8,
+        "task": "samsum",
+        "source_index": 0,
+        "input": {
+          "input_tokens": 9508,
+          "input_ids_sha256": "df7dbfe0b6402dfbfec00fccbe6b2a48b75f3132cf1bd281a526d302fe49b6b3",
+          "truncated": false
+        }
+      }
+    },
+    "flashinfer_eager": {
+      "generated_tokens": 8,
+      "stop_reason": "stop_string",
+      "logical_decode_steps": 7,
+      "submitted_decode_forwards": 7,
+      "score": 80.0,
+      "prediction_sha256": "5b3215faa5284ab0c054d4dcd35f3a4bf491a1a0632438aa94b9dbd46594089f",
+      "receipts_sha256": "f6066234963afc8e8755d08f7db0a927c5a772dc7a07707ec2af2588dc49a1b7",
+      "runcap_sha256": "65ec018b1e5f23cab98fb51b76dae2f3767f40a742d2991ab0b22afd91f7bbd2",
+      "result_sha256": "11646cbbd7d672484156d92e1dcff7d739b3323e5eefd301432875b77301d32b",
+      "manifest_sha256": "2263c6dba044e239057305127a17ab803c81da2b96ae95621aebd06a69df64c0",
+      "quality_harness_sha256": "b312e9947e5a9b1451e0ef36d3112a515b6ecee912598b04f58c3a08f46e00ef",
+      "receipt": {
+        "generated_tokens": 8,
+        "stop_reason": "stop_string",
+        "logical_decode_steps": 7,
+        "submitted_decode_forwards": 7,
+        "prefill_append_calls": 36,
+        "python_decode_append_calls": 252,
+        "python_decode_wrapper_calls": 252,
+        "graph_capture_count": 0,
+        "graph_replays": 0,
+        "graph_eager_fallbacks": 0,
+        "wrapper": "BatchDecodeWithPagedKVCacheWrapper",
+        "page_size": 64,
+        "fixed_split_size_pages": 8,
+        "task": "samsum",
+        "source_index": 0,
+        "input": {
+          "input_tokens": 9508,
+          "input_ids_sha256": "df7dbfe0b6402dfbfec00fccbe6b2a48b75f3132cf1bd281a526d302fe49b6b3",
+          "truncated": false
+        }
+      }
+    }
+  }
+}

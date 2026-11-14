@@ -494,11 +494,44 @@ def quality_manifest_path(output_dir, shard_index, num_shards):
     return Path(output_dir) / f"quality_manifest_s{shard_index}of{num_shards}.json"
 
 
+def quality_receipts_path(prediction_path):
+    return Path(prediction_path).with_suffix(".receipts.json")
+
+
+def _restore_quality_receipts(path, task, prepared):
+    if not path.is_file():
+        raise RuntimeError(f"完整预测缺少逐请求回执，拒绝 SKIP: {path}")
+    receipts = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(receipts, list) or len(receipts) != len(prepared):
+        raise RuntimeError(f"逐请求回执人口与完整预测不一致: {path}")
+    for receipt, (source_idx, _, _, identity) in zip(receipts, prepared):
+        if (
+            not isinstance(receipt, dict)
+            or receipt.get("task") != task
+            or receipt.get("source_index") != source_idx
+            or receipt.get("input") != identity
+        ):
+            raise RuntimeError(f"逐请求回执与当前输入身份不一致: {path} {source_idx}")
+    return receipts
+
+
 def run_quality(
     args, engine, prompt_cfg, maxgen_cfg, max_length, cap_gate_info=None
 ):
     out_dir = Path(args.output_dir) / "pred"
     out_dir.mkdir(parents=True, exist_ok=True)
+    implementation = getattr(
+        args, "quality_implementation", args.method + "_official")
+    result_label = getattr(args, "quality_label", None)
+    if result_label is None:
+        result_label = (
+            f"quest_official_b{args.budget}_p{args.quest_page_size}"
+            if args.method == "quest"
+            else f"jssa_official_vllm_b{args.budget}_r{args.jssa_rank}"
+        )
+    producer_file = getattr(args, "quality_producer_file", __file__)
+    track_receipts = hasattr(engine, "request_receipts")
+    manifest_receipts = []
     manifest = {
         "schema": "longbench-official-quality-manifest-v1",
         "verification": "pending-independent-verification",
@@ -519,13 +552,8 @@ def run_quality(
             and (args.sample_indices is None or source_idx in args.sample_indices)
         ]
         prefix = task.split("-")[0]
-        label = (
-            f"quest_official_b{args.budget}_p{args.quest_page_size}"
-            if args.method == "quest"
-            else f"jssa_official_vllm_b{args.budget}_r{args.jssa_rank}"
-        )
         out_path = out_dir / (
-            f"{prefix}-{label}_s{args.shard_index}of{args.num_shards}.jsonl"
+            f"{prefix}-{result_label}_s{args.shard_index}of{args.num_shards}.jsonl"
         )
 
         source_identity = build_lbv1_input_identity(rows, prompt_cfg[task])
@@ -547,14 +575,14 @@ def run_quality(
         runcap_core = build_run_cap_core(
             model_name=getattr(args, "model_name", "Qwen3-8B"),
             model_path=args.model_path,
-            method=args.method + "_official",
+            method=implementation,
             dataset=task,
             dataset_fingerprint=input_identity["source_fingerprint"],
             run_timestamp=run_timestamp,
             effective_cap=max_length,
             cap_gate_info=cap_gate_info,
             max_new_tokens=maxgen_cfg[task],
-            producer=resolve_producer_identity(__file__),
+            producer=resolve_producer_identity(producer_file),
             input_identity=input_identity,
         )
         if args.sample_indices is None:
@@ -609,8 +637,12 @@ def run_quality(
                     result_lines=None, input_ids_sha256=input_hashes,
                 ),
             )
+            receipt_path = quality_receipts_path(out_path)
+            task_receipts = []
             if not prepared:
                 out_path.write_text("", encoding="utf-8")
+                if track_receipts:
+                    atomic_json(receipt_path, [])
             elif line_count(out_path) == len(prepared):
                 records = [
                     json.loads(line)
@@ -621,19 +653,34 @@ def run_quality(
                         record.get("_id") != f"{task}:{source_idx}"
                         or record.get("input") != identity
                         or record.get("answers") != row["answers"]
+                        or record.get("implementation") != implementation
                     ):
                         raise RuntimeError(
                             f"既有预测与当前输入身份不一致: {out_path} {source_idx}"
                         )
+                if track_receipts:
+                    task_receipts = _restore_quality_receipts(
+                        receipt_path, task, prepared)
+                    engine.request_receipts.extend(task_receipts)
+                    manifest_receipts.extend(task_receipts)
                 print(f"[SKIP] {task}: {len(prepared)} 条已完成", flush=True)
             else:
                 generation_options = quality_generation_options(task, engine.tokenizer)
+                if track_receipts:
+                    # 部分预测总是整任务重跑，旧回执不得混入新一轮。
+                    atomic_json(receipt_path, [])
                 with out_path.open("w", encoding="utf-8") as handle:
                     for source_idx, row, ids, identity in prepared:
+                        receipts_before = (
+                            len(engine.request_receipts) if track_receipts else 0)
                         generated, _ = engine.generate(
                             ids, maxgen_cfg[task], ignore_eos=False,
                             **generation_options,
                         )
+                        if track_receipts and len(
+                                engine.request_receipts) != receipts_before + 1:
+                            raise RuntimeError(
+                                f"质量生成未恰好产生一个逐请求回执: {task} {source_idx}")
                         pred = engine.tokenizer.decode(
                             generated, skip_special_tokens=True
                         )
@@ -644,8 +691,15 @@ def run_quality(
                             "length": row["length"],
                             "_id": f"{task}:{source_idx}",
                             "input": identity,
-                            "implementation": args.method + "_official",
+                            "implementation": implementation,
                         }, ensure_ascii=False) + "\n")
+                        if track_receipts:
+                            receipt = engine.request_receipts[-1]
+                            receipt.update(
+                                task=task, source_index=source_idx, input=identity)
+                            task_receipts.append(receipt)
+                            manifest_receipts.append(receipt)
+                            atomic_json(receipt_path, task_receipts)
                         handle.flush()
                         print(
                             f"[{args.method}:{task}] {source_idx} "
@@ -668,10 +722,18 @@ def run_quality(
             "data_sha256": data_sha,
             "prediction_sha256": sha256_file(out_path),
         }
+        if track_receipts:
+            manifest["tasks"][task].update(
+                receipts=str(receipt_path.relative_to(Path(args.output_dir))),
+                receipts_sha256=sha256_file(receipt_path),
+                receipt_rows=len(task_receipts),
+            )
     if args.method == "quest":
         manifest["quest_call_counts"] = engine.model.quest_runtime_stats
         if manifest["quest_call_counts"]["decode_sparse_attn"] == 0:
             raise RuntimeError("Quest 未执行官方 decode_sparse_attn")
+    if track_receipts:
+        manifest["request_receipts"] = manifest_receipts
     atomic_json(
         quality_manifest_path(args.output_dir, args.shard_index, args.num_shards),
         manifest,
