@@ -16,7 +16,7 @@ from transformers.models.llama.modeling_llama import (
     LlamaAttention, apply_rotary_pos_emb, repeat_kv,
 )
 
-from qwen3_jssa_patch import _load_basis
+from qwen3_jssa_patch import _load_basis, _validate_basis_for_modules
 
 
 def _llama_jssa_forward(
@@ -105,31 +105,14 @@ def enable_jssa(model, basis_path: str, budget: int = 1024, rank: int = 32) -> i
     basis_dict = _load_basis(
         basis_path, probe.q_proj.weight.device, probe.q_proj.weight.dtype)
 
-    expected_layers = int(model.config.num_hidden_layers)
-    missing = sorted(set(range(expected_layers)) - set(basis_dict))
-    if missing:
-        raise ValueError(f"JSSA basis 缺层，拒绝静默 dense 回退: {missing}")
-
-    n_patched = 0
-    for module in model.modules():
-        if not isinstance(module, LlamaAttention):
-            continue
-        layer_idx = int(module.layer_idx)
-        basis = basis_dict[layer_idx]
-        kv_heads = module.k_proj.weight.shape[0] // module.head_dim
-        expected_shape = (kv_heads, rank, module.head_dim)
-        if tuple(basis.shape) != expected_shape:
-            raise ValueError(
-                f"JSSA basis M[{layer_idx}] shape {tuple(basis.shape)} "
-                f"!= expected {expected_shape}")
+    modules = [module for module in model.modules()
+               if isinstance(module, LlamaAttention)]
+    _validate_basis_for_modules(modules, basis_dict, rank,
+                                int(model.config.num_hidden_layers))
+    for module in modules:
         module.jssa_budget = budget
         module.jssa_rank = rank
-        module.jssa_M = basis
+        module.jssa_M = basis_dict[int(module.layer_idx)]
         module.flash_forward = module.forward
         module.forward = types.MethodType(_llama_jssa_forward, module)
-        n_patched += 1
-
-    if n_patched != expected_layers:
-        raise RuntimeError(
-            f"JSSA Llama patch 层数 {n_patched} != config 层数 {expected_layers}")
-    return n_patched
+    return len(modules)
