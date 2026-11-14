@@ -1,0 +1,140 @@
+{
+  "schema": "qwen-official-long-context-performance-v1",
+  "verification": "pending-independent-verification",
+  "status": "in_progress",
+  "method": "quest",
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "source": {
+    "head": "41006cf8298167eed4b9bac386dfaa2a6c24bc85",
+    "harness": "/home/wangyuanshuo02/two-level-attention/benchmark/official_baselines/long_context_official.py",
+    "harness_sha256": "5e0f564467a41db53dbe56cff2f3ac0d07a67055c4176ddfca478d8979fdb8af"
+  },
+  "context_length": 262144,
+  "task": "niah_multikey_2",
+  "sample_index": 2,
+  "input": {
+    "path": "/tmp/nfa_kernel_inputs/262144/niah_multikey_2.jsonl",
+    "sha256": "0f8b39583d1df5e267c1750da44300322a2b5359cf6b2fe89b45b56efe028b30",
+    "input_ids_sha256": "05325d14fa6868ab22b6964d160adaa1968323ca80e396261b97ac75b55c093d",
+    "task": "niah_multikey_2",
+    "sample_index": 2,
+    "sample_id": 2,
+    "file_row_index": 0,
+    "actual_prompt_tokens": 261935,
+    "provenance": "repeated-needle-body-extension",
+    "performance_only": true
+  },
+  "warmup_requests": 1,
+  "repeats": 3,
+  "max_new_tokens": 33,
+  "measurement_mode": "clean-e2e-no-profiler",
+  "timing_protocol": "T(33)-T(1) two-point complete request host wall; EOS ignored",
+  "runtime": {
+    "implementation": "official Quest CUDA _kernels and paged runtime",
+    "patched_layers": 36,
+    "budget": 1024,
+    "page_size": 16,
+    "page_budget": 64,
+    "query_and_metadata_heads": 32,
+    "physical_kv_heads": 8,
+    "hf_length_cache_layers": 1,
+    "prefill_tokenwise_chunk": 65536,
+    "quest": {
+      "path": "/home/wangyuanshuo02/two-level-attention/third-party/Quest",
+      "commit": "01c1623bf9395009520874e989e29f683203b357",
+      "uncommitted_diff_sha256": "e2d20d031fe5f4a85f08f9a2cc23db8bea1c5d3f595dadc898f44e962599c252"
+    },
+    "kernel_extension": "/home/wangyuanshuo02/two-level-attention/third-party/Quest/quest/_kernels.cpython-311-x86_64-linux-gnu.so",
+    "kernel_extension_sha256": "de7d6e32052fd63206c7ba20b54d9040c40f8dc6617eb2a392c80e0bcc1b6b1f",
+    "dense_or_torch_fallback": false,
+    "long_context_rope_policy": {
+      "quest": "official apply_rope_in_place with rope_scale=1 and model rope_theta; no Torch/YaRN substitution",
+      "jssa": "patched-vLLM model snapshot RoPE; no hidden HF/Torch attention fallback",
+      "nfa_flashinfer_reference": "near-far-rope-32768-v1 with YaRN factor 8 at 256K and 16 at 512K",
+      "cross_arm_output_identity_required": false,
+      "reason": "performance-only long-input comparison; RoPE semantics are disclosed rather than silently rewritten"
+    }
+  },
+  "cells": [
+    {
+      "task": "niah_multikey_2",
+      "sample_index": 2,
+      "repeat": 0,
+      "request_timing": {
+        "schema": "longbench-official-request-two-point-v1",
+        "ttft_ms": 265181.86565488577,
+        "decode_after_first_wall_ms": 893.6775401234627,
+        "tpot_ms": 27.92742312885821,
+        "request_wall_ms": 266075.54319500923,
+        "actual_generated_tokens": 33,
+        "generated_token_ids": [
+          220,
+          16,
+          23,
+          24,
+          23,
+          17,
+          19,
+          23,
+          23,
+          23,
+          19,
+          19,
+          19,
+          23,
+          19,
+          19,
+          18,
+          19,
+          23,
+          23,
+          24,
+          16,
+          24,
+          16,
+          24,
+          16,
+          19,
+          16,
+          23,
+          18,
+          24,
+          19,
+          18
+        ],
+        "eos_positions": [],
+        "eos_early_stop": false,
+        "decode_protocol": "T(1+D)-T(1), fixed 1+D tokens; EOS ignored",
+        "timing_metric": "complete request host wall including official runtime scheduling"
+      },
+      "output_ids_sha256": "f8c5bcd09e2bd2eb441dd9489820e9d962bdf122641be20073524e4714a67cb0"
+    }
+  ],
+  "summary": {
+    "per_task": {
+      "niah_multikey_2": {
+        "ttft_ms": 265181.86565488577,
+        "tpot_ms": 27.92742312885821,
+        "request_wall_ms": 266075.54319500923,
+        "requests": 1
+      }
+    },
+    "macro_task_mean": {
+      "ttft_ms": 265181.86565488577,
+      "tpot_ms": 27.92742312885821,
+      "request_wall_ms": 266075.54319500923
+    },
+    "all_request_median": {
+      "ttft_ms": 265181.86565488577,
+      "tpot_ms": 27.92742312885821,
+      "request_wall_ms": 266075.54319500923
+    }
+  },
+  "quest_call_counts": {
+    "prefill_forward": 144,
+    "decode_estimate": 2176,
+    "decode_topk": 2176,
+    "decode_sparse_attn": 2304,
+    "dense_or_torch_fallback": 0
+  }
+}

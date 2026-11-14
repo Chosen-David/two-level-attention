@@ -1,0 +1,196 @@
+{
+  "schema": "qwen-nfa-flashinfer-longbench-two-point-v1",
+  "verification": "pending-independent-verification",
+  "status": "complete",
+  "method": "nfa",
+  "execution": "graph",
+  "batch_size": 1,
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "source": {
+    "head": "d2b180eb53943c611e4aaa16b32a988906ae5b9e",
+    "harness": "/tmp/qwen3-nfa-lb-perf-20261114/benchmark/efficiency/benchmark_long_context_two_point.py",
+    "harness_sha256": "62308ee0d29e63c36ab61e985ede1e719b7e3d7c136a956829d4120453a21f4a",
+    "source_diff_sha256": "489f320ff4458968a3f33a35ed9525c6ab75b89d9f97f685f53f14b9cbb3ab27",
+    "longbench_harness": "/tmp/qwen3-nfa-lb-perf-20261114/benchmark/efficiency/benchmark_longbench_two_point.py",
+    "longbench_harness_sha256": "48e26c63776f43c82c375c12b03a7b419e2d28796e866fe6383aa829acc2d5c1",
+    "longbench_source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "max_length": 31500,
+  "tasks": [
+    "narrativeqa"
+  ],
+  "sample_indices": [
+    0
+  ],
+  "warmup_requests": 1,
+  "repeats": 1,
+  "max_new_tokens": 33,
+  "measurement_mode": "clean-e2e-no-profiler-no-per-step-cuda-events",
+  "timing_protocol": "T(33)-T(1) two-point complete request host wall; EOS ignored",
+  "task_runtime": {
+    "narrativeqa": {
+      "implementation": "NFA GraphReadyPagedRegionCache and production selector",
+      "execution": "graph",
+      "batch_size": 1,
+      "dtype": "torch.bfloat16",
+      "num_layers": 36,
+      "dense_or_torch_decode_fallback": false,
+      "nfa_selector_config": {
+        "subspace": "tail",
+        "subspace_cmp_ratio": 4,
+        "level1_topk": 128,
+        "level2_topk": 1024,
+        "page_size": 64,
+        "near_pages": 32,
+        "near_tokens": "off",
+        "near_len": 4096,
+        "enable_layer_skip": false,
+        "sink_tokens": 4,
+        "sliding_window_size": 128
+      },
+      "graph_session": {
+        "hit_count": 1,
+        "miss_count": 1,
+        "warmup_seconds": 166.47739896178246,
+        "fixed_cache_arena": true
+      }
+    }
+  },
+  "request_receipts": {
+    "narrativeqa": [
+      {
+        "request_index": 0,
+        "request_role": "warmup",
+        "cache_reused": false,
+        "generated_tokens": 1,
+        "nfa_decode_steps": 0,
+        "graph_capture_count": 0,
+        "graph_replays": 0,
+        "graph_eager_fallbacks": 0,
+        "graph_pool_hits": 0,
+        "graph_pool_misses": 0,
+        "graph_prepare_ms": 0.0
+      },
+      {
+        "request_index": 1,
+        "request_role": "warmup",
+        "cache_reused": true,
+        "generated_tokens": 33,
+        "nfa_decode_steps": 32,
+        "graph_capture_count": 1,
+        "graph_replays": 32,
+        "graph_eager_fallbacks": 0,
+        "graph_pool_hits": 0,
+        "graph_pool_misses": 1,
+        "graph_prepare_ms": 166477.3515164852
+      },
+      {
+        "request_index": 2,
+        "request_role": "measured",
+        "cache_reused": true,
+        "generated_tokens": 1,
+        "nfa_decode_steps": 0,
+        "graph_capture_count": 0,
+        "graph_replays": 0,
+        "graph_eager_fallbacks": 0,
+        "graph_pool_hits": 0,
+        "graph_pool_misses": 0,
+        "graph_prepare_ms": 0.0
+      },
+      {
+        "request_index": 3,
+        "request_role": "measured",
+        "cache_reused": true,
+        "generated_tokens": 33,
+        "nfa_decode_steps": 32,
+        "graph_capture_count": 0,
+        "graph_replays": 32,
+        "graph_eager_fallbacks": 0,
+        "graph_pool_hits": 1,
+        "graph_pool_misses": 0,
+        "graph_prepare_ms": 0.04744529724121094
+      }
+    ]
+  },
+  "cells": [
+    {
+      "task": "narrativeqa",
+      "sample_index": 0,
+      "repeat": 0,
+      "input": {
+        "input_tokens": 31397,
+        "input_ids_sha256": "7b0573deccd8a83ccc218544037be113240b7a6e3875cad11ad2835747bc8927",
+        "truncated": false
+      },
+      "data_sha256": "0fb8d08ba5cdad4b74244224b0dc2e8b41ee6b850d954a13eb2d282621ce2f71",
+      "request_timing": {
+        "schema": "longbench-official-request-two-point-v1",
+        "ttft_ms": 6889.222219586372,
+        "decode_after_first_wall_ms": 398.6681252717972,
+        "tpot_ms": 12.458378914743662,
+        "request_wall_ms": 7287.89034485817,
+        "actual_generated_tokens": 33,
+        "generated_token_ids": [
+          44505,
+          79703,
+          88086,
+          84933,
+          78373,
+          39435,
+          120261,
+          119,
+          116261,
+          73,
+          45652,
+          107799,
+          251,
+          80166,
+          99756,
+          65036,
+          120778,
+          101480,
+          13881,
+          93246,
+          115224,
+          96818,
+          69380,
+          80058,
+          42046,
+          120778,
+          91380,
+          55726,
+          75639,
+          68107,
+          104014,
+          40688,
+          93609
+        ],
+        "eos_positions": [],
+        "eos_early_stop": false,
+        "decode_protocol": "T(1+D)-T(1), fixed 1+D tokens; EOS ignored",
+        "timing_metric": "complete request host wall including official runtime scheduling"
+      },
+      "output_ids_sha256": "86817c1dedc6f81533fb70198142487eb9d707fdd595d0baf31a3dd1ef12a13b"
+    }
+  ],
+  "summary": {
+    "per_task": {
+      "narrativeqa": {
+        "ttft_ms": 6889.222219586372,
+        "tpot_ms": 12.458378914743662,
+        "request_wall_ms": 7287.89034485817,
+        "requests": 1
+      }
+    },
+    "macro_task_mean": {
+      "ttft_ms": 6889.222219586372,
+      "tpot_ms": 12.458378914743662,
+      "request_wall_ms": 7287.89034485817
+    },
+    "all_request_median": {
+      "ttft_ms": 6889.222219586372,
+      "tpot_ms": 12.458378914743662,
+      "request_wall_ms": 7287.89034485817
+    }
+  }
+}

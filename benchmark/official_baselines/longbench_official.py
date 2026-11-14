@@ -14,6 +14,21 @@ import subprocess
 import time
 from pathlib import Path
 
+from benchmark.LongBench.context_capability_gate import (
+    enforce_context_capability_gate,
+)
+from benchmark.LongBench.run_cap_manifest import (
+    build_lbv1_input_identity,
+    build_run_cap_core,
+    compute_result_binding,
+    finalize_run_cap_manifest,
+    gate_run_cap_identity,
+    input_ids_sha256 as runcap_input_ids_sha256,
+    resolve_producer_identity,
+    runcap_gate_lock,
+    write_run_cap_manifest,
+)
+
 REPO = Path(__file__).resolve().parents[2]
 ENGLISH16 = [
     "narrativeqa", "qasper", "multifieldqa_en", "hotpotqa",
@@ -110,6 +125,21 @@ def build_input(row, task, prompt_format, max_length, tokenizer):
     }
 
 
+def quality_generation_options(task, tokenizer):
+    """LongBench 质量协议：首 token 屏蔽 EOS；samsum 额外在换行停止。"""
+    stop_token_ids = []
+    options = {"stop_token_ids": stop_token_ids, "min_new_tokens": 1}
+    if task == "samsum":
+        newline_ids = tokenizer.encode("\n", add_special_tokens=False)
+        if not newline_ids:
+            raise RuntimeError("tokenizer 无法产生 samsum 换行停止 token")
+        stop_token_ids.append(newline_ids[-1])
+        # 换行常与前后字符合并为同一 BPE token（如 ".\n"），仅匹配独立
+        # token 198 会漏停；字符串停止同时覆盖合并 token 与独立 token。
+        options["stop_strings"] = ["\n"]
+    return options
+
+
 def line_count(path):
     if not path.exists():
         return 0
@@ -154,18 +184,22 @@ class OfficialEngine:
         # 所有 36 层随后都由官方 Quest prefill/decode 接管。这里只让 HF 的
         # mask interface 走 SDPA 的 is-causal 快路，避免 eager 在 256K/512K
         # 先物化 [1,1,L,L] 的 64/256GiB 布尔 mask；不执行 SDPA attention。
+        model_config = getattr(args, "model_config", None)
         self.model = AutoModelForCausalLM.from_pretrained(
             args.model_path,
+            config=model_config,
             torch_dtype=torch.float16,
             attn_implementation="sdpa",
             trust_remote_code=True,
         ).to(args.device).eval()
+        rope_mode = getattr(args, "quest_rope_mode", "native")
         n_patched = enable_quest(
             self.model,
             token_budget=args.budget,
             chunk_size=args.quest_page_size,
             page_size=args.quest_page_size,
             max_seq_len=max(args.quest_max_seq_len, max_model_len),
+            rope_mode=rope_mode,
         )
         extension = Path(quest_kernels.__file__).resolve()
         self.runtime = {
@@ -176,6 +210,12 @@ class OfficialEngine:
             "page_budget": args.budget // args.quest_page_size,
             "query_and_metadata_heads": int(self.model.config.num_attention_heads),
             "physical_kv_heads": int(self.model.config.num_key_value_heads),
+            "rope_mode": rope_mode,
+            "rope_execution": (
+                "official quest.apply_rope_in_place"
+                if rope_mode == "native"
+                else "HF position_embeddings exactly once before official Quest KV/attention"
+            ),
             "hf_length_cache_layers": 1,
             "prefill_tokenwise_chunk": 65536,
             "quest": git_identity(REPO / "third-party/Quest", QUEST_COMMIT),
@@ -267,6 +307,7 @@ class OfficialEngine:
             enable_chunked_prefill=False,
             max_num_seqs=1,
             trust_remote_code=True,
+            hf_overrides=getattr(args, "hf_overrides", None),
             kv_cache_dtype="jssa",
             attention_config={
                 "backend": "JSSA",
@@ -296,25 +337,55 @@ class OfficialEngine:
             "torch_or_hf_fallback": False,
         }
 
-    def generate(self, ids, max_new_tokens, ignore_eos):
+    def generate(
+        self, ids, max_new_tokens, ignore_eos, stop_token_ids=None,
+        min_new_tokens=0, stop_strings=None,
+    ):
+        if not 0 <= min_new_tokens <= max_new_tokens:
+            raise ValueError("min_new_tokens 必须位于 [0, max_new_tokens]")
         if self.args.method == "quest":
-            return self._generate_quest(ids, max_new_tokens, ignore_eos)
-        return self._generate_jssa(ids, max_new_tokens, ignore_eos)
+            return self._generate_quest(
+                ids, max_new_tokens, ignore_eos, stop_token_ids, min_new_tokens,
+                stop_strings,
+            )
+        return self._generate_jssa(
+            ids, max_new_tokens, ignore_eos, stop_token_ids, min_new_tokens,
+            stop_strings,
+        )
 
-    def _generate_quest(self, ids, max_new_tokens, ignore_eos):
+    def _generate_quest(
+        self, ids, max_new_tokens, ignore_eos, stop_token_ids=None,
+        min_new_tokens=0, stop_strings=None,
+    ):
         torch = self.torch
         inputs = torch.tensor([ids], dtype=torch.long, device=self.args.device)
+        configured = getattr(self.model.generation_config, "eos_token_id", None)
+        if configured is None:
+            configured = ()
+        elif not isinstance(configured, (list, tuple)):
+            configured = (configured,)
+        eos_ids = ([] if ignore_eos else [
+            *configured, self.tokenizer.eos_token_id,
+        ]) + list(stop_token_ids or ())
+        eos_ids = list(dict.fromkeys(
+            token for token in eos_ids
+            if isinstance(token, int) and not isinstance(token, bool) and token >= 0
+        ))
         try:
             torch.cuda.synchronize()
             started = time.perf_counter()
             with torch.no_grad():
                 output = self.model.generate(
                     input_ids=inputs,
+                    attention_mask=torch.ones_like(inputs),
                     max_new_tokens=max_new_tokens,
+                    min_length=inputs.shape[-1] + min_new_tokens,
                     do_sample=False,
                     temperature=1.0,
                     pad_token_id=self.tokenizer.eos_token_id,
-                    eos_token_id=None if ignore_eos else self.tokenizer.eos_token_id,
+                    eos_token_id=eos_ids or None,
+                    stop_strings=stop_strings or None,
+                    tokenizer=self.tokenizer if stop_strings else None,
                 )[0]
             torch.cuda.synchronize()
             elapsed = time.perf_counter() - started
@@ -323,11 +394,18 @@ class OfficialEngine:
         generated = output[len(ids):].tolist()
         return generated, elapsed
 
-    def _generate_jssa(self, ids, max_new_tokens, ignore_eos):
+    def _generate_jssa(
+        self, ids, max_new_tokens, ignore_eos, stop_token_ids=None,
+        min_new_tokens=0, stop_strings=None,
+    ):
         params = self.SamplingParams(
             temperature=0.0,
             max_tokens=max_new_tokens,
+            min_tokens=min_new_tokens,
             ignore_eos=ignore_eos,
+            stop_token_ids=list(stop_token_ids) if stop_token_ids else None,
+            stop=list(stop_strings) if stop_strings else None,
+            include_stop_str_in_output=bool(stop_strings),
         )
         prompt = self.TokensPrompt(prompt_token_ids=ids)
         self.torch.cuda.synchronize()
@@ -347,7 +425,7 @@ class OfficialEngine:
         return list(outputs[0].outputs[0].token_ids), elapsed
 
 
-def timed_pair(engine, ids, max_new_tokens):
+def timed_pair(engine, ids, max_new_tokens, require_positive=True):
     first_ids, ttft = engine.generate(ids, 1, ignore_eos=True)
     generated, request_wall = engine.generate(ids, max_new_tokens, ignore_eos=True)
     if len(first_ids) != 1 or len(generated) != max_new_tokens:
@@ -355,8 +433,11 @@ def timed_pair(engine, ids, max_new_tokens):
             f"固定长度生成失败: first={len(first_ids)}, full={len(generated)}"
         )
     decode_wall = request_wall - ttft
-    if decode_wall <= 0:
-        raise RuntimeError(f"两点法 decode 时间非正: {decode_wall}")
+    if require_positive and decode_wall <= 0:
+        raise RuntimeError(
+            f"两点法 decode 时间非正: {decode_wall}; "
+            f"T(1)={ttft}, T({max_new_tokens})={request_wall}"
+        )
     return generated, {
         "schema": "longbench-official-request-two-point-v1",
         "ttft_ms": ttft * 1000.0,
@@ -413,7 +494,9 @@ def quality_manifest_path(output_dir, shard_index, num_shards):
     return Path(output_dir) / f"quality_manifest_s{shard_index}of{num_shards}.json"
 
 
-def run_quality(args, engine, prompt_cfg, maxgen_cfg, max_length):
+def run_quality(
+    args, engine, prompt_cfg, maxgen_cfg, max_length, cap_gate_info=None
+):
     out_dir = Path(args.output_dir) / "pred"
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
@@ -444,36 +527,143 @@ def run_quality(args, engine, prompt_cfg, maxgen_cfg, max_length):
         out_path = out_dir / (
             f"{prefix}-{label}_s{args.shard_index}of{args.num_shards}.jsonl"
         )
-        if not selected:
-            out_path.write_text("", encoding="utf-8")
-        elif line_count(out_path) == len(selected):
-            print(f"[SKIP] {task}: {len(selected)} 条已完成", flush=True)
+
+        source_identity = build_lbv1_input_identity(rows, prompt_cfg[task])
+        # 标准 sample_sharding 只能描述完整的 source_order[rank::world] 人口。
+        # 额外 sample_indices 过滤时，把过滤后的有序行作为本次有效人口，同时
+        # 用扩展字段保留完整源身份和源行号，绝不把空/子集分片伪装成完整分片。
+        input_identity = (
+            source_identity if args.sample_indices is None
+            else build_lbv1_input_identity(
+                [row for _, row in selected], prompt_cfg[task]
+            )
+        )
+        run_timestamp = f"s{args.shard_index}of{args.num_shards}"
+        if args.sample_indices is not None:
+            selection_sha = hashlib.sha256(json.dumps(
+                args.sample_indices, separators=(",", ":")
+            ).encode("utf-8")).hexdigest()[:10]
+            run_timestamp += f"-filter{selection_sha}"
+        runcap_core = build_run_cap_core(
+            model_name=getattr(args, "model_name", "Qwen3-8B"),
+            model_path=args.model_path,
+            method=args.method + "_official",
+            dataset=task,
+            dataset_fingerprint=input_identity["source_fingerprint"],
+            run_timestamp=run_timestamp,
+            effective_cap=max_length,
+            cap_gate_info=cap_gate_info,
+            max_new_tokens=maxgen_cfg[task],
+            producer=resolve_producer_identity(__file__),
+            input_identity=input_identity,
+        )
+        if args.sample_indices is None:
+            selected_ids = [
+                f"{task}:{source_identity['source_fingerprint']}:{source_idx}"
+                for source_idx in range(
+                    args.shard_index, len(rows), args.num_shards
+                )
+            ]
+            runcap_core["sample_sharding"] = {
+                "algorithm": "source_order[rank::world_size]",
+                "rank": args.shard_index,
+                "world_size": args.num_shards,
+                "source_samples": len(rows),
+                "selected_samples": len(selected),
+                "source_sha256": source_identity["source_sha256"],
+                "selected_ids_sha256": hashlib.sha256(
+                    "\n".join(selected_ids).encode("utf-8")
+                ).hexdigest(),
+            }
         else:
-            with out_path.open("w", encoding="utf-8") as handle:
-                for source_idx, row in selected:
-                    ids, identity = build_input(
-                        row, task, prompt_cfg[task], max_length, engine.tokenizer
-                    )
-                    generated, _ = engine.generate(
-                        ids, maxgen_cfg[task], ignore_eos=False
-                    )
-                    pred = engine.tokenizer.decode(generated, skip_special_tokens=True)
-                    handle.write(json.dumps({
-                        "pred": pred,
-                        "answers": row["answers"],
-                        "all_classes": row["all_classes"],
-                        "length": row["length"],
-                        "_id": f"{task}:{source_idx}",
-                        "input": identity,
-                        "implementation": args.method + "_official",
-                    }, ensure_ascii=False) + "\n")
-                    handle.flush()
-                    print(
-                        f"[{args.method}:{task}] {source_idx} "
-                        f"in={len(ids)} out={len(generated)}", flush=True
-                    )
+            runcap_core["source_input_identity"] = source_identity
+            runcap_core["sample_selection"] = {
+                "algorithm": "explicit_source_indices_after_source_order_shard",
+                "source_indices": [source_idx for source_idx, _ in selected],
+                "source_samples": len(rows),
+                "source_sha256": source_identity["source_sha256"],
+                "shard_index": args.shard_index,
+                "num_shards": args.num_shards,
+            }
+
+        prepared = []
+        for source_idx, row in selected:
+            ids, identity = build_input(
+                row, task, prompt_cfg[task], max_length, engine.tokenizer
+            )
+            prepared.append((source_idx, row, ids, identity))
+        input_tokens = [len(ids) for _, _, ids, _ in prepared]
+        truncated = [identity["truncated"] for _, _, _, identity in prepared]
+        input_hashes = [
+            runcap_input_ids_sha256(ids) for _, _, ids, _ in prepared
+        ]
+
+        with runcap_gate_lock(str(out_path)):
+            runcap_sidecar = gate_run_cap_identity(str(out_path), runcap_core)
+            write_run_cap_manifest(
+                runcap_sidecar,
+                finalize_run_cap_manifest(
+                    runcap_core, status="generating", n_samples=len(prepared),
+                    input_tokens=input_tokens, truncated_flags=truncated,
+                    result_file=out_path.name, result_sha256=None,
+                    result_lines=None, input_ids_sha256=input_hashes,
+                ),
+            )
+            if not prepared:
+                out_path.write_text("", encoding="utf-8")
+            elif line_count(out_path) == len(prepared):
+                records = [
+                    json.loads(line)
+                    for line in out_path.read_text(encoding="utf-8").splitlines()
+                ]
+                for record, (source_idx, row, _, identity) in zip(records, prepared):
+                    if (
+                        record.get("_id") != f"{task}:{source_idx}"
+                        or record.get("input") != identity
+                        or record.get("answers") != row["answers"]
+                    ):
+                        raise RuntimeError(
+                            f"既有预测与当前输入身份不一致: {out_path} {source_idx}"
+                        )
+                print(f"[SKIP] {task}: {len(prepared)} 条已完成", flush=True)
+            else:
+                generation_options = quality_generation_options(task, engine.tokenizer)
+                with out_path.open("w", encoding="utf-8") as handle:
+                    for source_idx, row, ids, identity in prepared:
+                        generated, _ = engine.generate(
+                            ids, maxgen_cfg[task], ignore_eos=False,
+                            **generation_options,
+                        )
+                        pred = engine.tokenizer.decode(
+                            generated, skip_special_tokens=True
+                        )
+                        handle.write(json.dumps({
+                            "pred": pred,
+                            "answers": row["answers"],
+                            "all_classes": row["all_classes"],
+                            "length": row["length"],
+                            "_id": f"{task}:{source_idx}",
+                            "input": identity,
+                            "implementation": args.method + "_official",
+                        }, ensure_ascii=False) + "\n")
+                        handle.flush()
+                        print(
+                            f"[{args.method}:{task}] {source_idx} "
+                            f"in={len(ids)} out={len(generated)}", flush=True
+                        )
+            result_sha, result_lines = compute_result_binding(str(out_path))
+            write_run_cap_manifest(
+                runcap_sidecar,
+                finalize_run_cap_manifest(
+                    runcap_core, status="complete", n_samples=len(prepared),
+                    input_tokens=input_tokens, truncated_flags=truncated,
+                    result_file=out_path.name, result_sha256=result_sha,
+                    result_lines=result_lines, input_ids_sha256=input_hashes,
+                ),
+            )
         manifest["tasks"][task] = {
             "path": str(out_path.relative_to(Path(args.output_dir))),
+            "runcap": str(Path(runcap_sidecar).relative_to(Path(args.output_dir))),
             "rows": len(selected),
             "data_sha256": data_sha,
             "prediction_sha256": sha256_file(out_path),
@@ -520,7 +710,9 @@ def run_perf(args, engine, prompt_cfg, max_length):
                 row, task, prompt_cfg[task], max_length, engine.tokenizer
             )
             for _ in range(args.warmup_requests):
-                timed_pair(engine, ids, args.max_new_tokens)
+                timed_pair(
+                    engine, ids, args.max_new_tokens, require_positive=False
+                )
             for repeat in range(args.repeats):
                 generated, timing = timed_pair(engine, ids, args.max_new_tokens)
                 payload["cells"].append({
@@ -565,9 +757,14 @@ def main():
     if args.model_name != "Qwen3-8B" or max_length != 31500:
         raise ValueError("当前独立入口仅验收 Qwen3-8B 的 31500 对齐口径")
     max_new = args.max_new_tokens if args.mode == "perf" else max(maxgen_cfg[t] for t in args.tasks)
+    cap_gate_info = enforce_context_capability_gate(
+        args.model_name, args.model_path, max_length, args.config_path
+    )
     engine = OfficialEngine(args, max_length + max_new + 16)
     if args.mode == "quality":
-        run_quality(args, engine, prompt_cfg, maxgen_cfg, max_length)
+        run_quality(
+            args, engine, prompt_cfg, maxgen_cfg, max_length, cap_gate_info
+        )
     else:
         run_perf(args, engine, prompt_cfg, max_length)
 

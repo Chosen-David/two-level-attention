@@ -1,0 +1,46 @@
+{
+  "schema": "qwen-official-quest-capacity-probe-v1",
+  "verification": "pending-independent-verification",
+  "result_kind": "cold-start two-token capacity and official-path probe; not a performance result",
+  "date": "2026-11-13",
+  "source_commit": "41006cf8298167eed4b9bac386dfaa2a6c24bc85",
+  "task_id": "bhqj2mbhc",
+  "method": "quest",
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "input_tokens": 524288,
+  "generated_token_ids": [11, 11],
+  "elapsed_seconds": 997.4411583691835,
+  "runtime": {
+    "implementation": "official Quest CUDA _kernels and paged runtime",
+    "patched_layers": 36,
+    "budget": 1024,
+    "page_size": 16,
+    "page_budget": 64,
+    "query_and_metadata_heads": 32,
+    "physical_kv_heads": 8,
+    "hf_length_cache_layers": 1,
+    "prefill_tokenwise_chunk": 65536,
+    "quest": {
+      "path": "/home/wangyuanshuo02/two-level-attention/third-party/Quest",
+      "commit": "01c1623bf9395009520874e989e29f683203b357",
+      "uncommitted_diff_sha256": "e2d20d031fe5f4a85f08f9a2cc23db8bea1c5d3f595dadc898f44e962599c252"
+    },
+    "kernel_extension": "/home/wangyuanshuo02/two-level-attention/third-party/Quest/quest/_kernels.cpython-311-x86_64-linux-gnu.so",
+    "kernel_extension_sha256": "de7d6e32052fd63206c7ba20b54d9040c40f8dc6617eb2a392c80e0bcc1b6b1f",
+    "dense_or_torch_fallback": false
+  },
+  "calls": {
+    "prefill_forward": 36,
+    "decode_estimate": 34,
+    "decode_topk": 34,
+    "decode_sparse_attn": 36,
+    "dense_or_torch_fallback": 0
+  },
+  "raw_log": "quest_512k_capacity_probe.log",
+  "raw_log_sha256": "dd81abf6f1b5f58501b51d7614139fc3f7cf6054e615e1a38701b0017655d602",
+  "limitations": [
+    "Cold-start two-token generation only; elapsed_seconds must not be interpreted as TPOT or reused as a formal performance cell.",
+    "The raw probe output does not include a reusable input token hash or input provenance; formal performance must regenerate and record the aligned long input.",
+    "No independent owner has verified this result yet."
+  ]
+}

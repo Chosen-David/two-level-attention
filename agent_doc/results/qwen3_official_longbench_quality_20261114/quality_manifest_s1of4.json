@@ -1,0 +1,151 @@
+{
+  "schema": "longbench-official-quality-manifest-v1",
+  "verification": "pending-independent-verification",
+  "method": "quest",
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "max_length": 31500,
+  "shard_index": 1,
+  "num_shards": 4,
+  "runtime": {
+    "implementation": "official Quest CUDA _kernels and paged runtime",
+    "patched_layers": 36,
+    "budget": 1024,
+    "page_size": 16,
+    "page_budget": 64,
+    "query_and_metadata_heads": 32,
+    "physical_kv_heads": 8,
+    "rope_mode": "native",
+    "rope_execution": "official quest.apply_rope_in_place",
+    "hf_length_cache_layers": 1,
+    "prefill_tokenwise_chunk": 65536,
+    "quest": {
+      "path": "/tmp/qwen3-official-quality-20261114/third-party/Quest",
+      "commit": "01c1623bf9395009520874e989e29f683203b357",
+      "uncommitted_diff_sha256": "edb9e2d579687781a9b293ed87dc2445664db25118811bc5a8227b5ea6792b8f"
+    },
+    "kernel_extension": "/tmp/qwen3-official-quality-20261114/third-party/Quest/quest/_kernels.cpython-311-x86_64-linux-gnu.so",
+    "kernel_extension_sha256": "de7d6e32052fd63206c7ba20b54d9040c40f8dc6617eb2a392c80e0bcc1b6b1f",
+    "dense_or_torch_fallback": false
+  },
+  "tasks": {
+    "narrativeqa": {
+      "path": "pred/narrativeqa-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/narrativeqa-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "0fb8d08ba5cdad4b74244224b0dc2e8b41ee6b850d954a13eb2d282621ce2f71",
+      "prediction_sha256": "e74b6667c29420dbf1679d1039254c99e7886b1e21557bb5933379e51436a1e3"
+    },
+    "qasper": {
+      "path": "pred/qasper-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/qasper-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "29aa07d2a63f36f4fb8e8cd200a3428ee3126d750bde6af1c8f9bc41c2366854",
+      "prediction_sha256": "523cf1310678ec8fc8b292c39fab8661e0bd3b6d324663501e27efa993acb4d4"
+    },
+    "multifieldqa_en": {
+      "path": "pred/multifieldqa_en-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/multifieldqa_en-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 38,
+      "data_sha256": "0aac182fd317dcf6d74f8e1e0f3e61029407435346c2e0b3ff9fb45ae49c5c3f",
+      "prediction_sha256": "265c4abea6a1dcdd17a8d1873b240038982b13646c76d80b49feedeee51751da"
+    },
+    "hotpotqa": {
+      "path": "pred/hotpotqa-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/hotpotqa-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "a0005ab2a1bc2ac3a70352dccbf96cccc4e0aac6bb677f6a55180fa51b92ef6f",
+      "prediction_sha256": "8b6a538c8fb71233f950dd661544fb3847de21fd27d230f3f31677c6931207ba"
+    },
+    "2wikimqa": {
+      "path": "pred/2wikimqa-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/2wikimqa-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "dda279cf93a99e1e5bfa3291fb199fd55978d10a1feb31822953cf77a1742e37",
+      "prediction_sha256": "63c2b37f0f20dcb8f04816a3c870119c543a77c84a487fe1415fc8d16ae4956f"
+    },
+    "musique": {
+      "path": "pred/musique-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/musique-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "4ac69b91281c4ec6b21316cb7282e83fb6b4dda04fc68480bb8d8ed1e19ff7bd",
+      "prediction_sha256": "3b796f8aa9efab1f83e5c99c9e22aa44bb512a1a6e26c103fb2216aba35b7578"
+    },
+    "gov_report": {
+      "path": "pred/gov_report-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/gov_report-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "d28112beb3a9b41d80aa390837fa1a31c9e3da84a5262009c97585cc49f597c4",
+      "prediction_sha256": "fd4cd393d74ccf1c906d243aaf199ccd5c05b5f88e028839b0bf2d3d2303a84b"
+    },
+    "qmsum": {
+      "path": "pred/qmsum-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/qmsum-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "e992f5157679b0c1ca281d0da19d1a8b3496117630ae639c9683ed3dab029113",
+      "prediction_sha256": "dfcf735450c845b5ac46cb32ae4329cb1a3a81b25eec657afb0aa6387b0e7996"
+    },
+    "multi_news": {
+      "path": "pred/multi_news-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/multi_news-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "f8817c00af317c2d7f81128f334bcfe5780c6c2a515d5c96811aa0ddf8b5ee6b",
+      "prediction_sha256": "784ff95bca6cf9175c822f795755f5d59e35421839fc73f5ab8d2c29d12f906f"
+    },
+    "trec": {
+      "path": "pred/trec-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/trec-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "20a88e14f7442f58a39082cdd7396f1093ea8162da0a4ea7ead7d6757514c8f4",
+      "prediction_sha256": "2b585a0042c507a2685449e3413780206f35e2001809bb6fa7bf5cc5ad6e6535"
+    },
+    "triviaqa": {
+      "path": "pred/triviaqa-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/triviaqa-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "ed2529de2e10b12c00f49981870c23c7c51667069cdd8d0740e1423ff337d7fa",
+      "prediction_sha256": "0e274976882030adebf42dd1daf49a061351f090c2f3a5021eb84e258a29fcec"
+    },
+    "samsum": {
+      "path": "pred/samsum-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/samsum-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "d435a4c7a05d2006872da8dd0c44c0a48648baa1ce4f62a4084d07aa7883f0cc",
+      "prediction_sha256": "16b052e77b367bee2dfc2ed8385330a5b744405cbc35ce2dd151a1f87b15bf47"
+    },
+    "passage_count": {
+      "path": "pred/passage_count-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/passage_count-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "0455a8f1e8e99d63a86bdc6bdb8b943b22509e3102bbef65ce6794045e03bbcd",
+      "prediction_sha256": "cdfc649be21072fb89f8f9ab2c88c54799d1ebeaf60505ead3bfd517fab9b4ad"
+    },
+    "passage_retrieval_en": {
+      "path": "pred/passage_retrieval_en-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/passage_retrieval_en-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 50,
+      "data_sha256": "0f34d2955bfc9bd21ccaa3f4c5aa4e41263aaf83d3fb6002ff7118c134f1eabd",
+      "prediction_sha256": "19dc78711ff0ba74b1b4997de7f8a50465b502fc25ff2c2744d042d474e80e7c"
+    },
+    "lcc": {
+      "path": "pred/lcc-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/lcc-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 125,
+      "data_sha256": "a35809a88d899f61c116690b12f9e96d443238852cedc1a9fe48d85bff6f7aa1",
+      "prediction_sha256": "b5892adef84fe33dcbedf785b868030955fd7fa3335dec184a8353e06f2900d6"
+    },
+    "repobench-p": {
+      "path": "pred/repobench-quest_official_b1024_p16_s1of4.jsonl",
+      "runcap": "pred/repobench-quest_official_b1024_p16_s1of4.jsonl.runcap.json",
+      "rows": 125,
+      "data_sha256": "919a4439e2a84ebb25bacc39ac3b3269a7641af6e02ae205ed78d8c53dfe3568",
+      "prediction_sha256": "084816e60fbbeaf621a9a29fe932a7b1a7cb4eb916dc47e4cb65cf6b06b40ce4"
+    }
+  },
+  "quest_call_counts": {
+    "prefill_forward": 33768,
+    "decode_estimate": 2616844,
+    "decode_topk": 2616844,
+    "decode_sparse_attn": 2837700,
+    "dense_or_torch_fallback": 0
+  }
+}

@@ -3,7 +3,7 @@ index b180d59..d89ec83 100644
 --- a/kernels/include/decode/decode_attn.cuh
 +++ b/kernels/include/decode/decode_attn.cuh
 @@ -452,9 +452,9 @@ BatchDecodeWithPagedKVCacheKernel(DTypeIn* __restrict__ q,
- 
+
  	constexpr uint32_t head_dim = bdx * vec_size;
  	const uint32_t batch_idx = blockIdx.x;
 +	const uint32_t qo_head_idx = blockIdx.y * bdy + threadIdx.y;
@@ -36,11 +36,11 @@ index b180d59..d89ec83 100644
  	const uint32_t batch_size = paged_kv.batch_size;
 -	const uint32_t num_qo_heads = num_kv_heads * GROUP_SIZE;
 +	const uint32_t num_qo_heads = paged_kv.num_qo_heads;
- 
+
  	constexpr uint32_t vec_size = std::max(16UL / sizeof(DTypeIn), HEAD_DIM / 32UL);
  	constexpr uint32_t num_stages_smem = 2U;
 @@ -931,7 +933,7 @@ BatchDecodeWithPagedKVCacheDispatched(DTypeIn* q,
- 
+
  	if(tmp == nullptr) {
  		// do not use partition-kv kernel
 -		dim3 nblks(batch_size, num_kv_heads);
@@ -60,7 +60,7 @@ index b180d59..d89ec83 100644
 @@ -1049,8 +1051,12 @@ BatchDecodeWithPagedKVCache(DTypeIn* q,
  		throw std::invalid_argument(err_msg.str());
  	}
- 
+
 +	paged_kv.num_qo_heads = num_qo_heads;
 +
 +	// Quest selects pages independently for every query head. Use one query
@@ -121,7 +121,7 @@ index f4b07ce..e889d6e 100644
  		, head_dim(head_dim)
  		, batch_size(batch_size)
 @@ -324,6 +328,7 @@ struct paged_kv_t {
- 
+
  	__device__ __forceinline__ DType* protective_get_k_ptr_heads(IdType page_iter,
  																 uint32_t head_idx,
 +																 uint32_t index_head_idx,
@@ -149,7 +149,7 @@ index f4b07ce..e889d6e 100644
 -	uint32_t head_idx = ty;
 +	uint32_t qo_head_idx = ty;
 +	uint32_t kv_head_idx = qo_head_idx / group_size;
- 
+
  	uint32_t seq_len =
  		(paged_kv.indptr[batch_idx + 1] - paged_kv.indptr[batch_idx] - 1) * paged_kv.page_size +
 @@ -423,29 +431,31 @@ AppendPagedKVCacheDecodeKernel(paged_kv_t<page_storage, layout, DType, IdType> p
@@ -165,7 +165,7 @@ index f4b07ce..e889d6e 100644
  		local_max.fill(-CUDART_MAX_NORMAL_FP16);
  		local_min.fill(CUDART_MAX_NORMAL_FP16);
  	}
- 
+
 -	// load the append value
 +	// load the append value; grouped query heads share one physical KV head.
  	vec_t<DType, vec_size> local_k;
@@ -192,7 +192,7 @@ index f4b07ce..e889d6e 100644
 -		v_ptr, value + (batch_idx * num_heads + head_idx) * head_dim + tx * vec_size);
 +		candidate_kv.get_v_ptr(candidate_ptr, qo_head_idx, candidate_entry_idx, tx * vec_size));
  }
- 
+
  /*!
 @@ -474,9 +484,12 @@ AppendPagedKVCachePrefillKernel(paged_kv_t<page_storage, layout, DType, IdType>
  								DType* __restrict__ key,
@@ -226,7 +226,7 @@ index f4b07ce..e889d6e 100644
  		} else {
 @@ -523,39 +536,40 @@ AppendPagedKVCachePrefillKernel(paged_kv_t<page_storage, layout, DType, IdType>
  		}
- 
+
  		for(int32_t entry_idx = start_entry_idx; entry_idx < end_entry_idx; ++entry_idx) {
 -			DType* k_ptr = paged_kv.get_k_ptr(page_iter, head_idx, entry_idx, tx * vec_size);
 +			DType* k_ptr = paged_kv.get_k_ptr(page_iter, kv_head_idx, entry_idx, tx * vec_size);
@@ -319,7 +319,7 @@ index 314f6f9..435bfab 100644
  				static_cast<int32_t*>(paged_kv_indices.data_ptr()),
  				static_cast<int32_t*>(paged_kv_indptr.data_ptr()));
 +			paged_kv.num_qo_heads = num_qo_heads;
- 
+
  			cudaError_t status =
  				BatchDecodeWithPagedKVCacheWrapper<PageStorage::kIndices,
 diff --git a/quest/ops/csrc/page.cu b/quest/ops/csrc/page.cu
@@ -345,12 +345,12 @@ index a43b0aa..4be800c 100644
  	}
 +	CHECK_EQ(v.size(1), num_heads);
 +	CHECK_EQ(metadata_num_heads % num_heads, 0);
- 
+
  	bool success = DISPATCH_PYTORCH_DTYPE_TO_CTYPE(k.scalar_type(), c_type, [&] {
  		SWITCH_LAYOUT(kv_layout, KV_LAYOUT, {
 @@ -69,7 +74,7 @@ void append_kv_cache_decode(torch::Tensor k,
  				static_cast<int32_t*>(kv_indptr.data_ptr()));
- 
+
  			paged_kv_t<PageStorage::kIndices, KV_LAYOUT, c_type, int32_t> paged_metadata(
 -				num_heads,
 +				metadata_num_heads,
@@ -380,12 +380,12 @@ index a43b0aa..4be800c 100644
  	}
 +	CHECK_EQ(v.size(1), num_heads);
 +	CHECK_EQ(metadata_num_heads % num_heads, 0);
- 
+
  #ifdef BSK_TORCH_CHECK
  	CHECK_EQ(seq_len, v.size(0));
 @@ -179,7 +189,7 @@ void append_kv_cache_prefill(torch::Tensor k,
  				static_cast<int32_t*>(kv_indptr.data_ptr()));
- 
+
  			paged_kv_t<PageStorage::kIndices, KV_LAYOUT, c_type, int32_t> paged_metadata(
 -				num_heads,
 +				metadata_num_heads,
@@ -394,18 +394,18 @@ index a43b0aa..4be800c 100644
  				batch_size,
 @@ -223,12 +233,12 @@ void apply_rope_in_place(torch::Tensor q,
  	CHECK_DIM(3, k);
- 
+
  	CHECK_EQ(q.size(0), k.size(0));
 -	CHECK_EQ(q.size(1), k.size(1));
  	CHECK_EQ(q.size(2), k.size(2));
  #endif
- 
+
  	size_t seq_len = q.size(0);
 -	size_t num_heads = q.size(1);
 +	size_t num_qo_heads = q.size(1);
 +	size_t num_kv_heads = k.size(1);
  	size_t head_dim = q.size(2);
- 
+
  	bool success = DISPATCH_PYTORCH_DTYPE_TO_CTYPE(q.scalar_type(), c_type, [&] {
 @@ -236,8 +246,8 @@ void apply_rope_in_place(torch::Tensor q,
  														  static_cast<c_type*>(k.data_ptr()),
@@ -418,11 +418,97 @@ index a43b0aa..4be800c 100644
  														  head_dim,
  														  rope_scale,
  														  rope_theta,
+diff --git a/quest/tests/test_topk.py b/quest/tests/test_topk.py
+index 54a6f78..4ba0b35 100644
+--- a/quest/tests/test_topk.py
++++ b/quest/tests/test_topk.py
+@@ -6,6 +6,7 @@ import torch.nn as nn
+ import math
+
+ import quest.utils
++from quest.utils.controller import _topk_workspace_shape
+
+ # This file is used for testing topk kernel from libRAFT
+ # We do not seriously compare the topk indices since the random value leads to similar tensor.
+@@ -48,7 +49,9 @@ def test_topk_correctness(dtype_str, kv_len, k_budget):
+     cuda_input_indices = torch.arange(0, kv_len, dtype=torch.int32, device=device).repeat(num_heads, 1)
+     cuda_output_data = torch.randn(num_heads, k_budget, dtype=dtype, device=device)
+     cuda_output_indices = torch.arange(0, k_budget, dtype=torch.int32, device=device).repeat(num_heads, 1)
+-    topk_buf = torch.zeros((num_heads, 8192 * 2 * (2+4) // 2 // 48), dtype=dtype, device=device)
++    topk_buf = torch.zeros(
++        _topk_workspace_shape(num_heads, kv_len, dtype), dtype=dtype, device=device
++    )
+
+     quest.utils._kernels.topk_filtering(
+         cuda_input_data,
+@@ -61,4 +64,41 @@ def test_topk_correctness(dtype_str, kv_len, k_budget):
+
+     cuda_output_data = cuda_output_data.sum(dim=-1).squeeze()
+
+-    assert_close(cuda_output_data, torch_topk_value)
+\ No newline at end of file
++    assert_close(cuda_output_data, torch_topk_value)
++
++
++@pytest.mark.parametrize(
++    "kv_len, expected_workspace_bytes",
++    [(8192, 49152), (16372, 98304), (32739, 245760), (32740, 245760)],
++)
++@torch.inference_mode()
++def test_topk_workspace_guard(kv_len, expected_workspace_bytes):
++    dtype = torch.float16
++    device = torch.device("cuda:0")
++    num_heads = 32
++    k_budget = 63
++    guard_bytes = 1024 * 1024
++    guard_value = 0x5A
++
++    torch.manual_seed(20261114)
++    values = torch.randn(num_heads, kv_len, dtype=dtype, device=device)
++    indices = torch.arange(kv_len, dtype=torch.int32, device=device).repeat(num_heads, 1)
++    output = torch.empty(num_heads, k_budget, dtype=dtype, device=device)
++    output_indices = torch.empty(num_heads, k_budget, dtype=torch.int32, device=device)
++
++    workspace_shape = _topk_workspace_shape(num_heads, kv_len, dtype)
++    workspace_bytes = math.prod(workspace_shape) * torch.empty((), dtype=dtype).element_size()
++    assert workspace_bytes == expected_workspace_bytes
++    storage = torch.empty(workspace_bytes + guard_bytes, dtype=torch.uint8, device=device)
++    storage[:workspace_bytes].zero_()
++    storage[workspace_bytes:].fill_(guard_value)
++    topk_buf = storage[:workspace_bytes].view(dtype).view(workspace_shape)
++
++    quest.utils._kernels.topk_filtering(
++        values, indices, output, output_indices, topk_buf, k_budget
++    )
++    torch.cuda.synchronize()
++
++    assert int((storage[workspace_bytes:] != guard_value).sum().item()) == 0
++    reference = torch.topk(values, k=k_budget, dim=-1).values
++    assert_close(torch.sort(output, dim=-1).values, torch.sort(reference, dim=-1).values)
 diff --git a/quest/utils/controller.py b/quest/utils/controller.py
-index 135b8d2..0730792 100644
+index 135b8d2..5b2ccae 100644
 --- a/quest/utils/controller.py
 +++ b/quest/utils/controller.py
-@@ -14,12 +14,17 @@ class InferenceController:
+@@ -4,6 +4,18 @@ from quest.utils.utils import TensorLayout
+
+ import torch
+
++
++def _topk_workspace_shape(num_heads, length, dtype):
++    # 与 RAFT calc_buf_len 一致：FP16/BF16 value、Int32 index，按128元素向下对齐。
++    value_size = torch.empty((), dtype=dtype).element_size()
++    index_size = torch.empty((), dtype=torch.int32).element_size()
++    ratio = 2 + 2 * index_size // value_size
++    alignment = 256 // min(value_size, index_size)
++    buf_len = (length // (ratio * 8)) // alignment * alignment
++    elems_per_head = buf_len * 2 * (value_size + index_size) // value_size
++    return (num_heads, elems_per_head)
++
++
+ class InferenceController:
+     def __init__(
+         self,
+@@ -14,12 +26,17 @@ class InferenceController:
          page_budget, # Real page budget including the last page
          max_seq_len, # Real max for allocating kv / metadata
          dtype,
@@ -442,15 +528,26 @@ index 135b8d2..0730792 100644
              head_dim=head_dim,
              max_seq_len=max_seq_len,
              page_size=page_size,
-@@ -40,6 +45,7 @@ class InferenceController:
+@@ -40,6 +57,7 @@ class InferenceController:
          self.dtype = dtype
- 
+
          self.num_heads = num_heads
 +        self.num_kv_heads = num_kv_heads
          self.head_dim = head_dim
          self.page_size = page_size
- 
-@@ -122,7 +128,7 @@ class InferenceController:
+
+@@ -117,12 +135,17 @@ class InferenceController:
+             # Allocate buffer for top-k filtering
+             self.topk_dout_buffer = torch.zeros((self.num_heads, self.inference_page_budget - 1), dtype=self.dtype, device=self.device)
+             self.topk_dindices_buffer = torch.zeros((self.num_heads, self.inference_page_budget - 1), dtype=torch.int32, device=self.device)
+-            self.topk_buf = torch.zeros((self.num_heads, 8192 * 2 * (2+4) // 2 // 48), dtype=self.dtype, device=self.device)
++            topk_input_len = self.metadata_cache.seqlen - 1
++            self.topk_buf = torch.zeros(
++                _topk_workspace_shape(self.num_heads, topk_input_len, self.dtype),
++                dtype=self.dtype,
++                device=self.device,
++            )
+
              self._decode_handler.begin_forward(
                  self.kv_indptr_for_approx_decode,
                  self.num_heads,

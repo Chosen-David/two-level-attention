@@ -1,0 +1,13 @@
+Token indices sequence length is longer than the specified maximum sequence length for this model (523827 > 131072). Running this sequence through the model will result in indexing errors
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:00<00:00, 181.32it/s]
+register qwen3 attn: [model.layers.0.self_attn]
+register iter91 rmsnorm: [model.layers.0.self_attn.q_norm]
+register iter91 rmsnorm: [model.layers.0.self_attn.k_norm]
+register iter91 rmsnorm: [model.layers.0.input_layernorm]
+register iter91 rmsnorm: [model.layers.0.post_attention_layernorm]
+register iter97 MLP SiLU+mul: [model.layers.0.mlp]
+[LONG PERF] nfa-graph L=524288 repeat=0 TPOT=185.488ms
+[LONG PERF] nfa-graph L=524288 repeat=1 TPOT=61.052ms
+[LONG PERF] nfa-graph L=524288 repeat=2 TPOT=58.516ms
+[LONG PERF DONE] /home/wangyuanshuo02/two-level-attention/agent_doc/results/qwen3_official_long_context_20261113/nfa_512k_two_point_performance.json

@@ -16,6 +16,7 @@ from transformers.models.qwen3.modeling_qwen3 import (
     Qwen3Attention,
     Qwen3MLP,
     Qwen3RMSNorm,
+    apply_rotary_pos_emb,
 )
 
 QUEST_ROOT = Path(__file__).resolve().parents[2] / "third-party" / "Quest"
@@ -39,6 +40,44 @@ _assert_official_runtime()
 
 
 LONG_PREFILL_TOKENWISE_CHUNK = 65536
+QUEST_ROPE_MODES = ("native", "hf-position-embeddings")
+
+
+def _validate_quest_rope_mode(config, rope_mode):
+    """固定配置与真实旋转实现的一致性，禁止 native 静默忽略 YaRN。"""
+    if rope_mode not in QUEST_ROPE_MODES:
+        raise ValueError(f"未知 Quest RoPE 模式: {rope_mode!r}")
+    params = (
+        getattr(config, "rope_scaling", None)
+        or getattr(config, "rope_parameters", None)
+        or {}
+    )
+    rope_type = params.get("rope_type", params.get("type", "default"))
+    if rope_mode == "native" and rope_type != "default":
+        raise ValueError(
+            "Quest native RoPE 只接受 default 配置；YaRN 必须使用 "
+            "hf-position-embeddings，禁止配置缩放后仍执行原生旋转"
+        )
+    if rope_mode == "hf-position-embeddings" and rope_type != "yarn":
+        raise ValueError("Quest HF position-embeddings 模式当前仅验收 YaRN 配置")
+
+
+def _apply_hf_position_embeddings(query_states, key_states, position_embeddings):
+    """在 Quest 的 [L,H,D] 布局消费 HF cos/sin；Q/K 各旋转且仅旋转一次。"""
+    if position_embeddings is None or len(position_embeddings) != 2:
+        raise RuntimeError("Quest HF RoPE 模式缺少 position_embeddings=(cos,sin)")
+    cos, sin = position_embeddings
+    if cos.ndim != 3 or sin.ndim != 3 or cos.shape != sin.shape:
+        raise RuntimeError("Qwen3 HF cos/sin 必须为同形 [B,L,D]")
+    if cos.shape[0] != 1 or cos.shape[1] != query_states.shape[0]:
+        raise RuntimeError("Qwen3 HF cos/sin 与 Quest B1/q_len 布局不一致")
+    if cos.shape[-1] != query_states.shape[-1] or key_states.shape[-1] != cos.shape[-1]:
+        raise RuntimeError("Qwen3 HF cos/sin 与 Q/K head_dim 不一致")
+    # HF 对 [B,L,H,D] 使用 unsqueeze_dim=2；去掉唯一的 B 维后等价于
+    # 对 [L,H,D] 使用 unsqueeze_dim=1。cos/sin 已由 HF rotary 转为模型 dtype。
+    return apply_rotary_pos_emb(
+        query_states, key_states, cos[0], sin[0], unsqueeze_dim=1
+    )
 
 
 def _tokenwise_prefill_chunk(original, hidden_states, chunk_tokens):
@@ -114,9 +153,15 @@ def _qwen3_quest_forward(
 
     past_len = controller.kv_cache.seqlen - q_len
     rope_theta = float(self._quest_rope_theta)
-    quest_utils.apply_rope_in_place(
-        query_states, key_states, past_len, rope_scale=1.0, rope_theta=rope_theta
-    )
+    if self._quest_rope_mode == "native":
+        quest_utils.apply_rope_in_place(
+            query_states, key_states, past_len, rope_scale=1.0, rope_theta=rope_theta
+        )
+    else:
+        query_states, key_states = _apply_hf_position_embeddings(
+            query_states, key_states, position_embeddings
+        )
+    # Quest prefill/decode CUDA 内部均为 RotaryMode::kNone；此处是唯一旋转点。
     quest_utils.append_kv(key_states, value_states, controller, self.layer_idx)
 
     stats = self._quest_stats
@@ -179,6 +224,7 @@ def enable_quest(
     chunk_size: int = 16,
     max_seq_len: int = 40960,
     page_size: int = 16,
+    rope_mode: str = "native",
 ) -> int:
     """将全部 Qwen3Attention 绑定到官方 Quest kernel，禁止回退。"""
     if min(token_budget, chunk_size, max_seq_len, page_size) <= 0:
@@ -191,6 +237,7 @@ def enable_quest(
         raise RuntimeError("Quest 官方 _kernels 要求 CUDA 模型")
 
     _assert_official_runtime()
+    _validate_quest_rope_mode(model.config, rope_mode)
     _enable_long_prefill_tokenwise_chunk(model)
     num_layers = int(model.config.num_hidden_layers)
     num_heads = int(model.config.num_attention_heads)
@@ -233,6 +280,7 @@ def enable_quest(
         module.hidden_size = module.num_heads * module.head_dim
         module._quest_controller = controller
         module._quest_rope_theta = float(getattr(model.config, "rope_theta", 10000.0))
+        module._quest_rope_mode = rope_mode
         module._quest_stats = model.quest_runtime_stats
         module.forward = types.MethodType(_qwen3_quest_forward, module)
         n_patched += 1

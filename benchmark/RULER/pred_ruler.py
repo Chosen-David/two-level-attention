@@ -456,29 +456,14 @@ def main():
             torch_dtype=torch.bfloat16, device_map="auto").eval()
         print(f"[device-map] {getattr(model, 'hf_device_map', None)}")
     runtime_rope = verify_runtime_rope(model) if rope_policy_record is not None else None
-    # ---- Quest vendor（B 轨官方源码复用，主表口径）----
-    # 不走 register_patch 的 indexer_type_dict（A 轨 quest_indexer 是语义
-    # 复现），改为绑定官方 Quest forward 到 Qwen3Attention——与 LongBench
-    # pred.py 同口径：upstream/evaluation/quest_attention.py 是官方原样
-    # 快照，qwen3_quest_patch.py 仅接口胶水。RULER 长上下文预算独立设定
-    # （默认 1024，派单时按 Quest 论文口径显式传 --quest_token_budget）。
+    # Quest/JSSA 的 RULER 生产入口已迁至独立官方 runner；旧 vendor 分支
+    # fail-closed，避免误跑 Torch 参考适配或未接入 YaRN 的旧 Quest 路径。
     if args.method == "ffd_vendor":
         n_patched = model.config.num_hidden_layers
     elif args.method == "quest_vendor":
-        vendor_dir = os.path.join(
-            REPO, "exp", "vendor_baselines", "quest_vendor")
-        if vendor_dir not in sys.path:
-            sys.path.insert(0, vendor_dir)
-        if is_glm:
-            from glm4_moe_lite_quest_patch import enable_quest  # noqa: E402
-        elif getattr(config, "model_type", None) == "llama":
-            from llama3_quest_patch import enable_quest  # noqa: E402
-        else:
-            from qwen3_quest_patch import enable_quest  # noqa: E402
-        n_patched = enable_quest(
-            model,
-            token_budget=getattr(args, "quest_token_budget", 1024),
-            chunk_size=getattr(args, "quest_chunk_size", 16),
+        raise RuntimeError(
+            "旧 quest_vendor RULER 路径已停用；请运行 "
+            "benchmark/official_baselines/ruler_official.py --method quest"
         )
     elif args.method == "minference_vendor":
         # MInference（NeurIPS 2024 sparse prefill）B 轨官方源码复用——与
@@ -648,8 +633,8 @@ def main():
         )
     elif args.method == "jssa_vendor":
         raise RuntimeError(
-            "JSSA torch-semantics fallback has been disabled; "
-            "run benchmark/official_baselines/longbench_official.py --method jssa for the official backend"
+            "旧 jssa_vendor RULER 路径已停用；请运行 "
+            "benchmark/official_baselines/ruler_official.py --method jssa"
         )
     elif args.method == "clusterkv_vendor":
         # ClusterKV（KMeans 聚类稀疏）B 轨官方源码复用——官方语义：

@@ -1,0 +1,46 @@
+{
+  "schema": "longbench-official-quality-manifest-v1",
+  "verification": "pending-independent-verification",
+  "method": "quest",
+  "model_path": "/home/wangyuanshuo02/Qwen3-8B",
+  "max_length": 31500,
+  "shard_index": 0,
+  "num_shards": 1,
+  "runtime": {
+    "implementation": "official Quest CUDA _kernels and paged runtime",
+    "patched_layers": 36,
+    "budget": 1024,
+    "page_size": 16,
+    "page_budget": 64,
+    "query_and_metadata_heads": 32,
+    "physical_kv_heads": 8,
+    "rope_mode": "native",
+    "rope_execution": "official quest.apply_rope_in_place",
+    "hf_length_cache_layers": 1,
+    "prefill_tokenwise_chunk": 65536,
+    "quest": {
+      "path": "/home/wangyuanshuo02/two-level-attention/third-party/Quest",
+      "commit": "01c1623bf9395009520874e989e29f683203b357",
+      "uncommitted_diff_sha256": "e2d20d031fe5f4a85f08f9a2cc23db8bea1c5d3f595dadc898f44e962599c252"
+    },
+    "kernel_extension": "/home/wangyuanshuo02/two-level-attention/third-party/Quest/quest/_kernels.cpython-311-x86_64-linux-gnu.so",
+    "kernel_extension_sha256": "de7d6e32052fd63206c7ba20b54d9040c40f8dc6617eb2a392c80e0bcc1b6b1f",
+    "dense_or_torch_fallback": false
+  },
+  "tasks": {
+    "samsum": {
+      "path": "pred/samsum-quest_official_b1024_p16_s0of1.jsonl",
+      "runcap": "pred/samsum-quest_official_b1024_p16_s0of1.jsonl.runcap.json",
+      "rows": 1,
+      "data_sha256": "d435a4c7a05d2006872da8dd0c44c0a48648baa1ce4f62a4084d07aa7883f0cc",
+      "prediction_sha256": "c54303862992e74ccbc4994716ab84272751e206361a76d415e871310af8e024"
+    }
+  },
+  "quest_call_counts": {
+    "prefill_forward": 36,
+    "decode_estimate": 238,
+    "decode_topk": 238,
+    "decode_sparse_attn": 252,
+    "dense_or_torch_fallback": 0
+  }
+}
