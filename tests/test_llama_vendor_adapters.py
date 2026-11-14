@@ -210,3 +210,11 @@ def test_llama_base_prompt_is_raw():
     from benchmark.LongBench.pred import build_chat
     assert build_chat(None, "raw LongBench prompt", "Llama-3.1-8B") == (
         "raw LongBench prompt")
+
+
+def test_llama_base_longbench_cap_is_registered():
+    config_dir = REPO / "benchmark" / "LongBench" / "config"
+    model2maxlen = json.loads((config_dir / "model2maxlen.json").read_text())
+    model2path = json.loads((config_dir / "model2path.json").read_text())
+    assert model2maxlen["Llama-3.1-8B"] == 31500
+    assert model2path["Llama-3.1-8B"].endswith("/Llama-3.1-8B")
