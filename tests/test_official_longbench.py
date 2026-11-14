@@ -1,6 +1,9 @@
 import ast
+import hashlib
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,6 +24,7 @@ from benchmark.official_baselines.longbench_official import (
     perf_summary,
     quality_generation_options,
     quality_manifest_path,
+    quality_source_manifest_path,
     run_quality,
     sha256_file,
     sha256_ids,
@@ -66,6 +70,19 @@ class _QualityTokenizer:
 
     def decode(self, ids, skip_special_tokens=True):
         return "generated"
+
+
+class _LBV2QualityTokenizer(_QualityTokenizer):
+    def __init__(self, outputs):
+        self.outputs = iter(outputs)
+        self.texts = []
+
+    def __call__(self, text, **kwargs):
+        self.texts.append(text)
+        return super().__call__(text, **kwargs)
+
+    def decode(self, ids, skip_special_tokens=True):
+        return next(self.outputs)
 
 
 class OfficialLongBenchIndependenceTest(unittest.TestCase):
@@ -810,6 +827,162 @@ class OfficialLongBenchIndependenceTest(unittest.TestCase):
             )
             with self.assertRaisesRegex(SystemExit, "非 complete"):
                 load_runcap_consumer()(str(prediction), False)
+
+    def _execute_lbv2_quality(
+        self, root, outputs, sample_indices=None, shard_index=0, num_shards=1,
+    ):
+        source = root / "lbv2.json"
+        if not source.exists():
+            rows = [
+                {
+                    "_id": f"official-{index}", "answer": "A",
+                    "context": f"long context {index}", "question": "choose",
+                    "choice_A": "alpha", "choice_B": "beta",
+                    "choice_C": "gamma", "choice_D": "delta",
+                    "length": "long" if index % 2 == 0 else "short",
+                }
+                for index in range(3)
+            ]
+            source.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+        args = SimpleNamespace(
+            output_dir=str(root / "out"), data_root=str(root),
+            model_path=str(root / "model"), model_name="Qwen3-8B",
+            method="jssa", budget=1024, jssa_rank=32, quest_page_size=16,
+            shard_index=shard_index, num_shards=num_shards,
+            tasks=["lbv2"], sample_indices=sample_indices,
+        )
+
+        class Engine:
+            runtime = {"implementation": "test-official-jssa"}
+
+            def __init__(self):
+                self.tokenizer = _LBV2QualityTokenizer(outputs)
+                self.calls = []
+
+            def generate(self, ids, max_new_tokens, **kwargs):
+                self.calls.append((list(ids), max_new_tokens, kwargs))
+                return [7], 0.1
+
+        engine = Engine()
+        prompt = json.loads((ROOT / "benchmark/LongBench/config/dataset2prompt.json")
+                            .read_text(encoding="utf-8"))["lbv2"]
+        run_quality(args, engine, {"lbv2": prompt}, {"lbv2": 128}, 31500)
+        manifest = json.loads(quality_manifest_path(
+            args.output_dir, shard_index, num_shards
+        ).read_text(encoding="utf-8"))
+        return args, engine, manifest
+
+    def test_lbv2_quality_contract_passes_unchanged_official_eval(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            args, engine, manifest = self._execute_lbv2_quality(
+                root, ["The correct answer is (A)", "The correct answer is a"],
+                sample_indices=[0, 1],
+            )
+            entry = manifest["tasks"]["lbv2"]
+            prediction = Path(args.output_dir) / entry["path"]
+            records = [json.loads(line) for line in prediction.read_text(
+                encoding="utf-8").splitlines()]
+            self.assertEqual([row["_id"] for row in records], ["official-0", "official-1"])
+            self.assertEqual([row["answers"] for row in records], [["A"], ["A"]])
+            self.assertEqual([row["all_classes"] for row in records],
+                             [["A", "B", "C", "D"]] * 2)
+            self.assertEqual([row["length"] for row in records], ["long", "short"])
+            self.assertEqual([row["pred_choice"] for row in records], ["A", None])
+            self.assertTrue(any("(A) alpha" in text for text in engine.tokenizer.texts))
+            self.assertTrue(all(call[2] == {
+                "ignore_eos": False, "stop_token_ids": [], "min_new_tokens": 1,
+            } for call in engine.calls))
+
+            sidecar = json.loads(Path(
+                str(prediction) + RUN_CAP_SIDECAR_SUFFIX
+            ).read_text(encoding="utf-8"))
+            self.assertEqual(sidecar["source_file_sha256"], sha256_file(root / "lbv2.json"))
+            self.assertEqual(sidecar["choice_parser"], "official-strict-v1")
+            self.assertNotIn("sample_sharding", sidecar)
+            self.assertEqual(sidecar["sample_selection"]["source_indices"], [0, 1])
+            source_manifest_path = Path(args.output_dir) / entry["source_manifest"]
+            self.assertEqual(source_manifest_path, quality_source_manifest_path(prediction))
+            source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(source_manifest["lbv2"]["ids"], ["official-0", "official-1"])
+            self.assertEqual(entry["source_manifest_sha256"], sha256_file(source_manifest_path))
+
+            completed = subprocess.run([
+                sys.executable, "-m", "benchmark.LongBench.eval",
+                "--output-path", str(prediction.parent), "--expect-count", "2",
+                "--manifest", str(source_manifest_path),
+            ], cwd=ROOT, text=True, capture_output=True)
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            result = json.loads((prediction.parent / "result.json").read_text(encoding="utf-8"))
+            self.assertEqual(result[prediction.name]["score"], 50.0)
+
+    def test_lbv2_complete_skip_rechecks_strict_choice_and_sharding_ids(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            args, engine, manifest = self._execute_lbv2_quality(
+                root, ["The correct answer is (A)"], sample_indices=[0],
+            )
+            prediction = Path(args.output_dir) / manifest["tasks"]["lbv2"]["path"]
+            args, skipped_engine, skipped = self._execute_lbv2_quality(
+                root, [], sample_indices=[0],
+            )
+            self.assertEqual(skipped_engine.calls, [])
+            self.assertEqual(skipped["tasks"]["lbv2"]["rows"], 1)
+
+            args, engine, manifest = self._execute_lbv2_quality(
+                root, ["The correct answer is (A)"] * 2, shard_index=0, num_shards=2,
+            )
+            prediction = Path(args.output_dir) / manifest["tasks"]["lbv2"]["path"]
+            sidecar_path = str(prediction) + RUN_CAP_SIDECAR_SUFFIX
+            sidecar = json.loads(Path(sidecar_path).read_text(encoding="utf-8"))
+            expected_ids_sha = hashlib.sha256(
+                "official-0\nofficial-2".encode("utf-8")).hexdigest()
+            self.assertEqual(
+                sidecar["sample_sharding"]["selected_ids_sha256"], expected_ids_sha)
+            record = json.loads(prediction.read_text(encoding="utf-8").splitlines()[1])
+            record["pred"] = "The correct answer is (B)"
+            lines = prediction.read_text(encoding="utf-8").splitlines()
+            lines[1] = json.dumps(record, ensure_ascii=False)
+            prediction.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            result_sha, result_lines = compute_result_binding(str(prediction))
+            sidecar["result_sha256"] = result_sha
+            sidecar["result_lines"] = result_lines
+            write_run_cap_manifest(sidecar_path, sidecar)
+            with self.assertRaisesRegex(RuntimeError, "strict choice 不一致"):
+                self._execute_lbv2_quality(
+                    root, [], shard_index=0, num_shards=2,
+                )
+
+    def test_lbv2_round_robin_merge_restores_official_ids_and_source_manifest(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            shard_paths = []
+            for rank, outputs in ((0, ["The correct answer is (A)"] * 2),
+                                  (1, ["The correct answer is (A)"])):
+                args, _, quality_manifest = self._execute_lbv2_quality(
+                    root, outputs, shard_index=rank, num_shards=2,
+                )
+                shard_paths.append(
+                    Path(args.output_dir) / quality_manifest["tasks"]["lbv2"]["path"])
+            output = shard_paths[0].with_name(
+                shard_paths[0].name.replace("_s0of2", ""))
+            merged, manifest = merge_round_robin_shards(
+                list(reversed(shard_paths)), output, "lbv2", root,
+                ROOT / "benchmark/LongBench/config",
+            )
+            self.assertEqual(merged, output.resolve())
+            records = [json.loads(line) for line in output.read_text(
+                encoding="utf-8").splitlines()]
+            self.assertEqual([row["_id"] for row in records],
+                             ["official-0", "official-1", "official-2"])
+            self.assertTrue(all(row["pred_choice"] == "A" for row in records))
+            self.assertEqual(manifest["n_samples"], 3)
+            self.assertEqual(manifest["source_file_sha256"], sha256_file(root / "lbv2.json"))
+            source_manifest = json.loads(quality_source_manifest_path(
+                output).read_text(encoding="utf-8"))
+            self.assertEqual(source_manifest["lbv2"]["ids"],
+                             ["official-0", "official-1", "official-2"])
+            load_runcap_consumer()(str(output), False)
 
     def _make_round_robin_shards(self, root, world=4):
         config = root / "config"

@@ -1,4 +1,4 @@
-"""LongBench v1 英文16任务的纯官方 Quest/JSSA 独立入口。
+"""LongBench v1 英文16任务与 v2 的纯官方 Quest/JSSA 独立入口。
 
 Quest 使用本地官方克隆的 CUDA ``_kernels``；JSSA 使用指定提交加官方补丁的
 vLLM/Triton backend。本文件不导入 NFA、``sparse_attn`` 或旧 vendor runner。
@@ -16,6 +16,10 @@ from pathlib import Path
 
 from benchmark.LongBench.context_capability_gate import (
     enforce_context_capability_gate,
+)
+from benchmark.LongBench.lbv2_choice import (
+    LBV2_PARSER_VERSION,
+    extract_choice_official,
 )
 from benchmark.LongBench.run_cap_manifest import (
     build_lbv1_input_identity,
@@ -88,12 +92,67 @@ def load_json(path):
 
 
 def load_rows(data_root, task):
-    path = Path(data_root) / f"{task}.jsonl"
-    if not path.is_file():
-        raise FileNotFoundError(f"本地 LongBench 数据不存在: {path}")
-    raw = path.read_bytes()
-    rows = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line]
+    if task == "lbv2":
+        path = Path(data_root) / "lbv2.json"
+        if not path.is_file():
+            path = Path(data_root) / "data.json"
+        if not path.is_file():
+            raise FileNotFoundError(f"本地 LongBench v2 数据不存在: {path}")
+        raw = path.read_bytes()
+        rows = json.loads(raw)
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValueError(f"LongBench v2 必须是 JSON 对象数组: {path}")
+        sample_ids = [str(row.get("_id", "")) for row in rows]
+        if any(not sample_id for sample_id in sample_ids) or len(set(sample_ids)) != len(rows):
+            raise ValueError(f"LongBench v2 官方 _id 必须非空且唯一: {path}")
+    else:
+        path = Path(data_root) / f"{task}.jsonl"
+        if not path.is_file():
+            raise FileNotFoundError(f"本地 LongBench 数据不存在: {path}")
+        raw = path.read_bytes()
+        rows = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line]
     return rows, hashlib.sha256(raw).hexdigest()
+
+
+def quality_sample_id(task, source_idx, row):
+    return str(row["_id"]) if task == "lbv2" else f"{task}:{source_idx}"
+
+
+def sharding_sample_id(task, source_idx, source_fingerprint, row):
+    if task == "lbv2":
+        return quality_sample_id(task, source_idx, row)
+    return f"{task}:{source_fingerprint}:{source_idx}"
+
+
+def quality_row_metadata(task, row):
+    if task == "lbv2":
+        return {
+            "answers": [row["answer"]],
+            "all_classes": ["A", "B", "C", "D"],
+            "length": row["length"],
+        }
+    return {
+        "answers": row["answers"],
+        "all_classes": row["all_classes"],
+        "length": row["length"],
+    }
+
+
+def quality_source_manifest_path(prediction_path):
+    return Path(str(prediction_path) + ".source_manifest.json")
+
+
+def build_quality_source_manifest(task, selected):
+    if task != "lbv2":
+        return None
+    ids = [quality_sample_id(task, source_idx, row) for source_idx, row in selected]
+    answers_sha = {}
+    for source_idx, row in selected:
+        answers = quality_row_metadata(task, row)["answers"]
+        answers_sha[quality_sample_id(task, source_idx, row)] = hashlib.sha256(
+            json.dumps(answers, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+    return {task: {"ids": ids, "answers_sha": answers_sha}}
 
 
 def qwen3_chat_prompt(prompt):
@@ -622,9 +681,17 @@ def run_quality(
             producer=resolve_producer_identity(producer_file),
             input_identity=input_identity,
         )
+        if task == "lbv2":
+            # runcap 的 sample_sharding.source_sha256 必须继续绑定规范化源身份；
+            # 原始 JSON 字节哈希单独记录，二者不可互相替代。
+            runcap_core["source_file_sha256"] = data_sha
+            runcap_core["choice_parser"] = LBV2_PARSER_VERSION
         if args.sample_indices is None:
             selected_ids = [
-                f"{task}:{source_identity['source_fingerprint']}:{source_idx}"
+                sharding_sample_id(
+                    task, source_idx, source_identity["source_fingerprint"],
+                    rows[source_idx],
+                )
                 for source_idx in range(
                     args.shard_index, len(rows), args.num_shards
                 )
@@ -686,14 +753,24 @@ def run_quality(
                     for line in out_path.read_text(encoding="utf-8").splitlines()
                 ]
                 for record, (source_idx, row, _, identity) in zip(records, prepared):
+                    metadata = quality_row_metadata(task, row)
                     if (
-                        record.get("_id") != f"{task}:{source_idx}"
+                        record.get("_id") != quality_sample_id(task, source_idx, row)
                         or record.get("input") != identity
-                        or record.get("answers") != row["answers"]
+                        or record.get("answers") != metadata["answers"]
                         or record.get("implementation") != implementation
+                        or (task == "lbv2" and (
+                            record.get("all_classes") != metadata["all_classes"]
+                            or record.get("length") != metadata["length"]
+                        ))
                     ):
                         raise RuntimeError(
                             f"既有预测与当前输入身份不一致: {out_path} {source_idx}"
+                        )
+                    if task == "lbv2" and record.get("pred_choice") != extract_choice_official(
+                            record.get("pred")):
+                        raise RuntimeError(
+                            f"既有 LBV2 预测的 strict choice 不一致: {out_path} {source_idx}"
                         )
                 if track_receipts:
                     task_receipts = _restore_quality_receipts(
@@ -721,15 +798,16 @@ def run_quality(
                         pred = engine.tokenizer.decode(
                             generated, skip_special_tokens=True
                         )
-                        handle.write(json.dumps({
+                        record = {
                             "pred": pred,
-                            "answers": row["answers"],
-                            "all_classes": row["all_classes"],
-                            "length": row["length"],
-                            "_id": f"{task}:{source_idx}",
+                            **quality_row_metadata(task, row),
+                            "_id": quality_sample_id(task, source_idx, row),
                             "input": identity,
                             "implementation": implementation,
-                        }, ensure_ascii=False) + "\n")
+                        }
+                        if task == "lbv2":
+                            record["pred_choice"] = extract_choice_official(pred)
+                        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
                         if track_receipts:
                             receipt = engine.request_receipts[-1]
                             receipt.update(
@@ -752,6 +830,10 @@ def run_quality(
                     result_lines=result_lines, input_ids_sha256=input_hashes,
                 ),
             )
+            source_manifest = build_quality_source_manifest(task, selected)
+            source_manifest_path = quality_source_manifest_path(out_path)
+            if source_manifest is not None:
+                atomic_json(source_manifest_path, source_manifest)
         manifest["tasks"][task] = {
             "path": str(out_path.relative_to(Path(args.output_dir))),
             "runcap": str(Path(runcap_sidecar).relative_to(Path(args.output_dir))),
@@ -759,6 +841,12 @@ def run_quality(
             "data_sha256": data_sha,
             "prediction_sha256": sha256_file(out_path),
         }
+        if source_manifest is not None:
+            manifest["tasks"][task].update(
+                source_manifest=str(source_manifest_path.relative_to(Path(args.output_dir))),
+                source_manifest_sha256=sha256_file(source_manifest_path),
+                choice_parser=LBV2_PARSER_VERSION,
+            )
         if track_receipts:
             manifest["tasks"][task].update(
                 receipts=str(receipt_path.relative_to(Path(args.output_dir))),
@@ -841,8 +929,11 @@ def run_perf(args, engine, prompt_cfg, max_length):
 
 def main():
     args = parse_args()
-    if len(set(args.tasks)) != len(args.tasks) or any(t not in ENGLISH16 for t in args.tasks):
-        raise ValueError("tasks 必须是唯一的 LongBench 英文16任务")
+    if (len(set(args.tasks)) != len(args.tasks)
+            or any(t not in {*ENGLISH16, "lbv2"} for t in args.tasks)):
+        raise ValueError("tasks 必须是唯一的 LongBench 英文16任务或 lbv2")
+    if "lbv2" in args.tasks and args.tasks != ["lbv2"]:
+        raise ValueError("lbv2 必须作为唯一任务运行，不能与 LongBench v1 混合")
     if not (0 <= args.shard_index < args.num_shards):
         raise ValueError("要求 0<=shard-index<num-shards")
     if args.budget <= 0 or args.jssa_rank <= 0 or args.repeats <= 0:

@@ -8,6 +8,7 @@ import os
 import re
 from pathlib import Path
 
+from benchmark.LongBench.lbv2_choice import extract_choice_official
 from benchmark.LongBench.run_cap_manifest import (
     RUN_CAP_SIDECAR_SUFFIX,
     build_lbv1_input_identity,
@@ -20,6 +21,15 @@ from benchmark.LongBench.run_cap_manifest import (
     runcap_gate_lock,
     write_run_cap_manifest,
 )
+from benchmark.official_baselines.longbench_official import (
+    atomic_json,
+    build_quality_source_manifest,
+    load_rows,
+    quality_row_metadata,
+    quality_sample_id,
+    quality_source_manifest_path,
+    sharding_sample_id,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 SHARD_SUFFIX = re.compile(r"_s(?P<rank>\d+)of(?P<world>\d+)\.jsonl$")
@@ -30,7 +40,7 @@ def _load_rows(path):
     return [json.loads(line) for line in raw.decode("utf-8").splitlines() if line]
 
 
-def _validate_shard(path, dataset):
+def _validate_shard(path, dataset, source_rows):
     path = Path(path).resolve()
     manifest = read_run_cap_manifest(str(path) + RUN_CAP_SIDECAR_SUFFIX)
     result_sha, result_lines = compute_result_binding(str(path))
@@ -52,7 +62,12 @@ def _validate_shard(path, dataset):
     source_samples = sharding["source_samples"]
     source_fingerprint = manifest["input_identity"]["source_fingerprint"]
     source_indices = list(range(rank, source_samples, world))
-    selected_ids = [f"{dataset}:{source_fingerprint}:{index}" for index in source_indices]
+    selected_ids = [
+        sharding_sample_id(
+            dataset, index, source_fingerprint, source_rows[index]
+        )
+        for index in source_indices
+    ]
     selected_sha = hashlib.sha256("\n".join(selected_ids).encode("utf-8")).hexdigest()
     if sharding["selected_ids_sha256"] != selected_sha:
         raise RuntimeError(f"分片 selected_ids_sha256 与预期源人口不一致: {path}")
@@ -63,11 +78,17 @@ def _validate_shard(path, dataset):
     if not (len(records) == len(tokens) == len(truncated) == len(input_hashes)):
         raise RuntimeError(f"分片记录与逐样本 provenance 数量不一致: {path}")
     for position, (record, source_index) in enumerate(zip(records, source_indices)):
-        if record.get("_id") != f"{dataset}:{source_index}":
+        expected_id = quality_sample_id(
+            dataset, source_index, source_rows[source_index]
+        )
+        if record.get("_id") != expected_id:
             raise RuntimeError(
                 f"分片记录顺序/身份错误: {path}: position={position}, "
-                f"_id={record.get('_id')!r}, expected={dataset}:{source_index}"
+                f"_id={record.get('_id')!r}, expected={expected_id}"
             )
+        if dataset == "lbv2" and record.get("pred_choice") != extract_choice_official(
+                record.get("pred")):
+            raise RuntimeError(f"分片 LBV2 strict choice 不一致: {path}: {expected_id}")
         expected_input = {
             "input_tokens": tokens[position],
             "input_ids_sha256": record.get("input", {}).get("input_ids_sha256"),
@@ -96,7 +117,8 @@ def _validate_shard(path, dataset):
 
 
 def merge_round_robin_shards(shard_paths, output_path, dataset, data_root, config_path):
-    shards = [_validate_shard(path, dataset) for path in shard_paths]
+    rows, data_sha = load_rows(data_root, dataset)
+    shards = [_validate_shard(path, dataset, rows) for path in shard_paths]
     if not shards:
         raise RuntimeError("至少需要一个分片")
     worlds = {shard["manifest"]["sample_sharding"]["world_size"] for shard in shards}
@@ -120,6 +142,8 @@ def merge_round_robin_shards(shard_paths, output_path, dataset, data_root, confi
         "dataset_fingerprint", "effective_cap", "protocol_cap", "cap_treatment",
         "max_new_tokens", "input_identity", "producer",
     )
+    if dataset == "lbv2":
+        shared_fields += ("source_file_sha256", "choice_parser")
     for shard in shards[1:]:
         manifest = shard["manifest"]
         for field in shared_fields:
@@ -138,7 +162,6 @@ def merge_round_robin_shards(shard_paths, output_path, dataset, data_root, confi
             elif manifest[field] != first[field]:
                 raise RuntimeError(f"分片 {field} 不一致: {shard['path']}")
 
-    rows = _load_rows(Path(data_root) / f"{dataset}.jsonl")
     prompt_config = json.loads((Path(config_path) / "dataset2prompt.json").read_text(encoding="utf-8"))
     source_identity = build_lbv1_input_identity(rows, prompt_config[dataset])
     if identity["sample_count"] != len(rows) or any(
@@ -149,13 +172,16 @@ def merge_round_robin_shards(shard_paths, output_path, dataset, data_root, confi
         raise RuntimeError("runcap 完整源身份与本地原始数据/模板不一致")
     if first["sample_sharding"]["source_samples"] != len(rows):
         raise RuntimeError("sample_sharding.source_samples 与原始数据行数不一致")
+    if dataset == "lbv2" and first.get("source_file_sha256") != data_sha:
+        raise RuntimeError("LBV2 runcap 原始 JSON 文件 SHA256 与本地数据不一致")
 
     ordered = {}
     for shard in shards:
         for position, (record, source_index) in enumerate(zip(shard["records"], shard["source_indices"])):
             source_row = rows[source_index]
+            metadata = quality_row_metadata(dataset, source_row)
             for field in ("answers", "all_classes", "length"):
-                if record.get(field) != source_row.get(field):
+                if record.get(field) != metadata[field]:
                     raise RuntimeError(f"记录与原始源行不一致: {record.get('_id')}: {field}")
             if source_index in ordered:
                 raise RuntimeError(f"重复源索引: {source_index}")
@@ -186,6 +212,9 @@ def merge_round_robin_shards(shard_paths, output_path, dataset, data_root, confi
         max_new_tokens=first["max_new_tokens"], producer=first["producer"],
         input_identity=source_identity,
     )
+    if dataset == "lbv2":
+        core["source_file_sha256"] = data_sha
+        core["choice_parser"] = first["choice_parser"]
     core["canonical_merge"] = {
         "algorithm": "sort_by_source_index_after_round_robin_validation",
         "world_size": world,
@@ -230,6 +259,9 @@ def merge_round_robin_shards(shard_paths, output_path, dataset, data_root, confi
             raise RuntimeError("canonical cap_identity payload 重建不一致")
         os.replace(temporary, output_path)
         write_run_cap_manifest(str(output_path) + RUN_CAP_SIDECAR_SUFFIX, manifest)
+        source_manifest = build_quality_source_manifest(dataset, list(enumerate(rows)))
+        if source_manifest is not None:
+            atomic_json(quality_source_manifest_path(output_path), source_manifest)
     return output_path, manifest
 
 
